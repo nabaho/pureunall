@@ -165,6 +165,8 @@ function kboxWithDayFee(dayFee, days) {
     consTypeDayFee() { return dayFee; },
     /* 단위·부가세 — 현장클리닉은 일·부가세 별도(기술보호의 회·부가세 없음은 gisul-round-count.test.js 가 본다) */
     consTypeDayOpt() { return { fee: dayFee, unit: '일', noVat: false }; },
+    /* 📈 성과추적관리 알약(2026-10-19)은 현장클리닉일 때만 뜬다 — 위 유형(cons-clinic)은 현장클리닉이다 */
+    clinicIsType(code) { return code === 'cons-clinic'; },
     h(tag, props) { return { tag, props: props || {}, kids: Array.prototype.slice.call(arguments, 2) }; }
   };
   vm.createContext(ctx);

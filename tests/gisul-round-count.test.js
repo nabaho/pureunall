@@ -52,7 +52,7 @@ function 세상(types, extra) {
     const a = ERP_RAW.indexOf(k); assert.ok(a >= 0, k + ' 를 못 찾았습니다');
     vm.runInContext(ERP_RAW.slice(a, ERP_RAW.indexOf('\n', a)), ctx);
   });
-  vm.runInContext(['consNameKey', 'consTypeRole', 'consRoleOf', 'consTypeDayFee', 'consTypeDayOpt', 'consDayAmount', 'clinicIsType', 'techIsType',
+  vm.runInContext(['consNameKey', 'consTypeRole', 'consRoleOf', 'consTypeDayFee', 'consTypeDayOpt', 'consDayAmount', 'clinicIsType', 'techIsType', 'clinicIsPerf',
     'clinicFeeDays', 'clinicDaysOf', 'clinicFyRange', 'clinicDayCards', 'clinicGovHint'].map(fn).join('\n'), ctx);
   return ctx;
 }

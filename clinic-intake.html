@@ -85,7 +85,7 @@ function smesClip(intakeUrl) {
   var LABELS = { '지원기업명': 'name', '대표자성명': 'ceo', '사업자등록번호': 'bizNo', '본사주소': 'addr',
     '컨설팅주소': 'addr2', '본사전화': 'phone', 'e-mail주소': 'email', '이메일주소': 'email', '업태(업종)': 'bizType',
     '주생산품': 'item', '매출액': 'sales', '상시근로자수': 'workers', '설립년월일': 'openDate',
-    '컨설팅지역': 'region', '대표자휴대폰번호': 'mobile' };
+    '컨설팅지역': 'region', '대표자휴대폰번호': 'mobile', '신청경로': 'route' };
   var STAGES = ['현장클리닉추천', '현장클리닉승인', '자문위원선정', '수행계획서승인', '현장지도결과서승인', '자문료지급대기', '자문료지급'];
   var norm = function (s) { return String(s || '').replace(/\s+/g, '').replace(/[:：]/g, ''); };
   var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/[ \t]+/g, ' ').trim(); };
@@ -124,7 +124,7 @@ function smesClip(intakeUrl) {
   var timer = setInterval(function () {
     n++;
     if (got || n > 40) { clearInterval(timer); return; }
-    try { w.postMessage({ type: 'pu-smes-clinic', v: 1, data: out }, to); } catch (e) { }
+    try { w.postMessage({ type: 'pu-smes-clinic', v: 2, data: out }, to); } catch (e) { }
   }, 400);
 }
 
@@ -147,9 +147,16 @@ function clinicNorm(raw) {
     name: s(raw.name), bizNo: bizNo, bizOk: dg.length === 10, ceo: s(raw.ceo), address: addr, zipcode: zip,
     phone: s(raw.phone).replace(/^-+$/, ''), email: s(raw.email).replace(/^-+$/, ''),
     bizType: s(raw.bizType), item: s(raw.item), sales: s(raw.sales), workers: workers,
-    openDate: s(raw.openDate), region: s(raw.region), stage: s(raw.stage), mobile: s(raw.mobile)
+    openDate: s(raw.openDate), region: s(raw.region), stage: s(raw.stage), mobile: s(raw.mobile), route: s(raw.route)
   };
 }
+
+/* ── 📈 신청경로 「성과추적관리」 (대표 지시 2026-10-19 — 연간 수행일수·건수 셈에서 뺀다) ──
+   ⚠ 칸 글자가 «정확히» 같을 때만(띄어쓰기만 무시) — 「성과추적」이 들어 있다고 켜지 않는다.
+   ⚠ 실제로 표시를 켜는 곳은 계약관리(ctReqHumanFill)다. 여기서는 «그렇게 등록된다»고 보여 주기만 한다 —
+     글자는 pu-erp.html 의 CLINIC_PERF_ROUTE 와 같아야 한다(tests/clinic-perf-track.test.js 가 견준다). */
+var PERF_ROUTE = '성과추적관리';
+function clinicPerfRoute(route) { return String(route || '').replace(/\s+/g, '') === PERF_ROUTE; }
 
 /* ── 현장클리닉 유형 — 역할(role:'clinic')이 붙은 «한 개»만. 둘이면 안 고른다(사람이 고른다) ── */
 function clinicTypeOf(types) {
@@ -183,7 +190,7 @@ function clinicRequest(o) {
   }
   var rec = { id: id, state: 'pending', at: now, by: String(o.by || ''), managerMain: String(o.managerMain),
     consultingType: String(o.consultingType), company: company, source: 'smes',
-    smes: { stage: c.stage || '', region: c.region || '', workers: c.workers || 0, sales: c.sales || '', openDate: c.openDate || '', zipcode: c.zipcode || '' } };
+    smes: { stage: c.stage || '', region: c.region || '', workers: c.workers || 0, sales: c.sales || '', openDate: c.openDate || '', zipcode: c.zipcode || '', route: c.route || '' } };
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(o.startDate || ''))) rec.startDate = o.startDate;
   var nd = parseInt(o.consultDays, 10) || 0;
   if (nd > 0) rec.consultDays = nd;
@@ -200,7 +207,7 @@ function clinicRequest(o) {
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var vals = function (raw) { var v = raw && raw.v !== undefined ? raw.v : raw; return Array.isArray(v) ? v.filter(Boolean) : Object.keys(v || {}).map(function (k) { return v[k]; }).filter(Boolean); };
-  var S = { user: null, me: null, staff: [], type: null, data: null, co: null, dupReq: null, sent: false };
+  var S = { user: null, me: null, staff: [], type: null, data: null, ver: 0, co: null, dupReq: null, sent: false };
   var INTAKE_URL = location.origin + location.pathname;
 
   /* 중진공에서 온 값 받기 — 다른 곳에서 온 것은 버린다 */
@@ -211,6 +218,7 @@ function clinicRequest(o) {
     try { ev.source.postMessage({ type: 'pu-clinic-got' }, ev.origin); } catch (e) { }
     if (S.data) return;
     S.data = clinicNorm(d.data);
+    S.ver = Number(d.v) || 1;   /* 1 = 「신청경로」를 안 읽던 옛 즐겨찾기 단추 */
     lookups().then(draw);
     draw();
   });
@@ -295,7 +303,10 @@ function clinicRequest(o) {
       + (d.mobile ? esc(d.mobile) + ' — 체크하면 담당자 칸에 함께 보냅니다' : '화면에 없음') + '</div>'
       + '</div></div>'
       + '<div class="card"><div class="sect">📋 사업 <span class="tag t-b">' + esc(S.type ? S.type.name : '현장클리닉 유형 없음') + '</span>'
-      + (d.stage ? '<span class="tag t-b">단계 ' + esc(d.stage) + '</span>' : '') + (d.region ? '<span class="tag t-b">' + esc(d.region) + '</span>' : '') + '</div><div class="kv">'
+      + (d.stage ? '<span class="tag t-b">단계 ' + esc(d.stage) + '</span>' : '') + (d.region ? '<span class="tag t-b">' + esc(d.region) + '</span>' : '')
+      + (d.route ? '<span class="tag t-b">신청경로 ' + esc(d.route) + (clinicPerfRoute(d.route) ? ' · 연간 셈 제외' : '') + '</span>' : '') + '</div>'
+      + (S.ver < 2 ? '<div class="msg warn" style="margin:0 0 8px">⚠ 즐겨찾기 단추가 옛 판이라 「신청경로」를 못 읽었습니다 — 성과추적관리 건이면 계약관리에서 📈 표시를 체크해 주세요.<br>새 단추: <a class="bm" id="bmLink" href="#" onclick="return false" style="padding:3px 10px;font-size:12px">📤 푸른이알피로 보내기</a> 를 즐겨찾기 줄로 끌어다 놓아 옛 것과 바꿔 주세요.</div>' : '')
+      + '<div class="kv">'
       + '<label for="f-mgr">담당 노무사</label><select id="f-mgr"><option value="">— 고르세요 —</option>' + opts + '</select>'
       + '<label for="f-date">선정일</label><input id="f-date" type="date" value="' + today + '">'
       + '<label for="f-days">예정 일수</label><input id="f-days" type="number" min="0" max="60" placeholder="비우면 금액은 계약관리에서">'
@@ -303,6 +314,7 @@ function clinicRequest(o) {
       + '<div id="sendMsg"></div>'
       + '<div class="btns"><button class="btn" onclick="window.close()">취소</button><button class="btn pri" id="sendBtn">요청함으로 보내기</button></div>';
     $('sendBtn').onclick = send;
+    bindBm();
   }
 
   function bindBm() {
@@ -319,7 +331,7 @@ function clinicRequest(o) {
       startDate: val('f-date'), consultDays: val('f-days'), sendMobile: !!($('f-mob') && $('f-mob').checked),
       company: { name: val('f-name'), bizNo: val('f-bizNo'), ceo: val('f-ceo'), address: val('f-address'), phone: val('f-phone'),
         email: val('f-email'), bizType: val('f-bizType'), item: val('f-item'), mobile: S.data.mobile,
-        stage: S.data.stage, region: S.data.region, workers: S.data.workers, sales: S.data.sales, openDate: S.data.openDate, zipcode: S.data.zipcode }
+        stage: S.data.stage, region: S.data.region, workers: S.data.workers, sales: S.data.sales, openDate: S.data.openDate, zipcode: S.data.zipcode, route: S.data.route }
     });
     var box = $('sendMsg');
     if (r.why) { box.innerHTML = '<div class="msg err">' + esc(r.why) + '</div>'; return; }

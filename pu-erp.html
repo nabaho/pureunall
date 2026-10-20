@@ -15944,7 +15944,10 @@ function contractSubtypeLabel(c, kindV){
     if(found){
       var nm = String(found.name || found.short || '').trim();
       var ag = String(found.agency || '').trim();
-      return { code:code, name:nm, agency:ag, label: nm + (ag ? ' (' + ag + ')' : '') };
+      /* 📈 성과추적관리 현장클리닉은 이름표에 붙여 «원래 현장클리닉»과 갈린다(대표 지시 2026-10-20) — 중복 창·훑기에 그대로 보인다.
+         ⚠ name 은 그대로 둔다(이름으로 거르는 곳이 있다) — label 에만 붙인다. 표시가 없으면 clinicIsPerf 를 부르지도 않는다. */
+      var pf = (kindV === 'consulting' && c.perfTrack && clinicIsPerf(c, code)) ? ' · 📈 성과추적' : '';
+      return { code:code, name:nm, agency:ag, label: nm + (ag ? ' (' + ag + ')' : '') + pf };
     }
   }
   // 마지막 수단 — 이름이 그대로 박혀 있는 옛 레코드(이관된 사건·컨설팅 등)를 위해 남겨 둔다
@@ -15977,6 +15980,15 @@ function contractDupVStyle(verdict){
   };
   return T[verdict] || T.diff;
 }
+/* 📈 성과추적관리와 원래 현장클리닉은 «별도 건»이다 — 같은 회사·같은 현장클리닉이어도 중복이 아니다
+   (대표 지시 2026-10-20 「성과추적관련 체크할 수 있게 해달라 그래야 별도 관리되고 중복안된다 … 중복아님도 확인되게」).
+   ★ 한쪽만 성과추적 표시일 때만 가른다 — 둘 다 성과추적(또는 둘 다 아님)이면 그것끼리는 여전히 중복일 수 있다.
+   ⚠ 두 쪽 다 표시가 없으면 유형을 찾아보지도 않는다(빠른 길). */
+function contractPerfSplit(a, b){
+  if(!(a && a.perfTrack) === !(b && b.perfTrack)) return false;
+  var ca = contractSubtypeCode(a, 'consulting'), cb = contractSubtypeCode(b, 'consulting');
+  return !!ca && ca === cb && clinicIsType(ca, dbGet('biz_cons_types', BIZ_CONS_SEED) || []);   // ⚠ 사전을 넘긴다 — 안 넘기면 씨앗 코드만 안다
+}
 function contractDupVerdict(existing, form){
   if(!existing || !form) return null;
   var newKinds = form.kinds || (form.kind ? [form.kind] : []);
@@ -15984,18 +15996,19 @@ function contractDupVerdict(existing, form){
   var shared = cKinds.filter(function(k){ return newKinds.indexOf(k) >= 0; });
   if(!shared.length) return null;                       // 종류가 안 겹치면 비교 대상이 아니다
   var closed = existing.status === 'closed' || existing.status === 'cancelled' || !!existing.closedDate;
-  var same = [], diff = [], unknown = [];
+  var same = [], diff = [], unknown = [], perf = [];
   shared.forEach(function(k){
     var a = contractSubtypeCode(existing, k);
     var b = contractSubtypeCode(form, k);
     if(!a || !b)      unknown.push(k);
+    else if(a === b && k === 'consulting' && contractPerfSplit(existing, form)){ diff.push(k); perf.push(k); }   // 📈 별도 건
     else if(a === b)  same.push(k);
     else              diff.push(k);
   });
   var verdict = same.length ? (closed ? 'again' : 'dup')
               : unknown.length ? 'dup'
               : 'diff';
-  return { verdict:verdict, shared:shared, same:same, diff:diff, unknown:unknown,
+  return { verdict:verdict, shared:shared, same:same, diff:diff, unknown:unknown, perf:perf,
            missingSubtype: unknown.length > 0, closed:closed };
 }
 // ============ 지난 자료 중복 훑기 ============
@@ -16037,6 +16050,8 @@ function dupSweepFacets(kindKey, rec){
     return ks.map(function(k){
       var code = contractSubtypeCode(rec, k);
       var lb = contractSubtypeLabel(rec, k);
+      /* 📈 성과추적관리 현장클리닉은 «다른 묶음» — 원래 현장클리닉과 한 묶음에 넣으면 중복으로 잡힌다(대표 지시 2026-10-20) */
+      if(code && k === 'consulting' && rec.perfTrack && clinicIsPerf(rec, code)) code += '|perf';
       return { kindV:k, code:code, label:(lb && lb.label) || '' };
     });
   }
@@ -16486,6 +16501,23 @@ var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','p
 /* 「미수행 종료」 — 컨설팅을 하지 않고 끝난 건(대표 지시 2026-10-04). 이 사유면 수행 건수·일수에서 뺀다.
    ⚠ 다른 사유(계약 해지·중도 해지 등)는 «했는지 안 했는지»를 말하지 않으므로 그대로 센다. */
 var CLINIC_SKIP_REASON = '미수행 종료';
+/* 📈 「성과추적관리」 — 중진공 현장클리닉 가운데 «성과추적관리»로 신청된 건 (대표 지시 2026-10-19
+   「성과추적관리 사업의 경우 년간 수행일수에 포함되지 않는다 … 체크표시 할 수 있게 하고 카운팅에 들어가지 않게」).
+   계약·컨설팅 기록의 perfTrack:true 로 표시한다 — 사람이 체크하거나, 중진공 「신청경로」 칸 글자가 정확히 이 글자일 때.
+   ★ 셈에서만 뺀다 — 기록·일수·금액은 그대로 두고, 목록에는 «성과추적 · 셈 제외» 꼬리표로 남긴다(숨기지 않는다).
+   ★ 현장클리닉 사업의 표시다 — 유형이 현장클리닉이 아니면 켜져 있어도 셈에 손대지 않는다(기술보호와 합치지 않는다). */
+var CLINIC_PERF_ROUTE = '성과추적관리';
+/* ⚠ types 를 안 주면 «살아 있는 유형 사전»으로 본다 — clinicIsType(code) 만 부르면 씨앗 코드(cons-clinic)만 알아보고
+     실제 코드(consulting-mp0w…)는 모른다. 카드·이름표·중복 판정은 types 없이 부른다. */
+function clinicIsPerf(rec, code, types){ return !!(rec && rec.perfTrack) && clinicIsType(code, types || dbGet('biz_cons_types', BIZ_CONS_SEED) || []); }
+/* 「현장클리닉」 글자 «옆»에 붙는 작은 꼬리표 (대표 지시 2026-10-20 「현장클리닉 성과추적 표시도 해라 중복아님도 확인되게」).
+   계약 보드 카드·컨설팅관리 유형 칸이 쓴다. 표시가 없거나 현장클리닉이 아니면 null(아무것도 안 그린다). */
+var CLINIC_PERF_TIP = '📈 성과추적관리 — 연간 수행일수·건수 셈에서 뺍니다\n원래 현장클리닉과 따로 관리하는 별도 건입니다(중복 아님)';
+function clinicPerfTag(rec, code){
+  if(!clinicIsPerf(rec, code)) return null;
+  return h('span', { title:CLINIC_PERF_TIP, style:{ marginLeft:'4px', fontSize:'10px', fontWeight:700, color:'#1e40af', background:'#eff6ff',
+    border:'1px solid #bfdbfe', borderRadius:'8px', padding:'0 6px', whiteSpace:'nowrap', flexShrink:0 } }, '📈 성과추적');
+}
 function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnits){
   var out = { total:{ days:0, cnt:0, est:0, planDays:0, planCnt:0 }, by:{} };
   if(!fy) return out;
@@ -16493,10 +16525,10 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
   var isType = isTypeFn || clinicIsType;
   function inFy(d){ d = String(d || '').slice(0, 10); return !!d && d >= fy.start && d <= fy.end; }
   /* done = 끝난 건(컨설팅관리 표에는 안 나오고 「📦 종료 보기」에 나온다) · odd = 일수와 금액이 안 맞는 건 · zero = 일수를 못 셈
-     skip = 「미수행 종료」로 빼낸 건 · check = 사람이 한 번 봐야 할 건(아래) */
+     skip = 「미수행 종료」로 빼낸 건 · perf = 📈 성과추적관리로 빼낸 건(수행·예정 모두) · check = 사람이 한 번 봐야 할 건(아래) */
   /* rows = 그 사람의 건 목록(계약관리 «담당자별 한 해 목록»용) — 번호·업체·구분·시작일·일수만. 금액은 넣지 않는다(대표 2026-10-05). */
-  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0, done:0, skip:0, odd:[], zero:[], rows:[] }); }
-  out.total.done = 0; out.total.skip = 0; out.total.odd = []; out.total.zero = [];
+  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0, done:0, skip:0, perf:0, odd:[], zero:[], rows:[] }); }
+  out.total.done = 0; out.total.skip = 0; out.total.perf = 0; out.total.odd = []; out.total.zero = [];
   out.check = [];
   (items || []).forEach(function(c){
     if(!c || c._deleted || !c.managerMain) return;
@@ -16507,6 +16539,12 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
       return;
     }
     var r = clinicDaysOf(c, dayFeeOf ? dayFeeOf(c.typeCode) : 0, maxUnits), s = slot(c.managerMain);
+    /* 📈 성과추적관리 — 건수·일수·「⚠ 확인 필요」에서 모두 뺀다. 목록에는 일수와 함께 «셈 제외»로 남긴다. */
+    if(clinicIsPerf(c, c.typeCode, types)){
+      s.perf++; out.total.perf++;
+      s.rows.push({ id:c.id, no:c.no || c.id, co:c.companyName || '', start:String(c.startDate || '').slice(0, 10), st:'perf', days:r.days, est:r.est });
+      return;
+    }
     s.rows.push({ id:c.id, no:c.no || c.id, co:c.companyName || '', start:String(c.startDate || '').slice(0, 10),
       st: c.status === 'closed' ? 'end' : 'do', days:r.days, est:r.est, feeDays:r.feeDays });
     /* ⚠ 확인 필요 — 끝났는데 ① 종료 사유가 없거나 ② 일수를 아무도 안 적어 금액으로만 짐작한 건.
@@ -16530,6 +16568,12 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
     if(!isType((k.typeCodes || {}).consulting, types)) return;
     if(!inFy(k.startDate || k.signDate)) return;
     var d = parseInt(k.consultDays, 10) || 0, s = slot(k.managerMain);
+    if(clinicIsPerf(k, (k.typeCodes || {}).consulting, types)){
+      s.perf++; out.total.perf++;
+      s.rows.push({ id:k.id, no:k.contractNo || k.id, co:k.companyName || (k.company && k.company.name) || '',
+        start:String(k.startDate || k.signDate || '').slice(0, 10), st:'perf', days:d });
+      return;
+    }
     s.planCnt++; s.planDays += d;
     s.rows.push({ id:k.id, no:k.contractNo || k.id, co:k.companyName || (k.company && k.company.name) || '',
       start:String(k.startDate || k.signDate || '').slice(0, 10), st:'plan', days:d });
@@ -20345,6 +20389,7 @@ function erpBlankContractForm(){
        dayCalc 는 «어떻게 나온 숫자인지»를 남긴다 — 나중에 「이 1,155,000 어디서 왔나」에 답한다. */
     consultDays:0,
     dayCalc:null,                       // {dayFee, days, net, vat, total}
+    perfTrack:false,                    // 📈 현장클리닉 성과추적관리 — 연간 수행일수·건수 셈에서 뺀다(2026-10-19)
     payerName:'',                       // 입금자(예금주) — 업체명과 다르게 입금될 때만 사용
     vatType:'separate',                 // 'separate'(별도) | 'inclusive'(포함)
     journals:[],                        // 활동 일지 [{id, date, by, content}]
@@ -20394,11 +20439,17 @@ function erpContractDupBlock(form, contracts){
   var co = (form && form.company) || {};
   if(!String(co.name || '').trim() && !String(co.bizNo || '').replace(/\D/g,'') && !erpCoAddrKey(co.address)) return [];
   var kinds = (form && form.kinds) || [];
+  /* 📈 성과추적관리 ↔ 원래 현장클리닉은 겹쳐도 «별도 건»(contractPerfSplit, 대표 지시 2026-10-20).
+     화면에 골라져 있는 유형(드롭다운 첫 항목)까지 채워 본다 — 저장도 그 값으로 된다. */
+  var fEff = null;
+  function eff(){ return fEff || (fEff = contractFormSubtypeFill(form)); }
   return (contracts || []).filter(function(c){
     if(!c || c._deleted) return false;
     if(c.status === 'closed' || c.status === 'cancelled') return false;
     if(!erpSameCompany(form, c)) return false;
-    return (c.kinds || []).some(function(k){ return kinds.indexOf(k) >= 0; });
+    return (c.kinds || []).some(function(k){
+      return kinds.indexOf(k) >= 0 && !(k === 'consulting' && (form.perfTrack || c.perfTrack) && contractPerfSplit(eff(), c));
+    });
   });
 }
 
@@ -22888,7 +22939,11 @@ function ContractModal(props){
         var dupByUnknown = worst === 'dup'
           && !dupRows.some(function(r){ return r.v && r.v.verdict === 'dup' && r.v.same.length; })
           && dupRows.some(function(r){ return r.v && r.v.verdict === 'dup' && r.v.unknown.some(function(k){ return k !== 'consult'; }); });
-        var title = worst === 'dup'
+        /* 📈 겹친 것이 «성과추적 ↔ 원래 현장클리닉» 뿐이면 그 까닭을 그대로 적는다(대표 지시 2026-10-20 「중복아님도 확인되게」) —
+           「세부 종류가 다르다」는 틀린 말이다(둘 다 현장클리닉이다). */
+        var perfOnly = worst === 'diff' && dupRows.some(function(r){ return r.v && r.v.perf && r.v.perf.length; });
+        var title = perfOnly ? '같은 사업장의 현장클리닉 — 📈 성과추적은 별도 건(중복 아님)'
+          : worst === 'dup'
           ? (dupByUnknown
               ? '같은 사업장 계약 ' + dupContracts.length + '건 — 세부 종류가 비어 있어 확인 필요'
               : '같은 사업장에 같은 ' + (worstSameName || worstKindName) + ' 계약 — 중복 확인 필요')
@@ -22897,7 +22952,8 @@ function ContractModal(props){
           : rawWorst
           ? '같은 사업장, 다른 세부 종류 계약 — 신규 진행 정상'
           : '같은 사업장, 다른 종류 계약 — 신규 진행 정상';
-        var conclusion = worst === 'dup'
+        var conclusion = perfOnly ? '→ 성과추적관리는 원래 현장클리닉과 따로 관리하는 건입니다. 중복이 아닙니다 — 연간 수행일수에서도 빠집니다.'
+          : worst === 'dup'
           ? (dupByUnknown
               ? '→ 세부 종류가 비어 있어 중복인지 알 수 없습니다. 기존 계약을 열어 확인하세요.'
               : '→ 같은 ' + worstKindName + '이 진행 중입니다. 새로 만들지 말고 기존 계약을 확인하세요.')
@@ -22966,6 +23022,7 @@ function ContractModal(props){
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
                 h('span', { title: vk === 'dup'   ? '같은 세부 종류가 진행 중입니다 — 중복일 수 있습니다'
                                  : vk === 'again' ? '같은 세부 종류가 종료됐습니다 — 재계약으로 보입니다'
+                                 : (v && v.perf && v.perf.length) ? '📈 성과추적 — 별도 건(중복 아님)'
                                  :                  '세부 종류가 달라 중복이 아닙니다' }, dot),
                 h('span', { style:{ fontFamily:'monospace', fontWeight:700 } }, c.contractNo || '-'),
                 // 종류 › 세부종류 (기관) — 이름만으로는 구분이 안 되는 유형이 있어 기관까지 붙는다
@@ -23554,6 +23611,15 @@ function ContractModal(props){
                 h('select', { className:'pu-w-type', value: f.typeCodes[kindV] || (typesArr[0] ? typesArr[0].code : ''),
                   onChange:setTypeCodeFor(kindV) },
                   typesArr.map(function(t){ return h('option', { key:t.code, value:t.code }, '['+t.short+'] '+t.name); })),
+                /* 📈 성과추적관리 — 현장클리닉일 때만, 유형 바로 옆 알약 하나(대표 지시 2026-10-19, 목업 승인).
+                   켜면 담당자 연간 수행일수·건수 셈에서 빠진다(clinicIsPerf). 일수·금액은 그대로 적는다. */
+                isConsulting && clinicIsType(_selType, typesArr) && h('label', { className:'pu-vatpill' + (f.perfTrack ? ' on' : ''),
+                    title:'중진공 「신청경로」가 성과추적관리인 건 — 담당자 연간 수행일수·건수에서 뺍니다' },
+                  /* ☐ 체크 칸이 «보이게» — 알약만으로는 누르는 칸인지 몰랐다(대표 지시 2026-10-20 「성과추적관련 체크할 수 있게 해달라」).
+                     ⚠ .pu-krow input 의 안쪽 여백·테두리를 덮어써야 체크 칸이 부풀지 않는다. */
+                  h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ margin:0, padding:0, width:'13px', height:'13px', border:0, cursor:'pointer', flex:'none' },
+                    onChange:function(e){ var on = e.target.checked; setF(function(prev){ return Object.assign({}, prev, { perfTrack:on }); }); } }),
+                  h('span', null, '📈 성과추적관리')),
                 briefInput(kindV),
                 kEnd(
                   kLabel(isConsulting ? '계약금' : '착수금'),
@@ -23779,9 +23845,11 @@ function ContractModal(props){
             padding:'5px 10px', fontSize:'12px', color: over ? '#991b1b' : '#1e40af', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
             title:'주담당 기준 · 회계연도 · 컨설팅관리에 들어온 건 = 수행 / 계약관리 이관 전 = 예정 (이 계약은 빼고 셈)' },
           hint.prog.icon + ' ' + (u0 ? u0.name : f.managerMain) + ' · ' + hint.fyYear + ' 회계연도 — ',
-          h('b', null, (hint.cnt + hint.planCnt) + '건 · ' + (hint.days + hint.planDays) + un),
-          ' (수행 ' + hint.cnt + ' · 예정 ' + hint.planCnt + ') · 이 계약까지 ',
-          h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + (cap ? '/' + cap : '') + un),
+          /* 📈 이 계약이 성과추적관리면 «이 계약까지»를 안 보이고, 빠진 까닭을 그 자리에 적는다(2026-10-19) */
+          h('b', null, (hint.cnt + hint.planCnt) + '건 · ' + (hint.days + hint.planDays) + (hint.perf && cap ? '/' + cap : '') + un),
+          ' (수행 ' + hint.cnt + ' · 예정 ' + hint.planCnt + ') · ',
+          hint.perf ? h('b', null, '이 계약은 📈 성과추적관리 · 셈 제외') : '이 계약까지 ',
+          hint.perf ? null : h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + (cap ? '/' + cap : '') + un),
           over ? ' ⚠ 한 해 최대 ' + cap + un + '을(를) ' + (hint.nextDays - cap) + un + ' 넘습니다' : null);
       })(),
       /* 부담당 — 사람마다 칸 하나. 자리마다 select 를 두어 «그 자리»만 바꾼다.
@@ -24846,6 +24914,8 @@ function transferContract(contract, opt){
          「3일이라는데 지금 3회차가 맞나」를 알린다. 컨설팅에만 뜻이 있다. */
       consultDays: (kindV === 'consulting') ? (parseInt(contract.consultDays, 10) || 0) : 0,
       dayCalc: (kindV === 'consulting' && contract.dayCalc) ? contract.dayCalc : null,
+      /* 📈 성과추적관리 표시도 함께 — 안 넘기면 이관하는 순간 연간 셈에 다시 들어간다(대표 지시 2026-10-19) */
+      perfTrack: kindV === 'consulting' && !!contract.perfTrack,
       status: 'pending',
       brief: brief,                               // 업무 요약 — 계약에서 승계
       personalDeposit: !!contract.personalDeposit, // 👤 개인입금 승계 — 안 넘기면 입금확정이 못 본다
@@ -25599,6 +25669,7 @@ function ContractManagement(props){
         + (sm.region ? '\n컨설팅지역 ' + sm.region : '')
         + (sm.workers ? ' · 상시근로자 ' + sm.workers + '명' : '')
         + (sm.sales ? ' · 매출 ' + sm.sales : '')
+        + (sm.route ? '\n신청경로 「' + sm.route + '」' : '')
         + (ty ? '\n유형 「' + (ty.name || '') + '」 으로 등록했습니다' : '');
     }
     return form;
@@ -25612,6 +25683,12 @@ function ContractManagement(props){
        예정 일수는 이관 전 현장클리닉의 «예정»으로 셈에 들어간다(clinicDayCards ③). */
   function ctReqHumanFill(form, req){
     if(!req || req.source !== 'smes') return form;
+    /* 📈 중진공 «신청경로» 칸이 「성과추적관리」면 표시를 켠다(대표 지시 2026-10-19).
+       ⚠ 칸 글자가 «정확히» 같을 때만 — 「성과추적」이 들어 있다고 켜지 않는다(이름 짐작 금지). 띄어쓰기만 무시한다. */
+    if(String((req.smes || {}).route || '').replace(/\s+/g, '') === CLINIC_PERF_ROUTE){
+      form.perfTrack = true;
+      form.note = (form.note ? form.note + '\n' : '') + '📈 성과추적관리 — 연간 수행일수·건수 셈에서 뺍니다';
+    }
     var d = String(req.startDate || '');
     if(/^\d{4}-\d{2}-\d{2}$/.test(d)){ form.signDate = d; form.startDate = d; }
     var nd = parseInt(req.consultDays, 10) || 0;
@@ -26386,8 +26463,9 @@ function ContractManagement(props){
           // 세부 종류 (고정 너비 열 — 없으면 빈 공간 유지)
           (function(){
             var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean);
-            var text = subs.join(' / ');
-            return h('span', { style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
+            /* 📈 성과추적 — 고정 너비 열이라 따로 꼬리표를 달면 뒤 열이 밀린다. 글자에 붙이고 전문은 title 에 */
+            var text = subs.join(' / ') + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');
+            return h('span', { title: text || undefined, style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
               color: text ? '#2563eb' : 'transparent',
               background: text ? '#eff6ff' : 'transparent',
               border: '1px solid ' + (text ? '#bfdbfe' : 'transparent'),
@@ -26436,7 +26514,8 @@ function ContractManagement(props){
       if(CURRENT_USER && CURRENT_USER.isAdmin) mBtns.push(h('button', { key:'del', onClick:function(e){ e.stopPropagation(); del(c.id); }, title:'휴지통으로 이동 (총괄관리자)',
         style:Object.assign({},mBtn,{ background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca' }) }, '🗑'));
       var mk0 = kindInfo(kindsArr[0] || '');
-      var mSub = kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '';
+      var mSub = (kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '')
+        + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');   /* 📈 2026-10-20 */
       return h('div', { key:c.id,
         onClick:function(){ openEdit(c); },
         style:{ background: justMoved ? '#eff6ff' : '#fff', border:'1px solid '+(justMoved?'#2563eb':'#e2e8f0'), borderRadius:'6px',
@@ -26503,7 +26582,9 @@ function ContractManagement(props){
           // 자리가 모자라면 «이것이 먼저» 줄어든다(마우스를 올리면 전문).
           var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean).join(' / ');
           return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:'1 1 0', minWidth:0 }, title:subs }, subs);
-        })()
+        })(),
+        /* 📈 «현장클리닉» 옆 성과추적 꼬리표 — 세부 종류는 줄어도 이것은 안 줄어든다(대표 지시 2026-10-20) */
+        clinicPerfTag(c, contractSubtypeCode(c, 'consulting'))
       ),
       /* 둘째 줄: 담당자 · 오늘 시각 · 번호 · 메모 + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다.
          ★ 「오늘 13:47」·계약번호는 첫 줄에서 여기로 내렸다(2026-09-28) — 첫 줄은 «어느 회사» 자리다. */
@@ -69483,6 +69564,7 @@ function ClinicDayCards(props){
     if(s.est) lines.push('≈ ' + s.est + '건은 ' + cnt + '가 안 적혀 잔금으로 셈(' + feeNote + ')');
     if(s.done) lines.push('📦 끝난 ' + s.done + '건은 아래 표가 아니라 「📦 종료 보기」에 있습니다');
     if(s.skip) lines.push('「미수행 종료」 ' + s.skip + '건은 셈에서 뺐습니다');
+    if(s.perf) lines.push('📈 성과추적관리 ' + s.perf + '건은 연간 셈에서 뺐습니다');
     if(s.odd && s.odd.length) lines.push('⚠ ' + cnt + '와 금액이 다른 건: ' + s.odd.map(function(o){ return o.no + '(' + o.days + u + ' · 금액은 ' + o.feeDays + u + ')'; }).join(', '));
     if(s.zero && s.zero.length) lines.push('⚠ ' + cnt + '를 못 센 건: ' + s.zero.join(', ') + ' — ' + cnt + '를 적어 주세요');
     lines.push(props.listMode
@@ -69510,12 +69592,15 @@ function ClinicDayCards(props){
             return h('span', { style:{ color: on ? '#fff' : (over ? '#dc2626' : '#166534'), fontWeight:700 } },
               (over ? '⚠ ' : '') + s.days + (cap ? '/' + cap : '') + u);
           })(),
-      s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null);
+      s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null,
+      /* 📈 셈에서 뺀 성과추적관리 — 숨기지 않고 칩 꼬리에 (대표 지시 2026-10-19, 목업 승인) */
+      s.perf ? h('span', { style:{ color: on ? '#fff' : '#1e40af', fontSize:'11px', fontWeight:700 } }, isTotal ? '· 📈 성과추적 ' + s.perf + ' 제외' : '📈' + s.perf) : null);
   }
   var navS = { border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'0 7px', cursor:'pointer', color:'#475569', flex:'0 0 auto', lineHeight:'20px' };
   /* 담당자별 한 해 목록 (listMode) — 번호·업체·구분·시작일·일수. 금액은 넣지 않는다(대표 2026-10-05). */
   var openSlot = props.listMode && openSid ? r.by[openSid] : null;
-  var ST_TAG = { 'do':['수행','#f0fdf4','#166534'], end:['종료','#f8fafc','#64748b'], plan:['예정','#fffbeb','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'] };
+  var ST_TAG = { 'do':['수행','#f0fdf4','#166534'], end:['종료','#f8fafc','#64748b'], plan:['예정','#fffbeb','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'],
+    perf:['📈 성과추적 · 셈 제외','#eff6ff','#1e40af'] };
   var thS = { textAlign:'left', padding:'4px 6px', background:'#f8fafc', color:'#64748b', fontWeight:600, borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap' };
   var tdS = { padding:'4px 6px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
   var listBox = openSlot && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'6px 10px', marginTop:'-4px', marginBottom:'8px' } },
@@ -69528,7 +69613,7 @@ function ClinicDayCards(props){
       h('button', { onClick:function(){ setOpenSid(''); }, title:'목록 닫기', style:navS }, '✕')),
     h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed', fontSize:'12px', marginTop:'4px' } },
       h('thead', null, h('tr', null, ['번호', '업체', '구분', '계약 시작', u === '일' ? '일수' : '회차'].map(function(t, i){
-        return h('th', { key:i, style: i === 4 ? Object.assign({}, thS, { textAlign:'right', width:'70px' }) : (i === 1 ? thS : Object.assign({}, thS, { width: i === 2 ? '90px' : '130px' })) }, t); }))),
+        return h('th', { key:i, style: i === 4 ? Object.assign({}, thS, { textAlign:'right', width:'70px' }) : (i === 1 ? thS : Object.assign({}, thS, { width: i === 2 ? '140px' : '130px' })) }, t); }))),   /* 구분 140px — 「📈 성과추적 · 셈 제외」가 한 줄에 들게(2026-10-19) */
       h('tbody', null, openSlot.rows.slice().sort(function(a, b){ return String(b.start).localeCompare(String(a.start)); }).map(function(x){
         var tg = ST_TAG[x.st] || ST_TAG['do'];
         var odd = x.feeDays && !x.est && x.feeDays !== x.days;
@@ -69537,8 +69622,9 @@ function ClinicDayCards(props){
           h('td', { style:tdS, title:x.co }, x.co || '-'),
           h('td', { style:tdS }, h('span', { style:{ borderRadius:'4px', padding:'0 6px', fontSize:'11px', fontWeight:700, background:tg[1], color:tg[2] } }, tg[0])),
           h('td', { style:tdS }, x.start || '-'),
-          h('td', { style:Object.assign({}, tdS, { textAlign:'right', color: odd ? '#991b1b' : '#1e293b' }),
-            title: x.est ? (u === '일' ? '일수' : '회차') + '가 안 적혀 금액으로 짐작' : (odd ? '금액으로 보면 ' + x.feeDays + u : '') },
+          /* 📈 성과추적관리 줄은 일수를 흐리게 — 적힌 것은 보여 주되 셈에 안 든다는 뜻 */
+          h('td', { style:Object.assign({}, tdS, { textAlign:'right', color: x.st === 'perf' ? '#94a3b8' : (odd ? '#991b1b' : '#1e293b') }),
+            title: x.st === 'perf' ? '연간 셈에서 뺌' : (x.est ? (u === '일' ? '일수' : '회차') + '가 안 적혀 금액으로 짐작' : (odd ? '금액으로 보면 ' + x.feeDays + u : '')) },
             x.st === 'skip' ? '-' : ((x.est ? '≈ ' : '') + (x.days || 0) + u + (odd ? ' ⚠' : ''))));
       }))));
   return h('div', null,
@@ -69579,8 +69665,10 @@ function clinicContractHint(f, types){
   var r = clinicDayCards(dbGet('consultings', []), others, types, fy, consTypeDayFee, prog.isType, prog.max);
   var s = r.by[f.managerMain] || { cnt:0, days:0, planCnt:0, planDays:0 };
   var mine = parseInt(f.consultDays, 10) || 0;
-  return { prog:prog, fyYear:fy.year, cnt:s.cnt, days:s.days, planCnt:s.planCnt, planDays:s.planDays,
-    nextCnt: s.cnt + s.planCnt + 1, nextDays: s.days + s.planDays + mine };
+  /* 📈 이 계약이 성과추적관리면 «이 계약까지»에 더하지 않는다 — 셈에 안 드는 계약이다(대표 지시 2026-10-19) */
+  var perf = clinicIsPerf(f, code, types);
+  return { prog:prog, fyYear:fy.year, cnt:s.cnt, days:s.days, planCnt:s.planCnt, planDays:s.planDays, perf:perf,
+    nextCnt: s.cnt + s.planCnt + (perf ? 0 : 1), nextDays: s.days + s.planDays + (perf ? 0 : mine) };
 }
 /* ⚠ 현장클리닉 확인 필요 (대표 지시 2026-10-04 「날짜와 진행 일수가 안 맞다 · 수행 안 하고 종료된 것도」 →
    목업 + 「담당자들이 정부사업일정에 사진이나 일정 안 넣고 진행하는 경우도 많다 — 반영해라」).
@@ -70419,7 +70507,9 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                                   color: t ? props.fgColor : '#854d0e',
                                   fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px',
                                   fontWeight:700, cursor:'pointer' } },
-                          t ? t.name : '⚠️ 미설정')),
+                          t ? t.name : '⚠️ 미설정'),
+                    /* 📈 현장클리닉 옆 «성과추적» 꼬리표 (2026-10-20) */
+                    editingTypeId === it.id ? null : clinicPerfTag(it, it.typeCode)),
                   colVis.company && h('td', { className:'proj-co', title:coShown(it, 'name') || '' },
                     h('span', { onClick:function(){ setDetailModal(it); },
                       style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, coShown(it, 'name') || '-'),
@@ -70930,6 +71020,14 @@ function ProjectEditModal(props){
           h('div', { className:'fld' }, h('label', null, '유형 (변경 시 관리번호 자동 갱신)'),
             h('select', { value:f.typeCode || '', onChange:setTypeCode },
               props.types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); }))),
+          /* 📈 성과추적관리 — 현장클리닉일 때만(대표 지시 2026-10-19, 목업 승인). 계약에서 켠 것은 이관 때 넘어온다.
+             켜면 연간 수행일수·건수 셈(clinicDayCards)에서 빠진다 — 기록·일수·금액은 그대로. */
+          clinicIsType(f.typeCode, props.types) && h('div', { className:'fld' }, h('label', null, '성과추적관리'),
+            h('label', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12.5px', cursor:'pointer', whiteSpace:'nowrap' } },
+              h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ margin:0, width:'14px', height:'14px', cursor:'pointer' },
+                onChange:function(e){ var on = e.target.checked; setF(function(prev){ return Object.assign({}, prev, { perfTrack:on }); }); } }),
+              h('span', null, '📈 성과추적관리'),
+              h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, '— 연간 수행일수·건수 셈에서 뺍니다'))),
           h('div', { className:'fld' }, h('label', null, '관리번호'),
             h('div', { style:{ padding:'7px 10px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px', fontFamily:'monospace', fontSize:'12.5px', fontWeight:700, color:'#1e293b' } },
               f.no || '-'

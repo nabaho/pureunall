@@ -157,7 +157,8 @@ test('⑥ 계약관리 — 사람이 적은 일수만 「1일 단가 × 일수�
   const day = cutFrom(ERP, 'function consDayAmount(');
   const ctx = { consTypeDayOpt: () => ({ fee: 350000, unit: '일', noVat: false }) };
   vm.createContext(ctx);
-  vm.runInContext(day + '\n' + fn, ctx);
+  /* 📈 성과추적관리 글자(2026-10-19) — 원본의 한 줄을 그대로 싣는다 */
+  vm.runInContext((ERP.match(/^var CLINIC_PERF_ROUTE = .*$/m) || [''])[0] + '\n' + day + '\n' + fn, ctx);
   const blank = () => ({ typeCodes: { consulting: 'cons-x' }, signDate: '2026-10-01', startDate: '' });
   const f0 = ctx.ctReqHumanFill(blank(), { source: 'photo', consultDays: 3, startDate: '2026-10-07' });
   assert.ok(!('successFee' in f0) && f0.startDate === '', '사진첩 요청은 건드리지 않습니다');
