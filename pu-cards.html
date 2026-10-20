@@ -24716,7 +24716,7 @@ function whoPageHtml(){
       body += `<div class="dm-row" style="height:auto;padding:8px 0">
         <span class="who" style="width:150px">
           <b>${esc(p.name)}</b><br>
-          <span style="font-size:11px;color:#94a3b8">${esc(p.title||'')} · ${esc(p.sid||'')} · 퇴사</span>
+          <span style="font-size:11px;color:#94a3b8"${p.sid?` title="사번 ${esc(p.sid)}"`:''}>${esc([p.title,'퇴사'].filter(Boolean).join(' · '))}</span>
         </span>
         <span class="sub" style="white-space:normal">
           <b>${p.cos.length}곳</b>${p.addrs.length?` · 주소 ${p.addrs.length}개`:''}

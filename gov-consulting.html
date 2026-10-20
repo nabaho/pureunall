@@ -1390,6 +1390,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=74"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
+<script src="js/pu-staff-label.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -1401,7 +1402,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-backup.js?v=2"></script>
 <!-- 푸른사진첩에서 사진을 끌어다 놓을 수 있게 하는 공용 조각 -->
 <script src="js/pu-drag.js?v=2"></script>
-<script src="js/pu-photo-store.js?v=34"></script>
+<script src="js/pu-photo-store.js?v=35"></script>
 <!-- 참고 캡처를 «올리는 그 자리»에서 판독한다 (대표 승인 목업 2026-08-24).
      예전에는 사진첩에 올려만 두고, 누가 사진첩을 열 때까지 안 읽혔다 — 컨설팅
      담당자는 그 사이를 알 수 없었다. 그림을 이미 손에 들고 있으므로 창고에서
@@ -6614,7 +6615,7 @@ function renderStaffList(){
         <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른 캘린더에서 정합니다">
         <input class="staff-name-inp" type="text" value="${s.name}" disabled>
         <span style="font-size:11px;font-weight:800;color:var(--danger);white-space:nowrap;">${escAttr(s.leftWhy||'빠짐')}</span>
-        ${s.erpSid?`<span style="font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;">🔗 ${escAttr(s.erpSid)}</span>`:''}
+        ${s.erpSid?`<span title="푸른ERP 사번 ${escAttr(s.erpSid)} 와 연결됨" style="font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;">🔗 이알피</span>`:''}
         <button class="btn btn-s" style="font-size:11px;padding:4px 8px;white-space:nowrap;" onclick="unleaveStaff('${s.id}')" title="푸른ERP와 상관없이 다시 배정할 수 있게 합니다. 다음에 ERP를 읽으면 되돌아갑니다">되살리기</button>
         <button class="btn btn-s" style="font-size:11px;padding:4px 8px;" onclick="deleteStaff('${s.id}')">🗑</button>
       </div>`).join('')}
@@ -6639,7 +6640,7 @@ function unleaveStaff(id){
    동명이인이 생기면 그때부터 어긋난다. 미리 사번으로 못 박아 두는 편이 낫다. */
 function staffErpCell(s){
   if(s.erpSid){
-    return `<span title="푸른ERP 사번 ${escAttr(s.erpSid)} 와 연결됨" style="font-size:10px;font-weight:700;color:var(--ok);white-space:nowrap;">🔗 ${escAttr(s.erpSid)}</span>`;
+    return `<span title="푸른ERP 사번 ${escAttr(s.erpSid)} 와 연결됨" style="font-size:10px;font-weight:700;color:var(--ok);white-space:nowrap;">🔗 이알피</span>`;
   }
   if(!ERP.loaded)return '';
   const n=String(s.name||'').replace(/\s/g,'');
@@ -6662,7 +6663,7 @@ function linkStaffErp(id,sid){
   staff[idx].erpSid=sid;
   setStaff(staff);
   renderStaffList();
-  toast(`${staff[idx].name} · 사번 ${sid} 연결됨`);
+  toast(`${staff[idx].name} — 푸른이알피 계정과 연결됨`);
 }
 
 // 관리자: 직원 비밀번호 초기화 (123456)
@@ -6781,9 +6782,11 @@ function renderStaffAdd(){
     updateStaffAddCount();
     return;
   }
+  const dupN=window.PuStaffLabel?PuStaffLabel.dupNames(dir):{};
   body.innerHTML=rows.map(u=>{
     const done=has(u);
-    const sub=[u.title,u.branch,u.sid].filter(Boolean).join(' · ');
+    /* 사번은 같은 이름이 둘 이상일 때만 (대표 지시 2026-10-19, js/pu-staff-label.js) — 찾기(kw)는 여전히 사번으로도 된다 */
+    const sub=[u.title,u.branch,dupN[String(u.name||'').trim()]?u.sid:''].filter(Boolean).join(' · ');
     return `<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--sf2);${done?'opacity:.5;':'cursor:pointer;'}">
       <input type="checkbox" class="sa-chk" value="${escAttr(u.sid||u.name)}" ${done?'disabled':''} onchange="updateStaffAddCount()">
       <span style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -11060,7 +11063,7 @@ function erpSubStaffId(sid,staff,made){
   const rec={id:uid(),name:u.name,
     color:STAFF_COLORS[staff.length%STAFF_COLORS.length],erpSid:sid};
   staff.push(rec);
-  made.push(`${u.name}(${sid})`);
+  made.push(window.PuStaffLabel?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 같은 이름일 때만 사번(2026-10-19)
   return rec.id;
 }
 function erpSyncSubsDown(){
