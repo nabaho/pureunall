@@ -38,6 +38,7 @@ function box(o) {
     DB_ROOT: 'pucards',
     _mbMsgs: o.msgs || {},
     _mbPush: o.push || {},
+    _mbPushMaster: o.master || null,     /* 📵 받은 메일 폰 알림 전체 스위치(2026-10-20) — 안 적혀 있으면 켜진 것 */
     state: {},
     mbMyName: () => (o.me === undefined ? '권형하' : o.me),
     mbStaffOf: (n) => ({ '권형하': { sid: 'P-001' }, '박한별': { sid: 'P-002' } })[n] || null,
@@ -55,7 +56,7 @@ function box(o) {
       return o.failWrite ? Promise.reject(new Error('막힘')) : Promise.resolve(); },
   }) }) };
   vm.createContext(ctx);
-  ['mbMineBox', 'mbMineRows', 'mbMySid', 'mbMinePushOn', 'mbMinePushSet', 'mbMineLineHtml']
+  ['mbMineBox', 'mbMineRows', 'mbMySid', 'mbMinePushOn', 'mbMinePushSet', 'mbPushMasterOff', 'mbMineLineHtml']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   ['MB_MINE_DAYS', 'MB_MINE_NAMES', 'MB_MINE_KINDS'].forEach((n) => {
     const m = app.match(new RegExp('const ' + n + ' = [^;]*;'));
@@ -203,6 +204,25 @@ test('★★ 꺼도 띠는 그대로 보인다 — 끄는 것은 «폰»이다',
   const h = b.ctx.mbMineLineHtml();
   assert.ok(h.indexOf('내 담당 메일 1통') >= 0, '띠는 남아야 한다');
   assert.ok(/폰 알림 켜기/.test(h), '꺼져 있으면 「켜기」로 보여야 한다');
+});
+
+test('★★★ 받은 메일 폰 알림이 «전체» 꺼져 있으면 단추가 «전체 꺼짐» 안내다 — 「폰 알림 끄기」가 거짓말을 하지 않는다 (2026-10-20)', () => {
+  const rows = { whoOf: { 'a@x.kr': '권형하' }, msgs: { IN: { 1: ROW('a@x.kr', AGO(0)) } } };
+  const off = box(Object.assign({ master: { off: true } }, rows)).ctx.mbMineLineHtml();
+  assert.ok(off.indexOf('내 담당 메일 1통') >= 0, '띠는 남아야 한다 — 끄는 것은 폰이다');
+  assert.match(off, /<button disabled[^>]*>🔕 폰 알림 전체 꺼짐<\/button>/, '전체 꺼짐 안내가 아니다');
+  assert.doesNotMatch(off, /mbMinePushSet\(/, '전체가 꺼졌는데 사람별 단추가 살아 있다 — 켜도 안 울린다');
+  /* 안 적혀 있거나 off 가 아니면 예전 그대로 */
+  const on = box(Object.assign({ master: { off: false } }, rows)).ctx.mbMineLineHtml();
+  assert.match(on, /mbMinePushSet\(false\)/);
+  assert.match(box(rows).ctx.mbMineLineHtml(), /mbMinePushSet\(false\)/);
+});
+
+test('★★ 전체 스위치를 «따로» 읽는다 — 거절돼도 위 묶음(칸·분류)은 멀쩡하게', () => {
+  const src = strip(app);
+  assert.match(src, /config\/mailPushMaster'\)\.once\('value'\)/, '전체 스위치를 안 읽는다');
+  assert.match(sliceFn(app, 'function mbEnsureBins(').replace(/\/\*[\s\S]*?\*\//g, ' '), /mbPushMasterLoad\(\)/,
+    '분류를 읽을 때 전체 스위치도 읽지 않는다');
 });
 
 /* ══ 화면에 달려 있나 ══ */

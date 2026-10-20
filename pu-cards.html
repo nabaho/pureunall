@@ -19616,6 +19616,7 @@ function mbEnsureBins(cb){
     if(cb) cb();
     if(state.view==='mail') mbDrawSoon();
     mbWkLoad();                 /* 업무관리에서 이은 것 — «따로» 읽는다(거절돼도 위 묶음은 멀쩡하게) */
+    mbPushMasterLoad();         /* 📵 받은 메일 폰 알림 전체 스위치 — 이것도 «따로» (거절돼도 위 묶음은 멀쩡하게) */
   });
 }
 
@@ -20182,6 +20183,20 @@ function mbMinePushOn(){
   const c = (_mbPush || {})[sid];
   return !(c && c.off === true);
 }
+/* ══════ 📵 받은 메일 폰 알림의 «전체 스위치» (대표 지시 2026-10-20) ══════
+   서버(functions/push-admins.js mailPushOff)가 pucards/config/mailPushMaster.off === true 이면 📬 내 담당 메일·
+   📥 새 문의 폰 알림을 «전부» 안 보낸다. 화면은 그 값을 읽어 📬 띠의 단추가 «거짓말을 안 하게» 한다 —
+   전체가 꺼져 있는데 「🔔 폰 알림 끄기」가 보이면 지금 울리는 줄 안다.
+   ⚠ 못 읽거나 안 적혀 있으면 «켜진 것»으로 그린다(서버와 반대로) — 화면은 안내일 뿐이고, 실제로 보내는 쪽(서버)이
+     실패하면 꺼진 것으로 본다. 화면이 틀려도 폰이 울리는 일은 없다. */
+let _mbPushMaster = null;
+function mbPushMasterOff(){ return !!(_mbPushMaster && _mbPushMaster.off === true); }
+function mbPushMasterLoad(){
+  if(typeof Store==='undefined' || Store.mode!=='firebase') return;
+  firebase.database().ref(DB_ROOT+'/config/mailPushMaster').once('value')
+    .then(s=>{ _mbPushMaster = s.val() || {}; if(state.view==='mail') mbDrawSoon(); })
+    .catch(()=>{ /* 못 읽어도 메일함은 멀쩡해야 한다 */ });
+}
 function mbMinePushSet(on){
   const sid = mbMySid();
   if(!sid) return toast('명부에서 내 사번을 찾지 못했습니다 — 관리자에게 알려 주세요', 8000);
@@ -20213,9 +20228,11 @@ function mbMineLineHtml(){
   const on = mbMinePushOn();
   return `<div class="dm-inq">📬 <b>내 담당 메일 ${rows.length}통</b>
     <span class="who">— 아직 안 읽으셨습니다 · ${rows.slice(0, MB_MINE_NAMES).map(a).join(' · ')}${more}</span>
-    <button onclick="mbMinePushSet(${on?'false':'true'})"
+    ${mbPushMasterOff()
+      ? `<button disabled title="받은 메일 폰 알림은 전체가 꺼져 있습니다 — 대표님이 다시 켜실 때까지 울리지 않습니다. 이 띠는 그대로 보입니다">🔕 폰 알림 전체 꺼짐</button>`
+      : `<button onclick="mbMinePushSet(${on?'false':'true'})"
       title="${on ? '폰 알림을 끕니다 — 이 띠는 그대로 보입니다'
-                  : '새 메일이 오면 폰으로도 알려 드립니다'}">${on?'🔔 폰 알림 끄기':'🔕 폰 알림 켜기'}</button>
+                  : '새 메일이 오면 폰으로도 알려 드립니다'}">${on?'🔔 폰 알림 끄기':'🔕 폰 알림 켜기'}</button>`}
     <button onclick="mbOpenMsg('${esc(f.slug)}','${esc(f.u)}')"
       title="가장 최근 것을 엽니다 — 열면(읽음) 이 띠에서 빠집니다">보기</button></div>`;
 }

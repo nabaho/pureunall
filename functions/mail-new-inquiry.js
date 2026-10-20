@@ -117,6 +117,9 @@ async function notifyNewInquiries(deps, opts) {
   await db.ref().update(up);
   out.found = fresh.length;
 
+  /* 📵 받은 메일 폰 알림 «전체 스위치»가 꺼져 있으면 기록(위 띠)은 남기고 «폰만» 안 울린다 (2026-10-20) */
+  if (await PUSH.mailPushOff(db)) { out.off = true; return out; }
+
   const messaging = (deps.getMessaging || require("firebase-admin/messaging").getMessaging)();
   for (const r of fresh) {
     const who = clip(r.f || r.e, 24);
