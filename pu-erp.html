@@ -15936,7 +15936,10 @@ function contractSubtypeLabel(c, kindV){
     if(found){
       var nm = String(found.name || found.short || '').trim();
       var ag = String(found.agency || '').trim();
-      return { code:code, name:nm, agency:ag, label: nm + (ag ? ' (' + ag + ')' : '') };
+      /* 📈 성과추적관리 현장클리닉은 이름표에 붙여 «원래 현장클리닉»과 갈린다(대표 지시 2026-10-20) — 중복 창·훑기에 그대로 보인다.
+         ⚠ name 은 그대로 둔다(이름으로 거르는 곳이 있다) — label 에만 붙인다. 표시가 없으면 clinicIsPerf 를 부르지도 않는다. */
+      var pf = (kindV === 'consulting' && c.perfTrack && clinicIsPerf(c, code)) ? ' · 📈 성과추적' : '';
+      return { code:code, name:nm, agency:ag, label: nm + (ag ? ' (' + ag + ')' : '') + pf };
     }
   }
   // 마지막 수단 — 이름이 그대로 박혀 있는 옛 레코드(이관된 사건·컨설팅 등)를 위해 남겨 둔다
@@ -15969,6 +15972,15 @@ function contractDupVStyle(verdict){
   };
   return T[verdict] || T.diff;
 }
+/* 📈 성과추적관리와 원래 현장클리닉은 «별도 건»이다 — 같은 회사·같은 현장클리닉이어도 중복이 아니다
+   (대표 지시 2026-10-20 「성과추적관련 체크할 수 있게 해달라 그래야 별도 관리되고 중복안된다 … 중복아님도 확인되게」).
+   ★ 한쪽만 성과추적 표시일 때만 가른다 — 둘 다 성과추적(또는 둘 다 아님)이면 그것끼리는 여전히 중복일 수 있다.
+   ⚠ 두 쪽 다 표시가 없으면 유형을 찾아보지도 않는다(빠른 길). */
+function contractPerfSplit(a, b){
+  if(!(a && a.perfTrack) === !(b && b.perfTrack)) return false;
+  var ca = contractSubtypeCode(a, 'consulting'), cb = contractSubtypeCode(b, 'consulting');
+  return !!ca && ca === cb && clinicIsType(ca, dbGet('biz_cons_types', BIZ_CONS_SEED) || []);   // ⚠ 사전을 넘긴다 — 안 넘기면 씨앗 코드만 안다
+}
 function contractDupVerdict(existing, form){
   if(!existing || !form) return null;
   var newKinds = form.kinds || (form.kind ? [form.kind] : []);
@@ -15976,18 +15988,19 @@ function contractDupVerdict(existing, form){
   var shared = cKinds.filter(function(k){ return newKinds.indexOf(k) >= 0; });
   if(!shared.length) return null;                       // 종류가 안 겹치면 비교 대상이 아니다
   var closed = existing.status === 'closed' || existing.status === 'cancelled' || !!existing.closedDate;
-  var same = [], diff = [], unknown = [];
+  var same = [], diff = [], unknown = [], perf = [];
   shared.forEach(function(k){
     var a = contractSubtypeCode(existing, k);
     var b = contractSubtypeCode(form, k);
     if(!a || !b)      unknown.push(k);
+    else if(a === b && k === 'consulting' && contractPerfSplit(existing, form)){ diff.push(k); perf.push(k); }   // 📈 별도 건
     else if(a === b)  same.push(k);
     else              diff.push(k);
   });
   var verdict = same.length ? (closed ? 'again' : 'dup')
               : unknown.length ? 'dup'
               : 'diff';
-  return { verdict:verdict, shared:shared, same:same, diff:diff, unknown:unknown,
+  return { verdict:verdict, shared:shared, same:same, diff:diff, unknown:unknown, perf:perf,
            missingSubtype: unknown.length > 0, closed:closed };
 }
 // ============ 지난 자료 중복 훑기 ============
@@ -16029,6 +16042,8 @@ function dupSweepFacets(kindKey, rec){
     return ks.map(function(k){
       var code = contractSubtypeCode(rec, k);
       var lb = contractSubtypeLabel(rec, k);
+      /* 📈 성과추적관리 현장클리닉은 «다른 묶음» — 원래 현장클리닉과 한 묶음에 넣으면 중복으로 잡힌다(대표 지시 2026-10-20) */
+      if(code && k === 'consulting' && rec.perfTrack && clinicIsPerf(rec, code)) code += '|perf';
       return { kindV:k, code:code, label:(lb && lb.label) || '' };
     });
   }
@@ -16484,7 +16499,17 @@ var CLINIC_SKIP_REASON = '미수행 종료';
    ★ 셈에서만 뺀다 — 기록·일수·금액은 그대로 두고, 목록에는 «성과추적 · 셈 제외» 꼬리표로 남긴다(숨기지 않는다).
    ★ 현장클리닉 사업의 표시다 — 유형이 현장클리닉이 아니면 켜져 있어도 셈에 손대지 않는다(기술보호와 합치지 않는다). */
 var CLINIC_PERF_ROUTE = '성과추적관리';
-function clinicIsPerf(rec, code, types){ return !!(rec && rec.perfTrack) && clinicIsType(code, types); }
+/* ⚠ types 를 안 주면 «살아 있는 유형 사전»으로 본다 — clinicIsType(code) 만 부르면 씨앗 코드(cons-clinic)만 알아보고
+     실제 코드(consulting-mp0w…)는 모른다. 카드·이름표·중복 판정은 types 없이 부른다. */
+function clinicIsPerf(rec, code, types){ return !!(rec && rec.perfTrack) && clinicIsType(code, types || dbGet('biz_cons_types', BIZ_CONS_SEED) || []); }
+/* 「현장클리닉」 글자 «옆»에 붙는 작은 꼬리표 (대표 지시 2026-10-20 「현장클리닉 성과추적 표시도 해라 중복아님도 확인되게」).
+   계약 보드 카드·컨설팅관리 유형 칸이 쓴다. 표시가 없거나 현장클리닉이 아니면 null(아무것도 안 그린다). */
+var CLINIC_PERF_TIP = '📈 성과추적관리 — 연간 수행일수·건수 셈에서 뺍니다\n원래 현장클리닉과 따로 관리하는 별도 건입니다(중복 아님)';
+function clinicPerfTag(rec, code){
+  if(!clinicIsPerf(rec, code)) return null;
+  return h('span', { title:CLINIC_PERF_TIP, style:{ marginLeft:'4px', fontSize:'10px', fontWeight:700, color:'#1e40af', background:'#eff6ff',
+    border:'1px solid #bfdbfe', borderRadius:'8px', padding:'0 6px', whiteSpace:'nowrap', flexShrink:0 } }, '📈 성과추적');
+}
 function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnits){
   var out = { total:{ days:0, cnt:0, est:0, planDays:0, planCnt:0 }, by:{} };
   if(!fy) return out;
@@ -20406,11 +20431,17 @@ function erpContractDupBlock(form, contracts){
   var co = (form && form.company) || {};
   if(!String(co.name || '').trim() && !String(co.bizNo || '').replace(/\D/g,'') && !erpCoAddrKey(co.address)) return [];
   var kinds = (form && form.kinds) || [];
+  /* 📈 성과추적관리 ↔ 원래 현장클리닉은 겹쳐도 «별도 건»(contractPerfSplit, 대표 지시 2026-10-20).
+     화면에 골라져 있는 유형(드롭다운 첫 항목)까지 채워 본다 — 저장도 그 값으로 된다. */
+  var fEff = null;
+  function eff(){ return fEff || (fEff = contractFormSubtypeFill(form)); }
   return (contracts || []).filter(function(c){
     if(!c || c._deleted) return false;
     if(c.status === 'closed' || c.status === 'cancelled') return false;
     if(!erpSameCompany(form, c)) return false;
-    return (c.kinds || []).some(function(k){ return kinds.indexOf(k) >= 0; });
+    return (c.kinds || []).some(function(k){
+      return kinds.indexOf(k) >= 0 && !(k === 'consulting' && (form.perfTrack || c.perfTrack) && contractPerfSplit(eff(), c));
+    });
   });
 }
 
@@ -22900,7 +22931,11 @@ function ContractModal(props){
         var dupByUnknown = worst === 'dup'
           && !dupRows.some(function(r){ return r.v && r.v.verdict === 'dup' && r.v.same.length; })
           && dupRows.some(function(r){ return r.v && r.v.verdict === 'dup' && r.v.unknown.some(function(k){ return k !== 'consult'; }); });
-        var title = worst === 'dup'
+        /* 📈 겹친 것이 «성과추적 ↔ 원래 현장클리닉» 뿐이면 그 까닭을 그대로 적는다(대표 지시 2026-10-20 「중복아님도 확인되게」) —
+           「세부 종류가 다르다」는 틀린 말이다(둘 다 현장클리닉이다). */
+        var perfOnly = worst === 'diff' && dupRows.some(function(r){ return r.v && r.v.perf && r.v.perf.length; });
+        var title = perfOnly ? '같은 사업장의 현장클리닉 — 📈 성과추적은 별도 건(중복 아님)'
+          : worst === 'dup'
           ? (dupByUnknown
               ? '같은 사업장 계약 ' + dupContracts.length + '건 — 세부 종류가 비어 있어 확인 필요'
               : '같은 사업장에 같은 ' + (worstSameName || worstKindName) + ' 계약 — 중복 확인 필요')
@@ -22909,7 +22944,8 @@ function ContractModal(props){
           : rawWorst
           ? '같은 사업장, 다른 세부 종류 계약 — 신규 진행 정상'
           : '같은 사업장, 다른 종류 계약 — 신규 진행 정상';
-        var conclusion = worst === 'dup'
+        var conclusion = perfOnly ? '→ 성과추적관리는 원래 현장클리닉과 따로 관리하는 건입니다. 중복이 아닙니다 — 연간 수행일수에서도 빠집니다.'
+          : worst === 'dup'
           ? (dupByUnknown
               ? '→ 세부 종류가 비어 있어 중복인지 알 수 없습니다. 기존 계약을 열어 확인하세요.'
               : '→ 같은 ' + worstKindName + '이 진행 중입니다. 새로 만들지 말고 기존 계약을 확인하세요.')
@@ -22978,6 +23014,7 @@ function ContractModal(props){
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
                 h('span', { title: vk === 'dup'   ? '같은 세부 종류가 진행 중입니다 — 중복일 수 있습니다'
                                  : vk === 'again' ? '같은 세부 종류가 종료됐습니다 — 재계약으로 보입니다'
+                                 : (v && v.perf && v.perf.length) ? '📈 성과추적 — 별도 건(중복 아님)'
                                  :                  '세부 종류가 달라 중복이 아닙니다' }, dot),
                 h('span', { style:{ fontFamily:'monospace', fontWeight:700 } }, c.contractNo || '-'),
                 // 종류 › 세부종류 (기관) — 이름만으로는 구분이 안 되는 유형이 있어 기관까지 붙는다
@@ -23570,7 +23607,9 @@ function ContractModal(props){
                    켜면 담당자 연간 수행일수·건수 셈에서 빠진다(clinicIsPerf). 일수·금액은 그대로 적는다. */
                 isConsulting && clinicIsType(_selType, typesArr) && h('label', { className:'pu-vatpill' + (f.perfTrack ? ' on' : ''),
                     title:'중진공 「신청경로」가 성과추적관리인 건 — 담당자 연간 수행일수·건수에서 뺍니다' },
-                  h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ display:'none' },
+                  /* ☐ 체크 칸이 «보이게» — 알약만으로는 누르는 칸인지 몰랐다(대표 지시 2026-10-20 「성과추적관련 체크할 수 있게 해달라」).
+                     ⚠ .pu-krow input 의 안쪽 여백·테두리를 덮어써야 체크 칸이 부풀지 않는다. */
+                  h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ margin:0, padding:0, width:'13px', height:'13px', border:0, cursor:'pointer', flex:'none' },
                     onChange:function(e){ var on = e.target.checked; setF(function(prev){ return Object.assign({}, prev, { perfTrack:on }); }); } }),
                   h('span', null, '📈 성과추적관리')),
                 briefInput(kindV),
@@ -26416,8 +26455,9 @@ function ContractManagement(props){
           // 세부 종류 (고정 너비 열 — 없으면 빈 공간 유지)
           (function(){
             var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean);
-            var text = subs.join(' / ');
-            return h('span', { style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
+            /* 📈 성과추적 — 고정 너비 열이라 따로 꼬리표를 달면 뒤 열이 밀린다. 글자에 붙이고 전문은 title 에 */
+            var text = subs.join(' / ') + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');
+            return h('span', { title: text || undefined, style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
               color: text ? '#2563eb' : 'transparent',
               background: text ? '#eff6ff' : 'transparent',
               border: '1px solid ' + (text ? '#bfdbfe' : 'transparent'),
@@ -26466,7 +26506,8 @@ function ContractManagement(props){
       if(CURRENT_USER && CURRENT_USER.isAdmin) mBtns.push(h('button', { key:'del', onClick:function(e){ e.stopPropagation(); del(c.id); }, title:'휴지통으로 이동 (총괄관리자)',
         style:Object.assign({},mBtn,{ background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca' }) }, '🗑'));
       var mk0 = kindInfo(kindsArr[0] || '');
-      var mSub = kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '';
+      var mSub = (kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '')
+        + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');   /* 📈 2026-10-20 */
       return h('div', { key:c.id,
         onClick:function(){ openEdit(c); },
         style:{ background: justMoved ? '#eff6ff' : '#fff', border:'1px solid '+(justMoved?'#2563eb':'#e2e8f0'), borderRadius:'6px',
@@ -26533,7 +26574,9 @@ function ContractManagement(props){
           // 자리가 모자라면 «이것이 먼저» 줄어든다(마우스를 올리면 전문).
           var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean).join(' / ');
           return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:'1 1 0', minWidth:0 }, title:subs }, subs);
-        })()
+        })(),
+        /* 📈 «현장클리닉» 옆 성과추적 꼬리표 — 세부 종류는 줄어도 이것은 안 줄어든다(대표 지시 2026-10-20) */
+        clinicPerfTag(c, contractSubtypeCode(c, 'consulting'))
       ),
       /* 둘째 줄: 담당자 · 오늘 시각 · 번호 · 메모 + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다.
          ★ 「오늘 13:47」·계약번호는 첫 줄에서 여기로 내렸다(2026-09-28) — 첫 줄은 «어느 회사» 자리다. */
@@ -70456,7 +70499,9 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                                   color: t ? props.fgColor : '#854d0e',
                                   fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px',
                                   fontWeight:700, cursor:'pointer' } },
-                          t ? t.name : '⚠️ 미설정')),
+                          t ? t.name : '⚠️ 미설정'),
+                    /* 📈 현장클리닉 옆 «성과추적» 꼬리표 (2026-10-20) */
+                    editingTypeId === it.id ? null : clinicPerfTag(it, it.typeCode)),
                   colVis.company && h('td', { className:'proj-co', title:coShown(it, 'name') || '' },
                     h('span', { onClick:function(){ setDetailModal(it); },
                       style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, coShown(it, 'name') || '-'),

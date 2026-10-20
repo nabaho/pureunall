@@ -278,3 +278,109 @@ test('⑪ 컨설팅 수정창 — 현장클리닉일 때만 체크 칸이 있고
   const typeAt = pe.indexOf("'유형 (변경 시");
   assert.ok(typeAt >= 0 && typeAt < at, '체크 칸은 유형 고르개 아래에 둔다');
 });
+
+
+/* ══ «중복 아님» · 「현장클리닉 · 성과추적」 표시 (대표 지시 2026-10-20
+     「성과추적관련 체크할 수 있게 해달라 그래야 별도 관리되고 중복안된다. 그리고 현장클리닉 성과추적 표시도 해라 중복아님도 확인되게」) ══ */
+function dupCtx() {
+  const c = { console, Object, Array, String, Number, JSON, Math, parseInt, window: {}, __store: {} };
+  c.dbGet = (k, d) => (Object.prototype.hasOwnProperty.call(c.__store, k) ? c.__store[k] : d);
+  c.dbSet = (k, v) => { c.__store[k] = v; };
+  vm.createContext(c);
+  const seg = (a, b) => { const i = ERP_RAW.indexOf(a), j = ERP_RAW.indexOf(b, i); assert.ok(i >= 0 && j > i, a); return ERP_RAW.slice(i, j); };
+  vm.runInContext(seg('var BIZ_CASE_SEED = [', 'var CONSULTING_DEMO_SEED'), c);                 // 유형 씨앗(현장클리닉 cons-clinic)
+  vm.runInContext(seg('var CONTRACT_KINDS = [', '// 종류별 세부 분류 라벨'), c);
+  vm.runInContext(seg('function getKindTypes(kindV, includeHidden){', '// ============ 과거 회사 통합 검색'), c);   // 유형 역할·clinicIsPerf 포함
+  vm.runInContext(seg('// ============ 계약의 세부 종류', '// 계약번호 자동 생성'), c);           // 중복 판정·훑기
+  vm.runInContext(['erpCoAddrKey', 'erpSameCompany', 'erpContractDupBlock'].map((n) => cutFn(ERP, 'function ' + n + '(')).join('\n'), c);
+  return c;
+}
+const D = dupCtx();
+const CO = { name: '(주)가나산업', bizNo: '123-81-00001' };
+const KC = (o) => Object.assign({ kinds: ['consulting'], typeCodes: { consulting: 'cons-clinic' }, companyName: CO.name, bizNo: CO.bizNo, company: CO, status: 'review' }, o);
+
+test('⑫ 중복 판정 — 성과추적 ↔ 원래 현장클리닉은 «별도 건(중복 아님)», 같은 쪽끼리는 그대로 중복', () => {
+  const v1 = D.contractDupVerdict(KC({ id: 'old' }), KC({ perfTrack: true }));
+  assert.equal(v1.verdict, 'diff', '성과추적 계약이 원래 현장클리닉과 중복으로 잡힙니다');
+  assert.deepEqual(Array.from(v1.perf), ['consulting'], '왜 중복이 아닌지(perf)를 돌려주지 않습니다');
+  assert.equal(D.contractDupVerdict(KC({ id: 'old', perfTrack: true }), KC({})).verdict, 'diff', '거꾸로(기존이 성과추적)도 별도 건');
+  assert.equal(D.contractDupVerdict(KC({ id: 'old', perfTrack: true }), KC({ perfTrack: true })).verdict, 'dup', '★ 성과추적끼리는 여전히 중복이다');
+  assert.equal(D.contractDupVerdict(KC({ id: 'old' }), KC({})).verdict, 'dup', '★ 원래 현장클리닉끼리는 여전히 중복이다');
+  /* ★ 실제 서버 코드(씨앗이 아닌 consulting-mp0w…)에서도 — 사전(biz_cons_types)으로 현장클리닉을 알아본다 */
+  D.__store.biz_cons_types = [{ code: 'consulting-mp0w1084', short: '현장클리', name: '현장클리닉' }];
+  const live = { typeCodes: { consulting: 'consulting-mp0w1084' } };
+  assert.equal(D.contractDupVerdict(KC(Object.assign({ id: 'old' }, live)), KC(Object.assign({ perfTrack: true }, live))).verdict, 'diff',
+    '실제 코드의 현장클리닉에서 성과추적을 못 가릅니다(씨앗 코드만 알아봄)');
+  assert.equal(D.contractSubtypeLabel(KC(Object.assign({ perfTrack: true }, live)), 'consulting').label, '현장클리닉 · 📈 성과추적');
+  assert.equal(D.erpContractDupBlock(KC(Object.assign({ perfTrack: true }, live)), [KC(Object.assign({ id: 'k' }, live))]).length, 0);
+  delete D.__store.biz_cons_types;
+  /* 현장클리닉이 아닌 유형에 표시가 남아 있어도 가르지 않는다(기술보호와 합치지 않는다) */
+  const tg = { typeCodes: { consulting: 'cons-techguard' } };
+  assert.equal(D.contractDupVerdict(KC(Object.assign({ id: 'old' }, tg)), KC(Object.assign({ perfTrack: true }, tg))).verdict, 'dup');
+});
+
+test('⑫ 저장을 막는 잣대(erpContractDupBlock) — 성과추적 ↔ 원래 현장클리닉은 막지 않는다', () => {
+  const regular = KC({ id: 'k1', contractNo: '계약-1' });
+  const perf = KC({ id: 'k2', contractNo: '계약-2', perfTrack: true });
+  assert.equal(D.erpContractDupBlock(KC({ perfTrack: true }), [regular]).length, 0, '성과추적 계약을 원래 현장클리닉 때문에 막습니다');
+  assert.equal(D.erpContractDupBlock(KC({}), [perf]).length, 0, '원래 현장클리닉을 성과추적 계약 때문에 막습니다');
+  assert.equal(D.erpContractDupBlock(KC({}), [regular]).length, 1, '★ 같은 원래 현장클리닉 둘은 여전히 묻는다');
+  assert.equal(D.erpContractDupBlock(KC({ perfTrack: true }), [perf]).length, 1, '★ 성과추적 둘은 여전히 묻는다');
+  /* 유형을 안 건드려 드롭다운 첫 항목이 골라진 채로 저장해도(typeCodes 빔) 같은 판정 */
+  D.__store.biz_cons_types = [{ code: 'cons-clinic', short: '클릭', name: '현장클리닉' }, { code: 'cons-hr', short: '인노', name: '인사노무' }];
+  assert.equal(D.erpContractDupBlock({ kinds: ['consulting'], typeCodes: {}, company: CO, perfTrack: true }, [regular]).length, 0,
+    '화면에 골라져 있는 유형(첫 항목)으로 판정하지 않습니다');
+  delete D.__store.biz_cons_types;
+});
+
+test('⑫ 「지난 중복 훑기」 — 성과추적은 원래 현장클리닉과 «다른 묶음»이고 이름표에 성과추적이 붙는다', () => {
+  const a = D.dupSweepFacets('contract', KC({ id: 'a' }))[0];
+  const b = D.dupSweepFacets('contract', KC({ id: 'b', perfTrack: true }))[0];
+  assert.notEqual(a.code, b.code, '같은 묶음이면 훑기가 중복으로 보여 줍니다');
+  assert.equal(b.code, D.dupSweepFacets('contract', KC({ id: 'c', perfTrack: true }))[0].code, '★ 성과추적끼리는 같은 묶음(중복이면 잡힌다)');
+  assert.match(b.label, /현장클리닉 · 📈 성과추적/);
+  assert.doesNotMatch(a.label, /성과추적/);
+});
+
+test('⑫ 세부 종류 이름표 — label 에만 「· 📈 성과추적」, name 은 그대로(이름으로 거르는 곳이 있다)', () => {
+  const p = D.contractSubtypeLabel(KC({ perfTrack: true }), 'consulting');
+  assert.equal(p.label, '현장클리닉 · 📈 성과추적');
+  assert.equal(p.name, '현장클리닉', 'name 이 바뀌면 유형 거르개·칩이 성과추적 건을 놓칩니다');
+  assert.equal(D.contractSubtypeLabel(KC({}), 'consulting').label, '현장클리닉');
+  assert.equal(D.contractSubtypeLabel(KC({ perfTrack: true, typeCodes: { consulting: 'cons-techguard' } }), 'consulting').label, '기술보호울타리');
+});
+
+test('⑫ 계약 창 중복 띠 — 겹친 것이 성과추적뿐이면 «별도 건(중복 아님)»이라고 적는다', () => {
+  const cm = cutFn(ERP, 'function ContractModal(');
+  assert.match(cm, /var perfOnly = worst === 'diff' && dupRows\.some\(function\(r\)\{ return r\.v && r\.v\.perf && r\.v\.perf\.length; \}\);/);
+  assert.match(cm, /perfOnly \? '같은 사업장의 현장클리닉 — 📈 성과추적은 별도 건\(중복 아님\)'/, '띠 제목에 까닭이 없습니다');
+  assert.match(cm, /var conclusion = perfOnly \? '→ 성과추적관리는[^']*중복이 아닙니다/, '띠 결론에 까닭이 없습니다');
+  assert.match(cm, /\(v && v\.perf && v\.perf\.length\) \? '📈 성과추적 — 별도 건\(중복 아님\)'/, '줄마다 붙는 말풍선에 까닭이 없습니다');
+});
+
+test('⑬ 「현장클리닉」 옆 «📈 성과추적» — 보드 카드 · 목록 · 폰 카드 · 컨설팅관리 유형 칸', () => {
+  /* ★ 실제 서버의 현장클리닉 코드는 씨앗(cons-clinic)이 아니다 — 꼬리표는 types 없이 불리므로 «살아 있는 사전»을 읽어야 한다 */
+  const T = Object.assign(ctx, { BIZ_CONS_SEED: [], dbGet: (k, d) => (k === 'biz_cons_types' ? TYPES : d),
+    h(tag, props) { return { tag, props: props || {}, kids: Array.prototype.slice.call(arguments, 2) }; } });
+  vm.runInContext(line(ERP_RAW, 'var CLINIC_PERF_TIP = ') + '\n' + cutFn(ERP, 'function clinicPerfTag('), T);
+  assert.equal(T.clinicPerfTag({}, 'consulting-x1'), null, '표시가 없으면 아무것도 안 그린다');
+  assert.equal(T.clinicPerfTag({ perfTrack: true }, 'consulting-x2'), null, '현장클리닉이 아니면 안 그린다');
+  const tag = T.clinicPerfTag({ perfTrack: true }, 'consulting-x1');
+  assert.equal(tag.kids[0], '📈 성과추적');
+  assert.match(tag.props.title, /중복 아님/, '마우스를 올리면 «중복 아님»이 보여야 합니다');
+  assert.equal(tag.props.style.whiteSpace, 'nowrap');
+  const cmg = cutFn(ERP, 'function ContractManagement(');
+  assert.match(cmg, /clinicPerfTag\(c, contractSubtypeCode\(c, 'consulting'\)\)/, '보드 카드에 성과추적 꼬리표가 없습니다');
+  assert.match(cmg, /var text = subs\.join\(' \/ '\) \+ \(clinicIsPerf\(c, contractSubtypeCode\(c, 'consulting'\)\) \? ' · 📈 성과추적' : ''\);/, '목록 줄에 없습니다');
+  assert.match(cmg, /var mSub = [^;]*clinicIsPerf\(c, contractSubtypeCode\(c, 'consulting'\)\) \? ' · 📈 성과추적' : ''\)/, '폰 카드에 없습니다');
+  assert.match(cutFn(ERP, 'function ProjectManagementShared('), /clinicPerfTag\(it, it\.typeCode\)/, '컨설팅관리 유형 칸에 없습니다');
+});
+
+test('⑭ 계약 창 — 성과추적관리는 «체크 칸»이 눈에 보인다(숨긴 체크박스 알약이 아니다)', () => {
+  const cm = cutFn(ERP, 'function ContractModal(');
+  const a = cm.indexOf("className:'pu-w-type'"), b = cm.indexOf('briefInput(kindV)', a);
+  const row = cm.slice(a, b);
+  const box = row.match(/h\('input', \{ type:'checkbox', checked:!!f\.perfTrack, style:\{([^}]*)\}/);
+  assert.ok(box, '성과추적관리 체크 칸이 없습니다');
+  assert.doesNotMatch(box[1], /display:'none'/, '체크 칸이 숨겨져 있습니다 — 대표 「체크할 수 있게 해달라」');
+});
