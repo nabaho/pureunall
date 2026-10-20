@@ -69,6 +69,8 @@
 <!-- 사업장 하나로 오간 것을 한 줄기로 — 갈래(받은·보낸, 나중에 문자·카톡)를
      밖에서 넣는다. 화면은 그리기만 한다. -->
 <script src="js/pu-co-thread.js?v=3"></script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-mail-obsidian.js?v=1"></script>
 <script src="js/pu-hr-intake.js?v=1"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 푸른이알피(pu-erp.html)와 «같은 파일»을 쓴다.
      여기서 따로 셈하면 두 화면에서 «메인이 서로 달라진다». -->
@@ -18901,6 +18903,72 @@ function mbSetTabGo(id){
   try{ $('pcMain').scrollTop = 0; }catch(_){ }
 }
 
+/* ═════════════════════════════════════════════════════════════════
+   🪨 메일 → 옵시디언 (대표 지시 2026-10-20) — «기업별 · 사람별 · 푸른 담당자별»
+   ═════════════════════════════════════════════════════════════════
+   모아서 마크다운으로 바꾸고 폴더에 쓰는 일은 js/pu-mail-obsidian.js 가 한다.
+   여기는 «이 화면이 아는 것»을 건네는 풀칠만 한다 — 업체·담당자를 새로 판정하지 않는다.
+   ⚠ 보이는 칸(_mbMsgs)을 건드리지 않는다. 폴더를 «전부» 따로 읽어 쓰고 버린다 —
+     화면의 「몇 통씩」 한도와 더 보기 셈을 어지럽히지 않으려는 것이다.
+   ⚠ 총괄관리자(state.isAdmin)만. 메일함은 고객 임직원의 신상이 그대로 든 자리다. */
+let _mbObsBusy = false;
+function mbObsSay(t){ try{ const el = document.getElementById('mbObsMsg'); if(el) el.textContent = t; }catch(_){ } }
+function mbObsInternal(a){
+  a = String(a||'').toLowerCase();
+  if(/@pureun\.kr$/.test(a) || /^370-6@(daum|hanmail)\.net$/.test(a)) return true;
+  let me = ''; try{ me = String((matMailCfg()||{}).from||'').toLowerCase(); }catch(_){ }
+  return !!me && a === me;
+}
+function mbObsResolve(){
+  const idx = mbWhoIndex();
+  return function(em){
+    const w = mbWhoWhyOf(em, idx, { who:'', why:'' });
+    return { co: mbCoNameOf(em, idx), owner: mbPerson(w && w.who) || '', subs: mbSubsOfRow({ e:em }, idx) };
+  };
+}
+function mbObsReadAll(){
+  const db = firebase.database(), out = [];
+  let p = Promise.resolve();
+  mbSyncFolders().forEach(f=>{
+    p = p.then(()=>db.ref(MB_ROOT+'/msgs/'+f.slug).once('value')).then(s=>{
+      const box = s.val() || {}, label = mbFolderLabel(mbFolderBy(f.slug) || f);
+      Object.keys(box).forEach(k=>{ if(box[k]) out.push(Object.assign({}, box[k], { folder:label })); });
+      mbObsSay('메일함을 읽는 중… '+out.length+'통');
+    });
+  });
+  return p.then(()=> _mbMsgs[MB_OLD_ID] || db.ref(MB_ROOT+'/old/msgs').once('value').then(s=>s.val() || {}))
+    .then(box=>{ Object.keys(box).forEach(k=>{ if(box[k]) out.push(Object.assign({}, box[k], { folder:'지난 메일' })); }); return out; });
+}
+function mbObsExport(){
+  if(_mbObsBusy) return;
+  const PM = window.PuMailObsidian;
+  if(!state.isAdmin){ toast('대표님만 내보낼 수 있습니다'); return; }
+  if(!PM){ mbObsSay('내보내기 도구(js/pu-mail-obsidian.js)를 못 불렀습니다'); return; }
+  if(!PM.supported()){ mbObsSay('이 브라우저는 «폴더에 바로 쓰기»를 지원하지 않습니다 — 크롬이나 엣지에서 열어 주세요.'); return; }
+  if(typeof Store==='undefined' || Store.mode!=='firebase'){ mbObsSay('서버에 연결된 뒤에 할 수 있습니다'); return; }
+  /* 업체·담당자 자료가 «늦게» 온다 — 안 왔는데 내보내면 전부 «업체 미확인»이 되어 쓸모없는 폴더가 남는다 */
+  const nCards = Object.keys((state && state.items) || {}).length;
+  const nCos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) ? ErpMatch.companies.length : 0;
+  if(!nCards || !nCos){ mbObsSay('기업정보함·푸른이알피 자료가 아직 안 왔습니다 — 잠시 뒤 다시 눌러 주세요.'); return; }
+  _mbObsBusy = true;
+  /* ⚠ 폴더 고르기는 «누른 순간» 안에서 불러야 브라우저가 허락한다 — 맨 먼저 부른다 */
+  PM.pickVault().then(vault=>{
+    mbObsSay('메일함을 읽는 중…');
+    return mbObsReadAll().then(rows=>{
+      const r = PM.build(rows, { isInternal:mbObsInternal, resolve:mbObsResolve(), now:Date.now() });
+      const n = Object.keys(r.files).length;
+      mbObsSay('폴더에 쓰는 중… 0/'+n);
+      return PM.writeFiles(vault, r.files, (i, all)=>mbObsSay('폴더에 쓰는 중… '+i+'/'+all)).then(()=>{
+        const st = r.stats;
+        const msg = '메일 '+st.total+'통 → 업체 '+st.companies+'곳 · 사람 '+st.people+'명 · 담당자 '+st.owners+'명, 파일 '+n+'개를 «'+(vault.name||'보관함')+'/메일»에 적었습니다. 업체를 못 찾은 메일 '+st.unclassified+'통.';
+        mbObsSay(msg); toast('옵시디언에 메일 정리를 적었습니다');
+      });
+    });
+  }).catch(e=>{
+    mbObsSay(e && e.name==='AbortError' ? '폴더 고르기를 취소했습니다' : '내보내지 못했습니다 — '+((e&&e.message)||e));
+  }).then(()=>{ _mbObsBusy = false; });
+}
+
 function mailSetHtml(){
   const from = matMailCfg().from || '';
   const trk = matMailCfg().track;
@@ -19027,6 +19095,15 @@ function mailSetHtml(){
        <button class="edbtn" onclick="mbOldProbe()"${_mbProbing ? ' disabled' : ''}>${
          _mbProbing ? '물어보는 중…' : '알아보기'}</button>
        <div class="mshint">${mbProbeTell()}</div>`)}
+    ${state.isAdmin ? row('🪨 옵시디언으로 내보내기',
+      `<button class="edbtn" onclick="mbObsExport()">내보내기 ›</button>
+      <div class="mshint" id="mbObsMsg"></div>
+      <div class="mshint">메일을 <b>기업별 · 사람별 · 푸른 담당자별</b>로 갈라 옵시디언 보관함의 <b>메일/</b> 폴더에 적습니다.
+        날짜·방향·상대·제목·<b>첨부 이름</b>만 담고 <b>본문과 첨부 파일은 담지 않습니다</b>.
+        업체·담당자는 이 화면이 이미 아는 것(자문사 잇기 → 이알피 진행 건 → 기업정보함)을 그대로 쓰고,
+        못 찾은 주소는 «업체 미확인»에 모아 알려 드립니다.<br>
+        ⚠ 고객 임직원의 이름·주소·제목이 <b>PC 폴더에 그대로 남습니다</b> — 공유·클라우드 동기화 폴더에는 두지 마세요.
+        크롬·엣지에서만 됩니다. 한 방향이라 메일함에는 아무 일도 없고, 다시 내보내면 같은 이름 파일은 덮입니다.</div>`) : ''}
   </div>
 
   <div class="mspane ${mbSetTab()==='4'?'on':''}">
