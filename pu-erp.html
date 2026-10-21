@@ -59462,9 +59462,12 @@ function IncomeCompanyTab(){
     var cur = selYear + '-' + ('0'+m).slice(-2);
     return cur < cs;
   }
-  // 계약 중단 뒤의 달인지 (중단일이 든 달까지는 받는다)
+  /* 계약 중단 업체의 «체크 안 할 달» (대표 지시 2026-10-21 「이알피에서 중단된 건 재무관리에도 체크 필요 없게」).
+     ① 중단일 뒤의 달 — 받을 것이 없다.  ② 그 앞 달이라도 «받은 기록이 없는» 달 — 이미 끝난 업체라 독촉할 것이 없다.
+     ⚠ 받은 달(체크된 달)은 어느 쪽도 아니다 — 받은 돈은 화면에서 안 지운다. */
   function isAfterSuspend(co, m){
-    return erpFeeStopped(co, selYear + '-' + ('0'+m).slice(-2));
+    if(erpFeeStopped(co, selYear + '-' + ('0'+m).slice(-2))) return true;
+    return !!(co && co.suspended) && !isPaid(co, m);
   }
   /* 그 달에 자문료가 «아예 없는» 곳 — 계약 시작 전이거나, 계약을 중단한 뒤다.
      ⚠ 일괄 단추(달 전체·업체 한 줄·CMS·자동 생성)도 이것을 봐야 한다.
