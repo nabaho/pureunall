@@ -59,6 +59,7 @@ function 세상(opt) {
     localStorage: 저장소(opt.저장, opt.막힘),
     sessionStorage: 저장소({}, opt.막힘),
     document: { getElementById: (id) => els[id] || null },
+    navigator: { userAgent: opt.기기 || 'Mozilla/5.0 Chrome/130.0' },
     window: { PuKakao: {}, __myKakaoSid: opt.sid || 'p001' },
     auth: { currentUser: opt.로그인 === false ? null : { uid: 'U1' } },
     db: {
@@ -297,7 +298,8 @@ test('⑤ 포털이 그릴 때 권유 줄을 부른다', () => {
 });
 
 /* ── ⑦⑧ 공용 PC (대표 「제3의 장소에서 로그인할 경우 어떻게하나?」 → 「추천대로」 2026-09-28) ──
-   ⑦ 처음 쓰는 기기면 노란 단추가 카카오에게 «다시 묻게» 한다(앞 사람 카카오로 안 들어가게).
+   ⑦ 일반 브라우저에서는 사용 이력과 무관하게 카카오에게 «다시 묻게» 한다.
+      카카오톡 내부 브라우저는 카카오가 이 옵션을 지원하지 않으므로 제외한다.
    ⑧ 카카오로 들어온 사람의 로그아웃은 파이어베이스를 «먼저» 끊고, 카카오도 끊으러 간다. */
 function 단추세상(opt) {
   const w = 세상(opt);
@@ -314,17 +316,22 @@ function 단추세상(opt) {
   return { w, 부탁 };
 }
 
-test('⑦ ★★ 처음 쓰는 기기면 카카오가 다시 묻게 하고, 카카오를 쓴 기기면 안 묻는다', async () => {
+test('⑦ ★★ 일반 브라우저는 카카오 사용 이력과 무관하게 계정을 다시 확인한다', async () => {
   const 처음 = 단추세상({});
   처음.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(처음.부탁[0] && 처음.부탁[0].ask, true,
     '★★ 처음 쓰는 기기인데 안 묻습니다 — 공용 PC 에 남은 앞 사람 카카오로 들어갑니다');
   const 내것 = 단추세상({ 저장: { pu_kakao_used: '1' } });
   내것.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
-  assert.equal(내것.부탁[0] && 내것.부탁[0].ask, false, '★ 내 기기에서도 매번 카카오 비밀번호를 묻습니다');
+  assert.equal(내것.부탁[0] && 내것.부탁[0].ask, true,
+    '★★ 사용 이력만 믿으면 현재 남은 다른 카카오 계정으로 자동 로그인할 수 있습니다');
   const 막힘 = 단추세상({ 막힘: true });
   막힘.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(막힘.부탁[0] && 막힘.부탁[0].ask, true, '★ 저장소를 못 읽으면 «묻는 쪽» 이어야 합니다');
+  const 카카오톡 = 단추세상({ 저장: { pu_kakao_used: '1' }, 기기: 'Mozilla/5.0 KAKAOTALK/10.0' });
+  카카오톡.w.ctx.kkLogin(); await 틈();
+  assert.equal(카카오톡.부탁[0] && 카카오톡.부탁[0].ask, false,
+    '★ 카카오톡 내부 브라우저에서는 지원하지 않는 prompt=login 을 보내면 안 됩니다');
 });
 
 function 나가기세상(kakao, 주소실패, 주소) {

@@ -2166,7 +2166,7 @@ body.portal-mode #moreFab{display:flex;}
         // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다.
         // ⚠ 여기서 카카오 로그아웃으로 «보내지 않는다» (대표 2026-09-29 「로그인 눌렀는데 로그아웃 화면이 나온다」).
         //   카카오 로그아웃은 조용히 끝나지 않고 «로그아웃하시겠습니까?» 를 묻는 화면이다 — 로그인하러 온
-        //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «처음 쓰는 기기면 다시 묻기»(kkLogin)와
+        //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «브라우저에서는 다시 묻기»(kkLogin)와
         //   포털 「로그아웃」 단추(kkLogoutFlow)가 맡는다. 대표 선택: 「바로 들어가게」.
         if(!window.__kkReturning) _rmBootSplash();
         try { if(!window.__kkReturning) _loginGuard.shown('로그인 없음'); } catch(_g){}   // 숨은 탭이면 곧바로 다시 가린다
@@ -2212,10 +2212,12 @@ body.portal-mode #moreFab{display:flex;}
     /* 카카오로 떠나기 전에는 Firebase 인증 저장소를 바꿀 필요가 없다.
        특히 휴대전화 IndexedDB 가 느리면 노란 단추가 여기서 멈춘 듯 보였다.
        유지 방식은 복귀 뒤 인증표로 실제 로그인하기 직전에 적용한다. */
-    var used = false;
-    try { used = localStorage.getItem(KK_USED_KEY) === '1'; } catch(e){}
+    /* 카카오 사용 이력은 이 브라우저에서 지금 선택된 카카오 계정을 뜻하지 않는다.
+       다른 계정(사업자·단체 포함)이 남아 있을 수 있으므로 일반 브라우저에서는 매번 계정을 확인한다.
+       카카오톡 내부 브라우저는 카카오가 prompt=login 을 지원하지 않아 제외한다. */
+    var kakaoTalkInApp = /KAKAOTALK/i.test(navigator.userAgent || '');
     try { sessionStorage.setItem('pu_kakao_login_tap_at', String(Date.now())); } catch(_t){}
-    PuKakao.goLogin({ ask: !used }).catch(function(err){
+    PuKakao.goLogin({ ask: !kakaoTalkInApp }).catch(function(err){
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
       if(btn) btn.disabled = false;
     });
