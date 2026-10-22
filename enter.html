@@ -2024,6 +2024,9 @@ body.portal-mode #moreFab{display:flex;}
   var _portalUid = '';
   var _portalReady = false;
   var _authRecheckTimer = null;
+  /* 카카오 주소를 받아 오는 동안 저장된 Firebase 세션이 뒤늦게 복원될 수 있다.
+     그때 포털을 먼저 그리면 잠시 메인이 보인 뒤 주소 응답이 카카오로 다시 보낸다. */
+  var _kkLoginStarting = false;
   /* 카카오 인증을 마친 탭의 바로 앞 방문기록은 외부 카카오 계정·동의 화면일 수 있다.
      앱에서 포털로 돌아온 뒤 한 번 더 뒤로 가도 그 기록을 다시 밟지 않도록,
      포털 안에만 한 걸음을 둔다. 이 표는 탭이 닫히면 사라지고 인증 정보가 아니다. */
@@ -2140,7 +2143,7 @@ body.portal-mode #moreFab{display:flex;}
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
-        if(!_handled && !window.__kkReturning){ _handled = true; enterPortal(user); }
+        if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
         else if(_handled && _portalReady && _portalUid === user.uid) _rmBootSplash();
       } else if(_handled){
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
@@ -2195,6 +2198,8 @@ body.portal-mode #moreFab{display:flex;}
     t._kkT = setTimeout(function(){ t.style.display = 'none'; }, ms || 4000);
   }
   function kkLogin(){
+    if(_kkLoginStarting) return;   // 한 번 누른 요청이 끝나기 전 중복 이동을 만들지 않는다
+    _kkLoginStarting = true;
     var btn = $('kkLoginBtn');
     if(btn) btn.disabled = true;
     showErr('');
@@ -2219,6 +2224,11 @@ body.portal-mode #moreFab{display:flex;}
     var askKakaoAccount = !isMobile();
     try { sessionStorage.setItem('pu_kakao_login_tap_at', String(Date.now())); } catch(_t){}
     PuKakao.goLogin({ ask: askKakaoAccount }).catch(function(err){
+      _kkLoginStarting = false;
+      /* 카카오 주소 요청이 실패했는데 그 사이 저장된 로그인이 복원됐다면
+         비활성 로그인 폼에 오류만 남기지 말고 정상 포털을 한 번 연다. */
+      var restored = auth.currentUser;
+      if(restored && restored.email && !_handled){ _handled = true; enterPortal(restored); return; }
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
       if(btn) btn.disabled = false;
     });
