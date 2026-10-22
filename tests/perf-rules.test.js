@@ -96,7 +96,7 @@ const allowTop = ['worker_secret' /* 근로자 주민번호·계좌·예금주 �
   /* 2026-10-22 메일 서류 자동 처리 기록 — cfg(모드)만 관리자·위임관리인이 쓴다. last·log 는 서버(관리자 SDK)만 쓰고 규칙에는 쓰기 문이 없다
      (계획 2026-10-22-gov-report-auto.md). 읽기 로그인 · 루트 쓰기 문 없음. 게시 전. */
   'scal_autoRun',
-  'puphotos',   /* 2026-08-02 사진첩 B단계 */
+  'puphotos',    /* 2026-08-02 사진첩 B단계 */
   /* 2026-09-05 공인노무사회에서 받아 둔 자료. 서버(ilaborPull)가 관리자 SDK 로
      담기만 하던 자리라 규칙이 아예 없었고, 뉴스레터 화면이 읽으려 하자
      「permission_denied at /ilabor/items」 로 막혔다 — 받아 놓고 아무도 못 봤다.

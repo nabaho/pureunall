@@ -58,7 +58,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked', 'grBarHtml',
   'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView',
   'grLoadBizOrder', 'grSaveBizOrder', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grByBiz', 'grDragEnd', 'grHasDragType',
-  'grPutCell', 'grLoadAuto', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grAutoRows', 'grAutoName', 'grAutoHtml', 'grRenderAuto', 'grSetAutoMode', 'grUndoAuto', 'grOpenAutoMail', 'grAutoBadge'];
+  'grPutCell', 'grAutoLog', 'grAutoCo', 'grAutoBiz', 'grAutoSkip', 'grAutoUnmatched', 'grAutoToggle', 'grLoadAuto', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grAutoRows', 'grAutoName', 'grAutoHtml', 'grRenderAuto', 'grSetAutoMode', 'grUndoAuto', 'grOpenAutoMail', 'grAutoBadge'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -86,7 +86,7 @@ function world(o) {
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
   vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR_INBOX_NODES'),
-    varLine('GR_MAIL'), varLine('GR_BIZ'), varLine('GR_AUTO'), varLine('GR_AI'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
+    varLine('GR_MAIL'), varLine('GR_BIZ'), varLine('GR_AUTO'), varLine('GR_AUTO_SKIP'), varLine('GR_AI'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
     + "\ngrToday=function(){ return '2026-10-10'; };", ctx);
   if (o.email) vm.runInContext('GR.email=' + JSON.stringify(o.email) + ';', ctx);
   return { ctx, db, els, urls };
@@ -5270,12 +5270,24 @@ function autoSeed(o) {
       run.last.items = o.last === 'objItems' ? { 0: li[0], 1: li[1] } : li;
     }
     if (o.note) run.last.note = o.note;
+    if (o.unmatched) {
+      run.last.unmatched = [];
+      for (let i = 0; i < o.unmatched; i++) run.last.unmatched.push({ co: i % 2 ? 'c6' : 'c2', rid: i === 2 ? '' : 't3_2026', mail: 'i:INBOX-0a1b2c3d:' + (500 + i), name: (i === 0 ? '<u>미배정</u>' : '미배정' + i) + '.pdf', day: '2026-10-0' + (1 + (i % 8)), why: i === 0 ? '<s>알 수 없는 까닭</s>' : '줄을 하나로 정할 수 없습니다' });
+      run.last.nUnmatched = Math.max(o.unmatchedTotal || 0, o.unmatched);
+    }
+    if (o.skipped) run.last.skipped = o.skipped;
   }
   if (o.log !== false && mode !== 'dry') {
     const items = [{ co: 'c2', rid: 't3_2026', key: 'sign', step: 'sign', mail: AUTO_M1, name: '서명본.hwpx', day: '2026-09-25', act: 'done', prev: AUTO_PREV },
       { co: 'c6', rid: 't3_2026', key: 'attach', step: 'attach', mail: AUTO_M2, name: '<b>사진</b>.png', day: '2026-10-09', act: 'done' }];
     for (let i = 0; i < (o.extra || 0); i++) items.push({ co: 'c2', rid: 't3_2026', key: 'attach', step: 'attach', mail: 'i:INBOX-0a1b2c3d:' + (300 + i), name: '더미' + i + '.pdf', day: '2026-10-0' + (1 + (i % 8)), act: 'done' });
+    items.forEach((x) => { x.at = AUTO_AT; });
     run.log = { '2026-10-10': { at: AUTO_AT, mode: 'live', items } };
+    if (o.yesterday) {   // 어제 저녁 20시 실행이 처리한 줄 — 서류 줄도 자동이 쓴 그대로
+      s.scal_docs.c2.t3_2026.items.attach = { st: 'done', gotAt: '2026-10-08', how: 'mail', by: '자동', at: AUTO_AT - 18 * 3600e3, note: '자동 처리 — 메일 «어제것»', link: { src: 'mail', key: 'i:INBOX-0a1b2c3d:401', name: '어제것.pdf', date: '2026-10-08' } };
+      run.log['2026-10-09'] = { at: AUTO_AT - 18 * 3600e3, mode: 'live', items: [{ co: 'c2', rid: 't3_2026', key: 'attach', step: 'attach', mail: 'i:INBOX-0a1b2c3d:401', name: '어제것.pdf', day: '2026-10-08', act: 'done', at: AUTO_AT - 18 * 3600e3 }] };
+    }
+    if (o.days8) for (let d = 3; d <= 9; d++) run.log['2026-10-0' + d] = { at: AUTO_AT, mode: 'live', items: [{ co: 'c2', rid: 't3_2026', key: 'attach', step: 'attach', mail: 'i:INBOX-0a1b2c3d:60' + d, name: (d === 3 ? '여드레전' : '일' + d) + '.pdf', day: '2026-10-0' + d, act: 'done' }] };
   }
   if (Object.keys(run).length) s.scal_autoRun = run;
   return s;
@@ -5286,16 +5298,21 @@ function autoWorld(o) {
   const w = world({ seed: o.seed || autoSeed(o), email: 'p009@pureun.kr', confirm: o.confirm, db: (db) => ({ ref: (p) => {
     paths.push(p);
     const r = db.ref(p);
-    if (o.failRead && p.indexOf('scal_autoRun') === 0) return { once: async () => { throw new Error('permission_denied'); } };
+    if (o.failRead && p.indexOf('scal_autoRun') === 0) return { once: async () => { throw new Error('permission_denied'); }, orderByKey: () => ({ limitToLast: () => ({ once: async () => { throw new Error('permission_denied'); } }) }) };
+    if (p === 'scal_autoRun/log') return { once: r.once, orderByKey: () => ({ limitToLast: (n) => { w.limits.push(n); return o.gate ? { once: () => o.gate.then(() => r.orderByKey().limitToLast(n).once()) } : r.orderByKey().limitToLast(n); } }) };
+    if (o.gate && p.indexOf('scal_autoRun') === 0) return { once: () => o.gate.then(() => r.once()) };
     if (o.denyCfg && p === 'scal_autoRun/cfg') return { once: r.once, set: async () => { throw new Error('permission_denied'); } };
     if (o.denyDocs && p.indexOf('scal_docs/') === 0) return { once: r.once, set: async () => { throw new Error('permission_denied'); } };
     return r;
   } }) });
   w.paths = paths;
+  w.limits = [];
   w.opened = [];
   w.ctx.grOpenAtt = async (ref, name) => { w.opened.push([J(ref), name]); return { ok: true }; };   // 메일 열기 길은 따로 검사한다 — 여기서는 부른 값만 본다
   return w;
 }
+/* grLoad 는 자동 처리 읽기를 기다리지 않는다 — 값이 오는 것은 따로 기다린다 */
+const autoLoad = async (w) => { await w.ctx.grLoad(); await w.ctx.grLoadAuto(); };
 const autoSec = (w) => { const h = w.els.today.innerHTML, i = h.indexOf('id="tdAuto"'); return i < 0 ? '' : h.slice(i, h.indexOf('td-sec inbox', i)); };
 const autoRows = (h) => countOf(h, /class="td-au"/g);
 
@@ -5309,7 +5326,7 @@ test('170 정적 — 자동 처리 모듈을 inbox·send·nav 다음에 싣는�
   assert.match(SRC, /var GR_AUTO=\{node:'scal_autoRun',/);
   assert.doesNotMatch(INLINE, /ref\(\s*['"]scal_autoRun/, 'GR_AUTO 를 거치지 않았다');
   assert.match(grab('grSetAutoMode'), /fbDb\.ref\(GR_AUTO\.node\+'\/'\+GR_AUTO\.cfg\)\.set\(/, '모드는 cfg 한 칸 .set');
-  ['grAutoHtml', 'grAutoRows', 'grAutoName', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grRenderAuto', 'grAutoBadge'].forEach((n) =>
+  ['grAutoHtml', 'grAutoRows', 'grAutoName', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grRenderAuto', 'grAutoBadge', 'grAutoLog', 'grAutoCo', 'grAutoBiz', 'grAutoSkip', 'grAutoUnmatched', 'grAutoToggle'].forEach((n) =>
     assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|localStorage|grSaveCell|grPutCell/, n + ' 은 읽어 그리기만'));
   assert.doesNotMatch(grab('grUndoAuto'), /\.set\(|grSaveCell/, '되돌리기는 서류 줄 쓰기 길 grPutCell 로만');
   assert.match(grab('grUndoAuto'), /grPutCell\(/);
@@ -5317,6 +5334,9 @@ test('170 정적 — 자동 처리 모듈을 inbox·send·nav 다음에 싣는�
   assert.match(grab('grRenderToday'), /id="tdAuto"/);
   assert.ok(grab('grRenderToday').indexOf('id="tdAuto"') < grab('grRenderToday').indexOf('td-sec inbox'), '받은 서류 묶음 앞');
   assert.match(grab('grLoad'), /grLoadAuto\(\)/, 'grLoad 가 한 번 읽는다');
+  assert.doesNotMatch(grab('grLoad'), /await\s+grLoadAuto/, '기다리지 않는다 — 첫 화면이 왕복 하나 늦어지지 않게');
+  assert.match(grab('grLoadAuto'), /fbDb\.ref\(G\.node\+'\/'\+G\.log\)\.orderByKey\(\)\.limitToLast\(G\.logN\)\.once\('value'\)/, '기록은 날짜 키 마지막 몇 개만(이름 표 GR_AUTO)');
+  assert.match(SRC, /var GR_AUTO=\{[^\r\n]*logN:7,/, '7일');
   const css = SRC.slice(SRC.indexOf('<style>'), SRC.indexOf('</style>')).split(/\r?\n/).filter((l) => /\.td-au|\.td-am/.test(l)).join('\n');
   assert.ok(css.length > 0);
   noColor(css, '새 CSS 는 기존 변수만');
@@ -5324,7 +5344,7 @@ test('170 정적 — 자동 처리 모듈을 inbox·send·nav 다음에 싣는�
 
 test('171 live — 모드 딱지 «켜짐» · 마지막 실행 시각 · 처리/미배정 수 · 오늘 기록 + 마지막 실행의 처리분이 합쳐져 한 줄씩(중복 없음) · 업체·서류 줄 이름·첨부·날짜 · 메일 열기 · 되돌리기 · 값은 이스케이프 · 쓰기 0', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   assert.ok(h.includes('🤖 메일 자동 처리'));
   assert.match(h, /<span class="st st-done">켜짐<\/span>/);
@@ -5336,14 +5356,15 @@ test('171 live — 모드 딱지 «켜짐» · 마지막 실행 시각 · 처리
   assert.ok(h.includes('&#60;i&#62;북&#60;/i&#62;상사') && h.includes('&#60;b&#62;사진&#60;/b&#62;.png'), '업체·첨부 이름은 이스케이프');
   assert.ok(!h.includes('<i>') && !h.includes('<b>사진'), '바깥 값을 그대로 넣지 않았다');
   assert.ok(h.includes('산출물 별첨'), '이름을 못 찾는 쌍(일정 없는 업체)도 줄 이름은 서류 틀에서 — 못 찾으면 줄 키');
-  assert.deepEqual(w.paths.filter((p) => p.indexOf('scal_autoRun') === 0).sort(), ['scal_autoRun/cfg', 'scal_autoRun/last', 'scal_autoRun/log/2026-10-10'], '읽기는 셋 — 통째로 읽지 않는다');
+  assert.deepEqual([...new Set(w.paths.filter((p) => p.indexOf('scal_autoRun') === 0))].sort(), ['scal_autoRun/cfg', 'scal_autoRun/last', 'scal_autoRun/log'], '읽기는 셋 — 기록은 날짜 칸 하나가 아니라 «마지막 7개»');
+  assert.ok(w.limits.length >= 1 && w.limits.every((n) => n === 7), '기록은 orderByKey().limitToLast(7) 로 읽는다: ' + w.limits);
   assert.equal(w.db.쓴것.length, 0, '읽기만');
   assert.equal(w.ctx.GR.auto.mode, 'live');
 });
 
 test('172 시범 운행 — cfg 가 없으면 dry · 목록 «이렇게 처리할 예정» · 메일 열기만(되돌리기 없음) · 서류 줄은 안 쓴다', async () => {
   const w = autoWorld({ mode: null, lastMode: 'dry', written: false, log: false });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   assert.match(h, /<span class="st st-draft">시범 운행<\/span>/);
   assert.ok(h.includes('이렇게 처리할 예정'), h);
@@ -5358,7 +5379,7 @@ test('172 시범 운행 — cfg 가 없으면 dry · 목록 «이렇게 처리�
 
 test('173 꺼짐 — 모드 딱지 «꺼짐» · 목록은 오늘 처리분(되돌리기용)만 · last 가 시범 기록이면 예정 목록을 보이지 않는다', async () => {
   const w = autoWorld({ mode: 'off', lastMode: 'dry' });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   assert.match(h, /<span class="st st-wait">꺼짐<\/span>/);
   assert.ok(!h.includes('이렇게 처리할 예정'));
@@ -5368,7 +5389,7 @@ test('173 꺼짐 — 모드 딱지 «꺼짐» · 목록은 오늘 처리분(되�
 
 test('174 읽지 못하면(규칙 게시 전·권한) «자동 처리 상태를 읽지 못했습니다» 한 줄만 — 모드 버튼·목록 없음 · 앱은 그대로 · 던지지 않는다', async () => {
   const w = autoWorld({ failRead: true });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   assert.ok(h.includes('<div class="err-s">자동 처리 상태를 읽지 못했습니다</div>'), h);
   assert.equal(countOf(h, /<button/g), 0, '버튼 없음');
@@ -5380,43 +5401,43 @@ test('174 읽지 못하면(규칙 게시 전·권한) «자동 처리 상태를 
 
 test('175 처리 0건 — last 에 items 가 없어도(DB 가 빈 칸을 버린다) · 번호 객체로 와도 · 오늘 기록이 없어도 던지지 않는다 · last 가 없으면 «아직 실행 기록이 없습니다»', async () => {
   const w = autoWorld({ last: 'noItems', log: false });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   let h = autoSec(w);
   assert.ok(h.includes('처리 2건 · 미배정 1건'), h);
   assert.equal(autoRows(h), 0);
   assert.ok(h.includes('최근 자동 처리한 서류가 없습니다'), h);
   const wd = autoWorld({ mode: 'dry', last: 'noItems' });
-  await wd.ctx.grLoad();
+  await autoLoad(wd);
   assert.ok(autoSec(wd).includes('처리할 예정인 메일이 없습니다'));
   const wo = autoWorld({ last: 'objItems', log: false });
-  await wo.ctx.grLoad();
+  await autoLoad(wo);
   assert.equal(autoRows(autoSec(wo)), 2, '번호 객체로 와도 평평하게 읽는다');
   const wn = autoWorld({ last: 'none', log: false });
-  await wn.ctx.grLoad();
+  await autoLoad(wn);
   h = autoSec(wn);
   assert.ok(h.includes('아직 실행 기록이 없습니다'), h);
   assert.equal(wn.ctx.GR.loaded, true);
   const we = autoWorld({ seed: F.seed() });   // scal_autoRun 자체가 없다
-  await we.ctx.grLoad();
+  await autoLoad(we);
   assert.match(autoSec(we), /st-draft">시범 운행/, 'cfg 없음 = 시범 운행');
 });
 
 test('176 마지막 실행 알림 — last.note 가 있으면 한 줄(실패는 붉게) · 시각은 서울 시각 · 목록은 최대 10줄(+ 나머지 안내)', async () => {
   const w = autoWorld({ note: '실패: 입력 확인 실패', extra: 12 });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   assert.ok(h.includes('<div class="err-s">실패: 입력 확인 실패</div>'), h);
   assert.equal(autoRows(h), 10, '최대 10줄');
   assert.ok(h.includes('처음 10건만 보입니다'), '나머지 안내');
   const w2 = autoWorld({ note: '오늘 기록 칸(200)이 차서 3건은 다음 날로 미룸' });
-  await w2.ctx.grLoad();
+  await autoLoad(w2);
   assert.ok(autoSec(w2).includes('<div class="days">오늘 기록 칸(200)이 차서 3건은 다음 날로 미룸</div>'));
 });
 
 test('177 모드 스위치 — 버튼 셋(꺼짐·시범·켜짐) · 시범·꺼짐은 바로 cfg 한 칸 .set {mode, by(내 이름), at} · 켜짐은 확인 창(«서류 상태를 자동으로 완료로 바꿉니다») 뒤에만 · 모르는 값은 쓰지 않는다', async () => {
   const asked = [];
   const w = autoWorld({ confirm: (m) => { asked.push(m); return asked.length !== 2; } });   // 첫 확인은 예, 둘째는 아니오
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const h = autoSec(w);
   ['off', 'dry', 'live'].forEach((m) => assert.ok(h.includes('onclick="grSetAutoMode(\'' + m + '\')"'), m));
   assert.match(h, /class="act on"[^>]*onclick="grSetAutoMode\('live'\)"[^>]*aria-pressed="true"/, '지금 모드 표시');
@@ -5440,14 +5461,14 @@ test('177 모드 스위치 — 버튼 셋(꺼짐·시범·켜짐) · 시범·꺼
   assert.equal(w.db.쓴것.length, 3, '모르는 값은 쓰지 않는다');
   w.db.쓴것.forEach((x) => assert.equal(x.자리, 'scal_autoRun/cfg'));
   const wn = autoWorld({});   // 확인 창이 없는 환경 — 켜지 않는다
-  await wn.ctx.grLoad(); await wn.ctx.grSetAutoMode('off');
+  await autoLoad(wn); await wn.ctx.grSetAutoMode('off');
   await wn.ctx.grSetAutoMode('live');
   assert.equal(wn.db.쓴것.length, 1, '확인 창이 없으면 켜지 않는다');
 });
 
 test('178 직원(규칙 거절) — 눌러도 «관리자만 바꿀 수 있습니다» · 값·딱지 그대로 · 쓰기 0 · 잠금은 풀려 다시 눌러 볼 수 있다', async () => {
   const w = autoWorld({ denyCfg: true, confirm: () => true });
-  await w.ctx.grLoad();
+  await autoLoad(w);
   await w.ctx.grSetAutoMode('off');
   const h = w.els.tdAuto.innerHTML;
   assert.equal(w.ctx.GR.auto.msg, '저장하지 못했습니다 — 관리자만 바꿀 수 있습니다(규칙 게시 또는 권한 확인)');
@@ -5462,7 +5483,7 @@ test('178 직원(규칙 거절) — 눌러도 «관리자만 바꿀 수 있습�
 
 test('179 되돌리기(prev 있음) — 옛 줄(발송함) 그대로 + 그 메일 link · 처리자는 내 이름(자동 아님) · 서류 줄 쓰기 길로 한 번 · 로컬 기록·딱지·목록이 바뀐다 · 다시 자동 처리되지 않는다', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const i = w.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign');
   assert.ok(i >= 0 && w.ctx.GR.auto.rows[i].undo, '되돌릴 수 있는 줄');
   await w.ctx.grUndoAuto(i);
@@ -5493,7 +5514,7 @@ test('179 되돌리기(prev 있음) — 옛 줄(발송함) 그대로 + 그 메�
 
 test('180 되돌리기(prev 없음) — {st:none} + link · 처리자는 사람 · 이 줄에도 메일 연결이 남아 «연결됨» 으로 둔다', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const i = w.ctx.GR.auto.rows.findIndex((r) => r.key === 'attach');
   await w.ctx.grUndoAuto(i);
   assert.equal(w.db.쓴것.length, 1);
@@ -5509,7 +5530,7 @@ test('180 되돌리기(prev 없음) — {st:none} + link · 처리자는 사람 
 test('181 되돌리기를 막는 것 — 그 사이 사람이 고친 줄 · 저장 거절 · 기록을 못 읽은 상태 · 시범 운행 줄 · 이상한 이름 — 안내만 하고 값은 그대로', async () => {
   /* 사람이 고친 줄 */
   const w1 = autoWorld();
-  await w1.ctx.grLoad();
+  await autoLoad(w1);
   const line = w1.db.읽기('scal_docs/c2/t3_2026/items/sign');
   await w1.db.ref('scal_docs/c2/t3_2026/items/sign').set(Object.assign({}, line, { by: '김가나' }));   // 화면을 연 뒤 다른 사람이 고쳤다(화면의 기록은 아직 낡았다)
   const n0 = w1.db.쓴것.length;
@@ -5520,7 +5541,7 @@ test('181 되돌리기를 막는 것 — 그 사이 사람이 고친 줄 · 저�
   assert.equal(w1.ctx.GR.auto.busy, false);
   /* 저장 거절 */
   const w2 = autoWorld({ denyDocs: true });
-  await w2.ctx.grLoad();
+  await autoLoad(w2);
   const before = JSON.stringify(w2.ctx.GR.track);
   await w2.ctx.grUndoAuto(w2.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign'));
   assert.equal(JSON.stringify(w2.ctx.GR.track), before, '값 불변');
@@ -5530,27 +5551,27 @@ test('181 되돌리기를 막는 것 — 그 사이 사람이 고친 줄 · 저�
   assert.equal(w2.ctx.GR.saving['c2/t3_2026/sign'], undefined, '잠금이 풀린다');
   /* 기록을 못 읽은 상태 */
   const w3 = autoWorld({ denyDocs: false });
-  await w3.ctx.grLoad();
+  await autoLoad(w3);
   w3.ctx.GR.track = null; w3.ctx.GR.trackErr = true;
   await w3.ctx.grUndoAuto(0);
   assert.equal(w3.db.쓴것.length, 0);
   assert.ok(w3.ctx.GR.auto.msg.includes('기록'), w3.ctx.GR.auto.msg);
   /* 시범 운행의 예정 줄 · 범위 밖 번호 */
   const w4 = autoWorld({ mode: 'dry', written: false });
-  await w4.ctx.grLoad();
+  await autoLoad(w4);
   await w4.ctx.grUndoAuto(0); await w4.ctx.grUndoAuto(99); await w4.ctx.grUndoAuto(-1); await w4.ctx.grUndoAuto('x');
   assert.equal(w4.db.쓴것.length, 0);
   /* 이상한 이름 */
   const bad = autoSeed(); bad.scal_autoRun.log['2026-10-10'].items[0].key = 'a/b'; bad.scal_autoRun.log['2026-10-10'].items[1].rid = 'x.y';
   const w5 = autoWorld({ seed: bad });
-  await w5.ctx.grLoad();
+  await autoLoad(w5);
   await w5.ctx.grUndoAuto(0); await w5.ctx.grUndoAuto(1);
   assert.equal(w5.db.쓴것.length, 0, '규칙 열쇠 꼴이 아니면 쓰지 않는다');
 });
 
 test('182 메일 열기 — 기존 grOpenAtt 길(연결 열쇠 parse + 첨부 이름) · 개인 자료 거름은 서버가 이미 했다 · 범위 밖 번호는 무시', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   const i = w.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign');
   await w.ctx.grOpenAutoMail(i);
   assert.deepEqual(w.opened, [[{ kind: 'imap', slug: 'INBOX-0a1b2c3d', uid: '101' }, '서명본.hwpx']]);
@@ -5561,7 +5582,7 @@ test('182 메일 열기 — 기존 grOpenAtt 길(연결 열쇠 parse + 첨부 �
 
 test('183 «자동» 딱지 — 서류 체크표 칸·칸 창 머리에 처리자가 자동인 줄이 있을 때만 · 사람 줄에는 없다', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   w.ctx.grSetBiz('consulting-04');
   const d = w.els.docs.innerHTML;
   assert.match(d, /data-step="sign"[^>]*>[^]*?<\/button> <span class="tag-ai"[^>]*>자동<\/span>/, '다라정밀 ③ 칸');
@@ -5572,14 +5593,14 @@ test('183 «자동» 딱지 — 서류 체크표 칸·칸 창 머리에 처리�
   /* 사람이 고친 줄 */
   const s = autoSeed(); s.scal_docs.c2.t3_2026.items.sign.by = '김가나';
   const w2 = autoWorld({ seed: s });
-  await w2.ctx.grLoad();
+  await autoLoad(w2);
   w2.ctx.grSetBiz('consulting-04');
   assert.ok(!w2.els.docs.innerHTML.includes('>자동</span>'));
   w2.ctx.grOpenCell('c2', 't3', 'sign');
   assert.ok(!w2.els.cellw.innerHTML.includes('>자동</span>'));
   /* 기록을 못 읽으면 딱지도 없다(던지지 않는다) */
   const w3 = autoWorld();
-  await w3.ctx.grLoad();
+  await autoLoad(w3);
   w3.ctx.GR.track = null; w3.ctx.GR.trackErr = true;
   w3.ctx.grSetBiz('consulting-04');
   assert.ok(!w3.els.docs.innerHTML.includes('>자동</span>'));
@@ -5587,7 +5608,7 @@ test('183 «자동» 딱지 — 서류 체크표 칸·칸 창 머리에 처리�
 
 test('184 칸 창 저장은 그대로 — grPutCell 을 거쳐 같은 한 줄 .set · 기존 오늘 할 일·첫 화면 구성은 그대로(급함·챙기기·사업 카드 띠·받은 서류 묶음) · 구역은 받은 서류 묶음 앞', async () => {
   const w = autoWorld();
-  await w.ctx.grLoad();
+  await autoLoad(w);
   w.ctx.grSetBiz('consulting-04');
   w.ctx.grOpenCell('c2', 't3', 'sign');
   w.els.cwSt.value = 'done'; w.els.cwSent.value = '2026-09-20'; w.els.cwGot.value = '2026-09-26'; w.els.cwNote.value = '메모';
@@ -5600,4 +5621,136 @@ test('184 칸 창 저장은 그대로 — grPutCell 을 거쳐 같은 한 줄 .s
   assert.ok(h.includes('class="td-sec hot"') && h.includes('class="td-strip"') && h.includes('📬'));
   assert.ok(h.indexOf('id="tdAuto"') > 0 && h.indexOf('id="tdAuto"') < h.indexOf('td-sec inbox'), '구역은 받은 서류 묶음 앞');
   assert.equal(countOf(h, /class="td-task/g), tdModel(w).total, '한 줄 = 한 가지 일 — 자동 처리 줄은 할 일로 세지 않는다');
+});
+
+/* ── 수정 라운드 1 (독립 검토 I4·I5·Minor) ── */
+test('185 기록은 날짜 키 마지막 7개 — 어제 저녁에 처리된 줄도 목록에 나오고 되돌릴 수 있다(다음 실행이 0건이어도) · 8일 전은 읽지 않는다 · 최근 순 · 처리 날짜가 보인다', async () => {
+  const w = autoWorld({ yesterday: true, last: 'noItems' });   // 다음 실행이 0건이라 last 에 items 가 없다
+  await autoLoad(w);
+  const h = autoSec(w);
+  assert.equal(autoRows(h), 3, '오늘 둘 + 어제 하나');
+  assert.ok(h.includes('어제것.pdf') && h.includes('처리 2026-10-09 20:30'), '처리 날짜·시각');
+  assert.ok(h.indexOf('서명본.hwpx') < h.indexOf('어제것.pdf'), '최근 순');
+  assert.equal(countOf(h, /grUndoAuto\(/g), 3, '7일 안 줄은 모두 되돌릴 수 있다');
+  assert.ok(w.limits.length >= 1 && w.limits.every((n) => n === 7), 'limitToLast(7): ' + w.limits);
+  const i = w.ctx.GR.auto.rows.findIndex((r) => r.name === '어제것.pdf');
+  assert.ok(w.ctx.GR.auto.rows[i].undo);
+  await w.ctx.grUndoAuto(i);
+  assert.equal(w.db.쓴것.length, 1);
+  assert.equal(w.db.쓴것[0].자리, 'scal_docs/c2/t3_2026/items/attach');
+  const v = J(w.db.쓴것[0].값);
+  assert.equal(v.st, 'none'); assert.equal(v.by, '홍길동'); assert.equal(v.link.key, 'i:INBOX-0a1b2c3d:401');
+  /* 날짜 키가 여덟이면 가장 오래된 날은 읽지 않는다 */
+  const w8 = autoWorld({ days8: true });
+  await autoLoad(w8);
+  const h8 = autoSec(w8);
+  assert.ok(!h8.includes('여드레전.pdf'), '8번째로 오래된 날은 읽지 않았다');
+  assert.ok(h8.includes('일4.pdf') && h8.includes('일9.pdf'), '나머지 일곱 날은 읽었다');
+  assert.ok(w8.limits.every((n) => n === 7));
+  assert.equal(w8.db.쓴것.length, 0);
+});
+
+test('186 grLoad 는 자동 처리 읽기를 기다리지 않는다 — 읽기가 늦어도 판은 먼저 그려지고, 값이 오면 첫 화면만 다시 그린다', async () => {
+  let open; const gate = new Promise((r) => { open = r; });
+  const w = autoWorld({ gate });
+  let timer;
+  await Promise.race([w.ctx.grLoad(), new Promise((_, no) => { timer = setTimeout(() => no(new Error('grLoad 가 자동 처리 읽기를 기다린다')), 1500); })]);
+  clearTimeout(timer);
+  assert.equal(w.ctx.GR.loaded, true, '판은 그려졌다');
+  assert.ok(w.els.rows.innerHTML.includes('가나상사') && w.els.today.innerHTML.includes('📬'));
+  assert.ok(autoSec(w).includes('불러오는 중…'), '구역은 기다리는 중 표시');
+  open();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.match(autoSec(w), /st-done">켜짐/, '값이 오면 첫 화면이 다시 그려진다');
+  assert.equal(autoRows(autoSec(w)), 2);
+  /* 읽기가 아예 안 와도(영영 대기) 앱은 그대로 */
+  const w2 = autoWorld({ gate: new Promise(() => {}) });
+  let t2;
+  await Promise.race([w2.ctx.grLoad(), new Promise((_, no) => { t2 = setTimeout(() => no(new Error('멈췄다')), 1500); })]);
+  clearTimeout(t2);
+  assert.equal(w2.ctx.GR.loaded, true);
+  assert.ok(w2.els.rows.innerHTML.includes('가나상사'));
+});
+
+test('187 미배정 — last.unmatched 가 있으면 접이식 목록(≤10줄 + «외 n건» · 업체·서류(사업 이름)·첨부·날짜·까닭 그대로 · 메일 열기) · 수동 확인에도 남는다는 한 줄 · 없으면 접이식을 안 그린다', async () => {
+  const w = autoWorld({ unmatched: 12, unmatchedTotal: 15 });
+  await autoLoad(w);
+  const h = autoSec(w);
+  assert.match(h, /<details class="td-un"[^>]*><summary>미배정 15건 — 사람이 확인하세요<\/summary>/);
+  const d = h.slice(h.indexOf('<details'), h.indexOf('</details>'));
+  assert.equal(countOf(d, /class="td-au"/g), 10, '최대 10줄');
+  assert.ok(d.includes('외 5건'), '15 − 10');
+  assert.ok(d.includes('&#60;u&#62;미배정&#60;/u&#62;.pdf') && d.includes('&#60;s&#62;알 수 없는 까닭&#60;/s&#62;'), '첨부 이름·까닭은 이스케이프');
+  assert.ok(!d.includes('<u>') && !d.includes('<s>'));
+  assert.ok(d.includes('줄을 하나로 정할 수 없습니다'), '서버 까닭 그대로');
+  assert.ok(d.includes('다라정밀') && d.includes('&#60;i&#62;북&#60;/i&#62;상사'), '업체');
+  assert.ok(d.includes('인사노무컨설팅충남북부상의'), '서류 = rid → 일정 사업 → 사업 이름');
+  assert.ok(d.includes('(서류 미정)'), 'rid 가 비면');
+  assert.ok(d.includes('수동 「받은 서류 확인」'), '수동 후보에도 남는다');
+  assert.equal(countOf(d, /onclick="grOpenAutoMail\(\d+,1\)"/g), 10);
+  assert.equal(countOf(d, /grUndoAuto\(/g), 0, '미배정 줄에는 되돌릴 것이 없다');
+  await w.ctx.grOpenAutoMail(0, 1);
+  assert.deepEqual(w.opened, [[{ kind: 'imap', slug: 'INBOX-0a1b2c3d', uid: '500' }, '<u>미배정</u>.pdf']]);
+  await w.ctx.grOpenAutoMail(99, 1);
+  assert.equal(w.opened.length, 1);
+  /* 접어 두면 접힌 채, 펼쳤다면 다시 그려도 펼친 채 */
+  assert.ok(!/<details class="td-un" open/.test(h));
+  w.ctx.GR.auto.unOpen = true; w.ctx.grRenderAuto();
+  assert.match(w.els.tdAuto.innerHTML, /<details class="td-un" open/);
+  /* 없으면(옛 기록·0건) 안 그린다 */
+  const w0 = autoWorld({});
+  await autoLoad(w0);
+  assert.ok(!autoSec(w0).includes('<details'));
+  const w1 = autoWorld({ unmatched: 2 });
+  await autoLoad(w1);
+  assert.ok(!autoSec(w1).includes('외 '), '10줄 이하면 «외» 없음');
+  assert.ok(autoSec(w1).includes('미배정 2건 — 사람이 확인하세요'));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('188 모름·건너뜀 — last.mode 가 unknown 이면 «모름» 딱지 · cfg 값이 이상해도 «모름»(cfg 가 없을 때의 «시범 운행» 과 구분) · last.skipped 는 한국어 한 줄(많은 순 · 모르는 키는 키 그대로 · 숫자 아닌 것·0 은 뺀다)', async () => {
+  const w = autoWorld({ lastMode: 'unknown', skipped: { sharedAddr: 2, priv: 1, weirdKey: 3, zero: 0, bad: 'x' } });
+  await autoLoad(w);
+  const h = autoSec(w);
+  assert.ok(h.includes('실행 모드 <span class="st st-wait">모름</span>'), h);
+  assert.match(h, /st-done">켜짐/, '맨 위 딱지는 cfg(스위치)');
+  assert.ok(h.includes('<div class="days">이번 실행 건너뜀: weirdKey 3 · 공유 주소 2 · 개인 자료 1</div>'), h);
+  assert.equal(autoRows(h), 2, '모름인 마지막 실행의 items 는 처리분이 아니다 — 오늘 기록만');
+  const ws = autoWorld({ mode: 'weird' });
+  await autoLoad(ws);
+  assert.match(autoSec(ws), /<span class="st st-wait">모름<\/span><\/div>/, '이상한 cfg 값은 «모름»');
+  assert.equal(ws.ctx.GR.auto.mode, 'unknown');
+  assert.ok(!autoSec(ws).includes('onclick="grSetAutoMode(\'weird\')"'));
+  assert.equal(countOf(autoSec(ws), /grSetAutoMode\('/g), 3, '버튼은 그대로 셋 — 어느 것도 눌린 표시가 아니다');
+  assert.ok(!/class="act on"/.test(autoSec(ws)));
+  const wn = autoWorld({ mode: null, lastMode: 'dry', written: false, log: false });
+  await autoLoad(wn);
+  assert.match(autoSec(wn), /st-draft">시범 운행/, 'cfg 가 없으면 시범 운행');
+  const wk = autoWorld({});
+  await autoLoad(wk);
+  assert.ok(!autoSec(wk).includes('이번 실행 건너뜀') && !autoSec(wk).includes('실행 모드'), '없으면 한 줄도 없다');
+  const wd = autoWorld({ mode: 'dry', lastMode: 'live', written: false });   // cfg 는 시범인데 마지막 실행은 켜짐 — 다름을 보인다
+  await autoLoad(wd);
+  assert.ok(autoSec(wd).includes('실행 모드 <span class="st st-done">켜짐</span>'));
+});
+
+test('189 되돌리기 보호 — 줄이 «자동이 쓴 그대로»가 아니면(처리자가 사람·연결한 메일이 로그의 메일과 다름·줄이 없음) 쓰지 않는다 · 같을 때만 쓴다', async () => {
+  for (const [why, edit] of [['연결한 메일이 다르다', (l) => { l.link.key = 'i:INBOX-0a1b2c3d:999'; }], ['처리자가 사람이다', (l) => { l.by = '김가나'; }]]) {
+    const s = autoSeed();
+    const w = autoWorld({ seed: s });
+    await autoLoad(w);
+    const path = 'scal_docs/c2/t3_2026/items/sign';
+    const line = w.db.읽기(path);
+    edit(line);
+    await w.db.ref(path).set(line);   // 화면을 연 뒤 줄이 바뀌었다(화면의 기록은 아직 낡았다)
+    const n0 = w.db.쓴것.length;
+    await w.ctx.grUndoAuto(w.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign'));
+    assert.equal(w.db.쓴것.length, n0, why + ' — 쓰지 않는다');
+    assert.ok(w.ctx.GR.auto.msg.includes('그대로 두었습니다'), why + ': ' + w.ctx.GR.auto.msg);
+  }
+  const wn = autoWorld({});
+  await autoLoad(wn);
+  await wn.db.ref('scal_docs/c2/t3_2026/items/sign').set({ st: 'done', by: '자동', at: 1, link: { src: 'mail', key: AUTO_M1 } });
+  await wn.ctx.grUndoAuto(wn.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign'));
+  assert.equal(wn.db.쓴것.length, 2, '자동이 쓴 그대로이고 메일이 같으면 쓴다(처음 한 번은 이 검사의 흉내 쓰기)');
 });
