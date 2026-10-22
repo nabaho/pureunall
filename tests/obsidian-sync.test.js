@@ -139,3 +139,42 @@ test('끝에서 끝까지: 만들고 · 다시 돌려도 안 늘고 · 바뀐 �
   assert.ok(!fs.existsSync(dry), '모의 실행인데 보관함이 생겼다');
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+test('대표가 자기 위키 규칙(schema.md)을 갖고 있으면 우리 틀을 끼워 넣지 않고, 출처로 적힌 원자료는 대기에서 빠진다', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-own-'));
+  const vault = path.join(tmp, 'vault'); const claude = path.join(tmp, 'claude', 'p');
+  fs.mkdirSync(path.join(vault, 'wiki/sources'), { recursive: true }); fs.mkdirSync(claude, { recursive: true });
+  fs.writeFileSync(path.join(vault, 'schema.md'), '# Wiki Schema\n');
+  fs.writeFileSync(path.join(vault, 'wiki/log.md'), '내 기록\n');
+  const line = (o) => JSON.stringify(o) + '\n';
+  fs.writeFileSync(path.join(claude, 'sess-own1.jsonl'),
+    line({ type: 'user', sessionId: 'sess-own1', cwd: '/w/demo', timestamp: '2026-10-18T01:00:00Z', message: { role: 'user', content: '질문' } }) +
+    line({ type: 'assistant', timestamp: '2026-10-18T01:00:03Z', message: { role: 'assistant', content: [{ type: 'text', text: '답' }] } }));
+  const run = () => spawnSync(process.execPath, [SYNC, '--vault', vault, '--claude-dir', path.join(tmp, 'claude'), '--codex-dir', path.join(tmp, 'none')], { encoding: 'utf8' });
+  const r = run();
+  assert.equal(r.status, 0, r.stderr);
+  ['CLAUDE.md', 'AGENTS.md', 'wiki/index.md', 'wiki/projects'].forEach((f) => assert.ok(!fs.existsSync(path.join(vault, f)), f + ' 를 남의 규칙 옆에 끼워 넣었다'));
+  assert.equal(fs.readFileSync(path.join(vault, 'wiki/log.md'), 'utf8'), '내 기록\n', '남의 기록(log)에 끼어 썼다');
+  assert.ok(fs.readdirSync(path.join(vault, 'raw/sessions/claude-code')).length === 1);
+  const note = fs.readdirSync(path.join(vault, 'raw/sessions/claude-code'))[0].replace(/\.md$/, '');
+  assert.ok(fs.readFileSync(path.join(vault, 'wiki/_pending.md'), 'utf8').includes(note));
+  /* 대표 규칙대로 «출처» 칸에 적으면 대기에서 빠진다 */
+  fs.writeFileSync(path.join(vault, 'wiki/sources/요약.md'), '출처: [[' + note + ']]\n');
+  run();
+  assert.ok(!fs.readFileSync(path.join(vault, 'wiki/_pending.md'), 'utf8').includes(note));
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('자동 실행 등록: 인자 조립이 맞고, 저장소 안 보관함은 거절한다', () => {
+  const A = require(path.join(root, 'tools/obsidian-sync/auto.js'));
+  const a = A.parse(['--vault', path.join(os.tmpdir(), 'v'), '--every', '15']);
+  const args = A.createArgs(a, 'node');
+  assert.equal(args[0], '/Create');
+  assert.equal(args[args.indexOf('/MO') + 1], '15');
+  const tr = args[args.indexOf('/TR') + 1];
+  assert.match(tr, /sync\.js"\s+--vault\s+"/, '실행 명령이 sync.js --vault 꼴이 아니다');
+  assert.deepEqual(A.removeArgs().slice(0, 1), ['/Delete']);
+  assert.throws(() => A.parse(['--vault', path.join(root, 'docs')]), /저장소 안/);
+  assert.throws(() => A.parse(['--vault', path.join(os.tmpdir(), 'v'), '--every', '1']), /5~1440/);
+  assert.doesNotThrow(() => A.parse(['--remove']));
+});
