@@ -305,6 +305,9 @@ test('⑤ 포털이 그릴 때 권유 줄을 부른다', () => {
 function 단추세상(opt) {
   const w = 세상(opt);
   const 부탁 = [];
+  const 요청표시 = 화면.match(/var _kkLoginStarting = false;/);
+  assert.ok(요청표시, '카카오 주소 요청 중인지 인증 알림과 공유해야 합니다');
+  vm.runInContext(요청표시[0], w.ctx);
   w.ctx._persistenceReady = Promise.resolve();
   w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local', SESSION: 'session' } } } };
   w.ctx.유지 = [];
@@ -578,7 +581,39 @@ test('⑨ 카카오 복귀 중 기존 세션의 인증 알림으로 포털을 �
   const a = 화면.indexOf('auth.onAuthStateChanged(function(user)');
   const b = 화면.indexOf('} else if(_handled)', a);
   assert.ok(a >= 0 && b > a);
-  assert.match(화면.slice(a, b), /if\(!_handled && !window\.__kkReturning\)\{ _handled = true; enterPortal\(user\); \}/);
+  assert.match(화면.slice(a, b), /if\(!_handled && !window\.__kkReturning && !_kkLoginStarting\)\{ _handled = true; enterPortal\(user\); \}/);
+});
+
+test('★★ 카카오 주소 응답을 기다리는 동안 저장된 로그인이 복원돼도 메인을 먼저 열지 않는다', async () => {
+  const { w, 부탁 } = 단추세상({ 로그인: false });
+  let rejectRequest, opened = 0;
+  w.ctx.PuKakao.goLogin = (opts) => {
+    부탁.push(opts);
+    return new Promise((_resolve, reject) => { rejectRequest = reject; });
+  };
+  w.ctx._loginGuard = { userSeen() {}, cover() {} };
+  w.ctx.auth.onAuthStateChanged = (fn) => { w.ctx._authCb = fn; };
+  w.ctx.enterPortal = () => { opened++; };
+  w.ctx._handled = false;
+  w.ctx._portalUid = '';
+  w.ctx._portalReady = false;
+  w.ctx._authRecheckTimer = null;
+  const start = 화면.indexOf('auth.onAuthStateChanged(function(user)');
+  const end = 화면.indexOf('\n  });', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(화면.slice(start, end + '\n  });'.length), w.ctx);
+
+  w.ctx.kkLogin();
+  w.ctx.kkLogin();
+  assert.equal(부탁.length, 1, '한 번의 로그인 준비 중에 두 요청을 만들면 안 됩니다');
+  const restored = { uid: 'U1', email: 'p001@pureun.kr' };
+  w.ctx.auth.currentUser = restored;
+  w.ctx._authCb(restored);
+  assert.equal(opened, 0, '카카오 이동 직전에 메인을 잠깐 보여 주었습니다');
+
+  rejectRequest(new Error('연결 실패'));
+  await 틈();
+  assert.equal(opened, 1, '주소 요청에 실패했다면 그 사이 복원된 로그인을 포털에 보여 줘야 합니다');
 });
 
 test('⑪ ★ 칸은 노란 단추 바로 밑, 접히는 칸 «밖» 에 하나만 있다', () => {
