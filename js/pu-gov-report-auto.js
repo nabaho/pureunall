@@ -8,7 +8,8 @@
        연결 안 된 것 — 을 서버에서도 돌릴 수 있게 순수 함수로 옮겼다. 쓰는 것은 서버·화면 몫 — 이 모듈은 «이렇게 쓸 것»만 돌려준다.
    안전 규칙(전부 자동이라 엄격하게 — 모호하면 «쓰지 않는 쪽»)
      · 사람 손이 닿은 줄은 절대 안 덮는다(usable) — 기록이 없는 줄, 또는 «없음»인데 처리자·연결·메모·날짜·방식이 하나도 없는 줄에만 쓴다.
-       (사람이 «발송함» 으로 저장한 서명 줄도 사람 손이다 — 자동이 회신을 완료로 바꾸지 않는다. 계획서 그대로.)
+       한 가지 예외 — 서명 단계에서 사람이 «서명 요청 발송»(doing + 발송일, 회신일·연결 없음)으로 저장한 줄은, 발송일 이후에 받은 메일이면
+       자동이 «회신 받음»(done)으로 이어받는다(발송일·방식·확인은 그대로, 옛 줄은 prev 로 돌려준다).
      · 한 첨부 → 한 줄. 줄을 하나로 정할 수 없으면(같은 점수·두 사업에 후보) 아무 데도 안 쓰고 unmatched 로 남긴다. 같은 줄은 두 번 쓰지 않는다.
      · 개인 자료(PRIV_RE)·기술보호 사업·우리 주소·종결 사업·서류 틀 없는 사업은 안 본다. 기술보호 사업이 있는 업체는 «줄 이름이 맞을 때만» 쓴다.
      · 이미 연결된 메일, 다른 폴더로 옮겨 열쇠만 바뀐 같은 메일(보낸 사람·시각·제목·첨부 이름이 같음)은 다시 처리하지 않는다.
@@ -51,11 +52,17 @@
 
   /* «자동이 쓸 수 있는 줄» — 기록이 없거나, «없음»인데 사람이 남긴 흔적(처리자·연결·메모·날짜·방식·확인·회차 기록)이 하나도 없는 줄.
      계획서 식은 by·link·note 셋이다 — 날짜·방식·확인·회차 기록은 사람만 적을 수 있으므로 같은 쪽(쓰지 않는 쪽)으로 더 조였다 */
-  function usable(rec) {
+  function usable(rec, step) {
     if (!rec) return true;
     if (!obj(rec)) return false;
+    if (step === 'sign' && waiting(rec)) return true;
     return rec.st === 'none' && !str(rec.by) && !rec.link && !str(rec.note)
       && !str(rec.sentAt) && !str(rec.gotAt) && !str(rec.how) && !rec.ack && !rec.rd;
+  }
+  /* «발송함·회신 대기» 줄 — 사람이 서명 요청을 보냈다고 저장했고(doing + 발송일) 아직 회신·연결이 없다. 서명 단계에서만 자동이 «회신 받음» 으로 이어받을 수 있다
+     (수정 라운드 1, 대표 «전부 자동 완료» 취지). done·blocked·na·발송일 없는 doing·회신일이나 연결이 있는 줄은 계속 사람 손이다 */
+  function waiting(rec) {
+    return obj(rec) && rec.st === 'doing' && isDay(rec.sentAt) && !str(rec.gotAt) && !rec.link;
   }
 
   /* ── 줄 고르기 ── */
@@ -81,7 +88,12 @@
     var recs = obj(o.recs) ? o.recs : {};
     var all = Track.keysFor(o.plan, o.step, o.n);
     if (!all.length) return { why: '이 단계의 서류 줄이 없습니다' };
-    var targets = all.filter(function (k) { return usable(has(recs, k.key) ? recs[k.key] : null); });
+    /* 발송함 줄은 «발송일 이후에 받은 메일» 일 때만(메일 날짜 day 를 안 주면 대상 아님) */
+    var targets = all.filter(function (k) {
+      var r = has(recs, k.key) ? recs[k.key] : null;
+      if (!usable(r, o.step)) return false;
+      return !waiting(r) || (isDay(o.day) && str(o.day) >= r.sentAt);
+    });
     if (!targets.length) return { why: '쓸 수 있는 서류 줄이 없습니다(이미 기록됨)' };
     var name = str(o.att && o.att.name), sub = str(o.subject), hay = squash(name + ' ' + sub);
     function pick(k, why) { return { key: k.key, why: why }; }
@@ -120,10 +132,19 @@
     var room = NOTE_MAX - NOTE_HEAD.length - NOTE_TAIL.length;
     return NOTE_HEAD + str(name).slice(0, room) + NOTE_TAIL;
   }
-  function nextRec(c, att, step, now) {
+  function nextRec(c, att, step, now, prev) {
     var lk = Inbox.linkFrom(c, att.name);
     if (!lk) return null;
     var entry = { st: 'done', gotAt: c.day, how: 'mail', note: noteFor(att.name), link: lk };
+    if (step === 'sign' && waiting(prev)) {
+      /* 발송함 줄을 이어받는다 — 발송일·방식·확인·회차 기록은 옛 줄 것 그대로, 옛 메모는 «옛 메모 · 자동 처리 …» 로(200자 안에서 옛 메모를 자른다) */
+      entry = { st: 'done', sentAt: prev.sentAt, gotAt: c.day, link: lk };
+      if (prev.how) entry.how = prev.how;
+      if (prev.ack === true) entry.ack = true;
+      if (prev.rd) entry.rd = clone(prev.rd);
+      var auto = noteFor(att.name), room = NOTE_MAX - auto.length - 3, old = str(prev.note);
+      entry.note = (old && room > 0) ? old.slice(0, room) + ' · ' + auto : auto;
+    }
     if (Track.validate(entry, step)) return null;
     return Track.patchFor(entry, AUTO_BY, now);
   }
@@ -261,7 +282,7 @@
         if (!cands.length) { skip('noLine'); return; }
         var multi = !pin && cands.length > 1, hits = [], whys = [], techHit = false;
         cands.forEach(function (x) {
-          var d = decide({ plan: x.plan, step: step, n: x.n, recs: recsOf(x.p.coId, x.p.rid), att: att, subject: c.s, multi: multi });
+          var d = decide({ plan: x.plan, step: step, n: x.n, recs: recsOf(x.p.coId, x.p.rid), att: att, subject: c.s, multi: multi, day: c.day });
           if (x.plan.key === TECH_KEY) { if (d.key) techHit = true; return; }
           if (d.key) hits.push({ x: x, d: d }); else whys.push(d.why);
         });
@@ -273,12 +294,14 @@
           return;
         }
         var x = hits[0].x, key = hits[0].d.key, base = Track.recOf(track, x.p.coId, x.p.rid);
-        var next = nextRec(c, att, step, now);
+        var prevRec = has(base, key) ? base[key] : null;
+        var next = nextRec(c, att, step, now, prevRec);
         if (!next) { miss(m, att, '쓸 줄을 만들 수 없습니다', x.p.rid); return; }
         var cl = claimed[x.p.coId + '\u0001' + x.p.rid] || (claimed[x.p.coId + '\u0001' + x.p.rid] = {});
         cl[key] = 1;
         actions.push({ coId: x.p.coId, rid: x.p.rid, typeId: x.p.typeId, key: key, step: step, mailKey: c.key, name: att.name, day: c.day,
-          why: hits[0].d.why + (pin ? ' · 서명요청 꼬리표' : ''), next: next, prev: has(base, key) ? clone(base[key]) : null });
+          why: hits[0].d.why + (pin ? ' · 서명요청 꼬리표' : '') + (step === 'sign' && waiting(prevRec) ? ' · 발송함 줄 회신' : ''),
+          next: next, prev: prevRec ? clone(prevRec) : null });
       });
     });
 

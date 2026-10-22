@@ -123,7 +123,7 @@ test('pickKey — 간단형(충남북부 상의) 서명 once 줄: 쓸 수 있는
   assert.deepEqual(named, { key: 'sign', why: '줄 이름 일치' }, '줄 이름이 먼저 — 「업체 서명본」은 공백을 떼고 견준다');
 });
 test('pickKey — 사람 손이 닿은 줄은 대상이 아니다(null) · 자동이 쓴 줄도', () => {
-  [{ st: 'doing', by: '홍길동', sentAt: '2026-10-01', at: 1 }, { st: 'none', by: '홍길동', at: 1 }, { st: 'none', note: 'x', at: 1 },
+  [{ st: 'doing', by: '홍길동', at: 1 }, { st: 'doing', by: '홍길동', sentAt: '2026-10-01', gotAt: '2026-10-02', at: 1 }, { st: 'none', by: '홍길동', at: 1 }, { st: 'none', note: 'x', at: 1 },
     { st: 'done', by: '자동', at: 1 }].forEach((rec) => {
     assert.equal(A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: { sign: rec }, att: { name: '업체 서명본.pdf' }, subject: '', multi: false }), null, JSON.stringify(rec));
   });
@@ -227,7 +227,7 @@ test('plan — now 를 주면 at 에 그 값(서버가 찍는다) · 결과에 �
 /* ---------- 사람 손 ---------- */
 test('plan — 사람이 저장한 줄은 어떤 상태든 덮지 않는다(unmatched 로만) · 흔적 없는 «없음»은 쓰고 prev 를 남긴다', () => {
   const mails = [mail(11, '', ['업체 서명본.pdf'])];
-  const cases = [{ st: 'doing', by: '홍길동', sentAt: '2026-10-01', at: 5 }, { st: 'done', by: '김가나', gotAt: '2026-10-02', at: 5 },
+  const cases = [{ st: 'doing', by: '홍길동', at: 5 }, { st: 'doing', by: '홍길동', sentAt: '2026-10-01', gotAt: '2026-10-02', at: 5 }, { st: 'done', by: '김가나', gotAt: '2026-10-02', at: 5 },
     { st: 'none', by: '홍길동', at: 5 }, { st: 'none', note: '메모', at: 5 }, { st: 'na', by: '홍길동', at: 5 },
     { st: 'none', at: 5, link: { src: 'mail', key: 'i:Z:1', name: 'b.pdf' } }];
   cases.forEach((rec) => {
@@ -395,7 +395,7 @@ test('plan — 서명요청 꼬리표 [서명요청:rid] 가 그 쌍을 못 박�
   assert.deepEqual([submit.actions.length, submit.unmatched.length, submit.skipped.submitTag], [0, 0, 1]);
   /* 꼬리표가 가리키는 쌍의 줄이 사람 손이면 다른 쌍으로 새지 않는다 */
   const touched = A.plan(world({ cos: [DARA2], mails: [dm(14, 'RE: [서명요청:t4_2026] 일정', ['문서.pdf'])],
-    items: { c2: { t4_2026: { sign: { st: 'doing', by: '홍길동', sentAt: '2026-10-01', at: 1 } } } } }));
+    items: { c2: { t4_2026: { sign: { st: 'done', by: '홍길동', sentAt: '2026-10-01', gotAt: '2026-10-02', at: 1 } } } } }));
   assert.deepEqual([touched.actions.length, touched.unmatched.length], [0, 1]);
   assert.equal(touched.unmatched[0].rid, 't4_2026');
 });
@@ -461,7 +461,7 @@ test('plan — 100줄 상한: 오래된 메일부터 100건 · more · 나머지
 test('plan — unmatched 도 최대 100(넘으면 skipped.unmatchedCut)', () => {
   const spec = crowd(120, (i, em) => mail(3000 + i, '', ['업체 서명본.pdf'], '2026-10-01', em));
   spec.items = {};
-  spec.cos.forEach((c) => { spec.items[c.id] = { t3_2026: { sign: { st: 'doing', by: '홍길동', sentAt: '2026-09-30', at: 1 } } }; });
+  spec.cos.forEach((c) => { spec.items[c.id] = { t3_2026: { sign: { st: 'done', by: '홍길동', sentAt: '2026-09-30', gotAt: '2026-09-30', at: 1 } } }; });
   const r = A.plan(world(spec));
   assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.unmatchedCut], [0, 100, 20]);
 });
@@ -496,4 +496,96 @@ test('plan — 입력을 바꾸지 않는다(JSON 비교) · 결과가 입력과
   assert.deepEqual(clone(A.plan(w)), clone(r), '결정적');
   r.actions[0].next.st = 'x'; r.actions.forEach((a) => { if (a.prev) a.prev.st = 'x'; });
   assert.deepEqual(clone(w), snap, '결과를 고쳐도 입력은 그대로');
+});
+
+/* ---------- 수정 라운드 1 — 서명 단계의 «발송함·회신 대기» 줄은 자동이 «회신 받음» 으로 완료할 수 있다 ---------- */
+const WAIT = () => ({ st: 'doing', by: '홍길동', sentAt: '2026-10-05', how: 'mail', note: '1차 발송', at: 5 });
+const waitWorld = (mails, rec, over) => one(mails, Object.assign({ items: { c1: { t3_2026: { sign: rec || WAIT() } } } }, over || {}));
+test('usable(rec, step) — sign 단계만 «doing + sentAt 있음 + gotAt·link 없음» 줄을 허용 · 한 인자·attach·그 밖은 지금 규칙 그대로', () => {
+  assert.equal(A.usable(WAIT(), 'sign'), true);
+  assert.equal(A.usable({ st: 'doing', sentAt: '2026-10-05', at: 5 }, 'sign'), true, 'by·note·how 는 있어도 없어도');
+  assert.equal(A.usable(WAIT()), false, '단계를 안 주면 기존 규칙');
+  assert.equal(A.usable(WAIT(), 'attach'), false);
+  assert.equal(A.usable(WAIT(), 'submit'), false);
+  const no = [Object.assign(WAIT(), { gotAt: '2026-10-07' }), Object.assign(WAIT(), { link: { src: 'mail', key: 'i:Z:1' } }),
+    { st: 'doing', by: '홍길동', at: 5 }, Object.assign(WAIT(), { st: 'done' }), Object.assign(WAIT(), { st: 'blocked' }), Object.assign(WAIT(), { st: 'na' }),
+    Object.assign(WAIT(), { st: 'none' })];
+  no.forEach((r) => assert.equal(A.usable(r, 'sign'), false, JSON.stringify(r)));
+  assert.equal(A.usable({ st: 'none', at: 1 }, 'sign'), true);
+  assert.equal(A.usable(null, 'sign'), true);
+});
+test('pickKey — 발송함 줄은 메일 날짜(day)가 발송일 이상일 때만 대상(day 를 안 주면 아님)', () => {
+  const o = (day, rec) => A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: { sign: rec || WAIT() }, att: { name: '문서.pdf' }, subject: '', multi: false, day });
+  assert.equal(o('2026-10-10').key, 'sign');
+  assert.equal(o('2026-10-05').key, 'sign', '발송 당일 회신도');
+  assert.equal(o('2026-10-04'), null);
+  assert.equal(o(undefined), null);
+  assert.equal(o('2026-10-10', Object.assign(WAIT(), { gotAt: '2026-10-06' })), null);
+});
+test('plan ① 발송함 줄 + [서명요청] 꼬리표 회신 → 완료: sentAt·how·ack 보존 · 메모 잇기 · prev 는 옛 줄 전체 · Track 이 받아들인다', () => {
+  const rec = Object.assign(WAIT(), { ack: true });
+  const w = waitWorld([mail(11, 'RE: [서명요청:t3_2026] 서명 요청', ['문서.pdf'], '2026-10-10')], rec);
+  const r = A.plan(w);
+  assert.equal(r.actions.length, 1);
+  const a = r.actions[0];
+  assert.deepEqual([a.rid, a.key, a.step], ['t3_2026', 'sign', 'sign']);
+  assert.deepEqual(a.next, { st: 'done', at: 0, by: '자동', sentAt: '2026-10-05', gotAt: '2026-10-10', how: 'mail', ack: true,
+    note: '1차 발송 · 자동 처리 — 메일 «문서.pdf»', link: { src: 'mail', key: mkey(11), name: '문서.pdf', date: '2026-10-10' } });
+  assert.deepEqual(a.prev, { st: 'doing', by: '홍길동', sentAt: '2026-10-05', how: 'mail', note: '1차 발송', ack: true, at: 5 }, '되돌리기용 옛 줄 전체');
+  assert.notEqual(a.prev, w.track.c1.t3_2026.sign);
+  assert.match(a.why, /꼬리표/);
+  assert.equal(T.validate(a.next, a.step), '');
+  assert.deepEqual(T.put({}, a.coId, a.rid, a.key, a.next)[a.coId][a.rid][a.key], a.next);
+  assert.deepEqual(T.normalize({ c1: { t3_2026: { items: { sign: a.next } } } }).c1.t3_2026.sign, a.next);
+  assert.equal(A.plan(Object.assign({}, w, { track: T.put(w.track, a.coId, a.rid, a.key, a.next) })).actions.length, 0, '연결된 메일이라 다시 안 한다');
+});
+test('plan ① 옛 메모가 없으면 새 메모만 · how 가 없으면 만들지 않는다 · 옛 메모가 길면 옛 메모를 잘라 «자동 처리» 가 »로 닫힌다(200자)', () => {
+  const m = mail(11, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-10');
+  const bare = A.plan(waitWorld([m], { st: 'doing', sentAt: '2026-10-05', at: 5 })).actions[0].next;
+  assert.equal(bare.note, '자동 처리 — 메일 «문서.pdf»');
+  assert.equal('how' in bare, false);
+  assert.equal(bare.sentAt, '2026-10-05');
+  const long = A.plan(waitWorld([m], Object.assign(WAIT(), { note: '메'.repeat(200) }))).actions[0].next;
+  assert.equal(long.note.length, T.NOTE_MAX);
+  assert.ok(long.note.endsWith(' · 자동 처리 — 메일 «문서.pdf»') && long.note.startsWith('메'));
+  assert.equal(T.validate(long, 'sign'), '');
+});
+test('plan ② 발송함 줄 + 발송일 이전에 받은 메일 → 대상 아님(발송 당일은 대상)', () => {
+  const before = A.plan(waitWorld([mail(11, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-04')]));
+  assert.deepEqual([before.actions.length, before.unmatched.length], [0, 1]);
+  const same = A.plan(waitWorld([mail(12, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-05')]));
+  assert.equal(same.actions.length, 1);
+});
+test('plan ③ 발송함 줄 + 서명 키워드 업체 첨부(꼬리표 없음) → 줄이 하나면 완료 · 서명 키워드 없는 첨부는 단계를 몰라 안 쓴다', () => {
+  const r = A.plan(waitWorld([mail(11, '', ['가나상사 서명본.pdf'], '2026-10-12'), mail(12, '', ['문서.pdf'], '2026-10-13')]));
+  assert.deepEqual(r.actions.map((a) => [a.mailKey, a.key, a.prev && a.prev.st]), [[mkey(11), 'sign', 'doing']]);
+  assert.equal(r.skipped.noStep, 1);
+});
+test('plan ④ 사람이 done·blocked·na 로 저장한 줄 · sentAt 없는 doing · gotAt·link 가 이미 있는 줄은 절대 안 건드린다', () => {
+  const m = [mail(11, '[서명요청:t3_2026] 회신', ['서명본.pdf'], '2026-10-10')];
+  [{ st: 'done', by: '김가나', sentAt: '2026-10-05', gotAt: '2026-10-08', at: 5 }, { st: 'done', by: '김가나', sentAt: '2026-10-05', at: 5 },
+    { st: 'blocked', by: '김가나', sentAt: '2026-10-05', at: 5 }, { st: 'na', by: '김가나', at: 5 },
+    { st: 'doing', by: '김가나', at: 5 }, { st: 'doing', by: '김가나', sentAt: '2026-10-05', gotAt: '2026-10-08', at: 5 },
+    { st: 'doing', by: '김가나', sentAt: '2026-10-05', at: 5, link: { src: 'mail', key: 'i:Z:9', name: 'x.pdf' } }].forEach((rec) => {
+    assert.deepEqual(A.plan(waitWorld(m, rec)).actions, [], JSON.stringify(rec));
+  });
+});
+test('plan ⑤ attach 단계의 doing 줄은 안 건드린다(sentAt 이 있어도)', () => {
+  const w = one([mail(11, '현장 사진', ['a.jpg'], '2026-10-10')], { items: { c1: { t3_2026: { attach: { st: 'doing', by: '홍길동', sentAt: '2026-10-05', at: 5 } } } } });
+  const r = A.plan(w);
+  assert.deepEqual([r.actions.length, r.unmatched.length], [0, 1]);
+});
+test('plan — 두 사업의 서명 줄이 모두 발송함이어도 꼬리표·줄 이름이 있어야 한다 · 꼬리표가 가리킨 쌍에만 쓴다', () => {
+  const items = { c2: { t3_2026: { sign: WAIT() }, t4_2026: { sign: WAIT() } } };
+  const none = A.plan(world({ cos: [DARA2], mails: [dm(11, '서명본 송부', ['문서.pdf'], '2026-10-10')], items }));
+  assert.deepEqual([none.actions.length, none.unmatched.length], [0, 1]);
+  const tagged = A.plan(world({ cos: [DARA2], mails: [dm(12, 'RE: [서명요청:t4_2026] 회신', ['문서.pdf'], '2026-10-10')], items }));
+  assert.deepEqual(tagged.actions.map((a) => [a.rid, a.prev.st]), [['t4_2026', 'doing']]);
+});
+test('plan — 발송함 줄 완료도 입력 불변·결과 객체 비공유', () => {
+  const w = waitWorld([mail(11, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-10')], Object.assign(WAIT(), { ack: true }));
+  const snap = clone(w), inObjs = objects(w), r = A.plan(w);
+  assert.equal(r.actions.length, 1);
+  assert.deepEqual(clone(w), snap);
+  objects(r).forEach((o) => assert.ok(!inObjs.has(o)));
 });
