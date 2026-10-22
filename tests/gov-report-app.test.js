@@ -58,7 +58,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked', 'grBarHtml',
   'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView',
   'grLoadBizOrder', 'grSaveBizOrder', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grByBiz', 'grDragEnd', 'grHasDragType',
-  'grPutCell', 'grAutoLog', 'grAutoCo', 'grAutoBiz', 'grAutoSkip', 'grAutoUnmatched', 'grAutoToggle', 'grLoadAuto', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grAutoRows', 'grAutoName', 'grAutoHtml', 'grRenderAuto', 'grSetAutoMode', 'grUndoAuto', 'grOpenAutoMail', 'grAutoBadge'];
+  'grPutCell', 'grAutoLog', 'grAutoCo', 'grAutoBiz', 'grAutoSkip', 'grAutoUnmatched', 'grAutoToggle', 'grAutoMore', 'grLoadAuto', 'grAutoList', 'grAutoMode', 'grAutoTime', 'grAutoRows', 'grAutoName', 'grAutoHtml', 'grRenderAuto', 'grSetAutoMode', 'grUndoAuto', 'grOpenAutoMail', 'grAutoBadge'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -5270,6 +5270,7 @@ function autoSeed(o) {
       run.last.items = o.last === 'objItems' ? { 0: li[0], 1: li[1] } : li;
     }
     if (o.note) run.last.note = o.note;
+    if (o.planN) run.last.items = Array.from({ length: o.planN }, (_, i) => ({ co: 'c2', rid: 't3_2026', type: 't3', key: 'attach', step: 'attach', mail: 'i:INBOX-0a1b2c3d:' + (700 + i), name: '예정' + i + '.pdf', day: '2026-10-0' + (1 + (i % 8)), why: '쓸 수 있는 줄이 하나', did: false }));
     if (o.unmatched) {
       run.last.unmatched = [];
       for (let i = 0; i < o.unmatched; i++) run.last.unmatched.push({ co: i % 2 ? 'c6' : 'c2', rid: i === 2 ? '' : 't3_2026', mail: 'i:INBOX-0a1b2c3d:' + (500 + i), name: (i === 0 ? '<u>미배정</u>' : '미배정' + i) + '.pdf', day: '2026-10-0' + (1 + (i % 8)), why: i === 0 ? '<s>알 수 없는 까닭</s>' : '줄을 하나로 정할 수 없습니다' });
@@ -5314,7 +5315,7 @@ function autoWorld(o) {
 /* grLoad 는 자동 처리 읽기를 기다리지 않는다 — 값이 오는 것은 따로 기다린다 */
 const autoLoad = async (w) => { await w.ctx.grLoad(); await w.ctx.grLoadAuto(); };
 const autoSec = (w) => { const h = w.els.today.innerHTML, i = h.indexOf('id="tdAuto"'); return i < 0 ? '' : h.slice(i, h.indexOf('td-sec inbox', i)); };
-const autoRows = (h) => countOf(h, /class="td-au"/g);
+const autoRows = (h) => countOf(h, /class="td-au( dim)?"/g);   // 흐린 줄(적용 안 됨)도 한 줄
 
 test('170 정적 — 자동 처리 모듈을 inbox·send·nav 다음에 싣는다 · 쓰기는 .set 다섯(서류 줄·종결·되돌림 표시·순서·cfg) · 모드 쓰기는 상수 표 이름으로만 · 읽기도 이름 표 · 새 쓰기 길은 없다 · 색 직접 지정 없음', () => {
   assert.match(SRC, /<script src="js\/pu-gov-report-auto\.js\?v=\d+"><\/script>/);
@@ -5428,7 +5429,7 @@ test('176 마지막 실행 알림 — last.note 가 있으면 한 줄(실패는 
   const h = autoSec(w);
   assert.ok(h.includes('<div class="err-s">실패: 입력 확인 실패</div>'), h);
   assert.equal(autoRows(h), 10, '최대 10줄');
-  assert.ok(h.includes('처음 10건만 보입니다'), '나머지 안내');
+  assert.ok(h.includes('더 보기 (+4)') && h.includes('전체 14건'), '나머지는 「더 보기」');
   const w2 = autoWorld({ note: '오늘 기록 칸(200)이 차서 3건은 다음 날로 미룸' });
   await autoLoad(w2);
   assert.ok(autoSec(w2).includes('<div class="days">오늘 기록 칸(200)이 차서 3건은 다음 날로 미룸</div>'));
@@ -5753,4 +5754,115 @@ test('189 되돌리기 보호 — 줄이 «자동이 쓴 그대로»가 아니�
   await wn.db.ref('scal_docs/c2/t3_2026/items/sign').set({ st: 'done', by: '자동', at: 1, link: { src: 'mail', key: AUTO_M1 } });
   await wn.ctx.grUndoAuto(wn.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign'));
   assert.equal(wn.db.쓴것.length, 2, '자동이 쓴 그대로이고 메일이 같으면 쓴다(처음 한 번은 이 검사의 흉내 쓰기)');
+});
+
+/* ── 수정 라운드 2 (재검토) ── */
+test('190 세 목록 더 보기 — 시범 예정 25건: 10줄 + 「더 보기(+15)」 → 25줄 · 미배정 15건 · 되돌리기 목록(live) · 다시 그려도 유지 · 상한 200줄 · 제목에 전체 건수', async () => {
+  /* 시범 운행 예정 */
+  const autoAll = (x) => countOf(x, /class="td-au( dim)?"/g);
+  const w = autoWorld({ mode: 'dry', written: false, planN: 25 });
+  await autoLoad(w);
+  let h = autoSec(w);
+  assert.ok(h.includes('시범 운행 — 전체 25건 · 이렇게 처리할 예정'), h);
+  assert.equal(autoRows(h), 10);
+  assert.ok(h.includes('<button type="button" class="act" onclick="grAutoMore(\'run\')">더 보기 (+15)</button>'), h);
+  assert.deepEqual(J(w.ctx.GR.autoMore), { run: false, undo: false, unmatched: false });
+  w.ctx.grAutoMore('run');
+  h = w.els.tdAuto.innerHTML;
+  assert.equal(autoRows(h), 25, '전부');
+  assert.ok(!h.includes('더 보기'), '더 보기 단추는 사라진다');
+  assert.equal(w.ctx.GR.autoMore.run, true);
+  assert.equal(countOf(h, /grOpenAutoMail\(\d+\)/g), 25, '메일 열기 단추도 모두');
+  w.ctx.grRender();
+  assert.equal(autoRows(autoSec(w)), 25, '다시 그려도 유지');
+  assert.equal(countOf(autoSec(w), /grUndoAuto\(/g), 0);
+  w.ctx.grAutoMore('weird'); w.ctx.grAutoMore('__proto__');
+  assert.deepEqual(J(w.ctx.GR.autoMore), { run: true, undo: false, unmatched: false }, '모르는 이름은 무시');
+  /* 되돌리기 목록(live) */
+  const wl = autoWorld({ extra: 25 });
+  await autoLoad(wl);
+  h = autoSec(wl);
+  assert.ok(h.includes('최근 자동 처리 — 전체 27건 · 최근 기록(최대 7일치)의 줄은 되돌릴 수 있습니다'), h);
+  assert.ok(!h.includes('7일 안 줄'));
+  assert.equal(autoAll(h), 10);
+  assert.ok(h.includes('grAutoMore(\'undo\')">더 보기 (+17)</button>'), h);
+  wl.ctx.grAutoMore('undo');
+  h = wl.els.tdAuto.innerHTML;
+  assert.equal(autoAll(h), 27);
+  assert.equal(countOf(h, /grUndoAuto\(\d+\)/g), 2 + 0, '더미 줄은 서류 줄이 없어(적용 안 됨) 단추가 없다 — 실제로 쓴 둘만');
+  assert.ok(wl.ctx.GR.autoMore.undo && !wl.ctx.GR.autoMore.run);
+  /* 상한 200줄 */
+  const wc = autoWorld({ extra: 210 });
+  await autoLoad(wc);
+  wc.ctx.grAutoMore('undo');
+  h = wc.els.tdAuto.innerHTML;
+  assert.equal(autoAll(h), 200, '최대 200줄');
+  assert.ok(h.includes('전체 212건 중 200건까지 보입니다'), h);
+  /* 미배정 */
+  const wu = autoWorld({ unmatched: 15 });
+  await autoLoad(wu);
+  let d = autoSec(wu); d = d.slice(d.indexOf('<details'), d.indexOf('</details>'));
+  assert.equal(countOf(d, /class="td-au"/g), 10);
+  assert.ok(d.includes('grAutoMore(\'unmatched\')">더 보기 (+5)</button>') && d.includes('외 5건'), d);
+  wu.ctx.grAutoMore('unmatched');
+  d = wu.els.tdAuto.innerHTML; d = d.slice(d.indexOf('<details'), d.indexOf('</details>'));
+  assert.equal(countOf(d, /class="td-au"/g), 15);
+  assert.ok(!d.includes('더 보기') && !d.includes('외 '), d);
+  assert.equal(countOf(d, /onclick="grOpenAutoMail\(\d+,1\)"/g), 15);
+  await wu.ctx.grOpenAutoMail(14, 1);
+  assert.equal(wu.opened.length, 1, '열 번째 뒤 줄의 메일도 연다');
+  assert.equal(wu.db.쓴것.length, 0);
+});
+
+test('191 기록은 있는데 줄이 안 쓰인 경우(그 사이 사람이 저장) — «처리됨» 으로 믿지 않는다: 흐리게 + 「자동 처리가 적용되지 않음」 + 되돌리기 단추 없음 · 화면의 기록이 낡았거나 기록을 못 읽었으면 기존대로', async () => {
+  const s = autoSeed();
+  s.scal_docs.c2.t3_2026.items.sign = { st: 'doing', sentAt: '2026-09-20', by: '김가나', at: 1 };   // 서버가 기록(log)만 남기고 줄은 사람이 먼저 저장했다
+  const w = autoWorld({ seed: s });
+  await autoLoad(w);
+  let h = autoSec(w);
+  assert.equal(countOf(h, /class="td-au dim"/g), 1);
+  assert.equal(countOf(h, /grUndoAuto\(/g), 1, '실제로 쓴 한 줄만');
+  assert.ok(h.includes('자동 처리가 적용되지 않음'));
+  let dim = h.slice(h.indexOf('<div class="td-au dim">'));
+  const nx = dim.indexOf('<div class="td-au">', 5);
+  if (nx > 0) dim = dim.slice(0, nx);
+  assert.ok(dim.includes('서명본.hwpx') && !dim.includes('grUndoAuto'), dim);
+  assert.ok(dim.includes('grOpenAutoMail('), '메일 열기는 그대로');
+  const i = w.ctx.GR.auto.rows.findIndex((r) => r.key === 'sign');
+  assert.equal(w.ctx.GR.auto.rows[i].undo, false);
+  await w.ctx.grUndoAuto(i);
+  assert.equal(w.db.쓴것.length, 0);
+  /* 화면의 기록이 그 처리보다 낡았다(처리가 화면을 연 뒤) — 판단하지 않고 단추를 낸다(누르면 줄을 다시 읽는다) */
+  const s2 = autoSeed();
+  s2.scal_docs.c2.t3_2026.items.sign = { st: 'doing', sentAt: '2026-09-20', by: '김가나', at: 1 };
+  s2.scal_autoRun.log['2026-10-10'].items[0].at = Date.now() + 3600e3;
+  const w2 = autoWorld({ seed: s2 });
+  await autoLoad(w2);
+  h = autoSec(w2);
+  assert.equal(countOf(h, /class="td-au dim"/g), 0);
+  assert.equal(countOf(h, /grUndoAuto\(/g), 2);
+  /* 기록을 못 읽었으면 기존대로 */
+  const w3 = autoWorld({ seed: s });
+  await autoLoad(w3);
+  w3.ctx.GR.track = null; w3.ctx.GR.trackErr = true; w3.ctx.grRenderAuto();
+  h = w3.els.tdAuto.innerHTML;
+  assert.equal(countOf(h, /class="td-au dim"/g), 0);
+  assert.equal(countOf(h, /grUndoAuto\(/g), 2);
+  /* 자동이 쓴 그대로면 평소처럼 */
+  const w4 = autoWorld({});
+  await autoLoad(w4);
+  assert.equal(countOf(autoSec(w4), /class="td-au dim"/g), 0);
+  assert.equal(countOf(autoSec(w4), /grUndoAuto\(/g), 2);
+});
+
+test('192 미배정 why 가 «[기술보호] » 로 시작하면 딱지 «기술보호 — 수동 확인» · why 원문은 그대로(이스케이프)', async () => {
+  const s = autoSeed({ unmatched: 3 });
+  s.scal_autoRun.last.unmatched[1].why = '[기술보호] 줄 이름이 맞아야 합니다 <b>x</b>';
+  const w = autoWorld({ seed: s });
+  await autoLoad(w);
+  let d = autoSec(w); d = d.slice(d.indexOf('<details'), d.indexOf('</details>'));
+  assert.equal(countOf(d, /기술보호 — 수동 확인/g), 1);
+  assert.ok(d.includes('<span class="tag-chk">기술보호 — 수동 확인</span>'));
+  assert.ok(d.includes('[기술보호] 줄 이름이 맞아야 합니다 &#60;b&#62;x&#60;/b&#62;'), '원문 그대로 + 이스케이프');
+  assert.ok(!d.includes('<b>x</b>'));
 });
