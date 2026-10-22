@@ -114,9 +114,21 @@ function skip(a, s) {
 function ensure(dir) { fs.mkdirSync(dir, { recursive: true }); }
 function readOr(p, d) { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return d; } }
 
+/* 대표가 이미 자기 위키 규칙(schema.md · purpose.md)을 갖고 있으면 그것이 이긴다 —
+   우리 틀(CLAUDE.md·AGENTS.md·색인·기록·wiki/projects 등)을 «끼워 넣지 않는다».
+   2026-10-22 대표 보관함 갈무리: raw/ · wiki/ · schema(entities·concepts·sources·queries·synthesis) · purpose 가 이미 있었다.
+   이 경우 우리는 raw/sessions · raw/erp · daily 에 «원자료를 넣기만» 한다. */
+function hasOwnSchema(vault) {
+  return fs.existsSync(path.join(vault, 'schema.md')) || fs.existsSync(path.join(vault, 'purpose.md'));
+}
+
 /* 틀은 «없을 때만» 만든다 — 대표가 고친 규칙·색인을 덮지 않는다 */
 function scaffold(vault) {
   const made = [];
+  if (hasOwnSchema(vault)) {
+    ['raw/sessions', 'daily'].forEach((d) => ensure(path.join(vault, d)));
+    return made;
+  }
   [['CLAUDE.md', 'CLAUDE.md'], ['CLAUDE.md', 'AGENTS.md'], ['index.md', 'wiki/index.md'], ['log.md', 'wiki/log.md']].forEach((x) => {
     const dest = path.join(vault, x[1]);
     if (fs.existsSync(dest)) return;
@@ -139,15 +151,19 @@ function erpEntries(vault) {
   }).filter(Boolean);
 }
 
+/* «정리 끝» 판정 — wiki/ 안의 어느 장에든 그 원자료가 적혀 있으면(경로 또는 파일 이름) 정리된 것으로 본다.
+   우리 틀의 log.md 한 곳만 보지 않는다: 대표가 자기 규칙(schema.md)을 쓰면 «출처» 칸에 적기 때문이다. */
 function writePending(vault) {
-  const log = readOr(path.join(vault, 'wiki', 'log.md'), '');
-  const rawRoot = path.join(vault, 'raw');
-  const pend = walk(rawRoot, '.md').map((f) => path.relative(vault, f).split(path.sep).join('/'))
-    .filter((rel) => !log.includes(rel.replace(/\.md$/, '')) && !log.includes(rel))
+  const wikiText = walk(path.join(vault, 'wiki'), '.md')
+    .filter((f) => path.basename(f) !== '_pending.md').map((f) => readOr(f, '')).join('\n');
+  const pend = walk(path.join(vault, 'raw', 'sessions'), '.md').concat(walk(path.join(vault, 'raw', 'erp'), '.md'))
+    .map((f) => path.relative(vault, f).split(path.sep).join('/'))
+    .filter((rel) => !wikiText.includes(rel.replace(/\.md$/, '')) && !wikiText.includes(path.basename(rel, '.md')))
     .sort().reverse();
   const body = '---\ntags: [wiki-system]\n---\n# 아직 위키로 정리 안 된 원자료 (' + pend.length + '건)\n\n' +
-    '> 자동 생성 — 정리하면 `wiki/log.md` 에 `ingest | <경로>` 줄이 남고 이 목록에서 빠진다.\n\n' +
+    '> 자동 생성 — `wiki/` 의 어느 장에든 원자료 이름이 적히면 이 목록에서 빠진다(출처로 적는다).\n\n' +
     pend.map((r) => '- [[' + r.replace(/\.md$/, '') + ']]').join('\n') + '\n';
+  ensure(path.join(vault, 'wiki'));
   fs.writeFileSync(path.join(vault, 'wiki', '_pending.md'), body);
   return pend.length;
 }
@@ -191,7 +207,7 @@ function main() {
       const dp = path.join(vault, 'daily', date + '.md');
       fs.writeFileSync(dp, L.upsertDaily(readOr(dp, ''), date, L.renderDailyBlock(date, entries)));
     });
-    if (stat.새로 || stat.갱신) {
+    if ((stat.새로 || stat.갱신) && !hasOwnSchema(vault)) {   /* 남의 규칙이 있으면 그 기록(log)에 끼어쓰지 않는다 */
       fs.appendFileSync(path.join(vault, 'wiki', 'log.md'),
         '\n## [' + L.dateOf(new Date().toISOString()) + '] sync | 새 ' + stat.새로 + '건 · 갱신 ' + stat.갱신 + '건\n');
     }
@@ -205,7 +221,7 @@ function main() {
   if (!items.length) console.log('읽을 기록을 못 찾았습니다 — 경로: ' + a.claudeDir);
 }
 
-module.exports = { parseArgs, assertVaultSafe, skip, scaffold };
+module.exports = { parseArgs, assertVaultSafe, skip, scaffold, hasOwnSchema };
 if (require.main === module) {
   try { main(); } catch (e) { console.error('✗ ' + e.message); process.exit(1); }
 }
