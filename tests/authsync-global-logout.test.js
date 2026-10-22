@@ -99,6 +99,22 @@ test('★★ 나간 «뒤에» 새로 로그인한 탭은 끊지 않는다 — �
   assert.equal(g._signedOut, 0);
 });
 
+test('★★ 늦게 배달된 옛 로그아웃 알림은 새 로그인을 끊지 않는다', () => {
+  const g = boot();
+  const old = String(Date.now() - 60000);
+  g._store.local[KEY] = old;
+  g._login('U2');
+  g._ev_storage({ key: KEY, newValue: old });
+  assert.equal(g.PuAuthSync._wasKicked(), false, '옛 알림 때문에 다시 로그인 화면으로 튕겼습니다');
+  assert.equal(g._signedOut, 0, '옛 알림 때문에 새 Firebase 세션을 끊었습니다');
+
+  const fresh = String(Date.now() + 10);
+  g._store.local[KEY] = fresh;
+  g._ev_storage({ key: KEY, newValue: fresh });
+  assert.equal(g.PuAuthSync._wasKicked(), true, '실제 새 로그아웃까지 무시하면 안 됩니다');
+  assert.equal(g._signedOut, 1);
+});
+
 test('★ 사람을 본 적 없는 탭(공개 화면·부팅 중)은 끊지 않는다', () => {
   const g = boot();                                   // 로그인 없음
   const at = String(Date.now());
