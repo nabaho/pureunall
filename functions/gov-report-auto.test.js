@@ -61,7 +61,7 @@ const mail = (uid, an, day, over) => Object.assign({ uid, an: [].concat(an), day
 /* ── 가짜 DB ── */
 function fakeDb(tree, opt) {
   opt = opt || {};
-  const reads = [], writes = [];
+  const reads = [], writes = [], calls = [];
   const get = (p) => p.split('/').reduce((o, k) => (o == null ? undefined : o[k]), tree);
   const put = (p, v) => { const ks = p.split('/'); let o = tree; ks.slice(0, -1).forEach((k) => { o = o[k] || (o[k] = {}); }); if (v === null || v === undefined) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = v; };
   const asNull = (v) => (v === undefined ? null : clone(v));
@@ -80,8 +80,10 @@ function fakeDb(tree, opt) {
         }
         return { val: () => v };
       },
-      set: async (v) => { writes.push({ p: p, kind: 'set', v: clone(v) }); put(p, clone(v)); },
+      set: async (v) => { calls.push(p); writes.push({ p: p, kind: 'set', v: clone(v) }); put(p, clone(v)); },
       transaction: async (fn) => {
+        calls.push(p);                                   // 쓰기 «호출» 순서(실패한 것 포함)
+        if (opt.failTx && opt.failTx(p)) throw new Error('network');
         if (opt.onTx) opt.onTx(p, tree);                 // 실행기가 읽은 뒤·쓰기 전에 누가 고친다
         const cold = fn(null);                            // SDK 는 로컬에 값이 없으면 먼저 null 로 부른다
         if (cold === undefined) return { committed: false, snapshot: { val: () => asNull(get(p)) } };
@@ -94,7 +96,7 @@ function fakeDb(tree, opt) {
     };
     return api;
   }
-  return { tree, reads, writes, ref };
+  return { tree, reads, writes, calls, ref };
 }
 function deps(db, over) {
   const logs = [];
@@ -257,10 +259,10 @@ test('live — 줄마다 트랜잭션으로 쓴다(plan 의 next, at=now) · log
   assert.deepEqual(line, want.next, '쓴 줄 = 순수 모듈의 결과');
   assert.equal(line.at, NOW); assert.equal(line.by, '자동'); assert.equal(line.st, 'done');
   assert.deepEqual(db.writes.map((w) => [w.p, w.kind]), [
-    ['scal_docs/c1/t3_2026/items/sign', 'tx'], ['scal_autoRun/log/' + TODAY, 'tx'], ['scal_autoRun/last', 'set']], '줄 → 기록 → last 순서');
+    ['scal_autoRun/log/' + TODAY, 'tx'], ['scal_docs/c1/t3_2026/items/sign', 'tx'], ['scal_autoRun/last', 'set']], '기록 → 줄 → last 순서(기록이 먼저)');
   const log = db.tree.scal_autoRun.log[TODAY];
   assert.deepEqual([log.mode, log.at, log.items.length], ['live', NOW, 1]);
-  assert.deepEqual(log.items[0], { co: 'c1', rid: 't3_2026', key: 'sign', step: 'sign', mail: 'i:' + INBOX + ':11', name: '서명본.pdf', day: '2026-10-10', act: 'done' }, 'prev 가 없으면(null) 칸을 두지 않는다');
+  assert.deepEqual(log.items[0], { at: NOW, co: 'c1', rid: 't3_2026', key: 'sign', step: 'sign', mail: 'i:' + INBOX + ':11', name: '서명본.pdf', day: '2026-10-10', act: 'done' }, '기록 항목에 쓴 시각 at · prev 가 없으면(null) 칸을 두지 않는다');
   const last = db.tree.scal_autoRun.last;
   assert.deepEqual([last.mode, last.n, last.nDone, last.items[0].did], ['live', 1, 1, true]);
   assert.equal(db.tree.scal_autoRun.cfg.mode, 'live', 'cfg 는 건드리지 않는다');
@@ -282,7 +284,7 @@ test('live — 발송함 줄(사람이 «서명 요청 발송»)을 이어받으
   const line = db.tree.scal_docs.c1.t3_2026.items.sign;
   assert.equal(line.sentAt, '2026-10-05'); assert.equal(line.by, '자동'); assert.equal(line.st, 'done');
 });
-test('live — 읽은 뒤 사람이 그 줄을 고쳤으면(트랜잭션 콜백이 다른 값을 봄) 건너뛴다: 덮지 않음 · wrote 에 안 셈 · log 에 안 남김 · last 에 did:false', async () => {
+test('live — 읽은 뒤 사람이 그 줄을 고쳤으면(트랜잭션 콜백이 다른 값을 봄) 건너뛴다: 덮지 않음 · wrote 에 안 셈 · last 에 did:false (기록은 먼저 남아 있지만 줄은 사람 것이라 해가 없다)', async () => {
   const human = { st: 'done', by: '홍길동', gotAt: '2026-10-09', at: 99 };
   const tree = treeOf({ mails: [mail('11', '서명본.pdf')], cfg: { mode: 'live', at: 1 } });
   const db = fakeDb(tree, { onTx: (p, t) => { if (p === 'scal_docs/c1/t3_2026/items/sign') { t.scal_docs = { c1: { t3_2026: { items: { sign: clone(human) } } } }; } } });
@@ -290,9 +292,41 @@ test('live — 읽은 뒤 사람이 그 줄을 고쳤으면(트랜잭션 콜백�
   assert.deepEqual([r.n, r.nDone, r.wrote], [1, 0, 0]);
   assert.deepEqual(db.tree.scal_docs.c1.t3_2026.items.sign, human, '사람이 저장한 줄은 그대로');
   assert.equal(writesOf(db, 'scal_docs').length, 0);
-  assert.equal(db.tree.scal_autoRun.log, undefined, '쓰지 않은 줄은 log 에도 없다');
   assert.equal(db.tree.scal_autoRun.last.items[0].did, false);
-  assert.deepEqual(db.writes.map((w) => w.p), ['scal_autoRun/last']);
+  assert.deepEqual(db.writes.map((w) => w.p), ['scal_autoRun/log/' + TODAY, 'scal_autoRun/last'], '기록만 남고 줄 쓰기는 없다');
+  assert.equal(db.tree.scal_autoRun.log[TODAY].items.length, 1, '남은 기록은 «자동이 쓴 줄일 때만» 되돌리는 화면 규칙 덕에 해가 없다');
+});
+test('I3 live — 되돌리기 기록을 «먼저» 남긴다: 기록 쓰기 호출이 줄 쓰기 호출보다 앞 · 기록이 실패하면(던짐·상한) 그 줄은 쓰지 않고 «기록 실패로 건너뜀» · 다른 줄은 계속', async () => {
+  const cos = [GANA, { id: 'c2', name: '다라정밀', email: 'dara@example.com' }];
+  const mk = () => treeOf({ cos, mails: [mail('11', '서명본.pdf'), mail('12', '서명본.pdf', '2026-10-11', { from: 'dara@example.com' })], cfg: { mode: 'live', at: 1 } });
+  /* 호출 순서 — 줄마다 «기록 → 줄» */
+  const ok = fakeDb(mk());
+  await R.run(deps(ok));
+  const order = ok.calls.filter((p) => /^scal_(autoRun\/log|docs)\//.test(p));
+  assert.deepEqual(order, ['scal_autoRun/log/' + TODAY, 'scal_docs/c1/t3_2026/items/sign', 'scal_autoRun/log/' + TODAY, 'scal_docs/c2/t3_2026/items/sign']);
+  /* 기록이 던지면 — 첫 줄은 못 쓰고 둘째 줄은 쓴다(둘째 기록은 성공) */
+  let n = 0;
+  const bad = fakeDb(mk(), { failTx: (p) => p.indexOf('scal_autoRun/log') === 0 && ++n === 1 });
+  const r = await R.run(deps(bad));
+  assert.deepEqual([r.n, r.nDone, r.wrote], [2, 1, 1]);
+  assert.equal(bad.tree.scal_docs.c1, undefined, '기록이 실패한 줄은 쓰지 않았다');
+  assert.ok(bad.tree.scal_docs.c2, '다른 줄은 쓴다');
+  assert.equal(bad.tree.scal_autoRun.log[TODAY].items.length, 1);
+  assert.match(r.note, /기록 실패로 건너뜀 1건/);
+  assert.doesNotMatch(r.note, /^실패/, '던지지 않고 건너뛴다 — 전체 실패가 아니다');
+  assert.deepEqual(bad.tree.scal_autoRun.last.items.map((x) => [x.co, x.did]), [['c1', false], ['c2', true]]);
+  /* 기록이 항상 실패하면 줄 쓰기 0 */
+  const all = fakeDb(mk(), { failTx: (p) => p.indexOf('scal_autoRun/log') === 0 });
+  const r2 = await R.run(deps(all));
+  assert.deepEqual([r2.wrote, r2.nDone], [0, 0]);
+  assert.equal(writesOf(all, 'scal_docs').length, 0);
+  assert.match(r2.note, /기록 실패로 건너뜀 2건/);
+  assert.equal(all.tree.scal_docs, undefined);
+  /* 기록 성공 + 줄 건너뜀 → wrote 에 안 셈 */
+  const skip = fakeDb(mk(), { onTx: (p, t) => { if (p.indexOf('scal_docs/c1') === 0) t.scal_docs = { c1: { t3_2026: { items: { sign: { st: 'done', by: '홍길동', at: 9 } } } } }; } });
+  const r3 = await R.run(deps(skip));
+  assert.deepEqual([r3.nDone, r3.wrote], [1, 1]);
+  assert.equal(skip.tree.scal_autoRun.log[TODAY].items.length, 2);
 });
 test('live — 줄이 읽은 뒤 «새로 생겼으면»(읽을 땐 기록 없음) 이것도 건너뛴다 · 발송함 줄이 읽은 뒤 바뀌어도', async () => {
   const human = { st: 'doing', by: '홍길동', at: 99 };
@@ -316,7 +350,7 @@ test('live — 일부만 바뀌어도 나머지 줄은 쓴다(줄마다 따로)'
   assert.equal(db.tree.scal_docs.c2.t3_2026.items.sign.by, '자동');
   assert.equal(db.tree.scal_docs.c1.t3_2026.items.sign.by, '홍길동');
   assert.deepEqual(db.tree.scal_autoRun.last.items.map((x) => [x.co, x.did]), [['c1', false], ['c2', true]]);
-  assert.equal(db.tree.scal_autoRun.log[TODAY].items.length, 1);
+  assert.equal(db.tree.scal_autoRun.log[TODAY].items.length, 2, '기록은 줄마다 먼저 남는다(사람이 고친 c1 의 기록은 해가 없다)');
 });
 test('live — 한 번에 100줄까지(오래된 메일부터) · 나머지는 다음 실행 · log 이어 붙이기 · 다음 실행이 이어서 처리', async () => {
   const cos = [], mails = [];
@@ -357,6 +391,66 @@ test('live — 오늘 기록(log)이 200 을 넘으면 «기록 없이 쓰지 �
   const db2 = fakeDb(treeOf({ cos, mails, cfg: { mode: 'live', at: 1 }, log: { [TODAY]: { at: 1, mode: 'live', items: full } } }));
   const r2 = await R.run(deps(db2));
   assert.equal(r2.wrote, 0); assert.equal(writesOf(db2, 'scal_docs').length, 0);
+});
+
+/* ═══ 미배정 목록 · 모드 모름 · skipped 열쇠 ═══ */
+test('I5 last.unmatched — dry·live 모두 plan 의 미배정 항목 그대로 {co, rid, mail, name, day, why}(주소·제목 없음) · nUnmatched 는 개수', async () => {
+  for (const mode of ['dry', 'live']) {
+    const tree = treeOf({ mails: [mail('11', ['서명본.pdf', '서명 확인서.pdf'], '2026-10-10', { s: '비밀제목 secret@x.example' })], cfg: { mode, at: 1 } });
+    const want = directPlan(tree);
+    assert.ok(want.unmatched.length >= 1, '합성 자료가 미배정을 만든다');
+    const db = fakeDb(tree);
+    const r = await R.run(deps(db));
+    const last = db.tree.scal_autoRun.last;
+    assert.deepEqual(last.unmatched, want.unmatched.map((u) => ({ co: u.coId, rid: u.rid, mail: u.mailKey, name: u.name, day: u.day, why: u.why })), mode);
+    assert.deepEqual([r.nUnmatched, last.nUnmatched], [want.unmatched.length, want.unmatched.length]);
+    last.unmatched.forEach((u) => assert.deepEqual(Object.keys(u).sort(), ['co', 'day', 'mail', 'name', 'rid', 'why']));
+    assert.ok(JSON.stringify(last).indexOf('비밀제목') < 0, '제목 전문이 없다');
+    noAt(db);
+  }
+  /* 미배정이 없으면 칸을 두지 않는다 */
+  const db0 = fakeDb(treeOf({ mails: [mail('11', '서명본.pdf')] }));
+  await R.run(deps(db0));
+  assert.equal(db0.tree.scal_autoRun.last.unmatched, undefined);
+});
+test('I5 last.unmatched — 100건 상한(넘은 개수는 skipped.unmatchedCut · nUnmatched 는 전체) · 첨부 이름에 @ 가 있는 항목은 싣지 않는다', async () => {
+  const mails = [];
+  for (let i = 1; i <= 30; i++) mails.push(mail(String(i), [1, 2, 3, 4, 5].map((j) => '서명본' + i + '_' + j + '.pdf'), '2026-10-10'));
+  const tree = treeOf({ mails });
+  const want = directPlan(tree);
+  assert.ok(want.unmatched.length === 100 && want.skipped.unmatchedCut > 0, '합성 자료가 상한을 넘긴다');
+  const db = fakeDb(tree);
+  const r = await R.run(deps(db));
+  const last = db.tree.scal_autoRun.last;
+  assert.equal(last.unmatched.length, 100);
+  assert.equal(last.skipped.unmatchedCut, want.skipped.unmatchedCut);
+  assert.equal(r.nUnmatched, 100 + want.skipped.unmatchedCut, '개수는 전체');
+  noAt(db);
+  const at = fakeDb(treeOf({ mails: [mail('11', ['서명본.pdf', 'a@b 서명.pdf'])] }));
+  await R.run(deps(at));
+  assert.equal(at.tree.scal_autoRun.last.unmatched, undefined, '@ 가 든 항목은 싣지 않는다');
+  assert.equal(at.tree.scal_autoRun.last.skipped.atSignUnmatched, 1);
+  noAt(at);
+});
+test('Minor 모드 읽기가 실패하면 last.mode 는 «unknown»(dry 라고 적지 않는다) · 반환값도 · 다른 실패는 읽은 모드 그대로', async () => {
+  const db = fakeDb(treeOf({ mails: [mail('11', '서명본.pdf')], cfg: { mode: 'live', at: 1 } }), { failRead: (p) => p === 'scal_autoRun/cfg/mode' });
+  const r = await R.run(deps(db));
+  assert.equal(r.mode, 'unknown'); assert.equal(db.tree.scal_autoRun.last.mode, 'unknown');
+  assert.match(db.tree.scal_autoRun.last.note, /^실패/);
+  assert.deepEqual(db.writes.map((w) => w.p), ['scal_autoRun/last']);
+  const db2 = fakeDb(treeOf({ cfg: { mode: 'live', at: 1 } }), { failRead: (p) => p === 'scal_cos' });
+  assert.equal((await R.run(deps(db2))).mode, 'live', '모드를 읽은 뒤의 실패는 읽은 모드를 적는다');
+});
+test('Minor plan 의 skipped 열쇠(sharedAddr·priv·noStep …)가 last.skipped 에 그대로 실린다', async () => {
+  const cos = [GANA, { id: 'c2', name: '다라정밀', email: 'gana@example.com' }, { id: 'c3', name: '마바산업', email: 'maba@example.com' }];
+  const tree = treeOf({ cos, mails: [mail('11', '서명본.pdf'), mail('12', '주민등록증 서명본.pdf', '2026-10-11', { from: 'maba@example.com' }),
+    mail('13', '그냥 문서.pdf', '2026-10-12', { from: 'maba@example.com' })] });
+  const want = directPlan(tree);
+  assert.ok(want.skipped.sharedAddr >= 1 && want.skipped.priv >= 1 && want.skipped.noStep >= 1, '합성 자료가 세 열쇠를 만든다: ' + JSON.stringify(want.skipped));
+  const db = fakeDb(tree);
+  await R.run(deps(db));
+  assert.deepEqual(db.tree.scal_autoRun.last.skipped, want.skipped);
+  noAt(db);
 });
 
 /* ═══ 방어 ═══ */
@@ -407,7 +501,7 @@ test('쓰기가 도중에 실패해도 던지지 않는다 — 이미 쓴 것은
   assert.equal(r.wrote, 1, '이미 쓴 한 줄은 센다');
   assert.match(r.note, /^실패/);
   assert.ok(db.tree.scal_docs.c1, '앞 줄은 쓰였다');
-  assert.equal(db.tree.scal_autoRun.log[TODAY].items.length, 1, '쓴 줄은 기록돼 있다');
+  assert.equal(db.tree.scal_autoRun.log[TODAY].items.length, 2, '기록은 줄을 쓰기 «전에» 남는다 — c1 은 쓴 줄, c2 는 쓰다 실패했지만 기록만 남았다(화면은 자동이 쓴 줄일 때만 되돌림)');
   assert.match(db.tree.scal_autoRun.last.note, /^실패/);
 });
 test('입력이 비어 있어도(업체·일정·메일 없음) 던지지 않는다 · 오늘 날짜가 이상하면 실패로 끝난다', async () => {

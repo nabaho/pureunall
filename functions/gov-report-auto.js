@@ -9,7 +9,7 @@
    ── 세 모드 (scal_autoRun/cfg/mode) ──
    · off  : 아무것도 안 한다 — 읽는 것은 모드 한 칸뿐, 쓰기 0.
    · dry  : 시범 운행(cfg 가 없거나 모르는 값이면 이쪽) — 입력을 읽고 «이렇게 했을 것»만 scal_autoRun/last 에 쓴다. 서류 줄·log 에는 쓰지 않는다.
-   · live : 줄마다 트랜잭션으로 쓴다 — 읽은 뒤 그 줄이 바뀌었으면(사람이 저장했으면) 건너뛴다. 쓴 줄은 scal_autoRun/log/{오늘} 에 이어 붙인다(되돌리기용 prev 포함, 하루 200 상한).
+   · live : 줄마다 «되돌리기 기록(log)을 먼저 남기고» 그다음 트랜잭션으로 줄을 쓴다(기록이 실패하면 그 줄은 쓰지 않는다) —읽은 뒤 그 줄이 바뀌었으면(사람이 저장했으면) 건너뛴다. 쓴 줄은 scal_autoRun/log/{오늘} 에 이어 붙인다(되돌리기용 prev 포함, 하루 200 상한).
    ── 지키는 것 ──
    ⚠ 메일함은 «읽기만» — 거울(mailbox/*)의 짧은 머리글 칸과 첨부 «이름»만 본다. 첨부 파일·본문을 읽지도 복사하지도 않는다.
    ⚠ 쓰는 모든 값을 JSON 으로 만들어 '@' 가 없음을 확인한다(방어) — 있으면 그 줄은 쓰지 않고 «건너뜀» 개수만 남긴다. 로그·오류 글에도 주소·내용·제목을 넣지 않는다.
@@ -69,7 +69,7 @@ async function appendLog(db, day, now, item) {
   const res = await db.ref(ROOT.run + "/log/" + day).transaction((cur) => {
     const old = listOf(cur && cur.items);
     if (old.length >= LOG_MAX) return undefined;
-    return { at: now, mode: "live", items: old.concat([item]) };
+    return { at: now, mode: "live", items: old.concat([Object.assign({ at: now }, item)]) };
   });
   return !!(res && res.committed);
 }
@@ -84,6 +84,7 @@ function logItemOf(a) {
 }
 function lastDoc(S) {
   const d = { at: S.now, mode: S.mode, n: S.n, nDone: S.nDone, nUnmatched: S.nUnmatched, items: S.items };
+  if (S.unmatched.length) d.unmatched = S.unmatched;
   if (S.more) d.more = true;
   if (S.scanned !== null) d.scanned = S.scanned;
   if (S.skipped && Object.keys(S.skipped).length) d.skipped = S.skipped;
@@ -96,7 +97,7 @@ const outOf = (S, note) => ({ mode: S.mode, n: S.n, nDone: S.nDone, nUnmatched: 
 async function run(deps) {
   deps = deps || {};
   const db = deps.db, today = deps.today, log = typeof deps.log === "function" ? deps.log : () => {};
-  const S = { now: Number(deps.now) || Date.now(), mode: null, n: 0, nDone: 0, nUnmatched: 0, wrote: 0, items: [], note: "", more: false, scanned: null, skipped: {} };
+  const S = { now: Number(deps.now) || Date.now(), mode: null, n: 0, nDone: 0, nUnmatched: 0, wrote: 0, items: [], unmatched: [], note: "", more: false, scanned: null, skipped: {} };
   const hour = Number(deps.hour);
   if (!(hour >= HOUR_FROM && hour <= HOUR_TO)) return outOf(S, "쉼");          // 서울 07~20시 밖 — 읽기 0
   const notes = [];
@@ -118,6 +119,11 @@ async function run(deps) {
     if (P.skipped.badToday || P.skipped.noTrack || P.skipped.noState) throw new Error("입력 확인 실패");
     S.scanned = P.scanned; S.more = !!P.more; S.skipped = Object.assign({}, P.skipped);
     S.nUnmatched = P.unmatched.length + (P.skipped.unmatchedCut || 0);
+    /* 미배정 목록(≤100, plan 이 이미 자른다 — 넘은 개수는 skipped.unmatchedCut) — 주소·제목 없이 업체 id·rid·메일 열쇠·첨부 이름·날짜·까닭만 */
+    P.unmatched.forEach((u) => {
+      const row = { co: u.coId, rid: u.rid, mail: u.mailKey, name: u.name, day: u.day, why: u.why };
+      if (atFree(row)) S.unmatched.push(row); else S.skipped.atSignUnmatched = (S.skipped.atSignUnmatched || 0) + 1;
+    });
 
     /* 쓸 값에 '@' 가 있으면 그 줄은 쓰지 않는다(로그에는 줄 자리만) */
     const acts = [];
@@ -136,22 +142,27 @@ async function run(deps) {
       for (const a of acts) {
         const it = itemOf(a); S.items.push(it);
         if (room <= 0) { left++; continue; }
+        /* ★ 되돌리기 기록을 «먼저» 남기고 그다음 줄을 쓴다 — 기록이 실패하면 그 줄은 쓰지 않는다(되돌릴 길 없는 줄을 만들지 않는다).
+           기록만 남고 줄 쓰기가 건너뛰어져도 해가 없다: 화면 되돌리기는 «그 줄이 아직 자동이 쓴 것일 때만» 쓴다 */
+        let logged = false;
+        try { logged = await appendLog(db, today, S.now, logItemOf(a)); } catch (e) { logged = false; }
+        if (!logged) { lost++; continue; }
+        room--;
         if (!(await writeLine(db, a))) continue;                                // 읽은 뒤 바뀌었다 — 덮지 않는다
-        it.did = true; room--; S.nDone++; S.wrote++;
-        if (!(await appendLog(db, today, S.now, logItemOf(a)))) lost++;
+        it.did = true; S.nDone++; S.wrote++;
       }
       if (left) notes.push("오늘 기록 칸(" + LOG_MAX + ")이 차서 " + left + "건은 다음 날로 미룸");
-      if (lost) notes.push("되돌리기 기록을 못 남긴 줄 " + lost + "건");
+      if (lost) notes.push("기록 실패로 건너뜀 " + lost + "건");
     }
   } catch (e) {
     notes.unshift("실패: " + brief(e));
   }
-  if (!S.mode) S.mode = "dry";
+  if (!S.mode) S.mode = "unknown";                                               // 모드를 읽지 못했다 — dry 라고 적지 않는다(화면은 «모름»)
   S.note = notes.join(" · ");
 
   try {
     const doc = lastDoc(S);
-    if (!atFree(doc)) { doc.items = []; doc.note = "실패: 기록에 쓸 수 없는 글자가 있어 목록을 비움"; }
+    if (!atFree(doc)) { doc.items = []; delete doc.unmatched; doc.note = "실패: 기록에 쓸 수 없는 글자가 있어 목록을 비움"; }
     await db.ref(ROOT.run + "/last").set(doc);
   } catch (e) { log("[메일 자동 처리] last 를 못 씀: " + brief(e)); }
   log("[메일 자동 처리] " + JSON.stringify({ mode: S.mode, n: S.n, nDone: S.nDone, nUnmatched: S.nUnmatched, skipped: S.skipped, note: S.note }));
