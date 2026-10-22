@@ -303,7 +303,7 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* 2026-10-12 게시 전 — 사업 종결 표시(scal_bizState)를 만들개에 넣었다(설계 2026-10-12-gov-report-nav-closed.md). 게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 이 줄과 아래 항목을 뺄 것. */
   /* 2026-10-12 게시 전 — 사업 순서(scal_bizOrder)를 만들개에 넣었다(계획 docs/superpowers/plans/2026-10-12-gov-report-order.md). 게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 항목을 뺄 것. */
   /* 2026-10-22 게시 전 — 메일 서류 자동 처리 기록(scal_autoRun)을 만들개에 넣었다(계획 docs/superpowers/plans/2026-10-22-gov-report-auto.md Task 2). 게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 항목을 뺄 것. */
-  const PENDING = ['/scal_autoRun'];
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
