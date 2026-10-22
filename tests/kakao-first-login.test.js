@@ -59,8 +59,9 @@ function 세상(opt) {
     localStorage: 저장소(opt.저장, opt.막힘),
     sessionStorage: 저장소({}, opt.막힘),
     document: { getElementById: (id) => els[id] || null },
-    navigator: { userAgent: opt.기기 || 'Mozilla/5.0 Chrome/130.0' },
-    window: { PuKakao: {}, __myKakaoSid: opt.sid || 'p001' },
+    navigator: { userAgent: opt.기기 || 'Mozilla/5.0 Chrome/130.0', maxTouchPoints: opt.터치 || 0 },
+    window: { PuKakao: {}, __myKakaoSid: opt.sid || 'p001', innerWidth: opt.폭 || 1280,
+      matchMedia: (q) => ({ matches: /max-width:\s*760px/.test(q) && (opt.폭 || 1280) <= 760 }) },
     auth: { currentUser: opt.로그인 === false ? null : { uid: 'U1' } },
     db: {
       ref: (p) => ({
@@ -298,8 +299,8 @@ test('⑤ 포털이 그릴 때 권유 줄을 부른다', () => {
 });
 
 /* ── ⑦⑧ 공용 PC (대표 「제3의 장소에서 로그인할 경우 어떻게하나?」 → 「추천대로」 2026-09-28) ──
-   ⑦ 일반 브라우저에서는 사용 이력과 무관하게 카카오에게 «다시 묻게» 한다.
-      카카오톡 내부 브라우저는 카카오가 이 옵션을 지원하지 않으므로 제외한다.
+   ⑦ PC에서는 사용 이력과 무관하게 카카오에게 «다시 묻게» 한다.
+      휴대전화는 인증 창 전환을 줄이고 카카오톡 내부 브라우저의 미지원 옵션도 피한다.
    ⑧ 카카오로 들어온 사람의 로그아웃은 파이어베이스를 «먼저» 끊고, 카카오도 끊으러 간다. */
 function 단추세상(opt) {
   const w = 세상(opt);
@@ -312,11 +313,11 @@ function 단추세상(opt) {
   w.ctx.window.PuKakao = { goLogin: (o) => { 부탁.push(o || {}); return Promise.resolve(); } };
   w.ctx.PuKakao = w.ctx.window.PuKakao;
   w.els.kkLoginBtn = 요소('kkLoginBtn');
-  싣기(w, ['kkLogin']);
+  싣기(w, ['isMobile', 'kkLogin']);
   return { w, 부탁 };
 }
 
-test('⑦ ★★ 일반 브라우저는 카카오 사용 이력과 무관하게 계정을 다시 확인한다', async () => {
+test('⑦ ★★ PC는 계정을 다시 확인하고 휴대전화는 불필요한 카카오 재인증 창을 열지 않는다', async () => {
   const 처음 = 단추세상({});
   처음.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(처음.부탁[0] && 처음.부탁[0].ask, true,
@@ -328,7 +329,15 @@ test('⑦ ★★ 일반 브라우저는 카카오 사용 이력과 무관하게 
   const 막힘 = 단추세상({ 막힘: true });
   막힘.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(막힘.부탁[0] && 막힘.부탁[0].ask, true, '★ 저장소를 못 읽으면 «묻는 쪽» 이어야 합니다');
-  const 카카오톡 = 단추세상({ 저장: { pu_kakao_used: '1' }, 기기: 'Mozilla/5.0 KAKAOTALK/10.0' });
+  const 폰 = 단추세상({ 저장: { pu_kakao_used: '1' }, 기기: 'Mozilla/5.0 (Linux; Android 16) Mobile Chrome/140', 폭: 411 });
+  폰.w.ctx.kkLogin(); await 틈();
+  assert.equal(폰.부탁[0] && 폰.부탁[0].ask, false,
+    '★★ 휴대전화에서 기존 카카오 세션을 버리고 계정 창을 매번 다시 열면 안 됩니다');
+  const 좁은웹뷰 = 단추세상({ 기기: 'Mozilla/5.0 Chrome/140', 폭: 411, 터치: 5 });
+  좁은웹뷰.w.ctx.kkLogin(); await 틈();
+  assert.equal(좁은웹뷰.부탁[0] && 좁은웹뷰.부탁[0].ask, false,
+    '★ 모바일 표식이 빠진 웹뷰도 화면 폭으로 휴대전화임을 판별해야 합니다');
+  const 카카오톡 = 단추세상({ 저장: { pu_kakao_used: '1' }, 기기: 'Mozilla/5.0 (Linux; Android 16) KAKAOTALK/10.0', 폭: 411 });
   카카오톡.w.ctx.kkLogin(); await 틈();
   assert.equal(카카오톡.부탁[0] && 카카오톡.부탁[0].ask, false,
     '★ 카카오톡 내부 브라우저에서는 지원하지 않는 prompt=login 을 보내면 안 됩니다');
