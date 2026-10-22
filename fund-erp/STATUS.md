@@ -24,6 +24,7 @@
 ## 2. Firebase (인터넷판)
 - 프로젝트 `pureun-erp`, Realtime DB `https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app`, SDK 10.13.2 compat + App Check reCAPTCHA v3.
 - 로그인은 pu-erp와 공유(같은 도메인 auth).
+- 2026-10-22: 공용 `pu-authsync`가 잠든 탭에 늦게 도착한 옛 로그아웃 신호로 새 Firebase 로그인을 끊던 경로를 수정. 인터넷판 `fund.html`도 새 공용 인증 동기화 파일을 불러오며, 실제 새 로그아웃은 계속 전파한다. 휴대전화 재현 확인은 배포 뒤 필요.
 - **네임스페이스 `fund_erp/*` 필수**(루트 `funds`는 pu-erp 계약용, 충돌 금지).
 - RTDB 규칙: `fund_erp` `.read/.write:"auth != null"` 게시됨.
 - 데이터: `fund_erp/funds/{fid}`(+`years/{yr}/subsidy`,`years/{yr}/opening`, +담당 `mgr_main{sid,name}`·`mgr_subs[]`·`manager`문자열), `/sites/{fid}/{sid}`, `/annual/{fid}/{yr}/{code}`, `/welfare/{fid}/{yr}/{id}`, `/events/{fid}/{eid}`, `/txns/{fid}/{yr}/{hkey}`, `/billings/{id}`.

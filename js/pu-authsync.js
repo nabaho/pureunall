@@ -175,9 +175,10 @@
   /* 다른 탭이 바꾼 것 — 파이어베이스 신호가 늦거나 막혀도 이걸로 안다 */
   function onStorage(ev) {
     if (!ev) return;
-    /* 포털(또는 다른 앱)이 «지금 나갔다»고 적었다 — 사람을 본 적 있는 탭이면 즉시 끊는다 */
+    /* 잠든 탭에는 «옛 로그아웃» storage 신호가 새 로그인 뒤에 도착할 수 있다.
+       새 로그인보다 뒤에 일어난 로그아웃일 때만 끊는다 — 깨어날 때의 검사와 같은 기준. */
     if (ev.key === LOGOUT_KEY) {
-      if (ev.newValue && (curUid() || lastAuthAt)) forceOut();
+      if (ev.newValue && (lastAuthAt ? loggedOutSince() : !!curUid())) forceOut();
       return;
     }
     if (ev.key !== KEY) return;
