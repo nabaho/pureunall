@@ -172,3 +172,16 @@ test('scal_bizOrder(컨설팅보고서의 사업 순서)는 컨설팅보고서(g
   assert.ok(g.entityTypes.indexOf(wc[0].entityType) >= 0, '쓰기 계약의 개체 종류는 이 프로그램이 다루는 종류');
   assert.ok(O.TERMS.entityTypes[wc[0].entityType], '사전에 있는 개체 종류');
 });
+
+test('scal_autoRun(컨설팅보고서의 메일 서류 자동 처리 기록)은 컨설팅보고서(govreport) 하나만 소유한다 · 화면이 쓰는 자리는 cfg 한 칸뿐(last·log 는 서버)', () => {
+  const owners = Object.keys(O.PROGRAMS).filter(k => (O.PROGRAMS[k].primaryRoots || []).some(r => r.split('/')[0] === 'scal_autoRun'));
+  assert.deepEqual(owners, ['govreport'], '주인은 컨설팅보고서 하나');
+  const seen = O.auditRoots(['scal_autoRun', 'scal_docs']);
+  assert.deepEqual(seen.unowned, [], 'scal_autoRun 이 주인 없는 자리로 잡히지 않는다');
+  assert.deepEqual(seen.doubleOwned.filter(d => /scal_autoRun/.test(d.root)), []);
+  const g = O.PROGRAMS.govreport;
+  const wc = g.writeContracts.filter(w => /^scal_autoRun/.test(w.path));
+  assert.deepEqual(wc.map(w => w.path), ['scal_autoRun/cfg'], '쓰기 계약은 모드 한 칸 — last·log 는 서버(관리자 SDK)가 쓰므로 화면 쓰기 계약이 아니다');
+  assert.ok(g.entityTypes.indexOf(wc[0].entityType) >= 0, '쓰기 계약의 개체 종류는 이 프로그램이 다루는 종류');
+  assert.ok(O.TERMS.entityTypes[wc[0].entityType], '사전에 있는 개체 종류');
+});

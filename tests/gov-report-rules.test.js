@@ -304,3 +304,64 @@ test('scal_bizOrder — 두 규칙 JSON(전체-적용본·rules-paste)이 같은
   assert.deepEqual(a, rules, '적용본 전체가 생성기 출력과 같다');
   assert.deepEqual(p, rules, 'rules-paste 전체가 생성기 출력과 같다');
 });
+
+/* ═══ 메일 서류 자동 처리 기록 scal_autoRun (2026-10-22, 계획 docs/superpowers/plans/2026-10-22-gov-report-auto.md Task 2) ═══ */
+
+test('scal_autoRun — 읽기는 로그인 직원 · 루트 쓰기 문 없음 · cfg 쓰기는 관리자·위임관리인(MGR) 식 그대로 · last·log 에는 쓰기 문이 없다(서버 관리자 SDK 만)', () => {
+  const r = rules.scal_autoRun;
+  const login = rules.scal_scheds['.read'];            /* LOGIN 식 그대로 */
+  const admin = rules.serverBackups['.read'];          /* ADMIN 식 그대로 */
+  const mgr = rules.serverBackups['.write'];           /* MGR 식 그대로(생성기의 MGR 상수) */
+  assert.ok(r, 'scal_autoRun 자리가 없습니다');
+  assert.equal(r['.read'], login, '읽기는 로그인(재직 직원) — last·log 도 이 읽기를 따른다');
+  assert.equal(r['.write'], undefined, '루트에 쓰기 문을 열지 않는다(통째 지우기·덮어쓰기 방지)');
+  assert.equal(r.cfg['.write'], mgr, '모드 바꾸기는 관리자·위임관리인');
+  assert.notEqual(mgr, admin, 'MGR 은 ADMIN 과 다른 식(위임관리인 포함)이어야 한다');
+  assert.ok(mgr.includes(admin), 'MGR 은 ADMIN 을 포함한다');
+  /* last·log — 클라이언트 쓰기 거절: 쓰기 문도 검사 문도 두지 않는다(규칙에 없는 자리는 기본 거부) */
+  ['last', 'log'].forEach((k) => assert.equal(r[k], undefined, k + ' 에는 규칙 문을 두지 않는다(.write·.validate 없음)'));
+  const all = JSON.stringify(r);
+  assert.equal((all.match(/"\.write"/g) || []).length, 1, '쓰기 문은 cfg 하나뿐');
+  assert.deepEqual(Object.keys(r).sort(), ['.read', 'cfg'], 'cfg 말고 다른 자식 칸을 열지 않는다');
+});
+
+test('scal_autoRun/cfg 모양 — mode·at 필수 · mode 는 off|dry|live 세 값만 · by ≤40자 · at 숫자 · 다른 칸 거절', () => {
+  const c = rules.scal_autoRun.cfg;
+  assert.equal(c['.validate'], "newData.hasChildren(['mode','at'])", 'mode·at 필수');
+  const mode = c.mode['.validate'];
+  assert.equal(mode, "newData.isString() && (newData.val()==='off'||newData.val()==='dry'||newData.val()==='live')");
+  assert.deepEqual([...mode.matchAll(/===\s*'([a-z]+)'/g)].map((m) => m[1]).sort(), ['dry', 'live', 'off'], '모드는 세 값뿐');
+  assert.equal(upperOf(c.by['.validate']), 40, '처리자 이름 길이');
+  assert.ok(c.by['.validate'].includes('newData.isString()'));
+  assert.equal(c.at['.validate'], 'newData.isNumber()');
+  assert.equal(c.$other['.validate'], false, '다른 칸은 거절');
+  assert.deepEqual(Object.keys(c).sort(), ['$other', '.validate', '.write', 'at', 'by', 'mode']);
+  ['mode', 'by', 'at'].forEach((f) => assert.equal(c[f]['.write'], undefined, f + ' 에 따로 쓰기 문 없음'));
+  assert.doesNotMatch(JSON.stringify(rules.scal_autoRun), /\{\d+,\d*\}/, '배포된 규칙에 쓰인 적 없는 {m,n} 범위 한정자를 쓰지 않는다');
+});
+
+test('scal_autoRun/cfg — 규칙 식을 «진짜로 돌려» 본다: mode 세 값만 통과 · 날짜 꼴 아님·다른 칸·by 41자·at 문자열은 거절(식을 JS 로 옮겨 평가)', () => {
+  const c = rules.scal_autoRun.cfg;
+  const ev = (expr, v) => new Function('newData', 'return ' + expr)({ val: () => v, isString: () => typeof v === 'string', isNumber: () => typeof v === 'number',
+    hasChildren: (ks) => v && typeof v === 'object' && ks.every((k) => k in v) });
+  ['off', 'dry', 'live'].forEach((m) => assert.equal(ev(c.mode['.validate'], m), true, m));
+  ['', 'Live', 'on', 'live ', 'LIVE', 1, null].forEach((m) => assert.equal(ev(c.mode['.validate'], m), false, JSON.stringify(m)));
+  assert.equal(ev(c['.validate'], { mode: 'dry', at: 1 }), true);
+  assert.equal(ev(c['.validate'], { mode: 'dry' }), false, 'at 없음');
+  assert.equal(ev(c['.validate'], { at: 1 }), false, 'mode 없음');
+  assert.equal(ev(c.at['.validate'], 1760000000000), true);
+  assert.equal(ev(c.at['.validate'], '1'), false);
+});
+
+test('scal_autoRun — 두 규칙 JSON(전체-적용본·rules-paste)이 같은 블록을 가지고 생성기 출력과 같다', () => {
+  const fs = require('node:fs');
+  const pick = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', f), 'utf8')).rules;
+  const gen = rules.scal_autoRun;
+  assert.ok(gen, '생성기 출력에 scal_autoRun');
+  const a = pick('firebase-rules-전체-적용본.json');
+  const p = pick('rules-paste.json');
+  assert.deepEqual(a.scal_autoRun, gen, '적용본');
+  assert.deepEqual(p.scal_autoRun, gen, 'rules-paste');
+  assert.deepEqual(a, rules, '적용본 전체가 생성기 출력과 같다');
+  assert.deepEqual(p, rules, 'rules-paste 전체가 생성기 출력과 같다');
+});

@@ -807,6 +807,25 @@ rules.scal_bizOrder = {
   }
 };
 
+/* 컨설팅보고서 앱 — 받은 메일 서류 자동 처리 기록 (2026-10-22, 계획 docs/superpowers/plans/2026-10-22-gov-report-auto.md Task 2)
+   scal_autoRun/cfg = { mode:'off'|'dry'|'live', by?, at } — 자동 처리의 «스위치». 없으면 서버는 시범 운행(dry)으로 돈다.
+   scal_autoRun/last = { at, mode, n, nDone, nUnmatched, items:[…], … } · scal_autoRun/log/{YYYY-MM-DD} = { at, mode, items:[…] } — 서버 예약 함수(functions/gov-report-auto.js)만 쓴다.
+   ★ 읽기는 직원. cfg 쓰기는 관리자·위임관리인(MGR) — «켜짐(live)» 으로 바꾸는 일은 직원 손에 두지 않는다. 루트에는 쓰기 문이 없다.
+   ★ last·log 에는 쓰기 문도 검사 문도 «일부러» 두지 않는다 — 규칙에 쓰기 문이 없는 자리는 클라이언트가 못 쓰고(기본 거부), 서버 관리자 SDK 는 규칙을 건너뛰어 쓴다.
+     (화면이 되돌리기를 하면 서류 줄(scal_docs)만 다시 저장한다 — log 는 지우지도 고치지도 않는다.)
+   ★ 게시는 합친 뒤(컨트롤러). 게시 전에는 cfg 를 못 읽어도 서버는 dry 로 돌고, 화면의 모드 스위치만 거절된다. */
+rules.scal_autoRun = {
+  '.read': LOGIN,
+  cfg: {
+    '.write': MGR,
+    '.validate': "newData.hasChildren(['mode','at'])",
+    mode:   { '.validate': "newData.isString() && (newData.val()==='off'||newData.val()==='dry'||newData.val()==='live')" },
+    by:     { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+
 /* ══ 백업══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).
      전에는 전 직원이 쓸 수 있었다 — 직원 한 사람의 실수나 계정 하나가

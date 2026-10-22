@@ -94,7 +94,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   /* 2026-10-12 공고 모으기(아침 7:40, govFeedCollect)가 늘어 스물다섯 — 정부사업신청 공고 모아보기의 나라장터·알리오·기업마당을 매일 받아 gov_feed 에 쌓는다(대표 지시 「매일매일 공고를 크롤링」). 하루 셈 +1 */
   /* 2026-10-12 정부지원금 공고 감시(아침 8:10, govaidNoticeWatch)가 늘어 스물여섯 — 기업마당 공고를 매일 받아 govaid/notices 에 쌓고 사람이 이은 사업의 접수 상태를 맞춘다(대표 지시 「매년 사업관련 자동 업데이트」 → 「둘다」). 하루 셈 +1 */
   /* 2026-10-15 방문 사업장 안내 문자(아침 9:00, visitSmsPrepare)가 늘어 스물일곱 — 오늘 현장방문 목록을 만들고 대표 폰에 알린다(대표 지시 「방문 사업장에 문자로 사전 안내」). 하루 셈 +1 */
-  assert.strictEqual(all.length, 27, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
+  /* 2026-10-22 메일 서류 자동 처리(1시간마다, govReportAuto)가 늘어 스물여덟 — 서울 07~20시만 일하고 나머지는 읽기 0 으로 바로 끝나지만 «깨움»은 하루 24번이라 코드에서 읽은 주기로 센다(취업규칙 모으기와 같다) */
+  assert.strictEqual(all.length, 28,'스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -135,6 +136,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '안내문 원문 보관 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.visitSmsPrepare') >= 0 && ENTER.indexOf('방문 사업장 안내 문자 하루 한 번') >= 0,
     '방문 사업장 안내 문자 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.govReportAuto') >= 0 && ENTER.indexOf('메일 서류 자동 처리 1시간마다') >= 0,
+    '메일 서류 자동 처리 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -195,11 +198,13 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
   const rules = scheduleOf(FIDX, 'collectRulesMail ');
+  const gra = scheduleOf(FIDX, 'govReportAuto');
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
     + 13   // 방문 사업장 안내 문자(2026-10-15 +1) · 정부지원금 공고 감시(2026-10-12 +1) · 공고 모으기(2026-10-12 +1) · 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·컨설턴트 모집 감시·회생광고 수집·공인노무사회 자료·뉴스레터 반송 확인·안내문 대장 정리·안내문 원문 보관 — 각 하루 한 번
     + Math.round(60 / rules.every) * rules.hours   // 취업규칙 모으기 — 30분마다 깨움(2026-10-05)
+    + Math.round(60 / gra.every) * gra.hours   // 메일 서류 자동 처리 — 1시간마다 깨움(2026-10-22), 서울 07~20시 밖은 읽기 0 으로 바로 끝난다
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
   /* ⚠ 숫자를 박지 않는다 — 코드에서 셈한 값이 화면에 그대로 있는가만 본다 */

@@ -1267,6 +1267,26 @@ exports.govFeedCollect = functions
     return null;
   });
 
+/* 📮 컨설팅보고서 — 받은 메일 서류 «자동 연결·완료» (대표 지시 2026-10-22 「매일 메일 주고 받은 서류들을 완전히 자동화」 · 선택 «전부 자동 완료», functions/gov-report-auto.js)
+   한 시간마다 돌되 서울 07~20시만 일하고 나머지는 바로 끝낸다. 모드는 scal_autoRun/cfg/mode(off·dry·live) — 없으면 시범 운행(dry: scal_autoRun/last 만 쓴다).
+   ⚠ 열쇠(비밀) 없음 — 업체·일정·서류 기록·메일함 거울과 DB 만 읽는다. 첨부 파일은 읽지 않는다(첨부 «이름»만 거울에서 본다).
+   ⚠ 순수 모듈은 functions/gov-report-core/ 사본(scripts/sync-gov-report-core.js) — 화면과 같은 글자. 고친 뒤에는 이 함수도 다시 올려야 반영된다. */
+exports.govReportAuto = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("every 60 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const now = Date.now();
+    const seoul = new Date(now + 9 * 3600e3);   // 서울 시각(UTC+9)을 UTC 칸으로 읽는다
+    const r = await require("./gov-report-auto").run({
+      db: getDatabase(), now: now, today: seoul.toISOString().slice(0, 10), hour: seoul.getUTCHours(),
+      log: (m) => console.log(m),
+    });
+    console.log("[메일 자동 처리 결과]", { mode: r.mode, n: r.n, nDone: r.nDone, nUnmatched: r.nUnmatched, wrote: r.wrote, note: r.note });
+    return null;
+  });
+
 /* 🎯 정부지원금 — 매일 기업마당 공고 감시 (대표 지시 2026-10-12 「매년 사업관련 자동 업데이트」 → 「둘다」, functions/govaid-notice-watch.js)
    govaid/notices/{공고번호} 에 쌓고 사전 사업과 이름이 비슷한 것을 «제안»만 한다. 사람이 이은(program.bizinfo) 사업만 접수 상태를 맞춘다.
    ⚠ 인증키는 정부사업신청 대표 자리(gov/{uid}/key_biz)에서 읽기만 — 로그·결과에 안 남긴다. 사람이 표시한 접수 상태·처리는 덮지 않는다.
