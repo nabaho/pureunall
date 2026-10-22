@@ -185,6 +185,34 @@ module.exports = {
   views: [
     메뉴('biz/contract'),
     창('contract-open', '파하바이오헬스케어점검글로벌홀딩스제7공장'),   // 계약 카드는 (주) 를 ㈜ 로 줄여 그린다
+    /* 계약유형을 하나도 안 고른 계약 — CMS 줄이 «.fld» 칸 안으로 들어가 세로로 깨지던 자리
+       (대표 갈무리 2026-10-22: 「CMS 자동이체」·「개인입금」 글자가 한 자씩 세로로 섰다) */
+    { name: 'contract-nokind', wait: 1500,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500);   /* --view 로 이것만 열어도 되게 */
+        /* 새 계약 — 유형이 0개로 시작한다(옛 계약은 열 때 「상담」으로 채워진다) */
+        await page.evaluate(() => window._erpOpenNewContract(null));
+        await page.waitForTimeout(1500);
+        await page.evaluate(() => {   /* 탭 단추 — 글자가 다른 곳(안내문)에도 있어 getByText 가 엉뚱한 것을 집는다 */
+          const b = [...document.querySelectorAll('button')].find(x => /^\s*📄\s*계약정보\s*$/.test(x.textContent));
+          if (!b) throw new Error('계약정보 탭을 못 찾았습니다'); b.click();
+        });
+        await page.waitForTimeout(500);
+        await page.getByText('CMS 자동이체', { exact: false }).last().scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    },
+    /* 계약 창의 세 탭 — 폰에서 칸이 세로로 깨지던 자리(대표 갈무리 2026-10-22) */
+    ...['기업정보', '계약정보', '담당자'].map((tab, i) => ({
+      name: 'contract-tab' + (i + 1), wait: 1500,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500);   /* --view 로 이것만 열어도 되게 */
+        await page.locator('main').getByText('파하바이오헬스케어점검글로벌홀딩스제7공장', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+        await page.getByText(tab, { exact: false }).last().click({ timeout: 5000 });
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    })),
     메뉴('biz/company'),
     /* 폰 카드의 ☐ 를 눌러 «N건 선택» 줄이 뜨는지 본다 — 재고 나서 도로 푼다 */
     { name: 'company-pick', wait: 1200,

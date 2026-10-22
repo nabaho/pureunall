@@ -7,6 +7,7 @@ node tools/phone-audit/run.mjs                    # 포털 앱 전부, 360·411p
 node tools/phone-audit/run.mjs work cal           # 몇 개만 (enter.html APPS 의 key)
 node tools/phone-audit/run.mjs work --full        # 페이지 전체 갈무리도
 node tools/phone-audit/run.mjs work --view=week   # views 가운데 하나만
+node tools/phone-audit/run.mjs erp --font=1.4       # 폰 «글자 크게» 흉내 — 글자만 1.4배 (대표 폰이 그렇다)
 ```
 
 결과: `tools/phone-audit/out/` (갈무리 `<key>[-<view>]-<폭>.png` · `result*.json`) — 저장소에 안 올린다.

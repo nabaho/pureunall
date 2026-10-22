@@ -82,7 +82,9 @@ test('④★ 바닥은 늘 이전/다음/저장 — 「누르면 바로 저장�
   const between = MODAL.slice(atNext, at);
   assert.ok(!/h\('button'/.test(between),
     'goNext 와 goPrev 사이에 단추를 미리 돌려주는 지름길이 있다 — 어느 이름의 조건이든 안 된다');
-  const footer = MODAL.slice(at, at + 1100);
+  /* ⚠ 고정 폭(1100자)으로 자르지 않는다 — 2026-10-22 단추에 nowrap 을 붙이자 「다음」이
+       그 밖으로 밀려 «기능이 멀쩡한데» 깨졌다. 바닥 덩이(IIFE)가 닫히는 데까지 본다. */
+  const footer = MODAL.slice(at, MODAL.indexOf('})()', at));
   assert.match(footer, /'← 이전'/, '이전 단추가 있다');
   assert.match(footer, /'다음 → 계약정보'/, '다음 단추가 있다(1단계 → 2단계)');
   assert.match(footer, /'✓ 저장'/, '마지막 단계의 저장 단추가 있다');

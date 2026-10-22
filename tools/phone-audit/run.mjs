@@ -7,6 +7,7 @@
  *   node tools/phone-audit/run.mjs --out=/tmp/x    # 결과 자리 (기본: tools/phone-audit/out — 저장소에 안 올린다)
  *   node tools/phone-audit/run.mjs --full          # 페이지 전체 갈무리도 남긴다
  *   node tools/phone-audit/run.mjs gov --view=feed # 그 앱의 views 가운데 하나만
+ *   node tools/phone-audit/run.mjs erp --font=1.4  # 폰 «글자 크게» 흉내 (글자만 1.4배)
  *
  * 앱마다 자료·화면 열기: tools/phone-audit/seeds/<key>.js — { data, views:[{name, run(page)}], url?, localStorage? }
  *
@@ -88,6 +89,18 @@ const ALLOW = /^(https:\/\/(unpkg\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net
 /* 한 화면을 재고 갈무리한다 */
 async function snapOne(page, key, view, width) {
   let m = null, err = null;
+  /* --font=1.4 — 폰의 «글자 크게»(접근성 글자 배율)를 흉내 낸다 (2026-10-22).
+     대표 폰은 글자가 커서, 보통 크기에서 멀쩡한 칸이 세로로 깨졌다. 배율은 px 글자까지
+     키우므로 CSS zoom 과 다르다 — 칸 폭은 그대로, 글자만 커진다. 먼저 다 재고 나서 한꺼번에 바꾼다
+     (재면서 바꾸면 em 글자가 두 번 커진다). 이미 키운 것은 표시(data-pa-fs)로 건너뛴다. */
+  if (opt.font) {
+    await page.evaluate((f) => {
+      const els = [...document.querySelectorAll('body *')].filter(el => !el.dataset.paFs);
+      const sz = els.map(el => parseFloat(getComputedStyle(el).fontSize) || 0);
+      els.forEach((el, i) => { el.dataset.paFs = '1'; if (sz[i]) el.style.setProperty('font-size', (sz[i] * f) + 'px', 'important'); });
+    }, Number(opt.font)).catch(() => {});
+    await page.waitForTimeout(200);
+  }
   try {
     await page.addScriptTag({ content: measureSrc });
     m = await page.evaluate((w) => __paMeasure({ width: w }), width);

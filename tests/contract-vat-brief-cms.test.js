@@ -240,13 +240,15 @@ t('★ CMS 가 종류별 세부설정 박스 안에 있다', (function(){
   var cms = src.indexOf('cmsBlock()', open);
   if(cms < 0) return false;
   // 박스가 닫히는 곳 — 그 다음에 오는 「계약유형을 아직 안 골랐으면」 대비 줄이 경계다
-  var boxEnd = src.indexOf("(f.kinds||[]).length === 0 && h('div', { className:'fld' }", open);
+  /* ⚠ 2026-10-22 — 대비 줄은 이제 .fld 가 아니다(폰에서 글자가 세로로 섰다 — tests/contract-modal-phone.test.js).
+       칸 모양이 아니라 «유형 0개일 때의 줄»을 경계로 본다. */
+  var boxEnd = src.indexOf("(f.kinds||[]).length === 0 && h('div',", open);
   return boxEnd > 0 && cms < boxEnd;
 })(), true);
 t('★ 진행상태 아래 옛 CMS 칸이 사라졌다',
   /\/\/ CMS 자동이체 \(자문\/급여대행 계약에 적용\)/.test(src), false);
 t('★ 계약유형을 안 골랐을 때도 CMS 를 손댈 수 있다',
-  /\(f\.kinds\|\|\[\]\)\.length === 0 && h\('div', \{ className:'fld' \}[\s\S]{0,160}?cmsBlock\(\)\)/.test(src), true);
+  /\(f\.kinds\|\|\[\]\)\.length === 0 && h\('div', \{[^}]*\}[^}]*\}\s*,\s*cmsBlock\(\)\)/.test(src), true);
 t('그 이유를 코드에 적어 뒀다', /끌 길이 사라지면 안 된다/.test(src), true);
 
 /* ═══ 5. 부가세 안내가 모든 부가세 체크박스에 붙었는가 ═══
