@@ -210,6 +210,12 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 .td-tg{margin-top:3px}
 .td-mo{padding:6px 10px}
 .td-ib{padding:8px 10px}
+/* 🤖 메일 자동 처리 구역 — 모드 버튼 .td-am · 목록 줄 .td-au(왼쪽 글 + 오른쪽 단추). 색은 위 변수만 */
+.td-am{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.td-am button.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-ink);font-weight:700}
+.td-au{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.td-au-a{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+@media (max-width:760px){ .td-au{grid-template-columns:minmax(0,1fr)} .td-au-a{justify-content:flex-start} }
 @media (max-width:760px){ .td-task{grid-template-columns:28px minmax(0,1fr)} .td-task .act{grid-column:2;justify-self:start} .td-strip{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .dc-l{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 .tag-chk{display:inline-block;border-radius:6px;padding:1px 6px;font-size:11px;background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a}
@@ -395,8 +401,9 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 <script src="js/pu-ontology.js?v=75"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
-     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 알려진 .set 넷뿐이다 —
-     서류 진행 기록 줄(grSaveCell) · 사업 종결(grCloseBiz) · 되돌림 표시 closedFrom 9999(grReopenBiz) · 사업 순서 scal_bizOrder/main(grSaveBizOrder). 물리적 삭제(remove)는 관문이 막으므로 쓰지 않는다
+     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 알려진 .set 다섯뿐이다 —
+     서류 진행 기록 줄(grPutCell — 칸 창 저장 grSaveCell · 자동 처리 되돌리기 grUndoAuto 가 같이 쓴다) · 사업 종결(grCloseBiz) · 되돌림 표시 closedFrom 9999(grReopenBiz) · 사업 순서 scal_bizOrder/main(grSaveBizOrder)
+     · 메일 자동 처리 모드 scal_autoRun/cfg(grSetAutoMode — 다섯째). 물리적 삭제(remove)는 관문이 막으므로 쓰지 않는다
      (레코드 모양이 아니라 관문을 지난다 — 부분 update 도 관문이 막으므로 쓰지 않는다). -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -428,6 +435,8 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 <script src="js/pu-gov-report-inbox.js?v=6"></script>
 <script src="js/pu-gov-report-send.js?v=1"></script>
 <script src="js/pu-gov-report-criteria.js?v=1"></script>
+<!-- 메일 서류 «자동 연결·완료» — 화면은 처리자 이름표(AUTO_BY)만 읽는다. 이 모듈이 옆 모듈(track·docs·nav·inbox·send)을 불러 쓰므로 모두 위에서 싣고 나서 싣는다 -->
+<script src="js/pu-gov-report-auto.js?v=1"></script>
 <!-- 대형 보고서 「✨ 장별 AI 초안」 — 가리기(ai, 양식 표 모듈 다음) → 서버 부르기(정부사업일정 보고서 창과 같은 번호) → 장별 모듈. 저장·쓰기 없음 -->
 <script src="js/pu-gov-report-ai.js?v=4"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
@@ -457,7 +466,10 @@ var GR_MAIL={fn:'https://asia-northeast3-pureun-erp.cloudfunctions.net/',per:300
    사업 순서 — 쓰기 자리 셋째(scal_bizOrder/main 한 문서 { list:'코드,코드', by, at }). 읽기는 통째 한 번, 쓰기는 grSaveBizOrder 의 .set 하나
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_biz…') 를 쓰지 않는다(화면 검사가 막는다) */
 var GR_BIZ={node:'scal_bizState',code:/^[A-Za-z0-9_-]{1,40}$/,fail:'저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)',reopen:'되돌림',orderNode:'scal_bizOrder',orderKey:'main',orderFail:'저장하지 못했습니다 — 관리자만 사업 순서를 바꿀 수 있습니다',orderBad:'순서를 저장할 수 없습니다 — 사업 코드를 확인해 주세요',dragType:'application/x-gr-biz'};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},dashView:'table',tab:'today',todayMore:{},td:null,tdKey:'',dver:0,cm:null,bmsg:'',bbusy:false,bizOrder:[],oseq:0,drag:null,dmark:null,obusy:false,bbmsg:'',f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+/* 메일 자동 처리 — 서버 실행기(functions/gov-report-auto.js)가 한 시간마다 남기는 기록 scal_autoRun 을 읽고(cfg·last·log/{오늘}), 모드만 바꾼다(cfg 한 칸 .set — 쓰기 다섯째).
+   ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_autoRun…') 를 쓰지 않는다(화면 검사가 막는다). 켜짐으로 바꿀 때는 askLive 확인 창 */
+var GR_AUTO={node:'scal_autoRun',cfg:'cfg',last:'last',log:'log',modes:['off','dry','live'],name:{off:'꺼짐',dry:'시범 운행',live:'켜짐'},chip:{off:'wait',dry:'draft',live:'done'},max:10,who:'관리자',readFail:'자동 처리 상태를 읽지 못했습니다',fail:'저장하지 못했습니다 — 관리자만 바꿀 수 있습니다(규칙 게시 또는 권한 확인)',askLive:'받은 메일의 첨부를 서류 줄에 연결하고, 서류 상태를 자동으로 완료로 바꿉니다. 켤까요?\n(잘못 처리된 줄은 이 구역의 「되돌리기」로 줄마다 되돌릴 수 있습니다)'};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},dashView:'table',tab:'today',todayMore:{},td:null,tdKey:'',dver:0,cm:null,bmsg:'',bbusy:false,bizOrder:[],oseq:0,drag:null,dmark:null,obusy:false,bbmsg:'',auto:null,aseq:0,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -671,7 +683,7 @@ function grRenderDocs(){
   var btn=function(x,label){ return '<button type="button" class="act tocb" data-toc="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'">'+label+'</button>'; };
   var chip=function(c){ return c.key?'<span class="st st-'+c.key+'">'+grEsc(c.txt)+'</span>':grEsc(c.txt); };
   var cell=function(x,c){
-    return c.step?'<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" title="눌러서 기록">'+chip(c)+'</button>':chip(c);
+    return c.step?'<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" title="눌러서 기록">'+chip(c)+'</button>'+grAutoBadge(x,t.plan,c.step,''):chip(c);
   };
   var closed=PuGovReportNav.closedFor(GR.bizState,GR.f.biz,GR.f.year);
   /* 사업 대시보드 — 서류 틀이 있고(간단형·대형) 업체가 있을 때만. 기록을 못 읽었으면 요약이 «모름»(가짜 0% 없음) */
@@ -689,7 +701,7 @@ function grRenderDocs(){
     var bcell=function(x,c){
       if(GR.trackErr) return '?';
       if(!c.chip) return '—';
-      return '<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" data-item="'+grEsc(c.id)+'" title="눌러서 기록">'+chip(c.chip)+'</button>';
+      return '<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" data-item="'+grEsc(c.id)+'" title="눌러서 기록">'+chip(c.chip)+'</button>'+grAutoBadge(x,t.plan,c.step,c.id);
     };
     body='<div class="dc-wide"><table><thead><tr><th>업체</th>'+t.cols.map(function(c){ return '<th>'+grEsc(c)+'</th>'; }).join('')+'<th>다음 단계</th><th>기한</th><th></th></tr></thead><tbody>'
       +t.lines.map(function(x){
@@ -859,6 +871,7 @@ function grRenderToday(){
     +'<div class="td-sh">📂 사업별 진행 — 눌러서 열기</div>'+grTodayStrip(t.strip,t.stripErr)
     +((m.total===0&&t.known&&!t.skipped)?'<div class="td-empty">오늘 급한 일이 없습니다</div>':'')
     +sec('hot')+sec('mid')
+    +'<div class="td-sec td-auto" id="tdAuto">'+grAutoHtml()+'</div>'
     +'<div class="td-sec inbox"><div class="td-h">📬 받은 서류</div><div class="td-ib" id="tdInbox">'+grTodayInboxHtml()+'</div></div>'
     +sec('low');
   grApplyTodayView();
@@ -909,6 +922,180 @@ function grTodayInboxHtml(){
 function grRenderTodayInbox(){
   var el=$('tdInbox');
   if(el) el.innerHTML=grTodayInboxHtml();
+}
+/* ═══ 🤖 메일 자동 처리 — 계획 docs/superpowers/plans/2026-10-22-gov-report-auto.md Task 3 ═══
+   서버 예약 함수(govReportAuto)가 한 시간마다 받은 메일의 첨부를 서류 줄에 연결·완료하고 결과를 scal_autoRun(cfg·last·log/{날짜})에 남긴다.
+   ★ 이 화면은 그것을 «보여 주고», 스위치(cfg 한 칸 .set)와 되돌리기(서류 줄 쓰기 길 grPutCell)만 한다 — 이 기능의 새 쓰기는 cfg 하나뿐.
+   ★ 못 읽으면(규칙 게시 전·권한) 구역에 안내 한 줄만 — 앱은 그대로. cfg 가 없으면 서버와 같이 «시범 운행» 으로 본다.
+   ★ items 는 처리 0건이면 DB 가 칸을 버려 없을 수 있고 번호 객체로 올 수도 있다 — 서버 listOf 처럼 평평하게 읽는다. */
+function grAutoList(v){
+  var a=Array.isArray(v)?v:(v&&typeof v==='object'?Object.keys(v).sort(function(x,y){ return x-y; }).map(function(k){ return v[k]; }):[]);
+  return a.filter(function(x){ return !!x&&typeof x==='object'&&!Array.isArray(x); });
+}
+function grAutoMode(cfg){ var m=(cfg&&typeof cfg==='object')?cfg.mode:''; return GR_AUTO.modes.indexOf(m)>=0?m:'dry'; }
+/* 읽기 — cfg·last·오늘 기록 셋을 한 번씩. 하나라도 못 읽으면(규칙 게시 전·권한) 구역은 안내 한 줄 */
+async function grLoadAuto(){
+  var seq=++GR.aseq, G=GR_AUTO, day=GR.today||grToday();
+  var rd=function(p){ return fbDb.ref(G.node+'/'+p).once('value').then(function(s){ return s.val(); }); };
+  var one=function(v){ return (v&&typeof v==='object'&&!Array.isArray(v))?v:null; };
+  try{
+    var v=await Promise.all([rd(G.cfg),rd(G.last),rd(G.log+'/'+day)]);
+    if(seq!==GR.aseq) return;
+    var cfg=one(v[0]);
+    GR.auto={st:'ok',cfg:cfg,mode:grAutoMode(cfg),last:one(v[1]),log:grAutoList(one(v[2])&&v[2].items),rows:[],busy:false,msg:'',err:false,av:false};
+  }catch(e){
+    if(seq!==GR.aseq) return;
+    console.warn('[컨설팅보고서] 못 읽음 '+G.node,e);
+    GR.auto={st:'err',cfg:null,mode:'dry',last:null,log:[],rows:[],busy:false,msg:'',err:false,av:false};
+  }
+  grRenderAuto();
+}
+/* 마지막 실행 시각(ms) → 서울 시각 «YYYY-MM-DD HH:MM» */
+function grAutoTime(ms){
+  var n=Number(ms), d=new Date(n+9*3600e3);
+  return (isFinite(n)&&n>0&&!isNaN(d.getTime()))?d.toISOString().slice(0,16).replace('T',' '):'시각을 알 수 없음';
+}
+/* 구역에 보일 줄(최대 GR_AUTO.max) — 시범 운행(모드도 마지막 실행도 dry)이면 last.items 전부 «예정», 그 밖은 오늘 기록(log) + 마지막 실행의 처리분(did). 최근 순.
+   되돌릴 수 있는 줄은 기록(log — 이전 줄 prev 가 있다)에서 온 것뿐 */
+function grAutoRows(){
+  var A=GR.auto, last=A.last||{}, key=function(x){ return [x.co,x.rid,x.key,x.mail].join('\u0001'); };
+  var mk=function(x,src){
+    var s=function(v){ return v==null?'':String(v); };
+    return {co:s(x.co),rid:s(x.rid),type:s(x.type),key:s(x.key),step:s(x.step),mail:s(x.mail),name:s(x.name),day:s(x.day),why:s(x.why),
+      prev:(src==='log'&&x.prev&&typeof x.prev==='object'&&!Array.isArray(x.prev))?x.prev:null,src:src};
+  };
+  var plan=A.mode==='dry'&&last.mode==='dry', rows=[], seen={};
+  if(plan) rows=grAutoList(last.items).map(function(x){ return mk(x,'last'); }).reverse();
+  else{
+    A.log.slice().reverse().forEach(function(x){ seen[key(x)]=1; rows.push(mk(x,'log')); });
+    grAutoList(last.items).reverse().forEach(function(x){ if(x.did===true&&!seen[key(x)]) rows.push(mk(x,'last')); });
+  }
+  return {plan:plan,total:rows.length,rows:rows.slice(0,GR_AUTO.max)};
+}
+/* 줄 이름 — 업체(GR.input.cos 에서 찾는다, 없으면 «(업체)») · 서류 줄(rid → 일정 사업 → 이알피 사업 → 서류 틀 → 줄 이름, 못 찾으면 줄 키 글자) */
+function grAutoName(x){
+  var D=PuGovReportDocs, T=PuGovReportTrack, d=GR.docs||{}, inp=GR.input||{}, co='(업체)', line=x.key, cs=inp.cos;
+  (Array.isArray(cs)?cs:(cs&&typeof cs==='object'?Object.keys(cs).map(function(k){ return cs[k]; }):[])).forEach(function(c){
+    if(c&&c.id===x.co&&String(c.name||'').trim()) co=String(c.name).trim();
+  });
+  try{
+    var u=x.rid.lastIndexOf('_'), tid=x.type||(u>0?x.rid.slice(0,u):''), yr=u>0?x.rid.slice(u+1):'', erp=D.erpTypeFor(tid,d.biz,d.tmap);
+    if(erp){
+      var p=D.pairs(inp,tid,yr).filter(function(q){ return q.coId===x.co; })[0];
+      var n=Math.max(p?Math.max(+p.rounds||0,+p.planned||0):0,+(x.key.split(':')[1])||0);
+      var k=T.keysFor(D.planFor(erp.name),x.step,n).filter(function(z){ return z.key===x.key; })[0];
+      if(k) line=k.name;
+    }
+  }catch(e){ line=x.key; }
+  return {co:co,line:line};
+}
+/* 구역 안쪽 — 모드 딱지 · 마지막 실행 · 모드 버튼 · 목록. 바깥 값은 모두 grEsc. 읽기만(쓰기는 grSetAutoMode·grUndoAuto) */
+function grAutoHtml(){
+  var A=GR.auto, G=GR_AUTO, head='<div class="td-h">🤖 메일 자동 처리';
+  if(!A) return head+'</div><div class="td-ib"><div class="days">불러오는 중…</div></div>';
+  if(A.st!=='ok') return head+'</div><div class="td-ib"><div class="err-s">'+grEsc(G.readFail)+'</div></div>';
+  var T=PuGovReportTrack, who=PuGovReportAuto.AUTO_BY, known=!!GR.track&&!GR.trackErr, l=A.last, R=grAutoRows();
+  head+=' <span class="st st-'+G.chip[A.mode]+'">'+grEsc(G.name[A.mode])+'</span></div>';
+  var h='<div class="td-ib">';
+  h+=l?'<div class="days">마지막 실행 '+grEsc(grAutoTime(l.at))+' · 처리 '+grEsc((l.mode==='dry'?l.n:l.nDone)||0)+'건 · 미배정 '+grEsc(l.nUnmatched||0)+'건</div>'
+    :'<div class="days">아직 실행 기록이 없습니다 — 한 시간마다(서울 07~20시) 한 번씩 돕니다</div>';
+  if(l&&l.note) h+='<div class="'+(/^실패/.test(String(l.note))?'err-s':'days')+'">'+grEsc(l.note)+'</div>';
+  h+='<div class="days">'+grEsc({off:'꺼져 있습니다 — 새로 처리하지 않습니다',
+    dry:'시범 운행 — 메일을 읽고 «이렇게 했을 것»만 보여 줍니다. 서류 기록은 바꾸지 않습니다',
+    live:'켜져 있습니다 — 받은 메일의 첨부를 서류 줄에 연결하고 «완료»로 바꿉니다'}[A.mode])+'</div>';
+  h+='<div class="td-am" role="group" aria-label="자동 처리 모드">'+G.modes.map(function(m){
+    var on=A.mode===m;
+    return '<button type="button" class="act'+(on?' on':'')+'" onclick="grSetAutoMode(\''+m+'\')" aria-pressed="'+on+'"'+(A.busy?' disabled':'')+'>'+grEsc(G.name[m])+'</button>';
+  }).join('')+'<span class="days">모드는 관리자만 바꿀 수 있습니다</span></div>';
+  if(A.msg) h+='<div class="'+(A.err?'err-s':'days')+'">'+grEsc(A.msg)+'</div>';
+  h+='<div class="td-sh">'+(R.plan?'이렇게 처리할 예정 — 시범 운행이라 아직 서류에 쓰지 않았습니다':'최근 자동 처리')+'</div>';
+  A.rows=R.rows;
+  if(!R.rows.length) h+='<div class="days">'+(R.plan?'처리할 예정인 메일이 없습니다':'최근 자동 처리한 서류가 없습니다')+'</div>';
+  h+=R.rows.map(function(x,i){
+    var cur=known?T.recOf(GR.track,x.co,x.rid)[x.key]:null, nm=grAutoName(x);
+    x.done=!!(cur&&cur.link&&cur.link.key===x.mail&&cur.by!==who);   /* 그 뒤 사람이 손댔거나 이미 되돌린 줄 */
+    x.undo=x.src==='log'&&!x.done;
+    return '<div class="td-au"><div class="td-au-b"><div class="td-ti">'+grEsc(nm.co)+' · '+grEsc(nm.line)+'</div>'
+      +'<div class="td-me">📎 '+grEsc(x.name)+' · '+grEsc(x.day)+(R.plan&&x.why?' · '+grEsc(x.why):'')+'</div></div>'
+      +'<div class="td-au-a"><button type="button" class="act" onclick="grOpenAutoMail('+i+')"'+(GR.avBusy?' disabled':'')+'>메일 열기</button>'
+      +(x.undo?'<button type="button" class="act" onclick="grUndoAuto('+i+')"'+(A.busy?' disabled':'')+'>되돌리기</button>':(x.done?'<span class="days">되돌렸거나 사람이 고친 줄</span>':''))+'</div></div>';
+  }).join('');
+  if(R.total>R.rows.length) h+='<div class="days">처음 '+R.rows.length+'건만 보입니다 — 전체 '+R.total+'건</div>';
+  if(A.av&&GR.avMsg) h+='<div class="'+(GR.avErr?'err-s':'days')+'">'+grEsc(GR.avMsg)+'</div>';
+  return head+h+'</div>';
+}
+/* 구역만 다시 그린다(오늘 할 일 전체는 건드리지 않는다 — 받은 서류 묶음 grRenderTodayInbox 와 같은 꼴) */
+function grRenderAuto(){
+  var el=$('tdAuto');
+  if(el) el.innerHTML=grAutoHtml();
+}
+/* 모드 바꾸기 — scal_autoRun/cfg 한 칸 .set { mode, by, at }. 켜짐은 확인 창 뒤에만. 규칙은 관리자·위임관리인만 허락한다 —
+   직원이 눌러 거절되면(또는 규칙 게시 전) 안내하고 값은 그대로 둔다 */
+async function grSetAutoMode(mode){
+  var A=GR.auto, G=GR_AUTO;
+  if(!A||A.st!=='ok'||A.busy||G.modes.indexOf(mode)<0) return;
+  if(mode==='live'){
+    var yes=false;
+    try{ yes=typeof confirm==='function'&&!!confirm(G.askLive); }catch(e){ yes=false; }
+    if(!yes) return;
+  }
+  var entry={mode:mode,at:Date.now()}, by=String(GR.staffMap[GR.me]||'').trim().slice(0,40);
+  if(by) entry.by=by;
+  A.busy=true; A.msg='저장하는 중…'; A.err=false; grRenderAuto();
+  try{ await fbDb.ref(GR_AUTO.node+'/'+GR_AUTO.cfg).set(entry); }
+  catch(e){ console.warn('[컨설팅보고서] 자동 처리 모드 저장 못 함',e); A.busy=false; A.msg=G.fail; A.err=true; grRenderAuto(); return; }
+  A.cfg=entry; A.mode=mode; A.busy=false; A.msg='자동 처리 모드를 «'+G.name[mode]+'» 으로 바꿨습니다'; A.err=false;
+  grRenderAuto();
+}
+/* 되돌리기 — 자동 처리한 줄을 처리 전 모습(prev)으로. 쓰는 길은 칸 창 저장과 같은 grPutCell(서류 줄 .set) 하나, 처리자는 누른 사람 이름.
+   ★ 어느 경우든 그 메일의 연결(link)을 남긴다 — 메일이 «연결됨» 으로 남아 다시 자동 처리되지 않는다(발송함 줄을 prev 로 돌리면 연결이 없을 때 다시 자동 대상이 된다).
+   ★ 누른 때 그 줄을 다시 읽어 «아직 자동이 쓴 그대로»일 때만 쓴다 — 그 사이 사람이 고쳤으면 덮지 않는다. 저장이 거절되면 안내하고 값은 그대로 */
+async function grUndoAuto(i){
+  var A=GR.auto, T=PuGovReportTrack, G=GR_AUTO, x=(A&&A.rows&&typeof i==='number')?A.rows[i]:null;
+  if(!x||!x.undo||A.busy) return;
+  var pk=x.co+'/'+x.rid+'/'+x.key, stop=function(m){ A.msg=m; A.err=true; grRenderAuto(); };
+  if(!grOkId(x.co)||!grOkId(x.rid)||!T.KEY_RE.test(x.key)||x.key.length>20||!x.mail){ stop('되돌릴 줄의 이름을 확인할 수 없어 되돌리지 않았습니다'); return; }
+  if(!GR.track||GR.trackErr){ stop('서류 기록을 못 읽은 상태라 되돌리지 않았습니다 — 새로 고친 뒤 다시 눌러 주세요'); return; }
+  if(GR.saving[pk]){ stop('같은 칸을 저장하는 중입니다 — 잠시 뒤에 다시 눌러 주세요'); return; }
+  A.busy=true; GR.saving[pk]=true; A.msg='되돌리는 중…'; A.err=false; grRenderAuto();
+  var base=GR.track, rec=null, msg='';
+  try{
+    var one={}, raw=(await fbDb.ref(GR_TRACK_NODES.docs+'/'+x.co+'/'+x.rid+'/items/'+x.key).once('value')).val();
+    one[x.key]=raw;
+    var cur=T.recOf(T.normalize({c:{r:{items:one}}}),'c','r')[x.key]||null;
+    if(!cur||cur.by!==PuGovReportAuto.AUTO_BY||!cur.link||cur.link.key!==x.mail) msg='이 줄은 그 사이 사람이 고쳤거나 이미 되돌려져 있어 그대로 두었습니다';
+    else{
+      var p=x.prev, entry=p?{st:p.st,sentAt:p.sentAt,gotAt:p.gotAt,how:p.how,ack:p.ack,note:p.note,rd:p.rd}:{st:'none'};
+      entry.link={src:'mail',key:x.mail,name:x.name,date:x.day};
+      msg=T.validate(entry,x.step);
+      if(!msg){ rec=T.patchFor(entry,GR.staffMap[GR.me]||G.who,Date.now()); await grPutCell(x.co,x.rid,x.key,rec); }
+    }
+  }catch(e){ console.warn('[컨설팅보고서] 자동 처리 되돌리기 못 함',e); msg=T.SAVE_FAIL; rec=null; }
+  delete GR.saving[pk]; A.busy=false;
+  if(msg||!rec){ stop(msg||T.SAVE_FAIL); return; }
+  /* 저장하는 사이 다시 읽기가 시작·끝났거나 못 읽은 상태면(옛 기록 위에 덮지 않게) 로컬 표는 건드리지 않는다 — 칸 창 저장과 같다 */
+  if(GR.track===base&&!GR.trackErr){
+    GR.track=T.put(GR.track,x.co,x.rid,x.key,rec); GR.dver++;
+    A.msg='되돌렸습니다 — 서류 줄을 자동 처리 전 모습으로 돌리고 메일 연결은 남겼습니다'; A.err=false;
+    grGlobalRefresh(); grApplyTrack(); grRender();
+  }else{ A.msg='되돌렸습니다 — 목록을 다시 불러온 뒤 확인해 주세요'; A.err=false; grRenderAuto(); }
+}
+/* 「메일 열기」 — 연결 열쇠(PuGovReportInbox.linkKey.parse) + 첨부 이름으로 기존 grOpenAtt 길(grOpenLinked 와 같은 모양). 개인 자료는 서버가 이미 뺐다.
+   안내(받는 중·실패·열었음)는 grRenderInbox 가 이 구역에도 알려 준다(A.av) */
+function grOpenAutoMail(i){
+  var A=GR.auto, x=(A&&A.rows&&typeof i==='number')?A.rows[i]:null;
+  if(!x||!x.mail) return Promise.resolve({ok:false});
+  A.av=true;
+  return grOpenAtt(PuGovReportInbox.linkKey.parse(x.mail),x.name);
+}
+/* 서류 체크표 칸의 «자동» 딱지 — 그 칸의 서류 줄 가운데 처리자가 자동인 줄이 하나라도 있으면. itemId 가 있으면(대형 단계 칸) 그 항목의 줄들, 없으면 그 단계의 모든 서류 줄 */
+function grAutoBadge(x,plan,step,itemId){
+  var T=PuGovReportTrack, rec=T.recOf(GR.track||{},x.coId,x.rid), who=PuGovReportAuto.AUTO_BY, mine={};
+  if(!itemId) T.keysFor(plan,step,Math.max(+x.rounds||0,+x.planned||0)).forEach(function(k){ mine[k.key]=1; });
+  var hit=Object.keys(rec).some(function(k){
+    return !!rec[k]&&rec[k].by===who&&(itemId?(k===itemId||k.indexOf(itemId+':')===0):mine[k]===1);
+  });
+  return hit?' <span class="tag-ai" title="메일에서 자동으로 처리한 서류 줄이 있습니다">자동</span>':'';
 }
 /* 「더 보기」 — 그 묶음을 전부 보인다 */
 function grTodayMore(lv){
@@ -1002,7 +1189,7 @@ function grOpenCell(coId,typeId,step,itemId){
   GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,item:itemId||'',keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
     win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',cands:[],
     rd:isRd,crit:isRd?String(plan.criteria||''):'',chaps:chaps,chap:chaps.length?{busy:false,msg:'',err:false,draft:{},warn:{},sent:''}:null};
-  GR.avMsg=''; GR.avErr=false;
+  GR.avMsg=''; GR.avErr=false; if(GR.auto) GR.auto.av=false;
   grRenderCell();
   grLoadInbox();
 }
@@ -1023,7 +1210,8 @@ function grRenderCell(){
   var field=function(name,inner){ return '<label class="cw-f"><span>'+name+'</span>'+inner+'</label>'; };
   var date=function(id,val){ return '<input type="date" id="'+id+'" value="'+grEsc(val||'')+'">'; };
   var h='<div class="toc-box" role="dialog" aria-label="서류 진행 기록">'
-    +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+(c.item?' · '+grEsc(item.name):'')+' — '+grEsc(c.coName)+'</b><span class="sp"></span>'
+    +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+(c.item?' · '+grEsc(item.name):'')+' — '+grEsc(c.coName)+'</b>'
+    +(rec&&rec.by===PuGovReportAuto.AUTO_BY?' <span class="tag-ai" title="메일에서 자동으로 처리한 줄입니다">자동</span>':'')+'<span class="sp"></span>'
     +'<button type="button" data-close onclick="grCloseCell()">닫기</button></div>';
   if(c.keys.length>1) h+=field('서류','<select id="cwKey" onchange="grPickCell(this.value)">'+c.keys.map(function(k){ return opt(k.key,k.name,c.key); }).join('')+'</select>');
   else h+='<div class="toc-h">서류: '+grEsc(item.name)+'</div>';
@@ -1104,6 +1292,8 @@ function grRenderCrit(){
     +line('비대면 자료조사 '+S.remoteResearchMd+' MD(한도 '+C.IND_REMOTE_RESEARCH_MD+')',!S.researchOk);
   el.innerHTML=h;
 }
+/* 서류 줄 하나를 쓰는 «유일한 .set» — 칸 창 저장(grSaveCell)과 메일 자동 처리 되돌리기(grUndoAuto)가 같이 쓴다. 이름 점검은 부르는 쪽이 한다 */
+function grPutCell(coId,rid,key,rec){ return fbDb.ref(GR_TRACK_NODES.docs+'/'+coId+'/'+rid+'/items/'+key).set(rec); }
 /* 저장 — 그 줄 키 하나만 .set(scal_docs/{업체}/{rid}/items/{키}). update 는 저장 관문이 «부분 update» 로 막는다.
    op 없음(「저장」) = 옛 link 를 이어 받는다 · op.link 가 있으면 그것(「연결」) · op.link 가 null 이면 뺀다(「연결 지우기」) — 받은 서류함 2026-10-11.
    거절되면(규칙 게시 전·권한 없음) 창에 알리고 값은 그대로 둔다. 되면 다시 읽지 않고 로컬 값으로 다시 그린다 */
@@ -1131,7 +1321,7 @@ async function grSaveCell(op){
   var rec=T.patchFor(entry,GR.staffMap[GR.me]||'',Date.now());
   var base=GR.track;
   c.busy=true; GR.saving[pk]=true; c.msg='저장하는 중…'; c.err=false; grRenderCell();
-  try{ await fbDb.ref(GR_TRACK_NODES.docs+'/'+c.coId+'/'+c.rid+'/items/'+c.key).set(rec); }
+  try{ await grPutCell(c.coId,c.rid,c.key,rec); }
   catch(e){
     console.warn('[컨설팅보고서] 저장 못 함',e);
     delete GR.saving[pk];
@@ -1414,6 +1604,7 @@ function grRetryInbox(){ return grLoadInbox(true); }
 /* 칸 창 안 후보 자리 — 연결된 서류 · 후보 줄(받음/보냄·날짜·제목·딱지·첨부마다 열어 보기/연결) · 안내 */
 function grRenderInbox(){
   var I=PuGovReportInbox, T=PuGovReportTrack, c=GR.cw, el=$('cwInbox'), ib=GR.inbox||{};
+  if(GR.auto&&GR.auto.av&&!c) grRenderAuto();   /* 자동 처리 구역의 「메일 열기」 안내(받는 중·실패·열었음) */
   if(!el) return;
   if(!c){ el.innerHTML=''; return; }
   var rec=T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null, lk=rec&&rec.link, busy=!!GR.avBusy;
@@ -1921,6 +2112,8 @@ async function grLoad(){
   await grLoadTrack();
   if(seq!==GR.seq) return;
   grApplyTrack();
+  await grLoadAuto();   /* 메일 자동 처리 상태 — 못 읽어도 앱은 그대로(구역에 안내 한 줄) */
+  if(seq!==GR.seq) return;
   GR.loaded=true; GR.dver++;
   grRender();
 }
