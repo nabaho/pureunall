@@ -175,6 +175,14 @@ PC 에 에고라이트를 깔면 `ego-browser` 스킬이 Codex 에도 붙고 «�
 - 대표 PC(윈도)에 까는 길은 `tools/ego-lite/install-ego-lite.bat` 하나다. 「PC 보호」 창과 온보딩은 사람이 누른다 — 조용히 깔지 않는다
   (`tests/ego-lite-install.test.js`).
 
+### 화면 같이 보기 — 로그인된 크롬 일은 보이는 창에서, 보내기는 사람이 (2026-10-22)
+
+- 대표 PC·노트북의 브라우저 일은 Claude in Chrome(`claude --chrome`)을 먼저 쓴다 — 대표 눈앞의 크롬 창에서 움직인다.
+  크롬 창은 반드시 앞으로 뜬다 — `.claude/settings.json` 훅이 크롬 도구 직전마다 `node tools/phone-link.js --front` 를 부른다(지우지 말 것).
+- 메일(370-6 = 푸른 메일·다음메일)은 받는이·제목·본문까지 채우고 「보내기」 앞에서 멈춘다 — 누르는 것은 대표다.
+  로그인·비밀번호·인증번호는 치지 않는다. 위 에고라이트 금지 목록은 크롬에도 똑같다.
+- 준비 확인: `폰연결-켜기.bat` 5번. 쓰는 법: `docs/화면-같이보기.md` (`tests/phone-link.test.js`).
+
 ---
 
 ## 개인정보 — 이 저장소가 여러 겹으로 막아 온 것

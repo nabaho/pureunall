@@ -8,6 +8,7 @@ rem    1  start now (picked by itself after 5 seconds)
 rem    2  make a button on the desktop
 rem    3  start with Windows - ON
 rem    4  start with Windows - OFF
+rem    5  check this PC (Chrome watch-along, phone link)
 rem
 rem  Everything you read on screen comes from tools/phone-link.js.
 rem  NOTE: this .bat stays ASCII on purpose. Korean text inside a
@@ -36,7 +37,8 @@ rem The desktop button and the Windows-start shortcut call this file with --star
 if /i "%~1"=="--start" goto start
 
 node tools\phone-link.js --menu
-choice /c 1234 /t 5 /d 1 /n
+choice /c 12345 /t 5 /d 1 /n
+if errorlevel 5 goto check
 if errorlevel 4 goto off
 if errorlevel 3 goto on
 if errorlevel 2 goto desk
@@ -55,6 +57,10 @@ goto end
 
 :off
 node tools\phone-link.js --startup-off
+goto end
+
+:check
+node tools\phone-link.js --check
 
 :end
 echo.
