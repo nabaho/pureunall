@@ -356,6 +356,17 @@ test('pending — 30건까지 · 넘으면 more · 늦은 것이 위 · 자른 �
   assert.equal(I.pending(many.slice(0, 30), {}, {}).more, false, '딱 30건이면 more 아님');
 });
 
+test('mailRows — DB 가 번호 촘촘한 폴더를 «배열»로 돌려줘도 읽는다(인덱스가 uid · null 칸은 건너뜀)', () => {
+  const folders = { 'INBOX-0a1b2c3d': { path: 'INBOX', name: '받은메일함', kind: 'inbox' } };
+  const row = (u) => ({ u, f: '가나', e: 'gana@example.com', t: 'office@pureun.kr', s: '제목', d: Date.UTC(2026, 9, 10, 1), a: 1, an: ['a.pdf'] });
+  const fromArray = I.mailRows(folders, { 'INBOX-0a1b2c3d': [null, row(1), null, row(3), 'x', 5] });
+  const fromObject = I.mailRows(folders, { 'INBOX-0a1b2c3d': { 1: row(1), 3: row(3) } });
+  assert.deepEqual(fromArray.map((r) => r.uid), ['1', '3']);
+  assert.deepEqual(fromArray, fromObject, '배열이든 객체든 같은 줄');
+  assert.deepEqual(I.mailRows(folders, { 'INBOX-0a1b2c3d': [] }), []);
+  assert.deepEqual(I.mailRows(folders, { 'INBOX-0a1b2c3d': 'x' }), []);
+});
+
 test('pending — list·linked·seen 이 null 이어도 오류 없다', () => {
   assert.deepEqual(I.pending(null, null, null), { list: [], more: false });
   assert.deepEqual(I.pending(undefined, {}, {}), { list: [], more: false });

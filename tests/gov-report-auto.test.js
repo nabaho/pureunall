@@ -86,14 +86,17 @@ test('상수 — 45일 · 100줄 · 처리자 «자동»(40자 이내) · 꼬리
 });
 
 /* ---------- stepOf 표 ---------- */
-test('stepOf — 서명/날인/직인/인감/스캔/signed → sign · 사진/회의록/… → attach · 둘 다면 sign · 아무것도 아니면 null', () => {
+test('stepOf — 첨부 «이름»의 낱말이 정한다: 서명/날인/직인/인감/signed → sign · 사진/회의록/… → attach · 둘 다면 sign · «스캔» 단독·제목에만 있는 낱말은 null', () => {
   const rows = [
-    ['서명본.pdf', '', 'sign'], ['날인본.pdf', '', 'sign'], ['직인 찍은 것.png', '', 'sign'], ['인감.pdf', '', 'sign'], ['스캔_0001.pdf', '', 'sign'],
+    ['서명본.pdf', '', 'sign'], ['날인본.pdf', '', 'sign'], ['직인 찍은 것.png', '', 'sign'], ['인감.pdf', '', 'sign'], ['스캔 서명본.pdf', '', 'sign'],
     ['final_signed.pdf', '', 'sign'], ['SIGNED.PDF', '', 'sign'],
+    ['스캔_0001.pdf', '', null], ['견적서 스캔.pdf', '', null], ['스캔_0001.pdf', '스캔본 첨부', null],
     ['사진1.jpg', '', 'attach'], ['회의록.hwp', '', 'attach'], ['결과물.zip', '', 'attach'], ['산출물.pdf', '', 'attach'], ['증빙자료.pdf', '', 'attach'],
     ['참여 명단.xlsx', '', 'attach'], ['참석자.xlsx', '', 'attach'], ['출석부.xlsx', '', 'attach'], ['결과보고서.hwp', '', 'attach'], ['활동일지.pdf', '', 'attach'],
-    ['사진 서명.jpg', '', 'sign'], ['문서.pdf', '서명 부탁드립니다', 'sign'], ['문서.pdf', '현장 사진 송부', 'attach'], ['사진.jpg', '서명본 송부', 'sign'],
-    ['문서.pdf', '[서명요청:t3_2026] 회신', 'sign'], ['사진.jpg', '[서명요청:t3_2026] 회신', 'sign'], ['사진.jpg', '[제출:t3_2026] 접수', 'attach'],
+    ['사진 서명.jpg', '', 'sign'], ['문서.pdf', '서명 부탁드립니다', null], ['문서.pdf', '현장 사진 송부', null], ['수정의견.hwp', 'RE: 결과보고서 송부', null],
+    ['회사소개서.pdf', '서명 관련 문의드립니다', null], ['사진.jpg', '서명본 송부', 'attach'],
+    ['문서.pdf', '[서명요청:t3_2026] 회신', 'sign'], ['서명본.pdf', '[서명요청:t3_2026] 회신', 'sign'], ['사진.jpg', '[서명요청:t3_2026] 회신', 'attach'],
+    ['사진.jpg', '[제출:t3_2026] 접수', 'attach'], ['문서.pdf', '[제출:t3_2026] 접수', null],
     ['IMG_0001.jpg', '안녕하세요', null], ['문서.pdf', '', null], ['', '', null],
   ];
   rows.forEach(([n, s, want]) => assert.equal(A.stepOf(n, s), want, JSON.stringify([n, s])));
@@ -116,9 +119,17 @@ test('usable — 기록 없음 또는 «없음»이면서 사람 손(처리자·
 
 /* ---------- pickKey ---------- */
 test('pickKey — 간단형(충남북부 상의) 서명 once 줄: 쓸 수 있는 줄이 하나면 그 줄', () => {
-  const r = A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: {}, att: { name: '문서.pdf' }, subject: '', multi: false });
+  const r = A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: {}, att: { name: '서명본.pdf' }, subject: '', multi: false });
   assert.deepEqual(r, { key: 'sign', why: '쓸 수 있는 줄이 하나' });
-  assert.deepEqual(A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, att: { name: '문서.pdf' } }), { key: 'sign', why: '쓸 수 있는 줄이 하나' }, 'recs 없어도');
+  assert.deepEqual(A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, att: { name: '서명본.pdf' } }), { key: 'sign', why: '쓸 수 있는 줄이 하나' }, 'recs 없어도');
+  /* 줄이 하나뿐이라는 이유로 쓰려면 첨부 «이름»이 그 단계 낱말을 직접 가져야 한다(direct 로 따로 보증할 수도 있다) */
+  const no = (name, direct) => A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: {}, att: { name }, subject: '서명 부탁', multi: false, direct });
+  assert.equal(no('문서.pdf'), null, '이름에 낱말이 없으면(제목에만 있어도) 줄이 하나여도 안 쓴다');
+  assert.equal(no('견적서 스캔.pdf'), null, '«스캔» 단독은 서명이 아니다');
+  assert.equal(no('문서.pdf', true).key, 'sign', 'direct 로 보증하면(꼬리표 회신의 하나뿐인 PDF) 쓴다');
+  assert.equal(no('서명본.pdf', false), null, 'direct:false 는 낱말이 있어도 막는다');
+  assert.equal(A.pickKey({ plan: PLAN_NORTH, step: 'attach', n: 3, recs: {}, att: { name: '결과.pdf' }, subject: '사진', multi: false }), null, '별첨도 이름에 낱말이 있어야');
+  assert.equal(A.pickKey({ plan: PLAN_NORTH, step: 'attach', n: 3, recs: {}, att: { name: '사진.jpg' }, subject: '', multi: false }).key, 'attach');
   const named = A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: {}, att: { name: '업체 서명본.pdf' }, subject: '', multi: false });
   assert.deepEqual(named, { key: 'sign', why: '줄 이름 일치' }, '줄 이름이 먼저 — 「업체 서명본」은 공백을 떼고 견준다');
 });
@@ -156,7 +167,14 @@ test('pickKey — 회차 번호가 있는데 그 줄을 못 쓰면 null(다른 �
   const tgo = (name, recs) => A.pickKey({ plan: PLAN_TG, step: 'attach', n: 3, recs, att: { name }, subject: '', multi: false });
   const adv = { 'advice:2': { st: 'done', by: '홍길동', at: 1 }, 'advice:3': { st: 'done', by: '홍길동', at: 1 } };
   assert.equal(tgo('법률 자문 일지 3회차.pdf', adv), null, '3회차 줄은 사람 손 — 남은 1회차 줄로 새지 않는다');
-  assert.equal(tgo('법률 자문 일지.pdf', adv).key, 'advice:1', '번호가 없으면 줄 이름이 맞는 남은 한 줄');
+  assert.equal(tgo('법률 자문 일지.pdf', adv), null, '번호가 없으면 남은 회차 줄이 하나여도(이름이 맞아도) 안 쓴다 — 회차 줄은 회차 번호가 이름·제목에 있을 때만');
+  assert.equal(tgo('법률 자문 일지 1회차.pdf', adv).key, 'advice:1', '번호가 있으면 그 줄');
+  const one1 = { 'advice:1': { st: 'done', by: '홍길동', at: 1 }, 'advice:2': { st: 'done', by: '홍길동', at: 1 }, pledge: { st: 'done', by: '홍길동', at: 1 },
+    travel: { st: 'done', by: '홍길동', at: 1 }, survey: { st: 'done', by: '홍길동', at: 1 } };
+  assert.equal(A.pickKey({ plan: PLAN_TG, step: 'attach', n: 3, recs: one1, att: { name: '증빙.pdf' }, subject: '', multi: false }), null, '남은 줄이 회차 줄 하나뿐 — 번호 없으면 안 쓴다');
+  assert.equal(A.pickKey({ plan: PLAN_TG, step: 'attach', n: 1, recs: {}, att: { name: '증빙.pdf' }, subject: '', multi: false }), null, '회차 줄이 하나뿐인 틀(n=1)이어도 번호 없으면 안 쓴다');
+  assert.equal(A.pickKey({ plan: PLAN_TG, step: 'attach', n: 1, recs: {}, att: { name: '법률 자문 일지.pdf' }, subject: '', multi: true }), null, '두 사업 — 번호 무시하고 남은 회차에 쓰지 않는다');
+  assert.equal(A.pickKey({ plan: PLAN_TG, step: 'attach', n: 3, recs: {}, att: { name: '법률 자문 일지 2회차.pdf' }, subject: '', multi: true }).key, 'advice:2', '두 사업이어도 이름과 회차 번호가 함께 맞으면');
   assert.equal(o('2026 보고.pdf'), null, '번호 없음 + 줄 이름 없음 + 줄이 여럿');
 });
 test('pickKey — 줄 이름 점수: 회차 꼬리표를 뗀 줄 이름이 첨부 이름·제목에 들어 있으면 그 줄(공백·괄호 제거) · 동점이면 없음', () => {
@@ -173,7 +191,7 @@ test('pickKey — 줄 이름 점수: 회차 꼬리표를 뗀 줄 이름이 첨�
 });
 test('pickKey — 쓸 수 있는 줄이 하나뿐일 때: once 줄은 그 줄, 남은 «회차 줄» 하나는 어느 회차인지 몰라 안 쓴다', () => {
   const h = (keys) => keys.reduce((m, k) => { m[k] = { st: 'done', by: '홍길동', at: 1 }; return m; }, {});
-  const tg = (recs) => A.pickKey({ plan: PLAN_TG, step: 'attach', n: 3, recs, att: { name: '자료.pdf' }, subject: '', multi: false });
+  const tg = (recs) => A.pickKey({ plan: PLAN_TG, step: 'attach', n: 3, recs, att: { name: '증빙 자료.pdf' }, subject: '', multi: false });
   assert.deepEqual(tg(h(['advice:1', 'advice:2', 'advice:3', 'pledge', 'travel'])), { key: 'survey', why: '쓸 수 있는 줄이 하나' }, '남은 줄이 once');
   assert.equal(tg(h(['advice:1', 'advice:2', 'pledge', 'travel', 'survey'])), null, '남은 줄이 advice:3 뿐 — 어느 회차인지 모른다');
 });
@@ -274,11 +292,11 @@ test('plan — 개인 자료(첨부 이름·제목에 PRIV_RE)는 그 메일 전
 });
 test('plan — 기술보호 사업: 쓰지 않는다(skipped.tech) · 기술보호가 있는 업체는 줄 이름이 맞을 때만', () => {
   const tg = { id: 'c2', name: '다라정밀', types: ['t1'], email: 'dara@example.com' };
-  const onlyTg = A.plan(world({ cos: [tg], mails: [mail(11, '', ['보안서약서 서명본.pdf'], '2026-10-10', 'dara@example.com'), mail(12, '증빙', ['보안서약서.pdf'], '2026-10-11', 'dara@example.com')] }));
+  const onlyTg = A.plan(world({ cos: [tg], mails: [mail(11, '', ['보안서약서 서명본.pdf'], '2026-10-10', 'dara@example.com'), mail(12, '', ['보안서약서 증빙.pdf'], '2026-10-11', 'dara@example.com')] }));
   assert.deepEqual([onlyTg.actions.length, onlyTg.unmatched.length, onlyTg.skipped.tech], [0, 0, 2]);
   const both = { id: 'c2', name: '다라정밀', types: ['t1', 't3'], email: 'dara@example.com' };
   const w = (an, s, day, uid) => mail(uid, s, an, day, 'dara@example.com');
-  const r = A.plan(world({ cos: [both], mails: [w(['보안서약서 서명본.pdf'], '', '2026-10-10', 11), w(['업체 서명본.pdf'], '', '2026-10-11', 12), w(['보안서약서.pdf'], '증빙', '2026-10-12', 13)] }));
+  const r = A.plan(world({ cos: [both], mails: [w(['보안서약서 서명본.pdf'], '', '2026-10-10', 11), w(['업체 서명본.pdf'], '', '2026-10-11', 12), w(['보안서약서 증빙.pdf'], '', '2026-10-12', 13)] }));
   assert.deepEqual(r.actions.map((a) => [a.mailKey, a.key, a.rid]), [[mkey(12), 'sign', 't3_2026']], '기술보호 사업이 있어 «하나뿐인 줄» 로는 안 쓴다 — 줄 이름이 맞는 것만');
   assert.deepEqual(r.unmatched.map((u) => u.mailKey), [mkey(11)], '서명본인데 어느 사업인지 모름');
   assert.equal(r.skipped.tech, 1, '기술보호 줄 이름에 맞는 첨부는 기술보호 자료');
@@ -293,14 +311,14 @@ test('plan — 우리 주소(@pureun.kr)만 있는 업체·주소가 없는 업�
   assert.deepEqual([r.actions.length, r.scanned], [0, 0]);
   assert.equal(r.skipped.noAddr, 2, '가나상사(우리 주소만)·다라정밀(주소 없음)');
 });
-test('plan — 같은 주소를 이알피 연락처에서 두 업체가 같이 쓰면(주인 없음) 그 메일은 안 쓴다(skipped.multiCo)', () => {
+test('plan — 같은 주소를 이알피 연락처에서 두 업체가 같이 쓰면(주인 없음) 그 메일은 안 쓴다(skipped.sharedAddr)', () => {
   const cons = [{ id: 'k1', companyName: '가나상사', typeCodes: { consulting: 'consulting-04' }, company: { name: '가나상사', contacts: [{ email: 'both@example.com' }] } },
     { id: 'k2', companyName: '다라정밀', typeCodes: { consulting: 'consulting-04' }, company: { name: '다라정밀', contacts: [{ email: 'both@example.com' }] } }];
   const w = world({ cos: [{ id: 'c1', name: '가나상사', types: ['t3'], erpId: 'k1' }, { id: 'c2', name: '다라정밀', types: ['t3'], erpId: 'k2' }], cons,
     mails: [mail(11, '', ['서명본.pdf'], '2026-10-10', 'both@example.com')] });
   w.input.cos[0].erpId = 'k1'; w.input.cos[1].erpId = 'k2';
   const r = A.plan(w);
-  assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.multiCo, r.scanned], [0, 0, 1, 1]);
+  assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.sharedAddr, r.scanned], [0, 0, 1, 1]);
 });
 test('plan — 종결 사업(scal_bizState)은 안 본다 · 종결 시작 연도 전에는 본다 · 서류 틀 없는 사업·보낸 메일은 안 본다', () => {
   const m = [mail(11, '', ['서명본.pdf'])];
@@ -402,7 +420,7 @@ test('plan — 서명요청 꼬리표 [서명요청:rid] 가 그 쌍을 못 박�
 test('plan — 두 사업이어도 줄 이름이 한쪽에만 맞으면 그쪽(농촌융복합 «현장 사진» · 충남북부 «산출물 별첨»)', () => {
   const co = { id: 'c3', name: '마바산업', types: ['t3', 't6'], email: 'ma@example.com' };
   const mm = (uid, s, an) => mail(uid, s, an, '2026-10-10', 'ma@example.com');
-  const r = A.plan(world({ cos: [co], mails: [mm(11, '현장 사진 보냅니다', ['IMG_01.jpg']), mm(12, '', ['산출물 별첨 자료.pdf']), mm(13, '', ['사진.jpg'])] }));
+  const r = A.plan(world({ cos: [co], mails: [mm(11, '', ['현장 사진.jpg']), mm(12, '', ['산출물 별첨 자료.pdf']), mm(13, '', ['사진.jpg'])] }));
   assert.deepEqual(r.actions.map((a) => [a.mailKey, a.rid, a.key]), [[mkey(11), 't6_2026', 'photo'], [mkey(12), 't3_2026', 'attach']]);
   assert.deepEqual(r.unmatched.map((u) => u.mailKey), [mkey(13)], '이름 단서가 없는 사진은 안 쓴다');
 });
@@ -515,9 +533,10 @@ test('usable(rec, step) — sign 단계만 «doing + sentAt 있음 + gotAt·link
   assert.equal(A.usable(null, 'sign'), true);
 });
 test('pickKey — 발송함 줄은 메일 날짜(day)가 발송일 이상일 때만 대상(day 를 안 주면 아님)', () => {
-  const o = (day, rec) => A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: { sign: rec || WAIT() }, att: { name: '문서.pdf' }, subject: '', multi: false, day });
+  const o = (day, rec) => A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: { sign: rec || WAIT() }, att: { name: '서명본.pdf' }, subject: '', multi: false, day });
   assert.equal(o('2026-10-10').key, 'sign');
-  assert.equal(o('2026-10-05').key, 'sign', '발송 당일 회신도');
+  assert.equal(o('2026-10-06').key, 'sign', '발송 하루 뒤부터');
+  assert.equal(o('2026-10-05'), null, '발송 당일은 회신이 아니다(보낸 메일 사본·자동 응답이 같은 날 온다)');
   assert.equal(o('2026-10-04'), null);
   assert.equal(o(undefined), null);
   assert.equal(o('2026-10-10', Object.assign(WAIT(), { gotAt: '2026-10-06' })), null);
@@ -550,11 +569,13 @@ test('plan ① 옛 메모가 없으면 새 메모만 · how 가 없으면 만들
   assert.ok(long.note.endsWith(' · 자동 처리 — 메일 «문서.pdf»') && long.note.startsWith('메'));
   assert.equal(T.validate(long, 'sign'), '');
 });
-test('plan ② 발송함 줄 + 발송일 이전에 받은 메일 → 대상 아님(발송 당일은 대상)', () => {
+test('plan ② 발송함 줄 + 발송일 이전·당일에 받은 메일 → 대상 아님(하루 뒤부터 대상)', () => {
   const before = A.plan(waitWorld([mail(11, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-04')]));
   assert.deepEqual([before.actions.length, before.unmatched.length], [0, 1]);
   const same = A.plan(waitWorld([mail(12, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-05')]));
-  assert.equal(same.actions.length, 1);
+  assert.deepEqual([same.actions.length, same.unmatched.length], [0, 1]);
+  const next = A.plan(waitWorld([mail(13, '[서명요청:t3_2026] 회신', ['문서.pdf'], '2026-10-06')]));
+  assert.equal(next.actions.length, 1);
 });
 test('plan ③ 발송함 줄 + 서명 키워드 업체 첨부(꼬리표 없음) → 줄이 하나면 완료 · 서명 키워드 없는 첨부는 단계를 몰라 안 쓴다', () => {
   const r = A.plan(waitWorld([mail(11, '', ['가나상사 서명본.pdf'], '2026-10-12'), mail(12, '', ['문서.pdf'], '2026-10-13')]));
@@ -571,13 +592,13 @@ test('plan ④ 사람이 done·blocked·na 로 저장한 줄 · sentAt 없는 do
   });
 });
 test('plan ⑤ attach 단계의 doing 줄은 안 건드린다(sentAt 이 있어도)', () => {
-  const w = one([mail(11, '현장 사진', ['a.jpg'], '2026-10-10')], { items: { c1: { t3_2026: { attach: { st: 'doing', by: '홍길동', sentAt: '2026-10-05', at: 5 } } } } });
+  const w = one([mail(11, '', ['현장 사진.jpg'], '2026-10-10')], { items: { c1: { t3_2026: { attach: { st: 'doing', by: '홍길동', sentAt: '2026-10-05', at: 5 } } } } });
   const r = A.plan(w);
   assert.deepEqual([r.actions.length, r.unmatched.length], [0, 1]);
 });
 test('plan — 두 사업의 서명 줄이 모두 발송함이어도 꼬리표·줄 이름이 있어야 한다 · 꼬리표가 가리킨 쌍에만 쓴다', () => {
   const items = { c2: { t3_2026: { sign: WAIT() }, t4_2026: { sign: WAIT() } } };
-  const none = A.plan(world({ cos: [DARA2], mails: [dm(11, '서명본 송부', ['문서.pdf'], '2026-10-10')], items }));
+  const none = A.plan(world({ cos: [DARA2], mails: [dm(11, '', ['서명본.pdf'], '2026-10-10')], items }));
   assert.deepEqual([none.actions.length, none.unmatched.length], [0, 1]);
   const tagged = A.plan(world({ cos: [DARA2], mails: [dm(12, 'RE: [서명요청:t4_2026] 회신', ['문서.pdf'], '2026-10-10')], items }));
   assert.deepEqual(tagged.actions.map((a) => [a.rid, a.prev.st]), [['t4_2026', 'doing']]);
@@ -588,4 +609,133 @@ test('plan — 발송함 줄 완료도 입력 불변·결과 객체 비공유', 
   assert.equal(r.actions.length, 1);
   assert.deepEqual(clone(w), snap);
   objects(r).forEach((o) => assert.ok(!inObjs.has(o)));
+});
+
+/* ---------- 수정 라운드 2 — 독립 검토(live 전) ---------- */
+const act = (r) => r.actions.map((a) => [a.key, a.name]);
+test('C1 ① 제목에만 «결과보고서» 가 있고 첨부 이름에는 없으면 안 쓴다(unmatched · 제목에만 낱말)', () => {
+  const r = A.plan(one([mail(11, 'RE: 결과보고서 송부', ['수정의견.hwp'])]));
+  assert.deepEqual(r.actions, []);
+  assert.deepEqual(r.unmatched.map((u) => [u.name, u.why]), [['수정의견.hwp', '제목에만 낱말']]);
+});
+test('C1 ② 제목에만 «서명» 이 있으면(첨부 이름에 없음) 안 쓴다', () => {
+  const r = A.plan(one([mail(11, '서명 관련 문의드립니다', ['회사소개서.pdf'])]));
+  assert.deepEqual(r.actions, []);
+  assert.deepEqual(r.unmatched.map((u) => u.why), ['제목에만 낱말']);
+});
+test('C1 ③ «스캔» 단독(견적서 스캔.pdf)은 서명이 아니다 — 단계를 몰라 안 쓴다 · 서명/날인과 함께면 sign', () => {
+  const r = A.plan(one([mail(11, '', ['견적서 스캔.pdf']), mail(12, '스캔 부탁', ['스캔_01.pdf'], '2026-10-11')]));
+  assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.noStep], [0, 0, 2]);
+  assert.deepEqual(act(A.plan(one([mail(13, '', ['스캔 서명본.pdf'])]))), [['sign', '스캔 서명본.pdf']]);
+});
+test('C1 ④ 꼬리표 회신: 사진은 서명 줄을 못 차지한다 — 계약서(PDF 하나뿐)는 sign · 현장사진은 attach 줄로', () => {
+  const r = A.plan(one([mail(11, 'RE: [서명요청:t3_2026] 서명 요청', ['계약서.pdf', '현장사진.jpg'])]));
+  assert.deepEqual(act(r).sort(), [['attach', '현장사진.jpg'], ['sign', '계약서.pdf']]);
+  assert.equal(r.unmatched.length, 0);
+  /* attach 줄이 없는 틀이면 사진은 쓰이지 않는다 — 서명 줄에 새지 않는다 */
+  const co = { id: 'c8', name: '파사공업', types: ['t2'], email: 'pa@example.com' };
+  const wp = A.plan(world({ cos: [co], mails: [mail(12, 'RE: [서명요청:t2_2026] 안내서', ['현장사진.jpg'], '2026-10-10', 'pa@example.com')] }));
+  assert.deepEqual([wp.actions.length, wp.skipped.noLine], [0, 1]);
+  /* 사진만 있는 꼬리표 회신 */
+  assert.deepEqual(act(A.plan(one([mail(13, 'RE: [서명요청:t3_2026] 회신', ['현장사진.jpg'])]))), [['attach', '현장사진.jpg']]);
+});
+test('C1 꼬리표 회신의 서명본 고르기 — 서명 낱말 첨부가 있으면 그것만 · 없으면 PDF/이미지가 하나뿐일 때만 · 아니면 unmatched', () => {
+  const t = (an) => A.plan(one([mail(11, 'RE: [서명요청:t3_2026] 회신', an)]));
+  assert.deepEqual(act(t(['계약서.pdf', '서명본.pdf'])), [['sign', '서명본.pdf']]);
+  assert.deepEqual(t(['계약서.pdf', '서명본.pdf']).unmatched.map((u) => u.name), ['계약서.pdf']);
+  assert.deepEqual(act(t(['계약서.jpg'])), [['sign', '계약서.jpg']]);
+  [['계약서.hwp'], ['계약서.pdf', '부속서.pdf'], ['계약서.pdf', '표.xlsx', '부속서.png']].forEach((an) => {
+    const r = t(an);
+    assert.deepEqual(r.actions, [], JSON.stringify(an));
+    assert.equal(r.unmatched.length, an.filter((n) => !/사진/.test(n)).length, JSON.stringify(an));
+  });
+  assert.deepEqual(act(t(['계약서.pdf', '표.xlsx'])), [['sign', '계약서.pdf']], '엑셀은 서명본 후보가 아니라 PDF 가 하나뿐');
+  assert.equal(t(['계약서.pdf', '표.xlsx']).unmatched.length, 1, '엑셀은 서명본이 아니라 unmatched');
+});
+test('C1 (d) 한 메일 첨부 처리 순서 — 서명 낱말 → 별첨 낱말 → 나머지', () => {
+  const r = A.plan(one([mail(11, 'RE: [서명요청:t3_2026] 회신', ['현장사진.jpg', '계약서.pdf', '서명본.pdf'])]));
+  assert.deepEqual(act(r), [['sign', '서명본.pdf'], ['attach', '현장사진.jpg']]);
+  assert.deepEqual(r.unmatched.map((u) => [u.name, u.why]), [['계약서.pdf', '꼬리표 회신 — 서명본을 정할 수 없습니다']], '서명 낱말 첨부가 있어 계약서는 서명본이 아니다');
+});
+test('I1 두 사업(북부·서산) 중 한쪽 서명 줄을 사람이 완료해도 «남은 쪽» 에 안 쓴다 — 꼬리표 rid 일치일 때만', () => {
+  const items = { c2: { t3_2026: { sign: { st: 'done', by: '홍길동', sentAt: '2026-10-01', gotAt: '2026-10-03', at: 1 } } } };
+  const r = A.plan(world({ cos: [DARA2], mails: [dm(11, '', ['업체 서명본.pdf'], '2026-10-10'), dm(12, '', ['서명본.pdf'], '2026-10-11')], items }));
+  assert.deepEqual(r.actions, []);
+  assert.equal(r.unmatched.length, 2);
+  const tag = A.plan(world({ cos: [DARA2], mails: [dm(13, 'RE: [서명요청:t4_2026] 회신', ['서명본.pdf'], '2026-10-12')], items }));
+  assert.deepEqual(tag.actions.map((a) => [a.rid, a.key]), [['t4_2026', 'sign']]);
+});
+test('I1 이름이 맞는 줄을 가진 사업이 둘이면 한쪽 줄이 사람 손이어도 둘 다 안 쓴다 · 한 사업에만 이름이 맞으면 그 사업(줄이 비었을 때만)', () => {
+  const co = { id: 'c3', name: '마바산업', types: ['t3', 't6'], email: 'ma@example.com' };
+  const mm = (uid, an) => mail(uid, '', an, '2026-10-10', 'ma@example.com');
+  const used = { c3: { t6_2026: { photo: { st: 'done', by: '홍길동', gotAt: '2026-10-02', at: 1 } } } };
+  const r = A.plan(world({ cos: [co], mails: [mm(11, ['현장 사진.jpg'])], items: used }));
+  assert.deepEqual(r.actions, [], '현장 사진 줄은 농촌융복합에만 있고 사람이 채웠다 — 북부 별첨으로 새지 않는다');
+  assert.equal(r.unmatched.length, 1);
+  assert.deepEqual(act(A.plan(world({ cos: [co], mails: [mm(12, ['현장 사진.jpg'])] }))), [['photo', '현장 사진.jpg']]);
+});
+test('I2 같은 주소가 업체관리의 두 업체에 있으면(먼저 적힌 쪽 규칙과 상관없이) 어느 쪽에도 안 쓴다(skipped.sharedAddr) · 한 업체의 업체관리·계약 연락처 중복은 공유가 아니다', () => {
+  const w = world({ cos: [{ id: 'c1', name: '가나상사', types: ['t3'] }, { id: 'c2', name: '다라정밀', types: ['t3'] }],
+    companiesExtra: [{ id: 'm1', name: '가나상사', email: 'shared@example.com', contacts: [{ email: 'gana@example.com' }] }, { id: 'm2', name: '다라정밀', email: 'shared@example.com' }],
+    mails: [mail(11, '', ['서명본.pdf'], '2026-10-10', 'shared@example.com'), mail(12, '', ['서명본.pdf'], '2026-10-11', 'gana@example.com')] });
+  const r = A.plan(w);
+  assert.deepEqual(r.actions.map((a) => [a.coId, a.mailKey]), [['c1', mkey(12)]]);
+  assert.equal(r.skipped.sharedAddr, 1);
+  /* 업체관리 한 줄 + 이알피 계약(같은 사업자번호·이름) — 한 업체 */
+  const cons = [{ id: 'k1', companyName: '가나상사', bizNo: '000-00-00001', typeCodes: { consulting: 'consulting-04' }, company: { name: '가나상사', contacts: [{ email: 'gana@example.com' }] } }];
+  const w2 = world({ cos: [{ id: 'c1', name: '가나상사', types: ['t3'], email: 'gana@example.com' }], cons, mails: [mail(11, '', ['서명본.pdf'])] });
+  w2.input.cos[0].erpId = 'k1';
+  const r2 = A.plan(w2);
+  assert.deepEqual([r2.actions.length, r2.skipped.sharedAddr], [1, undefined]);
+  /* 이름이 달라도 사업자번호가 같으면 한 업체 */
+  const consB = [{ id: 'k1', companyName: '가나유통', bizNo: '000-00-00001', typeCodes: { consulting: 'consulting-04' }, company: { name: '가나유통', bizNo: '000-00-00001', contacts: [{ email: 'gana@example.com' }] } }];
+  const w4 = world({ cos: [{ id: 'c1', name: '가나상사', types: ['t3'] }], companiesExtra: [{ id: 'm1', name: '가나상사', bizNo: '000-00-00001', email: 'gana@example.com' }],
+    cons: consB, mails: [mail(11, '', ['서명본.pdf'])] });
+  w4.input.cos[0].erpId = 'k1';
+  assert.deepEqual([A.plan(w4).actions.length, A.plan(w4).skipped.sharedAddr], [1, undefined], '사업자번호가 같으면 이름이 달라도 같은 업체');
+  /* 계약 연락처 쪽에서 다른 업체와 겹치는 주소(업체관리에는 없음)도 공유 */
+  const cons2 = [{ id: 'k1', companyName: '가나상사', typeCodes: { consulting: 'consulting-04' }, company: { name: '가나상사', contacts: [{ email: 'x@example.com' }] } },
+    { id: 'k2', companyName: '타사', typeCodes: { consulting: 'consulting-05' }, company: { name: '타사', contacts: [{ email: 'x@example.com' }] } }];
+  const w3 = world({ cos: [{ id: 'c1', name: '가나상사', types: ['t3'], email: 'gana@example.com' }], cons: cons2, mails: [mail(11, '', ['서명본.pdf'], '2026-10-10', 'x@example.com')] });
+  w3.input.cos[0].erpId = 'k1';
+  const r3 = A.plan(w3);
+  assert.deepEqual([r3.actions.length, r3.skipped.sharedAddr], [0, 1]);
+});
+test('I6 첨부 이름·제목의 주민등록번호 꼴(6자리-7자리)은 개인 자료 — 그 메일 전체를 안 본다(skipped.priv) · 긴 숫자열·짧은 숫자는 아니다', () => {
+  const t = (s, an) => A.plan(one([mail(11, s, an)]));
+  ['서명본_900101-1234567.pdf', '서명본 9001011234567.pdf', '서명본 (850505-2345678).pdf', '서명본 000101-4000000.pdf'].forEach((n) => {
+    const r = t('', [n]);
+    assert.deepEqual([r.actions.length, r.skipped.priv], [0, 1], n);
+  });
+  const sub = t('확인 900101-1234567 서명본', ['서명본.pdf']);
+  assert.deepEqual([sub.actions.length, sub.skipped.priv], [0, 1], '제목에 있어도');
+  const other = t('', ['서명본.pdf', '확인서 900101-1234567.pdf']);
+  assert.deepEqual([other.actions.length, other.skipped.priv], [0, 1], '다른 첨부에만 있어도 메일 전체');
+  ['서명본_20261022123456.pdf', '서명본 900101-5234567.pdf', '서명본 12345-1234567.pdf', '서명본 2026-10-22.pdf', '서명본 90010112345678.pdf'].forEach((n) => {
+    assert.equal(t('', [n]).actions.length, 1, n + ' 은 주민번호 꼴이 아니다');
+  });
+});
+test('Minor ① 발송함 줄은 하루 뒤부터(같은 날 발송·회신 안 함) — plan 단위', () => {
+  const rec = () => ({ st: 'doing', by: '홍길동', sentAt: '2026-10-10', at: 5 });
+  assert.equal(A.plan(waitWorld([mail(11, '', ['서명본.pdf'], '2026-10-10')], rec())).actions.length, 0);
+  assert.equal(A.plan(waitWorld([mail(12, '', ['서명본.pdf'], '2026-10-11')], rec())).actions.length, 1);
+});
+test('Minor ② 이미 연결된 «날짜+첨부 이름» 과 같은 첨부는 다시 처리하지 않는다(폴더를 옮겨 열쇠가 바뀐 경우 — skipped.dupLinked)', () => {
+  const link = { src: 'mail', key: 'i:Other-11223344:5', name: '서명본.pdf', date: '2026-10-10' };
+  const items = { c9: { t9_2026: { sign: { st: 'done', by: '홍길동', gotAt: '2026-10-10', at: 1, link } } } };
+  const r = A.plan(one([mail(11, '', ['서명본.pdf'], '2026-10-10')], { items }));
+  assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.dupLinked], [0, 0, 1]);
+  const diffDay = A.plan(one([mail(12, '', ['서명본.pdf'], '2026-10-11')], { items }));
+  assert.equal(diffDay.actions.length, 1, '날짜가 다르면 다른 첨부');
+  const diffName = A.plan(one([mail(13, '', ['서명본2.pdf'], '2026-10-10')], { items }));
+  assert.equal(diffName.actions.length, 1, '이름이 다르면 다른 첨부');
+  const mixed = A.plan(one([mail(14, '', ['서명본.pdf', '사진.jpg'], '2026-10-10')], { items }));
+  assert.deepEqual(act(mixed), [['attach', '사진.jpg']], '같은 메일의 다른 첨부는 처리');
+});
+test('Minor ④ 거울 폴더가 «배열» 로 와도(번호가 촘촘할 때 DB 가 배열로 돌려준다) 읽는다 — null 칸은 건너뛴다', () => {
+  const w = one([mail(11, '', ['서명본.pdf'])]);
+  const row = w.msgs[INBOX][11];
+  w.msgs = { [INBOX]: [null, null, null, null, null, null, null, null, null, null, null, row] };
+  const r = A.plan(w);
+  assert.deepEqual(r.actions.map((a) => a.mailKey), [mkey(11)]);
 });

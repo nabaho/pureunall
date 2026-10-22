@@ -26,8 +26,11 @@
 
   var WINDOW_DAYS = 45, MAX_ACTIONS = 100, MAX_UNMATCHED = 100, AUTO_BY = '자동';
   var MAX_ROUND = 60;                                  // Track.keysFor 의 회차 상한과 같다
-  var SIGN_RE = /서명|날인|직인|인감|스캔|signed/i;
+  /* «스캔» 단독은 서명이 아니다(견적서 스캔·계약서 스캔도 있다) — 서명·날인 말과 함께일 때만 sign(그 말이 이미 SIGN_RE 에 걸린다) */
+  var SIGN_RE = /서명|날인|직인|인감|signed/i;
   var ATTACH_RE = /사진|회의록|결과물|산출물|증빙|명단|참석|출석|결과보고|활동일지/;
+  /* 주민등록번호 꼴(6자리-7자리, 뒷자리 첫 숫자 1~4) — 앞뒤가 숫자가 아닐 때만. 첨부 이름·제목에 있으면 개인 자료로 본다 */
+  var JUMIN_RE = /(^|[^0-9])[0-9]{6}-?[1-4][0-9]{6}([^0-9]|$)/;
   var TAG_RE = Send.TAG_RE;                            // [서명요청:rid] · [제출:rid] — 보내기 모듈 것을 그대로
   var NOTE_HEAD = '자동 처리 — 메일 «', NOTE_TAIL = '»';
   var NOTE_MAX = 200;                                  // 규칙(scal_docs note)과 같다 — Track.NOTE_MAX
@@ -41,13 +44,13 @@
   function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
 
   /* 첨부 하나의 단계 — sign(서명·날인본) · attach(사진·회의록 같은 별첨) · null(모름 → 자동 처리 안 함).
-     첨부 이름이나 메일 제목에 SIGN_RE 가 걸리면 sign(둘 다 걸려도 sign), 제목에 [서명요청:rid] 꼬리표가 있어도 sign(회신) */
+     단계는 첨부 «이름»의 낱말이 정한다(SIGN_RE 가 먼저 — 둘 다 걸려도 sign). 제목에만 낱말이 있으면 null(일상 메일 «RE: 결과보고서 송부»가 완료로 찍히지 않게).
+     단 제목에 [서명요청:rid] 꼬리표가 있고 이름이 별첨 낱말도 아니면 sign «후보»(회신) — 어느 첨부가 서명본인지는 plan 이 메일 전체를 보고 정한다 */
   function stepOf(att, subject) {
-    var name = str(att && typeof att === 'object' ? att.name : att), sub = str(subject);
-    var tag = TAG_RE.exec(sub);
-    if ((tag && tag[1] === '서명요청') || SIGN_RE.test(name) || SIGN_RE.test(sub)) return 'sign';
-    if (ATTACH_RE.test(name) || ATTACH_RE.test(sub)) return 'attach';
-    return null;
+    var name = str(att && typeof att === 'object' ? att.name : att), tag = TAG_RE.exec(str(subject));
+    if (SIGN_RE.test(name)) return 'sign';
+    if (ATTACH_RE.test(name)) return 'attach';
+    return (tag && tag[1] === '서명요청') ? 'sign' : null;
   }
 
   /* «자동이 쓸 수 있는 줄» — 기록이 없거나, «없음»인데 사람이 남긴 흔적(처리자·연결·메모·날짜·방식·확인·회차 기록)이 하나도 없는 줄.
@@ -82,25 +85,36 @@
   function scored(keys, hay) {
     return keys.filter(function (k) { var b = bareName(k); return b.length >= 2 && hay.indexOf(b) >= 0; });
   }
-  /* 한 첨부가 갈 줄 하나 — { key, why } 또는 까닭만 { why }. o = { plan, step, n, recs, att:{name}, subject, multi } */
+  /* 첨부 이름이 그 단계의 낱말을 직접 가졌는가 */
+  function directWord(step, name) { return step === 'sign' ? SIGN_RE.test(name) : (step === 'attach' ? ATTACH_RE.test(name) : false); }
+  /* 그 단계에 «이름이 맞는 줄» 을 가진 사업인가 — 줄을 사람이 채웠는지와 상관없이(사업을 고르는 데 쓴다) */
+  function nameHit(plan, step, n, att, subject) {
+    var hay = squash(str(att && att.name) + ' ' + str(subject));
+    return scored(Track.keysFor(plan, step, n), hay).length > 0;
+  }
+  /* 한 첨부가 갈 줄 하나 — { key, why } 또는 까닭만 { why }.
+     o = { plan, step, n, recs, att:{name}, subject, multi, day?, direct? } — day = 메일 날짜(발송함 줄 판정), direct = 첨부 이름이 단계 낱말을 «직접» 가졌다는 보증(없으면 이름으로 계산) */
   function decide(o) {
     o = obj(o) ? o : {};
     var recs = obj(o.recs) ? o.recs : {};
     var all = Track.keysFor(o.plan, o.step, o.n);
     if (!all.length) return { why: '이 단계의 서류 줄이 없습니다' };
-    /* 발송함 줄은 «발송일 이후에 받은 메일» 일 때만(메일 날짜 day 를 안 주면 대상 아님) */
+    /* 발송함 줄은 «발송일 다음 날부터 받은 메일» 일 때만(같은 날은 보낸 메일 사본·자동 응답일 수 있다 · 메일 날짜 day 를 안 주면 대상 아님) */
     var targets = all.filter(function (k) {
       var r = has(recs, k.key) ? recs[k.key] : null;
       if (!usable(r, o.step)) return false;
-      return !waiting(r) || (isDay(o.day) && str(o.day) >= r.sentAt);
+      return !waiting(r) || (isDay(o.day) && str(o.day) > r.sentAt);
     });
     if (!targets.length) return { why: '쓸 수 있는 서류 줄이 없습니다(이미 기록됨)' };
     var name = str(o.att && o.att.name), sub = str(o.subject), hay = squash(name + ' ' + sub);
+    var direct = typeof o.direct === 'boolean' ? o.direct : directWord(o.step, name);
     function pick(k, why) { return { key: k.key, why: why }; }
+    var ns = roundsIn(name);
+    if (!ns.length) ns = roundsIn(sub);
+    /* 회차 줄은 회차 번호가 이름·제목에 «딱 하나» 있고 그 번호의 줄일 때만 대상이다(번호 없이 남은 회차에 쓰지 않는다 — 두 사업일 때도) */
+    function eligible(k) { return k.round === 0 || (ns.length === 1 && k.round === ns[0]); }
     if (!o.multi && all.some(function (k) { return k.round > 0; })) {
-      /* 회차마다 줄이 있는 단계 — 회차 번호가 못 박아야 한다. 번호가 있으면(이름 먼저, 없으면 제목) 그 줄 아니면 안 쓴다(엉뚱한 회차로 새지 않게) */
-      var ns = roundsIn(name);
-      if (!ns.length) ns = roundsIn(sub);
+      /* 회차마다 줄이 있는 단계 — 번호가 있으면(이름 먼저, 없으면 제목) 그 줄 아니면 안 쓴다(엉뚱한 회차로 새지 않게) */
       if (ns.length > 1) return { why: '회차 번호가 여럿이라 정할 수 없습니다' };
       if (ns.length === 1) {
         var hits = targets.filter(function (k) { return k.round === ns[0]; });
@@ -114,11 +128,12 @@
         return once.length === 1 ? pick(once[0], '줄 이름 일치') : { why: ns[0] + '회차 서류 줄을 쓸 수 없습니다' };
       }
     }
-    var named = scored(targets, hay);
+    var named = scored(targets.filter(eligible), hay);
     if (named.length === 1) return pick(named[0], '줄 이름 일치');
     if (named.length > 1) return { why: '줄 이름이 맞는 줄이 둘 이상입니다' };
-    /* 쓸 수 있는 줄이 하나뿐이면 그 줄 — 사업이 하나일 때만. 회차 줄이 남은 하나인 것은 어느 회차인지 몰라 안 쓴다(그 단계에 줄이 그것뿐일 때만) */
-    if (!o.multi && targets.length === 1 && (targets[0].round === 0 || all.length === 1)) return pick(targets[0], '쓸 수 있는 줄이 하나');
+    /* 쓸 수 있는 줄이 하나뿐이면 그 줄 — 사업이 하나이고, 첨부 이름이 그 단계 낱말을 직접 가졌을 때만(제목만 보고 «줄이 하나라서» 쓰지 않는다).
+       회차 줄은 번호 없이는 안 쓴다 */
+    if (!o.multi && direct && targets.length === 1 && targets[0].round === 0) return pick(targets[0], '쓸 수 있는 줄이 하나');
     return { why: o.multi ? '사업이 둘 이상이라 줄 이름이 맞아야 합니다' : '줄을 하나로 정할 수 없습니다' };
   }
   function pickKey(o) {
@@ -163,6 +178,37 @@
   /* 메일이 «같은 메일»인지 알아보는 표 — 폴더를 옮기면 열쇠(폴더:번호)는 바뀌어도 보낸 사람·시각·제목·첨부 이름은 그대로다 */
   function sigOf(r) { return [r.from, r.d, r.s, r.an.join('\u0001')].join('\u0002'); }
 
+  /* 주소 → 그 주소가 적힌 «서로 다른 업체» 수 — 업체관리(data/companies)와 이알피 계약 연락처 전체에서 센다.
+     화면의 addrsFor 는 «먼저 적힌 업체가 임자» 로 가리지만, 자동은 두 업체 이상에 나오는 주소를 아예 안 쓴다(어느 업체 서류인지 모르는데 완료로 찍지 않는다).
+     같은 업체인지는 사업자번호(10자리 이상)나 이름(PuCoThread.norm)이 같으면 같은 업체로 묶는다(업체관리 한 줄 + 그 업체의 계약 = 한 업체) */
+  function addrOwners(companies, cons) {
+    var CT = root.PuCoThread, parent = Object.create(null), recs = [];
+    function find(t) { while (parent[t] !== t) { parent[t] = parent[parent[t]]; t = parent[t]; } return t; }
+    function tokensOf(name, bizNo, i) {
+      var t = [], b = str(bizNo).replace(/\D/g, ''), n = CT.norm(name);
+      if (b.length >= 10) t.push('b:' + b);
+      if (n) t.push('n:' + n);
+      if (!t.length) t.push('r:' + i);
+      t.forEach(function (x) { if (!(x in parent)) parent[x] = x; });
+      for (var j = 1; j < t.length; j++) parent[find(t[j])] = find(t[0]);
+      return t;
+    }
+    Docs.rowsOf(companies).forEach(function (co) { recs.push({ srcs: [co], t: tokensOf(co.name, co.bizNo, recs.length) }); });
+    Docs.rowsOf(cons).forEach(function (c) {
+      if (c._deleted === true) return;
+      var cc = obj(c.company) ? c.company : {};
+      recs.push({ srcs: [c, cc], t: tokensOf(cc.name || c.companyName, cc.bizNo || c.bizNo, recs.length) });
+    });
+    var owners = Object.create(null);
+    recs.forEach(function (r) {
+      var g = find(r.t[0]);
+      r.srcs.forEach(function (s) {
+        Object.keys(CT.addrsOf(s)).forEach(function (e) { (owners[e] || (owners[e] = Object.create(null)))[g] = 1; });
+      });
+    });
+    return function shared(e) { return !!owners[e] && Object.keys(owners[e]).length > 1; };
+  }
+
   /* 결정 전체. o = { today, now?, input, docs:{biz,cons,tmap}, companies, state, track, folders, msgs, years? } — 모양은 화면 grLoad·grReadInbox 가 만드는 것과 같다.
      track 이 객체가 아니거나 state 를 안 주면(undefined) 아무것도 안 한다(기록을 못 읽은 채 «기록 없음»으로 오해해 사람 줄을 덮지 않도록). state 가 null 이면 빈 노드 */
   function plan(o) {
@@ -199,12 +245,17 @@
     });
 
     /* 2) 연결된 메일 — 어느 업체·어느 줄이든 link.key 가 같으면 연결된 것 */
-    var linked = {};
+    var linked = {}, linkedDN = {};   // linkedDN = 연결된 «메일 날짜 + 첨부 이름» — 폴더를 옮겨 열쇠가 바뀐 같은 첨부를 알아본다
     Object.keys(track).forEach(function (co) {
       var rs = obj(track[co]) ? track[co] : {};
       Object.keys(rs).forEach(function (rid) {
         var its = obj(rs[rid]) ? rs[rid] : {};
-        Object.keys(its).forEach(function (k) { var lk = its[k] && its[k].link; if (lk && typeof lk.key === 'string' && lk.key) linked[lk.key] = 1; });
+        Object.keys(its).forEach(function (k) {
+          var lk = its[k] && its[k].link;
+          if (!lk || typeof lk.key !== 'string' || !lk.key) return;
+          linked[lk.key] = 1;
+          if (isDay(lk.date) && str(lk.name)) linkedDN[lk.date + '\u0001' + str(lk.name)] = 1;
+        });
       });
     });
 
@@ -215,8 +266,9 @@
       var k = Inbox.linkKey.make({ slug: r.slug, uid: r.uid });
       if (k && has(linked, k)) linkedSig[sigOf(r)] = 1;
     });
-    var sigByKey = {};
-    rows.forEach(function (r) { var k = Inbox.linkKey.make({ slug: r.slug, uid: r.uid }); if (k) sigByKey[k] = sigOf(r); });
+    var sigByKey = {}, fromByKey = {};
+    rows.forEach(function (r) { var k = Inbox.linkKey.make({ slug: r.slug, uid: r.uid }); if (k) { sigByKey[k] = sigOf(r); fromByKey[k] = r.from; } });
+    var sharedAddr = addrOwners(o.companies, docs.cons);
 
     /* 4) 쌍마다 주소 → 후보. 한 메일에 걸린 쌍들을 모은다 */
     var mails = Object.create(null), capped = false;
@@ -259,19 +311,33 @@
       if (has(linked, c.key)) { skip('linked'); return; }
       if (sig && (has(linkedSig, sig) || has(seenSig, sig))) { skip('dup'); return; }
       if (sig) seenSig[sig] = 1;
-      if (c.priv) { skip('priv'); return; }
+      if (sharedAddr(fromByKey[c.key])) { skip('sharedAddr'); return; }
+      if (c.priv || JUMIN_RE.test(c.s) || c.atts.some(function (a) { return JUMIN_RE.test(a.name); })) { skip('priv'); return; }
       if (Object.keys(m.cos).length > 1) { skip('multiCo'); return; }
       var tag = TAG_RE.exec(c.s);
       if (tag && tag[1] === '제출') { skip('submitTag'); return; }
       var pin = (tag && tag[1] === '서명요청') ? tag[2] : '';
       if (!c.atts.length) { skip('noAtt'); return; }
-      /* 같은 메일의 첨부는 이름이 서명·별첨 말을 직접 가진 것부터 — 꼬리표만 보고 sign 이 된 엉뚱한 첨부가 줄을 먼저 차지하지 않게 */
-      var atts = c.atts.map(function (a, i) { return { name: str(a.name), i: i, strong: SIGN_RE.test(a.name) || ATTACH_RE.test(a.name) }; })
-        .sort(function (a, b) { return ((b.strong ? 1 : 0) - (a.strong ? 1 : 0)) || (a.i - b.i); });
+      /* 같은 메일의 첨부 처리 순서 — 서명 낱말 → 별첨 낱말 → 나머지(꼬리표만 보고 sign 후보가 된 첨부는 맨 뒤) */
+      var rank = function (n) { return SIGN_RE.test(n) ? 0 : (ATTACH_RE.test(n) ? 1 : 2); };
+      var atts = c.atts.map(function (a, i) { return { name: str(a.name), i: i }; })
+        .sort(function (a, b) { return (rank(a.name) - rank(b.name)) || (a.i - b.i); });
+      /* 꼬리표 회신에서 서명본 고르기 — 서명 낱말 첨부가 있으면 그것들만, 없으면 «낱말 없는 PDF/이미지» 가 하나뿐일 때 그 하나 */
+      var hasSignWord = atts.some(function (a) { return SIGN_RE.test(a.name); });
+      var weak = atts.filter(function (a) { return !SIGN_RE.test(a.name) && !ATTACH_RE.test(a.name) && /^(pdf|img)$/.test(Inbox.kindOf(a.name)); });
+      var weakPick = (pin && !hasSignWord && weak.length === 1) ? weak[0] : null;
       atts.forEach(function (att) {
         if (!att.name) { skip('noStep'); return; }
-        var step = stepOf(att.name, c.s);
-        if (!step) { skip('noStep'); return; }
+        if (has(linkedDN, c.day + '\u0001' + att.name)) { skip('dupLinked'); return; }
+        var step = stepOf(att.name, c.s), direct;
+        if (!step) {
+          if (SIGN_RE.test(c.s) || ATTACH_RE.test(c.s)) miss(m, att, '제목에만 낱말'); else skip('noStep');
+          return;
+        }
+        if (step === 'sign' && !SIGN_RE.test(att.name)) {   // 꼬리표만으로 sign 후보가 된 첨부
+          if (att !== weakPick) { miss(m, att, '꼬리표 회신 — 서명본을 정할 수 없습니다'); return; }
+          direct = true;
+        }
         if (pin && !m.pairs.some(function (x) { return x.p.rid === pin; })) { miss(m, att, '꼬리표의 서류를 찾지 못했습니다'); return; }
         var cands = m.pairs.filter(function (x) {
           if (pin && x.p.rid !== pin) return false;
@@ -281,8 +347,15 @@
         });
         if (!cands.length) { skip('noLine'); return; }
         var multi = !pin && cands.length > 1, hits = [], whys = [], techHit = false;
+        if (multi) {
+          /* 사업이 둘 이상 — «그 단계에 이름이 맞는 줄을 가진 사업» 이 정확히 하나일 때만 그 사업(줄을 사람이 채웠는지와 상관없이 센다 —
+             한쪽 줄이 차 있다고 «남은 쪽» 에 쓰지 않는다). 간단형 틀은 줄 이름이 모두 «업체 서명본» 이라 이름으로 사업을 못 가른다 → 꼬리표 rid 일치 외에는 안 쓴다 */
+          var named = cands.filter(function (x) { return nameHit(x.plan, step, x.n, att, c.s); });
+          if (named.length !== 1) { miss(m, att, named.length ? '여러 사업에 같은 이름의 줄이 있어 정할 수 없습니다' : '사업이 둘 이상이라 줄을 정할 수 없습니다'); return; }
+          cands = named;
+        }
         cands.forEach(function (x) {
-          var d = decide({ plan: x.plan, step: step, n: x.n, recs: recsOf(x.p.coId, x.p.rid), att: att, subject: c.s, multi: multi, day: c.day });
+          var d = decide({ plan: x.plan, step: step, n: x.n, recs: recsOf(x.p.coId, x.p.rid), att: att, subject: c.s, multi: multi, day: c.day, direct: direct });
           if (x.plan.key === TECH_KEY) { if (d.key) techHit = true; return; }
           if (d.key) hits.push({ x: x, d: d }); else whys.push(d.why);
         });
