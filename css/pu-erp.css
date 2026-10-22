@@ -130,7 +130,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .env-section .desc { font-size: 10.5px; color: #64748b; margin-bottom: 8px; }
 .fld { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
 .fld label { font-size: 10.5px; color: #475569; font-weight: 600; }
-.fld input, .fld textarea, .fld select { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-family: inherit; }
+.fld input:not([type=checkbox]):not([type=radio]), .fld textarea, .fld select { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-family: inherit; }
 .fld input:focus, .fld textarea:focus, .fld select:focus { outline: 0; border-color: #2563eb; }
 .fld textarea { resize: vertical; min-height: 44px; }
 
@@ -494,8 +494,15 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   /* 모달 폭 화면에 맞춤 */
   .modal-card { max-width: 95vw !important; min-width: 0 !important; width: 95vw !important; }
   .modal-b { padding: 12px !important; }
-  /* fld 영역 폭 보장 */
-  .fld input, .fld select, .fld textarea { width: 100% !important; box-sizing: border-box; }
+  /* 계약 창 — 폰에서는 창 «전체»가 한 화면 안에 든다 (대표 지시 2026-10-22 「너무 길게 아래로 내려왔다」).
+     본문만 55vh 로 따로 구르고 위(계약번호·의뢰인·탭)는 쌓여, 창 합계가 화면을 넘어 취소·다음 단추가
+     밀려났다. 세로 상자로 두고 본문이 남은 높이를 채워 구르게 한다 — 단추는 늘 보인다. */
+  .modal[data-phone-fit] { display: flex !important; flex-direction: column; max-height: 94vh !important; overflow: hidden !important; }
+  .modal[data-phone-fit] > .modal-b { flex: 1 1 auto; min-height: 0; max-height: none !important; }
+  /* fld 영역 폭 보장
+     ⚠ 체크박스·라디오는 빼야 한다 (대표 갈무리 2026-10-22) — 100% 를 먹으면 네모 하나가
+       줄을 통째로 차지하고, 옆 글자(「CMS 자동이체」·「개인입금」)가 한 자씩 세로로 선다. */
+  .fld input:not([type=checkbox]):not([type=radio]), .fld select, .fld textarea { width: 100% !important; box-sizing: border-box; }
   /* 페이지 패딩 축소 */
   .page { padding: 12px !important; }
   /* 2컬럼 그리드 (대시보드 등) → 1컬럼 */

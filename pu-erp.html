@@ -175,7 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=24">
+<link rel="stylesheet" href="css/pu-erp.css?v=25">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -23289,14 +23289,17 @@ function ContractModal(props){
       ),  // showCompany 닫기
 
       // 기업담당자 (다중)
-      h('div', { style:{ display:'flex', alignItems:'center', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'14px', marginBottom:'8px' } },
-        h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', flex:1 } }, '👤 기업담당자 (' + (f.company.contacts||[]).length + ')'),
+      /* ⚠ 폭이 모자라면 단추를 «아랫줄로» 보낸다 (대표 갈무리 2026-10-22) — 전에는 제목(flex:1)이
+           단추 둘에 밀려 22px 까지 짓눌려 「기업담당자」가 한 자씩 세로로 섰다.
+           제목은 nowrap 으로 제 폭을 지키고, 단추가 대신 줄을 바꾼다. */
+      h('div', { style:{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:'6px', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'14px', marginBottom:'8px' } },
+        h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', flex:'1 0 auto', whiteSpace:'nowrap' } }, '👤 기업담당자 (' + (f.company.contacts||[]).length + ')'),
         // 기업정보함에서 여러 명을 한 번에 — 체크한 사람만 담긴다
         h('button', { onClick:function(){ setPcMultiOpen(true); }, type:'button',
           title:'기업정보함에서 이 회사 사람들을 보고 담당자만 골라 담습니다',
-          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', marginRight:'6px' } }, '📇 기업정보함에서 고르기'),
+          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '📇 기업정보함에서 고르기'),
         h('button', { onClick:addContact, type:'button',
-          style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer' } }, '+ 담당자 추가')
+          style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '+ 담당자 추가')
       ),
       /* 접힘 — 주담당 한 줄. 대표가 말한 「기존 주담당 1인 이름만」이다. */
       ctIsFolded() && (function(){
@@ -23756,8 +23759,10 @@ function ContractModal(props){
       ),
       // 계약유형을 아직 안 골랐으면 위 박스가 없다 — 그래도 CMS 는 손댈 수 있어야 한다
       // (이미 CMS 가 켜진 옛 계약을 열었을 때 끌 길이 사라지면 안 된다)
-      (f.kinds||[]).length === 0 && h('div', { className:'fld' },
-        h('label', null, '🏦 CMS 자동이체'),
+      /* ⚠ .fld(라벨 110px + 칸) 에 넣지 않는다 (대표 갈무리 2026-10-22) — 폰에서 왼쪽 라벨이
+           110px 을 먹고, cmsBlock 안의 체크박스까지 .fld 규칙(폭 100%)을 받아 글자가 세로로 섰다.
+           cmsBlock 은 제 이름(🏦 CMS 자동이체)을 이미 단다 — 바깥 라벨은 같은 말을 두 번 했다. */
+      (f.kinds||[]).length === 0 && h('div', { style:{ padding:'5px 0', borderBottom:'1px solid #e2e8f0' } },
         cmsBlock()),
       /* ⚠★ 차례를 바꿨다 (대표 지시 2026-09-18 「계약정보도 4칸 정리, 순서로
            문제가 없는지 정렬 다시」). 전에는 «돈»(입금자)이 먼저 나오고 계약일·
@@ -24017,7 +24022,12 @@ function ContractModal(props){
        기업정보 4칸의 칸 하나하나가 좁아진다(1080 시절의 "칸 210px 은 돼야" 기준에는
        못 미친다 — 알고 받아들인 선택). 종류별 세부설정의 «일수+잔금» 줄도 실측으로
        2줄이 되는 것을 확인하고 그대로 승인받았다(대표 지시 「이대로 진행해라」). */
-    h('div', { className:'modal', style:{ width:'756px' },
+    /* ⚠ 폰에서는 창 «전체»가 한 화면 안에 든다 (대표 지시 2026-10-22 「너무 길게 아래로
+         내려왔다」). 본문(modal-b)이 55vh 로 따로 굴러도 위의 계약번호·의뢰인·탭이 길어
+         창 합계가 화면을 넘었다 — 그래서 취소·다음 단추가 화면 아래로 밀렸다.
+         폰은 창을 세로 상자로 두고 본문만 남은 높이를 채워 굴린다 — 단추는 늘 보인다.
+         모양은 css/pu-erp.css 의 [data-phone-fit] 이 맡는다(창 너비 756px 은 그대로 한 값). */
+    h('div', { className:'modal', style:{ width:'756px' }, 'data-phone-fit':'1',
       onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, props.cur ? '계약 수정' : '계약 추가'),
@@ -24200,7 +24210,11 @@ function ContractModal(props){
             tabBody
           ),
       h('div', { className:'modal-f' },
-        h('button', { className:'btn-secondary', onClick:function(){ safeClose(false); } }, '취소'),
+        /* ⚠ 단추는 늘 «한 줄» (대표 갈무리 2026-10-22) — 폰에서 글자를 크게 쓰면 「취/소」가
+             두 줄로 서고 「이전」·「다음」이 위아래로 갈라졌다. 글자는 안 꺾고(nowrap),
+             모자라면 «다음» 단추만 줄어 … 로 끝난다(무슨 단추인지는 앞머리로 안다). */
+        h('button', { className:'btn-secondary', onClick:function(){ safeClose(false); },
+          style:{ whiteSpace:'nowrap', flexShrink:0 } }, '취소'),
         // 단계별 진행: 기업정보 → 계약정보 → 담당자정보 → 저장
         (function(){
           /* 탭 셋 (대표 지시 2026-09-18 — 일지를 담당자에 합쳤다).
@@ -24230,16 +24244,17 @@ function ContractModal(props){
             if(tab === 'contract') setTab('company');
             else if(tab === 'manager' || tab === 'journal' || tab === 'note') setTab('contract');
           }
-          return h('span', null,
+          return h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'6px', flexWrap:'nowrap', minWidth:0 } },
             // 이전 버튼 (company 제외)
             curIdx > 0 && h('button', {
               onClick:goPrev,
-              style:{padding:'7px 14px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px',fontWeight:600,cursor:'pointer',marginRight:'6px'} },
+              style:{padding:'7px 14px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0} },
               '← 이전'),
             // 다음 또는 저장
             isLast
-              ? h('button', { className:'btn-primary', onClick:function(){ Promise.resolve().then(save).catch(function(e){ console.error('[계약저장오류]', e); try{ showToast('❌ 저장 오류: ' + ((e && e.message) || String(e))); }catch(_){} }); } }, '✓ 저장')
-              : h('button', { className:'btn-primary', onClick:goNext },
+              ? h('button', { className:'btn-primary', style:{ whiteSpace:'nowrap', flexShrink:0 }, onClick:function(){ Promise.resolve().then(save).catch(function(e){ console.error('[계약저장오류]', e); try{ showToast('❌ 저장 오류: ' + ((e && e.message) || String(e))); }catch(_){} }); } }, '✓ 저장')
+              : h('button', { className:'btn-primary', onClick:goNext,
+                  style:{ whiteSpace:'nowrap', minWidth:0, overflow:'hidden', textOverflow:'ellipsis' } },
                   tab === 'company' ? '다음 → 계약정보' : '다음 → 담당자 · 일지')
           );
         })()
@@ -70386,7 +70401,10 @@ function ProjectManagementShared(props){
         filtered.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } },
               items.length === 0 ? '계약관리에서 이관된 데이터 없음' : '검색 결과가 없습니다')
-          : pgConsult.paged.map(function(it, idx){
+          /* ⚠★ 폰은 «전부» 그린다 (대표 지시 2026-10-22 「폰에서 20개밖에 못 본다」).
+               쪽 넘김(PaginationBar)과 개수 고르기는 PC 표 쪽에만 있다 — 폰에서 20건으로
+               자르면 21번째부터는 갈 길이 없다. 카드는 가벼워 수백 건도 버틴다. */
+          : filtered.map(function(it, idx){
               var t = _projTypeByCode[it.typeCode];
               var typeLabel = t ? t.name : (it.typeCode||'');
               var mgrU = _projUserBySid[it.mgrMain || it.managerMain];
@@ -70426,7 +70444,7 @@ function ProjectManagementShared(props){
                   totalFee>0 && h('span', { style:{ color:'#475569', fontWeight:700 } }, '합계 '+totalFee.toLocaleString()+'원')
                 )
               );
-              if(_isGrouped && (idx === 0 || grpKeyOf(pgConsult.paged[idx-1]||{}) !== grpKeyOf(it))){
+              if(_isGrouped && (idx === 0 || grpKeyOf(filtered[idx-1]||{}) !== grpKeyOf(it))){
                 return [_projGroupHeader(it, 'card'), _card];
               }
               return _card;
