@@ -9,6 +9,11 @@
  *   ④ 다시 켜기는 시작프로그램이 켠 것이 오류로 꺼졌을 때만, 한도 안에서만 — 사람이 끈 것은 안 되살린다
  *   ⑤ 시작프로그램 켬·끔은 같은 바로가기를 가리킨다 — 어긋나면 «끔»을 눌러도 아침마다 켜진다
  *   ⑥ .bat 는 ASCII, 한글은 node 가 chcp 65001 뒤에 찍는다(멈춘방-열기.bat 과 같은 까닭)
+ *   ⑦ 화면 같이 보기 — 크롬을 붙여 열되, 옛 판 claude 가 확실할 때만 뺀다(모르는 인자로 문이 안 열리지 않게)
+ *   ⑧ 준비 점검은 크롬·엣지의 «어느 프로필»에 깔린 확장도 찾는다 — Default 만 보면 Profile 1 에 깐 사람이 «안됨»을 받는다
+ *   ⑨ 크롬 창 띄우기(--front)는 내려간 창을 되살리고, 잠깐 «늘 위»로 올렸으면 «반드시 푼다» — 안 풀면 크롬이 영영 맨 위에 박힌다.
+ *      그리고 무슨 일이 있어도 0 으로 끝난다 — 훅이 실패하면 크롬 일이 막힐 수 있다
+ *   ⑩ .claude/settings.json 훅이 «크롬 도구에만» 걸려 --front 를 부르고, 뒤에서 돈다(크롬 일을 늦추지 않는다)
  * ★ 결정은 순수 함수로 떼어 두었다 — CI 는 리눅스라 윈도우 길(where·powershell·창)을 밟을 수 없다.
  * 실행: node --test tests/phone-link.test.js */
 'use strict';
@@ -98,4 +103,79 @@ test('--dry 는 아무것도 안 하고 «할 일»만 찍는다', () => {
   const out = execFileSync(process.execPath, [TOOL, '--dry', '--start'],
     { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
   assert.match(out, /\[dry\] claude remote-control/, '켤 명령을 안 찍습니다');
+});
+
+test('⑦ 화면 같이 보기 — 크롬을 붙이되, 옛 판이 «확실할 때만» 뺀다', () => {
+  assert.ok(P.서버인자().includes('--chrome'), '★ 폰에서 연 방이 이 PC 의 크롬을 못 씁니다 — 화면 같이 보기가 안 됩니다');
+  assert.ok(!P.서버인자({ 크롬: false }).includes('--chrome'), '★ 옛 판인데도 --chrome 을 붙여 문이 안 열립니다');
+  assert.equal(P.크롬쓸까('0.0.1 (Claude Code)'), false, '★ 옛 판에 --chrome 을 붙입니다');
+  assert.equal(P.크롬쓸까('999.0.0 (Claude Code)'), true);
+  assert.equal(P.크롬쓸까(P.크롬.최소판), true, '최소판 그 자체는 됩니다');
+  assert.equal(P.크롬쓸까(null), true, '판을 못 읽으면 붙입니다 — 요즘 판은 다 됩니다');
+  /* 판은 «수»로 견준다 — 글자로 견주면 2.1.10 이 2.1.9 보다 작다고 나온다 */
+  assert.equal(P.판넘나('2.1.10', '2.1.9'), true, '★ 판을 글자로 견줍니다');
+  assert.equal(P.판넘나('2.0.99', '2.1.0'), false);
+  assert.equal(P.판넘나('abc', '2.1.0'), null, '못 읽은 판을 됨/안됨으로 찍습니다 — «모름»이어야 합니다');
+});
+
+test('⑧ 준비 점검은 어느 프로필에 깐 확장이든 찾는다', () => {
+  const os = require('node:os');
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'phonelink-'));
+  const 크롬 = path.join(base, 'Chrome', 'User Data');
+  const 엣지 = path.join(base, 'Edge', 'User Data');
+  fs.mkdirSync(path.join(크롬, 'Default', 'Extensions', 'someother'), { recursive: true });
+  fs.mkdirSync(path.join(엣지, 'Profile 2', 'Extensions', P.크롬.확장ID), { recursive: true });
+  try {
+    assert.equal(P.확장찾기([크롬]), null, '★ 다른 확장만 있는데 «됨»이라 합니다');
+    assert.equal(P.확장찾기([path.join(base, '없는곳'), 크롬, 엣지]), path.join(엣지, 'Profile 2'),
+      '★ Default 가 아닌 프로필·엣지에 깐 확장을 못 찾습니다');
+  } finally { fs.rmSync(base, { recursive: true, force: true }); }
+});
+
+test('메뉴의 모든 갈래에 갈 자리가 있다', () => {
+  const 번호 = /choice\s+\/c\s+(\d+)/i.exec(bat);
+  assert.ok(번호, 'choice 를 못 찾았습니다');
+  const 갈곳 = [...bat.matchAll(/goto\s+(\w+)/gi)].map((m) => m[1].toLowerCase());
+  for (const g of new Set(갈곳)) {
+    assert.match(bat, new RegExp('^:' + g + '\\b', 'im'), '★ :' + g + ' 자리가 없습니다 — 그 번호를 누르면 끝으로 새어 나갑니다');
+  }
+  /* errorlevel 갈래 수 = 고를 수 있는 번호 수 - 1 (1번은 아래로 흘러 :start) */
+  const 갈래 = [...bat.matchAll(/if\s+errorlevel\s+\d\s+goto/gi)].length;
+  assert.equal(갈래, 번호[1].length - 1, '★ 고를 수 있는 번호와 갈래 수가 어긋납니다 — 어떤 번호는 엉뚱한 일을 합니다');
+  assert.match(bat, /:check\s*\n\s*node\s+tools\\phone-link\.js\s+--check/i, '★ 준비 점검 번호가 점검을 안 부릅니다');
+});
+
+test('⑨ 크롬 창 띄우기 — 되살리고, 올렸으면 풀고, 늘 0 으로 끝난다', () => {
+  const ps = P.앞으로스크립트();
+  assert.match(ps, /IsIconic\(\$h\)\)\s*\{\s*\[void\]\[PuWin\]::ShowWindowAsync\(\$h,\s*9\)/, '★ 최소화된 크롬을 되살리지 않습니다');
+  const 올림 = ps.indexOf('[IntPtr](-1)');
+  const 풂 = ps.indexOf('[IntPtr](-2)');
+  assert.ok(올림 > 0, '맨 위로 올리는 자리가 없습니다');
+  assert.ok(풂 > 올림, '★ 크롬을 «늘 위»로 올리고 풀지 않습니다 — 다른 창이 영영 크롬 밑에 깔립니다');
+  assert.match(ps, /'already'/, '★ 이미 맨 앞인 크롬을 또 건드립니다 — 크롬 일마다 깜빡입니다');
+  assert.match(ps, /Start-Process chrome/, '★ 크롬이 안 떠 있으면 켜지 않습니다 — Claude in Chrome 이 붙을 곳이 없습니다');
+  assert.equal(P.계획(['--front']).무엇, '앞으로');
+  for (const env of [{}, { PUREUN_CHROME_FRONT: '0' }]) {
+    const r = require('node:child_process').spawnSync(process.execPath, [TOOL, '--front'],
+      { encoding: 'utf8', env: Object.assign({}, process.env, env) });
+    assert.equal(r.status, 0, '★ --front 가 0 이 아닌 값으로 끝납니다 — 훅이 크롬 일을 막을 수 있습니다');
+  }
+});
+
+test('⑩ 훅은 크롬 도구에만 걸려 --front 를 부르고, 뒤에서 돈다', () => {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude', 'settings.json'), 'utf8'));
+  const 걸이 = ((cfg.hooks || {}).PreToolUse || []).filter((h) => (h.hooks || []).some((x) => /phone-link\.js["']?\s+--front/.test(x.command || '')));
+  assert.ok(걸이.length >= 1, '★ 크롬 도구를 쓰기 전에 크롬 창을 띄우는 훅이 없습니다 — AI 가 잊으면 안 뜹니다');
+  for (const h of 걸이) {
+    const re = new RegExp('^(?:' + h.matcher + ')$');
+    assert.ok(re.test('mcp__claude-in-chrome__navigate') && re.test('mcp__claude-in-chrome__computer'),
+      '★ 훅이 Claude in Chrome 도구에 안 걸립니다');
+    for (const 남 of ['Bash', 'Edit', 'mcp__github__create_pull_request']) {
+      assert.ok(!re.test(남), '★ 훅이 크롬과 상관없는 ' + 남 + ' 에도 걸립니다 — 일마다 크롬이 튀어나옵니다');
+    }
+    for (const x of h.hooks) {
+      assert.notEqual(x.onFailure, 'block', '★ 띄우기가 실패하면 크롬 일까지 막습니다');
+      assert.equal(x.async, true, '★ 훅이 앞에서 돌아 크롬 일 하나하나를 늦춥니다');
+    }
+  }
 });
