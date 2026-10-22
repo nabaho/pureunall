@@ -188,7 +188,7 @@ test('★★ 카카오 단추는 인증 저장소를 먼저 기다리지 않고 
   const end = enter.indexOf('function kkEndReturn()', start);
   assert.ok(start >= 0 && end > start, '카카오 단추 처리 구간을 찾지 못했다');
   const body = enter.slice(start, end);
-  assert.match(body, /PuKakao\.goLogin\(\{ ask: !kakaoTalkInApp \}\)/);
+  assert.match(body, /PuKakao\.goLogin\(\{ ask: askKakaoAccount \}\)/);
   assert.doesNotMatch(body, /auth\.setPersistence|_persistenceReady\.then/,
     '카카오 화면으로 가기 전 저장소 준비를 기다리고 있다');
   assert.match(enter.slice(end, enter.indexOf('var KK_WANT', end)),
