@@ -141,7 +141,8 @@
     if (!obj(msgs)) return out;
     boxesOf(folders).forEach(function (slug) {
       var box = has(msgs, slug) ? msgs[slug] : null, sent = folders[slug].kind === 'sent';
-      if (!obj(box)) return;
+      /* DB(RTDB)는 번호가 촘촘한 폴더(키가 0 부터 거의 빈틈없는 정수)를 «배열» 로 돌려준다 — 배열이면 인덱스가 uid, null 칸은 아래에서 건너뛴다 */
+      if (!obj(box) && !Array.isArray(box)) return;
       Object.keys(box).forEach(function (k) {
         var r = box[k];
         if (!obj(r) || !/^[0-9]{1,12}$/.test(k)) return;
