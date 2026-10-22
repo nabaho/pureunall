@@ -88,7 +88,7 @@ test('상수 — 45일 · 100줄 · 처리자 «자동»(40자 이내) · 꼬리
 /* ---------- stepOf 표 ---------- */
 test('stepOf — 첨부 «이름»의 낱말이 정한다: 서명/날인/직인/인감/signed → sign · 사진/회의록/… → attach · 둘 다면 sign · «스캔» 단독·제목에만 있는 낱말은 null', () => {
   const rows = [
-    ['서명본.pdf', '', 'sign'], ['날인본.pdf', '', 'sign'], ['직인 찍은 것.png', '', 'sign'], ['인감.pdf', '', 'sign'], ['스캔 서명본.pdf', '', 'sign'],
+    ['서명본.pdf', '', 'sign'], ['날인본.pdf', '', 'sign'], ['직인 찍은 것.png', '', 'sign'], ['인감 도장 찍은 것.pdf', '', 'sign'], ['인감.pdf', '', null], ['스캔 서명본.pdf', '', 'sign'],
     ['final_signed.pdf', '', 'sign'], ['SIGNED.PDF', '', 'sign'],
     ['스캔_0001.pdf', '', null], ['견적서 스캔.pdf', '', null], ['스캔_0001.pdf', '스캔본 첨부', null],
     ['사진1.jpg', '', 'attach'], ['회의록.hwp', '', 'attach'], ['결과물.zip', '', 'attach'], ['산출물.pdf', '', 'attach'], ['증빙자료.pdf', '', 'attach'],
@@ -711,9 +711,68 @@ test('I6 첨부 이름·제목의 주민등록번호 꼴(6자리-7자리)은 개
   assert.deepEqual([sub.actions.length, sub.skipped.priv], [0, 1], '제목에 있어도');
   const other = t('', ['서명본.pdf', '확인서 900101-1234567.pdf']);
   assert.deepEqual([other.actions.length, other.skipped.priv], [0, 1], '다른 첨부에만 있어도 메일 전체');
-  ['서명본_20261022123456.pdf', '서명본 900101-5234567.pdf', '서명본 12345-1234567.pdf', '서명본 2026-10-22.pdf', '서명본 90010112345678.pdf'].forEach((n) => {
+  ['서명본_20261022123456.pdf', '서명본 900101-9234567.pdf', '서명본 900101-0234567.pdf', '서명본 12345-1234567.pdf', '서명본 2026-10-22.pdf', '서명본 90010112345678.pdf'].forEach((n) => {
     assert.equal(t('', [n]).actions.length, 1, n + ' 은 주민번호 꼴이 아니다');
   });
+});
+test('Minor ② 주민번호 꼴 — 가운데 공백·밑줄·외국인등록번호(뒷자리 첫 숫자 5~8)도 개인 자료', () => {
+  ['서명본 900101 1234567.pdf', '서명본_900101_1234567.pdf', '서명본 900101-5234567.pdf', '서명본 900101-6234567.pdf', '서명본 900101 7234567.pdf', '서명본 900101_8234567.pdf'].forEach((n) => {
+    const r = A.plan(one([mail(11, '', [n])]));
+    assert.deepEqual([r.actions.length, r.skipped.priv], [0, 1], n);
+  });
+  assert.equal(A.plan(one([mail(12, '확인 900101 1234567', ['서명본.pdf'])])).skipped.priv, 1, '제목의 공백 꼴도');
+});
+test('Important 1 — 안내·공지·양식·증명서 성격이거나 뜻이 반대인 이름은 서명본이 아니다(서명 낱말이 있어도) — 쓰지 않음', () => {
+  const notice = ['서명 안내 공지.pdf', '서명란 없는 견적서.pdf', '날인 요청 안내문.docx', '전자서명 인증서 안내.hwp', '서명 양식.hwp', '서명 서식.pdf', '서명 샘플.pdf',
+    '서명 예시.pdf', '미서명 계약서.pdf', '미날인 계약서.pdf', '서명 체크리스트.xlsx', '날인 문의.pdf', '공동인증서 서명 인증서.pdf', '서명 확인 증명서.pdf'];
+  notice.forEach((n) => {
+    const r = A.plan(one([mail(11, '', [n])]));
+    assert.deepEqual(r.actions, [], n);
+    assert.deepEqual(r.unmatched.map((u) => u.why), ['서명 낱말이 있으나 안내성 이름'], n);
+  });
+  /* 인감 단독·영문 부분 문자열은 서명 낱말이 아니다 — 단계를 몰라 건너뜀(noStep) */
+  ['인감증명서.pdf', '법인인감증명서.pdf', '인감.pdf', 'unsigned.pdf', 'UNSIGNED_DRAFT.PDF', 'designed_logo.png', 'resigned.pdf', 'consigned_list.pdf'].forEach((n) => {
+    const r = A.plan(one([mail(11, '', [n])]));
+    assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.noStep], [0, 0, 1], n);
+    assert.equal(A.stepOf(n, ''), null, n);
+  });
+  /* 정상 이름은 그대로 sign */
+  ['서명본.pdf', '날인본 스캔.pdf', '가나_서명완료.pdf', 'signed_contract.pdf', '계약서 날인.pdf', 'contract-signed.pdf', 'Contract_SIGNED.pdf', 'signed.pdf',
+    '인감 도장 찍은 계약서.pdf', '인감날인.pdf', '인감 날인본.pdf', '직인 찍은 계약서.pdf', '참여 안내서 서명본.pdf'].forEach((n) => {
+    assert.equal(A.stepOf(n, ''), 'sign', n);
+    assert.deepEqual(act(A.plan(one([mail(11, '', [n])]))), [['sign', n]], n);
+  });
+  /* 별첨 낱말에는 안내성 말을 적용하지 않는다 */
+  assert.equal(A.stepOf('사진 안내.jpg', ''), 'attach');
+  assert.equal(A.stepOf('회의록 양식.hwp', ''), 'attach');
+  assert.equal(A.stepOf('서명 사진 안내.jpg', ''), 'attach', '서명 낱말은 안내성이라 빠지고 별첨 낱말이 남는다');
+});
+test('Important 1 — 첨부 여러 개 중 안내성 이름 하나만 서명 낱말이면 그것은 쓰지 않는다(꼬리표 회신 포함)', () => {
+  const r = A.plan(one([mail(11, '', ['서명 안내 공지.pdf', '서명본.pdf'])]));
+  assert.deepEqual(act(r), [['sign', '서명본.pdf']]);
+  assert.deepEqual(r.unmatched.map((u) => [u.name, u.why]), [['서명 안내 공지.pdf', '서명 낱말이 있으나 안내성 이름']]);
+  const tag = A.plan(one([mail(12, 'RE: [서명요청:t3_2026] 회신', ['서명 안내 공지.pdf', '계약서.pdf'])]));
+  assert.deepEqual(act(tag), [['sign', '계약서.pdf']], '안내성 이름은 서명본 후보에서 빠지고 낱말 없는 PDF 가 하나뿐이면 그것');
+  assert.deepEqual(tag.unmatched.map((u) => u.name), ['서명 안내 공지.pdf']);
+  const only = A.plan(one([mail(13, 'RE: [서명요청:t3_2026] 회신', ['서명 안내 공지.pdf'])]));
+  assert.deepEqual(only.actions, [], '안내성 이름 하나뿐인 꼬리표 회신도 안 쓴다');
+  assert.deepEqual(only.unmatched.map((u) => u.why), ['꼬리표 회신 — 서명본을 정할 수 없습니다']);
+  const cert = A.plan(one([mail(14, 'RE: [서명요청:t3_2026] 회신', ['사업자 증명서.pdf'])]));
+  assert.deepEqual([cert.actions.length, cert.unmatched.length], [0, 1], '낱말 없는 PDF 라도 안내·증명서 이름이면 하나뿐이어도 서명본으로 안 친다');
+  const pk = (name) => A.pickKey({ plan: PLAN_NORTH, step: 'sign', n: 3, recs: {}, att: { name }, subject: '', multi: false });
+  assert.equal(pk('서명 안내 공지.pdf'), null, '줄이 하나여도 안내성 이름은 안 쓴다');
+  assert.equal(pk('서명본.pdf').key, 'sign');
+});
+test('Minor ③ 기술보호 사업이 있는 업체 때문에 미배정이 된 항목은 why 앞에 «[기술보호] » — 없는 업체는 그대로', () => {
+  const both = { id: 'c2', name: '다라정밀', types: ['t1', 't3'], email: 'dara@example.com' };
+  const r = A.plan(world({ cos: [both], mails: [mail(11, '', ['보안서약서 서명본.pdf'], '2026-10-10', 'dara@example.com'), mail(12, '', ['업체 서명본.pdf'], '2026-10-11', 'dara@example.com')],
+    items: { c2: { t3_2026: { sign: { st: 'done', by: '홍길동', gotAt: '2026-10-02', at: 1 } } } } }));
+  assert.deepEqual(r.actions, []);
+  assert.equal(r.unmatched.length, 2);
+  r.unmatched.forEach((u) => assert.ok(u.why.startsWith('[기술보호] '), u.why));
+  const plain = A.plan(one([mail(13, '', ['서명본.pdf'])], { items: { c1: { t3_2026: { sign: { st: 'done', by: '홍길동', gotAt: '2026-10-02', at: 1 } } } } }));
+  assert.equal(plain.unmatched.length, 1);
+  assert.ok(!plain.unmatched[0].why.startsWith('[기술보호]'));
 });
 test('Minor ① 발송함 줄은 하루 뒤부터(같은 날 발송·회신 안 함) — plan 단위', () => {
   const rec = () => ({ st: 'doing', by: '홍길동', sentAt: '2026-10-10', at: 5 });
@@ -722,9 +781,11 @@ test('Minor ① 발송함 줄은 하루 뒤부터(같은 날 발송·회신 안 
 });
 test('Minor ② 이미 연결된 «날짜+첨부 이름» 과 같은 첨부는 다시 처리하지 않는다(폴더를 옮겨 열쇠가 바뀐 경우 — skipped.dupLinked)', () => {
   const link = { src: 'mail', key: 'i:Other-11223344:5', name: '서명본.pdf', date: '2026-10-10' };
-  const items = { c9: { t9_2026: { sign: { st: 'done', by: '홍길동', gotAt: '2026-10-10', at: 1, link } } } };
+  const items = { c1: { t3_2025: { sign: { st: 'done', by: '홍길동', gotAt: '2026-10-10', at: 1, link } } } };   // 같은 업체(c1)의 다른 서류 기록 — 쌍은 아니어도 연결은 연결이다
   const r = A.plan(one([mail(11, '', ['서명본.pdf'], '2026-10-10')], { items }));
   assert.deepEqual([r.actions.length, r.unmatched.length, r.skipped.dupLinked], [0, 0, 1]);
+  const other = A.plan(one([mail(11, '', ['서명본.pdf'], '2026-10-10')], { items: { c9: items.c1 } }));
+  assert.deepEqual([other.actions.length, other.skipped.dupLinked], [1, undefined], '다른 업체(c9)의 같은 날짜·이름 연결은 이 업체와 상관없다');
   const diffDay = A.plan(one([mail(12, '', ['서명본.pdf'], '2026-10-11')], { items }));
   assert.equal(diffDay.actions.length, 1, '날짜가 다르면 다른 첨부');
   const diffName = A.plan(one([mail(13, '', ['서명본2.pdf'], '2026-10-10')], { items }));

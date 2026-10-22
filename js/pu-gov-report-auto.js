@@ -26,11 +26,18 @@
 
   var WINDOW_DAYS = 45, MAX_ACTIONS = 100, MAX_UNMATCHED = 100, AUTO_BY = '자동';
   var MAX_ROUND = 60;                                  // Track.keysFor 의 회차 상한과 같다
-  /* «스캔» 단독은 서명이 아니다(견적서 스캔·계약서 스캔도 있다) — 서명·날인 말과 함께일 때만 sign(그 말이 이미 SIGN_RE 에 걸린다) */
-  var SIGN_RE = /서명|날인|직인|인감|signed/i;
+  /* 서명 낱말 — «스캔» 단독은 서명이 아니다(견적서 스캔도 있다). «인감» 단독도 아니다(인감증명서) — 날인 동작(인감 날인·인감 도장)과 함께일 때만.
+     영문 signed 는 낱말 경계 — unsigned·designed·resigned·consigned 는 아니고 _signed·-signed·signed.pdf·signed_contract 는 맞다 */
+  var SIGN_RE = /서명|날인|직인|인감\s*도장|(^|[^a-z])signed/i;
   var ATTACH_RE = /사진|회의록|결과물|산출물|증빙|명단|참석|출석|결과보고|활동일지/;
-  /* 주민등록번호 꼴(6자리-7자리, 뒷자리 첫 숫자 1~4) — 앞뒤가 숫자가 아닐 때만. 첨부 이름·제목에 있으면 개인 자료로 본다 */
-  var JUMIN_RE = /(^|[^0-9])[0-9]{6}-?[1-4][0-9]{6}([^0-9]|$)/;
+  /* 안내 성격 말 — 서명 낱말이 있어도 서명본이 아니다(안내문·양식·견본·«서명란 없는» 같은 반대 뜻·증명서·인증서). 별첨 낱말(사진·회의록)에는 적용하지 않는다.
+     NOTICE_HARD 는 언제나 막는다. NOTICE_SOFT(안내·공지·요청)는 «서명본·서명완료·날인본·날인완료·signed» 처럼 완료 말이 같이 있으면 풀어 준다
+     (일터상생혁신 «참여 안내서(서명)» 의 서명본 «참여 안내서 서명본.pdf» 가 «안내» 때문에 영영 안 쓰이지 않게) */
+  var NOTICE_HARD = /양식|서식|견본|샘플|예시|없는|미서명|미날인|증명서|인증서|문의|제출서류 목록|체크리스트/;
+  var NOTICE_SOFT = /안내|공지|요청/;
+  var DONE_WORD = /서명본|서명완료|서명 완료|날인본|날인완료|날인 완료|(^|[^a-z])signed/i;
+  /* 주민·외국인등록번호 꼴(6자리 + 없음·-·공백·_ + 뒷자리 첫 숫자 1~8 + 6자리) — 앞뒤가 숫자가 아닐 때만. 첨부 이름·제목에 있으면 개인 자료로 본다 */
+  var JUMIN_RE = /(^|[^0-9])[0-9]{6}[-\s_]?[1-8][0-9]{6}([^0-9]|$)/;
   var TAG_RE = Send.TAG_RE;                            // [서명요청:rid] · [제출:rid] — 보내기 모듈 것을 그대로
   var NOTE_HEAD = '자동 처리 — 메일 «', NOTE_TAIL = '»';
   var NOTE_MAX = 200;                                  // 규칙(scal_docs note)과 같다 — Track.NOTE_MAX
@@ -43,12 +50,15 @@
   function isDay(d) { return /^\d{4}-\d{2}-\d{2}$/.test(str(d)); }
   function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
 
+  /* 서명본 이름 — 서명 낱말이 있고 안내 성격 말이 없다(안내·공지·요청은 «서명본» 같은 완료 말이 함께면 푼다) */
+  function isNotice(name) { return NOTICE_HARD.test(name) || (NOTICE_SOFT.test(name) && !DONE_WORD.test(name)); }
+  function isSignName(name) { return SIGN_RE.test(name) && !isNotice(name); }
   /* 첨부 하나의 단계 — sign(서명·날인본) · attach(사진·회의록 같은 별첨) · null(모름 → 자동 처리 안 함).
      단계는 첨부 «이름»의 낱말이 정한다(SIGN_RE 가 먼저 — 둘 다 걸려도 sign). 제목에만 낱말이 있으면 null(일상 메일 «RE: 결과보고서 송부»가 완료로 찍히지 않게).
      단 제목에 [서명요청:rid] 꼬리표가 있고 이름이 별첨 낱말도 아니면 sign «후보»(회신) — 어느 첨부가 서명본인지는 plan 이 메일 전체를 보고 정한다 */
   function stepOf(att, subject) {
     var name = str(att && typeof att === 'object' ? att.name : att), tag = TAG_RE.exec(str(subject));
-    if (SIGN_RE.test(name)) return 'sign';
+    if (isSignName(name)) return 'sign';
     if (ATTACH_RE.test(name)) return 'attach';
     return (tag && tag[1] === '서명요청') ? 'sign' : null;
   }
@@ -86,7 +96,7 @@
     return keys.filter(function (k) { var b = bareName(k); return b.length >= 2 && hay.indexOf(b) >= 0; });
   }
   /* 첨부 이름이 그 단계의 낱말을 직접 가졌는가 */
-  function directWord(step, name) { return step === 'sign' ? SIGN_RE.test(name) : (step === 'attach' ? ATTACH_RE.test(name) : false); }
+  function directWord(step, name) { return step === 'sign' ? isSignName(name) : (step === 'attach' ? ATTACH_RE.test(name) : false); }
   /* 그 단계에 «이름이 맞는 줄» 을 가진 사업인가 — 줄을 사람이 채웠는지와 상관없이(사업을 고르는 데 쓴다) */
   function nameHit(plan, step, n, att, subject) {
     var hay = squash(str(att && att.name) + ' ' + str(subject));
@@ -254,7 +264,7 @@
           var lk = its[k] && its[k].link;
           if (!lk || typeof lk.key !== 'string' || !lk.key) return;
           linked[lk.key] = 1;
-          if (isDay(lk.date) && str(lk.name)) linkedDN[lk.date + '\u0001' + str(lk.name)] = 1;
+          if (isDay(lk.date) && str(lk.name)) linkedDN[co + '\u0001' + lk.date + '\u0001' + str(lk.name)] = 1;   // 업체별 — 다른 업체의 같은 이름 첨부와 섞이지 않는다
         });
       });
     });
@@ -319,22 +329,24 @@
       var pin = (tag && tag[1] === '서명요청') ? tag[2] : '';
       if (!c.atts.length) { skip('noAtt'); return; }
       /* 같은 메일의 첨부 처리 순서 — 서명 낱말 → 별첨 낱말 → 나머지(꼬리표만 보고 sign 후보가 된 첨부는 맨 뒤) */
-      var rank = function (n) { return SIGN_RE.test(n) ? 0 : (ATTACH_RE.test(n) ? 1 : 2); };
+      var rank = function (n) { return isSignName(n) ? 0 : (ATTACH_RE.test(n) ? 1 : 2); };
       var atts = c.atts.map(function (a, i) { return { name: str(a.name), i: i }; })
         .sort(function (a, b) { return (rank(a.name) - rank(b.name)) || (a.i - b.i); });
       /* 꼬리표 회신에서 서명본 고르기 — 서명 낱말 첨부가 있으면 그것들만, 없으면 «낱말 없는 PDF/이미지» 가 하나뿐일 때 그 하나 */
-      var hasSignWord = atts.some(function (a) { return SIGN_RE.test(a.name); });
-      var weak = atts.filter(function (a) { return !SIGN_RE.test(a.name) && !ATTACH_RE.test(a.name) && /^(pdf|img)$/.test(Inbox.kindOf(a.name)); });
+      var hasSignWord = atts.some(function (a) { return isSignName(a.name); });
+      var weak = atts.filter(function (a) { return !SIGN_RE.test(a.name) && !ATTACH_RE.test(a.name) && !isNotice(a.name) && /^(pdf|img)$/.test(Inbox.kindOf(a.name)); });
       var weakPick = (pin && !hasSignWord && weak.length === 1) ? weak[0] : null;
       atts.forEach(function (att) {
         if (!att.name) { skip('noStep'); return; }
-        if (has(linkedDN, c.day + '\u0001' + att.name)) { skip('dupLinked'); return; }
+        if (has(linkedDN, Object.keys(m.cos)[0] + '\u0001' + c.day + '\u0001' + att.name)) { skip('dupLinked'); return; }
         var step = stepOf(att.name, c.s), direct;
         if (!step) {
-          if (SIGN_RE.test(c.s) || ATTACH_RE.test(c.s)) miss(m, att, '제목에만 낱말'); else skip('noStep');
+          if (SIGN_RE.test(att.name)) miss(m, att, '서명 낱말이 있으나 안내성 이름');   // 서명 낱말이 있는데 단계가 없으면 안내성 이름뿐이다
+          else if (SIGN_RE.test(c.s) || ATTACH_RE.test(c.s)) miss(m, att, '제목에만 낱말');
+          else skip('noStep');
           return;
         }
-        if (step === 'sign' && !SIGN_RE.test(att.name)) {   // 꼬리표만으로 sign 후보가 된 첨부
+        if (step === 'sign' && !isSignName(att.name)) {   // 꼬리표만으로 sign 후보가 된 첨부
           if (att !== weakPick) { miss(m, att, '꼬리표 회신 — 서명본을 정할 수 없습니다'); return; }
           direct = true;
         }
@@ -346,12 +358,14 @@
           return x.plan.key === TECH_KEY || Track.keysFor(x.plan, step, x.n).length > 0;
         });
         if (!cands.length) { skip('noLine'); return; }
+        /* 기술보호 사업이 후보에 끼어 미배정이 되면 why 앞에 표시 — 기술보호 메일은 수동 길로 보낸다(화면이 알아보게) */
+        var techTag = cands.some(function (x) { return x.plan.key === TECH_KEY; }) ? '[기술보호] ' : '';
         var multi = !pin && cands.length > 1, hits = [], whys = [], techHit = false;
         if (multi) {
           /* 사업이 둘 이상 — «그 단계에 이름이 맞는 줄을 가진 사업» 이 정확히 하나일 때만 그 사업(줄을 사람이 채웠는지와 상관없이 센다 —
              한쪽 줄이 차 있다고 «남은 쪽» 에 쓰지 않는다). 간단형 틀은 줄 이름이 모두 «업체 서명본» 이라 이름으로 사업을 못 가른다 → 꼬리표 rid 일치 외에는 안 쓴다 */
           var named = cands.filter(function (x) { return nameHit(x.plan, step, x.n, att, c.s); });
-          if (named.length !== 1) { miss(m, att, named.length ? '여러 사업에 같은 이름의 줄이 있어 정할 수 없습니다' : '사업이 둘 이상이라 줄을 정할 수 없습니다'); return; }
+          if (named.length !== 1) { miss(m, att, techTag + (named.length ? '여러 사업에 같은 이름의 줄이 있어 정할 수 없습니다' : '사업이 둘 이상이라 줄을 정할 수 없습니다')); return; }
           cands = named;
         }
         cands.forEach(function (x) {
@@ -360,10 +374,10 @@
           if (d.key) hits.push({ x: x, d: d }); else whys.push(d.why);
         });
         if (techHit) { skip('tech'); return; }
-        if (hits.length > 1) { miss(m, att, '여러 사업에 후보가 있어 정할 수 없습니다'); return; }
+        if (hits.length > 1) { miss(m, att, techTag + '여러 사업에 후보가 있어 정할 수 없습니다'); return; }
         if (!hits.length) {
           if (cands.every(function (x) { return x.plan.key === TECH_KEY; })) { skip('tech'); return; }
-          miss(m, att, cands.length > 1 ? '사업이 둘 이상이라 줄을 정할 수 없습니다' : (whys[0] || '줄을 정할 수 없습니다'), cands.length === 1 ? cands[0].p.rid : '');
+          miss(m, att, techTag + (cands.length > 1 ? '사업이 둘 이상이라 줄을 정할 수 없습니다' : (whys[0] || '줄을 정할 수 없습니다')), cands.length === 1 ? cands[0].p.rid : '');
           return;
         }
         var x = hits[0].x, key = hits[0].d.key, base = Track.recOf(track, x.p.coId, x.p.rid);
