@@ -753,6 +753,9 @@
   /* 좁은 폰(360px 안팎) — ‹ › 🔍 오늘 단추 폭을 조금 줄여 부제(음력 범위)가 한 줄에 다 들게 한다.
      누르는 높이는 그대로다. 넓은 폰(411px 이상)은 그대로다. */
   @media (max-width:400px){ body.mob .mnav,body.mob .mtoday{width:36px} }
+  /* 「오늘」 알약 — 둥근 테두리 글자 단추(구글 PC 의 [오늘] 꼴). 폭은 글자만큼 */
+  body.mob .mtoday.mtoday-pill{width:auto;height:32px;padding:0 11px;border:1.5px solid currentColor;border-radius:16px;
+    font-size:13px;font-weight:700;white-space:nowrap;flex:none;margin:0 2px}
   body.mob .cal{border:none;border-radius:0}
   body.mob .mhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:none;border-bottom:1px solid var(--gline)}
   body.mob .mhd div{text-align:center;font-size:13px;font-weight:500;color:var(--gtext);padding:4px 0;
@@ -2751,7 +2754,9 @@ function 폰머리Html(){
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mtoday" data-srch="1" title="일정 검색">' + 선아이콘("search") + '</button>'
-    + '<button class="mtoday" data-mv="0" title="오늘"><i>' + parseInt(todayYMD().slice(8,10), 10) + '</i></button>'
+    /* 「오늘」 — 글자로 적는다 (대표 지시 2026-10-23 「오늘 클릭해서 오늘 날짜·오늘 달로 넘어가는 버튼」).
+       구글처럼 날짜 숫자(23)만 네모에 넣어 두었더니 «오늘로 가는 단추»인 줄 몰랐다. 하는 일은 그대로(data-mv=0). */
+    + '<button class="mtoday mtoday-pill" data-mv="0" title="오늘 날짜로 (' + parseInt(todayYMD().slice(5,7), 10) + '월 ' + parseInt(todayYMD().slice(8,10), 10) + '일)">오늘</button>'
     /* 내 동그라미 — 구글 앱 머리 오른쪽 끝의 프로필(2026-10-11 캡처). 누르면 «내 계정» 창(메일·로그아웃)이 열린다 */
     + '<button class="mavatar" data-mavatar="1" title="내 계정">' + esc(String((typeof document !== "undefined" && document.getElementById("me") && document.getElementById("me").textContent) || "·").trim().slice(0, 2)) + '</button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
