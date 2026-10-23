@@ -298,7 +298,8 @@ test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /body\.mob \.mplus\{position:fixed;right:16px;bottom:88px;[^}]*width:56px;\s*height:56px;border-radius:16px/);
   assert.match(캘, /data-theme="dark"\] body\.mob \.mplus\{background:#304678;color:#d9e2ff\}/);
-  assert.match(캘, /<button class="mtoday" data-mv="0" title="오늘">/);
+  /* 2026-10-23 — 날짜 숫자(23) 네모 → 「오늘」 글자 알약 (대표가 오늘 단추인 줄 몰랐다). 하는 일(data-mv=0)은 그대로 */
+  assert.match(캘, /<button class="mtoday[^"]*" data-mv="0" title="오늘[^"]*">오늘<\/button>/);
 });
 
 test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목', () => {
