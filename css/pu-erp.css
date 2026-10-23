@@ -1308,13 +1308,22 @@ input[type="search"]::-webkit-search-cancel-button{
        ■ 겉 여백을 걷고, 흰 판은 «상자»가 아니라 «바닥»으로 둔다 — 남는 상자는 카드 한 겹이다.
        ⚠ 넓은 화면(769px~)은 그대로 — 24px 여백과 흰 판이 그대로 있다. */
   .main{ padding:6px 0 !important; }
+  /* 🧊 틀 고정 (대표 지시 2026-10-23 「ERP 에서 폰으로 관리하는 … 데이터가 들어가는 모든 부분 틀 고정」)
+       목록(업체·계약·사건·컨설팅/기금/기타)을 내려도 검색·거르개 줄은 맨 위에 붙어 있다.
+       ⚠ 붙는 기준은 «구르는 상자»(.main) — 그 사이에 overflow 를 거는 겹을 넣으면 안 붙는다.
+       ⚠ 바탕을 칠한다 — 투명하면 밑으로 지나가는 카드가 비쳐 글자가 겹쳐 보인다. */
+  .pu-mfreeze{ position:sticky !important; top:0; z-index:6; background:#f3f4f6; margin-left:-6px; margin-right:-6px;
+    padding:4px 6px 6px !important; box-shadow:0 1px 0 #e2e8f0; }
   .page{ background:transparent !important; border-radius:0 !important; padding:2px 6px 8px !important; min-height:0 !important; }
   /* 창(모달)은 화면 폭 그대로 — 양옆 3%(12px)씩 비어 있었다 */
   .modal{ width:100vw !important; max-width:100vw !important; border-radius:0 !important; }
   .modal-b{ padding:10px !important; }
   /* 폰 목록 카드(업체·사건·컨설팅/기금/기타·종료·급여·퇴직정산 — className 'm-card') — 왼쪽은 색 띠(4px)가
      이미 줄을 가르므로 안 여백을 줄인다. 글이 화면 끝에서 14px 안쪽에 선다(전 22~29px). */
-  .m-card{ padding-left:4px !important; padding-right:7px !important; }
+  .m-card{ padding-left:4px !important; padding-right:7px !important;
+    /* ⚠ 카드가 제 상자보다 넓어지지 않게 (2026-10-23) — 글자를 크게 쓰는 폰에서 컨설팅·사건 카드가 425px 로
+         화면(411)을 넘어 오른쪽 「진행중」 표가 잘렸다. 여백·테두리까지 폭 안에 넣는다. */
+    box-sizing:border-box; max-width:100%; }
   /* 입력 상자(근태 입력·증명서 발급 — className 'm-box') — 화면 끝 ~ 상자 6px, 상자 ~ 칸 7px */
   .m-box{ padding-left:7px !important; padding-right:7px !important; }
   /* 환경설정 탭띠 — 흰 판 안 여백(16px)만큼 음수 여백으로 «판 끝까지» 펴던 것. 판 여백을 줄였으니 같이 줄인다

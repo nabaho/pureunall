@@ -214,6 +214,11 @@ module.exports = {
       back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
     })),
     메뉴('biz/company'),
+    /* 🧊 틀 고정 — 목록을 내린 뒤에도 검색·거르개 줄이 맨 위에 붙어 있는지 (대표 지시 2026-10-23) */
+    { name: 'company-scroll', wait: 800, run: async (page) => {
+      await page.evaluate(() => window.navigateTo('biz/company')); await page.waitForTimeout(2500);
+      await page.evaluate(() => { const m = document.querySelector('main.main'); if (m) m.scrollTop = 900; });
+    } },
     /* 폰 카드의 ☐ 를 눌러 «N건 선택» 줄이 뜨는지 본다 — 재고 나서 도로 푼다 */
     { name: 'company-pick', wait: 1200,
       run: async (page) => { await page.locator('main input[type=checkbox]').nth(1).click(); await page.locator('main input[type=checkbox]').nth(2).click(); },

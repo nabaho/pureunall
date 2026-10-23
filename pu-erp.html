@@ -175,7 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=26">
+<link rel="stylesheet" href="css/pu-erp.css?v=27">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -13757,8 +13757,15 @@ function MonthKpiHeader(props){
     window.addEventListener('resize', onResize);
     return function(){ window.removeEventListener('resize', onResize); };
   }, []);
+  /* 📊 폰에서는 요약 숫자를 «한 줄»로 접어 둔다 (대표 지시 2026-10-23 「상단은 아래 위 높이가 너무
+       많이 차지한다」). 업체관리는 상자 여섯이 두 줄로 약 130px 을 먹어 목록이 화면 절반 아래에서 시작했다.
+       눌러 펼치면 예전 상자 그대로 — 펼침은 이 기기에 기억한다(다음에 열어도 그대로). PC 는 그대로. */
+  var MKP = winW <= 768;
+  var koS = useState(function(){ try{ return localStorage.getItem('pucards_mkpi_open') === '1'; }catch(e){ return false; } });
+  var kpiOpen = koS[0];
+  function setKpiOpen(v){ koS[1](v); try{ localStorage.setItem('pucards_mkpi_open', v ? '1' : '0'); }catch(e){} }
   /* 칸 수를 CSS 에 알려 준다 — 폰에서 4칸이면 한 줄에 넣는다(3칸 고정이면 3+1 로 갈라졌다) */
-  var kpiGrid = kpis.length > 0 && h('div', { className:'mkpi-grid mkpi-n' + kpis.length,
+  var kpiGridFull = kpis.length > 0 && h('div', { className:'mkpi-grid mkpi-n' + kpis.length,
     style:{ display:'grid', gridAutoFlow:'column', gridAutoColumns:'minmax(0,1fr)', gap:'4px' } },
     kpis.map(function(k, i){
       return h('div', { key:i, onClick:k.onClick||null,
@@ -13771,6 +13778,22 @@ function MonthKpiHeader(props){
       );
     })
   );
+  /* 접힌 한 줄 — 「운영 업체 277개 · 활성 자문 211개 · …」, 넘치면 … (전문은 title) */
+  var kpiSum = kpis.map(function(k){
+    return String(k.label || '').replace(/^[^0-9A-Za-z가-힣]+/, '') + ' ' + k.value;
+  }).join(' · ');
+  var kpiGrid = !(MKP && kpis.length > 0) ? kpiGridFull
+    : kpiOpen
+      ? h('div', null, kpiGridFull,
+          h('button', { type:'button', className:'mkpi-fold', onClick:function(){ setKpiOpen(false); },
+            style:{ display:'block', margin:'3px 0 0 auto', padding:'2px 8px', background:'transparent', border:'none',
+              color:'#64748b', fontSize:'11px', cursor:'pointer', minHeight:0 } }, '▴ 요약 접기'))
+      : h('button', { type:'button', className:'mkpi-sum', title:kpiSum + '\n(누르면 펼칩니다)',
+          onClick:function(){ setKpiOpen(true); },
+          style:{ display:'block', width:'100%', padding:'5px 8px', background:'#fff', border:'1px solid #e2e8f0',
+            borderRadius:'6px', color:'#475569', fontSize:'11px', fontWeight:600, textAlign:'left', cursor:'pointer',
+            whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', minHeight:0 } },
+          '📊 ' + kpiSum + ' ▾');
   // 한 줄로 합칠지 — KPI 한 칸이 최소 100px 은 돼야 글자가 안 잘린다.
   // 월 네비(약 250px) + 오른쪽 단추(약 200px) 를 뺀 나머지로 판단한다.
   /* props.kpiOwnRow — 「이 줄에는 도구줄이 들어오니 KPI 는 아랫줄을 쓰라」 (2026-08-16 출금관리).
@@ -26716,7 +26739,8 @@ function ContractManagement(props){
       } }),
     // (종류 탭은 아래 툴바 드롭다운으로 통합)
     // 툴바+담당자 필터 영역 틀고정
-    h('div', { style:{ position: window.innerWidth<=768?'static':'sticky', top:0, zIndex: window.innerWidth<=768?0:50, background:'#fff',
+    /* 🧊 폰에서도 붙인다 (대표 지시 2026-10-23 「틀 고정」) — 전에는 폰만 static 이라 목록을 내리면 검색·거르개가 사라졌다. */
+    h('div', { className: window.innerWidth<=768 ? 'pu-mfreeze' : undefined, style:{ position:'sticky', top:0, zIndex: window.innerWidth<=768?6:50, background:'#fff',
       boxShadow: window.innerWidth<=768?'none':'0 2px 6px rgba(0,0,0,0.07)', marginLeft: window.innerWidth<=768?'0':'-16px', marginRight: window.innerWidth<=768?'0':'-16px',
       padding:'6px 10px', marginBottom:'6px', isolation:'isolate' } },
     // 툴바 — 등록·검색·종류·담당자·마감잠금·번호재정렬 한 줄 (좁으면 줄바꿈)
@@ -29346,6 +29370,25 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       })
     );
   }
+  /* 폰용 — typeChips 와 같은 거르개를 «고르기 상자» 하나로 (대표 지시 2026-10-23). 깔때기로 둘 이상 고른 상태면 그렇다고 보여 준다. */
+  function typeSelect(){
+    var items = cItems('type');
+    var n = {}; items.forEach(function(x){ n[x.v] = x.n; });
+    var sel = cGet('type');
+    var val = sel.length === 0 ? 'all' : (sel.length === 1 ? sel[0] : '__many');
+    var on = val !== 'all';
+    return h('select', { value:val, 'aria-label':'유형',
+        onChange:function(e){ var v = e.target.value; if(v === '__many') return;
+          cSet('type', v === 'all' ? [] : [v]); if(pg.setPage) pg.setPage(1); },
+        style:{ flex:'1 1 96px', minWidth:0, padding:'7px 6px', border:'1px solid '+(on?'#1e40af':'#cbd5e1'),
+          borderRadius:'8px', fontSize:'13px', fontWeight:700, background: on?'#eff6ff':'#fff',
+          color: on?'#1e40af':'#475569', cursor:'pointer' } },
+      COMPANY_TYPE_FILTERS.map(function(t){
+        return h('option', { key:t.v, value:t.v },
+          t.v === 'all' ? '🏷 유형 전체' : (t.icon + ' ' + t.label + ' ' + (n[t.v] || 0)));
+      }),
+      val === '__many' && h('option', { value:'__many' }, '여러 유형 (' + sel.length + ')'));
+  }
   var moS = useState(false); var monthOnly = moS[0]; var setMonthOnly = moS[1];
   var ymS = usePersistedState('company_month', todayYM()); var selYM = ymS[0]; var setSelYM = ymS[1];
   var thisYM = selYM;
@@ -30151,12 +30194,11 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     mgrReqOpen && h(CoMgrReqModal, { onClose:function(){ setMgrReqOpen(false); }, onChange: refreshCompanies }),
     // 통합 필터 — 모바일 compact / PC 기존
     window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px', flexWrap:'nowrap' } },
+    ? /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「데이터가 들어가는 … 틀 고정이 필요한 모든 부분」) — 목록을 내려도 검색·거르개 줄은 위에 붙어 있다. 모양은 css 의 .pu-mfreeze */ h('div', { className:'pu-mfreeze', style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px', flexWrap:'nowrap' } },
         // 줄1: 검색 + 엑셀 + 정리 도구 — «한 줄», 도구는 이 줄 안에서 옆으로 민다 (폰화면관리 2026-10-18)
         //   전: 검색칸이 70px 로 눌려 「🔍 업체」만 보였고, 정리 도구 다섯이 줄을 세 줄로 꺾어 목록을 90px 아래로 밀었다.
-        h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', overflowX:'auto',
-            WebkitOverflowScrolling:'touch', paddingBottom:'2px' } },
-          h('div', { style:{ position:'relative', flex:'1 0 150px', minWidth:'150px' } },
+        h('div', { style:{ display:'flex', flexWrap:'nowrap', gap:'6px', alignItems:'center', minWidth:0 } },
+          h('div', { style:{ position:'relative', flex:'1 1 auto', minWidth:0 } },
             h('input', { className:'dt-search', placeholder:'🔍 업체명·담당자',
               value:query, onChange:function(e){ setQuery(e.target.value); },
               style:{ width:'100%', fontSize:'14px', padding:'9px 12px', paddingRight: query?'55px':'12px',
@@ -30167,45 +30209,31 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
                 fontSize:'10px', fontWeight:700, padding:'2px 7px', cursor:'pointer' } },
               filtered.length + '×')
           ),
-          h('button', { onClick:exportExcel,
-            style:{ padding:'9px 11px', background:'#fff', color:'#16a34a', border:'1px solid #16a34a',
-              borderRadius:'8px', fontSize:'13px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '📥'),
-          // 이름이 겹치는 업체가 있을 때만 나타난다. 다 정리하면 사라진다.
-          dupCount > 0 && h('button', { onClick:function(){ setMergeOpen(true); },
-            className:'erp-tip', 'data-tip':CO_MERGE_TIP,
-            style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🔀 중복 정리 ' + dupCount),
-          lostSub > 0 && h('button', { onClick:doRepairSub,
-            className:'erp-tip', 'data-tip':CO_SUBOFFICE_FIX_TIP,
-            style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🏛️ 사무대행 복구 ' + lostSub),
-          linkCount > 0 && h('button', { onClick:function(){ setLinkOpen(true); },
-            className:'erp-tip', 'data-tip':CO_LINK_TIP,
-            style:{ padding:'9px 12px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🔗 업체 연결 ' + linkCount),
-          h('button', { onClick:function(){ setMisOpen(true); },
-            className:'erp-tip', 'data-tip':CO_MIS_TIP,
-            style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🔍 정보 대조'),
-          addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
-            className:'erp-tip', 'data-tip':CO_ADDR_TIP,
-            style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조'),
-          vatPend.total > 0 && h('button', { onClick:doVatAll,
-            className:'erp-tip', 'data-tip':CO_VAT_ALL_TIP,
-            style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
-              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🧾 부가세 포함 일괄 ' + vatPend.total)
+          /* 🛠 정리 도구 — 옆으로 미는 단추 줄 대신 «고르기 하나» (대표 지시 2026-10-23 「좌우로 말고 드롭다운」).
+               그때그때 있는 도구만 목록에 든다(건수가 0 이면 안 나온다 — 단추일 때와 같다). 고르면 바로 열고 도로 「도구」로 돌아온다. */
+          (function(){
+            var tools = [
+              dupCount > 0 && { v:'dup', tip:CO_MERGE_TIP, t:'🔀 중복 정리 ' + dupCount, run:function(){ setMergeOpen(true); } },
+              lostSub > 0 && { v:'sub', tip:CO_SUBOFFICE_FIX_TIP, t:'🏛️ 사무대행 복구 ' + lostSub, run:doRepairSub },
+              linkCount > 0 && { v:'link', tip:CO_LINK_TIP, t:'🔗 업체 연결 ' + linkCount, run:function(){ setLinkOpen(true); } },
+              { v:'mis', tip:CO_MIS_TIP, t:'🔍 정보 대조', run:function(){ setMisOpen(true); } },
+              addrMisN !== 0 && { v:'addr', tip:CO_ADDR_TIP, t: addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조', run:function(){ setAddrOpen(true); } },
+              vatPend.total > 0 && { v:'vat', tip:CO_VAT_ALL_TIP, t:'🧾 부가세 포함 일괄 ' + vatPend.total, run:doVatAll },
+              /* 📥 엑셀도 여기로 — 따로 단추를 두면 검색칸이 그만큼 좁아진다 */
+              { v:'xls', t:'📥 엑셀로 받기', run:exportExcel }
+            ].filter(Boolean);
+            return h('select', { value:'', 'aria-label':'정리 도구',
+              onChange:function(e){ var v = e.target.value; e.target.value = '';
+                var hit = tools.find(function(x){ return x.v === v; }); if(hit) hit.run(); },
+              style:{ flex:'0 0 auto', maxWidth:'38%', padding:'9px 8px', background:'#eff6ff', color:'#1e40af',
+                border:'1px solid #bfdbfe', borderRadius:'8px', fontSize:'13px', fontWeight:700, cursor:'pointer' } },
+              h('option', { value:'' }, '🛠 도구'),
+              tools.map(function(x){ return h('option', { key:x.v, value:x.v, title:x.tip || undefined }, x.t); }));   /* 설명은 단추 시절과 같은 글(한 벌) */
+          })()
         ),
         /* 줄1-2: 고른 뒤 할 일 — 고른 것이 있을 때만 (자료 목록 규칙 「N건 선택」과 할 수 있는 일).
            ⚠ 폰 카드에 ☐ 가 없어 이 단추들은 여태 «닿을 길이 없었다». 줄1 끝에 두면 옆으로 밀어야 보인다. */
-        selIds.size > 0 && h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', overflowX:'auto',
-            WebkitOverflowScrolling:'touch', paddingBottom:'2px' } },
+        selIds.size > 0 && h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' } },   /* 옆으로 밀지 않는다 — 모자라면 줄을 바꾼다 (2026-10-23) */
           h('span', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', whiteSpace:'nowrap', flexShrink:0 } },
             selIds.size + '건 선택'),
           selIds.size > 0 && h('button', {
@@ -30235,9 +30263,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               borderRadius:'8px', fontSize:'11px', cursor:'pointer', flexShrink:0 }
           }, '✕ 선택 해제')
         ),
-        // 줄2: 상태 탭(세그먼트) + 유형칩 + 담당자 — 가로 스크롤 1줄
-        h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', paddingBottom:'2px',
-          WebkitOverflowScrolling:'touch', alignItems:'center' } },
+        /* 줄2: ☐ 전체 + 상태 + 유형 + 내 담당 — «고르기 상자» 로 (대표 지시 2026-10-23 「급여 등 이 창을 좌우로
+             움직여야 되는데 … 좌우로 말고 드롭다운 방식으로」). 칩 줄을 옆으로 밀지 않는다 — 모자라면 줄을 바꾼다. */
+        h('div', { style:{ display:'flex', gap:'5px', flexWrap:'wrap', alignItems:'center' } },
           /* ☐ 전체 — 표의 머리 ☐ 자리. «지금 보이는 쪽»(거른 결과의 이 쪽)만 고른다(폰화면관리 2026-10-18) */
           h('label', { title:'지금 보이는 업체 모두 고르기',
             style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexShrink:0, padding:'0 4px 0 2px',
@@ -30247,21 +30275,17 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               onChange:function(e){ e.target.checked ? selectAll() : clearSel(); },
               style:{ width:'20px', height:'20px', margin:0, cursor:'pointer' } }),
             '전체'),
-          // 세그먼트: 활성 | 사무대행
-          h('div', { style:{ display:'inline-flex', flexShrink:0, background:'#f8fafc', borderRadius:'8px', padding:'2px' } },
-            h('button', { onClick:function(){ setStatusTab('active'); },
-              style:{ padding:'5px 10px', borderRadius:'6px', fontWeight:700, fontSize:'11px', cursor:'pointer', whiteSpace:'nowrap',
-                background: statusTab==='active'?'#1e40af':'transparent',
-                color: statusTab==='active'?'#fff':'#64748b', border:'none' } },
-              '💼 ' + activeCount),
-            h('button', { onClick:function(){ setStatusTab('suboffice'); },
-              style:{ padding:'5px 10px', borderRadius:'6px', fontWeight:700, fontSize:'11px', cursor:'pointer', whiteSpace:'nowrap',
-                background: statusTab==='suboffice'?'#854d0e':'transparent',
-                color: statusTab==='suboffice'?'#fff':'#64748b', border:'none' } },
-              '📁 ' + subofficeCount)
-          ),
-          // (담당·부담당·급여일 필터는 표 머리 깔때기로 옮겼다. 유형은 건수가 보여야 해서 칩으로 남긴다)
-          typeChips(),
+          h('select', { value:statusTab, 'aria-label':'상태',
+              onChange:function(e){ setStatusTab(e.target.value); if(pg.setPage) pg.setPage(1); },
+              style:{ flex:'1 1 96px', minWidth:0, padding:'7px 6px', border:'1px solid '+(statusTab==='suboffice'?'#854d0e':'#1e40af'),
+                borderRadius:'8px', fontSize:'13px', fontWeight:700, background:'#fff',
+                color: statusTab==='suboffice'?'#854d0e':'#1e40af', cursor:'pointer' } },
+            h('option', { value:'active' }, '💼 활성 ' + activeCount),
+            h('option', { value:'suboffice' }, '📁 사무대행 ' + subofficeCount),
+            /* 다른 화면(PC)에서 「계약 중단」 탭을 고른 채 왔으면 그 값도 보여 준다 — 빈칸이 되면 안 된다 */
+            statusTab === 'suspended' && h('option', { value:'suspended' }, '⏸ 계약 중단 ' + suspendedCount)),
+          /* 유형은 건수가 보여야 한다 — 고르기 상자 안에 건수를 그대로 적는다 */
+          typeSelect(),
           h(MineFirstChip, { on:mineFirst, onToggle:function(){ setMineFirst(!mineFirst); } }),
           activeFilterCount > 0 && h('button', { onClick:cClearAll,
             style:{ padding:'5px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:700, flexShrink:0,
@@ -34224,7 +34248,7 @@ function CaseManagement(props){
         monthOnly ? '✓ 이번 달만' : '📅 이번 달만')
     }),
     (window.IS_MOBILE || window.innerWidth <= 768)
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
+    ? /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「데이터가 들어가는 … 틀 고정이 필요한 모든 부분」) — 목록을 내려도 검색·거르개 줄은 위에 붙어 있다. 모양은 css 의 .pu-mfreeze */ h('div', { className:'pu-mfreeze', style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
         // 줄1: 검색 + 엑셀
         h('div', { style:{ display:'flex', gap:'6px' } },
           h('div', { style:{ position:'relative', flex:1 } },
@@ -34243,35 +34267,37 @@ function CaseManagement(props){
               borderRadius:'8px', fontSize:'13px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '📥')
         ),
         // 줄2: 상태·유형·담당자 가로 스크롤
-        h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', WebkitOverflowScrolling:'touch',
-          paddingBottom:'2px', alignItems:'center' } },
+        /* 거르개는 «한 줄에 나눠 앉는다» — 옆으로 밀지 않는다 (대표 지시 2026-10-23 「좌우로 말고 드롭다운」) */
+        h('div', { style:{ display:'flex', gap:'4px', flexWrap:'wrap', rowGap:'5px', alignItems:'center' } },
           h('select', { value:statusFilter, onChange:function(e){
               if(e.target.value === 'closed'){ sessionStorage.setItem('goto_closed_kind','사건'); onNav('biz/closed'); return; }
               setStatusFilter(e.target.value);
             },
             style:{ padding:'5px 8px', border:'1px solid '+(statusFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: statusFilter!=='all'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='all'?'#1e40af':'#64748b', fontWeight: statusFilter!=='all'?700:400, cursor:'pointer' } },
+            /* ⚠ 기본값 'open'(종결 제외)의 자리가 없어 폰에서 이 칸이 «빈칸»으로 보였다 (2026-10-23) */
+            h('option', { value:'open' }, '종결 제외'),
             CASE_STATUS.filter(function(s){ return s.v !== 'closed'; }).map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); }),
             h('option', { value:'closed' }, '📦 종결 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: typeFilter!=='all'?'#eff6ff':'#f8fafc',
               color: typeFilter!=='all'?'#2563eb':'#64748b', fontWeight: typeFilter!=='all'?700:400, cursor:'pointer' } },
             h('option', { value:'all' }, '전체 유형'),
             types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); })),
           h('select', { value:stageFilter, onChange:function(e){ setStageFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(stageFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: stageFilter!=='all'?'#eff6ff':'#f8fafc',
               color: stageFilter!=='all'?'#1e40af':'#64748b', fontWeight: stageFilter!=='all'?700:400, cursor:'pointer' } },
             h('option', { value:'all' }, '⚖ 전체 심급'),
             stageDefs.map(function(sd){ return h('option', { key:sd.code, value:sd.code }, sd.name); })),
           h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: mgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400, cursor:'pointer' } },
             h('option', { value:'all' }, '👤 담당자'),
@@ -34279,7 +34305,7 @@ function CaseManagement(props){
               return h('option', { key:u.sid, value:u.sid }, u.name); })),
           h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: subMgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: subMgrFilter!=='all'?'#2563eb':'#64748b', fontWeight: subMgrFilter!=='all'?700:400, cursor:'pointer' } },
             h('option', { value:'all' }, '👥 부담당'),
@@ -70277,7 +70303,7 @@ function ProjectManagementShared(props){
     /* 🏥 현장클리닉·🛡 기술보호 실적 띠는 계약관리로 옮겼다 (대표 지시 2026-10-05) — 같은 숫자를 두 곳에 두지 않는다. */
     // 툴바 — 모바일 compact / PC 기존
     window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
+    ? /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「데이터가 들어가는 … 틀 고정이 필요한 모든 부분」) — 목록을 내려도 검색·거르개 줄은 위에 붙어 있다. 모양은 css 의 .pu-mfreeze */ h('div', { className:'pu-mfreeze', style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
         h('div', { style:{ display:'flex', gap:'6px' } },
           h('div', { style:{ position:'relative', flex:1 } },
             h('input', { placeholder:'🔍 관리번호·업체명', value:query,
@@ -70294,34 +70320,35 @@ function ProjectManagementShared(props){
             style:{ padding:'9px 11px', background:'#fff', color:'#16a34a', border:'1px solid #16a34a',
               borderRadius:'8px', fontSize:'13px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '📥')
         ),
-        h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', WebkitOverflowScrolling:'touch',
-          paddingBottom:'2px', alignItems:'center' } },
+        /* 거르개 넷은 «한 줄에 나눠 앉는다» — 옆으로 밀지 않는다 (대표 지시 2026-10-23 「좌우로 말고 드롭다운」).
+             칸이 좁으면 고른 글자가 … 로 줄 뿐 누르면 목록이 다 보인다. 칩(내 담당 먼저 등)은 모자라면 아랫줄로. */
+        h('div', { style:{ display:'flex', gap:'4px', flexWrap:'wrap', rowGap:'5px', alignItems:'center' } },
           h('select', { value:statusFilter, onChange:function(e){
               if(e.target.value==='closed'){ var km={consulting:'컨설팅',fund:'기금',other:'기타',case:'사건'}; sessionStorage.setItem('goto_closed_kind',km[props.sourceKind]||''); onNav('biz/closed'); return; }
               setStatusFilter(e.target.value);
             },
             style:{ padding:'5px 8px', border:'1px solid '+(statusFilter!=='open'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: statusFilter!=='open'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='open'?'#1e40af':'#64748b', fontWeight: statusFilter!=='open'?700:400 } },
             h('option',{value:'open'},'종료 제외'), h('option',{value:'pending'},'대기'), h('option',{value:'progress'},'진행중'), h('option',{value:'closed'},'📦 종료 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: typeFilter!=='all'?'#eff6ff':'#f8fafc',
               color: typeFilter!=='all'?'#2563eb':'#64748b', fontWeight: typeFilter!=='all'?700:400 } },
             h('option',{value:'all'},'전체 유형'),
             types.map(function(t){ return h('option',{key:t.code,value:t.code},t.name); })),
           h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: mgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400 } },
             h('option',{value:'all'},'👤 담당자'),
             users.map(function(u){ return h('option',{key:u.sid,value:u.sid},u.name); })),
           h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
               background: subMgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: subMgrFilter!=='all'?'#2563eb':'#64748b', fontWeight: subMgrFilter!=='all'?700:400 } },
             h('option',{value:'all'},'👥 부담당'),
@@ -70429,7 +70456,7 @@ function ProjectManagementShared(props){
               var _card = h('div', { key:it.id, className:'m-card',
                 style:{ background:'#fff', border:'1px solid #e2e8f0',
                   borderLeft:'4px solid '+stColor,
-                  borderRadius:'8px', padding:'10px 12px',
+                  borderRadius:'8px', padding:'10px 12px', minWidth:0,
                   boxShadow:'0 1px 3px rgba(0,0,0,0.05)' } },
                 h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', marginBottom:'4px' } },
                   h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10px', background:'#475569',
@@ -70447,7 +70474,9 @@ function ProjectManagementShared(props){
                   h('span', null, '👤 '+(mgrName||'미지정')),
                   subNames.length>0 && h('span', { style:{ color:'#94a3b8' } }, '+ '+subNames.join(', '))
                 ),
-                totalFee>0 && h('div', { style:{ display:'flex', gap:'8px', fontSize:'11px' } },
+                /* ⚠ 폭이 모자라면 «합계» 를 다음 줄로 (2026-10-23) — 글자를 크게 쓰는 폰에서 세 금액이 한 줄을 넘어
+                     카드가 화면 밖으로 20px 밀렸다(오른쪽 「진행중」 표가 잘림). 금액은 꺾지 않고 덩어리째 넘긴다. */
+                totalFee>0 && h('div', { style:{ display:'flex', flexWrap:'wrap', columnGap:'8px', rowGap:'2px', fontSize:'11px', whiteSpace:'nowrap' } },
                   contractFee>0 && h('span', { style:{ color:'#2563eb' } }, '계약금 '+contractFee.toLocaleString()+'원'),
                   balanceFee>0 && h('span', { style:{ color:'#2563eb' } }, '잔금 '+balanceFee.toLocaleString()+'원'),
                   totalFee>0 && h('span', { style:{ color:'#475569', fontWeight:700 } }, '합계 '+totalFee.toLocaleString()+'원')

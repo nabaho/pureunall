@@ -147,9 +147,14 @@ test('★ 업체 폰 카드 — 업체명은 «한 줄»(넘치면 … + title),
     '이 검사의 전제(폰에서 gap 있는 flex 를 접는 공통 규칙)가 바뀌었습니다 — nowrap 이 아직 필요한지 다시 보세요');
 });
 
-test('★ 업체 폰 도구줄 — 검색칸은 쓸 만한 폭, 정리 도구는 «한 줄» 안에서 민다', () => {
-  assert.match(CO_ROW1, /overflowX:'auto'/, '★ 정리 도구 다섯이 줄을 세 줄로 꺾어 목록을 밀어 냈습니다');
-  assert.match(CO_ROW1, /flex:'1 0 \d+px',\s*minWidth:'\d+px'/, '★ 검색칸이 «최소 폭» 없이 눌려 「🔍 업체」만 보였습니다');
+test('★ 업체 폰 도구줄 — 검색칸이 줄을 차지하고, 정리 도구는 «고르기 상자 하나»', () => {
+  /* 2026-10-18 에는 도구 다섯을 한 줄 안에서 옆으로 밀게 했다. 2026-10-23 대표 지시 「좌우로 말고 드롭다운」 —
+     옆으로 미는 줄을 없애고 도구를 고르기 상자 하나(🛠 도구)에 담았다. 검색칸은 남는 폭을 다 쓴다. */
+  assert.doesNotMatch(CO_TOOLS, /overflowX:'auto'/, '★ 폰 도구줄을 다시 옆으로 밀게 했습니다 — 드롭다운으로 둡니다');
+  assert.match(CO_TOOLS, /'🛠 도구'/, '정리 도구 고르기 상자가 없습니다');
+  ['setMergeOpen(true)', 'doRepairSub', 'setLinkOpen(true)', 'setMisOpen(true)', 'setAddrOpen(true)', 'doVatAll', 'exportExcel']
+    .forEach((fn) => assert.ok(CO_TOOLS.indexOf(fn) > 0, '★ 도구 「' + fn + '」 로 갈 길이 폰에서 사라졌습니다'));
+  assert.match(CO_ROW1, /flex:'1 1 auto',\s*minWidth:0/, '★ 검색칸이 남는 폭을 안 씁니다');
 });
 
 test('★ 종료관리 폰 카드 — 그려 둔 조각을 글자로 이어 붙이지 않는다(「+ [object Object]」), 해제는 담당 줄 끝', () => {
