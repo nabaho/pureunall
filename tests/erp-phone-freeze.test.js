@@ -24,6 +24,10 @@ const PAGES = [
   ['업체관리', 'function CompanyManagement('],
   ['사건관리', 'function CaseManagement('],
   ['컨설팅·기금·기타', 'function ProjectManagementShared('],
+  /* 2026-10-23 「추천대로」 — 종료관리·휴가(직원별 연차 표)·급여관리도 */
+  ['종료관리', 'function ClosedManagement('],
+  ['휴가관리', 'function LeaveManagement('],
+  ['급여관리', 'function PayrollLedger('],
 ];
 
 test('①★★ 폰 목록의 검색·거르개 줄은 틀 고정이다', () => {
@@ -31,7 +35,10 @@ test('①★★ 폰 목록의 검색·거르개 줄은 틀 고정이다', () => 
     const fn = stripJs(cutFn(RAW, decl));
     const at = fn.indexOf('pu-mfreeze');
     assert.ok(at > 0, '★ ' + name + ' 폰 도구줄이 고정이 아닙니다 — 목록을 내리면 검색·거르개가 사라집니다');
-    assert.ok(fn.lastIndexOf('innerWidth <= 768', at) > 0, name + ' — 고정 표시가 폰 갈래 밖에 있습니다');
+    /* 폰에서만 붙는가 — 폰 갈래 안이거나, 폰일 때만 이름을 다는 꼴(innerWidth<=768 · IS_M · _lvM) */
+    const near = fn.slice(Math.max(0, at - 160), at);
+    assert.ok(fn.lastIndexOf('innerWidth <= 768', at) > 0 || /(innerWidth\s*<=\s*768|IS_M|_lvM)\s*\?\s*'?$/.test(near.replace(/'pu-mfreeze'?$/, '').trimEnd()) || /(innerWidth\s*<=\s*768|IS_M|_lvM)\s*\?\s*$/.test(near),
+      name + ' — 고정 표시가 폰 갈래 밖에 있습니다');
   });
   /* 계약관리는 한 덩이가 PC·폰을 같이 쓴다 — 폰에서도 sticky 여야 한다 */
   const ct = stripJs(cutFn(RAW, 'function ContractManagement('));
