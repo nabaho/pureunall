@@ -499,6 +499,8 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
      밀려났다. 세로 상자로 두고 본문이 남은 높이를 채워 구르게 한다 — 단추는 늘 보인다. */
   .modal[data-phone-fit] { display: flex !important; flex-direction: column; max-height: 94vh !important; overflow: hidden !important; }
   .modal[data-phone-fit] > .modal-b { flex: 1 1 auto; min-height: 0; max-height: none !important; }
+  /* 머리줄도 얇게 (대표 지시 2026-10-23 「상단이 너무 많다」) — 제목·× 한 줄에 위아래 여백만 줄인다 */
+  .modal[data-phone-fit] > .modal-h { padding: 6px 12px !important; }
   /* fld 영역 폭 보장
      ⚠ 체크박스·라디오는 빼야 한다 (대표 갈무리 2026-10-22) — 100% 를 먹으면 네모 하나가
        줄을 통째로 차지하고, 옆 글자(「CMS 자동이체」·「개인입금」)가 한 자씩 세로로 선다. */
