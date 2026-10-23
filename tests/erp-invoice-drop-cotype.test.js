@@ -89,9 +89,17 @@ test('갈고리는 이른 return 뒤에 걸리지 않는다', () => {
 });
 
 /* ── ② 업체관리 유형 칩 ── */
-test('자문·급여·노조·기금 칩이 도구줄에 있다', () => {
+test('자문·급여·노조·기금 거르개가 도구줄에 있다 — PC 는 칩, 폰은 고르기 상자', () => {
+  /* 2026-10-23 대표 지시 「좌우로 말고 드롭다운」 — 폰은 옆으로 밀던 칩 줄을 고르기 상자(typeSelect)로 바꿨다.
+     두 곳 다 «건수가 보이는» 같은 거르개여야 한다(아래 검사가 같은 상태를 쓰는지 본다). */
   assert.match(CM, /function typeChips\(\)\{/);
-  assert.equal((CM.match(/\n *typeChips\(\),/g) || []).length, 2, 'PC·모바일 두 곳 다');
+  assert.match(CM, /function typeSelect\(\)\{/);
+  assert.ok((CM.match(/\n *typeChips\(\),/g) || []).length >= 1, 'PC 도구줄에 칩이 없다');
+  assert.ok((CM.match(/\n *typeSelect\(\),/g) || []).length >= 1, '폰 도구줄에 유형 고르기가 없다');
+  const ts = CM.slice(CM.indexOf('function typeSelect(){'), CM.indexOf('var moS = useState(false);'));
+  assert.match(ts, /cItems\('type'\)/, '폰 고르기도 깔때기와 같은 셈법으로 건수를 낸다');
+  assert.match(ts, /cGet\('type'\)/); assert.match(ts, /cSet\('type',/);
+  assert.ok(ts.indexOf('useState') < 0, '따로 상태를 두면 깔때기와 어긋난다');
 });
 
 test('칩과 표 머리 깔때기가 같은 상태를 쓴다 (따로 놀면 안 된다)', () => {
