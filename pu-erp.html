@@ -72102,10 +72102,19 @@ function ClosedManagement(){
     /* ★ 탭줄 «오른쪽 빈자리»에 검색·갯수·내려받기를 얹는다 (대표 승인 라안).
        원래 비어 있던 자리라 줄 하나를 «공짜로» 얻는다. 좁아지면 검색이 먼저 줄고,
        더 좁으면(폰) 아래로 내려간다 — 탭은 늘 왼쪽에 남는다. */
-    h('div', { style:{ display:'flex', gap:'8px', marginBottom:'10px', alignItems:'center',
+    /* 🧊 폰 틀 고정 + 탭은 «고르기 상자» (대표 지시 2026-10-23 「틀 고정」·「좌우로 말고 드롭다운」 — 추천대로)
+         폰에서 탭 알약 여섯이 옆으로 밀려 「컨설팅」 뒤가 안 보였다. PC 는 알약 그대로. */
+    h('div', { className: window.innerWidth<=768 ? 'pu-mfreeze' : undefined,
+      style:{ display:'flex', gap:'8px', marginBottom:'10px', alignItems:'center',
       flexWrap:'wrap', borderBottom:'2px solid #e2e8f0',
       paddingBottom: window.innerWidth<=768?'4px':'0' } },
-    h('div', { style:{ display:'flex', gap:'4px', flex:'1 1 auto', minWidth:0,
+    window.innerWidth<=768
+    ? h('select', { value:activeTab, 'aria-label':'종료 갈래',
+        onChange:function(e){ setActiveTab(e.target.value); setYearFilter(String(new Date().getFullYear())); setMonthFilter('all'); setQuery(''); setClosedPage(1); },
+        style:{ flex:'1 1 100%', minWidth:0, padding:'7px 8px', border:'1px solid #1e40af', borderRadius:'8px',
+          background:'#fff', color:'#1e40af', fontWeight:700, cursor:'pointer' } },
+        tabs.map(function(t){ return h('option', { key:t.id, value:t.id }, t.label + ' ' + t.count); }))
+    : h('div', { style:{ display:'flex', gap:'4px', flex:'1 1 auto', minWidth:0,
       overflowX: window.innerWidth<=768?'auto':'visible', flexWrap: window.innerWidth<=768?'nowrap':'wrap',
       WebkitOverflowScrolling:'touch' } },
       tabs.map(function(t){
@@ -79961,7 +79970,8 @@ function LeaveManagement(){
       // ─ 좌: 직원별 연차 현황 테이블
       _isAdminView && h('div',null,
         h('div',{style:{fontWeight:700,fontSize:'15px',color:'#1e293b',marginBottom:'6px'}},'👥 직원별 연차 현황'),
-        h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}}),
+        /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「틀 고정」) — 직원 표를 내려도 이름 검색은 위에 붙는다 */
+        h('div',{className:_lvM?'pu-mfreeze':undefined}, h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}})),
         /* 폰: 양옆 테두리를 걷는다 — 줄 바탕색이 이미 줄을 가르고, 상자 안 상자가 되어 한 겹 더 좁았다(폰화면관리 2026-10-18) */
         h('div',{style:_lvM ? {borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0',overflow:'hidden'} : {border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
           /* 폰: display:table — 폰 공통 «.page table{display:block}» 이 표를 글자 폭으로 줄여 오른쪽 119px 이 비었다.
@@ -83695,7 +83705,8 @@ function PayrollLedger(props){
         h('div', { style:{ fontSize:'12.5px', color:'#2563eb', fontWeight:600 } }, '✅ 실지급액'),
         h('div', { style:{ fontSize:'14px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, totals.net.toLocaleString()+'원'))
     ),
-    h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'6px' } },
+    /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「틀 고정」) — 직원 줄을 내려도 달·도구·확정 줄은 위에 붙는다 */
+    h('div', { className: IS_M ? 'pu-mfreeze' : undefined, style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'6px' } },
       // ── 월 이동 + 잠금 (한 줄 통합) ──
       /* 폰에서는 이 겹을 «없앤다»(display:contents) — 월 이동·퇴사자 제외·마감 잠금이 바깥 줄의 낱개가 되어
          도구·확정과 함께 자리대로 꺾인다(폰화면관리 2026-10-18). 한 덩어리로 제 폭(367px)을 고집해 360px 폰에서
