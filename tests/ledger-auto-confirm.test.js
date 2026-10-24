@@ -27,7 +27,9 @@ ok('업체가 여럿이면 담지 않는다 (골라야 한다)',
 ok('단추가 그 목록을 그대로 쓴다 (따로 세지 않는다)',
    /confirmReadyList\(readyRows\)/.test(src));
 ok('저절로 확정도 같은 길을 쓴다 (갈래를 새로 만들지 않는다)',
-   /confirmReadyList\(autoRows\)/.test(src) && (src.match(/function confirmReadyList\(/g) || []).length === 1);
+   /* autoRows 그대로이거나, 그 안에서 스위치로 거른 것(_go = autoRows.filter)을 같은 함수로 — 2026-10-24 계산서 길 */
+   (/confirmReadyList\(autoRows\)/.test(src) || (/confirmReadyList\(_go\)/.test(src) && /var _go = autoRows\.filter\(/.test(src)))
+     && (src.match(/function confirmReadyList\(/g) || []).length === 1);
 
 console.log('\n[성과급 — 확정하면 성과가 함께 붙는다]');
 
