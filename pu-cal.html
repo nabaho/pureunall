@@ -16,7 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=76"></script>
+<script src="js/pu-ontology.js?v=77"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -35,7 +35,7 @@
 <script src="js/pu-cal-write.js?v=9"></script>
 <script src="js/pu-cal-map.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-cal-capture.js?v=1"></script>
+<script src="js/pu-cal-capture.js?v=2"></script>
 <script src="js/pu-cal-card.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -562,6 +562,39 @@
   .gform #contactres .cres{margin:2px 0 6px}
   .gform #contactres .crow{flex-wrap:wrap;white-space:normal;row-gap:2px}
   .gform #contactres .crow .cm{flex-basis:100%;color:var(--gsub);font-size:12px}
+  /* 📥 일정 후보함 (2026-10-24) — 받은 메일에서 AI 가 뽑은 일정 초안. 색은 팔레트 안(amber=손이 필요한 것 · blue=알림) */
+  .chip.cand{background:var(--warn-bg);border-color:#fde68a;color:var(--warn);font-weight:700}
+  .chip.cand b{background:#d97706;color:#ffffff;border-radius:999px;padding:0 6px;font-size:10px}
+  .mcand{position:relative}
+  .mcand b{position:absolute;top:2px;right:0;background:#d97706;color:#ffffff;border-radius:999px;min-width:16px;height:16px;font-size:10px;line-height:16px;text-align:center}
+  .modal.cinbox{width:min(460px,94vw);padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:88vh;border-radius:20px;background:var(--panel)}
+  body.mob .modal.cinbox{left:0;top:36px;transform:none;width:100%;max-width:none;height:calc(100% - 36px);max-height:none;border-radius:20px 20px 0 0}
+  .cinbox .cbh{display:flex;align-items:center;gap:6px;padding:14px 16px 6px}
+  .cinbox .cbt{font-size:17px;font-weight:700;color:var(--gtext)}
+  .cinbox .sp{flex:1}
+  .cinbox .cbx{border:none;background:transparent;font-size:18px;color:var(--gsub);padding:6px 10px;cursor:pointer;font-family:inherit}
+  .cinbox .cbsub{padding:0 16px 10px;font-size:12px;color:var(--gsub);line-height:1.5}
+  .cinbox .cblist{flex:1;overflow:auto;padding:0 12px 16px;background:var(--bg)}
+  .cinbox .cmail{background:var(--panel);border:1px solid var(--gline);border-radius:12px;margin:8px 0;overflow:hidden}
+  .cinbox .cfrom{display:flex;gap:8px;padding:9px 12px;border-bottom:1px solid var(--gline);font-size:12.5px}
+  .cinbox .csubj{font-weight:600;color:var(--gtext);line-height:1.4}
+  .cinbox .cwho{color:var(--gsub)}
+  .cinbox .ccand{padding:10px 12px;border-bottom:1px dashed var(--gline)}
+  .cinbox .ccand:last-child{border-bottom:none}
+  .cinbox .cwhen{font-size:13px;font-weight:700;color:var(--gtoday)}
+  .cinbox .cwhat{font-size:15px;font-weight:600;margin:2px 0 6px;color:var(--gtext)}
+  .cinbox .crow2{font-size:13px;color:var(--gsub);margin:2px 0;word-break:break-all}
+  .cinbox .cwarn,.cinbox .cdup{margin:8px 0 4px;border-radius:8px;padding:6px 9px;font-size:12.5px;line-height:1.5}
+  .cinbox .cwarn{background:var(--warn-bg);border:1px solid #fde68a;color:var(--warn)}
+  .cinbox .cdup{background:var(--acc-soft);border:1px solid #bfdbfe;color:var(--acc2)}
+  .cinbox .csame{font-size:12px;color:var(--gsub);margin-top:4px}
+  .cinbox .cbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .cinbox .cbtns button{border:1px solid var(--gline);background:var(--panel);color:var(--gtext);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .cinbox .cbtns button.p{background:var(--acc);border-color:var(--acc);color:#ffffff}
+  .cinbox .cbtns button.q{color:var(--gsub)}
+  .cinbox .cmsg{padding:14px 4px;color:var(--gsub);font-size:13px}
+  :root[data-theme="dark"] .chip.cand,:root[data-theme="dark"] .cinbox .cwarn{background:var(--panel)}
+  :root[data-theme="dark"] .cinbox .cdup{background:var(--panel);color:var(--ink)}
   .gform .mbtns{margin-top:10px}  .gform .mbtns{margin-top:10px}
   /* 넓게 — 구글의 큰 편집 화면: 위에 제목·저장, 왼쪽 세부, 오른쪽 달력·누구 */
   .modal.gform.full{left:0;top:0;transform:none;width:100vw;height:100vh;max-height:none;border-radius:0;
@@ -2753,6 +2786,7 @@ function 폰머리Html(){
         + '<button data-dreload="1">' + 선아이콘("refresh") + '새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
+    + (typeof 후보단추Html === "function" ? 후보단추Html(true) : "")
     + '<button class="mtoday" data-srch="1" title="일정 검색">' + 선아이콘("search") + '</button>'
     /* 「오늘」 — 글자로 적는다 (대표 지시 2026-10-23 「오늘 클릭해서 오늘 날짜·오늘 달로 넘어가는 버튼」).
        구글처럼 날짜 숫자(23)만 네모에 넣어 두었더니 «오늘로 가는 단추»인 줄 몰랐다. 하는 일은 그대로(data-mv=0). */
@@ -3232,6 +3266,7 @@ function chipsHtml(eumOnly){
           ? '<button class="chip" disabled>⏳ 구글 받는 중</button>'
           : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 ' + 구글수 + '</button>'
             + '<button class="chip' + (S.showGone ? " on" : "") + '" data-gone="1" title="구글에서 지워진 일정도 보관함에서 꺼내 보여 줍니다">🗄 지운 일정</button>'
+            + (typeof 후보단추Html === "function" ? 후보단추Html(false) : "")
             /* 로그인이 필요할 때만 자물쇠 — 누르면 구글 로그인(예전 「🔐 구글 로그인」 단추) */
             + (구글단추Html() ? '<button class="glock" data-glogin="1" title="구글과 이어진 일정을 지우려면 구글 로그인이 필요합니다">🔐</button>' : ''))
   );
@@ -3593,9 +3628,10 @@ function openNew(ymd){
 /* ✏️ 구글 일정을 고치는 창 — 우리 일정 창을 그대로 쓴다(store:"gcal").
    설명은 「담당자: …」 줄과 나머지(메모)로 가른다 — 서버가 같은 꼴로 다시 적는다(descOf ↔ splitDesc). */
 function 구글시분(iso){ var t = Date.parse(String(iso || "")); return t ? new Date(t + 9 * 3600000).toISOString().slice(11, 16) : ""; }
-function openGcalEdit(gid){
+function openGcalEdit(gid, 직접){
   var e = null;
-  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === gid) e = GCAL.evs[i];
+  if(직접) e = 직접;   /* 일정 후보함이 «다른 달» 일정을 열 때 */
+  else for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === gid) e = GCAL.evs[i];
   if(!e){ toast("그 일정을 못 찾았습니다 — 달력을 다시 받아 오는 중일 수 있습니다"); return; }
   var 줄들 = String(e.desc || "").split("\n"), 담당자 = "", 남음 = [];
   줄들.forEach(function(x){
@@ -3628,7 +3664,7 @@ function 구글고치기(m){
     title:String(m.title||"").trim(), place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||""), sid:String(m.sid||"") } })
     .then(function(r){
       S.busy = false; closeModal();
-      toast("✅ 구글 공용 달력을 고쳤습니다" + (r.linked ? " (이알피 일정도 함께)" : ""));
+      후보처리됨(m); toast("✅ 구글 공용 달력을 고쳤습니다" + (r.linked ? " (이알피 일정도 함께)" : ""));
       gcalLoad(true); refreshOne("my_schedules");
     })["catch"](function(e){ S.busy = false; m.err = (e && e.message) || String(e); render(); });
 }
@@ -4496,7 +4532,7 @@ function 개인에넣기(m){
     if(공용에서) PuCalWrite.remove(공용에서.store, 공용에서.id, 공용에서.prev).then(function(){ refreshOne(공용에서.store); });
     closeModal();
     var 이어짐 = 내구글에(item, prev);
-    toast((고침 ? "✅ 고쳤습니다 (🔒 나만 보기)" : "✅ 🔒 나만 보기로 넣었습니다 — 다른 사람에게는 안 보입니다")
+    후보처리됨(m); toast((고침 ? "✅ 고쳤습니다 (🔒 나만 보기)" : "✅ 🔒 나만 보기로 넣었습니다 — 다른 사람에게는 안 보입니다")
       + (이어짐 ? " · 내 구글 달력에도" : " · 구글 로그인하면 내 폰 구글 캘린더에도 뜹니다"));
     개인받기();
   });
@@ -4586,7 +4622,7 @@ function 구글에넣기(m){
     S.busy = false;
     if(m.옮김) 개인지우기조용히(m.옮김);
     closeModal();
-    toast("✅ 구글 공용 달력에 넣었습니다 — 폰 구글 캘린더에도 뜹니다");
+    후보처리됨(m); toast("✅ 구글 공용 달력에 넣었습니다 — 폰 구글 캘린더에도 뜹니다");
     gcalLoad(true);
   })["catch"](function(e){
     S.busy = false;
@@ -4594,6 +4630,279 @@ function 구글에넣기(m){
     render();
   });
 }
+
+/* ══ 일정 후보함 시작 ═════════════════════════════════════════════════════
+   대표 지시 2026-10-24 「메일·문자·카톡으로 온 일정을 달력에 넣는 자동화」(추천대로 · 목업 승인).
+   ★ 서버(functions/cal-inbox.js)가 받은 메일에서 뽑은 일정 «초안»(cal_inbox/cand)을 «대표(관리자)만» 본다.
+   ★ 저절로 달력에 넣지 않는다 — ✔ 이대로 넣기 · ✏ 고쳐서 넣기 · 일정 아님 을 사람이 누른다.
+   ★ 넣는 길은 기존 «새 일정 창»(doSave) 그대로다 — 마감 자물쇠·주소 확인·연락처 확인(#2678)이 다 붙는다.
+   ⚠ 후보 «상태 한 칸»만 쓴다(cal_inbox/cand/{id}/status = added | dismissed). 초안은 못 고친다(규칙).
+   ⚠ 달력·우리 표에는 이 구역이 직접 쓰지 않는다 — 넣는 것은 새 일정 창이 한다.
+   ⚠ 폰 알림은 없다(대표 결정). 달력을 열 때·시트를 열 때·창으로 돌아왔을 때 «받아 본다»(한 번에 쉰 건 안팎). */
+var 후보 = { list:null, state:null, loading:false, err:"", open:false, denied:false, bound:false, 같은날:{} };
+/* 같은 날 일정을 견줄 때 «겹쳐도 뜻이 없는» 낱말 — 업체·기관 이름이 겹쳐야 비슷한 일정이다 */
+var 후보불용어 = ["방문","미팅","회의","일정","안내","확인","요청","문의","참석","마감","제출","개최","강의","교육","행사","발표"];
+
+function 후보볼수있나(){ return !!(fbDb && typeof 관리자인가 === "function" && 관리자인가() && !후보.denied); }
+function 후보새것(){
+  var 한계 = Date.now() - 30 * 86400000;
+  return (후보.list || []).filter(function(c){ return c && c.status === "new" && Number(c.at) >= 한계; });
+}
+function 후보찾기(id){
+  var xs = 후보.list || [];
+  for(var i = 0; i < xs.length; i++) if(xs[i] && xs[i].id === id) return xs[i];
+  return null;
+}
+function 후보다시그리기(){
+  /* 시트를 다시 그려도 보던 자리를 지킨다(위에서 한 건 처리했다고 맨 위로 튀지 않게) */
+  var el = document.querySelector(".cinbox .cblist"), 위치 = el ? el.scrollTop : 0;
+  render();
+  el = document.querySelector(".cinbox .cblist");
+  if(el) el.scrollTop = 위치;
+}
+function 후보받기(){
+  if(!후보볼수있나() || 후보.loading) return Promise.resolve();
+  후보.loading = true;
+  return Promise.all([
+    fbDb.ref("cal_inbox/cand").orderByChild("at").limitToLast(80).once("value"),
+    fbDb.ref("cal_inbox/state").once("value")
+  ]).then(function(r){
+    var v = r[0].val() || {};
+    후보.list = Object.keys(v).map(function(k){
+      var x = v[k]; return (x && typeof x === "object") ? Object.assign({}, x, { id:k }) : null;
+    }).filter(Boolean);
+    후보.state = r[1].val() || null;
+    후보.loading = false; 후보.err = "";
+    if(!S.modal) 후보다시그리기();             /* 창에 적는 도중이면 다시 그리지 않는다 — 한글 조합이 끊긴다 */
+  })["catch"](function(e){
+    후보.loading = false;
+    /* 대표가 아니면(권한 없음) 조용히 접는다 — 단추도 안 보인다 */
+    if(e && /permission/i.test(String(e.code || "") + " " + String(e.message || ""))) 후보.denied = true;
+    else 후보.err = (e && e.message) || String(e);
+    if(!S.modal) 후보다시그리기();
+  });
+}
+function 후보바인드(){
+  if(후보.bound) return; 후보.bound = true;
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) 후보받기(); });
+}
+
+/* ── 같은 날 일정 — 구글 공용 달력에서 그 날 것만 따로 받는다(달력에 불러 둔 구간은 그 달뿐이라) ── */
+function 후보낱말(글){
+  return String(글 || "").split(/[^0-9A-Za-z가-힣]+/).filter(function(w){
+    return w.length >= 3 && !/^[0-9]+$/.test(w) && 후보불용어.indexOf(w) < 0;
+  });
+}
+function 후보비슷한(c, evs){
+  var 내 = 후보낱말(((c.ev && c.ev.title) || "") + " " + ((c.ev && c.ev.place) || ""));
+  if(!내.length) return null;
+  for(var i = 0; i < (evs || []).length; i++){
+    var 남 = 후보낱말((evs[i].text || "") + " " + (evs[i].place || ""));
+    for(var a = 0; a < 내.length; a++) if(남.indexOf(내[a]) >= 0) return evs[i];
+  }
+  return null;
+}
+function 후보같은날받기(){
+  var 날들 = {};
+  후보새것().forEach(function(c){ if(c.ev && c.ev.date && 후보.같은날[c.ev.date] === undefined) 날들[c.ev.date] = 1; });
+  Object.keys(날들).slice(0, 12).forEach(function(d){
+    후보.같은날[d] = null;                         /* 받는 중 표시 — 같은 날을 두 번 받지 않는다 */
+    var url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_CAL_ID) + "/events?key=" + GCAL_API_KEY
+      + "&timeMin=" + encodeURIComponent(d + "T00:00:00+09:00") + "&timeMax=" + encodeURIComponent(shiftDay(d, 1) + "T00:00:00+09:00")
+      + "&singleEvents=true&orderBy=startTime&maxResults=40";
+    fetch(url).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.error) throw new Error(j.error.message || "구글 달력 오류");
+      후보.같은날[d] = (j.items || []).filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); }).map(gcalToEvent)
+        .filter(function(e){ return e.date <= d && e.end >= d; });
+      if(후보.open && !S.modal) 후보다시그리기();
+    })["catch"](function(){
+      후보.같은날[d] = "x";                        /* 못 받았다 — 비교를 못 했으니 «이대로 넣기»는 막는다 */
+      if(후보.open && !S.modal) 후보다시그리기();
+    });
+  });
+}
+
+/* ── 그리기 ── */
+function 후보단추Html(작게){
+  if(!후보볼수있나()) return "";
+  /* 한 번도 안 돈 기능은 단추도 없다 — 후보도 «마지막 돈 기록»도 없을 때 */
+  if(!(후보.list && 후보.list.length) && !후보.state) return "";
+  var n = 후보새것().length;
+  return 작게
+    ? '<button class="mtoday mcand" data-cand="open" title="메일에서 찾은 일정 후보">📥' + (n ? '<b>' + n + '</b>' : '') + '</button>'
+    : '<button class="chip cand" data-cand="open" title="메일에서 AI 가 찾은 일정 후보">📥 후보' + (n ? ' <b>' + n + '</b>' : '') + '</button>';
+}
+function 후보짧은날(ymd){
+  var 글 = String(ymd || "");
+  return 글.length === 10 ? parseInt(글.slice(5, 7), 10) + "/" + parseInt(글.slice(8, 10), 10) + "(" + ["일","월","화","수","목","금","토"][new Date(글 + "T00:00:00Z").getUTCDay()] + ")" : "";
+}
+function 후보메일날글(ms){
+  var t = Number(ms); if(!(t > 0)) return "";
+  var d = new Date(t + 9 * 3600000).toISOString();
+  return parseInt(d.slice(5, 7), 10) + "/" + parseInt(d.slice(8, 10), 10) + " " + d.slice(11, 16);
+}
+function 후보마감인가(c){ return /^\[마감\]/.test(String((c.ev && c.ev.title) || "")); }
+/* 확인할 것 — 서버가 찾은 경고 + «못 찾은 칸». 마감(종일)은 시간·장소가 없는 것이 정상이다 */
+function 후보확인거리(c){
+  var ev = c.ev || {}, 마감 = 후보마감인가(c), out = [];
+  if(!String(ev.title || "").trim()) out.push("제목을 못 찾았습니다");
+  if(!ev.date) out.push("날짜를 못 찾았습니다");
+  if(!마감){
+    if(!ev.time) out.push("시간이 메일에 없습니다 — 종일로 들어갑니다");
+    if(!ev.place) out.push("장소가 메일에 없습니다");
+    if(typeof PuCalCard !== "undefined" && !PuCalCard.hasPhone(ev.contact)) out.push("담당자 전화번호가 없습니다");
+  }
+  (c.warns || []).forEach(function(w){ if(w && out.indexOf(w) < 0) out.push(w); });
+  return out;
+}
+function 후보카드Html(c){
+  var ev = c.ev || {}, 마감 = 후보마감인가(c);
+  var 언제 = ev.date ? 후보짧은날(ev.date) + (ev.time ? " " + ev.time + (ev.endTime ? " ~ " + ev.endTime : "") : " 종일") : "날짜를 못 찾음";
+  var 확인 = 후보확인거리(c);
+  var 같은 = ev.date ? 후보.같은날[ev.date] : undefined;
+  var 알수있음 = Array.isArray(같은);
+  var 비슷 = 알수있음 ? 후보비슷한(c, 같은) : null;
+  var 바로 = !!(ev.title && ev.date && !확인.length && 알수있음 && !비슷);
+  var id = esc(c.id);
+  var h = '<div class="ccand">'
+    + '<div class="cwhen">' + esc(언제) + '</div>'
+    + '<div class="cwhat">' + esc(ev.title || "(제목 없음)") + '</div>'
+    + (ev.place ? '<div class="crow2">📍 ' + esc(ev.place) + '</div>' : '')
+    + (ev.contact ? '<div class="crow2">👤 ' + esc(ev.contact) + '</div>' : '')
+    + (확인.length ? '<div class="cwarn">⚠ 확인하세요 — ' + 확인.map(function(x){ return esc(x); }).join(" · ") + '</div>' : '');
+  if(비슷) h += '<div class="cdup">📅 달력에 비슷한 일정이 이미 있습니다 — «' + esc(비슷.text) + '». 새로 넣지 말고 고칠까요?</div>';
+  else if(ev.date && 같은 === "x") h += '<div class="csame">같은 날 일정을 못 불러와 비교하지 못했습니다 — 고쳐서 넣어 주세요</div>';
+  if(알수있음 && 같은.length) h += '<div class="csame">📅 같은 날: ' + 같은.slice(0, 3).map(function(e){ return esc(e.text); }).join(" · ")
+    + (같은.length > 3 ? ' 외 ' + (같은.length - 3) + '건' : '') + '</div>';
+  h += '<div class="cbtns">'
+    + (비슷 ? '<button class="p" data-cand="dupedit" data-ci="' + id + '" data-gid="' + esc(비슷.id) + '">기존 일정 고치기</button>'
+             + '<button data-cand="edit" data-ci="' + id + '">따로 넣기</button>'
+        : 바로 ? '<button class="p" data-cand="quick" data-ci="' + id + '">✔ 이대로 넣기</button>'
+             + '<button data-cand="edit" data-ci="' + id + '">✏ 고쳐서 넣기</button>'
+        : '<button class="p" data-cand="edit" data-ci="' + id + '">✏ 고쳐서 넣기</button>')
+    + '<button class="q" data-cand="skip" data-ci="' + id + '">일정 아님</button></div></div>';
+  return h;
+}
+function 후보묶기(){
+  var 묶 = {}, 순서 = [];
+  후보새것().forEach(function(c){
+    var m = c.mail || {}, k = (m.slug || "") + ":" + (m.u || c.id);
+    if(!묶[k]){ 묶[k] = { mail:m, at:0, items:[] }; 순서.push(k); }
+    묶[k].items.push(c); 묶[k].at = Math.max(묶[k].at, Number(c.at) || 0);
+  });
+  순서.forEach(function(k){ 묶[k].items.sort(function(a, b){ return String((a.ev || {}).date || "9").localeCompare(String((b.ev || {}).date || "9")); }); });
+  return 순서.map(function(k){ return 묶[k]; }).sort(function(a, b){ return b.at - a.at; });
+}
+function 후보창Html(){
+  if(!후보.open) return "";
+  var 묶음 = 후보묶기(), n = 후보새것().length, st = 후보.state || {};
+  var 지난 = (후보.list || []).filter(function(c){ return c && c.status && c.status !== "new"; });
+  var 안내 = "받은 메일에서 AI 가 찾은 일정입니다 · 저절로 넣지 않습니다"
+    + (st.at ? " · 마지막 확인 " + 후보메일날글(st.at) : "");
+  var 멈춤 = st.paused === "budget" ? "⏸ 이번 달 AI 한도를 넘어 후보 뽑기를 멈췄습니다"
+    : st.paused === "day" ? "⏸ 오늘 쓸 몫을 다 써서 멈췄습니다 — 내일 다시 뽑습니다" : "";
+  return '<div class="veil" data-cand="close"></div><div class="modal cinbox">'
+    + '<div class="cbh"><span class="cbt">📥 일정 후보 ' + n + '건</span><span class="sp"></span>'
+    +   '<button class="cbx" data-cand="reload" title="새로 받기">↻</button><button class="cbx" data-cand="close" title="닫기">✕</button></div>'
+    + '<div class="cbsub">' + esc(안내) + (멈춤 ? '<div class="cwarn">' + esc(멈춤) + '</div>' : '')
+    +   (후보.err ? '<div class="cwarn">후보를 못 받았습니다 — ' + esc(후보.err) + '</div>' : '') + '</div>'
+    + '<div class="cblist">'
+    + (후보.loading && !후보.list ? '<div class="cmsg">불러오는 중…</div>'
+        : !묶음.length ? '<div class="cmsg">새 후보가 없습니다. 일정이 있는 메일이 오면 여기에 쌓입니다.</div>'
+        : 묶음.map(function(g){
+            var m = g.mail || {};
+            return '<div class="cmail"><div class="cfrom"><span>✉</span><div><div class="csubj">' + esc(m.s || "(제목 없음)") + '</div>'
+              + '<div class="cwho">' + esc(m.f || m.e || "") + (m.d ? ' · ' + esc(후보메일날글(m.d)) : '') + '</div></div></div>'
+              + g.items.map(후보카드Html).join("") + '</div>';
+          }).join(""))
+    + (지난.length ? '<div class="cmsg">지난 후보 ' + 지난.length + '건(넣음·일정 아님) — 30일이 지나면 지웁니다</div>' : '')
+    + '</div></div>';
+}
+
+/* ── 누르면 ── */
+function 후보누름(t){
+  var 뜻 = t.getAttribute("data-cand"), id = t.getAttribute("data-ci");
+  if(뜻 === "open"){
+    후보.open = true; render();
+    후보받기().then(후보같은날받기);
+    후보같은날받기();
+  }
+  else if(뜻 === "close"){ 후보.open = false; render(); }
+  else if(뜻 === "reload"){ 후보.같은날 = {}; 후보받기().then(후보같은날받기); }
+  else if(뜻 === "skip") 후보상태(id, "dismissed");
+  else if(뜻 === "quick") 후보바로넣기(id);
+  else if(뜻 === "edit") 후보열기(id);
+  else if(뜻 === "dupedit") 후보고치기(id, t.getAttribute("data-gid"));
+}
+/* 상태 한 칸만 쓴다 — 먼저 화면에 반영하고(눌렀는데 그대로면 또 누른다), 못 적으면 되돌린다 */
+function 후보상태(id, status){
+  var c = 후보찾기(id);
+  if(!c || !fbDb) return Promise.resolve();
+  var 옛 = c.status; c.status = status;
+  if(후보.open && !S.modal) 후보다시그리기(); else render();
+  return fbDb.ref("cal_inbox/cand/" + id + "/status").set(status)["catch"](function(e){
+    c.status = 옛;
+    if(후보.open && !S.modal) 후보다시그리기();
+    toast("⚠ 후보 상태를 못 적었습니다 — " + ((e && e.message) || ""));
+  });
+}
+/* 새 일정 창 «또는» 고치기 창에서 저장이 «성공한 뒤» 불린다 — 그 후보를 «넣음»으로 */
+function 후보처리됨(m){ if(m && m.candId) 후보상태(m.candId, "added"); }
+
+/* 후보 → 새 일정 창의 칸(PuCalCapture.applyDraft 와 같은 모양) */
+function 후보초안(c){
+  var ev = c.ev || {}, 출처 = c.mail && c.mail.s ? "(출처 메일: " + String(c.mail.s).slice(0, 60) + ")" : "";
+  return { title:ev.title || "", date:ev.date || "", endDate:ev.endDate || "", time:ev.time || "", endTime:ev.endTime || "",
+    place:ev.place || "", contact:ev.contact || "", note:[ev.note || "", 출처].filter(Boolean).join("\n"), warns:(c.warns || []).slice() };
+}
+function 후보열기(id){
+  var c = 후보찾기(id); if(!c || typeof PuCalCapture === "undefined") return;
+  후보.open = false;
+  openNew((c.ev && c.ev.date) || todayYMD());
+  var m = S.modal;
+  PuCalCapture.applyDraft(m, 후보초안(c));
+  m.candId = c.id;
+  if(typeof 명함받기 === "function") 명함받기();          /* 담당자 칸의 기업정보함 찾기가 바로 되게 */
+  render();
+  toast("✏ 메일에서 뽑은 내용을 채웠습니다 — 확인하고 «저장»을 눌러 주세요");
+}
+/* ✔ 이대로 넣기 — 확인할 것이 «하나도 없고» 같은 날 비슷한 일정도 없을 때만 보이는 단추.
+   새 일정 창을 채운 뒤 «저장 길(doSave)을 그대로» 탄다 — 마감 자물쇠·확인 물음이 다 붙는다.
+   ⚠ 먼저 그려 두고 저장한다(창의 칸 값이 modalRead 로 되읽히므로 화면과 값이 같아야 한다). 실패하면 창이 그대로 남는다. */
+function 후보바로넣기(id){
+  var c = 후보찾기(id); if(!c || typeof PuCalCapture === "undefined") return;
+  후보.open = false;
+  openNew((c.ev && c.ev.date) || todayYMD());
+  var m = S.modal;
+  PuCalCapture.applyDraft(m, 후보초안(c));
+  m.candId = c.id;
+  render();
+  doSave();
+}
+/* 기존 일정 고치기 — 달력에 이미 있는 비슷한 일정의 고치기 창에 메일 내용을 «덮어 두고» 사람이 확인해 저장한다 */
+function 후보덮기(m, ev){
+  if(ev.title) m.title = ev.title;
+  if(ev.date){ m.date = ev.date; m.endDate = (ev.endDate && ev.endDate > ev.date) ? ev.endDate : ev.date; }
+  if(ev.time){ m.timed = true; m.time = ev.time; m.endTime = ev.endTime || ""; }
+  if(ev.place) m.place = ev.place;
+  if(ev.contact) m.contact = ev.contact;
+  if(ev.note && String(m.note || "").indexOf(ev.note) < 0) m.note = (m.note ? m.note + "\n" : "") + ev.note;
+}
+function 후보고치기(id, gid){
+  var c = 후보찾기(id); if(!c || !c.ev) return;
+  var 옛 = null, 목록 = 후보.같은날[c.ev.date];
+  if(Array.isArray(목록)) for(var i = 0; i < 목록.length; i++) if(목록[i].id === gid) 옛 = 목록[i];
+  if(!옛){ toast("그 일정을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
+  후보.open = false;
+  openGcalEdit(gid, 옛);
+  var m = S.modal; if(!m) return;
+  후보덮기(m, c.ev);
+  m.candId = c.id;
+  if(typeof 명함받기 === "function") 명함받기();
+  render();
+  toast("✏ 기존 일정에 메일 내용을 덮어 두었습니다 — 확인하고 «저장»을 눌러 주세요");
+}
+/* ══ 일정 후보함 끝 ═══════════════════════════════════════════════════════ */
 
 /* ══ 캡처·말로 채우기 시작 ═══════════════════════════════════════════════
    대표 지시 2026-10-15 「폰에서 화면 캡처를 넣으면 장소·주소·시간을 자동으로 넣게」
@@ -4883,7 +5192,7 @@ function doSave(){
     var 고침 = m.mode==="edit";
     if(m.옮김) 개인지우기조용히(m.옮김);
     closeModal();
-    toast(고침 ? "✅ 고쳤습니다"
+    후보처리됨(m); toast(고침 ? "✅ 고쳤습니다"
       : (일정 ? "✅ 넣었습니다 — 구글 공용 달력으로 옮기는 중(몇 초)" : "✅ 넣었습니다"));
     refreshOne(store);
     /* 👥 서버가 구글 공용 달력에 대신 넣는다(functions/gcal-proxy.js) — 조금 뒤 구글을 다시 받아 맞춘다 */
@@ -5154,6 +5463,7 @@ function render(){
   html += detailHtml();
   if(typeof PuCalMap !== "undefined"){ html += tripHtml(); html += routeHtml(); }   /* 상세 창 «위»에. 지도 창은 판 «밖»(지도그리기) */
   html += noteHtml();
+  html += 후보창Html();
   html += 구글연결창Html();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   var 옛격자 = document.querySelector('.tgscroll'), 옛격자맨 = 옛격자 ? 옛격자.scrollTop : -1;
@@ -5291,7 +5601,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-cand]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -5410,6 +5720,7 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }
   if(t.hasAttribute('data-dmore')){ S.drawer = false; S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
+  if(t.hasAttribute('data-cand')){ 후보누름(t); return; }
   if(t.hasAttribute('data-cpick')){ 연락처고르기(t.getAttribute('data-cpick')); return; }
   if(t.hasAttribute('data-addr')){ 주소눌림(t.getAttribute('data-addr'), t.getAttribute('data-ai')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
@@ -5700,6 +6011,7 @@ function start(user){
     try{ S.showGone = localStorage.getItem("pu_cal_gone") === "1"; }catch(_){}
     개인받기();
     모집받기();
+    후보바인드(); 후보받기();      /* 📥 일정 후보함(대표만) — 메일에서 뽑은 후보를 받아 둔다 */
     /* 정부사업신청에서 고치고 돌아오면 다시 받는다(대표일 때만 — 모집받기 안에서 거른다) */
     if(!RECRUIT.bound){ RECRUIT.bound = true;
       document.addEventListener("visibilitychange", function(){ if(!document.hidden) 모집받기(); }); }
