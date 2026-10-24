@@ -63,3 +63,25 @@ test('화면 — 금액이라 재무 권한자만 «성과 이력» 단추를 �
   assert.match(d, /h\(StaffPerfHistoryModal,/);
   assert.match(fnSrc('StaffPerfHistoryModal'), /erpPerfHistory\(/);
 });
+
+test('급여 지급 — 급여 기록의 성과금을 달마다 더하고, 기록 없는 달은 «없음»으로 둔다(0 아님)', () => {
+  const ctx2 = { Math, Number, String, Date, Array, Object, JSON };
+  vm.createContext(ctx2);
+  vm.runInContext(fnSrc('erpPerfPaidByMonth') + '\nthis.P = erpPerfPaidByMonth;', ctx2);
+  const pay = [
+    { empSid: 'A', ym: '2026-01', bonus: 100 },
+    { empSid: 'A', ym: '2026-02', bonus: 0 },
+    { empSid: 'A', ym: '2026-03', bonus: 50, _deleted: true },
+    { empSid: 'B', ym: '2026-01', bonus: 999 },
+    { empSid: 'A', ym: '2026-04' }
+  ];
+  const p = ctx2.P('A', pay);
+  assert.equal(p['2026-01'], 100);
+  assert.equal(p['2026-02'], 0, '지급 0 도 «기록 있음»');
+  assert.equal('2026-03' in p, false, '지운 기록은 안 센다');
+  assert.equal(p['2026-04'], 0, 'bonus 칸이 비어도 기록은 있는 달');
+  assert.equal(Object.keys(ctx2.P('C', pay)).length, 0, '남의 급여는 안 센다');
+  const m = fnSrc('StaffPerfHistoryModal');
+  assert.match(m, /erpPerfPaidByMonth\(u\.sid/);
+  assert.match(m, /'급여 지급'/);
+});

@@ -73307,12 +73307,25 @@ function erpPerfHistory(sid, incomes){
   return out;
 }
 
+/* 급여 기록에 «실제로 지급한» 성과금 — 달마다 { 'YYYY-MM': 금액 }.
+   ★ 입금 기록이 덜 찬 해(2026 은 입금 78건이 재무에 없다)는 입금 기준 성과가 실제보다 적게 나온다 — 두 숫자를 나란히 보인다.
+   급여 기록이 없는 달은 키를 만들지 않는다(0 과 «기록 없음» 은 다르다). 지운 기록(_deleted)은 뺀다. */
+function erpPerfPaidByMonth(sid, payrolls){
+  var out = {};
+  (payrolls || []).forEach(function(r){
+    if(!r || r._deleted || r.empSid !== sid || !/^[0-9]{4}-[0-9]{2}$/.test(String(r.ym || ''))) return;
+    out[r.ym] = (out[r.ym] || 0) + (Number(r.bonus) || 0);
+  });
+  return out;
+}
+
 function StaffPerfHistoryModal(props){
   useEscClose(props.onClose);
   var u = props.user || {};
   var hist = erpPerfHistory(u.sid, dbGet('finance_income', []) || []);
   var years = Object.keys(hist).sort();
   var thisY = String(todayYMD()).slice(0, 4);
+  var paid = erpPerfPaidByMonth(u.sid, dbGet('payroll_monthly', []) || []);
   var yS = useState(years.indexOf(thisY) >= 0 ? thisY : (years[years.length - 1] || thisY));
   var selY = yS[0], setSelY = yS[1];
   var Y = hist[selY] || { n:0, sum:0, g:{}, m:{} };
@@ -73323,7 +73336,10 @@ function StaffPerfHistoryModal(props){
   var navBtn = { padding:'2px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', background:'#ffffff', color:'#64748b', cursor:'pointer', fontSize:'14px' };
   var th = { padding:'7px 9px', borderBottom:'1px solid #e2e8f0', color:'#64748b', fontSize:'13px', textAlign:'right', whiteSpace:'nowrap' };
   var td = { padding:'7px 9px', borderBottom:'1px solid #f8fafc', textAlign:'right', whiteSpace:'nowrap', fontSize:'14px' };
-  var months = Object.keys(Y.m).sort();
+  var paidMonths = Object.keys(paid).filter(function(ym){ return ym.slice(0, 4) === selY; }).map(function(ym){ return ym.slice(5, 7); });
+  var months = Object.keys(Y.m).concat(paidMonths.filter(function(mm){ return !Y.m[mm]; })).sort();
+  var paidSum = 0, hasPaid = false;
+  months.forEach(function(mm){ if(paid[selY + '-' + mm] != null){ hasPaid = true; paidSum += paid[selY + '-' + mm]; } });
   return h('div', { className:'modal-bg', onClick:props.onClose },
     h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ width:'920px', maxWidth:'96vw', maxHeight:'90vh', display:'flex', flexDirection:'column' } },
       h('div', { className:'modal-h' },
@@ -73353,21 +73369,25 @@ function StaffPerfHistoryModal(props){
                 h('th', { style:Object.assign({}, th, { textAlign:'left' }) }, '달'),
                 h('th', { style:th }, '건수'),
                 used.map(function(G){ return h('th', { key:G.k, style:th }, G.label); }),
-                h('th', { style:th }, '성과급'))),
+                h('th', { style:th, title:'입금 기록으로 셈한 성과급' }, '입금 기준'),
+                h('th', { style:th, title:'급여 기록에 실제로 적힌 성과금' }, '급여 지급'))),
               h('tbody', null,
                 months.map(function(mm){
-                  var M = Y.m[mm];
+                  var M = Y.m[mm] || { n:0, sum:0, g:{} };
+                  var pd = paid[selY + '-' + mm];
                   return h('tr', { key:mm },
                     h('td', { style:Object.assign({}, td, { textAlign:'left' }) }, parseInt(mm, 10) + '월'),
-                    h('td', { style:td }, M.n),
+                    h('td', { style:td }, M.n || ''),
                     used.map(function(G){ return h('td', { key:G.k, style:td }, M.g[G.k] ? won(M.g[G.k]) : ''); }),
-                    h('td', { style:Object.assign({}, td, { fontWeight:700 }) }, won(M.sum)));
+                    h('td', { style:Object.assign({}, td, { fontWeight:700 }) }, M.n ? won(M.sum) : ''),
+                    h('td', { style:Object.assign({}, td, { fontWeight:700 }) }, pd == null ? '' : won(pd)));
                 }),
                 h('tr', null,
                   h('td', { style:Object.assign({}, td, { textAlign:'left', fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, '합계'),
                   h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, Y.n),
                   used.map(function(G){ return h('td', { key:G.k, style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, won(Y.g[G.k])); }),
-                  h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, won(Y.sum)))))),
+                  h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, won(Y.sum)),
+                  h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, hasPaid ? won(paidSum) : ''))))),
           h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'8px', marginTop:'12px' } },
             years.map(function(y){
               var on = y === selY;
@@ -73378,6 +73398,7 @@ function StaffPerfHistoryModal(props){
             })),
           h('div', { style:{ fontSize:'13px', color:'#64748b', lineHeight:1.7, marginTop:'10px' } },
             '· 2025년까지는 엑셀 인센티브 시트에서 가져온 «지난 실적», 2026년부터는 입금확정에서 저절로 셉니다.', h('br'),
+            '· «급여 지급»은 급여 기록에 실제로 적힌 성과금입니다. 입금 기록이 덜 찬 해(2026년)는 «입금 기준»이 실제보다 적을 수 있어 둘을 나란히 둡니다.', h('br'),
             '· 업무 종류는 입금 항목 글자로 가른 것입니다(옛 입금은 사건·컨설팅 카드가 없음). 현금으로 따로 준 몫도 실적에 들어갑니다.'))),
       h('div', { className:'modal-f' },
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))));
