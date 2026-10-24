@@ -96,3 +96,15 @@ test('ⓔ 빠진 앱도 APPS 에는 남는다 — 그 앱 안에서 제 이름�
   ['hr', 'fin', 'career', 'home', 'news', 'govbid'].forEach((x) => assert.ok(all.includes(x), x + ' 가 APPS 에서 지워졌다'));
   B.APPS.forEach((a) => assert.ok(a.row, a.key + ' 에 row 가 없다'));
 });
+
+test('ⓕ 「지금 안 씀」(off) 앱은 앱 막대 목록에도 없다 — 관리자 포함 (대표 지시 2026-10-24)', () => {
+  /* 포털 타일의 off 와 짝 — 타일만 감추면 앱 막대 «프로그램 이동»으로 그대로 들어간다. */
+  ['admin', 'staff'].forEach((role) => {
+    const { B } = load(role);
+    const k = keys(B);
+    ['rules', 'payroll', 'paydata'].forEach((x) => assert.ok(!k.includes(x), role + ' 앱 막대에 ' + x + ' 가 남았다'));
+    ['erp', 'cards', 'photos', 'docs'].forEach((x) => assert.ok(k.includes(x), x + ' 까지 사라졌다'));
+  });
+  const { B } = load('admin');
+  ['rules', 'payroll', 'paydata'].forEach((x) => assert.ok(B.APPS.find((a) => a.key === x), x + ' 를 APPS 에서 지웠다 — 그 앱 안에서 whoAmI 가 길을 잃는다'));
+});

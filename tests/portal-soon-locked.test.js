@@ -38,7 +38,9 @@ function 타일그리기() {
 }
 
 /* 진짜 코드를 돌려 «그려 본다» — 이 저장소 교훈: 글자만 보면 안 잡힌다 */
-function 그려보기(role) {
+/* offLifted — 「지금 안 씀」(off)을 걷은 모습으로 그린다. 준비중 세 앱은 2026-10-24 부터 off 라
+   실제로는 안 그려진다. 그래도 «off 만 걷으면 준비중 타일로 돌아온다»가 규칙이라 그 모습을 본다. */
+function 그려보기(role, offLifted) {
   const 그린것 = [], 외침 = [];
   const el = () => {
     const o = { dataset: {}, style: {}, _attrs: {}, _clicks: [],
@@ -66,6 +68,7 @@ function 그려보기(role) {
   const B = SRC.indexOf('function appIsSoon(');
   const Bend = SRC.indexOf('\n', B);
   vm.runInContext(SRC.slice(A, SRC.indexOf('\n  ];', A) + 5), ctx);
+  if (offLifted) vm.runInContext('APPS.forEach(function(a){ delete a.off; });', ctx);
   vm.runInContext(SRC.slice(B, Bend), ctx);
   vm.runInContext('var _isAdm = (role === "admin") || sgIsAdmin();\n' + 타일그리기(), ctx);
   const m = {};
@@ -91,7 +94,7 @@ test('①★★ 아직 준비중인 앱에 표가 붙어 있다', () => {
 });
 
 test('②★★ 대표가 아니면 흐리고·「준비중」이라 적히고·못 눌린다', () => {
-  const { 타일 } = 그려보기('member');
+  const { 타일 } = 그려보기('member', true);
   준비중앱.forEach(k => {
     const t = 타일[k];
     assert.ok(t, '★★ ' + k + ' 타일이 아예 안 그려졌다 — 「보이되 못 누르게」이지 감추는 게 아니다');
@@ -107,7 +110,7 @@ test('②★★ 대표가 아니면 흐리고·「준비중」이라 적히고·
    관리자도 준비중인게 확인되게 해달라」. 예전엔 «대표 화면엔 준비중이 안 붙는다»를 못 박았다.
    이제는 «딱지는 붙되 그대로 열린다» 가 규칙이다. */
 test('③★★ 대표에게는 «딱지만» — 흐리거나 막지 않는다 (대표 지시 2026-10-09)', () => {
-  const { 타일, 외침 } = 그려보기('admin');
+  const { 타일, 외침 } = 그려보기('admin', true);
   준비중앱.forEach(k => {
     const t = 타일[k];
     assert.ok(t, '★★ ' + k + ' 타일이 대표 화면에서 사라졌다');
@@ -170,7 +173,7 @@ test('⑧ 준비중만 있는 줄은 밀지 않는다 · 순서를 적용한 «�
 });
 
 test('④★★ 눌렀을 때 «까닭을 말한다» — 아무 일도 안 나면 고장인 줄 안다', () => {
-  const { 타일, 외침 } = 그려보기('member');
+  const { 타일, 외침 } = 그려보기('member', true);
   /* ⚠★★ 「여는 처리가 아예 안 붙어 있는가」를 본다 — 막는 처리가 «있는가»가 아니다.
      처음에는 stopPropagation() 으로 막았다. 그것은 부모로 올라가는 것만 막을 뿐
      같은 칸에 붙은 다른 처리는 그대로 돈다 — PC 에서 그냥 열렸다.
@@ -213,4 +216,23 @@ test('⑦ 잣대가 «한 곳»이다 — 두 곳에 두면 한쪽만 고쳐진�
   assert.equal(센것, 1, '★★ 잣대 함수가 ' + 센것 + '개다');
   assert.ok((bare.match(/\.soon\b/g) || []).length <= 1,
     '★★ app.soon 을 직접 보는 자리가 또 있다 — 잣대를 거치지 않으면 규칙이 갈라진다');
+});
+
+/* ⑨ 「지금 안 씀」(off) — 대표 지시 2026-10-24 「이 3개 현재 필요없다 모두 화면에서 안 나오게 없애고 정리」
+   준비중(흐리게 보이되 못 누름)과 다르다 — «대표 화면에서도» 타일이 아예 없다.
+   앱 파일·안쪽 준비중 문은 남겨 두어, off 만 걷으면 준비중 타일로 돌아온다(②③④ 가 그 모습을 본다). */
+const 안씀앱 = ['rules', 'payroll', 'paydata'];
+test('⑨★★ 안 쓰는 앱은 누구 화면에도 타일이 없다 — 대표 포함 (대표 지시 2026-10-24)', () => {
+  ['admin', 'member'].forEach(role => {
+    const { 타일 } = 그려보기(role);
+    안씀앱.forEach(k => assert.equal(타일[k], undefined, '★★ ' + role + ' 화면에 ' + k + ' 타일이 남았다'));
+    ['erp', 'cards', 'photos', 'docs', 'fund'].forEach(k => assert.ok(타일[k], '★★ ' + k + ' 타일까지 사라졌다'));
+  });
+  const A = SRC.indexOf('var APPS = [');
+  const 목록 = SRC.slice(A, SRC.indexOf('\n  ];', A));
+  안씀앱.forEach(k => {
+    const 줄 = 목록.split('\n').find(l => l.indexOf("key:'" + k + "'") >= 0);
+    assert.ok(줄, '★ ' + k + ' 를 목록에서 지웠다 — off 로 감춰야 다시 쓸 때 한 곳만 고친다');
+    assert.match(줄, /off:\s*true/);
+  });
 });
