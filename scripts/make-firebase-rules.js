@@ -1150,7 +1150,9 @@ rules.appBuild = { '.read': true, '.write': ADMIN };
    (대표 지시 2026-08-27 「전 직원에게 다 열기」) */
 const STAFF = `auth != null && root.child('uid_roles').child(auth.uid).child('sid').exists()`
             + ` && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'`;
-rules.mailbox  = { '.read': STAFF, '.write': false };
+rules.mailbox  = { '.read': STAFF, '.write': false,
+  /* 📄 받는 탭(remember-intake)이 «새로 온 받은메일»만 날짜(d)로 추려 읽는다 (2026-10-24) — 읽는 사람·쓰기는 그대로 */
+  msgs: { $slug: { '.indexOn': ['d'] } } };
 
 /* ══ 「누가 봤나」 — 혼자 맡은 건 (대표 지시 2026-08-29) ═══════════════════
    "주담당 부담당만 본 기록 남게 하면 된다. 나머지는 기록은 권형하만 확인이 된다."

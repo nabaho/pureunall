@@ -1622,7 +1622,14 @@
     },
     "mailbox": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('sid').exists() && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-      ".write": false
+      ".write": false,
+      "msgs": {
+        "$slug": {
+          ".indexOn": [
+            "d"
+          ]
+        }
+      }
     },
     "pu_mailseen": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
