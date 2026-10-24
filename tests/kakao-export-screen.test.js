@@ -128,6 +128,14 @@ test('탭·화면을 떠나면 읽은 내용을 버린다', () => {
   assert.match(W, /kkNav\(\);[^\n]*[\s\S]{0,200}?kxReset\(\)|if\(S\.view!=='kakao'\)\s*kxReset\(\)/);
 });
 
+/* ── 알림 목록의 쌍둥이 ─────────────────────────────────────────────── */
+test('알림 탭: 같은 글이 알림·내보내기 양쪽에 있으면 알림 쪽을 숨기고(목록과 옵시디언 일지 모두), 원본 배열은 건드리지 않는다', () => {
+  assert.match(wfn('kkItems'), /dropAlertTwins\(KK\.items\)/);
+  assert.match(wfn('kkRows'), /groupBursts\(kkItems\(\)\)/, '쌍둥이를 거르기 전의 KK.items 를 묶는다');
+  assert.match(wfn('kkObsRun'), /groupBursts\(kkItems\(\)\)/, '옵시디언 일지에는 쌍둥이가 그대로 들어간다');
+  assert.ok(!/groupBursts\(KK\.items\)/.test(W), 'KK.items 를 바로 묶는 곳이 남았다');
+});
+
 /* ── 첨부 파일 복사 ─────────────────────────────────────────────────── */
 test('파일: 복사만 한다 — 지우거나 옮기는 호출이 없고, 쓰기 전에 같은 이름이 있는지 먼저 본다', () => {
   assert.ok(!/removeEntry|\.remove\(|\.move\(/.test(REGION), '원본을 지우거나 옮기는 호출이 있다');

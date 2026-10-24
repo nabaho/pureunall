@@ -3211,10 +3211,13 @@ function kkKindChip(g){
   if(g.kind==='media') return '<span class="kkc">📷 사진·파일</span>';
   return '<span class="kkc">직원 글</span>';
 }
+/* 같은 글이 폰 알림과 대화 내보내기 양쪽에 있으면(보낸 사람·글이 같고 90초 안) 알림 쪽을 숨긴다 — 내보내기가
+   실제로 말한 사람과 시각을 갖는다(2026-10-24). 화면이 «보는 목록»만 거른다 — 서버 자료는 그대로. */
+function kkItems(){ var X=window.PuKakaoExport; return (X&&KK.items)?X.dropAlertTwins(KK.items):(KK.items||[]); }
 function kkRows(){
   var K=window.PuKakaoWork; if(!K||!KK.items) return [];
   var marks=kkMarks();
-  return K.groupBursts(KK.items).reverse().map(function(g){
+  return K.groupBursts(kkItems()).reverse().map(function(g){
     g.key=g.ids[0]; g.mark=marks[g.key]||'';
     g.summary=g.texts.join(' / ').replace(/\s+/g,' ').trim()||(g.media?'📷 '+g.media+'장':'');
     g.due=K.findDue(g.texts.join('\n'),Date.now());
@@ -3364,7 +3367,7 @@ function kkObsRun(){
   if(!obsSupported()){ toast('크롬이나 엣지에서 열어 주세요','err'); return; }
   if(!KK.items||!KK.items.length){ toast('쓸 알림이 없습니다'); return; }
   var K=window.PuKakaoWork, marks=kkMarks(), byDay={};
-  K.groupBursts(KK.items).forEach(function(g){ var d=ymd(new Date(g.firstAt)); (byDay[d]=byDay[d]||[]).push(g); });
+  K.groupBursts(kkItems()).forEach(function(g){ var d=ymd(new Date(g.firstAt)); (byDay[d]=byDay[d]||[]).push(g); });
   (_obsRoot?Promise.resolve(_obsRoot):obsGet()).then(function(h){
     if(!h) return obsPick();
     return obsOk(h,true).then(function(ok){ return ok?h:obsPick(); });
