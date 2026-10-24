@@ -6394,8 +6394,9 @@ function endConsulting(coId,typeId){
     cos[idx].endedTypes[typeId]=todayStr();
     setCos(cos);renderSummaryBar();renderDash();renderCal();
     if(q('#endedList'))renderEndedView();
-    toast('종료 처리됨');
-    releaseCompanyEditLock();
+    releaseCompanyEditLock();          // 이알피에 묻는 동안 사업장 잠금을 쥐고 있지 않는다
+    /* 일정관리 종료는 이미 끝났다 — 이알피는 «묻고» 그때만 쓴다 */
+    if(!erpAskCloseUp(coId,typeId))toast('종료 처리됨');
   });
 }
 
@@ -11219,6 +11220,85 @@ function erpSyncClosedDown(){
   try{ renderDash();renderCal(); }catch(e){}
   return touched.length;
 }
+/* ══ 일정관리에서 종료하면 푸른이알피에도 종료 (대표 지시 2026-10-24 「추천대로」) ══
+   ★ «묻고» 쓴다 — 자동으로 쓰지 않는다. 이알피의 종료는 성과 분배·종료관리에 걸린다.
+   ★ 이알피의 «종료 권한»을 그대로 따른다(이알피 canCloseDirect) — 관리자이거나 그 건의 주담당일 때만.
+     아니면 쓰지 않고 «이알피에서 담당자가 종료해야 한다»고 말한다(막다른 길로 두지 않는다).
+   ★ 이알피 「종료」 단추와 «같은 칸»을 쓴다: status:'closed' · closedAt(YYYY-MM-DD) · endDate · closedReason ·
+     permanentArchived. closedDate 는 적지 않는다(erpIsClosed 주석).
+   ★ 「재개」는 이알피를 되살리지 않는다 — 더하기만 한다(erpSyncClosedDown 과 같은 원칙).
+   ★ 옛 사본으로 읽은 판이면 쓰지 않는다(erpSyncSubsUp 과 같다). 칸 단위로만 쓴다(통째로 보내면 남이 고친 칸이 되돌아간다). */
+/* 이 사업장·이 사업에 이어진, 아직 안 끝난 이알피 건 */
+function erpOpenFor(coId,typeId){
+  if(!ERP.loaded||!coId||!typeId)return [];
+  const map=getErpTypeMap(), cos=getCos(), out=[];
+  ERP.consultings.forEach(c=>{
+    if(!c||!c.id||erpIsClosed(c))return;
+    const code=erpConsCode(c);
+    if(!code||map[code]!==typeId)return;
+    const hit=findCoForErp(cos,c.id,String(c.companyName||'').trim(),typeId);
+    if(hit.co&&hit.co.id===coId)out.push(c);
+  });
+  return out;
+}
+/* 이알피의 종료 권한 — 관리자 또는 그 건의 주담당 */
+function erpCanCloseUp(c){
+  if(isAdmin())return true;
+  const me=getStaff().find(a=>a&&a.id===myId());
+  return !!(me&&me.erpSid&&c&&c.managerMain===me.erpSid);
+}
+function erpLocalPatch(id,fields){
+  try{
+    const raw=JSON.parse(localStorage.getItem(ERP_LS_PREFIX+'consultings')||'null');
+    if(!Array.isArray(raw))return;
+    const i=raw.findIndex(x=>x&&x.id===id);
+    if(i<0)return;
+    raw[i]={...raw[i],...fields};
+    localStorage.setItem(ERP_LS_PREFIX+'consultings',JSON.stringify(raw));
+  }catch(e){ console.warn('[종료 올리기] 이알피 사본',e); }
+}
+/* 이알피 한 건을 종료로 쓴다 — 이알피 종료 단추와 같은 칸, 칸 단위로 */
+async function erpWriteClosed(c){
+  const me=getStaff().find(a=>a&&a.id===myId());
+  const by=(((me&&me.name)||'')+' · 정부컨설팅').trim();
+  const ts=Date.now(), ymd=todayStr();
+  const f={status:'closed',closedAt:ymd,endDate:String(c.endDate||'').slice(0,10)||ymd,
+    closedReason:c.closedReason||'정상 종료',closedReasonDetail:'정부컨설팅 일정관리에서 종료',
+    permanentArchived:true,permanentArchivedAt:ymd,updatedAt:ts,updatedBy:by};
+  if(!FB_READY||!_fbDB)return false;                    // 클라우드가 없으면 올린 것이 아니다 — 사본만 고치지 않는다
+  if(!await erpConsObjForm(c.id))return false;          // 저장 형식을 확인 못 하면 쓰지 않는다
+  const up={};
+  Object.keys(f).forEach(k=>{ up['data/consultings/v/'+c.id+'/'+k]=f[k]; });
+  up['data/consultings/u']=ts;
+  try{ await _fbDB.ref().update(up); }
+  catch(e){ console.warn('[종료 올리기] 클라우드',e); return false; }
+  erpLocalPatch(c.id,f);                                // 올라간 뒤에 사본·메모리를 맞춘다
+  Object.assign(c,f);
+  return true;
+}
+/* 일정관리 종료 직후 — 이어진 이알피 건이 있으면 묻는다. 물었으면 true(알림을 이쪽이 띄운다). */
+function erpAskCloseUp(coId,typeId){
+  const open=erpOpenFor(coId,typeId);
+  if(!open.length)return false;
+  if(ERP.stale){
+    toast('종료 처리됨 — 푸른이알피 자료가 옛 사본이라 이알피에는 올리지 않았습니다. 이알피에서 종료해 주세요','err');
+    return true;
+  }
+  const can=open.filter(erpCanCloseUp), cannot=open.length-can.length;
+  if(!can.length){
+    toast('종료 처리됨 — 푸른이알피 종료는 담당자·관리자만 할 수 있어 이알피에는 올리지 않았습니다. 이알피에서 종료해 주세요','err');
+    return true;
+  }
+  const nm=can.slice(0,3).map(c=>escAttr(String(c.no||c.contractNo||c.id))).join(', ')+(can.length>3?' 외 '+(can.length-3)+'건':'');
+  showConfirm('종료 처리됨 · 푸른이알피의 같은 사업 '+can.length+'건('+nm+')도 종료할까요?'+(cannot?' (권한 없는 '+cannot+'건은 제외)':''),async()=>{
+    let ok=0,fail=0;
+    for(const c of can){ if(await erpWriteClosed(c))ok++; else fail++; }
+    if(fail)toast('푸른이알피 종료 '+ok+'건 · 못 올린 '+fail+'건 — 이알피에서 직접 종료해 주세요','err');
+    else toast('🔗 푸른이알피에서도 '+ok+'건을 종료했습니다');
+  });
+  return true;
+}
+
 /* 이알피 부담당 사번 → 우리 담당자 id. 없으면 «명단에 넣어서라도» 돌려준다.
    (대표 제보 2026-09-17 「대흥중공업 부담당은 최기운인데 왜 부담당 이름이 없나 —
     이알피에는 있고 정부사업일정에는 없다」 · 대표 결정 「자동으로 넣고 붙인다」)
