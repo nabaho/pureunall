@@ -1407,3 +1407,27 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
 @media (max-width:420px){
   .hd > button:not(.hd-burger):not(.hd-more):not(.hd-reload){ padding-left:5px !important; padding-right:5px !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   거래내역 정리 (대표 「시안대로」 2026-10-24 — 「버튼이 너무 많다 · 좌우화면이 넘친다」)
+
+   ★ 버튼: 넓은 화면에서는 «🤖 자동 ▾» · «⋯ 더보기 ▾» 두 메뉴가 원래 단추들의 «복사본»을 안고 있다.
+     원래 단추는 .ld-narrow-only 로 넓은 화면에서만 감춘다 — 폰(≤640px)은 예전 방식(⋯ 로 폈다 접기)이 그대로다.
+     메뉴(.ld-wide-only)는 반대로 폰에서 감춘다. 둘 중 하나만 보이므로 같은 일을 하는 단추가 두 번 보이지 않는다.
+
+   ★ 표: 칸이 «내용만큼» 늘어나 표가 화면보다 넓어지고 맨 오른쪽 «처리» 칸이 밀려 나갔다.
+     table-layout:fixed 로 th 에 적은 너비를 지키고, 넘치는 글은 …(전문은 title) — 「표의 한 칸은 한 줄」.
+     「처리」 칸은 오른쪽에 붙박이(sticky) — 표를 옆으로 밀어도 늘 보인다.
+   ⚠ 넓은 화면(641px↑)에만 건다 — 폰은 위의 카드 배치(display:grid)가 따로 있다. */
+@media (max-width:640px){
+  .ld-wide-only{ display:none !important; }
+}
+@media (min-width:641px){
+  .ld-narrow-only{ display:none !important; }
+  .ld-tb{ table-layout:fixed; min-width:980px; }
+  .ld-tb th, .ld-tb td{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ld-tb td.ld-c-act, .ld-tb th.ld-c-act{ position:sticky; right:0; z-index:2;
+    box-shadow:-6px 0 6px -6px rgba(15,23,42,0.18); }
+  .ld-tb th.ld-c-act{ z-index:4; }
+  .ld-tb td.ld-c-act{ background:inherit; }
+}
