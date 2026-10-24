@@ -119,6 +119,61 @@ async function ingest(db, linked, body, now) {
   return { ok: true, saved, duplicate, kakaoRooms: rooms };
 }
 
+/* ── 대화 내보내기(.txt) 올리기 (2026-10-24, 설계서 6장) ──────────────────────
+   총괄관리자가 브라우저에서 읽은 PC 카톡 내보내기를 «가린 원문 30일 보관»으로 담는다.
+   알림 길(ingest)과 같은 자리·같은 삭제(purgeOld)를 쓴다 — 두 벌로 만들지 않는다.
+   ⚠ ingest 와 다른 점 셋:
+     · 시각을 «지금»으로 바꾸지 않는다 — 내보내기는 며칠 전 글이 정상이고, 바꾸면 날짜 칸이 틀어진다.
+       대신 30일 밖 글(날짜 칸 기준 — purgeOld 와 같은 잣대)·미래 글은 «건너뛴다».
+     · 한 번에 IMPORT_ITEMS_MAX 건까지(넘친 만큼 over 로 알린다 — 부르는 쪽이 나눠 보낸다).
+     · 날짜 칸을 하루에 한 번만 읽어 중복을 견준다(글마다 읽으면 수백 번이다). */
+const IMPORT_ITEMS_MAX = 400;
+
+async function importExport(db, admin, body, now) {
+  const rooms = await readRooms(db);
+  const room = Core.normRoom(body.room).slice(0, ROOM_NAME_MAX);
+  if (!Core.roomAllowed(rooms, room)) return { ok: true, ignored: true, reason: "room_not_listed" };
+  const all = Array.isArray(body.items) ? body.items : [];
+  const over = Math.max(0, all.length - IMPORT_ITEMS_MAX);
+  const oldestDay = dayKey(now - Core.KEEP_DAYS * DAY_MS);
+  let tooOld = 0;
+  let future = 0;
+  const fresh = [];
+  for (const it of all.slice(0, IMPORT_ITEMS_MAX)) {
+    if (!it || typeof it !== "object") continue;
+    const text = Core.maskSensitive(String(it.text || "").slice(0, Core.TEXT_MAX)).trim();
+    const sentAt = Number(it.time);
+    if (!text || !(sentAt > 0)) continue;
+    if (sentAt > now + 10 * 60 * 1000) { future++; continue; }
+    if (dayKey(sentAt) < oldestDay) { tooOld++; continue; }
+    const sender = String(it.sender || "").trim().slice(0, SENDER_MAX);
+    fresh.push({ sender, text, sentAt, id: sha(Core.noteKeySource(room, sender, sentAt, text)).slice(0, 40) });
+  }
+  const have = {};
+  for (const day of [...new Set(fresh.map((x) => dayKey(x.sentAt)))]) {
+    have[day] = (await db.ref(`${NOTES_PATH}/${day}`).once("value")).val() || {};
+  }
+  const updates = {};
+  let saved = 0;
+  let duplicate = 0;
+  for (const x of fresh) {
+    const day = dayKey(x.sentAt);
+    const path = `${day}/${x.id}`;
+    if (have[day][x.id] || updates[path]) { duplicate++; continue; }
+    updates[path] = {
+      id: x.id, entityType: "Message", schemaVersion: 1, contractVersion: 1, revision: 1,
+      createdAt: now, updatedAt: now,
+      originSystem: "kakaotalk-export", originId: x.id,
+      room, sender: x.sender, text: x.text, sentAt: x.sentAt, receivedAt: now,
+      importedBy: String((admin && admin.uid) || ""), importedAt: now,
+    };
+    saved++;
+  }
+  if (saved) await db.ref(NOTES_PATH).update(updates);
+  await purgeOld(db, now).catch(() => { /* 지우기 실패로 올리기를 막지 않는다 — 다음에 또 지운다 */ });
+  return { ok: true, saved, duplicate, tooOld, future, over };
+}
+
 /* 보관기한이 지난 날짜 칸을 지운다 — 한 번에 몇 칸만(알림마다 돈다). */
 async function purgeOld(db, now) {
   const cutoff = dayKey(now - Core.KEEP_DAYS * DAY_MS);
@@ -140,6 +195,7 @@ async function list(db, days, now) {
       items.push({
         id: String(x.id || n.key), room: String(x.room || ""), sender: String(x.sender || ""),
         text: String(x.text || ""), sentAt: Number(x.sentAt || 0), receivedAt: Number(x.receivedAt || 0),
+        src: x.originSystem === "kakaotalk-export" ? "export" : "alert",
       });
     });
   });
@@ -147,4 +203,4 @@ async function list(db, days, now) {
   return { ok: true, days: d, items: items.slice(0, LIST_ITEMS_MAX), truncated: items.length > LIST_ITEMS_MAX };
 }
 
-module.exports = { ROOMS_PATH, NOTES_PATH, dayKey, cleanRooms, readRooms, setRooms, ingest, purgeOld, list };
+module.exports = { ROOMS_PATH, NOTES_PATH, IMPORT_ITEMS_MAX, dayKey, cleanRooms, readRooms, setRooms, ingest, importExport, purgeOld, list };
