@@ -81,6 +81,8 @@ function world(scheds, over) {
   ctx.__out = out;
   vm.createContext(ctx);
   vm.runInContext([grabArr('const TZ_DOW='), grab('tzDow'), 'var _tzKey=null;',
+    /* 종류 확대 창 머리가 «이 사업의» 주담당을 도우미로 정한다(2026-10-24 사업별 주담당) */
+    grab('getCoAtts'), grab('coMainOf'), grab('coTypeMainIds'), grab('dashHeadAtts'),
     grab('tlZoomCopyText'), grab('tlZoomCopy'),
     grab('openTlZoom'), grab('renderTlZoom')].join('\n'), ctx);
   return ctx;
