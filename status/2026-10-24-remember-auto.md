@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 사람 확인 필요 (대표 확장 설치 대기 — 코드는 #2713 으로 합침)
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-remember2
 가지: remember-auto
