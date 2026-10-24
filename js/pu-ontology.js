@@ -410,6 +410,10 @@
        계약은 계약관리가 사진첩 요청과 같은 문(processOneContractRequest)으로 만든다 — 여기서는 요청만 쓴다. */
     clinic_intake:{ name:'현장클리닉 보내기', file:'clinic-intake.html', program:'erp',
       note:'중진공 현장클리닉 → data/contract_requests 요청 한 줄 (계약은 계약관리가 만든다)' },
+    /* 📇 리멤버 받기 (2026-10-24) — 대표 크롬의 «푸른 리멤버 연결» 확장(tools/remember-ext)이 건넨 새 명함을
+       사진첩(PuPhotoStore.savePhoto)·기업정보함(PuDocFile.sendToCards)에 담는다. 제 자리는 pucards/remember(기준·받은 표시) 뿐 */
+    remember_intake:{ name:'리멤버 받기', file:'remember-intake.html', program:'cards',
+      note:'리멤버 새 명함 → 사진첩·기업정보함 (같은 문으로) · 쓰는 곳 pucards/remember' },
     esign_submit:{ name:'전자위임장 제출', file:'sign.html', program:'docs',
       note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' },
     /* ✍ 계약서 서명 요청 (2026-10-09) — 받는 사람이 폰으로 확인·서명하는 쪽. 쓰는 곳은 pu_sign/open/{열쇠}/seen·sub 뿐 */
