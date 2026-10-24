@@ -246,7 +246,7 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=20"></script>
+<script src="js/pu-form-cardfill.js?v=21"></script>
 <script src="js/pu-contract-forms.js?v=66"></script>
 <script src="js/pu-photo-store.js?v=35"></script>
 <script src="js/pu-office-store.js?v=10"></script>
@@ -497,20 +497,33 @@ async function formRelayout(doc, vals, fmt, keep) {
     return fmt === 'hwpx' ? d2.exportHwpx() : d2.exportHwp();
   } finally { try { d2.free(); } catch (e) {} }
 }
-/* 직인(sealstd)을 채운 글자 자리에 다시 맞춘다 — 옮긴 것이 없으면 null (규칙: PuFormCardFill.sealTargets·fitSeals) */
+/* 직인을 채운 글자 자리에 다시 맞춘다 — 옮긴 것이 없으면 null (규칙: PuFormCardFill.sealTargets·fitSeals)
+   ① 서명줄이 다른 쪽으로 넘어갔으면 그 쪽 빈 문단으로 옮겨 줄을 다시 나눈 뒤 ② 다시 재서 자리 값만 맞춘다. 쪽이 늘면 버린다 */
 async function formFitSeals(d, JSZ) {
-  var pages = [];
-  for (var p = 0; p < d.pageCount(); p++) pages.push((JSON.parse(d.getPageTextLayout(p)) || {}).runs || []);
-  var targets = PuFormCardFill.sealTargets(pages);
-  if (!targets.length) return null;
-  var zip = await JSZ.loadAsync(d.exportHwpx());
-  var secs = Object.keys(zip.files).filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); })
-    .sort(function (a, b) { return (+a.match(/(\d+)\.xml$/)[1]) - (+b.match(/(\d+)\.xml$/)[1]); });
-  var xmls = await Promise.all(secs.map(function (n) { return zip.file(n).async('string'); }));
-  var r = PuFormCardFill.fitSeals(xmls, targets);
-  if (!r.moved) return null;
-  secs.forEach(function (n, i) { zip.file(n, r.xmls[i]); });
-  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
+  var pagesOf = function (x) { var P = []; for (var p = 0; p < x.pageCount(); p++) P.push((JSON.parse(x.getPageTextLayout(p)) || {}).runs || []); return P; };
+  var secsOf = async function (zip) {
+    var secs = Object.keys(zip.files).filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); })
+      .sort(function (a, b) { return (+a.match(/(\d+)\.xml$/)[1]) - (+b.match(/(\d+)\.xml$/)[1]); });
+    return { secs: secs, xmls: await Promise.all(secs.map(function (n) { return zip.file(n).async('string'); })) };
+  };
+  var pack = function (zip) { return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' }); };
+  var t1 = PuFormCardFill.sealTargets(pagesOf(d));
+  if (!t1.length) return null;
+  var zip = await JSZ.loadAsync(d.exportHwpx()), S = await secsOf(zip), r1 = PuFormCardFill.fitSeals(S.xmls, t1);
+  if (!r1.moved) return null;
+  S.secs.forEach(function (n, i) { zip.file(n, r1.xmls[i]); });
+  var b1 = await pack(zip);
+  if (!r1.restruct) return b1;
+  var d2 = await PureunHwp.openDoc(b1, 'sealfit.hwpx');
+  try {
+    d2.reflowLinesegs();
+    if (d2.pageCount() > d.pageCount()) return null;
+    var t2 = PuFormCardFill.sealTargets(pagesOf(d2));
+    var zip2 = await JSZ.loadAsync(d2.exportHwpx()), S2 = await secsOf(zip2), r2 = PuFormCardFill.fitSeals(S2.xmls, t2, { offsetsOnly: true });
+    if (!r2.moved) return null;
+    S2.secs.forEach(function (n, i) { zip2.file(n, r2.xmls[i]); });
+    return await pack(zip2);
+  } finally { try { d2.free(); } catch (e) {} }
 }
 async function formHwpFill(bytes, name, V) {
   if (formIsXlsx(name)) {
