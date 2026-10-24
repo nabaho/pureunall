@@ -71,8 +71,10 @@ async function run() {
   fs.mkdirSync(PROFILE, { recursive: true });
   try { const age = Date.now() - fs.statSync(LOCK).mtimeMs; if (age < 50 * 60000) { log('skip: 앞 회차가 아직 돈다'); return; } } catch (e) { /* 자물쇠 없음 */ }
   fs.writeFileSync(LOCK, String(process.pid));
-  const browser = await puppeteer.launch({ executablePath: CHROME, userDataDir: PROFILE, headless: 'new', args: ['--no-first-run', '--window-size=1280,900'] });
+  let browser = null;
   try {
+    /* 로그인 창이 열려 있으면 프로필이 잠겨 못 띄운다 — 자물쇠를 남기지 않도록 try 안에서 */
+    browser = await puppeteer.launch({ executablePath: CHROME, userDataDir: PROFILE, headless: 'new', args: ['--no-first-run', '--window-size=1280,900'] });
     /* ① 받는 화면 */
     const ip = await browser.newPage();
     await ip.setUserAgent(UA);
@@ -134,7 +136,7 @@ async function run() {
     }
     log('mail: 받는 화면 회차 끝');
   } finally {
-    await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
     try { fs.unlinkSync(LOCK); } catch (e) { /* 이미 없음 */ }
   }
 }
