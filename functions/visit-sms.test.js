@@ -337,3 +337,63 @@ test("폰 길: 9시 목록 만들기 전(queue 에 줄이 없음)에는 내주�
   const db = fakeDb(Object.assign({}, SEED, { scal_env: { visitSms: { config: { mode: "auto" } } } }));
   assert.equal((await V.claimPhoneJobs(db, { nowMs: T10 })).length, 0);
 });
+
+/* ══ erpId 는 «업무관리 컨설팅 건 번호»다 (2026-10-24 실측 — 연결된 24곳 전부 cs-…) ══ */
+const WORK_SEED = {
+  scal_staff: [{ id: "a1", name: "권형하" }],
+  scal_cos: [
+    { id: "w1", name: "컨설팅번호로이은곳", erpId: "cs-aaa" },
+    { id: "w2", name: "건에번호없고업체에있는곳", erpId: "cs-bbb" },
+    { id: "w3", name: "건도업체도없는곳", erpId: "cs-ccc" },
+    { id: "w4", name: "건에번호없고업체도없는곳", erpId: "cs-ddd" },
+  ],
+  scal_scheds: ["w1", "w2", "w3", "w4"].map((c, i) => ({ id: "t" + i, date: DATE, attId: "a1", coId: c, isField: true })),
+  data: {
+    consultings: { v: [
+      { id: "cs-aaa", companyName: "가", primaryContactName: "나", primaryContactPhone: "010-2222-3333" },
+      { id: "cs-bbb", companyName: "다", companyId: "CO-B", primaryContactPhone: "" },
+      { id: "cs-ddd", companyName: "라", companyId: "CO-NONE", primaryContactPhone: "" },
+    ] },
+    companies: { v: [{ id: "CO-B", primaryContactName: "마", primaryContactPhone: "010-4444-5555" }] },
+  },
+};
+const planWork = () => V.planToday({ date: DATE, config: {}, scheds: WORK_SEED.scal_scheds, cos: WORK_SEED.scal_cos, staff: WORK_SEED.scal_staff, companies: WORK_SEED.data.companies.v, consultings: WORK_SEED.data.consultings.v });
+
+test("컨설팅 건 번호(cs-…)로 이은 사업장은 그 건의 담당자 번호를 쓴다", () => {
+  const by = {}; planWork().forEach((r) => { by[r.coId] = r; });
+  assert.equal(by.w1.status, "ready");
+  assert.equal(by.w1.phone, "01022223333");
+  assert.equal(by.w1.contactName, "나");
+});
+
+test("컨설팅 건에 번호가 없으면 그 건이 가리키는 업체(companyId)의 번호를 쓴다", () => {
+  const by = {}; planWork().forEach((r) => { by[r.coId] = r; });
+  assert.equal(by.w2.status, "ready");
+  assert.equal(by.w2.phone, "01044445555");
+});
+
+test("컨설팅 건도 업체도 못 찾으면 보내지 않는다(이름으로 짐작하지 않는다)", () => {
+  const by = {}; planWork().forEach((r) => { by[r.coId] = r; });
+  assert.equal(by.w3.status, "skip");
+  assert.match(by.w3.why, /못 찾음/);
+  assert.equal(by.w4.status, "skip");
+  assert.equal(by.w4.phone, "");
+});
+
+test("연결(erpId)이 없는 사업장은 같은 이름의 컨설팅 건이 있어도 자동으로 잇지 않는다", () => {
+  const out = V.planToday({
+    date: DATE, config: {}, staff: WORK_SEED.scal_staff,
+    cos: [{ id: "n1", name: "같은이름" }],
+    scheds: [{ id: "x", date: DATE, attId: "a1", coId: "n1", isField: true }],
+    consultings: [{ id: "cs-z", companyName: "같은이름", primaryContactPhone: "010-1111-2222" }],
+    companies: [],
+  });
+  assert.equal(out[0].status, "skip");
+  assert.match(out[0].why, /연결되지 않은/);
+});
+
+test("서버 읽기: 컨설팅 건 자료(data/consultings/v)도 함께 읽는다", async () => {
+  const db = fakeDb(Object.assign({}, SEED, { data: Object.assign({}, SEED.data, { consultings: { v: [{ id: "cs-q", primaryContactPhone: "010-9999-8888" }] } }) }));
+  const src = await V.readSources(db, DATE);
+  assert.ok(Array.isArray(src.consultings) && src.consultings.length === 1);
+});

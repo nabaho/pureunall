@@ -118,6 +118,12 @@ function planToday(src) {
   arr(src.cos).forEach((c) => { if (c && c.id != null) cosById[String(c.id)] = c; });
   const companyById = {};
   arr(src.companies).forEach((c) => { if (c && c.id != null) companyById[String(c.id)] = c; });
+  /* ★ 일정관리 사업장의 erpId 는 «업체관리 번호»가 아니라 «업무관리 컨설팅 건 번호»(cs-…)다
+       (2026-10-24 실측: 연결된 24곳 전부 cs-…, 업체관리 번호는 0곳). 그래서 담당자 연락처는
+       그 컨설팅 건 기록(primaryContact*·contacts)에서 먼저 찾고, 없으면 컨설팅 건이 가리키는
+       업체(companyId)에서 찾는다. 업체관리 번호로 직접 이은 옛 자료도 그대로 받는다. */
+  const consultingById = {};
+  arr(src.consultings).forEach((c) => { if (c && c.id != null) consultingById[String(c.id)] = c; });
 
   const byCo = {};
   arr(src.scheds).forEach((s) => {
@@ -135,13 +141,23 @@ function planToday(src) {
   return Object.keys(byCo).sort().map((k) => {
     const g = byCo[k];
     const co = cosById[g.coId];
-    const erp = co && co.erpId ? companyById[String(co.erpId)] : null;
+    const eid = co && co.erpId ? String(co.erpId) : "";
+    const work = eid ? consultingById[eid] : null;
+    const erp = work || (eid ? companyById[eid] : null);
     const att = staffById[g.attId];
     const attName = (att && att.name) || g.attId;
     let contact;
     if (!co) contact = { name: "", phone: "", why: "일정의 사업장을 찾을 수 없음" };
-    else if (!co.erpId) contact = { name: "", phone: "", why: "업체관리와 연결되지 않은 사업장" };
-    else contact = pickContact(erp);
+    else if (!co.erpId) contact = { name: "", phone: "", why: "업무관리 컨설팅 건과 연결되지 않은 사업장(연결 확인 필요)" };
+    else if (!erp) contact = { name: "", phone: "", why: "연결된 업무관리 컨설팅 건·업체관리 기록을 못 찾음" };
+    else {
+      contact = pickContact(erp);
+      /* 컨설팅 건에 번호가 없으면 그 건이 가리키는 «업체»의 주담당 번호를 본다 */
+      if (!contact.phone && work && work.companyId && companyById[String(work.companyId)]) {
+        const viaCo = pickContact(companyById[String(work.companyId)]);
+        if (viaCo.phone) contact = viaCo;
+      }
+    }
     return {
       key: src.date + "_" + g.coId,
       coId: g.coId,
@@ -201,10 +217,10 @@ async function solapiSendOne(cred, to, text, opt) {
 /* ── 자료 읽기 (읽기 전용) ── */
 async function readSources(db, date) {
   const get = async (p) => (await db.ref(p).once("value")).val();
-  const [scheds, cos, staff, companies, config] = await Promise.all([
-    get("scal_scheds"), get("scal_cos"), get("scal_staff"), get("data/companies/v"), get(ROOT + "/config"),
+  const [scheds, cos, staff, companies, consultings, config] = await Promise.all([
+    get("scal_scheds"), get("scal_cos"), get("scal_staff"), get("data/companies/v"), get("data/consultings/v"), get(ROOT + "/config"),
   ]);
-  return { scheds, cos, staff, companies, config: config || {}, date };
+  return { scheds, cos, staff, companies, consultings, config: config || {}, date };
 }
 
 function credFromEnv(env) {

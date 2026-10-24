@@ -38,7 +38,7 @@ test("서버: 번호는 queue 에 가려서만 적고, 화면 입력으로 번�
   const body = strip(SRV_SRC);
   assert.match(body, /phoneMasked:\s*maskPhone\(/, "queue 줄이 번호를 가리지 않는다");
   assert.doesNotMatch(body, /phone:\s*row\.phone/, "진짜 번호를 queue 에 적고 있다");
-  assert.doesNotMatch(body, /o\.(to|phone|text)\b/, "호출자가 준 번호·문구를 쓰고 있다");
+  assert.doesNotMatch(body, /\bo\.(to|phone|text)\b/, "호출자가 준 번호·문구를 쓰고 있다");
 });
 
 test("서버: 원본 자리(scal_scheds·scal_cos·data/companies)에는 쓰지 않는다", () => {
