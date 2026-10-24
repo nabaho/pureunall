@@ -98,6 +98,24 @@
       + rules(today) + '\n\n--- 말한 내용 ---\n' + text;
   }
 
+  /* 📥 받은 메일 한 통 — 일정 후보함(서버)이 쓴다 (2026-10-24).
+     mail: { from:'이름 <주소>', subject, ymd:'받은 날 YYYY-MM-DD', text:'본문 앞부분' }
+     ★ 「내일」「다음 주 화요일」은 «메일을 받은 날»이 기준이다(오늘이 아니다) — 며칠 지난 메일을 지금 읽어도 날이 맞게.
+     ★ 제출 마감·참석 요청도 일정이다(종일). 광고·뉴스·단순 안내처럼 «날짜가 걸린 할 일»이 없으면 events 는 빈 배열. */
+  function promptForMail(today, mail) {
+    mail = mail || {};
+    var base = realDate(mail.ymd) ? mail.ymd : today;
+    var wd = weekdayKo(base);
+    return '아래는 받은 메일 한 통입니다. 보낸 사람 · 제목 · 본문 앞부분이 있고, 메일을 받은 날은 ' + base + (wd ? '(' + wd + '요일)' : '') + '입니다.\n'
+      + '이 메일에서 «받는 사람이 챙겨야 할 일정»(참석할 행사·회의·방문, 제출·회신 마감)만 뽑으십시오. 날짜가 걸린 할 일이 없으면 events 는 빈 배열입니다.\n'
+      + rules(today)
+      + '\n10. 메일 속 「내일」「다음 주」 같은 말은 메일을 받은 날(' + base + ') 기준으로 계산합니다.'
+      + '\n11. 보낸 사람이 담당자입니다 — contact 는 「이름 · 전화번호」로 적고, 본문에 전화번호가 없으면 「이름 · 이메일」로 적습니다.'
+      + '\n12. 제출·회신 마감은 time 을 비우고 title 앞에 「[마감]」을 붙입니다.'
+      + '\n13. 날짜가 바뀌었다는 안내(예: 29일에서 30일로 변경)는 «바뀐 날짜»만 일정으로 뽑고, 바뀐 사실은 note 에 적습니다.'
+      + '\n\n--- 보낸 사람 ---\n' + s(mail.from) + '\n--- 제목 ---\n' + s(mail.subject) + '\n--- 본문 ---\n' + s(mail.text);
+  }
+
   /* ══ AI 답 → 걸러낸 초안 ════════════════════════════════════════════════ */
   /* 답에서 JSON 을 꺼낸다 — 코드블록 껍데기·앞뒤 군말이 붙어도 중괄호 구간만 잘라 본다 */
   function parseJson(raw) {
@@ -304,7 +322,7 @@
   return {
     APP: APP, LIMIT: LIMIT,
     realDate: realDate, weekdayKo: weekdayKo, hm: hm, scrubText: scrubText,
-    promptForImage: promptForImage, promptForText: promptForText,
+    promptForImage: promptForImage, promptForText: promptForText, promptForMail: promptForMail,
     parseJson: parseJson, normalize: normalize, applyDraft: applyDraft, summary: summary,
     readImages: readImages, readText: readText, shrinkImage: shrinkImage,
     speechSupported: speechSupported, listen: listen, joinText: joinText, friendly: friendly

@@ -142,7 +142,7 @@
        ⚠ 업무 자료의 주인은 «이알피»다. 여기는 그 칸을 빌려 읽는다(sharedRoots).
          일정·근태를 새로 만들 때도 이알피의 칸에 쓴다 — 두 벌로 갈리면 급여가 틀어진다.
        제 것은 «보던 자리»뿐이다(어느 탭·어느 거르개였나) — data 아래 곁방에 둔다. */
-    cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view','cal_private'],
+    cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view','cal_private','cal_inbox'],
       /* pucards/idx — 미팅 넣을 때 기업정보함 명함 «가벼운 색인»을 읽기만 한다(2026-09-27) */
       /* gov/{uid}/recruit — 대표일 때만 «컨설턴트 모집» 일정을 얹어 보인다(읽기만, 2026-10-04) */
       sharedRoots:['data','pucards/idx','gov/{uid}/recruit'],

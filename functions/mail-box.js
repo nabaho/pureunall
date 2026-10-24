@@ -396,7 +396,8 @@ function isHeadLine(ln) {
   return HEAD_LINE.test(t);
 }
 
-function previewFrom(buf, tp) {
+/* max — 자르는 길이(안 주면 목록 미리보기 140자). 일정 후보함(cal-inbox)이 «본문 앞부분»을 더 길게 뽑을 때만 준다(2026-10-24). */
+function previewFrom(buf, tp, max) {
   const t = tp || {};
   let s = toText(decodePart(buf, t.enc), t.cs);
   if (t.html) {
@@ -427,7 +428,7 @@ function previewFrom(buf, tp) {
   const lines = s.split(/\r?\n/);
   const body = clean(lines.filter((ln) => !/^\s*>/.test(ln) && !isHeadLine(ln)).join(' '));
   const out = body || clean(s.replace(/^\s*>+/gm, ' '));
-  return out.slice(0, PREVIEW_MAX);
+  return out.slice(0, Number(max) > 0 ? Number(max) : PREVIEW_MAX);
 }
 
 /* ── 줄 모양이 바뀌면 다시 가져와야 한다 ──
