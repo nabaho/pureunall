@@ -79,6 +79,8 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 확인은 `node tools/phone-audit/run.mjs <앱 key>`(가짜 파이어베이스로 로그인한 채 360·411px 에서 재고 갈무리).
 **새 앱은 `tools/phone-audit/seeds/<key>.js`(지어낸 자료만)를 함께 만든다.** 앱별 상태는 `docs/폰화면-현황.md`.
 → `tests/phone-screen-rules.test.js` · `tests/phone-input-zoom.test.js` · `tests/version-fab-phone-low.test.js`
+진짜 폰으로 볼 때는 `폰미러-켜기.bat`(`tools/phone-mirror.js` — scrcpy 미러 · `--shot` 갈무리 · `--measure` 폰 크롬의 푸른 화면만 measure.js 로 재기).
+**폰을 누르거나 치지 않는다**(사람이 미러 창에서 한다). 갈무리(`tools/phone-mirror/out/`)는 고객 화면이라 저장소·채팅에 올리지 않는다. → `tests/phone-mirror.test.js` · `docs/폰-미러.md`
 
 ---
 
