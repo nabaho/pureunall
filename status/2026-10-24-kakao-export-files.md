@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 완료
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-kakao-export
 가지: feat/kakao-export-files
@@ -33,7 +33,8 @@
 3. [x] work.html — 💬대화/📎받을 파일 갈래, 끌어 놓기 띠·미리보기 창·저장하는 법, 출처 칸·대표 글, 받을 파일 표·폴더·보내기
 4. [x] pu-cards.html — mbTakeToCo(카톡 파일 → 기업별 계약서 창), mbAttFetch 가 건네받은 바이트를 그대로 씀
 5. [x] tests/kakao-export.test.js (23건)
-6. [x] 전체 검사(2,229 파일 통과) · [ ] PR · 합치기 · **hanaMessageBridge 함수 배포**(화면만 새것이면 받을 파일이 「불러오지 못했습니다」)
+6. [x] 전체 검사(2,229 파일 통과) · PR #2742 합침(10/24 18:35) · 사이트 배포 확인(work.html·pu-cards.html·pu-kakao-work.js?v=3 실제 주소에서 새 코드)
+7. [x] **hanaMessageBridge 함수 배포**(대표 「니가 직접 배포해라」) — 10/24 18:43 최신 main(585378fd)에서 «Successful update operation»
 
 ## 남은 것 / 확인 필요
 - ⚠ **실제 PC 카톡 저장본으로 한 번 시험해야 한다** — 모양은 알려진 판(블로그·공개 파서) 기준으로 맞췄다.
