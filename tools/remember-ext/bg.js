@@ -16,6 +16,14 @@ function arm() { chrome.alarms.create('pull', { periodInMinutes: EVERY_MIN, dela
 chrome.runtime.onInstalled.addListener(arm);
 chrome.runtime.onStartup.addListener(arm);
 chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'pull') run(); });
+/* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다 */
+chrome.action.onClicked.addListener(function () { run(); });
+function note(badge, why) {
+  var at = new Date().toLocaleString('ko-KR');
+  chrome.action.setBadgeText({ text: badge });
+  chrome.action.setBadgeBackgroundColor({ color: /^(OK|\.\.)$/.test(badge) ? '#2e7d32' : '#c62828' });
+  chrome.action.setTitle({ title: '푸른 리멤버 연결 — ' + (why || badge) + ' · ' + at + ' (눌러서 지금 돌리기)' });
+}
 
 function sleep(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
 async function findOrOpen(prefix, url) {
@@ -62,20 +70,26 @@ async function image(url) {
 async function run() {
   if (running) return;
   running = true;
+  note('..', '도는 중');
   try {
     /* ① 받는 화면 */
     var it = await findOrOpen(INTAKE, INTAKE);
     await waitLoaded(it.id, 60000);
     var hello = await ask(it.id, { cmd: 'hello' }, 10);
-    if (!hello || !hello.ready) return;               /* 푸른 로그인 전 — 받는 화면이 빨간 띠로 알린다 */
+    if (!hello || !hello.ready) { note('로그인', '푸른 포털 로그인 필요(받는 화면 탭 확인)'); return; }               /* 푸른 로그인 전 — 받는 화면이 빨간 띠로 알린다 */
     var cp = Number(hello.cp) || 0;
     /* ② 리멤버 */
     var rt = await findOrOpen('https://card.rememberapp.co.kr/', REM_HOME);
     await chrome.tabs.update(rt.id, { url: REM_HOME });
     var t = await waitLoaded(rt.id, 60000);
-    if (!t || !/^https:\/\/card\.rememberapp\.co\.kr\//.test(t.url || '')) { await ask(it.id, { cmd: 'login-lost' }); return; }
+    if (!t || !/^https:\/\/card\.rememberapp\.co\.kr\//.test(t.url || '')) { await ask(it.id, { cmd: 'login-lost' }); note('리멤버', '리멤버 로그인 필요'); return; }
     var res = await ask(rt.id, { cmd: 'pull', cp: cp }, 10);
-    if (!res || res.err) { if (res && (res.err === 'login' || res.err === 'no-heads')) await ask(it.id, { cmd: 'login-lost' }); return; }
+    if (!res || res.err) {
+      var lost = res && (res.err === 'login' || res.err === 'no-heads');
+      if (lost) await ask(it.id, { cmd: 'login-lost' });
+      note(lost ? '리멤버' : '!', lost ? '리멤버 로그인 필요' : '리멤버 목록 못 받음: ' + (res && res.err ? res.err : '응답 없음'));
+      return;
+    }
     /* ③ 그림 — 이번에 새로 다룰 것만(기준 뒤) */
     var images = {};
     if (cp) {
@@ -86,6 +100,9 @@ async function run() {
         if (f && !f.empty) { var d = await image(f.original || f.preview); if (d) images[st.id] = d; }
       }
     }
-    await ask(it.id, { cmd: 'batch', stacks: res.stacks, images: images, total: res.total });
+    var done = await ask(it.id, { cmd: 'batch', stacks: res.stacks, images: images, total: res.total });
+    note(done ? 'OK' : '!', done ? '지난 회차 끝 · 받은 ' + res.stacks.length + '장' : '받는 화면이 답이 없음');
+  } catch (e) {
+    note('!', '오류: ' + String((e && e.message) || e).slice(0, 80));
   } finally { running = false; }
 }
