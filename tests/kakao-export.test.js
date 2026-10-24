@@ -277,7 +277,7 @@ const cut = (src, head) => { const i = src.indexOf(head); assert.ok(i >= 0, head
 
 test('화면: 원본 .txt 는 브라우저 안에서만 읽고, 서버로는 가린 줄만 보낸다', () => {
   const w = read('work.html');
-  const f = cut(w, 'function kkTxtFiles(');
+  const f = cut(w, 'function kkTxtFile(');
   assert.match(f, /K\.parseExport\(r\[0\]/, '저장본을 화면에서 읽지 않는다');
   assert.match(f, /K\.maskCount\(x\.text\)/, '보내기 전에 가리지 않는다');
   assert.match(f, /kkCall\('kakaoImport',\{room:room,lines:lines,files:fl,photos:p\.photos,dryRun:true\}\)/, '미리보기 없이 넣는다');
@@ -315,4 +315,40 @@ test('기업정보함: 카톡에서 건넨 파일은 메일 첨부와 «같은 �
   assert.match(t, /mbAttToCo\(0, \{ atts: \[/, '새 담기 창을 따로 지었다');
   assert.match(c, /hideCardsLogin\(\); ErpMatch\.load\(\); mbTakeToCo\(\);/, '로그인 뒤에 받지 않는다');
   assert.match(cut(c, 'function mbAttFetch('), /if\(a && a\.bytes\) return Promise\.resolve\(/, '건네받은 바이트를 서버에 다시 묻는다');
+});
+
+/* ── 📂 카톡 폴더에서 저장본 저절로 줍기 (2026-10-24) ─────────────────────── */
+test('화면: 끌어 놓기·파일 고르기·폴더 줍기는 «같은 길»(kkTxtFile)로 읽는다', () => {
+  const w = read('work.html');
+  assert.match(cut(w, 'function kkTxtFiles('), /kkTxtFile\(f,\{\}\)/);
+  assert.match(cut(w, 'function kkPickAuto('), /kkTxtFile\(f,\{auto:true\}\)/, '폴더에서 찾은 것을 다른 길로 넣는다');
+  assert.match(cut(w, 'function kkPickOpen('), /kkTxtFile\(P\.found\[0\],\{auto:true\}\)/);
+});
+
+test('화면: 폴더에서 찾은 저장본도 받는 방이 아니면 «창 없이» 건너뛰고, 넣는 것은 사람이 누른다', () => {
+  const w = read('work.html');
+  const f = cut(w, 'function kkTxtFile(');
+  assert.match(f, /if\(!room&&opt\.auto\)\{ kkPickMark\(f,'room'\); return; \}/, '다른 방 저장본에 오류 창을 띄우거나 넣는다');
+  assert.match(f, /if\(!p\.ok\)\{ if\(opt\.auto\)\{ kkPickMark\(f,'skip'\); return; \} \}/, '카톡 저장본이 아닌 .txt 에 오류 창을 띄운다');
+  assert.match(f, /dryRun:true/, '폴더에서 찾았다고 미리보기 없이 넣는다');
+  const a = cut(w, 'function kkPickAuto(');
+  assert.match(a, /\$\('modalbg'\)/, '다른 창이 떠 있는데 덮어 띄운다');
+  assert.match(a, /KK\.pickAuto\[sig\]/, '같은 파일을 열 때마다 또 띄운다');
+  assert.match(cut(w, 'function kkImportGo('), /if\(P\.file\) kkPickMark\(P\.file,'imp'\)/, '넣은 저장본을 다시 띄운다');
+});
+
+test('화면: 새 저장본 = 마지막으로 넣은 때 뒤 · 30일 안 · 이 PC 가 처리 안 한 것', () => {
+  const w = read('work.html');
+  const f = cut(w, 'function kkPickFind(');
+  assert.match(f, /since=Math\.max\(Number\(KK\.meta\.lastImportAt\|\|0\),cut\)/);
+  assert.match(f, /f\.lastModified>since&&!seen\[kkPickSig\(f\)\]/);
+  assert.ok(!/createWritable|removeEntry|\.remove\(/.test(f), '카톡 폴더 파일을 고치거나 지운다');
+});
+
+test('화면: 카톡 폴더는 열 때 살피되, 허락을 다시 묻는 것은 단추에서만', () => {
+  const w = read('work.html');
+  assert.match(cut(w, 'function renderKakao('), /if\(!KK\.dlInit\) kkDlInit\(\);/);
+  assert.match(cut(w, 'function kkPickHtml('), /onclick="kkDlAllow\(\)"/);
+  assert.ok(!/requestPermission/.test(cut(w, 'function kkPickFind(')));
+  assert.match(cut(w, 'function kkDlScan('), /if\(KK\.dlBusy\) return KK\.dlBusy;/, '폴더 살피기가 겹쳐 돈다');
 });
