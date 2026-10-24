@@ -59,14 +59,12 @@ async function image(url) {
   } catch (e) { return ''; }
 }
 
+/* 로그인 창은 puppeteer 없이 «보통 크롬»으로 연다 — 자동조종 표시가 붙은 창은 구글 로그인이 「로그인할 수 없음」으로 막힌다 */
 async function login() {
-  const browser = await puppeteer.launch({ executablePath: CHROME, userDataDir: PROFILE, headless: false, defaultViewport: null, args: ['--no-first-run'] });
-  const [p1] = await browser.pages();
-  await p1.goto(REM_HOME);
-  const p2 = await browser.newPage();
-  await p2.goto(INTAKE);
+  const { spawn } = require('child_process');
+  fs.mkdirSync(PROFILE, { recursive: true });
+  spawn(CHROME, ['--user-data-dir=' + PROFILE, '--no-first-run', REM_HOME, 'https://nabaho.github.io/pureunall/enter.html', INTAKE], { detached: true, stdio: 'ignore' }).unref();
   log('login: 전용 크롬을 띄웠습니다 — 리멤버·푸른 포털에 로그인한 뒤 창을 닫아 주세요');
-  await new Promise((ok) => browser.on('disconnected', ok));
 }
 
 async function run() {
