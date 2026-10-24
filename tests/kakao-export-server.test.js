@@ -119,6 +119,16 @@ test('한 번에 400건까지만 처리하고 넘친 만큼 알린다, 날짜 �
   assert.ok(noteReads.length <= 3, '날짜 칸을 글마다 읽었다: ' + noteReads.length + '번');
 });
 
+test('보낼 글이 0건이어도 방 확인은 한다 — 목록 밖 방이면 무시, 안 방이면 ok(화면이 서버가 동작을 아는지 보는 데 쓴다)', async () => {
+  const db = fakeDb();
+  await W.setRooms(db, ['푸른 업무방'], 'u1', now);
+  const ok = await W.importExport(db, ADMIN, { room: '푸른 업무방', items: [] }, now);
+  assert.deepStrictEqual({ ok: ok.ok, saved: ok.saved, over: ok.over }, { ok: true, saved: 0, over: 0 });
+  const no = await W.importExport(db, ADMIN, { room: '가족 단톡', items: [] }, now);
+  assert.strictEqual(no.ignored, true);
+  assert.strictEqual(db.data.kakaoWork.notes, undefined);
+});
+
 test('list 가 글의 출처(src)를 준다 — 내보내기는 export, 알림 길은 alert', async () => {
   const db = fakeDb();
   await W.setRooms(db, ['푸른 업무방'], 'u1', now);

@@ -131,6 +131,28 @@ test('탭·화면을 떠나면 읽은 내용을 버린다', () => {
   assert.match(W, /kkNav\(\);[^\n]*[\s\S]{0,200}?kxReset\(\)|if\(S\.view!=='kakao'\)\s*kxReset\(\)/);
 });
 
+/* ── 독립 검토 지적(2026-10-24) ─────────────────────────────────────── */
+test('지운 카톡 줄은 다음 올리기에서 되살아나지 않는다 — 지울 때 표식을 남기고, 올리기가 그 표식을 본다', () => {
+  const del = wfn('_delLog');
+  assert.match(del, /l\.k==='kt'/, '카톡 줄을 지울 때 표식을 남기지 않는다');
+  assert.match(del, /'\/kxoff\/'\+itemId\+'\/'\+lid/, '표식 자리가 다르다');
+  assert.ok(del.indexOf('/kxoff/') < del.indexOf('.update('), '표식이 지우기와 «같은 쓰기»에 있지 않다(반쯤 하다 멈출 수 있다)');
+  assert.match(fn('kxLogsOf'), /\/kxoff\//, '올리기가 표식을 읽지 않는다');
+  const st = fn('kxStatus');
+  assert.match(st, /gone/);
+  assert.ok(st.indexOf("'gone'") < st.indexOf("'more'"), '표식 확인이 새 줄/보강 판정보다 뒤에 있다');
+  assert.ok(!/gone/.test(fn('kxElig').replace(/\s/g, '')) || /new.*more/.test(fn('kxElig')), '지운 줄이 고를 수 있는 줄로 남는다');
+  assert.match(fn('kxRowHTML'), /지운 줄/, '지운 줄을 화면이 말하지 않는다');
+});
+
+test('새 업무 창으로 만든 업무(번호가 업무명에 있다)도 다음 올리기에서 같은 번호로 맞는다', () => {
+  assert.match(fn('kxItems'), /extractCaseNos\(it\.title/, '업무명에 적은 사건번호를 안 본다 — 다음 주 같은 번호가 또 «없는 번호»가 된다');
+});
+
+test('보낼 글이 0건이어도 서버 확인을 건너뛰지 않는다(배포 전엔 아무것도 저장하지 않는다)', () => {
+  assert.match(fn('kxImportRaw'), /if\(!chunks\.length\)\s*chunks\.push\(\[\]\)/, '0건이면 서버를 안 부른다');
+});
+
 /* ── 알림 목록의 쌍둥이 ─────────────────────────────────────────────── */
 test('알림 탭: 같은 글이 알림·내보내기 양쪽에 있으면 알림 쪽을 숨기고(목록과 옵시디언 일지 모두), 원본 배열은 건드리지 않는다', () => {
   assert.match(wfn('kkItems'), /dropAlertTwins\(KK\.items\)/);

@@ -192,10 +192,28 @@
       return hasAny(cases, g.caseNos) || hasAny(cos, g.companyKeys);
     }
 
+    function place(g, m) {
+      g.msgs.push(m); unionInto(g.files, m.files || []); g.media += m.media || 0; g.lastAt = m.at;
+    }
+
     list.forEach(function (m) {
       var cases = extractCaseNos(m.text, opts.extraKnown);
       var cos = opts.companies ? findCompanyKeys(m.text, opts.companies, opts.minLen || 3) : [];
       var g;
+      /* 한 글에 사건번호가 «둘 이상»이면 사건마다 묶음에 각각 넣는다 — 한 묶음에 합치면 그날 두 사건의 대화가
+         모두 거기로 모여, 사람이 하나를 고르는 순간 다른 사건의 대화가 그 업무에 붙는다.
+         바로 뒤의 번호 없는 글은 어느 사건인지 모르므로 직전 묶음에 붙이지 않는다(cur=null → 미분류). */
+      if (cases.length > 1) {
+        cases.forEach(function (c) {
+          var t = null;
+          for (var gi = groups.length - 1; !t && gi >= 0; gi--) if (joinsGroup(groups[gi], m.day, [c], cos)) t = groups[gi];
+          if (!t) t = open(m.day, 'case');
+          unionInto(t.caseNos, [c]); unionInto(t.companyKeys, cos); t.anchor = 'case';
+          place(t, m);
+        });
+        cur = null;
+        return;
+      }
       if (cases.length || cos.length) {
         /* 사건 9001 → 9002 → 9001 로 번갈아 오가도 같은 날 같은 번호는 «한 묶음»이다(업무·날짜당 한 줄).
            직전 묶음에 안 붙으면 같은 날 앞선 묶음 중 가장 최근 것에서 찾는다. */
@@ -209,8 +227,7 @@
       } else {
         g = noneByDay[m.day] || (noneByDay[m.day] = open(m.day, 'none'));
       }
-      g.msgs.push(m); unionInto(g.files, m.files || []); g.media += m.media || 0;
-      g.lastAt = m.at; cur = g;
+      place(g, m); cur = g;
     });
     return groups;
   }

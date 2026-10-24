@@ -74,6 +74,31 @@ test('묶기: 사건 9001 → 9002 → 9001 로 번갈아 오가도 같은 날 �
   assert.deepStrictEqual(g[0].msgs.map((x) => x.sender), ['노무사A', '노무사C', '노무사A'], '묶음 안 글이 시간 순서가 아니다');
 });
 
+test('묶기: 한 글에 사건번호가 둘이면 두 사건 묶음에 각각 넣고, 두 사건을 한 묶음으로 합치지 않는다', () => {
+  const m = [
+    msg(14, 0, '노무사A', '경기2026부해9001 · 경기2026부해9002 같이 보냅니다'),
+    msg(14, 10, '노무사B', '경기2026부해9001 증인 확정'),
+    msg(14, 20, '노무사C', '경기2026부해9002 심문 일정'),
+  ];
+  const g = X.groupMessages(m, {});
+  const by = (no) => g.find((x) => x.caseNos.length === 1 && x.caseNos[0] === no);
+  assert.ok(by('경기2026부해9001') && by('경기2026부해9002'), '사건별 묶음이 안 갈렸다(한 묶음에 번호 둘)');
+  assert.strictEqual(g.filter((x) => x.caseNos.length > 1).length, 0, '번호 둘이 한 묶음에 들어갔다');
+  assert.deepStrictEqual(by('경기2026부해9001').msgs.map((x) => x.sender), ['노무사A', '노무사B']);
+  assert.deepStrictEqual(by('경기2026부해9002').msgs.map((x) => x.sender), ['노무사A', '노무사C']);
+});
+
+test('묶기: 번호 둘인 글 바로 뒤의 번호 없는 글은 어느 사건에도 붙이지 않는다(미분류)', () => {
+  const m = [
+    msg(14, 0, '노무사A', '경기2026부해9001 · 경기2026부해9002 같이 보냅니다'),
+    msg(14, 5, '노무사B', '점심 뭐 드실래요'),
+  ];
+  const g = X.groupMessages(m, {});
+  const none = g.find((x) => x.anchor === 'none');
+  assert.ok(none && none.msgs.length === 1, '어느 사건인지 모르는 글을 사건 묶음에 붙였다');
+  assert.ok(g.filter((x) => x.caseNos.length === 1).every((x) => x.msgs.length === 1));
+});
+
 test('요약: 사람별 첫 글만 뽑고 잡담·첨부 줄은 문장에서 빼되 글 수에는 센다', () => {
   const m = [
     msg(14, 5, '노무사A', '경기2026부해9001 답변서 10월 30일까지\n연장 신청했습니다'),

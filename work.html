@@ -20,7 +20,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=76"></script>
 <script src="js/pu-kakao-work.js?v=2"></script>
-<script src="js/pu-kakao-export.js?v=1"></script>
+<script src="js/pu-kakao-export.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -3509,7 +3509,7 @@ function renderKb(){
      · 저장은 한 번의 쓰기. 원문 보관(서버)이 먼저고, 실패하면 진행 기록으로 가지 않는다.
    ⚠ 읽기·묶기·열쇠·맞추기 셈은 js/pu-kakao-export.js 한 곳 — 여기서 다시 짓지 않는다. */
 var KX_CHUNK=400;   /* 한 번에 서버로 보내는 글 수 — 서버 IMPORT_ITEMS_MAX 와 같다(tests/kakao-export-screen.test.js 가 견준다) */
-function kxBlank(){ return {err:'',busy:false,fileName:'',room:'',parsed:null,rows:null,logs:{},rawMsgs:null,rawState:'none',bad:0,
+function kxBlank(){ return {err:'',busy:false,fileName:'',room:'',parsed:null,rows:null,logs:{},off:{},rawMsgs:null,rawState:'none',bad:0,
   srcDir:null,srcName:'',srcNames:null,files:null,copyMsg:''}; }
 var KX=kxBlank();
 function kxReset(){ KX=kxBlank(); }
@@ -3526,14 +3526,21 @@ function kxItems(){
     var key=String(it.co_id||'')||('n:'+_koOnly(it.company));
     var open=it.state!=='done';
     if(open&&it.company&&_koOnly(it.company).length>=MLK_MIN_MATCH&&!seen[key]){ seen[key]=1; companies.push({key:key,name:it.company}); }
-    return {id:it._id,no:String(it.no||''),company:String(it.company||''),key:key,stageNos:kxStageNos(it),open:open};
+    /* 「새 업무 창 열기」로 만든 업무는 사건번호가 «업무명»에 있고 no 는 자동 번호다 — 업무명 속 번호도 «글자 그대로» 같으면 맞는다.
+       (이름으로 id 를 채우는 것이 아니다. 다음 주 같은 번호가 또 «없는 번호»로 떠 중복 업무를 만들게 하지 않으려는 것) */
+    var titleNos=window.PuKakaoExport?window.PuKakaoExport.extractCaseNos(it.title):[];
+    return {id:it._id,no:String(it.no||''),company:String(it.company||''),key:key,stageNos:kxStageNos(it).concat(titleNos),open:open};
   });
   return {list:list,companies:companies};
 }
 function kxLogsOf(id){
   if(KX.logs[id]) return Promise.resolve(KX.logs[id]);
-  return fbDb.ref(NS+'/itemlogs/'+id).once('value').then(function(s){
-    var v=s.val(); KX.logs[id]=(v&&typeof v==='object')?v:{}; return KX.logs[id];
+  /* 기록과 «사람이 지운 표식»(kxoff)을 함께 읽는다 — 지운 줄은 기록에 없으니 표식이 없으면 되살아난다 */
+  return Promise.all([fbDb.ref(NS+'/itemlogs/'+id).once('value'),fbDb.ref(NS+'/kxoff/'+id).once('value')]).then(function(r){
+    var v=r[0].val(), o=r[1].val();
+    KX.off[id]=(o&&typeof o==='object')?o:{};
+    KX.logs[id]=(v&&typeof v==='object')?v:{};
+    return KX.logs[id];
   });
 }
 /* 이 묶음을 반영하면 어떻게 되나 — new 새 줄 · more 같은 날인데 내용이 늘어 «보강»(옛 줄은 그대로) · same 이미 있음 · ? 아직 모름 */
@@ -3544,6 +3551,7 @@ function kxStatus(r){
   if(!logs) return '?';
   r.lid=X.logId(r.itemId,r.g.day,KX.room,r.d.text,r.g.files);
   if(logs[r.lid]) return 'same';
+  if((KX.off[r.itemId]||{})[r.lid]) return 'gone';   /* 사람이 지운 줄 — 다시 올리지 않는다 */
   var pre='K'+X.lineKey(r.itemId,r.g.day,KX.room);
   return Object.keys(logs).some(function(k){ return k.indexOf(pre)===0; })?'more':'new';
 }
@@ -3621,7 +3629,8 @@ function kxRowHTML(i,r){
     :m.basis==='guess'?chip(' a','짐작 — 확인 필요','짐작','업체명만 같거나 같은 번호가 업무 여럿 — 확인 필요')
     :m.basis==='newno'?chip('','업무관리에 없는 번호','번호 없음','사건번호가 업무관리에 없습니다'):chip('','근거 없음','근거 없음','');
   var state=st==='new'?'<span class="kkc g">새로 추가</span>':st==='more'?'<span class="kkc a" title="같은 날 줄이 이미 있는데 내용이 늘었습니다 — 옛 줄은 그대로 두고 새 줄을 더합니다">보강 · 옛 줄 유지</span>'
-    :st==='same'?'<span class="kkc">이미 있음</span>':'<span class="muted">—</span>';
+    :st==='same'?'<span class="kkc">이미 있음</span>'
+    :st==='gone'?'<span class="kkc" title="이 줄은 사람이 지웠습니다 — 같은 내용은 다시 올리지 않습니다. 그날 글이 늘어 내용이 달라지면 새 줄로 다시 나옵니다">지운 줄 · 다시 안 올림</span>':'<span class="muted">—</span>';
   var full=r.g.msgs.map(function(x){ return x.sender+': '+x.text; }).join('\n');
   return '<tr'+(ok&&r.on?'':' class="kxoff"')+'><td class="kkfit"><input type="checkbox"'+(r.on?' checked':'')+(ok?'':' disabled')+' onclick="kxPick('+i+',this.checked)"></td>'
     +'<td class="kkfit muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
@@ -3820,6 +3829,9 @@ function kxApply(){
 function kxImportRaw(){
   var msgs=KX.rawMsgs||[], chunks=[];
   for(var i=0;i<msgs.length;i+=KX_CHUNK) chunks.push(msgs.slice(i,i+KX_CHUNK));
+  /* 보낼 글이 0건(31일 넘은 파일)이어도 빈 요청 한 번은 보낸다 — 서버가 이 동작을 알고 이 방을 받는지 «먼저» 확인한다.
+     안 보내면 서버가 배포 전이어도 진행 기록만 쓰이는 길이 생긴다. */
+  if(!chunks.length) chunks.push([]);
   KX.rawState='none';
   return chunks.reduce(function(p,c){
     return p.then(function(){
@@ -6901,6 +6913,9 @@ function _delLog(itemId,lid){
   var up={};
   up[NS+'/itemlogs/'+itemId+'/'+lid]=null;
   if(wk) up[NS+'/logs/'+weekYear(wk)+'/'+wk+'/'+itemId+'/'+lid]=null;
+  /* 카톡 내보내기로 들어온 줄(k:'kt')을 지우면 표식(kxoff)을 «같은 쓰기»에 남긴다 — 안 남기면 겹치는 다음 주
+     내보내기에서 같은 줄이 «새로 추가»로 되살아난다(2026-10-24). 올리기 화면(kxStatus)이 이 표식을 본다. */
+  if(l&&l.k==='kt'){ var kw=_mlkWho(); up[NS+'/kxoff/'+itemId+'/'+lid]={at:kw.at, by:kw.by, byName:kw.byName}; }
   /* 자동 줄을 지우면 「이 업무 것 아님」으로 남긴다 — 안 남기면 다음에 돌 때 되살아난다 */
   var aw=l&&l.auto&&l.src&&(l.aw||wk), anone=null, aoff=null;
   if(aw){
