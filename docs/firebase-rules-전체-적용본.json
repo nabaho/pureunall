@@ -1329,6 +1329,20 @@
         ".write": "auth != null && auth.uid === $uid"
       }
     },
+    "cal_inbox": {
+      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "cand": {
+        ".indexOn": [
+          "at"
+        ],
+        "$id": {
+          "status": {
+            ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+            ".validate": "newData.isString() && (newData.val() === 'new' || newData.val() === 'added' || newData.val() === 'dismissed')"
+          }
+        }
+      }
+    },
     "pucards_private": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",

@@ -132,9 +132,34 @@ test('경력사항은 «줄 수»로만 보여 준다 — 스물몇 줄을 통�
   assert.ok(글.indexOf('ㄴ') < 0, '경력 본문이 통째로 들어갔습니다');
 });
 
-test('단추가 편집칸에 달려 있고 «파란 단추»를 뺏어 오지 않는다', () => {
-  const m = /<button class="([^"]*)" onclick="홈페이지바로고치기\(\)"/.exec(html);
-  assert.ok(m, '「바로 고치기」 단추가 없습니다');
-  assert.ok(!/\bpri\b/.test(m[1]),
-    '파란 단추는 띠마다 하나(저장)입니다 — 이 단추까지 파랗게 하면 무엇을 눌러야 할지 흐려집니다');
+test('바로 고치기는 «저장하고 반영» 한 단추를 거쳐 간다 — 따로 파란 단추를 만들지 않는다', () => {
+  /* 2026-10-24 대표 결정 — 「저장」과 「지금 홈페이지에 고치기」가 «저장하고 반영» 하나가 되었다. */
+  assert.match(html, /<button class="btn pri" onclick="저장하고반영\(\)"/, '「저장하고 반영」 단추가 없습니다');
+  assert.ok(!/<button class="[^"]*\bpri\b[^"]*" onclick="홈페이지바로고치기\(\)"/.test(html),
+    '바로 고치기를 부르는 파란 단추가 따로 있습니다 — 무엇을 눌러야 할지 흐려집니다');
+});
+
+/* «저장하고 반영»을 실제로 돌려 본다 — 저장이 안 되면, 글 번호가 없으면 반영으로 안 넘어간다 */
+async function 저장반영돌리기(저장결과, srl) {
+  const 부른것 = [];
+  const ctx = {
+    App: { draft: { kind: 'member', key: 'k1', srl: srl } },
+    saveDraft: async (조용히) => { 부른것.push('저장:' + 조용히); return 저장결과; },
+    홈페이지바로고치기: async () => { 부른것.push('반영'); },
+    toast: (t) => { 부른것.push('알림'); }, String: String, window: {}
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('저장하고반영'), ctx);
+  await ctx.저장하고반영();
+  return 부른것;
+}
+
+test('★★ 저장하고 반영 — 저장이 «된 뒤에만» 반영한다', async () => {
+  assert.deepEqual(await 저장반영돌리기(true, '190'), ['저장:true', '반영']);
+  assert.deepEqual(await 저장반영돌리기(false, '190'), ['저장:true'],
+    '★★ 저장에 실패했는데 반영으로 넘어갔습니다 — 화면과 자료가 어긋납니다');
+});
+
+test('★ 글 번호가 없으면 저장만 하고 그렇다고 말한다 — 묻는 창부터 띄우지 않는다', async () => {
+  assert.deepEqual(await 저장반영돌리기(true, ''), ['저장:true', '알림']);
 });

@@ -22,6 +22,7 @@
 const MB = require('./mail-box');
 const AICLASSIFY = require('./mail-ai-classify');   /* 받은메일함 자동분류(Jev) — 기본은 꺼짐 */
 const NEWINQ = require('./mail-new-inquiry');       /* 신규 문의 → 관리자 폰 알림 + 메일함 띠 */
+const CALINBOX = require('./cal-inbox');            /* 📥 받은 메일 → 푸른 캘린더 «일정 후보함»(AI) — 기본은 꺼짐 */
 const MAILFILL = require('./mail-fill');
 const MAILCARD = require('./mail-card');            /* 📬 처음 보는 보낸 사람의 서명 → 기업정보함 명함 줄 세우기(2026-10-24) */            /* 📥 회사 도메인이 같은 업체 담당자로 채우기(점검 ③-A) */
 const GONE = require('./gone-watch');            /* 🏚 반송 메일 → 없어진 듯한 곳 근거 */
@@ -534,6 +535,15 @@ async function runSync(deps, opts) {
                 if (inq.ran) console.log('mail-new-inquiry', JSON.stringify(inq));
               } catch (e) {
                 console.warn('mail-new-inquiry 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+              /* ── 📥 일정 후보함 — 일정이 있어 보이는 새 메일에서 초안을 뽑아 후보로 쌓는다 (대표 지시 2026-10-24) ──
+                 ⚠ 기본 꺼짐(pucards/config/calInbox.on). 본문은 저장하지 않는다 — 까닭·규칙은 cal-inbox.js.
+                 ⚠ 실패해도 던지지 않는다 — 후보함이 죽어도 동기화는 계속된다. */
+              try {
+                const cal = await CALINBOX.extractFromNewMail(deps, { client: client, slug: p.slug, held: held, deadline: deadline });
+                if (cal.ran) console.log('cal-inbox', JSON.stringify(cal));
+              } catch (e) {
+                console.warn('cal-inbox 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
               /* ── 📥 회사 도메인이 같은 업체 «한 곳» 담당자로 채운다 (2026-10-07 기업정보함 점검 ③-A) ──
                  예전에는 대표님 PC 에서 메일 화면이 열려 있을 때만 채웠다. 잣대·까닭은 mail-fill.js.
@@ -1595,7 +1605,8 @@ module.exports = function build(deps) {
       .region(REGION)
       /* ⚠ TYPESAFE_API_KEY — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
            config/mailAiClassify.on 이 꺼져 있으면 이 열쇠는 «읽히기만 하고 안 쓰인다». */
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 540, memory: '512MB' })
+      /* ⚠ GEMINI_KEY — 일정 후보함(cal-inbox)이 쓴다. config/calInbox.on 이 꺼져 있으면 «읽히기만 하고 안 쓰인다». */
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY', 'GEMINI_KEY'], timeoutSeconds: 540, memory: '512MB' })
       .pubsub.schedule('*/3 7-21 * * *')
       .timeZone('Asia/Seoul')
       .onRun(async () => {

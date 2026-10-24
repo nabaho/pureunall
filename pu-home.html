@@ -28,7 +28,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=76"></script>
+<script src="js/pu-ontology.js?v=77"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-version.js?v=12"></script>
@@ -174,6 +174,8 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   border:1px solid transparent;display:inline-block}
 .mini.bad{background:var(--bad-bg);color:#991b1b;border-color:#fecaca}
 .mini.ok{background:var(--ok-bg);color:#166534;border-color:#cbd5e1}
+/* ★ PC 에서는 «이상 없음»을 안 그린다 (2026-10-24 — 문제 있을 때만 알린다). 폰의 ✓ 는 560px 구간이 되살린다 */
+.dcard .mini.ok{display:none}
 /* «아직 안 봤다» — 색을 쓰지 않는다. 이것을 초록(깨끗함)으로 두면 조용히 틀린다 */
 .mini.none{background:#fff;color:var(--faint);border-color:var(--line)}
 /* «할 수 없다»(자문사현황) — 점선으로 «못 하는 것»임을 밝힌다
@@ -811,6 +813,7 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   .dcard .st{width:auto;line-height:1}
   .dcard .lw{display:none}
   .dcard .sw{display:inline}
+  .dcard .mini.ok{display:inline-block}
   .dcard .mini{padding:1px 4px;font-size:11px;line-height:1.2}
   .dcard .mini.bad{border-radius:9px;background:var(--bad);border-color:var(--bad);color:#fff}
   /* ── 경력 줄: 글칸에 자리를 몰아준다 (대표 지시 2026-10-17 「캡처하면 컴팩트하게 좀 정리해달라」) ──
@@ -2402,7 +2405,7 @@ window.쪽아래로 = 쪽아래로;
 function refuseIfPageConfigUnread() {
   if (!App.pageConfigUnread) return false;
   say('쪽 목록을 못 읽었습니다',
-    '「대조」가 아니라 화면을 <b>새로 고쳐(F5)</b> 목록을 먼저 읽어야 합니다 — '
+    '「다시 확인」이 아니라 화면을 <b>새로 고쳐(F5)</b> 목록을 먼저 읽어야 합니다 — '
     + '지금 저장하면 사장님이 저장해 두신 설정이 지워집니다.');
   return true;
 }
@@ -2448,7 +2451,7 @@ async function addPage() {
     await savePageConfig(next);
     App.group = 'work'; App.pick = mid;
     loadDraft(); App.render();
-    toast('「' + label + '」(/' + mid + ')을 목록에 넣었습니다. 「대조」를 누르면 읽어 옵니다.');
+    toast('「' + label + '」(/' + mid + ')을 목록에 넣었습니다. 「다시 확인」을 누르면 읽어 옵니다.');
   } catch (e) {
     await say('쪽 목록을 저장하지 못했습니다', esc((e && e.message) || e));
   }
@@ -3074,9 +3077,11 @@ async function saveRecord(kind, key, next) {
   return 쓴것 || Object.assign({}, next);
 }
 
-async function saveDraft() {
+/* 조용히 — 「저장하고 반영」이 부를 때. 저장 알림 대신 곧바로 반영 창이 뜨므로 겹쳐 띄우지 않는다.
+   ★ 저장이 됐는지를 돌려준다 — 저장에 실패했는데 반영으로 넘어가면 화면과 자료가 어긋난다. */
+async function saveDraft(조용히) {
   const d = App.draft;
-  if (!d) return;
+  if (!d) return false;
   App.saveErr = '';   // 다시 저장하니 지난 실패 띠는 지운다
   try {
     if (d.kind === 'member') {
@@ -3100,13 +3105,39 @@ async function saveDraft() {
     /* 고친 뒤에는 홈페이지와 달라졌다 — 「같음」 딱지를 그대로 두면 안 올린 것을 올린 줄 안다. */
     markChanged(d.kind, d.key);
     App.render();
-    toast('저장했습니다. 홈페이지는 「지금 홈페이지에 고치기」를 눌러야 바뀝니다.');
+    if (조용히 !== true) {
+      toast(d.kind === 'member'
+        ? '저장만 했습니다 — 홈페이지는 그대로입니다. 바꾸시려면 「저장하고 반영」을 누르십시오.'
+        : '저장했습니다.');
+    }
+    return true;
   } catch (e) {
     console.warn('[저장]', e);
     await say('저장하지 못했습니다', esc((e && e.message) || e));
+    return false;
   }
 }
 window.saveDraft = saveDraft;
+
+/* ★ 저장하고 반영 — 아래 띠의 «한 단추» (2026-10-24 대표 결정 ①).
+     전에는 「저장」과 「저장하고 반영」 두 단추였다. 둘을 차례로 눌러야 하는 것을
+     따로 두니, 저장만 하고 홈페이지는 안 바뀐 줄 모르는 일이 생겼다.
+   ★ 순서는 그대로다: ① 우리 자료에 저장 ② 서버가 «보기만» 하고 바뀔 것을 보여 줌
+     ③ 사람이 「고치기」를 눌러야 홈페이지에 씀. 한 단추가 되었을 뿐 «묻는 걸음»은 안 줄었다.
+   ⚠ 저장이 실패하면 반영으로 안 넘어간다. 글 번호가 없는 사람(아직 홈페이지에 글이 없음)은
+     저장만 하고 그렇다고 말한다 — 묻는 창부터 띄우면 고장처럼 보인다.
+   ⚠ «저장만» 하는 길은 ⋯ 안에 있다(saveDraft). 없애지 않는다. */
+async function 저장하고반영() {
+  const d = App.draft;
+  if (!d) return;
+  if (!await saveDraft(true)) return;
+  if (!String(d.srl || '').trim()) {
+    toast('저장했습니다 — 글 번호가 없어 홈페이지에는 아직 안 올라갑니다.');
+    return;
+  }
+  await 홈페이지바로고치기();
+}
+window.저장하고반영 = 저장하고반영;
 
 /* 우리 자료를 고쳤으니 딱지를 「안 올라감」으로 내린다. 확인은 사람이 눌러야 다시 돈다. */
 function markChanged(kind, key) {
@@ -3135,7 +3166,7 @@ function markChanged(kind, key) {
       App.saveErr = '딱지를 「안 올라감」으로 내린 것을 저장하지 못했습니다'
         + (e && e.code ? '(' + e.code + ')' : '')
         + ' — 이 화면에만 바뀌어 보이고, 다른 사람 화면에는 아직 「같음」으로 보입니다. '
-        + '「대조」를 눌러 다시 맞춰 주십시오.';
+        + '「다시 확인」을 눌러 다시 맞춰 주십시오.';
       App.render();
     });
   }
@@ -3357,8 +3388,8 @@ async function writeKeepOnSite(key, mark) {
     App.members[key] = await saveRecord('member', key, next);
     App.render();
     toast(mark
-      ? '홈페이지에 남기기로 표시했습니다. 「대조」를 누르면 퇴사 딱지를 달지 않습니다.'
-      : '예외를 풀었습니다. 「대조」를 누르면 퇴사 판정을 다시 받습니다.');
+      ? '홈페이지에 남기기로 표시했습니다. 「다시 확인」을 누르면 퇴사 딱지를 달지 않습니다.'
+      : '예외를 풀었습니다. 「다시 확인」을 누르면 퇴사 판정을 다시 받습니다.');
   } catch (e) {
     await say('표시를 저장하지 못했습니다', esc((e && e.message) || e));
   }
@@ -3392,7 +3423,7 @@ async function keepOnSiteClear() {
   const d = App.draft;
   if (!d || d.kind !== 'member') return;
   const yes = await askYes('「홈페이지에 남기기」 예외를 풀까요?',
-    '풀면 다음 「대조」에서 명부대로 퇴사 판정을 다시 받습니다.', '예외 풀기');
+    '풀면 다음 「다시 확인」에서 명부대로 퇴사 판정을 다시 받습니다.', '예외 풀기');
   if (!yes) return;
   await writeKeepOnSite(d.key, null);
 }
@@ -3795,7 +3826,7 @@ function openPaste() {
     + ' <span class="sub">— 위 칸들이 저절로 채워집니다</span></li>'
     + '<li>「이대로 저장할까요?」에 <b>확인</b>을 누른다'
     + ' <span class="sub">(무엇을 채웠는지 보여주고 «물어본 뒤에» 저장합니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>대조</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>다시 확인</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">4번까지 하면 딱지가 「안 올라감」에서 「같음」으로 바뀝니다. '
     + '안 바뀌면 등록이 안 된 것입니다.</div>'
     + '<div class="sub" style="margin-top:6px">단추를 아직 안 넣으셨으면 '
@@ -4082,7 +4113,7 @@ async function 올리기허락(key) {
     return false;
   }
   const r = (App.members || {})[key] || {};
-  if (String(r.srl || '').trim()) { await say('이미 홈페이지에 있습니다', '글 번호가 있는 분은 «지금 홈페이지 바로 고치기»로 고칩니다.'); return false; }
+  if (String(r.srl || '').trim()) { await say('이미 홈페이지에 있습니다', '글 번호가 있는 분은 «저장하고 반영»로 고칩니다.'); return false; }
   const 준비 = 새노무사준비(r);
   const 빠짐 = 준비.빠진것.filter(x => x !== '올리기 허락');
   if (빠짐.length) { await say('아직 허락할 수 없습니다', '빠진 것: ' + esc(빠짐.join(' · '))); return false; }
@@ -4177,7 +4208,7 @@ async function 퇴사자한번에내리기() {
     + 건너뜀(갈래.겹침, '같은 글 번호를 다른 사람도 써서 건너뜁니다 — 남의 글이 내려갈 수 있습니다.');
   if (!사람.length) {
     await say('내릴 사람이 없습니다',
-      (건너뜀말 || '먼저 <b>「지금 홈페이지」 대조</b>를 눌러 누가 남아 있는지 확인해 주십시오.'));
+      (건너뜀말 || '먼저 <b>「다시 확인」</b>를 눌러 누가 남아 있는지 확인해 주십시오.'));
     return;
   }
 
@@ -4349,7 +4380,7 @@ function 사진칸Html(d) {
     + '<div class="inl pdrop" style="' + (고른것 || 올린것 ? 'flex:0 0 auto' : 'flex:1') + '"'
     + ' ondragover="사진끌기(event)" ondragleave="사진끌기끝(event)" ondrop="사진놓기(event)">'
     + '<b>얼굴 사진'
-    + '<span class="tip" title="지금 홈페이지의 «메인 이미지» 칸으로 바로 갑니다 — 저장과 다른 길입니다">?</span></b>'
+    + '<span class="tip" title="홈페이지의 «메인 이미지» 칸으로 바로 갑니다 — 저장과 다른 길입니다">?</span></b>'
     + '<input type="file" accept="image/jpeg,image/png,image/webp" class="pf"'
     + ' onchange="사진고르기(this)">'
     + '<span class="sub dropsay">'
@@ -4808,7 +4839,7 @@ function openHistory() {
     const ts = Object.keys(v).sort((a, b) => (histTs(b) - histTs(a)) || String(b).localeCompare(String(a)));
     let h = '<h2>되돌리기 — ' + esc(d.kind === 'member' ? d.name : (PAGE_LABEL[d.key] || d.key)) + '</h2>';
     h += '<div class="bar info">고른 시점의 내용을 <b>통합시스템 자료로만</b> 되살립니다. '
-      + '홈페이지는 그대로입니다 — 되살린 뒤 <b>「지금 홈페이지에 고치기」</b>를 눌러야 홈페이지가 바뀝니다.<br>'
+      + '홈페이지는 그대로입니다 — 되살린 뒤 <b>「저장하고 반영」</b>를 눌러야 홈페이지가 바뀝니다.<br>'
       + '되살리기도 저장이라 <b>되살리기 직전 값도 이력에 남습니다.</b></div>';
     if (!ts.length) {
       h += '<div class="empty">남아 있는 이전 내용이 없습니다. 한 번도 덮어쓴 적이 없습니다.</div>';
@@ -5089,8 +5120,8 @@ async function restoreFrom(histKey, ts) {
   const d = App.draft;
   if (!d) return;
   const yes = await askYes('이 시점의 내용으로 되살릴까요?',
-    '지금 내용은 이력에 남습니다. 홈페이지는 그대로이며, 되살린 뒤 <b>「지금 홈페이지에 고치기」</b>를 '
-    + '눌러야 바뀝니다.<br><span class="sub">「홈페이지에 남기기」·「새 홈페이지에 넣기/빼기」는 '
+    '지금 내용은 이력에 남습니다. 홈페이지는 그대로이며, 되살린 뒤 <b>「저장하고 반영」</b>를 '
+    + '눌러야 바뀝니다.<br><span class="sub">「홈페이지에 남기기」·「새 사이트에서 빼기·넣기」는 '
     + '사람이 정한 것이라, <b>글 번호</b>와 직원 연결은 자동 연결의 열쇠라 지금 그대로 둡니다.</span>',
     '되살리기');
   if (!yes) return;
@@ -5109,7 +5140,7 @@ async function restoreFrom(histKey, ts) {
     loadDraft();
     closeModal();
     App.render();
-    toast('되살렸습니다. 홈페이지는 「지금 홈페이지에 고치기」를 눌러야 바뀝니다.');
+    toast('되살렸습니다. 홈페이지는 「저장하고 반영」를 눌러야 바뀝니다.');
   } catch (e) {
     await say('되살리지 못했습니다', esc((e && e.message) || e));
   }
@@ -5960,8 +5991,8 @@ window.자동미리보기 = 자동미리보기; window.자동지금돌리기 = �
 window.자동승인 = 자동승인; window.자동기록창 = 자동기록창;
 
 function railHtml() {
+  /* ★ 「무엇을 볼까」 이름표는 뗐다 (2026-10-24) — 갈래 다섯이 무엇인지는 그 자체로 읽힌다. */
   return '<div class="rail">'
-    + '<div class="rh">무엇을 볼까</div>'
     + '<div class="dash">' + dashHtml() + '</div>'
     + 자동카드Html()
     + todoHtml()
@@ -5970,39 +6001,30 @@ function railHtml() {
 
 function appbarHtml() {
   const at = App.check && App.check.at;
+  /* ★★ 2026-10-24 대표 결정(목업 «추천» ①①①) — 「홈페이지」 낱말을 이 띠에서 걷는다.
+       「홈페이지라는 단어가 너무 많아 혼란스럽다」. 맨 위 공용 띠(「푸 홈페이지」)가 이미
+       어느 앱인지 말한다 — 안에서 또 적으면 한 화면에 여덟 번이 된다.
+     ★ 그래서 «지금/새» 이름표(2026-09-06 ㉯)도 뗀다. 갈라 적어야 했던 까닭은
+       새 홈페이지 단추가 «늘 보여서»였다. 도메인을 아직 안 붙여 손님이 못 보는 사이트라
+       ⋯ 안으로 옮기면(「새 사이트에 올리기 (준비 중)」) 이 띠에 남는 것은 전부 손님이 보는
+       홈페이지 하나에 대한 것이다 — 갈라 적을 상대가 없다.
+     ⚠ 도메인을 옮기는 날: ⋯ 안의 «새 사이트»를 본길로 꺼내고 지금(라이믹스) 쪽 단추를
+       걷으면 한 자리에서 끝난다. 그때 다시 둘을 «나란히» 늘어놓지 말 것.
+     ★ 파란 단추는 이 띠에 «없다». 화면의 으뜸 일은 아래 띠의 「저장하고 반영」 하나다. */
   return '<div class="appbar">'
-    + '<div class="ttl">홈페이지</div>'
-    + '<span class="when">홈페이지 확인 ' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
+    + '<span class="when">마지막 확인 ' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
+    /* ★ 「다시 확인」은 시각 «바로 옆»에 둔다 — 무엇을 다시 하는지가 시각과 한 덩이로 읽힌다.
+         (옛 이름 「대조」 — 뜻은 같다: 살아 있는 홈페이지를 읽어 이 화면과 견준다.) */
+    + '<button class="btn sm" onclick="checkHomepage()"' + (App.checking ? ' disabled' : '')
+    + ' title="손님이 보는 홈페이지를 읽어 이 화면과 견줍니다">'
+    + (App.checking ? '확인 중…' : '다시 확인') + '</button>'
     + '<div class="sp"></div>'
-    /* ★ 이 띠가 «무엇에 대한 것인지» 이름표로 못 박는다 (대표 결정 2026-09-06 ㉯).
-       까닭 — 「홈페이지」가 붙은 단추가 한 화면에 일곱이었고, 다섯은 «지금» 홈페이지
-       (라이믹스, 우리가 못 고침) 를, 둘은 «새» 홈페이지(우리 거울, 자동으로 올라감) 를
-       가리켰다. 헷갈린 것은 단추가 많아서가 아니라 «어느 것이 무엇에 대한 것인지»가
-       안 적혀 있어서였다. 위는 화면 전체, 아래(.eft)는 고른 사람 하나다. */
-    + '<span class="tag">이 화면 전체</span>'
     /* ★ 「줄 모양」은 ⋯ 안에 있다 (2026-10-03 정리안 ①) — 한 번 정하면 거의 안 바꾸는 설정이라
          늘 자리를 차지할 까닭이 없다. */
     /* ★ 미리보기 — 기본은 접힘. 켜면 편집칸 오른쪽에 붙는다(대표 결정 2026-09-02 ㉮) */
     + '<button class="btn' + (App.preview ? ' on' : '') + '" onclick="togglePreview()"'
-    + ' title="고치는 대로 홈페이지에 어떻게 보이는지 옆에서 보여 드립니다">'
+    + ' title="고치는 대로 어떻게 보이는지 옆에서 보여 드립니다">'
     + (App.preview ? '👁 미리보기 끄기' : '👁 미리보기') + '</button>'
-    /* ★ 「지금 / 새」로 갈라 적는다 (대표 결정 2026-09-06 ㉯) —
-         지금 홈페이지 = 손님이 보는 라이믹스. 읽고 견주기만 된다.
-         새 홈페이지  = 우리 거울. 자동으로 올라간다.
-       ⚠ 도메인을 옮기면 「새」가 「지금」이 된다. 그때 «지금» 붙은 것들을 통째로 지우고
-         「새」를 떼면 끝나도록 이름을 지었다 — 한 자리에서 끝난다.
-       ★ 파란 단추는 이 띠에 «하나»다(올리기). 대조는 읽기만 하는 일이라 파랗지 않다 —
-         전에는 대조가 파랗고 정작 저장이 회색이었다. */
-    /* ★ 2026-09-13 ㉮ — 「지금 홈페이지」를 «이름표로 한 번만» 적고, 단추는 할 일만 적는다.
-         까닭: 한 화면의 단추 여섯 가운데 다섯이 「지금 홈페이지…」로 시작해,
-         이름이 아니라 «꼬리말»을 읽어야 구분됐다(대표 지시 「너무 복잡하다」).
-       ⚠ 이름표를 떼고 단추 이름만 「대조」·「보기」로 두지 말 것 — 그러면 어느
-         홈페이지인지가 사라진다. 이름표와 단추는 «한 벌»이다. */
-    + '<span class="sep"></span>'
-    + '<span class="tag">지금 홈페이지</span>'
-    + '<button class="btn" onclick="checkHomepage()"' + (App.checking ? ' disabled' : '')
-    + ' title="살아 있는 홈페이지를 읽어 이 화면과 견줍니다">'
-    + (App.checking ? '확인 중…' : '대조') + '</button>'
     /* ★ 「홈페이지에 올리기」는 «구성원 갈래를 볼 때»만 보인다.
        늘 보이면 쪽·자문사를 보다가 눌러 구성원이 올라간다 —
        무엇이 올라가는지와 지금 보는 화면이 맞아야 사람이 안 헷갈린다. */
@@ -6014,7 +6036,7 @@ function appbarHtml() {
        실제로 2026-09-06 에 「자문사 고르기」가 위아래 두 곳에 생겼다.
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
     + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
-    + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">보기</a>'
+    + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">사이트 열기 ↗</a>'
     /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).
        ⚠ 이 단추 하나가 «지금 홈페이지를 손 안 대고 고치는» 유일한 길인데, 넣는 자리가
          복사 안내문 «속 작은 글씨 링크»에만 있었다. 그래서 대표께서 몇 달을 못 찾으셨고,
@@ -6040,18 +6062,16 @@ function appbarHtml() {
          그 사람 편집칸의 「되돌리기」가 이미 보여 준다. */
     + '<button class="btn" onclick="openChangeLog()"'
     + ' title="누가 언제 무엇을 고쳤는지 전→후로 봅니다">🕘 바뀐 기록</button>'
-    + '</div></details>'
-    /* ★ 「새 홈페이지」도 이름표를 달아 «지금»과 갈라 둔다.
-       ⚠ 둘은 서로 다른 홈페이지다 — 한 낱말로 합치면 엉뚱한 곳에 올라간다.
-         도메인을 옮기면 「새」가 「지금」이 된다. 그때 «지금» 쪽을 통째로 지우고
-         이 이름표만 떼면 끝나도록 지었다. */
+    /* ★ 새 사이트(우리 거울)에 올리기 — ⋯ 안이 제자리다 (2026-10-24 대표 결정 ②).
+         도메인을 아직 안 붙여 손님이 못 보는 곳이라, 늘 보이는 자리에 두면 «손님 홈페이지»와
+         헷갈린다. 「(준비 중)」을 단추에 적어 어디로 가는지 누르기 전에 읽히게 한다.
+       ⚠ 없애지 않는다 — 구성원 갈래를 볼 때만 낸다(무엇이 올라가는지와 보는 화면이 맞게). */
     + (App.group === 'members'
-        ? '<span class="sep"></span>'
-          + '<span class="tag">새 홈페이지</span>'
-          + '<button class="btn pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
-          + ' title="여기 자료로 «구성원 소개» 쪽을 다시 만들어 올립니다. 무엇이 올라가는지 먼저 보여드립니다.">'
-          + (App.publishing ? '올리는 중…' : '올리기') + '</button>'
+        ? '<button class="btn" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
+          + ' title="여기 자료로 새 사이트의 «구성원 소개» 쪽을 다시 만들어 올립니다. 무엇이 올라가는지 먼저 보여드립니다.">'
+          + (App.publishing ? '올리는 중…' : '새 사이트에 올리기 (준비 중)') + '</button>'
         : '')
+    + '</div></details>'
     + '</div>';
 }
 
@@ -6194,7 +6214,7 @@ function jobsOf() {
       why: '<b>지우지 않습니다 — 홈페이지 «휴지통»으로 옮깁니다.</b> 글도 얼굴 사진도 경력도 '
          + '그대로 남고, 라이믹스 관리자 휴지통에서 되살릴 수 있습니다. '
          + '<span class="sub">(이 게시판에는 「비공개」 칸이 아예 없습니다 — 확인했습니다.)</span><br>'
-         + '내린 뒤 <b>「지금 홈페이지」 대조</b>를 누르면 딱지가 「내려감」으로 바뀝니다.<br>'
+         + '내린 뒤 <b>「다시 확인」</b>를 누르면 딱지가 「내려감」으로 바뀝니다.<br>'
          + '<span class="sub">서버가 막히면 한 사람씩 편집칸의 ⋯ 안에서도 내릴 수 있습니다.</span>' });
   }
   const liveOnly = rowsWith(r => r.status === 'liveOnly');
@@ -6258,7 +6278,7 @@ function jobsOf() {
     add({ cls: '', t: '고쳤는데 아직 홈페이지에 안 올라간 것', n: pending.length,
       who: someNames(pending), go: seeBtns(pending, 'pending'),
       why: '구성원은 <b>붙여넣을 내용 복사</b> → 홈페이지 편집 화면에 붙여넣기. '
-         + '쪽은 홈페이지 관리자 화면에서 직접 고치십시오. 그 뒤 <b>대조</b>를 '
+         + '쪽은 홈페이지 관리자 화면에서 직접 고치십시오. 그 뒤 <b>다시 확인</b>을 '
          + '누르면 딱지가 「같음」으로 바뀝니다.' });
   }
   const toAdd = rowsWith(r => r.status === 'toAdd');
@@ -6282,7 +6302,7 @@ function jobsOf() {
   if (unknown.length) {
     add({ cls: 'warn', t: '홈페이지에서 못 읽은 쪽', n: unknown.length, who: someNames(unknown),
       why: '그 쪽은 지난 결과를 그대로 두었습니다 — 자료가 바뀐 것이 아닙니다. '
-         + '잠시 뒤 <b>대조</b>를 다시 눌러 보십시오.' });
+         + '잠시 뒤 <b>다시 확인</b>을 다시 눌러 보십시오.' });
   }
 
   /* ── 알리기만 하는 것 ── */
@@ -6315,7 +6335,7 @@ function jobsOf() {
       go: 새사람.slice(0, 3).map(x => '<button class="btn sm" onclick="App.jump(\'members\',\''
           + esc(x.key) + '\')">' + esc(x.name) + '</button>').join(''),
       why: '사진을 넣고 «다음 달 1일에 올리기 허락»을 누르시면 <b>다음 달 1일에 저절로</b> 구성원 소개에 올라갑니다. '
-         + '올리지 않을 분은 «새 홈페이지에 빼기»로 두십시오.' });
+         + '올리지 않을 분은 «새 사이트에서 빼기»로 두십시오.' });
   }
   /* ★ 2단계(2026-10-05) — 새 거래처: 로고·공개 동의를 넣어 달라고 알린다.
        ⚠ typeof 로 감싼다 — 이 함수를 떼어 돌리는 검사 상자에 새 부품이 없어도 죽지 않게. */
@@ -6353,7 +6373,7 @@ function jobsOf() {
   /* ── 아직 대조를 안 눌렀다 ── */
   if (!App.check) {
     add({ cls: 'info', t: '홈페이지와 아직 대조하지 않았습니다',
-      who: '대조 딱지는 「대조」를 누를 때만 붙습니다',
+      who: '대조 딱지는 「다시 확인」을 누를 때만 붙습니다',
       go: '<button class="btn pri sm" onclick="checkHomepage()"'
           + (App.checking ? ' disabled' : '') + '>' + (App.checking ? '확인 중…' : '대조')
           + '</button>' });
@@ -6486,6 +6506,12 @@ function statusChip(group) {
     return '<span class="mini cant" title="홈페이지가 로고 그림이라 글자 대조를 못 합니다">' + two('대조 못 함', '–') + '</span>';
   }
   if (!App.check) return '<span class="mini none" title="대조 안 함">' + two('대조 안 함', '?') + '</span>';
+  /* ★ 이상 없으면 «아무것도 안 적는다» (2026-10-24 대표 결정 — 문제 있을 때만 알린다).
+       갈래 다섯에 「이상 없음」이 다섯 번 늘 떠 있어, 정작 빨간 것이 묻혔다.
+     ⚠ 그래도 «안 본 것»과는 갈린다 — 확인 전이면 위에서 「대조 안 함」을 적는다.
+       빈칸이 «깨끗하다»는 뜻이 되는 것은 확인을 한 뒤뿐이다.
+     ⚠ 글은 그대로 두고 «꾸밈(CSS .dcard .mini.ok)»으로 PC 에서만 감춘다 — 폰의 짧은 표(✓)는
+       남긴다. 다섯 칸이 한 줄이라 빈칸이면 칸이 무너져 보인다. */
   return '<span class="mini ok" title="이상 없음">' + two('이상 없음', '✓') + '</span>';
 }
 
@@ -6659,14 +6685,20 @@ function chipsHtml() {
   const 내려간수 = App.group === 'members' ? all.filter(r => r.status === 'done').length : 0;
   const base = App.group === 'partner' ? 살아있는.filter(r => r.posted !== '')
     : (내려간수 ? all.filter(r => r.status !== 'done') : all);
-  const defs = [{ k: '',
+  /* ★ 구성원은 «전체» 딱지를 안 낸다 (2026-10-24 대표 결정 — 목록 딱지는 할 일이 있을 때만).
+       목록 머리의 「노무사」 탭이 같은 일(걸러 보기 풀기)을 한다 — 「내려감 빼고 7」이 탭 숫자와
+       나란히 있어 숫자 둘이 서로 다른 말을 하는 것처럼 읽혔다.
+     ★ 「남김」 딱지도 구성원에서는 안 낸다 — 남김인 사람은 기본 목록에 그대로 있고 줄마다
+       「남김」 딱지가 붙어 있다. 같은 것을 두 번 말한다. */
+  const 구성원 = App.group === 'members';
+  const defs = 구성원 ? [] : [{ k: '',
     label: App.group === 'partner' ? '고른 것' : (내려간수 ? '내려감 빼고' : '전체'),
     n: base.length }];
   if (s.hot) defs.push({ k: 'todo', label: '손댈 것', n: s.hot });
   Object.keys(s.own).forEach(k => {
     defs.push({ k: 'own:' + (k === 'nobase' ? 'nobase' : k), label: OWN_LABEL[k] || k, n: s.own[k] });
   });
-  if (s.kept) defs.push({ k: 'kept', label: '남김', n: s.kept });
+  if (s.kept && !구성원) defs.push({ k: 'kept', label: '남김', n: s.kept });
   /* 노무사 / 직원 — 홈페이지 구성원 쪽이 그 둘로 나뉘어 있다(대표 지시 2026-09-02).
      ⚠ 한쪽이 0명이면 딱지를 안 낸다 — 눌러 봐야 빈 화면인 딱지는 자리만 먹는다. */
   /* ★ 둘 다 있을 때만 낸다 (2026-10-03 정리안 ③) — 직원이 0명이면 「노무사 9」는 눌러도
@@ -6726,10 +6758,12 @@ function chipsHtml() {
   /* ★ 「일반직원 수정」 탭은 목록 머리(listCountHtml)에 있다 (2026-10-03 정리안 ②).
        여기 딱지 줄 끝에 두었더니 딱지 줄이 두 줄로 넘쳤다. 다시 여기로 가져오지 말 것.
        ⚠ 다른 화면(주요업무)으로 넘기지 말 것. 「어디서 고치나」를 찾다 몇 달 헤매셨다. */
+  /* ★ 낼 딱지도, 알릴 말도 없으면 줄 자체를 안 그린다 — 빈 줄이 높이만 먹는다(한 칸 한 줄 규칙) */
+  if (!딱지들.length && App.group !== 'partner' && App.check) return '';
   return '<div class="chips">' + 딱지들.join('')
     + (App.group === 'partner'
         ? '<span class="sub">홈페이지는 로고 «그림»이라 대조를 못 합니다 — 올림 표시는 사람이 합니다</span>'
-        : (App.check ? '' : '<span class="sub">「대조」를 눌러야 홈페이지와 견줍니다</span>'))
+        : (App.check ? '' : '<span class="sub">위 「다시 확인」을 눌러야 견줍니다</span>'))
     + '</div>';
 }
 
@@ -6752,12 +6786,23 @@ function listCountHtml() {
     const 셈 = ['구성원 ' + all.length + '명', left ? '명부상 퇴사 ' + left : '',
       내려간수 && !App.filter ? '내려간 ' + 내려간수 + '명은 뺐음' : '',
       App.filter && !직원탭 ? '걸러서 ' + rows.length + '건' : ''].filter(Boolean).join(' · ');
+    /* ★ 「노무사 / 직원」 두 탭 (2026-10-24 대표 결정 ③) — 홈페이지 구성원 쪽이 실제로 그 둘로
+         나뉘어 있다. 「구성원 | 일반직원 수정」은 한쪽은 이름, 한쪽은 할 일이라 짝이 안 맞았다.
+       ⚠ 구성원 자료에 «직원» 구분이 하나라도 섞이면 첫 탭을 「노무사」라 부르면 거짓이다 —
+         그때는 「구성원」으로 돌아간다.
+       ⚠ 직원 탭에는 숫자를 안 적는다. 직원은 쪽에 박힌 글자라 몇 명인지 셀 자료가 없다 —
+         모르는 숫자를 지어 적지 않는다. */
+    const 첫탭 = all.every(r => r.mkind !== 'staff') ? '노무사' : '구성원';
+    /* ★ 탭 숫자 = 탭을 누르면 «실제로 보이는 줄 수»다 (2026-10-24). 「전체」 딱지를 걷었으니
+         이 탭이 그 자리를 맡는다 — 「9」라 적고 눌러 보니 7줄이면 사람이 목록을 의심한다.
+         내려가서 뺀 수와 전체 수는 탭에 마우스를 올리면 보인다(셈). */
+    const 탭수 = all.filter(r => r.status !== 'done').length;
     return '<span class="lseg">'
       + '<button class="' + (직원탭 ? '' : 'on') + '" onclick="App.filt(\'\')" title="' + esc(셈) + '">'
-      + '구성원 <b>' + all.length + '</b>'
+      + 첫탭 + ' <b>' + 탭수 + '</b>'
       + (App.filter && !직원탭 ? '<span class="c">· ' + rows.length + '</span>' : '') + '</button>'
       + '<button class="' + (직원탭 ? 'on' : '') + '" onclick="직원탭열기()"'
-      + ' title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">일반직원 수정</button>'
+      + ' title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">직원</button>'
       + '</span>';
   }
   if (App.group === 'work') {
@@ -6978,7 +7023,7 @@ function 미리보기HTML() {
   if (!mid) return { why: '왼쪽 목록에서 쪽을 하나 고르십시오.' };
   const 지금쪽 = App.pageHtml[mid];
   if (!지금쪽) return { mid: mid, why: '이 쪽을 아직 안 읽었습니다.\n'
-    + '편집칸의 「이 쪽 읽어오기」(또는 머리띠의 「대조」)를 누르십시오.' };
+    + '편집칸의 「이 쪽 읽어오기」(또는 머리띠의 「다시 확인」)를 누르십시오.' };
   if (App.previewMode === 'now') return { mid: mid, 바탕: 쪽바탕(mid), html: 지금쪽, 지금: true };
   /* ★ pageFixList 를 쓴다 — 여기가 «몇 번째»(n)와 «모두 몇 군데»(of)를
      실어 보내는 자리다. 지우개(PuSitePage.고칠줄)는 글자만 넘기므로
@@ -7250,7 +7295,7 @@ async function copyPrivate(key) {
     + '<li>즐겨찾기의 <b>★ 푸른ERP 채우기</b>를 누른다'
     + ' <span class="sub">— 「비공개로 바꿀까요?」를 묻고, 확인하시면 바꿉니다</span></li>'
     + '<li>「이대로 저장할까요?」에 <b>확인</b> <span class="sub">(저장해야 홈페이지에서 내려갑니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>대조</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>다시 확인</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
     + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '비공개로 바꾸는 자리를 못 찾으면 <b>아무것도 하지 않고 멈춥니다</b> — 엉뚱한 것을 건드리지 않기 위해서입니다.</div></div>';
@@ -7278,7 +7323,7 @@ function memberBandHtml(d, rec) {
       + '<span class="sm">' + esc(kept.by || '(표시한 사람 모름)') + ' · '
       + esc(kept.at || '(날짜 모름)')
       + ' · 명부에 퇴사로 찍혀 있어도 「내릴 것(퇴사)」 딱지를 달지 않고 내용 대조만 합니다. '
-      + '예외를 풀면 다음 「대조」에서 퇴사 판정을 다시 받습니다.</span></div>';
+      + '예외를 풀면 다음 「다시 확인」에서 퇴사 판정을 다시 받습니다.</span></div>';
   }
 
   if (mark && mark.kind === 'left' && !kept) {
@@ -7289,10 +7334,10 @@ function memberBandHtml(d, rec) {
       + '<b>푸른ERP 명부: ' + esc(mark.label + (mark.leftAt ? ' ' + mark.leftAt : '')) + '</b> · '
       + (내려감 ? '홈페이지에서도 <b>내려간 것으로 확인</b>됐습니다.'
          : (st.status ? '홈페이지에는 <b>아직 올라가 있습니다</b>.'
-            : '홈페이지에 올라가 있는지는 <b>「대조」</b>를 눌러야 알 수 있습니다.'))
+            : '홈페이지에 올라가 있는지는 <b>「다시 확인」</b>를 눌러야 알 수 있습니다.'))
       + '<br><span class="sm">'
       + (내려감 ? '더 하실 일은 없습니다. 이름이 다른 쪽에 남아 있으면 위 안내 띠로 알려 드립니다.'
-         : '내리시려면 아래 ⋯ 의 <b>「지금 홈페이지에서 내리기」</b>를 누르십시오 — '
+         : '내리시려면 아래 ⋯ 의 <b>「내리기 (휴지통)」</b>를 누르십시오 — '
            + '<b>삭제가 아니라 휴지통</b>이라 잘못 내렸어도 되살릴 수 있습니다.')
       + '</span></div>';
   }
@@ -7305,7 +7350,7 @@ function memberBandHtml(d, rec) {
   if (mark && mark.kind !== 'left') {
     h += '<div class="band ask"><b>' + esc(mark.label) + '</b> — ' + esc(mark.detail) + '<br>'
       + '<span class="sm">명부는 푸른ERP 것이라 여기서는 읽기만 합니다. '
-      + '지사장처럼 고용관계가 아닌 분은 아래 <b>「홈페이지에 남기기」</b>로 사유를 남겨 두십시오.</span></div>';
+      + '지사장처럼 고용관계가 아닌 분은 아래 ⋯ 의 <b>「퇴사 경고 끄기」</b>로 «홈페이지에 남기기» 사유를 적어 두십시오.</span></div>';
   }
   return h;
 }
@@ -7342,14 +7387,12 @@ function memberEdit(d) {
        따로 두면 라벨 한 줄 + 딱지 한 줄로 «두 줄»을 먹었다.
        둘 다 «이 사람 하나»에 대한 스위치라 한 줄에 있어도 뜻이 안 섞인다 —
        다만 사이를 벌리고 이름표를 붙여 어느 딱지가 무엇인지 헷갈리지 않게 한다. */
-    + '<span style="flex:1"></span>'
-    /* ★ 「새 홈페이지에」라고 갈라 적는다 (대표 결정 2026-09-06 ㉯).
-       ⚠ 아래 「퇴사 경고 끄기」와 헷갈리던 자리다 — 이름만 보면 둘 다 「올리냐 마냐」로
-         보였는데, 이것은 «새» 홈페이지에서 빼는 것이고 저것은 «지금» 홈페이지 이야기다. */
-    + '<span class="sub" style="font-weight:800">새 홈페이지에'
-    + '<span class="tip" title="빼기로 두면 「새 홈페이지에 올리기」에서 빠지고 할 일에도 안 잡힙니다. 우리 목록에는 그대로 남습니다">?</span></span>'
-    + '<button class="chip' + (d.offSite ? '' : ' on') + '" onclick="offSiteSet(false)">넣기</button>'
-    + '<button class="chip' + (d.offSite ? ' on' : '') + '" onclick="offSiteSet(true)">빼기</button>'
+    /* ★ 「새 홈페이지에 넣기/빼기」는 아래 띠의 ⋯ 안으로 옮겼다 (2026-10-24 대표 결정 ②).
+         도메인을 안 붙인 사이트의 스위치가 이 줄 오른쪽에 늘 있어, 손님 홈페이지에서 빼는 것으로
+         읽혔다. ⚠ 빠져 있을 때만 여기 «표»를 남긴다 — 빠진 줄 모르고 지나가면 안 된다. */
+    + (d.offSite
+        ? '<span style="flex:1"></span><span class="sub" title="⋯ 의 「새 사이트에 다시 넣기」로 되돌립니다">새 사이트에서 뺌</span>'
+        : '')
     + '</div>';
   /* ⚠ 「홈페이지에 올림/안 올림」은 위 «구분 줄»에 있다 (2026-09-03).
      여기에 다시 만들지 말 것 — 따로 두면 두 줄을 먹는다. */
@@ -7520,21 +7563,31 @@ function memberEdit(d) {
        이제 「고치기」 하나가 그 셋을 대신하므로 늘 자리를 차지할 까닭이 없다.
      ⚠ 없애지 않는다. 서버 비밀칸이 비었거나 홈페이지 화면이 바뀐 날의
        «두 번째 길»이다 — 그날 이 길이 없으면 고칠 방법이 아예 사라진다. */
+  /* ★ «저장만» — 홈페이지는 그대로 두고 우리 자료에만 남긴다 (2026-10-24 대표 결정 ①).
+       본길은 아래 띠의 「저장하고 반영」 하나다. 반영을 미루고 싶은 날을 위해 여기 둔다. */
+  더보기.push('<button class="btn" onclick="saveDraft()"'
+    + ' title="우리 자료에만 저장합니다 — 홈페이지는 바뀌지 않습니다">저장만 (홈페이지는 그대로)</button>');
   더보기.push('<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
-    + ' title="즐겨찾기 「채우기」 단추에 넘길 쪽지를 복사합니다 — 바로 고치기가 막힐 때">'
-    + '지금 홈페이지용 복사</button>');
+    + ' title="즐겨찾기 「채우기」 단추에 넘길 쪽지를 복사합니다 — 반영이 막힐 때">'
+    + '비상용 복사 (반영이 막힐 때)</button>');
   if (d.srl) {
     더보기.push('<a class="btn" style="text-decoration:none" href="'
       + esc(PuHomeExport.editUrl('member', d.srl))
-      + '" target="_blank" rel="noopener">지금 홈페이지에서 이 사람 글</a>');
+      + '" target="_blank" rel="noopener">관리자 화면에서 열기</a>');
   }
   더보기.push('<button class="btn" onclick="openHistory()">되돌리기</button>');
   /* 무엇이 «왜» 안 되는지 그 자리에서 보는 창. 값은 안 읽고 칸 이름만 본다. */
   if (d.srl) {
     더보기.push('<button class="btn" onclick="홈페이지칸살펴보기()"'
       + ' title="홈페이지 고치는 화면에 어떤 칸이 있는지 봅니다 — 값은 안 읽습니다">'
-      + '홈페이지 칸 살펴보기</button>');
+      + '칸 살펴보기</button>');
   }
+  /* ★ 새 사이트(준비 중)에서 빼기·넣기 — 위 줄에 늘 있던 것을 여기로 옮겼다 (2026-10-24 ②).
+       도메인을 안 붙인 사이트에 대한 스위치라 늘 자리를 차지할 까닭이 없다.
+       ⚠ 지금 상태를 단추 글에 적는다 — 누르면 무엇이 되는지가 누르기 전에 읽혀야 한다. */
+  더보기.push(d.offSite
+    ? '<button class="btn" onclick="offSiteSet(false)" title="지금은 새 사이트에서 빠져 있습니다">새 사이트에 다시 넣기</button>'
+    : '<button class="btn" onclick="offSiteSet(true)" title="새 사이트(준비 중) 구성원 쪽에서 뺍니다 — 우리 목록에는 남습니다">새 사이트에서 빼기</button>');
   더보기.push(kept
     ? '<button class="btn keep" onclick="keepOnSiteClear()">퇴사 경고 되살리기</button>'
     : '<button class="btn keep" onclick="keepOnSiteAsk()">퇴사 경고 끄기 (사유 남김)</button>');
@@ -7545,20 +7598,20 @@ function memberEdit(d) {
       /* ★ 「비공개로」가 아니라 «휴지통»이라 적는다 (2026-10-03) — 이 게시판에는 비공개 자리가
            없어 서버가 휴지통으로 옮긴다(2026-09-14). 확인 창은 맞게 말하는데 단추만 옛말이었다. */
       + ' title="홈페이지 휴지통으로 옮깁니다 — 지우지 않습니다, 되살릴 수 있습니다">'
-      + '지금 홈페이지에서 내리기 (휴지통)</button>');
+      + '내리기 (휴지통)</button>');
   }
 
+  /* ★ 이 띠는 «고른 사람 하나»에 대한 것이다 — 이름표(「○○ 한 사람」)는 뗐다 (2026-10-24).
+       편집칸 맨 위에 이름이 크게 있어 같은 말을 두 번 하고 있었다.
+     ★ 파란 단추는 «하나»다(저장하고 반영). 글 번호가 남과 겹치면 반영은 막고 «저장»만 준다 —
+       남의 글을 덮을 수 있어서다. 그때도 저장 길은 살아 있어야 고칠 수 있다. */
   h += '<div class="eft">'
-    + '<span class="tag">' + esc(d.name || '이 사람') + ' 한 사람</span>'
-    + '<button class="btn pri" onclick="saveDraft()">저장</button>'
+    + (clash.length
+        ? '<button class="btn pri" onclick="saveDraft()" title="글 번호가 겹쳐 반영은 막아 두었습니다">저장</button>'
+        : '<button class="btn pri" onclick="저장하고반영()"'
+          + ' title="저장한 뒤 홈페이지에서 무엇이 바뀌는지 먼저 보여 드리고, 「고치기」를 누르셔야 바뀝니다">'
+          + '저장하고 반영</button>')
     + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">' + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
-    + '<span class="sep"></span>'
-    /* ★ 2026-09-13 — 붙여넣기 없이 서버가 바로 고친다. 이것이 본길이다.
-       ★ 파란 «단추»는 이 띠에 하나(저장)다. 「고치기」는 파란 «테두리»로 둘째 자리를
-         준다 — 저장을 안 하고 고치기부터 누르면 화면에 있는 것이 안 나간다. */
-    + '<button class="btn hot" onclick="홈페이지바로고치기()"' + (clash.length ? ' disabled' : '')
-    + ' title="붙여넣기 없이 홈페이지를 바로 고칩니다 — 무엇이 바뀌는지 먼저 보여 드립니다">'
-    + '지금 홈페이지에 고치기</button>'
     + '<details class="more"><summary class="btn">⋯</summary>'
     + '<div class="morebox">' + 더보기.join('') + '</div></details>'
     + '<span style="flex:1"></span>'
@@ -7606,7 +7659,7 @@ function noteOneLine(short, why, whyLabel) {
    ★ 얼굴 사진은 홈페이지 것을 그대로 이어받는다(우리는 사진을 갖고 있지 않다).
      사진을 못 찾은 사람은 «올리지 않고» 이름을 알린다. */
 /* 새 홈페이지 «구성원 소개»에 갈 사람인가 (2026-10-07).
-   빠지는 사람: «새 홈페이지에 빼기» · 자동으로 내린 표시(takenDown) · 퇴사(남기기 사유가 없는).
+   빠지는 사람: «새 사이트에서 빼기» · 자동으로 내린 표시(takenDown) · 퇴사(남기기 사유가 없는).
    ★ 퇴사는 직원 번호(sid)로 이었으면 그 번호로, 아직 안 이었으면 명부 딱지(이름)로 본다.
    ★ 휴직은 퇴사가 아니다. 명부를 못 읽었으면 퇴사를 지어내지 않는다(간다). */
 function 새홈페이지에갈사람(rec) {
@@ -8469,7 +8522,7 @@ async function copyPageFix(mid) {
     + '<li>즐겨찾기의 <b>★ 푸른ERP 쪽 채우기</b>를 누른다'
     + ' <span class="sub">— 고친 줄만 저절로 바뀝니다</span></li>'
     + '<li>눈으로 확인하고 <b>저장</b>을 누른다 <span class="sub">(저장은 사람이 합니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>이 쪽 다시 읽기</b> → <b>대조 기준 저장</b> → <b>대조</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>이 쪽 다시 읽기</b> → <b>대조 기준 저장</b> → <b>다시 확인</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
     + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '원래 글을 못 찾은 줄은 <b>건너뛰고 무엇을 건너뛰었는지 알려 줍니다</b> — '
@@ -8492,7 +8545,7 @@ function pageLinesHtml(mid) {
       + '<span style="flex:1"></span>' + readPageBtn(mid, '이 쪽 읽어오기') + '</label>'
       + '<div class="note1 plain"><div>'
       + '홈페이지에 <b>어떻게 보이는지</b> 보시려면 위 <b>이 쪽 읽어오기</b>(또는 머리띠의 '
-      + '<b>대조</b>)를 누르십시오.</div></div></div>';
+      + '<b>다시 확인</b>)를 누르십시오.</div></div></div>';
   }
   if (!lines.length) {
     return '<div class="fld"><label>홈페이지 화면 — 본문 줄을 못 찾았습니다'
@@ -8624,7 +8677,7 @@ async function splitByLive() {
   const lines = (App.pageLines || {})[d.key];
   if (!Array.isArray(lines) || !lines.length) {
     await say('아직 홈페이지를 읽지 않았습니다',
-      '위 「대조」를 누르면 홈페이지에서 읽어온 «줄 모양»으로 나눠 드립니다. '
+      '위 「다시 확인」을 누르면 홈페이지에서 읽어온 «줄 모양»으로 나눠 드립니다. '
       + '없는 줄을 지어내 나누지는 않습니다 — 엉뚱한 데서 끊으면 확인이 더 어려워집니다.');
     return;
   }
@@ -8692,9 +8745,9 @@ function pageEdit(d) {
     + '<li>위 <b>홈페이지 화면</b> 칸에서 <b>고칠 줄을 그 자리에서 고친다</b> → '
     + '<b>홈페이지에 채우기용 복사</b> → 홈페이지 편집 화면에서 <b>★ 푸른ERP 쪽 채우기</b> → <b>저장</b>'
     + ' <span class="sub">(홈페이지 관리자 화면에서 직접 고치셔도 됩니다)</span></li>'
-    + '<li>돌아와 <b>대조</b> → 딱지가 「안 올라감」으로 바뀝니다</li>'
+    + '<li>돌아와 <b>다시 확인</b> → 딱지가 「안 올라감」으로 바뀝니다</li>'
     + '<li>바꾼 내용을 그대로 두려면 <b>대조 기준 글자</b>를 홈페이지와 맞춘 뒤 <b>대조 기준 저장</b> — '
-    + '<b>대조 기준 저장만으로는 딱지가 바뀌지 않습니다.</b> 그 뒤 <b>대조</b>를 '
+    + '<b>대조 기준 저장만으로는 딱지가 바뀌지 않습니다.</b> 그 뒤 <b>다시 확인</b>을 '
     + '한 번 더 눌러야 「같음」이 됩니다</li>'
     + '</ol></div></details>';
 
@@ -8734,10 +8787,10 @@ function legendHtml() {
     + '<span class="pill keep">남김</span> ← 명부만 보고 붙습니다 (화면을 열면 바로)<br>'
     + ['pending', 'toAdd', 'toRemove', 'liveOnly', 'done']
         .map(s => '<span class="pill ' + s + '">' + esc(STATUS_TEXT[s]) + '</span>').join(' ')
-    + ' ← 「대조」를 누를 때만 새로 붙습니다 — 저절로 돌지 않습니다.<br>'
+    + ' ← 「다시 확인」을 누를 때만 새로 붙습니다 — 저절로 돌지 않습니다.<br>'
     + '홈페이지와 같으면 딱지를 붙이지 않습니다.</div></details>'
     /* ★ 2026-10-03 정리안 ⑦ — 「홈페이지는 자동으로 바뀌지 않습니다 — 붙여넣기 한 번은 사람이
-         합니다」를 걷었다. 2026-09-13 부터 「지금 홈페이지에 고치기」가 서버로 «바로» 고친다 —
+         합니다」를 걷었다. 2026-09-13 부터 「저장하고 반영」가 서버로 «바로» 고친다 —
          늘 보이는 자리에 틀린 말이 떠 있었다. 대조 안내는 위 접기 안으로 옮겼다. */
     + '</div>';
 }

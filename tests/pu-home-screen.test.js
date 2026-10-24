@@ -1047,7 +1047,8 @@ test('★ 쪽 안내에 「대조 기준 저장」만으로는 안 바뀌고 「
   assert.match(h, /한 번 더 눌러야/, '홈페이지 다시 확인을 «한 번 더» 눌러야 한다는 말이 없습니다');
   /* ⚠ 단추 이름은 2026-10-03 에 「홈페이지 다시 확인」→「대조」로 맞췄다(머리띠 단추가 이미 「대조」).
        지키는 것은 «그 단추를 한 번 더 누르라»는 말이 있는가다. */
-  const 단추 = '(?:홈페이지 다시 확인|<b>대조</b>|「대조」)';
+  /* 2026-10-24 — 단추 이름이 「대조」→「다시 확인」(대표 결정). 둘 다 받는다 — 지키는 것은 «그 단추를 누르라»는 말이다. */
+  const 단추 = '(?:<b>다시 확인</b>|「다시 확인」|<b>대조</b>|「대조」)';
   assert.match(h, new RegExp(단추 + '[\\s\\S]*한 번 더|한 번 더[\\s\\S]*' + 단추 + '|「같음」으로 바뀝니다'),
     '한 번 더 눌러야 「같음」으로 바뀐다는 결론이 없습니다');
 });
@@ -1228,7 +1229,7 @@ test('★ 홈페이지를 아직 안 읽었으면 «빈 줄»이 아니라 그 �
   run(ctx, fnSource('pagePasteWhy') + '\n' + fnSource('stamp') + '\n' + fnSource('canDetachPage') + '\n'
     + fnSource('noteOneLine') + '\n' + fnSource('readPageBtn') + '\n' + fnSource('pageFrameDoc') + '\n' + fnSource('runSep') + '\n' + fnSource('runKey') + '\n' + fnSource('runOfKey') + '\n' + fnSource('pageLinesHtml') + '\n' + fnSource('pageEdit'));
   const h = ctx.pageEdit(ctx.App.draft);
-  assert.match(h, /「대조」|<b>대조<\/b>/, '어떻게 하면 줄 모양으로 보이는지 안 적혀 있습니다');
+  assert.match(h, /「(?:대조|다시 확인)」|<b>(?:대조|다시 확인)<\/b>/, '어떻게 하면 줄 모양으로 보이는지 안 적혀 있습니다');
   assert.equal(numbersIn(h).length, 0, '못 읽은 것을 빈 줄로 지어내 보여 줬습니다');
 });
 
@@ -2135,7 +2136,11 @@ test('★ 카드는 «상태 한 마디»만 적는다 — 딱지를 넷씩 붙�
   /* 세부는 목록의 걸러 보기 딱지에 있어야 한다 — 어디에도 없으면 정보가 사라진 것이다 */
   const chips = ctx.chipsHtml();
   assert.match(chips, /퇴사/, '카드에서 뺀 「퇴사」가 걸러 보기 딱지에도 없습니다');
-  assert.match(chips, /남김/, '카드에서 뺀 「남김」이 걸러 보기 딱지에도 없습니다');
+  /* ⚠ 2026-10-24 — 구성원 딱지 줄의 「남김」은 걷었다(줄마다 「남김」 딱지가 같은 말을 한다).
+     지키는 것은 «카드에서 뺀 정보가 어딘가에는 보이나»다 — 걸러 보기 딱지 또는 줄 딱지. */
+  run(ctx, fnSource('rosterPillHtml'));
+  assert.ok(/남김/.test(chips) || /남김/.test(ctx.rosterPillHtml({ kept: true })),
+    '카드에서 뺀 「남김」이 걸러 보기 딱지에도, 줄 딱지에도 없습니다');
 });
 
 test('★ 늘 뜨는 설명은 «접어» 둔다 — 쪽마다 네 줄을 다시 읽지 않는다', () => {
@@ -2668,7 +2673,7 @@ test('★ 확인 전에는 홈페이지에 «아직 있다»고 단정하지 않
   assert.ok(h1.indexOf('2026-06-30') >= 0, '명부 딱지는 확인 전에도 보여야 합니다');
   assert.ok(h1.indexOf('아직 올라가 있습니다') < 0,
     '홈페이지를 안 읽었는데 아직 올라가 있다고 단정했습니다 — 명부 딱지가 대조 딱지 흉내를 냈습니다');
-  assert.match(h1, /「대조」|<b>대조<\/b>/, '올라가 있는지 어떻게 알 수 있는지 안 적혀 있습니다');
+  assert.match(h1, /「(?:대조|다시 확인)」|<b>(?:대조|다시 확인)<\/b>/, '올라가 있는지 어떻게 알 수 있는지 안 적혀 있습니다');
 
   const 내려감 = bandBox({ name: '박성수', srl: '193', careers: [] },
                         [{ name: '박성수', leftAt: '2026-06-30' }],
