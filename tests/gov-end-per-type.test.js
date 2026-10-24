@@ -142,6 +142,7 @@ function endWorld(co) {
     acquireCompanyEditLock: async () => true, verifyCompanyEditLock: async () => true, releaseCompanyEditLock: () => {},
     renderSummaryBar: () => {}, renderDash: () => {}, renderCal: () => {}, renderEndedView: () => {},
     q: () => null, toast: (m) => log.toasts.push(m), todayStr: () => '2026-10-24',
+    erpAskCloseUp: () => false,   // endConsulting 이 실제로 부르는 함수 — 이알피 쪽은 gov-erp-close-up.test.js 가 돌린다
   });
   vm.runInContext(['dashActiveTypeIds', 'endConsulting'].map(grab).join('\n'), ctx);
   ctx._log = log;
