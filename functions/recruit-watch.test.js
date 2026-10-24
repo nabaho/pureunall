@@ -846,3 +846,24 @@ test('★★★ 한 번 돈다 — gate 게시판은 공학 평가위원 글을 
   const r2 = await W.run({ boards: [{ id: 'old', org: '', name: 'x', url: 'https://g.example/list' }], fetchText: () => Promise.resolve(html), today: '2026-10-11', nowIso: 'T' });
   assert.equal(r2.hits.length, 3);
 });
+
+/* ── 서버가 못 읽는 게시판은 «손으로 확인» (2026-10-24) — 충청북도·충북연구원: 서버 주소만 막혀 세 길 모두 11~12일째 실패 ── */
+test('★★★ manual 게시판은 «읽으러 가지 않고»(헛 요청 없음) 오류도 안 남기고 목록(manual)으로만 돌려준다 · checked 에도 안 센다', async () => {
+  const boards = BOARDS.slice(0, 2).concat([{ id: 'blocked', org: '', name: '막힌 곳', url: 'https://blocked.example/list', manual: true }]);
+  const asked = [];
+  const r = await W.run({ boards, fetchText: (u) => { asked.push(u); return fake(u); }, today: '2026-10-20' });
+  assert.ok(!asked.some((u) => /blocked/.test(u)), '막힌 곳에 요청을 보냈다');
+  assert.deepEqual(r.errors, []); assert.equal(r.checked, 2);
+  assert.deepEqual(r.manual, [{ id: 'blocked', name: '막힌 곳', url: 'https://blocked.example/list' }]);
+});
+test('★★ 쓰기 — manual 목록을 남기고, 그 게시판의 «며칠째 못 읽음» 기록(fails)은 지운다 · 목록이 없으면 manual 칸을 안 건드린다', () => {
+  const res = { hits: [], errors: [], counts: {}, checked: 27, manual: [{ id: 'chungbuk', name: '충청북도 고시/공고', url: 'https://www.chungbuk.go.kr/x' }] };
+  const upd = W.updatesOf(res, {}, 'T', { today: '2026-10-24', fails: { chungbuk: { since: '2026-10-14', n: 11 }, cri: { since: '2026-10-13', n: 12 } } });
+  assert.deepEqual(upd.manual, res.manual); assert.equal(upd['fails/chungbuk'], null);
+  assert.equal(upd['fails/cri'], undefined, '이번 목록에 없는 곳의 기록은 건드리지 않는다');
+  assert.equal('manual' in W.updatesOf({ hits: [], errors: [], counts: {}, checked: 1 }, {}, 'T', { today: '2026-10-24' }), false);
+});
+test('★★★ manual 은 «이 넷뿐» — 충청북도 둘·충북연구원 둘(다른 곳에 번지면 그 게시판을 영영 안 읽는다)', () => {
+  assert.deepEqual(W.BOARDS.filter((b) => b.manual).map((b) => b.id).sort(), ['chungbuk', 'chungbuk2', 'cri', 'cri_job']);
+  W.BOARDS.filter((b) => b.manual).forEach((b) => assert.match(b.url, /^https:\/\//, b.id + ' 직접 열기 주소가 없다'));
+});

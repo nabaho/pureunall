@@ -2059,6 +2059,11 @@ function recWatchHtml(grp){
     ? '<details class="recban"><summary>⚠ 서버가 게시판 <b>'+stuck.length+'곳</b>을 며칠째 못 읽고 있습니다 — '+esc(stuck.map(errName).join(' · '))+' <span class="sml">(눌러서 곳마다 보기)</span></summary>'
       +stuck.map(function(e){ return stuckOne(e,'div').replace('<div class="recban">','<div style="margin-top:6px">'); }).join('')+'</details>'
     : stuck.map(function(e){ return stuckOne(e,'div'); }).join('');
+  /* ★ 서버가 못 읽는 게시판(충청북도·충북연구원 — 서버 주소만 막힘)은 «손으로 확인»으로 둔다 — 헛 경고를 날마다 띄우지 않고 직접 열기 링크만 (2026-10-24) */
+  var man=(_recWatch.manual||[]).filter(function(m){ return m && m.id && (/^kcplaa/.test(m.id)?'kc':'pub')===grp && /^https:\/\//.test(String(m.url||'')); });
+  if(man.length) stuckHtml+='<div class="recban calm">🔗 <b>서버가 못 읽어 손으로 확인하는 게시판 '+man.length+'곳</b> — '
+    +man.map(function(m){ return '<a href="'+esc(m.url)+'" target="_blank" rel="noopener">'+esc(m.name||m.id)+'</a>'; }).join(' · ')
+    +' <span class="sml">(서버 주소만 막혀 있습니다 — 브라우저로는 열립니다)</span></div>';
   var fresh=all.filter(function(x){ return !seen[x.key]; });
   /* 서버 안내는 «작은 시각»으로 — 전체 문장은 마우스를 올리면(title). 못 읽은 곳만 빨갛게 드러낸다 */
   var atTxt=last.at?(function(d){ return (d.getMonth()+1)+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(last.at)):'아직 안 돎';
