@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "푸른 리멤버 연결",
   "version": "1.0.0",
-  "description": "리멤버에서 새로 받거나 고친 명함을 1시간마다 푸른사진첩·기업정보함으로 옮깁니다 (푸른노무법인 내부용).",
+  "description": "리멤버에서 새로 받거나 고친 명함을 30분마다 푸른사진첩·기업정보함으로 옮깁니다 (푸른노무법인 내부용).",
   "permissions": ["alarms", "tabs"],
   "host_permissions": [
     "https://card.rememberapp.co.kr/*",
