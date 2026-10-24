@@ -391,21 +391,10 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pin-h{flex-wrap:wrap;row-gap:6px;}
 .pin-star-t{color:#d97706;}
 .fold-tools{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0;}
-.fold-search{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.72);border:1px solid rgba(10,20,60,.12);
-  border-radius:10px;padding:5px 10px;width:230px;max-width:100%;min-width:0;}
-.fold-search input{border:0;background:none;outline:none;font:inherit;font-size:.8rem;color:var(--ink);flex:1;min-width:0;}
 #foldAllBtn{display:inline-flex;align-items:center;border:1px solid rgba(10,20,60,.14);background:rgba(255,255,255,.6);color:var(--sub);
   border-radius:99px;padding:4px 12px;font-size:.68rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex:none;}
 #foldAllBtn:hover{border-color:var(--accent);color:var(--accent);}
-#foldAllBtn[hidden]{display:none;}   /* 찾는 중에는 줄이 다 펼쳐지므로 단추가 할 일이 없다 */
-.pinrow.searching #pinTiles{display:none;}
-#appRows.searching .tilerow.srch-empty{display:none;}
-.srch-miss{display:none!important;}
-#searchEmpty{font-size:.8rem;color:var(--mute);padding:8px 10px;}
 @media (max-width:640px){
-  .fold-tools{flex-basis:100%;margin-left:0;}
-  .fold-search{flex:1;width:auto;}
-  .fold-search input{font-size:16px;}    /* 16px 밑이면 아이폰이 화면을 확대한다 */
   .tilerow.fold .tiles{padding-left:4px;}
   .pinrow{padding:5px 4px 0;}
 }
@@ -1301,21 +1290,19 @@ body.portal-mode #moreFab{display:flex;}
          여태는 여기에 손으로 두 줄을 적어 두어, 줄을 늘리려면 화면·자바스크립트
          네 군데를 함께 고쳐야 했다. 이제 자료 한 곳만 고치면 된다. -->
     <!-- ★ 자주 쓰는 앱 (대표 2026-10-24 시안 2) — 타일의 ☆ 로 고른 앱을 여기 «복제»해 보인다.
-         검색칸·모두 펴기는 이 줄 머리에 둔다 — 폰에서는 「업무 시스템」 줄이 숨으므로(.sec) 거기 두면 안 보인다. -->
+         「모두 펴기·접기」는 이 줄 머리에 둔다 — 폰에서는 「업무 시스템」 줄이 숨으므로(.sec) 거기 두면 안 보인다.
+         (앱 찾기 검색칸은 2026-10-24 대표 「이부분 삭제 해달라」로 걷었다) -->
     <div id="pinRow" class="tilerow pinrow empty">
       <div class="tilerow-h pin-h">
         <span class="tilerow-t"><span class="pin-star-t" aria-hidden="true">★</span> 자주 쓰는 앱</span>
         <span class="tilerow-n" id="pinCount"></span>
         <span class="fold-tools">
-          <label class="fold-search"><span aria-hidden="true">🔍</span>
-            <input id="appSearch" type="search" placeholder="앱 이름으로 찾기" aria-label="앱 이름으로 찾기" autocomplete="off"></label>
           <button id="foldAllBtn" type="button">모두 접기</button>
         </span>
       </div>
       <div class="tiles" id="pinTiles" aria-label="자주 쓰는 앱 목록"></div>
     </div>
     <div id="appRows"></div>
-    <div id="searchEmpty" hidden>맞는 앱이 없습니다. 다른 이름으로 찾아 보세요.</div>
   </section>
 
 </main>
@@ -3495,7 +3482,7 @@ body.portal-mode #moreFab{display:flex;}
 
     // 타일 드래그 재배치 + 순서 고정 (사용자별 저장)
     initTileOrder();
-    // 자주 쓰는 앱 · 줄 접기 · 앱 찾기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
+    // 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
     initFold();
 
     // 건의함: 현재 사용자 정보 전달 + 플로팅 버튼 표시
@@ -4294,7 +4281,8 @@ body.portal-mode #moreFab{display:flex;}
     };
   }
 
-  /* ══════════ 자주 쓰는 앱 · 줄 접기 · 앱 찾기 (대표 2026-10-24 시안 2 「추천대로」) ══════════
+  /* ══════════ 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2 「추천대로」) ══════════
+     (앱 찾기 검색칸은 같은 날 대표 「이부분 삭제 해달라」로 걷었다)
      「앱을 한화면에 다나오는것 말고 접어다 펴는 방식도 검토」 → 시안 넷 → 2번.
      ★ ☆ 로 고른 앱은 맨 위 «자주 쓰는 앱» 줄에 크게 · 네 줄은 머리를 누르면 «이름 칩»으로 접힌다.
      ★ 처음에는 네 줄 모두 «이름 칩»으로 접혀 있다 — 사람이 펴거나 접은 줄은 그대로 기억한다
@@ -4308,7 +4296,6 @@ body.portal-mode #moreFab{display:flex;}
        복제본을 누르면 진짜 타일을 대신 누른다 — 열기·준비중 안내·딱지 창이 한 길로만 돈다.
      ⚠ 폰에서 칩은 줄을 바꿔 흐른다 — 화면 밖으로 안 나간다(대표 지시, CSS 쪽 머리글). */
   var PIN_MAX = 7;          // 한도 — SAP 런치패드 권장(한 묶음 3~7개)을 따른다
-  var _searchQ = '';
   var _foldWired = false, _foldTimer = 0, _pinDrag = null;
 
   function pinKeys(){
@@ -4325,7 +4312,6 @@ body.portal-mode #moreFab{display:flex;}
   function pinnedVisible(){ return pinKeys().map(origTile).filter(tileShown); }
 
   function rowFolded(id){
-    if(_searchQ) return false;               // 찾는 중에는 다 펼친다 — 찾은 앱이 칩 속에 묻히지 않게
     var own = Object.prototype.hasOwnProperty;
     var f = (tilePrefs && tilePrefs.fold) || {};
     if(own.call(f, id)) return !!f[id];
@@ -4397,7 +4383,7 @@ body.portal-mode #moreFab{display:flex;}
       c.removeAttribute('id');
       c.removeAttribute('target');
       c.draggable = !tilePrefs.locked && !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기
-      c.classList.remove('dragging', 'tile-soon-first', 'srch-miss');
+      c.classList.remove('dragging', 'tile-soon-first');
       Array.prototype.forEach.call(c.querySelectorAll('[id]'), function(n){ n.removeAttribute('id'); });
       c.dataset.pinOf = orig.dataset.key;
       box.appendChild(c);
@@ -4433,7 +4419,7 @@ body.portal-mode #moreFab{display:flex;}
 
   function rowTilesShown(c){
     return Array.prototype.filter.call(c.children, function(t){
-      return tileShown(t) && !t.classList.contains('srch-miss');
+      return tileShown(t);
     }).length;
   }
   function applyFold(){
@@ -4445,7 +4431,6 @@ body.portal-mode #moreFab{display:flex;}
       if(!box || !head) return;
       var folded = rowFolded(r.id), shown = rowTilesShown(c);
       box.classList.toggle('fold', folded);
-      box.classList.toggle('srch-empty', !!_searchQ && shown === 0);   // 찾는 중 맞는 것이 없는 줄은 감춘다
       var exp = folded ? 'false' : 'true';
       if(head.getAttribute('aria-expanded') !== exp) head.setAttribute('aria-expanded', exp);
       var chev = head.querySelector('.fold-chev'), arrow = folded ? '▸' : '▾';
@@ -4458,11 +4443,9 @@ body.portal-mode #moreFab{display:flex;}
     if(btn){
       var lb = anyFold ? '모두 펴기' : '모두 접기';
       if(btn.textContent !== lb) btn.textContent = lb;
-      btn.hidden = !!_searchQ;
     }
   }
   function toggleRowFold(id){
-    if(_searchQ) return;      // 찾는 중에는 다 펼친 채
     var now = rowFolded(id);
     tilePrefs.fold = tilePrefs.fold || {};
     tilePrefs.fold[id] = !now;
@@ -4504,22 +4487,7 @@ body.portal-mode #moreFab{display:flex;}
     applyFold();
   }
 
-  /* 앱 찾기 — 이름과 설명(타일 말풍선)에서. 맞지 않는 타일은 class 로만 감춘다
-     (권한으로 감춘 style.display 와 섞이지 않게). */
-  function markSearch(){
-    var q = _searchQ.toLowerCase(), hits = 0;
-    allTiles().forEach(function(t){
-      var b = t.querySelector('b');
-      var hay = ((t.title || '') + ' ' + (b ? b.textContent : '')).toLowerCase();
-      var miss = !!q && hay.indexOf(q) < 0;
-      t.classList.toggle('srch-miss', miss);
-      if(!miss && tileShown(t)) hits++;
-    });
-    var rows = $('appRows'); if(rows) rows.classList.toggle('searching', !!q);
-    var pr = $('pinRow'); if(pr) pr.classList.toggle('searching', !!q);
-    var em = $('searchEmpty'); if(em) em.hidden = !(q && hits === 0);
-  }
-  function refreshFoldUi(){ ensurePinStars(); markSearch(); paintPins(); applyFold(); }
+  function refreshFoldUi(){ ensurePinStars(); paintPins(); applyFold(); }
 
   function initFold(){
     if(!_foldWired){
@@ -4540,11 +4508,6 @@ body.portal-mode #moreFab{display:flex;}
       pt.addEventListener('click', onPinCloneClick);
       pt.addEventListener('keydown', function(e){
         if((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pin-star')) onPinCloneClick(e);
-      });
-      var q = $('appSearch');
-      q.addEventListener('input', function(){ _searchQ = q.value.trim(); refreshFoldUi(); });
-      q.addEventListener('keydown', function(e){
-        if(e.key === 'Escape' && q.value){ q.value = ''; _searchQ = ''; refreshFoldUi(); }
       });
       $('foldAllBtn').addEventListener('click', foldAllToggle);
       /* 끌어 올리기 — 줄 안의 진짜 타일(접힌 칩도 같은 타일)을 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다.
