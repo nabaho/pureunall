@@ -118,5 +118,154 @@
     });
   }
 
-  return { parseExport: parseExport, maskMessages: maskMessages };
+  /* ── 사건번호 ──────────────────────────────────────────────────────────────
+     「경기2026부해3347」 = 지역 + 연도 4자리 + 사건부호 + 번호. 공백·하이픈을 지워 견준다.
+     ⚠ 사건부호는 «알려진 것만» 번호로 본다(잡음 방지) — 다만 업무관리에 이미 있는 번호는
+       낯선 부호여도 부르는 쪽이 extraKnown 으로 넘겨 잡는다. 부호를 더할 곳은 여기 한 곳. */
+  var CASE_CODES = ['부해', '부노', '부당', '부권', '구제', '차별', '구합', '구단', '구소', '가합', '가단', '가소', '카합', '카단'];
+  /* 지역 이름 — 「공문경기2026…」처럼 앞 글자가 딸려 들어오면 지역부터 자른다 */
+  var REGIONS = ['중앙', '서울', '부산', '경기', '인천', '대전', '대구', '광주', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+  var RE_CASE = /([가-힣]{2,4})\s*(20\d{2})\s*([가-힣]{1,3})\s*(\d{1,6})/g;
+
+  function normCaseNo(s) { return String(s == null ? '' : s).replace(/[\s\-. ]/g, ''); }
+
+  function extractCaseNos(text, extraKnown) {
+    var known = {};
+    (extraKnown || []).forEach(function (n) { known[normCaseNo(n)] = 1; });
+    var out = [], seen = {}, m;
+    var re = new RegExp(RE_CASE.source, 'g');
+    var s = String(text == null ? '' : text);
+    while ((m = re.exec(s))) {
+      var region = m[1];
+      for (var i = 0; i < region.length - 1; i++) {
+        if (REGIONS.indexOf(region.slice(i, i + 2)) >= 0) { region = region.slice(i); break; }
+      }
+      var no = region + m[2] + m[3] + m[4];
+      if ((CASE_CODES.indexOf(m[3]) >= 0 || known[no]) && !seen[no]) { seen[no] = 1; out.push(no); }
+    }
+    return out;
+  }
+
+  /* ── 업체명 후보 — 이름으로 업체 id 를 «채우지» 않는다, 후보만 낸다 ────────────
+     work.html 의 mlkSuggest 와 같은 뜻: 업체명 앞부분 minLen 글자 이상이 글에 들면 후보.
+     ⚠ minLen 은 부르는 쪽이 MLK_MIN_MATCH 를 넘긴다 — 같은 숫자를 두 곳에 두지 않는다. */
+  function koOnly(s) { return String(s == null ? '' : s).replace(/[^가-힣]/g, ''); }
+
+  function findCompanyKeys(text, companies, minLen) {
+    var hay = koOnly(text), out = [];
+    if (!hay) return out;
+    (companies || []).forEach(function (c) {
+      var co = koOnly(c.name);
+      for (var len = co.length; len >= minLen; len--) {
+        if (hay.indexOf(co.slice(0, len)) >= 0) { if (out.indexOf(c.key) < 0) out.push(c.key); break; }
+      }
+    });
+    return out;
+  }
+
+  /* ── 묶기 ──────────────────────────────────────────────────────────────────
+     · 번호·업체가 있는 글은 같은 날 같은 번호(또는 같은 업체)의 묶음에 붙고, 아니면 새 묶음.
+       같은 업체의 «다른 사건번호»는 따로 묶는다(번호가 둘 다 있고 겹치지 않을 때).
+     · 번호·업체가 없는 글은 같은 날, 직전 묶음에서 gapMin(30)분 안이면 그 묶음에 붙고,
+       아니면 그 날의 «미분류» 한 묶음에 모은다. */
+  var GAP_MIN = 30;
+
+  function hasAny(list, target) { return list.some(function (x) { return target.indexOf(x) >= 0; }); }
+
+  function unionInto(target, list) { list.forEach(function (x) { if (target.indexOf(x) < 0) target.push(x); }); }
+
+  function groupMessages(messages, opts) {
+    opts = opts || {};
+    var gap = (opts.gapMin == null ? GAP_MIN : opts.gapMin) * 60000;
+    var list = (messages || []).slice().sort(function (a, b) { return a.at - b.at; });
+    var groups = [], cur = null, noneByDay = {};
+
+    function open(day, anchor) {
+      var g = { day: day, caseNos: [], companyKeys: [], msgs: [], files: [], media: 0, anchor: anchor, lastAt: 0 };
+      groups.push(g);
+      return g;
+    }
+
+    list.forEach(function (m) {
+      var cases = extractCaseNos(m.text, opts.extraKnown);
+      var cos = opts.companies ? findCompanyKeys(m.text, opts.companies, opts.minLen || 3) : [];
+      var g;
+      if (cases.length || cos.length) {
+        var joins = cur && cur.day === m.day && cur.anchor !== 'none' &&
+          ((cases.length && cur.caseNos.length) ? hasAny(cases, cur.caseNos)
+            : (hasAny(cases, cur.caseNos) || hasAny(cos, cur.companyKeys)));
+        g = joins ? cur : open(m.day, cases.length ? 'case' : 'company');
+        unionInto(g.caseNos, cases); unionInto(g.companyKeys, cos);
+        if (g.caseNos.length) g.anchor = 'case';
+      } else if (cur && cur.day === m.day && cur.anchor !== 'none' && m.at - cur.lastAt <= gap) {
+        g = cur;
+      } else {
+        g = noneByDay[m.day] || (noneByDay[m.day] = open(m.day, 'none'));
+      }
+      g.msgs.push(m); unionInto(g.files, m.files || []); g.media += m.media || 0;
+      g.lastAt = m.at; cur = g;
+    });
+    return groups;
+  }
+
+  /* ── 진행 기록 한 줄 ────────────────────────────────────────────────────────
+     AI 없이 «사람별 첫 글» 발췌(최대 셋) + 첨부 이름. 잡담·첨부 줄은 문장에서 빼되 글 수에는 센다.
+     ⚠ 280자는 진행 기록 한 줄의 한도(설계서 5장). 넘으면 «글 쪽»을 자른다 — 첨부 이름은 지키지 않으면
+       어느 파일인지 알 수 없다. */
+  var LINE_MAX = 280;
+  var SENTENCE_MAX = 90;
+  var NOISE_RE = /^(네+|넵|넹|예|옙|확인(했습니다|했어요|하였습니다)?|감사합니다|고맙습니다|수고하셨습니다|알겠습니다|알겠어요|ㅇㅋ|ok|ㅎㅎ+|ㅋㅋ+|ㅠㅠ+|이모티콘|좋아요)[.!~\s]*$/i;
+
+  function sentenceOf(m) {
+    var text = String(m.text == null ? '' : m.text);
+    if ((m.files && m.files.length) || m.media) text = text.split('\n').slice(1).join('\n');   /* 첫 줄이 첨부 표시 */
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text || NOISE_RE.test(text)) return '';
+    return text.length > SENTENCE_MAX ? text.slice(0, SENTENCE_MAX) + '…' : text;
+  }
+
+  function digest(g) {
+    var who = [];
+    g.msgs.forEach(function (m) { if (who.indexOf(m.sender) < 0) who.push(m.sender); });
+    var names = who.slice(0, 3).join('·') + (who.length > 3 ? ' 외 ' + (who.length - 3) + '명' : '');
+    var head = '💬 카톡 · ' + names + ' — ';
+    var picked = {}, sentences = [], rest = 0;
+    g.msgs.forEach(function (m) {
+      var s = sentenceOf(m);
+      if (!s) return;
+      if (!picked[m.sender] && sentences.length < 3) { picked[m.sender] = 1; sentences.push(s); } else rest++;
+    });
+    var body = sentences.join(' / ') + (rest ? ' (+' + rest + '건)' : '');
+    if (!body) body = '글 ' + g.msgs.length + '건';
+    var tail = g.files.length ? ' · 📎 ' + g.files.join(', ') : '';
+    if (tail.length > 120) tail = tail.slice(0, 119) + '…';
+    var room = LINE_MAX - head.length - tail.length;
+    if (body.length > room) body = body.slice(0, Math.max(0, room - 1)) + '…';
+    return { text: head + body + tail, who: who, n: g.msgs.length };
+  }
+
+  /* ── 열쇠 ──────────────────────────────────────────────────────────────────
+     줄 열쇠 = (업무, 날짜, 방), 내용 열쇠 = (요약 글, 첨부). lid = 'K' + 줄 + 내용.
+     같은 파일을 다시 올리면 lid 가 같아 건너뛰고, 그 날 글이 늘면 줄 열쇠는 같고 내용 열쇠만 달라 «보강»이다.
+     해시는 32비트 둘(FNV-1a·djb2)을 이어 16진 16자 — BigInt 를 안 쓴다(옛 아이폰 사파리). */
+  function hash(str) {
+    var s = String(str), h1 = 0x811c9dc5, h2 = 5381;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+      h2 = (Math.imul(h2, 33) + c) >>> 0;
+    }
+    return ('00000000' + h1.toString(16)).slice(-8) + ('00000000' + h2.toString(16)).slice(-8);
+  }
+  function lineKey(itemId, day, room) { return hash([itemId, day, room].join('\u0001')); }
+  function logId(itemId, day, room, text, files) {
+    return 'K' + lineKey(itemId, day, room) + hash(String(text) + '\u0001' + (files || []).join('\u0002'));
+  }
+
+  return {
+    parseExport: parseExport, maskMessages: maskMessages,
+    CASE_CODES: CASE_CODES, GAP_MIN: GAP_MIN, LINE_MAX: LINE_MAX,
+    normCaseNo: normCaseNo, extractCaseNos: extractCaseNos, findCompanyKeys: findCompanyKeys,
+    groupMessages: groupMessages, digest: digest, hash: hash, lineKey: lineKey, logId: logId
+  };
 });
