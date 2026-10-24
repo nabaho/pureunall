@@ -299,12 +299,29 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-menu{position:absolute;right:0;top:calc(100% + 2px);z-index:40;width:380px;max-width:calc(100vw - 24px);
   background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.18);padding:12px;}
 .me-menu[hidden]{display:none;}
-.me-who{font-size:.86rem;font-weight:700;color:var(--ink);padding:0 2px 9px;margin-bottom:9px;border-bottom:1px solid #e2e8f0;line-height:1.35;}
+.me-who{display:flex;align-items:center;gap:10px;font-size:.86rem;font-weight:700;color:var(--ink);padding:0 2px 10px;margin-bottom:8px;
+  border-bottom:1px solid #e2e8f0;line-height:1.35;}
+.me-who .me-av{width:36px;height:36px;flex:none;cursor:default;font-size:.86rem;}
+.me-who-t{min-width:0;}
 .me-who small{display:block;font-size:.7rem;font-weight:500;color:var(--mute);margin-top:2px;word-break:break-all;}
-.me-menu #moneyBox{margin:0 0 6px;}
-.me-item{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:8px 6px;
+/* 내 메뉴 안의 돈 딱지는 «왼쪽 이름 · 오른쪽 값» 줄로 (대표 2026-10-24 「이부분도 추천대로 해라」 — 시안 1안 목업 모양).
+   머리줄의 검은 알약은 좁은 머리줄에 맞춘 모양이었다. 메뉴 안에서는 자리가 넉넉해 접었던 말(이번 달·N분 전·무료)도 다 편다.
+   ⚠ 경고 색(노랑·빨강)은 «남긴다» — 그 색이 «얼마나 썼나»를 말한다(#aiChip 풀이글).
+   ⚠ 고르개에 #moneyBox 를 넣어 «붙여 세우기»(#moneyBox[data-join="1"] #billChip) 모서리 규칙을 이긴다. */
+.me-menu #moneyBox{flex-direction:column;align-items:stretch;width:100%;gap:2px;margin:0 0 4px;}
+.me-menu #moneyBox #billChip,.me-menu #moneyBox #aiChip{width:100%;justify-content:flex-start;gap:8px;padding:8px 6px;
+  border:0;border-radius:8px;background:none;color:var(--sub);font-size:.8rem;}
+.me-menu #moneyBox #billChip:hover{background:#f8fafc;}
+.me-menu #moneyBox #billChip .amt,.me-menu #moneyBox #aiChip .amt{margin-left:auto;color:var(--ink);font-size:.82rem;}
+.me-menu #moneyBox #billChip .lb,.me-menu #moneyBox #aiChip .lb{display:inline;opacity:1;color:var(--sub);font-size:.8rem;}
+.me-menu #moneyBox #billChip .lb::after{content:' 사용액';}
+.me-menu #moneyBox #billChip .ago,.me-menu #moneyBox #aiChip .of{display:inline;opacity:1;color:var(--mute);font-size:.7rem;font-weight:600;}
+.me-menu #moneyBox #aiChip[data-tone="warn"]{background:#fffbeb;color:#854d0e;}
+.me-menu #moneyBox #aiChip[data-tone="over"]{background:#fef2f2;color:#991b1b;}
+.me-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:8px 6px;
   font-family:inherit;font-size:.8rem;color:var(--sub);cursor:pointer;}
 .me-item:hover{background:#f8fafc;color:var(--ink);}
+.me-go{margin-left:auto;font-size:.72rem;font-weight:700;color:var(--accent);}
 .pbar .me-menu .logout{display:block;width:100%;margin:6px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:9px;
   background:#ffffff;font-size:.8rem;text-align:center;}
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
@@ -1227,7 +1244,7 @@ body.portal-mode #moreFab{display:flex;}
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름·사번 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·사번·연결 상태는 머리줄(.pmeta)에 남는다. -->
       <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
-      <div class="me-who" id="meWho"></div>
+      <div class="me-who"><div class="avatar me-av" id="meAv" aria-hidden="true">·</div><div class="me-who-t" id="meWho"></div></div>
       <!-- 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안).
            ⚠ 상자 자체도 JS 가 켠다(moneyBoxSync) — 둘 다 감춰졌는데 상자만 남으면
              빈 테두리가 덩그러니 선다. -->
@@ -1248,7 +1265,7 @@ body.portal-mode #moreFab{display:flex;}
           <span class="of" id="aiOf"></span>
         </button>
       </div>
-      <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결</button>
+      <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
       <button class="logout" id="logoutBtn">로그아웃</button>
       </div>
       <div class="pmeta" id="meBtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="내 메뉴">
@@ -3326,6 +3343,7 @@ body.portal-mode #moreFab{display:flex;}
       + (mySid ? ' · ' + mySid.toUpperCase() : '') + '\n로그인 계정: ' + email; } catch(_e){}
     $('userAvatar').textContent = name ? name.charAt(0) : '·';
     /* 내 메뉴 맨 위 — 머리줄에서 접은 직책·권한·로그인 계정까지 다 적는다 */
+    try { $('meAv').textContent = name ? name.charAt(0) : '·'; } catch(_ma){}
     try { $('meWho').innerHTML = _e(name) + (title ? ' · ' + _e(title) : '')
       + (mySid ? ' · ' + _e(mySid.toUpperCase()) : '')
       + '<small>' + _e(email) + ' · ' + _e(role) + '</small>'; } catch(_mw){}

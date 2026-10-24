@@ -102,3 +102,13 @@ test('내 메뉴는 누르면 열리고 · 바깥을 누르거나 Esc 로 닫힌
   assert.match(fn, /'Enter'/, '★ 키보드로 열 수 없다');
   assert.match(fn, /meProfile[\s\S]*kkOpenProfile/, '★ 「내 정보」(카카오 연결)로 가는 길이 사라졌다');
 });
+
+/* 대표 2026-10-24 「이부분도 추천대로 해라」 — 내 메뉴 안의 사용액·AI 판독을 시안 1안 목업처럼 «줄»로 */
+test('내 메뉴 안의 돈 딱지는 «줄» — 값은 오른쪽 · 경고 색(노랑·빨강)은 남는다', () => {
+  const box = enter.match(/\.me-menu #moneyBox\{[^}]*\}/);
+  assert.ok(box && /flex-direction:column/.test(box[0]), '★ 사용액·AI 판독이 메뉴 안에서도 알약처럼 옆으로 붙어 선다');
+  assert.match(enter, /\.me-menu #moneyBox #billChip \.amt[^{]*\{[^}]*margin-left:auto/, '★ 금액이 오른쪽 끝에 안 선다');
+  /* 경고 색은 «얼마나 썼나»를 말한다 — 줄 모양으로 바꾸며 바탕을 지우더라도 경고 색은 되살려야 한다 */
+  assert.match(enter, /\.me-menu #moneyBox #aiChip\[data-tone="warn"\]\{background:/, '★ 한도에 가까워도 노란색이 안 보인다');
+  assert.match(enter, /\.me-menu #moneyBox #aiChip\[data-tone="over"\]\{background:/, '★ 한도를 넘어도 빨간색이 안 보인다');
+});
