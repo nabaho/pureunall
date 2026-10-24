@@ -143,7 +143,7 @@ test('★ 포털·설치·기업정보함이 «같은» 워커를 쓴다 — 다
    (직원은 폰 ⋯ 안 — 설정 창은 API 열쇠가 든 관리자 전용이라 직원에게 열지 않는다) ══ */
 
 test('★ 머리 카드에는 더 이상 없다 — PC 에도 떠서 「건의하기」를 카드 밖으로 밀어냈다', () => {
-  const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta">'));
+  const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta"'));
   assert.doesNotMatch(bar, /앱으로 깔기/, '★ 머리 카드에 다시 붙었습니다.');
 });
 

@@ -118,9 +118,15 @@ test('⑧ ★★ 잘 될 때만 「연결됨」 — 끊겼을 때는 긴 말 그
   assert.match(fn, /portalText\.title = label/, '★ 줄인 말의 전문을 덧말에 안 남겼습니다');
 });
 
-test('⑨ ★ 폰에서 자리잡기는 «상자»가 진다 — 딱지에 걸면 머리줄 첫 줄에 끼어든다', function () {
-  assert.match(ENTER, /\.pbar #moneyBox\{order:2;flex:0 0 auto;margin-top:7px;\}/,
-    '★★ 상자에 자리잡기가 안 걸려 있습니다');
+/* 2026-10-24 대표 머리 카드 1안 「아바타 하나」 — 돈 상자는 머리줄을 떠나 «내 메뉴»(#meMenu) 안으로 들어갔다.
+   그래서 «머리줄 몇째 자리에 앉는가»(옛 ⑨)는 더 지킬 것이 없다. 남는 규칙은 둘:
+   상자째 내 메뉴 안에 있을 것 · 딱지 하나에 자리잡기(order·margin)를 걸지 않을 것(상자와 다툰다). */
+test('⑨ ★ 돈 상자는 «상자째» 내 메뉴 안에 있다 — 딱지에 자리잡기를 따로 걸지 않는다', function () {
+  const 메뉴 = ENTER.indexOf('id="meMenu"');
+  const 끝 = ENTER.indexOf('id="meBtn"');
+  assert.ok(메뉴 > 0 && 끝 > 메뉴, '★★ 내 메뉴 자리를 못 찾았습니다');
+  const 안 = ENTER.slice(메뉴, 끝);
+  assert.ok(안.indexOf('id="moneyBox"') > 0, '★★ 돈 상자가 내 메뉴 밖(머리줄)에 남았습니다');
   const at = ENTER.indexOf('.pbar #billChip,.pbar #aiChip{padding:4px 8px');
   assert.ok(at > 0, '폰용 딱지 규칙을 못 찾았습니다');
   assert.ok(!/order:|margin-top:/.test(ENTER.slice(at, at + 90)),

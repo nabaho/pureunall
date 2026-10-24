@@ -27,7 +27,7 @@ test('포털 머리줄에서 PC/폰 전환 단추를 걷어냈다', () => {
 });
 
 test('머리줄에 남은 단추는 «가끔 쓰는 것»뿐이다', () => {
-  const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta">'));
+  const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta"'));
   /* 늘 쓰는 것(로그아웃·건의하기)만 남긴다 — 앱으로 깔기도 2026-09-23 설정 창·⋯ 로 옮겼다 */
   assert.ok(bar.indexOf('logoutBtn') > 0, '로그아웃이 사라졌습니다');
   assert.ok(bar.indexOf('sgFab') > 0, '건의하기가 사라졌습니다');
