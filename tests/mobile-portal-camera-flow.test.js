@@ -56,7 +56,11 @@ test('아래 왼쪽 단추는 모두 한 줄 바에 모은다', () => {
        pu-resilience.js 연결 경고 right:12px bottom:12px → 카메라와 같은 자리
      평소엔 안 보이다가 정작 문제가 생겼을 때 겹쳐서, 제일 봐야 할 알림이 가렸다.
      #fabBar 안에 넣으면 좌표를 잃고 옆으로 이어 붙으므로 몇 개가 늘어도 안 겹친다. */
-  assert.match(enter, /BAR_IDS = \['pu-backup-admin-button', 'pu-health-admin-badge', 'pu-resilience-badge'\]/);
+  /* ⚠ 목록을 글자 그대로 박지 않는다 — 2026-10-24 폰 아래 막대로 💬 건의하기(sgFab)가 «멀쩡하게» 더해졌다.
+     지키는 것은 «백업·복구 · 장애 알림 · 연결 경고가 바에 있다»다. */
+  const bar = (enter.match(/BAR_IDS = \[([^\]]*)\]/) || [])[1] || '';
+  ['pu-backup-admin-button', 'pu-health-admin-badge', 'pu-resilience-badge'].forEach((id) =>
+    assert.ok(bar.indexOf("'" + id + "'") >= 0, '★ ' + id + ' 가 아래 바에 안 들어간다 — 제 좌표로 떠서 다른 단추와 겹친다'));
   assert.match(enter, /#fabBar\{[^}]*left:var\(--fab-edge\);bottom:var\(--fab-bottom\)/);
   // 바 안에서는 각자 좌표를 잃어야 한다
   assert.match(enter, /#fabBar > \*\{position:static!important/);

@@ -405,8 +405,26 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   border-radius:99px;padding:4px 12px;font-size:.68rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex:none;}
 #foldAllBtn:hover{border-color:var(--accent);color:var(--accent);}
 @media (max-width:640px){
-  .tilerow.fold .tiles{padding-left:4px;}
+  .tilerow.fold .tiles{padding-left:4px;gap:6px;}
   .pinrow{padding:5px 4px 0;}
+  /* ── 폰은 칩을 «얇게» (대표 2026-10-24 폰 화면 안 1) — 한 화면에 앱이 더 들어온다 ── */
+  .tilerow.fold .tile{padding:4px 9px 4px 5px;}
+  .tilerow.fold .tile .ic{width:20px;height:20px;font-size:.85rem;}
+  .tilerow.fold .tile b{font-size:.76rem;}
+  /* ── 폰의 «자주 쓰는 앱»도 같은 얇은 칩 — 큰 동그라미 하나가 상자를 다 차지했다 ──
+     ★ 별표는 칩 오른쪽 끝에 남긴다 — 폰에서는 여기서 ★ 를 눌러 뺀다(끌기가 없다).
+     ⚠ 칸 수는 화면 폭을 따라 준다(auto-fill) — 화면 밖으로 안 나간다. */
+  #pinTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;padding:2px 2px 6px;}
+  #pinTiles .tile{flex-direction:row;width:auto;min-width:0;gap:5px;padding:4px 30px 4px 5px;border-radius:99px;transition:none;
+    background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.9);box-shadow:0 1px 3px rgba(20,30,80,.07);}
+  #pinTiles .tile .ic{position:static;width:20px;height:20px;font-size:.85rem;margin:0;border:0;background:none;backdrop-filter:none;flex:none;transition:none;}
+  #pinTiles .tile .ic svg{width:100%;height:100%;}
+  #pinTiles .tile b{font-size:.76rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #pinTiles .tile .tx span,#pinTiles .tile .newtab{display:none;}
+  #pinTiles .pin-star{right:5px;bottom:auto;top:50%;margin-top:-10px;}
+  #pinTiles .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;
+    font-size:10px;border-width:2px;z-index:2;}
+  #pinTiles .tile .nl-warn{right:-4px;top:-8px;min-width:18px;height:18px;line-height:18px;padding:0 5px;}
 }
 .tiles.dropzone{outline:2px dashed rgba(30,64,175,.35);outline-offset:3px;border-radius:12px;}
 .tile{background:none;border:none;border-radius:14px;padding:14px 8px;width:96px;
@@ -702,6 +720,29 @@ body.portal-mode #moreFab{display:flex;}
   @keyframes dockIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 }
 @media(max-width:520px){ #cfgFab{padding:6px 11px;font-size:.7rem;} }
+/* ══ 폰 아래 막대 (대표 2026-10-24 폰 화면 안 1 「추천대로.」) ══
+   떠 있던 단추(⋯·백업·복구·📷)가 앱을 가렸다(보내 주신 화면: 「회생광고」 위에 겹침).
+   → 아래 한 줄 바(#fabBar)를 화면 맨 아래 «전체 폭 막대»로 펴고, 📷 는 막대 가운데에 올리고,
+     💬 건의하기는 머리줄에서 막대 오른쪽으로 옮긴다(BAR_IDS 의 sgFab — 폰에서만, PC 로 가면 제자리).
+     본문은 막대 높이만큼 아래를 비운다 — 마지막 줄이 막대에 깔리지 않는다.
+   ⚠ 건의하기를 «스스로» fixed 로 띄우지 않는다 — 예전(2026-08-15)에 머리 카드(backdrop-filter)가
+     fixed 의 기준이 되어 삼성·네이버 브라우저에서 화면 위로 튀었다. 막대(body 의 자식) 안으로 «옮기면» 그 일이 없다.
+   ⚠ 백업·복구는 막대 위에 그대로 둔다(2026-08-15 「자주 쓰니 밖에」) — 막대가 넓어져 자리가 있다. */
+@media(max-width:520px){
+  body.portal-mode #fabBar{left:0;right:0;bottom:0;max-width:none;flex-wrap:nowrap;justify-content:flex-start;gap:8px;
+    min-height:58px;padding:7px 14px calc(7px + env(safe-area-inset-bottom));
+    background:rgba(248,251,255,.96);border-top:1px solid rgba(10,20,60,.1);box-shadow:0 -4px 16px rgba(20,30,80,.06);}
+  #fabBar > #sgFab{position:relative!important;margin-left:auto!important;}   /* 오른쪽 끝 · 숫자 배지 자리는 제 몸 기준 */
+  body.portal-mode #camFab{left:50%;right:auto;margin-left:-27px;width:54px;height:54px;z-index:62;
+    bottom:calc(16px + env(safe-area-inset-bottom));}
+  #moreDock{bottom:calc(68px + env(safe-area-inset-bottom));}
+  .portal{padding-bottom:92px;}
+}
+/* 아주 좁은 폰(320px 안팎) — 백업·복구 알약이 가운데 📷 와 겹쳤다(재어 보니 5px). 막대 여백·⋯ 크기를 한 치수 줄인다 */
+@media(max-width:380px){
+  body.portal-mode #fabBar{padding-left:8px;padding-right:8px;gap:6px;}
+  #moreFab{width:40px;height:40px;}
+}
 /* 사용액 자세히 보기 팝업 — 설정창과 같은 모양(#cfgModal)을 따른다 */
 #billModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:76;align-items:center;justify-content:center;padding:16px;}
 #billModal .box{background:#fff;border-radius:16px;width:860px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
@@ -6023,7 +6064,9 @@ body.portal-mode #moreFab{display:flex;}
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
        ⋯·카메라와 겹쳤다. 바 안에 넣으면 좌표를 잃고 옆으로 이어 붙는다. */
-    var BAR_IDS = ['pu-backup-admin-button', 'pu-health-admin-badge', 'pu-resilience-badge'];
+    /* 💬 건의하기(sgFab)도 폰에서는 이 막대 오른쪽으로 옮긴다 (대표 2026-10-24 폰 화면 안 1) —
+       머리줄이 한 줄이 되고, 막대(body 의 자식) 안이라 fixed 기준이 꼬일 일이 없다. PC 로 가면 release() 가 제자리로. */
+    var BAR_IDS = ['pu-backup-admin-button', 'pu-health-admin-badge', 'pu-resilience-badge', 'sgFab'];
     var phone = window.matchMedia('(max-width:520px)');
     var dock = $('moreDock'), fab = $('moreFab'), bar = $('fabBar');
     if(!dock || !fab || !bar) return;
