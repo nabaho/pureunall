@@ -175,7 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=28">
+<link rel="stylesheet" href="css/pu-erp.css?v=30">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -75318,7 +75318,7 @@ function PerfManagement(props){
         h('span',null,'🚪 퇴사자 제외')
       ),
       h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', padding:window.innerWidth<=768?'3px 6px':'6px 12px',
-        background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', marginBottom:_pfM?0:'4px', flexShrink:_pfM?0:undefined } },
+        background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', marginBottom:_pfM?0:'4px', flexWrap:_pfM?'wrap':undefined, minWidth:_pfM?0:undefined } },
         h('span', { style:{ fontSize:'13px', color:'#1e40af', fontWeight:700 } }, '👁 조회 전용'),
         window.innerWidth > 768 && h('span', { style:{ fontSize:'13px', color:'#2563eb', flex:1 } }, '금액 수정은 입금관리에서 확정하면 자동으로 반영됩니다'),
         h('button', { onClick:function(){ onNav('fin/income'); },
@@ -82972,10 +82972,10 @@ function PayrollManagement(props){
       h('span', { style:{ fontWeight:700, color:'#1e40af' } }, payYM+' 지급'),
       !_pmM && h('span', { style:{ color:'#64748b', fontSize:'13px', marginLeft:'auto' } }, '※ 화면의 월(ym)은 근무월. 지급은 다음달입니다.')
     ),
-    h('div', { style:{ display:'flex', gap: window.innerWidth<=768?'5px':'4px', marginBottom:'10px',
-      borderBottom:'2px solid #e2e8f0', overflowX: window.innerWidth<=768?'auto':'visible',
-      flexWrap: window.innerWidth<=768?'nowrap':'wrap', WebkitOverflowScrolling:'touch',
-      paddingBottom: window.innerWidth<=768?'4px':'0' } },
+    /* 폰은 탭 넷을 2칸 격자로 — 옆으로 밀어야 «비정규직»·«개인이력» 이 보였다 (2026-10-25 대표 «좌우로 너무 많이 나가고») */
+    h('div', { style: window.innerWidth<=768
+      ? { display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:'6px', marginBottom:'8px' }
+      : { display:'flex', gap:'4px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0', overflowX:'visible', flexWrap:'wrap', paddingBottom:'0' } },
       TABS.map(function(x){
         var on = tab === x.v;
         var dragging = dragV === x.v;
@@ -82992,7 +82992,7 @@ function PayrollManagement(props){
             background: on?'#1e40af':(_m?'#f8fafc':'transparent'),
             color: on?'#fff':'#475569',
             border: _m?'1px solid '+( on?'#1e40af':'#cbd5e1'):'none',
-            flexShrink: _m?0:undefined, whiteSpace:'nowrap',
+            flexShrink: _m?0:undefined, whiteSpace:'nowrap', overflow: _m?'hidden':undefined, textOverflow: _m?'ellipsis':undefined,
             marginBottom:'0' } }, x.label);
       })
     ),
@@ -85463,6 +85463,15 @@ function PayrollPayslip(props){
   }
 
   var _mob = window.innerWidth <= 768;
+  /* 폰은 «급여 입력» 을 접어 두고 명세서 숫자를 먼저 보인다 — 달·직원을 바꾸면 다시 접힌다. 넓은 화면은 늘 펼침 */
+  var ioS = useState(''); var inOpenKey = ioS[0]; var setInOpenKey = ioS[1];
+  var baS = useState(''); var basisOpenKey = baS[0]; var setBasisOpenKey = baS[1];
+  var trS = useState(''); var trendOpenKey = trS[0]; var setTrendOpenKey = trS[1];
+  var _foldKey = u.sid + '|' + props.selYM;
+  var inOpen = !_mob || inOpenKey === _foldKey;
+  var basisOpen = !_mob || basisOpenKey === _foldKey;
+  var trendOpen = !_mob || trendOpenKey === _foldKey;
+  var foldBar = { display:'flex', justifyContent:'space-between', alignItems:'center', gap:'6px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'9px 12px', fontSize:'12.5px', color:'#475569', cursor:'pointer', margin:'0 0 8px', whiteSpace:'nowrap' };
   var inputStyle = {width:'100%', padding:_mob?'3px 4px':'4px 6px', border:'1px solid #fbbf24', borderRadius:'5px', fontSize:'12px', boxSizing:'border-box'};
   var labelStyle = {color:'#854d0e', marginBottom:'1px', fontSize:_mob?'10px':'10.5px', fontWeight:600};
 
@@ -85479,7 +85488,7 @@ function PayrollPayslip(props){
           users.map(function(x){return h('option',{key:x.sid,value:x.sid},staffPickLabel(x));}))
       ),
       // 줄2: 버튼들 (가로 스크롤)
-      h('div', {style:{display:'flex',gap:'6px',overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:'2px'}},
+      h('div', {style: _mob ? {display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:'6px'} : {display:'flex',gap:'6px',overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:'2px'}},
         h('button', { onClick:function(){ emailSlip(sid); },
           title:'현재 직원의 등록된 이메일로 발송',
           style:{padding:'8px 12px',background:'#16a34a',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}, '📧 메일 송부'),
@@ -85499,13 +85508,17 @@ function PayrollPayslip(props){
     // ── 좌우 분할: [좌: 입력 폼 + 잠금 + 추이 + 변경이력] / [우: 명세서 본문] ──
     h('div', { className:'pay-grid', style:{display:'grid', gridTemplateColumns: window.innerWidth<=768?'1fr':'minmax(0,1fr) minmax(0,1fr)', gap: window.innerWidth<=768?'10px':'14px', alignItems:'flex-start'} },
       // ── 좌측 컬럼 시작
-      h('div', {style:{order: window.innerWidth<=768?1:2}},
+      h('div', {style: _mob ? {display:'contents'} : {order:2}},
     // ── 입력 영역 (인쇄 시 숨김) ──
-    h('div', {className:'no-print', style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:_mob?'10px 10px':'12px 14px',marginBottom:'8px'}},
+    h('div', {className:'no-print', style:{order:_mob?1:undefined,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:_mob?'8px 10px':'12px 14px',marginBottom:'8px'}},
       // ① 기본 입력 (부양가족 / 일할계산)
-      h('div', {style:{fontSize:_mob?'10.5px':'11.5px',fontWeight:700,color:'#854d0e',marginBottom:_mob?'4px':'6px'}},
-        '⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (' + erpOrdinaryWageFormula(calc) + ')'),
-      h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}}),
+      h('div', {onClick: _mob ? function(){ setInOpenKey(inOpen ? '' : _foldKey); } : undefined,
+          style:{fontSize:_mob?'13px':'11.5px',fontWeight:700,color:'#854d0e',marginBottom:(_mob && !inOpen)?'0':(_mob?'6px':'6px'),display:'flex',justifyContent:'space-between',alignItems:'center',gap:'6px',cursor:_mob?'pointer':'default'}},
+        h('span', {style:{whiteSpace:_mob?'nowrap':'normal'}}, _mob ? ('⚙️ 급여 입력 ' + (inOpen ? '▴' : '▾')) : ('⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (' + erpOrdinaryWageFormula(calc) + ')')),
+        _mob && h('span', {style:{fontWeight:400,fontSize:'12px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, '부양 ' + (rec.dependents||1) + ' · ' + (calc.prorated ? '일할 ' + Math.round(calc.prorate*100) + '%' : '일할 없음'))),
+      h('div', {style:{display: inOpen ? 'block' : 'none'}},
+      _mob && h('div', {style:{fontSize:'11px',color:'#854d0e',marginBottom:'6px'}}, '통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (' + erpOrdinaryWageFormula(calc) + ')'),
+      h('div', {style:{display:'grid',gridTemplateColumns:_mob?'minmax(0,1fr) minmax(0,1fr)':'1fr 1fr 1fr',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}},
         h('label', null,
           h('div',{style:labelStyle},'부양가족 수'),
           h('input',{type:'number',min:1,max:10,value:rec.dependents||1,
@@ -85518,19 +85531,20 @@ function PayrollPayslip(props){
             onChange:function(e){updateField('workDays', parseInt(e.target.value)||0);},
             style:inputStyle}),
           _mob ? null : (calc.prorated ? h('div',{style:{fontSize:'10.5px',color:'#dc2626',marginTop:'1px',fontWeight:700}},
-            '일할 적용 ' + Math.round(calc.prorate*100) + '%') : null),
-        h('label', null,
+            '일할 적용 ' + Math.round(calc.prorate*100) + '%') : null)),
+        h('label', _mob ? {style:{gridColumn:'1/-1'}} : null,
           h('div',{style:labelStyle},'기본급 (직원관리 자동)'),
           h('input',{type:'text',value:(rec.baseSalary||0).toLocaleString(),
             onChange:function(e){updateField('baseSalary', parseInt(e.target.value.replace(/[^0-9]/g,''))||0);},
             style:Object.assign({},inputStyle,{textAlign:'right',fontFamily:'monospace'})}),
           _mob ? null : (calc.prorated ? h('div',{style:{fontSize:'10.5px',color:'#854d0e',marginTop:'1px',fontFamily:'monospace'}},
             '일할 ' + calc.baseSalaryProrated.toLocaleString() + '원') : null)
+        )
       ),
       // ② 비과세 항목
       h('div', {style:{fontSize:_mob?'10px':'11px',fontWeight:700,color:'#854d0e',marginTop:_mob?'5px':'8px',marginBottom:_mob?'2px':'4px'}},
         '🟢 비과세 항목 (4대보험·소득세 산정 시 제외, 한도 월 20만원)'),
-      h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}}),
+      h('div', {style:{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}},
         h('label', null,
           h('div',{style:labelStyle},'식대 (≤20만)'),
           h('input',{type:'text',value:(rec.nonTaxableMeal||0).toLocaleString(),
@@ -85550,7 +85564,7 @@ function PayrollPayslip(props){
       // ③ 법정수당 시간
       h('div', {style:{fontSize:_mob?'10px':'11px',fontWeight:700,color:'#854d0e',marginTop:_mob?'5px':'8px',marginBottom:_mob?'2px':'4px'}},
         '⏱ 법정수당 시간 (근로기준법 56조)'),
-      h('div', {style:{display:'grid',gridTemplateColumns:_mob?'1fr 1fr':'1fr 1fr 1fr 1fr',gap:_mob?'5px':'8px',fontSize:'11px'}},
+      h('div', {style:{display:'grid',gridTemplateColumns:_mob?'minmax(0,1fr) minmax(0,1fr)':'1fr 1fr 1fr 1fr',gap:_mob?'5px':'8px',fontSize:'11px'}},
         h('label', null,
           h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:'2px'}},
             h('span',{style:labelStyle},'연장 ×1.5'),
@@ -85603,7 +85617,7 @@ function PayrollPayslip(props){
         ? h('div',{style:{fontSize:'10.5px',color:'#94a3b8',padding:'4px 0'}}, '등록된 실비가 없습니다')
         : h('div', {style:{display:'flex',flexDirection:'column',gap:'4px'}},
             (rec.reimbursements||[]).map(function(rb, i){
-              return h('div', {key:i, style:{display:'grid',gridTemplateColumns:'90px 80px 100px 1fr 24px',gap:'4px',alignItems:'center'}},
+              return h('div', {key:i, style:{display:'grid',gridTemplateColumns:_mob?'minmax(0,1fr) minmax(0,1fr)':'90px 80px 100px 1fr 24px',gap:'4px',alignItems:'center'}},
                 h(KoreanDatePicker, {value:rb.date||'',
                   onChange:function(e){
                     var list=(rec.reimbursements||[]).slice();
@@ -85644,9 +85658,10 @@ function PayrollPayslip(props){
               );
             })
           )
+      )
     ),
     // 잠금 상태 표시
-    isPayrollLocked(props.selYM) && h('div',{className:'no-print',style:{maxWidth:'700px',margin:'0 auto 10px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'7px 14px',fontSize:'11.5px',color:'#991b1b',fontWeight:700}},
+    isPayrollLocked(props.selYM) && h('div',{className:'no-print',style:{order:_mob?1:undefined,maxWidth:'700px',margin:'0 auto 10px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'7px 14px',fontSize:'11.5px',color:'#991b1b',fontWeight:700}},
       '🔒 ' + props.selYM + ' 잠김 (수정 불가, 권한자만 해제)'),
     // ── 12개월 급여 추이 ──
     (function(){
@@ -85659,8 +85674,8 @@ function PayrollPayslip(props){
       });
       var prevCalc = prevRec ? calcPayroll(prevRec) : null;
       var diff = prevCalc ? calc.netPay - prevCalc.netPay : 0;
-      return h('div',{className:'no-print', style:{maxWidth:'700px',margin:'0 auto 10px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px',padding:'10px 14px'}},
-        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
+      var _chart = h('div',{className:'no-print', style:{display: trendOpen ? 'block' : 'none',maxWidth:'700px',margin:'0 auto 10px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px',padding:'10px 14px'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px',flexWrap:'wrap',gap:'4px'}},
           h('div',{style:{fontSize:'11.5px',fontWeight:700,color:'#475569'}}, '📊 ' + u.name + ' 최근 12개월 실지급액 추이'),
           prevCalc ? h('div',{style:{fontSize:'11px',color: diff>0?'#16a34a':diff<0?'#dc2626':'#64748b',fontWeight:600}},
             '전월 대비 '+(diff>0?'+':'')+diff.toLocaleString()+'원' + (Math.abs(diff)>500000?' ⚠️':'')) : null
@@ -85680,24 +85695,28 @@ function PayrollPayslip(props){
           })
         )
       );
+      return h('div', {className:'no-print', style:{order:_mob?3:undefined}},
+        _mob && h('div', {onClick:function(){ setTrendOpenKey(trendOpen ? '' : _foldKey); }, style:foldBar},
+          h('span', null, '📊 12개월 실지급 추이'), h('span', null, trendOpen ? '▴' : '▸')),
+        _chart);
     })(),
     // ── 변경이력 토글 ──
-    h(PayslipAuditViewer, { empSid: u.sid, ym: props.selYM, refresh: refresh })
+    h('div', {style:{order:_mob?4:undefined}}, h(PayslipAuditViewer, { empSid: u.sid, ym: props.selYM, refresh: refresh }))
       ), // ── 좌측 컬럼 닫기
       // ── 우측 컬럼 시작 (명세서 본문)
       h('div', {style:{order: window.innerWidth<=768?2:1}},
     // 명세서 본문
-    h('div', { style:{background:'#fff',border:'1px solid #cbd5e1',borderRadius:'8px',padding:'30px',maxWidth:'700px',margin:'0 auto'}},
-      h('div', { style:{textAlign:'center',marginBottom:'24px',borderBottom:'2px solid #1e40af',paddingBottom:'12px'}},
+    h('div', { style:{background:'#fff',border:'1px solid #cbd5e1',borderRadius:'8px',padding:_mob?'12px':'30px',maxWidth:'700px',margin:'0 auto'}},
+      h('div', { style:{textAlign:'center',marginBottom:_mob?'10px':'24px',borderBottom:'2px solid #1e40af',paddingBottom:_mob?'8px':'12px'}},
         h('div', {style:{fontSize:'11px',color:'#64748b',marginBottom:'4px'}},'푸른노무법인'),
-        h('div', {style:{fontSize:'22px',fontWeight:800,color:'#1e293b'}}, props.selYM+' 급여명세서')
+        h('div', {style:{fontSize:_mob?'17px':'22px',fontWeight:800,color:'#1e293b'}}, props.selYM+' 급여명세서')
       ),
-      h('table', {style:{width:'100%',marginBottom:'18px',fontSize:'12.5px',borderCollapse:'collapse'}},
+      h('table', {style:{width:'100%',marginBottom:_mob?'10px':'18px',fontSize:'12.5px',borderCollapse:'collapse'}},
         h('tbody', null,
           h('tr', null,
-            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:'90px',fontWeight:700}}, '성명'),
+            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:_mob?'44px':'90px',fontWeight:700,whiteSpace:'nowrap'}}, '성명'),
             h('td', {style:{padding:'5px 8px',borderRight:'1px solid #e2e8f0'}}, u.name),
-            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:'90px',fontWeight:700}}, '사번'),
+            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:_mob?'44px':'90px',fontWeight:700,whiteSpace:'nowrap'}}, '사번'),
             h('td', {style:{padding:'5px 8px'}}, u.sid)),
           h('tr', null,
             h('td', {style:{padding:'5px 8px',background:'#f8fafc',fontWeight:700}}, '직책'),
@@ -85847,7 +85866,9 @@ function PayrollPayslip(props){
         );
       })(),
       // 산출근거 (근로기준법 48조) — 지급 근거(좌) · 공제 근거(우), 위 지급/공제 항목 순서대로
-      h('div', {style:{marginTop:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px'}},
+      _mob && h('div', {onClick:function(){ setBasisOpenKey(basisOpen ? '' : _foldKey); }, style:Object.assign({}, foldBar, {marginTop:'10px', marginBottom:0, background:'#f8fafc'})},
+        h('span', null, '📋 지급·공제 근거 보기'), h('span', null, basisOpen ? '▴' : '▸')),
+      h('div', {style:{marginTop:'12px',display: basisOpen ? 'grid' : 'none',gridTemplateColumns:_mob?'minmax(0,1fr)':'1fr 1fr',gap:'14px'}},
         h('div', {style:{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'5px',padding:'8px 12px',fontSize:'10px',color:'#166534',lineHeight:'1.7'}},
           h('div',{style:{fontWeight:700,color:'#166534',marginBottom:'3px'}},'📋 지급 근거'),
           calc.prorated
@@ -89820,6 +89841,8 @@ function ERPMain(props){
     if(hashMenu && !_inApp(hashMenu) && _menuAllowed(hashMenu) && typeof puAppGo === 'function') puAppGo(hashMenu);
   }, []);
   var s = useState(defaultMenu); var current = s[0]; var setCurrent = s[1];
+  /* 지금 열린 메뉴의 묶음(hr·fin·biz …)을 body 에 적어 둔다 — 폰 CSS 가 «인사관리만» 고르려고 (2026-10-25) */
+  useEffect(function(){ try { document.body.setAttribute('data-erp-group', String(current || '').split('/')[0]); } catch(e){} }, [current]);
   var tourS = useState(false); var showTour = tourS[0]; var setShowTour = tourS[1];
   var _fpRaw = localStorage.getItem('pureun_v6_force_pw') || '';
   // 저장된 force_pw가 현재 로그인 사용자와 다르면 이전 사용자 잔재 → 무시·삭제

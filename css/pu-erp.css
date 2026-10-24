@@ -1431,3 +1431,11 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .ld-tb th.ld-c-act{ z-index:4; }
   .ld-tb td.ld-c-act{ background:inherit; }
 }
+
+/* ══════ 인사관리 폰 — 옆으로 미는 줄을 없앤다 (대표 지시 2026-10-25 「좌우로 너무 많이 나가고」) ══════
+   칩·탭·단추 줄이 «한 줄 + 옆으로 밀기» 라 끝의 것이 화면 밖에 숨었다. 인사관리 메뉴(body[data-erp-group=hr])에서만 줄바꿈으로 바꾼다.
+   ⚠ 재무·사무관리는 그대로다(재무는 글자 크기 말고는 손대지 않는다). 표를 감싼 상자(display:block)는 그대로 옆으로 민다 — 표는 칸이 많아 어쩔 수 없다. */
+@media (max-width:768px){
+  body[data-erp-group="hr"] main [style*="overflow-x: auto"][style*="display: flex"],
+  body[data-erp-group="hr"] main [style*="overflow: auto hidden"][style*="display: flex"]{ flex-wrap:wrap !important; overflow:visible !important; }
+}
