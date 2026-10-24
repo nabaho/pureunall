@@ -20799,6 +20799,31 @@ function purgeAllFiles(){ if(!confirm('모든 원본 파일을 삭제합니다.\
    아무 말도 안 했고** ②알려도 1.5초 뒤 사라지는 토스트였다. 그래서 마지막 백업이 두 달 넘었는데도
    아무도 몰랐고, 브라우저 자료가 지워졌을 때 되살릴 파일이 없었다(위촉장 197건 사고).
    → 안 사라지는 띠 + 「지금 백업」 버튼으로 바꾼다. */
+/* ★★ 클라우드가 «매일 저절로» 백업한다 — 그것이 신선하면 이 띠는 뜨지 않는다 (대표 지시 2026-10-24
+   「항상 이게 나오는데 자동으로 백업하게 해라 · 폰에서도 안 나오게」).
+   ■ 사실: PUBackup 이 로그인한 기기가 앱을 열 때 하루 한 번 kcareer/{uid} 통째 사본을 클라우드(systemBackups)에 남기고
+     30일 지킨다(위촉장 197건 사고 뒤 만든 되살리기 — kcRecoverOpen). 그런데 이 띠는 «내 컴퓨터로 내려받은 파일»(last_backup)만
+     보아서, 클라우드 사본이 매일 쌓여도 14일마다 «백업이 없다»고 떠들었다 — 폰에서도.
+   ■ 이제: 클라우드 일일 사본이 «3일 안»이면 백업된 것으로 본다 → 띠를 숨기고 last_backup 에 «자동» 표시를 남긴다
+     (last_backup 은 기기끼리 오가므로 폰에서도 멎는다 — FB_SKIP 에 넣지 말 것).
+   ⚠ 클라우드 사본을 «못 읽거나 오래됐으면» 예전처럼 띠를 띄운다 — 197건 사고를 막은 띠이므로 약하게 고치지 않는다.
+   ⚠ 로그인 전이면 6초 기다렸다 한 번 다시 본다(부팅 때 uid 가 아직 없다). */
+var _bkWait=false;
+function kcCloudBackupGate(보이기){
+  var 오늘=new Date(), 기준=function(n){ var d=new Date(오늘.getTime()-n*86400000); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); };
+  try{
+    fbDb.ref('systemBackupsIndex/kcareer').orderByKey().limitToLast(4).once('value').then(function(snap){
+      var v=snap.val()||{}, 최근=Object.keys(v).filter(function(k){ return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort().pop()||'';
+      if(최근 && 최근>=기준(3)){
+        var el=document.getElementById('bkNotice'); if(el) el.style.display='none';
+        var lb=get('last_backup'), 이전=(lb&&!Array.isArray(lb)&&lb.d)?new Date(lb.d).getTime():0;
+        if(Date.now()-이전>86400000) _safe(function(){ set('last_backup',{ d:new Date().toISOString(), auto:'cloud', cloudDay:최근 }); });
+        return;
+      }
+      보이기();
+    }, function(){ 보이기(); });
+  }catch(e){ 보이기(); }
+}
 function checkBackupReminder(){
   var lb=get('last_backup'); var d=(lb&&!Array.isArray(lb)&&lb.d)?lb.d:null;
   var total=FB_COUNT_KEYS.reduce(function(s,k){ return s+((get(k)||[]).length); },0);
@@ -20807,10 +20832,15 @@ function checkBackupReminder(){
   if(days!=null && days<14) return;
   var el=document.getElementById('bkNotice'), msg=document.getElementById('bkMsg');
   if(!el||!msg) return;
-  msg.textContent=(days==null)
-    ? ('💾 기록 '+total+'건이 쌓였는데 아직 내 컴퓨터로 백업한 적이 없습니다. 브라우저 자료가 지워지면 되살릴 파일이 없습니다.')
-    : ('💾 마지막 백업이 '+days+'일 전입니다 (기록 '+total+'건). 브라우저 자료가 지워지면 그 사이 작업은 되살릴 수 없습니다.');
-  el.style.display='block';
+  var 보이기=function(){
+    msg.textContent=(days==null)
+      ? ('💾 기록 '+total+'건이 쌓였는데 아직 내 컴퓨터로 백업한 적이 없습니다. 브라우저 자료가 지워지면 되살릴 파일이 없습니다.')
+      : ('💾 마지막 백업이 '+days+'일 전입니다 (기록 '+total+'건). 브라우저 자료가 지워지면 그 사이 작업은 되살릴 수 없습니다.');
+    el.style.display='block';
+  };
+  if(typeof fbUid!=='undefined' && fbUid && typeof fbDb!=='undefined' && fbDb){ kcCloudBackupGate(보이기); return; }
+  if(!_bkWait){ _bkWait=true; setTimeout(function(){ _bkWait=false;
+    if(typeof fbUid!=='undefined' && fbUid && typeof fbDb!=='undefined' && fbDb) kcCloudBackupGate(보이기); else 보이기(); }, 6000); }
 }
 
 /* ===== 신분증 관리 (PIN 보안) ===== */
