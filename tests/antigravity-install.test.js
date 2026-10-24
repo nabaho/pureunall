@@ -12,6 +12,7 @@
  *   ④ 조용히 깔지 않는다
  *   ⑤ REA 는 공식 꾸러미 rea-agents 의 setup 을 «안티그래비티 하나»에만, 승인을 건너뛰지 않고(--yes 없이) 돌린다
  *   ⑥ 윈도 PowerShell 5.1 이 한글을 읽게 BOM 이 있고, .bat 는 ASCII 다(cmd 는 UTF-8 을 깨뜨린다)
+ *   ⑦ 바탕화면 바로가기를 만든다 — 자리는 GetFolderPath('Desktop') 로 묻는다(OneDrive 가 옮긴 바탕화면) (2026-10-24 「바탕화면에 안 보인다」)
  * 실행: node --test tests/antigravity-install.test.js */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -21,7 +22,7 @@ const path = require('node:path');
 const dir = path.join(__dirname, '..', 'tools', 'antigravity');
 const raw = fs.readFileSync(path.join(dir, 'install.ps1'));
 const ps = raw.toString('utf8');
-const bat = fs.readFileSync(path.join(dir, 'install-antigravity.bat'));
+const bats = fs.readdirSync(dir).filter((f) => /\.bat$/i.test(f));
 /* 주석 줄은 빼고 본다 — 설명에 적힌 예시 주소는 받는 곳이 아니다 */
 const 코드 = ps.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join('\n');
 
@@ -72,6 +73,20 @@ test('⑤ REA 는 공식 꾸러미 setup 을 안티그래비티에만, 승인을
 test('⑥ ps1 은 BOM, bat 는 ASCII — 윈도에서 한글이 안 깨지게', () => {
   assert.deepEqual([...raw.subarray(0, 3)], [0xef, 0xbb, 0xbf],
     '★ install.ps1 에 BOM 이 없습니다 — 윈도 PowerShell 5.1 이 ANSI 로 읽어 한글이 깨집니다');
-  assert.ok(bat.every((b) => b < 0x80), '★ .bat 에 ASCII 밖 글자가 있습니다 — cmd 가 깨뜨립니다');
-  assert.match(bat.toString(), /-File\s+"%~dp0install\.ps1"/, '.bat 가 제 옆의 install.ps1 을 안 부릅니다');
+  assert.ok(bats.includes('install-antigravity.bat'), '설치 bat 가 없습니다');
+  for (const f of bats) {
+    const bat = fs.readFileSync(path.join(dir, f));
+    assert.ok(bat.every((b) => b < 0x80), '★ ' + f + ' 에 ASCII 밖 글자가 있습니다 — cmd 가 깨뜨립니다');
+    assert.match(bat.toString(), /-File\s+"%~dp0install\.ps1"/, f + ' 가 제 옆의 install.ps1 을 안 부릅니다');
+  }
+});
+
+test('⑦ 바탕화면 바로가기 — OneDrive 바탕화면에도 보이게, 설치·바로가기만 두 길 모두', () => {
+  assert.match(코드, /GetFolderPath\('Desktop'\)/, '★ 바탕화면 자리를 Windows 에 묻지 않습니다');
+  assert.doesNotMatch(코드, /USERPROFILE[^\n]*Desktop/i,
+    '★ %USERPROFILE%\\Desktop 을 박았습니다 — OneDrive 가 바탕화면을 옮긴 PC 에서는 안 보이는 폴더입니다');
+  const 부름 = 코드.split('\n').filter((l) => /Add-DesktopShortcut\s*\(/.test(l) && !/^\s*function\b/.test(l));
+  assert.ok(부름.length >= 2, '★ 바로가기를 만드는 자리가 설치 길·바로가기만 길 둘 다에 없습니다');
+  assert.ok(bats.some((f) => /-ShortcutOnly\b/.test(fs.readFileSync(path.join(dir, f), 'utf8'))),
+    '바로가기만 만드는 bat 가 없습니다');
 });
