@@ -77737,6 +77737,10 @@ function GcalAttSync(){
   if(err) return h('div', { style:{ fontSize:'12.5px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'5px 10px', marginBottom:'8px' } }, '📅 캘린더를 읽지 못했습니다 — ' + err);
   if(!plan) return null;
   var askN = plan.ask.length, goneN = plan.gone.length;
+  /* 할 일이 없으면 큰 띠를 두지 않는다 — «저절로 넣음 0 · 사람 확인 0» 이 늘 화면 위를 차지했다 (2026-10-24) */
+  if(!askN && !goneN && !added){
+    return h('div', { style:{ fontSize:'12.5px', color:'#64748b', textAlign:'right', marginBottom:'6px' } }, '📅 캘린더 연동 · 새로 넣을 것 없음 · 이미 있음 ' + plan.dup.length);
+  }
   function saveAsk(){
     var now = new Date().toISOString();
     var recs = plan.ask.filter(function(it){ return (pick[it.id] || it.sid); }).map(function(it){ return gcalAttRecord(it, pick[it.id] || it.sid, now); });
@@ -78154,7 +78158,9 @@ function AttendanceManagement(){
                 var emp = users.find(function(u){return u.sid===r.sid;});
                 empName = (emp ? emp.name : r.sid) + ' ';
               }
-              var label = empName+t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'')+(r.note?' ('+r.note+')':'');
+              /* 칸에는 «종류»만 — 비고(캘린더 출처 글 포함)는 칸을 가득 채워 잘렸다. 전문은 title·삭제 확인에 (2026-10-24) */
+              var chipLabel = empName+t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'');
+              var label = chipLabel+(r.note?' ('+r.note+')':'');
               var isDragging = dragId===r.id;
               var isAllView = selSid === 'all';
               /* 폰 개별 보기 — 칸이 40px 남짓이라 「🏖️ 연차」가 「🏖…」로만 보였다. 그림만 또렷이 두고 전문은 title 로 */
@@ -78166,7 +78172,7 @@ function AttendanceManagement(){
                 title:label+(isAllView?'\n전체 보기 (개별 직원 선택 후 편집 가능)':'\n클릭: 삭제 / 드래그: 날짜 이동'),
                 style:{fontSize:'12.5px',background:isDragging?'#94a3b8':t.color,color:'#fff',
                   padding:_chipIcon?'1px 2px':'2px 5px',textAlign:_chipIcon?'center':undefined,borderRadius:'8px',marginTop:'1px',whiteSpace:'nowrap',overflow:'hidden',
-                  textOverflow:'ellipsis',fontWeight:600,cursor:isAllView?'default':'grab',opacity:isDragging?0.5:1,userSelect:'none'}},_chipIcon ? t.icon : label);
+                  textOverflow:'ellipsis',fontWeight:600,cursor:isAllView?'default':'grab',opacity:isDragging?0.5:1,userSelect:'none'}},_chipIcon ? t.icon : chipLabel);
             }),
             recs.length>4&&h('div',{style:{fontSize:'12px',color:'#94a3b8',marginTop:'1px'}},'+'+( recs.length-4)+'건')
           );
@@ -78282,7 +78288,7 @@ function AttendanceManagement(){
       )
     )
   // ━━━━━━━━━━━━━━━ PC 레이아웃 ━━━━━━━━━━━━━━━
-  : h('div',{style:{display:'grid',gridTemplateColumns:'130px 190px 1fr',gap:'10px',alignItems:'start'}},
+  : h('div',{style:{display:'grid',gridTemplateColumns:'190px 240px minmax(0,1fr)',gap:'10px',alignItems:'start'}},
 
       // ─ 좌: 직원 목록
       h('div',null,
@@ -78313,14 +78319,15 @@ function AttendanceManagement(){
                 background:isSel?'#1e40af':'#fff',
                 borderLeft:'3px solid '+(isSel?'#60a5fa':'transparent'),
                 transition:'background 0.1s'}},
-              h('div',{style:{fontWeight:700,fontSize:'13px',color:isSel?'#fff':'#1e293b'}},u.name),
-              h('div',{style:{fontSize:'12px',color:isSel?'#bfdbfe':'#94a3b8',marginTop:'2px'}},u.title),
-              myRecs.length>0&&h('div',{style:{display:'flex',gap:'4px',marginTop:'4px',flexWrap:'wrap'}},
-                lv>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#f0fdf4',color:isSel?'#fff':'#166534',padding:'1px 5px',borderRadius:'8px',fontWeight:700}},'🏖️'+lv),
-                ab>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#fef2f2',color:isSel?'#fff':'#991b1b',padding:'1px 5px',borderRadius:'8px',fontWeight:700}},'❌'+ab),
-                la>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#fffbeb',color:isSel?'#fff':'#d97706',padding:'1px 5px',borderRadius:'8px',fontWeight:700}},'⏰'+la),
-                tr>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#eff6ff',color:isSel?'#fff':'#1e40af',padding:'1px 5px',borderRadius:'8px',fontWeight:700}},'🚗'+tr)
-              )
+              /* 한 사람은 한 줄 — 이름·직책·이달 기록 배지 (2026-10-24) */
+              h('div',{style:{display:'flex',alignItems:'center',gap:'5px',whiteSpace:'nowrap',overflow:'hidden'}},
+                h('span',{style:{fontWeight:700,fontSize:'13px',color:isSel?'#fff':'#1e293b'}},u.name),
+                h('span',{style:{fontSize:'12px',color:isSel?'#bfdbfe':'#94a3b8',overflow:'hidden',textOverflow:'ellipsis'}},u.title),
+                h('span',{style:{marginLeft:'auto',display:'flex',gap:'3px'}},
+                  lv>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#f0fdf4',color:isSel?'#fff':'#166534',padding:'0 5px',borderRadius:'8px',fontWeight:700}},'🏖️'+lv),
+                  ab>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#fef2f2',color:isSel?'#fff':'#991b1b',padding:'0 5px',borderRadius:'8px',fontWeight:700}},'❌'+ab),
+                  la>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#fffbeb',color:isSel?'#fff':'#d97706',padding:'0 5px',borderRadius:'8px',fontWeight:700}},'⏰'+la),
+                  tr>0&&h('span',{style:{fontSize:'12px',background:isSel?'rgba(255,255,255,0.2)':'#eff6ff',color:isSel?'#fff':'#1e40af',padding:'0 5px',borderRadius:'8px',fontWeight:700}},'🚗'+tr)))
             );
           })
         )
@@ -78351,17 +78358,12 @@ function AttendanceManagement(){
             var yr = new Date().getFullYear();
             var lb = getLeaveRemain(selSid, yr);
             var sh = selUser.scheduledHours || 8;
-            return h('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}},
-              h('div',{style:{flex:1,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'6px 8px',textAlign:'center'}},
-                h('div',{style:{fontSize:'12.5px',color:'#2563eb',fontWeight:700,marginBottom:'2px'}},'잔여 연차'),
-                h('div',{style:{fontSize:'14px',fontWeight:800,color:lb.remain>0?'#2563eb':'#dc2626',fontFamily:'monospace'}},lb.remain+'일'),
-                h('div',{style:{fontSize:'12px',color:'#64748b'}}, '사용 '+lb.used+'/'+lb.total+'일')
-              ),
-              h('div',{style:{flex:1,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'6px',padding:'6px 8px',textAlign:'center'}},
-                h('div',{style:{fontSize:'12.5px',color:'#16a34a',fontWeight:700,marginBottom:'2px'}},'소정근로시간'),
-                h('div',{style:{fontSize:'14px',fontWeight:800,color:'#166534',fontFamily:'monospace'}},sh+'h/일'),
-                h('div',{style:{fontSize:'12px',color:'#64748b'}},'반차 '+(sh/2)+'h·연차 '+sh+'h')
-              )
+            /* 두 칸으로 갈라 세로로 꺾이던 것을 한 덩이로 — 잔여 연차는 큰 숫자 한 줄, 사용·소정시간은 작은 글 한 줄 (2026-10-24) */
+            return h('div',{style:{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'6px 10px',marginBottom:'10px'}},
+              h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',whiteSpace:'nowrap'}},
+                h('span',{style:{fontSize:'13px',color:'#2563eb',fontWeight:700}},'잔여 연차'),
+                h('b',{style:{fontSize:'18px',color:lb.remain>0?'#2563eb':'#dc2626'}},lb.remain+'일')),
+              h('div',{title:'소정근로시간 '+sh+'h/일 · 반차 '+(sh/2)+'h · 연차 '+sh+'h',style:{fontSize:'12px',color:'#64748b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},'사용 '+lb.used+'/'+lb.total+'일 · 소정 '+sh+'h/일')
             );
           })(),
           // 빠른 입력 - 세로 배치
@@ -78421,8 +78423,8 @@ function AttendanceManagement(){
                   h('span',{style:{fontSize:'12px',color:'#854d0e'}},'h'));
               }),
               h('button',{onClick:function(){setOtModal(true);},
-                style:{marginTop:'4px',padding:'5px 10px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',fontWeight:700}}, '📋 상세'),
-              h('div',{style:{fontSize:'12px',color:'#94a3b8',marginTop:'4px',textAlign:'center'}},'→ 월별급여 자동반영')
+                style:{gridColumn:'1/-1',marginTop:'4px',padding:'5px 10px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',fontWeight:700}}, '📋 상세'),
+              h('div',{style:{gridColumn:'1/-1',fontSize:'12px',color:'#94a3b8',marginTop:'2px',textAlign:'center',whiteSpace:'nowrap'}},'→ 월별급여 자동반영')
             )
           )
         )
@@ -78460,7 +78462,7 @@ function AttendanceManagement(){
                     h('td',{style:tdS},
                       h('span',{style:{background:t.color,color:'#fff',fontSize:'12px',padding:'2px 6px',borderRadius:'8px',fontWeight:700}},
                         t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':''))),
-                    h('td',{style:Object.assign({},tdS,{fontSize:'12.5px',color:'#64748b'})},r.note||'-'),
+                    h('td',{title:r.note||'',style:Object.assign({},tdS,{fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'280px'})},r.sourceKind==='gcal'?'📅 캘린더':(r.note||'-')),
                     h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'2px'})},
                       h('button',{onClick:function(){delRecord(r.id);},style:{background:'none',border:'none',color:'#dc2626',fontSize:'13px',cursor:'pointer'}},'×'))
                   );
@@ -78492,6 +78494,9 @@ function AttendanceManagement(){
           sick:  my.filter(function(r){return r.type==='sick';}).length,
           absent:my.filter(function(r){return r.type==='absent';}).length,
           trip:  my.filter(function(r){return r.type==='trip';}).length,
+          tele:  my.filter(function(r){return r.type==='telework';}).length,
+          pub:   my.filter(function(r){return r.type==='public';}).length,
+          spec:  my.filter(function(r){return r.type==='special-leave';}).length,
           ot:    myOt.filter(function(r){return r.kind==='overtime';}).reduce(function(s,r){return s+(parseFloat(r.hours)||0);},0),
           night: myOt.filter(function(r){return r.kind==='night';}).reduce(function(s,r){return s+(parseFloat(r.hours)||0);},0),
           holiday:myOt.filter(function(r){return r.kind==='holiday';}).reduce(function(s,r){return s+(parseFloat(r.hours)||0);},0)
@@ -78505,17 +78510,23 @@ function AttendanceManagement(){
       // 집계 셀 공통 스타일
       var sumTh = {padding:'2px 3px',borderBottom:'1px solid #e2e8f0',borderRight:'1px solid #e2e8f0',fontSize:'12.5px',fontWeight:700,textAlign:'center',minWidth:'34px',whiteSpace:'nowrap'};
       var sumTd = {padding:'3px 4px',borderBottom:'1px solid #f8fafc',borderRight:'1px solid #f8fafc',fontSize:'12px',textAlign:'center',fontWeight:600,fontFamily:'monospace'};
-      var SUM_COLS = [
+      var SUM_ALL = [
         { k:'leave',   label:'🏖️연차',   bg:'#f0fdf4', color:'#166534', unit:'일' },
         { k:'half',    label:'🌅반차',   bg:'#bfdbfe', color:'#2563eb', unit:'회' },
         { k:'hourLv',  label:'⏱️시연',   bg:'#bbf7d0', color:'#16a34a', unit:'h' },
         { k:'sick',    label:'🤒병가',   bg:'#fef2f2', color:'#991b1b', unit:'일' },
         { k:'absent',  label:'❌결근',   bg:'#fef2f2', color:'#991b1b', unit:'일' },
         { k:'trip',    label:'🚗출장',   bg:'#eff6ff', color:'#1e40af', unit:'일' },
+        { k:'tele',    label:'🏠재택',   bg:'#eff6ff', color:'#1e40af', unit:'일' },
+        { k:'pub',     label:'📋공가',   bg:'#fffbeb', color:'#854d0e', unit:'일' },
+        { k:'spec',    label:'🌴특별',   bg:'#f0fdf4', color:'#166534', unit:'일' },
         { k:'ot',      label:'⏰연장',   bg:'#fffbeb', color:'#d97706', unit:'h' },
         { k:'night',   label:'🌙야간',   bg:'#eff6ff', color:'#2563eb', unit:'h' },
         { k:'holiday', label:'🎌휴일',   bg:'#fef2f2', color:'#dc2626', unit:'h' }
       ];
+      /* 이달 값이 있는 칸만 — 대부분 «-» 인 칸이 줄줄이 늘어서 있었다. 하나도 없으면 전부 보인다 (2026-10-24) */
+      var SUM_COLS = SUM_ALL.filter(function(c){ return (totals[c.k] || 0) > 0; });
+      if(!SUM_COLS.length) SUM_COLS = SUM_ALL;
       return h('div',{className:'card',style:{padding:'8px',overflow:'auto'}},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px',gap:'6px'}},
           h('div',{style:{fontWeight:700,fontSize:'13.5px',color:'#1e293b',flex:1}}, '📅 '+selYM+' 매트릭스 ('+users.length+'명)'),
@@ -78539,7 +78550,7 @@ function AttendanceManagement(){
                   '📅 일자별 체크 (' + days.length + '일)'),
                 h('th',{colSpan:SUM_COLS.length,
                   style:{padding:'3px 5px',background:'#fffbeb',borderBottom:'1px solid #fde68a',textAlign:'center',fontSize:'13.5px',fontWeight:800,color:'#854d0e'}},
-                  '📊 월 합계 (' + SUM_COLS.length + '개 항목)')
+                  '📊 월 합계')
               ),
               // 2행: 세부 컬럼 (1~31일 / 연차·반차·...)
               h('tr',null,
