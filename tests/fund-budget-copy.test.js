@@ -27,10 +27,10 @@ const B = (() => {
   const box = {};
   new Function([
     'var S={fundId:"F1",year:2027}, funds={};',
-    grabDecl('BUD_GWAN'), grabDecl('BUD_CHK_FIELDS'),
+    grabDecl('BUD_GWAN'), grabDecl('BUD_CHK_FIELDS'), grabDecl('BUD_CHK_X'),
     grabFn('num'), grabFn('_fnum'), grabFn('budItemAmt'), grabFn('budItemBasis'), grabFn('budItemsList'),
-    grabFn('bizRate'), 'var BIZ_RATE_DEFAULT=2.0;', grabFn('budCopyPlan'), grabFn('budCopyMap'), grabFn('budSrcYears'), grabFn('budCopyTargets'),
-    'this.S=S; this.funds=funds; this.plan=budCopyPlan; this.map=budCopyMap; this.years=budSrcYears; this.targets=budCopyTargets; this.bizRate=bizRate; this.amt=budItemAmt;',
+    grabFn('bizRate'), 'var BIZ_RATE_DEFAULT=2.0;', grabFn('budCopyPlan'), grabFn('budCopyMap'), grabFn('budSrcYears'), grabFn('_budByName'), grabFn('_bcItems'), grabFn('budSrcList'), grabFn('budRefList'), grabFn('budCopyTargets'),
+    'this.S=S; this.funds=funds; this.plan=budCopyPlan; this.map=budCopyMap; this.years=budSrcYears; this.targets=budCopyTargets; this.bizRate=bizRate; this.srcList=budSrcList; this.refList=budRefList; this.amt=budItemAmt;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -132,4 +132,41 @@ test('★ 예금 이자율은 소수 그대로 읽는다 — 진짜 num()(정수
   assert.equal(B.bizRate({ interest_rate: '0' }), 0, '0%는 사람이 일부러 적은 값이다');
   [{}, { interest_rate: '' }, { interest_rate: '-1' }, { interest_rate: '99' }, { interest_rate: 'abc' }]
     .forEach((f) => assert.equal(B.bizRate(f), 2.0, JSON.stringify(f)));
+});
+test('★ 다른 기금에서 가져오면 관리비·예비비 금액도 «확인 필요» — 같은 기금의 지난해는 그대로', () => {
+  const x = B.plan(Y26, 2.8, true);
+  assert.deepEqual(x[3].o.chk, { price: 1 }, '관리비 금액(출연금에서 나오는 값)');
+  assert.deepEqual(x[4].o.chk, { price: 1 }, '예비비 금액');
+  assert.deepEqual(x[2].o.chk, { n: 1 }, '목적사업은 인원 그대로');
+  assert.deepEqual(x[3].why, ['금액 확인']);
+  const same = B.plan(Y26, 2.8);
+  assert.equal(same[3].o.chk, undefined);
+  assert.equal(same[4].o.chk, undefined);
+});
+
+test('원본 후보 — 이 기금의 지난해들 먼저, 다음 다른 기금(이름순, 올해 이하의 해)', () => {
+  Object.keys(B.funds).forEach((k) => delete B.funds[k]);
+  Object.assign(B.funds, {
+    F1: { _id: 'F1', name: '가 기금', years: { 2025: { budget_items: Y26 }, 2026: { budget_items: Y26 } } },
+    G2: { _id: 'G2', name: '나 기금', years: { 2026: { budget_items: Y26 }, 2028: { budget_items: Y26 } } },
+    G3: { _id: 'G3', name: '다 기금', years: {} },
+    G4: { _id: 'G4', name: '라 기금', _sample: true, years: { 2026: { budget_items: Y26 } } },
+    G5: { _id: 'G5', name: '마 기금', years: { 2027: { budget_items: Y26 }, 2024: { budget_items: Y26 } } },
+  });
+  assert.deepEqual(B.srcList('F1', 2027).map((x) => x.fid + '|' + x.y), ['F1|2026', 'F1|2025', 'G2|2026', 'G5|2027', 'G5|2024']);
+  assert.deepEqual(B.refList().map((x) => x.fid + '|' + x.y), ['F1|2026', 'G2|2026', 'G5|2027'], '기금마다 가장 가까운 한 해');
+});
+
+test('★ 일괄 — 기준 기금을 고르면 원본이 없던 기금도 그 계획을 받고, 이미 있는 곳은 여전히 건너뛴다', () => {
+  Object.keys(B.funds).forEach((k) => delete B.funds[k]);
+  Object.assign(B.funds, {
+    A: { _id: 'A', name: '예시 A', years: { 2026: { budget_items: Y26 } } },
+    B: { _id: 'B', name: '예시 B', years: { 2027: { budget_items: { z: Y26.a } } } },
+    C: { _id: 'C', name: '예시 C', years: {} },
+  });
+  const T = B.targets('A|2026');
+  assert.deepEqual(T.map((t) => [t.id, t.src, t.srcFid, t.cross, t.n, t.have]),
+    [['A', '2026', 'A', false, 5, 0], ['B', '2026', 'A', true, 5, 1], ['C', '2026', 'A', true, 5, 0]]);
+  const none = B.targets('');
+  assert.deepEqual(none.map((t) => t.src), ['2026', null, null], '기준 기금이 없으면 각자의 지난해만');
 });
