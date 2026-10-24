@@ -315,7 +315,9 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tilerow-h[data-fold-row]:focus-visible{outline:2px solid #1e40af;outline-offset:1px;}
 .fold-chev{width:12px;text-align:center;color:var(--mute);font-size:.66rem;}
 .tilerow-n{font-size:11px;color:var(--mute);font-weight:600;}
-.tilerow.fold .tiles{display:flex;flex-wrap:wrap;gap:6px;padding:2px 4px 8px 24px;}
+/* 행·열을 맞춘다 — 칩이 «같은 폭 칸»(grid)에 선다(대표 2026-10-24 「행 열 간격 정리 해라」).
+   칸 수는 화면 폭을 따라 저절로 준다(auto-fill) — 폰에서도 화면 밖으로 안 나간다. */
+.tilerow.fold .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px 6px;padding:4px 4px 6px 24px;}
 .tilerow.fold .tile{flex-direction:row;width:auto;min-width:0;max-width:100%;gap:5px;padding:5px 11px 5px 6px;border-radius:99px;transition:none;
   background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.9);box-shadow:0 1px 3px rgba(20,30,80,.07);}
 .tilerow.fold .tile:hover{border-color:var(--accent);}
@@ -325,8 +327,12 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tilerow.fold .tile b{font-size:.78rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tilerow.fold .tile .tx span,.tilerow.fold .tile .newtab,.tilerow.fold .pin-star{display:none;}
 .tilerow.fold .tile.tile-soon-first{margin-left:0;}
-.tilerow.fold .tile-alert{position:static;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;border-width:1px;box-shadow:none;flex:none;}
-.tilerow.fold .tile .nl-warn,.tilerow.fold .tile .tile-soon-pill{position:static;transform:none;flex:none;}
+/* 빨간 딱지는 칩 «오른쪽 위 귀퉁이에 떠 있게» — 칩 안에 글자처럼 서면 그 칩만 넓어져 열이 어긋난다
+   (대표 2026-10-24 「빨간색 팝업은 어떻게 정리해야 칸넓게 안늘어나는지」). */
+.tilerow.fold .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;
+  font-size:10px;border-width:2px;box-shadow:0 2px 6px rgba(185,28,28,.35);z-index:2;}
+.tilerow.fold .tile .nl-warn{position:absolute;right:-4px;top:-8px;transform:none;min-width:18px;height:18px;line-height:18px;padding:0 5px;z-index:2;}
+.tilerow.fold .tile .tile-soon-pill{position:static;transform:none;flex:none;}
 /* 별표 — 아이콘 오른쪽 아래 귀퉁이. 다른 딱지(오른쪽 위 경고 · 왼쪽 알림 · 가운데 준비중)와 안 겹친다. */
 .tile .ic{position:relative;}
 .pin-star{position:absolute;right:-5px;bottom:-5px;width:20px;height:20px;border-radius:50%;
