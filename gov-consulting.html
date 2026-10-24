@@ -10144,11 +10144,15 @@ function renderSubSyncNote(boxId,coId,sel,kind){
   const noSid=(sel||[]).map(id=>staff.find(a=>a&&a.id===id))
     .filter(s=>s&&!s.erpSid).map(s=>s.name);
   const many=linked.length>1?` 이어진 컨설팅 ${linked.length}건 모두에 같이 적용됩니다.`:'';
+  const oneMain=new Set(linked.map(c=>c.managerMain).filter(Boolean)).size<=1;
   const body=kind==='sched'
     ? `🔗 <b style="color:var(--accent);">새로 더한 사람은 푸른이알피 부담당으로도 올라갑니다.</b>
        여기서 빼는 것은 이 날짜 방문에만 적용됩니다 — 이알피에서 떼려면 사업장 수정에서 빼세요.${many}`
     : `🔗 <b style="color:var(--accent);">푸른이알피 부담당과 같이 바뀝니다.</b>
-       여기서 더하거나 빼면 이알피에도 그대로 반영됩니다.${many}`;
+       여기서 더하거나 빼면 이알피에도 그대로 반영됩니다.${many}
+       <br>${oneMain
+         ? '<b style="color:var(--accent);">주담당은 푸른이알피를 따라갑니다</b> — 이알피에서 바꾸면 여기도 바뀌고, 여기서 바꿔도 다음에 이알피 값으로 돌아옵니다.'
+         : '이어진 컨설팅마다 주담당이 달라 <b>주담당 칸은 자동으로 바뀌지 않습니다</b> — 이알피에서 건별 주담당을 확인해 주세요.'}`;
   const warn=noSid.length
     ? `<div style="color:#d97706;font-weight:700;margin-top:4px;">⚠️ ${escAttr(noSid.join(', '))}${eunNeun(noSid[noSid.length-1])} 푸른이알피에 못 올립니다 —
          환경설정 → 직원에서 「🔗 사번 잇기」를 해 주세요.</div>`
@@ -10299,6 +10303,10 @@ async function erpLoadAll(){
        ⚠ 옛 사본으로 읽은 판에서는 맞추지 않는다 — 몇 달 전 명부로 재직자를
          휴직·퇴사로 돌려놓으면 그 사람이 담당에서 빠진다. */
     if(!ERP.stale){
+      /* 사번이 비어 있는 직원을 «먼저» 잇는다 — 이 뒤에 오는 직원 맞춤·부담당·주담당 맞추기가
+         전부 사번을 잣대로 쓴다. 안 이으면 그 사람은 이알피와 영영 안 맞는다(2026-10-24 실측:
+         권형하·박한별·박재원 셋이 비어 있어 이어진 30곳 중 10곳이 어긋나 있었다). */
+      try{ erpAutoLinkStaff(); }catch(err){ console.warn('[사번 잇기]',err); }
       try{ syncStaffFromErp(); }catch(err){ console.warn('[직원 맞춤]',err); }
       /* 부담당도 함께 맞춘다 — 직원 맞춤 **뒤에** 와야 한다.
          사번·재직 여부가 정해진 뒤라야 누구를 올릴 수 있는지 판단할 수 있다. */
@@ -10306,6 +10314,9 @@ async function erpLoadAll(){
       /* 이알피에서 끝낸 컨설팅을 여기서도 끝낸다 — 부담당 맞춤과 같은 자리라
          「옛 사본이면 건너뛴다」는 막이 그대로 걸린다. */
       try{ erpSyncClosedDown(); }catch(err){ console.warn('[종료 맞춤]',err); }
+      /* 새로 이은 사람의 부담당을 이알피에 올린다 — 내려받아 합친 «뒤에» 와야 한다.
+         기다리지 않는다(화면을 붙잡지 않는다). 못 올리면 표시가 남아 다음에 다시 올린다. */
+      erpPushNewLinks().catch(err=>console.warn('[사번 이은 뒤 올리기]',err));
     }else{
       console.warn('[푸른ERP] 이 브라우저 사본이 클라우드보다 옛것입니다 — 맞추기를 건너뜁니다');
     }
@@ -10812,7 +10823,8 @@ function findCoForErp(cos, erpId, name, typeId){
      묶인 기록이라, 나중에 담당이 바뀌었다고 지워지면 안 된다.
    ⚠ 사번(erpSid)이 안 걸린 사람은 올리지 않고 **말해 준다**. 이름으로 밀어 넣으면
      동명이인에게 남의 컨설팅이 붙는다.
-   ⚠ 주담당(managerMain)은 건드리지 않는다. */
+   ⚠ 주담당(managerMain)은 «이알피 → 일정관리» 한 방향으로만 따라간다(2026-10-24).
+     일정관리가 이알피에 주담당을 쓰는 길은 없다 — 이알피의 주담당은 계약·성과의 기준이라서다. */
 
 /* 은/는 가리기 — 「손님노무사은(는)」처럼 괄호를 달아 두면 읽다 걸린다.
    마지막 글자의 받침으로 고른다(한글이 아니면 '는'). */
@@ -10934,17 +10946,30 @@ async function erpSyncSubsUp(coId,opt){
     if(s&&s.erpSid){ if(want.indexOf(s.erpSid)<0)want.push(s.erpSid); }
     else missing.push((s&&s.name)||id);
   });
-  let wrote=0;
+  /* ★ 이알피 칸을 «통째로» 갈아 끼우지 않는다 (2026-10-24).
+     예전에는 일정관리가 아는 사람만으로 새 배열을 만들어 썼다 — 사번이 비어 있던 직원이 있으면
+     그 사람을 뺀 배열이 이알피 부담당을 «지웠다»(기술보호-2026-004 가 2026-09-28 일정관리가 쓴 뒤 빈 칸).
+     이제 «일정관리가 아는 사람(사번이 걸린 직원)» 의 칸만 더하고 뺄 수 있고,
+     모르는 사람(퇴사자·아직 안 이은 사람)의 칸은 그대로 둔다.
+     이알피의 부담당은 성과 분배의 기준이라, 모르면서 지우는 것이 가장 나쁘다. */
+  const known=new Set(staff.map(a=>a&&a.erpSid).filter(Boolean));
+  /* 건마다 주담당이 다른 사업장 — 다른 건의 주담당은 이 사업장 사람이라 부담당 줄에 있지만,
+     그렇다고 이 건의 부담당이 되는 것은 아니다. «새로» 밀어 넣지 않는다. */
+  const mains=new Set(linked.map(c=>c.managerMain).filter(Boolean));
+  let wrote=0,failed=0;
   for(const c of linked){
-    const next=want.filter(sid=>sid&&sid!==c.managerMain);   // 주담당이 부담당에도 들어가면 안 된다
-    if(sameIdSet(c.managerSubs||[],next))continue;
-    if(await erpWriteSubs(c,next))wrote++;
+    const have=c.managerSubs||[];
+    const keep=have.filter(sid=>sid&&sid!==c.managerMain&&!known.has(sid));
+    const add=want.filter(sid=>sid&&sid!==c.managerMain&&(!mains.has(sid)||have.includes(sid)));   // 주담당이 부담당에도 들어가면 안 된다
+    const next=[...new Set([...add,...keep])];
+    if(sameIdSet(have,next))continue;
+    if(await erpWriteSubs(c,next))wrote++; else failed++;
   }
   if(!opt.silent){
     if(missing.length)toast(`⚠️ ${missing.join(', ')}${eunNeun(missing[missing.length-1])} 푸른이알피에 못 올렸습니다 — 환경설정 → 직원에서 「사번 잇기」를 해 주세요`,'err');
     else if(wrote)toast('🔗 푸른이알피 부담당에도 맞췄습니다');
   }
-  return {wrote,missing};
+  return {wrote,missing,failed};
 }
 
 /* 일정에서 **더한** 사람을 사업장 부담당에도 붙인다(거울로 가는 유일한 입구).
@@ -11066,6 +11091,84 @@ function erpSubStaffId(sid,staff,made){
   made.push(typeof PuStaffLabel!=='undefined'?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 같은 이름일 때만 사번(2026-10-19)
   return rec.id;
 }
+/* ══════ 담당자 따라가기 — 푸른이알피 → 정부컨설팅 일정관리 (대표 지시 2026-10-24) ══════
+   「푸른이알피에서 담당자 등이 변경되면 정부컨설팅 일정관리에서도 자동으로 바뀌어야 한다.
+     다우테크놀로지가 다르다 — 이유를 찾아 정리해라 · 앞으로도 문제없게」
+
+   ■ 무엇이 어긋나 있었나 (2026-10-24 서버 실측 — 이어진 30곳 중 10곳)
+     ① 주담당은 아예 따라가지 않았다. 스위트바이오·삼화케미칼·일신정밀은 10-09 이알피에서
+        주담당을 바꿨는데 일정관리는 옛 사람 그대로였다.
+     ② 사번이 비어 있는 직원(권형하·박한별·박재원)은 부담당 맞추기에서 통째로 빠졌다 —
+        내려받기는 「이알피가 판단 못 한다」며 두고, 올리기는 「못 올린다」며 건너뛰었다.
+        환경설정 → 직원의 「🔗 사번 잇기」 단추를 사람이 눌러야만 이어졌고, 아무도 안 눌렀다.
+     ③ 한 사업장에 사업이 둘 이상인데 건마다 주담당이 다르다(다우·에이치비씨솔루션).
+        일정관리는 사업장 «한 곳에 주담당 한 칸» 이라 둘을 한 칸에 담을 수 없다. */
+
+/* 이알피 주담당 사번 → 우리 담당자 id. 부담당(erpSubStaffId)과 달리 «새로 만들지 않는다» —
+   주담당은 일정을 고칠 수 있는 자리라, 명단에 없는 사람을 지어내서 앉히지 않는다
+   (가져오기도 같은 규칙이다: 주담당을 못 찾으면 「일정관리에서 찾을 수 없음」으로 멈춘다).
+   사번으로 먼저 찾고, 없으면 이름이 «딱 한 명»일 때만 이름으로. 동명이인이면 정하지 않는다. */
+function erpMainStaffId(sid,staff){
+  if(!sid)return '';
+  const bySid=staff.find(a=>a&&a.erpSid===sid);
+  if(bySid)return bySid.id;
+  const n=String(erpSidName(sid)||'').replace(/\s/g,'');
+  if(!n)return '';
+  const hit=staff.filter(a=>a&&String(a.name||'').replace(/\s/g,'')===n);
+  return hit.length===1?hit[0].id:'';
+}
+
+/* 사번 자동 잇기 — 이알피 명부에 같은 이름이 «딱 한 명»이면 사번을 이어 준다.
+   「🔗 사번 잇기」 단추(staffErpCell)와 같은 조건이다. 사람이 누르기를 기다리면 안 누른 사람은
+   영영 안 맞는다. 동명이인이거나 그 사번을 이미 다른 직원이 쓰면 잇지 않는다(사람이 정한다).
+   ⚠ 이은 사람은 erpLinkPending 표시를 단다 — 그 사람이 지금까지 사업장 부담당으로 있던 것은
+     이알피가 몰랐을 뿐 «빠진 것» 이 아니다. 내려받기가 지우지 않고(첫 판 규칙과 같다),
+     erpPushNewLinks 가 이알피에 올린 뒤에야 표시를 뗀다. */
+function erpAutoLinkStaff(){
+  if(!ERP.loaded||ERP.stale||!myId())return [];
+  const dir=(ERP.dir||[]).filter(u=>u&&u.sid&&u.name);
+  if(!dir.length)return [];
+  const staff=getStaff();
+  const nn=v=>String(v||'').replace(/\s/g,'');
+  const used=new Set(staff.map(a=>a&&a.erpSid).filter(Boolean));
+  const linked=[];
+  staff.forEach(a=>{
+    if(!a||a.erpSid)return;
+    const n=nn(a.name); if(!n)return;
+    const cand=dir.filter(u=>nn(u.name)===n);
+    if(cand.length!==1||used.has(cand[0].sid))return;
+    a.erpSid=cand[0].sid; a.erpLinkPending=true;
+    used.add(a.erpSid); linked.push(a.id);
+  });
+  if(!linked.length)return [];
+  setStaff(staff);
+  toast(`🔗 푸른이알피 사번을 자동으로 이었습니다 — ${linked.map(id=>staff.find(a=>a.id===id).name).join(', ')}`);
+  return linked;
+}
+
+/* 새로 이은 사람이 든 사업장의 부담당을 이알피에 올린다. 전부 올라가야 표시를 뗀다.
+   ⚠ 하나라도 못 올리면 표시를 «남긴다» — 떼면 다음 내려받기가 이알피를 잣대로 삼아
+     아직 못 올린 사람들을 지운다. */
+async function erpPushNewLinks(){
+  if(!ERP.loaded||ERP.stale||!myId())return 0;
+  const pend=getStaff().filter(a=>a&&a.erpLinkPending);
+  if(!pend.length)return 0;
+  const ids=new Set(pend.map(a=>a.id));
+  const byCo=erpConsByCo();
+  let failed=false;
+  for(const co of getCos()){
+    if(!co||co.deleted||!byCo[co.id])continue;
+    if(!getCoAtts(co).some(id=>ids.has(id)))continue;
+    const r=await erpSyncSubsUp(co.id,{silent:true});
+    if(!r||r.failed)failed=true;
+  }
+  if(failed)return 0;
+  const staff=getStaff();                       // 올리는 사이 바뀌었을 수 있다 — 새로 읽어 표시만 뗀다
+  staff.forEach(a=>{ if(a&&ids.has(a.id))delete a.erpLinkPending; });
+  setStaff(staff);
+  return pend.length;
+}
+
 function erpSyncSubsDown(){
   if(!ERP.loaded||!myId())return 0;
   if(!ERP.consultings.length)return 0;        // 덜 읽힌 판으로 지우지 않는다
@@ -11077,10 +11180,34 @@ function erpSyncSubsDown(){
   const one=id=>staff.find(a=>a&&a.id===id);
   const cos=getCos(),scheds=getScheds(),today=todayStr();
   let coChanged=false,scChanged=false;
-  const touched=[],seedUp=[],madeStaff=[];
+  const touched=[],seedUp=[],madeStaff=[],mainMoves=[];
   coIds.forEach(coId=>{
     const co=cos.find(c=>c&&c.id===coId);
     if(!co||co.deleted)return;
+    /* ── 주담당 따라가기 (대표 지시 2026-10-24) ──
+       이어진 이알피 건들의 주담당이 «하나»일 때만 따라간다. 건마다 다르면(다우·에이치비씨솔루션)
+       한 칸에 둘을 담을 수 없어서, 어느 쪽이 맞는지 앱이 정하면 안 된다 — 그대로 둔다.
+       ⚠ 지난 방문은 «그 날 누가 갔다» 는 증빙 기록이라 건드리지 않는다.
+       ⚠ 앞으로 올 방문은 «옛 주담당이 맡던 것만» 옮긴다 — 일부러 다른 사람에게 맡긴 방문은 그대로. */
+    const mainSids=[...new Set(byCo[coId].map(c=>c.managerMain).filter(Boolean))];
+    if(mainSids.length===1){
+      const gid=erpMainStaffId(mainSids[0],staff);
+      if(gid&&gid!==co.defAtt){
+        const old=co.defAtt;
+        co.defAtt=gid; coChanged=true;
+        mainMoves.push({name:co.name,from:old,to:gid});
+        /* 새 주담당이 부담당 줄에도 있으면 뺀다 — 주담당이 부담당에도 들어가면 안 된다 */
+        if(getCoAtts(co).includes(gid)){ co.defCoAtts=getCoAtts(co).filter(id=>id!==gid); delete co.defCoAtt; }
+        scheds.forEach(sc=>{
+          if(!sc||sc.coId!==coId)return;
+          if(String(sc.date||'')<today)return;
+          if(sc.attId!==old)return;
+          sc.attId=gid; scChanged=true;
+          const has=getCoAtts(sc);
+          if(has.includes(gid)){ sc.coAttIds=has.filter(id=>id!==gid); delete sc.coAttId; }
+        });
+      }
+    }
     const want=[];
     byCo[coId].forEach(c=>{
       (c.managerSubs||[]).forEach(sid=>{
@@ -11089,11 +11216,19 @@ function erpSyncSubsDown(){
         if(gid&&gid!==co.defAtt&&want.indexOf(gid)<0)want.push(gid);
       });
     });
+    /* 건마다 주담당이 갈리는 사업장 — «다른 건의 주담당» 도 이 사업장 사람이다.
+       빼 버리면 그 사람은 자기 컨설팅인데 일정관리에서 안 보이게 된다(다우: 산일충남 박재원).
+       명단에 없으면 만들지 않는다(주담당 규칙과 같다). */
+    if(mainSids.length>1)mainSids.forEach(sid=>{
+      const gid=erpMainStaffId(sid,staff);
+      if(gid&&gid!==co.defAtt&&want.indexOf(gid)<0)want.push(gid);
+    });
     const cur=getCoAtts(co);
     /* 이알피에 **보이지 않는** 사람은 이알피가 판단할 수 없다 — 그대로 둔다.
        사번이 안 걸린 직원을 이알피 명단으로 지워 버리면, 손으로 넣어 둔 것이
-       이알피를 읽을 때마다 조용히 사라진다. */
-    cur.forEach(id=>{ const s=one(id); if((!s||!s.erpSid)&&want.indexOf(id)<0)want.push(id); });
+       이알피를 읽을 때마다 조용히 사라진다.
+       ⚠ 방금 사번을 이은 사람(erpLinkPending)도 같다 — 이알피가 아직 모르던 것이다. */
+    cur.forEach(id=>{ const s=one(id); if((!s||!s.erpSid||s.erpLinkPending)&&want.indexOf(id)<0)want.push(id); });
     /* ★ 첫 한 번은 **지우지 않고 합친다**.
        거울을 세우기 전 정부컨설팅에만 있던 부담당은 이알피가 모르는 사람일 뿐,
        「빠진 사람」이 아니다. 처음부터 이알피를 잣대로 삼으면 그동안 손으로 넣어 둔
@@ -11134,11 +11269,15 @@ function erpSyncSubsDown(){
     /* 합친 판을 이알피에도 올려 거울을 맞춘다. 조용히 — 첫 로그인에 창이 쏟아지면 안 된다. */
     (async()=>{ for(const id of seedUp){ try{ await erpSyncSubsUp(id,{silent:true}); }catch(e){ console.warn('[부담당 맞추기 첫판]',e); } } })();
   }
+  if(mainMoves.length){
+    const nm=id=>(one(id)||{}).name||'';
+    toast(`🔗 푸른이알피 주담당을 따라 바꿨습니다 — ${mainMoves.slice(0,3).map(m=>`${m.name} ${nm(m.from)||'미지정'}→${nm(m.to)}`).join(', ')}${mainMoves.length>3?` 외 ${mainMoves.length-3}곳`:''}`);
+  }
   if(touched.length){
     toast(`🔗 푸른이알피 부담당과 맞췄습니다 — ${touched.slice(0,3).join(', ')}${touched.length>3?` 외 ${touched.length-3}곳`:''}`);
-    try{ renderDash();renderCal(); }catch(e){}
   }
-  return touched.length;
+  if(touched.length||mainMoves.length){ try{ renderDash();renderCal(); }catch(e){} }
+  return touched.length+mainMoves.length;
 }
 
 // ===== 사업장 가져오기 =====
