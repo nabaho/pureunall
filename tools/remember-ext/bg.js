@@ -1,5 +1,5 @@
 /* 푸른 리멤버 연결 — 확장의 시계 (2026-10-24, 대표 「반드시 자동으로」)
-   1시간마다: ① 받는 화면(푸른) 탭을 찾거나 연다 → 지난번 기준(cp)을 묻는다
+   30분마다: ① 받는 화면(푸른) 탭을 찾거나 연다 → 지난번 기준(cp)을 묻는다
               ② 리멤버 탭을 찾거나 열고 새로 고친다 → 기준 뒤에 바뀐 명함을 받는다
               ③ 앞면 그림을 받아(리멤버 그림 창고만) 받는 화면에 건넨다 → 사진첩·기업정보함에 담긴다
    ⚠ 리멤버 로그인이 풀렸으면 받는 화면에 알리고(빨간 띠) 그 회차는 쉰다.
@@ -7,7 +7,7 @@
 'use strict';
 var REM_HOME = 'https://card.rememberapp.co.kr/book/groups';
 var INTAKE = 'https://nabaho.github.io/pureunall/remember-intake.html';
-var EVERY_MIN = 60;
+var EVERY_MIN = 30;
 var IMG_OK = /^https:\/\/remember-cdn\.rememberapp\.co\.kr\/[^\s"'<>]+$/;
 var IMG_MAX = 4 * 1024 * 1024;
 var running = false;
