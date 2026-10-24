@@ -325,7 +325,11 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
     if (ev.source !== window || ev.origin !== location.origin) return;
     var m = ev.data;
     if (!m || m.__from !== EXT || m.__to !== PAGE) return;
-    if (m.cmd === 'hello') { reply({ cmd: 'cp', ready: S.ready, cp: (S.status && Number(S.status.cp)) || 0 }); return; }
+    if (m.cmd === 'hello') {
+      /* 확장이 «찾아왔다»는 흔적 — 회차가 어디까지 가는지 밖에서 볼 수 있게(개수·시각만) */
+      if (S.user && S.ready) db.ref(ROOT + '/ping').set({ at: Date.now(), by: S.user.uid }).catch(function () {});
+      reply({ cmd: 'cp', ready: S.ready, cp: (S.status && Number(S.status.cp)) || 0 }); return;
+    }
     if (!S.ready) { reply({ cmd: 'done', err: 'not-ready' }); return; }
     if (m.cmd === 'batch') { batch(m); return; }
     if (m.cmd === 'login-lost') {
