@@ -1439,3 +1439,84 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   body[data-erp-group="hr"] main [style*="overflow-x: auto"][style*="display: flex"],
   body[data-erp-group="hr"] main [style*="overflow: auto hidden"][style*="display: flex"]{ flex-wrap:wrap !important; overflow:visible !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   재무관리 폰 — «목록 카드 한 가지» (대표 「시안대로」 2026-10-24
+   「숫자가 줄이 안 맞거나 튀어나가거나 셀이 넘어가거나 엉망이다 — 재무관리 폰 UI 전체 정리」)
+
+   ★ 무엇이 어긋났나(대표 캡처 · tools/phone-audit 로 그대로 재현):
+     ㉠ 번호가 ☐ 에서 멀리 따로 떠 있다  ㉡ 금액 칸 폭이 없어 오른쪽 끝·자릿수가 줄마다 다르다
+     ㉢ 카테고리 칸이 줄 폭의 반쪽이고 이름은 한 줄에서 잘린다
+     ㉣ 확인창 단추가 카드마다 둘·셋이라 크기가 제각각, 설명은 «…» 로 잘린다
+   ★ 고침 — 거래내역 입금 카드(.ld-tb)·출금 카드(.ld-xt)·입금 확인 시트(.ld-hs-*)가 «같은 모양»을 쓴다:
+        ☐          이름(적요, 두 줄까지 접는다)            금액(고정 폭 · 오른쪽 끝 · 숫자 폭 같게)
+        번호        날짜·업체·현황 한 줄                    상태/카드
+                    [고르개 · 단추 — 줄 폭 전체]
+   ⚠ 폰(≤640px)만 건다. 넓은 화면은 하나도 안 바뀐다.
+   ⚠ 값을 자르지 않는다 — 금액·날짜·단추는 절대 안 잘리고 이름·설명은 두 줄까지 접는다.
+   ⚠ 앞의 폰 규칙(8월·10월)을 «덮어쓴다» — 같은 세기면 나중이 이기므로 이 블록은 맨 끝에 둔다.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width:640px){
+  /* 공통 — 한 장의 모양 */
+  .ld-tb tbody tr, .ld-xt tbody tr{
+    display:grid !important;
+    grid-template-columns:32px minmax(0,1fr) minmax(92px,max-content);
+    grid-template-rows:auto auto auto auto;
+    column-gap:8px !important; row-gap:3px !important; align-items:start !important;
+    padding:10px 14px 10px 8px !important; }
+  .ld-tb tbody td, .ld-xt tbody td{ min-width:0; word-break:normal !important; overflow-wrap:anywhere; }
+  /* ☐ 와 번호는 한 덩어리 — 같은 칸(1열)에 위아래로 선다 */
+  .ld-tb .ld-c-chk, .ld-xt .ld-x-chk{ grid-column:1 !important; grid-row:1 !important; justify-self:center; text-align:center; }
+  .ld-tb .ld-c-chk input, .ld-xt .ld-x-chk input{ width:22px; height:22px; margin:0; }
+  .ld-tb .ld-c-no, .ld-xt .ld-x-no{ display:block !important; grid-column:1 !important; grid-row:2 !important;
+    justify-self:center; text-align:center !important; font-size:12px !important; color:#94a3b8 !important;
+    font-variant-numeric:tabular-nums; line-height:1.2; }
+  /* 금액 — 폭 고정·오른쪽 끝·숫자 폭 같게(자릿수가 위아래로 맞는다)·줄바꿈 없음 */
+  .ld-tb .ld-c-amt, .ld-xt .ld-x-amt{ grid-column:3 !important; grid-row:1 !important;
+    text-align:right !important; font-size:15px !important; font-weight:800 !important;
+    font-variant-numeric:tabular-nums; white-space:nowrap !important; min-width:92px; }
+  /* 이름 — 두 줄까지 접고 그 이상만 … (한 줄로 자르지 않는다) */
+  .ld-xt .ld-x-memo > div{ white-space:normal !important; overflow:visible !important; flex-wrap:wrap !important; }
+  .ld-xt .ld-x-memo > div > span:first-child{ white-space:normal !important; text-overflow:clip !important;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden !important; }
+
+  /* 출금 카드 */
+  .ld-xt .ld-x-memo{ grid-column:2 !important; grid-row:1 !important; font-size:14px !important; font-weight:700; color:#1e293b !important; }
+  .ld-xt .ld-x-date{ grid-column:2 !important; grid-row:2 !important; font-size:12px !important; color:#64748b !important; }
+  .ld-xt .ld-x-card{ grid-column:3 !important; grid-row:2 !important; justify-self:end; }
+  .ld-xt .ld-x-cat { grid-column:2 !important; grid-row:3 !important; }
+  .ld-xt .ld-x-act { grid-column:3 !important; grid-row:3 !important; justify-self:end; text-align:right; }
+  .ld-xt .ld-x-cat select{ width:100% !important; font-size:14px !important; min-height:38px !important; height:38px !important; }
+  .ld-xt .ld-x-act button{ min-height:38px !important; padding:2px 12px !important; font-size:13px !important; }
+
+  /* 입금 카드 — 이름(적요) · 업체 · 현황 · 단추 */
+  .ld-tb .ld-c-memo{ grid-column:2 !important; grid-row:1 !important; font-size:14px !important; font-weight:700; color:#1e293b !important; }
+  .ld-tb .ld-c-co  { grid-column:2 !important; grid-row:2 !important; font-size:13px !important; }
+  .ld-tb .ld-c-st  { grid-column:3 !important; grid-row:2 !important; text-align:right !important; }
+  .ld-tb .ld-c-kind{ grid-column:2 / -1 !important; grid-row:3 !important; font-size:12px !important; color:#64748b !important; }
+  .ld-tb .ld-c-act { grid-column:2 / -1 !important; grid-row:4 !important; display:flex !important; flex-wrap:wrap;
+    justify-content:flex-start !important; align-items:center; gap:6px !important; margin-top:2px; }
+  /* 단추 높이는 공용 «손가락 자리» 규칙(button{min-height:38px})이 정한다 — 여기서 다시 적지 않는다(tests/ledger-phone-card) */
+  .ld-tb .ld-c-act button{ flex:1 1 0; min-width:64px !important; padding:4px 10px !important; font-size:13px !important; }
+  .ld-tb tbody button.ld-act-toggle{ flex:0 0 auto; min-width:44px !important; }
+
+  /* 출금 — 고르개는 줄 폭 전체. 「등록」 단추가 있을 때만 그 옆에 자리를 내준다(:has 는 크롬 105↑ — 안 되면 전체 폭으로 둔다) */
+  .ld-xt .ld-x-cat{ grid-column:2 / 4 !important; }
+  .ld-xt tbody tr:has(.ld-x-act button:not(.ld-act-x)) .ld-x-cat{ grid-column:2 !important; }   /* ✕ 는 폰에서 접혀 있다 — 「등록」이 있을 때만 */
+  .ld-xt .ld-x-act:empty{ display:none; }
+
+  /* ── 입금 사업장 확인 — 바닥 시트(.ld-hs-*) ──
+     카드마다 단추 수가 달라(둘·셋) 크기가 제각각이었고 설명은 «…» 로 잘렸다.
+     머리줄 = 이름 · 상태 · 금액(한 줄) / 설명 두 줄까지 / 단추 — 둘이면 반반, 셋이면 위 둘·아래 하나(넓게). */
+  .ld-hs-bg{ align-items:flex-end !important; padding:0 !important; }
+  .ld-hs-sheet{ width:100% !important; max-height:86vh !important; border-radius:16px 16px 0 0 !important; }
+  .ld-hs-card{ padding:10px !important; }
+  .ld-hs-l1{ display:grid !important; grid-template-columns:minmax(0,1fr) auto auto !important; column-gap:8px; align-items:baseline; }
+  .ld-hs-l1 > :nth-child(2){ grid-column:1; grid-row:1; white-space:normal !important; overflow-wrap:anywhere; overflow:visible !important; text-overflow:clip !important; font-size:14px !important; }
+  .ld-hs-l1 > :nth-child(3){ grid-column:2; grid-row:1; }
+  .ld-hs-l1 > :nth-child(1){ grid-column:3; grid-row:1; font-size:16px !important; text-align:right; }
+  .ld-hs-desc{ white-space:normal !important; display:-webkit-box !important; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden !important; }
+  .ld-hs-acts{ display:grid !important; grid-template-columns:1fr 1fr !important; gap:6px !important; }
+  .ld-hs-acts > button{ min-height:40px !important; font-size:13px !important; padding:6px 8px !important; }
+  .ld-hs-acts > button:last-child:nth-child(odd){ grid-column:1 / -1; }
+}
