@@ -1311,13 +1311,6 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .gn-tag.bnc{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
 .mck .gn-tag.nps{background:#fef2f2;color:#991b1b}
 .mck .gn-tag.alive{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:700}
-.mck.bzr-box{width:min(1100px,100%)}
-.mck .bzr-c{display:inline-block;border-radius:9px;padding:0 7px;font-size:11.5px;border:1px solid;margin-right:3px}
-.mck .bzr-c.ok{color:#166534;background:#f0fdf4;border-color:#bbf7d0}
-.mck .bzr-c.no{color:#991b1b;background:#fef2f2;border-color:#fecaca}
-.mck .bzr-c.wa{color:#854d0e;background:#fffbeb;border-color:#fde68a}
-.mck .bzr-c.dim{color:#64748b;background:#f8fafc;border-color:#e2e8f0}
-.mck table.gn tr.bzr-need td{background:#fffbeb}
 .mck .gn-tag.einone{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;font-weight:400}
 .mck .gn-cd.grn b{color:#166534}
 .mck .gn-pub{display:flex;align-items:center;gap:10px;margin:0 18px 10px;padding:7px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;font-size:12.5px;white-space:nowrap}
@@ -12807,117 +12800,6 @@ async function goneAskPub(){
   toast('공단 자료 ' + list.length + '곳을 청했습니다 — 몇 분 안에 저절로 붙습니다', 7000);
   for(const r of list){ try{ await PuPubdata.ask(r.o.bizno, 'ei', r.o.name || ''); }catch(_){ } }
 }
-/* ══════ 🧾 새로 들어온 사업자등록증 — 서버 자동 검토 결과 (대표 지시 2026-10-12, 목업 승인) ══════
-   서버(functions/bizreg-review.js)가 등록증이 들어올 때마다 국세청 상태·등록증 대조·4대보험·옛 번호·어긋난 칸을 보고
-   pucards/bizreg/{열쇠} 에 적는다. 이 창은 그것을 «보여 주고», 사람은 노란 줄만 처리한다.
-   ⚠ 저절로 고치거나 잇지 않는다. 「옛 번호에 새 번호 적기」는 국세청 «새 번호»(coNtsNewNoAsk 와 같은 칸)를 적을 뿐 합치지 않는다.
-   ⚠ 최근 30일만 받는다(색인 at). 「확인함」은 그 줄의 done 에 누가·언제만 적는다. */
-const BZR_DAYS = 30;
-let _bzr = null, _bzrAsk = false;
-function bzrLoad(cb){
-  if(_bzr !== null){ cb && cb(); return; }
-  if(_bzrAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
-  _bzrAsk = true;
-  Store.db.ref(DB_ROOT + '/bizreg').orderByChild('at').startAt(Date.now() - BZR_DAYS * 86400000).once('value').then(function(snap){
-    _bzr = snap.val() || {}; cb && cb();
-  }).catch(function(){ _bzrAsk = false; });
-}
-/* 줄 (순수 로직) — 새것이 위. 노란 줄 = need 이고 아직 확인 안 함 */
-function bzrRows(map){
-  return Object.keys(map || {}).map(function(k){ return Object.assign({ key:k }, map[k]); })
-    .filter(x => x && x.no)
-    .map(function(x){ x.todo = !!x.need && !(x.done && x.done.at); return x; })
-    .sort((a,b)=> (Number(b.at) || 0) - (Number(a.at) || 0));
-}
-/* ══════ 📇 리멤버 자동 연결 상태 (대표 「반드시 자동으로」 2026-10-24, 목업 승인) ══════
-   대표 크롬의 «푸른 리멤버 연결» 확장이 1시간마다 새 명함을 remember-intake.html 로 건네 사진첩·기업정보함에 담는다.
-   여기는 그 상태(pucards/remember/status)만 한 번 읽어 옆줄에 ● / ✕ 로 보인다 — 누르면 받는 화면이 열린다. */
-let _remSt = null, _remAsk = false;
-function remStatusLoad(){
-  if(_remAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
-  _remAsk = true;
-  Store.db.ref(DB_ROOT + '/remember/status').once('value').then(function(s){ _remSt = s.val() || {}; try{ renderSoon(); }catch(_){ } })
-    .catch(function(){ _remAsk = false; });
-}
-/* 옆줄 꼬리 (순수 로직) — 로그인 풀림 ✕ · 3시간 넘게 소식 없음 ⚠ · 정상 ● */
-function remStatusMark(st, now){
-  if(!st || !st.at) return '';
-  if(st.err === 'login') return '✕';
-  return (Number(now) || Date.now()) - Number(st.at) > 3 * 3600000 ? '⚠' : '●';
-}
-function bzrCount(){ if(_bzr === null){ bzrLoad(function(){ try{ renderSoon(); }catch(_){ } }); return 0; } return bzrRows(_bzr).filter(x => x.todo).length; }
-/* 검토 결과 꼬리표 (순수 로직) */
-function bzrTags(x){
-  const t = [], c = (k, s) => '<span class="bzr-c ' + k + '">' + s + '</span>';
-  const st = x.nts && x.nts.state ? String(x.nts.state) : '';
-  if(st){ const g = /폐업|휴업|등록되지 않은/.test(st);
-    t.push(c(g ? 'no' : 'ok', '🏛 ' + esc(/등록되지 않은/.test(st) ? '국세청에 없는 번호' : st) + (x.nts.end ? ' ' + esc(x.nts.end) : ''))); }
-  else t.push(c('dim', '🏛 못 물어봄'));
-  if(x.match === 'ok') t.push(c('ok', '🧾 등록증 일치'));
-  else if(x.match === 'bad') t.push(c('no', '🧾 대표자·개업일 다름'));
-  else if(x.match === 'name') t.push(c('wa', '🧾 상호 다름'));
-  if(x.ei) t.push(x.ei.none ? c('dim', '🏢 4대보험 사업장 없음') : c('ok', '🏢 상시 ' + (Number(x.ei.n) || 0) + '명'));
-  if((x.old || []).length) t.push(c('wa', '🔗 같은 대표·상호의 옛 번호 ' + x.old.length + '곳'));
-  else t.push(c('dim', x.link === 'existing' ? '🔗 기존 회사에 붙음' : '🔗 새 회사'));
-  if((x.conflicts || []).length) t.push(c('wa', '⚠ 지금 값과 다른 칸 ' + x.conflicts.length));
-  return t.join('');
-}
-function bzrOpen(){ state.bzrOn = true; bzrLoad(bzrMount); bzrMount(); }
-function bzrClose(){ state.bzrOn = false; bzrMount(); }
-function bzrMount(){
-  let box = document.getElementById('bzrBox');
-  if(!box){ if(!state.bzrOn) return; box = document.createElement('div'); box.id = 'bzrBox'; document.body.appendChild(box); }
-  box.innerHTML = state.bzrOn ? bzrHtml() : '';
-}
-function bzrHtml(){
-  const rows = bzrRows(_bzr), todo = rows.filter(x => x.todo);
-  const okN = rows.filter(x => !x.need).length, goneN = rows.filter(x => x.nts && /폐업|휴업/.test(x.nts.state || '')).length;
-  const card = (n, l, cls) => '<div class="gn-cd' + (cls ? ' ' + cls : '') + '" style="cursor:default"><b>' + n + '</b><span>' + l + '</span></div>';
-  const src = x => x.src === 'card' ? '🗂 기업정보함' : '📷 사진첩·메일';
-  const day = x => { const d = new Date(Number(x.at) || 0); return (d.getMonth() + 1) + '/' + d.getDate(); };
-  const act = function(x){
-    const k = esc(String(x.key).replace(/'/g, "\\'")), no = esc(x.no);
-    if(!x.need) return '<span class="em">끝</span>';
-    if(!x.todo) return '<span class="em">확인함' + (x.done && x.done.by ? ' · ' + esc(x.done.by) : '') + '</span>';
-    return '<button onclick="bzrOpenCo(\'' + no + '\')">기업 상세 열기</button>'
-      + ((x.old || []).length ? '<button onclick="bzrNewNo(\'' + k + '\')">옛 번호에 새 번호 적기</button>' : '')
-      + '<button class="ok" onclick="bzrDone(\'' + k + '\')">✓ 확인함</button>';
-  };
-  let body;
-  if(_bzr === null) body = '<p class="em">읽는 중입니다…</p>';
-  else if(!rows.length) body = '<p class="em">최근 ' + BZR_DAYS + '일 동안 들어온 등록증이 없습니다.</p>';
-  else body = '<table class="gn"><colgroup><col style="width:64px"><col style="width:18%"><col style="width:120px"><col><col style="width:330px"></colgroup>'
-    + '<tr><th>들어온 날</th><th>회사</th><th>어디서</th><th>검토 결과</th><th>처리</th></tr>'
-    + rows.map(x => '<tr class="' + (x.todo ? 'bzr-need' : '') + '"><td class="em">' + day(x) + '</td>'
-      + '<td title="' + esc(x.name || x.no) + '"><b>' + esc(x.name || x.no) + '</b></td><td>' + src(x) + '</td>'
-      + '<td title="' + esc((x.conflicts || []).join(', ')) + '">' + bzrTags(x) + '</td><td class="act">' + act(x) + '</td></tr>').join('')
-    + '</table>';
-  return '<div class="mck-dim" onclick="if(event.target===this)bzrClose()"><div class="mck gn-box bzr-box">'
-    + '<header><span>🧾</span><h2>새로 들어온 등록증</h2><span class="em">최근 ' + BZR_DAYS + '일 · 들어오자마자 서버가 검토합니다. 저절로 고치거나 잇지 않습니다.</span>'
-    + '<span class="x" onclick="bzrClose()" title="닫기">✕</span></header>'
-    + '<div class="gn-cards">' + card(rows.length, '들어옴') + card(okN, '✓ 다 맞음 (끝)', 'grn') + card(todo.length, '⚠ 사람 확인', 'amb') + card(goneN, '🏛 폐업·휴업', 'red') + '</div>'
-    + '<div class="body">' + body + '</div></div></div>';
-}
-function bzrOpenCo(no){ bzrClose(); state.coPick = String(no); openCoDetailPanel(String(no)); }
-async function bzrDone(k){
-  if(Store.mode !== 'firebase') return;
-  let me = myEmail || '';
-  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || me; }catch(_){ }
-  const v = { by: me, at: Date.now() };
-  try{ await Store.db.ref(DB_ROOT + '/bizreg/' + k + '/done').set(v); }catch(e){ toast('적지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return; }
-  if(_bzr && _bzr[k]) _bzr[k].done = v;
-  bzrMount(); renderSoon();
-}
-/* 옛 번호(폐업 등)에 «새 번호»를 적는다 — 🏚 와 국세청 칩이 「새 번호」로 처리된 곳으로 본다. 합치지 않는다 */
-function bzrNewNo(k){
-  const x = _bzr && _bzr[k]; if(!x || !(x.old || []).length) return;
-  const o = x.old[0];
-  const st = x.nts && x.nts.state ? x.nts.state : '';
-  if(!/계속/.test(st)){ toast('새 번호가 계속사업자가 아니라 적지 않습니다 — 국세청 「' + (st || '모름') + '」', 8000); return; }
-  if(!confirm('옛 번호 ' + o.no + (o.state ? ' (' + o.state + ')' : '') + ' 에\n새 번호 ' + x.no + ' (' + st + ') 를 적어 둡니다.\n\n· 옛 회사가 「🏚 없어진 듯한 곳」·국세청 확인에서 빠집니다\n· 두 회사를 합치지는 않습니다\n\n계속할까요?')) return;
-  coSaveInfoPatch(o.no, { ntsNewNo: x.no, ntsNewState: st, ntsNewAt: todayYmd() }, '🏛 옛 번호에 새 번호 ' + x.no + ' 를 적었습니다');
-  bzrDone(k);
-}
 function goneOpen(){
   state.goneOn = true; state.goneTab = 'todo'; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1;
   if(typeof loadPubCo === 'function') loadPubCo();      /* 공단 근거 — 기업 상세를 안 거쳐 열어도 */
@@ -15437,8 +15319,6 @@ function openMenu(){
       <span class="msub">중복·유사·빈·깨짐·휴지통</span></button>
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');goneOpen()">🏚 없어진 듯한 곳
       <span class="msub">국세청 폐업·도메인 없어짐·반송 메일</span></button>
-    <button class="sheetbtn" onclick="menuBg.classList.remove('open');bzrOpen()">🧾 새 등록증
-      <span class="msub">들어오자마자 서버가 검토 · 확인할 것만 노랗게</span></button>
 
     ${hd('📥 데이터')}
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');importInput.click()">📥 파일 가져오기
@@ -18110,8 +17990,6 @@ function renderPCSide(){
          수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
     <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
     ${/* 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09) — 창으로 연다. 수는 «정리할 것» 회사 수 */''}
-    <button onclick="window.open('remember-intake.html','pu-remember')" title="리멤버 새 명함이 1시간마다 사진첩·기업정보함에 저절로 들어옵니다 — ● 연결됨 · ⚠ 3시간 넘게 소식 없음 · ✕ 리멤버 로그인 풀림">📇<em>리멤버</em><span>${typeof remStatusMark === 'function' ? (remStatusLoad(), remStatusMark(_remSt)) : ''}</span></button>
-    <button onclick="bzrOpen()" title="최근 30일 들어온 사업자등록증 — 서버가 국세청·4대보험·옛 번호를 검토했습니다. 수는 사람이 확인할 것">🧾<em>새 등록증</em><span>${(n => n ? n.toLocaleString() : '')(typeof bzrCount === 'function' ? bzrCount() : 0)}</span></button>
     <button onclick="goneOpen()" title="국세청 폐업 · 메일 도메인 없어짐 · 반송 메일로 «없어진 듯한 회사»를 모아 봅니다">🏚<em>없어진 듯한 곳</em><span>${(n => n ? n.toLocaleString() : '')(typeof goneCount === 'function' ? goneCount() : 0)}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서

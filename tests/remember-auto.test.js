@@ -132,15 +132,10 @@ test('★★ ⑦ 그림은 리멤버 창고만 · 확장은 좁은 권한 · 인
   assert.match(onto, /remember_intake:\{ name:'리멤버 받기', file:'remember-intake\.html', program:'cards'/);
 });
 
-test('★★ 기업정보함 옆줄 — 로그인 풀림 ✕ · 3시간 넘게 소식 없음 ⚠ · 정상 ●', () => {
+/* 대표 「리멤버 새로 만들지마라 — 그냥 명함에」「두개 삭제」(2026-10-24): 옆줄에 «리멤버»·«새 등록증» 문을 두지 않는다.
+   리멤버 명함은 그냥 «명함»으로 들어오고, 등록증 검토는 서버가 뒤에서 한다. */
+test('★★ 기업정보함 옆줄에 «리멤버»·«새 등록증» 문이 없다', () => {
   const SRC = read(path.join(__dirname, '..', 'pu-cards.html'));
-  const a = SRC.indexOf('\nfunction remStatusMark(');
-  const ctx = vm.createContext({ Number, Date });
-  vm.runInContext(SRC.slice(a, SRC.indexOf('\n}\n', a) + 2), ctx);
-  const now = Date.UTC(2026, 9, 24, 3);
-  assert.equal(ctx.remStatusMark({ at: now - 600000 }, now), '●');
-  assert.equal(ctx.remStatusMark({ at: now - 4 * 3600000 }, now), '⚠', '★★ 확장이 멈췄는데 정상으로 보인다');
-  assert.equal(ctx.remStatusMark({ at: now, err: 'login' }, now), '✕');
-  assert.equal(ctx.remStatusMark(null, now), '');
-  assert.match(SRC, /onclick="window\.open\('remember-intake\.html','pu-remember'\)"[^>]*>📇<em>리멤버<\/em>/, '옆줄 문이 없다');
+  assert.doesNotMatch(SRC, /📇<em>리멤버<\/em>/, '★★ 대표가 지운 「리멤버」 문이 돌아왔다');
+  assert.doesNotMatch(SRC, /🧾<em>새 등록증<\/em>|bzrOpen\(\)">🧾 새 등록증/, '★★ 대표가 지운 「새 등록증」 문이 돌아왔다');
 });
