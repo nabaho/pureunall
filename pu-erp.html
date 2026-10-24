@@ -72943,8 +72943,135 @@ function perfUnsettleShare(fiId, shareIdx){
 window.perfSettleShare = perfSettleShare;
 window.perfUnsettleShare = perfUnsettleShare;
 
+/* ⭐ 직원 성과 이력 — 해마다 넘겨 보는 성과급 실적 (대표 「추천대로」·「시안대로」 2026-10-24)
+   ■ 옛 입금(2021~2025 인센티브 가져오기)은 사건·컨설팅 카드가 없다 — 가짜 카드를 만들지 않고
+     입금 «항목» 글자(kind·업체명)로 업무 종류만 가른다. 저장된 자료는 고치지 않는다(화면에서만 셈).
+   ■ 거르개는 erpPerfCounts(item,false) 하나 — 실적으로 세는 기준을 성과관리와 같게 둔다. */
+var ERP_PERF_GROUPS = [
+  { k:'consult', label:'컨설팅',   color:'#2563eb' },
+  { k:'wage',    label:'체당금',   color:'#16a34a' },
+  { k:'injury',  label:'산재',     color:'#d97706' },
+  { k:'remedy',  label:'권리구제', color:'#dc2626' },
+  { k:'subsidy', label:'지원금',   color:'#60a5fa' },
+  { k:'fund',    label:'기금',     color:'#fbbf24' },
+  { k:'bonus',   label:'상여·복지', color:'#64748b' },
+  { k:'etc',     label:'기타',     color:'#94a3b8' }
+];
+// 업무 종류 — 글자로 먼저 보고, 글자로 모르면 입금이 어디서 왔는지(sourceKind)로 본다
+function erpPerfWorkGroup(item){
+  if(!item) return 'etc';
+  var t = String(item.kind || '') + ' ' + String(item.caseTitle || '') + ' ' + String(item.title || '');
+  if(/상여|성과급|휴가비|대표님 추가/.test(t)) return 'bonus';   // 명절·연말 특별상여처럼 업무와 상관없이 준 몫
+  if(/체당|대지급/.test(t)) return 'wage';
+  if(/산재|장해|유족|요양|휴업급여|업무상\s*질병/.test(t)) return 'injury';
+  if(/기금|운영상황|공근/.test(t)) return 'fund';
+  if(/컨설팅|안전보건|관리체계|진단|혁신|우수기업|클리닉|비즈|용역|개선/.test(t)) return 'consult';
+  if(/장려금|지원금|고용지원|고용촉진|일자리|도약/.test(t)) return 'subsidy';
+  if(/부당|해고|징계|체불|괴롭힘|성희롱|노동위|지노위|중노위|구제|진정|소송|사건|착수금|성공보수|화해/.test(t)) return 'remedy';
+  var sk = item.sourceKind;
+  if(sk === 'consulting') return 'consult';
+  if(sk === 'fund') return 'fund';
+  if(sk === 'case') return 'remedy';
+  return 'etc';
+}
+// sid 의 해마다·달마다 성과 실적 { 'YYYY': { n, sum, g:{k:sum}, m:{ 'MM': { n, sum, g } } } }
+function erpPerfHistory(sid, incomes){
+  var out = {};
+  if(!sid) return out;
+  (incomes || []).forEach(function(it){
+    if(!it || it._deleted || !erpPerfCounts(it, false)) return;
+    var d = String(it.date || ''); if(!/^\d{4}-\d{2}/.test(d)) return;
+    var amt = 0, hit = false;
+    (it.perfShares || []).forEach(function(s){ if(s && s.sid === sid){ hit = true; amt += Number(s.amount) || 0; } });
+    if(!hit) return;
+    var y = d.slice(0, 4), mm = d.slice(5, 7), g = erpPerfWorkGroup(it);
+    var Y = out[y] || (out[y] = { n:0, sum:0, g:{}, m:{} });
+    var M = Y.m[mm] || (Y.m[mm] = { n:0, sum:0, g:{} });
+    Y.n++; Y.sum += amt; Y.g[g] = (Y.g[g] || 0) + amt;
+    M.n++; M.sum += amt; M.g[g] = (M.g[g] || 0) + amt;
+  });
+  return out;
+}
+
+function StaffPerfHistoryModal(props){
+  useEscClose(props.onClose);
+  var u = props.user || {};
+  var hist = erpPerfHistory(u.sid, dbGet('finance_income', []) || []);
+  var years = Object.keys(hist).sort();
+  var thisY = String(todayYMD()).slice(0, 4);
+  var yS = useState(years.indexOf(thisY) >= 0 ? thisY : (years[years.length - 1] || thisY));
+  var selY = yS[0], setSelY = yS[1];
+  var Y = hist[selY] || { n:0, sum:0, g:{}, m:{} };
+  var yi = years.indexOf(selY);
+  function won(n){ return Math.round(n || 0).toLocaleString('ko-KR'); }
+  function mil(n){ return (Math.round((n || 0) / 100000) / 10).toLocaleString('ko-KR') + '백만'; }
+  var used = ERP_PERF_GROUPS.filter(function(G){ return Y.g[G.k]; });
+  var navBtn = { padding:'2px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', background:'#ffffff', color:'#64748b', cursor:'pointer', fontSize:'14px' };
+  var th = { padding:'7px 9px', borderBottom:'1px solid #e2e8f0', color:'#64748b', fontSize:'13px', textAlign:'right', whiteSpace:'nowrap' };
+  var td = { padding:'7px 9px', borderBottom:'1px solid #f8fafc', textAlign:'right', whiteSpace:'nowrap', fontSize:'14px' };
+  var months = Object.keys(Y.m).sort();
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ width:'920px', maxWidth:'96vw', maxHeight:'90vh', display:'flex', flexDirection:'column' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '⭐ 성과 이력 · ' + (u.name || '') + (u.title ? ' · ' + u.title : '')),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ flex:1, overflowY:'auto' } },
+        years.length === 0 ? h('div', { style:{ padding:'30px', textAlign:'center', color:'#94a3b8' } }, '성과급 실적이 없습니다') :
+        h('div', null,
+          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'12px', alignItems:'center', marginBottom:'10px' } },
+            h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontWeight:800, fontSize:'17px' } },
+              h('button', { style:navBtn, disabled:yi <= 0, onClick:function(){ if(yi > 0) setSelY(years[yi - 1]); } }, '◀'),
+              selY + '년',
+              h('button', { style:navBtn, disabled:yi < 0 || yi >= years.length - 1, onClick:function(){ if(yi < years.length - 1) setSelY(years[yi + 1]); } }, '▶')),
+            h('div', { style:{ display:'flex', gap:'18px', marginLeft:'auto', whiteSpace:'nowrap' } },
+              [['건수', Y.n + '건'], ['성과급 합계', won(Y.sum) + '원'], ['한 건 평균', won(Y.n ? Y.sum / Y.n : 0) + '원']].map(function(k){
+                return h('div', { key:k[0], style:{ fontSize:'13px', color:'#64748b' } }, k[0], h('b', { style:{ display:'block', fontSize:'18px', color:'#1e293b' } }, k[1]));
+              }))),
+          Y.sum > 0 && h('div', { style:{ display:'flex', height:'14px', borderRadius:'7px', overflow:'hidden', margin:'4px 0 6px', background:'#f8fafc' } },
+            used.map(function(G){ return h('div', { key:G.k, title:G.label + ' ' + won(Y.g[G.k]) + '원', style:{ width:(Y.g[G.k] / Y.sum * 100) + '%', background:G.color } }); })),
+          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'12px', fontSize:'13px', color:'#64748b', marginBottom:'12px' } },
+            used.map(function(G){ return h('span', { key:G.k, style:{ whiteSpace:'nowrap' } },
+              h('i', { style:{ display:'inline-block', width:'10px', height:'10px', borderRadius:'3px', marginRight:'4px', background:G.color } }),
+              G.label + ' ' + Math.round(Y.g[G.k] / Y.sum * 100) + '%'); })),
+          h('div', { style:{ overflowX:'auto' } },
+            h('table', { style:{ borderCollapse:'collapse', width:'100%', fontVariantNumeric:'tabular-nums' } },
+              h('thead', null, h('tr', null,
+                h('th', { style:Object.assign({}, th, { textAlign:'left' }) }, '달'),
+                h('th', { style:th }, '건수'),
+                used.map(function(G){ return h('th', { key:G.k, style:th }, G.label); }),
+                h('th', { style:th }, '성과급'))),
+              h('tbody', null,
+                months.map(function(mm){
+                  var M = Y.m[mm];
+                  return h('tr', { key:mm },
+                    h('td', { style:Object.assign({}, td, { textAlign:'left' }) }, parseInt(mm, 10) + '월'),
+                    h('td', { style:td }, M.n),
+                    used.map(function(G){ return h('td', { key:G.k, style:td }, M.g[G.k] ? won(M.g[G.k]) : ''); }),
+                    h('td', { style:Object.assign({}, td, { fontWeight:700 }) }, won(M.sum)));
+                }),
+                h('tr', null,
+                  h('td', { style:Object.assign({}, td, { textAlign:'left', fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, '합계'),
+                  h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, Y.n),
+                  used.map(function(G){ return h('td', { key:G.k, style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, won(Y.g[G.k])); }),
+                  h('td', { style:Object.assign({}, td, { fontWeight:800, borderTop:'2px solid #e2e8f0' }) }, won(Y.sum)))))),
+          h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'8px', marginTop:'12px' } },
+            years.map(function(y){
+              var on = y === selY;
+              return h('button', { key:y, onClick:function(){ setSelY(y); },
+                style:{ textAlign:'left', border:'1px solid ' + (on ? '#2563eb' : '#e2e8f0'), background:on ? '#eff6ff' : '#ffffff', borderRadius:'7px', padding:'7px 10px', fontSize:'13px', color:'#64748b', cursor:'pointer', whiteSpace:'nowrap' } },
+                h('b', { style:{ display:'block', fontSize:'15px', color:'#1e293b' } }, y + (y === thisY ? ' · 진행 중' : '')),
+                hist[y].n + '건 · ' + mil(hist[y].sum));
+            })),
+          h('div', { style:{ fontSize:'13px', color:'#64748b', lineHeight:1.7, marginTop:'10px' } },
+            '· 2025년까지는 엑셀 인센티브 시트에서 가져온 «지난 실적», 2026년부터는 입금확정에서 저절로 셉니다.', h('br'),
+            '· 업무 종류는 입금 항목 글자로 가른 것입니다(옛 입금은 사건·컨설팅 카드가 없음). 현금으로 따로 준 몫도 실적에 들어갑니다.'))),
+      h('div', { className:'modal-f' },
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))));
+}
+
 function StaffRosterDetail(props){
   var u = props.user;
+  var phS = useState(false); var perfHistOpen = phS[0]; var setPerfHistOpen = phS[1];   // ⭐ 성과 이력 창
   var srS = useState(false); var showRRN = srS[0]; var setShowRRN = srS[1];
   // 퇴사자 성과급 정산 — 쓰고 나면 tick 을 올려 dbGet 을 다시 읽는다
   var stS = useState(0);     var setlTick = stS[0];  var setSetlTick = stS[1];
@@ -73233,8 +73360,12 @@ function StaffRosterDetail(props){
           );
         })()
       ),
+      perfHistOpen && h(StaffPerfHistoryModal, { user:u, onClose:function(){ setPerfHistOpen(false); } }),
       h('div', { className:'modal-f' },
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'),
+        _erpCanFin() && h('button', { onClick:function(){ setPerfHistOpen(true); },
+          style:{ padding:'7px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', fontSize:'12px', fontWeight:700, cursor:'pointer' } },
+          '⭐ 성과 이력'),
         props.onDelete && h('button', { onClick:function(){ props.onDelete(); },
           style:{ padding:'7px 12px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', fontSize:'12px', fontWeight:700, cursor:'pointer' } },
           '🗑 삭제'),
