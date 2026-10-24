@@ -124,12 +124,12 @@ const BOARDS = [
      ⚠ gate:'eval' — 「제안서 평가위원」은 공학 분야가 많아 분야 말(노무·인사·경영…)이 있거나 풀 모집일 때만 통과(evalOut). */
   { id: 'chungnam',  org: '', gate: 'eval', name: '충청남도 도정공고',          url: 'https://www.chungnam.go.kr/cnportal/province/province/list.do?menuNo=500487' },
   { id: 'daejeon',   org: '', gate: 'eval', name: '대전광역시 고시공고',        url: 'https://www.daejeon.go.kr/drh/MediaList.do?notiType=NOTI_06&menuSeq=2564' },
-  { id: 'chungbuk',  org: '', gate: 'eval', name: '충청북도 고시/공고',         url: 'https://www.chungbuk.go.kr/www/selectGosiPblancList.do?key=422' },
-  { id: 'chungbuk2', org: '', gate: 'eval', name: '충청북도 타기관 고시/공고',  url: 'https://www.chungbuk.go.kr/www/selectBbsNttList.do?bbsNo=61&key=423' },
+  { id: 'chungbuk',  org: '', gate: 'eval', manual: true, name: '충청북도 고시/공고',         url: 'https://www.chungbuk.go.kr/www/selectGosiPblancList.do?key=422' },
+  { id: 'chungbuk2', org: '', gate: 'eval', manual: true, name: '충청북도 타기관 고시/공고',  url: 'https://www.chungbuk.go.kr/www/selectBbsNttList.do?bbsNo=61&key=423' },
   { id: 'cheonan',   org: '', gate: 'eval', name: '천안시 공고알림',            url: 'https://www.cheonan.go.kr/prog/saeolGosi/GOSI/kor/sub02_02_01/list.do' },
   { id: 'dangjin',   org: '', gate: 'eval', name: '당진시 고시/공고',           url: 'https://www.dangjin.go.kr/prog/publicNotice/kor/sub03_02_01_01/list.do' },
-  { id: 'cri_job',   org: '', gate: 'eval', name: '충북연구원 채용공고',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0404' },
-  { id: 'cri',       org: '', gate: 'eval', name: '충북연구원 공지사항',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0304' },
+  { id: 'cri_job',   org: '', gate: 'eval', manual: true, name: '충북연구원 채용공고',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0404' },
+  { id: 'cri',       org: '', gate: 'eval', manual: true, name: '충북연구원 공지사항',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0304' },
   { id: 'gbsa',      org: '', gate: 'eval', name: '경기도경제과학진흥원 공지', url: 'https://www.gbsa.or.kr/board/notice.do' },
   { id: 'djmoel',    org: '', gate: 'eval', name: '대전지방고용노동청 공지',    url: 'https://www.moel.go.kr/local/daejeon/news/notice/noticeList.do' },
   { id: 'kpc',       org: '', gate: 'eval', name: '한국생산성본부 지원사업 모집공고', url: 'https://www.kpc.or.kr/kpc/PTWHP004_recruit_list.do' },
@@ -460,8 +460,12 @@ function 늦으면(ms, why) {
 }
 
 /* 한 번 돈다. fetchText(url, board) → Promise<string>. 네트워크는 부르는 쪽이 준다(검사에선 가짜) */
+/* ★ manual: true — «서버가 못 읽는» 게시판(2026-10-24). 충청북도·충북연구원은 서버(구글 클라우드 주소)에서만 막힌다 —
+     이 PC·크롬은 다 열리는데 서버는 ECONNRESET(충북도 10-14~)·HTTP 403(충북연구원 10-13~)이 undici·node https·브라우저 머리 «세 길 모두»에서 났다(11~12일째).
+     코드로는 못 푸는 «주소 차단»이라 날마다 헛 요청을 하지 않고 화면에서 «직접 열기» 링크로만 둔다(gov_watch/manual).
+     ⚠ 풀렸는지 가끔 보려면 이 표시만 빼고 다시 올린다(검사가 «manual 이 이 넷뿐»임을 못박는다). */
 async function run(o) {
-  const boards = o.boards || BOARDS, have = o.existing || {}, today = o.today, nowIso = o.nowIso || '';
+  const allBoards = o.boards || BOARDS, boards = allBoards.filter((b) => !b.manual), have = o.existing || {}, today = o.today, nowIso = o.nowIso || '';
   const now = o.now || Date.now, t0 = now();
   const together = Math.max(1, o.together || LIMITS.together);
   const boardMs = o.boardMs || LIMITS.boardMs, totalMs = o.totalMs || LIMITS.totalMs;
@@ -579,7 +583,8 @@ async function run(o) {
     };
     await Promise.all(Array.from({ length: Math.min(together, list.length) }, 읽개));
   }
-  return { hits, errors, counts, pers, docs, fixes, drops, ai: aiUsed, checked: boards.length, ms: now() - t0 };
+  const manual = allBoards.filter((b) => b.manual).map((b) => ({ id: b.id, name: b.name || b.id, url: b.page || b.url }));
+  return { hits, errors, counts, pers, docs, fixes, drops, ai: aiUsed, checked: boards.length, manual, ms: now() - t0 };
 }
 
 /* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
@@ -642,6 +647,9 @@ function updatesOf(result, existing, nowIso, o) {
   Object.keys(result.pers || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/per'] = result.pers[k]; });
   upd.last = { at: nowIso, checked: result.checked, added: result.hits.length,
     errors: result.errors, counts: result.counts };
+  /* 손으로 확인하는 게시판 — 화면이 «직접 열기» 링크로 보인다. 못 읽는 날수(fails)는 더 세지 않고 지운다 */
+  if (result.manual && result.manual.length) upd.manual = result.manual;
+  if (o.today) (result.manual || []).forEach((m) => { if ((o.fails || {})[m.id]) upd['fails/' + m.id] = null; });
   if (result.ai) upd.last.ai = result.ai;   // AI 에게 물은 건수(돈)
   if (o.today) {
     const fails = o.fails || {}, bad = {};

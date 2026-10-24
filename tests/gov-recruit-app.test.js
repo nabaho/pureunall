@@ -1647,6 +1647,22 @@ test('★★ 새로 받기 — 걸린 공고·열린 옛 공고에 제한을 붙
   assert.match(rf, /GovG2b\.dday\(r\.closeDt\)/, '마감 지난 공고는 안 부른다');
 });
 
+/* ═══ 서버가 못 읽는 게시판 — «손으로 확인» 링크 (2026-10-24) ═══ */
+test('★★★ 서버가 못 읽어 손으로 확인하는 게시판은 노란 경고가 아니라 «직접 열기» 링크로만 — 공공기관 탭에만, https 만', async () => {
+  const w = Object.assign({}, WATCH, { manual: [
+    { id: 'chungbuk', name: '충청북도 고시/공고', url: 'https://www.chungbuk.go.kr/www/selectGosiPblancList.do?key=422' },
+    { id: 'cri', name: '충북연구원 공지사항', url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0304' },
+    { id: 'bad', name: '이상한 주소', url: 'javascript:alert(1)' }] });
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(w), 'U1'); await r.api.recWatchPull();
+  const pub = r.el('recWatch').innerHTML;
+  assert.match(pub, /<div class="recban calm">🔗 <b>서버가 못 읽어 손으로 확인하는 게시판 2곳<\/b>/);
+  assert.match(pub, /<a href="https:\/\/www\.chungbuk\.go\.kr\/www\/selectGosiPblancList\.do\?key=422" target="_blank" rel="noopener">충청북도 고시\/공고<\/a>/);
+  assert.match(pub, /충북연구원 공지사항/); assert.doesNotMatch(pub, /javascript:|이상한 주소/);
+  assert.doesNotMatch(pub, /며칠째 못 읽고/, '경고가 아니다');
+  assert.doesNotMatch(r.el('recWatchKc').innerHTML, /손으로 확인하는 게시판/, '공인노무사회 탭에는 안 나온다');
+});
+
 /* ═══ 🎯 지원할 만한 것 — 팝업 (대표 지시 2026-10-24 「지원할 만한 컨설턴트 또는 사업을 팝업으로」 → 「추천대로」) ═══ */
 const PK_DAY = '2026-10-24T09:00:00';
 const PK_WATCH = { last: { at: '2026-10-24T01:00:00Z', checked: 31, added: 2 }, hits: {
