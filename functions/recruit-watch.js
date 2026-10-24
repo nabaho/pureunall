@@ -67,6 +67,42 @@ const EXTRA_CA = [
   '7ABvc7BYSQubQ2490OcdkIzUh3ZwDrakMVrbaTxUM2p24N6dB+ns2zptWCva6jzW\n' +
   'r8IWKIMxzxLPv5Kt3ePKcUdvkBU/smqujSczTzzSjIoR5QqQA6lN1ZRSnuHIWCvh\n' +
   'JEltkYnTAH41QJ6SAWO66GrrUESwN/cgZzL4JLEqz1Y=\n' +
+  '-----END CERTIFICATE-----\n',
+  /* 둘째 — 데이터산업진흥원(kdata.or.kr · 「voucher」 게시판, 2026-10-24 첫 실패) 도 같은 병이다: 사이트 인증서(*.kdata.or.kr) 다음에 중간 인증서
+     「TuringSign RSA Secure CA 2」 를 빼고 보낸다. 출처 = 사이트 인증서의 AIA http://public.wisekey.com/crt/tsrsasecureca2.cer
+     확인: Node 기본 뿌리 「OISTE WISeKey Global Root GB CA」 로 서명됐다. 2030-05-26 까지.
+     sha256 A6:F9:C9:67:EB:8A:A9:28:3A:1C:A6:49:B8:7B:76:47:20:E9:F5:C3:AF:A8:1C:15:06:76:F4:CA:36:E9:8C:F6 */
+  '-----BEGIN CERTIFICATE-----\n' +
+  'MIIFjjCCBHagAwIBAgIQcCosoce0HIWpncOmISmyLzANBgkqhkiG9w0BAQsFADBt\n' +
+  'MQswCQYDVQQGEwJDSDEQMA4GA1UEChMHV0lTZUtleTEiMCAGA1UECxMZT0lTVEUg\n' +
+  'Rm91bmRhdGlvbiBFbmRvcnNlZDEoMCYGA1UEAxMfT0lTVEUgV0lTZUtleSBHbG9i\n' +
+  'YWwgUm9vdCBHQiBDQTAeFw0yNTA1MjcxNTEwMzRaFw0zMDA1MjYxNTEwMzRaMFEx\n' +
+  'CzAJBgNVBAYTAkNIMR0wGwYDVQQKDBRUdXJpbmdTaWduIEdsb2JhbCBTQTEjMCEG\n' +
+  'A1UEAwwaVHVyaW5nU2lnbiBSU0EgU2VjdXJlIENBIDIwggIiMA0GCSqGSIb3DQEB\n' +
+  'AQUAA4ICDwAwggIKAoICAQDGDBcFU6l+Hs5OUzBVjDQP8xGhdPG7xvNPu2Q5FF1f\n' +
+  'L4IOIIYnx2E3ZFVbYf4a6d/8q4HFlWLT98BIPGo3nlsZiyaKb6MKMGONE5/4DfMk\n' +
+  'zn+JkQaggOmXNLhn0hbezFJOJaYBcCroBZmDyOKbHRSHnBDZuG8Fx5UqbSG3Zlic\n' +
+  'ywd4ET0CZXL/QZCcJzRJ6OMyndQpvmxbCq8TUwbqT4FwFDOwigqBPNlEgjSje0vc\n' +
+  '3Xg7KUOgcHs9NI26Vo72YR/uiA9N/0gMfum0DLp/31vhIHw68LC/7cU/4Rp6yYaY\n' +
+  'c8OfyhRuwfsMHWTXpAroHqbK8zlK4ZFOaTv+6MeFHnADyYRLdLl4cPTDmLUZFbyo\n' +
+  '3Ec/NFepKYP/hFM0Fo7wFHMg1QsLSOD9KcQzxOkAhggX5bHd3DvQZyo3g3EnC6l0\n' +
+  'FFQ4UwTI2qLKXpVN8EUfh3HSJmbVsQoyUdmbOz+qjtIjHAP2mIwip6AvE3DWA28E\n' +
+  'K09fLTCbCbP/NBAfZAWbfzSeombpwib5pLUQ6/0FzMRw8dE6jm5t5L5INBXaUUCx\n' +
+  'wXM9BJxMc+gqjxRJD5SEbyK0dFR74n2nkzzUS83GyFJXkfYDOnYBUN0kGtUzn4bt\n' +
+  'RLdQ00+xewgFVMPGXTeQMK0VpavOb0uFcu4ZhLA28B2iT8XWc4Not1Bj84+5O50K\n' +
+  'EwIDAQABo4IBRDCCAUAwEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSMEGDAWgBQ1\n' +
+  'D8g2Y17io+z5O2YVzlFS45GaPTBrBggrBgEFBQcBAQRfMF0wNgYIKwYBBQUHMAKG\n' +
+  'Kmh0dHA6Ly9wdWJsaWMud2lzZWtleS5jb20vY3J0L293Z3JnYmNhLmNlcjAjBggr\n' +
+  'BgEFBQcwAYYXaHR0cDovL29jc3Aud2lzZWtleS5jb20wEQYDVR0gBAowCDAGBgRV\n' +
+  'HSAAMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATA7BgNVHR8ENDAyMDCg\n' +
+  'LqAshipodHRwOi8vcHVibGljLndpc2VrZXkuY29tL2NybC9vd2dyZ2JjYS5jcmww\n' +
+  'HQYDVR0OBBYEFM3OdTxWi2FRu9+xUPmb6hymFzMRMA4GA1UdDwEB/wQEAwIBBjAN\n' +
+  'BgkqhkiG9w0BAQsFAAOCAQEAbjvOB6/tTaX0YG/8sPytIvU6nEWuq2Zfxl7FMMB7\n' +
+  'wAm7IPPf5MSTXcc8mmPh97YDj/A6N3jOf09G7IJEGYo7Sf9948ZhL6czKmByyKhU\n' +
+  'r3yCEmVV/+MyhTvhc5aJIG6dnADXw8C1lMwEt6gzMolsNyQ3gY6slPxZ2xUEcPZi\n' +
+  'wm9veB9aR+QfcUl7UHQHpfC7EoeelSir7AfcvLdbseaqM5GeWlFWmsCH7SweFybv\n' +
+  'Tjz94Rfsafz5fEL2EaApecOUK3bLh9mO6cgL7n8yryrUKG5hY6D4OirSYpYJvS6y\n' +
+  'u2wLYijDNYa2wMqRFdIoMB/7NxDyVQ3lfc7Kj50d33TUsQ==\n' +
   '-----END CERTIFICATE-----\n'
 ];
 /* 기본 뿌리 + 위의 중간 인증서 — node https 의 ca 에 넘긴다(ca 를 주면 기본 뿌리를 «대신»하므로 둘 다 넣는다) */
