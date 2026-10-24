@@ -19,19 +19,15 @@ function phoneBlock() {
   return enter.slice(mq, i + 1);
 }
 
-test('이름·사용액이 «한 줄»에 앉는다', () => {
-  /* 네 줄 → 두 줄(로고 줄 + 이 한 줄). 173px → 84px (대표 지시 2026-08-20
-     "너무 많은 부분 차지" → "최대 1줄 가능할까"). */
+/* 2026-10-24 대표 머리 카드 1안 「아바타 하나」 — 카드를 걷고 한 줄. 사용액·로그아웃은 «내 메뉴» 안으로.
+   (그 앞: 2026-08-20 「너무 많은 부분 차지」→ 네 줄을 두 줄로 — 사용액이 둘째 줄 둘째 자리에 앉았다) */
+test('폰: 내 메뉴 단추(이름·사번)는 «줄어들지 않는다» — 사번이 잘리지 않게', () => {
   const b = phoneBlock();
-  assert.match(b, /\.pbar \.pmeta\{order:1;flex:1 1 auto/);
-  /* ⚠ 고르개를 «글자 그대로» 박지 않는다 — 딱지가 하나 늘어 규칙을 함께 쓰게 되면
-     (`.pbar #billChip,.pbar #aiChip{…`) 멀쩡한 화면에서 이 검사만 깨진다.
-     지켜야 할 것은 「돈 딱지가 둘째 자리에 · 안 늘어나게 앉는가」다.
-     2026-09-12 부터 딱지 둘이 한 상자(#moneyBox)에 들어갔다 — .pbar 의 «자식»은
-     이제 상자이므로 자리잡기도 상자가 진다(딱지에 걸면 상자 안에서만 다툰다). */
-  assert.match(b, /\.pbar #(moneyBox|billChip)[^{]*\{order:2;flex:0 0 auto/);
-  /* (셋째 자리의 「로그인 후 바로가기」는 2026-09-28 걷어냈다 — 대표 「선택 하느거 필요 없다」) */
-  assert.match(b, /\.pbar \.pmeta\{[^}]*min-width:\d+px/);
+  /* 줄어들면 「권형하 · P-0…」 처럼 사번이 잘린다 — 자리가 모자라면 제 줄로 내려가야 한다 */
+  assert.match(b, /\.pbar \.pmeta\{[^}]*flex:0 0 auto/,
+    '★ 이름·사번 단추가 줄어들 수 있다 — 사번이 말줄임(…)으로 잘린다');
+  assert.doesNotMatch(b, /#userName\{[^}]*text-overflow:ellipsis/,
+    '★ 폰에서 이름 칸을 말줄임으로 자른다 — 사번이 사라진다');
 });
 
 test('한 줄로 몰면서 접은 것은 «다른 데 같은 말이 있는 것» 뿐이다', () => {
@@ -50,13 +46,16 @@ test('한 줄로 몰면서 접은 것은 «다른 데 같은 말이 있는 것»
   assert.match(enter, /var _e = function\(v\)/, 'innerHTML 로 넣으면서 감싸지 않으면 위험합니다.');
 });
 
-test('사용액은 맨 윗줄(로그아웃 옆)로 올리지 않는다', () => {
-  /* 거기서는 좁아 가려지고, 가려진 기능은 없는 기능이다
-     — 지문 로그인 안내가 실제로 그렇게 사라졌던 적이 있다. */
-  const b = phoneBlock();
-  /* 2026-09-12: 자리잡기는 딱지를 감싼 상자(#moneyBox)가 진다 — 위 풀이글 참고 */
-  const m = b.match(/\.pbar #(?:moneyBox|billChip)[^{]*\{order:(\d+)/);
-  assert.ok(m && Number(m[1]) >= 2, '★ 사용액이 맨 윗줄로 올라가면 로그아웃에 가려집니다.');
+test('사용액·로그아웃은 «내 메뉴» 안에 있다 — 머리줄에서 가려지지 않게', () => {
+  /* 예전에는 머리줄 좁은 자리에 끼어 가려졌다 — 가려진 기능은 없는 기능이다
+     (지문 로그인 안내가 실제로 그렇게 사라졌던 적이 있다). 이제는 내 메뉴를 열면 늘 보인다. */
+  const 메뉴 = enter.indexOf('id="meMenu"'), 끝 = enter.indexOf('id="meBtn"');
+  assert.ok(메뉴 > 0 && 끝 > 메뉴, '★ 내 메뉴가 없다');
+  const 안 = enter.slice(메뉴, 끝);
+  ['moneyBox', 'billChip', 'aiChip', 'logoutBtn'].forEach((id) =>
+    assert.ok(안.indexOf('id="' + id + '"') > 0, '★ ' + id + ' 가 내 메뉴 안에 없다'));
+  /* 닫힌 메뉴는 정말 닫혀 있어야 한다 — display 규칙이 hidden 을 이기면 늘 펼쳐진다 */
+  assert.match(enter, /\.me-menu\[hidden\]\{display:none;\}/, '★ 닫아도 내 메뉴가 그대로 떠 있다');
 });
 
 test('연결 상태는 «잘 될 때만» 점으로 줄인다 — 끊기면 말이 그대로 나온다', () => {
@@ -75,5 +74,31 @@ test('연결 상태는 «잘 될 때만» 점으로 줄인다 — 끊기면 말�
 test('PC 머리 카드는 그대로 한 줄이다', () => {
   /* 컴팩트는 폰 이야기다 — 넓은 화면은 한 줄에 다 들어간다. */
   assert.match(enter, /\.pbar\{display:flex;align-items:center;gap:13px/);
-  assert.match(enter, /\.pbar #sgFab\{order:4;\}/, 'PC 에서 건의하기는 오른쪽 끝이다');
+  assert.match(enter, /\.pbar #sgFab\{order:4;\}/, 'PC 에서 건의하기는 오른쪽이다');
+  /* 내 메뉴 단추(이름·사번)는 건의하기보다 오른쪽 끝 */
+  const m = enter.match(/\.pbar \.pmeta\{order:(\d+);/);
+  assert.ok(m && Number(m[1]) > 4, '★ 내 메뉴 단추가 건의하기 왼쪽으로 갔다');
+});
+
+test('★ 이름·사번과 연결 상태는 머리줄에 남는다 — 내 메뉴 속으로 숨기지 않는다', () => {
+  /* 사번: P005·A005 처럼 숫자가 같은 사번이 있어 늘 보여야 한다(2026-08-10).
+     연결: 끊겼을 때 그 말이 바로 보여야 한다. 둘 다 «펼쳐야 보이는» 자리에 두면 안 된다. */
+  const 메뉴 = enter.indexOf('id="meMenu"'), 끝 = enter.indexOf('id="meBtn"');
+  const 안 = enter.slice(메뉴, 끝);
+  assert.ok(안.indexOf('id="userName"') < 0, '★ 이름·사번이 내 메뉴 속으로 숨었다');
+  assert.ok(안.indexOf('id="statusDot"') < 0, '★ 연결 상태가 내 메뉴 속으로 숨었다');
+  const 단추 = enter.slice(끝, enter.indexOf('me-caret', 끝));
+  assert.ok(단추.indexOf('id="userName"') > 0 && 단추.indexOf('id="statusDot"') > 0,
+    '★ 머리줄의 내 메뉴 단추에 이름·사번·연결 상태가 없다');
+});
+
+test('내 메뉴는 누르면 열리고 · 바깥을 누르거나 Esc 로 닫힌다 · 「내 정보」는 메뉴 안 단추로', () => {
+  const at = enter.indexOf('(function initMeMenu(){');
+  assert.ok(at > 0, '★ 내 메뉴를 여닫는 곳이 없다');
+  const fn = enter.slice(at, enter.indexOf('})();', at));
+  assert.match(fn, /aria-expanded/, '★ 펼침 상태를 화면읽기에 알리지 않는다');
+  assert.match(fn, /'Escape'/, '★ Esc 로 닫히지 않는다');
+  assert.match(fn, /document\.addEventListener\('click'/, '★ 바깥을 눌러도 안 닫힌다');
+  assert.match(fn, /'Enter'/, '★ 키보드로 열 수 없다');
+  assert.match(fn, /meProfile[\s\S]*kkOpenProfile/, '★ 「내 정보」(카카오 연결)로 가는 길이 사라졌다');
 });

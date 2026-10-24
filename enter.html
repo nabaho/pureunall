@@ -225,11 +225,16 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 
 /* ---------- 포털 홈 ---------- */
 .portal{display:none;width:100%;max-width:920px;}
-.pbar{display:flex;align-items:center;gap:13px;background:var(--card-bg);border:1px solid var(--card-border);
-  border-radius:18px;padding:14px 20px;backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(20,30,80,.08);}
+/* ══ 머리줄 — 카드를 걷고 얇은 한 줄 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) ══
+   남는 것: 로고·이름 · 건의하기 · 내 메뉴 단추(.pmeta — 연결 점 · 이름·사번 ▾).
+   사용액·AI 판독·내 정보·로그아웃은 내 메뉴(#meMenu) 안으로 들어갔다.
+   ⚠ 이름·사번은 머리줄에 «늘» 보인다 — P005·A005 처럼 숫자가 같은 사번이 있다(userName 짓는 자리 풀이글).
+   ⚠ 연결이 끊기면 그 말이 머리줄에 «그대로» 나온다 — 잘 될 때만 점 하나로 줄인다(setConnectionStatus). */
+.pbar{display:flex;align-items:center;gap:13px;position:relative;padding:2px 4px 8px;}
+.pbar .nm{margin-right:auto;}
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
-.pbar #sgFab{order:4;}   /* 로그아웃(order:3)보다 오른쪽 끝 */
+.pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
 /* ✨ TypeSafe 검토 — 「업무 시스템」 줄 오른쪽, 로그인 후 바로가기 바로 왼쪽 (js/pu-typesafe.js 가 넣는다).
    ⚠ 머리 카드(.pbar)에 넣지 말 것 — 관리자 화면은 사용액·AI 판독 딱지로 이미 920px 를 다 쓴다
      (2026-09-23 실측: 그대로도 934px, 여기 넣으면 1081px 로 카드 밖으로 163px 넘쳤다). */
@@ -238,12 +243,18 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
 .pbar .nm small{display:block;font-size:.64rem;color:var(--mute);letter-spacing:.14em;margin-top:-1px;}
-.pbar .pmeta{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.8rem;color:var(--sub);}
+.pbar .logo{width:30px;height:30px;border-radius:9px;font-size:.85rem;}
+.pbar .pmeta{order:5;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--sub);
+  cursor:pointer;padding:3px 10px 3px 4px;border-radius:99px;border:1px solid transparent;}
+.pbar .pmeta:hover,.pbar .pmeta[aria-expanded="true"]{background:rgba(255,255,255,.7);border-color:rgba(10,20,60,.1);}
+.pbar .pmeta:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
+.pbar .pmeta .un-title{display:none;}    /* 직책은 내 메뉴 맨 위에 — 머리줄에는 이름·사번만 */
+.pbar .connection-status[data-state="online"] .cs-lb{display:none;}   /* 잘 될 때는 점 하나 · 끊기면 말 그대로 */
+.me-caret{font-size:.62rem;color:var(--mute);}
 /* 권한 이름「(admin)」은 «늘» 접는다 (대표 결정 2026-09-12) — 직책이 이미 같은 말을 하고,
    날마다 읽을 값이 아니다. 이름 칸에 마우스를 올리면 덧말로 그대로 나온다.
    ⚠ 사번은 접지 않는다 — P005·A005 처럼 숫자가 같은 사번이 있다(userName 짓는 자리 풀이글). */
 .pbar .pmeta .un-role{display:none;}
-.pbar .logout{order:3;}
 /* ══ 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안) ══
    목업 docs/mockups/portal-bar-tidy.html
    「이번 달 ₩10,592」와 「AI 판독 ₩44」가 따로 떨어져 있어, 머리줄을 훑을 때마다
@@ -281,9 +292,21 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 #aiChip[data-tone="over"] .dot{background:#dc2626;}
 .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;cursor:pointer;}
-/* 이름·아바타를 누르면 「내 정보」(카카오 연결 등)가 열린다(2026-09-27) */
+/* 이름·아바타(내 메뉴 단추)를 누르면 내 메뉴가 펼쳐진다 — 「내 정보」(카카오 연결 등)는 그 안의 단추(2026-10-24) */
 .pmeta #userName{cursor:pointer;}
 .logout{color:var(--accent);font-weight:700;cursor:pointer;background:none;border:none;font-size:.8rem;font-family:inherit;}
+/* 👤 내 메뉴 — 내 메뉴 단추(.pmeta)를 누르면 펼친다 (대표 2026-10-24 머리 카드 1안) */
+.me-menu{position:absolute;right:0;top:calc(100% + 2px);z-index:40;width:380px;max-width:calc(100vw - 24px);
+  background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.18);padding:12px;}
+.me-menu[hidden]{display:none;}
+.me-who{font-size:.86rem;font-weight:700;color:var(--ink);padding:0 2px 9px;margin-bottom:9px;border-bottom:1px solid #e2e8f0;line-height:1.35;}
+.me-who small{display:block;font-size:.7rem;font-weight:500;color:var(--mute);margin-top:2px;word-break:break-all;}
+.me-menu #moneyBox{margin:0 0 6px;}
+.me-item{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:8px 6px;
+  font-family:inherit;font-size:.8rem;color:var(--sub);cursor:pointer;}
+.me-item:hover{background:#f8fafc;color:var(--ink);}
+.pbar .me-menu .logout{display:block;width:100%;margin:6px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:9px;
+  background:#ffffff;font-size:.8rem;text-align:center;}
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
    ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
 #appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
@@ -478,28 +501,25 @@ body.portal-mode #camFab{display:flex;}
   /* ── 머리 카드는 작을수록 좋다 (대표 지시 2026-08-20 "너무 많은 부분 차지") ──
      네 줄(로고·상태·사용액·바로가기)을 세 줄로 줄이고 사이 여백을 깎는다.
      나누는 실선은 걷었다 — 카드가 작아지면 실선이 오히려 갑갑해 보인다. */
-  .pbar{flex-wrap:wrap;gap:0 8px;padding:9px 12px;border-radius:14px;}
+  /* (2026-10-24 머리 카드 1안 — 카드를 걷고 한 줄. 로그아웃·사용액은 내 메뉴 안으로 들어갔다) */
+  .pbar{flex-wrap:wrap;gap:4px 8px;padding:2px 2px 8px;}
   .pbar .logo{width:30px;height:30px;border-radius:9px;font-size:.85rem;}
   .pbar .nm b{font-size:.84rem;}
   .pbar .nm small{font-size:.58rem;}
-  .pbar .logout{order:0;margin-left:auto;font-size:.72rem;background:rgba(46,58,140,.08);padding:6px 13px;border-radius:8px;}
   /* 상태·이름과 사용액을 «한 줄»에 앉힌다 — 전에는 각자 한 줄씩 썼다.
      ⚠ 사용액을 맨 윗줄(로그아웃 옆)에 끼우지는 않는다 — 거기서는 좁아 가려지고,
        가려진 기능은 없는 기능이다(지문 로그인 안내가 겪었던 실수). */
   /* ⚠ flex:1 1 0 으로 두면 «맨 윗줄에 끼어» 이름이 「권형하 · …」로 잘린다.
      제 줄로 내려가게 하려면 바닥 너비를 넉넉히 잡아야 한다(2026-08-20 재어 보고 고침). */
-  .pbar .pmeta{order:1;flex:1 1 auto;min-width:96px;margin-left:0;margin-top:7px;
-    font-size:.7rem;gap:6px;}
+  /* ★ 내 메뉴 단추는 «줄어들지 않는다» — 줄면 「권형하 · P-0…」 처럼 사번이 잘린다.
+       자리가 모자라면 줄어드는 대신 제 줄로 내려간다(flex-wrap). */
+  .pbar .pmeta{order:1;flex:0 0 auto;font-size:.72rem;gap:6px;padding:3px 8px 3px 6px;}
   .pbar .pmeta .avatar{display:none;}          /* 폰에선 아바타 생략(공간 절약) */
-  .pbar .pmeta #userName{margin-left:auto;font-weight:600;min-width:0;
-    overflow:hidden;text-overflow:ellipsis;}
+  .pbar .pmeta #userName{font-weight:600;}
   /* 잘 될 때는 초록 점 하나로 충분하다 — 「서버 연결됨」 여섯 글자가 이름 자리를 먹는다.
      ⚠ 끊겼거나 확인 중일 때는 말을 그대로 남긴다. 그때가 정작 읽어야 할 때다. */
   .connection-status[data-state="online"] .cs-lb{display:none;}
   .pbar .pmeta .connection-status{flex:0 0 auto;}
-  /* ⚠ 자리잡기(order·margin)는 «상자»가 진다 — 딱지에 걸어 두면 상자 안에서만
-     자리를 다투고 머리줄에서는 상자가 통째로 첫 줄에 끼어 이름을 밀어낸다. */
-  .pbar #moneyBox{order:2;flex:0 0 auto;margin-top:7px;}
   .pbar #billChip,.pbar #aiChip{padding:4px 8px;font-size:.66rem;gap:5px;}
   /* ── 한 줄에 몰아 넣으려고 접는 것들 (대표 지시 2026-08-20 "최대 1줄") ──
      ⚠ 접는 것은 «다른 데 같은 말이 있는 것» 뿐이다.
@@ -524,8 +544,9 @@ body.portal-mode #camFab{display:flex;}
 /* 아주 좁은 폰(320px 안팎, 글자를 크게 키워 보는 경우도 여기 든다) —
    한 줄을 지키려면 여기서 한 치수 더 줄여야 한다. 줄이 늘어나는 것보다 낫다. */
 @media (max-width:380px){
-  .pbar{gap:0 6px;padding:8px 10px;}
-  .pbar .pmeta{font-size:.66rem;min-width:78px;gap:5px;}
+  .pbar{gap:4px 6px;padding:2px 2px 8px;}
+  .pbar .nm small{display:none;}
+  .pbar .pmeta{font-size:.68rem;gap:5px;}
   .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
   .pbar #moneyBox{max-width:100%;}
   /* ⚠ 열 수는 위 640px 구간에서 이미 못 박았다(minmax(0,1fr)). 여기서는 «간격만»
@@ -1202,11 +1223,14 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
-      <button class="logout" id="logoutBtn">로그아웃</button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
+      <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름·사번 ▾)를 누르면 펼친다.
+           사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·사번·연결 상태는 머리줄(.pmeta)에 남는다. -->
+      <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
+      <div class="me-who" id="meWho"></div>
       <!-- 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안).
            ⚠ 상자 자체도 JS 가 켠다(moneyBoxSync) — 둘 다 감춰졌는데 상자만 남으면
-             빈 테두리가 머리줄에 덩그러니 선다. -->
+             빈 테두리가 덩그러니 선다. -->
       <div id="moneyBox" data-join="0">
         <!-- 이번 달 사용액 — 관리자에게만 보인다(JS 가 display 를 켠다). 값이 없으면 끝까지 숨김. -->
         <button id="billChip" type="button" title="눌러서 자세히 보기">
@@ -1224,10 +1248,14 @@ body.portal-mode #moreFab{display:flex;}
           <span class="of" id="aiOf"></span>
         </button>
       </div>
-      <div class="pmeta">
+      <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결</button>
+      <button class="logout" id="logoutBtn">로그아웃</button>
+      </div>
+      <div class="pmeta" id="meBtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="내 메뉴">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
         <div class="avatar" id="userAvatar">·</div>
         <span id="userName">—</span>
+        <span class="me-caret" aria-hidden="true">▾</span>
       </div>
     </div>
 
@@ -3297,6 +3325,10 @@ body.portal-mode #moreFab{display:flex;}
     try { $('userName').title = name + (title ? ' · ' + title : '') + ' (' + role + ')'
       + (mySid ? ' · ' + mySid.toUpperCase() : '') + '\n로그인 계정: ' + email; } catch(_e){}
     $('userAvatar').textContent = name ? name.charAt(0) : '·';
+    /* 내 메뉴 맨 위 — 머리줄에서 접은 직책·권한·로그인 계정까지 다 적는다 */
+    try { $('meWho').innerHTML = _e(name) + (title ? ' · ' + _e(title) : '')
+      + (mySid ? ' · ' + _e(mySid.toUpperCase()) : '')
+      + '<small>' + _e(email) + ' · ' + _e(role) + '</small>'; } catch(_mw){}
 
     /* ── 신원 안내 띠 — 이상할 때는 크게, 자동 진입은 조용히 알린다 ── */
     var dupAll = info.all || [];
@@ -5953,10 +5985,25 @@ body.portal-mode #moreFab{display:flex;}
     box.textContent = lines.length ? lines.join('\n') : '이 기기의 로그인 기록이 아직 없습니다. 한 번 로그인한 뒤 다시 확인해 주세요.';
     box.hidden = false;
   });
-  // 이름·아바타를 누르면 「내 정보」 — 로그인 뒤에만 뜻이 있으므로 포털 안에서만 있는 요소지만
-  // 로그인 전에도 눌릴 수는 있어 kkOpenProfile 이 스스로 uid 없음을 가려낸다.
-  if($('userAvatar')) $('userAvatar').addEventListener('click', kkOpenProfile);
-  if($('userName')) $('userName').addEventListener('click', kkOpenProfile);
+  /* 이름·아바타(내 메뉴 단추)를 누르면 «내 메뉴» (대표 2026-10-24 머리 카드 1안).
+     「내 정보」는 그 안의 단추로 옮겼다 — 로그인 전에도 눌릴 수는 있어 kkOpenProfile 이 스스로 uid 없음을 가려낸다.
+     메뉴 안 단추(사용액·AI·내 정보·로그아웃)를 누르면 제 일을 한 뒤 메뉴가 닫힌다. 바깥을 누르거나 Esc 로도 닫힌다. */
+  (function initMeMenu(){
+    var btn = $('meBtn'), menu = $('meMenu'); if(!btn || !menu) return;
+    function setOpen(on){ menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+    btn.addEventListener('click', function(e){ e.stopPropagation(); setOpen(menu.hidden); });
+    btn.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); setOpen(menu.hidden); }
+    });
+    menu.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('button')) setOpen(false); });
+    document.addEventListener('click', function(e){
+      if(!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape' && !menu.hidden){ setOpen(false); btn.focus(); }
+    });
+    var prof = $('meProfile'); if(prof) prof.addEventListener('click', kkOpenProfile);
+  })();
   kkHandleReturn();
 
   // ══════════ ⋯ 더보기 — 흩어진 단추를 한 곳으로 ══════════
