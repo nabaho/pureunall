@@ -5,11 +5,13 @@
 
 대표 「리멤버에 있는 것 피시는 켜져 있는데 자동으로 터미널에서 연결해서 가지고 올 수 없나」 → 「진행」
 
-## 끝낸 것
-- `tools/remember-pull/run.js` — puppeteer-core 로 전용 크롬 프로필을 띄워 리멤버 수정분을 받아 `remember-intake.html` 에 넘김. 메일 서명·첨부 처리도 같은 회차에.
-- 이 PC: `C:\Users\fair0\Documents\pu-remember-pull` 에 설치, 예약 작업 `pu-remember-pull` 1시간마다(창 없이).
-- 로그인 전 시험 회차: 「푸른 포털 로그인이 안 되어 있습니다」 로 바르게 멈춤.
+## 결과: 터미널 길은 접음 — 예약 작업 `pu-remember-pull` 은 꺼 둠(Disabled)
+- 리멤버 보안벽이 화면 없는 크롬을 막음(「blocked」)
+- 프로그램이 모는 크롬은 구글 로그인이 「로그인할 수 없음」
+- 전용 프로필은 새 컴퓨터와 같아 대표가 아이디 여럿 속에서 다시 로그인해야 함 — 혼란이 큼
+  (푸른 포털은 「자동 로그인」 체크가 없으면 창을 닫을 때 풀림)
 
-## 남은 일 (사람)
-- `node run.js login` 창에서 대표님이 리멤버·푸른 포털 로그인 → 다음 회차가 기준(cp)을 잡는지 `run.log` 확인
-- 확장(tools/remember-ext)은 쓰지 않음 — 설치할 필요 없음
+## 대신: 대표가 이미 로그인한 평소 크롬(프로필 「형하」)에 확장 `tools/remember-ext` 설치
+- 설치 폴더 `C:\Users\fair0\Documents\pu-remember-ext` (저장소와 같은 판 확인)
+- chrome://extensions → 개발자 모드 → 압축해제된 확장 프로그램 로드 — 사람 손 (AI 는 파일 고르기 창을 못 씀)
+- 설치 뒤 첫 회차가 기준(cp)을 잡는지 확인
