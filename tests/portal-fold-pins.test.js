@@ -5,13 +5,15 @@
    지키는 규칙
    ① 줄 머리는 누르면 접히고 펴지는 «단추»다(키보드로도).
    ② 맨 위에 «자주 쓰는 앱» 줄 · 검색칸 · 「모두 펴기·접기」가 있다.
-   ③ 별표가 없으면 지금처럼 다 펼친 채, 별표가 있으면 손대지 않은 줄은 접힌 채로 시작.
-      첫 별표를 누른 순간 보던 줄이 갑자기 접히지는 않는다.
+   ③ 처음에는 줄이 «이름 칩»으로 접혀 있다(대표 2026-10-24 「니가 보여준건 길게 되었는데 왜 화면은 동그랗나」).
+      사람이 편 줄은 편 채로 기억하고, 찾는 중에는 다 펼친다.
    ④ 별표 수에는 한도가 있다.
    ⑤ 별표를 눌러도 앱이 열리지 않는다.
    ⑥ 복제한 타일(자주 쓰는 앱 줄)에는 data-key 가 없다 — 알림 딱지를 붙이는 곳이
       `.tile[data-key="…"]` 로 «첫 번째» 타일을 찾으므로, 복제본이 그 자리를 가로채면 안 된다.
-   ⑦ 폰에서 접힌 줄은 «줄을 바꿔» 흐른다 — 옆으로 밀거나 화면 밖으로 나가지 않는다(대표 지시). */
+   ⑦ 폰에서 접힌 줄은 «줄을 바꿔» 흐른다 — 옆으로 밀거나 화면 밖으로 나가지 않는다(대표 지시).
+   ⑧ 앱을 마우스로 끌어 «자주 쓰는 앱» 줄에 놓으면 들어간다 — 놓은 자리에
+      (대표 2026-10-24 「자주쓰는앱은 마우스로 위로 드래그해서 올릴수 있게 해라」). */
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -60,12 +62,12 @@ function foldBox() {
     E.match(/var PIN_MAX = \d+;/)[0],
     cutFn(E, 'function pinKeys('),
     cutFn(E, 'function rowFolded('),
+    cutFn(E, 'function pinAt('),
     cutFn(E, 'function togglePin('),
   ].join('\n');
   const ctx = {
     APP_ROWS: [{ id: 'client' }, { id: 'store' }, { id: 'sales' }, { id: 'inside' }],
     tilePrefs: { pins: null, fold: null },
-    _foldSession: {},
     _searchQ: '',
     APPS: [], alerts: 0, saved: 0,
     saveTilePrefs() { ctx.saved++; },
@@ -80,31 +82,51 @@ function foldBox() {
   return ctx;
 }
 
-test('③ 별표가 없으면 다 펼친 채, 별표가 있으면 손대지 않은 줄은 접힌 채로 시작', () => {
+test('③ 처음에는 줄이 이름 칩으로 접혀 있다 — 별표가 없어도 (대표 「왜 화면은 동그랗나」)', () => {
   const c = foldBox();
-  assert.strictEqual(c.rowFolded('client'), false, '★ 별표가 없는데 줄이 접혀 있다 — 지금 화면이 바뀐다');
-  c.tilePrefs.pins = ['a0'];
-  assert.strictEqual(c.rowFolded('client'), true, '★ 별표가 있는데 줄이 다 펼쳐져 있다');
+  c.APP_ROWS.forEach((r) =>
+    assert.strictEqual(c.rowFolded(r.id), true, '★ 처음 화면에서 ' + r.id + ' 줄이 동그란 타일로 펼쳐져 있다'));
   c.tilePrefs.fold = { client: false };
   assert.strictEqual(c.rowFolded('client'), false, '★ 사람이 펴 둔 줄을 다시 접는다');
-  c.tilePrefs.pins = [];
-  c.tilePrefs.fold = { store: true };
-  assert.strictEqual(c.rowFolded('store'), true, '★ 사람이 접어 둔 줄을 다시 편다');
+  assert.strictEqual(c.rowFolded('store'), true, '★ 손대지 않은 줄이 펼쳐진다');
   c._searchQ = '메일';
   assert.strictEqual(c.rowFolded('store'), false, '★ 찾는 중인데 줄이 접혀 찾은 앱이 안 보인다');
 });
 
-test('③ 첫 별표를 누른 순간 보던 줄은 접히지 않는다 — 다음에 열 때부터 접힌다', () => {
+test('③ 별표로 넣고 다시 누르면 뺀다 — 저장한다', () => {
   const c = foldBox();
   c.togglePin('a1');
   assert.deepStrictEqual(Array.from(c.tilePrefs.pins), ['a1']);
-  c.APP_ROWS.forEach((r) =>
-    assert.strictEqual(c.rowFolded(r.id), false, '★ 별표를 누르자 ' + r.id + ' 줄이 갑자기 접혔다'));
-  c._foldSession = {};   /* 다음에 포털을 열면 */
-  assert.strictEqual(c.rowFolded('client'), true, '★ 다음에 열어도 접히지 않는다');
   c.togglePin('a1');
   assert.deepStrictEqual(Array.from(c.tilePrefs.pins), [], '★ 별표를 다시 눌러도 빠지지 않는다');
   assert.ok(c.saved >= 2, '★ 넣고 뺀 것을 저장하지 않는다');
+});
+
+test('⑧ 끌어 놓으면 «놓은 자리»에 들어간다 — 이미 있으면 자리만 옮기고, 한도를 지킨다', () => {
+  const c = foldBox();
+  c.pinAt('a0', 0); c.pinAt('a1', 1); c.pinAt('a2', 2);
+  assert.deepStrictEqual(Array.from(c.tilePrefs.pins), ['a0', 'a1', 'a2']);
+  c.pinAt('a3', 1);
+  assert.deepStrictEqual(Array.from(c.tilePrefs.pins), ['a0', 'a3', 'a1', 'a2'], '★ 놓은 자리가 아닌 데로 들어갔다');
+  c.pinAt('a2', 0);
+  assert.deepStrictEqual(Array.from(c.tilePrefs.pins), ['a2', 'a0', 'a3', 'a1'], '★ 이미 있는 앱을 끌었는데 둘이 됐거나 자리가 틀렸다');
+  c.pinAt('a0', 99);
+  assert.deepStrictEqual(Array.from(c.tilePrefs.pins), ['a2', 'a3', 'a1', 'a0'], '★ 맨 뒤에 놓았는데 엉뚱한 자리');
+  for (let i = 4; i < c.PIN_MAX; i++) c.pinAt('a' + i, 0);
+  const before = c.alerts;
+  c.pinAt('a' + c.PIN_MAX, 0);
+  assert.strictEqual(c.tilePrefs.pins.length, c.PIN_MAX, '★ 끌어 놓기로 한도를 넘었다');
+  assert.strictEqual(c.alerts, before + 1, '★ 왜 안 들어가는지 말하지 않는다');
+  c.pinAt('a0', 0);
+  assert.strictEqual(c.tilePrefs.pins.length, c.PIN_MAX, '★ 한도에서 «자리 옮기기»까지 막았다');
+  assert.strictEqual(c.tilePrefs.pins[0], 'a0');
+});
+
+test('⑧ 자주 쓰는 앱 줄이 끌어 놓기를 받는다 (PC)', () => {
+  const wire = cutFn(E, 'function initFold(');
+  assert.match(wire, /'dragover'/, '★ 자주 쓰는 앱 줄 위로 끌어도 받지 않는다');
+  assert.match(wire, /'drop'/, '★ 자주 쓰는 앱 줄에 놓아도 아무 일이 없다');
+  assert.match(wire, /pinAt\(/, '★ 놓은 앱을 넣지 않는다');
 });
 
 test('④ 별표 수에는 한도가 있다 — 넘으면 넣지 않고 까닭을 말한다', () => {
@@ -128,7 +150,7 @@ test('⑥ 자주 쓰는 앱 줄의 복제 타일에는 data-key 가 없다', () 
   assert.match(fn, /cloneNode\(true\)/);
   assert.match(fn, /removeAttribute\('data-key'\)/,
     '★ 복제본이 data-key 를 지닌다 — 알림 딱지가 진짜 타일 대신 복제본에 붙는다');
-  assert.match(fn, /draggable = false/, '★ 복제본을 끌면 순서 저장이 엉킨다');
+  assert.match(fn, /c\.draggable =/, '★ 복제본의 끌기를 정하지 않았다 — 진짜 타일의 끌기 설정을 그대로 물려받는다');
 });
 
 test('⑦ 폰: 접힌 줄은 줄을 바꿔 흐른다 — 옆으로 밀거나 화면 밖으로 나가지 않는다', () => {

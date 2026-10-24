@@ -339,6 +339,9 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 @media (hover:none){ .pin-star{opacity:1;} }   /* 폰에는 «마우스 올림»이 없다 — 늘 보인다 */
 .pinrow{background:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.75);border-radius:18px;padding:6px 8px 2px;margin-bottom:10px;}
 .pinrow.empty{padding-bottom:6px;}
+/* 끌어 올리는 중 — 놓을 곳을 알린다(점선), 그 위에 오면 진하게 */
+.pinrow.pin-dropping{outline:2px dashed rgba(30,64,175,.35);outline-offset:2px;}
+.pinrow.pin-over{outline:2px solid rgba(30,64,175,.6);background:rgba(239,246,255,.7);}
 .pin-h{flex-wrap:wrap;row-gap:6px;}
 .pin-star-t{color:#d97706;}
 .fold-tools{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0;}
@@ -4238,8 +4241,10 @@ body.portal-mode #moreFab{display:flex;}
   /* ══════════ 자주 쓰는 앱 · 줄 접기 · 앱 찾기 (대표 2026-10-24 시안 2 「추천대로」) ══════════
      「앱을 한화면에 다나오는것 말고 접어다 펴는 방식도 검토」 → 시안 넷 → 2번.
      ★ ☆ 로 고른 앱은 맨 위 «자주 쓰는 앱» 줄에 크게 · 네 줄은 머리를 누르면 «이름 칩»으로 접힌다.
-     ★ 별표가 하나도 없으면 지금처럼 다 펼친 채다 — 직원 화면은 본인이 고르기 전까지 그대로다.
-       별표가 있으면 손대지 않은 줄은 접힌 채로 시작하고, 사람이 펴거나 접은 줄은 그대로 기억한다.
+     ★ 처음에는 네 줄 모두 «이름 칩»으로 접혀 있다 — 사람이 펴거나 접은 줄은 그대로 기억한다
+       (대표 2026-10-24 「니가 보여준건 길게 되었는데 왜 화면은 동그랗나」 — 처음엔 «별표가 있을 때만» 접었다).
+     ★ 앱을 마우스로 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다. 그 줄 안에서 끌면 순서가 바뀐다
+       (대표 2026-10-24 「자주쓰는앱은 마우스로 위로 드래그해서 올릴수 있게 해라」). 폰은 끌기가 없어 ☆ 로 넣는다.
      ★ 접힌 줄은 «같은 타일»에 class 하나(fold)만 붙인다 — 여는 처리·알림 딱지·준비중이 그대로 따라온다.
      ⚠ 자주 쓰는 앱 줄은 «복제본»이다. 복제본에서는 data-key·id 를 뗀다 —
        알림 딱지를 붙이는 곳(portalHanaPaintBadge·뉴스레터경고달기)이 `.tile[data-key=…]` 로
@@ -4247,9 +4252,8 @@ body.portal-mode #moreFab{display:flex;}
        복제본을 누르면 진짜 타일을 대신 누른다 — 열기·준비중 안내·딱지 창이 한 길로만 돈다.
      ⚠ 폰에서 칩은 줄을 바꿔 흐른다 — 화면 밖으로 안 나간다(대표 지시, CSS 쪽 머리글). */
   var PIN_MAX = 7;          // 한도 — SAP 런치패드 권장(한 묶음 3~7개)을 따른다
-  var _foldSession = {};    // 이번에 보는 동안만 — 첫 별표를 누른 순간 보던 줄이 접히지 않게
   var _searchQ = '';
-  var _foldWired = false, _foldTimer = 0;
+  var _foldWired = false, _foldTimer = 0, _pinDrag = null;
 
   function pinKeys(){
     var p = tilePrefs && tilePrefs.pins;
@@ -4267,33 +4271,32 @@ body.portal-mode #moreFab{display:flex;}
   function rowFolded(id){
     if(_searchQ) return false;               // 찾는 중에는 다 펼친다 — 찾은 앱이 칩 속에 묻히지 않게
     var own = Object.prototype.hasOwnProperty;
-    if(own.call(_foldSession, id)) return !!_foldSession[id];
     var f = (tilePrefs && tilePrefs.fold) || {};
     if(own.call(f, id)) return !!f[id];
-    return pinnedVisible().length > 0;
+    return true;                             // 처음에는 접힌 채(이름 칩)
   }
-  function togglePin(key){
+  /* 자주 쓰는 앱의 «idx 자리»에 넣는다 — 이미 있으면 자리만 옮긴다(끌어 놓기·별표가 한 길) */
+  function pinAt(key, idx){
     var known = {};
     APPS.forEach(function(a){ known[a.key] = 1; });
     var pins = pinKeys().filter(function(k){ return known[k]; });
-    var i = pins.indexOf(key);
-    if(i >= 0){
-      pins.splice(i, 1);
-    } else {
-      if(pins.length >= PIN_MAX){
-        alert('★ 자주 쓰는 앱은 ' + PIN_MAX + '개까지 둘 수 있습니다.\n하나를 빼고 넣어 주세요.');
-        return;
-      }
-      /* 첫 별표 — 손대지 않은 줄이 «지금» 접히면 방금 누른 별표가 눈앞에서 사라진다.
-         이번에 보는 동안은 펼친 채로 두고, 다음에 열 때부터 접힌다. */
-      if(pinnedVisible().length === 0){
-        var f = (tilePrefs && tilePrefs.fold) || {};
-        APP_ROWS.forEach(function(r){
-          if(!Object.prototype.hasOwnProperty.call(f, r.id)) _foldSession[r.id] = false;
-        });
-      }
-      pins.push(key);
+    var had = pins.indexOf(key);
+    if(had < 0 && pins.length >= PIN_MAX){
+      alert('★ 자주 쓰는 앱은 ' + PIN_MAX + '개까지 둘 수 있습니다.\n하나를 빼고 넣어 주세요.');
+      return;
     }
+    if(had >= 0){ pins.splice(had, 1); if(had < idx) idx--; }
+    idx = Math.max(0, Math.min(idx, pins.length));
+    pins.splice(idx, 0, key);
+    tilePrefs.pins = pins;
+    saveTilePrefs();
+    paintPins();
+    applyFold();
+  }
+  function togglePin(key){
+    var pins = pinKeys(), i = pins.indexOf(key);
+    if(i < 0){ pinAt(key, pins.length); return; }
+    pins.splice(i, 1);
     tilePrefs.pins = pins;
     saveTilePrefs();
     paintPins();
@@ -4337,7 +4340,7 @@ body.portal-mode #moreFab{display:flex;}
       c.removeAttribute('data-key');
       c.removeAttribute('id');
       c.removeAttribute('target');
-      c.draggable = false;
+      c.draggable = !tilePrefs.locked && !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기
       c.classList.remove('dragging', 'tile-soon-first', 'srch-miss');
       Array.prototype.forEach.call(c.querySelectorAll('[id]'), function(n){ n.removeAttribute('id'); });
       c.dataset.pinOf = orig.dataset.key;
@@ -4353,7 +4356,8 @@ body.portal-mode #moreFab{display:flex;}
       s.setAttribute('aria-pressed', lit ? 'true' : 'false');
     });
     row.classList.toggle('empty', !list.length);
-    var n = list.length ? (list.length + '/' + PIN_MAX) : '타일의 ☆ 를 누르면 여기에 모입니다';
+    var n = list.length ? (list.length + '/' + PIN_MAX)
+      : (isMobile() ? '줄을 펴서 ☆ 를 누르면 여기에 모입니다' : '앱을 끌어 여기에 놓거나 ☆ 를 누르면 모입니다');
     var cnt = $('pinCount'); if(cnt && cnt.textContent !== n) cnt.textContent = n;
   }
   /* 복제본을 누르면 «진짜 타일»을 대신 누른다 (딱지를 눌렀으면 진짜 딱지를) */
@@ -4406,7 +4410,6 @@ body.portal-mode #moreFab{display:flex;}
     var now = rowFolded(id);
     tilePrefs.fold = tilePrefs.fold || {};
     tilePrefs.fold[id] = !now;
-    delete _foldSession[id];
     saveTilePrefs();
     applyFold();
   }
@@ -4418,8 +4421,30 @@ body.portal-mode #moreFab{display:flex;}
     });
     tilePrefs.fold = tilePrefs.fold || {};
     APP_ROWS.forEach(function(r){ tilePrefs.fold[r.id] = !anyFold; });
-    _foldSession = {};
     saveTilePrefs();
+    applyFold();
+  }
+
+  /* ── 끌어 올리기 · 자주 쓰는 앱 줄 안에서 순서 바꾸기 ── */
+  function pinClones(){ var b = $('pinTiles'); return b ? Array.prototype.slice.call(b.children) : []; }
+  /* 놓은 자리 — 커서보다 «뒤»에 있는 첫 복제본의 자리 (skip = 지금 끌고 있는 복제본) */
+  function pinDropIndex(e, skip){
+    var kids = pinClones().filter(function(x){ return x !== skip; });
+    for(var i = 0; i < kids.length; i++){
+      var r = kids[i].getBoundingClientRect();
+      if(e.clientY < r.top) return i;
+      if(e.clientY <= r.bottom && e.clientX < r.left + r.width / 2) return i;
+    }
+    return kids.length;
+  }
+  /* 줄 안에서 끌어 바꾼 차례를 저장 — 지금 안 보이는(권한·안 씀) 별표는 버리지 않고 뒤에 붙인다 */
+  function savePinOrderFromDom(){
+    var order = pinClones().map(function(c){ return c.dataset.pinOf; }).filter(Boolean);
+    pinKeys().forEach(function(k){ if(order.indexOf(k) < 0) order.push(k); });
+    if(order.join('|') === pinKeys().join('|')) return;
+    tilePrefs.pins = order;
+    saveTilePrefs();
+    paintPins();
     applyFold();
   }
 
@@ -4466,6 +4491,42 @@ body.portal-mode #moreFab{display:flex;}
         if(e.key === 'Escape' && q.value){ q.value = ''; _searchQ = ''; refreshFoldUi(); }
       });
       $('foldAllBtn').addEventListener('click', foldAllToggle);
+      /* 끌어 올리기 — 줄 안의 진짜 타일(접힌 칩도 같은 타일)을 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다.
+         그 줄 안의 복제본을 끌면 순서가 바뀐다. 줄 사이 이동을 막는 끌기(onTileDragOver)는 제 줄 밖에서 손을 뗀다. */
+      var pr = $('pinRow');
+      host.addEventListener('dragstart', function(e){
+        if(!e.defaultPrevented && _dragEl) pr.classList.add('pin-dropping');
+      });
+      document.addEventListener('dragend', function(){
+        pr.classList.remove('pin-dropping', 'pin-over');
+        if(_pinDrag){ _pinDrag.classList.remove('dragging'); _pinDrag = null; savePinOrderFromDom(); }
+      });
+      pt.addEventListener('dragstart', function(e){
+        var c = e.target.closest && e.target.closest('[data-pin-of]');
+        if(!c || tilePrefs.locked){ e.preventDefault(); return; }
+        _pinDrag = c;
+        c.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', c.dataset.pinOf); } catch(_){}
+      });
+      pr.addEventListener('dragover', function(e){
+        if(!_dragEl && !_pinDrag) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        pr.classList.add('pin-over');
+        if(_pinDrag){
+          var at = pinDropIndex(e, _pinDrag), kids = pinClones().filter(function(x){ return x !== _pinDrag; });
+          if(kids[at] !== _pinDrag.nextElementSibling) pt.insertBefore(_pinDrag, kids[at] || null);
+        }
+      });
+      pr.addEventListener('dragleave', function(e){
+        if(!pr.contains(e.relatedTarget)) pr.classList.remove('pin-over');
+      });
+      pr.addEventListener('drop', function(e){
+        e.preventDefault();
+        pr.classList.remove('pin-over');
+        if(_dragEl && _dragEl.dataset && _dragEl.dataset.key) pinAt(_dragEl.dataset.key, pinDropIndex(e, null));
+      });
       /* 타일이 바뀌면(권한으로 감춤·알림 딱지·끌어 옮김) 복제본·개수를 다시 맞춘다.
          ⚠ 줄 머리·별표 안의 바뀜은 «내가 칠한 것»이라 건너뛴다 — 안 그러면 스스로를 계속 부른다. */
       if(window.MutationObserver){
