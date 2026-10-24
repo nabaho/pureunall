@@ -800,6 +800,8 @@
   .kkdrop .last{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .kkfold{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 13px;margin:0 0 10px;font-size:12.5px}
   .kkfold .ok{color:#166534;font-weight:800}
+  .kkfold.found{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+  .kkcame{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;font-size:12.5px;color:#166534;margin:0 0 10px}
   .kkleg{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;margin-top:8px}
   .kkleg b{white-space:nowrap}
   .kkpv{border-collapse:collapse;width:100%}
@@ -3239,12 +3241,14 @@ function renderKakao(){
     +'<span class="chipbtn'+(KK.tab==='talk'?' on':'')+'" onclick="kkTab(\'talk\')">💬 대화</span>'
     +'<span class="chipbtn'+(KK.tab==='files'?' on':'')+'" onclick="kkTab(\'files\')">📎 받을 파일'+(nf.open?' <b>'+nf.open+'</b>':'')+'</span></div>';
   app.innerHTML=h+(KK.tab==='files'?kkFilesHtml():kkTalkHtml());
+  if(!KK.dlInit) kkDlInit();   /* 📂 카톡 폴더 — 열 때마다 새 저장본·받은 파일을 살핀다(2026-10-24) */
 }
 function kkTab(t){ KK.tab=t; KK.fSel={}; renderKakao(); if(t==='files') kkDlInit(); }
 function kkTalkHtml(){
   if(KK.items===null&&!KK.busy&&!KK.err) kkLoad();
   var rows=kkRows();
-  var h=kkDropHtml();
+  var h=kkPickHtml()+(KK.dlH&&KK.dlOk?'':kkDropHtml())
+    +'<input type="file" id="kk-txt" accept=".txt,.csv,text/plain" style="display:none" onchange="kkTxtFiles(this.files);this.value=\'\'">';
   h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">'
     +[[1,'오늘'],[7,'7일'],[30,'30일']].map(function(d){
       return '<span class="chipbtn'+(KK.days===d[0]?' on':'')+'" onclick="kkDays('+d[0]+')">'+d[1]+'</span>'; }).join('')
@@ -3390,17 +3394,100 @@ function kkObsRun(){
    ⚠ 받는 방 목록에 없는 방이면 «아무것도» 안 보낸다 — 개인 대화 저장본을 잘못 끌어 놓아도 새지 않게.
    ⚠ 카톡 프로그램을 조종하거나 긁지 않는다(docs/카톡수집기-검토.md) — 사람이 저장한 파일만 읽는다. */
 function kkDropHtml(){
-  var m=KK.meta||{}, last=Number(m.lastImportAt||0), chip;
-  if(!last) chip='<span class="kkc a">아직 넣은 적 없음</span>';
-  else { var d=Math.floor((Date.now()-last)/864e5);
-    chip=d>=7?'<span class="kkc a">마지막 넣은 날 '+kkMD(last)+' · '+d+'일 지남</span>':'<span class="kkc">마지막 넣은 날 '+kkMD(last)+'</span>'; }
+  var chip=kkLastChip();
   return '<div class="kkdrop" id="kk-drop" ondragover="kkDragOn(event,1)" ondragleave="kkDragOn(event,0)" ondrop="kkDropTxt(event)">'
     +'<span class="ic">📄</span><div><div class="t">카톡 대화 저장본(.txt)을 여기에 끌어 놓으세요</div>'
     +'<div class="s">대표님 글 · 알림이 놓친 글이 채워지고, 오간 파일은 <b>📎 받을 파일</b>로 갑니다. 원본 파일은 서버로 안 올라갑니다.</div></div>'
     +'<div class="last">'+chip+'<button onclick="kkPickTxt()">파일 고르기</button><button onclick="kkHowModal()">저장하는 법 ?</button></div>'
-    +'<input type="file" id="kk-txt" accept=".txt,.csv,text/plain" style="display:none" onchange="kkTxtFiles(this.files);this.value=\'\'">'
     +'</div>';
 }
+/* ══ 📂 카톡 폴더에서 저장본 저절로 줍기 (2026-10-24) ═══════════════════════════
+   대표 「저장본을 자동으로 받아 올 수 없나 — 터미널·CLI 로」 → 카톡을 조종·해독·비공식 접속하는 길은
+   계정 정지 위험이라 권하지 않았다(docs/카톡수집기-검토.md) → 대안 목업 승인 → 「목업대로 진행」.
+   ★ 폴더는 «하나» — 📎 받을 파일의 폴더(손잡이 kakaoDl)를 「📂 카톡 폴더」로 함께 쓴다.
+     사람은 카톡에서 «대화 내보내기» 해 그 폴더에 저장만 한다. 끌어 놓을 필요가 없다.
+   ★ 새것 = 마지막으로 넣은 때(서버 meta.lastImportAt) 뒤에 저장 · 30일 안 · 이 PC 가 아직 처리 안 한 것.
+     처리 표는 이 PC 에 둔다(KK_PICK_KEY — 이름|크기|수정시각 → imp 넣음 / room 다른 방 / skip 못 읽음).
+   ★ 받는 방 저장본이면 미리보기 창을 «저절로» 띄운다(한 파일 한 번). 넣는 것은 「가리고 넣기」 한 번 —
+     원본·가림·받는 방 잣대는 끌어 놓기와 «같은 길»(kkTxtFile)이다.
+   ⚠ 폴더는 읽기만 한다. 고치지도 지우지도 않는다. */
+var KK_PICK_KEY='pu-kakao-pick-v1';
+function kkPickSeen(){ try{ return JSON.parse(localStorage.getItem(KK_PICK_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function kkPickSig(f){ return String(f.name)+'|'+f.size+'|'+f.lastModified; }
+function kkPickMark(f,v){
+  var m=kkPickSeen(); m[kkPickSig(f)]=v+':'+Date.now();
+  var ks=Object.keys(m);
+  if(ks.length>200) ks.sort(function(a,b){ return Number(String(m[a]).split(':')[1])-Number(String(m[b]).split(':')[1]); })
+    .slice(0,ks.length-200).forEach(function(k){ delete m[k]; });
+  try{ localStorage.setItem(KK_PICK_KEY,JSON.stringify(m)); }catch(e){}
+}
+/* 「마지막 넣은 날」 꼬리표 — 이레가 넘었거나 금요일이면 노랗게 */
+function kkLastChip(style){
+  var last=Number((KK.meta||{}).lastImportAt||0), d=last?Math.floor((Date.now()-last)/864e5):-1;
+  var fri=new Date().getDay()===5&&!(last&&kkMD(last)===kkMD(Date.now()));
+  var t=!last?'아직 넣은 적 없음':'마지막 넣은 날 '+kkMD(last)+(d>=7?' · '+d+'일 지남':'');
+  if(fri) t+=' · 오늘 금요일 — 저장본 넣는 날';
+  return '<span class="kkc'+((!last||d>=7||fri)?' a':'')+'"'+(style?' style="'+style+'"':'')+'>'+t+'</span>';
+}
+function kkPickHtml(){
+  if(!obsSupported()) return '';
+  if(!KK.dlH) return '<div class="kkfold"><span>📂 <b>카톡 폴더</b>를 한 번 연결하면, 카톡에서 그 폴더에 저장만 해도 <b>여기서 저절로 읽습니다</b> — 끌어 놓을 필요가 없습니다.</span>'
+    +'<button class="kksm primary" style="margin-left:auto" onclick="kkDlPick()">📂 카톡 폴더 연결</button></div>';
+  if(!KK.dlOk) return '<div class="kkfold"><span>📂 카톡 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="kkc a">브라우저를 다시 켜서 허락이 풀렸습니다</span>'
+    +'<button class="kksm primary" onclick="kkDlAllow()">허락하고 확인</button><button class="kksm" onclick="kkDlPick()">폴더 바꾸기</button>'
+    +'<span class="muted" style="margin-left:auto">한 번 누르면 새 저장본과 받은 파일을 함께 살핍니다</span></div>';
+  var P=KK.pick;
+  if(P&&P.found.length){
+    var f=P.found[0];
+    return '<div class="kkfold found"><span>📂 카톡 폴더에서 <b>새 저장본 '+P.found.length+'개</b>를 찾았습니다 — <b>'+esc(f.name)+'</b> ('+kkTime(f.lastModified)+' 저장)</span>'
+      +'<button class="kksm primary" style="margin-left:auto" onclick="kkPickOpen()">읽어서 확인</button></div>';
+  }
+  return '<div class="kkfold" ondragover="event.preventDefault()" ondrop="kkDropTxt(event)"><span>📂 카톡 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="ok">● 연결됨</span>'
+    +'<span class="muted">'+(KK.dlAt?'마지막 확인 '+kkHM(KK.dlAt)+' · ':'')+(P?'새 저장본 없음':'살피는 중…')+'</span>'
+    +(P&&P.skip?'<span class="kkc" title="받는 방 목록에 없는 방의 저장본 — 넣지 않고 건너뜁니다">다른 방 '+P.skip+'개 건너뜀</span>':'')
+    +'<button class="kksm" onclick="kkDlScan(true)">↻ 지금 확인</button><button class="kksm" onclick="kkDlPick()">폴더 바꾸기</button>'
+    +'<button class="kksm" onclick="kkPickTxt()">파일 고르기</button><button class="kksm" onclick="kkHowModal()" title="카톡에서 저장하는 법">?</button>'
+    +kkLastChip('margin-left:auto')+'</div>';
+}
+/* 폴더(KK.dl)에서 새 저장본 찾기 → KK.pick = { found:[File], skip:다른 방 수 }. 돌려주는 값은 찾은 수. */
+function kkPickFind(){
+  var K=window.PuKakaoWork, need=[];
+  if(!KK.rooms) need.push(kkCall('kakaoRooms').then(function(j){ KK.rooms=j.rooms||[]; }));
+  if(!KK.meta) need.push(kkCall('kakaoFiles').then(function(j){ KK.files=j.items||[]; KK.meta=j.meta||{}; }));
+  return Promise.all(need).then(function(){
+    var cut=Date.now()-K.KEEP_DAYS*864e5, since=Math.max(Number(KK.meta.lastImportAt||0),cut), seen=kkPickSeen();
+    var txt=(KK.dl||[]).filter(function(e){ return e.h&&/\.(txt|csv)$/i.test(e.name); });
+    return Promise.all(txt.map(function(e){ return e.h.getFile().catch(function(){ return null; }); })).then(function(fs){
+      fs=fs.filter(function(f){ return f&&f.lastModified>cut; });
+      var cands=fs.filter(function(f){ return f.lastModified>since&&!seen[kkPickSig(f)]; })
+        .sort(function(a,b){ return b.lastModified-a.lastModified; }).slice(0,10);
+      return cands.reduce(function(p,f){ return p.then(function(found){
+        if(f.size>80*1024*1024){ kkPickMark(f,'skip'); return found; }
+        return kkReadText(f).then(function(t){
+          var pe=K.parseExport(t,{fileName:f.name});
+          if(!pe.ok) kkPickMark(f,'skip');                                   /* 카톡 저장본이 아닌 .txt — 조용히 지나간다 */
+          else if(!K.pickRoom(KK.rooms,pe.rooms)) kkPickMark(f,'room');      /* 다른 방 — 넣지 않는다 */
+          else found.push(f);
+          return found;
+        },function(){ return found; });
+      }); },Promise.resolve([])).then(function(found){
+        var s2=kkPickSeen();
+        KK.pick={found:found,skip:fs.filter(function(f){ return /^room:/.test(s2[kkPickSig(f)]||''); }).length};
+        if(S.view==='kakao') renderKakao();
+        kkPickAuto();
+        return found.length;
+      });
+    });
+  }).catch(function(){ return 0; });
+}
+/* 찾았으면 미리보기를 «저절로» — 다른 창이 떠 있으면 기다리고, 한 화면에서 같은 파일은 한 번만 */
+function kkPickAuto(){
+  var P=KK.pick; if(!P||!P.found.length||S.view!=='kakao'||$('modalbg')) return;
+  var f=P.found[0], sig=kkPickSig(f);
+  KK.pickAuto=KK.pickAuto||{}; if(KK.pickAuto[sig]) return; KK.pickAuto[sig]=1;
+  kkTxtFile(f,{auto:true});
+}
+function kkPickOpen(){ var P=KK.pick; if(P&&P.found.length) kkTxtFile(P.found[0],{auto:true}); }
 function kkDragOn(e,on){ e.preventDefault(); var d=$('kk-drop'); if(d) d.classList.toggle('on',!!on); }
 function kkDropTxt(e){ kkDragOn(e,0); kkTxtFiles(e.dataTransfer&&e.dataTransfer.files); }
 function kkPickTxt(){ var i=$('kk-txt'); if(i) i.click(); }
@@ -3419,16 +3506,20 @@ function kkImportFail(title,detailHtml){
     +'<p class="muted" style="font-size:12.5px;line-height:1.7;margin:0">'+detailHtml+'</p>'
     +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>');
 }
-function kkTxtFiles(files){
-  var f=files&&files[0], K=window.PuKakaoWork; if(!f||!K) return;
+function kkTxtFiles(files){ var f=files&&files[0]; if(f) kkTxtFile(f,{}); }
+/* opt.auto — 📂 카톡 폴더에서 저절로 찾은 것. 못 읽거나 받는 방이 아니면 창을 띄우지 않고 «건너뜀»으로만 남긴다. */
+function kkTxtFile(f,opt){
+  var K=window.PuKakaoWork; if(!f||!K) return; opt=opt||{};
   if(!/\.(txt|csv)$/i.test(f.name||'')){ toast('카톡 «대화 내보내기»로 저장한 .txt 파일을 넣어 주세요','err'); return; }
   if(f.size>80*1024*1024){ toast('파일이 너무 큽니다(80MB 넘음)','err'); return; }
-  toast('저장본을 읽는 중…');
+  if(!opt.auto) toast('저장본을 읽는 중…');
   var rooms=KK.rooms?Promise.resolve(KK.rooms):kkCall('kakaoRooms').then(function(j){ return (KK.rooms=j.rooms||[]); });
   Promise.all([kkReadText(f),rooms]).then(function(r){
     var p=K.parseExport(r[0],{fileName:f.name});
+    if(!p.ok){ if(opt.auto){ kkPickMark(f,'skip'); return; } }
     if(!p.ok) return kkImportFail('⚠ '+esc(p.error),p.firstLine?'첫 줄: 「'+esc(p.firstLine)+'」':'');
     var room=K.pickRoom(r[1],p.rooms);
+    if(!room&&opt.auto){ kkPickMark(f,'room'); return; }
     if(!room) return kkImportFail('⛔ 받는 방이 아닌 저장본입니다 — 넣지 않았습니다',
       (p.rooms.length?'읽은 방 이름: 「'+esc(p.rooms[p.rooms.length-1])+'」':'저장본에서 방 이름을 읽지 못했습니다')
       +'<br>업무방이 맞으면 <b>⚙ 받을 방</b>에 카톡에 보이는 이름 그대로 적은 뒤 다시 끌어 놓으세요. 개인 대화는 넣지 않습니다.');
@@ -3440,7 +3531,7 @@ function kkTxtFiles(files){
     });
     if(lines.length>5000) lines=lines.slice(lines.length-5000);   /* 서버 한도 — 가장 최근 것을 남긴다 */
     var fl=p.files.filter(function(x){ return x.sentAt>=cut; });
-    KK.pend={room:room,lines:lines,files:fl,photos:p.photos,fileName:f.name,mask:mask,old:old,me:''};
+    KK.pend={room:room,lines:lines,files:fl,photos:p.photos,fileName:f.name,mask:mask,old:old,me:'',file:f,auto:!!opt.auto};
     return kkCall('kakaoImport',{room:room,lines:lines,files:fl,photos:p.photos,dryRun:true}).then(function(j){ KK.pend.dry=j; kkImportModal(); });
   }).catch(function(e){ kkImportFail('⚠ 저장본을 넣지 못했습니다',esc(e&&e.message||String(e))); });
 }
@@ -3456,7 +3547,8 @@ function kkImportModal(){
   var range=ts.length?kkMD(Math.min.apply(null,ts))+' ~ '+kkMD(Math.max.apply(null,ts)):'—';
   var oldAll=P.old+(j.old||0);
   var mk=[]; if(P.mask.rrn) mk.push('주민번호 '+P.mask.rrn+'곳'); if(P.mask.card) mk.push('카드 '+P.mask.card+'곳'); if(P.mask.account) mk.push('계좌 '+P.mask.account+'곳');
-  showModal('<h2 style="margin:0 0 4px">📄 저장본을 읽었습니다 — 넣기 전에 확인</h2>'
+  showModal((P.auto?'<div class="kkcame">📂 <b>카톡 폴더에서 저절로 찾은 저장본</b>입니다 — 끌어 놓지 않으셔도 됩니다.</div>':'')
+    +'<h2 style="margin:0 0 4px">📄 저장본을 읽었습니다 — 넣기 전에 확인</h2>'
     +'<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(P.fileName)+' · 이 PC 안에서만 읽었습니다</div>'
     +'<table class="kkpv">'
     +'<tr><td>방</td><td>'+esc(P.room)+' <span class="kkc g">✓ 받는 방</span></td></tr>'
@@ -3471,8 +3563,9 @@ function kkImportModal(){
       +senders.map(function(s){ return '<option value="'+esc(s.name)+'"'+(s.name===guess?' selected':'')+'>'+esc(s.name)+' · '+s.n+'줄</option>'; }).join('')
       +'</select> <span class="muted">· 카톡에서 대표님이 보이는 이름</span></td></tr>'
     +'</table>'
-    +'<div class="kknote">🔒 원본 .txt 파일은 서버에 <b>올라가지 않습니다.</b> 이 PC 안에서 읽고, 가린 줄만 보냅니다. 넣은 글은 30일 뒤 지워집니다.</div>'
-    +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">취소</button>'
+    +'<div class="kknote">🔒 원본 .txt 파일은 서버에 <b>올라가지 않습니다.</b> 이 PC 안에서 읽고, 가린 줄만 보냅니다. 넣은 글은 30일 뒤 지워집니다.'
+      +(P.auto?' 폴더의 파일도 <b>고치거나 지우지 않습니다</b> — 읽기만 합니다.':'')+'</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">'+(P.auto?'나중에':'취소')+'</button>'
     +'<button class="primary" id="kk-pv-go" onclick="kkImportGo()">넣기</button></div>');
   kkPvMe(guess);
 }
@@ -3485,7 +3578,8 @@ function kkPvMe(v){
 function kkImportGo(){
   var P=KK.pend; if(!P) return; var b=$('kk-pv-go'); if(b){ b.disabled=true; b.textContent='넣는 중…'; }
   kkCall('kakaoImport',{room:P.room,lines:P.lines,files:P.files,photos:P.photos,meName:P.me||''}).then(function(j){
-    closeM(); KK.pend=null; KK.items=null; KK.files=null;
+    if(P.file) kkPickMark(P.file,'imp');
+    closeM(); KK.pend=null; KK.items=null; KK.files=null; if(KK.pick) KK.pick.found=[];
     toast('저장본에서 글 '+j.fresh+'줄'+(j.files&&j.files.fresh?' · 파일 '+j.files.fresh+'개':'')+'를 넣었습니다');
     renderKakao(); kkFilesLoad();
   }).catch(function(e){ if(b){ b.disabled=false; b.textContent='다시 넣기'; } toast('넣지 못했습니다: '+e.message,'err'); });
@@ -3496,7 +3590,7 @@ function kkHowModal(){
     +'<div style="font-weight:800;font-size:13px;margin-top:6px">📄 대화 저장본 — 일주일에 한 번</div>'
     +'<ol style="margin:6px 0 0;padding-left:20px;line-height:1.9;font-size:13px">'
     +'<li>PC 카톡에서 <b>업무방</b>을 엽니다</li><li>오른쪽 위 <b>≡</b> → <b>대화 내용</b> → <b>대화 내보내기</b></li>'
-    +'<li>저장된 <b>.txt</b> 를 파란 점선 칸에 끌어 놓습니다</li></ol>'
+    +'<li>저장할 때 <b>📂 카톡 폴더</b>를 고릅니다 — 업무관리를 열면 저절로 찾아 미리보기가 뜹니다(끌어 놓아도 됩니다)</li></ol>'
     +'<div style="font-weight:800;font-size:13px;margin-top:12px">📎 파일 — «곧 만료»가 보이면</div>'
     +'<ol style="margin:6px 0 0;padding-left:20px;line-height:1.9;font-size:13px">'
     +'<li>같은 방에서 <b>≡</b> → <b>채팅방 서랍</b> → <b>파일</b></li><li>안 받은 파일을 여러 개 골라 <b>저장</b></li>'
@@ -3551,11 +3645,11 @@ function kkLocal(f){
 }
 function kkFoldHtml(){
   var h='<div class="kkfold" ondragover="event.preventDefault()" ondrop="kkDropFiles(event)">';
-  if(!obsSupported()) h+='<span>📂 받은 파일 폴더 연결은 <b>크롬·엣지</b>에서만 됩니다 — 받은 파일을 이 띠에 끌어 놓아 주세요.</span>';
-  else if(!KK.dlH) h+='<span>📂 받은 파일 폴더가 아직 없습니다</span><button class="kksm primary" onclick="kkDlPick()">📂 받은 파일 폴더 연결</button>';
-  else if(!KK.dlOk) h+='<span>📂 받은 파일 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="muted">브라우저가 다시 허락을 묻습니다</span>'
+  if(!obsSupported()) h+='<span>📂 카톡 폴더 연결은 <b>크롬·엣지</b>에서만 됩니다 — 받은 파일을 이 띠에 끌어 놓아 주세요.</span>';
+  else if(!KK.dlH) h+='<span>📂 카톡 폴더가 아직 없습니다 — 카톡이 받은 파일을 두는 폴더를 고르세요</span><button class="kksm primary" onclick="kkDlPick()">📂 카톡 폴더 연결</button>';
+  else if(!KK.dlOk) h+='<span>📂 카톡 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="muted">브라우저가 다시 허락을 묻습니다</span>'
     +'<button class="kksm primary" onclick="kkDlAllow()">허락하고 확인</button><button class="kksm" onclick="kkDlPick()">폴더 바꾸기</button>';
-  else h+='<span>📂 받은 파일 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="ok">● 연결됨</span>'
+  else h+='<span>📂 카톡 폴더: <b>'+esc(KK.dlH.name)+'</b></span><span class="ok">● 연결됨</span>'
     +'<span class="muted">마지막 확인 '+(KK.dlAt?kkHM(KK.dlAt):'—')+'</span>'
     +'<button class="kksm" onclick="kkDlScan(true)">↻ 지금 확인</button><button class="kksm" onclick="kkDlPick()">폴더 바꾸기</button>';
   return h+'<span class="muted" style="margin-left:auto">받은 파일은 <b>«보낼 곳»을 확인해야</b> 올라갑니다 — 저절로 올리지 않습니다</span></div>';
@@ -3680,20 +3774,29 @@ function kkDlAllow(){
 }
 function kkDlScan(manual){
   var h=KK.dlH; if(!h||!KK.dlOk) return Promise.resolve();
-  var list=[], it=h.values();
+  if(KK.dlBusy) return KK.dlBusy;
+  var list=[], it=h.values(), got=0;
   function step(){ return it.next().then(function(r){
     if(r.done||list.length>=5000) return;
     if(r.value&&r.value.kind==='file') list.push({name:r.value.name,h:r.value});
     return step();
   }); }
-  return step().then(function(){ KK.dl=list.concat(KK.dlDrop); KK.dlAt=Date.now(); return kkDlMatch(manual); })
-    .catch(function(e){ KK.dlOk=false; if(manual) toast('폴더를 읽지 못했습니다: '+e.message,'err'); renderKakao(); });
+  KK.dlBusy=step().then(function(){ KK.dl=list.concat(KK.dlDrop); KK.dlAt=Date.now(); return kkDlMatch(false); })
+    .then(function(n){ got=n||0; return kkPickFind(); })
+    .then(function(m){
+      if(!manual) return;
+      var say=[]; if(m) say.push('새 저장본 '+m+'개'); if(got) say.push('받은 파일 '+got+'개 «받음»');
+      toast(say.length?say.join(' · '):'새것이 없습니다');
+    })
+    .catch(function(e){ KK.dlOk=false; if(manual) toast('폴더를 읽지 못했습니다: '+e.message,'err'); renderKakao(); })
+    .then(function(){ KK.dlBusy=null; });
+  return KK.dlBusy;
 }
 /* 받을 파일 가운데 폴더에 같은 이름이 있는 것 → «받음» */
 function kkDlMatch(manual){
   var ids=(KK.files||[]).filter(function(f){ return f.status==='todo'&&kkLocal(f); }).map(function(f){ return f.id; });
-  if(!ids.length){ if(manual) toast('새로 받은 파일이 없습니다'); if(S.view==='kakao') renderKakao(); return Promise.resolve(); }
-  return kkFileMark(ids,'got',true).then(function(){ if(manual) toast(ids.length+'개를 «받음»으로 바꿨습니다'); });
+  if(!ids.length){ if(manual) toast('새로 받은 파일이 없습니다'); if(S.view==='kakao') renderKakao(); return Promise.resolve(0); }
+  return kkFileMark(ids,'got',true).then(function(){ if(manual) toast(ids.length+'개를 «받음»으로 바꿨습니다'); return ids.length; });
 }
 /* 폴더를 못 쓰는 브라우저 — 받은 파일을 띠에 끌어 놓는다 */
 function kkDropFiles(e){
