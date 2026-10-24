@@ -211,11 +211,31 @@ test('⑩ 폰: 아래 막대는 화면 맨 아래 전체 폭 · 본문은 그만
   assert.match(blk, /env\(safe-area-inset-bottom\)/, '★ 아이폰 아래 손잡이 줄에 막대가 깔린다');
 });
 
-test('⑩ 폰: 자주 쓰는 앱도 얇은 칩 — 칸 수는 화면 폭을 따라 준다 · ★ 는 남는다', () => {
-  const r = rulesFor('#pinTiles');
-  assert.ok(r.some((b) => /display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)),
-    '★ 폰의 자주 쓰는 앱 칸 수가 폭을 안 따른다 — 화면 밖으로 나간다');
-  r.forEach((b) => assert.ok(!/nowrap|overflow-x\s*:\s*(auto|scroll)/.test(b), '★ 자주 쓰는 앱을 옆으로 밀게 만들었다'));
-  assert.ok(!rulesFor('#pinTiles .pin-star').some((b) => /display:none/.test(b)),
-    '★ 폰에서 ★ 를 감췄다 — 폰은 끌기가 없어 ★ 로만 뺄 수 있다');
+/* 대표 2026-10-24 「폰에서는 자주 쓰는 앱을 위 상단에 별표하는 건 필요 없을 것 같다. 차라리 자주 쓰는 앱은
+   꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것 같다」 → 「맨 위 줄 없애기」. */
+test('⑪ 폰: 자주 쓰는 앱 줄은 없다 — 꾹 누르면 «그 자리 칩»에 ★·노란 테두리', () => {
+  /* 폰 구간 안에서 자주 쓰는 앱 줄을 감추고, ★ 붙은 칩을 그 자리에서 보인다 */
+  const at = HEAD.indexOf('#pinRow{display:none;}');
+  assert.ok(at > 0, '★ 폰에 자주 쓰는 앱 줄이 그대로 있다');
+  assert.match(HEAD.slice(HEAD.lastIndexOf('@media', at), at), /^@media \(max-width:\d+px\)\{/, '★ 자주 쓰는 앱 줄을 PC 에서까지 감췄다');
+  assert.ok(rulesFor('.tilerow.fold .tile.is-pin::after').some((b) => /content:'★'/.test(b)), '★ 꾹 눌러도 칩에 ★ 가 안 보인다');
+  assert.match(cutFn(E, 'function paintPins('), /classList\.toggle\('is-pin'/, '★ 별표 목록이 바뀌어도 칩의 ★ 가 안 따라간다');
+});
+
+test('⑪ 폰: 꾹 누르기 — 넣고 빼되 앱은 안 열리고 · 밀어 내리면 꾹 누르기가 아니고 · PC 오른쪽 메뉴는 그대로', () => {
+  const wire = cutFn(E, 'function initFold(');
+  assert.match(E, /var LONG_MS = \d+/, '★ 꾹 누르는 시간이 없다');
+  assert.match(wire, /'touchstart'[\s\S]*togglePin\(/, '★ 꾹 눌러도 자주 쓰는 앱에 안 들어간다');
+  assert.match(wire, /'touchmove'[\s\S]*lpStop\(\)/, '★ 화면을 밀어 내리다 멈춰도 별표가 붙는다');
+  assert.match(wire, /'touchend', function\(e\)\{ if\(_lp && _lp\.fired\) e\.preventDefault\(\)/, '★ 꾹 누르고 손을 떼면 앱이 열린다');
+  assert.match(wire, /addEventListener\('click', function\(e\)\{\s*if\(Date\.now\(\) - _lpAt < \d+ && lpTile\(e\)\)\{ e\.preventDefault\(\); e\.stopPropagation\(\); \}\s*\}, true\)/,
+    '★ 꾹 누른 뒤 따라오는 click 으로 앱이 열린다');
+  assert.match(wire, /'contextmenu'[\s\S]{0,120}\(_lp \|\| Date\.now\(\) - _lpAt < \d+\)/,
+    '★ 안드로이드 «새 탭에서 열기» 메뉴를 안 막거나, PC 오른쪽 단추 메뉴까지 늘 막는다');
+});
+
+test('⑩ 폰 아래 막대: 건의하기는 «늘» 오른쪽 끝 — 늦게 생기는 백업·복구가 그 뒤에 붙어도', () => {
+  /* 2026-10-24 대표 폰 캡처: 백업·복구가 건의하기 오른쪽에 붙어 가운데 📷 와 겹쳤다(차례에 기댔다) */
+  assert.ok(rulesFor('#fabBar > #sgFab').some((b) => /order:\d+/.test(b) && /margin-left:auto/.test(b)),
+    '★ 건의하기 자리를 차례(DOM)에 기댄다 — 늦게 붙는 단추가 그 오른쪽으로 간다');
 });
