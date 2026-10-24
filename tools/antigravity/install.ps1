@@ -15,6 +15,9 @@
 # ⚠ BOM 을 지우지 말 것 — 윈도 PowerShell 5.1 은 BOM 없는 파일을 ANSI 로 읽어 한글이 깨진다.
 # 쓰는 규칙: docs/안티그래비티-REA-설치.md
 
+# -ShortcutOnly : 이미 깔린 안티그래비티의 바탕화면 바로가기만 만든다(make-desktop-shortcut.bat)
+param([switch]$ShortcutOnly)
+
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'   # PS 5.1 은 진행 막대 때문에 받기가 몇 배 느려진다
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -55,6 +58,47 @@ function Find-Antigravity {
     Select-Object -First 1
 }
 
+# 깔린 실행 파일 — 목록의 아이콘 자리 → 설치 폴더 → 흔한 자리 순으로 찾는다
+function Find-AntigravityExe($entry) {
+  $cands = @()
+  if ($entry -and $entry.DisplayIcon) { $cands += (("$($entry.DisplayIcon)" -split ',')[0]).Trim('"', ' ') }
+  $dirs = @()
+  if ($entry -and $entry.InstallLocation) { $dirs += "$($entry.InstallLocation)".Trim('"', ' ') }
+  $dirs += Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles -Directory -Filter '*Antigravity*' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+  foreach ($d in $dirs) {
+    $cands += Get-ChildItem -Path $d -Filter 'Antigravity*.exe' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+  }
+  foreach ($c in $cands) {
+    if ($c -and ($c -like '*.exe') -and ((Split-Path $c -Leaf) -notlike 'Uninstall*') -and (Test-Path $c)) { return $c }
+  }
+  return $null
+}
+
+# 바탕화면 바로가기 — 설치 프로그램이 안 만들 때가 있다(2026-10-24 「바탕화면에 안 보인다」).
+# ⚠ 바탕화면 자리는 GetFolderPath 로 묻는다 — OneDrive 가 바탕화면을 옮겨 두면 %USERPROFILE%\Desktop 은 화면에 안 보이는 폴더다.
+function Add-DesktopShortcut($entry) {
+  $exe = Find-AntigravityExe $entry
+  if (-not $exe) {
+    Say '[주의] 안티그래비티 실행 파일을 못 찾았습니다 — 설치가 안 끝났을 수 있습니다. install-antigravity.bat 를 다시 실행해 주십시오.' Yellow
+    return $null
+  }
+  $desk = [Environment]::GetFolderPath('Desktop')
+  $lnk = Join-Path $desk 'Antigravity.lnk'
+  if (Test-Path $lnk) {
+    Say "[있음] 바탕화면 바로가기: $lnk" Green
+  } else {
+    $sh = New-Object -ComObject WScript.Shell
+    $sc = $sh.CreateShortcut($lnk)
+    $sc.TargetPath = $exe
+    $sc.WorkingDirectory = Split-Path $exe
+    $sc.IconLocation = "$exe,0"
+    $sc.Save()
+    Say "[만듦] 바탕화면 바로가기: $lnk" Green
+  }
+  Say "    실행 파일: $exe"
+  return $exe
+}
+
 function Test-NodeOk([string]$v) {
   $m = [regex]::Match($v, '(\d+)\.(\d+)\.(\d+)')
   if (-not $m.Success) { return $false }
@@ -67,6 +111,17 @@ function Test-NodeOk([string]$v) {
 
 Say '=== 구글 안티그래비티 + REA 설치 ===' Cyan
 Say ''
+
+if ($ShortcutOnly) {
+  $appExe = Add-DesktopShortcut (Find-Antigravity)
+  if ($appExe) {
+    $ans = Read-Host '지금 안티그래비티를 열까요? (y = 열기 / 엔터 = 닫기)'
+    if ($ans -eq 'y') { Start-Process -FilePath $appExe }
+  }
+  Say ''
+  Read-Host '엔터를 누르면 닫힙니다' | Out-Null
+  exit 0
+}
 
 # ── 1부. 안티그래비티 ──────────────────────────────────────────────
 $arch = $env:PROCESSOR_ARCHITECTURE
@@ -146,6 +201,9 @@ if (-not $skip) {
   else { Say '[주의] 프로그램 목록에서 안티그래비티를 못 찾았습니다. 설치를 끝냈는지 봐 주십시오. REA 연결은 이어서 합니다.' Yellow }
   Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# 깔았든 이미 있었든 바탕화면 바로가기를 맞춘다
+Add-DesktopShortcut (Find-Antigravity) | Out-Null
 
 # ── 2부. REA 를 안티그래비티에 잇기 ──────────────────────────────────
 Say ''

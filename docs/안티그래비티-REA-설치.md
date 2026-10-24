@@ -14,6 +14,12 @@
 6. `npx rea-agents@latest setup --client antigravity` — REA 가 «바꿀 내용»을 보여 주고, 승인하면 안티그래비티에 MCP 서버로 등록한다.
 7. `doctor --client antigravity` 로 점검한다. 끝나면 안티그래비티를 껐다 켠다.
 
+설치 중간에 바탕화면 바로가기도 만든다(설치 프로그램이 안 만들 때가 있다). 바탕화면 자리는 Windows 에 묻는다 —
+OneDrive 가 바탕화면을 옮겨 둔 PC 에서는 `%USERPROFILE%\Desktop` 이 화면에 안 보이는 폴더다.
+
+**이미 깔았는데 바탕화면에 안 보이면**: `tools/antigravity/make-desktop-shortcut.bat` — 받기·REA 없이 바로가기만 만들고, 열지 묻는다.
+실행 파일을 못 찾으면 설치가 안 끝난 것이니 `install-antigravity.bat` 을 다시 돌린다.
+
 ## 2026-10-24 확인한 것 (클라우드에서)
 
 | 항목 | 결과 |
