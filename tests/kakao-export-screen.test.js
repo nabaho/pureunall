@@ -127,3 +127,42 @@ test('탭·화면을 떠나면 읽은 내용을 버린다', () => {
   assert.match(wfn('kkTab'), /kxReset\(\)/);
   assert.match(W, /kkNav\(\);[^\n]*[\s\S]{0,200}?kxReset\(\)|if\(S\.view!=='kakao'\)\s*kxReset\(\)/);
 });
+
+/* ── 첨부 파일 복사 ─────────────────────────────────────────────────── */
+test('파일: 복사만 한다 — 지우거나 옮기는 호출이 없고, 쓰기 전에 같은 이름이 있는지 먼저 본다', () => {
+  assert.ok(!/removeEntry|\.remove\(|\.move\(/.test(REGION), '원본을 지우거나 옮기는 호출이 있다');
+  const f = fn('kxCopyOne');
+  const exist = f.indexOf('getFileHandle(outName)');
+  const create = f.indexOf('create:true', exist);
+  assert.ok(exist > 0 && create > exist, '쓰기(create) 전에 같은 이름을 확인하지 않는다');
+  assert.match(f, /skipped/, '이미 있으면 건너뛰지 않는다');
+  assert.match(f, /NotFoundError/, '없음과 다른 오류를 구분하지 않는다');
+});
+
+test('파일: 폴더·파일 이름은 safeName 을 거치고, 폴더 고르기가 안 되는 브라우저는 막고 안내한다', () => {
+  assert.match(fn('kxCopyOne'), /safeName\(f\.folder\)/);
+  assert.match(fn('kxCopyOne'), /safeName\(f\.day/);
+  for (const name of ['kxPickDir', 'kxCopyFiles']) {
+    assert.match(fn(name), /typeof window\.showDirectoryPicker\s*!==\s*'function'/, name + ' 에 지원 확인이 없다');
+  }
+});
+
+test('파일: 대화에 이름이 있는 파일만 목록에 오르고(matchFiles), 민감 의심은 기본 해제, 만료 D-N 을 보인다', () => {
+  const f = fn('kxFilesBuild');
+  assert.match(f, /matchFiles\(/);
+  assert.match(f, /isSensitiveName\(/);
+  assert.match(f, /attachmentExpiry\(/);
+  assert.match(f, /on:\s*!!m\.found\s*&&\s*!sens/, '찾았고 민감하지 않을 때만 기본 체크여야 한다');
+  const h = fn('kxFilesHTML') + fn('kxFileRowHTML');
+  assert.match(h, /<th class="kkfit"><input type="checkbox" onclick="kxFilePickAll\(/);
+  assert.match(h, /<th class="kkfit">번호<\/th>/);
+  assert.match(fn('kxFileRowHTML'), /\(i\+1\)/);
+  assert.match(h, /민감 의심/);
+  assert.match(h, /못 받음/);
+});
+
+test('파일: 고르기·번호는 저장하지 않고, 서버로 올리는 호출이 없다(파일은 서버로 안 간다)', () => {
+  const f = fn('kxFilesBuild') + fn('kxFileRowHTML') + fn('kxFilesHTML') + fn('kxCopyFiles') + fn('kxCopyOne');
+  assert.ok(!/localStorage|\.update\(|\.put\(|uploadBytes|storage\(\)|kkCall\(/.test(f), '파일 복사가 서버·저장소를 건드린다');
+});
+
