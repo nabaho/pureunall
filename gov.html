@@ -549,7 +549,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=2"></script>
-<script src="js/gov-g2b.js?v=9"></script>
+<script src="js/gov-g2b.js?v=10"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=3"></script>
@@ -558,7 +558,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-sync.js?v=9"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
-<script src="js/gov-inbox.js?v=3"></script>
+<script src="js/gov-inbox.js?v=4"></script>
 <script src="js/gov-pick.js?v=1"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
@@ -683,7 +683,7 @@ async function pullAll(name, urlOf, parse, max){
 }
 /* 나라장터 공고에 «참가 가능 지역·면허 제한»을 붙인다 — 공고마다 서비스 둘을 부른다(하루 1,000회 제한 안에서 60건까지, 한 번 본 공고는 lk 로 건너뜀) */
 async function restrictFill(buf, kd, adds){
-  var open=buf.filter(function(r){ if(!r||r.lk||r.src!=='나라장터'||adds.indexOf(r)>=0) return false; var d=GovG2b.dday(r.closeDt); return d==null||d>=0; }).slice(0,20);
+  var open=buf.filter(function(r){ if(!r||r.lk===GovG2b.LK||r.src!=='나라장터'||adds.indexOf(r)>=0) return false; var d=GovG2b.dday(r.closeDt); return d==null||d>=0; }).slice(0,20);
   var copies=open.map(function(r){ return {no:r.no, src:'나라장터'}; });   // 옛 줄은 복사본에만 붙인다 — 부른 뒤 번호로 찾아 합친다
   var todo=adds.filter(function(r){ return r.src==='나라장터'; }).concat(copies);
   var sum=await GovG2b.enrich(todo, pull, {key:kd, max:60});
@@ -742,7 +742,7 @@ async function _fetchAll(){
   fresh.forEach(function(r){ r.id=nextId(buf); r.savedAt=new Date().toISOString(); buf.unshift(r); });
   var patched=0;
   if(rFill) rFill.patches.forEach(function(pt){ var row=buf.find(function(r){ return r && String(r.no)===String(pt.no); });
-    if(row && !row.lk){ ['rgn','ind','lk'].forEach(function(f){ if(pt[f]) row[f]=pt[f]; }); patched++; } });
+    if(row && row.lk!==GovG2b.LK){ ['rgn','ind','lk'].forEach(function(f){ if(pt[f]) row[f]=pt[f]; }); patched++; } });
   if(fresh.length || patched) set('feed',buf);
   /* 받은 때·범위를 남긴다 — 화면이 「언제까지의 공고인가」를 말할 수 있게(feedPeriod) */
   lsSet('last_at', new Date().toISOString());
@@ -1061,7 +1061,7 @@ async function inboxPull(){
     /* 이미 내 목록에 있는 공고에는 서버가 새로 알아낸 지역·업종 제한만 «빈 칸에» 옮긴다(숨김·별표 같은 내 표시는 안 건드린다) */
     var carried=0, byNo={}; buf.forEach(function(r){ if(r&&r.no!=null) byNo[String(r.no)]=r; });
     Object.keys(v.rows||{}).forEach(function(k){ var sv=v.rows[k], l=sv&&byNo[String(sv.no)];
-      if(l && !l.lk && sv.lk){ ['rgn','ind','indY','jnt','lk'].forEach(function(f){ if(sv[f]) l[f]=String(sv[f]); }); carried++; } });
+      if(l && l.lk!==GovG2b.LK && sv.lk===GovG2b.LK){ ['rgn','ind','indY','jnt','lk'].forEach(function(f){ if(sv[f]) l[f]=String(sv[f]); }); carried++; } });
     if(m.adds.length){ set('feed',buf); ageOut(); _feedMerged+=m.adds.length;
       toast('🛰 서버가 매일 모은 공고 '+m.adds.length+'건을 목록에 합쳤습니다'); }
     else if(carried){ set('feed',buf); }

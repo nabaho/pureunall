@@ -134,3 +134,10 @@ test('★ 빈 입력·모르는 꼴에도 던지지 않는다', () => {
   assert.deepEqual(P.rank().items, []);
   assert.deepEqual(P.rank({ hits: [null, {}, { key: 'k' }], feed: [null, {}], orgs: [null, {}], deps: {} }).items, []);
 });
+
+test('★★ 실제 응답 꼴 — 「충청남도 공주시」처럼 시군까지 적혀 와도 시도로 읽는다 · 여러 줄이면 하나라도 우리 지역이면 in', () => {
+  assert.equal(P.regionFit('충청남도 공주시').k, 'in');
+  assert.equal(P.regionFit('서울특별시 · 경기도 수원시 · 충청남도 천안시').k, 'in');
+  assert.deepEqual(P.regionFit('경기도 수원시 · 서울특별시 강남구').names, ['경기', '서울']);
+  assert.equal(P.regionFit('경기도 수원시').k, 'out');
+});

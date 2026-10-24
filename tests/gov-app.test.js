@@ -574,7 +574,7 @@ test('★★★ 지역·업종 조회를 «기다리는 사이» 누른 ★·숨
   const feed = JSON.parse(r.store.gov3_feed);
   const old = feed.find((x) => x.no === 'OLD-1'), neu = feed.find((x) => x.no === 'NEW-1-000');
   assert.equal(old.type, '관심', '기다리는 사이 누른 ★ 이 지워졌다');
-  assert.equal(old.rgn, '충청남도', '옛 공고에도 지역이 붙는다'); assert.equal(old.lk, '1');
+  assert.equal(old.rgn, '충청남도', '옛 공고에도 지역이 붙는다'); assert.equal(old.lk, '2');
   assert.ok(neu && neu.rgn === '충청남도', '새 공고에도 지역이 붙는다');
 });
 

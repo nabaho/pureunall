@@ -82,9 +82,9 @@ async function collect(o) {
 function toInbox(row, atIso) {
   return { no: s(row.no), src: s(row.src), nm: s(row.nm), org: s(row.org), ntce: s(row.ntce), openDt: s(row.openDt),
     closeDt: s(row.closeDt), prc: Number(row.prc) || 0, mthd: s(row.mthd), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '',
-    kw: s(row.kw), at: atIso,
+    kw: s(row.kw), at: atIso, ...(s(row.lk) === G2B.LK ? { lk: G2B.LK } : {}),
     /* 지역·업종 제한 — 있을 때만(빈 값은 RTDB 가 어차피 안 담지만 모양을 분명히) */
-    ...['rgn', 'ind', 'indY', 'jnt', 'lk'].reduce((m, k) => { if (s(row[k])) m[k] = s(row[k]).slice(0, 300); return m; }, {}) };
+    ...['rgn', 'ind', 'indY', 'jnt'].reduce((m, k) => { if (s(row[k])) m[k] = s(row[k]).slice(0, 300); return m; }, {}) };
 }
 
 /* 제한 붙이기 하루 상한 — 새로 걸린 공고 + 예전 공고 보충. 하루 1,000회 제한 중 공고마다 두 번씩 쓴다 */
@@ -138,11 +138,11 @@ async function run(a) {
         const fresh = r.rows.filter((row) => !existing[safeKey(row.no)]);
         restrict.fresh = await G2B.enrich(fresh, a.getJson, { key: owner.keyData, max: RESTRICT_MAX.fresh });
         const old = Object.keys(existing).map((k) => ({ k, row: existing[k] }))
-          .filter((x) => x.row && x.row.no && !x.row.lk && s(x.row.src) === '나라장터' && (!x.row.closeDt || Date.parse(s(x.row.closeDt).replace(' ', 'T') + '+09:00') > now.getTime()))
+          .filter((x) => x.row && x.row.no && x.row.lk !== G2B.LK && s(x.row.src) === '나라장터' && (!x.row.closeDt || Date.parse(s(x.row.closeDt).replace(' ', 'T') + '+09:00') > now.getTime()))
           .slice(0, RESTRICT_MAX.backfill);
         const copies = old.map((x) => ({ no: x.row.no, src: '나라장터' }));
         restrict.backfill = await G2B.enrich(copies, a.getJson, { key: owner.keyData, max: RESTRICT_MAX.backfill });
-        copies.forEach((c, i) => { ['rgn', 'ind', 'lk'].forEach((f) => { if (c[f]) updates['rows/' + old[i].k + '/' + f] = c[f]; }); });
+        copies.forEach((c, i) => { ['rgn', 'ind', 'lk'].forEach((f) => { if (c[f]) updates['rows/' + old[i].k + '/' + f] = c[f]; }); });   /* 이미 «제대로 본» 표시(lk 2)가 아닌 옛 줄만 여기 온다 — 옛 lk 1 줄도 덮어 고친다 */
       } catch (e) { /* 공고 모으기는 계속 */ }
     }
     r.rows.forEach((row) => {
