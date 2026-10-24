@@ -1,0 +1,9 @@
+{
+  "name": "pu-remember-pull",
+  "private": true,
+  "version": "1.0.0",
+  "description": "푸른 리멤버·메일 가져오기 — 윈도우 작업 스케줄러가 1시간마다 (tools/ 는 배포 안 됨)",
+  "main": "run.js",
+  "scripts": { "login": "node run.js login", "run": "node run.js" },
+  "dependencies": { "puppeteer-core": "23.11.1" }
+}
