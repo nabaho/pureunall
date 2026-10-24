@@ -517,6 +517,52 @@
     }
     return out + src.slice(at);
   }
+  /* ══ 🔴 직인 맞추기 (대표 「도장위치 제각각 — 정리」 2026-10-24) ══
+     서식의 법인 직인(그림 sealstd, 종이 기준 절대 위치)은 «푸른노무법인·권형하가 있는 줄의 (인)» 한가운데에 둔다.
+     값을 채우면 위 글이 길어져 줄이 밀릴 수 있다 — 채운 뒤 글자 자리(rhwp getPageTextLayout)를 다시 재서 옮긴다.
+     ⚠ 쪽마다 하나 · 문서 차례대로 짝짓는다(같은 자리에 두 장 — 노동조합 자문계약서). 수가 안 맞으면 건드리지 않는다. */
+  var SEAL_LINE = /푸른노무법인|권\s*형\s*하|수임인\s*:|수탁자/, SEAL_NAME = /권\s*형\s*하|푸른/;
+  function sealTargets(pages) {
+    var out = [];
+    (pages || []).forEach(function (runs, p) {
+      runs = runs || [];
+      var key = function (r) { return JSON.stringify(r.cellPath || null); }, cands = [];
+      runs.forEach(function (r) {
+        var t = String(r.text || ''), k = t.lastIndexOf('(인)'), k2 = t.lastIndexOf('서명 또는 인');
+        if (k < 0 && k2 < 0) return;
+        var line = runs.filter(function (q) { return Math.abs(q.y - r.y) < 3 && key(q) === key(r) && q.x <= r.x + r.w; }).map(function (q) { return q.text; }).join(' ');
+        if (!SEAL_LINE.test(line)) return;
+        var c = r.charX || [], cx;
+        if (k >= 0) { var a = c[k], b = c[k + 3] != null ? c[k + 3] : r.w; cx = a != null ? r.x + (a + b) / 2 : r.x + r.w - 7; }
+        else { var kk = k2 + 6; cx = c[kk] != null ? r.x + (c[kk] + (c[kk + 1] != null ? c[kk + 1] : c[kk] + 12)) / 2 : r.x + r.w - 12; }
+        cands.push({ p: p, cx: cx, cy: r.y + (r.h || 14) / 2, own: SEAL_NAME.test(t) ? 1 : 0 });
+      });
+      if (!cands.length) return;
+      cands.sort(function (x, y) { return (y.own - x.own) || (y.cy - x.cy); });
+      out.push({ p: p, cx: cands[0].cx, cy: cands[0].cy });
+    });
+    return out;
+  }
+  /* xmls — 구역(section) XML 을 차례대로. targets — sealTargets 결과(쪽 차례). 단위: 화면 px(=HWPUNIT/75) */
+  function fitSeals(xmls, targets) {
+    var picRe = /<hp:pic\b[\s\S]*?<\/hp:pic>/g, seals = 0;
+    (xmls || []).forEach(function (x) { (String(x || '').match(picRe) || []).forEach(function (p) { if (isSeal(p)) seals++; }); });
+    function isSeal(p) { return /binaryItemIDRef="sealstd"/.test(p) && /vertRelTo="PAPER"/.test(p) && /horzRelTo="PAPER"/.test(p); }
+    targets = targets || [];
+    if (!seals || seals !== targets.length) return { xmls: xmls, moved: 0, seals: seals };
+    var i = 0, moved = 0;
+    var out = (xmls || []).map(function (x) {
+      return String(x || '').replace(picRe, function (p) {
+        if (!isSeal(p)) return p;
+        var t = targets[i++], sz = /<hp:sz\b[^>]*\bwidth="(\d+)"[^>]*\bheight="(\d+)"/.exec(p);
+        if (!t || !sz) return p;
+        var ho = Math.round(t.cx * 75 - (+sz[1]) / 2), vo = Math.round(t.cy * 75 - (+sz[2]) / 2);
+        return p.replace(/(<hp:pos\b[^>]*\bvertOffset=")-?\d+(")/, function (m, a, b) { return a + vo + b; })
+          .replace(/(<hp:pos\b[^>]*\bhorzOffset=")-?\d+(")/, function (m, a, b) { moved++; return a + ho + b; });
+      });
+    });
+    return { xmls: out, moved: moved, seals: seals };
+  }
   /* ══ 엑셀(.xlsx) 채우기 — XML 을 직접 고친다(모양·수식·그림은 그대로) ══
      SheetJS 로 다시 저장하면 칸 모양이 날아가서 쓰지 않는다. 틀은 「명단 한 줄에 표지」 꼴 —
      서식 시트들이 그 줄을 수식으로 끌어오고, 틀에 fullCalcOnLoad 가 있어 엑셀이 열 때 다시 계산한다.
@@ -661,7 +707,7 @@
     rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, coConflicts: coConflicts, ntsCls: ntsCls, ntsWordOf: ntsWordOf, ntsEndOf: ntsEndOf, ntsView: ntsView, fieldSource: fieldSource, sameField: sameField, CO_FIELD_OF: CO_FIELD_OF, searchCompanies: searchCompanies, contactsOf: contactsOf,
     searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
-    stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
+    stripLinesegsFor: stripLinesegsFor, sealTargets: sealTargets, fitSeals: fitSeals, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,

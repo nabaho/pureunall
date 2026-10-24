@@ -241,13 +241,13 @@
 <script src="js/pu-contract-vars.js?v=2"></script>
 <script src="js/pu-sign.js?v=3"></script>
 <script src="js/esign-crypto.js?v=1"></script>
-<script src="js/esign-docs.js?v=6"></script>
+<script src="js/esign-docs.js?v=7"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=19"></script>
-<script src="js/pu-contract-forms.js?v=65"></script>
+<script src="js/pu-form-cardfill.js?v=20"></script>
+<script src="js/pu-contract-forms.js?v=66"></script>
 <script src="js/pu-photo-store.js?v=35"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -481,7 +481,36 @@ async function formRelayout(doc, vals, fmt, keep) {
   var bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
   if (keep) keep.preview = bytes;
   var d2 = await PureunHwp.openDoc(bytes, 'relayout.hwpx');
-  try { d2.reflowLinesegs(); return fmt === 'hwpx' ? d2.exportHwpx() : d2.exportHwp(); } finally { try { d2.free(); } catch (e) {} }
+  try {
+    d2.reflowLinesegs();
+    /* 🔴 채운 뒤 직인 맞추기 — 채우기(keep 있을 때)만. 못 맞추면 원래대로(직인은 서식 자리 그대로) */
+    if (keep) {
+      var fit = null;
+      try { fit = await formFitSeals(d2, JSZ); } catch (e) { fit = null; }
+      if (fit) {
+        keep.preview = fit;
+        if (fmt === 'hwpx') return fit;
+        var d3 = await PureunHwp.openDoc(fit, 'sealfit.hwpx');
+        try { return d3.exportHwp(); } finally { try { d3.free(); } catch (e) {} }
+      }
+    }
+    return fmt === 'hwpx' ? d2.exportHwpx() : d2.exportHwp();
+  } finally { try { d2.free(); } catch (e) {} }
+}
+/* 직인(sealstd)을 채운 글자 자리에 다시 맞춘다 — 옮긴 것이 없으면 null (규칙: PuFormCardFill.sealTargets·fitSeals) */
+async function formFitSeals(d, JSZ) {
+  var pages = [];
+  for (var p = 0; p < d.pageCount(); p++) pages.push((JSON.parse(d.getPageTextLayout(p)) || {}).runs || []);
+  var targets = PuFormCardFill.sealTargets(pages);
+  if (!targets.length) return null;
+  var zip = await JSZ.loadAsync(d.exportHwpx());
+  var secs = Object.keys(zip.files).filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); })
+    .sort(function (a, b) { return (+a.match(/(\d+)\.xml$/)[1]) - (+b.match(/(\d+)\.xml$/)[1]); });
+  var xmls = await Promise.all(secs.map(function (n) { return zip.file(n).async('string'); }));
+  var r = PuFormCardFill.fitSeals(xmls, targets);
+  if (!r.moved) return null;
+  secs.forEach(function (n, i) { zip.file(n, r.xmls[i]); });
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
 }
 async function formHwpFill(bytes, name, V) {
   if (formIsXlsx(name)) {
