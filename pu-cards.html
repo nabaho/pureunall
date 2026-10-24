@@ -44,7 +44,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=75"></script>
+<script src="js/pu-ontology.js?v=76"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -12829,6 +12829,22 @@ function bzrRows(map){
     .map(function(x){ x.todo = !!x.need && !(x.done && x.done.at); return x; })
     .sort((a,b)=> (Number(b.at) || 0) - (Number(a.at) || 0));
 }
+/* ══════ 📇 리멤버 자동 연결 상태 (대표 「반드시 자동으로」 2026-10-24, 목업 승인) ══════
+   대표 크롬의 «푸른 리멤버 연결» 확장이 1시간마다 새 명함을 remember-intake.html 로 건네 사진첩·기업정보함에 담는다.
+   여기는 그 상태(pucards/remember/status)만 한 번 읽어 옆줄에 ● / ✕ 로 보인다 — 누르면 받는 화면이 열린다. */
+let _remSt = null, _remAsk = false;
+function remStatusLoad(){
+  if(_remAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
+  _remAsk = true;
+  Store.db.ref(DB_ROOT + '/remember/status').once('value').then(function(s){ _remSt = s.val() || {}; try{ renderSoon(); }catch(_){ } })
+    .catch(function(){ _remAsk = false; });
+}
+/* 옆줄 꼬리 (순수 로직) — 로그인 풀림 ✕ · 3시간 넘게 소식 없음 ⚠ · 정상 ● */
+function remStatusMark(st, now){
+  if(!st || !st.at) return '';
+  if(st.err === 'login') return '✕';
+  return (Number(now) || Date.now()) - Number(st.at) > 3 * 3600000 ? '⚠' : '●';
+}
 function bzrCount(){ if(_bzr === null){ bzrLoad(function(){ try{ renderSoon(); }catch(_){ } }); return 0; } return bzrRows(_bzr).filter(x => x.todo).length; }
 /* 검토 결과 꼬리표 (순수 로직) */
 function bzrTags(x){
@@ -18094,6 +18110,7 @@ function renderPCSide(){
          수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
     <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
     ${/* 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09) — 창으로 연다. 수는 «정리할 것» 회사 수 */''}
+    <button onclick="window.open('remember-intake.html','pu-remember')" title="리멤버 새 명함이 1시간마다 사진첩·기업정보함에 저절로 들어옵니다 — ● 연결됨 · ⚠ 3시간 넘게 소식 없음 · ✕ 리멤버 로그인 풀림">📇<em>리멤버</em><span>${typeof remStatusMark === 'function' ? (remStatusLoad(), remStatusMark(_remSt)) : ''}</span></button>
     <button onclick="bzrOpen()" title="최근 30일 들어온 사업자등록증 — 서버가 국세청·4대보험·옛 번호를 검토했습니다. 수는 사람이 확인할 것">🧾<em>새 등록증</em><span>${(n => n ? n.toLocaleString() : '')(typeof bzrCount === 'function' ? bzrCount() : 0)}</span></button>
     <button onclick="goneOpen()" title="국세청 폐업 · 메일 도메인 없어짐 · 반송 메일로 «없어진 듯한 회사»를 모아 봅니다">🏚<em>없어진 듯한 곳</em><span>${(n => n ? n.toLocaleString() : '')(typeof goneCount === 'function' ? goneCount() : 0)}</span></button>
   </div></div>`;

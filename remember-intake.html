@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e40af">
+<title>리멤버 받기 — 푸른노무법인</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📇</text></svg>">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="js/pu-ontology.js?v=76"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-doc-read.js?v=51"></script>
+<script src="js/pu-doc-file.js?v=37"></script>
+<script src="js/pu-remember.js?v=1"></script>
+<script src="js/pu-version.js?v=12"></script>
+<!--
+  ══ 📇 리멤버 → 푸른사진첩·기업정보함 «받는 화면» (대표 「반드시 자동으로」 2026-10-24, 목업 승인) ══
+  「리멤버에 받은 명함을 자동으로 푸른 사진첩과 기업정보함에 자동으로 저장되게」
+  「이미 모든 자료 다 가지고 왔다 — 최근 자료는 계속 업데이트해야 되는데 귀찮아서 자동화」
+
+  어떻게 도나
+   ① 대표 크롬의 «푸른 리멤버 연결» 확장(tools/remember-ext)이 1시간마다 리멤버 탭을 새로 고친다.
+   ② 리멤버 화면이 스스로 명함 목록을 부를 때 쓰는 머리를 그 자리에서 빌려, 수정순으로 지난번 뒤에 바뀐 명함만 받는다.
+   ③ 확장이 그 명함들과 앞면 그림을 이 창(고정 탭)에 건넨다 — 이 창이 사진첩·기업정보함에 담는다.
+      사진첩: PuPhotoStore.savePhoto (사진첩 「서류」, 판독 결과를 미리 적어 다시 판독하지 않음)
+      기업정보함: PuDocFile.sendToCards — 사진첩에서 보낼 때와 «같은 문». 같은 사람(휴대폰·이메일)이면 빈 칸만 채운다.
+  ⚠ 첫 회차는 «기준»만 잡는다 — 옛 명함은 대표가 이미 다 들여왔다(10/24).
+  ⚠ 리멤버 쪽은 읽기만 한다. 리멤버 비밀번호·열쇠를 이 창도 확장도 저장하지 않는다.
+  ⚠ 받는 메시지는 «같은 창(window) 안에서, 확장 표시가 붙은 것»만 믿는다.
+  ⚠ 이 화면은 기업정보함의 «딸린 화면»이다(pu-ontology.js SATELLITES.remember_intake) — 쓰는 곳은 pucards/remember 와 위 두 문뿐.
+-->
+<style>
+:root{--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;--bg:#f8fafc;--card:#ffffff;--blue:#1e40af;--blue2:#2563eb;--bluebg:#eff6ff;
+  --green:#166534;--greenbg:#f0fdf4;--amber:#854d0e;--amberbg:#fffbeb;--red:#991b1b;--redbg:#fef2f2;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px;min-height:100vh;}
+.hd{background:linear-gradient(135deg,#1e40af,#2563eb);color:#ffffff;padding:14px 18px;}
+.hd .org{font-size:10.5px;opacity:.8;letter-spacing:.1em;font-weight:600;}
+.hd h1{font-size:16px;font-weight:800;margin-top:2px;}
+.wrap{max-width:760px;margin:0 auto;padding:12px;}
+.card{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,30,70,.05),0 6px 18px -10px rgba(16,30,70,.15);}
+.band{border-radius:8px;padding:8px 12px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ok{background:var(--greenbg);color:var(--green);border:1px solid #bbf7d0;}
+.wait{background:var(--bluebg);color:var(--blue);border:1px solid #bfdbfe;}
+.bad{background:var(--redbg);color:var(--red);border:1px solid #fecaca;}
+.muted{color:var(--sub);font-size:12px;line-height:1.7;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;table-layout:fixed;}
+td,th{padding:6px 8px;border-bottom:1px solid var(--bg);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+th{background:var(--bg);color:var(--sub);font-size:11.5px;}
+</style>
+</head>
+<body>
+<div class="hd"><div class="org">푸른노무법인 · 기업정보함</div><h1>📇 리멤버 받기</h1></div>
+<div class="wrap">
+  <div class="card"><div id="state" class="band wait">준비 중…</div>
+    <p class="muted" style="margin-top:8px">이 탭은 «푸른 리멤버 연결» 확장이 쓰는 받는 창입니다 — 닫지 말고 고정해 두세요.
+      리멤버에서 새로 받거나 고친 명함이 1시간마다 사진첩과 기업정보함에 저절로 들어옵니다.</p></div>
+  <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:110px"><col style="width:90px"><col><col style="width:150px"></colgroup>
+    <tr><th>받은 때</th><th>이름</th><th>회사</th><th>기업정보함</th></tr></table></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',
+    databaseURL: 'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'pureun-erp',
+    storageBucket: 'pureun-erp-hrphotos',
+    appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7',
+    messagingSenderId: '936817166182'
+  };
+  var ROOT = 'pucards/remember';
+  var RECENT_MAX = 20;
+  var EXT = 'pu-remember-ext', PAGE = 'pu-remember-intake';
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  var db = firebase.database();
+  var storage = null;
+  try { storage = firebase.storage(); } catch (e) { storage = null; }
+  PuPhotoStore.init({ db: db, storage: storage, auth: firebase.auth() });
+  PuDocFile.init({ db: db });
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var S = { user: null, ready: false, status: null, busy: false };
+  var day = function (t) { var d = new Date(Number(t) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
+
+  function draw() {
+    var st = S.status || {}, el = $('state');
+    if (!S.user) { el.className = 'band bad'; el.textContent = '✕ 푸른 포털에 로그인되어 있지 않습니다 — 이 탭에서 로그인해 주세요'; return; }
+    if (st.err === 'login') { el.className = 'band bad'; el.textContent = '✕ 리멤버 로그인이 풀렸습니다 — 크롬에서 리멤버(card.rememberapp.co.kr)에 다시 로그인해 주세요 · ' + day(st.errAt); }
+    else if (st.at) { el.className = 'band ok'; el.textContent = '● 연결됨 — 마지막 확인 ' + day(st.at) + ' · 지난번 새로 ' + (st.newN || 0) + '장 · 고침 ' + (st.updN || 0) + '장' + (st.total ? ' · 리멤버 전체 ' + Number(st.total).toLocaleString() + '장' : ''); }
+    else { el.className = 'band wait'; el.textContent = '확장이 첫 회차를 보낼 때까지 기다리는 중입니다 (첫 회차는 기준만 잡습니다)'; }
+    var rows = (st.recent || []).map(function (r) {
+      return '<tr><td>' + esc(day(r.at)) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.company) + '</td><td>' + esc(r.what) + '</td></tr>';
+    }).join('');
+    var tb = $('recent');
+    tb.innerHTML = tb.rows[0].outerHTML + (rows || '<tr><td colspan="4" class="muted">아직 받은 명함이 없습니다</td></tr>');
+  }
+
+  function reply(msg) { window.postMessage(Object.assign({ __to: EXT, __from: PAGE }, msg), location.origin); }
+
+  /* 그림 하나를 사진첩 크기로 줄인다 — 사진첩과 같은 잣대(uploadSpec) */
+  function loadImg(dataUrl) {
+    return new Promise(function (ok, no) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = no; im.src = dataUrl; });
+  }
+  function shrink(im, edge, q) {
+    var sc = Math.min(1, edge / Math.max(im.naturalWidth, im.naturalHeight));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(im.naturalWidth * sc)); c.height = Math.max(1, Math.round(im.naturalHeight * sc));
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    return { dataUrl: c.toDataURL('image/jpeg', q), w: c.width, h: c.height };
+  }
+
+  /* 명함 한 장 — 사진첩에 (처음이거나 그림이 바뀌었을 때만) · 기업정보함에 (같은 사람이면 빈 칸만) */
+  function one(c, img, now) {
+    var seenRef = db.ref(ROOT + '/seen/' + c.rid);
+    return seenRef.once('value').then(function (snap) {
+      var seen = snap.val();
+      var photo = seen && seen.photo ? seen.photo : null;
+      var pic = null;
+      var addPhoto = PuRemember.needPhoto(c, seen) && /^data:image\/(jpeg|png|webp);base64,/.test(String(img || ''));
+      var step = addPhoto ? loadImg(img).then(function (im) {
+        var spec = PuPhotoStore.uploadSpec(true);
+        var full = shrink(im, spec.maxEdge, spec.quality), thumb = shrink(im, spec.thumbEdge, 0.85);
+        var id = PuPhotoStore.newId();
+        var meta = { takenAt: Date.parse(c.createdAt) || now, upAt: now, seq: 0, by: S.user.uid,
+          byName: PuPhotoStore.myName() || S.user.email || '', kind: 'doc', via: 'remember',
+          w: full.w, h: full.h, size: full.dataUrl.length, company: c.company || '', note: '리멤버 명함',
+          read: PuRemember.readOf(c, now, '리멤버') };
+        pic = { full: full.dataUrl, thumb: thumb.dataUrl };
+        return PuPhotoStore.savePhoto({ id: id, full: full.dataUrl, thumb: thumb.dataUrl, meta: meta })
+          .then(function (r) { photo = { owner: S.user.uid, year: String((r && r.year) || PuPhotoStore.photoYear(meta)), id: id }; });
+      }) : Promise.resolve();
+      return step.then(function () {
+        var fields = PuRemember.toFields(c);
+        if (!fields.name && !fields.company) return { what: '이름·회사 없음 — 건너뜀' };
+        return PuDocFile.sendToCards({ kind: 'card', fields: fields, takenAt: Date.parse(c.createdAt) || now, byName: '리멤버',
+          photoId: photo ? photo.id : '', photoYear: photo ? photo.year : '', photoOwner: photo ? photo.owner : '',
+          full: pic ? pic.full : '', thumb: pic ? pic.thumb : '' })
+          .then(function (r) {
+            return { what: r && r.created ? '새로 넣음' : (r && r.filled && r.filled.length ? '빈 칸 채움' : '이미 있음'), id: r && r.id };
+          }, function (e) { return { what: '못 넣음: ' + String((e && e.message) || e).slice(0, 40), err: true }; });
+      }).then(function (res) {
+        var rec = { u: c.updatedAt, at: now, card: res.id || '' };
+        if (c.front) rec.front = String(c.front).split('?')[0];
+        if (photo) rec.photo = photo;
+        return seenRef.set(rec).then(function () { return { name: c.name, company: c.company, what: res.what, at: now, isNew: !seen, err: !!res.err }; });
+      });
+    });
+  }
+
+  /* 확장이 건넨 한 회차 */
+  function batch(m) {
+    if (S.busy) return Promise.resolve();
+    S.busy = true;
+    var now = Date.now();
+    var cards = (m.stacks || []).map(PuRemember.fromApi);
+    var cp = (S.status && Number(S.status.cp)) || 0;
+    var p = PuRemember.plan(cards, cp);
+    var done = Promise.resolve([]);
+    var lastOk = cp;
+    if (!p.first) {
+      done = p.todo.reduce(function (pr, c) {
+        return pr.then(function (acc) {
+          return one(c, (m.images || {})[c.rid], now).then(function (r) { if (!r.err) lastOk = Math.max(lastOk, c.updatedAt); acc.push(r); return acc; },
+            function (e) { acc.push({ name: c.name, company: c.company, what: '못 넣음: ' + String((e && e.message) || e).slice(0, 40), at: now, err: true }); return acc; });
+        });
+      }, Promise.resolve([]));
+    }
+    return done.then(function (res) {
+      /* 기준은 «다 넣은 데까지»만 나아간다 — 하나라도 못 넣었으면 그 앞에서 멈춰 다음 회차에 다시 */
+      var failed = res.some(function (r) { return r.err; });
+      var nextCp = p.first ? p.cp : (failed ? lastOk : Math.max(lastOk, cp));
+      var recent = res.concat((S.status && S.status.recent) || []).slice(0, RECENT_MAX);
+      var st = { cp: nextCp, at: now, total: Number(m.total) || 0, newN: res.filter(function (r) { return r.isNew && !r.err; }).length,
+        updN: res.filter(function (r) { return !r.isNew && !r.err; }).length, errN: res.filter(function (r) { return r.err; }).length,
+        first: p.first || null, err: null, errAt: null, recent: recent, by: S.user.uid };
+      return db.ref(ROOT + '/status').set(st).then(function () { S.status = st; draw(); reply({ cmd: 'done', cp: nextCp, n: res.length }); });
+    }).catch(function (e) { reply({ cmd: 'done', err: String((e && e.message) || e).slice(0, 80) }); })
+      .then(function () { S.busy = false; });
+  }
+
+  /* 확장에서 온 말 — 같은 창 안에서, 확장 표시가 붙은 것만 */
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window || ev.origin !== location.origin) return;
+    var m = ev.data;
+    if (!m || m.__from !== EXT || m.__to !== PAGE) return;
+    if (m.cmd === 'hello') { reply({ cmd: 'cp', ready: S.ready, cp: (S.status && Number(S.status.cp)) || 0 }); return; }
+    if (!S.ready) { reply({ cmd: 'done', err: 'not-ready' }); return; }
+    if (m.cmd === 'batch') { batch(m); return; }
+    if (m.cmd === 'login-lost') {
+      db.ref(ROOT + '/status').update({ err: 'login', errAt: Date.now() }).then(function () {
+        S.status = Object.assign({}, S.status, { err: 'login', errAt: Date.now() }); draw(); });
+    }
+  });
+
+  firebase.auth().onAuthStateChanged(function (u) {
+    S.user = (u && u.email) ? u : null;
+    S.ready = false;
+    if (!S.user) { draw(); return; }
+    PuPhotoStore.signIn(u.uid, u.email, u.displayName).catch(function () {}).then(function () {
+      return db.ref(ROOT + '/status').once('value');
+    }).then(function (s) { S.status = s && s.val ? s.val() : null; S.ready = true; draw(); reply({ cmd: 'cp', ready: true, cp: (S.status && Number(S.status.cp)) || 0 }); },
+      function () { S.ready = true; draw(); });
+  });
+  draw();
+})();
+</script>
+</body>
+</html>
