@@ -185,16 +185,23 @@
       groups.push(g);
       return g;
     }
+    /* 이 글이 g 에 붙는가 — 같은 날, 같은 번호(번호가 둘 다 있으면 번호가 겹칠 때만, 아니면 업체로도) */
+    function joinsGroup(g, day, cases, cos) {
+      if (g.day !== day || g.anchor === 'none') return false;
+      if (cases.length && g.caseNos.length) return hasAny(cases, g.caseNos);
+      return hasAny(cases, g.caseNos) || hasAny(cos, g.companyKeys);
+    }
 
     list.forEach(function (m) {
       var cases = extractCaseNos(m.text, opts.extraKnown);
       var cos = opts.companies ? findCompanyKeys(m.text, opts.companies, opts.minLen || 3) : [];
       var g;
       if (cases.length || cos.length) {
-        var joins = cur && cur.day === m.day && cur.anchor !== 'none' &&
-          ((cases.length && cur.caseNos.length) ? hasAny(cases, cur.caseNos)
-            : (hasAny(cases, cur.caseNos) || hasAny(cos, cur.companyKeys)));
-        g = joins ? cur : open(m.day, cases.length ? 'case' : 'company');
+        /* 사건 9001 → 9002 → 9001 로 번갈아 오가도 같은 날 같은 번호는 «한 묶음»이다(업무·날짜당 한 줄).
+           직전 묶음에 안 붙으면 같은 날 앞선 묶음 중 가장 최근 것에서 찾는다. */
+        g = (cur && joinsGroup(cur, m.day, cases, cos)) ? cur : null;
+        for (var gi = groups.length - 1; !g && gi >= 0; gi--) if (joinsGroup(groups[gi], m.day, cases, cos)) g = groups[gi];
+        if (!g) g = open(m.day, cases.length ? 'case' : 'company');
         unionInto(g.caseNos, cases); unionInto(g.companyKeys, cos);
         if (g.caseNos.length) g.anchor = 'case';
       } else if (cur && cur.day === m.day && cur.anchor !== 'none' && m.at - cur.lastAt <= gap) {

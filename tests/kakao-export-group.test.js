@@ -59,6 +59,21 @@ test('묶기: 업체명만 있는 글도 업체로 묶고, 같은 업체 후속 
   assert.strictEqual(g[1].day, '2026-10-24');
 });
 
+test('묶기: 사건 9001 → 9002 → 9001 로 번갈아 오가도 같은 날 같은 번호는 한 묶음이다(업무·날짜당 한 줄)', () => {
+  const m = [
+    msg(14, 5, '노무사A', '경기2026부해9001 답변서'),
+    msg(14, 40, '노무사B', '경기2026부해9002 심문회의 통보'),
+    msg(15, 30, '노무사C', '경기2026부해9001 증인 확정'),
+    msg(15, 45, '노무사A', '근거 자료 첨부합니다'),            /* 마지막 글이 9001 묶음이므로 15분 안 번호 없는 글은 거기로 */
+  ];
+  const g = X.groupMessages(m, {});
+  assert.strictEqual(g.length, 2, '같은 번호가 두 묶음으로 갈렸다 — 같은 업무·같은 날에 줄이 둘 생긴다');
+  assert.deepStrictEqual(g[0].caseNos, ['경기2026부해9001']);
+  assert.strictEqual(g[0].msgs.length, 3);
+  assert.strictEqual(g[1].msgs.length, 1);
+  assert.deepStrictEqual(g[0].msgs.map((x) => x.sender), ['노무사A', '노무사C', '노무사A'], '묶음 안 글이 시간 순서가 아니다');
+});
+
 test('요약: 사람별 첫 글만 뽑고 잡담·첨부 줄은 문장에서 빼되 글 수에는 센다', () => {
   const m = [
     msg(14, 5, '노무사A', '경기2026부해9001 답변서 10월 30일까지\n연장 신청했습니다'),
