@@ -8277,7 +8277,8 @@ function _erpInvBuild(){
     var sup = parseInt(r.supply, 10) || 0;
     if(sup <= 0) return;
     add({ company:String(r.company || ''), date:String(r.date || '').slice(0, 10),
-          amount:sup, expect:Math.round(sup * 1.1), source:'hometax', item:String(r.item || '') });
+          amount:sup, expect:Math.round(sup * 1.1), source:'hometax', item:String(r.item || ''),
+          biznum:String(r.biznum || '') });   // 사업자번호 — 계산서 일치 저절로 확정이 번호로 업체를 본다(2026-10-24)
   });
 
   _erpInvByAmt = byAmt; _erpInvByName = byName; _erpInvByBand = byBand;
@@ -8870,6 +8871,51 @@ function erpAutoTidyOk(sug, memo, txnAmt){
     if((parseInt(al.count, 10) || 0) < 3) return false;
     if(erpNormName(al.companyName) !== erpNormName(sug.cand.companyName)) return false;
     return true;
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
+}
+
+/* ══ 🧾 세금계산서 일치 — 저절로 확정해도 되나 (대표 「시안대로」 2026-10-24) ══════════════
+   erpAutoTidyOk 의 «입금자 3번 학습» 대신 «끊어 둔 세금계산서» 를 증거로 삼는 두 번째 길.
+   부르는 자리(거래내역)는 이미 «초록 줄 + 후보 딱 하나 + 사람이 안 고른 줄 + 수수료 없음» 만 넘긴다.
+   여기서 더 본다 — 하나라도 어긋나면 false (노랑으로 남는다):
+     ① 추천 점수 90 이상, 금액이 청구와 꼭 같다(부가세 ×1.1 포함)
+     ② CMS·묶음 입금(나이스빌·효성·적요 CMS)은 이 길로 안 간다 — 9/15 «금액만 맞아 엉뚱한 업체» 자리
+     ③ 입금자 ↔ 업체: 사람이 그 업체로 확정해 둔 별칭이 있거나, 적요가 업체 이름과 많이 닮았다(85)
+     ④ 그 업체 앞으로 «합계가 입금액과 꼭 같은» 세금계산서가 입금 0~120일 전에 발행돼 있다
+        — 업체와 계산서는 사업자번호로 잇는다(둘 다 있을 때). 번호가 없으면 이름이 «똑같을» 때만.
+   ⚠ 색인의 e.paid 는 «과거 어느 달이든 같은 금액이 들어왔나» 라 매달 같은 자문료면 늘 true 다 —
+     그래서 미입금 판정은 여기서 하지 않고, 부르는 쪽 후보(아직 안 받은 그 달 항목)에 맡긴다. */
+function erpInvoiceAutoOk(sug, pItem, row){
+  try {
+    if(!sug || !sug.cand || !row) return false;
+    if((parseInt(sug.score, 10) || 0) < 90) return false;
+    var memo = row.memo || row.note || '';
+    if(row.src === 'nicebill' || row.src === 'hyosung' || erpIsCmsMemo(memo)) return false;
+    var amt = parseInt(row.amount, 10) || 0;
+    if(amt <= 0 || !erpAmountExact(amt, sug.cand.expect || sug.cand.amount)) return false;
+    var coName = String((pItem && pItem.companyName) || sug.cand.companyName || '');
+    var nk = erpNormName(coName);
+    if(!nk) return false;
+    var ae = erpAliasEvidence(memo), al = ae && ae.entry;
+    var payerOk = !!(al && erpNormName(al.companyName) === nk);
+    if(!payerOk){
+      var mk = ''; try { mk = erpNormName(erpCleanMemo(memo)); } catch(_m){ mk = erpNormName(memo); }
+      payerOk = !!mk && (_erpNameCmp(mk, nk).score || 0) >= 85;
+    }
+    if(!payerOk) return false;
+    var biz = String(((pItem && pItem.item) || {}).bizNo || '').replace(/\D/g, '').slice(0, 10);
+    _erpInvBuild();
+    var list = (_erpInvByAmt && _erpInvByAmt[amt]) || [];
+    for(var i = 0; i < list.length; i++){
+      var e = list[i];
+      if(e.expect !== amt) continue;
+      var gap = _erpInvGap(e.date, row.date);
+      if(gap === null || gap < 0 || gap > 120) continue;
+      var eb = String(e.biznum || '').replace(/\D/g, '').slice(0, 10);
+      if(biz.length === 10 && eb.length === 10){ if(eb === biz) return true; continue; }
+      if(e.nkey && e.nkey === nk) return true;
+    }
+    return false;
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
 }
 
@@ -50801,6 +50847,10 @@ function FinanceLedger(props){
   var autoTidyS = useState(function(){ var st = dbGet('app_settings', {}) || {}; return st.ledgerAutoTidy === true; });
   var autoTidyOn = autoTidyS[0];
   function setAutoTidyOn(v){ v = !!v; autoTidyS[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerAutoTidy:v })); }
+  /* 🧾 계산서 일치 저절로 확정 — 따로 켠다(처음 꺼짐 · 모든 PC 공통 app_settings.ledgerAutoTidyInv, 2026-10-24) */
+  var autoInvS = useState(function(){ var st = dbGet('app_settings', {}) || {}; return st.ledgerAutoTidyInv === true; });
+  var autoInvOn = autoInvS[0];
+  function setAutoInvOn(v){ v = !!v; autoInvS[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerAutoTidyInv:v })); }
   function setExpAutoReg(v){ v = !!v; expAutoRegS[1](v); _expAutoLocal[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerExpAutoReg:v })); }
   var dragS=useState(false);   var dragOver=dragS[0];   var setDragOver=dragS[1];
   var sugOpenS=useState({});   var sugOpen=sugOpenS[0]; var setSugOpen=sugOpenS[1]; // 후보 펼침 (행별)
@@ -52629,11 +52679,16 @@ function FinanceLedger(props){
        그 달에 이미 받은 자문료는 미입금 후보에서 빠지므로 두 번 받을 일이 없다.
      ⚠ 사람이 골라 둔 줄(picked)·수수료를 뺀 줄은 넣지 않는다 — 사람이 보는 몫이다.
      ⚠ 이 검사는 2026-09 초에 만들어져 있었으나 «아무 데서도» 안 불리고 있었다. */
-  var autoRows = readyRows.filter(function(r){
+  /* 🧾 두 번째 길(2026-10-24) — 입금자 학습이 모자라도 «끊어 둔 세금계산서» 가 같은 금액으로 있으면 후보.
+     각 줄은 어느 길로 왔는지(why)를 갖고, 확정은 그 길의 스위치가 켜졌을 때만 한다. */
+  var autoRows = [];
+  readyRows.forEach(function(r){
     var i = rowInfo[r.row._k]; var g = i && i.grp && i.grp[0];
-    if(!g || g.picked || !g.head || r.fee) return false;
-    return erpAutoTidyOk(g.head, r.row.memo || r.row.note || '', r.row.amount);
+    if(!g || g.picked || !g.head || r.fee) return;
+    if(erpAutoTidyOk(g.head, r.row.memo || r.row.note || '', r.row.amount)){ autoRows.push(Object.assign({ why:'alias' }, r)); return; }
+    if(erpInvoiceAutoOk(g.head, r.pItem, r.row)) autoRows.push(Object.assign({ why:'invoice' }, r));
   });
+  var autoInvCnt = autoRows.filter(function(r){ return r.why === 'invoice'; }).length;
   var autoKeys = {}; autoRows.forEach(function(r){ autoKeys[r.row._k] = 1; });
   /* 초록 줄 확정 — 일괄 확정 단추와 저절로 확정이 «같은 길»을 쓴다.
      ⚠ 갈래가 둘이면 저장 내용이 어긋난다(2026-08 에 실제로 그랬다 — 단추마다 저장하는 것이 달랐다). */
@@ -52660,10 +52715,12 @@ function FinanceLedger(props){
      ⚠ 같은 추천 지문(_sugSig)으로는 한 번만 돈다 — 다시 그릴 때마다 돌면 실패한 줄을 되풀이한다. */
   var _autoTidyDone = useRef('');
   useEffect(function(){
-    if(!autoTidyOn || !_meNow().isAdmin || ldTabEff !== 'inc' || _sugComputing || !autoRows.length) return;
+    if((!autoTidyOn && !autoInvOn) || !_meNow().isAdmin || ldTabEff !== 'inc' || _sugComputing || !autoRows.length) return;
     if(_autoTidyDone.current === _sugSig) return;
+    var _go = autoRows.filter(function(r){ return r.why === 'invoice' ? autoInvOn : autoTidyOn; });
+    if(!_go.length) return;
     _autoTidyDone.current = _sugSig;
-    var _r = confirmReadyList(autoRows);
+    var _r = confirmReadyList(_go);
     if(_r.ok) showToast('🤖 저절로 확정 '+_r.ok+'건 — 입금자·금액이 지난 확정과 꼭 같은 것 · 「확정 이력」에서 되돌릴 수 있습니다'+(_r.ng?(' · 실패 '+_r.ng+'건'):''));
   });
   /* ── 제목 클릭 정렬 ──
@@ -54123,7 +54180,7 @@ function FinanceLedger(props){
           title:'입금자가 같은 업체로 3번 넘게 확정됐고 금액이 청구와 꼭 같은 줄 — 누르면 그 줄만 봅니다',
           style:{padding:'4px 10px',background:ldStF==='auto'?'#1e40af':'#eff6ff',color:ldStF==='auto'?'#fff':'#1e40af',
             border:'1px solid #bfdbfe',borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}},
-          '🤖 저절로 확정 후보 '+autoRows.length+'건'),
+          '🤖 저절로 확정 후보 '+autoRows.length+'건'+(autoInvCnt?(' (🧾 계산서 '+autoInvCnt+')'):'')),
         /* 설정 스위치는 폰에서 ⚙ 뒤로 접는다(.ld-bar-auto) — 한 번 정하면 그만인 것이다 */
         ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',className:'ld-bar-auto',
           title:'켜면 거래내역을 열 때 위 후보를 저절로 확정합니다 — 「확정 이력」에서 되돌릴 수 있습니다',
@@ -54132,6 +54189,14 @@ function FinanceLedger(props){
             background:autoTidyOn?'#f0fdf4':'#f8fafc',border:'1px solid '+(autoTidyOn?'#bbf7d0':'#e2e8f0')}},
           h('input',{type:'checkbox',checked:!!autoTidyOn,onChange:function(){ setAutoTidyOn(!autoTidyOn); }}),
           autoTidyOn ? '🤖 저절로 확정 (켜짐)' : '🤖 저절로 확정'),
+        /* 🧾 두 번째 스위치 — 세금계산서와 꼭 같은 입금만(2026-10-24). 처음 꺼짐 · 관리자만 */
+        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autoinv',className:'ld-bar-auto',
+          title:'켜면 «그 업체 앞으로 끊은 세금계산서와 금액이 꼭 같고, 입금자도 그 업체로 확인되는» 줄을 저절로 확정합니다 — CMS·묶음 입금은 빼고 · 「확정 이력」에서 되돌릴 수 있습니다',
+          style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
+            padding:'3px 8px',borderRadius:'6px',color:autoInvOn?'#166534':'#64748b',
+            background:autoInvOn?'#f0fdf4':'#f8fafc',border:'1px solid '+(autoInvOn?'#bbf7d0':'#e2e8f0')}},
+          h('input',{type:'checkbox',checked:!!autoInvOn,onChange:function(){ setAutoInvOn(!autoInvOn); }}),
+          autoInvOn ? '🧾 계산서 일치 확정 (켜짐)' : '🧾 계산서 일치 확정'),
         ldTabEff==='inc' && readyRows.length>0 && h('button',{
           onClick:async function(){
             if(!(await popConfirm('확정 가능 '+readyRows.length+'건을 확정합니다.\n\n'
@@ -63486,6 +63551,7 @@ if(typeof window !== 'undefined'){
 
 function FinanceInvoice(){
   var _fill5 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 380px)
+  var _fillArc = useFillHeight(240, 0, true);   // 업체별 아카이브 두 목록도 창 바닥까지 (전: 600px·560px 고정 — 2026-10-24)
   /* ★ 저장소를 «늘 다시 읽는다» (2026-08-26 김보람 제보: 「읽지 못하거나 사라진다」).
      종전에는 useState(dbGet(...)) 라서 «처음 열 때의 사진»에 얼어붙었다.
      파이어베이스가 늦게 닿으면 화면은 영영 0건이고, ⚠ 그 0건 위에 한 건을 더하면
@@ -63958,30 +64024,21 @@ function FinanceInvoice(){
       return h('div', { style:{ padding:'16px', textAlign:'center', color:'#94a3b8', fontSize:'12px' } }, '⏳ 아카이브 데이터 로딩 중...');
     }
 
-    var uploadArea = h('div', { style:{ background:'#fff', border:'2px dashed #cbd5e1', borderRadius:'10px', padding:'14px', marginBottom:'12px' } },
-      h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'10px' } },
-        h('div', null,
-          h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b' } }, '📁 홈택스 매출 세금계산서 엑셀 업로드'),
-          h('div', { style:{ fontSize:'12.5px', color:'#94a3b8', marginTop:'3px' } },
-            '홈택스에서 다운받은 ', h('strong', null, '매출전자세금계산서목록 (.xls/.xlsx)'), ' 파일을 선택하세요. 여러 파일 동시 가능. 정기 자문업체(최근 12개월 6회+)는 자동 제외.')
-        ),
-        h('div', { style:{ display:'flex', gap:'8px', alignItems:'center' } },
-          h(FileDropZone, {
-            accept: '.xls,.xlsx',
-            multiple: true,
-            disabled: uploadState.status !== 'idle',
-            icon: '📊',
-            label: uploadState.status==='idle' ? '홈택스 세금계산서 엑셀' : '⏳ 처리 중...',
-            hint: '.xls / .xlsx · 여러 파일 동시 가능',
-            onFile: handleInvoiceUpload
-          }),
-          invoiceCompanies.length > 0 && h('button', { onClick:clearInvoiceArchive,
-            style:{ padding:'8px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:600 } }, '🗑 전체 삭제')
-        )
-      ),
-      /* 진행·결과 안내는 이 상자 밖 «탭 위» 로 옮겼다 — 어느 탭에서 올려도 보여야 한다.
-         여기 두었더니 발행관리 탭에서 올릴 때 아무것도 안 보였다(김보람 제보). */
+    /* ★ 한 줄로 줄였다 (대표 지시 2026-10-24 「세금계산서 업로드화면은 작게」).
+       이카운트분은 서버로 들어오니 이 칸은 가끔만 쓴다 — 끌어다 놓기·여러 파일·전체 삭제는 그대로. */
+    var uploadArea = h('div', { style:{ background:'#eff6ff', border:'1px dashed #bfdbfe', borderRadius:'6px', padding:'3px 8px', marginBottom:'6px',
+        display:'flex', alignItems:'center', gap:'10px', whiteSpace:'nowrap', overflow:'hidden', minHeight:'36px' } },
+      h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b' } }, '📂 홈택스 엑셀'),
+      h(FileDropBtn, { accept:'.xls,.xlsx', multiple:true, disabled: uploadState.status !== 'idle', icon:'📊', label:'파일 선택',
+        onFile: handleInvoiceUpload, btnStyle:{ padding:'4px 12px', fontSize:'12.5px', borderRadius:'4px' } }),
+      h('span', { title:'홈택스에서 다운받은 매출전자세금계산서목록(.xls/.xlsx) · 끌어다 놓아도 됩니다 · 여러 파일 · 정기 자문업체(최근 12개월 6회 이상) 자동 제외',
+          style:{ fontSize:'12px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } },
+        '끌어다 놓아도 됩니다 · 여러 파일 · 정기 자문업체 자동 제외'),
+      invoiceCompanies.length > 0 && h('button', { onClick:clearInvoiceArchive,
+        style:{ marginLeft:'auto', padding:'3px 10px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'4px', cursor:'pointer', fontSize:'12.5px', fontWeight:600 } }, '🗑 전체 삭제')
     );
+    /* 진행·결과 안내는 이 상자 밖 «탭 위» 로 옮겼다 — 어느 탭에서 올려도 보여야 한다.
+       여기 두었더니 발행관리 탭에서 올릴 때 아무것도 안 보였다(김보람 제보). */
 
     if(invoiceCompanies.length === 0){
       return h('div', null,
@@ -64012,26 +64069,24 @@ function FinanceInvoice(){
 
     return h('div', null,
       uploadArea,
-      // 검색·기간 필터
-      h('div', { style:{ display:'flex', gap:'8px', marginBottom:'10px', flexWrap:'wrap', alignItems:'center' } },
+      // 검색·기간 필터 + 합계 — 한 줄(2026-10-24 — 위가 덜 밀리게)
+      h('div', { style:{ display:'flex', gap:'8px', marginBottom:'6px', flexWrap:'wrap', alignItems:'center' } },
         h('input', { type:'search', value:arcQuery, placeholder:'🔍 업체명·사업자번호 검색', onChange:function(e){setArcQuery(e.target.value);},
           style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', minWidth:'250px' } }),
         h('select', { value:arcYear, onChange:function(e){setArcYear(e.target.value);},
           style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
           h('option', { value:'all' }, '전체 연도'),
-          ['2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015','2014','2013'].map(function(y){
+          (function(){ var a = [], y = (new Date()).getFullYear(); for(; y >= 2013; y--) a.push(String(y)); return a; })().map(function(y){
             return h('option', { key:y, value:y }, y+'년');
           })
-        )
+        ),
+        h('span', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'5px 10px', fontSize:'12px', color:'#1e40af', whiteSpace:'nowrap' } },
+          '🗄️ ', h('strong', null, arcFiltered.length+'개 업체'), ' / ',
+          h('strong', null, totalCnt.toLocaleString()+'건'), ' / ',
+          h('strong', null, totalAmt.toLocaleString()+'원'))
       ),
-      h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px', fontSize:'12px', color:'#1e40af' } },
-        '🗄️ ', h('strong', null, arcFiltered.length+'개 업체'), ' / ',
-        h('strong', null, totalCnt.toLocaleString()+'건'), ' / ',
-        h('strong', null, totalAmt.toLocaleString()+'원'),
-        h('span', { style:{ color:'#64748b', marginLeft:'10px', fontSize:'12.5px' } }, '※ IndexedDB 저장 (재무관리·미수금 영향 없음)')
-      ),
-      h('div', { style:{ display:'grid', gridTemplateColumns: selInvCompany ? '1fr 1.2fr' : '1fr', gap:'14px' } },
-        h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', maxHeight:'600px', overflowY:'auto' } },
+      h('div', { ref:_fillArc.ref, style:{ display:'grid', gridTemplateColumns: selInvCompany ? '1fr 1.2fr' : '1fr', gap:'14px', height:(_fillArc.max || 'calc(100vh - 300px)') } },
+        h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', maxHeight:'100%', overflowY:'auto' } },
           h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13.5px' } },
             h('thead', { style:{ position:'sticky', top:0, background:'#f8fafc', zIndex:1 } }, h('tr', null,
               h('th', { style:{ padding:'8px 6px', textAlign:'center', fontWeight:700, color:'#475569', fontSize:'13px', borderBottom:'1px solid #e2e8f0', width:'40px' } }, '#'),
@@ -64074,7 +64129,7 @@ function FinanceInvoice(){
             h('button', { onClick:function(){setSelInvCompany(null); setInvHistory([]);},
               style:{ padding:'4px 10px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'4px', cursor:'pointer', fontSize:'13px' } }, '✕ 닫기')
           ),
-          h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', maxHeight:'560px', overflowY:'auto' } },
+          h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', maxHeight:'calc(100% - 44px)', overflowY:'auto' } },
             h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13.5px' } },
               h('thead', { style:{ position:'sticky', top:0, background:'#f8fafc', zIndex:1 } }, h('tr', null,
                 h('th', { style:{ padding:'8px 10px', textAlign:'left', fontWeight:700, color:'#475569', fontSize:'13px', borderBottom:'1px solid #e2e8f0', width:'90px' } }, '발행일'),
@@ -69361,6 +69416,7 @@ function FinanceAuto(props){
   var isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && isAdminByUser(CURRENT_USER);
   var lastS = useState(window.__erpCmsAutoLast || null); var last = lastS[0], setLast = lastS[1];
   var ftS = usePersistedState('finauto_tab', 'check'); var faTab = ftS[0], setFaTab = ftS[1];
+  var _fillAuto = useFillHeight();   // 표가 창 바닥까지 + 머리줄 고정 (2026-10-24 대표 「상단 모두 틀고정」)
   var onS = useState(function(){ return (dbGet('app_settings', {}) || {}).cmsAutoConfirm === true; });
   var pickS = useState({}); var pick = pickS[0], setPick = pickS[1];
   useEffect(function(){
@@ -69444,9 +69500,9 @@ function FinanceAuto(props){
         return h('button', { key:t[0], onClick:function(){ setFaTab(t[0]); }, style:{ padding:'5px 11px', border:'1px solid #e2e8f0', borderBottom:'none',
           borderRadius:'7px 7px 0 0', background: faTab === t[0] ? '#ffffff' : '#f8fafc', color: faTab === t[0] ? '#2563eb' : '#475569', fontWeight:700, cursor:'pointer' } }, t[1]);
       })),
-    h('div', { style:{ background:'#ffffff', border:'1px solid #e2e8f0', overflowX:'auto' } },
+    h('div', { ref:_fillAuto.ref, style:{ background:'#ffffff', border:'1px solid #e2e8f0', overflow:'auto', maxHeight:(_fillAuto.max || 'calc(100vh - 260px)') } },
       h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px' } },
-        h('thead', null, head),
+        h('thead', { style:{ position:'sticky', top:0, zIndex:2, background:'#f8fafc' } }, head),
         h('tbody', null, list.map(function(it, i){
           var act = it.verdict === 'new_member' ? h('button', { style:smallBtn, onClick:function(){ link(it); } }, '이 업체로 잇기')
             : (it.verdict === 'done' && it.incomeId) ? h('button', { style:smallBtn, onClick:function(){ if(window.confirm('이 자동 확정을 휴지통으로 옮길까요?')) erpCmsUndo(it.incomeId, it.row._k).then(function(ok){ if(ok) erpCmsAutoRun({ write:false }); }); } }, '되돌리기')
@@ -69461,6 +69517,26 @@ function FinanceVAT(){
 
   var incomes = dbGet('finance_income', []);
   var invoices = dbGet('finance_invoice', []);
+  /* ★ 세금계산서 보관함(홈택스·이카운트 → invoice_arc → IndexedDB)도 읽는다 (2026-10-24 대표 「시안대로」).
+     전에는 «발행관리» 목록(finance_invoice)만 읽어 실제로 끊은 계산서가 수백 건인데도 0건·0원이었다.
+     보관함 줄은 공급가액(supply)이라 부가세 = 공급가액 × 10%. 수정(차감) 계산서는 음수 그대로 더한다.
+     ⚠ 발행관리에 같은 계산서(업체·날짜·금액)가 있으면 그쪽만 센다 — 두 번 세지 않게. */
+  var _vt = useState(0); var setVatTick = _vt[1];
+  useEffect(function(){
+    function again(){ setVatTick(function(n){ return n + 1; }); }
+    window.addEventListener('pureun-invidx', again);
+    try { if(typeof _erpInvArchLoad === 'function') _erpInvArchLoad(); } catch(_e){}
+    return function(){ window.removeEventListener('pureun-invidx', again); };
+  }, []);
+  var arch = (typeof _erpInvArch !== 'undefined' && Array.isArray(_erpInvArch)) ? _erpInvArch : [];
+  var _manualKey = {};
+  (Array.isArray(invoices) ? invoices : []).forEach(function(iv){
+    if(!iv || iv.status !== '발행') return;
+    var a = parseInt(iv.amount, 10) || 0;
+    var k = erpNormName(iv.companyName) + '|' + String(iv.issueDate || '').slice(0, 10);
+    _manualKey[k + '|' + a] = true;
+    _manualKey[k + '|' + Math.round(a / 1.1)] = true;
+  });
 
   // 분기별 집계
   function quarterRange(y, q){
@@ -69489,6 +69565,17 @@ function FinanceVAT(){
       return d >= r.start && d <= r.end && i.status === '발행';
     });
   }
+  // 보관함 줄 — 공급가액 기준. 발행관리에 같은 것이 있으면 뺀다
+  function quarterArchive(y, q){
+    var r = quarterRange(y, q);
+    return arch.filter(function(a){
+      if(!a) return false;
+      var d = String(a.date || '').slice(0, 10);
+      if(!(d >= r.start && d <= r.end)) return false;
+      var k = erpNormName(a.company) + '|' + d + '|' + (Number(a.supply) || 0);
+      return !_manualKey[k];
+    });
+  }
 
   var quarters = [1,2,3,4].map(function(q){
     var qIncomes = quarterIncomes(selYear, q);
@@ -69503,7 +69590,11 @@ function FinanceVAT(){
       var v = (i.vatType === 'separate' || i.vatType === 'exclusive') ? Math.round((i.amount||0) * 0.1) : Math.round((i.amount||0) / 11);
       return s + v;
     }, 0);
-    return { q:q, incomeCount:qIncomes.length, totalIncome:totalIncome, invoiceCount:qInvoices.length, totalInvoice:totalInvoice, vat:vat };
+    var qArch = quarterArchive(selYear, q);
+    var archSupply = qArch.reduce(function(s,a){ return s + (Number(a.supply) || 0); }, 0);
+    totalInvoice += archSupply;
+    vat += Math.round(archSupply * 0.1);
+    return { q:q, incomeCount:qIncomes.length, totalIncome:totalIncome, invoiceCount:qInvoices.length + qArch.length, totalInvoice:totalInvoice, vat:vat };
   });
 
   var totalYearVat = quarters.reduce(function(s,q){return s+q.vat;}, 0);
