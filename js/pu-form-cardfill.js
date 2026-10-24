@@ -517,10 +517,15 @@
     }
     return out + src.slice(at);
   }
-  /* ══ 🔴 직인 맞추기 (대표 「도장위치 제각각 — 정리」 2026-10-24) ══
-     서식의 법인 직인(그림 sealstd, 종이 기준 절대 위치)은 «푸른노무법인·권형하가 있는 줄의 (인)» 한가운데에 둔다.
-     값을 채우면 위 글이 길어져 줄이 밀릴 수 있다 — 채운 뒤 글자 자리(rhwp getPageTextLayout)를 다시 재서 옮긴다.
-     ⚠ 쪽마다 하나 · 문서 차례대로 짝짓는다(같은 자리에 두 장 — 노동조합 자문계약서). 수가 안 맞으면 건드리지 않는다. */
+  /* ══ 🔴 직인 맞추기 (대표 「도장위치 제각각 — 정리」·「채울 때 다시 맞추기 — 추천대로」 2026-10-24) ══
+     서식의 법인 직인(종이 기준 절대 위치)은 «푸른노무법인·권형하가 있는 줄의 (인)» 한가운데에 둔다.
+     값을 채우면 위 글이 길어져 줄이 밀리고, 서명줄이 다음 쪽으로 넘어가기도 한다 — 채운 뒤 글자 자리(rhwp getPageTextLayout)를 다시 재서 옮긴다.
+     ⚠ 쪽마다 하나 · 문서 차례대로 짝짓는다(같은 자리에 두 장 — 노동조합 자문계약서). 수가 안 맞으면 건드리지 않는다.
+     ⚠ 직인 알아보기: rhwp 가 다시 낼 때 그림 이름(sealstd)을 image1 따위로 바꾼다 → 종이 기준 + 원본 크기(276px=20700)·자리 크기(3900)로도 본다.
+     ⚠ 붙일 문단: 직인이 이미 그 쪽 문단에 붙어 있으면 자리 값만 바꾼다(서식 그대로인 보통 경우).
+       서명줄이 다른 쪽으로 넘어갔으면 그 쪽의 «빈 문단»(서명줄에 가까운 것)으로 옮기고, 빈 문단이 없으면 서명줄 뒤에 빈 문단을 하나 만든다.
+       글 있는 문단에는 붙이지 않는다 — rhwp 가 그 문단 줄을 다시 나누며 빈칸으로 맞춘 줄을 넘긴다
+       (「…대표 / 공인노무사 권형하 (인)」·「위임인 : 홍길동 / (인)」, 2026-10-24 실험). */
   var SEAL_LINE = /푸른노무법인|권\s*형\s*하|수임인\s*:|수탁자/, SEAL_NAME = /권\s*형\s*하|푸른/;
   function sealTargets(pages) {
     var out = [];
@@ -535,33 +540,98 @@
         var c = r.charX || [], cx;
         if (k >= 0) { var a = c[k], b = c[k + 3] != null ? c[k + 3] : r.w; cx = a != null ? r.x + (a + b) / 2 : r.x + r.w - 7; }
         else { var kk = k2 + 6; cx = c[kk] != null ? r.x + (c[kk] + (c[kk + 1] != null ? c[kk + 1] : c[kk] + 12)) / 2 : r.x + r.w - 12; }
-        cands.push({ p: p, cx: cx, cy: r.y + (r.h || 14) / 2, own: SEAL_NAME.test(t) ? 1 : 0 });
+        cands.push({ cx: cx, cy: r.y + (r.h || 14) / 2, own: SEAL_NAME.test(t) ? 1 : 0, sec: r.secIdx || 0, para: r.cellPath != null ? r.parentParaIdx : r.paraIdx });
       });
       if (!cands.length) return;
       cands.sort(function (x, y) { return (y.own - x.own) || (y.cy - x.cy); });
-      out.push({ p: p, cx: cands[0].cx, cy: cands[0].cy });
+      /* 이 쪽에 든 맨 윗단 문단 번호 범위(서명줄과 같은 구역) — 붙일 문단은 이 안에서 고른다 */
+      var c0 = cands[0], lo = null, hi = null;
+      runs.forEach(function (r) {
+        if (r.cellPath != null || r.paraIdx == null || (r.secIdx || 0) !== c0.sec) return;
+        if (lo == null || r.paraIdx < lo) lo = r.paraIdx;
+        if (hi == null || r.paraIdx > hi) hi = r.paraIdx;
+      });
+      out.push({ p: p, cx: c0.cx, cy: c0.cy, sec: c0.sec, para: c0.para, lo: lo, hi: hi });
     });
     return out;
   }
-  /* xmls — 구역(section) XML 을 차례대로. targets — sealTargets 결과(쪽 차례). 단위: 화면 px(=HWPUNIT/75) */
-  function fitSeals(xmls, targets) {
-    var picRe = /<hp:pic\b[\s\S]*?<\/hp:pic>/g, seals = 0;
-    (xmls || []).forEach(function (x) { (String(x || '').match(picRe) || []).forEach(function (p) { if (isSeal(p)) seals++; }); });
-    function isSeal(p) { return /binaryItemIDRef="sealstd"/.test(p) && /vertRelTo="PAPER"/.test(p) && /horzRelTo="PAPER"/.test(p); }
+  function sealPic(p) {
+    return /vertRelTo="PAPER"/.test(p) && /horzRelTo="PAPER"/.test(p)
+      && (/binaryItemIDRef="sealstd"/.test(p) || /<hp:orgSz width="20700" height="20700"\/>/.test(p) || /<hp:sz width="3900"[^>]*height="3900"/.test(p));
+  }
+  /* 구역 XML 의 맨 윗단 문단 [시작, </hp:p> 자리] — 표 안 문단은 세지 않는다(rhwp paraIdx 와 같은 차례) */
+  function topParas(s) {
+    var re = /<hp:p\b[^>]*?(\/?)>|<\/hp:p>/g, m, d = 0, st = -1, out = [];
+    while ((m = re.exec(s))) {
+      if (m[0].charAt(1) === '/') { d--; if (d === 0) out.push([st, m.index]); }
+      else if (m[1] !== '/') { if (d === 0) st = m.index; d++; }
+    }
+    return out;
+  }
+  /* xmls — 구역 XML 차례대로 · targets — sealTargets 결과 · o.offsetsOnly — 자리 값만(붙인 문단은 그대로). 단위: 화면 px(=HWPUNIT/75) */
+  function fitSeals(xmls, targets, o) {
+    o = o || {};
+    var picRe = /<hp:pic\b[\s\S]*?<\/hp:pic>/g, xs = (xmls || []).map(String), found = [];
+    xs.forEach(function (s, si) {
+      var T = topParas(s), m; picRe.lastIndex = 0;
+      while ((m = picRe.exec(s))) if (sealPic(m[0])) { var at = m.index; found.push({ sec: si, para: T.findIndex(function (r) { return at > r[0] && at < r[1]; }) }); }
+    });
     targets = targets || [];
-    if (!seals || seals !== targets.length) return { xmls: xmls, moved: 0, seals: seals };
-    var i = 0, moved = 0;
-    var out = (xmls || []).map(function (x) {
-      return String(x || '').replace(picRe, function (p) {
-        if (!isSeal(p)) return p;
-        var t = targets[i++], sz = /<hp:sz\b[^>]*\bwidth="(\d+)"[^>]*\bheight="(\d+)"/.exec(p);
-        if (!t || !sz) return p;
-        var ho = Math.round(t.cx * 75 - (+sz[1]) / 2), vo = Math.round(t.cy * 75 - (+sz[2]) / 2);
-        return p.replace(/(<hp:pos\b[^>]*\bvertOffset=")-?\d+(")/, function (m, a, b) { return a + vo + b; })
-          .replace(/(<hp:pos\b[^>]*\bhorzOffset=")-?\d+(")/, function (m, a, b) { moved++; return a + ho + b; });
+    if (!found.length || found.length !== targets.length) return { xmls: xmls, moved: 0, restruct: 0, seals: found.length };
+    function place(p, t) {
+      var sz = /<hp:sz\b[^>]*\bwidth="(\d+)"[^>]*\bheight="(\d+)"/.exec(p);
+      if (!sz) return p;
+      var ho = Math.round(t.cx * 75 - (+sz[1]) / 2), vo = Math.round(t.cy * 75 - (+sz[2]) / 2);
+      return p.replace(/(<hp:pos\b[^>]*\bvertOffset=")-?\d+(")/, function (m, a, b) { return a + vo + b; })
+        .replace(/(<hp:pos\b[^>]*\bhorzOffset=")-?\d+(")/, function (m, a, b) { return a + ho + b; });
+    }
+    /* 옮길 곳 — 그 쪽(lo..hi)의 빈 문단 가운데 서명줄에 가장 가까운 것, 없으면 서명줄 뒤 새 빈 문단 */
+    var empty = function (s, T) {
+      var seg = s.slice(T[0], T[1]);
+      if (/<hp:(tbl|pic|rect|line|ellipse|container|equation|ole)\b/.test(seg)) return false;
+      return !(seg.match(/<hp:t(?:\s[^>]*)?>[\s\S]*?<\/hp:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join('').trim();
+    };
+    targets.forEach(function (t) {
+      if (t.anchor || t.para == null || xs[t.sec] == null) return;
+      var s = xs[t.sec], T = topParas(s), best = null, a = t.lo == null ? t.para : t.lo, z = t.hi == null ? t.para : t.hi;
+      for (var i = a; i <= z; i++) {
+        if (i === t.para || !T[i] || !empty(s, T[i])) continue;
+        if (best == null || Math.abs(i - t.para) < Math.abs(best - t.para)) best = i;
+      }
+      t.anchor = best != null ? { sec: t.sec, para: best } : { sec: t.sec, para: t.para, after: 1 };
+    });
+    var k = 0, moves = [];
+    xs = xs.map(function (s) {
+      return s.replace(picRe, function (p) {
+        if (!sealPic(p)) return p;
+        var i = k++, t = targets[i], fr = found[i];
+        var here = fr.sec === t.sec && t.lo != null && fr.para >= t.lo && fr.para <= t.hi;
+        if (o.offsetsOnly || !t.anchor || here || (!t.anchor.after && t.anchor.sec === fr.sec && t.anchor.para === fr.para)) return place(p, t);
+        moves.push({ t: t, pic: place(p, t) });
+        return '\u0000SEAL\u0000';
       });
     });
-    return { xmls: out, moved: moved, seals: seals };
+    if (moves.length) {
+      /* 뺀 자리 — 빈 run 은 <hp:t/> 로 남긴다(run 없는 문단을 만들지 않는다) */
+      xs = xs.map(function (s) { return s.replace(/(<hp:run\b[^>]*>)\s*\u0000SEAL\u0000\s*(<\/hp:run>)/g, '$1<hp:t/>$2').split('\u0000SEAL\u0000').join(''); });
+      /* 붙이기 — 뒤에서부터(새 문단을 넣어도 앞 번호가 안 밀리게) */
+      moves.slice().sort(function (a, b) { return (b.t.anchor.sec - a.t.anchor.sec) || (b.t.anchor.para - a.t.anchor.para); }).forEach(function (mv) {
+        var s = xs[mv.t.anchor.sec]; if (s == null) return;
+        var T = topParas(s)[mv.t.anchor.para]; if (!T) return;
+        var cp = (/charPrIDRef="(\d+)"/.exec(s.slice(T[0], T[1])) || [0, '0'])[1];
+        if (mv.t.anchor.after) {
+          var head = /^<hp:p\b[^>]*>/.exec(s.slice(T[0])), pp = head && /paraPrIDRef="(\d+)"/.exec(head[0]), sp = head && /styleIDRef="(\d+)"/.exec(head[0]);
+          var end = T[1] + '</hp:p>'.length;
+          xs[mv.t.anchor.sec] = s.slice(0, end) + '<hp:p id="0" paraPrIDRef="' + (pp ? pp[1] : '0') + '" styleIDRef="' + (sp ? sp[1] : '0')
+            + '" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + cp + '">' + mv.pic + '<hp:t/></hp:run></hp:p>' + s.slice(end);
+          return;
+        }
+        var at = s.lastIndexOf('</hp:run>', T[1]); if (at < T[0]) return;
+        at += '</hp:run>'.length;
+        xs[mv.t.anchor.sec] = s.slice(0, at) + '<hp:run charPrIDRef="' + cp + '">' + mv.pic + '</hp:run>' + s.slice(at);
+      });
+    }
+    return { xmls: xs, moved: targets.length, restruct: moves.length, seals: found.length };
   }
   /* ══ 엑셀(.xlsx) 채우기 — XML 을 직접 고친다(모양·수식·그림은 그대로) ══
      SheetJS 로 다시 저장하면 칸 모양이 날아가서 쓰지 않는다. 틀은 「명단 한 줄에 표지」 꼴 —
