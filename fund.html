@@ -8191,8 +8191,9 @@ function useRate(f){
   return (f.sme==='중소기업 아님') ? 0.5 : 0.8;
 }
 function bizRate(f){
-  var r=num((f||{}).interest_rate);
-  return (r===''||r<0||r>20) ? BIZ_RATE_DEFAULT : r;
+  /* num() 은 정수로 반올림한다 — 예금 이자율 2.8% 가 3% 로 읽혀 이자수입이 틀렸다(2026-10-24). 소수 그대로 읽는다 */
+  var raw=(f||{}).interest_rate, r=(raw==null||raw==='')?NaN:parseFloat(String(raw).replace(/[%\s,]/g,''));
+  return (isNaN(r)||r<0||r>20) ? BIZ_RATE_DEFAULT : r;
 }
 /* ★ 「수익금만 쓰기」 (2026-10-05 목업 승인 · 2026-10-07 구현) — 실무매뉴얼 부록3 예시처럼 출연금을 «모두» 기본재산으로 두고
    그 수익금(이자 등)만 목적사업에 쓰는 기금. 기금마다 고른다(funds/{기금}/budget_mode='income').
@@ -17501,7 +17502,7 @@ function budgetView(arr){
     +'<button onclick="budgetFromContrib()" class="primary" title="출연예정금 하나에서 다섯 칸을 세웁니다 — 그해 쓸 몫·목적사업비·관리비·예비비·이자수입">💰 출연금에서</button>'
     +'<button onclick="budgetFromWelfare()" title="목적사업 탭의 사업별 예산 합계를 목적사업비 예산으로 옮깁니다">📥 목적사업에서</button>'+hlp('bizplan.auto')+'</div>'
     +(noPlan?'<div class="msg warn" style="margin:10px 0;font-size:12px">'
-      +'<b>'+yr+'년 예산이 비어 있습니다.</b> [💰 출연금에서]를 누르면 출연예정금에서 다섯 칸을 세웁니다.</div>':'')
+      +'<b>'+yr+'년 예산이 비어 있습니다.</b> [💰 출연금에서]를 누르면 출연예정금에서 다섯 칸을 세웁니다. 지난해 계획이 있으면 아래 세부 항목의 [📋 전년 계획에서 복사]가 빠릅니다.</div>':'')
     +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>항목</th>'
     +'<th style="text-align:right;width:150px">예산</th><th style="text-align:right">실적(장부)</th>'
     +'<th style="text-align:right;width:80px">집행률</th><th style="text-align:right">남은 것</th></tr></thead><tbody>'
@@ -17514,18 +17515,20 @@ function budgetView(arr){
 /* 세부 항목 화면 — 예산·집행 아래. 입력은 천원, 금액·산출근거는 저절로(목업 ①) */
 function budItemsHTML(fid,yr,plan){
   var f=funds[fid]||{}, yd=(f.years||{})[yr]||{}, L=budItemsList(yd.budget_items);
+  var cur=null;     // 지금 그리는 줄 — 전년 복사로 «확인 필요»가 달린 칸은 노랗게
   var inp=function(id,k,v,w,ph,txt){ return '<input value="'+esc(v==null?'':v)+'" placeholder="'+(ph||'')+'" onchange="budItemSet(\''+id+'\',\''+k+'\',this.value)" '
-    +'style="width:'+w+'px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;font-size:11.5px'+(txt?'':';text-align:right')+'">'; };
+    +'style="width:'+w+'px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;font-size:11.5px'+(txt?'':';text-align:right')
+    +((cur&&cur.chk&&cur.chk[k])?';background:#fde68a':'')+'">'; };
   var X='<span class="muted" style="margin:0 3px">×</span>';
   var gl=function(g){ for(var i=0;i<BUD_GWAN.length;i++) if(BUD_GWAN[i][0]===g) return BUD_GWAN[i]; return [g,g,'']; };
-  var rows=L.map(function(it,i){ var id=it._id, g=it.gwan, fx;
+  var rows=L.map(function(it,i){ var id=it._id, g=it.gwan, fx; cur=it;
     if(g==='int'||g==='loanint') fx=inp(id,'base',it.base,80,'원금')+X+inp(id,'rate',it.rate,44,'%')+'<span class="muted">%</span>'+X+inp(id,'months',it.months,34,'12')+'<span class="muted">/12</span>';
     else if(g==='spare') fx=inp(id,'price',it.price,90,'금액');
     else fx=inp(id,'n',it.n,46,'수')+inp(id,'n_unit',it.n_unit,30,'인',1)+X+inp(id,'price',it.price,70,'단가')+X+inp(id,'times',it.times,40,'횟수')+inp(id,'t_unit',it.t_unit,30,'회',1);
     return '<tr><td><input type="checkbox" class="bipick" value="'+id+'"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="white-space:nowrap">'+esc(gl(g)[1])+'</td>'
       +'<td>'+inp(id,'name',it.name,110,gl(g)[2]||'목',1)+(g==='purpose'?' '+inp(id,'goal',it.goal,120,'목적(사업계획서)',1):'')+'</td>'
-      +'<td style="white-space:nowrap">'+fx+'</td>'
+      +'<td style="white-space:nowrap">'+fx+(it.chk&&Object.keys(it.chk).length?' <button onclick="budChkOk(\''+id+'\')" title="노란 칸을 확인했습니다 — 표시를 지웁니다" style="padding:0 6px;font-size:11px">확인</button>':'')+'</td>'
       +'<td style="text-align:right;font-weight:700">'+budItemAmt(it).toLocaleString()+'</td>'
       +'<td class="mo">'+inp(id,'memo',it.memo,110,'내용(선택)',1)+' <span class="muted" style="font-size:11px">'+esc(budItemBasis(it))+'</span></td></tr>'; }).join('');
   /* 맞물림 — 손익예산 2.고유목적사업비용 · 비용예산 사업비 · 목적사업계획서 계 · 기금운영 목적사업이 모두 목적사업 항목 합과 같은가 */
@@ -17536,12 +17539,15 @@ function budItemsHTML(fid,yr,plan){
   var mesh=!hasPur?'':(r2&&(num(r2[1])||0)===pur&&(num(plan.exp_purpose)||0)===pur)
     ?'<span class="chip ok" title="손익예산·비용예산·목적사업계획서·기금운영계획서가 같은 목적사업비를 씁니다">맞물림 4곳 일치</span>'
     :'<span class="chip dg" title="목적사업 항목 합과 손익예산의 목적사업비가 다릅니다">맞물림 어긋남</span>';
+  var nchk=L.reduce(function(s,x){ return s+Object.keys(x.chk||{}).length; },0);
   var g=function(k){ return num(plan[k])||0; };
   var diff=g('rev_interest')+g('rev_loanint')+g('rev_etc')-g('exp_purpose')-g('exp_admin')-g('exp_etc');
   return '<div class="panel" style="margin-top:12px"><div class="row" style="flex-wrap:wrap;gap:6px"><h2 style="font-size:15px">'+yr+'년 예산 세부 항목</h2>'+hlp('budget.items')
     +'<span class="muted" style="font-size:11.5px">단위 천원</span>'+mesh
     +(L.length?'<span class="chip'+(diff<0?' warn':'')+'">수지차액 '+(diff<0?'−':'')+Math.abs(Math.round(diff/1000)).toLocaleString()+(diff<0?' → 준비금2 환입':'')+'</span>':'')
-    +'<span style="flex:1"></span><button onclick="budItemsSeed()">출연금에서 기본 항목 세우기</button>'
+    +(nchk?'<span class="chip warn" title="전년 계획에서 복사한 줄 중 해마다 바뀌는 칸(노란 칸)">확인할 칸 '+nchk+'곳</span><button onclick="budChkAll()" title="노란 칸을 모두 확인한 것으로 하고 표시를 지웁니다">확인 끝</button>':'')
+    +'<span style="flex:1"></span><button onclick="budCopyOpen()"'+(L.length?'':' class="primary"')+' title="지난해 세부 항목을 그대로 가져오고 해마다 바뀌는 칸은 노랗게 표시합니다">📋 전년 계획에서 복사</button>'+hlp('budget.copy')
+    +'<button onclick="budItemsSeed()">출연금에서 기본 항목 세우기</button>'
     +'<select id="biAdd" style="padding:3px 6px;font-size:12px">'+BUD_GWAN.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+(x[2]&&x[1]==='수입'?' · '+x[2]:'')+'</option>'; }).join('')+'</select>'
     +'<button onclick="budItemAdd(($(\'biAdd\')||{}).value)">＋ 항목</button>'
     +(L.length?'<button onclick="budItemDel()" style="color:var(--danger)">선택 삭제</button>':'')+'</div>'
@@ -17552,8 +17558,9 @@ function budItemsHTML(fid,yr,plan){
 }
 function _budItemsRef(){ return fbDb.ref(NS+'/funds/'+S.fundId+'/years/'+S.year+'/budget_items'); }
 function budItemSet(id,k,v){
-  var val=String(v==null?'':v).trim();
-  _budItemsRef().child(id+'/'+k).set(val||null).then(function(){ toast('저장됨'); })
+  var val=String(v==null?'':v).trim(), up={};
+  up[k]=val||null; up['chk/'+k]=null;          // 칸을 고치면 전년 복사의 노란 «확인 필요» 표시가 사라진다
+  _budItemsRef().child(id).update(up).then(function(){ toast('저장됨'); })
     .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function budItemAdd(g){
@@ -17574,6 +17581,131 @@ function budItemDel(){
     if(!ok) return; var up={}; ids.forEach(function(id){ up[id]=null; });
     _budItemsRef().update(up).then(function(){ toast('지웠습니다'); }).catch(function(e){ toast('삭제 실패: '+e.message,'err'); });
   });
+}
+/* ══ 전년 계획에서 복사 (대표 지시 2026-10-24 「지역 공동기금은 매년 비슷하다 — 사업계획서 어떻게」, 목업 승인 「추천대로」 = A안) ══
+   예산 세부 항목을 «지난해 것 그대로» 가져오되, 해마다 바뀌는 칸에는 노란 «확인 필요»(item.chk)를 단다.
+   ─ 이율만 올해 기금 정보 이율로 바꾼다. 원금(기본재산·대부 잔액)·인원은 지난해 결산이 끝나야 맞는 숫자라
+     추정해 넣지 않는다 — 전년 값을 두고 표시만 한다(지어내지 않는다).
+   ─ 올해 항목이 이미 있으면 일괄에서는 건너뛰고, 한 곳씩은 «지우고 다시 만들기»를 체크해야 덮어쓴다.
+   ─ 목적사업 탭(welfare)·예산 다섯 칸(budget)은 건드리지 않는다. */
+var BUD_CHK_FIELDS={int:[['base','원금']],loanint:[['base','대부 잔액']],purpose:[['n','인원']]};
+/* 복사 계획 — 순수. rows[i]={it:원본 줄, o:새 줄, rateFrom:바뀐 이율(없으면 null), why:[확인 필요 이유]} */
+function budCopyPlan(src,rate){
+  var rv=_fnum(rate), has=(rate!=null&&rate!=='');
+  return budItemsList(src).map(function(it){
+    var o=Object.assign({},it), from=null; delete o._id; delete o.chk;
+    if(o.gwan==='int'&&has&&_fnum(o.rate)!==rv){ from=_fnum(o.rate); o.rate=String(rv); }
+    var chk={}, why=[];
+    (BUD_CHK_FIELDS[o.gwan]||[]).forEach(function(c){ if(_fnum(o[c[0]])){ chk[c[0]]=1; why.push(c[1]+' 확인'); } });
+    if(why.length) o.chk=chk;
+    return {it:it,o:o,rateFrom:from,why:why};
+  });
+}
+/* 새 줄 묶음 → 저장할 map (순서 유지) */
+function budCopyMap(rows){
+  var t=Date.now(), m={};
+  rows.forEach(function(r,i){ var o=Object.assign({},r.o); o.ord=t+i; m['c'+t.toString(36)+i]=o; });
+  return m;
+}
+/* 이 기금에서 «지난해들» — 세부 항목이 있는 해, 가까운 해부터 */
+function budSrcYears(f,yr){
+  var Y=(f&&f.years)||{};
+  return Object.keys(Y).filter(function(y){ return +y<+yr&&budItemsList((Y[y]||{}).budget_items).length; })
+    .sort(function(a,b){ return b-a; });
+}
+function _bcBox(html){ var b=$('modalbox'); if(b) b.innerHTML=html; else showModal(html,{width:860}); }
+function budCopyOpen(){
+  var f=funds[S.fundId]||{}, ys=budSrcYears(f,S.year);
+  if(!ys.length){ toast('가져올 지난해 세부 항목이 없습니다 — [출연금에서 기본 항목 세우기]를 쓰세요','warn'); return; }
+  S._bc={src:ys[0], multi:false, over:false, skip:{}, pick:null};
+  budCopyShow();
+}
+function budCopyMode(multi){ S._bc.multi=!!multi; budCopyShow(); }
+function budCopySrc(y){ S._bc.src=y; S._bc.skip={}; budCopyShow(); }
+function budCopyTog(i,on){ if(on) delete S._bc.skip[i]; else S._bc.skip[i]=1; budCopyShow(); }
+function budCopyOver(on){ S._bc.over=!!on; budCopyShow(); }
+function budCopyPick(fid,on){ S._bc.pick=S._bc.pick||{}; S._bc.pick[fid]=!!on; budCopyShow(); }
+function budCopyShow(){
+  var B=S._bc, yr=S.year, W=function(n){ return Number(n).toLocaleString(); };
+  var head='<div class="row" style="margin-bottom:10px"><h2 style="font-size:16px;margin:0">📋 전년 계획에서 복사</h2>'+hlp('budget.copy')+'<span style="flex:1"></span>'
+    +'<button onclick="budCopyMode('+(B.multi?0:1)+')">'+(B.multi?'← 이 기금만':'여러 기금 한꺼번에 →')+'</button></div>';
+  if(B.multi){ _bcBox(head+budCopyMultiHTML()); return; }
+  var fid=S.fundId, f=funds[fid]||{}, ys=budSrcYears(f,yr);
+  var rows=budCopyPlan((((f.years||{})[B.src])||{}).budget_items, bizRate(f));
+  var have=budItemsList((((f.years||{})[yr])||{}).budget_items).length;
+  var sel=rows.filter(function(r,i){ return !B.skip[i]; });
+  var inc=0, exp=0; sel.forEach(function(r){ var a=budItemAmt(r.o); if(r.o.gwan==='int'||r.o.gwan==='loanint') inc+=a; else exp+=a; });
+  var gl=function(g){ for(var i=0;i<BUD_GWAN.length;i++) if(BUD_GWAN[i][0]===g) return BUD_GWAN[i][1]; return g; };
+  var body=rows.map(function(r,i){
+    var chips=(r.rateFrom!=null?'<span class="chip" style="background:#eff6ff;color:#1e40af">이율 자동 '+r.rateFrom+'→'+r.o.rate+'</span> ':'')
+      +(r.why.length?r.why.map(function(w){ return '<span class="chip warn">'+esc(w)+'</span>'; }).join(' '):(r.rateFrom==null?'<span class="chip">그대로</span>':''));
+    return '<tr><td><input type="checkbox"'+(B.skip[i]?'':' checked')+' onchange="budCopyTog('+i+',this.checked)"></td><td class="no">'+(i+1)+'</td>'
+      +'<td>'+esc(gl(r.o.gwan))+'</td><td>'+esc(r.o.name||'')+'</td><td class="sub">'+esc(budItemBasis(r.o))+'</td>'
+      +'<td style="text-align:right">'+W(budItemAmt(r.it))+'</td><td style="text-align:right;font-weight:700">'+W(budItemAmt(r.o))+'</td><td>'+chips+'</td></tr>'; }).join('');
+  _bcBox(head
+    +'<div class="row" style="margin-bottom:8px">원본 <select onchange="budCopySrc(this.value)" style="padding:3px 6px">'
+      +ys.map(function(y){ return '<option value="'+y+'"'+(y===B.src?' selected':'')+'>'+y+'년'+(+y===yr-1?' (전년)':'')+'</option>'; }).join('')
+    +'</select> → 대상 <b>'+yr+'년</b>'
+    +(have?'<span class="chip dg">'+yr+'년 항목 '+have+'줄이 이미 있습니다</span>':'<span class="chip ok">'+yr+'년 항목 비어 있음 — 그대로 복사</span>')+'</div>'
+    +(have?'<label class="row" style="font-size:12.5px;margin-bottom:8px"><input type="checkbox"'+(B.over?' checked':'')+' onchange="budCopyOver(this.checked)"> 이미 있는 '+have+'줄을 <b>지우고</b> 다시 만들기</label>':'')
+    +'<div style="overflow-x:auto"><table><thead><tr><th>□</th><th>#</th><th>관</th><th>목</th><th>산식 ('+yr+' 제안)</th><th style="text-align:right">'+B.src+' 금액</th><th style="text-align:right">'+yr+' 금액</th><th>상태</th></tr></thead><tbody>'+body
+      +'<tr style="font-weight:700"><td></td><td></td><td colspan="5">수입 − 지출 <span class="sub" style="font-weight:400">(수입 '+W(inc)+' − 지출 '+W(exp)+', 단위 천원)</span></td><td style="text-align:right'+(inc-exp<0?';color:var(--danger)':'')+'">'+(inc-exp<0?'−':'')+W(Math.abs(inc-exp))+'</td></tr></tbody></table></div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px"><span class="muted" style="flex:1;font-size:11.5px">노란 칸 = 해마다 바뀌는 칸(복사 뒤에도 노랗게 남음)</span>'
+      +'<button onclick="closeM()">취소</button><button class="primary" onclick="budCopyGo()"'+((have&&!B.over)||!sel.length?' disabled':'')+'>'+sel.length+'줄 복사</button></div>');
+}
+function budCopyGo(){
+  var B=S._bc, fid=S.fundId, f=funds[fid]||{}, yr=S.year;
+  var rows=budCopyPlan((((f.years||{})[B.src])||{}).budget_items, bizRate(f)).filter(function(r,i){ return !B.skip[i]; });
+  var have=budItemsList((((f.years||{})[yr])||{}).budget_items).length;
+  if(!rows.length){ toast('복사할 줄을 고르세요','warn'); return; }
+  if(have&&!B.over){ toast('이미 있는 항목을 지우고 다시 만들려면 체크하세요','warn'); return; }
+  _budItemsRef().set(budCopyMap(rows)).then(function(){
+    _audit(fid,'전년 계획 복사',B.src+'→'+yr+' '+rows.length+'줄'+(have?' (기존 '+have+'줄 지움)':''));
+    closeM(); toast(yr+'년 세부 항목 '+rows.length+'줄을 가져왔습니다 — 노란 칸을 확인하세요');
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+/* 일괄 — 지금 «운영 중인» 기금마다 가장 가까운 지난해에서. 올해 항목이 이미 있는 곳은 건너뛴다 */
+function budCopyTargets(){
+  var yr=S.year;
+  return Object.keys(funds||{}).filter(function(id){ var f=funds[id]; return f&&!f._sample&&(f.lifecycle||'운영')==='운영'; })
+    .sort(function(a,b){ return String(funds[a].name||a).localeCompare(String(funds[b].name||b),'ko'); })
+    .map(function(id){ var f=funds[id], ys=budSrcYears(f,yr), src=ys[0]||null;
+      return {id:id,f:f,src:src,n:src?budItemsList(((f.years||{})[src]||{}).budget_items).length:0,
+        have:budItemsList((((f.years||{})[yr])||{}).budget_items).length}; });
+}
+function budCopyMultiHTML(){
+  var B=S._bc, yr=S.year, T=budCopyTargets(); B.pick=B.pick||{};
+  T.forEach(function(t){ if(B.pick[t.id]===undefined) B.pick[t.id]=!!(t.src&&!t.have); });
+  var nsel=T.filter(function(t){ return B.pick[t.id]&&t.src&&!t.have; }).length;
+  var rows=T.map(function(t,i){
+    var ok=t.src&&!t.have;
+    return '<tr'+(t.src?'':' class="muted"')+'><td><input type="checkbox"'+(ok&&B.pick[t.id]?' checked':'')+(ok?'':' disabled')+' onchange="budCopyPick(\''+t.id+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
+      +'<td>'+esc(t.f.name||t.id)+'</td><td>'+esc(t.f.fund_type||'공동')+'</td>'
+      +'<td style="text-align:right">'+(t.src?t.n+'줄 ('+t.src+')':'0줄')+'</td>'
+      +'<td>'+(!t.src?'<span class="chip">원본 없음</span>':t.have?'<span class="chip warn">이미 '+t.have+'줄 있음</span>':'<span class="chip ok">비어 있음</span>')+'</td>'
+      +'<td class="sub">'+(!t.src?'[출연금에서 기본 항목 세우기] 사용':t.have?'건너뜀 (덮어쓰려면 그 기금에서 한 곳씩)':'복사')+'</td></tr>'; }).join('');
+  return '<h3 style="margin:0 0 6px;font-size:14px">'+yr+'년 사업계획 일괄 시작</h3>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th>□</th><th>#</th><th>기금</th><th>구분</th><th style="text-align:right">지난해 항목</th><th>'+yr+' 현황</th><th>처리</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px"><span class="muted" style="flex:1;font-size:11.5px">이미 항목이 있는 기금은 건너뜁니다(실수로 덮어쓰지 않게).</span>'
+    +'<button onclick="closeM()">취소</button><button class="primary" onclick="budCopyMultiGo()"'+(nsel?'':' disabled')+'>'+nsel+'곳 복사</button></div>';
+}
+function budCopyMultiGo(){
+  var B=S._bc, yr=S.year, T=budCopyTargets().filter(function(t){ return B.pick&&B.pick[t.id]&&t.src&&!t.have; });
+  if(!T.length){ toast('복사할 기금을 고르세요','warn'); return; }
+  Promise.all(T.map(function(t){
+    var rows=budCopyPlan((((t.f.years||{})[t.src])||{}).budget_items, bizRate(t.f));
+    return fbDb.ref(NS+'/funds/'+t.id+'/years/'+yr+'/budget_items').set(budCopyMap(rows)).then(function(){
+      _audit(t.id,'전년 계획 복사',t.src+'→'+yr+' '+rows.length+'줄 (일괄)'); });
+  })).then(function(){ closeM(); toast(yr+'년 계획을 '+T.length+'곳에 가져왔습니다 — 기금마다 노란 칸을 확인하세요'); })
+    .catch(function(e){ toast('저장 실패: '+e.message+' — 일부만 저장됐을 수 있습니다. 기금별 현황을 확인하세요','err'); });
+}
+/* 노란 «확인 필요» 지우기 — 한 줄 / 전부 */
+function budChkOk(id){ _budItemsRef().child(id+'/chk').set(null).catch(function(e){ toast('저장 실패: '+e.message,'err'); }); }
+function budChkAll(){
+  var yd=(((funds[S.fundId]||{}).years||{})[S.year])||{}, up={};
+  budItemsList(yd.budget_items).forEach(function(it){ if(it.chk) up[it._id+'/chk']=null; });
+  if(!Object.keys(up).length) return;
+  _budItemsRef().update(up).then(function(){ toast('노란 표시를 모두 지웠습니다'); }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 /* 출연금에서 기본 항목 — 예금이자(기본재산 × 이율)·목적사업(그 해 목적사업 탭의 사업별 예산, 없으면 한 줄)·관리비·예비비.
    숫자는 autoBudget 과 같은 셈이다. 세운 뒤 사람이 인원·단가·횟수로 고친다 */
@@ -23023,6 +23155,9 @@ var HELP={
  'budget.mode':{t:'출연금 사용 방식 — 사업계획서 셈',h:'<p><b>출연금 N% 사용</b>(기본) — 그해 출연금의 사용한도(공동 90%, 사내 80%, 중소기업 아닌 사내 50%)를 준비금2로 옮겨 목적사업에 씁니다. 나머지는 기본재산.</p>'
    +'<p><b>수익금만 쓰기</b> — 실무매뉴얼 예시처럼 출연금을 <b>모두 기본재산</b>으로 두고, 그 이자 등 수익금만 목적사업에 씁니다. 사업계획서의 손익예산·추정재무상태표·비용예산이 이 방식으로 셈해집니다.</p>'
    +'<p>⚠ 이 선택은 <b>사업계획서에만</b> 적용됩니다. 결산의 준비금2 설정(출연금 × 사용한도)과 회의록 문구는 그대로입니다. 바꾼 뒤 [💰 출연금에서]·「출연금에서 기본 항목 세우기」를 다시 누르면 예산이 새 방식으로 세워집니다.</p>'},
+ 'budget.copy':{t:'전년 계획에서 복사 — 해마다 바뀌는 칸은 노랗게',h:'<p>지역 공동기금은 사업 구조가 해마다 거의 같아서, 지난해 <b>예산 세부 항목을 그대로 가져옵니다</b>. 복사한 줄 중 <b>해마다 바뀌는 칸</b>(예금이자·대부이자의 원금, 목적사업의 인원)은 <b>노랗게</b> 남고, 고치거나 [확인]을 누르면 사라집니다.</p>'
+   +'<p><b>이율만 자동</b>으로 기금 정보의 올해 이율로 바꿉니다. 기본재산·대부 잔액·인원은 지난해 결산이 끝나야 맞는 숫자라 <b>추정해서 넣지 않고</b> 전년 값을 두고 표시만 합니다.</p>'
+   +'<p>올해 항목이 이미 있는 기금은 건너뜁니다(여러 기금 한꺼번에). 한 기금씩 열면 «지우고 다시 만들기»를 체크해야 덮어씁니다. 목적사업 탭과 위쪽 예산 다섯 칸은 건드리지 않습니다. 복사 기록은 일지에 남습니다.</p>'},
  'budget.items':{t:'예산 세부 항목 — 인원 × 단가 × 횟수',h:'<p>실무매뉴얼의 사업계획서처럼 항목마다 <b>산식</b>을 넣으면 금액과 <b>산출근거</b>(「-40인×2회×300=24,000」)가 저절로 나옵니다. 단위는 서식과 같은 <b>천원</b>입니다.</p>'
    +'<p>항목이 있는 관(예금이자·대부이자·목적사업·관리비·예비비)은 위 예산 칸이 <b>항목 합</b>으로 바뀌고, 손익예산·추정재무상태표·비용예산·목적사업계획서·기금운영계획서가 모두 같은 숫자를 씁니다(맞물림 4곳). 줄마다 천원으로 반올림하므로 줄의 합과 총액이 어긋나지 않습니다.</p>'
    +'<p>예금이자는 원금 × 이율 × 달/12, 예비비는 금액만. 「출연금에서 기본 항목 세우기」는 출연금·목적사업 탭 예산으로 첫 줄들을 세웁니다 — 그다음 인원·단가·횟수로 고치세요. 수지차액이 음수면 그만큼 준비금2에서 환입합니다.</p>'},
