@@ -153,14 +153,32 @@ test('⑥ 자주 쓰는 앱 줄의 복제 타일에는 data-key 가 없다', () 
   assert.match(fn, /c\.draggable =/, '★ 복제본의 끌기를 정하지 않았다 — 진짜 타일의 끌기 설정을 그대로 물려받는다');
 });
 
-test('⑦ 폰: 접힌 줄은 줄을 바꿔 흐른다 — 옆으로 밀거나 화면 밖으로 나가지 않는다', () => {
+test('⑦ 폰: 접힌 줄은 화면 폭을 따라 칸 수가 준다 — 옆으로 밀거나 화면 밖으로 나가지 않는다', () => {
   const r = rulesFor('.tilerow.fold .tiles');
   assert.ok(r.length > 0, '★ 접힌 줄 모양이 없다');
-  assert.ok(r.some((b) => /display:flex/.test(b)), '★ 폰의 네 칸 격자를 그대로 써서 칩이 칸에 갇힌다');
-  assert.ok(r.some((b) => /flex-wrap:wrap/.test(b)), '★ 칩이 줄을 안 바꾼다 — 화면 밖으로 나간다');
+  /* 줄바꿈(flex-wrap) 이든 «폭 따라 칸 수가 주는 격자»(auto-fill/auto-fit + minmax) 든 —
+     칩이 화면 폭을 넘지 않는 길이면 된다. 칸 수를 못 박은 격자(repeat(4,…))는 안 된다. */
+  const flows = r.some((b) => /flex-wrap:wrap/.test(b) ||
+    (/display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)));
+  assert.ok(flows, '★ 칩 칸 수가 화면 폭을 안 따른다 — 폰에서 화면 밖으로 나간다');
   r.forEach((b) => {
     assert.ok(!/nowrap|overflow-x\s*:\s*(auto|scroll)/.test(b),
       '★ 접힌 줄을 옆으로 밀게 만들었다 — 대표 지시 「폰에서는 화면 안 밖으로 나가면 안 된다」');
+  });
+});
+
+test('⑨ 행·열이 맞는다 — 접힌 줄의 칩은 같은 폭 칸(격자)에 선다 (대표 「행 열 간격 정리 해라」)', () => {
+  const r = rulesFor('.tilerow.fold .tiles');
+  assert.ok(r.some((b) => /display:grid/.test(b) && /grid-template-columns:/.test(b)),
+    '★ 칩이 제 글자 길이만큼 서서 줄마다 세로 열이 어긋난다');
+});
+
+test('⑨ 빨간 딱지가 칩 폭을 늘리지 않는다 — 귀퉁이에 떠 있다 (대표 「칸넓게 안늘어나는지」)', () => {
+  ['.tilerow.fold .tile-alert', '.tilerow.fold .tile .nl-warn'].forEach((sel) => {
+    const r = rulesFor(sel);
+    assert.ok(r.length > 0, '★ 접힌 줄에서 ' + sel + ' 자리를 안 정했다');
+    assert.ok(r.some((b) => /position:absolute/.test(b)),
+      '★ ' + sel + ' 이 칩 안에 글자처럼 서서 그 칩만 넓어진다');
   });
 });
 
