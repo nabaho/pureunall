@@ -4,7 +4,7 @@
 
    지키는 규칙
    ① 줄 머리는 누르면 접히고 펴지는 «단추»다(키보드로도).
-   ② 맨 위에 «자주 쓰는 앱» 줄 · 검색칸 · 「모두 펴기·접기」가 있다.
+   ② 맨 위에 «자주 쓰는 앱» 줄 · 「모두 펴기·접기」가 있다. 앱 찾기 검색칸은 없다(대표가 지우라 하심).
    ③ 처음에는 줄이 «이름 칩»으로 접혀 있다(대표 2026-10-24 「니가 보여준건 길게 되었는데 왜 화면은 동그랗나」).
       사람이 편 줄은 편 채로 기억하고, 찾는 중에는 다 펼친다.
    ④ 별표 수에는 한도가 있다.
@@ -50,8 +50,8 @@ test('① 줄 머리는 누르면 접히는 단추다 (키보드로도)', () => 
   assert.match(wire, /Enter/, '★ 키보드(Enter)로 접을 수 없다');
 });
 
-test('② 자주 쓰는 앱 줄 · 검색칸 · 모두 펴기 단추가 «줄들보다 위»에 있다', () => {
-  ['pinRow', 'pinTiles', 'appSearch', 'foldAllBtn'].forEach((id) =>
+test('② 자주 쓰는 앱 줄 · 모두 펴기 단추가 «줄들보다 위»에 있다', () => {
+  ['pinRow', 'pinTiles', 'foldAllBtn'].forEach((id) =>
     assert.ok(BODY.indexOf('id="' + id + '"') > 0, '★ ' + id + ' 칸이 없다'));
   assert.ok(BODY.indexOf('id="pinRow"') < BODY.indexOf('id="appRows"'),
     '★ 자주 쓰는 앱 줄이 네 줄보다 아래에 있다');
@@ -68,7 +68,6 @@ function foldBox() {
   const ctx = {
     APP_ROWS: [{ id: 'client' }, { id: 'store' }, { id: 'sales' }, { id: 'inside' }],
     tilePrefs: { pins: null, fold: null },
-    _searchQ: '',
     APPS: [], alerts: 0, saved: 0,
     saveTilePrefs() { ctx.saved++; },
     paintPins() {}, applyFold() {},
@@ -89,8 +88,6 @@ test('③ 처음에는 줄이 이름 칩으로 접혀 있다 — 별표가 없�
   c.tilePrefs.fold = { client: false };
   assert.strictEqual(c.rowFolded('client'), false, '★ 사람이 펴 둔 줄을 다시 접는다');
   assert.strictEqual(c.rowFolded('store'), true, '★ 손대지 않은 줄이 펼쳐진다');
-  c._searchQ = '메일';
-  assert.strictEqual(c.rowFolded('store'), false, '★ 찾는 중인데 줄이 접혀 찾은 앱이 안 보인다');
 });
 
 test('③ 별표로 넣고 다시 누르면 뺀다 — 저장한다', () => {
@@ -182,9 +179,11 @@ test('⑨ 빨간 딱지가 칩 폭을 늘리지 않는다 — 귀퉁이에 떠 �
   });
 });
 
-test('⑦ 폰: 검색칸 글씨가 16px 이상이다 (아이폰이 화면을 확대하지 않게)', () => {
-  const r = rulesFor('.fold-search input');
-  assert.ok(r.some((b) => /font-size:\s*16px/.test(b)), '★ 폰에서 검색칸을 누르면 화면이 확대된다');
+/* 앱 찾기 검색칸은 2026-10-24 대표 「이부분 삭제 해달라」로 걷었다 — 다시 붙이지 말 것.
+   (같은 날 시안 2 로 넣었다가 실제 화면을 보고 지우라 하셨다 — 앱이 19개라 접힌 이름 칩으로 다 보인다) */
+test('② 앱 찾기 검색칸은 없다 (대표 「이부분 삭제 해달라」)', () => {
+  assert.ok(BODY.indexOf('id="appSearch"') < 0, '★ 대표가 지우라 하신 검색칸이 다시 생겼다');
+  assert.ok(!/class="fold-search"/.test(BODY), '★ 검색칸 껍데기가 남았다');
 });
 
 test('설정을 읽을 때 별표·접힘을 버리지 않는다 (기기·서버 둘 다)', () => {
