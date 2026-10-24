@@ -7126,6 +7126,19 @@ exports.hanaMessageBridge = functions
         await requireTotalAdmin(req);
         hanaJson(res, 200, await KakaoWork.list(db, body.days, Date.now())); return;
       }
+      /* 대화 저장본 넣기 · 📎 받을 파일 (2026-10-24) — 원본 .txt 는 화면 안에서 읽고, 가린 줄만 온다 */
+      if (action === "kakaoImport") {
+        const admin = await requireTotalAdmin(req);
+        hanaJson(res, 200, await KakaoWork.importExport(db, admin.uid, body, Date.now())); return;
+      }
+      if (action === "kakaoFiles") {
+        await requireTotalAdmin(req);
+        hanaJson(res, 200, await KakaoWork.listFiles(db, Date.now())); return;
+      }
+      if (action === "kakaoFileSet") {
+        const admin = await requireTotalAdmin(req);
+        hanaJson(res, 200, await KakaoWork.setFiles(db, admin.uid, body, Date.now())); return;
+      }
 
       const staff = await requireFinanceStaff(req);
       const base = db.ref(`hanaSmsBridge`);

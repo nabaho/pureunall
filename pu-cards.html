@@ -4780,7 +4780,7 @@ const Store = {
             myEmail=(u.email||'').toLowerCase(); myUid=u.uid||'';
             /* ⚠ loadSharedGKey() 를 뗐다(2026-08-17) — 로그인할 때마다 실시간DB 의
                열쇠를 브라우저로 내려받던 자리다. 이제 열쇠는 서버만 안다. */
-            hideCardsLogin(); ErpMatch.load();
+            hideCardsLogin(); ErpMatch.load(); mbTakeToCo();
             /* ── 명함 씨앗을 먼저 그린다 (대표 보고 2026-08-29 「기업정보함도 빨리」) ──
                지난 로그인 때 담아 둔 스냅숏(IndexedDB)을 구독의 씨앗으로 준다 — 화면이
                «즉시» 서고, 최신본은 뒤에서 한 장씩 갈아 끼워진다(watchCardMap 머리글).
@@ -28960,6 +28960,8 @@ function mbOfficeStore(){
 }
 /* 첨부 하나의 바이트 — 내려받기(mbAtt)와 같은 서버 길 */
 function mbAttFetch(o, i, a){
+  /* 카톡 «받을 파일»에서 건네받은 파일(2026-10-24) — 바이트를 이미 손에 쥐고 있다. 서버에 다시 묻지 않는다. */
+  if(a && a.bytes) return Promise.resolve({ name: String(a.name||'첨부'), mime: String(a.mime||''), bytes: a.bytes });
   const u = firebase.auth().currentUser;
   if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
   const req = mbAttReq(o, i, a);
@@ -29184,8 +29186,8 @@ function mbAttToPhoto(i){
 }
 
 /* 확인 창 — 회사(보낸 사람으로 짐작)·종류(파일 이름으로 짐작)·날짜(메일 날짜)·🔒 서명본·계약 기록 한 줄 */
-function mbAttToCo(i){
-  const o = state.mbOpen||{}; const a = (o.atts||[])[i]; if(!a) return;
+function mbAttToCo(i, o0){
+  const o = o0 || state.mbOpen||{}; const a = (o.atts||[])[i]; if(!a) return;
   if(!window.PuOfficeStore || !window.PuCoRoster) return toast('원본 보관함 도구를 불러오지 못했습니다 — 새로고침해 주세요', 8000);
   const v = mbOneRow(o.slug, o.uid) || {};
   const em = String(v.e||'').trim().toLowerCase();
@@ -29268,7 +29270,7 @@ function mbAttToCoSave(o, i, a, p, full){
         const sec = !!p.secret && r.secret !== false;
         const dup = (have||[]).filter(d => d && d.fileId === r.fileId)[0];
         if(dup) return { docId: dup.id || '', dup: true, name: f.name, secret: dup.secret === true };
-        return store.addCoDoc({ coName: p.co, fileId: r.fileId, title: '[메일] ' + f.name, date: p.date, src: 'upload', secret: sec })
+        return store.addCoDoc({ coName: p.co, fileId: r.fileId, title: '[' + (a.from || '메일') + '] ' + f.name, date: p.date, src: 'upload', secret: sec })
           .then(d => ({ docId: d.docId, dup: false, name: f.name, secret: sec }));
       }))
   ).then(x => {
@@ -29282,12 +29284,38 @@ function mbAttToCoSave(o, i, a, p, full){
     const done = (x.dup ? '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다' : '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (x.secret ? ' (🔒 서명본)' : ''))
       + (x.got ? ' · 📬 서명본 대기에서 회수로 옮겼습니다' : '');
     if(!p.rec) return out(done);
-    const recIt = () => store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: '메일 첨부에서' }])
+    const recIt = () => store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: a.from ? a.from + ' 파일에서' : '메일 첨부에서' }])
       .then(r => out(done + (r && r.added ? ' · 계약 기록 한 줄' : ' · 같은 날짜·종류 계약 기록이 이미 있어 기록은 건너뜀')),
             e => { warn.push('계약 기록은 못 남김: ' + ((e&&e.message)||e)); return out(done); });
     if(!x.dup) return recIt();
     return store.listCoRecs(key).then(rs => (rs||[]).some(r => r && r.docId === x.docId) ? out(done) : recIt(), () => out(done));
   }).then(r => full ? r : r.msg);
+}
+
+/* ══ 카톡 «받을 파일» → 기업별 계약서 (2026-10-24) ══
+   업무관리 💬 카톡정리 › 📎 받을 파일에서 보낼 곳 「📑 기업별 계약서」로 「확인하고 보내기」를 누르면
+   그 파일을 PuHandoff 로 건네고 이 화면을 ?take=…&to=co 로 연다.
+   ★ 담는 창·담는 길은 메일 첨부와 «같은 것»(mbAttToCo · mbAttToCoSave) — 새로 짓지 않는다.
+     첨부 대신 건네받은 바이트를 쥐여 줄 뿐이다(mbAttFetch 가 a.bytes 를 그대로 돌려준다).
+   ⚠ 회사 이름 목록(ErpMatch)이 차기를 잠깐 기다린다 — 창의 회사 칸이 빈 목록으로 뜨지 않게.
+   ⚠ 열쇠는 한 번만 쓴다(take 가 꺼내며 지운다) · 주소에서 take·to 를 지운다(새로고침 때 또 뜨지 않게). */
+function mbTakeToCo(){
+  let q; try { q = new URLSearchParams(location.search); } catch(_){ return; }
+  const k = q.get('take') || '';
+  if(!k || q.get('to') !== 'co') return;
+  try { const u = new URL(location.href); u.searchParams.delete('take'); u.searchParams.delete('to'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch(_){}
+  if(!window.PuHandoff) return toast('건네받는 통로를 불러오지 못했습니다 — 새로고침해 주세요', 8000);
+  let n = 0;
+  const go = () => {
+    if(!(window.ErpMatch && ErpMatch.ready) && ++n < 40) return setTimeout(go, 500);
+    PuHandoff.take(k).then(g => {
+      if(!g) return toast('건네진 파일을 찾지 못했습니다 — 업무관리 카톡정리에서 다시 눌러 주세요', 8000);
+      return g.file.arrayBuffer().then(buf => {
+        mbAttToCo(0, { atts: [{ name: g.name, mime: g.type, bytes: new Uint8Array(buf), from: '카톡' }] });
+      });
+    }).catch(e => toast('건네받지 못했습니다 — ' + ((e&&e.message)||e), 9000));
+  };
+  go();
 }
 
 function mbAttToPay(i){
