@@ -125,3 +125,5 @@ hana-mod.patch
 # 이 컴퓨터에서만 쓰는 설정 (사람마다 다르다)
 .claude/settings.local.json
 tools/phone-audit/out/
+# 폰 미러 갈무리·잰 값 — 실제 고객 화면이 찍힌다. 저장소에 올리지 않는다 (2026-10-24)
+tools/phone-mirror/out/
