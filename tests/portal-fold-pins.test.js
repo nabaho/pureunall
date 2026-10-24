@@ -199,3 +199,23 @@ test('설정을 읽을 때 별표·접힘을 버리지 않는다 (기기·서버
   assert.ok((init.match(/tilePrefsFrom\(/g) || []).length >= 2,
     '★ 기기 저장분이나 서버 저장분 한쪽이 별표·접힘을 버린다');
 });
+
+/* 대표 2026-10-24 폰 화면 안 1 「추천대로.」 — 떠 있던 단추가 앱을 가렸다(「회생광고」 위에 겹침). */
+test('⑩ 폰: 아래 막대는 화면 맨 아래 전체 폭 · 본문은 그만큼 비운다 — 단추가 앱을 안 가린다', () => {
+  const at = HEAD.indexOf('body.portal-mode #fabBar{left:0;right:0;bottom:0');
+  assert.ok(at > 0, '★ 폰 아래 막대가 화면 폭 전체로 안 펴졌다 — 떠 있는 단추가 앱 위에 겹친다');
+  const mq = HEAD.lastIndexOf('@media', at);
+  assert.match(HEAD.slice(mq, at), /^@media\(max-width:520px\)\{/, '★ 막대 모양이 폰 구간 밖에 있다 — PC 까지 바뀐다');
+  const blk = HEAD.slice(at, HEAD.indexOf('\n}', at));
+  assert.match(blk, /\.portal\{padding-bottom:\d+px;\}/, '★ 본문 아래를 안 비워 마지막 줄이 막대에 깔린다');
+  assert.match(blk, /env\(safe-area-inset-bottom\)/, '★ 아이폰 아래 손잡이 줄에 막대가 깔린다');
+});
+
+test('⑩ 폰: 자주 쓰는 앱도 얇은 칩 — 칸 수는 화면 폭을 따라 준다 · ★ 는 남는다', () => {
+  const r = rulesFor('#pinTiles');
+  assert.ok(r.some((b) => /display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)),
+    '★ 폰의 자주 쓰는 앱 칸 수가 폭을 안 따른다 — 화면 밖으로 나간다');
+  r.forEach((b) => assert.ok(!/nowrap|overflow-x\s*:\s*(auto|scroll)/.test(b), '★ 자주 쓰는 앱을 옆으로 밀게 만들었다'));
+  assert.ok(!rulesFor('#pinTiles .pin-star').some((b) => /display:none/.test(b)),
+    '★ 폰에서 ★ 를 감췄다 — 폰은 끌기가 없어 ★ 로만 뺄 수 있다');
+});

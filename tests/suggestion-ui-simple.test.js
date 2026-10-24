@@ -39,13 +39,18 @@ test('휴대폰에서는 건의함이 화면 전체를 사용한다', () => {
    일부 삼성·네이버 브라우저는 fixed 좌표를 무시하고 단추를 헤더 자리로 되돌려
    화면 위에서 잘랐다. !important 로도 막지 못했다.
    그래서 폰에서는 헤더 카드 안(로그아웃 옆)에 두고, 대신 헤더가 두 줄로 꺾이도록 했다. */
-test('휴대폰 건의하기 버튼은 헤더 카드 안에 있다', () => {
+/* ★ 2026-10-24 대표 폰 화면 안 1 — 폰에서 건의하기는 화면 맨 아래 «막대(#fabBar) 오른쪽»으로 간다.
+   위 사고의 뿌리는 «단추 스스로 fixed» 였다(머리 카드의 backdrop-filter 가 fixed 기준이 되어 위로 튐).
+   이제도 단추는 스스로 띄우지 «않고», body 의 자식인 막대 안으로 «옮겨진다»(BAR_IDS) — 그래서 그 사고가 다시 안 난다. */
+test('휴대폰 건의하기는 스스로 떠 있지 않는다 — 아래 막대 안으로 옮겨지거나 머리줄 안', () => {
   assert.match(html, /#sgFab\{position:relative;display:inline-flex;/);
-  // PC용 `.pbar #sgFab{order:4}` 를 이기려면 같은 우선순위로 적어야 로그아웃 옆에 선다
+  // PC용 `.pbar #sgFab{order:4}` 를 이기려면 같은 우선순위로 적어야 한다(막대로 옮기기 전·PC 로 돌아온 뒤)
   assert.match(html, /\.pbar #sgFab\{order:0;/);
   assert.match(html, /\.sg-tip\{display:none!important;\}/);
-  // 헤더가 좁아지면 아래 줄로 꺾여야 단추가 밀려 잘리지 않는다
   assert.match(html, /\.pbar\{flex-wrap:wrap;/);
+  /* 폰에서는 아래 막대로 옮긴다 — 막대 안에서도 숫자 배지가 제 몸에 붙게 relative */
+  assert.match(html, /BAR_IDS = \[[^\]]*'sgFab'/, '★ 폰에서 건의하기가 아래 막대로 안 간다 — 머리줄이 두 줄로 꺾인다');
+  assert.match(html, /#fabBar > #sgFab\{position:relative!important;/, '★ 막대 안에서 숫자 배지가 엉뚱한 데 붙는다');
 });
 
 test('일반 사용자는 건의 작성 안내만 보고 전체 목록과 상세에는 들어가지 못한다', () => {
