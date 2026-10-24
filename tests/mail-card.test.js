@@ -91,3 +91,19 @@ test('★★★ ⑥ 받는 탭 — read 줄만, 같은 문, 폴더', () => {
   assert.ok(!/ref\(['"]pucards\/items['"]\)\.(push|set)/.test(fn), '명함을 직접 만든다');
   assert.match(html, /MAIL_FOLDER = '📬 메일에서 온 명함'/);
 });
+
+test('★★★ ⑦ 첨부 서류 → 사진첩 — 읽음으로 안 바꾸고, 같은 잣대, 같은 문, 한 번만, 지금부터', () => {
+  const html = read('remember-intake.html');
+  const a = html.indexOf('function docOne('), fn = html.slice(a, html.indexOf('\n  function docFlush', a));
+  assert.match(fn, /call\('readMailMessage', \{ slug: slug, uid: String\(row\.u\), peek: 1 \}\)/, '★★★ 메일을 읽음으로 바꾼다(peek 없음)');
+  assert.match(fn, /ref\.transaction\(/, '★★ 두 탭이 같은 메일을 두 번 담는다');
+  assert.match(fn, /PuHandoff\.put\(/, '사진첩 건네기 통로가 아니다');
+  assert.match(html, /fr\.src = 'pu-photos\.html\?take='/, '★★★ 사진첩 올리기 문(addFiles)을 안 탄다');
+  assert.ok(!/\.ref\(['"]puphotos/.test(html), '★★★ 사진첩에 직접 쓴다');
+  const w = html.slice(html.indexOf('function docWatch('), html.indexOf('/* 확장에서 온 말'));
+  assert.match(w, /PuDocPick\.보낼만한가\(row\)/, '★★ 메일함과 다른 잣대로 고른다(계약서까지 담긴다)');
+  assert.match(w, /if \(!base\) \{ base = Date\.now\(\);/, '★★ 첫 회차에 옛 메일 첨부까지 쓸어 담는다');
+  assert.match(w, /orderByChild\('d'\)\.startAt\(base\)/);
+  const rules = read('scripts/make-firebase-rules.js');
+  assert.match(rules, /msgs: \{ \$slug: \{ '\.indexOn': \['d'\] \} \}/, '날짜 색인이 없으면 받은메일 전부를 내려받는다');
+});
