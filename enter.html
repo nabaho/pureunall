@@ -546,7 +546,10 @@ body.portal-mode #camFab{display:flex;}
   .pbar .pmeta{order:1;flex:0 0 auto;font-size:.72rem;gap:6px;padding:3px 8px 3px 6px;}
   .pbar .pmeta .avatar{display:none;}          /* 폰에선 아바타 생략(공간 절약) */
   .pbar .pmeta #userName{font-weight:600;}
-  .pbar .pmeta .me-money{display:none;}        /* 폰은 좁다 — 사용액은 내 메뉴 안에서 */
+  /* 사용액은 폰에서도 «늘» 보인다 (대표 2026-10-24 「사용 량 금액표시는 해야된다 그래야 계속 검토한다」) —
+     자리가 좁아 「이번 달」 글자만 접고 금액(₩)은 남긴다. 모자라면 내 메뉴 단추가 줄어드는 대신 아랫줄로 내려간다. */
+  .pbar .pmeta .me-money small{display:none;}
+  .pbar .pmeta .me-money{padding-left:6px;}
   .pbar > #logoutBtn{display:none;}            /* 폰은 좁다 — 로그아웃은 내 메뉴 맨 아래(#meLogout) */
   .pbar .me-menu .me-logout{display:block;}
   /* 잘 될 때는 초록 점 하나로 충분하다 — 「서버 연결됨」 여섯 글자가 이름 자리를 먹는다.

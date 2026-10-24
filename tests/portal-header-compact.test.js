@@ -126,3 +126,10 @@ test('내 메뉴 안의 돈 딱지는 «줄» — 값은 오른쪽 · 경고 색
   assert.match(enter, /\.me-menu #moneyBox #aiChip\[data-tone="warn"\]\{background:/, '★ 한도에 가까워도 노란색이 안 보인다');
   assert.match(enter, /\.me-menu #moneyBox #aiChip\[data-tone="over"\]\{background:/, '★ 한도를 넘어도 빨간색이 안 보인다');
 });
+
+/* 대표 2026-10-24 「사용 량 금액표시는 해야된다 그래야 계속 검토한다」 — 폰에서 메뉴 속에만 두었더니 안 보였다 */
+test('★ 사용액은 폰에서도 머리줄(내 메뉴 단추)에 늘 보인다 — 금액은 접지 않는다', () => {
+  const b = phoneBlock();
+  assert.doesNotMatch(b, /\.me-money\{[^}]*display:none/, '★ 폰에서 사용액을 감췄다 — 대표가 «늘 보여야 검토한다» 하셨다');
+  assert.doesNotMatch(b, /#meMoneyAmt\{[^}]*display:none/, '★ 폰에서 금액 숫자를 감췄다');
+});
