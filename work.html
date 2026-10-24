@@ -20,6 +20,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=76"></script>
 <script src="js/pu-kakao-work.js?v=2"></script>
+<script src="js/pu-kakao-export.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -788,6 +789,31 @@
   .kkc.a{background:#fffbeb;border-color:#fde68a;color:#854d0e}
   .kkc.g{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
   .kksm{padding:2px 8px;font-size:11.5px}
+  /* 내보내기 올리기 표(2026-10-24) — PC 는 한 칸 한 줄, 폰은 줄마다 «두 줄 카드»(1줄 ☐·번호·날짜·묶인 곳, 2줄 요약) */
+  .kxt select{max-width:220px}
+  .kxt tr.kxoff td{color:var(--faint)}
+  .kxnote{white-space:normal}
+  .kxshort{display:none}
+  .kkc.r{color:var(--danger);border-color:var(--danger);background:#fff}
+  .kxt td.kxwork{max-width:320px;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:640px){
+    .panel.tbl table.kxt,.kxt tbody{display:block;width:100%;min-width:0}   /* 표 폭이 기본 최소폭(.panel.tbl table)이나 칸 글자 길이를 따라 화면 밖으로 가지 않게 */
+    .kxt thead{display:none}
+    .kxt tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+    .kxt td{padding:0;border:0;white-space:nowrap}
+    .kxt td.kkfit{width:auto}                       /* PC 의 «1%» 폭이 카드에서는 글자를 한 자씩 세운다 */
+    .kxt td.kxwho,.kxt td.kxatt{display:none}       /* 말한 사람·첨부는 요약 글머리·꼬리에 이미 있다 */
+    .kxt td.kxwork{flex:1 1 120px;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis}   /* 1줄: ☐ 번호 날짜 업무 근거 상태 — 업무 이름이 줄어들 자리 */
+    .kxt td.kxbasis{order:2}
+    .kxt td.kxstate{order:3}
+    .kxt .kxlong{display:none}
+    .kxt .kxshort{display:inline}
+    .kxt td.kxnone,.kxt td.kxnew{display:none}      /* 기한이 없거나 «새로 추가»(기본)이면 칸을 그리지 않는다 — 말하는 값만 보인다 */
+    .kxt td.kxdue{order:8}                          /* 2줄: 기한(있을 때) + 요약 */
+    .kxt td.kxsum{order:9;flex:1 1 55%;min-width:0;max-width:none;white-space:normal;overflow:hidden;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .kxt input[type=checkbox]{width:22px;height:22px}
+    .kxt select,.kxt input[type=text]{font-size:16px;max-width:100%}
+  }
   .wsbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:0 0 10px}
   .wsbar .n{margin-left:auto;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
@@ -3155,7 +3181,7 @@ function pcRowHTML(ym,p,fid){
    ⚠ 갈래·묶기·기한 셈은 js/pu-kakao-work.js 한 곳 — 여기서 다시 짓지 않는다. */
 var KK_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/hanaMessageBridge';
 var KK_MARK_KEY='pu-kakao-mark-v1';
-var KK={days:1,items:null,rooms:null,err:'',busy:false,show:'todo',sel:{}};
+var KK={days:1,items:null,rooms:null,err:'',busy:false,show:'todo',sel:{},tab:'alert'};
 function kkMarks(){ try{ return JSON.parse(localStorage.getItem(KK_MARK_KEY)||'{}')||{}; }catch(e){ return {}; } }
 function kkMarkSet(id,v){ var m=kkMarks(); if(v) m[id]=v; else delete m[id];
   try{ localStorage.setItem(KK_MARK_KEY,JSON.stringify(m)); }catch(e){} }
@@ -3185,10 +3211,13 @@ function kkKindChip(g){
   if(g.kind==='media') return '<span class="kkc">📷 사진·파일</span>';
   return '<span class="kkc">직원 글</span>';
 }
+/* 같은 글이 폰 알림과 대화 내보내기 양쪽에 있으면(보낸 사람·글이 같고 90초 안) 알림 쪽을 숨긴다 — 내보내기가
+   실제로 말한 사람과 시각을 갖는다(2026-10-24). 화면이 «보는 목록»만 거른다 — 서버 자료는 그대로. */
+function kkItems(){ var X=window.PuKakaoExport; return (X&&KK.items)?X.dropAlertTwins(KK.items):(KK.items||[]); }
 function kkRows(){
   var K=window.PuKakaoWork; if(!K||!KK.items) return [];
   var marks=kkMarks();
-  return K.groupBursts(KK.items).reverse().map(function(g){
+  return K.groupBursts(kkItems()).reverse().map(function(g){
     g.key=g.ids[0]; g.mark=marks[g.key]||'';
     g.summary=g.texts.join(' / ').replace(/\s+/g,' ').trim()||(g.media?'📷 '+g.media+'장':'');
     g.due=K.findDue(g.texts.join('\n'),Date.now());
@@ -3199,13 +3228,25 @@ function kkRows(){
     return !g.mark && g.kind!=='media';
   });
 }
+/* 위쪽 탭 둘 — 알림(폰이 받은 것) · 대화 내보내기 올리기(사람이 내보낸 .txt, 2026-10-24) */
+function kkTabsHTML(){
+  return '<div class="row" style="gap:6px;margin-bottom:10px">'
+    +[['alert','알림'],['export','대화 내보내기 올리기']].map(function(t){
+      return '<span class="chipbtn'+(KK.tab===t[0]?' on':'')+'" onclick="kkTab(\''+t[0]+'\')">'+t[1]+'</span>'; }).join('')+'</div>';
+}
+function kkTab(t){ KK.tab=t; if(t!=='export') kxReset(); renderKakao(); }
 function renderKakao(){
   var app=$('app'); if(!app) return;
+  if(KK.tab==='export'){
+    app.innerHTML='<div class="row" style="flex-wrap:wrap;margin-bottom:10px;gap:8px"><h1>💬 카톡정리</h1></div>'+kkTabsHTML()+kxHTML();
+    return;
+  }
   if(KK.items===null&&!KK.busy&&!KK.err) kkLoad();
   var rows=kkRows();
   var h='<div class="row" style="flex-wrap:wrap;margin-bottom:10px;gap:8px"><h1>💬 카톡정리</h1>'
     +'<span class="statbar" style="margin:0">업무방 알림을 <b>누가 · 언제 · 무엇을</b>로 묶었습니다 — '
     +'<b>✓ 할 일로</b>를 누르면 새 업무 창이 채워져 열립니다(저장은 직접).</span></div>';
+  h+=kkTabsHTML();
   h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">'
     +[[1,'오늘'],[7,'7일'],[30,'30일']].map(function(d){
       return '<span class="chipbtn'+(KK.days===d[0]?' on':'')+'" onclick="kkDays('+d[0]+')">'+d[1]+'</span>'; }).join('')
@@ -3326,7 +3367,7 @@ function kkObsRun(){
   if(!obsSupported()){ toast('크롬이나 엣지에서 열어 주세요','err'); return; }
   if(!KK.items||!KK.items.length){ toast('쓸 알림이 없습니다'); return; }
   var K=window.PuKakaoWork, marks=kkMarks(), byDay={};
-  K.groupBursts(KK.items).forEach(function(g){ var d=ymd(new Date(g.firstAt)); (byDay[d]=byDay[d]||[]).push(g); });
+  K.groupBursts(kkItems()).forEach(function(g){ var d=ymd(new Date(g.firstAt)); (byDay[d]=byDay[d]||[]).push(g); });
   (_obsRoot?Promise.resolve(_obsRoot):obsGet()).then(function(h){
     if(!h) return obsPick();
     return obsOk(h,true).then(function(ok){ return ok?h:obsPick(); });
@@ -3359,6 +3400,7 @@ function route(){
     cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
   visBadge();
   kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
+  if(S.view!=='kakao') kxReset();   /* 올린 대화 내용은 화면을 떠나면 버린다 */
   /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
   var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
   wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */
@@ -3453,6 +3495,389 @@ function renderKb(){
   h+='</div>';
   app.innerHTML=h;
 }
+/* ══ 💬 카톡정리 › 대화 내보내기 올리기 (2026-10-24) ══════════════════════════════
+   대표 지시 2026-10-24 「PC 카톡의 법인 대화방 자료를 받아 따로 보관하고, 대화 진행상황을 업무관리에
+   자동으로 넣을 수 없나」 → 사람이 PC 카톡에서 내보낸 .txt 를 여기서 읽어 업무별 진행 기록으로 정리한다.
+   설계서: docs/superpowers/specs/2026-10-24-카톡-법인방-업무정리-design.md
+   ■ 흐름: .txt 올리기 → 방 확인 → 읽기 → 묶기 → 맞추기 → 미리보기 → 반영(원문 30일 보관 → 진행 기록)
+   ■ 지키는 것
+     · 읽기·묶기·미리보기는 이 PC 의 브라우저 안에서만 한다. «반영» 전에는 서버로 아무것도 안 간다.
+     · 방 이름이 «받을 방» 목록(⚙ 받을 방 — 알림 길과 같은 것)과 글자 그대로 같을 때만 읽는다.
+     · 사건번호가 업무관리 번호와 글자 그대로 같을 때만 «확실»(기본 체크). 업체명만이면 «짐작»(기본 해제).
+       이름으로 업체·업무 id 를 채우지 않는다 — 연결의 열쇠는 업무 id 다.
+     · 진행 기록은 덮어쓰거나 지우지 않는다 — 같은 내용은 건너뛰고, 그날 글이 늘면 새 줄로만 더한다.
+     · 저장은 한 번의 쓰기. 원문 보관(서버)이 먼저고, 실패하면 진행 기록으로 가지 않는다.
+   ⚠ 읽기·묶기·열쇠·맞추기 셈은 js/pu-kakao-export.js 한 곳 — 여기서 다시 짓지 않는다. */
+var KX_CHUNK=400;   /* 한 번에 서버로 보내는 글 수 — 서버 IMPORT_ITEMS_MAX 와 같다(tests/kakao-export-screen.test.js 가 견준다) */
+function kxBlank(){ return {err:'',busy:false,fileName:'',room:'',parsed:null,rows:null,logs:{},off:{},rawMsgs:null,rawState:'none',bad:0,
+  srcDir:null,srcName:'',srcNames:null,files:null,copyMsg:''}; }
+var KX=kxBlank();
+function kxReset(){ KX=kxBlank(); }
+/* 업무 하나가 가진 «심급 사건번호» — 푸른이알피 사건 레코드의 stages[].caseNo (읽기만) */
+function kxStageNos(it){
+  var r=null; try{ r=peRec(it); }catch(e){ r=null; }
+  return ((r&&r.stages)||[]).map(function(s){ return String((s&&s.caseNo)||''); }).filter(Boolean);
+}
+/* 맞추기에 넘길 업무 목록 — 종결 업무도 넣는다(사건번호가 같으면 종결 뒤 대화도 기록돼야 한다).
+   업체 후보는 «진행 중»인 업무의 업체만, 문턱은 메일 잇기와 같은 MLK_MIN_MATCH 한 곳. */
+function kxItems(){
+  var companies=[], seen={};
+  var list=allItems().map(function(it){
+    var key=String(it.co_id||'')||('n:'+_koOnly(it.company));
+    var open=it.state!=='done';
+    if(open&&it.company&&_koOnly(it.company).length>=MLK_MIN_MATCH&&!seen[key]){ seen[key]=1; companies.push({key:key,name:it.company}); }
+    /* 「새 업무 창 열기」로 만든 업무는 사건번호가 «업무명»에 있고 no 는 자동 번호다 — 업무명 속 번호도 «글자 그대로» 같으면 맞는다.
+       (이름으로 id 를 채우는 것이 아니다. 다음 주 같은 번호가 또 «없는 번호»로 떠 중복 업무를 만들게 하지 않으려는 것) */
+    var titleNos=window.PuKakaoExport?window.PuKakaoExport.extractCaseNos(it.title):[];
+    return {id:it._id,no:String(it.no||''),company:String(it.company||''),key:key,stageNos:kxStageNos(it).concat(titleNos),open:open};
+  });
+  return {list:list,companies:companies};
+}
+function kxLogsOf(id){
+  if(KX.logs[id]) return Promise.resolve(KX.logs[id]);
+  /* 기록과 «사람이 지운 표식»(kxoff)을 함께 읽는다 — 지운 줄은 기록에 없으니 표식이 없으면 되살아난다 */
+  return Promise.all([fbDb.ref(NS+'/itemlogs/'+id).once('value'),fbDb.ref(NS+'/kxoff/'+id).once('value')]).then(function(r){
+    var v=r[0].val(), o=r[1].val();
+    KX.off[id]=(o&&typeof o==='object')?o:{};
+    KX.logs[id]=(v&&typeof v==='object')?v:{};
+    return KX.logs[id];
+  });
+}
+/* 이 묶음을 반영하면 어떻게 되나 — new 새 줄 · more 같은 날인데 내용이 늘어 «보강»(옛 줄은 그대로) · same 이미 있음 · ? 아직 모름 */
+function kxStatus(r){
+  var X=window.PuKakaoExport;
+  if(!r.itemId) return '';
+  var logs=KX.logs[r.itemId];
+  if(!logs) return '?';
+  r.lid=X.logId(r.itemId,r.g.day,KX.room,r.d.text,r.g.files);
+  if(logs[r.lid]) return 'same';
+  if((KX.off[r.itemId]||{})[r.lid]) return 'gone';   /* 사람이 지운 줄 — 다시 올리지 않는다 */
+  var pre='K'+X.lineKey(r.itemId,r.g.day,KX.room);
+  return Object.keys(logs).some(function(k){ return k.indexOf(pre)===0; })?'more':'new';
+}
+function kxElig(r){ var s=kxStatus(r); return !!r.itemId&&(s==='new'||s==='more'); }
+function kxOnTxt(inp){ var f=inp&&inp.files&&inp.files[0]; if(inp) inp.value=''; if(f) kxReadFile(f); }
+function kxDrop(ev){
+  ev.preventDefault();
+  var fs=(ev.dataTransfer&&ev.dataTransfer.files)||[];
+  for(var i=0;i<fs.length;i++) if(/\.txt$/i.test(fs[i].name)){ kxReadFile(fs[i]); return; }
+  toast('.txt 파일을 놓아 주세요','warn');
+}
+function kxReadFile(f){
+  f.text().then(function(t){ kxLoad(t,f.name); })
+    .catch(function(e){ KX=kxBlank(); KX.err='파일을 읽지 못했습니다: '+((e&&e.message)||''); renderKakao(); });
+}
+function kxLoad(text,name){
+  var X=window.PuKakaoExport, K=window.PuKakaoWork, M=window.PuRrnMask;
+  KX=kxBlank(); KX.fileName=name||'';
+  if(!X||!K){ KX.err='읽기 도구(js/pu-kakao-export.js)가 이 화면에 실려 있지 않습니다'; renderKakao(); return Promise.resolve(); }
+  /* ⚠ 주민번호 지우개가 없으면 «읽기 전에» 멈춘다 — 조용히 새는 것보다 시끄럽게 멈춘다(옵시디언 내보내기와 같은 규칙) */
+  if(!M||!M.maskRrnInText){ KX.err='주민번호 지우개(js/pu-rrn-mask.js)가 이 화면에 실려 있지 않습니다 — 그대로 올리면 주민번호가 서버로 갑니다'; renderKakao(); return Promise.resolve(); }
+  KX.busy=true; renderKakao();
+  var room=X.parseExport(String(text||'').split('\n').slice(0,8).join('\n')).room;   /* 머리글만 읽어 방부터 확인한다 */
+  var rooms=KK.rooms?Promise.resolve(KK.rooms):kkCall('kakaoRooms').then(function(r){ KK.rooms=r.rooms||[]; return KK.rooms; });
+  return rooms.then(function(list){
+    if(!room||!K.roomAllowed(list,room)){
+      KX.err=!room?'이 파일에서 방 이름(첫 줄 「… 카카오톡 대화」)을 찾지 못했습니다. 카톡 PC 의 «대화 내보내기 › 텍스트만» 파일인지 확인해 주세요.'
+        :'「'+room+'」은 받을 방 목록에 없습니다. 개인 대화방은 올리지 않습니다 — 업무방이면 «알림» 탭의 ⚙ 받을 방에 먼저 넣어 주세요.';
+      return null;
+    }
+    KX.room=K.normRoom(room);
+    var parsed=X.parseExport(text);
+    var mask=function(s){ return M.maskRrnInText(K.maskSensitive(s)).text; };
+    var msgs=X.maskMessages(parsed.messages,mask);
+    KX.bad=parsed.badLines;
+    if(!msgs.length){ KX.err='읽을 수 있는 대화 줄이 없습니다(못 읽은 줄 '+parsed.badLines+'개). 내보내기 형식이 다른 것 같습니다.'; return null; }
+    var base=kxItems(), extra=[];
+    base.list.forEach(function(it){ extra.push(it.no); it.stageNos.forEach(function(n){ extra.push(n); }); });
+    var groups=X.groupMessages(msgs,{companies:base.companies,minLen:MLK_MIN_MATCH,extraKnown:extra});
+    var matches=X.matchGroups(groups,base.list);
+    var days=msgs.map(function(m){ return m.day; }).sort(), who={};
+    msgs.forEach(function(m){ who[m.sender]=1; });
+    KX.parsed={n:msgs.length,from:days[0],to:days[days.length-1],senders:Object.keys(who).length};
+    KX.rows=groups.map(function(g,i){
+      var m=matches[i];
+      return {g:g,m:m,d:X.digest(g),due:K.findDue(g.msgs.map(function(x){ return x.text; }).join('\n'),g.lastAt||Date.now()),
+              itemId:m.itemId,on:m.basis==='sure',lid:''};
+    });
+    var cutoff=Date.now()-(K.KEEP_DAYS+1)*86400000;
+    KX.rawMsgs=msgs.filter(function(x){ return x.at>=cutoff; });
+    var ids={}; KX.rows.forEach(function(r){ if(r.itemId) ids[r.itemId]=1; });
+    return Promise.all(Object.keys(ids).map(kxLogsOf)).then(function(){
+      KX.rows.forEach(function(r){ if(!kxElig(r)) r.on=false; });
+      kxFilesBuild();
+    });
+  }).catch(function(e){ KX.err='읽는 중 문제가 생겼습니다: '+((e&&e.message)||e); KX.rows=null; KX.parsed=null; })
+    .then(function(){ KX.busy=false; renderKakao(); });
+}
+function kxItemLabel(i,r){
+  var it=r.itemId?items[r.itemId]:null, m=r.m;
+  var nm=function(x){ return esc(x.company||'')+' · '+esc(itemName(x)||x.no||''); };
+  if(m.basis==='guess'&&m.candidates.length>1){
+    return '<select onchange="kxSetItem('+i+',this.value)"><option value="">업무 고르기 ▾</option>'
+      +m.candidates.map(function(id){ var x=items[id]; return x?'<option value="'+esc(id)+'"'+(id===r.itemId?' selected':'')+'>'+nm(x)+'</option>':''; }).join('')+'</select>';
+  }
+  if(it) return nm(it);
+  if(m.basis==='newno') return '<b>'+esc(m.caseNo)+'</b> <button class="kksm" onclick="kxTask('+i+')">새 업무 창 열기</button>';
+  return '<span class="muted">미분류</span>';
+}
+function kxRowHTML(i,r){
+  var m=r.m, st=kxStatus(r), ok=kxElig(r);
+  /* 근거 칩은 PC 에서 길게, 폰에서는 짧게(.kxlong·.kxshort) — 폰 한 줄에 업무 이름이 들어갈 자리를 남긴다 */
+  var chip=function(cls,long,short,title){ return '<span class="kkc'+cls+'"'+(title?' title="'+esc(title)+'"':'')+'><span class="kxlong">'+long+'</span><span class="kxshort">'+short+'</span></span>'; };
+  var basis=m.basis==='sure'?chip(' b','사건번호 일치 · 확실','확실','사건번호가 업무관리 번호(또는 심급 사건번호)와 글자 그대로 같음')
+    :m.basis==='guess'?chip(' a','짐작 — 확인 필요','짐작','업체명만 같거나 같은 번호가 업무 여럿 — 확인 필요')
+    :m.basis==='newno'?chip('','업무관리에 없는 번호','번호 없음','사건번호가 업무관리에 없습니다'):chip('','근거 없음','근거 없음','');
+  var state=st==='new'?'<span class="kkc g">새로 추가</span>':st==='more'?'<span class="kkc a" title="같은 날 줄이 이미 있는데 내용이 늘었습니다 — 옛 줄은 그대로 두고 새 줄을 더합니다">보강 · 옛 줄 유지</span>'
+    :st==='same'?'<span class="kkc">이미 있음</span>'
+    :st==='gone'?'<span class="kkc" title="이 줄은 사람이 지웠습니다 — 같은 내용은 다시 올리지 않습니다. 그날 글이 늘어 내용이 달라지면 새 줄로 다시 나옵니다">지운 줄 · 다시 안 올림</span>':'<span class="muted">—</span>';
+  var full=r.g.msgs.map(function(x){ return x.sender+': '+x.text; }).join('\n');
+  return '<tr'+(ok&&r.on?'':' class="kxoff"')+'><td class="kkfit"><input type="checkbox"'+(r.on?' checked':'')+(ok?'':' disabled')+' onclick="kxPick('+i+',this.checked)"></td>'
+    +'<td class="kkfit muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
+    +'<td class="kkfit">'+esc(md(r.g.day))+'</td>'
+    +'<td class="kkfit kxwork">'+kxItemLabel(i,r)+'</td>'
+    +'<td class="kkfit kxbasis">'+basis+'</td>'
+    +'<td class="kkfit kxwho">'+esc(r.d.who.slice(0,3).join('·')+(r.d.who.length>3?' 외 '+(r.d.who.length-3):''))+'</td>'
+    +'<td class="kkcut kxsum" title="'+esc(full)+'">'+esc(r.d.text.replace(/^💬 카톡 · /,''))+'</td>'
+    +'<td class="kkfit kxdue'+(r.due?'':' kxnone')+'">'+(r.due?'<span class="kkc a">기한 '+esc(md(r.due))+'</span>':'<span class="muted">—</span>')+'</td>'
+    +'<td class="kkfit kxatt">'+(r.g.files.length?'📎 '+r.g.files.length:'<span class="muted">—</span>')+'</td>'
+    +'<td class="kkfit kxstate'+(st==='new'?' kxnew':'')+'">'+state+'</td></tr>';
+}
+function kxHTML(){
+  var rows=KX.rows||[];
+  var h='<div class="panel" ondragover="event.preventDefault()" ondrop="kxDrop(event)"><div class="row" style="gap:8px;flex-wrap:wrap">'
+    +'<button class="primary" onclick="$(\'kx-txt\').click()">📄 대화 내보내기 .txt 고르기</button>'
+    +'<input type="file" id="kx-txt" accept=".txt,text/plain" hidden onchange="kxOnTxt(this)">'
+    +'</div><div class="muted kxnote" style="font-size:12px;margin-top:6px">또는 여기로 끌어 놓기 — 이 PC 안에서만 읽습니다. <b>«반영»을 누르기 전에는 서버로 아무것도 안 갑니다.</b></div>'
+    +'<details style="margin-top:8px"><summary class="muted" style="font-size:12px;cursor:pointer">PC 카톡에서 내보내는 법</summary>'
+    +'<div class="muted" style="font-size:12px;line-height:1.7;margin-top:4px">채팅방 열기 → ≡(메뉴) → 대화 내용 → 대화 내보내기 → <b>텍스트만</b> 저장. '
+    +'사진·파일은 같은 방의 서랍에서 따로 받습니다(카톡이 약 2주 뒤 지웁니다). [확인 필요 — 메뉴 이름은 카톡 판마다 다릅니다]</div></details></div>';
+  if(KX.err) h+='<div class="panel" style="color:#991b1b;white-space:pre-line">'+esc(KX.err)+'</div>';
+  if(KX.busy) h+='<div class="panel muted">처리하는 중…</div>';
+  if(!KX.parsed) return h+kxNotesHTML();
+  var nSame=rows.filter(function(r){ return kxStatus(r)==='same'; }).length;
+  var elig=rows.filter(kxElig), nSel=rows.filter(function(r){ return r.on; }).length;
+  h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+    +'<span class="kkc g">✓ 방 확인: '+esc(KX.room)+'</span>'
+    +'<span class="kkc">기간 '+esc(md(KX.parsed.from))+' ~ '+esc(md(KX.parsed.to))+'</span>'
+    +'<span class="kkc">글 '+KX.parsed.n+'건</span><span class="kkc">말한 사람 '+KX.parsed.senders+'명</span>'
+    +(KX.bad?'<span class="kkc a">못 읽은 줄 '+KX.bad+'개</span>':'')
+    +(nSame?'<span class="kkc">이미 반영한 묶음 '+nSame+'개는 건너뜀</span>':'')+'</div>';
+  h+='<div class="row" style="gap:8px;margin-bottom:6px;min-height:30px;flex-wrap:wrap">'
+    +'<b style="font-size:12.5px">'+nSel+'건 고름</b>'
+    +'<button class="primary"'+(nSel&&!KX.busy?'':' disabled')+' onclick="kxApply()">업무관리에 반영 ('+nSel+'건 · 한 번에 저장)</button>'
+    +'</div><div class="muted kxnote" style="font-size:12px;margin-bottom:6px">고르기만으로는 아무것도 안 바뀝니다 · 기존 기록은 덮어쓰지 않고 새 줄로만 더합니다</div>';
+  h+='<div class="panel tbl"><table class="kkt kxt"><thead><tr>'
+    +'<th class="kkfit"><input type="checkbox" onclick="kxPickAll(this.checked)"'+(nSel&&nSel===elig.length?' checked':'')+(elig.length?'':' disabled')+'></th>'
+    +'<th class="kkfit">번호</th><th class="kkfit">날짜</th><th class="kkfit">묶인 업무</th><th class="kkfit">맞춘 근거</th>'
+    +'<th class="kkfit">말한 사람</th><th>한 줄 요약 (가린 발췌)</th><th class="kkfit">기한</th><th class="kkfit">첨부</th><th class="kkfit">반영하면</th></tr></thead><tbody>'
+    +rows.map(function(r,i){ return kxRowHTML(i,r); }).join('')+'</tbody></table></div>';
+  return h+kxFilesHTML()+kxNotesHTML();
+}
+function kxNotesHTML(){
+  return '<div class="muted" style="font-size:11.5px;line-height:1.7;margin-top:8px">'
+    +'· 「확실」(파랑)은 사건번호가 업무관리 번호와 글자 그대로 같을 때뿐입니다. 업체명만 같으면 「짐작」이라 기본으로 체크하지 않고, 업체 id 를 이름으로 채우지 않습니다.<br>'
+    +'· 주민번호·카드·계좌처럼 보이는 숫자는 가려져 보입니다. 요약은 AI 를 부르지 않습니다.<br>'
+    +'· 반영하면 가린 원문(최근 30일 글)이 서버에 <b>30일</b> 보관되고(총괄관리자만 봄), 업무관리 진행 기록에는 가린 발췌 한 줄이 더해집니다.</div>';
+}
+function kxPick(i,on){ var r=(KX.rows||[])[i]; if(!r) return; r.on=!!on&&kxElig(r); renderKakao(); }
+function kxPickAll(on){ (KX.rows||[]).forEach(function(r){ r.on=!!on&&kxElig(r); }); renderKakao(); }
+function kxSetItem(i,id){
+  var r=(KX.rows||[])[i]; if(!r) return;
+  r.itemId=id||''; r.on=false;
+  if(!id){ renderKakao(); return; }
+  kxLogsOf(id).then(function(){ renderKakao(); })
+    .catch(function(e){ r.itemId=''; toast('기록을 읽지 못했습니다: '+((e&&e.message)||''),'err'); renderKakao(); });
+}
+/* 새 업무 창을 «채워서» 연다 — 사건번호만 넣고 저장은 사람이 한다. 업체 칸은 이름으로 채우지 않는다. */
+function kxTask(i){
+  var r=(KX.rows||[])[i]; if(!r) return;
+  itemModal();
+  var tries=0;
+  (function fill(){
+    var t=$('if-title');
+    if(!t){ if(++tries<40) setTimeout(fill,75); return; }
+    t.value=r.m.caseNo;
+    var b=$('if-brief'); if(b) b.value=('카톡 '+md(r.g.day)+' '+r.d.who.join('·')).slice(0,b.maxLength>0?b.maxLength:120);
+    var d=$('if-due'); if(d&&r.due) d.value=r.due;
+  })();
+}
+/* ── 첨부 파일 — 대화에 이름이 적힌 «법인방 파일»만 골라 사건·업체 폴더로 «복사»한다 ──────────
+   서버에 올리지 않는다(창고·요금·보유기간 부담이 없다). 원본은 지우지 않고, 같은 이름이 있으면 건너뛴다.
+   받은 파일 폴더에는 다른 방 파일도 섞여 있다 — 대화에 이름이 없는 것은 목록에 올리지도, 건드리지도 않는다.
+   ⚠ 폴더 고르기(File System Access)는 크롬·엣지만 된다 — 옵시디언 내보내기와 같은 한계. */
+function kxPickDir(){
+  if(typeof window.showDirectoryPicker!=='function'){ toast('크롬이나 엣지에서 열어 주세요','err'); return; }
+  window.showDirectoryPicker({id:'pu-kakao-src',mode:'read'}).then(function(h){
+    var names=[], it=h.entries();
+    var step=function(){ return it.next().then(function(r){ if(r.done) return names; if(r.value[1].kind==='file') names.push(r.value[0]); return step(); }); };
+    return step().then(function(){ KX.srcDir=h; KX.srcName=h.name; KX.srcNames=names; kxFilesBuild(); renderKakao(); });
+  }).catch(function(e){ if(e&&e.name==='AbortError') return; toast('폴더를 읽지 못했습니다: '+((e&&e.message)||''),'err'); });
+}
+function kxFilesBuild(){
+  var X=window.PuKakaoExport, want=[], meta={}, today=todayStr();
+  (KX.rows||[]).forEach(function(r,ri){
+    r.g.msgs.forEach(function(m){ (m.files||[]).forEach(function(n){ if(!meta[n]){ meta[n]={day:m.day,sender:m.sender,ri:ri}; want.push(n); } }); });
+  });
+  KX.files=X.matchFiles(want,KX.srcNames||[]).map(function(m){
+    var mt=meta[m.name], r=KX.rows[mt.ri], sens=X.isSensitiveName(m.name);
+    var it=r.itemId?items[r.itemId]:null;
+    /* 폴더: 사건번호가 있는 묶음은 그 번호, 짐작·미분류는 「미분류」 — 짐작한 이름으로 폴더를 정하지 않는다 */
+    var folder=(r.m.basis==='sure'||r.m.basis==='newno')?(r.m.caseNo||(it&&it.no)||'미분류'):'미분류';
+    return {name:m.name,found:m.found,similar:m.similar,day:mt.day,sender:mt.sender,folder:folder,sens:sens,
+      expiry:X.attachmentExpiry(mt.day,today),on:!!m.found&&!sens};
+  });
+}
+function kxFileRowHTML(i,f){
+  var ok=!!f.found;
+  var exp=f.expiry<0?'<span class="kkc r">만료됨</span>':f.expiry===0?'<span class="kkc r">D-0 · 오늘 만료</span>'
+    :'<span class="kkc'+(f.expiry<=3?' r':f.expiry<=7?' a':'')+'">D-'+f.expiry+'</span>';
+  var got=!KX.srcNames?'<span class="muted">폴더 고르기 전</span>'
+    :f.found?'<span class="kkc g">✓ 찾음'+(f.similar?' · 이름 비슷':'')+'</span>':'<span class="kkc r">✗ 못 받음 — 톡서랍에서 받으세요</span>';
+  return '<tr'+(ok&&f.on?'':' class="kxoff"')+'><td class="kkfit"><input type="checkbox"'+(f.on?' checked':'')+(ok?'':' disabled')+' onclick="kxFilePick('+i+',this.checked)"></td>'
+    +'<td class="kkfit muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
+    +'<td class="kkfit kxwork" title="'+esc(f.name)+'">'+esc(f.name)+(f.sens?' <span class="kkc r" title="신분증·통장·진단서 같은 낱말이 든 이름 — 확인 후 직접 체크하세요">민감 의심</span>':'')+'</td>'
+    +'<td class="kkfit kxwho">'+esc(md(f.day))+'</td>'
+    +'<td class="kkfit kxbasis">'+exp+'</td>'
+    +'<td class="kkfit kxdue">'+got+'</td>'
+    +'<td class="kkcut kxsum" title="'+esc(f.folder)+'">카톡파일/'+esc(f.folder)+'/</td></tr>';
+}
+function kxFilesHTML(){
+  var fl=KX.files||[]; if(!fl.length) return '';
+  var nSel=fl.filter(function(f){ return f.on; }).length, nFound=fl.filter(function(f){ return f.found; }).length;
+  return '<h2 style="margin:14px 0 6px;font-size:14px">첨부 파일 '+fl.length+'개 <span class="kkc a">카톡 보관 약 '+window.PuKakaoExport.ATTACH_LIFE_DAYS+'일</span></h2>'
+    +'<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<button onclick="kxPickDir()">📁 «카카오톡 받은 파일» 폴더 고르기'+(KX.srcName?' · '+esc(KX.srcName):'')+'</button>'
+    +'<button class="primary"'+(nSel&&!KX.busy?'':' disabled')+' onclick="kxCopyFiles()">고른 파일 '+nSel+'개 복사 (원본은 지우지 않습니다)</button></div>'
+    +'<div class="muted kxnote" style="font-size:12px;margin-bottom:6px">대화에 이름이 적힌 파일만 법인방 것으로 봅니다 — 폴더의 다른 방 파일은 건드리지도 않습니다. '
+    +'파일은 서버에 올리지 않고, 고른 폴더(내 PC·공유 폴더) 아래 «카톡파일/사건번호 또는 미분류/» 로 <b>복사만</b> 합니다. 같은 이름이 이미 있으면 건너뜁니다.</div>'
+    +(KX.copyMsg?'<div class="panel" style="padding:8px 12px">'+esc(KX.copyMsg)+'</div>':'')
+    +'<div class="panel tbl"><table class="kkt kxt"><thead><tr>'
+    +'<th class="kkfit"><input type="checkbox" onclick="kxFilePickAll(this.checked)"'+(nSel&&nSel===nFound?' checked':'')+(nFound?'':' disabled')+'></th>'
+    +'<th class="kkfit">번호</th><th class="kkfit">파일 이름(대화에 적힌 대로)</th><th class="kkfit">보낸 날</th><th class="kkfit">카톡 만료</th>'
+    +'<th class="kkfit">받은 파일 폴더</th><th>보낼 곳</th></tr></thead><tbody>'
+    +fl.map(function(f,i){ return kxFileRowHTML(i,f); }).join('')+'</tbody></table></div>';
+}
+function kxFilePick(i,on){ var f=(KX.files||[])[i]; if(!f) return; f.on=!!on&&!!f.found; renderKakao(); }
+/* 한꺼번에 고르기는 «민감 의심»을 건너뛴다 — 그것은 사람이 확인하고 직접 체크한다 */
+function kxFilePickAll(on){ (KX.files||[]).forEach(function(f){ f.on=!!on&&!!f.found&&!f.sens; }); renderKakao(); }
+function kxCopyFiles(){
+  if(typeof window.showDirectoryPicker!=='function'){ toast('크롬이나 엣지에서 열어 주세요','err'); return; }
+  var todo=(KX.files||[]).filter(function(f){ return f.on&&f.found; });
+  if(!todo.length){ toast('복사할 파일을 먼저 고르세요','warn'); return; }
+  confirmM(todo.length+'개 파일을 다음에 고를 폴더 아래 «카톡파일/사건번호(또는 미분류)/» 로 복사합니다.\n원본은 지우지 않고, 같은 이름이 이미 있으면 건너뜁니다.',{ok:'폴더 고르고 복사'}).then(function(ok){
+    if(!ok) return null;
+    return window.showDirectoryPicker({id:'pu-kakao-dest',mode:'readwrite'}).then(function(dest){ return kxCopyInto(dest,todo); });
+  }).catch(function(e){
+    if(e&&e.name==='AbortError') return;
+    KX.err='파일 복사에 실패했습니다: '+((e&&e.message)||e); KX.busy=false; renderKakao();
+  });
+}
+function kxCopyInto(dest,todo){
+  var res={copied:0,skipped:0,failed:0};
+  KX.busy=true; KX.err=''; renderKakao();
+  return dest.getDirectoryHandle('카톡파일',{create:true}).then(function(root){
+    return todo.reduce(function(p,f){
+      return p.then(function(){ return kxCopyOne(root,f).then(function(k){ res[k]++; },function(){ res.failed++; }); });
+    },Promise.resolve());
+  }).then(function(){
+    KX.copyMsg='복사 '+res.copied+'개 · 건너뜀(같은 이름 있음) '+res.skipped+'개'+(res.failed?' · 실패 '+res.failed+'개':'')+' — 원본은 그대로 있습니다.';
+    toast(KX.copyMsg,res.failed?'warn':undefined);
+  }).catch(function(e){ KX.err='파일 복사에 실패했습니다: '+((e&&e.message)||e); })
+    .then(function(){ KX.busy=false; renderKakao(); });
+}
+/* 파일 하나 — 같은 이름이 있으면 건너뛰고(skipped), 없을 때만 만든다. «없음»이 아닌 오류는 그대로 던진다. */
+function kxCopyOne(root,f){
+  var X=window.PuKakaoExport;
+  var dirName=X.safeName(f.folder), outName=X.safeName(f.day+'_'+f.sender+'_'+f.name);
+  return root.getDirectoryHandle(dirName,{create:true}).then(function(dir){
+    return dir.getFileHandle(outName).then(function(){ return 'skipped'; },function(e){
+      if(!e||e.name!=='NotFoundError') throw e;
+      return KX.srcDir.getFileHandle(f.found).then(function(h){ return h.getFile(); }).then(function(file){
+        return dir.getFileHandle(outName,{create:true}).then(function(h){ return h.createWritable(); })
+          .then(function(w){ return file.stream().pipeTo(w); }).then(function(){ return 'copied'; });
+      });
+    });
+  });
+}
+
+/* 반영 — ① 가린 원문 30일 보관(서버) ② 진행 기록(업무관리). ①이 실패하면 ②로 가지 않는다. */
+function kxApply(){
+  if(KX.busy) return;
+  var rows=(KX.rows||[]).filter(function(r){ return r.on&&r.itemId; });
+  if(!rows.length){ toast('반영할 묶음을 먼저 고르세요','warn'); return; }
+  var ids={}; rows.forEach(function(r){ ids[r.itemId]=1; });
+  KX.busy=true; KX.err=''; renderKakao();
+  Promise.all(Object.keys(ids).map(kxLogsOf)).then(function(){
+    var todo=rows.filter(function(r){ var s=kxStatus(r); return s==='new'||s==='more'; });
+    if(!todo.length){ toast('이미 모두 반영돼 있습니다'); return null; }
+    return confirmM(todo.length+'건을 업무관리 진행 기록에 더하고, 가린 원문 '+(KX.rawMsgs||[]).length+'건을 서버에 30일간 보관합니다.\n'
+      +'같은 내용은 건너뛰고, 기존 기록은 덮어쓰지 않습니다.',{ok:'반영'}).then(function(ok){
+      if(!ok) return null;
+      return kxImportRaw().then(function(){ return kxWriteLogs(todo); });
+    });
+  }).then(function(n){
+    if(typeof n==='number'&&n>0){ toast('진행 기록 '+n+'줄을 더했습니다'); (KX.rows||[]).forEach(function(r){ r.on=false; }); }
+  }).catch(function(e){
+    var m=(e&&e.message)||String(e);
+    KX.err=KX.rawState==='done'?'원문은 보관됐지만 진행 기록 반영에 실패했습니다: '+m+' — 다시 누르면 이어서 됩니다(같은 내용은 건너뜁니다).'
+      :KX.rawState==='part'?m
+      :'아무것도 저장하지 않았습니다 — '+m;
+  }).then(function(){ KX.busy=false; renderKakao(); });
+}
+/* 가린 원문을 서버에 — KX_CHUNK 건씩 나눠 보낸다. 같은 글은 서버가 건너뛰므로 다시 보내도 안전하다. */
+function kxImportRaw(){
+  var msgs=KX.rawMsgs||[], chunks=[];
+  for(var i=0;i<msgs.length;i+=KX_CHUNK) chunks.push(msgs.slice(i,i+KX_CHUNK));
+  /* 보낼 글이 0건(31일 넘은 파일)이어도 빈 요청 한 번은 보낸다 — 서버가 이 동작을 알고 이 방을 받는지 «먼저» 확인한다.
+     안 보내면 서버가 배포 전이어도 진행 기록만 쓰이는 길이 생긴다. */
+  if(!chunks.length) chunks.push([]);
+  KX.rawState='none';
+  return chunks.reduce(function(p,c){
+    return p.then(function(){
+      return kkCall('kakaoImport',{room:KX.room,items:c.map(function(m){ return {sender:m.sender,text:m.text,time:m.at}; })}).then(function(j){
+        if(j.ignored) throw new Error('서버가 이 방을 받을 방 목록에서 찾지 못했습니다');
+        if(j.over) throw new Error('서버가 한 번에 받는 건수를 넘었습니다');
+        KX.rawState='part';
+      });
+    });
+  },Promise.resolve()).then(function(){ KX.rawState='done'; },function(e){
+    var why='원문 보관(서버)이 안 됐습니다: '+((e&&e.message)||e)+' — 서버에 새 기능(kakaoImport)이 아직 배포 전일 수 있습니다.';
+    throw new Error(KX.rawState==='part'?'원문이 일부만 보관됐고 진행 기록은 아직 안 더했습니다. '+why+' 다시 누르면 이어서 됩니다(중복은 건너뜁니다).':why);
+  });
+}
+/* 진행 기록을 쓴다 — addLog 와 같은 자리(logs·itemlogs)·같은 모양, 한 번의 쓰기. 줄 열쇠(lid)가 내용에서 나와 같은 줄은 겹치지 않는다. */
+function kxWriteLogs(rows){
+  var X=window.PuKakaoExport, up={}, lastBy={}, done=[], now=new Date().toISOString();
+  rows.forEach(function(r){
+    var st=kxStatus(r); if(!r.itemId||!r.lid||(st!=='new'&&st!=='more')) return;
+    var id=r.itemId, g=r.g, wk=weekKeyOf(mondayOf(new Date(g.day+'T00:00:00'))), y=weekYear(wk);
+    var log={d:g.day,t:r.d.text,by:(S.me&&S.me.sid)||'',byName:(S.me&&S.me.name)||'',at:now,k:'kt',
+      kroom:KX.room,kn:r.d.n,kwho:r.d.who.join('·'),kck:X.lineKey(id,g.day,KX.room),kh:r.lid.slice(17)};
+    up[NS+'/logs/'+y+'/'+wk+'/'+id+'/'+r.lid]=log;
+    up[NS+'/itemlogs/'+id+'/'+r.lid]=Object.assign({w:wk},log);
+    done.push({id:id,lid:r.lid,wk:wk,log:log});
+    if(!lastBy[id]||lastBy[id].d<g.day) lastBy[id]={d:g.day,t:r.d.text};
+  });
+  Object.keys(lastBy).forEach(function(id){
+    var it=items[id];
+    if(it&&(!it.last||String(it.last.d||'')<=lastBy[id].d)) up[NS+'/items/'+id+'/last']=lastBy[id]; else delete lastBy[id];
+  });
+  if(!done.length) return Promise.resolve(0);
+  return fbDb.ref().update(up).then(function(){
+    done.forEach(function(x){
+      if(!wkCache[x.wk]) wkCache[x.wk]={}; if(!wkCache[x.wk][x.id]) wkCache[x.wk][x.id]={};
+      wkCache[x.wk][x.id][x.lid]=x.log;
+      if(itemLogsCache[x.id]) itemLogsCache[x.id][x.lid]=Object.assign({w:x.wk},x.log);
+      if(KX.logs[x.id]) KX.logs[x.id][x.lid]=x.log;
+    });
+    Object.keys(lastBy).forEach(function(id){ items[id].last=lastBy[id]; });
+    return done.length;
+  });
+}
+
+/* ══ 끝: 💬 카톡정리 › 대화 내보내기 올리기 ══ — 이 구간은 성과급 구간(var PC_PATH= ~ 라우팅) 밖에 둔다: tests/perf-confirm-work.test.js 가 그 사이의 fbDb.ref 를 센다 */
+
 /* ── 3단계: 본문 검색 ─────────────────────────────────────────────────
    기존 검색(matchQ)은 업무의 필드만 훑는다. 노트 본문·회고·기록·지식 카드는
    대상이 아니었다 — 암묵지를 쌓아도 찾을 수 없으면 죽은 자료가 된다.
@@ -6488,6 +6913,9 @@ function _delLog(itemId,lid){
   var up={};
   up[NS+'/itemlogs/'+itemId+'/'+lid]=null;
   if(wk) up[NS+'/logs/'+weekYear(wk)+'/'+wk+'/'+itemId+'/'+lid]=null;
+  /* 카톡 내보내기로 들어온 줄(k:'kt')을 지우면 표식(kxoff)을 «같은 쓰기»에 남긴다 — 안 남기면 겹치는 다음 주
+     내보내기에서 같은 줄이 «새로 추가»로 되살아난다(2026-10-24). 올리기 화면(kxStatus)이 이 표식을 본다. */
+  if(l&&l.k==='kt'){ var kw=_mlkWho(); up[NS+'/kxoff/'+itemId+'/'+lid]={at:kw.at, by:kw.by, byName:kw.byName}; }
   /* 자동 줄을 지우면 「이 업무 것 아님」으로 남긴다 — 안 남기면 다음에 돌 때 되살아난다 */
   var aw=l&&l.auto&&l.src&&(l.aw||wk), anone=null, aoff=null;
   if(aw){

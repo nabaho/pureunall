@@ -7126,6 +7126,12 @@ exports.hanaMessageBridge = functions
         await requireTotalAdmin(req);
         hanaJson(res, 200, await KakaoWork.list(db, body.days, Date.now())); return;
       }
+      /* 대화 내보내기(.txt) 올리기 — 총괄관리자가 브라우저에서 읽은 글을 «가린 원문 30일 보관»으로 담는다
+         (2026-10-24). 알림 길과 같은 자리(kakaoWork/notes)·같은 방 허용목록·같은 30일 삭제를 쓴다. */
+      if (action === "kakaoImport") {
+        const admin = await requireTotalAdmin(req);
+        hanaJson(res, 200, await KakaoWork.importExport(db, admin, body, Date.now())); return;
+      }
 
       const staff = await requireFinanceStaff(req);
       const base = db.ref(`hanaSmsBridge`);
