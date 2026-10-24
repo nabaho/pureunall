@@ -759,16 +759,24 @@ test('★★ 서버 — fetch 가 못 열면 node https(IPv4)로 한 번 더 · 
 });
 
 /* ── 중간 인증서를 빠뜨리는 서버 — 지방공기업평가원 (2026-10-10 원인 확정: UNABLE_TO_VERIFY_LEAF_SIGNATURE) ── */
-test('★★★ 더하는 중간 인증서는 «Sectigo DV R36» 하나 — Node 기본 뿌리(R46)로 서명된 진짜이고 2036년까지', () => {
+test('★★★ 더하는 중간 인증서는 «둘» — Sectigo DV R36(평가원) · TuringSign RSA Secure CA 2(데이터산업진흥원), 둘 다 Node 기본 뿌리로 서명된 진짜', () => {
   const c = require('crypto'), tls = require('tls');
-  assert.equal(W.EXTRA_CA.length, 1);
+  const roots = tls.rootCertificates.map((p) => new c.X509Certificate(p));
+  const t2 = new c.X509Certificate(W.EXTRA_CA[1]);
+  assert.match(t2.subject, /CN=TuringSign RSA Secure CA 2/);
+  assert.equal(t2.fingerprint256, 'A6:F9:C9:67:EB:8A:A9:28:3A:1C:A6:49:B8:7B:76:47:20:E9:F5:C3:AF:A8:1C:15:06:76:F4:CA:36:E9:8C:F6');
+  const r2 = roots.find((r) => t2.checkIssued(r) && t2.verify(r.publicKey));
+  assert.ok(r2, '기본 뿌리로 서명되지 않은 것을 넣었다'); assert.match(r2.subject, /OISTE WISeKey Global Root GB CA/);
+  assert.ok(Date.parse(t2.validTo) > Date.parse('2029-01-01'));
+  assert.equal(W.caList().length, tls.rootCertificates.length + 2); assert.ok(W.caList().indexOf(W.EXTRA_CA[1]) >= 0);
+  assert.equal(W.EXTRA_CA.length, 2, '검증 없이 아무 인증서나 더하지 않는다 — 더할 때마다 이 검사에 지문을 적는다');
   const x = new c.X509Certificate(W.EXTRA_CA[0]);
   assert.match(x.subject, /CN=Sectigo Public Server Authentication CA DV R36/);
   assert.equal(x.fingerprint256, '8C:54:C3:34:B6:6B:A4:E4:26:77:2A:F4:A3:F9:13:6C:19:A1:AE:C7:29:FD:B2:8C:53:5C:07:A5:A4:EF:22:E0');
   const root = tls.rootCertificates.map((p) => new c.X509Certificate(p)).find((r) => x.checkIssued(r) && x.verify(r.publicKey));
   assert.ok(root, '기본 뿌리로 서명되지 않은 것을 넣었다'); assert.match(root.subject, /Root R46/);
   assert.ok(Date.parse(x.validTo) > Date.parse('2036-01-01'));
-  assert.equal(W.caList().length, tls.rootCertificates.length + 1, '기본 뿌리를 빼먹으면 다른 기관이 다 막힌다');
+  assert.equal(W.caList().length, tls.rootCertificates.length + 2, '기본 뿌리를 빼먹으면 다른 기관이 다 막힌다');
   assert.ok(W.caList().indexOf(W.EXTRA_CA[0]) >= 0);
 });
 test('★★ 서버 — 다른 길이 그 목록(ca)으로 검증한다 · 검증을 «끄지» 않는다', () => {
