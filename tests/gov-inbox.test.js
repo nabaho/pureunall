@@ -57,9 +57,9 @@ test('★ 상태 — 안 돌았음 / 오류 / 정상(서울 시각·출처별 �
   assert.equal(I.status({ at: '2026-10-10T22:40:00.000Z', today: '2026-10-11', counts: {}, added: 0 }, '2026-10-12').k, 'ok', '하루 늦은 것은 정상(아침 7시 40분 전에 열면 어제 것)');
 });
 test('★★ 서버가 알아낸 지역·업종 제한(rgn·ind·indY·jnt·lk)을 새 줄에 «있을 때만» 데려간다', () => {
-  const m = I.merge([], { a: row('A', '제한 있는 용역', { rgn: '충청남도', ind: '정보통신공사업', indY: 'Y', jnt: '대전', lk: '1' }), b: row('B', '제한 모르는 용역') }, O);
+  const m = I.merge([], { a: row('A', '제한 있는 용역', { rgn: '충청남도', ind: '정보통신공사업', indY: 'Y', jnt: '대전', lk: '2' }), b: row('B', '제한 모르는 용역') }, O);
   const a = m.adds.find((x) => x.no === 'A'), b = m.adds.find((x) => x.no === 'B');
-  assert.equal(a.rgn, '충청남도'); assert.equal(a.ind, '정보통신공사업'); assert.equal(a.indY, 'Y'); assert.equal(a.jnt, '대전'); assert.equal(a.lk, '1');
+  assert.equal(a.rgn, '충청남도'); assert.equal(a.ind, '정보통신공사업'); assert.equal(a.indY, 'Y'); assert.equal(a.jnt, '대전'); assert.equal(a.lk, '2');
   ['rgn', 'ind', 'indY', 'jnt', 'lk'].forEach((k) => assert.equal(k in b, false, k));
 });
 
@@ -112,4 +112,8 @@ test('★ history — 최근 날부터 · 칸 글(건수·최근 게시 / ⚠ �
   assert.deepEqual(h.map((x) => x.day), ['10.19', '10.18']);
   assert.equal(h[0].cells.alio, '⚠ 못 받음'); assert.equal(h[0].cells.g2b, '—'); assert.equal(h[1].cells.g2b, '3,077건 · 최근 게시 10.18');
   assert.deepEqual(I.history(null), []);
+});
+test('★ 옛 «헛 조회» 표시(lk 1)는 받은 함에서 데려오지 않는다 — 제대로 본 것(2)만', () => {
+  const m = I.merge([], { a: row('A', '옛 헛 조회', { lk: '1' }), b: row('B', '제대로 본', { lk: '2', rgn: '충청남도' }) }, O);
+  assert.equal('lk' in m.adds.find((x) => x.no === 'A'), false); assert.equal(m.adds.find((x) => x.no === 'B').lk, '2');
 });

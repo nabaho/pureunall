@@ -177,7 +177,7 @@ test('★★ run — 새로 걸린 나라장터 공고에 참가 가능 지역·
   const x = adapters({ fake: fakeWithDetail() });
   await C.run(x.a);
   const u = x.written[0], k = C.safeKey('R1-000');
-  assert.equal(u['rows/' + k].rgn, '충청남도'); assert.equal(u['rows/' + k].ind, '정보통신공사업'); assert.equal(u['rows/' + k].lk, '1');
+  assert.equal(u['rows/' + k].rgn, '충청남도'); assert.equal(u['rows/' + k].ind, '정보통신공사업'); assert.equal(u['rows/' + k].lk, '2');
   assert.equal(x.calls.filter((c) => /PrtcptPsblRgn/.test(c)).length, 1, '공고마다 지역 한 번');
   assert.ok(x.calls.some((c) => /LicenseLimit/.test(c)));
   const biz = Object.keys(u).filter((p) => p.startsWith('rows/') && u[p] && u[p].src === '기업마당')[0];
@@ -199,11 +199,28 @@ test('★★ run — 예전에 받아 둔 열린 공고(lk 없음)는 조금씩 
     [shut]: { no: 'OLD-2', src: '나라장터', nm: '옛 닫힌 공고', closeDt: '2026-10-01 10:00:00', at: '2026-10-05T00:00:00.000Z' } } });
   await C.run(x.a);
   const u = x.written[0];
-  assert.equal(u['rows/' + open + '/rgn'], '충청남도'); assert.equal(u['rows/' + open + '/lk'], '1');
+  assert.equal(u['rows/' + open + '/rgn'], '충청남도'); assert.equal(u['rows/' + open + '/lk'], '2');
   assert.equal(u['rows/' + open], undefined, '줄 전체를 덮어쓰면 안 된다');
   assert.equal(u['rows/' + shut + '/lk'], undefined, '마감 지난 공고는 안 부른다');
   assert.ok(!x.calls.some((c) => /bidNtceNo=OLD-2/.test(c)));
 });
 test('★ 하루 상한 — 새 공고 40 · 옛 공고 20 (하루 1,000회 제한 안에서 공고마다 두 번씩)', () => {
   assert.deepEqual(C.RESTRICT_MAX, { fresh: 40, backfill: 20 });
+});
+
+test('★★★ 예전 «헛 조회» 표시(lk 1 — 차수를 빠뜨려 빈 답을 받은 것)가 붙은 열린 공고도 다시 본다 · 제대로 본 것(lk 2)은 안 부른다', async () => {
+  const bad = C.safeKey('OLD-1'), good = C.safeKey('OLD-2');
+  const x = adapters({ fake: fakeWithDetail(), existing: {
+    [bad]: { no: 'OLD-1', src: '나라장터', nm: '옛 헛 조회', lk: '1', closeDt: '2026-10-30 10:00:00', at: '2026-10-11T00:00:00.000Z' },
+    [good]: { no: 'OLD-2', src: '나라장터', nm: '제대로 본', lk: '2', rgn: '대전광역시', closeDt: '2026-10-30 10:00:00', at: '2026-10-11T00:00:00.000Z' } } });
+  await C.run(x.a);
+  const u = x.written[0];
+  assert.equal(u['rows/' + bad + '/lk'], '2'); assert.equal(u['rows/' + bad + '/rgn'], '충청남도');
+  assert.equal(u['rows/' + good + '/rgn'], undefined, '제대로 본 줄은 안 건드린다');
+  assert.ok(!x.calls.some((c) => /bidNtceNo=OLD-2/.test(c)));
+});
+test('★ 서버 조회에는 공고 차수(bidNtceOrd)가 «반드시» 붙는다 — 빠지면 나라장터가 «필수값 입력 에러»를 HTTP 200 으로 돌려준다', async () => {
+  const x = adapters({ fake: fakeWithDetail() }); await C.run(x.a);
+  const d = x.calls.filter((c) => /getBidPblancListInfo(PrtcptPsblRgn|LicenseLimit)/.test(c));
+  assert.ok(d.length >= 2); d.forEach((c) => assert.match(c, /bidNtceNo=R1&bidNtceOrd=000&/));
 });

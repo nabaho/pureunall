@@ -33,7 +33,8 @@
         type: '새 공고', savedAt: s(r.at)
       });
       /* 지역·업종 제한 — 있을 때만(서버가 나라장터 상세에서 읽은 것). 아래 칸 이름은 gov-g2b.js 와 같다 */
-      ['rgn', 'ind', 'indY', 'jnt', 'lk'].forEach(function (k) { if (s(r[k])) adds[adds.length - 1][k] = s(r[k]); });
+      ['rgn', 'ind', 'indY', 'jnt'].forEach(function (k) { if (s(r[k])) adds[adds.length - 1][k] = s(r[k]); });
+      if (s(r.lk) === '2') adds[adds.length - 1].lk = '2';   /* «제대로 본» 표시만(1 은 차수 빠진 옛 헛 조회) */
     });
     return { adds: adds, skipped: skipped, dropped: dropped };
   }
