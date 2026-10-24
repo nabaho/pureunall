@@ -411,20 +411,16 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   .tilerow.fold .tile{padding:4px 9px 4px 5px;}
   .tilerow.fold .tile .ic{width:20px;height:20px;font-size:.85rem;}
   .tilerow.fold .tile b{font-size:.76rem;}
-  /* ── 폰의 «자주 쓰는 앱»도 같은 얇은 칩 — 큰 동그라미 하나가 상자를 다 차지했다 ──
-     ★ 별표는 칩 오른쪽 끝에 남긴다 — 폰에서는 여기서 ★ 를 눌러 뺀다(끌기가 없다).
-     ⚠ 칸 수는 화면 폭을 따라 준다(auto-fill) — 화면 밖으로 안 나간다. */
-  #pinTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;padding:2px 2px 6px;}
-  #pinTiles .tile{flex-direction:row;width:auto;min-width:0;gap:5px;padding:4px 30px 4px 5px;border-radius:99px;transition:none;
-    background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.9);box-shadow:0 1px 3px rgba(20,30,80,.07);}
-  #pinTiles .tile .ic{position:static;width:20px;height:20px;font-size:.85rem;margin:0;border:0;background:none;backdrop-filter:none;flex:none;transition:none;}
-  #pinTiles .tile .ic svg{width:100%;height:100%;}
-  #pinTiles .tile b{font-size:.76rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #pinTiles .tile .tx span,#pinTiles .tile .newtab{display:none;}
-  #pinTiles .pin-star{right:5px;bottom:auto;top:50%;margin-top:-10px;}
-  #pinTiles .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;
-    font-size:10px;border-width:2px;z-index:2;}
-  #pinTiles .tile .nl-warn{right:-4px;top:-8px;min-width:18px;height:18px;line-height:18px;padding:0 5px;}
+  /* ── 폰에는 «자주 쓰는 앱» 줄이 없다 (대표 2026-10-24 「폰에서는 자주 쓰는 앱을 위 상단에 별표하는 건 필요 없을 것 같다.
+       차라리 자주 쓰는 앱은 꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것 같다」 → 「맨 위 줄 없애기」) ──
+     앱을 «꾹 누르면» 그 자리 칩에 ★·노란 테두리가 붙고, 다시 꾹 누르면 빠진다(initFold 의 꾹 누르기).
+     ⚠ 같은 별표 목록(tilePrefs.pins)을 쓴다 — 폰에서 붙인 ★ 는 PC 의 자주 쓰는 앱 줄에 그대로 올라간다. */
+  #pinRow{display:none;}
+  .tilerow.fold .tile.is-pin{background:#fffbeb;border-color:#fde68a;}
+  .tilerow.fold .tile.is-pin::after{content:'★';margin-left:auto;padding-left:4px;color:#d97706;font-size:.82rem;line-height:1;flex:none;}
+  .pin-star:not(.on){display:none;}   /* 펼친 줄(동그란 타일)에서도 빈 ☆ 단추는 안 보인다 — 넣기는 꾹 누르기로 */
+  /* 꾹 누를 때 글자가 잡히거나(아이폰) 링크 말풍선이 뜨지 않게 */
+  #appRows .tile{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
 }
 .tiles.dropzone{outline:2px dashed rgba(30,64,175,.35);outline-offset:3px;border-radius:12px;}
 .tile{background:none;border:none;border-radius:14px;padding:14px 8px;width:96px;
@@ -732,7 +728,10 @@ body.portal-mode #moreFab{display:flex;}
   body.portal-mode #fabBar{left:0;right:0;bottom:0;max-width:none;flex-wrap:nowrap;justify-content:flex-start;gap:8px;
     min-height:58px;padding:7px 14px calc(7px + env(safe-area-inset-bottom));
     background:rgba(248,251,255,.96);border-top:1px solid rgba(10,20,60,.1);box-shadow:0 -4px 16px rgba(20,30,80,.06);}
-  #fabBar > #sgFab{position:relative!important;margin-left:auto!important;}   /* 오른쪽 끝 · 숫자 배지 자리는 제 몸 기준 */
+  /* 오른쪽 끝 · 숫자 배지 자리는 제 몸 기준.
+     ⚠ order 로 «늘» 끝에 둔다 — 백업·복구는 로그인 뒤 늦게 생겨 막대 맨 뒤에 붙는다. 차례에 기대면
+       건의하기 «오른쪽»에 붙어 가운데 📷 와 겹쳤다(2026-10-24 대표 폰 캡처). */
+  #fabBar > #sgFab{position:relative!important;margin-left:auto!important;order:9;}
   body.portal-mode #camFab{left:50%;right:auto;margin-left:-27px;width:54px;height:54px;z-index:62;
     bottom:calc(16px + env(safe-area-inset-bottom));}
   #moreDock{bottom:calc(68px + env(safe-area-inset-bottom));}
@@ -4359,6 +4358,7 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 폰에서 칩은 줄을 바꿔 흐른다 — 화면 밖으로 안 나간다(대표 지시, CSS 쪽 머리글). */
   var PIN_MAX = 7;          // 한도 — SAP 런치패드 권장(한 묶음 3~7개)을 따른다
   var _foldWired = false, _foldTimer = 0, _pinDrag = null;
+  var LONG_MS = 500, _lp = null, _lpAt = 0;   // 꾹 누르기 — 0.5초 · 지금 누르는 중 · 마지막으로 꾹 누른 시각
 
   function pinKeys(){
     var p = tilePrefs && tilePrefs.pins;
@@ -4459,9 +4459,11 @@ body.portal-mode #moreFab{display:flex;}
       if(s.title !== say){ s.title = say; s.setAttribute('aria-label', say); }
       s.setAttribute('aria-pressed', lit ? 'true' : 'false');
     });
+    /* 폰: 꾹 눌러 붙인 ★ 를 «그 자리 칩»에 보인다(css .is-pin) — 폰에는 자주 쓰는 앱 줄이 없다 */
+    allTiles().forEach(function(t){ t.classList.toggle('is-pin', !!on[t.dataset.key]); });
     row.classList.toggle('empty', !list.length);
     var n = list.length ? (list.length + '/' + PIN_MAX)
-      : (isMobile() ? '줄을 펴서 ☆ 를 누르면 여기에 모입니다' : '앱을 끌어 여기에 놓거나 ☆ 를 누르면 모입니다');
+      : (isMobile() ? '앱을 꾹 누르면 여기에 모입니다' : '앱을 끌어 여기에 놓거나 ☆ 를 누르면 모입니다');
     var cnt = $('pinCount'); if(cnt && cnt.textContent !== n) cnt.textContent = n;
   }
   /* 복제본을 누르면 «진짜 타일»을 대신 누른다 (딱지를 눌렀으면 진짜 딱지를) */
@@ -4572,6 +4574,39 @@ body.portal-mode #moreFab{display:flex;}
         if((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pin-star')) onPinCloneClick(e);
       });
       $('foldAllBtn').addEventListener('click', foldAllToggle);
+      /* 폰: 앱을 «꾹 누르면» 자주 쓰는 앱 넣기·빼기 (대표 2026-10-24 「꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것」).
+         ⚠ 꾹 누른 뒤 손을 떼도 앱이 «열리지 않게» — touchend 를 막고, 그래도 오는 click 은 잡아서 막는다.
+         ⚠ 안드로이드가 링크를 꾹 누르면 띄우는 «새 탭에서 열기» 메뉴(contextmenu)는 «누르는 중»일 때만 막는다
+           — PC 오른쪽 단추 메뉴는 그대로 둔다. 밀어 내리는 중(10px 넘게 움직임)이면 꾹 누르기가 아니다. */
+      var lpTile = function(e){
+        var t = e.target && e.target.closest ? e.target.closest('.tile') : null;
+        return (t && host.contains(t) && t.dataset.key && t.getAttribute('aria-disabled') !== 'true') ? t : null;
+      };
+      var lpStop = function(){ if(_lp){ clearTimeout(_lp.timer); _lp = null; } };
+      host.addEventListener('touchstart', function(e){
+        var t = lpTile(e); if(!t || e.touches.length !== 1) return;
+        var p = e.touches[0], me = { x: p.clientX, y: p.clientY, fired: false };
+        me.timer = setTimeout(function(){
+          if(_lp !== me) return;
+          me.fired = true; _lpAt = Date.now();
+          togglePin(t.dataset.key);
+          try { if(navigator.vibrate) navigator.vibrate(25); } catch(_v){}
+        }, LONG_MS);
+        _lp = me;
+      }, { passive: true });
+      host.addEventListener('touchmove', function(e){
+        if(!_lp || _lp.fired) return;
+        var p = e.touches[0];
+        if(Math.abs(p.clientX - _lp.x) > 10 || Math.abs(p.clientY - _lp.y) > 10) lpStop();
+      }, { passive: true });
+      host.addEventListener('touchend', function(e){ if(_lp && _lp.fired) e.preventDefault(); lpStop(); });
+      host.addEventListener('touchcancel', lpStop);
+      host.addEventListener('click', function(e){
+        if(Date.now() - _lpAt < 800 && lpTile(e)){ e.preventDefault(); e.stopPropagation(); }
+      }, true);
+      host.addEventListener('contextmenu', function(e){
+        if(lpTile(e) && (_lp || Date.now() - _lpAt < 800)) e.preventDefault();
+      });
       /* 끌어 올리기 — 줄 안의 진짜 타일(접힌 칩도 같은 타일)을 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다.
          그 줄 안의 복제본을 끌면 순서가 바뀐다. 줄 사이 이동을 막는 끌기(onTileDragOver)는 제 줄 밖에서 손을 뗀다. */
       var pr = $('pinRow');
