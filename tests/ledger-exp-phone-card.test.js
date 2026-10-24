@@ -265,7 +265,8 @@ test('★ 「📆 오늘」은 0건일 때만 폰에서 접는다 — 있으면 
 
 test('★ 폰 띠에서 «설정·가끔 쓰는 것»은 ⚙ 뒤로, 주 단추는 통째 한 줄', () => {
   /* 카테고리 자동(배운 것은 열자마자 저절로 채워진다)·저절로 등록/확정 스위치는 한 번 정하면 그만이다 */
-  assert.ok((F.match(/className:'ld-bar-auto'/g) || []).length >= 4, '접을 연장에 손잡이가 없다');
+  /* 손잡이가 «붙어 있는가» — 넓은 화면에서만 감추는 ld-narrow-only 가 함께 달려도 된다(2026-10-24 버튼 정리) */
+  assert.ok((F.match(/className:'ld-bar-auto[' ]/g) || []).length >= 4, '접을 연장에 손잡이가 없다');
   assert.match(F, /ldTabEff==='exp' && expReadyCnt>0 && h\('button',\{className:'ld-bar-go'/,
     '★ 「출금 N건 등록」이 주 단추가 아니면 폰에서 칸 하나에 끼어 잘린다');
 });

@@ -175,7 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=27">
+<link rel="stylesheet" href="css/pu-erp.css?v=28">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -51045,6 +51045,9 @@ function FinanceLedger(props){
      보였고, 그래서 줄이 넷이 됐다(대표 지시 2026-08-23).
      ⚠ 없애는 것이 아니다 — ⋯ 를 거르개 줄 «끝»에 두어 늘 눈에 걸리게 한다. */
   var ldMoreS=useState(false); var ldMore=ldMoreS[0]; var setLdMore=ldMoreS[1];
+  /* 넓은 화면의 «묶음 메뉴» — '' | 'auto' | 'more' (2026-10-24 대표 「버튼이 너무 많다」 → 시안 ②).
+     한 번에 하나만 열린다. 폰은 예전 방식(⋯ 로 폈다 접기)이 그대로라 이 메뉴를 안 쓴다(.ld-wide-only). */
+  var wMenuS=useState(''); var wMenu=wMenuS[0]; var setWMenu=wMenuS[1];
   /* 마지막으로 누른 체크상자 자리 — 「묶어 확정」 권유를 그 옆에 띄우기 위함이다.
      화면 위 도구줄에만 단추가 있으면, 아래쪽 줄을 체크하던 사람은 그것을 못 본다. */
   var chkAnchorS=useState(null); var chkAnchor=chkAnchorS[0]; var setChkAnchor=chkAnchorS[1];
@@ -52852,6 +52855,34 @@ function FinanceLedger(props){
     if(!_dAskByK[row._k] && erpDepAskWanted(row, i && i.st, held)) depAskNew.push(row);
   });
   var depAskWait = _dAsks.filter(function(a){ return a && a.status === 'ask'; }).length;
+  /* ── 넓은 화면의 «묶음 메뉴» (2026-10-24 대표 「버튼이 너무 많다」 → 시안 ②) ──
+     늘 쓰는 것(✅ 확정 단추 · 💬 묻기)만 겉에 두고, 가끔 쓰는 것은 «🤖 자동 ▾» · «⋯ 더보기 ▾» 안으로 묶는다.
+     ⚠ 없애는 것이 아니다 — 같은 동작을 부르는 «복사본»이다. 폰은 예전 방식이 그대로라 원래 단추가 폰에서 산다
+       (원래 단추는 .ld-narrow-only = 넓은 화면에서만 숨김, 이 메뉴는 .ld-wide-only = 폰에서 숨김). */
+  function wideMenu(key, label, title, kids, on){
+    var open = wMenu === key;
+    return h('span',{key:'wm-'+key, className:'ld-wide-only', style:{position:'relative',display:'inline-block',flexShrink:0}},
+      h('button',{onClick:function(){ setWMenu(open ? '' : key); }, title:title,
+        style:{padding:'4px 10px',background:(open||on)?'#eff6ff':'#fff',color:'#1e40af',border:'1px solid #bfdbfe',
+          borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}, label+' ▾'),
+      open && h('div',{onClick:function(){ setWMenu(''); }, style:{position:'fixed',left:0,top:0,right:0,bottom:0,zIndex:49}}),
+      open && h('div',{style:{position:'absolute',right:0,top:'calc(100% + 4px)',zIndex:50,minWidth:'240px',background:'#fff',
+        border:'1px solid #e2e8f0',borderRadius:'8px',boxShadow:'0 4px 12px rgba(0,0,0,0.15)',padding:'6px',
+        display:'flex',flexDirection:'column',gap:'2px'}}, kids));
+  }
+  function wideItem(key, label, sub, title, onClick){
+    return h('button',{key:key, title:title, onClick:function(){ setWMenu(''); onClick(); },
+      style:{display:'flex',justifyContent:'space-between',gap:'10px',textAlign:'left',padding:'5px 8px',background:'transparent',
+        border:'none',borderRadius:'5px',fontSize:'13px',fontWeight:600,color:'#1e293b',cursor:'pointer',fontFamily:'inherit'}},
+      h('span',null,label), (sub!==null && sub!==undefined) && h('span',{style:{color:'#94a3b8',fontWeight:700}},sub));
+  }
+  function wideSwitch(key, label, on, toggle, title){
+    return h('label',{key:key, title:title, style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',
+        padding:'5px 8px',fontSize:'13px',fontWeight:600,cursor:'pointer',color:'#1e293b'}},
+      h('span',null,label),
+      h('span',{style:{display:'inline-flex',alignItems:'center',gap:'4px',color:on?'#166534':'#64748b',fontSize:'12px',fontWeight:700}},
+        h('input',{type:'checkbox',checked:!!on,onChange:toggle}), on?'켜짐':'꺼짐'));
+  }
   async function depAskSend(list){
     if(!list || !list.length) return;
     if(!(await popConfirm('후보가 없는 입금 ' + list.length + '건을 직원에게 묻습니다.\n\n'
@@ -54327,7 +54358,7 @@ function FinanceLedger(props){
               background:'#fff',color:'#991b1b',fontSize:'13px',fontWeight:700,cursor:'pointer',flexShrink:0}},
             '🗑 이 달'),
           // 그 달 처리현황
-          h('span',{key:'b',className:'ld-bar-todo',style:st.todo>0
+          h('span',{key:'b',className:'ld-bar-todo ld-narrow-only',style:st.todo>0
             ? {background:'#fef2f2',color:'#dc2626',border:'1px solid #fecaca',
                borderRadius:'8px',padding:'1px 7px',fontSize:'12.5px',fontWeight:800,whiteSpace:'nowrap',flexShrink:0}
             : {background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0',
@@ -54352,8 +54383,22 @@ function FinanceLedger(props){
         incCnt>0 && ledgerTabBtn('inc','💰 입금', incCnt, (stCnt.check||0)+(stCnt.none||0)),
         expCnt>0 && ledgerTabBtn('exp','💸 출금', expCnt, expCnt-expReadyCnt),
         h('div',{className:'ld-bar-gap',style:{flex:1}}),
+        /* 🤖 자동 ▾ — 넓은 화면에서 자동 매칭·저절로 확정 후보·두 스위치를 한 메뉴로 (시안 ②).
+           스위치는 지금처럼 관리자에게만, 처음엔 꺼짐. 폰은 아래 원래 단추들이 그대로다. */
+        ldTabEff==='inc' && incCnt>0 && wideMenu('auto',
+          '🤖 자동'+(autoRows.length ? ' · 후보 '+autoRows.length : '')+((autoTidyOn||autoInvOn) ? ' ●' : ''),
+          '자동 매칭 · 저절로 확정 · 계산서 일치 확정',
+          [ wideItem('am','🤖 자동 매칭 실행','1회','적요·금액·날짜를 대조해 고신뢰 후보를 자동 선택합니다',runAutoMatch),
+            autoRows.length>0 && wideItem('ac','🤖 저절로 확정 후보 보기','후보 '+autoRows.length+(autoInvCnt?(' · 🧾 '+autoInvCnt):''),
+              '입금자가 같은 업체로 3번 넘게 확정됐고 금액이 청구와 꼭 같은 줄 — 누르면 그 줄만 봅니다',
+              function(){ setLdStF(ldStF==='auto' ? '' : 'auto'); }),
+            _meNow().isAdmin && wideSwitch('at','🤖 저절로 확정',autoTidyOn,function(){ setAutoTidyOn(!autoTidyOn); },
+              '켜면 거래내역을 열 때 위 후보를 저절로 확정합니다 — 「확정 이력」에서 되돌릴 수 있습니다'),
+            _meNow().isAdmin && wideSwitch('ai','🧾 계산서 일치 확정',autoInvOn,function(){ setAutoInvOn(!autoInvOn); },
+              '켜면 «그 업체 앞으로 끊은 세금계산서와 금액이 꼭 같고, 입금자도 그 업체로 확인되는» 줄을 저절로 확정합니다 — CMS·묶음 입금은 빼고 · 「확정 이력」에서 되돌릴 수 있습니다')
+          ], autoRows.length>0),
         ldTabEff==='inc' && incCnt>0 && h('button',{
-          className:'ld-bar-auto',
+          className:'ld-bar-auto ld-narrow-only',
           onClick:runAutoMatch,
           title:'적요·금액·날짜를 대조해 고신뢰 후보를 자동 선택합니다',
           style:{padding:'4px 11px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}
@@ -54363,14 +54408,14 @@ function FinanceLedger(props){
            갈래마다 저장하는 내용이 조금씩 달라 결과가 어긋났고, 무엇을 눌러야 하는지
            사람이 알 수 없었다. 이제 줄 상태(erpRowState)가 초록인 것만 한 번에 확정한다. */
         /* 🤖 저절로 확정 — 후보 수를 늘 보인다(켜기 전에 «몇 건이 저절로 되는지» 를 눈으로 보고 정한다) */
-        ldTabEff==='inc' && autoRows.length>0 && h('button',{key:'autoc',
+        ldTabEff==='inc' && autoRows.length>0 && h('button',{key:'autoc',className:'ld-narrow-only',
           onClick:function(){ setLdStF(ldStF==='auto' ? '' : 'auto'); },
           title:'입금자가 같은 업체로 3번 넘게 확정됐고 금액이 청구와 꼭 같은 줄 — 누르면 그 줄만 봅니다',
           style:{padding:'4px 10px',background:ldStF==='auto'?'#1e40af':'#eff6ff',color:ldStF==='auto'?'#fff':'#1e40af',
             border:'1px solid #bfdbfe',borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}},
           '🤖 저절로 확정 후보 '+autoRows.length+'건'+(autoInvCnt?(' (🧾 계산서 '+autoInvCnt+')'):'')),
         /* 설정 스위치는 폰에서 ⚙ 뒤로 접는다(.ld-bar-auto) — 한 번 정하면 그만인 것이다 */
-        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',className:'ld-bar-auto',
+        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',className:'ld-bar-auto ld-narrow-only',
           title:'켜면 거래내역을 열 때 위 후보를 저절로 확정합니다 — 「확정 이력」에서 되돌릴 수 있습니다',
           style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
             padding:'3px 8px',borderRadius:'6px',color:autoTidyOn?'#166534':'#64748b',
@@ -54378,7 +54423,7 @@ function FinanceLedger(props){
           h('input',{type:'checkbox',checked:!!autoTidyOn,onChange:function(){ setAutoTidyOn(!autoTidyOn); }}),
           autoTidyOn ? '🤖 저절로 확정 (켜짐)' : '🤖 저절로 확정'),
         /* 🧾 두 번째 스위치 — 세금계산서와 꼭 같은 입금만(2026-10-24). 처음 꺼짐 · 관리자만 */
-        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autoinv',className:'ld-bar-auto',
+        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autoinv',className:'ld-bar-auto ld-narrow-only',
           title:'켜면 «그 업체 앞으로 끊은 세금계산서와 금액이 꼭 같고, 입금자도 그 업체로 확인되는» 줄을 저절로 확정합니다 — CMS·묶음 입금은 빼고 · 「확정 이력」에서 되돌릴 수 있습니다',
           style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
             padding:'3px 8px',borderRadius:'6px',color:autoInvOn?'#166534':'#64748b',
@@ -54536,8 +54581,9 @@ function FinanceLedger(props){
             /* 걸러 볼 수 있다는 것을 «알려 준다» — 모르면 있는 기능도 없는 기능이다 */
             !ldStF && (stCnt.check>0 || stCnt.none>0) && h('span',{
               className:'ld-hint',
-              style:{fontSize:'12px',color:'#64748b',fontWeight:400}},
-              '↑ 칩을 누르면 그 갈래만 모아 봅니다 — 한 갈래씩 정리하면 훨씬 빠릅니다'),
+              title:'칩을 누르면 그 갈래만 모아 봅니다 — 한 갈래씩 정리하면 훨씬 빠릅니다',
+              style:{fontSize:'12px',color:'#64748b',fontWeight:400,cursor:'help'}},
+              'ⓘ'),
             // 정렬 중이면 원래 순서로 돌아가는 길 (줄이 사라지지는 않으니 건수는 그대로다)
             ldSort && h('button',{onClick:function(){ setLdSort(null); },
               title:'제목을 눌러 세운 순서를 풉니다',
@@ -54567,17 +54613,23 @@ function FinanceLedger(props){
               style:{padding:'3px 8px',background:depAskNew.length?'#2563eb':'#fff',color:depAskNew.length?'#fff':'#2563eb',
                 border:'1px solid #2563eb',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},
               depAskNew.length ? ('💬 직원에게 묻기 '+depAskNew.length) : ('💬 묻는 중 '+depAskWait)),
+            /* ⋯ 더보기 ▾ — 넓은 화면에서 보류함·찾기·확정 이력을 한 메뉴로 (시안 ②). 폰은 원래 ⋯ 가 있다. */
+            wideMenu('more','⋯ 더보기','보류함 · 찾기 · 확정 이력',[
+              wideItem('mh','🗄 보류함',_heldS.n,'누가 왜 보낸 돈인지 모를 때 넣어 둔 입금입니다 — 열면 지금 후보로 다시 맞춰 봅니다',function(){ setHeldOpen(true); }),
+              wideItem('mq','🔍 찾기','/','표 안에서 업체·적요·금액으로 찾습니다 — 줄을 감추지 않고 맞는 줄만 노랗게 칠합니다',function(){ setLdQ(ldQ===null?'':null); }),
+              wideItem('mc','확정 이력',null,'확정한 것을 보고 되돌립니다',function(){ setConfHistOpen(true); })
+            ], false),
             // 보류함 — 비어 있으면 아예 안 그린다 (0이 붙어 있으면 눈에 걸린다)
-            _heldS.n>0 && h('button',{className:'ld-more-item',onClick:function(){setHeldOpen(true);},
+            _heldS.n>0 && h('button',{className:'ld-more-item ld-narrow-only',onClick:function(){setHeldOpen(true);},
               title:'누가 왜 보낸 돈인지 모를 때 넣어 둔 입금입니다\n합계 '+_heldS.sum.toLocaleString()+'원'
                     +(_heldS.oldest?('\n가장 오래된 것 '+_heldS.oldest):'')
                     +'\n\n열면 지금 후보로 다시 맞춰 봅니다 — 짝이 생긴 것을 알려 드립니다',
               style:{padding:'3px 8px',background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},'🗄 보류함 '+_heldS.n),
-            h('button',{className:'ld-more-item',onClick:function(){ setLdQ(ldQ===null?'':null); },
+            h('button',{className:'ld-more-item ld-narrow-only',onClick:function(){ setLdQ(ldQ===null?'':null); },
               title:'표 안에서 업체·적요·금액으로 찾습니다 (키보드 /)\n줄을 감추지 않고 맞는 줄만 노랗게 칠합니다',
               style:{padding:'3px 8px',background:ldQ!==null?'#2563eb':'#fff',color:ldQ!==null?'#fff':'#64748b',
                 border:'1px solid '+(ldQ!==null?'#2563eb':'#cbd5e1'),borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},'🔍 찾기'),
-            h('button',{className:'ld-more-item',onClick:function(){setConfHistOpen(true);},
+            h('button',{className:'ld-more-item ld-narrow-only',onClick:function(){setConfHistOpen(true);},
               style:{padding:'3px 8px',background:'#64748b',color:'#fff',border:'none',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},'확정 이력'),
             /* ⋯ — 폰에서만 보인다. 위 넷을 폈다 접는다.
                ⚠ 거르개 줄 «끝»에 둔다. 딴 데 숨기면 「환경설정 안의 메일」이 된다. */
@@ -54656,7 +54708,7 @@ function FinanceLedger(props){
               colSortTh('co','업체','📁 업체',Object.assign({},thS,{width:'150px',padding:'6px 6px',borderLeft:'2px solid #e2e8f0',cursor:'pointer'}),'ld-c-co'),
               colSortTh('kind','항목','항목 · 현황',Object.assign({},thS,{padding:'6px 6px',cursor:'pointer'}),'ld-c-kind'),
               colSortTh('staff','담당','담당',Object.assign({},thS,{width:'58px',padding:'6px 4px',cursor:'pointer'}),'ld-c-staff'),
-              h('th',{className:'ld-c-act',style:Object.assign({},thS,{width:'120px',textAlign:'right',padding:'6px 6px',borderLeft:'2px solid #e2e8f0'})},'처리')
+              h('th',{className:'ld-c-act',style:Object.assign({},thS,{width:'240px',textAlign:'right',padding:'6px 6px',borderLeft:'2px solid #e2e8f0'})},'처리')
             )),
             /* ── 한 줄 = 한 입금 · 칸마다 자리를 정한다 ──
                한 칸에 업체·항목·달·담당을 다 밀어 넣었더니 줄마다 길이가 달라 세로로 비교가 안 됐다
