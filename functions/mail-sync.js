@@ -22,7 +22,8 @@
 const MB = require('./mail-box');
 const AICLASSIFY = require('./mail-ai-classify');   /* 받은메일함 자동분류(Jev) — 기본은 꺼짐 */
 const NEWINQ = require('./mail-new-inquiry');       /* 신규 문의 → 관리자 폰 알림 + 메일함 띠 */
-const MAILFILL = require('./mail-fill');            /* 📥 회사 도메인이 같은 업체 담당자로 채우기(점검 ③-A) */
+const MAILFILL = require('./mail-fill');
+const MAILCARD = require('./mail-card');            /* 📬 처음 보는 보낸 사람의 서명 → 기업정보함 명함 줄 세우기(2026-10-24) */            /* 📥 회사 도메인이 같은 업체 담당자로 채우기(점검 ③-A) */
 const GONE = require('./gone-watch');            /* 🏚 반송 메일 → 없어진 듯한 곳 근거 */
 const MYMAIL = require('./mail-owner');             /* 📬 내 담당 메일 → 그 담당자 폰 알림 */
 
@@ -543,6 +544,16 @@ async function runSync(deps, opts) {
                 if (mf.ran) console.log('mail-fill', JSON.stringify(mf));
               } catch (e) {
                 console.warn('mail-fill 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+              /* ── 📬 처음 보는 보낸 사람의 서명 → 기업정보함 명함 줄 세우기 (대표 「추천대로」 2026-10-24) ──
+                 여기서는 서명 글자만 잘라 줄 세운다(AI 안 부름) — 읽기는 mailCardRead, 넣기는 받는 탭(같은 문).
+                 ⚠ 실패해도 던지지 않는다 — 명함이 죽어도 동기화는 계속된다. */
+              try {
+                const mc = await MAILCARD.queueFromNewMail(Object.assign({}, deps, { MB: MB }), {
+                  client: client, held: held, slug: p.slug, self: [String(user || '').toLowerCase()] });
+                if (mc.queued) console.log('mail-card', JSON.stringify(mc));
+              } catch (e) {
+                console.warn('mail-card 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
               /* ── 🏚 반송 메일 → 「없어진 듯한 곳」 근거 (대표 승인 목업 2026-10-09) — 던지지 않는다 ── */
               try {
