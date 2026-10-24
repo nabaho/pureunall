@@ -91,21 +91,26 @@ test('★★ 감추는 것이 아니다 — 「내려감」 딱지를 누르면 
   assert.deepEqual(보임.slice().sort(), ['이몽룡', '홍길동'].sort());
 });
 
-test('★★★ 세는 곳과 보이는 곳이 «같은 규칙»을 쓴다 — 첫 딱지 수 = 실제 줄 수', () => {
+/* ⚠ 2026-10-24 — 구성원은 «전체» 딱지를 걷었다(대표 결정 — 목록 딱지는 할 일이 있을 때만).
+     걸러 보기를 푸는 일은 목록 머리의 «노무사» 탭이 맡는다. 그래서 지키는 자리를 그 탭으로 옮긴다 —
+     규칙은 같다: 적힌 수 = 누르면 실제로 보이는 줄 수. */
+const 푸는탭 = (h) => /onclick="App\.filt\(''\)"[^>]*>([^<]*)<b>(\d+)<\/b>/.exec(h);
+
+test('★★★ 세는 곳과 보이는 곳이 «같은 규칙»을 쓴다 — 탭 숫자 = 실제 줄 수', () => {
   const ctx = 줄상자(아홉);
   const 보이는수 = ctx.visibleRows('members').length;
-  const 첫딱지 = /onclick="App\.filt\(''\)">([^<]*)<span class="c">(\d+)<\/span>/.exec(ctx.chipsHtml());
-  assert.ok(첫딱지, '걸러 보기를 푸는 딱지가 없습니다');
-  assert.equal(Number(첫딱지[2]), 보이는수,
-    '★★★ 「' + 첫딱지[1] + '」에 적힌 수와 실제 줄 수가 다릅니다');
-  assert.ok(첫딱지[1].indexOf('전체') < 0,
-    '★★ 뺀 것이 있는데 「전체」라고 적습니다 — 거짓말입니다: ' + 첫딱지[1]);
+  const 탭 = 푸는탭(ctx.listCountHtml());
+  assert.ok(탭, '걸러 보기를 푸는 탭이 없습니다');
+  assert.equal(Number(탭[2]), 보이는수,
+    '★★★ 「' + 탭[1] + '」에 적힌 수와 실제 줄 수가 다릅니다 — 눌러 보니 줄 수가 다르면 목록을 의심합니다');
+  assert.ok(!/onclick="App\.filt\(''\)"/.test(ctx.chipsHtml()),
+    '★ 구성원 딱지 줄에 「전체」 딱지가 되살아났습니다 — 탭 숫자와 숫자 둘이 서로 다른 말을 합니다');
 });
 
-test('뺀 것이 없으면 첫 딱지는 그대로 「전체」다', () => {
-  const ctx = 줄상자(아홉.filter(r => r.status !== 'done'));
-  const 첫딱지 = /onclick="App\.filt\(''\)">([^<]*)<span/.exec(ctx.chipsHtml());
-  assert.match(첫딱지[1], /전체/);
+test('뺀 것이 없으면 탭 숫자 = 전체 수다', () => {
+  const 남은 = 아홉.filter(r => r.status !== 'done');
+  const 탭 = 푸는탭(줄상자(남은).listCountHtml());
+  assert.equal(Number(탭[2]), 남은.length);
 });
 
 test('★★ 뺀 뒤에는 번호를 «다시 매긴다» — 1,3,4,5,7… 로 비어 있으면 안 된다', () => {
