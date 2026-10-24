@@ -46,14 +46,28 @@ test('한 줄로 몰면서 접은 것은 «다른 데 같은 말이 있는 것»
   assert.match(enter, /var _e = function\(v\)/, 'innerHTML 로 넣으면서 감싸지 않으면 위험합니다.');
 });
 
-test('사용액·로그아웃은 «내 메뉴» 안에 있다 — 머리줄에서 가려지지 않게', () => {
-  /* 예전에는 머리줄 좁은 자리에 끼어 가려졌다 — 가려진 기능은 없는 기능이다
-     (지문 로그인 안내가 실제로 그렇게 사라졌던 적이 있다). 이제는 내 메뉴를 열면 늘 보인다. */
-  const 메뉴 = enter.indexOf('id="meMenu"'), 끝 = enter.indexOf('id="meBtn"');
-  assert.ok(메뉴 > 0 && 끝 > 메뉴, '★ 내 메뉴가 없다');
-  const 안 = enter.slice(메뉴, 끝);
-  ['moneyBox', 'billChip', 'aiChip', 'logoutBtn'].forEach((id) =>
+/* 2026-10-24 대표 「사용액등은 어디 사라지고 로그아웃 기능도 어디로 사라졌나」 → 윗줄 정리 안 1:
+   메뉴 속에만 두니 «없어진 것»으로 보였다. 사용액은 내 메뉴 단추 «안»에 늘 보이고(관리자만),
+   로그아웃은 PC 머리줄 맨 오른쪽에 늘 보인다(폰은 좁아 메뉴 맨 아래). 자세한 사용액·AI 판독은 메뉴 안. */
+test('사용액·로그아웃은 «사라져 보이지» 않는다 — 단추 안 사용액 · PC 머리줄 로그아웃 · 폰은 메뉴 맨 아래', () => {
+  const 메뉴 = enter.indexOf('id="meMenu"');
+  const 메뉴끝 = enter.indexOf('<button class="logout" id="logoutBtn"');
+  const 단추 = enter.indexOf('id="meBtn"');
+  assert.ok(메뉴 > 0 && 메뉴끝 > 메뉴 && 단추 > 메뉴끝, '★ 내 메뉴 · 머리줄 로그아웃 · 내 메뉴 단추 차례가 틀렸다');
+  const 안 = enter.slice(메뉴, 메뉴끝);
+  ['moneyBox', 'billChip', 'aiChip', 'meLogout'].forEach((id) =>
     assert.ok(안.indexOf('id="' + id + '"') > 0, '★ ' + id + ' 가 내 메뉴 안에 없다'));
+  /* 사용액은 내 메뉴 단추 안에도 — 값·켜고 끄기를 사용액 딱지와 «같이» 맞춘다 */
+  const 단추안 = enter.slice(단추, enter.indexOf('me-caret', 단추));
+  assert.ok(단추안.indexOf('id="meMoney"') > 0, '★ 내 메뉴 단추에 사용액이 없다 — 또 «사라진 것»으로 보인다');
+  assert.match(enter, /var mm = \$\('meMoney'\); if\(mm\) mm\.hidden = !bOn;/,
+    '★ 단추 안 사용액을 사용액 딱지와 같이 켜고 끄지 않는다 — 직원에게 새거나 관리자에게 안 보인다');
+  assert.match(enter, /\$\('meMoneyAmt'\)\.textContent = \$\('billAmt'\)\.textContent/, '★ 단추 안 사용액이 값을 안 따라간다');
+  /* 폰: 머리줄 로그아웃은 숨기고 메뉴 맨 아래 것이 대신 누른다 */
+  const b = phoneBlock();
+  assert.match(b, /\.pbar > #logoutBtn\{display:none;\}/, '★ 폰 머리줄에 로그아웃이 남아 자리를 먹는다');
+  assert.match(b, /\.pbar \.me-menu \.me-logout\{display:block;\}/, '★ 폰에서 로그아웃할 길이 없다');
+  assert.match(enter, /\$\('meLogout'\)[\s\S]{0,120}\$\('logoutBtn'\)\.click\(\)/, '★ 메뉴의 로그아웃이 진짜 로그아웃을 안 누른다');
   /* 닫힌 메뉴는 정말 닫혀 있어야 한다 — display 규칙이 hidden 을 이기면 늘 펼쳐진다 */
   assert.match(enter, /\.me-menu\[hidden\]\{display:none;\}/, '★ 닫아도 내 메뉴가 그대로 떠 있다');
 });
