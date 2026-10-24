@@ -3052,7 +3052,9 @@ var FB_ALL_SYNC_KEYS = [
   /* 🔐 업체 주담당 변경 요청 (대표 승인 목업 2026-10-03) — 관리자 화면에 띠가 뜨려면 이 목록에 있어야 한다 */
   'co_mgr_requests',
   /* 사건 «업무 메모» — 2026-10-05 까지 그 PC 의 localStorage 에만 있었다(CaseMemoPanel 머리글) */
-  'case_memos'
+  'case_memos',
+  /* 💬 누구 입금인가요? (2026-10-24) — 재무가 묻고 직원이 답한다. 날짜·금액·보낸 사람 이름만 */
+  'deposit_asks'
 ];
 /* 큰 사본 창고를 여기서 만들고 켠다 — 이 목록이 생긴 «바로 뒤»라야 무엇을 옮길지 안다(ERP_BIG_KEYS 머리글) */
 try { _erpBigMake(); _erpBigBoot(); } catch(_){}
@@ -5320,7 +5322,7 @@ try { window.addEventListener('fb_initial_done', function(){ setTimeout(function
   try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
 }, 4000); }); } catch(e){}
 /* user_accounts — 2026-10-10 사번 열쇠 지도로(번호 = 사번, dbSet 이 붙인다) */
-var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos'];
+var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos','deposit_asks'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
      다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
@@ -8632,6 +8634,15 @@ function erpMatchScore(txn, cand){
       var _ps = Math.max(_erpNameCmp(tn, _pn).score, tnc ? _erpNameCmp(tnc, _pn).score : 0);
       if(_ps > 60 && _ps > nameScore){ nameScore = _ps; reasons.push('입금자명 일치'); }
     }
+    /* 체불·대지급금은 근로자가 «자기 이름»으로 낸다 — 사건 근로자 명단·대표자 이름도 입금자로 본다
+       (대표 「시안대로」 2026-10-24). 명단에 있는데도 짝을 못 찾아 손으로 이었다.
+       ⚠ 이름만 맞으면 후보까지다 — 초록은 금액까지 맞아야 한다(erpRowState 그대로). */
+    /* ⚠ 사람 이름은 «꼭 같을 때만» — 닮음(부분 일치)으로 보면 「이원」이 「이원남」에 걸린다 */
+    var _who = erpMemoPayerName(txn.memo);
+    var _whoA = erpNormName(_who), _whoB = erpNormName(_who.replace(/\(.*$/, ''));
+    erpPayerPeople(cand.item).forEach(function(pp){
+      if((pp.n === _whoA || pp.n === _whoB) && nameScore < 100){ nameScore = 100; reasons.push(pp.why); }
+    });
   }
 
   // ── 이력 기반 금액 지문 — 이름 대체 신호 (월 고정 자문료는 적요가 무의미할 때가 많다) ──
@@ -8690,6 +8701,26 @@ function erpMatchScore(txn, cand){
            invScore:_invScore, aliasWeak:aliasWeak };
 }
 
+/* 적요에서 «보낸 사람» 이름만 — 하나은행 문자는 「계좌번호 680******45904 홍길동」 꼴이다.
+   직원 확인함(deposit_asks)에 보이는 이름도 이것이다 — 계좌 끝자리·잔액은 안 싣는다. */
+function erpMemoPayerName(memo){
+  var s = String(memo === null || memo === undefined ? '' : memo);
+  s = s.replace(/^\s*입금\s*[\d,]+원\s*/, '').replace(/계좌번호|적요/g, ' ').replace(/\d*\*+\d*/g, ' ');
+  return s.replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+/* 그 건에서 «돈을 낼 수 있는 사람» 이름 — 근로자 명단 · 대표자. 두 글자 미만은 뺀다(성 하나로 아무와 맞는다) */
+function erpPayerPeople(it){
+  var out = [], seen = {};
+  function add(n, why){
+    n = erpNormName(n || '');
+    if(n.length < 2 || seen[n]) return;
+    seen[n] = 1; out.push({ n:n, why:why });
+  }
+  if(!it) return out;
+  (Array.isArray(it.workers) ? it.workers : []).forEach(function(w){ if(w) add(w.name, '근로자 명단 일치'); });
+  add(it.ceo, '대표자 이름 일치'); add(it.ceo2, '대표자 이름 일치'); add(it.ceoName, '대표자 이름 일치');
+  return out;
+}
 /* ── 이름 근거 게이트 ──
    금액이 비슷하다는 것만으로는 후보가 아니다. 자문료 22만원짜리 업체가 열둘이면
    열둘이 다 44%로 뜬다 — 사람이 고를 수 없고, 잘못 고르면 남의 돈이 된다.
@@ -48399,6 +48430,127 @@ function erpPickWho(cur, rowKey, mySid){
   return { sid:v.by, name:v.byName || v.by, at:v.at || '' };
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   💬 누구 입금인가요? — 이름으로 못 찾은 입금을 담당 직원이 골라 준다 (대표 「시안대로」 2026-10-24)
+   ══════════════════════════════════════════════════════════════════════════
+   「아직 정리 안 된 건은 담당 직원이 한 번에 체크해서 정리 가능하게」
+   「개인이 입금하는 경우(체불·대지급금) 이알피에 대표자만 있고 개인은 없는 경우가 많다」
+   ■ 흐름: 재무가 「💬 직원에게 묻기」 → data/deposit_asks 에 한 줄씩 → 나의 업무 맨 위에 뜬다
+          → 직원이 ☐ 골라 「어느 건」을 정해 한 번에 보낸다 → 재무 화면이 그것을 «골라 둔 짝»으로 받는다
+          → 확정은 지금처럼 재무가 한다(성과급·부가세 셈은 확정 길 그대로).
+   ■ 담는 것: 날짜·금액·보낸 사람 이름뿐 — 통장 잔액·계좌·적요 전문은 안 싣는다.
+     통장 자료(ledger_batches)는 재무 권한자만 읽는다. 이 칸은 재직 직원 누구나 읽는다(규칙 deposit_asks).
+   ⚠ 직원 답은 «확정»이 아니다 — 재무 화면에서 그 건이 아직 받을 돈으로 남아 있을 때만 짝으로 받는다.
+   ⚠ 이름·금액이 닮았다고 저절로 답하지 않는다 — 짐작은 «⭐ 내 건일 수도»로 보여 주기만 한다. */
+var DEP_ASK_KEY = 'deposit_asks';
+var DEP_ASK_STORES = [ { key:'cases', label:'사건' }, { key:'consultings', label:'컨설팅' }, { key:'other_projects', label:'기타' } ];
+function erpDepAskId(rowK){
+  var s = String(rowK || ''), h1 = 0x811c9dc5, h2 = 0x9747b28c;
+  for(var i = 0; i < s.length; i++){ var c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822507); }
+  return 'dask-' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
+/* 물을 줄인가 — 후보가 하나도 없는 입금만. CMS·더빌·집금은 사람 이름이 아니라 묻지 않는다(CMS 화면이 따로 맞춘다) */
+function erpDepAskWanted(row, st, held){
+  if(!row || !row._k || row._dup || row.cancel) return false;
+  if((parseInt(row.amount, 10) || 0) <= 0) return false;
+  if(held && held[row._k]) return false;
+  if(!st || st.state !== 'none') return false;
+  var m = row.memo || row.note || '';
+  if(typeof erpIsCmsMemo === 'function' && erpIsCmsMemo(m)) return false;
+  return !!erpMemoPayerName(m);
+}
+function erpDepAskMake(row, who, nowIso){
+  var now = nowIso || new Date().toISOString(); who = who || {};
+  return { id:erpDepAskId(row._k), entityType:'depositAsk', schemaVersion:1,
+    rowK:String(row._k), bankKey:erpBankRowKey(row), date:String(row.date || '').slice(0, 10),
+    amount:parseInt(row.amount, 10) || 0, payer:erpMemoPayerName(row.memo || row.note || ''),
+    status:'ask', askedBy:String(who.sid || ''), askedByName:String(who.name || ''),
+    createdAt:now, updatedAt:now };
+}
+/* 그 사람이 «아직 안 본» 물음 — 답했거나 「내 건 아님」을 누른 것은 뺀다 */
+function erpDepAskOpenFor(list, sid){
+  return (list || []).filter(function(a){
+    return a && a.status === 'ask' && !(a.notMine && sid && a.notMine[sid]);
+  });
+}
+/* 내가 담당인 건의 «받을 돈» — pid 는 거래내역 후보 번호와 같은 꼴(사건 id-r · 자문료 adv-업체-YYYY-MM) */
+function erpDepAskMyItems(sid, get){
+  get = get || dbGet; sid = String(sid || '');
+  var out = [];
+  if(!sid) return out;
+  var SUF = { retainer:'-r', success:'-s', contractFee:'-k', balance:'-b', legacy:'-c' };
+  function mine(it){ return String(it.managerMain || '') === sid || (Array.isArray(it.managerSubs) && it.managerSubs.map(String).indexOf(sid) >= 0); }
+  DEP_ASK_STORES.forEach(function(s){
+    (get(s.key, []) || []).forEach(function(it){
+      if(!it || it._deleted || !it.id || !mine(it)) return;
+      erpUnpaidParts(it).forEach(function(u){
+        out.push({ pid:it.id + (SUF[u.kind] || '-x'), store:s.key, sourceId:it.id,
+          label:s.label + ' ' + (it.companyName || it.name || '') + (it.title ? ' ' + it.title : '') + ' · ' + (u.kindLabel || ''),
+          companyName:String(it.companyName || it.name || ''),
+          expect:erpExpectAmount(u.fee, u.taxType, u.paid), people:erpPayerPeople(it), item:it });
+      });
+    });
+  });
+  (get('companies', []) || []).forEach(function(co){
+    if(!co || co._deleted || co.status !== 'active' || String(co.managerMain || '') !== sid) return;
+    var fee = parseInt(co.monthlyAdvisoryFee, 10) || 0;
+    if(fee <= 0) return;
+    out.push({ pid:'adv-' + co.id + '-', store:'companies', sourceId:co.id, advisory:true,
+      label:'자문료 ' + (co.name || ''), companyName:String(co.name || ''), expect:fee, people:erpPayerPeople(co), item:co });
+  });
+  return out;
+}
+/* 이 물음이 «내 건일 수도» 있나 — 금액이 받을 돈과 꼭 같거나, 이름이 업체명·근로자·대표자와 꼭 같으면 */
+function erpDepAskGuess(ask, items){
+  var nm = erpNormName(ask && ask.payer || ''), nm0 = erpNormName(String(ask && ask.payer || '').replace(/\(.*$/, ''));
+  var amt = parseInt(ask && ask.amount, 10) || 0, best = null;
+  (items || []).forEach(function(it){
+    var why = '', score = 0;
+    var cn = erpNormName(it.companyName);
+    var nameHit = !!nm && ((cn && (cn === nm || cn === nm0))
+      || (it.people || []).some(function(p){ return p.n === nm || p.n === nm0; }));
+    var amtHit = amt > 0 && (parseInt(it.expect, 10) || 0) === amt;
+    if(nameHit && amtHit){ score = 3; why = '이름·금액이 내 건과 같음'; }
+    else if(nameHit){ score = 2; why = '이름이 내 건과 같음'; }
+    else if(amtHit){ score = 1; why = '받을 돈 ' + amt.toLocaleString() + ' 과 같음'; }
+    if(score && (!best || score > best.score)) best = { score:score, why:why, item:it };
+  });
+  return best;
+}
+/* 답 한 줄 — 자문료는 «입금한 달»의 자문료로 본다(재무가 확정 창에서 달을 바꿀 수 있다) */
+function erpDepAskAnswerFields(ask, item, who, addWorker, nowIso){
+  who = who || {}; var now = nowIso || new Date().toISOString();
+  var pid = item.advisory ? item.pid + String(ask.date || '').slice(0, 7) : item.pid;
+  return { status:'answered', updatedAt:now,
+    answer:{ pid:pid, label:String(item.label || '').slice(0, 120), sourceKind:item.store, sourceId:String(item.sourceId || ''),
+      by:String(who.sid || ''), byName:String(who.name || ''), at:now, addWorker:!!addWorker } };
+}
+/* 근로자 명단에 넣을 사람인가 — 사건에서, 그 이름이 명단·업체명·대표자 어디에도 없을 때만 */
+function erpDepAskNeedsWorker(ask, item){
+  if(!item || item.store !== 'cases' || !item.item) return false;
+  var raw = String(ask && ask.payer || '').replace(/\(.*$/, '').trim();
+  /* ⚠ 이름 다듬기(erpNormName)가 「주식회사」를 떼어 「주식회사가나」가 «가나» 사람처럼 보인다 — 원문으로 먼저 거른다 */
+  if(!/^[가-힣]{2,4}$/.test(raw)) return false;
+  var nm = erpNormName(raw);
+  if(erpNormName(item.companyName) === nm) return false;
+  return !(item.people || []).some(function(p){ return p.n === nm; });
+}
+/* 재무 화면 — 답 온 것을 «골라 둔 짝»으로, 처리된 줄의 물음은 닫는다. 쓰지 않고 할 일만 돌려준다.
+   pend: { 후보번호: 후보 } · picks: ledger_picks 원본 · processed: bank_processed */
+function erpDepAskSync(asks, picks, pend, processed, nowIso){
+  var now = nowIso || new Date().toISOString(), toPick = [], toPatch = [];
+  picks = picks || {}; pend = pend || {}; processed = processed || {};
+  (asks || []).forEach(function(a){
+    if(!a || !a.id || a.status === 'done') return;
+    if(a.bankKey && processed[a.bankKey]){ toPatch.push({ id:a.id, fields:{ status:'done', updatedAt:now } }); return; }
+    if(a.status !== 'answered' || !a.answer || !a.answer.pid) return;
+    if(!pend[a.answer.pid]){ toPatch.push({ id:a.id, fields:{ status:'stale', updatedAt:now } }); return; }
+    if(!picks[a.rowK]) toPick.push({ rowK:a.rowK, pid:a.answer.pid, who:{ sid:a.answer.by, name:a.answer.byName, at:a.answer.at } });
+    toPatch.push({ id:a.id, fields:{ status:'picked', updatedAt:now } });
+  });
+  return { toPick:toPick, toPatch:toPatch };
+}
+
 if(typeof window !== 'undefined'){
   window.erpMakeBatch = erpMakeBatch;       window.erpBatchRows = erpBatchRows;
   window.erpCanDropBatch = erpCanDropBatch; window.erpTrimBatches = erpTrimBatches;
@@ -52690,6 +52842,42 @@ function FinanceLedger(props){
   });
   var autoInvCnt = autoRows.filter(function(r){ return r.why === 'invoice'; }).length;
   var autoKeys = {}; autoRows.forEach(function(r){ autoKeys[r.row._k] = 1; });
+  /* ── 💬 누구 입금인가요? (대표 「시안대로」 2026-10-24, erpDepAskSync 머리글) ──
+     후보가 하나도 없는 줄 가운데 «아직 안 물은 것» 을 센다. 묻는 것은 사람이 단추를 눌러서만 한다. */
+  var _dAsks = dbGet(DEP_ASK_KEY, []) || []; if(!Array.isArray(_dAsks)) _dAsks = [];
+  var _dAskByK = {}; _dAsks.forEach(function(a){ if(a && a.rowK) _dAskByK[a.rowK] = a; });
+  var depAskNew = [];
+  if(rows && ldTabEff === 'inc') incList.forEach(function(row){
+    var i = rowInfo[row._k];
+    if(!_dAskByK[row._k] && erpDepAskWanted(row, i && i.st, held)) depAskNew.push(row);
+  });
+  var depAskWait = _dAsks.filter(function(a){ return a && a.status === 'ask'; }).length;
+  async function depAskSend(list){
+    if(!list || !list.length) return;
+    if(!(await popConfirm('후보가 없는 입금 ' + list.length + '건을 직원에게 묻습니다.\n\n'
+      + '직원 «나의 업무» 맨 위에 날짜·금액·보낸 사람 이름만 보입니다(잔액·계좌는 안 보입니다).\n'
+      + '담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다 — 확정은 여기서 합니다.'))) return;
+    var me = _meNow(), now = new Date().toISOString();
+    var recs = list.map(function(r){ return erpDepAskMake(r, me, now); });
+    showToast(dbUpsertMany(DEP_ASK_KEY, recs) ? '💬 ' + recs.length + '건을 직원에게 물었습니다' : '❌ 묻기를 저장하지 못했습니다');
+  }
+  /* 답 온 것 → 골라 둔 짝 · 확정·등록된 줄의 물음 → 닫음. 재무 권한 기기에서만 돈다(짝 자리는 재무 칸이다). */
+  var _dAskSig = _dAsks.map(function(a){ return a ? a.id + ':' + a.status : ''; }).join(',');
+  var _pendN = Object.keys(pendById).length;
+  useEffect(function(){
+    if(!rows || !_dAsks.length || !_erpCanFin()) return;
+    try {
+      var plan = erpDepAskSync(_dAsks, dbGet(LEDGER_PICK_KEY, {}) || {}, pendById, erpBankProcessedStore());
+      if(plan.toPick.length){
+        var cur = dbGet(LEDGER_PICK_KEY, {}) || {}, nm = Object.assign({}, inMatch);
+        plan.toPick.forEach(function(p){ cur = erpPickSet(cur, p.rowK, p.pid, p.who); nm[p.rowK] = p.pid; });
+        dbSet(LEDGER_PICK_KEY, cur); setInMatch(nm);
+        showToast('💬 직원 답 ' + plan.toPick.length + '건을 골라 둔 짝으로 받았습니다 — 확인하고 확정하세요');
+      }
+      plan.toPatch.forEach(function(x){ dbPatch(DEP_ASK_KEY, x.id, x.fields); });
+    } catch(e){ if(window._erpErrLog) window._erpErrLog(e); }
+  }, [_dAskSig, !!rows, _pendN]);
+
   /* 초록 줄 확정 — 일괄 확정 단추와 저절로 확정이 «같은 길»을 쓴다.
      ⚠ 갈래가 둘이면 저장 내용이 어긋난다(2026-08 에 실제로 그랬다 — 단추마다 저장하는 것이 달랐다). */
   function confirmReadyList(list){
@@ -54370,6 +54558,15 @@ function FinanceLedger(props){
                 style:{padding:'3px 9px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'5px',fontSize:'12.5px',fontWeight:800,cursor:'pointer',whiteSpace:'nowrap'}},
                 '⊞ 묶어 한 항목에 확정 '+_gk.length+'행 · '+_gsum.toLocaleString()+'원');
             })(),
+            /* 💬 직원에게 묻기 — 후보 없는 줄 가운데 아직 안 물은 것. 0이면 그리지 않고, 묻는 중인 수만 보인다 */
+            (depAskNew.length>0 || depAskWait>0) && h('button',{
+              onClick:function(){ if(depAskNew.length) depAskSend(depAskNew); else showToast('💬 직원 답을 기다리는 입금 '+depAskWait+'건 — 답이 오면 «골라 둔 짝»으로 들어옵니다'); },
+              title:'후보가 없는 입금을 직원 «나의 업무» 맨 위에 올립니다 — 날짜·금액·보낸 사람 이름만 보입니다\n'
+                    +'담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다(확정은 여기서)'
+                    +(depAskWait?('\n지금 답을 기다리는 것 '+depAskWait+'건'):''),
+              style:{padding:'3px 8px',background:depAskNew.length?'#2563eb':'#fff',color:depAskNew.length?'#fff':'#2563eb',
+                border:'1px solid #2563eb',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},
+              depAskNew.length ? ('💬 직원에게 묻기 '+depAskNew.length) : ('💬 묻는 중 '+depAskWait)),
             // 보류함 — 비어 있으면 아예 안 그린다 (0이 붙어 있으면 눈에 걸린다)
             _heldS.n>0 && h('button',{className:'ld-more-item',onClick:function(){setHeldOpen(true);},
               title:'누가 왜 보낸 돈인지 모를 때 넣어 둔 입금입니다\n합계 '+_heldS.sum.toLocaleString()+'원'
@@ -54683,13 +54880,17 @@ function FinanceLedger(props){
                        확정하기 전에 「이건 ○○님이 골라 둔 것」 을 알아야 물어볼 수 있다. */
                     (function(){
                       var _pw = pickedBy(row._k);
+                      var _da = _dAskByK[row._k];
+                      if(!_pw && _da && _da.status === 'ask')
+                        return h('div',{style:{marginTop:'1px',color:'#64748b',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap'},
+                          title:'직원에게 물어 둔 입금입니다 — '+String(_da.createdAt||'').slice(0,10)+' 물음'},'💬 묻는 중');
                       if(!_pw) return null;
                       return h('div',{style:{marginTop:'1px',color:'#2563eb',fontSize:'12px',fontWeight:700,
                           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'},
                         title:_pw.name+' 님이 골라 둔 줄입니다'
                              +(_pw.at?('\n'+String(_pw.at).slice(0,16).replace('T',' ')):'')
                              +'\n확정하기 전에 한 번 확인하세요'},
-                        '✋ '+_pw.name);
+                        ((_da && _da.answer && _da.answer.by === _pw.sid) ? '💬 ' : '✋ ')+_pw.name);
                     })()),
                   // ══ 처리 — 단추 크기를 하나로 맞춘다 ══
                   h('td',{className:'ld-c-act',style:Object.assign({},tdS,{borderLeft:'2px solid #f8fafc',textAlign:'right',
@@ -65315,6 +65516,117 @@ var _wsPendingId = null;
     }catch(e){ fin(); }
   }
 
+/* 💬 누구 입금인가요? — «나의 업무» 맨 위 (대표 「시안대로」 2026-10-24, erpDepAskSync 머리글)
+   ☐ 골라 「어느 건」을 정하고 한 번에 보낸다. 보낸 답은 확정이 아니다 — 재무가 보고 확정한다.
+   ⚠ 짐작(⭐ 내 건일 수도)은 «골라 놓기»까지만 한다 — 보내는 것은 사람이 누른다. */
+function DepositAskBox(){
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var sid = String(me.sid || '');
+  var tabS = useState('mine'); var tab = tabS[0], setTab = tabS[1];
+  var chkS = useState({}); var chk = chkS[0], setChk = chkS[1];
+  var selS = useState({}); var sel = selS[0], setSel = selS[1];     // 물음 id → 고른 건 pid
+  var wkS = useState({});  var wk = wkS[0], setWk = wkS[1];         // 물음 id → 근로자 명단에 넣기(끄면 false)
+  if(!sid) return null;
+  var all = dbGet(DEP_ASK_KEY, []) || []; if(!Array.isArray(all)) all = [];
+  var items = erpDepAskMyItems(sid);
+  var byPid = {}; items.forEach(function(it){ byPid[it.pid] = it; });
+  var open = erpDepAskOpenFor(all, sid).sort(function(a, b){ return String(b.date).localeCompare(String(a.date)); });
+  var likely = [], rest = [];
+  open.forEach(function(a){ var g = erpDepAskGuess(a, items); (g ? likely : rest).push({ a:a, g:g }); });
+  var mine = all.filter(function(a){ return a && a.answer && a.answer.by === sid && a.status !== 'done'; });
+  if(!open.length && !mine.length) return null;
+  var list = tab === 'mine' ? likely : tab === 'all' ? likely.concat(rest) : [];
+  function pidOf(x){ return sel[x.a.id] !== undefined ? sel[x.a.id] : (x.g ? x.g.item.pid : ''); }
+  function wkOf(x, it){ return erpDepAskNeedsWorker(x.a, it) && wk[x.a.id] !== false; }
+  var picked = list.filter(function(x){ return chk[x.a.id]; });
+  function send(){
+    var ok = 0, skip = 0, addW = 0, now = new Date().toISOString();
+    picked.forEach(function(x){
+      var it = byPid[pidOf(x)];
+      if(!it){ skip++; return; }
+      var w = wkOf(x, it);
+      if(!dbPatch(DEP_ASK_KEY, x.a.id, erpDepAskAnswerFields(x.a, it, me, w, now))) return;
+      ok++;
+      if(w){
+        var nm = String(x.a.payer || '').replace(/\(.*$/, '').trim();
+        var cur = (dbGet('cases', []) || []).filter(function(c){ return c && c.id === it.sourceId; })[0];
+        if(cur && dbPatch('cases', cur.id, { workers:(cur.workers || []).concat([{ id:uid('wk'), name:nm, isPrimary:false,
+          note:'입금자 — 💬 확인함에서 ' + (me.name || '') + ' 넣음 ' + now.slice(0, 10) }]) })) addW++;
+      }
+    });
+    setChk({});
+    showToast(ok ? ('💬 ' + ok + '건 보냈습니다 — 재무가 확인하고 확정합니다' + (addW ? ' · 근로자 명단에 ' + addW + '명 넣음' : '')
+      + (skip ? ' · 건을 안 고른 ' + skip + '건은 남겨 둠' : '')) : '어느 건인지 고른 줄이 없습니다');
+  }
+  function notMine(){
+    var n = 0;
+    picked.forEach(function(x){
+      var nm = Object.assign({}, x.a.notMine || {}); nm[sid] = 1;
+      if(dbPatch(DEP_ASK_KEY, x.a.id, { notMine:nm, updatedAt:new Date().toISOString() })) n++;
+    });
+    setChk({}); if(n) showToast('🙅 ' + n + '건을 내 목록에서 뺐습니다 — 다른 직원에게는 그대로 보입니다');
+  }
+  var chip = function(k, label){ var on = tab === k;
+    return h('button', { key:k, onClick:function(){ setTab(k); setChk({}); },
+      style:{ padding:'2px 10px', borderRadius:'99px', border:'1px solid ' + (on ? '#2563eb' : '#cbd5e1'),
+        background:on ? '#2563eb' : '#fff', color:on ? '#fff' : '#475569', fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, label); };
+  var th = { padding:'5px 8px', background:'#eff6ff', color:'#1e3a8a', fontWeight:700, textAlign:'left', whiteSpace:'nowrap', position:'sticky', top:0 };
+  var td = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
+  var allOn = list.length > 0 && list.every(function(x){ return chk[x.a.id]; });
+  return h('div', { className:'dep-ask-box', style:{ marginBottom:'14px', background:'#fff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'10px 12px' } },
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'6px' } },
+      h('b', { style:{ fontSize:'13px', color:'#1e3a8a', marginRight:'4px' } }, '💬 누구 입금인가요?'),
+      chip('mine', '⭐ 내 건일 수도 ' + likely.length), chip('all', '전체 ' + open.length), chip('done', '내가 답한 것 ' + mine.length),
+      h('span', { style:{ flex:'1' } }),
+      tab !== 'done' && h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '☑ ' + picked.length + '건'),
+      tab !== 'done' && h('button', { onClick:send, disabled:!picked.length,
+        style:{ padding:'3px 10px', background:picked.length ? '#2563eb' : '#cbd5e1', color:'#fff', border:'none', borderRadius:'5px', fontSize:'12px', fontWeight:700, cursor:picked.length ? 'pointer' : 'default' } }, '고른 것 한 번에 보내기'),
+      tab !== 'done' && h('button', { onClick:notMine, disabled:!picked.length,
+        style:{ padding:'3px 10px', background:'#fff', color:'#2563eb', border:'1px solid #2563eb', borderRadius:'5px', fontSize:'12px', fontWeight:700, cursor:picked.length ? 'pointer' : 'default' } }, '내 건 아님')),
+    h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'6px' } },
+      '재무가 이름으로 못 찾은 입금입니다 — 내 건이면 ☐ 고르고 «어느 건인가요?»를 정해 보내 주세요. 보낸 답은 재무가 보고 확정합니다.'),
+    h('div', { style:{ overflow:'auto', maxHeight:'300px', border:'1px solid #e2e8f0', borderRadius:'6px' } },
+      tab === 'done'
+        ? h('table', { style:{ borderCollapse:'collapse', width:'100%', fontSize:'12.5px' } },
+            h('thead', null, h('tr', null, ['#', '입금일', '금액', '입금자', '내가 고른 건', '상태'].map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+            h('tbody', null, mine.map(function(a, i){
+              var st = a.status === 'picked' ? '재무가 받음 — 확정 기다림' : a.status === 'stale' ? '⚠ 그 건은 이미 받은 것으로 나옵니다 — 재무 확인' : '보냄';
+              return h('tr', { key:a.id },
+                h('td', { style:Object.assign({}, td, { color:'#94a3b8' }) }, i + 1), h('td', { style:td }, String(a.date).slice(5)),
+                h('td', { style:Object.assign({}, td, { textAlign:'right' }) }, (a.amount || 0).toLocaleString()), h('td', { style:td }, a.payer),
+                h('td', { style:Object.assign({}, td, { maxWidth:'320px' }), title:a.answer.label }, a.answer.label), h('td', { style:td }, st));
+            })))
+        : h('table', { style:{ borderCollapse:'collapse', width:'100%', fontSize:'12.5px' } },
+            h('thead', null, h('tr', null,
+              h('th', { style:th }, h('input', { type:'checkbox', checked:allOn, onChange:function(){
+                var n = {}; if(!allOn) list.forEach(function(x){ n[x.a.id] = 1; }); setChk(n); } })),
+              ['#', '입금일', '금액', '입금자', '왜 나에게?', '어느 건인가요?'].map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+            h('tbody', null, list.length ? list.map(function(x, i){
+              var pid = pidOf(x), it = byPid[pid], needW = erpDepAskNeedsWorker(x.a, it);
+              return h('tr', { key:x.a.id, style:{ background:chk[x.a.id] ? '#eff6ff' : '#fff' } },
+                h('td', { style:td }, h('input', { type:'checkbox', checked:!!chk[x.a.id], onChange:function(){
+                  var n = Object.assign({}, chk); if(n[x.a.id]) delete n[x.a.id]; else n[x.a.id] = 1; setChk(n); } })),
+                h('td', { style:Object.assign({}, td, { color:'#94a3b8' }) }, i + 1),
+                h('td', { style:td }, String(x.a.date).slice(5)),
+                h('td', { style:Object.assign({}, td, { textAlign:'right', fontWeight:700 }) }, (x.a.amount || 0).toLocaleString()),
+                h('td', { style:Object.assign({}, td, { maxWidth:'160px' }), title:x.a.payer }, x.a.payer),
+                h('td', { style:Object.assign({}, td, { color:'#166534', maxWidth:'220px' }), title:x.g ? x.g.why : '' }, x.g ? x.g.why : '—'),
+                h('td', { style:td },
+                  h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+                    h('select', { value:pid, onChange:function(e){ var n = Object.assign({}, sel); n[x.a.id] = e.target.value; setSel(n);
+                        if(e.target.value && !chk[x.a.id]){ var c = Object.assign({}, chk); c[x.a.id] = 1; setChk(c); } },
+                      style:{ maxWidth:'280px', fontSize:'12px', padding:'2px 4px', border:'1px solid ' + (it ? '#16a34a' : '#cbd5e1'), borderRadius:'4px' } },
+                      h('option', { value:'' }, items.length ? '— 내 건에서 고르기 —' : '— 내가 맡은 받을 돈이 없습니다 —'),
+                      items.map(function(o){ return h('option', { key:o.pid, value:o.pid },
+                        o.label + (o.expect ? ' ' + o.expect.toLocaleString() : '')); })),
+                    needW && h('label', { style:{ fontSize:'11.5px', color:'#475569', whiteSpace:'nowrap', cursor:'pointer' },
+                        title:'이 이름을 그 사건 근로자 명단에 넣습니다 — 다음부터는 저절로 짝이 됩니다' },
+                      h('input', { type:'checkbox', checked:wk[x.a.id] !== false, onChange:function(){ var n = Object.assign({}, wk); n[x.a.id] = (wk[x.a.id] === false); setWk(n); } }),
+                      ' 근로자 명단에 넣기'))));
+            }) : h('tr', null, h('td', { colSpan:7, style:Object.assign({}, td, { color:'#94a3b8', textAlign:'center', padding:'12px' }) },
+              tab === 'mine' ? '내 건과 닮은 입금은 없습니다 — «전체»에서 아는 것이 있는지 봐 주세요' : '물어 온 입금이 없습니다'))))));
+}
+
 function MyDeskV2(props){
   var sid = CURRENT_USER.sid;
   var name = CURRENT_USER.name;
@@ -65849,6 +66161,8 @@ function MyDeskV2(props){
       // 중앙 메인 (캘린더 full 모드에서는 숨김)
       // ─────────────────────
       calSize !== 'full' && h('div', { style:{display:'flex', flexDirection:'column'} },
+        /* 💬 누구 입금인가요? — 물어 온 입금이 있을 때만 뜬다(DepositAskBox 머리글) */
+        h(DepositAskBox, null),
         // 🔔 내 일정 변경 알림 (타인에 의해)
         myAlerts.length > 0 && h('div', { style:{ marginBottom:'14px', background:'#fffbeb', border:'1px solid #fbbf24', borderRadius:'8px', padding:'12px 14px' } },
           h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' } },

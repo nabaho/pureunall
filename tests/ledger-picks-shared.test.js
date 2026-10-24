@@ -116,7 +116,8 @@ t('아직 없으면 이 기기 옛 것 (하던 일을 잃지 않게)',
   /setInMatch\(Object\.keys\(_pk0\)\.length \? _pk0 : \(d\.inMatch \|\| \{\}\)\);/.test(src), true);
 
 console.log('\n[⑩ 화면에 「누가 골랐는지」 가 뜬다]');
-t('남이 고른 줄에 이름표', /'✋ '\+_pw\.name/.test(src), true);
+/* 직원이 «💬 누구 입금인가요?»로 답한 짝이면 ✋ 대신 💬 (2026-10-24) — 규칙은 «이름표가 붙는다» 이다 */
+t('남이 고른 줄에 이름표', /'✋ '[\s\S]{0,40}?\+_pw\.name/.test(src), true);
 t('언제 골랐는지는 도움말로', /_pw\.at\?\('\\n'\+String\(_pw\.at\)\.slice\(0,16\)/.test(src), true);
 t('확정 전에 확인하라고 적는다', /확정하기 전에 한 번 확인하세요/.test(src), true);
 t('내 것에는 안 붙는다 (pickedBy 가 내 사번을 걸러 낸다)',
