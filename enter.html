@@ -235,18 +235,27 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
-/* ✨ TypeSafe 검토 — 「업무 시스템」 줄 오른쪽, 로그인 후 바로가기 바로 왼쪽 (js/pu-typesafe.js 가 넣는다).
-   ⚠ 머리 카드(.pbar)에 넣지 말 것 — 관리자 화면은 사용액·AI 판독 딱지로 이미 920px 를 다 쓴다
-     (2026-09-23 실측: 그대로도 934px, 여기 넣으면 1081px 로 카드 밖으로 163px 넘쳤다). */
-.sec #pu-typesafe-review-button{margin-left:auto;}
+/* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
+   예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
+   여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
+.pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
 .pbar .nm small{display:block;font-size:.64rem;color:var(--mute);letter-spacing:.14em;margin-top:-1px;}
 .pbar .logo{width:30px;height:30px;border-radius:9px;font-size:.85rem;}
+/* ★ 내 메뉴 단추는 «늘» 단추로 보인다 — 흰 바탕·테두리 (대표 2026-10-24 「사용액등은 어디 사라지고」:
+     테두리 없이 이름만 서 있어 누르는 곳인 줄 몰랐다). 안에 «이번 달 사용액»을 작게 늘 보인다(관리자만). */
 .pbar .pmeta{order:5;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--sub);
-  cursor:pointer;padding:3px 10px 3px 4px;border-radius:99px;border:1px solid transparent;}
-.pbar .pmeta:hover,.pbar .pmeta[aria-expanded="true"]{background:rgba(255,255,255,.7);border-color:rgba(10,20,60,.1);}
+  cursor:pointer;padding:3px 10px 3px 4px;border-radius:99px;background:#ffffff;border:1px solid #cbd5e1;
+  box-shadow:0 2px 8px rgba(20,30,80,.08);}
+.pbar .pmeta:hover,.pbar .pmeta[aria-expanded="true"]{border-color:var(--accent);}
+.me-money{border-left:1px solid #e2e8f0;padding-left:8px;font-variant-numeric:tabular-nums;}
+.me-money b{color:var(--ink);font-weight:700;}
+.me-money small{font-size:.68rem;color:var(--mute);margin-left:3px;}
+.me-money[data-tone="warn"] b{color:#d97706;}
+.me-money[data-tone="over"] b{color:#dc2626;}
+.pbar > .logout{order:6;padding:6px 4px;}    /* 로그아웃은 맨 오른쪽에 «늘» 보인다(PC) — 폰은 내 메뉴 맨 아래 */
 .pbar .pmeta:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
 .pbar .pmeta .un-title{display:none;}    /* 직책은 내 메뉴 맨 위에 — 머리줄에는 이름·사번만 */
 .pbar .connection-status[data-state="online"] .cs-lb{display:none;}   /* 잘 될 때는 점 하나 · 끊기면 말 그대로 */
@@ -324,6 +333,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-go{margin-left:auto;font-size:.72rem;font-weight:700;color:var(--accent);}
 .pbar .me-menu .logout{display:block;width:100%;margin:6px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:9px;
   background:#ffffff;font-size:.8rem;text-align:center;}
+.pbar .me-menu .me-logout{display:none;}     /* PC 는 머리줄에 로그아웃이 있다 — 메뉴 안 것은 폰에서만 */
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
    ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
 #appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
@@ -522,6 +532,9 @@ body.portal-mode #camFab{display:flex;}
   .pbar .pmeta{order:1;flex:0 0 auto;font-size:.72rem;gap:6px;padding:3px 8px 3px 6px;}
   .pbar .pmeta .avatar{display:none;}          /* 폰에선 아바타 생략(공간 절약) */
   .pbar .pmeta #userName{font-weight:600;}
+  .pbar .pmeta .me-money{display:none;}        /* 폰은 좁다 — 사용액은 내 메뉴 안에서 */
+  .pbar > #logoutBtn{display:none;}            /* 폰은 좁다 — 로그아웃은 내 메뉴 맨 아래(#meLogout) */
+  .pbar .me-menu .me-logout{display:block;}
   /* 잘 될 때는 초록 점 하나로 충분하다 — 「서버 연결됨」 여섯 글자가 이름 자리를 먹는다.
      ⚠ 끊겼거나 확인 중일 때는 말을 그대로 남긴다. 그때가 정작 읽어야 할 때다. */
   .connection-status[data-state="online"] .cs-lb{display:none;}
@@ -1255,12 +1268,15 @@ body.portal-mode #moreFab{display:flex;}
         </button>
       </div>
       <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
-      <button class="logout" id="logoutBtn">로그아웃</button>
+      <button type="button" class="logout me-logout" id="meLogout">로그아웃</button>
       </div>
+      <!-- 로그아웃은 머리줄 맨 오른쪽에 늘 보인다(PC, order:6). 폰은 좁아서 숨기고 내 메뉴 맨 아래 #meLogout 이 대신 누른다. -->
+      <button class="logout" id="logoutBtn">로그아웃</button>
       <div class="pmeta" id="meBtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="내 메뉴">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
         <div class="avatar" id="userAvatar">·</div>
         <span id="userName">—</span>
+        <span class="me-money" id="meMoney" hidden><b id="meMoneyAmt">—</b><small>이번 달</small></span>
         <span class="me-caret" aria-hidden="true">▾</span>
       </div>
     </div>
@@ -1284,7 +1300,8 @@ body.portal-mode #moreFab{display:flex;}
 
     <div class="sec"><h2 id="portalHeading">업무 시스템</h2>
       <button id="tileLockBtn" type="button" aria-describedby="tileHint"></button>
-      <span id="tileHint">마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서)</span>
+      <!-- 긴 안내는 «이동 가능» 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
+      <span id="tileHint" hidden>마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서)</span>
     </div>
     <!-- 줄은 APP_ROWS 에서 «만들어» 넣는다 (대표 결정 2026-08-29, 안 ㉮).
          여태는 여기에 손으로 두 줄을 적어 두어, 줄을 늘리려면 화면·자바스크립트
@@ -3605,6 +3622,7 @@ body.portal-mode #moreFab{display:flex;}
     var bOn = on(b), aOn = on(a);
     box.style.display = (bOn || aOn) ? 'inline-flex' : 'none';
     box.dataset.join = (bOn && aOn) ? '1' : '0';
+    var mm = $('meMoney'); if(mm) mm.hidden = !bOn;   /* 내 메뉴 단추 안 사용액 — 사용액 딱지와 같이 켜고 끈다(관리자만) */
   }
 
   function billStart(role){
@@ -3705,6 +3723,8 @@ body.portal-mode #moreFab{display:flex;}
     $('billDot').style.background = spike ? BILL_DOT.over : (BILL_DOT[s.tone] || BILL_DOT.none);
     $('billAmt').textContent = window.PuBilling.fmtWon(s.cost);
     $('billAgo').textContent = spike ? ('⚠ 오늘 ' + spike.ratio + '배') : (s.ago || '');
+    /* 내 메뉴 단추 안 사용액 — 같은 값·같은 경고 색 */
+    if($('meMoneyAmt')){ $('meMoneyAmt').textContent = $('billAmt').textContent; $('meMoney').dataset.tone = spike ? 'over' : (s.tone || ''); }
     if(document.getElementById('billModal').style.display === 'flex') billPaintModal(s);
   }
 
@@ -4143,7 +4163,8 @@ body.portal-mode #moreFab{display:flex;}
     b.classList.toggle('locked', tilePrefs.locked);
     b.setAttribute('aria-pressed', tilePrefs.locked ? 'true' : 'false');
     b.setAttribute('aria-label', tilePrefs.locked ? '타일 순서 고정 해제' : '타일 순서 고정');
-    $('tileHint').style.display = tilePrefs.locked ? 'none' : 'inline';
+    b.title = tilePrefs.locked ? '눌러서 순서 고정 풀기'
+      : '마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서) — 눌러서 고정';
     allTiles().forEach(function(t){ t.draggable = !tilePrefs.locked; });
   }
 
@@ -5984,6 +6005,8 @@ body.portal-mode #moreFab{display:flex;}
       if(e.key === 'Escape' && !menu.hidden){ setOpen(false); btn.focus(); }
     });
     var prof = $('meProfile'); if(prof) prof.addEventListener('click', kkOpenProfile);
+    /* 폰의 로그아웃(메뉴 맨 아래)은 머리줄 로그아웃을 대신 누른다 — 나가는 길은 한 곳에서만 짠다 */
+    var mo = $('meLogout'); if(mo) mo.addEventListener('click', function(){ $('logoutBtn').click(); });
   })();
   kkHandleReturn();
 
@@ -6176,13 +6199,14 @@ body.portal-mode #moreFab{display:flex;}
    ⚠ 포털은 떠 있는 단추 자리를 한 곳에서만 정한다(위 「화면에 떠 있는 단추의 자리」) —
      그래서 떠 있게 두지 않고 「업무 시스템」 줄 오른쪽 끝에 세운다
      (옆에 있던 「로그인 후 바로가기」는 2026-09-28 대표 지시 「선택 하느거 필요 없다」로 걷어냈다).
-     ⚠ 목업에선 건의하기 왼쪽이었지만 관리자 머리 카드는 이미 꽉 차 넘친다(위 css 설명). 폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
+     ★ 2026-10-24 대표 윗줄 정리 안 1 — 머리 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 나서, 목업대로 «건의하기 왼쪽»에 세운다.
+       폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
    관리자만 보이는 것·미국 서버 확인란·하루 한도는 js/pu-typesafe.js 가 그대로 지킨다.
    포털은 직원·업체 목록을 안 들고 있으므로 가리기용 함수를 넘기지 «않는다» —
    부품이 「제안 받기」를 누를 때 스스로 목록을 읽어 가린다. */
 window.PU_TYPESAFE_MOUNT = function(){
-  var h = document.getElementById('portalHeading');
-  return h && h.parentNode ? { parent: h.parentNode, before: null } : null;
+  var sg = document.getElementById('sgFab');
+  return sg && sg.parentNode ? { parent: sg.parentNode, before: null } : null;   /* 줄 «끝»에 붙이고 자리는 css order 로 — 남의 요소 앞에 기대지 않는다 */
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
