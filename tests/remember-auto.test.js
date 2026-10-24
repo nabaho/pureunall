@@ -109,7 +109,10 @@ test('★★★ ⑥ 받는 화면 — 같은 창·확장 표시만 믿고, 저�
   assert.match(js, /m\.__from !== EXT \|\| m\.__to !== PAGE/);
   assert.match(js, /PuPhotoStore\.savePhoto\(/, '사진첩 저장 문이 아니다');
   assert.match(js, /PuDocFile\.sendToCards\(\{ kind: 'card'/, '★★ 기업정보함 «같은 문»(겹침 검사)을 안 쓴다');
-  assert.ok(!/pucards\/items|pucards\/idx|\.ref\(['"]puphotos/.test(js), '★★★ 기업정보함·사진첩에 직접 쓴다 — 둘째 저장 길이 생긴다');
+  /* 메일 명함(2026-10-24)은 만든 뒤 «폴더 칸»만 붙인다 — 명함 자체는 여전히 sendToCards 로만 만든다 */
+  const itemPaths = js.match(/'pucards\/items[^']*'(\s*\+\s*[\w.]+\s*\+\s*'[^']*')?/g) || [];
+  assert.ok(itemPaths.every((p) => /'\/group'|'\/updatedAt'/.test(p)), '★★★ 기업정보함 명함에 직접 쓴다 — 둘째 저장 길이 생긴다: ' + itemPaths.join(' | '));
+  assert.ok(!/pucards\/idx|\.ref\(['"]puphotos/.test(js), '★★★ 기업정보함 색인·사진첩에 직접 쓴다');
   assert.match(js, /PuRemember\.plan\(/); assert.match(js, /failed \? lastOk/, '★★ 못 넣은 것을 넘겨 기준을 앞당긴다');
   assert.match(html, /<script src="js\/pu-remember\.js\?v=\d+"><\/script>/);
 });

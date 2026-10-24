@@ -7296,6 +7296,37 @@ const MAIL_DEPS = {
 };
 const MSYNC = require("./mail-sync")(MAIL_DEPS);
 exports.syncMailbox = MSYNC.syncMailbox;
+/* 📬 메일 서명 → 기업정보함 명함 — 줄 선 서명을 AI 로 칸에 읽는다 (대표 「추천대로」 2026-10-24, functions/mail-card.js)
+   ⚠ readDoc 과 같은 열쇠·같은 달 한도·같은 셈(app:cards). 넣기는 받는 탭(remember-intake.html)이 같은 문으로 한다. */
+const MAILCARD = require("./mail-card");
+exports.mailCardRead = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .database.ref("/pucards/mailcard/q/{id}")
+  .onCreate(async (snap) => {
+    const q = (snap && snap.val && snap.val()) || {};
+    if (q.st !== "new") return null;
+    const done = (v) => snap.ref.update(Object.assign({ readAt: Date.now() }, v));
+    try {
+      const 몫 = await aiMonthSpend();
+      if (몫.known && 몫.over) return done({ st: "skip", why: "이번 달 AI 한도" });
+      const key = await readGeminiKey();
+      if (!key) return done({ st: "skip", why: "AI 키 없음" });
+      let f = null;
+      if (q.sig) {
+        const r = await DR.callGemini(fetch, key, [{ text: MAILCARD.prompt(q.sig, q) }], [2000], {});
+        await bumpReadTally("cards", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        if (!r.ok) return done({ st: "skip", why: String(r.why || "AI 오류").slice(0, 80) });
+        const parts = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+        f = MAILCARD.fieldsFrom(MAILCARD.parseAi(parts.map((p) => (p && p.text) || "").join("")), q);
+      } else {
+        f = MAILCARD.fieldsFrom({}, q);
+      }
+      return done(f ? { st: "read", f: f } : { st: "skip", why: "서명 아님" });
+    } catch (e) {
+      return done({ st: "skip", why: String((e && e.message) || e).slice(0, 80) });
+    }
+  });
 exports.pullMailbox = MSYNC.pullMailbox;
 exports.readMailMessage = MSYNC.readMailMessage;
 exports.mailKeepWarm = MSYNC.mailKeepWarm;   /* ☕ 업무 시간 3분마다 메일 열기 함수를 따뜻하게 */
