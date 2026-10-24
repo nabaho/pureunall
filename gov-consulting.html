@@ -239,6 +239,16 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .dcard-hd{cursor:pointer;}
 .dcard-title{flex:1;min-width:0;}
 .dcard-sub{margin-top:2px;font-size:10.5px;font-weight:800;color:var(--dash-t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* 「사업 · 주담당」 줄 — 사업마다 주담당이 다른 사업장에만 (대표 결정 2026-10-24) */
+.dcard-tms{margin-top:4px;display:flex;flex-direction:column;gap:3px;}
+.tm-row{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;min-width:0;}
+.tm-bar{width:4px;height:13px;border-radius:2px;flex:none;}
+.tm-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ctm-row{display:grid;grid-template-columns:4px 1fr 168px;gap:9px;align-items:center;margin-bottom:7px;}
+.ctm-row .tm-bar{height:30px;}
+.ctm-nm{font-size:12.5px;font-weight:800;line-height:1.3;min-width:0;}
+.ctm-lock{font-size:12.5px;font-weight:800;color:var(--ok);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ctm-lock span{font-size:10.5px;}
 .dcard-open-btn{width:22px;height:22px;border:1px solid var(--dash-border);border-radius:6px;background:#f8fafc;color:var(--dash-text);font-size:11px;font-weight:900;cursor:pointer;line-height:1;flex-shrink:0;}
 .dcard:not(.open) .dcard-hd{border-bottom:none;}
 .dcard:not(.open) .dcard-rows{display:none;}
@@ -2278,6 +2288,11 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fld">
         <label class="flbl">진행 컨설팅 (복수선택)</label>
         <div id="mCoTypes" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
+      </div>
+      <div class="fld" id="mCoTypeMains" style="display:none;">
+        <label class="flbl">사업별 주담당 <span style="font-size:10px;color:var(--t2);font-weight:600;">(진행 컨설팅이 둘 이상일 때)</span></label>
+        <div id="mCoTypeMainList" style="margin-top:6px;"></div>
+        <div id="mCoTypeMainNote" style="font-size:10.5px;color:var(--t2);margin-top:4px;line-height:1.55;"></div>
       </div>
       <div class="fld" id="mCoDeadlines" style="display:none;">
         <label class="flbl">사업장별 컨설팅 조건</label>
@@ -4991,6 +5006,35 @@ function getCoAtts(o){
   if(o.defCoAtt)return [o.defCoAtt];
   return [];
 }
+/* ══ 사업별 주담당 (대표 지시 2026-10-24 「추천대로」) ══
+   한 사업장에 사업이 둘 이상이고 사업마다 주담당이 다르면(다우테크놀로지·에이치비씨솔루션·가야엔지니어링)
+   «사업장 한 곳에 주담당 한 칸» 에 담을 수 없었다 — 이알피는 «건마다» 주담당을 적기 때문이다.
+   co.typeAtts = {종류id: 직원id} — 사업장 대표(defAtt)와 «다른 종류만» 적는 성긴 표다. 비면 칸 자체를 지운다.
+   ⚠ 사업별 주담당은 «언제나 defAtt 이거나 defCoAtts 에 든 사람»이다 — 이알피 동기화는 다른 건 주담당을
+     부담당 줄에 남기고, 수정 창은 저장할 때 합친다(coAttsWithTypeMains). 그래서 권한 판단(coIsMine 등)은 그대로다. */
+function coMainOf(co,tid){
+  if(!co)return '';
+  const m=tid&&co.typeAtts&&co.typeAtts[tid];
+  return m||co.defAtt||'';
+}
+function coTypeMainIds(co){
+  return [...new Set(Object.values((co&&co.typeAtts)||{}).filter(Boolean))];
+}
+/* 수정 창에서 저장할 사업별 칸 — 대표와 같은 것·고르지 않은 종류는 적지 않고, 종류가 하나뿐이면 아예 비운다.
+   keep(잠긴 종류의 기존 값)이 사람이 고른 값(picked)보다 먼저다 — 이알피를 따르는 사업은 이알피가 정한다. */
+function coTypeAttsToSave(defAtt,selTypes,picked,keep){
+  const sel=[...selTypes];
+  if(sel.length<2)return {};
+  const out={};
+  sel.forEach(t=>{ const v=(keep&&keep[t])||(picked&&picked[t]); if(v&&v!==defAtt)out[t]=v; });
+  return out;
+}
+/* 사업별 주담당은 부담당 줄에도 들어 있어야 그 사람이 자기 사업 일정을 고칠 수 있다 */
+function coAttsWithTypeMains(defAtt,coAtts,typeAtts){
+  const out=(coAtts||[]).filter(id=>id&&id!==defAtt);
+  Object.values(typeAtts||{}).forEach(id=>{ if(id&&id!==defAtt&&out.indexOf(id)<0)out.push(id); });
+  return out;
+}
 function coAttStaffList(o){const st=getStaff();return getCoAtts(o).map(id=>st.find(a=>a.id===id)).filter(Boolean);}
 // Stamp state
 const ST={sid:null,photos:[null,null],times:[null,null],done:[false,false],pos:'bottom-left',color:'#fbbf24',slot:0,rangeHr:2,single:false,view:[{ox:.5,oy:.5,z:1},{ox:.5,oy:.5,z:1}]};
@@ -5532,8 +5576,8 @@ async function saveSingle(){
   const agErr=checkAgencyExclusive(single.coId,single.typeId,single.selDate);
   if(agErr){showBigAlert(agErr);return;}
   const newId=uid();
-  // 담당자 배정: 사업장 정담당 우선, 협업노무사가 등록해도 정담당 유지
-  const defA=co?.defAtt||myId()||'a1';
+  // 담당자 배정: 그 사업의 주담당 우선(사업별 칸이 없으면 사업장 정담당), 협업노무사가 등록해도 주담당 유지
+  const defA=coMainOf(co,single.typeId)||myId()||'a1';
   const defCoAs=getCoAtts(co);
   const attErr=checkAttLimit(defA,single.selDate);
   if(attErr){toast(attErr,'err');return;}
@@ -5564,7 +5608,7 @@ async function saveMultiSingle(){
   const co=getCos().find(c=>c.id===single.coId);
   const t=getTypes().find(x=>x.id===single.typeId);
   const maxR=getCoMaxRounds(single.coId,single.typeId);
-  const defA=co?.defAtt||myId()||'a1';
+  const defA=coMainOf(co,single.typeId)||myId()||'a1';
   const defCoAs=getCoAtts(co);
   const sorted=[...single.picks].sort((a,b)=>a.date<b.date?-1:1);
   const okIds=[]; const skipped=[];
@@ -7083,6 +7127,34 @@ function dashPhaseBadges(co,types){
   });
   return out.join('');
 }
+/* 목록 카드 머리의 주담당·부담당 — 종류를 좁혀 보는 중(필터·사업별 묶음)이면 «그 사업의» 주담당이다.
+   ⚠ 그때 다른 사업의 주담당(부담당 줄에 남아 있는 사람)은 +로 끼워 보이지 않는다 —
+     기술보호 필터에 산일충남 주담당이 +로 붙으면 「이 사업 담당」으로 읽는다. */
+function dashHeadAtts(co,tid){
+  const view=(tid&&(co.types||[]).includes(tid))?tid:'';
+  const main=view?coMainOf(co,view):co.defAtt;
+  let subs=getCoAtts(co).filter(id=>id&&id!==main);
+  if(view){
+    const others=new Set([co.defAtt,...coTypeMainIds(co)]);
+    others.delete(main);
+    subs=subs.filter(id=>!others.has(id));
+  }
+  return {main,subs};
+}
+/* 「사업 · 주담당」 줄 — 진행 중인 사업들의 주담당이 «서로 다를 때만». 같으면 줄을 만들지 않는다(목록이 길어지기만 한다). */
+function dashTypeMainRows(co,activeIds){
+  const ids=(activeIds||[]).filter(t=>(co.types||[]).includes(t));
+  const rows=ids.map(t=>({tid:t,main:coMainOf(co,t)}));
+  return new Set(rows.map(r=>r.main)).size>1?rows:[];
+}
+/* 「사업 · 주담당」 줄을 글자로 — 줄이 없으면 빈 글자 */
+function dashTypeMainHtml(rows,types,staff){
+  if(!rows||!rows.length)return '';
+  return `<div class="dcard-tms" title="사업마다 주담당이 다릅니다">`+rows.map(r=>{
+    const tt=types.find(x=>x.id===r.tid)||{}, mm=staff.find(a=>a.id===r.main)||{};
+    return `<div class="tm-row"><span class="tm-bar" style="background:${tt.color||'#94a3b8'}"></span><span class="tm-nm">${escAttr(tt.name||'')}</span><span class="att-label" style="background:${staffColor(mm)}">${escAttr(mm.name||'')}</span></div>`;
+  }).join('')+`</div>`;
+}
 function dashCardSummary(co,types,risk){
   const active=dashActiveTypeIds(co,types);
   const ended=(co.types||[]).filter(tid=>co.endedTypes?.[tid]).length;
@@ -7280,7 +7352,7 @@ function renderProg(){
     if(open){
       const left=tot>0?Math.max(0,tot-P.done-P.plan):null;
       const fNeed=it.mand>0?Math.max(0,it.mand-P.field):0;
-      const att=[nm(co.defAtt),...getCoAtts(co).map(nm)].filter(Boolean);
+      const att=[nm(coMainOf(co,it.t.id)),...getCoAtts(co).filter(id=>id!==coMainOf(co,it.t.id)).map(nm)].filter(Boolean);
       det=`<div class="mp-det">
         한 것 <b>${P.done}회</b> (방문 ${P.field} · 사무실 ${P.office})${P.preN?` · 사전진단 ${P.preN}회 별도`:''} · 잡아 둔 것 <b>${P.plan}회</b>${left!==null?` · 남은 것 <b>${left}회</b>`:''}<br>
         ${it.mand>0?`필수 방문 <b>${P.field}/${it.mand}</b>${fNeed?` — 방문 ${fNeed}회 더 필요`:' ✓'}<br>`:''}
@@ -7382,8 +7454,12 @@ function renderDash(){
   let firstOpenAssigned=false;
   const cardHtml=(item,onlyTid)=>{
     const co=item.co;
-    const att=staff.find(a=>a.id===co.defAtt)||staff[0];
-    const coAtts=coAttStaffList(co);
+    /* 종류를 좁혀 보는 중이면(필터·사업별 묶음) 머리 칸은 «그 사업의» 주담당이다 (대표 결정 2026-10-24) */
+    const vt=onlyTid||typeF;
+    const head=dashHeadAtts(co,vt);
+    const att=staff.find(a=>a.id===head.main)||staff[0];
+    const coAtts=head.subs.map(id=>staff.find(a=>a.id===id)).filter(Boolean);
+    const tmRows=vt?[]:dashTypeMainRows(co,item.activeIds);
     const rows=renderDashTypeRows(co,types,showEnded,onlyTid);
     if(!rows)return'';
     const shouldOpen=S.dashOpenCoId?S.dashOpenCoId===co.id:!firstOpenAssigned;
@@ -7394,6 +7470,7 @@ function renderDash(){
         <div class="dcard-title">
           <div class="dcard-name" title="${co.name}"><span class="dcard-nm">${co.name}</span>${coIsNew(co)?`<span class="new-badge" title="최근 ${NEW_DAYS}일 안에 등록됨">NEW</span>`:''}${dashPhaseBadges(co,types)}</div>
           <div class="dcard-sub">${dashCardSummary(co,types,item.risk)}</div>
+          ${dashTypeMainHtml(tmRows,types,staff)}
         </div>
         <div class="dcard-meta">
           <span class="dcard-grip" title="끌어서 순서 바꾸기 (같은 묶음 안에서만)">⠿</span>
@@ -8750,14 +8827,16 @@ function renderTlZoom(){
   const pct=maxR>0?Math.round(progN/maxR*100):null;
   const dl=(co.deadlines||{})[t.id]||'';
   const ended=(co.endedTypes||{})[t.id]||'';
-  const subs=coAttStaffList(co);
+  const head=dashHeadAtts(co,t.id);                 // 이 사업의 주담당 · 다른 사업 주담당은 +로 끼지 않는다
+  const mainId=head.main;
+  const subs=head.subs.map(id=>staff.find(a=>a.id===id)).filter(Boolean);
 
   q('#tzHead').innerHTML=`<div class="tz-head">
     <div class="tz-h1">${escAttr(co.name)}</div>
     <div class="tz-h2"><span class="tz-dot" style="background:${t.color}"></span>
       ${escAttr(t.fullName||t.name)}${t.agency?' · '+escAttr(t.agency):''}</div>
     <div class="tz-h3">
-      <span class="att-label" style="background:${ac(co.defAtt)}" title="주담당">${escAttr(an(co.defAtt))}</span>
+      <span class="att-label" style="background:${ac(mainId)}" title="주담당">${escAttr(an(mainId))}</span>
       ${subs.map(x=>`<span class="att-label" style="background:${staffColor(x)}99;border:1px solid ${staffColor(x)};" title="부담당(협업)">+${escAttr(x.name)}</span>`).join('')}
     </div></div>`;
 
@@ -8783,7 +8862,7 @@ function renderTlZoom(){
     const scEnd=endedDateForSchedule(sc);
     /* 주담당과 «다른» 사람이 간 회차만 이름을 붙인다 —
        같으면 머리에 이미 있고, 칸마다 붙이면 좁은 칸이 이름으로 가득 찬다. */
-    const other=(sc.attId&&sc.attId!==co.defAtt)?staff.find(a=>a.id===sc.attId):null;
+    const other=(sc.attId&&sc.attId!==coMainOf(co,t.id))?staff.find(a=>a.id===sc.attId):null;
     return `<div class="tzc${sc.date<today?' past':''}${sc.isField?' field':''}" data-sid="${sc.id}"
       title="${escAttr(sc.date+' ('+wd+') '+schedulePlaceLabel(sc)+(schedHasPhoto(sc.id)?' · 사진':''))}">
       <div class="tzc-no" style="background:${scEnd?'var(--t2)':t.color}">${scEnd?'종':sc.round}</div>
@@ -8845,7 +8924,7 @@ function renderTimeline(){
       const ended=!!(co.endedTypes?.[tid])||!!co.deleted;
       if(tlStatus==='active'&&ended)return;
       if(tlStatus==='ended'&&!ended)return;
-      const att=staff.find(a=>a.id===co.defAtt)||staff[0];
+      const att=staff.find(a=>a.id===coMainOf(co,tid))||staff[0];
       if(generalKw){
         const coAttNames=getCoAtts(co).map(id=>staff.find(a=>a.id===id)?.name||'');
         const schedAttNames=done.flatMap(s=>[
@@ -9486,8 +9565,8 @@ function checkConflictMatrix(coId,typeId,date,excludeId=null){
   const types=getTypes();
   const ty=types.find(t=>t.id===typeId);
   if(!isConflictPair(typeId,typeId))return null; // '하루 1건'으로 표시된 유형만 검사(환경설정)
-  // 등록/이동하려는 일정의 주담당 = 그 사업장의 주담당(defAtt)
-  const mainAtt=getCos().find(c=>c.id===coId)?.defAtt;
+  // 등록/이동하려는 일정의 주담당 = 그 «사업의» 주담당(사업별 칸이 없으면 사업장 주담당)
+  const mainAtt=coMainOf(getCos().find(c=>c.id===coId),typeId);
   if(!mainAtt)return null;
   // 같은 날 · 같은 주담당 · 같은 유형 · 다른 사업장 일정
   const clash=getScheds().find(s=>
@@ -9750,7 +9829,7 @@ async function handleDrop(date,item){
   const agErr=checkAgencyExclusive(item.coId,item.typeId,date);
   if(agErr){showBigAlert(agErr);return;}
   const ty=getTypes().find(t=>t.id===item.typeId);
-  const defA=co?.defAtt||myId()||'a1';
+  const defA=coMainOf(co,item.typeId)||myId()||'a1';
   const defCoAs=getCoAtts(co);
   const attErr=checkAttLimit(defA,date);
   if(attErr){toast(attErr,'err');return;}
@@ -9987,9 +10066,10 @@ async function deleteEdit(){
 let co_deadlines={};
 let co_rounds={};
 let co_mandatory={};
+let co_typeAtts={};
 
 async function openCoModal(editId=null){
-  co_editId=editId;co_selTypes=new Set();co_deadlines={};co_rounds={};co_mandatory={};
+  co_editId=editId;co_selTypes=new Set();co_deadlines={};co_rounds={};co_mandatory={};co_typeAtts={};
   const co=editId?getCos().find(c=>c.id===editId):null;
   if(editId&&!await acquireCompanyEditLock(editId))return;
   q('#mCoTitle').textContent=editId?'사업장 수정':'사업장 추가';
@@ -10003,6 +10083,7 @@ async function openCoModal(editId=null){
   if(co?.deadlines)co_deadlines={...co.deadlines};
   if(co?.customRounds)co_rounds={...co.customRounds};
   if(co?.customMandatory)co_mandatory={...co.customMandatory};
+  if(co?.typeAtts)co_typeAtts={...co.typeAtts};
   q('#mCoDelBtn').style.display=editId?'block':'none';
   renderCoTypes();
   q('#mbCo').classList.add('open');
@@ -10103,6 +10184,36 @@ function renderCoTypes(){
       ${erpDaysNote(tid,appliedRounds)}
     </div>`;
   }).join('');
+  renderCoTypeMains();
+}
+
+/* 「사업별 주담당」 칸 — 진행 컨설팅이 둘 이상일 때만 보인다 (대표 결정 2026-10-24).
+   이알피와 이어진 사업(그 종류의 이알피 건 주담당이 «한 사람»)은 잠근다 — 여기서 바꿔도
+   다음에 이알피 값으로 돌아오기 때문이다. 이어지지 않은 사업은 직접 정한다. */
+function renderCoTypeMains(){
+  const fld=q('#mCoTypeMains'); if(!fld)return;
+  const sel=[...co_selTypes];
+  if(sel.length<2){ fld.style.display='none'; return; }
+  fld.style.display='block';
+  const types=getTypes(), staff=getStaff();
+  const defAtt=q('#mCoAtt')?q('#mCoAtt').value:'';
+  const opts=cur=>pickableStaff(cur).map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${escAttr(a.name)}</option>`).join('');
+  let anyLock=false;
+  q('#mCoTypeMainList').innerHTML=sel.map(tid=>{
+    const t=types.find(x=>x.id===tid); if(!t)return '';
+    const locked=co_editId?erpTypeMainFor(co_editId,tid):'';
+    if(locked)anyLock=true;
+    const cur=locked||co_typeAtts[tid]||defAtt;
+    const nm=(staff.find(a=>a.id===cur)||{}).name||'';
+    const ctl=locked
+      ?`<div class="ctm-lock" title="푸른이알피 건별 주담당을 따라갑니다"><b>${escAttr(nm)}</b><span>🔗 이알피</span></div>`
+      :`<select class="fsel" data-tid="${tid}">${opts(cur)}</select>`;
+    return `<div class="ctm-row"><span class="tm-bar" style="background:${t.color}"></span><div class="ctm-nm">${escAttr(t.fullName||t.name)}</div>${ctl}</div>`;
+  }).join('');
+  qa('#mCoTypeMainList select').forEach(sl=>sl.onchange=()=>{ co_typeAtts[sl.dataset.tid]=sl.value; });
+  q('#mCoTypeMainNote').innerHTML=anyLock
+    ?'<span style="color:var(--ok);font-weight:800;">🔗 푸른이알피 건별 주담당을 따라갑니다</span> — 잠긴 사업은 이알피에서 바꾸면 여기도 바뀝니다(여기서 바꿔도 다음에 이알피 값으로 돌아옵니다).'
+    :'이알피와 이어지지 않은 사업은 여기서 직접 정합니다. 사업마다 주담당이 다를 때만 목록에 「사업 · 주담당」 줄이 나옵니다.';
 }
 
 function _renderCoAttChips(boxId,mainSelId,selArr,rerender){
@@ -10124,6 +10235,7 @@ function _renderCoAttChips(boxId,mainSelId,selArr,rerender){
 function renderCoCoAtts(){
   co_selCoAtts=_renderCoAttChips('mCoCoAttChips','mCoAtt',co_selCoAtts,renderCoCoAtts);
   renderSubSyncNote('mCoSubSyncNote',co_editId,co_selCoAtts,'co');
+  renderCoTypeMains();
 }
 function renderEditCoAtts(){
   edit_selCoAtts=_renderCoAttChips('mEditCoAttChips','mEditAtt',edit_selCoAtts,renderEditCoAtts);
@@ -10152,7 +10264,7 @@ function renderSubSyncNote(boxId,coId,sel,kind){
        여기서 더하거나 빼면 이알피에도 그대로 반영됩니다.${many}
        <br>${oneMain
          ? '<b style="color:var(--accent);">주담당은 푸른이알피를 따라갑니다</b> — 이알피에서 바꾸면 여기도 바뀌고, 여기서 바꿔도 다음에 이알피 값으로 돌아옵니다.'
-         : '이어진 컨설팅마다 주담당이 달라 <b>주담당 칸은 자동으로 바뀌지 않습니다</b> — 이알피에서 건별 주담당을 확인해 주세요.'}`;
+         : '이어진 컨설팅마다 주담당이 달라, 주담당은 <b style="color:var(--accent);">사업별로 푸른이알피를 따라갑니다</b>(아래 「사업별 주담당」).'}`;
   const warn=noSid.length
     ? `<div style="color:#d97706;font-weight:700;margin-top:4px;">⚠️ ${escAttr(noSid.join(', '))}${eunNeun(noSid[noSid.length-1])} 푸른이알피에 못 올립니다 —
          환경설정 → 직원에서 「🔗 사번 잇기」를 해 주세요.</div>`
@@ -10164,7 +10276,14 @@ async function saveCo(){
   const name=q('#mCoName').value.trim();
   if(co_editId&&!await verifyCompanyEditLock(co_editId))return;
   if(!name){toast('사업장명을 입력해주세요','err');return;}
-  const defAtt=q('#mCoAtt').value;const defCoAtts=co_selCoAtts.filter(id=>id&&id!==defAtt);
+  const defAtt=q('#mCoAtt').value;
+  /* 사업별 주담당 — 잠긴 종류(이알피를 따르는 사업)는 «지금 적힌 값»을 그대로 두고, 나머지는 사람이 고른 값.
+     사업별 주담당은 부담당 줄에도 넣는다(없으면 그 사람이 자기 사업 일정을 못 고친다). */
+  const _old=co_editId?getCos().find(c=>c.id===co_editId):null;
+  const _keep={};
+  if(co_editId)[...co_selTypes].forEach(tid=>{ const v=_old&&_old.typeAtts&&_old.typeAtts[tid]; if(v&&erpTypeMainFor(co_editId,tid))_keep[tid]=v; });
+  const typeAtts=coTypeAttsToSave(defAtt,co_selTypes,co_typeAtts,_keep);
+  const defCoAtts=coAttsWithTypeMains(defAtt,co_selCoAtts,typeAtts);
   const cos=getCos();
   if(co_editId){
     const idx=cos.findIndex(c=>c.id===co_editId);
@@ -10180,10 +10299,12 @@ async function saveCo(){
          실시간DB는 그런 저장을 «통째로 거부» 한다
          (2026-08-17: 이 한 줄 때문에 사업장 수정이 저장되지 않았다). */
       delete next.defCoAtt;
+      /* 사업별 칸이 비면 «칸 자체를 지운다» — 빈 객체·undefined 값은 실시간DB가 저장을 거부한다 */
+      if(Object.keys(typeAtts).length)next.typeAtts=typeAtts; else delete next.typeAtts;
       cos[idx]=next;
     }
   }
-  else cos.push(stampNewCo({id:uid(),name,defAtt,defCoAtts,types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},active:true}));
+  else cos.push(stampNewCo({id:uid(),name,defAtt,defCoAtts,...(Object.keys(typeAtts).length?{typeAtts}:{}),types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},active:true}));
   const savedId=co_editId||cos[cos.length-1].id;
   setCos(cos);closeModal('mbCo');renderDash();renderCal();toast(co_editId?'수정됨':'추가됨');
   /* 여기가 거울이다 — 부담당을 더했든 뺐든 이알피에 그대로 옮긴다.
@@ -10573,7 +10694,15 @@ function mergePreview(g){
   const add=(id)=>{ if(id&&id!==keep.defAtt&&subs.indexOf(id)<0)subs.push(id); };
   g.forEach(c=>getCoAtts(c).forEach(add));
   gone.forEach(c=>add(c.defAtt));
-  return { keep, gone, types, ended, subs,
+  /* 없어지는 쪽 주담당은 «그 종류의 사업별 칸»으로도 남긴다 — 안 남기면 합친 사업이 사업장 대표의 일로 보인다
+     (다우테크놀로지가 바로 그렇게 생겼다). 남는 쪽이 이미 가진 종류는 덮지 않는다. */
+  const typeAtts=Object.assign({},keep.typeAtts||{});
+  gone.forEach(c=>(c.types||[]).forEach(t=>{
+    if((keep.types||[]).includes(t))return;
+    const m=(c.typeAtts&&c.typeAtts[t])||c.defAtt;
+    if(m&&m!==keep.defAtt&&!typeAtts[t])typeAtts[t]=m;
+  }));
+  return { keep, gone, types, ended, subs, typeAtts,
     moved: gone.reduce((n,c)=>n+scheds.filter(s=>s.coId===c.id).length,0),
     /* 한쪽이 끝나 있었는데 다른 쪽이 돌아 «살아나는» 사업 */
     revive: types.filter(t=>!ended[t]&&(keep.endedTypes||{})[t]) };
@@ -10584,6 +10713,7 @@ function mergeApplyOne(p,cos,scheds){
   keep.types=p.types.slice();
   keep.endedTypes=Object.assign({},p.ended);
   keep.defCoAtts=p.subs.slice();
+  if(p.typeAtts&&Object.keys(p.typeAtts).length)keep.typeAtts=Object.assign({},p.typeAtts);
   delete keep.coAttIds;                              // 옛 칸이 남아 있으면 그쪽이 이긴다
   delete keep.coAttId; delete keep.defCoAtt;
   if(keep.active===false&&p.gone.some(c=>c.active!==false))keep.active=true;
@@ -11169,6 +11299,35 @@ async function erpPushNewLinks(){
   return pend.length;
 }
 
+/* 이 사업장에 이어진 이알피 건들의 «종류별» 주담당 — 그 종류의 건 주담당이 «한 사람»일 때만 {종류id: 직원id}.
+   한 종류에 건이 둘이고 주담당이 갈리면 어느 쪽이 맞는지 앱이 정할 수 없어 그 종류는 뺀다.
+   명단에 없는 사람이면 새로 만들지 않고 뺀다(주담당은 일정을 고칠 수 있는 자리다). */
+function erpTypeMains(linked,co,tmap,staff){
+  const bucket={};
+  (linked||[]).forEach(c=>{
+    const code=erpConsCode(c); const tid=code?tmap[code]:'';
+    if(!tid||(co.types||[]).indexOf(tid)<0||!c.managerMain)return;
+    (bucket[tid]=bucket[tid]||[]).push(c.managerMain);
+  });
+  const out={};
+  Object.keys(bucket).forEach(tid=>{
+    const u=[...new Set(bucket[tid])];
+    if(u.length!==1)return;
+    const gid=erpMainStaffId(u[0],staff);
+    if(gid)out[tid]=gid;
+  });
+  return out;
+}
+/* 수정 창이 «잠글지» 정하는 데 쓴다 — 값이 있으면 그 종류는 이알피를 따른다 */
+function erpTypeMainFor(coId,tid){
+  if(!ERP.loaded||!coId||!tid)return '';
+  const linked=erpConsByCo()[coId]||[];
+  if(!linked.length)return '';
+  const co=getCos().find(c=>c&&c.id===coId);
+  if(!co)return '';
+  return erpTypeMains(linked,co,getErpTypeMap(),getStaff())[tid]||'';
+}
+
 function erpSyncSubsDown(){
   if(!ERP.loaded||!myId())return 0;
   if(!ERP.consultings.length)return 0;        // 덜 읽힌 판으로 지우지 않는다
@@ -11179,34 +11338,69 @@ function erpSyncSubsDown(){
   const staff=getStaff();
   const one=id=>staff.find(a=>a&&a.id===id);
   const cos=getCos(),scheds=getScheds(),today=todayStr();
+  const tmap=getErpTypeMap();
   let coChanged=false,scChanged=false;
   const touched=[],seedUp=[],madeStaff=[],mainMoves=[];
+  const typeName=tid=>{ try{ return (getTypes().find(t=>t.id===tid)||{}).name||''; }catch(e){ return ''; } };
   coIds.forEach(coId=>{
     const co=cos.find(c=>c&&c.id===coId);
     if(!co||co.deleted)return;
     /* ── 주담당 따라가기 (대표 지시 2026-10-24) ──
-       이어진 이알피 건들의 주담당이 «하나»일 때만 따라간다. 건마다 다르면(다우·에이치비씨솔루션)
-       한 칸에 둘을 담을 수 없어서, 어느 쪽이 맞는지 앱이 정하면 안 된다 — 그대로 둔다.
+       이알피 건들의 주담당이 «전부 한 사람»이면 사업장 대표를 따라가고 사업별 칸은 지운다.
+       건마다 다르면 «종류별로» 사업별 칸(typeAtts)에 적는다 — 그 종류의 건 주담당이 한 사람일 때만.
+       대표(defAtt)가 어느 건의 주담당도 아니면 «첫 종류의 주담당»으로 옮긴다(이알피에 없는 사람이 대표로 남지 않게).
        ⚠ 지난 방문은 «그 날 누가 갔다» 는 증빙 기록이라 건드리지 않는다.
-       ⚠ 앞으로 올 방문은 «옛 주담당이 맡던 것만» 옮긴다 — 일부러 다른 사람에게 맡긴 방문은 그대로. */
+       ⚠ 앞으로 올 방문은 «그 종류의 옛 주담당이 맡던 것만» 옮긴다 — 일부러 다른 사람에게 맡긴 방문은 그대로. */
     const mainSids=[...new Set(byCo[coId].map(c=>c.managerMain).filter(Boolean))];
+    const oldDef=co.defAtt;
+    const oldMain={};
+    (co.types||[]).forEach(t=>{ oldMain[t]=coMainOf(co,t); });
+    let defMoved=false;
     if(mainSids.length===1){
       const gid=erpMainStaffId(mainSids[0],staff);
-      if(gid&&gid!==co.defAtt){
-        const old=co.defAtt;
-        co.defAtt=gid; coChanged=true;
-        mainMoves.push({name:co.name,from:old,to:gid});
-        /* 새 주담당이 부담당 줄에도 있으면 뺀다 — 주담당이 부담당에도 들어가면 안 된다 */
-        if(getCoAtts(co).includes(gid)){ co.defCoAtts=getCoAtts(co).filter(id=>id!==gid); delete co.defCoAtt; }
-        scheds.forEach(sc=>{
-          if(!sc||sc.coId!==coId)return;
-          if(String(sc.date||'')<today)return;
-          if(sc.attId!==old)return;
-          sc.attId=gid; scChanged=true;
-          const has=getCoAtts(sc);
-          if(has.includes(gid)){ sc.coAttIds=has.filter(id=>id!==gid); delete sc.coAttId; }
-        });
+      if(gid){
+        if(gid!==co.defAtt){ co.defAtt=gid; coChanged=true; defMoved=true; mainMoves.push({name:co.name,from:oldDef,to:gid}); }
+        if(co.typeAtts){ delete co.typeAtts; coChanged=true; }
       }
+    }else if(mainSids.length>1){
+      const desired=erpTypeMains(byCo[coId],co,tmap,staff);
+      const tids=Object.keys(desired);
+      if(tids.length){
+        const allMains=new Set(mainSids.map(sid=>erpMainStaffId(sid,staff)).filter(Boolean));
+        if(!allMains.has(co.defAtt)){
+          const first=(co.types||[]).find(t=>desired[t]);
+          if(first){ co.defAtt=desired[first]; coChanged=true; defMoved=true; mainMoves.push({name:co.name,from:oldDef,to:co.defAtt}); }
+        }
+        const ta=Object.assign({},co.typeAtts||{});
+        tids.forEach(t=>{ if(desired[t]===co.defAtt)delete ta[t]; else ta[t]=desired[t]; });
+        Object.keys(ta).forEach(t=>{ if((co.types||[]).indexOf(t)<0||ta[t]===co.defAtt)delete ta[t]; });
+        const same=JSON.stringify(Object.keys(ta).sort().map(k=>[k,ta[k]]))===JSON.stringify(Object.keys(co.typeAtts||{}).sort().map(k=>[k,co.typeAtts[k]]));
+        if(!same){
+          if(Object.keys(ta).length)co.typeAtts=ta; else delete co.typeAtts;
+          coChanged=true;
+          tids.forEach(t=>{
+            const to=coMainOf(co,t);
+            if(oldMain[t]!==to&&!(defMoved&&t===(co.types||[]).find(x=>desired[x])))mainMoves.push({name:co.name+' '+typeName(t),from:oldMain[t],to});
+          });
+        }
+      }
+    }
+    if(defMoved&&getCoAtts(co).includes(co.defAtt)){
+      /* 새 대표가 부담당 줄에도 있으면 뺀다 — 주담당이 부담당에도 들어가면 안 된다 */
+      co.defCoAtts=getCoAtts(co).filter(id=>id!==co.defAtt); delete co.defCoAtt;
+    }
+    const movedTypes=(co.types||[]).filter(t=>oldMain[t]!==coMainOf(co,t));
+    if(defMoved||movedTypes.length){
+      scheds.forEach(sc=>{
+        if(!sc||sc.coId!==coId)return;
+        if(String(sc.date||'')<today)return;
+        const o=(sc.typeId in oldMain)?oldMain[sc.typeId]:oldDef;
+        const n=coMainOf(co,sc.typeId);
+        if(o===n||sc.attId!==o)return;
+        sc.attId=n; scChanged=true;
+        const has=getCoAtts(sc);
+        if(has.includes(n)){ sc.coAttIds=has.filter(id=>id!==n); delete sc.coAttId; }
+      });
     }
     const want=[];
     byCo[coId].forEach(c=>{

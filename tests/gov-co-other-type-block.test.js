@@ -80,6 +80,7 @@ function world(scheds) {
   vm.createContext(ctx);
   vm.runInContext([
     grab('p2'), grab('todayStr'), grab('escAttr'),
+    grab('coMainOf'),   // 새 일정의 기본 담당은 «그 사업의» 주담당이다(2026-10-24 사업별 주담당)
     grab('isBlocked'), grab('coOtherTypeOn'),
     // 기관 하루1건(agencyExclusiveDay) — renderSingleCal·saveSingle·saveMultiSingle 이 부른다
     grab('agencyOtherSiteOn'), grab('checkAgencyExclusive'),
