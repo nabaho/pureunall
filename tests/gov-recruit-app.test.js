@@ -30,7 +30,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovInbox: require('../js/gov-inbox.js'), GovSync: require('../js/gov-sync.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovInbox: require('../js/gov-inbox.js'), GovPick: require('../js/gov-pick.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -48,7 +48,7 @@ function runApp(seed, opt) {
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
-    + 'inboxPull,feedSrvHtml,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
+    + 'pickOpen,pickBody,pickOff,pickReset,pickStar,pickAuto,pickRank,pickBadge,inboxPull,feedSrvHtml,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
@@ -1645,4 +1645,90 @@ test('★★ 새로 받기 — 걸린 공고·열린 옛 공고에 제한을 붙
   const rf = src.slice(src.indexOf('async function restrictFill'), src.indexOf('var _fetching=false'));
   assert.match(rf, /GovG2b\.enrich\(todo, pull, \{key:kd, max:60\}\)/); assert.match(rf, /\.slice\(0,20\)/, '옛 공고는 20건씩만');
   assert.match(rf, /GovG2b\.dday\(r\.closeDt\)/, '마감 지난 공고는 안 부른다');
+});
+
+/* ═══ 🎯 지원할 만한 것 — 팝업 (대표 지시 2026-10-24 「지원할 만한 컨설턴트 또는 사업을 팝업으로」 → 「추천대로」) ═══ */
+const PK_DAY = '2026-10-24T09:00:00';
+const PK_WATCH = { last: { at: '2026-10-24T01:00:00Z', checked: 31, added: 2 }, hits: {
+  p1: { key: 'p1', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '2026 외부 자문위원 모집', date: '2026-10-20', href: 'https://erc.example/p1', per: { to: '2026-10-28' } },
+  p2: { key: 'p2', board: 'semas', org: 'semas', boardName: '소진공 공지', title: '일자리 박람회 참가 노무사 모집', date: '2026-10-20', href: 'https://semas.example/p2', per: { to: '2026-11-30' } },
+  p3: { key: 'p3', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '지난 컨설턴트 모집', date: '2026-09-01', href: 'https://erc.example/p3', per: { to: '2026-10-05' } },
+  p4: { key: 'p4', board: 'kcplaa', org: '', boardName: '공인노무사회 공지', title: '일터혁신 컨설턴트 모집 안내', date: '2026-10-22', href: 'https://kcplaa.example/p4', per: { to: '2026-12-20' } }
+} };
+const PK_FEED = () => [
+  { id: 'G1', src: '나라장터', type: '새 공고', no: 'N1', nm: '노무 컨설팅 용역(서울만)', org: '갑기관', closeDt: '2026-11-20 10:00:00', dday: 27, url: 'https://g2b.example/1', rgn: '서울특별시 · 경기도' },
+  { id: 'G2', src: '나라장터', type: '새 공고', no: 'N2', nm: '조직진단 용역', org: '을기관', closeDt: '2026-10-26 10:00:00', dday: 2, url: 'https://g2b.example/2', rgn: '충청남도' },
+  { id: 'G3', src: '나라장터', type: '관심', no: 'N3', nm: '이미 별표', org: '병기관', closeDt: '2026-11-20 10:00:00', dday: 27 },
+  { id: 'G4', src: '기업마당', type: '새 공고', no: 'B4', nm: '지난 공고', org: '정기관', closeDt: '2026-10-01 10:00:00', dday: -23, hidden: true }
+];
+async function pkApp(feed) {
+  const r = runApp({ feed: feed === undefined ? PK_FEED() : feed }, { Date: FixedDate(PK_DAY) });
+  r.api.setFb(fbWith(PK_WATCH), 'U1');
+  await r.api.recWatchLoad();
+  return r;
+}
+test('★★★ 팝업 — 모집 글·공고를 한 목록으로: 곧 마감이 위 · 행사·지난 글 제외 · 지역 밖은 맨 뒤 · 줄마다 «왜»', async () => {
+  const r = await pkApp(); r.api.pickOpen(true);
+  assert.equal(r.el('popTtl').textContent, '🎯 지원할 만한 것');
+  const h = r.el('popBody').innerHTML;
+  const at = (s) => h.indexOf(s);
+  assert.ok(at('조직진단 용역') < at('외부 자문위원 모집'), '곧 마감(D-2)·우리 지역 포함인 공고(75점)가 D-4 모집 글(73점)보다 위');
+  assert.ok(at('외부 자문위원 모집') < at('일터혁신 컨설턴트 모집 안내'), '곧 마감이 먼 마감보다 위');
+  assert.ok(at('일터혁신 컨설턴트 모집 안내') < at('노무 컨설팅 용역(서울만)'), '지역 밖은 맨 뒤');
+  assert.doesNotMatch(h, /박람회/, '행사는 모집이 아니다'); assert.doesNotMatch(h, /지난 컨설턴트 모집/, '마감 지난 글'); assert.doesNotMatch(h, /이미 별표|지난 공고/);
+  assert.ok(h.lastIndexOf('pk-row') === h.lastIndexOf('pk-row out'), '지역 밖 공고가 맨 뒤(흐리게)');
+  assert.match(h, /지역 제한 — 우리 지역 아님\(서울·경기\)/); assert.match(h, /지역 제한 — 우리 지역 포함\(충남\)/);
+  assert.match(h, /마감 4일 전|마감 3일 전/);
+  assert.match(h, /<span class="tag teal">새 글<\/span>/); assert.match(h, /★ 관심으로 이미 고른 1건은 뺐습니다/); assert.match(h, /지역 제한이 우리 지역/);
+  assert.match(h, /순서는 규칙/); assert.equal(r.el('pickN').textContent, ' 3', '단추 숫자는 지역 안의 것만');
+});
+test('★★ 모집 글 제목은 «열면 봤음» 길(recOpenPost)로 · 공고는 새 탭 링크 · 줄마다 관심/숨기기', async () => {
+  const r = await pkApp(); r.api.pickOpen(true);
+  const h = r.el('popBody').innerHTML;
+  assert.match(h, /href="https:\/\/erc\.example\/p1" onclick="return recOpenPost\('p1'\)"/);
+  assert.match(h, /href="https:\/\/g2b\.example\/2" target="_blank" rel="noopener"/);
+  assert.match(h, /pickStar\('G2'\)/); assert.match(h, /pickOff\('p1'\)/); assert.doesNotMatch(h, /pickStar\('p1'\)/, '모집 글에는 ★ 이 없다(공고 목록에 없다)');
+});
+test('★★★ 🙈 숨기기 — 이 팝업에서만 빠진다(공고·모집 글은 그대로) · 동기화 칸에 적힌다 · 되살리기', async () => {
+  const r = await pkApp(); r.api.pickOpen(true);
+  const feedBefore = r.store.gov3_feed;
+  r.api.pickOff('p1'); r.api.pickOff('f|N2');
+  const off = JSON.parse(r.store.gov3_pick_off);
+  assert.deepEqual(Object.keys(off).sort(), ['f|N2', 'p1']);
+  assert.equal(off.p1, '2026-10-24');
+  const h = r.el('popBody').innerHTML;
+  assert.doesNotMatch(h, /외부 자문위원 모집/); assert.doesNotMatch(h, /조직진단 용역/);
+  assert.equal(r.store.gov3_feed, feedBefore, '공고 목록을 고쳤다'); assert.equal(r.api.get('feed').filter((x) => x.hidden).length, 1, '공고를 숨김 처리하면 안 된다');
+  assert.match(h, /숨긴 2건 되살리기/);
+  r.api.pickReset();
+  assert.match(r.el('popBody').innerHTML, /외부 자문위원 모집/); assert.equal(r.store.gov3_pick_off, '{}');
+});
+test('★★ ☆ 관심 — 공고 모아보기의 별표로 옮기고 이 목록에서는 빠진다(별표 수로 센다)', async () => {
+  const r = await pkApp(); r.api.pickOpen(true);
+  r.api.pickStar('G2');
+  assert.equal(r.api.get('feed').find((x) => x.id === 'G2').type, '관심');
+  const h = r.el('popBody').innerHTML;
+  assert.doesNotMatch(h, /조직진단 용역/); assert.match(h, /★ 관심으로 이미 고른 2건은 뺐습니다/);
+});
+test('★★★ 하루 한 번 자동 — 쓸 만한 줄이 있을 때만 · 오늘 이미 떴으면 안 뜸 · 이미 열린 팝업은 덮지 않음', async () => {
+  const r = await pkApp(); await r.api.pickAuto();
+  assert.equal(r.el('pop').className, 'pop on'); assert.equal(r.el('popTtl').textContent, '🎯 지원할 만한 것');
+  assert.equal(r.store.gov3_pick_day, '2026-10-24');
+  r.api.popClose(); await r.api.pickAuto();
+  assert.equal(r.el('pop').className, 'pop', '같은 날 두 번 뜨면 귀찮다');
+  const busy = await pkApp(); busy.el('pop').className = 'pop on'; busy.el('popTtl').textContent = '다른 팝업'; await busy.api.pickAuto();
+  assert.equal(busy.el('popTtl').textContent, '다른 팝업', '열려 있는 팝업을 덮었다'); assert.equal(busy.store.gov3_pick_day, undefined, '못 띄웠으면 «오늘 띄웠다»로 적지 않는다');
+});
+test('★★ 쓸 만한 줄이 없으면 자동으로 안 뜬다(빈 말로 뜨면 귀찮다) · 그래도 단추 숫자는 갱신', async () => {
+  const quiet = await pkApp([{ id: 'G1', src: '나라장터', type: '새 공고', no: 'N1', nm: '평범한 용역', org: '갑', closeDt: '2026-12-20 10:00:00', dday: 57 }]);
+  quiet.api.setFb(fbWith({ last: {}, hits: {} }), 'U1'); await quiet.api.recWatchLoad(); await quiet.api.pickAuto();
+  assert.equal(quiet.el('pop').className, ''); assert.equal(quiet.el('pickN').textContent, ' 1');
+  assert.equal(quiet.store.gov3_pick_day, undefined);
+});
+test('★ 팝업은 단추로도 연다 · 헤더에 단추 · 하루 한 번 자동은 부팅 «뒤»에 부른다 · 숨김은 동기화 칸', () => {
+  assert.match(src, /<button class="btn" id="pickBtn" onclick="pickOpen\(\)"/);
+  assert.match(src, /setTab\(lsGet\('tab'\)\);\s*\n\s*pickAuto\(\);/);
+  assert.match(src, /<script src="js\/gov-pick\.js\?v=\d+"><\/script>/);
+  assert.ok(require('../js/gov-sync.js').field('pick_off'), 'pick_off 가 칸 목록에 없다');
+  assert.doesNotMatch(src, /localStorage\.setItem\(NS\+'pick_/, '쓰기는 lsSet 한 길로만');
 });
