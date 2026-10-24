@@ -1553,6 +1553,8 @@
     var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {}, ntsLive: null, ntsBusy: false,
       pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
       wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
+    /* 근로자 사건은 모두 부가세 포함 (대표 2026-10-24) — 고른 양식이 모두 근로자측이면 「포함」에서 시작한다 */
+    if (fms.every(function (fm) { return sideOf(fm) === 'worker'; })) st.wi.vat = 'incl';
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
     var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var caseBox = el('div', { 'class': 'pcf-prop', hidden: true });
