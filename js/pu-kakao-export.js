@@ -262,10 +262,114 @@
     return 'K' + lineKey(itemId, day, room) + hash(String(text) + '\u0001' + (files || []).join('\u0002'));
   }
 
+  /* ── 업무 맞추기 ───────────────────────────────────────────────────────────
+     sure   : 사건번호가 업무관리 번호(no) 또는 심급 사건번호(stageNos)와 «글자 그대로» 같고 업무가 하나.
+     guess  : 같은 번호가 업무 여럿이거나, 업체명만 같다 — 사람이 고른다. 자동으로 정하지 않는다.
+     newno  : 알려진 부호의 번호인데 업무관리에 없다 — 「새 업무 창 열기」는 사람이 저장한다.
+     none   : 근거 없음.
+     ⚠ 사건번호 일치는 종결된 업무도 본다(번호가 정확하고, 종결 뒤 후속 대화도 기록돼야 한다).
+       업체명 후보는 «진행 중»인 업무만 — 닫힌 업무에 줄을 붙이는 것은 거의 항상 실수다.
+     ⚠ 연결 열쇠는 업무 id 다. 업체명은 후보를 보여 주는 데만 쓴다(이름으로 id 를 채우지 않는다). */
+  function matchGroups(groups, items) {
+    var byNo = {}, byKey = {};
+    (items || []).forEach(function (it) {
+      [it.no].concat(it.stageNos || []).forEach(function (n) {
+        var k = normCaseNo(n);
+        if (!k) return;
+        var a = byNo[k] || (byNo[k] = []);
+        if (a.indexOf(it.id) < 0) a.push(it.id);
+      });
+      if (it.open) (byKey[it.key] || (byKey[it.key] = [])).push(it.id);
+    });
+    return (groups || []).map(function (g) {
+      var cases = g.caseNos || [];
+      var cands = [];
+      (g.companyKeys || []).forEach(function (k) { unionInto(cands, byKey[k] || []); });
+      if (cases.length) {
+        var ids = [], matchedNo = '';
+        cases.forEach(function (n) {
+          var hit = byNo[normCaseNo(n)];
+          if (hit) { if (!matchedNo) matchedNo = n; unionInto(ids, hit); }
+        });
+        if (ids.length === 1) return { basis: 'sure', itemId: ids[0], candidates: ids, caseNo: matchedNo };
+        if (ids.length > 1) return { basis: 'guess', itemId: '', candidates: ids, caseNo: matchedNo };
+        return { basis: 'newno', itemId: '', candidates: cands, caseNo: cases[0] };
+      }
+      if (cands.length) return { basis: 'guess', itemId: cands.length === 1 ? cands[0] : '', candidates: cands, caseNo: '' };
+      return { basis: 'none', itemId: '', candidates: [], caseNo: '' };
+    });
+  }
+
+  /* ── 첨부 파일 ─────────────────────────────────────────────────────────────
+     법인방 파일 = 대화에 적힌 이름과 같은 파일뿐. 카톡이 겹침을 「이름 (1).확장자」로 바꾸므로
+     «같은 이름이 없을 때만» 그 꼴로 한 번 더 찾고 similar 로 표시한다.
+     한글 파일 이름은 맥(NFD)과 윈도(NFC)의 자모 형식이 달라 둘 다 NFC 로 견준다. */
+  var ATTACH_LIFE_DAYS = 14;   /* 카톡 파일 보관 약 2주 [확인 필요 — 관찰: 10/23 받은 파일 기한 11/06] */
+  var RE_SENSITIVE = /신분증|주민|통장|계좌|진단서|여권|등본|초본|인감|사본/;
+
+  function nfc(s) { return String(s == null ? '' : s).normalize('NFC'); }
+  function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  function matchFiles(wanted, available) {
+    var avail = available || [], seen = {}, out = [];
+    (wanted || []).forEach(function (w) {
+      var key = nfc(w);
+      if (seen[key]) return;
+      seen[key] = 1;
+      var found = '', similar = false, i;
+      for (i = 0; i < avail.length; i++) if (nfc(avail[i]) === key) { found = avail[i]; break; }
+      if (!found) {
+        var dot = key.lastIndexOf('.');
+        var base = dot > 0 ? key.slice(0, dot) : key, ext = dot > 0 ? key.slice(dot) : '';
+        var re = new RegExp('^' + escRe(base) + ' \\((\\d+)\\)' + escRe(ext) + '$');
+        var bestN = Infinity;
+        for (i = 0; i < avail.length; i++) {
+          var m = re.exec(nfc(avail[i]));
+          if (m && Number(m[1]) < bestN) { bestN = Number(m[1]); found = avail[i]; similar = true; }
+        }
+      }
+      out.push({ name: w, found: found, similar: similar });
+    });
+    return out;
+  }
+
+  /* 카톡에서 내려받을 수 있는 남은 날 — 보낸 날 + lifeDays − 오늘. 지났으면 음수. */
+  function attachmentExpiry(sentDay, today, lifeDays) {
+    function ms(s) { var p = String(s).split('-'); return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
+    var life = lifeDays == null ? ATTACH_LIFE_DAYS : lifeDays;
+    return life - Math.round((ms(today) - ms(sentDay)) / 86400000);
+  }
+
+  function isSensitiveName(name) { return RE_SENSITIVE.test(String(name == null ? '' : name)); }
+
+  /* 폴더·파일 이름으로 쓸 수 있게 — 경로 문자·「..」를 «_» 로 바꾸고 앞뒤 점·빈칸을 뗀다. */
+  function safeName(s) {
+    var t = String(s == null ? '' : s).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\.{2,}/g, '_');
+    t = t.replace(/^[.\s]+|[.\s]+$/g, '');
+    return t || '_';
+  }
+
+  /* ── 알림 쌍둥이 ───────────────────────────────────────────────────────────
+     같은 글이 폰 알림과 내보내기 양쪽에 있으면(보낸 사람·글이 같고 90초 안) 알림 쪽을 숨긴다.
+     내보내기가 실제로 말한 사람과 시각을 갖는다. src 가 없으면(옛 서버) 알림으로 본다. */
+  var TWIN_MS = 90 * 1000;
+  function dropAlertTwins(items) {
+    function norm(t) { return String(t == null ? '' : t).replace(/\s+/g, ' ').trim(); }
+    var exp = (items || []).filter(function (x) { return x.src === 'export'; });
+    return (items || []).filter(function (x) {
+      if (x.src === 'export') return true;
+      return !exp.some(function (e) {
+        return e.sender === x.sender && norm(e.text) === norm(x.text) && Math.abs(e.sentAt - x.sentAt) <= TWIN_MS;
+      });
+    });
+  }
+
   return {
     parseExport: parseExport, maskMessages: maskMessages,
-    CASE_CODES: CASE_CODES, GAP_MIN: GAP_MIN, LINE_MAX: LINE_MAX,
+    CASE_CODES: CASE_CODES, GAP_MIN: GAP_MIN, LINE_MAX: LINE_MAX, ATTACH_LIFE_DAYS: ATTACH_LIFE_DAYS,
     normCaseNo: normCaseNo, extractCaseNos: extractCaseNos, findCompanyKeys: findCompanyKeys,
-    groupMessages: groupMessages, digest: digest, hash: hash, lineKey: lineKey, logId: logId
+    groupMessages: groupMessages, digest: digest, hash: hash, lineKey: lineKey, logId: logId,
+    matchGroups: matchGroups, matchFiles: matchFiles, attachmentExpiry: attachmentExpiry,
+    isSensitiveName: isSensitiveName, safeName: safeName, dropAlertTwins: dropAlertTwins
   };
 });
