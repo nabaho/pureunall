@@ -13,7 +13,8 @@ const W = read('work.html');
 
 /* 새 구간 전체 — 머리 주석부터 「라우팅」 앞까지 */
 const START = W.indexOf('💬 카톡정리 › 대화 내보내기 올리기');
-const END = W.indexOf('/* ── 라우팅 ── */');
+/* 끝 표시 — 이 구간은 «성과급 구간»(var PC_PATH= ~ 라우팅) 밖이어야 한다: tests/perf-confirm-work.test.js 가 그 사이의 fbDb.ref 를 센다 */
+const END = W.indexOf('/* ══ 끝: 💬 카톡정리 › 대화 내보내기 올리기');
 const REGION = START > 0 && END > START ? W.slice(START, END) : '';
 /* 함수 하나의 몸통 — src 안에서 */
 function body(src, name) {
@@ -27,6 +28,8 @@ const wfn = (name) => body(W, name);       /* work.html 어디든 — 탭처럼 
 
 test('새 구간이 있고, 내보내기 읽기 스크립트가 카톡 셈 «뒤»에 실려 있다', () => {
   assert.ok(REGION.length > 500, '대화 내보내기 올리기 구간이 없다');
+  const pc = W.indexOf('var PC_PATH='), route = W.indexOf('/* ── 라우팅 ── */', pc);
+  assert.ok(pc > 0 && !(START > pc && START < route), '새 구간이 성과급 구간(var PC_PATH= ~ 라우팅) 안에 있다 — 성과급 검사가 fbDb.ref 를 센다');
   const a = W.indexOf('<script src="js/pu-kakao-work.js');
   const b = W.search(/<script src="js\/pu-kakao-export\.js\?v=\d+"><\/script>/);
   assert.ok(a > 0 && b > a, 'pu-kakao-export.js 가 pu-kakao-work.js 뒤에 없다');

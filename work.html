@@ -3382,6 +3382,119 @@ function kkObsRun(){
     .catch(function(e){ if(e&&e.name!=='AbortError') toast('쓰지 못했습니다: '+e.message,'err'); });
 }
 
+/* ── 라우팅 ── */
+function go(v){ S.view=v; S.f=null; S.q=''; sideDrawer(false);
+  try{history.pushState({view:v},'');}catch(e){} route(); }
+function goBack(){ if(history.length>1) history.back(); else { S.view='my'; route(); } }
+window.addEventListener('popstate',function(ev){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ var st=ev.state; S.view=(st&&st.view)||'my'; route(); });
+function route(){
+  ['my','visits','team','stats','mlk','kakao','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',kakao:'카톡정리',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
+  var c=$('crumb'); if(c)c.textContent=crumbs[S.view]||'업무관리';
+  var qw=$('qwrap'); if(qw)qw.style.display=(S.view==='my'||S.view==='team')?'':'none';
+  var cm=$('cnt-my'); if(cm)cm.textContent=viewOpen().length||'';
+  var ca=$('cnt-ar'); if(ca)ca.textContent=allItems().filter(function(it){return it.state==='done';}).length||'';
+  var ch=$('cnt-ho'); if(ch){ var n2=hoBadgeCount(); ch.textContent=n2||''; ch.style.color=n2?'#dc2626':''; ch.style.fontWeight=n2?'800':''; }
+  /* ⚠ 메일을 아직 못 읽었으면 숫자를 안 붙인다 — 0 이라고 적으면 「없다」로 읽힌다 */
+  var cl=$('cnt-mlk'); if(cl){ var n4=mailSrc?mlkBadge():0;
+    cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
+  visBadge();
+  kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
+  if(S.view!=='kakao') kxReset();   /* 올린 대화 내용은 화면을 떠나면 버린다 */
+  /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
+  var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
+  wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */
+  /* 내가 확인할 달 + (대표라면) 답할 이의 건수를 함께 센다 — 둘 다 「내 성과급」에서 하는 일이다 */
+  var cp=$('cnt-perf'); if(cp){
+    var n3=(S.perfData||[]).filter(function(x){return !x.p.done;}).length + pcAdmPending().n;
+    cp.textContent=n3||''; cp.style.color=n3?'#dc2626':''; cp.style.fontWeight=n3?'800':''; }
+  pcBand();   /* 화면을 옮길 때마다 띠를 다시 판단한다 (성과급 화면에서는 숨긴다) */
+  if(S.view==='visits') renderVisits();
+  else if(S.view==='team') renderTeam();
+  else if(S.view==='stats') renderStats();
+  /* 옛 주소(#kb)로 들어온 사람 — 빈 화면 대신 내 업무로 보낸다.
+     ⚠ 지식은 없어진 것이 아니라 «업무 안»으로 들어갔다. */
+  else if(S.view==='kb'){ S.view='my'; renderMy(); }
+  else if(S.view==='mlk') renderMlk();
+  else if(S.view==='kakao') renderKakao();
+  else if(S.view==='ho') renderHo();
+  else if(S.view==='clean') renderClean();
+  else if(S.view==='archive') renderArchive();
+  else if(S.view==='perf') renderPerf();
+  else { S.view='my'; renderMy(); }
+  if(S.drawerId) renderDrawer();
+}
+/* 지식 화면 — 종류별로 모아 보고, 본문까지 검색한다 */
+function renderKb(){
+  var app=$('app'); if(!app)return;
+  var all=kbAll(), q=String(S.kbQ||'').toLowerCase().trim();
+  var list=all.filter(function(c){
+    if(S.kbKind&&c._kind!==S.kbKind) return false;
+    if(S.kbBad&&!kbBad(c)) return false;
+    if(S.kbOld&&!kbStale(c)) return false;
+    if(!q) return true;
+    return [c.t,c.x,c.kl,c.byName,(c.src&&c.src.title)]
+      .some(function(s){ return String(s||'').toLowerCase().indexOf(q)>=0; });
+  });
+  var h='<div class="row" style="flex-wrap:wrap"><h1>지식</h1>'
+    +'<span class="muted" style="font-size:12.5px">업무에서 얻은 암묵지 — 사람·업체·유형·기관에 붙여 두고 다음에 꺼내 씁니다</span></div>';
+  h+='<div class="statbar">전체 <b>'+all.length+'</b>장'
+    +'<span class="sep">|</span>'
+    +KB_KINDS.map(function(k){
+        var n=all.filter(function(c){return c._kind===k[0];}).length;
+        return '<span class="sb'+(S.kbKind===k[0]?' on':'')+'" onclick="kbFilt(\'kind\',\''+k[0]+'\')" '
+          +'title="'+esc(k[3])+'">'+k[2]+' '+k[1]+' '+n+'</span>';
+      }).join('')
+    +'<span class="sep">|</span>'
+    +'<span class="sb dg'+(S.kbBad?' on':'')+'" onclick="kbFilt(\'bad\',1)" title="사실과 다르다고 표시된 카드">정정 요청 '
+    +all.filter(kbBad).length+'</span>'
+    +'<span class="sb am'+(S.kbOld?' on':'')+'" onclick="kbFilt(\'old\',1)" title="2년이 지나 관행이 바뀌었을 수 있는 카드">2년 경과 '
+    +all.filter(kbStale).length+'</span>'
+    +'</div>';
+  if(aiProxyUrl()&&all.length){
+    h+='<div class="fbar" style="margin-bottom:8px">'
+      +'<input id="kbq" placeholder="🤔 물어보기 — 예: 천안지청 접수는 언제 되나? 이 감독관은 뭘 먼저 보나?" '
+      +'onkeydown="if(event.key===\'Enter\'&&!_ime(event)){event.preventDefault();kbAsk()}" '
+      +'style="flex:1;min-width:240px;padding:5px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">'
+      +'<button id="kbask-btn" class="primary" style="padding:5px 13px;font-size:12px" onclick="kbAsk()">물어보기</button>'
+      +'<span class="muted" style="font-size:10.5px">저장된 지식·노트만 근거로 답합니다</span>'
+      +'</div>';
+  }
+  h+='<div class="fbar">'
+    +'<input id="qbox" value="'+esc(S.kbQ||'')+'" placeholder="🔍 제목·내용·대상·작성자" oninput="kbOnQ(this.value)">'
+    +(S.kbQ?'<span class="chipbtn" onclick="S.kbQ=\'\';renderKb()">✕</span>':'')
+    +'<span class="muted" style="font-size:11.5px">'+(list.length!==all.length?list.length+' / '+all.length:all.length)+'장</span>'
+    +((S.kbKind||S.kbBad||S.kbOld||S.kbQ)
+      ?'<span class="chipbtn on" onclick="S.kbKind=\'\';S.kbBad=0;S.kbOld=0;S.kbQ=\'\';renderKb()">✕ 필터</span>':'')
+    +'</div>';
+  if(!all.length){
+    h+='<div class="panel" style="text-align:center;color:var(--sub);padding:36px;line-height:1.8">'
+      +'아직 저장된 지식이 없습니다.<br>'
+      +'<span class="muted" style="font-size:12.5px">업무를 열어 <b>주간 기록</b>이나 <b>인수인계 노트</b>의 한 줄에서 '
+      +'<b>↗ 지식으로</b>를 누르면 여기에 쌓입니다. 새로 쓸 필요가 없습니다.</span></div>';
+    app.innerHTML=h; return;
+  }
+  if(!list.length){
+    h+='<div class="panel" style="text-align:center;color:var(--sub);padding:30px">조건에 맞는 카드가 없습니다.</div>';
+    app.innerHTML=h; return;
+  }
+  // 대상(키)별로 묶어 보여준다 — 같은 감독관 카드가 흩어지지 않게
+  var g={};
+  list.forEach(function(c){ var k=c._kind+'|'+(c.kl||c._key); (g[k]=g[k]||[]).push(c); });
+  var keys=Object.keys(g).sort(function(a,b){ return g[b].length-g[a].length||a.localeCompare(b,'ko'); });
+  h+='<div class="panel" style="padding:12px">';
+  keys.forEach(function(k,i){
+    var arr=g[k], kind=k.split('|')[0], kl=k.slice(kind.length+1);
+    h+='<div style="margin:'+(i?'16px':'0')+' 0 7px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
+      +'<span class="rowno" style="color:var(--faint);font-size:11px">'+(i+1)+'</span>'
+      +'<span class="ktag">'+esc(KB_KLBL[kind]||kind)+'</span>'
+      +'<b style="font-size:13px">'+esc(kl)+'</b>'
+      +'<span class="muted" style="font-size:11px">'+arr.length+'장</span></div>';
+    h+=arr.map(function(c){ return kbCardHTML(c); }).join('');
+  });
+  h+='</div>';
+  app.innerHTML=h;
+}
 /* ══ 💬 카톡정리 › 대화 내보내기 올리기 (2026-10-24) ══════════════════════════════
    대표 지시 2026-10-24 「PC 카톡의 법인 대화방 자료를 받아 따로 보관하고, 대화 진행상황을 업무관리에
    자동으로 넣을 수 없나」 → 사람이 PC 카톡에서 내보낸 .txt 를 여기서 읽어 업무별 진행 기록으로 정리한다.
@@ -3751,119 +3864,8 @@ function kxWriteLogs(rows){
   });
 }
 
-/* ── 라우팅 ── */
-function go(v){ S.view=v; S.f=null; S.q=''; sideDrawer(false);
-  try{history.pushState({view:v},'');}catch(e){} route(); }
-function goBack(){ if(history.length>1) history.back(); else { S.view='my'; route(); } }
-window.addEventListener('popstate',function(ev){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ var st=ev.state; S.view=(st&&st.view)||'my'; route(); });
-function route(){
-  ['my','visits','team','stats','mlk','kakao','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
-  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',kakao:'카톡정리',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
-  var c=$('crumb'); if(c)c.textContent=crumbs[S.view]||'업무관리';
-  var qw=$('qwrap'); if(qw)qw.style.display=(S.view==='my'||S.view==='team')?'':'none';
-  var cm=$('cnt-my'); if(cm)cm.textContent=viewOpen().length||'';
-  var ca=$('cnt-ar'); if(ca)ca.textContent=allItems().filter(function(it){return it.state==='done';}).length||'';
-  var ch=$('cnt-ho'); if(ch){ var n2=hoBadgeCount(); ch.textContent=n2||''; ch.style.color=n2?'#dc2626':''; ch.style.fontWeight=n2?'800':''; }
-  /* ⚠ 메일을 아직 못 읽었으면 숫자를 안 붙인다 — 0 이라고 적으면 「없다」로 읽힌다 */
-  var cl=$('cnt-mlk'); if(cl){ var n4=mailSrc?mlkBadge():0;
-    cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
-  visBadge();
-  kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
-  if(S.view!=='kakao') kxReset();   /* 올린 대화 내용은 화면을 떠나면 버린다 */
-  /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
-  var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
-  wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */
-  /* 내가 확인할 달 + (대표라면) 답할 이의 건수를 함께 센다 — 둘 다 「내 성과급」에서 하는 일이다 */
-  var cp=$('cnt-perf'); if(cp){
-    var n3=(S.perfData||[]).filter(function(x){return !x.p.done;}).length + pcAdmPending().n;
-    cp.textContent=n3||''; cp.style.color=n3?'#dc2626':''; cp.style.fontWeight=n3?'800':''; }
-  pcBand();   /* 화면을 옮길 때마다 띠를 다시 판단한다 (성과급 화면에서는 숨긴다) */
-  if(S.view==='visits') renderVisits();
-  else if(S.view==='team') renderTeam();
-  else if(S.view==='stats') renderStats();
-  /* 옛 주소(#kb)로 들어온 사람 — 빈 화면 대신 내 업무로 보낸다.
-     ⚠ 지식은 없어진 것이 아니라 «업무 안»으로 들어갔다. */
-  else if(S.view==='kb'){ S.view='my'; renderMy(); }
-  else if(S.view==='mlk') renderMlk();
-  else if(S.view==='kakao') renderKakao();
-  else if(S.view==='ho') renderHo();
-  else if(S.view==='clean') renderClean();
-  else if(S.view==='archive') renderArchive();
-  else if(S.view==='perf') renderPerf();
-  else { S.view='my'; renderMy(); }
-  if(S.drawerId) renderDrawer();
-}
-/* 지식 화면 — 종류별로 모아 보고, 본문까지 검색한다 */
-function renderKb(){
-  var app=$('app'); if(!app)return;
-  var all=kbAll(), q=String(S.kbQ||'').toLowerCase().trim();
-  var list=all.filter(function(c){
-    if(S.kbKind&&c._kind!==S.kbKind) return false;
-    if(S.kbBad&&!kbBad(c)) return false;
-    if(S.kbOld&&!kbStale(c)) return false;
-    if(!q) return true;
-    return [c.t,c.x,c.kl,c.byName,(c.src&&c.src.title)]
-      .some(function(s){ return String(s||'').toLowerCase().indexOf(q)>=0; });
-  });
-  var h='<div class="row" style="flex-wrap:wrap"><h1>지식</h1>'
-    +'<span class="muted" style="font-size:12.5px">업무에서 얻은 암묵지 — 사람·업체·유형·기관에 붙여 두고 다음에 꺼내 씁니다</span></div>';
-  h+='<div class="statbar">전체 <b>'+all.length+'</b>장'
-    +'<span class="sep">|</span>'
-    +KB_KINDS.map(function(k){
-        var n=all.filter(function(c){return c._kind===k[0];}).length;
-        return '<span class="sb'+(S.kbKind===k[0]?' on':'')+'" onclick="kbFilt(\'kind\',\''+k[0]+'\')" '
-          +'title="'+esc(k[3])+'">'+k[2]+' '+k[1]+' '+n+'</span>';
-      }).join('')
-    +'<span class="sep">|</span>'
-    +'<span class="sb dg'+(S.kbBad?' on':'')+'" onclick="kbFilt(\'bad\',1)" title="사실과 다르다고 표시된 카드">정정 요청 '
-    +all.filter(kbBad).length+'</span>'
-    +'<span class="sb am'+(S.kbOld?' on':'')+'" onclick="kbFilt(\'old\',1)" title="2년이 지나 관행이 바뀌었을 수 있는 카드">2년 경과 '
-    +all.filter(kbStale).length+'</span>'
-    +'</div>';
-  if(aiProxyUrl()&&all.length){
-    h+='<div class="fbar" style="margin-bottom:8px">'
-      +'<input id="kbq" placeholder="🤔 물어보기 — 예: 천안지청 접수는 언제 되나? 이 감독관은 뭘 먼저 보나?" '
-      +'onkeydown="if(event.key===\'Enter\'&&!_ime(event)){event.preventDefault();kbAsk()}" '
-      +'style="flex:1;min-width:240px;padding:5px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">'
-      +'<button id="kbask-btn" class="primary" style="padding:5px 13px;font-size:12px" onclick="kbAsk()">물어보기</button>'
-      +'<span class="muted" style="font-size:10.5px">저장된 지식·노트만 근거로 답합니다</span>'
-      +'</div>';
-  }
-  h+='<div class="fbar">'
-    +'<input id="qbox" value="'+esc(S.kbQ||'')+'" placeholder="🔍 제목·내용·대상·작성자" oninput="kbOnQ(this.value)">'
-    +(S.kbQ?'<span class="chipbtn" onclick="S.kbQ=\'\';renderKb()">✕</span>':'')
-    +'<span class="muted" style="font-size:11.5px">'+(list.length!==all.length?list.length+' / '+all.length:all.length)+'장</span>'
-    +((S.kbKind||S.kbBad||S.kbOld||S.kbQ)
-      ?'<span class="chipbtn on" onclick="S.kbKind=\'\';S.kbBad=0;S.kbOld=0;S.kbQ=\'\';renderKb()">✕ 필터</span>':'')
-    +'</div>';
-  if(!all.length){
-    h+='<div class="panel" style="text-align:center;color:var(--sub);padding:36px;line-height:1.8">'
-      +'아직 저장된 지식이 없습니다.<br>'
-      +'<span class="muted" style="font-size:12.5px">업무를 열어 <b>주간 기록</b>이나 <b>인수인계 노트</b>의 한 줄에서 '
-      +'<b>↗ 지식으로</b>를 누르면 여기에 쌓입니다. 새로 쓸 필요가 없습니다.</span></div>';
-    app.innerHTML=h; return;
-  }
-  if(!list.length){
-    h+='<div class="panel" style="text-align:center;color:var(--sub);padding:30px">조건에 맞는 카드가 없습니다.</div>';
-    app.innerHTML=h; return;
-  }
-  // 대상(키)별로 묶어 보여준다 — 같은 감독관 카드가 흩어지지 않게
-  var g={};
-  list.forEach(function(c){ var k=c._kind+'|'+(c.kl||c._key); (g[k]=g[k]||[]).push(c); });
-  var keys=Object.keys(g).sort(function(a,b){ return g[b].length-g[a].length||a.localeCompare(b,'ko'); });
-  h+='<div class="panel" style="padding:12px">';
-  keys.forEach(function(k,i){
-    var arr=g[k], kind=k.split('|')[0], kl=k.slice(kind.length+1);
-    h+='<div style="margin:'+(i?'16px':'0')+' 0 7px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
-      +'<span class="rowno" style="color:var(--faint);font-size:11px">'+(i+1)+'</span>'
-      +'<span class="ktag">'+esc(KB_KLBL[kind]||kind)+'</span>'
-      +'<b style="font-size:13px">'+esc(kl)+'</b>'
-      +'<span class="muted" style="font-size:11px">'+arr.length+'장</span></div>';
-    h+=arr.map(function(c){ return kbCardHTML(c); }).join('');
-  });
-  h+='</div>';
-  app.innerHTML=h;
-}
+/* ══ 끝: 💬 카톡정리 › 대화 내보내기 올리기 ══ — 이 구간은 성과급 구간(var PC_PATH= ~ 라우팅) 밖에 둔다: tests/perf-confirm-work.test.js 가 그 사이의 fbDb.ref 를 센다 */
+
 /* ── 3단계: 본문 검색 ─────────────────────────────────────────────────
    기존 검색(matchQ)은 업무의 필드만 훑는다. 노트 본문·회고·기록·지식 카드는
    대상이 아니었다 — 암묵지를 쌓아도 찾을 수 없으면 죽은 자료가 된다.
