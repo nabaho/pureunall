@@ -127,9 +127,13 @@ test('★ 워커가 «화면»을 캐시하지 않는다 — 캐시를 두면 �
   assert.match(handler, /method !== 'POST'\) return;/,
     '★ POST 가 아닌 것을 흘려보내지 않으면 화면까지 워커를 거쳐 옛것이 남습니다');
   /* respondWith 는 공유 길 셋에만 — 그 밖에 하나라도 있으면 GET 을 잡는 길이 생긴다 */
+  /* 공유 길의 «개수»는 못 박지 않는다 — 앱이 공유받기를 더하면 `*_SHARE` 상수가 하나 느는 것이 정상이다(2026-10-25 문서뷰어가 넷째).
+     지킬 것은 «가로채는 곳 = 공유 길 상수의 수» 다. 상수 없이 respondWith 가 늘면 GET 을 잡는 길이 생긴 것이다. */
+  const shares = (sw.match(/^var [A-Z_]+_SHARE\s*=\s*'/gm) || []).length;
+  assert.ok(shares >= 3, '공유 길 상수(…_SHARE)를 찾지 못했습니다');
   const responds = (handler.match(/respondWith\(/g) || []).length;
-  assert.equal(responds, 3,
-    '★ 가로채는 곳이 ' + responds + '군데입니다 — 공유 길(기업정보함·사진첩·급여데이터함) 셋뿐이어야 합니다');
+  assert.equal(responds, shares,
+    '★ 가로채는 곳이 ' + responds + '군데인데 공유 길 상수는 ' + shares + '개입니다 — 공유 길(…_SHARE) 밖에서 가로채면 화면을 잡는 길이 생깁니다');
 });
 
 test('★ 워커를 한 곳에서만 등록한다 — 앱마다 따로 등록하면 서로 밀어내 공유가 죽는다', () => {
