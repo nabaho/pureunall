@@ -99,7 +99,9 @@ async function snapOne(page, key, view, width) {
       const sz = els.map(el => parseFloat(getComputedStyle(el).fontSize) || 0);
       els.forEach((el, i) => { el.dataset.paFs = '1'; if (sz[i]) el.style.setProperty('font-size', (sz[i] * f) + 'px', 'important'); });
     }, Number(opt.font)).catch(() => {});
-    await page.waitForTimeout(200);
+    /* 폭에 따라 표를 줄이거나 카드로 접는 앱(재무관리 js/pu-fin-phone.js)은 글자가 커진 뒤 다시 잰다 */
+    await page.evaluate(() => { try { window.__puFinPhone && window.__puFinPhone.rescan && window.__puFinPhone.rescan(); } catch (e) {} }).catch(() => {});
+    await page.waitForTimeout(250);
   }
   try {
     await page.addScriptTag({ content: measureSrc });
