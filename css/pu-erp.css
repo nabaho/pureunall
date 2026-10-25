@@ -1688,3 +1688,17 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .ip-filter > input[type="number"]{ flex:1 1 30%; width:auto !important; min-width:0; box-sizing:border-box; }
   .ip-filter > input[type="date"]{ flex:1 1 38%; min-width:0; box-sizing:border-box; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   입금관리 탭 줄이기 (대표 2026-10-25 「입금관리 탭도 줄여라」)
+   탭 여덟 개(미입금 대기·입금 리스트·업체·사건·컨설팅·기금·기타·성과 미반영)가 폰에서 위쪽 3~4줄(글자 크게면 4줄)을 먹었다.
+   → 폰에서는 «고르개 하나 + 가져오기» 한 줄. 지금 어느 갈래인지 고르개에 보이고, 누르면 여덟이 다 있다(없앤 것 없음).
+   ⚠ 넓은 화면은 하나도 안 바뀐다 — 고르개(.fi-sel)는 거기서 안 보이고 탭이 그대로다. */
+.fi-sel{ display:none; }
+@media (max-width:640px){
+  .fi-tabs{ flex-wrap:nowrap !important; overflow:visible !important; align-items:center; border-bottom:0 !important; gap:6px !important; }
+  .fi-tabs > button:not(.fi-imp){ display:none !important; }
+  .fi-sel{ display:block; flex:1 1 auto; min-width:0; min-height:40px; font-size:15px; font-weight:700; padding:4px 8px;
+    border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#1e293b; }
+  .fi-tabs > .fi-imp{ margin-left:0 !important; min-height:40px; }
+}
