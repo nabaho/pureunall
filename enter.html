@@ -391,6 +391,12 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tile:hover .pin-star,.tile:focus-within .pin-star,.pin-star.on,.pin-star:focus-visible{opacity:1;}
 .pin-star.on{color:#d97706;}
 .pin-star:hover{color:#d97706;}
+/* ① 이미 넣은 앱(★)에 마우스를 올리면 빨간 ✕ — «누르면 빠진다»가 보이게 (대표 2026-10-25 「자주쓰는앱 삭제 … 둘다」).
+   ⚠ 마우스가 있는 화면만(hover) — 폰은 꾹 누르기로 뺀다. */
+@media (hover:hover){
+  .tile:hover .pin-star.on{background:#dc2626;color:#ffffff;font-size:0;}
+  .tile:hover .pin-star.on::after{content:'✕';font-size:.7rem;font-weight:800;}
+}
 .pin-star:focus-visible{outline:2px solid #1e40af;}
 @media (hover:none){ .pin-star{opacity:1;} }   /* 폰에는 «마우스 올림»이 없다 — 늘 보인다 */
 .pinrow{background:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.75);border-radius:18px;padding:6px 8px 2px;margin-bottom:10px;}
@@ -398,6 +404,11 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 /* 끌어 올리는 중 — 놓을 곳을 알린다(점선), 그 위에 오면 진하게 */
 .pinrow.pin-dropping{outline:2px dashed rgba(30,64,175,.35);outline-offset:2px;}
 .pinrow.pin-over{outline:2px solid rgba(30,64,175,.6);background:rgba(239,246,255,.7);}
+/* ② 자주 쓰는 앱을 줄 «밖»으로 끌고 나가는 중 — 놓으면 빠진다고 알린다 */
+.pinrow{position:relative;}
+.pinrow.pin-out{outline:2px dashed #f87171;outline-offset:2px;}
+.pinrow.pin-out::after{content:'여기 밖에 놓으면 자주 쓰는 앱에서 빠집니다';position:absolute;right:14px;bottom:8px;
+  font-size:.7rem;font-weight:700;color:#dc2626;pointer-events:none;}
 .pin-h{flex-wrap:wrap;row-gap:6px;}
 .pin-star-t{color:#d97706;}
 .fold-tools{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0;}
@@ -4361,6 +4372,7 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 폰에서 칩은 줄을 바꿔 흐른다 — 화면 밖으로 안 나간다(대표 지시, CSS 쪽 머리글). */
   var PIN_MAX = 7;          // 한도 — SAP 런치패드 권장(한 묶음 3~7개)을 따른다
   var _foldWired = false, _foldTimer = 0, _pinDrag = null;
+  var _pinIn = false, _pinOut = false;       // 자주 쓰는 앱 복제본을 끌어 «줄 안»에 놓았나 · «줄 밖»에 놓았나
   var LONG_MS = 500, _lp = null, _lpAt = 0;   // 꾹 누르기 — 0.5초 · 지금 누르는 중 · 마지막으로 꾹 누른 시각
 
   function pinKeys(){
@@ -4617,8 +4629,29 @@ body.portal-mode #moreFab{display:flex;}
         if(!e.defaultPrevented && _dragEl) pr.classList.add('pin-dropping');
       });
       document.addEventListener('dragend', function(){
-        pr.classList.remove('pin-dropping', 'pin-over');
-        if(_pinDrag){ _pinDrag.classList.remove('dragging'); _pinDrag = null; savePinOrderFromDom(); }
+        pr.classList.remove('pin-dropping', 'pin-over', 'pin-out');
+        if(_pinDrag){
+          var key = _pinDrag.dataset.pinOf;
+          _pinDrag.classList.remove('dragging'); _pinDrag = null;
+          /* ② 줄 밖에 놓으면 뺀다 · 줄 안에 놓으면 차례만 · 그냥 그만두면(Esc 등) 아무것도 안 바꾸고 제자리로 */
+          if(_pinOut) togglePin(key);
+          else if(_pinIn) savePinOrderFromDom();
+          else paintPins();
+        }
+        _pinIn = _pinOut = false;
+      });
+      /* ② 자주 쓰는 앱 복제본을 줄 «밖»으로 끌고 나가면 어디든 놓을 수 있게 한다 — 그래야 «놓았다»와 «그만뒀다»를 가른다 */
+      document.addEventListener('dragover', function(e){
+        if(!_pinDrag || pr.contains(e.target)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        pr.classList.remove('pin-over');
+        pr.classList.add('pin-out');
+      });
+      document.addEventListener('drop', function(e){
+        if(!_pinDrag || pr.contains(e.target)) return;
+        e.preventDefault();
+        _pinOut = true;
       });
       pt.addEventListener('dragstart', function(e){
         var c = e.target.closest && e.target.closest('[data-pin-of]');
@@ -4632,6 +4665,7 @@ body.portal-mode #moreFab{display:flex;}
         if(!_dragEl && !_pinDrag) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        pr.classList.remove('pin-out');
         pr.classList.add('pin-over');
         if(_pinDrag){
           var at = pinDropIndex(e, _pinDrag), kids = pinClones().filter(function(x){ return x !== _pinDrag; });
@@ -4644,6 +4678,7 @@ body.portal-mode #moreFab{display:flex;}
       pr.addEventListener('drop', function(e){
         e.preventDefault();
         pr.classList.remove('pin-over');
+        if(_pinDrag) _pinIn = true;
         if(_dragEl && _dragEl.dataset && _dragEl.dataset.key) pinAt(_dragEl.dataset.key, pinDropIndex(e, null));
       });
       /* 타일이 바뀌면(권한으로 감춤·알림 딱지·끌어 옮김) 복제본·개수를 다시 맞춘다.
