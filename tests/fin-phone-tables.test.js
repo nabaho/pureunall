@@ -48,7 +48,10 @@ test('⑤ ★ 카드 — 칸 이름을 값 위에 작게, 빈 칸을 지우지 �
 test('⑥ ★ 모든 규칙은 폰(≤640px)·재무관리 안에서만', () => {
   const open = CSS.indexOf('@media (max-width:640px){', at);
   assert.ok(open > 0);
-  const outside = CSS.slice(CSS.lastIndexOf('/*', at)).replace(/\/\*[\s\S]*?\*\//g, '');
+  /* 이 블록은 «다음 블록의 머리 주석» 앞에서 끝난다 — 뒤에 다른 방이 붙인 블록은 이 검사의 몫이 아니다(입금관리 탭 줄이기 등) */
+  const nextHead = CSS.indexOf('입금관리 탭 줄이기', at);
+  const stop = nextHead > 0 ? CSS.lastIndexOf('/*', nextHead) : CSS.length;
+  const outside = CSS.slice(CSS.lastIndexOf('/*', at), stop).replace(/\/\*[\s\S]*?\*\//g, '');
   let depth = 0, end = -1;
   for(let i = outside.indexOf('{', outside.indexOf('@media (max-width:640px)')); i < outside.length; i++){
     if(outside[i] === '{') depth++; else if(outside[i] === '}'){ depth--; if(!depth){ end = i; break; } }
@@ -112,4 +115,12 @@ test('⑫ ★ 숫자 표는 fit → fit2 → fit3(덜 중요한 열 접기) → 
 test('⑬ ★ 월말 마감 — 설명(sub)은 접고 단계 한 칸은 이름·상태 / 보기·마감 두 줄', () => {
   assert.match(BLOCK, /\.mc-row > \.mc-name > span:nth-child\(2\)\{ display:none !important; \}/, '★ 인라인 display:block 을 눌러야 접힌다');
   assert.match(BLOCK, /\.mc-row > \.mc-stat\{ grid-column:3; grid-row:1;/);
+});
+
+test('⑭ ★ 입금관리 탭 여덟 개는 폰에서 고르개 하나 + 가져오기 한 줄 — 갈래를 없애지 않는다', () => {
+  assert.match(CSS, /\.fi-sel\{ display:none; \}\n@media \(max-width:640px\)\{[\s\S]*?\.fi-tabs > button:not\(\.fi-imp\)\{ display:none !important; \}/, '★ 폰에서 탭이 그대로 남습니다');
+  assert.match(CSS, /\.fi-sel\{ display:block;/, '★ 폰에서 고르개가 안 보입니다');
+  // 고르개가 탭과 «같은 목록»으로 만들어진다 — 한쪽만 늘면 갈래가 한 곳에서 사라진다
+  assert.match(HTML, /className:'fi-sel'[\s\S]{0,200}SUBTABS\.map\(function\(t\)\{ return h\('option'/);
+  assert.match(HTML, /className:'fi-imp'/);
 });
