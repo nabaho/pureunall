@@ -80594,7 +80594,8 @@ function LeaveManagement(){
         /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「틀 고정」) — 직원 표를 내려도 이름 검색은 위에 붙는다 */
         h('div',{className:_lvM?'pu-mfreeze':undefined}, h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}})),
         /* 폰: 양옆 테두리를 걷는다 — 줄 바탕색이 이미 줄을 가르고, 상자 안 상자가 되어 한 겹 더 좁았다(폰화면관리 2026-10-18) */
-        h('div',{style:_lvM ? {borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0',overflow:'hidden'} : {border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
+        /* 폰은 목록 상자에 높이 한도(약 6줄) — 안에서 위아래로 구른다. 제목줄·합계줄은 위아래에 붙어 늘 보인다 (2026-10-25 대표 «휴가관리도 줄여») */
+        h('div',{style:_lvM ? {borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0',overflowX:'hidden',overflowY:'auto',maxHeight:'264px',WebkitOverflowScrolling:'touch'} : {border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
           /* 폰: display:table — 폰 공통 «.page table{display:block}» 이 표를 글자 폭으로 줄여 오른쪽 119px 이 비었다.
              이 표는 폰에서 한 줄 다섯 칸이라 넘치지 않는다(바깥 상자는 overflow:hidden). */
           h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px',display:_lvM?'table':undefined}},
@@ -80605,7 +80606,7 @@ function LeaveManagement(){
                   : lvView === 'now'
                   ? [['#','center'],['이름','left'],['이번 연차 기간','left'],['생긴','right'],['쓴','right'],['남은','right'],['다음 연차','left'],['촉진','left'],['','center']]
                   : [['#','center'],['이름','left'],['부여','right'],['이월','right'],['총','right'],['사용','right'],['잔여','right'],['촉진','left'],['','center']])
-                  .map(function(c, k){ return h('th',{key:k,style:Object.assign({},thS,{textAlign:c[1],whiteSpace:'nowrap'})},c[0]); })
+                  .map(function(c, k){ return h('th',{key:k,style:Object.assign({},thS,{textAlign:c[1],whiteSpace:'nowrap'},_lvM ? {position:'sticky',top:0,zIndex:2,background:'#f8fafc'} : null)},c[0]); })
               )
             ),
             h('tbody',null,
@@ -80725,21 +80726,22 @@ function LeaveManagement(){
               (function(){
                 var rows = leaveUsers.map(lvRow);
                 var sum = function(k){ return Math.round(rows.reduce(function(t, r){ return t + (+r[k] || 0); }, 0) * 10) / 10; };
-                var cS = {padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800};
+                var stk = _lvM ? {position:'sticky',bottom:0,background:'#1e40af',zIndex:1} : {};
+                var cS = Object.assign({padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}, stk);
                 return h('tr',{style:{background:'#1e40af',color:'#fff'}},
-                  h('td',{colSpan: _lvM ? 1 : (lvView==='now' ? 3 : 4),style:{padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}},
+                  h('td',{colSpan: _lvM ? 1 : (lvView==='now' ? 3 : 4),style:Object.assign({padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}, stk)},
                     '합계', h('span',{style:{fontWeight:600,fontSize:'12px',opacity:.85,marginLeft:'5px'}},
                       (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
                   h('td',{style:cS},sum('granted')),
                   h('td',{style:cS},sum('used')),
                   h('td',{style:cS},sum('remain')),
-                  (_lvM ? (lvView==='now' ? h('td',null) : null) : h('td',{colSpan: lvView==='now' ? 3 : 2})));
+                  (_lvM ? (lvView==='now' ? h('td',{style:stk}) : null) : h('td',{colSpan: lvView==='now' ? 3 : 2})));
               })()
             )
           )
         ),
         h('div',{style:{fontSize:'12.5px',color:'#94a3b8',marginTop:'6px'}},
-          '💡 직원 클릭 → 우측에서 상세 분석 보기 | ⚙️ = 수동 설정값')
+          '💡 직원 클릭 → ' + (_lvM ? '아래' : '우측') + '에서 상세 분석 보기 | ⚙️ = 수동 설정값')
       ),
 
       // ─ 우: 선택 직원 개인 달력 (폰은 표 아래 — 줄을 누르면 여기로 내려온다)
