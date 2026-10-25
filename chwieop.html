@@ -5,16 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>옛 취업규칙 작성기</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📝</text></svg>">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -380,7 +381,8 @@ function chwArtTitles(){
 }
 /* 저장한 사람 이름 — 로그인 계정에서 직원 이름을 찾는다(포털과 같은 규칙) */
 var CHW_NAME='';
-function chwWho(){ return CHW_NAME || (fbUser && (fbUser.displayName||fbUser.email)) || ''; }
+/* 이름만 — 못 찾았으면 빈 글자(로그인 이메일·사번을 대신 적지 않는다, 대표 결정 2026-10-25) */
+function chwWho(){ return CHW_NAME || (fbUser && fbUser.displayName) || ''; }
 function chwResolveName(){
   if(!fbDb || !fbUser || !fbUser.email) return;
   var em=String(fbUser.email).toLowerCase();
@@ -463,7 +465,8 @@ function newDoc(){ if(doc.info.company && !confirm('현재 작성 중인 내용�
 /* ══════ 저장 / 불러오기 (Firebase, 로컬 폴백) ══════ */
 function saveDoc(){
   if(!doc.info.company){ toast('회사명을 먼저 입력하세요'); return; }
-  doc.updatedAt=Date.now(); doc.by=(fbUser&&fbUser.email)||'';
+  doc.updatedAt=Date.now(); doc.by=(fbUser&&fbUser.email)||'';   // by = 기록용 저장값(그대로) · byName = 화면에 보이는 이름
+  doc.byName=chwWho();
   if(!doc.id) doc.id='r'+doc.updatedAt+Math.floor(Math.random()*1000);
   if(fbDb){
     fbDb.ref(DB_ROOT+'/docs/'+doc.id).set(doc).then(function(){
@@ -486,7 +489,7 @@ function openLoad(){
     if(!arr.length){ box.innerHTML='<div class="empty">저장된 취업규칙이 없습니다.</div>'; return; }
     box.innerHTML=arr.map(function(d){
       return '<div class="li"><div style="flex:1"><div class="nm">'+esc((d.info&&d.info.company)||'(회사명 없음)')+'</div>'
-        +'<div class="dt">'+(d.updatedAt?new Date(d.updatedAt).toLocaleString('ko-KR'):'')+(d.by?' · '+esc(d.by):'')+'</div></div>'
+        +'<div class="dt">'+(d.updatedAt?new Date(d.updatedAt).toLocaleString('ko-KR'):'')+(d.byName?' · '+esc(d.byName):'')+'</div></div>'
         +'<button onclick="loadDoc(\''+d.id+'\')">열기</button>'
         +'<button class="del" onclick="delDoc(\''+d.id+'\')">삭제</button></div>';
     }).join('');

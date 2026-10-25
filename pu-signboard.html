@@ -236,11 +236,12 @@ main{padding:12px 16px 40px}
 <div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -248,20 +249,29 @@ main{padding:12px 16px 40px}
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-appbar.js?v=34"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-signboard-core.js?v=2"></script>
-<script src="js/pu-signboard-view.js?v=2"></script>
+<script src="js/pu-signboard-core.js?v=3"></script>
+<script src="js/pu-signboard-view.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, bucket=null, ME={sid:''};
 var C=SignboardCore, V=SignboardView;
 var D={ ads:{}, pub:null, ctl:{}, state:null, hist:{}, log:{} };
+/* 사번 → 이름 — 기록(올린이·고친이·지운이)은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
+var NAMES={};
+function loadNames(){
+  return fbDb.ref('data/user_dir').once('value').then(function(snap){
+    var v=snap.val(); if(v && v.v!==undefined) v=v.v;
+    var list=Array.isArray(v)?v:(v&&typeof v==='object'?Object.keys(v).map(function(k){return v[k];}):[]);
+    list.forEach(function(r){ if(r && r.sid && r.name) NAMES[r.sid]=String(r.name); });
+  }).catch(function(){});
+}
 var TAB='ads', SEL={}, EDIT=null, SCREEN={ width:128, height:64, assumed:true }, TIMER=null, LOGLIM=500, LG={ q:'', action:'' };
 
 function $(id){ return document.getElementById(id); }
@@ -309,13 +319,13 @@ function drawPend(){
   $('pendTxt').textContent='올리지 않은 변경 '+df.total+'건 ('+parts.join(' · ')+')';
   $('pendTxt').title=$('pendTxt').textContent;   /* 폰에서는 한 줄로 줄인다 — 다 못 보이면 누르고 있으면 보인다 */
 }
-function drawState(){ $('stateBox').innerHTML=V.stateCards(D.state, D.ctl, Date.now()); }
+function drawState(){ $('stateBox').innerHTML=V.stateCards(D.state, D.ctl, Date.now(), NAMES); }
 function drawHist(){
   var cur=D.pub&&Number(D.pub.version)||0;
   var list=Object.keys(D.hist).map(function(k){ return D.hist[k]; }).filter(function(h){ return h && Number(h.version)<=cur; });
   /* 올린 판은 올라갔는데 기록 쓰기가 실패한 경우 — 지금 판은 올린 판에서 직접 그려 준다 */
   if(D.pub && !D.hist[cur]) list.push(C.historyRecord(D.pub));
-  $('histBox').innerHTML=V.historyTable(list, cur);
+  $('histBox').innerHTML=V.historyTable(list, cur, NAMES);
 }
 function setTab(t){
   TAB=t; lsSet('tab', t); drawTabs();
@@ -476,10 +486,10 @@ async function logEvent(action, o){
   catch(e){ toast('활동 기록을 남기지 못했습니다: '+errMsg(e)); return false; }
 }
 function drawArchive(){
-  $('delBox').innerHTML=V.deletedTable(D.ads);
+  $('delBox').innerHTML=V.deletedTable(D.ads, NAMES);
   if(!$('lgBar').innerHTML) $('lgBar').innerHTML=V.logFilterBar(LG);
   var list=C.filterLog(D.log, LG), n=Object.keys(D.log).length;
-  $('lgBox').innerHTML=V.logTable(list);
+  $('lgBox').innerHTML=V.logTable(list, NAMES);
   $('lgMore').innerHTML='<span class="hint">최근 '+n+'건을 불러왔습니다'+(list.length!==n?' · 걸러서 '+list.length+'건':'')+'</span>'+(n>=LOGLIM?' <button class="sm" data-log-more>더 불러오기</button>':'');
 }
 function showModal(title, body){
@@ -489,7 +499,7 @@ function showModal(title, body){
 }
 function viewLog(id){
   var r=D.log[id]; if(!r||!r.after) return;
-  showModal('그때의 내용 — '+(C.ACTION_KO[r.action]||''), V.detailBox(r.after, SCREEN, C.kstText(r.at)+' · '+(r.byName||r.by)+' · '+(C.ACTION_KO[r.action]||r.action)));
+  showModal('그때의 내용 — '+(C.ACTION_KO[r.action]||''), V.detailBox(r.after, SCREEN, [C.kstText(r.at), r.byName, (C.ACTION_KO[r.action]||r.action)].filter(Boolean).join(' · ')));   /* 이름만 — 이름이 없으면 사번(r.by)을 대신 적지 않고 줄인다(2026-10-25) */
 }
 function viewAd(id){ var a=D.ads[id]; if(a) showModal('광고 내용 — '+(a.title||''), V.detailBox(a, SCREEN, '지금 저장된 내용')); }
 function viewHist(ver){
@@ -589,9 +599,11 @@ function boot(){
     if(!u){ PuGate.show(); return; }
     PuGate.hide();
     var sid=await managerSid(u);
-    if(!sid){ lock('접속: '+(u.email||'-')+' — 관리자·위임관리인이 아니거나 재직 중이 아닙니다'); return; }
+    /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
+    if(!sid){ lock((who()?'접속: '+who()+' — ':'')+'관리자·위임관리인이 아니거나 재직 중이 아닙니다'); return; }
     ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
     $('lock').style.display='none'; $('app').style.display='';
+    await loadNames();
     await reload(); setTab(TAB);
   });
 }

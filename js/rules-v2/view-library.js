@@ -199,12 +199,22 @@
     }
     return td('', '후보 없음 — 메일 줄의 「사업장 확정」으로 잇는다', '<span class="none">후보 없음 — 찾아 잇기</span>');
   }
-  function finalCell(it, M) {
+  /* 최종본을 고른 사람 — g.finalBy 는 사번(저장값)이라 화면에는 이름으로 바꿔 낸다(대표 결정 2026-10-25 「이름만 있어야한다」).
+     명부(st.staff: 사번→이름)에서 못 찾으면 «이름 미확인» — 사번을 대신 적지 않는다. 사람이 적은 이름이면 그대로. */
+  function finalByName(st, by) {
+    by = String(by == null ? '' : by).trim();
+    if (!by) return '';
+    var key = by.toUpperCase().replace(/^([A-Z])-?(\d+)$/, '$1-$2');
+    var n = st && st.staff && (st.staff[key] || st.staff[by]);
+    if (n) return n;
+    return /^[A-Za-z]{1,3}-?\d{1,4}$/.test(by) || by.indexOf('@') >= 0 ? '이름 미확인' : by;
+  }
+  function finalCell(st, it, M) {
     var i = M.info[it.id] || {};
     if (it.status === '보류') return td('fin0', '보류는 못 고른다', '보류는 못 고름');
     if (i.final) {
       var g = i.group || {};
-      var who = [g.finalBy, g.finalAt ? md(g.finalAt) : ''].filter(Boolean).join(' ');
+      var who = [finalByName(st, g.finalBy), g.finalAt ? md(g.finalAt) : ''].filter(Boolean).join(' ');
       return td('', '★ 최종본' + (who ? ' — ' + who : ''), '<span class="fin1">★ 최종본</span>' + (who ? ' <span class="why">· ' + esc(who) + '</span>' : ''));
     }
     if (i.cand && i.cand.length) return td('', '후보 — ' + i.cand.join(' / '), '<span class="sug">후보 · ' + esc(i.cand[0]) + '</span>');
@@ -239,7 +249,7 @@
           + td('file', it.name, '<button class="lnk" data-act="sel" data-id="' + esc(it.id) + '">' + esc(it.name) + '</button>')
           + siteCell(st, it)
           + td('pan', pan, esc(pan))
-          + finalCell(it, M)
+          + finalCell(st, it, M)
           + td('pii', pii ? '가린 것: ' + pii : '가린 것 없음', pii ? esc(pii) : '<span class="none">없음</span>')
           + statusCell(it)
           + '</tr>';
@@ -283,7 +293,7 @@
           dif = d ? '바뀐 조 <b>' + (d.counts['바뀜'] || 0) + '</b>' + (d.counts['새 조'] ? ' · 새 조 ' + d.counts['새 조'] : '') + (d.counts['없어짐'] ? ' · 없어짐 ' + d.counts['없어짐'] : '')
             : '<button class="lnk" data-act="diff" data-id="' + esc(it.id) + '" data-prev="' + esc(prev.id) + '" title="앞 판과 조 단위로 견줍니다">…</button>';
         }
-        var finHtml = fin ? '<span class="fin1">★ 최종본</span> <span class="why">' + esc([g.finalBy, g.finalAt ? md(g.finalAt) : ''].filter(Boolean).join(' ')) + '</span>'
+        var finHtml = fin ? '<span class="fin1">★ 최종본</span> <span class="why">' + esc([finalByName(st, g.finalBy), g.finalAt ? md(g.finalAt) : ''].filter(Boolean).join(' ')) + '</span>'
           + ' <button class="lnk" data-act="unsetFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '">풀기</button>'
           : '<button class="btn sm g" data-act="setFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '" data-id="' + esc(it.id) + '">★ 최종본으로</button>'
             + (g.finalDocId ? ' <span class="fin0">이전 판</span>' : '');

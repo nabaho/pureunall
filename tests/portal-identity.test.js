@@ -63,32 +63,39 @@ t('그래도 겹침은 알린다 (명부를 정리해야 한다)', ctx.puDirMatc
 t('전원 퇴사면 그중 첫 사람이라도 (이름이 아예 안 뜨는 것보다 낫다)',
   ctx.puDirMatch([{ sid:'A003', name:'김보람', status:'left' }], 'a003@pureun.kr').acct.name, '김보람');
 
-console.log('\n[③ 화면 — 이름 옆에 사번이 뜬다]');
+console.log('\n[③ 화면 — 이름만 뜬다 (사번·이메일은 안 뜬다)]');
 /* ⚠ 글월 한 줄을 그대로 찾지 않는다 — 2026-08-20 에 「(admin)」만 폰에서 접으려고
    span 으로 감싸면서 이 줄이 바뀌었고, 멀쩡한 고침이 걸렸다.
    지켜야 할 것은 «머리에 이름·직책·역할·사번이 함께 뜨는가»다. */
-t('★ 머리에 사번을 함께 적는다', (function(){
+t('★ 머리에는 이름·직책·역할만 적는다 — 사번은 안 적는다 (대표 결정 2026-10-25)', (function(){
   var m = /\$\('userName'\)\.(?:textContent|innerHTML) =([\s\S]*?);/.exec(src);
   if(!m) return false;
   var line = m[1];
   return /\bname\b/.test(line) && /\btitle\b/.test(line)
-      && /\brole\b/.test(line) && /mySid[\s\S]*toUpperCase\(\)/.test(line);
+      && /\brole\b/.test(line) && !/mySid|email/.test(line);
 })(), true);
 /* ⚠ 덧말을 «글자 그대로» 박지 않는다 — 2026-09-12 에 (admin)을 머리줄에서 접고
    덧말로 옮기면서 앞에 이름·직책·권한이 붙었다. 지켜야 할 것은
    「마우스를 올리면 로그인 계정을 알 수 있다」이고, 그 값은 email 이다. */
-t('마우스를 올리면 로그인 이메일이 보인다',
-  /\.title = [\s\S]{0,220}?로그인 계정: ' \+ email;/.test(src), true);
+t('★ 마우스를 올려도 로그인 이메일·사번은 안 보인다 (보이는 것이다)', (function(){
+  var m = /\$\('userName'\)\.title =([\s\S]*?);/.exec(src);
+  return !!m && !/mySid|email|로그인 계정/.test(m[1]);
+})(), true);
+t('★ 내 메뉴 맨 위에도 이메일·사번은 안 적는다', (function(){
+  var m = /\$\('meWho'\)\.innerHTML =([\s\S]*?);/.exec(src);
+  return !!m && !/mySid|email/.test(m[1]);
+})(), true);
 /* 접은 것은 덧말에 «반드시» 남는다 — 안 그러면 권한을 확인할 길이 없어진다 */
 t('접은 (admin) 도 덧말에 남는다', /\$\('userName'\)\.title = [\s\S]{0,200}?role/.test(src), true);
-t('명부에 없어도 이메일에서 사번을 만들어 보여준다', /var mySid = acct \? String\(acct\.sid \|\| ''\) : puEmailToSid\(email\);/.test(src), true);
+t('명부에 없어도 «내부» 사번은 이메일에서 만든다 (카카오 연결용 — 화면에는 안 적는다)', /var mySid = acct \? String\(acct\.sid \|\| ''\) : puEmailToSid\(email\);/.test(src), true);
 
 console.log('\n[④ 신원 안내 띠 — 이상할 때는 크게 말한다]');
 t('겹침이면 빨간 띠', /dupAll\.length > 1\)\{/.test(src) && /여러 명에게 등록되어 있습니다/.test(src), true);
+t('★ 그 띠에도 아이디(사번·이메일)는 안 적는다 — 이름들만', !/같은 아이디\(/.test(src), true);
 t('겹친 사람 이름을 모두 적는다', /dupAll\.map\(function\(x\)\{ return \(x\.name \|\| '\?'\)/.test(src), true);
 /* 글자만 보면 조건을 false 로 막아도 통과한다 — «갈림길 자체» 를 못 박는다 */
 t('명부에 없으면 노란 띠 (조건까지)', /\} else if\(!acct\)\{/.test(src), true);
-t('명부에 없으면 노란 띠', /직원명부에서 <b>' \+ email \+ '<\/b> 을 찾지 못했습니다/.test(src), true);
+t('명부에 없으면 노란 띠 — 이메일(로그인 아이디)은 안 적는다', /직원명부에서 <b>이 계정<\/b>을 찾지 못했습니다/.test(src) && !/직원명부에서 <b>' \+ email/.test(src), true);
 /* ★ (2026-08-10) 「자동 로그인되었습니다 — 본인이 아니면 로그아웃」 띠는 걷어냈다.
    대표 지시: "본인이 아니면 .. 로그아웃 후 이문구 안나오게 해라".
    자동 로그인은 «늘» 일어나는 정상 동작이라, 들어올 때마다 뜨는 경고가 되어 버렸다.
@@ -99,8 +106,8 @@ t('그 띠의 닫기 단추도 없앴다', /puIdBandX/.test(src), false);
 /* ★ 사번은 «절대» 감추지 않는다. P005·A005 처럼 숫자가 같은 사번이 있어,
    사번이 안 보이면 엉뚱한 계정으로 들어간 것을 알아챌 길이 없다.
    폰에서 머리 카드를 한 줄로 줄일 때도 사번만은 남겨 두었다(2026-08-20). */
-t('★ 그래도 사번은 늘 떠 있다 (신원 확인은 이것이 맡는다)',
-  /mySid \? ' · ' \+ (?:_e\()?mySid\.toUpperCase\(\)/.test(src)
+t('★ 사번은 화면 어디에도 안 적는다 — 신원 확인은 이름이 맡는다 (이름은 접지 않는다)',
+  !/mySid \? ' · ' \+ (?:_e\()?mySid\.toUpperCase\(\)/.test(src)
   && !/#userName[^{]*\{[^}]*display:none/.test(src), true);
 t('이상할 때는 여전히 알린다 — 겹침·명부 없음', /dupAll\.length > 1\)\{/.test(src) && /\} else if\(!acct\)\{/.test(src), true);
 t('띠는 하나만 그린다 (다시 그리면 갈아 끼움)', /var el = document\.getElementById\('puIdBand'\);\s*\n\s*if\(!el\)\{/.test(src), true);

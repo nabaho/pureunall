@@ -14,17 +14,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="푸른사진첩">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -1947,7 +1948,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
   <script>
   /* 이 앱은 제 상단바에 이미 로그인한 사람을 그린다 — 표를 두 번 띄우지 않는다 (2026-08-16) */
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
@@ -3107,7 +3108,7 @@ firebase.auth().onAuthStateChanged(u => {
   const authGeneration = ++photoAuthGeneration;
   if (photoBootTimer) { clearTimeout(photoBootTimer); photoBootTimer = null; }
   const signedIn = !!(u && u.email);
-  $('who').textContent = signedIn ? (u.displayName || u.email) : '';
+  $('who').textContent = signedIn ? (u.displayName || '') : '';   // ⚠ 이메일(사번에서 만든 아이디)은 안 적는다 — 이름은 아래 signIn 뒤에 채운다 (대표 결정 2026-10-25)
   /* ⚠★ 로그아웃 화면은 «모든 앱이 같은 것»을 쓴다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
      제 화면(#login)은 그대로 두되 «안 띄운다» — 지우면 안에 딸린 것들이 함께 죽는다. */
   $('login').style.display = 'none';
@@ -3132,7 +3133,7 @@ firebase.auth().onAuthStateChanged(u => {
     const current = firebase.auth().currentUser;
     if (authGeneration !== photoAuthGeneration || !current || current.uid !== u.uid || (me.uid && me.uid !== u.uid)) return;
     /* 주소(p001@pureun.kr)가 아니라 사람 이름이 떠야 한다 — 명부에서 찾아 온다. */
-    $('who').textContent = me.name || u.email || '';
+    $('who').textContent = me.name || '';   // ⚠ 이름을 못 찾았다고 이메일을 대신 적지 않는다 (대표 결정 2026-10-25)
     /* 관리자는 첫 목록부터 전 직원 사진을 한 번만 읽는다. 예전에는 먼저 내 사진을
        읽고, 사람 고르개가 완성된 뒤 전 직원 사진을 다시 읽어 첫 화면이 두 배 느렸다. */
     if (me.isAdmin) {
@@ -6805,7 +6806,7 @@ async function addFiles(fileList, isDoc, opts) {
         upAt: batchUpAt,
         seq: fi,
         by: u.uid,
-        byName: PuPhotoStore.myName() || u.email || '',
+        byName: PuPhotoStore.myName() || '',   // ⚠ 이름이 없다고 이메일을 대신 적지 않는다 (대표 결정 2026-10-25)
         kind: upKind,
         w: full.w, h: full.h,
         size: full.dataUrl.length,
@@ -9785,7 +9786,7 @@ function sendCards(id, year, job) {
       takenAt: photoTime(it || job) || Date.now(),
       /* **찍은 사람**을 남긴다. 남의 사진을 대신 보낼 때 내 이름을 적으면
          기업정보함의 「누가 가져온 명함인가」가 틀어진다. */
-      byName: (it && it.meta && it.meta.__ownerName) || PuPhotoStore.myName() || (u && u.email) || ''
+      byName: (it && it.meta && it.meta.__ownerName) || PuPhotoStore.myName() || ''   // ⚠ 이메일을 대신 적지 않는다 (대표 결정 2026-10-25)
     });
   }).then(function (res) {
     /* ── 회사를 «찾아» 붙였으면 그렇다고 말한다 (대표 지시 2026-08-31) ──
@@ -13753,7 +13754,7 @@ function autoShareByCo(ids, coName) {
          앞은 업체관리에서 담당을 정해야 하고, 뒤는 그 사람이 한 번 들어오면 된다. */
       /* 누구인지는 «이름»으로 — 이름을 못 찾았을 때만 사번 (대표 지시 2026-10-19) */
       toast(m.noAcct && m.noAcct.length
-        ? coName + ' 담당자(' + m.noAcct.map(function (s, i) { return (m.noAcctNames && m.noAcctNames[i]) || s; }).join('·')
+        ? coName + ' 담당자(' + m.noAcct.map(function (s, i) { return (m.noAcctNames && m.noAcctNames[i]) || '이름 미확인'; }).join('·')
           + ')는 아직 로그인한 적이 없어 못 열어 드렸습니다'
         : '🏢 업체는 달았지만 ' + coName + ' 에 담당자가 지정돼 있지 않습니다 — 업체관리에서 정해 주세요');
       return;
@@ -14074,8 +14075,8 @@ function openSharePeople(ids, host, note) {
     /* ⚠ 이 앱에는 «사번 → 이름» 표가 없다(처음에는 있지도 않은 staffNameBySid 를 불러
        「s9님은…」이라고 적고 있었다). 그래서 coMgrsFor 가 공개 명부(PuPhotoStore.namesOfSids)로
        이름을 함께 찾아 온다(대표 지시 2026-10-19 — 화면 글자는 사번 대신 이름).
-       이름을 못 찾은 사람만 **사번 그대로** 적는다 — 「1명은 못 고릅니다」보다는 짚을 데가 있다. */
-    const noAcct = ((m && m.noAcct) || []).map(function (s, i) { return String((m.noAcctNames && m.noAcctNames[i]) || s); });
+       이름을 못 찾은 사람은 「이름 미확인」 — 사번을 대신 적지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」). */
+    const noAcct = ((m && m.noAcct) || []).map(function (s, i) { return String((m.noAcctNames && m.noAcctNames[i]) || '이름 미확인'); });
     _sharePick = { ids: can, pre: pre, has: has, mayDrop: mayDrop, role: role,
       coName: coName, host: host, title: title, skipped: skipped, note: note || null };
     const box = $(host);
@@ -14376,7 +14377,7 @@ function hayOf(it) {
   if (it._hayFor === it.meta) return it._hay;
   const m = it.meta || {}, r = m.read || {}, f = r.fields || {};
   const ck = m.customKind && CUSTOM_KINDS[m.customKind];
-  const bits = [READ_LABEL[r.kind] || '', m.byName || '', ck ? ck.name : '',
+  const bits = [READ_LABEL[r.kind] || '', shownBy(m.byName), ck ? ck.name : '',
     m.company || '', m.note || '',
     /* 스캔 파일 이름으로도 찾을 수 있어야 한다 — 여러 쪽짜리는 그 이름이
        사람이 기억하는 유일한 실마리다(2026-08-10) */
@@ -15344,7 +15345,7 @@ function renderViewerTitle(it) {
   const sub = [
     (it.meta.kind === 'doc' && !(it.meta.read && it.meta.read.kind === 'meeting')) ? '서류' : '',
     docLabel(it.meta),
-    it.meta.byName || '',
+    shownBy(it.meta.byName),
     photoWhere()
   ].filter(function (x) { return x; }).join(' · ');
   const date = viewerDateText(it);
@@ -17317,7 +17318,7 @@ let ownerDefaulted = false;   // 관리자를 「전체 근로자」로 한 번�
    그런데 이 단추가 하려는 일은 «아직 안 본 사람에게 열어 주기»다 —
    **열지 않았기 때문에 열어 줄 수 없는**, 뒤집힌 문이었다.
    ⚠ owners 에 이름이 있으면 그것을 그대로 둔다 — 그 사람이 사진첩에 적어 둔 이름표다.
-   ⚠ 이름이 비면 사번으로 적는다. uid 를 그대로 내면 사람은 누구인지 못 읽는다.
+   ⚠ 이름이 비면 비워 둔다(화면에는 「(이름 모름)」). 사번은 안 적는다 — 사번에서 로그인 아이디가 만들어진다(대표 결정 2026-10-25).
    ⚠ 못 읽어도 조용히 넘어간다 — 명단이 좁아질 뿐, 사진첩이 안 열릴 까닭은 없다. */
 function mergeStaffNames() {
   return PuPhotoStore.listStaff().then(function (staff) {
@@ -17327,7 +17328,7 @@ function mergeStaffNames() {
            사진첩에 이름을 안 적은 최기운 님이 「HVp8SMqMGVO8aUz…」로 떴다). */
       if (ownerNameReal(uid)) return;
       const x = staff[uid] || {};
-      ownerNames[uid] = x.name || x.sid || '';
+      ownerNames[uid] = x.name || '';   // ⚠ 이름을 모른다고 사번을 대신 적지 않는다 — 비면 「(이름 모름)」이 뜬다 (대표 결정 2026-10-25)
     });
     return staff;
   }).catch(function (e) { console.warn('[직원 명단]', e && e.message); });
@@ -17346,6 +17347,13 @@ function ownerNameReal(uid) {
 }
 function ownerNameOf(uid) {
   return ownerNameReal(uid) || '(이름 모름)';
+}
+/* 기록에 남은 «올린 사람»(byName)을 화면·내려받는 글에 낼 때 — 예전에 이름을 못 찾으면 이메일(p001@pureun.kr)을
+   이름 자리에 적던 때가 있어, 그 줄이 지금도 자료에 남아 있다. 이메일·사번 꼴이면 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+   저장된 값은 그대로 둔다 — 보이는 글자만 거른다. */
+function shownBy(v) {
+  const s = String(v == null ? '' : v).trim();
+  return (s.indexOf('@') >= 0 || /^[A-Za-z]{1,3}-?\d{3}$/.test(s)) ? '' : s;
 }
 /* 직원 명단이 이름을 채운 «뒤에» 고르개의 사람 줄 글자를 바꿔 쓴다.
    ⚠ 줄을 지우고 다시 만들지 않는다 — 글자만 바꾼다(고르던 값·펼친 목록이 그대로다).
@@ -22039,7 +22047,7 @@ function backupYear() {
             zip.file(name, b64, { base64: true });
             const m = it.meta, r = m.read || {}, f = r.fields || {};
             csv.push([made, whenText(m.takenAt || m.upAt || 0), READ_LABEL[r.kind] || '',
-              (f.company || f.name || ''), (m.byName || ''), name].map(csvCell).join(','));
+              (f.company || f.name || ''), shownBy(m.byName), name].map(csvCell).join(','));
           }).catch(function (e) { console.warn('[백업]', id, e); });
         });
       });
@@ -22149,7 +22157,7 @@ function loadDelLog() {
         return '<tr><td>' + esc(r.what || '사진') +
           (r.why ? '<span class="why">' + esc(r.why) + '</span>' : '') + '</td>' +
           '<td>' + esc(whenText(r.delAt)) + '</td>' +
-          '<td>' + esc(r.byName || '') + '</td>' +
+          '<td>' + esc(shownBy(r.byName)) + '</td>' +
           '<td>' + (r.purgedAt
             ? '<span class="gone">완전히 지움 · ' + esc(whenText(r.purgedAt)) + '</span>'
             : '휴지통에 있음') + '</td></tr>';

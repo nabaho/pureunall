@@ -76,11 +76,13 @@ test('이미 진짜 이름이 있으면 직원 명단이 덮지 않는다 — �
   assert.equal(vm.runInContext("ownerNameOf('" + UID + "')", 상자), '본인이 적은 이름');
 });
 
-test('이름이 없고 사번만 있으면 사번을 낸다 — 번호보다 낫다', async () => {
+test('이름이 없고 사번만 있으면 사번을 내지 않는다 — 「(이름 모름)」 (대표 결정 2026-10-25 「이름만 있어야한다」)', async () => {
   const 상자 = 싣기({ [UID]: { sid: 'A-001', name: '' } });
   vm.runInContext("ownerNames['" + UID + "'] = '';", 상자);
   await vm.runInContext('mergeStaffNames()', 상자);
-  assert.equal(vm.runInContext("ownerNameOf('" + UID + "')", 상자), 'A-001');
+  const 글 = vm.runInContext("ownerNameOf('" + UID + "')", 상자);
+  assert.ok(!/A-001/.test(글), '사번이 이름 자리에 나옵니다: ' + 글);
+  assert.ok(글.trim().length > 0, '빈 글자가 되면 줄이 안 보인다');
 });
 
 /* ── 소스 — 번호를 이름처럼 내던 자리가 «다시 생기지 않는다» ───────────────── */

@@ -134,7 +134,7 @@ exports.passkeyRegisterStart = functions.region(REGION).https.onRequest(async (r
     rpName: RP_NAME,
     rpID: RP_ID,
     userName: sid,
-    userDisplayName: String((req.body && req.body.name) || sid),
+    userDisplayName: String((req.body && req.body.name) || "푸른 직원"),   // 사번은 적지 않는다(2026-10-25)
     attestationType: "none",                       // 기기 제조사 증명서는 받지 않는다 — 필요 없고, 개인정보만 는다
     // 이미 등록한 기기를 또 등록하지 않게 알려 준다
     excludeCredentials: have.map((c) => ({ id: c.credId })),

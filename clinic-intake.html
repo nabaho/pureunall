@@ -6,16 +6,17 @@
 <meta name="theme-color" content="#1e40af">
 <title>현장클리닉 보내기 — 푸른노무법인</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📤</text></svg>">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-active.js?v=1"></script>
 <script src="js/pu-authsync.js?v=5"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <!--
   ══ 중진공 현장클리닉 → 푸른이알피 «계약 등록 요청» (대표 지시 2026-10-07 「목업」→「진행해라」) ══
   「현장클리닉 사업장의 컨설팅 자문위원을 푸른노무법인 노무사로 선정하는 경우
@@ -327,7 +328,7 @@ function clinicRequest(o) {
     var mgr = val('f-mgr');
     var me = S.staff.filter(function (u) { return u.sid === ((S.me && S.me.sid) || ''); })[0];
     var r = clinicRequest({
-      managerMain: mgr, consultingType: S.type && S.type.code, by: (me && me.name) || (S.me && S.me.name) || (S.user && S.user.email) || '',
+      managerMain: mgr, consultingType: S.type && S.type.code, by: (me && me.name) || (S.me && S.me.name) || '',
       startDate: val('f-date'), consultDays: val('f-days'), sendMobile: !!($('f-mob') && $('f-mob').checked),
       company: { name: val('f-name'), bizNo: val('f-bizNo'), ceo: val('f-ceo'), address: val('f-address'), phone: val('f-phone'),
         email: val('f-email'), bizType: val('f-bizType'), item: val('f-item'), mobile: S.data.mobile,

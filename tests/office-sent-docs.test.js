@@ -18,14 +18,15 @@ function load() {
   return box.PuOfficeDocs;
 }
 
-test('ⓐ 합치기 — 같은 보냄은 한 줄, 최근 위, 보낸 이는 @ 앞만', () => {
+test('ⓐ 합치기 — 같은 보냄은 한 줄, 최근 위, 보낸 이는 «이름»만 (로그인 이메일 앞부분도 안 낸다 · 대표 결정 2026-10-25)', () => {
   const D = load();
-  const a = { at: 200, kind: '제안서', names: ['제안서.pdf'], who: '박담당', by: 'hong@example.com', card: '' };
-  const b = { at: 100, kind: '계약서', names: ['위임계약서.hwp', '견적서.xlsx'], who: '', by: 'kim@example.com' };
+  const a = { at: 200, kind: '제안서', names: ['제안서.pdf'], who: '박담당', by: 'hong@example.com', byName: '홍길동', card: '' };
+  const b = { at: 100, kind: '계약서', names: ['위임계약서.hwp', '견적서.xlsx'], who: '', by: 'kim@example.com' };   /* 이름을 안 적어 둔 옛 기록 */
   const rows = JSON.parse(JSON.stringify(D.sentRows([[a, b], [Object.assign({}, a)], null, [{ at: 0, kind: 'x' }, null]])));
   assert.deepStrictEqual(rows, [
-    { at: 200, kind: '제안서', names: ['제안서.pdf'], who: '박담당', by: 'hong' },
-    { at: 100, kind: '계약서', names: ['위임계약서.hwp', '견적서.xlsx'], who: '', by: 'kim' }]);
+    { at: 200, kind: '제안서', names: ['제안서.pdf'], who: '박담당', by: '홍길동' },
+    { at: 100, kind: '계약서', names: ['위임계약서.hwp', '견적서.xlsx'], who: '', by: '' }]);
+  assert.ok(rows.every(r => !/hong|kim|@/.test(r.by)), '로그인 이메일(또는 그 앞부분)이 보낸 이 칸에 나왔다');
   assert.ok(!('to' in rows[0]), '받는 주소는 없다');
   const many = []; for (let i = 1; i <= 60; i++) many.push({ at: i, kind: '제안서', names: [] });
   const cut = D.sentRows([many]);

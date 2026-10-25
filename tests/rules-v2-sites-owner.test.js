@@ -61,13 +61,14 @@ test('③ 「내 담당」은 사번을 알 때만 · 담당자 이름은 명부
   assert.doesNotMatch(h2, /내 담당/, '사번을 모르는데 「내 담당」을 보인다');
 });
 
-test('⑤ 표에 담당 칸 — 명부 이름, 없으면 사번', () => {
+test('⑤ 표에 담당 칸 — 명부 이름, 없으면 «이름 미확인» (사번을 글자로 내지 않는다 · 대표 결정 2026-10-25)', () => {
   const rows = L.model(DATA, CO);
   const st = { data: DATA, companies: CO, sites: { f: 'all' }, staff: { 'P-001': '홍길동' } };
   const h = V.listHtml(st, rows);
   assert.match(h, /<th>담당<\/th>/);
   assert.match(h, /홍길동/);
-  assert.match(h, /A-002/, '명부에 없는 사번을 지웠다');
+  assert.match(h, /이름 미확인/, '명부에 없는 담당자를 칸에서 지웠다 — 이름 미확인으로 남아야 한다');
+  assert.doesNotMatch(h, /\b[A-Za-z]-\d{3}\b/, '명부에 없다고 사번 글자를 이름 자리에 적었다');
 });
 
 test('화면이 명부를 읽고, 로그인한 사람의 사번을 넘기고, 고르개를 받는다', () => {

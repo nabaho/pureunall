@@ -175,6 +175,7 @@ test('올린 날짜를 크게', async (t) => {
       /* 원본 단추 판정도 «진짜 것»을 넣는다 — 가짜를 넣으면 이 검사가
          「그려지더라」만 보고 실제 판정이 깨진 것을 못 잡는다 */
       cut(app, 'function origOf(') + '\n' +
+      cut(app, 'function shownBy(') + '\n' +   /* 이름만 보인다(2026-10-25) — 올린 사람 글자를 거르는 «진짜» 도우미 */
       cut(app, 'function renderViewerTitle(') + '\nreturn renderViewerTitle;')(
       function () { return el; },
       function (it) { return it.ts; },

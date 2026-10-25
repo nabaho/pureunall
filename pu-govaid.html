@@ -230,7 +230,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
   </div>
 </div>
 
-<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>정부지원금은 재직 중인 직원 계정(사번이 있는 계정)으로 엽니다.</p></div>
+<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>정부지원금은 재직 중인 직원 계정으로 엽니다.</p></div>
 
 <main id="app" style="display:none">
   <div class="note" id="loadNote" style="display:none"></div>
@@ -309,10 +309,11 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -320,7 +321,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-appbar.js?v=34"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
@@ -368,7 +369,7 @@ function condChips(items){ return (items||[]).map(function(i){ return '<span cla
 function decChip(r){
   if(!r) return '<span class="chip">미검토</span>';
   var c={yes:'c-green',hold:'c-amber',no:''}[r.decision]||'';
-  return '<span class="chip '+c+'" title="'+esc((r.reason?r.reason+' · ':'')+(r.by||'')+' '+ymd(r.at))+'">'+esc(DEC[r.decision]||'?')+'</span>';
+  return '<span class="chip '+c+'" title="'+esc((r.reason?r.reason+' · ':'')+nameOf(r.by)+' '+ymd(r.at))+'">'+esc(DEC[r.decision]||'?')+'</span>';
 }
 function decBtns(key,pid,r){
   var cur=r&&r.decision;
@@ -463,7 +464,7 @@ function drawDict(){
     && (!fd||fieldsOf(p).indexOf(fd)>=0) && (!st || (st==='check')===GovaidView.needsCheck(p,YEAR)); });
   $('dBox').innerHTML = view.length ? tbl('dict',['사업명','분야','담당기관','조건','상태','확인'], view.map(function(p){
     return { id:p.id, cells:[ starBtn(p)+'<span title="'+esc(p.summary||'')+'">'+esc(nm(p))+'</span>', fieldsOf(p).map(function(f){ return '<span class="chip">'+esc(f)+'</span>'; }).join(''),
-      esc(p.agency||'—'), condSummary(p), statusChip(p), p.confirmedBy ? esc(p.confirmedBy)+' · '+ymd(p.confirmedAt) : '—' ] }; }))
+      esc(p.agency||'—'), condSummary(p), statusChip(p), p.confirmedBy ? esc([nameOf(p.confirmedBy), ymd(p.confirmedAt)].filter(Boolean).join(' · ')) : '—' ] }; }))
     : '<div class="empty">'+(PROGS.length?'조건에 맞는 사업이 없습니다':'사업 사전이 비어 있습니다 — 「📥 캡처 사업 넣기」를 누르세요')+'</div>';
 }
 /* 씨앗 — 빈 자리에만. 이미 있는(지운 표식 포함) id 는 건드리지 않는다(expectedRevision:-1) */
@@ -498,7 +499,7 @@ function openJudge(key,pid){
   openModal('<div class="mhead"><h3>'+esc(pf.name)+' × '+esc(nm(p))+'</h3><span class="chip">'+VERDICT[res.verdict]+'</span><span class="sp"></span><button class="sm" data-close="1">닫기</button></div>'
     +'<div class="prof">'+(res.items.length ? condChips(res.items) : '<span class="hint">이 사업은 조건이 확정되지 않았습니다 — 「확인할 조건」에서 확정하세요</span>')+'</div>'
     +(p.summary ? '<div class="prof hint">'+esc(p.summary)+(p.summaryCut?'…':'')+'</div>' : '')
-    +'<div class="ed"><label class="k">지금 검토</label><div>'+decChip(r)+(r&&r.by?' <span class="hint">'+esc(r.by)+' · '+ymd(r.at)+'</span>':'')+'</div>'
+    +'<div class="ed"><label class="k">지금 검토</label><div>'+decChip(r)+(r&&r.by?' <span class="hint">'+esc([nameOf(r.by), ymd(r.at)].filter(Boolean).join(' · '))+'</span>':'')+'</div>'
     +'<label class="k" for="jReason">사유</label><input id="jReason" maxlength="300" value="'+esc(r&&r.reason||'')+'"></div>'
     +'<div class="mfoot"><button data-jdec="no">비해당</button><button data-jdec="hold">보류</button><button class="pri" data-jdec="yes">해당</button></div>');
 }
@@ -630,7 +631,7 @@ function drawProgDetail(){
 function starBtn(p){
   if(!p||!p.id) return '';
   var on=GovaidView.isStar(p), st=p.star||{};
-  return '<button class="star'+(on?' on':'')+'" data-star="'+esc(p.id)+'" title="'+esc(on ? '★ 노무사 직접 사업'+(st.why?' — '+st.why:'')+(st.by?' ('+st.by+')':'')+' · 누르면 끕니다' : '누르면 ★ 노무사 직접 사업으로 표시합니다')+'">'+(on?'★':'☆')+'</button>';
+  return '<button class="star'+(on?' on':'')+'" data-star="'+esc(p.id)+'" title="'+esc(on ? '★ 노무사 직접 사업'+(st.why?' — '+st.why:'')+(nameOf(st.by)?' ('+nameOf(st.by)+')':'')+' · 누르면 끕니다' : '누르면 ★ 노무사 직접 사업으로 표시합니다')+'">'+(on?'★':'☆')+'</button>';
 }
 async function toggleStar(id){
   var p=progById(id); if(!p) return;
@@ -748,7 +749,7 @@ function checkDetail(p){
   var left='<h4>조건</h4>'+(x.items.length ? '<ul>'+x.items.map(function(i){ return '<li>'+esc(i.label)+' '+(i.state==='manual'?'<span class="chip c-amber">사람 확인</span>':'<span class="chip c-green">기계가 봄</span>')+'</li>'; }).join('')+'</ul>' : '<div class="hint">적힌 조건이 없습니다</div>')
     +(p.summary?'<div class="hint" style="margin-top:6px">'+esc(p.summary)+(p.summaryCut?'…':'')+'</div>':'')
     +(p.aiDraft&&p.aiDraft.notes?'<div class="hint" style="margin-top:6px">🤖 '+esc(p.aiDraft.notes)+'</div>':'')
-    +(p.closure&&p.closure.state?'<div class="hint" style="margin-top:6px">접수 상태 '+(closureChip(p)||esc({open:'접수 중',unknown:'모름'}[p.closure.state]||''))+' '+confChip(p.closure.confidence)+' '+srcLinks(p.closure.sources)+(p.closure.note?' — '+esc(p.closure.note):'')+(p.closure.checkedAt?' · 확인 '+ymd(p.closure.checkedAt)+' '+esc(p.closure.by||''):'')+'</div>':'')
+    +(p.closure&&p.closure.state?'<div class="hint" style="margin-top:6px">접수 상태 '+(closureChip(p)||esc({open:'접수 중',unknown:'모름'}[p.closure.state]||''))+' '+confChip(p.closure.confidence)+' '+srcLinks(p.closure.sources)+(p.closure.note?' — '+esc(p.closure.note):'')+(p.closure.checkedAt?' · 확인 '+ymd(p.closure.checkedAt)+' '+esc(nameOf(p.closure.by)):'')+'</div>':'')
     +'<div class="hint" style="margin-top:6px">'+esc(p.agency||'기관 모름')+(src.url&&/^https?:\/\//.test(src.url)?' · <a href="'+esc(src.url)+'" target="_blank" rel="noopener">🔗 공고 원문</a>':'')+'</div>'
     +'<div style="margin-top:8px">'+(GovaidView.needsCheck(p,YEAR)?'<button class="sm pri" data-cconf="'+esc(p.id)+'">✓ 확정 ('+YEAR+' 기준)</button> ':'')+'<button class="sm" data-cp="'+esc(p.id)+'">✏ 고치기</button></div>';
   var right='<h4>필요서류</h4>'+(docs.length ? '<ul>'+docs.map(function(d){ var lb=isLabor(d);
@@ -1080,6 +1081,19 @@ function reviewJobs(name, ids, d){
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 async function staffSid(u){ try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.status==='active' && v.sid ? String(v.sid) : ''; }catch(e){ return ''; } }
+/* 사번 → «이름» (공개 명부 data/user_dir). 「누가 검토·확정했나」는 사번으로 저장하지만 화면에는 이름만 보인다(대표 결정 2026-10-25).
+   명부에서 못 찾았는데 사번 꼴이면 빈 글자 — 사번을 이름 자리에 적지 않는다. 사번 꼴이 아닌 글(자동 수집 표시 등)은 그대로 둔다 */
+var NAMES={};
+function sidKey(v){ return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function nameOf(v){ var s=String(v==null?'':v).trim(); if(!s) return ''; return NAMES[sidKey(s)] || (/^[A-Za-z]-?\d{3}$/.test(s) ? '' : s); }
+async function loadNames(){
+  try{
+    var raw=(await fbDb.ref('data/user_dir').once('value')).val();
+    var arr=(raw&&Object.prototype.hasOwnProperty.call(raw,'v'))?raw.v:raw;
+    var list=Array.isArray(arr)?arr:(arr?Object.keys(arr).map(function(k){ return arr[k]; }):[]);
+    list.forEach(function(x){ if(x&&x.sid&&x.name) NAMES[sidKey(x.sid)]=String(x.name); });
+  }catch(e){}
+}
 function boot(){
   ['coQ','pQ','dQ'].forEach(function(id){ $(id).addEventListener('input', draw); });
   ['cQ','nQ'].forEach(function(id){ $(id).addEventListener('input', draw); });
@@ -1097,9 +1111,11 @@ function boot(){
     if(!u){ PuGate.show(); return; }
     PuGate.hide();
     var sid=await staffSid(u);
-    if(!sid){ lock('접속: '+(u.email||'-')+' — 사번이 없거나 재직 중이 아닙니다'); return; }
+    /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
+    if(!sid){ var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return; }
     ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
     $('lock').style.display='none'; $('app').style.display='';
+    await loadNames();
     await reload();
   });
 }

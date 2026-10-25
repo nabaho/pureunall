@@ -68,21 +68,22 @@ test('같은 사번이 겹치면 재직자를 먼저 본다', () => {
   assert.strictEqual(got.name, '박재원');
 });
 
-test('이름 · 직책 · 사번을 적는다', () => {
-  /* 대표 결정 — 사번까지 있어야 남의 계정으로 들어갔을 때 그 자리에서 알아챈다 */
+test('이름 · 직책만 적는다 — 사번은 안 적는다 (대표 결정 2026-10-25 「이름만 있어야한다」)', () => {
+  /* 사번에서 로그인 아이디가 그대로 만들어진다(P-001 → p001@…) — 화면에 보이면 아이디를 알려 주는 셈이다.
+     ★ 규칙: 어떤 모양으로도 사번이 글자에 끼면 안 된다(P-001 · P001 · p001). 값 자체는 시험용이다. */
   const g = boot();
-  assert.strictEqual(g.PuWhoami._text({ name: '권형하', title: '대표노무사', sid: 'P001' }),
-    '권형하 대표노무사 · P-001');
+  const t = g.PuWhoami._text({ name: '권형하', title: '대표노무사', sid: 'P001', email: 'p001@pureun.kr' });
+  assert.strictEqual(t, '권형하 대표노무사');
+  assert.ok(!/[A-Za-z]-?d{3}/.test(t), '★ 사번이 글자에 끼었다: ' + t);
 });
 
-test('이름을 아직 못 찾았으면 이메일 «앞부분»이라도 보여 준다', () => {
-  /* 빈 자리가 뜨는 것보다 낫다 — 명부를 읽는 동안 잠깐이다.
-     ⚠ 2026-08-17 대표 지시로 «통째»에서 «앞부분»으로 바꿨다:
-       화면 위에서 「p001@pureun.kr」은 읽을 거리도 아니고 자리만 넓게 먹는다.
-       사번이 뒤에 붙으므로 앞부분만으로 누구인지 갈린다. */
+test('이름을 아직 못 찾았으면 «비운다» — 사번도 이메일 앞부분(= 아이디)도 대신 적지 않는다', () => {
+  /* 예전에는 「p001 · P-001」처럼 이메일 앞부분과 사번을 보여 줬다. 둘 다 로그인 아이디다.
+     빈 칸이 아이디를 알려 주는 것보다 낫다 — 명부를 읽는 동안 잠깐이다. */
   const g = boot();
-  assert.strictEqual(g.PuWhoami._text({ name: '', email: 'p001@pureun.kr', sid: 'P001' }),
-    'p001 · P-001');
+  assert.strictEqual(g.PuWhoami._text({ name: '', email: 'p001@pureun.kr', sid: 'P001' }), '');
+  assert.strictEqual(g.PuWhoami._text({ email: 'p001@pureun.kr', sid: 'P001', role: 'admin' }), '',
+    '직책(영문 권한명)만 덩그러니 뜨면 누구인지 모른다');
 });
 
 test('로그아웃하면 아무것도 안 적는다', () => {
@@ -90,11 +91,15 @@ test('로그아웃하면 아무것도 안 적는다', () => {
   assert.strictEqual(g.PuWhoami._text(null), '');
 });
 
-test('자리를 정해 주면 그 자리에 그린다', () => {
+test('자리를 정해 주면 그 자리에 그린다 — 이름만, 사번 없이', () => {
   const g = boot({ hasSlot: true });
   g.PuWhoami.mount('#topuser');
   g.PuWhoami._resolve({ email: 'p001@pureun.kr' });
-  assert.ok(/P-001/.test(g._el.innerHTML), '자리에 안 그렸다: ' + g._el.innerHTML);
+  /* 이름을 아직 모르는 순간 — 아무것도 안 그린다(아이디를 대신 적지 않는다) */
+  assert.ok(!/p001|P-?001/i.test(g._el.innerHTML), '★ 이름도 모르는데 아이디가 그려졌다: ' + g._el.innerHTML);
+  g.PuWhoami._set({ sid: 'P001', email: 'p001@pureun.kr', name: '권형하', title: '대표노무사', role: 'admin' });
+  assert.ok(/권형하/.test(g._el.innerHTML), '자리에 안 그렸다: ' + g._el.innerHTML);
+  assert.ok(!/p001|P-?001/i.test(g._el.innerHTML), '★ 자리에 사번·아이디가 그려졌다: ' + g._el.innerHTML);
 });
 
 test('「우리가 그린다」고 하면 표를 «정말» 안 띄운다', () => {
@@ -192,13 +197,13 @@ test('★ 사번은 모양이 달라도 같은 사람으로 본다', () => {
   assert.strictEqual(W._pick(dir, 'P002'), null);
 });
 
-test('이름을 못 찾아도 이메일 통째로는 안 보여 준다', () => {
-  /* 「p001@pureun.kr」은 읽을 거리도 아니고 자리만 넓게 먹는다.
-     사번이 뒤에 붙으므로 앞부분만으로 충분하다. */
+test('이름을 못 찾으면 이메일도 사번도 안 보여 준다 (이메일·사번 = 로그인 아이디)', () => {
+  /* 예전: 이메일 통째로는 안 보이고 「p001 · P-001」처럼 «앞부분 + 사번» 을 보였다.
+     2026-10-25 대표 결정으로 둘 다 걷었다 — 어떤 모양으로도 아이디가 글자에 끼면 안 된다. */
   const g = boot();
   const t = g.PuWhoami._text({ sid: 'P001', email: 'p001@pureun.kr', name: '', title: '' });
-  assert.ok(t.indexOf('@') < 0, '★ 이메일 통째로 보이면 안 됩니다: ' + t);
-  assert.match(t, /P-001/);
+  assert.ok(t.indexOf('@') < 0, '★ 이메일이 보이면 안 됩니다: ' + t);
+  assert.ok(!/p001|P-?001/i.test(t), '★ 사번·아이디가 보이면 안 됩니다: ' + t);
 });
 
 test('이력관리는 머리줄 «안»에 그린다 — 떠 있는 딱지가 안내글을 덮었다', () => {

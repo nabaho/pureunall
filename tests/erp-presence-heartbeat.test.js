@@ -83,7 +83,7 @@ test('★ 이름이 뒤늦게 잡히면 통째로 다시 쓴다 — 자가복구
   });
   sandbox._writePresence(true);
   assert.equal(calls.set.length, 1);
-  assert.equal(calls.set[0].name, 'P-001', '이름이 없으면 사번으로 적힌다');
+  assert.equal(calls.set[0].name, '', '이름을 모르면 빈 글자 — 사번을 이름으로 적지 않는다(2026-10-25)');
 
   nm = '권형하';                          // 명부가 도착했다
   sandbox._writePresence();              // 다음 심장박동

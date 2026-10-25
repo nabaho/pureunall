@@ -164,7 +164,11 @@
         var k = r.at + '|' + (r.kind || '') + '|' + names.join('/');
         if (seen[k]) return;
         seen[k] = 1;
-        out.push({ at: +r.at, kind: String(r.kind || '그 밖'), names: names, who: String(r.who || ''), by: String(r.by || '').split('@')[0] });
+        /* 보낸 이 — 이름(byName)만. r.by 는 로그인 이메일이라 «@ 앞»(p001)도 화면에 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+           이름을 안 적어 둔 옛 기록은 빈 칸 — 이메일 앞부분으로 대신하지 않는다. */
+        var byName = String(r.byName || '').trim();
+        if (byName.indexOf('@') >= 0) byName = '';
+        out.push({ at: +r.at, kind: String(r.kind || '그 밖'), names: names, who: String(r.who || ''), by: byName });
       });
     });
     return out.sort(function (a, b) { return b.at - a.at; }).slice(0, 50);
