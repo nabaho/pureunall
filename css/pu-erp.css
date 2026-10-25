@@ -1548,6 +1548,10 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
 
   /* ㉠ 표 — 들어가면 줄인다(fit) */
   body[data-erp-group="fin"] main table[data-pt="fit"]{ font-size:12px; }
+  /* 칸에 글자 크기를 직접 적어 둔 표가 많다(13px) — 줄이려면 칸 쪽까지 눌러야 한다 */
+  body[data-erp-group="fin"] main table[data-pt="fit"] th, body[data-erp-group="fin"] main table[data-pt="fit"] td{ font-size:12px !important; }
+  body[data-erp-group="fin"] main table[data-pt="fit2"] th, body[data-erp-group="fin"] main table[data-pt="fit2"] td,
+  body[data-erp-group="fin"] main table[data-pt="fit3"] th, body[data-erp-group="fin"] main table[data-pt="fit3"] td{ font-size:11.5px !important; }
   body[data-erp-group="fin"] main table[data-pt="fit"] th,
   body[data-erp-group="fin"] main table[data-pt="fit"] td{ padding:5px 4px !important; }
   body[data-erp-group="fin"] main table[data-pt="fit"] .pt-no{ padding-left:2px !important; padding-right:2px !important; }
@@ -1556,9 +1560,15 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   body[data-erp-group="fin"] main table[data-pt="fit2"] th,
   body[data-erp-group="fin"] main table[data-pt="fit2"] td{ padding:5px 3px !important; }
   body[data-erp-group="fin"] main table[data-pt="fit2"] .pt-idx{ display:none; }
+  body[data-erp-group="fin"] main table[data-pt="fit3"]{ font-size:11.5px; }
+  body[data-erp-group="fin"] main table[data-pt="fit3"] th,
+  body[data-erp-group="fin"] main table[data-pt="fit3"] td{ padding:5px 3px !important; }
+  body[data-erp-group="fin"] main table[data-pt="fit3"] .pt-idx,
+  body[data-erp-group="fin"] main table[data-pt="fit3"] .pt-lo{ display:none; }
   /* 머리글은 접는다(「매출/지출 건수」 한 칸이 90px 를 먹었다) · 숫자는 안 접는다 */
   body[data-erp-group="fin"] main table[data-pt="fit"] th,
-  body[data-erp-group="fin"] main table[data-pt="fit2"] th{ white-space:normal !important; word-break:keep-all; line-height:1.25; }
+  body[data-erp-group="fin"] main table[data-pt="fit2"] th,
+  body[data-erp-group="fin"] main table[data-pt="fit3"] th{ white-space:normal !important; word-break:keep-all; line-height:1.25; }
   /* 달 열이 열두 개인 «표(월별 입금 대조 등)» — 칸마다 눌러 쓰는 표라 카드로 접지 않는다.
      옆으로 밀되 이름 칸(.pt-key)을 왼쪽에 붙박이로 둬서 어느 줄인지 늘 보이게 한다. */
   body[data-erp-group="fin"] main table[data-pt="matrix"]{ font-size:12px; }
@@ -1584,6 +1594,8 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
     content:attr(data-l); display:block; font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:1px; }
   body[data-erp-group="fin"] main table[data-pt="card"] td[data-l=""]::before,
   body[data-erp-group="fin"] main table[data-pt="card"] td:not([data-l])::before{ display:none; }
+  body[data-erp-group="fin"] main table[data-pt="card"][data-pts="3"] tbody tr{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px 10px; }
+  body[data-erp-group="fin"] main table[data-pt="card"][data-pts="3"] td.pt-no{ grid-column:auto; font-size:12px; align-self:end; }
   body[data-erp-group="fin"] main table[data-pt="card"] td.pt-w,
   body[data-erp-group="fin"] main table[data-pt="card"] td.pt-no{ grid-column:1 / -1; }
   body[data-erp-group="fin"] main table[data-pt="card"] td.pt-no{ font-size:11px; color:#94a3b8; }
@@ -1607,13 +1619,14 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .fe-row > .fe-btn:last-child{ grid-column:3; justify-self:end; }
   .fe-name > span{ white-space:normal; }
 
-  /* 월말 마감 — 단계 한 칸 = 번호·이름 / 상태·누가언제 / 보기·마감(같은 폭) */
+  /* 월말 마감 — 단계 한 칸 = 번호·이름·상태 / 누가언제 / 보기·마감(같은 폭). 설명(sub)은 접는다 — 이름이 말해 준다 */
   .mc-hint{ flex:1 1 100%; margin-left:0 !important; white-space:normal !important; }
-  .mc-row{ display:grid !important; grid-template-columns:24px minmax(0,1fr) minmax(0,1fr); gap:4px 8px !important; align-items:start !important; }
+  .mc-row{ display:grid !important; grid-template-columns:24px minmax(0,1fr) minmax(0,1fr); gap:3px 8px !important; align-items:center !important; }
   .mc-row > .mc-no{ grid-column:1; grid-row:1; }
-  .mc-row > .mc-name{ grid-column:2 / 4; grid-row:1; min-width:0 !important; }
-  .mc-row > .mc-stat{ grid-column:2; grid-row:2; justify-self:start; font-size:13px !important; }
-  .mc-row > .mc-info{ grid-column:3; grid-row:2; min-width:0 !important; text-align:right !important; }
+  .mc-row > .mc-name{ grid-column:2; grid-row:1; min-width:0 !important; }
+  .mc-row > .mc-name > span:nth-child(2){ display:none !important; }
+  .mc-row > .mc-stat{ grid-column:3; grid-row:1; justify-self:end; text-align:right; font-size:13px !important; }
+  .mc-row > .mc-info{ grid-column:2 / -1; grid-row:2; min-width:0 !important; text-align:left !important; }
   .mc-row > .mc-info:empty{ display:none; }
   .mc-row > .mc-view{ grid-column:2; grid-row:3; }
   .mc-row > .mc-lock{ grid-column:3; grid-row:3; width:auto !important; }
@@ -1627,4 +1640,51 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .fx-tools > input{ grid-column:1 / -1; min-height:38px; }
   /* 접어 둔 요약 한 줄 — 잘리지 않고 두 줄까지 접는다(눌러 펼치는 것은 그대로) */
   body[data-erp-group="fin"] .mkpi-sum{ white-space:normal !important; line-height:1.45; text-overflow:clip !important; }
+
+  /* ── 위쪽 «요약 칸» 줄이기 (대표 2026-10-25 「KPI 나 상단 셀이 너무 불필요하게 크고 길게 내려와서 데이터 확인이 어렵다」) ──
+     글자를 키워 쓰는 폰(1.4배)에서 요약·도구가 화면 절반을 먹어 «데이터»가 맨 아래로 밀렸다.
+     ★ 틀고정 덩어리(position:sticky · z-index:5)는 PC 에서 머리를 붙이려던 것이다. 폰에서는 그 덩어리가 곧 화면의 절반이라
+       위로 올릴 때 같이 붙어 데이터를 가린다 → 폰에서는 붙박이를 풀고 같이 올라가게 한다.
+     ★ 숫자는 하나도 안 없앤다 — 줄 수만 줄인다. */
+  body[data-erp-group="fin"] main [style*="position: sticky"][style*="z-index: 5"]{ position:static !important; }
+
+  /* 자동 처리 띠 — 한 줄씩 늘어놓던 것을 이어 붙이고 보조 설명은 작게 */
+  .fa-band{ gap:2px 10px !important; padding:6px 10px !important; font-size:13px; line-height:1.4; }
+  .fa-band .fa-sub{ font-size:12px; }
+  .fa-band .fa-sw{ margin-left:0 !important; flex:1 1 100%; font-size:12.5px; }
+
+  /* 미수금 — 여섯 칸 카드를 «두 줄짜리 작은 칸» 셋씩 두 줄로 */
+  .rv-csv{ margin-bottom:4px !important; }
+  .rv-csv button{ min-height:32px; padding:3px 10px !important; }
+  .rv-kpi{ grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:5px !important; margin-bottom:8px !important; }
+  .rv-card{ display:grid !important; grid-template-columns:auto minmax(0,1fr); column-gap:6px; align-items:baseline; padding:5px 8px !important; }
+  .rv-card > div{ margin:0 !important; font-size:12px !important; line-height:1.35; min-width:0; }
+  .rv-card > div:nth-child(3):last-child{ grid-column:1 / -1; }
+  .rv-card > div:nth-child(2):not(:last-child){ text-align:right; opacity:.85; }
+  .rv-card > div:nth-child(4){ text-align:right; }
+
+  /* 손익계산서 — 연도 이동 + CSV 한 줄 / 숫자 칸 셋을 같은 폭으로 한 줄 / 탭 한 줄 */
+  .pl-csv{ order:1; margin-left:auto; }
+  .pl-gap{ display:none; }
+  .pl-kpi{ order:2; flex:1 1 30% !important; min-width:0; white-space:normal !important; text-align:center; border-radius:10px !important; padding:3px 4px !important; line-height:1.3; }
+  .pl-kl, .pl-kv{ display:block; font-size:12px; }
+  .pl-kv{ font-size:12.5px; font-weight:800; }
+  .pl-tabs{ order:3; flex:1 1 100% !important; }
+  .pl-tabs > button{ flex:1 1 0; padding:4px 2px !important; font-size:12.5px !important; }
+
+  /* 세금계산서 — 안내 글(세 줄)은 접고, 단추·검색·기간 토글을 줄 폭 맞춰 */
+  .iv-hint{ display:none; }
+  .iv-tool{ gap:6px !important; margin-bottom:8px !important; }
+  .iv-tool > *:nth-child(-n+2){ flex:1 1 40%; min-width:0; }
+  .iv-tool .iv-q{ flex:1 1 100%; width:100% !important; box-sizing:border-box; min-height:38px; }
+  .iv-tool .iv-mode{ flex:1 1 100%; display:flex !important; }
+  .iv-tool .iv-mode > button{ flex:1 1 0; padding:6px 2px !important; }
+
+  /* 입금관리(미입금 대기) — 안내 띠의 설명 글은 접고 칩은 한 치수 작게, 검색 줄은 칸을 나눠 쓴다 */
+  .ip-band .ip-intro{ display:none; }
+  .ip-band button, .ip-band > span{ font-size:12px !important; padding:2px 7px !important; }
+  .ip-filter{ flex-wrap:wrap !important; }
+  .ip-filter > input[type="text"]{ flex:1 1 100%; width:100% !important; box-sizing:border-box; }
+  .ip-filter > input[type="number"]{ flex:1 1 30%; width:auto !important; min-width:0; box-sizing:border-box; }
+  .ip-filter > input[type="date"]{ flex:1 1 38%; min-width:0; box-sizing:border-box; }
 }

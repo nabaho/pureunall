@@ -17,6 +17,7 @@
   window.__puFinPhone = { scans:0 };
   var MQ = window.matchMedia ? window.matchMedia('(max-width:640px)') : null;
   var timer = 0;
+  var LOW = /건수|비중|시각화|마진율|비고/;      // fit3 에서 접는 «덜 중요한» 열 이름
 
   function active(){
     return !!(MQ && MQ.matches && document.body && document.body.getAttribute('data-erp-group') === 'fin');
@@ -45,7 +46,7 @@
   function mark(table, labels){
     var rows = [];
     for(var b = 0; b < table.tBodies.length; b++) for(var r = 0; r < table.tBodies[b].rows.length; r++) rows.push(table.tBodies[b].rows[r]);
-    var real = 0;
+    var real = 0, anyWide = false;
     rows.forEach(function(tr){
       var cells = tr.cells;
       if(cells.length === 1 && (cells[0].colSpan || 1) > 1) return;      // 「없습니다」 한 줄
@@ -57,11 +58,15 @@
         var txt = (td.textContent || '').trim();
         var wide = txt.length > 12 || td.querySelector('input,select,textarea,button');
         td.classList.toggle('pt-w', !!wide);
+        if(wide) anyWide = true;
         td.classList.toggle('pt-no', (lab === '#' || lab === '번호' || lab === '') && /^\d{1,4}$/.test(txt));
-        td.classList.toggle('pt-idx', lab === '#' || lab === '번호');      // fit2 에서 접는 «번호» 칸
+        td.classList.toggle('pt-lo', LOW.test(lab));
+        td.classList.toggle('pt-idx', (lab === '#' || lab === '번호') && (td.colSpan || 1) === 1);      // fit2 에서 접는 «번호» 칸
         col += td.colSpan || 1;
       }
     });
+    /* 긴 칸이 하나도 없는 «숫자 표»는 카드를 세 칸씩 늘어놓는다 — 두 칸씩이면 한 줄이 너무 길어 «한눈에 비교»가 안 된다 */
+    table.setAttribute('data-pts', anyWide ? '2' : '3');
     return real;
   }
   function overflows(table){
@@ -75,7 +80,7 @@
     if(!labels) return;
     var n = mark(table, labels);
     Array.prototype.forEach.call(table.tHead.querySelectorAll('th'), function(th){
-      var t = clean(th.textContent); th.classList.toggle('pt-idx', t === '#' || t === '번호');
+      var t = clean(th.textContent); th.classList.toggle('pt-idx', t === '#' || t === '번호'); th.classList.toggle('pt-lo', LOW.test(t));
     });
     var sig = n + '|' + labels.join('|') + '|' + (table.parentElement ? table.parentElement.clientWidth : 0);
     if(table.__ptSig === sig) return;
@@ -102,6 +107,11 @@
     if(!table.querySelector('input[type=checkbox]')){
       table.setAttribute('data-pt', 'fit2');
       if(!overflows(table)) return;
+      /* ③ 덜 중요한 열(건수·비중·시각화·마진율·비고)까지 접어 본다 — 숫자 표를 카드로 늘이면 «한눈에 비교»가 사라진다 */
+      if(table.querySelector('.pt-lo')){
+        table.setAttribute('data-pt', 'fit3');
+        if(!overflows(table)) return;
+      }
     }
     table.setAttribute('data-pt', 'card');
   }
@@ -124,4 +134,10 @@
   }
   if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
   window.__puFinPhone.scan = scan;
+  /* 글자 크기·창 폭을 밖에서 바꾼 뒤(점검 도구의 «글자 크게» 흉내 등) 모든 표를 처음부터 다시 잰다 */
+  window.__puFinPhone.rescan = function(){
+    var t = document.querySelectorAll('main table');
+    for(var i = 0; i < t.length; i++) t[i].__ptSig = null;
+    scan();
+  };
 })();

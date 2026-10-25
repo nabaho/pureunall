@@ -118,7 +118,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-form-fill.js?v=2"></script>
 <script src="js/pu-form-auto.js?v=1"></script>
-<script src="js/pu-fin-phone.js?v=1"></script>
+<script src="js/pu-fin-phone.js?v=2"></script>
 <!-- Firebase SDK: 실시간 동기화 + 11명 동시 접속 -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
@@ -176,7 +176,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=32">
+<link rel="stylesheet" href="css/pu-erp.css?v=33">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -58237,13 +58237,13 @@ function IncomePendingTab(props){
        전에는 안내 띠와 고르개 줄이 따로 두 줄을 차지해, 목록이 그만큼 아래로 밀렸다.
        안내 두 문장은 한 문장으로 줄이고 나머지는 옆으로 붙인다.
        좁은 화면에서는 가로로 밀어 볼 수 있게 둔다 — 줄을 접으면 다시 두 줄이 된다. */
-    h('div', { style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'6px',
+    h('div', { className:'ip-band', style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'6px',
         padding:'4px 8px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'7px',
         overflowX:'auto',flexWrap:'nowrap',WebkitOverflowScrolling:'touch'} },
-      h('span', { title:'착수금·성공보수 미입금 목록 — 확정하면 성과급이 자동으로 나뉩니다',
+      h('span', { className:'ip-intro', title:'착수금·성공보수 미입금 목록 — 확정하면 성과급이 자동으로 나뉩니다',
         style:{fontWeight:700,color:'#991b1b',fontSize:'12.5px',whiteSpace:'nowrap',flexShrink:0} },
         '⏳ 입금 도착 → [입금확정] → 성과 자동 분배'),
-      h('span', { style:{width:'1px',alignSelf:'stretch',background:'#fecaca',flexShrink:0} }),
+      h('span', { className:'ip-intro', style:{width:'1px',alignSelf:'stretch',background:'#fecaca',flexShrink:0} }),
       h('button', { onClick:function(){setSrcFilter('all');},
         style:{padding:'2px 7px',border:'1px solid '+(srcFilter==='all'?'#1e40af':'#e2e8f0'),background:srcFilter==='all'?'#1e40af':'#fff',color:srcFilter==='all'?'#fff':'#475569',borderRadius:'6px',cursor:'pointer',fontSize:'13.5px',fontWeight:srcFilter==='all'?700:500,whiteSpace:'nowrap',flexShrink:0} },
         '전체 (' + pending.length + ')'),
@@ -58291,7 +58291,7 @@ function IncomePendingTab(props){
     ),
 
     // 검색·금액·날짜 필터
-    h('div', { style:{display:'flex',gap:'4px',marginBottom:'5px',flexWrap:'nowrap',overflowX:'auto',alignItems:'center',padding:'5px 6px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px'} },
+    h('div', { className:'ip-filter', style:{display:'flex',gap:'4px',marginBottom:'5px',flexWrap:'nowrap',overflowX:'auto',alignItems:'center',padding:'5px 6px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px'} },
       h('input', { type:'text', value:query, onChange:function(e){setQuery(e.target.value);},
         placeholder:'🔍 업체·번호·담당',
         style:{padding:'3px 6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12.5px',width:'110px',flexShrink:0} }),
@@ -64448,19 +64448,19 @@ function FinanceInvoice(){
         function quarterPrev(){ var y = parseInt(monthFilter.slice(0,4),10); var q = parseInt(monthFilter.slice(-1),10); q--; if(q<1){q=4;y--;} setMonthFilter(y+'-Q'+q); }
         function quarterNext(){ var y = parseInt(monthFilter.slice(0,4),10); var q = parseInt(monthFilter.slice(-1),10); q++; if(q>4){q=1;y++;} setMonthFilter(y+'-Q'+q); }
         var navBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'10px', cursor:'pointer', fontSize:'13px', color:'#475569' };
-        return h('div', { style:{ display:'flex', gap:'8px', marginBottom:'14px', alignItems:'center', flexWrap:'wrap' } },
+        return h('div', { className:'iv-tool', style:{ display:'flex', gap:'8px', marginBottom:'14px', alignItems:'center', flexWrap:'wrap' } },
           h('button', { onClick:addNew,
             style:{ background:'#1e40af', color:'#fff', border:'none', padding:'7px 14px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '+ 세금계산서 발행'),
           h(FileDropBtn,{label:'엑셀 일괄 업로드',icon:'📁',accept:'.xlsx,.xls',multiple:true,onFile:handleInvoiceUpload,btnStyle:{background:'#16a34a',padding:'7px 14px',borderRadius:'4px',fontSize:'12px',fontWeight:600}}),
-          h('span', { style:{ fontSize:'13px', color:'#94a3b8' } },
+          h('span', { className:'iv-hint', style:{ fontSize:'13px', color:'#94a3b8' } },
             '화면 아무 곳에나 끌어다 놓아도 됩니다',
             h('br'),
             '홈택스 파일 → 업체별 아카이브에 담깁니다 (여기엔 회색으로 함께 보입니다) · ⚠ 올린 것은 «이 컴퓨터에만» 남습니다 — 다른 PC에서는 안 보입니다'),
-          h('input', { type:'search', placeholder:'🔍 업체명·사업자번호 검색', value:query,
+          h('input', { type:'search', placeholder:'🔍 업체명·사업자번호 검색', value:query, className:'iv-q',
             onChange:function(e){ setQuery(e.target.value); },
             style:{ width:'220px', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } }),
           // 모드 토글
-          h('div', { style:{display:'inline-flex', gap:'4px', background:'#f8fafc', padding:'3px', borderRadius:'7px'} },
+          h('div', { className:'iv-mode', style:{display:'inline-flex', gap:'4px', background:'#f8fafc', padding:'3px', borderRadius:'7px'} },
             modeBtn('month',   '📅 월별'),
             modeBtn('quarter', '📊 분기별'),
             modeBtn('year',    '🗓️ 연도별'),
@@ -69082,18 +69082,18 @@ function FinancePnL(){
       h('div',{style:{fontWeight:700,fontSize:'13px',minWidth:'44px',textAlign:'center',flexShrink:0}},selYear+'년'),
       h('button',{onClick:yearNext,style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569',flexShrink:0}},'▶'),
       // KPI — 세 칸 그리드였던 것을 알약으로
-      h('span',{style:{padding:'3px 9px',borderRadius:'99px',background:'#eff6ff',color:'#1e40af',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}},
-        '💵 매출 '+totalRev.toLocaleString()+' · '+totalIncomeCnt+'건'),
-      h('span',{style:{padding:'3px 9px',borderRadius:'99px',background:'#fef2f2',color:'#991b1b',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}},
-        '💸 지출 '+totalExp.toLocaleString()+' · '+totalExpenseCnt+'건'),
-      h('span',{style:{padding:'3px 9px',borderRadius:'99px',fontSize:'13px',fontWeight:800,whiteSpace:'nowrap',flexShrink:0,
+      h('span',{className:'pl-kpi',style:{padding:'3px 9px',borderRadius:'99px',background:'#eff6ff',color:'#1e40af',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}},
+        h('span',{className:'pl-kl'},'💵 매출 '),h('span',{className:'pl-kv'},totalRev.toLocaleString()+' · '+totalIncomeCnt+'건')),
+      h('span',{className:'pl-kpi',style:{padding:'3px 9px',borderRadius:'99px',background:'#fef2f2',color:'#991b1b',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}},
+        h('span',{className:'pl-kl'},'💸 지출 '),h('span',{className:'pl-kv'},totalExp.toLocaleString()+' · '+totalExpenseCnt+'건')),
+      h('span',{className:'pl-kpi',style:{padding:'3px 9px',borderRadius:'99px',fontSize:'13px',fontWeight:800,whiteSpace:'nowrap',flexShrink:0,
           background:totalProfit>=0?'#f0fdf4':'#fef2f2',color:totalProfit>=0?'#166534':'#991b1b'}},
-        '📈 순이익 '+totalProfit.toLocaleString()+(totalRev>0?' ('+Math.round(totalProfit/totalRev*100)+'%)':'')),
-      h('span',{style:{flex:1,minWidth:'4px'}}),
-      h('button',{onClick:downloadCSV,
+        h('span',{className:'pl-kl'},'📈 순이익 '),h('span',{className:'pl-kv'},totalProfit.toLocaleString()+(totalRev>0?' ('+Math.round(totalProfit/totalRev*100)+'%)':''))),
+      h('span',{className:'pl-gap',style:{flex:1,minWidth:'4px'}}),
+      h('button',{className:'pl-csv',onClick:downloadCSV,
         style:{padding:'3px 8px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'10px',cursor:'pointer',fontSize:'12px',fontWeight:600,color:'#475569',flexShrink:0}},'⬇ CSV'),
       // 탭
-      h('div',{style:{display:'flex',gap:'4px',background:'#f8fafc',borderRadius:'8px',padding:'3px',flexShrink:0}},
+      h('div',{className:'pl-tabs',style:{display:'flex',gap:'4px',background:'#f8fafc',borderRadius:'8px',padding:'3px',flexShrink:0}},
         h('button',{onClick:function(){setViewMode('month');},
           style:{padding:'3px 10px',border:'none',borderRadius:'5px',cursor:'pointer',fontWeight:viewMode==='month'?700:500,fontSize:'13.5px',whiteSpace:'nowrap',
             background:viewMode==='month'?'#1e40af':'transparent',color:viewMode==='month'?'#fff':'#64748b'}},'월별 손익'),
@@ -69473,15 +69473,15 @@ function FinanceReceivable(props){
   }
 
   return h('div', { className:'page' },
-    h('div', { style:{ display:'flex', justifyContent:'flex-end', marginBottom:'8px' } },
+    h('div', { className:'rv-csv', style:{ display:'flex', justifyContent:'flex-end', marginBottom:'8px' } },
       h('button', { onClick:downloadCSV,
         style:{ padding:'7px 14px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'13.5px', fontWeight:600, color:'#475569' } }, '⬇ CSV')
     ),
 
     // 등급별 KPI 카드 (5개 + 전체)
-    h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'8px', marginBottom:'14px' } },
+    h('div', { className:'rv-kpi', style:{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:'8px', marginBottom:'14px' } },
       // 전체
-      h('div', { onClick:function(){setSelGrade(-1);},
+      h('div', { className:'rv-card', onClick:function(){setSelGrade(-1);},
         style:{ background:selGrade===-1?'#1e293b':'#fff', color:selGrade===-1?'#fff':'#1e293b',
           border:'1px solid '+(selGrade===-1?'#1e293b':'#e2e8f0'), borderRadius:'8px', padding:'10px 12px', cursor:'pointer' } },
         h('div',{style:{fontSize:'12.5px',fontWeight:600,opacity:0.85}},'⏳ 전체'),
@@ -69494,7 +69494,7 @@ function FinanceReceivable(props){
         /* ⚠ 「장기」는 바탕이 짙은 빨강(#991b1b)이라 글자도 같은 빨강이면 «빈 빨간 칸»으로 보였다(폰화면관리 2026-10-18 발견,
            넓은 화면도 같았다). invertText 표시는 적혀만 있고 쓰이지 않았다 — 이제 흰 글자로 읽힌다. */
         var fg = (sel || g.invertText) ? '#fff' : g.color;
-        return h('div',{key:g.idx,onClick:function(){setSelGrade(sel?-1:g.idx);},
+        return h('div',{key:g.idx,className:'rv-card',onClick:function(){setSelGrade(sel?-1:g.idx);},
           style:{background:bg,color:fg,border:'1px solid '+(sel?g.color:g.border),borderRadius:'8px',padding:'10px 12px',cursor:'pointer'}},
           h('div',{style:{fontSize:'12.5px',fontWeight:600}},g.label),
           h('div',{style:{fontSize:'12.5px',opacity:0.8}},g.range),
@@ -69846,17 +69846,17 @@ function FinanceAuto(props){
   var head = h('tr', null, ['☐', '번호', '무엇', '출금일', '더빌 회원명', '금액', '이알피에서 본 것', '할 일'].map(function(t){ return h('th', { key:t, style:th }, t); }));
   var list = faTab === 'fail' ? fails : (faTab === 'auto' ? autos : check);
   return h('div', { style:{ padding: window.innerWidth <= 768 ? '6px' : '14px' } },   // 폰 6px — .page 밖 화면이라 제 여백이 곧 화면 끝 여백(폰화면관리 2026-10-18)
-    h('div', { style:{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap', padding:'9px 12px', borderRadius:'8px',
+    h('div', { className:'fa-band', style:{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap', padding:'9px 12px', borderRadius:'8px',
       background: st.needLogin ? '#fef2f2' : '#eff6ff', border:'1px solid ' + (st.needLogin ? '#fecaca' : '#bfdbfe'), fontWeight:700 } },
       st.needLogin ? h('span', { style:{ color:'#dc2626' } }, noTab ? 'Aside 를 켜고 더빌에 로그인해 주세요 (더빌 탭이 없음)' : '더빌 로그인이 풀렸습니다 — Aside 에서 로그인해 주세요') : null,
       h('span', null, '더빌 명세 ' + items.length + '건'),
       h('span', { style:{ color:'#16a34a' } }, '✓ 자동 확정 ' + autos.length),
       h('span', { style:{ color:'#d97706' } }, '● 확인할 것 ' + check.length),
       h('span', { style:{ color:'#dc2626' } }, '✕ 출금 실패 ' + fails.length),
-      recs ? h('span', { style:{ fontWeight:400, color:'#64748b' } }, '이미 들어간 줄 ' + recs) : null,
-      olds ? h('span', { style:{ fontWeight:400, color:'#64748b' } }, '시작일 이전 ' + olds + '줄' + (last && last.since ? ' (' + last.since + ' 부터 자동)' : '')) : null,
-      h('span', { style:{ fontWeight:400, color:'#64748b' } }, '마지막으로 읽은 때 ' + (st.lastOkAt ? new Date(st.lastOkAt).toLocaleString('ko-KR') : '없음')),
-      h('label', { style:{ marginLeft:'auto', fontWeight:700, color: onS[0] ? '#16a34a' : '#64748b' } },
+      recs ? h('span', { className:'fa-sub', style:{ fontWeight:400, color:'#64748b' } }, '이미 들어간 줄 ' + recs) : null,
+      olds ? h('span', { className:'fa-sub', style:{ fontWeight:400, color:'#64748b' } }, '시작일 이전 ' + olds + '줄' + (last && last.since ? ' (' + last.since + ' 부터 자동)' : '')) : null,
+      h('span', { className:'fa-sub', style:{ fontWeight:400, color:'#64748b' } }, '마지막으로 읽은 때 ' + (st.lastOkAt ? new Date(st.lastOkAt).toLocaleString('ko-KR') : '없음')),
+      h('label', { className:'fa-sw', style:{ marginLeft:'auto', fontWeight:700, color: onS[0] ? '#16a34a' : '#64748b' } },
         h('input', { type:'checkbox', checked:onS[0], onChange:function(e){ setOn(e.target.checked); } }),
         onS[0] ? ' 자동 확정 켜짐' : ' 자동 확정 꺼짐 (미리보기)')),
     /* R14 — 수수료는 출금 쪽 일이다 */

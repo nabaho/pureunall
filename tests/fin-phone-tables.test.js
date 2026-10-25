@@ -30,7 +30,7 @@ test('② ★★ 표를 «지우거나 고치지 않는다» — 속성·클래�
 });
 
 test('③ ★ 순서는 fit → fit2 → card — 체크칸이 있는 «고르는 표»는 번호를 접지 않는다', () => {
-  assert.match(JS, /'fit'[\s\S]{0,200}overflows\(table\)[\s\S]{0,300}input\[type=checkbox\][\s\S]{0,200}'fit2'[\s\S]{0,200}'card'/);
+  assert.match(JS, /'fit'[\s\S]{0,200}overflows\(table\)[\s\S]{0,300}input\[type=checkbox\][\s\S]{0,200}'fit2'[\s\S]{0,600}'card'/);
 });
 
 test('④ ★★ 달 열이 여섯 개 이상인 «눌러 쓰는 달력표»는 카드로 접지 않는다 — 접으면 칸이 흩어진다', () => {
@@ -86,4 +86,30 @@ test('⑩ 폰 점검 도구가 재무 화면·탭 스무 개를 그린다 — �
   ['fin/ledger', 'ledger-exp', 'fin/income', 'income-list', 'income-case', 'income-co', 'expense-list', 'expense-add',
     'fin/pnl', 'pnl-cat', 'pnl-chart', 'fin/invoice', 'invoice-match', 'invoice-arc', 'fin/recv', 'fin/vat', 'fin/auto', 'auto-fail', 'auto-done', 'fin/close']
     .forEach((v) => assert.ok(seed.includes(v), '점검 도구에 ' + v + ' 화면이 없습니다'));
+});
+
+test('⑪ ★★ 위쪽 요약·도구가 화면을 먹지 않는다 — 틀고정 덩어리는 폰에서 풀고, 요약 칸은 줄 수를 줄인다(숫자는 안 없앤다)', () => {
+  assert.match(BLOCK, /body\[data-erp-group="fin"\] main \[style\*="position: sticky"\]\[style\*="z-index: 5"\]\{ position:static !important; \}/,
+    '★★ 폰에서 틀고정 덩어리가 그대로면 요약 칸이 곧 화면 절반이라 데이터가 가려진다');
+  // 줄이는 칸마다 마크업 손잡이가 있다
+  ['fa-band', 'fa-sub', 'fa-sw', 'rv-kpi', 'rv-card', 'rv-csv', 'pl-kpi', 'pl-kl', 'pl-kv', 'pl-csv', 'pl-tabs', 'pl-gap',
+    'iv-tool', 'iv-hint', 'iv-q', 'iv-mode', 'ip-band', 'ip-intro', 'ip-filter'].forEach((c) =>
+    assert.ok(HTML.includes("'" + c + "'"), '★ 마크업에 ' + c + ' 손잡이가 없습니다'));
+  assert.match(BLOCK, /\.rv-kpi\{[^}]*repeat\(3,minmax\(0,1fr\)\)/, '★ 미수금 여섯 칸이 셋씩 두 줄이 아닙니다');
+  assert.match(BLOCK, /\.pl-kpi\{[^}]*flex:1 1 30%/, '★ 손익 숫자 칸 셋이 같은 폭이 아닙니다');
+  assert.match(BLOCK, /\.iv-hint\{ display:none; \}/);
+});
+
+test('⑫ ★ 숫자 표는 fit → fit2 → fit3(덜 중요한 열 접기) → 카드 — 카드로 늘이기 전에 «한눈에 비교»를 지킨다', () => {
+  assert.match(JS, /'fit2'[\s\S]{0,300}'fit3'[\s\S]{0,200}'card'/);
+  assert.match(JS, /LOW = \/건수\|비중\|시각화\|마진율\|비고\//);
+  assert.match(BLOCK, /table\[data-pt="fit3"\] \.pt-lo\{ display:none; \}/);
+  assert.match(BLOCK, /table\[data-pt="fit"\] th, body\[data-erp-group="fin"\] main table\[data-pt="fit"\] td\{ font-size:12px !important; \}/,
+    '★ 칸마다 적힌 글자 크기(13px)를 눌러야 표가 줄어든다');
+  assert.match(BLOCK, /data-pts="3"\] tbody tr\{ grid-template-columns:repeat\(3/, '★ 긴 칸 없는 숫자 카드는 세 칸씩이어야 한 줄이 짧다');
+});
+
+test('⑬ ★ 월말 마감 — 설명(sub)은 접고 단계 한 칸은 이름·상태 / 보기·마감 두 줄', () => {
+  assert.match(BLOCK, /\.mc-row > \.mc-name > span:nth-child\(2\)\{ display:none !important; \}/, '★ 인라인 display:block 을 눌러야 접힌다');
+  assert.match(BLOCK, /\.mc-row > \.mc-stat\{ grid-column:3; grid-row:1;/);
 });
