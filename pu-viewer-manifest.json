@@ -1,0 +1,73 @@
+{
+  "name": "푸른 문서뷰어",
+  "short_name": "문서뷰어",
+  "description": "한글·PDF·엑셀을 광고 없이 보기만 합니다 — 파일은 이 기기 밖으로 나가지 않습니다",
+  "id": "/pureunall/pu-viewer.html",
+  "start_url": "./pu-viewer.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "icon-viewer-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-viewer-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "_share_target_주석": "카톡·파일관리자의 「공유」 목록에 푸른 문서뷰어가 뜨게 한다. 안드로이드 전용이고 폰에 설치돼 있어야 뜬다(애플은 막아 두었다 — 아이폰은 「파일 열기」 단추로 연다). 파일은 POST 로 오므로 pu-sw.js 가 받아 IndexedDB(pu-viewer-share)에 잠깐 두고, 화면이 꺼내 «바로 지운다».",
+  "share_target": {
+    "action": "./pu-viewer.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "files": [
+        {
+          "name": "docs",
+          "accept": [
+            ".hwp",
+            ".hwpx",
+            ".pdf",
+            ".xlsx",
+            ".xls",
+            ".csv",
+            "application/pdf",
+            "application/x-hwp",
+            "application/vnd.hancom.hwp",
+            "application/haansofthwp",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "text/csv"
+          ]
+        }
+      ]
+    }
+  },
+  "_file_handlers_주석": "PC(엣지·크롬)에 앱으로 설치하면 이 파일들을 «연결 프로그램»으로 열 수 있다. 화면(pu-viewer-app.js)이 launchQueue 로 받는다.",
+  "file_handlers": [
+    {
+      "action": "./pu-viewer.html",
+      "name": "푸른 문서뷰어",
+      "accept": {
+        "application/pdf": [".pdf"],
+        "application/x-hwp": [".hwp"],
+        "application/haansofthwp": [".hwpx"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "application/vnd.ms-excel": [".xls"],
+        "text/csv": [".csv"]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}

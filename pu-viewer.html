@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e40af">
+<title>푸른 문서뷰어</title>
+<link rel="manifest" href="pu-viewer-manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📖</text></svg>">
+<!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
+<link rel="apple-touch-icon" href="icon-viewer-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="문서뷰어">
+<!-- ═══════════════════════════════════════════════════════════════════════
+     푸른 문서뷰어 — 폰·PC 에서 한글·PDF·엑셀을 «광고 없이 보기만» 한다 (대표 지시 2026-10-25, 설계 docs/폰-문서뷰어-설계.md)
+
+     ★ 파일은 이 기기 밖으로 나가지 않는다 — 이 화면은 Firebase·분석·외부 스크립트를 싣지 않고, 아래 CSP 가 «이 사이트의 정적 파일»
+       말고는 어디로도 연결을 못 하게 막는다(connect-src 'self').
+     ★ 문서를 해석하는 일은 «격리된 칸»(pu-viewer-frame.html, sandbox="allow-scripts")에서 한다. 이 화면은 바이트를 건네고 쪽 번호만 받는다.
+     ★ 파일 내용은 저장하지 않는다 — 최근 목록에는 이름·크기·형식·때만 남긴다(js/pu-viewer-recent.js).
+     ⚠ 포털 타일·공용 앱바(즐겨찾기 손잡이)는 아직 없다 — 포털에 넣으려면 온톨로지 등록부가 «저장 자리 없는 프로그램»을 받도록 규칙을 먼저 정해야 한다
+       (tests/ontology-contract.test.js 가 모든 프로그램에 primaryRoots 를 요구한다). 대표 결정 대기 — status/2026-10-25-viewer-build.md.
+     ⚠ pu-version.js 를 싣지 않는다 — 문서를 읽는 중에 «30초 손 안 대면 새로고침» 이 돌면 열어 둔 문서가 닫힌다.
+     ⚠ 서비스워커(pu-sw.js)는 «공유받기»를 위해서만 등록한다 — 아무것도 캐시하지 않는다.
+     ⚠ 이 화면에 스크립트 태그 안에 코드를 직접 쓰지 말 것 — CSP 가 막는다(tests/pu-viewer-isolation.test.js). 코드는 js/pu-viewer-app.js. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; worker-src 'self'; form-action 'none'; base-uri 'self'">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:#f8fafc;color:#1e293b;-webkit-tap-highlight-color:transparent;letter-spacing:-0.01em;
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:16px;}
+button{font-family:inherit;}
+[hidden]{display:none !important;}
+
+/* ── 첫 화면 ── */
+#home{min-height:100%;display:flex;flex-direction:column;}
+.hd{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1e40af;color:#fff;
+  padding-top:max(10px,env(safe-area-inset-top));}
+.hd h1{font-size:17px;font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hd .sub{font-size:12px;opacity:.8;font-weight:500;margin-left:8px;}
+.hd button{min-width:44px;min-height:44px;border:0;background:transparent;color:#fff;font-size:22px;border-radius:10px;}
+.wrap{width:100%;max-width:720px;margin:0 auto;padding:14px 12px 28px;}
+#info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.55;margin-bottom:12px;}
+.open-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:64px;border:0;border-radius:14px;
+  background:#1e40af;color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px -8px rgba(30,64,175,.7);}
+.open-btn:active{background:#1e3a8a;}
+.hint{margin:10px 2px 0;font-size:13px;color:#64748b;line-height:1.5;text-align:center;}
+.drop-on #dropmsg{display:block;}
+#dropmsg{display:none;margin-top:10px;padding:14px;border:2px dashed #1e40af;border-radius:12px;text-align:center;color:#1e40af;font-weight:700;}
+#err{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:14px;line-height:1.5;}
+
+/* ── 최근 연 파일 (☐ 고르기 칸 + 번호 — 정리하는 목록이라) ── */
+.rc-hd{display:flex;align-items:center;gap:8px;margin:22px 2px 8px;font-size:15px;font-weight:800;}
+.rc-hd .grow{flex:1;}
+.rc-hd .cnt{font-weight:500;color:#64748b;font-size:13px;}
+#bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin-bottom:8px;border-radius:10px;background:#1e293b;color:#fff;font-size:14px;}
+#bulk b{flex:1;}
+#bulk button{min-height:40px;padding:0 14px;border-radius:9px;border:1px solid #475569;background:#334155;color:#fff;font-size:14px;}
+.rc-list{list-style:none;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;}
+.rc-row,.rc-all{display:flex;align-items:center;gap:6px;padding:0 10px 0 4px;border-bottom:1px solid #f1f5f9;min-height:56px;}
+.rc-all{min-height:44px;background:#f8fafc;color:#64748b;font-size:13px;}
+.rc-row:last-child{border-bottom:0;}
+.ck{flex:0 0 44px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;}
+.ck input{width:22px;height:22px;accent-color:#1e40af;}
+.no{flex:0 0 36px;width:36px;text-align:right;color:#94a3b8;font-size:13px;font-variant-numeric:tabular-nums;}
+.rc-main{flex:1;min-width:0;background:transparent;border:0;text-align:left;padding:8px 6px;cursor:pointer;color:inherit;}
+.rc-name{display:block;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rc-meta{display:block;margin-top:2px;font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+.rc-empty{padding:20px 12px;text-align:center;color:#94a3b8;font-size:14px;}
+.rc-note{margin:8px 2px 0;font-size:12px;color:#94a3b8;line-height:1.5;}
+
+/* ── 보는 화면 ── */
+#viewer{position:fixed;inset:0;display:flex;flex-direction:column;background:#e8edf3;}
+.vb{display:flex;align-items:center;gap:4px;padding:4px 8px 4px 4px;background:#fff;border-bottom:1px solid #cbd5e1;
+  padding-top:max(4px,env(safe-area-inset-top));}
+.vb button{flex:0 0 44px;min-width:44px;min-height:44px;border:0;background:transparent;font-size:22px;color:#1e293b;border-radius:10px;}
+.vb .t{flex:1;min-width:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vb .pn{flex:0 0 auto;font-size:13px;color:#475569;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.vf{flex:1;min-height:0;position:relative;}
+#frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#e8edf3;}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,237,243,.92);
+  font-size:16px;color:#334155;text-align:center;padding:24px;line-height:1.6;}
+#busy.bad{color:#991b1b;}
+.pager{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 8px;background:#fff;border-top:1px solid #cbd5e1;
+  padding-bottom:max(6px,env(safe-area-inset-bottom));}
+.pager button{min-width:48px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:20px;color:#1e293b;}
+.pager input{width:64px;min-height:44px;text-align:center;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;font-variant-numeric:tabular-nums;}
+.pager .of{font-size:15px;color:#475569;font-variant-numeric:tabular-nums;}
+
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:92vw;padding:10px 16px;
+  border-radius:10px;background:#1e293b;color:#fff;font-size:14px;z-index:9;text-align:center;}
+
+/* 폰 — 글·단추는 화면 양 끝 8~14px 안에서 시작하고, 상자는 한 겹이다 */
+@media (max-width:640px){
+  .hd .sub{display:none;}
+  .wrap{padding:10px 8px 24px;}
+  .rc-list{border-radius:10px;}
+}
+/* 터치 기기에는 끌어다 놓기 안내가 필요 없다 */
+@media (hover:none){
+  #dropHint{display:none;}
+}
+</style>
+</head>
+<body>
+
+<main id="home">
+  <header class="hd">
+    <h1>푸른 문서뷰어<span class="sub">한글·PDF·엑셀 보기 전용</span></h1>
+    <button type="button" id="infoBtn" title="안내" aria-label="안내">⋯</button>
+  </header>
+  <div class="wrap">
+    <div id="info" hidden>
+      <b>이 앱은 보기만 합니다.</b> 광고도, 로그인도 없습니다.<br>
+      · 파일은 <b>이 기기 밖으로 나가지 않습니다</b> (서버에 올리지 않습니다).<br>
+      · 최근 목록에는 <b>이름·크기·열어 본 날짜만</b> 남고, 파일 내용은 남기지 않습니다.<br>
+      · 한글 글꼴이 이 기기에 없으면 한글 프로그램과 <b>모양이 조금 다를 수 있습니다</b>.<br>
+      · 워드(docx)·파워포인트(pptx)는 다음 판에서 보여 드립니다.<br>
+      · <a href="enter.html">푸른 통합시스템 열기</a>
+    </div>
+
+    <label class="open-btn" for="pick" id="openBtn" role="button" tabindex="0">📂 파일 열기</label>
+    <input type="file" id="pick" hidden
+      accept=".hwp,.hwpx,.pdf,.xlsx,.xls,.csv,.tsv,.docx,.pptx,application/pdf,application/x-hwp,application/vnd.hancom.hwp,application/haansofthwp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv">
+    <p class="hint">한글(hwp·hwpx) · PDF · 엑셀(xlsx·xls) · CSV</p>
+    <p class="hint" id="dropHint">PC 에서는 파일을 이 창에 끌어다 놓아도 됩니다.</p>
+    <div id="dropmsg">여기에 놓으면 엽니다</div>
+    <div id="err" hidden role="alert"></div>
+
+    <section id="recent" hidden>
+      <div class="rc-hd"><span>최근 연 파일</span><span class="cnt" id="rcCnt"></span><span class="grow"></span></div>
+      <div id="bulk" hidden>
+        <b id="bulkN"></b>
+        <button type="button" id="bulkDel">목록에서 빼기</button>
+        <button type="button" id="bulkClr">선택 해제</button>
+      </div>
+      <ul class="rc-list" id="rcList"></ul>
+      <p class="rc-note">파일 내용은 저장하지 않아서, 줄을 누르면 파일을 다시 고르는 창이 열립니다.</p>
+    </section>
+  </div>
+</main>
+
+<section id="viewer" hidden>
+  <div class="vb">
+    <button type="button" id="vBack" title="닫기" aria-label="닫기">←</button>
+    <span class="t" id="vTitle"></span>
+    <span class="pn" id="vPn" hidden></span>
+  </div>
+  <div class="vf">
+    <!-- 격리된 칸: sandbox 에 allow-same-origin 을 «주지 않는다». 주소(src)는 app 이 sandbox 를 건 뒤에 넣는다 -->
+    <iframe id="frame" title="문서" sandbox="allow-scripts"></iframe>
+    <div id="busy">불러오는 중…</div>
+  </div>
+  <div class="pager" id="pager" hidden>
+    <button type="button" id="pPrev" aria-label="앞 쪽">‹</button>
+    <input type="number" id="pNo" min="1" inputmode="numeric" aria-label="쪽 번호">
+    <span class="of" id="pOf"></span>
+    <button type="button" id="pNext" aria-label="다음 쪽">›</button>
+  </div>
+</section>
+
+<div id="toast" hidden></div>
+
+<script src="js/pu-viewer-kind.js?v=1"></script>
+<script src="js/pu-viewer-recent.js?v=1"></script>
+<script src="js/pu-viewer-app.js?v=1"></script>
+</body>
+</html>

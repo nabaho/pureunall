@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 푸른 문서뷰어 «격리된 칸» — pu-viewer.html 이 sandbox="allow-scripts" 로만 연다(allow-same-origin 을 주지 않는다).
+     ★ 문서를 해석하는 곳이다. 해석기에 약점이 있어 나쁜 파일이 코드를 돌려도 이 칸 밖(포털 로그인 증표·다른 앱 자료)에 손이 안 닿고,
+       아래 CSP 가 바깥으로 나가는 길을 막는다(connect-src 'self' = 이 사이트의 정적 파일만).
+     ⚠ 'unsafe-eval' 은 한글 엔진(pu-hwp-engine.js)이 Function 으로 dynamic import 를 불러서 필요하다 — 이 칸 안에서만 연다.
+     ⚠ 이 칸을 sandbox 없이 직접 열지 말 것 — tests/pu-viewer-isolation.test.js 가 지킨다. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob:; worker-src blob:; connect-src 'self' blob:; img-src blob: data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; frame-src 'none'">
+<title>문서 칸</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#e8edf3;color:#1e293b;font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;}
+#root{min-height:100vh;}
+.pages{padding:8px 0 24px;}
+.pg{margin:0 auto 10px;width:calc(100% - 16px);background:#fff;box-shadow:0 1px 6px rgba(15,23,42,.18);overflow:hidden;}
+.pg canvas{display:block;}
+.pg[data-err]{min-height:120px;}
+.pg[data-err]::after{content:"이 쪽을 그리지 못했습니다";display:block;padding:20px;font-size:13px;color:#b91c1c;}
+/* 엑셀 — 한 칸은 한 줄(넘치면 … + title 에 전문) */
+.tabs{position:sticky;top:0;z-index:2;display:flex;gap:6px;overflow-x:auto;white-space:nowrap;padding:8px;background:#f8fafc;border-bottom:1px solid #cbd5e1;-webkit-overflow-scrolling:touch;}
+.tabs button{flex:0 0 auto;min-height:36px;padding:0 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-size:14px;font-family:inherit;white-space:nowrap;}
+.tabs button.on{background:#1e40af;border-color:#1e40af;color:#fff;font-weight:700;}
+.sheet{padding:0 0 28px;overflow-x:auto;background:#fff;-webkit-overflow-scrolling:touch;}
+.sheet table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;}
+.sheet th,.sheet td{border:1px solid #e2e8f0;padding:6px 10px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;}
+.sheet thead th{background:#f1f5f9;color:#64748b;font-weight:600;text-align:center;}
+.sheet .rn{position:sticky;left:0;background:#f1f5f9;color:#64748b;text-align:right;min-width:40px;}
+.sheet thead .rn{z-index:1;}
+.sheet .note,.sheet .empty{padding:12px;font-size:13px;color:#64748b;}
+.sheet .more{display:block;margin:12px auto;min-height:44px;padding:0 20px;border:1px solid #1e40af;border-radius:10px;background:#fff;color:#1e40af;font-size:15px;font-family:inherit;}
+.sheet .more[hidden]{display:none;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="js/pu-viewer-render.js?v=1"></script>
+</body>
+</html>
