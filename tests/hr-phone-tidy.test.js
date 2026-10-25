@@ -58,3 +58,11 @@ test('인사관리 폰 — 칩·탭·단추 줄은 옆으로 밀지 않고 줄�
   const media = CSS.lastIndexOf('@media', at);
   assert.match(CSS.slice(media, at), /max-width:768px/, '폰에서만');
 });
+
+test('휴가관리 폰 — 직원 목록 상자에 높이 한도(안에서 구름)·제목줄·합계줄은 붙어 있다', () => {
+  const lv = fnSrc('LeaveManagement');
+  assert.match(lv, /overflowX:'hidden',overflowY:'auto',maxHeight:'\d+px'/, '★ 폰 목록 상자에 높이 한도가 없습니다 — 직원 22명이 화면 두 장을 차지합니다');
+  assert.match(lv, /_lvM \? \{position:'sticky',top:0,/, '제목줄이 위에 붙어야 한다');
+  assert.match(lv, /var stk = _lvM \? \{position:'sticky',bottom:0,/, '합계줄이 아래에 붙어야 한다');
+  assert.match(lv, /\(_lvM \? '아래' : '우측'\)/, '폰에서는 상세가 «아래»에 있다');
+});
