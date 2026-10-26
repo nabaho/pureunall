@@ -90,3 +90,22 @@ test('ⓒ 「기업담당자」 제목은 짓눌리지 않는다 — 단추가 �
   assert.match(seg, /flexWrap\s*:\s*'wrap'/, '줄이 안 바뀌어 제목이 짓눌립니다');
   assert.match(seg.slice(seg.lastIndexOf("h('span'")), /whiteSpace\s*:\s*'nowrap'/, '★ 제목이 한 자씩 세로로 섭니다');
 });
+
+/* ── 줄·칸 맞추기 (대표 지시 2026-10-26 「줄 셀 정렬 안 되었다 정렬해라」) ── */
+test('ⓓ★ 폰 칸 격자 — 반 칸이 기본이고, 규모·고용·산재는 한 줄에 셋', () => {
+  const at = css.search(/@media \(max-width: 640px\) \{\s*\n?\s*\/\* 두 칸 = 여섯 줄눈/);
+  assert.ok(at >= 0, '폰(≤640) 칸 격자 규칙을 못 찾았습니다');
+  const blk = css.slice(at, css.indexOf('\n}', at));
+  assert.match(blk, /\.pu-g6 > :not\(\.pu-g6-sec\) \{ grid-column: span 3; \}/, '★ .pu-n6 가 아닌 칸이 줄눈 하나씩 먹어 짓눌립니다');
+  assert.match(blk, /\.pu-n6-t3 \{ grid-column: span 2; \}/, '규모·고용·산재가 한 줄에 셋 서지 않습니다');
+  const fn = code.slice(code.indexOf("phOption('규모')"), code.indexOf("placeholder:'산재보험(명)'") + 200);
+  assert.equal((fn.match(/'pu-n6-t3'/g) || []).length, 3, '★ 규모·고용·산재 셋 모두에 줄 표시가 있어야 합니다 — 하나라도 빠지면 혼자 아랫줄로 떨어집니다');
+});
+
+test('ⓔ 대표자 명함·사업자등록증 — 폰에서 한 장씩 한 줄, 단추 넷이 한 줄', () => {
+  const at = css.indexOf('.modal[data-phone-fit] .dz1line {');
+  assert.ok(at >= 0, '★ 폰에서 명함·등록증이 반 칸씩이라 「채우기」가 혼자 아랫줄로 떨어집니다');
+  assert.match(css.slice(at, at + 80), /flex: 1 1 100%/);
+  assert.match(css, /\.modal\[data-phone-fit\] \.dz1line > div:first-child \{ flex-wrap: nowrap/, '단추가 줄을 꺾습니다');
+  assert.match(css, /\.modal\[data-phone-fit\] \.pu-g6-sec > span:first-child \{ white-space: nowrap/, '★ 「대표연락 / 처」처럼 묶음 이름이 꺾입니다');
+});

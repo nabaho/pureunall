@@ -204,8 +204,12 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .pu-n6-4, .pu-n6-6 { grid-column: span 3; }
 }
 @media (max-width: 640px) {
-  .pu-g6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pu-n6-2, .pu-n6-3, .pu-n6-4, .pu-n6-6 { grid-column: span 2; }
+  /* 두 칸 = 여섯 줄눈의 3+3 (2026-10-26 「줄 셀 정렬」) — 겉보기는 예전 두 칸 그대로이고,
+     규모·고용·산재(.pu-n6-t3)만 2+2+2 로 «한 줄에 셋» 선다. 전에는 규모·고용 다음 산재가 혼자 아랫줄 반 칸에 남았다. */
+  .pu-g6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pu-g6 > :not(.pu-g6-sec) { grid-column: span 3; }   /* .pu-n6 가 아닌 칸(담당자 칸 등)도 반 칸 — 안 주면 여섯 줄눈 하나씩 먹어 가늘게 짓눌린다 */
+  .pu-g6 > .pu-n6.pu-n6-t3 { grid-column: span 2; }
+  .pu-g6 > .pu-n6-2, .pu-g6 > .pu-n6-3, .pu-g6 > .pu-n6-4, .pu-g6 > .pu-n6-6 { grid-column: span 6; }
 }
 
 /* ── 계약금·잔금 「종류별 세부설정」 박스 — flex 줄 (대표 지시 2026-09-19
@@ -518,6 +522,18 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .modal[data-phone-fit] > .modal-b { flex: 1 1 auto; min-height: 0; max-height: none !important; }
   /* 머리줄도 얇게 (대표 지시 2026-10-23 「상단이 너무 많다」) — 제목·× 한 줄에 위아래 여백만 줄인다 */
   .modal[data-phone-fit] > .modal-h { padding: 6px 12px !important; }
+  /* 줄·칸 맞추기 (대표 지시 2026-10-26 「줄 셀 정렬 안 되었다 정렬해라」)
+     ① 대표자 명함·사업자등록증 — 반 칸씩 나란히 두면 「가져오기·보기」 다음 「채우기」가 혼자 아랫줄 오른쪽에 떨어졌다.
+        폰에서는 한 장씩 «한 줄 전체»를 쓰고, 이름·가져오기·보기·채우기를 한 줄에 둔다(채우기는 오른쪽 끝).
+     ② 묶음 머리(☎ 대표연락처 …) — 이름이 「대표연락 / 처」로 꺾이고 귀띔이 두 줄이었다. 이름은 한 줄, 귀띔은 한 줄 … */
+  .modal[data-phone-fit] div:has(> .dz1line) { flex-wrap: wrap; gap: 6px !important; }
+  .modal[data-phone-fit] .dz1line { flex: 1 1 100% !important; }
+  .modal[data-phone-fit] .dz1line > div:first-child { flex-wrap: nowrap !important; }
+  .modal[data-phone-fit] .pu-g6-sec > span:first-child { white-space: nowrap; flex: none; }
+  .modal[data-phone-fit] .pu-g6-sec .hint { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* ③ 업태·종목 위의 «안 보이는 이름표 자리» — PC 에서 고용·산재 이름표와 줄을 맞추려고 둔 것이다.
+        폰에서는 그 줄(규모·고용·산재)이 따로 서므로 업태·종목 위에 빈 띠만 남는다. 규모 위의 것은 남긴다. */
+  .modal[data-phone-fit] .pu-g6 > .pu-n6:not(.pu-n6-t3) > div > div[style*="visibility: hidden"] { display: none; }
   /* fld 영역 폭 보장
      ⚠ 체크박스·라디오는 빼야 한다 (대표 갈무리 2026-10-22) — 100% 를 먹으면 네모 하나가
        줄을 통째로 차지하고, 옆 글자(「CMS 자동이체」·「개인입금」)가 한 자씩 세로로 선다. */
