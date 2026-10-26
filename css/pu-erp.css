@@ -469,6 +469,23 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .corp-alert-zone { display: none !important; }
 }
 
+/* 사무관리기준 — 업무유형 카드 다섯 장의 폭 (2026-10-26)
+   5칸이 같은 폭이면 컨설팅 카드의 칩(수행기관·1일 단가·셈 묶음)이 잘리고, 기금 카드의 긴 이름(지역공동근로복지기금)이 …로 잘렸다.
+   · PC(1100px 이상): 업체 1 · 사건 1 · 컨설팅 2.3 · 기금 1.4 · 기타사업 1.1 — 칩이 붙는 카드와 이름이 긴 카드에 폭을 더 준다
+   · 중간(769~1099px): 한 칸 최소 210px 로 줄을 나눠(줄당 2~4장) 이름이 잘리지 않게, 컨설팅만 두 칸
+   · 폰(768px 이하): 한 칸 — 같은 글자가 다 보이고 모자라면 칩이 아래 줄로 내려간다
+   ⚠ 폰에서 span 2 가 남으면 한 칸짜리 그리드에 가로로 밀려 나가는 칸이 생기므로, span 은 중간 폭에만 건다. */
+.biz-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px; align-items: stretch; }
+@media (min-width: 769px) and (max-width: 1099px) {
+  .biz-type-card-consulting { grid-column: span 2; }
+}
+@media (min-width: 1100px) {
+  .biz-type-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2.3fr) minmax(0, 1.4fr) minmax(0, 1.1fr); }
+}
+@media (max-width: 768px) {
+  .biz-type-grid { grid-template-columns: 1fr; }
+}
+
 /* 모바일 폼 1컬럼 자동 변환 (768px 이하) */
 @media (max-width: 768px) {
   /* 모달 내 grid 2~4컬럼 → 1컬럼 */

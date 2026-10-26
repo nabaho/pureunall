@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=35">
+<link rel="stylesheet" href="css/pu-erp.css?v=36">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -38649,6 +38649,16 @@ function bizTypeRead(storageKey, seed){
   if(!Array.isArray(v)) v = Object.keys(v).map(function(k){ return v[k]; });
   return v.filter(function(x){ return x != null; }).map(function(x){ return Object.assign({}, x); });
 }
+/* 새 유형의 sortOrder — «끝 자리» 유형(「기타」= 999 처럼 900 이상) 앞에 놓는다. 기타가 늘 맨 끝에 있게.
+   예전엔 «가장 큰 번호 + 10» 이라 기타(999) 뒤(1009)에 붙었다 — 2026-10-26 「위험평가」를 넣자 기타 아래에 달렸다.
+   끝 자리 유형이 없으면 예전 그대로 맨 끝(가장 큰 번호 + 10). */
+function bizTypeNextOrder(cur){
+  var all = (cur || []).map(function(x){ return (x && x.sortOrder) || 0; });
+  var reg = all.filter(function(n){ return n < 900; });
+  var top = reg.length ? Math.max.apply(null, reg) : 0;
+  if(reg.length === all.length) return all.length === 0 ? 10 : top + 10;
+  return Math.min(top + 10, 898);
+}
 function bizTypeApply(storageKey, seed, fn){
   var cur = bizTypeRead(storageKey, seed);
   /* 컨설팅 사전은 «고치기 전» 역할(role)을 굳힌다 — 이름을 바꾸는 이 저장에서도 역할은 옛 이름으로 먼저 정해진다 */
@@ -39226,7 +39236,7 @@ function BizTypeCard(props){
     }
     var code = cat.key + '-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     persistWith(function(cur){
-      var nextOrder = cur.length === 0 ? 10 : (Math.max.apply(null, cur.map(function(x){ return x.sortOrder || 0; })) + 10);
+      var nextOrder = bizTypeNextOrder(cur);   // 「기타」(끝 자리) 앞에 놓는다
       var item = { code:code, short:sh, name:name, sortOrder:nextOrder };
       if(cat.key === 'consulting') item.agency = agencyIn.trim();
       return cur.concat([bizTypeHist(item, '추가', null, who())]);
@@ -39419,7 +39429,7 @@ function BizTypeCard(props){
   }
   function onDragEnd(){ setDragCode(null); setDragOverCode(null); }
 
-  return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', display:'flex', flexDirection:'column' } },
+  return h('div', { className:'biz-type-card biz-type-card-' + cat.key, style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', display:'flex', flexDirection:'column' } },
     h('div', { style:{ background:cat.headBg, color:cat.headFg, padding:'6px 10px', fontSize:'11.5px', fontWeight:700, display:'flex', alignItems:'center', gap:'6px', userSelect:'none' } },
       h('span', null, cat.icon),
       h('span', null, cat.title),
@@ -39452,18 +39462,21 @@ function BizTypeCard(props){
                 cursor:'grab', userSelect:'none', transition:'all 0.1s' } },
               h('span', { style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮'),
               h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short),
-              h('span', { title: [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
-                style:{ flex:1, fontSize:'11px', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 } },
-                x.name,
-                x.hidden ? h('span', { style:{ marginLeft:'6px', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } },
+              /* ⚠ 이름과 칩(수행기관·1일 단가·셈 묶음)을 «한 줄에 나란히» 두되 모자라면 줄바꿈한다 — 예전엔 한 덩어리에 말줄임(…)을 걸어
+                   좁은 PC 카드(5칸)에서는 셈 묶음 칩이 통째로 안 보였고, 폰에서는 «셈:…»·«1회 300,000원…» 으로 잘렸다.
+                   폰에는 마우스 말풍선(title)이 없어 잘린 글자를 볼 길도 없다. 두 화면이 같은 글자를 보이는 것이 규칙이다(2026-10-26). */
+              h('div', { className:'biz-type-name', title: [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
+                style:{ flex:1, minWidth:0, display:'flex', flexWrap:'wrap', alignItems:'center', gap:'2px 6px', fontSize:'11px', color:'#1e293b' } },
+                h('span', { style:{ minWidth:0, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.name),   /* 이름은 한 줄 — 칩이 모자라면 칩만 아래로 내려간다. 이름 하나가 카드보다 길 때만 …(말풍선에 전문) */
+                x.hidden ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } },
                   x.mergedInto ? '합쳐짐 → ' + ((list.find(function(y){ return y.code === x.mergedInto; }) || {}).short || '') : '숨김') : null,
-                cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
+                cat.key === 'consulting' && x.agency ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
                 /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지
                    여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
-                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
+                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
                 /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
                 cat.key === 'consulting' && consTypeRole(x) ? h('span', { title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)',
-                  style:{ marginLeft:'6px', fontSize:'10.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null
+                  style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null
               ),
               cat.key === 'consulting' && h('button', { onClick:function(e){ e.stopPropagation(); togglePersonal(x); },
                 title: x.personalDeposit
@@ -40150,7 +40163,8 @@ function BizMasters(){
             )
       ) : null
     ),
-    h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:'6px', alignItems:'stretch' } },
+    /* 카드 폭은 CSS(.biz-type-grid · css/pu-erp.css)가 정한다 — PC 는 카드마다 다르게, 폰은 한 칸 */
+    h('div', { className:'biz-type-grid' },
       BIZ_CATS.map(function(cat){
         return h(BizTypeCard, { key:cat.key + '-' + cardKey, cat:cat });   // 합친 뒤 다시 읽게 key 를 바꾼다
       })
