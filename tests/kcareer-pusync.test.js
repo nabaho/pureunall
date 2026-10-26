@@ -57,7 +57,7 @@ test('mapRecord: consultings → consult, funds → fund, other_projects → etc
     programName: '재기컨설팅', companyName: '중진공', status: '완료', managerMain: '9999'
   }, UMAP);
   assert.equal(e.store, 'etc');
-  assert.equal(e.rec.main, '9999');              // 변환표에 없으면 sid 그대로
+  assert.equal(e.rec.main, '');                  // 변환표에 없으면 «빈 글자» — 사번을 대신 적지 않는다(대표 결정 2026-10-25 「이름만」)
   assert.equal(e.rec.year, '');                  // 날짜가 아예 없으면 빈 값
 });
 

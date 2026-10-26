@@ -55,7 +55,9 @@ test('① ★★ 캘린더는 공개 명부로도 사람을 찾는다 — 재무
 test('② ★★ 캘린더 머리에 이름이 «글자로» 있다', () => {
   const S = read('pu-cal.html');
   assert.match(S, /<span id="meName"[^>]*><\/span>\s*\n\s*<button id="me"/, '★★ 동그라미 옆 이름 자리가 없습니다');
-  assert.match(bare('pu-cal.html'), /\$\('meName'\)[\s\S]{0,200}textContent = ME \? \(\(ME\.name/, '이름 자리에 이름을 안 넣습니다');
+  /* 규칙: 내 정보(ME)가 있으면 이름 칸에 글자를 넣는다 — 이름을 못 찾았을 때 이메일·사번을 대신 적지 않는다(2026-10-25) */
+  assert.match(bare('pu-cal.html'), /\$\('meName'\)[\s\S]{0,300}textContent\s*=\s*ME\s*\?/, '이름 자리에 이름을 안 넣습니다');
+  assert.doesNotMatch(bare('pu-cal.html').split("$('meName')")[1].slice(0, 400), /\.email|\.sid\b/, '이름 자리에 이메일·사번이 들어갑니다');
 });
 
 test('③ ★★ 공용 부품은 메일 없는 로그인(카카오 표)도 사번으로 찾는다', async () => {

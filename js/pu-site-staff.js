@@ -214,15 +214,22 @@
         || (!!c && (c === coreName(out.사업장) || c === coreName(stripTag(out.사업장))));
     }
     out.sid = String(co.managerMain || '');
-    out.담당 = out.sid ? (dir[out.sid] || out.sid) : '';
+    out.담당 = out.sid ? shownStaff(dir, out.sid) : '';
     out.subs = (co.managerSubs || []).map(String).filter(function (x) { return x && x !== out.sid; });
-    out.부담당 = out.subs.map(function (s) { return dir[s] || s; });
+    out.부담당 = out.subs.map(function (s) { return shownStaff(dir, s); });
     if (!out.sid && !out.subs.length && !out.경고) out.경고 = '업체관리에 주담당이 비어 있습니다';
     return out;
   }
 
   /* 사번의 꼴 — 「글자 하나 + 숫자 두세 자리」(A-001·P-002). 데이터함 SID_RE 와 같다. */
   var SID_RE = /^[A-Za-z]-?\d{2,3}$/;
+
+  /* 화면에 내는 담당자 글자 — 이름만(대표 결정 2026-10-25 「이름만 있어야한다」).
+     명부에서 이름을 못 찾았는데 값이 «사번 꼴»이면 사번을 대신 적지 않고 「이름 미확인」.
+     사번 꼴이 아닌 값(담당 칸에 사람이 적어 둔 이름·메모)은 사번이 아니므로 그대로 보인다 — 고쳐야 할 것이 묻히면 안 된다. */
+  function shownStaff(dir, sid) {
+    return dir[sid] || (/^[A-Za-z]{1,3}-?\d{1,4}$/.test(String(sid)) ? '이름 미확인' : sid);
+  }
 
   /* 사번을 줄 세우는 열쇠 — 급여데이터함(pu-paydata-store.js sidKey)과 같은 규칙.
      A-9 가 A-10 보다 앞이어야 하고, 사번이 아닌 값은 맨 뒤다. */
@@ -252,7 +259,7 @@
       });
       if (!st.업체 || !sids.length) { none.push({ site: s, staff: st }); return; }
       sids.forEach(function (sid) {
-        if (!bySid[sid]) { bySid[sid] = { sid: sid, 담당: dir[sid] || sid, rows: [] }; order.push(sid); }
+        if (!bySid[sid]) { bySid[sid] = { sid: sid, 담당: shownStaff(dir, sid), rows: [] }; order.push(sid); }
         bySid[sid].rows.push({ site: s, staff: st, 역할: sid === st.sid ? '주' : '부' });
       });
     });
@@ -324,7 +331,7 @@
       if (!sids.length) { unassigned.push(co); return; }
       sids.forEach(function (sid) {
         if (!bySid[sid]) {
-          bySid[sid] = { sid: sid, 담당: dir[sid] || sid, badSid: !SID_RE.test(sid), cos: [] };
+          bySid[sid] = { sid: sid, 담당: shownStaff(dir, sid), badSid: !SID_RE.test(sid), cos: [] };
           order.push(sid);
         }
         bySid[sid].cos.push(co);

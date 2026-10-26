@@ -55,7 +55,7 @@ function 상자(더) {
   vm.createContext(ctx);
   vm.runInContext([constLine('새거래처기준일'), constLine('로고파일한도'),
     fnSource('새거래처목록'), fnSource('새로고넣기'), fnSource('공개동의저장'), fnSource('홈페이지에없음확인'),
-    fnSource('새로올리기칸Html'), fnSource('partnerMark')].join('\n'), ctx);
+    fnSource('새로올리기칸Html'), fnSource('partnerMark'), fnSource('기록자이름')].join('\n'), ctx);
   return ctx;
 }
 const 회사 = (id, 더) => Object.assign({ id, name: '가나상사', status: 'active', monthlyAdvisoryFee: '300000',

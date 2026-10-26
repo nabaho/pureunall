@@ -7,6 +7,7 @@
 <link rel="manifest" href="pu-erp-manifest.json">
 <!-- ⚠ apple- 쪽만 두면 크롬이 켤 때마다 「deprecated」 경고를 찍는다. 둘 다 둔다(아이폰은 apple- 를 본다). -->
 <meta name="mobile-web-app-capable" content="yes">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script>
 /* 폰 「공유 → 푸른이알피」를 받는 일꾼 (대표 지시 2026-09-17).
    ⚠ 이 일꾼은 아무것도 캐시하지 않는다 — 공유 POST 말고는 손도 안 댄다(pu-erp-sw.js 머리 참고).
@@ -109,7 +110,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=66"></script>
+<script src="js/pu-contract-forms.js?v=67"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -126,8 +127,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-resilience.js?v=3"></script>
 <!-- 큰 사본(계약서 양식·급여·장부)은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
 <script src="js/pu-big-store.js?v=3"></script>
-<script src="js/pu-conflict.js?v=2"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-conflict.js?v=3"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
@@ -176,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=34">
+<link rel="stylesheet" href="css/pu-erp.css?v=35">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -184,7 +185,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
   <script>
   /* 이 앱은 제 상단바에 이미 로그인한 사람을 그린다 — 표를 두 번 띄우지 않는다 (2026-08-16) */
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
@@ -204,18 +205,18 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
-<script src="js/pu-ieum-public.js?v=1"></script>
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-ieum-public.js?v=2"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-staff-label.js?v=1"></script>
+<script src="js/pu-staff-label.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
@@ -237,7 +238,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 옵시디언 업무요약 — 떠 있는 단추를 달지 않는다: 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 덮었다(2026-09-27).
      메뉴 바닥의 한 줄(환경설정 바로 위)에서 연다. -->
 <script>window.PU_OBSIDIAN_NO_FAB = true;</script>
-<script src="js/pu-obsidian.js?v=3"></script>
+<script src="js/pu-obsidian.js?v=4"></script>
 <script>
 (function(){
 'use strict';
@@ -1727,11 +1728,24 @@ function useAutoZip(addr, zip, put){
   }, [a, empty]);
 }
 
-/* 👤 직원 이름표 — 이름만, 같은 이름 재직자가 둘 이상일 때만 사번 (대표 지시 2026-10-19, js/pu-staff-label.js 머리말).
+/* 👤 이름을 못 찾았을 때 — «사번을 대신 적지 않는다» (대표 결정 2026-10-25 「이름만 있어야한다」).
+   사번에서 로그인 아이디가 만들어지므로 화면·엑셀·알림에 사번이 새면 안 된다.
+   현재 직원 목록에 없는 사람(퇴사자)은 «전체 계정 목록»에서 이름을 찾고, 그래도 없으면 「이름 미확인」.
+   sid 가 비면 빈 글자(호출하는 쪽의 || '-' 같은 대체값이 그대로 살게). */
+function erpNoName(sid){
+  if(!sid) return '';
+  try {
+    var all = dbGet('user_accounts', USERS_SEED) || [];
+    var u = all.find(function(x){ return x && x.sid === sid && x.name; });
+    if(u) return u.name;
+  } catch(e){}
+  return '이름 미확인';
+}
+/* 👤 직원 이름표 — 이름만 (같은 이름이면 직책으로 가른다). 사번은 안 적는다 (대표 결정 2026-10-25, js/pu-staff-label.js 머리말).
    ⚠ 값(value)은 그대로 사번이다 — 보이는 글자만. list 는 «그 화면이 다루는 사람 전체»를 준다. */
 function erpStaffLabel(u, list){
   var L = (typeof window !== 'undefined' && window.PuStaffLabel) || null;
-  return L ? L.label(u, list) : String((u && (u.name || u.sid)) || '');
+  return L ? L.label(u, list) : String((u && u.name) || '이름 미확인');
 }
 
 // ============ 편의기능 패키지 v1 (CONVENIENCE PACK) ============
@@ -2007,7 +2021,7 @@ function erpStaffLabel(u, list){
           var d=new Date(u.contractEnd); if(isNaN(d)) return;
           var days=Math.ceil((d-today)/DAY);
           if(days>=0 && days<=30){
-            alerts.push({type:'empContract', color:'#2563eb', text:'직원계약만료 D-'+days+' · '+(u.name||u.sid)});
+            alerts.push({type:'empContract', color:'#2563eb', text:'직원계약만료 D-'+days+' · '+(u.name||erpNoName(u.sid))});
           }
         });
       }
@@ -2443,8 +2457,9 @@ function _presenceName(p){
   if(!nm || looksSid){
     var r = sidToName(p && p.sid);
     if(r) return r;
+    return '이름 미확인';   // ⚠ 사번(= 로그인 아이디)을 대신 적지 않는다 (대표 결정 2026-10-25)
   }
-  return nm || (p && p.sid) || '?';
+  return nm;
 }
 /* 마지막으로 «통째로» 기록한 내용. 30초마다 이것과 견줘 「달라진 게 없으면
    lastSeen 한 칸만」 쓴다(요금 조사 2026-08-16). */
@@ -2455,7 +2470,7 @@ function _writePresence(full){
   var sid = (typeof getSessionSid === 'function' ? getSessionSid() : '') || (_presencePayload && _presencePayload.sid) || '';
   var u = (sid && typeof buildCurrentUser === 'function') ? buildCurrentUser(sid) : null;
   // 사번이 이름으로 기록되지 않도록 sidToName 폴백 추가 (명부 미수신 기기 대비)
-  var name = (u && u.name) || (CURRENT_USER && CURRENT_USER.sid === sid && CURRENT_USER.name) || sidToName(sid) || (_presencePayload && _presencePayload.name) || sid || '';
+  var name = (u && u.name) || (CURRENT_USER && CURRENT_USER.sid === sid && CURRENT_USER.name) || sidToName(sid) || (_presencePayload && _presencePayload.name) || '';   // ⚠ 사번을 이름으로 저장하지 않는다(2026-10-25)
   var loginAt = (_presencePayload && _presencePayload.loginAt) || Date.now();
   /* ⚠ 예전에는 30초마다 **기록 전체**를 set() 했다. 바뀌는 것은 lastSeen 하나뿐인데,
      그 한 번이 접속 중인 **모든 기기**에게 퍼진다(presence 를 통째로 구독한다).
@@ -10682,7 +10697,7 @@ function CoMergeModal(props){
     if(!sid) return '';
     var us = dbGet('user_accounts', []) || [];
     var u = us.find(function(x){ return x && x.sid === sid; });
-    return u ? (u.name || sid) : sid;
+    return u ? (u.name || erpNoName(sid)) : erpNoName(sid);
   }
   function val(c, f){
     var v = c[f];
@@ -15434,7 +15449,7 @@ function GlobalSearch(props){
   var results = [];
   if(query.trim().length >= 1){
     var users = (typeof getActiveUsers==='function') ? getActiveUsers() : (dbGet('user_accounts',[])||[]);
-    function name(sid){ if(!sid) return ''; var u=users.find(function(u){return u.sid===sid;}); return u?u.name:sid; }
+    function name(sid){ if(!sid) return ''; var u=users.find(function(u){return u.sid===sid;}); return u?u.name:erpNoName(sid); }
     function mgrs(item){
       var arr = [];
       if(item.managerMain) arr.push(name(item.managerMain));
@@ -19400,7 +19415,7 @@ function erpSharePhotoWithMgrs(photo, item, where){
     sids.forEach(function(sid){
       var uid = (map || {})[sid];
       if(uid){ if(uids.indexOf(uid) < 0) uids.push(uid); }
-      else noAcct.push((typeof userName === 'function' && userName(sid)) || sid);
+      else noAcct.push((typeof userName === 'function' && userName(sid)) || erpNoName(sid));
     });
     var tail = noAcct.length
       ? ' (' + noAcct.join('·') + '님은 아직 로그인한 적이 없어 못 열어 드렸습니다)' : '';
@@ -21885,7 +21900,7 @@ function ContractModal(props){
     else { subs[i] = sid; }
     setF(function(prev){ return Object.assign({}, prev, { managerSubs:subs }); });
   }
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
 
   function setSimple(k){ return function(e){
     var v = e.target.type === 'number' ? parseInt(e.target.value||0,10) : e.target.value;
@@ -23970,7 +23985,7 @@ function ContractModal(props){
           return u.sid !== f.managerMain && ((f.managerSubs||[]).indexOf(u.sid) < 0 || u.sid === sid);
         });
         if(sid && !optList.find(function(u){ return u.sid === sid; })){
-          optList = optList.concat([Object.assign({}, u0||{sid:sid,name:sid}, { _statusLabel: st.label })]);
+          optList = optList.concat([Object.assign({}, u0||{sid:sid,name:erpNoName(sid)}, { _statusLabel: st.label })]);
         }
         /* ⚠★ 칸은 주담당과 «같은» pu-n6 이다 (대표 지시 2026-10-17 「부담당 줄 이상하다
              줄일치시켜달라」). 전에는 pu-c4(라벨이 위에 한 줄)라 이 칸만 이름표 높이만큼
@@ -25598,7 +25613,7 @@ function ContractManagement(props){
     if(ax === 'mgr'){
       return keys.map(function(sid){
         var u = users.find(function(x){ return x.sid === sid; });
-        return { v:sid, label:(u ? u.name : sid), n:m[sid] };
+        return { v:sid, label:(u ? u.name : erpNoName(sid)), n:m[sid] };
       });
     }
     return keys.map(function(x){ return { v:x, label:x, n:m[x] }; });
@@ -25974,7 +25989,7 @@ function ContractManagement(props){
   var jm = useState(null); var justMovedId = jm[0]; var setJustMovedId = jm[1];
 
   var users = getActiveUsers();
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
 
   function persist(arr){
     // 잠금 가드: 변경/추가/삭제되는 항목의 signDate 월 중 잠긴 게 있으면 차단
@@ -26800,7 +26815,7 @@ function ContractManagement(props){
       var cTypes = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
       var cItems = dbGet('consultings', []) || [];
       var allU = getActiveUsers();
-      var uName = function(sid){ var x = allU.find(function(z){ return z.sid === sid; }); return x ? x.name : sid; };
+      var uName = function(sid){ var x = allU.find(function(z){ return z.sid === sid; }); return x ? x.name : erpNoName(sid); };
       /* ⚠ 확인 필요 창의 「수행 확정」·「미수행 종료」 — 컨설팅 한 건만 고친다(컨설팅관리와 같은 dbPatch 길) */
       var patch = function(id, fields){ var ok = dbPatch('consultings', id, fields); if(ok) setUnitTick(unitTick + 1); else showToast('❌ 저장 실패'); return ok; };
       return h('div', { key:'unit-' + unitTick },
@@ -26908,8 +26923,8 @@ function ContractManagement(props){
     // [필터 경고 배너] 담당·부담당·검색 등으로 숨겨진 계약이 있으면 알림 + 원클릭 해제
     (function(){
       var af = [];
-      if(mgrFilter !== 'all') af.push('담당 ' + (mgrFilter === 'mine' ? '나' : ((typeof sidToName === 'function' && sidToName(mgrFilter)) || mgrFilter)));
-      if(subMgrFilter !== 'all') af.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || subMgrFilter));
+      if(mgrFilter !== 'all') af.push('담당 ' + (mgrFilter === 'mine' ? '나' : ((typeof sidToName === 'function' && sidToName(mgrFilter)) || erpNoName(mgrFilter))));
+      if(subMgrFilter !== 'all') af.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || erpNoName(subMgrFilter)));
       if(monthOnly) af.push('이번 달만');
       if(query) af.push('검색 "' + query + '"');
       var scoped = contracts.filter(function(c){ return isActiveContract(c); }).length;
@@ -28346,7 +28361,7 @@ function calcPerfShares(amount, mainSid, subSids, sourceKind, splitMainPct, opts
   }
   var rates = getMgrRates();
   var users = dbGet('user_accounts', []);
-  function nameOf(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function nameOf(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
   // 수습 기간 판정 (opts.paidDate 기준)
   function isInProbation(sid){
     if(!opts.paidDate) return false;
@@ -29558,10 +29573,10 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     companies.filter(function(co){ return selIds.has(co.id); }).forEach(function(co){
       if(String(co.managerMain||'') === String(sid)) return;
       if(coMgrNeedsOk(co.managerMain, sid)){ if(coMgrRequest(co, sid, '', _batch)) _asked++; return; }
-      _chg.push(Object.assign({}, co, { managerMain: sid, managerMainName: u?u.name:sid, mgrHistory: coMgrHistAdd(co, sid) }));
+      _chg.push(Object.assign({}, co, { managerMain: sid, managerMainName: u?u.name:erpNoName(sid), mgrHistory: coMgrHistAdd(co, sid) }));
     });
     if(_chg.length && !coUpsertMany(_chg)) return;
-    showToast((_chg.length ? '✅ ' + _chg.length + '개 업체에 ' + (u?u.name:sid) + ' 배정됨' : '')
+    showToast((_chg.length ? '✅ ' + _chg.length + '개 업체에 ' + (u?u.name:erpNoName(sid)) + ' 배정됨' : '')
       + (_asked ? (_chg.length ? ' · ' : '') + '⏳ ' + _asked + '곳은 담당 변경 요청 — 관리자가 승인하면 바뀝니다' : '')
       || '바뀌는 것이 없습니다', 6000);
     if(_asked) refreshCompanies();
@@ -30166,7 +30181,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     }
     var mgrSid = co.managerMain;
     var mgrUser = mgrSid ? users.find(function(u){return u.sid===mgrSid;}) : null;
-    var mgrName = mgrUser ? mgrUser.name : (mgrSid||'');
+    var mgrName = mgrUser ? mgrUser.name : (erpNoName(mgrSid)||'');
     if(!mgrSid){
       return h('div', {
         onClick:function(){ startEdit(co,'managerMain'); setEditVal(''); },
@@ -30597,7 +30612,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : pg.paged.map(function(co, idx){
               var mgrU = users.find(function(u){return u.sid===co.managerMain || u.name===co.managerMain;});
-              var subNames = (co.managerSubs||[]).map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid; }).filter(Boolean);
+              var subNames = (co.managerSubs||[]).map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid); }).filter(Boolean);
               var expiring = isExpiringSoon(co);
               var suspended = !!co.suspended;
               var typeColors = { '자문':['#eff6ff','#1e40af'], '급여':['#f0fdf4','#166534'], '노조':['#eff6ff','#2563eb'], '기금':['#fffbeb','#854d0e'] };
@@ -31061,7 +31076,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       var nameOf = function(sid){
         if(!sid) return '';
         var u = users.find(function(x){ return x.sid === sid; });
-        return u ? u.name : sid;
+        return u ? u.name : erpNoName(sid);
       };
       var moved = w.filter(function(x){ return x.ownerFrom; });
       var KIND = {
@@ -31162,7 +31177,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       var nameOf = function(sid){
         if(!sid) return '담당 없음';
         var u = users.find(function(x){ return x.sid === sid; });
-        return (u ? u.name : sid);
+        return (u ? u.name : erpNoName(sid));
       };
       var HOW = {
         biz:  { t:'사업자번호', bg:'#f0fdf4', fg:'#166534' },
@@ -32349,7 +32364,7 @@ function CompanyEditModal(props){
               return u.sid !== f.managerMain && ((f.managerSubs||[]).indexOf(u.sid) < 0 || u.sid === sid);
             });
             if(sid && !optList.find(function(u){ return u.sid === sid; })){
-              optList = optList.concat([Object.assign({}, u0||{sid:sid,name:sid}, { _statusLabel: st.label })]);
+              optList = optList.concat([Object.assign({}, u0||{sid:sid,name:erpNoName(sid)}, { _statusLabel: st.label })]);
             }
             return h('div', { key:'sub'+i, className:'pu-c4' },
               h('label', null,
@@ -33608,7 +33623,7 @@ function CaseEditModal(props){
                       fontWeight:600,
                       border: needReassign ? '1px solid #fecaca' : 'none' } },
                     needReassign && h('span', { style:{ fontSize:'10px' } }, '🚫'),
-                    h('span', null, u?u.name:sid),
+                    h('span', null, u?u.name:erpNoName(sid)),
                     needReassign && h('span', { style:{ fontSize:'10px' } }, '('+st.label+')'),
                     h('button', { type:'button', onClick:function(){ toggleSub(sid); },
                       style:{ width:'16px', height:'16px', borderRadius:'50%', border:0, background: needReassign?'#dc2626':'#60a5fa', color:'#fff', fontSize:'10px', cursor:'pointer' } }, '×'));
@@ -33786,7 +33801,7 @@ function CaseManagement(props){
   var types = getCaseTypes();
   var stageDefs = getCaseStages('');   // 심급·단계 전체 (필터 드롭다운용)
   var users = getActiveUsers();
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
 
   // ── Phase 3: 건별 저장 (과거회귀 방지) — 그 건만 서버 반영 ──
   function refreshCases(){
@@ -34086,7 +34101,7 @@ function CaseManagement(props){
     if(already){ showToast('이미 입금 데이터가 있습니다'); return; }
 
     var users = dbGet('user_accounts', []);
-    var nameOf = function(sid){ var u = users.find(function(x){return x.sid===sid;}); return u?u.name:sid; };
+    var nameOf = function(sid){ var u = users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid); };
     var perfShares = calcPerfShares(amount, c.managerMain, c.managerSubs, 'case', 100, { paidDate:paidDate });
 
     var newFi = {
@@ -34200,8 +34215,8 @@ function CaseManagement(props){
     return true;
   }).length;
   var _activeFilters = [];
-  if(mgrFilter !== 'all') _activeFilters.push('담당 ' + ((typeof sidToName === 'function' && sidToName(mgrFilter)) || mgrFilter));
-  if(subMgrFilter !== 'all') _activeFilters.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || subMgrFilter));
+  if(mgrFilter !== 'all') _activeFilters.push('담당 ' + ((typeof sidToName === 'function' && sidToName(mgrFilter)) || erpNoName(mgrFilter)));
+  if(subMgrFilter !== 'all') _activeFilters.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || erpNoName(subMgrFilter)));
   if(typeFilter !== 'all') _activeFilters.push('유형 ' + typeFilter);
   if(stageFilter !== 'all') _activeFilters.push('심급 ' + ((caseStageInfo(stageFilter)||{}).name || stageFilter));
   if(monthOnly) _activeFilters.push('이번 달만');
@@ -34475,7 +34490,7 @@ function CaseManagement(props){
               var t = types.find(function(x){return x.code===c.typeCode;});
               var typeLabel = t ? t.name : (c.typeCode||'');
               var mgrU = users.find(function(u){return u.sid===c.managerMain;});
-              var subNames = (c.managerSubs||[]).map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid; }).filter(Boolean);
+              var subNames = (c.managerSubs||[]).map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid); }).filter(Boolean);
               var retainerAmt = c.retainerFee||0;
               var successAmt = c.successFee||0;
               var confirmedAmt = (c.incomes||[]).filter(function(i){return i.confirmed;}).reduce(function(s,i){return s+i.amount;},0);
@@ -34969,11 +34984,11 @@ function CaseManagement(props){
       h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'720px', width:'92%' } },
         h('h3', { style:{ margin:'0 0 8px', fontSize:'15px' } }, '📥 외부 데이터 가져오기 — ' + dropPreview.length + '건'),
         h('div', { style:{ fontSize:'12px', color:'#475569', marginBottom:'10px', lineHeight:1.5 } },
-          '컬럼 순서: 사건번호·유형·의뢰인·주담당·부담당·관할기관·관할담당자·관할연락처·관할이메일·수임일·기한·착수금·성공보수·상태·비고. 담당자는 사번으로만 연결합니다. 이름으로 들어온 값은 아래에서 직접 선택하세요. 한 행이라도 오류가 있거나 저장이 실패하면 전체 입력을 유지합니다.'),
+          '컬럼 순서: 사건번호·유형·의뢰인·주담당·부담당·관할기관·관할담당자·관할연락처·관할이메일·수임일·기한·착수금·성공보수·상태·비고. 담당자는 아래 목록에서 직원을 골라 연결합니다. 이름이나 다른 글자로 들어온 값도 여기서 직접 선택하세요. 한 행이라도 오류가 있거나 저장이 실패하면 전체 입력을 유지합니다.'),
         h('div', { style:{ overflow:'auto', maxHeight:'320px', border:'1px solid #e2e8f0', borderRadius:'6px', marginBottom:'12px' } },
           h('table', { className:'dt', style:{ fontSize:'11px' } },
             h('thead', null, h('tr', null,
-              ['사건번호','유형','의뢰인','주담당 사번','부담당 사번','수임일','기한','상태','비고'].map(function(hd){ return h('th', { key:hd }, hd); }))),
+              ['사건번호','유형','의뢰인','주담당','부담당','수임일','기한','상태','비고'].map(function(hd){ return h('th', { key:hd }, hd); }))),
             h('tbody', null,
               dropPreview.map(function(r, i){
                 return h('tr', { key:i },
@@ -35253,7 +35268,7 @@ function TrashCaseModal(props){
   var rf = useState(0); var refresh = rf[0]; var setRefresh = rf[1];
   var deleted = TrashBin.list('cases');
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   async function restore(id){
     if(!(await popConfirm('복원하시겠습니까?'))) return;
@@ -35411,7 +35426,7 @@ function UnifiedDetailModal(props){
     _linkedContract = _contracts.find(function(x){ return (c.companyId && x.companyId && x.companyId === c.companyId) || (c.bizNo && x.bizNo && x.bizNo === c.bizNo); }) || null;
   }
   var _cpm = useState(null); var _contractPrint = _cpm[0]; var _setContractPrint = _cpm[1];
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
 
   function row(label, val){
     return h('div', { key:label, style:{ display:'flex', borderBottom:'1px solid #f8fafc', padding:'7px 0', fontSize:'12px' } },
@@ -35805,7 +35820,7 @@ function roleInfo(v){ return ROLES.find(function(r){return r.v===v;}) || ROLES[2
 function staffPickLabel(u){
   if(!u) return '';
   var t = String(u.title == null ? '' : u.title).trim();
-  return String(u.name || u.sid || '') + ' (' + (t || '직위 미입력') + ')';
+  return String(u.name || erpNoName(u.sid) || '') + ' (' + (t || '직위 미입력') + ')';
 }
 try { window.staffPickLabel = staffPickLabel; } catch(_){ }
 
@@ -35961,11 +35976,6 @@ function UserAccountModal(props){
         h('button', { className:'x', onClick:props.onClose }, '×')
       ),
       h('div', { className:'modal-b' },
-        h('div', { className:'fld' }, h('label', null, '사번'),
-          h('input', { type:'text', value: props.user ? f.sid : autoSid,
-            readOnly:true,
-            style:{ background:'#f8fafc', fontFamily:'monospace', fontWeight:600, color:'#475569' },
-            title:'직책에 따라 자동 부여 (노무사=P, 기타=A)' })),
         h('div', { className:'fld' }, h('label', null, '이름'),
           h('input', { type:'text', value:f.name||'', readOnly:true,
             style:{ background:'#f8fafc', color:'#475569' }, title:'근로자명부에서 수정' })),
@@ -35988,6 +35998,7 @@ function UserAccountModal(props){
         ),
         h('div', { className:'fld' }, h('label', null, '로그인 아이디'),
           h('input', { type:'text', value:f.loginId||'', onChange:set('loginId'),
+            style:{ WebkitTextSecurity:'disc' }, onInput:function(e){ e.target.style.WebkitTextSecurity = 'none'; },   // 고치기 전까지 점으로 가린다(2026-10-25)
             placeholder: '미설정 시 이름 사용', autoComplete:'off' })),
         h('div', { className:'fld' }, h('label', null, '비밀번호 설정'),
           h('input', { type:'password', value:f._pwPlain||'', autoComplete:'new-password',
@@ -37766,7 +37777,6 @@ function UserWithRateSection(){
     h('table', { className:'dt user-tbl' },
       h('thead', null, h('tr', null,
         h('th', { style:{ width:'18px' } }, ''),
-        h('th', null, '사번'),
         h('th', null, '이름'),
         h('th', null, '직책'),
         h('th', null, '권한'),
@@ -37774,13 +37784,12 @@ function UserWithRateSection(){
         h('th', null, '상태'),
         h('th', { className:'ac' }, '담당'),
         h('th', { className:'ac' }, '성과%'),
-        h('th', { className:'ac' }, '아이디'),
         h('th', { className:'ac' }, '비번'),
         h('th', { className:'ac' }, '관리')
       )),
       h('tbody', null,
         filtered.length === 0
-          ? h('tr', null, h('td', { colSpan:12, className:'ac', style:{ color:'#94a3b8', padding:'30px' } }, '등록된 데이터가 없습니다'))
+          ? h('tr', null, h('td', { colSpan:10, className:'ac', style:{ color:'#94a3b8', padding:'30px' } }, '등록된 데이터가 없습니다'))
           : filtered.map(function(x){
               var ri = roleInfo(x.role);
               var isAdmin = isAdminByUser(x);
@@ -37801,7 +37810,6 @@ function UserWithRateSection(){
                   cursor: 'grab'
                 } },
                 h('td', { style:{ color:'#94a3b8', textAlign:'center', userSelect:'none' } }, '⋮⋮'),
-                h('td', { style:{ fontFamily:'monospace', fontWeight:600 } }, x.sid),
                 h('td', { style:{ fontWeight:600 } }, x.name),
                 h('td', null, x.title || '-'),
                 h('td', null, h('span', { className:'tag '+ri.tag }, ri.label)),
@@ -37827,7 +37835,7 @@ function UserWithRateSection(){
                       //   이 화면에는 입사일도 급여도 없어 그 계산을 할 수가 없다.
                       //   그래서 여기서는 접속만 끊고, 정식 절차는 근로자명부로 보낸다.
                       if(newStatus === 'locked'){
-                        var lockMsg = '"' + x.name + '" (' + x.sid + ') 의 접속을 지금 바로 잠급니다.\n\n'
+                        var lockMsg = '"' + x.name + '" 의 접속을 지금 바로 잠급니다.\n\n'
                           + '→ 로그인 차단 · 비밀번호 무효화 · 자동로그인 삭제\n'
                           + '→ 새 담당 배정에서 제외\n\n'
                           + '이것은 퇴사 처리가 아닙니다. 인사 상태는 재직 그대로입니다.\n'
@@ -38011,10 +38019,6 @@ function UserWithRateSection(){
                     : h('span', { style:{ color:'#94a3b8', fontSize:'11px' } }, '-')
                 ),
                 h('td', { className:'ac' },
-                  h('span', { style:{fontSize:'11px',color:'#475569',fontFamily:'monospace',fontWeight:600} },
-                    x.loginId || x.sid)
-                ),
-                h('td', { className:'ac' },
                   x.sid === 'P-001'
                     ? h('span', { style:{fontSize:'10.5px',color:'#16a34a',fontWeight:700,background:'#f0fdf4',padding:'2px 6px',borderRadius:'4px'} }, '자동')
                     : h('div', { style:{display:'inline-flex',alignItems:'center',gap:'4px'} },
@@ -38196,8 +38200,8 @@ function ManagerBulkChangeSection(){
     if(fromSid === toSid){ showToast('동일 담당자입니다'); return; }
     var targets = (rows||[]).filter(function(r){ return checked[r.store+':'+r.id]; });
     if(!targets.length){ showToast('변경할 항목을 선택하세요'); return; }
-    var fromName = (allUsers.find(function(u){return u.sid===fromSid;})||{}).name||fromSid;
-    var toName   = (allUsers.find(function(u){return u.sid===toSid;})||{}).name||toSid;
+    var fromName = (allUsers.find(function(u){return u.sid===fromSid;})||{}).name||erpNoName(fromSid);
+    var toName   = (allUsers.find(function(u){return u.sid===toSid;})||{}).name||erpNoName(toSid);
     if(!(await popConfirm(fromName + ' → ' + toName + ' 일괄변경 ' + targets.length + '건 진행합니까?'))) return;
     setProcessing(true);
     var grouped = {};
@@ -39103,7 +39107,7 @@ function personalReclassPatch(fi, src, toPersonal){
   if(main){
     if(toPersonal){
       var users = dbGet('user_accounts', []) || [];
-      var nameOf = function(sid){ var u = users.find(function(x){ return x.sid === sid; }); return u ? u.name : sid; };
+      var nameOf = function(sid){ var u = users.find(function(x){ return x.sid === sid; }); return u ? u.name : erpNoName(sid); };
       var rateOf = function(sid){ return fi.date ? getRateAt(sid, fi.date) : resolveBaseRate(sid); };
       var push = function(sid, role, pct){
         var base = Math.round(calc.perfBaseAmount * pct / 100), rate = rateOf(sid), amt = Math.round(base * rate / 100);
@@ -39198,7 +39202,7 @@ function BizTypeCard(props){
     if(next) setList(next);
     return next;
   }
-  function who(){ return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || ''; }
+  function who(){ return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || ''; }
   /* 👤 개인입금 사업 스위치 (컨설팅 유형만) — 바꾼 뒤 «이미 확정된 입금» 일괄 변경 창을 연다 */
   var pdbS = useState(null); var pdBulk = pdbS[0]; var setPdBulk = pdbS[1];
   function togglePersonal(x){
@@ -39887,7 +39891,7 @@ function TypeMergeModal(props){
       { title:'유형 합치기 (' + n + '건)', confirmText:'합치기', danger:true });
     if(!ok) return;
     setBusy(true);
-    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || '';
+    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '';
     var r = bizTypeMergeRun(plan, who);
     setBusy(false);
     if(r.failed){
@@ -40029,7 +40033,7 @@ function BizMasters(){
       + '· 지금 유형으로 잇기 ' + nLink + '건 — 유형 표시만 바꿉니다(관리번호는 그대로)\n'
       + '· 숨긴 옛 유형으로 이름표만 되살리기 ' + nRest + '건 — 기록은 안 바꿉니다', { title:'🧹 추천대로 정리', confirmText:'정리하기', danger:false });
     if(!ok) return;
-    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || '';
+    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '';
     var r = bizTypeOrphanRun(plan, who);
     showToast(r.failed ? '⚠ ' + r.done + '건까지 하고 멈췄습니다(' + r.failed.why + ') — 다시 누르면 남은 것만' : '🧹 ' + r.done + '건 정리했습니다', 7000);
     setCardKey(function(n){ return n + 1; });
@@ -45883,7 +45887,7 @@ function LostRecordsModal(props){
     setPushBusy(false);
   }
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   function runForensics(word){
     setFx({ loading:true, report:null });
@@ -49498,7 +49502,7 @@ function CmsMatchModal(props){
   var refDay = parseInt(ymd.slice(8,10),10) || 0;
 
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   // ── 업체 풀·기납부 목록은 열 때 한 번만 만든다 (행마다 다시 훑지 않도록) ──
   var poolRef = useRef(null);
@@ -51947,7 +51951,7 @@ function FinanceLedger(props){
 
   // ── 입금 매칭 행 보조 (1-1 요약·팝업용) ──
   var _usersCache=null;
-  function _sidName(sid){ if(!sid) return ''; if(!_usersCache) _usersCache=dbGet('user_accounts',[])||[]; var u=_usersCache.find(function(x){return x&&x.sid===sid;}); return u?u.name:sid; }
+  function _sidName(sid){ if(!sid) return ''; if(!_usersCache) _usersCache=dbGet('user_accounts',[])||[]; var u=_usersCache.find(function(x){return x&&x.sid===sid;}); return u?u.name:erpNoName(sid); }
   function _pendStaff(p){
     if(!p||!p.item) return '';
     var it=p.item;
@@ -55650,11 +55654,11 @@ function FinanceLedger(props){
                     h('span',{style:Object.assign({},_cw,{width:'104px',textAlign:'right',fontSize:'12px',
                         color:'#16a34a',fontVariantNumeric:'tabular-nums'}),
                       title:_perf.length?_perf.map(function(ps){
-                        return (ps.name||ps.sid)+' '+ps.role+' '+((ps.pct!==undefined&&ps.pct!==null)?ps.pct+'%':'-')
+                        return (ps.name||erpNoName(ps.sid))+' '+ps.role+' '+((ps.pct!==undefined&&ps.pct!==null)?ps.pct+'%':'-')
                              + ' → '+(ps.amount||0).toLocaleString()+'원';
                       }).join('\n'):''},
                       _pt>0 ? (_perf.map(function(ps){
-                          return (ps.name||ps.sid)+' '+((ps.pct!==undefined&&ps.pct!==null)?ps.pct+'%':'');
+                          return (ps.name||erpNoName(ps.sid))+' '+((ps.pct!==undefined&&ps.pct!==null)?ps.pct+'%':'');
                         }).join(', ') + ' · ' + _pt.toLocaleString()) : '')
                   ),
                   on && h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginTop:'6px',
@@ -55689,7 +55693,7 @@ function FinanceLedger(props){
                             '기준 '+((_perf[0]&&_perf[0].baseAmount)||p.amount||0).toLocaleString())),
                         _perf.map(function(ps,pi){
                           return h('div',{key:pi,style:{display:'flex',alignItems:'center',gap:'4px',padding:'1px 0'}},
-                            h('b',{style:{width:'44px',flexShrink:0}},ps.name||ps.sid),
+                            h('b',{style:{width:'44px',flexShrink:0}},ps.name||erpNoName(ps.sid)),
                             h('span',{style:{width:'32px',flexShrink:0,fontSize:'12px',
                               color:ps.role==='주담당'?'#1e40af':'#2563eb',fontWeight:700}},ps.role),
                             // 요율 — 이 사람이 몇 %를 받는 사람인지
@@ -56361,7 +56365,7 @@ function FinanceLedger(props){
                           h('span',null,
                             h('span',{style:{display:'inline-block',width:'7px',height:'7px',borderRadius:'50%',
                               background:ps.role==='주담당'?'#1e40af':'#2563eb',marginRight:'4px'}}),
-                            h('b',null,ps.name||ps.sid),' ',
+                            h('b',null,ps.name||erpNoName(ps.sid)),' ',
                             h('span',{style:{background:ps.role==='주담당'?'#eff6ff':'#eff6ff',
                               color:ps.role==='주담당'?'#1e40af':'#2563eb',
                               padding:'1px 4px',borderRadius:'3px',fontSize:'12px',fontWeight:700}},ps.role)),
@@ -57385,7 +57389,7 @@ function IncomeUnmatchedTab(props){
   props = props || {};
   var compact = props.compact === true;
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   // 월/연도 필터: compact 모드면 props.month 외부 제어, 아니면 자체 state (기본=이번 월)
   var mf = usePersistedState('income_unmatched_month', todayYM()); var localMonth = mf[0]; var setLocalMonth = mf[1];
@@ -57721,7 +57725,7 @@ function IncomePendingTab(props){
   props = props || {};
   var onNavigate = props.onNavigate || function(){};
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   /* ── 🏁 마무리 (2026-08-16 대표 지시) ────────────────────────────────
      일부만 받은 건을 «끝맺는» 자리. 지금까지는 못 받기로 해도 닫을 길이 없어
@@ -58048,7 +58052,7 @@ function IncomePendingTab(props){
     if(isPersonalRev){
       var adjPctMap = (confirmModal && confirmModal.perfAdjPctMap) || {};
       var _usersPR = dbGet('user_accounts', []);
-      var _nameOfPR = function(sid){ var u = _usersPR.find(function(x){return x.sid===sid;}); return u ? u.name : sid; };
+      var _nameOfPR = function(sid){ var u = _usersPR.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
       var _baseRatePR = function(sid){ return paidDate ? getRateAt(sid, paidDate) : resolveBaseRate(sid); };
       perfShares = [];
       var _mainSid = it.managerMain;
@@ -58758,7 +58762,7 @@ function IncomePendingTab(props){
         var u = users.find(function(x){ return x.sid === sid; });
         if(u) return u.name;
         var byName = users.find(function(x){ return x.name === sid; });   // 이름으로 저장된 옛 자료
-        return byName ? byName.name : sid;
+        return byName ? byName.name : erpNoName(sid);
       }
       var chipMain = { display:'inline-flex', alignItems:'center', gap:'4px', padding:'2px 9px',
                        borderRadius:'99px', fontSize:'13.5px', fontWeight:800, whiteSpace:'nowrap',
@@ -59065,7 +59069,7 @@ function IncomePendingTab(props){
                         background: can ? (isMain ? '#1e40af' : '#2563eb') : '#94a3b8'} }, isMain ? '주' : '부'),
                     h('div', null,
                       h('div', { style:{fontSize:'12px',fontWeight:700,color: can ? '#1e293b' : '#64748b'} },
-                        (u?u.name:sid),
+                        (u?u.name:erpNoName(sid)),
                         isOverride && h('span', { style:{background:'#fbbf24', color:'#fff', padding:'1px 6px', borderRadius:'8px', fontSize:'12px', marginLeft:'4px', fontWeight:700} },
                           '기본 '+baseRate+'%')),
                       /* 요율은 «이름 아래 글씨» 다 — 늘 열린 칸으로 두면 실수로 만져
@@ -59208,7 +59212,7 @@ function IncomePendingTab(props){
                 ded.personalRevenue && (function(){
                   var pctMap = confirmModal.perfAdjPctMap || {};
                   var _u = dbGet('user_accounts', []);
-                  var _nm = function(sid){ var u = _u.find(function(x){return x.sid===sid;}); return u ? u.name : sid; };
+                  var _nm = function(sid){ var u = _u.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
                   var _base = function(sid){ return confirmModal.date ? getRateAt(sid, confirmModal.date) : resolveBaseRate(sid); };
                   var subs = (it.managerSubs||[]).filter(function(s){return s;});
                   function getRate(sid){ return pctMap[sid] != null ? pctMap[sid] : _base(sid); }
@@ -59587,7 +59591,7 @@ function IncomeListTab(){
   var ipsS = usePersistedState('pagesize_income_list', 100); var incPageSize = ipsS[0]; var setIncPageSize = ipsS[1];
   var pgInc = usePagination(filtered, incPageSize);
   function exportListExcel(){
-    function uname(sid){ var u = users.find(function(x){ return x.sid===sid; }); return u ? u.name : (sid||''); }
+    function uname(sid){ var u = users.find(function(x){ return x.sid===sid; }); return u ? u.name : (erpNoName(sid)||''); }
     var rows = filtered.map(function(it, idx){
       return { '#': idx+1, '입금일': it.date||'', '출처': it.sourceKind||'', '업체명': it.companyName||'',
         '유형': it.kind||'', '담당자': uname(it.managerSid), '입금액': it.amount||0 };
@@ -59768,7 +59772,7 @@ function IncomeCompanyTab(){
 
   var allCompanies = dbGet('companies', null) || [];
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   var TYPE_TABS = [
     { v:'all',         label:'전체',    icon:'📊', color:'#1e293b', bg:'#f8fafc' },
@@ -61325,7 +61329,7 @@ function IncomeKindTab(props){
   function setThisYear(){ setMonthFilter(String((new Date()).getFullYear())); }
 
   var users = getActiveUsers();
-  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+  function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   var filtered = allIncomes.filter(function(it){
     if(it.sourceKind !== kind) return false;
@@ -61852,7 +61856,7 @@ function employerBurdenByWorker(ym){
   var rows = recs.map(function(r){
     var c = {}; try { c = calcPayroll(r) || {}; } catch(_){ c = {}; }
     var e = c.employer || {};
-    return { name: r.empName || r.name || r.sid || '-',
+    return { name: r.empName || r.name || erpNoName(r.sid) || '-',
       pension:e.pension||0, healthIns:e.healthIns||0, longCare:e.longCare||0, empIns:e.empIns||0, workers:e.workers||0, total:e.total||0 };
   }).filter(function(x){ return x.total > 0; }).sort(function(a,b){ return b.total - a.total; });
   var totals = rows.reduce(function(t,x){ t.pension+=x.pension; t.healthIns+=x.healthIns; t.longCare+=x.longCare; t.empIns+=x.empIns; t.workers+=x.workers; t.total+=x.total; return t; }, {pension:0,healthIns:0,longCare:0,empIns:0,workers:0,total:0});
@@ -70492,7 +70496,7 @@ function ProjectManagementShared(props){
   users.forEach(function(u){ if(u && u.sid) _projUserBySid[u.sid] = u; });
   var _projTypeByCode = {};
   types.forEach(function(t){ if(t && t.code) _projTypeByCode[t.code] = t; });
-  function userName(sid){ var u = _projUserBySid[sid]; return u ? u.name : sid; }
+  function userName(sid){ var u = _projUserBySid[sid]; return u ? u.name : erpNoName(sid); }
   function typeName(code){ var t = _projTypeByCode[code]; return t ? t.name : code; }
   // ── Phase 3: 건별 저장 (과거회귀 방지) — 그 건만 서버 반영 ──
   function refreshItems(){
@@ -70600,8 +70604,8 @@ function ProjectManagementShared(props){
     return true;
   }).length;
   var _activeFilters = [];
-  if(mgrFilter !== 'all') _activeFilters.push('담당 ' + ((typeof sidToName === 'function' && sidToName(mgrFilter)) || mgrFilter));
-  if(subMgrFilter !== 'all') _activeFilters.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || subMgrFilter));
+  if(mgrFilter !== 'all') _activeFilters.push('담당 ' + ((typeof sidToName === 'function' && sidToName(mgrFilter)) || erpNoName(mgrFilter)));
+  if(subMgrFilter !== 'all') _activeFilters.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || erpNoName(subMgrFilter)));
   if(typeFilter !== 'all'){
     var _tfObj = _projTypeByCode[typeFilter];
     _activeFilters.push('유형 ' + ((_tfObj && _tfObj.name) || typeFilter));
@@ -70909,7 +70913,7 @@ function ProjectManagementShared(props){
               var mgrU = _projUserBySid[it.mgrMain || it.managerMain];
               var mgrName = mgrU ? mgrU.name : (it.mgrMain||it.managerMain||'');
               var subSids = it.mgrSubs||it.managerSubs||[];
-              var subNames = subSids.map(function(sid){ var u=_projUserBySid[sid]; return u?u.name:sid; }).filter(Boolean);
+              var subNames = subSids.map(function(sid){ var u=_projUserBySid[sid]; return u?u.name:erpNoName(sid); }).filter(Boolean);
               var contractFee = it.contractFee||it.fee||0;
               var balanceFee = it.balanceFee||0;
               var totalFee = contractFee + balanceFee;
@@ -71589,7 +71593,7 @@ function ProjectEditModal(props){
               (f.managerSubs||[]).length > 0 && h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginTop:'8px' } },
                 (f.managerSubs||[]).map(function(sid){
                   var u = (props.users||[]).find(function(x){return x.sid===sid;});
-                  var nm = u ? u.name : sid;
+                  var nm = u ? u.name : erpNoName(sid);
                   var st = getUserAssignStatus(sid);
                   var needReassign = !st.assignable && st.reason !== 'inactive';
                   return h('span', { key:sid,
@@ -71754,7 +71758,7 @@ function ClosedManagement(){
   }, [detailModalCo]);
 
   var users = getAssignableUsers();
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
+  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
   function persist(arr){ setArchive(arr); dbSet('closed_archive', arr); }
 
   // 휴지통 삭제 헬퍼 (관리자만)
@@ -72796,7 +72800,7 @@ function StaffRosterModal(props){
                 border:'1px solid '+(sidType==='A'?'#16a34a':'#cbd5e1') } }, '직원 (A-)')
           ),
           h('input', { type:'text', value:f.sid||'', readOnly:true,
-            style:{ width:'100%', padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'12.5px', background:'#f8fafc', fontFamily:'monospace', boxSizing:'border-box' } })
+            style:{ width:'100%', padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'12.5px', background:'#f8fafc', fontFamily:'monospace', boxSizing:'border-box', WebkitTextSecurity:'disc' } })
         )),
         fld('이름 *', inp('name'))
       ),
@@ -73509,7 +73513,6 @@ function StaffRosterDetail(props){
           h('span', { style:{ background:'#f8fafc', color:'#475569', fontSize:'13px', padding:'3px 10px', borderRadius:'10px', fontWeight:600 } }, u.branch||'')
         ),
         h('div', { style:{ fontSize:'13.5px', fontWeight:700, color:'#475569', marginBottom:'4px', paddingBottom:'4px', borderBottom:'2px solid #e2e8f0' } }, '기본 정보'),
-        row('사번', u.sid),
         row('생년월일', u.birthDate),
         row('성별', erpGenderLabel(u.gender)),
         u.rrn && h('div', { style:{ display:'flex', gap:'8px', padding:'6px 0', borderBottom:'1px solid #f8fafc', fontSize:'12.5px', alignItems:'center' } },
@@ -74337,7 +74340,7 @@ function pcfRetiredHolds(empPerfs, users){
     if(!picked.length) return;
     var total = 0;
     picked.forEach(function(x){ total += Math.round(x.amount || 0); });
-    out.push({ sid:p.sid, name:u.name || p.sid, retireDate:u.retireDate || '',
+    out.push({ sid:p.sid, name:u.name || erpNoName(p.sid), retireDate:u.retireDate || '',
       n:picked.length, total:total });
   });
   out.sort(function(a, b){ return b.total - a.total; });
@@ -74495,7 +74498,7 @@ function pcfOpenObjections(month){
       var o = by[fid] || {}; if(!o.text) return;
       var it = (per.items||{})[fid] || {};
       var closed = !!(it.reply && it.reply.state === 'done');
-      out.push({ sid:sid, name:per.name||sid, fid:fid, it:it, ob:o,
+      out.push({ sid:sid, name:per.name||erpNoName(sid), fid:fid, it:it, ob:o,
         withdrawn: !!o.withdrawnAt, closed: closed,
         open: !o.withdrawnAt && !closed });
     });
@@ -74907,7 +74910,7 @@ function PerfConfirmTab(){
           var st = open ? { t:'이의 ' + open + '건', c:'#d97706' }
                  : (per.done === true ? { t:'확인 완료', c:'#166534' } : { t:'미확인', c:'#64748b' });
           return h('tr', { key:sid },
-            h('td', { style:cell }, per.name || sid,
+            h('td', { style:cell }, per.name || erpNoName(sid),
               !per.uid && h('span', { style:{ marginLeft:'6px', fontSize:'12.5px', background:'#fffbeb',
                 color:'#854d0e', borderRadius:'4px', padding:'1px 5px', fontWeight:700 } }, '계정 없음')),
             h('td', { style:Object.assign({textAlign:'right'}, cell) }, (per.itemCount||0)),
@@ -75423,7 +75426,7 @@ function PerfManagement(props){
                     h('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
                       h('div',{style:{width:'22px',height:'22px',borderRadius:'50%',background:isSel?'#2563eb':'#e2e8f0',color:isSel?'#fff':'#64748b',fontSize:'13px',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}},idx+1),
                       h('div',{style:{display:'flex',alignItems:'baseline',gap:'5px',whiteSpace:'nowrap',minWidth:0}},
-                        h('span',{style:{fontWeight:700,fontSize:'13px'}},(u?u.name:ep.sid)),
+                        h('span',{style:{fontWeight:700,fontSize:'13px'}},(u?u.name:erpNoName(ep.sid))),
                         h('span',{style:{fontSize:'12px',color:'#94a3b8'}},(u?u.title:'')+' '+rate+'%')
                       )
                     ),
@@ -75449,7 +75452,7 @@ function PerfManagement(props){
         selSid&&selPerf ? h('div',null,
           h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
             h('div',null,
-              h('div',{style:{fontWeight:700,fontSize:'13px'}},(selUser?selUser.name:selSid)+' 발생내역'),
+              h('div',{style:{fontWeight:700,fontSize:'13px'}},(selUser?selUser.name:erpNoName(selSid))+' 발생내역'),
               h('div',{style:{fontSize:'12.5px',color:'#64748b',display:'flex',gap:'10px',flexWrap:'wrap',marginTop:'2px'}},
                 h('span',null, selYm),
                 h('span',{style:{color:'#2563eb',fontWeight:700}}, '✓ 반영 '+selPerf.matchedTotal.toLocaleString()+'원'),
@@ -75653,7 +75656,7 @@ function PerfManagement(props){
                       if(hasShares){
                         (fi.perfShares||[]).forEach(function(ps){
                           var u = users.find(function(x){return x.sid===ps.sid;});
-                          var nm = u ? u.name : ps.sid;
+                          var nm = u ? u.name : erpNoName(ps.sid);
                           if(ps.role==='주담당'){ mainName = nm; mainAmt = ps.amount||0; }
                           else { subList.push({name:nm, amount:ps.amount||0}); }
                         });
@@ -75822,7 +75825,7 @@ function PerfManagement(props){
                       h('td',{style:Object.assign({},tdS,{textAlign:'center',fontWeight:700,color:'#94a3b8'})},i+1),
                       h('td',{style:tdS},
                         h('div',{style:{display:'flex',alignItems:'baseline',gap:'5px',whiteSpace:'nowrap',minWidth:0}},
-                          h('span',{style:{fontWeight:600}},(u?u.name:ep.sid)),
+                          h('span',{style:{fontWeight:600}},(u?u.name:erpNoName(ep.sid))),
                           h('span',{style:{fontSize:'12px',color:'#94a3b8'}},(u?u.title:'')+' 요율 '+rateLabel))
                       ),
                       h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,color:'#2563eb'})},
@@ -75850,7 +75853,7 @@ function PerfManagement(props){
     tab==='personal' ? (function(){
       var isAdmin = CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin; // ★ 부관리자도 전체 열람
       var mySid = CURRENT_USER.sid;
-      function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid||'-'; }
+      function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
       function isAdj(fi){ return !!(fi.deductions && fi.deductions.personalRevenue && (fi.perfShares||[]).length); }
       function matchSid(fi, sid){
         if(!sid) return true;
@@ -77809,7 +77812,7 @@ function GcalAttSync(){
     if(dbRemoveMany('attendance_records', [r.id])){ showToast('지웠습니다'); setPlan(Object.assign({}, plan, { gone:plan.gone.filter(function(x){ return x.id !== r.id; }) })); }
   }
   var people = (dbGet('user_accounts', USERS_SEED) || []).filter(function(u){ return u && u.sid && u.status !== 'retired'; });
-  var nameOf = function(sid){ var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; }); return u ? u.name : sid; };
+  var nameOf = function(sid){ var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; }); return u ? u.name : erpNoName(sid); };
   var cS = { padding:'6px 8px', borderBottom:'1px solid #e2e8f0', fontSize:'13px', whiteSpace:'nowrap', textAlign:'left' };
   return h('div', { style:{ marginBottom:'10px' } },
     h('div', { style:{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'8px', fontSize:'13px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'7px', padding:'6px 10px' } },
@@ -78214,7 +78217,7 @@ function AttendanceManagement(){
               var empName = '';
               if(selSid === 'all'){
                 var emp = users.find(function(u){return u.sid===r.sid;});
-                empName = (emp ? emp.name : r.sid) + ' ';
+                empName = (emp ? emp.name : erpNoName(r.sid)) + ' ';
               }
               /* 칸에는 «종류»만 — 비고(캘린더 출처 글 포함)는 칸을 가득 채워 잘렸다. 전문은 title·삭제 확인에 (2026-10-24) */
               var chipLabel = empName+t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'');
@@ -79305,7 +79308,7 @@ function LeaveOfAbsenceTab(){
     pLeaves.forEach(function(x){ if(empSids.indexOf(x.sid)<0) empSids.push(x.sid); });
     var empOpts = empSids.map(function(sid){
       var u = allUsers.find(function(z){return z.sid===sid;}) || {};
-      return { sid:sid, name:u.name||sid, title:u.title||'' };
+      return { sid:sid, name:u.name||erpNoName(sid), title:u.title||'' };
     });
     var curSid = selEmpSid || (empOpts[0] ? empOpts[0].sid : '');
     var yearNum = selYear==='all' ? null : parseInt(selYear,10);
@@ -79352,7 +79355,7 @@ function LeaveOfAbsenceTab(){
         '📐 주수 = 사용 평일(월~금) ÷ 5 · 개월 = 캘린더 기준 · 잔여 = 한도 − 사용'),
       empOpts.length===0 ? null : h('div', { style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',overflow:'hidden'} },
         h('div', { style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'} },
-          h('div', { style:{fontSize:'15px',fontWeight:800} }, (selUser.name||curSid), selUser.title?h('span',{style:{fontSize:'13px',color:'#94a3b8',fontWeight:500,marginLeft:'6px'}},selUser.title):null),
+          h('div', { style:{fontSize:'15px',fontWeight:800} }, (selUser.name||erpNoName(curSid)), selUser.title?h('span',{style:{fontSize:'13px',color:'#94a3b8',fontWeight:500,marginLeft:'6px'}},selUser.title):null),
           h('span', { style:{marginLeft:'auto',fontSize:'13px',fontWeight:700,padding:'4px 11px',borderRadius:'20px',background:'#eff6ff',color:'#1e40af'} }, limitLabel)
         ),
         h('div',{style:{display:'flex',gap:'12px',padding:'14px',flexWrap:'wrap'}},
@@ -79459,11 +79462,11 @@ function LeaveOfAbsenceTab(){
               h('div', { style:{fontSize:'12px',color:'#991b1b',fontWeight:600} }, '⚠️ 동기화 불일치'),
               h('div', { style:{fontSize:'13px',fontWeight:800,color:'#991b1b'} }, inconsistent.length+'명'),
               h('div', { style:{fontSize:'12px',color:'#991b1b',marginTop:'3px',marginBottom:'5px'} },
-                inconsistent.map(function(u){return u.name||u.sid;}).join(', ')),
+                inconsistent.map(function(u){return u.name||erpNoName(u.sid);}).join(', ')),
               h('div', { style:{display:'flex',gap:'4px',marginTop:'4px'} },
                 // 옵션 1: 재직 복귀 (LoA 기록 없음 → user 상태도 active로)
                 h('button', { onClick:async function(){
-                    if(!(await popConfirm(inconsistent.length+'명의 사용자를 [재직]으로 변경하시겠습니까?\n\n→ '+inconsistent.map(function(u){return u.name||u.sid;}).join(', ')+'\n\n※ LoA 기록 없으니 휴직 상태 해제됩니다.'))) return;
+                    if(!(await popConfirm(inconsistent.length+'명의 사용자를 [재직]으로 변경하시겠습니까?\n\n→ '+inconsistent.map(function(u){return u.name||erpNoName(u.sid);}).join(', ')+'\n\n※ LoA 기록 없으니 휴직 상태 해제됩니다.'))) return;
                     var allUsers2 = dbGet('user_accounts', USERS_SEED);
                     var updated = allUsers2.map(function(u){
                       if(inconsistent.find(function(i){return i.sid===u.sid;})){
@@ -79527,7 +79530,7 @@ function LeaveOfAbsenceTab(){
             : leaves.slice().sort(function(a,b){return (b.startDate||'').localeCompare(a.startDate||'');}).map(function(it){
                 var u = users.find(function(x){return x.sid===it.sid;});
                 if(!u){ u = dbGet('user_accounts', USERS_SEED).find(function(x){return x.sid===it.sid;}); }
-                var name = u ? u.name : it.sid;
+                var name = u ? u.name : erpNoName(it.sid);
                 var label = (policyMap[it.code] && policyMap[it.code].name) || it.typeLabel || it.code || '-';
                 return h('tr', { key:it.id },
                   h('td', { style:Object.assign({},tdS,{fontWeight:700}) }, name,
@@ -79580,7 +79583,7 @@ function LeaveOfAbsenceTab(){
                     ? h('select', { value:modal.item.sid,
                         onChange:function(e){setModal({isNew:modal.isNew,item:Object.assign({},modal.item,{sid:e.target.value})});},
                         style:{width:'100%',padding:'4px 6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'13px',fontWeight:700,color:'#1e293b',background:'#fff'} },
-                        users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name+' ('+u.sid+')'); }))
+                        users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, erpStaffLabel(u, users)); }))
                     : h('div', { style:{fontSize:'13px',fontWeight:700,color:'#1e293b'} },
                         selUser.name,
                         h('span', { style:{fontSize:'12px',color:'#64748b',marginLeft:'6px',fontWeight:500,fontFamily:'monospace'} }, selUser.sid)),
@@ -81495,7 +81498,7 @@ function DcAutoTab(props){
   var vwS = useState('year'); var view = vwS[0]; var setView = vwS[1];
   var contribs = dbGet('dc_contributions', []) || [];
   var paidList = contribs.filter(function(x){ return x && x.kind === 'paid'; });
-  var nameOf = function(sid){ var u = users.find(function(x){ return x && x.sid === sid; }); return u ? u.name : (sid || ''); };
+  var nameOf = function(sid){ var u = users.find(function(x){ return x && x.sid === sid; }); return u ? u.name : (erpNoName(sid) || ''); };
   var cS = { padding:'6px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'13px', textAlign:'right', fontFamily:'monospace' };
   var lS = Object.assign({}, cS, { textAlign:'left', fontFamily:'inherit' });
   var hS = Object.assign({}, cS, { background:'#f8fafc', color:'#475569', fontWeight:700, fontFamily:'inherit', fontSize:'12px' });
@@ -84015,7 +84018,7 @@ function PayrollLedger(props){
     if(rec) return rec;
     var u = _users.find(function(x){return x.sid===sid;});
     return {
-      id:'pay-'+sid+'-'+props.selYM, empSid:sid, empName:u?u.name:sid,
+      id:'pay-'+sid+'-'+props.selYM, empSid:sid, empName:u?u.name:erpNoName(sid),
       deptName:(u&&u.branch)||'', position:(u&&u.title)||'',
       ym:props.selYM,
       baseSalary:(u&&u.baseSalary)||0,
@@ -87019,7 +87022,7 @@ function EmploymentContractModal(props){
       +HWPXDOC.note('※ 실제 근로조건과 법정 필수사항을 최종 확인한 뒤 서명·교부해 주세요.')
       +HWPX.spacer()+HWPXDOC.dateLine(c.signedDate||todayYMD())
       +HWPXDOC.signBlock([['사업주',''],['근로자', u.name||'']], doc);
-    var base=((c.type||'근로계약서')+'_'+(u.name||u.sid||'근로자')+'_'+(c.signedDate||todayYMD())).replace(/[\\/:*?"<>|]/g,'_');
+    var base=((c.type||'근로계약서')+'_'+(u.name||erpNoName(u.sid)||'근로자')+'_'+(c.signedDate||todayYMD())).replace(/[\\/:*?"<>|]/g,'_');
     HWPX.download([{body:body, landscape:false, margin:doc.margin}],base+'.hwpx');
     showToast('근로계약서 한글 초안 저장 완료');
   }
@@ -87258,7 +87261,7 @@ function PersonnelCardModal(props){
   return h('div', { className:'modal-bg', onClick:function(e){if(e.target===e.currentTarget)props.onClose();} },
     h('div', { className:'modal', style:{width:'820px', maxHeight:'94vh', display:'flex', flexDirection:'column'}, onClick:function(e){e.stopPropagation();} },
       h('div', { className:'modal-h' },
-        h('div', { className:'t' }, '🪪 인사기록카드 — ' + u.name + ' (' + u.sid + ')'),
+        h('div', { className:'t' }, '🪪 인사기록카드 — ' + u.name),
         h('button', { className:'x', onClick:props.onClose }, '×')
       ),
       h('div', { className:'modal-b', style:{flex:1, overflowY:'auto', background:'#f8fafc', padding:'14px'} },
@@ -87850,7 +87853,7 @@ function StaffRoster(){
     var warn = total > 0
       ? '\n⚠ 연결된 데이터: 급여 ' + r.급여 + ' · 근태 ' + r.근태 + ' · 성과/입금 ' + r.성과입금 + ' · 업체/사건 ' + r.업체사건 + '건\n(데이터는 지워지지 않고 사번만 사라져 고아 데이터가 됩니다)\n'
       : '\n연결된 데이터 없음 — 안전하게 삭제 가능\n';
-    if(!(await popConfirm(nm + ' (' + sid + ') 삭제하시겠습니까?\n' + warn + '명부에서만 제거됩니다.'))) return;
+    if(!(await popConfirm(nm + ' 삭제하시겠습니까?\n' + warn + '명부에서만 제거됩니다.'))) return;
     var _backup = users.slice();
     persist(users.filter(function(u){ return u.sid !== sid; }));
     setDetailModal(null);
@@ -87935,7 +87938,7 @@ function StaffRoster(){
               background:'#fff', color:'#854d0e', border:'1px solid #fde68a',
               borderRadius:'5px', fontSize:'13.5px', fontWeight:600,
               display:'inline-flex', gap:'8px', alignItems:'center' }, _ach) },
-            h('span', { style:{ fontWeight:700 } }, (u?u.name:c.sid)),
+            h('span', { style:{ fontWeight:700 } }, (u?u.name:erpNoName(c.sid))),
             h('span', { style:{ fontSize:'12.5px', color:'#854d0e' } }, _aDay(c.endDate)),
             h('span', { style:{ background:'#dc2626', color:'#fff', padding:'1px 6px',
               borderRadius:'8px', fontSize:'12px', fontWeight:700 } }, 'D-'+dleft));
@@ -88114,7 +88117,6 @@ function StaffRoster(){
       h('table', { className:'dt' },
         h('thead', null, h('tr', null,
           h('th', { className:'ac', style:{ width:'36px' } }, 'No'),
-          h('th', null, '사번'),
           h('th', null, '이름'),
           h('th', null, '직책'),
           h('th', null, '지사'),
@@ -88129,13 +88131,12 @@ function StaffRoster(){
         )),
         h('tbody', null,
           filtered.length === 0
-            ? h('tr', null, h('td', { colSpan:13, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
+            ? h('tr', null, h('td', { colSpan:12, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
             : filtered.map(function(u, idx){
                 return h('tr', { key:u.sid, style:{ cursor:'pointer' },
                   onClick:function(){ setDetailModal(u); },
                   onContextMenu:function(ev){ ev.preventDefault(); setCtxMenu({ x:ev.clientX, y:ev.clientY, item:u }); } },
                   h('td', { className:'ac', style:{ color:'#94a3b8', fontSize:'13px', fontWeight:500 } }, idx+1),
-                  h('td', { style:{ fontFamily:'monospace', fontWeight:700, fontSize:'13.5px', color:'#475569' } }, u.sid),
                   h('td', { style:{ fontWeight:700, color:'#1e293b' } }, u.name,
                     effStatus(u)==='leave' && h('span', {
                       style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#fffbeb',color:'#854d0e',fontSize:'12.5px',fontWeight:700,verticalAlign:'middle'}
@@ -88332,11 +88333,11 @@ function ChangePasswordModal(props){
                 h('label', null, '아이디'),
                 h('input', { type:'text', value:inputId, autoFocus:true,
                   onChange:function(e){ setInputId(e.target.value); setErr(''); },
-                  placeholder:'로그인 아이디 또는 사번' })),
+                  placeholder:'로그인 아이디' })),
               presetSid && h('div', { className:'fld' },
                 h('label', null, '계정'),
                 h('input', { type:'text', readOnly:true,
-                  value:(function(){ var u=(dbGet('user_accounts',USERS_SEED)||[]).find(function(x){return x.sid===presetSid;}); if(!u) return presetSid; var lid=u.loginId||u.sid; return (lid===u.name) ? u.name : (u.name+' ('+lid+')'); })(),
+                  value:(function(){ var u=(dbGet('user_accounts',USERS_SEED)||[]).find(function(x){return x.sid===presetSid;}); return (u && u.name) ? u.name : ''; })(),   /* 이름만 — 로그인 아이디·사번은 적지 않는다(2026-10-25) */
                   style:{ background:'#f8fafc', color:'#475569' } })),
               h('div', { className:'fld' },
                 h('label', null, '현재 비밀번호'),
@@ -88399,6 +88400,7 @@ function LoginScreen(props){
   var lastId = saveIdFlag ? (localStorage.getItem('pureun_v6_last_login_id') || '') : '';
   var lastPw = '';
   var idS = useState(lastId); var loginId = idS[0]; var setLoginId = idS[1];
+  var idMaskS = useState(!!lastId); var idMasked = idMaskS[0]; var setIdMasked = idMaskS[1];   // 저장된 아이디는 손대기 전까지 점으로 가린다
   var pwS = useState(lastPw); var pw = pwS[0]; var setPw = pwS[1];
   var errS = useState(window._reloginNotice || ''); var err = errS[0]; var setErr = errS[1];
   if(window._reloginNotice){ try { window._reloginNotice = ''; window._fbPermAlerted = false; } catch(_){} }
@@ -88510,7 +88512,7 @@ function LoginScreen(props){
       var _email = id.indexOf('@') >= 0 ? idl
                  : (_u0 ? sidToEmail(_u0.sid)
                         : (/^[A-Za-z]+-?\d+$/.test(id) ? sidToEmail(id) : ''));
-      if(!_email){ setErr('이메일로 로그인하세요. (예: p001@pureun.kr)'); setLoading(false); return; }
+      if(!_email){ setErr('아이디 형식이 맞지 않습니다. 아이디를 다시 확인해 주세요.'); setLoading(false); return; }
       function _loginFail(){
         var newFail = failCount + 1;
         setFailCount(newFail); localStorage.setItem(FAIL_KEY, String(newFail));
@@ -88670,6 +88672,7 @@ function LoginScreen(props){
     '.pln-field-icon{color:var(--mute);display:flex;flex:0 0 auto;}',
     '.pln-field-input input{flex:1;min-width:0;border:none;outline:none;background:transparent;font:inherit;color:var(--ink);font-size:15px;font-weight:500;letter-spacing:-0.005em;}',
     '.pln-id-input{ime-mode:active;-ms-ime-mode:active;}',
+    '.pln-id-input.pln-saved-mask{-webkit-text-security:disc;text-security:disc;}',   /* 저장된 아이디는 고치기 전까지 점으로 가린다(대표 결정 2026-10-25) */
     '.pln-field-input input[type="password"]{font-family:"JetBrains Mono",monospace;letter-spacing:0.18em;}',
     '.pln-eye{background:none;border:none;padding:0;cursor:pointer;color:var(--mute);display:flex;align-items:center;}',
     '.pln-eye:hover{color:var(--ink);}',
@@ -88747,8 +88750,9 @@ function LoginScreen(props){
             h('span',{className:'pln-field-input'},
               h('span',{className:'pln-field-icon'}, svgUser()),
               h('input',{id:'pln-login-id',type:'text',value:loginId,placeholder:'아이디',autoComplete:'username',autoFocus:true,
-                className:'pln-id-input', lang:'en', inputMode:'text',
-                onChange:function(e){ setLoginId(e.target.value); setErr(''); },
+                className:'pln-id-input' + (idMasked ? ' pln-saved-mask' : ''), lang:'en', inputMode:'text',
+                onInput:function(){ if(idMasked) setIdMasked(false); },
+                onChange:function(e){ setLoginId(e.target.value); setErr(''); setIdMasked(false); },
                 onKeyDown:function(e){ if(e.key==='Enter'){ var p=document.getElementById('pln-pw'); p&&p.focus(); } }}))),
           // 비밀번호
           h('label',{className:'pln-field'},
@@ -90604,7 +90608,7 @@ function App(){
       dir.forEach(function(u){ if(u && u.sid) have[u.sid] = 1; });
       var lost = curArr.filter(function(u){ return u && u.sid && !have[u.sid]; });
       if(lost.length > USERDIR_MAX_DROP){
-        _udGuard = lost.length + '명이 사라짐(' + lost.slice(0, 3).map(function(u){ return u.name || u.sid; }).join('·') + ' …)';
+        _udGuard = lost.length + '명이 사라짐(' + lost.slice(0, 3).map(function(u){ return u.name || erpNoName(u.sid); }).join('·') + ' …)';
         return;
       }
       var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());

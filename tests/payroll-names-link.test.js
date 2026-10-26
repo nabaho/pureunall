@@ -65,7 +65,7 @@ function loadNames(opts) {
     'function esc(s){ return String(s==null?"":s).replace(/\'/g,"").replace(/"/g,""); }',
     cut('staffOf'), cut('linkVal'), cut('saveLink'), cut('nameState'), cut('linkStats'),
     cut('screenNames'), cut('namesCandHtml'), cut('pickCo'), cut('markNotCo'),
-    cut('unlinkSite'), cut('linkAllSame'), cut('linkCo'),
+    cut('unlinkSite'), cut('linkAllSame'), cut('linkCo'), cut('whoName'),
     'globalThis.links = function(){ return LINKS; };'
   ].join('\n')).runInContext(sandbox);
   return sandbox;

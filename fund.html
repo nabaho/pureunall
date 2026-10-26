@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>기금관리</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🪙</text></svg>">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -17,7 +18,7 @@
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -28,7 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <!-- 회사 공용 사진·서류 저장 층 — 사진첩/기업정보함/컨설팅과 같은 파일을 쓴다(판독·보관 방식이 한 곳) -->
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -520,7 +521,7 @@
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
 </head>
 <body>
 <div id="root"><div class="gate">불러오는 중…</div></div>
@@ -1773,7 +1774,7 @@ function _normStaff(v){
   return v.filter(function(u){return u&&u.sid;})
     .filter(function(u){return !u.status||u.status==='active'||(u.status==='leave'&&u.leaveLoginAllowed===true);})
     .filter(function(u){ if(seen[u.sid])return false; seen[u.sid]=1; return true; })
-    .map(function(u){return {sid:u.sid,name:u.name||u.sid,title:u.title||u.role||'',branch:u.branch||''};})
+    .map(function(u){return {sid:u.sid,name:u.name||'',title:u.title||u.role||'',branch:u.branch||''};})   // 이름을 모르면 빈 글자 — 사번을 이름 자리에 적지 않는다(2026-10-25)
     .sort(function(a,b){return String(a.sid||'').localeCompare(String(b.sid||''),'en',{numeric:true});});  // 푸른이알피 사번 순
 }
 function loadStaff(){
@@ -4126,10 +4127,10 @@ function renderPuerpBox(){
     var unl=wait.filter(function(r){return !r.fund_id;}).concat(done.filter(function(r){return !r.fund_id;}));
     var sumW=wait.reduce(function(s,x){return s+x.amount;},0), sumD=done.reduce(function(s,x){return s+x.amount;},0);
     var src=(pe.projects.length||pe.income.length)?'':'<span class="chip warn" style="font-size:10px">푸른이알피 데이터를 읽지 못했습니다 — 권한 또는 미등록</span>';
-    // 담당은 푸른이알피 사번(P-001)으로 들어온다 → 재직자 명단으로 이름 표시(명단 미로드 시 사번 그대로)
+    // 담당은 푸른이알피 사번으로 들어온다 → 재직자 명단으로 «이름만» 표시. 못 찾으면 사번 대신 「이름 미확인」(명단을 아직 안 읽었으면 빈 글자 — 읽으면 다시 그린다)
     function mgrN(sid){ if(!sid) return '—';
       var me=(_staffCache||[]).filter(function(u){return u.sid===sid;})[0];
-      return esc(me?me.name:sid); }
+      return esc(me?me.name:(_staffCache?'이름 미확인':'')); }
     function rowW(r){
       return '<tr><td>'+_peFundCell(r)+'</td>'
         +'<td>'+esc(r.company||'—')+'<div class="muted mo" style="font-size:11px">'+esc(r.no||'')+(r.bizNo?' · '+esc(r.bizNo):'')+'</div></td>'

@@ -76,7 +76,9 @@
     if (who && me && who === me) return null;           // 내가 고친 것이다
     var sure = !!opts.base;
     return {
-      who: who, at: theirs, sure: sure,
+      /* 화면에 나가는 「누가」 — 이름만. 고친 사람이 로그인 이메일·사번으로 적혀 있으면(옛 기록) 이름 모름 → 안내문이 「다른 사람」으로 말한다
+         (대표 결정 2026-10-25 「이름만 있어야한다」). 위 비교(내 것인가)는 적힌 그대로 했다. */
+      who: (who.indexOf('@') >= 0 || /^[A-Za-z]{1,3}-?\d{3,4}$/.test(who)) ? '' : who, at: theirs, sure: sure,
       diff: diffFields(stored, sure ? opts.base : mine, opts.labels)
     };
   }

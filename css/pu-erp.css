@@ -554,12 +554,13 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   [style*="overflow-x: auto"] { flex-wrap: nowrap !important; min-width: 0 !important; max-width: 100% !important; }
   /* 외부협력자 테이블 모바일: 비고(5) 숨기기 (활성 컬럼 제거로 관리 버튼은 표시) */
   .ext-tbl th:nth-child(5), .ext-tbl td:nth-child(5) { display: none !important; }
-  /* 사용자 테이블 모바일: 직책/지사/담당/아이디/비번 숨기기 (4,6,8,10,11번째 컬럼) */
-  .user-tbl th:nth-child(4), .user-tbl td:nth-child(4),
-  .user-tbl th:nth-child(6), .user-tbl td:nth-child(6),
-  .user-tbl th:nth-child(8), .user-tbl td:nth-child(8),
-  .user-tbl th:nth-child(10), .user-tbl td:nth-child(10),
-  .user-tbl th:nth-child(11), .user-tbl td:nth-child(11) { display: none !important; }
+  /* 사용자 테이블 모바일: 직책/지사/담당/비번 숨기기 (3,5,7,9번째 컬럼)
+     ⚠ 칸 번호는 pu-erp.html 의 사용자 표 머리글 순서와 같아야 한다 — 사번·아이디 칸을 뺀 2026-10-25 에 번호를 옮겼다
+       (tests/user-tbl-mobile-columns.test.js 가 «이름 칸»으로 견준다). */
+  .user-tbl th:nth-child(3), .user-tbl td:nth-child(3),
+  .user-tbl th:nth-child(5), .user-tbl td:nth-child(5),
+  .user-tbl th:nth-child(7), .user-tbl td:nth-child(7),
+  .user-tbl th:nth-child(9), .user-tbl td:nth-child(9) { display: none !important; }
   /* 사용자 테이블 상태 select 너비 제한 */
   .user-tbl select { max-width: 54px; font-size: 10px !important; padding: 2px 2px !important; }
   /* 성과% input 더 작게 */

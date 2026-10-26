@@ -7,18 +7,19 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📜</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <!-- ⑤ 서고 원본 파일 — 기존 창고(pureun-erp-hrphotos)에 담는다. 설계서 §3-⑤ -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <!-- 큰 작업본(올린 원본 포함)·보관함 사본은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
 <script src="js/pu-big-store.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -882,7 +883,7 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
@@ -5033,7 +5034,7 @@ let FBDB=null, FBUSER=null;
 const FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 let FBNAME=null;   // 직원명부에서 찾은 한글 이름
 function updateWho(){const el=$("who");if(!el)return;
-  if(FBUSER){el.innerHTML=escapeH(FBNAME||FBUSER.displayName||FBUSER.email||"사용자")+' <b>· 로그인됨</b>';}
+  if(FBUSER){el.innerHTML=escapeH(FBNAME||FBUSER.displayName||"사용자")+' <b>· 로그인됨</b>';}
   else if(FBDB){el.innerHTML='<b style="color:#854d0e">로그인 필요</b> — 포털에서 접속';}
   else{el.innerHTML='<b>로컬 데모</b> (localStorage)';}}
 /* 로그인 이메일 → 직원명부(data/user_dir)에서 한글 이름 조회 (포털 enter.html과 동일 경로) */
@@ -5094,7 +5095,7 @@ function refreshDash(){renderDash();}
    화면에서 견줄 때만 대소문자를 무시한다. */
 const myEmail=()=>String((FBUSER&&FBUSER.email)||"");
 const myUid=()=>String((FBUSER&&FBUSER.uid)||"");
-const myName=()=>(FBUSER&&(FBNAME||FBUSER.displayName||FBUSER.email))||"";
+const myName=()=>(FBUSER&&(FBNAME||FBUSER.displayName))||"";   // 이름만 — 못 찾았으면 빈 글자(로그인 이메일·사번을 대신 적지 않는다, 2026-10-25)
 const sameUser=(a,b)=>String(a||"").toLowerCase()===String(b||"").toLowerCase();
 /* 담당자 대조는 계정 uid 기준 — 푸른 규칙이 모두 auth.uid 를 쓰고, uid 는
    이메일과 달리 대소문자·주소 변경에 흔들리지 않는다.
@@ -5115,7 +5116,7 @@ function setReadOnly(on,rec){
   const b=$("ro-banner");
   if(b){
     b.style.display=on?"block":"none";
-    if(on)b.innerHTML="🔒 <b>열람 전용</b> — "+escapeH((rec&&(rec.ownerName||rec.owner))||"다른 노무사")
+    if(on)b.innerHTML="🔒 <b>열람 전용</b> — "+escapeH((rec&&rec.ownerName)||"다른 노무사")
       +" 담당 사업장의 <b>검토 완료본</b>입니다. 내용 확인·서류 출력은 되지만 저장·개정은 담당자만 할 수 있습니다.";
   }
   const ready=!!(LAST&&LAST.arts&&LAST.arts.length);
@@ -5850,11 +5851,11 @@ function doSaveArchive(silent){
   // 보관함에서 완료 회차를 열어 고치는 중이면 그 회차에, 아니면 내 작업중 자리에 저장
   const tid=(OPEN_REC&&siteKeyOf(OPEN_REC)===sk)?OPEN_REC:sk;
   const rec={id:tid,siteKey:sk,rev:(tid===sk?null:tid.split("@")[1]),site,bizno:LAST.bizno,file:SITE_FILE[LAST.key]||"",size:LAST.size,conds:LAST.conds,asof:LAST.asof,
-    savedAt:new Date().toISOString().slice(0,16).replace("T"," "),savedBy:(FBUSER&&(FBNAME||FBUSER.displayName||FBUSER.email))||"",
+    savedAt:new Date().toISOString().slice(0,16).replace("T"," "),savedBy:myName(),
     summary:LAST.summary,items,changed:changedCnt,mode:REV_MODE,addendum:LAST.addendum||""};
   const prev=loadArch().find(r=>r.id===rec.id);
   if(!putRecord(rec)){
-    if(!silent)alert(`'${site}'은(는) ${(prev&&(prev.ownerName||prev.owner))||"다른 노무사"} 담당 사업장이라 저장할 수 없습니다.`);
+    if(!silent)alert(`'${site}'은(는) ${(prev&&prev.ownerName)||"다른 노무사"} 담당 사업장이라 저장할 수 없습니다.`);
     return null;
   }
   // 이 업로드가 만든 기록 id를 기억 — [이 업로드 취소]가 지울 대상
@@ -8302,7 +8303,7 @@ function renderArch(q){
       : done ? '<span class="badge" style="background:#f0fdf4;color:#166534">완료</span>'
              : '<span class="badge" style="background:#fffbeb;color:#854d0e">작업중</span>';
     const noOwner=!r.ownerUid&&!r.owner;
-    const whoTxt=legacy&&noOwner?"담당자 미지정":(own?"내 담당":(r.ownerName||r.owner||"담당자 미상"));
+    const whoTxt=legacy&&noOwner?"담당자 미지정":(own?"내 담당":(r.ownerName||"담당자 미상"));
     const same=(r.site===prevSite); prevSite=r.site;
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${same?'<span style="color:var(--mute)">↳ 같은 사업장</span>':`<b>${r.site}</b>`}

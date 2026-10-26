@@ -184,13 +184,14 @@ test('★ 담당자가 로그인한 적 없으면 «그 사실을 말해 준다�
   assert.match(c._calls.toast.join(' '), /로그인/, '★ 조용히 넘기면 「왜 저 사람만 못 보지」가 됩니다');
 });
 
-test('★ 로그인 안 한 담당자는 «이름»으로 알린다 — 이름을 못 찾은 사람만 사번 (대표 지시 2026-10-19)', async () => {
+test('★ 로그인 안 한 담당자는 «이름»으로 알린다 — 못 찾으면 「이름 미확인」 (사번 안 적음, 대표 결정 2026-10-25)', async () => {
   const c = autoCtx({ mgrs: { co: {}, sids: ['s1', 's2'], uids: [], noAcct: ['s1', 's2'], noAcctNames: ['홍길동', ''] } });
   await c.autoShareByCo(['p1'], '마바텍라인');
   const said = c._calls.toast.join(' ');
   assert.match(said, /홍길동/, '★ 이름을 찾아 왔는데 안 씁니다');
   assert.doesNotMatch(said, /s1/, '★ 이름이 있는 사람을 사번으로 적었습니다');
-  assert.match(said, /s2/, '이름을 못 찾은 사람은 사번이라도 적어야 짚을 데가 있습니다');
+  assert.doesNotMatch(said, /s2/, '★ 이름을 못 찾았다고 사번을 대신 적었습니다 (대표 결정 2026-10-25 「이름만」)');
+  assert.match(said, /이름 미확인/, '이름을 못 찾은 사람은 「이름 미확인」이라고 알려야 짚을 데가 있습니다');
 });
 
 test('나 자신은 빼고 연다 — 내 사진에 내 이름이 뜨면 안 된다', async () => {

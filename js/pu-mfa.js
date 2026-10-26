@@ -55,7 +55,10 @@ window.PuMFA = {
     const factors = multiFactor(u).enrolledFactors || [];
     return { signedIn:true, enrolled:factors.some(f => f.factorId === TotpMultiFactorGenerator.FACTOR_ID) };
   },
-  async beginEnrollment(){
+  /* accountName — 인증 앱(폰)에 «푸른노무법인:○○○» 로 뜨는 이름. 로그인 이메일(p001@…)·사번은 쓰지 않는다
+     (대표 결정 2026-10-25 「이름만 있어야한다」). 호출하는 쪽이 직원 이름을 넘기고, 못 넘기면 Firebase 표시이름 → 「직원」 순.
+     ⚠ 빈 글자를 넘기면 Firebase 가 로그인 이메일로 채우므로 반드시 비지 않은 글자를 만든다. */
+  async beginEnrollment(accountName){
     await waitAuth();
     const u = auth.currentUser;
     if(!u) throw new Error('다시 로그인한 뒤 등록해 주세요.');
@@ -70,7 +73,9 @@ window.PuMFA = {
     enrollSecret = await TotpMultiFactorGenerator.generateSecret(session);
     return {
       secretKey: enrollSecret.secretKey,
-      uri: enrollSecret.generateQrCodeUrl(u.email || '', '푸른노무법인')
+      uri: enrollSecret.generateQrCodeUrl(
+        [accountName, u.displayName].map(v => String(v || '').trim()).find(v => v && v.indexOf('@') < 0) || '직원',
+        '푸른노무법인')
     };
   },
   async finishEnrollment(code){

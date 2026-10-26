@@ -47,11 +47,12 @@ test('대소문자·앞뒤 공백이 달라도 찾는다', () => {
   assert.equal(C.staffNameOf({ 'p001@pureun.kr':'권형하' }, '  P001@Pureun.KR '), '권형하');
 });
 
-test('명부에 없으면 계정 앞부분이라도 보여준다 — 빈칸이 더 나쁘다', () => {
-  /* 「누가 보냈는지 모르는 메일」이 되면 기록의 뜻이 없다. */
+test('명부에 없으면 계정 앞부분(로그인 아이디)을 이름 대신 적지 않는다', () => {
+  /* 대표 결정 2026-10-25 「이름만 있어야한다」 — p009 는 사번에서 만들어진 로그인 아이디다.
+     모르면 빈 글자를 돌려주고, 보여 주는 쪽이 「이름 미확인」 같은 대체값을 둔다. */
   const C = load();
-  assert.equal(C.staffNameOf({}, 'p009@pureun.kr'), 'p009');
-  assert.equal(C.staffNameOf(null, 'x@y.kr'), 'x');
+  assert.equal(C.staffNameOf({}, 'p009@pureun.kr'), '');
+  assert.equal(C.staffNameOf(null, 'x@y.kr'), '');
 });
 
 test('보낸 사람이 아예 없으면 빈 글자', () => {

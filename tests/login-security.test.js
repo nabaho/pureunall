@@ -170,3 +170,21 @@ test('buildAlerts — detail 필드의 (모름) 대체경로', () => {
   assert.ok(!noIp[0].detail.includes(' · 국가'), 'country가 없으면 국가 부분 생략');
   assert.ok(!noIp[0].detail.includes(' · ') || noIp[0].detail.indexOf(' · ') === noIp[0].detail.lastIndexOf(' · '), 'UA가 없으면 마지막 · 생략');
 });
+
+test('buildAlerts — 알림 글에는 이메일(로그인 아이디)이 안 들어가고 이름만 적힌다', () => {
+  /* 대표 결정 2026-10-25 「이름만 있어야한다」 — 이메일은 사번에서 만들어진 로그인 아이디다. */
+  const al = LS.buildAlerts({
+    uid: 'u1', email: 'p001@pureun.kr', name: '홍길동', deviceIsNew: true, countryIsNew: true,
+    burstSuspicious: true, country: 'US', ip: '1.2.3.4', ua: 'UA', failCount: 5,
+  });
+  assert.equal(al.length, 3);
+  al.forEach((a) => {
+    assert.ok(a.message.includes('홍길동'), '이름이 알림 글에 있어야 한다');
+    assert.ok(!/p\d{3}|@pureun/i.test(a.message), '알림 글에 로그인 아이디가 새고 있다');
+  });
+  const unknown = LS.buildAlerts({
+    uid: 'u2', email: 'p002@pureun.kr', deviceIsNew: true, countryIsNew: false,
+    burstSuspicious: false, country: '', ip: '', ua: '', failCount: 0,
+  });
+  assert.ok(unknown[0].message.includes('이름 미확인') && !/p002|@pureun/i.test(unknown[0].message));
+});

@@ -153,3 +153,16 @@ test('메일 머리줄 — 사업장 확정은 «메일 한 통» 단위로 건�
   const h = V.tableHtml(st());
   assert.match(h, /<tr class="mail">[\s\S]*data-act="linkMail"/);
 });
+
+test('★ 최종본을 고른 사람은 «이름»으로 — 사번(P-001)을 글자로 내지 않는다 (대표 결정 2026-10-25)', () => {
+  const fin = { co1_r202607: { id: 'co1_r202607', companyId: 'co1', roundKey: 'r202607', finalDocId: 'v1', finalBy: 'P-001', finalAt: T0 } };
+  const base = { data: coData(fin), view: 'company', companies: COS };
+  [['company', {}], ['mail', {}]].forEach(([view, extra]) => {
+    const none = V.tableHtml(st(Object.assign({}, base, { view }, extra)));
+    assert.match(none, /class="fin1"/);
+    assert.doesNotMatch(none, /\bP-?001\b/i, view + ' 표에 사번이 나왔다(이름을 모를 때)');
+    assert.match(none, /이름 미확인/);
+    const named = V.tableHtml(st(Object.assign({}, base, { view, staff: { 'P-001': '권형하' } })));
+    assert.match(named, /권형하/); assert.doesNotMatch(named, /\bP-?001\b/i);
+  });
+});

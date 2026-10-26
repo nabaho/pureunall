@@ -2561,7 +2561,7 @@
         ros.filter(function (r) { return showGone || r.why !== '퇴사'; }).forEach(function (r, i) {
           listBox.appendChild(el('div', { style: 'display:flex;gap:10px;align-items:center;padding:5px 8px;border:1px solid ' + (r.on ? '#bbf7d0' : '#e2e8f0') + ';border-radius:6px;background:' + (r.on ? '#f0fdf4' : '#f8fafc') + ';' + (r.on ? '' : 'color:#94a3b8') }, [
             el('span', { style: 'width:20px;text-align:right', text: r.on ? String(on.indexOf(r) + 1) : '–' }),
-            el('b', { text: r.name }), el('span', { style: 'font-size:12px', text: r.title || r.sid }),
+            el('b', { text: r.name }), el('span', { style: 'font-size:12px', text: r.title || '' }),
             el('span', { style: 'margin-left:auto;font-size:12px;font-weight:700;color:' + (r.on ? '#166534' : '#b45309'), text: r.on ? '✔ 위임장에 들어감' + (r.rep ? ' · 맨 위' : '') : '✕ 빠짐 — ' + r.why })]));
         });
         var lines = ros.length ? CF.lawyerLines(CF.lawyerPeople(S.lawDir, S.lawLoa)) : CF.lawyerLinesNow();

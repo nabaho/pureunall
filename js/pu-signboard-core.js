@@ -242,7 +242,7 @@
     return toArr(list).filter(function (r) { return r && r.at; }).filter(function (r) {
       if (o.action && r.action !== o.action) return false;
       if (!q) return true;
-      return (str(r.title) + ' ' + (r.after ? adSummary(r.after) : '') + ' ' + str(r.byName) + ' ' + str(r.by)).toLowerCase().indexOf(q) >= 0;
+      return (str(r.title) + ' ' + (r.after ? adSummary(r.after) : '') + ' ' + str(r.byName)).toLowerCase().indexOf(q) >= 0;
     }).sort(function (x, y) { return (Number(y.at) - Number(x.at)) || (x.id < y.id ? 1 : -1); });
   }
   /* 엑셀로 열리는 표(UTF-8 BOM + 따옴표 처리) */
@@ -250,7 +250,7 @@
   function logToCsv(list) {
     var rows = [['시각(한국)', '누가', '무엇을', '광고', '종류', '내용', '기간']];
     toArr(list).forEach(function (r) {
-      rows.push([kstText(r.at), r.byName || r.by || '', ACTION_KO[r.action] || r.action, r.title || '', KINDS[r.kind] || '',
+      rows.push([kstText(r.at), r.byName || (r.by ? '이름 미확인' : ''), ACTION_KO[r.action] || r.action, r.title || '', KINDS[r.kind] || '',
         r.after ? adSummary(r.after) : (r.version != null ? r.version + '번 판' + (r.count != null ? ' · 광고 ' + r.count + '건' : '') + (r.note ? ' · ' + r.note : '') : ''),
         r.after ? periodSummary(r.after.period) : '']);
     });

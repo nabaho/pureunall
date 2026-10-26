@@ -120,9 +120,26 @@ test('②★★ 우리 일정은 «그대로» 고치는 창 — 걸음이 늘�
 test('③★ 장소·설명을 «통째로» 들고 온다 — 전엔 두 줄만 잘라 담았다', () => {
   const 몸 = 함수몸('function gcalToEvent(ev){');
   assert.match(몸, /place: ev\.location/, '★ 장소를 안 들고 옵니다');
-  assert.match(몸, /desc: String\(ev\.description/, '★ 설명을 안 들고 옵니다');
+  /* 설명은 «ev.description 을 통째로» 들고 온다 — 사번 가림막(사번가림)을 거쳐도 된다 */
+  assert.match(몸, /desc:[^\n]*String\(ev\.description/, '★ 설명을 안 들고 옵니다');
   /* tip(칩에 마우스 올렸을 때)은 그대로 두 줄이어야 한다 — 거기까지 길어지면 화면을 덮는다 */
   assert.match(몸, /slice\(0, 2\)/, 'tip 이 두 줄로 안 잘립니다');
+});
+
+test('③-1★ 옛 일정 설명의 「푸른 담당: 이름 (P-005)」 — 보이는 복사본(desc·tip)에서는 사번을 걷는다 (대표 결정 2026-10-25 「이름만」)', () => {
+  const 몸 = 함수몸('function gcalToEvent(ev){');
+  /* 규칙: desc·tip 두 보이는 글이 모두 가림막을 거친다 */
+  assert.match(몸, /desc:\s*사번가림\(/, '★ 상세 창의 설명이 가림막을 안 거칩니다 — 옛 일정의 사번이 그대로 뜹니다');
+  assert.match(몸, /tip:[\s\S]*사번가림\(String\(ev\.description\)/, '★ 말풍선(tip)이 가림막을 안 거칩니다');
+  /* 가림막을 실제로 돌려 본다 */
+  const 한줄 = 몸.match(/var 사번가림 = (function[^\n]*\});/);
+  assert.ok(한줄, '사번가림 함수를 못 찾았습니다');
+  const 가림 = vm.runInContext('(' + 한줄[1] + ')', vm.createContext({ String }));
+  assert.strictEqual(가림('푸른 담당: 홍길동 (P-005)\n담당자: 김철수'), '푸른 담당: 홍길동\n담당자: 김철수');
+  assert.strictEqual(가림('푸른 담당: 홍길동'), '푸른 담당: 홍길동', '사번이 없으면 그대로');
+  assert.strictEqual(가림('회의 (A-100 호실)'), '회의 (A-100 호실)', '「푸른 담당」 줄이 아니면 건드리지 않는다');
+  /* 원문은 안 건드린다 — 담당 찾기(일정담당)는 ev.description 을 그대로 읽는다 */
+  assert.match(몸, /var 담당 = 일정담당\(ev\)/, '담당 찾기가 원문을 읽는 길이 사라졌습니다');
 });
 
 test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {

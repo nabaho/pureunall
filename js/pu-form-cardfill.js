@@ -430,6 +430,9 @@
     o = o || {};
     var r = { at: Number(o.at) || 0, by: String(o.by || ''), kind: String(o.kind || '그 밖'),
       names: (o.names || []).map(function (v) { return String(v || ''); }).filter(Boolean), card: '', who: String(o.who || '').trim() };
+    /* 보낸 사람 «이름» — by 는 로그인 이메일이라 화면에 못 낸다. 화면(보낸 서류 표)은 byName 만 보인다(대표 결정 2026-10-25).
+       호출하는 쪽이 이름을 넘기면 적고, 안 넘기면 칸을 만들지 않는다(옛 모양 그대로). */
+    if (o.byName && String(o.byName).trim() && String(o.byName).indexOf('@') < 0) r.byName = String(o.byName).trim().slice(0, 60);
     /* 이알피 계약에서 채웠으면 그 계약의 «ID»를 함께 — 온톨로지는 번호가 아니라 ID 로만 잇는다(pu-ontology.js sourceContractId).
        번호(sourceContractNo)는 사람이 보는 참고용 — 번호가 바뀌어도 ID 로 이어진다 */
     var ct = o.contract;

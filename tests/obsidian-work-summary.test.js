@@ -86,3 +86,17 @@ test('이알피 요약은 AI 기록과 같은 보관함의 raw/erp 로 간다 �
   assert.match(source, /obsidian:\/\/new\?vault=/, '보관함 이름이 없으면 «마지막에 연 보관함» 으로 가 버립니다');
   assert.equal((source.match(/obsidian:\/\/new\?/g) || []).length, 1, '주소 조립이 두 벌로 갈라졌습니다 — noteUri 하나만');
 });
+
+test('★ 노트에 사번을 적지 않는다 — 이름을 못 찾은 담당자는 «이름 미확인» (대표 결정 2026-10-25)', () => {
+  const o = load({
+    user_accounts: [{ sid: 'P-001', name: '권형하' }, { sid: 'P-002' }],
+    cases: [{ id: 'a', managerMain: 'P-001', managerSubs: ['P-002'], companyName: '대흥중공업', brief: '해고 대응' }]
+  });
+  const got = o.collect();
+  assert.equal(got.tasks.length, 1);
+  assert.ok(!/\b[A-Za-z]-?\d{3}\b/.test(JSON.stringify(got.tasks)), '업무 줄에 사번이 들어갔다');
+  const all = o.collectAll();
+  assert.ok(all.groups.length >= 2 && all.groups.every((g) => !/\b[A-Za-z]-?\d{3}\b/.test(g.owner)), '담당자 묶음 이름에 사번이 들어갔다');
+  assert.ok(!/\b[A-Za-z]-?\d{3}\b/.test(o.allNote(all).body), '담당자별 노트 글에 사번이 나왔다');
+  assert.ok(all.groups.some((g) => g.owner === '이름 미확인'));
+});

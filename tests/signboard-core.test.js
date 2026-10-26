@@ -212,11 +212,14 @@ test('보관 — 기록 걸러 보기: 최근 것이 위, 이름·문구·사람
 
 test('보관 — 표(엑셀) 내려받기: BOM·머리줄·쉼표·따옴표·줄바꿈을 지킨다', () => {
   const a = textAd({ id: 'ad_c', title: '쉼표, 따옴표 "있음"' }); a.text.string = '첫 줄\n둘째 줄';
-  const csv = C.logToCsv([C.logRecord('create', { id: 'lg_c', now: Date.UTC(2026, 9, 12, 3, 0, 0), actor: 'A-001', ad: a }), C.logRecord('publish', { id: 'lg_p', now: 5, actor: 'A-001', version: 4, count: 2 })]);
+  const csv = C.logToCsv([C.logRecord('create', { id: 'lg_c', now: Date.UTC(2026, 9, 12, 3, 0, 0), actor: 'A-001', actorName: '홍길동', ad: a }), C.logRecord('publish', { id: 'lg_p', now: 5, actor: 'A-001', version: 4, count: 2 })]);
   assert.equal(csv.charCodeAt(0), 0xFEFF, '엑셀이 한글을 알아보도록 BOM');
   const lines = csv.slice(1).split('\r\n');
   assert.equal(lines[0], '시각(한국),누가,무엇을,광고,종류,내용,기간');
-  assert.ok(lines[1].startsWith('2026-10-12 12:00,A-001,만듦,"쉼표, 따옴표 ""있음""",글자,'), lines[1]);
+  assert.ok(lines[1].startsWith('2026-10-12 12:00,홍길동,만듦,"쉼표, 따옴표 ""있음""",글자,'), lines[1]);
+  /* 내려받는 파일에도 사번을 글자로 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」) — 이름이 없으면 「이름 미확인」 */
+  assert.ok(lines[2].split(',')[1] === '이름 미확인', lines[2]);
+  assert.doesNotMatch(csv, /A-001/, '내려받는 표에 사번이 나왔다');
   assert.ok(lines[1].includes('첫 줄 / 둘째 줄'), '문구의 줄바꿈은 « / » 로 한 칸에');
   assert.ok(lines[2].includes('4번 판 · 광고 2건'));
 });

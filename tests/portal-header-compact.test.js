@@ -21,13 +21,13 @@ function phoneBlock() {
 
 /* 2026-10-24 대표 머리 카드 1안 「아바타 하나」 — 카드를 걷고 한 줄. 사용액·로그아웃은 «내 메뉴» 안으로.
    (그 앞: 2026-08-20 「너무 많은 부분 차지」→ 네 줄을 두 줄로 — 사용액이 둘째 줄 둘째 자리에 앉았다) */
-test('폰: 내 메뉴 단추(이름·사번)는 «줄어들지 않는다» — 사번이 잘리지 않게', () => {
+test('폰: 내 메뉴 단추(이름)는 «줄어들지 않는다» — 이름이 잘리지 않게', () => {
   const b = phoneBlock();
-  /* 줄어들면 「권형하 · P-0…」 처럼 사번이 잘린다 — 자리가 모자라면 제 줄로 내려가야 한다 */
+  /* 줄어들면 「권형하 · 대표노…」 처럼 이름이 잘린다 — 자리가 모자라면 제 줄로 내려가야 한다 */
   assert.match(b, /\.pbar \.pmeta\{[^}]*flex:0 0 auto/,
-    '★ 이름·사번 단추가 줄어들 수 있다 — 사번이 말줄임(…)으로 잘린다');
+    '★ 이름 단추가 줄어들 수 있다 — 이름이 말줄임(…)으로 잘린다');
   assert.doesNotMatch(b, /#userName\{[^}]*text-overflow:ellipsis/,
-    '★ 폰에서 이름 칸을 말줄임으로 자른다 — 사번이 사라진다');
+    '★ 폰에서 이름 칸을 말줄임으로 자른다 — 이름이 사라진다');
 });
 
 test('한 줄로 몰면서 접은 것은 «다른 데 같은 말이 있는 것» 뿐이다', () => {
@@ -36,11 +36,14 @@ test('한 줄로 몰면서 접은 것은 «다른 데 같은 말이 있는 것»
   assert.match(b, /\.pbar \.pmeta \.un-role,\.pbar \.pmeta \.un-title\{display:none;\}/);
   assert.match(enter, /<span class="un-title">/, '직책을 감싸지 않으면 접을 수가 없습니다.');
   assert.match(b, /\.pbar #billChip \.lb,\.pbar #billChip \.ago\{display:none;\}/);
-  /* ★ 사번은 «절대» 접지 않는다 — P005·A005 처럼 숫자가 같은 사번이 있어,
-     사번이 안 보이면 엉뚱한 계정으로 들어간 것을 알아챌 길이 없다(2026-08-10 고침). */
+  /* ★ 이름은 «절대» 접지 않는다 — 신원 확인은 이름이 맡는다.
+     ★ 사번은 «어디에도» 안 적는다(대표 결정 2026-10-25 「이름만 있어야한다」 — 사번에서 로그인 아이디가 만들어진다).
+       그래서 이름 칸을 짓는 문장에 mySid 가 끼면 안 된다. */
   assert.doesNotMatch(b, /#userName\{[^}]*display:none/,
-    '★ 사번이 사라지면 남의 계정으로 들어간 것을 못 알아챕니다.');
-  assert.match(enter, /mySid \? ' · ' \+ _e\(mySid\.toUpperCase\(\)\)/);
+    '★ 이름이 사라지면 남의 계정으로 들어간 것을 못 알아챕니다.');
+  const 이름칸 = enter.slice(enter.indexOf("$('userName').innerHTML"), enter.indexOf(';', enter.indexOf("$('userName').innerHTML")) + 1);
+  assert.ok(이름칸.length > 30 && /\bname\b/.test(이름칸), '이름 칸을 짓는 자리를 못 찾았습니다');
+  assert.doesNotMatch(이름칸, /mySid/, '★ 머리의 이름 칸에 사번이 끼었다 — 사번은 화면에 안 적는다');
   /* 감춘 말은 «명부 값»과 섞이지 않게 감싸서 넣는다 */
   assert.match(enter, /<span class="un-role">/);
   assert.match(enter, /var _e = function\(v\)/, 'innerHTML 로 넣으면서 감싸지 않으면 위험합니다.');
@@ -89,21 +92,21 @@ test('PC 머리 카드는 그대로 한 줄이다', () => {
   /* 컴팩트는 폰 이야기다 — 넓은 화면은 한 줄에 다 들어간다. */
   assert.match(enter, /\.pbar\{display:flex;align-items:center;gap:13px/);
   assert.match(enter, /\.pbar #sgFab\{order:4;\}/, 'PC 에서 건의하기는 오른쪽이다');
-  /* 내 메뉴 단추(이름·사번)는 건의하기보다 오른쪽 끝 */
+  /* 내 메뉴 단추(이름)는 건의하기보다 오른쪽 끝 */
   const m = enter.match(/\.pbar \.pmeta\{order:(\d+);/);
   assert.ok(m && Number(m[1]) > 4, '★ 내 메뉴 단추가 건의하기 왼쪽으로 갔다');
 });
 
-test('★ 이름·사번과 연결 상태는 머리줄에 남는다 — 내 메뉴 속으로 숨기지 않는다', () => {
-  /* 사번: P005·A005 처럼 숫자가 같은 사번이 있어 늘 보여야 한다(2026-08-10).
+test('★ 이름과 연결 상태는 머리줄에 남는다 — 내 메뉴 속으로 숨기지 않는다', () => {
+  /* 이름: 늘 보여야 한다(사번은 2026-10-25 부터 안 적는다).
      연결: 끊겼을 때 그 말이 바로 보여야 한다. 둘 다 «펼쳐야 보이는» 자리에 두면 안 된다. */
   const 메뉴 = enter.indexOf('id="meMenu"'), 끝 = enter.indexOf('id="meBtn"');
   const 안 = enter.slice(메뉴, 끝);
-  assert.ok(안.indexOf('id="userName"') < 0, '★ 이름·사번이 내 메뉴 속으로 숨었다');
+  assert.ok(안.indexOf('id="userName"') < 0, '★ 이름이 내 메뉴 속으로 숨었다');
   assert.ok(안.indexOf('id="statusDot"') < 0, '★ 연결 상태가 내 메뉴 속으로 숨었다');
   const 단추 = enter.slice(끝, enter.indexOf('me-caret', 끝));
   assert.ok(단추.indexOf('id="userName"') > 0 && 단추.indexOf('id="statusDot"') > 0,
-    '★ 머리줄의 내 메뉴 단추에 이름·사번·연결 상태가 없다');
+    '★ 머리줄의 내 메뉴 단추에 이름·연결 상태가 없다');
 });
 
 test('내 메뉴는 누르면 열리고 · 바깥을 누르거나 Esc 로 닫힌다 · 「내 정보」는 메뉴 안 단추로', () => {

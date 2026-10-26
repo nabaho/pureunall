@@ -218,3 +218,14 @@ test('★ 지점까지 같은 이름이 먼저다 — 괄호 안을 버리면 �
   assert.equal(S.staffFor('새별반찬(배방점)', { companies: cos, dir: DIR, links: {} }).coId, 'b1');
   assert.equal(S.fullName('㈜ 새별반찬 (모종점)'), '새별반찬모종점');
 });
+
+test('★ 이름을 못 찾은 담당자는 «이름 미확인» — 사번을 글자로 내지 않는다 (대표 결정 2026-10-25 「이름만 있어야한다」)', () => {
+  const co = [{ name: '가나상사', typeCode: '급여', status: 'active', managerMain: 'A-009', managerSubs: ['A-008', '손으로 적은 이름'] }];
+  const r = S.staffFor('가나상사', { companies: co, dir: DIR, links: {} });
+  assert.equal(r.담당, '이름 미확인');
+  assert.equal(r.부담당[0], '이름 미확인');
+  assert.equal(r.부담당[1], '손으로 적은 이름', '사번 꼴이 아닌 값(사람이 적어 둔 이름·메모)은 그대로 보인다 — 고칠 것이 묻히면 안 된다');
+  const g = S.groupByStaff(['가나상사'], { companies: co, dir: DIR, links: {} });
+  const shown = JSON.stringify(g.map(x => x.담당).concat(g.map(x => x.rows.map(y => y.staff.담당))));
+  assert.doesNotMatch(shown, /\b[A-Za-z]-?\d{3}\b/, '묶음 이름·줄 담당에 사번이 나왔다');
+});

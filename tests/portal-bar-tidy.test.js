@@ -95,16 +95,22 @@ test('⑥ ★ 권한 이름「(admin)」은 접고 덧말로 옮긴다', functio
     '★★ 접기만 하고 덧말에 안 남겼습니다 — 권한을 확인할 길이 없어집니다');
 });
 
-test('⑦ ★★ «사번»은 접지 않는다 — P005·A005 를 가르는 유일한 값이다', function () {
+test('⑦ ★★ «사번»·로그인 이메일은 화면 어디에도 안 적는다 — 이름만 (대표 결정 2026-10-25)', function () {
   const at = ENTER.indexOf("$('userName').innerHTML");
   assert.ok(at > 0, '이름 칸을 짓는 자리를 못 찾았습니다');
-  /* ⚠ 그 «한 문장»만 본다. 넉넉히 잘라 보면 바로 아래 덧말 짓는 줄의 사번이 걸려,
-     정작 이름 칸에서 사번을 빼도 검사가 통과한다(2026-09-12 이빨 확인에서 찾음). */
+  /* ⚠ 그 «한 문장»만 본다. 넉넉히 잘라 보면 이웃 줄이 섞여 검사가 헛돈다. */
   const 구역 = ENTER.slice(at, ENTER.indexOf(';', at) + 1);
-  assert.match(구역, /mySid.*toUpperCase\(\)/, '★★ 사번이 이름 칸에서 사라졌습니다');
-  /* 사번을 감추는 css 가 생기면 안 된다 */
-  assert.ok(!/\.un-sid\{display:none|un-sid[^{]*\{[^}]*display:none/.test(ENTER),
-    '★★ 사번을 접는 규칙이 생겼습니다 — 엉뚱한 계정으로 들어간 것을 못 알아챕니다');
+  assert.match(구역, /\bname\b/, '이름 칸에서 이름이 사라졌습니다');
+  assert.doesNotMatch(구역, /mySid|email/, '★★ 머리 이름 칸에 사번·이메일이 끼었습니다 — 로그인 아이디가 화면에 보입니다');
+  /* 마우스를 올리면 보이는 덧말(title)과 내 메뉴 맨 위(meWho)도 «보이는 것»이다 */
+  const t0 = ENTER.indexOf("$('userName').title");
+  assert.ok(t0 > 0, '이름 덧말을 짓는 자리를 못 찾았습니다');
+  const 덧말 = ENTER.slice(t0, ENTER.indexOf(';', t0) + 1);
+  assert.doesNotMatch(덧말, /mySid|email|로그인 계정/, '★★ 덧말에 사번·이메일(로그인 아이디)이 끼었습니다');
+  const w0 = ENTER.indexOf("$('meWho').innerHTML");
+  assert.ok(w0 > 0, '내 메뉴 맨 위를 짓는 자리를 못 찾았습니다');
+  const 메뉴 = ENTER.slice(w0, ENTER.indexOf(';', w0) + 1);
+  assert.doesNotMatch(메뉴, /mySid|email/, '★★ 내 메뉴 맨 위에 사번·이메일이 끼었습니다');
 });
 
 test('⑧ ★★ 잘 될 때만 「연결됨」 — 끊겼을 때는 긴 말 그대로다', function () {

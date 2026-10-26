@@ -36,8 +36,9 @@
   }
 
   /* ── 위 거르개 줄 ── */
-  /* 담당 이름 — 명부(st.staff: 사번→이름)에서. 명부에 없으면 사번 그대로(지우면 누가 맡았는지 잃는다) */
-  function staffName(st, sid) { return (st.staff && st.staff[sid]) || sid; }
+  /* 담당 이름 — 명부(st.staff: 사번→이름)에서. 명부에 없으면 «이름 미확인» — 사번을 글자로 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+     (사번 꼴이 아닌 값 — 담당 칸에 사람이 적어 둔 이름·메모 — 은 그대로 둔다) */
+  function staffName(st, sid) { return (st.staff && st.staff[sid]) || (/^[A-Za-z]{1,3}-?\d{1,4}$/.test(String(sid)) ? '이름 미확인' : String(sid)); }
   /* 담당 고르개 (2026-10-05) — 모두 · 내 담당(사번을 알 때만) · 담당자별(곳 수) · 담당 없음 */
   function ownerSelect(st, oc) {
     var who = (st.sites || {}).who || '', me = st.me || '';

@@ -2617,7 +2617,7 @@ async function payMailAddMissingSeats(db, cos, dir, owners) {
     let user = null;
     try { user = await getAuth().getUserByEmail(email); } catch (_) { user = null; }
     if (!user || !user.uid || owners[user.uid]) continue;
-    const rec = { email: email, name: MR.dirNameOf(dir, sid) || sid,
+    const rec = { email: email, name: MR.dirNameOf(dir, sid) || "",
       addedBy: "server", addedAt: Date.now() };
     owners[user.uid] = rec;
     up[PAYDATA_ROOT + "/owners/" + user.uid] = rec;
@@ -4077,6 +4077,15 @@ async function photoGate(decoded, v) {
    ⚠ 내주기 «전»에 적으면 창고에 원본이 없어 실패한 것까지 「봤다」로 남는다.
    ⚠ 적기가 실패해도 **사진은 이미 나갔다.** 여기서 throw 하면 안 된다 —
      기록 때문에 일이 막히는 것이 기록이 없는 것보다 나쁘다. 대신 서버 기록에 남긴다. */
+/* 로그인 uid → 직원 «이름». 명부에서 못 찾으면 빈 글자 — 이메일(= 사번에서 만든 로그인 아이디)을 이름 대신 적지 않는다(2026-10-25) */
+async function staffNameByUid(uid) {
+  try {
+    const db = getDatabase();
+    const role = (await db.ref("uid_roles/" + uid).once("value")).val() || {};
+    return MR.dirNameOf((await db.ref("data/user_dir").once("value")).val(), role.sid);
+  } catch (_) { return ""; }
+}
+
 async function photoNoteView(decoded, v, gate) {
   try {
     const item = (gate && gate.item) || {};
@@ -4084,7 +4093,7 @@ async function photoNoteView(decoded, v, gate) {
     const fields = read.fields || {};
     const row = PV.logRow({
       byUid: decoded.uid,
-      byName: decoded.name || decoded.email || "",
+      byName: decoded.name || (await staffNameByUid(decoded.uid)) || "",
       as: gate && gate.as,
       owner: v.owner, year: v.year, id: v.id,
       kind: read.kind || "",
@@ -6561,7 +6570,7 @@ exports.publishSite = functions
         return;
       }
 
-      const 누가 = decoded.name || decoded.email || decoded.uid;
+      const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
       const 사연글 = 사연(누가, path, (req.body && req.body.note) || "");
       const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
 
@@ -7697,8 +7706,10 @@ exports.logLoginAttempt = functions
       }
       await db.ref().update(writes);
 
+      /* 알림 글에는 이메일(= 사번에서 만든 로그인 아이디) 대신 «이름»을 적는다 (대표 결정 2026-10-25) */
+      const name = (deviceIsNew || countryIsNew || burstSuspicious) ? await staffNameByUid(uid) : "";
       const alerts = LS.buildAlerts({
-        uid, email, deviceIsNew, countryIsNew, burstSuspicious,
+        uid, email, name, deviceIsNew, countryIsNew, burstSuspicious,
         country, ip, ua: parsed.ua, failCount: burst.count,
       });
       for (const a of alerts) {

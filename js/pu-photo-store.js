@@ -1086,7 +1086,7 @@
     return listOwners().then(function (owners) {
       Object.keys(items).forEach(function (id) {
         var uid = items[id].__ownerUid;
-        items[id].__ownerName = (owners[uid] && owners[uid].name) || uid;
+        items[id].__ownerName = nameOnly(owners[uid] && owners[uid].name) || uid;   /* 옛 기록에 이름 대신 이메일이 저장돼 있으면 이름으로 안 친다 */
       });
       return items;
     }).catch(function () { return items; });
@@ -2006,11 +2006,20 @@
      화면에서 짐작하지 않는다. 이 값으로 남의 사진을 볼 수 있는지가 갈리므로
      짐작하면 안 된다(어차피 규칙이 한 번 더 막지만 이중으로 잠근다).
      경로에 계정이 필요하므로 **이것이 끝난 뒤에 사진을 읽어야 한다.** */
+  /* 이름 자리에 들어온 글자가 이메일·사번 꼴(p001@…, P-001, p001)이면 이름이 아니다 — 빈 글자로 돌린다 */
+  function nameOnly(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (!s || s.indexOf('@') >= 0 || /^[A-Za-z]{1,3}-?\d{3}$/.test(s)) return '';
+    return s;
+  }
+
   function signIn(uid, email, fallbackName) {
     var generation = ++identityGeneration;
     var signedUid = uid || '';
     var signedDb = deps.db;
-    var signedName = fallbackName || email || '';
+    /* 이름만 쓴다 — 이름을 못 찾았다고 로그인 이메일·사번(p001)을 이름 자리에 넣지 않는다.
+       (이 이름은 deps.name → byName·owners 색인에 «저장»되어 나중에 화면에 나온다. 대표 결정 2026-10-25 「이름만 있어야한다」) */
+    var signedName = nameOnly(fallbackName);
     deps.uid = signedUid;
     deps.isAdmin = false;
     deps.name = signedName;
@@ -2162,7 +2171,7 @@
       var uids = Object.keys(owners);
       if (uids.indexOf(deps.uid) < 0) uids.push(deps.uid);   // 나 자신도 포함한다
       return Promise.all(uids.map(function (uid) {
-        var name = (owners[uid] && owners[uid].name) || (uid === deps.uid ? deps.name : uid);
+        var name = nameOnly(owners[uid] && owners[uid].name) || (uid === deps.uid ? deps.name : uid);
         return listYear(year, uid).then(function (items) {
           var out = {};
           Object.keys(items).forEach(function (id) {

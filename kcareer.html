@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="경력관리">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script>(function(){var svg="<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='100' fill='#1e293b'/><rect x='150' y='120' width='212' height='272' rx='18' fill='#fff'/><rect x='185' y='175' width='142' height='16' rx='8' fill='#166534'/><rect x='185' y='215' width='142' height='12' rx='6' fill='#d97706'/><rect x='185' y='252' width='110' height='12' rx='6' fill='#cbd5e1'/><rect x='185' y='289' width='142' height='12' rx='6' fill='#cbd5e1'/><rect x='185' y='326' width='90' height='12' rx='6' fill='#cbd5e1'/></svg>";var icon='data:image/svg+xml,'+encodeURIComponent(svg);function L(rel,href){var l=document.createElement('link');l.rel=rel;l.href=href;document.head.appendChild(l);}L('icon',icon);L('apple-touch-icon',icon);try{ if(localStorage.getItem('kc_theme')==='dark') document.documentElement.classList.add('dark'); }catch(e){}
 document.addEventListener('DOMContentLoaded',function(){ var tb=document.getElementById('themeBtn'); if(tb) tb.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙'; });try{var m={name:'푸른노무법인 경력관리',short_name:'경력관리',start_url:location.href,scope:location.href.replace(/[^/]*$/,''),display:'standalone',background_color:'#1e293b',theme_color:'#1e293b',icons:[{src:icon,sizes:'any',type:'image/svg+xml',purpose:'any'}]};var b=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});L('manifest',URL.createObjectURL(b));}catch(e){}})();</script>
 <style>
@@ -1442,12 +1443,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -1459,7 +1460,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=12"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
-<script src="js/kcareer-pusync.js?v=9"></script>
+<script src="js/kcareer-pusync.js?v=10"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
@@ -1508,7 +1509,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
   <script>
     /* 머리줄 안의 자리를 쓴다 — 안 알려 주면 pu-whoami 가 화면 오른쪽 위에
        «떠 있는 딱지»를 만들어 안내글·머리줄을 덮는다(대표 화면에서 그랬다). */
@@ -6136,10 +6137,19 @@ async function openPuSource(puRef){
     if(!v){ toast('pu-erp에서 이 건을 찾을 수 없습니다 (삭제되었을 수 있음)'); return; }
     var KEY_LABEL = { companyName:'고객사', title:'내용', caseType:'사건유형', consultingType:'컨설팅유형',
       fundType:'기금유형', programName:'사업명', status:'상태', closedDate:'종료일', endDate:'예정일', managerMain:'주담당' };
+    /* ⚠ 담당자 칸(managerMain 등)에는 «사번»이 들어 있다 — 화면에는 이름만(대표 결정 2026-10-25). 이름을 못 찾으면 「이름 미확인」 */
+    try{ await _puLoadUserMap(); }catch(e){}
+    var 값보임 = function(k, x){
+      var t = String(x);
+      if(/manager|mgr|owner|worker|assignee|handler|createdBy|updatedBy/i.test(k) && /^[A-Za-z]-?\d{3,}$/.test(t)){
+        return (_puUserMap && _puUserMap[t]) || '이름 미확인';
+      }
+      return t;
+    };
     var rows = Object.keys(v).filter(function(k){ return typeof v[k] !== 'object'; }).map(function(k){
       return '<div style="display:flex;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border-soft)">'
         + '<span style="min-width:90px;color:var(--text-mute)">' + escapeHtml(KEY_LABEL[k]||k) + '</span>'
-        + '<span style="flex:1;word-break:break-all">' + escapeHtml(String(v[k])) + '</span></div>';
+        + '<span style="flex:1;word-break:break-all">' + escapeHtml(값보임(k, v[k])) + '</span></div>';
     }).join('');
     $('puSrcBody').innerHTML = '<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">' + escapeHtml(puRef) + ' — pu-erp의 현재 값입니다. 여기 실적은 가져온 시점으로 고정돼 있습니다.</div>' + rows;
     $('modalPuSrc').classList.add('open');
@@ -21172,7 +21182,7 @@ function kcApplyLock(){
   box=document.createElement('div'); box.id='kcLock';
   box.innerHTML='<div class="kl-card"><div class="kl-ico">🔒</div>'
     +'<h2>'+escapeHtml(r.t)+'</h2><p>'+escapeHtml(r.d)+'</p>'
-    +'<div class="kl-who">지금 접속: '+escapeHtml(uid?((_me.name||'(이름 미확인)')+(_me.sid?' · '+_me.sid:'')):'로그인 안 됨')
+    +'<div class="kl-who">지금 접속: '+escapeHtml(uid?(_me.name||'(이름 미확인)'):'로그인 안 됨')
     +(uid?'<br>uid '+escapeHtml(uid):'')+'</div>'
     +'<div class="kl-act">'
     +'<button class="btn" onclick="fbLogout()">로그아웃</button>'
@@ -21321,7 +21331,7 @@ function renderInbox(){
           + '<span style="font-size:12px;color:var(--text-mute)">' + escapeHtml(String(what).slice(0,26))
           + (when ? ' · ' + escapeHtml(String(when)) : '') + '</span>'
           + '<span style="margin-left:auto;font-size:11px;color:var(--text-mute)">'
-          + escapeHtml((x.by && (x.by.name || x.by.sid)) || '?') + ' · '
+          + escapeHtml((x.by && x.by.name) || '이름 미확인') + ' · '
           + new Date(x.at || 0).toLocaleString('ko-KR').slice(0,17) + '</span></div>'
           + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">'
           + '<span style="font-size:11px;color:var(--text-mute);flex:1;min-width:120px">📄 '
@@ -21588,7 +21598,8 @@ async function _puLoadUserMap(){
   var map={};
   try{ var s=await fbDb.ref('data/user_dir').once('value'); var v=_puUnwrap(s.val());
     if(v){ var arr=Array.isArray(v)?v:Object.keys(v).map(function(k){return v[k];});
-      arr.filter(Boolean).forEach(function(u){ if(u&&u.sid) map[String(u.sid)]=u.name||String(u.sid); }); }
+      /* ⚠ 이름이 없으면 «빈 글자» — 사번을 이름 자리에 넣지 않는다(실적 표·증명서에 담당자로 샌다. 대표 결정 2026-10-25) */
+      arr.filter(Boolean).forEach(function(u){ if(u&&u.sid) map[String(u.sid)]=u.name||''; }); }
     _puUserMap=map; /* 응답 수신 성공 시에만 캐시 — 실패하면 캐시 안 하고 다음에 재시도 */
   }catch(e){ console.warn('user_dir load',e); }
   return _puUserMap||map;
@@ -21735,6 +21746,8 @@ async function resolveMe(){
     Object.keys(PU_COLLS).forEach(function(coll){ var cache=null; try{ cache=JSON.parse(LS.get(NS+PU_COLLS[coll].cache)||'null'); }catch(e){} if(cache&&cache.byMgr){ try{ renderPuPerf(coll,cache.byMgr); }catch(e){} } });
     try{ applyPerfAccess(); }catch(e){}
     try{ kcApplyLock(); }catch(e){}
+    /* 클라우드 창의 「로그인한 사람」 — 로그인 이메일 대신 이름(대표 결정 2026-10-25 「이름만」) */
+    try{ var _w=document.getElementById('fbWho'); if(_w) _w.textContent=_me.name||'로그인됨'; }catch(e){}
   }catch(e){ console.warn('resolveMe',e); }
 }
 /* 화면에 보일 담당자 이름: 대표/미해결=전체, 직원=본인만 */
@@ -21771,7 +21784,7 @@ async function loadPuPerf(coll,force){
     if(!v){ box.innerHTML='<div style="font-size:12px;color:var(--text-mute);padding:10px">pu-erp '+cfg.label+' 데이터가 없습니다</div>'; return; }
     var arr=(Array.isArray(v)?v:Object.keys(v).map(function(k){return v[k];})).filter(Boolean);
     var byMgr={};
-    arr.forEach(function(c){ var sid=_puMainMgr(c); var nm=_puUserMap[String(sid)]||String(sid||'(미지정)'); (byMgr[nm]=byMgr[nm]||[]).push(c); });
+    arr.forEach(function(c){ var sid=_puMainMgr(c); var nm=_puUserMap[String(sid)]||(sid?'이름 미확인':'(미지정)'); (byMgr[nm]=byMgr[nm]||[]).push(c); });
     try{ LS.set(NS+cfg.cache, JSON.stringify({at:new Date().toISOString(),byMgr:byMgr})); }catch(e){}
     renderPuPerf(coll,byMgr);
     if(force) toast('pu-erp '+cfg.label+' '+arr.length+'건 불러옴 (주담당 '+Object.keys(byMgr).length+'명)');
@@ -21820,7 +21833,7 @@ async function loadPuConsulting(force){
     if(!v){ box.innerHTML='<div style="font-size:12px;color:var(--text-mute);padding:10px">pu-erp 컨설팅 데이터가 없습니다</div>'; return; }
     var arr=(Array.isArray(v)?v:Object.keys(v).map(function(k){return v[k];})).filter(Boolean);
     var byMgr={};
-    arr.forEach(function(c){ var sid=_puMainMgr(c); var nm=_puUserMap[String(sid)]||String(sid||'(미지정)'); (byMgr[nm]=byMgr[nm]||[]).push(c); });
+    arr.forEach(function(c){ var sid=_puMainMgr(c); var nm=_puUserMap[String(sid)]||(sid?'이름 미확인':'(미지정)'); (byMgr[nm]=byMgr[nm]||[]).push(c); });
     try{ LS.set(NS+'pu_consult_cache', JSON.stringify({at:new Date().toISOString(),byMgr:byMgr})); }catch(e){}
     renderPuConsulting(byMgr);
     if(force) toast('pu-erp 컨설팅 '+arr.length+'건 불러옴 (주담당 '+Object.keys(byMgr).length+'명)');
@@ -22011,7 +22024,7 @@ function fbInit(){ if(location.protocol==='file:') return; if(typeof firebase===
   }catch(e){ console.warn('fbInit',e); } }
 function fbUpdateUI(u){ var lo=document.getElementById('fbLoggedOut'), li=document.getElementById('fbLoggedIn'), btn=document.getElementById('fbBtn');
   var lob=document.getElementById('fbLogoutBtn'); if(lob) lob.style.display=u?'':'none';
-  if(u){ if(lo)lo.style.display='none'; if(li)li.style.display=''; var w=document.getElementById('fbWho'); if(w)w.textContent=u.email||u.uid; if(btn){btn.textContent='☁ 동기화'; btn.style.color='var(--teal)';} fbLoadInfo();
+  if(u){ if(lo)lo.style.display='none'; if(li)li.style.display=''; var w=document.getElementById('fbWho'); if(w)w.textContent=(_me&&_me.name)||'로그인됨'; if(btn){btn.textContent='☁ 동기화'; btn.style.color='var(--teal)';} fbLoadInfo();
     _fbBase=fbGetBase(); var chk=document.getElementById('fbAutoChk'); if(chk) chk.checked=fbAutoOn(); if(fbAutoOn()) fbWatch(); }
   else { if(lo)lo.style.display=''; if(li)li.style.display='none'; if(btn){btn.textContent='☁ 클라우드'; btn.style.color='';} fbHideNotice(); } }
 function fbOpenModal(){ if(location.protocol==='file:'){ toast('GitHub Pages(https)에서 열어야 클라우드가 됩니다'); return; } if(!fbDb){ toast('클라우드 준비 중 — 잠시 후 다시 (인터넷 확인)'); return; } var m=document.getElementById('fbModal'); if(m) m.style.display='flex'; }

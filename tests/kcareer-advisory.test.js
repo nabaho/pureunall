@@ -94,9 +94,10 @@ test('★ 코드표가 없고 코드도 모르면 «받지 않는다» — 자�
   assert.equal(S.mapRecord('companies', 'co1', co(), USERMAP, {}), null);
 });
 
-test('담당 사번을 못 찾으면 사번을 그대로 보여 준다', () => {
+test('담당 이름을 못 찾으면 «빈 글자» — 사번을 대신 적지 않는다 (대표 결정 2026-10-25 「이름만 있어야한다」)', () => {
   const r = S.mapRecord('companies', 'co1', co({ managerMain: 'P-099' }), USERMAP, TYPEMAP).rec;
-  assert.equal(r.main, 'P-099');
+  assert.equal(r.main, '', '이름을 모를 때 사번이 담당자 칸에 들어갔다 — 표·증명서에 그대로 샌다');
+  assert.ok(!/[A-Za-z]-?\d{3}/.test(String(r.main)), '사번 꼴이 담당자 칸에 끼었다');
 });
 
 /* ───────── ⚠ contracts 는 가져오지 않는다 ───────── */

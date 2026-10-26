@@ -1516,9 +1516,10 @@
           bySid[sid] = {
             sid: sid, email: email,
             /* 이름은 공개 명부가 먼저, 없으면 급여데이터함에 적힌 이름, 그래도
-               없으면 사번. 명부 한 번 못 읽었다고 담당자가 통째로 사라지면
-               그 사람 업체까지 같이 사라진다. */
-            name: names[sid] || (own && own.name) || sid,
+               없으면 「이름 미확인」(사번은 안 적는다 — 사번에서 로그인 아이디가 만들어진다).
+               명부 한 번 못 읽었다고 담당자가 통째로 사라지면 그 사람 업체까지 같이 사라지므로
+               줄은 세운다. */
+            name: names[sid] || (own && own.name) || (SID_RE.test(sid) ? '이름 미확인' : sid),   // ⚠ 사번 꼴이면 사번을 대신 적지 않는다(대표 결정 2026-10-25) — 사번이 아닌 값(badSid)은 업체관리에 적힌 글자 그대로 보여야 고친다
             uid: own ? own.uid : '',
             /* 자리(uid)는 있어도 «들어온 것»은 아닐 수 있다 — 서버가 계정으로 자리를
                찾아 적어 둔 줄(2026-10-03)은 lastAt 이 없다. 자리를 알아야 관리자가 그
@@ -1685,7 +1686,21 @@
 
   function listOwners() {
     if (!deps.db) return Promise.resolve({});
-    return deps.db.ref(ownerBoxPath()).once('value').then(function (s) { return s.val() || {}; });
+    return deps.db.ref(ownerBoxPath()).once('value').then(function (s) {
+      var all = s.val() || {};
+      /* ⚠ 예전 로그인이 이름을 못 찾았을 때 «이메일»(p001@pureun.kr)이나 번호를 이름 자리에 적어 둔 줄이 있다.
+         화면에 그대로 뜨면 로그인 아이디가 드러나므로, 읽을 때 「이름 미확인」으로 바꿔 돌려준다(저장된 것은 그대로,
+         그 사람이 다시 로그인하면 진짜 이름으로 덮인다 — 대표 결정 2026-10-25 「이름만 있어야한다」). */
+      Object.keys(all).forEach(function (uid) {
+        var o = all[uid];
+        if (!o || typeof o !== 'object') return;
+        var n = String(o.name || '').trim();
+        if (n && (n.indexOf('@') >= 0 || n === uid || /^[A-Za-z]{1,3}-?\d{3}$/.test(n))) {
+          all[uid] = Object.assign({}, o, { name: '이름 미확인' });
+        }
+      });
+      return all;
+    });
   }
 
   /* 내 업체 순서는 내 담당자 명단 칸(owners/$uid) 밑에 둔다 — 이미 나만 쓸 수 있는
@@ -1700,9 +1715,9 @@
   }
 
   /* 로그인 마무리 — 이름을 찾고 명단에 나를 적어 둔다. 이름을 못 찾아도
-     로그인은 막지 않는다(이메일이라도 보이는 것이 빈칸보다 낫다). */
+     로그인은 막지 않는다(이름은 빈 채로 둔다 — 이메일·사번을 대신 적지 않는다, 대표 결정 2026-10-25). */
   function signIn(email, fallbackName) {
-    deps.name = fallbackName || email || deps.uid || '';
+    deps.name = fallbackName || '';
     return lookupName(email).then(function (found) {
       if (found) deps.name = found;
       return touchOwner(deps.name, email);

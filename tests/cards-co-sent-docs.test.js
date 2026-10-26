@@ -44,6 +44,8 @@ function load(extra) {
     esc: s => String(s == null ? '' : s).replace(/[&<>"']/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
     state: { sendLog: {} },
+    /* 보낸 사람 이름 — 화면은 메일 주소를 직접 안 적고 staffName 을 거친다. 모르는 계정은 빈 글자(2026-10-25) */
+    staffName: e => ({ 'ha@pureun.kr': '하팀장' }[String(e || '')] || ''),
     console
   }, extra || {});
   /* ⚠ 2026-09-03: 칸이 «한 줄 설명»(hintLine)을 부른다 — 진짜를 함께 싣는다 */
@@ -70,7 +72,8 @@ test('★ 두 사람에게 흩어진 보낸 기록이 한 줄기로 모인다 �
   assert.equal(rows.length, 2, '두 사람 몫이 다 모여야 한다');
   assert.equal(rows[0].what, '계약서', '최근 것이 위다');
   assert.equal(rows[0].who, '이과장', '누구에게 갔는지가 줄에 남아야 한다');
-  assert.equal(rows[0].by, 'ha', '보낸 사람은 메일 앞부분만');
+  /* 목록 짜는 함수는 날것(메일 주소)만 넘긴다 — 화면이 이름으로 바꾼다(staffName). 로그인 아이디 앞부분을 이름 대신 적지 않는다(2026-10-25) */
+  assert.equal(rows[0].by, 'ha@pureun.kr', '보낸 사람은 날것으로 넘긴다 — 앞부분을 잘라 이름 자리에 쓰지 않는다');
   assert.equal(rows[1].what, '제안서');
   assert.equal(rows[1].who, '김대리');
 });
@@ -135,6 +138,14 @@ test('세는 수와 그리는 줄 수가 같다 — 안 읽은 명함 몫을 세
   const html = c.coSentHtml({ cards: many });
   assert.match(html, /보낸 서류 30건/, '읽어 온 30명분만 센다');
   assert.equal(html.split('<div class="cof">').length - 1, 30, '개수와 줄 수가 어긋나면 안 된다');
+});
+
+test('★ 보낸 사람은 «이름»으로 그린다 — 메일 주소·앞부분(로그인 아이디)을 안 적는다', () => {
+  const c = load();
+  c.state.sendLog = { c1: { a: log(1000, { names: ['제안서'], by: 'ha@pureun.kr' }), b: log(900, { names: ['계약서'], by: 'zz@pureun.kr' }) } };
+  const html = c.coSentHtml({ cards: [card('c1', '김대리')] });
+  assert.match(html, /하팀장/, '알려진 직원은 이름으로 나와야 한다');
+  assert.doesNotMatch(html, /ha@|zz@|>s*·s*zz|· zz|· ha/, '메일 주소·앞부분이 화면 글자에 새고 있다');
 });
 
 /* ── 없는 것을 있는 척하지 않는다 ── */

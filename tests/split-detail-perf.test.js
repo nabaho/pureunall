@@ -63,7 +63,7 @@ t('나눠 갖는 몫도 보여준다', /'몫 '\+ps\.sharePct\+'%'/.test(MODAL), 
 t('몫이 100%면 굳이 안 적는다', /ps\.sharePct!==100/.test(MODAL), true);
 t('성과 기준액을 보여준다', /'기준 '\+\(\(_perf\[0\]&&_perf\[0\]\.baseAmount\)\|\|p\.amount\|\|0\)\.toLocaleString\(\)/.test(MODAL), true);
 t('한 줄에서도 이름과 %를 보여준다',
-  /\(ps\.name\|\|ps\.sid\)\+' '\+\(\(ps\.pct!==undefined&&ps\.pct!==null\)\?ps\.pct\+'%':''\)/.test(MODAL), true);
+  /\(ps\.name\|\|[^\n]{1,40}?\)\+' '\+\(\(ps\.pct!==undefined&&ps\.pct!==null\)\?ps\.pct\+'%':''\)/.test(MODAL), true);   // 이름이 앞에 온다 — 이름 없을 때의 대체값은 사번 걷기 규칙이 지킨다
 t('마우스를 올리면 사람별로 다 보인다', /' → '\+\(ps\.amount\|\|0\)\.toLocaleString\(\)\+'원'/.test(MODAL), true);
 t('금액만 적던 옛 표시가 없다',
   /_pt>0\?\('성과 '\+_pt\.toLocaleString\(\)\):''/.test(MODAL), false);

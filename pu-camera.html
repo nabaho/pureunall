@@ -51,6 +51,7 @@
      ⚠ 이 넘기기를 지우지 말 것 — 기업정보함·포털이 mode=card·document 로 이 주소를
        부른다. 지우면 그 길이 통째로 끊긴다.
      ⚠ **아래 무거운 것들보다 먼저** 둔다. 넘길 길이면 Firebase·저장 층을 받을 까닭이 없다. -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script data-part="forward">
 (function () {
   var params = new URLSearchParams(location.search || '');
@@ -68,13 +69,13 @@
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-version.js?v=12"></script>
 <style>
 :root{ --ink:#e2e8f0; --sub:#94a3b8; --blue:#2563eb; }
@@ -472,7 +473,7 @@ function shoot() {
        AI 요금이 나가고, 「사진만 찍는 앱」이라는 약속이 깨진다(대표 결정 2026-09-12). */
     var meta = {
       takenAt: at, upAt: at, seq: 0,
-      by: me.uid, byName: PuPhotoStore.myName() || me.email || '',
+      by: me.uid, byName: PuPhotoStore.myName() || '',   /* 이름만 — 못 찾았으면 빈 글자(이메일을 대신 적지 않는다, 2026-10-25) */
       kind: 'photo',
       w: full.w, h: full.h, size: full.dataUrl.length,
       /* 어디서 들어왔는지 — 화질 이야기가 나오면 이 값이 답한다(사진첩과 같은 규칙) */
@@ -584,11 +585,12 @@ firebase.auth().onAuthStateChanged(function (u) {
   /* 사진 자리가 사람별로 갈려 있어 **계정을 알기 전에는 담을 수 없다** —
      사진첩과 같은 차례다(로그인 확인 → 계정 등록 → 그다음). */
   PuPhotoStore.signIn(u.uid, u.email, u.displayName).then(function (who) {
-    $('who').textContent = ((who && who.name) || u.email || '') + ' · 푸른사진첩으로 자동 저장';
+    /* 이름만 — 이름을 못 찾으면 이름 줄은 빼고 안내만(이메일·사번을 대신 적지 않는다, 2026-10-25) */
+    $('who').textContent = [(who && who.name) || '', '푸른사진첩으로 자동 저장'].filter(Boolean).join(' · ');
     startCam();
   }).catch(function (e) {
     console.warn('[로그인]', e);
-    $('who').textContent = (u.email || '') + ' · 푸른사진첩으로 자동 저장';
+    $('who').textContent = '푸른사진첩으로 자동 저장';
     startCam();
   });
 });

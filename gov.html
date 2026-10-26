@@ -526,10 +526,11 @@ table.cmp td{white-space:nowrap}
 </div></div>
 <div id="toast"></div>
 
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -541,7 +542,7 @@ table.cmp td{white-space:nowrap}
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
@@ -1506,7 +1507,9 @@ async function whoAmI(u){
     var me=list.find(function(x){ return x && (x.sid===OWNER_SID || x.name===OWNER_NAME); });
     if(me && (u.email||'').indexOf(String(me.sid).toLowerCase())>=0) return {ok:true};
   }catch(e){}
-  return {ok:false, why:'접속: '+(u.email||'-')+' · uid '+u.uid};
+  /* 이름만 — 로그인 이메일·uid 를 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
+  var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||'';
+  return {ok:false, why:(nm?'접속: '+nm+' — ':'')+'이 계정으로는 열 수 없습니다'};
 }
 function applyLock(state, why){
   var el=$('lock');
