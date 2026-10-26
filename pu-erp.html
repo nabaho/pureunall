@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=36">
+<link rel="stylesheet" href="css/pu-erp.css?v=37">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -22420,7 +22420,8 @@ function ContractModal(props){
        예전 라벨-위 칸처럼 <label> 을 더 그리지 않는다 — 값을 채우면 이름이 사라지는
        대신, «칸 차례가 늘 같다»로 무엇인지 가늠한다(대표 승인 2026-09-19). */
   function fldn6(ctrl, span){
-    var cn = 'pu-n6' + (span > 1 ? (' pu-n6-' + span) : '');
+    var extra = arguments[2];   /* 덧붙일 칸 이름(예: 'pu-n6-t3' — 폰에서 한 줄에 셋). 머리줄 글자는 그대로 둔다 — 검사가 이 줄로 찾는다 */
+    var cn = 'pu-n6' + (span > 1 ? (' pu-n6-' + span) : '') + (extra ? ' ' + extra : '');
     return h('div', { className:cn }, ctrl);
   }
   function sec6(title, hint){
@@ -23380,7 +23381,7 @@ function ContractModal(props){
             ['소기업','중기업','중견기업','대기업','공공기관','기타'].map(function(sz){
               return h('option', { key:sz, value:sz }, sz);
             })
-          ))),
+          )), 1, 'pu-n6-t3'),
       /* ⚠ 라벨 없이 원칙(2026-09-19)의 예외다 — 부담당 슬롯과 같은 까닭
          (대표 지시 2026-09-21 「4대보험가입자 줄의 숫자위에 고용 산재 단어 넣어라」).
          placeholder 는 값이 «비어 있을 때만» 보인다. 고용·산재 인원수는 기본값이
@@ -23393,13 +23394,13 @@ function ContractModal(props){
           h('div', { style:{ fontSize:'10px', color:'#94a3b8', fontWeight:600, marginBottom:'2px' } }, '고용'),
           h(NumberInput, { value:f.company.employmentInsuredCount,
             onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
-            style:{ textAlign:'right', fontFamily:'monospace' } }))),
+            style:{ textAlign:'right', fontFamily:'monospace' } })), 1, 'pu-n6-t3'),
       fldn6(
         h('div', null,
           h('div', { style:{ fontSize:'10px', color:'#94a3b8', fontWeight:600, marginBottom:'2px' } }, '산재'),
           h(NumberInput, { value:f.company.injuryInsuredCount,
             onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
-            style:{ textAlign:'right', fontFamily:'monospace' } })))
+            style:{ textAlign:'right', fontFamily:'monospace' } })), 1, 'pu-n6-t3')
       )  // 그리드 2(주소·연락처·업종·4대보험) 닫기
       )  // 회사정보 내용 wrapper 닫기
       ),  // showCompany 닫기
@@ -23413,9 +23414,9 @@ function ContractModal(props){
         // 기업정보함에서 여러 명을 한 번에 — 체크한 사람만 담긴다
         h('button', { onClick:function(){ setPcMultiOpen(true); }, type:'button',
           title:'기업정보함에서 이 회사 사람들을 보고 담당자만 골라 담습니다',
-          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '📇 기업정보함에서 고르기'),
+          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, window.innerWidth<=768 ? '📇 기업정보함' : '📇 기업정보함에서 고르기'),   /* 폰은 짧게 — 「+ 추가」와 한 줄에 (2026-10-26) */
         h('button', { onClick:addContact, type:'button',
-          style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '+ 담당자 추가')
+          style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, window.innerWidth<=768 ? '+ 추가' : '+ 담당자 추가')
       ),
       /* 접힘 — 주담당 한 줄. 대표가 말한 「기존 주담당 1인 이름만」이다. */
       ctIsFolded() && (function(){
@@ -23454,7 +23455,7 @@ function ContractModal(props){
             ctDutySelect(idx, ct.duty),
             // 사업자 동일인 체크박스 — 라벨은 짧게, 뜻은 마우스를 올리면 그대로 보인다
             h('label', { title:'🔗 사업자(대표) 동일인 — 사업자등록증의 대표자와 같은 사람입니다',
-              style:{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10.5px', cursor:'pointer', color: locked ? '#1e40af' : '#64748b', fontWeight: locked ? 700 : 500, background: locked ? '#eff6ff' : 'transparent', padding:'2px 8px', borderRadius:'10px', border:'1px solid '+(locked ? '#bfdbfe' : 'transparent') } },
+              style:{ display:'flex', alignItems:'center', gap:'4px', fontSize:'10.5px', cursor:'pointer', color: locked ? '#1e40af' : '#64748b', fontWeight: locked ? 700 : 500, background: locked ? '#eff6ff' : 'transparent', padding: locked ? '2px 8px' : '2px 8px 2px 0', borderRadius:'10px', border:'1px solid '+(locked ? '#bfdbfe' : 'transparent') /* 안 켰을 땐 왼쪽 여백 0 — 폰에서 줄이 바뀌면 «#1» 과 같은 선에서 시작한다 (2026-10-26 「줄 셀 정렬」) */ } },
               h('input', { type:'checkbox', checked:locked, onChange:function(){ toggleSameAsCeo(idx); },
                 style:{ margin:0, cursor:'pointer' } }),
               h('span', null, '🔗 동일인')
