@@ -1693,6 +1693,33 @@ table.mstab2 tr:last-child td{border-bottom:none}
   #mmBody .dm-read .rtop .lft>*{flex:none;white-space:nowrap}
   /* ⑤ 📎 자료함 — 폰에서도 이제 그린다(renderMatMobile). PC 자리(#pcMat)와 같은 종이·같은 색 변수를 깐다.
        명함 갈래 줄·거르개 줄·＋ 는 이 화면 것이 아니라 접는다(메일 화면과 같은 까닭). */
+  /* ⑥ 메일 쓰기 (대표 지시 2026-10-26 「메일함 UI 너무 이상하다 깔끔하게 … 위로 올라가니까 틀 고정 안 돼 있어서 다 안 보인다」)
+       ⓐ 보내기 줄 틀 고정 — 받는사람을 치려고 글자판이 뜨면 화면이 올라가 「보내기」가 사라졌다.
+          머리칸(.cphead)은 폰에서 «겹을 풀어»(display:contents) 보내기 줄이 쓰기 화면 «전체»에서 붙게 한다
+          — 머리칸 안에서 붙이면 첨부 칸이 끝나는 곳에서 같이 올라가 버린다. PC(#pcMail)는 그대로.
+       ⓑ 보내기 줄은 한 줄 — 「← 목록으로」는 바로 위 「‹ 목록」과 같은 일이라 폰에서 뺀다. 자동저장 글도 뺀다.
+       ⓒ 「보내는 / 사람」 처럼 이름표가 두 줄로 꺾였다 — 이름표는 한 줄, 폭은 글자만큼.
+       ⓓ 받는사람을 고르면 「누구인지」(오현숙 주무관 · 제주…)가 칸의 절반을 먹어 입력칸이 «빈 네모»만 남았다
+          — 「누구인지」는 입력칸 «아래 줄»로 내린다.
+       ⓔ 찾기 목록에서 이름·회사가 한 글자씩 세로로 섰다 — 줄을 꺾지 않고, 이메일은 아랫줄에 …로 줄인다. */
+  #mmBody .cphead{display:contents}
+  /* ⚠ 위에 이미 「‹ 목록 · 메일함 …」 줄(.mmbar)이 붙어 있다 — 그 «밑»에 붙는다(높이는 renderMailMobile 이 재서 --mmbarH 로 준다).
+       top:0 이면 그 줄을 덮어 목록으로 갈 길이 가려졌다. z-index 도 그 줄(6)보다 낮게. */
+  #mmBody .mtop{position:sticky;top:var(--mmbarH,0px);z-index:5;background:#fff;flex-wrap:wrap;gap:2px 8px;
+    padding:6px 12px;margin:0 -12px 2px;border-bottom:1px solid #e2e8f0}   /* 양옆 −12px — #mmBody 여백까지 덮어야 밑 글이 옆으로 안 비친다 */
+  #mmBody .mtop .setback,#mmBody .mtop .mauto{display:none}
+  #mmBody .mtop>*{flex:none;white-space:nowrap}
+  #mmBody .mtop .cpsendbtn{padding:7px 16px}
+  #mmBody .mtop .cpghost{padding:6px 4px}
+  #mmBody .mtop .mchk{font-size:12px}
+  #mmBody .cpk{flex:0 0 auto;min-width:48px;white-space:nowrap}
+  #mmBody .cprow>div:has(>.cptowho){flex-wrap:wrap}
+  #mmBody .cptowho{order:3;flex:1 0 100%;max-width:100%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mmBody .cpsi{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px;row-gap:1px;align-items:baseline}
+  #mmBody .cpsi>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  #mmBody .cpsi .e{grid-column:1 / -1;margin-left:0}
+  /* ⓕ 글꼴·크기 고르기 — #mmBody select{width:100%} 이 글꼴 상자를 한 줄 통째로, 크기 상자는 64px 에 묶어 「10|」로 잘랐다 */
+  #mmBody .edbar .edsel{width:auto !important;flex:0 0 auto;max-width:48%}
   body.matview #tabs,body.matview #subbar,body.matview #fab{display:none}
   body.matview #listwrap{background:#fff}
   #matM{padding:12px 8px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
@@ -8601,6 +8628,8 @@ function renderMailMobile(){
       ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
       <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
     </div><div id="mmBody"></div>`;
+  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
+  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
   const body=$('mmBody'); if(!body) return;
   body.innerHTML = (state.mailSent==='box' ? mbMobileHtml()
                  /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고친다 — 한쪽만 고치면 폰에서만 안 열린다 */
@@ -8779,12 +8808,14 @@ function mailWriteHtml(){
           const mode = state.edMode || 'editor';
           if(mode!=='editor') return '';
           return `<div class="edbar">
-          <select class="edsel" onchange="edCmd('fontName',this.value)" title="글꼴">
-            ${['맑은고딕','굴림','돋움','바탕','나눔고딕'].map(f=>`<option>${f}</option>`).join('')}
+          ${/* 글꼴·크기는 «고른 대로 기억»한다 (대표 지시 2026-10-26 「셀픽도 좀 저장해라」 — 고르기 상자 값을 저장).
+                이 기기에 남기고, 다음 편지를 쓸 때 본문을 처음 누르면 그 글꼴·크기로 시작한다(edKeepApply). */''}
+          <select class="edsel" onchange="edKeepSet('font',this.value);edCmd('fontName',this.value)" title="글꼴 — 고른 것을 기억합니다">
+            ${['맑은고딕','굴림','돋움','바탕','나눔고딕'].map(f=>`<option ${f===edKeep('font')?'selected':''}>${f}</option>`).join('')}
           </select>
-          <select class="edsel" style="width:64px" onchange="edFontSize(this.value)" title="글자 크기">
+          <select class="edsel" style="width:64px" onchange="edKeepSet('pt',this.value);edFontSize(this.value)" title="글자 크기 — 고른 것을 기억합니다">
             ${['9','10','11','12','14','16','18','24'].map(n=>
-              `<option value="${n}" ${n==='10'?'selected':''}>${n}pt</option>`).join('')}
+              `<option value="${n}" ${n===edKeep('pt')?'selected':''}>${n}pt</option>`).join('')}
           </select>
           ${ED_TOOLS.map(t=> t.sep ? '<span class="edsep"></span>'
             : t.color
@@ -8821,7 +8852,7 @@ function mailWriteHtml(){
              ⚠ 누르거나 글자를 넣을 때마다 edSyncBar 로 켜짐 표시만 새로 칠한다(화면은 안 그린다). */
           return `<div id="cpBody" class="cpbody" contenteditable="true" spellcheck="false"
             data-ph="여기에 내용을 적으세요"
-            onkeyup="edSyncBar()" onmouseup="edSyncBar()"
+            onkeyup="edSyncBar()" onmouseup="edSyncBar()" onfocus="edKeepApply()"
             oninput="grabCompose()">${signPreviewHtml(html)}</div>`;
         })()}
         <div class="edfoot">
@@ -8917,6 +8948,23 @@ function edCmd(cmd, val){
   /* 누른 결과를 «곧바로» 담는다 — 안 담으면 다음에 화면을 그릴 때 사라진다 */
   grabCompose();
   edSyncBar();
+}
+
+/* 글꼴·크기 기억 (대표 지시 2026-10-26 「셀픽도 좀 저장해라」) — 이 기기(localStorage)에만 남긴다.
+   ⚠ 기억한 값을 «보여만» 주면 거짓말이다(상자는 굴림인데 치면 맑은고딕) — 그래서 본문을 처음 누를 때
+     그 글꼴·크기를 실제로 켠다. 편지마다 한 번만(_compose._edKeep), 기본값(맑은고딕·10pt)이면 아무것도 안 한다. */
+const ED_KEEP_DEF = { font:'맑은고딕', pt:'10' };
+function edKeep(k){
+  try{ const v = localStorage.getItem('pucards_ed_' + k); if(v) return v; }catch(_){}
+  return ED_KEEP_DEF[k];
+}
+function edKeepSet(k, v){ try{ localStorage.setItem('pucards_ed_' + k, String(v)); }catch(_){} }
+function edKeepApply(){
+  if(!_compose || _compose._edKeep) return;
+  _compose._edKeep = true;
+  const f = edKeep('font'), p = edKeep('pt');
+  if(f !== ED_KEEP_DEF.font) edCmd('fontName', f);
+  if(p !== ED_KEEP_DEF.pt) edFontSize(p);
 }
 
 /* 글자 크기 — 브라우저 명령은 1~7 만 받는다. 화면에는 pt 로 보여 주고 여기서 바꾼다. */
@@ -9663,7 +9711,7 @@ function wireMailWrite(){
     sug.innerHTML = hits.map(it=>{
       const em = normEmail(it.email);
       return `<div class="cpsi ${em?'':'off'}" ${em?`onclick="pickPerson('${it.id}')"`:''}>
-        👤 <b>${esc(it.name||'(이름 없음)')}</b>
+        <b>👤 ${esc(it.name||'(이름 없음)')}</b>
         <span class="c">${esc(it.company||'')}</span>
         <span class="e">${em?esc(em):'이메일 없음'}</span></div>`;
     }).join('');
