@@ -44,7 +44,7 @@ function build(companies) {
 }
 const CO = [
   { id: 'a1', name: '(주)활성상사', status: 'active', bizNo: '111-11-11111', monthlyAdvisoryFee: 110000 },
-  { id: 'c1', name: '엔타스시', status: 'closed', bizNo: '742-32-00726', monthlyAdvisoryFee: 110000 },
+  { id: 'c1', name: '엔타스시', status: 'closed', bizNo: '123-81-20012', monthlyAdvisoryFee: 110000 },
   { id: 'c2', name: '합쳐진옛업체', status: 'closed', bizNo: '999-99-99999', mergedInto: 'a1' },
 ];
 
@@ -57,7 +57,7 @@ test('①★ 종료 업체는 «꼭 같은 이름»일 때 알아본다 (창이 
 
 test('①★ 사업자번호가 꼭 같아도 알아본다 (이름이 달라도)', () => {
   const w = build(CO);
-  const hit = w.match(w.idx, '다른표기', '742-32-00726', { allowClosed: true });
+  const hit = w.match(w.idx, '다른표기', '123-81-20012', { allowClosed: true });
   assert.ok(hit && hit.id === 'c1');
 });
 
@@ -80,7 +80,7 @@ test('③★ 활성 업체가 먼저다 · 합쳐 없앤 종료 업체는 안 �
   const w = build(CO);
   assert.equal(w.match(w.idx, '(주)활성상사', '', { allowClosed: true }).id, 'a1');
   assert.equal(w.match(w.idx, '합쳐진옛업체', '999-99-99999', { allowClosed: true }), null, '★ 합쳐 없앤 업체에 붙었다');
-  const dup = build(CO.concat([{ id: 'a2', name: '엔타스시', status: 'active', bizNo: '742-32-00726' }]));
+  const dup = build(CO.concat([{ id: 'a2', name: '엔타스시', status: 'active', bizNo: '123-81-20012' }]));
   const o = { allowClosed: true };
   assert.equal(dup.match(dup.idx, '엔타스시', '', o).id, 'a2', '같은 이름의 활성 업체가 있으면 그쪽이다');
   assert.notEqual(o.via, 'closed');
