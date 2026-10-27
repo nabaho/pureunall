@@ -48628,6 +48628,41 @@ if(typeof window !== 'undefined'){
   window.erpPickMap = erpPickMap;           window.erpPickWho = erpPickWho;
 }
 
+/* ★ 종료·해지 업체가 «여러 달 몫»을 한 번에 낸 자동이체를 달별로 나눈다 (건의 · 김보람 2026-10-27, 대표 「추천대로」)
+   엔타스시는 계약을 끝내며 남은 두 달 몫이 4/17 에 220,000원(= 110,000 × 2)으로 한 번에 나갔다.
+   한 줄(220,000원, 받을 달 1개)로 적으면 달별 자문료가 어긋난다 — 자문료의 «정확한 배수»(2~6배)일 때만 달마다 한 줄로 나눈다.
+   받을 달은 고른 달부터 «다음 달»로 이어 간다. 나눌 수 없으면(마감된 달·이미 입금된 달) {ok:false, why} — 부르는 쪽이 한 줄로 적는다.
+   배수가 아니거나 자문료가 없으면 null(나누지 않는다). */
+function erpCmsSplitPlan(co, amount, ym, all){
+  var fee = parseInt(co && co.fee, 10) || 0, amt = parseInt(amount, 10) || 0;
+  if(fee <= 0 || amt <= 0 || amt % fee !== 0) return null;
+  var k = amt / fee;
+  if(k < 2 || k > 6) return null;
+  var months = [], m = ym;
+  for(var i = 0; i < k; i++){ months.push(m); m = _erpYmNext(m); }
+  for(var j = 0; j < months.length; j++){
+    if(typeof isIncomeLocked === 'function' && isIncomeLocked(months[j]))
+      return { ok:false, k:k, fee:fee, months:months, why: months[j] + ' 입금이 마감돼 있습니다' };
+    if(erpAdvisoryPaidFor(co, months[j], all || []).length)
+      return { ok:false, k:k, fee:fee, months:months, why: months[j] + ' 자문료가 이미 입금돼 있습니다' };
+  }
+  return { ok:true, k:k, fee:fee, months:months };
+}
+/* 계획대로 달마다 자문료 한 줄씩 만든다. 나이스빌 지문(cmsKey)은 «첫 줄에만» — 같은 명세 줄이라 지문은 하나다.
+   만든 줄 수를 돌려준다(add = erpAddCompanyIncome — 검사가 가짜를 넣어 돌린다). */
+function erpCmsAddRows(co, plan, date, note, kind, cmsKey, add){
+  var made = 0;
+  for(var i = 0; i < plan.months.length; i++){
+    var mm = /^(\d{4})-(\d{2})$/.exec(plan.months[i]);
+    if(!mm) break;
+    var okRow = add(co, parseInt(mm[2], 10), parseInt(mm[1], 10), date,
+                    note + ' · ' + plan.k + '개월분 중 ' + (i + 1) + '번째', kind, plan.fee, { cmsKey: (i === 0 ? cmsKey : '') });
+    if(!okRow) break;
+    made++;
+  }
+  return made;
+}
+
 // ══════════════════════════════════════════════
 // 🏦 CMS 일괄이체(더빌이체) 매칭 — 입금 1건을 여러 업체 자문료로 나눠 표시
 // ══════════════════════════════════════════════
@@ -49837,11 +49872,42 @@ function CmsMatchModal(props){
       if(k === false) return;                       // 그만두기 · 바깥 누르기 · Esc
       offKind = k;
     }
+    /* ★ 종료·해지 업체가 «여러 달 몫»을 한 번에 냈으면 달별로 나눠 적을지 묻는다 (건의 · 김보람 2026-10-27, 대표 「추천대로」).
+       ⚠ 거래내역 창에서만 — 업체입금 탭에서 열면(props.addIncome) 달 칸에 직접 적는 곳이라 나누지 않는다. 자문료로 잡을 때만. */
+    var splitPlans = {}, splitDo = false;
+    if(!props.addIncome && offKind === '자문료'){
+      var _all0 = dbGet('finance_income', []) || [];
+      sel.forEach(function(n){
+        var _c0 = byNameAll[n];
+        if(!_c0 || !_c0.off || paidMap[n]) return;
+        var _p0 = erpCmsSplitPlan(_c0, effAmt(n), ym, _all0);
+        if(_p0) splitPlans[n] = _p0;
+      });
+      var _canSplit = Object.keys(splitPlans).filter(function(n){ return splitPlans[n].ok; });
+      var _cannot = Object.keys(splitPlans).filter(function(n){ return !splitPlans[n].ok; });
+      if(_cannot.length){
+        try { showToast('⚠ ' + _cannot.map(function(n){ return n + ' — ' + splitPlans[n].why; }).join(' · ') + ' → 나누지 않고 한 줄로 적습니다', 9000); } catch(_t){}
+      }
+      if(_canSplit.length){
+        var sq = await popConfirm('종료·해지 업체의 이 입금은 «여러 달 몫»입니다.\n\n'
+          + _canSplit.map(function(n){
+              var _p = splitPlans[n];
+              return '· ' + n + ' ' + effAmt(n).toLocaleString() + '원 = ' + _p.fee.toLocaleString() + '원 × ' + _p.k + '개월\n    → ' + _p.months.join(' · ');
+            }).join('\n')
+          + '\n\n달마다 자문료 한 줄씩 나눠 적을까요?',
+          { choices:[{ key:'split', label:'달별로 나눠 적기' }, { key:'one', label:'한 줄로 적기 (' + ym + ')' }],
+            cancelText:'그만두기', danger:false });
+        if(sq === false) return;
+        splitDo = (sq === 'split');
+      }
+    }
     setBusy(true);
     var ok=0, skip=0;          // skip = 이미 입금표시돼 «금액만 맞춘» 곳
     var okNames = [];
     sel.forEach(function(n){
-      var co = byName[n];
+      /* ★ 해지·미등록 업체도 «고른 업체»다 — byName(자문 중 풀)만 보면 그 업체는 조용히 건너뛰어졌다.
+         건의(2026-10-27)의 「고른 업체가 없습니다」: 엔타스시를 골라 확인까지 눌렀는데 입금표시가 하나도 안 만들어졌다. */
+      var co = byName[n] || byNameAll[n];
       if(!co) return;
       if(paidMap[n]){ skip++; return; }              // 중복 방지 2차 관문 (이미 입금표시된 업체+월)
       var d = ymd || todayYMD();
@@ -49863,6 +49929,12 @@ function CmsMatchModal(props){
       var _nbRows = nbData ? nbData.items.filter(function(it){ return it.coName === n; }) : [];
       var _ck = (_nbRows.length === 1) ? (_nbRows[0].key || '') : '';
       if(_ck && erpCmsKeyTaken(_ck, dbGet('finance_income', []) || [])){ skip++; return; }
+      if(splitDo && splitPlans[n] && splitPlans[n].ok){
+        var _made = erpCmsAddRows(co, splitPlans[n], d, _note, _k, _ck, erpAddCompanyIncome);
+        if(!_made){ skip++; return; }
+        if(_made < splitPlans[n].k) showToast('⚠ ' + n + ': ' + splitPlans[n].k + '개월 중 ' + _made + '개월만 적었습니다 — 입금관리에서 확인해 주세요', 9000);
+        paidMap[n] = 1; ok++; okNames.push(n); return;
+      }
       if(props.addIncome){ props.addIncome(co, month, d, _note, _k, _amt, { cmsKey:_ck }); }
       else if(!erpAddCompanyIncome(co, month, year, d, _note, _k, _amt, { cmsKey:_ck })){ skip++; return; }
       paidMap[n] = 1; ok++; okNames.push(n);
@@ -49874,7 +49946,7 @@ function CmsMatchModal(props){
       try {
         var _all = dbGet('companies', []) || [];
         var _want = {};
-        okNames.forEach(function(n){ _want[n] = 1; });
+        okNames.forEach(function(n){ if(!(byNameAll[n] && byNameAll[n].off)) _want[n] = 1; });   // 종료·해지 업체의 업체관리 기록은 건드리지 않는다
         var _chg = [];
         _all.forEach(function(c){
           if(!c || !c.id || !_want[c.name]) return;
