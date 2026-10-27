@@ -313,7 +313,8 @@ test('기업정보함: 카톡에서 건넨 파일은 메일 첨부와 «같은 �
   assert.match(t, /q\.get\('to'\) !== 'co'/);
   assert.match(t, /PuHandoff\.take\(k\)/);
   assert.match(t, /mbAttToCo\(0, \{ atts: \[/, '새 담기 창을 따로 지었다');
-  assert.match(c, /hideCardsLogin\(\); ErpMatch\.load\(\); mbTakeToCo\(\);/, '로그인 뒤에 받지 않는다');
+  /* 2026-10-27 — 맨몸 호출이 «뒤쪽 덩이가 아직»일 때 던져 명함 구독까지 멈췄다. 이제 있는지 보고 부른다(tests/cards-detail-actions.test.js ④) */
+  assert.match(c, /hideCardsLogin\(\); ErpMatch\.load\(\);[\s\S]{0,900}?mbTakeToCo\(\);/, '로그인 뒤에 받지 않는다');
   assert.match(cut(c, 'function mbAttFetch('), /if\(a && a\.bytes\) return Promise\.resolve\(/, '건네받은 바이트를 서버에 다시 묻는다');
 });
 

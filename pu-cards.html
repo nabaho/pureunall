@@ -83,6 +83,7 @@
      각자 셈하면 같은 회사가 둘로 갈린다. -->
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
 <script src="js/pu-doc-file.js?v=37"></script>
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
 <script src="js/pu-office-store.js?v=10"></script>
@@ -424,6 +425,18 @@ body:has(.mck-dim) #pu-version-fab{display:none!important}
 .ditem .k{width:88px;flex-shrink:0;color:var(--sub);font-size:12.5px;padding-top:2px}
 .ditem .v{flex:1;word-break:break-all}
 .ditem .v a{color:var(--orange);text-decoration:none}
+/* 명함 상세 — 복사 단추·주소 지도 창 (2026-10-27) */
+.dcopy{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px;padding:2px 8px;font-size:11.5px;
+  font-weight:700;cursor:pointer;margin-left:6px;vertical-align:middle;white-space:nowrap;font-family:inherit}
+#addrMapOv{position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
+#addrMapOv .amap{background:#fff;color:#1e293b;border-radius:12px;width:min(640px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+#addrMapOv .amap-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13.5px}
+#addrMapOv .amap-h b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#addrMapOv iframe{border:0;width:100%;height:min(60vh,460px);display:block}
+#addrMapOv .amap-b{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid #e2e8f0}
+#addrMapOv .amap-b a{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;padding:7px 12px;
+  font-size:13px;font-weight:700;text-decoration:none}
+#addrMapOv .amap-b .dcopy{margin-left:auto;padding:7px 12px;font-size:13px}
 
 #zoombg{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;z-index:200;
   align-items:center;justify-content:center;cursor:zoom-out}
@@ -4808,7 +4821,15 @@ const Store = {
             myEmail=(u.email||'').toLowerCase(); myUid=u.uid||'';
             /* ⚠ loadSharedGKey() 를 뗐다(2026-08-17) — 로그인할 때마다 실시간DB 의
                열쇠를 브라우저로 내려받던 자리다. 이제 열쇠는 서버만 안다. */
-            hideCardsLogin(); ErpMatch.load(); mbTakeToCo();
+            hideCardsLogin(); ErpMatch.load();
+            /* ⚠ mbTakeToCo 는 «뒤쪽» <script> 덩이에 있다 — 로그인이 그 덩이가 읽히기 «전»에 끝나면
+                 «is not defined» 로 던져, 이 아래(명함 구독 붙이기)가 통째로 안 돌아 목록이 텅 빈다
+                 (2026-10-27 점검 도구에서 실제로 그랬다 — 명함 0장). 함수 끌어올림은 제 덩이 안에서만 된다.
+                 있으면 지금, 없으면 문서가 다 읽힌 뒤에 한 번 부르고, 무엇이 나든 이 줄에서 멈추지 않는다. */
+            try {
+              if (typeof mbTakeToCo === 'function') mbTakeToCo();
+              else window.addEventListener('load', function(){ try { mbTakeToCo(); } catch(_e){ console.warn('[take]', _e); } }, { once:true });
+            } catch(_e) { console.warn('[take]', _e); }
             /* ── 명함 씨앗을 먼저 그린다 (대표 보고 2026-08-29 「기업정보함도 빨리」) ──
                지난 로그인 때 담아 둔 스냅숏(IndexedDB)을 구독의 씨앗으로 준다 — 화면이
                «즉시» 서고, 최신본은 뒤에서 한 장씩 갈아 끼워진다(watchCardMap 머리글).
@@ -14019,6 +14040,57 @@ function photoBackBtn(it){
     onclick="openCoDoc('${esc(it.photoYear)}','${esc(it.photoId)}','${esc(it.photoOwner)}')">📷 사진첩 원본</button>`;
 }
 
+/* ══════ 명함 상세 — 바로 걸기·복사·지도 (대표 지시 2026-10-27 「주소나 이메일 복사하기 버튼, 주소를 클릭하면
+   팝업으로 지도, 전화도 휴대폰도 바로 전화 걸 수 있게」) ══════
+   ★ 번호는 다 «누르면 걸린다» — 휴대폰·직통·회사 대표번호·대표번호. (팩스도 예전처럼 걸린다 — 팩스 번호로
+     전화하는 일도 있다.) 회사 대표번호는 여태 글자만이라 눌러도 안 걸렸다.
+   ★ 주소는 누르면 지도 창 — 지도·링크 셈은 캘린더와 «같은 것»(js/pu-cal-map.js PuCalMap)을 쓴다. 두 벌로 만들지 않는다.
+     카카오·네이버는 창 안에 못 끼운다(열쇠·도메인 등록) — 그래서 끼워 보기는 구글, 카카오·네이버는 앱으로 넘기는 단추.
+   ★ 이메일·주소 옆 「복사」 — 줄 끝에 작게, 같은 줄에(한 칸은 한 줄).
+   ⚠ 값은 남이 적은 글이다 — 화면에는 esc, 지도 주소는 PuCalMap 이 encodeURIComponent 를 거친다. */
+const D_TEL_KEYS = ['mobile','tel','fax','companyTel'];
+const D_ADDR_KEYS = ['companyAddr','address'];
+function dAddrLink(addr){
+  return `<a href="#" class="daddr" data-a="${esc(addr)}" onclick="openAddrMap(this.dataset.a);return false"`
+    + ` title="누르면 지도가 뜹니다">📍 ${esc(addr)}</a>`;
+}
+function dCopyBtn(text){
+  return ` <button type="button" class="dcopy" data-c="${esc(text)}" onclick="event.stopPropagation();dCopy(this.dataset.c)"`
+    + ` title="복사합니다">복사</button>`;
+}
+function dCopy(text){
+  const done = ()=>toast('복사했습니다 — ' + String(text).slice(0, 40), 2500);
+  const old = ()=>{
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('복사 실패'); }
+    document.body.removeChild(ta);
+  };
+  /* ⚠ 누른 «그 순간»에 바로 부른다 — 앞에서 기다리면 브라우저가 «사람이 누른 것»으로 안 쳐 조용히 실패한다 */
+  if(navigator.clipboard) navigator.clipboard.writeText(String(text)).then(done).catch(old); else old();
+  puExport('copy', 1, '명함 이메일·주소 복사');   /* 반출 기록 — 고객 연락처가 밖으로 나가는 길이다(tests/cards-export-log.test.js) */
+}
+function openAddrMap(addr){
+  const M = window.PuCalMap;
+  const src = M ? M.embedUrl(addr) : '';
+  const L = M ? M.links(addr) : null;
+  if(!src || !L){ toast('지도를 불러오지 못했습니다 — 주소를 복사해 지도 앱에 붙여 넣으세요', 5000); return; }
+  closeAddrMap();
+  const ov = document.createElement('div');
+  ov.id = 'addrMapOv';
+  ov.onclick = (e)=>{ if(e.target === ov) closeAddrMap(); };
+  ov.innerHTML = `<div class="amap">
+      <div class="amap-h"><b>📍 ${esc(addr)}</b><button class="iconbtn" onclick="closeAddrMap()" title="닫기">✕</button></div>
+      <iframe src="${esc(src)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="지도"></iframe>
+      <div class="amap-b">
+        <a href="${esc(L.kakao)}" target="_blank" rel="noopener">카카오맵</a>
+        <a href="${esc(L.naver)}" target="_blank" rel="noopener">네이버지도</a>
+        <a href="${esc(L.googleGo)}" target="_blank" rel="noopener">길찾기</a>
+        <button type="button" class="dcopy" data-c="${esc(addr)}" onclick="dCopy(this.dataset.c)">주소 복사</button>
+      </div></div>`;
+  document.body.appendChild(ov);
+}
+function closeAddrMap(){ const o=$('addrMapOv'); if(o) o.remove(); }
+
 /* ⚠ backCo — 「기업 상세에서 열었다」는 표. 그 회사 열쇠를 그대로 받아 「◀ 뒤로」에
      심는다(대표 보고 2026-09-12 「명함확인후 뒤로 백할 수 없다」).
    ⚠ 전역에 두지 «않는다» — 한 번 켜 두면 목록에서 연 명함에도 「뒤로」가 남아
@@ -14041,8 +14113,10 @@ function openDetail(id, backCo){
   const rows = fields.filter(([k])=>it[k]).map(([k,label])=>{
     let v=esc(it[k]);
     if (k==='bizno') v=esc(fmtBizno(it[k]));
-    if (['mobile','tel','fax'].includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
+    if (D_TEL_KEYS.includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
       if (k==='email') v=`<a href="#" onclick="openMailWindow('${it.id}');return false" title="딴 창에서 메일을 씁니다 — 보던 화면은 그대로 남습니다">${v}</a>`;
+    if (D_ADDR_KEYS.includes(k)) v = dAddrLink(it[k]);
+    if (k==='email' || D_ADDR_KEYS.includes(k)) v += dCopyBtn(it[k]);
     /* 둘째 번호·이메일이 있으면 메인 아래에 흐리게 (대표 지시 2026-09-08) */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
     v += addrNoteHtml(it, k);
@@ -14311,8 +14385,10 @@ function openPcDetail(id, backCo){
   const rows = fields.filter(([k])=>it[k] && k!=='memo').map(([k,label])=>{
     let v=esc(it[k]);
     if (k==='bizno') v=esc(fmtBizno(it[k]));
-    if (['mobile','tel','fax'].includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
+    if (D_TEL_KEYS.includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
       if (k==='email') v=`<span class="pd1" title="${esc(it[k])}"><a href="#" onclick="openMailWindow('${it.id}');return false" title="${esc(it[k])} — 딴 창에서 메일을 씁니다(보던 화면은 그대로 남습니다)">${v}</a></span>`;
+    if (D_ADDR_KEYS.includes(k)) v = dAddrLink(it[k]);
+    if (k==='email' || D_ADDR_KEYS.includes(k)) v += dCopyBtn(it[k]);
     /* 폰 상세와 «같은 줄»을 붙인다 — 한쪽에만 있으면 화면에 따라 둘째가 사라진다 */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
     v += addrNoteHtml(it, k);
