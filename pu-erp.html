@@ -49024,11 +49024,20 @@ function erpParseNicebill(raw, det){
 
 // ── 회원명·사업자번호 → ERP 업체 색인 (파싱 1회만 만든다 — 행마다 업체목록을 훑지 않도록) ──
 function erpNicebillCoIndex(){
-  var idx = { byNorm:{}, byBiz:{}, byPrev:{}, list:[], cache:{} };
+  var idx = { byNorm:{}, byBiz:{}, byPrev:{}, list:[], cache:{}, closed:{ byNorm:{}, byBiz:{} } };
   var all = dbGet('companies', []) || [];
   if(!Array.isArray(all)) return idx;
   for(var i=0; i<all.length; i++){
     var c = all[i];
+    /* 종료(closed) 업체 — «이름·사업자번호가 꼭 같을 때만» 알아보려고 따로 모은다(2026-10-27 건의).
+       계약을 끝낸 뒤에도 자동이체가 남은 달 몫으로 한두 번 더 나가는데, 활성 업체만 색인하면 그 출금이 「연결 안 됨」이 된다.
+       ⚠ 활성 색인(byNorm·byBiz·list)에는 섞지 않는다 — 비슷한 이름·예전 이름·학습 별칭으로 종료 업체에 붙으면 안 된다.
+       ⚠ 합쳐서 없앤(mergedInto) 업체는 제외 — 이름이 같은 «진짜» 업체가 따로 있다. */
+    if(c && c.id && c.name && c.status === 'closed' && !c.mergedInto){
+      var ce = { id:c.id, name:c.name, norm:erpNormName(c.name), biz:_nbDigits(c.bizNo), closed:true };
+      if(ce.norm && !idx.closed.byNorm[ce.norm]) idx.closed.byNorm[ce.norm] = ce;
+      if(ce.biz.length >= 10 && !idx.closed.byBiz[ce.biz]) idx.closed.byBiz[ce.biz] = ce;
+    }
     if(!c || !c.id || !c.name || c.status !== 'active') continue;
     var e = {
       id: c.id, name: c.name, norm: erpNormName(c.name), biz: _nbDigits(c.bizNo),
@@ -49061,7 +49070,7 @@ function erpNicebillMatchCo(idx, name, bizNo, out){
   if(!idx) return null;
   var nm = erpNormName(name);
   var bz = _nbDigits(bizNo);
-  var ck = nm + '|' + bz;
+  var ck = nm + '|' + bz + ((out && out.allowClosed) ? '|c' : '');   // 종료 업체까지 보는 호출은 따로 센다(섞이면 다른 화면이 종료 업체를 받는다)
   if(idx.cache && idx.cache.hasOwnProperty(ck)) return idx.cache[ck];
   var hit = null;
   if(nm && idx.byNorm[nm]) hit = idx.byNorm[nm];
@@ -49087,8 +49096,15 @@ function erpNicebillMatchCo(idx, name, bizNo, out){
       if(an && idx.byNorm[an]) hit = idx.byNorm[an];
     }
   }
+  /* 종료 업체 — 활성에서 못 찾았을 때만, «꼭 같은 이름 또는 사업자번호»일 때만(비슷한 이름은 안 된다).
+     부르는 쪽이 out.allowClosed 를 켠 경우에만 본다 — 다른 화면(자동 확정·목록)은 그대로 활성 업체만 이어진다. */
+  var _closedHit = false;
+  if(!hit && out && out.allowClosed && idx.closed){
+    var _ch = (nm && idx.closed.byNorm[nm]) || (bz.length >= 10 && idx.closed.byBiz[bz]) || null;
+    if(_ch){ hit = _ch; _closedHit = true; }
+  }
   if(out){
-    out.via = _prevHit ? 'prev' : (hit ? 'name' : '');
+    out.via = _closedHit ? 'closed' : (_prevHit ? 'prev' : (hit ? 'name' : ''));
     out.matched = _prevHit ? _prevHit.matched : (hit ? hit.name : '');
   }
   if(idx.cache){
@@ -49639,14 +49655,14 @@ function CmsMatchModal(props){
       var _nbIdx = erpNicebillCoIndex();
       var _items = [], _pick = [], _seen = {}, _noLink = 0;
       _nbInfo.rows.forEach(function(r){
-        var _mv = {};
+        var _mv = { allowClosed:true };   // 종료 업체도 «꼭 같은 이름·번호»면 알아본다(2026-10-27 건의)
         var co = erpNicebillMatchCo(_nbIdx, r.name, r.bizNo, _mv);
         var cn = co ? co.name : '';
-        var inPool = !!(cn && byName[cn]);
+        var inPool = !!(cn && (byName[cn] || (_mv.via === 'closed' && byNameAll[cn])));
         if(!cn) _noLink++;
         _items.push({ name:r.name, coName:cn, amount:parseInt(r.amount,10)||0,
                       key:erpCmsRowKey(r),           // 나이스빌 줄 지문 — 입금에 cmsKey 로 남긴다
-                      inPool:inPool, paid:!!(cn && paidMap[cn]),
+                      inPool:inPool, paid:!!(cn && paidMap[cn]), closed:(_mv.via === 'closed'),
                       /* 말없이 붙지 않는다 — 무엇을 보고 붙였는지 줄에 적는다. */
                       prevVia:(_mv.via === 'prev' ? _mv.matched : '') });
         if(inPool && !paidMap[cn] && !_seen[cn]){ _seen[cn] = 1; _pick.push(cn); }
@@ -49662,8 +49678,12 @@ function CmsMatchModal(props){
     var m = {};
     nbData.pick.forEach(function(n){ m[n] = 1; });
     setChk(m);
+    /* 종료 업체가 들어 있으면 말한다 — 그 업체는 아래 목록에 «해지·미등록도» 를 켜야 보인다(저절로 켠다) */
+    var _clN = nbData.items.filter(function(i){ return i.closed && nbData.pick.indexOf(i.coName) >= 0; }).length;
+    if(_clN) setShowMore(true);
     setHint('🏦 나이스빌 CMS 실데이터 '+nbData.pick.length+'곳 · 정산예정일 '+nbData.info.date
-            + (nbData.info.exact ? ' — 입금액과 일치' : ' (합계 '+nbData.info.total.toLocaleString()+'원 · 차액 '+nbData.info.diff.toLocaleString()+'원)'));
+            + (nbData.info.exact ? ' — 입금액과 일치' : ' (합계 '+nbData.info.total.toLocaleString()+'원 · 차액 '+nbData.info.diff.toLocaleString()+'원)')
+            + (_clN ? ' · 종료 업체 '+_clN+'곳 포함' : ''));
     return true;
   }
 
@@ -49788,6 +49808,7 @@ function CmsMatchModal(props){
                 var a = effAmt(n);
                 return '· '+n+' '+a.toLocaleString()+'원'
                        + (amtFrom(n)==='hand' ? ' (손수정)' : '')
+                       + ((byNameAll[n] && byNameAll[n].off) ? ' (종료·해지 업체)' : '')
                        + (paidMap[n] ? ' (이미 입금 — 새로 만들지 않음)' : '');
               }).join('\n')
             + (sel.length>12 ? '\n· … 외 '+(sel.length-12)+'곳' : '')
@@ -49977,6 +49998,11 @@ function CmsMatchModal(props){
               it.name + (it.coName && erpNormName(it.coName)!==erpNormName(it.name) ? ' → '+it.coName : '')
               + ' ' + it.amount.toLocaleString()+'원'
               + (bad ? ' · 연결 안 됨' : (it.paid ? ' · 이미입금' : (it.inPool ? '' : ' · 목록없음')))
+              /* 종료 업체 — 「연결 안 됨」이 아니라 «종료 업체로 알아봤다»고 말한다. 자문료의 배수면 몇 개월분인지도(220,000 = 110,000 × 2) */
+              + (it.closed ? (' · 종료 업체' + (function(){
+                  var _c2 = byNameAll[it.coName], _f = _c2 ? (parseInt(_c2.fee, 10) || 0) : 0;
+                  return (_f > 0 && it.amount % _f === 0 && it.amount / _f >= 2) ? (' · ' + (it.amount / _f) + '개월분') : '';
+                })()) : '')
               + (it.prevVia ? (' · 예전 이름 「' + it.prevVia + '」') : ''));
           })
         )
