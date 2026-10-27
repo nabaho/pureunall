@@ -21942,6 +21942,8 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              /* ⚠ 도장 목록(stamps)은 2026-10-09 부터 «오간다» — 아래 FB_UNION 머리말 */
              /* 이 기기에서 고친 것이 아직 안 올라갔다는 표시 — 기기마다의 사정이다 */
              '_fbpending',
+             /* 합치기 «쉼»·«새로고침» 시각 — 기기마다의 사정이다(오가면 다른 기기까지 같이 쉰다) */
+             '_fbmergeat', '_fbmergereload',
              /* 지금 올리는 중인 시각(탭끼리 보는 표) — 기기마다의 사정이다 */
              '_fbpushing',
              /* «이 기기 세 통은 직원용 사본» 표시 — 기기마다 */
@@ -22647,7 +22649,7 @@ function fbFirstSync(){
    올리기도 멈춘 채 서로 달라진 채로 남았다(누를 때까지). 받아도 잃을 것이 없으면 받는다.
    ⚠ 이 기기에 안 올라간 고침(_fbpending)이 있으면 받지 않는다 — 띠로 사람이 고른다(덮으면 그 고침이 사라진다).
    ⚠ 창(모달)이 열려 있으면 받지 않는다 — 새로고침이 쓰던 것을 날린다. 띠만 띄운다. */
-var _fbMerging=false, _fbMergeFails=0, _fbBusyWait=0;
+var _fbMerging=false, _fbMergeFails=0, _fbBusyWait=0, _fbMergeLater=false;
 /* ★★ 두 기기가 서로 고쳤으면 «합친다» — 띠로 한쪽을 버리게 하지 않는다 (대표 지시 2026-10-18)
    「폰 하면서 코딩하는데 항상 상단에 다른 기기에 데이터 관련돼서 체크 항목이 나온다 — 한 번에 해결하고 표시 안 나오게」.
    ■ 예전엔 막다른 길이었다: 클라우드가 새것이면 올리기를 멈추고, 이 기기에 안 올라간 고침이 있으면 받기를 멈췄다.
@@ -22674,6 +22676,14 @@ function fbNewerSync(){
   if(busy && _fbBusyWait<40){ _fbBusyWait++; setTimeout(fbNewerSync, 15000); return; }
   if(busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
   if(_fbMerging) return;
+  /* ★★ 쉼(2026-10-27 사고) — 두 기기(에지·크롬)가 «서로 합치고 새로고침하며» 6초마다 되풀이했다(「이 탭이 3분 안에 13번 다시 켜졌습니다」).
+     합친 뒤 올리면 상대가 «더 새것»을 보고 합치고 다시 올리고 … 끝이 없었다. 한 기기가 2분에 한 번만 합친다 — 쉬는 동안은 «조용히» 기다렸다 한다. */
+  var 지난=Number(LS.get(NS+'_fbmergeat'))||0, 쉼=120000;
+  if(Date.now()-지난<쉼){
+    if(!_fbMergeLater){ _fbMergeLater=true; setTimeout(function(){ _fbMergeLater=false; fbNewerSync(); }, 쉼-(Date.now()-지난)+500); }
+    return;
+  }
+  try{ LS.set(NS+'_fbmergeat', String(Date.now())); }catch(e){}
   _fbMerging=true; _fbBusyWait=0;
   var 실패=function(e){ _fbMerging=false; _fbMergeFails++;
     if(e) console.warn('fbNewerSync', e);
@@ -22693,7 +22703,15 @@ function fbNewerSync(){
     if(내게){ if(kcRestoreFailed(kcApplyRestore(m.ls, 'pull'))){ _fbMerging=false; return; } }
     fbSetBase(v.at);
     var 끝=function(){ _fbMerging=false; _fbMergeFails=0; fbHideNotice();
-      if(내게){ toast('☁ 폰·PC 기록을 합쳤습니다'+(m.fromLocal?(' (이 기기에만 있던 '+m.fromLocal+'건 포함)'):'')+' — 새로고침합니다', 5000); kcReload(1500); } };
+      if(!내게) return;
+      /* ★ 새로고침은 10분에 한 번만 — 그 사이는 «화면만 다시 그린다»(자료는 이미 이 기기에 썼다). 되풀이 새로고침이 요금과 깜빡임의 뿌리였다 */
+      var 전=Number(LS.get(NS+'_fbmergereload'))||0;
+      if(Date.now()-전>600000){
+        try{ LS.set(NS+'_fbmergereload', String(Date.now())); }catch(e){}
+        toast('☁ 폰·PC 기록을 합쳤습니다'+(m.fromLocal?(' (이 기기에만 있던 '+m.fromLocal+'건 포함)'):'')+' — 새로고침합니다', 5000); kcReload(1500);
+      }else{
+        _safe(function(){ if(typeof buildNav==='function') buildNav(); }); _safe(function(){ if(typeof renderHome==='function') renderHome(); });
+      } };
     if(!구름에){ _fbPendingClear(null); 끝(); return; }      /* 클라우드는 이미 같다 — 올릴 것 없음 */
     _fbDoPush(_fbCounts(null).total, true).then(끝, 실패);
   }).catch(실패);
