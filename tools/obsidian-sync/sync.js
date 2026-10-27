@@ -4,6 +4,7 @@
    node tools/obsidian-sync/sync.js --vault "D:\푸른업무"                     # 클로드 코드(+코덱스)
    node tools/obsidian-sync/sync.js --vault ... --chatgpt "C:\...\conversations.json"   # 챗지피티 내보내기
    node tools/obsidian-sync/sync.js --vault ... --dry-run                      # 아무것도 안 쓰고 건수만
+   node tools/obsidian-sync/sync.js --vault ... --inbox "D:\\전달함"                 # 클라우드 방 노트(전달함)도 함께 들임
 
    읽는 곳(원본은 읽기만 한다)
      · 클로드 코드  ~/.claude/projects 아래 모든 .jsonl (--claude-dir 로 바꿈)
@@ -35,6 +36,7 @@ function parseArgs(argv) {
     else if (k === '--claude-dir') a.claudeDir = argv[++i];
     else if (k === '--codex-dir') a.codexDir = argv[++i];
     else if (k === '--chatgpt') a.chatgpt = argv[++i];
+    else if (k === '--inbox') a.inbox = argv[++i];
     else if (k === '--since') a.since = argv[++i];
     else if (k === '--min-turns') a.minTurns = Number(argv[++i]) || 2;
     else if (k === '--exclude') a.exclude.push(argv[++i]);
@@ -168,6 +170,33 @@ function writePending(vault) {
   return pend.length;
 }
 
+/* 전달함(--inbox) — 클라우드 방 기록을 remote-export.js 가 노트로 만들어 둔 폴더(예: 비공개 저장소를 받아 둔 곳).
+   그 안의 raw/sessions/claude-cloud/*.md 를 보관함의 같은 자리로 «바뀐 것만» 복사하고, 하루 목록·대기 목록에 건다.
+   원본(전달함)은 읽기만 한다. 같은 방은 같은 파일에 갱신한다. */
+function importInbox(inbox, vault, state, touched) {
+  const got = { 새로: 0, 갱신: 0, 그대로: 0 };
+  const root = path.join(path.resolve(inbox), 'raw', 'sessions', 'claude-cloud');
+  walk(root, '.md').forEach((f) => {
+    const text = readOr(f, '');
+    const fm = /^---\n([\s\S]*?)\n---/.exec(text);
+    const get = (k) => { const m = fm && new RegExp('^' + k + ':\\s*(.*)$', 'm').exec(fm[1]); return m ? m[1].trim() : ''; };
+    const id = get('session'), start = get('started');
+    if (!id || !start) return;
+    const rel = 'raw/sessions/claude-cloud/' + path.basename(f);
+    const sig = require('crypto').createHash('sha1').update(text).digest('hex');
+    const key = 'claude-cloud:' + id, prev = state.sessions[key];
+    if (prev && prev.sig === sig && fs.existsSync(path.join(vault, prev.file))) { got.그대로++; return; }
+    ensure(path.dirname(path.join(vault, rel)));
+    fs.writeFileSync(path.join(vault, rel), text);
+    const h1 = /^# (.+)$/m.exec(text);
+    state.sessions[key] = { sig, file: (prev && prev.file) || rel, source: 'claude-cloud', project: '', title: h1 ? h1[1].trim() : id, start };
+    if (prev && prev.file !== rel) { try { fs.unlinkSync(path.join(vault, prev.file)); } catch (e) { /* 옛 이름 정리 실패는 무시 */ } }
+    touched.add(L.dateOf(start));
+    prev ? got.갱신++ : got.새로++;
+  });
+  return got;
+}
+
 function main() {
   const a = parseArgs(process.argv.slice(2));
   assertVaultSafe(a.vault);
@@ -198,6 +227,8 @@ function main() {
 
   if (!a.dryRun) {
     const made = scaffold(vault);
+    const inboxGot = a.inbox ? importInbox(a.inbox, vault, state, touched) : null;
+    if (inboxGot) { stat.새로 += inboxGot.새로; stat.갱신 += inboxGot.갱신; stat.그대로 += inboxGot.그대로; console.log('전달함(클라우드 방): 새로 ' + inboxGot.새로 + ' · 갱신 ' + inboxGot.갱신 + ' · 그대로 ' + inboxGot.그대로); }
     const erp = erpEntries(vault);
     erp.forEach((e) => touched.add(L.dateOf(e.start)));
     touched.forEach((date) => {

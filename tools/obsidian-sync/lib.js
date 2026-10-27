@@ -132,6 +132,55 @@ function parseCodexSession(text, hintId) {
   return { source: 'codex', id, title: firstUser ? firstUser.text : '', project: baseName(cwd), start, end, turns, tools };
 }
 
+/* 클라우드 방(Claude 앱의 ☁) — 기록이 서버에만 있어 «세션 목록·사건(event) 조회» 도구로 읽어 온 JSON 을 쓴다.
+   사건 한 줄 = {created_at, user|assistant:{uuid, internal_anthropic_catchall:{message:{role,content}, agent_id?, parent_tool_use_id?}}}.
+   하위 에이전트(agent_id · parent_tool_use_id)의 말은 본 대화에 요약돼 돌아오므로 뺀다. 생각·도구 결과는 글 블록이 아니라 자연히 빠진다. */
+function parseRemoteEvents(events, meta) {
+  meta = meta || {};
+  const seen = {}, list = [];
+  (Array.isArray(events) ? events : []).forEach((e) => {
+    const kind = e && (e.user ? 'user' : e.assistant ? 'assistant' : '');
+    if (!kind) return;
+    const u = e[kind].uuid || '';
+    if (u && seen[u]) return;       /* 쪽을 나눠 받으면 경계가 겹칠 수 있다 */
+    if (u) seen[u] = 1;
+    list.push({ kind, at: e.created_at || '', c: e[kind].internal_anthropic_catchall || e[kind] });
+  });
+  list.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const turns = []; let tools = 0;
+  list.forEach((x) => {
+    const c = x.c || {};
+    if (c.agent_id || c.parent_tool_use_id) return;
+    const msg = c.message || {};
+    if (x.kind === 'assistant' && Array.isArray(msg.content)) tools += msg.content.filter((b) => b && b.type === 'tool_use').length;
+    const body = textOfBlocks(msg.content);
+    /* 다른 세션·하위 에이전트가 «사용자 말처럼» 돌려보낸 보고는 사람의 말이 아니다 */
+    if (x.kind === 'user' && /^Another Claude session sent a message|<agent-message\b/.test(body)) return;
+    if (body) turns.push({ role: x.kind, text: body, at: x.at });
+  });
+  const first = turns[0] ? turns[0].at : '';
+  const firstUser = turns.find((t) => t.role === 'user');
+  return {
+    source: 'claude-cloud', id: meta.id || '', title: meta.title || (firstUser ? firstUser.text : ''), project: '',
+    start: meta.created_at || first, end: meta.updated_at || (turns.length ? turns[turns.length - 1].at : ''), turns, tools
+  };
+}
+
+/* 도구 결과 파일(앞뒤에 안내 글이 붙은 JSON)에서 첫 JSON 덩어리를 꺼낸다 — 글자 안의 괄호는 세지 않는다 */
+function extractJson(text) {
+  const s = String(text || ''); const a = s.indexOf('{"');
+  if (a < 0) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = a; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) { try { return JSON.parse(s.slice(a, i + 1)); } catch (e) { return null; } }
+  }
+  return null;
+}
+
 /* 챗지피티 «데이터 내보내기» 의 conversations.json — 대화가 나뭇가지(mapping)로 저장돼 있다.
    현재 가지(current_node)에서 뿌리까지 거슬러 올라가 «지금 보이는 대화»만 편다. */
 function parseChatGPTExport(json) {
@@ -159,10 +208,10 @@ function parseChatGPTExport(json) {
 
 /* ── 4. 마크다운 만들기 ────────────────────────────────────────── */
 const MAX_TURN = 6000; /* 한 마디가 너무 길면(붙여넣은 문서 등) 잘라 노트가 터지지 않게 */
-const SRC_LABEL = { 'claude-code': '클로드 코드', codex: '코덱스', chatgpt: '챗지피티', erp: '푸른이알피' };
+const SRC_LABEL = { 'claude-code': '클로드 코드', codex: '코덱스', chatgpt: '챗지피티', erp: '푸른이알피', 'claude-cloud': '클로드 클라우드' };
 
 function noteFileName(s) {
-  return dateOf(s.start) + ' ' + slug(maskSensitive(oneLine(s.title, 60)), 50) + ' ' + String(s.id).slice(0, 8) + '.md';
+  return dateOf(s.start) + ' ' + slug(maskSensitive(oneLine(s.title, 60)), 50) + ' ' + String(s.id).replace(/^session_/, '').slice(0, 8) + '.md';
 }
 
 function renderNote(s) {
@@ -214,6 +263,6 @@ function upsertDaily(existing, date, block) {
 
 module.exports = {
   maskSensitive, oneLine, slug, dateOf, hhmm, cleanText,
-  parseClaudeSession, parseCodexSession, parseChatGPTExport,
+  parseClaudeSession, parseCodexSession, parseChatGPTExport, parseRemoteEvents, extractJson,
   noteFileName, renderNote, renderDailyBlock, upsertDaily, DAILY_BEGIN, DAILY_END
 };
