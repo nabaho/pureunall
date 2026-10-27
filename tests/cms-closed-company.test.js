@@ -67,6 +67,23 @@ test('①★ 비슷한 이름으로는 종료 업체에 붙지 않는다 (엉뚱
   assert.equal(w.match(w.idx, '엔타스', '', { allowClosed: true }), null);
 });
 
+test('①★ 같은 이름이 여러 줄이어도 «종료 업체» 표시는 줄마다 남는다 (캐시에서 꺼낸 줄도)', () => {
+  /* 한 달에 출금이 여러 번 나간 업체(3/20 · 4/17 · 4/20)는 같은 이름이 연달아 온다 —
+     캐시에서 꺼낸 줄은 via 가 비어서 둘째 줄부터 일반 업체·미선택으로 보였다 */
+  const w = build(CO);
+  for (let i = 1; i <= 3; i++) {
+    const out = { allowClosed: true };
+    const hit = w.match(w.idx, '엔타스시', '', out);
+    assert.ok(hit && hit.id === 'c1', i + '번째 줄이 안 붙었다');
+    assert.equal(out.via, 'closed', '★ ' + i + '번째 줄에서 «종료 업체» 표시가 사라졌다 (캐시 적중)');
+    assert.equal(out.matched, '엔타스시');
+  }
+  /* 허용 없는 호출은 여전히 안 붙고, via 도 거짓으로 채워지지 않는다 */
+  const none = { };
+  assert.equal(w.match(w.idx, '엔타스시', '', none), null);
+  assert.equal(none.via, '');
+});
+
 test('②★ 허용하지 않은 호출(다른 화면·자동 확정)은 종료 업체를 받지 않는다', () => {
   const w = build(CO);
   assert.equal(w.match(w.idx, '엔타스시', '', {}), null, '★ 허용 없이 종료 업체가 붙었다 — 다른 화면이 넓어졌다');
