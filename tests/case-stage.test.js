@@ -28,6 +28,9 @@ const ctx = { console, Object, Array, String, Number, JSON, Math, Date, parseInt
   PuCaseDue: require(require('path').join(__dirname, '..', 'js', 'pu-case-due.js')) };
 ctx.dbGet = function (k, d) { return Object.prototype.hasOwnProperty.call(ctx.__store, k) ? ctx.__store[k] : d; };
 ctx.dbSet = function (k, v) { ctx.__store[k] = v; };
+/* 씨앗 심기는 erpPlantSeed 를 거친다(서버에 먼저 묻는다 — 실제 동작은 tests/seed-plant-needs-server.test.js 가 지킨다).
+   여기서는 «서버가 비어 있다»고 보고 이 기기 안에 심는 것으로 흉내 낸다. */
+ctx.erpPlantSeed = function (k, seed) { ctx.__store[k] = seed; };
 vm.createContext(ctx);
 vm.runInContext(STAGE_SRC, ctx);
 
