@@ -55,6 +55,8 @@ for (let i = 0; i < 32; i++) {
     email: i % 7 === 3 ? '' : 'pa' + i + '@example.invalid',
     companyTel: i % 3 === 0 ? '02-0000-' + pad(2000 + i, 4) : '',
     owner: ['점검대표', '점검노무', ''][i % 3],
+    /* 지어낸 주소 — 상세의 「📍 주소 → 지도」·「복사」를 보려고 (2026-10-27) */
+    companyAddr: i % 4 === 1 ? '' : '점검시 점검구 점검로 ' + (10 + i) + ', ' + (i % 5 + 1) + '층',
     thumb: '', createdAt: NOW - i * 0.7 * DAY, updatedAt: NOW - i * 0.7 * DAY,
   };
   if (i % 9 === 0) it.fav = true;
@@ -201,6 +203,18 @@ module.exports = {
     { name: 'cnt', run: clickFirst('#tabCnt'), wait: 2500 },
     { name: 'card', run: clickFirst('#tabCard') },
     { name: 'detail', run: clickFirst('#list .row'), back: esc },
+    /* 명함 상세 — 번호는 걸리고, 이메일·주소 옆에 「복사」 (대표 지시 2026-10-27) */
+    { name: 'detail-rows', wait: 1200, run: async (page) => {
+      await page.locator('#tabCard').first().click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(1200);
+      await page.locator('#list .row').first().click({ timeout: 4000 }); await page.waitForTimeout(800);
+      await page.evaluate(() => { const r = document.querySelector('#detailM .daddr'); if (r) r.scrollIntoView({ block: 'center' }); });
+    }, back: async (page) => { await page.evaluate(() => { try { closeDetail(); } catch (e) {} }); } },
+    /* 명함 상세 — 주소를 누르면 지도 창 (대표 지시 2026-10-27) */
+    { name: 'detail-map', wait: 1500, run: async (page) => {
+      await page.locator('#tabCard').first().click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(1200);   /* --view 로 이것만 열어도 되게 */
+      await page.locator('#list .row').first().click({ timeout: 4000 }); await page.waitForTimeout(800);
+      await page.locator('#detailM .daddr').first().click({ timeout: 4000 });
+    }, back: async (page) => { await page.evaluate(() => { try { closeAddrMap(); closeDetail(); } catch (e) {} }); } },
     { name: 'sel', run: async (page) => { await page.evaluate(() => toggleSelMode()); await page.locator('#list .row').nth(1).click(); },
       back: async (page) => { await page.evaluate(() => toggleSelMode()); } },
     { name: 'search', run: async (page) => { await page.locator('#appbar .iconbtn').first().click(); await page.fill('#search', '점검'); },

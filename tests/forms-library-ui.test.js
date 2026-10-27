@@ -62,7 +62,8 @@ test('문서관리 — 메뉴는 HTML 에선 「검토 후」, 실린 것이 있
   assert.match(f, /bindNav\(b\)/);
   assert.match(html, /if \(h === '#lib' && libIndex && libIndex\.length\) return 'lib';/, '실린 것이 없으면 #lib 주소로도 못 들어간다');
   assert.match(html, /js\/pu-form-library\.js\?v=\d+/);
-  assert.match(html, /PuOfficeStore\.init\([^\n]*\);\n  openLibraryNav\(\);/, '로그인 뒤에 연다');
+  /* 원본 보관함 설정 직후에 연다 — 설정은 직접 부르든 officeInit() 도우미(올린 사람 «이름»을 명부를 읽은 뒤 다시 넣는 길)를 거치든 같다 */
+  assert.match(html, /(?:PuOfficeStore\.init\([^\n]*\)|officeInit\(\));\r?\n  openLibraryNav\(\);/, '로그인 뒤에 연다');
 });
 
 test('채운 값은 저장하지 않는다 — 서식집 화면에 db 쓰기가 없다', () => {

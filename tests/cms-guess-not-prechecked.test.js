@@ -30,11 +30,8 @@ const { stripJs } = require('./strip-comments.js');
 const ROOT = path.join(__dirname, '..');
 const RAW = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
 const ERP = stripJs(RAW);
-const MODAL = (function () {
-  const at = ERP.indexOf('function CmsMatchModal(props){');
-  assert.ok(at > 0, 'CmsMatchModal 을 찾지 못했습니다');
-  return ERP.slice(at, at + 30000);
-})();
+/* 함수를 «통째로» 뽑는다 — 고정 폭(30000자)으로 자르면 함수가 자랄 때 끝을 못 본다(tests/test-cut-truncation.test.js) */
+const MODAL = cutFn(ERP, 'function CmsMatchModal(props)');
 
 /* ══ ① 조합이 몇 가지인지 함께 돌려준다 ══ */
 function loadSubset() {

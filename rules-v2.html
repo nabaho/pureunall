@@ -14,11 +14,12 @@
      2026-10-04 두 앱 합치기 — 포털 타일은 「취업규칙」(rules.html) 하나다. 이 화면은 그 앱의
      📚 조별 문안(#topics)·📥 모은 자료(#lib) 갈래이고, 머리줄 갈래 단추로 들어온다.
      2026-10-04 ③-ⓐⓑ 「🏢 사업장」(#sites) 갈래를 더했다 — 빈 주소의 첫 화면이 이것이다(목업 「추천대로」). -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -26,7 +27,7 @@
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script>
 /* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, #lib 면 「📥 모은 자료」, 그 밖(빈 것·#sites)은 「🏢 사업장」.
@@ -48,9 +49,9 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-sites.js?v=2"></script>
 <script src="js/rules-v2/store.js?v=4"></script>
-<script src="js/rules-v2/view-library.js?v=4"></script>
+<script src="js/rules-v2/view-library.js?v=5"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=10"></script>
+<script src="js/rules-v2/view-sites.js?v=11"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -495,7 +496,7 @@ button{font:inherit;cursor:pointer}
 <script src="js/pu-appbar.js?v=34"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 -->
 <script src="js/pu-active.js?v=1"></script>
 <script>
@@ -1018,11 +1019,11 @@ try {
         };
         var store = PuRulesV2Store.make({ db: db, gateway: gw, companies: function () { return list; },
           actor: function () { return role.sid || u.uid; }, now: function () { return Date.now(); } });
-        /* 명부 — 담당 이름. 못 읽어도 화면은 돈다(이름 대신 사번이 보인다) */
+        /* 명부 — 담당 이름. 못 읽어도 화면은 돈다(이름을 모르면 빈 글자 — 사번을 이름 자리에 적지 않는다, 2026-10-25) */
         var sidOf = function (x) { return String(x || '').trim().toUpperCase().replace(/^([A-Z])-?(\d+)$/, '$1-$2'); };
         return db.ref('data/user_dir').once('value').then(function (d) { return d.val() || {}; }, function () { return {}; }).then(function (dir) {
           var arr = Array.isArray(dir.v) ? dir.v : Object.keys(dir.v || {}).map(function (k) { return dir.v[k]; });
-          arr.forEach(function (p) { if (p && p.sid) ST.staff[sidOf(p.sid)] = String(p.name || p.sid); });
+          arr.forEach(function (p) { if (p && p.sid) ST.staff[sidOf(p.sid)] = String(p.name || ''); });
           ST.me = sidOf(role.sid);
           boot(store, { isAdmin: role.isAdmin === true, companies: list });
         });

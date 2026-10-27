@@ -136,7 +136,7 @@
         start: start,
         end: (closed && endRaw) ? endRaw : '',
         period: start ? (start + ' ~ ' + ((closed && endRaw) ? endRaw : '현재')) : '',
-        main: (userMap && userMap[sid]) || sid,
+        main: (userMap && userMap[sid]) || '',   /* 이름을 못 찾으면 빈 글자 — 사번을 대신 적지 않는다(대표 결정 2026-10-25) */
         status: closed ? '종료' : '진행',
         closedReason: c.closedReason || '',
         puRef: refOf('companies', key, c)
@@ -177,7 +177,7 @@
         org: c.companyName || c.payee || '',
         project: proj,
         year: String(dateRaw).slice(0, 4) || (cn ? cn.year : '') || yearOf(coll, c),
-        main: (userMap && userMap[sid]) || sid,
+        main: (userMap && userMap[sid]) || '',   /* 이름을 못 찾으면 빈 글자 — 사번을 대신 적지 않는다(대표 결정 2026-10-25) */
         /* 진행중도 가져온다(실사용: 사건 13건 중 11건이 진행중이었다).
            상태를 그대로 옮겨 두고, 증명서 발급은 '완료' 건만 고르게 한다. */
         status: isClosed(c) ? '완료' : '진행',

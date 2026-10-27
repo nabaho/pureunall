@@ -421,7 +421,12 @@
       note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' }
   };
   var EXCLUDED_SCREENS = {
-    'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다'
+    'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다',
+    /* 푸른 문서뷰어 (2026-10-25) — 이 기기의 파일을 «보기만» 한다. 서버·Firebase 를 쓰지 않고 저장하는 자리가 없다
+       (최근 목록은 이 브라우저 localStorage 의 이름·크기·형식·때뿐, 파일 내용은 안 담는다). 그래서 PROGRAMS(저장 자리)도
+       SATELLITES(주인 프로그램)도 아니다. 포털 타일은 «저장 자리 없는 프로그램»을 등록부가 어떻게 받을지 정한 뒤에 단다. 설계 docs/폰-문서뷰어-설계.md */
+    'pu-viewer.html':'문서뷰어 — 이 기기의 파일을 보기만 한다. 서버·저장 자리 없음',
+    'pu-viewer-frame.html':'문서뷰어의 격리된 칸(sandbox iframe) — 부모가 바이트를 건네 주면 그리기만 한다. 저장 자리 없음'
     /* fund-poc.html(기금관리 실험 화면)은 2026-10-09 지웠다 — 운영에 쓰지 않았다(대표 「지워」) */
   };
 
@@ -603,7 +608,7 @@
   function recordLabel(r,type,id){
     r=r||{};
     if(type==='Organization')return clean(r.name||r.companyName||r.company||id);
-    if(type==='Person')return clean(r.name||r.userName||r.sid||id);
+    if(type==='Person')return clean(r.name||r.userName)||'이름 미확인';   /* 이름만 — 사번을 이름 자리에 대신 적지 않는다(대표 결정 2026-10-25) */
     return clean(r.title||r.name||r.companyName||r.company||r.no||r.filename||r.월||id);
   }
   /* ★ 회사 이름 다듬개는 «하나»다 (2026-09-04).
@@ -757,12 +762,12 @@
         var rid=clean(r.id), st=STORE_TYPES[store];
         var main=clean(r.managerMain||r.managerSid||r.ownerSid);
         if(main){
-          if(!people[main]) issue(issues,'high','orphan_person',store,rid,main,'등록되지 않은 주담당 사번입니다.');
+          if(!people[main]) issue(issues,'high','orphan_person',store,rid,recordLabel(r,st,rid),'등록되지 않은 주담당 사번입니다.');   /* 이름표는 «그 업무»의 이름 — 사번 글자를 화면에 내지 않는다 */
           else addEdge(edges,canon(st,rid),'assignedTo',canon('Person',main),store,rid,1);
         }
         (Array.isArray(r.managerSubs)?r.managerSubs:[]).forEach(function(sid){
           sid=clean(sid); if(!sid) return;
-          if(!people[sid]) issue(issues,'high','orphan_person',store,rid,sid,'등록되지 않은 부담당 사번입니다.');
+          if(!people[sid]) issue(issues,'high','orphan_person',store,rid,recordLabel(r,st,rid),'등록되지 않은 부담당 사번입니다.');
           else addEdge(edges,canon(st,rid),'assists',canon('Person',sid),store,rid,1);
         });
       });
@@ -776,7 +781,7 @@
         if(!rid) return;
         if(!sid){ issue(issues,'medium','missing_person_sid',store,rid,recordLabel(r,st,rid),
           '사번이 비어 있어 누구의 기록인지 확정할 수 없습니다.'); return; }
-        if(!people[sid]){ issue(issues,'high','orphan_person',store,rid,sid,
+        if(!people[sid]){ issue(issues,'high','orphan_person',store,rid,recordLabel(r,st,rid),
           '등록되지 않은 사번입니다.'); return; }
         addEdge(edges,canon(st,rid),'recordedFor',canon('Person',sid),store,rid,1);
       });
@@ -969,10 +974,15 @@
       severity:sev,entities:graph.entities,edges:dedup,issues:issues,coverage:coverage,coverageCount:ready,programCount:Object.keys(PROGRAMS).length,readOnly:true});
   }
 
+  /* 화면에 내는 이름표 — 사람은 이름이 없어도 사번(열쇠)을 글자로 내지 않는다. id·key 는 그대로(연결 열쇠). */
+  function shownLabel(type,label,id){
+    var l=clean(label); if(l) return l;
+    return (type==='Person'&&/^[A-Za-z]{1,3}-?\d{1,4}$/.test(clean(id).replace(/^Person:/,'')))?'이름 미확인':clean(id);
+  }
   /* 4단계 조회 엔진. 화면에 이미 올라온 관계망만 검색하며 서버를 다시 읽거나 쓰지 않는다. */
   function searchEntities(report,query,options){
     report=report||{};options=options||{};var q=clean(query).toLowerCase(),type=clean(options.type),limit=Math.max(1,Math.min(200,Number(options.limit)||30));
-    return Object.keys(report.entities||{}).map(function(key){var e=report.entities[key]||{};return {key:key,id:e.id,type:e.type,label:clean(e.label||e.id),program:clean(e.program||'erp'),source:clean(e.source||e.store)};})
+    return Object.keys(report.entities||{}).map(function(key){var e=report.entities[key]||{};return {key:key,id:e.id,type:e.type,label:shownLabel(e.type,e.label,e.id),program:clean(e.program||'erp'),source:clean(e.source||e.store)};})
       .filter(function(e){return (!type||e.type===type)&&(!q||(e.label+' '+e.id).toLowerCase().indexOf(q)>=0);})
       .sort(function(a,b){return a.label.localeCompare(b.label,'ko');}).slice(0,limit);
   }
@@ -981,7 +991,7 @@
     (report.edges||[]).forEach(function(e){
       var other=null,direction='out';if(e.subject===entityKey)other=e.object;else if(e.object===entityKey){other=e.subject;direction='in';}else return;
       var n=entities[other]||{};rows.push({edgeId:e.id,predicate:e.predicate,direction:direction,confidence:Number(e.confidence),
-        key:other,id:n.id||other,type:n.type||'Unknown',label:clean(n.label||n.id||other),program:clean(n.program||'erp'),sourceStore:e.sourceStore,sourceId:e.sourceId});
+        key:other,id:n.id||other,type:n.type||'Unknown',label:shownLabel(n.type||(String(other).indexOf('Person:')===0?'Person':''),n.label,n.id||other),program:clean(n.program||'erp'),sourceStore:e.sourceStore,sourceId:e.sourceId});
     });
     return rows.sort(function(a,b){return (a.type+a.label).localeCompare(b.type+b.label,'ko');});
   }
@@ -1059,13 +1069,15 @@
     if(options.requireMain&&!main)problem('missing_manager','managerMain','주담당 사번을 선택하세요.',false);
     if(!Array.isArray(subs)){problem('invalid_manager_subs','managerSubs','부담당은 사번 목록이어야 합니다.',false);subs=[];}
     var seenStaff=Object.create(null);
+    /* 안내문에는 «이름»만 쓴다 — 사번 글자를 내지 않는다(대표 결정 2026-10-25). 이름을 모르면 뒤에 아무것도 안 붙인다. */
+    function who(sid){var n=people[sid]&&clean(people[sid].name);return n?': '+n:'';}
     function staff(sid,field,unchanged){
       if(!sid){problem('empty_manager_sid',field,'빈 부담당 사번을 제거하세요.',false);return;}
-      if(seenStaff[sid]){problem('duplicate_manager_sid',field,'주담당·부담당에 같은 사번이 중복되어 있습니다: '+sid,false);return;}seenStaff[sid]=true;
+      if(seenStaff[sid]){problem('duplicate_manager_sid',field,'주담당·부담당에 같은 담당자가 중복되어 있습니다'+who(sid),false);return;}seenStaff[sid]=true;
       var u=people[sid];
-      if(!u||duplicates[sid]){problem('unresolved_manager',field,'명부에서 사번을 유일하게 확인할 수 없습니다: '+sid,unchanged);return;}
+      if(!u||duplicates[sid]){problem('unresolved_manager',field,'명부에서 담당자를 유일하게 확인할 수 없습니다'+who(sid),unchanged);return;}
       if(u._deleted||u.accessLocked||u.excludeFromAssign||(u.status&&u.status!=='active')||(options.unassignableSids||[]).indexOf(sid)>=0)
-        problem('manager_not_assignable',field,'새로 배정할 수 없는 담당자입니다: '+sid,unchanged);
+        problem('manager_not_assignable',field,'새로 배정할 수 없는 담당자입니다'+who(sid),unchanged);
     }
     if(main)staff(main,'managerMain',main===clean(previous.managerMain));
     subs.forEach(function(sid){sid=clean(sid);staff(sid,'managerSubs',oldSubs.indexOf(sid)>=0);});

@@ -91,7 +91,10 @@ function box(extra) {
     fnSource('사진칸Html'),
     /* 푸른ERP 직원과 잇는 줄 — 편집칸의 «붙은 칸»이 이것을 지난다 (월간 자동 연결 2026-10-05).
        ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽는 일이 일곱 번째가 되지 않게 여기에 싣는다. */
-    fnSource('잇기후보'), fnSource('직원연결칸Html')].join('\n'), ctx);
+    fnSource('잇기후보'), fnSource('직원연결칸Html'),
+    /* 이름만 보인다(대표 결정 2026-10-25) — 편집칸의 직원 줄·남기기 띠·마지막 수정이 «이름표 도우미»를 부른다.
+       ⚠ 위와 같은 까닭으로 «여기 한 자리»에 싣는다. */
+    fnSource('고름이름표'), fnSource('기록자이름')].join('\n'), ctx);
   return ctx;
 }
 function run(ctx, code) { vm.runInContext(code, ctx); return ctx; }

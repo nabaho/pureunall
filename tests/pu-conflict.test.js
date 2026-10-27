@@ -219,3 +219,16 @@ test('시각을 사람 말로 바꾼다 — 1970년을 보여주지 않는다', 
   assert.equal(C.whenText(0), '');
   assert.ok(!/1970/.test(C.message('업체', { who: '김', at: 0, diff: [] })));
 });
+
+test('★ 동시 편집 안내에 사번·로그인 이메일을 내지 않는다 — 고친 사람이 그렇게 적혀 있으면 「다른 사람」 (대표 결정 2026-10-25)', () => {
+  const C = loadConflict();
+  ['P-001', 'p001', 'p001@pureun.kr'].forEach((by) => {
+    const hit = C.check({ id: 'a', updatedAt: T2, updatedBy: by, phone: '2' }, { id: 'a', updatedAt: T1, phone: '1' }, { myName: '김노무' });
+    assert.ok(hit, '겹침 판단은 그대로여야 한다');
+    const text = C.message('업체', hit) + C.overwriteNote(hit);
+    assert.doesNotMatch(text, /p-?001/i, by + ' 가 안내문에 나왔다');
+    assert.match(text, /다른 사람/);
+  });
+  const named = C.check({ id: 'a', updatedAt: T2, updatedBy: '권형하' }, { id: 'a', updatedAt: T1 }, { myName: '김노무' });
+  assert.match(C.message('업체', named), /권형하님/, '이름은 그대로 말한다');
+});

@@ -90,17 +90,19 @@ function burstAlertDue(prevBurst, newBurst) {
 
 function buildAlerts(input) {
   const alerts = [];
+  /* 누구인지는 «이름»으로만 — 이메일(=사번에서 만든 로그인 아이디)은 알림 글에 적지 않는다 (대표 결정 2026-10-25) */
+  const who = ' (' + (input.name || '이름 미확인') + ')';
   const detail = 'IP ' + (input.ip || '(모름)')
     + (input.country ? ' · 국가 ' + input.country : '')
     + (input.ua ? ' · ' + input.ua : '');
   if (input.deviceIsNew) {
-    alerts.push({ kind: 'security-device', message: '처음 보는 기기에서 로그인 성공 (' + input.email + ')' });
+    alerts.push({ kind: 'security-device', message: '처음 보는 기기에서 로그인 성공' + who });
   }
   if (input.countryIsNew) {
-    alerts.push({ kind: 'security-country', message: '평소와 다른 국가에서 로그인 성공: ' + input.country + ' (' + input.email + ')' });
+    alerts.push({ kind: 'security-country', message: '평소와 다른 국가에서 로그인 성공: ' + input.country + who });
   }
   if (input.burstSuspicious) {
-    alerts.push({ kind: 'security-burst', message: '짧은 시간에 비밀번호 ' + input.failCount + '회 연속 실패 (' + input.email + ')' });
+    alerts.push({ kind: 'security-burst', message: '짧은 시간에 비밀번호 ' + input.failCount + '회 연속 실패' + who });
   }
   return alerts.map((a) => Object.assign(
     { uid: input.uid, email: input.email, page: 'enter.html', status: 'new', detail },

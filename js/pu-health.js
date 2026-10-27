@@ -93,6 +93,13 @@
     return null;
   }
 
+  /* 지금 로그인한 사람의 «이름» — 포털의 PuWhoami → Firebase 표시이름 순. 이메일 꼴이면 이름이 아니다. */
+  function myName(user) {
+    var me = window.PuWhoami && window.PuWhoami.get && window.PuWhoami.get();
+    var n = String((me && me.name) || (user && user.displayName) || '').trim();
+    return n.indexOf('@') >= 0 ? '' : n;
+  }
+
   function flush() {
     if (flushing || window.navigator.onLine === false) return Promise.resolve(false);
     var app = activeApp();
@@ -104,7 +111,8 @@
     var chain = Promise.resolve();
     pending.slice().forEach(function (event) {
       chain = chain.then(function () {
-        var record = Object.assign({}, event, { uid: user.uid, email: safeText(user.email, 150) });
+        /* name — 관리자 장애 창에 «누구 것인지» 보여 줄 이름. 창에는 로그인 이메일을 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」) */
+        var record = Object.assign({}, event, { uid: user.uid, email: safeText(user.email, 150), name: safeText(myName(user), 60) });
         delete record.localId;
         return app.database().ref('systemAlerts/' + user.uid + '/' + event.localId).set(record).then(function () {
           var latest = readJson(STORE_KEY, []).filter(function (item) { return item.localId !== event.localId; });
@@ -322,7 +330,7 @@
       var row = window.document.createElement('div');
       row.style.cssText = 'border:1px solid #dce3ec;border-radius:10px;padding:11px;margin:8px 0;font-size:12px;line-height:1.5;';
       var when = new Date(Number(item.createdAt || 0)).toLocaleString('ko-KR');
-      row.innerHTML = '<b>' + escapeHtml(item.page) + '</b> · ' + escapeHtml(item.kind) + '<br>' + escapeHtml(item.message) + '<br><small>' + escapeHtml(when) + ' · ' + escapeHtml(item.email || item.uid) + '</small> ';
+      row.innerHTML = '<b>' + escapeHtml(item.page) + '</b> · ' + escapeHtml(item.kind) + '<br>' + escapeHtml(item.message) + '<br><small>' + escapeHtml(when) + ' · ' + escapeHtml(item.name || '이름 미확인') + '</small> ';
       var resolve = window.document.createElement('button');
       resolve.type = 'button'; resolve.textContent = '처리 완료';
       resolve.style.cssText = 'float:right;border:0;border-radius:7px;background:#17365f;color:#fff;padding:5px 9px;cursor:pointer;';

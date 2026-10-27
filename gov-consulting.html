@@ -6,6 +6,7 @@
 <title>정부사업일정</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📅</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -1399,21 +1400,21 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
-<script src="js/pu-staff-label.js?v=1"></script>
+<script src="js/pu-staff-label.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-visit-sms.js?v=2"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <!-- 푸른사진첩에서 사진을 끌어다 놓을 수 있게 하는 공용 조각 -->
 <script src="js/pu-drag.js?v=2"></script>
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <!-- 참고 캡처를 «올리는 그 자리»에서 판독한다 (대표 승인 목업 2026-08-24).
      예전에는 사진첩에 올려만 두고, 누가 사진첩을 열 때까지 안 읽혔다 — 컨설팅
      담당자는 그 사이를 알 수 없었다. 그림을 이미 손에 들고 있으므로 창고에서
@@ -1427,7 +1428,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
        hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게.
        ai(3단계 AI 초안, 2026-10-10)도 gov-report 를 쓴다 — 그 뒤에. -->
@@ -1818,7 +1819,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="login-card">
         <div class="login-field">
           <label>아이디</label>
-          <input type="text" id="loginId" placeholder="아이디 (예: p001@pureun.kr)" autocomplete="username">
+          <input type="text" id="loginId" placeholder="아이디" autocomplete="username">
         </div>
         <div class="login-field">
           <label>비밀번호</label>
@@ -5993,7 +5994,7 @@ async function doLogin(){
   // 아이디 → 이메일 (이메일이면 그대로, 사번이면 변환: P-001 → p001@pureun.kr)
   const email=(idRaw.indexOf('@')>=0)?idRaw.toLowerCase()
              :(/^[A-Za-z]+-?\d+$/.test(idRaw)?(idRaw.toLowerCase().replace(/-/g,'')+'@pureun.kr'):'');
-  if(!email){err.textContent='이메일 형식으로 입력하세요. (예: p001@pureun.kr)';err.classList.add('on');return;}
+  if(!email){err.textContent='아이디 형식이 맞지 않습니다. 아이디를 다시 확인해 주세요.';err.classList.add('on');return;}
 
   q('#loginBtn').disabled=true; err.classList.remove('on');
   // 포털에서 자동로그인을 선택한 세션은 이 화면의 독립 로그인 때문에
@@ -6667,7 +6668,7 @@ function renderStaffList(){
         <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른 캘린더에서 정합니다">
         <input class="staff-name-inp" type="text" value="${s.name}" disabled>
         <span style="font-size:11px;font-weight:800;color:var(--danger);white-space:nowrap;">${escAttr(s.leftWhy||'빠짐')}</span>
-        ${s.erpSid?`<span title="푸른ERP 사번 ${escAttr(s.erpSid)} 와 연결됨" style="font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;">🔗 이알피</span>`:''}
+        ${s.erpSid?`<span title="푸른이알피 계정과 연결됨" style="font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;">🔗 이알피</span>`:''}
         <button class="btn btn-s" style="font-size:11px;padding:4px 8px;white-space:nowrap;" onclick="unleaveStaff('${s.id}')" title="푸른ERP와 상관없이 다시 배정할 수 있게 합니다. 다음에 ERP를 읽으면 되돌아갑니다">되살리기</button>
         <button class="btn btn-s" style="font-size:11px;padding:4px 8px;" onclick="deleteStaff('${s.id}')">🗑</button>
       </div>`).join('')}
@@ -6692,7 +6693,7 @@ function unleaveStaff(id){
    동명이인이 생기면 그때부터 어긋난다. 미리 사번으로 못 박아 두는 편이 낫다. */
 function staffErpCell(s){
   if(s.erpSid){
-    return `<span title="푸른ERP 사번 ${escAttr(s.erpSid)} 와 연결됨" style="font-size:10px;font-weight:700;color:var(--ok);white-space:nowrap;">🔗 이알피</span>`;
+    return `<span title="푸른이알피 계정과 연결됨" style="font-size:10px;font-weight:700;color:var(--ok);white-space:nowrap;">🔗 이알피</span>`;
   }
   if(!ERP.loaded)return '';
   const n=String(s.name||'').replace(/\s/g,'');
@@ -6700,7 +6701,7 @@ function staffErpCell(s){
   const cand=erpDirAll().filter(u=>String(u.name||'').replace(/\s/g,'')===n);
   /* 같은 이름이 둘이면 어느 쪽인지 앱이 정할 수 없다 — 사람이 정해야 하므로 안내만 */
   if(cand.length===1&&cand[0].sid){
-    return `<button class="btn btn-s" style="font-size:10px;padding:3px 7px;white-space:nowrap;" title="푸른ERP 사번 ${escAttr(cand[0].sid)} 로 못 박습니다" onclick="linkStaffErp('${s.id}','${escAttr(cand[0].sid)}')">🔗 사번 잇기</button>`;
+    return `<button class="btn btn-s" style="font-size:10px;padding:3px 7px;white-space:nowrap;" title="푸른이알피의 같은 이름 직원과 이어 둡니다" onclick="linkStaffErp('${s.id}','${escAttr(cand[0].sid)}')">🔗 이알피와 잇기</button>`;
   }
   if(cand.length>1){
     return `<span title="푸른ERP에 같은 이름이 ${cand.length}명 있어 자동으로 정할 수 없습니다" style="font-size:10px;font-weight:700;color:#d97706;white-space:nowrap;cursor:help;">⚠️ 동명 ${cand.length}</span>`;
@@ -6834,11 +6835,10 @@ function renderStaffAdd(){
     updateStaffAddCount();
     return;
   }
-  const dupN=typeof PuStaffLabel!=='undefined'?PuStaffLabel.dupNames(dir):{};
   body.innerHTML=rows.map(u=>{
     const done=has(u);
-    /* 사번은 같은 이름이 둘 이상일 때만 (대표 지시 2026-10-19, js/pu-staff-label.js) — 찾기(kw)는 여전히 사번으로도 된다 */
-    const sub=[u.title,u.branch,dupN[String(u.name||'').trim()]?u.sid:''].filter(Boolean).join(' · ');
+    /* 사번은 안 적는다(대표 결정 2026-10-25 「이름만 있어야한다」) — 찾기(kw)는 «치는 글자»라 사번으로도 찾아진다 */
+    const sub=[u.title,u.branch].filter(Boolean).join(' · ');
     return `<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--sf2);${done?'opacity:.5;':'cursor:pointer;'}">
       <input type="checkbox" class="sa-chk" value="${escAttr(u.sid||u.name)}" ${done?'disabled':''} onchange="updateStaffAddCount()">
       <span style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -11330,7 +11330,7 @@ function erpSubStaffId(sid,staff,made){
   const rec={id:uid(),name:u.name,
     color:STAFF_COLORS[staff.length%STAFF_COLORS.length],erpSid:sid};
   staff.push(rec);
-  made.push(typeof PuStaffLabel!=='undefined'?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 같은 이름일 때만 사번(2026-10-19)
+  made.push(typeof PuStaffLabel!=='undefined'?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 사번은 안 적는다(2026-10-25)
   return rec.id;
 }
 /* ══════ 담당자 따라가기 — 푸른이알피 → 정부컨설팅 일정관리 (대표 지시 2026-10-24) ══════

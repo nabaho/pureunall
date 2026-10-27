@@ -105,3 +105,22 @@ test('사업장 재직 관계는 여전히 «미룬 것»으로 남아 있다', 
   assert.equal(관계(r, 'belongsToOrganization').length, 0,
     '★ 사업장 재직 관계를 만들었습니다 — 근로자 영구 번호가 아직 없습니다');
 });
+
+test('★ 화면 글자에 사번을 내지 않는다 — 이름 없는 사람은 «이름 미확인», 끊어진 담당 연결은 «그 업무의 이름»으로 (대표 결정 2026-10-25)', () => {
+  const r = O.audit({
+    user_accounts: [{ sid: 'P-009' }],
+    contracts: [{ id: 'ct1', companyName: '가나상사', managerMain: 'P-777', managerSubs: ['P-778'] }]
+  });
+  const person = Object.keys(r.entities).map((k) => r.entities[k]).filter((e) => e.type === 'Person');
+  assert.ok(person.length >= 1 && person.every((e) => !/\b[A-Za-z]-?\d{3}\b/.test(e.label)), '이름 없는 사람의 이름표에 사번이 들어갔다');
+  const orphans = r.issues.filter((x) => x.code === 'orphan_person');
+  assert.ok(orphans.length >= 2);
+  orphans.forEach((x) => assert.ok(!/\b[A-Za-z]-?\d{3}\b/.test(x.label + x.detail), '끊어진 담당 안내에 사번이 나왔다: ' + x.label));
+  /* 조회 화면: 이름 없는 사람 개체가 «없어도» 관계의 상대가 사람이면 사번 글자를 내지 않는다 */
+  const rep = { entities: { 'Organization:c1': { type: 'Organization', id: 'c1', label: '가나' } },
+    edges: [{ id: 'e', subject: 'Organization:c1', predicate: 'assignedTo', object: 'Person:P-001', sourceStore: 'contracts', sourceId: 'x', confidence: 1 }] };
+  const rows = O.entityConnections(rep, 'Organization:c1');
+  assert.ok(rows.length === 1 && !/\b[A-Za-z]-?\d{3}\b/.test(rows[0].label), '관계 상대의 이름표에 사번이 나왔다');
+  const ref = O.validateWorkReferences({ managerMain: 'P-009', managerSubs: ['P-009', 'P-555'] }, { user_dir: [{ sid: 'P-009', name: '박담당' }] }, {});
+  assert.ok(ref.errors.length >= 1 && ref.errors.every((e) => !/\b[A-Za-z]-?\d{3}\b/.test(e.message)), '저장 거절 안내에 사번이 나왔다');
+});

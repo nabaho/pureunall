@@ -41,7 +41,7 @@ t('부담당 알약', /h\('span', \{ key:s, style:chipSub \}, '부 ' \+ whoName\
 t('주담당이 없으면 빨갛게 알린다', /'⚠ 주담당 미지정'/.test(MODAL), true);
 t('오른쪽 위 회색 잔글씨를 없앴다', /h\('span', \{ style:\{color:'#94a3b8'\} \}, '주담당 '\)/.test(MODAL), false);
 t('이름 찾기를 한 곳으로 모았다 (SID·이름 둘 다 받는다)',
-  /function whoName\(sid\)\{[\s\S]{0,320}?byName \? byName\.name : sid/.test(MODAL), true);
+  /function whoName\(sid\)\{[\s\S]{0,320}?byName \? byName\.name : /.test(MODAL), true);   // 사번으로도 이름으로도 찾는다 — 못 찾았을 때 무엇을 돌려주는지는 사번 걷기 규칙(tests/sid-never-shown.test.js)이 지킨다
 
 console.log('\n■ ③ 성과급 미리보기 — 늘 보이는가');
 /* ★ 머리(제목 + 나누기 체크)는 «켜든 끄든 같은 자리» 에 있어야 한다 (2026-08-13 대표 지적).

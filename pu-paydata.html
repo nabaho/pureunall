@@ -19,20 +19,21 @@
   ⚠ 이 파일에는 실시간DB·창고 경로를 적지 않는다.
     경로를 아는 곳은 js/pu-paydata-store.js 한 군데뿐이다(검사가 지킨다).
 -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-staff-label.js?v=1"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-staff-label.js?v=2"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
-<script src="js/pu-paydata-store.js?v=12"></script>
+<script src="js/pu-paydata-store.js?v=13"></script>
 <script src="js/pu-hr-intake.js?v=1"></script>
 <!-- ?v= 는 판독기 판 번호(READ_VERSION)와 **같이 올린다**(2026-08-15).
      ⚠ 사진첩만 올리고 여기를 빠뜨리면, 같은 브라우저 안에서 사진첩은 새 판독기·
@@ -57,7 +58,7 @@
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-authsync.js?v=5"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
@@ -1116,8 +1117,8 @@ firebase.auth().onAuthStateChanged(function (user) {
 
 function afterLogin() {
   /* 저장 층에 계정을 알려 준다 — 자리 계산이 이걸로 된다. */
-  S.init({ db: db, storage: store, uid: App.me.uid, name: App.me.email || '' });
-  $('whoami').textContent = App.me.email || '';
+  S.init({ db: db, storage: store, uid: App.me.uid, name: '' });   // ⚠ 이름은 아래 signIn 이 명부에서 찾아 채운다 — 이메일(사번에서 만든 아이디)을 이름 자리에 안 넣는다 (대표 결정 2026-10-25)
+  $('whoami').textContent = '';
 
   /* 권한은 나중에 알려 줘도 된다 — 못 읽어도 화면은 떠야 한다.
      fin(재무권한)도 함께 읽는다 — 급여관리로 "이 달 값 넘기기" 단추가
@@ -1136,7 +1137,7 @@ function afterLogin() {
 
   /* 이름을 찾아 화면·명단에 반영한다 — 남이 나를 「이름으로」 고르려면
      내가 먼저 한 번 로그인해야 한다(명단에 내가 적힌다). */
-  S.signIn(App.me.email || '', App.me.email || '').then(name => {
+  S.signIn(App.me.email || '', '').then(name => {
     if (name) { App.myName = name; $('whoami').textContent = name; App.render(); }
   }).catch(e => console.warn('[이름 찾기]', e && e.message));
 
@@ -1451,7 +1452,7 @@ function sideListModel(view, ctx, opt) {
     const sid = v.slice(2);
     const who = roster.people.filter(p => p.sid === sid)[0];
     list = who ? who.companies.slice() : [];
-    title = (who ? who.name : sid) + ' 담당';
+    title = (who ? who.name : '이름 미확인') + ' 담당';   // ⚠ 사번을 대신 적지 않는다 (대표 결정 2026-10-25)
   } else { v = 'mine'; list = cos.filter(isMine); canOrder = true; }
 
   /* ── 「왔는데 아직 안 담긴 것」을 사업장 줄에 붙인다 (대표 지시 2026-08-17) ──
@@ -3257,7 +3258,7 @@ function coOwnerName(co) {
   const sid = String((co && co.managerMain) || '');
   if (!sid) return '';
   const p = fixPeople().filter(x => x.sid === sid)[0];
-  return p ? p.name : sid;
+  return p ? p.name : '';   // ⚠ 못 찾았다고 사번을 대신 적지 않는다 — 부르는 쪽이 빈 글자면 「담당자 칸」으로 쓴다 (대표 결정 2026-10-25)
 }
 
 /* 사업장 화면에서 바로 주소 넣기 — 메일 줄이 아니라 **사업장**에서 여는 길이다.
@@ -3368,15 +3369,15 @@ function fixPeople() {
   return ((roster && roster.people) || []).filter(p => p && !p.badSid && p.sid);
 }
 
-/* 👤 이름표 — 이름만, 같은 이름이 둘 이상일 때만 사번 (대표 지시 2026-10-19, js/pu-staff-label.js).
+/* 👤 이름표 — 이름만 (같은 이름이면 직책으로 가른다). 사번은 안 적는다 (대표 결정 2026-10-25, js/pu-staff-label.js).
    ⚠ 고르는 값(value)은 그대로 사번이다 — 보이는 글자만 바꾼다. */
 function staffLbl(p, people) {
-  return window.PuStaffLabel ? PuStaffLabel.label(p, people) : String((p && (p.name || p.sid)) || '');
+  return window.PuStaffLabel ? PuStaffLabel.label(p, people) : String((p && p.name) || '이름 미확인');
 }
 function ownerLabel(sid) {
   const people = fixPeople();
   const p = people.filter(x => x.sid === sid)[0];
-  return p ? staffLbl(p, people) : String(sid || '');
+  return p ? staffLbl(p, people) : '이름 미확인';   // ⚠ 못 찾았다고 사번을 대신 적지 않는다
 }
 
 /* 고르는 서랍. 화면 위에 얹는다 — 목록을 떠나면 어느 줄을 고치던 것인지 잊는다. */
@@ -5680,7 +5681,17 @@ function hrCan(coId) {
   const c = hrCompany(coId);
   return !!(c && S.isMyCompany(c, (App.me && App.me.email) || ''));
 }
-function hrWho() { return App.myName || (App.me && App.me.email) || ''; }
+function hrWho() { return App.myName || (App.me && App.me.email) || ''; }   // 기록용 저장값(doneBy·updatedBy) — 저장은 이대로, 화면에 보일 때는 아래 whoText() 를 거친다
+/* 기록에 남은 «누가»를 화면에 보일 때 — 저장값은 그대로 두고 «보이는 글자»만 이름으로 (대표 결정 2026-10-25 「이름만 있어야한다」).
+   이름이 적혀 있으면 그대로, 로그인 이메일·사번 꼴이면 공개 명부(App.dir)에서 이름을 찾는다. 못 찾으면 빈 글자. */
+function whoText(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const 메일 = s.indexOf('@') >= 0;
+  if (!메일 && !/^[A-Za-z]{1,3}-?\d{3}$/.test(s)) return s;       // 이름이다
+  if (메일 && !/@pureun\.kr$/i.test(s)) return '';                 // 다른 도메인 이메일 — 이름을 알 길이 없다
+  return S.pickFromRoster(App.dir, 메일 ? s : S.sidToEmail(s)) || '';
+}
 
 /* 할 일 상태 적기 — 거래(transaction)로 «서버 최신 판» 위에 얹는다.
    ⚠ 찬 자리에서는 cur 가 null 로 먼저 온다 — 그때도 값을 돌려줘야 서버에 묻는다
@@ -5810,7 +5821,7 @@ function hrCardHtml(coId) {
     h += rows.map(t => {
       const tip = '건강보험 ' + t.due.health + ' 까지(14일 이내) · 고용·연금 ' + t.due.monthly + ' 까지(다음 달 15일)';
       const dueTxt = t.done
-        ? '<span class="hrdone">✓ ' + esc(hrMd(HR.ymdOf(t.doneAt))) + ' 처리 · ' + esc(t.doneBy) + '</span>'
+        ? '<span class="hrdone">✓ ' + esc(hrMd(HR.ymdOf(t.doneAt))) + ' 처리 · ' + esc(whoText(t.doneBy)) + '</span>'
         : '<span class="hrdue' + (t.left < 0 ? ' late' : '') + '" title="' + esc(tip) + '">⏰ '
           + (t.kind === 'out' ? '상실신고 ' : '취득신고 ') + esc(hrMd(t.due.first)) + ' (' + esc(hrLeftText(t.left)) + ')</span>';
       const nm = t.name
@@ -5937,9 +5948,9 @@ function viewBarHtml() {
       return '<div class="vrow prow' + (on ? ' sel' : '')
         + (p.badSid ? ' badsid' : (p.away ? ' off' : ''))
         + '" onclick="pickSideView(\'p:' + jsq(p.sid) + '\')"'
-        /* 사번은 title 로 보여 준다 — 업체관리에서 담당자를 고칠 때 필요한 값인데
-           줄에 적으면 이름이 밀려 잘린다(칸이 좁다). */
-        + ' title="' + esc(p.name) + ' (' + esc(p.sid) + ') — ' + p.total + '곳 중 ' + p.done + '곳 도착'
+        /* 사번은 어디에도 안 적는다(대표 결정 2026-10-25 「이름만 있어야한다」) — 사번에서 로그인 아이디가 만들어진다.
+           업체관리에서 담당자를 고칠 때는 이름으로 고른다(고르개의 값만 사번). */
+        + ' title="' + esc(p.name) + ' — ' + p.total + '곳 중 ' + p.done + '곳 도착'
         + (p.badSid ? ' · 업체관리 담당자 칸이 사번이 아닙니다(「' + esc(p.sid) + '」) — 고쳐야 열립니다'
           : (p.away ? ' · 아직 이 함에 들어오지 않았습니다' : '')) + '">'
         + '<span class="fill" style="width:' + p.pct + '%"></span>'

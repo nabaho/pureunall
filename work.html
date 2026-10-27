@@ -15,10 +15,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="업무관리">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-kakao-work.js?v=3"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=1"></script>
@@ -27,7 +28,7 @@
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 옵시디언 금고로 내보낼 때 주민번호를 지운다. 없으면 내보내기가 «멈춘다» -->
@@ -1402,7 +1403,7 @@
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
 <!-- 말로 기록 — 소리를 판독 서버(Gemini)로 보낸다. 업무관리의 aiCall 은 글자만 보내는 길이라 소리를 못 싣는다. -->
 <script src="js/pu-ai-call.js?v=5"></script>
 </head>
@@ -1892,7 +1893,7 @@ function _normStaff(v){
   return v.filter(function(u){return u&&u.sid;})
     .filter(function(u){return !u.status||u.status==='active'||(u.status==='leave'&&u.leaveLoginAllowed===true);})
     .filter(function(u){ if(seen[u.sid])return false; seen[u.sid]=1; return true; })
-    .map(function(u){return {sid:u.sid,name:u.name||u.sid,title:u.title||u.role||'',
+    .map(function(u){return {sid:u.sid,name:u.name||'이름 미확인',title:u.title||u.role||'',
       ord:(typeof u.sortOrder==='number')?u.sortOrder:9999};})
     // 푸른이알피가 정해 둔 차례(sortOrder)를 그대로 쓴다. 예전에는 사번순이라
     // A-00x(사무직)이 앞에, P-00x(노무사)가 뒤에 와서 그쪽 화면과 순서가 달랐다.
@@ -2070,7 +2071,7 @@ function resolveMe(){
     if(local) me=list.filter(function(x){return String(x.sid||'').toLowerCase().replace(/[^a-z0-9]/g,'')===local;})[0]||null;
     S.me=me||{sid:'',name:'미지정',title:''};
     S.vsid=S.me.sid; S.vname=S.me.name;          // 보는 사람 = 언제나 본인 (viewer() 참조)
-    // 상단 이름은 공용 부품이 그린다 (이름·직책·사번) — 두 곳에서 그리면 언젠가 어긋난다
+    // 상단 이름은 공용 부품이 그린다 (이름·직책 — 사번은 안 보인다) — 두 곳에서 그리면 언젠가 어긋난다
     if(window.PuWhoami) PuWhoami.mount('#topuser'); else _setTopUser(S.me.name,S.me.title||'');
   });
 }
@@ -2806,7 +2807,7 @@ function pcAdminHTML(){
     var mark = w.k==='obj'
       ? ' <span style="background:#fbbf24;color:#fff;border-radius:9px;padding:0 6px;font-size:10.5px">이의</span>'
       : (w.k==='todo' ? ' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#dc2626;vertical-align:1px"></span>' : '');
-    h+=pcTabHTML(sid, esc((all[sid].name)||sid)+mark, sel===sid, w.k==='done');
+    h+=pcTabHTML(sid, esc((all[sid].name)||'이름 미확인')+mark, sel===sid, w.k==='done');
   });
   h+='</div>';
 
@@ -2862,7 +2863,7 @@ function pcAdmAllHTML(ym, all, sids, st, mask){
       extra=' · 마감 '+pcDaysAgo(p.due+'T00:00:00Z')+'일 지남';
     }
     h+='<tr onclick="pcAdmPick(\''+esc(sid)+'\')" style="cursor:pointer;border-bottom:1px solid #f8fafc;background:'+(w.k==='done'?'#fff':w.bg)+'">'
-      +'<td style="padding:8px 4px">'+esc(p.name||sid)+'</td>'
+      +'<td style="padding:8px 4px">'+esc(p.name||'이름 미확인')+'</td>'
       +'<td style="padding:8px 4px;text-align:right;color:'+(c.todo?'var(--tx)':'var(--faint)')+'">'+c.handled+' / '+c.total+'</td>'
       +'<td style="padding:8px 4px;text-align:right;font-weight:600">'+(mask?'●●●':pcMoney(p.total))+'</td>'
       +'<td style="padding:8px 4px 8px 12px;color:'+(late?'#991b1b':w.c)+';font-weight:'+(w.k==='done'?400:700)+'">'
@@ -4529,7 +4530,7 @@ function dPpHTML(it,itemId){
   return '<div class="dbox"><div class="bh">🔗 푸른이알피 진행 메모'+hlp('ppnote')
     +'<span class="r">'+arr.length+'건</span></div><div class="bb">'
     +arr.map(function(p){
-      var who=(_peU2N&&_peU2N[p.sid])||p.sid||'';
+      var who=(_peU2N&&_peU2N[p.sid])||'이름 미확인';   /* 사번을 대신 적지 않는다 (대표 결정 2026-10-25) */
       var done=ppTaken(it,p);
       return '<div class="mlrow'+(done?' seen':'')+'">'
         +'<div class="p" style="margin-top:0">'+esc(String(p.note||''))+'</div>'
@@ -5374,9 +5375,19 @@ function dMailRowHTML(m,id,up){
    ⚠ 「✓ 확인만」을 안 붙인다 — 보낸 것은 이미 한 일이라 치울 것이 없다.
    ⚠ 받는 사람의 «메일 주소»는 안 보여 준다. 기업정보함이 회사 쪽에 주소를 안 남긴
      까닭과 같다 — 이름이면 「누구에게 갔나」는 알 수 있다. */
+/* 보낸 사람 — 기업정보함이 적은 by 는 «로그인 이메일»(p001@…)이다. 화면에는 «이름»만 (대표 결정 2026-10-25).
+   명부(allStaff)에서 사번으로 이름을 찾고, 못 찾으면 빈 글자 — 이메일 앞부분(p001)을 대신 적지 않는다.
+   이미 한글 이름이 적혀 있으면 그대로 쓴다. */
+function _sentByName(by){
+  by=String(by||'').trim(); if(!by) return '';
+  if(/[^\x00-\x7f]/.test(by)) return by;
+  var local=by.toLowerCase().split('@')[0].replace(/[^a-z0-9]/g,''); if(!local) return '';
+  var u=allStaff().filter(function(x){ return String(x.sid||'').toLowerCase().replace(/[^a-z0-9]/g,'')===local; })[0];
+  return u?String(u.name||''):'';
+}
 function dSentRowHTML(r,id,up){
   var ck=sentKey(r), c=sentChk(r);
-  var by=String(r.by||'').split('@')[0];
+  var by=_sentByName(r.by);
   var t=sentBrief(r);
   return mlRowHTML({ seen:true, out:1, up:up, date:_mlDay(r.at), text:t, full:t,
     meta:_mailWhen(r.at)+' 보냄'+(r.who?' · '+String(r.who)+' 앞':'')
@@ -11640,7 +11651,7 @@ function dPeopleHTML(id,it){
     +'</div>'
     +'</div></div>'
     +dOrgHTML(it,id);
-  var subs=(it.mgr_subs||[]).filter(function(s){return s&&(s.name||s.sid);});
+  var subs=(it.mgr_subs||[]).filter(function(s){return !!s&&(!!s.sid||!!s.name);});   /* 걸러내기만 한다 — 글자로는 이름만(없으면 「이름 미확인」) */
   h+='<div class="dbox"><div class="bh">👥 담당'+hlp('mgr')
     +'<span class="r">'+(subs.length?'공동 '+subs.length+'명':'')+'</span></div><div class="bb">'
     +'<div class="subrow"><span class="muted" style="font-size:11.5px;min-width:44px">주담당</span>'
@@ -11648,7 +11659,7 @@ function dPeopleHTML(id,it){
     +esc((it.mgr_main&&it.mgr_main.name)||'미지정')+'</span></div>'
     +'<div class="subrow"><span class="muted" style="font-size:11.5px;min-width:44px">부담당</span>'
     +(subs.length?subs.map(function(s,i){
-        return '<span class="subchip">'+esc(s.name||s.sid)
+        return '<span class="subchip">'+esc(s.name||'이름 미확인')
           +'<span class="x" onclick="subDel(\''+escJ(id)+'\','+i+')" title="부담당에서 제외">✕</span></span>';
       }).join('')
       :'<span class="muted" style="font-size:11.5px">없음</span>')
@@ -13747,7 +13758,8 @@ function peUsers(){
   if(_peU2N) return Promise.resolve(_peU2N);
   function fin(arr,known){
     var m={}, n=0;
-    (arr||[]).forEach(function(u){ if(u&&u.sid){ m[u.sid]=u.name||u.sid; n++; } });
+    /* ⚠ 이름이 없으면 «빈 글자» — 사번을 이름 자리에 넣지 않는다(부담당 이름으로 저장·화면에 샌다). 소비처가 filter(Boolean) 으로 거른다 */
+    (arr||[]).forEach(function(u){ if(u&&u.sid){ m[u.sid]=u.name||''; n++; } });
     if(known&&n) _peU2NKnown=true;
     _peU2N=m; return m;
   }

@@ -24,17 +24,18 @@
   ★ 판단은 전부 js/pu-home-*.js 네 부품이 한다. 화면은 그 결과를 보여주기만 한다.
     같은 판단을 화면 안에서 다시 만들면 두 곳이 서로 다른 답을 낸다.
 -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 앱바가 관리자 전용 줄(경력관리·홈페이지 관리)을 가리려면 신원을 알아야 한다 — 앱바보다 먼저 -->
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script src="js/pu-appbar.js?v=34"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
@@ -1354,7 +1355,21 @@ const App = {
 window.App = App;
 
 function currentUserName() {
-  return App.myName || (App.me && App.me.email) || '';
+  return App.myName || (App.me && App.me.email) || '';   // 기록용 저장값(by·updatedBy) — 저장은 이대로, 화면에 보일 때는 아래 기록자이름() 을 거친다
+}
+
+/* 기록에 남은 «누가»(by·updatedBy)를 화면에 보일 때 — 저장값은 그대로 두고 «보이는 글자»만 이름으로 (대표 결정 2026-10-25 「이름만 있어야한다」).
+   이름이 적혀 있으면 그대로, 로그인 이메일·사번 꼴이면 직원 명부(App.staff)에서 이름을 찾는다. 못 찾으면 빈 글자(사번·이메일을 대신 적지 않는다). */
+function 기록자이름(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const 메일 = s.indexOf('@') >= 0;
+  if (!메일 && !/^[A-Za-z]{1,3}-?\d{3}$/.test(s)) return s;       // 이름이다
+  if (메일 && !/@pureun\.kr$/i.test(s)) return '';                 // 다른 도메인 이메일 — 이름을 알 길이 없다
+  const 열쇠 = s.split('@')[0].toLowerCase().replace(/-/g, '');
+  const p = (Array.isArray(App.staff) ? App.staff : [])
+    .filter(x => x && String(x.sid || '').toLowerCase().replace(/-/g, '') === 열쇠)[0];
+  return p && p.name ? String(p.name) : '';
 }
 
 /* 갈래를 열 때 기본으로 걸러 둘 딱지 (위 App.go 의 주석 참고) */
@@ -1387,7 +1402,7 @@ firebase.auth().onAuthStateChanged(function (user) {
 /* 총괄관리자만 연다. 홈페이지 문구는 밖에서 보이는 글이라 아무나 고치면 안 된다.
    권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다. */
 function afterLogin() {
-  $('whoami').textContent = App.me.email || '';
+  $('whoami').textContent = '';   // ⚠ 로그인 이메일(사번에서 만든 아이디)은 화면에 안 적는다 — 이름은 아래 loadMyName 이 명부에서 찾아 적는다 (대표 결정 2026-10-25)
   db.ref('uid_roles/' + App.me.uid).once('value')
     .then(s => {
       const r = s.val() || {};
@@ -2286,13 +2301,13 @@ function 새로올리기칸Html(d) {
     + '<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="max-width:230px" '
     + 'onchange="새로고넣기(\'' + esc(d.key) + '\', this.files[0])">');
   h += 줄('<b>공개 동의</b>' + (동의
-      ? '<span>' + esc(동의.date) + ' 동의 · ' + esc(동의.by || '') + '</span>'
+      ? '<span>' + esc(동의.date) + ' 동의 · ' + esc(기록자이름(동의.by)) + '</span>'
         + '<button class="btn sm" onclick="공개동의풀기(\'' + esc(d.key) + '\')">풀기</button>'
       : '<input type="date" id="consentDate">'
         + '<button class="btn sm" onclick="공개동의저장(\'' + esc(d.key) + '\', document.getElementById(\'consentDate\').value)">동의 저장</button>'
         + '<span>이름·로고를 싣는 데 그 회사가 동의한 날</span>'));
   h += 줄('<b>홈페이지 확인</b>' + (없음확인
-      ? '<span>지금 홈페이지에 이 회사 로고 <b>없음</b> · ' + esc(없음확인.at) + ' ' + esc(없음확인.by || '') + '</span>'
+      ? '<span>지금 홈페이지에 이 회사 로고 <b>없음</b> · ' + esc(없음확인.at) + ' ' + esc(기록자이름(없음확인.by)) + '</span>'
         + '<button class="btn sm" onclick="홈페이지에없음확인(\'' + esc(d.key) + '\', false)">풀기</button>'
       : '<button class="btn sm" onclick="홈페이지에없음확인(\'' + esc(d.key) + '\', true)">지금 홈페이지에 없음 — 확인함</button>'
         + '<span>이미 있으면 위 「로고와 잇기」를 하십시오(두 장이 걸립니다)</span>'));
@@ -3060,7 +3075,7 @@ async function saveRecord(kind, key, next) {
     return 쓴것;
   });
   if (남이고침 || (r && r.committed === false)) {
-    const 누가 = (남이고침 && 남이고침.updatedBy) || '다른 사람';
+    const 누가 = 기록자이름(남이고침 && 남이고침.updatedBy) || '다른 사람';
     const e = new Error('그 사이 ' + 누가 + ' 님이 이 줄을 고쳤습니다 — 덮어쓰지 않았습니다. '
       + '새로고침해 그쪽 내용을 본 뒤 다시 고쳐 주세요.');
     e.code = 'stale';
@@ -4031,7 +4046,7 @@ async function 한번에잇기() {
   }
   if (!await askYes(줄.length + '명을 푸른ERP 직원과 잇습니다',
     '<ul style="margin:6px 0 0;padding-left:18px">' + 줄.map(x => '<li>'
-      + esc((App.members[x.key] || {}).name || x.key) + ' — 직원 번호 ' + esc(x.sid) + '</li>').join('') + '</ul>'
+      + esc((App.members[x.key] || {}).name || '이름 미확인') + '</li>').join('') + '</ul>'   // ⚠ 직원 번호(사번)는 안 적는다 — 이을 때 쓰는 값은 x.sid 그대로 (대표 결정 2026-10-25)
     + '<div style="margin-top:8px">이어 두면 그분이 푸른ERP 에서 퇴사 처리될 때 '
     + '<b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 휴직은 내리지 않습니다.</div>', '잇기')) return;
   for (const x of 줄) { if (!await 직원잇기(x.key, x.sid)) return; }
@@ -4039,6 +4054,15 @@ async function 한번에잇기() {
 }
 window.한번에잇기 = 한번에잇기;
 window.직원잇기 = 직원잇기;
+
+/* 고르는 목록의 직원 이름표 — 「이름 · 직급」. 이름·직급이 같은 분이 또 있으면 「(1)」「(2)」로 가른다(목록 순서).
+   ⚠ 사번 글자는 안 적는다 — 사번에서 로그인 아이디가 만들어진다 (대표 결정 2026-10-25 「이름만 있어야한다」). */
+function 고름이름표(s, list) {
+  const n = String((s && s.name) || '').trim() || '이름 미확인';
+  const t = String((s && s.title) || '').trim();
+  const 같은 = (list || []).filter(x => x && (String(x.name || '').trim() || '이름 미확인') === n && String(x.title || '').trim() === t);
+  return n + (t ? ' · ' + t : '') + (같은.length > 1 ? ' (' + (같은.indexOf(s) + 1) + ')' : '');
+}
 
 /* 편집칸의 «푸른ERP 직원» 한 줄 — 글 번호가 있을 때만(자동 내리기는 글 번호가 있어야 한다).
    ★ 동명이인이면 고르개를 «비워 두고» 사람이 고르게 한다. 하나를 미리 골라 두면 그냥 누른다. */
@@ -4052,12 +4076,12 @@ function 직원연결칸Html(d) {
   if (rec.sid) {
     const 이은 = (App.staff || []).filter(s => s && s.sid === rec.sid)[0];
     return 줄('<span>' + esc(이은 ? 이은.name + (이은.title ? ' · ' + 이은.title : '') : '명부에 없음')
-      + ' · 번호 ' + esc(rec.sid) + '</span><span>— 퇴사 처리되면 다음 달 1일에 저절로 내려갑니다</span>');
+      + '</span><span>— 퇴사 처리되면 다음 달 1일에 저절로 내려갑니다</span>');   // ⚠ 직원 번호(사번)는 안 적는다 (대표 결정 2026-10-25)
   }
   const 후보 = 잇기후보(rec).length ? 잇기후보(rec) : (App.staff || []).filter(s => s && s.sid);
   return 줄('<select id="sidPick" style="max-width:260px"><option value="">— 고르십시오 —</option>'
-    + 후보.map(s => '<option value="' + esc(s.sid) + '">' + esc(s.name)
-      + (s.title ? ' · ' + esc(s.title) : '') + ' · ' + esc(s.sid) + '</option>').join('')
+    + 후보.map(s => '<option value="' + esc(s.sid) + '">' + esc(고름이름표(s, 후보))
+      + '</option>').join('')   // ⚠ value 는 사번 그대로, 보이는 글자는 이름(·직급)만 (대표 결정 2026-10-25)
     + '</select><button class="btn" style="padding:3px 9px;font-size:11.5px" '
     + 'onclick="직원잇기(\'' + esc(d.key) + '\', document.getElementById(\'sidPick\').value)">잇기</button>'
     + '<span>이어 두어야 퇴사 때 저절로 내려갑니다</span>');
@@ -4160,7 +4184,7 @@ function 새노무사칸Html(d) {
     + '<input type="file" accept="image/jpeg,image/png,image/webp" style="max-width:230px" '
     + 'onchange="새사진넣기(\'' + esc(d.key) + '\', this.files[0])">');
   h += 줄('<b>올리기 허락</b>' + (rec.publishOk
-      ? '<span>' + esc(rec.publishOk.at || '') + ' · ' + esc(rec.publishOk.by || '') + '</span>'
+      ? '<span>' + esc(rec.publishOk.at || '') + ' · ' + esc(기록자이름(rec.publishOk.by)) + '</span>'
         + '<button class="btn sm" onclick="올리기허락풀기(\'' + esc(d.key) + '\')">풀기</button>'
         + (준비.낡은허락 ? '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">경력이 바뀜 — 다시 허락</button>' : '')
       : '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">다음 달 1일에 올리기 허락</button>'));
@@ -4851,7 +4875,7 @@ function openHistory() {
           ? ((b.name || '') + ' · 경력 ' + ((b.careers || []).length) + '줄')
           : (String(b.text || '').slice(0, 60) + (String(b.text || '').length > 60 ? '…' : ''));
         return '<div class="pk"><div class="t"><b>' + esc(stamp(histTs(t))) + '</b>'
-          + '<div class="d">' + esc(r.updatedBy || '') + ' · ' + esc(line) + '</div></div>'
+          + '<div class="d">' + esc(기록자이름(r.updatedBy)) + ' · ' + esc(line) + '</div></div>'
           + '<button class="btn sm" onclick="restoreFrom(\'' + esc(histKey) + '\',\'' + esc(t) + '\')">이 시점으로</button></div>';
       }).join('') + '</div>';
     }
@@ -4943,7 +4967,7 @@ function logRowsOf(kind, key, 이름, 이력, 지금) {
     const 다음열쇠 = 열쇠들[i + 1];
     const 후 = 다음열쇠 ? ((이력[다음열쇠] || {}).before || {}) : (지금 || {});
     logDiff(전, 후).forEach((d) => {
-      out.push({ when: histTs(t), who: 이번.updatedBy || '', kind: kind,
+      out.push({ when: histTs(t), who: 기록자이름(이번.updatedBy), kind: kind,
                  key: key, 이름: 이름, histKey: (kind === 'member' ? key : 'page:' + key),
                  ts: t, 칸: d.칸, 전: d.전, 후: d.후, 더: d.더 || 0 });
     });
@@ -5802,7 +5826,7 @@ function 자동대상이름(x) {
   }
   if (r.sid) {
     const s = (App.staff || []).filter(p => p && p.sid === r.sid)[0];
-    return (s ? s.name : '직원 ' + r.sid) + ' · 구성원 소개';
+    return (s ? s.name : '이름 미확인') + ' · 구성원 소개';   // ⚠ 못 찾았다고 사번을 적지 않는다 (대표 결정 2026-10-25)
   }
   if (r.companyId) {
     const c = (App.companies || []).filter(c => c && c.id === r.companyId)[0];
@@ -7201,7 +7225,7 @@ function partnerEdit(d) {
     + '<button class="' + (d.posted === '' ? 'on' : '') + '" onclick="clearPosted()">표시 안 함</button>'
     + '</div>'
     + '<div class="sub" style="margin-top:5px">'
-    + (mk.by || mk.at ? '표시: ' + esc(mk.by || '(누구인지 모름)') + ' · ' + esc(mk.at || '(날짜 모름)')
+    + (mk.by || mk.at ? '표시: ' + esc(기록자이름(mk.by) || '(누구인지 모름)') + ' · ' + esc(mk.at || '(날짜 모름)')
                       : '아직 아무도 표시하지 않았습니다') + '</div></div>';
 
   /* ★ 월간 자동 연결(2026-10-05) — 로고 잇기 · 계약이 끝나도 남기기 · (2단계) 새로 올리기 */
@@ -7320,7 +7344,7 @@ function memberBandHtml(d, rec) {
   if (kept) {
     h += '<div class="band keep"><b>홈페이지에 남기기로 함</b> — '
       + esc(kept.why || '(사유 없음)') + '<br>'
-      + '<span class="sm">' + esc(kept.by || '(표시한 사람 모름)') + ' · '
+      + '<span class="sm">' + esc(기록자이름(kept.by) || '(표시한 사람 모름)') + ' · '
       + esc(kept.at || '(날짜 모름)')
       + ' · 명부에 퇴사로 찍혀 있어도 「내릴 것(퇴사)」 딱지를 달지 않고 내용 대조만 합니다. '
       + '예외를 풀면 다음 「다시 확인」에서 퇴사 판정을 다시 받습니다.</span></div>';
@@ -7615,7 +7639,7 @@ function memberEdit(d) {
     + '<details class="more"><summary class="btn">⋯</summary>'
     + '<div class="morebox">' + 더보기.join('') + '</div></details>'
     + '<span style="flex:1"></span>'
-    + '<span class="sub">' + (rec.updatedAt ? '마지막 수정: ' + esc(stamp(rec.updatedAt)) + ' · ' + esc(rec.updatedBy || '') : '수정 기록 없음') + '</span>'
+    + '<span class="sub">' + (rec.updatedAt ? '마지막 수정: ' + esc(stamp(rec.updatedAt)) + ' · ' + esc(기록자이름(rec.updatedBy)) : '수정 기록 없음') + '</span>'
     + '</div>';
   return h + '</div>';
 }
@@ -8768,7 +8792,7 @@ function pageEdit(d) {
     + '<span style="flex:1"></span>'
     + (url ? '<a class="btn pri" style="text-decoration:none" href="' + esc(url) + '" target="_blank" rel="noopener">'
              + '홈페이지에서 이 쪽 열기</a>' : '')
-    + '<span class="sub">' + (rec.updatedAt ? '마지막 수정: ' + esc(stamp(rec.updatedAt)) + ' · ' + esc(rec.updatedBy || '') : '수정 기록 없음') + '</span>'
+    + '<span class="sub">' + (rec.updatedAt ? '마지막 수정: ' + esc(stamp(rec.updatedAt)) + ' · ' + esc(기록자이름(rec.updatedBy)) : '수정 기록 없음') + '</span>'
     + '</div>';
   return h + '</div>';
 }

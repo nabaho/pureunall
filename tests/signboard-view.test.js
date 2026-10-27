@@ -138,7 +138,10 @@ test('첫 전송 확인 — 기다리는 중에만 단추가 나오고, 허락�
   const wait = V.stateCards(st, {}, NOW);
   assert.match(wait, /data-confirm-first/); assert.match(wait, /1건/); assert.match(wait, /옛 광고/);
   const done = V.stateCards(st, { firstReplaceConfirmed: true, confirmedBy: 'A-001', confirmedAt: NOW }, NOW);
-  assert.doesNotMatch(done, /data-confirm-first/); assert.match(done, /A-001/);
+  assert.doesNotMatch(done, /data-confirm-first/);
+  /* 누가 허락했는지는 «이름»으로 — 사번 글자를 내지 않는다(대표 결정 2026-10-25). 이름을 모르면 「이름 미확인」 */
+  assert.doesNotMatch(done, /A-001/); assert.match(done, /이름 미확인 님이/);
+  assert.match(V.stateCards(st, { firstReplaceConfirmed: true, confirmedBy: 'A-001', confirmedAt: NOW }, NOW, { 'A-001': '홍길동' }), /홍길동 님이/);
 });
 
 test('올린 기록 — 보기 전용 표, 지금 판에는 되돌리기 단추가 없다, 최신이 위', () => {
@@ -228,4 +231,23 @@ test('편집 상자 — 올려 둔 파일 크기는 1MB 미만이면 KB 로 보�
 test('광고 표 — 켜기 칸은 ☐ 하나이고, 켜진 광고는 checked', () => {
   const h = V.adsTable([ad('ad_a', 1), ad('ad_b', 2, { enabled: false })], { now: NOW });
   assert.match(h, /data-en="ad_a" checked/); assert.doesNotMatch(h, /data-en="ad_b" checked/);
+});
+
+test('★ 기록 표 «누가» 칸에 사번을 내지 않는다 — 이름(기록의 byName → 넘겨 준 names 지도) → «이름 미확인» (대표 결정 2026-10-25)', () => {
+  const log = [C.logRecord('create', { id: 'lg_a', now: NOW, actor: 'A-001', actorName: '홍길동', ad: ad('ad_a', 1) }),
+    C.logRecord('publish', { id: 'lg_b', now: NOW - 1, actor: 'A-002', version: 2, count: 1 }),
+    C.logRecord('publish', { id: 'lg_c', now: NOW - 2, actor: 'A-003', version: 3, count: 1 })];
+  const shown = (h) => h.replace(/data-(hist|log)-view="[^"]*"/g, '');
+  const h1 = V.logTable(log, { 'A-002': '김노무' });
+  assert.match(h1, /홍길동/); assert.match(h1, /김노무/); assert.match(h1, /이름 미확인/);
+  assert.doesNotMatch(shown(h1), /\bA-00\d\b/, '활동 기록 표에 사번이 나왔다');
+  const dels = { ad_1: ad('ad_1', 1, { _deleted: true, deletedAt: NOW, deletedBy: 'A-001' }) };
+  assert.doesNotMatch(V.deletedTable(dels), /\bA-001\b/, '지운 광고 표에 사번이 나왔다');
+  assert.match(V.deletedTable(dels, { 'A-001': '홍길동' }), /홍길동/);
+  const hist = [{ version: 5, publishedBy: 'A-001', publishedAt: NOW, ads: [1], note: '' }];
+  assert.doesNotMatch(V.historyTable(hist, 4), /\bA-001\b/, '올린 기록 표에 사번이 나왔다');
+  assert.match(V.historyTable(hist, 4, { 'A-001': '홍길동' }), /홍길동/);
+  /* 찾기·내려받기에서도 사번이 새지 않는다 — 사번으로 찾아 «누가 누구인지» 알아내는 길도 닫는다 */
+  assert.deepEqual(C.filterLog(log, { q: 'A-001' }), []);
+  assert.doesNotMatch(C.logToCsv(log), /\bA-00\d\b/);
 });

@@ -177,12 +177,13 @@
       return Promise.resolve(fail('empty', '빈 색표는 안 올립니다 — 서버의 색이 통째로 날아갑니다'));
     }
     for (var i = 0; i < keys.length; i++) {
+      /* ⚠ 오류 글에 사번을 안 적는다 — 이 글은 화면에 뜬다(대표 결정 2026-10-25 「이름만 있어야한다」) */
       if (BADKEY.test(keys[i])) {
-        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다'));
       }
       if (!COLORV.test(String(colors[keys[i]]))) {
         return Promise.resolve(fail('bad_color',
-          '색이 #rrggbb 꼴이 아닙니다: ' + keys[i] + ' = ' + colors[keys[i]]));
+          '색이 #rrggbb 꼴이 아닙니다: ' + colors[keys[i]]));
       }
     }
     return _db.ref('data/staff_colors').set({ v: colors, u: Date.now() })
@@ -206,7 +207,7 @@
       return Promise.resolve(fail('bad_id', '누구의 색인지 모릅니다'));
     }
     if (BADKEY.test(sid)) {
-      return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + sid));
+      return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다'));
     }
     if (!COLORV.test(String(color))) {
       return Promise.resolve(fail('bad_color', '색이 #rrggbb 꼴이 아닙니다: ' + color));
@@ -247,7 +248,7 @@
       }
       var sid = map[keys[i]];
       if (typeof sid !== 'string' || !sid || BADKEY.test(sid)) {
-        return Promise.resolve(fail('bad_sid', '사번이 이상합니다: ' + keys[i] + ' = ' + sid));
+        return Promise.resolve(fail('bad_sid', '사번이 이상합니다'));
       }
     }
     return _db.ref('data/gcal_mail_sid').set({ v: map, u: Date.now() })
@@ -270,10 +271,10 @@
     var keys = Object.keys(notes);
     for (var i = 0; i < keys.length; i++) {
       if (BADKEY.test(keys[i])) {
-        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다'));
       }
       if (typeof notes[keys[i]] !== 'string') {
-        return Promise.resolve(fail('bad_note', '비고는 글이어야 합니다: ' + keys[i]));
+        return Promise.resolve(fail('bad_note', '비고는 글이어야 합니다'));
       }
     }
     return _db.ref('data/ieum_notes').set({ v: notes, u: Date.now() })

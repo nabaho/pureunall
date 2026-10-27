@@ -53,6 +53,13 @@
     var many = arrayOf(x.managerSubs || x.assignees || x.managers).map(String);
     return one.concat(many).indexOf(String(sid)) >= 0;
   }
+  /* 노트에 적는 담당자 글자 — 이름만(대표 결정 2026-10-25). 명부에서 이름을 못 찾았는데 값이 사번 꼴이면
+     사번을 대신 적지 않고 「이름 미확인」. (담당 칸에 사람이 적어 둔 이름·메모는 그대로) 열쇠(sid)는 users 지도의 키로만 쓴다. */
+  function nameOf(users, key) {
+    key = clean(key);
+    if (!key) return '';
+    return users[key] || (/^[A-Za-z]{1,3}-?\d{1,4}$/.test(key) ? '이름 미확인' : key);
+  }
   function taskOf(x, label, users) {
     var managerSid = clean(x.managerMain || x.managerSid || x.assigneeSid || x.manager || '');
     var company = clean(label === '자문' ? (x.name || x.companyName) : (x.companyName || x.company || x.fundName || x.targetName));
@@ -62,14 +69,14 @@
       company: company, kind: kind,
       title: clean(x.title || x.caseName || x.projectName || x.programName || kind),
       summary: clean(x.brief || x.summary || x.scope), due: dueOf(x),
-      assignee: clean(users[managerSid] || managerSid),
+      assignee: nameOf(users, managerSid),
       url: clean(w.location && w.location.href)
     };
   }
   function collect() {
     var me = w.CURRENT_USER || {};
     var users = {};
-    readStore('user_accounts').forEach(function (u) { if (u && u.sid) users[String(u.sid)] = clean(u.name || u.sid); });
+    readStore('user_accounts').forEach(function (u) { if (u && u.sid && clean(u.name)) users[String(u.sid)] = clean(u.name); });
     var all = [], counts = {};
     STORE_DEF.forEach(function (def) {
       var live = readStore(def[0]).filter(function (x) { return !isClosed(x); });
@@ -85,7 +92,7 @@
   function collectAll() {
     var users = {}, rows = {};
     readStore('user_accounts').forEach(function (u) {
-      if (u && u.sid) { users[String(u.sid)] = clean(u.name || u.sid); rows[String(u.sid)] = []; }
+      if (u && u.sid) { if (clean(u.name)) users[String(u.sid)] = clean(u.name); rows[String(u.sid)] = []; }
     });
     STORE_DEF.forEach(function (def) {
       readStore(def[0]).filter(function (x) { return !isClosed(x); }).forEach(function (x) {
@@ -100,7 +107,7 @@
     var groups = Object.keys(rows).map(function (sid) {
       var tasks = rows[sid];
       tasks.sort(function (a, b) { return (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99'); });
-      return { sid: sid, owner: clean(users[sid] || sid), tasks: tasks };
+      return { sid: sid, owner: nameOf(users, sid), tasks: tasks };
     }).filter(function (g) { return g.tasks.length; }).sort(function (a, b) { return a.owner.localeCompare(b.owner, 'ko'); });
     return { owner: '전체 담당자', sid: '', tasks: [], groups: groups, counts: {} };
   }

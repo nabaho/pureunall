@@ -43,6 +43,38 @@ module.exports = {
       back: async (page) => { await page.evaluate(() => mbFindToggle()); } },
     { name: 'sent', run: async (page) => { await page.evaluate(() => mbGo('B_SENT')); }, wait: 2500 },
     { name: 'compose', run: clickFirst('.dmm-fab'), wait: 2500 },
+    /* 🧊 보내기 줄 틀 고정 — 쓰기 화면을 내린 뒤에도 보내기·임시저장이 위에 붙어 있는지 */
+    { name: 'compose-scroll', wait: 800, run: async (page) => {
+      await page.evaluate(() => { const b = document.querySelector('.dmm-fab'); if (b) b.click(); });
+      await page.waitForTimeout(2500);
+      await page.evaluate(() => { const w = document.getElementById('listwrap'); if (w) w.scrollTop = 500; });
+    } },
+    /* 받는사람 찾기 목록 — 폰에서 이름·회사가 한 글자씩 세로로 서던 자리(대표 갈무리 2026-10-26) */
+    { name: 'compose-to', wait: 1500, run: async (page) => {
+      await page.evaluate(() => { const b = document.querySelector('.dmm-fab'); if (b) b.click(); });
+      await page.waitForTimeout(2500);
+      /* 메일 화면에서는 명함이 아직 안 실려 있을 수 있다 — 지어낸 명함 셋을 손에 쥐여 준다(긴 이름·긴 회사·긴 주소) */
+      await page.evaluate(() => {
+        const add = { 'pa-sug-1': { id: 'pa-sug-1', name: '점검가', company: '점검서진산업주식회사', email: 'pa-sug-1-long-address@example.invalid' },
+          'pa-sug-2': { id: 'pa-sug-2', name: '점검나다', company: '제주특별자치도 점검과', email: 'pa-sug-2@example.invalid' },
+          'pa-sug-3': { id: 'pa-sug-3', name: '점검라', company: '', email: '' } };
+        state.items = Object.assign({}, state.items || {}, add);
+      });
+      await page.click('#cpTo'); await page.keyboard.type('점검');
+    } },
+    { name: 'compose-picked', wait: 1500, run: async (page) => {
+      await page.evaluate(() => { const b = document.querySelector('.dmm-fab'); if (b) b.click(); });
+      await page.waitForTimeout(2500);
+      /* 메일 화면에서는 명함이 아직 안 실려 있을 수 있다 — 지어낸 명함 셋을 손에 쥐여 준다(긴 이름·긴 회사·긴 주소) */
+      await page.evaluate(() => {
+        const add = { 'pa-sug-1': { id: 'pa-sug-1', name: '점검가', company: '점검서진산업주식회사', email: 'pa-sug-1-long-address@example.invalid' },
+          'pa-sug-2': { id: 'pa-sug-2', name: '점검나다', company: '제주특별자치도 점검과', email: 'pa-sug-2@example.invalid' },
+          'pa-sug-3': { id: 'pa-sug-3', name: '점검라', company: '', email: '' } };
+        state.items = Object.assign({}, state.items || {}, add);
+      });
+      await page.click('#cpTo'); await page.keyboard.type('점검');
+      await page.waitForTimeout(400); await page.locator('.cpsi:not(.off)').first().click();   /* 고른 뒤 — 「누구인지」가 입력칸을 짓누르던 자리 */
+    } },
     /* 서랍 맨 아래 「푸른 도구」 — 폰에서는 PC 화면을 그대로 그린다(renderMailMobile) */
     { name: 'sentlog', run: async (page) => { await page.evaluate(() => openSentBox()); }, wait: 2000 },
     { name: 'inboxlog', run: async (page) => { await page.evaluate(() => openInbox()); }, wait: 2000 },

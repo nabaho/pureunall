@@ -88,7 +88,8 @@ function eventOf(rec, id, nameOf) {
   if (s(rec.contact).trim()) 설명.push('담당자: ' + s(rec.contact).trim());
   if (s(rec.note).trim()) 설명.push(s(rec.note).trim());
   const sid = SID_RE.test(s(rec.sid)) ? s(rec.sid) : '';
-  if (sid) 설명.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid));   // 사번은 puSid 로만 — 설명 글엔 안 적는다
+  const 담당이름 = sid && nameOf ? s(nameOf(sid)).trim() : '';
+  if (담당이름) 설명.push('푸른 담당: ' + 담당이름);   // 사번은 puSid 로만 — 설명 글엔 안 적는다(이름을 모르면 줄째 뺀다, 2026-10-25)
   return {
     date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각,
     repeat: /^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(rec.repeat)) ? s(rec.repeat) : '',
@@ -109,7 +110,8 @@ function descOf(contact, note, sid, nameOf) {
   const 줄 = [];
   if (s(contact).trim()) 줄.push('담당자: ' + s(contact).trim());
   if (s(note).trim()) 줄.push(s(note).trim());
-  if (SID_RE.test(s(sid))) 줄.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid));
+  const 담당이름 = SID_RE.test(s(sid)) && nameOf ? s(nameOf(sid)).trim() : '';
+  if (담당이름) 줄.push('푸른 담당: ' + 담당이름);   // 이름을 모르면 사번을 적지 않고 줄째 뺀다(2026-10-25)
   return 줄.join('\n');
 }
 /* 구글 설명 → { contact, note } — descOf 의 거꾸로. 「푸른 담당」 줄은 뺀다(담당은 sid 로 따로 온다) */

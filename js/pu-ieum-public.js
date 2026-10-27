@@ -55,7 +55,8 @@
         name = e.name; kind = kindOf(e);
       } else if (r.sid) {
         var u = userMap[r.sid];
-        name = u ? u.name : r.sid; kind = 'in';
+        /* ⚠ 공개 거울이다 — 이름을 모르면 사번을 대신 적지 않는다(사번 = 로그인 아이디, 대표 결정 2026-10-25) */
+        name = (u && u.name) ? u.name : '이름 미확인'; kind = 'in';
       } else { return; }
       if (!roster[r.date]) roster[r.date] = [];
       roster[r.date].push({ n: name, k: kind });

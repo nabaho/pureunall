@@ -37,6 +37,7 @@ self.addEventListener('activate', function (e) {
 var CARDS_SHARE = '/pu-cards-share';    // 기업정보함 manifest 의 share_target.action
 var PHOTOS_SHARE = '/pu-photos.html';   // 사진첩 manifest 의 share_target.action
 var PAYDATA_SHARE = '/pu-paydata.html'; // 급여데이터함 manifest 의 share_target.action
+var VIEWER_SHARE = '/pu-viewer.html';   // 문서뷰어 manifest 의 share_target.action
 
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'POST') return;          // GET 등은 건드리지 않는다(캐시 없음)
@@ -46,6 +47,7 @@ self.addEventListener('fetch', function (e) {
   if (p.slice(-CARDS_SHARE.length) === CARDS_SHARE) { e.respondWith(takeCards(e.request)); return; }
   if (p.slice(-PHOTOS_SHARE.length) === PHOTOS_SHARE) { e.respondWith(takePhotos(e.request, url)); return; }
   if (p.slice(-PAYDATA_SHARE.length) === PAYDATA_SHARE) { e.respondWith(takePaydata(e.request, url)); return; }
+  if (p.slice(-VIEWER_SHARE.length) === VIEWER_SHARE) { e.respondWith(takeViewer(e.request, url)); return; }
 });
 
 /* 303 — 받은 POST 를 GET 으로 바꿔 돌려보낸다(새로고침해도 다시 안 보낸다) */
@@ -174,6 +176,57 @@ function takePaydata(req, url) {
     return redirect(back + (n ? '?share=1' : '?share=none'));
   }).catch(function (err) {
     if (self.console) console.warn('[급여데이터함 공유 받기]', err);
+    return redirect(back + '?share=err');
+  });
+}
+
+/* ══════ 문서뷰어: 공유받은 파일을 IndexedDB 에 «잠깐만» 둔다 ══════
+   화면(js/pu-viewer-app.js takeShared)이 ?share=1 로 돌아와 꺼내면서 «바로 지운다» — 파일 내용을 남기지 않는다.
+   자리(store)는 따로 둔다 — 사진첩·급여데이터함의 대기분과 섞이면 서로 집어가 버린다.
+   ⚠ 파일 이름 칸(manifest params.files[0].name)은 'docs' — manifest 와 짝이라 바꾸면 안 된다. */
+var VIEWER_IDB_NAME = 'pu-viewer-share', VIEWER_IDB_STORE = 'inbox', VIEWER_IDB_VER = 1;
+
+function openViewerIdb() {
+  return new Promise(function (res, rej) {
+    var r = indexedDB.open(VIEWER_IDB_NAME, VIEWER_IDB_VER);
+    r.onupgradeneeded = function () {
+      var d = r.result;
+      if (!d.objectStoreNames.contains(VIEWER_IDB_STORE)) {
+        d.createObjectStore(VIEWER_IDB_STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+
+function keepViewer(files) {
+  return openViewerIdb().then(function (db) {
+    return new Promise(function (res, rej) {
+      var tx = db.transaction(VIEWER_IDB_STORE, 'readwrite');
+      var st = tx.objectStore(VIEWER_IDB_STORE);
+      var at = Date.now();
+      files.forEach(function (f, i) {
+        st.add({ blob: f, name: f.name || ('공유문서_' + (i + 1)), type: f.type || '', at: at });
+      });
+      tx.oncomplete = function () { db.close(); res(files.length); };
+      tx.onerror = function () { db.close(); rej(tx.error); };
+    });
+  });
+}
+
+function takeViewer(req, url) {
+  var back = url.origin + url.pathname;
+  return req.formData().then(function (fd) {
+    var files = fd.getAll('docs').filter(function (f) {
+      return f && typeof f === 'object' && f.size > 0;
+    });
+    if (!files.length) return 0;
+    return keepViewer(files);
+  }).then(function (n) {
+    return redirect(back + (n ? '?share=1' : '?share=none'));
+  }).catch(function (err) {
+    if (self.console) console.warn('[문서뷰어 공유 받기]', err);
     return redirect(back + '?share=err');
   });
 }

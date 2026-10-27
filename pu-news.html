@@ -28,18 +28,19 @@
     관리자만 읽는 자리라 직원에게 열려면 홈페이지 관리의 문까지 함께 열어야 했다.
     권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다.
 -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <!-- ★ 창고 — 명절 인사 사진을 올린다(2026-09-23 「창고 + 함수」). 얼굴이 들어가서
      공개 저장소(img/)에 못 둔다. 올리는 자리는 newsletter_img/ 하나뿐이다. -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script src="js/pu-appbar.js?v=34"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
@@ -1799,8 +1800,8 @@ firebase.auth().onAuthStateChanged(function(user){
 });
 
 function afterLogin(){
-  /* ★ 머리줄엔 «이름»을 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) — 이름은 공용 부품(PuWhoami)이 찾아 준다. 찾기 전에는 메일을 잠깐 둔다. */
-  $('whoami').textContent = App.me.email || '';
+  /* ★ 머리줄엔 «이름»을 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) — 이름은 공용 부품(PuWhoami)이 찾아 준다. 찾기 전에는 «빈 칸» — 메일·사번을 잠깐이라도 적지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」). */
+  $('whoami').textContent = (window.PuWhoami && PuWhoami.get() && PuWhoami.get().name) || '';
   if (window.PuWhoami && !window.__newsWhoHooked) {
     window.__newsWhoHooked = true;
     PuWhoami.onChange(function (me) { if (me && me.name) $('whoami').textContent = me.name + (me.title ? ' ' + me.title : ''); });
@@ -7763,7 +7764,7 @@ function 설정화면(){
         <span style="font-weight:400">(비우면 보내는 주소로)</span></label>
        <input type="text" id="cfgTestTo" value="${esc(s.시험주소||'')}"
          placeholder="${esc(보내는주소())}" onchange="설정저장()">
-       <div class="hint" style="margin-top:5px">⚠ 로그인 아이디(사번@pureun.kr)는
+       <div class="hint" style="margin-top:5px">⚠ 직원 로그인 계정은
          <b>메일함이 아닙니다</b> — 그리로 보내면 구글이 되돌려 보냅니다.</div>
       </div>
 

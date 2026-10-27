@@ -580,7 +580,8 @@ test('★★ 연결 안 된 카카오로 들어오려 하면 기록이 남는다
 });
 
 test('★★ 퇴사·휴직 계정이 카카오로 들어오려 하면 기록 + 알림', async () => {
-  const K = fresh({ kakao_links: { '333': { uid: 'gone', sid: 'P-900' } } });
+  const K = fresh({ kakao_links: { '333': { uid: 'gone', sid: 'P-900' } },
+    data: { user_dir: { v: [ { sid: 'P-900', name: '나간사람', role: 'member', status: 'retired' } ] } } });
   const r = await call(K.kakaoLoginFinish, { body: { code: 'cC' } });
   assert.equal(r.status, 403);
   const ev = 기록들('gone')[0];
@@ -589,7 +590,9 @@ test('★★ 퇴사·휴직 계정이 카카오로 들어오려 하면 기록 + 
   const al = Object.values((world.data.systemAlerts || {}).gone || {})[0];
   assert.ok(al, '★★ 나간 사람이 들어오려 했는데 알림이 없습니다');
   assert.equal(al.kind, 'security-kakao-inactive');
-  assert.match(al.message, /P-900/, '누구인지(사번) 알림에 없습니다');
+  /* 누구인지는 «이름»으로 — 사번은 로그인 아이디가 되므로 알림 글에 적지 않는다 (대표 결정 2026-10-25) */
+  assert.match(al.message, /나간사람/, '누구인지(이름) 알림에 없습니다');
+  assert.doesNotMatch(al.message, /P-?900/i, '알림 글에 사번이 새고 있습니다');
   assert.equal(issued.length, 0, '표를 내줬습니다');
 });
 

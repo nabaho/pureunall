@@ -2176,3 +2176,23 @@ test('★ 공유가 풀렸는데 색인 줄만 남았으면 «받은 사진»에
   assert.equal(idx.self, undefined, '내 사진을 가리키는 색인 줄을 안 치웠습니다');
   assert.ok(db.tree.puphotos.u.U2.items[2026].gone, '★ 남의 사진 정보를 건드렸습니다');
 });
+
+test('★ 이름을 못 찾아도 로그인 이메일·사번을 이름으로 쓰지 않는다 — 저장되어 나중에 화면에 나오는 이름이다 (대표 결정 2026-10-25)', async () => {
+  const S = loadStore();
+  /* 명부가 비어 이름을 못 찾는 경우 + 부르는 쪽이 이메일 앞부분(p001)을 «이름» 자리에 넘긴 경우 */
+  const db = fakeDbFor({ 'uid_roles/U1/isAdmin': false, 'data/user_dir': null, 'data/user_accounts': null });
+  S.init({ uid: 'U1', db: db, isAdmin: false });
+  const lost = await S.signIn('U1', 'p001@pureun.kr', 'p001');
+  assert.equal(lost.name, '', '이름을 못 찾았는데 이메일/사번 글자가 이름이 됐다');
+  const lost2 = await S.signIn('U1', 'p001@pureun.kr', 'p001@pureun.kr');
+  assert.equal(lost2.name, '');
+  const none = await S.signIn('U1', 'p001@pureun.kr');
+  assert.equal(none.name, '');
+  const named = await S.signIn('U1', 'p001@pureun.kr', '권형하');
+  assert.equal(named.name, '권형하', '사람 이름은 그대로 쓴다');
+  /* 이름 칸에 이메일이 «옛 기록으로» 저장돼 있어도 공유 표시 이름으로 안 친다 */
+  const S2 = loadStore();
+  S2.init({ uid: 'U1', db: fakeDbFor({ 'puphotos/owners': { U9: { name: 'p001@pureun.kr' } } }), isAdmin: false });
+  const items = await S2.fillSharedNames({ a: { __ownerUid: 'U9' } });
+  assert.ok(!/@/.test(items.a.__ownerName), '옛 기록의 이메일이 공유 표시 이름으로 나왔다');
+});

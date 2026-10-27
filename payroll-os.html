@@ -10,22 +10,23 @@
   - pu-erp와 같은 프로젝트(pureun-erp)·같은 도메인 → 로그인(SSO)·권한(uid_roles)·App Check 공유
   - 데이터는 payroll_os 칸에만 (pu-erp data 안 건드림)
 -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=6"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
-<script src="js/pu-site-staff.js?v=5"></script>
+<script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -274,7 +275,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-authsync.js?v=5"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-10-20 「급여관리도 준비중으로」) ══
    2026-09-23 에 처음 막았고, 2026-10-09 「준비중 풀기」로 열었다가 다시 닫는다.
@@ -372,12 +373,12 @@ function doLogout(){ firebase.auth().signOut().then(function(){ location.reload(
 function afterLogin(){
   document.getElementById('gate').style.display='none';
   /* ★ 머리줄엔 «이름»을 — 메일만으로는 누구인지 한눈에 안 보인다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」).
-     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 메일을 잠깐 둔다. */
+     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 비워 둔다(메일은 안 적는다). */
   var whoRole='';
   function drawWho(){
     var m=window.PuWhoami&&PuWhoami.get();
-    var nm=(m&&m.name)?(m.name+(m.title?' '+m.title:'')):(me.email||'');
-    document.getElementById('whoami').textContent=nm+(whoRole?' · '+whoRole:'');
+    var nm=(m&&m.name)?(m.name+(m.title?' '+m.title:'')):'';   /* ⚠ 이름을 못 찾았다고 메일(사번에서 만든 아이디)을 대신 적지 않는다 (대표 결정 2026-10-25 「이름만 있어야한다」) */
+    document.getElementById('whoami').textContent=nm?(nm+(whoRole?' · '+whoRole:'')):whoRole;
   }
   drawWho();
   if(window.PuWhoami&&!window.__payWhoHooked){ window.__payWhoHooked=true; PuWhoami.onChange(function(){ drawWho(); }); }
@@ -677,7 +678,7 @@ function lockLogHtml(site){
       +'<span style="width:120px;color:var(--sub)">'+when+'</span>'
       +'<b style="width:70px;'+(x.action==='되돌리기'?'color:var(--warn)':'')+'">'+(x.action||'')+'</b>'
       +'<span style="flex:1">'+(x.months||[]).join(', ')+(x.why?(' · <span style="color:var(--sub)">'+x.why+'</span>'):'')+'</span>'
-      +'<span style="color:var(--sub)">'+String(x.by||'').split('@')[0]+'</span></div>';
+      +'<span style="color:var(--sub)">'+esc(whoName(x.by))+'</span></div>';   /* ⚠ 메일 앞부분(p001)이 아니라 이름 (대표 결정 2026-10-25) */
   });
   return h+'</div>';
 }
@@ -1752,9 +1753,23 @@ function cardField(v,i,f){
      틀린 급여일이 명세서에 계속 찍힌다. */
 /* 누가 정했는지 남기려고 쓴다 — 나중에 「이 급여일 누가 넣었지」를 물을 수 있게.
    ⚠ 로그인 정보를 못 읽어도 저장은 막지 않는다(누가 넣었는지만 비고 값은 들어간다). */
-function meEmail(){
+function meEmail(){   // 기록용 저장값(by) — 저장은 이대로, 화면에 보일 때는 아래 whoName() 을 거친다
   try{ var u=(window.firebase&&firebase.auth&&firebase.auth().currentUser)||null;
        return (u&&u.email)||''; }catch(e){ return ''; }
+}
+/* 기록에 남은 «누가»(by)를 화면에 보일 때 — 저장값(이메일)은 그대로 두고 «보이는 글자»만 이름으로 (대표 결정 2026-10-25 「이름만 있어야한다」).
+   이름이 적혀 있으면 그대로, 로그인 이메일·사번 꼴이면 공개 명부(coData.dir)에서 이름을 찾는다. 못 찾으면 빈 글자. */
+function whoName(v){
+  var s=String(v==null?'':v).trim(); if(!s) return '';
+  var mail=s.indexOf('@')>=0;
+  if(!mail && !/^[A-Za-z]{1,3}-?\d{3}$/.test(s)) return s;          // 이름이다
+  if(mail && !/@pureun\.kr$/i.test(s)) return '';                   // 다른 도메인 이메일 — 이름을 알 길이 없다
+  var key=(mail?s.split('@')[0]:s).toLowerCase().replace(/-/g,'');
+  var m=window.PuWhoami&&PuWhoami.get&&PuWhoami.get();
+  if(m&&m.name&&me&&String(me.email||'').toLowerCase()===(key+'@pureun.kr')) return m.name;   // 내 것은 상단에 이미 뜬 이름
+  var map=(coData&&window.PuSiteStaff&&PuSiteStaff.nameBySid)?PuSiteStaff.nameBySid(coData.dir):{};
+  var hit=Object.keys(map).filter(function(sid){ return String(sid).toLowerCase().replace(/-/g,'')===key; })[0];
+  return hit?map[hit]:'';
 }
 var cardEditOn=null;                        // {site, field} 또는 null
 var PAYDAY_CHIPS=['5일','10일','15일','20일','25일','말일'];
@@ -1811,7 +1826,8 @@ function drawCardEdit(){
   var f=cardEditOn.field;
   var v=cardsView().filter(function(x){return x.사업장===cardEditOn.site;})[0]||{};
   var was=v[f]||'';
-  var who=(v.고친이&&v[f+'_사람'])?('마지막으로 '+v.고친이+'님이 정함'):'';
+  var whoN=whoName(v.고친이);   /* ⚠ 기록에는 메일이 남아 있다 — 화면에는 이름만 (대표 결정 2026-10-25) */
+  var who=(v.고친이&&v[f+'_사람'])?('마지막으로 '+(whoN?esc(whoN)+'님이':'사람이')+' 정함'):'';
   box.innerHTML='<div class="mask" onclick="if(event.target===this)closeCardEdit()"><div class="modal">'
     +'<h3>'+f+'</h3>'
     +'<div class="who">'+esc(cardEditOn.site)+(v.담당자?(' · 담당 '+esc(v.담당자)):'')+(who?(' · '+who):'')+'</div>'
@@ -2215,7 +2231,7 @@ function screenNames(){
           :'<span style="color:var(--warn)">후보 없음</span>'))
       +'<span style="flex:1"></span>';
     if(isAdminUser){
-      if(r.k==='done') h+='<span style="font-size:11.5px;color:var(--sub)">'+(link.by||'')+'</span> <button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="unlinkSite(\''+s+'\')">바꾸기</button>';
+      if(r.k==='done') h+='<span style="font-size:11.5px;color:var(--sub)">'+esc(whoName(link.by))+'</span> <button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="unlinkSite(\''+s+'\')">바꾸기</button>';
       else h+=(st.업체?'<button class="btn" style="padding:4px 10px;font-size:12px" onclick="linkCo(\''+s+'\')">맞음</button> ':'')
         +'<button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="namesEdit(\''+s+'\')">다른 업체</button> '
         +'<button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="markNotCo(\''+s+'\')">업체 아님</button>';

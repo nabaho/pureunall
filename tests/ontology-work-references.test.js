@@ -137,7 +137,11 @@ test('실제 계약 담당자 선택창은 동명이인도 SID로 구별하고 �
   ctx.PANES={};
   function render(){new vm.Script(body).runInContext(ctx);return nodes(ctx.PANES.manager,'select');}
   let selects=render();
-  assert.ok(nodes(selects[0],'option').some(x=>x.props.value==='P2'&&x.children.join('').includes('P2')));
+  /* 같은 이름 두 사람은 «값(사번)»으로 구별한다 — 글자에는 사번이 안 나온다(대표 결정 2026-10-25): 이름 + 순번 */
+  const opts=nodes(selects[0],'option').filter(x=>x.props.value==='P1'||x.props.value==='P2');
+  assert.equal(opts.length,2,'같은 이름 두 사람이 모두 고를 수 있어야 한다');
+  assert.notEqual(opts[0].children.join(''),opts[1].children.join(''),'★ 같은 이름이라 글자만 보고는 못 고른다');
+  assert.ok(opts.every(x=>!/Pd/.test(x.children.join(''))),'★ 고르는 목록 글자에 사번이 끼었다');
   assert.ok(!nodes(selects[0],'option').some(x=>x.props.value==='같은이름'));
   selects[0].props.onChange({target:{value:'P2'}});
   selects=render();selects[1].props.onChange({target:{value:'P1'}});

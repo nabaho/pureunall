@@ -13,26 +13,27 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="푸른 캘린더">
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
-<script src="js/pu-ieum-public.js?v=1"></script>
+<script src="js/pu-ieum-public.js?v=2"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/pu-cal-recruit.js?v=1"></script>
-<script src="js/pu-cal-write.js?v=9"></script>
+<script src="js/pu-cal-write.js?v=10"></script>
 <script src="js/pu-cal-map.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-cal-capture.js?v=2"></script>
@@ -1310,7 +1311,9 @@ function userOf(sid){
 }
 /* ⚠ 이름은 «그만둔 사람까지» 찾는다 — 이알피도 그렇게 한다.
      지나간 이음 근무에 「장한돌 이음센터」라고 적혀 있어야지, 사번만 뜨면 못 읽는다. */
-function nameOf(sid){ var u=userOf(sid); return u ? (u.name||sid) : sid; }
+/* ⚠ 이름을 못 찾으면 «빈 글자» — 사번을 대신 돌려주지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+     사번에서 로그인 아이디가 만들어져 화면에 새면 해킹 단서가 된다. 글자로 쓸 때는 호출부가 || '이름 미확인' 을 붙인다. */
+function nameOf(sid){ var u=userOf(sid); return u ? (u.name||"") : ""; }
 function externalOf(id){
   var xs = arr(D.external_staff);
   for(var i=0;i<xs.length;i++) if(xs[i] && xs[i].id===id) return xs[i];
@@ -1546,13 +1549,13 @@ function myColorHtml(){
     var 남 = 임자[k] && 임자[k] !== ME.sid ? 임자[k] : "";
     return '<button class="mysw' + (k === 지금 ? " cur" : "") + (남 ? " taken" : "") + '"'
       + ' data-mycol="' + esc(c) + '"'
-      + ' title="' + (남 ? esc(nameOf(남)) + ' 님이 쓰는 색입니다' : esc(c)) + '"'
+      + ' title="' + (남 ? esc(nameOf(남) || '이름 미확인') + ' 님이 쓰는 색입니다' : esc(c)) + '"'
       + ' style="background:' + esc(c) + '">'
-      + (남 ? '<span class="myw">' + esc(String(nameOf(남)).slice(0,2)) + '</span>' : '')
+      + (남 ? '<span class="myw">' + esc(String(nameOf(남) || '이름 미확인').slice(0,2)) + '</span>' : '')
       + '</button>';
   }
   return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:360px">'
-    + '<h3>🎨 내 색 고르기 <span class="mmn" style="display:inline">— ' + esc(nameOf(ME.sid) || ME.sid) + '</span></h3>'
+    + '<h3>🎨 내 색 고르기 <span class="mmn" style="display:inline">— ' + esc(nameOf(ME.sid) || '이름 미확인') + '</span></h3>'
     + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : "")
     + '<button class="btn ghost" data-myfilter="1" style="width:100%;margin-bottom:9px">📋 내 일정만 보기</button>'
     + (!색들.length
@@ -1583,7 +1586,7 @@ function 내색고르기(색){
   /* ★ 겹치면 «창»으로 막는다. 서버도 막지 않는 일이라(색은 겹쳐도 저장은 된다)
      여기서 사람에게 알리는 것이 유일한 울타리다 — 조용히 넘기면 둘이 같은 색이 된다. */
   var 남 = 색임자()[k];
-  if(남 && 남 !== ME.sid){ m.겹침 = nameOf(남) || 남; render(); return; }
+  if(남 && 남 !== ME.sid){ m.겹침 = nameOf(남) || '이름 미확인'; render(); return; }
   m.busy = true; m.err = ""; render();
   PuCalWrite.saveMyColor(ME.sid, 색).then(function(r){
     m.busy = false;
@@ -1621,7 +1624,7 @@ function colorsHtml(){
             var 지금 = colorOf(u.sid) || "";
             var 열림 = m.pick === u.sid;
             return '<div class="mmrow" style="flex-wrap:wrap">'
-              + '<div class="mmwho"><span class="mmmail">' + esc(u.name || u.sid) + '</span>'
+              + '<div class="mmwho"><span class="mmmail">' + esc(u.name || '이름 미확인') + '</span>'
               +   '<span class="mmn">' + (지금 ? esc(지금) : "아직 색이 없습니다") + '</span></div>'
               + '<button class="cdot' + (열림 ? " on" : "") + '" data-copen="' + esc(u.sid) + '"'
               +   (m.busy ? " disabled" : "")
@@ -1633,7 +1636,7 @@ function colorsHtml(){
                       return '<button class="cswatch' + (String(c).toLowerCase() === String(지금).toLowerCase() ? " cur" : "") + '"'
                         + ' data-cset="' + esc(u.sid) + '|' + esc(c) + '"'
                         + ' style="background:' + esc(c) + '"'
-                        + ' title="' + (남의것 ? esc(nameOf(임자)) + ' 님이 쓰는 색입니다' : esc(c)) + '">'
+                        + ' title="' + (남의것 ? esc(nameOf(임자) || '이름 미확인') + ' 님이 쓰는 색입니다' : esc(c)) + '">'
                         + (남의것 ? '<span class="ctaken">·</span>' : "") + '</button>';
                     }).join("") + '</div>'
                   : "")
@@ -1721,13 +1724,13 @@ function mailmapHtml(){
         ? '<div class="mmlist">' + 줄.map(function(r){
             return '<div class="mmrow">'
               + '<div class="mmwho"><span class="mmmail" title="' + esc(r.mail) + '">' + esc(r.mail) + '</span>'
-              +   '<span class="mmn">' + r.n + '건 · ' + (r.sid ? esc(nameOf(r.sid)) + ' 이어짐' : '아직 안 이음') + '</span></div>'
+              +   '<span class="mmn">' + r.n + '건 · ' + (r.sid ? esc(nameOf(r.sid) || '이름 미확인') + ' 이어짐' : '아직 안 이음') + '</span></div>'
               + '<select data-mm="' + esc(r.key) + '"' + (m.busy ? ' disabled' : '')
               +   ' class="' + (r.sid ? 'on' : '') + '">'
               +   '<option value="">— 고르세요 —</option>'
               +   현직.map(function(u){
                     return '<option value="' + esc(u.sid) + '"' + (u.sid === r.sid ? ' selected' : '') + '>'
-                      + esc(u.name || u.sid) + '</option>';
+                      + esc(u.name || '이름 미확인') + '</option>';
                   }).join("")
               + '</select></div>';
           }).join("") + '</div>'
@@ -2147,6 +2150,9 @@ function gcalToEvent(ev){
   if(!title) title = "일정";
   var gColor = (window._gcalColors && ev.colorId) ? (window._gcalColors[String(ev.colorId)] || "") : "";
   var mail = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || "";
+  /* 2026-10-19 이전에 넣은 일정 설명에는 「푸른 담당: 이름 (P-005)」 꼴로 사번이 들어 있다 — 화면에는 이름만(대표 결정 2026-10-25).
+     ⚠ 보이는 복사본만 고친다 — 담당 찾기(일정담당)는 구글 원문(ev.description)을 그대로 읽는다. */
+  var 사번가림 = function(s){ return String(s).replace(/(푸른 담당:[^\n(（]*?)\s*[(（]\s*[A-Za-z]-?\d{3}\s*[)）]/g, "$1"); };
   /* ★ 담당 번호가 있으면 그것이 이긴다 — 서버가 직원 대신 넣은 일정(functions/gcal-proxy.js)은
        만든이가 대표 계정이다(2026-10-10). 번호가 명부에 없으면 쓰지 않는다. */
   var 담당 = 일정담당(ev);
@@ -2201,14 +2207,14 @@ function gcalToEvent(ev){
     /* ★ 상세 창에 낼 것 — 장소·설명을 «통째로» 들고 온다.
        tip 은 칩에 마우스를 올렸을 때 쓰는 짧은 글이라 두 줄로 자른다. 상세는 다 보여 준다. */
     place: ev.location || "",
-    desc: String(ev.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim(),
+    desc: 사번가림(String(ev.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim()),
     /* 언제 넣고 언제 고쳤나 — 열쇠로 읽어도 구글이 준다(2026-10-04 상세 창 🕒) */
     created: ev.created || "", updated: ev.updated || "",
     /* ✏️ 고치기(2026-10-10)가 쓰는 «구글에 실제로 든» 시각 — 위의 time·endAt 은 제목 시각으로 옮겨졌을 수 있다 */
     gStart: ev.start.dateTime || "", gEnd: (ev.end && ev.end.dateTime) || "", recur: !!ev.recurringEventId,
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
          /* 설명 앞 두 줄(담당자 등 — 이 앱이 넣은 미팅이면 「담당자: …」가 첫 줄이다) */
-         + (ev.description ? "\n" + String(ev.description).replace(/<[^>]+>/g, "").split("\n").slice(0, 2).join("\n") : "")
+         + (ev.description ? "\n" + 사번가림(String(ev.description).replace(/<[^>]+>/g, "")).split("\n").slice(0, 2).join("\n") : "")
          + (mail ? "\n✉ " + mail : "") };
 }
 
@@ -3235,7 +3241,7 @@ function matchSearch(e){
      그 색은 아무 뜻도 없어진다. 여기서 새로 정하지 않는다. */
 function chipsHtml(eumOnly){
   var 사람 = eumOnly ? ieumPeople().filter(function(p){ return !p.left; }) : users().map(function(u){
-    return { pk:u.sid, name:u.name || u.sid, color: colorOf(u.sid) || "#64748b" };
+    return { pk:u.sid, name:u.name || "이름 미확인", color: colorOf(u.sid) || "#64748b" };
   });
   /* 배지 숫자의 «뜻» — 이알피와 같다: 총 건수가 아니라 «같은 날에 두 건 넘게 잡힌 날이 며칠인가».
      ⚠ 총 건수를 적으면 바쁜 사람일수록 큰 숫자가 붙어 아무 뜻도 없다.
@@ -3421,7 +3427,7 @@ function ieumPeople(){
        현직처럼 보이고, 이음 근무를 배정할 사람 목록에까지 오른다.
        (검사 tests/cal-ieum-same-as-erp.test.js 가 실제로 돌려 본다 — 처음엔 섞여 있었다) */
     if(u.status !== "active") return;
-    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사",
+    rows.push({ pk:u.sid, name:u.name||"이름 미확인", kind:"in", roleLabel:"내부 노무사",
       color:colorOf(u.sid) || "#1e40af", note:(D.ieum_notes && D.ieum_notes[u.sid]) || "",
       phone:u.phone||u.contact||"" });
   });
@@ -3437,7 +3443,7 @@ function ieumPeople(){
   users().forEach(function(u){
     if(이미[u.sid] || u.status === "active") return;
     if(!이음근무있나(function(r){ return r.sid === u.sid && !r.externalId; })) return;
-    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사", color:"#94a3b8", left:true, note:"" });
+    rows.push({ pk:u.sid, name:u.name||"이름 미확인", kind:"in", roleLabel:"내부 노무사", color:"#94a3b8", left:true, note:"" });
   });
   ext.filter(function(x){ return x && x.active === false; }).forEach(function(x){
     if(이미[x.id]) return;
@@ -4264,7 +4270,7 @@ function modalHtml(){
         + (m.type==="leave-hour"
             ? '<span class="trange"><input type="number" min="1" max="8" data-m="hours" value="' + esc(m.hours) + '"><span>시간</span></span>' : ''), "날짜");
   var 누가 = '<select data-m="sid" title="누구">'
-    + users().map(function(u){ return '<option value="' + esc(u.sid) + '"' + (u.sid===m.sid ? ' selected' : '') + '>' + esc(u.name||u.sid) + '</option>'; }).join("")
+    + users().map(function(u){ return '<option value="' + esc(u.sid) + '"' + (u.sid===m.sid ? ' selected' : '') + '>' + esc(u.name||'이름 미확인') + '</option>'; }).join("")
     + '</select>';
   var 달력 = '<select data-m="vis" class="gvis">'
     + '<option value="shared"' + (m.vis!=="private" ? ' selected' : '') + '>푸른노무법인 · 공용 (모두 보기)</option>'
@@ -5997,15 +6003,15 @@ function start(user){
       return null;
     })();
     /* 구글처럼 이름 첫 글자 동그라미 — 이름·직함·메일은 누르면 뜨는 창에 (예전엔 머리줄에 늘 떠 있었다) */
-    var 이름 = (ME && ME.name) || (user.email || '?');
-    $('me').textContent = String(이름).slice(0, 1);
+    /* ⚠ 로그인 이메일(p001@…)·사번은 어디에도 글자로 안 낸다 — 이름을 못 찾으면 「이름 미확인」 (대표 결정 2026-10-25) */
+    var 이름 = (ME && ME.name) || '이름 미확인';
+    $('me').textContent = ME && ME.name ? String(ME.name).slice(0, 1) : '?';
     /* ★ 동그라미만으로는 누구인지 모른다 — 이름을 글자로 옆에 둔다 (대표 지시 2026-09-29) */
     var 이름칸 = $('meName');
-    if(이름칸){ 이름칸.textContent = ME ? ((ME.name || ME.sid) + (ME.title ? ' ' + ME.title : '')) : ''; 이름칸.title = 이름; }
-    $('me').title = 이름 + (user.email ? ' · ' + user.email : '');
+    if(이름칸){ 이름칸.textContent = ME ? (이름 + (ME.title ? ' ' + ME.title : '')) : ''; 이름칸.title = 이름; }
+    $('me').title = 이름;
     $('whoName').innerHTML = '<b>' + esc(ME ? (ME.name||'') : '')
-      + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b>'
-      + esc(user.email||'') + ' · ';
+      + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b> · ';
     render();
     S.uid = user.uid;
     try{ S.showGone = localStorage.getItem("pu_cal_gone") === "1"; }catch(_){}

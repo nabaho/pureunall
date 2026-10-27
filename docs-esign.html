@@ -122,9 +122,10 @@
 <!-- 프로그램 사이 이동 (공용 앱바) — 이 한 줄이 빠져 있어서
      문서관리에만 오른쪽 「즐겨찾기」 손잡이가 없었다(대표 보고 2026-08-13) -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 「준비중」 판단에 «지금 로그인한 사람의 역할»이 필요하다 (2026-09-23) -->
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <!-- ⚠ 이 화면은 머리줄 #whoami 를 «스스로» 채운다(loadAll 안). 자리를 안 알려 주면
      부품이 떠 있는 표를 따로 그려 그 위에 겹친다 — 다른 셋(급여데이터함·급여관리·
      취업규칙)과 같은 길로 「그리지 말라」고 한다. tests/whoami-mount.test.js 가 지킨다. -->
@@ -223,11 +224,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 계약 근로자 주민번호 — 그 계약의 담당자와 대표만 (2026-10-15) -->
@@ -246,13 +247,13 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=21"></script>
-<script src="js/pu-contract-forms.js?v=66"></script>
-<script src="js/pu-photo-store.js?v=35"></script>
+<script src="js/pu-form-cardfill.js?v=22"></script>
+<script src="js/pu-contract-forms.js?v=67"></script>
+<script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=21"></script>
+<script src="js/pu-office-docs.js?v=22"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -267,6 +268,11 @@ firebase.initializeApp(FB_CONFIG);
 var db = firebase.database();
 var $ = function (id) { return document.getElementById(id); };
 var curUser = null;
+/* 지금 로그인한 사람의 «이름» — 못 찾았으면 빈 글자. 사번·아이디(p001)를 대신 적지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+   여기서 만든 이름은 저장되는 「올린 사람」·서명 요청서의 「요청」 줄로 나가므로 서명을 받는 바깥 사람에게도 보인다. */
+function meName() { var me = window.PuWhoami && PuWhoami.get(); return (me && me.name) || ''; }
+/* 원본 보관함(올린 사람 이름 포함) 설정 — 이름은 명부를 읽은 뒤에야 알려지므로, 알려지면 한 번 더 부른다(init 은 값만 바꾼다) */
+function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); }
 var casesCache = {};
 var savePending = 0, saveFailed = false;
 function setSaveState(kind, text) {
@@ -296,20 +302,24 @@ firebase.auth().onAuthStateChanged(function (u) {
   curUser = u;
   /* 원본 보관함 — 서면함·서고 원본과 같은 창고(pureun-erp-hrphotos). 창고가 없어도 양식 화면은 돈다 */
   try { docBucket = firebase.app().storage('gs://pureun-erp-hrphotos'); } catch (e) { docBucket = null; }
-  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0], secretFetch: fetchSecretDoc });
+  officeInit();
   openLibraryNav();
   /* ✉ 메일 첨부 — ⚠ storage 를 넘기지 않는다(기본 기업정보함 창고 pureun-erp-photos 라야 서버가 첨부를 찾는다) */
   if (window.PuDocFile) PuDocFile.init({ db: db });
   if (window.PuPhotoStore) {
     PuPhotoStore.init({ db: db, storage: docBucket, auth: firebase.auth() });
-    photosReady = PuPhotoStore.signIn(u.uid, u.email, u.email.split('@')[0]).catch(function () {});
+    photosReady = PuPhotoStore.signIn(u.uid, u.email, meName()).catch(function () {});
   }
   /* ★ 머리줄엔 «이름»을 — 아이디(p001)만으로는 누구인지 모른다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」).
-     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 아이디를 잠깐 둔다. */
-  $('whoami').textContent = u.email.split('@')[0];
+     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 «빈 칸» — 아이디·사번을 잠깐이라도 적지 않는다(2026-10-25). */
+  $('whoami').textContent = meName();
   if (window.PuWhoami && !window.__docsWhoHooked) {
     window.__docsWhoHooked = true;
-    PuWhoami.onChange(function (me) { if (me && me.name) $('whoami').textContent = me.name + (me.title ? ' ' + me.title : ''); });
+    PuWhoami.onChange(function (me) {
+      if (me && me.name) $('whoami').textContent = me.name + (me.title ? ' ' + me.title : '');
+      /* 올린 사람·서명 요청자 이름이 «이름»으로 저장되게 — 이름은 로그인 직후가 아니라 명부를 읽은 뒤에 알려진다 */
+      if (me && me.name && curUser) officeInit();
+    });
   }
   /* {{공인노무사명단}} — 재직 공인노무사 전원(직원 명부). 위임장·서명 요청·집단체불 서류가 같이 쓴다. 못 읽으면 기본 명단 */
   if (window.PuFormCardFill && PuFormCardFill.setLawyers) {
@@ -640,7 +650,7 @@ async function formMailSend(p, files) {
    o.await — 계약서등관리에서 만든 «계약서»면 📬 서명본 대기에도 한 줄(pu_docs/await). 기업별 계약서 다시 보내기는 안 적는다 */
 function formMailRecord(row, V, o) {
   var keys = PuFormCardFill.sentKeys(row, V), at = Date.now();
-  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.how === '받기' ? '(받기)' : o.who, contract: o.contract });
+  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', byName: meName(), kind: o.kind, names: o.names, who: o.how === '받기' ? '(받기)' : o.who, contract: o.contract });
   var jobs = keys.map(function (k) { return trackedWrite(db.ref('pucards/sentDocs/' + k).push(rec)); });
   var coName = String((V && V.회사명) || (row && row.c) || '').trim();
   if (o.await && o.kind === '계약서' && coName)
@@ -656,7 +666,7 @@ function formSignHost() {
 }
 function formSignCreate(req, open) {
   var ref = db.ref('pu_sign/req').push(), id = ref.key;
-  req.at = Date.now(); req.by = curUser.uid; req.byName = String(curUser.email || '').split('@')[0];
+  req.at = Date.now(); req.by = curUser.uid; req.byName = meName();   /* 서명 확인서의 「요청」 줄로 서명하는 바깥 사람에게도 나간다 — 이름만(아이디·사번 금지) */
   open.req = id;
   return trackedWrite(ref.set(req)).then(function () { return trackedWrite(db.ref('pu_sign/open/' + req.t).set(open)); })
     .then(function () {
@@ -671,6 +681,8 @@ function formSignList() {
     var rows = Object.keys(v).map(function (k) { return Object.assign({ id: k }, v[k]); });
     return Promise.all(rows.map(function (r) {
       r.o = {};
+      /* 옛 요청은 byName 에 아이디(p001)가 저장돼 있다 — 서명 확인서(PDF)의 「요청」 줄로 바깥에 나가므로 사번·이메일 꼴이면 비운다(2026-10-25) */
+      if (/^[A-Za-z]{1,3}-?\d{3}$/.test(String(r.byName || '').trim()) || String(r.byName || '').indexOf('@') >= 0) r.byName = '';
       if (r.status === 'saved' || r.status === 'void') return r;
       /* 상태만 콕 집어 읽는다 — 문서 그림(pages)은 받지 않는다. 못 읽으면 err(그 줄은 지우지 않는다) */
       var err = false;
@@ -839,7 +851,7 @@ async function formCoMerge(fromKey, toKey) {
   }));
   if (!got[0]) throw new Error('합칠 회사를 찾지 못했습니다 — 이미 합쳐졌을 수 있습니다');
   var plan = PuOfficeDocs.mergePlan(fromKey, toKey, { from: got[0], to: got[1], fromDocs: got[2] || {}, toDocs: got[3] || {}, fromRecs: got[4] || {}, toRecs: got[5] || {} },
-    { uid: curUser ? curUser.uid : '', name: curUser && curUser.email ? curUser.email.split('@')[0] : '' });
+    { uid: curUser ? curUser.uid : '', name: meName() });
   return trackedWrite(db.ref('pu_docs').update(plan));
 }
 /* 보낸 사본 — 기업별 서류. 규칙 안의 값만(kind:'co', src:'upload') */

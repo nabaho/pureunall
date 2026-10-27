@@ -38,13 +38,14 @@
   document.documentElement.classList.add('maildoor');
 }catch(e){} })();
 </script>
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -53,7 +54,7 @@
 <script src="js/pu-mgr-watch-core.js?v=1"></script>
 <script src="js/pu-mail-fill-core.js?v=2"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=6"></script>
+<script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 사건 근로자 주민번호 — 그 사건의 담당자와 대표만 (2026-10-15) -->
@@ -82,6 +83,7 @@
      각자 셈하면 같은 회사가 둘로 갈린다. -->
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
 <script src="js/pu-doc-file.js?v=37"></script>
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
 <script src="js/pu-office-store.js?v=10"></script>
@@ -423,6 +425,18 @@ body:has(.mck-dim) #pu-version-fab{display:none!important}
 .ditem .k{width:88px;flex-shrink:0;color:var(--sub);font-size:12.5px;padding-top:2px}
 .ditem .v{flex:1;word-break:break-all}
 .ditem .v a{color:var(--orange);text-decoration:none}
+/* 명함 상세 — 복사 단추·주소 지도 창 (2026-10-27) */
+.dcopy{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px;padding:2px 8px;font-size:11.5px;
+  font-weight:700;cursor:pointer;margin-left:6px;vertical-align:middle;white-space:nowrap;font-family:inherit}
+#addrMapOv{position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}
+#addrMapOv .amap{background:#fff;color:#1e293b;border-radius:12px;width:min(640px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+#addrMapOv .amap-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13.5px}
+#addrMapOv .amap-h b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#addrMapOv iframe{border:0;width:100%;height:min(60vh,460px);display:block}
+#addrMapOv .amap-b{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid #e2e8f0}
+#addrMapOv .amap-b a{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;padding:7px 12px;
+  font-size:13px;font-weight:700;text-decoration:none}
+#addrMapOv .amap-b .dcopy{margin-left:auto;padding:7px 12px;font-size:13px}
 
 #zoombg{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;z-index:200;
   align-items:center;justify-content:center;cursor:zoom-out}
@@ -1692,6 +1706,33 @@ table.mstab2 tr:last-child td{border-bottom:none}
   #mmBody .dm-read .rtop .lft>*{flex:none;white-space:nowrap}
   /* ⑤ 📎 자료함 — 폰에서도 이제 그린다(renderMatMobile). PC 자리(#pcMat)와 같은 종이·같은 색 변수를 깐다.
        명함 갈래 줄·거르개 줄·＋ 는 이 화면 것이 아니라 접는다(메일 화면과 같은 까닭). */
+  /* ⑥ 메일 쓰기 (대표 지시 2026-10-26 「메일함 UI 너무 이상하다 깔끔하게 … 위로 올라가니까 틀 고정 안 돼 있어서 다 안 보인다」)
+       ⓐ 보내기 줄 틀 고정 — 받는사람을 치려고 글자판이 뜨면 화면이 올라가 「보내기」가 사라졌다.
+          머리칸(.cphead)은 폰에서 «겹을 풀어»(display:contents) 보내기 줄이 쓰기 화면 «전체»에서 붙게 한다
+          — 머리칸 안에서 붙이면 첨부 칸이 끝나는 곳에서 같이 올라가 버린다. PC(#pcMail)는 그대로.
+       ⓑ 보내기 줄은 한 줄 — 「← 목록으로」는 바로 위 「‹ 목록」과 같은 일이라 폰에서 뺀다. 자동저장 글도 뺀다.
+       ⓒ 「보내는 / 사람」 처럼 이름표가 두 줄로 꺾였다 — 이름표는 한 줄, 폭은 글자만큼.
+       ⓓ 받는사람을 고르면 「누구인지」(오현숙 주무관 · 제주…)가 칸의 절반을 먹어 입력칸이 «빈 네모»만 남았다
+          — 「누구인지」는 입력칸 «아래 줄»로 내린다.
+       ⓔ 찾기 목록에서 이름·회사가 한 글자씩 세로로 섰다 — 줄을 꺾지 않고, 이메일은 아랫줄에 …로 줄인다. */
+  #mmBody .cphead{display:contents}
+  /* ⚠ 위에 이미 「‹ 목록 · 메일함 …」 줄(.mmbar)이 붙어 있다 — 그 «밑»에 붙는다(높이는 renderMailMobile 이 재서 --mmbarH 로 준다).
+       top:0 이면 그 줄을 덮어 목록으로 갈 길이 가려졌다. z-index 도 그 줄(6)보다 낮게. */
+  #mmBody .mtop{position:sticky;top:var(--mmbarH,0px);z-index:5;background:#fff;flex-wrap:wrap;gap:2px 8px;
+    padding:6px 12px;margin:0 -12px 2px;border-bottom:1px solid #e2e8f0}   /* 양옆 −12px — #mmBody 여백까지 덮어야 밑 글이 옆으로 안 비친다 */
+  #mmBody .mtop .setback,#mmBody .mtop .mauto{display:none}
+  #mmBody .mtop>*{flex:none;white-space:nowrap}
+  #mmBody .mtop .cpsendbtn{padding:7px 16px}
+  #mmBody .mtop .cpghost{padding:6px 4px}
+  #mmBody .mtop .mchk{font-size:12px}
+  #mmBody .cpk{flex:0 0 auto;min-width:48px;white-space:nowrap}
+  #mmBody .cprow>div:has(>.cptowho){flex-wrap:wrap}
+  #mmBody .cptowho{order:3;flex:1 0 100%;max-width:100%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mmBody .cpsi{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px;row-gap:1px;align-items:baseline}
+  #mmBody .cpsi>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  #mmBody .cpsi .e{grid-column:1 / -1;margin-left:0}
+  /* ⓕ 글꼴·크기 고르기 — #mmBody select{width:100%} 이 글꼴 상자를 한 줄 통째로, 크기 상자는 64px 에 묶어 「10|」로 잘랐다 */
+  #mmBody .edbar .edsel{width:auto !important;flex:0 0 auto;max-width:48%}
   body.matview #tabs,body.matview #subbar,body.matview #fab{display:none}
   body.matview #listwrap{background:#fff}
   #matM{padding:12px 8px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
@@ -3797,7 +3838,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=3"></script>
+  <script src="js/pu-whoami.js?v=4"></script>
 <script>
 /* ══ 「준비중」 문은 걷었다 (대표 지시 2026-10-09 「푸른메일은 준비중 풀어도 된다」) ══
    2026-09-23 부터 메일 쪽(?view=mail)만 관리자 말고는 못 들어오게 막아 두었다.
@@ -4780,7 +4821,15 @@ const Store = {
             myEmail=(u.email||'').toLowerCase(); myUid=u.uid||'';
             /* ⚠ loadSharedGKey() 를 뗐다(2026-08-17) — 로그인할 때마다 실시간DB 의
                열쇠를 브라우저로 내려받던 자리다. 이제 열쇠는 서버만 안다. */
-            hideCardsLogin(); ErpMatch.load(); mbTakeToCo();
+            hideCardsLogin(); ErpMatch.load();
+            /* ⚠ mbTakeToCo 는 «뒤쪽» <script> 덩이에 있다 — 로그인이 그 덩이가 읽히기 «전»에 끝나면
+                 «is not defined» 로 던져, 이 아래(명함 구독 붙이기)가 통째로 안 돌아 목록이 텅 빈다
+                 (2026-10-27 점검 도구에서 실제로 그랬다 — 명함 0장). 함수 끌어올림은 제 덩이 안에서만 된다.
+                 있으면 지금, 없으면 문서가 다 읽힌 뒤에 한 번 부르고, 무엇이 나든 이 줄에서 멈추지 않는다. */
+            try {
+              if (typeof mbTakeToCo === 'function') mbTakeToCo();
+              else window.addEventListener('load', function(){ try { mbTakeToCo(); } catch(_e){ console.warn('[take]', _e); } }, { once:true });
+            } catch(_e) { console.warn('[take]', _e); }
             /* ── 명함 씨앗을 먼저 그린다 (대표 보고 2026-08-29 「기업정보함도 빨리」) ──
                지난 로그인 때 담아 둔 스냅숏(IndexedDB)을 구독의 씨앗으로 준다 — 화면이
                «즉시» 서고, 최신본은 뒤에서 한 장씩 갈아 끼워진다(watchCardMap 머리글).
@@ -5157,7 +5206,7 @@ const ErpMatch = {
     ]).then(([du,dc])=>{
       const dir = ErpMatch._arr(du.val()), cos = ErpMatch._arr(dc.val());
       const nameBySid = {};
-      dir.forEach(u=>{ if(u&&u.sid) nameBySid[u.sid]=u.name||u.sid; });
+      dir.forEach(u=>{ if(u&&u.sid) nameBySid[u.sid]=u.name||''; });   /* ⚠ 이름을 모르면 빈 글자 — 사번을 이름 자리에 넣지 않는다(2026-10-25) */
       /* ⚠ 사번 → 이름 표를 «밖에도» 내놓는다 (대표 지시 2026-08-29 「사무관리 공동작업」).
            사무관리 기록(컨설팅·사건·기금)의 담당자는 사번으로 적혀 있어(P-007),
            이 표가 없으면 메일함 옆줄에 「P-007」이 사람 이름 자리에 그대로 뜬다.
@@ -5192,8 +5241,8 @@ const ErpMatch = {
       const byBiz={}, byName={}, byId={};
       cos.forEach(co=>{
         if(!co) return;
-        const main = co.managerMain ? (nameBySid[co.managerMain]||co.managerMain) : '';
-        const subs = (co.managerSubs||[]).map(s=>nameBySid[s]||s).filter(Boolean);
+        const main = co.managerMain ? (nameBySid[co.managerMain]||'') : '';
+        const subs = (co.managerSubs||[]).map(s=>nameBySid[s]||'').filter(Boolean);
         /* 유형(자문/급여/노조/기금)·실무담당자명 — 담당 노무사가 없어도 유형 배지는 의미 있음 */
         /* 업체 퇴사(종료·이탈) 여부 — 업체관리 status가 종료/해지/비활성이면 left */
         const _st = String(co.status||'');
@@ -6803,7 +6852,7 @@ function renderCompose(){
       </div></div>
     <textarea id="cpBody" class="cpbody">${esc(c.body)}</textarea>
     <div class="cphint">자료함의 메일 본문 틀에서 채워졌습니다. 여기서 고쳐 보내도 <b>틀은 안 바뀝니다.</b>
-      · 답장은 <b>${esc((myEmail||'').split('@')[0]||'보낸 직원')}</b> 님께 옵니다.
+      · 답장은 <b>${esc(staffName(myEmail)||'보낸 직원')}</b> 님께 옵니다.
       ${local.length?'<br>💻 내 PC 파일은 <b>이번 편지에만</b> 붙습니다 — 계속 쓰실 것이면 자료함에서 [교체]로 올려주세요.':''}</div>
     <button class="sm-send" onclick="sendCompose()" ${over?'disabled':''}>보내기</button>`;
 }
@@ -7505,7 +7554,7 @@ function sendLogHtml(cardId){
   return `<div class="sendlog">
     <div class="slh">📤 보낸 자료 <span>${sendLogList(state.sendLog[cardId]).length}회</span></div>
     ${rows.map((r,i)=>`<div class="slrow ${i?'':'on'}">
-      <div class="sld">${fmtDate(r.at)}${r.by?' · '+esc(String(r.by).split('@')[0]):''}</div>
+      <div class="sld">${fmtDate(r.at)}${staffName(r.by)?' · '+esc(staffName(r.by)):''}</div>
       <div class="sln">${r.set?`<b>📦 ${esc(r.set)}</b> — `:''}${esc((r.names||[]).join(' · ')||'자료')}</div>
     </div>`).join('')}</div>`;
 }
@@ -8600,6 +8649,8 @@ function renderMailMobile(){
       ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
       <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
     </div><div id="mmBody"></div>`;
+  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
+  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
   const body=$('mmBody'); if(!body) return;
   body.innerHTML = (state.mailSent==='box' ? mbMobileHtml()
                  /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고친다 — 한쪽만 고치면 폰에서만 안 열린다 */
@@ -8778,12 +8829,14 @@ function mailWriteHtml(){
           const mode = state.edMode || 'editor';
           if(mode!=='editor') return '';
           return `<div class="edbar">
-          <select class="edsel" onchange="edCmd('fontName',this.value)" title="글꼴">
-            ${['맑은고딕','굴림','돋움','바탕','나눔고딕'].map(f=>`<option>${f}</option>`).join('')}
+          ${/* 글꼴·크기는 «고른 대로 기억»한다 (대표 지시 2026-10-26 「셀픽도 좀 저장해라」 — 고르기 상자 값을 저장).
+                이 기기에 남기고, 다음 편지를 쓸 때 본문을 처음 누르면 그 글꼴·크기로 시작한다(edKeepApply). */''}
+          <select class="edsel" onchange="edKeepSet('font',this.value);edCmd('fontName',this.value)" title="글꼴 — 고른 것을 기억합니다">
+            ${['맑은고딕','굴림','돋움','바탕','나눔고딕'].map(f=>`<option ${f===edKeep('font')?'selected':''}>${f}</option>`).join('')}
           </select>
-          <select class="edsel" style="width:64px" onchange="edFontSize(this.value)" title="글자 크기">
+          <select class="edsel" style="width:64px" onchange="edKeepSet('pt',this.value);edFontSize(this.value)" title="글자 크기 — 고른 것을 기억합니다">
             ${['9','10','11','12','14','16','18','24'].map(n=>
-              `<option value="${n}" ${n==='10'?'selected':''}>${n}pt</option>`).join('')}
+              `<option value="${n}" ${n===edKeep('pt')?'selected':''}>${n}pt</option>`).join('')}
           </select>
           ${ED_TOOLS.map(t=> t.sep ? '<span class="edsep"></span>'
             : t.color
@@ -8820,7 +8873,7 @@ function mailWriteHtml(){
              ⚠ 누르거나 글자를 넣을 때마다 edSyncBar 로 켜짐 표시만 새로 칠한다(화면은 안 그린다). */
           return `<div id="cpBody" class="cpbody" contenteditable="true" spellcheck="false"
             data-ph="여기에 내용을 적으세요"
-            onkeyup="edSyncBar()" onmouseup="edSyncBar()"
+            onkeyup="edSyncBar()" onmouseup="edSyncBar()" onfocus="edKeepApply()"
             oninput="grabCompose()">${signPreviewHtml(html)}</div>`;
         })()}
         <div class="edfoot">
@@ -8916,6 +8969,23 @@ function edCmd(cmd, val){
   /* 누른 결과를 «곧바로» 담는다 — 안 담으면 다음에 화면을 그릴 때 사라진다 */
   grabCompose();
   edSyncBar();
+}
+
+/* 글꼴·크기 기억 (대표 지시 2026-10-26 「셀픽도 좀 저장해라」) — 이 기기(localStorage)에만 남긴다.
+   ⚠ 기억한 값을 «보여만» 주면 거짓말이다(상자는 굴림인데 치면 맑은고딕) — 그래서 본문을 처음 누를 때
+     그 글꼴·크기를 실제로 켠다. 편지마다 한 번만(_compose._edKeep), 기본값(맑은고딕·10pt)이면 아무것도 안 한다. */
+const ED_KEEP_DEF = { font:'맑은고딕', pt:'10' };
+function edKeep(k){
+  try{ const v = localStorage.getItem('pucards_ed_' + k); if(v) return v; }catch(_){}
+  return ED_KEEP_DEF[k];
+}
+function edKeepSet(k, v){ try{ localStorage.setItem('pucards_ed_' + k, String(v)); }catch(_){} }
+function edKeepApply(){
+  if(!_compose || _compose._edKeep) return;
+  _compose._edKeep = true;
+  const f = edKeep('font'), p = edKeep('pt');
+  if(f !== ED_KEEP_DEF.font) edCmd('fontName', f);
+  if(p !== ED_KEEP_DEF.pt) edFontSize(p);
 }
 
 /* 글자 크기 — 브라우저 명령은 1~7 만 받는다. 화면에는 pt 로 보여 주고 여기서 바꾼다. */
@@ -9662,7 +9732,7 @@ function wireMailWrite(){
     sug.innerHTML = hits.map(it=>{
       const em = normEmail(it.email);
       return `<div class="cpsi ${em?'':'off'}" ${em?`onclick="pickPerson('${it.id}')"`:''}>
-        👤 <b>${esc(it.name||'(이름 없음)')}</b>
+        <b>👤 ${esc(it.name||'(이름 없음)')}</b>
         <span class="c">${esc(it.company||'')}</span>
         <span class="e">${em?esc(em):'이메일 없음'}</span></div>`;
     }).join('');
@@ -10134,14 +10204,15 @@ function resendFrom(id){
    그동안 로그인 계정을 그대로 잘라 써서 「p001」로 나왔다. 사람 이름이 아니면
    누가 보냈는지 알 수 없다.
 
-   ⚠ 명부를 아직 못 읽었거나 명부에 없는 계정이면 **계정 앞부분이라도 보여준다** —
-     빈칸으로 두면 「누가 보냈는지 모르는 메일」이 되어 더 나쁘다. */
+   ⚠ 명부를 아직 못 읽었거나 명부에 없는 계정이면 **빈 글자**를 돌려준다 — 계정 앞부분(p001)은
+     로그인 아이디가 되므로 이름 대신 적지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」).
+     보여 주는 쪽은 `|| '이름 미확인'` 같은 대체값을 둔다. */
 function staffNameOf(dirMap, email){
   const e = String(email||'').trim().toLowerCase();
   if(!e) return '';
   const hit = dirMap && dirMap[e];
   if(hit) return hit;
-  return e.split('@')[0];
+  return '';
 }
 function staffName(email){ return staffNameOf(ErpMatch.nameByEmail, email); }
 
@@ -13969,6 +14040,57 @@ function photoBackBtn(it){
     onclick="openCoDoc('${esc(it.photoYear)}','${esc(it.photoId)}','${esc(it.photoOwner)}')">📷 사진첩 원본</button>`;
 }
 
+/* ══════ 명함 상세 — 바로 걸기·복사·지도 (대표 지시 2026-10-27 「주소나 이메일 복사하기 버튼, 주소를 클릭하면
+   팝업으로 지도, 전화도 휴대폰도 바로 전화 걸 수 있게」) ══════
+   ★ 번호는 다 «누르면 걸린다» — 휴대폰·직통·회사 대표번호·대표번호. (팩스도 예전처럼 걸린다 — 팩스 번호로
+     전화하는 일도 있다.) 회사 대표번호는 여태 글자만이라 눌러도 안 걸렸다.
+   ★ 주소는 누르면 지도 창 — 지도·링크 셈은 캘린더와 «같은 것»(js/pu-cal-map.js PuCalMap)을 쓴다. 두 벌로 만들지 않는다.
+     카카오·네이버는 창 안에 못 끼운다(열쇠·도메인 등록) — 그래서 끼워 보기는 구글, 카카오·네이버는 앱으로 넘기는 단추.
+   ★ 이메일·주소 옆 「복사」 — 줄 끝에 작게, 같은 줄에(한 칸은 한 줄).
+   ⚠ 값은 남이 적은 글이다 — 화면에는 esc, 지도 주소는 PuCalMap 이 encodeURIComponent 를 거친다. */
+const D_TEL_KEYS = ['mobile','tel','fax','companyTel'];
+const D_ADDR_KEYS = ['companyAddr','address'];
+function dAddrLink(addr){
+  return `<a href="#" class="daddr" data-a="${esc(addr)}" onclick="openAddrMap(this.dataset.a);return false"`
+    + ` title="누르면 지도가 뜹니다">📍 ${esc(addr)}</a>`;
+}
+function dCopyBtn(text){
+  return ` <button type="button" class="dcopy" data-c="${esc(text)}" onclick="event.stopPropagation();dCopy(this.dataset.c)"`
+    + ` title="복사합니다">복사</button>`;
+}
+function dCopy(text){
+  const done = ()=>toast('복사했습니다 — ' + String(text).slice(0, 40), 2500);
+  const old = ()=>{
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('복사 실패'); }
+    document.body.removeChild(ta);
+  };
+  /* ⚠ 누른 «그 순간»에 바로 부른다 — 앞에서 기다리면 브라우저가 «사람이 누른 것»으로 안 쳐 조용히 실패한다 */
+  if(navigator.clipboard) navigator.clipboard.writeText(String(text)).then(done).catch(old); else old();
+  puExport('copy', 1, '명함 이메일·주소 복사');   /* 반출 기록 — 고객 연락처가 밖으로 나가는 길이다(tests/cards-export-log.test.js) */
+}
+function openAddrMap(addr){
+  const M = window.PuCalMap;
+  const src = M ? M.embedUrl(addr) : '';
+  const L = M ? M.links(addr) : null;
+  if(!src || !L){ toast('지도를 불러오지 못했습니다 — 주소를 복사해 지도 앱에 붙여 넣으세요', 5000); return; }
+  closeAddrMap();
+  const ov = document.createElement('div');
+  ov.id = 'addrMapOv';
+  ov.onclick = (e)=>{ if(e.target === ov) closeAddrMap(); };
+  ov.innerHTML = `<div class="amap">
+      <div class="amap-h"><b>📍 ${esc(addr)}</b><button class="iconbtn" onclick="closeAddrMap()" title="닫기">✕</button></div>
+      <iframe src="${esc(src)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="지도"></iframe>
+      <div class="amap-b">
+        <a href="${esc(L.kakao)}" target="_blank" rel="noopener">카카오맵</a>
+        <a href="${esc(L.naver)}" target="_blank" rel="noopener">네이버지도</a>
+        <a href="${esc(L.googleGo)}" target="_blank" rel="noopener">길찾기</a>
+        <button type="button" class="dcopy" data-c="${esc(addr)}" onclick="dCopy(this.dataset.c)">주소 복사</button>
+      </div></div>`;
+  document.body.appendChild(ov);
+}
+function closeAddrMap(){ const o=$('addrMapOv'); if(o) o.remove(); }
+
 /* ⚠ backCo — 「기업 상세에서 열었다」는 표. 그 회사 열쇠를 그대로 받아 「◀ 뒤로」에
      심는다(대표 보고 2026-09-12 「명함확인후 뒤로 백할 수 없다」).
    ⚠ 전역에 두지 «않는다» — 한 번 켜 두면 목록에서 연 명함에도 「뒤로」가 남아
@@ -13991,8 +14113,10 @@ function openDetail(id, backCo){
   const rows = fields.filter(([k])=>it[k]).map(([k,label])=>{
     let v=esc(it[k]);
     if (k==='bizno') v=esc(fmtBizno(it[k]));
-    if (['mobile','tel','fax'].includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
+    if (D_TEL_KEYS.includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
       if (k==='email') v=`<a href="#" onclick="openMailWindow('${it.id}');return false" title="딴 창에서 메일을 씁니다 — 보던 화면은 그대로 남습니다">${v}</a>`;
+    if (D_ADDR_KEYS.includes(k)) v = dAddrLink(it[k]);
+    if (k==='email' || D_ADDR_KEYS.includes(k)) v += dCopyBtn(it[k]);
     /* 둘째 번호·이메일이 있으면 메인 아래에 흐리게 (대표 지시 2026-09-08) */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
     v += addrNoteHtml(it, k);
@@ -14261,8 +14385,10 @@ function openPcDetail(id, backCo){
   const rows = fields.filter(([k])=>it[k] && k!=='memo').map(([k,label])=>{
     let v=esc(it[k]);
     if (k==='bizno') v=esc(fmtBizno(it[k]));
-    if (['mobile','tel','fax'].includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
+    if (D_TEL_KEYS.includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
       if (k==='email') v=`<span class="pd1" title="${esc(it[k])}"><a href="#" onclick="openMailWindow('${it.id}');return false" title="${esc(it[k])} — 딴 창에서 메일을 씁니다(보던 화면은 그대로 남습니다)">${v}</a></span>`;
+    if (D_ADDR_KEYS.includes(k)) v = dAddrLink(it[k]);
+    if (k==='email' || D_ADDR_KEYS.includes(k)) v += dCopyBtn(it[k]);
     /* 폰 상세와 «같은 줄»을 붙인다 — 한쪽에만 있으면 화면에 따라 둘째가 사라진다 */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
     v += addrNoteHtml(it, k);
@@ -22179,7 +22305,7 @@ function mbBizSubsLoad(){
       /* 끝난 건은 안 본다 — 「진행 중」만 */
       if(/종료|closed|inactive|취소|완료/.test(String(rec.status||''))) return;
       (rec.managerSubs||[]).forEach(s=>{
-        const n = String(nameBySid[String(s||'')] || s || '').trim();
+        const n = String(nameBySid[String(s||'')] || '').trim();
         if(!n || mbRetired(n)) return;
         (map[key] = map[key] || []);
         if(map[key].indexOf(n) < 0) map[key].push(n);
@@ -23853,7 +23979,7 @@ function mailSideHtml(){
         if(open) bys.forEach(b=>{
           h += `<div class="dm-f sub ${state.sentBy===b?'on':''}" style="padding-left:26px"
             onclick="sentFilterBy('${esc(b)}')">
-            <span class="nm">👤 ${esc(staffName(b))}</span>
+            <span class="nm">👤 ${esc(staffName(b) || '이름 미확인')}</span>
             <span class="n">${sent.filter(v=>String(v.by||'')===b).length}</span></div>`;
         });
       }
@@ -24611,7 +24737,7 @@ function whoPageHtml(){
       body += `<div class="dm-row" style="height:auto;padding:8px 0">
         <span class="who" style="width:150px">
           <b>${esc(p.name)}</b><br>
-          <span style="font-size:11px;color:#94a3b8"${p.sid?` title="사번 ${esc(p.sid)}"`:''}>${esc([p.title,'퇴사'].filter(Boolean).join(' · '))}</span>
+          <span style="font-size:11px;color:#94a3b8">${esc([p.title,'퇴사'].filter(Boolean).join(' · '))}</span>
         </span>
         <span class="sub" style="white-space:normal">
           <b>${p.cos.length}곳</b>${p.addrs.length?` · 주소 ${p.addrs.length}개`:''}
@@ -28953,7 +29079,7 @@ function mbOfficeStore(){
     if(!u) throw new Error('로그인이 필요합니다');
     /* 문서관리(docs-esign)와 «같은 창고» — 서명본 자리 pu_docs/secret 도 그 안에 있다 */
     PuOfficeStore.init({ db: firebase.database(), storage: firebase.app().storage('gs://pureun-erp-hrphotos'),
-      uid: u.uid, name: String(u.email||'').split('@')[0] });
+      uid: u.uid, name: staffName(u.email) });   /* 이름 — 계정 앞부분(p001)을 적지 않는다 */
     _mbOffInit = true;
   }
   return PuOfficeStore;
@@ -38637,7 +38763,7 @@ function coSentList(cards, logs, docs){
                set: String(r.set||''),
                what: (r.names||[]).join(' · ') || String(r.name||'') || '자료',
                who: String(r.who||'').trim(),
-               by: String(r.by||'').split('@')[0] });
+               by: String(r.by||'') });   /* 날것 그대로 — 화면에 그릴 때 staffName 으로 이름을 바꾼다 */
   });
   coSentCards(cards, CO_SENT_MAX_CARDS).forEach(c=>{
     sendLogList((logs||{})[c.id]).forEach(r=>{
@@ -38645,7 +38771,7 @@ function coSentList(cards, logs, docs){
       out.push({ at: Number(r.at)||0, day: coSentDay(r.at),
                  set: String(r.set||''), what: (r.names||[]).join(' · ') || '자료',
                  who: String(c.name||'').trim() || String(c.title||'').trim(),
-                 by: String(r.by||'').split('@')[0] });
+                 by: String(r.by||'') });   /* 날것 그대로 — 화면에 그릴 때 staffName 으로 이름을 바꾼다 */
     });
   });
   return out.sort((a,b)=>(b.at-a.at));
@@ -38838,7 +38964,7 @@ function coSentHtml(o){
     ${hintLine(note, noteFull)}
     ${rows.length ? rows.map(r=>`<div class="cof">
       <span>${r.kind && r.kind!=='자료' ? `<b>${esc(r.kind)}</b> · ` : ''}${r.set?`<b>📦 ${esc(r.set)}</b> — `:''}${esc(r.what)}</span>
-      <b>${esc(r.day)}${r.who?` · → ${esc(r.who)}`:''}${r.by?` · ${esc(r.by)}`:''}</b>
+      <b>${esc(r.day)}${r.who?` · → ${esc(r.who)}`:''}${staffName(r.by)?` · ${esc(staffName(r.by))}`:''}</b>
     </div>`).join('')
     : `<div class="cof" style="color:#94a3b8">아직 보낸 기록이 없습니다</div>`}`;
 }

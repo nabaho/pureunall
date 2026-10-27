@@ -46,7 +46,7 @@ function 상자() {
   const ctx = { window: {}, JSON, String, Array, Object, Number, Boolean };
   vm.createContext(ctx);
   vm.runInContext(한줄상수('MEMBER_KINDS') + '\n' + 덩어리상수('LOG_FIELD') + '\n' + 함수('histTs') + '\n'
-    + 함수('logVal') + '\n' + 함수('logDiff') + '\n' + 함수('logRowsOf'), ctx);
+    + 함수('logVal') + '\n' + 함수('logDiff') + '\n' + 함수('logRowsOf') + '\n' + 함수('기록자이름'), ctx);
   return ctx;
 }
 

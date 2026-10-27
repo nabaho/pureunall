@@ -71,7 +71,8 @@ test('③★ 더하는 크기는 «이번에 올린 몫»이지 합계가 아니
 });
 
 /* ══════ ② 홈페이지 기록 저장 ══════ */
-const SAVE = cutFn(HOME, 'async function saveRecord(');
+/* 저장이 막혔을 때 «누가 고쳤는지»를 이름으로 말한다 — 그 이름 도우미(대표 결정 2026-10-25 「이름만 있어야한다」)도 진짜를 함께 싣는다 */
+const SAVE = cutFn(HOME, 'function 기록자이름(') + '\n' + cutFn(HOME, 'async function saveRecord(');
 
 /* 진짜 함수를 떠서 돌린다 — 글자만 보면 기능을 꺼도 통과한다 */
 function 저장해보기(서버판, 내가본판) {

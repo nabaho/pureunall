@@ -90,10 +90,12 @@ async function dayUsed(db, ymd) {
   catch (e) { return 0; }
 }
 
-/* 판독을 한 번 불렀다 — 앱별·합계 셈(readDoc 의 bumpReadTally 와 같은 자리). 못 적어도 일은 계속한다. */
-async function bumpTally(db) {
+/* 판독을 한 번 불렀다 — 앱별·합계 셈(readDoc 의 bumpReadTally 와 같은 자리). 못 적어도 일은 계속한다.
+   ⚠ 날짜는 «하루 한도를 읽은 날»(ymd)과 같아야 한다 — 비워 두면 그 순간의 실제 날짜로 적혀,
+     자정을 넘긴 회차는 한도를 어제 칸에서 읽고 셈은 오늘 칸에 적는다(2026-10-25 검사가 자정에 깨져 배포가 막혔다). */
+async function bumpTally(db, ymd) {
   try {
-    await Promise.all(DR.tallyPaths(APP, null, "n").map((p) => db.ref(p).transaction((cur) => (Number(cur) || 0) + 1)));
+    await Promise.all(DR.tallyPaths(APP, ymd || null, "n").map((p) => db.ref(p).transaction((cur) => (Number(cur) || 0) + 1)));
   } catch (e) { console.warn("cal-inbox 판독 셈 적기 실패(후보는 계속):", String((e && e.message) || e)); }
 }
 
@@ -229,7 +231,7 @@ async function extractFromNewMail(deps, o) {
       let r;
       try { r = await DR.callGemini(fetchFn, key, [{ text: prompt }], [1500], { temperature: 0, maxOutputTokens: 1500 }); }
       catch (e) { console.warn("cal-inbox 판독 실패:", String((e && e.message) || e).slice(0, 200)); continue; }
-      await bumpTally(db);
+      await bumpTally(db, today);
       if (!r || !r.ok) { console.warn("cal-inbox AI 가 답하지 않았습니다:", r && r.status, String((r && r.why) || "").slice(0, 120)); continue; }
 
       const norm = CAP.normalize(replyText(r.json), today);

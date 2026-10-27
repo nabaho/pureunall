@@ -239,3 +239,22 @@ test('⑩ 폰 아래 막대: 건의하기는 «늘» 오른쪽 끝 — 늦게 �
   assert.ok(rulesFor('#fabBar > #sgFab').some((b) => /order:\d+/.test(b) && /margin-left:auto/.test(b)),
     '★ 건의하기 자리를 차례(DOM)에 기댄다 — 늦게 붙는 단추가 그 오른쪽으로 간다');
 });
+
+/* 대표 2026-10-25 「자주쓰는앱 삭제 가능한가 어떻게 삭제하는게 좋은가」 → ① ★ 위에 마우스 ✕ · ② 줄 밖으로 끌기 → 「둘다」 */
+test('⑫ PC 빼기 ① — 넣은 앱(★)에 마우스를 올리면 ✕ (마우스 있는 화면만)', () => {
+  const at = HEAD.indexOf('.tile:hover .pin-star.on::after{');
+  assert.ok(at > 0, '★ 마우스를 올려도 ★ 가 «빼기»로 안 보인다');
+  assert.match(HEAD.slice(at, HEAD.indexOf('}', at)), /content:'✕'/, '★ 빼기 표시가 ✕ 가 아니다');
+  assert.match(HEAD.slice(HEAD.lastIndexOf('@media', at), at), /^@media \(hover:hover\)\{/, '★ 폰(마우스 없음)에서까지 ✕ 로 바뀐다');
+});
+
+test('⑫ PC 빼기 ② — 줄 밖에 놓으면 빠지고 · 줄 안이면 차례만 · 그냥 그만두면(Esc) 제자리', () => {
+  const wire = cutFn(E, 'function initFold(');
+  assert.match(wire, /document\.addEventListener\('drop', function\(e\)\{\s*if\(!_pinDrag \|\| pr\.contains\(e\.target\)\) return;[\s\S]{0,60}_pinOut = true;/,
+    '★ 줄 밖에 놓아도 «놓았다»를 모른다');
+  assert.match(wire, /if\(_pinOut\) togglePin\(key\);\s*else if\(_pinIn\) savePinOrderFromDom\(\);\s*else paintPins\(\);/,
+    '★ 끌기를 끝낸 뒤 «밖이면 빼기 · 안이면 차례 · 그만두면 제자리»로 안 가른다');
+  /* 그만두기와 밖에 놓기를 가르려면 줄 밖이 «놓을 수 있는 곳»이어야 한다 */
+  assert.match(wire, /document\.addEventListener\('dragover', function\(e\)\{\s*if\(!_pinDrag \|\| pr\.contains\(e\.target\)\) return;\s*e\.preventDefault\(\);/,
+    '★ 줄 밖이 놓을 수 없는 곳이라 «밖에 놓기»와 «그만두기»가 같아진다');
+});

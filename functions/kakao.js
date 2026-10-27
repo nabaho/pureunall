@@ -183,6 +183,17 @@ function loginProfileOf(raw, sid, role) {
   return { acct, all };
 }
 
+/* 명부(data/user_dir)에서 사번의 «이름» — 재직 여부와 무관하게 찾는다. 없으면 빈 글자. */
+function dirNameOfSid(raw, sid) {
+  const norm = (v) => String(v || "").replace(/-/g, "").toLowerCase();
+  const wanted = norm(sid);
+  if (!wanted || !raw) return "";
+  let list = raw.v !== undefined ? raw.v : raw;
+  if (!Array.isArray(list)) list = list && typeof list === "object" ? Object.values(list) : [];
+  const hit = list.find((row) => row && norm(row.sid) === wanted && row.name);
+  return hit ? String(hit.name) : "";
+}
+
 async function loginProfileWithin(sid, role) {
   let timer;
   try {
@@ -448,9 +459,12 @@ exports.kakaoLoginFinish = functions
        포털이 「들어온 것처럼」 뜨고 빈 화면이 되면 본인이 까닭을 모른다. */
     if (role.status !== "active") {
       const sid = String(role.sid || link.sid || "");
+      /* 누가 시도했는지는 «이름»으로 적는다 — 사번은 로그인 아이디가 되므로 알림 글에 안 넣는다(2026-10-25) */
+      let 이름 = "";
+      try { 이름 = dirNameOfSid((await db().ref("data/user_dir").once("value")).val(), sid); } catch (_) { 이름 = ""; }
       await kakaoFailTrail(req, pathSafe(link.uid), "kakao-inactive", {
         kind: "security-kakao-inactive",
-        message: "재직 중이 아닌 계정이 카카오로 로그인하려 했습니다 (" + (sid || "사번 없음") + " · " + (role.status || "상태 없음") + ")",
+        message: "재직 중이 아닌 계정이 카카오로 로그인하려 했습니다 (" + (이름 || "이름 미확인") + " · " + (role.status || "상태 없음") + ")",
       });
       return bad(res, 403, "재직 중인 계정이 아닙니다. 관리자에게 문의해 주세요");
     }

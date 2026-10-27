@@ -46,7 +46,7 @@ function 상자(더) {
   }, 더 || {});
   ctx.쓴것 = 쓴것;
   vm.createContext(ctx);
-  vm.runInContext(['잇기후보', '이름하나만맞는것', '직원잇기', '한번에잇기', '직원연결칸Html']
+  vm.runInContext(['잇기후보', '이름하나만맞는것', '직원잇기', '한번에잇기', '직원연결칸Html', '고름이름표']
     .map(fnSource).join('\n'), ctx);
   return ctx;
 }
@@ -99,8 +99,12 @@ test('편집칸의 직원 줄 — 동명이인이면 사람이 고르게 하고,
   ctx.App.staff = 직원들();
   ctx.App.members = { a: { name: '홍길동', srl: 1 } };
   const h = ctx.직원연결칸Html({ key: 'a', srl: '1' });
-  assert.ok(h.includes('S1') && h.includes('S2'), '후보 둘이 다 보여야 합니다');
+  assert.ok(h.includes('S1') && h.includes('S2'), '후보 둘이 다 보여야 합니다');   // 고르는 값(value)은 사번 그대로
   assert.ok(!/selected/.test(h), '동명이인인데 하나를 미리 골라 두었습니다');
+  /* 대표 결정 2026-10-25 「이름만 있어야한다」 — 눈에 보이는 글자에는 사번이 없고, 같은 이름은 번호로 가른다 */
+  const 보이는글 = h.replace(/<[^>]*>/g, '');
+  assert.ok(!/S[123]/.test(보이는글), '사번이 눈에 보입니다: ' + 보이는글);
+  assert.ok(보이는글.includes('홍길동 (1)') && 보이는글.includes('홍길동 (2)'), '같은 이름을 번호로 못 갈랐습니다: ' + 보이는글);
 });
 
 test('편집칸의 직원 줄 — 글 번호가 없으면 안 그린다(자동 내리기와 상관없다)', () => {

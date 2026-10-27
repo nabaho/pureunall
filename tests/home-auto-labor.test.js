@@ -46,7 +46,7 @@ function 상자(더) {
   }, 더 || {});
   ctx.쓴것 = 쓴것;
   vm.createContext(ctx);
-  vm.runInContext(['새사진넣기', '올리기허락', '새노무사준비', '새노무사칸Html', '새노무사목록'].map(fnSource).join('\n'), ctx);
+  vm.runInContext(['새사진넣기', '올리기허락', '새노무사준비', '새노무사칸Html', '새노무사목록', '기록자이름'].map(fnSource).join('\n'), ctx);
   return ctx;
 }
 const 노무사 = (더) => Object.assign({ name: '홍길동', kind: 'labor', srl: '', sid: 'S1', careers: ['現 가'] }, 더 || {});

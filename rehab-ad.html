@@ -458,10 +458,11 @@ td.mm{display:none}
 </div>
 <div id="toast"></div>
 
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=77"></script>
+<script src="js/pu-ontology.js?v=78"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
      없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -469,7 +470,7 @@ td.mm{display:none}
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-appbar.js?v=34"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
-<script src="js/pu-whoami.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
@@ -1180,7 +1181,8 @@ function boot(){
     $('outBtn').style.display=u?'':'none';
     if(!u){ $('who').textContent=''; PuGate.show(); return; }
     PuGate.hide();
-    if(!(await isAdmin(u))){ lock('접속: '+(u.email||'-')); return; }
+    /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
+    if(!(await isAdmin(u))){ var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'이 계정으로는 열 수 없습니다'); return; }
     gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:u.uid });
     $('lock').style.display='none'; $('app').style.display='';
     await reload();

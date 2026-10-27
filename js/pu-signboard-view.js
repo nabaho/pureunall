@@ -136,7 +136,7 @@
 
   /* ── ③ 전광판 상태 ── */
   var RESULT_KO = { ok: '정상', fail: '실패', 'dry-run': '시험 모드(장비에 연결 안 함)', 'wait-confirm': '첫 전송 확인 기다림', skip: '보내지 않음' };
-  function stateCards(state, control, now) {
+  function stateCards(state, control, now, names) {
     state = state || {}; control = control || {};
     var stale = !state.agentSeenAt || now - state.agentSeenAt > 20 * 60000, d = state.device || {}, h = '';
     h += '<div class="card cardp"><h3>심부름꾼(이 PC)</h3><div class="kv"><span>마지막 응답</span><b class="' + (stale ? 'bad' : 'good') + '">' + esc(ago(state.agentSeenAt, now)) + '</b></div>'
@@ -156,19 +156,19 @@
         + (ex.length ? '<div class="note">' + ex.map(function (x) { return esc(x.name || x.uuid); }).join(' · ') + '</div>' : '')
         + '<button class="pri" data-confirm-first>지워도 됩니다 — 전송을 허락합니다</button></div>';
     } else if (control.firstReplaceConfirmed === true) {
-      h += '<div class="card cardp"><h3>첫 전송 확인</h3><div class="note">' + esc(control.confirmedBy || '') + ' 님이 ' + esc(ago(control.confirmedAt, now)) + ' 허락했습니다.</div></div>';
+      h += '<div class="card cardp"><h3>첫 전송 확인</h3><div class="note">' + esc(whoText(control.confirmedBy, names, control.confirmedByName)) + ' 님이 ' + esc(ago(control.confirmedAt, now)) + ' 허락했습니다.</div></div>';
     }
     return h;
   }
 
   /* ── ④ 올린 기록 (보기 전용 표 — 되돌리기 단추만) ── */
-  function historyTable(list, currentVersion) {
+  function historyTable(list, currentVersion, names) {
     var rows = C.toArr(list).filter(Boolean).sort(function (a, b) { return Number(b.version) - Number(a.version); });
     if (!rows.length) return '<div class="empty">아직 올린 기록이 없습니다.</div>';
     var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="hist"><thead><tr><th>판</th><th>올린 사람</th><th>올린 때</th><th>광고 수</th><th>메모</th><th></th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var cur = Number(r.version) === Number(currentVersion);
-      h += '<tr><td class="nw" data-k="ver">' + esc(r.version) + '번' + (cur ? ' <span class="pill ps-ok">지금</span>' : '') + '</td><td class="nw" data-k="by">' + esc(r.publishedBy || '') + '</td><td class="nw" data-k="at">' + esc(hm(r.publishedAt)) + '</td>'
+      h += '<tr><td class="nw" data-k="ver">' + esc(r.version) + '번' + (cur ? ' <span class="pill ps-ok">지금</span>' : '') + '</td><td class="nw" data-k="by">' + esc(whoText(r.publishedBy, names, r.publishedByName)) + '</td><td class="nw" data-k="at">' + esc(hm(r.publishedAt)) + '</td>'
         + '<td class="nw" data-k="cnt">' + C.toArr(r.ads).length + '</td><td class="nw" data-k="memo" title="' + esc(r.note || '') + '">' + esc(r.note || '') + '</td>'
         + '<td class="nw" data-k="act"><button class="sm" data-hist-view="' + esc(r.version) + '">광고 내용</button>' + (cur ? '' : ' <button class="sm" data-rollback="' + esc(r.version) + '">이 판으로 되돌리기</button>') + '</td></tr>';
     });
@@ -177,34 +177,40 @@
 
   /* ── 보관함 — 만든 내용을 «다시 읽어 보는» 화면들. 읽기 전용(고치는 단추는 «되살리기» 하나뿐) ── */
   function s(v) { return v == null ? '' : String(v); }
+  /* 「누가」 칸 글자 — 이름만(대표 결정 2026-10-25 「이름만 있어야한다」). 기록의 by·publishedBy·deletedBy 는 사번(저장값)이라 글자로 내지 않는다.
+     이름은 ① 기록에 적힌 이름 ② 화면이 넘겨 준 «사번→이름» 지도(names) 순. 둘 다 없으면 「이름 미확인」(사번이 있을 때만). */
+  function whoText(id, names, recName) {
+    var n = s(recName).trim() || (names && s(names[id]).trim()) || '';
+    return n || (s(id).trim() ? '이름 미확인' : '');
+  }
   function sizeText(n) { n = Number(n) || 0; return !n ? '' : (n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : (n / 1048576).toFixed(1) + 'MB'); }
   function logFilterBar(o) {
     o = o || {};
     var acts = '<option value="">모든 행동</option>' + Object.keys(C.ACTION_KO).map(function (k) { return '<option value="' + k + '"' + (o.action === k ? ' selected' : '') + '>' + esc(C.ACTION_KO[k]) + '</option>'; }).join('');
     return '<div class="bar"><input id="lgQ" type="search" placeholder="광고 이름·문구·사람으로 찾기" value="' + esc(o.q || '') + '" style="flex:1;min-width:180px"><select id="lgAct">' + acts + '</select><button class="sm" data-csv>표로 내려받기</button></div>';
   }
-  function logTable(list) {
+  function logTable(list, names) {
     var rows = C.toArr(list);
     if (!rows.length) return '<div class="empty">조건에 맞는 기록이 없습니다.</div>';
     var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="log"><thead><tr><th>시각</th><th>누가</th><th>무엇을</th><th>광고</th><th>내용</th><th></th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var content = r.after ? C.adSummary(r.after) : (r.version != null ? r.version + '번 판' + (r.count != null ? ' · 광고 ' + r.count + '건' : '') + (r.note ? ' · ' + r.note : '') : s(r.note));
-      var who = r.byName ? r.byName + ' (' + s(r.by) + ')' : s(r.by);
-      h += '<tr><td class="nw" data-k="at">' + esc(C.kstText(r.at)) + '</td><td class="nw" data-k="by" title="' + esc(who) + '">' + esc(r.byName || r.by || '') + '</td>'
+      var who = whoText(r.by, names, r.byName);
+      h += '<tr><td class="nw" data-k="at">' + esc(C.kstText(r.at)) + '</td><td class="nw" data-k="by" title="' + esc(who) + '">' + esc(who) + '</td>'
         + '<td class="nw" data-k="act"><span class="pill act-' + esc(r.action) + '">' + esc(C.ACTION_KO[r.action] || r.action) + '</span></td>'
         + '<td class="nw" data-k="ti" title="' + esc(r.title) + '">' + esc(r.title) + '</td><td class="nw" data-k="body" title="' + esc(content) + '">' + esc(content) + '</td>'
         + '<td class="nw" data-k="btn">' + (r.after ? '<button class="sm" data-log-view="' + esc(r.id) + '">그때 내용</button>' : (r.version != null ? '<button class="sm" data-hist-view="' + esc(r.version) + '">그 판 내용</button>' : '')) + '</td></tr>';
     });
     return h + '</tbody></table></div>';
   }
-  function deletedTable(ads) {
+  function deletedTable(ads, names) {
     var rows = C.deletedAds(ads);
     if (!rows.length) return '<div class="empty">지운 광고가 없습니다.</div>';
     var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="del"><thead><tr><th>광고 이름</th><th>종류</th><th>내용</th><th>지운 때</th><th>지운 사람</th><th></th></tr></thead><tbody>';
     rows.forEach(function (a) {
       var sm = C.adSummary(a);
       h += '<tr><td class="ti" title="' + esc(a.title) + '">' + esc(a.title || '(이름 없음)') + '</td><td class="nw" data-k="kind">' + esc(C.KINDS[a.kind] || '?') + '</td><td class="nw" data-k="body" title="' + esc(sm) + '">' + esc(sm) + '</td>'
-        + '<td class="nw" data-k="at">' + esc(a.deletedAt ? C.kstText(a.deletedAt) : '') + '</td><td class="nw" data-k="by">' + esc(a.deletedBy) + '</td>'
+        + '<td class="nw" data-k="at">' + esc(a.deletedAt ? C.kstText(a.deletedAt) : '') + '</td><td class="nw" data-k="by">' + esc(whoText(a.deletedBy, names, a.deletedByName)) + '</td>'
         + '<td class="nw" data-k="btn"><button class="sm" data-ad-view="' + esc(a.id) + '">내용</button> <button class="sm" data-restore="' + esc(a.id) + '">되살리기</button></td></tr>';
     });
     return h + '</tbody></table></div>';
