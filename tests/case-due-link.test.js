@@ -32,7 +32,9 @@ const erp = (function(){
        상자에 그 모듈을 «진짜로» 넣어 준다 — 흔내 낸 가짜를 넣으면
        이알피가 실제로 어떤 날짜를 받는지 못 보게 된다. */
     PuCaseDue: require(path.join(__dirname, '..', 'js', 'pu-case-due.js')),
-    dbGet(k, d){ return (k in store) ? store[k] : d; }, dbSet(k, v){ store[k] = v; return true; }
+    dbGet(k, d){ return (k in store) ? store[k] : d; }, dbSet(k, v){ store[k] = v; return true; },
+    /* 씨앗 심기는 erpPlantSeed 를 거친다 — 여기서는 «서버가 비어 있다»고 보고 이 기기 안에 심는 것으로 흉내 낸다 */
+    erpPlantSeed(k, seed){ store[k] = seed; }
   };
   vm.createContext(c);
   vm.runInContext(sliceOf(ERP, 'var BIZ_CASE_STAGE_KEY', 'window.caseSyncStageCode'), c);

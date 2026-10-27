@@ -27274,7 +27274,7 @@ function getCaseTypes(){
   var arr = dbGet('biz_case_types', null);
   // 미저장 또는 빈 배열 → 시드로 복구
   if(!arr || !Array.isArray(arr) || arr.length === 0){
-    dbSet('biz_case_types', BIZ_CASE_SEED);
+    erpPlantSeed('biz_case_types', BIZ_CASE_SEED);   // 서버에 먼저 묻는다 — 곧바로 심으면 진짜 사전을 덮는다(2026-10-26)
     return BIZ_CASE_SEED.slice();
   }
   // 옛 형식 데이터 자동 보정 (short/name 없으면 시드에서 매칭)
@@ -27432,7 +27432,7 @@ var SPECIAL_LEAVE_SEED = [
 
 function getSpecialLeavePolicy(){
   var existing = dbGet('policy_special_leave', null);
-  if(!existing){ dbSet('policy_special_leave', SPECIAL_LEAVE_SEED); return SPECIAL_LEAVE_SEED; }
+  if(!existing){ erpPlantSeed('policy_special_leave', SPECIAL_LEAVE_SEED); return SPECIAL_LEAVE_SEED; }
   return existing;
 }
 function setSpecialLeavePolicy(list){ dbSet('policy_special_leave', list); }
@@ -27481,7 +27481,7 @@ var LOA_SEED = [
 
 function getLoaPolicy(){
   var existing = dbGet('policy_loa', null);
-  if(!existing){ dbSet('policy_loa', LOA_SEED); return LOA_SEED; }
+  if(!existing){ erpPlantSeed('policy_loa', LOA_SEED); return LOA_SEED; }
   return existing;
 }
 function setLoaPolicy(list){ dbSet('policy_loa', list); }
@@ -36421,7 +36421,7 @@ function CategoryModal(props){
 function CategorySection(props){
   // props: title, storageKey, seed, codePrefix
   var existing = dbGet(props.storageKey, null);
-  if(!existing){ dbSet(props.storageKey, props.seed); existing = props.seed; }
+  if(!existing){ erpPlantSeed(props.storageKey, props.seed); existing = props.seed; }   // 서버에 먼저 묻는다(2026-10-26)
   // 옛 로컬 캐시가 code-키 객체로 남아있어도 배열로 변환 (list.map 크래시 방지, SEQ121 BizTypeCard와 동일)
   if(!Array.isArray(existing)) existing = Object.keys(existing).map(function(k){ return existing[k]; }).filter(function(x){ return x != null; });
   var u = useState(existing); var list = u[0]; var setList = u[1];
@@ -36669,7 +36669,7 @@ function PayItemModal(props){
 
 function PayItemSection(){
   var existing = dbGet('pay_items', null);
-  if(!existing){ dbSet('pay_items', PAY_ITEM_SEED); existing = PAY_ITEM_SEED; }
+  if(!existing){ erpPlantSeed('pay_items', PAY_ITEM_SEED); existing = PAY_ITEM_SEED; }
   var u = useState(existing); var list = u[0]; var setList = u[1];
   var m = useState(null); var modal = m[0]; var setModal = m[1];
 
@@ -37001,7 +37001,7 @@ function erpHolidays(){
 
 function HolidaySection(){
   var existing = dbGet('holidays', null);
-  if(!existing){ dbSet('holidays', HOLIDAY_SEED); existing = HOLIDAY_SEED; }
+  if(!existing){ erpPlantSeed('holidays', HOLIDAY_SEED); existing = HOLIDAY_SEED; }
   var u = useState(existing); var list = u[0]; var setList = u[1];
   var m = useState(null); var modal = m[0]; var setModal = m[1];
   var y = useState((new Date()).getFullYear()); var year = y[0]; var setYear = y[1];
@@ -38491,7 +38491,7 @@ window.caseStageFillSeedNotes = caseStageFillSeedNotes;
 function getCaseStagesAll(includeHidden){
   var arr = dbGet(BIZ_CASE_STAGE_KEY, null);
   if(!arr || !Array.isArray(arr) || arr.length === 0){
-    dbSet(BIZ_CASE_STAGE_KEY, BIZ_CASE_STAGE_SEED);
+    erpPlantSeed(BIZ_CASE_STAGE_KEY, BIZ_CASE_STAGE_SEED);   // 서버에 먼저 묻는다(2026-10-26)
     arr = BIZ_CASE_STAGE_SEED;
   }
   arr = caseStageFillSeedNotes(arr);
@@ -38644,6 +38644,40 @@ function bizTypeMissingSeeds(list, seed){
   });
 }
 /* 저장 직전 «지금 사전»을 다시 읽어 그 위에 바꿈 하나(fn)만 얹는다 — 화면이 들고 있던 목록으로 덮지 않는다. */
+/* ★★ 씨앗 심기 — 「이 기기에 사본이 없다」 ≠ 「서버에 자료가 없다」 (2026-10-26 사건)
+   2026-10-26 09:28(KST) 사본이 없던 기기가 환경설정 › 사무관리기준을 열자, 그 화면이 «사본이 없으면 씨앗을 심는다»는 옛 규칙으로
+   씨앗을 서버에 써 버렸다. 컨설팅 19건·사건 12건·기타사업 12건의 유형 사전이 통째로 씨앗(14·13·11건)으로 바뀌었고,
+   그 사전을 코드로 잇던 컨설팅 112건·사건 40건·기타사업 5건이 모두 「미설정」이 됐다(서버 백업 10/25 에서 되살렸다).
+   ■ 규칙: ① 화면은 씨앗을 «보기만» 한다(dbGet 의 기본값) ② 서버에 자료가 있으면 그것을 이 기기에 받아 둔다
+          ③ 서버도 «비어 있다고 확인된 뒤에만» 씨앗을 심는다 ④ 서버를 못 읽으면 심지 않는다(다음에 다시 묻는다)
+   ⚠ dbSet(키, 씨앗) 을 직접 부르지 말 것 — 이 함수를 거친다(tests/seed-plant-needs-server.test.js 가 지킨다).
+   onDone(how): 'local'(이미 사본 있음) · 'server'(서버 것을 받음) · 'planted'(서버도 비어 심음) · 'offline' · 'error' */
+var _erpSeedAsked = {};
+function erpPlantSeed(k, seed, onDone){
+  var fin = function(how){ if(onDone){ try { onDone(how); } catch(_e){ window._erpErrLog && window._erpErrLog(_e); } } };
+  var cur = dbGet(k, null);
+  if(cur != null && !(Array.isArray(cur) && cur.length === 0)){ fin('local'); return; }
+  if(_erpSeedAsked[k] && Date.now() - _erpSeedAsked[k] < 30000) return;   // 그리는 동안 여러 번 불린다 — 30초에 한 번만 묻는다
+  _erpSeedAsked[k] = Date.now();
+  if(typeof fbDb === 'undefined' || !fbDb){ fin('offline'); return; }   // 서버가 없으면 아무것도 쓰지 않는다
+  fbDb.ref('data/' + k).once('value').then(function(snap){
+    var rec = snap.val();
+    if(rec && rec.v !== undefined && typeof rec.u === 'number'){
+      _fbApplyRecord(k, rec, { notify:true, force:true });   // 서버 것을 이 기기에 받아 둔다
+      fin('server');
+      return;
+    }
+    if(dbGet(k, null) == null || (Array.isArray(dbGet(k, null)) && !dbGet(k, null).length)){ dbSet(k, seed); fin('planted'); }
+    else fin('local');
+  }).catch(function(e){ fin('error'); });   // 못 읽으면 심지 않는다(30초 뒤 다시 묻는다)
+}
+/* 유형 사전을 «쓰기» 전 점검 — 이 기기에 사본이 있어야 쓴다. 없으면 아직 서버에서 못 받은 것이다:
+   씨앗 위에 바꿈 하나를 얹어 저장하면 서버의 진짜 사전을 덮는다. */
+function bizTypeWritable(storageKey){
+  if(dbGet(storageKey, null) != null) return true;
+  try { showToast('서버에서 유형 사전을 받는 중입니다 — 잠시 뒤 다시 해 주세요'); } catch(_){}
+  return false;
+}
 function bizTypeRead(storageKey, seed){
   var v = dbGet(storageKey, null);
   if(v == null) return (seed || []).slice();
@@ -38661,6 +38695,7 @@ function bizTypeNextOrder(cur){
   return Math.min(top + 10, 898);
 }
 function bizTypeApply(storageKey, seed, fn){
+  if(!bizTypeWritable(storageKey)) return null;   // 마지막 그물 — 씨앗 위에 얹어 서버를 덮지 않는다
   var cur = bizTypeRead(storageKey, seed);
   /* 컨설팅 사전은 «고치기 전» 역할(role)을 굳힌다 — 이름을 바꾸는 이 저장에서도 역할은 옛 이름으로 먼저 정해진다 */
   if(storageKey === 'biz_cons_types' && typeof bizTypeStampRoles === 'function') cur = bizTypeStampRoles(cur);
@@ -39196,7 +39231,7 @@ function PersonalDepositBulkModal(props){
 function BizTypeCard(props){
   var cat = props.cat;
   var existing = dbGet(cat.storageKey, null);
-  if(!existing){ dbSet(cat.storageKey, cat.seed); existing = cat.seed; }
+  if(!existing){ existing = cat.seed; }   // 화면용 임시 — 서버에 쓰지 않는다(erpPlantSeed 머리글)
   // 옛 로컬 캐시가 code-키 객체({other-committee:..})로 남아있어도 배열로 변환 (list.map 크래시 방지)
   if(!Array.isArray(existing)) existing = Object.keys(existing).map(function(k){ return existing[k]; }).filter(function(x){ return x != null; });
   var u = useState(existing); var list = u[0]; var setList = u[1];
@@ -39206,6 +39241,13 @@ function BizTypeCard(props){
   // 드래그 state
   var dgS = useState(null); var dragCode = dgS[0]; var setDragCode = dgS[1];
   var doS = useState(null); var dragOverCode = doS[0]; var setDragOverCode = doS[1];
+  /* 이 기기에 사본이 없으면 서버에 «물어서» 받는다 — 받으면 목록을 다시 그린다. 서버도 비어 있을 때만 씨앗이 심긴다. */
+  useEffect(function(){
+    if(dbGet(cat.storageKey, null) != null) return;
+    erpPlantSeed(cat.storageKey, cat.seed, function(how){
+      if(how === 'server' || how === 'planted') setList(bizTypeRead(cat.storageKey, cat.seed));
+    });
+  }, []);
 
   /* ⚠ 저장은 늘 «지금 사전» 위에 바꿈 하나만 얹는다(bizTypeApply) — 화면 목록으로 통째 덮지 않는다 */
   function persistWith(fn){
@@ -39217,6 +39259,7 @@ function BizTypeCard(props){
   /* 👤 개인입금 사업 스위치 (컨설팅 유형만) — 바꾼 뒤 «이미 확정된 입금» 일괄 변경 창을 연다 */
   var pdbS = useState(null); var pdBulk = pdbS[0]; var setPdBulk = pdbS[1];
   function togglePersonal(x){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     var on = !x.personalDeposit;
     persistWith(function(cur){
       return cur.map(function(it){
@@ -39227,6 +39270,7 @@ function BizTypeCard(props){
     setPdBulk({ code:x.code, name:x.name, on:on });
   }
   function add(){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     var name = input.trim();
     if(!name){ showToast('이름 입력'); return; }
     var sh = shortIn.trim() || name.slice(0,2);
@@ -39255,6 +39299,7 @@ function BizTypeCard(props){
     });
   }
   function del(code){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     var used = countUsage(code);
     if(used > 0){
       var item = list.find(function(x){ return x.code === code; });
@@ -39277,6 +39322,7 @@ function BizTypeCard(props){
   }
   // 숨김 유형 다시 보이기
   function unhide(code){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     /* 합쳐진 유형은 다시 띄우지 않는다 — 띄우면 같은 사업이 다시 두 유형이 된다 */
     var mx = list.find(function(x){ return x.code === code; });
     if(mx && mx.mergedInto){
@@ -39288,6 +39334,7 @@ function BizTypeCard(props){
     showToast('👁 다시 표시됨');
   }
   async function editType(x){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     var sh = window.prompt('약어 (최대 4자)', x.short || ''); if(sh === null) return;
     var nm = window.prompt('유형 이름', x.name || ''); if(nm === null) return;
     sh = sh.trim().slice(0,4); nm = nm.trim();
@@ -39380,6 +39427,7 @@ function BizTypeCard(props){
   /* 「복원」 — 빠진 기본 유형만 더한다. 지금 목록은 하나도 안 지운다(bizTypeMissingSeeds 머리글).
      ⚠ 예전처럼 씨앗으로 통째 덮지 말 것 — 운영 유형은 씨앗과 번호가 달라 모든 업무가 미설정이 된다. */
   function reseed(){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
     var miss = bizTypeMissingSeeds(bizTypeRead(cat.storageKey, cat.seed), cat.seed);
     if(!miss.length){ showToast('빠진 기본 유형이 없습니다 — 바꾼 것 없음'); return; }
     showConfirm('기본 유형 가운데 지금 목록에 없는 ' + miss.length + '개를 더합니다.\n\n'
@@ -39412,6 +39460,7 @@ function BizTypeCard(props){
   }
   function onDrop(targetCode, e){
     e.preventDefault();
+    if(!bizTypeWritable(cat.storageKey)){ setDragCode(null); setDragOverCode(null); return; }
     if(!dragCode || dragCode === targetCode){ setDragCode(null); setDragOverCode(null); return; }
     var fromC = dragCode;
     persistWith(function(cur){
