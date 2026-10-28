@@ -5312,6 +5312,10 @@ body.portal-mode #moreFab{display:flex;}
           + '<button type="button" class="sg-btn ghost" data-sgd-no="'+i+'" style="margin:0;flex:1;padding:8px">🙅 아직 안 됐어요</button></div>'
           + '<div class="sgd-fb" data-sgd-fb="'+i+'" hidden style="margin-top:8px">'
           + '<textarea data-sgd-txt="'+i+'" placeholder="어떤 부분이 해결되지 않았는지 자세히 적어주세요 — 그대로 재요청으로 접수됩니다" style="width:100%;min-height:72px;padding:8px;border:1px solid #fecaca;border-radius:8px;font-size:.78rem"></textarea>'
+          /* 📎 캡처 붙이기 (2026-10-28 「캡쳐안된다」) — 재요청 양식에는 글 칸뿐이라 «화면 캡처»를 못 붙였다.
+             images:[] 로 못 박아 접수해, 붉은 알림 글자 같은 단서를 말로만 적어야 했다. */
+          + '<div class="sgd-shots" style="margin-top:6px"><button type="button" class="sg-btn ghost" data-sgd-pick="'+i+'" style="margin:0;padding:6px 10px;font-size:.74rem">📎 캡처 붙이기 <span style="font-weight:400">(선택 · 최대 3장 · 글 칸에서 Ctrl+V)</span></button>'
+          + '<input type="file" data-sgd-file="'+i+'" accept="image/*" multiple style="display:none"><div class="sg-thumbs" data-sgd-th="'+i+'"></div></div>'
           + '<button type="button" class="sg-btn" data-sgd-send="'+i+'" style="margin-top:6px;background:#991b1b">↩ 재요청 보내기</button></div>'
           + '</div>';
       }).join('');
@@ -5329,6 +5333,39 @@ body.portal-mode #moreFab{display:flex;}
           if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
             $('sgDoneModal').style.display='none';
         });
+        /* 📎 재요청에 붙이는 캡처 — 새 건의(sgAddImgs)와 같은 줄여 담기(sgCompress)·3장 한도를 쓴다 */
+        it._imgs = [];
+        (function(){
+          var pick=row.querySelector('[data-sgd-pick="'+i+'"]'), file=row.querySelector('[data-sgd-file="'+i+'"]'),
+              th=row.querySelector('[data-sgd-th="'+i+'"]'), tx=row.querySelector('[data-sgd-txt="'+i+'"]');
+          if(!pick || !file || !th) return;
+          function paint(){
+            th.innerHTML = it._imgs.map(function(u, k){
+              return '<div class="sg-th"><img src="'+sgImgSrc(u)+'"><span class="del" data-i="'+k+'">✕</span></div>';
+            }).join('');
+            Array.prototype.forEach.call(th.querySelectorAll('.del'), function(el){
+              el.addEventListener('click', function(){ it._imgs.splice(+el.dataset.i, 1); paint(); });
+            });
+          }
+          function add(files){
+            var arr = Array.prototype.slice.call(files).filter(function(f){ return f.type && f.type.indexOf('image/')===0; });
+            if(!arr.length){ alert('그림 파일만 붙일 수 있습니다.'); return; }
+            if(it._imgs.length >= 3){ alert('캡처는 최대 3장까지 붙일 수 있습니다.'); return; }
+            arr.slice(0, 3 - it._imgs.length).forEach(function(f){
+              sgCompress(f, function(dataUrl){
+                if(dataUrl){ it._imgs.push(dataUrl); paint(); }
+                else alert('그림을 읽지 못했습니다. 다른 파일로 다시 시도해 주세요.');
+              });
+            });
+          }
+          pick.addEventListener('click', function(){ file.click(); });
+          file.addEventListener('change', function(e){ add(e.target.files); file.value=''; });
+          if(tx) tx.addEventListener('paste', function(e){
+            var items=(e.clipboardData||{}).items||[]; var imgs=[];
+            for(var n=0;n<items.length;n++){ if(items[n].type&&items[n].type.indexOf('image/')===0){ var g=items[n].getAsFile(); if(g) imgs.push(g); } }
+            if(imgs.length){ e.preventDefault(); add(imgs); }
+          });
+        })();
         row.querySelector('[data-sgd-no="'+i+'"]').addEventListener('click', function(){
           var fb=row.querySelector('[data-sgd-fb="'+i+'"]');
           fb.hidden=!fb.hidden;
@@ -5339,7 +5376,7 @@ body.portal-mode #moreFab{display:flex;}
           if(!txt){ alert('어떤 부분이 해결되지 않았는지 적어주세요.'); return; }
           var btn=row.querySelector('[data-sgd-send="'+i+'"]'); btn.disabled=true; btn.textContent='접수 중…';
           var rec={ cat:sgCatClass(it.cat), title:('↩ 재요청: '+(it.title||'')).slice(0,200), content:txt,
-            images:[], author:SG.name, authorEmail:SG.email, authorUid:SG.uid,
+            images:(it._imgs||[]).slice(0,3), author:SG.name, authorEmail:SG.email, authorUid:SG.uid,
             status:'new', reply:'', relatedId:it._id, createdAt:Date.now() };
           var ref=db.ref(SG_PRIVATE_PATH).push();
           ref.set(rec).then(function(){
