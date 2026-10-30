@@ -1,4 +1,4 @@
-﻿/* 푸른통합시스템 — 서류 등록 층
+/* 푸른통합시스템 — 서류 등록 층
    판독한 서류를 기업정보함과 업체관리에 넣는 유일한 파일이다.
    판독 층(pu-doc-read.js)이 "읽기"를 아는 유일한 파일인 것과 짝을 이룬다.
    화면은 이 파일의 함수 하나를 부르고 결과 문구만 띄운다 —
@@ -227,7 +227,63 @@
       .catch(function () { return ''; });                       /* 못 찾으면 그냥 빈 채로 간다 */
   }
 
+  /* ── 번호가 비었을 때의 둘째 열쇠 — «이름 + 회사(또는 이메일)» (대표 지시 2026-10-30) ──
+     「중복되는 자료 너무 많다 … 반드시 중복체크하고 중복 아닌 것만 저장해라」
+     실측: 휴대폰 같은 중복 0건 · 사업자번호 같은 중복 0건인데, 이름+회사가 같은 명함이 60묶음 —
+     전부 «한 쪽 휴대폰이 비어서» 휴대폰 열쇠가 아예 안 돌았다. 메일 서명·리멤버·사진첩이 같은 문을 쓴다.
+     ⚠ 이름만으로는 절대 붙이지 않는다 — 동명이인이 서로를 덮는다. 이름 + (회사 같음 | 이메일 같음)일 때만.
+     ⚠ 둘 다 휴대폰이 있는데 «다르면» 다른 사람이다(같은 회사 동명이인·번호 둘) — 붙이지 않는다.
+        한쪽이라도 휴대폰이 비었을 때만 본다. */
+  function nameKey(v) { return String(v == null ? '' : v).replace(/[\s·.,()（）\-]/g, '').toLowerCase(); }
+  function coKey(v) {
+    return String(v == null ? '' : v).replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\(사\)|사단법인|\(재\)|재단법인/g, '')
+      .replace(/[\s·.,()（）\-]/g, '').toLowerCase();
+  }
+  /* ⚠ 목록을 통째로 훑지 않는다(사진 한 장마다 색인 6천 줄 = 1MB — 위 findByKey 의 까닭).
+     idx 를 이름(n)으로 «물어서» 같은 이름 몇 줄만 받는다 — 규칙의 .indexOn 'n' 이 짝이다.
+     물을 수 없는 환경(색인 없음·옛 화면)은 찾지 않고 지나간다 — 못 찾아 새로 만드는 쪽이 옛 동작과 같다. */
+  function sameNameRows(name) {
+    var ref = deps.db.ref(CARDS_ROOT + '/idx');
+    if (typeof ref.orderByChild !== 'function') return Promise.resolve({});
+    return ref.orderByChild('n').equalTo(name).once('value')
+      .then(function (s) { return s.val() || {}; })
+      .catch(function () { return {}; });
+  }
+
+  function findBySoft(kind, fields) {
+    var want = TO_CARD_KIND[kind];
+    if (want !== 'card') return Promise.resolve(null);
+    var f = fields || {};
+    var nk = nameKey(f.name), ck = coKey(f.company);
+    var ek = String(f.email == null ? '' : f.email).trim().toLowerCase();
+    if (!nk || (!ck && !ek)) return Promise.resolve(null);       /* 이름만으로는 붙이지 않는다 */
+    var mine = digits(f.mobile);
+    var raw = String(f.name).trim(), tight = raw.replace(/\s+/g, '');
+    var asks = [sameNameRows(raw)];
+    if (tight !== raw) asks.push(sameNameRows(tight));            /* 「김 가나」·「김가나」 */
+    return Promise.all(asks).then(function (got) {
+      var idx = Object.assign({}, got[1] || {}, got[0] || {});
+      var ids = Object.keys(idx);
+      for (var i = 0; i < ids.length; i++) {
+        var row = idx[ids[i]] || {};
+        if ((row.k || 'card') !== 'card') continue;
+        if (nameKey(row.n) !== nk) continue;
+        var rm = digits(row.m);
+        if (mine && rm && mine !== rm) continue;                   /* 둘 다 번호가 있는데 다르면 다른 사람 */
+        var sameCo = ck && coKey(row.c) === ck;
+        var sameEmail = ek && String(row.e || '').trim().toLowerCase() === ek;
+        if (sameCo || sameEmail) return { id: ids[i], idx: row, soft: true };
+      }
+      return null;
+    });
+  }
   function findExisting(kind, fields) {
+    return findExistingHard(kind, fields).then(function (hit) {
+      return hit || findBySoft(kind, fields);
+    });
+  }
+
+  function findExistingHard(kind, fields) {
     var key = dedupKey(kind, fields);
     var want = TO_CARD_KIND[kind];
     if (!key || !want) return Promise.resolve(null);
@@ -412,6 +468,8 @@
       }
       /* 인덱스도 같이 갱신해야 검색에 새 값이 잡힌다. */
       u[CARDS_ROOT + '/idx/' + hit.id] = idxOf(Object.assign({}, rec, gaps, { kind: want }));
+      /* 번호 없던 명함에 번호가 «이번에» 채워졌다 — 번호 열쇠도 적어야 다음에 휴대폰으로 찾는다 */
+      if (want === 'card' && gaps.mobile && digits(gaps.mobile)) u[CARDS_ROOT + '/' + BYKEY + '/c' + digits(gaps.mobile)] = hit.id;
       out.message = head + '. 빈 칸 ' + labels.length + '개를 채웠습니다 (' + labels.join('·') + ')';
       /* 원본은 «먼저» 창고에 올린다 — 올라갔으면 실시간DB 에는 안 넣는다.
          막혔으면 옛 자리에 담아 사진이 사라지지 않게 한다. */
