@@ -119,16 +119,21 @@
     }
     return null;
   }
-  /* 답에서 {text} 를 가진 첫 JSON 객체 — ```json 껍데기·앞뒤 잡글(그 속의 { 도)을 지나쳐 뒤의 { 에서 다시 해 본다.
-     지시문의 보기 글을 되풀이한 것(text 가 「고친 본문」)은 답이 아니다 — 건너뛰고 다음 것을 본다 */
-  function findReply(s) {
+  /* 답에서 accept 를 통과하는 첫 JSON 객체 — ```json 껍데기·앞뒤 잡글(그 속의 { 도)을 지나쳐 뒤의 { 에서 다시 해 본다.
+     💬 묻기(lib-ask)도 이 읽개 «한 벌»을 쓴다 — 두 벌이면 한쪽만 고쳐진다 */
+  function findJson(s, accept) {
+    s = str(s);
     for (var a = s.indexOf('{'); a >= 0; a = s.indexOf('{', a + 1)) {
       var raw = objectAt(s, a), o = null;
       if (!raw) continue;
       try { o = JSON.parse(raw); } catch (e) { continue; }
-      if (o && typeof o === 'object' && typeof o.text === 'string' && o.text.trim() !== SAMPLE.text) return o;
+      if (o && typeof o === 'object' && (!accept || accept(o))) return o;
     }
     return null;
+  }
+  /* 지시문의 보기 글을 되풀이한 것(text 가 「고친 본문」)은 답이 아니다 — 건너뛰고 다음 것을 본다 */
+  function findReply(s) {
+    return findJson(s, function (o) { return typeof o.text === 'string' && o.text.trim() !== SAMPLE.text; });
   }
   /* 가린 자리 꼴의 덩어리 — 숫자·영문·@·.·- 에 «붙은» ● 덩어리(010-●●●●-5678 · h●●●@a.com).
      띄어 쓴 글머리표(「●● 항목」)는 가림이 아니다. */
@@ -162,7 +167,7 @@
     }).replace(/\{회사\}/g, function () { return name; });
   }
 
-  var api = { MODES: MODES, MASK: MASK, coCore: coCore, toSend: toSend, prompt: prompt, parse: parse, restore: restore };
+  var api = { MODES: MODES, MASK: MASK, coCore: coCore, toSend: toSend, prompt: prompt, parse: parse, restore: restore, findJson: findJson };
   if (root) root.PuRulesPolish = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
