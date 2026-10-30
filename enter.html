@@ -1945,8 +1945,9 @@ body.portal-mode #moreFab{display:flex;}
        앱 머리줄의 세 갈래 단추(✏️ 검토·개정 · 📚 조별 문안 · 📥 모은 자료)로 들어간다.
        ⚠ 타일을 다시 둘로 나누지 말 것 — 같은 앱의 문이 둘이면 사람이 어느 쪽인지 헷갈린다.
        첫 화면은 🏢 사업장(2026-10-04 대표 「추천」) — 타일은 rules-v2.html 로 열고, ✏️ 검토·개정은 머리줄 단추로 간다.
-       준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게). */
-    { key:'rules',   name:'취업규칙',      desc:'작성·검토·개정·신고', icon:'📜', url:'rules-v2.html',       roles:null, soon:true, off:true, row:'client' },
+       준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게).
+       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
+    { key:'rules',   name:'취업규칙',      desc:'작성·검토·개정·신고', icon:'📜', url:'rules-v2.html',       roles:null, soon:true, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
     { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, soon:true, off:true, row:'client' },  /* 2026-10-09 열었다가 2026-10-20 대표 「급여관리도 준비중으로」 — 안쪽 문과 짝 */
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
@@ -3463,7 +3464,7 @@ body.portal-mode #moreFab{display:flex;}
       var _isAdm = (role === 'admin') ||
                    (typeof sgIsAdmin === 'function' && sgIsAdmin());
       /* 「지금 안 씀」(off) — 대표 지시 2026-10-24 「이 3개 현재 필요없다 모두 화면에서 안 나오게」
-         (취업규칙·급여관리·급여데이터함). 준비중과 달리 «대표 화면에서도» 안 그린다.
+         (급여관리·급여데이터함 — 취업규칙은 2026-10-30 대표 지시로 off 를 걷었다). 준비중과 달리 «대표 화면에서도» 안 그린다.
          앱 파일과 안쪽 준비중 문(PuGate.soonUnlessAdmin)은 그대로 둔다 — 다시 쓸 때는 off 만 걷으면
          준비중 타일로 돌아온다. 앱 막대(js/pu-appbar.js)의 off 와 짝이다. */
       if(app.off) return;

@@ -102,9 +102,17 @@ test('ⓕ 「지금 안 씀」(off) 앱은 앱 막대 목록에도 없다 — �
   ['admin', 'staff'].forEach((role) => {
     const { B } = load(role);
     const k = keys(B);
-    ['rules', 'payroll', 'paydata'].forEach((x) => assert.ok(!k.includes(x), role + ' 앱 막대에 ' + x + ' 가 남았다'));
+    ['payroll', 'paydata'].forEach((x) => assert.ok(!k.includes(x), role + ' 앱 막대에 ' + x + ' 가 남았다'));
     ['erp', 'cards', 'photos', 'docs'].forEach((x) => assert.ok(k.includes(x), x + ' 까지 사라졌다'));
   });
   const { B } = load('admin');
   ['rules', 'payroll', 'paydata'].forEach((x) => assert.ok(B.APPS.find((a) => a.key === x), x + ' 를 APPS 에서 지웠다 — 그 앱 안에서 whoAmI 가 길을 잃는다'));
+});
+
+test('ⓖ 되살린 취업규칙은 앱 막대에도 돌아온다 — 포털 타일과 짝 (대표 지시 2026-10-30)', () => {
+  /* 타일만 되살리고 앱 막대에 안 넣으면 다른 앱에서 건너갈 길이 없다(그 반대도 같다). */
+  ['admin', 'staff'].forEach((role) => {
+    const { B } = load(role);
+    assert.ok(keys(B).includes('rules'), role + ' 앱 막대에 취업규칙이 없다');
+  });
 });
