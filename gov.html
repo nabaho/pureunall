@@ -56,6 +56,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 .orgrec{border:1px solid var(--amber);background:var(--bg);color:var(--amber);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;line-height:18px}
 /* ★ 별표 — 줄 왼쪽(№ 옆)에 늘 보인다. 예전엔 맨 오른쪽 「관리」 칸에 있어 넓지 않은 화면에선 아예 안 보였다(대표 지시 2026-10-11 「별표표시 하게」) */
 .stc{width:30px;text-align:center}
+.apptag{border:1px solid var(--navy);background:var(--bg);color:var(--navy);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;line-height:18px}
+.apptag.many{background:var(--navy);color:#fff}
 .starbtn{border:0;background:none;cursor:pointer;font-size:17px;line-height:1;vertical-align:middle;color:var(--text-mute);padding:2px 4px}
 .starbtn.on{color:var(--amber)}
 .starbtn:hover{color:var(--amber)}
@@ -408,6 +410,7 @@ table.cmp td{white-space:nowrap}
   <span id="who" class="sub"></span>
   <button class="btn m-only" id="mFavBtn" title="다른 프로그램으로 이동" onpointerdown="favDown(this)" onclick="favOpen(this)">⭐</button>
   <button class="btn" id="pickBtn" onclick="pickOpen()" title="푸른노무법인·권형하 노무사가 지원할 만한 모집 글·공고를 한 번에 봅니다">🎯<span class="mx"> 지원할 만한 것</span><span id="pickN"></span></button>
+  <button class="btn" id="starAllBtn" onclick="starAllOpen()" title="별표(★) 친 공고·발주·모집 글을 한 창에서 봅니다">★<span class="mx"> 별표 모음</span><span id="starAllN"></span></button>
   <button class="btn" onclick="openKeys()" title="인증키">🔑<span class="mx"> 인증키</span></button>
   <button class="btn" id="outBtn" onclick="doLogout()" style="display:none">로그아웃</button>
 </div>
@@ -495,6 +498,7 @@ table.cmp td{white-space:nowrap}
     <div id="recPaneHist" style="display:none">
       <div class="bar">
         <span id="recHistSeg"></span>
+        <span id="recStarBtnH"></span>
         <div class="sp"></div>
         <span id="recOrgBtns"><span class="sml" id="recAt"></span>
           <button class="btn primary" onclick="recScan()">📂 서류 폴더에서 읽기</button>
@@ -505,7 +509,7 @@ table.cmp td{white-space:nowrap}
       <div id="recBan"></div>
       <div id="recOrgBar"></div>
       <div class="scroll"><table>
-        <thead><tr><th class="chk"><input type="checkbox" id="recOrgAll" title="보이는 것 모두" onchange="recSelAll('org',this.checked)"></th><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
+        <thead><tr><th class="stc" title="별표(★)">★</th><th class="chk"><input type="checkbox" id="recOrgAll" title="보이는 것 모두" onchange="recSelAll('org',this.checked)"></th><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
         <tbody id="recTb"></tbody>
       </table></div>
       <div id="recRest" style="margin-top:10px"></div>
@@ -558,7 +562,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-bizinfo.js?v=3"></script>
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/gov-submit.js?v=3"></script>
-<script src="js/gov-sync.js?v=9"></script>
+<script src="js/gov-sync.js?v=10"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
 <script src="js/gov-inbox.js?v=4"></script>
@@ -922,7 +926,7 @@ function planDraw(){
       +'<td class="rn">'+(pg.from+i+1)+'</td>'
       +'<td><span class="tag '+(r.kind==='spec'?'red':'navy')+'">'+(r.kind==='spec'?'사전규격':'발주계획')+'</span></td>'
       +'<td class="dt">'+when+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+planMobile(r, st, stc, lk)+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+planMobile(r, st, stc, lk)+'</td>'
       +'<td class="og" title="'+esc((r.top&&r.top!==r.org?r.top+' · ':'')+(r.org||''))+'">'+esc(r.org||'-')+'</td>'
       +'<td style="text-align:right">'+(r.prc?Math.round(r.prc/10000).toLocaleString()+'만원':'-')+'</td>'
       +'<td class="sml"'+(isSole(r)?' style="color:var(--amber);font-weight:700"':'')+'>'+esc(r.mthd||'-')+'</td>'   /* 수의계약은 두되 눈에 띄게(대표 2026-10-10) */
@@ -964,7 +968,7 @@ function planSelAll(on){ if(!on){ _planSel={}; planDraw(); return; }
 function _planEdit(nos, fn){ var a=get('plan'), n=0;
   a.forEach(function(r){ if(r && nos.indexOf(r.no)>=0 && fn(r)!==false) n++; });
   if(n) set('plan', a); return n; }
-function planStar(no){ _planEdit([no], function(r){ r.star=!r.star; }); planDraw(); }
+function planStar(no){ _planEdit([no], function(r){ r.star=!r.star; }); planDraw(); starAllBadge(); }
 function planHide(no, on){ _planEdit([no], function(r){ r.hidden=!!on; }); planDraw();
   toast(on?'숨겼습니다 — 지우지 않습니다. 보기 「🙈 숨긴 것」에서 되살립니다':'되살렸습니다'); }
 function planBulk(what){
@@ -1331,7 +1335,7 @@ function draw(){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+restrictTags(r)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+restrictTags(r)+appTag(mt().orgId)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(mt)
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -1445,7 +1449,7 @@ function feedStarBtn(all){
 function star(id){ var h=find(id); if(!h) return; var r=h.a[h.i];
   if(r.type==='관심'){ r.type=r.prevType||'새 공고'; delete r.prevType; }
   else { if(r.type && r.type!=='새 공고') r.prevType=r.type; r.type='관심'; }
-  set('feed',h.a); draw(); }
+  set('feed',h.a); draw(); starAllBadge(); }
 function hide(id){ var h=find(id); if(!h) return;
   h.a[h.i].hidden=true; set('feed',h.a); draw(); toast('숨겼습니다 — 지우지 않습니다. 상태 「숨긴 것」에서 되살립니다'); }
 /* ═══ 서식 채우기 — «경력관리로 넘긴다» (대표 승인 2026-09-10) ═══
@@ -1740,6 +1744,8 @@ function recDraw(){
   if($('recWatchKc')) $('recWatchKc').innerHTML=recWatchHtml('kc');
   if($('recWatch')) $('recWatch').innerHTML=recWatchHtml('pub');
   recStickySync();   /* 한 줄 높이가 바뀌었을 수 있다(갈래 수·선택 줄) */
+  if($('recStarBtnH')) $('recStarBtnH').innerHTML=recStarBtn();
+  starAllBadge();
   recSubDraw();
   matchEnsure();
   var mnr=$('matchNoteR'); if(mnr) mnr.innerHTML=matchNoteHtml();
@@ -1750,10 +1756,11 @@ function recDraw(){
     $('recBan').innerHTML='<div class="recban calm">📂 아직 서류 폴더를 읽지 않았습니다. <b>📂 서류 폴더에서 읽기</b>를 눌러 '
       +'<b>'+esc(REC_DIR)+'</b> 폴더(또는 그 위 서류 폴더)를 골라 주세요.<br>'
       +'이름만 읽습니다 — 파일을 옮기거나 고치지 않습니다. 경력관리에서 폴더를 연결해 두셨으면 묻지 않고 바로 읽습니다.</div>';
-    $('recTb').innerHTML='<tr><td colspan="7" class="empty">아직 읽은 것이 없습니다</td></tr>';
+    $('recTb').innerHTML='<tr><td colspan="8" class="empty">아직 읽은 것이 없습니다</td></tr>';
     $('recRest').innerHTML=''; return;
   }
   var g=recGroups(), list=GovRecruit.order(g.orgs, today), sn=GovRecruit.soon(g.orgs, today);
+  var _orgAll=0;
   /* ⚠ 한 번도 안 낸 기관이라도 게시판에 새 모집 글이 걸렸으면 목록 끝에 보인다 — 「🆕 새 글」이 갈 자리가 없으면 안 보인다 */
   g.orgs.forEach(function(o){ if(list.indexOf(o)<0 && recNewFor(o.id)) list.push(o); });
   var nm=function(a){ return a.map(function(o){ return '<b>'+esc(o.name)+'</b>'; }).join(', '); };
@@ -1764,6 +1771,7 @@ function recDraw(){
     +sn.near.count+'곳, '+sn.near.ahead+'달 뒤)입니다.</span>';
   $('recBan').innerHTML = ban ? '<div class="recban'+((sn.now.length||sn.next.length)?'':' calm')+'">'+ban
     +'<span class="sml">「보통」은 그동안 서류를 만든 «파일 날짜»로 어림한 달입니다 — 실제 모집 공고를 꼭 확인하세요.</span></div>' : '';
+  _orgAll=list.length; list=recStarFilter('o', list, function(o){ return o.id; });
   $('recTb').innerHTML = list.length ? list.map(function(o,i){
     var ah=GovRecruit.monthsAhead(o.month, today), done=GovRecruit.appliedThisYear(o, today), st=recStatus(o,y);
     var yrs=o.years.map(function(v){ return '<span class="yr'+(v===y?' cur':'')+'">'+v.slice(2)+'</span>'; }).join('');
@@ -1774,8 +1782,8 @@ function recDraw(){
     var link = o.url ? '<a class="btn sm" href="'+esc(o.url)+'" target="_blank" rel="noopener">🔗 공지 열기</a>'
       : '<button class="btn sm" onclick="recSetUrl(\''+esc(o.id)+'\')">🔗 링크 넣기</button>';
     var dd=recDue(o,y), ds=dd?GovRecruit.dueState({to:dd}, recYmd(today)):null;
-    return '<tr class="'+(ah<=1&&o.month?'rec-now':'')+'">'+recChk('org', o.id)+'<td class="rn">'+(i+1)+'</td>'
-      +'<td class="onm"><b style="color:var(--navy)">'+esc(o.name)+'</b>'+(o.custom?' <span class="tag navy">직접 더함</span>':'')
+    return '<tr class="'+(ah<=1&&o.month?'rec-now':'')+'">'+recStarCell('o', o.id)+recChk('org', o.id)+'<td class="rn">'+(i+1)+'</td>'
+      +'<td class="onm">'+appTag(o.id)+'<b style="color:var(--navy)">'+esc(o.name)+'</b>'+(o.custom?' <span class="tag navy">직접 더함</span>':'')
         +(recNewFor(o.id)?' <span class="tag red" title="기관 게시판에 새 모집 글 — 「🏛 공인노무사회」·「🏢 공공기관」 탭">🆕 새 글</span>':'')
         +'<div class="sml">'+esc(o.what)+'</div></td>'
       +'<td class="omo" style="white-space:nowrap">'+(o.month?o.month+'월'+(ah===0?' <span class="tag amber">이번 달</span>':ah===1?' <span class="tag amber">다음 달</span>':''):'<span class="sml">—</span>')+'</td>'
@@ -1783,7 +1791,7 @@ function recDraw(){
       +'<td class="ost">'+stHtml+recMailMark(o.id, y)+(ds?'<div class="due '+ds.k+'">'+esc(ds.text)+'</div>':'')+'</td>'
       +'<td class="act">'+link+' <button class="btn sm" onclick="recPrep(\''+esc(o.id)+'\')">📋 서류 준비</button>'
         +(o.month?' <button class="btn sm" onclick="recCal(\''+esc(o.id)+'\')" title="해마다 '+(o.month===1?12:o.month-1)+'월 1일에 준비 알림 — 구글 캘린더">📅 알림</button>':'')+'</td></tr>';
-  }).join('') : '<tr><td colspan="7" class="empty">기관에 묶인 지원 이력이 없습니다 — ＋ 기관 더하기로 찾는 말을 넣어 보세요</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">'+(_recStarOnly&&_orgAll?'별표 친 기관이 없습니다 — 줄 맨 왼쪽의 ☆ 를 눌러 보세요(「★ 별표만」을 다시 누르면 전체)':'기관에 묶인 지원 이력이 없습니다 — ＋ 기관 더하기로 찾는 말을 넣어 보세요')+'</td></tr>';
   recSelShown('org', list.map(function(o){ return o.id; }));
   if($('recOrgAll')) $('recOrgAll').checked=recSelAllOn('org');
   if($('recOrgBar')) $('recOrgBar').innerHTML=recSelBar('org',
@@ -2184,17 +2192,17 @@ function recWatchHtml(grp){
   var stOf=function(x){ return GovRecruit.dueState(recPer(x.key, x.per, x.title, x.date), today).k; };
   var pastN=all.filter(function(x){ return stOf(x)==='past'; }).length;
   chips=chips.replace(/<\/div>$/, (pastN?'<button class="mchip'+(_recLive[grp]?' on':'')+'" onclick="recLiveTog(\''+grp+'\')" title="접수 기간이 끝난 글을 목록에서 뺍니다(지우지 않습니다)">⏳ 마감 지난 것 빼기 <span class="n">'+pastN+'</span></button>':'')+'</div>');
-  var list=(cur?all.filter(function(x){ return GovRecruit.kindOf(x.title)===cur; }):all)
-    .filter(function(x){ return !_recLive[grp] || stOf(x)!=='past'; });
+  var list=recStarFilter('h', (cur?all.filter(function(x){ return GovRecruit.kindOf(x.title)===cur; }):all)
+    .filter(function(x){ return !_recLive[grp] || stOf(x)!=='past'; }), function(x){ return x.key; });
   var fr=list.filter(function(x){ return !seen[x.key]; });
   /* ⚠ 새 글은 «모두» 보인다 — 30건으로 자르면 31번째 새 글이 영영 안 보인다. 본 글은 합쳐 30건까지 */
   var shown=fr.concat(list.filter(function(x){ return seen[x.key]; }).slice(0, Math.max(0, 30-fr.length)));
   var row=function(x, i){ var nw=!seen[x.key], ki=GovRecruit.kindInfo(GovRecruit.kindOf(x.title)), pp=recPer(x.key, x.per, x.title, x.date);
     var past=GovRecruit.dueState(pp, today).k==='past';
-    return '<tr class="'+(nw?'rec-now':'')+(past?' rec-past':'')+'">'+recChk(grp, x.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(x.date||'')+'</td>'
+    return '<tr class="'+(nw?'rec-now':'')+(past?' rec-past':'')+'">'+recStarCell('h', x.key)+recChk(grp, x.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(x.date||'')+'</td>'
       +'<td class="src">'+recSrcCell(x, grp)+'</td>'
       +'<td class="kd"><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td>'
-      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')
+      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')+appTag(x.org&&x.org!=='kcplaa'?x.org:appOrgOf(x.title))
         +(/^https:\/\//.test(x.href||'')?'<a class="tlink" href="'+esc(x.href)+'" title="누르면 공고가 팝업 창으로 열립니다" onclick="return recOpenPost(\''+esc(x.key)+'\')">'+esc(x.title)+'</a>':esc(x.title))+'</td>'
       +matchCell(function(){ return matchTargetHit(x); })
       +docsCell(x)
@@ -2204,13 +2212,13 @@ function recWatchHtml(grp){
       +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
   recSelShown(grp, shown.map(function(x){ return x.key; }));
   /* 한 줄: 갈래 단추 · 마감 지난 것 빼기 | (오른쪽) 새 글 모두 봤음 · 🕒 서버 시각. 고르면 선택 줄도 이 고정 칸 안에 */
-  return stuckHtml+'<div class="rec-stick"><div class="rec-line">'+chips+'<span class="sp"></span>'
+  return stuckHtml+'<div class="rec-stick"><div class="rec-line">'+chips+recStarBtn()+'<span class="sp"></span>'
     +(fr.length>1?'<button class="btn sm" onclick="recSeenAll(\''+grp+'\')">✓ 새 글 '+fr.length+'건 모두 봤음</button>':'')
     +atHtml+'</div>'
     +recSelBar(grp, '<button class="btn sm" onclick="recSelSeen(\''+grp+'\',true)">✓ 고른 것 봤음</button> <button class="btn sm" onclick="recSelSeen(\''+grp+'\',false)">↩ 안 본 것으로</button>')+'</div>'
-    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"></colgroup>'
-    +'<thead><tr>'+recChkHead(grp)+'<th>날짜</th><th>'+(grp==='kc'?'게시판':'기관')+'</th><th>갈래</th><th>제목</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th title="공고 본문의 제출서류 — 갖고 있는 것/필요한 것">서류</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
-    +shown.map(row).join('')+'</tbody></table></div>'
+    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"></colgroup>'
+    +'<thead><tr><th class="stc" title="별표(★)">★</th>'+recChkHead(grp)+'<th>날짜</th><th>'+(grp==='kc'?'게시판':'기관')+'</th><th>갈래</th><th>제목</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th title="공고 본문의 제출서류 — 갖고 있는 것/필요한 것">서류</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
+    +(shown.length?shown.map(row).join(''):'<tr><td colspan="11" class="empty">'+(_recStarOnly?'별표 친 모집 글이 없습니다 — 줄 맨 왼쪽의 ☆ 를 눌러 보세요(「★ 별표만」을 다시 누르면 전체)':'해당하는 글이 없습니다')+'</td></tr>')+'</tbody></table></div>'
     +(list.length>shown.length?'<div class="sml">이미 본 옛 글 '+(list.length-shown.length)+'건은 줄였습니다</div>':'');
 }
 /* 공고를 팝업 창으로 — 한 창을 돌려 쓴다(누를 때마다 창이 쌓이지 않게). 연 글은 «봤음»으로 적는다.
@@ -2246,6 +2254,155 @@ function recWatchCal(key){
     details:(x.boardName||'')+(/^https:\/\//.test(x.href||'')?'\n공고: '+x.href:'')+'\n(정부사업신청 › 컨설턴트 모집 › 새 모집 글)' });
   if(!u){ toast('날짜를 읽지 못했습니다'); return; }
   window.open(u, '_blank', 'noopener');
+}
+
+/* ═══ ★ 별표 + 📚 과거 지원 표시 (대표 지시 2026-10-30 「중요한 부분은 별표 표시하고 별표만 따로 보게 — 공고·발주·컨설턴트 모집 모든 영역」
+   「이미 여러 번 지원했거나 도전했거나 하고 있는 사업은 과거 지원 표시 창도 나오게」) ═══
+   · 공고 모아보기·발주 예정의 별(type '관심' · r.star)은 «그대로» 둔다. 컨설턴트 모집은 별이 없었다 → recruit_star 에 둔다.
+     열쇠는 종류+번호(h=모집 글 · o=기관 · m=메일). ⚠ 새 칸은 GovSync.FIELDS 에 있어야 클라우드로 간다(검사가 맞댄다).
+   · 「별표만」은 이 기기에서만 기억한다(rec_staronly — 클라우드 칸 아님). 별표를 지우거나 별표만으로 가려도 «자료는 안 지운다».
+   · 과거 지원 = 서류 폴더에 그해 서류가 있거나, 올해 상태가 지원함·선정·탈락인 해. 「지원 예정」·「이번엔 안 함」은 지원으로 안 센다(안 했으니까).
+     ⚠ 기관을 «모르면» 표시하지 않는다 — 지어내지 않는다. 이름만 같다고 다른 기관의 이력을 붙이면 거짓 이력이 된다(gov-orgrec 와 같은 잣대). */
+var _recStarOnly = (function(){ try{ return lsGet('rec_staronly')==='1'; }catch(e){ return false; } })();
+function recStarMap(){ return recObj('recruit_star'); }
+function recStarKey(kind, k){ return GovSync.safeKey(kind+'|'+k); }
+function recStarOn(kind, k){ return !!recStarMap()[recStarKey(kind, k)]; }
+function recStarN(){ return Object.keys(recStarMap()).length; }
+function recStarTog(kind, k){
+  var m=recStarMap(), sk=recStarKey(kind, k);
+  if(m[sk]) delete m[sk]; else m[sk]=Date.now();
+  recObjSet('recruit_star', m); recDraw(); starAllBadge();
+}
+function recStarCell(kind, k){
+  var on=recStarOn(kind, k);
+  return '<td class="stc"><button class="starbtn'+(on?' on':'')+'" title="'+(on?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();recStarTog(\''+kind+'\',\''+esc(k)+'\')">'+(on?'★':'☆')+'</button></td>';
+}
+/* 별표만 켜져 있으면 별표 친 것만 남긴다 — 꺼져 있으면 그대로 */
+function recStarFilter(kind, list, keyOf){
+  if(!_recStarOnly) return list;
+  return list.filter(function(x){ return recStarOn(kind, keyOf(x)); });
+}
+function recStarOnlyTog(){ _recStarOnly=!_recStarOnly; lsSet('rec_staronly', _recStarOnly?'1':'0'); recDraw(); }
+function recStarBtn(){
+  var n=recStarN();
+  return '<button class="btn sm'+(_recStarOnly?' primary':'')+'" onclick="recStarOnlyTog()" title="별표(★) 친 모집 글·기관·메일만 모아 봅니다 — 한 번 더 누르면 전체로 돌아옵니다">'
+    +(_recStarOnly?'★':'☆')+' 별표만'+(n?' <span class="n">'+n+'</span>':'')+'</button>';
+}
+
+/* 📚 과거 지원 — 기관 하나의 해마다 */
+var _appOrgsKey='', _appOrgsVal=null;
+function appOrgs(){
+  /* ⚠ 줄마다 부르므로(공고 50~100줄) 서류 폴더 묶기를 매번 하지 않는다 — 폴더·직접 더한 기관이 바뀔 때만 다시 */
+  var k=(lsGet('recruit_scan')||'').length+':'+(lsGet('recruit_custom')||'').length+':'+(lsGet('recruit_url')||'').length;
+  if(_appOrgsVal && k===_appOrgsKey) return _appOrgsVal;
+  var o=[]; try{ o=recGroups().orgs; }catch(e){}
+  _appOrgsKey=k; _appOrgsVal=o; return o;
+}
+var APP_DONE={ '지원함':1, '선정':1, '탈락':1 };
+function appHist(orgId){
+  if(!orgId) return null;
+  var o=appOrgs().filter(function(x){ return x.id===orgId; })[0];
+  var lg=recObj('recruit_log')[orgId]||{}, ys={}, cy=String(recToday().getFullYear());
+  if(o) (o.years||[]).forEach(function(y){ ys[y]={ y:y, folder:true }; });
+  Object.keys(lg).forEach(function(y){
+    var c=lg[y]||{}; if(!/^\d{4}$/.test(y)) return;
+    if(APP_DONE[c.st]){ (ys[y]=ys[y]||{ y:y }).st=c.st; ys[y].src=c.mail||c.result||null; }
+    else if(c.st==='지원 예정'){ (ys[y]=ys[y]||{ y:y }).plan=true; }
+  });
+  var rows=Object.keys(ys).map(function(y){ return ys[y]; }).sort(function(a,b){ return b.y.localeCompare(a.y); });
+  var applied=rows.filter(function(r){ return r.folder || r.st; });
+  var won=applied.filter(function(r){ return r.st==='선정'; }).length, lost=applied.filter(function(r){ return r.st==='탈락'; }).length;
+  var cur=(lg[cy]||{}).st||'';
+  return { id:orgId, name:recOrgName(orgId), rows:rows, n:applied.length, won:won, lost:lost, cur:cur };
+}
+/* 글·공고의 제목·기관에서 «기관»을 정한다 — 모르면 빈 글자. 공인노무사회는 글을 낸 곳이 아니라 뺀다 */
+function appOrgOf(text){
+  var ids=GovRecruit.matches(text||'', get('recruit_custom')).filter(function(x){ return x!=='kcplaa'; });
+  return ids[0]||'';
+}
+function appTag(orgId){
+  var h=appHist(orgId); if(!h || !h.n) return '';
+  var cy=String(recToday().getFullYear());
+  var live=h.rows.some(function(r){ return r.y===cy && (r.folder || r.st==='지원함'); }) && h.cur!=='선정' && h.cur!=='탈락';
+  var txt='📚 지원 '+h.n+'회'+(h.won?' · 선정 '+h.won:'')+(live?' · 진행':'');
+  return '<button class="apptag'+(h.n>=2?' many':'')+'" title="이 기관에 '+h.n+'해 지원한 기록이 있습니다 — 눌러서 해마다 보기" onclick="event.stopPropagation();appOpen(\''+esc(orgId)+'\')">'+esc(txt)+'</button>';
+}
+function appOpen(orgId){
+  var h=appHist(orgId); if(!h) return;
+  var cy=recToday().getFullYear(), yopt='';
+  for(var y=cy; y>=cy-12; y--) yopt+='<option value="'+y+'">'+y+'년</option>';
+  var sopt=['지원함','선정','탈락','이번엔 안 함'].map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('');
+  var body='<div class="note" style="margin-bottom:8px"><b>'+esc(h.name)+'</b> — '
+    +(h.n?'<b>'+h.n+'해</b> 지원한 기록이 있습니다'+(h.won||h.lost?' (선정 '+h.won+' · 탈락 '+h.lost+')':'')+'.':'지원한 기록이 아직 없습니다.')
+    +' <span class="sml">서류 폴더의 해 폴더와 「올해 상태」·메일에서 찾은 것을 합친 것입니다.</span></div>';
+  body+= h.rows.length
+    ? '<div class="scroll"><table class="cmp"><thead><tr><th>해</th><th>상태</th><th>근거</th><th></th></tr></thead><tbody>'
+      + h.rows.map(function(r){
+        var why=[]; if(r.folder) why.push('📂 서류 폴더에 그해 서류');
+        if(r.src && r.src.subject) why.push('📨 '+esc(String(r.src.date||'')+' 「'+String(r.src.subject).slice(0,60)+'」'));
+        var st=r.st?'<span class="tag '+(r.st==='선정'?'teal':(r.st==='탈락'?'red':'navy'))+'">'+esc(r.st)+'</span>'
+          : (r.plan?'<span class="tag amber">지원 예정</span>':'<span class="sml">상태 없음</span>');
+        return '<tr><td><b>'+esc(r.y)+'</b></td><td>'+st+'</td><td style="white-space:normal" class="sml">'+(why.join('<br>')||'직접 적음')+'</td>'
+          +'<td>'+(r.st?'<button class="btn sm" onclick="appSetSt(\''+esc(orgId)+'\',\''+esc(r.y)+'\',\'\')" title="그해 상태를 비웁니다(서류 폴더 기록은 그대로)">비우기</button>':'')+'</td></tr>'; }).join('')
+      +'</tbody></table></div>'
+    : '<div class="sml" style="margin:6px 0">아직 없습니다.</div>';
+  body+='<div class="pop-sub" style="margin-top:12px">＋ 과거 지원 적어 두기 <span class="sml">— 폴더에 서류가 없거나 메일을 못 찾은 해를 직접 적습니다</span></div>'
+    +'<div class="bar" style="margin:6px 0"><select id="appY">'+yopt+'</select><select id="appS">'+sopt+'</select>'
+    +'<button class="btn primary sm" onclick="appSetSt(\''+esc(orgId)+'\',$(\'appY\').value,$(\'appS\').value)">적기</button></div>'
+    +'<div class="sml">적은 것은 「지원한 해」에 바로 들어가고, 이 기관의 공고·모집 글에 「📚 지원 N회」로 표시됩니다.</div>';
+  popOpen('📚 지난 지원 이력', body);
+}
+/* 그해 상태를 적는다 — 마감일(due)·메일 근거는 같은 칸에 산다, 통째로 덮지 않는다(recSetSt 와 같다) */
+function appSetSt(orgId, y, v){
+  if(!orgId || !/^\d{4}$/.test(String(y))) return;
+  var lg=recObj('recruit_log'); lg[orgId]=lg[orgId]||{};
+  var cur=lg[orgId][y]||{};
+  if(cur.via==='mail' && cur.mail){ delete cur.via; delete cur.mail; }
+  if(v){ cur.st=v; cur.at=Date.now(); lg[orgId][y]=cur; }
+  else { delete cur.st; if(cur.due) lg[orgId][y]=cur; else delete lg[orgId][y]; }
+  if(!Object.keys(lg[orgId]||{}).length) delete lg[orgId];
+  recObjSet('recruit_log', lg); _appOrgsKey='';
+  recDraw(); try{ draw(); }catch(e){} try{ planDraw(); }catch(e){}
+  appOpen(orgId);
+  toast(v ? recOrgName(orgId)+' '+y+'년을 「'+v+'」로 적었습니다' : '그해 상태를 비웠습니다');
+}
+
+/* ★ 별표 모음 — 공고·발주·모집을 한 창에 (머리 단추) */
+function starAllItems(){
+  var feed=get('feed').filter(function(r){ return r && r.type==='관심'; });
+  var plan=get('plan').filter(function(r){ return r && r.star; });
+  var sm=recStarMap(), hits=recWatchHits().filter(function(x){ return sm[recStarKey('h', x.key)]; });
+  var orgs=appOrgs().filter(function(o){ return sm[recStarKey('o', o.id)]; });
+  var mails=(get('recruit_mailitems')||[]).filter(function(x){ return x && sm[recStarKey('m', x.key)]; });
+  return { feed:feed, plan:plan, hits:hits, orgs:orgs, mails:mails,
+    n: feed.length+plan.length+hits.length+orgs.length+mails.length };
+}
+function starAllBadge(){
+  var el=$('starAllN'); if(!el) return;
+  var n=0; try{ n=starAllItems().n; }catch(e){}
+  el.innerHTML = n ? ' <span class="n">'+n+'</span>' : '';
+}
+function starGo(where){
+  popClose();
+  if(where==='feed'){ setTab('feed'); var s=$('fSt'); if(s && s.value!=='관심') feedStarOnly(); }
+  else if(where==='plan'){ setTab('plan'); var p=$('pView'); if(p && p.value!=='star') planStarOnly(); }
+  else { setTab('rec'); if(!_recStarOnly) recStarOnlyTog(); }
+}
+function starAllOpen(){
+  var S=starAllItems(), LIM=30;
+  var sec=function(title, go, rows, n){
+    if(!n) return '';
+    return '<div class="pop-sub" style="margin:10px 0 4px">'+title+' <span class="sml">'+n+'건</span> <button class="btn sm" onclick="starGo(\''+go+'\')">이 탭에서 별표만 보기</button></div>'
+      +'<div class="scroll"><table class="cmp"><tbody>'+rows.slice(0, LIM).join('')+'</tbody></table></div>'
+      +(n>LIM?'<div class="sml">… '+LIM+'건만 보입니다 — 탭에서 전부 볼 수 있습니다</div>':''); };
+  var tr=function(a,b,c){ return '<tr><td style="white-space:normal"><b>'+esc(a)+'</b></td><td class="sml">'+esc(b||'')+'</td><td class="sml">'+(c||'')+'</td></tr>'; };
+  var body=''
+    +sec('📅 공고 모아보기', 'feed', S.feed.map(function(r){ return tr(r.nm||'-', r.org||'', esc(String(r.closeDt||'').slice(0,10))+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))); }), S.feed.length)
+    +sec('📅 발주 예정', 'plan', S.plan.map(function(r){ return tr(r.nm||'-', r.org||'', esc(r.ym||'')+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))); }), S.plan.length)
+    +sec('🧑‍💼 컨설턴트 모집 — 모집 글', 'rec', S.hits.map(function(x){ return tr(x.title, (x.boardName||'')+' '+(x.date||''), appTag(x.org&&x.org!=='kcplaa'?x.org:appOrgOf(x.title))); }), S.hits.length)
+    +sec('🧑‍💼 컨설턴트 모집 — 기관', 'rec', S.orgs.map(function(o){ return tr(o.name, o.what||'', appTag(o.id)); }), S.orgs.length)
+    +sec('🧑‍💼 컨설턴트 모집 — 메일', 'rec', S.mails.map(function(m){ return tr(m.subject||'', m.date||'', ''); }), S.mails.length);
+  popOpen('★ 별표 모음', body || '<div class="empty" style="padding:18px 6px">별표 친 것이 없습니다 — 공고·발주·모집 글 줄 맨 왼쪽의 ☆ 를 눌러 보세요.</div>');
 }
 
 /* ═══ 📬 메일에서 찾은 것 — 「냈나·됐나」 (대표 지시 2026-10-04 「제출한 경우 자동으로 정리」, 선택 「① 정리」) ═══
@@ -2408,16 +2565,17 @@ function recMailHtml(){
     + orgs.map(function(o){ return '<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>'; }).join('')+'</select>'; };
   var more=function(n){ return n>LIM?'<div class="sml" style="margin:4px 0">… '+LIM+'건만 보입니다 — 처리하면 다음 것이 나옵니다(전체 '+n+'건)</div>':''; };
   /* ⚠ 모든 묶음이 «같은 열» 표 — 날짜 · 기관·구분 · 메일 제목 · 기간 · 판단 · 할 일 (2026-10-05 「열을 좀 정리」) */
+  var mkeyOf=function(a){ return a.item?a.item.key:(a.key||a); };
   var mtable=function(set, title, rows, acts){
     return (title?'<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>':'')+recSelBar(set, acts)
-      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col><col style="width:130px"><col style="width:96px"><col style="width:224px"></colgroup>'
-      +'<thead><tr>'+recChkHead(set)+'<th>날짜</th><th>기관 · 구분</th><th>메일 제목</th><th>기간</th><th>판단</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
+      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col><col style="width:130px"><col style="width:96px"><col style="width:224px"></colgroup>'
+      +'<thead><tr><th class="stc" title="별표(★)">★</th>'+recChkHead(set)+'<th>날짜</th><th>기관 · 구분</th><th>메일 제목</th><th>기간</th><th>판단</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
       +rows.join('')+'</tbody></table></div>'; };
   var mrow=function(set, k, i, d, who, subj, judge, act){
-    return '<tr>'+recChk(set, k)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(d)+'</td><td class="src">'+who+'</td><td class="tt">「'+esc(subj)+'」</td>'
+    return '<tr>'+recStarCell('m', k)+recChk(set, k)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(d)+'</td><td class="src">'+who+'</td><td class="tt">「'+esc(subj)+'」</td>'
     +recDueCell(recPer('m|'+k, null, subj, d))+'<td>'+(judge||'')+'</td><td class="act">'+act+'</td></tr>'; };
   var askTable=function(set, list, title){
-    var L=list.slice(0, LIM); recSelShown(set, L.map(function(a){ return a.item.key; }));
+    var L=recStarFilter('m', list, mkeyOf).slice(0, LIM); recSelShown(set, L.map(function(a){ return a.item.key; }));
     return mtable(set, title, L.map(function(a, i){ var k=a.item.key;
       return mrow(set, k, i, a.item.date, '<b>'+esc(recOrgName(a.org))+'</b>', a.item.subject,
         a.guess?'<span class="tag teal">'+esc(a.guess)+' 같음</span>':'<span class="tag amber">열어 봐야 앎</span>',
@@ -2426,19 +2584,19 @@ function recMailHtml(){
         +'<button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button>'); }),
       '<button class="btn sm" onclick="recSelSkip(\''+set+'\')">고른 것 무시</button>')+more(list.length); };
   var pickTable=function(set, list, title){
-    var L=list.slice(0, LIM); recSelShown(set, L.map(function(it){ return it.key; }));
+    var L=recStarFilter('m', list, mkeyOf).slice(0, LIM); recSelShown(set, L.map(function(it){ return it.key; }));
     return mtable(set, title, L.map(function(it, i){
       return mrow(set, it.key, i, it.date, it.kind==='submit'?'📨 지원':'🏅 결과', it.subject, '',
         opt(it.key)+'<button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button>'); }),
       '<button class="btn sm" onclick="recSelSkip(\''+set+'\')">고른 것 무시</button>')+more(list.length); };
   var ntTable=function(set, list, title){
-    var L=list.slice(0, LIM); recSelShown(set, L.map(function(n){ return n.key; }));
+    var L=recStarFilter('m', list, mkeyOf).slice(0, LIM); recSelShown(set, L.map(function(n){ return n.key; }));
     return '<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>'
       +recSelBar(set, '<button class="btn sm" onclick="recSelSeen(\''+set+'\',true)">✓ 고른 것 봤음</button>')
-      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:124px"><col><col style="width:130px"><col style="width:200px"></colgroup>'
-      +'<thead><tr>'+recChkHead(set)+'<th>날짜</th><th>갈래</th><th>메일 제목</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
+      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:124px"><col><col style="width:130px"><col style="width:200px"></colgroup>'
+      +'<thead><tr><th class="stc" title="별표(★)">★</th>'+recChkHead(set)+'<th>날짜</th><th>갈래</th><th>메일 제목</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
       + L.map(function(n, i){ var ki=GovRecruit.kindInfo(GovRecruit.kindOf(n.subject));
-        return '<tr>'+recChk(set, n.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(n.date)+'</td><td class="kd"><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td><td class="tt">「'+esc(n.subject)+'」</td>'
+        return '<tr>'+recStarCell('m', n.key)+recChk(set, n.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(n.date)+'</td><td class="kd"><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td><td class="tt">「'+esc(n.subject)+'」</td>'
           +recDueCell(recPer('m|'+n.key, null, n.subject, n.date))
           +'<td class="act"><button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button>'
           +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></td></tr>'; }).join('')+'</tbody></table></div>'+more(list.length); };

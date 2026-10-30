@@ -40,6 +40,7 @@
     { ls: 'recruit_mailskip',   path: 'recruit/mailskip',   kind: 'map' },
     { ls: 'recruit_mailtidy',   path: 'recruit/mailtidy',   kind: 'map' },   /* 「참고용 치우기」로 빠진 것 — ↩ 되살릴 때 «그것만» 되돌리려고 (2026-10-10) */
     { ls: 'recruit_need',       path: 'recruit/need',       kind: 'map' },
+    { ls: 'recruit_star',       path: 'recruit/star',       kind: 'map' },   /* 컨설턴트 모집의 별표(★) — h=모집 글 · o=기관 · m=메일 (2026-10-30) */
     { ls: 'recruit_due',        path: 'recruit/due',        kind: 'map' },   /* 글마다 사람이 넣은 마감일 (2026-10-05) */
     { ls: 'recruit_match',      path: 'recruit/match',      kind: 'map' },   /* 지난 이력 견주기 — 맞음·아님 (2026-10-05) */
     /* 📅 발주 예정 — 나라장터 발주계획·사전규격 (2026-10-09). 받은 범위(since)도 함께 — 폰이 올해 1월부터 또 받지 않게 */
