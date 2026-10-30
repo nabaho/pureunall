@@ -16354,7 +16354,219 @@ function subsidyApplyPanel(f){
     +'<div class="grid" style="margin-top:12px" oninput="markDirty()" onchange="markDirty()">'+flds+'</div>'
     +'<div class="row" style="margin-top:14px"><button class="primary" onclick="saveSubsidy()">💾 저장</button>'
     +(hasPrev?' <button onclick="copyPrevSubsidy()" title="'+(S.year-1)+'년 지원금 값을 올해로 불러오기">↩ 작년('+(S.year-1)+') 값 불러오기</button>':'')
-    +recon+'</div></div>';
+    +recon+'</div></div>'+subLedgerHTML(f);
+}
+/* ══ 지원금 신청·정산 — 출연 확인 · 서류 진행표 · 연도별 (대표 지시 2026-10-30 「매년 지원금 신청 · 기업 출연액과 지자체 지원액 모두 검토」, 목업 승인 「추천대로」 = A안) ══
+   저장: subsidy_steps/{기금}/{연도}/{단계} = {done, date, date2}
+         subsidy_remit/{기금}/{연도}/{사업장id | gov} = {amt, date, ok, src}   (ok = 사람이 확인함)
+   ─ 입금은 장부에서 «찾아 제안만» 한다. 사람이 적용하거나 □를 눌러야 확인이 된다(지어내지 않는다).
+   ─ 기한은 사람이 넣은 날짜에서 계산한다. 날짜를 모르면 기한 규칙 글만 보인다.
+   ─ 단계·기한은 근로복지기금지원사업 업무처리규정(2023.5.25. 개정본) 기준 — 현행본 대조 [확인 필요]. */
+var SUB_STEPS=[
+  {k:'apply',  n:'지원신청서', sub:'별지 제1호의2', law:'규정 §7③', due:'공단 공고 기간', forms:[['subsidy','양식·작성']], files:['신청서','공고문']},
+  {k:'attach', n:'첨부서류 11종 + 참여사별 3종', sub:'정관·사업계획서·확약서 등', law:'규정 §7③', due:'신청과 함께', go:'docs', files:['참여사업장명단']},
+  {k:'plan',   n:'지원금 관련 사업계획서·예산서, 서약서', sub:'별지 제2호의2·제2호의4', law:'규정 §7③', due:'신청과 함께', forms:[['sub_welfare_plan','사업계획서'],['sub_oath','서약서']]},
+  {k:'supp',   n:'보완 요구 대응', sub:'요구일 → 제출일', law:'규정 §10', due:'요구일+7일', dueFrom:['self',7], two:1, na:1},
+  {k:'notice', n:'지원 결정 통지 받음', sub:'결정액 칸과 연결', law:'규정 §13', due:'공단 통지', auto:'decided_amount', files:['결정통지']},
+  {k:'payreq', n:'지원금 지급신청서 + 출연 입금증', sub:'별지 제6호', law:'규정 §14④', due:'결정 통지 알게 된 날+30일', dueFrom:['notice',30], forms:[['sub_payment','양식·작성']], files:['교부신청']},
+  {k:'paid',   n:'지원금 입금 확인', sub:'교부·입금일 칸과 연결', law:'규정 §15', due:'—', auto:'paid_date'},
+  {k:'settle', n:'목적사업 집행·정산', sub:'집행액 칸과 연결', law:'법 §62① · 규정 §19②', due:'해당 연도 안', auto:'spent_amount', files:['집행·정산보고']},
+  {k:'cancel', n:'(해당 시) 결정 취소 이의·반환', sub:'통지 후 30일', law:'규정 §16~17', due:'통지일+30일', dueFrom:['self',30], na:1}
+];
+var SUB_GOV_RE=/시청|군청|구청|도청|특별자치|광역시|지자체|지방자치/;
+/* 날짜 + N일 — 순수. 날짜가 아니면 '' */
+function subDueDate(base,days){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(base||''))) return '';
+  var d=new Date(base+'T00:00:00Z'); if(isNaN(d.getTime())) return '';
+  d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10);
+}
+/* 한 단계의 상태 — 순수. steps={단계:{done,date,date2}}, yd=그 해 subsidy 칸, today='YYYY-MM-DD'
+   → {done, auto, due, late, label, kind} */
+function subStepState(def,steps,yd,today){
+  var s=(steps&&steps[def.k])||{}, auto=false;
+  if(def.auto){ var v=yd&&yd[def.auto]; auto=!(v==null||String(v).trim()===''); }
+  var done=!!(s.done||auto||(def.two&&s.date2));
+  var from=def.dueFrom?String(def.dueFrom[0]==='notice'?((steps&&steps.notice&&steps.notice.date)||''):(s.date||'')):'';
+  var due=def.dueFrom?subDueDate(from,def.dueFrom[1]):'';
+  var late=!!due&&!done&&String(today||'')>due;
+  var label=done?'완료':(def.na&&!s.date)?'해당 없음':late?'기한 지남':due?'기한 '+due:'대기';
+  return {done:done,auto:auto,due:due,late:late,label:label,kind:done?'ok':late?'dg':(def.na&&!s.date)?'':due?'warn':''};
+}
+/* 회사 이름 비교용 — 법인 꼬리표·공백·괄호를 걷는다. 순수 */
+function subNormCo(s){
+  return String(s||'').replace(/주식회사|유한책임회사|유한회사|합자회사|합명회사|\(주\)|\(유\)|㈜|㈔/g,'').replace(/[\s()（）.,·\-_]/g,'').toLowerCase();
+}
+/* 장부 입금 → 사업장·지자체 «제안» — 순수. txns=[{memo,deposit,date}], sites=[{id,name}]
+   한 거래가 여러 사업장 이름에 걸리면 가장 긴 이름에, 길이가 같으면 건너뛴다. → {id:{amt,date,n}} */
+function subRemitMatch(txns,sites){
+  var nm=(sites||[]).map(function(s){ return {id:s.id,k:subNormCo(s.name)}; }).filter(function(x){ return x.k.length>=2; });
+  var out={};
+  (txns||[]).forEach(function(x){
+    var dep=num(x&&x.deposit)||0; if(dep<=0) return;
+    var memo=String(x.memo||''), key=subNormCo(memo), id=null;
+    var hits=nm.filter(function(s){ return key.indexOf(s.k)>=0; }).sort(function(a,b){ return b.k.length-a.k.length; });
+    if(hits.length){ if(hits.length>1&&hits[0].k.length===hits[1].k.length) return; id=hits[0].id; }
+    else if(SUB_GOV_RE.test(memo)) id='gov';
+    if(!id) return;
+    var o=out[id]=out[id]||{amt:0,date:'',n:0};
+    o.amt+=dep; o.n++; if(String(x.date||'')>o.date) o.date=String(x.date||'');
+  });
+  return out;
+}
+/* 출연 한 줄의 상태 — 순수. r={pledge, remit:{amt,ok}} */
+function subRemitStatus(r){
+  var rm=r.remit||{}, amt=num(rm.amt)||0, p=r.pledge||0;
+  if(rm.ok) return amt>=p?{k:'ok',t:'입금 확인'}:{k:'warn',t:(p-amt).toLocaleString()+' 부족'};
+  if(amt) return {k:'warn',t:'확인 전'};
+  return p?{k:'dg',t:'미입금'}:{k:'',t:'약정 없음'};
+}
+function subLedgerLoad(){
+  var fid=S.fundId, yr=S.year, L=S._led;
+  if(L&&L.fid===fid&&L.yr===yr) return L.ready?L:null;
+  var cur={fid:fid,yr:yr,ready:false,err:0,steps:{},remit:{},syAll:{},docs:{},chk:{},sug:null}; S._led=cur;
+  var rd=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ cur.err++; return {}; }); };
+  Promise.all([rd('subsidy_steps/'+fid),rd('subsidy_remit/'+fid),rd('site_years/'+fid),rd('subsidy_docs/'+fid),rd('subsidy_chk/'+fid+'/'+yr)]).then(function(r){
+    if(S._led!==cur) return;
+    cur.steps=r[0]; cur.remit=r[1]; cur.syAll=r[2]; cur.docs=r[3]; cur.chk=r[4]; cur.ready=true;
+    if(S.tab==='subsidy'&&S.view==='fund'&&S.subTab==='apply'&&S.fundId===fid&&S.year===yr) renderFund();
+  });
+  return null;
+}
+function _subLedPut(L,node,id,field,val){   // 저장 + 읽어 둔 것에도 반영
+  var base=NS+'/'+node+'/'+L.fid+'/'+L.yr+'/'+id+(field?'/'+field:'');
+  return fbDb.ref(base).set(val).then(function(){
+    var root=node==='subsidy_steps'?L.steps:L.remit, y=(root[L.yr]=root[L.yr]||{});
+    if(field){ var m=(y[id]=y[id]||{}); if(val===null||val===undefined) delete m[field]; else m[field]=val; }
+    else if(val===null) delete y[id]; else y[id]=val;
+  });
+}
+function subStepSet(k,field,v){
+  var L=S._led; if(!L||!L.ready) return;
+  var val=field==='done'?(v?true:null):(String(v==null?'':v).trim()||null);
+  _subLedPut(L,'subsidy_steps',k,field,val).then(function(){
+    _audit(L.fid,'지원금 진행표',L.yr+'년 '+k+' '+field+' '+(val===true?'완료':val===null?'지움':val));
+    if(S._led===L) renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); renderFund(); });
+}
+function subRemitSet(id,field,v){
+  var L=S._led; if(!L||!L.ready) return;
+  var val=field==='ok'?(v?true:null):field==='amt'?((num(v)===''||num(v)===0)?null:num(v)):(String(v==null?'':v).trim()||null);
+  _subLedPut(L,'subsidy_remit',id,field,val).then(function(){
+    if(field==='ok') _audit(L.fid,'지원금 출연 확인',L.yr+'년 '+id+' 입금 '+(val?'확인':'확인 취소'));
+    if(S._led===L) renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); renderFund(); });
+}
+/* 장부에서 찾은 제안을 적용 — 금액·날짜를 넣고 «확인»까지 한다(사람이 [적용]을 눌렀으므로) */
+function subRemitApply(id){
+  var L=S._led, g=L&&L.sug&&L.sug[id]; if(!g) return;
+  _subLedPut(L,'subsidy_remit',id,null,{amt:g.amt,date:g.date||null,ok:true,src:'ledger'}).then(function(){
+    _audit(L.fid,'지원금 출연 확인',L.yr+'년 '+id+' 입금 '+g.amt.toLocaleString()+'원 장부에서 적용');
+    if(S._led===L) renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function subRemitFind(){
+  var L=S._led; if(!L||!L.ready) return;
+  var sites=Object.keys(S.sites||{}).map(function(k){ return {id:k,name:(S.sites[k]||{}).name,st:(S.sites[k]||{}).status}; }).filter(function(s){ return s.st!=='closed'; });
+  fbDb.ref(NS+'/txns/'+L.fid+'/'+L.yr).once('value').then(function(sn){
+    var v=sn.val()||{}, arr=Object.keys(v).map(function(k){ return v[k]; });
+    L.sug=subRemitMatch(arr,sites);
+    var n=Object.keys(L.sug).length;
+    toast(arr.length?(n?'장부에서 '+n+'곳의 입금을 찾았습니다 — 확인 후 [적용]하세요':'이름이 맞는 입금을 찾지 못했습니다'):L.yr+'년 장부가 비어 있습니다','warn');
+    if(S._led===L) renderFund();
+  }).catch(function(e){ toast('장부를 읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function subStartNext(){
+  var ny=new Date().getFullYear()+1;
+  if(S.year===ny){ toast(ny+'년 화면입니다 — 아래 진행표에서 시작하세요'); return; }
+  changeYear(ny);
+}
+function subLedgerHTML(f){
+  if(f.fund_type==='사내') return '';
+  var L=subLedgerLoad();
+  if(!L) return '<div class="panel">'+loadingHTML('출연·서류 진행표 불러오는 중…')+'</div>';
+  var yr=S.year, yd=(f.years&&f.years[yr]&&f.years[yr].subsidy)||{}, today=ymd(), W=function(n){ return (Number(n)||0).toLocaleString(); };
+  var act=Object.keys(S.sites||{}).map(function(k){ return Object.assign({_id:k},S.sites[k]); }).filter(function(s){ return s.status!=='closed'; })
+    .sort(function(a,b){ return String(a.seq_label||'').localeCompare(String(b.seq_label||''),'ko',{numeric:true}); });
+  var sy=(L.syAll&&L.syAll[yr])||{}, remit=(L.remit&&L.remit[yr])||{}, steps=(L.steps&&L.steps[yr])||{}, sug=L.sug||{};
+  var gov=num(yd.gov_contrib)||0;
+  /* ── ① 출연 구성 확인 ── */
+  var rows=act.map(function(s){ return {id:s._id,name:s.name||'',kind:'기업',pledge:num((sy[s._id]||{}).contrib)||siteContribOf(s,f)||0,remit:remit[s._id]||{}}; });
+  rows.push({id:'gov',name:'지자체 출연',kind:'지자체',pledge:gov,remit:remit.gov||{}});
+  var sumP=0, sumR=0, bad=0, corp=0;
+  var body=rows.map(function(r,i){
+    var st=subRemitStatus(r), rm=r.remit||{}, g=sug[r.id];
+    sumP+=r.pledge; if(rm.ok) sumR+=num(rm.amt)||0; if(r.pledge&&st.k!=='ok') bad++; if(r.kind==='기업') corp+=r.pledge;
+    var pledgeCell=r.id==='gov'
+      ? '<input value="'+esc(gov||'')+'" onchange="patchSub(S.fundId,\'gov_contrib\',this.value,\'num\')" style="width:120px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right" title="지자체가 이 해에 출연하기로 한 금액">'
+      : W(r.pledge)||'<span class="muted">—</span>';
+    return '<tr><td class="ckcol"><input type="checkbox"'+(rm.ok?' checked':'')+' onchange="subRemitSet(\''+r.id+'\',\'ok\',this.checked)" title="입금을 확인했습니다"></td><td class="no">'+(i+1)+'</td>'
+      +'<td>'+esc(r.name)+'</td><td class="muted">'+r.kind+'</td><td style="text-align:right">'+pledgeCell+'</td>'
+      +'<td style="text-align:right"><input value="'+esc(rm.amt||'')+'" onchange="subRemitSet(\''+r.id+'\',\'amt\',this.value)" style="width:110px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right"></td>'
+      +'<td><input type="date" value="'+esc(rm.date||'')+'" onchange="subRemitSet(\''+r.id+'\',\'date\',this.value)" style="padding:2px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px"></td>'
+      +'<td><span class="chip'+(st.k?' '+st.k:'')+'">'+esc(st.t)+'</span>'
+      +((g&&!rm.ok)?' <span class="chip" style="background:#eff6ff;color:#1e40af">장부에서 찾음 '+W(g.amt)+(g.date?' · '+esc(g.date):'')+'</span><button onclick="subRemitApply(\''+r.id+'\')" style="padding:0 6px;font-size:11px">적용</button>':'')+'</td></tr>'; }).join('');
+  var req=num(yd.request_amount)||0, tie=!req?'<span class="chip warn">신청액 칸이 비어 있음</span>':(req===sumP?'<span class="chip ok">신청액 칸과 일치</span>':'<span class="chip dg">신청액 칸과 '+W(Math.abs(req-sumP))+'원 차이</span>');
+  var p1='<div class="panel"><div class="row" style="margin-bottom:8px"><h2 style="font-size:15px">'+yr+'년 출연 구성 확인 — 기업과 지자체가 얼마를 내는가</h2>'+hlp('sub.ledger')+'<span style="flex:1"></span>'
+    +(bad?'<span class="chip warn">입금 미확인 '+bad+'곳</span>':'')+'<button onclick="subRemitFind()" title="장부의 입금 중 입금자 이름이 참여사·지자체와 비슷한 것을 찾아 제안합니다">🔍 장부에서 입금 찾기</button>'
+    +(L.err?'<span class="chip dg" title="일부 자료를 읽지 못했습니다 — 새로고침 후 다시 보세요">읽기 오류 '+L.err+'</span>':'')+'</div>'
+    +'<div style="overflow:auto;max-height:420px"><table><thead><tr><th class="ckcol">□</th><th>#</th><th>출연자</th><th>구분</th><th style="text-align:right">약정(예정) 출연금</th><th style="text-align:right">입금액</th><th>입금일</th><th>상태</th></tr></thead><tbody>'+body
+    +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td></td><td></td><td colspan="3" style="text-align:right">합계 약정 '+W(sumP)+'</td><td style="text-align:right">'+W(sumR)+'</td><td></td><td>'+(sumP>sumR?'<span class="chip warn">'+W(sumP-sumR)+' 부족(확인된 입금 기준)</span>':'<span class="chip ok">약정 이상 입금</span>')+'</td></tr></tbody></table></div>'
+    +'<div class="row" style="margin-top:10px;gap:12px"><span>기업 <b>'+W(corp)+'</b> + 지자체 <b>'+W(gov)+'</b> = <b>'+W(corp+gov)+'</b></span>'+tie
+    +'<button onclick="goSubTab(\'plan\')">🧮 한도·점수 보기</button></div></div>';
+  /* ── ② 서류 진행표 ── */
+  var docsOf=function(kinds){ var n=0, D=(L.docs&&L.docs[yr])||{}; Object.keys(D).forEach(function(id){ if(kinds.indexOf(D[id].kind||'기타')>=0) n++; }); return n; };
+  var fchk=(L.chk&&L.chk.fund)||{}, schk=(L.chk&&L.chk.site)||{};
+  var fneed=SUB_REQ_DOCS.filter(function(d){ return d.scope==='fund'&&!d.opt; }), fdone=fneed.filter(function(d){ return fchk[d.k]; }).length;
+  var stotal=act.length*SUB_SITE_DOCS.length, sdone=act.reduce(function(a,s){ return a+SUB_SITE_DOCS.filter(function(c){ return (schk[s._id]||{})[c[0]]; }).length; },0);
+  var attachDone=fneed.length>0&&fdone===fneed.length&&sdone===stotal;
+  var nDone=0;
+  var srows=SUB_STEPS.map(function(d,i){
+    var stt=subStepState(d,steps,yd,today), s=steps[d.k]||{};
+    if(d.k==='attach'&&attachDone&&!stt.done){ stt.done=true; stt.kind='ok'; stt.label='완료'; stt.auto=true; }
+    if(stt.done) nDone++;
+    var chipTxt=d.k==='attach'?('필수 '+fdone+'/'+fneed.length+' · 참여사 '+sdone+'/'+stotal+'장'):stt.label;
+    var dateCell=d.two
+      ? '<input type="date" value="'+esc(s.date||'')+'" onchange="subStepSet(\''+d.k+'\',\'date\',this.value)" title="요구일" style="width:124px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;font-size:11.5px"> → '
+        +'<input type="date" value="'+esc(s.date2||'')+'" onchange="subStepSet(\''+d.k+'\',\'date2\',this.value)" title="제출일" style="width:124px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">'
+      : d.auto==='paid_date'
+        ? (yd.paid_date?esc(yd.paid_date):'<span class="muted">교부·입금일 칸</span>')
+        : (d.k==='attach'?'<span class="muted">—</span>':'<input type="date" value="'+esc(s.date||'')+'" onchange="subStepSet(\''+d.k+'\',\'date\',this.value)" style="width:128px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">');
+    var forms=(d.forms||[]).map(function(x){ return '<button onclick="subDocForm(\''+x[0]+'\')" style="padding:1px 7px;font-size:11px;margin-right:3px">📄 '+esc(x[1])+'</button>'; }).join('')
+      +(d.go?'<button onclick="goSubTab(\''+d.go+'\')" style="padding:1px 7px;font-size:11px">📁 제출서류 탭</button>':'');
+    var nf=d.files?docsOf(d.files):0;
+    var filesCell=d.files?'<button onclick="goSubTab(\'docs\')" title="지원금 서류함에 올린 파일" style="padding:1px 7px;font-size:11px;'+(nf?'':'opacity:.55')+'">📎 '+nf+'</button>':'';
+    var dueTxt=stt.due?('<span class="chip'+(stt.late?' dg':' warn')+'">'+esc(stt.due)+'까지</span>'):'<span class="muted">'+esc(d.due)+'</span>';
+    return '<tr><td class="ckcol"><input type="checkbox"'+(stt.done?' checked':'')+(stt.auto?' disabled title="칸에 값이 있어 자동으로 완료입니다"':' onchange="subStepSet(\''+d.k+'\',\'done\',this.checked)"')+'></td><td class="no">'+(i+1)+'</td>'
+      +'<td>'+esc(d.n)+' <span class="muted" style="font-size:11px">'+esc(d.sub)+'</span></td><td class="muted" style="font-size:11.5px">'+esc(d.law)+'</td><td>'+dueTxt+'</td>'
+      +'<td>'+forms+'</td><td><span class="chip'+(stt.kind?' '+stt.kind:'')+'">'+esc(chipTxt)+'</span></td><td style="white-space:nowrap">'+dateCell+'</td><td>'+filesCell+'</td></tr>'; }).join('');
+  var p2='<div class="panel"><div class="row" style="margin-bottom:8px"><h2 style="font-size:15px">'+yr+'년 신청·정산 서류 진행표 — 무엇을 언제 냈나</h2><span style="flex:1"></span><span class="chip'+(nDone===SUB_STEPS.length?' ok':'')+'">'+nDone+'/'+SUB_STEPS.length+' 단계 완료</span></div>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol">□</th><th>#</th><th>단계·서류</th><th>근거</th><th>기한</th><th>양식</th><th>상태</th><th>날짜</th><th>파일</th></tr></thead><tbody>'+srows+'</tbody></table></div></div>';
+  /* ── ③ 연도별 한눈에 ── */
+  var thisY=new Date().getFullYear(), yset={}; yset[yr]=1; yset[thisY]=1; yset[thisY+1]=1;
+  Object.keys(f.years||{}).forEach(function(y){ if(((f.years[y]||{}).subsidy)) yset[y]=1; });
+  Object.keys(L.steps||{}).forEach(function(y){ yset[y]=1; });
+  var ys=Object.keys(yset).map(Number).sort(function(a,b){ return a-b; }).slice(-6);
+  var ydOf=function(y){ return ((f.years&&f.years[y]&&f.years[y].subsidy)||{}); };
+  var corpOf=function(y){ var m=(L.syAll&&L.syAll[y])||{}; return Object.keys(m).reduce(function(a,k){ return a+(num((m[k]||{}).contrib)||0); },0); };
+  var miss=function(y){ return y>thisY?'<span class="chip">미시작</span>':'<span class="chip warn">입력 안 됨</span>'; };
+  var MROWS=[
+    ['지원신청서 제출',function(y){ var a=(L.steps&&L.steps[y]&&L.steps[y].apply)||{}; return a.date?'<span class="chip ok">제출 '+esc(a.date)+'</span>':(a.done?'<span class="chip ok">제출</span>':(num(ydOf(y).request_amount)?'<span class="chip warn">제출일 없음</span>':miss(y))); }],
+    ['기업 출연 합계(약정)',function(y){ var v=corpOf(y); return v?W(v):miss(y); }],
+    ['지자체 출연',function(y){ var v=num(ydOf(y).gov_contrib)||0; return v?W(v):miss(y); }],
+    ['신청액',function(y){ var v=num(ydOf(y).request_amount)||0; return v?W(v):miss(y); }],
+    ['결정액 (결정율)',function(y){ var d=num(ydOf(y).decided_amount)||0, q=num(ydOf(y).request_amount)||0; return d?W(d)+(q?' <span class="muted">('+Math.round(d/q*100)+'%)</span>':''):(num(ydOf(y).request_amount)?'<span class="chip warn">대기</span>':miss(y)); }],
+    ['지급신청·입금',function(y){ var p=ydOf(y).paid_date; var r=(L.steps&&L.steps[y]&&L.steps[y].payreq)||{}; return p?'입금 '+esc(p):(r.date?'신청 '+esc(r.date):(num(ydOf(y).decided_amount)?'<span class="chip warn">입금일 없음</span>':miss(y))); }],
+    ['집행·정산 (집행액)',function(y){ var d=ydOf(y); var v=num(d.spent_amount)||0, dc=num(d.decided_amount)||0; return v?W(v)+(dc?(v>dc?' <span class="chip dg">과다</span>':v<dc?' <span class="chip warn">미집행 '+W(dc-v)+'</span>':' <span class="chip ok">일치</span>'):''):(dc?'<span class="chip warn">집행액 없음</span>':miss(y)); }]
+  ];
+  var mhead=ys.map(function(y){ return '<th style="text-align:right;cursor:pointer'+(y===yr?';background:#eff6ff':'')+'" onclick="changeYear('+y+')" title="'+y+'년 화면으로">'+y+'</th>'; }).join('');
+  var mbody=MROWS.map(function(r,i){
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(r[0])+'</td>'
+      +ys.map(function(y){ return '<td style="text-align:right'+(y===yr?';background:#f8fafc':'')+'">'+r[1](y)+'</td>'; }).join('')+'</tr>'; }).join('');
+  var ny=thisY+1;
+  var p3='<div class="panel"><div class="row" style="margin-bottom:8px"><h2 style="font-size:15px">연도별 한눈에 — 매년 신청했는지·얼마였는지</h2><span style="flex:1"></span>'
+    +(yr<ny?'<button class="primary" onclick="subStartNext()" title="'+ny+'년 화면을 열어 신청을 시작합니다 — 작년 값 불러오기로 신청서 메모·지원요건·지자체 출연 예정액을 가져옵니다(결정액·집행액은 가져오지 않음)">＋ '+ny+'년 신청 시작</button>':'')+'</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol">□</th><th>#</th><th>항목</th>'+mhead+'</tr></thead><tbody>'+mbody+'</tbody></table></div></div>';
+  return p1+p2+p3;
 }
 /* ══ 지원금 ① 한도·점수 ══
    우리가 이미 가진 데이터(참여사업장 상시근로자수·출연금)로 세 한도와 예상 심사점수를 계산한다.
@@ -16555,8 +16767,8 @@ function fillSubsidyExcelFor(fid){ S.formFund=fid; fillForm('subsidy'); }
 function copyPrevSubsidy(){
   var f=funds[S.fundId], prev=(f.years&&f.years[S.year-1]&&f.years[S.year-1].subsidy)||null;
   if(!prev){ toast('작년 값이 없습니다','warn'); return; }
-  SUB_FIELDS.forEach(function(c){ var el=$('su-'+c[0]); if(el&&c[0]!=='paid_date') el.value=(prev[c[0]]!=null?prev[c[0]]:''); });
-  var pd=$('su-paid_date'); if(pd) pd.value='';   // 교부·입금일은 올해 새로 입력
+  SUB_FIELDS.forEach(function(c){ var el=$('su-'+c[0]); if(el&&c[0]!=='paid_date'&&c[0]!=='decided_amount'&&c[0]!=='spent_amount') el.value=(prev[c[0]]!=null?prev[c[0]]:''); });
+  ['paid_date','decided_amount','spent_amount'].forEach(function(k){ var el=$('su-'+k); if(el) el.value=''; });   // 교부일·결정액·집행액은 올해 일어난 일이라 새로 입력
   markDirty(); toast((S.year-1)+'년 값을 불러왔습니다. 확인 후 저장하세요');
 }
 // ── 지원금 서류함 (연도별 파일 보관, Firebase Storage) ──
@@ -23189,6 +23401,9 @@ var HELP={
  'budget.mode':{t:'출연금 사용 방식 — 사업계획서 셈',h:'<p><b>출연금 N% 사용</b>(기본) — 그해 출연금의 사용한도(공동 90%, 사내 80%, 중소기업 아닌 사내 50%)를 준비금2로 옮겨 목적사업에 씁니다. 나머지는 기본재산.</p>'
    +'<p><b>수익금만 쓰기</b> — 실무매뉴얼 예시처럼 출연금을 <b>모두 기본재산</b>으로 두고, 그 이자 등 수익금만 목적사업에 씁니다. 사업계획서의 손익예산·추정재무상태표·비용예산이 이 방식으로 셈해집니다.</p>'
    +'<p>⚠ 이 선택은 <b>사업계획서에만</b> 적용됩니다. 결산의 준비금2 설정(출연금 × 사용한도)과 회의록 문구는 그대로입니다. 바꾼 뒤 [💰 출연금에서]·「출연금에서 기본 항목 세우기」를 다시 누르면 예산이 새 방식으로 세워집니다.</p>'},
+ 'sub.ledger':{t:'지원금 출연 확인 · 서류 진행표 · 연도별',h:'<p><b>① 출연 구성 확인</b> — 참여기업과 지자체가 그 해 얼마를 내기로 했는지(약정)와 실제로 낸 돈(입금)을 나란히 봅니다. 규정상 신청서·사업계획서에 적은 출연약정액 <b>이상</b>을 출연해야 지원금을 받을 수 있어(업무처리규정 제14조⑤), 모자라면 지급신청 전에 눈에 띄게 합니다. [장부에서 입금 찾기]는 장부의 입금 중 입금자 이름이 참여사 이름과 비슷한 것을 <b>제안만</b> 합니다 — 사람이 [적용]하거나 □를 눌러야 «입금 확인»이 됩니다.</p>'
+   +'<p><b>② 서류 진행표</b> — 지원신청 → 첨부 → 사업계획서·서약서 → 보완 → 결정 통지 → 지급신청 → 입금 → 집행·정산 순서입니다. 날짜는 사람이 넣으면 기한이 계산됩니다(결정 통지를 안 날부터 30일 등). 지어내지 않습니다. 결정액·교부일·집행액 칸에 값이 있으면 그 단계는 자동으로 완료로 칩니다.</p>'
+   +'<p><b>③ 연도별 한눈에</b> — 해마다 신청했는지, 얼마였는지. 값이 비어 있으면 «없음»이 아니라 «입력 안 됨»으로 표시해 빠뜨린 것을 찾게 합니다. 단계·기한은 업무처리규정 2023.5.25. 개정본 기준이라 현행 규정과 한 번 더 대조가 필요합니다 [확인 필요].</p>'},
  'budget.copy':{t:'전년 계획에서 복사 — 해마다 바뀌는 칸은 노랗게',h:'<p>지역 공동기금은 사업 구조가 해마다 거의 같아서, 지난해 <b>예산 세부 항목을 그대로 가져옵니다</b>. 복사한 줄 중 <b>해마다 바뀌는 칸</b>(예금이자·대부이자의 원금, 목적사업의 인원)은 <b>노랗게</b> 남고, 고치거나 [확인]을 누르면 사라집니다.</p>'
    +'<p><b>이율만 자동</b>으로 기금 정보의 올해 이율로 바꿉니다. 기본재산·대부 잔액·인원은 지난해 결산이 끝나야 맞는 숫자라 <b>추정해서 넣지 않고</b> 전년 값을 두고 표시만 합니다.</p>'
    +'<p><b>다른 기금에서도</b> 가져올 수 있습니다 — 지역 공동기금은 기금끼리도 비슷하니 기준 기금 하나를 입력해 두고 나머지로 복사하세요. 이때는 출연금·인원이 달라 <b>관리비·예비비 금액도 노랗게</b> 표시합니다.</p><p>올해 항목이 이미 있는 기금은 건너뜁니다(여러 기금 한꺼번에). 한 기금씩 열면 «지우고 다시 만들기»를 체크해야 덮어씁니다. 목적사업 탭과 위쪽 예산 다섯 칸은 건드리지 않습니다. 복사 기록은 일지에 남습니다.</p>'},
