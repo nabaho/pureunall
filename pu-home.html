@@ -115,6 +115,8 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .appbar{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
 .appbar .ttl{font-weight:800;font-size:16px;letter-spacing:-.2px}
 .appbar .when{font-size:12.5px;color:var(--faint)}
+/* 폰에서만·PC 에서만 보이는 조각 (2026-10-30 「폰화면도 더 간단히」) — 폰 구간(560px)이 뒤집는다 */
+.ph-only{display:none}
 .appbar .sp{flex:1}
 /* 이 띠가 «무엇에 대한 것인지» 적는 이름표 (대표 결정 2026-09-06 ㉯).
    위는 화면 전체, 아래(.eft)는 고른 사람 하나 — 그 갈림이 안 보여 헷갈렸다. */
@@ -815,6 +817,24 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   .dcard .lw{display:none}
   .dcard .sw{display:inline}
   .dcard .mini.ok{display:inline-block}
+  /* ── 폰은 «무엇을 할지»만 (대표 결정 2026-10-30 「폰화면도 더 간단히」, 목업 추천 ①) ──
+     ⚠ 기능은 안 뺀다 — 글자·설명만 감추고, 단추는 ⋯·펼침 안에 그대로 있다. PC 는 그대로다. */
+  .pc-only{display:none !important}
+  .ph-only{display:inline}
+  .appbar{flex-wrap:nowrap}
+  /* 자동 연결 — 머리 한 줄만, 누르면 펴진다(.open). 멈춤·못 읽음이면 그리는 쪽이 늘 편다 */
+  .autocard .ath{cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .autocard:not(.open) .arow,.autocard:not(.open) .ago{display:none}
+  /* 할 일 — 한 건 = 한 줄(제목·건수·단추). 설명(누가·어떻게 하면 되나)은 PC 에서 본다 */
+  .todo .th .sub{display:none}
+  .todo .job{display:flex;align-items:center;gap:6px}
+  .todo .job .h{flex:1;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .todo .job .go{margin:0;flex:none}
+  .todo .job .who,.todo .job details{display:none}
+  /* 목록 — 줄마다 붙던 「확인 전」은 뺀다(위 시각이 같은 말을 한다). 뜻 있는 딱지(남김·퇴사…)만 */
+  #rowsBox .pill.none{display:none}
+  /* 편집칸 — 사진 칸의 긴 안내, 아래 띠의 수정 시각 */
+  .dropsay,.eft .sub{display:none}
   .dcard .mini{padding:1px 4px;font-size:11px;line-height:1.2}
   .dcard .mini.bad{border-radius:9px;background:var(--bad);border-color:var(--bad);color:#fff}
   /* ── 경력 줄: 글칸에 자리를 몰아준다 (대표 지시 2026-10-17 「캡처하면 컴팩트하게 좀 정리해달라」) ──
@@ -4087,7 +4107,7 @@ function 직원연결칸Html(d) {
       + '</option>').join('')   // ⚠ value 는 사번 그대로, 보이는 글자는 이름(·직급)만 (대표 결정 2026-10-25)
     + '</select><button class="btn" style="padding:3px 9px;font-size:11.5px" '
     + 'onclick="직원잇기(\'' + esc(d.key) + '\', document.getElementById(\'sidPick\').value)">잇기</button>'
-    + '<span>이어 두어야 퇴사 때 저절로 내려갑니다</span>');
+    + '<span class="pc-only">이어 두어야 퇴사 때 저절로 내려갑니다</span>');
 }
 
 /* ══════ 3단계 — 새 노무사 «올리기» (월간 자동 연결 2026-10-05) ══════
@@ -5801,7 +5821,14 @@ function 마지막자동() {
 function 자동카드Html() {
   const r = 마지막자동();
   const 줄 = (t, v) => v ? '<div class="arow"><span>' + t + '</span><b>' + v + '</b></div>' : '';
-  return '<div class="autocard"><div class="ath">자동 연결 <span class="sub">매달 1일 08:00</span></div>'
+  /* ★ 폰에서는 «한 줄»로 접는다 (대표 결정 2026-10-30 — 「폰화면도 더 간단히」, 목업 추천).
+       머리를 누르면 펴진다(App.autoOpen). PC 는 늘 펴져 있다 — 접는 꾸밈이 폰 구간에만 있다.
+     ⚠ 멈췄거나 못 읽었으면 «접지 않는다» — 사고를 한 줄 뒤에 숨기면 아무도 모른다. */
+  const 펼침 = App.autoOpen || App.autoErr || (r && r.멈춤);
+  return '<div class="autocard' + (펼침 ? ' open' : '') + '">'
+    + '<div class="ath" onclick="App.autoOpen=!App.autoOpen;App.render()">자동 연결 '
+    + '<span class="sub pc-only">매달 1일 08:00</span>'
+    + '<span class="sub ph-only">다음 ' + esc(다음자동날(todayString()).slice(5).replace('-', '/')) + ' 08:00 ' + (펼침 ? '▴' : '▾') + '</span></div>'
     + (App.autoErr ? '<div class="arow"><span class="sub">' + esc(App.autoErr) + '</span></div>' : '')
     + (r
         ? 줄('마지막', esc(stampShort(r.at)))
@@ -6038,8 +6065,11 @@ function appbarHtml() {
      ⚠ 도메인을 옮기는 날: ⋯ 안의 «새 사이트»를 본길로 꺼내고 지금(라이믹스) 쪽 단추를
        걷으면 한 자리에서 끝난다. 그때 다시 둘을 «나란히» 늘어놓지 말 것.
      ★ 파란 단추는 이 띠에 «없다». 화면의 으뜸 일은 아래 띠의 「저장하고 반영」 하나다. */
+  /* ★ 폰에서는 이 띠가 «한 줄»이다 (대표 결정 2026-10-30 — 「폰화면도 더 간단히」, 목업 추천).
+       「마지막 확인」 글자·「열기」 글자는 폰에서 빼고(.pc-only), 미리보기는 폰에서 ⋯ 안으로 옮긴다
+       (.pc-only 단추 + ⋯ 안의 .ph-only 단추 — 같은 togglePreview 다). 두 줄이던 띠가 폰 한 화면의 1/8 을 먹었다. */
   return '<div class="appbar">'
-    + '<span class="when">마지막 확인 ' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
+    + '<span class="when"><span class="pc-only">마지막 확인 </span>' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
     /* ★ 「다시 확인」은 시각 «바로 옆»에 둔다 — 무엇을 다시 하는지가 시각과 한 덩이로 읽힌다.
          (옛 이름 「대조」 — 뜻은 같다: 살아 있는 홈페이지를 읽어 이 화면과 견준다.) */
     + '<button class="btn sm" onclick="checkHomepage()"' + (App.checking ? ' disabled' : '')
@@ -6049,7 +6079,7 @@ function appbarHtml() {
     /* ★ 「줄 모양」은 ⋯ 안에 있다 (2026-10-03 정리안 ①) — 한 번 정하면 거의 안 바꾸는 설정이라
          늘 자리를 차지할 까닭이 없다. */
     /* ★ 미리보기 — 기본은 접힘. 켜면 편집칸 오른쪽에 붙는다(대표 결정 2026-09-02 ㉮) */
-    + '<button class="btn' + (App.preview ? ' on' : '') + '" onclick="togglePreview()"'
+    + '<button class="btn pc-only' + (App.preview ? ' on' : '') + '" onclick="togglePreview()"'
     + ' title="고치는 대로 어떻게 보이는지 옆에서 보여 드립니다">'
     + (App.preview ? '👁 미리보기 끄기' : '👁 미리보기') + '</button>'
     /* ★ 「홈페이지에 올리기」는 «구성원 갈래를 볼 때»만 보인다.
@@ -6063,7 +6093,7 @@ function appbarHtml() {
        실제로 2026-09-06 에 「자문사 고르기」가 위아래 두 곳에 생겼다.
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
     + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
-    + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">사이트 열기 ↗</a>'
+    + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">사이트 <span class="pc-only">열기 </span>↗</a>'
     /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).
        ⚠ 이 단추 하나가 «지금 홈페이지를 손 안 대고 고치는» 유일한 길인데, 넣는 자리가
          복사 안내문 «속 작은 글씨 링크»에만 있었다. 그래서 대표께서 몇 달을 못 찾으셨고,
@@ -6076,6 +6106,9 @@ function appbarHtml() {
     + '<span class="sep"></span>'
     + '<details class="more"><summary class="btn" title="가끔 쓰는 것들">⋯</summary>'
     + '<div class="morebox">'
+    /* 폰에서만 보이는 미리보기 문 — 위 띠의 미리보기 단추가 폰에서 빠진 자리 */
+    + '<button class="btn ph-only" onclick="togglePreview()">'
+    + (App.preview ? '👁 미리보기 끄기' : '👁 미리보기') + '</button>'
     + '<label class="sub">줄 모양 '
     + '<select onchange="setLineFormat(this.value)">'
     + '<option value="plain"' + (App.lineFormat === 'plain' ? ' selected' : '') + '>줄바꿈만 (기본)</option>'
@@ -7035,9 +7068,12 @@ function 미리보기HTML() {
     }
     if (App.previewMode === 'now') return { mid: 'people', 바탕: 사본바탕('people'), html: App.sitePeople, 지금: true };
     try {
-      /* ★ 「안 올림」은 빼고 그린다 — 올릴 것과 같은 것을 보여 줘야 한다 */
+      /* ★ «올리기와 같은 사람»만 그린다 — 「올릴 것과 같음」이라 적어 두었으니 같아야 한다.
+           ⚠ 2026-10-30 대표 지적 「미리보기 중에 박성수가 여전히 남아 있다」 — 퇴사 빼기(2026-10-07)를
+             publishPeople 에만 넣고 여기는 «안 올림»만 걸러, 퇴사한 분이 «고친 뒤»에 그대로 나왔다.
+             이제 둘 다 새홈페이지에갈사람 «한 곳»을 지난다(안 올림·내린 표시·퇴사를 함께 뺀다). */
       const ours = Object.keys(App.members)
-        .filter(function (k) { return !offSiteOf(App.members[k]); })
+        .filter(function (k) { return 새홈페이지에갈사람(App.members[k]); })
         .map(function (k) { return Object.assign({}, App.members[k], { key: k }); });
       const 고른것 = PuSitePeople.올릴사람(App.sitePeople, ours);
       return { mid: 'people', 바탕: 사본바탕('people'),

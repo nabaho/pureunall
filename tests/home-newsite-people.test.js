@@ -72,3 +72,39 @@ test('새 홈페이지에 올리기가 이 잣대를 쓰고, 뺀 사람을 묻�
   assert.match(b, /새홈페이지에갈사람\(/);
   assert.match(b, /퇴사로 뺀/);
 });
+
+/* ══════ 미리보기 «고친 뒤»도 같은 잣대 (대표 지적 2026-10-30 「미리보기 중에 박성수가 여전히 남아 있다」) ══════
+   퇴사 빼기를 올리기에만 넣고 미리보기는 «안 올림»만 걸러, 퇴사한 분이 «고친 뒤»에 남았다.
+   미리보기 함수를 실제로 돌려 «그리는 데 넘긴 사람»을 본다. 이름은 예시만. */
+function 미리보기상자(members) {
+  const ctx = 상자(명부);
+  ctx.App.group = 'members'; ctx.App.previewMode = 'after'; ctx.App.sitePeople = '<html>쪽</html>';
+  ctx.App.members = members;
+  ctx.넘긴 = null;
+  ctx.PuSitePeople = {
+    올릴사람: (쪽, ours) => { ctx.넘긴 = ours.map(p => p.name); return { 갈것: ours, 못갈것: [] }; },
+    쪽그리기: (쪽, 갈것) => '<html>' + 갈것.map(p => p.name).join(',') + '</html>'
+  };
+  ctx.사본바탕 = () => '';
+  vm.runInContext(fnSource('미리보기HTML'), ctx);
+  return ctx;
+}
+
+test('★★ 미리보기 «고친 뒤»에 퇴사자가 안 나온다 — 올리기와 같은 사람만 그린다', () => {
+  const ctx = 미리보기상자({
+    a: { name: '홍길동', sid: 'S1' },          // 재직 — 간다
+    b: { name: '김가나', sid: 'S2' },          // 퇴사 — 빠진다
+    c: { name: '이다라', sid: 'S3', offSite: true },   // 안 올림 — 빠진다
+    d: { name: '박마바', takenDown: { at: 1 } }        // 자동으로 내림 — 빠진다
+  });
+  const r = ctx.미리보기HTML();
+  assert.deepStrictEqual(Array.from(ctx.넘긴 || []), ['홍길동'],
+    '★★ 미리보기가 퇴사·안 올림·내린 사람까지 그립니다 — 「올릴 것과 같음」이 거짓말이 됩니다: ' + ctx.넘긴);
+  assert.ok(r.html.indexOf('김가나') < 0);
+});
+
+test('★ 남기기로 한 퇴사자(지사장 등)는 미리보기에도 나온다', () => {
+  const ctx = 미리보기상자({ b: { name: '김가나', sid: 'S2', keepOnSite: { why: '지사장' } } });
+  ctx.미리보기HTML();
+  assert.deepStrictEqual(Array.from(ctx.넘긴 || []), ['김가나']);   // vm 속 배열은 겉과 «다른 배열»이라 옮겨 담아 견준다
+});
