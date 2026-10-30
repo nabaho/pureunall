@@ -306,23 +306,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* 2026-10-30 게시 전 — 영업관리 다섯 앱(홈페이지·뉴스레터·정부사업신청·회생광고·전광판)을 재직 직원(LOGIN)에게 열었다
      (대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」 · 완전 공개). 새로 생김 0 · 사라짐 0 · 바뀜 15.
      게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 열다섯 줄을 뺄 것. */
-  const PENDING = [
-    '/homepage/.read',
-    '/homepage/.write',
-    '/newsletter/.read',
-    '/newsletter/.write',
-    '/ilabor/.read',
-    '/gov_watch/.read',
-    '/gov_feed/.read',
-    '/rehab_ad/.read',
-    '/rehab_ad/marks/.write',
-    '/signboard/.read',
-    '/signboard/ads/$id/.write',
-    '/signboard/published/.write',
-    '/signboard/history/$v/.write',
-    '/signboard/control/.write',
-    '/signboard/log/$id/.write',
-  ];
+  /* ★ 2026-10-30 — 영업관리 열다섯 칸 게시 완료(rules-deploy.js --deploy, 새로 0 · 바뀜 15 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인) — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
