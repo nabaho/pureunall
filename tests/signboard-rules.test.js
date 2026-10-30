@@ -1,4 +1,4 @@
-/* 전광판 규칙 — 관리자·위임관리인만 · 지우기 금지 · 열쇠와 id 일치 · state 는 화면에서 아무도 못 씀 (2026-10-12)
+/* 전광판 규칙 — 재직 직원(2026-10-30 전엔 관리자·위임관리인만) · 지우기 금지 · 열쇠와 id 일치 · state 는 화면에서 아무도 못 씀 (2026-10-12)
    읽는 것은 만들개의 출력(docs/firebase-rules-전체-적용본.json)이다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -19,7 +19,7 @@ const root = new Snap({ uid_roles: {
   staffUid: { status: 'active', sid: 'A-003' },
   retiredUid: { status: 'retired', sid: 'P-004' },
 } });
-function auth(uid) { return { uid, token: { firebase: { sign_in_provider: 'password' }, email: uid + '@pureun.kr' } }; }
+function auth(uid, provider) { return { uid, token: { firebase: { sign_in_provider: provider || 'password' }, email: uid + '@pureun.kr' } }; }
 function ev(expr, o) {
   o = o || {};
   const names = ['auth', 'root', 'data', 'newData', '$id', '$v'];
@@ -30,27 +30,35 @@ const S = rules.signboard;
 
 test('규칙에 signboard 자리가 있다', () => { assert.ok(S, '만들개에 rules.signboard 가 없다'); });
 
-test('읽기 — 관리자와 위임관리인만. 일반 직원·퇴직자·남은 못 읽는다', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 읽기·쓰기가 MGR 에서 LOGIN(재직 직원)으로 넓어졌다.
+   ★ 지키는 것: 재직 직원은 된다 · 퇴직자·남·익명·로그인 안 함은 안 된다 · 지우기 금지 · log 덧붙이기 전용. */
+test('읽기 — 재직 직원 모두. 퇴직자·남·익명은 못 읽는다', () => {
   assert.equal(ev(S['.read'], { auth: auth('adminUid') }), true);
   assert.equal(ev(S['.read'], { auth: auth('subUid') }), true);
-  assert.equal(ev(S['.read'], { auth: auth('staffUid') }), false);
+  assert.equal(ev(S['.read'], { auth: auth('staffUid') }), true, '재직 직원이 못 읽는다');
+  assert.equal(ev(S['.read'], { auth: auth('staffUid', 'anonymous') }), false, '익명 로그인으로 읽힌다');
   assert.equal(ev(S['.read'], { auth: auth('retiredUid') }), false);
   assert.equal(ev(S['.read'], { auth: auth('outsider') }), false);
   assert.equal(ev(S['.read'], {}), false);
 });
 
-test('쓰기 — 관리자·위임관리인만, 빈 값(지우기)은 아무도', () => {
+test('쓰기 — 재직 직원 모두, 퇴직자·남은 못 쓰고 빈 값(지우기)은 아무도', () => {
   const w = S.ads.$id['.write'];
   assert.equal(ev(w, { auth: auth('adminUid'), newData: { id: 'ad_1' } }), true);
   assert.equal(ev(w, { auth: auth('subUid'), newData: { id: 'ad_1' } }), true);
-  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'ad_1' } }), false, '일반 직원은 못 쓴다');
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'ad_1' } }), true, '재직 직원이 못 쓴다');
+  assert.equal(ev(w, { auth: auth('retiredUid'), newData: { id: 'ad_1' } }), false, '퇴직자가 쓴다');
+  assert.equal(ev(w, { auth: auth('outsider'), newData: { id: 'ad_1' } }), false, '남이 쓴다');
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: null }), false, '지우기 금지');
   assert.equal(ev(w, { auth: auth('adminUid'), newData: null }), false, '지우기 금지');
   ['published', 'control'].forEach((k) => {
-    assert.equal(ev(S[k]['.write'], { auth: auth('staffUid'), newData: { id: k } }), false, k);
+    assert.equal(ev(S[k]['.write'], { auth: auth('staffUid'), newData: { id: k } }), true, k);
+    assert.equal(ev(S[k]['.write'], { auth: auth('retiredUid'), newData: { id: k } }), false, k);
     assert.equal(ev(S[k]['.write'], { auth: auth('adminUid'), newData: { id: k } }), true, k);
     assert.equal(ev(S[k]['.write'], { auth: auth('adminUid'), newData: null }), false, k + ' 지우기 금지');
   });
-  assert.equal(ev(S.history.$v['.write'], { auth: auth('staffUid'), newData: { id: '3' } }), false);
+  assert.equal(ev(S.history.$v['.write'], { auth: auth('staffUid'), newData: { id: '3' } }), true);
+  assert.equal(ev(S.history.$v['.write'], { auth: auth('outsider'), newData: { id: '3' } }), false);
 });
 
 test('열쇠와 레코드 id 가 어긋나면 막는다', () => {
@@ -67,18 +75,21 @@ test('활동 기록(log) — 덧붙이기 전용: 새로 만들기만, 고치기
   const w = S.log.$id['.write'];
   assert.equal(ev(w, { auth: auth('adminUid'), newData: { id: 'lg_1' } }), true, '관리자는 새 기록을 만든다');
   assert.equal(ev(w, { auth: auth('subUid'), newData: { id: 'lg_1' } }), true, '위임관리인도');
-  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'lg_1' } }), false, '일반 직원은 못 만든다');
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'lg_1' } }), true, '재직 직원도 새 기록을 만든다');
+  assert.equal(ev(w, { auth: auth('retiredUid'), newData: { id: 'lg_1' } }), false, '퇴직자는 못 만든다');
+  assert.equal(ev(w, { auth: auth('staffUid'), data: { id: 'lg_1', at: 1 }, newData: { id: 'lg_1', at: 2 } }), false, '재직 직원도 이미 있는 기록은 못 고친다');
   assert.equal(ev(w, { auth: auth('adminUid'), data: { id: 'lg_1', at: 1 }, newData: { id: 'lg_1', at: 2 } }), false, '이미 있는 기록은 고칠 수 없다');
   assert.equal(ev(w, { auth: auth('adminUid'), data: { id: 'lg_1', at: 1 }, newData: null }), false, '지울 수 없다');
   assert.equal(ev(w, { auth: auth('adminUid'), newData: null }), false, '없는 자리에 «빈 값»을 써서 지우는 시늉도 막는다');
   assert.equal(ev(S.log.$id['.validate'], { newData: { id: 'lg_1' }, $id: 'lg_1' }), true);
   assert.equal(ev(S.log.$id['.validate'], { newData: { id: 'lg_2' }, $id: 'lg_1' }), false, '열쇠와 id 가 어긋나면 막는다');
-  assert.equal(ev(S.log['.read'] || S['.read'], { auth: auth('staffUid') }), false, '읽기도 관리자·위임관리인만');
+  assert.equal(ev(S.log['.read'] || S['.read'], { auth: auth('staffUid') }), true, '읽기는 재직 직원');
+  assert.equal(ev(S.log['.read'] || S['.read'], { auth: auth('retiredUid') }), false, '퇴직자는 못 읽는다');
 });
 
 test('state 는 화면에서 아무도 못 쓴다 — 심부름꾼(관리자 권한 CLI)만', () => {
   assert.equal(S.state['.write'], false);
-  assert.equal(S.state['.read'], undefined, '읽기는 위(signboard)에서 MGR 로 내려온다');
+  assert.equal(S.state['.read'], undefined, '읽기는 위(signboard)에서 LOGIN 으로 내려온다');
 });
 
 test('알려지지 않은 하위 칸에는 쓰기 규칙이 없다 — 기본은 막힘', () => {

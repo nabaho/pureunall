@@ -69,7 +69,10 @@ test('★ 규칙이 «읽기만» 연다 — 화면이 원본을 지우면 다�
   const j = JSON.parse(out);
   const r = j.rules && j.rules.ilabor;
   assert.ok(r, '★ 만들어진 규칙에 ilabor 가 없다');
-  assert.ok(/isAdmin/.test(String(r['.read'])), '★ 아무나 읽는다 — 남의 회원 계정으로 받아 온 자료다');
+  /* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 뉴스레터와 함께 재직 직원(LOGIN)에게 열었다(전엔 관리자만).
+     «아무나»는 여전히 아니다 — 비번 로그인 + 재직(status 'active')을 둘 다 본다. */
+  assert.ok(/status'\)\.val\(\) === 'active'/.test(String(r['.read'])), '★ 재직 여부를 안 본다 — 남의 회원 계정으로 받아 온 자료가 아무나에게 열린다');
+  assert.ok(/sign_in_provider === 'password'/.test(String(r['.read'])), '★ 익명 손님이 읽는다');
   assert.equal(r['.write'], false, '★ 화면이 쓸 수 있다 — 원본을 지울 수 있는 길이 열린다');
 });
 

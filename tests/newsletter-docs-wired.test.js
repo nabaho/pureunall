@@ -73,12 +73,13 @@ test('★ 못 받아도 자료를 «버리지 않는다» — 기관 서버가 �
   assert.ok(/return 것;/.test(seg), '실패하면 자료까지 잃는다');
 });
 
-test('「지금 가져오기」는 총괄관리자만 — 남의 서버를 여러 번 두드리는 일이다', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 총괄관리자만에서 재직 직원(requireStaff)으로 넓혔다. */
+test('「지금 가져오기」는 재직 직원만 — 남의 서버를 여러 번 두드리는 일이다', () => {
   const i = idx.indexOf('exports.newsDocsPull');
   assert.ok(i >= 0, 'newsDocsPull 이 없다');
   const seg = idx.slice(i, i + 1600);
-  assert.ok(/requireStaff\(req\)/.test(seg), '로그인 확인이 없다');
-  assert.ok(/권\.isAdmin !== true/.test(seg), '총괄관리자 확인이 없다');
+  assert.ok(/requireStaff\(req\)/.test(seg), '재직 직원 확인이 없다');
+  assert.ok(seg.indexOf('requireStaff(req)') < seg.indexOf('자료판례모아담기('), '확인보다 가져오기가 먼저다');
 });
 
 test('★ 스케줄과 「지금 가져오기」가 «같은 몸통»을 쓴다 — 두 벌이면 한쪽만 낡는다', () => {

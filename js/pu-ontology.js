@@ -213,7 +213,7 @@
     /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
        notices = 서버(rehabWatch)가 담는 공고(Document) — 화면은 «읽기만». marks = 사람이 정한 발송·보류·제외(Task).
        ⚠ 회사명(debtorName)은 «보이는 이름»일 뿐 관계 열쇠가 아니다 — 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다).
-       빌려 읽는 곳: uid_roles(관리자인지 확인). */
+       빌려 읽는 곳: uid_roles(재직 직원인지 확인 — 2026-10-30 전엔 관리자인지). */
     rehabad:{ name:'회생광고', file:'rehab-ad.html', primaryRoots:['rehab_ad'],
       /* 읽기만 — 법원 공고의 회사가 이미 거래·연결된 곳인지 알아본다(js/rehab-match.js). 이름으로 추정한 관계는 저장하지 않는다. */
       sharedRoots:['uid_roles','data/companies','data/contracts','pucards/idx'],
@@ -238,7 +238,8 @@
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).
          state 는 심부름꾼이 쓴다 — 화면은 읽기만.
-       ⚠ 길거리에 그대로 보이는 것이라 읽기·쓰기 모두 관리자·위임관리인만(규칙 signboard). */
+       ⚠ 읽기·쓰기 모두 재직 직원(규칙 signboard = LOGIN) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
+         예전엔 길거리에 그대로 보이는 것이라 관리자·위임관리인만이었다. 지우기 금지·log 덧붙이기 전용은 그대로다. */
     signboard:{ name:'전광판', file:'pu-signboard.html', primaryRoots:['signboard'], sharedRoots:['uid_roles'],
       writeContracts:[{path:'signboard/ads/{id}',entityType:'SignboardAd'},
                       {path:'signboard/published',entityType:'SignboardPublish'},

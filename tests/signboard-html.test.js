@@ -64,9 +64,13 @@ test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
   assert.doesNotMatch(NOC, /window\.open\([^)]*_blank/);
 });
 
-test('관리자·위임관리인이 아니면 잠근다 — 사번·재직·권한을 모두 본다', () => {
-  const fn = fnBody('async function managerSid(');
-  assert.match(fn, /status==='active'/); assert.match(fn, /isAdmin===true/); assert.match(fn, /isSubAdmin===true/);
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 관리자·위임관리인만에서 재직 직원 모두로 넓혔다.
+   ★ 지키는 것: 재직(status==='active')과 사번(sid)을 «둘 다» 보고, 모르면 잠근다. 관리자 잣대로 되돌아가지 않는다. */
+test('재직 직원이 아니면 잠근다 — 사번·재직을 함께 본다(관리자·위임관리인만으로 되돌리지 않는다)', () => {
+  const fn = fnBody('async function staffSid(');
+  assert.match(fn, /status==='active'/); assert.match(fn, /v\.sid/);
+  assert.doesNotMatch(fn, /isAdmin|isSubAdmin/, '전광판이 다시 관리자·위임관리인만으로 닫혔다');
+  assert.match(fn, /catch\(e\)\{ return ''; \}/, '권한을 못 읽으면 잠가야 한다');
   assert.match(NOC, /if\(!sid\)\{ lock\(/);
 });
 

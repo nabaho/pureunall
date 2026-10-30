@@ -34,7 +34,7 @@ function 상자(더) {
   const 쓴것 = [];
   const ctx = Object.assign({
     console: { warn() {}, log() {} },
-    App: { members: {}, staff: [{ sid: 'S1', name: '홍길동', status: 'active' }], lineFormat: 'plain', render() {}, isAdmin: true, dirty: false },
+    App: { members: {}, staff: [{ sid: 'S1', name: '홍길동', status: 'active' }], lineFormat: 'plain', render() {}, isStaff: true, dirty: false },
     db: { ref: (p) => ({ set: async (v) => { 쓴것.push(['set', p, v]); } }) },
     esc: (s) => String(s == null ? '' : s),
     toast() {}, say: async () => {}, askYes: async () => true,

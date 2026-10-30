@@ -40,7 +40,7 @@ function 상자(더) {
   const ctx = Object.assign({
     console: { warn() {}, log() {} },
     PARTNER_PATH: 'homepage/partners',
-    App: { partners: {}, companies: [], render() {}, isAdmin: true },
+    App: { partners: {}, companies: [], render() {}, isStaff: true },
     db: { ref: (p) => ({
       set: async (v) => { 쓴것.push(['set', p, v]); },
       update: async (v) => { 쓴것.push(['update', p, v]); }

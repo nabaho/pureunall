@@ -16,7 +16,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const R = path.join(__dirname, '..');
-const 관리자전용 = ['career', 'home'];   // 경력관리 · 홈페이지 관리
+/* ⚠ 2026-10-30 홈페이지(home)는 빠졌다 — 대표 지시 「영업관리 … 모든 직원들에게 공개」(완전 공개).
+     경력관리(내부관리 줄)만 그대로 관리자 전용이다. 영업관리 다섯이 열린 것은 tests/sales-row-open-to-staff.test.js 가 지킨다. */
+const 관리자전용 = ['career'];   // 경력관리
 
 /* 앱바는 IIFE 끝에서 window 를 그대로 받는다 — 상자에 진짜 window 노릇을 할 것을 준다 */
 function load(role) {

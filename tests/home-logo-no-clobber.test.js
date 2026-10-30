@@ -25,7 +25,7 @@ function 상자(서버) {
   const 쓴것 = [];
   const ctx = {
     console, Object, Array, String, Math, JSON, Promise, Error,
-    App: { isAdmin: true, partnerLogos: { 숨김: {}, 차례: [], 추가: [] } },
+    App: { isStaff: true, partnerLogos: { 숨김: {}, 차례: [], 추가: [] } },
     firebase: { auth: () => ({ currentUser: { getIdToken: () => Promise.resolve('t') } }) },
     fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) }),
     PUBLISH_URL: 'x', PARTNER_LOGO_PATH: 'homepage/partnerLogos', drawPartnerLogos() {},

@@ -23,9 +23,10 @@
     한 곳마다 예약 한 건씩 걸리고 sendScheduledMail 이 15분마다 빼 간다.
     한꺼번에 쏟으면 다음메일 계정이 막히고, 막히면 평소 자료 발송까지 멈춘다.
 
-  ★ 총괄관리자 전용이다 — 경력관리·홈페이지 관리와 «같은 줄, 같은 잣대».
-    한때 「짓는 것은 직원도」로 두려 했으나, 자동으로 담을 밑감(homepage/newsBrief)이
-    관리자만 읽는 자리라 직원에게 열려면 홈페이지 관리의 문까지 함께 열어야 했다.
+  ★ 재직 직원 모두 쓴다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(완전 공개 · 직원도 사용).
+    예전엔 총괄관리자 전용이었다(자동으로 담을 밑감 homepage/newsBrief 가 관리자만 읽는 자리라서).
+    그날 홈페이지 관리의 문(homepage)도 «함께» 재직 직원(규칙 LOGIN)에게 열었다 — 두 곳을 같이 보고 정했다.
+    잣대는 uid_roles 의 status==='active' + sid(규칙 LOGIN 과 같다). 짓기·보내기 모두 직원이 한다.
     권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다.
 -->
 <script src="js/pu-sid-guard.js?v=1"></script>
@@ -1715,7 +1716,7 @@ const Core = window.PuNewsCore, Tpl = window.PuNewsTpl, Show = window.PuNewsShow
   지역출처 = window.PuNewsRegionalSources, 지역검토 = window.PuNewsReview;
 var db = null;
 var App = {
-  me: null, isAdmin: false,
+  me: null, isStaff: false,
   /* ★ 포털의 «⚠» 칸을 누르면 ?tab=watch 로 온다 — 자동화 점검부터 연다 (2026-10-04) */
   tab: (function(){ try{ var t = new URLSearchParams(location.search).get('tab');
     return ['now','past','note','who','friend','closed','noaddr','bounce','res','watch','cfg'].indexOf(t) >= 0 ? t : 'now'; }catch(_){ return 'now'; } })(),
@@ -1808,10 +1809,10 @@ function afterLogin(){
   }
   /* 권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다 */
   db.ref('uid_roles/' + App.me.uid).once('value')
-    .then(s => { App.isAdmin = (s.val()||{}).isAdmin === true; })
-    .catch(e => { console.warn('[권한]', e && e.code); App.isAdmin = false; })
+    .then(s => { const r = s.val()||{}; App.isStaff = r.status === 'active' && !!r.sid; })
+    .catch(e => { console.warn('[권한]', e && e.code); App.isStaff = false; })
     .then(function(){
-      if(!App.isAdmin){ 잠그기('총괄관리자만 쓸 수 있습니다.'); return; }
+      if(!App.isStaff){ 잠그기('재직 중인 직원만 쓸 수 있습니다.'); return; }
       불러오기();
     });
 }
@@ -1822,7 +1823,7 @@ function 잠그기(말){
   $('gate').style.display = '';
   $('gate').innerHTML = '<div style="font-size:15px;font-weight:700;margin-bottom:6px">'
     + esc(말) + '</div><div class="sub">법인 이름으로 거래처에 나가는 편지라 '
-    + '총괄관리자에게만 열려 있습니다.</div>';
+    + '재직 중인 직원에게만 열려 있습니다.</div>';
 }
 
 function 불러오기(){
@@ -2424,7 +2425,7 @@ function 이번회차화면(){
          ⚠ 보낸 회차에는 안 보인다. 그 쪽은 「그때 나간 그대로」여야 한다. -->
     ${d.상태 === '발송' ? '' : `<button class="lnk redo" onclick="전문다시담기()"
       title="전문 다시 담기 — 편지 서식을 고친 뒤 「전문 보기」가 옛 모습이면 눌러 주세요"
-      ${App.isAdmin?'':'disabled'}>↻<span class="t"> 다시 담기</span></button>`}
+      ${App.isStaff?'':'disabled'}>↻<span class="t"> 다시 담기</span></button>`}
     <span class="sp"></span>
     <!-- ⚠⚠ 못 누르는 단추에는 «왜»를 붙인다 — 연습 표본 때문에 잠긴 것을
            말해 주지 않으면 대표께서 「고장났다」로 보신다. 줄을 늘리지 않게
@@ -2440,10 +2441,10 @@ function 이번회차화면(){
            다시 준비」)이 단추에 서면 그것만으로 줄이 넘친다. -->
     <button class="btn rsv ${예약.꼴}" onclick="자동발송준비()"
       title="${esc(예약.글 + ' — ' + (갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭))}"
-      ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.짧은 || 예약.글)}</button>
+      ${갈수있나.ok && App.isStaff?'':'disabled'}>${esc(예약.짧은 || 예약.글)}</button>
     <button class="btn pri" onclick="진짜보내기()"
       title="${esc(갈수있나.ok ? '' : 갈수있나.까닭)}"
-      ${갈수있나.ok && App.isAdmin?'':'disabled'}>
+      ${갈수있나.ok && App.isStaff?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳<span class="t2">에 보내기</span></button>
   </div>
   <!-- ⚠ 「아직 못 보냅니다」 알림은 오른쪽 «요약»으로 옮겼다 (대표 지시 2026-09-08
@@ -2527,7 +2528,7 @@ function 이번회차화면(){
      <textarea id="fwdBox" rows="5" placeholder="받은 뉴스레터 본문을 통째로 붙여넣으세요."></textarea>
      <div style="display:flex;gap:9px;margin-top:9px;flex-wrap:wrap">
       <button class="btn warn" onclick="전달시험()">✉ 나에게 시험 발송</button>
-      <button class="btn" onclick="전달보내기()" ${App.isAdmin?'':'disabled'}>
+      <button class="btn" onclick="전달보내기()" ${App.isStaff?'':'disabled'}>
         📨 ${명단셈().셈.보낼곳.toLocaleString()}곳에 그대로 전달</button>
      </div>
      <div class="note bad" style="margin-top:11px"><b>권해 드리지 않습니다.</b>
@@ -4613,7 +4614,7 @@ function 다음월요일(){
 
 /* 자동 일꾼은 내용을 만들지 않는다. 사람이 본 «확정본»과 당시 명단을 한 벌로 봉인해 둔다. */
 async function 자동발송준비(){
-  if(!App.isAdmin) return toast('자동발송 준비는 총괄관리자만 할 수 있습니다');
+  if(!App.isStaff) return toast('자동발송 준비는 재직 직원만 할 수 있습니다');
   const d = 지금회차(), r = 명단셈(), 갈수있나 = Core.보낼수있나(d, r.셈);
   if(!갈수있나.ok) return toast(갈수있나.까닭, 8000);
   const 편 = 지금편지(); if(!편) return toast('실을 것이 없습니다');
@@ -4747,7 +4748,7 @@ async function 시험발송(){
 
 async function 진짜보내기(){
   if(App.보내는중) return toast('보내는 중입니다 — 잠시만 기다려 주세요');
-  if(!App.isAdmin) return toast('보내기는 총괄관리자만 누를 수 있습니다');
+  if(!App.isStaff) return toast('보내기는 재직 직원만 누를 수 있습니다');
   const d = 지금회차();
   const r = 명단셈();
   const 갈수있나 = Core.보낼수있나(d, r.셈);
@@ -5542,7 +5543,7 @@ async function 안내시험발송(){
 
 async function 안내보내기(){
   if(App.보내는중) return toast('보내는 중입니다 — 잠시만 기다려 주세요');
-  if(!App.isAdmin) return toast('보내기는 총괄관리자만 누를 수 있습니다');
+  if(!App.isStaff) return toast('보내기는 재직 직원만 누를 수 있습니다');
   const x = 지금안내(); if(!x) return;
   if(x.상태 === '발송') return toast('이미 보낸 안내문입니다');
   const 편 = 안내편지(x); if(!편) return toast('제목과 함께 «확인할 것»·본문·자료 가운데 하나를 넣어 주세요', 8000);
@@ -5584,7 +5585,7 @@ async function 전달시험(){
   }catch(e){ toast('시험 발송 실패: ' + ((e&&e.message)||''), 9000); }
 }
 async function 전달보내기(){
-  if(!App.isAdmin) return toast('보내기는 총괄관리자만 누를 수 있습니다');
+  if(!App.isStaff) return toast('보내기는 재직 직원만 누를 수 있습니다');
   const box = $('fwdBox'); const html = box ? box.value : '';
   if(!String(html).trim()) return toast('받은 뉴스레터를 먼저 붙여넣으세요');
   const r = 명단셈(); if(!r.ok.length) return toast('받는 곳이 없습니다');

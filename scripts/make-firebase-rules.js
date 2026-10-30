@@ -1194,23 +1194,30 @@ rules.pu_mailseen = {
       + ` && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'`
   } }
 };
-rules.homepage = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != null && ${ADMIN}` };
+/* ══ 홈페이지 관리(pu-home.html) ══
+   ★ 읽기·쓰기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 총괄관리자만(ADMIN, 2026-08-17 「홈페이지 수정은 오로지 관리자만」)이었다. 뉴스레터와 «같이» 열었다 —
+     밑감(homepage/newsBrief·newsPrec·newsDocs)을 뉴스레터가 읽으므로 두 곳을 함께 보고 정했다.
+   ⚠ 담긴 것: 구성원 소개(홈페이지에 공개되는 글·사진)·거래처 로고와 게시 동의·고친 기록·자동 점검 결과.
+     주민번호·계좌는 없다. 홈페이지를 «실제로» 고치는 것은 서버(homepageWrite·homepageAuto·publishSite)이고,
+     그 서버도 같은 날 재직 직원으로 넓혔다(functions/index.js). */
+rules.homepage = { '.read': LOGIN, '.write': LOGIN };
 
 /* ══ 뉴스레터 (대표 지시 2026-09-02 「푸른내외관리에 뉴스레터관리를 넣고 매주 관리하고 싶다」) ══
    화면: pu-news.html · 판단: js/pu-news-core.js · 편지: js/pu-news-tpl.js
 
-   ⚠ homepage 와 «같은 잣대»(총괄관리자만)로 둔다. 셋 다 그럴 까닭이 있다.
+   ★ homepage 와 «같은 잣대»로 둔다 — 2026-10-30 부터 재직 직원(LOGIN).
+     대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 총괄관리자만(ADMIN)이었고 「⚠ 직원에게 열지 말 것 — 열려면 homepage 도 함께」라 적혀 있었다.
+     그 말대로 «두 곳을 같이» 보고 함께 열었다. 그때 닫아 둔 까닭(아래 셋)은 지금도 참이다 — 알고 연다:
      · recipients — 거래처 담당자 이름·이메일이 든 명단이다. 밖으로 나가면 안 된다.
+       (직원은 이미 같은 명단을 기업정보함(pucards, LOGIN)에서 읽는다 — 보는 사람이 그보다 넓어지지는 않는다.)
      · issues     — 법인 이름으로 나갈 편지의 초안이다. 남이 고치면 그대로 나간다.
      · config     — 여기의 「범위」가 (광고) 표기를 켜고 끈다. 곧 법 판단이라 더 그렇다.
 
-   ⚠ 직원에게 열지 말 것. 열려면 homepage 읽기도 함께 열어야 하는데
-     (자동으로 담을 밑감이 homepage/newsBrief 에 있다) 그러면 홈페이지 관리의 문이
-     함께 열린다. 여는 것이 옳다고 판단되면 «두 곳을 같이» 보고 정할 것.
-
    ★ 서버(sendBulkMail)는 관리자 SDK 로 돌아 이 규칙을 지나지 않는다 —
      보내기가 막히지 않는다. */
-rules.newsletter = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != null && ${ADMIN}` };
+rules.newsletter = { '.read': LOGIN, '.write': LOGIN };
 
 /* ══ 공인노무사회에서 받아 둔 자료 (ilabor) ════════════════════════════
    ★ 서버(ilaborPull)가 관리자 SDK 로 «담기만» 하던 자리다. 규칙이 아예 없어서
@@ -1219,8 +1226,10 @@ rules.newsletter = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != nul
      받아 놓고도 아무도 못 보는 상태였다.
    ⚠ 읽기만 연다. 담는 것은 서버가 한다 — 화면이 쓰게 열어 두면
      받아 온 자료를 사람이 실수로 지울 수 있고, 그러면 원본이 없다.
-   ⚠ 총괄관리자만 — 남의 회원 계정으로 받아 온 자료다. */
-rules.ilabor = { '.read': `auth != null && ${ADMIN}`, '.write': false };
+   ★ 읽기 = 재직 직원(LOGIN) — 뉴스레터 화면이 읽는다. 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 총괄관리자만(남의 회원 계정 — 대표의 공인노무사회 회원 계정 — 으로 받아 온 자료라서)이었다.
+     뉴스레터를 직원에게 열면서 함께 열었다. 받아 오기(ilaborPull)도 재직 직원이 누를 수 있다. */
+rules.ilabor = { '.read': LOGIN, '.write': false };
 /* ★ 경력관리 올리기는 «내가 마지막에 본 판 위에만» (2026-10-07 — 마지막에 쓴 쪽이 이기던 것).
      화면이 prevAt(내 기준 시각)을 함께 보내면, 지금 클라우드 시각(at)과 같을 때만 받는다.
      확인과 쓰기가 서버에서 «한 번에» 일어나 — 두 기기가 같은 순간에 올리거나 꺼졌다 붙으며 묵은 쓰기가 나가도
@@ -1247,16 +1256,18 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
 /* ══ 컨설턴트 모집 감시(서버 recruitWatch) — 기관 게시판 새 모집 글 (2026-10-04) ══
    대표 결정 「기관 게시판 새 글 자동 감지 서버 — 지금 만든다」.
    담기는 것은 기관 «공개 공지»의 제목·날짜·주소뿐이다(개인정보 없음).
-   ⚠ 읽기 = 관리자만(대표가 isAdmin). 직원 화면엔 안 보인다 — 무엇을 지켜보는지가 곧 대표의 관심이다.
+   ★ 읽기 = 재직 직원(LOGIN) — 정부사업신청 화면이 읽는다. 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 관리자만(무엇을 지켜보는지가 곧 대표의 관심이라)이었다. 담긴 것은 공개 공지뿐이다.
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
-rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
+rules.gov_watch = { '.read': LOGIN, '.write': false };
 
 /* ══ 공고 «받은 함» — 서버가 매일 아침 모은 공고 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나」) ══
    서버(govFeedCollect, 07:40)가 나라장터·알리오·기업마당을 받아 rows/{번호} 에 쌓고 last 에 건수·오류를 남긴다.
    화면(정부사업신청)은 열 때 여기서 «빠진 공고»를 가져다 자기 목록에 합친다.
    담기는 것은 «공개 공고»의 제목·기관·날짜·주소뿐이다(인증키·개인정보 없음).
-   ⚠ 읽기 = 관리자만(gov_watch 와 같다 — 무엇을 지켜보는지가 곧 대표의 관심이다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
-rules.gov_feed = { '.read': 'auth != null && ' + ADMIN, '.write': false };
+   ★ 읽기 = 재직 직원(LOGIN, gov_watch 와 같다) — 2026-10-30 정부사업신청을 직원에게 열면서 함께(전엔 관리자만).
+   ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
+rules.gov_feed = { '.read': LOGIN, '.write': false };
 
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
@@ -1290,15 +1301,17 @@ rules.govaid = { '.read': LOGIN,
   noticeLast: { '.write': false } };
 
 /* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
-   설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 대표 「대표 + 관리직원」.
-   ⚠ 읽기·쓰기 = MGR(관리자 또는 위임관리인) — 길거리에 그대로 보이는 문구라 일반 직원 열림 없음.
+   설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 처음엔 대표 「대표 + 관리직원」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 MGR(관리자 또는 위임관리인) — 길거리에 그대로 보이는 문구라 일반 직원을 막았다. 아래 지우기 금지·log 덧붙이기 전용이
+     그대로라 «누가 언제 무엇을 올렸는지»는 지워지지 않는다.
    ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식(공용 관문 tombstone)으로만.
    ⚠ 열쇠와 레코드 id 가 어긋나면 막는다(ads/$id · history/$v · log/$id). published·control 은 id 가 이름 그대로다.
    ⚠★ log = «덧붙이기 전용» — 새로 만들기만 허락한다(!data.exists()). 고치기·지우기는 관리자도 못 한다(대표 요구 「항상 보관」).
    ⚠ state = 심부름꾼이 «관리자 권한 CLI»로 쓴다(규칙을 건너뛴다) — 화면에서는 아무도 못 쓴다. */
-const SIGNBOARD_W = `(${MGR}) && newData.exists()`;
-const SIGNBOARD_LOG_W = `(${MGR}) && !data.exists() && newData.exists()`;
-rules.signboard = { '.read': MGR,
+const SIGNBOARD_W = `(${LOGIN}) && newData.exists()`;
+const SIGNBOARD_LOG_W = `(${LOGIN}) && !data.exists() && newData.exists()`;
+rules.signboard = { '.read': LOGIN,
   ads:       { $id: { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === $id" } },
   published: { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === 'published'" },
   history:   { $v:  { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === $v" } },
@@ -1308,12 +1321,13 @@ rules.signboard = { '.read': MGR,
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
-   ⚠ 읽기 = 관리자만. 누구에게 무엇을 보낼지는 대표가 정한다 — 직원 화면엔 안 보인다.
+   ★ 읽기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
+     예전엔 관리자만(누구에게 무엇을 보낼지는 대표가 정한다)이었다. 담긴 것은 공개 공고 + 서버가 찾은 회사 연락처(rehab_ad/info)다.
    ⚠ notices·runs 쓰기 = 아무도(서버가 관리자 권한으로 담는다). 화면이 공고를 고치면 원본이 사라진다.
-   ⚠ marks(발송·보류·제외 표시) = 관리자만 쓴다. */
-rules.rehab_ad = { '.read': 'auth != null && ' + ADMIN,
+   ★ marks(발송·보류·제외 표시) = 재직 직원이 쓴다(2026-10-30 전엔 관리자만). */
+rules.rehab_ad = { '.read': LOGIN,
   notices: { '.write': false }, runs: { '.write': false },
-  marks: { '.write': 'auth != null && ' + ADMIN } };
+  marks: { '.write': LOGIN } };
 
 /* ══ 경력관리 «직원 공개용 사본» ═══════════════════════════════════════
    대표 지시 2026-09-02: 「경력관리 이부분만 다른 직원들이 볼 수 있게」 → 방식 「나」 승인.

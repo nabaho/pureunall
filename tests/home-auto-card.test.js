@@ -235,7 +235,7 @@ const 서버판 = require('../functions/homepage-auto.js').정찰판;
 function 정찰상자(지난, 관리자, 판) {
   const 값 = { 'homepage/auto/recon/at': 지난, 'homepage/auto/recon/판': 판 === undefined ? 서버판 : 판 };
   const ctx = 상자({ db: { ref: (p) => ({ once: async () => ({ val: () => (p in 값 ? 값[p] : null) }) }) } });
-  ctx.App.isAdmin = 관리자 !== false;
+  ctx.App.isStaff = 관리자 !== false;   /* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 총괄관리자(App.isAdmin)에서 재직 직원(App.isStaff)으로 넓혔다 */
   vm.runInContext(constLine('자동정찰간격') + '\n' + constLine('자동정찰판') + '\n' + fnSource('자동정찰저절로'), ctx);
   return ctx;
 }

@@ -759,11 +759,8 @@ exports.sendBulkMail = functions
       ? body.newsletterSend : null;
     let newsletterIssueKey = "", newsletterRequestId = "", newsletterClaim = null;
     if (newsletterSend) {
-      const role = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
-      if (role.isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "총괄관리자만 뉴스레터를 발송할 수 있습니다." });
-        return;
-      }
+      /* 보내는 사람은 위 requireStaff 가 이미 «재직 직원»으로 확인했다 — 뉴스레터 발송도 직원이 한다
+         (대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 전엔 총괄관리자만). 두 번 보내기는 아래 회차 잠금이 막는다. */
       newsletterIssueKey = String(newsletterSend.issueKey || "");
       newsletterRequestId = String(newsletterSend.requestId || "");
       if (!/^\d{4}-\d{2}-w\d{1,2}$/.test(newsletterIssueKey)
@@ -822,11 +819,8 @@ exports.sendBulkMail = functions
         res.status(400).json({ ok: false, error: "뉴스레터와 안내문을 한 번에 보낼 수 없습니다." });
         return;
       }
-      const role = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
-      if (role.isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "총괄관리자만 안내문을 발송할 수 있습니다." });
-        return;
-      }
+      /* 보내는 사람은 위 requireStaff 가 이미 «재직 직원»으로 확인했다 — 안내문 발송도 직원이 한다
+         (대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 전엔 총괄관리자만). 두 번 보내기는 아래 잠금이 막는다. */
       noticeId = String(noticeSend.id || "");
       noticeRequestId = String(noticeSend.requestId || "");
       /* ⚠ 번호가 곧 자리 이름이다 — 파이어베이스가 만든 번호 꼴만 받는다(../ 금지) */
@@ -1087,7 +1081,7 @@ exports.rulesLawWatch = functions
    대표 결정 2026-10-04 「기관 게시판 새 글 자동 감지 서버 — 지금 만든다」.
    ⚠ 기관 누리집에는 «읽기만» 한다(목록 첫 쪽 한 번씩). 신청·로그인은 하지 않는다.
    ⚠ 남기는 것은 기관 공지 «제목·날짜·주소»뿐(공개 정보). 대표 지원 이력은 여기 없다.
-   ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › gov_watch). 화면은 정부사업신청 › 컨설턴트 모집.
+   ⚠ 보는 사람: 재직 직원(2026-10-30 전엔 관리자만, scripts/make-firebase-rules.js › gov_watch). 화면은 정부사업신청 › 컨설턴트 모집.
    07:20 — 다른 아침 일들(06:00 법 감시·07:00·07:10)과 겹치지 않게. */
 /* 컨설턴트 모집 감시 — fetch(undici) 가 못 열 때 쓰는 «다른 길»(node https · IPv4 · 넘김 셋까지) */
 function 모집다른길(u, raw, 넘김, 브라우저) {
@@ -1321,7 +1315,7 @@ exports.govaidNoticeWatch = functions
    ⚠ 법원 공고는 «읽기만» 한다(로그인 없음 · 요청 사이 0.8초). 남기는 것은 회사명·주소·사건 정보뿐.
    ⚠ 연락처는 «회사가 공개한» 홈페이지·업체 등록 정보에서만 찾는다(functions/rehab-contact.js).
      찾기만 한다 — 이메일·문자를 보내는 일은 없다(정보통신망법 제50조).
-   ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › rehab_ad). 화면은 rehab-ad.html.
+   ⚠ 보는 사람: 재직 직원(2026-10-30 전엔 관리자만, scripts/make-firebase-rules.js › rehab_ad). 화면은 rehab-ad.html.
    07:40 — 다른 아침 일들(07:20 모집 감시)과 겹치지 않게. 최근 10일을 다시 훑어 늦게 뜬 공고도 줍는다.
    ★ 검색은 서버에 «이미 있는» 열쇠(KAKAO_REST_KEY — 카카오 로그인용)로 다음 웹검색·카카오맵 업체검색을 부른다.
      새로 신청할 것이 없다. 네이버 열쇠는 서버에 없다(대표 결정 「가입 안 하고 진행 안 한다」). */
@@ -1408,8 +1402,10 @@ exports.rehabAuto = functions
       if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(m[1], true);
       const db = getDatabase();
-      const role = (await db.ref("uid_roles/" + decoded.uid).once("value")).val() || {};
-      if (role.isAdmin !== true) { res.status(403).json({ error: "총괄관리자만 부를 수 있습니다." }); return; }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
       const body = req.body || {};
       const action = String(body.action || "get");
       const root = db.ref("rehab_ad");
@@ -1543,7 +1539,7 @@ exports.rehabWatch = functions
   });
 
 /* 회생광고 연락처 «지금 찾기» — 대표가 화면에서 누를 때(한 곳 또는 몇 곳). 사람이 알려 준 홈페이지(hints)가 있으면 그것을 읽는다.
-   ⚠ 관리자만. 한 번에 8곳까지. 찾은 것은 rehab_ad/info 에 남기고 화면이 다시 읽는다. */
+   ⚠ 재직 직원(2026-10-30 전엔 관리자만). 한 번에 8곳까지. 찾은 것은 rehab_ad/info 에 남기고 화면이 다시 읽는다. */
 exports.rehabEnrich = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
@@ -1555,8 +1551,10 @@ exports.rehabEnrich = functions
       const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
       if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(m[1], true);
-      const role = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
-      if (role.isAdmin !== true) { res.status(403).json({ error: "총괄관리자만 부를 수 있습니다." }); return; }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
       const ids = ((req.body && req.body.ids) || []).map((x) => String(x)).filter((x) => /^c\d{6}_\d+$/.test(x)).slice(0, 8);
       const hints = (req.body && req.body.hints) || {};
       if (!ids.length) { res.status(400).json({ error: "찾을 회사가 없습니다." }); return; }
@@ -4626,12 +4624,10 @@ exports.readHomepage = functions
       const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
       if (!match) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(match[1], true);
-      const roleSnapshot = await getDatabase().ref(`uid_roles/${decoded.uid}`).once("value");
-      const role = roleSnapshot.val() || {};
-      if (role.isAdmin !== true) {
-        res.status(403).json({ error: "총괄관리자만 홈페이지를 읽어올 수 있습니다." });
-        return;
-      }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
 
       const url = homepageUrl((req.body && req.body.path) || "");
       if (!url) { res.status(400).json({ error: "읽을 수 없는 쪽입니다." }); return; }
@@ -4732,16 +4728,16 @@ exports.homepageWrite = functions
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
 
     try {
-      /* ⚠ 총괄관리자만 — 회사 홈페이지를 «바꾸는» 일이다.
-           대표 지시(2026-08-17): 홈페이지 수정은 오로지 관리자만. */
+      /* ⚠ 회사 홈페이지를 «바꾸는» 일이다. 2026-08-17 「홈페이지 수정은 오로지 관리자만」이었다가
+           대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원에게 열었다.
+           «보기 → 사람이 「예」» 두 걸음과 아래 자물쇠(경력 칸·숨은 칸·글 번호·확인표)는 그대로다. */
       const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
       if (!match) { res.status(401).json({ ok: false, error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(match[1], true);
-      const 권 = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
-      if (권.isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "총괄관리자만 홈페이지를 고칠 수 있습니다." });
-        return;
-      }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ ok: false, error: String((e && e.message) || e) }); return; }
 
       const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
       /* 보기 = 무엇이 바뀌는지만 · 쓰기 = 진짜로 보낸다 · 정찰 = 칸 «이름»만 본다
@@ -5050,7 +5046,7 @@ async function 홈자동게시판보기(그릇, 목록) {
 
 /* 자동 올리기(2·3·4단계) 정찰 — 정해 둔 «읽기 화면»만 관리자로 열어 칸 이름·채워진 칸 이름만 적는다.
    ⚠ 값은 한 글자도 안 남긴다(HW.정찰·HW.채운칸들 규칙). 읽기만 하고 아무것도 보내지 않는다.
-   결과는 homepage/auto/recon 에 — 관리자만 읽는 자리다. */
+   결과는 homepage/auto/recon 에 — 재직 직원이 읽는 자리다(2026-10-30 전엔 관리자만). */
 async function 홈자동정찰(그릇) {
   let 로고글번호 = 0;
   try {
@@ -5314,15 +5310,14 @@ exports.homepageAuto = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
     try {
-      /* ⚠ 총괄관리자만 — 대표 지시(2026-08-17): 홈페이지 수정은 오로지 관리자만 */
+      /* 2026-08-17 「홈페이지 수정은 오로지 관리자만」이었다가 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원에게 열었다 */
       const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
       if (!match) { res.status(401).json({ ok: false, error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(match[1], true);
-      const 권 = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
-      if (권.isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "총괄관리자만 홈페이지를 고칠 수 있습니다." });
-        return;
-      }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ ok: false, error: String((e && e.message) || e) }); return; }
       const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
       const 방식 = ["보기", "돌리기", "승인"].indexOf(String(몸.mode || "보기")) >= 0
         ? String(몸.mode || "보기") : "보기";
@@ -6015,8 +6010,7 @@ exports.newsDocsPull = functions
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
 
     const db = getDatabase();
-    const 권 = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
-    if (권.isAdmin !== true) { res.status(403).json({ ok: false, error: "총괄관리자만 쓸 수 있습니다." }); return; }
+    /* 위 requireStaff 가 «재직 직원»을 이미 확인했다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만). */
 
     const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
 
@@ -6476,9 +6470,9 @@ exports.ilaborPull = functions
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
 
     const db = getDatabase();
-    /* ⚠ 총괄관리자만 — 회원 계정으로 남의 사이트에 들어가는 일이다 */
-    const 권 = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
-    if (권.isAdmin !== true) { res.status(403).json({ ok: false, error: "총괄관리자만 쓸 수 있습니다." }); return; }
+    /* ⚠ 회원 계정(대표의 공인노무사회 회원 계정)으로 남의 사이트에 들어가는 일이다 — 전엔 총괄관리자만이었다.
+         대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 뉴스레터를 직원에게 열면서 재직 직원(위 requireStaff)이면 누르게 했다.
+         한 번에 30건 상한(아래 상한)은 그대로다. */
 
     const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
     /* peek = 첫 자료 하나만 열어 «원본을 남긴다»(상세 모양 맞추기용)
@@ -6538,12 +6532,10 @@ exports.publishSite = functions
       const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
       if (!match) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
       const decoded = await getAuth().verifyIdToken(match[1], true);
-      const roleSnapshot = await getDatabase().ref(`uid_roles/${decoded.uid}`).once("value");
-      const role = roleSnapshot.val() || {};
-      if (role.isAdmin !== true) {
-        res.status(403).json({ error: "총괄관리자만 홈페이지를 올릴 수 있습니다." });
-        return;
-      }
+      /* 재직 직원이면 부를 수 있다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(전엔 총괄관리자만).
+         잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
 
       const path = (req.body && req.body.path) || "";
       const content = (req.body && req.body.content) || "";

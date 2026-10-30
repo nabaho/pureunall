@@ -1217,7 +1217,7 @@ function askText(title, body, opt) {
 
 /* ══════ 화면 상태 ══════ */
 const App = {
-  group: 'members', pick: '', me: null, myName: '', isAdmin: null,
+  group: 'members', pick: '', me: null, myName: '', isStaff: null,
   members: {}, pages: {}, staff: null, staffErr: '', lineFormat: 'plain',
   /* pageConfig — 관리 대상 쪽 목록(자료 homepage/config/pages 그대로).
      pageLines — 홈페이지에서 읽어온 «줄 목록». 보여주기 전용이고 저장하지 않는다.
@@ -1399,20 +1399,23 @@ firebase.auth().onAuthStateChanged(function (user) {
   PuGate.show();
 });
 
-/* 총괄관리자만 연다. 홈페이지 문구는 밖에서 보이는 글이라 아무나 고치면 안 된다.
+/* 재직 직원이면 연다 — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(완전 공개 · 직원도 사용).
+   예전엔 총괄관리자만 열었다(2026-08-17 「홈페이지 수정은 오로지 관리자만」) — 이 지시로 거두었다.
+   잣대는 uid_roles 의 status==='active' + sid(규칙 LOGIN 과 같다). 그래도 «보기 → 사람이 「예」» 두 걸음과
+   서버의 자물쇠(경력 칸·얼굴 사진 칸·글 번호·확인표)는 그대로다 — 누가 눌러도 같은 길을 지난다.
    권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다. */
 function afterLogin() {
   $('whoami').textContent = '';   // ⚠ 로그인 이메일(사번에서 만든 아이디)은 화면에 안 적는다 — 이름은 아래 loadMyName 이 명부에서 찾아 적는다 (대표 결정 2026-10-25)
   db.ref('uid_roles/' + App.me.uid).once('value')
     .then(s => {
       const r = s.val() || {};
-      App.isAdmin = r.isAdmin === true;
-      if (!App.isAdmin) { showLocked('총괄관리자만 쓸 수 있습니다.'); return; }
+      App.isStaff = r.status === 'active' && !!r.sid;
+      if (!App.isStaff) { showLocked('재직 중인 직원만 쓸 수 있습니다.'); return; }
       openApp();
     })
     .catch(e => {
       console.warn('[권한]', e && e.code);
-      showLocked('권한을 확인하지 못했습니다. 총괄관리자만 쓸 수 있습니다.');
+      showLocked('권한을 확인하지 못했습니다. 재직 중인 직원만 쓸 수 있습니다.');
     });
 }
 
@@ -1420,7 +1423,7 @@ function showLocked(msg) {
   $('main').style.display = 'none';
   $('gate').style.display = '';
   $('gate').innerHTML = '<div style="font-size:15px;font-weight:700;margin-bottom:6px">' + esc(msg) + '</div>'
-    + '<div class="sub">홈페이지에 올라가는 글이라 총괄관리자에게만 열려 있습니다.</div>';
+    + '<div class="sub">홈페이지에 올라가는 글이라 재직 중인 직원에게만 열려 있습니다.</div>';
 }
 
 function openApp() {
@@ -1829,7 +1832,7 @@ function partnerPatch(고침) {
 
 async function pickSave() {
   if (Pick.saving) return;
-  if (!App.isAdmin) { await say('총괄관리자만 표시할 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 표시할 수 있습니다', ''); return; }
   const 고침 = pickChanges();
   const 열쇠 = Object.keys(고침);
   if (!열쇠.length) { toast('바뀐 것이 없습니다.'); return; }
@@ -2107,7 +2110,7 @@ function 로고의업체(srl) {
 /* 로고 잇기 창 — 지금 홈페이지의 로고를 한 줄씩, 업체를 골라 잇는다.
    ★ 로고 이름과 같은 업체를 «위로» 올려 주기만 한다. 미리 골라 두지 않는다. */
 async function 로고잇기창() {
-  if (!App.isAdmin) { await say('총괄관리자만 할 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 할 수 있습니다', ''); return; }
   openModal(modalHead('로고와 업체 잇기') + '<div class="sub">자문사현황 로고를 읽고 있습니다…</div>');
   if (!App.siteLogoList) await 홈로고목록();
   로고잇기창그리기();
@@ -2208,7 +2211,7 @@ function 새거래처목록() {
 }
 
 async function 새로고넣기(companyId, file) {
-  if (!App.isAdmin) { await say('총괄관리자만 넣을 수 있습니다', ''); return false; }
+  if (!App.isStaff) { await say('재직 직원만 넣을 수 있습니다', ''); return false; }
   if (!companyId || !file) return false;
   let p = null;
   try { p = await 로고그림다루기(file); }
@@ -2270,7 +2273,7 @@ async function 공개동의풀기(companyId) {
      서버는 그 글을 알아볼 길이 없어 1일에 «두 번째» 로고를 올렸다. 그림끼리는 견줄 수 없다 —
      사람이 한 번 보고 눌러야 올린다. 이미 있으면 이 단추 대신 「로고와 잇기」다. */
 async function 홈페이지에없음확인(companyId, 켬) {
-  if (!App.isAdmin) { await say('총괄관리자만 할 수 있습니다', ''); return false; }
+  if (!App.isStaff) { await say('재직 직원만 할 수 있습니다', ''); return false; }
   const 값 = 켬 ? { at: todayString(), by: currentUserName() } : null;
   try {
     await db.ref(PARTNER_PATH + '/' + companyId + '/notOnSite').set(값);
@@ -3682,7 +3685,7 @@ async function 내린표시남기기(key, 까닭) {
    ★ 한 칸만 지운다. 글 번호·직원 연결·올림 표시는 그대로다.
    ★ 휴지통에서 글을 되살리셨으면 이것만 지우면 된다 — 다시 퇴사·계약 종료가 되면 자동으로 또 내려간다. */
 async function 내린표시지우기(갈래, id) {
-  if (!App.isAdmin) { await say('총괄관리자만 할 수 있습니다', ''); return false; }
+  if (!App.isStaff) { await say('재직 직원만 할 수 있습니다', ''); return false; }
   const 사람 = 갈래 === 'member';
   const 묶음 = 사람 ? App.members : App.partners;
   const rec = (묶음 || {})[id];
@@ -4096,7 +4099,7 @@ function 직원연결칸Html(d) {
    ⚠ 한 자리씩만 쓴다(photo · publishOk) — 구성원 자료를 통째로 덮지 않는다. */
 function 새사진넣기(key, file) {
   return new Promise(function (resolve) {
-    if (!App.isAdmin || !key || !file) { resolve(false); return; }
+    if (!App.isStaff || !key || !file) { resolve(false); return; }
     사진줄이기(file, async function (된것, 탈) {
       if (!된것) { await say('사진을 읽지 못했습니다', esc(탈 || '')); resolve(false); return; }
       const 바이트 = Math.round(String(된것.바이트64 || '').length * 3 / 4);
@@ -4131,7 +4134,7 @@ function 새노무사준비(rec) {
   return { 준비: !빠진것.length && !낡은허락, 빠진것: 빠진것, 낡은허락: 낡은허락, 지금글: 지금글 };
 }
 async function 올리기허락(key) {
-  if (!App.isAdmin) { await say('총괄관리자만 허락할 수 있습니다', ''); return false; }
+  if (!App.isStaff) { await say('재직 직원만 허락할 수 있습니다', ''); return false; }
   if (App.dirty && App.draft && App.draft.key === key) {
     await say('먼저 저장해 주십시오', '저장하지 않은 고침이 있습니다 — 저장한 내용으로 허락해야 그대로 올라갑니다.');
     return false;
@@ -5863,7 +5866,7 @@ const 자동정찰간격 = 7 * 24 * 60 * 60 * 1000;
 /* 정찰 판 — 서버(functions/homepage-auto.js 정찰판)와 «같아야» 한다. 다르면 이레가 안 지났어도 다시 정찰한다. */
 const 자동정찰판 = 4;
 async function 자동정찰저절로() {
-  if (!App.isAdmin) return false;
+  if (!App.isStaff) return false;
   try {
     const s = await db.ref('homepage/auto/recon/at').once('value');
     const 지난 = Number(s.val() || 0);
@@ -7701,7 +7704,7 @@ function 새홈페이지에갈사람(rec) {
 
 async function publishPeople() {
   if (App.publishing) return;
-  if (!App.isAdmin) { await say('총괄관리자만 올릴 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   App.publishing = true; App.render();
   try {
     /* 지금 올라가 있는 쪽을 먼저 읽는다 — 사진과 «틀»을 그대로 이어받기 위해서다 */
@@ -7760,7 +7763,7 @@ window.publishPeople = publishPeople;
      「두 군데라 못 한다」고 헛걸린다. */
 async function publishPage(mid) {
   if (App.publishing) return;
-  if (!App.isAdmin) { await say('총괄관리자만 올릴 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   /* ★ pageFixList 를 쓴다 — 여기가 «몇 번째»(n)와 «모두 몇 군데»(of)를
      실어 보내는 자리다. 지우개(PuSitePage.고칠줄)는 글자만 넘기므로
      똘잔은 줄을 못 짚았다 — 그러면 때 자물쇠가 다시 생긴다. */
@@ -8052,7 +8055,7 @@ async function onLogoPaste(e) {
   if (!f) return;
   e.preventDefault();
   try {
-    if (!App.isAdmin) throw new Error('총괄관리자만 올릴 수 있습니다.');
+    if (!App.isStaff) throw new Error('재직 직원만 올릴 수 있습니다.');
     App.logoPick = await 로고그림다루기(f);
     drawPartnerLogos();
   } catch (err) {
@@ -8109,7 +8112,7 @@ function 로고열쇠() {
 }
 
 async function 로고담기(base64, 끝, 사연) {
-  if (!App.isAdmin) throw new Error('총괄관리자만 올릴 수 있습니다.');
+  if (!App.isStaff) throw new Error('재직 직원만 올릴 수 있습니다.');
   if (!base64) throw new Error('그림이 비어 있습니다.');
   const 바이트 = Math.round(base64.length * 3 / 4);
   const 한도 = 700 * 1024;
@@ -8164,7 +8167,7 @@ async function 로고파일담기(f) {
 async function 로고여러장(파일들) {
   const 목록 = Array.prototype.slice.call(파일들 || []);
   if (!목록.length) return;
-  if (!App.isAdmin) { await say('총괄관리자만 올릴 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   const 된것 = [], 안된것 = [];
   const 칸 = $('logoDrop');
   const 알림 = (s) => { if (칸) 칸.textContent = s; };
@@ -8214,7 +8217,7 @@ window.logoDragOver = logoDragOver; window.logoDrop = logoDrop;
 
 async function publishPartner() {
   if (App.publishing) return;
-  if (!App.isAdmin) { await say('총괄관리자만 올릴 수 있습니다', ''); return; }
+  if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   App.publishing = true;
   try {
     const res = await fetch(SITE_BASE + '/partner/index.html?t=' + Date.now());

@@ -144,9 +144,12 @@ function 안내갈래() {
   assert.ok(b > a, '안내문 갈래가 뉴스레터 대기열 쓰기보다 «앞»에 있어야 한다(끝나면 return)');
   return 몸.slice(a, b);
 }
-test('★★★ 안내문 발송은 총괄관리자만 · 서버 잠금 · 번호 꼴만', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 안내문 발송도 총괄관리자만에서 재직 직원으로.
+   재직 확인은 sendBulkMail 맨 앞 requireStaff 가 한다(갈래 안이 아니라 함수 머리). */
+test('★★★ 안내문 발송은 재직 직원만 · 서버 잠금 · 번호 꼴만', () => {
   const g = 안내갈래();
-  assert.ok(/role\.isAdmin !== true/.test(g), '총괄관리자 확인이 없다');
+  const 머리 = 서버.slice(서버.indexOf('exports.sendBulkMail'), 서버.indexOf('const noticeSend'));
+  assert.ok(/sender = await requireStaff\(req\)/.test(머리), '재직 직원 확인이 없다');
   /* ⚠ «잠글까·transaction 글자가 어딘가 있다»로는 부족하다 — 되돌림 검사에서 헛돌았다.
        잠금의 답(noticeClaim)이 «잠글까를 부른 트랜잭션»에서 나오고, 못 잡으면 409 로 서야 한다. */
   assert.match(g, /noticeClaim = await lockRef\.transaction\(\s*\(cur\) => NL\.잠글까\(/,
@@ -241,6 +244,6 @@ test('★ 화면에 「안내문」 탭이 있고 짓개를 싣는다(캐시 번
   assert.match(화면, /<script src="js\/pu-news-notice\.js\?v=\d+"/, '안내문 짓개를 안 싣거나 캐시 번호가 없다');
   const 보내기 = 함수몸(화면, '안내보내기');
   assert.ok(보내기 && /noticeSend:\s*\{\s*id:/.test(보내기), '서버 잠금(noticeSend) 없이 보낸다');
-  assert.ok(/App\.isAdmin/.test(보내기), '총괄관리자 확인이 없다');
+  assert.ok(/App\.isStaff/.test(보내기), '재직 직원 확인이 없다');   /* 2026-10-30 전엔 App.isAdmin(총괄관리자만) */
   assert.ok(/안내저장\(x\)/.test(보내기), '저장 전에 보낸다 — 서버가 «없는 안내문»이라 거절한다');
 });

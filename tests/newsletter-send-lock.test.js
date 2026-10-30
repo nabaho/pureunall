@@ -226,9 +226,13 @@ test('★ 자동발송도 «손누름과 같은 잠금»을 지난다', () => {
   assert.match(몸, /NL\.마쳤다\(/, '자동발송이 완료 잠금을 안 남긴다');
 });
 
-test('★ 뉴스레터 발송은 총괄관리자만 — 자료 메일 길로 우회할 수 없다', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 발송은 총괄관리자만에서 «재직 직원»으로 넓혔다.
+   ★ 지키는 것: 재직 직원 확인(requireStaff — 비번 로그인 + uid_roles 재직)이 잠금보다 «먼저» 온다. */
+test('★ 뉴스레터 발송은 재직 직원만 — 확인이 잠금보다 먼저다', () => {
   const 몸 = 손누름();
-  const 문 = 몸.indexOf('uid_roles/');
+  const 문 = 몸.indexOf('requireStaff(req)');
   const 잠금 = 몸.indexOf('.transaction(');
-  assert.ok(문 >= 0 && 잠금 > 문, '관리자 확인보다 잠금이 먼저다 — 아무나 회차를 잠글 수 있다');
+  assert.ok(문 >= 0 && 잠금 > 문, '재직 직원 확인보다 잠금이 먼저다 — 아무나 회차를 잠글 수 있다');
+  const 직원문 = 서버.slice(서버.indexOf('async function requireStaff('), 서버.indexOf('async function requireStaff(') + 1600);
+  assert.match(직원문, /STAFF_GATE\.assertActive\(/, 'requireStaff 가 재직 여부(uid_roles)를 안 본다 — 가입만 한 사람이 보낸다');
 });

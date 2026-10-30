@@ -175,8 +175,12 @@ test('네 모듈을 모두 부른다', () => {
     .forEach(n => assert.match(html, new RegExp('<script src="js/' + n + '\\.js\\?v=\\d+">')));
 });
 
-test('관리자만 쓸 수 있게 막아둔다', () => {
-  assert.match(html, /isAdmin/);
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 총괄관리자(App.isAdmin)에서 재직 직원(App.isStaff)으로 넓혔다.
+   ★ 지키는 것: 재직(status 'active')과 사번(sid)을 함께 보고, 못 읽으면 잠근다. */
+test('재직 직원만 쓸 수 있게 막아둔다 — 못 읽으면 잠근다', () => {
+  assert.match(html, /App\.isStaff = r\.status === 'active' && !!r\.sid;/);
+  assert.match(html, /if \(!App\.isStaff\) \{ showLocked\(/);
+  assert.match(html, /\.catch\(e => \{\s*console\.warn\('\[권한\]'[^)]*\);\s*showLocked\(/, '권한을 못 읽었을 때 잠그지 않는다');
 });
 
 test('홈페이지에 글을 쓰는 경로가 없다', () => {
@@ -1497,7 +1501,7 @@ function loadAllBox(dbRef) {
   dlgStubs(ctx);
   ctx.toast = m => { ctx.said.push(String(m)); };
   ctx.App = {
-    group: 'members', pick: '', me: null, myName: '', isAdmin: null,
+    group: 'members', pick: '', me: null, myName: '', isStaff: null,
     members: {}, pages: {}, staff: null, staffErr: '', lineFormat: 'plain',
     pageConfig: {}, pageLines: {}, pageConfigUnread: false,
     dataErr: '', saveErr: '', check: null, loading: true, draft: null, dirty: false,

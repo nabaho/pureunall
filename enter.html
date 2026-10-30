@@ -1913,14 +1913,17 @@ body.portal-mode #moreFab{display:flex;}
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
          이쪽은 «아직 안 한» 공고를 찾는 곳이다. 이름이 비슷하니 설명으로 갈라 준다.
-       ⚠ 대표 전용이다(경력관리와 같은 잣대) — adminOnly. */
-    { key:'govbid',  name:'정부사업신청',  desc:'공고 모아보기',    icon:'🏛', url:'gov.html',            roles:null, adminOnly:true, row:'sales' },
+       ★ 재직 직원 모두(대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 완전 공개 · 직원도 사용).
+         예전엔 대표 전용(adminOnly)이었다. 공고 목록·인증키는 사람마다 자기 자리(gov/{uid})에 따로 담긴다. */
+    { key:'govbid',  name:'정부사업신청',  desc:'공고 모아보기',    icon:'🏛', url:'gov.html',            roles:null, row:'sales' },
     /* 회생광고 — 법원 회생 공고(포괄적 금지명령)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
-       ⚠ 대표 전용(adminOnly) — 누구에게 영업 안내를 보낼지는 대표가 정한다. 자료 규칙(rehab_ad)도 관리자만 읽는다. */
-    { key:'rehabad', name:'회생광고',     desc:'회생기업 안내 발송', icon:'⚖️', url:'rehab-ad.html',       roles:null, adminOnly:true, row:'sales' },
-    /* 전광판 — 외부 전광판 광고 바꾸기(대표 지시 2026-10-12 「영업관리 줄에 전광판 컨트롤 앱」). 관리자·위임관리인만(규칙 signboard).
-       adminOnly 가 아니라 perm 이다 — adminOnly 는 role==='admin' 만 통과시켜 위임관리인이 빠진다. */
-    { key:'signboard', name:'전광판',   desc:'외부 전광판 광고 바꾸기', icon:'📺', url:'pu-signboard.html', roles:null, perm:'signboard', row:'sales' },
+       ★ 재직 직원 모두(대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」). 자료 규칙(rehab_ad)도 재직 직원(LOGIN)이 읽고 표시한다.
+         예전엔 대표 전용(adminOnly)이었다 — 누구에게 영업 안내를 보낼지를 이제 직원도 고른다. */
+    { key:'rehabad', name:'회생광고',     desc:'회생기업 안내 발송', icon:'⚖️', url:'rehab-ad.html',       roles:null, row:'sales' },
+    /* 전광판 — 외부 전광판 광고 바꾸기(대표 지시 2026-10-12 「영업관리 줄에 전광판 컨트롤 앱」).
+       ★ 재직 직원 모두(대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」) — 규칙 signboard 도 LOGIN.
+         예전엔 관리자·위임관리인만(perm:'signboard', 규칙 MGR)이었다. 지우기 금지·올린 기록 덧붙이기 전용은 그대로다. */
+    { key:'signboard', name:'전광판',   desc:'외부 전광판 광고 바꾸기', icon:'📺', url:'pu-signboard.html', roles:null, row:'sales' },
     /* 이름·설명은 **지금 그 앱이 무엇을 하는가**를 적는다(대표 지시 2026-08-10).
        기업정보함은 메일 보내기까지 하고, 사진첩은 현장 사진보다 서류가 더 많다 —
        처음 지을 때의 이름이 하는 일보다 좁아지면 사람이 엉뚱한 타일을 찾는다. */
@@ -1949,20 +1952,16 @@ body.portal-mode #moreFab{display:flex;}
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
     { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, soon:true, off:true, row:'store' },
-    /* 경력관리·홈페이지 관리 — 총괄관리자만 본다 (대표 지시 2026-08-17).
-       「흐리게도 보이지 않게」 하라 하셨으므로 타일을 아예 안 그린다.
-       ★ 잣대는 ⚙ 설정·백업 타일과 «같은 것»(sgIsAdmin = 명부의 role)을 쓴다.
-         앱 자체는 uid_roles/{uid}.isAdmin 으로 한 번 더 막으므로 문이 둘이다.
-         근거가 둘인 것은 «알고» 두는 것이다 — 오늘 두 명부의 관리자가 같은 한 사람이고,
-         어긋나도 앱이 닫는 쪽으로 실패한다. */
-    { key:'home',    name:'홈페이지',  desc:'구성원·주요업무 글', icon:'🌐', url:'pu-home.html',        roles:null, adminOnly:true, row:'sales' },
+    /* 홈페이지 관리 — 2026-08-17 「총괄관리자만」(경력관리와 함께 adminOnly)이었다가
+       대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원 모두에게 열었다.
+       ★ 앱 자체는 uid_roles/{uid} 의 status==='active' + sid(규칙 LOGIN)로 한 번 더 막는다 — 모르면 닫는다.
+       ⚠ 경력관리(career)는 그대로 adminOnly 다 — 내부관리 줄이라 이 지시에 들지 않는다. */
+    { key:'home',    name:'홈페이지',  desc:'구성원·주요업무 글', icon:'🌐', url:'pu-home.html',        roles:null, row:'sales' },
     /* 뉴스레터 관리 (대표 지시 2026-09-02 「푸른내외관리에 뉴스레터관리를 넣고 매주 관리하고 싶다」).
-       ★ 옆의 둘(경력관리·홈페이지 관리)과 «같이» 총괄관리자 전용이다.
-         한때 「짓는 것은 직원도」로 두려 했으나, 자동으로 담을 밑감이
-         homepage/newsBrief 에 있고 그 자리가 관리자만 읽는 곳이다 —
-         직원에게 열려면 규칙을 넓혀야 하는데, 그것은 홈페이지 관리의 문을 함께 여는 일이다.
-         법인 이름으로 밖에 나가는 편지이기도 하다. */
-    { key:'news',    name:'뉴스레터',  desc:'주간뉴스레터 짓기·보내기', icon:'📰', url:'pu-news.html',        roles:null, adminOnly:true, row:'sales' },
+       ★ 재직 직원 모두(대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 짓기·보내기 모두).
+         예전엔 총괄관리자 전용이었다 — 밑감(homepage/newsBrief)이 관리자만 읽는 자리라 홈페이지 관리의 문까지 함께 열어야 했다.
+         그날 «두 곳을 같이» 열었다(규칙 newsletter·homepage 모두 LOGIN). */
+    { key:'news',    name:'뉴스레터',  desc:'주간뉴스레터 짓기·보내기', icon:'📰', url:'pu-news.html',        roles:null, row:'sales' },
     /* ⚙ 시스템 설정·백업·복구는 «타일로 두지 않는다» (대표 지시 2026-08-30).
        화면 왼쪽 아래 떠 있는 단추(#cfgFab · pu-backup-admin-button)와 «같은 일»이라
        타일로도 두면 한 가지 일에 문이 둘이 된다 — 대표님이 중복이라 짚으셨다.
