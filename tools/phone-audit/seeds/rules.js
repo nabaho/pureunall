@@ -74,5 +74,22 @@ module.exports = {
     { name: 'lib-co', run: async (page) => { await page.click('#lib [data-act="view"][data-v="company"]'); } },
     { name: 'tidy', run: async (page) => { await page.click('#lib [data-act="view"][data-v="tidy"]'); } },
     { name: 'topics', wait: 4000, run: async (page) => { await page.evaluate(() => { history.pushState(null, '', '#topics'); window.rv2Route(); }); } },
+    /* ✏️ 검토·개정(rules.html)의 💬 묻기 탭 (설계 §13) — 화면 안 «지어낸 샘플 문서»에 지어낸 답 한 줄을 그려 잰다.
+       AI 는 안 부른다. ⚠ 다른 화면(rules.html)으로 넘어가므로 «맨 끝»에 둔다 — 뒤에 둔 view 는 rules-v2 를 못 찾는다 */
+    { name: 'ask', wait: 2500, run: async (page) => {
+      await page.goto(new URL('rules.html', page.url()).href, { waitUntil: 'load', timeout: 45000 });
+      await page.waitForTimeout(4000);
+      await page.click('#pv-ask');
+      await page.evaluate(() => {
+        /* global ASK, askDraw */
+        ASK.list.unshift({ state: 'ready', q: '본인 결혼하면 며칠 쉬나요?', sent: ['제15조', '제16조', '제17조', '제19조'],
+          titles: { '제16조': '경조휴가', '제19조': '배우자 출산전후휴가' },
+          answer: '회사는 사원의 결혼·사망 등 경조사에 대하여 별도 기준에 따라 유급 경조휴가를 줍니다.',
+          cites: [{ label: '제16조', where: '' }], none: false, dropped: 0, review: { state: 'warn', counts: { '수동확인': 1 }, n: 1 } });
+        ASK.list.unshift({ state: 'ready', q: '재택근무 규정 있나요?', sent: ['제8조'], titles: {}, answer: '이 규칙에는 재택근무를 정한 조항이 없습니다.',
+          cites: [], none: true, dropped: 0, review: { state: 'before' } });
+        askDraw();
+      });
+    } },
   ],
 };

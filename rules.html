@@ -53,8 +53,11 @@
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
 <!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/rules-v2/lib-polish.js?v=3"></script>
+<script src="js/rules-v2/lib-polish.js?v=4"></script>
 <script src="js/rules-v2/view-polish.js?v=2"></script>
+<!-- 💬 이 문서에 묻기(설계 §13) — 셈·그리기. lib-ask 는 lib-polish 의 답 읽개(findJson)를 쓴다(위에서 싣는다) -->
+<script src="js/rules-v2/lib-ask.js?v=1"></script>
+<script src="js/rules-v2/view-ask.js?v=1"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
 :root{
@@ -660,6 +663,50 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .ae-pol .pol-warn{margin-top:6px;padding:3px 8px;border-radius:6px;background:#fffbeb;color:#854d0e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ae-pol .pol-foot{display:flex;gap:6px;margin-top:6px}
 .ae-pol .pol-use{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
+/* 💬 이 문서에 묻기 (설계 §13) — 오른쪽 칸의 탭. 켜면(#right-pane.ask-on) 검토 결과 자리를 묻기 칸이 쓴다.
+   한 줄 칸(범위·칩·⚠·끝 줄)은 넘치면 … , 전문은 title. 색은 💡·✨ 상자와 같은 것만 쓴다. 폰에서는 묻기 칸이 위로 온다 */
+#right-pane h3 .rtab{flex:0 0 auto;font-size:14px;font-weight:600;color:var(--sub);background:none;border:0;border-bottom:2px solid transparent;padding:2px;cursor:pointer;font-family:inherit;white-space:nowrap}
+#right-pane h3 .rtab.on{color:var(--ink);border-bottom-color:var(--accent2)}
+#right-pane h3 #tab-ask{font-size:12.5px;color:var(--accent)}
+.ask-pane{display:none;flex-direction:column;gap:8px;padding:10px 14px;overflow:auto;flex:1;min-height:0;font-size:12px}
+#right-pane.ask-on .ask-pane{display:flex}
+/* 켜면 머리·묻기 칸·아래 단추 줄만 남긴다(편집 카드·거르기 띠·알림·검토 목록은 가린다) — 판에 무엇이 더해져도 함께 가려진다.
+   !important 는 편집 카드의 인라인 display:block 을 이기려고 */
+#right-pane.ask-on>:not(h3):not(.ask-pane):not(.rowbtns){display:none!important}
+.ask-pane .ask-scope{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.ask-pane .ask-lbl,.ask-qa .ask-lbl{flex:0 0 auto;font-size:11px;color:var(--mute)}
+.ask-pane .ask-scope-chip{min-width:0;overflow:hidden;text-overflow:ellipsis;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:20px;padding:2px 10px;font-size:11.5px}
+.ask-pane .ask-lock{font-size:11px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:5px 8px;line-height:1.55}
+.ask-pane .ask-in{display:flex;gap:6px}
+.ask-pane .ask-in input{flex:1;min-width:0;font-size:16px;font-family:inherit;border:1px solid #bfdbfe;border-radius:9px;padding:7px 10px;background:#fff;color:var(--ink)}
+.ask-pane .ask-in .btn{flex:0 0 auto}
+.ask-pane .ask-empty{color:var(--mute);font-size:11.5px;padding:6px 2px}
+.ask-qa{border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;margin-bottom:8px}
+.ask-qa .ask-q{font-weight:700;color:var(--ink);margin-bottom:4px}
+.ask-qa .ask-q::before{content:"Q ";color:var(--accent2)}
+.ask-qa .ask-a{line-height:1.7;color:#1e293b}
+.ask-qa .ask-row{display:flex;align-items:center;gap:6px;margin-top:6px;min-width:0;white-space:nowrap;overflow-x:auto}
+.ask-qa .ask-cite{flex:0 0 auto;font-family:inherit;font-size:11.5px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:20px;padding:2px 9px;cursor:pointer;white-space:nowrap}
+.ask-qa .ask-cite.off{border-color:#e2e8f0;background:#f8fafc;color:#475569}
+.ask-qa .ask-rv{flex:0 1 auto;min-width:0;font-family:inherit;font-size:11.5px;border-radius:8px;padding:2px 8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ask-qa .ask-rv.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.ask-qa .ask-rv.warn{border-color:#fde68a;background:#fffbeb;color:#854d0e;cursor:pointer}
+.ask-qa .ask-warn,.ask-qa .ask-wait,.ask-qa .ask-note{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.ask-qa .ask-warn,.ask-qa .ask-note{color:#854d0e}
+.ask-qa .ask-wait{color:var(--sub)}
+.ask-qa .ask-err{color:#991b1b}
+.ask-qa .ask-foot{display:flex;align-items:flex-start;gap:10px;margin-top:6px;min-width:0;color:var(--mute);font-size:11px}
+.ask-qa .ask-note{flex:1}
+.ask-qa .ask-sent summary{cursor:pointer;white-space:nowrap}
+.ask-qa .ask-sent-list{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+@media(max-width:900px){.grid.ask-on #right-pane{order:-1}}
+/* 원본 미리보기 머리 — 제목·단추 글자는 한 줄(1366px 에서 「전체/보기」·「원본 미리/보기」로 접혔다 — 💬 단추를 더하며 함께 고침).
+   자리가 모자라면 설명 딱지(#pv-tag)가 줄어든다 */
+.pane h3 .pv-ttl{flex:0 0 auto;white-space:nowrap}
+.pane h3 #pv-tag{min-width:0}
+.grid>.pane:first-child h3 .btn{flex:0 0 auto;white-space:nowrap}
+/* 폰 — 판 안쪽 여백과 답 상자 여백이 겹겹이 쌓이지 않게(폰화면관리 「좌우 옆공간 모두 채워서」). PC 는 그대로 */
+@media(max-width:760px){.ask-pane{padding:8px 8px}.ask-qa{padding:7px 8px}}
 .sample-banner{background:#fffbeb;border:1px solid #fbbf24;color:#854d0e;font-size:11.5px;font-weight:600;border-radius:8px;padding:7px 11px;margin-bottom:10px;line-height:1.55;white-space:normal}
 .panel-card{background:var(--card);border:1px solid var(--card-bd);border-radius:12px;padding:8px 12px;margin-bottom:10px;box-shadow:0 4px 16px rgba(30,58,138,.05)}
 /* 상태 점 — 이제 단추 앞과 전체 보기 목록에서 쓴다.
@@ -1035,7 +1082,9 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
   </div>
   <div class="grid" id="grid">
     <div class="pane">
-      <h3>원본 미리보기 <span id="pv-site" style="font-size:13px;font-weight:700;color:var(--accent);margin-left:4px"></span> <span class="tag" id="pv-tag">— 조 0개</span>
+      <h3><span class="pv-ttl">원본 미리보기</span> <span id="pv-site" style="font-size:13px;font-weight:700;color:var(--accent);margin-left:4px"></span> <span class="tag" id="pv-tag">— 조 0개</span>
+        <!-- 💬 묻기 — 단추 줄 «맨 앞»(설계 §13 목업 ①). ⚠ 이 머리는 flex 라 float:right 가 먹지 않는다 — 화면 차례 = 마크업 차례 -->
+        <button class="btn ghost" id="pv-ask" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px" title="이 규칙에 물어봅니다 — 답에 근거 조와 같은 조의 검토 판정이 붙습니다">💬 묻기</button>
         <button class="btn ghost" id="pv-full" style="float:right;padding:3px 10px;font-size:11.5px" onclick="openFullPreview()">⛶ 전체보기</button>
         <button class="btn ghost" id="pv-pick" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px">✎ 조문 선택</button>
         <button class="btn ghost" id="pv-view" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px">📄 원문 보기</button>
@@ -1049,7 +1098,8 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
     </div>
     <div id="split" title="드래그하여 좌우 너비 조절"></div>
     <div class="pane" id="right-pane">
-      <h3><span style="flex:0 0 auto">자동 검토 결과</span>
+      <h3><button type="button" class="rtab on" id="tab-review" title="자동 검토 결과를 봅니다">자동 검토 결과</button>
+        <button type="button" class="rtab" id="tab-ask" title="이 규칙에 물어봅니다 — 답에 근거 조와 같은 조의 검토 판정이 붙습니다">💬 묻기</button>
         <span class="summary">
           <span class="stat s" data-fs="위반의심" title="클릭하면 위반의심 항목만 골라 봅니다"><span class="n" id="c-s">0</span><span class="l">위반의심</span></span>
           <span class="stat m" data-fs="누락" title="클릭하면 누락 항목만 골라 봅니다"><span class="n" id="c-miss">0</span><span class="l">누락</span></span>
@@ -1057,6 +1107,13 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
           <span class="stat u" data-fs="시행예정" title="클릭하면 시행예정 항목만 골라 봅니다"><span class="n" id="c-up">0</span><span class="l">시행예정</span></span>
         </span>
         <span class="tag" id="rb-tag">규칙집 v3</span></h3>
+      <!-- 💬 이 문서에 묻기(설계 §13) — #tab-ask·#pv-ask 로 켠다(#right-pane.ask-on). 답은 어디에도 저장하지 않는다 -->
+      <div class="ask-pane" id="ask-pane">
+        <div class="ask-scope" id="ask-scope"></div>
+        <div class="ask-lock">🔒 회사 이름은 {회사}로, 주민번호·전화·계좌는 가려서 «관련 조만» AI 에 보냅니다. 가리기에 실패하면 보내지 않습니다. 답은 저장하지 않습니다.</div>
+        <div class="ask-in"><input id="ask-q" type="text" autocomplete="off" placeholder="이 규칙에 물어보세요 — 예) 경조휴가 며칠?" aria-label="이 규칙에 물어볼 말"><button class="btn" id="ask-go" type="button">묻기</button></div>
+        <div class="ask-list" id="ask-list"></div>
+      </div>
       <div class="artedit" id="art-edit" style="display:none">
         <div class="ae-h"><b id="ae-title">조문 편집</b><span class="x" id="ae-close" title="닫기">×</span></div>
         <div class="ae-lbl">현행 (변경 전)</div>
@@ -2648,6 +2705,7 @@ async function renderPreview(){
 function resetReviewUI(){
   CUR_ITEMS=[];CUR_KEY=null;AE_LABEL=null;
   const ae=$("art-edit");if(ae)ae.style.display="none";
+  if(typeof askReset==="function")askReset();   // 💬 다른 문서의 답이 남으면 이 문서의 것으로 읽힌다
   OPEN_REC=null;        // 새 검토는 내 작업중 자리에 저장한다
   setReadOnly(false);   // 새 검토를 시작하면 열람전용 해제 (버튼은 아래에서 다시 잠근다)
   $("mk-daejo").disabled=true;$("save").disabled=true;
@@ -2692,6 +2750,7 @@ function ensureItems(){
 function openArtEdit(a){
   ensureItems();
   const it=CUR_ITEMS.find(x=>x.id==="art_"+a.label); if(!it)return;
+  if(typeof askTab==="function")askTab(false);   // 💬 묻기 탭이 켜져 있으면 편집 카드가 가려진다 — 조를 열면 검토 쪽으로
   AE_LABEL=a.label; AE_TITLE=String(a.title||"");
   $("ae-title").textContent=a.label+(a.title?" ("+a.title+")":"")+" — 조문 편집";
   $("ae-before").textContent=it.orig;
@@ -7942,6 +8001,118 @@ function polClick(ev){
 }
 $("ae-pol").addEventListener("click",polClick);
 $("ae-polish").addEventListener("click",polMenu);
+
+/* ══════ 💬 이 문서에 묻기 — 오른쪽 칸의 탭 (설계 §13 · 2026-10-30 목업 세 물음 「추천대로」) ══════
+   지금 연 문서의 «원본»에서 질문과 관련된 조를 낱말로 고르고(lib-ask — AI 없이), 그 조만 가려서 AI 에게 묻는다.
+   셈은 lib-ask, 그리기는 view-ask, 부르기·가림은 ✨ 다듬기와 «같은 길»(PuAiCall · toSend · kordoc · polCoName · polErr).
+   ★ 걸리는 조가 없으면 AI 를 부르지 않는다 — 회사 공동 하루 몫을 헛되이 쓰지 않게.
+   ★ 가림이 실패하면 보내지 않는다(그 오류로 끝난다). 무료 등급이라 구글이 보낸 글을 학습에 쓸 수 있어서다.
+   ⚠ 열람 전용이어도 묻는다 — 읽기만 한다(✨ 와 달리 넣는 것이 없다).
+   ⚠ 한 번 누르면 한 번 부른다(ASK.busy). 답이 오는 사이 문서를 바꾸면 그 답은 버린다(askReset 이 목록을 비운다).
+   ⚠ 서버 저장소에 아무것도 쓰지 않는다. 묻고 답한 것은 이 화면을 보는 동안만(많아야 ASK_KEEP 개). */
+const ASK={list:[],busy:false};
+const ASK_KEEP=10;
+/* 원본 미리보기가 보이는 그 글 — 「변경 후」 편집본이 아니다(묻는 범위에 「원본」이라 밝힌다) */
+function askArts(){ return parseArticles(SAMPLES[siteSel.value]||""); }
+/* 묻는 범위에 보일 이름 — 보이기만 한다. 가릴 이름은 polCoName(ERP)이 정한다 */
+function askSite(){
+  const key=siteSel.value, L=(LAST&&LAST.key===key)?LAST:null;
+  return String(SITE_NAME[key]||(L?L.site:SITE_MAP[key])||"").replace(/^[📄🏢]\s*/u,"").replace(/〔샘플〕/g,"").trim();
+}
+/* 이 문서를 «검토했는가» — 안 했으면 지적 0 이 «괜찮다»가 아니다 */
+function askReviewed(){ return !!(LAST&&LAST.key===siteSel.value&&Array.isArray(LAST.res)&&LAST.res.length); }
+function askDraw(){
+  const sc=$("ask-scope"), el=$("ask-list");
+  try{
+    if(sc)sc.innerHTML=PuRulesAskView.scopeHtml({site:askSite(),n:askArts().length});
+    if(el)el.innerHTML=PuRulesAskView.listHtml(ASK.list);
+  }catch(e){ if(el)el.innerHTML='<div class="ask-qa"><div class="ask-err">💬 묻기를 그리지 못했습니다 — '+escapeH(String((e&&e.message)||e||"알 수 없는 오류"))+'</div></div>'; }
+}
+/* 탭 — 켜면 검토 결과 자리를 묻기 칸이 쓴다(폰에서는 판이 위로 온다) */
+function askTab(on){
+  on=!!on;
+  const rp=$("right-pane"), g=$("grid"), a=$("tab-ask"), r=$("tab-review");
+  if(rp)rp.classList.toggle("ask-on",on);
+  if(g)g.classList.toggle("ask-on",on);
+  if(a)a.classList.toggle("on",on);
+  if(r)r.classList.toggle("on",!on);
+  if(on){ askDraw(); const q=$("ask-q"); if(q)try{ q.focus(); }catch(e){} }
+}
+function askReset(){ ASK.list=[]; askDraw(); }
+function askPush(e){ ASK.list.unshift(e); if(ASK.list.length>ASK_KEEP)ASK.list.length=ASK_KEEP; }
+/* 실패 글은 ✨ 와 한 벌(polErr — 달 한도·분당·하루 몫·로그인) — 머리말만 바꾼다 */
+function askErr(e){ return polErr(e).replace(/^AI 다듬기를 못 했습니다/,"AI 에게 묻지 못했습니다"); }
+async function askSend(){
+  if(ASK.busy)return;
+  const qEl=$("ask-q"), q=String((qEl&&qEl.value)||"").trim();
+  if(!q)return;
+  const A=PuRulesAsk, key=siteSel.value, arts=askArts();
+  if(!arts.length){ askPush({state:"nolocal",q,msg:"이 문서에서 조를 찾지 못했습니다 — 사업장을 고르고 원본을 먼저 올리세요"}); askDraw(); return; }
+  const picks=A.pick(arts,q);
+  if(!picks.length){ askPush({state:"nolocal",q,msg:A.NONE_LOCAL}); askDraw(); return; }   // AI 를 부르지 않는다
+  ASK.busy=true;
+  // 가릴 회사 이름은 «지금» ERP 에서 — ✨ 와 같은 잣대(polCoName). 업체 목록이 아직 없으면 한 번 받아 온다
+  let co="";
+  try{
+    if(!ERP_COS.length)await loadErpCompanies();
+    co=polCoName();
+  }catch(e){ co=""; }
+  if(siteSel.value!==key){ ASK.busy=false; return; }   // 기다리는 사이 문서를 바꿨으면 그만둔다
+  if(!co&&!confirm("회사 이름을 몰라 가리지 못합니다 — 그래도 보낼까요?")){ ASK.busy=false; return; }
+  const titles={}; arts.forEach(a=>{ if(a.title)titles[a.label]=a.title; });
+  const st={state:"sending",q,sent:picks.map(a=>a.label),titles};
+  askPush(st); if(qEl)qEl.value=""; askDraw();
+  const mine=()=>ASK.list.indexOf(st)>=0&&siteSel.value===key;
+  // 버린 답의 줄은 목록에서도 뺀다 — 문서만 바뀌고 목록이 남았으면 «읽는 중…»으로 영영 남는다
+  const drop=()=>{ const i=ASK.list.indexOf(st); if(i>=0){ ASK.list.splice(i,1); askDraw(); } };
+  try{
+    // 가림 — ✨ 와 같은 묶음(기본 + 사업자번호). 질문에 든 회사 이름·번호도 함께 가린다
+    const P=PuRulesPolish, KT=PuKordocText, groups=KT.PII_GROUPS.filter(g=>g.on).map(g=>g.key).concat("brn");
+    const data=P.toSend(A.dataText(picks),co), qs=P.toSend(q,co);
+    const red=await KT.redactFile(new Uint8Array(0),data.text,groups);
+    const redQ=await KT.redactFile(new Uint8Array(0),qs.text,groups);
+    const auth=(window.firebase&&firebase.auth)?firebase.auth():null;
+    const call=(manual)=>PuAiCall.ask([{text:A.prompt(String(redQ.text),String(red.text))}],
+      {auth,app:"rules",generationConfig:{temperature:0.1},manual});
+    let reply;
+    try{ reply=await call(false); }
+    catch(e){
+      // 이번 달 요금 한도 — 사람이 누른 묻기라 «물어본 뒤» manual 을 실어 한 번 더(✨ 와 같은 결정 ⓵㉮)
+      if(!(e&&e.overBudget)||!mine())throw e;
+      if(!confirm("이번 달 AI 한도에 걸렸습니다.\n사람이 직접 누른 묻기라 그래도 부를 수 있습니다 — 부를까요?"))throw e;
+      if(!mine())return drop();
+      reply=await call(true);
+    }
+    if(!mine())return drop();
+    const r=A.parse(PuAiCall.textOf(reply),picks);
+    if(!r.ok)throw new Error(r.why);
+    // {회사} 는 «원문의 꼴»로 되돌린다(✨ 와 같은 규칙) — 원문에 이름이 없었으면 질문의 꼴, 그것도 없으면 ERP 표기
+    Object.assign(st,{state:"ready",answer:P.restore(r.answer,data.form||qs.form||co),cites:r.cites,none:r.none,dropped:r.dropped,
+      review:A.reviewOf(r.cites.map(c=>c.label),ALL_FINDINGS||[],askReviewed())});
+  }catch(e){
+    if(!mine())return drop();
+    st.state="error"; st.err=askErr(e);
+  }finally{ ASK.busy=false; }
+  askDraw();
+}
+/* 근거 조로 — 📍 와 같은 길(focusPreviewArticle). 원문 보기·조문 선택 중이면 조문 보기로 돌린 뒤 */
+function askGo(label){
+  if(PV_VIEW!=="arts"||PICK_MODE){ PV_VIEW="arts"; PICK_MODE=false; renderPreview(); }
+  focusPreviewArticle(label);
+}
+function askClick(ev){
+  const t=ev&&ev.target; if(!t||!t.closest)return;
+  const go=t.closest("[data-ask-go]"); if(go){ askGo(go.dataset.askGo); return; }
+  if(t.closest("[data-ask-review]"))askTab(false);
+}
+$("tab-ask").addEventListener("click",()=>askTab(true));
+$("pv-ask").addEventListener("click",()=>askTab(true));
+$("tab-review").addEventListener("click",()=>askTab(false));
+$("ask-go").addEventListener("click",askSend);
+$("ask-q").addEventListener("keydown",ev=>{ if(ev.key==="Enter"&&!ev.isComposing&&!ev.shiftKey){ ev.preventDefault(); askSend(); } });
+$("ask-list").addEventListener("click",askClick);
+$("run").addEventListener("click",()=>askTab(false));   // 검토를 돌리면 결과를 보인다
+document.querySelectorAll(".summary .stat[data-fs]").forEach(el=>el.addEventListener("click",()=>askTab(false)));
 
 /* ══════ 표준취업규칙 (고용노동부, 연도별) ══════
    chwieop/standard/{연도} — 법인 공동 자산. 브라우저 사본과 병행. */
