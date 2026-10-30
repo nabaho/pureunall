@@ -323,11 +323,14 @@ test('★ 읽개는 바깥을 «두드리지 않는다» — 검사가 인터넷
     });
 });
 
-test('★ 총괄관리자만 부를 수 있다 — 회원 계정으로 남의 사이트에 드는 일이다', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 뉴스레터를 직원에게 열면서 총괄관리자만에서 재직 직원으로 넓혔다.
+   ★ 지키는 것: 재직 직원 확인(requireStaff)이 «받아 오기»보다 먼저 오고, 한 번에 30건 상한이 그대로다. */
+test('★ 재직 직원만 부를 수 있다 — 회원 계정으로 남의 사이트에 드는 일이다', () => {
   const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
   const 덩이 = /exports\.ilaborPull[\s\S]*?\n  \}\);/.exec(idx)[0];
-  assert.ok(/requireStaff/.test(덩이), '누가 부르는지 안 본다');
-  assert.ok(/isAdmin\s*!==\s*true/.test(덩이), '총괄관리자로 막지 않는다');
+  assert.ok(/sender = await requireStaff\(req\)/.test(덩이), '누가 부르는지 안 본다');
+  assert.ok(덩이.indexOf('requireStaff(req)') < 덩이.indexOf('노무사회모으기('), '확인보다 받아 오기가 먼저다');
+  assert.ok(/Math\.min\(30,/.test(덩이), '한 번에 받는 상한(30)이 빠졌다');
 });
 
 test('★ 남의 서버를 몰아치지 않는다 — 부를 때마다 쉰다', () => {

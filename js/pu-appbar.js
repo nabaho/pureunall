@@ -47,9 +47,11 @@
     { key: 'govaid',  row: 'client', name: '정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
-    { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기', adminOnly: true },
-    { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송', adminOnly: true },
-    { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기', perm: 'signboard' },
+    /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
+       adminOnly·perm 을 뺐다 — 포털 타일과 짝. */
+    { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기' },
+    { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송' },
+    { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기' },
     { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
        whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
@@ -63,10 +65,10 @@
     { key: 'rules',   row: 'client', name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고', off: true },
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
     { key: 'payroll', row: 'client', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱', off: true },
-    { key: 'home',    row: 'sales', name: '홈페이지', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
-    /* 뉴스레터 — 경력관리·홈페이지 관리와 «같이» 총괄관리자 전용이다.
+    /* 홈페이지·뉴스레터 — 예전엔 총괄관리자 전용이었다가 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원 모두.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */
-    { key: 'news',    row: 'sales', name: '뉴스레터', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기', adminOnly: true }
+    { key: 'home',    row: 'sales', name: '홈페이지', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글' },
+    { key: 'news',    row: 'sales', name: '뉴스레터', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기' }
   ];
 
   /* 단추에 적는 말 — 한 곳에서만 정한다. 바꾸려면 여기 한 줄. */

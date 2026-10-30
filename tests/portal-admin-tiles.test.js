@@ -52,8 +52,10 @@ test('두 곳 다 sgIsAdmin() 만으로 판정하지 않는다 — 그것은 보
     });
 });
 
-test('감추기로 한 두 앱은 여전히 관리자 전용으로 표시돼 있다', () => {
-  ['career', 'home'].forEach(function (k) {
+/* ⚠ 2026-10-30 홈페이지(home)는 «감추기»에서 빠졌다 — 대표 지시 「영업관리 … 모든 직원들에게 공개」.
+     경력관리만 남는다. 영업관리 다섯이 열린 것은 tests/sales-row-open-to-staff.test.js 가 지킨다. */
+test('감추기로 한 앱(경력관리)은 여전히 관리자 전용으로 표시돼 있다', () => {
+  ['career'].forEach(function (k) {
     const 줄 = enter.split(/\r?\n/).find(l => l.includes("key:'" + k + "'") && l.includes('url:'));
     assert.match(줄 || '', /adminOnly\s*:\s*true/, k + ' 타일에 관리자 전용 표시가 없습니다');
   });

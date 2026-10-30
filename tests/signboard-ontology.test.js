@@ -49,12 +49,13 @@ test('광고·올린 판·제어 레코드가 강제 관문을 통과한다', ()
   assert.equal(ctl.ok, true, JSON.stringify(ctl.issues));
 });
 
-test('포털 타일과 앱 막대가 짝이다 — «영업관리» 줄, perm 방식(adminOnly 는 위임관리인이 빠진다)', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — perm·adminOnly 를 둘 다 뺐다(재직 직원 모두). */
+test('포털 타일과 앱 막대가 짝이다 — «영업관리» 줄, 재직 직원 모두(perm·adminOnly 없음)', () => {
   const tile = read('enter.html').split('\n').find((l) => /key:'signboard'/.test(l));
   assert.ok(tile, 'enter.html 에 타일이 없다');
-  assert.match(tile, /row:'sales'/); assert.match(tile, /url:'pu-signboard\.html'/); assert.match(tile, /perm:'signboard'/);
-  assert.doesNotMatch(tile, /adminOnly/);
+  assert.match(tile, /row:'sales'/); assert.match(tile, /url:'pu-signboard\.html'/);
+  assert.doesNotMatch(tile, /adminOnly|perm\s*:/, '전광판 타일이 다시 관리자 전용으로 닫혔다');
   const bar = read('js/pu-appbar.js').split('\n').find((l) => /key: 'signboard'/.test(l));
   assert.ok(bar, 'pu-appbar.js 에 항목이 없다');
-  assert.match(bar, /row: 'sales'/); assert.match(bar, /perm: 'signboard'/); assert.doesNotMatch(bar, /adminOnly/);
+  assert.match(bar, /row: 'sales'/); assert.doesNotMatch(bar, /adminOnly|perm\s*:/, '앱 막대가 포털 타일과 어긋난다');
 });

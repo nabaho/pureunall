@@ -25,12 +25,13 @@ function 함수몸(이름) {
   return 주석뺌.slice(i, 끝 < 0 ? undefined : i + 끝);
 }
 
-test('homepageAuto 는 총괄관리자만 연다', () => {
+/* 2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 총괄관리자에서 재직 직원(STAFF_GATE)으로 넓혔다. */
+test('homepageAuto 는 재직 직원만 연다', () => {
   const b = 덩어리('homepageAuto');
   assert.match(b, /verifyIdToken\(/);
-  assert.match(b, /isAdmin\s*!==\s*true/);
-  const 문 = b.indexOf('isAdmin'), 일 = b.indexOf('홈자동한번(');
-  assert.ok(문 > 0 && 일 > 문, '관리자 확인이 일보다 먼저여야 합니다');
+  assert.match(b, /STAFF_GATE\.assertActive\(decoded\.uid\)/);
+  const 문 = b.indexOf('STAFF_GATE.assertActive'), 일 = b.indexOf('홈자동한번(');
+  assert.ok(문 > 0 && 일 > 문, '재직 직원 확인이 일보다 먼저여야 합니다');
 });
 
 test('homepageAuto 가 받는 방식은 보기·돌리기·승인뿐이고, 모르면 보기다', () => {

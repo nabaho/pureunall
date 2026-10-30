@@ -41,13 +41,13 @@ test('둘 다 pu-news.html 을 가리킨다', () => {
   assert.ok(/pu-news\.html/.test(타일(appbar, 'news')));
 });
 
-test('★ 포털과 앱바의 «관리자 전용» 잣대가 같다', () => {
+test('★ 포털과 앱바의 잣대가 같다 — 둘 다 재직 직원 모두(관리자 전용 아님)', () => {
   /* 한쪽만 보이면 «눌러도 막히는 문»이 된다 — 직원이 왜 안 되는지 알 수 없다.
-     경력관리·홈페이지 관리가 이미 그렇게 맞춰져 있다. */
+     2026-10-30 대표 지시 「영업관리 … 모든 직원들에게 공개」 — 예전엔 총괄관리자 전용(adminOnly)이었다. */
   const e = /adminOnly/.test(타일(enter, 'news'));
   const a = /adminOnly/.test(타일(appbar, 'news'));
   assert.equal(e, a, '포털=' + e + ' 앱바=' + a + ' — 두 문의 잣대가 다르다');
-  assert.equal(e, true, '법인 이름으로 밖에 나가는 편지라 총괄관리자 전용이어야 한다');
+  assert.equal(e, false, '뉴스레터는 재직 직원 모두에게 연다(2026-10-30) — 다시 관리자 전용으로 닫혔다');
 });
 
 test('뉴스레터는 영업관리 줄에 선다', () => {
@@ -113,8 +113,12 @@ test('규칙 만들개가 newsletter 자리를 낸다', () => {
     [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8', maxBuffer: 1e8 });
   const r = JSON.parse(out).rules || JSON.parse(out);
   assert.ok(r.newsletter, 'newsletter 자리가 규칙에 없다 — 화면이 아무것도 못 읽는다');
-  assert.ok(/isAdmin/.test(r.newsletter['.read']), '명단·초안을 아무나 읽는다');
-  assert.ok(/isAdmin/.test(r.newsletter['.write']), '법인 이름으로 나갈 초안을 아무나 고친다');
+  /* 2026-10-30 — 재직 직원(LOGIN)에게 열었다. «아무나»(로그인만·익명·퇴직자)는 여전히 아니다:
+     비번 로그인 + uid_roles 의 status==='active' 를 둘 다 본다. */
+  ['.read', '.write'].forEach((k) => {
+    assert.ok(/status'\)\.val\(\) === 'active'/.test(r.newsletter[k]), k + ' — 재직 여부를 안 본다(명단·초안이 아무나에게 열린다)');
+    assert.ok(/sign_in_provider === 'password'/.test(r.newsletter[k]), k + ' — 비번 로그인을 안 본다(익명 손님이 든다)');
+  });
 });
 
 test('규칙은 화면의 잣대와 «같다»', () => {
@@ -124,17 +128,19 @@ test('규칙은 화면의 잣대와 «같다»', () => {
     [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8', maxBuffer: 1e8 });
   const r = JSON.parse(out).rules || JSON.parse(out);
   assert.equal(r.newsletter['.read'], r.homepage['.read'],
-    '홈페이지 관리와 같은 잣대로 두기로 했다(둘 다 총괄관리자)');
+    '홈페이지 관리와 같은 잣대로 두기로 했다(2026-10-30 부터 둘 다 재직 직원)');
 });
 
 /* ══════ ⑥ 지키기로 한 것 ══════ */
 
-test('화면이 관리자를 «못 읽었을 때» 열지 않는다', () => {
-  /* 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다 */
-  const m = /\.catch\([^)]*\)\s*=>\s*\{[^}]*App\.isAdmin\s*=\s*false/.test(news)
-         || /catch\([\s\S]{0,120}?App\.isAdmin\s*=\s*false/.test(news);
-  assert.ok(m, '권한 읽기가 실패했을 때 isAdmin 을 false 로 안 내린다');
-  assert.ok(/if\s*\(\s*!App\.isAdmin\s*\)\s*\{\s*잠그기/.test(news), '관리자가 아니면 잠가야 한다');
+test('화면이 권한을 «못 읽었을 때» 열지 않는다', () => {
+  /* 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다.
+     2026-10-30 — 잣대가 관리자(isAdmin)에서 재직 직원(isStaff = status 'active' + sid)으로 바뀌었다. */
+  const m = /\.catch\([^)]*\)\s*=>\s*\{[^}]*App\.isStaff\s*=\s*false/.test(news)
+         || /catch\([\s\S]{0,120}?App\.isStaff\s*=\s*false/.test(news);
+  assert.ok(m, '권한 읽기가 실패했을 때 isStaff 를 false 로 안 내린다');
+  assert.ok(/App\.isStaff\s*=\s*r\.status\s*===\s*'active'\s*&&\s*!!r\.sid/.test(news), '재직·사번을 함께 안 본다');
+  assert.ok(/if\s*\(\s*!App\.isStaff\s*\)\s*\{\s*잠그기/.test(news), '재직 직원이 아니면 잠가야 한다');
 });
 
 test('이미 보낸 회차를 두 번 보내지 않는다 — 상태를 자리에 적는다', () => {

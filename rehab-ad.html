@@ -23,7 +23,8 @@
      ⚠ 혁신바우처 관리지침 제37조 — 수요기업에게 «과도한 영업»은 참여제한 사유다. 노무(대지급금·고용조정·임금 정리) 안내가 중심이다.
      ⚠ 라벨은 «본점 주소»로 만든다. 법원 송달주소는 대리인 법률사무소인 일이 많아 따로 보여 주기만 한다.
      ⚠ 회사명은 «보이는 이름»이다. 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다 — 온톨로지 규칙).
-     ⚠ 대표 전용(uid_roles 의 isAdmin). 모르면 잠근다(fail-closed).
+     ⚠ 재직 직원 모두 쓴다(uid_roles 의 status==='active' + sid — 규칙 LOGIN 과 같은 잣대). 모르면 잠근다(fail-closed).
+       대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(완전 공개 · 직원도 사용). 예전엔 대표 전용(isAdmin)이었다.
      ══════════════════════════════════════════════════════════════ -->
 <style>
 :root{
@@ -337,7 +338,7 @@ td.mm{display:none}
   </div>
 </div>
 
-<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>회생광고는 대표 전용입니다.</p></div>
+<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>회생광고는 재직 직원만 쓸 수 있습니다.</p></div>
 
 <main id="app" style="display:none">
   <div id="fixbar">
@@ -1133,9 +1134,10 @@ async function reload(){
 function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fLog').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; STAR_ONLY=false; draw(); }
 function clearSel(){ SEL={}; draw(); }
 
-/* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
-async function isAdmin(u){
-  try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.isAdmin===true; }catch(e){ return false; }
+/* ═══ 로그인·잠금 — 모르면 잠근다 ═══
+   재직 직원이면 연다(대표 지시 2026-10-30). 로그인 안 함·퇴사·uid_roles 를 못 읽음은 그대로 잠근다. */
+async function isStaff(u){
+  try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.status==='active' && !!v.sid; }catch(e){ return false; }
 }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function copyText(t){
@@ -1182,7 +1184,7 @@ function boot(){
     if(!u){ $('who').textContent=''; PuGate.show(); return; }
     PuGate.hide();
     /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
-    if(!(await isAdmin(u))){ var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'이 계정으로는 열 수 없습니다'); return; }
+    if(!(await isStaff(u))){ var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'이 계정으로는 열 수 없습니다'); return; }
     gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:u.uid });
     $('lock').style.display='none'; $('app').style.display='';
     await reload();

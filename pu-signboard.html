@@ -13,7 +13,9 @@
        (scripts/signboard-agent)이 «올린 판»을 가져다 한다. 이 화면은 장비와 직접 말하지 않는다.
      ★ 쓰는 자리(관문 강제 모드, PROGRAMS.signboard.writeContracts): signboard/ads · published · history · control
      ★ 읽기만: signboard/state(심부름꾼이 쓴다) · uid_roles(권한·사번)
-     ⚠ 길거리에 그대로 보이는 것이라 «관리자·위임관리인»만 연다(규칙 signboard = MGR). 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
+     ⚠ 재직 직원 모두 연다(규칙 signboard = LOGIN) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」(완전 공개 · 직원도 사용).
+       예전엔 길거리에 그대로 보이는 것이라 «관리자·위임관리인»(MGR)만 열었다. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
+       ⚠ 그래도 지우기는 막혀 있고(_deleted 표식만) 올린 기록(log)은 덧붙이기 전용이다 — 누가 무엇을 올렸는지는 남는다.
      ⚠ 고치는 즉시 전광판에 나가지 않는다 — «전광판에 올리기»를 눌러야 한다. 올린 기록(history)에서 이전 판으로 되돌린다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -217,7 +219,7 @@ main{padding:12px 16px 40px}
     <button data-tab="archive">🗂 보관함</button>
   </div>
 </div>
-<div id="lock"><h2>📺 전광판</h2><div id="lockWhy"></div><p>대표·관리직원만 열 수 있습니다.</p></div>
+<div id="lock"><h2>📺 전광판</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
 <main id="app">
   <section class="pane" id="pane-ads">
     <div class="card">
@@ -579,11 +581,12 @@ document.addEventListener('input', function(ev){
   if(EDIT && $('modal').contains(ev.target)) refreshPreview();
 });
 
-/* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
+/* ═══ 로그인·잠금 — 모르면 잠근다 ═══
+   재직 직원(status==='active' + sid)이면 연다 — 대표 지시 2026-10-30. 로그인 안 함·퇴사·못 읽음은 그대로 잠근다. */
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
-async function managerSid(u){
+async function staffSid(u){
   try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{};
-    return v.status==='active' && v.sid && (v.isAdmin===true||v.isSubAdmin===true) ? String(v.sid) : '';
+    return v.status==='active' && v.sid ? String(v.sid) : '';
   }catch(e){ return ''; }
 }
 function boot(){
@@ -598,9 +601,9 @@ function boot(){
     $('outBtn').style.display=u?'':'none';
     if(!u){ PuGate.show(); return; }
     PuGate.hide();
-    var sid=await managerSid(u);
+    var sid=await staffSid(u);
     /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
-    if(!sid){ lock((who()?'접속: '+who()+' — ':'')+'관리자·위임관리인이 아니거나 재직 중이 아닙니다'); return; }
+    if(!sid){ lock((who()?'접속: '+who()+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return; }
     ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
     $('lock').style.display='none'; $('app').style.display='';
     await loadNames();

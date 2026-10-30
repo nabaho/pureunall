@@ -1658,15 +1658,15 @@
       }
     },
     "homepage": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
     },
     "newsletter": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
-      ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
     },
     "ilabor": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": false
     },
     "kcareer": {
@@ -1686,11 +1686,11 @@
       }
     },
     "gov_watch": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": false
     },
     "gov_feed": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": false
     },
     "pubdata": {
@@ -1745,30 +1745,30 @@
       }
     },
     "signboard": {
-      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       "ads": {
         "$id": {
-          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
           ".validate": "newData.child('id').val() === $id"
         }
       },
       "published": {
-        ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
         ".validate": "newData.child('id').val() === 'published'"
       },
       "history": {
         "$v": {
-          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
           ".validate": "newData.child('id').val() === $v"
         }
       },
       "control": {
-        ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
         ".validate": "newData.child('id').val() === 'control'"
       },
       "log": {
         "$id": {
-          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && !data.exists() && newData.exists()",
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists() && newData.exists()",
           ".validate": "newData.child('id').val() === $id"
         }
       },
@@ -1777,7 +1777,7 @@
       }
     },
     "rehab_ad": {
-      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       "notices": {
         ".write": false
       },
@@ -1785,7 +1785,7 @@
         ".write": false
       },
       "marks": {
-        ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
       }
     },
     "kcareer_pub": {
