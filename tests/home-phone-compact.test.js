@@ -179,6 +179,40 @@ test('★ PC 에서는 「이상 없음」을 감추고, 폰 구간이 ✓ 를 �
   assert.ok(!/\.dcard \.mini\.none\{display:none\}/.test(src), '★ 「대조 안 함」까지 감췄습니다 — 안 본 것이 깨끗한 것으로 읽힙니다');
 });
 
+/* ══════ 폰은 «무엇을 할지»만 (대표 결정 2026-10-30 「폰화면도 더 간단히」, 목업 추천 ①) ══════
+   지키는 것: ① PC 전용·폰 전용 조각이 서로 뒤집힌다 ② 자동 연결은 폰에서 접히되 «사고»면 안 접힌다
+   ③ 할 일은 한 줄 ④ 감추는 것은 글·설명뿐 — 단추(미리보기)는 ⋯ 안에 길이 있다 */
+test('★★ 폰에서는 PC 전용 조각을 감추고 폰 전용 조각을 꺼낸다 — PC 에서는 거꾸로', () => {
+  const 바깥 = src.slice(0, src.indexOf('@media'));
+  assert.match(바깥, /\.ph-only\{display:none\}/, '★ PC 에 폰 전용 조각이 보입니다');
+  const 폰 = 폰구간();
+  assert.match(폰, /\.pc-only\{display:none/, '★★ 폰에 PC 전용 조각(긴 글자·미리보기 단추)이 남습니다');
+  assert.match(폰, /\.ph-only\{display:inline/, '★ 폰 전용 조각이 폰에서도 안 보입니다');
+});
+
+test('★★ 미리보기는 폰에서 위 띠에서 빠지되 ⋯ 안에 길이 있다', () => {
+  const s = 함수('appbarHtml');
+  assert.match(s, /class="btn pc-only[^"]*" onclick="togglePreview\(\)"/, '★ 위 띠의 미리보기가 폰에서도 자리를 먹습니다');
+  const 안 = s.slice(s.indexOf('<details'), s.indexOf('</details>'));
+  assert.match(안, /class="btn ph-only" onclick="togglePreview\(\)"/,
+    '★★ 폰에서 미리보기를 켤 길이 사라졌습니다 — 감추는 것과 없애는 것은 다릅니다');
+});
+
+test('★★ 자동 연결은 폰에서 한 줄로 접히고, 멈췄거나 못 읽었으면 «늘 펴져» 있다', () => {
+  const 폰 = 폰구간();
+  assert.match(폰, /\.autocard:not\(\.open\) \.arow/, '★ 폰에서 자동 연결이 안 접힙니다');
+  const s = 함수('자동카드Html');
+  assert.match(s, /펼침 = App\.autoOpen \|\| App\.autoErr \|\| \(r && r\.멈춤\)/,
+    '★★ 멈춤·못 읽음을 한 줄 뒤에 숨깁니다 — 사고를 아무도 모르게 됩니다');
+  assert.match(s, /onclick="App\.autoOpen=!App\.autoOpen;App\.render\(\)"/, '★ 접힌 것을 펼 길이 없습니다');
+});
+
+test('★ 폰에서 할 일은 «한 건 = 한 줄»이다 — 설명은 PC 에서', () => {
+  const 폰 = 폰구간();
+  assert.match(폰, /\.todo \.job\{display:flex/, '★ 할 일이 한 줄이 아닙니다');
+  assert.match(폰, /\.todo \.job \.who,\.todo \.job details\{display:none\}/, '★ 할 일 설명이 폰에서 줄을 늘립니다');
+});
+
 test('★ 상태 딱지 이름이 카드판(.dash)과 겹치지 않는다 — 판 규칙이 딱지에 얹힌다', () => {
   const 딱지이름 = [...함수('statusChip').matchAll(/class="mini ([\w-]+)"/g)].map((m) => m[1]);
   assert.ok(딱지이름.length, '상태 딱지를 못 찾았습니다');
