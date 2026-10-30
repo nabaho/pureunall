@@ -49,6 +49,7 @@ function runApp(seed, opt) {
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
     + 'pickOpen,pickBody,pickOff,pickReset,pickStar,pickAuto,pickRank,pickBadge,inboxPull,feedSrvHtml,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
+    + 'recStarTog,recStarOnlyTog,recStarMap,recStarOn,appHist,appTag,appOpen,appSetSt,starAllItems,starAllOpen,appOrgOf,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
@@ -826,7 +827,7 @@ test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박�
   r.api.setFb(fbWith(MIX), 'U1');
   await r.api.recWatchPull();
   const kc = r.el('recWatchKc').innerHTML;
-  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"><\/colgroup>/);
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"><\/colgroup>/);
   assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th[^>]*>이력<\/th><th[^>]*>서류<\/th><th>기간<\/th>/);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
@@ -881,7 +882,7 @@ test('★★★ ㅁ·№ — 맨 왼쪽에 고르는 칸과 번호, 고른 것�
   r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   const rows = w.split('<tbody>')[1].split('</tr>').filter((x) => /<tr/.test(x));
-  rows.forEach((x, i) => assert.match(x, new RegExp('<tr[^>]*><td class="chk"><input type="checkbox" class="row-chk"[^>]*><\\/td><td class="rn">' + (i + 1) + '<\\/td>'), '줄 ' + (i + 1)));
+  rows.forEach((x, i) => assert.match(x, new RegExp('<tr[^>]*><td class="stc">.*?<\\/td><td class="chk"><input type="checkbox" class="row-chk"[^>]*><\\/td><td class="rn">' + (i + 1) + '<\\/td>'), '줄 ' + (i + 1)));
   r.api.recSelTog('pub', 'p2', true); r.api.recSelTog('pub', 'p3', true);
   assert.match(r.el('recWatch').innerHTML, /✔ <b>2건<\/b> 선택/);
   r.api.recSelSeen('pub', true);
@@ -1747,4 +1748,124 @@ test('★ 팝업은 단추로도 연다 · 헤더에 단추 · 하루 한 번 �
   assert.match(src, /<script src="js\/gov-pick\.js\?v=\d+"><\/script>/);
   assert.ok(require('../js/gov-sync.js').field('pick_off'), 'pick_off 가 칸 목록에 없다');
   assert.doesNotMatch(src, /localStorage\.setItem\(NS\+'pick_/, '쓰기는 lsSet 한 길로만');
+});
+
+/* ═══ ★ 별표 + 📚 과거 지원 표시 (대표 지시 2026-10-30) ═══
+   별은 «모든 영역»(공고·발주·컨설턴트 모집)에 있고 «별표만»으로 따로 본다. 이미 지원한 기관은 「📚 지원 N회」로 알린다.
+   못 박는 것은 «지금 값»이 아니라 규칙이다: 별표만은 자료를 안 지운다 · 모르는 기관에는 이력을 안 붙인다 · 안 한 일은 지원으로 안 센다. */
+const STAR_SRC = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
+const STAR_NOW = FixedDate('2026-12-05T09:00:00');
+const STAR_API = 'recStarTog,recStarOnlyTog,recStarMap,recStarOn,appHist,appTag,appOpen,appSetSt,starAllItems,starAllOpen,appOrgOf,';
+
+test('★★ 모집 글 줄 맨 앞에 별(☆)이 있고, 누르면 ★ 로 바뀌며 recruit_star 에 적힌다 · 한 번 더 누르면 지워진다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: STAR_NOW });
+  r.api.setFb(fbWith(MIX), 'U1'); await r.api.recWatchPull();
+  assert.match(r.el('recWatchKc').innerHTML, /<tr class="rec-now"><td class="stc"><button class="starbtn" title="별표 치기"/, '별 칸이 줄 맨 앞(ㅁ 앞)');
+  r.api.recStarTog('h', 'd');
+  assert.ok(r.api.recStarMap()['h|d'], 'h|d 가 적혀야 한다');
+  assert.match(r.el('recWatchKc').innerHTML, /<button class="starbtn on" title="별표 끄기"[^>]*recStarTog\('h','d'\)">★<\/button>/);
+  r.api.recStarTog('h', 'd');
+  assert.ok(!r.api.recStarMap()['h|d'], '두 번째는 지운다');
+});
+
+test('★★★ 「별표만」 — 별표 친 모집 글만 남기고, 자료는 지우지 않는다 · 별이 하나도 없으면 «없다»고 말한다(빈 표로 두지 않는다)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: STAR_NOW });
+  r.api.setFb(fbWith(MIX), 'U1'); await r.api.recWatchPull();
+  const before = r.api.recWatchHits().length;
+  r.api.recStarOnlyTog();                       /* 별 없이 켠다 */
+  assert.match(r.el('recWatchKc').innerHTML, /별표 친 모집 글이 없습니다/);
+  r.api.recStarTog('h', 'd');
+  const kc = r.el('recWatchKc').innerHTML;
+  assert.match(kc, /2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고/);
+  assert.doesNotMatch(kc, /관세청 안심노무사/, '별 안 친 글은 가린다');
+  assert.equal(r.api.recWatchHits().length, before, '가리기만 한다 — 자료는 그대로');
+  r.api.recStarOnlyTog();                       /* 끄면 전체로 */
+  assert.match(r.el('recWatchKc').innerHTML, /관세청 안심노무사/);
+  assert.equal(r.store.gov3_rec_staronly, '0', '이 기기에만 기억한다(클라우드 칸이 아니다)');
+});
+
+test('★★ 기관 표(지원 이력)에도 별 — 별표만으로 별 친 기관만 남는다', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: STAR_NOW });
+  r.api.recDraw();
+  const all = (r.el('recTb').innerHTML.match(/<tr /g) || []).length;
+  assert.ok(all >= 1);
+  assert.match(r.el('recTb').innerHTML, /<td class="stc"><button class="starbtn"/);
+  r.api.recStarTog('o', 'erc'); r.api.recStarOnlyTog();
+  const rows = (r.el('recTb').innerHTML.match(/<tr /g) || []).length;
+  assert.equal(rows, 1, '별 친 기관 하나만');
+  assert.match(r.el('recTb').innerHTML, /지방공기업평가원/);
+});
+
+test('★★★ 과거 지원 — 폴더에 서류가 있는 해 + 지원함·선정·탈락인 해를 센다 · 「지원 예정」·「이번엔 안 함」은 안 센다', () => {
+  const r = runApp({ recruit_scan: SCAN, recruit_log: {
+    erc: { 2023: { st: '지원함' }, 2022: { st: '지원 예정' }, 2021: { st: '이번엔 안 함' }, 2020: { st: '선정' } } } }, { Date: STAR_NOW });
+  const h = r.api.appHist('erc');
+  /* 폴더 2024·2025·2026 + 로그 2023(지원함)·2020(선정) = 5 */
+  assert.equal(h.n, 5, JSON.stringify(h.rows.map((x) => x.y + ':' + (x.st || (x.folder ? '폴더' : '-')))));
+  assert.equal(h.won, 1);
+  assert.ok(h.rows.some((x) => x.y === '2022' && x.plan), '지원 예정은 보이되 세지 않는다');
+  assert.ok(!h.rows.some((x) => x.y === '2021'), '이번엔 안 함은 지원이 아니다');
+  const tag = r.api.appTag('erc');
+  assert.match(tag, /class="apptag many"/, '두 번 넘게 지원했으면 눈에 띄게');
+  assert.match(tag, /지원 5회 · 선정 1/);
+});
+
+test('★★★ 기관을 «모르면» 이력을 붙이지 않는다 — 없는 기관·빈 값·지원 기록 없는 기관 모두 빈 글자', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: STAR_NOW });
+  assert.equal(r.api.appTag(''), '');
+  assert.equal(r.api.appTag('없는기관'), '');
+  assert.equal(r.api.appHist(''), null);
+  assert.equal(r.api.appOrgOf('아무 관련 없는 공고'), '', '모르는 글은 기관을 지어내지 않는다');
+});
+
+test('★★ 「그해 상태 적기」 — 과거 지원을 직접 적으면 바로 세어지고, 같은 칸의 마감일(due)은 안 지운다 · 비워도 마감일은 산다', () => {
+  const r = runApp({ recruit_scan: SCAN, recruit_log: { erc: { 2019: { due: '2019-03-01' } } } }, { Date: STAR_NOW });
+  const n0 = r.api.appHist('erc').n;
+  r.api.appSetSt('erc', '2019', '지원함');
+  assert.equal(r.api.appHist('erc').n, n0 + 1);
+  assert.equal(r.api.recObj('recruit_log').erc['2019'].due, '2019-03-01', '마감일을 덮으면 안 된다');
+  r.api.appSetSt('erc', '2019', '');
+  assert.equal(r.api.appHist('erc').n, n0);
+  assert.equal(r.api.recObj('recruit_log').erc['2019'].due, '2019-03-01', '비워도 마감일은 남는다');
+  r.api.appSetSt('erc', '19xx', '지원함');           /* 이상한 해는 무시 */
+  assert.equal(r.api.appHist('erc').n, n0);
+});
+
+test('★★ 이력 창 — 해마다 상태·근거를 보여 주고 «적어 두기» 칸이 있다', () => {
+  const r = runApp({ recruit_scan: SCAN, recruit_log: { erc: { 2023: { st: '탈락', result: { date: '2023-12-01', subject: '결과 안내' } } } } }, { Date: STAR_NOW });
+  r.api.appOpen('erc');
+  assert.match(r.el('popTtl').textContent, /지난 지원 이력/);
+  const b = r.el('popBody').innerHTML;
+  assert.match(b, /탈락/); assert.match(b, /서류 폴더에 그해 서류/); assert.match(b, /결과 안내/);
+  assert.match(b, /과거 지원 적어 두기/); assert.match(b, /id="appY"/);
+});
+
+test('★★ 별표 모음 — 공고(관심)·발주(별)·모집(글·기관·메일)을 한 창에 모은다 · 아무것도 없으면 안내', async () => {
+  const r = runApp({ recruit_scan: SCAN,
+    feed: [{ id: 'g1', nm: '노무 컨설팅 용역', org: '갑기관', type: '관심', src: '나라장터' }, { id: 'g2', nm: '다른 공고', type: '새 공고' }],
+    plan: [{ no: 'P1', nm: '발주 계획 하나', org: '을기관', star: true }, { no: 'P2', nm: '별 없음', org: '병' }] }, { Date: STAR_NOW });
+  r.api.setFb(fbWith(MIX), 'U1'); await r.api.recWatchPull();
+  r.api.recStarTog('h', 'd'); r.api.recStarTog('o', 'erc');
+  const S = r.api.starAllItems();
+  assert.equal(S.feed.length, 1); assert.equal(S.plan.length, 1); assert.equal(S.hits.length, 1); assert.equal(S.orgs.length, 1);
+  assert.equal(S.n, 4);
+  r.api.starAllOpen();
+  const b = r.el('popBody').innerHTML;
+  assert.match(r.el('popTtl').textContent, /별표 모음/);
+  assert.match(b, /노무 컨설팅 용역/); assert.match(b, /발주 계획 하나/); assert.match(b, /일터혁신 컨설팅 지원사업/); assert.match(b, /지방공기업평가원/);
+  assert.doesNotMatch(b, /별 없음|다른 공고/);
+  const e = runApp({}, { Date: STAR_NOW }); e.api.starAllOpen();
+  assert.match(e.el('popBody').innerHTML, /별표 친 것이 없습니다/);
+});
+
+test('★ 별표·이력은 클라우드 칸에 적히고(recruit_star), 직접 localStorage 에 쓰지 않는다 · 모든 표 머리에 ★ 칸 · 머리 단추', () => {
+  const S = require('../js/gov-sync.js');
+  assert.equal(S.field('recruit_star').path, 'recruit/star'); assert.equal(S.field('recruit_star').kind, 'map');
+  assert.doesNotMatch(STAR_SRC, /localStorage\.setItem\(NS\+'recruit_star/, '쓰기는 lsSet 한 길로만');
+  assert.match(STAR_SRC, /<button class="btn" id="starAllBtn" onclick="starAllOpen\(\)"/);
+  assert.match(STAR_SRC, /<th class="stc" title="별표\(★\)">★<\/th><th class="chk"><input type="checkbox" id="recOrgAll"/, '기관 표 머리');
+  assert.equal((STAR_SRC.match(/<th class="stc" title="별표\(★\)">★<\/th>'\+recChkHead\(/g) || []).length, 3, '모집 글 표 + 메일 표 둘(할 일·참고용 공용 한 곳 + 공고 묶음)에 ★ 머리 칸');
+  /* 공고·발주 줄에도 지원 이력 표시 */
+  assert.match(STAR_SRC, /restrictTags\(r\)\+appTag\(mt\(\)\.orgId\)\+orgRecTag\(r\)/);
+  assert.match(STAR_SRC, /soleTag\(r\)\+appTag\(appOrgOf\(\(r\.org\|\|''\)\+' '\+\(r\.nm\|\|''\)\)\)\+'<b>'/);
 });
