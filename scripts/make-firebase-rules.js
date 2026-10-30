@@ -887,6 +887,9 @@ rules.pucards = {
   /* 📬 메일 서명 → 명함 줄(서버 mail-card) — 받는 탭이 «read» 줄만 st 로 추려 읽는다 (2026-10-24).
      이름 붙은 칸이라 $k 가 주던 쓰기 허락을 그대로 옮긴다(위 머리말). q 아래 줄 «처리 표시»는 받는 탭이 쓴다. */
   mailcard: { '.write': pucardsWrite, $k2: { '.write': LOGIN, '.indexOn': ['st'] } },
+  /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
+     쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
+  idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */

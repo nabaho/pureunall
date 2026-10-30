@@ -36,6 +36,18 @@ function fakeDb(map) {
           calls.once.push(key);
           return Promise.resolve({ val: () => (key in map ? map[key] : null) });
         },
+        /* 자식 값으로 «묻기» — 실제 DB 의 orderByChild().equalTo() 처럼 같은 줄만 돌려준다 */
+        orderByChild(child) {
+          return { equalTo(v) {
+            return { once() {
+              calls.once.push(key + '?' + child + '=' + v);
+              const rows = (key in map ? map[key] : null) || {};
+              const out = {};
+              Object.keys(rows).forEach((k) => { if (rows[k] && rows[k][child] === v) out[k] = rows[k]; });
+              return Promise.resolve({ val: () => (Object.keys(out).length ? out : null) });
+            } };
+          } };
+        },
         push() { return { key: '-new' + (calls.update.length + 1) }; }
       };
     }
@@ -502,4 +514,76 @@ test('실시간DB가 없으면 한국어로 거절한다 — 업체관리도', a
   const F = loadFile();
   F.init({});
   await assert.rejects(() => F.sendToCompany({ kind: 'bizreg', fields: BIZ }), /실시간DB/);
+});
+
+
+/* ── 번호 없는 명함의 둘째 열쇠: 이름 + 회사(또는 이메일) (대표 지시 2026-10-30) ── */
+
+test('번호가 비어 있어도 이름+회사가 같으면 같은 사람으로 찾는다', async () => {
+  const F = loadFile();
+  F.init({ db: fakeDb({ 'pucards/idx': { a1: { n: '김가나', c: '(주)다라상사', m: '', k: 'card' } } }) });
+  const hit = await F.findExisting('card', { name: '김 가나', company: '다라상사 주식회사', mobile: '010-1111-2222' });
+  assert.ok(hit && hit.id === 'a1', '회사 표기(주)·공백이 달라도 같은 사람이어야 한다');
+  const hit2 = await F.findExisting('card', { name: '김가나', company: '다라상사' });
+  assert.ok(hit2 && hit2.id === 'a1', '들어온 쪽 번호가 비어도 찾아야 한다');
+});
+
+test('이름만으로는 붙이지 않는다 · 회사도 이메일도 없으면 만든다', async () => {
+  const F = loadFile();
+  F.init({ db: fakeDb({ 'pucards/idx': { a1: { n: '김가나', c: '다라상사', m: '', k: 'card' } } }) });
+  assert.equal(await F.findExisting('card', { name: '김가나' }), null);
+  assert.equal(await F.findExisting('card', { name: '김가나', company: '마바상사' }), null, '회사가 다르면 다른 사람');
+});
+
+test('둘 다 휴대폰이 있는데 다르면 같은 회사 동명이인이다 — 붙이지 않는다', async () => {
+  const F = loadFile();
+  F.init({ db: fakeDb({ 'pucards/idx': { a1: { n: '김가나', c: '다라상사', m: '01011112222', k: 'card' } } }) });
+  assert.equal(await F.findExisting('card', { name: '김가나', company: '다라상사', mobile: '010-9999-8888' }), null);
+});
+
+test('이름+이메일이 같고 번호가 빈 쪽이면 같은 사람으로 본다', async () => {
+  const F = loadFile();
+  F.init({ db: fakeDb({ 'pucards/idx': { a1: { n: '박나다', c: '', e: 'Na@Da.Kr', m: '', k: 'card' } } }) });
+  const hit = await F.findExisting('card', { name: '박나다', email: 'na@da.kr' });
+  assert.ok(hit && hit.id === 'a1');
+});
+
+test('사업자등록증은 이름 열쇠를 쓰지 않는다 — 사업자번호만', async () => {
+  const F = loadFile();
+  F.init({ db: fakeDb({ 'pucards/idx': { b1: { n: '김가나', c: '다라상사', k: 'biz', bz: '1238120031' } } }) });
+  assert.equal(await F.findExisting('bizreg', { name: '김가나', company: '다라상사' }), null);
+});
+
+test('번호 없던 명함에 번호가 채워지면 번호 열쇠(bykey)도 적는다', async () => {
+  const F = loadFile();
+  const db = fakeDb({
+    'pucards/idx': { a1: { n: '김가나', c: '다라상사', m: '', k: 'card' } },
+    'pucards/items/a1': { id: 'a1', name: '김가나', company: '다라상사', kind: 'card' }
+  });
+  F.init({ db });
+  const r = await F.sendToCards({ kind: 'card', fields: { name: '김가나', company: '다라상사', mobile: '010-1111-2222' } });
+  assert.equal(r.created, false, '새 명함을 만들면 안 된다');
+  assert.equal(r.id, 'a1');
+  const all = Object.assign({}, ...db.calls.update.map((c) => c.u));
+  assert.equal(all['pucards/bykey/c01011112222'], 'a1', '번호 열쇠가 적혀야 다음에 휴대폰으로 찾는다');
+});
+
+test('번호 없는 새 명함도 색인 줄에 이름(n)이 들어간다 — 다음 번 «물어서» 찾는 열쇠', async () => {
+  const F = loadFile();
+  const db = fakeDb({ 'pucards/idx': {} });
+  F.init({ db });
+  const a = await F.sendToCards({ kind: 'card', fields: { name: '최다라', company: '가나상사', email: 'cd@ga.kr' } });
+  assert.equal(a.created, true);
+  const all = Object.assign({}, ...db.calls.update.map((c) => c.u));
+  const row = all['pucards/idx/' + a.id];
+  assert.ok(row && row.n === '최다라' && row.c === '가나상사', '이름·회사가 색인에 없으면 다음에 못 찾는다');
+});
+
+test('둘째 열쇠는 색인 «전체»를 읽지 않고 이름으로 물어서 찾는다', async () => {
+  const F = loadFile();
+  const db = fakeDb({ 'pucards/config/bykeyAt': 1, 'pucards/idx': { a1: { n: '김가나', c: '다라상사', m: '', k: 'card' } } });
+  F.init({ db });
+  await F.findExisting('card', { name: '김가나', company: '다라상사', mobile: '010-1111-2222' });
+  assert.ok(!db.calls.once.includes('pucards/idx'), '색인 통째 읽기는 사진 한 장마다 1MB 다');
+  assert.ok(db.calls.once.some((c) => /^pucards\/idx\?n=/.test(c)), '이름으로 물어야 한다');
 });
