@@ -15,7 +15,7 @@ const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
 const { stripJs } = require('./strip-comments');
 
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n'); // 윈도우(autocrlf) 꺼냄에서도 같은 결과
 const MOB = stripJs(cutFn(SRC, 'function openDetail('));
 const PC = stripJs(cutFn(SRC, 'function openPcDetail('));
 

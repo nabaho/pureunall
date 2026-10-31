@@ -15,3 +15,8 @@
 
 ## 검사
 node --test "tests/**/*.test.js" — fail 1: cards-detail-actions ⑤(명함 지도 창) — main 에서도 실패(이번 변경과 무관).
+
+## 덧붙임 — 명함 지도 창 검사(⑤) 윈도우 실패 고침
+- 원인: 이 PC 의 git autocrlf 로 pu-cards.html 이 CRLF 로 꺼내져, 검사가 찾는 `"...return;\n  /* 주소 지도 창"` 문구가 안 맞았다(저장소 원본은 LF 라 CI 에서는 통과).
+- 고침: tests/cards-detail-actions.test.js 가 읽은 원문의 CRLF 를 LF 로 맞춘 뒤 검사. 규칙 자체는 그대로.
+- 전체 검사: 통과 27744 / 실패 0.
