@@ -266,6 +266,57 @@ test('normalizeRun — 파이어베이스가 지운 빈 배열·null 칸을 되�
   assert.deepEqual(n.rows[1].amounts, {});
 });
 
+/* ── 입금 대조 (대표 지시 2026-10-31 「개개인에게 입금된 금액을 비교 … 복사 붙여넣기 … 당겨오기」) ── */
+test('붙여넣기 읽기 — 인터넷뱅킹·입금 문자·엑셀 줄에서 금액만, 잔액·계좌번호·날짜·시각은 빼고 출금 줄은 건너뛴다', () => {
+  const text = [
+    '2026.10.30 14:22:10\t입금\t가나재단\t945,033\t\t12,345,678',
+    '[Web발신] 하나 10/30 14:23 123-******-45678 입금 2,483,442원 가나재단 잔액15,000,000원',
+    '2026-10-31 09:10 출금 관리비 330,000',
+    '10.29 다라협회 977,273'
+  ].join('\n');
+  const f = C.parseDepositText(text);
+  const amounts = f.map((x) => x.amount);
+  assert.ok(amounts.indexOf(945033) >= 0, JSON.stringify(amounts));
+  assert.ok(amounts.indexOf(2483442) >= 0);
+  assert.ok(amounts.indexOf(977273) >= 0);
+  assert.equal(amounts.indexOf(15000000), -1, '잔액은 금액이 아니다');
+  assert.equal(amounts.indexOf(330000), -1, '출금 줄은 건너뛴다');
+  assert.equal(amounts.some((a) => String(a).indexOf('45678') >= 0 && a < 100000), false, '계좌번호 조각을 금액으로 읽지 않는다');
+  assert.equal(f.find((x) => x.amount === 945033).date, '2026-10-30');
+  assert.equal(f.find((x) => x.amount === 977273).date, '10-29');
+});
+
+test('재무관리 거래내역 — 기간 안 «입금»만, 지운 묶음·카드 취소·지출은 뺀다', () => {
+  const batches = { v: [
+    { id: 'lb1', rows: [
+      { _k: 'a', type: 'income', date: '2026-10-02 10:01', amount: 2483442, memo: '가나재단', note: '하나은행 문자 · ****1234' },
+      { _k: 'b', type: 'expense', date: '2026-10-02 11:00', amount: 50000 },
+      { _k: 'c', type: 'income', date: '2026-08-01', amount: 999999 },
+      { _k: 'd', type: 'income', date: '2026-10-05', amount: 120000, cancel: true }
+    ] },
+    { id: 'lb2', _deleted: true, rows: [{ _k: 'e', type: 'income', date: '2026-10-03', amount: 2483442 }] }
+  ] }.v;
+  const w = C.depositWindow('2026-09');
+  assert.deepEqual(w, { from: '2026-09-01', to: '2026-10-20' });
+  const got = C.ledgerDeposits(batches, w.from, w.to);
+  assert.deepEqual(got.map((x) => [x.amount, x.memo, x.source]), [[2483442, '가나재단', 'ledger']]);
+  assert.deepEqual(C.depositWindow('2026-12'), { from: '2026-12-01', to: '2027-01-20' });
+});
+
+test('예상 세후 — 그 사람의 사업장마다 한 줄(계산한 세후)', () => {
+  const sites = C.settleMonth(notice(), '2026-10', RULE, ctx({ actuals: { 'C-1|T-A': 945000 } })).sites;
+  assert.deepEqual(C.expectedFor({ sites }, 'T-A'), [{ key: 'C-1|T-A', company: '가나상사', round: 1, amount: 945033, actual: 945000 }]);
+  assert.deepEqual(C.expectedFor({ sites }, 'T-LEAD').map((e) => e.amount), [2483442]);
+});
+
+test('맞추기 — 같은 금액 먼저, 1% 안쪽은 «가까움»(차이 표시), 찾은 줄은 한 번만 쓴다', () => {
+  const exp = [{ key: 'C-1|T-LEAD', company: '가나상사', amount: 2483442 }, { key: 'C-2|T-LEAD', company: '다라산업', amount: 2483442 },
+    { key: 'C-3|T-LEAD', company: '마바상사', amount: 1934000 }, { key: 'C-4|T-LEAD', company: '사아상사', amount: 500000 }];
+  const found = [{ id: 'x1', amount: 2483442 }, { id: 'x2', amount: 2483442 }, { id: 'x3', amount: 1933980 }, { id: 'x4', amount: 777777 }];
+  const m = C.matchDeposits(exp, found);
+  assert.deepEqual(m.map((o) => [o.kind, o.found && o.found.id, o.diff]), [['exact', 'x1', 0], ['exact', 'x2', 0], ['near', 'x3', -20], ['none', null, null]]);
+});
+
 test('noticeHash — 같은 줄이면 같고, 금액이 다르면 다르다', () => {
   const a = notice(), b = notice();
   assert.equal(C.noticeHash(a.rows), C.noticeHash(b.rows));

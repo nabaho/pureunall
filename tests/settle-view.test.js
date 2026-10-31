@@ -48,6 +48,18 @@ test('정산표 — 정산액은 쉼표와 빼기표, 실입금 칸은 계산만
   assert.doesNotMatch(c, /<input[^>]*data-actual=/);
 });
 
+test('정산표 — 통장 실입금이 있으면 계산한 세후와 견준 딱지(일치/차이)와 «입금 확인 n/m»', () => {
+  const r = fakeRun('draft');
+  const a = r.sites[0].members.find((m) => m.sid === 'T-A');
+  a.actual = 945000;
+  const lead = r.sites[0].members.find((m) => m.sid === 'T-LEAD');
+  lead.actual = lead.net;
+  const v = visible(V.runDetail(r, NAMES));
+  assert.match(v, /입금 확인 2\/2/);
+  assert.match(v, /일치/);
+  assert.match(v, /−33/);
+});
+
 test('정산표 — 확인 필요가 있으면 «확정» 단추가 잠긴다', () => {
   const r = fakeRun('draft');
   r.sites[0].issues.push('요율 없음: 김가나');
@@ -71,6 +83,24 @@ test('계산만인 달도 송금 목록을 미리 보여 주되 «보냄»은 �
   assert.match(visible(t), /87,915/);
   assert.match(t, /data-paid="0" disabled/);
   assert.match(visible(h), /미리보기/);
+});
+
+test('입금 대조 상자 — ☐·번호, 찾은 입금 고르기, 일치·금액 다름 표시, 사번은 화면에 없다', () => {
+  const found = [{ id: 'p0', amount: 945033, date: '2026-10-30', memo: '<i>가나재단</i>' }, { id: 'p1', amount: 945000, date: '2026-10-30', memo: '다라' }];
+  const matches = [{ key: 'C-1|T-A', company: '가나상사', expected: 945033 }, { key: 'C-2|T-A', company: '다라산업', expected: 945033 }];
+  const h = V.depositBox({ open: true, people: [{ sid: 'T-A', name: '김가나' }], sid: 'T-A', found, source: 'paste', matches, pick: { 'C-1|T-A': 'p0', 'C-2|T-A': 'p1' }, sel: { 'C-1|T-A': 1 } });
+  const t = h.slice(h.indexOf('data-name="deposits"'));
+  const ths = [...t.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="deposits"/);
+  assert.match(ths[1], /번호/);
+  assert.match(t, /<select data-dep="C-1\|T-A">/);
+  assert.match(visible(t), /일치/);
+  assert.match(visible(t), /금액 다름/);
+  assert.match(visible(t), /−33/);
+  assert.doesNotMatch(h, /<i>가나재단/);
+  assert.doesNotMatch(visible(h), /T-A/);
+  assert.match(h, /id="dep_apply"/);
+  assert.match(h, /id="dep_pull"/);
 });
 
 test('카톡 문구 상자 — 사람마다 복사 단추', () => {

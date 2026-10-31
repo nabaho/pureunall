@@ -64,11 +64,14 @@
   function runDetail(run, names, sel) {
     sel = sel || {};
     var iss = issuesOf(run), ok = C.checkRun(run.sites || [], run.issues || []).ok, draft = run.status === 'draft';
-    var T = 0, shares = 0, tr = draft ? previewTransfers(run.sites) : (run.transfers || []), trSum = 0;
-    (run.sites || []).forEach(function (s) { T += s.totalNet; s.members.forEach(function (m) { if (m.role === 'staff' && m.share != null) shares += m.share; }); });
+    var T = 0, shares = 0, tr = draft ? previewTransfers(run.sites) : (run.transfers || []), trSum = 0, paidN = 0, checkedN = 0;
+    (run.sites || []).forEach(function (s) { T += s.totalNet; s.members.forEach(function (m) {
+      if (m.role === 'staff' && m.share != null) shares += m.share;
+      if (m.pre > 0) { paidN++; if (m.actual != null) checkedN++; }
+    }); });
     tr.forEach(function (t) { trSum += t.amount; });
     var h = '<div class="kpis">'
-      + '<div class="kpi"><span>세후 합계</span><b>' + won(T) + '원</b></div>'
+      + '<div class="kpi"><span>세후 합계 · 입금 확인 ' + checkedN + '/' + paidN + '</span><b>' + won(T) + '원</b></div>'
       + '<div class="kpi"><span>담당 몫 합계</span><b>' + won(shares) + '원</b></div>'
       + '<div class="kpi"><span>' + (draft ? '송금(확정하면)' : '송금') + '</span><b>' + tr.length + '건 · ' + won(trSum) + '원</b></div>'
       + '<div class="kpi' + (iss.length ? ' bad' : '') + '"><span>확인 필요</span><b>' + iss.length + '건</b></div></div>';
@@ -91,7 +94,9 @@
           + num('pre', m.pre) + num('wht', m.inc + m.loc) + num('net', m.net)
           + '<td class="r" data-k="act">' + (draft && s.consultingId && m.sid
             ? '<input type="text" inputmode="numeric" class="amt" data-actual="' + esc(key) + '" value="' + (m.actual == null ? '' : esc(C.fmt(m.actual))) + '" placeholder="통장 입금">'
-            : esc(m.actual == null ? '' : won(m.actual))) + '</td>'
+            : esc(m.actual == null ? '' : won(m.actual)))
+          /* 통장 실입금이 있으면 계산한 세후와 견준 딱지 — 같으면 «일치», 다르면 차이(실입금 − 계산) */
+          + (m.actual == null ? '' : ' <span class="pill ' + (m.actual === m.net ? 'st-confirmed' : 'st-draft') + '" data-k="cmp">' + (m.actual === m.net ? '일치' : esc(C.fmt(m.actual - m.net))) + '</span>') + '</td>'
           + '<td class="r" data-k="rate">' + (m.rate == null ? '' : esc(m.rate) + '%') + '</td>'
           /* 주관은 몫·차액이 없다 — «—» 를 찍지 않고 비워 둔다(말을 하는 값만, 폰 카드에서 칸 이름도 안 붙는다) */
           + (m.role === 'lead' ? '<td class="r" data-k="share"></td><td class="r" data-k="diff"></td>' : num('share', m.share) + num('diff', m.diff))
@@ -197,6 +202,37 @@
     return h + '</tbody></table></div>';
   }
 
+  /* ── ②-1 입금 대조 (계산만인 정산표) — 통장에 실제로 들어온 금액과 계산한 세후를 견준다 ──
+     st = {people:[{sid,name}], sid, found:[], source:'paste'|'ledger'|'', text, matches:[C.matchDeposits 결과], pick:{key:foundId}, sel:{key:1}}
+     ⚠ 금액이 같다는 것은 후보일 뿐 — 아래 «저장»을 눌러야 통장 실입금이 된다. 고르기만으로는 아무것도 안 바뀐다. */
+  var KIND_KO = { exact: '일치', near: '금액 다름 — 확인', none: '못 찾음' };
+  function depositBox(st) {
+    st = st || {};
+    var people = st.people || [], found = st.found || [], matches = st.matches || [], pick = st.pick || {}, sel = st.sel || {};
+    var h = '<details class="card dep"' + (st.open ? ' open' : '') + ' data-dep-box><summary class="sec">💳 입금 대조 — 통장에 실제로 들어온 금액과 견주기</summary>'
+      + '<div class="bar"><label class="hint" for="dep_sid">누구 통장</label><select id="dep_sid"><option value="">— 사람 —</option>'
+      + people.map(function (p) { return '<option value="' + esc(p.sid) + '"' + (p.sid === st.sid ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select>'
+      + '<span class="sp"></span><button class="sm" id="dep_pull" title="재무관리 거래내역(하나은행 문자·통장 엑셀로 모은 대표 통장)에서 이 달 입금을 가져온다">재무관리에서 당겨오기</button></div>'
+      + '<div class="fr"><textarea id="dep_text" rows="3" placeholder="인터넷뱅킹 거래내역·입금 문자·엑셀 줄을 복사해 붙여 넣으세요">' + esc(st.text || '') + '</textarea></div>'
+      + '<div class="bar"><button class="sm" id="dep_read">붙여 넣은 글 읽기</button><span class="hint">' + (found.length ? '찾은 입금 ' + found.length + '건 · ' + (st.source === 'ledger' ? '재무관리' : '붙여넣기') : '사람을 고르고 붙여 넣거나 당겨오세요') + '</span></div>';
+    if (!st.sid) return h + '</details>';
+    if (!matches.length) return h + '<div class="empty">이 사람은 이 정산표에 받을 금액이 없습니다.</div></details>';
+    var allOn = matches.every(function (m) { return sel[m.key]; });
+    h += '<div class="scroll"><table class="t" data-name="deposits"><thead><tr>' + ckHead('deposits', allOn)
+      + '<th>사업장</th><th class="r">예상 세후</th><th>찾은 입금</th><th class="r">차이</th><th>상태</th></tr></thead><tbody>';
+    matches.forEach(function (m, i) {
+      var cur = pick[m.key] || '', f = found.filter(function (x) { return x.id === cur; })[0] || null, diff = f ? f.amount - m.expected : null;
+      var kind = !f ? 'none' : (diff === 0 ? 'exact' : 'near');
+      h += '<tr>' + ckCell(m.key, sel[m.key]) + '<td class="n">' + (i + 1) + '</td>' + nw('site', m.company, 'ti') + num('exp', m.expected)
+        + '<td data-k="pick"><select data-dep="' + esc(m.key) + '"><option value="">— 없음 —</option>'
+        + found.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(C.fmt(x.amount) + '원 · ' + (x.date || '') + ' · ' + (x.memo || '') + (x.note ? ' · ' + x.note : '')) + '</option>'; }).join('')
+        + '</select></td>' + '<td class="r" data-k="diff">' + (diff == null ? '' : esc(C.fmt(diff))) + '</td>'
+        + '<td class="nw" data-k="st"><span class="pill ' + (kind === 'exact' ? 'st-confirmed' : kind === 'near' ? 'st-draft' : '') + '">' + esc(KIND_KO[kind]) + '</span></td></tr>';
+    });
+    return h + '</tbody></table></div><div class="bar"><span class="hint">고른 줄의 «찾은 입금»을 통장 실입금으로 저장하고 다시 계산합니다.</span><span class="sp"></span>'
+      + '<button class="pri" id="dep_apply">고른 줄 저장</button></div></details>';
+  }
+
   /* ── ⑤ 카톡 문구 ── */
   function messagesBox(msgs) {
     if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 확정 정산표를 고르세요.</div>';
@@ -206,6 +242,6 @@
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, runsTable: runsTable, runDetail: runDetail, noticesTable: noticesTable, linkBox: linkBox,
+  return { STATUS_KO: STATUS_KO, esc: esc, runsTable: runsTable, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rulesBox: rulesBox, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });

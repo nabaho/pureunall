@@ -44,9 +44,19 @@ function run(mk, status) {
 const runs = {};
 [['2026-07', 'manual'], ['2026-09', 'confirmed'], ['2026-10', 'draft']].forEach(([mk, st]) => { const r = run(mk, st); runs[r.id] = r; });
 
+/* 재무관리 거래내역(입금 대조 «당겨오기») — 10월 사업장 주관 세후와 같은 금액 둘 + 가까운 금액 하나 + 관계없는 입금·지출 */
+const net = (pre) => pre - C.withholding(pre).total;
+const ledger_batches = { v: [{ id: 'lb-pa1', by: 'P001', at: '2026-10-31T01:00:00Z', fileName: '점검 거래문자', src: 'hana-sms', rows: [
+  { _k: 'h1', type: 'income', src: 'bank', date: '2026-10-28 10:12', memo: '가나점검재단', note: '하나은행 문자 · ****1234', amount: net(2568182 + 2 * 1000) },
+  { _k: 'h2', type: 'income', src: 'bank', date: '2026-10-28 10:13', memo: '가나점검재단', note: '하나은행 문자 · ****1234', amount: net(2568182 + 5 * 1000) - 20 },
+  { _k: 'h3', type: 'income', src: 'bank', date: '2026-10-29 09:00', memo: '점검상사 자문료', note: '하나은행 문자 · ****1234', amount: 550000 },
+  { _k: 'h4', type: 'expense', src: 'bank', date: '2026-10-29 12:00', memo: '사무실 임차료', amount: 1100000 },
+] }] };
+
 module.exports = {
   data: {
     data: {
+      ledger_batches,
       biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' }] },
       consultings: { v: consultings },
     },

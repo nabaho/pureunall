@@ -273,6 +273,85 @@
     });
   }
 
+  /* ═══ 입금 대조 ═══ — 통장에 «실제로» 들어온 금액을 계산한 세후와 견준다(대표 지시 2026-10-31 「개개인에게 입금된 금액을 비교」)
+     ⚠ 금액이 같다는 것은 «후보»일 뿐이다 — 사람이 고르고 «저장»을 눌러야 통장 실입금이 된다(온톨로지: 금액 일치로 ID 를 자동 대입하지 않는다). */
+  var MONEY_RE = /(?:^|[^\d,.\-*])(\d{1,3}(?:,\d{3})+|\d{4,9})(?:\s*원)?(?![\d,*\-])/g;
+  /* 인터넷뱅킹 거래내역·입금 문자·엑셀에서 복사한 글 → 줄마다 금액 후보.
+     잔액·계좌번호(-·*)·날짜·시각은 금액으로 안 본다. «출금»만 있는 줄은 건너뛴다. */
+  function parseDepositText(text) {
+    var out = [];
+    String(text == null ? '' : text).split(/\r?\n/).forEach(function (raw, li) {
+      var line = clean(raw.replace(/\t/g, ' '));
+      if (!line) return;
+      if (/출금|이체출금|지급/.test(line) && !/입금/.test(line)) return;
+      var date = '', d = /(20\d{2})[.\-\/년]\s*(\d{1,2})[.\-\/월]\s*(\d{1,2})/.exec(line);
+      if (d) date = d[1] + '-' + pad2(Number(d[2])) + '-' + pad2(Number(d[3]));
+      else if ((d = /(?:^|\s)(\d{1,2})[.\/](\d{1,2})(?:\s|$)/.exec(line))) date = pad2(Number(d[1])) + '-' + pad2(Number(d[2]));
+      var body = line.replace(/잔액\s*:?\s*[\d,]+\s*원?/g, ' ')
+        .replace(/20\d{2}[.\-\/년]\s*\d{1,2}[.\-\/월]\s*\d{1,2}일?/g, ' ').replace(/\d{1,2}:\d{2}(?::\d{2})?/g, ' ')
+        .replace(/[\d*]+(?:-[\d*]+){1,4}/g, ' ');
+      var m, n = 0;
+      MONEY_RE.lastIndex = 0;
+      while ((m = MONEY_RE.exec(body))) {
+        var amount = Number(m[1].replace(/,/g, ''));
+        if (amount < 1000) continue;
+        out.push({ id: 'p' + li + '_' + (n++), source: 'paste', amount: amount, date: date, memo: line.length > 60 ? line.slice(0, 60) + '…' : line });
+      }
+    });
+    return out;
+  }
+  function ymd(s) { return String(s || '').slice(0, 10); }
+  /* 재무관리 거래내역 묶음(data/ledger_batches 의 v) → 기간 안의 «입금» 줄. 지운 묶음·카드 취소는 뺀다 */
+  function ledgerDeposits(batches, from, to) {
+    var out = [];
+    toArr(batches).forEach(function (b) {
+      if (!b || b._deleted) return;
+      toArr(b.rows).forEach(function (r, i) {
+        if (!r || r.type !== 'income' || r.cancel || r._deleted) return;
+        var day = ymd(r.date), amount = Math.round(Number(r.amount) || 0);
+        if (!day || day < from || day > to || amount <= 0) return;
+        out.push({ id: String(b.id || 'b') + ':' + String(r._k || i), source: 'ledger', amount: amount, date: String(r.date || ''), memo: clean(r.memo), note: clean(r.note) });
+      });
+    });
+    return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  }
+  /* 지급월 열쇠의 입금 찾을 기간 — 「9월 (10/2 지급)」처럼 이름 달보다 늦게 들어오기도 해서 다음 달 20일까지 본다 */
+  function depositWindow(monthKey) {
+    var y = Number(String(monthKey).slice(0, 4)), m = Number(String(monthKey).slice(5, 7));
+    var ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    return { from: y + '-' + pad2(m) + '-01', to: ny + '-' + pad2(nm) + '-20' };
+  }
+  /* 한 사람이 이 정산표에서 받았어야 할 세후 — 사업장마다 한 줄(계산값 기준, 이미 넣은 실입금과 견주려고 net 을 쓴다) */
+  function expectedFor(run, sid) {
+    var out = [];
+    ((run && run.sites) || []).forEach(function (s) {
+      (s.members || []).forEach(function (m) {
+        if (m.sid !== sid || !(m.pre > 0) || !s.consultingId) return;
+        out.push({ key: s.consultingId + '|' + sid, company: s.company, round: s.round, amount: m.net, actual: m.actual == null ? null : m.actual });
+      });
+    });
+    return out;
+  }
+  /* 맞추기 — ① 같은 금액 ② 1%(최소 1,000원) 안쪽의 가까운 금액(«확인 필요») ③ 없음. 찾은 줄 하나는 한 번만 쓴다 */
+  function matchDeposits(expected, found) {
+    var used = {}, out = (expected || []).map(function (e) { return { key: e.key, company: e.company, expected: e.amount, found: null, kind: 'none', diff: null }; });
+    out.forEach(function (o) {
+      var f = (found || []).filter(function (x) { return !used[x.id] && x.amount === o.expected; })[0];
+      if (f) { used[f.id] = 1; o.found = f; o.kind = 'exact'; o.diff = 0; }
+    });
+    out.forEach(function (o) {
+      if (o.found) return;
+      var tol = Math.max(1000, Math.round(o.expected * 0.01)), best = null;
+      (found || []).forEach(function (x) {
+        if (used[x.id]) return;
+        var d = Math.abs(x.amount - o.expected);
+        if (d <= tol && (!best || d < Math.abs(best.amount - o.expected))) best = x;
+      });
+      if (best) { used[best.id] = 1; o.found = best; o.kind = 'near'; o.diff = best.amount - o.expected; }
+    });
+    return out;
+  }
+
   /* ═══ 읽은 자료 고르기 ═══ — 파이어베이스는 빈 배열·null 칸을 저장하지 않고, 배열을 {0:…,1:…} 로 돌려줄 때가 있다.
      읽을 때 늘 이것을 거친다(전광판 normalizeAd 와 같은 까닭) */
   function toArr(v) {
@@ -324,6 +403,7 @@
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
     parseNotice: parseNotice, settleMonth: settleMonth, transfersOf: transfersOf, checkRun: checkRun,
     runId: runId, diffRun: diffRun, appliedAdjustIds: appliedAdjustIds, unapplyAdjusts: unapplyAdjusts,
-    buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice
+    buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice,
+    parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits
   };
 });

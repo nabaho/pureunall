@@ -117,6 +117,23 @@ test('탭 넷 — 폰에서 한 줄(접지 않고 옆으로 민다), 입력칸 1
   assert.match(NOC, /@media \(max-width:768px\)\{ input,select,textarea\{font-size:16px\} \}/);
 });
 
+test('입금 대조 — 당겨오기는 재무관리 거래내역을 «읽기만», 붙여넣기는 계산 모듈로 읽고, 저장은 고른 줄을 한 번에', () => {
+  const pull = fnBody('async function pullLedger(');
+  assert.match(pull, /fbDb\.ref\('data\/ledger_batches'\)\.once\('value'\)/);
+  assert.match(pull, /C\.ledgerDeposits\(/);
+  assert.match(pull, /C\.depositWindow\(/);
+  assert.doesNotMatch(NOC, /ledger_batches[^;]*\.(set|update|push|remove|transaction)\(/, '거래내역에 쓰지 않는다');
+  assert.match(NOC, /C\.parseDepositText\(DEP\.text\)/);
+  const ap = fnBody('async function applyDeposits(');
+  assert.match(ap, /SEL\.deposits/);
+  assert.equal((ap.match(/patchRecord\(/g) || []).length, 1, '정산표를 한 번만 저장한다');
+  assert.match(ap, /curDraft\(\)/, '계산만인 정산표에서만');
+  /* 같은 금액이라도 «후보»로만 — 고르기(☐)는 미리 해 두되 저장은 단추로만 */
+  const rm = fnBody('function depRematch(');
+  assert.match(rm, /o\.kind==='exact'/);
+  assert.doesNotMatch(rm, /patchRecord|save\(/);
+});
+
 test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
   assert.doesNotMatch(NOC, /window\.open\([^)]*_blank/);
 });

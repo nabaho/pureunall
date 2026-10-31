@@ -252,9 +252,10 @@
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).
-       ★ 읽기만: data/user_dir · data/biz_cons_types · data/consultings(업체 연결 후보) — 이알피 원본은 고치지 않는다.
+       ★ 읽기만: data/user_dir · data/biz_cons_types · data/consultings(업체 연결 후보) · data/ledger_batches(입금 대조 «당겨오기» — 재무관리 거래내역)
+         — 이알피 원본은 고치지 않는다.
        ⚠ 대표·위임관리인·재무권한자만(규칙 settle) — 재무관리보다 넓게 열지 않는다. */
-    settle:{ name:'컨설팅정산', file:'pu-settle.html', primaryRoots:['settle'], sharedRoots:['uid_roles','data/user_dir','data/biz_cons_types','data/consultings'],
+    settle:{ name:'컨설팅정산', file:'pu-settle.html', primaryRoots:['settle'], sharedRoots:['uid_roles','data/user_dir','data/biz_cons_types','data/consultings','data/ledger_batches'],
       writeContracts:[{path:'settle/rules/{typeCode}',entityType:'SettleRule'},
                       {path:'settle/links/{kind}/{key}',entityType:'SettleLink'},
                       {path:'settle/notices/{id}',entityType:'SettleNotice'},
