@@ -61,3 +61,18 @@ test('④★★ 로그인 직후 뒤쪽 함수가 없어도 명함 구독이 멈
   assert.match(seg, /typeof mbTakeToCo === 'function'/, '있는지 보지 않습니다');
   assert.match(seg, /addEventListener\('load'/, '없을 때 나중에 부를 길이 없습니다');
 });
+
+test('⑤★ 지도 창 안을 누르거나 Esc 를 눌러도 뒤의 명함 패널은 그대로 — 지도 창이 먼저 닫힌다', () => {
+  const out = cutFn(SRC, 'function coOutsideDown(');
+  assert.match(out, /closest\('#addrMapOv'\)\) return;/, '★ 지도 창 안을 누르면 뒤의 PC 명함 패널이 닫힙니다');
+  assert.ok(out.indexOf("closest('#addrMapOv')") < out.indexOf('closePcDetail();'), '닫기보다 먼저 봐야 합니다');
+  const at = SRC.indexOf("if(e.key!=='Escape') return;\n  /* 주소 지도 창");
+  assert.ok(at > 0, 'Esc 에서 지도 창을 먼저 보지 않습니다');
+  assert.match(SRC.slice(at, at + 260), /if\(\$\('addrMapOv'\)\)\{ e\.preventDefault\(\); e\.stopImmediatePropagation\(\); closeAddrMap\(\); return; \}/, '★ Esc 한 번에 지도와 뒤의 명함 패널이 함께 닫힙니다');
+});
+
+test('⑥ PC 명함 패널 — 값과 「복사」는 한 줄(값이 … 로 줄고 단추는 늘 보인다)', () => {
+  assert.match(SRC, /#pcDetail \.pdrow \.v:has\(> \.dcopy\)\{display:flex;/, '★ 좁은 PC 칸에서 「복사」가 아랫줄로 떨어집니다');
+  assert.match(SRC, /#pcDetail \.pdrow \.v:has\(> \.dcopy\) > \.pd1,#pcDetail \.pdrow \.v:has\(> \.dcopy\) > a\{flex:1 1 0;min-width:0;max-width:max-content;[^}]*text-overflow:ellipsis/, '값이 줄지 않아 단추를 밀어냅니다');
+  assert.match(SRC, /#pcDetail \.pdrow \.v:has\(> \.dcopy\) > \.dcopy\{flex:none/, '단추가 줄어 글자가 꺾입니다');
+});

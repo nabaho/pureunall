@@ -193,5 +193,15 @@ ok('물릴 때 사유는 안 지운다 (withdrawnAt 만 찍는다)',
 ok('금액·이름 쓰기는 아예 없다',
    !/update\(\{[^}]*amount:/.test(blk) && !/update\(\{[^}]*\bname:/.test(blk));
 
+/* ── 31일에도 한 달씩 (2026-10-31 실제로 났다 — 「9월 31일」이 10월 1일로 넘어가 10월이 두 번) ── */
+{
+  const RealDate = Date;
+  const fixed = new RealDate(2026, 9, 31, 10, 0, 0);   /* 10월 31일 */
+  ctx.Date = class extends RealDate { constructor(...a){ super(...(a.length ? a : [fixed.getTime()])); } static now(){ return fixed.getTime(); } };
+  let m31;
+  try { m31 = vm.runInContext('pcMonths(4)', ctx); } finally { ctx.Date = RealDate; }
+  ok('★ 31일에도 달이 겹치지 않는다 — 10·9·8·7월', JSON.stringify(m31) === JSON.stringify(['2026-10','2026-09','2026-08','2026-07']), JSON.stringify(m31));
+}
+
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===');
 process.exit(fail ? 1 : 0);
