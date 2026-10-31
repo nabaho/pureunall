@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 컨설팅정산</title>
+<!-- ═══════════════════════════════════════════════════════
+     푸른노무법인 컨설팅정산 (pu-settle.html) — 2026-10-31
+     대표 지시 「내부관리에 컨설팅정산 항목을 만들고 프로그램 만들어달라 … 개인입금되는 것들 중 개별정산이 필요한 것은 프로그램에서 정리」
+     설계: docs/superpowers/specs/2026-10-31-consult-settle-design.md · 계획: docs/superpowers/plans/2026-10-31-consult-settle-app.md
+
+     ★ 하는 일: 운영기관이 보낸 «비용지급 안내» 엑셀을 읽어, 사업장마다 주관(대표)과 담당노무사 사이의 지급월 정산표를 만든다
+       (사업장 세후 합계 × 담당 요율 = 담당 몫, 차액 양방향). 확정하면 송금 목록과 담당노무사별 카톡 문구가 나온다.
+     ★ 쓰는 자리(관문 강제 모드, PROGRAMS.settle.writeContracts): settle/rules · links · notices · runs · adjusts
+     ★ 읽기만: data/user_dir(이름) · data/biz_cons_types(사업 이름) · data/consultings(업체 연결 후보 — 2026년만) · uid_roles(권한·사번)
+     ⚠ 대표·위임관리인·재무권한자만 연다(규칙 settle = 같은 사람) — 대표 선택 2026-10-31. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
+     ⚠ 업체·사람은 «사람이 한 번 확정한 연결»로만 ID 를 붙인다 — 이름이 비슷해도 저절로 잇지 않는다(온톨로지 규칙).
+     ⚠ 확정된 달은 새 안내가 와도 덮지 않는다 — «바뀜»만 표시한다. 돈 기록은 지우지 않는다(_deleted 표식).
+     ═══════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--mute)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button.sm{padding:3px 9px;font-size:12px}
+input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+textarea{width:100%;resize:vertical;font-family:inherit}
+@media (max-width:768px){ input,select,textarea{font-size:16px} }
+a{color:var(--blue-d);text-decoration:none}
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0}
+.top .sub{font-size:12px;color:var(--mute)}
+.sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
+.chip{display:inline-block;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
+main{padding:12px 16px 40px}
+.pane{display:none}
+.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+.bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:8px 10px}
+.scroll{overflow:auto}
+.t{border-collapse:collapse;width:100%}
+.t th,.t td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.t th{background:var(--bg);color:var(--ink2);font-size:12px;position:sticky;top:0}
+.t td.ti{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.t td.nw{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.t .c{width:34px;text-align:center}
+.t .n{width:44px;color:var(--mute);text-align:right;font-variant-numeric:tabular-nums}
+.t .r{text-align:right;font-variant-numeric:tabular-nums}
+.t .b{font-weight:700}
+.t tr.grp td{background:var(--blue-bg);color:var(--blue-d);font-weight:700;max-width:none;overflow:hidden;text-overflow:ellipsis}
+.t input.amt{width:110px;text-align:right}
+.t input.pct{width:70px;text-align:right}
+.pill{display:inline-block;border-radius:10px;padding:1px 8px;font-size:11.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink2)}
+.st-confirmed{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
+.st-draft,.st-chg{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber)}
+.ck{display:inline-flex;gap:3px;align-items:center;font-size:12px;white-space:nowrap}
+.bulk{display:none;gap:6px;align-items:center;padding:6px 12px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);font-size:12.5px}
+.bulk.on{display:flex}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+.hint{font-size:12px;color:var(--mute)}
+.sec{padding:10px 14px 2px;font-weight:700;color:var(--ink2)}
+.warn{margin:8px 10px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:12.5px}
+.bad{color:var(--red)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi span{font-size:12px;color:var(--mute)}
+.kpi b{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.bad b{color:var(--red)}
+.fr{display:flex;gap:10px;padding:7px 14px;align-items:center}
+.fr>label{width:110px;flex:none;color:var(--ink2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv{flex:1;min-width:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fv input[type=text]{flex:1;min-width:0}
+.drop{border:2px dashed var(--line2);border-radius:10px;padding:18px;text-align:center;color:var(--ink2);margin:10px}
+.drop.on{border-color:var(--blue);background:var(--blue-bg)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.cardp{padding:4px 10px 10px}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#lock p{color:var(--mute);font-size:13px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:90vw}
+#toast.on{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto}
+/* ── 폰: 한 화면에 (대표 지시 2026-10-18 「폰화면관리」) ──
+   표는 줄마다 «두 줄 카드» — ☐·번호는 왼쪽 끝 고정, 1줄 이름·핵심 금액, 2줄 나머지(칸 이름을 앞에 붙인다). 칸 손잡이는 js/pu-settle-view.js 의 data-k. */
+.phone-only{display:none}
+@media (max-width:640px){
+  .phone-only{display:inline}
+  .wide-only{display:none}
+  .top{padding:7px 12px;gap:6px;flex-wrap:nowrap}
+  .top h1{font-size:16px;white-space:nowrap}
+  .top .sub,.top .sp{display:none}
+  #who{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .top button{flex:0 0 auto}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:0 0 auto;padding:8px 6px;font-size:13px}
+  main{padding:8px 0 60px}
+  .card{border-left:0;border-right:0;border-radius:0}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px 10px}
+  .fr{flex-direction:column;align-items:stretch;gap:4px;padding:6px 10px}
+  .fr>label{width:auto}
+  .sec{padding:10px 10px 2px}
+  .bar{padding:8px 10px}
+  .warn{margin:8px 10px}
+  .drop{margin:8px 10px}
+  .bulk{flex-wrap:wrap}
+  .t[data-name],.t[data-name] thead,.t[data-name] tbody{display:block;width:100%}
+  .t[data-name] thead tr{display:flex;align-items:center}
+  .t[data-name] thead th{display:none}
+  .t[data-name] thead th.c{display:block;width:36px;padding:6px 0;margin-left:4px}
+  .t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0}
+  .t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;position:relative;padding:7px 10px 7px 70px;min-height:44px;border-bottom:1px solid var(--line)}
+  .t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
+  .t[data-name] tbody td{border:0;padding:0;max-width:none}
+  .t[data-name] tbody td.c{position:absolute;left:4px;top:7px;width:36px;text-align:center}
+  .t[data-name] tbody td.n{position:absolute;left:40px;top:10px;width:24px;text-align:right}
+  .t[data-name] tbody td.ti,.t[data-name] tbody td[data-k="file"]{order:1;flex:1 1 0;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .t[data-name] tbody td{order:6;color:var(--ink2)}
+  .t[data-name] tbody td[data-k="settle"],.t[data-name] tbody td[data-k="amt"],.t[data-name] tbody td[data-k="st"],.t[data-name] tbody td[data-k="btn"],.t[data-name] tbody td[data-k="paid"]{order:2;color:var(--ink)}
+  .t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%}
+  .t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
+  .t[data-name] tbody tr.grp{padding-left:10px;min-height:0}
+  .t[data-name] tbody tr.grp td{flex:1 1 0;min-width:0}
+  .t[data-name=run] tbody td[data-k="pre"]::before{content:'세전 '}
+  .t[data-name=run] tbody td[data-k="wht"]::before{content:'원천 '}
+  .t[data-name=run] tbody td[data-k="net"]::before{content:'세후 '}
+  .t[data-name=run] tbody td[data-k="share"]:not(:empty)::before{content:'몫 '}
+  .t[data-name=run] tbody td[data-k="diff"]:not(:empty)::before{content:'차액 '}
+  .t[data-name=run] tbody td[data-k="adj"]:not(:empty)::before{content:'조정 '}
+  .t[data-name=run] tbody td[data-k="final"]::before{content:'최종 '}
+  .t[data-name=run] tbody td[data-k="site"]{display:none}
+  .t[data-name=run] tbody td[data-k="act"] input{width:100%}
+  .t[data-name=rates] tbody tr,.t[data-name=siteRates] tbody tr{padding-left:10px}
+  .cards{grid-template-columns:1fr;gap:8px}
+}
+</style>
+</head>
+<body>
+<div id="head">
+  <div class="top">
+    <h1>🧾 컨설팅정산</h1>
+    <span class="sub">개인입금 사업 — 사업장별 주관·담당 정산</span>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button class="sm" onclick="reload()" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
+    <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="runs">🧮 정산 <span class="chip" id="nRuns">0</span></button>
+    <button data-tab="notices">📥 안내 파일</button>
+    <button data-tab="rules">⚙️ 규칙·요율</button>
+    <button data-tab="msgs">💬 카톡 문구</button>
+  </div>
+</div>
+<div id="lock"><h2>🧾 컨설팅정산</h2><div id="lockWhy"></div><p>재무관리 권한이 있는 분만 열 수 있습니다.</p></div>
+<main id="app">
+  <section class="pane" id="pane-runs">
+    <div class="card"><div id="runsBox"></div></div>
+    <div class="card" id="runCard" style="display:none"><div id="runBox"></div></div>
+  </section>
+  <section class="pane" id="pane-notices">
+    <div class="card">
+      <div class="bar"><b>비용지급 안내 올리기</b><span class="sp"></span><label class="hint" for="upType">사업 종류</label><select id="upType"></select></div>
+      <div class="drop" id="drop">여기에 비용지급 안내 엑셀(.xlsx)을 끌어 놓거나 <button class="sm" id="pickBtn">파일 고르기</button><input type="file" id="file" accept=".xlsx,.xls" style="display:none"></div>
+      <div id="noticesBox"></div>
+    </div>
+    <div id="linkBox"></div>
+  </section>
+  <section class="pane" id="pane-rules">
+    <div class="card"><div class="bar"><b>규칙</b><select id="rulePick"></select><span class="sp"></span><span class="hint">요율은 퍼센트 숫자(25 = 25%)</span></div></div>
+    <div id="ruleBox"></div>
+    <div class="card"><div class="sec">이월·조정 — 다음 확정 정산표에 한 번 붙는다</div><div id="adjBox"></div></div>
+  </section>
+  <section class="pane" id="pane-msgs">
+    <div class="card"><div class="bar"><b>정산표</b><select id="msgPick"></select><span class="sp"></span><span class="hint">확정된 정산표만 — 복사해서 카톡에 붙여 넣으세요</span></div></div>
+    <div id="msgBox"></div>
+  </section>
+</main>
+<div class="modal" id="modal" style="display:none"></div>
+<div id="toast"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=78"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
+     관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=35"></script>
+<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=3"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script src="js/pu-settle-core.js?v=1"></script>
+<script src="js/pu-settle-view.js?v=1"></script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var fbDb=null, gate=null, ME={sid:''};
+var C=SettleCore, V=SettleView;
+var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:{} };
+var ERP={ biz:[], consultings:[], people:[] };
+/* 사번 → 이름 — 기록은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
+var NAMES={};
+var TAB='runs', CUR_RUN='', CUR_NOTICE='', MSG_RUN='', RULE_EDIT=null, RULE_NEW=false;
+var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{} };
+var YEAR_FROM='2026-01-01', YEAR_TO='2026-12-31';   /* 대표 지시 2026-10-31 「2026년도 올해 진행상황만 우선」 — 업체 연결 후보 범위 */
+
+function $(id){ return document.getElementById(id); }
+function lsGet(k){ try{ return localStorage.getItem('pu_settle_'+k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem('pu_settle_'+k, v); }catch(e){} }
+function toast(m){ var t=$('toast'); t.textContent=m; t.className='on'; clearTimeout(toast._t); toast._t=setTimeout(function(){ t.className=''; }, 4500); }
+function errMsg(e){ return String((e&&e.message)||e); }
+function vals(o){ return Object.keys(o||{}).map(function(k){ return o[k]; }).filter(function(x){ return x && !x._deleted; }); }
+function newId(p){ return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+/* 이알피 data/<key> 는 {v: 배열 또는 {id: 레코드}, u: 시각} 꼴이다 */
+function unwrap(v){ if(v && v.v!==undefined) v=v.v; return Array.isArray(v)?v.filter(Boolean):(v&&typeof v==='object'?Object.keys(v).map(function(k){ return v[k]; }).filter(Boolean):[]); }
+function bareName(s){ return String(s||'').replace(/\(주\)|㈜|주식회사|\s/g,''); }
+
+/* ═══ 읽기 ═══ */
+async function loadErp(){
+  var r=await Promise.all(['data/user_dir','data/biz_cons_types','data/consultings'].map(function(p){ return fbDb.ref(p).once('value').catch(function(){ return { val:function(){ return null; } }; }); }));
+  NAMES={}; ERP.people=[];
+  unwrap(r[0].val()).forEach(function(u){ if(u && u.sid && u.name){ NAMES[u.sid]=String(u.name); ERP.people.push({ sid:String(u.sid), name:String(u.name) }); } });
+  ERP.people.sort(function(a,b){ return a.name<b.name?-1:a.name>b.name?1:0; });
+  ERP.biz=unwrap(r[1].val()).filter(function(b){ return b && b.code && !b.hidden && !b.mergedInto; }).map(function(b){ return { code:String(b.code), name:String(b.name||b.code)+(b.agency?' ('+b.agency+')':'') }; });
+  ERP.consultings=unwrap(r[2].val()).filter(function(c){ return c && c.id && !c._deleted; });
+}
+async function reload(){
+  try{
+    var r=await Promise.all(['rules','links','notices','runs','adjusts'].map(function(k){ return fbDb.ref('settle/'+k).once('value'); }));
+    D.rules=r[0].val()||{}; var lk=r[1].val()||{}; D.links={ company:lk.company||{}, person:lk.person||{} };
+    D.notices=r[2].val()||{}; D.runs=r[3].val()||{}; D.adjusts=r[4].val()||{};
+    draw();
+  }catch(e){ toast('불러오지 못했습니다: '+errMsg(e)); }
+}
+function typeOf(c){ return String(c.typeCode||(c.typeCodes&&c.typeCodes.consulting)||''); }
+/* 업체 연결 후보 — 그 사업 종류 + 수행기간이 2026년에 걸친 컨설팅만 */
+function sitesFor(typeCode){
+  return ERP.consultings.filter(function(c){
+    return (!typeCode || typeOf(c)===typeCode) && String(c.startDate||'')<=YEAR_TO && String(c.endDate||'9999-12-31')>=YEAR_FROM;
+  }).map(function(c){ return { consultingId:String(c.id), companyId:String(c.companyId||''), companyName:String(c.companyName||''),
+    label:String(c.companyName||'(업체 이름 없음)')+(c.no?' · '+c.no:'')+(c.startDate?' · '+c.startDate+'~'+(c.endDate||''):'') }; });
+}
+function siteNames(){ var o={}; ERP.consultings.forEach(function(c){ o[c.id]=String(c.companyName||''); }); return o; }
+function bizName(code){ var r=D.rules[code]; if(r&&r.title) return r.title; var b=ERP.biz.filter(function(x){ return x.code===code; })[0]; return b?b.name:code; }
+function bizNames(){ var o={}; ERP.biz.forEach(function(b){ o[b.code]=bizName(b.code); }); Object.keys(D.rules).forEach(function(k){ o[k]=bizName(k); }); return o; }
+
+/* ═══ 계산 ═══ */
+function ruleObj(r){
+  var rates={}, siteRates={};
+  Object.keys(r.rates||{}).forEach(function(s){ rates[s]=Number(r.rates[s]); });
+  Object.keys(r.siteRates||{}).forEach(function(cid){ siteRates[cid]={}; Object.keys(r.siteRates[cid]||{}).forEach(function(s){ siteRates[cid][s]=Number(r.siteRates[cid][s]); }); });
+  return { typeCode:r.typeCode, title:r.title||bizName(r.typeCode), mode:'pool', leadSid:r.leadSid||'', rates:rates, siteRates:siteRates, msgHead:r.msgHead||'', msgFoot:r.msgFoot||'' };
+}
+function ctxFor(rid, actuals){
+  var cl={}, pl={};
+  Object.keys(D.links.company).forEach(function(k){ var l=D.links.company[k]; if(l && !l._deleted && l.consultingId) cl[k]={ consultingId:l.consultingId, companyId:l.companyId||'' }; });
+  Object.keys(D.links.person).forEach(function(k){ var l=D.links.person[k]; if(l && !l._deleted && l.sid) pl[k]=l.sid; });
+  var adjusts=vals(D.adjusts).filter(function(a){ return !a.appliedRunId || a.appliedRunId===rid; });
+  return { companyLinks:cl, personLinks:pl, actuals:actuals||{}, adjusts:adjusts, names:NAMES };
+}
+function compute(notice, monthKey, rule, rid, actuals){ return C.settleMonth(notice, monthKey, ruleObj(rule), ctxFor(rid, actuals)); }
+function monthLabel(notice, key){ var m=notice.months.filter(function(x){ return x.key===key; })[0]; return key.slice(0,4)+'년 '+(m?m.label:key.slice(5)+'월'); }
+
+/* ═══ 그리기 ═══ */
+function draw(){ drawTabs(); drawRuns(); drawNotices(); drawRules(); drawMsgs(); }
+function drawTabs(){
+  [].forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.className=b.getAttribute('data-tab')===TAB?'on':''; });
+  ['runs','notices','rules','msgs'].forEach(function(t){ $('pane-'+t).className='pane'+(t===TAB?' on':''); });
+  $('nRuns').textContent=vals(D.runs).length;
+}
+function runsList(){ return vals(D.runs).map(C.normalizeRun); }
+function drawRuns(){
+  $('runsBox').innerHTML=V.runsTable(runsList(), SEL.runs, bizNames());
+  var run=CUR_RUN && D.runs[CUR_RUN] ? C.normalizeRun(D.runs[CUR_RUN]) : null;
+  $('runCard').style.display=run?'':'none';
+  $('runBox').innerHTML=run?V.runDetail(run, NAMES, Object.assign({}, SEL.members, SEL.transfers)):'';
+  drawBulks();
+}
+function bulkHtml(kind, n){
+  if(!n) return '';
+  var b={ runs:'', members:'<button class="sm" data-bulk-do="clearActual">통장 실입금 비우기</button>', transfers:'<button class="sm" data-bulk-do="paidOn">보냄 표시</button> <button class="sm" data-bulk-do="paidOff">보냄 취소</button>',
+    notices:'<button class="sm" data-bulk-do="delNotice">지우기</button>', adjusts:'<button class="sm" data-bulk-do="delAdjust">지우기</button>' }[kind]||'';
+  return '<b>'+n+'건 선택</b> '+b+' <button class="sm" data-bulk-do="clear:'+kind+'">선택 풀기</button>';
+}
+function drawBulks(){
+  Object.keys(SEL).forEach(function(k){ var el=document.querySelector('[data-bulk="'+k+'"]'); if(!el) return; var n=Object.keys(SEL[k]).length; el.className='bulk'+(n?' on':''); el.innerHTML=bulkHtml(k, n); });
+}
+function ruleOptions(sel, withNew){
+  var keys=Object.keys(D.rules).filter(function(k){ return D.rules[k] && !D.rules[k]._deleted; });
+  return keys.map(function(k){ return '<option value="'+V.esc(k)+'"'+(k===sel?' selected':'')+'>'+V.esc(bizName(k))+'</option>'; }).join('')+(withNew?'<option value="__new"'+(sel==='__new'?' selected':'')+'>+ 새 규칙</option>':'');
+}
+function drawNotices(){
+  var cur=$('upType').value||lsGet('upType')||'';
+  $('upType').innerHTML=ruleOptions(cur, false)||'<option value="">규칙을 먼저 만드세요</option>';
+  $('noticesBox').innerHTML=V.noticesTable(vals(D.notices).map(C.normalizeNotice), SEL.notices);
+  var n=CUR_NOTICE && D.notices[CUR_NOTICE] ? C.normalizeNotice(D.notices[CUR_NOTICE]) : null;
+  $('linkBox').innerHTML=n?V.linkBox(unlinkedOf(n)):'';
+  drawBulks();
+}
+function unlinkedOf(n){
+  var companies=[], people=[], seenC={}, seenP={};
+  n.rows.forEach(function(r){
+    if(!(r.totalPre>0 || Object.keys(r.amounts).length)) return;
+    var ck=C.linkKey(r.company), pk=C.linkKey(r.name);
+    if(!seenC[ck] && !(D.links.company[ck] && !D.links.company[ck]._deleted)){
+      seenC[ck]=1; var b=bareName(r.company);
+      var cands=sitesFor(n.typeCode).map(function(s){ var sb=bareName(s.companyName); return Object.assign({ score: sb===b?2:(sb&&b&&(sb.indexOf(b)>=0||b.indexOf(sb)>=0))?1:0 }, s); })
+        .sort(function(x,y){ return y.score-x.score || (x.label<y.label?-1:1); });
+      companies.push({ key:ck, text:r.company, candidates:cands });
+    }
+    if(!seenP[pk] && !(D.links.person[pk] && !D.links.person[pk]._deleted)){
+      seenP[pk]=1;
+      var pc=ERP.people.slice().sort(function(x,y){ return (y.name===r.name)-(x.name===r.name); }).map(function(p){ return { sid:p.sid, label:p.name }; });
+      people.push({ key:pk, text:r.name, candidates:pc });
+    }
+  });
+  return { companies:companies, people:people };
+}
+function drawRules(){
+  var keys=Object.keys(D.rules).filter(function(k){ return D.rules[k] && !D.rules[k]._deleted; });
+  if(!RULE_EDIT){
+    var pick=lsGet('rule'); if(!pick || !D.rules[pick]) pick=keys[0]||'__new';
+    startRule(pick);
+  }
+  $('rulePick').innerHTML=ruleOptions(RULE_NEW?'__new':RULE_EDIT.typeCode, true);
+  var used={}; keys.forEach(function(k){ used[k]=1; });
+  var biz=RULE_NEW?ERP.biz.filter(function(b){ return !used[b.code]; }):ERP.biz;
+  $('ruleBox').innerHTML=V.rulesBox(RULE_EDIT, { bizTypes:biz, people:ERP.people, sites:sitesFor(RULE_EDIT.typeCode), isNew:RULE_NEW });
+  var allSites=[]; keys.forEach(function(k){ allSites=allSites.concat(sitesFor(k)); });
+  $('adjBox').innerHTML=V.adjustsTable(vals(D.adjusts), siteNames(), NAMES, SEL.adjusts, { sites:allSites, people:ERP.people });
+  drawBulks();
+}
+function startRule(pick){
+  if(pick==='__new' || !D.rules[pick]){
+    var used={}; Object.keys(D.rules).forEach(function(k){ used[k]=1; });
+    var b=ERP.biz.filter(function(x){ return !used[x.code]; })[0]||{ code:'', name:'' };
+    RULE_EDIT={ typeCode:b.code, title:'', leadSid:'', rates:{}, siteRates:{}, msgHead:'', msgFoot:'', active:true }; RULE_NEW=true;
+  }else{
+    var r=D.rules[pick];
+    RULE_EDIT=JSON.parse(JSON.stringify({ typeCode:r.typeCode, title:r.title||'', leadSid:r.leadSid||'', rates:r.rates||{}, siteRates:r.siteRates||{}, msgHead:r.msgHead||'', msgFoot:r.msgFoot||'', active:r.active!==false }));
+    RULE_NEW=false; lsSet('rule', pick);
+  }
+}
+function readRuleForm(){
+  if(!RULE_EDIT) return;
+  var g=function(id){ var e=$(id); return e?e.value:''; };
+  if(RULE_NEW && $('r_type')) RULE_EDIT.typeCode=g('r_type');
+  RULE_EDIT.title=g('r_title').trim(); RULE_EDIT.leadSid=g('r_lead'); RULE_EDIT.active=!!($('r_active')&&$('r_active').checked);
+  RULE_EDIT.msgHead=g('r_head').trim(); RULE_EDIT.msgFoot=g('r_foot').trim();
+  [].forEach.call(document.querySelectorAll('[data-rate]'), function(e){ RULE_EDIT.rates[e.getAttribute('data-rate')]=e.value.trim(); });
+}
+function confirmedRuns(){ return runsList().filter(function(r){ return r.status==='confirmed'; }).sort(function(a,b){ return a.monthKey<b.monthKey?1:-1; }); }
+function drawMsgs(){
+  var list=confirmedRuns();
+  if(!MSG_RUN || !list.some(function(r){ return r.id===MSG_RUN; })) MSG_RUN=list.length?list[0].id:'';
+  $('msgPick').innerHTML=list.map(function(r){ return '<option value="'+V.esc(r.id)+'"'+(r.id===MSG_RUN?' selected':'')+'>'+V.esc(r.label+' · '+bizName(r.typeCode))+'</option>'; }).join('')||'<option value="">확정된 정산표 없음</option>';
+  $('msgBox').innerHTML=V.messagesBox(currentMsgs());
+}
+function currentMsgs(){
+  var run=MSG_RUN && D.runs[MSG_RUN] ? C.normalizeRun(D.runs[MSG_RUN]) : null;
+  if(!run || !D.rules[run.typeCode]) return [];
+  return C.buildMessages(run, ruleObj(D.rules[run.typeCode]), NAMES);
+}
+function setTab(t){ TAB=t; lsSet('tab', t); Object.keys(SEL).forEach(function(k){ SEL[k]={}; }); draw(); }
+
+/* ═══ 저장 — 모두 관문(gate)으로. 지우기는 _deleted 표식을 gate.save 한다 ═══
+   ⚠ 고칠 때 expectedRevision 을 쓰지 않는다 — 찬 자리 거래는 먼저 null 로 불리는데 그때 «판이 다르다»며 접어 버린다(전광판 선례).
+     남이 먼저 고쳤는지는 «진짜 값이 올 때만» 직접 견준다. */
+function save(path, entityType, fn, opts){ return gate.save(fbDb.ref(path), fn, Object.assign({ entityType:entityType }, opts||{})); }
+function patchRecord(path, entityType, known, patch){
+  return save(path, entityType, function(prev){ return Object.assign({}, prev||known||{}, patch); });
+}
+
+/* 엑셀 도구(vendor/xlsx.full.min.js, 1MB)는 처음부터 싣지 않는다 — 올리기·내려받기를 누를 때만(폰 첫 화면이 느려지지 않게, 정부사업 보고서 앱 grLib 선례) */
+var XLSX_SRC='vendor/xlsx.full.min.js?v=1', xlsxP=null;
+function needXlsx(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(!xlsxP) xlsxP=new Promise(function(ok, no){ var s=document.createElement('script'); s.src=XLSX_SRC; s.onload=function(){ window.XLSX?ok(window.XLSX):no(new Error('엑셀 도구를 싣지 못했습니다')); }; s.onerror=function(){ xlsxP=null; no(new Error('엑셀 도구를 내려받지 못했습니다')); }; document.head.appendChild(s); });
+  return xlsxP;
+}
+/* 안내 파일 올리기 */
+function readFileBuf(f){ return new Promise(function(ok, no){ var r=new FileReader(); r.onload=function(){ ok(r.result); }; r.onerror=function(){ no(r.error); }; r.readAsArrayBuffer(f); }); }
+async function onFile(f){
+  if(!f) return;
+  var typeCode=$('upType').value;
+  if(!typeCode || !D.rules[typeCode]){ toast('사업 종류 규칙을 먼저 만드세요 — «⚙️ 규칙·요율»'); return; }
+  var parsed;
+  try{
+    await needXlsx();
+    var wb=XLSX.read(new Uint8Array(await readFileBuf(f)), { type:'array' }), ws=wb.Sheets[wb.SheetNames[0]];
+    var grid=XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, blankrows:true });
+    parsed=C.parseNotice(grid, ws['!merges']||[], { fileName:f.name, receivedAt:Date.now(), ref:ws['!ref'] });
+  }catch(e){ toast('엑셀을 읽지 못했습니다: '+errMsg(e)); return; }
+  if(!parsed.ok){ toast('읽지 못했습니다 — '+parsed.error+' (아무것도 저장하지 않았습니다)'); return; }
+  var hash=C.noticeHash(parsed.rows);
+  var dup=vals(D.notices).filter(function(n){ return n.hash===hash && n.typeCode===typeCode; })[0];
+  if(dup){ CUR_NOTICE=dup.id; drawNotices(); toast('이미 올린 파일과 내용이 같습니다 — 그 파일을 엽니다'); return; }
+  var id=newId('N'), rec={ id:id, entityType:'SettleNotice', typeCode:typeCode, fileName:parsed.fileName, receivedAt:parsed.receivedAt, source:'upload', hash:hash, months:parsed.months, rows:parsed.rows };
+  try{ await save('settle/notices/'+id, 'SettleNotice', function(){ return rec; }, { expectedRevision:-1 }); }
+  catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+  lsSet('upType', typeCode); CUR_NOTICE=id; await reload();
+  toast('읽었습니다 — 지급월 '+parsed.months.length+'개 · '+parsed.rows.length+'줄. 연결을 확정한 뒤 «정산표 만들기»를 누르세요');
+}
+async function saveLink(kind, key){
+  var selEl=document.querySelector('select[data-link="'+kind+'"][data-key="'+CSS.escape(key)+'"]'); if(!selEl||!selEl.value){ toast('고를 것을 먼저 고르세요'); return; }
+  var n=C.normalizeNotice(D.notices[CUR_NOTICE]), text='';
+  n.rows.forEach(function(r){ if(kind==='company' && C.linkKey(r.company)===key) text=r.company; if(kind==='person' && C.linkKey(r.name)===key) text=r.name; });
+  var rec={ id:key, entityType:'SettleLink', kind:kind, text:text };
+  if(kind==='company'){ var p=selEl.value.split('|'); rec.consultingId=p[0]; rec.companyId=p[1]||''; } else rec.sid=selEl.value;
+  try{ await patchRecord('settle/links/'+kind+'/'+key, 'SettleLink', null, rec); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+  await reload(); toast('연결했습니다 — 다음 파일부터 저절로 씁니다');
+}
+/* 안내 하나 → 지급월마다 정산표. 계산만이면 다시 계산, 확정·기록만이면 덮지 않고 «바뀜»만 */
+async function buildRuns(noticeId){
+  var n=C.normalizeNotice(D.notices[noticeId]), rule=n&&D.rules[n.typeCode];
+  if(!rule){ toast('이 사업 종류의 규칙이 없습니다 — «⚙️ 규칙·요율»에서 먼저 만드세요'); return; }
+  var made=0, again=0, changed=0;
+  try{
+    for(var i=0;i<n.months.length;i++){
+      var key=n.months[i].key, rid=C.runId(n.typeCode, key), known=D.runs[rid];
+      var res=compute(n, key, rule, rid, known&&known.actuals);
+      if(!res.sites.length) continue;
+      var outcome='';
+      await save('settle/runs/'+rid, 'SettleRun', function(prev){
+        var base=prev||known||null;
+        if(base && base.status && base.status!=='draft'){
+          var ch=C.diffRun(C.normalizeRun(base).sites, res.sites);
+          outcome=ch?'changed':'same';
+          return Object.assign({}, base, { changed:!!(ch || base.changed) });
+        }
+        outcome=base?'again':'made';
+        return { id:rid, entityType:'SettleRun', typeCode:n.typeCode, monthKey:key, label:monthLabel(n, key), noticeId:noticeId, status:'draft',
+          sites:res.sites, issues:res.issues, actuals:(base&&base.actuals)||{}, transfers:[], changed:false };
+      });
+      if(outcome==='made') made++; else if(outcome==='again') again++; else if(outcome==='changed') changed++;
+    }
+  }catch(e){ toast('정산표를 만들지 못했습니다: '+errMsg(e)); await reload(); return; }
+  await reload(); TAB='runs'; draw();
+  toast('정산표 새로 '+made+' · 다시 계산 '+again+(changed?' · 확정된 달 바뀜 '+changed:''));
+}
+async function recalc(rid){
+  var run=D.runs[rid]; if(!run || run.status!=='draft') return;
+  if(!D.notices[run.noticeId]){ toast('이 정산표를 만든 안내 파일이 없습니다'); return; }
+  await buildRuns(run.noticeId); CUR_RUN=rid; drawRuns();
+}
+async function confirmRun(rid){
+  var known=D.runs[rid], n=known&&C.normalizeNotice(D.notices[known.noticeId]), rule=n&&D.rules[known.typeCode];
+  if(!known || known.status!=='draft' || !n || !rule){ toast('확정할 수 없습니다 — 안내 파일과 규칙을 확인하세요'); return; }
+  var res=compute(n, known.monthKey, rule, rid, known.actuals), chk=C.checkRun(res.sites, res.issues);
+  if(!chk.ok){ toast('확인 필요: '+chk.issues[0]); await reload(); return; }
+  var transfers=C.transfersOf(res.sites, rule.leadSid).map(function(t){ return Object.assign({ paid:false }, t); }), adjIds=C.appliedAdjustIds(res.sites);
+  var sum=transfers.reduce(function(s,t){ return s+t.amount; }, 0);
+  if(!window.confirm(known.label+' 정산표를 확정할까요?\n송금 '+transfers.length+'건 · '+C.fmt(sum)+'원'+(adjIds.length?'\n이월·조정 '+adjIds.length+'건이 이 달에 붙습니다':''))) return;
+  var rev=Number(known.revision||0), lost=false;
+  try{
+    await save('settle/runs/'+rid, 'SettleRun', function(prev){
+      if(prev && Number(prev.revision||0)!==rev){ lost=true; return undefined; }
+      lost=false;
+      return Object.assign({}, prev||known, { sites:res.sites, issues:res.issues, transfers:transfers, status:'confirmed', confirmedAt:Date.now(), confirmedBy:ME.sid, changed:false });
+    });
+  }catch(e){ toast(lost?'다른 분이 먼저 고쳤습니다 — 다시 불러옵니다':'확정하지 못했습니다: '+errMsg(e)); await reload(); return; }
+  var failed=0;
+  for(var i=0;i<adjIds.length;i++){
+    try{ await patchRecord('settle/adjusts/'+adjIds[i], 'SettleAdjust', D.adjusts[adjIds[i]], { appliedRunId:rid }); }catch(e){ failed++; }
+  }
+  await reload();
+  toast(failed?'확정했지만 이월·조정 '+failed+'건을 붙이지 못했습니다 — «확정 풀기» 후 다시 확정하세요':'확정했습니다 — 송금 '+transfers.length+'건');
+}
+async function setManual(rid){
+  var known=D.runs[rid]; if(!known || known.status!=='draft') return;
+  if(!window.confirm(known.label+' 은(는) 이미 손으로 정산을 끝낸 달로 «기록만» 남길까요?\n송금 목록·카톡 문구를 만들지 않고, 이월·조정도 붙이지 않습니다.')) return;
+  try{ await patchRecord('settle/runs/'+rid, 'SettleRun', known, { status:'manual', confirmedAt:Date.now(), confirmedBy:ME.sid, transfers:[] }); }
+  catch(e){ toast('바꾸지 못했습니다: '+errMsg(e)); }
+  await reload();
+}
+async function unconfirm(rid){
+  var known=D.runs[rid]; if(!known || known.status==='draft') return;
+  var paid=C.toArr(known.transfers).filter(function(t){ return t.paid; }).length;
+  if(!window.confirm(known.label+' 확정을 풀까요?'+(paid?'\n«보냄» 표시 '+paid+'건이 지워집니다.':'')+'\n붙었던 이월·조정은 다시 «다음 정산 때 붙음»으로 돌아갑니다.')) return;
+  try{
+    await patchRecord('settle/runs/'+rid, 'SettleRun', known, { status:'draft', transfers:[], confirmedAt:null, confirmedBy:null });
+    var ids=C.unapplyAdjusts(D.adjusts, rid);
+    for(var i=0;i<ids.length;i++) await patchRecord('settle/adjusts/'+ids[i], 'SettleAdjust', D.adjusts[ids[i]], { appliedRunId:null });
+  }catch(e){ toast('풀지 못했습니다: '+errMsg(e)); await reload(); return; }
+  await reload(); await recalc(rid);
+}
+async function setActual(rid, key, raw){
+  var known=D.runs[rid]; if(!known || known.status!=='draft') return;
+  var a=Object.assign({}, known.actuals||{}), v=String(raw||'').trim();
+  if(v===''){ delete a[key]; } else { var w=C.won(v); if(!(w>0)){ toast('금액을 숫자로 적어 주세요'); drawRuns(); return; } a[key]=w; }
+  var n=C.normalizeNotice(D.notices[known.noticeId]), rule=D.rules[known.typeCode];
+  if(!n || !rule){ toast('안내 파일과 규칙을 확인하세요'); return; }
+  var res=compute(n, known.monthKey, rule, rid, a);
+  try{ await patchRecord('settle/runs/'+rid, 'SettleRun', known, { actuals:a, sites:res.sites, issues:res.issues }); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); }
+  await reload();
+}
+async function setPaid(rid, idxs, on){
+  var known=D.runs[rid]; if(!known || known.status!=='confirmed') return;
+  var tr=C.toArr(known.transfers).map(function(t, i){
+    if(idxs.indexOf(i)<0) return t;
+    return Object.assign({}, t, { paid:!!on, paidAt:on?Date.now():null, paidBy:on?ME.sid:null });
+  });
+  try{ await patchRecord('settle/runs/'+rid, 'SettleRun', known, { transfers:tr }); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); }
+  SEL.transfers={}; await reload();
+}
+async function saveRule(){
+  readRuleForm();
+  var r=RULE_EDIT;
+  if(!r.typeCode){ toast('사업 종류를 고르세요'); return; }
+  if(!r.leadSid){ toast('주관(대표)을 고르세요'); return; }
+  var rates={}, bad='';
+  Object.keys(r.rates).forEach(function(s){ var v=Number(String(r.rates[s]).replace(/[%\s]/g,'')); if(!(v>=0 && v<=100)) bad=NAMES[s]||'(이름 없음)'; else rates[s]=v; });
+  if(bad){ toast(bad+' 요율을 0~100 사이 숫자로 적어 주세요'); return; }
+  var rec={ id:r.typeCode, entityType:'SettleRule', typeCode:r.typeCode, mode:'pool', title:r.title||bizName(r.typeCode), leadSid:r.leadSid, rates:rates, siteRates:r.siteRates||{}, msgHead:r.msgHead, msgFoot:r.msgFoot, active:r.active!==false };
+  try{
+    if(RULE_NEW) await save('settle/rules/'+r.typeCode, 'SettleRule', function(){ return rec; }, { expectedRevision:-1 });
+    else await patchRecord('settle/rules/'+r.typeCode, 'SettleRule', D.rules[r.typeCode], rec);
+  }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+  lsSet('rule', r.typeCode); RULE_EDIT=null; await reload(); toast('규칙을 저장했습니다 — 계산만인 정산표는 «다시 계산»을 눌러 주세요');
+}
+async function addAdjust(){
+  var cid=$('a_site').value, sid=$('a_sid').value, amt=String($('a_amt').value||'').trim(), memo=String($('a_memo').value||'').trim();
+  var neg=/^[-−]/.test(amt), w=C.won(amt.replace(/^[-−]/,'')), v=neg?-w:w;
+  if(!cid || !sid || !w){ toast('사업장·사람·금액을 적어 주세요'); return; }
+  var c=ERP.consultings.filter(function(x){ return String(x.id)===cid; })[0];
+  var id=newId('A'), rec={ id:id, entityType:'SettleAdjust', typeCode:c?typeOf(c):'', consultingId:cid, sid:sid, amount:v, memo:memo, appliedRunId:null };
+  try{ await save('settle/adjusts/'+id, 'SettleAdjust', function(){ return rec; }, { expectedRevision:-1 }); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+  await reload(); toast('이월·조정을 더했습니다 — 그 사업장·사람이 든 다음 확정 정산표에 붙습니다');
+}
+async function softDelete(path, entityType, known){
+  return save(path, entityType, function(prev){ return Object.assign({}, prev||known||{}, { _deleted:true, deletedAt:Date.now(), deletedBy:ME.sid }); });
+}
+async function exportXlsx(rid){
+  var run=C.normalizeRun(D.runs[rid]); if(!run) return;
+  try{ await needXlsx(); }catch(e){ toast(errMsg(e)); return; }
+  var rows=[['사업장','회차','구분','이름','세전','소득세','지방소득세','세후','통장 실입금','요율(%)','몫','차액','조정','정산액','최종']];
+  run.sites.forEach(function(s){ s.members.forEach(function(m){
+    rows.push([s.company, s.round, m.role==='lead'?'주관':'담당', NAMES[m.sid]||m.name, m.pre, m.inc, m.loc, m.net, m.actual==null?'':m.actual, m.rate==null?'':m.rate, m.share==null?'':m.share, m.diff==null?'':m.diff, m.adjust||'', m.settle==null?'':m.settle, m.final==null?'':m.final]);
+  }); });
+  var tr=[['사업장','보내는 사람','받는 사람','금액','보냄']];
+  run.transfers.forEach(function(t){ tr.push([t.company, NAMES[t.fromSid]||'', NAMES[t.toSid]||'', t.amount, t.paid?'보냄':'']); });
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '정산표');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tr), '송금 목록');
+  XLSX.writeFile(wb, '컨설팅정산_'+bizName(run.typeCode)+'_'+run.label.replace(/[\\\/:*?"<>|]/g,'')+'.xlsx');
+}
+function copyMsg(i){
+  var m=currentMsgs()[i]; if(!m) return;
+  var done=function(){ toast(m.name+' 문구를 복사했습니다 — 카톡에 붙여 넣으세요'); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(m.text).then(done, function(){ fallbackCopy(i, done); });
+  else fallbackCopy(i, done);
+}
+function fallbackCopy(i, done){ var ta=document.querySelector('textarea[data-msg="'+i+'"]'); if(!ta) return; ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('복사하지 못했습니다 — 글을 길게 눌러 복사하세요'); } }
+
+/* ═══ 단추 듣기 ═══ */
+function selectedIdx(prefix){ return Object.keys(SEL.transfers).map(function(k){ return Number(k.replace(prefix,'')); }).filter(function(x){ return x>=0; }); }
+document.addEventListener('click', async function(ev){
+  var t=ev.target, b;
+  if((b=t.closest('#tabs button'))){ setTab(b.getAttribute('data-tab')); return; }
+  if((b=t.closest('[data-run]'))){ ev.preventDefault(); CUR_RUN=b.getAttribute('data-run'); SEL.members={}; SEL.transfers={}; drawRuns(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' }); return; }
+  if((b=t.closest('[data-act]'))){
+    var act=b.getAttribute('data-act');
+    if(act==='confirm') await confirmRun(CUR_RUN);
+    else if(act==='manual') await setManual(CUR_RUN);
+    else if(act==='recalc') await recalc(CUR_RUN);
+    else if(act==='unconfirm') await unconfirm(CUR_RUN);
+    else if(act==='xlsx') await exportXlsx(CUR_RUN);
+    else if(act==='msgs'){ MSG_RUN=CUR_RUN; setTab('msgs'); }
+    return;
+  }
+  if((b=t.closest('[data-bulk-do]'))){
+    var d=b.getAttribute('data-bulk-do');
+    if(d.indexOf('clear:')===0){ SEL[d.slice(6)]={}; draw(); return; }
+    if(d==='paidOn'||d==='paidOff'){ await setPaid(CUR_RUN, selectedIdx('t'), d==='paidOn'); return; }
+    if(d==='clearActual'){
+      var run=C.normalizeRun(D.runs[CUR_RUN]); if(!run||run.status!=='draft'){ toast('계산만인 정산표에서만 고칠 수 있습니다'); return; }
+      var a=Object.assign({}, run.actuals);
+      Object.keys(SEL.members).forEach(function(k){ var p=k.split(':'), s=run.sites[+p[0]], m=s&&s.members[+p[1]]; if(s&&m) delete a[s.consultingId+'|'+m.sid]; });
+      var n=C.normalizeNotice(D.notices[run.noticeId]), res=compute(n, run.monthKey, D.rules[run.typeCode], run.id, a);
+      try{ await patchRecord('settle/runs/'+run.id, 'SettleRun', D.runs[run.id], { actuals:a, sites:res.sites, issues:res.issues }); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); }
+      SEL.members={}; await reload(); return;
+    }
+    if(d==='delNotice'||d==='delAdjust'){
+      var kind=d==='delNotice'?'notices':'adjusts', ids=Object.keys(SEL[kind]);
+      if(d==='delAdjust') ids=ids.filter(function(id){ return D.adjusts[id] && !D.adjusts[id].appliedRunId; });
+      if(!ids.length || !window.confirm(ids.length+'건을 지울까요? (기록은 남고 목록에서만 빠집니다)')) return;
+      try{ for(var i=0;i<ids.length;i++) await softDelete('settle/'+kind+'/'+ids[i], d==='delNotice'?'SettleNotice':'SettleAdjust', D[kind][ids[i]]); }catch(e){ toast('지우지 못했습니다: '+errMsg(e)); }
+      SEL[kind]={}; await reload(); return;
+    }
+    return;
+  }
+  if(t.closest('#pickBtn')){ $('file').click(); return; }
+  if((b=t.closest('[data-notice]'))){ CUR_NOTICE=b.getAttribute('data-notice'); var un=unlinkedOf(C.normalizeNotice(D.notices[CUR_NOTICE]));
+    if(un.companies.length||un.people.length){ drawNotices(); toast('먼저 아래 «연결 확정»을 끝내 주세요 — 업체 '+un.companies.length+' · 사람 '+un.people.length); $('linkBox').scrollIntoView({ behavior:'smooth' }); return; }
+    await buildRuns(CUR_NOTICE); return; }
+  if((b=t.closest('[data-link-save]'))){ var p=b.getAttribute('data-link-save'), cut=p.indexOf('|'); await saveLink(p.slice(0,cut), p.slice(cut+1)); return; }
+  if(t.closest('#r_save')){ await saveRule(); return; }
+  if(t.closest('#r_addRate')){ readRuleForm(); var s=$('r_addSid').value, v=$('r_addPct').value.trim(); if(!s||v===''){ toast('사람과 요율을 적어 주세요'); return; } RULE_EDIT.rates[s]=v; drawRules(); return; }
+  if((b=t.closest('[data-rate-del]'))){ readRuleForm(); delete RULE_EDIT.rates[b.getAttribute('data-rate-del')]; drawRules(); return; }
+  if(t.closest('#r_addSRate')){ readRuleForm(); var cid=$('r_sSite').value, ss=$('r_sSid').value, sv=Number($('r_sPct').value); if(!cid||!ss||!(sv>=0&&sv<=100)){ toast('사업장·사람·요율(0~100)을 적어 주세요'); return; }
+    RULE_EDIT.siteRates[cid]=RULE_EDIT.siteRates[cid]||{}; RULE_EDIT.siteRates[cid][ss]=sv; drawRules(); return; }
+  if((b=t.closest('[data-srate-del]'))){ readRuleForm(); var q=b.getAttribute('data-srate-del').split('|'); if(RULE_EDIT.siteRates[q[0]]){ delete RULE_EDIT.siteRates[q[0]][q[1]]; if(!Object.keys(RULE_EDIT.siteRates[q[0]]).length) delete RULE_EDIT.siteRates[q[0]]; } drawRules(); return; }
+  if(t.closest('#a_add')){ await addAdjust(); return; }
+  if((b=t.closest('[data-adj-del]'))){ var aid=b.getAttribute('data-adj-del'); if(!window.confirm('이 이월·조정을 지울까요?')) return; try{ await softDelete('settle/adjusts/'+aid, 'SettleAdjust', D.adjusts[aid]); }catch(e){ toast('지우지 못했습니다: '+errMsg(e)); } await reload(); return; }
+  if((b=t.closest('[data-copy]'))){ copyMsg(Number(b.getAttribute('data-copy'))); return; }
+});
+document.addEventListener('change', async function(ev){
+  var t=ev.target;
+  if(t.matches('input[data-all]')){ var k=t.getAttribute('data-all'); [].forEach.call(t.closest('table').querySelectorAll('input[data-ck]'), function(c){ c.checked=t.checked; var id=c.getAttribute('data-ck'); if(t.checked) SEL[k][id]=1; else delete SEL[k][id]; }); drawBulks(); return; }
+  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?tb.getAttribute('data-name'):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts' }[kind]; if(!kind) return;
+    var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
+  if(t.matches('input[data-paid]')){ await setPaid(CUR_RUN, [Number(t.getAttribute('data-paid'))], t.checked); return; }
+  if(t.matches('input[data-actual]')){ await setActual(CUR_RUN, t.getAttribute('data-actual'), t.value); return; }
+  if(t.id==='file'){ var f=t.files&&t.files[0]; t.value=''; await onFile(f); return; }
+  if(t.id==='upType'){ lsSet('upType', t.value); return; }
+  if(t.id==='rulePick'){ startRule(t.value); drawRules(); return; }
+  if(t.id==='r_type'){ readRuleForm(); drawRules(); return; }
+  if(t.id==='msgPick'){ MSG_RUN=t.value; drawMsgs(); return; }
+});
+(function(){
+  var dz=$('drop');
+  ['dragenter','dragover'].forEach(function(e){ dz.addEventListener(e, function(ev){ ev.preventDefault(); dz.className='drop on'; }); });
+  ['dragleave','drop'].forEach(function(e){ dz.addEventListener(e, function(ev){ ev.preventDefault(); dz.className='drop'; }); });
+  dz.addEventListener('drop', function(ev){ var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; onFile(f); });
+})();
+
+/* ═══ 로그인·잠금 — 모르면 잠근다 ═══
+   대표·위임관리인·재무권한자(재무관리와 같은 사람)만 연다 — 대표 선택 2026-10-31. 로그인 안 함·퇴사·권한 없음은 잠근다. */
+function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true || role.fin===true); }
+async function staffRole(u){ try{ return (await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||null; }catch(e){ return null; } }
+function boot(){
+  var t=lsGet('tab'); if(['runs','notices','rules','msgs'].indexOf(t)>=0) TAB=t;
+  if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
+  if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  fbDb=firebase.database();
+  try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+  firebase.auth().onAuthStateChanged(async function(u){
+    $('outBtn').style.display=u?'':'none';
+    if(!u){ PuGate.show(); return; }
+    PuGate.hide();
+    var role=await staffRole(u);
+    if(!canOpen(role)){ lock(role&&role.status==='active'?'재무관리 권한이 없는 계정입니다':'재직 중인 직원 계정이 아닙니다'); return; }
+    ME.sid=String(role.sid); gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:ME.sid });
+    $('lock').style.display='none'; $('app').style.display='';
+    await loadErp();
+    await reload(); setTab(TAB);
+  });
+}
+boot();
+</script>
+</body>
+</html>
