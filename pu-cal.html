@@ -391,6 +391,15 @@
   .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
   /* ── 주소 지도 · 하루 동선 (2026-10-09) ── 상세 창 «위»에 겹쳐 뜬다 */
   .veil.top{z-index:44}
+  /* 🚗 주소 길게 누르기 → 제네시스에 보낼까요? (2026-10-31) — 글 선택 손잡이가 길게 누르기를 가로채지 않게 주소 자리만 선택을 끈다 */
+  [data-lp]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .modal.genp{z-index:60;width:min(380px,92vw)}
+  .genp .gphd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:15px}
+  .genp .gx{border:none;background:transparent;font-size:18px;color:var(--gsub);cursor:pointer;padding:4px 8px;font-family:inherit}
+  .genp .gpplace{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.5;word-break:break-all;margin-bottom:10px}
+  .genp .gpbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .genp .gpgo{flex:1;min-width:0}
+  body.mob .modal.genp{left:0;top:auto;bottom:0;transform:none;width:100%;max-width:none;border-radius:20px 20px 0 0;padding-bottom:22px}
   .modal.mapw{z-index:45;width:min(560px,94vw);padding:0;overflow:hidden}
   .mapw .mwhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--gline)}
   .mapw .gx{border:none;background:transparent;color:var(--gtext);font-size:18px;width:36px;height:36px;border-radius:50%;cursor:pointer;flex-shrink:0}
@@ -3800,13 +3809,93 @@ function 제네시스로(place){
   }catch(e){}
   toast("복사가 안 됩니다 — 주소를 길게 눌러 복사한 뒤 제네시스 앱에 붙여 넣으세요"); 열기();
 }
+/* ══ 주소 길게 누르기 → «제네시스에 보낼까요?» 시작 ══════════════════════════════════════════
+   대표 지시 2026-10-31 「출장이 있으면 사업장 주소를 찾아 제네시스 이동에 넣어야 한다 — 캘린더 일정의 사업장 주소를
+   누르고 있으면 «제네시스에 붙여넣기 할까요?»가 나오고 연결되게」.
+   ★ 가능한 데까지: 주소를 «복사»하고 마이 제네시스 앱을 «연다»(제네시스로 — 이미 있던 길). 앱의 검색칸에 «자동으로 붙여 넣는» 것은
+     안드로이드가 막고, 공식으로 주소를 받는 통로(딥링크·API)도 확인되지 않았다(2026-10-31 조사). 앱에서 남는 일은
+     맵 → 검색칸 붙여넣기 → 「내 차로 전송」이다.
+   ★ 짧게 누르기는 그대로(지도 창) — 길게 누르면(0.5초) 이 확인 창이 뜬다. 데스크톱은 오른쪽 클릭.
+   ★ 주소가 적힌 자리에 data-lp(주소 글)를 달면 된다 — 일정 상세 📍 · 출장 카드 · 지도 창 · 동선 목록.
+   ⚠ 길게 눌렀을 때는 «아직 아무것도 복사·실행하지 않는다» — [열기]를 눌러야 한다(실수로 앱이 열리지 않게).
+   ⚠ 길게 누른 손을 뗄 때의 «누름 하나»는 삼킨다(길게삼킴) — 안 삼키면 방금 뜬 창의 바깥(닫기)이 눌린다.
+   ⚠ 온라인 회의 링크 같은 «주소가 아닌 것»은 창을 안 띄운다(PuCalMap.cleanPlace). */
+var _길게때 = 0, _길게타이머 = null, _길게자리 = null;
+/* 눌린 자리 위쪽의 data-lp 주소 글 — 주소가 아니면 "" */
+function 길게주소(el){
+  var p = (el && el.closest) ? el.closest("[data-lp]") : null;
+  if(!p) return "";
+  var 글 = String(p.getAttribute("data-lp") || "");
+  return (typeof PuCalMap !== "undefined") ? PuCalMap.cleanPlace(글) : 글.trim();
+}
+function 제네시스창열기(place){
+  var 글 = String(place || "").trim();
+  if(!글) return false;
+  S.gen = { place:글 };
+  _길게때 = Date.now();
+  try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_){}
+  render();
+  return true;
+}
+/* 길게 누른 직후의 누름 하나를 삼킨다 */
+function 길게삼킴(){
+  if(_길게때 && Date.now() - _길게때 < 800){ _길게때 = 0; return true; }
+  return false;
+}
+function 제네시스창Html(){
+  var g = S.gen; if(!g) return "";
+  var 안드 = /Android/i.test(navigator.userAgent || "");
+  return '<div class="veil top" data-gen="close" style="z-index:59"></div>'
+    + '<div class="modal genp">'
+    + '<div class="gphd"><b>🚗 제네시스에 보낼까요?</b><button class="gx" data-gen="close" title="닫기">✕</button></div>'
+    + '<div class="gpplace">📍 ' + esc(g.place) + '</div>'
+    + '<div class="gpbtns"><button class="btn gpgo" data-gen="go">' + (안드 ? '📋 복사하고 제네시스 앱 열기' : '📋 주소 복사') + '</button>'
+    +   '<button class="btn ghost" data-gen="map">🗺 지도</button></div>'
+    + '<div class="dhint" style="margin:10px 0 0">' + (안드 ? '열린 제네시스 앱에서 <b>맵</b> → 검색칸을 길게 눌러 <b>붙여넣기</b> → <b>「내 차로 전송」</b>' : '폰의 제네시스 앱 → <b>맵</b> → 검색칸에 붙여넣기 → <b>「내 차로 전송」</b>') + '</div>'
+    + '</div>';
+}
+function 제네시스누름(t){
+  var 뜻 = t.getAttribute("data-gen"), g = S.gen;
+  if(뜻 === "go" && g){ S.gen = null; render(); 제네시스로(g.place); }
+  else if(뜻 === "map" && g){ S.gen = null; openMap(g.place, ""); }
+  else { S.gen = null; render(); }
+}
+/* 손가락 — 0.52초 눌렀고 10px 넘게 안 움직였으면 연다. 스크롤·끌기는 움직이므로 취소된다. */
+document.addEventListener("touchstart", function(e){
+  var 글 = 길게주소(e.target);
+  if(!글 || !e.touches || e.touches.length !== 1) return;
+  var t0 = e.touches[0];
+  _길게자리 = { x:t0.clientX, y:t0.clientY, 열림:false };
+  clearTimeout(_길게타이머);
+  _길게타이머 = setTimeout(function(){ if(_길게자리) _길게자리.열림 = 제네시스창열기(글); }, 520);
+}, { passive:true });
+document.addEventListener("touchmove", function(e){
+  if(!_길게자리 || !e.touches || !e.touches[0]) return;
+  if(Math.abs(e.touches[0].clientX - _길게자리.x) > 10 || Math.abs(e.touches[0].clientY - _길게자리.y) > 10) clearTimeout(_길게타이머);
+}, { passive:true });
+function 길게끝(){
+  clearTimeout(_길게타이머);
+  if(_길게자리 && _길게자리.열림) _길게때 = Date.now();      /* 뗀 뒤에 오는 누름 하나를 삼키게 */
+  _길게자리 = null;
+}
+document.addEventListener("touchend", 길게끝, { passive:true });
+document.addEventListener("touchcancel", 길게끝, { passive:true });
+/* 길게 누르기·오른쪽 클릭이 «브라우저 메뉴(복사·선택)»로 가지 않게 — 주소 자리만. 위 손가락 타이머가 먼저 열었으면 다시 안 연다 */
+document.addEventListener("contextmenu", function(e){
+  var 글 = 길게주소(e.target);
+  if(!글) return;
+  e.preventDefault();
+  if(!S.gen) 제네시스창열기(글);
+});
+/* ══ 주소 길게 누르기 끝 ═════════════════════════════════════════════════════════════════════ */
+
 function tripHtml(){
   var t = S.trip; if(!t) return "";
   var x = 출장하나();
   var 몸 = x
     ? '<div class="trwhen">' + esc(긴날짜(t.date) + (x.time ? " · " + x.time + (x.endTime ? "~" + x.endTime : "") : "")) + '</div>'
       + '<div class="trttl">' + esc(x.title) + '</div>'
-      + '<div class="trplace">📍 <span>' + esc(x.place) + '</span></div>'
+      + '<div class="trplace" data-lp="' + esc(x.place) + '">📍 <span>' + esc(x.place) + '</span></div>'
       + '<button class="btn trgo" data-tripgo="1">📋 주소 복사하고 제네시스 앱 열기</button>'
       + '<div class="dhint" style="margin:10px 0 0">제네시스 앱 → <b>맵</b> → 검색칸에 붙여 넣기 → <b>「내 차로 전송」</b></div>'
     : '<div class="rnone">' + (GCAL.loading || !GCAL.ym ? "⏳ 일정을 불러오는 중…"
@@ -3827,7 +3916,7 @@ function mapHtml(){
   return '<div class="veil top" data-close="1" style="z-index:46"></div>'
     + '<div class="modal mapw" style="z-index:47">'
     + '<div class="mwhd"><b>🗺 ' + esc(m.title || "지도") + '</b><button class="gx" data-close="1" title="닫기">✕</button></div>'
-    + '<div class="maddr">📍 ' + esc(m.place) + '</div>'
+    + '<div class="maddr" data-lp="' + esc(m.place) + '" title="길게 누르면 제네시스로 보내기">📍 ' + esc(m.place) + '</div>'
     + '<iframe src="' + esc(PuCalMap.embedUrl(m.place)) + '" referrerpolicy="no-referrer-when-downgrade" title="지도"></iframe>'
     + '<div class="mbtns">'
     +   '<button class="btn ghost" data-mapcopy="1" title="마이 제네시스 앱 «내 차로 전송»에 붙여 넣기">📋 주소 복사</button>'
@@ -3861,7 +3950,7 @@ function routeHtml(){
       + '<span class="rno">' + (i + 1) + '</span>'
       + '<span class="rtm">' + esc(x.time ? x.time + (x.endTime ? "~" + x.endTime : "") : "시각 없음") + '</span>'
       + '<span class="rbody"><div class="rttl" title="' + esc(x.title) + '">' + esc(x.title) + '</div>'
-      +   '<div class="rpl" title="' + esc(x.place) + '">📍 ' + esc(x.place) + '</div></span>'
+      +   '<div class="rpl" data-lp="' + esc(x.place) + '" title="' + esc(x.place) + ' · 길게 누르면 제네시스로 보내기">📍 ' + esc(x.place) + '</div></span>'
       + '<button class="btn ghost" data-rmap="' + esc(x.key) + '" title="지도 보기">🗺</button>'
       + '<button class="btn ghost" data-rcopy="' + esc(x.key) + '" title="이 주소 복사 — 마이 제네시스 «내 차로 전송»에">📋</button>'
       + '</div>';
@@ -4085,7 +4174,7 @@ function detailHtml(){
             if(/^https:\/\//i.test(r.href || "")) 글 = '<a href="' + esc(r.href) + '" target="_blank" rel="noopener">' + 글 + '</a>';
             /* 📍 장소 — 누르면 지도 창(2026-10-09). 온라인 회의 링크 같은 «장소 아닌 것»은 그대로 */
             else if(r.i === "📍" && typeof PuCalMap !== "undefined" && PuCalMap.cleanPlace(r.t))
-              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + '</a>';
+              글 = '<a class="maplink" href="#" data-map="det" data-lp="' + esc(r.t) + '" title="지도 보기 · 길게 누르면 제네시스로 보내기">' + 글 + '</a>';
             return '<div class="drow"><span class="di">' + 행아이콘(r.i) + '</span>'
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
@@ -5499,6 +5588,7 @@ function render(){
   if(typeof PuCalMap !== "undefined"){ html += tripHtml(); html += routeHtml(); }   /* 상세 창 «위»에. 지도 창은 판 «밖»(지도그리기) */
   html += noteHtml();
   html += 후보창Html();
+  html += 제네시스창Html();
   html += 구글연결창Html();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   var 옛격자 = document.querySelector('.tgscroll'), 옛격자맨 = 옛격자 ? 옛격자.scrollTop : -1;
@@ -5606,6 +5696,7 @@ document.addEventListener('touchend', function(e){
 /* 자물쇠 없이 닫는 길 하나 더 — 창이 떠 있을 때 ESC */
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && S.open){ S.open = null; render(); }
+  if(e.key === 'Escape' && S.gen){ S.gen = null; render(); }
   /* 비어 있는 검색칸은 ESC 로 도로 돋보기가 된다 */
   if(e.key === 'Escape' && S.srch && !S.q){ S.srch = false; render(); }
 });
@@ -5618,6 +5709,7 @@ document.addEventListener('focusout', function(e){
 document.addEventListener('click', function(e){
   /* 밀어서 달을 넘긴 직후의 «누름»은 삼킨다 — 안 그러면 손 뗀 자리의 날이 골라진다 */
   if(_민때 && Date.now() - _민때 < 500){ _민때 = 0; return; }
+  if(typeof 길게삼킴 === "function" && 길게삼킴()){ e.preventDefault(); return; }   /* 주소를 길게 누르고 뗀 뒤의 누름 하나 */
   /* 펼침 창은 «바깥을 누르면» 닫힌다 — 창 안을 누른 것은 그대로 둔다 */
   if(S.open && !(e.target.closest && e.target.closest(".pop"))
      && !(e.target.closest && e.target.closest("[data-more]"))){
@@ -5636,7 +5728,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-cand]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-cand],[data-gen]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -5755,6 +5847,7 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }
   if(t.hasAttribute('data-dmore')){ S.drawer = false; S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
+  if(t.hasAttribute('data-gen')){ 제네시스누름(t); return; }
   if(t.hasAttribute('data-cand')){ 후보누름(t); return; }
   if(t.hasAttribute('data-cpick')){ 연락처고르기(t.getAttribute('data-cpick')); return; }
   if(t.hasAttribute('data-addr')){ 주소눌림(t.getAttribute('data-addr'), t.getAttribute('data-ai')); return; }
