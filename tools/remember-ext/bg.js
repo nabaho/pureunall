@@ -81,6 +81,11 @@ async function run() {
     itId = it.id;
     await waitLoaded(it.id, 60000);
     var hello = await ask(it.id, { cmd: 'hello' }, 10);
+    if (!hello) {                                              /* 확장을 새로고침하면 열려 있던 탭의 다리가 끊긴다 — 탭을 새로 불러 한 번 더 */
+      await chrome.tabs.reload(it.id).catch(function () {});
+      await waitLoaded(it.id, 60000);
+      hello = await ask(it.id, { cmd: 'hello' }, 10);
+    }
     if (!hello || !hello.ready) { note('로그인', '푸른 포털 로그인 필요(받는 화면 탭 확인)'); return; }               /* 푸른 로그인 전 — 받는 화면이 빨간 띠로 알린다 */
     var cp = Number(hello.cp) || 0;
     await trace(itId, '1 받는 화면 확인', 'cp=' + cp);
@@ -91,6 +96,11 @@ async function run() {
     await trace(itId, '2 리멤버 탭', (t && t.status) + ' ' + String((t && t.url) || '').replace(/[?#].*$/, ''));
     if (!t || !/^https:\/\/card\.rememberapp\.co\.kr\//.test(t.url || '')) { await ask(it.id, { cmd: 'login-lost' }); note('리멤버', '리멤버 로그인 필요'); return; }
     var res = await ask(rt.id, { cmd: 'pull', cp: cp }, 10);
+    if (!res) {                                                /* 리멤버 탭 다리가 없다 — 새로 불러 한 번 더 */
+      await chrome.tabs.reload(rt.id).catch(function () {});
+      await waitLoaded(rt.id, 60000);
+      res = await ask(rt.id, { cmd: 'pull', cp: cp }, 10);
+    }
     await trace(itId, '3 목록 받기', !res ? '응답 없음(리멤버 탭 다리 없음)' : res.err ? 'err=' + res.err : (res.stacks.length + '장'));
     if (!res || res.err) {
       var lost = res && (res.err === 'login' || res.err === 'no-heads');
