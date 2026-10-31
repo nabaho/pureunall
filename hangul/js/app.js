@@ -31,9 +31,11 @@
     updatePrintPage();
     desk.scrollTop = d.scroll || 0;
     document.title = d.name + (d.readOnly ? ' [읽기 전용]' : '') + ' - 푸른 한글편집기';
-    docEl.contentEditable = d.readOnly ? 'false' : 'true';
+    // 휴대폰 '보기' 모드(body.m-view)는 글을 고치지 않으므로 입력 상자(키보드)를 띄우지 않음
+    const mView = document.body.classList.contains('m-view');
+    docEl.contentEditable = d.readOnly || mView ? 'false' : 'true';
     document.body.classList.toggle('read-only', !!d.readOnly);
-    E.focus();
+    if (!mView) E.focus();
     E.caretAt(docEl.querySelector('p, td') || docEl, true);
     refreshAll();
   }
@@ -978,7 +980,7 @@
       if (gi) out.push({ sep: true });
       for (const x of grp) {
         if (x.d) out.push({ label: x.l + ' ▸', icon: x.i, act: () => setTimeout(() => UI.menu(document.querySelector(`.menu-tab[data-key="${key}"]`), x.d()), 0) });
-        else out.push({ label: x.l, icon: x.i, checked: x.on && x.on(), act: x.a });
+        else out.push({ label: x.l, icon: x.i, checked: x.on && x.on(), act: () => { const r = x.a(); if (Array.isArray(r)) setTimeout(() => UI.menu(document.querySelector('.menu-tab[data-key="' + key + '"]'), r), 0); } });
       }
     });
     return out;
@@ -1014,7 +1016,7 @@
       for (const x of grp) {
         const b = h('button', { class: 'rb', title: x.l, html: I[x.i] || '' }, h('span', {}, x.l), x.d ? h('span', { class: 'caret' }, '▾') : null);
         b.addEventListener('mousedown', e => e.preventDefault());
-        b.addEventListener('click', () => { if (x.d) UI.menu(b, x.d()); else { x.a(); refreshAll(); } });
+        b.addEventListener('click', () => { if (x.d) UI.menu(b, x.d()); else { const r = x.a(); if (Array.isArray(r)) UI.menu(b, r); /* 펼침 목록을 돌려주는 단추(표·붙이기·글자 색…) */ refreshAll(); } });
         g2.append(b);
         ribbonButtons.push([b, x]);
       }
@@ -1262,5 +1264,5 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  window.PureunApp = { C, addDoc, docs: () => docs, current: () => cur, buildBytes };
+  window.PureunApp = { C, D, addDoc, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
 })();
