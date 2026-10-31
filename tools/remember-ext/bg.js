@@ -49,6 +49,16 @@ async function ask(id, msg, tries) {
   }
   return null;
 }
+/* 받는 화면은 막 열리면 로그인 확인 중이라 «준비 안 됨»부터 답한다 — 준비될 때까지(최대 약 40초) 다시 묻는다 */
+async function askReady(id) {
+  var r = null;
+  for (var i = 0; i < 20; i++) {
+    r = await ask(id, { cmd: 'hello' }, 1);
+    if (r && r.ready) return r;
+    await sleep(2000);
+  }
+  return r;
+}
 function b64(buf) {
   var s = '', b = new Uint8Array(buf);
   for (var i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
@@ -80,11 +90,11 @@ async function run() {
     var it = await findOrOpen(INTAKE, INTAKE);
     itId = it.id;
     await waitLoaded(it.id, 60000);
-    var hello = await ask(it.id, { cmd: 'hello' }, 10);
+    var hello = await askReady(it.id);
     if (!hello) {                                              /* 확장을 새로고침하면 열려 있던 탭의 다리가 끊긴다 — 탭을 새로 불러 한 번 더 */
       await chrome.tabs.reload(it.id).catch(function () {});
       await waitLoaded(it.id, 60000);
-      hello = await ask(it.id, { cmd: 'hello' }, 10);
+      hello = await askReady(it.id);
     }
     if (!hello || !hello.ready) { note('로그인', '푸른 포털 로그인 필요(받는 화면 탭 확인)'); return; }               /* 푸른 로그인 전 — 받는 화면이 빨간 띠로 알린다 */
     var cp = Number(hello.cp) || 0;
