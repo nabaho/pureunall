@@ -8,7 +8,7 @@ const V = require('../js/pu-settle-view.js');
 function visible(html) { return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' '); }
 
 const NAMES = { 'T-LEAD': '홍길동', 'T-A': '<b>김가나</b>' };
-function fakeRun(status) {
+function fakeRun(status, rate) {
   const notice = { months: [{ key: '2026-10', label: '10월' }], rows: [
     { name: '홍길동', company: '가나상사', totalPre: 5136364, amounts: { '2026-10': 2568182 } },
     { name: '<b>김가나</b>', company: '가나상사', totalPre: 1954545, amounts: { '2026-10': 977273 } }
@@ -17,7 +17,7 @@ function fakeRun(status) {
   ctx.companyLinks[C.linkKey('가나상사')] = { consultingId: 'C-1', companyId: 'CO-1' };
   ctx.personLinks[C.linkKey('홍길동')] = 'T-LEAD';
   ctx.personLinks[C.linkKey('<b>김가나</b>')] = 'T-A';
-  const rule = { typeCode: 'cons-test', title: '테스트사업', leadSid: 'T-LEAD', rates: { 'T-A': 25 }, siteRates: {} };
+  const rule = { typeCode: 'cons-test', title: '테스트사업', leadSid: 'T-LEAD', rates: { 'T-A': rate || 25 }, siteRates: {} };
   const res = C.settleMonth(notice, '2026-10', rule, ctx);
   return { id: 'cons-test_2026-10', typeCode: 'cons-test', monthKey: '2026-10', label: '10월', status: status || 'draft', sites: res.sites,
     issues: res.issues, transfers: C.transfersOf(res.sites, 'T-LEAD').map((t) => Object.assign({ paid: false }, t)), changed: false };
@@ -219,4 +219,29 @@ test('안내 파일 목록·이월 목록도 ☐ 다음 번호', () => {
     assert.match(ths[1], /번호/);
   });
   assert.match(visible(a), /−1,000/);
+});
+
+test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받았으면 «추가 지급»(묶음 머리·송금 목록·뜻 풀이·카톡·계산기)', () => {
+  const back = V.runDetail(fakeRun('draft'), NAMES);
+  assert.match(visible(back), /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동 87,915원\s+반환/);
+  assert.match(visible(back), /정산 방향/);
+  assert.match(visible(back), /주관\(홍길동\)에게 돌려줌/);
+  const tb = back.slice(back.indexOf('data-name="transfers"'));
+  assert.match(visible(tb.slice(0, tb.indexOf('</thead>'))), /구분/);
+  assert.match(tb, /data-k="dir"><span class="pill dir-back">반환</);
+  /* 40% 면 담당 몫(1,371,390)이 받은 세후(945,033)보다 크다 → 주관이 더 줌 */
+  const more = V.runDetail(fakeRun('draft', 40), NAMES);
+  assert.match(visible(more), /홍길동 → &lt;b&gt;김가나&lt;\/b&gt; 426,357원\s+추가 지급/);
+  assert.match(more, /class="pill dir-more">추가 지급</);
+  /* 확정한 달 — 저장된 송금에는 방향 칸이 없다. 받는 사람이 주관이면 반환 */
+  const c = V.runDetail(fakeRun('confirmed'), NAMES);
+  assert.match(c.slice(c.indexOf('data-name="transfers"')), /dir-back">반환</);
+  /* 카톡 문구도 같은 말 */
+  const rule = { title: '테스트사업', leadSid: 'T-LEAD' };
+  assert.match(C.buildMessages(fakeRun('confirmed'), rule, NAMES)[0].text, /반환 87,915원/);
+  assert.match(C.buildMessages(fakeRun('confirmed', 40), rule, NAMES)[0].text, /추가 지급 426,357원/);
+  /* 계산기 */
+  const calc = C.calcSite([{ name: '갑', role: 'lead', pre: 2568182 }, { name: '을', role: 'staff', pre: 977273, rate: 25 }]);
+  assert.equal(calc.transfers[0].dir, 'back');
+  assert.match(visible(V.calcResult(calc, {})), /을 → 갑\s+87,915원\s+반환/);
 });

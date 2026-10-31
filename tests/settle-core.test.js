@@ -325,7 +325,7 @@ test('계산기 — 사업장 하나: 주관 1 + 담당, 정산표와 같은 식
   const a = r.members[1], l = r.members[0];
   assert.deepEqual([a.net, a.share, a.settle, a.final], [945033, 857118, -87915, 857118]);
   assert.deepEqual([l.net, l.settle, l.final], [2483442, 87915, 2571357]);
-  assert.deepEqual(r.transfers, [{ from: '김가나', to: '홍길동', amount: 87915 }]);
+  assert.deepEqual(r.transfers, [{ from: '김가나', to: '홍길동', amount: 87915, dir: 'back' }]);
 });
 
 test('계산기 — 담당 둘·통장 실입금, 정산액 합 0', () => {

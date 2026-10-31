@@ -116,6 +116,9 @@ main{padding:12px 16px 40px}
 .t tr.grp td.grp-tr{font-weight:400;color:var(--ink2)}
 .t input.amt.dirty{background:var(--amber-bg);border-color:var(--amber-m)}
 .pill.role-lead{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
+/* 송금 방향(대표 지시 2026-10-31 「권형하가 더 받은것이면 추가로 담당자에게 더 지급 … 담당자가 더받은것이면 반환」) — 반환은 노랑, 추가 지급은 초록 */
+.pill.dir-back{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber)}
+.pill.dir-more{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
 button.pend{background:var(--amber-bg);border-color:var(--amber-m);color:var(--amber)}
 details.rd>summary{cursor:pointer;padding:10px 14px}
 details.dep{margin:12px 10px 4px}
@@ -291,8 +294,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=4"></script>
-<script src="js/pu-settle-view.js?v=6"></script>
+<script src="js/pu-settle-core.js?v=5"></script>
+<script src="js/pu-settle-view.js?v=7"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -756,8 +759,9 @@ async function exportXlsx(rid){
   run.sites.forEach(function(s){ s.members.forEach(function(m){
     rows.push([s.company, s.round, m.role==='lead'?'주관':'담당', NAMES[m.sid]||m.name, m.pre, m.inc, m.loc, m.net, m.actual==null?'':m.actual, m.rate==null?'':m.rate, m.share==null?'':m.share, m.diff==null?'':m.diff, m.adjust||'', m.settle==null?'':m.settle, m.final==null?'':m.final]);
   }); });
-  var tr=[['사업장','보내는 사람','받는 사람','금액','보냄']];
-  run.transfers.forEach(function(t){ tr.push([t.company, NAMES[t.fromSid]||'', NAMES[t.toSid]||'', t.amount, t.paid?'보냄':'']); });
+  var leadBy={}; run.sites.forEach(function(s){ s.members.forEach(function(m){ if(m.role==='lead') leadBy[s.consultingId||s.company]=m.sid; }); });
+  var tr=[['사업장','구분','보내는 사람','받는 사람','금액','보냄']];
+  run.transfers.forEach(function(t){ tr.push([t.company, C.DIR_KO[C.dirOf(t, leadBy[t.consultingId||t.company])], NAMES[t.fromSid]||'', NAMES[t.toSid]||'', t.amount, t.paid?'보냄':'']); });
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '정산표');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tr), '송금 목록');
