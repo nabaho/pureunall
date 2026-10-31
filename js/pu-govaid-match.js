@@ -314,6 +314,8 @@
       add('size', '규모: ' + sizes.join('·'), hasS && hasM ? 'ok' : (!hasS && !hasM ? 'no' : 'unknown'));
     } else oneOf('size', c.sizes, v('size'), '규모');
     oneOf('region', c.regions, v('region'), '지역');
+    /* 시·군 — 지역 반복 사업을 사전에 올렸을 때(2026-10-31 3단계). 회사 시·군을 모르면 모름 */
+    oneOf('sigungu', c.sigungu, v('sigungu'), '시·군');
     var ind = c.industries || {}, inc = list(ind.include), exc = list(ind.exclude), iv = v('industry');
     if (inc.length || exc.length) {
       var text = '업종' + (inc.length ? ': ' + inc.map(indName).join('·') : '') + (exc.length ? ' (제외 ' + exc.map(indName).join('·') + ')' : '');

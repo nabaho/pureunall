@@ -328,10 +328,10 @@ table.mx td.dot.yes{background:var(--green-bg)}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-govaid-match.js?v=8"></script>
+<script src="js/pu-govaid-match.js?v=9"></script>
 <script src="js/pu-govaid-view.js?v=7"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
-<script src="js/pu-govaid-records.js?v=3"></script>
+<script src="js/pu-govaid-records.js?v=4"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''}, YEAR=GovaidMatch.kstYear();
@@ -651,7 +651,8 @@ function areaChip(n){
   var a=n.area||{}, g=GovaidMatch.list(a.sgg), s=GovaidMatch.list(a.sido);
   return g.length ? '<span class="chip c-amber">'+esc(g.join('·'))+'</span>' : s.length ? '<span class="chip c-blue">'+esc(s.join('·'))+'</span>' : '<span class="chip">전국</span>';
 }
-function scopeChip(p){ var r=GovaidMatch.list((p.cond||{}).regions); return r.length ? '<span class="chip c-blue">'+esc(r.join('·'))+'</span>' : '<span class="chip">전국</span>'; }
+function scopeChip(p){ var c=p.cond||{}, r=GovaidMatch.list(c.regions), g=GovaidMatch.list(c.sigungu);
+  return g.length ? '<span class="chip c-amber">'+esc(r.join('·')+' '+g.join('·'))+'</span>' : r.length ? '<span class="chip c-blue">'+esc(r.join('·'))+'</span>' : '<span class="chip">전국</span>'; }
 function starBtnN(n){
   var on=!!(n&&n.star&&n.star.on);
   return '<button class="star'+(on?' on':'')+'" data-nstar="'+esc(n.id)+'" title="'+(on?'★ 노무사 직접 — 누르면 끕니다':'누르면 ★ 노무사 직접으로 표시합니다')+'">'+(on?'★':'☆')+'</button>';
@@ -779,7 +780,7 @@ function confOf(p){ return (p.docsInfo&&p.docsInfo.confidence) || (p.aiDraft&&p.
 function checkRow(p,n){
   var L=GovaidMatch.list, c=p.cond||{}, ind=c.industries||{}, k='check|'+p.id, open=OPEN_CK===p.id;
   var sz=L(c.sizes).map(function(s){ return s.replace('기업',''); }).join('·');
-  var ir=[L(ind.include).join('·'), L(ind.exclude).length?'제외 '+L(ind.exclude).join('·'):'', L(c.regions).join('·')].filter(Boolean).join(' · ');
+  var ir=[L(ind.include).join('·'), L(ind.exclude).length?'제외 '+L(ind.exclude).join('·'):'', L(c.regions).join('·'), L(c.sigungu).join('·')].filter(Boolean).join(' · ');
   var fc=L(c.facts).map(function(f){ return (GovaidMatch.FACTS[f.key]||f.key).replace(/이다$|가 있다$|이 있다$|를 운영한다$|했다$/,'')+(f.want===false?' ✗':''); }).join('·');
   var indiv=(p.applicability||(p.aiDraft&&p.aiDraft.applicability))==='individual';
   return '<tr data-row="'+esc(p.id)+'"'+(open?' class="cur"':'')+'><td class="c"><input type="checkbox" data-ck="'+esc(k)+'"'+(SEL[k]?' checked':'')+'></td><td class="n">'+n+'</td>'
@@ -860,6 +861,8 @@ function editorHtml(p){
       +'<span class="gap"></span>매출 감소 <input id="eSdMin" type="number" min="0" class="num" value="'+v(sd.min)+'">% 이상</div>'
     +'<label class="k">규모 · 지역</label><div>'+ckGroup('eSize', GovaidMatch.SIZES.map(function(s){ return pair(s,s); }), L(c.sizes))+'<span class="gap"></span>'
       +ckGroup('eReg', GovaidMatch.REGIONS.map(function(s){ return pair(s,s); }), L(c.regions))+'<span class="hint">비우면 제한 없음·전국</span></div>'
+    /* 시·군 — 지역 반복 사업(2026-10-31 3단계). 지역 공고에서 «사전으로» 올리면 공고의 시·군이 저절로 들어온다 */
+    +'<label class="k" for="eSgg">시·군</label><div class="row"><input id="eSgg" value="'+v(L(c.sigungu).join(', '))+'" placeholder="예: 아산시, 천안시 — 비우면 시·도 전체" style="flex:1;min-width:200px"><span class="hint">시·도를 함께 고르세요</span></div>'
     +'<label class="k">업종 해당</label><div>'+ckGroup('eIndInc', indShortOpts(), L(ind.include))+'</div>'
     +'<label class="k">업종 제외</label><div>'+ckGroup('eIndExc', indShortOpts(), L(ind.exclude))+'</div>'
     +'<label class="k">예 / 아니오</label><div class="facts">'+Object.keys(GovaidMatch.FACTS).map(function(k){ return '<label class="fk" for="eF_'+k+'"><span>'+esc(GovaidMatch.FACTS[k])+'</span><select id="eF_'+k+'"><option value="">따지지 않음</option><option value="yes"'+(facts[k]==='yes'?' selected':'')+'>그래야 함</option><option value="no"'+(facts[k]==='no'?' selected':'')+'>아니어야 함</option></select></label>'; }).join('')+'</div>'
@@ -905,7 +908,7 @@ function readEditor(cur){
     fields:$('eFields').value.split(',').map(function(s){ return s.trim(); }).filter(Boolean),
     summary:summary, summaryCut: !!(cur && summary===cur.summary && cur.summaryCut),
     cond:{ headcount:{min:hcMin,max:hcMax}, yearsInBiz:{min:yrMin,max:yrMax}, salesDropPct:{min:sdMin},
-      sizes:checked('eSize'), regions:checked('eReg'), industries:{include:checked('eIndInc'), exclude:checked('eIndExc')},
+      sizes:checked('eSize'), regions:checked('eReg'), sigungu:$('eSgg').value.split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(function(x){ return /^[가-힣]{1,6}(시|군|구)$/.test(x); }).slice(0,30), industries:{include:checked('eIndInc'), exclude:checked('eIndExc')},
       facts:facts, manual:$('eManual').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean) },
     source:{ title:$('eSrcTitle').value.trim(), no:$('eSrcNo').value.trim(), page:$('eSrcPage').value.trim(), url:url },
     bizinfo:$('eBiz').value.split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(Boolean).slice(0,20),

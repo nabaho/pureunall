@@ -236,3 +236,10 @@ test('공고에도 ★ — 공고 함 자리에 GovaidRecords.starred 로', () =
 test('사업 사전에 «범위»(전국·시·도) 열', () => {
   assert.match(fnBody('drawDict'), /'범위'/);
 });
+
+test('3단계 — 편집 창에 시·군 칸, 범위·확인할 조건 표에 시·군이 보인다', () => {
+  assert.match(fnBody('editorHtml'), /id="eSgg"/);
+  assert.match(fnBody('readEditor'), /sigungu:/);
+  assert.match(fnBody('scopeChip'), /sigungu/);
+  assert.match(fnBody('checkRow'), /sigungu/);
+});
