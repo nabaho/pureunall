@@ -237,10 +237,16 @@ async function extractFromNewMail(deps, o) {
       const norm = CAP.normalize(replyText(r.json), today);
       if (!norm.ok || !norm.drafts.length) continue;             /* 일정이 아니다 — 아무것도 안 남긴다 */
 
+      /* ★ 날짜를 못 찾은 초안은 후보로 안 만든다(2026-10-31) — 달력에 넣을 수 없고 후보함만 어지럽힌다(첫 한 주 8건 중 1건).
+         ⚠ 걸러낸 «뒤의 순서»로 열쇠를 매긴다 — 첫째가 빠져도 «이미 뽑았나» 검사(열쇠 _0)가 맞는다. */
+      const keep = norm.drafts.filter((d) => d.date);
+      out.nodate = (out.nodate || 0) + (norm.drafts.length - keep.length);
+      if (!keep.length) continue;
+
       const up = {};
-      norm.drafts.forEach((d, i) => { const rec = recordOf(row, slug, i, d, now, baseYmd); up[ROOT + "/cand/" + rec.id] = rec; });
+      keep.forEach((d, i) => { const rec = recordOf(row, slug, i, d, now, baseYmd); up[ROOT + "/cand/" + rec.id] = rec; });
       await db.ref().update(up);
-      out.made += norm.drafts.length;
+      out.made += keep.length;
     }
 
     out.skipped = picks.length - out.tried;

@@ -93,9 +93,16 @@
   function promptForImage(today) {
     return '이것은 휴대폰 화면 캡처(문자·카카오톡·메일·공지 등)입니다.\n' + rules(today);
   }
-  function promptForText(today, text) {
-    return '아래는 사람이 말한 내용을 받아 적은 글입니다. 받아쓰기 오류(숫자·업체 이름·지명)가 있을 수 있으니 확실하지 않으면 check 에 적으십시오.\n'
-      + rules(today) + '\n\n--- 말한 내용 ---\n' + text;
+  /* kind 'share' — 폰 «공유» 버튼으로 받은 문자·카톡·메일 글 (2026-10-31).
+     말(받아쓰기)과 다르다: ★ «언제 받은 글인지» 모른다. 오래된 글의 「내일」을 오늘 기준으로 계산하면 엉뚱한 날이 된다.
+     그래서 오늘 기준으로 계산하더라도 «그렇게 계산했다»고 check 에 반드시 남기게 한다 — 화면이 「확인하세요」로 띄운다.
+     (가장 흔한 것은 방금 받은 글을 바로 공유하는 것이라, 날짜를 비우지 않고 계산은 하되 알리게 했다.) */
+  function promptForText(today, text, kind) {
+    var 공유 = kind === 'share';
+    var 머리 = 공유
+      ? '아래는 휴대폰의 문자·카카오톡·메일 앱에서 공유한 글입니다. 언제 받은 글인지 알 수 없습니다. 글 안에 받은 날(날짜 구분선·날짜·시각)이 보이면 그 날 기준으로, 보이지 않으면 오늘 기준으로 「내일」「다음 주」 같은 상대적인 날짜를 계산하되 — 오늘 기준으로 계산했다면 check 에 「받은 날을 몰라 오늘 기준으로 계산함 — 날짜 확인」이라고 반드시 적으십시오.\n'
+      : '아래는 사람이 말한 내용을 받아 적은 글입니다. 받아쓰기 오류(숫자·업체 이름·지명)가 있을 수 있으니 확실하지 않으면 check 에 적으십시오.\n';
+    return 머리 + rules(today) + '\n\n--- ' + (공유 ? '공유한 글' : '말한 내용') + ' ---\n' + text;
   }
 
   /* 📥 받은 메일 한 통 — 일정 후보함(서버)이 쓴다 (2026-10-24).
@@ -251,7 +258,7 @@
   function readText(text, deps) {
     var t = scrubText(s(text)).trim().slice(0, LIMIT.text);
     if (!t) return Promise.resolve({ ok: false, why: '말하거나 적은 내용이 없습니다' });
-    return ask([{ text: promptForText(deps.today, t) }], deps);
+    return ask([{ text: promptForText(deps.today, t, deps.kind) }], deps);
   }
 
   /* ══ 사진 줄이기 (브라우저 전용) ════════════════════════════════════════
