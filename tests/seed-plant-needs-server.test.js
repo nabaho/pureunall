@@ -125,10 +125,10 @@ test('②★ 같은 키를 그리는 동안 거듭 묻지 않는다 (30초에 �
 });
 
 /* ── ③ 유형 사전을 쓰는 동작은 사본이 있을 때만 ── */
-test('③★ 유형 카드의 쓰는 동작 일곱 가지가 모두 문(bizTypeWritable)을 지난다', () => {
+test('③★ 유형 카드의 쓰는 동작 여덟 가지가 모두 문(bizTypeWritable)을 지난다', () => {
   const card = cutFn(ERP, 'function BizTypeCard(props)');
   [
-    'function togglePersonal(x)', 'function add()', 'function del(code)', 'function unhide(code)',
+    'function togglePersonal(x)', 'function add()', 'function del(code)', 'function purge(code)', 'function unhide(code)',
     'async function editType(x)', 'function reseed()', 'function onDrop(targetCode, e)',
   ].forEach((decl) => {
     const body = cutFn(card, decl);

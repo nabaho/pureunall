@@ -78,8 +78,14 @@ test('②★ 쓰는 건수에 계약관리도 센다 · 삭제표시 줄은 안 
 test('② 지우기 화면은 그 셈을 쓰고, 지우기 직전에 한 번 더 센다', () => {
   const card = strip(body(src, 'function BizTypeCard('));
   assert.match(body(card, 'function countUsage('), /bizTypeUsage\(/);
+  /* 2026-10-31: 「사용 0건」 지우기가 removeUnused 한 곳으로 모였다(완전 삭제·보관 칸의 🗑 도 같은 길) —
+     «묻기 전» 한 번(del)과 «지우기 직전» 한 번(removeUnused)을 합쳐 두 번 센다. */
   const del = body(card, 'function del(');
-  assert.ok((del.match(/countUsage\(/g) || []).length >= 2, '누르는 사이 생긴 사용을 못 본다');
+  assert.ok((del.match(/countUsage\(/g) || []).length >= 1, '지우기 전에 쓰는 건수를 안 센다');
+  const ru = body(card, 'function removeUnused(');
+  assert.ok(/\.then\(function\(ok\)\{[\s\S]*countUsage\(/.test(ru), '누르는 사이 생긴 사용을 지우기 «직전»에 다시 세지 않는다');
+  assert.equal((card.match(/cur\.filter\(function\(x\)\{ return x\.code !== code; \}\)/g) || []).length, 1,
+    '유형을 지우는 줄이 removeUnused 말고 또 있다 — 직전 재확인을 건너뛰는 길이 생긴다');
 });
 
 test('③★ 같은 약어·같은 이름(띄어쓰기·점 무시)은 겹침으로 본다 — 숨긴 것과도', () => {
@@ -93,6 +99,21 @@ test('③★ 같은 약어·같은 이름(띄어쓰기·점 무시)은 겹침으
 test('③ 고칠 때는 자기 자신과는 견주지 않는다', () => {
   const c = ctx();
   assert.equal(c.bizTypeDupOf(LIVE, '현클', '현장클리닉', 'consulting-mp0w1084'), null);
+});
+test('③★ 자기가 «흡수한» 합쳐진 유형의 이름은 되찾을 수 있다 — 남의 유형 이름은 여전히 막는다 (일터 이름 바로잡기 2026-10-31)', () => {
+  const c = ctx();
+  /* 일터상생(mozfisq7)이 옛 「일터혁신상생컨설팅」(숨김·mergedInto)을 흡수했다 — 공식 이름 순서로 되돌리는 고침 */
+  const list = LIVE.concat([{ code: 'old', short: '일터혁신', name: '일터혁신상생컨설팅', hidden: true, mergedInto: 'consulting-mozfisq7' }]);
+  assert.equal(c.bizTypeDupOf(list, '일터', '일터혁신상생컨설팅', 'consulting-mozfisq7'), null,
+    '★ 합쳐 남은 유형이 흡수한 옛 유형의 이름을 못 쓰면 이름을 바로잡을 길이 없다');
+  assert.equal(c.bizTypeDupOf(list, '일터혁신', 'x', 'consulting-mozfisq7'), null, '옛 약어도 마찬가지');
+  /* 그러나 — 다른 유형이 그 이름을 쓰려 하면 막는다(합쳐진 유형은 «흡수한 쪽»에게만 열린다) */
+  assert.equal(c.bizTypeDupOf(list, '현클', '일터혁신상생컨설팅', 'consulting-mp0w1084').code, 'old', '★ 남의 유형이 합쳐진 이름을 가져갔다');
+  /* 새로 만들 때(exceptCode 없음)도 막는다 */
+  assert.equal(c.bizTypeDupOf(list, 'zz', '일터혁신상생컨설팅', null).code, 'old');
+  /* 합쳐지지 않고 «그냥 숨긴» 유형은 흡수한 쪽이 없으므로 누구에게도 안 열린다 */
+  const hid = LIVE.concat([{ code: 'h', short: '숨김', name: '숨긴 유형', hidden: true }]);
+  assert.equal(c.bizTypeDupOf(hid, 'zz', '숨긴 유형', 'consulting-mozfisq7').code, 'h');
 });
 test('③ 추가·수정 화면이 겹침 검사를 거친다', () => {
   const card = strip(body(src, 'function BizTypeCard('));
