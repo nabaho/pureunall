@@ -225,3 +225,55 @@ test('★★ 서류 보관함 → 서류 종류 (이름·해·제출처만, 신�
   assert.ok(G.STORES.includes('resume') && G.STORES.includes('certdoc'));
   assert.equal(G.counts(G.build(ls, '2026-10-05')).total, 0, '보관함은 신청 재료 건수에 안 섞인다');
 });
+
+/* ───────── AI·DX 수행·강의 이력 (2026-10-31) ───────── */
+
+const AI_LS = {
+  lecture: JSON.stringify([
+    { id: 'L0211', date: '2026-10-23', year: '2026', topic: '2026년 개정노동법 및 AI 강의', org: '서산상공회의소', duration: 2, participants: '' },
+    { id: 'L0212', date: '2026-10-27', year: '2026', topic: '실무자직무역량강화교육 — 개정노동법·AI 업무 활용(1시간)', org: '(사)한국여성인력개발센터연합', duration: 3, participants: 18 },
+    { id: 'L0100', date: '2025-04-18', year: '2025', topic: '일터혁신 현장 강의', org: '노사발전재단', note: '생성형 인공지능 활용 사례 포함' },
+    { id: 'L0001', date: '2024-05-01', year: '2024', topic: '기초노동법', org: 'TAX MAIL RAIN 교육원' },
+    { id: 'L0002', date: '2025-01-01', year: '2025', topic: 'AI 특강 (뺀 것)', org: '어딘가', excluded: true }
+  ]),
+  consult: JSON.stringify([
+    { id: 'C1', year: '2026', project: '인사노무 분야 AI 활용 방안 컨설팅', org: '비밀고객사㈜', agency: '중소벤처기업부 통합 기술보호지원반' },
+    { id: 'C2', year: '2026', project: '임금체계 개선', org: 'AI소프트(고객사)', agency: '노사발전재단' }
+  ])
+};
+
+test('★ AI 낱말이 든 강의·컨설팅만 모은다 — 낱말 속 AX·AI(TAX·MAIL·RAIN)는 잡지 않는다', () => {
+  const r = G.aiLectures(AI_LS);
+  const ids = r.map((x) => x.id).sort();
+  assert.deepEqual(ids, ['C1', 'L0100', 'L0211', 'L0212'], '잡힌 줄: ' + ids.join(','));
+});
+
+test('★ 배제한 건은 도로 들어오지 않는다', () => {
+  assert.ok(G.aiLectures(AI_LS).every((x) => x.id !== 'L0002'));
+});
+
+test('★★ 컨설팅의 org(고객사)는 보여 줄 글에도 찾는 글에도 쓰지 않는다 — 수행기관만', () => {
+  const r = G.aiLectures(AI_LS);
+  const c1 = r.find((x) => x.id === 'C1');
+  assert.equal(c1.org, '중소벤처기업부 통합 기술보호지원반');
+  assert.ok(JSON.stringify(r).indexOf('비밀고객사') < 0, '고객사 이름이 나왔습니다');
+  assert.ok(r.every((x) => x.id !== 'C2'), '고객사 이름에 든 AI 로 줄이 잡혔습니다');
+});
+
+test('날짜 늦은 것이 먼저 — 같은 날이면 번호 순', () => {
+  const r = G.aiLectures(AI_LS);
+  assert.deepEqual(r.map((x) => x.id), ['L0212', 'L0211', 'C1', 'L0100']);
+  assert.equal(r[0].hours, '3');
+  assert.equal(r[0].people, '18');
+});
+
+test('★ 비어 있으면 «빈 목록» — 지어 넣지 않는다', () => {
+  assert.deepEqual(G.aiLectures({}), []);
+  assert.deepEqual(G.aiLectures(null), []);
+  assert.deepEqual(G.aiLectures({ lecture: '깨진 값' }), []);
+});
+
+test('★ AI 이력은 신청 재료 건수에 섞지 않는다 — build 결과가 그대로다', () => {
+  const m = G.build(AI_LS, '2026-10-31');
+  assert.ok(!('ai' in m) && !('aiLectures' in m));
+});
