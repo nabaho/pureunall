@@ -79,8 +79,37 @@ function combine(cs) {
   return ok.sort((a, b) => (a.closedAt < b.closedAt ? 1 : -1))[0];
 }
 
+/* ── 보조금24 «대한민국 공공서비스(혜택) 정보»(행정안전부, data.go.kr 15113968 — 2026-10-31 활용신청 승인) ──
+   대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」 → 2단계. 전체 약 1만 건 중 «지자체 · 기업(소상공인·법인) 대상 ·
+   고용·창업·생활안정» 만 남긴다(실측 전국 약 360건 — 충남 노인 고용장려금·소상공인 사회보험료·아산 지역우수인재 고용촉진 등).
+   ⚠ 신청기한은 «상시신청»·«매년 상반기» 같은 글이라 날짜 칸이 아니라 요약(memo)에 붙인다 — 접수 중으로 본다 */
+const G24_URL = 'https://api.odcloud.kr/api/gov24/v3/serviceList', G24_PAGES = 15;
+const SIDO_FULL = [['서울', '서울특별시'], ['부산', '부산광역시'], ['대구', '대구광역시'], ['인천', '인천광역시'], ['광주', '광주광역시'], ['대전', '대전광역시'],
+  ['울산', '울산광역시'], ['세종', '세종특별자치시'], ['경기', '경기도'], ['강원', '강원특별자치도'], ['강원', '강원도'], ['충북', '충청북도'], ['충남', '충청남도'],
+  ['전북', '전북특별자치도'], ['전북', '전라북도'], ['전남', '전라남도'], ['경북', '경상북도'], ['경남', '경상남도'], ['제주', '제주특별자치도']];
+/* 소관기관명 → 시·도·시·군. «충청남도 아산시» → 충남·아산시, «재단법인충남경제진흥원» → 충남. 시·도를 모르면 비운다(천안도시공사 등) */
+function sidoOfOrg(org) {
+  const o = s(org);
+  for (const [short, full] of SIDO_FULL) if (o.indexOf(full) === 0) {
+    const w = o.slice(full.length).trim().split(/\s+/)[0] || '';
+    return { sido: [short], sgg: /^[가-힣]{1,6}(시|군|구)$/.test(w) ? [w] : [] };
+  }
+  const hit = SIDO.filter((x) => o.indexOf(x) >= 0);
+  return { sido: hit.length === 1 ? hit : [], sgg: [] };
+}
+function gov24Keep(x) {
+  x = x || {};
+  return /시군구|광역시도|지방/.test(s(x['소관기관유형'])) && /소상공인|법인/.test(s(x['사용자구분'])) && /고용|창업|생활안정/.test(s(x['서비스분야']));
+}
+function gov24Row(x) {
+  const id = s(x['서비스ID']), lim = s(x['신청기한']).replace(/\s+/g, ' ').slice(0, 60);
+  return { src: '보조금24', no: 'G24_' + id, nm: s(x['서비스명']), inst: s(x['소관기관명']), ntce: s(x['부서명']), field: s(x['서비스분야']),
+    target: s(x['사용자구분']), startDt: '', closeDt: '', openDt: s(x['등록일시']).slice(0, 8).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3'),
+    url: /^https:\/\//.test(s(x['상세조회URL'])) ? s(x['상세조회URL']) : '', memo: (s(x['서비스목적요약']) + (lim ? ' · 신청기한: ' + lim : '')).slice(0, 300),
+    area: sidoOfOrg(x['소관기관명']) };
+}
 function noticeRecord(row, sug, today, nowMs, prev) {
-  const base = { area: areaOf(row.nm), who: whoOf(row.nm, row.memo, row.target), target: s(row.target).slice(0, 120), nm: s(row.nm).slice(0, 300), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '', inst: s(row.inst).slice(0, 120), ntce: s(row.ntce).slice(0, 120),
+  const base = { area: row.area || areaOf(row.nm), who: whoOf(row.nm, row.memo, row.target), target: s(row.target).slice(0, 120), nm: s(row.nm).slice(0, 300), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '', inst: s(row.inst).slice(0, 120), ntce: s(row.ntce).slice(0, 120),
     field: s(row.field).slice(0, 40), startDt: s(row.startDt), closeDt: s(row.closeDt), openDt: s(row.openDt), memo: s(row.memo).slice(0, 300),
     suggest: sug, seenAt: nowMs, updatedAt: nowMs };
   if (prev) return base;
@@ -145,16 +174,29 @@ async function run(a) {
       last.error = '기업마당 인증키를 찾지 못했습니다 — 정부사업신청에서 🔑 기업마당 인증키를 넣고 저장해 주세요';
       await a.write({ noticeLast: last }); return { ok: false, last };
     }
-    const secrets = [owner.keyBiz], rows = [], errors = [];
+    const dkey = a.dataKey ? s(await a.dataKey()) : '';
+    const secrets = [owner.keyBiz, dkey], rows = [], errors = [];
     for (const field of FIELDS) {
       try {
         const b = BIZ.parse(await a.getJson(BIZ.buildUrl({ key: owner.keyBiz, field, count: BIZ.NATION_COUNT })));
         if (b.ok) b.rows.forEach((r) => rows.push(r)); else errors.push(BIZ.FIELDS[field] + ': ' + Feed.scrub(b.err, secrets).slice(0, 100));
       } catch (e) { errors.push(BIZ.FIELDS[field] + ': 받지 못했습니다 — ' + Feed.scrub((e && e.message) || e, secrets).slice(0, 80)); }
     }
+    /* 보조금24 — 기업마당에 없는 지자체 «상시» 지원금(조례 근거)을 채운다. 공공데이터포털 열쇠가 있을 때만 */
+    let g24n = 0;
+    if (dkey) {
+      try {
+        for (let p = 1; p <= G24_PAGES; p++) {
+          const j = await a.getJson(G24_URL + '?returnType=JSON&perPage=1000&page=' + p + '&serviceKey=' + encodeURIComponent(dkey));
+          const d = (j && j.data) || [];
+          d.filter(gov24Keep).forEach((x) => { rows.push(gov24Row(x)); g24n++; });
+          if (d.length < 1000) break;
+        }
+      } catch (e) { errors.push('보조금24: 받지 못했습니다 — ' + Feed.scrub((e && e.message) || e, secrets).slice(0, 80)); }
+    }
     const programs = (await a.programs()) || {}, existing = (await a.existing()) || {};
     const r = plan({ rows, programs, existing, today, nowMs });
-    Object.assign(last, r.stats, { received: rows.length, errors: errors.slice(0, 8) });
+    Object.assign(last, r.stats, { received: rows.length, gov24: g24n, errors: errors.slice(0, 8) });
     await a.write(Object.assign({}, r.updates, { noticeLast: last }));
     return { ok: true, last };
   } catch (e) {
@@ -164,4 +206,4 @@ async function run(a) {
   }
 }
 
-module.exports = { run, plan, areaOf, whoOf, SIDO, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };
+module.exports = { run, plan, areaOf, whoOf, SIDO, gov24Keep, gov24Row, sidoOfOrg, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };

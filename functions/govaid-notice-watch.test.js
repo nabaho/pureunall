@@ -128,3 +128,39 @@ test('저장 — 새 공고에 지역·대상 칸이 붙고, 있는 공고도 �
   assert.deepEqual(r2.updates['notices/L2/area'], { sido: ['충북'], sgg: [] });
   assert.deepEqual(r2.updates['notices/L2/who'], ['소상공인']);
 });
+
+/* 2단계 — 보조금24 «대한민국 공공서비스(혜택) 정보»(행정안전부, 2026-10-31 활용신청 승인) */
+const g24 = (o) => Object.assign({ 서비스ID: 'S1', 서비스명: '지역우수인재 고용촉진 지원', 소관기관명: '충청남도 아산시', 소관기관유형: '시군구', 사용자구분: '법인/시설/단체', 서비스분야: '고용·창업', 서비스목적요약: '지역 인재 고용 시 인건비 지원', 신청기한: '상시신청', 부서명: '일자리경제과', 상세조회URL: 'https://plus.gov.kr/x?svcId=S1' }, o || {});
+test('보조금24 — 지자체·기업 대상·고용/창업/생활안정만 고른다', () => {
+  assert.equal(W.gov24Keep(g24()), true);
+  assert.equal(W.gov24Keep(g24({ 사용자구분: '개인' })), false, '개인 대상은 뺀다');
+  assert.equal(W.gov24Keep(g24({ 소관기관유형: '중앙행정기관' })), false, '중앙부처는 사전·기업마당에서 본다');
+  assert.equal(W.gov24Keep(g24({ 서비스분야: '농림축산어업' })), false);
+  assert.equal(W.gov24Keep(g24({ 사용자구분: '소상공인', 서비스분야: '생활안정' })), true);
+});
+test('보조금24 → 공고 줄 — 소관기관명에서 시·도·시·군, 번호는 G24_, 신청기한은 요약에', () => {
+  const r = W.gov24Row(g24());
+  assert.equal(r.no, 'G24_S1');
+  assert.equal(r.src, '보조금24');
+  assert.deepEqual(r.area, { sido: ['충남'], sgg: ['아산시'] });
+  assert.match(r.memo, /상시신청/);
+  assert.equal(r.url, 'https://plus.gov.kr/x?svcId=S1');
+  assert.deepEqual(W.gov24Row(g24({ 소관기관명: '충청남도' })).area, { sido: ['충남'], sgg: [] });
+  assert.deepEqual(W.gov24Row(g24({ 소관기관명: '재단법인충남경제진흥원' })).area, { sido: ['충남'], sgg: [] });
+  assert.deepEqual(W.gov24Row(g24({ 소관기관명: '천안도시공사' })).area, { sido: [], sgg: [] }, '시·도를 모르면 비움');
+});
+test('저장 — 줄에 지역이 붙어 오면 이름 대신 그것을 쓴다', () => {
+  const r = W.plan({ rows: [W.gov24Row(g24())], programs: [], existing: {}, today: TODAY, nowMs: NOW });
+  assert.deepEqual(r.updates['notices/G24_S1'].area, { sido: ['충남'], sgg: ['아산시'] });
+});
+test('run — 공공데이터포털 열쇠가 있으면 보조금24 도 받고, 열쇠가 결과에 안 남는다', async () => {
+  const writes = [], KEY = 'data-key-5678';
+  const r = await W.run({ roles: async () => ({ u1: { isAdmin: true, status: 'active' } }), cfg: async () => ({ keyBiz: 'biz-key-1234' }), dataKey: async () => KEY,
+    programs: async () => ({}), existing: async () => ({}), write: async (u) => { writes.push(u); }, now: new Date(NOW),
+    getJson: async (u) => /odcloud/.test(u) ? { totalCount: 1, data: [g24()] } : { jsonArray: [] } });
+  assert.equal(r.ok, true);
+  const last = writes[writes.length - 1];
+  assert.ok(last['notices/G24_S1'], '보조금24 줄을 쓴다');
+  assert.equal(last.noticeLast.gov24, 1);
+  assert.ok(!JSON.stringify(last).includes(KEY));
+});
