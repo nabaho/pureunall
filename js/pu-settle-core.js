@@ -212,7 +212,7 @@
       lead.settle = -staffSum; lead.final = lead.used + lead.settle;
       members.forEach(function (m) {
         if (m.role !== 'staff' || !m.settle) return;
-        transfers.push(m.settle < 0 ? { from: m.name, to: lead.name, amount: -m.settle } : { from: lead.name, to: m.name, amount: m.settle });
+        transfers.push(m.settle < 0 ? { from: m.name, to: lead.name, amount: -m.settle, dir: 'back' } : { from: lead.name, to: m.name, amount: m.settle, dir: 'more' });
       });
     } else {
       members.forEach(function (m) { m.settle = null; m.final = null; });
@@ -220,6 +220,11 @@
     return { members: members, totalNet: T, issues: issues, transfers: transfers };
   }
 
+  /* 송금 방향의 이름 — 대표 지시 2026-10-31 「권형하가 더 받은것이면 추가로 담당자에게 더 지급해야되고 담당자가 더받은것이면 반환해야된다 …
+     정확하게 이해가능하게」. back = 담당이 몫보다 더 받아 주관에게 돌려줌(반환) · more = 주관이 더 받아 담당에게 더 줌(추가 지급).
+     저장된 송금(transfers)에는 방향 칸이 없다 — 받는 사람이 그 사업장 주관이면 반환이다. */
+  var DIR_KO = { back: '반환', more: '추가 지급' };
+  function dirOf(t, leadSid) { return t && t.dir ? t.dir : (t && leadSid && t.toSid === leadSid ? 'back' : 'more'); }
   function transfersOf(sites, leadSid) {
     var out = [];
     (sites || []).forEach(function (s) {
@@ -272,8 +277,8 @@
     return (n < 0 ? '−' : '') + s;
   }
   function settleLine(prefix, v, leadName) {
-    if (v < 0) return prefix + fmt(-v) + '원 송금 부탁드립니다 (받는 분 ' + leadName + ')';
-    if (v > 0) return prefix + fmt(v) + '원을 보내 드립니다 (보내는 분 ' + leadName + ')';
+    if (v < 0) return prefix + '반환 ' + fmt(-v) + '원 — 몫보다 더 받으신 금액입니다. 송금 부탁드립니다 (받는 분 ' + leadName + ')';
+    if (v > 0) return prefix + '추가 지급 ' + fmt(v) + '원 — 몫보다 덜 받으신 금액을 보내 드립니다 (보내는 분 ' + leadName + ')';
     return prefix + '주고받을 금액이 없습니다';
   }
   function buildMessages(run, rule, names) {
@@ -441,6 +446,6 @@
     runId: runId, diffRun: diffRun, appliedAdjustIds: appliedAdjustIds, unapplyAdjusts: unapplyAdjusts,
     buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice,
     parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
-    shareOf: shareOf, calcSite: calcSite
+    shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf
   };
 });
