@@ -152,3 +152,36 @@ test('배선 — 받기·미리보기·팝업이 같은 값을 쓰고, 저장은
   assert.ok(/'sub\.xform':\{t:/.test(SRC), '도움말 항목');
   assert.match(grabFn('_xlsHTML'), /xmk-/, '엑셀 그림이 칸 표시를 받는다');
 });
+
+test('엑셀 그림 — 숨긴 열·행은 그리지 않는다(원본 지원신청서의 E~L 열은 인쇄용 복사본)', () => {
+  const XLSX = {
+    utils: {
+      decode_range: (ref) => { const m = /^([A-Z])(\d+):([A-Z])(\d+)$/.exec(ref); return { s: { c: m[1].charCodeAt(0) - 65, r: +m[2] - 1 }, e: { c: m[3].charCodeAt(0) - 65, r: +m[4] - 1 } }; },
+      encode_cell: (a) => String.fromCharCode(65 + a.c) + (a.r + 1),
+    },
+  };
+  const f = new Function('XLSX', 'esc', grabFn('_xlsPx') + '\n' + grabFn('_xlsHTML') + '\nreturn _xlsHTML;')(XLSX, (x) => String(x));
+  const ws = {
+    '!ref': 'A1:F3',
+    '!cols': [{ wpx: 40 }, { wpx: 40 }, { wpx: 40, hidden: true }, { wpx: 40, hidden: true }, { wpx: 40 }, { wpx: 40 }],
+    '!rows': [{}, { hidden: true }, {}],
+    '!merges': [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }],      // A~D 병합 — C·D 가 숨겨져 있어 «보이는 2열»
+    A1: { v: '제목', w: '제목' }, C1: { v: '숨김복사본', w: '숨김복사본' }, E1: { v: '오른쪽', w: '오른쪽' },
+    A2: { v: '숨긴행', w: '숨긴행' }, A3: { v: '보이는행', w: '보이는행' }, C3: { v: '숨김칸', w: '숨김칸' }, F3: { v: '끝', w: '끝' },
+  };
+  const html = f(ws, 1);
+  assert.equal((html.match(/<col /g) || []).length, 4, '보이는 열만 폭을 준다');
+  assert.ok(!/숨김|숨긴행/.test(html), '숨긴 열·행의 글자는 나오지 않는다');
+  assert.match(html, /<td colspan="2">제목<\/td>/, '병합은 보이는 열 수로 센다');
+  assert.ok(html.includes('보이는행') && html.includes('오른쪽') && html.includes('끝'));
+  // 숨긴 열이 없으면 예전과 같다
+  const plain = f({ '!ref': 'A1:B1', A1: { v: 'x', w: 'x' }, B1: { v: 'y', w: 'y' } }, 1);
+  assert.equal((plain.match(/<td/g) || []).length, 2);
+});
+
+test('팝업 — 두 번 눌러도 창이 겹치지 않고, 기금 문맥으로 연다(샘플 모드 문턱)', () => {
+  const o = grabFn('subxOpen');
+  assert.match(o, /S\.formsCtx='fund'/);
+  assert.match(o, /while\(\$\('modalbg'\)\) closeM\(\)/);
+  assert.match(grabFn('fillSubsidyExcelFor'), /S\.formsCtx='fund'/);
+});
