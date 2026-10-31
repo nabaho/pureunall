@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>제출서류 자동 검토 목업</title>
+<style>
+:root{--acc:#2563eb;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#e2e8f0;
+  --ok:#166534;--okbg:#f0fdf4;--warn:#854d0e;--warnbg:#fffbeb;--dg:#991b1b;--dgbg:#fef2f2}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px;color:var(--ink);background:var(--bg);padding:0 16px 40px}
+.mock{background:#fde68a;color:#854d0e;font-size:12px;padding:6px 14px;font-weight:700;margin:0 -16px 14px}
+h1{font-size:19px;margin:0 0 4px} h2{font-size:15px;margin:0} h3{font-size:13.5px;margin:0 0 6px}
+.panel{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--line);color:var(--sub);white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.dg{background:var(--dgbg);color:var(--dg)}.chip.blue{background:#eff6ff;color:#1e40af}
+.fl{cursor:pointer;border:1px solid transparent}.fl.on{border-color:var(--acc);box-shadow:0 0 0 2px #dbeafe}
+button{font-family:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+input,select{font-family:inherit;font-size:12.5px;padding:3px 7px;border:1px solid var(--line);border-radius:7px}
+.note{font-size:11.5px;color:var(--sub);background:#f8fafc;border:1px dashed var(--faint);border-radius:8px;padding:8px 10px;margin-top:10px}
+.lbl{font-size:11px;font-weight:700;color:#fff;background:#64748b;border-radius:5px;padding:1px 7px;margin-right:6px}
+.rec{background:#16a34a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700}
+.hlp{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-size:11.5px;color:var(--sub);border-bottom:2px solid var(--line);padding:5px 6px;white-space:nowrap}
+td{border-bottom:1px solid var(--line);padding:5px 6px;vertical-align:top}
+td.no,th.no{width:34px;color:var(--faint)} .muted{color:var(--faint)}
+/* 격자 칸 */
+.g td.c{text-align:center;min-width:128px}
+.cell{display:inline-block;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid transparent;line-height:1.35}
+.cell small{display:block;font-weight:400;font-size:10.5px}
+.cell.none{background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1}
+.cell.got{background:#eff6ff;color:#1e40af}
+.cell.match{background:var(--okbg);color:var(--ok);border-color:#bbf7d0}
+.cell.human{background:#16a34a;color:#fff}
+.cell.diff{background:var(--warnbg);color:var(--warn);border-color:#fde68a}
+.cell.bad{background:var(--dgbg);color:var(--dg);border-color:#fecaca}
+.cell.unk{background:#f1f5f9;color:#475569;border-color:#cbd5e1}
+/* 확인 창 */
+.shade{background:rgba(15,23,42,.55);border-radius:12px;padding:18px}
+.modal{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden}
+.mh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:#f8fafc}
+.mb{display:grid;grid-template-columns:1fr 1.15fr;min-height:330px}@media(max-width:900px){.mb{grid-template-columns:1fr}}
+.orig{padding:12px;border-right:1px solid var(--line);background:#f8fafc}
+.paper{background:#fff;border:1px solid #cbd5e1;border-radius:6px;height:270px;padding:12px;font-size:11px;color:#64748b;position:relative}
+.paper b{color:#334155}.hl{background:#fde68a;color:#1e293b;padding:0 2px;border-radius:3px}
+.cmp{padding:12px 14px}
+.cmp table td{padding:5px 6px}.cmp .k{color:var(--sub);width:92px}
+.cmp tr.d td{background:var(--warnbg)}.cmp tr.u td{background:#f1f5f9}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:900px){.two{grid-template-columns:1fr}}
+.rule td{padding:4px 6px;font-size:12px}
+</style></head><body>
+<div class="mock">목업 — 모양만 보는 가짜 화면입니다. 기금·회사·대표자·금액·날짜는 전부 예시이고, 승인 전에는 코드를 바꾸지 않습니다.</div>
+<h1>지원금 ▸ 제출서류 — «자동 검토 격자» 추가</h1>
+<div style="color:var(--sub);margin-bottom:12px">참여사 서류(사업자등록증·중소기업확인서·등기부등본)가 ① 들어왔는지 ② 우리 사업장 정보·신청일과 맞는지를 한 표에서 봅니다. 기계는 <b>«일치 / 다름 / 못 읽음» 후보만 걸러</b> 주고, <b>«맞음» 확정은 사람이 원본을 보고</b> 누릅니다. 읽는 기능(사업자등록증·중소기업확인서·등기부)은 이미 있는 것을 그대로 씁니다.</div>
+
+<!-- ───────── ① 격자 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">화면 ①</span><b>제출서류 탭 맨 위에 «자동 검토» 격자</b> <span class="rec">추천</span></div>
+  <div class="row" style="margin-bottom:10px">
+    <h2>참여사 서류 검토</h2><span class="hlp" title="클릭하면 설명 팝업(검토 규칙 표)이 뜹니다 — 화면에는 안내문을 깔지 않음">ⓘ</span>
+    <span class="chip">기금 예시 1호 · 2026년</span>
+    <span>신청일 <input type="date" value="2026-04-10" style="width:132px"></span>
+    <span style="flex:1"></span>
+    <span class="chip dg fl on">⚠ 다름 3</span><span class="chip fl">⬜ 미수령 4</span><span class="chip fl">？ 못 읽음 2</span><span class="chip blue fl">🟦 안 읽음 3</span><span class="chip ok fl">✔ 확인 완료 11</span>
+    <button class="pri">🔍 받은 서류 전부 읽기</button>
+    <span class="chip blue">읽는 중 7/18 …</span>
+  </div>
+
+  <div style="overflow-x:auto">
+  <table class="g">
+    <thead><tr><th><input type="checkbox"></th><th class="no">번호</th><th>참여사</th><th class="c" style="text-align:center">사업자등록증</th><th style="text-align:center">중소기업확인서</th><th style="text-align:center">등기부등본</th><th>한 줄 상태</th></tr></thead>
+    <tbody>
+      <tr><td><input type="checkbox"></td><td class="no">1</td><td><b>예시산업(주)</b></td>
+        <td class="c"><span class="cell human">✔ 확인함</span></td>
+        <td class="c"><span class="cell human">✔ 확인함</span></td>
+        <td class="c"><span class="cell human">✔ 확인함</span></td><td><span class="chip ok">3/3 완료</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">2</td><td><b>예시테크(주)</b></td>
+        <td class="c"><span class="cell match">✔ 일치<small>사람 확인 대기</small></span></td>
+        <td class="c"><span class="cell diff">⚠ 유효기간 지남<small>2025-03-31까지</small></span></td>
+        <td class="c"><span class="cell match">✔ 일치<small>사람 확인 대기</small></span></td><td><span class="chip warn">확인서 새로 필요</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">3</td><td><b>예시전자(주)</b></td>
+        <td class="c"><span class="cell diff">⚠ 대표자 다름<small>서류 «김○○» ≠ 정보 «이○○»</small></span></td>
+        <td class="c"><span class="cell match">✔ 일치<small>사람 확인 대기</small></span></td>
+        <td class="c"><span class="cell got">🟦 받음<small>아직 안 읽음</small></span></td><td><span class="chip warn">대표자 변경 확인</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">4</td><td><b>예시화학(주)</b></td>
+        <td class="c"><span class="cell bad">⚠ 번호 다름<small>서류 123-45-… ≠ 정보 123-46-…</small></span></td>
+        <td class="c"><span class="cell unk">？ 못 읽음<small>스캔이 흐림 — 직접 확인</small></span></td>
+        <td class="c"><span class="cell none">⬜ 미수령</span></td><td><span class="chip dg">사업자번호 확인 필요</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">5</td><td><b>예시금속(주)</b></td>
+        <td class="c"><span class="cell none">⬜ 미수령</span></td>
+        <td class="c"><span class="cell none">⬜ 미수령</span></td>
+        <td class="c"><span class="cell none">⬜ 미수령</span></td><td><span class="chip">0/3 — 독촉 대상</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">6</td><td><b>예시식품(주)</b></td>
+        <td class="c"><span class="cell human">✔ 확인함</span></td>
+        <td class="c"><span class="cell diff">⚠ 상호 다름<small>서류 «예시푸드» ≠ 정보 «예시식품»</small></span></td>
+        <td class="c"><span class="cell unk">？ 못 읽음<small>글자는 읽었으나 항목 못 찾음</small></span></td><td><span class="chip warn">상호 변경 여부 확인</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="row" style="margin-top:10px;padding:6px 10px;background:#eff6ff;border-radius:8px">
+    <b>☑ 선택한 참여사 3곳</b>
+    <button>📋 미수령 서류 독촉 문구 복사</button>
+    <button>✔ 선택한 «일치» 칸 한꺼번에 확인함</button>
+    <span style="color:var(--faint);font-size:11.5px">※ 체크한 때만 나타납니다. 복사는 글만 만들고 발송하지 않습니다. «한꺼번에 확인함»은 일치 칸만 바뀌고, 다름·못 읽음 칸은 건드리지 않습니다.</span>
+  </div>
+
+  <div class="note"><b>칸의 뜻</b> —
+    <span class="cell none" style="cursor:default">⬜ 미수령</span> 사진첩에 이어진 원본이 없음 ·
+    <span class="cell got" style="cursor:default">🟦 받음</span> 원본은 있고 아직 안 읽음 ·
+    <span class="cell match" style="cursor:default">✔ 일치</span> 읽어서 맞춰 보니 같음(사람 확인 전) ·
+    <span class="cell diff" style="cursor:default">⚠ 다름</span> 달라진 항목 이름을 같이 적음 ·
+    <span class="cell unk" style="cursor:default">？ 못 읽음</span> 지어내지 않고 «직접 확인» ·
+    <span class="cell human" style="cursor:default">✔ 확인함</span> 사람이 원본을 보고 [맞음]을 누름 → 진행표의 «첨부서류 11종 + 참여사별 3종» 단계가 이 칸 수를 센다.<br>
+    <b>기존 □ 체크와의 관계</b> — 지금의 «받음» 체크칸은 그대로 두고, <b>«확인함»이 되면 □가 자동으로 켜집니다.</b> 반대로 사람이 □만 켠 칸은 «받음·사람 체크»로 남겨 두어 기존 자료가 깨지지 않습니다.</div>
+</div>
+
+<!-- ───────── ② 칸 누르면 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">화면 ②</span><b>칸을 누르면 — 원본 옆에 «읽은 값 ↔ 우리 정보» 비교 창</b> <span style="color:var(--sub)">(지금 판독 확인 창과 같은 모양)</span></div>
+  <div class="shade"><div class="modal">
+    <div class="mh"><b>예시전자(주) — 사업자등록증</b><span class="chip warn">⚠ 다름 1</span><span style="flex:1"></span><button>◀ 이전 칸</button><button>다음 «다름» 칸 ▶</button><button>✕ 닫기</button></div>
+    <div class="mb">
+      <div class="orig">
+        <div class="row" style="margin-bottom:6px"><b style="font-size:12px">원본 (사진첩)</b><span class="chip blue">OCR 판독</span><span style="flex:1"></span><button>＋</button><button>－</button></div>
+        <div class="paper"><b>사 업 자 등 록 증</b><br><br>등록번호 : 123-45-67890<br>상 호 : 예시전자 주식회사<br>대 표 자 : <span class="hl">김○○</span><br>개업연월일 : 2015 년 03 월 02 일<br>사업장 소재지 : 충청남도 ○○시 …<br>업태 : 제조업　종목 : 전자부품<br><br><span style="position:absolute;right:10px;bottom:8px;color:#cbd5e1">(원본 이미지 자리 — 읽은 글자에 노란 줄)</span></div>
+      </div>
+      <div class="cmp">
+        <table>
+          <thead><tr><th>항목</th><th>서류에서 읽음</th><th>우리 사업장 정보</th><th>결과</th></tr></thead>
+          <tbody>
+            <tr><td class="k">사업자번호</td><td>123-45-67890</td><td>123-45-67890</td><td><span class="chip ok">일치</span></td></tr>
+            <tr><td class="k">상호</td><td>예시전자(주)</td><td>예시전자(주)</td><td><span class="chip ok">일치</span></td></tr>
+            <tr class="d"><td class="k">대표자</td><td><b>김○○</b></td><td><b>이○○</b></td><td><span class="chip warn">다름</span></td></tr>
+            <tr><td class="k">소재지</td><td>충남 ○○시 …</td><td>충남 ○○시 …</td><td><span class="chip ok">일치</span></td></tr>
+            <tr class="u"><td class="k">폐업·휴업</td><td colspan="2" class="muted">서류만으로는 알 수 없음 (국세청 조회 열쇠 없음)</td><td><span class="chip">검토 불가</span></td></tr>
+          </tbody>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <button class="pri">✔ 맞음 (그대로 확인함)</button>
+          <button>✎ 사업장 정보를 서류대로 고침 (대표자 → 김○○)</button>
+          <button>↻ 다시 읽기</button>
+          <button>메모 남기기</button>
+        </div>
+        <div class="note">«다름»일 때 어느 쪽이 맞는지는 사람이 정합니다 — <b>서류가 최신이면 사업장 정보를 고치고, 서류가 낡았으면 «새 서류 요청»</b>. 기계는 어느 쪽도 스스로 덮어쓰지 않습니다. 고치면 변경 기록(📜 일지)에 남습니다.</div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ───────── ③ 검토 규칙 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">화면 ③</span><b>ⓘ 팝업 — 서류마다 «무엇을 맞춰 보나»</b> <span style="color:var(--sub)">(규칙은 한 곳에 두고 여기에서 그대로 보여 줌)</span></div>
+  <table class="rule">
+    <thead><tr><th>서류</th><th>읽는 것</th><th>맞춰 보는 것</th><th>기한·요건</th></tr></thead>
+    <tbody>
+      <tr><td><b>사업자등록증</b></td><td>사업자번호·상호·대표자·소재지·개업일</td><td>사업장 정보(번호·상호·대표자·소재지)와 같은지</td><td>해당 없음 — 발급일 요건은 공고문 확인 <span class="chip warn">확인 필요</span></td></tr>
+      <tr><td><b>중소기업확인서</b></td><td>기업규모(소기업·중기업 구분)·유효기간·상호</td><td>«해당 없음» 표시가 아닌지 · <b>유효기간이 신청일을 덮는지</b> · 상호 같은지</td><td>유효기간(보통 4/1~다음해 3/31) — 이미 앱에 있는 «확인서 지남» 규칙과 같음</td></tr>
+      <tr><td><b>등기부등본</b></td><td>등록번호·상호·주소·대표자(텍스트 PDF일 때만 정확)</td><td>상호·소재지·대표자가 같은지</td><td>발급 후 N일 이내 여부 <span class="chip warn">확인 필요</span> — 현행 공고문·규정 파일을 받으면 채움. 모르면 «발급일만 표시»하고 판정하지 않음</td></tr>
+    </tbody>
+  </table>
+  <div class="note">모든 «다름»은 후보일 뿐입니다 — 상호가 «예시푸드»↔«예시식품»처럼 정말 바뀐 것일 수도, OCR 오독일 수도 있어서 <b>원본을 보고 사람이 정합니다.</b> 법인 꼬리말(㈜·주식회사)·띄어쓰기·괄호는 같은 것으로 보고 비교합니다. 적합 여부의 최종 판단은 공단과 담당 노무사입니다.</div>
+</div>
+
+<!-- ───────── ④ 독촉 문구 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">화면 ④</span><b>«미수령 독촉 문구 복사» 결과 (예시)</b> <span style="color:var(--sub)">— 복사만 합니다. 카톡·메일은 직접 보냅니다.</span></div>
+  <div style="background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;white-space:pre-wrap;font-size:12.5px">[예시 1호 · 2026년 지원금 신청 — 제출서류 안내]
+○ 예시금속(주): 사업자등록증, 중소기업확인서, 법인등기부등본 (3종 미제출)
+○ 예시화학(주): 법인등기부등본 (1종 미제출) · 사업자등록증은 번호 확인 후 다시 안내드리겠습니다
+○ 예시테크(주): 중소기업확인서 새로 발급본 (유효기간 2025-03-31 지남)
+※ 제출 기한: [확인 필요 — 공단 공고 기간 기준으로 날짜를 넣어 주세요]</div>
+  <div class="note">제출 기한 날짜는 지어내지 않고 <b>[확인 필요]</b>로 비워 둡니다(신청일 칸에 날짜가 있으면 그 날짜를 쓸 수 있음).</div>
+</div>
+
+<div class="panel" style="background:#f0fdf4">
+  <b>만드는 방법(추천)과 까닭</b><br>
+  ① 서류를 읽는 자리는 <b>이미 있는 읽기 기능</b>(사업자등록증·중소기업확인서·등기부)을 그대로 씁니다 — 새로 만들면 두 갈래가 되어 서로 다르게 읽습니다.<br>
+  ② 읽은 결과는 <b>«그 해·그 참여사·그 서류»마다 따로 저장</b>(기존 제출서류 체크 자리 옆, 새 칸)합니다. 원본은 사진첩에 있는 그대로 두고 사본을 만들지 않습니다.<br>
+  ③ 기업정보함(명함첩)은 읽기만 합니다(쓰기 금지 규칙). 사업자등록증이 거기에 이미 있으면 «받음 후보»로만 알려 줍니다.<br>
+  ④ 한 번에 «전부 읽기»는 브라우저가 한 장씩 차례로 읽습니다(한 장 수 초 — 18장이면 1~2분). 읽는 도중에도 다른 화면을 쓸 수 있습니다.<br><br>
+  <b>정해 주실 것 (모두 «추천대로»면 아래대로 만듭니다)</b><br>
+  ① 대상 서류 — 추천: <b>사업자등록증·중소기업확인서·등기부등본 3종 먼저</b>, 근로자대표 재직증명서는 다음 묶음 (이유: 지금 제출서류 표가 이 3종이라 표와 1:1로 맞음)<br>
+  ② 격자는 제출서류 탭 맨 위에 둔다 — 추천: 예 (기존 □ 체크표는 그 아래 그대로)<br>
+  ③ 선택 일괄 단추 2개(독촉 문구 복사 · 일치 칸 한꺼번에 확인함) — 추천: 둘 다 넣기<br>
+  ④ 등기부등본 발급일 요건 — 추천: 요건을 모르는 동안은 «발급일만 표시, 판정 안 함», 현행 공고문 파일을 받으면 규칙 추가
+</div>
+</body></html>

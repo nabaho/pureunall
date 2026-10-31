@@ -186,6 +186,11 @@
   .ckcol{width:30px;text-align:center}tr.ticked td{background:#bbf7d0}
   .chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px}
   .chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.dg{background:var(--danger-bg);color:var(--danger)}
+  .rvc{display:inline-block;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid transparent;line-height:1.35;text-align:center}
+  .rvc small{display:block;font-weight:400;font-size:10.5px}
+  .rvc.none{background:#f8fafc;color:var(--sub);border:1px dashed var(--faint)}.rvc.manual{background:#f8fafc;color:var(--sub);border:1px solid var(--line)}
+  .rvc.got{background:var(--acc-soft);color:var(--acc2)}.rvc.match{background:#fff;color:var(--ok);border-color:var(--ok)}
+  .rvc.human{background:var(--ok);color:#fff}.rvc.diff{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}.rvc.unk{background:#f8fafc;color:var(--sub);border:1px solid var(--faint)}
   .sbbar{display:inline-flex;gap:2px;vertical-align:middle}.sbbar i{width:11px;height:11px;border-radius:3px;background:var(--line);display:inline-block}
   .sbbar i.d{background:var(--ok)}.sbbar i.n{background:#fff;box-shadow:inset 0 0 0 2px var(--acc)}.sbbar i.l{background:var(--danger)}.sbbar i.x{background:#f8fafc;box-shadow:inset 0 0 0 1px var(--faint)}
   tr.sb-late td:first-child{box-shadow:inset 3px 0 0 var(--danger)}.fl{cursor:pointer;border:1px solid transparent}.fl.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc-soft)}
@@ -17173,6 +17178,327 @@ function subDocForm(kind){
   S.formFund=S.fundId; S.formsCtx='fund';      // 이 기금 자료로 채운다
   sidePreview(kind);
 }
+/* ══ 참여사 제출서류 자동 검토 (대표 지시 2026-10-31 「서류를 받았는지·문제 없는지 자동으로 검토」, 목업 승인 「추천대로」) ══
+   서류 3종(사업자등록증·중소기업확인서·등기부등본)을 «읽어서» 우리 사업장 정보·신청일과 맞춰 본다.
+   ★ 기계는 후보만 건다 — 일치/다름/못 읽음. «맞음»은 사람이 원본을 보고 눌러야 확인함이 된다.
+   ★ 저장 subsidy_chk/{기금}/{연도}/review/site/{사업장}/{서류} = {read:{읽은 값}, src:{사진 id}, at, by, ocr, fail?, ok?:{by,at}}
+      · 읽은 «값»만 둔다(비교 결과는 두지 않는다) — 화면을 열 때마다 지금의 사업장 정보·신청일로 다시 맞춰, 정보를 고치면 ⚠ 가 저절로 풀린다.
+      · src 가 지금 이어진 원본과 다르면(사진을 바꿔 이었으면) 읽은 값을 버린 것으로 본다.
+      · 체크 자리(site/…)·사진첩 참조(scan/…)와 같은 마디 안 — 화면을 열 때 읽기가 늘지 않는다. 열 전체 켜기·노동청 일괄 반영은 site/·fund/ 만 건드려 이 값을 지우지 않는다.
+   ⚠ 못 읽은 칸은 «못 읽음»으로 둔다 — 빈 칸이 틀린 값보다 낫다. 폐업·위조는 서류만으로 알 수 없어 판정하지 않는다.
+   ⚠ 등기부등본의 주민등록번호는 읽지 않는다(법인등록번호는 «등록번호» 이름표 바로 뒤 숫자만). 대표자는 등기부에서 읽지 않는다.
+   ⚠ 기업정보함·사진첩은 읽기만 한다. 사본을 만들지 않는다. */
+var RV_AREA=[['충청남도','충남'],['충청북도','충북'],['경상남도','경남'],['경상북도','경북'],['전라남도','전남'],['전라북도','전북'],['전북특별자치도','전북'],
+  ['제주특별자치도','제주'],['강원특별자치도','강원'],['서울특별시','서울'],['부산광역시','부산'],['대구광역시','대구'],['인천광역시','인천'],
+  ['광주광역시','광주'],['대전광역시','대전'],['울산광역시','울산'],['세종특별자치시','세종'],['경기도','경기']];
+function rvNormAddr(s){ var t=String(s||'').replace(/[\s()（）,.\-·]/g,''); RV_AREA.forEach(function(a){ t=t.split(a[0]).join(a[1]); }); return t; }
+function _rvSameDigits(a,b){ var x=String(a||'').replace(/\D/g,''), y=String(b||'').replace(/\D/g,''); return !!x&&x===y; }
+function _rvSameName(a,b){ var x=subNormCo(a), y=subNormCo(b); return !!x&&x===y; }
+function _rvSameCeo(a,b){ var x=String(a||'').replace(/\s/g,''), y=String(b||'').replace(/\s/g,''); return !!x&&x===y; }
+function _rvSameAddr(a,b){ var x=rvNormAddr(a), y=rvNormAddr(b); return !!x&&!!y&&(x===y||x.indexOf(y)===0||y.indexOf(x)===0); }   // 층·호수 같은 꼬리는 한쪽이 더 길 수 있다
+/* 등기부등본(참여사) 판독 — 쓰는 칸만: 법인등록번호·상호·본점·발급일. ⚠ 주민등록번호가 같은 서류에 있다 — «등록번호» 이름표 뒤 «법인» 번호만 받는다. */
+function parseSiteReg(txt){
+  var flat=_flat(txt), o={}, m;
+  m=flat.match(/등\s*록\s*번\s*호\s*[:：]?\s*(\d{6})\s*-\s*(\d{7})/); if(m) o.corp_no=m[1]+'-'+m[2];
+  m=flat.match(/상\s*호\s*[:：]?\s*(.+?)(?=\s*(?:본\s*점|공\s*고\s*방\s*법|지\s*점|\d+\s*\.|$))/);
+  if(m){ var nm=_cleanCoName(m[1]); if(nm) o.name=nm; }
+  m=flat.match(/본\s*점\s*[:：]?\s*(.+?)(?=\s*(?:공\s*고|1\s*주|발\s*행|자\s*본|목\s*적|$))/);
+  if(m){ var ad=_cleanAddr(m[1]); if(ad) o.address=ad; }
+  m=flat.match(/(?:발\s*행\s*일|발\s*급\s*일|열\s*람\s*일\s*시)\s*[:：]?\s*(\d{4})\s*[./년-]\s*(\d{1,2})\s*[./월-]\s*(\d{1,2})/);
+  if(m) o.issued=m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  return o;
+}
+var RV_PICK={bizno:['biz_no','name','ceo','address'],sme:['sme_cert','sme_from','sme_to','name'],reg:['corp_no','name','address','issued']};
+/* 읽은 것에서 «저장할 칸»만 — 실시간DB 는 undefined 를 거부하고 빈 객체는 지운다 */
+function rvPickRead(kind,got){
+  var o={}, n=0; (RV_PICK[kind]||[]).forEach(function(k){ var v=got&&got[k]; if(v!=null&&String(v).trim()!==''){ o[k]=String(v).trim(); n++; } });
+  return n?o:null;
+}
+/* 서류 한 장의 «읽은 값 ↔ 우리 사업장 정보·신청일» 대조 — 순수.
+   → {st:'match'|'diff'|'unk', items:[{k,label,read,have,res:'ok'|'diff'|'unk'|'na'|'info'}]}
+   res: ok 같음 · diff 다름 · unk 서류에서 못 읽음 · na 우리 정보에 값이 없어 맞춰 볼 수 없음 · info 참고 */
+function docCompare(kind,read,site,applyDate,today){
+  read=read||{}; site=site||{};
+  var items=[];
+  var add=function(k,label,r,h,res){ items.push({k:k,label:label,read:r||'',have:h||'',res:res}); };
+  var cmp=function(k,label,r,h,same){
+    if(!r) return add(k,label,'',h,'unk');
+    if(!h) return add(k,label,r,'','na');
+    add(k,label,r,h,same(r,h)?'ok':'diff');
+  };
+  if(kind==='bizno'){
+    cmp('biz_no','사업자번호',read.biz_no,site.biz_no,_rvSameDigits); cmp('name','상호',read.name,site.name,_rvSameName);
+    cmp('ceo','대표자',read.ceo,site.ceo,_rvSameCeo); cmp('address','소재지',read.address,site.address,_rvSameAddr);
+  }else if(kind==='sme'){
+    var c=read.sme_cert||'';
+    add('sme_cert','기업규모',c,'중소기업',!c?'unk':(c==='해당 없음'||c==='중견기업')?'diff':'ok');
+    var base=applyDate||today||'', baseLbl=applyDate?('신청일 '+applyDate):('오늘 '+(today||'')+' (신청일 미입력)');
+    var per=read.sme_to?((read.sme_from||'')+' ~ '+read.sme_to):'';
+    var perOk=!!read.sme_to&&!!base&&(!read.sme_from||read.sme_from<=base)&&base<=read.sme_to;
+    add('period','유효기간',per,baseLbl,!per?'unk':!base?'na':perOk?'ok':'diff');
+    cmp('name','상호',read.name,site.name,_rvSameName);
+  }else if(kind==='reg'){
+    cmp('corp_no','법인등록번호',read.corp_no,site.corp_no,_rvSameDigits); cmp('name','상호',read.name,site.name,_rvSameName);
+    cmp('address','소재지',read.address,site.address,_rvSameAddr);
+    if(read.issued) add('issued','발급일(참고)',read.issued,'','info');      // 발급 후 N일 요건은 공고문으로 확인 [확인 필요] — 판정하지 않는다
+  }
+  var req=({bizno:['biz_no','name'],sme:['sme_cert','period'],reg:['name']})[kind]||[];
+  var has=function(k){ return items.filter(function(x){ return x.k===k; })[0]||{}; };
+  var st=items.some(function(x){ return x.res==='diff'; })?'diff':req.every(function(k){ return has(k).res==='ok'; })?'match':'unk';
+  return {st:st,items:items};
+}
+/* 칸 한 개의 상태 — 순수. ref=사진첩 참조, flag=기존 «받음» 체크, rv=저장된 읽은 값
+   → {k:'none'|'manual'|'got'|'match'|'diff'|'unk'|'human', cmp?, msg?} */
+function docCellState(kind,ref,flag,rv,site,applyDate,today){
+  if(!ref) return flag?{k:'manual'}:{k:'none'};
+  if(!rv||(rv.src&&rv.src!==ref.id)) return {k:'got'};
+  if(rv.ok) return {k:'human'};
+  if(!rv.read) return rv.fail?{k:'unk',msg:rv.fail}:{k:'got'};
+  var c=docCompare(kind,rv.read,site,applyDate,today);
+  return {k:c.st,cmp:c};
+}
+function _rvDiffText(it){
+  if(it.k==='period') return {t:'유효기간 지남',s:(it.read.split('~')[1]||'').trim()+'까지'};
+  if(it.k==='sme_cert') return {t:it.read+' — 대상 아님?',s:'확인서 내용 확인'};
+  return {t:it.label+' 다름',s:'서류 «'+it.read+'» ≠ 정보 «'+it.have+'»'};
+}
+function _rvCellHTML(sid,kind,st){
+  var go='rvOpen(\''+sid+'\',\''+kind+'\')', pick='openAlbumPick(\'\',\''+kind+'\',\''+sid+'\')';
+  var tx=({none:['⬜ 미수령','사진첩에서 붙이기'],manual:['☑ 받음','사람 체크 · 원본 없음'],got:['🟦 받음','아직 안 읽음'],match:['✔ 일치','사람 확인 대기'],human:['✔ 확인함',''],unk:['？ 못 읽음',st.msg||'직접 확인']})[st.k];
+  if(st.k==='diff'){
+    var bad=st.cmp.items.filter(function(x){ return x.res==='diff'; }), d=_rvDiffText(bad[0]);
+    tx=['⚠ '+d.t,(bad.length>1?'외 '+(bad.length-1)+'건 · ':'')+d.s];
+  }
+  return '<span class="rvc '+st.k+'" onclick="'+((st.k==='none'||st.k==='manual')?pick:go)+'" title="'+esc(tx[0]+(tx[1]?' — '+tx[1]:''))+'">'+tx[0]+(tx[1]?'<small>'+esc(tx[1])+'</small>':'')+'</span>';
+}
+/* 미수령·새로 필요한 서류 독촉 글 — 순수. rows=[{name,cells:{kind:{k,cmp}}}]. 기한 날짜는 지어내지 않는다 */
+function rvRemindText(fundName,yr,rows,deadline){
+  var lines=['['+fundName+' · '+yr+'년 지원금 신청 — 제출서류 안내]'];
+  var label={sme:'중소기업확인서',reg:'법인등기부등본',bizno:'사업자등록증'};
+  rows.forEach(function(r){
+    var miss=[], extra=[];
+    ['sme','reg','bizno'].forEach(function(k){
+      var c=r.cells[k]||{k:'none'};
+      if(c.k==='none') miss.push(label[k]);
+      else if(c.k==='diff'){
+        c.cmp.items.filter(function(x){ return x.res==='diff'; }).forEach(function(x){
+          extra.push(x.k==='period'?(label[k]+' 새로 발급본 (유효기간 '+(x.read.split('~')[1]||'').trim()+' 지남)')
+            :(label[k]+': '+x.label+'이(가) 등록된 정보와 다릅니다 — 확인 부탁드립니다'));
+        });
+      }
+    });
+    if(miss.length||extra.length) lines.push('○ '+r.name+(miss.length?': '+miss.join(', ')+' ('+miss.length+'종 미제출)':'')+(extra.length?(miss.length?' · ':': ')+extra.join(' · '):''));
+  });
+  lines.push('※ 제출 기한: '+(deadline||'[확인 필요 — 공단 공고 기간 기준으로 날짜를 넣어 주세요]'));
+  return lines.join('\n');
+}
+/* ── 읽기 ── */
+var _rvBusy=false;
+function _rvKey(){ return S.fundId+'/'+S.year; }
+function rvApplyDate(){
+  var key=_rvKey(), D=S._rvDate;
+  if(D&&D.key===key) return D.val;
+  var fid=S.fundId, yr=S.year; S._rvDate={key:key,val:''};
+  fbDb.ref(NS+'/subsidy_form/'+fid+'/'+yr+'/date').once('value').then(function(sn){
+    var v=sn.val(); if(S._rvDate&&S._rvDate.key===key&&typeof v==='string'&&v){ S._rvDate.val=v; _rvRefresh(); }
+  }).catch(function(){});
+  return '';
+}
+function rvSetDate(v){
+  var fid=S.fundId, yr=S.year, val=/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:'';
+  fbDb.ref(NS+'/subsidy_form/'+fid+'/'+yr+'/date').set(val||null).then(function(){
+    S._rvDate={key:fid+'/'+yr,val:val}; _audit(fid,'지원금 신청일',yr+'년 신청일 '+(val||'지움')+' (제출서류 검토)'); renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function _rvRefresh(){ if(S.tab==='subsidy'&&S.view==='fund'&&S.subTab==='docs') renderFund(); }
+/* 원본 한 장을 읽는다 — 사진첩 원본 → 이미지 → OCR → 서류별 판독. 기존 읽기 도구를 그대로 쓴다 */
+function rvRead(sid,kind){
+  var ref=_subScanOf(sid,kind);
+  if(!ref) return Promise.reject(new Error('연결된 원본이 없습니다'));
+  if(!photoStoreReady()) return Promise.reject(new Error('사진첩과 연결되지 않았습니다'));
+  var fn=({bizno:parseBizReg,sme:parseSmeCert,reg:parseSiteReg})[kind];
+  return PuPhotoStore.loadFullDetail(String(ref.year),ref.id,ref.owner||undefined).then(function(got){
+    if(!got||!got.src) throw new Error((got&&got.why)||'원본을 찾지 못했습니다');
+    return _dataUrlToFile(got.src,kind+'.jpg');
+  }).then(function(file){ return imgCanvas(file,true); })
+    .then(function(cv){ return ocrCanvases([cv],function(){}); })
+    .then(function(txt){ return {read:rvPickRead(kind,fn(txt)),src:ref.id}; });
+}
+function _rvPath(fid,yr,sid,kind){ return NS+'/subsidy_chk/'+fid+'/'+yr+'/review/site/'+sid+(kind?'/'+kind:''); }
+function _rvLocal(fid,yr,sid,kind,rec){
+  if(S.fundId!==fid||S.year!==yr||!S.subChk) return;
+  var r=S.subChk.review=S.subChk.review||{}; r.site=r.site||{}; r.site[sid]=r.site[sid]||{};
+  if(rec) r.site[sid][kind]=rec; else delete r.site[sid][kind];
+}
+function rvSaveRead(fid,yr,sid,kind,res,err){
+  var rec={src:res&&res.src||((_subScanOf(sid,kind)||{}).id||''),at:ymd(),by:(S.user||''),ocr:true};
+  if(res&&res.read) rec.read=res.read; else rec.fail=err?('읽기 실패: '+((err&&err.message)||err)).slice(0,80):'글자는 읽었지만 항목을 못 찾았습니다';
+  return fbDb.ref(_rvPath(fid,yr,sid,kind)).set(rec).then(function(){ _rvLocal(fid,yr,sid,kind,rec); });
+}
+/* 칸들을 차례로 읽는다(한 장씩 — 메모리·OCR 엔진 한 벌) */
+function rvReadCells(cells){
+  if(_rvBusy){ toast('이미 읽는 중입니다','warn'); return; }
+  if(!cells.length){ toast('읽을 서류가 없습니다 — 원본이 이어진 칸만 읽습니다','warn'); return; }
+  var fid=S.fundId, yr=S.year, i=0, bad=0; _rvBusy=true; S._rvRun={key:fid+'/'+yr,n:0,total:cells.length};
+  var done=function(){
+    _rvBusy=false; S._rvRun=null; _rvRefresh();
+    if(S.fundId===fid&&S.year===yr) toast(cells.length+'장을 읽었습니다'+(bad?' — 못 읽은 것 '+bad+'장':'')+' · 결과를 확인하고 «맞음»을 눌러 주세요','warn');
+  };
+  var next=function(){
+    if(S.fundId!==fid||S.year!==yr||i>=cells.length) return done();      // 그 사이 다른 기금·연도로 갔으면 멈춘다
+    var c=cells[i++];
+    rvRead(c.sid,c.kind).then(function(r){ if(!r.read) bad++; return rvSaveRead(fid,yr,c.sid,c.kind,r); },
+      function(e){ bad++; return rvSaveRead(fid,yr,c.sid,c.kind,null,e); })
+      .catch(function(e){ bad++; toast('저장 실패: '+((e&&e.message)||e),'err'); })
+      .then(function(){ if(S._rvRun) S._rvRun.n=i; _rvRefresh(); next(); });
+  };
+  next();
+}
+function rvReadAll(){
+  var sc=((S.subChk||{}).scan||{}).site||{}, rv=((S.subChk||{}).review||{}).site||{}, out=[];
+  Object.keys(S.sites||{}).forEach(function(sid){
+    if((S.sites[sid]||{}).status==='closed') return;
+    SUB_SITE_DOCS.forEach(function(c){
+      var ref=(sc[sid]||{})[c[0]]; if(!ref) return;
+      var r=(rv[sid]||{})[c[0]]; if(r&&r.src===ref.id&&(r.read||r.fail)) return;      // 이미 읽은 것은 다시 읽지 않는다 — 칸의 [↻]로 다시
+      out.push({sid:sid,kind:c[0]});
+    });
+  });
+  rvReadCells(out);
+}
+function rvReadOne(sid,kind){ rvReadCells([{sid:sid,kind:kind}]); }
+/* ── 사람이 정한다 ── */
+function dvOk(sid,kind,on){
+  var fid=S.fundId, yr=S.year, up={}, rec=(((S.subChk||{}).review||{}).site||{})[sid];
+  rec=rec&&rec[kind]; if(!rec&&on) return;
+  up['review/site/'+sid+'/'+kind+'/ok']=on?{by:(S.user||''),at:ymd()}:null;
+  if(on) up['site/'+sid+'/'+kind]=1;                                                // 확인함이면 «받음» □ 도 켠다(진행표가 이 □를 센다)
+  fbDb.ref(NS+'/subsidy_chk/'+fid+'/'+yr).update(up).then(function(){
+    if(S.fundId!==fid||S.year!==yr) return;
+    S.subChk=S.subChk||{}; var r=_rvLocalRec(sid,kind); if(r){ if(on) r.ok={by:(S.user||''),at:ymd()}; else delete r.ok; }
+    if(on){ S.subChk.site=S.subChk.site||{}; S.subChk.site[sid]=S.subChk.site[sid]||{}; S.subChk.site[sid][kind]=1; }
+    _audit(fid,'제출서류 검토',_siteName(sid)+' '+docZoneLabel(kind)+(on?' 확인함':' 확인 취소')+' '+yr);
+    closeM(); renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function _rvLocalRec(sid,kind){ var r=(((S.subChk||{}).review||{}).site||{})[sid]; return r&&r[kind]; }
+/* 선택한 참여사의 «일치» 칸만 한꺼번에 확인함 — 다름·못 읽음 칸은 건드리지 않는다 */
+function rvOkMatched(){
+  var fid=S.fundId, yr=S.year, up={}, n=0, sel=S.rvSel||{}, today=ymd();
+  (S._rvRows||[]).forEach(function(r){
+    if(!sel[r.sid]) return;
+    SUB_SITE_DOCS.forEach(function(c){
+      if((r.cells[c[0]]||{}).k!=='match') return;
+      up['review/site/'+r.sid+'/'+c[0]+'/ok']={by:(S.user||''),at:today}; up['site/'+r.sid+'/'+c[0]]=1; n++;
+    });
+  });
+  if(!n){ toast('선택한 참여사에 «일치» 칸이 없습니다','warn'); return; }
+  fbDb.ref(NS+'/subsidy_chk/'+fid+'/'+yr).update(up).then(function(){
+    if(S.fundId===fid&&S.year===yr){
+      Object.keys(up).forEach(function(p){ var a=p.split('/');
+        if(a[0]==='review'){ var r=_rvLocalRec(a[2],a[3]); if(r) r.ok=up[p]; }
+        else if(a[0]==='site'){ S.subChk.site=S.subChk.site||{}; S.subChk.site[a[1]]=S.subChk.site[a[1]]||{}; S.subChk.site[a[1]][a[2]]=1; }
+      });
+    }
+    _audit(fid,'제출서류 검토','일치 '+n+'칸 한꺼번에 확인함 '+yr); renderFund(); toast(n+'칸을 확인함으로 바꿨습니다');
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 서류 값으로 사업장 정보를 고친다 — 사람이 «이 서류가 최신»이라고 정한 칸 하나만 */
+var RV_FIX={biz_no:'biz_no',ceo:'ceo',name:'name',address:'address',corp_no:'corp_no'};
+function rvFix(sid,field,kind){
+  var rec=_rvLocalRec(sid,kind), v=rec&&rec.read&&rec.read[field], tgt=RV_FIX[field];
+  if(!tgt||!v) return;
+  var fid=S.fundId, o={}, b=((S.sites||{})[sid]||{})[tgt]; o[tgt]=v;
+  fbDb.ref(NS+'/sites/'+fid+'/'+sid).update(o).then(function(){
+    if(typeof _track==='function') _track([{path:'sites/'+fid+'/'+sid+'/'+tgt,a:v,b:b,m:0}],{what:'서류 검토 — 서류대로 고침',audit:false});
+    if(S.sitesFor===fid&&S.sites&&S.sites[sid]) S.sites[sid][tgt]=v;
+    _audit(fid,'제출서류 검토',_siteName(sid)+' '+tgt+' «'+(b||'')+'» → «'+v+'» (서류 '+docZoneLabel(kind)+' 기준)');
+    toast('사업장 정보를 서류대로 고쳤습니다'); closeM(); rvOpen(sid,kind); renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+/* ── 화면 ── */
+function sbRvFilter(k){ S.rvFilter=(S.rvFilter===k?'':k); renderFund(); }
+function dvPick(sid,on){ S.rvSel=S.rvSel||{}; if(on) S.rvSel[sid]=1; else delete S.rvSel[sid]; renderFund(); }
+function dvPickAll(on){ S.rvSel={}; if(on) (S._rvRows||[]).forEach(function(r){ if(r.show) S.rvSel[r.sid]=1; }); renderFund(); }
+function rvCopyRemind(){
+  var sel=S.rvSel||{}, rows=(S._rvRows||[]).filter(function(r){ return sel[r.sid]; });
+  if(!rows.length){ toast('복사할 참여사를 먼저 선택하세요','warn'); return; }
+  _copyText(rvRemindText((funds[S.fundId]||{}).short_name||(funds[S.fundId]||{}).name||'',S.year,rows,''),'독촉 문구를 복사했습니다 — 제출 기한 날짜를 넣어 보내세요');
+}
+var RV_CHIPS=[['diff','⚠ 다름','warn'],['none','⬜ 미수령',''],['unk','？ 못 읽음',''],['got','🟦 안 읽음',''],['human','✔ 확인 완료','ok'],['manual','☑ 사람 체크','']];
+function subDocReviewPanel(f,act,schk){
+  var ad=rvApplyDate(), today=ymd();
+  var scan=((S.subChk||{}).scan||{}).site||{}, rvAll=((S.subChk||{}).review||{}).site||{};
+  var rows=act.map(function(s){
+    var cells={}, first='';
+    SUB_SITE_DOCS.forEach(function(c){
+      var st=docCellState(c[0],(scan[s._id]||{})[c[0]],(schk[s._id]||{})[c[0]],(rvAll[s._id]||{})[c[0]],s,ad,today);
+      cells[c[0]]=st;
+      if(!first&&st.k==='diff') first=_rvDiffText(st.cmp.items.filter(function(x){ return x.res==='diff'; })[0]).t;
+    });
+    var nOk=SUB_SITE_DOCS.filter(function(c){ return cells[c[0]].k==='human'; }).length;
+    return {sid:s._id,s:s,name:s.name||'',seq:s.seq_label||'',cells:cells,first:first,nOk:nOk};
+  });
+  var flt=S.rvFilter||'', sel=S.rvSel||{};
+  var count={}; RV_CHIPS.forEach(function(x){ count[x[0]]=0; });
+  rows.forEach(function(r){ SUB_SITE_DOCS.forEach(function(c){ var k=r.cells[c[0]].k; if(count[k]!=null) count[k]++; }); });
+  rows.forEach(function(r){ r.show=!flt||SUB_SITE_DOCS.some(function(c){ return r.cells[c[0]].k===flt; }); });
+  S._rvRows=rows;
+  var vis=rows.filter(function(r){ return r.show; }), nSel=rows.filter(function(r){ return sel[r.sid]; }).length;
+  var run=S._rvRun&&S._rvRun.key===_rvKey()?S._rvRun:null;
+  var chips=RV_CHIPS.map(function(x){
+    return '<span class="chip'+(x[2]?' '+x[2]:'')+' fl'+(flt===x[0]?' on':'')+'" onclick="sbRvFilter(\''+x[0]+'\')" title="누르면 이 상태의 칸이 있는 참여사만 보입니다. 한 번 더 누르면 풀립니다">'+x[1]+' '+count[x[0]]+'</span>';
+  }).join(' ');
+  var body=vis.map(function(r,i){
+    return '<tr><td class="ckcol"><input type="checkbox"'+(sel[r.sid]?' checked':'')+' onchange="dvPick(\''+r.sid+'\',this.checked)"></td><td class="no">'+esc(r.seq||String(i+1))+'</td>'
+      +'<td style="font-weight:700">'+esc(r.name)+'</td>'
+      +SUB_SITE_DOCS.map(function(c){ return '<td style="text-align:center">'+_rvCellHTML(r.sid,c[0],r.cells[c[0]])+'</td>'; }).join('')
+      +'<td>'+(r.first?'<span class="chip warn">'+esc(r.first)+'</span>':r.nOk===SUB_SITE_DOCS.length?'<span class="chip ok">'+r.nOk+'/'+SUB_SITE_DOCS.length+' 완료</span>':'<span class="muted">'+r.nOk+'/'+SUB_SITE_DOCS.length+'</span>')+'</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="muted" style="text-align:center;padding:12px">이 상태의 참여사가 없습니다</td></tr>';
+  return '<div class="panel"><div class="row"><h2 style="font-size:15px">🔍 참여사 서류 검토</h2>'+hlp('sub.review')
+    +'<span style="font-size:12px">신청일 <input type="date" value="'+esc(ad)+'" onchange="rvSetDate(this.value)" style="width:132px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px" title="중소기업확인서 유효기간이 이 날짜를 덮는지 봅니다. 신청서 엑셀의 신청일과 같은 칸입니다"></span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="primary" onclick="rvReadAll()"'+(_rvBusy?' disabled':'')+' title="원본이 이어진 서류를 차례로 읽어 서류와 사업장 정보를 맞춰 봅니다(한 장 수 초)">🔍 받은 서류 전부 읽기</button>'
+    +(run?'<span class="chip warn">읽는 중 '+run.n+'/'+run.total+' …</span>':'')+'</div>'
+    +'<div class="row" style="margin-top:8px;gap:6px">'+chips+(flt?' <button onclick="sbRvFilter(\''+flt+'\')">전체 보기</button>':'')+'</div>'
+    +(act.length?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onchange="dvPickAll(this.checked)" title="보이는 참여사 전체 선택"'+(vis.length&&nSel===vis.length?' checked':'')+'></th><th>번호</th><th>참여사</th>'
+      +SUB_SITE_DOCS.map(function(c){ return '<th style="text-align:center">'+esc(c[1])+'</th>'; }).join('')+'<th>한 줄 상태</th></tr></thead><tbody>'+body+'</tbody></table></div>'
+      +(nSel?'<div class="row" style="margin-top:10px;padding:6px 10px;background:var(--acc-soft);border-radius:8px"><b>☑ 선택한 참여사 '+nSel+'곳</b>'
+        +'<button onclick="rvCopyRemind()" title="미수령·새로 필요한 서류를 글로 만듭니다. 보내지는 않습니다">📋 미수령 서류 독촉 문구 복사</button>'
+        +'<button onclick="rvOkMatched()" title="«일치»인 칸만 확인함으로 바꿉니다. 다름·못 읽음 칸은 그대로 둡니다">✔ 선택한 «일치» 칸 한꺼번에 확인함</button></div>':'')
+      :'<div class="muted" style="padding:12px 2px">참여사업장이 없습니다 — 참여사업장 탭에서 먼저 등록하세요.</div>')
+    +'</div>';
+}
+/* 칸을 누르면 — 원본 옆에 «읽은 값 ↔ 우리 정보» */
+function rvOpen(sid,kind){
+  var ref=_subScanOf(sid,kind), site=(S.sites||{})[sid]||{}; if(!ref) return;
+  var ad=rvApplyDate(), today=ymd(), rec=_rvLocalRec(sid,kind);
+  var st=docCellState(kind,ref,1,rec,site,ad,today), human=!!(rec&&rec.ok&&(!rec.src||rec.src===ref.id));
+  var head='<div class="row" style="margin:0 0 8px"><h2 style="margin:0">'+esc(site.name||'')+' — '+esc(docZoneLabel(kind))+'</h2>'
+    +'<span class="chip'+(st.k==='diff'?' warn':st.k==='human'||st.k==='match'?' ok':'')+'">'+({got:'안 읽음',match:'일치(사람 확인 대기)',human:'확인함',diff:'다름',unk:'못 읽음'})[st.k]+'</span>'
+    +'<span style="flex:1"></span><button onclick="closeM()">✕ 닫기</button></div>';
+  var cmpHTML;
+  if(st.k==='got'){ cmpHTML='<div class="msg warn">아직 읽지 않았습니다. [↻ 읽기]를 누르면 원본을 글자로 읽어 사업장 정보와 맞춰 봅니다.</div>'; }
+  else{
+    var c=st.cmp||(rec&&rec.read?docCompare(kind,rec.read,site,ad,today):null);
+    if(!c) cmpHTML='<div class="msg err">'+esc((rec&&rec.fail)||st.msg||'읽지 못했습니다')+'</div><div class="muted" style="margin-top:6px;font-size:11.5px">스캔 상태가 나쁘면 인식이 어렵습니다 — 원본을 보고 직접 확인하세요.</div>';
+    else cmpHTML='<table><thead><tr><th>항목</th><th>서류에서 읽음</th><th>우리 정보·기준</th><th>결과</th><th></th></tr></thead><tbody>'
+      +c.items.map(function(x){
+        var res=({ok:'<span class="chip ok">일치</span>',diff:'<span class="chip warn">다름</span>',unk:'<span class="chip">못 읽음</span>',na:'<span class="chip">정보 없음</span>',info:'<span class="chip">참고</span>'})[x.res];
+        var fix=((x.res==='diff'||x.res==='na')&&RV_FIX[x.k]&&x.read)?'<button onclick="rvFix(\''+sid+'\',\''+x.k+'\',\''+kind+'\')" style="padding:1px 7px;font-size:11px" title="이 서류가 최신일 때만 — 사업장 정보의 이 칸을 서류 값으로 바꿉니다(변경 기록에 남습니다)">✎ 서류대로 고침</button>':'';
+        return '<tr'+(x.res==='diff'?' style="background:var(--warn-bg)"':'')+'><td class="muted">'+esc(x.label)+'</td><td>'+esc(x.read||'—')+'</td><td>'+esc(x.have||'—')+'</td><td>'+res+'</td><td>'+fix+'</td></tr>';
+      }).join('')+'</tbody></table>'
+      +'<div class="muted" style="font-size:11.5px;margin-top:6px">폐업·휴업과 서류의 진위는 서류만으로 알 수 없어 판정하지 않습니다.'+(kind==='reg'?' 발급일 요건(발급 후 며칠 이내)은 공고문으로 확인해야 합니다 [확인 필요].':'')+'</div>';
+  }
+  var btns='<div class="row" style="margin-top:12px">'
+    +(human?'<button onclick="dvOk(\''+sid+'\',\''+kind+'\',false)">확인 취소</button>':(st.k!=='got'?'<button class="primary" onclick="dvOk(\''+sid+'\',\''+kind+'\',true)">✔ 맞음 (원본을 보고 확인함)</button>':''))
+    +'<button onclick="closeM();rvReadOne(\''+sid+'\',\''+kind+'\')">↻ '+(st.k==='got'?'읽기':'다시 읽기')+'</button>'
+    +'<button onclick="closeM();openSiteScan(\''+sid+'\',\''+kind+'\')" title="원본 연결을 바꾸거나 해제하는 창">📎 원본 연결 관리</button></div>';
+  showModal(head+'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px">'
+    +'<div id="scanBody" style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px">'+loadingHTML('사진첩에서 불러오는 중…')+'</div>'
+    +'<div>'+cmpHTML+btns+'</div></div>',{width:1100});
+  _loadScanInto(ref);
+}
 function subsidyDocsPanel(f){
   if(f.fund_type==='사내') return '<div class="panel"><div class="msg warn">사내근로복지기금은 공동기금 지원사업 대상이 아닙니다.</div></div>';
   var key=S.fundId+'/'+S.year;
@@ -17252,6 +17578,7 @@ function subsidyDocsPanel(f){
 
   return '<div id="subSplit" style="display:flex;align-items:stretch;flex-wrap:wrap;gap:10px">'
     +'<div style="flex:1.1;min-width:340px">'
+    +subDocReviewPanel(f,act,schk)
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">📁 제출서류 — 기금 단위</h2>'+hlp('sub.docs')+yearSel()+'<span style="flex:1"></span>'
     +'<span class="muted" style="font-size:11px">공식 11종 = 기금 단위 '+fNeed+'종 + 참여사별 '+SUB_SITE_DOCS.length+'종</span>'
     +'<span class="stat'+(fDone===fNeed?' ok':'')+'">'+fDone+'/'+fNeed+'종</span></div>'
@@ -23598,6 +23925,14 @@ var HELP={
  'sub.docs':{t:'제출서류 관리',h:'<p>공동기금 지원 신청 제출서류는 <b>11종</b>입니다(사내기금은 14종).</p>'
    +'<p>이 중 <b>중소기업확인서·법인등기부등본·사업자등록증은 참여사마다 각 1부</b>라, 32개사면 96장이 됩니다. 그래서 아래 격자에서 사업장별로 따로 체크합니다.</p>'
    +'<p>[📄 서식] 버튼이 있는 것은 이 시스템이 만들어 줍니다. [📋 미제출 명단]으로 담당자 연락처까지 복사해 독촉할 수 있습니다.</p>'},
+ 'sub.review':{t:'참여사 서류 검토 — 무엇을 맞춰 보나',h:'<p>원본이 사진첩에 이어진 서류를 <b>글자로 읽어</b> 우리 사업장 정보·신청일과 맞춰 봅니다. 기계는 <b>후보만</b> 걸러 주고, <b>«맞음»은 사람이 원본을 보고</b> 눌러야 확인함이 됩니다.</p>'
+  +'<table><thead><tr><th>서류</th><th>맞춰 보는 것</th></tr></thead><tbody>'
+  +'<tr><td>사업자등록증</td><td>사업자번호·상호·대표자·소재지</td></tr>'
+  +'<tr><td>중소기업확인서</td><td>기업규모(해당 없음·중견은 다름) · <b>유효기간이 신청일을 덮는지</b> · 상호</td></tr>'
+  +'<tr><td>등기부등본</td><td>법인등록번호·상호·본점 소재지. 발급일은 보여 주기만(요건 확인 필요)</td></tr>'
+  +'</tbody></table>'
+  +'<p>상호는 ㈜·주식회사·띄어쓰기를 같은 것으로 봅니다. 못 읽은 칸은 «못 읽음»으로 두고 지어내지 않습니다. 폐업·서류 진위는 서류만으로 알 수 없어 판정하지 않습니다.</p>'
+  +'<p>«다름»일 때 어느 쪽이 맞는지는 사람이 정합니다 — 서류가 최신이면 [서류대로 고침], 서류가 낡았으면 새 서류를 요청하세요. 신청일은 신청서 엑셀의 신청일과 같은 칸입니다.</p>'},
  'subboard':{t:'지원금 한 화면 입력·진행 요약',h:'<p>그 해 공동기금 전체의 지원금을 <b>한 화면에서</b> 입력합니다.</p><p>칸에 입력하고 다른 칸으로 이동하면 <b>자동 저장</b>됩니다. 기금명을 클릭하면 그 기금의 <b>신청·정산 진행표</b>로 넘어갑니다.</p>'
   +'<p><b>진행</b> — 진행표 9단계를 네모로 보여 줍니다. 초록=끝남, 파랑 테두리=지금 할 차례, 빨강=기한 지남, 점선=해당 없음(보완 요구·취소 이의는 필요할 때만).</p>'
   +'<p><b>다음 할 일</b> — 끝나지 않은 첫 단계(기한이 지난 단계가 있으면 그것). 기한은 사람이 넣은 날짜가 있을 때만 계산하고, 모르면 규칙 글만 적습니다.</p>'
