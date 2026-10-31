@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=38">
+<link rel="stylesheet" href="css/pu-erp.css?v=39">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -39247,6 +39247,7 @@ function BizTypeCard(props){
   var dgS = useState(null); var dragCode = dgS[0]; var setDragCode = dgS[1];
   var doS = useState(null); var dragOverCode = doS[0]; var setDragOverCode = doS[1];
   var arS = useState(false); var arcOpen = arS[0], setArcOpen = arS[1];   // 맨 아래 「📦 보관」 칸 — 기본은 접힘
+  var adS = useState(false); var addOpen = adS[0], setAddOpen = adS[1];   // 「+ 새 유형」 입력줄 — 기본은 접힘(한 화면에 최대한 · 대표 2026-10-31)
   /* 이 기기에 사본이 없으면 서버에 «물어서» 받는다 — 받으면 목록을 다시 그린다. 서버도 비어 있을 때만 씨앗이 심긴다. */
   useEffect(function(){
     if(dbGet(cat.storageKey, null) != null) return;
@@ -39491,6 +39492,11 @@ function BizTypeCard(props){
     e.preventDefault();
     if(!bizTypeWritable(cat.storageKey)){ setDragCode(null); setDragOverCode(null); return; }
     if(!dragCode || dragCode === targetCode){ setDragCode(null); setDragOverCode(null); return; }
+    /* 컨설팅: 개인입금 ↔ 법인 입금 묶음 사이로는 끌어 옮기지 않는다 — 묶음은 개인입금 값에서 자동으로 갈리므로 ⇄ 단추로 옮긴다 */
+    if(cat.key === 'consulting'){
+      var _fx = list.find(function(x){ return x.code === dragCode; }), _tx = list.find(function(x){ return x.code === targetCode; });
+      if(_fx && _tx && !!_fx.personalDeposit !== !!_tx.personalDeposit){ showToast('개인입금 사업 ↔ 법인 입금 사업은 줄 끝의 ⇄ 단추로 옮깁니다'); setDragCode(null); setDragOverCode(null); return; }
+    }
     var fromC = dragCode;
     persistWith(function(cur){
       var arr = cur.slice().sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
@@ -39512,75 +39518,88 @@ function BizTypeCard(props){
   var shown = list.filter(function(x){ return !x.hidden; });
   var arc = list.filter(function(x){ return x.hidden; });
 
+  /* 한 줄 그리기 — 컨설팅은 칸을 세로로 맞춘 표 줄(css .bt-row), 나머지 카드는 예전 한 줄 모양.
+     줄 높이는 «한 화면에 최대한»(대표 2026-10-31)이라 낮췄다(단추 20px · 위아래 여백 0 — 예전 약 34px → 23px). */
+  function renderRow(x){
+    var isOver = dragOverCode === x.code && dragCode && dragCode !== x.code;
+    var isDragging = dragCode === x.code;
+    var dnd = { draggable:true,
+      onDragStart:function(e){onDragStart(x.code, e);},
+      onDragOver:function(e){onDragOver(x.code, e);},
+      onDragLeave:function(){onDragLeave(x.code);},
+      onDrop:function(e){onDrop(x.code, e);},
+      onDragEnd:onDragEnd };
+    var gripEl = h('span', { className:'bt-grip', style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮');
+    var shortEl = h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short);
+    var tipName = [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n');
+    var rowLook = { border:'1px solid '+(isOver?'#1e40af':'#e2e8f0'),
+      borderTop: isOver ? '3px solid #1e40af' : '1px solid #e2e8f0',
+      background: isOver?'#eff6ff':'#fff',
+      opacity: isDragging?0.4:1,
+      cursor:'grab', userSelect:'none', transition:'all 0.1s' };
+    var editEl = function(cls){ return h('button', { onClick:function(){ editType(x); }, className:'erp-tip ' + cls, 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
+      style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'20px', fontSize:'11px', cursor:'pointer', padding:0 } }, '✏'); };
+    var delEl = function(cls){ return h('button', { onClick:function(){ del(x.code); }, className:cls,
+      style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'20px', fontSize:'12px', cursor:'pointer', padding:0 } }, '×'); };
+    /* 🧾 컨설팅 유형 — 칸을 세로로 맞춘 한 줄(css .bt-row): ⋮⋮ | 약어 | 사업명 | 수행기관·단가·셈 | ⇄ | ✏ | ×
+       · 개인입금은 칸이 아니라 «묶음»이다(👤 개인입금 사업 | 🏢 법인 입금 사업) — 줄 끝의 ⇄ 로 옮기면 자동으로 그 묶음으로 간다(consGroups).
+       · 카드 폭이 모자라면 css 가 두 줄로 접는다(첫 줄 약어·사업명·⇄·✏·× / 둘째 줄 수행기관·단가·셈) — 같은 글자·칩은 안 잘린다. */
+    if(cat.key === 'consulting'){
+      return h('div', Object.assign({ key:x.code, className:'bt-row', style:rowLook }, dnd),
+        gripEl, shortEl,
+        h('span', { className:'bt-name biz-type-name', title:tipName }, x.name),
+        h('div', { className:'bt-l2' },
+          h('span', { className:'bt-ag' },
+            x.agency ? h('span', { className:'bt-chip bt-chip-agency', title:x.agency }, x.agency) : null,
+            /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지 여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
+            x.dayFee > 0 ? h('span', { className:'bt-chip bt-chip-fee' }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
+            /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
+            consTypeRole(x) ? h('span', { className:'bt-chip bt-chip-role', title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)' }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null)),
+        h('button', { className:'bt-swap', onClick:function(e){ e.stopPropagation(); togglePersonal(x); },
+          title: x.personalDeposit
+            ? '👤 개인입금 사업입니다 — 누르면 법인 입금 사업으로 옮깁니다(개인입금 끄기). 유형이 자동으로 해당 묶음으로 옮겨집니다'
+            : '누르면 개인입금 사업으로 옮깁니다(개인입금 켜기) — 법인 아닌 개인 계좌로 받는 사업이며, 이 유형의 계약·컨설팅은 입금확정 때 「개인수익」으로 열립니다',
+          style:{ flexShrink:0, width:'20px', height:'20px', padding:0, borderRadius:'5px', cursor:'pointer', fontSize:'11px',
+            border:'1px solid ' + (x.personalDeposit ? '#fde68a' : '#e2e8f0'), background: x.personalDeposit ? '#fffbeb' : '#f8fafc',
+            color: x.personalDeposit ? '#854d0e' : '#64748b', fontWeight:700 } }, '⇄'),
+        editEl('bt-edit'), delEl('bt-del'));
+    }
+    return h('div', Object.assign({ key:x.code, style:Object.assign({ display:'flex', alignItems:'center', gap:'4px', padding:'0 5px', borderRadius:'4px', marginBottom:'1px' }, rowLook) }, dnd),
+      gripEl, shortEl,
+      h('div', { className:'biz-type-name', title:tipName,
+        style:{ flex:1, minWidth:0, display:'flex', flexWrap:'wrap', alignItems:'center', gap:'2px 6px', fontSize:'11px', color:'#1e293b' } },
+        h('span', { style:{ minWidth:0, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.name)),
+      editEl(''), delEl(''));
+  }
+  var emptyEl = h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', padding:'10px' } }, '항목 없음');
+  /* 컨설팅 «개인입금 사업 | 법인 입금 사업» 묶음 — personalDeposit 값에서 «자동으로» 갈린다(데이터는 그대로, 보이는 자리만).
+     켜면 개인입금 묶음으로, 끄면 법인 묶음으로 저절로 옮겨진다. 묶음 안의 순서는 sortOrder 그대로. */
+  function btHead(){ return h('div', { className:'bt-head' }, ['', '약어', '사업명', '수행기관 · 단가 · 셈', '', '', ''].map(function(t, i){ return h('span', { key:i }, t); })); }
+  function btGroup(icon, title, cls, rows){
+    return h('div', { className:'bt-group ' + cls },
+      h('div', { className:'bt-gtitle' }, h('span', null, icon), h('b', null, title), h('span', { className:'bt-gcount' }, '(' + rows.length + ')')),
+      btHead(),
+      rows.length === 0 ? h('div', { className:'bt-gempty' }, '해당하는 유형이 없습니다') : rows.map(renderRow));
+  }
+  var consGroups = cat.key === 'consulting' ? h('div', { className:'bt-groups' },
+    btGroup('👤', '개인입금 사업', 'bt-priv', shown.filter(function(x){ return !!x.personalDeposit; })),
+    btGroup('🏢', '법인 입금 사업', 'bt-corp', shown.filter(function(x){ return !x.personalDeposit; }))) : null;
+
   return h('div', { className:'biz-type-card biz-type-card-' + cat.key, style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', display:'flex', flexDirection:'column' } },
     h('div', { style:{ background:cat.headBg, color:cat.headFg, padding:'6px 10px', fontSize:'11.5px', fontWeight:700, display:'flex', alignItems:'center', gap:'6px', userSelect:'none' } },
       h('span', null, cat.icon),
       h('span', null, cat.title),
       h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + shown.length + ')'),
       h('div', { style:{ flex:1 } }),
+      h('button', { onClick:function(e){ e.stopPropagation(); setAddOpen(!addOpen); }, className:'biz-type-add-toggle',
+        style:{ fontSize:'10.5px', padding:'1px 8px', background: addOpen ? cat.headFg : 'transparent', color: addOpen ? '#fff' : cat.headFg, border:'1px solid '+cat.headFg, borderRadius:'4px', cursor:'pointer', fontWeight:700, marginLeft:'6px' } }, addOpen ? '× 닫기' : '+ 새 유형'),
       h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, className:'erp-tip', 'data-tip':'기본 유형 가운데 빠진 것만 더합니다 — 지금 목록은 지우거나 바꾸지 않습니다',
         style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:cat.headFg, border:'1px solid '+cat.headFg, borderRadius:'4px', opacity:.6, cursor:'pointer', marginLeft:'6px' } }, '복원')
     ),
     h('div', null,
     pdBulk && h(PersonalDepositBulkModal, { code:pdBulk.code, name:pdBulk.name, on:pdBulk.on, onClose:function(){ setPdBulk(null); } }),
     h('div', { style:{ padding:'4px 6px', flex:1 } },
-      cat.key === 'consulting' && shown.length > 0 && h('div', { className:'bt-head' },
-        ['', '약어', '사업명', '수행기관', '단가·셈', '개인입금', '', ''].map(function(t, i){ return h('span', { key:i }, t); })),
-      shown.length === 0
-        ? h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', padding:'10px' } }, '항목 없음')
-        : shown.map(function(x){
-            var isOver = dragOverCode === x.code && dragCode && dragCode !== x.code;
-            var isDragging = dragCode === x.code;
-            var dnd = { draggable:true,
-              onDragStart:function(e){onDragStart(x.code, e);},
-              onDragOver:function(e){onDragOver(x.code, e);},
-              onDragLeave:function(){onDragLeave(x.code);},
-              onDrop:function(e){onDrop(x.code, e);},
-              onDragEnd:onDragEnd };
-            var gripEl = h('span', { className:'bt-grip', style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮');
-            var shortEl = h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short);
-            var tipName = [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n');
-            var rowLook = { border:'1px solid '+(isOver?'#1e40af':'#e2e8f0'),
-              borderTop: isOver ? '3px solid #1e40af' : '1px solid #e2e8f0',
-              background: isOver?'#eff6ff':'#fff',
-              opacity: isDragging?0.4:1,
-              cursor:'grab', userSelect:'none', transition:'all 0.1s' };
-            var editEl = function(cls){ return h('button', { onClick:function(){ editType(x); }, className:'erp-tip ' + cls, 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
-              style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'); };
-            var delEl = function(cls){ return h('button', { onClick:function(){ del(x.code); }, className:cls,
-              style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'22px', fontSize:'12px', cursor:'pointer' } }, '×'); };
-            /* 🧾 컨설팅 유형 — 칸을 세로로 맞춘 한 줄(css .bt-row): ⋮⋮ | 약어 | 사업명 | 수행기관 | 단가·셈 | 개인입금 | ✏ | ×
-               ⚠ 수행기관·단가·셈·개인 칸은 «비어 있어도» 칸을 둔다 — 비면 뒤 칸이 앞으로 밀려 줄마다 어긋난다.
-               카드 폭이 모자라면 css 가 두 줄로 접는다(첫 줄 약어·사업명·✏·× / 둘째 줄 수행기관·단가·셈·개인) — 같은 글자·칩은 안 잘린다. */
-            if(cat.key === 'consulting'){
-              return h('div', Object.assign({ key:x.code, className:'bt-row', style:rowLook }, dnd),
-                gripEl, shortEl,
-                h('span', { className:'bt-name biz-type-name', title:tipName }, x.name),
-                h('div', { className:'bt-l2' },
-                  h('span', { className:'bt-agency' }, x.agency ? h('span', { className:'bt-chip bt-chip-agency', title:x.agency }, x.agency) : null),
-                  h('span', { className:'bt-fee' },
-                    /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지 여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
-                    x.dayFee > 0 ? h('span', { className:'bt-chip bt-chip-fee' }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
-                    /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
-                    consTypeRole(x) ? h('span', { className:'bt-chip bt-chip-role', title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)' }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null)),
-                h('span', { className:'bt-pd' },
-                    h('button', { onClick:function(e){ e.stopPropagation(); togglePersonal(x); },
-                      title: x.personalDeposit
-                        ? '👤 개인입금 사업 — 이 유형의 계약·컨설팅은 입금확정 때 「개인수익」으로 열립니다. 누르면 끕니다'
-                        : '누르면 «개인입금 사업»으로 — 법인 아닌 개인 계좌로 받는 사업',
-                      style:{ flexShrink:0, height:'22px', padding:'0 6px', borderRadius:'10px', cursor:'pointer', fontSize:'10.5px', whiteSpace:'nowrap',
-                        border:'1px solid ' + (x.personalDeposit ? '#fde68a' : '#e2e8f0'), background: x.personalDeposit ? '#fffbeb' : '#fff',
-                        color: x.personalDeposit ? '#854d0e' : '#94a3b8', fontWeight: x.personalDeposit ? 700 : 400 } },
-                      x.personalDeposit ? '✓ 👤 개인' : '👤')),
-                editEl('bt-edit'), delEl('bt-del'));
-            }
-            return h('div', Object.assign({ key:x.code, style:Object.assign({ display:'flex', alignItems:'center', gap:'4px', padding:'3px 5px', borderRadius:'4px', marginBottom:'4px' }, rowLook) }, dnd),
-              gripEl, shortEl,
-              h('div', { className:'biz-type-name', title:tipName,
-                style:{ flex:1, minWidth:0, display:'flex', flexWrap:'wrap', alignItems:'center', gap:'2px 6px', fontSize:'11px', color:'#1e293b' } },
-                h('span', { style:{ minWidth:0, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.name)),
-              editEl(''), delEl(''));
-          }),
+      shown.length === 0 ? emptyEl : (cat.key === 'consulting' ? consGroups : shown.map(renderRow)),
       /* 📦 보관 — 숨긴 것·합쳐진 것을 맨 아래 접힌 칸으로(대표 2026-10-31). 숨긴 것이 없으면 칸 자체가 안 보인다.
          ⚠ 합쳐진 유형은 지우지도 다시 띄우지도 않는다(옛 번호가 메모·휴지통·나간 문서에 남아 있을 수 있다). */
       arc.length > 0 && h('div', { className:'biz-type-arc', style:{ borderTop:'1px dashed #cbd5e1', marginTop:'6px', paddingTop:'5px' } },
@@ -39606,7 +39625,7 @@ function BizTypeCard(props){
         })
       )
     ),
-    h('div', { style:{ padding:'4px 6px', borderTop:'1px solid #f8fafc', background:'#f8fafc' } },
+    addOpen && h('div', { style:{ padding:'4px 6px', borderTop:'1px solid #f8fafc', background:'#f8fafc' } },
       h('div', { style:{ display:'flex', gap:'4px', marginBottom:'3px' } },
         h('input', { type:'text', value:shortIn, onChange:function(e){ setShortIn(e.target.value.slice(0,4)); }, placeholder:'약어(최대 4자)',
           style:{ width:'72px', padding:'4px 5px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'10.5px', textAlign:'center', fontFamily:'inherit' },
