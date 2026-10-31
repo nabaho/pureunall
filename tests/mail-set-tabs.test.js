@@ -43,7 +43,7 @@ function draw(tab) {
          그 덩이가 안 그려져도 검사가 통과한다. */
     /* ⚠ 기간은 «서버가 적어 둔 것»(mailbox/sync)에서 센다 — 앱이 손에 든 줄로 세면
          칸마다 100통씩뿐이라 늘 틀린다(2026-09-06 대표 화면에서 드러났다). */
-    _mbMsgs: { '*old': {} }, _mbOldState: { got: 0 },
+    _mbMsgs: { '*old': {} }, _mbOldState: { got: 0 }, _mbPushMaster: {},
     _mbSync: { INBOX: { kept: 438, oldest: Date.now() - 94 * 86400000, newest: Date.now() } },
     _mbFolders: { INBOX: { name: '받은메일함' } },
     state: { isAdmin: true, mbSize: 100, mbSetTab: tab || '' },
@@ -62,7 +62,7 @@ function draw(tab) {
   vm.runInContext(app.match(/const MB_SET_LS = [^\n]*/)[0], ctx);
   vm.runInContext(app.match(/const MB_OLD_DAY = [^\n]*/)[0], ctx);
   vm.runInContext(app.match(/const MB_OLD_ID = [^\n]*/)[0], ctx);
-  ['mbSetTab', 'mbSetTabGo', 'mbOldSpans', 'mbOldCount', 'mbOldHtml', 'mbSpamOn',
+  ['mbSetTab', 'mbSetTabGo', 'mbOldSpans', 'mbOldCount', 'mbOldHtml', 'mbSpamOn', 'mbPushMasterInner',
    'mailSetHtml'].forEach(n =>
     vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return ctx;
