@@ -52,3 +52,23 @@ test('★★★ 서버는 «창 밖»이라고 말한다 — 「지워졌을 수
   assert.match(code, /최근 3만 통만 열어 줘서/, '왜 못 여는지 말하지 않는다');
   assert.doesNotMatch(code, /지워졌을 수 있습니다/, '옛 거짓 안내가 남았다');
 });
+
+/* ── 「다음메일 웹에서 열기」 단추 (대표 승인 2026-10-31) ── */
+test('★★★ «창 밖»이면 한 줄 + 다음메일 웹 단추(새 창, noopener) — 앞부분은 그대로 함께', () => {
+  const h = errHtml({ slug: '*old', uid: 'K1', err: MSG, outWin: true }, { p: '안녕하세요 근로계약서 건입니다' });
+  assert.match(h, /<a href="https:\/\/mail\.daum\.net"[^>]*target="_blank"[^>]*rel="noopener"/, '다음메일 단추가 없다');
+  assert.match(h, /창\(최근 3만 통\) 밖/);
+  assert.doesNotMatch(h, /열지 못했습니다/, '긴 오류 문구가 그대로 남았다');
+  assert.match(h, /안녕하세요 근로계약서 건입니다 …/, '앞부분이 사라졌다');
+});
+
+test('★★ «창 밖» 표시가 없으면(그냥 실패) 단추를 달지 않는다 · 폴더 메일에도 달지 않는다', () => {
+  assert.doesNotMatch(errHtml({ slug: '*old', err: '네트워크 오류' }, {}), /mail\.daum\.net/);
+  assert.doesNotMatch(errHtml({ slug: 'INBOX-a', err: '없습니다', outWin: true }, {}), /mail\.daum\.net/);
+});
+
+test('★★ 서버의 outOfWindow 가 오류 → 화면 상태까지 이어진다', () => {
+  const fetchFn = strip(sliceFn(HTML, 'function mbFetchBodyNow('));
+  assert.match(fetchFn, /er\.outOfWindow *= *!!j\.outOfWindow/, '서버 표시를 오류에 싣지 않는다');
+  assert.match(strip(HTML), /state\.mbOpen\.outWin *= *!!\(e *&& *e\.outOfWindow\)/, '화면 상태에 옮기지 않는다');
+});
