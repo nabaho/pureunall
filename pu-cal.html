@@ -5688,7 +5688,66 @@ function 창도구Html(){
   return out ? out + '<hr>' : '';
 }
 
+/* ★ 입력 지킴 (대표 지시 2026-10-31 「폰에서 일정 입력하려고 창을 열거나 이름을 고르면 화면이 깜빡이거나 뒤로 간다 — 입력이 어렵다」).
+   까닭: render() 는 판 전체를 새로 갈아 끼운다 — 입력칸이 «새 칸»이 되어 쓰던 글·커서·키보드를 잃는다.
+     폰은 칸을 누르면 키보드가 올라와 resize 가 오고(그때마다 render), 서버 자료·구글 일정·알림이 도착해도 render 가 온다.
+     키보드가 내려가면 또 resize → 또 render … 그것이 깜빡임이다. 검색칸도 같다(빈 칸이 포커스를 잃으면 검색이 닫힌다).
+   방법: ① 글을 쓰는 중에 «높이만» 바뀐 resize 는 무시한다(아래 resize 처리)
+         ② 그래도 그려야 하면 그리기 «앞에» 사용자가 마지막 그림 뒤 친 칸만 S.modal 에 담고, «그린 뒤» 포커스·커서·창 스크롤을 되돌린다.
+   ⚠ 통째로 modalRead 를 부르지 않는다 — 코드가 S.modal 을 바꾼 뒤 render 하는 길(캡처 결과 채우기 · 새 창을 열고 시각 넣기)에서
+     그려 둔 옛 칸 값이 새 값을 덮어쓴다. «그린 뒤 사용자가 손댄 칸»만 옮긴다(코드가 바꾼 칸은 코드가 이긴다). */
+var 창칸들 = ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind","guests","attach"];
+var _그린창값 = null;      /* 창을 마지막으로 그렸을 때 칸마다의 값 — 그 뒤 달라진 칸이 «사용자가 친 것» */
+function 입력중인가(){
+  var a = document.activeElement;
+  if(!a || !a.tagName) return false;
+  if(a.tagName === "TEXTAREA" || a.tagName === "SELECT") return true;
+  return a.tagName === "INPUT" && !/^(button|checkbox|radio|submit|reset|file|image|range|color)$/i.test(a.type || "");
+}
+function 창입력지킴(){
+  var 지킴 = { 초점:null, 위:0 };
+  try{
+    var m = S.modal, 창 = document.querySelector(".modal.gform");
+    if(m && 창 && _그린창값){
+      창칸들.forEach(function(f){
+        var el = 창.querySelector("[data-m='" + f + "']");
+        if(el && (f in _그린창값) && el.value !== _그린창값[f]) m[f] = el.value;
+      });
+    }
+    var a = document.activeElement, 열쇠 = "";
+    if(a && a !== document.body && a.getAttribute){
+      if(a.id === "calq") 열쇠 = "#calq";
+      else if(창 && 창.contains(a) && a.getAttribute("data-m")) 열쇠 = ".modal.gform [data-m='" + a.getAttribute("data-m") + "']";
+    }
+    if(열쇠){
+      var s = null, e = null;
+      try{ s = a.selectionStart; e = a.selectionEnd; }catch(_){}
+      지킴.초점 = { 열쇠:열쇠, s:s, e:e };
+    }
+    if(창) 지킴.위 = 창.scrollTop;
+  }catch(_){}
+  return 지킴;
+}
+function 창입력되살림(지킴){
+  try{
+    var 창 = document.querySelector(".modal.gform");
+    if(S.modal && 창){
+      var 값 = {};
+      창칸들.forEach(function(f){ var el = 창.querySelector("[data-m='" + f + "']"); if(el) 값[f] = el.value; });
+      _그린창값 = 값;
+      if(지킴 && 지킴.위) 창.scrollTop = 지킴.위;
+    } else _그린창값 = null;
+    if(지킴 && 지킴.초점){
+      var el2 = document.querySelector(지킴.초점.열쇠);
+      if(el2 && document.activeElement !== el2){
+        el2.focus({ preventScroll:true });
+        if(지킴.초점.s != null){ try{ el2.setSelectionRange(지킴.초점.s, 지킴.초점.e); }catch(_){} }
+      }
+    }
+  }catch(_){}
+}
 function render(){
+  var 지킴 = 창입력지킴();
   if(!S.modal && S.cap) 캡처정리();   /* 창이 닫히면 듣기도 멈춘다 — 어느 길로 닫혔든 여기서 한 번에 */
   renderTabs();
   var tab = TABS.filter(function(t){ return t.v===S.tab; })[0] || TABS[0];
@@ -5719,6 +5778,7 @@ function render(){
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   var 옛격자 = document.querySelector('.tgscroll'), 옛격자맨 = 옛격자 ? 옛격자.scrollTop : -1;
   $('app').innerHTML = html;
+  창입력되살림(지킴);
   지도그리기();
   끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
   /* 시간 축 — 다시 그려도 보던 높이를 지킨다. 처음 들어오면 «지금 한 시간 전»(오늘이 보이면) 또는 오전 7시 */
@@ -5774,8 +5834,14 @@ function render(){
 var _다시그리는중 = false;
 
 /* 창 크기가 바뀌면 한 칸에 들어가는 수도 바뀐다 — 잦은 신호라 한 박자 쉬고 그린다 */
-var _크기타이머 = null;
+var _크기타이머 = null, _크기너비 = window.innerWidth;
 window.addEventListener('resize', function(){
+  /* ★ 폰은 입력칸을 누르면 키보드가 올라와 resize 가 온다 — «너비는 그대로, 높이만» 바뀌었고 글을 쓰는 중이면
+     칸 수를 다시 잴 까닭이 없다. 다시 그리면 입력칸이 새로 생겨 키보드가 내려가고, 그러면 또 resize 가 온다(깜빡임).
+     키보드가 내려간 뒤(포커스가 없을 때)의 resize 는 그대로 받아 칸 수를 다시 잰다. */
+  var 너비 = window.innerWidth;
+  if(입력중인가() && 너비 === _크기너비) return;
+  _크기너비 = 너비;
   if(_크기타이머) clearTimeout(_크기타이머);
   _크기타이머 = setTimeout(function(){ _크기타이머 = null; render(); }, 150);
 });
