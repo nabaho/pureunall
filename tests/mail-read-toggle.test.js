@@ -77,7 +77,7 @@ function load(over){
     pickOn: (sel,id) => !!(sel && sel[id]), pickList: () => [], pickAllOn: () => false,
     pickClear(){}, pickHit(){}, pickToggleAll(){}, pickRedraw(){},
     renderPCSide(){}, renderMailPage(){}, render(){},
-    document: { getElementById: () => null, addEventListener(){}, removeEventListener(){},
+    document: { getElementById: () => null, querySelector: () => null, addEventListener(){}, removeEventListener(){},
       body:{ classList:{ contains: () => true } } },
     $: () => ({ set innerHTML(v){}, get innerHTML(){ return ''; }, style:{}, offsetHeight:100,
       value:'', focus(){}, select(){}, contains:()=>false, scrollTop:0,
