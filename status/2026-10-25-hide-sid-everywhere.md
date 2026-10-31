@@ -32,6 +32,7 @@
 - 이미 저장된 옛 기록 값(예: 실적 main)에 사번이 들어 있으면 안전망에만 의존한다 — 일괄 정리는 판단 필요.
 
 ## 남은 일 (코드는 끝 — 사람·배포 단계)
-- 합친 뒤 서버 함수 이름 찍어 배포: gcalProxy 계열(functions/gcal-proxy.js)·logLoginAttempt(login-security + index.js)·kakao 로그인·패스키·사진 열람 기록(index.js)
+- ✅ 서버 함수 6개는 2026-10-31 대표 「배포해라」로 올렸다(최신 main 118df14c 에서 이름 찍어): gcalProxy·gcalEdit·logLoginAttempt·photoView·kakaoLoginFinish·passkeyRegisterStart. 업데이트 성공 · 공개 호출 5개가 우리 코드 응답(gcalProxy 는 일정 저장 때 도는 트리거라 요청 호출은 구글 앞단 401 이 정상) · 로그에 오류 없음.
+  ⚠ 같은 사번 PR 이 index.js 에서 publishSite(올린 사람 로그 글)·receivePaydataMail(빈자리 직원 이름) 도 고쳤지만 «알림·로그 글»뿐이라 이번에 안 올렸다 — 다른 방이 그 함수를 같이 고쳤을 수 있어 그 방의 배포 때 함께 나간다.
 - 대표 크롬에서 실물 확인: 포털 머리 이름만 · 말풍선에 사번/이메일 없음 · 로그인 화면 저장된 아이디 점 표시
 - 대표 결정: 급여명세서·급여대장·인사기록카드 «문서»의 사번을 그대로 둘지(법적 기재 사항 확인 필요)
