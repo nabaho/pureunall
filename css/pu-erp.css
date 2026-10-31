@@ -473,56 +473,69 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .corp-alert-zone { display: none !important; }
 }
 
-/* 사무관리기준 — 업무유형 카드 다섯 장의 폭 (2026-10-26)
-   5칸이 같은 폭이면 컨설팅 카드의 칩(수행기관·1일 단가·셈 묶음)이 잘리고, 기금 카드의 긴 이름(지역공동근로복지기금)이 …로 잘렸다.
-   · PC(1100px 이상): 업체 1 · 사건 1 · 컨설팅 2.3 · 기금 1.4 · 기타사업 1.1 — 칩이 붙는 카드와 이름이 긴 카드에 폭을 더 준다
-   · 중간(769~1099px): 한 칸 최소 210px 로 줄을 나눠(줄당 2~4장) 이름이 잘리지 않게, 컨설팅만 두 칸
-   · 폰(768px 이하): 한 칸 — 같은 글자가 다 보이고 모자라면 칩이 아래 줄로 내려간다
-   ⚠ 폰에서 span 2 가 남으면 한 칸짜리 그리드에 가로로 밀려 나가는 칸이 생기므로, span 은 중간 폭에만 건다. */
+/* 사무관리기준 — 업무유형 카드 다섯 장의 배치 (2026-10-26 → 2026-10-31 «한 화면에 최대한»)
+   · PC(1100px 이상): 컨설팅 카드가 «윗줄 전체 폭», 그 아래 3열 — [사건 | 기타사업 | 업체 위·기금 아래].
+     짧은 카드(업체 5·기금 3)를 한 칸에 위아래로 쌓아 카드 밖 빈 자리를 없앤다(grid-template-areas).
+   · 중간(769~1099px): 한 칸 최소 210px 로 줄을 나눠(줄당 2~4장) 이름이 잘리지 않게, 컨설팅만 윗줄 전체 폭
+   · 폰(768px 이하): 한 칸 — 같은 글자가 다 보이고 모자라면 칩이 아래 줄로 내려간다. 카드 순서는 그대로
+   ⚠ 폰(한 칸 그리드)에서는 order·전체 폭·영역 이름을 걸지 않는다 — 걸면 카드 순서가 바뀌거나 가로로 밀려 나간다. */
 .biz-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px; align-items: stretch; }
-/* 2026-10-31 (대표 「컨설팅유형에서 열 정리해달라」 · 제안 A): 컨설팅 카드는 «윗줄 전체 폭»을 쓰고, 나머지 네 카드는 아래 한 줄로 나란히.
-   칸(약어·사업명·수행기관·단가·셈·개인입금)을 세로로 맞추려면 한 줄에 일곱 칸이 들어갈 폭이 필요해서다(아래 .bt-row).
-   ⚠ 폰(768px 이하)은 한 칸 그리드라 order·전체 폭을 걸지 않는다 — 폰의 카드 순서는 그대로 둔다. */
 @media (min-width: 769px) {
   .biz-type-card-consulting { grid-column: 1 / -1; order: -1; }
 }
 @media (min-width: 1100px) {
-  .biz-type-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.1fr); }
+  .biz-type-grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-areas: "cons cons cons" "case other comp" "case other fund";
+  }
+  .biz-type-card-consulting { grid-area: cons; }
+  .biz-type-card-case { grid-area: case; }
+  .biz-type-card-other { grid-area: other; }
+  .biz-type-card-company { grid-area: comp; }
+  .biz-type-card-fund { grid-area: fund; }
 }
 @media (max-width: 768px) {
   .biz-type-grid { grid-template-columns: 1fr; }
 }
-/* 컨설팅 유형 카드 — 열 정리 (2026-10-31)
-   한 줄: ⋮⋮ | 약어 | 사업명 | 수행기관 | 단가·셈 | 개인입금 | ✏ | × (또는 👁) — 어느 줄이든 같은 자리에 같은 것이 온다.
-   ★ 카드 «자신의 폭»(컨테이너 쿼리)으로 가른다 — 창 폭이 아니라 카드 폭이 모자랄 때만(사이드바·창 크기와 무관하게) 두 줄로 접는다:
-     첫 줄 약어·사업명·✏·× / 둘째 줄 수행기관·단가·셈·개인. 두 모양 모두 같은 글자를 보이고 칩(수행기관·단가·셈)은 잘리지 않는다(10/26 규칙의 취지).
-   ⚠ .bt-l2 는 넓을 때 display:contents — 수행기관·단가·셈·개인 칸이 바깥 줄 칸에 «직접» 앉는다. */
+/* 컨설팅 유형 카드 — «개인입금 사업 | 법인 입금 사업» 두 묶음 + 칸 정리 (2026-10-31)
+   묶음은 개인입금 값에서 «자동으로» 갈린다(.bt-group). 줄: ⋮⋮ | 약어 | 사업명 | 수행기관·단가·셈 | ⇄ | ✏ | ×
+   ★ 카드 «자신의 폭»(컨테이너 쿼리)으로 가른다 — 창 폭이 아니라 카드 폭으로(사이드바·창 크기와 무관하게):
+     · 1120px 이상: 두 묶음을 좌우로   · 760~1119px: 위아래로(칸은 폭 상한을 둬 칸 사이가 벌어지지 않게)
+     · 759px 이하(폰 포함): 줄이 두 줄 — 첫 줄 약어·사업명·⇄·✏·×, 수행기관·단가·셈이 «있는 줄만» 둘째 줄. 같은 글자·칩은 안 잘린다.
+   ⚠ .bt-l2 는 넓을 때 display:contents — 수행기관·단가·셈 칸이 바깥 줄 칸에 «직접» 앉는다. */
 .biz-type-card-consulting { container-type: inline-size; container-name: biztype; }
-.bt-row, .bt-head { display: grid; align-items: center; gap: 4px; grid-template-columns: 12px 56px minmax(0, 1.3fr) minmax(0, 1fr) 172px 66px 20px 20px; }
-.bt-row { padding: 3px 5px; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 4px; }
-.bt-head { padding: 0 5px 3px; color: #94a3b8; font-size: 10px; font-weight: 700; }
-.bt-head > span:nth-child(6) { text-align: center; }
+.bt-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.bt-gtitle { display: flex; align-items: center; gap: 6px; padding: 3px 4px 4px; font-size: 11.5px; color: #1e293b; }
+.bt-priv .bt-gtitle b { color: #854d0e; }
+.bt-corp .bt-gtitle b { color: #1e40af; }
+.bt-gcount { color: #64748b; font-weight: 400; }
+.bt-gempty { color: #94a3b8; font-size: 11px; padding: 6px 8px; }
+.bt-row, .bt-head { display: grid; align-items: center; gap: 4px; justify-content: start; grid-template-columns: 12px 56px minmax(0, 300px) minmax(0, 300px) 20px 20px 20px; }
+.bt-row { padding: 0 5px; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 1px; }
+.bt-head { padding: 0 5px 2px; color: #94a3b8; font-size: 10px; font-weight: 700; }
 .bt-l2 { display: contents; }
 .bt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #1e293b; }
-.bt-agency, .bt-fee { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.bt-agency { overflow: hidden; }
-.bt-pd { display: flex; justify-content: center; }
+.bt-ag { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
+.bt-swap { display: inline-flex; align-items: center; justify-content: center; }
 .bt-chip { white-space: nowrap; font-size: 10.5px; border-radius: 10px; flex-shrink: 0; }
 .bt-chip-agency { color: #64748b; background: #f8fafc; padding: 2px 7px; font-weight: 500; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .bt-chip-fee { color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 7px; font-weight: 700; }
 .bt-chip-role { color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 7px; font-weight: 700; }
+@container biztype (min-width: 1120px) {
+  .bt-groups { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .bt-row, .bt-head { justify-content: normal; grid-template-columns: 12px 56px minmax(0, 1.1fr) minmax(0, 1.5fr) 20px 20px 20px; }
+}
 @container biztype (max-width: 759px) {
   .bt-head { display: none; }
-  /* 첫 줄: ⋮⋮ | 약어 | 사업명 | 개인 | ✏ | ×  ·  둘째 줄(수행기관·단가·셈이 «있을 때만»): 사업명 아래.
-     개인 칸은 폭을 고정해 켜짐(✓ 👤 개인)·꺼짐(👤)이어도 오른쪽 단추 줄이 맞는다.
+  /* 첫 줄: ⋮⋮ | 약어 | 사업명 | ⇄ | ✏ | ×  ·  둘째 줄(수행기관·단가·셈이 «있을 때만»): 사업명 아래.
      사업명은 폰에서 잘리지 않고 줄바꿈한다 — 폰에는 마우스 말풍선(title)이 없어 잘린 글자를 볼 길이 없다. */
-  .bt-row { grid-template-columns: 12px 56px minmax(0, 1fr) 62px 20px 20px; row-gap: 3px; padding: 4px 5px; }
+  .bt-row { justify-content: normal; grid-template-columns: 12px 56px minmax(0, 1fr) 20px 20px 20px; row-gap: 2px; padding: 2px 5px; }
   .bt-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   .bt-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; grid-column: 3 / 7; grid-row: 2; }
   .bt-l2:not(:has(.bt-chip)) { display: none; }
   .bt-l2 > span { min-width: 0; }
   .bt-l2 > span:empty { display: none; }
-  .bt-row > .bt-pd { grid-column: 4; grid-row: 1; }
+  .bt-row > .bt-swap { grid-column: 4; grid-row: 1; }
   .bt-row > .bt-edit { grid-column: 5; grid-row: 1; }
   .bt-row > .bt-del { grid-column: 6; grid-row: 1; }
 }

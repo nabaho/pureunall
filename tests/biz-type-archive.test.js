@@ -10,7 +10,9 @@
      ② 합쳐진 유형은 지우지도 다시 띄우지도 않는다(🗑 없음, 👁 은 안내만) — 옛 번호가 메모·휴지통·나간 문서에 남아 있을 수 있다
      ③ 쓰는 기록 0건의 ×: 컨설팅·기타사업은 «보관이 기본»(완전 삭제는 따로) · 업체·사건·기금은 예전 그대로 곧바로 삭제를 묻는다
      ④ 쓰는 기록이 있으면 어느 카드든 숨김만 권한다 · 보관 칸의 🗑 은 0건일 때만 지운다
-     ⑤ 서버 사전을 못 받았으면(bizTypeWritable 거짓) 아무것도 쓰지 않는다 */
+     ⑤ 서버 사전을 못 받았으면(bizTypeWritable 거짓) 아무것도 쓰지 않는다
+     ⑥ 컨설팅은 개인입금 값에서 «자동으로» 개인입금|법인 두 묶음에 갈리고, ⇄ 로 옮기면 저절로 반대 묶음으로 간다(묶음 사이는 끌어서 안 옮김)
+     ⑦ 「+ 새 유형」 입력줄은 평소 접혀 있다(한 화면에 최대한) */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -203,7 +205,7 @@ test('⑤★ 서버 사전을 못 받았으면 × · 🗑 이 아무것도 쓰�
   assert.equal(w.log.pop.length + w.log.confirm.length, 0, '묻지도 않아야 합니다');
 });
 
-test('①★ 컨설팅 줄은 칸이 같다 — 수행기관·단가·셈이 «비어도» 같은 세 칸, 다른 카드엔 새 줄이 없다', () => {
+test('①★ 컨설팅 줄은 칸이 같다 — 수행기관·단가·셈이 «비어도» 같은 칸 구성, 다른 카드엔 새 줄이 없다', () => {
   const list = [
     { code: 'a', short: '현장클리', name: '현장클리닉', sortOrder: 10, agency: '샘플기관', dayFee: 350000, dayUnit: '일', role: 'clinic', personalDeposit: false },
     { code: 'b', short: '위험평가', name: '위험성평가', sortOrder: 20 },
@@ -214,15 +216,89 @@ test('①★ 컨설팅 줄은 칸이 같다 — 수행기관·단가·셈이 «�
   rows.forEach((r) => {
     const l2 = w.find2(r, (n) => n.p && n.p.className === 'bt-l2')[0];
     assert.ok(l2, '.bt-l2 가 없습니다');
-    assert.deepEqual(l2.c.map((n) => n.p.className), ['bt-agency', 'bt-fee'], '★ 줄마다 칸 구성이 다릅니다 — 비면 뒤 칸이 앞으로 밀립니다');
-    /* 개인 단추는 .bt-l2 «밖»(바깥 줄의 직접 칸)이다 — 접힌 모양에서 첫 줄에 오고, 수행기관·단가·셈이 없는 줄은 둘째 줄이 안 생긴다 */
-    assert.deepEqual(r.c.map((n) => (n.p && n.p.className) || '').filter((c) => /^bt-(l2|pd)$/.test(c) || /\bbt-(edit|del)\b/.test(c)).map((c) => c.replace(/^erp-tip /, '')),
-      ['bt-l2', 'bt-pd', 'bt-edit', 'bt-del'], '★ 줄 안 칸의 차례가 다릅니다 — 넓은 모양에서 칸이 어긋납니다');
+    assert.deepEqual(l2.c.map((n) => n.p.className), ['bt-ag'], '★ 줄마다 칸 구성이 다릅니다 — 비면 뒤 칸이 앞으로 밀립니다');
+    /* ⇄ 는 .bt-l2 «밖»(바깥 줄의 직접 칸)이다 — 접힌 모양에서 첫 줄에 오고, 수행기관·단가·셈이 없는 줄은 둘째 줄이 안 생긴다 */
+    assert.deepEqual(r.c.map((n) => (n.p && n.p.className) || '').filter((c) => /^bt-l2$/.test(c) || /\bbt-(swap|edit|del)\b/.test(c)).map((c) => c.replace(/^erp-tip /, '')),
+      ['bt-l2', 'bt-swap', 'bt-edit', 'bt-del'], '★ 줄 안 칸의 차례가 다릅니다 — 넓은 모양에서 칸이 어긋납니다');
   });
   const t0 = w.text(rows[0]), t1 = w.text(rows[1]);
   assert.match(t0, /샘플기관/); assert.match(t0, /1일 350,000원/); assert.match(t0, /셈: 현장클리닉/);
   assert.doesNotMatch(t1, /원|셈:/, '값이 없는 줄에 칩이 생겼습니다');
-  assert.ok(w.find((n) => n.p && n.p.className === 'bt-head').length === 1, '머리글이 없습니다');
+  assert.equal(w.find((n) => n.p && /\bbt-head\b/.test(String(n.p.className))).length, 2, '묶음마다 머리글이 하나씩(둘) 있어야 합니다');
   const o = mount('other', list);
-  assert.equal(o.find((n) => n.p && /bt-row|bt-head/.test(String(n.p.className))).length, 0, '★ 다른 카드에 새 줄(bt-row)이 쓰였습니다');
+  assert.equal(o.find((n) => n.p && /bt-row|bt-head|bt-group/.test(String(n.p.className))).length, 0, '★ 다른 카드에 새 줄·묶음(bt-row·bt-group)이 쓰였습니다');
+});
+
+/* ── 묶음: 개인입금 값에서 «자동으로» ── */
+const GL = () => [
+  { code: 'A', short: '가나', name: '가 사업', sortOrder: 10, personalDeposit: true },
+  { code: 'B', short: '다라', name: '나 사업', sortOrder: 20 },
+  { code: 'C', short: '마바', name: '다 사업', sortOrder: 30, personalDeposit: true },
+  { code: 'D', short: '사아', name: '라 사업', sortOrder: 40 },
+];
+const inGroup = (w, cls) => {
+  const g = w.find((n) => n.p && new RegExp('\\b' + cls + '\\b').test(String(n.p.className || '')) && /bt-group/.test(String(n.p.className)))[0];
+  return g ? w.find2(g, (n) => n.p && n.p.className === 'bt-row').map((r) => r.p.key) : null;
+};
+const rowOf = (w, code) => w.find((n) => n.p && n.p.className === 'bt-row' && n.p.key === code)[0];
+const swapOf = (w, code) => w.find2(rowOf(w, code), (n) => n.t === 'button' && /\bbt-swap\b/.test(String(n.p.className)))[0];
+const evt = () => ({ preventDefault() {}, dataTransfer: { setData() {}, effectAllowed: '' } });
+const order = (w) => w.store().slice().sort((a, b) => a.sortOrder - b.sortOrder).map((x) => x.code).join('');
+
+test('②★ 컨설팅은 개인입금 값으로 «자동으로» 두 묶음에 갈린다 — 제목에 개수, 값은 그대로', () => {
+  const w = mount('consulting', GL());
+  assert.deepEqual([...inGroup(w, 'bt-priv')], ['A', 'C'], '★ 개인입금 묶음이 개인입금 켠 유형이 아닙니다');
+  assert.deepEqual([...inGroup(w, 'bt-corp')], ['B', 'D'], '★ 법인 입금 묶음이 나머지가 아닙니다');
+  const titles = w.find((n) => n.p && n.p.className === 'bt-gtitle').map((n) => w.text(n));
+  assert.ok(/개인입금 사업\(2\)/.test(titles[0]) && /법인 입금 사업\(2\)/.test(titles[1]), '묶음 제목에 개수가 없습니다: ' + titles.join(' | '));
+  assert.deepEqual(w.store().map((x) => !!x.personalDeposit), [true, false, true, false], '그리기만 했는데 값이 바뀌었습니다');
+});
+
+test('②★ ⇄ 를 누르면 유형이 «저절로» 반대 묶음으로 옮겨진다 (켜면 개인입금 · 끄면 법인)', () => {
+  const w = mount('consulting', GL());
+  swapOf(w, 'B').p.onClick({ stopPropagation() {} });
+  assert.equal(w.store().find((x) => x.code === 'B').personalDeposit, true, '개인입금이 안 켜졌습니다');
+  assert.deepEqual([...inGroup(w, 'bt-priv')], ['A', 'B', 'C'], '★ 켠 유형이 개인입금 묶음으로 자동으로 안 옮겨졌습니다(번호 순서 안)');
+  assert.deepEqual([...inGroup(w, 'bt-corp')], ['D']);
+  swapOf(w, 'A').p.onClick({ stopPropagation() {} });
+  assert.equal(w.store().find((x) => x.code === 'A').personalDeposit, false);
+  assert.deepEqual([...inGroup(w, 'bt-priv')], ['B', 'C'], '★ 끈 유형이 개인입금 묶음에 남았습니다');
+  assert.deepEqual([...inGroup(w, 'bt-corp')], ['A', 'D'], '끈 유형이 법인 입금 묶음으로 안 옮겨졌습니다');
+  assert.equal(w.store().find((x) => x.code === 'A').hist.slice(-1)[0].act, '개인입금 끔', '고친 기록이 남아야 합니다');
+});
+
+test('②★ 서버 사전을 못 받았으면 ⇄ 가 아무것도 안 바꾼다 (사본 없음)', () => {
+  const w = mount('consulting', GL(), { writable: false });
+  swapOf(w, 'B').p.onClick({ stopPropagation() {} });
+  assert.deepEqual(w.store(), GL(), '★ 사본이 없는데 썼습니다 — 씨앗 위에 얹어 서버를 덮을 수 있습니다');
+});
+
+test('②★ 묶음 «사이»로는 끌어서 안 옮긴다(⇄ 로) · 같은 묶음 안에서는 끌어서 순서를 바꾼다', () => {
+  const w = mount('consulting', GL());
+  /* 개인입금 A 를 법인 B 위로 — 막고 안내 */
+  rowOf(w, 'A').p.onDragStart(evt());
+  rowOf(w, 'B').p.onDrop(evt());
+  assert.ok(w.log.toast.some((m) => /⇄/.test(m)), '★ 막으면서 ⇄ 로 옮기라고 알리지 않습니다: ' + w.log.toast.join('|'));
+  assert.equal(order(w), 'ABCD', '★ 묶음 사이 끌기로 순서가 바뀌었습니다');
+  assert.deepEqual([...inGroup(w, 'bt-priv')], ['A', 'C']);
+  /* 같은 묶음: A 를 C 위로 */
+  rowOf(w, 'A').p.onDragStart(evt());
+  rowOf(w, 'C').p.onDrop(evt());
+  assert.equal(order(w), 'BCAD', '같은 묶음 안에서는 끌어서 순서가 바뀌어야 합니다');
+  assert.deepEqual([...inGroup(w, 'bt-priv')], ['C', 'A'], '묶음 안 순서가 그리기에 반영돼야 합니다');
+});
+
+test('④★ 「+ 새 유형」 입력줄은 평소 접혀 있고 단추로 펼치고 닫는다 (다섯 카드 공통)', () => {
+  ['consulting', 'other', 'company'].forEach((k) => {
+    const w = mount(k, GL().map((x) => Object.assign({}, x, { personalDeposit: false })));
+    const inputs = () => w.find((n) => n.t === 'input').length;
+    assert.equal(inputs(), 0, '★ ' + k + ' 카드의 추가 입력줄이 처음부터 펼쳐져 있습니다 — 한 화면에 안 들어옵니다');
+    const tg = () => w.find((n) => n.t === 'button' && n.p.className === 'biz-type-add-toggle')[0];
+    assert.ok(tg() && /새 유형/.test(w.text(tg())), k + ' 머리줄에 「+ 새 유형」 단추가 없습니다');
+    tg().p.onClick({ stopPropagation() {} });
+    assert.ok(inputs() >= 2, '단추를 눌러도 입력줄이 안 펼쳐집니다');
+    assert.ok(/닫기/.test(w.text(tg())), '펼친 뒤 단추가 「닫기」로 안 바뀝니다');
+    tg().p.onClick({ stopPropagation() {} });
+    assert.equal(inputs(), 0, '다시 누르면 접혀야 합니다');
+  });
 });
