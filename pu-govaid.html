@@ -227,6 +227,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
     <button data-tab="check">⏳ 확인할 조건 <span class="chip c-amber" id="nCheck">0</span></button>
     <button data-tab="news">📰 새 공고 <span class="chip c-amber" id="nNews">·</span></button>
     <label class="ck starsw" title="공인노무사가 직접 할 수 있는 사업(★)만 — 모든 탭에 같이 걸립니다"><input type="checkbox" id="starOnly"><span class="staron">★</span> 노무사 직접 사업만</label>
+    <button class="sm" data-starclear="1" title="표시된 ★ 를 사업·공고 모두 끕니다(확인 창을 거칩니다)">☆ 모두 지우기</button>
   </div>
 </div>
 
@@ -341,6 +342,8 @@ var STATE_TXT={ok:'✓',no:'✗',unknown:'?',manual:'👀'};
 var DEC={yes:'해당',hold:'보류',no:'비해당'};
 var VERDICT={candidate:'후보',unknown:'정보 부족',no:'안 맞음',unconfirmed:'조건 미확정',closed:'사업종료'};
 /* 고르기(☐) 묶음마다 할 수 있는 일 — 표 이름 → 일 */
+/* ★ 한 번에 켜고 끌 수 있는 표 — 줄 id 가 사업 id(p)인지 공고 id(n)인지 */
+var STAR_TABLES={ dict:'p', check:'p', coCand:'p', coUnk:'p', coNo:'p', news:'n', coLocal:'n' };
 var BULK={ coCand:'review', coUnk:'review', coNo:'review', progCand:'review', progUnk:'review',
   coList:'dropProspect', coLocal:'ignoreNotice', dict:'dropProgram', check:'confirmProgram', news:'ignoreNotice' };
 
@@ -407,6 +410,8 @@ function drawBulk(){
       : kind==='dropProgram' ? '<button class="sm" data-bulkdo="'+name+'">사전에서 빼기</button>'
       : kind==='ignoreNotice' ? '<button class="sm" data-bulkdo="'+name+'">관계없음</button>'
       : '<button class="sm" data-bulkdo="'+name+'">확정('+YEAR+' 기준)</button>';
+    /* ★ 한 번에(대표 지시 2026-10-31 「모든 영역에서 별표 한번에 모두 클릭 하거나 별표 모두 색 안들어가게」) */
+    if(STAR_TABLES[name]) b+=' <button class="sm" data-bulkdo="'+name+'" data-d="star:on"><span class="staron">★</span> 켜기</button> <button class="sm" data-bulkdo="'+name+'" data-d="star:off">☆ 끄기</button>';
     el.innerHTML='고른 <b>'+n+'</b>건 '+b+' <button class="sm" data-bulkclear="'+name+'">고르기 풀기</button>';
   });
 }
@@ -643,6 +648,32 @@ async function toggleStar(id){
     await reload(); if(mb && mb===p.id) openEditor(p.id);
     toast(on ? '★ 「'+GovaidView.shortName(p)+'」을(를) 노무사 직접 사업으로 표시했습니다' : '★ 표시를 껐습니다');
   }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+/* ★ 여러 개 한 번에 — 사업 표는 govaid/programs, 공고 표는 govaid/notices. 이미 같은 상태인 것은 건너뛴다 */
+async function starMany(name, ids, on){
+  var isN=STAR_TABLES[name]==='n', jobs=[];
+  ids.forEach(function(id){
+    var rec = isN ? (D.notices||{})[id] : progById(id); if(!rec) return;
+    if(!!(rec.star&&rec.star.on)===on) return;
+    jobs.push(function(){ return gate.save(fbDb.ref((isN?'govaid/notices/':'govaid/programs/')+id), function(prev){ return GovaidRecords.starred(prev, rec, on, on?'노무사 직접(사람 표시)':'', ME.sid, Date.now()); }, { entityType: isN?'Document':'SupportProgram' }); });
+  });
+  if(!jobs.length){ toast('바꿀 것이 없습니다 — 이미 모두 '+(on?'★':'☆')+'입니다'); return; }
+  if(!confirm(jobs.length+'건을 '+(on?'★ 노무사 직접으로 표시':'★ 표시 끄기')+'할까요?')) return;
+  var res=await Promise.allSettled(jobs.map(function(f){ return f(); })), fail=res.filter(function(x){ return x.status==='rejected'; });
+  dropPicked([name]); if(isN) await loadNotices(true); await reload();
+  toast(fail.length ? (jobs.length-fail.length)+'건 완료 · '+fail.length+'건 실패' : jobs.length+'건 '+(on?'★ 켰습니다':'☆ 껐습니다'));
+}
+/* ☆ 모두 지우기 — 사업·공고의 ★ 를 모두 끈다(끈 기록은 남는다 — 정기 조사가 다시 켜지 않게) */
+async function clearAllStars(){
+  await loadNotices();
+  var ps=PROGS.filter(GovaidView.isStar), ns=Object.keys(D.notices||{}).map(function(k){ return D.notices[k]; }).filter(function(n){ return n && n.star && n.star.on; });
+  if(!ps.length && !ns.length){ toast('켜진 ★ 가 없습니다'); return; }
+  if(!confirm('★ 표시를 모두 끕니다 — 사업 '+ps.length+'개 · 공고 '+ns.length+'건. 끌까요?')) return;
+  var jobs=ps.map(function(p){ return function(){ return gate.save(fbDb.ref('govaid/programs/'+p.id), function(prev){ return GovaidRecords.starred(prev, p, false, '', ME.sid, Date.now()); }, { entityType:'SupportProgram' }); }; })
+    .concat(ns.map(function(n){ return function(){ return gate.save(fbDb.ref('govaid/notices/'+n.id), function(prev){ return GovaidRecords.starred(prev, n, false, '', ME.sid, Date.now()); }, { entityType:'Document' }); }; }));
+  var res=await Promise.allSettled(jobs.map(function(f){ return f(); })), fail=res.filter(function(x){ return x.status==='rejected'; });
+  await loadNotices(true); await reload();
+  toast(fail.length ? (jobs.length-fail.length)+'건 껐습니다 · '+fail.length+'건 실패' : '★ 를 모두 껐습니다 ('+jobs.length+'건)');
 }
 /* ═══ 📍 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭등도 모두 연결」 → 「추천대로 순서대로」 1단계)
    지역 공고는 사전에 넣지 않고 «공고 그대로» 회사에 맞춘다 — 서버가 공고 이름 앞 [충남] 아산시 … 에서 시·도·시·군을 읽어 둔다(area).
@@ -1063,6 +1094,7 @@ document.addEventListener('click', function(e){
 /* 처리했으면 true — 못 받은 누르기만 줄 누르기(rowClick)로 넘어간다 */
 function clickMore(t){
   var b;
+  if((b=t.closest('[data-starclear]'))){ clearAllStars(); return true; }
   if((b=t.closest('[data-star]'))){ toggleStar(b.getAttribute('data-star')); return true; }
   if((b=t.closest('[data-nstar]'))){ toggleNoticeStar(b.getAttribute('data-nstar')); return true; }
   if((b=t.closest('[data-loadlocal]'))){ lsSet('localAuto','1'); loadNotices().then(draw); return true; }
@@ -1108,6 +1140,7 @@ function rowReview(name,id){
 }
 async function bulkDo(name, d){
   var ids=picked(name); if(!ids.length) return;
+  if(/^star:/.test(d||'')) return starMany(name, ids, d==='star:on');
   var kind=BULK[name], jobs=[], label='';
   if(kind==='review'){ var r=reviewJobs(name, ids, d); jobs=r.jobs; label=r.label; }
   else if(kind==='ignoreNotice'){ label='관계없음으로 두기'; jobs=ids.map(function(k){ return function(){ return decideNotice(k,'ignore'); }; }); }

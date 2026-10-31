@@ -243,3 +243,21 @@ test('3단계 — 편집 창에 시·군 칸, 범위·확인할 조건 표에 �
   assert.match(fnBody('scopeChip'), /sigungu/);
   assert.match(fnBody('checkRow'), /sigungu/);
 });
+
+/* ★ 한 번에 (대표 지시 2026-10-31 「모든 영역에서 별표 한번에 모두 클릭 하거나 별표 모두 색 안들어가게 해달라」) */
+test('★ 한 번에 — 고른 줄(☐)에 «★ 켜기·☆ 끄기» 띠 단추가 사업 표와 공고 표 모두에', () => {
+  const f = fnBody('drawBulk');
+  assert.match(f, /star:on/);
+  assert.match(f, /star:off/);
+  ['dict', 'check', 'coCand', 'coUnk', 'coNo', 'news', 'coLocal'].forEach((n) => assert.match(NOC, new RegExp("STAR_TABLES[^\n]*" + n), n + ' 표에 별 띠가 없다'));
+  assert.match(fnBody('bulkDo'), /starMany\(/);
+  assert.match(fnBody('starMany'), /GovaidRecords\.starred\(/);
+});
+test('★ 모두 지우기 — 탭 줄 단추, 확인 창을 거쳐 사업·공고의 별을 모두 끈다', () => {
+  assert.match(NOC, /data-starclear/);
+  const f = fnBody('clearAllStars');
+  assert.match(f, /confirm\(/);
+  assert.match(f, /GovaidRecords\.starred\(/);
+  assert.match(f, /govaid\/programs\//);
+  assert.match(f, /govaid\/notices\//);
+});
