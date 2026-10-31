@@ -1831,6 +1831,50 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dmr .dm-read .atts .attrow .sp{display:none}
 .dmr .dm-read .atts .attrow .send{margin-left:auto;padding:5px 12px;font-size:12.5px}
 .dmr .dm-read .atts .attrow .peek{padding:5px 6px;font-size:13px}
+/* ══ 폰 읽기 «머리를 줄인다 + 빠른 답장» (대표 지시 2026-10-31, 목업 «안 B + 빠른 답장» 승인) ══
+   「화면의 절반이 여러 정보라 본문을 보기 전에 상단이 너무 많은 공간을 차지한다」
+   ★ 기본 = 위 줄 하나(‹ · 제목 한 줄 · ▲ ▼ · ⓘ📎N) + 「보낸이 · 날짜」 한 줄 + 본문. 나머지(보낸이 주소·받는 곳·받은 때·폴더·열어봄·첨부)는 ⓘ.
+   ★ 이 메일에 하는 일(.lft)은 아래 막대 «⋯ 더보기» 시트로 — 새로 만들지 않고 «있던 단추»를 그대로 쓴다(핸들러 한 벌).
+   ⚠ 새 요소(.phtitle .phinfo .phfrom .phbot)는 PC 에서 감춘다 — PC 읽기는 그대로다. */
+.dm-read .phtitle,.dm-read .phinfo,.dm-read .phfrom,.dm-read .phbot{display:none}
+.dmr{padding-bottom:0}   /* ⚠ 아래 막대가 «화면 맨 아래»에 붙으려면 0 — 패딩이 있으면 막대 밑으로 본문이 비친다(폰 폭으로 재서 확인) */
+.dmr .dm-read{min-height:100vh;min-height:100dvh}
+.dmr .dm-read .body{flex:1;padding-bottom:20px}
+.dmr .dm-read .rtop .rgt .phtitle{display:block;flex:1;min-width:0;font-size:13.5px;font-weight:700;color:#000000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dmr .dm-read .rtop .rgt .phinfo{display:inline-block;flex:none;padding:0 9px;white-space:nowrap}
+.dmr .dm-read .rtop .rgt .phinfo.on{background:#e2e8f0}
+.dmr .dm-read .rtop .rgt .rbtn.list{margin-right:0;font-size:0;min-width:36px;padding:0 10px}
+.dmr .dm-read .rtop .rgt .rbtn.list::before{content:'‹';font-size:22px;line-height:1}
+.dmr .dm-read .rtop .rgt .rbtn.nav{font-size:0;min-width:0;padding:0 10px}
+.dmr .dm-read .rtop .rgt .rbtn.nav::before{content:attr(data-a);font-size:13px}
+.dmr .dm-read .rtop .rgt .rbtn.prn{display:none}
+.dmr .dm-read .phfrom{display:block;padding:6px 0 0;font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dmr .dm-read h3{display:none}
+.dmr .dm-read:not(.infoon) .dm-hint,.dmr .dm-read:not(.infoon) .meta,.dmr .dm-read:not(.infoon) .atts{display:none}
+.dmr .dm-read .rtop .lft{display:none}
+.dmr .dm-read.moreon .rtop .lft{display:flex;flex-wrap:wrap;gap:8px;position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));
+  max-height:55vh;overflow-y:auto;margin:0;padding:12px;background:#fff;border-top:1px solid #cbd5e1;z-index:6;
+  -webkit-mask-image:none;mask-image:none}
+.dmr .dm-read.moreon .rtop .lft .rbtn.pri{display:none}
+.dmr .dm-read .phbot{display:flex;gap:6px;order:99;position:sticky;bottom:0;z-index:7;margin:0 -12px;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e2e8f0}
+.dmr .dm-read .phbot button{flex:1;height:38px;font:inherit;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b}
+/* 빠른 답장 시트 — body 에 붙인다(읽기 화면이 다시 그려져도 쓰던 글이 안 지워진다) */
+#mbQr{position:fixed;inset:0;z-index:55;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif}
+#mbQr .qd{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+#mbQr .qs{position:absolute;left:0;right:0;bottom:0;background:#fff;color:#1e293b;border-top:1px solid #cbd5e1;
+  border-radius:14px 14px 0 0;padding:10px 12px calc(12px + env(safe-area-inset-bottom))}
+#mbQr .qh{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#64748b;margin-bottom:8px;min-width:0}
+#mbQr .qh b{color:#1e293b;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mbQr .qh button{margin-left:auto;flex:none;font:inherit;font-size:12.5px;color:#1e40af;background:none;border:none;padding:4px 0}
+#mbQr .qc{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;scrollbar-width:none}
+#mbQr .qc button{flex:none;white-space:nowrap;font:inherit;font-size:13px;padding:5px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#f8fafc;color:#1e293b}
+#mbQr textarea{width:100%;box-sizing:border-box;min-height:84px;font:inherit;font-size:16px;padding:8px 10px;
+  border:1px solid #cbd5e1;border-radius:8px;resize:none;color:#000000;background:#fff}
+#mbQr .qf{display:flex;align-items:center;gap:8px;margin-top:8px}
+#mbQr .qf span{flex:1;min-width:0;font-size:11.5px;color:#64748b}
+#mbQr .qf button{flex:none;font:inherit;font-size:14px;height:38px;padding:0 16px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#1e293b}
+#mbQr .qf button.go{background:#2563eb;border-color:#2563eb;color:#ffffff;font-weight:700}
 /* 읽는 동안 떠다니는 🏠·즐겨찾기·백업·「새 버전」을 비켜 둔다 — 본문 글자를 덮는다. 목록으로 나가면 도로 나온다(.dmm 엔 안 건다).
    ⚠ 같은 자리에서 쓰는 방식은 위 «시트가 떠 있는 동안» 과 같다 */
 body:has(.dmr) [data-pu-appbar-btn],
@@ -26977,6 +27021,7 @@ function mbReadMarkBg(slug, uid){
 }
 function mbOpenMsg(slug, uid){
   mbCardHide();
+  state.mbInfoOn = false; mbPhMoreSet(false); mbQrClose();   /* 다른 통은 늘 접힌 채로 연다 */
   state.mailSent='box';
   /* 이 통이 «아직 안 읽음»이었나 — 미리 받은 본문으로 열면 서버에 따로 알려야 한다 */
   const row0 = (_mbMsgs[slug]||{})[String(uid)];
@@ -27048,7 +27093,7 @@ function mbSeenDone(slug, uid){
     ? '✅ 「내가 봤다」로 남겼습니다 — 함께 맡은 분에게 보입니다'
     : '✅ 「내가 봤다」로 남겼습니다 — 이 기록은 대표님만 보십니다', 7000);
 }
-function mbBack(){ state.mbOpen=null; renderMailPage(); }
+function mbBack(){ mbPhMoreSet(false); mbQrClose(); state.mbOpen=null; renderMailPage(); }
 /* 읽는 자리에서 누르는 전달·삭제 — 목록에서 고르지 않고 «지금 보는 이 통»에 한다.
    ⚠ 고른 것(pick)을 건드리지 않는다. 목록에서 딴 것을 골라 두었는데 여기서 누르면
      엉뚱한 메일이 지워진다. */
@@ -28713,7 +28758,7 @@ function mbReadHtml(){
   const bodyHtml = o.html ? mbCleanHtml(o.html)
     : o.text ? '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">'+esc(o.text)+'</pre>'
     : '';
-  return `<div class="dm-read">
+  return `<div class="dm-read${state.mbInfoOn?' infoon':''}${state.mbMoreOn?' moreon':''}">
     ${/* ── 위 단추줄 — 다음메일과 «같은 자리»에 둔다 (대표 지시 2026-08-30) ──
          왼쪽: 이 메일에 하는 일   오른쪽: 목록 · 위 · 아래
          ⚠ 예전에는 손댈 것이 모두 오른쪽에 몰려 있고, 돌아가는 길은 왼쪽 끝의
@@ -28721,10 +28766,10 @@ function mbReadHtml(){
          ⚠ 위·아래가 이 자리의 핵심이다. 목록으로 나갔다 다시 들어오지 않아도
            다음 통으로 넘어간다 — 그 왕복이 느림의 절반이었다. */''}
     <div class="rtop">
-      <div class="lft">
-        <button class="rbtn" onclick="mbReply(false)">답장</button>
-        <button class="rbtn" onclick="mbReply(true)">전체답장</button>
-        <button class="rbtn" onclick="mbForwardOne('${o.slug}','${o.uid}')">전달</button>
+      <div class="lft" onclick="mbPhMoreAuto(event)">
+        <button class="rbtn pri" onclick="mbReply(false)">답장</button>
+        <button class="rbtn pri" onclick="mbReply(true)">전체답장</button>
+        <button class="rbtn pri" onclick="mbForwardOne('${o.slug}','${o.uid}')">전달</button>
         <button class="rbtn" onclick="mbTrashOne('${o.slug}','${o.uid}')">삭제</button>
         ${mbSentBox(o.slug) ? '' : `<button class="rbtn" onclick="mbSpamReportOne('${o.slug}','${o.uid}')"
           title="다음메일에 «스팸으로 신고»합니다 — 스팸함으로 실제로 옮겨집니다">스팸신고</button>`}
@@ -28759,16 +28804,21 @@ function mbReadHtml(){
       <div class="rgt">
         <button class="rbtn list" onclick="mbBack()"
           title="목록으로 돌아갑니다 (Esc)">‹ 목록<i>${esc(mbBoxName(o.slug))}</i></button>
+        <b class="phtitle">${esc(v.s||'(제목 없음)')}</b>
         ${(function(){
           const up = mbNeighbor(-1), dn = mbNeighbor(1);
-          return `<button class="rbtn nav" onclick="mbStep(-1)" ${up?'':'disabled'}
+          return `<button class="rbtn nav" data-a="▲" onclick="mbStep(-1)" ${up?'':'disabled'}
               title="${up ? '윗 메일 — '+esc(String(up.s||'(제목 없음)')).slice(0,40) : '첫 메일입니다'}">▲ 위</button>
-            <button class="rbtn nav" onclick="mbStep(1)" ${dn?'':'disabled'}
+            <button class="rbtn nav" data-a="▼" onclick="mbStep(1)" ${dn?'':'disabled'}
               title="${dn ? '아랫 메일 — '+esc(String(dn.s||'(제목 없음)')).slice(0,40) : '마지막 메일입니다'}">▼ 아래</button>
-            <button class="rbtn nav" onclick="mbPrintOne()" title="이 메일만 인쇄합니다">🖨</button>`;
+            <button class="rbtn nav prn" onclick="mbPrintOne()" title="이 메일만 인쇄합니다">🖨</button>`;
         })()}
+        <button class="rbtn phinfo${state.mbInfoOn?' on':''}" onclick="mbPhInfo()"
+          title="보낸이·받는 곳·첨부·열어봄을 펼치거나 접습니다">ⓘ${(o.atts&&o.atts.length) ? ' 📎'+o.atts.length : ''}</button>
       </div>
     </div>
+    ${/* 폰 전용 한 줄 — 누구 메일인지는 늘 보여야 한다(자세한 것은 ⓘ). PC 에서는 CSS 로 감춘다 */''}
+    <div class="phfrom">${esc(mbNameOf(v.e, v.f)||'(모름)')} · ${esc(fmtDate(v.d)+' '+new Date(Number(v.d||0)).toTimeString().slice(0,5))}</div>
     ${/* ── 누가 봤나 — 읽는 자리에는 «다» 적는다 (목록에서는 한 줄만) ──
          ⚠ 볼 자격이 없으면 아무것도 안 그린다. */''}
     ${(()=>{ if(!mbSeenCanSee(v)) return '';
@@ -28821,6 +28871,13 @@ function mbReadHtml(){
          옮기기를 하십니다」라는 안내가 있었다 — 2026-09-27 에 걷었다. 위 줄에 [답장]·
          [전체답장]이 이미 있어(2026-08-25~) «틀린 말»이 되어 있었다. 어긋난 안내는 없는 것보다
          나쁘다 — 읽은 사람이 멀쩡한 단추를 안 누른다. */''}
+    ${/* 폰 아래 막대 — 답장은 «빠른 답장», 나머지 일은 ⋯ 더보기(위 .lft 를 시트로 연다). PC 에서는 CSS 로 감춘다 */''}
+    <div class="phbot">
+      <button onclick="mbQrOpen()">↩ 답장</button>
+      <button onclick="mbReply(true)">↩↩ 전체</button>
+      <button onclick="mbForwardOne('${o.slug}','${o.uid}')">➡ 전달</button>
+      <button onclick="mbPhMore()">⋯ 더보기</button>
+    </div>
   </div>`;
 }
 
@@ -29885,6 +29942,106 @@ function mbReadMark(on){
      그래야 보낸 기록이 앱에도 남고 자료함의 자료를 붙일 수 있다.
    ⚠ 본문을 인용해 넣는다 — 인용 없이 「네 알겠습니다」만 가면 받는 쪽이 무슨 이야기인지
      모른다. 열어 둔 메일의 본문을 쓰므로, 목록에서 바로 누르면 먼저 열어 온다. */
+/* ══════ 폰 읽기 — ⓘ 펼치기 · ⋯ 더보기 · 빠른 답장 (대표 승인 2026-10-31) ══════
+   ⚠ 펼침·시트 상태는 state 에도 적는다 — 본문이 늦게 도착해 읽기 화면이 «다시 그려져도» 접히지 않게.
+   ⚠ 더보기·빠른 답장은 뒤로가기가 «시트부터» 닫는다(PuBack 층). 안 그러면 시트가 열린 채 목록으로 나간다.
+   ⚠ 빠른 답장은 «실제로 메일이 나가는» 자리다 — 빈 글 막기 · 연타 막기 · 보낸 «뒤에만» 답장 표(mbAnswered). */
+let _mbMoreH = null, _mbQrH = null, _mbQrBusy = false;
+function mbPhInfo(){
+  state.mbInfoOn = !state.mbInfoOn;
+  const r = document.querySelector('.dmr .dm-read'); if(!r) return;
+  r.classList.toggle('infoon', !!state.mbInfoOn);
+  const b = r.querySelector('.phinfo'); if(b) b.classList.toggle('on', !!state.mbInfoOn);
+}
+function mbPhMoreSet(on){
+  state.mbMoreOn = !!on;
+  const r = document.querySelector('.dmr .dm-read'); if(r) r.classList.toggle('moreon', !!on);
+  if(on && !_mbMoreH){ try{ _mbMoreH = PuBack.open('더보기', function(){ mbPhMoreSet(false); }); }catch(_){} }
+  if(!on && _mbMoreH){ const h = _mbMoreH; _mbMoreH = null; try{ PuBack.close(h); }catch(_){} }
+}
+function mbPhMore(){ mbPhMoreSet(!state.mbMoreOn); }
+/* 시트 안 단추를 누르면 시트를 닫는다 — 그 단추의 일(삭제·이동…)이 먼저 돈 뒤에 */
+function mbPhMoreAuto(e){
+  const t = e && e.target;
+  if(state.mbMoreOn && t && t.closest && t.closest('button')) setTimeout(function(){ mbPhMoreSet(false); }, 0);
+}
+function mbQrChip(t){
+  const ta = document.getElementById('mbQrText'); if(!ta) return;
+  ta.value = ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' + t : t;
+  ta.focus();
+}
+function mbQrClose(){
+  const d = document.getElementById('mbQr'); if(d) d.remove();
+  if(_mbQrH){ const h = _mbQrH; _mbQrH = null; try{ PuBack.close(h); }catch(_){} }
+}
+function mbQrOpen(){
+  const o = state.mbOpen; if(!o) return;
+  const v = (_mbMsgs[o.slug]||{})[o.uid] || {};
+  /* 보낸 사람 주소를 모르거나 자동 발송이 꺼져 있으면 예전 길(쓰기 화면·켜는 곳 안내)로 */
+  if(!v.u || !v.e || mailModeOf(matMailCfg()) !== 'auto') return mbReply(false);
+  if(o.loading) return toast('본문을 가져온 뒤 답장할 수 있습니다 — 잠시만요', 4000);
+  mbQrClose();
+  try{ if(mySign() && !_signThumb) loadSignThumb(function(){}); }catch(_){}
+  const who = mbNameOf(v.e, v.f) || v.e;
+  const d = document.createElement('div');
+  d.id = 'mbQr'; d.dataset.slug = String(o.slug); d.dataset.uid = String(o.uid);
+  d.innerHTML = '<div class="qd" onclick="mbQrClose()"></div><div class="qs">'
+    + '<div class="qh"><span>받는 사람</span><b>' + esc(who) + '</b>'
+    + '<button onclick="mbQrFull()">⤢ 전체 화면으로 쓰기</button></div>'
+    + '<div class="qc"><button onclick="mbQrChip(\'확인했습니다\')">확인했습니다</button>'
+    + '<button onclick="mbQrChip(\'감사합니다\')">감사합니다</button>'
+    + '<button onclick="mbQrChip(\'검토 후 연락드리겠습니다\')">검토 후 연락드리겠습니다</button></div>'
+    + '<textarea id="mbQrText" placeholder="답장을 적으세요…"></textarea>'
+    + '<div class="qf"><span>서명과 원문 인용은 자동으로 붙습니다</span>'
+    + '<button onclick="mbQrClose()">취소</button><button class="go" id="mbQrGo" onclick="mbQrSend()">보내기</button></div></div>';
+  document.body.appendChild(d);
+  try{ _mbQrH = PuBack.open('빠른 답장', mbQrClose); }catch(_){}
+  setTimeout(function(){ const ta = document.getElementById('mbQrText'); if(ta) ta.focus(); }, 60);
+}
+/* 쓰던 글을 들고 전체 화면 쓰기로 — 적은 것이 사라지지 않게 */
+function mbQrFull(){
+  const ta = document.getElementById('mbQrText');
+  const typed = String((ta && ta.value) || '').trim();
+  mbQrClose();
+  mbReply(false);
+  if(typed && typeof _compose !== 'undefined' && _compose){
+    _compose.body = typed + '\n\n' + _compose.body;
+    _compose.html = textToHtml(typed) + '<br><br>' + _compose.html;
+    renderMailPage();
+  }
+}
+async function mbQrSend(){
+  if(_mbQrBusy) return;
+  const d = document.getElementById('mbQr'); if(!d) return;
+  const ta = document.getElementById('mbQrText');
+  const text = String((ta && ta.value) || '').trim();
+  if(!text) return toast('보낼 글을 적어 주세요', 4000);
+  const slug = d.dataset.slug, uid = d.dataset.uid;
+  const v = (_mbMsgs[slug]||{})[uid] || {};
+  const o = state.mbOpen;
+  const to = String(v.e||'');
+  if(!to) return toast('받는 사람 주소를 알 수 없어 보내지 못했습니다', 6000);
+  const orig = (o && String(o.slug) === slug && String(o.uid) === uid) ? (o.text || htmlToTextC(o.html||'')) : '';
+  const subj = /^re\s*:/i.test(String(v.s||'')) ? String(v.s) : 'RE: ' + String(v.s||'');
+  const html = textToHtml(text + mbReplyBody(v, orig)) + '<br><br>' + signBlockHtml();
+  const btn = document.getElementById('mbQrGo');
+  _mbQrBusy = true;
+  if(btn){ btn.textContent = '보내는 중…'; btn.disabled = true; }
+  try{
+    const r = await postAutoMail({ cardId:'', to:to, cc:'', bcc:'', toMe:false, oneByOne:false, scheduleAt:0,
+      subject:subj, body:htmlToTextC(html), html:html, matIds:[], set:'', toName:(mbNameOf(v.e, v.f) || ''), files:[] });
+    toast('✉️ 보냈습니다 — ' + esc(r.from||'회사 메일') + ' 에서 ' + esc(to) + ' 로', 7000);
+    mbAnswered(slug, uid);    /* ⚠ 보낸 «뒤에만» 답장 표 */
+    mbQrClose();
+  }catch(e){
+    /* 시트를 닫지 않는다 — 쓴 글이 그대로 남아 다시 보낼 수 있어야 한다 */
+    toast('보내지 못했습니다 — ' + ((e&&e.message)||'알 수 없는 오류') + ' (쓴 글은 그대로 있습니다)', 9000);
+    if(btn){ btn.textContent = '보내기'; btn.disabled = false; }
+  }finally{
+    _mbQrBusy = false;
+  }
+}
+
 function mbReplyBody(v, text){
   const when = fmtDate(v.d) + ' ' + new Date(Number(v.d||0)).toTimeString().slice(0,5);
   const head = `\n\n────────── ${when} ${v.f||v.e||''} 님이 쓰신 글 ──────────\n`;
