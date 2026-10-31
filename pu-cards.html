@@ -26698,7 +26698,7 @@ function mbFetchBodyNow(slug, uid, peek){
         body: JSON.stringify({ key:String(uid) }) }))
       .then(r=>r.json().catch(()=>({})))
       .then(j=>{
-        if(!j.ok) throw new Error(j.error||'열지 못했습니다');
+        if(!j.ok){ const er = new Error(j.error||'열지 못했습니다'); er.outOfWindow = !!j.outOfWindow; throw er; }
         const o = { html:j.html||'', text:j.text||'', atts:j.atts||[], partial:!!j.partial, size:Number(j.size||0) };
         mbBodyPut(slug, uid, o);
         return o;
@@ -26987,6 +26987,7 @@ function mbOpenMsg(slug, uid){
     .catch(e=>{
       if(!state.mbOpen) return;
       state.mbOpen.loading=false; state.mbOpen.err=(e&&e.message)||'열지 못했습니다';
+      state.mbOpen.outWin = !!(e && e.outOfWindow);
       renderMailPage();
     });
 }
@@ -28661,7 +28662,12 @@ function mbOldFull(){
      밀려나 열 수 없다. 그 메일을 눌러 빈 화면과 「없습니다」만 보이면 고장으로 읽힌다 — 앞부분이라도 보이게 한다.
    ⚠ 글자는 esc 로만 넣는다(남의 글). ⚠ 다음메일 폴더 메일(IMAP)은 앞부분을 덧붙이지 않는다 — 그쪽 «없다»는 지워진 것이라 지운 메일을 보이면 안 된다. */
 function mbReadErrHtml(o, v){
-  const msg = '<div class="wait">열지 못했습니다 — ' + esc(o.err) + '</div>';
+  /* ★ «창 밖»(서버 outOfWindow)이면 긴 안내 대신 한 줄 + 다음메일 웹 단추.
+     ⚠ 다음메일은 메일 한 통으로 바로 가는 주소를 주지 않는다 — 첫 화면만 열린다(제목·날짜로 찾는다). */
+  const msg = (o.outWin && String(o.slug) === MB_OLD_ID)
+    ? '<div class="wait">다음메일 창(최근 3만 통) 밖이라 여기서는 못 엽니다. '
+      + '<a href="https://mail.daum.net" target="_blank" rel="noopener">다음메일 웹에서 열기 ↗</a></div>'
+    : '<div class="wait">열지 못했습니다 — ' + esc(o.err) + '</div>';
   if(String(o.slug) !== MB_OLD_ID || !(v && v.p)) return msg;
   return msg + '<pre style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0;color:#475569">' + esc(String(v.p)) + ' …</pre>';
 }
