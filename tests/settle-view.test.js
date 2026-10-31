@@ -140,6 +140,32 @@ test('사업마다 «자세히» — 머리말·맺음말·이름 칸과 사업�
   assert.match(h, /data-srate-add="cons-a"/);
 });
 
+test('계산기 — 종류·사업장·수행자(재직자)·구분·세전·요율 칸, 줄 맨 왼쪽 ☐·번호, 주관은 요율 칸이 없다', () => {
+  const st = { type: 'cons-a', siteId: 'C-1', rows: [{ sid: 'T-LEAD', role: 'lead', pre: '2568182' }, { sid: 'T-A', role: 'staff', pre: '977273', rate: '25' }] };
+  const h = V.calcBox(st, { bizList: [{ code: 'cons-a', name: '가나사업' }], sites: [{ consultingId: 'C-1', label: '가나상사' }],
+    staff: [{ sid: 'T-LEAD', name: '홍길동' }, { sid: 'T-A', name: '김가나' }], names: { 'T-LEAD': '홍길동', 'T-A': '김가나' }, sel: {} });
+  assert.match(h, /<select id="c_type">[\s\S]*value="cons-a" selected/);
+  assert.match(h, /<select id="c_site">[\s\S]*value="C-1" selected/);
+  const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="calc"/); assert.match(ths[1], /번호/);
+  assert.match(h, /data-c="0\|sid">[\s\S]*?value="T-LEAD" selected/);
+  assert.doesNotMatch(h, /data-c="0\|rate"/, '주관 줄에는 요율 칸이 없다');
+  assert.match(h, /data-c="1\|rate"[^>]*value="25"/);
+  assert.match(h, /list="c_rates"/);
+  assert.doesNotMatch(visible(h), /T-[A-Z]/);
+  assert.doesNotMatch(h, /카톡/, '카톡 문구는 계산기에 두지 않는다(별도 탭)');
+});
+
+test('계산 결과 — 사람별 세후·몫·정산액과 «누가 누구에게 얼마»', () => {
+  const res = C.calcSite([{ sid: 'T-LEAD', name: '홍길동', role: 'lead', pre: 2568182 }, { sid: 'T-A', name: '김가나', role: 'staff', pre: 977273, rate: 25 }]);
+  const v = visible(V.calcResult(res, { 'T-LEAD': '홍길동', 'T-A': '김가나' }));
+  assert.match(v, /3,428,475원/);
+  assert.match(v, /857,118/);
+  assert.match(v, /−87,915/);
+  assert.match(v, /김가나 → 홍길동\s+87,915원/);
+  assert.equal(V.calcResult({ members: [] }), '');
+});
+
 test('카톡 문구 상자 — 사람마다 복사 단추', () => {
   const h = V.messagesBox([{ sid: 'T-A', name: '김가나', text: '첫 줄\n둘째 줄' }, { sid: 'T-B', name: '이다라', text: 'x' }]);
   assert.match(h, /data-copy="0"/);

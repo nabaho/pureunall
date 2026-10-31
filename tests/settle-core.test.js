@@ -317,6 +317,39 @@ test('맞추기 — 같은 금액 먼저, 1% 안쪽은 «가까움»(차이 표�
   assert.deepEqual(m.map((o) => [o.kind, o.found && o.found.id, o.diff]), [['exact', 'x1', 0], ['exact', 'x2', 0], ['near', 'x3', -20], ['none', null, null]]);
 });
 
+/* ── 계산기 (대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게」) ── */
+test('계산기 — 사업장 하나: 주관 1 + 담당, 정산표와 같은 식', () => {
+  const r = C.calcSite([{ sid: 'T-LEAD', name: '홍길동', role: 'lead', pre: '2,568,182' }, { sid: 'T-A', name: '김가나', role: 'staff', pre: 977273, rate: '25' }]);
+  assert.deepEqual(r.issues, []);
+  assert.equal(r.totalNet, 3428475);
+  const a = r.members[1], l = r.members[0];
+  assert.deepEqual([a.net, a.share, a.settle, a.final], [945033, 857118, -87915, 857118]);
+  assert.deepEqual([l.net, l.settle, l.final], [2483442, 87915, 2571357]);
+  assert.deepEqual(r.transfers, [{ from: '김가나', to: '홍길동', amount: 87915 }]);
+});
+
+test('계산기 — 담당 둘·통장 실입금, 정산액 합 0', () => {
+  const r = C.calcSite([{ name: '홍길동', role: 'lead', pre: 2568182 }, { name: '김가나', role: 'staff', pre: 977273, rate: 25, actual: '945,000' },
+    { name: '이다라', role: 'staff', pre: 977273, rate: 30 }]);
+  assert.deepEqual(r.issues, []);
+  assert.equal(r.members[1].used, 945000);
+  assert.equal(r.members.reduce((s, m) => s + m.settle, 0), 0);
+  assert.equal(r.members.reduce((s, m) => s + m.final, 0), r.totalNet);
+  /* 담당이 둘이면 사업장 합계가 커져 김가나 몫(1,093,368)도 받은 돈(945,000)보다 크다 — 둘 다 주관에게서 받는다 */
+  assert.equal(r.members[1].share, 1093368);
+  assert.deepEqual(r.transfers.map((t) => t.to + '<' + t.from + ':' + t.amount), ['김가나<홍길동:148368', '이다라<홍길동:367009']);
+});
+
+test('계산기 — 주관 없음·주관 둘·요율 없음·금액 없음은 알리고 정산액을 내지 않는다', () => {
+  assert.ok(C.calcSite([{ name: '김가나', role: 'staff', pre: 1000000, rate: 25 }]).issues.some((x) => x.indexOf('주관') >= 0));
+  assert.ok(C.calcSite([{ name: 'A', role: 'lead', pre: 1 }, { name: 'B', role: 'lead', pre: 1 }]).issues.some((x) => x.indexOf('한 사람') >= 0));
+  const r = C.calcSite([{ name: '홍길동', role: 'lead', pre: 2000000 }, { name: '김가나', role: 'staff', pre: 1000000, rate: '' }]);
+  assert.ok(r.issues.some((x) => x.indexOf('김가나') >= 0 && x.indexOf('요율') >= 0));
+  assert.equal(r.members[0].settle, null);
+  assert.deepEqual(r.transfers, []);
+  assert.ok(C.calcSite([]).issues.length > 0);
+});
+
 test('noticeHash — 같은 줄이면 같고, 금액이 다르면 다르다', () => {
   const a = notice(), b = notice();
   assert.equal(C.noticeHash(a.rows), C.noticeHash(b.rows));

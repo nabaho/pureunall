@@ -260,6 +260,56 @@
       + '<button class="pri" id="dep_apply">고른 줄 저장</button></div></details>';
   }
 
+  /* ── ⓪ 계산기 — 컨설팅 종류 · 사업장 · 수행자 · 요율을 고르면 그 사업장 하나만 계산한다(저장 없음) ──
+     대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게 해라. 카톡문구는 별도로」.
+     st  = {type, siteId, rows:[{sid, role:'lead'|'staff', pre, rate, actual}]}
+     opt = {bizList:[{code,name}], sites:[{consultingId,label}](그 종류·2026), staff:[{sid,name}](재직자), names, sel:{i:1}} */
+  var RATES = [10, 15, 20, 25, 30, 35, 40, 50];
+  function calcBox(st, opt) {
+    st = st || {}; opt = opt || {};
+    var rows = st.rows || [], sel = opt.sel || {};
+    var h = '<div class="card"><div class="bar"><b>🧮 계산기</b><span class="hint">고른 사업장 하나만 계산합니다 — 저장하지 않습니다</span><span class="sp"></span><button class="sm" id="c_reset">새로</button></div>'
+      + '<div class="bar"><label class="hint" for="c_type">컨설팅 종류</label><select id="c_type"><option value="">— 고르기 —</option>'
+      + (opt.bizList || []).map(function (b) { return '<option value="' + esc(b.code) + '"' + (b.code === st.type ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<label class="hint" for="c_site">사업장</label><select id="c_site"><option value="">— 사업장 —</option>'
+      + (opt.sites || []).map(function (s) { return '<option value="' + esc(s.consultingId) + '"' + (s.consultingId === st.siteId ? ' selected' : '') + '>' + esc(s.label) + '</option>'; }).join('') + '</select></div>'
+      + '<datalist id="c_rates">' + RATES.map(function (r) { return '<option value="' + r + '">'; }).join('') + '</datalist>'
+      + '<div class="bulk" data-bulk="calc"></div><div class="scroll"><table class="t" data-name="calc"><thead><tr>' + ckHead('calc', rows.length > 0 && rows.every(function (r, i) { return sel[i]; }))
+      + '<th>수행자</th><th>구분</th><th class="r">세전</th><th class="r">요율(%)</th><th class="r">통장 실입금</th><th></th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      h += '<tr>' + ckCell(String(i), sel[i]) + '<td class="n">' + (i + 1) + '</td>'
+        + '<td data-k="who"><select data-c="' + i + '|sid">' + staffOpts(opt.staff, opt.names, r.sid, '— 수행자 —') + '</select></td>'
+        + '<td data-k="role"><select data-c="' + i + '|role"><option value="lead"' + (r.role === 'lead' ? ' selected' : '') + '>주관</option><option value="staff"' + (r.role !== 'lead' ? ' selected' : '') + '>담당</option></select></td>'
+        + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-c="' + i + '|pre" value="' + esc(r.pre || '') + '" placeholder="세전"></td>'
+        + '<td class="r" data-k="rate">' + (r.role === 'lead' ? '<span class="hint">—</span>' : '<input type="text" inputmode="decimal" class="pct" list="c_rates" data-c="' + i + '|rate" value="' + esc(r.rate == null ? '' : r.rate) + '" placeholder="%">') + '</td>'
+        + '<td class="r" data-k="act"><input type="text" inputmode="numeric" class="amt" data-c="' + i + '|actual" value="' + esc(r.actual || '') + '" placeholder="선택"></td>'
+        + '<td data-k="btn"><button class="sm" data-c-del="' + i + '" title="이 줄 빼기">빼기</button></td></tr>';
+    });
+    return h + '</tbody></table></div><div class="bar"><button class="sm" id="c_add">+ 수행자</button><span class="hint">요율은 담당만 — 주관은 나머지를 받는다. 통장 실입금을 넣으면 그 금액으로 계산</span></div></div>';
+  }
+  /* 계산 결과 — 보기 전용(고르기 칸 없음) */
+  function calcResult(res, names) {
+    res = res || {}; names = names || {};
+    if (!res.members || !res.members.length) return '';
+    var nm = function (m) { return (m.sid && names[m.sid]) || m.name || '(이름 없음)'; };
+    var h = '<div class="card"><div class="kpis">'
+      + '<div class="kpi"><span>사업장 세후 합계</span><b>' + won(res.totalNet) + '원</b></div>'
+      + '<div class="kpi"><span>담당 몫 합계</span><b>' + won(res.members.reduce(function (s, m) { return s + (m.share || 0); }, 0)) + '원</b></div>'
+      + '<div class="kpi"><span>송금</span><b>' + (res.transfers || []).length + '건</b></div>'
+      + '<div class="kpi' + (res.issues.length ? ' bad' : '') + '"><span>확인 필요</span><b>' + res.issues.length + '건</b></div></div>';
+    if (res.issues.length) h += '<div class="warn">' + res.issues.map(esc).join(' · ') + '</div>';
+    h += '<div class="scroll"><table class="t" data-name="calcout"><thead><tr><th>이름</th><th>구분</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">요율</th><th class="r">몫</th><th class="r">정산액</th><th class="r">최종</th></tr></thead><tbody>';
+    res.members.forEach(function (m) {
+      h += '<tr>' + nw('name', nm(m), 'ti') + nw('role', ROLE_KO[m.role]) + num('pre', m.pre) + num('wht', m.inc + m.loc) + num('net', m.used)
+        + '<td class="r" data-k="rate">' + (m.rate == null ? '' : esc(m.rate) + '%') + '</td>'
+        + (m.role === 'lead' ? '<td class="r" data-k="share"></td>' : num('share', m.share)) + '<td class="r b" data-k="settle">' + esc(won(m.settle)) + '</td>' + num('final', m.final) + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    if ((res.transfers || []).length) h += '<div class="sec">정산</div><div class="bar tr-list">'
+      + res.transfers.map(function (t) { return '<span>' + esc(t.from) + ' → ' + esc(t.to) + '  <b>' + esc(C.fmt(t.amount)) + '원</b></span>'; }).join('') + '</div>';
+    return h + '</div>';
+  }
+
   /* ── ⑤ 카톡 문구 ── */
   function messagesBox(msgs) {
     if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 확정 정산표를 고르세요.</div>';
@@ -269,6 +319,6 @@
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, runsTable: runsTable, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, runsTable: runsTable, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });

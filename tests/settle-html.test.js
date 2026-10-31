@@ -141,7 +141,9 @@ test('고르는 사람은 재직자만 — 직원계정 active 를 먼저, 못 �
   /* vm 안에서 만든 배열은 이쪽 배열과 «다른 집» 것이라 Array.from 으로 옮겨 견준다 */
   assert.deepEqual(Array.from(ctx.activeStaff(accts, []), (p) => p.name), ['나재직']);
   const dir = [{ sid: 'D1', name: '라명부', status: 'active' }, { sid: 'D2', name: '마빈칸' }, { sid: 'D3', name: '바퇴직', status: 'retired' }];
-  assert.deepEqual(Array.from(ctx.activeStaff([], dir), (p) => p.name), ['라명부', '마빈칸']);
+  assert.deepEqual(Array.from(ctx.activeStaff([], dir), (p) => p.name), ['라명부'], '재직 표시가 빈 옛 줄은 섞지 않는다');
+  assert.deepEqual(Array.from(ctx.activeStaff([], [{ sid: 'E1', name: '사빈칸' }, { sid: 'E2', name: '아퇴직', status: 'resigned' }]), (p) => p.name), ['사빈칸'],
+    '명부에 재직 표시가 하나도 없을 때만 빈 표시를 받아 준다');
   /* 이름표(NAMES)는 퇴사자도 — 지난 기록의 이름이 사번으로 새지 않게 */
   assert.match(fnBody('async function loadErp('), /ERP\.people=activeStaff\(accts, dir\)/);
   assert.match(fnBody('async function loadErp('), /dir\.concat\(accts\)\.forEach/);
@@ -157,6 +159,17 @@ test('요율표 저장 — 주관 없음·요율 범위 밖이면 아무것도 �
   /* 칸에 글을 칠 때는 사본만 고친다 — 서버 쓰기는 «저장» 한 길 */
   assert.match(NOC, /input\[data-mx\]'\)\)\{[^}]*WORK\.rules/);
   assert.doesNotMatch(NOC, /RULE_EDIT|readRuleForm|rulesBox/, '옛 규칙 상자가 남았다');
+});
+
+test('계산기 — 첫 탭·기본 탭이고, 계산 모듈 calcSite 로 계산하며 서버에 쓰지 않는다(이 기기에만 기억)', () => {
+  assert.ok(NOC.indexOf('data-tab="calc"') < NOC.indexOf('data-tab="runs"'), '계산기가 첫 탭');
+  assert.match(NOC, /var TAB='calc'/);
+  assert.match(fnBody('function drawCalcOut('), /C\.calcSite\(calcRows\(\)\)/);
+  ['function drawCalc(', 'function saveCalc(', 'function calcPrefill(', 'function drawCalcOut('].forEach((h) =>
+    assert.doesNotMatch(fnBody(h), /gate\.save|patchRecord|save\('settle/, h + ' 가 서버에 쓴다'));
+  assert.match(fnBody('function saveCalc('), /lsSet\('calc'/);
+  /* 글을 칠 때는 결과만 다시 그린다 — 입력칸을 다시 그리면 치던 글이 끊긴다 */
+  assert.match(NOC, /input\[data-c\]'\)\)\{[^}]*drawCalcOut\(\)/);
 });
 
 test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {

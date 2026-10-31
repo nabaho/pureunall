@@ -193,7 +193,28 @@ details.dep textarea{min-height:64px}
   .t[data-name] tbody td select{width:100%}
   .t[data-name=siteRates] tbody tr:last-child td:first-child,.t[data-name=adjusts] tbody tr:last-child td:nth-child(3){flex:0 0 100%}
   .cards{grid-template-columns:1fr;gap:8px}
+  /* 계산기 — 1줄 수행자·구분, 2줄 세전·요율·실입금(칸 이름을 앞에) */
+  .t[data-name=calc] tbody td[data-k="who"]{order:1;flex:1 1 0}
+  .t[data-name=calc] tbody td[data-k="role"]{order:2}
+  .t[data-name=calc] tbody td[data-k="role"] select{width:auto}
+  .t[data-name=calc] tbody td[data-k="pre"],.t[data-name=calc] tbody td[data-k="rate"],.t[data-name=calc] tbody td[data-k="act"]{order:6}
+  .t[data-name=calc] tbody td[data-k="pre"]::before{content:'세전 '}
+  .t[data-name=calc] tbody td[data-k="rate"]::before{content:'요율 '}
+  .t[data-name=calc] tbody td[data-k="act"]::before{content:'실입금 '}
+  .t[data-name=calc] input.amt{width:118px}
+  .t[data-name=calc] tbody td[data-k="btn"]{order:7}
+  .t[data-name=calcout] tbody tr{padding-left:10px}
+  .t[data-name=calcout] tbody td[data-k="name"]{order:1;font-weight:600}
+  .t[data-name=calcout] tbody td[data-k="settle"]{order:2;color:var(--ink)}
+  .t[data-name=calcout] tbody td[data-k="pre"]::before{content:'세전 '}
+  .t[data-name=calcout] tbody td[data-k="wht"]::before{content:'원천 '}
+  .t[data-name=calcout] tbody td[data-k="net"]::before{content:'세후 '}
+  .t[data-name=calcout] tbody td[data-k="share"]:not(:empty)::before{content:'몫 '}
+  .t[data-name=calcout] tbody td[data-k="final"]::before{content:'최종 '}
 }
+/* 계산기 탭도 규칙 탭처럼 칸이 내용만큼(넓게 펼치지 않는다) */
+#pane-calc{max-width:920px}
+.tr-list{flex-direction:column;align-items:flex-start}
 </style>
 </head>
 <body>
@@ -207,7 +228,8 @@ details.dep textarea{min-height:64px}
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
   <div class="tabs" id="tabs">
-    <button data-tab="runs">🧮 정산 <span class="chip" id="nRuns">0</span></button>
+    <button data-tab="calc">🧮 계산기</button>
+    <button data-tab="runs">📋 정산 <span class="chip" id="nRuns">0</span></button>
     <button data-tab="notices">📥 안내 파일</button>
     <button data-tab="rules">⚙️ 규칙·요율</button>
     <button data-tab="msgs">💬 카톡 문구</button>
@@ -215,6 +237,7 @@ details.dep textarea{min-height:64px}
 </div>
 <div id="lock"><h2>🧾 컨설팅정산</h2><div id="lockWhy"></div><p>재무관리 권한이 있는 분만 열 수 있습니다.</p></div>
 <main id="app">
+  <section class="pane" id="pane-calc"><div id="calcBox"></div><div id="calcOut"></div></section>
   <section class="pane" id="pane-runs">
     <div class="card"><div id="runsBox"></div></div>
     <div class="card" id="runCard" style="display:none"><div id="runBox"></div></div>
@@ -259,8 +282,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=2"></script>
-<script src="js/pu-settle-view.js?v=4"></script>
+<script src="js/pu-settle-core.js?v=3"></script>
+<script src="js/pu-settle-view.js?v=5"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -269,10 +292,13 @@ var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:
 var ERP={ biz:[], consultings:[], people:[] };
 /* 사번 → 이름 — 기록은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
 var NAMES={};
-var TAB='runs', CUR_RUN='', CUR_NOTICE='', MSG_RUN='';
+var TAB='calc', CUR_RUN='', CUR_NOTICE='', MSG_RUN='';
 /* 요율표 — 고치는 중인 사본. 저장하기 전까지는 D.rules(서버)와 따로 둔다. 다시 불러와도 «저장 안 한 변경»은 지키지 않고 버리지 않는다 */
 var WORK=null;
-var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{} };
+var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{} };
+/* 계산기 — 저장하지 않는다. 고친 것을 잃지 않게 이 기기(localStorage)에만 기억한다(작은 글 한 덩이) */
+function calcDefault(){ return { type:'', siteId:'', rows:[{ sid:'', role:'lead', pre:'' }, { sid:'', role:'staff', pre:'', rate:'' }] }; }
+var CALC=calcDefault();
 /* 입금 대조 — 열어 둔 정산표 하나에 대한 «지금 견주는 중» 상태(저장하지 않는다). 다른 정산표를 열면 비운다 */
 var DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false };
 var YEAR_FROM='2026-01-01', YEAR_TO='2026-12-31';   /* 대표 지시 2026-10-31 「2026년도 올해 진행상황만 우선」 — 업체 연결 후보 범위 */
@@ -294,7 +320,10 @@ function bareName(s){ return String(s||'').replace(/\(주\)|㈜|주식회사|\s/
    ⚠ 이름표(NAMES)는 재직·퇴직 모두 — 지난 정산표·요율에 남은 사람도 이름으로 보이게. 고르는 목록(ERP.people)만 재직자. */
 function activeStaff(accounts, dir){
   var act=(accounts||[]).filter(function(u){ return u && u.sid && u.name && u.status==='active'; });
-  if(!act.length) act=(dir||[]).filter(function(u){ return u && u.sid && u.name && (u.status==='active' || !u.status); });
+  /* 공개 명부로 물러설 때도 «재직 표시가 있는 사람»만 — 표시가 빈 옛 줄이 섞여 퇴사자가 나오던 것(대표 지적 2026-10-31 「여전히 기존사람 다나온다」).
+     명부 전체에 재직 표시가 하나도 없을 때만 빈 표시를 받아 준다(아무도 못 고르는 화면을 막는다). */
+  if(!act.length) act=(dir||[]).filter(function(u){ return u && u.sid && u.name && u.status==='active'; });
+  if(!act.length) act=(dir||[]).filter(function(u){ return u && u.sid && u.name && !u.status; });
   var seen={}, out=[];
   act.forEach(function(u){ var s=String(u.sid); if(!seen[s]){ seen[s]=1; out.push({ sid:s, name:String(u.name) }); } });
   return out.sort(function(a,b){ return a.name<b.name?-1:a.name>b.name?1:0; });
@@ -348,10 +377,27 @@ function compute(notice, monthKey, rule, rid, actuals){ return C.settleMonth(not
 function monthLabel(notice, key){ var m=notice.months.filter(function(x){ return x.key===key; })[0]; return key.slice(0,4)+'년 '+(m?m.label:key.slice(5)+'월'); }
 
 /* ═══ 그리기 ═══ */
-function draw(){ drawTabs(); drawRuns(); drawNotices(); drawRules(); drawMsgs(); }
+function draw(){ drawTabs(); drawCalc(); drawRuns(); drawNotices(); drawRules(); drawMsgs(); }
+/* ═══ 계산기 ═══ (대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게」) */
+function loadCalc(){ try{ var v=JSON.parse(lsGet('calc')||'null'); if(v && Array.isArray(v.rows)) return v; }catch(e){} return calcDefault(); }
+function saveCalc(){ lsSet('calc', JSON.stringify(CALC)); }
+function calcRows(){ return CALC.rows.map(function(r){ return { sid:r.sid||'', name:NAMES[r.sid]||'', role:r.role, pre:r.pre, rate:r.rate, actual:r.actual }; }); }
+function drawCalc(){
+  $('calcBox').innerHTML=V.calcBox(CALC, { bizList:ERP.biz, sites:CALC.type?sitesFor(CALC.type):[], staff:ERP.people, names:NAMES, sel:SEL.calc });
+  drawCalcOut(); drawBulks();
+}
+function drawCalcOut(){ $('calcOut').innerHTML=V.calcResult(C.calcSite(calcRows()), NAMES); }
+/* 고른 컨설팅 종류에 저장된 규칙이 있으면 주관·요율을 «빈 칸에만» 먼저 채운다(고칠 수 있다) */
+function calcPrefill(){
+  var rule=CALC.type && D.rules[CALC.type]; if(!rule) return;
+  CALC.rows.forEach(function(r){
+    if(r.role==='lead' && !r.sid && rule.leadSid) r.sid=rule.leadSid;
+    if(r.role==='staff' && r.sid && (r.rate==null || r.rate==='') && rule.rates && rule.rates[r.sid]!=null) r.rate=String(rule.rates[r.sid]);
+  });
+}
 function drawTabs(){
   [].forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.className=b.getAttribute('data-tab')===TAB?'on':''; });
-  ['runs','notices','rules','msgs'].forEach(function(t){ $('pane-'+t).className='pane'+(t===TAB?' on':''); });
+  ['calc','runs','notices','rules','msgs'].forEach(function(t){ $('pane-'+t).className='pane'+(t===TAB?' on':''); });
   $('nRuns').textContent=vals(D.runs).length;
 }
 function runsList(){ return vals(D.runs).map(C.normalizeRun); }
@@ -406,7 +452,8 @@ function bulkHtml(kind, n){
   if(!n) return '';
   var b={ runs:'', members:'<button class="sm" data-bulk-do="clearActual">통장 실입금 비우기</button>', transfers:'<button class="sm" data-bulk-do="paidOn">보냄 표시</button> <button class="sm" data-bulk-do="paidOff">보냄 취소</button>',
     notices:'<button class="sm" data-bulk-do="delNotice">지우기</button>', adjusts:'<button class="sm" data-bulk-do="delAdjust">지우기</button>',
-    mxpeople:'<button class="sm" data-bulk-do="mxRemove" title="고른 사람의 요율을 모든 사업에서 뺀다 — «저장»을 눌러야 반영">요율표에서 빼기</button>' }[kind]||'';
+    mxpeople:'<button class="sm" data-bulk-do="mxRemove" title="고른 사람의 요율을 모든 사업에서 뺀다 — «저장»을 눌러야 반영">요율표에서 빼기</button>',
+    calc:'<button class="sm" data-bulk-do="calcDel">고른 줄 빼기</button>' }[kind]||'';
   return '<b>'+n+'건 선택</b> '+b+' <button class="sm" data-bulk-do="clear:'+kind+'">선택 풀기</button>';
 }
 function drawBulks(){
@@ -709,6 +756,7 @@ document.addEventListener('click', async function(ev){
     var d=b.getAttribute('data-bulk-do');
     if(d.indexOf('clear:')===0){ SEL[d.slice(6)]={}; draw(); return; }
     if(d==='paidOn'||d==='paidOff'){ await setPaid(CUR_RUN, selectedIdx('t'), d==='paidOn'); return; }
+    if(d==='calcDel'){ CALC.rows=CALC.rows.filter(function(r, i){ return !SEL.calc[i]; }); SEL.calc={}; saveCalc(); drawCalc(); return; }
     if(d==='mxRemove'){ var gone=Object.keys(SEL.mxpeople); if(!WORK||!gone.length) return;
       WORK.people=WORK.people.filter(function(s){ return gone.indexOf(s)<0; });
       WORK.types.forEach(function(k){ var w=WORK.rules[k]; gone.forEach(function(s){ delete w.rates[s]; Object.keys(w.siteRates||{}).forEach(function(c){ delete w.siteRates[c][s]; if(!Object.keys(w.siteRates[c]).length) delete w.siteRates[c]; }); }); });
@@ -735,6 +783,10 @@ document.addEventListener('click', async function(ev){
     if(un.companies.length||un.people.length){ drawNotices(); toast('먼저 아래 «연결 확정»을 끝내 주세요 — 업체 '+un.companies.length+' · 사람 '+un.people.length); $('linkBox').scrollIntoView({ behavior:'smooth' }); return; }
     await buildRuns(CUR_NOTICE); return; }
   if((b=t.closest('[data-link-save]'))){ var p=b.getAttribute('data-link-save'), cut=p.indexOf('|'); await saveLink(p.slice(0,cut), p.slice(cut+1)); return; }
+  /* 계산기 — 이 기기에만 기억, 서버에 쓰지 않는다 */
+  if(t.closest('#c_add')){ CALC.rows.push({ sid:'', role:'staff', pre:'', rate:'' }); saveCalc(); drawCalc(); return; }
+  if((b=t.closest('[data-c-del]'))){ CALC.rows.splice(Number(b.getAttribute('data-c-del')), 1); SEL.calc={}; saveCalc(); drawCalc(); return; }
+  if(t.closest('#c_reset')){ CALC=calcDefault(); SEL.calc={}; saveCalc(); drawCalc(); return; }
   /* 요율표 — 고치는 것은 사본(WORK)만, 서버에는 «저장»에서 한 번에 */
   if(t.closest('#mx_save')){ await saveRules(); return; }
   if((b=t.closest('[data-srate-add]'))){ var sc=b.getAttribute('data-srate-add'), box=b.closest('[data-rd]');
@@ -752,7 +804,11 @@ document.addEventListener('change', async function(ev){
   if(t.matches('input[data-all]')){ var k=t.getAttribute('data-all'); [].forEach.call(t.closest('table').querySelectorAll('input[data-ck]'), function(c){ c.checked=t.checked; var id=c.getAttribute('data-ck'); if(t.checked) SEL[k][id]=1; else delete SEL[k][id]; }); drawBulks(); return; }
   if(t.id==='dep_sid'){ var ds=curDraft(); DEP.sid=t.value; DEP.open=true; if(ds) depRematch(ds); drawRuns(); return; }
   if(t.matches('select[data-dep]')){ DEP.pick[t.getAttribute('data-dep')]=t.value; if(!t.value) delete DEP.pick[t.getAttribute('data-dep')]; drawRuns(); return; }
-  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople' }[kind]; if(!kind) return;
+  if(t.id==='c_type'){ CALC.type=t.value; CALC.siteId=''; calcPrefill(); saveCalc(); drawCalc(); return; }
+  if(t.id==='c_site'){ CALC.siteId=t.value; saveCalc(); return; }
+  if(t.matches('select[data-c]')){ var cp=t.getAttribute('data-c').split('|'), cr=CALC.rows[+cp[0]]; if(!cr) return;
+    cr[cp[1]]=t.value; if(cp[1]==='role' && t.value==='lead') delete cr.rate; calcPrefill(); saveCalc(); drawCalc(); return; }
+  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc' }[kind]; if(!kind) return;
     var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
   if(t.matches('input[data-paid]')){ await setPaid(CUR_RUN, [Number(t.getAttribute('data-paid'))], t.checked); return; }
   if(t.matches('input[data-actual]')){ await setActual(CUR_RUN, t.getAttribute('data-actual'), t.value); return; }
@@ -770,6 +826,8 @@ document.addEventListener('change', async function(ev){
 document.addEventListener('input', function(ev){
   var t=ev.target;
   if(t.id==='dep_text'){ DEP.text=t.value; return; }
+  /* 계산기 칸 — 친 글은 기억만 하고 결과만 다시 그린다(입력칸을 다시 그리지 않아 글이 끊기지 않는다) */
+  if(t.matches('input[data-c]')){ var cq=t.getAttribute('data-c').split('|'), crow=CALC.rows[+cq[0]]; if(!crow) return; crow[cq[1]]=t.value; saveCalc(); drawCalcOut(); return; }
   /* 요율표 칸·자세히 칸 — 글을 칠 때마다 사본만 고친다(다시 그리지 않아 입력이 끊기지 않는다) */
   if(t.matches('input[data-mx]')){ var p=t.getAttribute('data-mx').split('|'), v=t.value.trim(); if(v==='') delete WORK.rules[p[0]].rates[p[1]]; else WORK.rules[p[0]].rates[p[1]]=v; markDirty(); return; }
   if(t.matches('input[data-rf]')){ var q=t.getAttribute('data-rf').split('|'); WORK.rules[q[0]][q[1]]=t.value.trim(); markDirty(); return; }
@@ -792,7 +850,8 @@ function lock(why){ $('app').style.display='none'; $('lock').style.display='bloc
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true || role.fin===true); }
 async function staffRole(u){ try{ return (await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||null; }catch(e){ return null; } }
 function boot(){
-  var t=lsGet('tab'); if(['runs','notices','rules','msgs'].indexOf(t)>=0) TAB=t;
+  var t=lsGet('tab'); if(['calc','runs','notices','rules','msgs'].indexOf(t)>=0) TAB=t;
+  CALC=loadCalc();
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
