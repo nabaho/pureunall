@@ -76699,6 +76699,21 @@ function calcPayrollFresh(rec){
     loa:loa, fullLoa:fullLoa, legacyPay:legacyPay };
 }
 
+/* 📄 문서(임금명세서·급여대장)의 «근로자를 특정할 수 있는 정보» 자리 — 사번 대신 생년월일 (대표 2026-10-31 「사번은 숨겨라」).
+   법: 근로기준법 시행령 제27조의2 제1호 «근로자의 성명, 생년월일, 사원번호 등 근로자를 특정할 수 있는 정보»(임금명세서),
+       제27조 제1항 제1·2호 «성명» + «생년월일, 사원번호 등 근로자를 특정할 수 있는 정보»(임금대장) — 사원번호는 «예시»다(국가법령정보센터 원문, 시행 2025.10.23).
+   ⚠ 값이 없으면 빈 글자 — 사번·이메일·이름으로 대신 채우지 않는다. 직원 정보(근로자명부)의 생년월일 칸을 채우면 문서에 나온다. */
+function erpDocBirth(u){ return String((u && u.birthDate) || '').trim().slice(0, 10); }
+/* 급여 CSV 가져오기 — 줄이 «누구 것인가». 사번 칸이 «파일에 있으면» 사번(열쇠). 사번 칸이 없는 파일(내려받은 급여대장.csv 는 사번을 안 적는다)은
+   이름과 생년월일이 둘 다 똑같은 «한 사람»으로만 맞춘다. ⚠ 이름만으로는 안 맞춘다(동명이인) · 생년월일이 비면 안 맞춘다 · 둘 이상이어도 안 맞춘다. */
+function payCsvFindUser(users, idx, cells){
+  var cell = function(k){ return idx[k] >= 0 ? String(cells[idx[k]] || '').trim() : ''; };
+  if(idx['사번'] >= 0){ var sid = cell('사번'); return sid ? ((users || []).find(function(x){ return x && x.sid === sid; }) || null) : null; }
+  var nm = cell('이름'), bd = cell('생년월일');
+  if(!nm || !bd) return null;
+  var hits = (users || []).filter(function(x){ return x && x.name === nm && erpDocBirth(x) === bd; });
+  return hits.length === 1 ? hits[0] : null;
+}
 /* ══ 임금명세서에 실을 «항목별» 금액 (대표 지시 2026-09-03) ═══════════════
    ★★ 왜 만들었나 — 명세서가 «있지도 않은 칸»을 읽고 있었다.
      메일 본문과 한글 임금명세서가 dedPension·dedHealth·allowFood… 를 읽는데,
@@ -83751,7 +83766,7 @@ function PayrollDupModal(props){
           : h('div', null,
               h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px' } },
                 h('span', { style:{ fontSize:'15px', fontWeight:700 } }, g.empName + ' · ' + g.ym),
-                h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '사번 ' + g.empSid + ' · 줄 ' + g.items.length + '개 · 다른 칸 ' + g.diffFields.length + '개'),
+                h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '줄 ' + g.items.length + '개 · 다른 칸 ' + g.diffFields.length + '개'),
                 h('span', { style:{ marginLeft:'auto', fontSize:'12px', color:'#94a3b8' } }, (idx+1) + ' / ' + groups.length)),
               h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', marginBottom:'10px' } },
                 h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
@@ -83970,7 +83985,7 @@ function PayrollLedger(props){
       el.innerHTML =
         '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1e40af;padding-bottom:12px"><div style="font-size:11px;color:#64748b;margin-bottom:4px">푸른노무법인</div><div style="font-size:22px;font-weight:800;color:#1e293b">'+ym+' 급여명세서</div></div>'
         + '<table style="width:100%;margin-bottom:18px;font-size:12.5px;border-collapse:collapse"><tbody>'
-        + '<tr><td style="padding:5px 8px;background:#f8fafc;width:90px;font-weight:700">성명</td><td style="padding:5px 8px;border-right:1px solid #e2e8f0">'+u.name+'</td><td style="padding:5px 8px;background:#f8fafc;width:90px;font-weight:700">사번</td><td style="padding:5px 8px">'+u.sid+'</td></tr>'
+        + '<tr><td style="padding:5px 8px;background:#f8fafc;width:90px;font-weight:700">성명</td><td style="padding:5px 8px;border-right:1px solid #e2e8f0">'+u.name+'</td><td style="padding:5px 8px;background:#f8fafc;width:90px;font-weight:700">생년월일</td><td style="padding:5px 8px">'+erpDocBirth(u)+'</td></tr>'
         + '<tr><td style="padding:5px 8px;background:#f8fafc;font-weight:700">직책</td><td style="padding:5px 8px;border-right:1px solid #e2e8f0">'+u.title+'</td><td style="padding:5px 8px;background:#f8fafc;font-weight:700">소속</td><td style="padding:5px 8px">'+(u.branch||'천안본사')+'</td></tr>'
         + '<tr><td style="padding:5px 8px;background:#f8fafc;font-weight:700">입사일</td><td style="padding:5px 8px;border-right:1px solid #e2e8f0">'+(u.hireDate||'-')+'</td><td style="padding:5px 8px;background:#f8fafc;font-weight:700">지급일</td><td style="padding:5px 8px">'+(rec.paidDate||(ym+'-25'))+'</td></tr>'
         + '</tbody></table>'
@@ -84456,11 +84471,11 @@ function PayrollLedger(props){
   }
 
   function downloadExcel(){
-    var rows = [['사번','이름','직책','기본급','수당','상여','지급액','국민연금','건강보험','장기요양','고용보험','소득세','지방세','공제계','실지급액','상태']];
+    var rows = [['생년월일','이름','직책','기본급','수당','상여','지급액','국민연금','건강보험','장기요양','고용보험','소득세','지방세','공제계','실지급액','상태']];
     users.forEach(function(u){
       var rec = getRec(u.sid);
       var calc = calcPayroll(rec);
-      rows.push([u.sid, u.name, u.title, rec.baseSalary, calc.allowSum, rec.bonus||0, calc.grossPay,
+      rows.push([erpDocBirth(u), u.name, u.title, rec.baseSalary, calc.allowSum, rec.bonus||0, calc.grossPay,
         calc.pension, calc.healthIns, calc.longCare, calc.empIns, calc.incomeTax, calc.localTax,
         calc.totalDeduct, calc.netPay, rec.status||'draft']);
     });
@@ -84641,7 +84656,7 @@ function PayrollLedger(props){
               users.forEach(function(u){
                 var rec=getRec(u.sid); var calc=calcPayroll(rec);
                 html+='<div class="slip"><h2>푸른노무법인 '+props.selYM+' 급여명세서</h2>';
-                html+='<table><tr><th>성명</th><td>'+u.name+'</td><th>사번</th><td>'+u.sid+'</td></tr><tr><th>직책</th><td>'+u.title+'</td><th>소속</th><td>'+(u.branch||'')+'</td></tr></table>';
+                html+='<table><tr><th>성명</th><td>'+u.name+'</td><th>생년월일</th><td>'+erpDocBirth(u)+'</td></tr><tr><th>직책</th><td>'+u.title+'</td><th>소속</th><td>'+(u.branch||'')+'</td></tr></table>';
                 html+='<table><tr><th colspan="2" style="background:#f0fdf4">지급</th></tr><tr><td>기본급</td><td style="text-align:right">'+(rec.baseSalary||0).toLocaleString()+'</td></tr><tr><td>수당</td><td style="text-align:right">'+calc.allowSum.toLocaleString()+'</td></tr><tr><td>법정수당</td><td style="text-align:right">'+calc.legal.total.toLocaleString()+'</td></tr><tr><td>성과금</td><td style="text-align:right">'+calc.perfBonus.total.toLocaleString()+'</td></tr><tr><th>지급액 합계</th><th style="text-align:right">'+calc.grossPay.toLocaleString()+'</th></tr></table>';
                 html+='<table><tr><th colspan="2" style="background:#fffbeb">공제</th></tr><tr><td>국민연금</td><td style="text-align:right">'+calc.pension.toLocaleString()+'</td></tr><tr><td>건강+장기요양</td><td style="text-align:right">'+(calc.healthIns+calc.longCare).toLocaleString()+'</td></tr><tr><td>고용보험</td><td style="text-align:right">'+calc.empIns.toLocaleString()+'</td></tr><tr><td>소득세+지방세</td><td style="text-align:right">'+(calc.incomeTax+calc.localTax).toLocaleString()+'</td></tr><tr><th>공제 합계</th><th style="text-align:right">'+calc.totalDeduct.toLocaleString()+'</th></tr></table>';
                 html+='<div class="summary"><span>실지급액</span><span>'+calc.netPay.toLocaleString()+' 원</span></div>';
@@ -84710,20 +84725,19 @@ function PayrollLedger(props){
                     if(lines.length<2){ showToast('등록된 데이터가 없습니다'); return; }
                     var hdr=lines[0].split(',').map(function(s){return s.trim();});
                     var idx={};
-                    ['사번','기본급','수당','상여','부양가족','식대','자가운전','보육','근무일수'].forEach(function(k){ idx[k]=hdr.indexOf(k); });
-                    var imported=0;
+                    ['사번','이름','생년월일','기본급','수당','상여','부양가족','식대','자가운전','보육','근무일수'].forEach(function(k){ idx[k]=hdr.indexOf(k); });
+                    var imported=0, skipped=0;
                     lines.slice(1).forEach(function(ln){
                       var c=ln.split(',').map(function(s){return s.trim();});
-                      if(!c[idx['사번']]) return;
-                      var sid=c[idx['사번']];
-                      var u=users.find(function(x){return x.sid===sid;}); if(!u) return;
+                      var u=payCsvFindUser(users, idx, c); if(!u){ skipped++; return; }
+                      var sid=u.sid;
                       var num=function(i){return i>=0?parseInt((c[i]||'').replace(/[^0-9]/g,''))||0:0;};
                       var patch={ baseSalary:num(idx['기본급']), bonus:num(idx['상여']), dependents:num(idx['부양가족'])||1, nonTaxableMeal:num(idx['식대']), nonTaxableCar:num(idx['자가운전']), nonTaxableChildcare:num(idx['보육']), workDays:num(idx['근무일수'])||0 };
                       var allowanceAmt=num(idx['수당']);
                       if(allowanceAmt>0){ var existRec=recs.find(function(r){return r.empSid===sid&&r.ym===props.selYM;}); var prevA=(existRec&&existRec.allowances)?existRec.allowances.filter(function(a){return a.code!=='etc';}):[];  patch.allowances=prevA.concat([{code:'etc',amount:allowanceAmt}]); }
                       updateRec(sid,patch); imported++;
                     });
-                    showToast('CSV 가져오기 완료 ('+imported+'명)');
+                    showToast('CSV 가져오기 완료 ('+imported+'명)'+(skipped ? ' · 건너뜀 '+skipped+'줄 — 사번 칸이 없으면 이름과 생년월일이 둘 다 같은 한 사람만 맞춥니다' : ''));
                   }catch(err){ showToast('CSV 파싱 오류: '+err.message); }
                   e.target.value='';
                 };
@@ -85646,9 +85660,9 @@ function PayrollPayslip(props){
     var d = slipData(empSid, ym), won = function(v){ return v.toLocaleString()+'원'; };
     var line = function(x){ return x[0]+': '+won(x[1]); };
     var body = ['【'+d.ym+' 급여명세서】', '',
-      '성명: '+(d.emp.name||''), '사번: '+(d.emp.sid||''), '직책: '+(d.emp.title||''),
-      '지급일: '+(d.paidDate || '[확인 필요]'), '',
-      '─── 지급 ───'].concat(d.pay.map(line), ['지급합계: '+won(d.gross), '', '─── 공제 ───'],
+      '성명: '+(d.emp.name||'')].concat(erpDocBirth(d.emp) ? ['생년월일: '+erpDocBirth(d.emp)] : [],
+      ['직책: '+(d.emp.title||''), '지급일: '+(d.paidDate || '[확인 필요]'), '',
+      '─── 지급 ───'], d.pay.map(line), ['지급합계: '+won(d.gross), '', '─── 공제 ───'],
       d.ded.map(line), ['공제합계: '+won(d.cut), '', '─── 실지급액 ───', won(d.net), ''],
       d.methods.length ? ['─── 계산 방법 ───'].concat(d.methods, ['']) : [],
       ['※ 푸른노무법인', '※ 근로기준법 제48조제2항에 따라 교부되는 임금명세서입니다.']).join('\n');
@@ -85670,7 +85684,7 @@ function PayrollPayslip(props){
     var doc=HWPXDOC.begin('plain');
     var body=HWPXDOC.title('임 금 명 세 서', props.selYM+'분')+HWPX.spacer()
       +HWPXDOC.infoTable([
-        ['성명', d.emp.name||'', '사번', d.emp.sid||''],
+        ['성명', d.emp.name||'', '생년월일', erpDocBirth(d.emp)],
         ['직책', d.emp.title||'', '귀속월', props.selYM],
         ['지급일', d.paidDate || '[확인 필요]', '', '']
       ], doc)+HWPX.spacer()
@@ -85974,8 +85988,8 @@ function PayrollPayslip(props){
           h('tr', null,
             h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:_mob?'44px':'90px',fontWeight:700,whiteSpace:'nowrap'}}, '성명'),
             h('td', {style:{padding:'5px 8px',borderRight:'1px solid #e2e8f0'}}, u.name),
-            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:_mob?'44px':'90px',fontWeight:700,whiteSpace:'nowrap'}}, '사번'),
-            h('td', {style:{padding:'5px 8px'}}, u.sid)),
+            h('td', {style:{padding:'5px 8px',background:'#f8fafc',width:_mob?'44px':'90px',fontWeight:700,whiteSpace:'nowrap'}}, '생년월일'),
+            h('td', {style:{padding:'5px 8px'}}, erpDocBirth(u))),
           h('tr', null,
             h('td', {style:{padding:'5px 8px',background:'#f8fafc',fontWeight:700}}, '직책'),
             h('td', {style:{padding:'5px 8px',borderRight:'1px solid #e2e8f0'}}, u.title),
@@ -87515,7 +87529,7 @@ function PersonnelCardModal(props){
         h('div', { style:{background:'#1e293b', color:'#fff', borderRadius:'8px', padding:'16px 20px', marginBottom:'12px', display:'flex', justifyContent:'space-between', alignItems:'center'} },
           h('div', null,
             h('div', { style:{fontSize:'20px', fontWeight:800} }, u.name),
-            h('div', { style:{fontSize:'11.5px', color:'#94a3b8', marginTop:'4px', fontFamily:'monospace'} }, u.sid+' · '+(u.title||'')+' · '+(u.branch||'')),
+            h('div', { style:{fontSize:'11.5px', color:'#94a3b8', marginTop:'4px', fontFamily:'monospace'} }, [u.title, u.branch].filter(Boolean).join(' · ')),
             workYears && h('div', { style:{fontSize:'11px', color:'#cbd5e1', marginTop:'4px'} }, '재직기간: '+workYears+' ('+hireDate+(retireDate?' ~ '+retireDate:' ~ 현재')+')')
           ),
           h('div', { style:{ display:'flex', flexDirection:'column', gap:'5px', alignItems:'flex-end' } },

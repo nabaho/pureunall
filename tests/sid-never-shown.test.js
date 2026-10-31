@@ -18,8 +18,8 @@
 
    ⚠ 이 검사는 «모양»을 찾는다. 새는 모양을 새로 발견하면 SHAPES 에 한 줄 보태고, 합당한 예외가 정말 있으면
      ALLOW 에 «왜 괜찮은지»와 함께 적는다(귀찮아서 적지 말 것 — tests/test-pin-guard.test.js 의 정신과 같다).
-   ⚠ 문서(급여명세서·급여대장·인사기록카드 출력물)의 사번은 법적 기재 사항 확인이 끝나기 전까지 이 검사 밖이다
-     (대표 결정 대기 — status/2026-10-25-hide-sid-everywhere.md). */
+   ⚠ 문서(급여명세서·급여대장·인사기록카드 출력물)는 2026-10-31 대표 결정(「사번은 숨겨라」)으로 «tests/sid-hidden-in-docs.test.js» 가 따로 지킨다.
+     법 확인: 근로기준법 시행령 제27조·제27조의2 — 사원번호는 «예시»라 성명·생년월일이면 된다(status/2026-10-31-hide-sid-docs.md). */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
