@@ -57,8 +57,14 @@
       re: /창조혁신|창조경제|창업마루|창업현장/, url: 'https://ccei.creativekorea.or.kr/chungnam/' },
     { id: 'sei',    name: '한국사회적기업진흥원',  what: '프로보노',
       re: /프로보노|사회적기업진흥원/, url: 'https://www.socialenterprise.or.kr/' },
+    /* 공단 중소기업 AI훈련확산센터 «AI훈련코치»(= AX 강사·코칭) — 센터(지역 운영기관)마다 따로 모집한다.
+       ⚠ 2026 모집은 3월(충청권 한국생산성본부 ~3.27), 공단 능력개발전담주치의 게시판(hrd4u mId=34)에 안내가 올라온다.
+       ⚠ 주소는 2026-10-31 에 열리는 것을 확인한 게시판 목록이다(2027 모집 글은 아직 없다). */
+    { id: 'hrdkai', name: '공단 AI훈련코치(AX 코칭)', what: '중소기업 AI훈련확산센터 AI훈련코치·AX 강사',
+      re: /AI\s*훈련\s*(?:확산|코치)|AX\s*(?:코치|코칭|강사)|AI\s*특화\s*공동훈련/, url: 'https://www.hrd4u.or.kr/hrddoctor/web/board/list.do?mId=34' },
     { id: 'hrdk',   name: '한국산업인력공단',      what: 'NCS·공정채용 컨설턴트·전문가 인력풀',
-      re: /NCS|공정채용|산업인력공단|HRD\s*전문가/, url: 'https://www.hrd4u.or.kr/expertpool/main.do' },
+      re: /NCS|공정채용|산업인력공단|HRD\s*전문가/, not: /AI\s*훈련\s*(?:확산|코치)|AX\s*(?:코치|코칭|강사)|AI\s*특화\s*공동훈련/,
+      url: 'https://www.hrd4u.or.kr/expertpool/main.do' },
     { id: 'family', name: '가족친화 지원사업',     what: '가족친화 컨설턴트·인증심사원',
       re: /가족친화/, url: 'https://www.ffsb.kr/ffsbbod/bs/boardList.do?boardSeq=1' },
     { id: 'cnse',   name: '충남사회적경제지원센터', what: '컨설턴트·위원',
