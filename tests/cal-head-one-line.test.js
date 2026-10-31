@@ -57,7 +57,7 @@ function 머리그려본다(탭, 더) {
   };
   vm.createContext(상자);
   const 이름들 = ['function esc(s){', 'function arr(v){', 'function todayYMD(){',
-    'function allUsers(){', 'function users(){', 'function userOf(sid){', 'function nameOf(sid){',
+    'function allUsers(){', 'function users(){', 'function 사번순(list, 내사번){', 'function userOf(sid){', 'function nameOf(sid){',
     'function externalOf(id){', 'function colorOf(sid){', 'function holidayOf(ymd){',
     'function gcalMailKey(m){', 'function gcalMailMap(){', 'function gcalSidByMail(mail){',
     'function gcalPalette(){', 'function gcalMailColor(mail){', 'function gcalToEvent(ev){',
