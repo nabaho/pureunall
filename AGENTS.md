@@ -29,6 +29,8 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 `scripts/make-firebase-rules.js` 를 고치고 다시 만든다. JSON 을 손으로 고치면
 다음에 만들 때 조용히 사라진다. 올리는 것은 `node scripts/rules-deploy.js --deploy` 다
 (살아 있는 콘솔을 읽어 견주고, 사라질 규칙이 있으면 멈춘다).
+firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Firebase 배포」(`.github/workflows/firebase-deploy.yml`,
+수동 실행·main 만)를 부른다 — 그 안에서도 규칙은 `rules-deploy.js` 로만, 함수는 이름을 찍어서만, 열쇠는 GitHub 비밀에만(`docs/배포-클라우드에서.md`).
 → `tests/firebase-rules-apply.test.js`
 
 **창고(Storage) 규칙은 딴 길이다** (2026-09-08) — `docs/firebase-storage-전체(붙여넣기용).txt`

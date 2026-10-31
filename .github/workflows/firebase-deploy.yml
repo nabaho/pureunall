@@ -1,0 +1,112 @@
+name: Firebase 배포 (규칙·서버 함수·매일 정리 스위치)
+
+# 대표 지시 2026-10-31 「니가 직접 하면 안되나 아니면 한번에 하게 가능하게 하던가」
+#   — 대표 PC 가 아닌 곳(클라우드 방의 Claude)에서도 이 작업을 «실행»해 규칙 게시·서버 함수 배포·스위치를 한 번에 한다.
+#     사람도 GitHub › Actions › 「Firebase 배포」 › Run workflow 로 똑같이 누를 수 있다. 쓰는 법: docs/배포-클라우드에서.md
+#
+# ★ 열쇠는 GitHub 비밀에만 — 저장소는 공개다. FIREBASE_SERVICE_ACCOUNT(서비스 계정 JSON, 권장) 또는 FIREBASE_TOKEN.
+#   비밀이 없으면 첫 단계에서 멈춘다(아무것도 안 올린다). 열쇠 파일은 끝에 지운다.
+# ★ 수동 실행(workflow_dispatch)만, main 에서만 — push·PR 로는 안 돈다(남이 연 PR 이 배포를 부를 길이 없다).
+# ⚠ 규칙은 반드시 scripts/rules-deploy.js 로만 올린다 — 살아 있는 콘솔과 견줘 사라질 규칙·승인 없는 헐거워짐이면 멈춘다.
+#   여기서 `firebase deploy --only database` 를 직접 부르거나 우회 깃발을 만들지 말 것(CLAUDE.md 파이어베이스 보안규칙 절).
+# ⚠ 서버 함수는 이름을 찍어서만 — 이름은 scripts/firebase-deploy-check.js 가 functions/index.js 와 견준다(전체 배포 금지 — 할당량).
+# ⚠ 입력은 env 로만 넘긴다 — run: 안에 입력 식을 바로 넣으면 입력 글이 셸 명령이 된다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rules:
+        description: '① 보안규칙 게시 (scripts/rules-deploy.js --deploy — 사라질 규칙·승인 없는 헐거워짐이면 멈춤)'
+        type: boolean
+        default: false
+      functions:
+        description: '② 배포할 서버 함수 이름(쉼표로, 많아야 10개). 비우면 함수는 안 올림. 예: collectRulesMail,collectRulesMailAsk'
+        type: string
+        default: ''
+      daily_mode:
+        description: '③ 취업규칙 🤖 매일 정리 스위치 — 비우면 안 바꿈 (dry 시범 · live 켜기 · off 끄기)'
+        type: choice
+        options: ['', 'dry', 'live', 'off']
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: firebase-prod
+    timeout-minutes: 30
+    env:
+      RULES_INPUT: ${{ inputs.rules }}
+      FN_INPUT: ${{ inputs.functions }}
+      MODE_INPUT: ${{ inputs.daily_mode }}
+      PROJECT: pureun-erp
+      INSTANCE: pureun-erp-default-rtdb
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: 열쇠 준비
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FB_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$SA_JSON" ]; then
+            umask 077
+            printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+            echo "열쇠: 서비스 계정"
+          elif [ -n "$FB_TOKEN" ]; then
+            echo "FIREBASE_TOKEN=$FB_TOKEN" >> "$GITHUB_ENV"
+            echo "열쇠: login:ci 토큰"
+          else
+            echo "::error::배포 열쇠가 없습니다 — GitHub › Settings › Secrets and variables › Actions 에 FIREBASE_SERVICE_ACCOUNT 를 넣어 주세요(docs/배포-클라우드에서.md). 아무것도 올리지 않았습니다."
+            exit 1
+          fi
+
+      - name: 할 일 확인
+        run: |
+          if [ "$RULES_INPUT" != "true" ] && [ -z "$FN_INPUT" ] && [ -z "$MODE_INPUT" ]; then
+            echo "::error::할 일이 없습니다 — ①·②·③ 가운데 하나는 골라 주세요."
+            exit 1
+          fi
+          if [ -n "$FN_INPUT" ]; then
+            ONLY="$(node scripts/firebase-deploy-check.js "$FN_INPUT")" || exit 1
+            echo "ONLY=$ONLY" >> "$GITHUB_ENV"
+            echo "올릴 함수: $ONLY"
+          fi
+
+      - name: firebase-tools 설치
+        run: npm i -g firebase-tools@14 --no-audit --no-fund
+
+      - name: ① 보안규칙 게시 (안전장치째)
+        if: inputs.rules
+        run: node scripts/rules-deploy.js --deploy
+
+      - name: ② 서버 함수 배포 (이름 찍어서)
+        if: inputs.functions != ''
+        run: |
+          (cd functions && npm ci --no-audit --no-fund)
+          firebase deploy --only "$ONLY" --project "$PROJECT" --non-interactive
+
+      - name: ③ 취업규칙 매일 정리 스위치
+        if: inputs.daily_mode != ''
+        run: |
+          case "$MODE_INPUT" in dry|live|off) ;; *) echo "::error::모르는 모드: $MODE_INPUT"; exit 1;; esac
+          printf '{"mode":"%s","by":"github-actions","at":%s}' "$MODE_INPUT" "$(date +%s%3N)" > "$RUNNER_TEMP/cfg.json"
+          # --force 는 «이 한 칸을 덮어써도 되나» 묻는 확인 창을 넘기는 깃발이다(안전장치 우회가 아니다 — 쓰는 자리·값은 위에서 못 박았다)
+          firebase database:set /rules_mgmt/library/auto/cfg "$RUNNER_TEMP/cfg.json" --project "$PROJECT" --instance "$INSTANCE" --force
+          echo "지금 스위치:"
+          firebase database:get /rules_mgmt/library/auto/cfg --project "$PROJECT" --instance "$INSTANCE"
+
+      - name: 열쇠 지우기
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json" "$RUNNER_TEMP/cfg.json"

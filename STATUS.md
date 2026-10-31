@@ -236,6 +236,9 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 코드·검사는 PR 에 있고, **클라우드 방에서는 배포가 안 돼** 대표 PC 에서 아래를 해야 돈다(`status/2026-10-31-rules-daily.md`).
 - [x] 규칙 게시 — 대표가 콘솔에 먼저 올렸다(2026-10-31). 컨설팅정산 게시 때 콘솔 원문 새 판(`docs/firebase-rules-콘솔원문-2026-10-31.json`)·`tests/photos-staff-share.test.js` PENDING 비움까지 함께 끝냈다
 - [ ] 함수 배포 — `firebase deploy --only functions:collectRulesMail,functions:collectRulesMailAsk` (회차 끝에 매일 정리가 돈다)
+  ★ 클라우드 방에서도 된다(2026-10-31 대표 「니가 직접」) — GitHub 작업 「Firebase 배포」(`.github/workflows/firebase-deploy.yml`)를
+    `functions=collectRulesMail,collectRulesMailAsk` · `daily_mode=live` 로 부르면 함수 배포와 켜기가 한 번에 된다.
+    ⚠ 그 전에 대표가 GitHub 비밀 `FIREBASE_SERVICE_ACCOUNT` 를 한 번 넣어야 한다(`docs/배포-클라우드에서.md` §1). 넣으면 Claude 가 부른다
 - [ ] 시범 결과 보기 — 📥 모은 자료 › 🤖 매일 정리 의 «자동 확정했을 것» 줄을 훑어 엉뚱한 회사가 없으면 관리자가 「켜기」
 - 설계 `docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md` §14
 

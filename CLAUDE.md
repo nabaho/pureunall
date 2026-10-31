@@ -222,6 +222,10 @@ phone-audit 와 같은 자(`measure.js`)로 잰다. 고치는 순서: 갈무리�
 - firebase CLI 는 이 PC 에 로그인돼 있다(현재 프로젝트 `pureun-erp`).
   로그인이 풀렸거나 CLI 가 없으면 자동 배포가 안 된다 — 그때만 `docs/rules-paste.json`
   을 사람에게 건네 붙여넣게 한다.
+- ★ **클라우드 방(대표 PC 가 아닌 곳)에서는 GitHub 작업 「Firebase 배포」를 부른다**(대표 지시 2026-10-31 「니가 직접 하면 안되나 … 한번에 하게」) —
+  `.github/workflows/firebase-deploy.yml`(수동 실행·main 만). 그 안에서도 규칙은 `rules-deploy.js --deploy` 로만, 함수는 이름을 찍어서만,
+  열쇠는 GitHub 비밀(`FIREBASE_SERVICE_ACCOUNT`)에만. 올린 뒤 새 기준 파일·PENDING 정리 PR 은 부른 쪽이 만든다. 쓰는 법 `docs/배포-클라우드에서.md`
+  (`tests/firebase-deploy-workflow.test.js` 가 울타리를 지킨다).
 - 읽을 문서: `docs/firebase-rules-적용안내.md` · `docs/firebase-rules-읽어보세요.md`.
 
 **예전 방식을 되살리지 말 것** — 채팅에 규칙 전문을 통째 부어 대표가 붙여넣게 하는 것은
