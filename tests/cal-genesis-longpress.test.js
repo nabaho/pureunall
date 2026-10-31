@@ -204,7 +204,7 @@ test('⑤ 짧게 누르기(지도 보기)는 그대로다 — 상세의 주소 �
 
 test('⑤ 화면 끼움: 그리기에 창 · 클릭 위임에 data-gen(후보함보다 앞에서 받음) · Esc 로 닫기', () => {
   assert.ok(/html \+= 제네시스창Html\(\);/.test(캘린더));
-  assert.ok(/\[data-cand\],\[data-gen\]'\) : null;/.test(캘린더));
+  assert.ok(/\[data-cand\],\[data-gen\][^']*'\) : null;/.test(캘린더), '후보함 뒤에 data-gen 이 눌림 목록에 있는가(뒤에 다른 것이 더 붙어도 된다)');
   const 젠 = 캘린더.indexOf("if(t.hasAttribute('data-gen')){ 제네시스누름(t); return; }");
   const 후보 = 캘린더.indexOf("if(t.hasAttribute('data-cand')){ 후보누름(t); return; }");
   assert.ok(젠 > 0 && 후보 > 젠);
