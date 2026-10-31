@@ -134,7 +134,8 @@
     progs.forEach(function (p) { if (!p || !p.id || p._deleted) return; byId[p.id] = p; M.list(p.bizinfo).forEach(function (no) { linkOf[clean(no)] = p; }); });
     return rows(noticesMap).filter(function (n) { return n && clean(n.id); }).map(function (n) {
       var sug = M.list(n.suggest).filter(function (s) { return s && byId[s.id]; }).map(function (s) { return { p: byId[s.id], score: s.score }; });
-      return { n: n, linkedTo: linkOf[clean(n.no || n.id)] || null, sug: sug };
+      var cos = view === 'local' ? M.list(opt.profiles).filter(function (pf) { var v = pf.vals || {}; return !!areaMatch(n, (v.region || {}).v, (v.sigungu || {}).v); }).length : 0;
+      return { n: n, linkedTo: linkOf[clean(n.no || n.id)] || null, sug: sug, cos: cos };
     }).filter(function (r) {
       var n = r.n, open = !clean(n.closeDt) || clean(n.closeDt) >= today, fresh = !n.decision && !r.linkedTo;
       if (opt.openOnly && !open) return false;
@@ -143,9 +144,49 @@
       if (view === 'ignored') return n.decision === 'ignore';
       if (!fresh) return false;
       if (view === 'sug') return r.sug.length > 0;
+      if (view === 'local') return r.cos > 0;   /* 지역 공고 — 우리 고객사가 있는 지역만 */
       if (view === 'labor') return LABOR_FIELDS.indexOf(clean(n.field)) >= 0;
       return true;
-    }).sort(function (a, b) { return clean(b.n.openDt).localeCompare(clean(a.n.openDt)) || clean(a.n.nm).localeCompare(clean(b.n.nm), 'ko'); });
+    }).sort(function (a, b) { return (b.cos - a.cos) || clean(b.n.openDt).localeCompare(clean(a.n.openDt)) || clean(a.n.nm).localeCompare(clean(b.n.nm), 'ko'); });
+  }
+  /* 📍 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」 → 「추천대로」: 공고 그대로 회사에 매칭).
+     공고 area = {sido:[…], sgg:[…]}(서버가 이름 앞 [충남] 아산시 … 에서 읽음). 시·도가 같고, 시·군 공고면 시·군도 같아야 맞음.
+     ⚠ 지역만 맞춘 «넓은 1차 명단»이다 — 공고마다 세부 조건이 달라 기계가 확정하지 않는다(화면이 «원문 확인»을 붙인다) */
+  function areaMatch(n, region, sgg) {
+    var a = (n && n.area) || {}, sido = M.list(a.sido), g = M.list(a.sgg);
+    if (!clean(region) || sido.indexOf(clean(region)) < 0) return '';
+    if (g.length) return g.indexOf(clean(sgg)) >= 0 ? 'sgg' : '';
+    return 'sido';
+  }
+  function openNow(n, today) { return !clean(n.closeDt) || clean(n.closeDt) >= today; }
+  function localNotices(profile, noticesMap, today) {
+    var v = (profile && profile.vals) || {}, region = (v.region || {}).v, sgg = (v.sigungu || {}).v, hc = M.num((v.headcount || {}).v);
+    return rows(noticesMap).filter(function (n) { return n && clean(n.id) && !n.decision && openNow(n, today); }).map(function (n) {
+      var scope = areaMatch(n, region, sgg); if (!scope) return null;
+      var who = M.list(n.who), small = who.indexOf('소상공인') >= 0 && who.indexOf('중소기업') < 0;
+      /* 소상공인 — 상시 근로자 10명 미만(제조·건설·운수, 그 밖은 5명 미만)이 상한이라 10명 이상이면 어긋남(추정) */
+      return { n: n, scope: scope, mismatch: small && hc != null && hc >= 10 ? '소상공인 대상 — 이 회사 근로자 ' + hc + '명(추정 어긋남)' : '' };
+    }).filter(Boolean).sort(function (a, b) {
+      return (a.scope === b.scope ? 0 : (a.scope === 'sgg' ? -1 : 1)) || (!!a.mismatch - !!b.mismatch) || clean(b.n.openDt).localeCompare(clean(a.n.openDt));
+    });
+  }
+  /* 지역 요약 — 고객사가 있는 시·도·시·군마다 고객사 수 · 그 시·군 공고 · 도 전체 공고(접수 중, 처리 안 한 것) */
+  function regionSummary(profiles, noticesMap, today) {
+    var by = {}, out = [], open = rows(noticesMap).filter(function (n) { return n && !n.decision && openNow(n, today) && M.list((n.area || {}).sido).length; });
+    profiles.forEach(function (pf) {
+      var v = pf.vals || {}, r = clean((v.region || {}).v), g = clean((v.sigungu || {}).v), k = r + '|' + g;
+      if (!by[k]) { by[k] = { sido: r, sgg: g, cos: 0, sggOpen: 0, sidoOpen: 0, star: 0 }; out.push(by[k]); }
+      by[k].cos++;
+    });
+    out.forEach(function (x) {
+      if (!x.sido) return;
+      open.forEach(function (n) {
+        var s = areaMatch(n, x.sido, x.sgg);
+        if (s === 'sgg') x.sggOpen++; else if (s === 'sido') x.sidoOpen++;
+        if (s && n.star && n.star.on) x.star++;
+      });
+    });
+    return out.sort(function (a, b) { return (!a.sido - !b.sido) || (b.cos - a.cos); });
   }
   function noticeCount(noticesMap, progs, today) { return noticeRows(noticesMap, progs, { view: 'sug', openOnly: true, today: today }).length; }
   /* ★ 노무사 직접 사업 — 화면마다 같은 잣대(대표 지시 2026-10-13 「모든 영역에서」) */
@@ -156,5 +197,5 @@
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
     ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
-    noticeRows: noticeRows, noticeCount: noticeCount, isStar: isStar, starOnly: starOnly };
+    noticeRows: noticeRows, noticeCount: noticeCount, localNotices: localNotices, regionSummary: regionSummary, areaMatch: areaMatch, isStar: isStar, starOnly: starOnly };
 });

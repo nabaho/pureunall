@@ -102,3 +102,29 @@ test('제안은 «거의 같은 이름»만 — 낱말 몇 개만 겹치는 다�
   assert.deepEqual(W.suggest(row('P1', '[부산] 영도구 2026년 소상공인 보증료 지원사업 공고', '', ''), ps), [], '보증료 ≠ 고용보험료');
   assert.equal(W.suggest(row('P2', '[울산] 2026년 소상공인 고용보험료 지원사업 공고', '', ''), ps)[0].id, 'ei', '같은 사업의 지역 공고는 제안한다');
 });
+
+/* 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」) — 이름 앞 [지역]·시군을 칸으로 */
+test('공고 지역 — [시·도] 머리와 바로 뒤의 시·군·구만 읽는다(본문 낱말은 안 읽는다)', () => {
+  assert.deepEqual(W.areaOf('[충남] 아산시 2026년 해외마케팅 지원사업 참가기업 모집 공고'), { sido: ['충남'], sgg: ['아산시'] });
+  assert.deepEqual(W.areaOf('[충남]  공주시 2026년 소상공인 특례보증 지원계획 공고'), { sido: ['충남'], sgg: ['공주시'] });
+  assert.deepEqual(W.areaOf('[경기] 수원시ㆍ용인시ㆍ화성시 2026년 청년일자리도약장려금 참여기업 모집'), { sido: ['경기'], sgg: ['수원시', '용인시', '화성시'] });
+  assert.deepEqual(W.areaOf('[대구ㆍ경북] 2026년 사회적가치형 청년 일경험 지원사업'), { sido: ['대구', '경북'], sgg: [] });
+  assert.deepEqual(W.areaOf('[전남광주] 2026년 해외지사화 지원사업'), { sido: ['전남', '광주'], sgg: [] });
+  assert.deepEqual(W.areaOf('[충남] 2026년 중소기업육성자금 융자 지원계획 공고'), { sido: ['충남'], sgg: [] });
+  assert.deepEqual(W.areaOf('2026년 스마트 제조혁신 지원사업 통합 공고'), { sido: [], sgg: [] }, '머리가 없으면 전국 공고');
+  assert.deepEqual(W.areaOf('[충남] 2026년 도시재생 연구 지원'), { sido: ['충남'], sgg: [] }, '본문 «도시»·«연구»를 시·구로 읽지 않는다');
+});
+test('공고 대상 — 이름·요약·대상 칸에서 정해진 낱말만', () => {
+  assert.deepEqual(W.whoOf('[충남] 2026년 소상공인자금 융자', '', ''), ['소상공인']);
+  assert.deepEqual(W.whoOf('중소기업 수출 지원', '예비창업자 포함', '중소기업'), ['중소기업', '창업', '수출']);
+  assert.deepEqual(W.whoOf('어느 공고', '', ''), []);
+});
+test('저장 — 새 공고에 지역·대상 칸이 붙고, 있는 공고도 서버 칸으로 고쳐진다', () => {
+  const r = W.plan({ rows: [row('L1', '[충남] 아산시 2026년 해외마케팅 지원사업', '2026-10-01', '2026-11-14')], programs: [], existing: { L2: { id: 'L2', seenAt: NOW } },
+    today: TODAY, nowMs: NOW });
+  assert.deepEqual(r.updates['notices/L1'].area, { sido: ['충남'], sgg: ['아산시'] });
+  assert.ok(Array.isArray(r.updates['notices/L1'].who));
+  const r2 = W.plan({ rows: [row('L2', '[충북] 2026년 소상공인 지원', '', '')], programs: [], existing: { L2: { id: 'L2', seenAt: NOW } }, today: TODAY, nowMs: NOW });
+  assert.deepEqual(r2.updates['notices/L2/area'], { sido: ['충북'], sgg: [] });
+  assert.deepEqual(r2.updates['notices/L2/who'], ['소상공인']);
+});

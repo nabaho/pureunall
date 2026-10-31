@@ -288,3 +288,25 @@ test('접수 중·모름·표시 없음은 판정에 영향 없음', () => {
     assert.equal(M.closureOf(p).closed, false);
   });
 });
+
+/* 지자체 사업 연결 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭등도 모두 연결」) — 회사의 시·군·구 */
+test('주소 → 시·군·구 — 시·도 다음 낱말이 시·군·구일 때만, 모르면 빈 글자', () => {
+  assert.equal(M.sigunguOf('충남 아산시 배방읍 …'), '아산시');
+  assert.equal(M.sigunguOf('(31116) 충청남도 천안시 동남구 …'), '천안시');
+  assert.equal(M.sigunguOf('서울특별시 강남구 테헤란로'), '강남구');
+  assert.equal(M.sigunguOf('경기도 수원시 영통구'), '수원시');
+  assert.equal(M.sigunguOf('세종특별자치시 한누리대로'), '', '세종은 시·군이 없다');
+  assert.equal(M.sigunguOf('광주시 오포읍'), '', '시·도를 모르면 시·군도 모름');
+  assert.equal(M.sigunguOf(''), '');
+});
+test('회사 지역 — 업체관리 주소가 없으면 고용보험 사업장 주소로(출처 꼬리표), 시·군도 함께', () => {
+  const a = M.profileFromCompany({ id: 'c1', address: '충남 아산시 배방읍' }, null, null);
+  assert.equal(a.vals.region.v, '충남');
+  assert.deepEqual(a.vals.sigungu, { v: '아산시', src: '업체관리 주소' });
+  const b = M.profileFromCompany({ id: 'c2', address: '' }, { ei: { gy: 3, rows: [{ fg: 'gy', addr: '충청남도 서산시 대산읍', cnt: 3 }] } }, null);
+  assert.equal(b.vals.region.v, '충남');
+  assert.match(b.vals.region.src, /고용보험/);
+  assert.equal(b.vals.sigungu.v, '서산시');
+  const c = M.profileFromCompany({ id: 'c3', address: '' }, null, null);
+  assert.equal(c.vals.sigungu.v, null);
+});

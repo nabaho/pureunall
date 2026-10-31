@@ -211,3 +211,28 @@ test('회사 목록 — 지역·인원 꼬리말을 빼고, ☐·번호·사업�
   assert.match(f, /co-head/, '열 머리줄이 없다');
   assert.match(NOC, /\.li\.co-row\{[^}]*grid-template-columns/, '열을 격자로 맞추지 않는다');
 });
+
+/* 📍 지자체 공고 (대표 지시 2026-10-31 → 「추천대로 순서대로」 1단계) */
+test('회사 중심 «📍 우리 지역 공고» — 공고 함을 읽은 뒤 그 회사 지역에 맞는 공고를 ☐ + 번호 표로(관계없음·사전으로·★)', () => {
+  const f = fnBody('coLocal');
+  assert.match(fnBody('drawCoDetail'), /coLocal\(/);
+  assert.match(f, /GovaidView\.localNotices\(/);
+  assert.match(f, /tbl\('coLocal'/);
+  assert.match(f, /우리 지역 공고/);
+  assert.match(f, /data-ndraft|data-nignore/);
+});
+test('새 공고 «지역 공고» 보기 — 지역 요약표(regionSummary)와 해당 고객사 수', () => {
+  assert.match(NOC, /<option value="local">/);
+  const f = fnBody('drawNews');
+  assert.match(f, /regionTable\(/);
+  assert.match(fnBody('regionTable'), /GovaidView\.regionSummary\(/);
+  assert.match(f, /profiles:\s*PROFILES/);
+});
+test('공고에도 ★ — 공고 함 자리에 GovaidRecords.starred 로', () => {
+  const f = fnBody('toggleNoticeStar');
+  assert.match(f, /GovaidRecords\.starred\(/);
+  assert.match(f, /govaid\/notices\//);
+});
+test('사업 사전에 «범위»(전국·시·도) 열', () => {
+  assert.match(fnBody('drawDict'), /'범위'/);
+});

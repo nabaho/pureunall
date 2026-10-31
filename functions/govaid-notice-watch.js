@@ -20,7 +20,21 @@ const FIELDS = Object.keys(BIZ.FIELDS);          // 금융·기술·인력·수�
 /* 0.65 — 2026-10-12 첫 실측(공고 1,462건): 0.5 면 115건 중 «보증료 → 고용보험료» 같은 엉뚱한 짝이 섞였고, 0.65 에서 56건으로 대부분 맞았다 */
 const MIN_SCORE = 0.65, MAX_SUGGEST = 3;
 const KEEP_DAYS = 150;                           // 사람이 처리하지 않은 공고를 남기는 날수(마지막으로 본 날부터)
-const SERVER_FIELDS = ['nm', 'url', 'inst', 'ntce', 'field', 'startDt', 'closeDt', 'openDt', 'memo', 'suggest', 'seenAt', 'updatedAt'];
+const SERVER_FIELDS = ['nm', 'url', 'inst', 'ntce', 'field', 'startDt', 'closeDt', 'openDt', 'memo', 'target', 'area', 'who', 'suggest', 'seenAt', 'updatedAt'];
+/* 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」) — 기업마당은 지자체 공고 이름 앞에 [충남]·[대구ㆍ경북] 처럼 시·도를,
+   그 바로 뒤에 «아산시»·«수원시ㆍ용인시» 처럼 시·군·구를 붙인다. 머리와 그 바로 뒤만 읽는다 — 본문의 «도시»·«연구»를 시·구로 읽지 않게 */
+const SIDO = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+function areaOf(nm) {
+  const m = /^\s*\[([^\]]+)\]\s*(.*)$/.exec(s(nm));
+  if (!m) return { sido: [], sgg: [] };
+  const sido = SIDO.filter((x) => m[1].indexOf(x) >= 0).sort((a, b) => m[1].indexOf(a) - m[1].indexOf(b));
+  const g = /^((?:[가-힣]{1,6}(?:시|군|구)\s*[ㆍ·,]?\s*)+)(?=\s|20\d\d|$)/.exec(m[2]);
+  const sgg = g ? g[1].split(/[ㆍ·,\s]+/).filter((x) => /^[가-힣]{1,6}(시|군|구)$/.test(x)) : [];
+  return { sido, sgg: sido.length ? sgg : [] };
+}
+/* 대상 — 회사와 어긋나는지 볼 때만 쓰는 정해진 낱말(소상공인이면 근로자 많은 회사는 흐리게) */
+const WHO = [['소상공인', /소상공인/], ['중소기업', /중소기업/], ['중견기업', /중견기업/], ['창업', /창업/], ['사회적경제', /사회적(경제|기업)|협동조합/], ['여성기업', /여성기업/], ['장애인기업', /장애인기업/], ['수출', /수출/], ['제조', /제조/], ['청년', /청년/]];
+function whoOf(nm, memo, target) { const t = [nm, memo, target].map(s).join(' '); return WHO.filter((w) => w[1].test(t)).map((w) => w[0]); }
 
 function s(v) { return v == null ? '' : String(v).trim(); }
 function list(v) { return Array.isArray(v) ? v.filter((x) => x != null) : (v && typeof v === 'object' ? Object.keys(v).map((k) => v[k]).filter((x) => x != null) : []); }
@@ -66,7 +80,7 @@ function combine(cs) {
 }
 
 function noticeRecord(row, sug, today, nowMs, prev) {
-  const base = { nm: s(row.nm).slice(0, 300), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '', inst: s(row.inst).slice(0, 120), ntce: s(row.ntce).slice(0, 120),
+  const base = { area: areaOf(row.nm), who: whoOf(row.nm, row.memo, row.target), target: s(row.target).slice(0, 120), nm: s(row.nm).slice(0, 300), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '', inst: s(row.inst).slice(0, 120), ntce: s(row.ntce).slice(0, 120),
     field: s(row.field).slice(0, 40), startDt: s(row.startDt), closeDt: s(row.closeDt), openDt: s(row.openDt), memo: s(row.memo).slice(0, 300),
     suggest: sug, seenAt: nowMs, updatedAt: nowMs };
   if (prev) return base;
@@ -150,4 +164,4 @@ async function run(a) {
   }
 }
 
-module.exports = { run, plan, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };
+module.exports = { run, plan, areaOf, whoOf, SIDO, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };

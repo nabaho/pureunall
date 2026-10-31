@@ -152,3 +152,42 @@ test('별표 — 켜진 사업만 ★, 거르기는 별 사업만 남긴다', ()
   assert.deepEqual(V.starOnly(P, true).map((p) => p.id), ['a']);
   assert.deepEqual(V.starOnly(P, false).map((p) => p.id), ['a', 'b', 'c']);
 });
+
+/* 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」 → 「추천대로」: 공고 그대로 회사에 매칭) */
+const T31 = '2026-10-31';
+const LN = {
+  a: { id: 'a', nm: '[충남] 아산시 해외마케팅', area: { sido: ['충남'], sgg: ['아산시'] }, who: ['중소기업'], closeDt: '2026-11-14', openDt: '2026-10-01' },
+  b: { id: 'b', nm: '[충남] 중소기업육성자금', area: { sido: ['충남'], sgg: [] }, who: ['중소기업'], closeDt: '', openDt: '2026-01-02' },
+  c: { id: 'c', nm: '[충남] 공주시 특례보증', area: { sido: ['충남'], sgg: ['공주시'] }, who: ['소상공인'], closeDt: '', openDt: '2026-02-01' },
+  d: { id: 'd', nm: '[충남] 소상공인자금', area: { sido: ['충남'], sgg: [] }, who: ['소상공인'], closeDt: '', openDt: '2026-01-05' },
+  e: { id: 'e', nm: '[충남] 마감 공고', area: { sido: ['충남'], sgg: [] }, who: [], closeDt: '2026-09-30', openDt: '2026-09-01' },
+  f: { id: 'f', nm: '[충남] 관계없음 둔 것', area: { sido: ['충남'], sgg: [] }, who: [], closeDt: '', decision: 'ignore', openDt: '2026-03-01' },
+  g: { id: 'g', nm: '전국 공고', area: { sido: [], sgg: [] }, who: [], closeDt: '', openDt: '2026-03-01' },
+  h: { id: 'h', nm: '[경기] 수원시 공고', area: { sido: ['경기'], sgg: ['수원시'] }, who: [], closeDt: '', openDt: '2026-03-01' },
+};
+const pfOf = (key, region, sgg, hc) => ({ key, kind: 'co', vals: { region: { v: region }, sigungu: { v: sgg }, headcount: { v: hc } }, facts: {} });
+test('우리 지역 공고 — 시·도가 같고, 시·군 공고면 시·군도 같아야, 접수 중·처리 안 한 것만, 시·군 공고가 먼저', () => {
+  const rs = V.localNotices(pfOf('co_1', '충남', '아산시', 22), LN, T31);
+  assert.deepEqual(rs.map((r) => r.n.id), ['a', 'b', 'd']);
+  assert.equal(rs[0].scope, 'sgg');
+  assert.equal(rs[1].scope, 'sido');
+  assert.match(rs[2].mismatch, /소상공인/, '근로자 22명 — 소상공인 대상 공고는 흐리게');
+  assert.equal(rs[1].mismatch, '');
+  assert.deepEqual(V.localNotices(pfOf('co_2', '', '', 3), LN, T31), [], '지역을 모르면 없음');
+});
+test('지역 요약 — 고객사가 있는 시·도·시·군마다 고객사 수와 접수 중 지역 공고 수(시·군 + 도 전체)', () => {
+  const S = V.regionSummary([pfOf('co_1', '충남', '아산시', 5), pfOf('co_2', '충남', '아산시', 5), pfOf('co_3', '충남', '천안시', 5), pfOf('co_4', '', '', 5)], LN, T31);
+  const as = S.find((x) => x.sido === '충남' && x.sgg === '아산시');
+  assert.equal(as.cos, 2);
+  assert.equal(as.sggOpen, 1);
+  assert.equal(as.sidoOpen, 2, '도 전체 공고 b·d');
+  assert.equal(S[0].sgg, '아산시', '고객사 많은 곳이 먼저');
+  assert.ok(S.some((x) => x.sido === '' && x.cos === 1), '지역 모름도 센다');
+});
+test('새 공고 «지역 공고» 보기 — 고객사가 있는 지역의 지역 공고만, 해당 고객사 수를 단다', () => {
+  const P = [pfOf('co_1', '충남', '아산시', 5), pfOf('co_2', '충남', '천안시', 5)];
+  const rs = V.noticeRows(LN, [], { view: 'local', openOnly: true, today: T31, profiles: P });
+  assert.deepEqual(rs.map((r) => r.n.id).sort(), ['a', 'b', 'd']);
+  assert.equal(rs.find((r) => r.n.id === 'b').cos, 2);
+  assert.equal(rs.find((r) => r.n.id === 'a').cos, 1);
+});
