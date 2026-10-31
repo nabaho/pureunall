@@ -254,6 +254,10 @@
     }
     return n;
   }
+  /* 「공인노무사 권형하」·「대표/ 공인노무사 박 한 별」 → 「권형하, 박한별」 */
+  function cellNamesLine(lines) {
+    return (lines || []).map(function (x) { return String(x || '').replace(/^\s*(?:대표\s*\/?\s*)?공인\s*노무사\s*/, '').replace(/\s+/g, ''); }).filter(Boolean).join(', ');
+  }
   function applyLawyerLine(doc, line, lines) {
     if ((!line && !(lines && lines.length)) || !doc) return 0;
     var js = function (q) { try { return JSON.parse(doc.searchAllText(q, false, true)) || []; } catch (e) { return []; } };
@@ -277,7 +281,8 @@
       for (var i = paras.length - 1; i >= 0; i--) {
         var tx = String(paras[i].text || '');
         try {
-          if (c && NAME_CELL.test(tx)) { writeLines(A, paras[i].key, '', vertical); n++; continue; }
+          /* 표 칸에 이름만 든 꼴(한국공인노무사회 승인서식 사건위임계약서)은 한 줄로 이어 쓴다 — 세로로 늘리면 1쪽 공식 서식이 2쪽이 된다(대표 「추천대로」 2026-10-31) */
+          if (c && NAME_CELL.test(tx)) { A.set(paras[i].key, cellNamesLine(vertical)); n++; continue; }
           var m = NAMES_LINE.exec(tx); if (!m) continue;
           var reuse = [];
           for (var j = i + 1; j < paras.length && NAME_ONLY.test(String(paras[j].text || '')); j++) reuse.push(paras[j].key);
@@ -289,7 +294,7 @@
   }
 
   var api = {
-    lawyerLineEdits: lawyerLineEdits, applyLawyerLine: applyLawyerLine, expandLawyerMarker: expandLawyerMarker, spacesFor: spacesFor, lawyerLinesOf: lawyerLinesOf,
+    lawyerLineEdits: lawyerLineEdits, applyLawyerLine: applyLawyerLine, cellNamesLine: cellNamesLine, expandLawyerMarker: expandLawyerMarker, spacesFor: spacesFor, lawyerLinesOf: lawyerLinesOf,
     withAliases: withAliases, fillMode: fillMode, caseForms: caseForms, hasRepForms: hasRepForms, PERSON_KEYS: PERSON_KEYS,
     MK_OPEN: MK_OPEN, MK_CLOSE: MK_CLOSE, BLANK: BLANK,
     mk: mk, markerAt: markerAt, markersOf: markersOf, fillDoc: fillDoc,
