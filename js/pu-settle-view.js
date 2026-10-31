@@ -13,7 +13,8 @@
 })(typeof self !== 'undefined' ? self : this, function (C) {
   'use strict';
 
-  var STATUS_KO = { draft: '계산만', confirmed: '확정', manual: '기록만' };
+  /* draft 는 «임시저장» — 서버에 저장돼 있고 확정 전까지 고칠 수 있다(대표 지시 2026-10-31 「임시저장기능 만들어 달라」) */
+  var STATUS_KO = { draft: '임시저장', confirmed: '확정', manual: '기록만' };
   var ROLE_KO = { lead: '주관', staff: '담당' };
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -30,20 +31,22 @@
     return out;
   }
 
-  /* ── ① 지급월 정산표 목록 ── */
-  function runsTable(runs, sel, bizNames) {
+  /* ── ① 지급월 정산표 목록 — 사업 종류마다 묶음 머리(사업 이름 전체) 아래 지급월 줄 ──
+     대표 지시 2026-10-31 「깔끔하게 볼수 있게」 「사업 이름 정확하게 알아야 된다」 — 줄마다 긴 사업 이름을 되풀이하지 않는다 */
+  function runsTable(runs, sel, bizNames, cur) {
     sel = sel || {}; bizNames = bizNames || {};
+    var bn = function (r) { return bizNames[r.typeCode] || r.typeCode || ''; };
     var list = (runs || []).filter(function (r) { return r && !r._deleted; })
-      .sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : a.monthKey > b.monthKey ? -1 : (a.typeCode < b.typeCode ? -1 : 1); });
+      .sort(function (a, b) { return bn(a) < bn(b) ? -1 : bn(a) > bn(b) ? 1 : (a.monthKey < b.monthKey ? 1 : -1); });
     if (!list.length) return '<div class="empty">아직 정산표가 없습니다. «📥 안내 파일»에서 비용지급 안내를 올려 주세요.</div>';
-    var allOn = list.every(function (r) { return sel[r.id]; });
+    var allOn = list.every(function (r) { return sel[r.id]; }), lastType = null;
     var h = '<div class="bulk" data-bulk="runs"></div><div class="scroll"><table class="t" data-name="runs"><thead><tr>' + ckHead('runs', allOn)
-      + '<th>지급월</th><th>사업</th><th class="r">사업장</th><th>상태</th><th class="r">송금 남음</th></tr></thead><tbody>';
+      + '<th>지급월</th><th class="r">사업장</th><th>상태</th><th class="r">송금 남음</th></tr></thead><tbody>';
     list.forEach(function (r, i) {
       var tr = r.transfers || [], left = tr.filter(function (t) { return !t.paid; }).length;
-      h += '<tr data-id="' + esc(r.id) + '">' + ckCell(r.id, sel[r.id]) + '<td class="n">' + (i + 1) + '</td>'
+      if (r.typeCode !== lastType) { lastType = r.typeCode; h += '<tr class="grp"><td colspan="6" title="' + esc(bn(r)) + '">' + esc(bn(r)) + '</td></tr>'; }
+      h += '<tr data-id="' + esc(r.id) + '"' + (r.id === cur ? ' class="on"' : '') + '>' + ckCell(r.id, sel[r.id]) + '<td class="n">' + (i + 1) + '</td>'
         + '<td class="ti"><a href="#" data-run="' + esc(r.id) + '" title="' + esc(r.label) + '">' + esc(r.label || r.monthKey) + '</a></td>'
-        + nw('biz', bizNames[r.typeCode] || r.typeCode)
         + '<td class="r" data-k="cnt">' + (r.sites || []).length + '</td>'
         + '<td class="nw" data-k="st"><span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? ' <span class="pill st-chg">바뀜</span>' : '') + '</td>'
         + '<td class="r" data-k="left">' + (r.status === 'confirmed' && tr.length ? left + ' / ' + tr.length : '') + '</td></tr>';
@@ -51,7 +54,7 @@
     return h + '</tbody></table></div>';
   }
 
-  /* 계산만인 달은 아직 송금 목록이 저장돼 있지 않다 — 각 사업장의 주관을 상대로 «확정하면 생길» 목록을 미리 보여 준다 */
+  /* 임시저장(확정 전)인 달은 아직 송금 목록이 저장돼 있지 않다 — 각 사업장의 주관을 상대로 «확정하면 생길» 목록을 미리 보여 준다 */
   function previewTransfers(sites) {
     var out = [];
     (sites || []).forEach(function (s) {
@@ -60,53 +63,66 @@
     });
     return out;
   }
-  /* ── ② 정산표 한 장 ── */
-  function runDetail(run, names, sel) {
-    sel = sel || {};
+  /* ── ② 정산표 한 장 ──
+     opt = {biz:사업 이름, pend:{'consultingId|sid': 친 글}} — pend 는 «아직 임시저장 안 한» 통장 실입금(화면에만 있다).
+     대표 지시 2026-10-31 「임시저장기능 만들어 달라 … 깔끔하게 볼수 있게」:
+       · 통장 실입금은 쳐도 바로 저장하지 않는다 — 노란 칸으로 남고 «임시저장 (n)» 한 번에 저장, 옆에 마지막 임시저장 시각
+       · 사업장은 묶음 머리에 한 번(누가 누구에게 얼마도 거기에), 구분·요율은 이름 옆 딱지, 차액·조정 칸은 이월·조정이 있을 때만 */
+  function runDetail(run, names, sel, opt) {
+    sel = sel || {}; opt = opt || {};
+    var pend = opt.pend || {}, nPend = Object.keys(pend).length;
     var iss = issuesOf(run), ok = C.checkRun(run.sites || [], run.issues || []).ok, draft = run.status === 'draft';
-    var T = 0, shares = 0, tr = draft ? previewTransfers(run.sites) : (run.transfers || []), trSum = 0, paidN = 0, checkedN = 0;
+    var T = 0, shares = 0, tr = draft ? previewTransfers(run.sites) : (run.transfers || []), trSum = 0, paidN = 0, checkedN = 0, hasAdj = false;
     (run.sites || []).forEach(function (s) { T += s.totalNet; s.members.forEach(function (m) {
       if (m.role === 'staff' && m.share != null) shares += m.share;
       if (m.pre > 0) { paidN++; if (m.actual != null) checkedN++; }
+      if (m.adjust) hasAdj = true;
     }); });
     tr.forEach(function (t) { trSum += t.amount; });
-    var h = '<div class="kpis">'
+    var h = '<div class="bar"><b>' + esc(run.label || run.monthKey) + '</b> <span class="pill st-' + esc(run.status) + '">' + esc(STATUS_KO[run.status] || run.status) + '</span>'
+      + (opt.biz ? '<span class="hint" title="' + esc(opt.biz) + '">' + esc(opt.biz) + '</span>' : '') + '<span class="sp"></span>';
+    if (draft) h += '<span class="hint" data-k="stamp">' + esc(kst(run.updatedAt || run.createdAt)) + ' 임시저장됨</span>'
+      + '<button class="sm" data-act="manual" title="이미 손으로 정산을 끝낸 달 — 기록만 남기고 카톡은 보내지 않는다">기록만</button><button class="sm" data-act="recalc">다시 계산</button>'
+      + '<button class="sm' + (nPend ? ' pend' : '') + '" data-act="draftSave" id="draftSave" title="고친 통장 실입금을 서버에 저장한다 — 다른 PC에서도 이어서 할 수 있다">임시저장' + (nPend ? ' (' + nPend + ')' : '') + '</button>'
+      + '<button class="sm pri" data-act="confirm"' + (ok ? '' : ' disabled title="확인 필요를 먼저 풀어 주세요"') + '>확정</button>';
+    else h += '<button class="sm" data-act="unconfirm">' + (run.status === 'manual' ? '기록만 풀기' : '확정 풀기') + '</button><button class="sm" data-act="xlsx">엑셀</button>'
+      + (run.status === 'confirmed' ? '<button class="sm pri" data-act="msgs">카톡 문구</button>' : '');
+    h += '</div><div class="kpis">'
       + '<div class="kpi"><span>세후 합계 · 입금 확인 ' + checkedN + '/' + paidN + '</span><b>' + won(T) + '원</b></div>'
       + '<div class="kpi"><span>담당 몫 합계</span><b>' + won(shares) + '원</b></div>'
       + '<div class="kpi"><span>' + (draft ? '송금(확정하면)' : '송금') + '</span><b>' + tr.length + '건 · ' + won(trSum) + '원</b></div>'
       + '<div class="kpi' + (iss.length ? ' bad' : '') + '"><span>확인 필요</span><b>' + iss.length + '건</b></div></div>';
-    h += '<div class="bar"><b>' + esc(run.label || run.monthKey) + '</b> <span class="pill st-' + esc(run.status) + '">' + esc(STATUS_KO[run.status] || run.status) + '</span><span class="sp"></span>';
-    if (draft) h += '<button class="sm" data-act="recalc">다시 계산</button><button class="sm" data-act="manual" title="이미 손으로 정산을 끝낸 달 — 기록만 남기고 카톡은 보내지 않는다">기록만</button>'
-      + '<button class="sm pri" data-act="confirm"' + (ok ? '' : ' disabled title="확인 필요를 먼저 풀어 주세요"') + '>확정</button>';
-    else h += '<button class="sm" data-act="unconfirm">' + (run.status === 'manual' ? '기록만 풀기' : '확정 풀기') + '</button><button class="sm" data-act="xlsx">엑셀</button>'
-      + (run.status === 'confirmed' ? '<button class="sm pri" data-act="msgs">카톡 문구</button>' : '');
-    h += '</div>';
     if (run.changed) h += '<div class="warn">새 안내 파일에서 이 달 금액이 바뀌었습니다 — 확정을 풀고 다시 계산하세요.</div>';
     if (iss.length) h += '<div class="warn">' + iss.map(esc).join(' · ') + '</div>';
-    var rows = [], idx = 0;
+    var cols = hasAdj ? 12 : 10, rows = [], idx = 0;
     (run.sites || []).forEach(function (s, si) {
-      rows.push('<tr class="grp"><td colspan="15" title="' + esc(s.company) + '">' + esc(s.company) + ' · ' + s.round + '차 · 세후 합계 ' + won(s.totalNet) + '원' + (s.issues.length ? ' · <span class="bad">확인 필요 ' + s.issues.length + '</span>' : '') + '</td></tr>');
+      var st = draft ? previewTransfers([s]) : tr.filter(function (t) { return t.consultingId && s.consultingId ? t.consultingId === s.consultingId : t.company === s.company; });
+      var stText = st.length ? st.map(function (t) { return nameOf(names, t.fromSid) + ' → ' + nameOf(names, t.toSid) + ' ' + won(t.amount) + '원'; }).join(' · ') : '주고받을 금액 없음';
+      rows.push('<tr class="grp"><td colspan="6" title="' + esc(s.company) + '">' + esc(s.company) + ' · ' + s.round + '차 · 세후 합계 ' + won(s.totalNet) + '원' + (s.issues.length ? ' · <span class="bad">확인 필요 ' + s.issues.length + '</span>' : '') + '</td>'
+        + '<td colspan="' + (cols - 6) + '" class="r grp-tr" title="' + esc(stText) + '">' + esc(stText) + '</td></tr>');
       s.members.forEach(function (m, mi) {
-        var id = si + ':' + mi, key = s.consultingId + '|' + m.sid;
+        var id = si + ':' + mi, key = s.consultingId + '|' + m.sid, nm = nameOf(names, m.sid, m.name), hasP = Object.prototype.hasOwnProperty.call(pend, key);
+        var tag = m.role === 'lead' ? '<span class="pill role-lead">주관</span>' : '<span class="pill">' + ROLE_KO.staff + (m.rate == null ? '' : ' ' + esc(m.rate) + '%') + '</span>';
         idx++;
         rows.push('<tr>' + ckCell(id, sel[id]) + '<td class="n">' + idx + '</td>'
-          + nw('site', s.company) + nw('role', ROLE_KO[m.role] || m.role) + nw('name', nameOf(names, m.sid, m.name), 'ti')
+          + '<td class="nw ti" data-k="name" title="' + esc(nm) + '">' + esc(nm) + ' ' + tag + '</td>'
           + num('pre', m.pre) + num('wht', m.inc + m.loc) + num('net', m.net)
           + '<td class="r" data-k="act">' + (draft && s.consultingId && m.sid
-            ? '<input type="text" inputmode="numeric" class="amt" data-actual="' + esc(key) + '" value="' + (m.actual == null ? '' : esc(C.fmt(m.actual))) + '" placeholder="통장 입금">'
+            ? '<input type="text" inputmode="numeric" class="amt' + (hasP ? ' dirty' : '') + '" data-actual="' + esc(key) + '" value="' + esc(hasP ? pend[key] : (m.actual == null ? '' : C.fmt(m.actual))) + '" placeholder="통장 입금">'
             : esc(m.actual == null ? '' : won(m.actual)))
-          /* 통장 실입금이 있으면 계산한 세후와 견준 딱지 — 같으면 «일치», 다르면 차이(실입금 − 계산) */
-          + (m.actual == null ? '' : ' <span class="pill ' + (m.actual === m.net ? 'st-confirmed' : 'st-draft') + '" data-k="cmp">' + (m.actual === m.net ? '일치' : esc(C.fmt(m.actual - m.net))) + '</span>') + '</td>'
-          + '<td class="r" data-k="rate">' + (m.rate == null ? '' : esc(m.rate) + '%') + '</td>'
+          /* 통장 실입금이 있으면 계산한 세후와 견준 딱지 — 같으면 «일치», 다르면 차이(실입금 − 계산). 고치는 중(노란 칸)이면 옛 딱지는 감춘다 */
+          + (m.actual == null || hasP ? '' : ' <span class="pill ' + (m.actual === m.net ? 'st-confirmed' : 'st-draft') + '" data-k="cmp">' + (m.actual === m.net ? '일치' : esc(C.fmt(m.actual - m.net))) + '</span>') + '</td>'
           /* 주관은 몫·차액이 없다 — «—» 를 찍지 않고 비워 둔다(말을 하는 값만, 폰 카드에서 칸 이름도 안 붙는다) */
-          + (m.role === 'lead' ? '<td class="r" data-k="share"></td><td class="r" data-k="diff"></td>' : num('share', m.share) + num('diff', m.diff))
-          + '<td class="r" data-k="adj">' + (m.adjust ? esc(won(m.adjust)) : '') + '</td>'
+          + (m.role === 'lead' ? '<td class="r" data-k="share"></td>' : num('share', m.share))
+          + (hasAdj ? (m.role === 'lead' ? '<td class="r" data-k="diff"></td>' : num('diff', m.diff)) + '<td class="r" data-k="adj">' + (m.adjust ? esc(won(m.adjust)) : '') + '</td>' : '')
           + '<td class="r b" data-k="settle">' + esc(won(m.settle)) + '</td>' + num('final', m.final) + '</tr>');
       });
     });
     h += '<div class="bulk" data-bulk="members"></div><div class="scroll"><table class="t" data-name="run"><thead><tr>' + ckHead('members', false)
-      + '<th>사업장</th><th>구분</th><th>이름</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">통장 실입금</th><th class="r">요율</th><th class="r">몫</th><th class="r">차액</th><th class="r">조정</th><th class="r">정산액</th><th class="r">최종</th></tr></thead><tbody>'
+      + '<th>이름</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">통장 실입금</th><th class="r">몫</th>'
+      + (hasAdj ? '<th class="r">차액</th><th class="r">조정</th>' : '') + '<th class="r">정산액</th><th class="r">최종</th></tr></thead><tbody>'
       + rows.join('') + '</tbody></table></div>';
+    if (draft) h += '<div class="warn" id="pendNote"' + (nPend ? '' : ' style="display:none"') + '>저장 안 한 칸 ' + nPend + '개 — «임시저장»을 누르면 다른 PC에서도 이어서 할 수 있습니다</div>';
     h += '<div class="sec">' + (draft ? '송금 목록 — 미리보기(확정하면 이대로 생깁니다)' : '송금 목록') + '</div>';
     if (!tr.length) return h + '<div class="empty">주고받을 금액이 없습니다.</div>';
     h += '<div class="bulk" data-bulk="transfers"></div><div class="scroll"><table class="t" data-name="transfers"><thead><tr>' + ckHead('transfers', false)
@@ -155,7 +171,6 @@
      work = {types:[code], rules:{code:{title, leadSid, rates:{sid:'25'}, siteRates:{cid:{sid:pct}}, msgHead, msgFoot, active}}, people:[sid], dirty, open}
      opt  = {bizNames:{code:이름}, addTypes:[{code,name}], staff:[{sid,name}](재직자만), names:{sid:이름}, sitesByType:{code:[{consultingId,label}]}, sel:{sid:1}}
      ⚠ 고르기(사람·주관)는 재직자만 — 그러나 이미 들어 있는 사람(퇴사 뒤에도 남은 요율)은 이름으로 보인다. */
-  function shortBiz(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, ''); }
   function staffOpts(staff, names, cur, blank) {
     var list = (staff || []).slice();
     if (cur && !list.some(function (p) { return p.sid === cur; })) list.unshift({ sid: cur, name: (names && names[cur]) || '(이름 없음)' });
@@ -164,7 +179,8 @@
   function rateMatrix(work, opt) {
     opt = opt || {}; work = work || {};
     var types = work.types || [], rules = work.rules || {}, people = work.people || [], names = opt.names || {}, sel = opt.sel || {}, biz = opt.bizNames || {};
-    var title = function (code) { var r = rules[code] || {}; return r.title || shortBiz(biz[code] || code); };
+    /* 칸 머리는 사업 이름 «전체» — 줄이거나 … 로 자르지 않는다(대표 지시 2026-10-31 「사업 이름 정확하게 알아야 된다」). 사업이 많으면 표만 옆으로 민다 */
+    var title = function (code) { var r = rules[code] || {}; return r.title || biz[code] || code; };
     var h = '<div class="card"><div class="bar"><b>요율표</b><span class="hint">줄 = 사람 · 칸 = 사업 종류 · 25 = 25%</span><span class="sp"></span>'
       + '<select id="mx_addType" title="요율표에 사업 종류 칸을 더한다"><option value="">+ 사업 종류</option>'
       + (opt.addTypes || []).map(function (b) { return '<option value="' + esc(b.code) + '">' + esc(b.name) + '</option>'; }).join('') + '</select>'
@@ -173,7 +189,7 @@
     var allOn = people.length > 0 && people.every(function (s) { return sel[s]; });
     h += '<div class="bulk" data-bulk="mxpeople"></div><div class="scroll"><table class="t mx" data-mx-table><thead><tr>'
       + '<th class="c"><input type="checkbox" data-all="mxpeople"' + (allOn ? ' checked' : '') + '></th><th class="n">번호</th><th>이름</th>'
-      + types.map(function (c) { return '<th class="mxc" title="' + esc(biz[c] || c) + '">' + esc(title(c)) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + types.map(function (c) { return '<th class="mxc" title="' + esc(title(c)) + '">' + esc(title(c)) + '</th>'; }).join('') + '</tr></thead><tbody>'
       + '<tr class="cfg"><td></td><td></td><td>주관</td>' + types.map(function (c) { return '<td class="mxc"><select data-lead="' + esc(c) + '">' + staffOpts(opt.staff, names, (rules[c] || {}).leadSid, '— 고르기 —') + '</select></td>'; }).join('') + '</tr>'
       + '<tr class="cfg"><td></td><td></td><td>켜짐</td>' + types.map(function (c) { return '<td class="mxc"><label class="ck" title="켜면 이 사업 종류는 컨설팅정산에서 개별정산한다(재무관리 성과급에서 뺀다)"><input type="checkbox" data-on="' + esc(c) + '"' + ((rules[c] || {}).active !== false ? ' checked' : '') + '></label></td>'; }).join('') + '</tr>';
     people.forEach(function (sid, i) {
@@ -194,8 +210,8 @@
       sites.forEach(function (s) { label[s.consultingId] = s.label; });
       var rows = [];
       Object.keys(sr).forEach(function (cid) { Object.keys(sr[cid] || {}).forEach(function (sid) { rows.push({ cid: cid, sid: sid, pct: sr[cid][sid] }); }); });
-      var h = '<details class="card rd" data-rd="' + esc(c) + '"' + (work.open === c ? ' open' : '') + '><summary class="sec">⋯ ' + esc(r.title || shortBiz(biz[c] || c)) + ' 자세히 — 카톡 문구 · 사업장별 예외 요율' + (rows.length ? ' (' + rows.length + ')' : '') + '</summary>'
-        + '<div class="fr"><label>이름</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|title" value="' + esc(r.title || '') + '" placeholder="' + esc(shortBiz(biz[c] || c)) + '"></div></div>'
+      var h = '<details class="card rd" data-rd="' + esc(c) + '"' + (work.open === c ? ' open' : '') + '><summary class="sec">⋯ ' + esc(r.title || biz[c] || c) + ' 자세히 — 카톡 문구 · 사업장별 예외 요율' + (rows.length ? ' (' + rows.length + ')' : '') + '</summary>'
+        + '<div class="fr"><label>이름</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|title" value="' + esc(r.title || '') + '" placeholder="' + esc(biz[c] || c) + '"></div></div>'
         + '<div class="fr"><label>머리말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgHead" value="' + esc(r.msgHead || '') + '" placeholder="' + esc(C.DEFAULT_HEAD) + '"></div></div>'
         + '<div class="fr"><label>맺음말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgFoot" value="' + esc(r.msgFoot || '') + '" placeholder="' + esc(C.DEFAULT_FOOT) + '"></div></div>'
         + '<div class="sec">사업장별 예외 요율 <span class="hint">— 이 사업장에서만 요율표와 다를 때</span></div><div class="scroll"><table class="t sr"><tbody>';
@@ -229,7 +245,7 @@
     return h + '</tbody></table></div>';
   }
 
-  /* ── ②-1 입금 대조 (계산만인 정산표) — 통장에 실제로 들어온 금액과 계산한 세후를 견준다 ──
+  /* ── ②-1 입금 대조 (임시저장인 정산표) — 통장에 실제로 들어온 금액과 계산한 세후를 견준다 ──
      st = {people:[{sid,name}], sid, found:[], source:'paste'|'ledger'|'', text, matches:[C.matchDeposits 결과], pick:{key:foundId}, sel:{key:1}}
      ⚠ 금액이 같다는 것은 후보일 뿐 — 아래 «저장»을 눌러야 통장 실입금이 된다. 고르기만으로는 아무것도 안 바뀐다. */
   var KIND_KO = { exact: '일치', near: '금액 다름 — 확인', none: '못 찾음' };
