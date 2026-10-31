@@ -255,6 +255,20 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       return fetch(MB_FN + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify(body) });
     }).then(function (r) { return r.json().catch(function () { return {}; }); });
   }
+  /* 파일 내용의 지문(SHA-256)을 «먼저 차지한 쪽»만 사진첩에 보낸다. 사진첩에 못 가면 release 로 돌려놓는다.
+     지문을 못 만들면(옛 브라우저) 막지 않고 그냥 보낸다 — 못 넣는 것보다 겹치는 것이 낫다. */
+  var FP_ROOT = 'pucards/mailcard/fp';
+  function firstOfFile(buf, from) {
+    var pass = { first: true, release: function () { return Promise.resolve(); } };
+    if (!(window.crypto && crypto.subtle)) return Promise.resolve(pass);
+    return crypto.subtle.digest('SHA-256', buf).then(function (d) {
+      var hex = Array.prototype.map.call(new Uint8Array(d), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+      var r = db.ref(FP_ROOT + '/' + hex);
+      return r.transaction(function (cur) { return cur ? undefined : { at: Date.now(), from: String(from).slice(0, 80) }; }).then(function (tx) {
+        return { first: !!tx.committed, release: function () { return r.remove().catch(function () {}); } };
+      });
+    }).catch(function () { return pass; });
+  }
   function docOne(slug, row) {
     var id = String(slug).replace(/[.#$\/\[\]]/g, '_') + '_' + row.u;
     var ref = db.ref(DOC_ROOT + '/' + id);
@@ -275,9 +289,19 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
         if (!j.ok) throw new Error(j.error || '첨부를 가져오지 못했습니다');
         var bin = atob(j.b64 || ''), buf = new Uint8Array(bin.length);
         for (var k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
-        return PuHandoff.put({ name: String(j.name || '첨부'), type: String(j.mime || ''), bytes: buf, from: '메일 · ' + String(row.f || row.e || '').slice(0, 40) });
-      }).then(function (key) {
-        docKeys.push(key);
+        /* 똑같은 파일이 또 오면(다른 메일·다른 이름이어도) 사진첩에 안 넣는다 — 지우지 않고 «같은 첨부»로만 적는다 */
+        return firstOfFile(buf, id).then(function (fp) {
+          if (!fp.first) return { dup: true };
+          return PuHandoff.put({ name: String(j.name || '첨부'), type: String(j.mime || ''), bytes: buf, from: '메일 · ' + String(row.f || row.e || '').slice(0, 40) })
+            .then(function (key) { return { key: key }; }, function (e) { return fp.release().then(function () { throw e; }); });
+        });
+      }).then(function (r) {
+        if (r.dup) {
+          return ref.update({ st: 'dup', name: String(row.s || '').slice(0, 80) }).then(function () {
+            note({ name: String(row.f || row.e || ''), company: '', what: '📄 같은 첨부 — 이미 사진첩에 보냄', at: Date.now() });
+          });
+        }
+        docKeys.push(r.key);
         if (!docTimer) docTimer = setTimeout(docFlush, 20000);     /* 몇 통이 한꺼번에 오면 한 번에 */
         return ref.update({ st: 'photos', name: String(row.s || '').slice(0, 80) }).then(function () {
           note({ name: String(row.f || row.e || ''), company: '', what: '📄 첨부 → 사진첩', at: Date.now() });
