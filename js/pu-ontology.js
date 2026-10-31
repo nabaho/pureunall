@@ -274,9 +274,13 @@
                        ⚠ 등록은 지우지 말 것 — 쓰는 자리 선언(writeContracts)이 사라지면 관문이 저장을 거절한다 */
       primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir'],
       entityTypes:['RulesDocument','RulesRound','Organization','Task'],
+      /* 🤖 매일 정리(2026-10-31, 설계 §14) — 화면이 쓰는 자리 하나 더: auto/cfg = {mode:'off'|'dry'|'live', by, at}(스위치, 관리자·위임관리인 — 규칙 MGR).
+         auto/last·auto/log/{날짜} 와 서류의 처리 담당(docs/{id}/owner)은 서버(collectRulesMail 회차 끝 rules-daily.js)만 쓴다 — 쓰기 계약이 아니다.
+         자동 확정은 서버가 human/{id} 에 사람 칸과 같은 모양(linkedBy:'자동')으로 쓴다 — 위 human 계약 그대로. */
       writeContracts:[{path:'rules_mgmt/library/human/{id}',entityType:'RulesDocument'},
                       {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
-                      {path:'rules_mgmt/library/ask/{id}',entityType:'Task'}] },
+                      {path:'rules_mgmt/library/ask/{id}',entityType:'Task'},
+                      {path:'rules_mgmt/library/auto/cfg',entityType:'Task'}] },
     docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */

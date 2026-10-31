@@ -84,8 +84,10 @@ test('지금 더 모으기 신호', async () => {
 test('읽기 — 서버 칸이 비어 있어도 빈 모양을 돌려준다', async () => {
   const db = fakeDb(); const S = make(db);
   const L = await S.load();
-  assert.deepEqual(Object.keys(L).sort(), ['docs', 'human', 'rounds', 'run']);
+  // 🤖 매일 정리 기록(auto)이 더해졌다(설계 §14) — 서버 칸 넷 + 기록 하나. 비어 있으면 빈 모양
+  ['docs', 'human', 'rounds', 'run', 'auto'].forEach((k) => assert.ok(k in L, k + ' 가 없다'));
   assert.equal(L.run, null);
+  assert.deepEqual(L.auto, {});
   assert.equal(await S.text('rd_none'), '');
 });
 
@@ -131,4 +133,39 @@ test('「최종본 없음」 뒤에 최종본을 정하면 noFinal 이 꺼진다
   await S.setFinal('co_gana', 'r202601', null);
   const r = db.store.rules_mgmt.library.rounds.co_gana_r202601;
   assert.equal(r.finalDocId, null); assert.notEqual(r.noFinal, true, '풀면 다시 정리 목록으로 돌아온다');
+});
+
+/* ── 🤖 매일 정리 (설계 §14) ── */
+test('🤖 기록(auto)을 못 읽어도(규칙 게시 전) 모은 자료는 열린다 — 못 읽었다는 표시만', async () => {
+  const db = fakeDb();
+  const ref0 = db.ref;
+  db.ref = (p) => (p === 'rules_mgmt/library/auto' ? { once: async () => { throw new Error('PERMISSION_DENIED'); } } : ref0(p));
+  const L = await make(db).load();
+  assert.deepEqual(L.docs, {});
+  assert.equal(L.auto.unreadable, true);
+});
+
+test('🤖 자동 확정 되돌리기 — 미확정으로 + noAuto(그 주소는 다시 자동 확정 안 함), 관문 레코드 모양', async () => {
+  const db = fakeDb(); const S = make(db);
+  await S.linkCompany(['rd_1'], 'co_gana');
+  await S.undoAuto(['rd_1']);
+  const r = db.store.rules_mgmt.library.human.rd_1;
+  assert.equal(r.companyLinkStatus, 'pending');
+  assert.ok(!r.companyId);
+  assert.equal(r.noAuto, true);
+  assert.equal(r.linkedBy, '홍길동', '되돌린 사람이 안 남았다');
+  assert.equal(r.entityType, 'RulesDocument');
+  assert.ok(r.revision >= 2);
+});
+
+test('🤖 스위치 — off/dry/live 셋만, 문서 하나를 통째로', async () => {
+  const sets = [];
+  const db = fakeDb();
+  const ref0 = db.ref;
+  db.ref = (p) => (p === 'rules_mgmt/library/auto/cfg' ? { set: async (v) => { sets.push(v); } } : ref0(p));
+  const S = make(db);
+  await S.setAutoMode('live');
+  assert.deepEqual(Object.keys(sets[0]).sort(), ['at', 'by', 'mode']);
+  assert.equal(sets[0].mode, 'live');
+  await assert.rejects(() => S.setAutoMode('yes'), /모르는 모드/);
 });

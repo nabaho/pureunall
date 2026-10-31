@@ -1493,6 +1493,24 @@ rules.rules_mgmt = {
     rounds: { '.read': LOGIN, $id: { '.write': `${LOGIN} && newData.exists()`,
       '.validate': "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesRound'" } },
     ask: { $id: { '.write': `auth != null && ${ADMIN}` } },
+    /* ── 🤖 매일 정리(설계 §14 · 2026-10-31 대표 「추천대로」) ─────────────────────────
+       auto/cfg = { mode:'off'|'dry'|'live', by, at } — 사업장 자동 확정의 «스위치». 없으면 서버는 시범(dry)으로 돈다.
+       ★ cfg 쓰기는 관리자·위임관리인(MGR) — «켜짐(live)»으로 바꾸는 일은 직원 손에 두지 않는다(🤖 메일 자동 처리 scal_autoRun 과 같은 모양).
+       ★ auto/last·auto/log/{날짜} 는 서버(collectRulesMail 회차 끝의 rules-daily.js)만 쓴다 — 쓰기 문을 «일부러» 안 둔다(기본 거부).
+         담는 것은 서류 id·업체 id·수·담당 이름뿐(메일 주소·제목·본문 없음) — 그래서 읽기는 재직 직원(docs 와 같은 범위).
+       ★ 자동 확정 자체는 서버가 human/{id} 에 사람 칸과 «같은 모양»으로 쓴다(linkedBy:'자동') — human 규칙은 그대로다.
+         되돌리기(noAuto:true)도 human 의 지금 규칙(관문 레코드 모양) 안에서 직원이 쓴다. */
+    auto: {
+      '.read': LOGIN,
+      cfg: {
+        '.write': MGR,
+        '.validate': "newData.hasChildren(['mode','at'])",
+        mode: { '.validate': "newData.isString() && (newData.val()==='off'||newData.val()==='dry'||newData.val()==='live')" },
+        by:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
+        at:   { '.validate': 'newData.isNumber()' },
+        $other: { '.validate': false }
+      }
+    },
   },
 
   /* ── 서고(사례집) ─ 2026-09-07 · 설계서 §3·§6 ───────────────────────────

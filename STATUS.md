@@ -230,6 +230,15 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
+### 🤖 취업규칙 «매일 정리» — 배포·켜기 대기 (2026-10-31 대표 「추천대로」)
+
+메일함으로 들어오는 취업규칙 등 개정 서류를 매일 «사업장 자동 확정(주소 일치·사람이 앞서 확정한 주소만) · 처리 담당 기록(메일함 잣대) · 하루 기록»으로 정리한다.
+코드·검사는 PR 에 있고, **클라우드 방에서는 배포가 안 돼** 대표 PC 에서 아래를 해야 돈다(`status/2026-10-31-rules-daily.md`).
+- [ ] 규칙 게시 — `node scripts/rules-deploy.js --deploy`(새로 1: `/rules_mgmt/library/auto` · 바뀜 0 · 사라짐 0) → 콘솔 원문 새 판 → `tests/photos-staff-share.test.js` PENDING 비우기
+- [ ] 함수 배포 — `firebase deploy --only functions:collectRulesMail,functions:collectRulesMailAsk` (회차 끝에 매일 정리가 돈다)
+- [ ] 시범 결과 보기 — 📥 모은 자료 › 🤖 매일 정리 의 «자동 확정했을 것» 줄을 훑어 엉뚱한 회사가 없으면 관리자가 「켜기」
+- 설계 `docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md` §14
+
 ### ✅ 끝남 — «건마다 주담당이 다른 사업장» → 사업별 주담당 (2026-10-24 대표 「추천대로」)
 
 이알피 담당자가 일정관리에 안 따라오던 것을 고쳤다(`status/2026-10-24-gov-erp-assignee-sync.md`) — 주담당 따라가기 · 사번 자동 잇기 ·

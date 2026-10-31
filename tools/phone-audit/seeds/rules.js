@@ -58,6 +58,38 @@ for (let i = 0; i < 90; i++) {
   const rk = 'r' + d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0');
   rounds[c + '_' + rk] = { id: c + '_' + rk, companyId: c, roundKey: rk, finalDocId: id, finalBy: 'P001', finalAt: T0 - k * DAY };
 });
+/* 🤖 매일 정리(설계 §14) — «오늘» 담은 서류 몇 건(점검을 돌리는 그때 기준)과 지난 기록. 처리 담당·자동 확정·확인 필요가 섞이게 */
+const NOWD = Date.now();
+[
+  { co: 0, why: '주소', owner: '점검노무', auto: true },
+  { co: 0, why: '주소', owner: '점검노무', auto: true },
+  { co: 2, why: '주소', owner: '점검대표' },
+  { co: 6, why: '도메인', owner: '' },
+  { co: 9, why: '주소', owner: '점검사무장', cand2: 10 },
+  { co: 12, why: '주소', owner: '점검대표', human: true },
+].forEach((x, k) => {
+  const id = 'rdt' + String(k + 1).padStart(3, '0');
+  const co = companies[x.co];
+  const created = NOWD - (k + 1) * 47 * 60e3;
+  const cand = [{ companyId: co.id, why: x.why }].concat(x.cand2 ? [{ companyId: companies[x.cand2].id, why: '주소' }] : []);
+  docs[id] = {
+    name: '취업규칙_' + co.name.replace(/[()]/g, '') + '_오늘 들어온 개정안' + (k % 2 ? '(최종 신고용)' : '') + '.hwp',
+    kind: k === 3 ? '신구대조표' : '규칙본문', status: '담김', dir: '받음',
+    mail: { src: 'imap', box: 'INBOX', key: 'mt' + k, date: created, subject: '[점검] ' + co.name + ' 취업규칙 변경 검토 요청' },
+    pii: { count: 0 }, createdAt: created, companyCand: cand,
+    owner: x.owner ? { who: x.owner, sid: '', why: 'erp', at: created } : { who: '', sid: '', why: '', at: created },
+  };
+  if (x.auto) human[id] = { id, companyId: co.id, companyLinkStatus: 'linked', linkedBy: '자동', linkedAt: created + 60e3, auto: { why: '주소 일치', at: created + 60e3 } };
+  if (x.human) human[id] = { id, companyId: co.id, companyLinkStatus: 'linked', linkedBy: 'P001', linkedAt: created + 120e3 };
+});
+const dayOf = (ms) => new Date(ms + 9 * 36e5).toISOString().slice(0, 10);
+const log = {};
+for (let d = 1; d <= 6; d++) {
+  const k = dayOf(NOWD - d * 864e5);
+  log[k] = { date: k, at: NOWD - d * 864e5, mode: 'dry', mails: d % 3 + 1, docs: d % 4 + 2, linked: 0, would: d % 3, need: d % 2, noOwner: d % 2,
+    byOwner: { 점검노무: d % 3 + 1, 점검대표: 1 } };
+}
+const auto = { last: { at: NOWD - 50 * 60e3, mode: 'dry', plan: 2, more: 0, skip: { weak: 3, undone: 0, left: 0, touched: 1 }, items: [], applied: 0, done: true }, log };
 const text = {};
 Object.keys(docs).slice(0, 30).forEach((id) => {
   text[id] = '제1조(목적) 이 규칙은 ' + docs[id].name + ' 의 근로조건을 정한다.\n제2조(적용범위) 이 규칙은 모든 근로자에게 적용한다.\n제3조(근로시간) 1일 8시간, 1주 40시간으로 한다.\n제4조(휴게) 4시간에 30분 이상 준다.\n';
@@ -66,13 +98,19 @@ Object.keys(docs).slice(0, 30).forEach((id) => {
 module.exports = {
   data: {
     data: { companies: { v: companies } },
-    rules_mgmt: { library: { docs, human, rounds, text, run: { at: T0, mails: 60, stored: 41, held: 3, dup: 2 } } },
+    rules_mgmt: { library: { docs, human, rounds, text, auto, run: { at: T0, mails: 60, stored: 41, held: 3, dup: 2 } } },
   },
   views: [
     { name: 'site', run: async (page) => { await page.click('#sites tbody tr[data-co]'); } },
     { name: 'lib', run: async (page) => { await page.evaluate(() => { history.pushState(null, '', '#lib'); window.rv2Route(); }); } },
     { name: 'lib-co', run: async (page) => { await page.click('#lib [data-act="view"][data-v="company"]'); } },
     { name: 'tidy', run: async (page) => { await page.click('#lib [data-act="view"][data-v="tidy"]'); } },
+    /* 🤖 매일 정리(설계 §14-4) — 📥 의 네 번째 보기. 판·오늘 들어온 서류 표(폰에서는 두 줄 카드) */
+    { name: 'daily', run: async (page) => {
+      // 혼자 돌려도(--view=daily) 되게 📥 로 먼저 간다
+      await page.evaluate(() => { history.pushState(null, '', '#lib'); window.rv2Route(); });
+      await page.click('#lib [data-act="view"][data-v="daily"]');
+    } },
     { name: 'topics', wait: 4000, run: async (page) => { await page.evaluate(() => { history.pushState(null, '', '#topics'); window.rv2Route(); }); } },
     /* ✏️ 검토·개정(rules.html)의 💬 묻기 탭 (설계 §13) — 화면 안 «지어낸 샘플 문서»에 지어낸 답 한 줄을 그려 잰다.
        AI 는 안 부른다. ⚠ 다른 화면(rules.html)으로 넘어가므로 «맨 끝»에 둔다 — 뒤에 둔 view 는 rules-v2 를 못 찾는다 */

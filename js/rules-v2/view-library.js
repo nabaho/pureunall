@@ -150,10 +150,12 @@
     }
     var TV = root.PuRulesV2Tidy, tn = TV ? TV.counts(st.data, st.companies) : null;
     var tleft = tn ? tn.groups + tn.rounds : 0;
-    var seg = '<div class="seg"><button data-act="view" data-v="mail" class="' + (st.view !== 'company' && st.view !== 'tidy' ? 'on' : '') + '">메일 순</button>'
+    var seg = '<div class="seg"><button data-act="view" data-v="mail" class="' + (st.view !== 'company' && st.view !== 'tidy' && st.view !== 'daily' ? 'on' : '') + '">메일 순</button>'
       + '<button data-act="view" data-v="company" class="' + (st.view === 'company' ? 'on' : '') + '">사업장별 순서</button>'
       + (tn ? '<button data-act="view" data-v="tidy" class="' + (st.view === 'tidy' ? 'on' : '') + '" title="미확정 서류를 사업장에 잇고, 회차마다 ★최종본을 고릅니다">'
-        + (tleft ? '🧹 정리하기 <b>' + tleft + '</b>' : '✓ 정리 끝') + '</button>' : '') + '</div>';
+        + (tleft ? '🧹 정리하기 <b>' + tleft + '</b>' : '✓ 정리 끝') + '</button>' : '')
+      /* 🤖 매일 정리(설계 §14-4) — 서버가 매일 하는 정리(처리 담당·자동 확정)와 오늘 들어온 서류 */
+      + (root.PuRulesV2DailyView ? '<button data-act="view" data-v="daily" class="' + (st.view === 'daily' ? 'on' : '') + '" title="오늘 들어온 서류의 사업장 정리·처리 담당과 매일 기록">🤖 매일 정리</button>' : '') + '</div>';
     var chips = chip('kind', '', '모두', n.all, !f.kind);
     KINDS.forEach(function (k) { if (byKind[k]) chips += chip('kind', k, KIND_LABEL[k] || k, byKind[k], f.kind === k); });
     chips += '<span class="sep"></span>'
@@ -161,8 +163,8 @@
       + chip('only', 'cand', '최종본 후보', n.cand, f.only === 'cand')
       + chip('only', 'unlinked', '사업장 미확정', n.unlinked, f.only === 'unlinked')
       + chip('only', 'hold', '보류', n.hold, f.only === 'hold');
-    return '<div class="flt">' + seg + (st.view === 'company' || st.view === 'tidy' ? '' : chips)
-      + (st.view === 'tidy' ? '' : '<input class="q" data-role="q" placeholder="🔍 파일·회사·메일 제목" value="' + esc(f.q || '') + '">') + '</div>';
+    return '<div class="flt">' + seg + (st.view === 'company' || st.view === 'tidy' || st.view === 'daily' ? '' : chips)
+      + (st.view === 'tidy' || st.view === 'daily' ? '' : '<input class="q" data-role="q" placeholder="🔍 파일·회사·메일 제목" value="' + esc(f.q || '') + '">') + '</div>';
   }
 
   /* ── 고르면 뜨는 일괄 단추 ── */
@@ -180,6 +182,7 @@
   /* ── 표 ── (글을 안 받는다 — 셈과 이름만 그린다) */
   function tableHtml(st) {
     if (st.view === 'tidy' && root.PuRulesV2TidyView) return root.PuRulesV2TidyView.html(st);
+    if (st.view === 'daily' && root.PuRulesV2DailyView) return root.PuRulesV2DailyView.html(st);
     return st.view === 'company' ? companyTable(st) : mailTable(st);
   }
   function td(cls, title, html) {
@@ -359,7 +362,7 @@
   /* ── 꽂기 — 위 글들을 놓고 data-act 단추에 손잡이를 건다 ── */
   function render(el, st, handlers) {
     var side = st.sel ? sideHtml(st, st.text && st.text.id === st.sel ? st.text.body : null) : '';
-    el.innerHTML = runHtml(st) + filterHtml(st) + (st.view === 'tidy' ? '' : bulkHtml(st))
+    el.innerHTML = runHtml(st) + filterHtml(st) + (st.view === 'tidy' || st.view === 'daily' ? '' : bulkHtml(st))
       + '<div class="wrap' + (side ? ' two' : '') + '"><div class="tbl">' + tableHtml(st) + '</div>' + side + '</div>'
       + (st.picker ? '<div class="veil">' + linkPickerHtml(st.picker, st.companies, st.picker.q) + '</div>' : '')
       + (st.busy ? '<div class="busy">' + esc(st.busy) + '</div>' : '');
@@ -372,6 +375,8 @@
     el.onchange = function (ev) {
       var t = ev.target;
       if (t.dataset && t.dataset.tpick != null && H.tpick) H.tpick(t.dataset.tpick, t.checked);
+      else if (t.dataset && t.dataset.dpick != null && H.dpick) H.dpick(t.dataset.dpick, t.checked);
+      else if (t.dataset && t.dataset.act === 'dpickAll' && H.dpickAll) H.dpickAll(t.checked);
       else if (t.dataset && t.dataset.act === 'tpickAll' && H.tpickAll) H.tpickAll(t.checked);
       else if (t.dataset && t.dataset.role === 'tidyVer' && H.tidyVer) H.tidyVer(t.dataset.rid, t.value);
       else if (t.dataset && t.dataset.pick != null && H.pick) H.pick(t.dataset.pick, t.checked);
