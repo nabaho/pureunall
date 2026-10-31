@@ -10934,7 +10934,11 @@ function _xlsHTML(ws,zoom,mark){
     span[m.s.r+':'+m.s.c]=[m.e.c-m.s.c+1, m.e.r-m.s.r+1];
   });
   var cols=ws['!cols']||[], rows=ws['!rows']||[], cg='<colgroup>', wpx=[], c, r;
+  /* ⚠ 엑셀에서 «숨긴 열·행»은 그리지 않는다. 지원신청서 원본은 E~H·I~L 열(인쇄용 복사본)을 숨겨 두었는데,
+     그대로 그리면 같은 글자가 두 번씩 나란히 서고 표가 넓어진다. */
+  var hidC=function(k){ return !!(cols[k]&&cols[k].hidden); };
   for(c=R.s.c;c<=R.e.c;c++){
+    if(hidC(c)) continue;
     var cw=cols[c]||{};
     var w=cw.wpx || (cw.wch!=null ? cw.wch*7.5+5 : (cw.width!=null ? cw.width*7.5+5 : 64));
     w=Math.max(7,Math.round(w*Z)); wpx[c-R.s.c]=w;
@@ -10945,10 +10949,11 @@ function _xlsHTML(ws,zoom,mark){
   var out='';
   for(r=R.s.r;r<=R.e.r;r++){
     var rh=rows[r]||{};
+    if(rh.hidden) continue;
     var hp=(rh.hpx || (rh.hpt!=null ? rh.hpt*4/3 : 0))*Z;
     out+='<tr'+(hp?' style="height:'+Math.round(hp)+'px"':'')+'>';
     for(c=R.s.c;c<=R.e.c;c++){
-      if(cov[r+':'+c]) continue;
+      if(cov[r+':'+c]||hidC(c)) continue;
       var sp=span[r+':'+c], cell=ws[XLSX.utils.encode_cell({r:r,c:c})];
       var t=cell?(cell.w!=null?cell.w:(cell.v==null?'':String(cell.v))):'';
       /* 엑셀은 옆 칸이 비면 «글자가 넘쳐 흐른다». 표에는 그런 것이 없어,
@@ -10961,6 +10966,7 @@ function _xlsHTML(ws,zoom,mark){
       if(!sp&&t){
         var need=_xlsPx(t,Z), have=wpx[c-R.s.c], k=c+1;
         while(need>have&&k<=R.e.c&&!cov[r+':'+k]&&!span[r+':'+k]){
+          if(hidC(k)){ k++; continue; }          /* 숨긴 열은 건너뛴다 — 폭도 칸 수도 세지 않는다 */
           var nx=ws[XLSX.utils.encode_cell({r:r,c:k})];
           var nt=nx?(nx.w!=null?nx.w:(nx.v==null?'':String(nx.v))):'';
           if(nt!=='') break;
@@ -10972,6 +10978,7 @@ function _xlsHTML(ws,zoom,mark){
       else if(cell&&cell.t==='n') st+='text-align:right;';
       if(al.vertical) st+='vertical-align:'+(VA[al.vertical]||'middle')+';';
       var cs=sp?sp[0]:(1+eat), rs=sp?sp[1]:1;
+      if(sp){ cs=0; for(var q=c;q<c+sp[0];q++) if(!hidC(q)) cs++; }   /* 병합이 숨긴 열을 품으면 보이는 열만 센다 */
       var mk=mark&&mark[XLSX.utils.encode_cell({r:r,c:c})];   /* 신청서 팝업이 «채운·확인할·바뀐» 칸을 물들인다 */
       out+='<td'+(cs>1?' colspan="'+cs+'"':'')+(rs>1?' rowspan="'+rs+'"':'')+(mk?' class="xmk-'+mk+'"':'')
         +(st?' style="'+st+'"':'')+'>'+esc(t)+'</td>';
@@ -16764,7 +16771,7 @@ function saveSubPlan(){
     toast('저장되었습니다');
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
-function fillSubsidyExcelFor(fid){ S.formFund=fid; fillForm('subsidy'); }
+function fillSubsidyExcelFor(fid){ S.formFund=fid; S.formsCtx='fund'; fillForm('subsidy'); }
 function subsidyExcelPanel(f){
   // 서식 자료실의 지원신청서 원본(IndexedDB·클라우드) 상태 확인 후 — 팝업으로 보고 입력하고, 이 기금 데이터로 채워 받는다
   if(S._subTplChk!==true){ S._subTplChk='...';
@@ -16879,7 +16886,8 @@ function subxState(ctx,edits){
 function subxOpen(){
   var fid=S.fundId, f=funds[fid]; if(!f) return;
   if((f.fund_type||'')!=='공동'){ toast('지원신청서는 공동근로복지기금 전용입니다','warn'); return; }
-  S.formFund=fid;
+  S.formFund=fid; S.formsCtx='fund';   /* _fillWbBuffer 의 «샘플 모드» 문턱을 넘는다 — 기금 화면에서 연 것이다 */
+  while($('modalbg')) closeM();       /* 단추를 두 번 눌러도 창이 겹쳐 뜨지 않게 */
   var st=S._sx={fid:fid,yr:S.year,edits:{},seq:0,zoom:1.25,sheet:0,base:null,out:null,ctx:null};
   showModal('<div class="muted" style="padding:30px;text-align:center">신청서 준비 중…</div>',{width:1360,onclose:function(){ if(S._sx===st) S._sx=null; }});
   subxLoad(fid,S.year).then(function(c){
