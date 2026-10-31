@@ -1,5 +1,5 @@
 /* 푸른 리멤버 연결 — 확장의 시계 (2026-10-24, 대표 「반드시 자동으로」)
-   30분마다: ① 받는 화면(푸른) 탭을 찾거나 연다 → 지난번 기준(cp)을 묻는다
+   낮 09~18시 30분마다 · 밤 00시·06시 한 번씩: ① 받는 화면(푸른) 탭을 찾거나 연다 → 지난번 기준(cp)을 묻는다
               ② 리멤버 탭을 찾거나 열고 새로 고친다 → 기준 뒤에 바뀐 명함을 받는다
               ③ 앞면 그림을 받아(리멤버 그림 창고만) 받는 화면에 건넨다 → 사진첩·기업정보함에 담긴다
    ⚠ 리멤버 로그인이 풀렸으면 받는 화면에 알리고(빨간 띠) 그 회차는 쉰다.
@@ -13,10 +13,30 @@ var IMG_OK = /^https:\/\/remember-cdn\.rememberapp\.co\.kr\/[^\s"'<>]+$/;
 var IMG_MAX = 4 * 1024 * 1024;
 var running = false;
 
-function arm() { chrome.alarms.create('pull', { periodInMinutes: EVERY_MIN, delayInMinutes: 1 }); }
-chrome.runtime.onInstalled.addListener(arm);
-chrome.runtime.onStartup.addListener(arm);
-chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'pull') run(); });
+/* 도는 때 (대표 지시 2026-10-31): 낮 09:00~18:00 은 EVERY_MIN 분마다, 그 밖에는 00:00 · 06:00 에 한 번씩.
+   알람은 «다음 때» 하나만 맞추고, 울릴 때마다 다시 맞춘다(PC 시계 기준). */
+var DAY_FROM = 9 * 60, DAY_TO = 18 * 60, NIGHT = [0, 6 * 60];
+function slotsOfDay() {
+  var s = NIGHT.slice();
+  for (var m = DAY_FROM; m <= DAY_TO; m += EVERY_MIN) s.push(m);
+  return s.sort(function (a, b) { return a - b; });
+}
+function nextSlot(nowMs) {
+  var now = new Date(nowMs), s = slotsOfDay();
+  for (var d = 0; d < 2; d++) {
+    for (var i = 0; i < s.length; i++) {
+      var t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, 0, s[i], 0, 0).getTime();
+      if (t > nowMs) return t;
+    }
+  }
+  return nowMs + EVERY_MIN * 60000;
+}
+function arm() { chrome.alarms.create('pull', { when: nextSlot(Date.now()) }); }
+/* 시작·새로고침 때: 이미 «다음 때» 알람이 있으면 건드리지 않는다(옛 판의 30분 반복 알람은 갈아 끼운다) */
+function armIfNone() { chrome.alarms.get('pull', function (a) { if (!a || a.periodInMinutes) arm(); }); }
+chrome.runtime.onInstalled.addListener(armIfNone);
+chrome.runtime.onStartup.addListener(armIfNone);
+chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'pull') { arm(); run(); } });
 /* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다 */
 chrome.action.onClicked.addListener(function () { run(); });
 function note(badge, why) {
@@ -86,7 +106,10 @@ async function selfUpdate() {
   try {
     var txt = await (await fetch(chrome.runtime.getURL('ver.js'), { cache: 'no-store' })).text();
     var m = /DISK_VER\s*=\s*'([^']*)'/.exec(txt);
-    if (m && m[1] !== DISK_VER) { chrome.runtime.reload(); return true; }
+    if (m && m[1] !== DISK_VER) {
+      chrome.alarms.create('pull', { delayInMinutes: 1 });     /* 다시 시작한 뒤 이 회차를 바로 이어 한다 */
+      chrome.runtime.reload(); return true;
+    }
   } catch (e) { /* 못 읽으면 그냥 이번 판으로 돈다 */ }
   return false;
 }
