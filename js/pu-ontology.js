@@ -255,7 +255,7 @@
        ★ 읽기만: data/user_dir · data/biz_cons_types · data/consultings(업체 연결 후보) · data/ledger_batches(입금 대조 «당겨오기» — 재무관리 거래내역)
          — 이알피 원본은 고치지 않는다.
        ⚠ 대표·위임관리인·재무권한자만(규칙 settle) — 재무관리보다 넓게 열지 않는다. */
-    settle:{ name:'컨설팅정산', file:'pu-settle.html', primaryRoots:['settle'], sharedRoots:['uid_roles','data/user_dir','data/biz_cons_types','data/consultings','data/ledger_batches'],
+    settle:{ name:'컨설팅정산', file:'pu-settle.html', primaryRoots:['settle'], sharedRoots:['uid_roles','data/user_dir','data/user_accounts','data/biz_cons_types','data/consultings','data/ledger_batches'],
       writeContracts:[{path:'settle/rules/{typeCode}',entityType:'SettleRule'},
                       {path:'settle/links/{kind}/{key}',entityType:'SettleLink'},
                       {path:'settle/notices/{id}',entityType:'SettleNotice'},

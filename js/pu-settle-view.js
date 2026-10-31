@@ -150,37 +150,64 @@
     return h + '</div>';
   }
 
-  /* ── ④ 규칙·요율 ── */
-  function rulesBox(rule, opt) {
-    opt = opt || {}; rule = rule || {};
-    var people = opt.people || [], sites = opt.sites || [], biz = opt.bizTypes || [];
-    function personOpts(cur) { return '<option value="">— 사람 —</option>' + people.map(function (p) { return '<option value="' + esc(p.sid) + '"' + (p.sid === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join(''); }
-    function nameBy(sid) { var p = people.filter(function (x) { return x.sid === sid; })[0]; return p ? p.name : '(이름 없음)'; }
-    var h = '<div class="card"><div class="sec">정산 규칙</div>'
-      + '<div class="fr"><label>사업 종류</label><div class="fv"><select id="r_type"' + (opt.isNew ? '' : ' disabled') + '>' + biz.map(function (b) { return '<option value="' + esc(b.code) + '"' + (b.code === rule.typeCode ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select></div></div>'
-      + '<div class="fr"><label>이름</label><div class="fv"><input type="text" id="r_title" value="' + esc(rule.title || '') + '" placeholder="카톡 머리말에 쓰는 사업 이름"></div></div>'
-      + '<div class="fr"><label>방식</label><div class="fv"><span class="pill">pool — 사업장 세후 합계 × 담당 요율, 차액 양방향 정산</span></div></div>'
-      + '<div class="fr"><label>주관</label><div class="fv"><select id="r_lead">' + personOpts(rule.leadSid) + '</select></div></div>'
-      + '<div class="fr"><label>켜짐</label><div class="fv"><label class="ck"><input type="checkbox" id="r_active"' + (rule.active !== false ? ' checked' : '') + '> 이 사업 종류는 컨설팅정산에서 개별정산한다(재무관리 성과급에서 뺀다)</label></div></div>'
-      + '<div class="sec">사람별 요율 (%)</div><div class="scroll"><table class="t" data-name="rates"><thead><tr><th>이름</th><th class="r">요율</th><th></th></tr></thead><tbody>';
-    Object.keys(rule.rates || {}).forEach(function (sid) {
-      h += '<tr>' + nw('name', nameBy(sid), 'ti') + '<td class="r" data-k="pct"><input type="text" inputmode="decimal" class="pct" data-rate="' + esc(sid) + '" value="' + esc(rule.rates[sid]) + '"></td><td data-k="btn"><button class="sm" data-rate-del="' + esc(sid) + '">빼기</button></td></tr>';
+  /* ── ④ 규칙·요율 — 요율표 하나(줄 = 사람, 칸 = 사업 종류) + 사업마다 «자세히»(접힘) ──
+     대표 지시 2026-10-31 「규칙 요율 너무 불필요하게 화면 많이 차지 … 사업종류 사람마다 다 다를 수 있는데 깔끔하게 정리」.
+     work = {types:[code], rules:{code:{title, leadSid, rates:{sid:'25'}, siteRates:{cid:{sid:pct}}, msgHead, msgFoot, active}}, people:[sid], dirty, open}
+     opt  = {bizNames:{code:이름}, addTypes:[{code,name}], staff:[{sid,name}](재직자만), names:{sid:이름}, sitesByType:{code:[{consultingId,label}]}, sel:{sid:1}}
+     ⚠ 고르기(사람·주관)는 재직자만 — 그러나 이미 들어 있는 사람(퇴사 뒤에도 남은 요율)은 이름으로 보인다. */
+  function shortBiz(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, ''); }
+  function staffOpts(staff, names, cur, blank) {
+    var list = (staff || []).slice();
+    if (cur && !list.some(function (p) { return p.sid === cur; })) list.unshift({ sid: cur, name: (names && names[cur]) || '(이름 없음)' });
+    return '<option value="">' + esc(blank || '— 사람 —') + '</option>' + list.map(function (p) { return '<option value="' + esc(p.sid) + '"' + (p.sid === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('');
+  }
+  function rateMatrix(work, opt) {
+    opt = opt || {}; work = work || {};
+    var types = work.types || [], rules = work.rules || {}, people = work.people || [], names = opt.names || {}, sel = opt.sel || {}, biz = opt.bizNames || {};
+    var title = function (code) { var r = rules[code] || {}; return r.title || shortBiz(biz[code] || code); };
+    var h = '<div class="card"><div class="bar"><b>요율표</b><span class="hint">줄 = 사람 · 칸 = 사업 종류 · 25 = 25%</span><span class="sp"></span>'
+      + '<select id="mx_addType" title="요율표에 사업 종류 칸을 더한다"><option value="">+ 사업 종류</option>'
+      + (opt.addTypes || []).map(function (b) { return '<option value="' + esc(b.code) + '">' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<button class="sm pri" id="mx_save"' + (work.dirty ? '' : ' disabled') + '>저장</button></div>';
+    if (!types.length) return h + '<div class="empty">아직 사업 종류가 없습니다 — 오른쪽 위 «+ 사업 종류»로 칸을 더하세요.</div></div>';
+    var allOn = people.length > 0 && people.every(function (s) { return sel[s]; });
+    h += '<div class="bulk" data-bulk="mxpeople"></div><div class="scroll"><table class="t mx" data-mx-table><thead><tr>'
+      + '<th class="c"><input type="checkbox" data-all="mxpeople"' + (allOn ? ' checked' : '') + '></th><th class="n">번호</th><th>이름</th>'
+      + types.map(function (c) { return '<th class="mxc" title="' + esc(biz[c] || c) + '">' + esc(title(c)) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + '<tr class="cfg"><td></td><td></td><td>주관</td>' + types.map(function (c) { return '<td class="mxc"><select data-lead="' + esc(c) + '">' + staffOpts(opt.staff, names, (rules[c] || {}).leadSid, '— 고르기 —') + '</select></td>'; }).join('') + '</tr>'
+      + '<tr class="cfg"><td></td><td></td><td>켜짐</td>' + types.map(function (c) { return '<td class="mxc"><label class="ck" title="켜면 이 사업 종류는 컨설팅정산에서 개별정산한다(재무관리 성과급에서 뺀다)"><input type="checkbox" data-on="' + esc(c) + '"' + ((rules[c] || {}).active !== false ? ' checked' : '') + '></label></td>'; }).join('') + '</tr>';
+    people.forEach(function (sid, i) {
+      h += '<tr>' + ckCell(sid, sel[sid]) + '<td class="n">' + (i + 1) + '</td><td class="ti" title="' + esc(names[sid] || '') + '">' + esc(names[sid] || '(이름 없음)') + '</td>'
+        + types.map(function (c) { var v = ((rules[c] || {}).rates || {})[sid]; return '<td class="mxc"><input type="text" inputmode="decimal" class="pct" data-mx="' + esc(c + '|' + sid) + '" value="' + esc(v == null ? '' : v) + '" placeholder="—"></td>'; }).join('') + '</tr>';
     });
-    h += '<tr><td><select id="r_addSid">' + personOpts('') + '</select></td><td class="r"><input type="text" inputmode="decimal" class="pct" id="r_addPct" placeholder="%"></td><td><button class="sm" id="r_addRate">더하기</button></td></tr></tbody></table></div>';
-    h += '<div class="sec">사업장별 예외 요율</div><div class="scroll"><table class="t" data-name="siteRates"><thead><tr><th>사업장</th><th>이름</th><th class="r">요율</th><th></th></tr></thead><tbody>';
-    var siteLabel = {}; sites.forEach(function (s) { siteLabel[s.consultingId] = s.label; });
-    Object.keys(rule.siteRates || {}).forEach(function (cid) {
-      Object.keys(rule.siteRates[cid] || {}).forEach(function (sid) {
-        h += '<tr>' + nw('site', siteLabel[cid] || '(연결된 사업장)') + nw('name', nameBy(sid), 'ti') + '<td class="r" data-k="pct">' + esc(rule.siteRates[cid][sid]) + '%</td><td data-k="btn"><button class="sm" data-srate-del="' + esc(cid + '|' + sid) + '">빼기</button></td></tr>';
+    var addable = (opt.staff || []).filter(function (p) { return people.indexOf(p.sid) < 0; });
+    h += '<tr class="cfg"><td></td><td></td><td colspan="' + (types.length + 1) + '"><select id="mx_addSid"><option value="">+ 사람(재직자)</option>'
+      + addable.map(function (p) { return '<option value="' + esc(p.sid) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></td></tr>';
+    return h + '</tbody></table></div>' + (work.dirty ? '<div class="bar"><span class="hint bad">저장하지 않은 변경이 있습니다.</span></div>' : '') + '</div>';
+  }
+  /* 사업마다 접어 두는 «자세히» — 카톡 머리말·맺음말·이름, 사업장별 예외 요율 */
+  function ruleDetails(work, opt) {
+    opt = opt || {}; work = work || {};
+    var rules = work.rules || {}, names = opt.names || {}, biz = opt.bizNames || {};
+    return (work.types || []).map(function (c) {
+      var r = rules[c] || {}, sites = (opt.sitesByType || {})[c] || [], label = {}, sr = r.siteRates || {};
+      sites.forEach(function (s) { label[s.consultingId] = s.label; });
+      var rows = [];
+      Object.keys(sr).forEach(function (cid) { Object.keys(sr[cid] || {}).forEach(function (sid) { rows.push({ cid: cid, sid: sid, pct: sr[cid][sid] }); }); });
+      var h = '<details class="card rd" data-rd="' + esc(c) + '"' + (work.open === c ? ' open' : '') + '><summary class="sec">⋯ ' + esc(r.title || shortBiz(biz[c] || c)) + ' 자세히 — 카톡 문구 · 사업장별 예외 요율' + (rows.length ? ' (' + rows.length + ')' : '') + '</summary>'
+        + '<div class="fr"><label>이름</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|title" value="' + esc(r.title || '') + '" placeholder="' + esc(shortBiz(biz[c] || c)) + '"></div></div>'
+        + '<div class="fr"><label>머리말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgHead" value="' + esc(r.msgHead || '') + '" placeholder="' + esc(C.DEFAULT_HEAD) + '"></div></div>'
+        + '<div class="fr"><label>맺음말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgFoot" value="' + esc(r.msgFoot || '') + '" placeholder="' + esc(C.DEFAULT_FOOT) + '"></div></div>'
+        + '<div class="sec">사업장별 예외 요율 <span class="hint">— 이 사업장에서만 요율표와 다를 때</span></div><div class="scroll"><table class="t sr"><tbody>';
+      rows.forEach(function (x) {
+        h += '<tr><td class="nw" title="' + esc(label[x.cid] || '') + '">' + esc(label[x.cid] || '(연결된 사업장)') + '</td><td class="nw">' + esc(names[x.sid] || '(이름 없음)') + '</td><td class="r">' + esc(x.pct) + '%</td>'
+          + '<td><button class="sm" data-srate-del="' + esc(c + '|' + x.cid + '|' + x.sid) + '">빼기</button></td></tr>';
       });
-    });
-    h += '<tr><td><select id="r_sSite"><option value="">— 사업장 —</option>' + sites.map(function (s) { return '<option value="' + esc(s.consultingId) + '">' + esc(s.label) + '</option>'; }).join('') + '</select></td><td><select id="r_sSid">' + personOpts('') + '</select></td>'
-      + '<td class="r"><input type="text" inputmode="decimal" class="pct" id="r_sPct" placeholder="%"></td><td><button class="sm" id="r_addSRate">더하기</button></td></tr></tbody></table></div>';
-    h += '<div class="sec">카톡 문구</div>'
-      + '<div class="fr"><label>머리말</label><div class="fv"><input type="text" id="r_head" value="' + esc(rule.msgHead || '') + '" placeholder="' + esc(C.DEFAULT_HEAD) + '"></div></div>'
-      + '<div class="fr"><label>맺음말</label><div class="fv"><input type="text" id="r_foot" value="' + esc(rule.msgFoot || '') + '" placeholder="' + esc(C.DEFAULT_FOOT) + '"></div></div>'
-      + '<div class="bar"><span class="hint">{사업} · {월} 은 저절로 바뀝니다.</span><span class="sp"></span><button class="pri" id="r_save">규칙 저장</button></div></div>';
-    return h;
+      h += '<tr><td><select data-sr-site="' + esc(c) + '"><option value="">— 사업장 —</option>' + sites.map(function (s) { return '<option value="' + esc(s.consultingId) + '">' + esc(s.label) + '</option>'; }).join('') + '</select></td>'
+        + '<td><select data-sr-sid="' + esc(c) + '"><option value="">— 사람 —</option>' + (work.people || []).map(function (sid) { return '<option value="' + esc(sid) + '">' + esc(names[sid] || '(이름 없음)') + '</option>'; }).join('') + '</select></td>'
+        + '<td class="r"><input type="text" inputmode="decimal" class="pct" data-sr-pct="' + esc(c) + '" placeholder="%"></td><td><button class="sm" data-srate-add="' + esc(c) + '">더하기</button></td></tr>';
+      return h + '</tbody></table></div><div class="bar"><span class="hint">{사업} · {월} 은 저절로 바뀝니다. 고친 뒤 요율표의 «저장»을 누르세요.</span></div></details>';
+    }).join('');
   }
   function adjustsTable(adjusts, siteNames, names, sel, opt) {
     sel = sel || {}; siteNames = siteNames || {}; opt = opt || {};
@@ -243,5 +270,5 @@
   }
 
   return { STATUS_KO: STATUS_KO, esc: esc, runsTable: runsTable, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
-    rulesBox: rulesBox, adjustsTable: adjustsTable, messagesBox: messagesBox };
+    rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });
