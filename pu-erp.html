@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=37">
+<link rel="stylesheet" href="css/pu-erp.css?v=38">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -38616,11 +38616,15 @@ function bizTypeUsage(kindKey, code, get){
   });
   return { n:n, by:by };
 }
-/* 같은 약어 또는 같은 이름(띄어쓰기·점 무시)이 이미 있으면 그 항목 — 자기 자신은 뺀다. 숨긴 것도 본다. */
+/* 같은 약어 또는 같은 이름(띄어쓰기·점 무시)이 이미 있으면 그 항목 — 자기 자신은 뺀다. 숨긴 것도 본다.
+   ⚠ 예외 하나: 고치는 유형(exceptCode)이 «자기가 흡수한» 합쳐진 유형(mergedInto === exceptCode)은 겹침으로 보지 않는다.
+     합쳐 남은 쪽이 옛 유형의 이름을 «바로잡아» 이어받는 것은 같은 사업이라 두 갈래가 되지 않는다
+     (일터상생혁신컨설팅 → 옛 일터혁신상생컨설팅, 2026-10-31). 다른 유형의 이름·약어를 쓰는 것은 그대로 막는다. */
 function bizTypeDupOf(list, short, name, exceptCode){
   var s = bizTypeNorm(short), nm = bizTypeNorm(name);
   return (list || []).find(function(x){
     if(!x || x.code === exceptCode) return false;
+    if(exceptCode && x.mergedInto === exceptCode) return false;
     return (s && bizTypeNorm(x.short) === s) || (nm && bizTypeNorm(x.name) === nm);
   }) || null;
 }
@@ -39230,6 +39234,7 @@ function PersonalDepositBulkModal(props){
 }
 function BizTypeCard(props){
   var cat = props.cat;
+  var archiveFirst = cat.key === 'consulting' || cat.key === 'other';   // 쓰는 기록 0건인 유형도 «보관»이 기본(대표 2026-10-31) — 업체·사건·기금은 예전 그대로
   var existing = dbGet(cat.storageKey, null);
   if(!existing){ existing = cat.seed; }   // 화면용 임시 — 서버에 쓰지 않는다(erpPlantSeed 머리글)
   // 옛 로컬 캐시가 code-키 객체({other-committee:..})로 남아있어도 배열로 변환 (list.map 크래시 방지)
@@ -39241,6 +39246,7 @@ function BizTypeCard(props){
   // 드래그 state
   var dgS = useState(null); var dragCode = dgS[0]; var setDragCode = dgS[1];
   var doS = useState(null); var dragOverCode = doS[0]; var setDragOverCode = doS[1];
+  var arS = useState(false); var arcOpen = arS[0], setArcOpen = arS[1];   // 맨 아래 「📦 보관」 칸 — 기본은 접힘
   /* 이 기기에 사본이 없으면 서버에 «물어서» 받는다 — 받으면 목록을 다시 그린다. 서버도 비어 있을 때만 씨앗이 심긴다. */
   useEffect(function(){
     if(dbGet(cat.storageKey, null) != null) return;
@@ -39307,11 +39313,25 @@ function BizTypeCard(props){
         { title:'유형 사용 중', confirmText:'숨김 처리', danger:false }).then(function(ok){
         if(!ok) return;
         setHidden(code, true, '숨김');
-        showToast('🙈 숨김 처리됨 — 기존 '+used+'건 표시 유지');
+        showToast('🙈 숨김 처리됨 — 기존 '+used+'건 표시 유지 (맨 아래 「📦 보관」 칸에서 다시 꺼낼 수 있습니다)');
       });
       return;
     }
-    // 사용 0건 → 안전하게 삭제
+    /* 사용 0건 — 컨설팅·기타사업은 나중에 없어지거나 바뀔 수 있어 «보관»이 기본이다(대표 2026-10-31 「삭제보다 숨기기·보관」).
+       완전 삭제는 옆 작은 단추로 따로. 업체·사건·기금 카드는 예전 그대로 곧바로 삭제를 묻는다. */
+    if(archiveFirst){
+      var itemA = list.find(function(x){ return x.code === code; }) || {};
+      popConfirm('"' + (itemA.name || code) + '" 유형은 쓰는 기록이 없습니다.\n지우지 않고 「보관」으로 옮겨 두면 나중에 다시 꺼낼 수 있습니다.',
+        { cancelText:'취소', thirdText:'완전 삭제', choices:[{ key:'archive', label:'📦 보관' }] }).then(function(pick){
+        if(pick === 'archive'){ setHidden(code, true, '보관'); showToast('📦 보관 칸으로 옮겼습니다 — 맨 아래에서 다시 꺼낼 수 있습니다'); }
+        else if(pick === 'third') removeUnused(code);
+      });
+      return;
+    }
+    removeUnused(code);
+  }
+  /* 쓰는 기록이 0건인 유형을 «완전히» 지운다 — 묻고, 누르는 사이 생긴 사용을 지우기 직전에 한 번 더 센다 */
+  function removeUnused(code){
     showConfirm('"'+(list.find(function(x){return x.code===code;})||{}).name+'" 유형을 삭제할까요?\n(사용 중인 데이터 없음 — 계약관리까지 세었습니다)', { title:'유형 삭제', confirmText:'삭제', danger:true }).then(function(ok){
       if(!ok) return;
       /* 누르는 사이 누가 그 유형을 썼을 수 있다 — 지우기 직전에 한 번 더 센다 */
@@ -39319,6 +39339,15 @@ function BizTypeCard(props){
       persistWith(function(cur){ return cur.filter(function(x){ return x.code !== code; }); });
       showToast('🗑 삭제됨');
     });
+  }
+  /* 보관 칸의 🗑 — 합쳐진 유형은 지우지 않는다(옛 번호가 메모·휴지통·나간 문서에 남아 있을 수 있다). 쓰는 기록이 있으면 못 지운다. */
+  function purge(code){
+    if(!bizTypeWritable(cat.storageKey)) return;   // 서버 사전을 못 받았으면 아무것도 쓰지 않는다
+    var mx = list.find(function(x){ return x.code === code; });
+    if(!mx || mx.mergedInto) return;
+    var used = countUsage(code);
+    if(used > 0){ showToast('⚠ 「' + mx.name + '」 은 쓰는 기록이 ' + used + '건 있어 지울 수 없습니다 — 보관 칸에 그대로 둡니다', 7000); return; }
+    removeUnused(code);
   }
   // 숨김 유형 다시 보이기
   function unhide(code){
@@ -39479,11 +39508,15 @@ function BizTypeCard(props){
   }
   function onDragEnd(){ setDragCode(null); setDragOverCode(null); }
 
+  /* 숨긴 것·합쳐진 것은 맨 아래 「📦 보관」 칸으로 — 제목의 숫자는 «지금 쓰는 유형»만 센다 */
+  var shown = list.filter(function(x){ return !x.hidden; });
+  var arc = list.filter(function(x){ return x.hidden; });
+
   return h('div', { className:'biz-type-card biz-type-card-' + cat.key, style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', display:'flex', flexDirection:'column' } },
     h('div', { style:{ background:cat.headBg, color:cat.headFg, padding:'6px 10px', fontSize:'11.5px', fontWeight:700, display:'flex', alignItems:'center', gap:'6px', userSelect:'none' } },
       h('span', null, cat.icon),
       h('span', null, cat.title),
-      h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + list.length + ')'),
+      h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + shown.length + ')'),
       h('div', { style:{ flex:1 } }),
       h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, className:'erp-tip', 'data-tip':'기본 유형 가운데 빠진 것만 더합니다 — 지금 목록은 지우거나 바꾸지 않습니다',
         style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:cat.headFg, border:'1px solid '+cat.headFg, borderRadius:'4px', opacity:.6, cursor:'pointer', marginLeft:'6px' } }, '복원')
@@ -39491,60 +39524,87 @@ function BizTypeCard(props){
     h('div', null,
     pdBulk && h(PersonalDepositBulkModal, { code:pdBulk.code, name:pdBulk.name, on:pdBulk.on, onClose:function(){ setPdBulk(null); } }),
     h('div', { style:{ padding:'4px 6px', flex:1 } },
-      list.length === 0
+      cat.key === 'consulting' && shown.length > 0 && h('div', { className:'bt-head' },
+        ['', '약어', '사업명', '수행기관', '단가·셈', '개인입금', '', ''].map(function(t, i){ return h('span', { key:i }, t); })),
+      shown.length === 0
         ? h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', padding:'10px' } }, '항목 없음')
-        : list.map(function(x){
+        : shown.map(function(x){
             var isOver = dragOverCode === x.code && dragCode && dragCode !== x.code;
             var isDragging = dragCode === x.code;
-            return h('div', { key:x.code,
-              draggable:true,
+            var dnd = { draggable:true,
               onDragStart:function(e){onDragStart(x.code, e);},
               onDragOver:function(e){onDragOver(x.code, e);},
               onDragLeave:function(){onDragLeave(x.code);},
               onDrop:function(e){onDrop(x.code, e);},
-              onDragEnd:onDragEnd,
-              style:{ display:'flex', alignItems:'center', gap:'4px', padding:'3px 5px',
-                border:'1px solid '+(isOver?'#1e40af':'#e2e8f0'),
-                borderTop: isOver ? '3px solid #1e40af' : '1px solid #e2e8f0',
-                borderRadius:'4px', marginBottom:'4px',
-                background: isOver?'#eff6ff':(x.hidden?'#f8fafc':'#fff'),
-                opacity: isDragging?0.4:(x.hidden?0.55:1),
-                cursor:'grab', userSelect:'none', transition:'all 0.1s' } },
-              h('span', { style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮'),
-              h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short),
-              /* ⚠ 이름과 칩(수행기관·1일 단가·셈 묶음)을 «한 줄에 나란히» 두되 모자라면 줄바꿈한다 — 예전엔 한 덩어리에 말줄임(…)을 걸어
-                   좁은 PC 카드(5칸)에서는 셈 묶음 칩이 통째로 안 보였고, 폰에서는 «셈:…»·«1회 300,000원…» 으로 잘렸다.
-                   폰에는 마우스 말풍선(title)이 없어 잘린 글자를 볼 길도 없다. 두 화면이 같은 글자를 보이는 것이 규칙이다(2026-10-26). */
-              h('div', { className:'biz-type-name', title: [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
+              onDragEnd:onDragEnd };
+            var gripEl = h('span', { className:'bt-grip', style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮');
+            var shortEl = h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short);
+            var tipName = [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n');
+            var rowLook = { border:'1px solid '+(isOver?'#1e40af':'#e2e8f0'),
+              borderTop: isOver ? '3px solid #1e40af' : '1px solid #e2e8f0',
+              background: isOver?'#eff6ff':'#fff',
+              opacity: isDragging?0.4:1,
+              cursor:'grab', userSelect:'none', transition:'all 0.1s' };
+            var editEl = function(cls){ return h('button', { onClick:function(){ editType(x); }, className:'erp-tip ' + cls, 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
+              style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'); };
+            var delEl = function(cls){ return h('button', { onClick:function(){ del(x.code); }, className:cls,
+              style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'22px', fontSize:'12px', cursor:'pointer' } }, '×'); };
+            /* 🧾 컨설팅 유형 — 칸을 세로로 맞춘 한 줄(css .bt-row): ⋮⋮ | 약어 | 사업명 | 수행기관 | 단가·셈 | 개인입금 | ✏ | ×
+               ⚠ 수행기관·단가·셈·개인 칸은 «비어 있어도» 칸을 둔다 — 비면 뒤 칸이 앞으로 밀려 줄마다 어긋난다.
+               카드 폭이 모자라면 css 가 두 줄로 접는다(첫 줄 약어·사업명·✏·× / 둘째 줄 수행기관·단가·셈·개인) — 같은 글자·칩은 안 잘린다. */
+            if(cat.key === 'consulting'){
+              return h('div', Object.assign({ key:x.code, className:'bt-row', style:rowLook }, dnd),
+                gripEl, shortEl,
+                h('span', { className:'bt-name biz-type-name', title:tipName }, x.name),
+                h('div', { className:'bt-l2' },
+                  h('span', { className:'bt-agency' }, x.agency ? h('span', { className:'bt-chip bt-chip-agency', title:x.agency }, x.agency) : null),
+                  h('span', { className:'bt-fee' },
+                    /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지 여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
+                    x.dayFee > 0 ? h('span', { className:'bt-chip bt-chip-fee' }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
+                    /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
+                    consTypeRole(x) ? h('span', { className:'bt-chip bt-chip-role', title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)' }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null)),
+                h('span', { className:'bt-pd' },
+                    h('button', { onClick:function(e){ e.stopPropagation(); togglePersonal(x); },
+                      title: x.personalDeposit
+                        ? '👤 개인입금 사업 — 이 유형의 계약·컨설팅은 입금확정 때 「개인수익」으로 열립니다. 누르면 끕니다'
+                        : '누르면 «개인입금 사업»으로 — 법인 아닌 개인 계좌로 받는 사업',
+                      style:{ flexShrink:0, height:'22px', padding:'0 6px', borderRadius:'10px', cursor:'pointer', fontSize:'10.5px', whiteSpace:'nowrap',
+                        border:'1px solid ' + (x.personalDeposit ? '#fde68a' : '#e2e8f0'), background: x.personalDeposit ? '#fffbeb' : '#fff',
+                        color: x.personalDeposit ? '#854d0e' : '#94a3b8', fontWeight: x.personalDeposit ? 700 : 400 } },
+                      x.personalDeposit ? '✓ 👤 개인' : '👤')),
+                editEl('bt-edit'), delEl('bt-del'));
+            }
+            return h('div', Object.assign({ key:x.code, style:Object.assign({ display:'flex', alignItems:'center', gap:'4px', padding:'3px 5px', borderRadius:'4px', marginBottom:'4px' }, rowLook) }, dnd),
+              gripEl, shortEl,
+              h('div', { className:'biz-type-name', title:tipName,
                 style:{ flex:1, minWidth:0, display:'flex', flexWrap:'wrap', alignItems:'center', gap:'2px 6px', fontSize:'11px', color:'#1e293b' } },
-                h('span', { style:{ minWidth:0, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.name),   /* 이름은 한 줄 — 칩이 모자라면 칩만 아래로 내려간다. 이름 하나가 카드보다 길 때만 …(말풍선에 전문) */
-                x.hidden ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } },
-                  x.mergedInto ? '합쳐짐 → ' + ((list.find(function(y){ return y.code === x.mergedInto; }) || {}).short || '') : '숨김') : null,
-                cat.key === 'consulting' && x.agency ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
-                /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지
-                   여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
-                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
-                /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
-                cat.key === 'consulting' && consTypeRole(x) ? h('span', { title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)',
-                  style:{ whiteSpace:'nowrap', fontSize:'10.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null
-              ),
-              cat.key === 'consulting' && h('button', { onClick:function(e){ e.stopPropagation(); togglePersonal(x); },
-                title: x.personalDeposit
-                  ? '👤 개인입금 사업 — 이 유형의 계약·컨설팅은 입금확정 때 「개인수익」으로 열립니다. 누르면 끕니다'
-                  : '누르면 «개인입금 사업»으로 — 법인 아닌 개인 계좌로 받는 사업',
-                style:{ flexShrink:0, height:'22px', padding:'0 6px', borderRadius:'10px', cursor:'pointer', fontSize:'10.5px', whiteSpace:'nowrap',
-                  border:'1px solid ' + (x.personalDeposit ? '#fde68a' : '#e2e8f0'), background: x.personalDeposit ? '#fffbeb' : '#fff',
-                  color: x.personalDeposit ? '#854d0e' : '#94a3b8', fontWeight: x.personalDeposit ? 700 : 400 } },
-                x.personalDeposit ? '✓ 👤 개인' : '👤'),
-              h('button', { onClick:function(){ editType(x); }, className:'erp-tip', 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
-                style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'),
-              x.hidden
-                ? h('button', { onClick:function(){ unhide(x.code); }, className:'erp-tip', 'data-tip':'다시 표시',
-                    style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '👁')
-                : h('button', { onClick:function(){ del(x.code); },
-                    style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'22px', fontSize:'12px', cursor:'pointer' } }, '×')
-            );
-          })
+                h('span', { style:{ minWidth:0, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.name)),
+              editEl(''), delEl(''));
+          }),
+      /* 📦 보관 — 숨긴 것·합쳐진 것을 맨 아래 접힌 칸으로(대표 2026-10-31). 숨긴 것이 없으면 칸 자체가 안 보인다.
+         ⚠ 합쳐진 유형은 지우지도 다시 띄우지도 않는다(옛 번호가 메모·휴지통·나간 문서에 남아 있을 수 있다). */
+      arc.length > 0 && h('div', { className:'biz-type-arc', style:{ borderTop:'1px dashed #cbd5e1', marginTop:'6px', paddingTop:'5px' } },
+        h('button', { type:'button', className:'biz-type-arc-bar', onClick:function(){ setArcOpen(!arcOpen); },
+          style:{ display:'flex', alignItems:'center', gap:'6px', width:'100%', background:'transparent', border:'none', padding:'3px 4px', fontSize:'11px', color:'#64748b', cursor:'pointer', textAlign:'left' } },
+          h('span', null, '📦'), h('b', { style:{ color:'#1e293b' } }, '보관 ' + arc.length),
+          h('span', { style:{ fontSize:'10px' } }, '숨긴 것·합쳐진 것'),
+          h('span', { style:{ marginLeft:'auto', border:'1px solid #e2e8f0', background:'#fff', borderRadius:'5px', padding:'1px 8px', fontSize:'10.5px', color:'#475569', whiteSpace:'nowrap' } }, arcOpen ? '접기 ▴' : '펼치기 ▾')),
+        arcOpen && arc.map(function(x){
+          var merged = !!x.mergedInto;
+          var into = merged ? list.find(function(y){ return y.code === x.mergedInto; }) : null;
+          var used = merged ? 0 : countUsage(x.code);
+          return h('div', { key:'arc-' + x.code, className:'biz-type-arc-row', title:[x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
+            style:{ display:'flex', alignItems:'center', gap:'4px', padding:'3px 5px', border:'1px solid #e2e8f0', borderRadius:'4px', marginBottom:'4px', background:'#f8fafc' } },
+            h('span', { style:{ background:'#e2e8f0', color:'#64748b', fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short),
+            h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:'11px', color:'#64748b' } }, x.name),
+            h('span', { style:{ whiteSpace:'nowrap', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600, flexShrink:0 } },
+              merged ? '합쳐짐 → ' + ((into && into.short) || '') : '숨김'),
+            h('button', { onClick:function(){ unhide(x.code); }, className:'erp-tip', 'data-tip': merged ? '합쳐진 유형은 다시 띄우지 않습니다' : '다시 표시',
+              style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer', opacity: merged ? 0.35 : 1 } }, '👁'),
+            merged ? null : h('button', { onClick:function(){ purge(x.code); }, className:'erp-tip', 'data-tip': used > 0 ? '쓰는 기록 ' + used + '건 — 지울 수 없습니다' : '완전 삭제 (쓰는 기록 0건)',
+              style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer', opacity: used > 0 ? 0.35 : 1 } }, '🗑'));
+        })
+      )
     ),
     h('div', { style:{ padding:'4px 6px', borderTop:'1px solid #f8fafc', background:'#f8fafc' } },
       h('div', { style:{ display:'flex', gap:'4px', marginBottom:'3px' } },

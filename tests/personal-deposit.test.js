@@ -133,7 +133,15 @@ console.log('\n[⑩ 이미 확정된 입금 일괄 변경 — 고르는 규칙]'
   t('바꿀 것은 개인수익으로', rows.find((r) => r.fi.id === 'f1').to, true);
 }
 t('★ 일괄 변경은 손댄 기록을 남긴다', /erpIncomeLog\(r\.fi\.id, '👤 개인입금 사업 일괄 변경/.test(src), true);
-t('★ 유형 카드에 스위치가 있다(컨설팅만)', /cat\.key === 'consulting' && h\('button', \{ onClick:function\(e\)\{ e\.stopPropagation\(\); togglePersonal\(x\); \}/.test(src), true);
+{
+  /* 2026-10-31: 컨설팅 줄이 «칸을 세로로 맞춘 표 줄»로 바뀌어 스위치가 `if(cat.key === 'consulting'){ … }` 분기 안으로 들어갔다.
+     규칙은 그대로다 — 유형 카드에 스위치가 있고, 컨설팅 줄에만 있다(다른 카드 줄에는 없다). */
+  const card = src.slice(src.indexOf('function BizTypeCard(props){'));
+  const at = card.indexOf("if(cat.key === 'consulting'){");
+  const end = card.indexOf("return h('div', Object.assign({ key:x.code, style:Object.assign", at);
+  t('★ 유형 카드에 스위치가 있다(컨설팅만)',
+    at > 0 && end > at && /onClick:function\(e\)\{ e\.stopPropagation\(\); togglePersonal\(x\); \}/.test(card.slice(at, end)) && !/togglePersonal/.test(card.slice(end, end + 1500)), true);
+}
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
 process.exit(fail ? 1 : 0);
