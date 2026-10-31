@@ -5328,8 +5328,34 @@ exports.homepageAuto = functions
     }
   });
 
+/* 새 사이트 지킴이 (대표 지시 2026-10-31 「앞으로 이런 문제 없게 자동으로」) — 규칙은 functions/homepage-newsite.js 한 곳 */
+const HN = require("./homepage-newsite");
+async function 새사이트파일읽기(토큰, repo, path) {
+  const 답 = await githubRequest(토큰, `/repos/${repo}/contents/${path}`);
+  return Buffer.from(String((답 && 답.content) || ""), "base64").toString("utf8");
+}
+async function 새사이트한번(누가) {
+  const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
+  const db = getDatabase();
+  return HN.돌기({
+    읽기: async (p) => (await db.ref(p).once("value")).val(),
+    쓰기: (p, v) => db.ref(p).set(v),
+    쪽읽기: () => 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(HN.사본자리)),
+    /* 화면의 「새 사이트에 올리기」(publishSite)와 같은 차례 — 사람이 보는 쪽 먼저, 우리 사본은 실패해도 알리기만 */
+    올리기: async (html, note) => {
+      const 사연글 = 사연(누가, HN.사본자리, note);
+      const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(HN.사본자리), html, 사연글);
+      try { await 올리기(githubRequest, 토큰, REPO, HN.사본자리, html, 사연글); }
+      catch (e) { console.warn("[새 사이트 자동] 사본 올리기 실패", (e && e.message) || e); }
+      return 답;
+    },
+    지금: () => Date.now(),
+    누가: 누가
+  });
+}
+
 exports.monthlyHomepageAuto = functions
-  .runWith({ secrets: ["HOME_ADMIN_ID", "HOME_ADMIN_PW"], timeoutSeconds: 300, memory: "256MB" })
+  .runWith({ secrets: ["HOME_ADMIN_ID", "HOME_ADMIN_PW", "GITHUB_AUTOMATION_TOKEN"], timeoutSeconds: 300, memory: "256MB" })
   /* 매달 1일 08:00(서울) — 대표 결정 2026-10-05 */
   .pubsub.schedule("0 8 1 * *")
   .timeZone("Asia/Seoul")
@@ -5338,6 +5364,31 @@ exports.monthlyHomepageAuto = functions
     console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
       + " · 못내림 " + (r.못내림 || []).length
       + (r.꺼짐 ? " · 꺼져 있음" : "") + (r.멈춤 ? " · 멈춤" : "") + (r.실패 ? " · 실패 " + r.실패 : ""));
+    /* ★ 내리기를 «마친 뒤» 새 사이트를 만든다 — 방금 내린 사람(takenDown)이 새 사이트에서도 함께 빠진다.
+       앞 일이 실패해도 새 사이트는 따로 돈다(서로 다른 저장소다). */
+    const n = await 새사이트한번("auto");
+    console.log("[새 사이트 자동] " + (n.꺼짐 ? "꺼져 있음" : n.ok ? (n.멈춤 ? "멈춤 " + n.멈춤
+      : n.올림 ? "올림 " + n.인원 + "명 · 뺌 " + n.뺀수 : "바뀐 것 없음") : "실패 " + n.실패));
+    return null;
+  });
+
+/* 매일 아침 7:50 — 새 사이트 GitHub 열쇠 점검. 막히면 홈페이지 관리 화면 맨 위에 띠가 뜬다.
+   ★ 2026-10-31 열쇠가 죽어 있었는데 아무도 몰랐다 — 사람이 단추를 누른 날에야 알았다. 읽기만 한다. */
+exports.dailyHomepageKeyCheck = functions
+  .runWith({ secrets: ["GITHUB_AUTOMATION_TOKEN"], timeoutSeconds: 60, memory: "256MB" })
+  .pubsub.schedule("50 7 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
+    const db = getDatabase();
+    const r = await HN.열쇠점검({
+      읽어보기: (이름) => 이름 === "새 사이트"
+        ? 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(HN.사본자리))
+        : 새사이트파일읽기(토큰, REPO, HN.사본자리),
+      쓰기: (p, v) => db.ref(p).set(v),
+      지금: () => Date.now()
+    });
+    console.log("[새 사이트 열쇠 점검] " + (r.ok ? "이상 없음" : "막힘 — " + r.까닭));
     return null;
   });
 
@@ -6581,6 +6632,12 @@ exports.publishSite = functions
       } catch (e) {
         사본 = (e && e.message) || "사본을 올리지 못했습니다";
         console.warn("[publishSite] 사본 올리기 실패", 사본);
+      }
+      /* 구성원 쪽을 손으로 올렸으면 «새 사이트» 기록도 바꾼다 — 지난 자동 실패 띠가 고친 뒤에도 남지 않게 (2026-10-31) */
+      if (path === HN.사본자리) {
+        await getDatabase().ref("homepage/auto/newsite").set({ at: Date.now(), by: decoded.uid, ok: true, 올림: true,
+          수동: true, commit: (답 && 답.commit && 답.commit.sha) ? 답.commit.sha.slice(0, 7) : "" })
+          .catch((e) => console.warn("[publishSite] 새 사이트 기록 실패", (e && e.message) || e));
       }
 
       res.json({
