@@ -1299,6 +1299,8 @@ exports.govaidNoticeWatch = functions
         const b = await db.ref("gov/" + uid + "/key_biz").once("value");
         return { keyBiz: b.val() };
       },
+      /* 보조금24(2026-10-31) — 공공데이터포털 열쇠(다른 공공데이터와 같은 것). 읽기만, 로그·결과에 안 남긴다 */
+      dataKey: async () => (await db.ref("data/app_config/ntsKey").once("value")).val(),
       programs: async () => (await g.child("programs").once("value")).val(),
       existing: async () => (await g.child("notices").once("value")).val(),
       write: (updates) => g.update(updates),
