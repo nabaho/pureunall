@@ -103,6 +103,69 @@ test('입금 대조 상자 — ☐·번호, 찾은 입금 고르기, 일치·금
   assert.match(h, /id="dep_pull"/);
 });
 
+test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜짐 줄, «+ 사람»은 재직자 중 아직 없는 사람만, 사번은 화면에 없다', () => {
+  const work = { types: ['cons-a', 'cons-b'], people: ['T-A', 'T-B'], dirty: true,
+    rules: { 'cons-a': { leadSid: 'T-LEAD', rates: { 'T-A': '25', 'T-B': '30' }, active: true }, 'cons-b': { title: '나다사업', leadSid: '', rates: { 'T-A': '20' }, active: false } } };
+  const staff = [{ sid: 'T-LEAD', name: '홍길동' }, { sid: 'T-A', name: '김가나' }, { sid: 'T-C', name: '박재직' }];
+  const names = { 'T-LEAD': '홍길동', 'T-A': '김가나', 'T-B': '이퇴사' };
+  const h = V.rateMatrix(work, { bizNames: { 'cons-a': '가나사업 (가나재단)', 'cons-b': '나다사업' }, staff, names, sel: {}, addTypes: [{ code: 'cons-c', name: '다라사업' }] });
+  const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="mxpeople"/);
+  assert.match(ths[1], /번호/);
+  assert.match(visible(ths[3]), /가나사업/);
+  assert.doesNotMatch(visible(ths[3]), /가나재단/, '칸 머리는 짧은 이름 한 줄');
+  assert.match(h, /data-mx="cons-a\|T-A" value="25"/);
+  assert.match(h, /data-mx="cons-b\|T-B" value=""/);
+  assert.match(h, /<select data-lead="cons-a">[\s\S]*?value="T-LEAD" selected/);
+  assert.match(h, /data-on="cons-b"(?! checked)/);
+  const add = h.slice(h.indexOf('id="mx_addSid"'));
+  assert.match(add, /박재직/);
+  assert.doesNotMatch(add.slice(0, add.indexOf('</select>')), /김가나/, '이미 줄이 있는 사람은 다시 안 나온다');
+  assert.match(visible(h), /이퇴사/, '퇴사자라도 이미 든 요율은 이름으로 보인다');
+  assert.doesNotMatch(visible(h), /T-[A-Z]/);
+  assert.doesNotMatch(h, /<br/i);
+  assert.match(h, /id="mx_save"(?! disabled)/);
+  assert.match(visible(h), /저장하지 않은 변경/);
+});
+
+test('사업마다 «자세히» — 머리말·맺음말·이름 칸과 사업장별 예외 요율(더하기·빼기)', () => {
+  const work = { types: ['cons-a'], people: ['T-A'], open: 'cons-a',
+    rules: { 'cons-a': { leadSid: 'T-LEAD', rates: { 'T-A': '25' }, siteRates: { 'C-1': { 'T-A': 30 } }, msgHead: '', msgFoot: '수고' } } };
+  const h = V.ruleDetails(work, { bizNames: { 'cons-a': '가나사업' }, names: { 'T-A': '김가나' }, sitesByType: { 'cons-a': [{ consultingId: 'C-1', label: '가나상사' }] } });
+  assert.match(h, /<details class="card rd" data-rd="cons-a" open>/);
+  assert.match(h, /data-rf="cons-a\|msgFoot" value="수고"/);
+  assert.match(visible(h), /가나상사/);
+  assert.match(visible(h), /30%/);
+  assert.match(h, /data-srate-del="cons-a\|C-1\|T-A"/);
+  assert.match(h, /data-srate-add="cons-a"/);
+});
+
+test('계산기 — 종류·사업장·수행자(재직자)·구분·세전·요율 칸, 줄 맨 왼쪽 ☐·번호, 주관은 요율 칸이 없다', () => {
+  const st = { type: 'cons-a', siteId: 'C-1', rows: [{ sid: 'T-LEAD', role: 'lead', pre: '2568182' }, { sid: 'T-A', role: 'staff', pre: '977273', rate: '25' }] };
+  const h = V.calcBox(st, { bizList: [{ code: 'cons-a', name: '가나사업' }], sites: [{ consultingId: 'C-1', label: '가나상사' }],
+    staff: [{ sid: 'T-LEAD', name: '홍길동' }, { sid: 'T-A', name: '김가나' }], names: { 'T-LEAD': '홍길동', 'T-A': '김가나' }, sel: {} });
+  assert.match(h, /<select id="c_type">[\s\S]*value="cons-a" selected/);
+  assert.match(h, /<select id="c_site">[\s\S]*value="C-1" selected/);
+  const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="calc"/); assert.match(ths[1], /번호/);
+  assert.match(h, /data-c="0\|sid">[\s\S]*?value="T-LEAD" selected/);
+  assert.doesNotMatch(h, /data-c="0\|rate"/, '주관 줄에는 요율 칸이 없다');
+  assert.match(h, /data-c="1\|rate"[^>]*value="25"/);
+  assert.match(h, /list="c_rates"/);
+  assert.doesNotMatch(visible(h), /T-[A-Z]/);
+  assert.doesNotMatch(h, /카톡/, '카톡 문구는 계산기에 두지 않는다(별도 탭)');
+});
+
+test('계산 결과 — 사람별 세후·몫·정산액과 «누가 누구에게 얼마»', () => {
+  const res = C.calcSite([{ sid: 'T-LEAD', name: '홍길동', role: 'lead', pre: 2568182 }, { sid: 'T-A', name: '김가나', role: 'staff', pre: 977273, rate: 25 }]);
+  const v = visible(V.calcResult(res, { 'T-LEAD': '홍길동', 'T-A': '김가나' }));
+  assert.match(v, /3,428,475원/);
+  assert.match(v, /857,118/);
+  assert.match(v, /−87,915/);
+  assert.match(v, /김가나 → 홍길동\s+87,915원/);
+  assert.equal(V.calcResult({ members: [] }), '');
+});
+
 test('카톡 문구 상자 — 사람마다 복사 단추', () => {
   const h = V.messagesBox([{ sid: 'T-A', name: '김가나', text: '첫 줄\n둘째 줄' }, { sid: 'T-B', name: '이다라', text: 'x' }]);
   assert.match(h, /data-copy="0"/);

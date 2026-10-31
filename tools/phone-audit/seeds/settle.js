@@ -53,9 +53,19 @@ const ledger_batches = { v: [{ id: 'lb-pa1', by: 'P001', at: '2026-10-31T01:00:0
   { _k: 'h4', type: 'expense', src: 'bank', date: '2026-10-29 12:00', memo: '사무실 임차료', amount: 1100000 },
 ] }] };
 
+/* 직원 명부 — seed.js 의 세 사람 + 퇴사자 한 명(요율표 «+ 사람»·주관 고르기에 안 나와야 한다) */
+const 명부 = [
+  { sid: 'P001', name: '점검대표', role: 'admin', status: 'active' },
+  { sid: 'P002', name: '점검노무', role: 'staff', status: 'active' },
+  { sid: 'P003', name: '점검사무장', role: 'staff', status: 'active' },
+  { sid: 'P009', name: '점검퇴사', role: 'staff', status: 'resigned' },
+];
+
 module.exports = {
   data: {
     data: {
+      user_dir: { v: 명부 },
+      user_accounts: { v: 명부 },
       ledger_batches,
       biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' }] },
       consultings: { v: consultings },

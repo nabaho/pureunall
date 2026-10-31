@@ -118,6 +118,8 @@
   /* ═══ 지급월 정산 — 방식 pool (일터혁신) ═══
      사람마다 세후 = 세전 − 3.3% (통장 실입금이 있으면 그 값), 사업장 T = 세후 합,
      담당 몫 = FLOOR(T × 요율), 정산액 = 몫 − 세후 + 이월·조정, 주관 정산액 = −(담당 합), 최종 = 세후 + 정산액 */
+  /* 담당 몫 = FLOOR(사업장 세후 합계 × 요율) — 요율은 만분율 정수로 바꿔 곱한다(정산표·계산기가 같이 쓴다) */
+  function shareOf(T, rate) { return Math.floor(T * Math.round(Number(rate) * 100) / 10000); }
   function rateOf(rule, consultingId, sid) {
     var site = rule.siteRates && consultingId && rule.siteRates[consultingId];
     if (site && own(site, sid) && site[sid] !== '' && site[sid] != null && isFinite(Number(site[sid]))) return Number(site[sid]);
@@ -165,7 +167,7 @@
         var rate = rateOf(rule, cid, m.sid);
         if (rate == null) { sIssues.push('요율 없음: ' + m.name); complete = false; return; }
         m.rate = rate;
-        m.share = Math.floor(T * Math.round(rate * 100) / 10000);
+        m.share = shareOf(T, rate);
         m.diff = m.share - m.used;
         adjs.forEach(function (a) {
           if (a && cid && a.consultingId === cid && a.sid === m.sid) { m.adjust += Math.round(Number(a.amount) || 0); m.adjustIds.push(a.id); }
@@ -182,6 +184,40 @@
       sites.push({ company: g.company, key: g.key, consultingId: cid, companyId: coid, round: paidBefore + 1, members: members, totalNet: T, issues: sIssues });
     });
     return { sites: sites, issues: issues };
+  }
+
+  /* ═══ 계산기 — 사업장 하나를 그 자리에서 ═══ (대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게」)
+     rows = [{sid?, name, role:'lead'|'staff', pre, rate?, actual?}] — 저장하지 않는다. 식은 정산표(settleMonth)와 같다. */
+  function calcSite(rows) {
+    /* 빈 줄 거르기 — 수행자를 고른(sid) 줄이나 이름을 적은 줄만. ⚠ «이름 || 사번» 모양을 쓰지 않는다(tests/sid-never-shown) */
+    var issues = [], members = (rows || []).filter(function (r) { return r && (r.sid || clean(r.name)); }).map(function (r) {
+      var pre = won(r.pre), w = withholding(pre), net = pre - w.total, actual = r.actual === '' || r.actual == null ? null : won(r.actual);
+      var rate = r.role === 'staff' && r.rate !== '' && r.rate != null && isFinite(Number(String(r.rate).replace(/[%\s]/g, ''))) ? Number(String(r.rate).replace(/[%\s]/g, '')) : null;
+      return { sid: r.sid || '', name: clean(r.name), role: r.role === 'lead' ? 'lead' : 'staff', pre: pre, inc: w.inc, loc: w.loc, net: net, actual: actual,
+        used: actual != null ? actual : net, rate: rate, share: null, diff: null, settle: null, final: null };
+    });
+    if (!members.length) return { members: [], totalNet: 0, issues: ['수행자를 넣으세요'], transfers: [] };
+    var leads = members.filter(function (m) { return m.role === 'lead'; });
+    if (!leads.length) issues.push('주관을 한 사람 고르세요');
+    if (leads.length > 1) issues.push('주관은 한 사람만 고르세요');
+    var T = members.reduce(function (s, m) { return s + m.used; }, 0), staffSum = 0;
+    members.forEach(function (m) {
+      if (m.role !== 'staff') return;
+      if (m.rate == null || m.rate < 0 || m.rate > 100) { issues.push('요율 없음: ' + (m.name || '(이름 없음)')); m.rate = null; return; }
+      m.share = shareOf(T, m.rate); m.diff = m.share - m.used; m.settle = m.diff; m.final = m.used + m.settle; staffSum += m.settle;
+    });
+    var transfers = [];
+    if (!issues.length) {
+      var lead = leads[0];
+      lead.settle = -staffSum; lead.final = lead.used + lead.settle;
+      members.forEach(function (m) {
+        if (m.role !== 'staff' || !m.settle) return;
+        transfers.push(m.settle < 0 ? { from: m.name, to: lead.name, amount: -m.settle } : { from: lead.name, to: m.name, amount: m.settle });
+      });
+    } else {
+      members.forEach(function (m) { m.settle = null; m.final = null; });
+    }
+    return { members: members, totalNet: T, issues: issues, transfers: transfers };
   }
 
   function transfersOf(sites, leadSid) {
@@ -404,6 +440,7 @@
     parseNotice: parseNotice, settleMonth: settleMonth, transfersOf: transfersOf, checkRun: checkRun,
     runId: runId, diffRun: diffRun, appliedAdjustIds: appliedAdjustIds, unapplyAdjusts: unapplyAdjusts,
     buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice,
-    parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits
+    parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
+    shareOf: shareOf, calcSite: calcSite
   };
 });
