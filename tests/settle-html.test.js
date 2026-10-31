@@ -103,12 +103,14 @@ test('안내 올리기 — 읽지 못하면 아무것도 저장하지 않고, �
   assert.match(fn, /expectedRevision:-1/);
 });
 
-test('업체 연결 후보는 2026년에 걸친 그 사업 종류 컨설팅만', () => {
-  assert.match(NOC, /YEAR_FROM='2026-01-01', YEAR_TO='2026-12-31'/);
+test('업체 연결 후보는 고른 해(YEAR)에 걸친 그 사업 종류 컨설팅만 — 해는 올해가 기본, 이 기기에 기억', () => {
+  assert.match(NOC, /var YEAR=\(function\(\)\{ var y=lsGet\('year'\); return \/\^\\d\{4\}\$\/\.test\(y\|\|''\)\?y:nowYear\(\); \}\)\(\);/);
+  assert.match(fnBody('function yearFrom('), /YEAR\+'-01-01'/);
+  assert.match(fnBody('function yearTo('), /YEAR\+'-12-31'/);
   const fn = fnBody('function sitesFor(');
   assert.match(fn, /typeOf\(c\)===typeCode/);
-  assert.match(fn, /<=YEAR_TO/);
-  assert.match(fn, />=YEAR_FROM/);
+  assert.match(fn, /<=yearTo\(\)/);
+  assert.match(fn, />=yearFrom\(\)/);
 });
 
 test('탭 넷 — 폰에서 한 줄(접지 않고 옆으로 민다), 입력칸 16px', () => {
@@ -204,7 +206,7 @@ test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
 });
 
 test('정산 탭 두 칸 — 넓은 화면은 왼쪽 목록·오른쪽 정산표, 좁으면 위아래', () => {
-  assert.match(NOC, /<div class="runs2">\s*<div class="card runs-side"><div id="runsBox"><\/div><\/div>\s*<div class="card runs-main" id="runCard">/);
+  assert.match(NOC, /<div class="runs2">\s*<div class="card runs-side"><div id="runsBox"><\/div><div id="yearBox"><\/div><\/div>\s*<div class="card runs-main" id="runCard">/);
   assert.match(NOC, /@media \(min-width:1280px\)\{\s*\.runs2\{grid-template-columns:450px minmax\(0,1fr\)\}/);
   assert.match(fnBody('function drawRuns('), /types:ruleTypes\(\)/);
 });
@@ -229,4 +231,39 @@ test('직접 입력 — 검사(주관·사업장·지급월·숫자·요율·엑
   assert.match(rm, /softDelete\('settle\/runs\/'/);
   /* 안내 파일로 만든 달과 직접 입력으로 만든 달은 서로 덮지 않는다 */
   assert.match(fnBody('async function buildRuns('), /\(kn\.source==='manual'\)!==\(n\.source==='manual'\)\)\{ skipped\+\+; continue; \}/);
+});
+
+
+test('연도별 관리 — 탭 줄 «연도», 정산표·안내 파일·카톡 문구·직접 입력 목록은 그 해 것만, 왼쪽 아래 그 해 합계', () => {
+  assert.match(NOC, /<select id="yearPick"/);
+  assert.match(fnBody('function yearRuns('), /C\.yearOf\(r\.monthKey\)===YEAR/);
+  const dr = fnBody('function drawRuns(');
+  assert.match(dr, /V\.runsTable\(yearRuns\(\)/);
+  assert.match(dr, /V\.yearBox\(C\.yearSummary\(runsList\(\), YEAR\), NAMES\)/);
+  assert.match(fnBody('function confirmedRuns('), /yearRuns\(\)/);
+  assert.match(fnBody('function drawNotices('), /filter\(noticeInYear\)/);
+  assert.match(fnBody('function manualOpt('), /C\.yearOf\(e\.monthKey\)===YEAR/);
+  assert.match(fnBody('function drawTabs('), /yearRuns\(\)\.length/);
+  /* 바꾸면 그 해에 없는 정산표는 닫는다 */
+  assert.match(NOC, /if\(t\.id==='yearPick'\)\{ YEAR=t\.value; lsSet\('year', YEAR\); if\(CUR_RUN && D\.runs\[CUR_RUN\] && C\.yearOf\(D\.runs\[CUR_RUN\]\.monthKey\)!==YEAR\) CUR_RUN='';/);
+  /* 직접 입력 저장 뒤에는 그 지급월의 해로 옮겨 방금 만든 정산표가 보이게 */
+  assert.match(fnBody('async function saveManual('), /YEAR=mk\.slice\(0,4\); lsSet\('year', YEAR\);/);
+});
+
+test('역계산 — 계산기 위 상자(저장 없음), 직접 입력 실수령액 칸은 세전을 채우고 저장 때 통장 실입금이 된다, 계산기는 세전을 비우면 실입금에서', () => {
+  assert.match(NOC, /<section class="pane" id="pane-calc"><div id="revBox"><\/div>/);
+  assert.match(NOC, /if\(t\.id==='r_net'\)\{ REV\.net=t\.value; lsSet\('rev'/);
+  const inp = NOC.slice(NOC.indexOf("if(t.matches('input[data-m]'))"));
+  const body = inp.slice(0, inp.indexOf('return; }') + 9);
+  assert.match(body, /C\.preFromNet\(t\.value, mrow\.tax\)/);
+  assert.doesNotMatch(body, /patchRecord|save\(|drawRuns\(/);
+  const sv = fnBody('async function saveManual(');
+  assert.match(sv, /acts\[String\(c\.id\)\+'\|'\+sid\]=C\.won\(nt\)/);
+  assert.match(sv, /await setActuals\(CUR_RUN, acts\)/);
+  assert.ok(sv.indexOf('실수령액은 숫자로') < sv.indexOf('patchRecord('), '숫자 검사가 저장보다 먼저');
+  assert.match(fnBody('async function setActuals('), /status!=='draft'\) return;/);
+  assert.match(fnBody('function calcRows('), /C\.preFromNet\(r\.actual, r\.tax\)\.pre/);
+  /* 규칙 기본 세율은 바뀐 것만 저장하는 비교에도 든다 */
+  assert.match(fnBody('async function saveRules('), /tax:C\.taxOf\(w\.tax\)/);
+  assert.match(fnBody('async function saveRules('), /JSON\.stringify\(\[o\.title\|\|'', C\.taxOf\(o\.tax\)/);
 });

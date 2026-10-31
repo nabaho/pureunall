@@ -20,6 +20,12 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function won(n) { return n == null ? '—' : C.fmt(n); }
   function kst(ms) { return ms ? new Date(Number(ms) + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' ') : ''; }
+  function kstFull(ms) { return ms ? new Date(Number(ms) + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') : ''; }
+  /* 세율 고르기 — 3.3% 사업소득 / 8.8% 기타소득(대표 지시 2026-10-31 「3.3 8.8 퍼로 역계산」) */
+  function taxSel(attr, cur) {
+    return '<select ' + attr + ' title="원천징수 세율">' + ['3.3', '8.8'].map(function (t) { return '<option value="' + t + '"' + (C.taxOf(cur) === t ? ' selected' : '') + '>' + t + '%</option>'; }).join('') + '</select>';
+  }
+  function whtCell(m) { return '<td class="r" data-k="wht">' + esc(won(m.inc + m.loc)) + (C.taxOf(m.tax) === '8.8' ? ' <span class="pill">8.8%</span>' : '') + '</td>'; }
   function nameOf(names, sid, fallback) { return (names && sid && names[sid]) || fallback || '(이름 없음)'; }
   function ckHead(key, allOn) { return '<th class="c"><input type="checkbox" data-all="' + esc(key) + '"' + (allOn ? ' checked' : '') + '></th><th class="n">번호</th>'; }
   function ckCell(id, on) { return '<td class="c"><input type="checkbox" data-ck="' + esc(id) + '"' + (on ? ' checked' : '') + '></td>'; }
@@ -65,7 +71,8 @@
   }
 
   /* ── ①-1 직접 입력 — 안내 엑셀이 없는 컨설팅(대표 선택 2026-10-31) ──
-     st  = {type, siteId, month:'YYYY-MM', rows:[{sid, role:'lead'|'staff', pre}]}
+     st  = {type, siteId, month:'YYYY-MM', rows:[{sid, role:'lead'|'staff', tax:'3.3'|'8.8', net(실수령액, 선택), pre}]}
+     ★ 실수령액만 알면 거기에 적는다 → 세율로 세전을 거꾸로 계산해 세전 칸을 채운다(대표 지시 2026-10-31). 저장하면 그 금액이 통장 실입금이 된다.
      opt = {types:[{code,name}](규칙이 있는 종류), sites:[{consultingId,label}](그 종류·2026), staff:[{sid,name}](재직자), names, rates:{sid:%}(그 종류 요율),
             entries:[C.manualEntries 결과](그 종류), sel:{i:1}, selE:{key:1}}
      ⚠ 주관 줄은 규칙의 주관으로 못박는다(바꾸려면 요율표). 담당은 요율표에 요율이 있어야 저장된다. */
@@ -79,19 +86,21 @@
       + (opt.sites || []).map(function (s) { return '<option value="' + esc(s.consultingId) + '"' + (s.consultingId === st.siteId ? ' selected' : '') + '>' + esc(s.label) + '</option>'; }).join('') + '</select>'
       + '<label class="hint" for="m_month">지급월</label><input type="month" id="m_month" value="' + esc(st.month || '') + '"></div>'
       + '<div class="bulk" data-bulk="manual"></div><div class="scroll"><table class="t" data-name="manual"><thead><tr>' + ckHead('manual', rows.length > 0 && rows.every(function (r, i) { return sel[i]; }))
-      + '<th>수행자</th><th class="r">요율</th><th class="r">세전</th><th class="r">세후(3.3% 뗀 뒤)</th></tr></thead><tbody>';
+      + '<th>수행자</th><th class="r">요율</th><th>세율</th><th class="r">실수령액(통장)</th><th class="r">세전</th><th class="r">세후 계산</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
-      var pre = C.won(r.pre), w = C.withholding(pre), rate = r.sid && rates[r.sid] != null ? rates[r.sid] + '%' : '';
+      var pre = C.won(r.pre), w = C.withholding(pre, r.tax), rate = r.sid && rates[r.sid] != null ? rates[r.sid] + '%' : '';
       h += '<tr>' + ckCell(String(i), sel[i]) + '<td class="n">' + (i + 1) + '</td>'
         + (r.role === 'lead'
           ? '<td class="ti" data-k="who">' + esc(nameOf(names, r.sid, '(주관 없음 — 요율표에서 고르세요)')) + ' <span class="pill role-lead">주관</span></td><td class="r" data-k="rate"></td>'
           : '<td data-k="who"><select data-m="' + i + '|sid">' + staffOpts(opt.staff, names, r.sid, '— 담당 —') + '</select> <span class="pill">담당</span></td>'
             + '<td class="r" data-k="rate">' + (rate ? esc(rate) : (r.sid ? '<span class="bad">요율표에 없음</span>' : '')) + '</td>')
+        + '<td data-k="tax">' + taxSel('data-m="' + i + '|tax"', r.tax) + '</td>'
+        + '<td class="r" data-k="real"><input type="text" inputmode="numeric" class="amt" data-m="' + i + '|net" value="' + esc(r.net == null ? '' : r.net) + '" placeholder="알면 적기"></td>'
         + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-m="' + i + '|pre" value="' + esc(r.pre == null ? '' : r.pre) + '" placeholder="세전"></td>'
         + '<td class="r" data-k="net" data-m-net="' + i + '">' + esc(won(pre - w.total)) + '</td></tr>';
     });
     h += '</tbody></table></div><div class="bar"><button class="sm" id="m_add">+ 담당</button>'
-      + '<span class="hint">따로 나눠 받지 않았으면 주관이 전액 — 담당 세전은 0 (대표 2026-10-31 「특별히 배분되어서 입금되는게 아니면 항상 권형하에게」)</span>'
+      + '<span class="hint">따로 나눠 받지 않았으면 주관이 전액, 담당 세전은 0 · 실수령액만 알면 그 칸에 — 세전을 거꾸로 계산합니다</span>'
       + '<span class="sp"></span><button class="pri" id="m_save">저장하고 정산표 만들기</button></div>';
     var es = opt.entries || [], selE = opt.selE || {};
     h += '<div class="sec">이 컨설팅에 직접 넣은 것</div>';
@@ -151,8 +160,9 @@
     (run.sites || []).forEach(function (s) { s.members.forEach(function (m) { if (m.role === 'lead') { leadBy[s.consultingId || s.company] = m.sid; if (!leadName) leadName = nameOf(names, m.sid, m.name); } }); });
     var dirTag = function (t) { var d = C.dirOf(t, leadBy[t.consultingId || t.company]); return '<span class="pill dir-' + d + '">' + C.DIR_KO[d] + '</span>'; };
     var lead = leadName ? '주관(' + esc(leadName) + ')' : '주관';
-    h += '<div class="bar"><span class="hint">정산 방향 — <span class="pill dir-back">반환</span> 담당이 몫(사업장 세후 합계 × 요율)보다 더 받아 ' + lead + '에게 돌려줌 · '
-      + '<span class="pill dir-more">추가 지급</span> ' + lead + '이 더 받아 담당에게 더 줌 · 정산액 +는 받을 돈, −는 보낼 돈</span></div>';
+    h += '<div class="bar legend"><span class="pill dir-back">반환</span><span class="hint">담당 → ' + lead + '</span>'
+      + '<span class="pill dir-more">추가 지급</span><span class="hint">' + lead + ' → 담당</span>'
+      + '<span class="hint">· 몫 = 사업장 세후 합계 × 요율 · 정산액 + 받을 돈 / − 보낼 돈</span></div>';
     var cols = hasAdj ? 12 : 10, rows = [], idx = 0;
     (run.sites || []).forEach(function (s, si) {
       var st = draft ? previewTransfers([s]) : tr.filter(function (t) { return t.consultingId && s.consultingId ? t.consultingId === s.consultingId : t.company === s.company; });
@@ -167,7 +177,7 @@
         idx++;
         rows.push('<tr>' + ckCell(id, sel[id]) + '<td class="n">' + idx + '</td>'
           + '<td class="nw ti" data-k="name" title="' + esc(nm) + '">' + esc(nm) + ' ' + tag + '</td>'
-          + num('pre', m.pre) + num('wht', m.inc + m.loc) + num('net', m.net)
+          + num('pre', m.pre) + whtCell(m) + num('net', m.net)
           + '<td class="r" data-k="act">' + (draft && s.consultingId && m.sid
             ? '<input type="text" inputmode="numeric" class="amt' + (hasP ? ' dirty' : '') + '" data-actual="' + esc(key) + '" value="' + esc(hasP ? pend[key] : (m.actual == null ? '' : C.fmt(m.actual))) + '" placeholder="통장 입금">'
             : esc(m.actual == null ? '' : won(m.actual)))
@@ -199,17 +209,21 @@
   }
 
   /* ── ③ 안내 파일 ── */
-  function noticesTable(notices, sel) {
-    sel = sel || {};
+  function noticesTable(notices, sel, bizNames) {
+    sel = sel || {}; bizNames = bizNames || {};
     var list = (notices || []).filter(function (n) { return n && !n._deleted; }).sort(function (a, b) { return (b.receivedAt || 0) - (a.receivedAt || 0); });
     if (!list.length) return '<div class="empty">올린 안내 파일이 없습니다.</div>';
     var allOn = list.every(function (n) { return sel[n.id]; });
     var h = '<div class="bulk" data-bulk="notices"></div><div class="scroll"><table class="t" data-name="notices"><thead><tr>' + ckHead('notices', allOn)
-      + '<th>파일</th><th>받은 때</th><th>지급월</th><th class="r">줄</th><th>출처</th><th></th></tr></thead><tbody>';
+      + '<th>사업</th><th>파일</th><th>지급월</th><th>받은 때</th><th class="r">줄</th><th>출처</th><th></th></tr></thead><tbody>';
     list.forEach(function (n, i) {
-      var months = (n.months || []).map(function (m) { return m.label; }).join(' · ');
-      h += '<tr>' + ckCell(n.id, sel[n.id]) + '<td class="n">' + (i + 1) + '</td>' + nw('file', n.fileName, 'ti') + '<td class="nw" data-k="at">' + esc(kst(n.receivedAt)) + '</td>'
-        + nw('months', months) + '<td class="r" data-k="rows">' + (n.rows || []).length + '</td>' + nw('src', n.source === 'agent' ? 'PC 심부름꾼' : n.source === 'manual' ? '직접 입력' : '올림')
+      /* 지급월은 해마다 묶어 «2026년 7월 · 9월 (10/2 지급) · 10월» */
+      var byY = {}, ys = [];
+      (n.months || []).forEach(function (m) { var y = C.yearOf(m.key); if (!byY[y]) { byY[y] = []; ys.push(y); } byY[y].push(m.label); });
+      var months = ys.map(function (y) { return y + '년 ' + byY[y].join(' · '); }).join(' / ');
+      h += '<tr>' + ckCell(n.id, sel[n.id]) + '<td class="n">' + (i + 1) + '</td>' + nw('biz', bizNames[n.typeCode] || n.typeCode || '', 'ti') + nw('file', n.fileName)
+        + nw('months', months) + '<td class="nw" data-k="at">' + esc(kstFull(n.receivedAt)) + '</td>'
+        + '<td class="r" data-k="rows">' + (n.rows || []).length + '</td>' + nw('src', n.source === 'agent' ? 'PC 심부름꾼' : n.source === 'manual' ? '직접 입력' : '올림')
         + '<td data-k="btn"><button class="sm" data-notice="' + esc(n.id) + '">정산표 만들기</button></td></tr>';
     });
     return h + '</tbody></table></div>';
@@ -276,6 +290,7 @@
         + '<div class="fr"><label>이름</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|title" value="' + esc(r.title || '') + '" placeholder="' + esc(biz[c] || c) + '"></div></div>'
         + '<div class="fr"><label>머리말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgHead" value="' + esc(r.msgHead || '') + '" placeholder="' + esc(C.DEFAULT_HEAD) + '"></div></div>'
         + '<div class="fr"><label>맺음말</label><div class="fv"><input type="text" data-rf="' + esc(c) + '|msgFoot" value="' + esc(r.msgFoot || '') + '" placeholder="' + esc(C.DEFAULT_FOOT) + '"></div></div>'
+        + '<div class="fr"><label>원천징수</label><div class="fv">' + taxSel('data-rf="' + esc(c) + '|tax"', r.tax) + '<span class="hint">이 컨설팅의 기본 — 3.3% 사업소득 / 8.8% 기타소득</span></div></div>'
         + '<div class="sec">사업장별 예외 요율 <span class="hint">— 이 사업장에서만 요율표와 다를 때</span></div><div class="scroll"><table class="t sr"><tbody>';
       rows.forEach(function (x) {
         h += '<tr><td class="nw" title="' + esc(label[x.cid] || '') + '">' + esc(label[x.cid] || '(연결된 사업장)') + '</td><td class="nw">' + esc(names[x.sid] || '(이름 없음)') + '</td><td class="r">' + esc(x.pct) + '%</td>'
@@ -302,7 +317,7 @@
     if (opt.sites && opt.people) {
       h += '<tr><td></td><td></td><td><select id="a_site"><option value="">— 사업장 —</option>' + opt.sites.map(function (s) { return '<option value="' + esc(s.consultingId) + '">' + esc(s.label) + '</option>'; }).join('') + '</select></td>'
         + '<td><select id="a_sid"><option value="">— 사람 —</option>' + opt.people.map(function (p) { return '<option value="' + esc(p.sid) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></td>'
-        + '<td class="r"><input type="text" inputmode="numeric" class="amt" id="a_amt" placeholder="−는 담당→주관"></td><td><input type="text" id="a_memo" placeholder="내용"></td><td></td><td><button class="sm" id="a_add">더하기</button></td></tr>';
+        + '<td class="r"><input type="text" inputmode="numeric" class="amt" id="a_amt" placeholder="−는 반환"></td><td><input type="text" id="a_memo" placeholder="내용"></td><td></td><td><button class="sm" id="a_add">더하기</button></td></tr>';
     }
     return h + '</tbody></table></div>';
   }
@@ -353,17 +368,18 @@
       + (opt.sites || []).map(function (s) { return '<option value="' + esc(s.consultingId) + '"' + (s.consultingId === st.siteId ? ' selected' : '') + '>' + esc(s.label) + '</option>'; }).join('') + '</select></div>'
       + '<datalist id="c_rates">' + RATES.map(function (r) { return '<option value="' + r + '">'; }).join('') + '</datalist>'
       + '<div class="bulk" data-bulk="calc"></div><div class="scroll"><table class="t" data-name="calc"><thead><tr>' + ckHead('calc', rows.length > 0 && rows.every(function (r, i) { return sel[i]; }))
-      + '<th>수행자</th><th>구분</th><th class="r">세전</th><th class="r">요율(%)</th><th class="r">통장 실입금</th><th></th></tr></thead><tbody>';
+      + '<th>수행자</th><th>구분</th><th>세율</th><th class="r">세전</th><th class="r">요율(%)</th><th class="r">통장 실입금</th><th></th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
       h += '<tr>' + ckCell(String(i), sel[i]) + '<td class="n">' + (i + 1) + '</td>'
         + '<td data-k="who"><select data-c="' + i + '|sid">' + staffOpts(opt.staff, opt.names, r.sid, '— 수행자 —') + '</select></td>'
         + '<td data-k="role"><select data-c="' + i + '|role"><option value="lead"' + (r.role === 'lead' ? ' selected' : '') + '>주관</option><option value="staff"' + (r.role !== 'lead' ? ' selected' : '') + '>담당</option></select></td>'
-        + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-c="' + i + '|pre" value="' + esc(r.pre || '') + '" placeholder="세전"></td>'
+        + '<td data-k="tax">' + taxSel('data-c="' + i + '|tax"', r.tax) + '</td>'
+        + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-c="' + i + '|pre" value="' + esc(r.pre || '') + '" placeholder="비우면 역계산"></td>'
         + '<td class="r" data-k="rate">' + (r.role === 'lead' ? '<span class="hint">—</span>' : '<input type="text" inputmode="decimal" class="pct" list="c_rates" data-c="' + i + '|rate" value="' + esc(r.rate == null ? '' : r.rate) + '" placeholder="%">') + '</td>'
         + '<td class="r" data-k="act"><input type="text" inputmode="numeric" class="amt" data-c="' + i + '|actual" value="' + esc(r.actual || '') + '" placeholder="선택"></td>'
         + '<td data-k="btn"><button class="sm" data-c-del="' + i + '" title="이 줄 빼기">빼기</button></td></tr>';
     });
-    return h + '</tbody></table></div><div class="bar"><button class="sm" id="c_add">+ 수행자</button><span class="hint">요율은 담당만 — 주관은 나머지를 받는다. 통장 실입금을 넣으면 그 금액으로 계산</span></div></div>';
+    return h + '</tbody></table></div><div class="bar"><button class="sm" id="c_add">+ 수행자</button><span class="hint">요율은 담당만 — 주관은 나머지를 받는다. 통장 실입금을 넣으면 그 금액으로 계산하고, 세전을 비우면 실입금에서 거꾸로 계산</span></div></div>';
   }
   /* 계산 결과 — 보기 전용(고르기 칸 없음) */
   function calcResult(res, names) {
@@ -378,7 +394,7 @@
     if (res.issues.length) h += '<div class="warn">' + res.issues.map(esc).join(' · ') + '</div>';
     h += '<div class="scroll"><table class="t" data-name="calcout"><thead><tr><th>이름</th><th>구분</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">요율</th><th class="r">몫</th><th class="r">정산액</th><th class="r">최종</th></tr></thead><tbody>';
     res.members.forEach(function (m) {
-      h += '<tr>' + nw('name', nm(m), 'ti') + nw('role', ROLE_KO[m.role]) + num('pre', m.pre) + num('wht', m.inc + m.loc) + num('net', m.used)
+      h += '<tr>' + nw('name', nm(m), 'ti') + nw('role', ROLE_KO[m.role]) + num('pre', m.pre) + whtCell(m) + num('net', m.used)
         + '<td class="r" data-k="rate">' + (m.rate == null ? '' : esc(m.rate) + '%') + '</td>'
         + (m.role === 'lead' ? '<td class="r" data-k="share"></td>' : num('share', m.share)) + '<td class="r b" data-k="settle">' + esc(won(m.settle)) + '</td>' + num('final', m.final) + '</tr>';
     });
@@ -387,6 +403,45 @@
       + res.transfers.map(function (t) { return '<span>' + esc(t.from) + ' → ' + esc(t.to) + '  <b>' + esc(C.fmt(t.amount)) + '원</b> <span class="pill dir-' + t.dir + '">' + C.DIR_KO[t.dir] + '</span></span>'; }).join('')
       + '<span class="hint">반환 = 담당이 몫보다 더 받아 주관에게 돌려줌 · 추가 지급 = 주관이 더 받아 담당에게 더 줌</span></div>';
     return h + '</div>';
+  }
+
+  /* ── ⓪-1 실수령액 → 세전 역계산(대표 지시 2026-10-31 「실수령액만 알고 있어서 세전금액을 판단하기 어려운 경우 … 3.3 8.8 퍼로 역계산」) ──
+     st = {net, tax}. 입력칸은 revBox 가 한 번 그리고, 글을 칠 때는 revResult 만 다시 그린다 */
+  function revBox(st) {
+    st = st || {};
+    return '<div class="card"><div class="bar"><b>↩️ 실수령액 → 세전</b><span class="hint">통장에 들어온 금액만 알 때 세전을 거꾸로 계산합니다</span></div>'
+      + '<div class="bar"><label class="hint" for="r_net">실수령액</label><input type="text" inputmode="numeric" class="amt" id="r_net" value="' + esc(st.net || '') + '" placeholder="예: 6,759,330">'
+      + '<label class="hint" for="r_tax">세율</label>' + taxSel('id="r_tax"', st.tax) + '</div><div id="revOut">' + revResult(st) + '</div></div>';
+  }
+  function revResult(st) {
+    st = st || {};
+    if (!(C.won(st.net) > 0)) return '<div class="bar"><span class="hint">3.3% 사업소득: 소득세 3% + 지방소득세 0.3% · 8.8% 기타소득: 필요경비 60% 뺀 40%에 22%(세전 12만 5천 원 이하는 0)</span></div>';
+    var r = C.preFromNet(st.net, st.tax);
+    return '<div class="kpis">'
+      + '<div class="kpi"><span>세전(' + esc(C.TAX_KO[C.taxOf(st.tax)]) + ')</span><b>' + won(r.pre) + '원</b></div>'
+      + '<div class="kpi"><span>소득세</span><b>' + won(r.inc) + '원</b></div>'
+      + '<div class="kpi"><span>지방소득세</span><b>' + won(r.loc) + '원</b></div>'
+      + '<div class="kpi' + (r.exact ? '' : ' bad') + '"><span>' + (r.exact ? '검산 — 세후' : '딱 맞는 세전 없음 — 가장 가까운 세후') + '</span><b>' + won(r.net) + '원</b></div></div>';
+  }
+
+  /* ── ①-2 연간 합계 — 고른 해의 정산표에서 담당마다 반환·추가 지급(대표 지시 2026-10-31 「매년 관리할 수 있게」) ──
+     sum = C.yearSummary 결과. 보기 전용 요약(고르기 칸 없음 — 저장소 규칙의 «요약 숫자» 예외) */
+  function yearBox(sum, names) {
+    sum = sum || { counts: {}, people: [], leads: {} }; names = names || {};
+    var c = sum.counts || {}, h = '<div class="sec">' + esc(sum.year) + '년 합계</div>'
+      + '<div class="bar"><span class="hint">정산표 ' + (c.runs || 0) + ' — 임시저장 ' + (c.draft || 0) + ' · 확정 ' + (c.confirmed || 0) + ' · 기록만 ' + (c.manual || 0) + '</span></div>';
+    if (!sum.people.length) return h + '<div class="empty">이 해에 주고받을 금액이 없습니다.</div>';
+    h += '<div class="scroll"><table class="t" data-name="year"><thead><tr><th>담당</th><th class="r">반환</th><th class="r">추가 지급</th><th class="r">차감</th></tr></thead><tbody>';
+    sum.people.forEach(function (p) {
+      var net = p.more - p.back;
+      h += '<tr>' + nw('name', nameOf(names, p.sid, p.name), 'ti') + num('back', p.back || null) + num('more', p.more || null)
+        + '<td class="r b" data-k="sum">' + esc(net > 0 ? '받을 ' + C.fmt(net) : net < 0 ? '보낼 ' + C.fmt(-net) : '0') + '</td></tr>';
+    });
+    Object.keys(sum.leads).forEach(function (sid) {
+      var v = sum.leads[sid];
+      h += '<tr class="grp"><td colspan="3" title="주관 순액">주관 ' + esc(nameOf(names, sid)) + ' — 순액</td><td class="r">' + esc(v > 0 ? '받을 ' + C.fmt(v) : v < 0 ? '보낼 ' + C.fmt(-v) : '0') + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
   }
 
   /* ── ⑤ 카톡 문구 ── */
@@ -398,6 +453,6 @@
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });
