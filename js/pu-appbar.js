@@ -40,6 +40,8 @@
        포털이 마지막으로 읽은 값(pu_app_perm_<uid>)을 빌려 본다. */
     { key: 'hr',      row: 'inside', name: '인사관리',    icon: '👥', url: 'pu-erp.html?app=hr',  desc: '명부·급여·근태', perm: 'hr' },
     { key: 'fin',     row: 'inside', name: '재무관리',     icon: '📒', url: 'pu-erp.html?app=fin', desc: '입출금·마감', perm: 'fin' },
+    /* 컨설팅정산(2026-10-31) — 개인입금 사업의 주관·담당 정산. 재무관리와 같은 사람(perm 'fin')만 — 포털 타일과 짝 */
+    { key: 'settle',  row: 'inside', name: '컨설팅정산',   icon: '🧾', url: 'pu-settle.html',      desc: '개인입금 사업 정산', perm: 'fin' },
     { key: 'cal',     row: 'client', name: '푸른 캘린더',  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
     { key: 'consult', row: 'client', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     /* 컨설팅보고서(2026-10-10) — 포털 타일과 짝. 쓰는 일은 정부사업일정의 보고서 창이 한다 */

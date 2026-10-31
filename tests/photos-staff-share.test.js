@@ -315,6 +315,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-10-31 — 게시 완료(rules-deploy.js --deploy, 대표 PC): 취업규칙 매일 정리(rules_mgmt/library/auto) 새로 1 +
        통째 지우기 막기(대표 지시 2026-10-31 「추천대로 위험 건은 막는장치설치해라») homepage·newsletter 갈래 새로 2 · 바뀜 2 · 사라짐 0,
        다시 읽어 «콘솔이 올린 것과 같음» 확인 — 목록을 비운다. */
+  /* 2026-10-31 게시 전 — 컨설팅정산(settle)을 만들개에 넣었다(설계 2026-10-31-consult-settle-design.md §6).
+     새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 새 자리뿐이다(읽기·쓰기 재직 + 관리자·위임관리인·재무권한, 지우기 금지). */
+  /* ★ 2026-10-31 — /settle 게시 완료(rules-deploy.js --deploy, 대표 PC, 위 «통째 지우기 막기» 게시 뒤): 새로 1 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 같음 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-10-31.json(settle 까지 든 판) — 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

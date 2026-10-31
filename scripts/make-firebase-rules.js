@@ -1329,6 +1329,23 @@ rules.signboard = { '.read': LOGIN,
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
 
+/* ══ 🧾 컨설팅정산(pu-settle.html) — 개인입금 사업의 주관·담당 정산 (2026-10-31) ══
+   설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §6 · 대표 선택 2026-10-31 「대표·재무권한자만」.
+   ★ 읽기·쓰기 = 재직 + (관리자 · 위임관리인 · 재무권한) — 포털 타일(perm 'fin')·재무관리와 «같은 사람». 재무관리보다 넓게 열지 않는다.
+     담기는 것: 사업 종류별 요율 · 안내 파일의 사람별 지급액 · 정산표(사람별 세전·세후·정산액) · 송금 «보냄» 기록.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식으로만(돈 기록은 지우지 않는다).
+   ⚠ 열쇠와 레코드 id 가 어긋나면 막는다. links 는 «업체·사람» 두 갈래뿐이고 kind 칸이 갈래 이름과 같아야 한다.
+   ⚠ 카톡 대기열(kakaoQueue)·채팅방(rooms)·심부름꾼 상태(agent)는 PR ② 에서 더한다 — 그때까지 기본 닫힘. */
+const SETTLE_R = `(${LOGIN}) && (${ADMIN} || ${SUB} || ${FIN})`;
+const SETTLE_W = `${SETTLE_R} && newData.exists()`;
+rules.settle = { '.read': SETTLE_R,
+  rules:   { $t:    { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $t" } },
+  links:   { $kind: { $key: { '.write': SETTLE_W,
+    '.validate': "newData.child('id').val() === $key && newData.child('kind').val() === $kind && ($kind === 'company' || $kind === 'person')" } } },
+  notices: { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } },
+  runs:    { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } },
+  adjusts: { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } } };
+
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
    ★ 읽기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).
