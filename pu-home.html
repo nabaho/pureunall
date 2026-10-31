@@ -117,6 +117,12 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .appbar .when{font-size:12.5px;color:var(--faint)}
 /* 폰에서만·PC 에서만 보이는 조각 (2026-10-30 「폰화면도 더 간단히」) — 폰 구간(560px)이 뒤집는다 */
 .ph-only{display:none}
+/* 새 사이트 지킴이 띠 (2026-10-31) — 막혔을 때만 뜨는 한 줄. 색은 .bar.bad / .bar.warn 과 같은 짝 */
+.gband{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:13px;white-space:nowrap;overflow:hidden}
+.gband.red{background:var(--bad-bg);border-bottom:1px solid #fecaca;color:#991b1b}
+.gband.amber{background:var(--warn-bg);border-bottom:1px solid #fde68a;color:#854d0e}
+.gband .how{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.gband .btn{margin-left:auto;flex:none}
 .appbar .sp{flex:1}
 /* 이 띠가 «무엇에 대한 것인지» 적는 이름표 (대표 결정 2026-09-06 ㉯).
    위는 화면 전체, 아래(.eft)는 고른 사람 하나 — 그 갈림이 안 보여 헷갈렸다. */
@@ -1556,10 +1562,15 @@ function loadAll() {
     /* 월간 자동 연결 기록 (2026-10-05) — 못 읽어도 화면은 뜬다. 못 읽은 것은 카드가 따로 말한다
        («아직 돈 적 없음»과 «못 읽음»을 가른다). 그래서 failed(전체 띠)에 넣지 않는다. */
     db.ref('homepage/auto/runs').once('value').then(s => ({ v: s.val() || {} }),
-      e => ({ err: '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')' }))
-  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns]) => {
+      e => ({ err: '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')' })),
+    /* 새 사이트 지킴이 (2026-10-31) — 매달 자동 올리기 결과 · 매일 열쇠 점검. 못 읽으면 띠를 안 그릴 뿐이다 */
+    db.ref('homepage/auto/newsite').once('value').then(s => s.val(), () => null),
+    db.ref('homepage/auto/keyCheck').once('value').then(s => s.val(), () => null)
+  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns, newsite, keyCheck]) => {
     App.autoRuns = (autoRuns && autoRuns.v) || null;
     App.autoErr = (autoRuns && autoRuns.err) || '';
+    App.newsite = newsite;
+    App.keyCheck = keyCheck;
     App.members = members || {};
     App.partnerLogos = logoCfg || { 숨김: {}, 차례: [] };
     App.pages = pages || {};
@@ -5784,6 +5795,7 @@ function screen() {
   if (App.loading) return '<div class="empty">자료를 읽고 있습니다…</div>';
   return '<div class="app">'
     + '<div class="top">' + appbarHtml() + '</div>'
+    + 새사이트띠Html()
     /* ★ 미리보기를 펴면 편집칸과 «나란히» 놓는다. 접으면 지금과 똑같다. */
     + '<div class="body">' + railHtml() + listHtml()
       + (App.preview ? '<div class="pane2">' + editHtml() + prevHtml() + '</div>' : editHtml())
@@ -5817,6 +5829,51 @@ function 마지막자동() {
   }));
   return 끝;
 }
+/* ══════ 새 사이트 지킴이 (대표 지시 2026-10-31 「앞으로 이런 문제 없게 자동으로」 → 「둘 다」) ══════
+   그날 열쇠가 죽어 있었고 올리는 길은 처음부터 막혀 있었는데 아무도 몰랐다.
+   서버가 매일 07:50 열쇠를 점검하고(homepage/auto/keyCheck) 매달 1일 새 사이트 구성원 쪽을 다시 올린다
+   (homepage/auto/newsite). 화면은 «막혔을 때만» 맨 위에 띠 한 줄을 띄운다 — 평소에는 아무것도 안 보인다.
+   ⚠ 늦음 기준은 서버 functions/homepage-newsite.js 점검늦음ms 와 같아야 한다(검사가 본다). */
+const 열쇠점검늦음ms = 3 * 24 * 60 * 60 * 1000;
+function 새사이트띠(지금ms) {
+  const k = App.keyCheck, n = App.newsite;
+  if (k && k.ok === false) return { 색: 'red', 제목: '새 사이트에 올릴 수 없습니다',
+    말: 'GitHub 열쇠로 저장소를 못 읽습니다 — ' + (k.까닭 || '까닭 모름') + ' (' + stampShort(k.at) + ' 점검)', 열쇠: true };
+  /* ★ 열쇠 점검이 «이상 없음»이어도 지난 올리기 실패는 지우지 않는다 — 읽기는 되는데 쓰기가 막힌 날이 있었다(2026-10-31, 400) */
+  if (n && n.ok === false) return { 색: 'red', 제목: '새 사이트 자동 올리기가 실패했습니다',
+    말: (n.실패 || '까닭 모름') + ' (' + stampShort(n.at) + ') — 「새 사이트에 올리기」로 다시 해 보세요' };
+  if (n && n.멈춤) return { 색: 'amber', 제목: '새 사이트 자동 올리기가 멈췄습니다', 말: n.멈춤 + ' (' + stampShort(n.at) + ')' };
+  if (k && Number(k.at) && 지금ms - Number(k.at) > 열쇠점검늦음ms) return { 색: 'amber',
+    제목: '열쇠 점검이 ' + Math.floor((지금ms - Number(k.at)) / 86400000) + '일째 안 돌았습니다',
+    말: '마지막 점검 ' + stampShort(k.at) + ' — 서버 예약이 멈췄을 수 있습니다' };
+  return null;
+}
+function 새사이트띠Html() {
+  const b = 새사이트띠(Date.now());
+  if (!b) return '';
+  return '<div class="gband ' + b.색 + '">' + (b.색 === 'red' ? '⛔ ' : '⚠ ') + '<b>' + esc(b.제목) + '</b>'
+    + '<span class="how" title="' + esc(b.말) + '">— ' + esc(b.말) + '</span>'
+    + (b.열쇠 ? '<button class="btn sm" onclick="열쇠고치는법()">고치는 법</button>' : '') + '</div>';
+}
+async function 열쇠고치는법() {
+  await say('GitHub 열쇠 바꾸는 법',
+    '1. GitHub → 설정 → Developer settings → Fine-grained tokens 에서 새 토큰을 만듭니다.\n' +
+    '   저장소: pureun-site · pureunall / 권한: Contents · Issues · Actions 읽기·쓰기\n' +
+    '2. Claude 에게 「새 사이트 열쇠 바꿔」라고 하면 서버에 넣는 한 줄과 다시 배포를 이어서 합니다.\n\n' +
+    '다음 날 아침 7:50 점검에서 이상이 없으면 이 띠는 저절로 사라집니다.');
+}
+window.열쇠고치는법 = 열쇠고치는법;
+/* 자동 연결 칸의 「새 사이트」 한 줄 — 늘 보인다(아직 안 돌았으면 그렇다고 말한다) */
+function 새사이트줄() {
+  const n = App.newsite;
+  if (!n) return '아직 안 돎';
+  const 때 = stampShort(n.at).split(' ')[0];
+  if (n.ok === false) return 때 + ' 실패 — 위 띠 참고';
+  if (n.멈춤) return 때 + ' 멈춤';
+  if (n.수동) return 때 + ' 손으로 올림';
+  if (n.올림) return 때 + ' 올림 ' + (n.인원 || 0) + '명' + (n.뺀수 ? ' · ' + n.뺀수 + '명 뺌' : '');
+  return 때 + ' 바뀐 것 없음';
+}
 /* 한 줄 = 말 · 숫자. 숫자가 없으면(0·빈 값) 그 줄을 안 그린다 — 빈 값은 자리만 차지한다. */
 function 자동카드Html() {
   const r = 마지막자동();
@@ -5838,6 +5895,7 @@ function 자동카드Html() {
           + 줄('못 올림', (r.못올림 || []).length || '')
           + (r.멈춤 ? 줄('멈춤', '확인 필요') : '')
         : '<div class="arow"><span class="sub">아직 돈 적 없음</span></div>')
+    + 줄('새 사이트', esc(새사이트줄()))
     + 줄('다음', 다음자동날(todayString()) + ' 08:00')
     + '<div class="ago">'
     /* ★ 「미리 보기」라 부르지 않는다 (2026-10-11) — 위 띠의 「👁 미리보기」(화면 모양)와 이름이 겹쳐 헷갈렸다 */

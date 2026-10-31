@@ -60,7 +60,7 @@ function 상자(더) {
   ctx.부른것 = 부른것;
   vm.createContext(ctx);
   vm.runInContext([constLine('HOME_AUTO_URL'), fnSource('다음자동날'), fnSource('마지막자동'),
-    fnSource('자동카드Html'), fnSource('자동부르기'), fnSource('자동지금돌리기'), fnSource('자동승인'),
+    fnSource('새사이트줄'), fnSource('자동카드Html'), fnSource('자동부르기'), fnSource('자동지금돌리기'), fnSource('자동승인'),
     fnSource('자동대상이름'), fnSource('자동기록다시읽기'), fnSource('자동줄목록'),
     fnSource('자동결과알리기'), fnSource('자동멈춘목록보기')].join('\n'), ctx);
   return ctx;
