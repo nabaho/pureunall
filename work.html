@@ -2513,7 +2513,9 @@ var PC_PATH='data/perf_confirm';
 var PC_MONTHS=6;
 function pcMySid(){ return (S.me&&S.me.sid)||''; }        /* ★ S.vsid 아님 */
 function pcMonths(n){
-  var out=[], d=new Date();
+  /* ⚠ 1일로 세우고 거슬러 간다 (2026-10-31 실제로 났다) — 31일에 setMonth(-1) 을 하면 「9월 31일」이
+       10월 1일로 넘어가 10월이 두 번 나오고 9월이 빠졌다. 달만 셀 것이므로 날은 1일이면 된다. */
+  var out=[], d=new Date(); d.setDate(1);
   for(var i=0;i<(n||4);i++){ out.push(d.getFullYear()+'-'+pad(d.getMonth()+1)); d.setMonth(d.getMonth()-1); }
   return out;
 }
