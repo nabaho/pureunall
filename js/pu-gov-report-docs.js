@@ -120,7 +120,7 @@
       it('result', '결과보고서', 'round', 'report'),
       it('receipt', '수당 영수증·청렴서약서', 'once', 'attach'),
       it('photo', '현장 사진', 'once', 'attach')] },
-    /* 이알피 이름이 「일터상생혁신컨설팅」이다(옛 「일터혁신상생컨설팅」은 숨김·합침) — 낱말 둘 다 본다 */
+    /* 이알피 이름은 공식 사업명 순서인 「일터혁신상생컨설팅」이다(2026-10-31 바로잡음 — 그 전 이름 「일터상생혁신컨설팅」으로 쓴 기록·서류도 남아 있고, 합쳐진 옛 유형은 숨김) — 낱말 둘 다 본다 */
     { key: 'workplace', words: ['일터혁신', '일터상생혁신'], kind: '대형', criteria: 'workplace', source: SOURCE, items: [
       it('guide', '참여 안내서(서명)', 'once', 'sign', { note: '담당자 서명 후 플랫폼에 업로드' }),
       it('plan', '수행계획서', 'once', 'plat', { steps: [PLAT_LOGIN, '진단 결과 문제점·개선 필요사항 입력',
