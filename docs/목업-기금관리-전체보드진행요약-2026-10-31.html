@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>전체 보드 진행 요약 목업</title>
+<style>
+:root{--acc:#2563eb;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#e2e8f0;
+  --ok:#166534;--okbg:#f0fdf4;--warn:#854d0e;--warnbg:#fffbeb;--dg:#991b1b;--dgbg:#fef2f2}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px;color:var(--ink);background:var(--bg);padding:0 16px 40px}
+.mock{background:#fde68a;color:#854d0e;font-size:12px;padding:6px 14px;font-weight:700;margin:0 -16px 14px}
+h1{font-size:19px;margin:0 0 4px} h2{font-size:15px;margin:0}
+.panel{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--line);color:var(--sub);white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.dg{background:var(--dgbg);color:var(--dg)}
+.fl{cursor:pointer;border:1px solid transparent}.fl.on{border-color:var(--acc);box-shadow:0 0 0 2px #dbeafe}
+button{font-family:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.note{font-size:11.5px;color:var(--sub);background:#f8fafc;border:1px dashed var(--faint);border-radius:8px;padding:8px 10px;margin-top:10px}
+.lbl{font-size:11px;font-weight:700;color:#fff;background:#64748b;border-radius:5px;padding:1px 7px;margin-right:6px}
+.rec{background:#16a34a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700}
+.new{background:#2563eb;color:#fff;border-radius:4px;padding:0 5px;font-size:10px;font-weight:700;margin-left:4px}
+.hlp{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-size:11.5px;color:var(--sub);border-bottom:2px solid var(--line);padding:5px 6px;white-space:nowrap}
+td{border-bottom:1px solid var(--line);padding:5px 6px;white-space:nowrap}
+td.no,th.no{width:34px;color:var(--faint)}
+td.r,th.r{text-align:right}
+.muted{color:var(--faint)}
+.bar{display:inline-flex;gap:2px;vertical-align:middle}
+.bar i{width:11px;height:11px;border-radius:3px;background:#e2e8f0;display:inline-block}
+.bar i.d{background:#16a34a}.bar i.n{background:#fff;border:2px solid var(--acc)}.bar i.l{background:#dc2626}.bar i.x{background:#f1f5f9;border:1px dashed #cbd5e1}
+.sel{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 10px;margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mx td,.mx th{text-align:center;padding:4px 3px}.mx td.nm,.mx th.nm{text-align:left}
+.mx .c{display:inline-block;width:18px;height:18px;border-radius:4px;line-height:18px;font-size:11px;font-weight:700}
+.c.d{background:#16a34a;color:#fff}.c.n{background:#fff;border:2px solid var(--acc);color:var(--acc)}.c.l{background:#dc2626;color:#fff}.c.x{background:#f1f5f9;color:#cbd5e1}.c.w{background:#e2e8f0;color:#94a3b8}
+.cols{display:grid;grid-template-columns:1fr;gap:12px}
+</style></head><body>
+<div class="mock">목업 — 모양만 보는 가짜 화면입니다. 기금 이름·금액·날짜는 전부 예시이고, 승인 전에는 코드를 바꾸지 않습니다.</div>
+<h1>지원금 ▸ 전체 보드 — «기금별 진행 요약» 추가</h1>
+<div style="color:var(--sub);margin-bottom:12px">지금 보드는 신청액·결정액·입금일·집행액만 보여서, 서류가 어느 단계인지는 기금마다 들어가 봐야 압니다. 기금마다 만든 «진행표 9단계»를 보드 한 화면에서 보이게 합니다. 저장하는 곳은 새로 만들지 않고, 이미 있는 진행표 자료(<code>subsidy_steps</code>·<code>subsidy_remit</code>)를 읽기만 합니다.</div>
+
+<!-- ───────── A안 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">A안</span><b>지금 보드에 «진행» 세 칸을 붙임</b> <span class="rec">추천</span>
+  <span style="color:var(--sub)">— 한 줄이 기금 하나, 금액 입력은 그대로 두고 오른쪽에 진행 칸이 붙습니다.</span></div>
+
+  <div class="row" style="margin-bottom:10px">
+    <h2>전체 보드</h2><span class="hlp" title="클릭하면 설명 팝업이 뜹니다(화면에는 안내문을 깔지 않음)">ⓘ</span>
+    <select><option>2026년</option></select><span class="chip">공동기금 8</span>
+    <span style="flex:1"></span>
+    <span class="chip dg fl on" title="누르면 이 조건인 기금만 보임">⏰ 기한 지남 2</span>
+    <span class="chip warn fl">📨 결정 대기 3</span>
+    <span class="chip warn fl">💰 입금 확인 전 2</span>
+    <span class="chip fl">🧾 정산 남음 4</span>
+    <span class="chip ok fl">✔ 완료 1</span>
+    <button>전체 보기</button>
+  </div>
+
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr>
+      <th><input type="checkbox" title="전체 선택"></th><th class="no">번호</th><th>기금명</th><th>지역</th>
+      <th class="r">신청액</th><th class="r">결정액</th><th>교부·입금일</th><th class="r">집행액</th><th>정산</th>
+      <th>진행 <span class="new">신규</span></th><th>다음 할 일 <span class="new">신규</span></th><th>출연 확인 <span class="new">신규</span></th>
+    </tr></thead>
+    <tbody>
+      <tr style="background:#fef2f2"><td><input type="checkbox"></td><td class="no">1</td><td><b>충남 1호</b></td><td class="muted">충남</td>
+        <td class="r">120,000,000</td><td class="r">120,000,000</td><td>2026-04-18</td><td class="r">80,000,000</td><td><span class="chip warn">미집행 40,000,000</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="l"></i><i class="x"></i></span> <b>7/9</b></td>
+        <td>목적사업 집행·정산 <span class="chip dg">기한 지남</span></td><td><span class="chip ok">5/5 입금</span></td></tr>
+      <tr style="background:#fef2f2"><td><input type="checkbox"></td><td class="no">2</td><td><b>충남 2호</b></td><td class="muted">충남</td>
+        <td class="r">90,000,000</td><td class="r">90,000,000</td><td class="muted">—</td><td class="r"></td><td><span class="muted">—</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="d"></i><i class="l"></i><i class="x"></i><i class="x"></i><i class="x"></i></span> <b>4/9</b></td>
+        <td>지급신청서 + 출연 입금증 <span class="chip dg">기한 지남 · 2026-10-20</span></td><td><span class="chip warn">3/4 · 1곳 미입금</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">3</td><td><b>충남 3호</b></td><td class="muted">충남</td>
+        <td class="r">150,000,000</td><td class="r"></td><td class="muted">—</td><td class="r"></td><td><span class="muted">—</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="n"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="x"></i></span> <b>3/9</b></td>
+        <td>지원 결정 통지 대기 <span class="chip">공단 통지</span></td><td><span class="chip ok">6/6 입금</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">4</td><td><b>충남 4호</b></td><td class="muted">충남</td>
+        <td class="r">60,000,000</td><td class="r"></td><td class="muted">—</td><td class="r"></td><td><span class="muted">—</span></td>
+        <td><span class="bar"><i class="d"></i><i class="n"></i><i class="w"></i><i class="x"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="x"></i></span> <b>1/9</b></td>
+        <td>첨부서류 준비 <span class="chip">공고 기간</span></td><td><span class="chip warn">2/5 입금</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">5</td><td><b>경기 1호</b></td><td class="muted">경기</td>
+        <td class="r">200,000,000</td><td class="r">200,000,000</td><td>2026-06-02</td><td class="r">200,000,000</td><td><span class="chip ok">일치</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i></span> <b>8/9</b></td>
+        <td><span class="chip ok">모두 끝</span></td><td><span class="chip ok">7/7 입금</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">6</td><td><b>경기 2호</b></td><td class="muted">경기</td>
+        <td class="r">70,000,000</td><td class="r">70,000,000</td><td>2026-07-11</td><td class="r">20,000,000</td><td><span class="chip warn">미집행 50,000,000</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="n"></i><i class="x"></i></span> <b>7/9</b></td>
+        <td>목적사업 집행·정산 <span class="chip warn">기한 2026-12-31</span></td><td><span class="chip ok">4/4 입금</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">7</td><td><b>경기 3호</b></td><td class="muted">경기</td>
+        <td class="r"></td><td class="r"></td><td class="muted">—</td><td class="r"></td><td><span class="muted">—</span></td>
+        <td><span class="muted">진행 기록 없음</span></td><td><span class="muted">신청 전</span></td><td><span class="muted">—</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">8</td><td><b>제주 1호</b></td><td class="muted">제주</td>
+        <td class="r">80,000,000</td><td class="r">80,000,000</td><td>2026-05-09</td><td class="r">45,000,000</td><td><span class="chip warn">미집행 35,000,000</span></td>
+        <td><span class="bar"><i class="d"></i><i class="d"></i><i class="d"></i><i class="x"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="n"></i><i class="x"></i></span> <b>7/9</b></td>
+        <td>목적사업 집행·정산 <span class="chip warn">기한 2026-12-31</span></td><td><span class="chip warn">확인 전 1</span></td></tr>
+    </tbody>
+    <tfoot><tr style="font-weight:700;border-top:2px solid var(--line)"><td></td><td></td><td>합계</td><td></td><td class="r">770,000,000</td><td class="r">560,000,000</td><td></td><td class="r">345,000,000</td><td></td><td></td><td></td><td></td></tr></tfoot>
+  </table></div>
+
+  <div class="sel"><b>☑ 선택한 기금 2곳</b>
+    <button>📋 진행 요약 복사 (카톡·메일에 붙여넣기)</button>
+    <button>▶ 진행표로 이동 (첫 번째 기금)</button>
+    <span style="color:var(--faint);font-size:11.5px">※ 이 줄은 체크한 때만 나타납니다.</span></div>
+
+  <div class="note"><b>보는 법</b> — 네모 9칸 = 진행표 9단계 순서. <span class="bar"><i class="d"></i></span> 끝남 · <span class="bar"><i class="n"></i></span> 지금 할 차례 · <span class="bar"><i class="l"></i></span> 기한 지남 · <span class="bar"><i class="x"></i></span> 해당 없음(보완 요구·취소 이의는 필요할 때만) · 회색 = 아직 앞 단계가 안 끝남.<br>
+  <b>다음 할 일</b> = 끝나지 않은 첫 단계. 기한은 «사람이 넣은 날짜»가 있을 때만 계산해 보여주고, 날짜를 모르면 «공단 통지»처럼 규칙 글만 적습니다(지어내지 않음).<br>
+  <b>줄을 누르면</b> 그 기금의 신청·정산 진행표로 이동합니다(지금 기금명을 누르는 것과 같음). 위쪽 칩을 누르면 그 조건의 기금만 남기고, 한 번 더 누르면 풀립니다.<br>
+  <b>빨간 바탕 줄</b> = 기한이 지난 단계가 있는 기금. 연도를 바꾸면 그 해 진행표대로 다시 그립니다.</div>
+</div>
+
+<!-- ───────── B안 ───────── -->
+<div class="panel">
+  <div class="row" style="margin-bottom:8px"><span class="lbl">B안</span><b>진행 전용 «단계 지도» 표를 따로 둠</b>
+  <span style="color:var(--sub)">— 기금(세로) × 9단계(가로). 한눈에 막힌 곳이 보이지만, 금액 표와 화면이 둘로 갈립니다.</span></div>
+  <div style="overflow-x:auto">
+  <table class="mx">
+    <thead><tr><th><input type="checkbox"></th><th class="no">번호</th><th class="nm">기금명</th>
+      <th>① 신청서</th><th>② 첨부</th><th>③ 사업계획</th><th>④ 보완</th><th>⑤ 결정</th><th>⑥ 지급신청</th><th>⑦ 입금</th><th>⑧ 정산</th><th>⑨ 이의</th></tr></thead>
+    <tbody>
+      <tr><td><input type="checkbox"></td><td class="no">1</td><td class="nm"><b>충남 1호</b></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c x">–</span></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c l">!</span></td><td><span class="c x">–</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">2</td><td class="nm"><b>충남 2호</b></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c x">–</span></td><td><span class="c d">✓</span></td><td><span class="c l">!</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c x">–</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">3</td><td class="nm"><b>충남 3호</b></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c d">✓</span></td><td><span class="c x">–</span></td><td><span class="c n">▶</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c x">–</span></td></tr>
+      <tr><td><input type="checkbox"></td><td class="no">4</td><td class="nm"><b>충남 4호</b></td><td><span class="c d">✓</span></td><td><span class="c n">▶</span></td><td><span class="c w">·</span></td><td><span class="c x">–</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c w">·</span></td><td><span class="c x">–</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">장점: 막힌 단계가 열(세로 줄)로 모여 «결정 통지 기다리는 곳이 몇 곳인지» 바로 셉니다. 단점: 금액·입금일은 다른 표를 봐야 하고, 지금 보드의 «금액 바로 입력»과 따로 놀아 화면이 둘이 됩니다.</div>
+</div>
+
+<div class="panel" style="background:#f0fdf4">
+  <b>추천 = A안.</b> 까닭: 대표님이 매번 보시는 건 «금액 표»라서 같은 줄에 진행이 붙는 쪽이 한 번에 보이고, 화면·저장 장소가 늘지 않습니다. 단계 지도(B안)가 필요하면 나중에 A안 위에 «진행 칸을 누르면 9단계 펼침»으로 얹을 수 있습니다.<br><br>
+  <b>정해 주실 것 (모두 «추천대로»면 아래대로 만듭니다)</b><br>
+  ① A안 / B안 — 추천 A<br>
+  ② 위쪽 칩 필터(기한 지남·결정 대기·입금 확인 전·정산 남음·완료) — 추천: 넣기. 누른 칩은 새로 고쳐도 유지하지 않음<br>
+  ③ 선택한 기금의 «진행 요약 복사» 단추 — 추천: 넣기(카톡·메일 보고용 글만 만들고, 발송은 하지 않음)<br>
+  ④ 단계·기한 규칙은 지금 앱 기준(2023.5.25. 개정본)을 그대로 쓰고, 현행본을 받으면 한 곳만 고침 — 보드는 진행표의 같은 계산을 쓰므로 규칙이 두 군데로 갈리지 않음
+</div>
+</body></html>
