@@ -91,7 +91,10 @@ test('★ 지금 있는 파일을 갈아 끼울 때는 «본 그것»의 sha 를
   await S.올리기(가짜, 'T', 'nabaho/pureunall', 'site/people/index.html', '<html>새것</html>', '사연');
   assert.equal(부른것.length, 2, '읽고 쓰는 두 걸음이어야 한다');
   assert.equal(부른것[0].method, 'GET', '먼저 지금 있는 것을 읽어야 한다');
-  const 보낸것 = JSON.parse(부른것[1].body);
+  /* ★ 진짜 githubRequest 는 body 를 «객체»로 받아 스스로 JSON 으로 감싼다 — 가짜도 그 약속을 따른다.
+       (2026-10-31 전에는 가짜가 글자를 기대해서, 두 번 감싸던 버그를 검사가 오히려 지켜 주었다) */
+  const 보낸것 = 부른것[1].body;
+  assert.equal(typeof 보낸것, 'object', '★ 몸통을 글자로 감싸 넘겼다 — githubRequest 가 또 감싸 깃허브가 400 으로 거절한다');
   assert.equal(보낸것.sha, 'OLDSHA',
     '★ 본 그것의 sha 를 안 보냈다 — 그 사이 남이 고친 것을 조용히 덮는다');
   assert.equal(Buffer.from(보낸것.content, 'base64').toString('utf8'), '<html>새것</html>');
@@ -101,7 +104,7 @@ test('★ 처음 올리는 파일이면 sha 없이 올린다 — 없는 것을 �
   const 부른것 = [];
   const 가짜 = async (token, route, options) => {
     if (!options) { const e = new Error('Not Found'); e.status = 404; throw e; }
-    부른것.push(JSON.parse(options.body));
+    부른것.push(options.body);
     return { commit: { sha: 'NEW' } };
   };
   await S.올리기(가짜, 'T', 'nabaho/pureunall', 'site/새쪽/index.html', '<html>처음</html>', '사연');
@@ -159,7 +162,7 @@ test('★ 그림은 «다시 감싸지» 않는다 — 감싸면 글자가 그�
   const 보낸것 = [];
   const 가짜 = async (token, route, options) => {
     if (!options) { const e = new Error("Not Found"); e.status = 404; throw e; }
-    보낸것.push(JSON.parse(options.body));
+    보낸것.push(options.body);
     return { commit: { sha: "NEW" } };
   };
   const 그림base64 = Buffer.from('가짜 그림 바이트').toString('base64');

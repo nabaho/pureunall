@@ -95,9 +95,11 @@ async function 올리기(githubRequest, token, repo, path, content, message, bas
     content: base64인가 ? String(content) : Buffer.from(String(content), "utf8").toString("base64")
   };
   if (sha) body.sha = sha;
+  /* ★ 객체 그대로 넘긴다 — githubRequest 가 JSON 으로 감싼다. 여기서 또 감싸면 깃허브가
+     글자 하나를 받고 「Body should be a JSON object」로 거절한다(2026-10-31 실제로 그랬다). */
   return githubRequest(token, `/repos/${repo}/contents/${path}`, {
     method: "PUT",
-    body: JSON.stringify(body)
+    body: body
   });
 }
 
