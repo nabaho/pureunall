@@ -2277,7 +2277,11 @@ module.exports = function build(deps) {
           if (!hit.n) {
             /* 번호가 «어떤 모양»으로 왔는지만 남긴다(내용은 안 남긴다) — 화면이 엉뚱한 번호를 보내는지 가린다 */
             console.log('MB_OLD_MISS', JSON.stringify({ len: key.length, digits: /^\d+$/.test(key), listed: got.s.size }));
-            reply(res, 404, { ok: false, error: '그 메일이 다음메일에 없습니다 — 지워졌을 수 있습니다.' });
+            /* ★ 실측 2026-10-31(oldProbe): 담아 둔 지난 메일 23,155통 중 811통(2020-12~2021-03, 가장 옛것)이 다음메일
+                 POP3 목록(최근 3만 통)에서 «밀려나» 열 수 없다. 새 메일이 올 때마다 옛것이 더 밀려난다.
+                 「지워졌을 수 있습니다」는 사실과 다른 말이었다 — 지운 게 아니라 «창 밖»이다. */
+            reply(res, 404, { ok: false, outOfWindow: true,
+              error: '다음메일 POP3 는 최근 3만 통만 열어 줘서 이 옛 메일은 여기서 못 엽니다 — 다음메일(웹)에서 보세요. 저장해 둔 앞부분은 아래에 있습니다.' });
             return;
           }
           try {

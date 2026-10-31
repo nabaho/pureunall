@@ -28656,6 +28656,15 @@ function mbOldFull(){
       renderMailPage(); toast('전체를 받지 못했습니다 — ' + ((e && e.message) || e), 8000);
     });
 }
+/* 못 열었을 때 본문 자리 — 📦 지난 메일은 «저장해 둔 앞부분»(목록의 미리보기 글, 800자)도 함께 보여 준다.
+   ★ 실측 2026-10-31(oldProbe): 담아 둔 지난 메일 23,155통 중 811통(가장 옛 2020-12~2021-03)이 다음메일 POP3 목록(최근 3만 통)에서
+     밀려나 열 수 없다. 그 메일을 눌러 빈 화면과 「없습니다」만 보이면 고장으로 읽힌다 — 앞부분이라도 보이게 한다.
+   ⚠ 글자는 esc 로만 넣는다(남의 글). ⚠ 다음메일 폴더 메일(IMAP)은 앞부분을 덧붙이지 않는다 — 그쪽 «없다»는 지워진 것이라 지운 메일을 보이면 안 된다. */
+function mbReadErrHtml(o, v){
+  const msg = '<div class="wait">열지 못했습니다 — ' + esc(o.err) + '</div>';
+  if(String(o.slug) !== MB_OLD_ID || !(v && v.p)) return msg;
+  return msg + '<pre style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0;color:#475569">' + esc(String(v.p)) + ' …</pre>';
+}
 function mbReadHtml(){
   const o = state.mbOpen||{};
   const box = _mbMsgs[o.slug]||{};
@@ -28770,7 +28779,7 @@ function mbReadHtml(){
     <div class="body">${o.loading ? '<div class="wait">본문을 가져오고 있습니다…'
         + (String(o.slug)===MB_OLD_ID ? ' <span style="color:#94a3b8">(지난 메일은 처음 한 통만 10초쯤 걸리고, 다음 통부터는 바로 열립니다)</span>' : '')
         + '</div>'
-      : o.err ? '<div class="wait">열지 못했습니다 — '+esc(o.err)+'</div>'
+      : o.err ? mbReadErrHtml(o, v)
       : (bodyHtml || '<div class="wait">본문이 없습니다.</div>')}</div>
     ${/* ⚠ 여기 「답장은 다음메일에서 하십니다 … 이 자리에서는 전달·다시보내기와 휴지통
          옮기기를 하십니다」라는 안내가 있었다 — 2026-09-27 에 걷었다. 위 줄에 [답장]·
