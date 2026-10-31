@@ -15,7 +15,8 @@ const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
 const { stripJs } = require('./strip-comments');
 
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
+/* 윈도 PC 에서 꺼내면(core.autocrlf) 줄끝이 CRLF — ⑤는 줄바꿈까지 넣어 찾으므로 LF 로 맞춘다 */
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 const MOB = stripJs(cutFn(SRC, 'function openDetail('));
 const PC = stripJs(cutFn(SRC, 'function openPcDetail('));
 
