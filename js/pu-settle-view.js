@@ -88,12 +88,14 @@
       + '<div class="bulk" data-bulk="manual"></div><div class="scroll"><table class="t" data-name="manual"><thead><tr>' + ckHead('manual', rows.length > 0 && rows.every(function (r, i) { return sel[i]; }))
       + '<th>수행자</th><th class="r">요율</th><th>세율</th><th class="r">실수령액(통장)</th><th class="r">세전</th><th class="r">세후 계산</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
-      var pre = C.won(r.pre), w = C.withholding(pre, r.tax), rate = r.sid && rates[r.sid] != null ? rates[r.sid] + '%' : '';
+      var pre = C.won(r.pre), w = C.withholding(pre, r.tax), sg = (opt.suggest || {})[r.sid];
+      var rate = r.sid && rates[r.sid] != null ? rates[r.sid] + '%' : (r.sid && sg != null ? sg + '% (기존)' : '');
       h += '<tr>' + ckCell(String(i), sel[i]) + '<td class="n">' + (i + 1) + '</td>'
         + (r.role === 'lead'
           ? '<td class="ti" data-k="who">' + esc(nameOf(names, r.sid, '(주관 없음 — 요율표에서 고르세요)')) + ' <span class="pill role-lead">주관</span></td><td class="r" data-k="rate"></td>'
           : '<td data-k="who"><select data-m="' + i + '|sid">' + staffOpts(opt.staff, names, r.sid, '— 담당 —') + '</select> <span class="pill">담당</span></td>'
-            + '<td class="r" data-k="rate">' + (rate ? esc(rate) : (r.sid ? '<span class="bad">요율표에 없음</span>' : '')) + '</td>')
+            + '<td class="r" data-k="rate"' + (rate && rates[r.sid] == null ? ' title="이 컨설팅 요율표에 없어 다른 컨설팅에서 쓰는 요율을 가져왔습니다 — 저장하면 요율표에도 들어갑니다"' : '') + '>'
+            + (rate ? esc(rate) : (r.sid ? '<span class="bad">요율표에 없음</span>' : '')) + '</td>')
         + '<td data-k="tax">' + taxSel('data-m="' + i + '|tax"', r.tax) + '</td>'
         + '<td class="r" data-k="real"><input type="text" inputmode="numeric" class="amt" data-m="' + i + '|net" value="' + esc(r.net == null ? '' : r.net) + '" placeholder="알면 적기"></td>'
         + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-m="' + i + '|pre" value="' + esc(r.pre == null ? '' : r.pre) + '" placeholder="세전"></td>'
@@ -260,8 +262,10 @@
     var h = '<div class="card"><div class="bar"><b>요율표</b><span class="hint">줄 = 사람 · 칸 = 사업 종류 · 25 = 25%</span><span class="sp"></span>'
       + '<select id="mx_addType" title="요율표에 사업 종류 칸을 더한다"><option value="">+ 사업 종류</option>'
       + (opt.addTypes || []).map(function (b) { return '<option value="' + esc(b.code) + '">' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + (Object.keys(opt.suggest || {}).length ? '<button class="sm" id="mx_fill" title="빈 칸에 그 사람이 다른 컨설팅에서 쓰는 요율을 넣는다 — «저장»을 눌러야 반영">빈 칸에 기존 % 넣기</button>' : '')
       + '<button class="sm pri" id="mx_save"' + (work.dirty ? '' : ' disabled') + '>저장</button></div>';
     if (!types.length) return h + '<div class="empty">아직 사업 종류가 없습니다 — 오른쪽 위 «+ 사업 종류»로 칸을 더하세요.</div></div>';
+    var sug = opt.suggest || {};
     var allOn = people.length > 0 && people.every(function (s) { return sel[s]; });
     h += '<div class="bulk" data-bulk="mxpeople"></div><div class="scroll"><table class="t mx" data-mx-table><thead><tr>'
       + '<th class="c"><input type="checkbox" data-all="mxpeople"' + (allOn ? ' checked' : '') + '></th><th class="n">번호</th><th>이름</th>'
@@ -270,7 +274,11 @@
       + '<tr class="cfg"><td></td><td></td><td>켜짐</td>' + types.map(function (c) { return '<td class="mxc"><label class="ck" title="켜면 이 사업 종류는 컨설팅정산에서 개별정산한다(재무관리 성과급에서 뺀다)"><input type="checkbox" data-on="' + esc(c) + '"' + ((rules[c] || {}).active !== false ? ' checked' : '') + '></label></td>'; }).join('') + '</tr>';
     people.forEach(function (sid, i) {
       h += '<tr>' + ckCell(sid, sel[sid]) + '<td class="n">' + (i + 1) + '</td><td class="ti" title="' + esc(names[sid] || '') + '">' + esc(names[sid] || '(이름 없음)') + '</td>'
-        + types.map(function (c) { var v = ((rules[c] || {}).rates || {})[sid]; return '<td class="mxc"><input type="text" inputmode="decimal" class="pct" data-mx="' + esc(c + '|' + sid) + '" value="' + esc(v == null ? '' : v) + '" placeholder="—"></td>'; }).join('') + '</tr>';
+        + types.map(function (c) {
+          var v = ((rules[c] || {}).rates || {})[sid], s = sug[c + '|' + sid];
+          /* 빈 칸은 그 사람의 기존 %를 흐리게 보여 준다(넣지는 않는다 — «빈 칸에 기존 % 넣기» 또는 직접 친다) */
+          return '<td class="mxc"><input type="text" inputmode="decimal" class="pct" data-mx="' + esc(c + '|' + sid) + '" value="' + esc(v == null ? '' : v) + '" placeholder="' + (s == null ? '—' : esc(s)) + '"'
+            + (s == null ? '' : ' title="기존 ' + esc(s) + '% — 다른 컨설팅에서 쓰는 요율"') + '></td>'; }).join('') + '</tr>';
     });
     var addable = (opt.staff || []).filter(function (p) { return people.indexOf(p.sid) < 0; });
     h += '<tr class="cfg"><td></td><td></td><td colspan="' + (types.length + 1) + '"><select id="mx_addSid"><option value="">+ 사람(재직자)</option>'

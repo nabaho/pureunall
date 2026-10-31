@@ -13,8 +13,8 @@
 
   /* 카톡 문구 머리 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로」. {사업} 사업 이름 · {지급월} «2026년 10월» · {월} «10월» */
   var DEFAULT_HEAD = '[컨설팅 비용 정산 안내]\n{사업} — {지급월}';
-  var HOW_TO = '※ 계산 방법 — 사업장에 들어온 금액(원천징수 뒤 세후)을 모두 더해 담당 요율(%)을 곱한 것이 담당자 산정금액입니다(원 미만 버림). '
-    + '담당자가 이미 받은 금액이 산정금액보다 많으면 차액을 반환하고, 적으면 차액을 추가로 지급받습니다.';
+  var HOW_TO = '※ 계산 방법 — 입금 금액(원천징수 뒤 세후)을 모두 더해 담당자 퍼센트를 곱한 것이 담당자 퍼센트 반영금액입니다(원 미만 버림). '
+    + '담당자가 받은 금액이 반영금액보다 많으면 차액을 반환하고, 적으면 차액을 추가로 지급받습니다. 담당자 입금 없이 주관에게만 입금됐으면 주관이 반영금액 전액을 지급합니다.';
   var DEFAULT_FOOT = '확인 부탁드립니다. 감사합니다.';
   var KST = 9 * 3600 * 1000;
 
@@ -316,8 +316,10 @@
     if (!(m.pre > 0)) return ' · ' + nm + ' 0원';
     return ' · ' + nm + ' ' + fmt(m.used) + '원 (' + w + ')';
   }
-  /* 카톡 문구 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로 하고 입금자 입금금액 담당자 담당자 산정금액 % 등 계산방법등을 정리해서」.
-     담당마다 한 통: 사업장마다 ① 입금자·입금금액 ② 담당자 산정금액(사업장 합계 × %) ③ 정산(반환 / 추가 지급), 끝에 계산 방법 */
+  /* 카톡 문구 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로 하고 입금자 입금금액 담당자 담당자 산정금액 % 등 계산방법등을 정리해서」,
+     「권형하 입금금액 얼마 박재원 얼마. 각각 세후 담당자 퍼센트 반영금액 담당자 받은금액 에대한 차액등으로」,
+     「담당자가 전혀 입금없이 권형하만 입금되는경우 … 권형하가 담당자에게 지급만 하면 된다 퍼센트에 따라」.
+     담당마다 한 통: 사업장마다 ① 입금 금액(세후, 사람마다) ② 담당자 퍼센트 반영금액(합계 × %) ③ 담당자 받은 금액 ④ 차액(반환 / 추가 지급), 끝에 계산 방법 */
   function buildMessages(run, rule, names) {
     rule = rule || {}; names = names || {};
     var month = Number(String(run.monthKey || '').slice(5)) + '월', label = run.label || (String(run.monthKey || '').slice(0, 4) + '년 ' + month);
@@ -339,13 +341,15 @@
         var ln = (lead && nameOf(lead)) || names[rule.leadSid] || '주관';
         leadName = leadName || ln;
         L.push('■ ' + s.company + ' (' + s.round + '차)');
-        L.push('① 입금자·입금금액');
+        L.push('① 입금 금액(세후)');
         s.members.forEach(function (x) { if (x.role === 'lead' || x.sid === m.sid || x.pre > 0 || x.actual != null) L.push(depositLine(x, nameOf(x))); });
-        L.push(' · 사업장 합계(세후) ' + fmt(s.totalNet) + '원');
-        L.push('② 담당자 산정금액 (' + p.name + ' ' + m.rate + '%)');
+        L.push(' · 합계 ' + fmt(s.totalNet) + '원');
+        L.push('② 담당자 퍼센트 반영금액 (' + p.name + ' ' + m.rate + '%)');
         L.push(' · ' + fmt(s.totalNet) + '원 × ' + m.rate + '% = ' + fmt(m.share) + '원');
-        L.push('③ 정산');
-        L.push(' · 산정금액 ' + fmt(m.share) + '원 − ' + p.name + ' 입금 ' + fmt(m.used) + '원' + (m.adjust ? ' + 이월·조정 ' + fmt(m.adjust) + '원' : '') + ' = ' + (m.settle > 0 ? '+' : '') + fmt(m.settle) + '원');
+        L.push('③ 담당자 받은 금액');
+        L.push(' · ' + p.name + ' ' + fmt(m.used) + '원' + (m.used > 0 ? '' : ' (입금 없음 — ' + ln + '에게 입금)'));
+        L.push('④ 차액');
+        L.push(' · ' + fmt(m.share) + '원 − ' + fmt(m.used) + '원' + (m.adjust ? ' + 이월·조정 ' + fmt(m.adjust) + '원' : '') + ' = ' + (m.settle > 0 ? '+' : '') + fmt(m.settle) + '원');
         L.push(settleLine(' → ', m.settle, p.name, ln));
         L.push('');
         total += m.settle;
@@ -543,6 +547,25 @@
     return out.sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : a.monthKey > b.monthKey ? -1 : (a.company < b.company ? -1 : 1); });
   }
 
+  /* ═══ 기존 % 끌어오기 — 대표 지시 2026-10-31 「퍼센트는 가급적 기존에 있던 퍼센트를 가지고 오도록」 ═══
+     rules = {종류: {rates:{sid:%}, updatedAt}} — 그 사람이 «다른 컨설팅 종류»에 이미 가진 요율. 여럿이면 가장 많이 쓴 값,
+     같으면 최근에 고친 규칙의 값. 없으면 null(이알피 성과%는 성과급용이라 쓰지 않는다 — 김혜민 15% vs 정산 25% 처럼 다르다). */
+  function existingRate(rules, sid, exceptType) {
+    var count = {}, latest = {};
+    Object.keys(rules || {}).forEach(function (k) {
+      var r = rules[k];
+      if (!r || r._deleted || k === exceptType || !r.rates || r.rates[sid] == null || String(r.rates[sid]).trim() === '') return;
+      var v = Number(String(r.rates[sid]).replace(/[%\s]/g, ''));
+      if (!(v >= 0 && v <= 100)) return;
+      count[v] = (count[v] || 0) + 1;
+      latest[v] = Math.max(latest[v] || 0, Number(r.updatedAt) || 0);
+    });
+    var vs = Object.keys(count);
+    if (!vs.length) return null;
+    vs.sort(function (a, b) { return count[b] - count[a] || latest[b] - latest[a] || Number(b) - Number(a); });
+    return Number(vs[0]);
+  }
+
   /* ═══ 연도별 관리 — 대표 지시 2026-10-31 「매년 관리할 수 있게 해라」 ═══
      그 해(지급월 기준) 정산표에서 담당마다 반환·추가 지급 합계와 주관 순액(+ 받을 돈). 지운(_deleted) 정산표는 뺀다. */
   function yearOf(monthKey) { return String(monthKey || '').slice(0, 4); }
@@ -575,6 +598,6 @@
     parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
     manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
-    TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary
+    TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate
   };
 });
