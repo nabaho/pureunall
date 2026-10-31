@@ -202,3 +202,31 @@ test('임시저장 — 통장 실입금은 칠 때 저장하지 않고 «임시�
 test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
   assert.doesNotMatch(NOC, /window\.open\([^)]*_blank/);
 });
+
+test('정산 탭 두 칸 — 넓은 화면은 왼쪽 목록·오른쪽 정산표, 좁으면 위아래', () => {
+  assert.match(NOC, /<div class="runs2">\s*<div class="card runs-side"><div id="runsBox"><\/div><\/div>\s*<div class="card runs-main" id="runCard">/);
+  assert.match(NOC, /@media \(min-width:1280px\)\{\s*\.runs2\{grid-template-columns:450px minmax\(0,1fr\)\}/);
+  assert.match(fnBody('function drawRuns('), /types:ruleTypes\(\)/);
+});
+
+test('직접 입력 — 검사(주관·사업장·지급월·숫자·요율·엑셀 달 겹침)가 저장보다 먼저, 안내는 settle/notices/M_<종류>, 고른 연결을 잇고 정산표를 만든다', () => {
+  const fn = fnBody('async function saveManual(');
+  const firstSave = fn.indexOf('patchRecord(');
+  ['사업장을 고르세요', '지급월을 고르세요', '세전은 숫자로', '요율표에 요율이 없습니다', "n.source!=='manual'"].forEach((k) =>
+    assert.ok(fn.indexOf(k) >= 0 && fn.indexOf(k) < firstSave, k + ' 검사가 저장보다 먼저가 아니다'));
+  assert.match(fn, /patchRecord\('settle\/notices\/'\+id/);
+  assert.match(fn, /source:'manual'/);
+  assert.match(fn, /patchRecord\('settle\/links\/company\/'\+ck/);
+  assert.match(fn, /patchRecord\('settle\/links\/person\/'\+pk/);
+  assert.match(fn, /await buildRuns\(id\)/);
+  assert.match(fnBody('function manualId('), /'M_'\+type/);
+  /* 세전을 칠 때는 기억만 — 저장·다시 그리기 없음 */
+  const inp = NOC.slice(NOC.indexOf("if(t.matches('input[data-m]'))"));
+  assert.doesNotMatch(inp.slice(0, inp.indexOf('return; }') + 9), /patchRecord|save\(|drawRuns\(/);
+  /* 빼기 — 비게 된 «임시저장» 정산표만 표식(확정한 달은 «바뀜»으로) */
+  const rm = fnBody('async function removeManual(');
+  assert.match(rm, /run\.status==='draft' && run\.noticeId===id/);
+  assert.match(rm, /softDelete\('settle\/runs\/'/);
+  /* 안내 파일로 만든 달과 직접 입력으로 만든 달은 서로 덮지 않는다 */
+  assert.match(fnBody('async function buildRuns('), /\(kn\.source==='manual'\)!==\(n\.source==='manual'\)\)\{ skipped\+\+; continue; \}/);
+});

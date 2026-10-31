@@ -245,3 +245,35 @@ test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받
   assert.equal(calc.transfers[0].dir, 'back');
   assert.match(visible(V.calcResult(calc, {})), /을 → 갑\s+87,915원\s+반환/);
 });
+
+test('정산표 목록 — 규칙이 있는 컨설팅 종류는 정산표가 없어도 묶음으로 보이고 «+ 입력»이 붙는다', () => {
+  const h = V.runsTable([fakeRun()], {}, { 'cons-test': '테스트사업', 'cons-b': '나다사업 (나다협회)' }, '', { types: ['cons-test', 'cons-b'] });
+  assert.match(h, /data-manual="cons-b"/);
+  assert.match(h, /data-manual="cons-test"/);
+  assert.match(visible(h), /나다사업 \(나다협회\)[\s\S]*아직 정산표 없음/);
+  assert.equal((h.match(/<td class="n">\d+<\/td>/g) || []).length, 1, '번호는 정산표 줄에만');
+});
+
+test('직접 입력 상자 — ☐·번호, 주관은 규칙대로 못박고, 담당은 재직자 고르기·요율 표시, 세후 계산, 넣은 것 목록, 사번은 화면에 없다', () => {
+  const st = { type: 'cons-b', siteId: 'C-9', month: '2026-10', rows: [{ sid: 'T-LEAD', role: 'lead', pre: '6990000' }, { sid: 'T-A', role: 'staff', pre: '0' }, { sid: 'T-C', role: 'staff', pre: '0' }] };
+  const entries = [{ key: '2026-10|x', monthKey: '2026-10', company: '<i>승진</i> (번호-1)', people: [{ name: '홍길동', pre: 6990000 }, { name: '김가나', pre: 0 }] }];
+  const h = V.manualBox(st, { types: [{ code: 'cons-b', name: '나다사업 (나다협회)' }], sites: [{ consultingId: 'C-9', label: '승진' }], staff: [{ sid: 'T-A', name: '김가나' }, { sid: 'T-C', name: '박재직' }],
+    names: { 'T-LEAD': '홍길동', 'T-A': '김가나', 'T-C': '박재직' }, rates: { 'T-A': 10 }, entries, sel: {}, selE: {} });
+  const t = h.slice(h.indexOf('data-name="manual"'));
+  const ths = [...t.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="manual"/);
+  assert.match(ths[1], /번호/);
+  assert.match(visible(h), /홍길동\s+주관/);
+  assert.doesNotMatch(h, /data-m="0\|sid"/, '주관 줄은 고르기가 없다');
+  assert.match(h, /<select data-m="1\|sid">[\s\S]*?value="T-A" selected/);
+  assert.match(visible(h), /10%/);
+  assert.match(visible(h), /요율표에 없음/);
+  assert.match(visible(h), /6,759,330/);
+  assert.match(h, /id="m_save"/);
+  assert.match(h, /id="m_month" value="2026-10"/);
+  assert.match(h, /data-name="mentries"/);
+  assert.match(visible(h), /홍길동 6,990,000 · 김가나 0/);
+  assert.doesNotMatch(h, /<i>승진/);
+  assert.doesNotMatch(visible(h), /T-[A-Z]/);
+  assert.doesNotMatch(h, /<br/i);
+});

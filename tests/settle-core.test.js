@@ -356,3 +356,29 @@ test('noticeHash — 같은 줄이면 같고, 금액이 다르면 다르다', ()
   b.rows[0].amounts['2026-10'] += 1;
   assert.notEqual(C.noticeHash(a.rows), C.noticeHash(b.rows));
 });
+
+test('직접 입력 — 사업 종류 안내 하나에 쌓고, 세전 0 담당도 줄로 남아 주관이 전액 받은 사업장에서 «추가 지급»을 받는다', () => {
+  let n = C.manualAdd(null, { monthKey: '2026-10', company: '가나상사 (번호-1)', people: [{ name: '홍길동', pre: '6,990,000' }, { name: '김가나', pre: '0' }] });
+  assert.deepEqual(Array.from(n.months, (m) => m.key + ':' + m.label), ['2026-10:10월']);
+  assert.equal(n.rows.length, 2);
+  assert.equal(n.rows[1].amounts['2026-10'], 0, '세전 0 담당도 남는다');
+  const ctx = { companyLinks: {}, personLinks: {}, actuals: {}, adjusts: [], names: {} };
+  ctx.companyLinks[C.linkKey('가나상사 (번호-1)')] = { consultingId: 'C-9', companyId: '' };
+  ctx.personLinks[C.linkKey('홍길동')] = 'T-LEAD'; ctx.personLinks[C.linkKey('김가나')] = 'T-A';
+  const s = C.settleMonth(n, '2026-10', { leadSid: 'T-LEAD', rates: { 'T-A': 10 }, siteRates: {} }, ctx).sites[0];
+  assert.equal(s.totalNet, 6759330);
+  const lead = s.members.find((m) => m.role === 'lead'), staff = s.members.find((m) => m.role === 'staff');
+  assert.equal(staff.share, 675933);
+  assert.equal(staff.settle, 675933);
+  assert.equal(lead.final, 6083397);
+  assert.equal(C.dirOf(C.transfersOf([s], 'T-LEAD')[0], 'T-LEAD'), 'more', '주관이 더 받음 → 추가 지급');
+  /* 같은 달·같은 사업장은 통째로 바꾸고, 다른 달은 쌓는다 */
+  n = C.manualAdd(n, { monthKey: '2026-10', company: '가나상사 (번호-1)', people: [{ name: '홍길동', pre: '7000000' }] });
+  assert.equal(n.rows.length, 1);
+  assert.equal(n.rows[0].amounts['2026-10'], 7000000);
+  n = C.manualAdd(n, { monthKey: '2026-11', company: '다라산업 (번호-2)', people: [{ name: '홍길동', pre: '1000' }] });
+  assert.deepEqual(Array.from(C.manualEntries(n), (e) => e.monthKey + '|' + e.company), ['2026-11|다라산업 (번호-2)', '2026-10|가나상사 (번호-1)']);
+  const r = C.manualRemove(n, [{ monthKey: '2026-10', company: '가나상사 (번호-1)' }]);
+  assert.deepEqual(Array.from(r.months, (m) => m.key), ['2026-11']);
+  assert.equal(r.rows.length, 1);
+});

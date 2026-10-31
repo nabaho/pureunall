@@ -18,6 +18,8 @@
        재무관리에서 당겨와 사람별 예상 세후와 맞춘다. 금액이 같아도 «저장»을 눌러야 통장 실입금이 된다.
      ★ 임시저장(대표 지시 2026-10-31 「임시저장기능 만들어 달라」): 확정 전 정산표(draft = «임시저장»)의 통장 실입금은 쳐도 바로 저장하지 않고
        노란 칸으로 두었다가 «임시저장 (n)» 한 번에 저장한다. 저장 안 한 칸이 있으면 확정·기록만을 막고, 창을 닫을 때 묻는다.
+     ★ 직접 입력(대표 선택 2026-10-31): 안내 엑셀이 없는 컨설팅(예: 산업일자리전환 능률협회)은 정산 탭 왼쪽 목록 «+ 입력»으로 사업장·지급월·세전을 넣는다
+       → settle/notices/M_<종류>(source 'manual')에 쌓고 정산표는 같은 길로 만든다. 정산 탭은 넓은 화면에서 왼쪽 목록 · 오른쪽 정산표.
      ⚠ 대표·위임관리인·재무권한자만 연다(규칙 settle = 같은 사람) — 대표 선택 2026-10-31. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
      ⚠ 업체·사람은 «사람이 한 번 확정한 연결»로만 ID 를 붙인다 — 이름이 비슷해도 저절로 잇지 않는다(온톨로지 규칙).
      ⚠ 확정된 달은 새 안내가 와도 덮지 않는다 — «바뀜»만 표시한다. 돈 기록은 지우지 않는다(_deleted 표식).
@@ -110,8 +112,17 @@ main{padding:12px 16px 40px}
 #pane-rules .t[data-name=adjusts] input.amt{width:100px}
 #pane-rules .t[data-name=adjusts] #a_memo{width:140px}
 /* 정산 탭 — 내용만큼(넓은 화면에서 줄이 끝없이 퍼지지 않게), 임시저장 안 한 칸은 노랗게 (대표 지시 2026-10-31 「임시저장기능 … 깔끔하게 볼수 있게」) */
-#pane-runs{max-width:1100px}
-.t[data-name=runs]{width:auto}
+/* 넓은 화면에서는 왼쪽 지급월 목록 · 오른쪽 정산표(대표 지시 2026-10-31 「캡쳐1(정산표)을 오른쪽 화면으로 두고 캡쳐2(목록)는 왼쪽으로」). 좁으면 위아래 */
+#pane-runs{max-width:1600px}
+.runs2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.runs2>.card{margin-bottom:0}
+@media (min-width:1280px){
+  .runs2{grid-template-columns:450px minmax(0,1fr)}
+  .runs-side{position:sticky;top:100px;max-height:calc(100vh - 112px);overflow:auto}
+}
+.runs-side .t th,.runs-side .t td{padding:5px 6px}
+.t tr.none td{color:var(--mute)}
+.t input.amt[data-m]{width:130px}
 .t tr.on td{background:var(--bg);font-weight:700}
 .t tr.grp td.grp-tr{font-weight:400;color:var(--ink2)}
 .t input.amt.dirty{background:var(--amber-bg);border-color:var(--amber-m)}
@@ -187,6 +198,10 @@ details.dep textarea{min-height:64px}
   .t[data-name=run] tbody td[data-k="act"]{display:flex;gap:6px;align-items:center}
   .t[data-name=run] tbody td[data-k="act"] input{flex:1 1 0;min-width:0;width:auto}
   .t[data-name=run] tbody td[data-k="act"] .pill{flex:0 0 auto}
+  /* 직접 입력 — 1줄 수행자, 2줄 요율·세전·세후(칸 이름을 앞에) */
+  .t[data-name=manual] tbody td[data-k="who"]{order:1;flex:1 1 0;min-width:0}
+  .t[data-name=manual] tbody td[data-k="rate"]:not(:empty)::before{content:'요율 '}
+  .t[data-name=manual] tbody td[data-k="net"]::before{content:'세후 '}
   /* ⚠ 위의 «#pane-rules .t select{max-width:200px}» 가 더 세다(아이디 잣대) — 폰 값도 같은 잣대로 쓴다 */
   #pane-rules .t.mx th,#pane-rules .t.mx td{padding:4px 4px}
   #pane-rules .t.mx select{max-width:92px}
@@ -251,12 +266,14 @@ details.dep textarea{min-height:64px}
 <main id="app">
   <section class="pane" id="pane-calc"><div id="calcBox"></div><div id="calcOut"></div></section>
   <section class="pane" id="pane-runs">
-    <div class="card"><div id="runsBox"></div></div>
-    <div class="card" id="runCard" style="display:none"><div id="runBox"></div></div>
+    <div class="runs2">
+      <div class="card runs-side"><div id="runsBox"></div></div>
+      <div class="card runs-main" id="runCard"><div id="runBox"></div></div>
+    </div>
   </section>
   <section class="pane" id="pane-notices">
     <div class="card">
-      <div class="bar"><b>비용지급 안내 올리기</b><span class="sp"></span><label class="hint" for="upType">사업 종류</label><select id="upType"></select></div>
+      <div class="bar"><b>비용지급 안내 올리기</b><span class="sp"></span><label class="hint" for="upType">사업 종류</label><select id="upType"></select><button class="sm" data-manual="" title="안내 엑셀이 없는 컨설팅 지급분을 직접 넣는다">✍️ 직접 입력</button></div>
       <div class="drop" id="drop">여기에 비용지급 안내 엑셀(.xlsx)을 끌어 놓거나 <button class="sm" id="pickBtn">파일 고르기</button><input type="file" id="file" accept=".xlsx,.xls" style="display:none"></div>
       <div id="noticesBox"></div>
     </div>
@@ -294,8 +311,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=5"></script>
-<script src="js/pu-settle-view.js?v=7"></script>
+<script src="js/pu-settle-core.js?v=6"></script>
+<script src="js/pu-settle-view.js?v=8"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -307,7 +324,7 @@ var NAMES={};
 var TAB='calc', CUR_RUN='', CUR_NOTICE='', MSG_RUN='';
 /* 요율표 — 고치는 중인 사본. 저장하기 전까지는 D.rules(서버)와 따로 둔다. 다시 불러와도 «저장 안 한 변경»은 지키지 않고 버리지 않는다 */
 var WORK=null;
-var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{} };
+var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{}, manual:{}, mentries:{} };
 /* 계산기 — 저장하지 않는다. 고친 것을 잃지 않게 이 기기(localStorage)에만 기억한다(작은 글 한 덩이) */
 function calcDefault(){ return { type:'', siteId:'', rows:[{ sid:'', role:'lead', pre:'' }, { sid:'', role:'staff', pre:'', rate:'' }] }; }
 var CALC=calcDefault();
@@ -413,12 +430,93 @@ function drawTabs(){
   $('nRuns').textContent=vals(D.runs).length;
 }
 function runsList(){ return vals(D.runs).map(C.normalizeRun); }
+function ruleTypes(){ return Object.keys(D.rules).filter(function(k){ return D.rules[k] && !D.rules[k]._deleted; }); }
 function drawRuns(){
-  $('runsBox').innerHTML=V.runsTable(runsList(), SEL.runs, bizNames(), CUR_RUN);
-  var run=CUR_RUN && D.runs[CUR_RUN] ? C.normalizeRun(D.runs[CUR_RUN]) : null;
-  $('runCard').style.display=run?'':'none';
-  $('runBox').innerHTML=run?V.runDetail(run, NAMES, Object.assign({}, SEL.members, SEL.transfers), { biz:bizName(run.typeCode), pend:run.status==='draft'?(PEND[run.id]||{}):{} })+(run.status==='draft'?V.depositBox(depState(run)):''):'';
+  $('runsBox').innerHTML=V.runsTable(runsList(), SEL.runs, bizNames(), MANUAL.open?'':CUR_RUN, { types:ruleTypes() });
+  var run=!MANUAL.open && CUR_RUN && D.runs[CUR_RUN] && !D.runs[CUR_RUN]._deleted ? C.normalizeRun(D.runs[CUR_RUN]) : null;
+  if(MANUAL.open) $('runBox').innerHTML=V.manualBox(MANUAL, manualOpt());
+  else $('runBox').innerHTML=run?V.runDetail(run, NAMES, Object.assign({}, SEL.members, SEL.transfers), { biz:bizName(run.typeCode), pend:run.status==='draft'?(PEND[run.id]||{}):{} })+(run.status==='draft'?V.depositBox(depState(run)):'')
+    :'<div class="empty">왼쪽 목록에서 지급월을 고르세요. 안내 엑셀이 없는 지급분은 컨설팅 종류 옆 «+ 입력»으로 넣습니다.</div>';
   drawBulks();
+}
+/* ═══ 직접 입력 — 안내 엑셀이 없는 컨설팅(대표 선택 2026-10-31 「직접 입력 기능 추가」, 예: 산업일자리전환 능률협회) ═══
+   사업 종류마다 안내 하나(settle/notices/M_<종류>, source:'manual')에 쌓고, 정산표는 안내 파일과 같은 길(buildRuns)로 만든다.
+   사업장 글은 «업체명 (컨설팅 번호)» — 같은 업체가 여러 컨설팅에 있어도 연결이 섞이지 않게. 업체·사람 연결은 화면에서 고른 것으로 바로 잇는다(사람이 확정한 연결).
+   ⚠ 안내 파일로 만든 달과는 섞지 않는다 — 같은 종류·같은 달에 엑셀 안내가 있으면 저장하지 않는다(buildRuns 도 출처가 다른 정산표는 덮지 않는다). */
+var MANUAL={ open:false, type:'', siteId:'', month:'', rows:[] };
+function manualId(type){ return 'M_'+type; }
+function nowMonth(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,7); }
+function manualCons(id){ return ERP.consultings.filter(function(c){ return String(c.id)===id; })[0]||null; }
+function manualSiteText(c){ return String(c.companyName||'(업체 이름 없음)')+(c.no?' ('+c.no+')':''); }
+function sidOfAny(x){ return typeof x==='string'?x:(x&&x.sid?String(x.sid):''); }
+function manualDefaultRows(type, siteId, leadPre){
+  var rule=D.rules[type]||{}, rows=[{ sid:rule.leadSid||'', role:'lead', pre:leadPre||'' }], c=siteId&&manualCons(siteId);
+  var subs=c?(Array.isArray(c.managerSubs)?c.managerSubs:[]).map(sidOfAny).filter(function(s){ return s && s!==rule.leadSid && ERP.people.some(function(p){ return p.sid===s; }); }):[];
+  subs.forEach(function(s){ rows.push({ sid:s, role:'staff', pre:'0' }); });
+  if(rows.length===1) rows.push({ sid:'', role:'staff', pre:'0' });
+  return rows;
+}
+function openManual(type){
+  var types=ruleTypes(); if(!types.length){ toast('컨설팅 종류 규칙이 없습니다 — «⚙️ 규칙·요율»에서 먼저 더하세요'); return; }
+  if(types.indexOf(type)<0) type=types[0];
+  MANUAL={ open:true, type:type, siteId:'', month:nowMonth(), rows:manualDefaultRows(type, '') };
+  SEL.manual={}; SEL.mentries={}; CUR_RUN=''; TAB='runs'; draw(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function manualOpt(){
+  var rule=D.rules[MANUAL.type]||{}, n=D.notices[manualId(MANUAL.type)];
+  return { types:ruleTypes().map(function(k){ return { code:k, name:bizName(k) }; }), sites:sitesFor(MANUAL.type), staff:ERP.people, names:NAMES,
+    rates:rule.rates||{}, entries:n&&!n._deleted?C.manualEntries(n):[], sel:SEL.manual, selE:SEL.mentries };
+}
+async function saveManual(){
+  var type=MANUAL.type, rule=D.rules[type], mk=String(MANUAL.month||''), c=MANUAL.siteId&&manualCons(MANUAL.siteId);
+  if(!rule){ toast('이 컨설팅 종류의 규칙이 없습니다 — «⚙️ 규칙·요율»에서 먼저 더하세요'); return; }
+  if(!rule.leadSid){ toast('요율표에서 이 컨설팅의 주관을 먼저 고르세요'); return; }
+  if(!c){ toast('사업장을 고르세요'); return; }
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(mk)){ toast('지급월을 고르세요'); return; }
+  var people=[], seen={}, bad='', anyPaid=false;
+  MANUAL.rows.forEach(function(r){
+    if(bad) return;
+    var sid=r.role==='lead'?rule.leadSid:r.sid, t=String(r.pre==null?'':r.pre).trim();
+    if(!sid){ if(r.role==='staff' && (t===''||C.won(t)===0)) return; bad='담당을 고르세요'; return; }
+    if(seen[sid]){ bad=(NAMES[sid]||'같은 사람')+' 이(가) 두 번 들어 있습니다'; return; }
+    if(t!=='' && !/^[\d,\s]+$/.test(t)){ bad='세전은 숫자로 적어 주세요 — '+t; return; }
+    if(r.role==='staff' && (rule.rates||{})[sid]==null){ bad=(NAMES[sid]||'담당')+' — 요율표에 요율이 없습니다(«⚙️ 규칙·요율»에서 먼저)'; return; }
+    seen[sid]=1; var pre=C.won(t); if(pre>0) anyPaid=true;
+    people.push({ sid:sid, name:NAMES[sid]||'', pre:pre });
+  });
+  if(bad){ toast(bad+' (아무것도 저장하지 않았습니다)'); return; }
+  if(!anyPaid){ toast('세전을 한 사람 이상 적어 주세요'); return; }
+  var clash=vals(D.notices).filter(function(n){ return n.typeCode===type && n.source!=='manual' && C.toArr(n.months).some(function(m){ return m && m.key===mk; }); })[0];
+  if(clash){ toast(mk+' 은(는) 안내 파일(«'+clash.fileName+'»)로 만든 달입니다 — 직접 입력은 안내 엑셀이 없는 달에만'); return; }
+  var pl=D.links.person;
+  for(var i=0;i<people.length;i++){ var lk=pl[C.linkKey(people[i].name)]; if(lk && !lk._deleted && lk.sid && lk.sid!==people[i].sid){ toast(people[i].name+' — 같은 이름이 다른 사람에게 연결돼 있습니다. 확인이 필요합니다'); return; } }
+  var id=manualId(type), company=manualSiteText(c), merged=C.manualAdd(D.notices[id], { monthKey:mk, company:company, people:people });
+  var rec={ id:id, entityType:'SettleNotice', typeCode:type, fileName:'직접 입력', receivedAt:Date.now(), source:'manual', hash:C.noticeHash(merged.rows), months:merged.months, rows:merged.rows };
+  try{
+    await patchRecord('settle/notices/'+id, 'SettleNotice', D.notices[id]||null, rec);
+    var ck=C.linkKey(company), cl=D.links.company[ck];
+    if(!cl || cl._deleted || cl.consultingId!==String(c.id)) await patchRecord('settle/links/company/'+ck, 'SettleLink', null, { id:ck, entityType:'SettleLink', kind:'company', text:company, consultingId:String(c.id), companyId:String(c.companyId||'') });
+    for(var j=0;j<people.length;j++){ var pk=C.linkKey(people[j].name), lp=pl[pk];
+      if(!lp || lp._deleted || !lp.sid) await patchRecord('settle/links/person/'+pk, 'SettleLink', null, { id:pk, entityType:'SettleLink', kind:'person', text:people[j].name, sid:people[j].sid }); }
+  }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); await reload(); return; }
+  MANUAL.open=false; await reload(); await buildRuns(id);
+  CUR_RUN=C.runId(type, mk); drawRuns();
+}
+/* 고른 입력 빼기 — 그 달·그 사업장 입력을 지우고, 비게 된 «임시저장» 정산표는 _deleted 표식(돈 기록은 지우지 않는다) */
+async function removeManual(){
+  var type=MANUAL.type, id=manualId(type), n=D.notices[id]; if(!n) return;
+  var picks=C.manualEntries(n).filter(function(e){ return SEL.mentries[e.key]; });
+  if(!picks.length || !window.confirm('직접 넣은 것 '+picks.length+'건을 뺄까요?\n그 달 정산표를 다시 계산합니다.')) return;
+  var merged=C.manualRemove(n, picks);
+  try{
+    await patchRecord('settle/notices/'+id, 'SettleNotice', n, { months:merged.months, rows:merged.rows, hash:C.noticeHash(merged.rows), receivedAt:Date.now() });
+    var left={}; merged.rows.forEach(function(r){ Object.keys(r.amounts).forEach(function(k){ if(Number(r.amounts[k])>0) left[k]=1; }); });
+    for(var i=0;i<picks.length;i++){ var rid=C.runId(type, picks[i].monthKey), run=D.runs[rid];
+      if(run && !run._deleted && run.status==='draft' && run.noticeId===id && !left[picks[i].monthKey]) await softDelete('settle/runs/'+rid, 'SettleRun', run); }
+  }catch(e){ toast('빼지 못했습니다: '+errMsg(e)); await reload(); return; }
+  SEL.mentries={}; await reload();
+  if(merged.rows.length) await buildRuns(id);
+  MANUAL.open=true; TAB='runs'; draw();
 }
 /* ═══ 임시저장 — 통장 실입금은 쳐도 바로 저장하지 않는다(대표 지시 2026-10-31 「임시저장기능 만들어 달라」) ═══
    친 글은 PEND(정산표마다 {'consultingId|sid': 글})에만 두고 노란 칸으로 보인다 → «임시저장 (n)» 한 번에 서버로, 다시 계산.
@@ -503,7 +601,8 @@ function bulkHtml(kind, n){
   var b={ runs:'', members:'<button class="sm" data-bulk-do="clearActual">통장 실입금 비우기</button>', transfers:'<button class="sm" data-bulk-do="paidOn">보냄 표시</button> <button class="sm" data-bulk-do="paidOff">보냄 취소</button>',
     notices:'<button class="sm" data-bulk-do="delNotice">지우기</button>', adjusts:'<button class="sm" data-bulk-do="delAdjust">지우기</button>',
     mxpeople:'<button class="sm" data-bulk-do="mxRemove" title="고른 사람의 요율을 모든 사업에서 뺀다 — «저장»을 눌러야 반영">요율표에서 빼기</button>',
-    calc:'<button class="sm" data-bulk-do="calcDel">고른 줄 빼기</button>' }[kind]||'';
+    calc:'<button class="sm" data-bulk-do="calcDel">고른 줄 빼기</button>',
+    manual:'<button class="sm" data-bulk-do="manualDel">고른 줄 빼기</button>', mentries:'<button class="sm" data-bulk-do="mentriesDel">고른 입력 빼기</button>' }[kind]||'';
   return '<b>'+n+'건 선택</b> '+b+' <button class="sm" data-bulk-do="clear:'+kind+'">선택 풀기</button>';
 }
 function drawBulks(){
@@ -659,10 +758,13 @@ async function saveLink(kind, key){
 async function buildRuns(noticeId){
   var n=C.normalizeNotice(D.notices[noticeId]), rule=n&&D.rules[n.typeCode];
   if(!rule){ toast('이 사업 종류의 규칙이 없습니다 — «⚙️ 규칙·요율»에서 먼저 만드세요'); return; }
-  var made=0, again=0, changed=0;
+  var made=0, again=0, changed=0, skipped=0;
   try{
     for(var i=0;i<n.months.length;i++){
       var key=n.months[i].key, rid=C.runId(n.typeCode, key), known=D.runs[rid];
+      /* 직접 입력으로 만든 달과 안내 파일로 만든 달은 서로 덮지 않는다(한쪽 사업장이 통째로 사라진다) */
+      var kn=known && !known._deleted && known.noticeId!==noticeId ? D.notices[known.noticeId] : null;
+      if(kn && !kn._deleted && (kn.source==='manual')!==(n.source==='manual')){ skipped++; continue; }
       var res=compute(n, key, rule, rid, known&&known.actuals);
       if(!res.sites.length) continue;
       var outcome='';
@@ -681,7 +783,7 @@ async function buildRuns(noticeId){
     }
   }catch(e){ toast('정산표를 만들지 못했습니다: '+errMsg(e)); await reload(); return; }
   await reload(); TAB='runs'; draw();
-  toast('정산표 새로 '+made+' · 다시 계산 '+again+(changed?' · 확정된 달 바뀜 '+changed:''));
+  toast('정산표 새로 '+made+' · 다시 계산 '+again+(changed?' · 확정된 달 바뀜 '+changed:'')+(skipped?' · 출처가 다른 달 '+skipped+'개는 건드리지 않음':''));
 }
 async function recalc(rid){
   var run=D.runs[rid]; if(!run || run.status!=='draft') return;
@@ -780,7 +882,11 @@ function selectedIdx(prefix){ return Object.keys(SEL.transfers).map(function(k){
 document.addEventListener('click', async function(ev){
   var t=ev.target, b;
   if((b=t.closest('#tabs button'))){ setTab(b.getAttribute('data-tab')); return; }
-  if((b=t.closest('[data-run]'))){ ev.preventDefault(); CUR_RUN=b.getAttribute('data-run'); SEL.members={}; SEL.transfers={}; SEL.deposits={}; DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false }; drawRuns(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' }); return; }
+  if((b=t.closest('[data-manual]'))){ openManual(b.getAttribute('data-manual')||$('upType').value); return; }
+  if(t.closest('#m_close')){ MANUAL.open=false; drawRuns(); return; }
+  if(t.closest('#m_add')){ MANUAL.rows.push({ sid:'', role:'staff', pre:'0' }); drawRuns(); return; }
+  if(t.closest('#m_save')){ await saveManual(); return; }
+  if((b=t.closest('[data-run]'))){ ev.preventDefault(); MANUAL.open=false; CUR_RUN=b.getAttribute('data-run'); SEL.members={}; SEL.transfers={}; SEL.deposits={}; DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false }; drawRuns(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' }); return; }
   if(t.closest('#dep_read')){ var dr=curDraft(); if(!dr) return; DEP.text=$('dep_text').value; DEP.found=C.parseDepositText(DEP.text); DEP.source='paste'; DEP.open=true;
     if(!DEP.sid){ toast('누구 통장인지 먼저 고르세요'); drawRuns(); return; } depRematch(dr); drawRuns(); toast('붙여 넣은 글에서 금액 '+DEP.found.length+'개를 찾았습니다'); return; }
   if(t.closest('#dep_pull')){ await pullLedger(); return; }
@@ -800,6 +906,8 @@ document.addEventListener('click', async function(ev){
     var d=b.getAttribute('data-bulk-do');
     if(d.indexOf('clear:')===0){ SEL[d.slice(6)]={}; draw(); return; }
     if(d==='paidOn'||d==='paidOff'){ await setPaid(CUR_RUN, selectedIdx('t'), d==='paidOn'); return; }
+    if(d==='manualDel'){ MANUAL.rows=MANUAL.rows.filter(function(r, i){ return r.role==='lead' || !SEL.manual[i]; }); SEL.manual={}; drawRuns(); return; }
+    if(d==='mentriesDel'){ await removeManual(); return; }
     if(d==='calcDel'){ CALC.rows=CALC.rows.filter(function(r, i){ return !SEL.calc[i]; }); SEL.calc={}; saveCalc(); drawCalc(); return; }
     if(d==='mxRemove'){ var gone=Object.keys(SEL.mxpeople); if(!WORK||!gone.length) return;
       WORK.people=WORK.people.filter(function(s){ return gone.indexOf(s)<0; });
@@ -848,11 +956,16 @@ document.addEventListener('change', async function(ev){
   if(t.matches('input[data-all]')){ var k=t.getAttribute('data-all'); [].forEach.call(t.closest('table').querySelectorAll('input[data-ck]'), function(c){ c.checked=t.checked; var id=c.getAttribute('data-ck'); if(t.checked) SEL[k][id]=1; else delete SEL[k][id]; }); drawBulks(); return; }
   if(t.id==='dep_sid'){ var ds=curDraft(); DEP.sid=t.value; DEP.open=true; if(ds) depRematch(ds); drawRuns(); return; }
   if(t.matches('select[data-dep]')){ DEP.pick[t.getAttribute('data-dep')]=t.value; if(!t.value) delete DEP.pick[t.getAttribute('data-dep')]; drawRuns(); return; }
+  /* 직접 입력 — 종류·사업장을 바꾸면 담당 줄을 이알피 부담당으로 다시 채운다(주관 세전은 지킨다) */
+  if(t.id==='m_type'||t.id==='m_site'){ var lp0=(MANUAL.rows[0]||{}).pre; if(t.id==='m_type'){ MANUAL.type=t.value; MANUAL.siteId=''; } else MANUAL.siteId=t.value;
+    MANUAL.rows=manualDefaultRows(MANUAL.type, MANUAL.siteId, lp0); SEL.manual={}; SEL.mentries={}; drawRuns(); return; }
+  if(t.id==='m_month'){ MANUAL.month=t.value; return; }
+  if(t.matches('select[data-m]')){ var mp=t.getAttribute('data-m').split('|'), mr=MANUAL.rows[+mp[0]]; if(mr){ mr.sid=t.value; drawRuns(); } return; }
   if(t.id==='c_type'){ CALC.type=t.value; CALC.siteId=''; calcPrefill(); saveCalc(); drawCalc(); return; }
   if(t.id==='c_site'){ CALC.siteId=t.value; saveCalc(); return; }
   if(t.matches('select[data-c]')){ var cp=t.getAttribute('data-c').split('|'), cr=CALC.rows[+cp[0]]; if(!cr) return;
     cr[cp[1]]=t.value; if(cp[1]==='role' && t.value==='lead') delete cr.rate; calcPrefill(); saveCalc(); drawCalc(); return; }
-  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc' }[kind]; if(!kind) return;
+  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries' }[kind]; if(!kind) return;
     var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
   if(t.matches('input[data-paid]')){ await setPaid(CUR_RUN, [Number(t.getAttribute('data-paid'))], t.checked); return; }
   if(t.id==='file'){ var f=t.files&&t.files[0]; t.value=''; await onFile(f); return; }
@@ -869,6 +982,9 @@ document.addEventListener('change', async function(ev){
 document.addEventListener('input', function(ev){
   var t=ev.target;
   if(t.id==='dep_text'){ DEP.text=t.value; return; }
+  /* 직접 입력 세전 — 친 글은 기억만 하고 세후 칸만 고친다(입력칸을 다시 그리지 않는다) */
+  if(t.matches('input[data-m]')){ var mq=t.getAttribute('data-m').split('|'), mrow=MANUAL.rows[+mq[0]]; if(!mrow) return; mrow.pre=t.value;
+    var mpre=C.won(t.value), mnet=document.querySelector('[data-m-net="'+mq[0]+'"]'); if(mnet) mnet.textContent=C.fmt(mpre-C.withholding(mpre).total); return; }
   /* 통장 실입금 — 친 글은 PEND 에만(저장 X). 저장된 값과 같아지면 노란 표시를 뗀다 */
   if(t.matches('input[data-actual]')){ var ak=t.getAttribute('data-actual'), pp=PEND[CUR_RUN]=PEND[CUR_RUN]||{};
     if(pendSame(CUR_RUN, ak, t.value)){ delete pp[ak]; t.classList.remove('dirty'); } else { pp[ak]=t.value; t.classList.add('dirty'); }

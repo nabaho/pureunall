@@ -33,23 +33,75 @@
 
   /* ── ① 지급월 정산표 목록 — 사업 종류마다 묶음 머리(사업 이름 전체) 아래 지급월 줄 ──
      대표 지시 2026-10-31 「깔끔하게 볼수 있게」 「사업 이름 정확하게 알아야 된다」 — 줄마다 긴 사업 이름을 되풀이하지 않는다 */
-  function runsTable(runs, sel, bizNames, cur) {
-    sel = sel || {}; bizNames = bizNames || {};
-    var bn = function (r) { return bizNames[r.typeCode] || r.typeCode || ''; };
-    var list = (runs || []).filter(function (r) { return r && !r._deleted; })
-      .sort(function (a, b) { return bn(a) < bn(b) ? -1 : bn(a) > bn(b) ? 1 : (a.monthKey < b.monthKey ? 1 : -1); });
-    if (!list.length) return '<div class="empty">아직 정산표가 없습니다. «📥 안내 파일»에서 비용지급 안내를 올려 주세요.</div>';
-    var allOn = list.every(function (r) { return sel[r.id]; }), lastType = null;
+  /* 대표 지시 2026-10-31 「여러가지 다양한 컨설팅이 있을 가능성 … 추가로 정리가능하게」 — opt.types(규칙이 있는 사업 종류)는 정산표가 아직 없어도
+     묶음 머리로 보이고, 묶음마다 «+ 입력»(안내 엑셀 없는 컨설팅의 직접 입력)을 단다 */
+  function runsTable(runs, sel, bizNames, cur, opt) {
+    sel = sel || {}; bizNames = bizNames || {}; opt = opt || {};
+    var bnOf = function (code) { return bizNames[code] || code || ''; };
+    var list = (runs || []).filter(function (r) { return r && !r._deleted; });
+    var types = [], seen = {};
+    list.map(function (r) { return r.typeCode; }).concat(opt.types || []).forEach(function (c) { if (c && !seen[c]) { seen[c] = 1; types.push(c); } });
+    types.sort(function (a, b) { return bnOf(a) < bnOf(b) ? -1 : bnOf(a) > bnOf(b) ? 1 : 0; });
+    if (!types.length) return '<div class="empty">아직 정산표가 없습니다. «📥 안내 파일»에서 비용지급 안내를 올리거나, «⚙️ 규칙·요율»에서 컨설팅 종류를 더한 뒤 직접 입력하세요.</div>';
+    var allOn = list.length > 0 && list.every(function (r) { return sel[r.id]; }), i = 0;
     var h = '<div class="bulk" data-bulk="runs"></div><div class="scroll"><table class="t" data-name="runs"><thead><tr>' + ckHead('runs', allOn)
       + '<th>지급월</th><th class="r">사업장</th><th>상태</th><th class="r">송금 남음</th></tr></thead><tbody>';
-    list.forEach(function (r, i) {
+    types.forEach(function (code) {
+      h += '<tr class="grp"><td colspan="5" title="' + esc(bnOf(code)) + '">' + esc(bnOf(code)) + '</td>'
+        + '<td class="r"><button class="sm" data-manual="' + esc(code) + '" title="안내 엑셀이 없는 지급분을 직접 넣는다">+ 입력</button></td></tr>';
+      var mine = list.filter(function (r) { return r.typeCode === code; }).sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : -1; });
+      if (!mine.length) h += '<tr class="none"><td></td><td></td><td colspan="4" class="hint">아직 정산표 없음 — «+ 입력» 또는 «📥 안내 파일»</td></tr>';
+      mine.forEach(function (r) { i++; h += runRow(r, i); });
+    });
+    return h + '</tbody></table></div>';
+    function runRow(r, i) {
       var tr = r.transfers || [], left = tr.filter(function (t) { return !t.paid; }).length;
-      if (r.typeCode !== lastType) { lastType = r.typeCode; h += '<tr class="grp"><td colspan="6" title="' + esc(bn(r)) + '">' + esc(bn(r)) + '</td></tr>'; }
-      h += '<tr data-id="' + esc(r.id) + '"' + (r.id === cur ? ' class="on"' : '') + '>' + ckCell(r.id, sel[r.id]) + '<td class="n">' + (i + 1) + '</td>'
+      return '<tr data-id="' + esc(r.id) + '"' + (r.id === cur ? ' class="on"' : '') + '>' + ckCell(r.id, sel[r.id]) + '<td class="n">' + i + '</td>'
         + '<td class="ti"><a href="#" data-run="' + esc(r.id) + '" title="' + esc(r.label) + '">' + esc(r.label || r.monthKey) + '</a></td>'
         + '<td class="r" data-k="cnt">' + (r.sites || []).length + '</td>'
         + '<td class="nw" data-k="st"><span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? ' <span class="pill st-chg">바뀜</span>' : '') + '</td>'
         + '<td class="r" data-k="left">' + (r.status === 'confirmed' && tr.length ? left + ' / ' + tr.length : '') + '</td></tr>';
+    }
+  }
+
+  /* ── ①-1 직접 입력 — 안내 엑셀이 없는 컨설팅(대표 선택 2026-10-31) ──
+     st  = {type, siteId, month:'YYYY-MM', rows:[{sid, role:'lead'|'staff', pre}]}
+     opt = {types:[{code,name}](규칙이 있는 종류), sites:[{consultingId,label}](그 종류·2026), staff:[{sid,name}](재직자), names, rates:{sid:%}(그 종류 요율),
+            entries:[C.manualEntries 결과](그 종류), sel:{i:1}, selE:{key:1}}
+     ⚠ 주관 줄은 규칙의 주관으로 못박는다(바꾸려면 요율표). 담당은 요율표에 요율이 있어야 저장된다. */
+  function manualBox(st, opt) {
+    st = st || {}; opt = opt || {};
+    var rows = st.rows || [], sel = opt.sel || {}, rates = opt.rates || {}, names = opt.names || {};
+    var h = '<div class="bar"><b>✍️ 직접 입력</b><span class="hint">안내 엑셀이 없는 지급분 — 사업장·지급월·사람별 세전을 넣으면 정산표가 생깁니다</span><span class="sp"></span><button class="sm" id="m_close">닫기</button></div>'
+      + '<div class="bar"><label class="hint" for="m_type">컨설팅 종류</label><select id="m_type">'
+      + (opt.types || []).map(function (b) { return '<option value="' + esc(b.code) + '"' + (b.code === st.type ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<label class="hint" for="m_site">사업장</label><select id="m_site"><option value="">— 사업장 —</option>'
+      + (opt.sites || []).map(function (s) { return '<option value="' + esc(s.consultingId) + '"' + (s.consultingId === st.siteId ? ' selected' : '') + '>' + esc(s.label) + '</option>'; }).join('') + '</select>'
+      + '<label class="hint" for="m_month">지급월</label><input type="month" id="m_month" value="' + esc(st.month || '') + '"></div>'
+      + '<div class="bulk" data-bulk="manual"></div><div class="scroll"><table class="t" data-name="manual"><thead><tr>' + ckHead('manual', rows.length > 0 && rows.every(function (r, i) { return sel[i]; }))
+      + '<th>수행자</th><th class="r">요율</th><th class="r">세전</th><th class="r">세후(3.3% 뗀 뒤)</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      var pre = C.won(r.pre), w = C.withholding(pre), rate = r.sid && rates[r.sid] != null ? rates[r.sid] + '%' : '';
+      h += '<tr>' + ckCell(String(i), sel[i]) + '<td class="n">' + (i + 1) + '</td>'
+        + (r.role === 'lead'
+          ? '<td class="ti" data-k="who">' + esc(nameOf(names, r.sid, '(주관 없음 — 요율표에서 고르세요)')) + ' <span class="pill role-lead">주관</span></td><td class="r" data-k="rate"></td>'
+          : '<td data-k="who"><select data-m="' + i + '|sid">' + staffOpts(opt.staff, names, r.sid, '— 담당 —') + '</select> <span class="pill">담당</span></td>'
+            + '<td class="r" data-k="rate">' + (rate ? esc(rate) : (r.sid ? '<span class="bad">요율표에 없음</span>' : '')) + '</td>')
+        + '<td class="r" data-k="pre"><input type="text" inputmode="numeric" class="amt" data-m="' + i + '|pre" value="' + esc(r.pre == null ? '' : r.pre) + '" placeholder="세전"></td>'
+        + '<td class="r" data-k="net" data-m-net="' + i + '">' + esc(won(pre - w.total)) + '</td></tr>';
+    });
+    h += '</tbody></table></div><div class="bar"><button class="sm" id="m_add">+ 담당</button>'
+      + '<span class="hint">따로 나눠 받지 않았으면 주관이 전액 — 담당 세전은 0 (대표 2026-10-31 「특별히 배분되어서 입금되는게 아니면 항상 권형하에게」)</span>'
+      + '<span class="sp"></span><button class="pri" id="m_save">저장하고 정산표 만들기</button></div>';
+    var es = opt.entries || [], selE = opt.selE || {};
+    h += '<div class="sec">이 컨설팅에 직접 넣은 것</div>';
+    if (!es.length) return h + '<div class="empty">아직 없습니다.</div>';
+    h += '<div class="bulk" data-bulk="mentries"></div><div class="scroll"><table class="t" data-name="mentries"><thead><tr>' + ckHead('mentries', es.every(function (e) { return selE[e.key]; }))
+      + '<th>지급월</th><th>사업장</th><th>사람별 세전</th></tr></thead><tbody>';
+    es.forEach(function (e, i) {
+      var ppl = e.people.map(function (p) { return p.name + ' ' + C.fmt(p.pre); }).join(' · ');
+      h += '<tr>' + ckCell(e.key, selE[e.key]) + '<td class="n">' + (i + 1) + '</td><td class="nw" data-k="mon">' + esc(e.monthKey) + '</td>'
+        + nw('site', e.company, 'ti') + nw('ppl', ppl) + '</tr>';
     });
     return h + '</tbody></table></div>';
   }
@@ -157,7 +209,7 @@
     list.forEach(function (n, i) {
       var months = (n.months || []).map(function (m) { return m.label; }).join(' · ');
       h += '<tr>' + ckCell(n.id, sel[n.id]) + '<td class="n">' + (i + 1) + '</td>' + nw('file', n.fileName, 'ti') + '<td class="nw" data-k="at">' + esc(kst(n.receivedAt)) + '</td>'
-        + nw('months', months) + '<td class="r" data-k="rows">' + (n.rows || []).length + '</td>' + nw('src', n.source === 'agent' ? 'PC 심부름꾼' : '올림')
+        + nw('months', months) + '<td class="r" data-k="rows">' + (n.rows || []).length + '</td>' + nw('src', n.source === 'agent' ? 'PC 심부름꾼' : n.source === 'manual' ? '직접 입력' : '올림')
         + '<td data-k="btn"><button class="sm" data-notice="' + esc(n.id) + '">정산표 만들기</button></td></tr>';
     });
     return h + '</tbody></table></div>';
@@ -346,6 +398,6 @@
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, runsTable: runsTable, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });
