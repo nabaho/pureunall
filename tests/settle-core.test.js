@@ -234,7 +234,7 @@ test('문구 — 담당마다 한 통, 그 사람 사업장만, 금액은 쉼표
   const a = msgs.find((m) => m.sid === 'T-A');
   assert.equal(a.text.split('\n')[0], '[컨설팅 비용 정산 안내]');
   assert.match(a.text.split('\n')[1], /^테스트사업 — 2026년 9월$/);
-  ['① 입금자·입금금액', '② 담당자 산정금액', '③ 정산', '※ 계산 방법'].forEach((k) => assert.ok(a.text.indexOf(k) >= 0, k));
+  ['① 입금 금액(세후)', '② 담당자 퍼센트 반영금액', '③ 담당자 받은 금액', '④ 차액', '※ 계산 방법'].forEach((k) => assert.ok(a.text.indexOf(k) >= 0, k));
   assert.ok(a.text.indexOf('마바상사') >= 0 && a.text.indexOf('725,250') >= 0);
   assert.equal(a.text.indexOf('다라산업'), -1);
   assert.ok(a.text.indexOf('송금 부탁드립니다') >= 0);
@@ -419,4 +419,36 @@ test('연간 합계 — 그 해 지급월 정산표에서 담당별 반환·추�
   assert.equal(s.people[0].back, 100);
   assert.equal(s.people[0].more, 30);
   assert.equal(s.leads.L, 70, '주관은 반환 100 받고 추가 지급 30 줌');
+});
+
+
+test('기존 % — 다른 컨설팅 종류에서 그 사람이 쓰는 요율(가장 많이 쓴 값, 같으면 최근), 없으면 null', () => {
+  const rules = {
+    a: { rates: { S: 25, T: 30 }, updatedAt: 1 },
+    b: { rates: { S: '25', T: 20 }, updatedAt: 3 },
+    c: { rates: { S: 10 }, updatedAt: 2 },
+    d: { rates: { S: 99 }, _deleted: true }
+  };
+  assert.equal(C.existingRate(rules, 'S', 'x'), 25, '가장 많이 쓴 값');
+  assert.equal(C.existingRate(rules, 'T', 'x'), 20, '같은 횟수면 최근에 고친 규칙');
+  assert.equal(C.existingRate(rules, 'S', 'a'), 25, '그 종류는 빼고 본다(b 25 · c 10 → 같은 횟수, 최근 b)');
+  assert.equal(C.existingRate(rules, 'Z', 'x'), null);
+});
+
+
+test('문구 — 담당자 입금 없이 주관에게만 입금됐으면 받은 금액 0원(입금 없음)·주관이 % 따라 추가 지급', () => {
+  const notice = { months: [{ key: '2026-10', label: '10월' }], rows: [
+    { name: '홍길동', company: '가나 (번호-1)', totalPre: 6990000, amounts: { '2026-10': 6990000 } },
+    { name: '김가나', company: '가나 (번호-1)', totalPre: 0, amounts: { '2026-10': 0 } }] };
+  const c = { companyLinks: {}, personLinks: {}, actuals: { 'C-9|T-LEAD': 6759330 }, adjusts: [], names: { 'T-LEAD': '홍길동', 'T-A': '김가나' } };
+  c.companyLinks[C.linkKey('가나 (번호-1)')] = { consultingId: 'C-9', companyId: '' };
+  c.personLinks[C.linkKey('홍길동')] = 'T-LEAD'; c.personLinks[C.linkKey('김가나')] = 'T-A';
+  const rule = { title: '능률', leadSid: 'T-LEAD', rates: { 'T-A': 10 }, siteRates: {} };
+  const t = C.buildMessages({ monthKey: '2026-10', label: '2026년 10월', sites: C.settleMonth(notice, '2026-10', rule, c).sites }, rule, c.names)[0].text;
+  assert.match(t, / · 홍길동 6,759,330원 \(세전 6,990,000원 − 원천징수 3\.3% 230,670원\)/);
+  assert.match(t, / · 김가나 0원\n/);
+  assert.match(t, /6,759,330원 × 10% = 675,933원/);
+  assert.match(t, / · 김가나 0원 \(입금 없음 — 홍길동에게 입금\)/);
+  assert.match(t, /675,933원 − 0원 = \+675,933원/);
+  assert.match(t, /추가 지급: 홍길동 → 김가나 675,933원/);
 });

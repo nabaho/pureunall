@@ -325,8 +325,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=8"></script>
-<script src="js/pu-settle-view.js?v=10"></script>
+<script src="js/pu-settle-core.js?v=9"></script>
+<script src="js/pu-settle-view.js?v=11"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -445,7 +445,10 @@ function calcPrefill(){
   var rule=CALC.type && D.rules[CALC.type]; if(!rule) return;
   CALC.rows.forEach(function(r){
     if(r.role==='lead' && !r.sid && rule.leadSid) r.sid=rule.leadSid;
-    if(r.role==='staff' && r.sid && (r.rate==null || r.rate==='') && rule.rates && rule.rates[r.sid]!=null) r.rate=String(rule.rates[r.sid]);
+    if(r.role==='staff' && r.sid && (r.rate==null || r.rate==='')){
+      var cr=rule.rates && rule.rates[r.sid]!=null ? rule.rates[r.sid] : C.existingRate(D.rules, r.sid, CALC.type);   /* 그 컨설팅에 없으면 기존 % */
+      if(cr!=null) r.rate=String(cr);
+    }
     if(!r.tax) r.tax=C.taxOf(rule.tax);
   });
 }
@@ -503,10 +506,16 @@ function openManual(type){
   MANUAL={ open:true, type:type, siteId:'', month:defaultMonth(), rows:manualDefaultRows(type, '') };
   SEL.manual={}; SEL.mentries={}; CUR_RUN=''; TAB='runs'; draw(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
+/* 직접 입력 — 이 컨설팅 요율표에 없는 담당은 기존 %를 쓴다(저장하면 요율표에도 넣는다) */
+function manualSuggest(){
+  var rule=D.rules[MANUAL.type]||{}, out={};
+  MANUAL.rows.forEach(function(r){ if(r.role==='staff' && r.sid && (rule.rates||{})[r.sid]==null){ var e=C.existingRate(D.rules, r.sid, MANUAL.type); if(e!=null) out[r.sid]=e; } });
+  return out;
+}
 function manualOpt(){
   var rule=D.rules[MANUAL.type]||{}, n=D.notices[manualId(MANUAL.type)];
   return { types:ruleTypes().map(function(k){ return { code:k, name:bizName(k) }; }), sites:sitesFor(MANUAL.type), staff:ERP.people, names:NAMES,
-    rates:rule.rates||{}, entries:n&&!n._deleted?C.manualEntries(n).filter(function(e){ return C.yearOf(e.monthKey)===YEAR; }):[], sel:SEL.manual, selE:SEL.mentries };
+    rates:rule.rates||{}, suggest:manualSuggest(), entries:n&&!n._deleted?C.manualEntries(n).filter(function(e){ return C.yearOf(e.monthKey)===YEAR; }):[], sel:SEL.manual, selE:SEL.mentries };
 }
 async function saveManual(){
   var type=MANUAL.type, rule=D.rules[type], mk=String(MANUAL.month||''), c=MANUAL.siteId&&manualCons(MANUAL.siteId);
@@ -514,7 +523,7 @@ async function saveManual(){
   if(!rule.leadSid){ toast('요율표에서 이 컨설팅의 주관을 먼저 고르세요'); return; }
   if(!c){ toast('사업장을 고르세요'); return; }
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(mk)){ toast('지급월을 고르세요'); return; }
-  var people=[], seen={}, bad='', anyPaid=false, acts={};
+  var people=[], seen={}, bad='', anyPaid=false, acts={}, addRates={};
   MANUAL.rows.forEach(function(r){
     if(bad) return;
     var sid=r.role==='lead'?rule.leadSid:r.sid, t=String(r.pre==null?'':r.pre).trim();
@@ -523,7 +532,11 @@ async function saveManual(){
     if(t!=='' && !/^[\d,\s]+$/.test(t)){ bad='세전은 숫자로 적어 주세요 — '+t; return; }
     var nt=String(r.net==null?'':r.net).trim();
     if(nt!=='' && !/^[\d,\s]+$/.test(nt)){ bad='실수령액은 숫자로 적어 주세요 — '+nt; return; }
-    if(r.role==='staff' && (rule.rates||{})[sid]==null){ bad=(NAMES[sid]||'담당')+' — 요율표에 요율이 없습니다(«⚙️ 규칙·요율»에서 먼저)'; return; }
+    if(r.role==='staff' && (rule.rates||{})[sid]==null){
+      var ex=C.existingRate(D.rules, sid, type);
+      if(ex==null){ bad=(NAMES[sid]||'담당')+' — 요율표에 요율이 없고 다른 컨설팅에도 없습니다(«⚙️ 규칙·요율»에서 먼저)'; return; }
+      addRates[sid]=ex;
+    }
     seen[sid]=1; var pre=C.won(t); if(pre>0) anyPaid=true;
     people.push({ sid:sid, name:NAMES[sid]||'', pre:pre, tax:C.taxOf(r.tax) });
     if(C.won(nt)>0) acts[String(c.id)+'|'+sid]=C.won(nt);   /* 적은 실수령액은 그대로 통장 실입금이 된다 */
@@ -537,6 +550,8 @@ async function saveManual(){
   var id=manualId(type), company=manualSiteText(c), merged=C.manualAdd(D.notices[id], { monthKey:mk, company:company, people:people });
   var rec={ id:id, entityType:'SettleNotice', typeCode:type, fileName:'직접 입력', receivedAt:Date.now(), source:'manual', hash:C.noticeHash(merged.rows), months:merged.months, rows:merged.rows };
   try{
+    /* 이 컨설팅 요율표에 없던 담당은 기존 %를 요율표에 넣는다(정산표가 «요율 없음»으로 막히지 않게) */
+    if(Object.keys(addRates).length) await patchRecord('settle/rules/'+type, 'SettleRule', rule, { rates:Object.assign({}, rule.rates||{}, addRates) });
     await patchRecord('settle/notices/'+id, 'SettleNotice', D.notices[id]||null, rec);
     var ck=C.linkKey(company), cl=D.links.company[ck];
     if(!cl || cl._deleted || cl.consultingId!==String(c.id)) await patchRecord('settle/links/company/'+ck, 'SettleLink', null, { id:ck, entityType:'SettleLink', kind:'company', text:company, consultingId:String(c.id), companyId:String(c.companyId||'') });
@@ -707,11 +722,21 @@ function buildWork(){
   people.sort(function(a,b){ var x=NAMES[a]||'', y=NAMES[b]||''; return x<y?-1:x>y?1:0; });
   return { types:types, rules:rules, people:people, dirty:false, open:(WORK&&WORK.open)||'' };
 }
+/* 기존 % — 대표 지시 2026-10-31 「퍼센트는 가급적 기존에 있던 퍼센트를 가지고 오도록」.
+   요율표(고치는 사본 WORK)의 빈 칸마다 그 사람이 다른 컨설팅에서 쓰는 % → {'종류|사번': %}. 넣지는 않고 흐리게 보여 준다 */
+function rateSuggest(){
+  var out={}; if(!WORK) return out;
+  WORK.types.forEach(function(c){ WORK.people.forEach(function(sid){
+    var v=(WORK.rules[c].rates||{})[sid]; if(v!=null && String(v).trim()!=='') return;
+    var e=C.existingRate(WORK.rules, sid, c); if(e!=null) out[c+'|'+sid]=e;
+  }); });
+  return out;
+}
 function drawRules(){
   if(!WORK || !WORK.dirty) WORK=buildWork();
   var addTypes=ERP.biz.filter(function(b){ return WORK.types.indexOf(b.code)<0; });
   var sitesByType={}; WORK.types.forEach(function(k){ sitesByType[k]=sitesFor(k); });
-  var opt={ bizNames:bizNames(), addTypes:addTypes, staff:ERP.people, names:NAMES, sitesByType:sitesByType, sel:SEL.mxpeople };
+  var opt={ bizNames:bizNames(), addTypes:addTypes, staff:ERP.people, names:NAMES, sitesByType:sitesByType, sel:SEL.mxpeople, suggest:rateSuggest() };
   $('ruleBox').innerHTML=V.rateMatrix(WORK, opt);
   $('ruleDetBox').innerHTML=V.ruleDetails(WORK, opt);
   var allSites=[]; WORK.types.forEach(function(k){ allSites=allSites.concat(sitesByType[k]); });
@@ -999,6 +1024,9 @@ document.addEventListener('click', async function(ev){
   if(t.closest('#c_reset')){ CALC=calcDefault(); SEL.calc={}; saveCalc(); drawCalc(); return; }
   /* 요율표 — 고치는 것은 사본(WORK)만, 서버에는 «저장»에서 한 번에 */
   if(t.closest('#mx_save')){ await saveRules(); return; }
+  if(t.closest('#mx_fill')){ var sg=rateSuggest(), sk=Object.keys(sg); if(!sk.length) return;
+    sk.forEach(function(k){ var q=k.split('|'); WORK.rules[q[0]].rates[q[1]]=String(sg[k]); }); markDirty(); drawRules();
+    toast('빈 칸 '+sk.length+'개에 기존 %를 넣었습니다 — 확인하고 «저장»을 누르세요'); return; }
   if((b=t.closest('[data-srate-add]'))){ var sc=b.getAttribute('data-srate-add'), box=b.closest('[data-rd]');
     var scid=box.querySelector('[data-sr-site]').value, ssid=box.querySelector('[data-sr-sid]').value, spv=Number(String(box.querySelector('[data-sr-pct]').value).replace(/[%\s]/g,''));
     if(!scid||!ssid||!(spv>=0&&spv<=100)){ toast('사업장·사람·요율(0~100)을 적어 주세요'); return; }
@@ -1037,7 +1065,10 @@ document.addEventListener('change', async function(ev){
   if(t.id==='mx_addType' && t.value){ var nt=t.value; WORK.types.push(nt);
     var leads={}; WORK.types.forEach(function(k){ var l=WORK.rules[k]&&WORK.rules[k].leadSid; if(l) leads[l]=(leads[l]||0)+1; });
     var lead0=Object.keys(leads).sort(function(a,b){ return leads[b]-leads[a]; })[0]||'';   /* 주관은 다른 사업에서 가장 많이 맡은 사람으로 먼저 채운다(고칠 수 있다) */
-    WORK.rules[nt]={ typeCode:nt, title:'', tax:'3.3', leadSid:lead0, rates:{}, siteRates:{}, msgHead:'', msgFoot:'', active:true }; markDirty(); drawRules(); return; }
+    /* 새 칸은 사람마다 기존 %로 먼저 채운다(고칠 수 있다, «저장»을 눌러야 반영) */
+    var nr={}; WORK.people.forEach(function(s){ var e=C.existingRate(WORK.rules, s, nt); if(e!=null) nr[s]=String(e); });
+    WORK.rules[nt]={ typeCode:nt, title:'', tax:'3.3', leadSid:lead0, rates:nr, siteRates:{}, msgHead:'', msgFoot:'', active:true }; markDirty(); drawRules();
+    if(Object.keys(nr).length) toast('새 칸에 기존 %를 '+Object.keys(nr).length+'명 넣었습니다 — 확인하고 «저장»을 누르세요'); return; }
   if(t.id==='mx_addSid' && t.value){ WORK.people.push(t.value); markDirty(); drawRules(); return; }
   if(t.matches('select[data-lead]')){ WORK.rules[t.getAttribute('data-lead')].leadSid=t.value; markDirty(); return; }
   if(t.matches('input[data-on]')){ WORK.rules[t.getAttribute('data-on')].active=t.checked; markDirty(); return; }

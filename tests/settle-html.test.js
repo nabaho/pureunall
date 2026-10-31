@@ -214,7 +214,7 @@ test('정산 탭 두 칸 — 넓은 화면은 왼쪽 목록·오른쪽 정산표
 test('직접 입력 — 검사(주관·사업장·지급월·숫자·요율·엑셀 달 겹침)가 저장보다 먼저, 안내는 settle/notices/M_<종류>, 고른 연결을 잇고 정산표를 만든다', () => {
   const fn = fnBody('async function saveManual(');
   const firstSave = fn.indexOf('patchRecord(');
-  ['사업장을 고르세요', '지급월을 고르세요', '세전은 숫자로', '요율표에 요율이 없습니다', "n.source!=='manual'"].forEach((k) =>
+  ['사업장을 고르세요', '지급월을 고르세요', '세전은 숫자로', '요율표에 요율이 없고', "n.source!=='manual'"].forEach((k) =>
     assert.ok(fn.indexOf(k) >= 0 && fn.indexOf(k) < firstSave, k + ' 검사가 저장보다 먼저가 아니다'));
   assert.match(fn, /patchRecord\('settle\/notices\/'\+id/);
   assert.match(fn, /source:'manual'/);
@@ -273,4 +273,15 @@ test('카톡 문구 탭 — 확정 전 정산표도 미리보기로 고를 수 �
   assert.match(fnBody('function drawMsgs('), /preview:!!\(cur && cur\.status!=='confirmed'\)/);
   const cp = fnBody('function copyMsg(');
   assert.ok(cp.indexOf("cur.status!=='confirmed'") >= 0 && cp.indexOf("cur.status!=='confirmed'") < cp.indexOf('currentMsgs()'), '복사 전에 확정인지 본다');
+});
+
+
+test('기존 % — 요율표 새 칸은 기존 %로 채우고(저장은 단추로), 계산기·직접 입력은 그 컨설팅에 없으면 기존 %', () => {
+  assert.match(NOC, /var e=C\.existingRate\(WORK\.rules, s, nt\); if\(e!=null\) nr\[s\]=String\(e\);/);
+  assert.match(NOC, /if\(t\.closest\('#mx_fill'\)\)\{[^}]*rateSuggest\(\)/);
+  assert.doesNotMatch(fnBody('function rateSuggest('), /patchRecord|save\(/, '제안은 화면에만');
+  assert.match(fnBody('function calcPrefill('), /C\.existingRate\(D\.rules, r\.sid, CALC\.type\)/);
+  const sv = fnBody('async function saveManual(');
+  assert.match(sv, /addRates\[sid\]=ex/);
+  assert.ok(sv.indexOf("patchRecord('settle/rules/'+type") < sv.indexOf("patchRecord('settle/notices/'"), '요율표에 먼저 넣고 안내를 저장');
 });

@@ -328,3 +328,16 @@ test('카톡 문구 상자 — 확정 전이면 미리보기 안내와 «확정�
   assert.doesNotMatch(pv, /data-copy=/);
   assert.match(V.messagesBox(msgs), /data-copy="0"/);
 });
+
+
+test('요율표 — 빈 칸에 기존 %를 흐리게(placeholder), 제안이 있으면 «빈 칸에 기존 % 넣기»', () => {
+  const work = { types: ['cons-a', 'cons-b'], people: ['T-A'], rules: { 'cons-a': { leadSid: 'T-LEAD', rates: { 'T-A': '25' } }, 'cons-b': { leadSid: 'T-LEAD', rates: {} } } };
+  const h = V.rateMatrix(work, { names: { 'T-A': '김가나' }, staff: [], suggest: { 'cons-b|T-A': 25 } });
+  assert.match(h, /data-mx="cons-b\|T-A" value="" placeholder="25" title="기존 25%/);
+  assert.match(h, /id="mx_fill"/);
+  assert.doesNotMatch(V.rateMatrix(work, { names: {}, staff: [] }), /id="mx_fill"/);
+  const m = V.manualBox({ type: 'cons-b', rows: [{ sid: 'T-LEAD', role: 'lead', pre: '' }, { sid: 'T-A', role: 'staff', pre: '0' }] },
+    { types: [], staff: [{ sid: 'T-A', name: '김가나' }], names: { 'T-LEAD': '홍길동', 'T-A': '김가나' }, rates: {}, suggest: { 'T-A': 25 } });
+  assert.match(visible(m), /25% \(기존\)/);
+  assert.doesNotMatch(visible(m), /요율표에 없음/);
+});
