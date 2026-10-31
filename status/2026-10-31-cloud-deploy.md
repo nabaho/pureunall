@@ -1,6 +1,6 @@
 # ☁️ 클라우드 방에서 배포하기 — GitHub 「Firebase 배포」 작업 (2026-10-31)
 
-상태: 코드·검사 완료 · **열쇠 넣기 대기**(대표 — GitHub 비밀 `FIREBASE_SERVICE_ACCOUNT`, 한 번만)
+상태: **쓰는 중** — 열쇠 넣음(대표, 2026-10-31) · 취업규칙 매일 정리 함수 배포·켜기 성공(실행 41177914318)
 
 대표: 「매일정리켜기 니가 직접해라」 → 클라우드 방에는 firebase 로그인이 없다(확인: CLI 없음 · gcloud 열쇠는 푸른 프로젝트에 «인증 안 됨» · 연결된 PC 폴더 없음, 대표 PC 는 윈도우라 클라우드에서 빌려 쓸 수 없음)
 → 「니가 직접 하면 안되나 아니면 한번에 하게 가능하게 하던가」.
@@ -17,4 +17,12 @@
 
 ## 지금 상태 (취업규칙 매일 정리)
 - 규칙(`rules_mgmt/library/auto`)은 오늘 대표 PC 의 다른 방이 이미 게시했다(콘솔 원문 2026-10-31).
-- 남은 것: 함수 배포 + 켜기 — 열쇠가 들어오면 Claude 가 이 작업을 `functions=collectRulesMail,collectRulesMailAsk`·`daily_mode=live` 로 부른다.
+- ~~남은 것: 함수 배포 + 켜기~~ → 2026-10-31 15:48 끝 (아래).
+
+## 열쇠 넣은 뒤 (2026-10-31 오후)
+대표가 서비스 계정 열쇠를 만들어 GitHub 비밀 `FIREBASE_SERVICE_ACCOUNT` 에 넣고, IAM 에서 역할을 더했다. Claude 가 `functions=collectRulesMail,collectRulesMailAsk`·`daily_mode=live` 로 불렀다.
+- 실행 2·3(재실행 포함): 「② 서버 함수 배포」에서 `firebaseextensions.googleapis.com … instances … 403` — 서버는 그대로(올리기 전 준비 단계에서 멈춤).
+  firebase-tools 14 가 함수 배포 전에 확장 목록을 본다 → **Firebase 확장 프로그램 뷰어** 역할이 필요했다. 같은 김에 배포 경로를 끝까지 읽어
+  보안 비밀은 접근자 대신 **뷰어**(latest 판 확인만), Artifact Registry 는 일부러 안 주기(정리 규칙 확인이 비대화형에서 실패할 수 있어서)로 정했다 — `docs/배포-클라우드에서.md` §1.
+- 실행 41177914318: ✅ `collectRulesMailAsk`(us-central1)·`collectRulesMail`(asia-northeast3) 갱신 → 스위치 `{mode:'live', by:'github-actions'}` 쓰고 다시 읽어 확인 → 열쇠 지움.
+- ⚠ IAM 에서 연필로 사람 계정을 열어 소유자(Owner) 칸을 다른 역할로 바꿀 뻔했다(저장 전 취소) — 문서에 «기존 칸을 바꾸지 말 것»을 적었다.

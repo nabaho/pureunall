@@ -230,16 +230,15 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
-### 🤖 취업규칙 «매일 정리» — 배포·켜기 대기 (2026-10-31 대표 「추천대로」)
+### 🤖 취업규칙 «매일 정리» — 켜짐(live) · 첫 결과 확인 대기 (2026-10-31 대표 「추천대로」·「니가 직접」)
 
 메일함으로 들어오는 취업규칙 등 개정 서류를 매일 «사업장 자동 확정(주소 일치·사람이 앞서 확정한 주소만) · 처리 담당 기록(메일함 잣대) · 하루 기록»으로 정리한다.
-코드·검사는 PR 에 있고, **클라우드 방에서는 배포가 안 돼** 대표 PC 에서 아래를 해야 돈다(`status/2026-10-31-rules-daily.md`).
+코드·검사는 main 에 있다(`status/2026-10-31-rules-daily.md`). 배포·켜기는 클라우드 방이 GitHub 「Firebase 배포」로 했다(`status/2026-10-31-cloud-deploy.md`).
 - [x] 규칙 게시 — 대표가 콘솔에 먼저 올렸다(2026-10-31). 컨설팅정산 게시 때 콘솔 원문 새 판(`docs/firebase-rules-콘솔원문-2026-10-31.json`)·`tests/photos-staff-share.test.js` PENDING 비움까지 함께 끝냈다
-- [ ] 함수 배포 — `firebase deploy --only functions:collectRulesMail,functions:collectRulesMailAsk` (회차 끝에 매일 정리가 돈다)
-  ★ 클라우드 방에서도 된다(2026-10-31 대표 「니가 직접」) — GitHub 작업 「Firebase 배포」(`.github/workflows/firebase-deploy.yml`)를
-    `functions=collectRulesMail,collectRulesMailAsk` · `daily_mode=live` 로 부르면 함수 배포와 켜기가 한 번에 된다.
-    ⚠ 그 전에 대표가 GitHub 비밀 `FIREBASE_SERVICE_ACCOUNT` 를 한 번 넣어야 한다(`docs/배포-클라우드에서.md` §1). 넣으면 Claude 가 부른다
-- [ ] 시범 결과 보기 — 📥 모은 자료 › 🤖 매일 정리 의 «자동 확정했을 것» 줄을 훑어 엉뚱한 회사가 없으면 관리자가 「켜기」
+- [x] 함수 배포 — `collectRulesMail`(asia-northeast3)·`collectRulesMailAsk`(us-central1) 갱신 (2026-10-31 15:48, GitHub 작업 실행 41177914318). 회차 끝에 매일 정리가 돈다
+- [x] 켜기 — `rules_mgmt/library/auto/cfg` = `{mode:'live', by:'github-actions'}` (같은 실행). 대표 「매일정리켜기 니가 직접해라」라 시범(dry)을 건너뛰었다
+- [ ] 첫 결과 보기 — 📥 모은 자료 › 🤖 매일 정리 의 «자동 확정» 줄을 훑어 엉뚱한 회사가 있으면 「되돌리기」(그 주소는 다시 자동 확정 안 함).
+  끄려면 같은 판의 스위치(관리자) 또는 「Firebase 배포」를 `daily_mode=off` 로
 - 설계 `docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md` §14
 
 ### 대표 확인 대기 — 🧾 컨설팅정산 규칙 게시·첫 자료 (2026-10-31)
