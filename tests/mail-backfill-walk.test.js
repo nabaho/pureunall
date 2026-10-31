@@ -100,6 +100,24 @@ test('runBackfill 을 밖으로 내놓는다 — 돌려 볼 수 있어야 한다
   assert.equal(typeof MS.runBackfill, 'function');
 });
 
+/* ══════ ⓪ 「지난 메일」 옆줄 숫자 — «실제로 담긴 수» (2026-10-31) ══════
+   got 은 «이 길로 받은 누적»이라 실제 줄 수보다 적다(실측 got 21,905 · 실제 23,155). 화면 옆줄이 got 을 보이다가
+   칸을 열면 실제 수로 뛰었다. 그래서 회차 끝에 «지금 실제로 담긴 수»(held = 시작 때 센 것 + 이번에 담은 것)도 적는다. */
+test('★★★ 회차가 끝나면 state.held = 지금 «실제로 담긴» 줄 수 — got 과 따로 적는다', async () => {
+  const list = mails(60, (k) => 60 - k);
+  const db = fakeDb();
+  await run(db, list, 365, { dieAfterTop: 25 });
+  assert.equal(db.get('mailbox/old/state/held'), stored(db).length, '첫 회차 — 적힌 수가 실제와 다르다');
+  assert.equal(db.get('mailbox/old/state/held'), 25);
+  await run(db, list, 365, null);
+  assert.equal(db.get('mailbox/old/state/held'), stored(db).length, '둘째 회차(이어 받기) — 시작 때 센 것 + 이번에 담은 것이 아니다');
+  assert.equal(db.get('mailbox/old/state/held'), 60);
+  /* 이미 든 것을 «다시 훑어» 만나도(already) 두 번 세지 않는다 — fresh 로 처음부터 걷게 한다 */
+  const again = await run(db, list, 365, null, { again: true, fresh: true });
+  assert.ok(again.already > 0, '검사 준비가 틀렸다 — 다시 훑었는데 이미 든 것을 못 만났다(already=' + again.already + ')');
+  assert.equal(db.get('mailbox/old/state/held'), stored(db).length, '이미 담은 것을 다시 만나 두 번 셌다');
+});
+
 /* ══════ ① 연결이 끊기면 «멈추고», 끝난 데까지만 적는다 ══════ */
 
 test('★★★ 중간에 연결이 끊겨도 남은 메일을 건너뛰지 않는다', async () => {

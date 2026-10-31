@@ -18653,7 +18653,10 @@ function mbOpenPillHtml(slug, after){
 function mbOldCount(){
   const held = Object.keys(_mbMsgs[MB_OLD_ID] || {}).length;
   if(held) return held;
-  return Number((_mbOldState || {}).got || 0);
+  /* ⚠ 열기 «전»에는 서버가 적어 둔 «실제로 담긴 수»(held)를 쓴다 — got 은 이 길로 받은 누적이라 실제보다 적어서
+       옆줄이 21,905 로 보이다가 칸을 열면 23,155 로 뛰었다(대표 화면 2026-10-10). held 가 없는 옛 기록만 got 으로 물러선다. */
+  const st = _mbOldState || {};
+  return Number(st.held || 0) || Number(st.got || 0);
 }
 let _mbOldState = null;
 let _mbOldStateBusy = false;

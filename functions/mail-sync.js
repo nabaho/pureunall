@@ -1437,6 +1437,10 @@ async function runBackfill(o) {
   await db.ref(ROOT + '/old/state').update({
     curId: lastId, done: !!out.done, bottom: !!out.bottom, at: nowMs(),
     got: Number(st.got || 0) + out.got, oldest: out.oldest, days: days,
+    /* ★ 지금 «실제로 담겨 있는» 줄 수 (2026-10-31). got 은 «이 길로 받은 누적»이라 실제보다 적다
+       (실측: got 21,905 · 실제 23,155) — 화면 옆줄이 got 을 보이다가 칸을 열면 실제 수로 뛰었다.
+       시작할 때 센 것(haveN) + 이번에 담은 것(out.got) 이다. */
+    held: haveN + out.got,
   });
   return out;
 }
