@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>신청서 엑셀 팝업 목업</title>
+<style>
+:root{--acc:#2563eb;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#e2e8f0;
+  --ok:#166534;--okbg:#f0fdf4;--warn:#854d0e;--warnbg:#fffbeb;--dg:#991b1b;--dgbg:#fef2f2;--yel:#fde68a;--chg:#fdba74}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px;color:var(--ink);background:var(--bg);padding:0 16px 40px}
+.mock{background:#fde68a;color:#854d0e;font-size:12px;padding:6px 14px;font-weight:700;margin:0 -16px 14px}
+h1{font-size:19px;margin:0 0 4px} h2{font-size:15px;margin:0} h3{font-size:13.5px;margin:0 0 6px}
+.panel{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--line);color:var(--sub);white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.dg{background:var(--dgbg);color:var(--dg)}.chip.blue{background:#eff6ff;color:#1e40af}
+button{font-family:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+input,select{font-family:inherit;font-size:12.5px;padding:3px 7px;border:1px solid var(--line);border-radius:7px}
+.note{font-size:11.5px;color:var(--sub);background:#f8fafc;border:1px dashed var(--faint);border-radius:8px;padding:8px 10px;margin-top:10px}
+.lbl{font-size:11px;font-weight:700;color:#fff;background:#64748b;border-radius:5px;padding:1px 7px;margin-right:6px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}.tabs div{padding:5px 10px;border-radius:8px;font-size:12.5px;background:#f1f5f9}.tabs .on{background:#eff6ff;color:#1e40af;font-weight:700}
+.rec{background:#16a34a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700}
+/* 팝업 */
+.shade{background:rgba(15,23,42,.55);border-radius:12px;padding:18px}
+.modal{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden}
+.mh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:#f8fafc}
+.mb{display:grid;grid-template-columns:330px 1fr;min-height:470px}@media(max-width:900px){.mb{grid-template-columns:1fr}}
+.inp{padding:10px 12px;border-right:1px solid var(--line);background:#fcfcfd;overflow:auto}
+.grp{margin-bottom:11px}.grp h4{margin:0 0 5px;font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center}
+.f{display:grid;grid-template-columns:88px 1fr;gap:5px;align-items:center;margin-bottom:4px}.f label{font-size:11.5px;color:var(--sub)}
+.f input[type=text]{width:100%}.f.auto input{background:#f1f5f9;color:var(--faint)}
+.f input.need{background:var(--yel);border-color:#d6a60a}
+.tag{font-size:10px;font-weight:700;border-radius:4px;padding:0 5px;margin-left:4px}
+.tag.a{background:#e2e8f0;color:#475569}.tag.n{background:var(--yel);color:#854d0e}.tag.p{background:#dbeafe;color:#1e40af}
+.pv{padding:10px 12px;overflow:auto;background:#fff}
+.sheet{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}
+.sheet td{border:1px solid #cbd5e1;padding:3px 5px;height:25px;vertical-align:middle;overflow:hidden;text-align:center}
+.sheet td.l{text-align:left}.sheet td.h{background:#f1f5f9;font-weight:600}
+.sheet td.fill{background:#f0fdf4}            /* 앱이 채우는 칸 */
+.sheet td.todo{background:var(--yel)}           /* 사람이 넣을 칸(아직 빔) */
+.sheet td.chg{background:var(--chg);animation:fl 1.4s ease-out}  /* 방금 바뀐 칸 */
+@keyframes fl{0%{box-shadow:0 0 0 3px #f97316}100%{box-shadow:0 0 0 0 transparent}}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin:6px 0}
+.legend i{display:inline-block;width:12px;height:12px;border:1px solid #cbd5e1;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.mf{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line);background:#f8fafc}
+.opt{border:1px solid var(--line);border-radius:9px;padding:10px;background:#f8fafc}.opt.best{border:2px solid #16a34a;background:#fff}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:800px){.two{grid-template-columns:1fr}}
+ul{margin:4px 0 0;padding-left:18px}li{margin:2px 0}
+</style></head><body>
+<div class="mock">🧪 목업 — 모양 확인용입니다. 아직 앱에 반영하지 않았습니다. 기금·회사 이름과 숫자는 모두 가짜 예시입니다. (아래 팝업의 입력칸은 직접 눌러 보세요 — 오른쪽 칸이 바로 바뀝니다)</div>
+<h1>근복지원금 › 📥 신청서 엑셀 — 팝업으로 «보고», 입력할 칸만 «따로» 넣기</h1>
+<p style="color:var(--sub);margin:0 0 12px">지금은 [원본 등록] 또는 [받기] 단추뿐이라 <b>엑셀을 열어 보기 전에는 무엇이 채워졌는지 알 수 없고</b>, 원본이 없으면 아무것도 안 보입니다. 아래처럼 바꿉니다.</p>
+
+<div class="panel">
+  <h3>① 신청서 엑셀 탭 첫 화면 — 열어 보는 단추가 맨 앞에 옵니다</h3>
+  <div class="tabs"><div>🔎 특수관계 점검</div><div>🧮 한도·점수</div><div>📋 신청·정산</div><div>📁 제출서류</div><div>🧰 입력 도우미</div><div class="on">📥 신청서 엑셀</div><div>🗂 전체 보드</div></div>
+  <div class="row"><h2>지원신청서 엑셀 (근로복지공단 제출용)</h2><span class="chip ok">빈 양식 있음</span><span style="flex:1"></span>
+    <button class="pri">👁 신청서 열어 보기·입력</button><button>⬇ 바로 받기</button><button>원본 교체</button></div>
+  <div class="row" style="margin-top:8px"><span class="chip warn">입력할 칸 9곳 중 2곳 비어 있음</span><span class="chip">마지막 저장 2026-10-31</span></div>
+</div>
+
+<div class="panel">
+  <h3>② [👁 신청서 열어 보기·입력]을 누르면 — 팝업 (A안, 추천)</h3>
+  <div class="shade"><div class="modal">
+    <div class="mh"><b style="font-size:14px">📥 예시 공동기금 3호 — 2026년 지원신청서</b><span class="chip blue">별지 제1호의2</span><span class="chip warn" id="cnt">바뀐 칸 0곳</span><span style="flex:1"></span><button>⤢ 배율 125%</button><button class="pri">⬇ 엑셀 받기</button><button>✕ 닫기</button></div>
+    <div class="mb">
+      <div class="inp">
+        <div class="legend"><span><span class="tag a">자동</span> 기금 정보에서 가져옴(여기서 못 고침)</span><span><span class="tag p">작년</span> 작년 값 — 확인</span><span><span class="tag n">입력</span> 직접 넣을 칸</span></div>
+
+        <div class="grp"><h4>1. 신청일 <span class="tag n">입력</span></h4>
+          <div class="f"><label>신청일</label><input type="date" id="i-date" data-t="t-date" data-f="date" placeholder=""></div></div>
+
+        <div class="grp"><h4>2. 지원요건 — 기금 출연 <span class="tag p">작년</span></h4>
+          <label style="display:block;margin:2px 0"><input type="checkbox" id="c1" checked data-t="t-c1" data-f="box"> 1) 둘 이상의 기업이 출연</label>
+          <label style="display:block;margin:2px 0"><input type="checkbox" id="c2" data-t="t-c2" data-f="box"> 2) 대기업(도급업체)이 출연</label>
+          <label style="display:block;margin:2px 0"><input type="checkbox" id="c3" checked data-t="t-c3" data-f="box"> 3) 지방자치단체가 출연</label></div>
+
+        <div class="grp"><h4>3. 지자체·대기업 현황 <span class="tag n">입력</span></h4>
+          <div class="f"><label>명칭</label><input type="text" class="need" id="i-gn" data-t="t-gn" data-f="txt" placeholder="예) ○○시"></div>
+          <div class="f"><label>대표자</label><input type="text" class="need" id="i-gc" data-t="t-gc" data-f="txt" placeholder="예) ○○시장"></div>
+          <div class="f"><label>소재지</label><input type="text" class="need" id="i-ga" data-t="t-ga" data-f="txt"></div>
+          <div class="f"><label>전화</label><input type="text" class="need" id="i-gp" data-t="t-gp" data-f="txt"></div></div>
+
+        <div class="grp"><h4>4. 출연·신청 금액 (원)</h4>
+          <div class="f auto"><label>1) 기업 출연 <span class="tag a">자동</span></label><input type="text" value="157,400,000" disabled></div>
+          <div class="f auto"><label>3) 지자체 출연 <span class="tag a">자동</span></label><input type="text" value="100,000,000" disabled></div>
+          <div class="f"><label>1) 신청액 <span class="tag p">작년</span></label><input type="text" id="i-a1" value="157,400,000" data-t="t-a1" data-f="num"></div>
+          <div class="f"><label>3) 신청액 <span class="tag n">입력</span></label><input type="text" class="need" id="i-a3" data-t="t-a3" data-f="num" placeholder="지자체분 신청액"></div></div>
+
+        <div class="grp"><h4>5. 확인 질문 <span class="tag n">입력</span></h4>
+          <div class="f"><label>지원받은 사실</label><select id="q1" data-t="t-q1" data-f="yn"><option value="Y">예 (작년 신청 있음 → 제안)</option><option value="N">아니오</option></select></div>
+          <div class="f"><label>법령위반·시정</label><select id="q2" data-t="t-q2" data-f="yn"><option value="N">아니오</option><option value="Y">예</option></select></div></div>
+
+        <div class="grp"><h4>6. 자동으로 채워지는 칸 <span class="tag a">자동</span></h4>
+          <div style="font-size:11.5px;color:var(--sub);line-height:1.6">기금법인명·대표자·소재지·전화·인가번호·법인등록번호·사업자등록번호·설립일·참여사업장 수·근로자수, 참여사업장 명부 16곳, 사업계획서 작성자 <a href="#" onclick="return false">▾ 자세히</a></div></div>
+      </div>
+
+      <div class="pv">
+        <div class="tabs" style="margin-bottom:6px"><div class="on">신청서</div><div>기금법인정보</div><div>참여사업장정보 (16곳)</div><div>심사위원회 평가표</div></div>
+        <div class="legend"><span><i style="background:#f0fdf4"></i>앱이 채운 칸</span><span><i style="background:var(--yel)"></i>아직 비어 있는 입력칸</span><span><i style="background:var(--chg)"></i>방금 바뀐 칸</span></div>
+        <table class="sheet">
+          <colgroup><col style="width:13%"><col style="width:12%"><col style="width:25%"><col style="width:13%"><col style="width:12%"><col style="width:25%"></colgroup>
+          <tr><td colspan="6" style="font-size:15px;font-weight:700;height:34px">공동근로복지기금 지원신청서</td></tr>
+          <tr><td class="h" rowspan="3">신청인</td><td class="h">기금법인명</td><td class="fill">예시 공동기금 3호</td><td class="h">대표자</td><td class="fill" colspan="2">예시 대표</td></tr>
+          <tr><td class="h">소재지</td><td class="fill">예시도 예시시 가나로 1</td><td class="h">전화</td><td class="fill" colspan="2">000-000-0000</td></tr>
+          <tr><td class="h">참여 사업장수</td><td class="fill">16</td><td class="h">수혜 근로자수</td><td class="fill" colspan="2">413</td></tr>
+          <tr><td class="h" rowspan="2">대기업·지자체 현황</td><td class="h">명칭</td><td class="todo" id="t-gn"></td><td class="h">대표자</td><td class="todo" colspan="2" id="t-gc"></td></tr>
+          <tr><td class="h">소재지</td><td class="todo" id="t-ga"></td><td class="h">전화</td><td class="todo" colspan="2" id="t-gp"></td></tr>
+          <tr><td class="h" rowspan="3">지원요건<br>기금출연</td><td colspan="5" class="l" id="t-c1">1) ■ 둘 이상의 기업이 공동근로복지기금에 출연</td></tr>
+          <tr><td colspan="5" class="l" id="t-c2">2) □ 대기업(도급업체)가 중소기업(협력업체) 공동근로복지기금에 출연</td></tr>
+          <tr><td colspan="5" class="l" id="t-c3">3) ■ 지방자치단체가 중소기업 공동근로복지기금에 출연</td></tr>
+          <tr><td class="h" rowspan="2">출연(예정)금액</td><td class="h">1) 출연</td><td class="fill">157,400,000 원</td><td class="h" rowspan="2">지원신청금액</td><td class="h">1) 신청</td><td class="fill" id="t-a1">157,400,000 원</td></tr>
+          <tr><td class="h">3) 출연</td><td class="fill">100,000,000 원</td><td class="h">3) 신청</td><td class="todo" id="t-a3"></td></tr>
+          <tr><td colspan="6" class="l">※ 업무처리 규정에 따른 지원을 받은 사실이 있습니까? <b id="t-q1">■ 예 □ 아니오</b></td></tr>
+          <tr><td colspan="6" class="l">※ 근로복지기본법령 위반 등 신고·시정명령 사실이 있습니까? <b id="t-q2">□ 예 ■ 아니오</b></td></tr>
+          <tr><td colspan="6" style="height:30px">위와 같이 지원 신청합니다. &nbsp;&nbsp; <span class="todo" id="t-date" style="padding:2px 14px;display:inline-block;min-width:150px">    년   월   일</span></td></tr>
+        </table>
+        <p class="legend" style="margin-top:8px">※ 실제 팝업은 엑셀 원본 모양(병합·열폭)을 그대로 그립니다(지금 서식 탭 오른쪽 판과 같은 그림). 위는 모양 확인용 약식입니다.</p>
+      </div>
+    </div>
+    <div class="mf"><span class="chip warn" id="left">비어 있는 입력칸 5곳</span><span style="flex:1"></span><span class="sub" style="color:var(--sub);font-size:11.5px">입력값은 «기금 · 연도»별로 저장 — 내년엔 올해 값이 «작년»으로 뜹니다</span><button class="pri">💾 저장</button></div>
+  </div></div>
+</div>
+
+<div class="panel">
+  <h3>③ 원본이 아직 없을 때 — 지금 화면(스크린샷)의 문제</h3>
+  <div class="two">
+    <div class="opt best"><span class="rec">추천</span> <b>빈 양식을 «서식 보관함(클라우드)»에 한 번 올립니다</b>
+      <ul><li>이미 만들어 둔 <b>빈 양식</b>(남의 기금 자료 걷어낸 것)을 올리면, 어느 브라우저에서 열어도 «원본 등록됨»이 됩니다.</li>
+      <li>팝업은 <b>빈 문서라도</b> 그대로 열려, 입력칸을 채우는 대로 오른쪽이 바뀝니다.</li>
+      <li>⚠ 공개 저장소(github.io)에는 넣지 않습니다 — 올리는 곳은 로그인해야 열리는 보관함뿐입니다.</li></ul></div>
+    <div class="opt"><b>각 브라우저에서 사람이 [원본 등록]</b>
+      <ul><li>지금 방식 그대로. 브라우저마다 한 번씩 파일을 골라야 합니다.</li><li>이번처럼 «미등록» 화면을 또 만나게 됩니다.</li></ul></div>
+  </div>
+  <div class="note"><b>코드와 빈 양식을 읽어 확인한 것</b>(화면에서 직접 돌려 본 것은 아닙니다): 지금 앱은 기금 정보·참여사업장 명부만 채우고, ① <b>신청일(2025년 4월 8일이 박혀 있음)</b> ② 지원요건 ■/□ 표시 ③ 대기업·지자체 현황 칸 ④ <b>지자체 출연·신청액 3) 칸</b> ⑤ 두 가지 확인 질문은 <b>손대지 않습니다.</b> 그래서 받은 파일을 열어 사람이 고쳐야 했습니다 — 위 입력칸이 바로 그 자리들입니다. 지자체 출연액(3)은 지난번 만든 «출연 구성 확인»의 값을 그대로 가져옵니다.</div>
+</div>
+
+<div class="panel">
+  <h3>④ 정해 주실 것 (제 추천 포함)</h3>
+  <ul>
+    <li><b>팝업 vs 오른쪽 판</b> — 추천: <b>팝업</b>(화면을 넓게 써서 신청서 한 장이 한눈에 들어옵니다). 서식 탭의 오른쪽 판은 그대로 둡니다.</li>
+    <li><b>신청일 기본값</b> — 추천: <b>비워 두고 노란 칸으로 표시</b>(날짜를 지어내지 않음). 대안: 오늘 날짜.</li>
+    <li><b>입력값 저장</b> — 추천: 기금·연도별로 저장하고 내년엔 «작년» 값을 노란 확인 칸으로 가져오기(사업계획서 복사와 같은 방식). 금액·지자체 정보는 사람이 확인해야 확정.</li>
+    <li><b>빈 양식 올리기</b> — 추천: 위 ③ 왼쪽. <b>올리기 전에 제가 먼저 묻겠습니다</b>(되돌리기 어려운 쓰기).</li>
+  </ul>
+</div>
+
+<script>
+var chg={};
+function mark(id){ chg[id]=1; document.getElementById('cnt').textContent='바뀐 칸 '+Object.keys(chg).length+'곳'; }
+function fmtNum(v){ var n=String(v).replace(/[^0-9]/g,''); return n?Number(n).toLocaleString()+' 원':''; }
+function left(){ var n=0; ['i-date','i-gn','i-gc','i-ga','i-gp','i-a3'].forEach(function(i){ if(!document.getElementById(i).value) n++; }); document.getElementById('left').textContent=n?('비어 있는 입력칸 '+n+'곳'):'모든 입력칸 작성됨'; document.getElementById('left').className='chip '+(n?'warn':'ok'); }
+function apply(el){
+  var t=document.getElementById(el.dataset.t), f=el.dataset.f, v;
+  if(f==='date'){ var d=el.value.split('-'); v=el.value?(d[0]+' 년 '+Number(d[1])+' 월 '+Number(d[2])+' 일'):'    년   월   일'; }
+  else if(f==='box'){ var n=el.id.slice(1); var txt=['','둘 이상의 기업이 공동근로복지기금에 출연','대기업(도급업체)가 중소기업(협력업체) 공동근로복지기금에 출연','지방자치단체가 중소기업 공동근로복지기금에 출연'][n]; v=n+') '+(el.checked?'■':'□')+' '+txt; }
+  else if(f==='yn'){ v=(el.value==='Y'?'■ 예 □ 아니오':'□ 예 ■ 아니오'); }
+  else if(f==='num'){ v=fmtNum(el.value); } else v=el.value;
+  t.textContent=v;
+  t.classList.remove('todo'); if(el.dataset.f==='txt'||f==='num'||f==='date'){ if(!el.value) t.classList.add('todo'); }
+  t.classList.remove('chg'); void t.offsetWidth; t.classList.add('chg'); mark(el.dataset.t); left();
+}
+document.querySelectorAll('[data-t]').forEach(function(el){ el.addEventListener('input',function(){apply(el);}); el.addEventListener('change',function(){apply(el);}); });
+left();
+</script>
+</body></html>

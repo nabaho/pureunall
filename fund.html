@@ -10880,19 +10880,27 @@ function _xlsRecalc(wb){
     if(!moved) break;
   }
 }
-function _fillWbBuffer(key){
+function _fillWbBuffer(key,opt){
   var fid=S.formFund, f=funds[fid];
   if(curForm()._sample) return Promise.reject(new Error('샘플 모드 — 실데이터 채움은 기금 현황 → 기금 → 📑 서식에서'));
   if(!f) return Promise.reject(new Error('기금을 선택하세요'));
   return tplGet(key).then(function(buf){
     if(!buf) throw new Error('먼저 원본 엑셀을 등록하세요');
-    return _loadSites(fid).then(function(sites){
-      var wb=new ExcelJS.Workbook();
-      return wb.xlsx.load(buf).then(function(){
-        if(key==='contribx') fillContribXls(wb,f,sites);
-        else (key==='setup'?fillSetup:fillSubsidy)(wb,f,sites);
-        _xlsRecalc(wb);            /* 수식 칸에 남은 앞 기금 값을 걷어낸다 — 반드시 채운 «뒤에» */
-        return wb.xlsx.writeBuffer();
+    /* 지원신청서: 팝업이 넘긴 «지금 입력 중인 값»이 있으면 그것을, 없으면 저장된 값(+작년 값)을 쓴다.
+       받기·서식 탭 미리보기·팝업이 «같은 값»을 보게 한다 — 길마다 값이 갈리면 어느 것이 제출본인지 모른다. */
+    var pre=(key==='subsidy')
+      ? ((opt&&opt.subx)?Promise.resolve(opt.subx):subxLoad(fid,S.year).then(function(c){ return subxState(c,{}); }))
+      : Promise.resolve(null);
+    return pre.then(function(sx){
+      return (sx?Promise.resolve(sx.sites):_loadSites(fid)).then(function(sites){
+        var wb=new ExcelJS.Workbook();
+        return wb.xlsx.load(buf).then(function(){
+          if(key==='contribx') fillContribXls(wb,f,sites);
+          else if(key==='setup') fillSetup(wb,f,sites);
+          else fillSubsidy(wb,f,sites,sx?{form:sx.v,yr:sx.yr,gov:sx.gov}:undefined);
+          _xlsRecalc(wb);            /* 수식 칸에 남은 앞 기금 값을 걷어낸다 — 반드시 채운 «뒤에» */
+          return wb.xlsx.writeBuffer();
+        });
       });
     });
   }).then(function(out){
@@ -10913,7 +10921,7 @@ function fillForm(key){
 /* 글자가 차지하는 폭 어림(px). 한글·한자는 넓고 로마자·숫자는 좁다.
    정확할 필요는 없다 — «이 칸에 안 들어간다»만 알면 된다. */
 function _xlsPx(t,z){ var k=(+z||1), n=6*k; for(var i=0;i<t.length;i++) n+=(t.charCodeAt(i)>0x2000?11:6)*k; return n; }
-function _xlsHTML(ws,zoom){
+function _xlsHTML(ws,zoom,mark){
   if(!ws||!ws['!ref']) return '<div class="muted" style="padding:10px">빈 시트입니다</div>';
   /* 배율은 열폭·행높이·글자에 «함께» 걸어야 한다. 글자만 키우면 칸을 넘고,
      칸만 키우면 글자가 콩알만 하게 남는다. */
@@ -10964,7 +10972,8 @@ function _xlsHTML(ws,zoom){
       else if(cell&&cell.t==='n') st+='text-align:right;';
       if(al.vertical) st+='vertical-align:'+(VA[al.vertical]||'middle')+';';
       var cs=sp?sp[0]:(1+eat), rs=sp?sp[1]:1;
-      out+='<td'+(cs>1?' colspan="'+cs+'"':'')+(rs>1?' rowspan="'+rs+'"':'')
+      var mk=mark&&mark[XLSX.utils.encode_cell({r:r,c:c})];   /* 신청서 팝업이 «채운·확인할·바뀐» 칸을 물들인다 */
+      out+='<td'+(cs>1?' colspan="'+cs+'"':'')+(rs>1?' rowspan="'+rs+'"':'')+(mk?' class="xmk-'+mk+'"':'')
         +(st?' style="'+st+'"':'')+'>'+esc(t)+'</td>';
     }
     out+='</tr>';
@@ -11129,7 +11138,7 @@ function fillContribXls(wb,f,sites){
     });
   });
 }
-function fillSubsidy(wb,f,sites){
+function fillSubsidy(wb,f,sites,opt){
   if((f.fund_type||'')!=='공동') throw new Error('지원신청서는 공동근로복지기금 전용입니다');
   var info=wb.getWorksheet('기금법인정보'); if(!info) throw new Error('기금법인정보 시트를 찾을 수 없습니다');
   var yrs=f.years||{}, sub={};
@@ -11164,6 +11173,14 @@ function fillSubsidy(wb,f,sites){
     doc.getColumn(9).eachCell({includeEmpty:false},function(cell){ if(typeof cell.value==='string'&&/^\d+-\d+$/.test(cell.value.trim())) keys.push(cell); });
     keys.sort(function(a,b){return a.row-b.row;});
     keys.forEach(function(cell,idx){ if(cell.type!==ExcelJS.ValueType.Formula) cell.value=idx<sites.length?('1-'+(idx+1)):null; });
+  }
+  /* 팝업에서 넣은 «사람이 정할 칸» — 신청일·지원요건 ■□·지자체 현황·지자체 출연/신청액·확인 질문.
+     ⚠ 예전에는 이 칸들을 아무도 안 건드려 원본에 박힌 «2025년 4월 8일»이 그대로 공단에 나갔다.
+     ⚠ 참여사업장정보 맨 위 제목에는 원본의 «다른 기금 이름»이 박혀 있다 — 이 기금·연도로 바꾼다. */
+  if(opt&&opt.form){
+    setC(info,'N2',num(opt.form.a1)||'');
+    subxCells(opt.form,{gov:opt.gov}).forEach(function(w){ subxPut(wb,w); });
+    if(parts&&opt.yr) setC(parts,'A1',opt.yr+'년 '+(f.name||''));
   }
 }
 
@@ -16747,8 +16764,9 @@ function saveSubPlan(){
     toast('저장되었습니다');
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
+function fillSubsidyExcelFor(fid){ S.formFund=fid; fillForm('subsidy'); }
 function subsidyExcelPanel(f){
-  // 서식 자료실의 지원신청서 원본(IndexedDB) 상태 확인 후 이 기금 데이터로 채워 다운로드
+  // 서식 자료실의 지원신청서 원본(IndexedDB·클라우드) 상태 확인 후 — 팝업으로 보고 입력하고, 이 기금 데이터로 채워 받는다
   if(S._subTplChk!==true){ S._subTplChk='...';
     tplHas('subsidy').then(function(buf){ S._subTplHas=!!buf; S._subTplChk=true; if(S.tab==='subsidy'&&S.view==='fund')renderFund(); })
       .catch(function(){ S._subTplHas=false; S._subTplChk=true; if(S.tab==='subsidy'&&S.view==='fund')renderFund(); });
@@ -16757,13 +16775,240 @@ function subsidyExcelPanel(f){
   var has=S._subTplHas;
   return '<div class="panel"><div class="row" style="margin-bottom:8px"><h2 style="font-size:15px">📥 지원신청서 엑셀 (근로복지공단 제출용)</h2>'+hlp('sub.fill')+'</div>'
     +(has
-      ? '<div class="row"><button class="primary" onclick="fillSubsidyExcelFor(\''+S.fundId+'\')">⬇ ['+esc(f.short_name||f.name)+'] '+S.year+'년 지원신청서 받기(데이터 채움)</button>'
+      ? '<div class="row"><button class="primary" onclick="subxOpen()">👁 신청서 열어 보기·입력</button>'
+        +'<button onclick="fillSubsidyExcelFor(\''+S.fundId+'\')">⬇ 바로 받기 ('+S.year+'년)</button>'
         +'<span class="chip ok">원본 등록됨</span> <button onclick="pickTpl(\'subsidy\')" style="padding:3px 8px">원본 교체</button></div>'
       : '<div class="row"><span class="chip dg">원본 미등록</span><button class="primary" onclick="pickTpl(\'subsidy\')">📎 지원신청서 원본 엑셀 등록 (최초 1회)</button></div>'
         +'<p class="muted" style="font-size:11px;margin-top:8px">원본: 2025년 공동근로복지기금지원신청서 양식.xlsx</p>')
     +'</div>';
 }
-function fillSubsidyExcelFor(fid){ S.formFund=fid; fillForm('subsidy'); }
+/* ══ 지원신청서 엑셀 — 팝업에서 «보고», 사람이 정할 칸만 «따로» 넣는다 (대표 지시 2026-10-31, 목업 승인 「추천대로」) ══
+   저장: subsidy_form/{기금}/{연도} = {date, r1, r2, r3, gn, gc, ga, gp, a1, a3, q1, q2}  — 이 12칸만 사람이 정한다.
+   · 해마다 «작년 저장값»이 먼저 당겨 온다(신청일은 안 당긴다 — 지어내지 않음). 당겨 온 값·비어 있는 값은 노란 칸 = «확인 필요».
+   · 참여사업장은 사업장 명부의 «참여 상태»(탈퇴·폐업)로 저절로 갈린다 — 그 회사만 처리하면 신청서 명부·사업장 수·근로자 수가 따라온다.
+     (그 해 신청일 «뒤»에 나간 곳은 그 해 신청서에 남는다 — 신청일을 넣어야 확정)
+   · 칸 지도(2025년판 별지 제1호의2): 신청일 신청서!AD34·AG34·AI34 / 질문 AF31·AH31, AF32·AH32 / 요건 Q25·Q26·Q27 /
+     지자체 현황 Q22·AC22·Q23·AF23 / 기금법인정보 M2(출연3)·N2(신청1)·O2(신청3). */
+var SUBX_KEYS=['date','r1','r2','r3','gn','gc','ga','gp','a1','a3','q1','q2'];
+function subxYmd(s){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s==null?'':s)); return m?[+m[1],+m[2],+m[3]]:null; }
+/* 그 해 신청서에 «들어갈» 참여사업장 — 참여 중인 곳 + 신청일 뒤에 나간 곳. 신청일이 없으면 그 해 1월 1일을 기준으로 본다(잠정). */
+function subSitesFor(all,yr,applyDate){
+  var cut=subxYmd(applyDate)?String(applyDate):(yr+'-01-01'), out=[], late=[], nodate=[];
+  (all||[]).forEach(function(s){
+    if(!s) return;
+    if((s.status||'active')!=='closed'){ out.push(s); return; }
+    var d=s.leave_date||s.biz_closed_date||'';
+    if(!d){ nodate.push(s); return; }          /* 탈퇴일이 없으면 언제 나갔는지 모른다 — 넣지 않고 알린다 */
+    if(String(d)>cut){ out.push(s); late.push({s:s,date:String(d)}); }
+  });
+  return {sites:out,late:late,nodate:nodate};
+}
+/* 저장값 > 자동(그 해 자료) > 작년 저장값 > 빈 값 — 값마다 «어디서 왔는지(src)»와 «확인이 필요한가(need)» 를 같이 낸다 */
+function subxDefaults(c){
+  var sv=c.saved||{}, pv=c.prev||{}, sub=c.sub||{}, v={}, src={}, need={};
+  var own=function(o,k){ return o[k]!==undefined&&o[k]!==null; };
+  var take=function(k,auto,blank){
+    if(own(sv,k)){ v[k]=sv[k]; src[k]='saved'; }
+    else if(auto!==undefined&&auto!==''){ v[k]=auto; src[k]='auto'; }
+    else if(own(pv,k)&&pv[k]!==''){ v[k]=pv[k]; src[k]='prev'; }
+    else { v[k]=blank; src[k]='blank'; }
+  };
+  v.date=own(sv,'date')?sv.date:''; src.date=own(sv,'date')?'saved':'blank'; need.date=!v.date;
+  take('r1',(num(c.nSites)||0)>=2?true:undefined,false);
+  take('r2',undefined,false);
+  take('r3',(num(c.gov)||0)>0?true:undefined,false);
+  need.r1=need.r2=need.r3=false;
+  ['gn','gc','ga','gp'].forEach(function(k){ take(k,undefined,''); need[k]=!!v.r3&&(!v[k]||src[k]==='prev'); });
+  var ra=num(sub.request_amount)||num(sub.apply_amount)||0;
+  take('a1',ra>0?ra:undefined,'');
+  if(src.a1==='blank'&&(num(c.contribution)||0)>0){ v.a1=num(c.contribution); src.a1='contrib'; }
+  need.a1=!v.a1||(src.a1!=='saved'&&src.a1!=='auto');
+  take('a3',undefined,''); need.a3=!!v.r3&&(!v.a3||src.a3==='prev');
+  take('q1',c.hist?'Y':undefined,'N'); need.q1=false;
+  take('q2',undefined,'N'); need.q2=src.q2!=='saved';
+  return {v:v,src:src,need:need};
+}
+/* 값 → 쓸 칸 목록. box 는 «문장 속 ■□ 한 글자»만 바꾼다(문장은 원본 그대로). */
+function subxCells(v,o){
+  o=o||{}; var p=subxYmd(v.date), w=[], A='신청서', gov=!!v.r3;
+  w.push({s:A,a:'AD34',k:'date',v:p?p[0]:null},{s:A,a:'AG34',k:'date',v:p?p[1]:null},{s:A,a:'AI34',k:'date',v:p?p[2]:null});
+  [['q1','31'],['q2','32']].forEach(function(q){ var y=v[q[0]]==='Y';
+    w.push({s:A,a:'AF'+q[1],k:q[0],v:y?'■':'□'},{s:A,a:'AH'+q[1],k:q[0],v:y?'□':'■'}); });
+  [['r1','Q25'],['r2','Q26'],['r3','Q27']].forEach(function(r){ w.push({s:A,a:r[1],k:r[0],box:true,on:!!v[r[0]]}); });
+  [['gn','Q22'],['gc','AC22'],['ga','Q23'],['gp','AF23']].forEach(function(g){ w.push({s:A,a:g[1],k:g[0],v:gov?(String(v[g[0]]==null?'':v[g[0]]).trim()||null):null}); });
+  w.push({s:'기금법인정보',a:'M2',k:'c3',v:gov?(num(o.gov)||null):null},
+         {s:'기금법인정보',a:'O2',k:'a3',v:gov?(num(v.a3)||null):null},
+         {s:'기금법인정보',a:'N2',k:'a1',v:num(v.a1)||null});
+  return w;
+}
+function subxPut(wb,w){
+  var ws=wb.getWorksheet(w.s); if(!ws) return;
+  if(!w.box){ setC(ws,w.a,w.v); return; }
+  var c=ws.getCell(w.a), val=c.value; if(c.type===ExcelJS.ValueType.Formula) return;
+  var on=w.on?'■':'□';
+  if(typeof val==='string') c.value=val.replace(/[■□]/,on);
+  else if(val&&val.richText){ var done=false; val.richText.forEach(function(r){ if(!done&&/[■□]/.test(r.text)){ r.text=r.text.replace(/[■□]/,on); done=true; } }); c.value=val; }
+}
+/* 팝업 그림에서 물들일 칸(신청서 시트) — k 는 칸의 이름. c1·c3 은 앱이 채우는(고칠 수 없는) 출연액 */
+function subxMarks(){
+  var m=[['date','AD34'],['date','AG34'],['date','AI34'],['q1','AF31'],['q1','AH31'],['q2','AF32'],['q2','AH32'],
+    ['r1','Q25'],['r2','Q26'],['r3','Q27'],['gn','Q22'],['gc','AC22'],['ga','Q23'],['gp','AF23'],
+    ['c1','O28'],['a1','AC28'],['c3','O30'],['a3','AC30']];
+  return m.map(function(x){ return {k:x[0],a:x[1]}; });
+}
+function subxLoad(fid,yr){
+  var f=funds[fid]||{};
+  return Promise.all([_loadSites(fid,{withClosed:true}), fbDb.ref(NS+'/subsidy_form/'+fid).once('value')]).then(function(a){
+    var all=a[0], forms=a[1].val()||{}, yrs=f.years||{};
+    var ys=Object.keys(forms).map(Number).filter(function(y){ return y<yr; }).sort(function(x,y){ return y-x; });
+    var hist=Object.keys(yrs).some(function(y){ var s=yrs[y]&&yrs[y].subsidy; return +y<yr&&s&&(num(s.decided_amount)>0||!!s.paid_date); });
+    return {fid:fid,yr:yr,f:f,all:all,saved:forms[yr]||null,prev:ys.length?forms[ys[0]]:null,prevYr:ys.length?ys[0]:0,
+      hist:!!hist,sub:(yrs[yr]&&yrs[yr].subsidy)||{}};
+  });
+}
+function subxState(ctx,edits){
+  var sv=Object.assign({},ctx.saved||{},edits||{}), sc=subSitesFor(ctx.all,ctx.yr,sv.date||''), sub=ctx.sub||{};
+  var gov=num(sub.gov_contrib)||0, contribution=foundContribLive(ctx.f,sc.sites)||num(sub.contribution)||'';
+  var d=subxDefaults({nSites:sc.sites.length,gov:gov,sub:sub,saved:sv,prev:ctx.prev,hist:ctx.hist,contribution:contribution});
+  Object.keys(edits||{}).forEach(function(k){ if(d.src[k]!==undefined) d.src[k]='edit'; });
+  var prevSc=subSitesFor(ctx.all,ctx.yr-1,'');
+  var keep={}; sc.sites.forEach(function(s){ keep[s._id]=1; });
+  var gone=prevSc.sites.filter(function(s){ return !keep[s._id]; });   /* 작년엔 있었는데 올해는 빠진 곳 */
+  return {v:d.v,src:d.src,need:d.need,sites:sc.sites,sc:sc,gone:gone,nPrev:prevSc.sites.length,gov:gov,yr:ctx.yr,ctrb:contribution};
+}
+function subxOpen(){
+  var fid=S.fundId, f=funds[fid]; if(!f) return;
+  if((f.fund_type||'')!=='공동'){ toast('지원신청서는 공동근로복지기금 전용입니다','warn'); return; }
+  S.formFund=fid;
+  var st=S._sx={fid:fid,yr:S.year,edits:{},seq:0,zoom:1.25,sheet:0,base:null,out:null,ctx:null};
+  showModal('<div class="muted" style="padding:30px;text-align:center">신청서 준비 중…</div>',{width:1360,onclose:function(){ if(S._sx===st) S._sx=null; }});
+  subxLoad(fid,S.year).then(function(c){
+    if(S._sx!==st) return;
+    st.ctx=c; var box=$('modalbox'); if(!box) return;
+    box.innerHTML=subxHTML(); subxFill(); subxPaint(); subxPreview();
+  }).catch(function(e){ closeM(); toast('신청서를 열지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function subxHTML(){
+  var st=S._sx, c=st.ctx, f=c.f;
+  var tag=function(k){ return '<span class="sx-tag" id="sx-tag-'+k+'"></span>'; };
+  var row=function(lab,k,ctl){ return '<div class="sx-f"><label>'+lab+' '+tag(k)+'</label>'+ctl+'</div>'; };
+  var inp=function(k,type,ph){ return '<input type="'+type+'" id="sx-'+k+'" oninput="subxIn(\''+k+'\')" onchange="subxIn(\''+k+'\')"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>'; };
+  var ck=function(k,lab){ return '<label class="sx-ck"><input type="checkbox" id="sx-'+k+'" onchange="subxIn(\''+k+'\')"> '+lab+' '+tag(k)+'</label>'; };
+  var yn=function(k){ return '<select id="sx-'+k+'" onchange="subxIn(\''+k+'\')"><option value="N">아니오</option><option value="Y">예</option></select>'; };
+  return '<style>'
+    +'.sx-wrap{display:grid;grid-template-columns:330px 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}@media(max-width:900px){.sx-wrap{grid-template-columns:1fr}}'
+    +'.sx-in{padding:10px 12px;border-right:1px solid var(--line);background:#f8fafc;overflow:auto;max-height:68vh}.sx-pv{padding:8px 10px;overflow:auto;max-height:68vh}'
+    +'.sx-grp{margin-bottom:12px}.sx-grp h4{margin:0 0 5px;font-size:12px;color:#475569}'
+    +'.sx-f{display:grid;grid-template-columns:96px 1fr;gap:5px;align-items:center;margin-bottom:4px}.sx-f label{font-size:11.5px;color:#475569}'
+    +'.sx-f input,.sx-f select{width:100%;box-sizing:border-box}.sx-ck{display:block;margin:2px 0;font-size:12.5px}'
+    +'.sx-need{background:#fde68a!important}.sx-ro{font-size:12.5px;padding:3px 0}'
+    +'.sx-tag{font-size:10px;font-weight:700;border-radius:4px;padding:0 5px;background:#e2e8f0;color:#475569}'
+    +'.sx-tag.p{background:#bfdbfe;color:#1e40af}.sx-tag.n{background:#fde68a;color:#854d0e}.sx-tag.s{background:#bbf7d0;color:#166534}'
+    +'.sx-leg{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#475569;margin:2px 0 6px}.sx-leg i{display:inline-block;width:12px;height:12px;border:1px solid #cbd5e1;border-radius:3px;vertical-align:-2px;margin-right:4px}'
+    +'.xlsprev .xlsgrid{border-collapse:collapse;table-layout:fixed}.xlsprev .xlsgrid td{border:1px solid #e2e8f0;padding:1px 3px;white-space:pre-wrap;word-break:keep-all;overflow:hidden;vertical-align:middle;line-height:1.15}'
+    +'.xlsprev td.xmk-fill{background:#f0fdf4}.xlsprev td.xmk-todo{background:#fde68a}.xlsprev td.xmk-chg{background:#bfdbfe}'
+    +'</style>'
+    +'<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0;font-size:15px">📥 '+esc(f.short_name||f.name)+' — '+c.yr+'년 지원신청서</h2>'
+    +'<span class="chip">별지 제1호의2</span>'+hlp('sub.xform')+'<span class="chip warn" id="sx-cnt">바뀐 칸 0곳</span><span class="chip" id="sx-open"></span><span style="flex:1"></span>'
+    +'<button onclick="subxZoom()" style="padding:3px 10px">⤢ 배율 <span id="sx-z"></span></button> '
+    +'<button class="primary" onclick="subxDl()" style="padding:3px 10px">⬇ 엑셀 받기</button> <button onclick="closeM()" style="padding:3px 10px">✕ 닫기</button></div>'
+    +'<div class="sx-wrap"><div class="sx-in">'
+    +'<div class="sx-leg"><span><span class="sx-tag">자동</span> 기금·장부에서</span><span><span class="sx-tag p">작년</span> 작년 저장값</span><span><span class="sx-tag n">입력</span> 직접</span></div>'
+    +'<div class="sx-grp" id="sx-sites"></div>'
+    +'<div class="sx-grp"><h4>1. 신청일</h4>'+row('신청일','date',inp('date','date'))+'</div>'
+    +'<div class="sx-grp"><h4>2. 지원요건 — 기금 출연</h4>'+ck('r1','1) 둘 이상의 기업이 출연')+ck('r2','2) 대기업(도급업체)이 출연')+ck('r3','3) 지방자치단체가 출연')+'</div>'
+    +'<div class="sx-grp"><h4>3. 지자체·대기업 현황 <span class="muted" style="font-weight:400">(3번 요건에 √일 때)</span></h4>'
+      +row('명칭','gn',inp('gn','text','예) ○○시'))+row('대표자','gc',inp('gc','text','예) ○○시장'))+row('소재지','ga',inp('ga','text'))+row('전화','gp',inp('gp','text'))+'</div>'
+    +'<div class="sx-grp"><h4>4. 출연·신청 금액 (원)</h4>'
+      +'<div class="sx-f"><label>1) 기업 출연 <span class="sx-tag">자동</span></label><div class="sx-ro" id="sx-c1"></div></div>'
+      +'<div class="sx-f"><label>3) 지자체 출연 <span class="sx-tag">자동</span></label><div class="sx-ro" id="sx-c3"></div></div>'
+      +row('1) 신청액','a1',inp('a1','text'))+row('3) 신청액','a3',inp('a3','text','지자체분 신청액'))+'</div>'
+    +'<div class="sx-grp"><h4>5. 확인 질문</h4>'+row('지원받은 사실','q1',yn('q1'))+row('법령위반·시정','q2',yn('q2'))+'</div>'
+    +'<div class="sx-grp" style="font-size:11.5px;color:#475569;line-height:1.6">자동으로 채워지는 칸: 기금법인명·대표자·소재지·전화·인가번호·법인등록번호·사업자등록번호·설립일·참여사업장 수·근로자수와 참여사업장 명부 — 기금 정보·참여사업장에서 옵니다.</div>'
+    +'</div><div class="sx-pv"><div id="sx-tabs"></div><div class="sx-leg"><span><i style="background:#f0fdf4"></i>앱이 채운 칸</span><span><i style="background:#fde68a"></i>확인 필요</span><span><i style="background:#bfdbfe"></i>방금 바뀐 칸</span></div>'
+    +'<div id="sx-pv" class="xlsprev"></div></div></div>'
+    +'<div class="row" style="margin-top:10px;gap:8px"><span class="muted" style="font-size:11.5px">저장하면 «기금·연도»별로 남고, 내년에는 이 값이 «작년»으로 먼저 뜹니다(신청일은 제외).</span><span style="flex:1"></span>'
+    +'<button class="primary" onclick="subxSave()">💾 저장</button></div>';
+}
+/* 입력칸에 처음 값을 넣는다(다시 그릴 때 입력 중인 칸을 지우지 않도록 «한 번만») */
+function subxFill(){
+  var st=S._sx; if(!st||!st.ctx) return; var s=subxState(st.ctx,st.edits);
+  SUBX_KEYS.forEach(function(k){
+    var el=$('sx-'+k); if(!el) return; var val=s.v[k];
+    if(el.type==='checkbox') el.checked=!!val;
+    else if(k==='a1'||k==='a3') el.value=val?Number(val).toLocaleString():'';
+    else el.value=(val==null?'':val);
+  });
+}
+function subxIn(k){
+  var st=S._sx; if(!st||!st.ctx) return; var el=$('sx-'+k); if(!el) return;
+  var val=(el.type==='checkbox')?el.checked:el.value;
+  if(k==='a1'||k==='a3') val=num(val)||'';
+  st.edits[k]=val;
+  clearTimeout(st.tm); st.tm=setTimeout(subxPreview,250); subxPaint();
+}
+var SUBX_SRC={auto:['','자동'],prev:['p','작년'],contrib:['n','설립 출연액'],edit:['s','수정'],saved:['s','저장됨'],blank:['n','입력']};
+/* 칸 옆 딱지·노란 칸·참여사 상자·합계 칩 — 입력 중에도 바로 고친다 */
+function subxPaint(){
+  var st=S._sx; if(!st||!st.ctx) return; var s=subxState(st.ctx,st.edits), nNeed=0;
+  SUBX_KEYS.forEach(function(k){
+    var t=$('sx-tag-'+k), el=$('sx-'+k), sc=SUBX_SRC[s.src[k]]||['',''];
+    if(t){ t.className='sx-tag'+(sc[0]?' '+sc[0]:''); t.textContent=sc[1]; }
+    if(el&&el.type!=='checkbox') el.classList.toggle('sx-need',!!s.need[k]);
+    if(s.need[k]) nNeed++;
+  });
+  var c1=$('sx-c1'), c3=$('sx-c3');
+  if(c1) c1.textContent=s.ctrb?Number(s.ctrb).toLocaleString():'—';
+  if(c3) c3.textContent=(s.v.r3&&s.gov)?Number(s.gov).toLocaleString():'—';
+  var o=$('sx-open'); if(o){ o.className='chip '+(nNeed?'warn':'ok'); o.textContent=nNeed?('확인할 칸 '+nNeed+'곳'):'모든 칸 확인됨'; }
+  var z=$('sx-z'); if(z) z.textContent=Math.round(st.zoom*100)+'%';
+  var b=$('sx-sites'); if(b){
+    var h='<h4 style="margin:0 0 5px;font-size:12px;color:#475569">참여 사업장 '+s.sites.length+'곳 <span class="muted" style="font-weight:400">(작년 '+s.nPrev+'곳)</span></h4>';
+    if(s.gone.length) h+='<div style="font-size:11.5px;margin-bottom:3px"><span class="chip dg" style="font-size:10px">올해 빠짐</span> '+s.gone.map(function(x){ return esc(x.name||'')+' <span class="muted">('+esc(x.leave_date||x.biz_closed_date||'')+(x.biz_closed?' 폐업':' 탈퇴')+')</span>'; }).join(', ')+'</div>';
+    if(s.sc.late.length) h+='<div style="font-size:11.5px;margin-bottom:3px"><span class="chip warn" style="font-size:10px">신청일 뒤 탈퇴 — 이 신청서에는 포함</span> '+s.sc.late.map(function(x){ return esc(x.s.name||'')+' <span class="muted">('+esc(x.date)+')</span>'; }).join(', ')+'</div>';
+    if(s.sc.nodate.length) h+='<div style="font-size:11.5px;margin-bottom:3px"><span class="chip warn" style="font-size:10px">탈퇴일 없음 — 제외됨</span> '+s.sc.nodate.map(function(x){ return esc(x.name||''); }).join(', ')+' <span class="muted">(참여사업장에서 탈퇴일을 넣으면 맞춰집니다)</span></div>';
+    if(!s.gone.length&&!s.sc.late.length&&!s.sc.nodate.length) h+='<div class="muted" style="font-size:11.5px">작년과 같은 참여사입니다. 탈퇴·폐업은 <b>참여사업장 탭에서 그 회사만</b> 바꾸면 여기에 따라옵니다.</div>';
+    b.innerHTML=h;
+  }
+}
+function subxZoom(){ var st=S._sx; if(!st) return; var Z=[1,1.25,1.5,2,0.8], i=Z.indexOf(st.zoom); st.zoom=Z[(i<0?0:i+1)%Z.length]; subxPaint(); subxPreview(); }
+function subxSheet(i){ var st=S._sx; if(!st) return; st.sheet=i; subxPreview(); }
+function subxDl(){ var st=S._sx; if(!st||!st.out){ toast('아직 준비 중입니다','warn'); return; } dlBuf(st.out,st.fname); }
+function subxPreview(){
+  var st=S._sx; if(!st||!st.ctx) return; var box=$('sx-pv'); if(!box) return;
+  if(typeof XLSX==='undefined'){ box.innerHTML='<div class="msg err" style="margin:6px">엑셀 뷰어 로드 실패 — 새로고침하세요</div>'; return; }
+  var s=subxState(st.ctx,st.edits), my=++st.seq;
+  _fillWbBuffer('subsidy',{subx:s}).then(function(r){
+    if(S._sx!==st||my!==st.seq) return;
+    st.out=r.out; st.fname=r.fname;
+    var wb=XLSX.read(new Uint8Array(r.out),{type:'array',cellStyles:true});
+    var si=Math.max(0,Math.min(st.sheet||0,wb.SheetNames.length-1)), nm=wb.SheetNames[si], ws=wb.Sheets[nm], mark={};
+    var txt=function(a){ var c=ws[a]; return c?(c.w!=null?c.w:(c.v==null?'':String(c.v))):''; };
+    var chgK={};
+    if(nm==='신청서'){
+      if(!st.base){ st.base={}; subxMarks().forEach(function(m){ st.base[m.a]=txt(m.a); }); }
+      subxMarks().forEach(function(m){
+        var chg=(st.base[m.a]!==txt(m.a)); if(chg) chgK[m.k]=1;
+        mark[m.a]=chg?'chg':((s.need[m.k]&&m.k!=='c1'&&m.k!=='c3')?'todo':'fill');
+      });
+      st.nChg=Object.keys(chgK).length;
+    }
+    var cnt=$('sx-cnt'); if(cnt) cnt.textContent='바뀐 칸 '+(st.nChg||0)+'곳';
+    var tabs=wb.SheetNames.map(function(n,i){
+      return '<button onclick="subxSheet('+i+')" style="padding:3px 9px'+(i===si?';background:#fffbeb;border-color:#d97706;font-weight:700':'')+'">'+esc(n)+'</button>'; }).join(' ');
+    $('sx-tabs').innerHTML='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">'+tabs+'</div>';
+    box.innerHTML=_xlsHTML(ws,st.zoom,mark);
+  }).catch(function(e){ if(S._sx===st) box.innerHTML='<div class="msg err" style="margin:6px">'+esc((e&&e.message)||e)+'</div>'; });
+}
+function subxSave(){
+  var st=S._sx; if(!st||!st.ctx) return; var c=st.ctx, s=subxState(c,st.edits), obj={};
+  SUBX_KEYS.forEach(function(k){ obj[k]=(s.v[k]===undefined||s.v[k]===null)?'':s.v[k]; });
+  fbDb.ref(NS+'/subsidy_form/'+c.fid+'/'+c.yr).set(obj).then(function(){
+    c.saved=obj; if(S._sx===st){ st.edits={}; subxPaint(); subxPreview(); }
+    _audit(c.fid,'지원신청서 입력',c.yr+'년 지원신청서 입력칸 저장');
+    toast('저장되었습니다 — 내년에는 이 값이 «작년»으로 먼저 뜹니다');
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
 function copyPrevSubsidy(){
   var f=funds[S.fundId], prev=(f.years&&f.years[S.year-1]&&f.years[S.year-1].subsidy)||null;
   if(!prev){ toast('작년 값이 없습니다','warn'); return; }
@@ -23380,7 +23625,12 @@ var HELP={
  'close.report':{t:'운영상황보고',h:'<p>체크하면 완료로 저장됩니다.</p><p>운영상황보고(별지15호) 기한은 <b>회계연도 종료 후 3개월</b>(익년 3월 31일)입니다.</p>'},
  'sub.incent':{t:'공단 인센티브 현황',h:'<p>근로복지공단 지원 사업 정보입니다.</p><p><b>결정액 대비 집행액</b>으로 정산 상태가 자동 표시됩니다.</p>'},
  'sub.fill':{t:'지원신청서 자동 채움',h:'<p>공단 원본 양식에 이 기금의 <b>법인정보·참여사업장 명단</b>을 자동으로 채워 내려받습니다.</p>'
-   +'<p>서술칸(사업목적 등)은 내려받은 뒤 직접 작성하세요.</p><p>원본 엑셀은 한 번 등록하면 이 브라우저에 저장됩니다.</p>'},
+   +'<p>[👁 신청서 열어 보기·입력]을 누르면 팝업에서 채워진 신청서를 미리 보고, <b>사람이 정할 칸</b>(신청일·지원요건·지자체 현황·신청액·확인 질문)만 따로 넣을 수 있습니다.</p>'
+   +'<p>서술칸(사업목적 등)은 내려받은 뒤 직접 작성하세요.</p><p>원본 엑셀은 한 번 등록하면 서식 보관함에 올라가 다른 브라우저에서도 열립니다.</p>'},
+ 'sub.xform':{t:'지원신청서 입력칸',h:'<p>오른쪽은 공단에 내는 신청서 그대로입니다. 왼쪽 칸을 고치면 오른쪽 해당 칸이 <b>파랗게</b> 바뀝니다.</p>'
+   +'<p><b>노란 칸</b>은 확인이 필요한 칸입니다 — 비어 있거나, 작년 값을 가져왔거나, 매년 직접 확인해야 하는 답(법령 위반 여부)입니다. [💾 저장]하면 확인한 것으로 봅니다.</p>'
+   +'<p><b>신청일</b>은 작년 값을 가져오지 않습니다(날짜를 지어내지 않음). 원본에 박혀 있던 «2025년 4월 8일»은 더 이상 그대로 나가지 않습니다.</p>'
+   +'<p><b>참여 사업장</b>은 참여사업장 탭의 «참여 상태»에서 옵니다 — 탈퇴·폐업한 회사는 그 회사만 바꾸면 신청서 명부·사업장 수·근로자 수가 따라옵니다. 그 해 신청일 <b>뒤</b>에 나간 곳은 그 해 신청서에 남습니다.</p>'},
  'site.years':{t:'사업장 연도별 기록',h:'<p>사업장 명부는 <b>현재 상태 한 벌</b>만 두고, 해마다 달라지는 값은 여기에 연도별로 쌓습니다.</p>'
    +'<p><b>출연금</b> — 그 해 이 사업장이 낸 금액<br><b>상시근로자</b> — 그 해 기준 인원<br><b>수혜자</b> — 그 해 복지혜택을 받은 인원</p>'
    +'<p>칸에서 벗어나면 자동 저장됩니다. 위 연도 선택으로 다른 해를 보고, [작년 값 불러오기]로 <b>비어 있는 칸만</b> 채울 수 있습니다(이미 넣은 값은 건드리지 않습니다).</p>'
