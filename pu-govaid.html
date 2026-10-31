@@ -281,7 +281,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
     <div class="note">서버가 <b>매일 아침 8:10</b> 기업마당 공고를 받아 둡니다. 사전의 사업과 이름이 비슷하면 <b>제안만</b> 합니다 — <b>↔ 잇기</b>를 눌러야 그 사업의 접수 상태(접수 중·접수 마감)를 서버가 날마다 맞춥니다.</div>
     <div class="card">
       <div class="bar">
-        <select id="nView"><option value="sug">사전 사업과 비슷한 공고</option><option value="all">처리 안 한 공고 전체</option><option value="labor">인력·경영 분야</option><option value="linked">사업에 이은 공고</option><option value="ignored">관계없음으로 둔 것</option></select>
+        <select id="nView"><option value="sug">사전 사업과 비슷한 공고</option><option value="local">📍 지역 공고(우리 고객사 지역)</option><option value="all">처리 안 한 공고 전체</option><option value="labor">인력·경영 분야</option><option value="linked">사업에 이은 공고</option><option value="ignored">관계없음으로 둔 것</option></select>
         <select id="nOpen"><option value="open">접수 중·예정만</option><option value="">마감 포함</option></select>
         <input id="nQ" type="search" placeholder="공고 찾기" style="min-width:0;flex:1;max-width:260px">
         <span class="hint" id="nCount"></span><span class="sp"></span><span class="hint" id="nLast"></span>
@@ -328,8 +328,8 @@ table.mx td.dot.yes{background:var(--green-bg)}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-govaid-match.js?v=7"></script>
-<script src="js/pu-govaid-view.js?v=6"></script>
+<script src="js/pu-govaid-match.js?v=8"></script>
+<script src="js/pu-govaid-view.js?v=7"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
 <script src="js/pu-govaid-records.js?v=3"></script>
 <script>
@@ -342,7 +342,7 @@ var DEC={yes:'해당',hold:'보류',no:'비해당'};
 var VERDICT={candidate:'후보',unknown:'정보 부족',no:'안 맞음',unconfirmed:'조건 미확정',closed:'사업종료'};
 /* 고르기(☐) 묶음마다 할 수 있는 일 — 표 이름 → 일 */
 var BULK={ coCand:'review', coUnk:'review', coNo:'review', progCand:'review', progUnk:'review',
-  coList:'dropProspect', dict:'dropProgram', check:'confirmProgram', news:'ignoreNotice' };
+  coList:'dropProspect', coLocal:'ignoreNotice', dict:'dropProgram', check:'confirmProgram', news:'ignoreNotice' };
 
 /* ═══ 작은 도구 ═══ */
 function $(id){ return document.getElementById(id); }
@@ -462,9 +462,9 @@ function drawDict(){
   var q=$('dQ').value.trim().toLowerCase(), ag=$('dAgency').value, fd=$('dField').value, st=$('dStatus').value;
   var view=VP().filter(function(p){ return (!q||nm(p).toLowerCase().indexOf(q)>=0) && (!ag||p.agency===ag)
     && (!fd||fieldsOf(p).indexOf(fd)>=0) && (!st || (st==='check')===GovaidView.needsCheck(p,YEAR)); });
-  $('dBox').innerHTML = view.length ? tbl('dict',['사업명','분야','담당기관','조건','상태','확인'], view.map(function(p){
+  $('dBox').innerHTML = view.length ? tbl('dict',['사업명','분야','담당기관','범위','조건','상태','확인'], view.map(function(p){
     return { id:p.id, cells:[ starBtn(p)+'<span title="'+esc(p.summary||'')+'">'+esc(nm(p))+'</span>', fieldsOf(p).map(function(f){ return '<span class="chip">'+esc(f)+'</span>'; }).join(''),
-      esc(p.agency||'—'), condSummary(p), statusChip(p), p.confirmedBy ? esc([nameOf(p.confirmedBy), ymd(p.confirmedAt)].filter(Boolean).join(' · ')) : '—' ] }; }))
+      esc(p.agency||'—'), scopeChip(p), condSummary(p), statusChip(p), p.confirmedBy ? esc([nameOf(p.confirmedBy), ymd(p.confirmedAt)].filter(Boolean).join(' · ')) : '—' ] }; }))
     : '<div class="empty">'+(PROGS.length?'조건에 맞는 사업이 없습니다':'사업 사전이 비어 있습니다 — 「📥 캡처 사업 넣기」를 누르세요')+'</div>';
 }
 /* 씨앗 — 빈 자리에만. 이미 있는(지운 표식 포함) id 는 건드리지 않는다(expectedRevision:-1) */
@@ -520,7 +520,7 @@ function valTxt(key,x){
   return esc(t)+(x.src?' <span class="chip">'+esc(x.src)+'</span>':'');
 }
 function profLine(pf){
-  var v=pf.vals, cells=[['업종','industry'],['지역','region'],['근로자','headcount'],['개업','foundedYear'],['규모','size'],['매출 감소','salesDropPct']];
+  var v=pf.vals, cells=[['업종','industry'],['지역','region'],['시·군','sigungu'],['근로자','headcount'],['개업','foundedYear'],['규모','size'],['매출 감소','salesDropPct']];
   /* 사실도 출처 꼬리표를 단다 — 우선지원대상기업은 기계가 «추정»으로 채울 수 있다(사람 답은 «직접 입력») */
   var f=Object.keys(GovaidMatch.FACTS).filter(function(k){ return pf.facts[k]; }).map(function(k){ var x=pf.facts[k]; return esc(GovaidMatch.FACTS[k]+': '+(x.v?'예':'아니오'))+(x.src?' <span class="chip">'+esc(x.src)+'</span>':''); });
   return '<div class="prof">'+cells.map(function(c){ return '<span><b>'+c[0]+'</b>'+valTxt(c[1],v[c[1]])+'</span>'; }).join('')
@@ -563,6 +563,7 @@ function drawCoDetail(){
   box.innerHTML='<div class="bar"><b style="font-size:15px">'+esc(pf.name)+'</b>'+kindChip(pf)+(pf.bizno?'<span class="hint">'+esc(pf.bizno)+'</span>':'')
       +'<span class="sp"></span><button class="sm" data-subj="'+esc(pf.key)+'">✏ 사업장 정보</button></div>'
     + profLine(pf)
+    + coLocal(pf)
     + '<div class="sec">✅ 조건 충족 — 후보 '+cand.length+'</div>'
     + (cand.length ? tbl('coCand',['지원사업','담당기관','맞은 조건','검토','사유'],cand) : '<div class="empty">후보가 없습니다</div>')
     + coDocs(pf, cand.length)
@@ -643,10 +644,56 @@ async function toggleStar(id){
     toast(on ? '★ 「'+GovaidView.shortName(p)+'」을(를) 노무사 직접 사업으로 표시했습니다' : '★ 표시를 껐습니다');
   }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
 }
+/* ═══ 📍 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭등도 모두 연결」 → 「추천대로 순서대로」 1단계)
+   지역 공고는 사전에 넣지 않고 «공고 그대로» 회사에 맞춘다 — 서버가 공고 이름 앞 [충남] 아산시 … 에서 시·도·시·군을 읽어 둔다(area).
+   ⚠ 지역만 맞춘 1차 명단 — 세부 조건은 공고 원문을 사람이 확인한다. 굵직한 반복 사업만 «사전으로» 올려 조건을 확정한다 ═══ */
+function areaChip(n){
+  var a=n.area||{}, g=GovaidMatch.list(a.sgg), s=GovaidMatch.list(a.sido);
+  return g.length ? '<span class="chip c-amber">'+esc(g.join('·'))+'</span>' : s.length ? '<span class="chip c-blue">'+esc(s.join('·'))+'</span>' : '<span class="chip">전국</span>';
+}
+function scopeChip(p){ var r=GovaidMatch.list((p.cond||{}).regions); return r.length ? '<span class="chip c-blue">'+esc(r.join('·'))+'</span>' : '<span class="chip">전국</span>'; }
+function starBtnN(n){
+  var on=!!(n&&n.star&&n.star.on);
+  return '<button class="star'+(on?' on':'')+'" data-nstar="'+esc(n.id)+'" title="'+(on?'★ 노무사 직접 — 누르면 끕니다':'누르면 ★ 노무사 직접으로 표시합니다')+'">'+(on?'★':'☆')+'</button>';
+}
+async function toggleNoticeStar(k){
+  var n=(D.notices||{})[k]; if(!n) return;
+  var on=!(n.star&&n.star.on);
+  try{
+    await gate.save(fbDb.ref('govaid/notices/'+k), function(prev){ return GovaidRecords.starred(prev, n, on, on?'노무사 직접(사람 표시)':'', ME.sid, Date.now()); }, { entityType:'Document' });
+    await loadNotices(true); draw(); toast(on?'★ 표시했습니다':'★ 표시를 껐습니다');
+  }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+function coLocal(pf){
+  var v=pf.vals||{}, r=(v.region||{}).v, g=(v.sigungu||{}).v, head='<div class="sec">📍 우리 지역 공고';
+  if(!r) return head+' <span class="hint">— 이 회사 지역을 몰라 맞출 수 없습니다(업체관리 주소를 넣으면 맞춰집니다)</span></div>';
+  if(!D.notices){
+    /* 공고 함은 무겁다 — 한 번 «불러오기»를 누른 기기만 다음부터 저절로 읽는다 */
+    if(lsGet('localAuto')==='1'){ loadNotices().then(function(){ if(TAB==='co'){ drawCoDetail(); drawBulk(); } }); return head+' <span class="hint">읽는 중…</span></div>'; }
+    return head+' <span class="sp"></span><button class="sm" data-loadlocal="1">불러오기</button></div>';
+  }
+  var rs=GovaidView.localNotices(pf, D.notices, todayKst());
+  if(STAR_ONLY) rs=rs.filter(function(x){ return x.n.star && x.n.star.on; });
+  var sggN=rs.filter(function(x){ return x.scope==='sgg'; }).length;
+  return head+' — 접수 중 '+rs.length+'건 <span class="hint">('+esc([g?g+' '+sggN:'', r+' '+(rs.length-sggN)].filter(Boolean).join(' · '))+') · 지역만 맞춘 1차 명단 — 공고 원문을 확인하세요</span></div>'
+    + (rs.length ? tbl('coLocal',['공고','범위','신청기간','대상','처리'], rs.map(function(x){
+        var n=x.n, k=n.id, link=/^https:\/\//.test(n.url||'') ? ' <a href="'+esc(n.url)+'" target="_blank" rel="noopener" title="기업마당 공고">🔗</a>' : '';
+        return { id:k, cells:[ starBtnN(n)+'<span'+(x.mismatch?' class="hint"':'')+' title="'+esc(n.nm+(n.memo?' — '+n.memo:''))+'">'+esc(n.nm)+'</span>'+link,
+          areaChip(n), periodChip(n), x.mismatch ? '<span class="chip c-amber">'+esc(x.mismatch)+'</span>' : esc(GovaidMatch.list(n.who).join('·')||'—'),
+          '<button class="sm" data-ndraft="'+esc(k)+'" title="해마다 되풀이되는 굵직한 사업이면 사전으로 올려 조건을 확정합니다">사전으로</button> <button class="sm" data-nignore="'+esc(k)+'">관계없음</button>' ] };
+      })) : '');
+}
+/* 지역 한눈 — 고객사가 있는 시·도·시·군마다 고객사 수와 접수 중 지역 공고 수(보기 전용) */
+function regionTable(){
+  var S=GovaidView.regionSummary(PROFILES, D.notices||{}, todayKst());
+  return '<div class="sec">📍 지역 한눈 — 고객사가 있는 곳 <span class="hint">시·군 공고 = 그 시·군 이름이 붙은 공고 · 도 전체 = 시·군 없이 [시·도]만 붙은 공고</span></div><div class="scroll"><table class="t" data-viewonly="1"><thead><tr><th class="n">번호</th><th>시·도</th><th>시·군·구</th><th class="n">고객사</th><th class="n">시·군 공고</th><th class="n">도 전체 공고</th><th class="n">★</th></tr></thead><tbody>'
+    + S.map(function(x,i){ return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(x.sido||'지역 모름')+'</td><td>'+esc(x.sgg||(x.sido?'(시·군 모름)':'—'))+'</td><td class="n">'+x.cos+'</td><td class="n">'+(x.sido?x.sggOpen:'—')+'</td><td class="n">'+(x.sido?x.sidoOpen:'—')+'</td><td class="n">'+(x.star||'')+'</td></tr>'; }).join('')
+    + '</tbody></table></div>';
+}
 /* ═══ 📰 새 공고 — 서버(govaidNoticeWatch, 매일 08:10)가 쌓은 기업마당 공고를 사람이 처리한다 (대표 승인 2026-10-12 「네」)
    ↔ 잇기 = 사업의 bizinfo 에 공고번호 → 그 뒤로 서버가 날마다 접수 상태(접수 중·접수 마감)를 맞춘다 · 새 사업 초안 · 관계없음.
    ⚠ 이름이 비슷하다고 저절로 잇지 않는다(제안만) — 잇는 것은 사람이다. 공고 함은 이 탭을 열 때만 읽는다(앱을 열 때 안 내려받게) ═══ */
-var NEWS_VIEW={sug:'사전 사업과 비슷한 공고',all:'처리 안 한 공고 전체',labor:'인력·경영 분야',linked:'사업에 이은 공고',ignored:'관계없음으로 둔 것'};
+var NEWS_VIEW={sug:'사전 사업과 비슷한 공고',local:'우리 고객사 지역의 지역 공고',all:'처리 안 한 공고 전체',labor:'인력·경영 분야',linked:'사업에 이은 공고',ignored:'관계없음으로 둔 것'};
 var NEWS_MAX=300;
 async function loadNotices(force){
   if(D.notices && !force) return;
@@ -668,9 +715,10 @@ function drawNews(){
   var L=D.noticeLast||{};
   $('nLast').textContent = L.at ? '마지막 받음 '+ymd(L.at)+' · '+(L.received||0)+'건'+(L.errors&&L.errors.length?' · 오류 '+L.errors.length:'')+(L.error?' · '+L.error:'') : '아직 받은 적 없음(매일 아침 8:10)';
   if(!D.notices){ $('nBox').innerHTML='<div class="empty">공고 함을 읽는 중…</div>'; loadNotices().then(function(){ if(TAB==='news') draw(); }); return; }
-  var rs=GovaidView.noticeRows(D.notices, PROGS, { view:$('nView').value, openOnly:$('nOpen').value==='open', q:$('nQ').value, today:todayKst() });
+  var LOC=$('nView').value==='local';
+  var rs=GovaidView.noticeRows(D.notices, PROGS, { profiles: PROFILES, view:$('nView').value, openOnly:$('nOpen').value==='open', q:$('nQ').value, today:todayKst() });
   $('nCount').textContent=rs.length+'건'+(rs.length>NEWS_MAX?' (앞 '+NEWS_MAX+'건만 보입니다 — 찾기로 좁히세요)':'');
-  $('nBox').innerHTML = rs.length ? tbl('news',['공고','소관·수행','신청기간','비슷한 사전 사업','처리'], rs.slice(0,NEWS_MAX).map(function(r){
+  $('nBox').innerHTML = (LOC ? regionTable() : '') + (rs.length ? tbl('news', LOC ? ['공고','범위','신청기간','해당 고객사','처리'] : ['공고','소관·수행','신청기간','비슷한 사전 사업','처리'], rs.slice(0,NEWS_MAX).map(function(r){
     var n=r.n, k=n.id, src=/^https:\/\//.test(n.url||'') ? ' <a href="'+esc(n.url)+'" target="_blank" rel="noopener" title="기업마당 공고">🔗</a>' : '';
     var who=[n.ntce,n.inst].filter(function(x,i,a){ return x && a.indexOf(x)===i; }).join(' · ');
     var sug=r.sug.map(function(s){ return starBtn(s.p)+esc(GovaidView.shortName(s.p))+' <span class="chip">'+esc(s.score)+'</span>'; }).join(' · ');
@@ -680,9 +728,10 @@ function drawNews(){
     else act=(r.sug.length>1 ? '<select data-nsel="'+esc(k)+'">'+r.sug.map(function(s){ return '<option value="'+esc(s.p.id)+'">'+esc(GovaidView.shortName(s.p))+'</option>'; }).join('')+'</select> ' : '')
       +(r.sug.length ? '<button class="sm pri" data-nlink="'+esc(k)+'" data-pid="'+esc(r.sug[0].p.id)+'">↔ 잇기</button> ' : '')
       +'<button class="sm" data-ndraft="'+esc(k)+'" title="사전에 없는 사업 — 이 공고로 초안을 만들고 편집 창을 엽니다">＋초안</button> <button class="sm" data-nignore="'+esc(k)+'">관계없음</button>';
-    return { id:k, cells:[ (r.linkedTo?'<span class="chip c-blue">이음</span>':'')+'<span title="'+esc(n.nm+(n.memo?' — '+n.memo:''))+'">'+esc(n.nm)+'</span>'+src,
-      '<span title="'+esc(who)+'">'+esc(who||'—')+'</span>', periodChip(n), sug||'<span class="hint">—</span>', act ] };
-  })) : '<div class="empty">'+esc(NEWS_VIEW[$('nView').value]||'')+' — 없습니다</div>';
+    var c1=starBtnN(n)+(r.linkedTo?'<span class="chip c-blue">이음</span>':'')+'<span title="'+esc(n.nm+(n.memo?' — '+n.memo:''))+'">'+esc(n.nm)+'</span>'+src;
+    return { id:k, cells: LOC ? [ c1, areaChip(n), periodChip(n), '<b>'+r.cos+'곳</b>', act ]
+      : [ c1, '<span title="'+esc(who)+'">'+esc(who||'—')+'</span>', periodChip(n), sug||'<span class="hint">—</span>', act ] };
+  })) : '<div class="empty">'+esc(NEWS_VIEW[$('nView').value]||'')+' — 없습니다</div>');
 }
 /* 잇기·풀기 — 근거는 사업 레코드 하나(bizinfo). 공고 쪽엔 «누가 처리했는지»만 남긴다 */
 async function linkNotice(k, pid, add){
@@ -1012,6 +1061,8 @@ document.addEventListener('click', function(e){
 function clickMore(t){
   var b;
   if((b=t.closest('[data-star]'))){ toggleStar(b.getAttribute('data-star')); return true; }
+  if((b=t.closest('[data-nstar]'))){ toggleNoticeStar(b.getAttribute('data-nstar')); return true; }
+  if((b=t.closest('[data-loadlocal]'))){ lsSet('localAuto','1'); loadNotices().then(draw); return true; }
   if((b=t.closest('[data-subj]'))){ openSubject(b.getAttribute('data-subj')); return true; }
   if((b=t.closest('[data-ssave]'))){ saveSubject(); return true; }
   if((b=t.closest('[data-psave]'))){ saveProgram(b.getAttribute('data-psave')); return true; }
@@ -1033,7 +1084,7 @@ function clickReview(t){
   if((b=t.closest('[data-foldoth]'))){ OPEN_OTH=!OPEN_OTH; drawCoDetail(); drawBulk(); return true; }
   if((b=t.closest('[data-foldno]'))){ OPEN_NO=!OPEN_NO; drawCoDetail(); drawBulk(); return true; }
   /* 회사·사업을 바꾸면 그 화면 표의 고르기를 푼다 — 고르기 열쇠에 회사·사업이 없어, 남겨 두면 새 화면의 쌍에 저장된다 */
-  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); pickedShow('coDetail'); return true; }
+  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo','coLocal']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); pickedShow('coDetail'); return true; }
   if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); pickedShow('pDetail'); return true; }
   return false;
 }

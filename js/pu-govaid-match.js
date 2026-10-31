@@ -106,6 +106,20 @@
     for (var i = 0; i < REGION_PREFIX.length; i++) if (a.indexOf(REGION_PREFIX[i][1]) === 0) return REGION_PREFIX[i][0];
     return '';
   }
+  /* 주소 → 시·군·구 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」) — 시·도를 알고, 그 다음 낱말이 …시·…군·…구일 때만.
+     «천안시 동남구»처럼 구가 붙으면 앞의 시를 쓴다(지원사업은 시 단위로 나온다). 세종은 시·군이 없다 */
+  function sigunguOf(address) {
+    var a = clean(address).replace(/^\(?\d{5}\)?\s*/, '');
+    if (!regionOf(a) || regionOf(a) === '세종') return '';
+    var w = a.split(/\s+/)[1] || '';
+    return /^[가-힣]{1,6}(시|군|구)$/.test(w) ? w : '';
+  }
+  /* 고용·산재보험 사업장 줄의 주소 — 업체관리 주소가 없을 때 지역을 채운다(인원이 가장 많은 줄) */
+  function eiAddr(pub) {
+    var best = null;
+    list(((pub || {}).ei || {}).rows).forEach(function (r) { if (r && clean(r.addr) && (!best || (num(r.cnt) || 0) > (num(best.cnt) || 0))) best = r; });
+    return best ? clean(best.addr) : '';
+  }
 
   /* 후보 [값, 출처] 가운데 «빈 것이 아닌» 첫 값 — 0 은 빈 것이 아니다 */
   function first(cands) {
@@ -216,13 +230,17 @@
   function profileFromCompany(co, pub, extra) {
     co = co || {};
     var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub), ia = industryAuto(pub, co);
+    /* 지역 — 업체관리 주소가 시·도를 모르면 고용보험 사업장 주소로(2026-10-31). 사람이 시·도를 따로 넣었는데 주소와 다르면 시·군은 모름 */
+    var addr = regionOf(co.address) ? clean(co.address) : eiAddr(pub), asrc = regionOf(co.address) ? '업체관리 주소' : '고용보험 사업장 주소';
+    var sgg = (regionOk(ex.region) && regionOk(ex.region) !== regionOf(addr)) ? '' : sigunguOf(addr);
     return withPriority({
       key: 'co_' + clean(co.id), kind: 'co', id: clean(co.id), name: clean(co.name), bizno: digits(co.bizNo), aliases: [],
       vals: {
         headcount: first([[num(ex.headcount), MINE], [hc.v, hc.src], [num(autoOf(extra, 'headcount')[0]), autoOf(extra, 'headcount')[1]]]),
         foundedYear: first([[num(ex.foundedYear), MINE], [num(autoOf(extra, 'foundedYear')[0]), autoOf(extra, 'foundedYear')[1]]]),
         size: first([[sizeOk(ex.size), MINE], [sizeOk(co.companySize), '업체관리'], [autoSizeOk(autoOf(extra, 'size')[0]), autoOf(extra, 'size')[1]]]),
-        region: first([[regionOk(ex.region), MINE], [regionOf(co.address), '업체관리 주소']]),
+        region: first([[regionOk(ex.region), MINE], [regionOf(addr), asrc]]),
+        sigungu: first([[clean(ex.sigungu), MINE], [sgg, asrc]]),
         industry: first([[industryOk(ex.industry), MINE], [ia.v, ia.src]]),
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
       },
@@ -321,7 +339,7 @@
 
   return {
     SIZES: SIZES, REGIONS: REGIONS, INDUSTRIES: INDUSTRIES, FACTS: FACTS, DOCS: DOCS, docKeyOf: docKeyOf, closureOf: closureOf,
-    list: list, digits: digits, blank: blank, num: num, kstYear: kstYear, regionOf: regionOf,
+    list: list, digits: digits, blank: blank, num: num, kstYear: kstYear, regionOf: regionOf, sigunguOf: sigunguOf,
     headcountAuto: headcountAuto, prioritySupportAuto: prioritySupportAuto, industryFromName: industryFromName, industryAuto: industryAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
     judge: judge
   };
