@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=78"></script>
+<script src="js/pu-ontology.js?v=79"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -48,13 +48,16 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/lib-order.js?v=2"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-sites.js?v=2"></script>
-<script src="js/rules-v2/store.js?v=4"></script>
-<script src="js/rules-v2/view-library.js?v=5"></script>
+<script src="js/rules-v2/store.js?v=5"></script>
+<script src="js/rules-v2/view-library.js?v=6"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
 <script src="js/rules-v2/view-sites.js?v=11"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
+<!-- 「🤖 매일 정리」(📥 의 네 번째 보기 · 설계 §14) — 셈(lib-daily)은 lib-tidy 를 «그대로» 딛는다(서버 사본과 한 글자까지 같다), 그리기(view-daily)는 view-library 를 쓴다 -->
+<script src="js/rules-v2/lib-daily.js?v=1"></script>
+<script src="js/rules-v2/view-daily.js?v=1"></script>
 <!-- 「📚 조별 문안」 — 검토 기준은 규정관리와 «같은 한 벌»(pu-rules-criteria.js), 주제 차례는 표준취업규칙(std_2026.js) -->
 <script src="js/pu-rules-criteria.js?v=3"></script>
 <script src="std_2026.js?v=2"></script>
@@ -473,6 +476,68 @@ button{font:inherit;cursor:pointer}
 .tflow i{font-style:normal;display:inline-block;padding:0 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;margin-right:4px;font-size:11.5px}
 .tflow i.f{background:#fffbeb;border-color:#fde68a;color:#854d0e;font-weight:700}
 .tflow i.rep{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+/* 🤖 매일 정리 (설계 §14-4) — 판(모드·마지막·오늘 숫자·담당 칩·지난 기록) + 표(.lib 그대로). 색은 이 화면에 이미 있는 것만 */
+.daily{padding:0 0 8px}
+.dpanel{margin:10px 20px;border:1px solid #bfdbfe;border-radius:12px;background:#ffffff;overflow:hidden}
+.dpanel .dh{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e2e8f0;white-space:nowrap;min-width:0}
+.dpanel .dh .why{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dmode{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;border:1px solid #fde68a;background:#fffbeb;color:#854d0e;flex-shrink:0}
+.dmode.live{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.dmode.off{border-color:#cbd5e1;background:#f8fafc;color:#475569}
+.dsw{margin-left:auto;display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;flex-shrink:0}
+.dsw button{border:0;background:#ffffff;color:#475569;font-size:11.5px;padding:3px 10px;white-space:nowrap}
+.dsw button.on{background:#1e40af;color:#ffffff;font-weight:700}
+.dwarn{padding:6px 12px;background:#fffbeb;color:#854d0e;font-size:11.5px;border-bottom:1px solid #fde68a}
+.dkpis{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px}
+.dkpi{border:1px solid #e2e8f0;border-radius:10px;padding:4px 12px;min-width:96px}
+.dkpi b{display:block;font-size:17px;color:#1e293b;font-variant-numeric:tabular-nums}
+.dkpi span{font-size:11px;color:#475569;white-space:nowrap}
+.dkpi.ok b{color:#166534}.dkpi.w b{color:#854d0e}.dkpi.m b{color:#475569}
+.dwho{display:flex;align-items:center;gap:6px;padding:0 12px 8px;white-space:nowrap;overflow-x:auto}
+.dlogs{border-top:1px dashed #e2e8f0;padding:4px 12px 6px}
+.dlog{font-size:11.5px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 0}
+.dspan{display:flex;align-items:center;gap:6px;padding:0 20px 6px}
+.dbar{display:flex;align-items:center;gap:8px;margin:0 20px 8px;padding:6px 12px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:10px;white-space:nowrap;overflow-x:auto}
+.dly .dchip{display:inline-block;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:999px;padding:0 8px;font-size:11.5px;margin-right:5px}
+.dly .dchip.no{border-color:#fde68a;background:#fffbeb;color:#854d0e}
+.dst{display:inline-block;font-size:11px;font-weight:700;border-radius:7px;padding:0 7px;margin-right:5px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
+.dst.auto{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.dst.human{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}
+.dst.would,.dst.soon{border-color:#bfdbfe;background:#ffffff;color:#1e40af}
+.dst.need{border-color:#fde68a;background:#fffbeb;color:#854d0e}
+/* 폰(900px 이하) — 표를 «두 줄 카드»로(폰화면관리 2026-10-18 · 🏢 사업장 표와 같은 처방). 1줄 ☐·№·사업장·정리 / 2줄 서류·담당·담은 때·손잡이. PC 는 그대로 */
+@media (max-width:900px){
+  .dpanel,.dspan,.dbar{margin-left:8px;margin-right:8px}
+  .dspan{padding-left:0;padding-right:0}
+  /* 머리줄은 접는다 — 한 줄에 우겨 넣으면 관리자 스위치(시범·켜기·끄기)가 오른쪽 밖으로 밀려 「켜기」가 잘렸다 */
+  .dpanel .dh{flex-wrap:wrap;row-gap:6px;padding:8px 10px}
+  .dsw{margin-left:0}
+  /* 오늘 숫자는 한 줄에 셋 — 다섯 칸이 세 줄을 먹어 첫 화면에 표가 안 보였다. 이름은 넘치면 … (title 에 전문) */
+  .dkpis{gap:6px;padding:8px 10px}
+  .dkpi{flex:1 1 28%;min-width:0;padding:3px 8px}
+  .dkpi b{font-size:15px}
+  .dkpi span{display:block;overflow:hidden;text-overflow:ellipsis}
+  .dwho{padding:0 10px 8px}
+  .dlogs{padding:4px 10px 6px}
+  .dlog:nth-child(n+4){display:none}
+  .dly{display:block;min-width:0}
+  .dly colgroup{display:none}
+  .dly thead tr{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#f8fafc}
+  .dly thead th{display:none;border:0;padding:0;background:none}
+  .dly thead th:first-child{display:block}
+  .dly tbody{display:block}
+  .dly tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px 8px 6px;border-bottom:1px solid #e2e8f0;background:#ffffff}
+  .dly tbody td{display:block;border:0;padding:0;background:none;min-width:0}
+  .dly td.c{order:1}.dly td.no{order:2;min-width:22px}
+  .dly td.co{order:3;flex:1 1 0;font-weight:700}
+  .dly td.st{order:4;flex:0 1 auto;max-width:48%}
+  .dly td.file{order:5;flex:1 1 100%;padding-left:46px;font-size:12px}
+  .dly td.who{order:6;padding-left:46px}
+  .dly td.dt{order:7;font-size:11px;color:#475569}
+  .dly td.act{order:8;margin-left:auto}
+  .dly td.empty{flex:1 1 100%}
+  .dly input[type=checkbox]{width:24px;height:24px}
+}
 </style>
 <link rel="stylesheet" href="css/rules-shell.css?v=4">
 </head>
@@ -646,6 +711,18 @@ function tNoneMany(ids, label) {
     return reload();
   });
 }
+/* 🤖 고른 줄 가운데 조건에 맞는 것 — «보이는» 줄만(걸러져 안 보이는 줄은 고르지 않는다) */
+function dPicked(ok) {
+  var M = PuRulesV2DailyView.model(ST), t = PuRulesV2DailyView.ensure(ST);
+  return M.shown.filter(function (r) { return t.picked.has(r.it.id) && ok(r); }).map(function (r) { return r.it.id; });
+}
+/* 🤖 자동 확정 되돌리기 — 건수를 묻고 한 건씩(🧹 와 같은 길). 멈추면 «몇 건 했는지»를 알린다 */
+function dUndo(ids) {
+  if (!ids.length) return;
+  if (!confirm('자동 확정 ' + ids.length + '건을 «미확정»으로 돌립니다.\n이 서류들의 주소는 앞으로 자동 확정하지 않습니다(사람이 정합니다).')) return;
+  busy('되돌리는 중… 0/' + ids.length, S.undoAuto(ids, function (n) { tProgress('되돌리는 중… ' + n + '/' + ids.length); }))
+    .then(function () { PuRulesV2DailyView.ensure(ST).picked.clear(); return reload(); }, function () { return reload(); });
+}
 function itemOf(id) {
   return PuRulesV2Order.merge(ST.data.docs, ST.data.human).filter(function (it) { return it.id === id; })[0];
 }
@@ -666,7 +743,8 @@ var H = {
     });
   },
   view: function (d) {
-    ST.view = d.v === 'company' || d.v === 'tidy' ? d.v : 'mail'; ST.picked.clear();
+    ST.view = d.v === 'company' || d.v === 'tidy' || d.v === 'daily' ? d.v : 'mail'; ST.picked.clear();
+    if (ST.daily) ST.daily.picked.clear();   // 고른 것은 화면을 떠나면 비운다
     // 🧹 처음 열 때 ① 에 이을 묶음이 없고 ② 에 고를 회차가 있으면 ② 부터 보인다(설계 §10-1)
     if (ST.view === 'tidy' && !ST.tidy) {
       var n = PuRulesV2Tidy.counts(ST.data, ST.companies);
@@ -674,6 +752,32 @@ var H = {
     } if (ST.tidy) { ST.tidy.picked.clear(); ST.tidy.last = null; } draw();
   },
   kind: function (d) { ST.filt.kind = d.v || ''; draw(); },
+  /* ── 🤖 매일 정리 (설계 §14-4) — 그리기는 PuRulesV2DailyView, 셈은 PuRulesDaily(서버와 같은 판정) ── */
+  dailySpan: function (d) { var t = PuRulesV2DailyView.ensure(ST); t.span = d.v === 'week' ? 'week' : 'today'; t.picked.clear(); draw(); },
+  dailyWho: function (d) { var t = PuRulesV2DailyView.ensure(ST); t.who = t.who === d.v ? '' : (d.v || ''); t.picked.clear(); draw(); },
+  dpick: function (id, on) { var t = PuRulesV2DailyView.ensure(ST); if (on) t.picked.add(id); else t.picked.delete(id); draw(); },
+  dpickAll: function (on) {
+    var t = PuRulesV2DailyView.ensure(ST);
+    $lib.querySelectorAll('input[data-dpick]').forEach(function (c) { if (on) t.picked.add(c.dataset.dpick); else t.picked.delete(c.dataset.dpick); });
+    draw();
+  },
+  dailyUnpick: function () { PuRulesV2DailyView.ensure(ST).picked.clear(); draw(); },
+  dailyUndo: function (d) { dUndo([d.id]); },
+  dailyUndoPicked: function () { dUndo(dPicked(function (r) { return r.state === 'auto'; })); },
+  dailyLinkPicked: function () {
+    var ids = dPicked(function (r) { return ['auto', 'human', 'none'].indexOf(r.state) < 0; });
+    if (!ids.length) return;
+    ST.picker = { ids: ids, label: '고른 ' + ids.length + '건', q: '' }; draw();
+  },
+  dailyMode: function (d) {
+    if (!ST.isAdmin) { alert('관리자만 바꿀 수 있습니다.'); return; }
+    var m = d.m;
+    var msg = m === 'live' ? '켜면 매일 정리 때 «주소 일치·사람이 앞서 확정한 주소»인 서류의 사업장을 자동으로 확정합니다.\n줄마다 되돌릴 수 있습니다. 켤까요?'
+      : m === 'off' ? '끄면 처리 담당 기록과 자동 확정을 모두 멈춥니다. 끌까요?'
+      : '시범 운행으로 돌립니다 — «확정했을 것»만 기록하고 실제로는 확정하지 않습니다. 바꿀까요?';
+    if (!confirm(msg)) return;
+    busy('스위치를 바꾸는 중…', S.setAutoMode(m)).then(reload);
+  },
   only: function (d) { ST.filt.only = ST.filt.only === d.v ? '' : d.v; draw(); },
   q: function (v) {
     clearTimeout(qTimer);
@@ -710,7 +814,7 @@ var H = {
     var ids = ST.picker.ids, tidy = ST.view === 'tidy', saved = []; ST.picker = null;
     // 🧹 정리하기에서 «다른 회사…»로 왔다면 되돌리기 줄도 방금 한 이 일을 가리켜야 한다(옛 줄은 다른 일을 되돌린다)
     busy('사업장을 잇는 중…', S.linkCompany(ids, d.co, function (n) { saved.push(ids[n - 1]); })).then(function () {
-      ST.picked.clear();
+      ST.picked.clear(); if (ST.daily) ST.daily.picked.clear();
       if (tidy) T().last = { kind: 'link', label: PuRulesV2TidyView.coName(ST, d.co), ids: ids.slice(), rounds: [] };
       return reload();
     }, function () {

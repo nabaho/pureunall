@@ -7467,6 +7467,7 @@ exports.gcalTokenSweep = _gcalLink.gcalTokenSweep;
    ⚠ 메일은 읽기만 한다(MAIL_DEPS 를 메일 동기화와 «같은 것»으로 쓴다 — 계정·비밀번호가 한 곳). */
 const RulesCollect = require("./rules-collect");
 const RulesCollectMail = require("./rules-collect-mail");
+const RulesDaily = require("./rules-daily");
 async function rulesCollectOnce(reason, chain) {
   const sum = await RulesCollect.run({
     db: getDatabase(), bucket: getStorage().bucket(PHOTO_BUCKET), now: () => Date.now(),
@@ -7486,7 +7487,17 @@ async function rulesCollectOnce(reason, chain) {
      ⚠ 그만두는 셈은 RulesCollect.shouldChain 한 곳(다 봤다 · 나아가지 않았다 · 연결 실패투성이 · 한도 MAX_CHAIN).
      ⚠ 동시에 둘이 돌지 않는 것은 run 의 잠금이 지킨다 — 사람이 「지금 더 모으기」를 눌러도 잠겨 있으면 그냥 돌아간다. */
   const n = Number(chain || 0);
-  if (RulesCollect.shouldChain(sum, n)) {
+  const chainNext = RulesCollect.shouldChain(sum, n);
+  /* 🤖 매일 정리 (설계 §14 · 2026-10-31) — 이어 달리기의 «마지막» 회차 끝에서 한 번. 잠겨 돌려보낸 회차(skipped)는 안 한다(도는 쪽이 끝에 한다).
+     처리 담당 적기 · 사업장 자동 확정(스위치가 live 일 때만, 기본은 시범) · 하루 기록. 실제 코드는 rules-daily.js — 던지지 않는다. */
+  if (!chainNext && !(sum && sum.skipped)) {
+    try {
+      const daily = await RulesDaily.runOnce({ db: getDatabase(), now: () => Date.now(),
+        contractVersion: OntologyServerWrite.CONTRACT_VERSION, log: (s) => console.warn("[취업규칙 매일 정리]", s) });
+      console.log("[취업규칙 매일 정리]", reason, JSON.stringify(daily));
+    } catch (e) { console.warn("[취업규칙 매일 정리] 실패:", e && e.message); }
+  }
+  if (chainNext) {
     const ref = getDatabase().ref(RulesCollect.LIB + "/ask").push();
     const at = Date.now();
     await ref.set({ id: ref.key, kind: "rulesCollect", by: "이어 달리기", chain: n + 1, left: Number(sum.left || 0),

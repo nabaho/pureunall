@@ -31,8 +31,10 @@
     }
     var S = {
       load: function () {
-        return Promise.all([val(LIB + '/docs'), val(LIB + '/human'), val(LIB + '/rounds'), val(LIB + '/run')])
-          .then(function (v) { return { docs: v[0] || {}, human: v[1] || {}, rounds: v[2] || {}, run: v[3] || null }; });
+        /* 🤖 매일 정리 기록(auto) — 규칙 게시 전에는 못 읽는다. 그것 때문에 모은 자료 전체가 안 열리면 안 되므로 따로 받는다(설계 §14-3) */
+        var autoP = val(LIB + '/auto').then(function (a) { return a || {}; }, function () { return { unreadable: true }; });
+        return Promise.all([val(LIB + '/docs'), val(LIB + '/human'), val(LIB + '/rounds'), val(LIB + '/run'), autoP])
+          .then(function (v) { return { docs: v[0] || {}, human: v[1] || {}, rounds: v[2] || {}, run: v[3] || null, auto: v[4] }; });
       },
       text: function (id) { return val(LIB + '/text/' + id).then(function (t) { return t == null ? '' : String(t); }); },
       // 가린 글 여럿 받기 — docs={id:doc}. 브라우저 칸(cache)에 같은 판(v)이 있으면 받지 않는다.
@@ -79,6 +81,18 @@
         return each(ids, function (id) {
           return saveHuman(id, { companyId: null, companyLinkStatus: 'pending', linkedBy: by, linkedAt: at });
         }, onProgress);
+      },
+      // 🤖 자동 확정 되돌리기(설계 §14-4) — «미확정»으로 + noAuto: 이 서류의 주소는 다시 자동 확정하지 않는다. 지우지 않고 칸만 돌린다.
+      undoAuto: function (ids, onProgress) {
+        var at = o.now(), by = o.actor();
+        return each(ids, function (id) {
+          return saveHuman(id, { companyId: null, companyLinkStatus: 'pending', linkedBy: by, linkedAt: at, noAuto: true });
+        }, onProgress);
+      },
+      // 🤖 스위치 — 문서 하나를 통째로 .set(🤖 메일 자동 처리 scal_autoRun/cfg 와 같은 모양). 규칙이 관리자·위임관리인만 허락한다
+      setAutoMode: function (mode) {
+        if (['off', 'dry', 'live'].indexOf(mode) < 0) return Promise.reject(new Error('모르는 모드: ' + mode));
+        return db.ref(LIB + '/auto/cfg').set({ mode: mode, by: String(o.actor() || ''), at: o.now() });
       },
       setKind: function (id, kind) { return saveHuman(id, { kindFix: String(kind || '') }); },
       setRound: function (id, roundKey) { return saveHuman(id, { round: String(roundKey || '') }); },
