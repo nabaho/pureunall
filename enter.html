@@ -1909,6 +1909,8 @@ body.portal-mode #moreFab{display:flex;}
        ⚠ «급여관리»(payroll-os.html, 의뢰인 급여 아웃소싱)와 헷갈리지 않게 «직원» 을 붙였다. */
     { key:'hr',      name:'인사관리',    desc:'명부·급여·근태',   icon:'👥', url:'pu-erp.html?app=hr',  roles:null, perm:'hr',  row:'inside' },
     { key:'fin',     name:'재무관리',      desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inside' },
+    /* 컨설팅정산(2026-10-31 대표 지시) — 개인입금 사업 정산. 재무관리와 같은 사람만(perm 'fin' — 새 권한 깃발을 만들지 않는다) */
+    { key:'settle',  name:'컨설팅정산',    desc:'개인입금 사업 정산', icon:'🧾', url:'pu-settle.html',      roles:null, perm:'fin', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고

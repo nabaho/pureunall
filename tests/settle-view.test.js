@@ -63,6 +63,16 @@ test('송금 목록 — ☐·번호·보냄 칸, 보내는 사람 → 받는 사
   assert.match(visible(t), /87,915/);
 });
 
+test('계산만인 달도 송금 목록을 미리 보여 주되 «보냄»은 누를 수 없다', () => {
+  const r = fakeRun('draft'); r.transfers = [];
+  const h = V.runDetail(r, NAMES);
+  const t = h.slice(h.indexOf('data-name="transfers"'));
+  assert.ok(h.indexOf('data-name="transfers"') > 0, '미리보기 송금 표가 없다');
+  assert.match(visible(t), /87,915/);
+  assert.match(t, /data-paid="0" disabled/);
+  assert.match(visible(h), /미리보기/);
+});
+
 test('카톡 문구 상자 — 사람마다 복사 단추', () => {
   const h = V.messagesBox([{ sid: 'T-A', name: '김가나', text: '첫 줄\n둘째 줄' }, { sid: 'T-B', name: '이다라', text: 'x' }]);
   assert.match(h, /data-copy="0"/);

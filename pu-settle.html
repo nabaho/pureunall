@@ -142,8 +142,16 @@ main{padding:12px 16px 40px}
   .t[data-name=run] tbody td[data-k="adj"]:not(:empty)::before{content:'조정 '}
   .t[data-name=run] tbody td[data-k="final"]::before{content:'최종 '}
   .t[data-name=run] tbody td[data-k="site"]{display:none}
+  .t[data-name=runs] tbody td[data-k="cnt"]::before{content:'사업장 '}
+  .t[data-name=runs] tbody td[data-k="left"]:not(:empty)::before{content:'송금 남음 '}
   .t[data-name=run] tbody td[data-k="act"] input{width:100%}
   .t[data-name=rates] tbody tr,.t[data-name=siteRates] tbody tr{padding-left:10px}
+  /* 고르기 칸은 긴 사업장 이름(옵션 글)만큼 넓어진다 — 폰 폭 안에 가둔다. 설명이 긴 확인 칸은 접어 쓴다 */
+  select{max-width:100%}
+  .fr .ck{white-space:normal;align-items:flex-start}
+  .t[data-name] tbody td{min-width:0}
+  .t[data-name] tbody td select{width:100%}
+  .t[data-name=siteRates] tbody tr:last-child td:first-child,.t[data-name=adjusts] tbody tr:last-child td:nth-child(3){flex:0 0 100%}
   .cards{grid-template-columns:1fr;gap:8px}
 }
 </style>
@@ -196,13 +204,13 @@ main{padding:12px 16px 40px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=78"></script>
+<script src="js/pu-ontology.js?v=79"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=35"></script>
+<script src="js/pu-appbar.js?v=36"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -212,7 +220,7 @@ main{padding:12px 16px 40px}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-settle-core.js?v=1"></script>
-<script src="js/pu-settle-view.js?v=1"></script>
+<script src="js/pu-settle-view.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
