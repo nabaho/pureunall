@@ -11,7 +11,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var DEFAULT_HEAD = '[{사업} {월} 입금분 정산 안내]';
+  /* 카톡 문구 머리 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로」. {사업} 사업 이름 · {지급월} «2026년 10월» · {월} «10월» */
+  var DEFAULT_HEAD = '[컨설팅 비용 정산 안내]\n{사업} — {지급월}';
+  var HOW_TO = '※ 계산 방법 — 사업장에 들어온 금액(원천징수 뒤 세후)을 모두 더해 담당 요율(%)을 곱한 것이 담당자 산정금액입니다(원 미만 버림). '
+    + '담당자가 이미 받은 금액이 산정금액보다 많으면 차액을 반환하고, 적으면 차액을 추가로 지급받습니다.';
   var DEFAULT_FOOT = '확인 부탁드립니다. 감사합니다.';
   var KST = 9 * 3600 * 1000;
 
@@ -300,39 +303,56 @@
     var s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return (n < 0 ? '−' : '') + s;
   }
-  function settleLine(prefix, v, leadName) {
-    if (v < 0) return prefix + '반환 ' + fmt(-v) + '원 — 몫보다 더 받으신 금액입니다. 송금 부탁드립니다 (받는 분 ' + leadName + ')';
-    if (v > 0) return prefix + '추가 지급 ' + fmt(v) + '원 — 몫보다 덜 받으신 금액을 보내 드립니다 (보내는 분 ' + leadName + ')';
+  /* 담당 기준 정산액 → 누가 누구에게(반환 / 추가 지급) */
+  function settleLine(prefix, v, staffName, leadName) {
+    if (v < 0) return prefix + '반환: ' + staffName + ' → ' + leadName + ' ' + fmt(-v) + '원 (송금 부탁드립니다)';
+    if (v > 0) return prefix + '추가 지급: ' + leadName + ' → ' + staffName + ' ' + fmt(v) + '원 (보내 드립니다)';
     return prefix + '주고받을 금액이 없습니다';
   }
+  /* 입금자 한 줄 — 통장 확인 금액이 있으면 그것, 없으면 세전에서 원천징수를 뺀 계산값 */
+  function depositLine(m, nm) {
+    var w = '세전 ' + fmt(m.pre) + '원 − 원천징수 ' + taxOf(m.tax) + '% ' + fmt(m.inc + m.loc) + '원';
+    if (m.actual != null) return ' · ' + nm + ' ' + fmt(m.used) + '원 (' + (m.actual === m.net ? w : '통장 확인 금액 · 계산상 세후 ' + fmt(m.net) + '원') + ')';
+    if (!(m.pre > 0)) return ' · ' + nm + ' 0원';
+    return ' · ' + nm + ' ' + fmt(m.used) + '원 (' + w + ')';
+  }
+  /* 카톡 문구 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로 하고 입금자 입금금액 담당자 담당자 산정금액 % 등 계산방법등을 정리해서」.
+     담당마다 한 통: 사업장마다 ① 입금자·입금금액 ② 담당자 산정금액(사업장 합계 × %) ③ 정산(반환 / 추가 지급), 끝에 계산 방법 */
   function buildMessages(run, rule, names) {
     rule = rule || {}; names = names || {};
-    var month = Number(String(run.monthKey || '').slice(5)) + '월';
-    var head = String(rule.msgHead || DEFAULT_HEAD).split('{사업}').join(rule.title || '').split('{월}').join(month);
+    var month = Number(String(run.monthKey || '').slice(5)) + '월', label = run.label || (String(run.monthKey || '').slice(0, 4) + '년 ' + month);
+    var head = String(rule.msgHead || DEFAULT_HEAD).split('{사업}').join(rule.title || '').split('{지급월}').join(label).split('{월}').join(month);
     var foot = String(rule.msgFoot || DEFAULT_FOOT);
-    var leadName = names[rule.leadSid] || '주관';
+    var nameOf = function (m) { return names[m.sid] || m.name || ''; };
     var order = [], by = {};
     (run.sites || []).forEach(function (s) {
       s.members.forEach(function (m) {
         if (m.role !== 'staff' || !m.sid || m.settle == null) return;
-        if (!by[m.sid]) { by[m.sid] = { sid: m.sid, name: names[m.sid] || m.name, items: [] }; order.push(m.sid); }
+        if (!by[m.sid]) { by[m.sid] = { sid: m.sid, name: nameOf(m), items: [] }; order.push(m.sid); }
         by[m.sid].items.push({ s: s, m: m });
       });
     });
     return order.map(function (sid) {
-      var p = by[sid], L = [head, p.name + '님, ' + month + ' 입금분 정산 내역을 안내드립니다.', ''], total = 0;
+      var p = by[sid], L = [head, '', p.name + '님, ' + label + ' 지급분 컨설팅 비용 정산 내역을 안내드립니다.', ''], total = 0, leadName = '';
       p.items.forEach(function (it) {
-        var s = it.s, m = it.m;
+        var s = it.s, m = it.m, lead = s.members.filter(function (x) { return x.role === 'lead'; })[0];
+        var ln = (lead && nameOf(lead)) || names[rule.leadSid] || '주관';
+        leadName = leadName || ln;
         L.push('■ ' + s.company + ' (' + s.round + '차)');
-        if (m.actual != null) L.push('· 세전 ' + fmt(m.pre) + '원 / 통장 입금 ' + fmt(m.used) + '원');
-        else L.push('· 세전 ' + fmt(m.pre) + '원 − 원천징수(' + taxOf(m.tax) + '%) ' + fmt(m.inc + m.loc) + '원 = 세후 ' + fmt(m.used) + '원');
-        L.push('· 사업장 세후 합계 ' + fmt(s.totalNet) + '원 × ' + m.rate + '% = ' + fmt(m.share) + '원');
-        if (m.adjust) L.push('· 이월·조정 ' + fmt(m.adjust) + '원');
-        L.push(settleLine('· 정산: ', m.settle, leadName));
+        L.push('① 입금자·입금금액');
+        s.members.forEach(function (x) { if (x.role === 'lead' || x.sid === m.sid || x.pre > 0 || x.actual != null) L.push(depositLine(x, nameOf(x))); });
+        L.push(' · 사업장 합계(세후) ' + fmt(s.totalNet) + '원');
+        L.push('② 담당자 산정금액 (' + p.name + ' ' + m.rate + '%)');
+        L.push(' · ' + fmt(s.totalNet) + '원 × ' + m.rate + '% = ' + fmt(m.share) + '원');
+        L.push('③ 정산');
+        L.push(' · 산정금액 ' + fmt(m.share) + '원 − ' + p.name + ' 입금 ' + fmt(m.used) + '원' + (m.adjust ? ' + 이월·조정 ' + fmt(m.adjust) + '원' : '') + ' = ' + (m.settle > 0 ? '+' : '') + fmt(m.settle) + '원');
+        L.push(settleLine(' → ', m.settle, p.name, ln));
         L.push('');
         total += m.settle;
       });
-      if (p.items.length > 1) { L.push(settleLine('■ 합계: ', total, leadName)); L.push(''); }
+      if (p.items.length > 1) { L.push(settleLine('■ 이번 지급분 합계 — ', total, p.name, leadName)); L.push(''); }
+      L.push(HOW_TO);
+      L.push('');
       L.push(foot);
       return { sid: sid, name: p.name, text: L.join('\n') };
     });
