@@ -5,6 +5,7 @@
    ⚠ 리멤버 로그인이 풀렸으면 받는 화면에 알리고(빨간 띠) 그 회차는 쉰다.
    ⚠ 두 탭은 «고정 탭»으로 연다 — 대표가 닫으면 다음 회차에 다시 연다. */
 'use strict';
+importScripts('ver.js');                 /* DISK_VER — 지금 돌고 있는 판 */
 var REM_HOME = 'https://card.rememberapp.co.kr/book/groups';
 var INTAKE = 'https://nabaho.github.io/pureunall/remember-intake.html';
 var EVERY_MIN = 30;
@@ -80,9 +81,20 @@ async function image(url) {
 /* 회차가 «어디까지 갔는지» 받는 화면이 pucards/remember/trace 에 적는다(단계·짧은 사유뿐 — 명함 내용 없음) */
 async function trace(itId, step, why) { if (itId) await ask(itId, { cmd: 'trace', step: step, why: String(why || '').slice(0, 120) }); }
 
+/* 자동 갱신 — PC 예약 작업(sync-ext.js)이 파일을 새 판으로 바꾸면 ver.js 도 바뀐다. 달라졌으면 다시 시작해 새 코드를 읽는다 */
+async function selfUpdate() {
+  try {
+    var txt = await (await fetch(chrome.runtime.getURL('ver.js'), { cache: 'no-store' })).text();
+    var m = /DISK_VER\s*=\s*'([^']*)'/.exec(txt);
+    if (m && m[1] !== DISK_VER) { chrome.runtime.reload(); return true; }
+  } catch (e) { /* 못 읽으면 그냥 이번 판으로 돈다 */ }
+  return false;
+}
+
 async function run() {
   if (running) return;
   running = true;
+  if (await selfUpdate()) { running = false; return; }
   note('..', '도는 중');
   var itId = 0;
   try {
