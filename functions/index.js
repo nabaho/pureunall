@@ -6470,9 +6470,12 @@ exports.ilaborPull = functions
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
 
     const db = getDatabase();
-    /* ⚠ 회원 계정(대표의 공인노무사회 회원 계정)으로 남의 사이트에 들어가는 일이다 — 전엔 총괄관리자만이었다.
-         대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 — 뉴스레터를 직원에게 열면서 재직 직원(위 requireStaff)이면 누르게 했다.
-         한 번에 30건 상한(아래 상한)은 그대로다. */
+    /* ⚠ 총괄관리자만 — 회원 계정(대표의 공인노무사회 회원 계정)으로 남의 사이트에 들어가는 일이다.
+         2026-10-30 뉴스레터를 직원에게 열면서 하루 재직 직원에게도 열었다가,
+         대표 지시 2026-10-31 「추천대로 위험 건은 막는장치설치해라」로 되돌렸다.
+         직원은 이미 모아 둔 자료(ilabor 읽기)만 본다. 매일 아침 자동 모으기(dailyIlaborCollect)는 그대로다. */
+    const 권 = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
+    if (권.isAdmin !== true) { res.status(403).json({ ok: false, error: "총괄관리자만 쓸 수 있습니다 — 대표 회원 계정으로 들어가는 일입니다." }); return; }
 
     const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
     /* peek = 첫 자료 하나만 열어 «원본을 남긴다»(상세 모양 맞추기용)

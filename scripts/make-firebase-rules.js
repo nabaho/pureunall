@@ -1204,7 +1204,14 @@ rules.pu_mailseen = {
    ⚠ 담긴 것: 구성원 소개(홈페이지에 공개되는 글·사진)·거래처 로고와 게시 동의·고친 기록·자동 점검 결과.
      주민번호·계좌는 없다. 홈페이지를 «실제로» 고치는 것은 서버(homepageWrite·homepageAuto·publishSite)이고,
      그 서버도 같은 날 재직 직원으로 넓혔다(functions/index.js). */
-rules.homepage = { '.read': LOGIN, '.write': LOGIN };
+/* ★ 통째 지우기 막기 — 대표 지시 2026-10-31 「추천대로 위험 건은 막는장치설치해라」.
+     homepage·newsletter 를 직원에게 연 뒤(2026-10-30) 맨 위 칸에 쓰기가 열려 있어,
+     직원 한 명이 칸 전체(또는 issues·members 같은 큰 갈래 하나)를 한 번에 지울 수 있었다.
+     → 맨 위 칸 쓰기는 총괄관리자만, 그 아래 갈래는 재직 직원이 쓰되 «갈래를 통째로 비우는 것»은 총괄관리자만.
+       편지 한 통·구성원 한 명처럼 갈래 «안의 한 줄»을 지우는 것은 지금처럼 된다(앱이 그렇게 쓴다).
+       서버(관리자 SDK)는 규칙을 지나지 않아 영향이 없다. */
+const 통째지우기막음 = { '.write': ADMIN, $part: { '.write': `${LOGIN} && (newData.exists() || ${ADMIN})` } };
+rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
 
 /* ══ 뉴스레터 (대표 지시 2026-09-02 「푸른내외관리에 뉴스레터관리를 넣고 매주 관리하고 싶다」) ══
    화면: pu-news.html · 판단: js/pu-news-core.js · 편지: js/pu-news-tpl.js
@@ -1220,7 +1227,7 @@ rules.homepage = { '.read': LOGIN, '.write': LOGIN };
 
    ★ 서버(sendBulkMail)는 관리자 SDK 로 돌아 이 규칙을 지나지 않는다 —
      보내기가 막히지 않는다. */
-rules.newsletter = { '.read': LOGIN, '.write': LOGIN };
+rules.newsletter = Object.assign({ '.read': LOGIN }, 통째지우기막음);  /* 통째 지우기 막기 — 위 homepage 머리글(2026-10-31) */
 
 /* ══ 공인노무사회에서 받아 둔 자료 (ilabor) ════════════════════════════
    ★ 서버(ilaborPull)가 관리자 SDK 로 «담기만» 하던 자리다. 규칙이 아예 없어서

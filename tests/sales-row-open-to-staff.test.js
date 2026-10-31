@@ -95,8 +95,8 @@ function ev(expr, auth, newData) {
   return f(auth, root, new Snap(undefined), new Snap(newData === undefined ? { id: 'x' } : newData), 'x', 'x');
 }
 const 열린칸 = [
-  ['homepage', '.read'], ['homepage', '.write'],
-  ['newsletter', '.read'], ['newsletter', '.write'],
+  ['homepage', '.read'], ['homepage/$part', '.write'],
+  ['newsletter', '.read'], ['newsletter/$part', '.write'],
   ['ilabor', '.read'], ['gov_watch', '.read'], ['gov_feed', '.read'],
   ['rehab_ad', '.read'], ['rehab_ad/marks', '.write'],
   ['signboard', '.read'], ['signboard/ads/$id', '.write'], ['signboard/published', '.write'],
@@ -124,6 +124,16 @@ test('규칙 — 그래도 지키던 것은 그대로: 서버 전용 칸은 아�
   assert.equal(ev(rules.signboard.ads.$id['.write'], who.재직직원, null), false, '전광판 광고를 지울 수 있다');
 });
 
+/* ★ 2026-10-31 통째 지우기 막기 — 대표 지시 「추천대로 위험 건은 막는장치설치해라」.
+     맨 위 칸은 총괄관리자만 쓰고, 갈래($part)는 직원이 쓰되 «갈래를 통째로 비우기»는 총괄관리자만. */
+test('규칙 — homepage·newsletter 는 직원이 칸·갈래를 통째로 지우지 못한다(한 줄 지우기는 된다)', () => {
+  ['homepage', 'newsletter'].forEach((p) => {
+    assert.equal(ev(rules[p]['.write'], who.재직직원), false, p + ' 맨 위 칸을 직원이 통째로 쓸 수 있다');
+    assert.equal(ev(rules[p].$part['.write'], who.재직직원, null), false, p + ' 갈래를 직원이 통째로 지울 수 있다');
+    assert.equal(ev(rules[p].$part['.write'], who.재직직원), true, p + ' 갈래에 직원이 못 쓴다');
+  });
+});
+
 test('규칙 — 정부사업신청의 개인 자리(gov/{uid})는 여전히 «본인만»이다(인증키가 있다)', () => {
   assert.match(rules.gov.$uid['.read'], /auth\.uid === \$uid/);
   assert.match(rules.gov.$uid['.write'], /auth\.uid === \$uid/);
@@ -137,8 +147,15 @@ const 덩이 = (name) => {
   assert.ok(m, name + ' 함수가 없다');
   return m[0];
 };
+/* ilaborPull 은 빠진다 — 대표 회원 계정으로 남의 사이트에 들어가는 일이라 2026-10-31 총괄관리자만으로 되돌렸다(아래 검사). */
 const 바꾼함수 = ['sendBulkMail', 'rehabAuto', 'rehabEnrich', 'readHomepage', 'homepageWrite',
-  'homepageAuto', 'newsDocsPull', 'ilaborPull', 'publishSite'];
+  'homepageAuto', 'newsDocsPull', 'publishSite'];
+
+test('ilaborPull 은 총괄관리자만 — 대표 회원 계정으로 들어가는 일이다(2026-10-31 되돌림)', () => {
+  const b = 덩이('ilaborPull');
+  assert.match(b, /requireStaff\(req\)/, '재직 직원 문을 먼저 지나지 않는다');
+  assert.match(b, /isAdmin\s*!==\s*true/, '총괄관리자 확인이 없다');
+});
 
 test('영업관리 다섯 앱이 부르는 서버 함수는 «총괄관리자만»으로 막지 않는다', () => {
   바꾼함수.forEach((n) => {
