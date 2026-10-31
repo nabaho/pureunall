@@ -325,3 +325,42 @@ test('시트: 시트를 열면 후보를 새로 받고 같은 날 일정을 받�
   t.실행('후보.state = { at: ' + 지금 + ', paused: "day" };');
   assert.ok(/내일 다시/.test(t.실행('후보창Html()')));
 });
+
+/* ② 후보함 다듬기 (2026-10-31) — 지난·날짜 없는 후보는 숨긴다 */
+test('② 날짜가 지났거나 없는 «새» 후보는 숫자·목록에서 숨기고 숨긴 수를 알린다 — 오늘 날짜는 보인다(경계)', () => {
+  const t = 상자();
+  t.b.__l = [후보('a', { date: '2026-10-24' }), 후보('p', { date: '2026-10-23' }), 후보('n', { date: '' }), 후보('f', { date: '2026-11-05' }),
+    후보('d', { date: '2026-10-01' }, { status: 'dismissed' })];
+  t.실행('후보.list = __l; 후보.open = true;');
+  assert.strictEqual(t.실행('후보새것().length'), 2, '오늘(10/24)과 앞날만 센다');
+  assert.strictEqual(t.실행('후보숨김수()'), 2, '지난 것 하나 + 날짜 없는 것 하나 — 처리한 것(일정 아님)은 숨긴 수에 안 든다');
+  const h = t.실행('후보창Html()');
+  assert.ok(/일정 후보 2건/.test(h));
+  assert.ok(/후보 2건은 숨겼습니다/.test(h) && /날짜가 지났거나 날짜를 못 찾은/.test(h));
+  assert.ok(/<b>2<\/b>/.test(t.실행('후보단추Html(false)')), '단추 숫자도 숨긴 것을 빼고 센다');
+  assert.ok(!/data-ci="p"/.test(h) && !/data-ci="n"/.test(h), '숨긴 후보의 단추가 그려졌다');
+});
+
+test('② 전부 숨겨지면 «새 후보가 없습니다» + 숨긴 수 — 빈 시트가 말없이 비지 않는다', () => {
+  const t = 상자();
+  t.b.__l = [후보('p', { date: '2026-10-01' })];
+  t.실행('후보.list = __l; 후보.open = true;');
+  const h = t.실행('후보창Html()');
+  assert.ok(/새 후보가 없습니다/.test(h) && /1건은 숨겼습니다/.test(h));
+});
+
+test('② 숨긴 후보의 «같은 날 일정»은 구글에 묻지 않는다(지난 날을 받아 올 까닭이 없다)', () => {
+  const t = 상자();
+  const 부름 = [];
+  t.b.fetch = async (url) => { 부름.push(url); return { json: async () => ({ items: [] }) }; };
+  t.b.__l = [후보('p', { date: '2026-10-01' }), 후보('n', { date: '' }), 후보('f', { date: '2026-11-05' })];
+  t.실행('후보.list = __l; 후보같은날받기();');
+  assert.strictEqual(부름.length, 1);
+  assert.ok(/timeMin=2026-11-05/.test(decodeURIComponent(부름[0])));
+});
+
+test('② 숨기는 규칙은 서버 규칙(날짜 없는 초안은 안 만든다)과 짝이다 — 둘 다 «날짜»를 기준으로 한다', () => {
+  const 서버 = fs.readFileSync(path.join(ROOT, 'functions', 'cal-inbox.js'), 'utf8');
+  assert.ok(/norm\.drafts\.filter\(\(d\) => d\.date\)/.test(서버));
+  assert.ok(/ev\.date && ev\.date >= todayYMD\(\)/.test(캘린더), '화면이 오늘 이전·날짜 없음을 숨긴다');
+});

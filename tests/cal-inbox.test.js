@@ -296,11 +296,25 @@ test('⑤ 같은 메일을 두 번 돌려도 AI 는 한 번만 부른다(요금�
 });
 
 /* ⑥ AI 가 엉뚱하게 */
-test('⑥ 없는 날(2월 31일)은 날짜를 비우고 «확인할 것»으로 남긴다 — 지어내지 않는다', async () => {
-  const { db } = await 돌리기({ 답: { events: [{ title: '방문', date: '2026-02-31', time: '10:00', place: '서천' }] } });
-  const id = CI.candId('INBOX-abcd1234', 101, 0);
-  assert.strictEqual(db.store['cal_inbox/cand/' + id + '/ev/date'], '');
-  assert.ok(db.store['cal_inbox/cand/' + id + '/missing'].indexOf('날짜') >= 0);
+test('⑥ 날짜를 못 찾은(없는 날 2월 31일 포함) 초안은 후보로 만들지 않는다 — 달력에 넣을 수 없고 후보함만 어지럽힌다', async () => {
+  const { r, db } = await 돌리기({ 답: { events: [{ title: '방문', date: '2026-02-31', time: '10:00', place: '서천' }, { title: '[마감] 회신', date: '', time: '' }] } });
+  assert.strictEqual(r.made, 0);
+  assert.strictEqual(r.nodate, 2, '몇 건을 걸렀는지 센다');
+  assert.strictEqual(Object.keys(db.store).filter((k) => k.startsWith('cal_inbox/cand')).length, 0);
+});
+
+test('⑥ 날짜 있는 초안만 남기고 «걸러낸 뒤의 순서»로 열쇠를 매긴다 — 첫째가 빠져도 같은 메일을 다시 안 부른다', async () => {
+  const 답 = { events: [{ title: '날짜 없음', date: '' }, { title: '1000 가나상사 방문', date: '2026-10-30', time: '10:00', place: '서천', contact: '임꺽정 · 010-0000-0000' }] };
+  const db = 가짜DB({ 'pucards/config/calInbox/on': true });
+  const fetchFn = 가짜구글(답);
+  const 첫째 = await 돌리기({ db, fetchFn });
+  assert.strictEqual(첫째.r.made, 1);
+  assert.strictEqual(첫째.r.nodate, 1);
+  const id0 = CI.candId('INBOX-abcd1234', 101, 0);
+  assert.strictEqual(db.store['cal_inbox/cand/' + id0 + '/ev/title'], '1000 가나상사 방문', '살아남은 것이 _0 이어야 «이미 뽑았나» 검사가 맞는다');
+  const 둘째 = await 돌리기({ db, fetchFn });
+  assert.strictEqual(fetchFn.calls.length, 1, '같은 메일을 또 AI 에 보냈다');
+  assert.strictEqual(둘째.r.tried, 0);
 });
 
 test('⑥ JSON 이 아닌 답·일정 없음 답은 후보를 남기지 않는다', async () => {

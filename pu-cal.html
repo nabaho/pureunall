@@ -36,7 +36,7 @@
 <script src="js/pu-cal-write.js?v=10"></script>
 <script src="js/pu-cal-map.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-cal-capture.js?v=2"></script>
+<script src="js/pu-cal-capture.js?v=3"></script>
 <script src="js/pu-cal-card.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -4650,9 +4650,16 @@ var 후보 = { list:null, state:null, loading:false, err:"", open:false, denied:
 var 후보불용어 = ["방문","미팅","회의","일정","안내","확인","요청","문의","참석","마감","제출","개최","강의","교육","행사","발표"];
 
 function 후보볼수있나(){ return !!(fbDb && typeof 관리자인가 === "function" && 관리자인가() && !후보.denied); }
-function 후보새것(){
+/* 새 후보 — 30일 안이고, «날짜가 오늘 이후»인 것만. 지난 마감·지난 행사와 날짜 없는 것은 달력에 넣을 일이 없어 세지도 보이지도 않는다(2026-10-31). */
+function 후보살아있나(c){
+  var 한계 = Date.now() - 30 * 86400000, ev = (c && c.ev) || {};
+  return !!(c && c.status === "new" && Number(c.at) >= 한계 && ev.date && ev.date >= todayYMD());
+}
+function 후보새것(){ return (후보.list || []).filter(후보살아있나); }
+/* 숨긴 수 — 새 것인데 날짜가 지났거나 없어서 안 보이는 후보 */
+function 후보숨김수(){
   var 한계 = Date.now() - 30 * 86400000;
-  return (후보.list || []).filter(function(c){ return c && c.status === "new" && Number(c.at) >= 한계; });
+  return (후보.list || []).filter(function(c){ return c && c.status === "new" && Number(c.at) >= 한계 && !후보살아있나(c); }).length;
 }
 function 후보찾기(id){
   var xs = 후보.list || [];
@@ -4821,6 +4828,7 @@ function 후보창Html(){
               + '<div class="cwho">' + esc(m.f || m.e || "") + (m.d ? ' · ' + esc(후보메일날글(m.d)) : '') + '</div></div></div>'
               + g.items.map(후보카드Html).join("") + '</div>';
           }).join(""))
+    + (후보숨김수() ? '<div class="cmsg">날짜가 지났거나 날짜를 못 찾은 후보 ' + 후보숨김수() + '건은 숨겼습니다</div>' : '')
     + (지난.length ? '<div class="cmsg">지난 후보 ' + 지난.length + '건(넣음·일정 아님) — 30일이 지나면 지웁니다</div>' : '')
     + '</div></div>';
 }
@@ -4971,7 +4979,8 @@ function 캡처누름(t){
 }
 function 캡처묶음(manual){
   var u = null; try{ u = firebase.auth(); }catch(_){}
-  return { ai: (typeof PuAiCall !== "undefined" ? PuAiCall : null), auth: u, today: todayYMD(), manual: manual === true };
+  return { ai: (typeof PuAiCall !== "undefined" ? PuAiCall : null), auth: u, today: todayYMD(), manual: manual === true,
+    kind: (S.cap && S.cap.src) || "" };   /* 'share' = 폰 공유 버튼으로 받은 글 — 받은 날을 모른다는 프롬프트 */
 }
 /* 읽는다 — 한도에 걸렸다는 답이 오면 캡처결과가 «그래도?»를 묻고 manual 로 다시 부른다 */
 function 캡처읽기(last, manual){
@@ -5086,6 +5095,26 @@ function 캡처글읽기(){
 document.addEventListener("input", function(e){
   if(e.target && e.target.id === "capText" && S.cap){ S.cap.text = e.target.value; S.cap.live = ""; }
 });
+/* 📲 폰 «공유» 버튼으로 온 글 (2026-10-31) — 카톡·문자·메일 앱에서 글을 길게 눌러 공유 → 푸른 캘린더.
+   ★ pu-cal-manifest.json 의 share_target(GET)이 주소에 title·text·url 을 실어 이 화면을 연다.
+   ★ 대표가 «직접 고른 글»이라 저절로 읽는다(한 번 덜 누른다). 저장은 그대로 사람이 «저장»을 눌러야 한다 — 칸만 채운다.
+   ⚠ 읽기 시작하면서 주소의 그 글을 «지운다» — 새로고침·뒤로 가기가 같은 글을 또 AI 에 보내지 않게.
+   ⚠ 부팅·로그인이 끝난 뒤에만 부른다(AI 호출에 로그인이 필요하다). 로그인 화면을 거치면 글이 사라질 수 있다 — 그때는 다시 공유한다.
+   ⚠ 이미지 공유는 서비스 워커가 필요해 이번엔 없다(글만). */
+function 공유받기(){
+  var q; try{ q = new URLSearchParams(location.search); }catch(_){ return false; }
+  var 글 = [q.get("title"), q.get("text"), q.get("url")].map(function(x){ return String(x || "").trim(); })
+    .filter(function(x, i, a){ return x && a.indexOf(x) === i; }).join("\n").trim();
+  if(!글) return false;
+  try{ history.replaceState(null, "", location.pathname + location.hash); }catch(_){}
+  if(typeof PuCalCapture === "undefined") return false;
+  글 = 글.slice(0, PuCalCapture.LIMIT.text);
+  openNew(todayYMD());
+  S.cap = { mode:"voice", src:"share", text:글, live:"", listening:false, busy:false, msg:"", drafts:null };
+  render();
+  캡처글읽기();
+  return true;
+}
 /* ══ 캡처·말로 채우기 끝 ═════════════════════════════════════════════════ */
 
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
@@ -6018,6 +6047,7 @@ function start(user){
     개인받기();
     모집받기();
     후보바인드(); 후보받기();      /* 📥 일정 후보함(대표만) — 메일에서 뽑은 후보를 받아 둔다 */
+    공유받기();                    /* 📲 폰 공유 버튼으로 온 글이 있으면 «말로 채우기» 창에 채워 읽는다 */
     /* 정부사업신청에서 고치고 돌아오면 다시 받는다(대표일 때만 — 모집받기 안에서 거른다) */
     if(!RECRUIT.bound){ RECRUIT.bound = true;
       document.addEventListener("visibilitychange", function(){ if(!document.hidden) 모집받기(); }); }
