@@ -27,7 +27,9 @@ test('포털의 모든 프로그램이 온톨로지 등록부에 있다', () => 
 test('모든 프로그램에 파일·소유 저장뿌리·개체 종류가 있다', () => {
   Object.entries(O.PROGRAMS).forEach(([key, p]) => {
     assert.ok(p.name && p.file, key + ': 이름 또는 파일 없음');
-    assert.ok(Array.isArray(p.primaryRoots) && p.primaryRoots.length, key + ': 소유 저장뿌리 없음');
+    /* localOnly: 파이어베이스에 쓰지 않는 «이 PC 안» 도구(한글 편집기)만 저장뿌리 없이 허용 — 이유(note)를 반드시 적는다 */
+    if (p.localOnly) assert.ok(p.note && Array.isArray(p.primaryRoots) && p.primaryRoots.length === 0, key + ': localOnly 는 이유(note)가 있고 저장뿌리가 비어야 합니다');
+    else assert.ok(Array.isArray(p.primaryRoots) && p.primaryRoots.length, key + ': 소유 저장뿌리 없음');
     assert.ok(Array.isArray(p.entityTypes) && p.entityTypes.length, key + ': 개체 종류 없음');
     p.entityTypes.forEach(t => assert.ok(O.TERMS.entityTypes[t], key + ': 미등록 개체어 ' + t));
   });
@@ -86,7 +88,7 @@ test('향후 새 프로그램도 온톨로지를 먼저 따르도록 저장소 �
 
 test('2단계 읽기 계획은 모든 프로그램을 다루되 민감 본문 경로를 읽지 않는다', () => {
   const covered = new Set(Object.values(O.READ_ADAPTERS).map(a => a.program));
-  Object.keys(O.PROGRAMS).forEach(key => assert.ok(covered.has(key), key + ': 읽기 어댑터 없음'));
+  Object.keys(O.PROGRAMS).forEach(key => assert.ok(covered.has(key) || O.PROGRAMS[key].localOnly, key + ': 읽기 어댑터 없음')); // localOnly: 읽을 저장 자리가 없다
   const plan = O.getReadPlan({ uid:'user-1' });
   assert.ok(plan.some(x => x.path === 'work_erp/items'));
   assert.ok(plan.some(x => x.path === 'puphotos/u/user-1/items'));

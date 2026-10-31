@@ -48,6 +48,7 @@
     Object.keys(programs||{}).forEach(function(key){
       var p=programs[key]||{};
       if(LEGACY_OBSERVE_PROGRAMS[key]){legacy.push(key);return;}
+      if(p.localOnly===true && !(p.primaryRoots||[]).length)return; /* 파이어베이스에 쓰지 않는 이 PC 안 도구(한글 편집기)는 쓰기 계약이 없다 */
       if(!Array.isArray(p.writeContracts)||!p.writeContracts.length)missing.push(key);
       else enforced.push(key);
     });

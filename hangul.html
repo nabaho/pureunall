@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한글 편집기 - 푸른통합시스템</title>
+<link rel="icon" href="hangul/icon.ico">
+<!-- 등록 프로그램 공용 관문: 이 화면은 파이어베이스에 쓰지 않지만(localOnly) 등록된 화면은 모두 싣는다 -->
+<script src="js/pu-ontology.js?v=82"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<link rel="stylesheet" href="hangul/app.css?v=1">
+<style>
+/* 폰에서 입력칸에 손을 대도 화면이 커지지 않게(포털 앱 공통 규칙) */
+@media (max-width:768px){ input,select,textarea{ font-size:16px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 메뉴 줄 -->
+  <div class="menubar" id="menubar">
+    <div class="menus" id="menus"></div>
+    <div class="grow"></div>
+    <div class="quickfind"><input id="quickFind" placeholder="찾을 내용" aria-label="찾을 내용"><button id="quickFindBtn" title="찾기">⌕</button></div>
+    <button class="mb-btn" id="ribbonToggle" title="열림 상자 접기/펴기">︿</button>
+  </div>
+  <!-- 열림 상자 (리본) -->
+  <div class="ribbon" id="ribbon"></div>
+  <!-- 서식 도구 상자 -->
+  <div class="fmtbar" id="fmtbar"></div>
+
+  <div class="work">
+    <div class="ruler-corner"></div>
+    <canvas class="hruler" id="hruler"></canvas>
+    <canvas class="vruler" id="vruler"></canvas>
+    <div class="desk" id="desk">
+      <div class="stack" id="stack">
+        <div class="sheets" id="sheets"></div>
+        <div class="doc" id="doc" contenteditable="true" spellcheck="false"></div>
+      </div>
+    </div>
+    <aside class="taskpane" id="taskpane">
+      <div class="tp-tabs" id="tpTabs">
+        <button data-tp="tpl" class="on">서식</button>
+        <button data-tp="fill">자동 채우기</button>
+        <button class="tp-close" id="tpClose" title="작업 창 닫기">✕</button>
+      </div>
+      <div class="tp-body" data-tp-body="tpl">
+        <ul id="tplList" class="tpl-list"></ul>
+        <p class="tp-note">한글 2022에서 만든 서식에 <code>{{항목}}</code>을 적어 HWPX로 저장하면, 여기서 열어 자동 채우기를 할 수 있습니다.</p>
+      </div>
+      <div class="tp-body" data-tp-body="fill" hidden>
+        <div id="fieldList" class="field-list"></div>
+        <div class="field-actions">
+          <button class="btn" id="fieldRescan" title="문서에서 {{항목}}을 다시 찾습니다">↻ 다시 찾기</button>
+          <button class="btn" id="fieldClear">입력 지우기</button>
+        </div>
+        <p class="tp-note">입력하는 즉시 문서의 칸에 반영됩니다. 색 표시는 화면용이며 저장·인쇄되지 않습니다. 입력값은 저장하지 않습니다.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 문서 탭 -->
+  <div class="doctabs" id="doctabs"></div>
+  <!-- 상태 표시줄 -->
+  <div class="statusbar" id="status">
+    <span id="stPage">1/1쪽</span><span>1단</span><span id="stLine">1줄</span><span id="stCol">1칸</span>
+    <span id="stChars">0글자</span><span>문자 입력</span><span>1/1 구역</span>
+    <span id="stMode" class="clickable" title="Insert 키로 바꿈">삽입</span>
+    <span id="stMsg" class="st-msg"></span>
+    <span class="grow"></span>
+    <button class="st-btn" id="stView" title="쪽 윤곽">▭</button>
+    <button class="st-btn" id="zoomOut" title="축소">−</button>
+    <input type="range" id="zoomRange" min="25" max="300" step="5" value="100" aria-label="확대 비율">
+    <button class="st-btn" id="zoomIn" title="확대">+</button>
+    <button class="st-zoom" id="zoomLabel" title="확대/축소">100%</button>
+  </div>
+</div>
+
+<input id="fileInput" type="file" accept=".hwpx,.hwp,.hwt" hidden>
+<input id="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/bmp" hidden>
+
+<script src="hangul/js/zip.js?v=1"></script>
+<script src="hangul/js/hwpx.js?v=1"></script>
+<script src="hangul/js/shape.js?v=1"></script>
+<script src="hangul/js/hwp.js?v=1"></script>
+<script src="hangul/js/wmf.js?v=1"></script>
+<script src="hangul/js/eq.js?v=1"></script>
+<script src="hangul/js/dom.js?v=1"></script>
+<script src="hangul/js/icons.js?v=1"></script>
+<script src="hangul/js/ui.js?v=1"></script>
+<script src="hangul/js/editor.js?v=1"></script>
+<script src="hangul/js/mailmerge.js?v=1"></script>
+<script src="hangul/js/templates.js?v=1"></script>
+<script src="hangul/js/app.js?v=1"></script>
+<script src="js/pu-appbar.js?v=37"></script>
+<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-active.js?v=1"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('.dlg-layer:not(.modeless)'); }); }catch(e){}</script>
+</body>
+</html>
