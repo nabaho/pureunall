@@ -67,23 +67,31 @@ async function image(url) {
   } catch (e) { return ''; }
 }
 
+/* 회차가 «어디까지 갔는지» 받는 화면이 pucards/remember/trace 에 적는다(단계·짧은 사유뿐 — 명함 내용 없음) */
+async function trace(itId, step, why) { if (itId) await ask(itId, { cmd: 'trace', step: step, why: String(why || '').slice(0, 120) }); }
+
 async function run() {
   if (running) return;
   running = true;
   note('..', '도는 중');
+  var itId = 0;
   try {
     /* ① 받는 화면 */
     var it = await findOrOpen(INTAKE, INTAKE);
+    itId = it.id;
     await waitLoaded(it.id, 60000);
     var hello = await ask(it.id, { cmd: 'hello' }, 10);
     if (!hello || !hello.ready) { note('로그인', '푸른 포털 로그인 필요(받는 화면 탭 확인)'); return; }               /* 푸른 로그인 전 — 받는 화면이 빨간 띠로 알린다 */
     var cp = Number(hello.cp) || 0;
+    await trace(itId, '1 받는 화면 확인', 'cp=' + cp);
     /* ② 리멤버 */
     var rt = await findOrOpen('https://card.rememberapp.co.kr/', REM_HOME);
     await chrome.tabs.update(rt.id, { url: REM_HOME });
     var t = await waitLoaded(rt.id, 60000);
+    await trace(itId, '2 리멤버 탭', (t && t.status) + ' ' + String((t && t.url) || '').replace(/[?#].*$/, ''));
     if (!t || !/^https:\/\/card\.rememberapp\.co\.kr\//.test(t.url || '')) { await ask(it.id, { cmd: 'login-lost' }); note('리멤버', '리멤버 로그인 필요'); return; }
     var res = await ask(rt.id, { cmd: 'pull', cp: cp }, 10);
+    await trace(itId, '3 목록 받기', !res ? '응답 없음(리멤버 탭 다리 없음)' : res.err ? 'err=' + res.err : (res.stacks.length + '장'));
     if (!res || res.err) {
       var lost = res && (res.err === 'login' || res.err === 'no-heads');
       if (lost) await ask(it.id, { cmd: 'login-lost' });
@@ -101,8 +109,10 @@ async function run() {
       }
     }
     var done = await ask(it.id, { cmd: 'batch', stacks: res.stacks, images: images, total: res.total });
+    await trace(itId, '4 batch 끝', done ? (done.err ? 'err=' + done.err : 'ok') : '받는 화면 답 없음');
     note(done ? 'OK' : '!', done ? '지난 회차 끝 · 받은 ' + res.stacks.length + '장' : '받는 화면이 답이 없음');
   } catch (e) {
+    await trace(itId, '! 오류', (e && e.message) || e).catch(function () {});
     note('!', '오류: ' + String((e && e.message) || e).slice(0, 80));
   } finally { running = false; }
 }

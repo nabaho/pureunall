@@ -331,6 +331,11 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       if (S.user && S.ready) db.ref(ROOT + '/ping').set({ at: Date.now(), by: S.user.uid }).catch(function () {});
       reply({ cmd: 'cp', ready: S.ready, cp: (S.status && Number(S.status.cp)) || 0 }); return;
     }
+    if (m.cmd === 'trace') {
+      /* 회차 진행 흔적 — 단계·사유·시각뿐(밖에서 «어디서 멈췄나» 보려고) */
+      if (S.user && S.ready) db.ref(ROOT + '/trace').set({ step: String(m.step || '').slice(0, 40), why: String(m.why || '').slice(0, 120), at: Date.now() }).catch(function () {});
+      return;
+    }
     if (!S.ready) { reply({ cmd: 'done', err: 'not-ready' }); return; }
     if (m.cmd === 'batch') { batch(m); return; }
     if (m.cmd === 'login-lost') {
