@@ -115,9 +115,11 @@ test('규칙 만들개가 newsletter 자리를 낸다', () => {
   assert.ok(r.newsletter, 'newsletter 자리가 규칙에 없다 — 화면이 아무것도 못 읽는다');
   /* 2026-10-30 — 재직 직원(LOGIN)에게 열었다. «아무나»(로그인만·익명·퇴직자)는 여전히 아니다:
      비번 로그인 + uid_roles 의 status==='active' 를 둘 다 본다. */
-  ['.read', '.write'].forEach((k) => {
-    assert.ok(/status'\)\.val\(\) === 'active'/.test(r.newsletter[k]), k + ' — 재직 여부를 안 본다(명단·초안이 아무나에게 열린다)');
-    assert.ok(/sign_in_provider === 'password'/.test(r.newsletter[k]), k + ' — 비번 로그인을 안 본다(익명 손님이 든다)');
+  /* 2026-10-31 — 쓰기는 갈래($part)에서만(맨 위 칸 통째 쓰기는 총괄관리자만 — 통째 지우기 막기). */
+  [r.newsletter['.read'], r.newsletter.$part['.write']].forEach((e, i) => {
+    const k = i ? '$part/.write' : '.read';
+    assert.ok(/status'\)\.val\(\) === 'active'/.test(e), k + ' — 재직 여부를 안 본다(명단·초안이 아무나에게 열린다)');
+    assert.ok(/sign_in_provider === 'password'/.test(e), k + ' — 비번 로그인을 안 본다(익명 손님이 든다)');
   });
 });
 
