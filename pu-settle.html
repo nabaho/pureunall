@@ -18,6 +18,10 @@
        재무관리에서 당겨와 사람별 예상 세후와 맞춘다. 금액이 같아도 «저장»을 눌러야 통장 실입금이 된다.
      ★ 임시저장(대표 지시 2026-10-31 「임시저장기능 만들어 달라」): 확정 전 정산표(draft = «임시저장»)의 통장 실입금은 쳐도 바로 저장하지 않고
        노란 칸으로 두었다가 «임시저장 (n)» 한 번에 저장한다. 저장 안 한 칸이 있으면 확정·기록만을 막고, 창을 닫을 때 묻는다.
+     ★ 연도별 관리(대표 지시 2026-10-31 「매년 관리할 수 있게 해라」): 탭 줄 오른쪽 «연도»로 그 해 정산표·안내 파일·카톡 문구만 보고, 정산 탭 왼쪽 아래에 그 해 사람별 합계.
+       요율표·이월·조정은 해와 상관없이 하나다.
+     ★ 실수령액 → 세전 역계산(대표 지시 2026-10-31 「3.3 8.8 퍼로 역계산」): 계산기 탭 위 상자 · 직접 입력의 «실수령액» 칸 · 계산기 줄(세전을 비우면).
+       세율은 사람·줄마다 3.3%(사업소득) / 8.8%(기타소득), 컨설팅마다 기본값(규칙 «자세히»).
      ★ 직접 입력(대표 선택 2026-10-31): 안내 엑셀이 없는 컨설팅(예: 산업일자리전환 능률협회)은 정산 탭 왼쪽 목록 «+ 입력»으로 사업장·지급월·세전을 넣는다
        → settle/notices/M_<종류>(source 'manual')에 쌓고 정산표는 같은 길로 만든다. 정산 탭은 넓은 화면에서 왼쪽 목록 · 오른쪽 정산표.
      ⚠ 대표·위임관리인·재무권한자만 연다(규칙 settle = 같은 사람) — 대표 선택 2026-10-31. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
@@ -49,7 +53,7 @@ a{color:var(--blue-d);text-decoration:none}
 .top .sub{font-size:12px;color:var(--mute)}
 .sp{flex:1}
 #who{font-size:13px;color:var(--mute)}
-.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap;align-items:center}
 .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
 .tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
 .chip{display:inline-block;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
@@ -111,6 +115,10 @@ main{padding:12px 16px 40px}
 #pane-rules .t[data-name=adjusts] td.nw{max-width:170px}
 #pane-rules .t[data-name=adjusts] input.amt{width:100px}
 #pane-rules .t[data-name=adjusts] #a_memo{width:140px}
+/* 안내 파일 탭도 내용만큼(화면 끝까지 퍼지지 않게) · 정산표 뜻 풀이 줄 */
+#pane-notices{max-width:1100px}
+.bar.legend{gap:5px;padding-top:2px;padding-bottom:2px}
+#tabs #yearPick{margin:4px 0 4px 6px}
 /* 정산 탭 — 내용만큼(넓은 화면에서 줄이 끝없이 퍼지지 않게), 임시저장 안 한 칸은 노랗게 (대표 지시 2026-10-31 「임시저장기능 … 깔끔하게 볼수 있게」) */
 /* 넓은 화면에서는 왼쪽 지급월 목록 · 오른쪽 정산표(대표 지시 2026-10-31 「캡쳐1(정산표)을 오른쪽 화면으로 두고 캡쳐2(목록)는 왼쪽으로」). 좁으면 위아래 */
 #pane-runs{max-width:1600px}
@@ -122,7 +130,7 @@ main{padding:12px 16px 40px}
 }
 .runs-side .t th,.runs-side .t td{padding:5px 6px}
 .t tr.none td{color:var(--mute)}
-.t input.amt[data-m]{width:130px}
+.t input.amt[data-m]{width:118px}
 .t tr.on td{background:var(--bg);font-weight:700}
 .t tr.grp td.grp-tr{font-weight:400;color:var(--ink2)}
 .t input.amt.dirty{background:var(--amber-bg);border-color:var(--amber-m)}
@@ -202,6 +210,11 @@ details.dep textarea{min-height:64px}
   .t[data-name=manual] tbody td[data-k="who"]{order:1;flex:1 1 0;min-width:0}
   .t[data-name=manual] tbody td[data-k="rate"]:not(:empty)::before{content:'요율 '}
   .t[data-name=manual] tbody td[data-k="net"]::before{content:'세후 '}
+  /* 연간 합계 — 고르기 칸이 없는 요약 표라 왼쪽 자리를 비우지 않고, 숫자 앞에 칸 이름 */
+  .t[data-name=year] tbody tr{padding-left:10px}
+  .t[data-name=year] tbody td[data-k="back"]::before{content:'반환 '}
+  .t[data-name=year] tbody td[data-k="more"]::before{content:'추가 지급 '}
+  .t[data-name=manual] tbody td[data-k="real"]::before{content:'실수령 '}
   /* ⚠ 위의 «#pane-rules .t select{max-width:200px}» 가 더 세다(아이디 잣대) — 폰 값도 같은 잣대로 쓴다 */
   #pane-rules .t.mx th,#pane-rules .t.mx td{padding:4px 4px}
   #pane-rules .t.mx select{max-width:92px}
@@ -260,14 +273,15 @@ details.dep textarea{min-height:64px}
     <button data-tab="notices">📥 안내 파일</button>
     <button data-tab="rules">⚙️ 규칙·요율</button>
     <button data-tab="msgs">💬 카톡 문구</button>
+    <span class="sp"></span><label class="hint" for="yearPick">연도</label><select id="yearPick" title="고른 해의 정산표·안내 파일·카톡 문구만 보입니다"></select>
   </div>
 </div>
 <div id="lock"><h2>🧾 컨설팅정산</h2><div id="lockWhy"></div><p>재무관리 권한이 있는 분만 열 수 있습니다.</p></div>
 <main id="app">
-  <section class="pane" id="pane-calc"><div id="calcBox"></div><div id="calcOut"></div></section>
+  <section class="pane" id="pane-calc"><div id="revBox"></div><div id="calcBox"></div><div id="calcOut"></div></section>
   <section class="pane" id="pane-runs">
     <div class="runs2">
-      <div class="card runs-side"><div id="runsBox"></div></div>
+      <div class="card runs-side"><div id="runsBox"></div><div id="yearBox"></div></div>
       <div class="card runs-main" id="runCard"><div id="runBox"></div></div>
     </div>
   </section>
@@ -311,8 +325,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=6"></script>
-<script src="js/pu-settle-view.js?v=8"></script>
+<script src="js/pu-settle-core.js?v=7"></script>
+<script src="js/pu-settle-view.js?v=9"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -330,7 +344,14 @@ function calcDefault(){ return { type:'', siteId:'', rows:[{ sid:'', role:'lead'
 var CALC=calcDefault();
 /* 입금 대조 — 열어 둔 정산표 하나에 대한 «지금 견주는 중» 상태(저장하지 않는다). 다른 정산표를 열면 비운다 */
 var DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false };
-var YEAR_FROM='2026-01-01', YEAR_TO='2026-12-31';   /* 대표 지시 2026-10-31 「2026년도 올해 진행상황만 우선」 — 업체 연결 후보 범위 */
+/* 연도별 관리 — 대표 지시 2026-10-31 「매년 관리할 수 있게 해라」(처음엔 「2026년도 올해 진행상황만 우선」).
+   고른 해(YEAR, 이 기기에 기억)의 정산표·안내 파일·카톡 문구만 보이고, 업체 연결·직접 입력·계산기의 사업장 후보도 그 해에 걸친 컨설팅만. */
+function nowYear(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,4); }
+var YEAR=(function(){ var y=lsGet('year'); return /^\d{4}$/.test(y||'')?y:nowYear(); })();
+function yearFrom(){ return YEAR+'-01-01'; }
+function yearTo(){ return YEAR+'-12-31'; }
+/* 역계산 상자 — 저장하지 않는다(이 기기에만 기억) */
+var REV=(function(){ try{ var v=JSON.parse(lsGet('rev')||'null'); if(v && typeof v==='object') return { net:String(v.net||''), tax:v.tax==='8.8'?'8.8':'3.3' }; }catch(e){} return { net:'', tax:'3.3' }; })();
 
 function $(id){ return document.getElementById(id); }
 function lsGet(k){ try{ return localStorage.getItem('pu_settle_'+k); }catch(e){ return null; } }
@@ -380,7 +401,7 @@ function typeOf(c){ return String(c.typeCode||(c.typeCodes&&c.typeCodes.consulti
 /* 업체 연결 후보 — 그 사업 종류 + 수행기간이 2026년에 걸친 컨설팅만 */
 function sitesFor(typeCode){
   return ERP.consultings.filter(function(c){
-    return (!typeCode || typeOf(c)===typeCode) && String(c.startDate||'')<=YEAR_TO && String(c.endDate||'9999-12-31')>=YEAR_FROM;
+    return (!typeCode || typeOf(c)===typeCode) && String(c.startDate||'')<=yearTo() && String(c.endDate||'9999-12-31')>=yearFrom();
   }).map(function(c){ return { consultingId:String(c.id), companyId:String(c.companyId||''), companyName:String(c.companyName||''),
     label:String(c.companyName||'(업체 이름 없음)')+(c.no?' · '+c.no:'')+(c.startDate?' · '+c.startDate+'~'+(c.endDate||''):'') }; });
 }
@@ -393,7 +414,7 @@ function ruleObj(r){
   var rates={}, siteRates={};
   Object.keys(r.rates||{}).forEach(function(s){ rates[s]=Number(r.rates[s]); });
   Object.keys(r.siteRates||{}).forEach(function(cid){ siteRates[cid]={}; Object.keys(r.siteRates[cid]||{}).forEach(function(s){ siteRates[cid][s]=Number(r.siteRates[cid][s]); }); });
-  return { typeCode:r.typeCode, title:r.title||bizName(r.typeCode), mode:'pool', leadSid:r.leadSid||'', rates:rates, siteRates:siteRates, msgHead:r.msgHead||'', msgFoot:r.msgFoot||'' };
+  return { typeCode:r.typeCode, title:r.title||bizName(r.typeCode), mode:'pool', tax:C.taxOf(r.tax), leadSid:r.leadSid||'', rates:rates, siteRates:siteRates, msgHead:r.msgHead||'', msgFoot:r.msgFoot||'' };
 }
 function ctxFor(rid, actuals){
   var cl={}, pl={};
@@ -410,8 +431,11 @@ function draw(){ drawTabs(); drawCalc(); drawRuns(); drawNotices(); drawRules();
 /* ═══ 계산기 ═══ (대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게」) */
 function loadCalc(){ try{ var v=JSON.parse(lsGet('calc')||'null'); if(v && Array.isArray(v.rows)) return v; }catch(e){} return calcDefault(); }
 function saveCalc(){ lsSet('calc', JSON.stringify(CALC)); }
-function calcRows(){ return CALC.rows.map(function(r){ return { sid:r.sid||'', name:NAMES[r.sid]||'', role:r.role, pre:r.pre, rate:r.rate, actual:r.actual }; }); }
+function calcRows(){ return CALC.rows.map(function(r){
+  var pre=r.pre; if((pre==null || String(pre).trim()==='') && C.won(r.actual)>0) pre=C.preFromNet(r.actual, r.tax).pre;   /* 세전을 비우면 실입금에서 거꾸로 */
+  return { sid:r.sid||'', name:NAMES[r.sid]||'', role:r.role, tax:r.tax, pre:pre, rate:r.rate, actual:r.actual }; }); }
 function drawCalc(){
+  $('revBox').innerHTML=V.revBox(REV);
   $('calcBox').innerHTML=V.calcBox(CALC, { bizList:ERP.biz, sites:CALC.type?sitesFor(CALC.type):[], staff:ERP.people, names:NAMES, sel:SEL.calc });
   drawCalcOut(); drawBulks();
 }
@@ -422,17 +446,32 @@ function calcPrefill(){
   CALC.rows.forEach(function(r){
     if(r.role==='lead' && !r.sid && rule.leadSid) r.sid=rule.leadSid;
     if(r.role==='staff' && r.sid && (r.rate==null || r.rate==='') && rule.rates && rule.rates[r.sid]!=null) r.rate=String(rule.rates[r.sid]);
+    if(!r.tax) r.tax=C.taxOf(rule.tax);
   });
 }
 function drawTabs(){
   [].forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.className=b.getAttribute('data-tab')===TAB?'on':''; });
   ['calc','runs','notices','rules','msgs'].forEach(function(t){ $('pane-'+t).className='pane'+(t===TAB?' on':''); });
-  $('nRuns').textContent=vals(D.runs).length;
+  $('nRuns').textContent=yearRuns().length;
+  $('yearPick').innerHTML=yearOptions().map(function(y){ return '<option value="'+y+'"'+(y===YEAR?' selected':'')+'>'+y+'년</option>'; }).join('');
 }
 function runsList(){ return vals(D.runs).map(C.normalizeRun); }
+function yearRuns(){ return runsList().filter(function(r){ return C.yearOf(r.monthKey)===YEAR; }); }
+/* 고를 수 있는 해 — 자료가 있는 해 + 올해 + 내년 */
+function yearOptions(){
+  var o={}; o[nowYear()]=1; o[String(Number(nowYear())+1)]=1; o[YEAR]=1;
+  vals(D.runs).forEach(function(r){ var y=C.yearOf(r.monthKey); if(y) o[y]=1; });
+  vals(D.notices).forEach(function(n){ C.toArr(n.months).forEach(function(m){ if(m && m.key) o[C.yearOf(m.key)]=1; }); });
+  return Object.keys(o).filter(function(y){ return /^\d{4}$/.test(y); }).sort().reverse();
+}
+function noticeInYear(n){
+  var ms=C.toArr(n.months).filter(Boolean);
+  return ms.length ? ms.some(function(m){ return C.yearOf(m.key)===YEAR; }) : new Date(Number(n.receivedAt||0)+9*3600e3).toISOString().slice(0,4)===YEAR;
+}
 function ruleTypes(){ return Object.keys(D.rules).filter(function(k){ return D.rules[k] && !D.rules[k]._deleted; }); }
 function drawRuns(){
-  $('runsBox').innerHTML=V.runsTable(runsList(), SEL.runs, bizNames(), MANUAL.open?'':CUR_RUN, { types:ruleTypes() });
+  $('runsBox').innerHTML=V.runsTable(yearRuns(), SEL.runs, bizNames(), MANUAL.open?'':CUR_RUN, { types:ruleTypes() });
+  $('yearBox').innerHTML=V.yearBox(C.yearSummary(runsList(), YEAR), NAMES);
   var run=!MANUAL.open && CUR_RUN && D.runs[CUR_RUN] && !D.runs[CUR_RUN]._deleted ? C.normalizeRun(D.runs[CUR_RUN]) : null;
   if(MANUAL.open) $('runBox').innerHTML=V.manualBox(MANUAL, manualOpt());
   else $('runBox').innerHTML=run?V.runDetail(run, NAMES, Object.assign({}, SEL.members, SEL.transfers), { biz:bizName(run.typeCode), pend:run.status==='draft'?(PEND[run.id]||{}):{} })+(run.status==='draft'?V.depositBox(depState(run)):'')
@@ -446,26 +485,28 @@ function drawRuns(){
 var MANUAL={ open:false, type:'', siteId:'', month:'', rows:[] };
 function manualId(type){ return 'M_'+type; }
 function nowMonth(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,7); }
+/* 지급월 기본값 — 올해면 이번 달, 지난해면 12월, 다음 해면 1월 */
+function defaultMonth(){ var m=nowMonth(), y=m.slice(0,4); return y===YEAR?m:(YEAR<y?YEAR+'-12':YEAR+'-01'); }
 function manualCons(id){ return ERP.consultings.filter(function(c){ return String(c.id)===id; })[0]||null; }
 function manualSiteText(c){ return String(c.companyName||'(업체 이름 없음)')+(c.no?' ('+c.no+')':''); }
 function sidOfAny(x){ return typeof x==='string'?x:(x&&x.sid?String(x.sid):''); }
 function manualDefaultRows(type, siteId, leadPre){
-  var rule=D.rules[type]||{}, rows=[{ sid:rule.leadSid||'', role:'lead', pre:leadPre||'' }], c=siteId&&manualCons(siteId);
+  var rule=D.rules[type]||{}, tax=C.taxOf(rule.tax), rows=[{ sid:rule.leadSid||'', role:'lead', tax:tax, net:'', pre:leadPre||'' }], c=siteId&&manualCons(siteId);
   var subs=c?(Array.isArray(c.managerSubs)?c.managerSubs:[]).map(sidOfAny).filter(function(s){ return s && s!==rule.leadSid && ERP.people.some(function(p){ return p.sid===s; }); }):[];
-  subs.forEach(function(s){ rows.push({ sid:s, role:'staff', pre:'0' }); });
-  if(rows.length===1) rows.push({ sid:'', role:'staff', pre:'0' });
+  subs.forEach(function(s){ rows.push({ sid:s, role:'staff', tax:tax, net:'', pre:'0' }); });
+  if(rows.length===1) rows.push({ sid:'', role:'staff', tax:tax, net:'', pre:'0' });
   return rows;
 }
 function openManual(type){
   var types=ruleTypes(); if(!types.length){ toast('컨설팅 종류 규칙이 없습니다 — «⚙️ 규칙·요율»에서 먼저 더하세요'); return; }
   if(types.indexOf(type)<0) type=types[0];
-  MANUAL={ open:true, type:type, siteId:'', month:nowMonth(), rows:manualDefaultRows(type, '') };
+  MANUAL={ open:true, type:type, siteId:'', month:defaultMonth(), rows:manualDefaultRows(type, '') };
   SEL.manual={}; SEL.mentries={}; CUR_RUN=''; TAB='runs'; draw(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 function manualOpt(){
   var rule=D.rules[MANUAL.type]||{}, n=D.notices[manualId(MANUAL.type)];
   return { types:ruleTypes().map(function(k){ return { code:k, name:bizName(k) }; }), sites:sitesFor(MANUAL.type), staff:ERP.people, names:NAMES,
-    rates:rule.rates||{}, entries:n&&!n._deleted?C.manualEntries(n):[], sel:SEL.manual, selE:SEL.mentries };
+    rates:rule.rates||{}, entries:n&&!n._deleted?C.manualEntries(n).filter(function(e){ return C.yearOf(e.monthKey)===YEAR; }):[], sel:SEL.manual, selE:SEL.mentries };
 }
 async function saveManual(){
   var type=MANUAL.type, rule=D.rules[type], mk=String(MANUAL.month||''), c=MANUAL.siteId&&manualCons(MANUAL.siteId);
@@ -473,16 +514,19 @@ async function saveManual(){
   if(!rule.leadSid){ toast('요율표에서 이 컨설팅의 주관을 먼저 고르세요'); return; }
   if(!c){ toast('사업장을 고르세요'); return; }
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(mk)){ toast('지급월을 고르세요'); return; }
-  var people=[], seen={}, bad='', anyPaid=false;
+  var people=[], seen={}, bad='', anyPaid=false, acts={};
   MANUAL.rows.forEach(function(r){
     if(bad) return;
     var sid=r.role==='lead'?rule.leadSid:r.sid, t=String(r.pre==null?'':r.pre).trim();
     if(!sid){ if(r.role==='staff' && (t===''||C.won(t)===0)) return; bad='담당을 고르세요'; return; }
     if(seen[sid]){ bad=(NAMES[sid]||'같은 사람')+' 이(가) 두 번 들어 있습니다'; return; }
     if(t!=='' && !/^[\d,\s]+$/.test(t)){ bad='세전은 숫자로 적어 주세요 — '+t; return; }
+    var nt=String(r.net==null?'':r.net).trim();
+    if(nt!=='' && !/^[\d,\s]+$/.test(nt)){ bad='실수령액은 숫자로 적어 주세요 — '+nt; return; }
     if(r.role==='staff' && (rule.rates||{})[sid]==null){ bad=(NAMES[sid]||'담당')+' — 요율표에 요율이 없습니다(«⚙️ 규칙·요율»에서 먼저)'; return; }
     seen[sid]=1; var pre=C.won(t); if(pre>0) anyPaid=true;
-    people.push({ sid:sid, name:NAMES[sid]||'', pre:pre });
+    people.push({ sid:sid, name:NAMES[sid]||'', pre:pre, tax:C.taxOf(r.tax) });
+    if(C.won(nt)>0) acts[String(c.id)+'|'+sid]=C.won(nt);   /* 적은 실수령액은 그대로 통장 실입금이 된다 */
   });
   if(bad){ toast(bad+' (아무것도 저장하지 않았습니다)'); return; }
   if(!anyPaid){ toast('세전을 한 사람 이상 적어 주세요'); return; }
@@ -500,7 +544,17 @@ async function saveManual(){
       if(!lp || lp._deleted || !lp.sid) await patchRecord('settle/links/person/'+pk, 'SettleLink', null, { id:pk, entityType:'SettleLink', kind:'person', text:people[j].name, sid:people[j].sid }); }
   }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); await reload(); return; }
   MANUAL.open=false; await reload(); await buildRuns(id);
-  CUR_RUN=C.runId(type, mk); drawRuns();
+  YEAR=mk.slice(0,4); lsSet('year', YEAR); CUR_RUN=C.runId(type, mk);
+  if(Object.keys(acts).length) await setActuals(CUR_RUN, acts);
+  draw();
+}
+/* 통장 실입금 여럿을 한 번에 넣고 다시 계산(직접 입력의 실수령액) */
+async function setActuals(rid, map){
+  var known=D.runs[rid]; if(!known || known.status!=='draft') return;
+  var n=C.normalizeNotice(D.notices[known.noticeId]), rule=D.rules[known.typeCode]; if(!n || !rule) return;
+  var a=Object.assign({}, known.actuals||{}, map), res=compute(n, known.monthKey, rule, rid, a);
+  try{ await patchRecord('settle/runs/'+rid, 'SettleRun', known, { actuals:a, sites:res.sites, issues:res.issues }); }catch(e){ toast('통장 실입금을 넣지 못했습니다: '+errMsg(e)); return; }
+  await reload();
 }
 /* 고른 입력 빼기 — 그 달·그 사업장 입력을 지우고, 비게 된 «임시저장» 정산표는 _deleted 표식(돈 기록은 지우지 않는다) */
 async function removeManual(){
@@ -615,7 +669,7 @@ function ruleOptions(sel){
 function drawNotices(){
   var cur=$('upType').value||lsGet('upType')||'';
   $('upType').innerHTML=ruleOptions(cur)||'<option value="">규칙을 먼저 만드세요</option>';
-  $('noticesBox').innerHTML=V.noticesTable(vals(D.notices).map(C.normalizeNotice), SEL.notices);
+  $('noticesBox').innerHTML=V.noticesTable(vals(D.notices).filter(noticeInYear).map(C.normalizeNotice), SEL.notices, bizNames());
   var n=CUR_NOTICE && D.notices[CUR_NOTICE] ? C.normalizeNotice(D.notices[CUR_NOTICE]) : null;
   $('linkBox').innerHTML=n?V.linkBox(unlinkedOf(n)):'';
   drawBulks();
@@ -648,7 +702,7 @@ function buildWork(){
   types.forEach(function(k){
     var r=D.rules[k], rates={};
     Object.keys(r.rates||{}).forEach(function(s){ rates[s]=String(r.rates[s]); if(!seen[s]){ seen[s]=1; people.push(s); } });
-    rules[k]={ typeCode:k, title:r.title||'', leadSid:r.leadSid||'', rates:rates, siteRates:JSON.parse(JSON.stringify(r.siteRates||{})), msgHead:r.msgHead||'', msgFoot:r.msgFoot||'', active:r.active!==false };
+    rules[k]={ typeCode:k, title:r.title||'', tax:C.taxOf(r.tax), leadSid:r.leadSid||'', rates:rates, siteRates:JSON.parse(JSON.stringify(r.siteRates||{})), msgHead:r.msgHead||'', msgFoot:r.msgFoot||'', active:r.active!==false };
   });
   people.sort(function(a,b){ var x=NAMES[a]||'', y=NAMES[b]||''; return x<y?-1:x>y?1:0; });
   return { types:types, rules:rules, people:people, dirty:false, open:(WORK&&WORK.open)||'' };
@@ -676,8 +730,8 @@ async function saveRules(){
       var t=String(w.rates[s]).replace(/[%\s]/g,''); if(t==='') return;
       var v=Number(t); if(!(v>=0 && v<=100) && !bad) bad=bizName(k)+' · '+(NAMES[s]||'(이름 없음)')+' — 요율은 0~100 숫자'; else rates[s]=v;
     });
-    var rec={ id:k, entityType:'SettleRule', typeCode:k, mode:'pool', title:w.title||bizName(k), leadSid:w.leadSid, rates:rates, siteRates:w.siteRates||{}, msgHead:w.msgHead||'', msgFoot:w.msgFoot||'', active:w.active!==false };
-    var old=D.rules[k], pick=function(o){ return o?JSON.stringify([o.title||'', o.leadSid||'', o.rates||{}, o.siteRates||{}, o.msgHead||'', o.msgFoot||'', o.active!==false]):''; };
+    var rec={ id:k, entityType:'SettleRule', typeCode:k, mode:'pool', title:w.title||bizName(k), tax:C.taxOf(w.tax), leadSid:w.leadSid, rates:rates, siteRates:w.siteRates||{}, msgHead:w.msgHead||'', msgFoot:w.msgFoot||'', active:w.active!==false };
+    var old=D.rules[k], pick=function(o){ return o?JSON.stringify([o.title||'', C.taxOf(o.tax), o.leadSid||'', o.rates||{}, o.siteRates||{}, o.msgHead||'', o.msgFoot||'', o.active!==false]):''; };
     if(!old || pick(old)!==pick(rec)) recs.push({ k:k, rec:rec, isNew:!old });
   });
   if(bad){ toast(bad); return; }
@@ -693,7 +747,7 @@ async function saveRules(){
   }catch(e){ toast('저장하지 못했습니다('+done+'/'+recs.length+'건 저장됨): '+errMsg(e)); await reload(); return; }
   WORK=null; await reload(); toast('요율표를 저장했습니다 — 사업 '+done+'개. 임시저장인 정산표는 «다시 계산»을 눌러 주세요');
 }
-function confirmedRuns(){ return runsList().filter(function(r){ return r.status==='confirmed'; }).sort(function(a,b){ return a.monthKey<b.monthKey?1:-1; }); }
+function confirmedRuns(){ return yearRuns().filter(function(r){ return r.status==='confirmed'; }).sort(function(a,b){ return a.monthKey<b.monthKey?1:-1; }); }
 function drawMsgs(){
   var list=confirmedRuns();
   if(!MSG_RUN || !list.some(function(r){ return r.id===MSG_RUN; })) MSG_RUN=list.length?list[0].id:'';
@@ -857,9 +911,9 @@ async function softDelete(path, entityType, known){
 async function exportXlsx(rid){
   var run=C.normalizeRun(D.runs[rid]); if(!run) return;
   try{ await needXlsx(); }catch(e){ toast(errMsg(e)); return; }
-  var rows=[['사업장','회차','구분','이름','세전','소득세','지방소득세','세후','통장 실입금','요율(%)','몫','차액','조정','정산액','최종']];
+  var rows=[['사업장','회차','구분','이름','세율(%)','세전','소득세','지방소득세','세후','통장 실입금','요율(%)','몫','차액','조정','정산액','최종']];
   run.sites.forEach(function(s){ s.members.forEach(function(m){
-    rows.push([s.company, s.round, m.role==='lead'?'주관':'담당', NAMES[m.sid]||m.name, m.pre, m.inc, m.loc, m.net, m.actual==null?'':m.actual, m.rate==null?'':m.rate, m.share==null?'':m.share, m.diff==null?'':m.diff, m.adjust||'', m.settle==null?'':m.settle, m.final==null?'':m.final]);
+    rows.push([s.company, s.round, m.role==='lead'?'주관':'담당', NAMES[m.sid]||m.name, Number(C.taxOf(m.tax)), m.pre, m.inc, m.loc, m.net, m.actual==null?'':m.actual, m.rate==null?'':m.rate, m.share==null?'':m.share, m.diff==null?'':m.diff, m.adjust||'', m.settle==null?'':m.settle, m.final==null?'':m.final]);
   }); });
   var leadBy={}; run.sites.forEach(function(s){ s.members.forEach(function(m){ if(m.role==='lead') leadBy[s.consultingId||s.company]=m.sid; }); });
   var tr=[['사업장','구분','보내는 사람','받는 사람','금액','보냄']];
@@ -884,7 +938,7 @@ document.addEventListener('click', async function(ev){
   if((b=t.closest('#tabs button'))){ setTab(b.getAttribute('data-tab')); return; }
   if((b=t.closest('[data-manual]'))){ openManual(b.getAttribute('data-manual')||$('upType').value); return; }
   if(t.closest('#m_close')){ MANUAL.open=false; drawRuns(); return; }
-  if(t.closest('#m_add')){ MANUAL.rows.push({ sid:'', role:'staff', pre:'0' }); drawRuns(); return; }
+  if(t.closest('#m_add')){ MANUAL.rows.push({ sid:'', role:'staff', tax:C.taxOf((D.rules[MANUAL.type]||{}).tax), net:'', pre:'0' }); drawRuns(); return; }
   if(t.closest('#m_save')){ await saveManual(); return; }
   if((b=t.closest('[data-run]'))){ ev.preventDefault(); MANUAL.open=false; CUR_RUN=b.getAttribute('data-run'); SEL.members={}; SEL.transfers={}; SEL.deposits={}; DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false }; drawRuns(); $('runCard').scrollIntoView({ behavior:'smooth', block:'start' }); return; }
   if(t.closest('#dep_read')){ var dr=curDraft(); if(!dr) return; DEP.text=$('dep_text').value; DEP.found=C.parseDepositText(DEP.text); DEP.source='paste'; DEP.open=true;
@@ -960,7 +1014,13 @@ document.addEventListener('change', async function(ev){
   if(t.id==='m_type'||t.id==='m_site'){ var lp0=(MANUAL.rows[0]||{}).pre; if(t.id==='m_type'){ MANUAL.type=t.value; MANUAL.siteId=''; } else MANUAL.siteId=t.value;
     MANUAL.rows=manualDefaultRows(MANUAL.type, MANUAL.siteId, lp0); SEL.manual={}; SEL.mentries={}; drawRuns(); return; }
   if(t.id==='m_month'){ MANUAL.month=t.value; return; }
-  if(t.matches('select[data-m]')){ var mp=t.getAttribute('data-m').split('|'), mr=MANUAL.rows[+mp[0]]; if(mr){ mr.sid=t.value; drawRuns(); } return; }
+  if(t.matches('select[data-m]')){ var mp=t.getAttribute('data-m').split('|'), mr=MANUAL.rows[+mp[0]]; if(!mr) return;
+    mr[mp[1]]=t.value; if(mp[1]==='tax' && C.won(mr.net)>0) mr.pre=String(C.preFromNet(mr.net, mr.tax).pre); drawRuns(); return; }
+  /* 연도 — 그 해 것만 보이게. 열어 둔 정산표가 다른 해면 닫는다 */
+  if(t.id==='yearPick'){ YEAR=t.value; lsSet('year', YEAR); if(CUR_RUN && D.runs[CUR_RUN] && C.yearOf(D.runs[CUR_RUN].monthKey)!==YEAR) CUR_RUN='';
+    MANUAL.open=false; SEL.runs={}; SEL.notices={}; MSG_RUN=''; CALC.siteId=''; draw(); return; }
+  if(t.id==='r_tax'){ REV.tax=t.value; lsSet('rev', JSON.stringify(REV)); $('revOut').innerHTML=V.revResult(REV); return; }
+  if(t.matches('select[data-rf]')){ var rq=t.getAttribute('data-rf').split('|'); WORK.rules[rq[0]][rq[1]]=t.value; markDirty(); return; }
   if(t.id==='c_type'){ CALC.type=t.value; CALC.siteId=''; calcPrefill(); saveCalc(); drawCalc(); return; }
   if(t.id==='c_site'){ CALC.siteId=t.value; saveCalc(); return; }
   if(t.matches('select[data-c]')){ var cp=t.getAttribute('data-c').split('|'), cr=CALC.rows[+cp[0]]; if(!cr) return;
@@ -973,7 +1033,7 @@ document.addEventListener('change', async function(ev){
   if(t.id==='mx_addType' && t.value){ var nt=t.value; WORK.types.push(nt);
     var leads={}; WORK.types.forEach(function(k){ var l=WORK.rules[k]&&WORK.rules[k].leadSid; if(l) leads[l]=(leads[l]||0)+1; });
     var lead0=Object.keys(leads).sort(function(a,b){ return leads[b]-leads[a]; })[0]||'';   /* 주관은 다른 사업에서 가장 많이 맡은 사람으로 먼저 채운다(고칠 수 있다) */
-    WORK.rules[nt]={ typeCode:nt, title:'', leadSid:lead0, rates:{}, siteRates:{}, msgHead:'', msgFoot:'', active:true }; markDirty(); drawRules(); return; }
+    WORK.rules[nt]={ typeCode:nt, title:'', tax:'3.3', leadSid:lead0, rates:{}, siteRates:{}, msgHead:'', msgFoot:'', active:true }; markDirty(); drawRules(); return; }
   if(t.id==='mx_addSid' && t.value){ WORK.people.push(t.value); markDirty(); drawRules(); return; }
   if(t.matches('select[data-lead]')){ WORK.rules[t.getAttribute('data-lead')].leadSid=t.value; markDirty(); return; }
   if(t.matches('input[data-on]')){ WORK.rules[t.getAttribute('data-on')].active=t.checked; markDirty(); return; }
@@ -983,8 +1043,13 @@ document.addEventListener('input', function(ev){
   var t=ev.target;
   if(t.id==='dep_text'){ DEP.text=t.value; return; }
   /* 직접 입력 세전 — 친 글은 기억만 하고 세후 칸만 고친다(입력칸을 다시 그리지 않는다) */
-  if(t.matches('input[data-m]')){ var mq=t.getAttribute('data-m').split('|'), mrow=MANUAL.rows[+mq[0]]; if(!mrow) return; mrow.pre=t.value;
-    var mpre=C.won(t.value), mnet=document.querySelector('[data-m-net="'+mq[0]+'"]'); if(mnet) mnet.textContent=C.fmt(mpre-C.withholding(mpre).total); return; }
+  if(t.matches('input[data-m]')){ var mq=t.getAttribute('data-m').split('|'), mrow=MANUAL.rows[+mq[0]]; if(!mrow) return;
+    mrow[mq[1]]=t.value;
+    /* 실수령액을 치면 세율로 세전을 거꾸로 계산해 세전 칸을 채운다 */
+    if(mq[1]==='net' && C.won(t.value)>0){ var rv=C.preFromNet(t.value, mrow.tax), pin=document.querySelector('input[data-m="'+mq[0]+'|pre"]'); mrow.pre=C.fmt(rv.pre); if(pin) pin.value=mrow.pre; }
+    var mpre=C.won(mrow.pre), mnet=document.querySelector('[data-m-net="'+mq[0]+'"]'), mv=mpre-C.withholding(mpre, mrow.tax).total;
+    if(mnet) mnet.textContent=C.fmt(mv)+(C.won(mrow.net)>0 && mv!==C.won(mrow.net)?' ≠ 실수령액':''); return; }
+  if(t.id==='r_net'){ REV.net=t.value; lsSet('rev', JSON.stringify(REV)); $('revOut').innerHTML=V.revResult(REV); return; }
   /* 통장 실입금 — 친 글은 PEND 에만(저장 X). 저장된 값과 같아지면 노란 표시를 뗀다 */
   if(t.matches('input[data-actual]')){ var ak=t.getAttribute('data-actual'), pp=PEND[CUR_RUN]=PEND[CUR_RUN]||{};
     if(pendSame(CUR_RUN, ak, t.value)){ delete pp[ak]; t.classList.remove('dirty'); } else { pp[ak]=t.value; t.classList.add('dirty'); }

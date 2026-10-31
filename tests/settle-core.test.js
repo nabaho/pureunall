@@ -382,3 +382,39 @@ test('직접 입력 — 사업 종류 안내 하나에 쌓고, 세전 0 담당�
   assert.deepEqual(Array.from(r.months, (m) => m.key), ['2026-11']);
   assert.equal(r.rows.length, 1);
 });
+
+
+test('원천징수 8.8%(기타소득) · 실수령액 → 세전 역계산 · 규칙 기본 세율이 정산표에 든다', () => {
+  assert.deepEqual(C.withholding(1000000, '8.8'), { inc: 80000, loc: 8000, total: 88000 });
+  assert.deepEqual(C.withholding(125000, '8.8'), { inc: 0, loc: 0, total: 0 }, '과세최저한');
+  assert.deepEqual(C.withholding(6990000), { inc: 209700, loc: 20970, total: 230670 }, '기본은 3.3%');
+  assert.equal(C.preFromNet('6,759,330', '3.3').pre, 6990000);
+  assert.equal(C.preFromNet(945033, '3.3').pre, 977273);
+  assert.equal(C.preFromNet(912000, '8.8').pre, 1000000);
+  assert.equal(C.preFromNet(100000, '8.8').pre, 100000);
+  const r = C.preFromNet(6759330, '3.3');
+  assert.equal(r.exact, true);
+  assert.equal(r.net, 6759330);
+  /* 정산표 — 규칙 기본 세율 8.8 이면 세후도 8.8% 로 */
+  const notice = { months: [{ key: '2026-10', label: '10월' }], rows: [{ name: '홍길동', company: '가', totalPre: 1000000, amounts: { '2026-10': 1000000 } }] };
+  const ctx = { companyLinks: {}, personLinks: {}, actuals: {}, adjusts: [], names: {} };
+  ctx.companyLinks[C.linkKey('가')] = { consultingId: 'C-1', companyId: '' }; ctx.personLinks[C.linkKey('홍길동')] = 'T-LEAD';
+  const m = C.settleMonth(notice, '2026-10', { leadSid: 'T-LEAD', tax: '8.8', rates: {}, siteRates: {} }, ctx).sites[0].members[0];
+  assert.equal(m.tax, '8.8');
+  assert.equal(m.net, 912000);
+  /* 줄마다 세율이 있으면 그것이 먼저 */
+  notice.rows[0].tax = '3.3';
+  assert.equal(C.settleMonth(notice, '2026-10', { leadSid: 'T-LEAD', tax: '8.8', rates: {}, siteRates: {} }, ctx).sites[0].members[0].net, 967000);
+});
+
+test('연간 합계 — 그 해 지급월 정산표에서 담당별 반환·추가 지급, 주관 순액, 지운 정산표는 뺀다', () => {
+  const mk = (id, monthKey, status, settle, extra) => Object.assign({ id, monthKey, status, sites: [{ members: [{ role: 'lead', sid: 'L' }, { role: 'staff', sid: 'A', name: '가', settle }] }] }, extra || {});
+  const s = C.yearSummary([mk('1', '2026-07', 'draft', -100), mk('2', '2026-10', 'confirmed', 30), mk('3', '2027-01', 'draft', -5), mk('4', '2026-11', 'draft', -7, { _deleted: true })], '2026');
+  assert.equal(s.counts.runs, 2);
+  assert.equal(s.counts.draft, 1);
+  assert.equal(s.counts.confirmed, 1);
+  assert.equal(s.people.length, 1);
+  assert.equal(s.people[0].back, 100);
+  assert.equal(s.people[0].more, 30);
+  assert.equal(s.leads.L, 70, '주관은 반환 100 받고 추가 지급 30 줌');
+});

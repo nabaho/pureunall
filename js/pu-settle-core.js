@@ -26,12 +26,36 @@
     var n = Number(x);
     return isFinite(n) && x !== '' && x !== null ? Math.round(n) : 0;
   }
-  /* 사업소득 3.3% — 소득세 3%, 지방소득세 = 소득세 × 10%, 둘 다 10원 아래 버림 */
-  function withholding(pre) {
+  /* 원천징수 — 대표 지시 2026-10-31 「세전금액을 3.3 8.8 퍼로 역계산」.
+     '3.3' 사업소득: 소득세 = 세전 × 3%, 지방소득세 = 소득세 × 10%, 둘 다 10원 아래 버림.
+     '8.8' 기타소득(필요경비 60%): 기타소득금액 = 세전 × 40%, 소득세 = 그 × 20%, 지방소득세 = 소득세 × 10%, 10원 아래 버림.
+       기타소득금액이 5만 원 이하(세전 12만 5천 원 이하)면 과세최저한으로 0원(소득세법 제84조) [확인 필요: 건별 판단은 담당 노무사]. */
+  var TAX_KO = { '3.3': '3.3% 사업소득', '8.8': '8.8% 기타소득' };
+  function taxOf(x) { return String(x) === '8.8' ? '8.8' : '3.3'; }
+  function withholding(pre, tax) {
     pre = Math.max(0, Math.floor(Number(pre) || 0));
-    var inc = Math.floor(pre * 3 / 1000) * 10;
+    var inc;
+    if (taxOf(tax) === '8.8') { var base = Math.floor(pre * 4 / 10); inc = base > 50000 ? Math.floor(base * 2 / 100) * 10 : 0; }
+    else inc = Math.floor(pre * 3 / 1000) * 10;
     var loc = Math.floor(inc / 100) * 10;
     return { inc: inc, loc: loc, total: inc + loc };
+  }
+  /* 실수령액(세후) → 세전 역계산. 10원 버림 때문에 딱 맞는 세전이 없거나 둘일 수 있다 —
+     딱 맞는 것 중 끝자리 0 이 많은 것(실제 지급액은 대개 둥근 수), 없으면 가장 가까운 것(exact:false) */
+  function preFromNet(net, tax) {
+    net = won(net);
+    if (!(net > 0)) return { pre: 0, exact: net === 0, net: 0, inc: 0, loc: 0 };
+    var r = taxOf(tax) === '8.8' ? 0.088 : 0.033, mid = Math.round(net / (1 - r)), best = null, near = null;
+    var zeros = function (n) { var z = 0; while (n > 0 && n % 10 === 0 && z < 9) { n /= 10; z++; } return z; };
+    var cands = [net];
+    for (var p = mid - 40; p <= mid + 40; p++) if (p > 0) cands.push(p);
+    cands.forEach(function (q) {
+      var d = Math.abs(q - withholding(q, tax).total - net);
+      if (d === 0 && (best == null || zeros(q) > zeros(best) || (zeros(q) === zeros(best) && q < best))) best = q;
+      if (!near || d < near.d || (d === near.d && q < near.p)) near = { p: q, d: d };
+    });
+    var pre = best != null ? best : near.p, w = withholding(pre, tax);
+    return { pre: pre, exact: best != null, net: pre - w.total, inc: w.inc, loc: w.loc };
   }
   /* 연결 열쇠 — 카톡 창 제목·엑셀 글에 섞이는 특수 공백을 고르고, RTDB 열쇠에 못 쓰는 글자를 바꾼다 */
   function linkKey(text) { return clean(text).replace(/[.#$\[\]\/]/g, '_'); }
@@ -151,9 +175,9 @@
       var members = roster.map(function (r) {
         var sid = pl[linkKey(r.name)] || '';
         if (!sid) sIssues.push('사람 연결 필요: ' + r.name);
-        var pre = (r.amounts || {})[monthKey] || 0, w = withholding(pre), net = pre - w.total;
+        var tax = taxOf(r.tax || rule.tax), pre = (r.amounts || {})[monthKey] || 0, w = withholding(pre, tax), net = pre - w.total;
         var ak = cid + '|' + sid, actual = cid && sid && own(act, ak) && act[ak] !== '' && act[ak] != null ? won(act[ak]) : null;
-        return { name: r.name, sid: sid, role: sid && sid === rule.leadSid ? 'lead' : 'staff', pre: pre, inc: w.inc, loc: w.loc, net: net,
+        return { name: r.name, sid: sid, role: sid && sid === rule.leadSid ? 'lead' : 'staff', tax: tax, pre: pre, inc: w.inc, loc: w.loc, net: net,
           actual: actual, used: actual != null ? actual : net, rate: null, share: null, diff: null, adjust: 0, adjustIds: [], settle: null, final: null };
       });
       if (rule.leadSid && !members.some(function (m) { return m.role === 'lead'; })) {
@@ -191,9 +215,9 @@
   function calcSite(rows) {
     /* 빈 줄 거르기 — 수행자를 고른(sid) 줄이나 이름을 적은 줄만. ⚠ «이름 || 사번» 모양을 쓰지 않는다(tests/sid-never-shown) */
     var issues = [], members = (rows || []).filter(function (r) { return r && (r.sid || clean(r.name)); }).map(function (r) {
-      var pre = won(r.pre), w = withholding(pre), net = pre - w.total, actual = r.actual === '' || r.actual == null ? null : won(r.actual);
+      var tax = taxOf(r.tax), pre = won(r.pre), w = withholding(pre, tax), net = pre - w.total, actual = r.actual === '' || r.actual == null ? null : won(r.actual);
       var rate = r.role === 'staff' && r.rate !== '' && r.rate != null && isFinite(Number(String(r.rate).replace(/[%\s]/g, ''))) ? Number(String(r.rate).replace(/[%\s]/g, '')) : null;
-      return { sid: r.sid || '', name: clean(r.name), role: r.role === 'lead' ? 'lead' : 'staff', pre: pre, inc: w.inc, loc: w.loc, net: net, actual: actual,
+      return { sid: r.sid || '', name: clean(r.name), role: r.role === 'lead' ? 'lead' : 'staff', tax: tax, pre: pre, inc: w.inc, loc: w.loc, net: net, actual: actual,
         used: actual != null ? actual : net, rate: rate, share: null, diff: null, settle: null, final: null };
     });
     if (!members.length) return { members: [], totalNet: 0, issues: ['수행자를 넣으세요'], transfers: [] };
@@ -254,7 +278,7 @@
   function diffRun(oldSites, newSites) {
     function sig(sites) {
       var o = {};
-      (sites || []).forEach(function (s) { (s.members || []).forEach(function (m) { o[s.key + '|' + (m.sid || m.name)] = m.pre + '/' + (m.actual == null ? '' : m.actual); }); });
+      (sites || []).forEach(function (s) { (s.members || []).forEach(function (m) { o[s.key + '|' + (m.sid || m.name)] = m.pre + '/' + (m.actual == null ? '' : m.actual) + '/' + taxOf(m.tax); }); });
       return o;
     }
     var a = sig(oldSites), b = sig(newSites), ka = Object.keys(a), kb = Object.keys(b);
@@ -301,7 +325,7 @@
         var s = it.s, m = it.m;
         L.push('■ ' + s.company + ' (' + s.round + '차)');
         if (m.actual != null) L.push('· 세전 ' + fmt(m.pre) + '원 / 통장 입금 ' + fmt(m.used) + '원');
-        else L.push('· 세전 ' + fmt(m.pre) + '원 − 원천징수 ' + fmt(m.inc + m.loc) + '원 = 세후 ' + fmt(m.used) + '원');
+        else L.push('· 세전 ' + fmt(m.pre) + '원 − 원천징수(' + taxOf(m.tax) + '%) ' + fmt(m.inc + m.loc) + '원 = 세후 ' + fmt(m.used) + '원');
         L.push('· 사업장 세후 합계 ' + fmt(s.totalNet) + '원 × ' + m.rate + '% = ' + fmt(m.share) + '원');
         if (m.adjust) L.push('· 이월·조정 ' + fmt(m.adjust) + '원');
         L.push(settleLine('· 정산: ', m.settle, leadName));
@@ -412,7 +436,7 @@
       return { company: s.company || '', key: s.key || linkKey(s.company), consultingId: s.consultingId || '', companyId: s.companyId || '', round: Number(s.round) || 1,
         totalNet: Number(s.totalNet) || 0, issues: toArr(s.issues),
         members: toArr(s.members).map(function (m) {
-          return { name: m.name || '', sid: m.sid || '', role: m.role === 'lead' ? 'lead' : 'staff', pre: Number(m.pre) || 0, inc: Number(m.inc) || 0, loc: Number(m.loc) || 0,
+          return { name: m.name || '', sid: m.sid || '', role: m.role === 'lead' ? 'lead' : 'staff', tax: taxOf(m.tax), pre: Number(m.pre) || 0, inc: Number(m.inc) || 0, loc: Number(m.loc) || 0,
             net: Number(m.net) || 0, actual: nn(m.actual), used: Number(m.used) || 0, rate: nn(m.rate), share: nn(m.share), diff: nn(m.diff),
             adjust: Number(m.adjust) || 0, adjustIds: toArr(m.adjustIds), settle: nn(m.settle), final: nn(m.final) };
         }) };
@@ -424,7 +448,11 @@
     var out = {};
     Object.keys(n).forEach(function (k) { out[k] = n[k]; });
     out.months = toArr(n.months);
-    out.rows = toArr(n.rows).map(function (r) { return { line: r.line, name: r.name || '', company: r.company || '', totalPre: Number(r.totalPre) || 0, amounts: r.amounts || {} }; });
+    out.rows = toArr(n.rows).map(function (r) {
+      var o = { line: r.line, name: r.name || '', company: r.company || '', totalPre: Number(r.totalPre) || 0, amounts: r.amounts || {} };
+      if (r.tax) o.tax = taxOf(r.tax);
+      return o;
+    });
     return out;
   }
 
@@ -457,7 +485,11 @@
   }
   function manualCopy(notice) {
     var n = normalizeNotice(notice) || { months: [], rows: [] };
-    return { months: n.months, rows: n.rows.map(function (r) { return { line: r.line, name: r.name, company: r.company, totalPre: r.totalPre, amounts: Object.assign({}, r.amounts) }; }) };
+    return { months: n.months, rows: n.rows.map(function (r) {
+      var o = { line: r.line, name: r.name, company: r.company, totalPre: r.totalPre, amounts: Object.assign({}, r.amounts) };
+      if (r.tax) o.tax = r.tax;
+      return o;
+    }) };
   }
   function manualAdd(notice, entry) {
     var n = manualCopy(notice), mk = entry.monthKey, ck = linkKey(entry.company);
@@ -466,6 +498,7 @@
       var r = n.rows.filter(function (x) { return linkKey(x.company) === ck && linkKey(x.name) === linkKey(p.name); })[0];
       if (!r) { r = { line: 0, name: p.name, company: entry.company, totalPre: 0, amounts: {} }; n.rows.push(r); }
       r.amounts[mk] = won(p.pre);
+      if (taxOf(p.tax) === '8.8') r.tax = '8.8'; else delete r.tax;
     });
     var rows = manualRows(n.rows);
     return { months: manualMonths(rows, n.months.concat([{ key: mk, label: Number(mk.slice(5)) + '월' }])), rows: rows };
@@ -484,10 +517,33 @@
       Object.keys(r.amounts).forEach(function (mk) {
         var k = mk + '|' + linkKey(r.company);
         if (!by[k]) { by[k] = { key: k, monthKey: mk, company: r.company, people: [] }; out.push(by[k]); }
-        by[k].people.push({ name: r.name, pre: Number(r.amounts[mk]) || 0 });
+        by[k].people.push({ name: r.name, pre: Number(r.amounts[mk]) || 0, tax: taxOf(r.tax) });
       });
     });
     return out.sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : a.monthKey > b.monthKey ? -1 : (a.company < b.company ? -1 : 1); });
+  }
+
+  /* ═══ 연도별 관리 — 대표 지시 2026-10-31 「매년 관리할 수 있게 해라」 ═══
+     그 해(지급월 기준) 정산표에서 담당마다 반환·추가 지급 합계와 주관 순액(+ 받을 돈). 지운(_deleted) 정산표는 뺀다. */
+  function yearOf(monthKey) { return String(monthKey || '').slice(0, 4); }
+  function yearSummary(runs, year) {
+    var by = {}, order = [], leads = {}, n = { runs: 0, draft: 0, confirmed: 0, manual: 0 };
+    (runs || []).forEach(function (run) {
+      if (!run || run._deleted || yearOf(run.monthKey) !== String(year)) return;
+      n.runs++; n[run.status] = (n[run.status] || 0) + 1;
+      toArr(run.sites).forEach(function (s) {
+        var lead = toArr(s.members).filter(function (m) { return m.role === 'lead'; })[0];
+        toArr(s.members).forEach(function (m) {
+          if (m.role !== 'staff' || !m.sid || !m.settle) return;
+          if (!by[m.sid]) { by[m.sid] = { sid: m.sid, name: m.name || '', back: 0, more: 0, sites: 0 }; order.push(m.sid); }
+          var p = by[m.sid];
+          p.sites++;
+          if (m.settle < 0) p.back += -m.settle; else p.more += m.settle;
+          if (lead && lead.sid) leads[lead.sid] = (leads[lead.sid] || 0) + (-m.settle);
+        });
+      });
+    });
+    return { year: String(year), counts: n, people: order.map(function (k) { return by[k]; }), leads: leads };
   }
 
   return {
@@ -498,6 +554,7 @@
     buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice,
     parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
-    manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries
+    manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
+    TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary
   };
 });

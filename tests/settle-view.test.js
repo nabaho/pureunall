@@ -224,8 +224,8 @@ test('안내 파일 목록·이월 목록도 ☐ 다음 번호', () => {
 test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받았으면 «추가 지급»(묶음 머리·송금 목록·뜻 풀이·카톡·계산기)', () => {
   const back = V.runDetail(fakeRun('draft'), NAMES);
   assert.match(visible(back), /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동 87,915원\s+반환/);
-  assert.match(visible(back), /정산 방향/);
-  assert.match(visible(back), /주관\(홍길동\)에게 돌려줌/);
+  assert.match(visible(back), /반환\s+담당 → 주관\(홍길동\)/);
+  assert.match(visible(back), /추가 지급\s+주관\(홍길동\) → 담당/);
   const tb = back.slice(back.indexOf('data-name="transfers"'));
   assert.match(visible(tb.slice(0, tb.indexOf('</thead>'))), /구분/);
   assert.match(tb, /data-k="dir"><span class="pill dir-back">반환</);
@@ -276,4 +276,47 @@ test('직접 입력 상자 — ☐·번호, 주관은 규칙대로 못박고, �
   assert.doesNotMatch(h, /<i>승진/);
   assert.doesNotMatch(visible(h), /T-[A-Z]/);
   assert.doesNotMatch(h, /<br/i);
+});
+
+
+test('안내 파일 목록 — 사업 칸(전체 이름), 지급월·받은 때에 연도', () => {
+  const n = { id: 'N1', typeCode: 'cons-b', fileName: '안내.xlsx', receivedAt: Date.UTC(2026, 9, 31, 6, 32), source: 'upload', rows: [{}],
+    months: [{ key: '2026-07', label: '7월' }, { key: '2026-09', label: '9월 (10/2 지급)' }, { key: '2027-01', label: '1월' }] };
+  const v = visible(V.noticesTable([n, Object.assign({}, n, { id: 'N2', source: 'manual', fileName: '직접 입력' })], {}, { 'cons-b': '나다사업 (나다협회)' }));
+  assert.match(v, /나다사업 \(나다협회\)/);
+  assert.match(v, /2026년 7월 · 9월 \(10\/2 지급\) \/ 2027년 1월/);
+  assert.match(v, /2026-10-31 15:32/);
+  assert.match(v, /직접 입력/);
+});
+
+test('역계산 상자 — 세전·소득세·지방소득세·검산, 딱 맞는 세전이 없으면 알린다', () => {
+  const h = V.revBox({ net: '6,759,330', tax: '3.3' });
+  assert.match(h, /id="r_net" value="6,759,330"/);
+  assert.match(h, /<select id="r_tax"[^>]*><option value="3.3" selected>/);
+  assert.match(visible(h), /6,990,000원/);
+  assert.match(visible(h), /209,700원/);
+  assert.match(visible(h), /20,970원/);
+  assert.match(visible(V.revResult({ net: '912000', tax: '8.8' })), /1,000,000원/);
+  assert.match(visible(V.revResult({ net: '', tax: '3.3' })), /3\.3% 사업소득/);
+});
+
+test('연간 합계 — 담당마다 반환·추가 지급·차감, 주관 순액, 사번은 화면에 없다', () => {
+  const sum = { year: '2026', counts: { runs: 3, draft: 2, confirmed: 1, manual: 0 },
+    people: [{ sid: 'T-A', name: '', back: 1977964, more: 0, sites: 2 }, { sid: 'T-C', name: '', back: 0, more: 675933, sites: 1 }], leads: { 'T-LEAD': 1302031 } };
+  const v = visible(V.yearBox(sum, { 'T-A': '김가나', 'T-C': '박재직', 'T-LEAD': '홍길동' }));
+  assert.match(v, /2026년 합계/);
+  assert.match(v, /임시저장 2 · 확정 1/);
+  assert.match(v, /김가나\s+1,977,964\s+—\s+보낼 1,977,964/);
+  assert.match(v, /박재직\s+—\s+675,933\s+받을 675,933/);
+  assert.match(v, /주관 홍길동 — 순액\s+받을 1,302,031/);
+  assert.doesNotMatch(v, /T-[A-Z]/);
+});
+
+test('직접 입력 상자 — 세율·실수령액 칸', () => {
+  const h = V.manualBox({ type: 'cons-b', month: '2026-10', rows: [{ sid: 'T-LEAD', role: 'lead', tax: '8.8', net: '912,000', pre: '1,000,000' }] },
+    { types: [{ code: 'cons-b', name: '나다사업' }], names: { 'T-LEAD': '홍길동' }, rates: {} });
+  assert.match(h, /<select data-m="0\|tax"[^>]*>[\s\S]*?<option value="8.8" selected>/);
+  assert.match(h, /data-m="0\|net" value="912,000"/);
+  assert.match(visible(h), /912,000/);
+  assert.match(visible(h.slice(h.indexOf('data-name="manual"'))), /세율[\s\S]*실수령액\(통장\)[\s\S]*세전[\s\S]*세후 계산/);
 });
