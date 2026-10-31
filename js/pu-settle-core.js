@@ -273,6 +273,41 @@
     });
   }
 
+  /* ═══ 읽은 자료 고르기 ═══ — 파이어베이스는 빈 배열·null 칸을 저장하지 않고, 배열을 {0:…,1:…} 로 돌려줄 때가 있다.
+     읽을 때 늘 이것을 거친다(전광판 normalizeAd 와 같은 까닭) */
+  function toArr(v) {
+    if (Array.isArray(v)) return v.filter(function (x) { return x != null; });
+    if (v && typeof v === 'object') return Object.keys(v).sort(function (a, b) { return Number(a) - Number(b); }).map(function (k) { return v[k]; }).filter(function (x) { return x != null; });
+    return [];
+  }
+  function nn(v) { return v === undefined ? null : v; }
+  function normalizeRun(run) {
+    if (!run || typeof run !== 'object') return null;
+    var out = {};
+    Object.keys(run).forEach(function (k) { out[k] = run[k]; });
+    out.issues = toArr(run.issues);
+    out.transfers = toArr(run.transfers);
+    out.actuals = run.actuals && typeof run.actuals === 'object' ? run.actuals : {};
+    out.sites = toArr(run.sites).map(function (s) {
+      return { company: s.company || '', key: s.key || linkKey(s.company), consultingId: s.consultingId || '', companyId: s.companyId || '', round: Number(s.round) || 1,
+        totalNet: Number(s.totalNet) || 0, issues: toArr(s.issues),
+        members: toArr(s.members).map(function (m) {
+          return { name: m.name || '', sid: m.sid || '', role: m.role === 'lead' ? 'lead' : 'staff', pre: Number(m.pre) || 0, inc: Number(m.inc) || 0, loc: Number(m.loc) || 0,
+            net: Number(m.net) || 0, actual: nn(m.actual), used: Number(m.used) || 0, rate: nn(m.rate), share: nn(m.share), diff: nn(m.diff),
+            adjust: Number(m.adjust) || 0, adjustIds: toArr(m.adjustIds), settle: nn(m.settle), final: nn(m.final) };
+        }) };
+    });
+    return out;
+  }
+  function normalizeNotice(n) {
+    if (!n || typeof n !== 'object') return null;
+    var out = {};
+    Object.keys(n).forEach(function (k) { out[k] = n[k]; });
+    out.months = toArr(n.months);
+    out.rows = toArr(n.rows).map(function (r) { return { line: r.line, name: r.name || '', company: r.company || '', totalPre: Number(r.totalPre) || 0, amounts: r.amounts || {} }; });
+    return out;
+  }
+
   /* 같은 내용을 두 번 올리지 않게 — 줄을 정렬해 FNV-1a 32비트 */
   function noticeHash(rows) {
     var parts = (rows || []).map(function (r) {
@@ -289,6 +324,6 @@
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
     parseNotice: parseNotice, settleMonth: settleMonth, transfersOf: transfersOf, checkRun: checkRun,
     runId: runId, diffRun: diffRun, appliedAdjustIds: appliedAdjustIds, unapplyAdjusts: unapplyAdjusts,
-    buildMessages: buildMessages, noticeHash: noticeHash
+    buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice
   };
 });

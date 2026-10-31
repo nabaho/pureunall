@@ -249,6 +249,23 @@ test('문구 머리말·맺음말은 규칙에서 바꿀 수 있다', () => {
   assert.equal(t.trim().split('\n').pop(), '수고하셨습니다.');
 });
 
+test('normalizeRun — 파이어베이스가 지운 빈 배열·null 칸을 되살리고, 되살린 정산표로 다시 검산이 된다', () => {
+  const sites = C.settleMonth(notice(), '2026-10', RULE, ctx()).sites;
+  /* 저장→읽기 흉내: JSON 으로 null 을 빼고, 빈 배열을 지우고, 배열을 {0:…} 로 */
+  const stored = JSON.parse(JSON.stringify({ id: 'r', sites, issues: [], transfers: [] }, (k, v) => (v === null || (Array.isArray(v) && !v.length) ? undefined : v)));
+  stored.sites = { 0: stored.sites[0] };
+  const r = C.normalizeRun(stored);
+  assert.deepEqual(r.issues, []);
+  assert.deepEqual(r.transfers, []);
+  assert.deepEqual(r.sites[0].issues, []);
+  assert.equal(r.sites[0].members.find((m) => m.role === 'lead').rate, null);
+  assert.deepEqual(r.sites[0].members[0].adjustIds, []);
+  assert.deepEqual(C.checkRun(r.sites), { ok: true, issues: [] });
+  const n = C.normalizeNotice(JSON.parse(JSON.stringify({ rows: { 1: { name: 'b', company: 'x' }, 0: { name: 'a', company: 'x', amounts: { '2026-10': 1 } } }, months: { 0: { key: '2026-10' } } })));
+  assert.deepEqual(n.rows.map((x) => x.name), ['a', 'b']);
+  assert.deepEqual(n.rows[1].amounts, {});
+});
+
 test('noticeHash — 같은 줄이면 같고, 금액이 다르면 다르다', () => {
   const a = notice(), b = notice();
   assert.equal(C.noticeHash(a.rows), C.noticeHash(b.rows));
