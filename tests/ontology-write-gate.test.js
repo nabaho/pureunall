@@ -200,7 +200,7 @@ test('전수조사기는 모든 프로그램·소유뿌리·서버 쓰기 흔적
   assert.equal(inv.counts.gated,inv.counts.programs);
   assert.ok(inv.server.length>0);
   inv.programs.forEach(p=>{
-    assert.ok(p.primaryRoots.length,p.key+': 소유 저장뿌리 없음');
+    assert.ok(p.primaryRoots.length||O.PROGRAMS[p.key].localOnly,p.key+': 소유 저장뿌리 없음'); // localOnly: 저장하지 않는 이 PC 안 도구
     assert.notEqual(p.mode,'missing',p.key+': 관문 없음');
   });
 });

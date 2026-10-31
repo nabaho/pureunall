@@ -67,6 +67,7 @@
        2026-10-24 off 로 감췄다가 2026-10-30 대표 「다시 살려」로 off 를 걷었다 — 포털 타일과 함께. */
     { key: 'rules',   row: 'client', name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고' },
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
+    { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
     { key: 'payroll', row: 'client', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱', off: true },
     /* 홈페이지·뉴스레터 — 예전엔 총괄관리자 전용이었다가 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원 모두.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */

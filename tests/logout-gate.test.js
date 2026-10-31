@@ -42,7 +42,11 @@ const 앱파일 = [];
    정부사업일정은 포털과 «다른 계정»을 쓴다(p_session · 제 아이디/비밀번호 ·
    5회 실패 30초 잠금 · 제 비밀번호 변경). 포털로 보내면 로그인해도 이 앱에는
    못 들어간다 — 고치려면 계정을 먼저 합쳐야 한다(대표 판단 대기, 2026-09-14). */
-const 아직 = { 'gov-consulting.html': '포털과 다른 자체 계정(p_session)을 쓴다 — 계정 합치기가 먼저다' };
+const 아직 = {
+  'gov-consulting.html': '포털과 다른 자체 계정(p_session)을 쓴다 — 계정 합치기가 먼저다',
+  /* 파이어베이스를 쓰지 않는 «이 PC 안» 도구(PuOntology.PROGRAMS.hangul.localOnly) — 지킬 로그인 세션이 없다 */
+  'hangul.html': '로그인·서버가 없는 이 PC 안 도구(localOnly) — 문서는 이 PC 에서만 열린다'
+};
 
 /* 넣으면 «안 되는» 화면 */
 const NEVER = {

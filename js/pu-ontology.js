@@ -199,6 +199,10 @@
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
+    /* 한글 편집기 — 한글 문서를 «이 PC 안에서» 열고 고치는 도구다(2026-10-31). 파이어베이스에 아무것도 쓰지 않으므로
+       저장 뿌리·쓰기 계약이 없다. 자료가 서버로 가지 않는다는 것이 이 앱의 약속이다(주민번호가 든 서식). */
+    hangul:{ name:'한글 편집기', file:'hangul.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
+      note:'한글 문서를 이 PC 안에서 열고 고치는 도구 — 파이어베이스에 쓰지 않는다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],

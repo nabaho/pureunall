@@ -1950,7 +1950,10 @@ body.portal-mode #moreFab{display:flex;}
        준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게).
        2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
     { key:'rules',   name:'취업규칙',      desc:'작성·검토·개정·신고', icon:'📜', url:'rules-v2.html',       roles:null, soon:true, row:'client' },
-    { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
+    { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */,
+    /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
+       ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
+    { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
     { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, soon:true, off:true, row:'client' },  /* 2026-10-09 열었다가 2026-10-20 대표 「급여관리도 준비중으로」 — 안쪽 문과 짝 */
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
