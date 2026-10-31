@@ -267,3 +267,10 @@ test('역계산 — 계산기 위 상자(저장 없음), 직접 입력 실수령
   assert.match(fnBody('async function saveRules('), /tax:C\.taxOf\(w\.tax\)/);
   assert.match(fnBody('async function saveRules('), /JSON\.stringify\(\[o\.title\|\|'', C\.taxOf\(o\.tax\)/);
 });
+
+test('카톡 문구 탭 — 확정 전 정산표도 미리보기로 고를 수 있고, 복사는 확정한 정산표만', () => {
+  assert.match(fnBody('function msgRuns('), /confirmedRuns\(\)\.concat\(yearRuns\(\)\.filter\(function\(r\)\{ return r\.status==='draft'; \}\)/);
+  assert.match(fnBody('function drawMsgs('), /preview:!!\(cur && cur\.status!=='confirmed'\)/);
+  const cp = fnBody('function copyMsg(');
+  assert.ok(cp.indexOf("cur.status!=='confirmed'") >= 0 && cp.indexOf("cur.status!=='confirmed'") < cp.indexOf('currentMsgs()'), '복사 전에 확정인지 본다');
+});

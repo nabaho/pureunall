@@ -445,11 +445,15 @@
   }
 
   /* ── ⑤ 카톡 문구 ── */
-  function messagesBox(msgs) {
-    if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 확정 정산표를 고르세요.</div>';
-    return '<div class="cards">' + msgs.map(function (m, i) {
-      return '<div class="card cardp"><div class="bar"><b>' + esc(m.name) + '</b><span class="sp"></span><button class="sm pri" data-copy="' + i + '">복사</button></div>'
-        + '<textarea readonly rows="' + Math.min(18, String(m.text).split('\n').length + 1) + '" data-msg="' + i + '">' + esc(m.text) + '</textarea></div>';
+  /* opt.preview — 확정 전 정산표: 문구는 보여 주되 복사 단추 대신 안내(금액이 바뀔 수 있다) */
+  function messagesBox(msgs, opt) {
+    opt = opt || {};
+    if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 정산표를 고르세요.</div>';
+    return (opt.preview ? '<div class="warn">확정 전 미리보기입니다 — 금액이 바뀔 수 있어 복사는 정산표를 «확정»한 뒤에 됩니다.</div>' : '')
+      + '<div class="cards">' + msgs.map(function (m, i) {
+      return '<div class="card cardp"><div class="bar"><b>' + esc(m.name) + '</b><span class="sp"></span>'
+        + (opt.preview ? '<span class="hint">확정하면 복사</span>' : '<button class="sm pri" data-copy="' + i + '">복사</button>') + '</div>'
+        + '<textarea readonly rows="' + Math.min(30, String(m.text).split('\n').length + 1) + '" data-msg="' + i + '">' + esc(m.text) + '</textarea></div>';
     }).join('') + '</div>';
   }
 

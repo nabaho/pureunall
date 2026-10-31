@@ -238,8 +238,8 @@ test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받
   assert.match(c.slice(c.indexOf('data-name="transfers"')), /dir-back">반환</);
   /* 카톡 문구도 같은 말 */
   const rule = { title: '테스트사업', leadSid: 'T-LEAD' };
-  assert.match(C.buildMessages(fakeRun('confirmed'), rule, NAMES)[0].text, /반환 87,915원/);
-  assert.match(C.buildMessages(fakeRun('confirmed', 40), rule, NAMES)[0].text, /추가 지급 426,357원/);
+  assert.match(C.buildMessages(fakeRun('confirmed'), rule, NAMES)[0].text, /반환: <b>김가나<\/b> → 홍길동 87,915원/);
+  assert.match(C.buildMessages(fakeRun('confirmed', 40), rule, NAMES)[0].text, /추가 지급: 홍길동 → <b>김가나<\/b> 426,357원/);
   /* 계산기 */
   const calc = C.calcSite([{ name: '갑', role: 'lead', pre: 2568182 }, { name: '을', role: 'staff', pre: 977273, rate: 25 }]);
   assert.equal(calc.transfers[0].dir, 'back');
@@ -319,4 +319,12 @@ test('직접 입력 상자 — 세율·실수령액 칸', () => {
   assert.match(h, /data-m="0\|net" value="912,000"/);
   assert.match(visible(h), /912,000/);
   assert.match(visible(h.slice(h.indexOf('data-name="manual"'))), /세율[\s\S]*실수령액\(통장\)[\s\S]*세전[\s\S]*세후 계산/);
+});
+
+test('카톡 문구 상자 — 확정 전이면 미리보기 안내와 «확정하면 복사», 확정이면 복사 단추', () => {
+  const msgs = [{ sid: 'T-A', name: '김가나', text: '[컨설팅 비용 정산 안내]\n둘째 줄' }];
+  const pv = V.messagesBox(msgs, { preview: true });
+  assert.match(visible(pv), /확정 전 미리보기/);
+  assert.doesNotMatch(pv, /data-copy=/);
+  assert.match(V.messagesBox(msgs), /data-copy="0"/);
 });

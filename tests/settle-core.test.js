@@ -232,7 +232,9 @@ test('문구 — 담당마다 한 통, 그 사람 사업장만, 금액은 쉼표
   const msgs = C.buildMessages(run, RULE, ctx().names);
   assert.deepEqual(msgs.map((m) => m.sid).sort(), ['T-A', 'T-B']);
   const a = msgs.find((m) => m.sid === 'T-A');
-  assert.equal(a.text.split('\n')[0], '[테스트사업 9월 입금분 정산 안내]');
+  assert.equal(a.text.split('\n')[0], '[컨설팅 비용 정산 안내]');
+  assert.match(a.text.split('\n')[1], /^테스트사업 — 2026년 9월$/);
+  ['① 입금자·입금금액', '② 담당자 산정금액', '③ 정산', '※ 계산 방법'].forEach((k) => assert.ok(a.text.indexOf(k) >= 0, k));
   assert.ok(a.text.indexOf('마바상사') >= 0 && a.text.indexOf('725,250') >= 0);
   assert.equal(a.text.indexOf('다라산업'), -1);
   assert.ok(a.text.indexOf('송금 부탁드립니다') >= 0);
