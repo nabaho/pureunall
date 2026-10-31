@@ -23,13 +23,17 @@ function fakeRun(status) {
     issues: res.issues, transfers: C.transfersOf(res.sites, 'T-LEAD').map((t) => Object.assign({ paid: false }, t)), changed: false };
 }
 
-test('정산표 목록 — 맨 왼쪽 ☐(보이는 것 모두) 다음 번호', () => {
-  const h = V.runsTable([fakeRun()], {}, { 'cons-test': '테스트사업' });
+test('정산표 목록 — 맨 왼쪽 ☐(보이는 것 모두) 다음 번호, 사업 종류마다 묶음 머리(사업 이름 전체)를 한 번만', () => {
+  const r2 = Object.assign(fakeRun(), { id: 'cons-test_2026-09', monthKey: '2026-09', label: '9월' });
+  const h = V.runsTable([fakeRun(), r2], {}, { 'cons-test': '테스트사업 (테스트재단)' }, 'cons-test_2026-10');
   const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
   assert.match(ths[0], /input type="checkbox" data-all=/);
   assert.match(ths[1], /번호/);
   assert.match(h, /data-ck="cons-test_2026-10"/);
-  assert.match(visible(h), /계산만/);
+  assert.match(visible(h), /임시저장/);
+  assert.equal((visible(h).match(/테스트사업 \(테스트재단\)/g) || []).length, 1, '사업 이름은 묶음 머리에 한 번, 줄이지 않고 전체');
+  assert.ok(h.indexOf('10월') < h.indexOf('9월'), '최근 달이 위');
+  assert.match(h, /<tr data-id="cons-test_2026-10" class="on">/, '열어 둔 달 표시');
 });
 
 test('정산표 — 한 칸 한 줄(<br> 없음), 사람이 적은 글은 막는다, 사번은 화면에 없다', () => {
@@ -58,6 +62,40 @@ test('정산표 — 통장 실입금이 있으면 계산한 세후와 견준 딱
   assert.match(v, /입금 확인 2\/2/);
   assert.match(v, /일치/);
   assert.match(v, /−33/);
+});
+
+test('정산표 — 사업장은 묶음 머리에 한 번(누가 누구에게 얼마), 구분·요율은 이름 옆 딱지, 차액·조정 칸은 이월·조정이 있을 때만', () => {
+  const h = V.runDetail(fakeRun('draft'), NAMES, {}, { biz: '테스트사업 (테스트재단)' });
+  const head = h.slice(h.indexOf('data-name="run"'), h.indexOf('</thead>', h.indexOf('data-name="run"')));
+  const hv = visible(head);
+  assert.doesNotMatch(hv, /사업장|구분|요율|차액|조정/, '빠진 칸이 머리에 남았다');
+  assert.match(hv, /이름[\s\S]*세전[\s\S]*원천징수[\s\S]*세후[\s\S]*통장 실입금[\s\S]*몫[\s\S]*정산액[\s\S]*최종/);
+  const v = visible(h);
+  assert.match(v, /가나상사 · 1차 · 세후 합계/);
+  assert.match(v, /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동 87,915원/);
+  assert.match(v, /주관/);
+  assert.match(v, /담당 25%/);
+  assert.match(v, /테스트사업 \(테스트재단\)/);
+  const body = visible(h.slice(h.indexOf('data-name="run"'), h.indexOf('data-name="transfers"')));
+  assert.equal((body.match(/가나상사/g) || []).length, 1, '사업장 이름이 줄마다 되풀이된다');
+  const r = fakeRun('draft');
+  const a = r.sites[0].members.find((m) => m.sid === 'T-A'); a.adjust = -5; a.settle -= 5;
+  const hv2 = visible(V.runDetail(r, NAMES).slice(0, V.runDetail(r, NAMES).indexOf('</thead>')));
+  assert.match(hv2, /차액[\s\S]*조정/);
+});
+
+test('정산표 임시저장 — 저장 안 한 칸은 노란 칸·«임시저장 (n)»·안내 줄, 마지막 임시저장 시각, 확정한 달에는 없다', () => {
+  const r = Object.assign(fakeRun('draft'), { updatedAt: Date.UTC(2026, 9, 31, 6, 32) });
+  const h0 = V.runDetail(r, NAMES, {}, {});
+  assert.match(h0, /data-act="draftSave"[^>]*>임시저장<\/button>/);
+  assert.match(visible(h0), /10-31 15:32 임시저장됨/);
+  assert.match(h0, /id="pendNote" style="display:none"/);
+  const h1 = V.runDetail(r, NAMES, {}, { pend: { 'C-1|T-A': '945,000' } });
+  assert.match(h1, /class="amt dirty" data-actual="C-1\|T-A" value="945,000"/);
+  assert.match(h1, />임시저장 \(1\)<\/button>/);
+  assert.match(visible(h1), /저장 안 한 칸 1개/);
+  const c = V.runDetail(fakeRun('confirmed'), NAMES, {}, { pend: { 'C-1|T-A': '1' } });
+  assert.doesNotMatch(c, /data-act="draftSave"|임시저장됨|pendNote/);
 });
 
 test('정산표 — 확인 필요가 있으면 «확정» 단추가 잠긴다', () => {
@@ -112,8 +150,7 @@ test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜�
   const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
   assert.match(ths[0], /data-all="mxpeople"/);
   assert.match(ths[1], /번호/);
-  assert.match(visible(ths[3]), /가나사업/);
-  assert.doesNotMatch(visible(ths[3]), /가나재단/, '칸 머리는 짧은 이름 한 줄');
+  assert.match(visible(ths[3]), /가나사업 \(가나재단\)/, '칸 머리는 사업 이름 전체(대표 지시 「사업 이름 정확하게」)');
   assert.match(h, /data-mx="cons-a\|T-A" value="25"/);
   assert.match(h, /data-mx="cons-b\|T-B" value=""/);
   assert.match(h, /<select data-lead="cons-a">[\s\S]*?value="T-LEAD" selected/);

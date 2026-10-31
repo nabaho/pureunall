@@ -172,6 +172,33 @@ test('계산기 — 첫 탭·기본 탭이고, 계산 모듈 calcSite 로 계산
   assert.match(NOC, /input\[data-c\]'\)\)\{[^}]*drawCalcOut\(\)/);
 });
 
+test('임시저장 — 통장 실입금은 칠 때 저장하지 않고 «임시저장» 한 번에, 저장 안 한 칸이 있으면 확정·기록만을 막고 떠날 때 묻는다', () => {
+  /* 칠 때: PEND 에만 담고 단추 글만 고친다 — 서버 쓰기·다시 그리기 없음 */
+  const inp = NOC.slice(NOC.indexOf("if(t.matches('input[data-actual]'))"));
+  const inpBody = inp.slice(0, inp.indexOf('return; }') + 9);
+  assert.match(inpBody, /PEND\[CUR_RUN\]/);
+  assert.match(inpBody, /paintPending\(\)/);
+  assert.doesNotMatch(inpBody, /patchRecord|save\(|reload\(|drawRuns\(/);
+  assert.equal((NOC.match(/input\[data-actual\]/g) || []).length, 1, '바꿈(change) 때 바로 저장하던 길이 남았다');
+  assert.doesNotMatch(NOC, /function setActual\(/);
+  /* 저장: 한 번에, 숫자가 아니면 아무것도 저장하지 않는다, 저장 뒤 PEND 비움 */
+  const sv = fnBody('async function saveDraft(');
+  assert.equal((sv.match(/patchRecord\(/g) || []).length, 1);
+  assert.ok(sv.indexOf("toast('금액을 숫자로") < sv.indexOf('patchRecord('), '검사가 저장보다 먼저');
+  assert.match(sv, /delete PEND\[rid\]/);
+  assert.match(NOC, /act==='draftSave'\) await saveDraft\(CUR_RUN\)/);
+  /* 막기 — 확정·기록만 */
+  ['async function confirmRun(', 'async function setManual('].forEach((h) => {
+    const fn = fnBody(h);
+    assert.ok(fn.indexOf('pendCount(rid)') >= 0 && fn.indexOf('pendCount(rid)') < fn.indexOf('window.confirm('), h + ' 가 저장 안 한 칸을 안 본다');
+  });
+  /* 고른 줄 비우기도 노란 칸으로만 */
+  const clr = NOC.slice(NOC.indexOf("if(d==='clearActual')"));
+  assert.doesNotMatch(clr.slice(0, clr.indexOf('return;\n')), /patchRecord/);
+  /* 떠날 때 — 저장 안 한 칸·요율표 저장 안 한 변경 */
+  assert.match(NOC, /addEventListener\('beforeunload', function\(e\)\{\s*if\(Object\.keys\(PEND\)[\s\S]{0,80}\|\| \(WORK && WORK\.dirty\)\)\{ e\.preventDefault\(\); e\.returnValue=''; \}/);
+});
+
 test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
   assert.doesNotMatch(NOC, /window\.open\([^)]*_blank/);
 });
