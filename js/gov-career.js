@@ -147,6 +147,36 @@
     }).filter(function (x) { return !!x.org; });
   }
 
+  /* ── AI·DX 수행·강의 이력 (2026-10-31, 대표 지시 「ai 강의 … 정부사업신청에서 가지고 올 수 있게」) ──
+     공단 AI훈련코치처럼 «AI 분야 경력»을 묻는 모집에서 쓴다. 강의·컨설팅·기타 창고의 주제·기관·비고에
+     AI 낱말이 든 줄만 모은다 — 읽기만 한다(경력관리에는 쓰지 않는다).
+     ⚠ 낱말이 없으면 «없다»가 답이다 — 비슷해 보인다고 지어 넣지 않는다.
+     ⚠ 영문 낱말은 «앞뒤가 영문이 아닐 때만» — TAX·MAIL·Rain 같은 낱말 속 AX·AI 를 잡지 않는다. */
+  var AI_RE = /(?:^|[^A-Za-z])(?:AI|AX|DX)(?![A-Za-z])|인공지능|생성형|챗\s*GPT|프롬프트|디지털\s*전환|Claude|클로드/i;
+  var AI_STORES = [['lecture', '강의'], ['consult', '컨설팅'], ['etc', '기타']];
+  function aiLectures(ls) {
+    ls = ls || {};
+    var out = [];
+    AI_STORES.forEach(function (p) {
+      var rows = parseStore(ls[p[0]]).filter(function (r) { return r && !r.excluded; });
+      var found = rows.map(function (r) {
+        var topic = p[0] === 'lecture' ? s(r.topic) : s(r.project);
+        var lec = p[0] === 'lecture';
+        /* ⚠ 컨설팅·기타의 org 는 «고객사»다 — 보여 줄 글에 넣지 않는다(수행기관만). 찾는 글에도 안 쓴다. */
+        var org = lec ? s(r.org) : s(r.agency);
+        if (!AI_RE.test((lec ? [topic, org, s(r.note)] : [topic, s(r.note)]).join(' '))) return null;
+        return { kind: p[1], date: ymd(r.date) || s(r.date), year: s(r.year) || yearOf(r.date),
+                 topic: topic, org: org, hours: s(r.duration), people: s(r.participants),
+                 note: s(r.note), id: s(r.id) };
+      }).filter(Boolean);
+      out = out.concat(found);
+    });
+    out.sort(function (a, b) {
+      return (s(b.date) || s(b.year)).localeCompare(s(a.date) || s(a.year)) || s(a.id).localeCompare(s(b.id));
+    });
+    return out;
+  }
+
   /* ── 창고 묶음 하나를 통째로 다듬는다 ──
      ls = { edu:'[...]', cert:'[...]', ... } (값은 JSON 글자) */
   function build(ls, today) {
@@ -264,7 +294,7 @@
 
   var api = { STORES: STORES, paths: paths, parseStore: parseStore, docbox: docbox,
               isAward: isAward, isComplete: isComplete, ymd: ymd, splitPeriod: splitPeriod,
-              build: build, counts: counts, sentence: sentence,
+              build: build, counts: counts, sentence: sentence, aiLectures: aiLectures,
               advisorySentence: advisorySentence, advisoryForExport: advisoryForExport };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovCareer = api;

@@ -555,7 +555,7 @@ table.cmp td{white-space:nowrap}
 </script>
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
-<script src="js/gov-career.js?v=2"></script>
+<script src="js/gov-career.js?v=3"></script>
 <script src="js/gov-g2b.js?v=10"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
@@ -1627,7 +1627,7 @@ async function cloudPull(){ return cloudSync(); }
    ⚠★ 받아온 것을 «어디에도 담지 않는다» — 화면이 열려 있는 동안만 머리에 둔다(cloudPush 도 안 건드린다).
       담으면 대표님 이력이 두 자리에 있게 되고 한쪽이 낡는다. 원본은 언제나 경력관리 하나다.
    ⚠★ 경력관리에 한 글자도 쓰지 않는다 — 읽기 전용이다. */
-var _mat=null, _matDocs=null;
+var _mat=null, _matDocs=null, _matAi=null;   /* _matAi — AI·DX 수행·강의 이력(서류 준비 창, 읽기만) */
 
 function setTab(t){
   if(t!=='rec' && t!=='plan') t='feed';   /* 예전에 「신청 재료」('mat')를 보던 기기도 공고로 연다 */
@@ -1852,6 +1852,7 @@ function matchEnsure(){
       : (!GovCareer.counts(_mat).total && !(_matDocs||[]).length)
         ? '경력관리 자료가 클라우드에 아직 없습니다 — 경력관리에서 ☁ 클라우드에 저장을 한 번 누르신 뒤 새로고침해 주세요' : '';
     if(_mat || _matchErr){ try{ draw(); }catch(e){} try{ recDraw(); }catch(e){} }
+    try{ if(_recPopId) recAiDraw(_recPopId); }catch(e){}   /* 서류 준비 창이 열려 있으면 AI 이력도 */
   }, function(){ _matchLoading=false; });
 }
 function matchNoteHtml(){
@@ -2894,6 +2895,7 @@ function recPrep(id){
       +'<button class="btn sm" onclick="recSetUrl(\''+esc(id)+'\')">✏ 링크 고치기</button></td></tr>'
     +'<tr><th>올해('+y+') 상태</th><td>'+(GovRecruit.appliedThisYear(o,recToday())?'<span class="tag teal">✓ 서류 폴더에 '+y+'년 것이 있습니다</span> ':'')
       +(st?'<span class="tag navy">'+esc(st)+'</span>':'')+'</td></tr></table>'
+    +(id==='hrdkai'?'<div class="pop-sub">🤖 AI·DX 수행·강의 이력 <span class="sml">— 경력관리에서 읽어 옵니다(자격요건: AI 분야 경력)</span></div><div id="recAi"></div>':'')
     +'<div class="pop-sub">① 올해 공고를 확인한다</div><div class="note">위 <b>공지</b>에서 '+y+'년 모집 공고를 찾고, 공고문·서식(한글 파일)을 내려받으세요.</div>'
     +'<div class="pop-sub">② 서식을 채운다</div><div class="note">경력관리 「기관 양식 채우기」에서 내려받은 서식을 올리면 내 정보가 채워집니다. '
       +'<button class="btn sm primary" onclick="recToForm(\''+esc(id)+'\')">📝 경력관리에서 서식 채우기</button></div>'
@@ -2917,12 +2919,49 @@ function recPrep(id){
       +'다른 길로 냈으면 목록의 「올해」 칸에서 고르세요.</div>'
     +(o.custom?'<div style="margin-top:12px"><button class="btn sm" onclick="recDelOrg(\''+esc(id)+'\')">🗑 직접 더한 기관 빼기</button></div>':''));
   _recPopId=id;
+  if(id==='hrdkai'){ matchEnsure(); recAiDraw(id); }   /* 경력관리 자료는 한 번만 받는다 — 받으면 matchEnsure 가 다시 그린다 */
   if(_recChk[id]) recCheckDraw(id);   /* 다시 열면 지난 점검이 그대로 보인다 */
 }
 function recToForm(id){
   var o=recFind(id); if(!o) return;
   var t=String(recToday().getFullYear())+' '+o.name+(o.what?' '+o.what:'');
   window.open('kcareer.html?go=form&t='+encodeURIComponent(t), '_blank', 'noopener');
+}
+/* ═══ 🤖 AI·DX 수행·강의 이력 (대표 지시 2026-10-31 「ai 강의 … 경력관리에 넣어두고 정부사업신청에서 가지고 올 수 있게」) ═══
+   찾는 일은 GovCareer.aiLectures(순수, 읽기만). 여기는 보여 주고 «고른 것만 복사»한다.
+   ⚠ 경력관리에 쓰지 않고, 받은 것을 어디에도 담지 않는다(꺼 둔 줄 표시 _aiOff 만 이 창 동안).
+   ⚠ 없으면 «없다»고 말한다 — 지어 넣지 않는다. 증빙(확인서)은 기관에서 받아야 한다는 말을 함께 둔다. */
+var _aiOff={};
+function recAiKey(r,i){ return r.id||('i'+i); }
+function recAiDraw(id){
+  var box=$('recAi'); if(!box || _recPopId!==id) return;
+  if(!_mat){ box.innerHTML='<div class="note">'+(_matchErr?'⚠ '+esc(_matchErr):'📚 경력관리 자료를 받는 중…')+'</div>'; return; }
+  var rows=Array.isArray(_matAi)?_matAi:[];
+  if(!rows.length){ box.innerHTML='<div class="note">경력관리에 AI·DX 관련 강의·컨설팅이 아직 없습니다 — 경력관리 › 강의에 넣어 두시면 여기로 옵니다. <span class="sml">(주제·기관·비고에 AI·AX·DX·인공지능·생성형 등이 든 줄을 찾습니다)</span></div>'; return; }
+  var on=rows.filter(function(r,i){ return !_aiOff[recAiKey(r,i)]; }).length;
+  box.innerHTML='<div class="note" style="margin-bottom:4px">경력관리 › 강의·컨설팅·기타에서 AI 관련 <b>'+rows.length+'건</b>을 찾았습니다 <span class="sml">— 읽기만 합니다. 증빙(강의 확인서)은 기관에서 따로 받아 두세요</span></div>'
+    +'<div class="scroll"><table class="cmp"><thead><tr><th class="chk"><input type="checkbox" title="모두"'+(on===rows.length?' checked':'')+' onchange="recAiAll(this.checked)"></th><th class="rn">№</th><th>날짜</th><th>구분</th><th>기관</th><th>주제</th><th>시간·인원</th></tr></thead><tbody>'
+    +rows.map(function(r,i){ var k=recAiKey(r,i);
+      return '<tr><td class="chk"><input type="checkbox"'+(_aiOff[k]?'':' checked')+' onchange="recAiPick(\''+esc(k)+'\',this.checked)"></td><td class="rn">'+(i+1)+'</td>'
+        +'<td class="sml" style="white-space:nowrap">'+esc(r.date||r.year)+'</td><td>'+esc(r.kind)+'</td>'
+        +'<td style="white-space:normal">'+esc(r.org)+'</td><td style="white-space:normal">'+esc(r.topic)+'</td>'
+        +'<td class="sml" style="white-space:nowrap">'+esc([r.hours?r.hours+'시간':'',r.people?r.people+'명':''].filter(Boolean).join(' · '))+'</td></tr>'; }).join('')
+    +'</tbody></table></div><div class="bar" style="margin-top:4px"><button class="btn sm" onclick="recAiCopy()">📋 고른 '+on+'건 복사</button>'
+    +'<span class="sml">신청서 경력란에 붙일 한 줄씩의 글이 복사됩니다</span></div>';
+}
+function recAiPick(k,on){ if(on) delete _aiOff[k]; else _aiOff[k]=1; if(_recPopId) recAiDraw(_recPopId); }
+function recAiAll(on){ _aiOff={}; if(!on) (Array.isArray(_matAi)?_matAi:[]).forEach(function(r,i){ _aiOff[recAiKey(r,i)]=1; }); if(_recPopId) recAiDraw(_recPopId); }
+function recAiText(){
+  return (Array.isArray(_matAi)?_matAi:[]).filter(function(r,i){ return !_aiOff[recAiKey(r,i)]; }).map(function(r){
+    var more=[r.hours?r.hours+'시간':'',r.people?r.people+'명':''].filter(Boolean).join(', ');
+    return [r.date||r.year, r.org, r.topic].filter(Boolean).join(' · ')+(more?' ('+more+')':''); }).join('\n');
+}
+function recAiCopy(){
+  var tx=recAiText(); if(!tx){ toast('고른 줄이 없습니다'); return; }
+  var done=function(){ toast('📋 복사했습니다 — 신청서에 붙여 넣으세요'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(tx).then(done, function(){ toast('⚠ 복사하지 못했습니다 — 브라우저 권한을 확인해 주세요'); }); return; }
+  try{ var ta=document.createElement('textarea'); ta.value=tx; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }
+  catch(e){ toast('⚠ 복사하지 못했습니다'); }
 }
 /* 서류 폴더의 파일을 «읽기만» 해서 연다 — 옮기거나 고치지 않는다 */
 async function recOpen(id, i){
@@ -2961,9 +3000,10 @@ async function careerPull(){
       .then(function(s){ ls[p.store]=s.val(); okN++; })
       .catch(function(){});
   }));
-  if(!okN){ _mat=null; _matDocs=null; return; }
+  if(!okN){ _mat=null; _matDocs=null; _matAi=null; return; }
   _mat=GovCareer.build(ls, new Date().toISOString().slice(0,10));
   _matDocs=GovCareer.docbox(ls);   /* 서류 보관함 이름·해 — 필요서류 견주기 */
+  _matAi=GovCareer.aiLectures(ls);   /* AI·DX 강의·컨설팅 — 공단 AI훈련코치 서류 준비 */
 }
 
 /* 틀고정 높이 재기 — 머리(#head)와 하위 탭 줄(#recSubs)의 «지금» 높이를 CSS 변수로 알려 준다.
