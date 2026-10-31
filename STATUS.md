@@ -234,7 +234,7 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 메일함으로 들어오는 취업규칙 등 개정 서류를 매일 «사업장 자동 확정(주소 일치·사람이 앞서 확정한 주소만) · 처리 담당 기록(메일함 잣대) · 하루 기록»으로 정리한다.
 코드·검사는 PR 에 있고, **클라우드 방에서는 배포가 안 돼** 대표 PC 에서 아래를 해야 돈다(`status/2026-10-31-rules-daily.md`).
-- [ ] 규칙 게시 — `node scripts/rules-deploy.js --deploy`(새로 1: `/rules_mgmt/library/auto` · 바뀜 0 · 사라짐 0) → 콘솔 원문 새 판 → `tests/photos-staff-share.test.js` PENDING 비우기
+- [x] 규칙 게시 — 대표가 콘솔에 먼저 올렸다(2026-10-31). 컨설팅정산 게시 때 콘솔 원문 새 판(`docs/firebase-rules-콘솔원문-2026-10-31.json`)·`tests/photos-staff-share.test.js` PENDING 비움까지 함께 끝냈다
 - [ ] 함수 배포 — `firebase deploy --only functions:collectRulesMail,functions:collectRulesMailAsk` (회차 끝에 매일 정리가 돈다)
 - [ ] 시범 결과 보기 — 📥 모은 자료 › 🤖 매일 정리 의 «자동 확정했을 것» 줄을 훑어 엉뚱한 회사가 없으면 관리자가 「켜기」
 - 설계 `docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md` §14
@@ -243,7 +243,8 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 포털 «내부관리»에 컨설팅정산 앱(`pu-settle.html`)을 더했다 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 차액을 정산한다
 (`status/2026-10-31-feat-consult-settle.md`, 설계 `docs/superpowers/specs/2026-10-31-consult-settle-design.md`). 지금은 PR ①(계산·화면·문구 복사)까지.
-- [ ] 보안 규칙 게시 — 미리보기 «새 1(/settle)·바뀜 0·사라짐 0», 재무관리와 같은 사람(관리자·위임관리인·재무권한)만 읽고 쓴다
+- [x] 보안 규칙 게시 (2026-10-31, 대표 「둘 다 진행」) — 새 1(/settle)·바뀜 0·사라짐 0, 재무관리와 같은 사람(관리자·위임관리인·재무권한)만 읽고 쓴다.
+  ⚠ 그 전에 대표 PC 의 다른 방이 홈페이지·뉴스레터 «통째 지우기 막기»를 게시했다(통째 쓰기 총괄관리자만 · 하위 칸 직원 · 지우기 관리자만) — 그 만들개·검사가 main 에 들어와 그대로 따랐다
 - [ ] 첫 자료 — 일터혁신 규칙·요율, 2026 안내 파일, 업체·사람 연결, 이미 수기로 끝낸 달 «기록만», 이월 한 건
 - [ ] PR ② 카톡 심부름꾼 · PR ③ 재무관리 성과급 겹침 막기 — 아직 안 만들었다(설계는 승인됨)
 
