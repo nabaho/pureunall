@@ -26,9 +26,12 @@ function docsOf(id, list) {
 }
 function checkCond(id, c) {
   const L = M.list; c = c || {};
-  Object.keys(c).forEach((k) => { if (['headcount', 'yearsInBiz', 'salesDropPct', 'sizes', 'regions', 'industries', 'facts', 'manual'].indexOf(k) < 0) bad.push(id + ': 모르는 칸 ' + k); });
+  Object.keys(c).forEach((k) => { if (['headcount', 'yearsInBiz', 'salesDropPct', 'sizes', 'regions', 'sigungu', 'industries', 'facts', 'manual'].indexOf(k) < 0) bad.push(id + ': 모르는 칸 ' + k); });
   L(c.sizes).forEach((s) => { if (M.SIZES.indexOf(s) < 0) bad.push(id + ': 규모 ' + s); });
   L(c.regions).forEach((s) => { if (M.REGIONS.indexOf(s) < 0) bad.push(id + ': 지역 ' + s); });
+  /* 시·군(2026-10-31 지역 반복 사업) — «…시·…군·…구» 꼴이고, 시·도도 함께 있어야 한다 */
+  L(c.sigungu).forEach((s) => { if (!/^[가-힣]{1,6}(시|군|구)$/.test(s)) bad.push(id + ': 시·군 ' + s); });
+  if (L(c.sigungu).length && !L(c.regions).length) bad.push(id + ': 시·군만 있고 시·도가 없음');
   const ind = c.industries || {};
   L(ind.include).concat(L(ind.exclude)).forEach((s) => { if (!M.INDUSTRIES[s]) bad.push(id + ': 업종 ' + s); });
   L(c.facts).forEach((f) => { if (!f || !M.FACTS[f.key]) bad.push(id + ': 사실 ' + JSON.stringify(f)); });
@@ -37,7 +40,7 @@ function cleanCond(c) {
   c = c || {}; const o = {};
   ['headcount', 'yearsInBiz'].forEach((k) => { const r = c[k] || {}, v = {}; if (r.min != null) v.min = r.min; if (r.max != null) v.max = r.max; if (Object.keys(v).length) o[k] = v; });
   if (c.salesDropPct && c.salesDropPct.min != null) o.salesDropPct = { min: c.salesDropPct.min };
-  ['sizes', 'regions'].forEach((k) => { const a = M.list(c[k]).filter((x) => String(x).trim()); if (a.length) o[k] = a; });
+  ['sizes', 'regions', 'sigungu'].forEach((k) => { const a = M.list(c[k]).filter((x) => String(x).trim()); if (a.length) o[k] = a; });
   const man = M.list(c.manual).map((x) => cut(x, 300)).filter(Boolean).slice(0, 20); if (man.length) o.manual = man;
   const inc = M.list((c.industries || {}).include), exc = M.list((c.industries || {}).exclude);
   if (inc.length || exc.length) o.industries = Object.assign(inc.length ? { include: inc } : {}, exc.length ? { exclude: exc } : {});

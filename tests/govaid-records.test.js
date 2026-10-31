@@ -108,3 +108,11 @@ test('별표 — 켜고 끄는 사람·때·까닭을 남긴다(끈 것도 남�
   assert.equal(off.star.by, 'A-002');
   assert.equal(off.star.why, '신청 대행', '끌 때 까닭을 비우면 앞 까닭을 둔다');
 });
+
+test('지역 공고 → 사전 초안 — 공고의 시·도·시·군을 조건으로 옮긴다', () => {
+  const n = { id: 'P9', no: 'P9', nm: '[충남] 아산시 해외마케팅', area: { sido: ['충남'], sgg: ['아산시'] }, url: 'https://www.bizinfo.go.kr/a' };
+  const p = R.programFromNotice(n, 2026);
+  assert.deepEqual(p.cond.regions, ['충남']);
+  assert.deepEqual(p.cond.sigungu, ['아산시']);
+  assert.deepEqual(R.programFromNotice({ id: 'P8', nm: '전국 공고' }, 2026).cond, {}, '전국 공고는 조건 없음');
+});

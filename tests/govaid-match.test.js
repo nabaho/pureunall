@@ -310,3 +310,14 @@ test('회사 지역 — 업체관리 주소가 없으면 고용보험 사업장 
   const c = M.profileFromCompany({ id: 'c3', address: '' }, null, null);
   assert.equal(c.vals.sigungu.v, null);
 });
+
+/* 3단계 — 지역 반복 사업을 사전에 올리면 시·군 조건으로 정밀 매칭 (대표 2026-10-31 「추천대로 순서대로」) */
+test('시·군 조건 — 회사 시·군이 목록 안이면 맞음, 밖이면 안 맞음, 모르면 모름', () => {
+  const p = prog({ regions: ['충남'], sigungu: ['아산시', '천안시'] });
+  const v = (r, g) => ({ headcount: null, foundedYear: null, size: null, region: r, industry: null, salesDropPct: null, sigungu: g });
+  const pfg = (r, g) => { const x = pf(v(r, g)); x.vals.sigungu = { v: g, src: '시험' }; return x; };
+  assert.equal(M.judge(pfg('충남', '아산시'), p, Y).verdict, 'candidate');
+  assert.equal(M.judge(pfg('충남', '서산시'), p, Y).verdict, 'no');
+  assert.equal(M.judge(pfg('충남', null), p, Y).verdict, 'unknown');
+  assert.ok(M.judge(pfg('충남', '아산시'), p, Y).items.some((i) => i.key === 'sigungu' && /아산시/.test(i.label)));
+});

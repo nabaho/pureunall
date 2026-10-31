@@ -58,12 +58,19 @@
       decision: decision || null, decidedBy: decision ? actor : null, decidedAt: decision ? now : null });
   }
   /* 사전에 없는 사업 — 공고로 초안을 만든다(조건·서류는 노무사가 채워 확정). id 는 공고번호에서 — 같은 공고로 두 번 만들지 않게 */
+  /* 지역 공고의 시·도·시·군 → 사업 조건(2026-10-31 3단계). 전국 공고면 빈 조건 */
+  function areaCond(a) {
+    var s = list((a || {}).sido), g = list((a || {}).sgg), c = {};
+    if (s.length) c.regions = s.map(String);
+    if (s.length && g.length) c.sigungu = g.map(String);
+    return c;
+  }
   function programFromNotice(n, year) {
     n = n || {};
     var ag = [n.ntce, n.inst].map(function (x) { return x == null ? '' : String(x).trim(); }).filter(Boolean)
       .filter(function (x, i, a) { return a.indexOf(x) === i; }).join(' · ');
     return { id: 'gp-b' + n.id, name: String(n.nm || '').slice(0, 200), agency: ag, fields: n.field ? [String(n.field)] : [],
-      summary: String(n.memo || '').slice(0, 600), status: 'draft', baseYear: year, cond: {},
+      summary: String(n.memo || '').slice(0, 600), status: 'draft', baseYear: year, cond: areaCond(n.area),
       source: { title: String(n.nm || '').slice(0, 200), no: String(n.no || ''), page: '', url: /^https:\/\//.test(n.url || '') ? n.url : '' },
       bizinfo: [String(n.no || n.id)] };
   }
