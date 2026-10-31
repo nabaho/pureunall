@@ -439,6 +439,57 @@
     return ('0000000' + h.toString(16)).slice(-8) + '-' + parts.length;
   }
 
+  /* ═══ 직접 입력 — 안내 엑셀이 없는 컨설팅(대표 선택 2026-10-31 「직접 입력 기능 추가」) ═══
+     사업 종류마다 «직접 입력» 안내 하나에 쌓는다 — 안내 파일과 같은 모양(사람+사업장 한 줄, 달마다 amounts)이라 정산표 계산은 그대로.
+     entry = {monthKey:'2026-10', company:'사업장 글', people:[{name, pre}]}. 같은 달·같은 사업장을 다시 넣으면 통째로 바꾼다.
+     ★ 세전 0 인 담당도 줄로 남긴다(amounts 에 0) — 대표 2026-10-31 「특별히 배분되어서 입금되는게 아니면 항상 권형하에게 입금」:
+       주관이 전액 받은 사업장에서도 담당이 정산표에 들어가 몫을 «추가 지급» 받는다. */
+  function manualRows(rows) {
+    rows = rows.filter(function (r) { return Object.keys(r.amounts).length; });
+    rows.forEach(function (r, i) { r.line = i + 1; r.totalPre = Object.keys(r.amounts).reduce(function (s, k) { return s + (Number(r.amounts[k]) || 0); }, 0); });
+    return rows;
+  }
+  function manualMonths(rows, known) {
+    var label = {}, seen = {};
+    (known || []).forEach(function (m) { if (m && m.key) label[m.key] = m.label; });
+    rows.forEach(function (r) { Object.keys(r.amounts).forEach(function (k) { seen[k] = 1; }); });
+    return Object.keys(seen).sort().map(function (k) { return { key: k, label: label[k] || (Number(k.slice(5)) + '월') }; });
+  }
+  function manualCopy(notice) {
+    var n = normalizeNotice(notice) || { months: [], rows: [] };
+    return { months: n.months, rows: n.rows.map(function (r) { return { line: r.line, name: r.name, company: r.company, totalPre: r.totalPre, amounts: Object.assign({}, r.amounts) }; }) };
+  }
+  function manualAdd(notice, entry) {
+    var n = manualCopy(notice), mk = entry.monthKey, ck = linkKey(entry.company);
+    n.rows.forEach(function (r) { if (linkKey(r.company) === ck) delete r.amounts[mk]; });
+    (entry.people || []).forEach(function (p) {
+      var r = n.rows.filter(function (x) { return linkKey(x.company) === ck && linkKey(x.name) === linkKey(p.name); })[0];
+      if (!r) { r = { line: 0, name: p.name, company: entry.company, totalPre: 0, amounts: {} }; n.rows.push(r); }
+      r.amounts[mk] = won(p.pre);
+    });
+    var rows = manualRows(n.rows);
+    return { months: manualMonths(rows, n.months.concat([{ key: mk, label: Number(mk.slice(5)) + '월' }])), rows: rows };
+  }
+  /* picks = [{monthKey, company}] — 그 달·그 사업장 입력을 뺀다 */
+  function manualRemove(notice, picks) {
+    var n = manualCopy(notice);
+    (picks || []).forEach(function (p) { n.rows.forEach(function (r) { if (linkKey(r.company) === linkKey(p.company)) delete r.amounts[p.monthKey]; }); });
+    var rows = manualRows(n.rows);
+    return { months: manualMonths(rows, n.months), rows: rows };
+  }
+  /* 화면에 보일 입력 목록 — 달·사업장마다 한 줄(최근 달 위) */
+  function manualEntries(notice) {
+    var n = manualCopy(notice), by = {}, out = [];
+    n.rows.forEach(function (r) {
+      Object.keys(r.amounts).forEach(function (mk) {
+        var k = mk + '|' + linkKey(r.company);
+        if (!by[k]) { by[k] = { key: k, monthKey: mk, company: r.company, people: [] }; out.push(by[k]); }
+        by[k].people.push({ name: r.name, pre: Number(r.amounts[mk]) || 0 });
+      });
+    });
+    return out.sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : a.monthKey > b.monthKey ? -1 : (a.company < b.company ? -1 : 1); });
+  }
+
   return {
     DEFAULT_HEAD: DEFAULT_HEAD, DEFAULT_FOOT: DEFAULT_FOOT,
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
@@ -446,6 +497,7 @@
     runId: runId, diffRun: diffRun, appliedAdjustIds: appliedAdjustIds, unapplyAdjusts: unapplyAdjusts,
     buildMessages: buildMessages, noticeHash: noticeHash, toArr: toArr, normalizeRun: normalizeRun, normalizeNotice: normalizeNotice,
     parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
-    shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf
+    shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
+    manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries
   };
 });
