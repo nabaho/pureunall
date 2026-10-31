@@ -189,7 +189,8 @@
   /* ═══ 계산기 — 사업장 하나를 그 자리에서 ═══ (대표 지시 2026-10-31 「컨설팅종류, 사업장 수행자 요율 등 각각 선택하게 하고 그부분만 반영하게 간단하게」)
      rows = [{sid?, name, role:'lead'|'staff', pre, rate?, actual?}] — 저장하지 않는다. 식은 정산표(settleMonth)와 같다. */
   function calcSite(rows) {
-    var issues = [], members = (rows || []).filter(function (r) { return r && (r.name || r.sid); }).map(function (r) {
+    /* 빈 줄 거르기 — 수행자를 고른(sid) 줄이나 이름을 적은 줄만. ⚠ «이름 || 사번» 모양을 쓰지 않는다(tests/sid-never-shown) */
+    var issues = [], members = (rows || []).filter(function (r) { return r && (r.sid || clean(r.name)); }).map(function (r) {
       var pre = won(r.pre), w = withholding(pre), net = pre - w.total, actual = r.actual === '' || r.actual == null ? null : won(r.actual);
       var rate = r.role === 'staff' && r.rate !== '' && r.rate != null && isFinite(Number(String(r.rate).replace(/[%\s]/g, ''))) ? Number(String(r.rate).replace(/[%\s]/g, '')) : null;
       return { sid: r.sid || '', name: clean(r.name), role: r.role === 'lead' ? 'lead' : 'staff', pre: pre, inc: w.inc, loc: w.loc, net: net, actual: actual,
