@@ -158,6 +158,46 @@ async function followGone(db, p, out) {
   return dead.length;
 }
 
+/* ══════ 📦 지난 메일 «지금 열 수 있는 것이 얼마인가» — 부탁했을 때 «한 번만» 센다 (2026-10-31) ══════
+   ★ 왜 — 「지난 메일」 한 통이 «다음메일에 없습니다»로 나오는 일이 있었다. 다음메일 POP3 는 «최근 3만 통»만
+     목록(UIDL)에 올리는데(MB_BACKFILL total 30000), 새 메일이 오면 가장 옛것이 그 창 밖으로 밀려나면서
+     우리가 담아 둔 줄은 «목록에는 있는데 열 수는 없는» 줄이 될 수 있다. 얼마나 되는지, 어느 달이 그런지 모른다.
+   ★ 어떻게 — mailbox/old/probeAsk 에 true 를 적어 두면 «다음 회차(3분 안)»가 센다: 지금 POP3 목록의 이름표와
+     담아 둔 줄의 열쇠를 견주어 mailbox/old/probe 에 {listed, stored, found, missing, byMonth} 를 적는다.
+     센 뒤 probeAsk 는 «먼저» 지운다(도중에 죽어도 같은 일을 되풀이하지 않는다).
+   ⚠ 사람 눈에는 «수»만 남긴다 — 제목·주소·열쇠는 안 적는다. ⚠ 부탁이 없으면 아무것도 안 읽는다(작은 값 하나만).
+   ⚠ 예산이 90초 넘게 남았을 때만 한다(9MB 를 읽고 POP3 목록을 받으므로). 못 하면 부탁 표시를 남겨 다음 회차에 한다. */
+async function oldProbe(deps, db, deadline) {
+  const ask = (await db.ref(ROOT + '/old/probeAsk').once('value')).val();
+  if (!ask) return null;
+  if (nowMs() > deadline - 90000) return null;                 /* 부탁 표시를 남긴 채 — 다음 회차에 */
+  await db.ref(ROOT + '/old/probeAsk').remove();
+  const user = await deps.mailUserAsync();
+  const pass = deps.mailPass();
+  if (!user || !pass) return null;
+  const pop = await (deps.openPop || popOpen)(user, pass, 120000);
+  let list;
+  try { list = popUidlList((await pop.cmd('UIDL', true)).body); }
+  finally { try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ } }
+  const listed = new Set(list.map((x) => popKey(x.id)));
+  const msgs = (await db.ref(ROOT + '/old/msgs').once('value')).val() || {};
+  const keys = Object.keys(msgs);
+  const byMonth = {};
+  let found = 0;
+  keys.forEach((k) => {
+    const ok = listed.has(k);
+    if (ok) found++;
+    const d = Number((msgs[k] || {}).d || 0);
+    const ym = d ? new Date(d).toISOString().slice(0, 7) : '?';
+    const b = byMonth[ym] || (byMonth[ym] = { found: 0, missing: 0 });
+    b[ok ? 'found' : 'missing']++;
+  });
+  const res = { at: nowMs(), listed: list.length, stored: keys.length, found: found, missing: keys.length - found, byMonth: byMonth };
+  await db.ref(ROOT + '/old/probe').set(res);
+  console.log('MB_OLD_PROBE', JSON.stringify({ listed: res.listed, stored: res.stored, found: res.found, missing: res.missing }));
+  return res;
+}
+
 async function runSync(deps, opts) {
   const o = opts || {};
   const deadline = nowMs() + Math.max(20000, Number(o.deadlineMs || 460000));
@@ -798,6 +838,10 @@ async function runSync(deps, opts) {
     });
     out.turns = turns;
 
+    /* 📦 지난 메일 «열 수 있는 것이 얼마인가» — 부탁이 있을 때만(위 oldProbe 머리글). 못 해도 동기화는 멀쩡해야 한다 */
+    if (!o.client) {
+      try { await oldProbe(deps, db, deadline); } catch (e) { console.warn('oldProbe 실패:', String((e && e.message) || e).slice(0, 200)); }
+    }
     await db.ref(ROOT + '/meta').update({
       at: nowMs(), ok: true, folders: out.folders, rows: out.rows,
       removed: out.removed, ready: out.ready, waiting: out.waiting, turns: turns, err: '',
@@ -2353,3 +2397,5 @@ module.exports.oldPopForget = oldPopForget;
 module.exports.oldPopOpen = oldPopOpen;
 /* 연 메일이 «없을» 때 가르기 — 지운 것(뺀다)·창 밖(남긴다)을 돌려 본다(2026-10-10) */
 module.exports.notHere = notHere;
+/* 지난 메일 «열 수 있는 것이 얼마인가» 세기 — 가짜 POP3(deps.openPop)로 돌려 본다(2026-10-31) */
+module.exports.oldProbe = oldProbe;
