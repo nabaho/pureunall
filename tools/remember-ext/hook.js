@@ -34,7 +34,8 @@
   }
 
   function page(n) {
-    return of.call(window, LIST, { method: 'POST', headers: heads, credentials: 'include',
+    /* ⚠ credentials 를 넣지 않는다 — 리멤버 화면도 기본값으로 부른다. 'include' 를 주면 서버의 CORS 답과 맞지 않아 «Failed to fetch»(2026-10-31 실측) */
+    return of.call(window, LIST, { method: 'POST', headers: heads,
       body: JSON.stringify({ group_ids: [], exclude_fields: ['sub_cards'], master: false, page: n, per: PER, sort: [{ updated_at: 'desc' }] }) })
       .then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('login'); return r.json(); });
   }

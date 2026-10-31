@@ -100,6 +100,8 @@ test('★★★ ⑤ 화면 안 조각 — 기준까지만 넘기고, 머리를 �
   const code = strip(read(path.join(EXT, 'hook.js')));
   assert.ok(!/localStorage|sessionStorage|indexedDB|chrome\.storage|document\.cookie\s*=/.test(code), '★★★ 머리를 어딘가에 저장한다');
   assert.ok(!/method:\s*'(DELETE|PUT|PATCH)'/.test(code) && !/\/(delete|destroy|update)\b/.test(code), '★★ 리멤버에 쓰는 주소를 부른다');
+  /* 2026-10-31 실측: credentials:'include' 로 부르면 리멤버 서버가 «Failed to fetch» — 화면과 같은 기본값으로 불러야 200 */
+  assert.ok(!/credentials\s*:\s*'include'/.test(code), '★ 목록 요청에 credentials:include 를 줬다 — 리멤버가 거부한다');
 });
 
 test('★★★ ⑥ 받는 화면 — 같은 창·확장 표시만 믿고, 저장은 같은 문으로만', () => {
