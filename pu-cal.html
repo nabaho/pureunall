@@ -2140,6 +2140,7 @@ function 보관칩(r, 지워짐){
 /* 그 달(앞뒤 걸친 42칸)의 구글 일정을 받아 둔다.
    ⚠ 달이 바뀔 때만 받는다 — 다시 그릴 때마다 받으면 요금과 깜빡임이 는다. */
 function gcalLoad(force){
+  if(force && typeof GSRCH !== "undefined") GSRCH.at = 0;   /* 일정이 바뀌었다 — 검색용 사본도 다음에 다시 받는다 */
   var 칸 = monthGrid(S.ym);
   var 첫날 = 칸[0].date, 끝날 = shiftDay(칸[칸.length-1].date, 1);
   var 키 = 첫날 + "~" + 끝날;
@@ -2169,6 +2170,67 @@ function gcalLoad(force){
       GCAL.loading = false; GCAL.err = (e && e.message) || String(e); render();
       보관받기();
     });
+}
+
+/* ★ 검색용 구글 일정 (대표 지시 2026-11-01 「다른 달의 구글 일정까지 검색되게 — 앞뒤 3개월」).
+   왜: 달력은 «보고 있는 달» 구글 일정만 받아 둔다(GCAL.evs). 폰 검색은 그 안에서만 찾아서 다른 달 일정은 «없다»고 나왔다.
+   방법: 폰에서 검색어를 치면 오늘 앞뒤 검색구글일 일을 따로 받아 둔다(GSRCH). 10분 안에는 다시 안 받는다.
+   ⚠ 검색 «결과 목록»에만 합친다(_검색합침). 월 칸·그날 목록은 그대로 GCAL.evs 만 그린다 — 지워진 일정이 옛 사본으로 되살아나지 않게.
+   ⚠ 보고 있는 달(GCAL 창)과 겹치는 날은 GCAL 쪽이 진실이다 — GSRCH 에서는 뺀다. */
+var GSRCH = { evs:[], 날:"", at:0, loading:false, err:"" };
+var 검색구글일 = 90, 검색구글다시 = 10 * 60 * 1000;
+var _검색합침 = false;
+function 구글목록(){
+  if(!_검색합침 || !GSRCH.evs.length) return GCAL.evs;
+  var 창 = String(GCAL.ym || "").split("~"), 첫 = 창[0] || "", 끝 = 창[1] || "";
+  var 있음 = {};
+  GCAL.evs.forEach(function(x){ 있음[x.id] = 1; });
+  var 더 = GSRCH.evs.filter(function(g){
+    if(!g || 있음[g.id]) return false;
+    var 맨끝 = g.end && g.end > g.date ? g.end : g.date;
+    return !(첫 && 끝 && g.date < 끝 && 맨끝 >= 첫);
+  });
+  return GCAL.evs.concat(더);
+}
+/* 열린 일정 하나를 아이디로 — 달력에 받아 둔 것 먼저, 없으면 검색용으로 받아 둔 것 */
+function 구글찾기(id){
+  var i;
+  for(i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) return GCAL.evs[i];
+  for(i = 0; i < GSRCH.evs.length; i++) if(GSRCH.evs[i] && GSRCH.evs[i].id === id) return GSRCH.evs[i];
+  return null;
+}
+function 검색구글받기(){
+  var 오늘 = todayYMD();
+  if(GSRCH.loading) return Promise.resolve();
+  if(GSRCH.날 === 오늘 && Date.now() - GSRCH.at < 검색구글다시) return Promise.resolve();
+  GSRCH.loading = true; GSRCH.err = "";
+  var 첫날 = shiftDay(오늘, -검색구글일), 끝날 = shiftDay(오늘, 검색구글일 + 1);
+  var 모음 = [];
+  function 쪽(토큰, 번){
+    var url = "https://www.googleapis.com/calendar/v3/calendars/"
+      + encodeURIComponent(GCAL_CAL_ID) + "/events?key=" + GCAL_API_KEY
+      + "&timeMin=" + encodeURIComponent(첫날 + "T00:00:00+09:00")
+      + "&timeMax=" + encodeURIComponent(끝날 + "T00:00:00+09:00")
+      + "&singleEvents=true&orderBy=startTime&maxResults=250"
+      + (토큰 ? "&pageToken=" + encodeURIComponent(토큰) : "");
+    return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+      if(d && d.error) throw new Error(d.error.message || "구글 달력 오류");
+      모음 = 모음.concat((d.items || [])
+        .filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); })
+        .map(gcalToEvent));
+      if(d.nextPageToken && 번 < 10) return 쪽(d.nextPageToken, 번 + 1);
+      if(d.nextPageToken) throw new Error("일정이 너무 많아 끝까지 받지 못했습니다");
+    });
+  }
+  return gcalLoadColors().then(function(){ return 쪽("", 1); }).then(function(){
+    GSRCH.evs = 모음; GSRCH.날 = 오늘; GSRCH.at = Date.now(); GSRCH.loading = false;
+    if(String(S.q || "").replace(/\s+/g, "")) render();
+  }).catch(function(e){
+    /* ⚠ 못 받았으면 말한다(결과 맨 아래) — 받은 만큼도 버리지 않는다. 1분 뒤 다시 받아 본다 */
+    GSRCH.evs = 모음; GSRCH.err = (e && e.message) || String(e);
+    GSRCH.날 = 오늘; GSRCH.at = Date.now() - 검색구글다시 + 60000; GSRCH.loading = false;
+    if(String(S.q || "").replace(/\s+/g, "")) render();
+  });
 }
 
 /* 구글 일정 한 건 → 우리 칩.
@@ -2374,8 +2436,9 @@ function eventsOn(ymd, eumOnly){
         사람을 고른 채로 구글까지 섞으면 칩에 붙는 「겹친 날」 숫자가 두 앱에서 달라진다. */
   if(!eumOnly && (S.filter === null || S.filter === "gcal")){
     /* 여러 날 일정은 «걸친 날마다» 든다 — 구글처럼 막대로 잇는 것은 그리는 쪽(줄배치)이 한다 */
-    for(var gi = 0; gi < GCAL.evs.length; gi++){
-      var ge = GCAL.evs[gi];
+    var 구글들 = typeof 구글목록 === "function" ? 구글목록() : GCAL.evs;   /* 검색 «결과 목록»일 때만 다른 달도 섞인다 */
+    for(var gi = 0; gi < 구글들.length; gi++){
+      var ge = 구글들[gi];
       if(ge.date === ymd || (ge.end && ge.date < ymd && ymd <= ge.end)) out.push(ge);
     }
     /* 🗄 보관함 — 구글을 못 받았으면 보관본 전부, 스위치가 켜져 있으면 «지워진 것»만 더한다 */
@@ -2949,19 +3012,22 @@ function 검색날짜들(){
   arr(D.my_schedules).forEach(function(s){ if(s) 담기(s.date); });
   arr(D.cal_private).forEach(function(p){ if(p) 담기(p.date); });
   arr(D.attendance_records).forEach(function(r){ if(r) 담기(r.date); });
-  arr(GCAL.evs).forEach(function(g){ if(g) 담기(g.date, g.end); });
+  arr(typeof 구글목록 === "function" ? 구글목록() : GCAL.evs).forEach(function(g){ if(g) 담기(g.date, g.end); });
   arr(typeof ARCH !== "undefined" && ARCH.list).forEach(function(r){ if(r) 담기(r.date, r.end); });
   return Object.keys(집).sort();
 }
 function 폰검색Html(eumOnly){
   var 오늘 = todayYMD(), 봄 = {}, 찾음 = [];
-  검색날짜들().forEach(function(ds){
-    eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch).forEach(function(e){
-      var 키 = e.store + ":" + e.id;
-      if(봄[키]) return;                      /* 여러 날 일정은 한 번만 */
-      봄[키] = 1; 찾음.push({ e:e, ds:ds });
+  _검색합침 = true;                           /* ⚠ 끝나면 반드시 끈다 — 켜진 채 남으면 월 칸에 다른 달 일정이 샌다 */
+  try{
+    검색날짜들().forEach(function(ds){
+      eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch).forEach(function(e){
+        var 키 = e.store + ":" + e.id;
+        if(봄[키]) return;                      /* 여러 날 일정은 한 번만 */
+        봄[키] = 1; 찾음.push({ e:e, ds:ds });
+      });
     });
-  });
+  } finally { _검색합침 = false; }
   var 앞 = 찾음.filter(function(x){ return x.ds >= 오늘; });
   var 뒤 = 찾음.filter(function(x){ return x.ds < 오늘; }).reverse();   /* 지난 것은 «가까운 날»이 위로 */
   var 잘림 = (앞.length + 뒤.length) > 검색상한;
@@ -2985,10 +3051,14 @@ function 폰검색Html(eumOnly){
     return '<div class="shd">' + 제목 + ' · ' + 목록.length + '건</div>' + 자름.map(줄).join("");
   }
   var 몸 = 묶음("앞으로 일정", 앞) + 묶음("지난 일정", 뒤);
+  var 개월 = Math.round(검색구글일 / 30);
+  var 구글말 = GSRCH.loading ? "구글 일정을 더 받는 중입니다…"
+    : GSRCH.err ? "구글 일정을 끝까지 받지 못했습니다 — 보고 있는 달과 받은 만큼만 찾았습니다"
+    : "구글 일정은 오늘 앞뒤 " + 개월 + "개월까지 찾아집니다";
   return '<div class="cal"><div class="slistq">'
-    + (몸 || '<div class="mnone">찾는 일정이 없습니다 · 오늘 앞뒤 1년 안에서 찾았습니다</div>')
+    + (몸 || '<div class="mnone">' + (GSRCH.loading ? "구글 일정까지 찾는 중입니다…" : "찾는 일정이 없습니다 · 오늘 앞뒤 1년 안에서 찾았습니다 (구글 일정은 앞뒤 " + 개월 + "개월)") + '</div>')
     + (잘림 ? '<div class="mnone">' + 검색상한 + '건까지만 보입니다 — 검색어를 더 적어 좁혀 보세요</div>' : '')
-    + (몸 ? '<div class="sfoot">구글 일정은 «받아 둔 달» 것만 찾아집니다</div>' : '')
+    + '<div class="sfoot">' + 구글말 + '</div>'
     + '</div></div>';
 }
 /* ★ 폰 «그날 목록 창» (2026-10-10 ㉯) — 날(또는 「•••」)을 누르면 아래에서 올라온다.
@@ -3060,7 +3130,10 @@ function calendarHtml(eumOnly){
   /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
   if(fbDb) gcalLoad();
   var 폰머리 = (typeof 폰 === "function" && 폰()) ? 폰머리Html() : "";
-  if(폰머리 && String(S.q || "").replace(/\s+/g, "") && typeof 폰검색Html === "function") return 폰머리 + 폰검색Html(eumOnly);
+  if(폰머리 && String(S.q || "").replace(/\s+/g, "") && typeof 폰검색Html === "function"){
+    if(fbDb && typeof 검색구글받기 === "function") 검색구글받기();   /* 다른 달 구글 일정도 찾게 — 10분 안에는 다시 안 받는다 */
+    return 폰머리 + 폰검색Html(eumOnly);
+  }
   if(S.view === "sched") return 폰머리 + 폰일정Html(eumOnly);
   if(S.view === "week") return 폰머리 + weekHtml(eumOnly);
   if(S.view === "day")  return 폰머리 + dayHtml(eumOnly);
@@ -3772,7 +3845,10 @@ function 구글시분(iso){ var t = Date.parse(String(iso || "")); return t ? ne
 function openGcalEdit(gid, 직접){
   var e = null;
   if(직접) e = 직접;   /* 일정 후보함이 «다른 달» 일정을 열 때 */
-  else for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === gid) e = GCAL.evs[i];
+  else{
+    for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === gid) e = GCAL.evs[i];
+    if(!e && typeof 구글찾기 === "function") e = 구글찾기(gid);   /* 검색으로 받아 둔 다른 달 일정 */
+  }
   if(!e){ toast("그 일정을 못 찾았습니다 — 달력을 다시 받아 오는 중일 수 있습니다"); return; }
   var 줄들 = String(e.desc || "").split("\n"), 담당자 = "", 남음 = [];
   줄들.forEach(function(x){
@@ -4106,6 +4182,7 @@ function routeHtml(){
 function 구글상세(id){
   var e = null;
   for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) e = GCAL.evs[i];
+  if(!e && typeof 구글찾기 === "function") e = 구글찾기(id);   /* 검색으로 받아 둔 다른 달 일정 */
   if(!e) return null;
   var rows = [];
   var 누구 = e.mailSid ? nameOf(e.mailSid) : "";

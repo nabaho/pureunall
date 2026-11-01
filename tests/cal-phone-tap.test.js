@@ -37,6 +37,8 @@ vm.createContext(상자);
   'function 칩날(e, t){', 'function 검색날짜들(){', 'function 폰검색Html(eumOnly){', 'function 폰목록Html(eumOnly, 날){']
   .forEach((h) => vm.runInContext(함수몸(h), 상자));
 vm.runInContext(캘린더.match(/var 검색폭 = [^;]+;/)[0], 상자);
+/* 검색용 구글 받아 둔 칸(GSRCH)과 그 값들 — 폰검색Html 이 읽는다. 다른 달 합치기는 tests/cal-search-gcal.test.js 가 따로 지킨다 */
+['var GSRCH = [^;]+;','var 검색구글일 = [^;]+;','var _검색합침 = [^;]+;'].forEach((p) => vm.runInContext(캘린더.match(new RegExp(p))[0], 상자));
 
 const 실행 = (식) => vm.runInContext(식, 상자);
 const 오늘 = 실행('todayYMD()');
@@ -176,7 +178,8 @@ test('㉠ 날을 다른 길로 고르면(날 칸·「•••」) 강조를 지
 });
 
 test('㉡ 검색 결과 — 폰이고 검색어가 있을 때만 달 칸 대신 목록 · 「달력」 단추가 눌림 목록에 있다', () => {
-  assert.ok(/if\(폰머리 && String\(S\.q \|\| ""\)\.replace\(\/\\s\+\/g, ""\) && typeof 폰검색Html === "function"\) return 폰머리 \+ 폰검색Html\(eumOnly\);/.test(캘린더));
+  /* 조건(폰 머리 + 검색어 + 함수 있음)은 지키되, 그 안에서 다른 일(구글 받아 두기)을 해도 되게 «return 줄»만 본다 */
+  assert.ok(/if\(폰머리 && String\(S\.q \|\| ""\)\.replace\(\/\\s\+\/g, ""\) && typeof 폰검색Html === "function"\)\{?[^}]*return 폰머리 \+ 폰검색Html\(eumOnly\);/.test(캘린더));
   assert.ok(/\[data-gen\],\[data-sgo\]'\)/.test(캘린더), 'data-sgo 가 눌림 목록에 없으면 「달력」이 죽는다');
   assert.ok(/if\(t\.hasAttribute\('data-sgo'\)\)\{[^}]*S\.q = ''; S\.srch = false;[^}]*S\.sheet = true/.test(캘린더));
 });
