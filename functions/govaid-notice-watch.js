@@ -20,7 +20,7 @@ const FIELDS = Object.keys(BIZ.FIELDS);          // 금융·기술·인력·수�
 /* 0.65 — 2026-10-12 첫 실측(공고 1,462건): 0.5 면 115건 중 «보증료 → 고용보험료» 같은 엉뚱한 짝이 섞였고, 0.65 에서 56건으로 대부분 맞았다 */
 const MIN_SCORE = 0.65, MAX_SUGGEST = 3;
 const KEEP_DAYS = 150;                           // 사람이 처리하지 않은 공고를 남기는 날수(마지막으로 본 날부터)
-const SERVER_FIELDS = ['nm', 'url', 'inst', 'ntce', 'field', 'startDt', 'closeDt', 'openDt', 'memo', 'target', 'area', 'who', 'suggest', 'seenAt', 'updatedAt'];
+const SERVER_FIELDS = ['nm', 'url', 'inst', 'ntce', 'field', 'startDt', 'closeDt', 'openDt', 'memo', 'target', 'area', 'who', 'suggest', 'guide', 'seenAt', 'updatedAt'];
 /* 지자체 공고 (대표 지시 2026-10-31 「각 지자체별로 진행되는 지원사업등 매칭」) — 기업마당은 지자체 공고 이름 앞에 [충남]·[대구ㆍ경북] 처럼 시·도를,
    그 바로 뒤에 «아산시»·«수원시ㆍ용인시» 처럼 시·군·구를 붙인다. 머리와 그 바로 뒤만 읽는다 — 본문의 «도시»·«연구»를 시·구로 읽지 않게 */
 const SIDO = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
@@ -34,6 +34,15 @@ function areaOf(nm) {
 }
 /* 대상 — 회사와 어긋나는지 볼 때만 쓰는 정해진 낱말(소상공인이면 근로자 많은 회사는 흐리게) */
 const WHO = [['소상공인', /소상공인/], ['중소기업', /중소기업/], ['중견기업', /중견기업/], ['창업', /창업/], ['사회적경제', /사회적(경제|기업)|협동조합/], ['여성기업', /여성기업/], ['장애인기업', /장애인기업/], ['수출', /수출/], ['제조', /제조/], ['청년', /청년/]];
+/* 연간 안내 자료(대표 지시 2026-11-01 「매년 고용노동부·정부부처·지자체 지원금 안내 자료도 자동으로 검토하고 가지고 오게」 → 「추천대로」).
+   여러 사업을 한데 모은 «묶음 자료»만 고른다 — 서버는 표시만, 첨부를 읽어 사업을 뽑는 일은 이 PC 매월 예약 작업(scripts/govaid-refresh)이 한다.
+   2026-11-01 실측: 공고 1,722 중 «통합 공고» 25. 낱개 사업의 «시행계획 공고»는 한 사업이라 넣지 않는다 */
+function guideOf(nm) {
+  const t = s(nm);
+  if (/통합\s*(시행\s*)?공고/.test(t)) return '통합공고';
+  if (/지원\s*제도\s*안내|지원\s*시책|안내\s*책자|가이드\s*북/.test(t)) return '지원 안내';
+  return '';
+}
 function whoOf(nm, memo, target) { const t = [nm, memo, target].map(s).join(' '); return WHO.filter((w) => w[1].test(t)).map((w) => w[0]); }
 
 function s(v) { return v == null ? '' : String(v).trim(); }
@@ -111,7 +120,7 @@ function gov24Row(x) {
 function noticeRecord(row, sug, today, nowMs, prev) {
   const base = { area: row.area || areaOf(row.nm), who: whoOf(row.nm, row.memo, row.target), target: s(row.target).slice(0, 120), nm: s(row.nm).slice(0, 300), url: /^https:\/\//.test(s(row.url)) ? s(row.url) : '', inst: s(row.inst).slice(0, 120), ntce: s(row.ntce).slice(0, 120),
     field: s(row.field).slice(0, 40), startDt: s(row.startDt), closeDt: s(row.closeDt), openDt: s(row.openDt), memo: s(row.memo).slice(0, 300),
-    suggest: sug, seenAt: nowMs, updatedAt: nowMs };
+    suggest: sug, guide: guideOf(row.nm) || null, seenAt: nowMs, updatedAt: nowMs };
   if (prev) return base;
   return Object.assign({ id: Feed.safeKey(row.no), entityType: 'Document', docKind: 'govNotice', no: s(row.no), src: '기업마당',
     schemaVersion: 1, createdAt: nowMs, createdBy: AUTO_BY, updatedBy: AUTO_BY, firstSeen: nowMs, revision: 1 }, base);
@@ -156,7 +165,7 @@ function plan(o) {
   /* 덜어내기 — 오늘 안 보였고, 마지막으로 본 지 오래고, 사람이 처리하지 않은 공고만 */
   Object.keys(existing).forEach((k) => {
     const n = existing[k] || {};
-    if (seen[k] || n.decision) return;
+    if (seen[k] || n.decision || n.guideDone) return;   /* 이 PC 가 읽은 연간 안내 자료(guideDone)도 남긴다 — 무엇을 읽었는지의 기록 */
     if ((Number(n.seenAt) || 0) < nowMs - KEEP_DAYS * 86400000) { updates['notices/' + k] = null; stats.pruned++; }
   });
   return { updates, stats };
@@ -206,4 +215,4 @@ async function run(a) {
   }
 }
 
-module.exports = { run, plan, areaOf, whoOf, SIDO, gov24Keep, gov24Row, sidoOfOrg, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };
+module.exports = { run, plan, areaOf, whoOf, guideOf, SIDO, gov24Keep, gov24Row, sidoOfOrg, suggest, score, normName, closureFromPeriod, combine, AUTO_BY, AI_BY, FIELDS, MIN_SCORE, KEEP_DAYS };

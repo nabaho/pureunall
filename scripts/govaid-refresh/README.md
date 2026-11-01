@@ -14,6 +14,17 @@ node scripts/govaid-refresh/load-close.js <결과폴더>     # 마른 돌리기 
 node scripts/govaid-refresh/load-close.js <결과폴더> --go
 ```
 
+## 매월 1일 — 연간 안내 자료 읽기 (2026-11-01 대표 「매년 … 지원금 안내 자료도 자동으로 검토하고 가지고 오게」)
+서버가 기업마당 공고 가운데 묶음 자료(통합공고·지원제도 안내)에 `guide` 를 표시해 둔다. 아직 안 읽은 것만 한 달에 6건까지.
+고용노동부 «고용장려금 지원제도 안내»는 기업마당에 없을 수 있어 해마다 한 번 고용24 에서 찾는다(못 찾으면 다음 달에 다시).
+```
+node scripts/govaid-refresh/guide-list.js <결과폴더>         # guides.json — 비어 있으면 여기서 끝
+(조사 담당: 자료 한 건에 한 사람, BRIEF-guide.md 대로 new-guide-<id>.json · guide-<id>.json)
+node scripts/govaid-refresh/load-yearly.js <결과폴더>         # 마른 돌리기 → 문제 없으면 --go (새 사업은 초안)
+node scripts/govaid-refresh/load-yearly.js <결과폴더> --go
+node scripts/govaid-refresh/guide-done.js <결과폴더> --go     # 공고에 «읽음 · 새 초안 N» 표시(화면 📰 새 공고 → 📘)
+```
+
 ## 매년 1월 — 새해 사업·조건·서류
 ```
 node scripts/govaid-refresh/export.js <결과폴더> 4

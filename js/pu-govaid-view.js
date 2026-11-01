@@ -142,6 +142,8 @@
       if (q && (clean(n.nm) + ' ' + clean(n.ntce) + ' ' + clean(n.inst)).toLowerCase().indexOf(q) < 0) return false;
       if (view === 'linked') return !!r.linkedTo;
       if (view === 'ignored') return n.decision === 'ignore';
+      /* 📘 연간 안내 자료(2026-11-01) — 서버가 표시한 묶음 자료(통합공고·지원제도 안내). 처리했어도 보인다(읽을 거리라서) */
+      if (view === 'guide') return !!clean(n.guide);
       if (!fresh) return false;
       if (view === 'sug') return r.sug.length > 0;
       if (view === 'local') return r.cos > 0;   /* 지역 공고 — 우리 고객사가 있는 지역만 */

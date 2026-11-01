@@ -164,3 +164,24 @@ test('run — 공공데이터포털 열쇠가 있으면 보조금24 도 받고, 
   assert.equal(last.noticeLast.gov24, 1);
   assert.ok(!JSON.stringify(last).includes(KEY));
 });
+
+/* 연간 안내 자료(대표 지시 2026-11-01 「매년 … 지원금 안내 자료도 자동으로 검토하고 가지고 오게」 → 「추천대로」) —
+   서버는 «표시»만 한다. 첨부를 읽어 사업을 뽑는 일은 이 PC 매월 예약 작업이 한다 */
+test('연간 안내 자료 — 통합공고·지원제도 안내·지원시책만 고른다(낱개 사업 공고는 아님)', () => {
+  assert.equal(W.guideOf('2026년 중앙부처 및 지자체 창업지원사업 통합공고'), '통합공고');
+  assert.equal(W.guideOf('2026년 중소기업 기술개발 지원사업 통합 공고'), '통합공고');
+  assert.equal(W.guideOf("'26년 고용장려금 지원제도 안내"), '지원 안내');
+  assert.equal(W.guideOf('[충남] 2026년 중소기업 지원시책 안내'), '지원 안내');
+  assert.equal(W.guideOf('[충남] 아산시 2026년 해외마케팅 지원사업'), '');
+  assert.equal(W.guideOf('2026년 청년일자리도약장려금 참여기업 모집 공고'), '');
+  assert.equal(W.guideOf(''), '');
+});
+
+test('연간 안내 자료 — 새 공고·있는 공고 모두 guide 칸(서버 칸)으로, 아니면 칸을 비운다', () => {
+  const r = W.plan({ rows: [row('G1', '2026년 중소기업 지원사업 통합공고', '2026-01-02', '2026-12-31'), row('G2', '2026년 어느 지원사업 모집', '', '')], programs: [], existing: {}, today: TODAY, nowMs: NOW });
+  assert.equal(r.updates['notices/G1'].guide, '통합공고');
+  assert.equal(r.updates['notices/G2'].guide, null);
+  const r2 = W.plan({ rows: [row('G1', '2026년 중소기업 지원사업 통합공고', '', '')], programs: [], existing: { G1: { id: 'G1', seenAt: NOW, guideDone: { at: 1 } } }, today: TODAY, nowMs: NOW });
+  assert.equal(r2.updates['notices/G1/guide'], '통합공고');
+  assert.equal('notices/G1/guideDone' in r2.updates, false, '이 PC 가 읽고 남긴 표시(guideDone)는 서버가 건드리지 않는다');
+});

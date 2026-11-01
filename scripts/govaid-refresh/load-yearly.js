@@ -51,6 +51,9 @@ const info = (r) => ({ confidence: r.confidence || '', notes: cut(r.notes, 1000)
 
 const live = get('/govaid/programs') || {};
 const plan = {}, stat = { updated: 0, noteOnly: 0, created: 0, sameName: 0 };
+/* 연간 안내 자료(2026-11-01) — new-guide-*.json 줄에 guideId 가 있으면 자료마다 새 초안·이미 있음을 센다(guide-done.js 가 공고에 남긴다) */
+const byGuide = {};
+const tally = (r, k) => { const g = String(r.guideId || '').trim(); if (g) { byGuide[g] = byGuide[g] || { created: 0, known: 0 }; byGuide[g][k]++; } };
 /* ① 기존 사업 */
 read(/^docs-.*\.json$/).forEach((r) => {
   const prev = live[r.id];
@@ -72,7 +75,7 @@ const norm = (s) => String(s || '').replace(/\s|\(.*?\)|20\d\d년도?/g, '');
 const names = Object.values(live).filter((p) => p && !p._deleted).map((p) => norm(p.name));
 let seq = Object.keys(live).map((k) => (/^gp-n(\d+)$/.exec(k) || [])[1]).filter(Boolean).map(Number).reduce((a, b) => Math.max(a, b), 0);
 read(/^new-.*\.json$/).forEach((r) => {
-  if (names.indexOf(norm(r.name)) >= 0) { stat.sameName++; return; }
+  if (names.indexOf(norm(r.name)) >= 0) { stat.sameName++; tally(r, 'known'); return; }
   names.push(norm(r.name));
   const id = 'gp-n' + String(++seq).padStart(3, '0');
   checkCond(id, r.cond);
@@ -81,17 +84,18 @@ read(/^new-.*\.json$/).forEach((r) => {
     summary: cut(r.summary, 600), status: 'draft', baseYear: Number(r.baseYear) || new Date().getFullYear(), cond: cleanCond(r.cond),
     source: src[0] ? { title: src[0].title, no: '', page: src[0].page, url: src[0].url } : {},
     docs: docsOf(id, r.docs), laborPrep: cut(r.laborPrep, 300), docsInfo: info(r),
-    aiDraft: { at: NOW, confidence: r.confidence || '', applicability: r.applicability || '', notes: cut(r.notes, 1000), baseYearSeen: r.baseYear || null } };
+    aiDraft: Object.assign({ at: NOW, confidence: r.confidence || '', applicability: r.applicability || '', notes: cut(r.notes, 1000), baseYearSeen: r.baseYear || null }, r.guideId ? { guideId: cut(r.guideId, 120) } : {}) };
   if (r.applicability === 'individual') rec.applicability = 'individual';
   /* ★ 노무사 직접 사업(대표 지시 2026-10-13) — 고용노동부 계열 사업주 신청 사업은 처음부터 ★(AI 초안). 근거: 공인노무사법 제2조제1항제1호 */
   else if (V.ministryOf(rec.agency) === '고용노동부') rec.star = { on: true, why: STAR_WHY, by: ACTOR, at: NOW };
   if (live[id]) bad.push(id + ': 자리에 이미 무엇이 있음');
   const p = W.prepareRecord(rec, { entityType: 'SupportProgram', now: NOW, actor: ACTOR, expectedRevision: -1 });
   if (!p.ok) { bad.push(id + ': 관문 ' + p.issues.map((i) => i.code).join(',')); return; }
-  plan[id] = p.value; stat.created++;
+  plan[id] = p.value; stat.created++; tally(r, 'created');
 });
 console.log(JSON.stringify(stat), '· 쓸 레코드', Object.keys(plan).length, '· 문제', bad.length);
 if (bad.length) { bad.slice(0, 30).forEach((b) => console.log('  ✗', b)); process.exit(3); }
+fs.writeFileSync(path.join(dir, 'guide-stat.json'), JSON.stringify(byGuide, null, 1));
 const file = path.join(dir, 'yearly-plan.json');
 fs.writeFileSync(file, JSON.stringify(plan, null, 1));
 if (!GO || !Object.keys(plan).length) { console.log(GO ? '쓸 것이 없습니다' : '마른 돌리기 — 쓰려면 --go'); process.exit(0); }
