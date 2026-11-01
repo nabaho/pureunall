@@ -232,7 +232,7 @@
          extras(원장에 없는 보충값, Organization) · reviews(EligibilityReview — 판정이 아니라 사람의 결정만).
        ★ 빌려 읽는 곳: data/companies(원장) · pubdata/co(국민연금·고용보험 인원, 사업자번호 열쇠) · uid_roles(사번·재직).
        ⚠ 예비 고객 → 업체 연결은 사업자번호가 같을 때만(validateCompanyLink) — 이름으로 잇지 않는다. */
-    govaid:{ name:'정부지원금', file:'pu-govaid.html', primaryRoots:['govaid'],
+    govaid:{ name:'기업정부지원금', file:'pu-govaid.html', primaryRoots:['govaid'],
       sharedRoots:['data/companies','pubdata/co','uid_roles','work_erp/items'],
       writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
                       {path:'govaid/prospects/{id}',entityType:'Organization'},

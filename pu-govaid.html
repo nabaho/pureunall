@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>푸른노무법인 정부지원금</title>
+<title>푸른노무법인 기업정부지원금</title>
 <!-- ══════════════════════════════════════════════════════════════
      푸른노무법인 정부지원금 (pu-govaid.html) — 2026-10-11
      대표 지시 「정부지원금 프로그램 만들려고 한다」 · 「고객사 뿐 아니라 신규고객사에게도 검토후 지원받을 수 있는것 연계예정」
@@ -221,7 +221,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <body>
 <div id="head">
   <div class="top">
-    <h1>🎯 정부지원금</h1>
+    <h1>🎯 기업정부지원금</h1>
     <span class="sub">지원사업 찾기·검토 — 기존·예비 고객사</span>
     <span id="who"></span>
     <span class="sp"></span>
@@ -339,13 +339,13 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=84"></script>
+<script src="js/pu-ontology.js?v=85"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=37"></script>
+<script src="js/pu-appbar.js?v=38"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -449,7 +449,7 @@ function closeModal(){ $('modal').style.display='none'; $('mbox').innerHTML=''; 
 
 /* ═══ 불러오기 — 하나가 막혀도 나머지로 이어 간다. 못 읽은 자료에서 오는 값은 «모름» ═══ */
 async function reload(){
-  var names=['정부지원금 자료','업체관리','국민연금·고용보험 인원'], fail=[];
+  var names=['기업정부지원금 자료','업체관리','국민연금·고용보험 인원'], fail=[];
   /* govaid 는 칸마다 따로 읽는다 — 서버가 매일 쌓는 공고 함(govaid/notices)은 「새 공고」를 열 때만 읽는다(2026-10-12) */
   var G=['programs','prospects','extras','reviews'], GP=['govaid/programs','govaid/prospects','govaid/extras','govaid/reviews'];
   var gres=await Promise.allSettled(GP.map(function(p){ return fbDb.ref(p).once('value'); }));
