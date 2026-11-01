@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>취업규칙</title>
+<title>기업규정집</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📜</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
 <!-- ⑤ 서고 원본 파일 — 기존 창고(pureun-erp-hrphotos)에 담는다. 설계서 §3-⑤ -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=86"></script>
+<script src="js/pu-ontology.js?v=87"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -43,10 +43,11 @@
 <script src="js/pu-rules-draft.js?v=3"></script>
 <!-- 「💡 우리 문안」(✏️ 조문 편집 아래) — 📚 조별 문안과 «같은 부품». 캐시 번호는 rules-v2.html 과 같게.
      lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-order.js?v=3"></script>
+<script src="js/rules-v2/lib-set.js?v=1"></script>
+<script src="js/rules-v2/lib-order.js?v=4"></script>
 <script src="js/rules-v2/lib-topics.js?v=3"></script>
-<script src="js/rules-v2/lib-sites.js?v=3"></script>
-<script src="js/rules-v2/store.js?v=6"></script>
+<script src="js/rules-v2/lib-sites.js?v=4"></script>
+<script src="js/rules-v2/store.js?v=7"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
 <script src="js/rules-v2/view-topics.js?v=7"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
@@ -926,7 +927,7 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=38"></script>
+  <script src="js/pu-appbar.js?v=39"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -939,7 +940,7 @@ table.daejo td.dj2{padding:0}
      사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
    ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
 /* 이름은 포털 타일과 같게 — 「취업규칙」 타일 하나(두 앱 합치기 2026-10-04), rules-v2.html 도 같은 이름 */
-try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
+try { PuGate.soonUnlessAdmin('기업규정집'); } catch(_){}
 </script>
   <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
        자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
@@ -954,7 +955,7 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
 <header class="rs-head">
   <!-- 왼쪽 묶음 — rules-v2.html 과 «글자까지 같다»(css/rules-shell.css · tests/rules-shell.test.js).
        다르면 갈래를 오갈 때 단추가 튄다(대표 지시 2026-10-05 「위치가 안바뀌고 고정위치로」). -->
-  <div class="logo rs-logo">규</div><b class="rs-name">취업규칙</b>
+  <div class="logo rs-logo">규</div><b class="rs-name">기업규정집</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
        코드는 두 파일(rules.html · rules-v2.html)이지만 사람 눈에는 이 단추 하나로 오간다.
        ⚠ rules-v2.html 머리줄에 «같은 단추»가 있다 — 한쪽만 고치면 오가다 단추가 바뀐다

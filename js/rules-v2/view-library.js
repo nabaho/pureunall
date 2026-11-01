@@ -14,6 +14,11 @@
   'use strict';
 
   function O() { return root.PuRulesV2Order; }
+  function S() {
+    if (root && root.PuRulesV2Set) return root.PuRulesV2Set;
+    if (typeof require === 'function') { try { return require('./lib-set.js'); } catch (e) { /* 화면에서는 위에서 찾는다 */ } }
+    return null;
+  }
   function KT() {
     if (root && root.PuKordocText) return root.PuKordocText;
     if (typeof require === 'function') { try { return require('../pu-kordoc-text.js'); } catch (e) { /* 화면에서는 위에서 찾는다 */ } }
@@ -90,11 +95,19 @@
     return { hold: it.status === '보류', final: !!i.final, cand: !!(i.cand && i.cand.length) && !i.final,
       unlinked: !it.companyId && it.h.companyLinkStatus !== 'not_required' };
   }
-  var KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표', '신고서', '동의서', '의견청취', '기타'];
+  var SETS = ['취업규칙', '노사협의회', '단체협약'];
+  var KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표', '회의록', '위원·고충', '합의·교섭', '신고서', '동의서', '의견청취', '기타'];
   var KIND_LABEL = { '규칙본문': '규칙 본문' };
-  var KIND_CLS = { '규칙본문': 'rule', '노사협의회': 'rule', '단체협약': 'rule', '신구대조표': 'cmp', '신고서': 'rep', '동의서': 'agr' };
+  var KIND_CLS = { '규칙본문': 'rule', '노사협의회': 'rule', '단체협약': 'rule', '신구대조표': 'cmp', '회의록': 'cmp', '합의·교섭': 'cmp', '신고서': 'rep', '동의서': 'agr', '위원·고충': 'agr' };
+  function kindsFor(set) { var s = S(); return s ? s.kindsFor(set) : KINDS; }
+  function kindLabel(k, set) {
+    if (set === '노사협의회' && k === '노사협의회') return '규정 본문';
+    if (set === '단체협약' && k === '단체협약') return '협약 본문';
+    return KIND_LABEL[k] || k;
+  }
   function passes(it, st, M) {
     var f = st.filt || {}, fl = flags(it, M);
+    if (f.set && (it.set || '취업규칙') !== f.set) return false;
     if (f.kind && it.kind !== f.kind) return false;
     if (f.only === 'final' && !fl.final) return false;
     if (f.only === 'cand' && !fl.cand) return false;
@@ -138,8 +151,11 @@
   /* ── 거르기 줄 ── */
   function filterHtml(st) {
     var M = model(st), f = st.filt || {};
-    var n = { all: 0, final: 0, cand: 0, unlinked: 0, hold: 0 }, byKind = {};
+    var n = { all: 0, final: 0, cand: 0, unlinked: 0, hold: 0 }, byKind = {}, bySet = {};
     M.items.forEach(function (it) {
+      var s = it.set || '취업규칙';
+      bySet[s] = (bySet[s] || 0) + 1;
+      if (f.set && s !== f.set) return;
       var fl = flags(it, M);
       n.all++; byKind[it.kind] = (byKind[it.kind] || 0) + 1;
       if (fl.final) n.final++; if (fl.cand) n.cand++; if (fl.hold) n.hold++;
@@ -156,8 +172,11 @@
         + (tleft ? '🧹 정리하기 <b>' + tleft + '</b>' : '✓ 정리 끝') + '</button>' : '')
       /* 🤖 매일 정리(설계 §14-4) — 서버가 매일 하는 정리(처리 담당·자동 확정)와 오늘 들어온 서류 */
       + (root.PuRulesV2DailyView ? '<button data-act="view" data-v="daily" class="' + (st.view === 'daily' ? 'on' : '') + '" title="오늘 들어온 서류의 사업장 정리·처리 담당과 매일 기록">🤖 매일 정리</button>' : '') + '</div>';
-    var chips = chip('kind', '', '모두', n.all, !f.kind);
-    KINDS.forEach(function (k) { if (byKind[k]) chips += chip('kind', k, KIND_LABEL[k] || k, byKind[k], f.kind === k); });
+    var setChips = '';
+    SETS.forEach(function (s) { setChips += chip('set', s, s, bySet[s] || 0, f.set === s); });
+    setChips += '<span class="sep"></span>';
+    var chips = setChips + chip('kind', '', '모두', n.all, !f.kind);
+    kindsFor(f.set).forEach(function (k) { if (byKind[k]) chips += chip('kind', k, kindLabel(k, f.set), byKind[k], f.kind === k); });
     chips += '<span class="sep"></span>'
       + chip('only', 'final', '★ 최종본만', n.final, f.only === 'final')
       + chip('only', 'cand', '최종본 후보', n.cand, f.only === 'cand')
@@ -245,10 +264,12 @@
         var cls = [st.picked && st.picked.has(it.id) ? 'ck' : '', fl.hold ? 'hold' : '', fl.final ? 'fin' : '', st.sel === it.id ? 'sel' : ''].filter(Boolean).join(' ');
         var pan = i.ver != null && it.kind === '규칙본문' ? (i.ver === 0 ? '현행' : i.ver + '판 / ' + i.total) : '—';
         var pii = piiLabel((it.doc.pii || {}).count);
+        var setTag = it.set && it.set !== '취업규칙' && it.kind !== it.set ? it.set + ' · ' : '';
+        var kText = setTag + (KIND_LABEL[it.kind] || it.kind);
         rows += '<tr data-row="' + esc(it.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>'
           + pickCell(st, it, fl.hold)
           + '<td class="no">' + M.no[it.id] + '</td>'
-          + td('', it.kind, '<span class="k1 ' + (KIND_CLS[it.kind] || '') + '">' + esc(KIND_LABEL[it.kind] || it.kind) + '</span>')
+          + td('', kText, '<span class="k1 ' + (KIND_CLS[it.kind] || '') + '">' + esc(kText) + '</span>')
           + td('file', it.name, '<button class="lnk" data-act="sel" data-id="' + esc(it.id) + '">' + esc(it.name) + '</button>')
           + siteCell(st, it)
           + td('pan', pan, esc(pan))
@@ -326,13 +347,18 @@
     var h = (d.human || {})[st.sel] || {};
     var co = h.companyLinkStatus === 'linked' ? h.companyId : '';
     var m = doc.mail || {};
-    var kind = h.kindFix || (O().inferKind ? O().inferKind(doc) : doc.kind);
+    var set = O().inferSet ? O().inferSet(doc, h) : '취업규칙';
+    var kind = O().inferKind ? O().inferKind(doc, h) : (h.kindFix || doc.kind);
     var pii = piiLabel((doc.pii || {}).count);
-    var opts = KINDS.map(function (k) { return '<option value="' + esc(k) + '"' + (k === kind ? ' selected' : '') + '>' + esc(KIND_LABEL[k] || k) + '</option>'; }).join('');
+    var setOpts = SETS.map(function (s) { return '<option value="' + esc(s) + '"' + (s === set ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
+    var kList = kindsFor(set).slice();
+    if (kList.indexOf(kind) < 0) kList.push(kind);
+    var opts = kList.map(function (k) { return '<option value="' + esc(k) + '"' + (k === kind ? ' selected' : '') + '>' + esc(kindLabel(k, set)) + '</option>'; }).join('');
     return '<div class="side">'
       + '<div class="sh"><b title="' + esc(doc.name) + '">' + esc(doc.name) + '</b><button class="lnk" data-act="closeSide">닫기</button></div>'
       + '<div class="meta2">✉ ' + esc(m.subject || '') + '<br>' + esc(ymd(m.date)) + ' · ' + esc(doc.dir || '') + (co ? ' · 🏢 ' + esc(coName(st, co) || co) : '') + '</div>'
-      + '<div class="meta2">갈래 <select data-role="kind" data-id="' + esc(st.sel) + '">' + opts + '</select>'
+      + '<div class="meta2">분류 <select data-role="set" data-id="' + esc(st.sel) + '">' + setOpts + '</select>'
+      + ' · 갈래 <select data-role="kind" data-id="' + esc(st.sel) + '">' + opts + '</select>'
       + ' · 가린 것: ' + (pii ? esc(pii) : '없음') + '</div>'
       + '<div class="acts"><a class="btn sm" href="' + esc(mailHref(co)) + '" target="_blank" rel="noopener">✉ 메일 열기(원본)</a>'
       + (doc.file && doc.file.path ? '<button class="btn sm" data-act="file" data-id="' + esc(st.sel) + '">📎 가린 파일 받기</button>' : '')
@@ -381,6 +407,7 @@
       else if (t.dataset && t.dataset.role === 'tidyVer' && H.tidyVer) H.tidyVer(t.dataset.rid, t.value);
       else if (t.dataset && t.dataset.pick != null && H.pick) H.pick(t.dataset.pick, t.checked);
       else if (t.dataset && t.dataset.act === 'pickAll' && H.pickAll) H.pickAll(t.checked);
+      else if (t.dataset && t.dataset.role === 'set' && H.setSet) H.setSet(t.dataset.id, t.value);
       else if (t.dataset && t.dataset.role === 'kind' && H.setKind) H.setKind(t.dataset.id, t.value);
     };
     el.oninput = function (ev) {

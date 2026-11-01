@@ -6,20 +6,21 @@
   'use strict';
   // 반년(183일) 넘게 비면 다른 회차로 본다
   var GAP = 183 * 864e5;
+  function S() { return (root && root.PuRulesV2Set) || (typeof require === 'function' ? require('./lib-set.js') : null); }
   function str(v) { return v == null ? '' : String(v); }
-  // 옛 수집기에서 규칙본문·기타로 들어온 서류 가운데 노사협의회 규정·단체협약은 따로 가른다(사람이 kindFix 로 고친 것은 그대로 둔다).
-  function inferKind(d) {
-    var k = str(d && d.kind), nm = str(d && d.name);
-    if ((k === '규칙본문' || k === '기타' || !k) && !/신구|대조|비교표|신고|제출|동의|의견|취업\s*규칙|취업\s*규정|사규/.test(nm)) {
-      if (/노사\s*협의회|협의회\s*(?:운영\s*)?규정/.test(nm)) return '노사협의회';
-      if (/단체\s*협약|임금\s*협약|단협/.test(nm)) return '단체협약';
-    }
-    return k;
+  // 옛 수집기에서 규칙본문·기타로 들어온 서류 가운데 노사협의회·단체협약과 각 서식을 가른다(사람이 kindFix 로 고친 것은 그대로 둔다).
+  function inferKind(d, h) {
+    var s = S();
+    return s ? s.kindOf(d, h) : str(d && d.kind);
+  }
+  function inferSet(d, h) {
+    var s = S();
+    return s ? s.setOf(d, h) : '취업규칙';
   }
   function merge(docs, human) {
     return Object.keys(docs || {}).map(function (id) {
       var d = docs[id] || {}, h = (human || {})[id] || {};
-      return { id: id, doc: d, h: h, kind: h.kindFix || inferKind(d), name: str(d.name), status: d.status, dir: d.dir,
+      return { id: id, doc: d, h: h, set: inferSet(d, h), kind: inferKind(d, h), name: str(d.name), status: d.status, dir: d.dir,
         companyId: h.companyLinkStatus === 'linked' && h.companyId ? str(h.companyId) : null,
         date: Number((d.mail && d.mail.date) || 0), round: str(h.round) };
     });
@@ -70,8 +71,9 @@
       byKey[k].items.sort(function (a, b) { return a.date - b.date || (a.id < b.id ? -1 : 1); }); return byKey[k];
     }).sort(function (a, b) { var x = first(a), y = first(b); return x === y ? 0 : (x < y ? -1 : 1); });
   }
-  function versionsOf(round) {
-    var rules = round.items.filter(function (it) { return it.kind === '규칙본문' && it.status === '담김'; });
+  function versionsOf(round, targetSet) {
+    var s = S(), bodyKind = (s && s.BODY_KIND && s.BODY_KIND[targetSet || '취업규칙']) || '규칙본문';
+    var rules = round.items.filter(function (it) { return it.kind === bodyKind && it.status === '담김'; });
     var out = [], n = 0;
     rules.forEach(function (it, i) {
       if (i === 0 && it.dir === '받음') out.push({ item: it, no: 0 });
@@ -80,10 +82,10 @@
     return out;
   }
   var R_REPORT = '신고서 메일 바로 앞 판', R_NAME = '파일 이름에 「최종·신고용」', R_AGREE = '동의서와 같은 메일';
-  function finalCandOf(round) {
+  function finalCandOf(round, targetSet) {
     var out = {};
     function add(id, why) { (out[id] = out[id] || []).indexOf(why) < 0 && out[id].push(why); }
-    var vs = versionsOf(round).map(function (v) { return v.item; });
+    var vs = versionsOf(round, targetSet).map(function (v) { return v.item; });
     var report = round.items.filter(function (it) { return it.kind === '신고서'; })[0];
     if (report) {
       var before = vs.filter(function (it) { return it.date <= report.date; }).pop();
@@ -97,17 +99,20 @@
     });
     return out;
   }
-  function companyGroups(items, rounds) {
+  function companyGroups(items, rounds, targetSet) {
+    var tSet = targetSet || '취업규칙';
     var byCo = {};
-    items.forEach(function (it) { if (it.companyId) (byCo[it.companyId] = byCo[it.companyId] || []).push(it); });
+    items.forEach(function (it) {
+      if (it.companyId && (it.set || '취업규칙') === tSet) (byCo[it.companyId] = byCo[it.companyId] || []).push(it);
+    });
     var out = [];
     Object.keys(byCo).forEach(function (co) {
       roundsOf(byCo[co]).forEach(function (r) {
-        var rid = co + '_' + r.roundKey, rec = (rounds || {})[rid] || {};
+        var rid = co + (tSet === '취업규칙' ? '_' : '_' + tSet + '_') + r.roundKey, rec = (rounds || {})[rid] || {};
         // 최종본은 그 회차 안에 있는 문서일 때만 보인다 — 회차가 바뀌어 밖으로 나간 옛 표시는 무시
         var fin = rec.finalDocId && r.items.some(function (it) { return it.id === rec.finalDocId; }) ? rec.finalDocId : null;
-        out.push({ companyId: co, roundKey: r.roundKey, roundId: rid, items: r.items, rows: versionsOf(r),
-          cand: finalCandOf(r), finalDocId: fin, finalBy: fin ? rec.finalBy : '', finalAt: fin ? rec.finalAt : 0,
+        out.push({ companyId: co, set: tSet, roundKey: r.roundKey, roundId: rid, items: r.items, rows: versionsOf(r, tSet),
+          cand: finalCandOf(r, tSet), finalDocId: fin, finalBy: fin ? rec.finalBy : '', finalAt: fin ? rec.finalAt : 0,
           // 「최종본 없음」(중간에 멈춘 회차) — 최종본이 정해져 있으면 무시한다 (설계 §10-2)
           noFinal: !fin && rec.noFinal === true,
           hasReport: r.items.some(function (it) { return it.kind === '신고서'; }),
@@ -116,7 +121,7 @@
     });
     return out.sort(function (a, b) { return (a.finalDocId ? 1 : 0) - (b.finalDocId ? 1 : 0) || b.last - a.last; });
   }
-  var api = { merge: merge, inferKind: inferKind, numberOf: numberOf, byMail: byMail, roundsOf: roundsOf, versionsOf: versionsOf,
+  var api = { merge: merge, inferKind: inferKind, inferSet: inferSet, numberOf: numberOf, byMail: byMail, roundsOf: roundsOf, versionsOf: versionsOf,
     finalCandOf: finalCandOf, companyGroups: companyGroups, mailKey: mailKey, R_REPORT: R_REPORT, R_NAME: R_NAME, R_AGREE: R_AGREE };
   if (root) root.PuRulesV2Order = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

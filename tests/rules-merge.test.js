@@ -37,7 +37,7 @@ const 포털 = () => listOf(R('enter.html'), 'enter.html');
 const 앱바 = () => listOf(R('js/pu-appbar.js'), 'js/pu-appbar.js');
 const 취업규칙줄 = (list) => list.filter((a) => /^rules/.test(a.key) || /^rules(-v2)?\.html/.test(a.url));
 
-test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은 「취업규칙」, rulesv2 줄은 없다', () => {
+test('①★ 포털에 기업규정집 타일은 하나 — 열쇠 rules, 이름은 「기업규정집」, rulesv2 줄은 없다', () => {
   const list = 포털();
   assert.ok(list.length >= 10, '★ 포털 목록이 너무 짧다 — 검사가 헛돈다');
   const 줄 = 취업규칙줄(list);
@@ -47,7 +47,7 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
   // (프로그램 등록은 rules.html 그대로 — 갈래 단추가 두 화면을 오간다)
   assert.equal(줄[0].url, 'rules-v2.html', '★ 타일은 첫 화면 🏢 사업장(rules-v2.html)으로 들어온다'); // 검사고정-허용 — 대표 결정 2026-10-04 「추천」: 첫 화면 = 사업장
   assert.match(줄[0].url, /^rules(-v2)?\.html(#|\?|$)/, '★ 타일 주소가 취업규칙 앱 식구가 아니다');
-  assert.equal(줄[0].name, '취업규칙', '★ 대표 결정 — 포털 타일 이름은 「취업규칙」'); // 검사고정-허용 — 대표 결정 2026-10-04 타일 이름
+  assert.equal(줄[0].name, '기업규정집', '★ 대표 결정 — 포털 타일 이름은 「기업규정집」'); // 검사고정-허용 — 대표 결정 2026-11-01 타일 이름 변경
   assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ rulesv2 타일이 남았다');
 });
 
