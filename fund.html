@@ -17317,12 +17317,49 @@ function rvRead(sid,kind){
   if(!ref) return Promise.reject(new Error('연결된 원본이 없습니다'));
   if(!photoStoreReady()) return Promise.reject(new Error('사진첩과 연결되지 않았습니다'));
   var fn=({bizno:parseBizReg,sme:parseSmeCert,reg:parseSiteReg})[kind];
-  return PuPhotoStore.loadFullDetail(String(ref.year),ref.id,ref.owner||undefined).then(function(got){
-    if(!got||!got.src) throw new Error((got&&got.why)||'원본을 찾지 못했습니다');
-    return _dataUrlToFile(got.src,kind+'.jpg');
-  }).then(function(file){ return imgCanvas(file,true); })
-    .then(function(cv){ return ocrCanvases([cv],function(){}); })
-    .then(function(txt){ return {read:rvPickRead(kind,fn(txt)),src:ref.id}; });
+  return rvAlbumRead(ref,kind).then(function(have){
+    var need=RV_NEED[kind]||[];
+    if(have&&need.length&&need.every(function(k){ return have[k]; })) return {read:have,src:ref.id,via:'album'};     // 이미 읽어 둔 값으로 충분 — 다시 OCR 하지 않는다
+    return PuPhotoStore.loadFullDetail(String(ref.year),ref.id,ref.owner||undefined).then(function(got){
+      if(!got||!got.src) throw new Error((got&&got.why)||'원본을 찾지 못했습니다');
+      return _dataUrlToFile(got.src,kind+'.jpg');
+    }).then(function(file){ return imgCanvas(file,true); })
+      .then(function(cv){ return ocrCanvases([cv],function(){}); })
+      .then(function(txt){
+        var got=Object.assign({},fn(txt)||{},have||{});                       // 겹치면 사진첩 값이 이긴다(OCR 은 글자를 빠뜨린다)
+        return {read:rvPickRead(kind,got),src:ref.id,via:have?'album+ocr':'ocr'};
+      });
+  });
+}
+
+/* 사진첩에 이미 «읽어 둔 값»(read.fields)을 먼저 쓴다 — 2026-11-01 실서류 시험: 같은 장을 OCR 로 다시 읽으면
+   상호·소재지를 자주 놓치고 대표자 글자가 빠졌다. 사진첩 쪽 값이 더 낫고 한 장 4~9초도 아낀다.
+   등기부(reg)는 사진첩에 읽어 둔 칸이 없어 OCR 그대로. 목록은 «일괄 읽기 한 판» 동안만 들고 있는다. */
+var RV_ALBUM_KIND={bizno:'bizreg',sme:'sme'};
+var RV_NEED={bizno:['biz_no','name'],sme:['sme_cert','sme_to'],reg:[]};
+var _rvAlbum={};
+function _rvDate(v){ var m=String(v==null?'':v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2):''; }
+function rvFromFields(kind,f){
+  f=f||{}; var t=function(v){ return v==null?'':String(v).trim(); };
+  if(kind==='bizno') return rvPickRead('bizno',{biz_no:t(f.bizno),name:t(f.company),ceo:t(f.ceo),address:t(f.address)});
+  if(kind==='sme') return rvPickRead('sme',{sme_cert:t(f.smeType),sme_from:_rvDate(f.issueDate),sme_to:_rvDate(f.expiry),name:t(f.company)});
+  return null;
+}
+function rvAlbumItems(year,owner){
+  var k=year+'/'+(owner||'');
+  if(!_rvAlbum[k]){
+    var p=(_isBoss()&&PuPhotoStore.listYearAll)?PuPhotoStore.listYearAll(String(year)).catch(function(){ return PuPhotoStore.listYear(String(year),owner||undefined); })
+                                               :PuPhotoStore.listYear(String(year),owner||undefined);
+    _rvAlbum[k]=p.catch(function(e){ delete _rvAlbum[k]; throw e; });
+  }
+  return _rvAlbum[k];
+}
+function rvAlbumRead(ref,kind){
+  var want=RV_ALBUM_KIND[kind]; if(!want) return Promise.resolve(null);
+  return rvAlbumItems(ref.year,ref.owner).then(function(items){
+    var m=(items||{})[ref.id], rd=m&&m.read;
+    return (rd&&rd.kind===want&&rd.fields)?rvFromFields(kind,rd.fields):null;
+  }).catch(function(){ return null; });                                       // 목록을 못 읽으면 OCR 로 간다
 }
 function _rvPath(fid,yr,sid,kind){ return NS+'/subsidy_chk/'+fid+'/'+yr+'/review/site/'+sid+(kind?'/'+kind:''); }
 function _rvLocal(fid,yr,sid,kind,rec){
@@ -17331,7 +17368,8 @@ function _rvLocal(fid,yr,sid,kind,rec){
   if(rec) r.site[sid][kind]=rec; else delete r.site[sid][kind];
 }
 function rvSaveRead(fid,yr,sid,kind,res,err){
-  var rec={src:res&&res.src||((_subScanOf(sid,kind)||{}).id||''),at:ymd(),by:(S.user||''),ocr:true};
+  var rec={src:res&&res.src||((_subScanOf(sid,kind)||{}).id||''),at:ymd(),by:(S.user||''),ocr:!(res&&res.via==='album')};
+  if(res&&res.via) rec.via=res.via;
   if(res&&res.read) rec.read=res.read; else rec.fail=err?('읽기 실패: '+((err&&err.message)||err)).slice(0,80):'글자는 읽었지만 항목을 못 찾았습니다';
   return fbDb.ref(_rvPath(fid,yr,sid,kind)).set(rec).then(function(){ _rvLocal(fid,yr,sid,kind,rec); });
 }
@@ -17339,7 +17377,7 @@ function rvSaveRead(fid,yr,sid,kind,res,err){
 function rvReadCells(cells){
   if(_rvBusy){ toast('이미 읽는 중입니다','warn'); return; }
   if(!cells.length){ toast('읽을 서류가 없습니다 — 원본이 이어진 칸만 읽습니다','warn'); return; }
-  var fid=S.fundId, yr=S.year, i=0, bad=0; _rvBusy=true; S._rvRun={key:fid+'/'+yr,n:0,total:cells.length};
+  var fid=S.fundId, yr=S.year, i=0, bad=0; _rvBusy=true; _rvAlbum={}; S._rvRun={key:fid+'/'+yr,n:0,total:cells.length};
   var done=function(){
     _rvBusy=false; S._rvRun=null; _rvRefresh();
     if(S.fundId===fid&&S.year===yr) toast(cells.length+'장을 읽었습니다'+(bad?' — 못 읽은 것 '+bad+'장':'')+' · 결과를 확인하고 «맞음»을 눌러 주세요','warn');
@@ -23925,7 +23963,7 @@ var HELP={
  'sub.docs':{t:'제출서류 관리',h:'<p>공동기금 지원 신청 제출서류는 <b>11종</b>입니다(사내기금은 14종).</p>'
    +'<p>이 중 <b>중소기업확인서·법인등기부등본·사업자등록증은 참여사마다 각 1부</b>라, 32개사면 96장이 됩니다. 그래서 아래 격자에서 사업장별로 따로 체크합니다.</p>'
    +'<p>[📄 서식] 버튼이 있는 것은 이 시스템이 만들어 줍니다. [📋 미제출 명단]으로 담당자 연락처까지 복사해 독촉할 수 있습니다.</p>'},
- 'sub.review':{t:'참여사 서류 검토 — 무엇을 맞춰 보나',h:'<p>원본이 사진첩에 이어진 서류를 <b>글자로 읽어</b> 우리 사업장 정보·신청일과 맞춰 봅니다. 기계는 <b>후보만</b> 걸러 주고, <b>«맞음»은 사람이 원본을 보고</b> 눌러야 확인함이 됩니다.</p>'
+ 'sub.review':{t:'참여사 서류 검토 — 무엇을 맞춰 보나',h:'<p>원본이 사진첩에 이어진 서류를 읽어 우리 사업장 정보·신청일과 맞춰 봅니다. 사진첩에 <b>이미 읽어 둔 값</b>이 있으면 그것을 먼저 쓰고, 없을 때만 글자로 다시 읽습니다. 기계는 <b>후보만</b> 걸러 주고, <b>«맞음»은 사람이 원본을 보고</b> 눌러야 확인함이 됩니다.</p>'
   +'<table><thead><tr><th>서류</th><th>맞춰 보는 것</th></tr></thead><tbody>'
   +'<tr><td>사업자등록증</td><td>사업자번호·상호·대표자·소재지</td></tr>'
   +'<tr><td>중소기업확인서</td><td>기업규모(해당 없음·중견은 다름) · <b>유효기간이 신청일을 덮는지</b> · 상호</td></tr>'
