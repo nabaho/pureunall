@@ -1005,6 +1005,11 @@ body.portal-mode #moreFab{display:flex;}
   border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;white-space:nowrap;}
 #sgPushBtn.on{border-color:#bbf7d0;background:#f0fdf4;color:#166534;}
 #sgPushBtn:disabled{opacity:.55;cursor:default;}
+/* 🔔 테스트 — 등록된 기기(폰·PC)로 시험 알림을 보낸다. 관리자에게만 보인다(대표 지시 2026-11-01 「둘다」) */
+#sgPushTestBtn{display:none;margin-right:10px;cursor:pointer;font-family:inherit;
+  font-size:.72rem;font-weight:700;padding:5px 11px;border-radius:20px;
+  border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;white-space:nowrap;}
+#sgPushTestBtn:disabled{opacity:.55;cursor:default;}
 #sgModal .bd{padding:16px 18px;overflow-y:auto;}
 #sgModal label{font-size:.76rem;font-weight:700;color:#475569;display:block;margin:12px 0 5px;}
 #sgModal label:first-child{margin-top:0;}
@@ -1615,6 +1620,7 @@ body.portal-mode #moreFab{display:flex;}
     <div class="hd">
       <b id="sgTitle">💬 건의함</b>
       <button id="sgPushBtn" type="button" title="이 기기(폰)로 알림을 받습니다 — 내 담당 메일이 오면 알려 드립니다(관리자는 새 건의도 함께).">🔔 폰 알림</button>
+      <button id="sgPushTestBtn" type="button" title="이 계정에 등록된 모든 기기(폰·PC)로 시험 알림을 보냅니다 — 폰에 안 뜨면 폰 크롬의 알림 설정을 확인하세요.">🔔 테스트</button>
       <button class="x" id="sgClose" type="button" aria-label="건의함 닫기">✕</button>
     </div>
     <div class="bd" id="sgBody"></div>
@@ -5239,9 +5245,16 @@ body.portal-mode #moreFab{display:flex;}
     b.disabled = (state === 'busy' || state === 'na');
     b.textContent = text;
   }
+  /* [🔔 테스트] 는 관리자에게만 보인다 — «등록 단추»(pushRefresh)가 아니라 이 줄만 가린다.
+     ⚠ pushRefresh 안에 관리자 가림막을 넣지 말 것: 직원도 제 기기를 등록해야 담당 메일 알림이 간다(push-open-to-staff 검사). */
+  function pushTestRefresh(){
+    var tb = $('sgPushTestBtn'); if(!tb) return;
+    tb.style.display = (SG.uid && sgIsAdmin()) ? 'inline-block' : 'none';
+  }
   // 건의함을 열 때마다 버튼 상태를 다시 그린다 (관리자에게만 보인다)
   function pushRefresh(){
     var b = $('sgPushBtn'); if(!b) return;
+    pushTestRefresh();
     /* ⚠★ 2026-10-07 — 여기 «관리자만»이 있었다. 그런데 2026-10-05 에 「📬 내 담당 메일 →
        그 담당자 폰 알림」이 들어오면서, 직원도 제 기기를 등록해야 알림이 간다.
        등록할 길이 관리자에게만 있어서 그 기능은 **한 번도 울릴 수 없었다**(등록 0대).
@@ -5312,6 +5325,33 @@ body.portal-mode #moreFab{display:flex;}
         pushRefresh();
         alert((err && err.message) ? err.message : '알림을 켜지 못했습니다.');
       });
+  }
+  /* 🔔 테스트 (대표 지시 2026-11-01) — pucards/config/pushTest/{내 uid} 에 요청(req)을 쓰면 서버 함수(pushSelfTest)가
+     내 등록 기기 «모두»로 시험 알림을 보내고 결과를 같은 자리 done 에 적는다. 새 규칙이 없다(pucards/config 는 이미 열려 있다).
+     ⚠ 15초 안에 답이 없으면 「함수가 안 올라갔거나 느리다」고 말한다 — 조용히 멈추면 「안 된다」로 보인다. */
+  function pushSelfTest(){
+    var b = $('sgPushTestBtn'); if(!b || !SG.uid) return;
+    var ref = db.ref('pucards/config/pushTest/' + SG.uid), req = Date.now(), watcher = null, timer = null;
+    function finish(msg){
+      clearTimeout(timer); if(watcher) ref.off('value', watcher);
+      b.disabled = false; b.textContent = '🔔 테스트'; alert(msg);
+    }
+    b.disabled = true; b.textContent = '보내는 중…';
+    watcher = function(snap){
+      var v = snap.val() || {}, d = v.done;
+      if(!d || Number(d.req) !== req) return;
+      if(d.error) return finish('못 보냈습니다 — ' + d.error);
+      if(d.limited) return finish('방금 보냈습니다 — 15초 뒤에 다시 눌러 주세요.');
+      if(!d.targets) return finish('등록된 기기가 없습니다.\n\n폰에서 건의함을 열어 「🔔 폰 알림 받기」를 눌러 켜 주세요.');
+      if(!d.sent) return finish('알림을 보내지 못했습니다(' + d.failed + '대 실패).\n\n폰에서 「🔔 폰 알림」을 껐다 다시 켜 보세요.');
+      finish('✅ ' + d.sent + '대로 보냈습니다' + (d.failed ? ' (' + d.failed + '대는 실패)' : '') + '.\n\n'
+        + '이 PC와 폰에 곧 알림이 뜹니다. 폰에 안 뜨면 폰 크롬의 사이트 알림 설정과 절전 설정을 확인하세요.');
+    };
+    ref.on('value', watcher);
+    timer = setTimeout(function(){
+      finish('서버가 15초 안에 답하지 않았습니다.\n\n알림 함수(pushSelfTest)가 아직 안 올라갔거나 느린 것입니다. 잠시 뒤 다시 눌러 보세요.');
+    }, 15000);
+    ref.update({ req: req }).catch(function(e){ finish('요청을 쓰지 못했습니다: ' + ((e && e.message) || e)); });
   }
   function pushDisable(){
     var mine = pushMyToken();
@@ -6190,6 +6230,7 @@ body.portal-mode #moreFab{display:flex;}
   $('sgClose').addEventListener('click', sgCloseModal);
   $('sgModal').addEventListener('click', function(e){ if(e.target === $('sgModal')) sgCloseModal(); });
   $('sgFab').addEventListener('click', sgOpen);
+  $('sgPushTestBtn').addEventListener('click', pushSelfTest);
   $('sgPushBtn').addEventListener('click', function(){
     if($('sgPushBtn').className === 'on') pushDisable(); else pushEnable();
   });

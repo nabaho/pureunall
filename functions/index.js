@@ -560,6 +560,25 @@ exports.notifySuggestion = functions.database
     return null;
   });
 
+// ══════════ 건의함 폰 알림 덧붙이 둘 (2026-11-01 「둘다」) — 본문은 suggestion-push.js ══════════
+//  ① notifySuggestionWatch: 건의함 감시(예약 작업)가 suggestions_private/{id}/watchNotice 에 쓴 한 줄을
+//     관리자 폰으로 — 「수정안 준비됨 · 대표 결정 필요 · 사람 확인 필요 · 답변까지 끝남」.
+//  ② pushSelfTest: 건의함 머리 [🔔 테스트] — pucards/config/pushTest/{내 uid} 의 요청을 받아
+//     그 사람의 등록 기기로 시험 알림을 보내고 결과를 done 에 적는다.
+//  ⚠ 새 규칙·새 최상위 자리가 없다 — 함수만 올린다(`firebase deploy --only functions:notifySuggestionWatch,functions:pushSelfTest`).
+//  ⚠ 쓴 사람을 본다(관리자·관리 도구만) — 직원도 쓸 수 있는 자리라서, 안 보면 대표 폰에 아무 글자나 울린다.
+const SGP = require("./suggestion-push");
+exports.notifySuggestionWatch = functions.database
+  .ref("/suggestions_private/{id}/watchNotice/{nid}")
+  .onCreate((snap, context) => SGP.onWatchNotice(snap, context, {
+    db: getDatabase(), messaging: getMessaging(), catName: SG_CAT_NAME,
+  }));
+exports.pushSelfTest = functions.database
+  .ref("/pucards/config/pushTest/{uid}")
+  .onWrite((change, context) => SGP.onPushTest(change, context, {
+    db: getDatabase(), messaging: getMessaging(),
+  }));
+
 // ════════════════════════════════════════════════════════════════════════════
 // 기업정보함 자료 메일 보내기 — 다음메일(smtp.daum.net)로 대신 보낸다
 // ════════════════════════════════════════════════════════════════════════════
