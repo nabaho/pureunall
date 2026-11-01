@@ -1411,6 +1411,63 @@
     ins: t => () => E.insertText(t),
     color: c => () => E.setColor(c),
   };
+  // 셀 블록 모드 (표 안에서 F5): 방향키로 셀 이동, F5/F3 확장, F7 칸 · F8 줄 전체, M 합치기, S 나누기, Delete 내용 지우기, Esc/Enter 끝
+  const CB = {
+    on: false, expand: false, table: null, r0: 0, c0: 0, r1: 0, c1: 0,
+    rect() { return { r0: Math.min(this.r0, this.r1), r1: Math.max(this.r0, this.r1), c0: Math.min(this.c0, this.c1), c1: Math.max(this.c0, this.c1) }; },
+    cells() {
+      const g = E.table.grid(CB.table), q = CB.rect(), out = new Set();
+      for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) if (g[r] && g[r][c]) out.add(g[r][c]);
+      return Array.from(out);
+    },
+    paint() { document.querySelectorAll('td.cb-sel, th.cb-sel').forEach(x => x.classList.remove('cb-sel')); if (CB.on) CB.cells().forEach(x => x.classList.add('cb-sel')); },
+    start() {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      CB.table = td.closest('table'); E.table.grid(CB.table);
+      CB.on = true; CB.expand = false; CB.r0 = CB.r1 = td._r; CB.c0 = CB.c1 = td._c;
+      CB.paint(); toast('셀 블록 모드 — 방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Esc 끝');
+    },
+    end(toCell) {
+      const g = CB.on && E.table.grid(CB.table), td = g && g[CB.r0] && g[CB.r0][CB.c0];
+      CB.on = false; CB.paint();
+      if (toCell && td) E.caretAt(td.querySelector('p') || td);
+    },
+    merge() {
+      const g = E.table.grid(CB.table), q = CB.rect(), cs = CB.cells();
+      if (cs.length < 2) return toast('합칠 셀을 블록으로 잡으세요.', true);
+      if (cs.some(td => td._r < q.r0 || td._c < q.c0 || td._r + td.rowSpan - 1 > q.r1 || td._c + td.colSpan - 1 > q.c1)) return toast('블록 밖으로 걸친 셀이 있어 합칠 수 없습니다.', true);
+      const first = g[q.r0][q.c0];
+      CB.end(false);
+      E.checkpoint();
+      const empty = c => !c.textContent.replace(/​/g, '').trim() && !c.querySelector('img,table');
+      for (const td of cs) if (td !== first && !empty(td)) { if (empty(first)) first.innerHTML = ''; first.append(...td.childNodes); }
+      cs.forEach(td => { if (td !== first) td.remove(); });
+      first.rowSpan = q.r1 - q.r0 + 1; first.colSpan = q.c1 - q.c0 + 1;
+      E.afterEdit(); E.caretAt(first.querySelector('p') || first);
+    },
+    clear() { const cs = CB.cells(); CB.end(false); E.checkpoint(); cs.forEach(td => { td.innerHTML = '<p><br></p>'; }); E.afterEdit(); },
+    key(e) {
+      const g = E.table.grid(CB.table), R = g.length - 1, Cn = g[0].length - 1, k = e.key;
+      const done = () => { e.preventDefault(); e.stopImmediatePropagation(); return true; };
+      if (/^Arrow/.test(k) && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+        const dr = k === 'ArrowDown' ? 1 : k === 'ArrowUp' ? -1 : 0, dc = k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0, cl = (v, m) => Math.max(0, Math.min(m, v));
+        if (CB.expand) { CB.r1 = cl(CB.r1 + dr, R); CB.c1 = cl(CB.c1 + dc, Cn); }
+        else { CB.r0 = CB.r1 = cl(CB.r1 + dr, R); CB.c0 = CB.c1 = cl(CB.c1 + dc, Cn); }
+        CB.paint(); return done();
+      }
+      if (k === 'F5' || k === 'F3') { CB.expand = !CB.expand; toast(CB.expand ? '셀 확장 모드' : '셀 이동 모드'); return done(); }
+      if (k === 'F7') { CB.r0 = 0; CB.r1 = R; CB.expand = true; CB.paint(); return done(); }
+      if (k === 'F8') { CB.c0 = 0; CB.c1 = Cn; CB.expand = true; CB.paint(); return done(); }
+      if (k === 'Escape' || k === 'Enter') { CB.end(true); return done(); }
+      if (k === 'Delete' || (e.ctrlKey && (k === 'e' || k === 'E'))) { CB.clear(); return done(); }
+      if (!e.ctrlKey && !e.altKey && (k === 'm' || k === 'M')) { CB.merge(); return done(); }
+      if (!e.ctrlKey && !e.altKey && (k === 's' || k === 'S')) { CB.end(true); E.table.split(); return done(); }
+      if (!e.ctrlKey && !e.altKey && /^[cplCPL]$/.test(k)) { CB.end(true); C.cellDlg(); return done(); }
+      return false;
+    },
+  };
+  document.addEventListener('keydown', e => { if (CB.on && !e.isComposing && !['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) CB.key(e); }, true);
+  document.addEventListener('mousedown', () => { if (CB.on) CB.end(false); }, true);
   // [단축키(여러 개면 배열), 이름, 명령] — 도움말(F1)의 목록도 이 표로 만든다
   const SHORTCUTS = [
     ['파일', [
@@ -1463,7 +1520,7 @@
       ['F8', '맞춤법', C.toggleSpell], ['Alt+M', '메일 머지 만들기', C.mailMerge], ['F1', '단축키 일람', () => KB.help()], ['F10', '메뉴', KB.fileMenu], ['Shift+F10', '빠른 메뉴', KB.ctx], ['F11', '개체 선택', KB.nextShape],
     ]],
     ['표', [
-      ['F5', '현재 셀 선택', KB.cellSelect], ['Alt+Left', '셀 단위로 왼쪽 이동', () => KB.cellMove(0, -1)], ['Alt+Right', '셀 단위로 오른쪽 이동', () => KB.cellMove(0, 1)], ['Alt+Up', '셀 단위로 위로 이동', () => KB.cellMove(-1, 0)],
+      ['F5', '셀 블록 모드 (방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Delete 지우기 · Esc 끝)', () => CB.start()], ['Alt+Left', '셀 단위로 왼쪽 이동', () => KB.cellMove(0, -1)], ['Alt+Right', '셀 단위로 오른쪽 이동', () => KB.cellMove(0, 1)], ['Alt+Up', '셀 단위로 위로 이동', () => KB.cellMove(-1, 0)],
       ['Alt+Down', '셀 단위로 아래로 이동', () => KB.cellMove(1, 0)], ['Ctrl+N,A', '표 나누기', KB.tableSplit], ['Ctrl+N,Z', '표 붙이기', KB.tableJoin], ['Ctrl+Shift+H', '가로 합계', KB.calc('row', 'sum')], ['Ctrl+Shift+V', '세로 합계', KB.calc('col', 'sum')], ['Ctrl+Shift+J', '가로 평균', KB.calc('row', 'avg')], ['Ctrl+Shift+B', '세로 평균', KB.calc('col', 'avg')], ['Ctrl+Shift+K', '가로 곱', KB.calc('row', 'mul')], ['Ctrl+Shift+N', '세로 곱', KB.calc('col', 'mul')], ['Alt+Insert', '줄 추가하기', C.rowBelow], ['Alt+Delete', '줄 지우기', C.delRow],
     ]],
     ['그대로 쓰는 것(브라우저 기본)', [
@@ -1475,7 +1532,7 @@
     const body = h('div', { class: 'key-help' }, ...SHORTCUTS.flatMap(([sec, rows]) => [
       h('div', { class: 'kh-sec' }, sec),
       h('table', { class: 'info-table' }, ...rows.map(r => h('tr', {}, h('td', {}, (Array.isArray(r[0]) ? r[0] : [r[0]]).join('  /  ')), h('td', {}, r[1])))),
-    ]), h('div', { class: 'tp-note' }, '연결하지 못한 것: 조판 부호, 한자 입력, 상용구, 스크립트 매크로, 차례·색인, 책갈피·상호 참조, 셀 블록 모드 글쇠(블록 계산식 포함), 장평, 단·구역 나누기·감추기 — 이 편집기에 해당 기능이 없습니다. 브라우저가 가로채는 Ctrl+N·Ctrl+T·Ctrl+W·Ctrl+Q·Ctrl+Tab 은 «앱으로 설치(바로 가기 창)»해서 열어야 듣습니다.'));
+    ]), h('div', { class: 'tp-note' }, '연결하지 못한 것: 조판 부호, 한자 입력, 상용구, 스크립트 매크로, 차례·색인, 책갈피·상호 참조, 셀 블록 모드의 일부 글쇠(블록 계산식·줄/칸 크기), 장평, 단·구역 나누기·감추기 — 이 편집기에 해당 기능이 없습니다. 브라우저가 가로채는 Ctrl+N·Ctrl+T·Ctrl+W·Ctrl+Q·Ctrl+Tab 은 «앱으로 설치(바로 가기 창)»해서 열어야 듣습니다.'));
     UI.dialog({ title: '단축키 일람 (한/글 기준)', width: 560, body, buttons: [{ label: '닫기', cancel: true }] });
   };
   const KEYS = {}; // 이름 → 명령 (겹글쇠는 'Ctrl+N,T')

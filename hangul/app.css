@@ -440,3 +440,5 @@ body.drag-file::after { content: '여기에 놓으면 한글 문서를 엽니다
 .key-help { max-height: 65vh; overflow-y: auto; min-width: 0; }
 .kh-sec { margin: 12px 0 4px; font-weight: 700; color: var(--navy); }
 .key-help .info-table td:first-child { white-space: nowrap; font-family: Consolas, monospace; padding-right: 16px; }
+
+td.cb-sel, th.cb-sel { box-shadow: inset 0 0 0 9999px rgba(47, 111, 224, .28); }
