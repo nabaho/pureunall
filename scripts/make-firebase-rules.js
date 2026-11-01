@@ -1453,6 +1453,35 @@ rules.worker_secret = { $kind: { $rec: {
   }
 } } };
 
+/* ══ 직원 주민번호·계좌·예금주 금고(staff_secret) — 대표 승인 2026-11-01 (개인정보 2단계) ══
+   근로자명부(user_accounts)는 재무 권한자가 «한 덩어리»로 읽는다. 그 안의 칸 하나는 규칙이 못 막으므로
+   주민번호·계좌·예금주를 이 금고로 떼어 «대표(isAdmin)만» 읽고 쓰게 한다. 위임관리인·재무 권한자는 못 본다.
+   ★ 값은 브라우저가 잠가서(enc:v1, AES-GCM) 넣는다 — 규칙은 «잠겼는지»까지는 못 따진다(길이만 본다).
+   ★ _log 는 «새로 쓰기만» — 열람·저장·지우기 기록을 고치거나 지울 수 없다(고시 제8조 접속기록). 값은 기록에 안 넣는다.
+   ⚠ 위(금고 전체)에는 .write 를 두지 않는다 — 위에서 쓰기를 열면 아래 _log 의 «지울 수 없음»이 풀린다. */
+const SS_OWNER = `(${LOGIN}) && ${ADMIN}`;
+const ssText = (n) => `newData.isString() && newData.val().length <= ${n}`;
+rules.staff_secret = {
+  '.read': SS_OWNER,
+  $sid: {
+    '.validate': "$sid.matches(/^[A-Za-z0-9_-]{1,24}$/)",
+    rrn:     { '.write': SS_OWNER, '.validate': ssText(300) },
+    account: { '.write': SS_OWNER, '.validate': ssText(300) },
+    holder:  { '.write': SS_OWNER, '.validate': ssText(300) },
+    _log: { $id: {
+      '.write': `(${SS_OWNER}) && !data.exists() && newData.exists()`,
+      '.validate': "newData.hasChildren(['by','at','act','field'])",
+      by:     { '.validate': "newData.isString() && newData.val().length <= 24" },
+      byName: { '.validate': "newData.isString() && newData.val().length <= 40" },
+      at:     { '.validate': "newData.isNumber()" },
+      act:    { '.validate': "newData.val() === 'view' || newData.val() === 'save' || newData.val() === 'clear'" },
+      field:  { '.validate': "newData.val() === 'rrn' || newData.val() === 'account' || newData.val() === 'holder'" },
+      $other: { '.validate': false }
+    } },
+    $other: { '.validate': false }
+  }
+};
+
 /* ══ 취업규칙 관리 ═════════════════════════════════════════════════════ */
 const revWrite = `auth != null && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
 const origWrite = `auth != null && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;

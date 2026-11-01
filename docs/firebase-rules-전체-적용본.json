@@ -1910,6 +1910,51 @@
         }
       }
     },
+    "staff_secret": {
+      ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$sid": {
+        ".validate": "$sid.matches(/^[A-Za-z0-9_-]{1,24}$/)",
+        "rrn": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "account": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "holder": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "_log": {
+          "$id": {
+            ".write": "((auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && !data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['by','at','act','field'])",
+            "by": {
+              ".validate": "newData.isString() && newData.val().length <= 24"
+            },
+            "byName": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "act": {
+              ".validate": "newData.val() === 'view' || newData.val() === 'save' || newData.val() === 'clear'"
+            },
+            "field": {
+              ".validate": "newData.val() === 'rrn' || newData.val() === 'account' || newData.val() === 'holder'"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "rules_mgmt": {
       "wip": {
         "$uid": {
