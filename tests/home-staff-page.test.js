@@ -72,7 +72,7 @@ function 상자(옵) {
   };
   vm.createContext(ctx);
   vm.runInContext(부품글, ctx);
-  vm.runInContext(['직원명부딱지', '직원사이트딱지', '직원행들', '명부에만있는직원수', '직원목록Html',
+  vm.runInContext(['경력제안', '직원명부딱지', '직원사이트딱지', '직원행들', '명부에만있는직원수', '직원목록Html',
     '직원탭열기', '직원가져오기열기', '직원가져오기그리기', '직원가져오기넣기'].map(n => fnSource(n)).join('\n'), ctx);
   return { ctx, 한것 };
 }

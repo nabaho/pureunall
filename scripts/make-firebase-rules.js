@@ -1212,6 +1212,17 @@ rules.pu_mailseen = {
        서버(관리자 SDK)는 규칙을 지나지 않아 영향이 없다. */
 const 통째지우기막음 = { '.write': ADMIN, $part: { '.write': `${LOGIN} && (newData.exists() || ${ADMIN})` } };
 rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
+/* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
+     직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
+   ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.
+     쓰기 = 재직 직원이 «내 사번 칸»에만, 지우기·돌려보내기 = 총괄관리자. 10줄(0~9)까지만. */
+rules.homepage.careerInbox = {
+  '.write': ADMIN,
+  $sid: {
+    '.write': `${LOGIN} && root.child('uid_roles').child(auth.uid).child('sid').val() === $sid && newData.exists()`,
+    '.validate': "!newData.child('lines').child('10').exists()"
+  }
+};
 
 /* ══ 뉴스레터 (대표 지시 2026-09-02 「푸른내외관리에 뉴스레터관리를 넣고 매주 관리하고 싶다」) ══
    화면: pu-news.html · 판단: js/pu-news-core.js · 편지: js/pu-news-tpl.js

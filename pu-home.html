@@ -51,7 +51,7 @@
 <script src="js/pu-home-diff.js?v=10"></script>
 <script src="js/pu-home-fill.js?v=10"></script>
 <!-- 새 홈페이지를 «자료로» 그리는 부품. 명령줄(scripts/build-people.js)도 같은 것을 쓴다 -->
-<script src="js/pu-site-people.js?v=4"></script>
+<script src="js/pu-site-people.js?v=5"></script>
 <script src="js/pu-site-page.js?v=1"></script>
 <script src="js/pu-site-partner.js?v=3"></script>
 <style>
@@ -1579,8 +1579,11 @@ function loadAll() {
       e => ({ err: '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')' })),
     /* 새 사이트 지킴이 (2026-10-31) — 매달 자동 올리기 결과 · 매일 열쇠 점검. 못 읽으면 띠를 안 그릴 뿐이다 */
     db.ref('homepage/auto/newsite').once('value').then(s => s.val(), () => null),
-    db.ref('homepage/auto/keyCheck').once('value').then(s => s.val(), () => null)
-  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns, newsite, keyCheck]) => {
+    db.ref('homepage/auto/keyCheck').once('value').then(s => s.val(), () => null),
+    /* 직원이 「내 정보」에서 보낸 경력 제안 (2026-11-01) — 사번 → {lines, at, …}. 못 읽으면 제안이 안 보일 뿐이다 */
+    db.ref('homepage/careerInbox').once('value').then(s => s.val() || {}, () => ({}))
+  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns, newsite, keyCheck, careerInbox]) => {
+    App.careerInbox = careerInbox || {};
     App.autoRuns = (autoRuns && autoRuns.v) || null;
     App.autoErr = (autoRuns && autoRuns.err) || '';
     App.newsite = newsite;
@@ -2564,7 +2567,8 @@ function 직원행들() {
     .map(k => Object.assign({}, App.members[k], { key: k }))
     .sort(PuSitePeople.차례견주기)
     .map((m, i) => ({ key: m.key, name: m.name || '(이름 없음)', mkind: 'staff', _no: i + 1,
-                      desc: String(m.position1 || ''), 명부: 직원명부딱지(m), 사이트: 직원사이트딱지(m, 쪽직원) }));
+                      desc: String(m.position1 || ''), 명부: 직원명부딱지(m), 사이트: 직원사이트딱지(m, 쪽직원),
+                      제안: (경력제안(m) || { lines: [] }).lines.length }));
 }
 
 /* 명부에는 재직 직원인데 목록에 «이어진» 사람이 없는 수 — 알림 줄만 띄운다(저절로 넣지 않는다, 대표 결정 ④) */
@@ -2588,7 +2592,8 @@ function 직원목록Html() {
   let h = 줄.map(r => '<div class="r ' + (r.key === App.pick ? 'on' : '') + '" onclick="App.select(\'' + esc(r.key) + '\')">'
     + '<span class="num">' + r._no + '</span>'
     + '<div class="who"><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div>'
-    + '<div class="po" title="' + esc(r.desc) + '">' + esc(r.desc || '(직급 없음)') + '</div></div>'
+    + '<div class="po" title="' + esc(r.desc) + '">' + esc(r.desc || '(직급 없음)')
+    + (r.제안 ? ' · <b style="color:#854d0e">경력 제안 ' + r.제안 + '줄</b>' : '') + '</div></div>'
     + '<span class="tags"><span class="tc">' + 딱지(r.명부) + '</span><span class="tc">' + 딱지(r.사이트) + '</span></span>'
     + '</div>').join('');
   const 남은 = 명부에만있는직원수();
@@ -2728,6 +2733,50 @@ function 직원차례(d) {
 }
 window.직원차례 = 직원차례;
 
+/* ══ 직원 경력 제안 — 직원이 포털 「내 정보」에서 보내고, 여기서 대표가 받는다 (2026-11-01 「대표 확인 뒤」) ══
+   자리: homepage/careerInbox/{사번} = { lines, at, by, status?('돌려보냄'), why? }.
+   ⚠ 사번으로 잇는다(이름으로 안 맞춘다). 이 직원 자료에 사번이 없으면 제안을 보여 주지 않는다. */
+function 경력제안(rec) {
+  const sid = String((rec || {}).sid || '');
+  const x = sid ? (App.careerInbox || {})[sid] : null;
+  if (!x || x.status === '돌려보냄' || !Array.isArray(x.lines) || !x.lines.length) return null;
+  return x;
+}
+async function 경력제안받기() {
+  const d = App.draft;
+  if (!d || d.kind !== 'member') return;
+  const sid = String((App.members[d.key] || {}).sid || '');
+  const 제안 = 경력제안(App.members[d.key]);
+  if (!제안) return;
+  d.careers = 제안.lines.map(x => String(x || '').trim()).filter(Boolean);
+  App.dirty = true;
+  if (!(await saveDraft(true))) return;          // 저장이 안 됐으면 제안은 그대로 둔다
+  try {
+    await db.ref('homepage/careerInbox/' + sid).remove();
+    delete App.careerInbox[sid];
+  } catch (e) { console.warn('[경력 제안 지우기]', e && e.code); }
+  App.render();
+  toast('받았습니다 — 새 사이트에는 「새 사이트에 올리기」나 매달 1일에 올라갑니다.');
+}
+window.경력제안받기 = 경력제안받기;
+async function 경력제안돌려보내기() {
+  const d = App.draft;
+  if (!d || d.kind !== 'member') return;
+  const sid = String((App.members[d.key] || {}).sid || '');
+  if (!경력제안(App.members[d.key])) return;
+  const why = await askText('돌려보내는 까닭', '직원의 「내 정보」에 그대로 보입니다. 비워 두어도 됩니다.',
+    { rows: 2, hint: '예: 회사 이름을 정식 명칭으로 고쳐 주세요', ok: '돌려보내기' });
+  if (why === null) return;
+  try {
+    await db.ref('homepage/careerInbox/' + sid).update({ status: '돌려보냄', why: String(why).trim(),
+      backAt: Date.now(), backBy: currentUserName() });
+    App.careerInbox[sid] = Object.assign({}, App.careerInbox[sid], { status: '돌려보냄' });
+    App.render();
+    toast('돌려보냈습니다.');
+  } catch (e) { await say('돌려보내지 못했습니다', esc((e && e.code) || String(e))); }
+}
+window.경력제안돌려보내기 = 경력제안돌려보내기;
+
 /* 직원 편집칸의 「⤓ 경력관리에서 가져오기」 — 노무사 칸과 «같은 일·같은 이름»이다(openPull).
    ⚠ 단추를 openPull 로 바로 걸지 않는 까닭: 가져오는 단추는 화면 원본에 «하나»만 두는 규칙
      (tests/home-career-pull ⓑ)이 노무사 칸을 지킨다. 직원 칸은 이 손잡이를 거쳐 같은 길로 간다. */
@@ -2761,10 +2810,21 @@ function 직원편집(d) {
   if (kept) {
     h += '<div class="sub" style="margin-top:6px">퇴사해도 남김 — ' + esc(String(kept.why || '')) + '</div>';
   }
+  /* ── 직원이 「내 정보」에서 보낸 경력 제안 (대표 결정 2026-11-01 「대표 확인 뒤」) ──
+       받기를 누르기 전에는 우리 목록도 새 사이트도 안 바뀐다. */
+  const 제안 = 경력제안(rec);
+  if (제안) {
+    h += '<div class="consent" style="margin-top:12px"><b>직원이 보낸 경력 ' + 제안.lines.length + '줄</b>'
+      + '<span class="sub"> · ' + esc(stamp(제안.at)) + '</span>'
+      + '<ol style="margin:6px 0 6px;padding-left:20px;font-size:13px">'
+      + 제안.lines.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>'
+      + '<div style="display:flex;gap:6px"><button class="btn pri" onclick="경력제안받기()">받기 (아래 경력을 이것으로 바꿈)</button>'
+      + '<button class="btn" onclick="경력제안돌려보내기()">돌려보내기</button></div></div>';
+  }
   /* ── 경력 (대표 승인 2026-11-01 직원 소개 2단계, 사진 제외) ──
      노무사 경력 칸과 같은 손잡이(現/前 딱지·▲▼·✕·경력관리에서 가져오기)를 쓴다. */
   h += '<div class="fld" style="margin-top:12px"><div class="fldbar">'
-    + '<label style="margin:0">경력 — ' + d.careers.length + '줄</label>'
+    + '<label style="margin:0">경력 — ' + d.careers.length + '줄 <span class="sub">(맨 위가 최근 · 새 사이트엔 ' + PuSitePeople.경력한도 + '줄까지)</span></label>'
     + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="직원경력가져오기()"'
     + ' title="경력관리에 담긴 위촉장·학력·자격증에서 골라 넣습니다">⤓ 경력관리에서 가져오기</button></div>'
     + '<div class="car" id="careerBox">'

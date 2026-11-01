@@ -1671,6 +1671,13 @@
       ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "$part": {
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)"
+      },
+      "careerInbox": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "$sid": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && root.child('uid_roles').child(auth.uid).child('sid').val() === $sid && newData.exists()",
+          ".validate": "!newData.child('lines').child('10').exists()"
+        }
       }
     },
     "newsletter": {
