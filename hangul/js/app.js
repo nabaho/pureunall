@@ -1348,6 +1348,44 @@
       if (p) E.caretAt(p.querySelector('p') || p);
     },
     styleNo: i => () => { const n = E.styleList()[i]; if (n) E.applyStyle(n); },
+    // 쉬운 계산식: 현재 셀의 왼쪽(가로) 또는 위쪽(세로) 숫자 칸을 계산해 현재 셀에 씀
+    calc: (dir, op) => () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const tr = td.parentElement, t = td.closest('table');
+      const cells = dir === 'row' ? Array.from(tr.cells).slice(0, td.cellIndex) : Array.from(t.rows).slice(0, tr.rowIndex).map(r => r.cells[td.cellIndex]).filter(Boolean);
+      const v = cells.map(c => { const x = c.textContent.replace(/[​,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(x) ? parseFloat(x) : null; }).filter(x => x !== null);
+      if (!v.length) return toast('계산할 숫자 칸이 없습니다.', true);
+      const sum = v.reduce((a, b) => a + b, 0);
+      const res = op === 'sum' ? sum : op === 'avg' ? sum / v.length : v.reduce((a, b) => a * b, 1);
+      E.checkpoint();
+      (td.querySelector('p') || td).textContent = String(Math.round(res * 100) / 100);
+      E.afterEdit();
+    },
+    // 표 나누기(현재 줄 아래부터 새 표) · 표 붙이기(다음 표를 이어 붙임)
+    tableSplit: () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const tr = td.parentElement, t = td.closest('table'), body = tr.parentElement;
+      if (!tr.nextElementSibling) return toast('마지막 줄에서는 나눌 수 없습니다.', true);
+      const rows = Array.from(t.rows), at = tr.rowIndex;
+      if (rows.slice(0, at + 1).some((r, i) => Array.from(r.cells).some(c => i + c.rowSpan > at + 1))) return toast('합친 칸이 걸쳐 있어 여기서는 나눌 수 없습니다.', true);
+      E.checkpoint();
+      const nt = t.cloneNode(false);
+      Array.from(t.children).filter(c => c.tagName === 'COLGROUP').forEach(c => nt.append(c.cloneNode(true)));
+      const nb = body.cloneNode(false); nt.append(nb);
+      rows.slice(at + 1).forEach(r => nb.append(r));
+      t.after(nt);
+      E.afterEdit();
+    },
+    tableJoin: () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const t = td.closest('table'), nx = t.nextElementSibling;
+      if (!nx || nx.tagName !== 'TABLE') return toast('바로 아래에 붙일 표가 없습니다.', true);
+      E.checkpoint();
+      const body = t.tBodies[t.tBodies.length - 1];
+      Array.from(nx.rows).forEach(r => body.append(r));
+      nx.remove();
+      E.afterEdit();
+    },
     // 표
     cellMove: (dr, dc) => {
       const td = E.currentCell(); if (!td) return;
@@ -1426,7 +1464,7 @@
     ]],
     ['표', [
       ['F5', '현재 셀 선택', KB.cellSelect], ['Alt+Left', '셀 단위로 왼쪽 이동', () => KB.cellMove(0, -1)], ['Alt+Right', '셀 단위로 오른쪽 이동', () => KB.cellMove(0, 1)], ['Alt+Up', '셀 단위로 위로 이동', () => KB.cellMove(-1, 0)],
-      ['Alt+Down', '셀 단위로 아래로 이동', () => KB.cellMove(1, 0)], ['Alt+Insert', '줄 추가하기', C.rowBelow], ['Alt+Delete', '줄 지우기', C.delRow],
+      ['Alt+Down', '셀 단위로 아래로 이동', () => KB.cellMove(1, 0)], ['Ctrl+N,A', '표 나누기', KB.tableSplit], ['Ctrl+N,Z', '표 붙이기', KB.tableJoin], ['Ctrl+Shift+H', '가로 합계', KB.calc('row', 'sum')], ['Ctrl+Shift+V', '세로 합계', KB.calc('col', 'sum')], ['Ctrl+Shift+J', '가로 평균', KB.calc('row', 'avg')], ['Ctrl+Shift+B', '세로 평균', KB.calc('col', 'avg')], ['Ctrl+Shift+K', '가로 곱', KB.calc('row', 'mul')], ['Ctrl+Shift+N', '세로 곱', KB.calc('col', 'mul')], ['Alt+Insert', '줄 추가하기', C.rowBelow], ['Alt+Delete', '줄 지우기', C.delRow],
     ]],
     ['그대로 쓰는 것(브라우저 기본)', [
       ['Ctrl+X / Shift+Delete', '오려 두기'], ['Ctrl+C / Ctrl+Insert', '복사하기'], ['Ctrl+V / Shift+Insert', '붙이기'], ['방향키 · Home · End · PageUp · PageDown', '커서 이동'], ['Shift+방향키', '블록 설정'], ['Tab · Shift+Tab', '표 안 셀 이동'],
@@ -1437,7 +1475,7 @@
     const body = h('div', { class: 'key-help' }, ...SHORTCUTS.flatMap(([sec, rows]) => [
       h('div', { class: 'kh-sec' }, sec),
       h('table', { class: 'info-table' }, ...rows.map(r => h('tr', {}, h('td', {}, (Array.isArray(r[0]) ? r[0] : [r[0]]).join('  /  ')), h('td', {}, r[1])))),
-    ]), h('div', { class: 'tp-note' }, '연결하지 못한 것: 조판 부호, 한자 입력, 상용구, 스크립트 매크로, 차례·색인, 책갈피·상호 참조, 셀 블록 모드 글쇠, 글자 스타일(Ctrl+숫자), 장평, 빠른 내어쓰기 — 이 편집기에 해당 기능이 없습니다. 브라우저가 가로채는 Ctrl+N·Ctrl+T·Ctrl+W·Ctrl+Q·Ctrl+Tab 은 «앱으로 설치(바로 가기 창)»해서 열어야 듣습니다.'));
+    ]), h('div', { class: 'tp-note' }, '연결하지 못한 것: 조판 부호, 한자 입력, 상용구, 스크립트 매크로, 차례·색인, 책갈피·상호 참조, 셀 블록 모드 글쇠(블록 계산식 포함), 장평, 단·구역 나누기·감추기 — 이 편집기에 해당 기능이 없습니다. 브라우저가 가로채는 Ctrl+N·Ctrl+T·Ctrl+W·Ctrl+Q·Ctrl+Tab 은 «앱으로 설치(바로 가기 창)»해서 열어야 듣습니다.'));
     UI.dialog({ title: '단축키 일람 (한/글 기준)', width: 560, body, buttons: [{ label: '닫기', cancel: true }] });
   };
   const KEYS = {}; // 이름 → 명령 (겹글쇠는 'Ctrl+N,T')
