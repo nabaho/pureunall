@@ -35,7 +35,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=1"></script>
+<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=2"></script>
 <!-- 다음(Daum) 우편번호 서비스 — 무료, 가입 불필요. 푸른이알피(pu-erp.html)에서 이미 쓰는 것과 같다 -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
@@ -1620,10 +1620,9 @@ function libImport(){
   };
   inp.click();
 }
-/* ══ 💬 고용노동부 유권해석 · 근로복지공단 지침 · 법령 챗봇 및 지식베이스 (fund_kb.js 연동) ══ */
+/* ══ 💬 고용노동부 유권해석 · 근로복지공단 지침 · 법령 RAG 챗봇 및 지식베이스 (fund_kb.js 연동) ══ */
 function _kbList(){ return (typeof window!=='undefined'&&window.FUND_KB)||[]; }
 function _kbCats(){ return ((typeof window!=='undefined'&&window.FUND_KB_CATS)||[]).filter(function(c){ return c[0]!=='all'; }); }
-function _kbQuick(){ return (typeof window!=='undefined'&&window.FUND_KB_QUICK)||[]; }
 function _kbCatLbl(catId){
   var c=((typeof window!=='undefined'&&window.FUND_KB_CATS)||[]).filter(function(x){ return x[0]===catId; })[0];
   return c?c[1]:(catId||'기타');
@@ -1634,93 +1633,69 @@ function _kbFind(id){
 function _kbChipHtml(id){
   var it=_kbFind(id);
   if(!it) return '';
-  return '<button onclick="openFundKbItem(\''+esc(it.id)+'\')" style="padding:3px 8px;font-size:11.5px;border:1px solid var(--acc);background:var(--acc-soft);color:var(--acc2);border-radius:999px;cursor:pointer;font-weight:600" title="'+esc((it.law||'')+' · '+(it.docNo||''))+'">📎 ['+esc(it.docNo||it.id)+'] '+esc(it.title)+'</button>';
+  return '<button onclick="openFundKbItem(\''+esc(it.id)+'\')" style="padding:2px 8px;font-size:11px;border:1px solid var(--line);background:#f8fafc;color:var(--acc2);border-radius:999px;cursor:pointer;font-weight:600" title="클릭하면 유권해석·지침 원문 전체를 봅니다">📎 원문 보기: '+esc(it.docNo||it.id)+'</button>';
 }
-function _kbTurnHtml(turn,idx){
-  var cites=(turn.citations||[]).map(_kbChipHtml).filter(Boolean).join(' ');
-  var items=(turn.items||[]).map(function(it){
-    var pts=(it.points||[]).map(function(p){ return '<li style="margin:2px 0">'+esc(p)+'</li>'; }).join('');
-    return '<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:6px">'
-      +'<div class="row" style="gap:6px;margin-bottom:4px"><span class="chip" style="font-size:10.5px">'+esc(_kbCatLbl(it.cat))+'</span>'
-      +'<b style="font-size:12.5px;color:var(--acc2)">'+esc(it.title)+'</b>'
-      +'<span class="muted" style="font-size:11px">'+esc(it.docNo||'')+'</span><span style="flex:1"></span>'
-      +'<button onclick="openFundKbItem(\''+esc(it.id)+'\')" style="padding:2px 8px;font-size:11px">📖 전문 보기</button></div>'
-      +'<div style="font-size:11.5px;color:var(--sub);margin-bottom:3px"><b>근거:</b> '+esc(it.law||'')+' · '+esc(it.source||'')+'</div>'
-      +'<div style="font-size:12px;line-height:1.55;white-space:pre-line">'+esc(it.a||'')+'</div>'
-      +(pts?'<ul style="margin:5px 0 0;padding-left:18px;font-size:11.5px;color:var(--sub)">'+pts+'</ul>':'')
-      +'</div>';
-  }).join('');
-  return '<div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#f8fafc;margin-bottom:10px">'
-    +'<div class="row" style="margin-bottom:8px"><span class="chip" style="background:var(--acc);color:#fff;font-weight:700">질문</span>'
-    +'<b style="font-size:13.5px">'+esc(turn.q)+'</b><span style="flex:1"></span>'
-    +(turn.aiText?'<span class="chip ok" style="font-size:10.5px">🤖 AI 종합답변</span>'
-      :'<button onclick="askFundBotAi('+idx+')" style="padding:2px 8px;font-size:11px" title="Claude AI 프록시로 위 근거 문서를 종합해 맞춤형 심층 답변을 받습니다">🤖 AI 심층답변</button>')
-    +'</div>'
-    +(turn.aiLoading?'<div style="padding:8px 0">'+loadingHTML('근거 법령·유권해석을 바탕으로 AI 심층답변을 작성하는 중…')+'</div>':'')
-    +(turn.aiErr?'<div class="msg warn" style="display:block;margin:6px 0;font-size:12px">⚠ '+esc(turn.aiErr)+' (아래 법령·유권해석 원문 판시를 확인하세요)</div>':'')
-    +(turn.aiText
-      ? '<div style="padding:10px 12px;border:1px solid var(--acc);border-radius:8px;background:#fff;font-size:13px;line-height:1.65;white-space:pre-line;margin-bottom:8px">'+esc(turn.aiText)+'</div>'
-      : '<div style="padding:9px 11px;border-left:3px solid var(--acc);background:#fff;border-radius:6px;font-size:12.5px;line-height:1.6;white-space:pre-line;margin-bottom:6px">'+esc(turn.answer||'')+'</div>')
-    +(cites?'<div class="row" style="gap:5px;flex-wrap:wrap;margin:6px 0"><span class="muted" style="font-size:11px">인용 근거:</span>'+cites+'</div>':'')
-    +(items?'<details style="margin-top:6px"'+(turn.aiText?'':' open')+'><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--sub)">📚 검색된 유권해석·지침 원문 ('+(turn.items||[]).length+'건 펼치기/접기)</summary>'+items+'</details>':'')
-    +'</div>';
+function _kbTurnHtml(turn){
+  var cites=(turn.citations||[]).slice(0,2).map(_kbChipHtml).filter(Boolean).join(' ');
+  var ans=turn.aiText||turn.answer||'';
+  return '<div style="margin-bottom:12px">'
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
+    +'<div style="max-width:84%;padding:8px 12px;border-radius:12px 12px 2px 12px;background:var(--acc);color:#fff;font-size:13px;line-height:1.5;white-space:pre-line">'+esc(turn.q)+'</div></div>'
+    +'<div style="display:flex;justify-content:flex-start">'
+    +'<div style="max-width:92%;padding:10px 12px;border-radius:12px 12px 12px 2px;background:#fff;border:1px solid var(--line);font-size:12.5px;line-height:1.65;color:var(--ink)">'
+    +'<div style="white-space:pre-line">'+esc(ans)+'</div>'
+    +(turn.aiLoading?'<div class="muted" style="font-size:11px;margin-top:4px">🤖 AI 답변 다듬는 중…</div>':'')
+    +(cites?'<div class="row" style="gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)">'+cites+'</div>':'')
+    +'</div></div></div>';
 }
-function askFundBot(qOpt,useAi){
-  var inp=$('kb-modal-inp')||$('kb-ask-inp');
+function askFundBot(qOpt,fromPage){
+  var inp=fromPage?($('kb-ask-inp')||$('kb-modal-inp')):($('kb-modal-inp')||$('kb-ask-inp'));
   var q=String(qOpt!=null?qOpt:(inp?inp.value:'')).trim();
-  if(!q){ toast('질문이나 검색어를 입력해 주세요','warn'); return; }
+  if(!q){ toast('질문을 입력해 주세요','warn'); return; }
   if(inp&&qOpt==null) inp.value='';
   var kb=_kbList();
-  var picked=(window.PuFundAsk&&PuFundAsk.pick)?PuFundAsk.pick(kb,q,{max:4}):[];
+  var picked=(window.PuFundAsk&&PuFundAsk.pick)?PuFundAsk.pick(kb,q,{max:2}):[];
   var loc=(window.PuFundAsk&&PuFundAsk.localAnswer)?PuFundAsk.localAnswer(picked,q):{answer:'',cites:[],none:true};
   S.kbChatLog=S.kbChatLog||[];
-  var turn={q:q, picked:picked, answer:loc.answer, citations:loc.cites||[], items:picked, aiText:'', aiLoading:false, aiErr:''};
-  S.kbChatLog.unshift(turn);
-  if(S.kbChatLog.length>15) S.kbChatLog.length=15;
-  _refreshKbChatViews();
-  if(useAi) askFundBotAi(0);
+  var turn={q:q, picked:picked, answer:loc.answer, citations:loc.cites||[], aiText:'', aiLoading:false};
+  S.kbChatLog.push(turn);
+  if(S.kbChatLog.length>30) S.kbChatLog.shift();
+  var idx=S.kbChatLog.length-1;
+  _refreshKbChatViews(true);
+  if(aiProxyUrl()&&picked.length) askFundBotAi(idx);
 }
 function askFundBotAi(idx){
   S.kbChatLog=S.kbChatLog||[];
-  var turn=S.kbChatLog[idx]; if(!turn) return;
-  if(!aiProxyUrl()){
-    turn.aiErr='AI 프록시 주소가 설정되지 않아 즉시 판시 모드로 안내합니다. (포털 [⚙ 설정]에서 AI 프록시 설정 시 AI 종합답변 가능)';
-    _refreshKbChatViews();
-    return;
-  }
-  turn.aiLoading=true; turn.aiErr='';
-  _refreshKbChatViews();
+  var turn=S.kbChatLog[idx]; if(!turn||!aiProxyUrl()) return;
+  turn.aiLoading=true;
+  _refreshKbChatViews(false);
   var pr=PuFundAsk.makePrompt(turn.picked||[],turn.q);
   aiCall(pr.system,pr.user).then(function(reply){
     var parsed=PuFundAsk.parseReply(reply,turn.picked||[]);
     turn.aiLoading=false;
-    turn.aiText=parsed.answer||'';
-    if(parsed.cites&&parsed.cites.length) turn.citations=parsed.cites;
-    _refreshKbChatViews();
-  }).catch(function(e){
+    if(parsed&&parsed.answer) turn.aiText=parsed.answer;
+    if(parsed&&parsed.cites&&parsed.cites.length) turn.citations=parsed.cites.slice(0,2);
+    _refreshKbChatViews(true);
+  }).catch(function(){
     turn.aiLoading=false;
-    turn.aiErr=(e&&e.message)||String(e);
-    _refreshKbChatViews();
+    _refreshKbChatViews(false);
   });
 }
 function clearFundChat(){
   S.kbChatLog=[];
-  _refreshKbChatViews();
+  _refreshKbChatViews(false);
 }
-function _refreshKbChatViews(){
+function _kbEmptyMsg(){
+  return '<div style="display:flex;justify-content:flex-start;margin-bottom:8px"><div style="max-width:90%;padding:10px 12px;border-radius:12px 12px 12px 2px;background:#fff;border:1px solid var(--line);font-size:12.5px;line-height:1.6;color:var(--sub)">안녕하세요! 사내·공동근로복지기금의 <b>설립·운영·지원금·결산·해산</b>에 대해 궁금한 점을 아래 채팅창에 입력해 주세요.<br><span class="muted" style="font-size:11.5px">(예: 적자 기업 설립 가능 여부, 감사 겸직, 대부 자기거래, 출연금 한도, 공단 지원금, 4호 해산 회계처리 등)</span></div></div>';
+}
+function _refreshKbChatViews(scrollEnd){
+  var html=(S.kbChatLog&&S.kbChatLog.length)?S.kbChatLog.map(_kbTurnHtml).join(''):_kbEmptyMsg();
   var mlog=$('kb-modal-log');
-  if(mlog){
-    mlog.innerHTML=(S.kbChatLog&&S.kbChatLog.length)
-      ? S.kbChatLog.map(_kbTurnHtml).join('')
-      : '<div class="muted" style="padding:18px;text-align:center;font-size:12.5px">위의 자주 묻는 질문 칩을 누르거나 궁금한 내용을 입력해 보세요.<br>고용노동부 예규 제169호 · 근로복지공단 업무처리규정(제1375호) · 주요 행정해석·국민신문고 답변을 즉시 찾아 드립니다.</div>';
-  }
+  if(mlog){ mlog.innerHTML=html; if(scrollEnd) mlog.scrollTop=mlog.scrollHeight; }
   if(S.view==='library'&&S.libTab==='kb'){
     var clog=$('kb-chat-box');
-    if(clog){
-      clog.innerHTML=(S.kbChatLog&&S.kbChatLog.length)
-        ? S.kbChatLog.map(_kbTurnHtml).join('')
-        : '<div class="muted" style="padding:14px;text-align:center;font-size:12.5px">질문을 입력하거나 빠른 질문 칩을 누르면 관련 법령·예규·공단 규정·유권해석 판시가 바로 표시됩니다.</div>';
-    } else renderFundKbPanel();
+    if(clog){ clog.innerHTML=html; if(scrollEnd) clog.scrollTop=clog.scrollHeight; }
+    else renderFundKbPanel();
   }
 }
 function openFundKbItem(id){
@@ -1741,29 +1716,59 @@ function openFundKbItem(id){
     +esc(it.a||'')+'</div>'
     +(pts?'<div style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;font-size:12px;margin-bottom:10px"><b style="color:var(--acc2)">📌 실무 핵심 체크포인트</b><ul style="margin:5px 0 0;padding-left:18px;line-height:1.6">'+pts+'</ul></div>':'')
     +'<div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">'
-    +'<button onclick="closeM();openFundChat(\''+esc(it.q)+'\')">💬 이 주제로 챗봇 질문</button>'
-    +'<button class="primary" onclick="closeM()">닫기</button></div>',{width:700});
+    +'<button class="primary" onclick="closeM()">닫기</button></div>',{width:680});
+}
+function closeFundChat(){
+  var w=$('kbChatWin'); if(w) w.remove();
+}
+function bindKbChatDrag(win,head){
+  if(!win||!head||head._dragBound) return; head._dragBound=1;
+  var st=null;
+  head.addEventListener('pointerdown',function(e){
+    if(e.button!==undefined&&e.button!==0) return;
+    if(e.target.closest&&e.target.closest('button,[data-nodrag]')) return;
+    var r=win.getBoundingClientRect();
+    st={pid:e.pointerId,sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top};
+    try{ head.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove',function(e){
+    if(!st) return;
+    var nx=Math.max(6,Math.min(window.innerWidth-120,Math.round(st.ox+(e.clientX-st.sx))));
+    var ny=Math.max(6,Math.min(window.innerHeight-60,Math.round(st.oy+(e.clientY-st.sy))));
+    win.style.left=nx+'px'; win.style.top=ny+'px';
+    win.style.right='auto'; win.style.bottom='auto';
+    S._kbWinPos={left:nx,top:ny};
+  });
+  function end(){
+    if(!st) return;
+    try{ head.releasePointerCapture(st.pid); }catch(_){}
+    st=null;
+  }
+  head.addEventListener('pointerup',end);
+  head.addEventListener('pointercancel',end);
 }
 function openFundChat(initQ){
-  var quick=_kbQuick().map(function(x){
-    return '<button onclick="askFundBot(\''+esc(x.q)+'\')" style="padding:3px 9px;font-size:11.5px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer">'+esc(x.q)+'</button>';
-  }).join(' ');
-  showModal('<div class="row" style="margin-bottom:8px"><h2 style="margin:0;font-size:16px">💬 기금 법령·유권해석·공단 지침 챗봇</h2>'
-    +'<span class="chip">'+_kbList().length+'건 수록</span>'+hlp('lib.chat')+'<span style="flex:1"></span>'
-    +'<button onclick="closeM();S.libTab=\'kb\';go(\'library\')" style="font-size:11.5px;padding:4px 9px">📚 전체 사전 화면으로</button>'
-    +'<button onclick="clearFundChat()" style="font-size:11.5px;padding:4px 9px">지우기</button></div>'
-    +'<div style="font-size:12px;color:var(--sub);margin-bottom:8px">근로복지기본법령 · 고용노동부 예규 제169호 · 근로복지공단 업무처리규정(제1375호) · 행정해석·국민신문고 회신을 바탕으로 답변합니다.</div>'
-    +'<div class="row" style="gap:5px;flex-wrap:wrap;margin-bottom:8px">'+quick+'</div>'
-    +'<div class="row" style="gap:6px;margin-bottom:10px">'
-    +'<input id="kb-modal-inp" placeholder="궁금한 법령·유권해석·지원금·결산·해산 기준을 물어보세요 (예: 적자 기업도 기금 설립 가능한가요?)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();askFundBot();}" style="flex:1;padding:8px 10px;border:1px solid var(--acc);border-radius:8px;font-size:13px">'
-    +'<button class="primary" onclick="askFundBot()">💬 질문하기</button>'
-    +'<button onclick="askFundBot(null,true)" title="Claude AI 프록시로 심층 답변 생성">🤖 AI 심층답변</button></div>'
-    +'<div id="kb-modal-log" style="max-height:52vh;overflow-y:auto"></div>'
-    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>',{width:780,after:function(){
-      _refreshKbChatViews();
-      if(initQ){ askFundBot(initQ); }
-      else { var el=$('kb-modal-inp'); if(el) el.focus(); }
-    }});
+  var w=$('kbChatWin');
+  if(!w){
+    w=document.createElement('div'); w.id='kbChatWin';
+    var pos=S._kbWinPos?('left:'+S._kbWinPos.left+'px;top:'+S._kbWinPos.top+'px;'):'right:24px;bottom:24px;';
+    w.style.cssText='position:fixed;'+pos+'width:420px;max-width:calc(100vw - 20px);height:520px;max-height:calc(100vh - 76px);z-index:90;display:flex;flex-direction:column;background:#fff;border:1px solid var(--acc);border-radius:14px;box-shadow:0 16px 48px rgba(15,23,42,.22);overflow:hidden';
+    w.innerHTML='<div id="kbChatHead" title="마우스로 끌어서 위치를 옮길 수 있습니다" style="cursor:move;user-select:none;touch-action:none;background:var(--acc-soft);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;align-items:center;gap:6px">'
+      +'<b style="font-size:13.5px;color:var(--acc2)">💬 기금 법령·유권해석 챗봇</b>'+hlp('lib.chat')+'<span style="flex:1"></span>'
+      +'<button data-nodrag="1" onclick="closeFundChat();S.libTab=\'kb\';go(\'library\')" style="font-size:11px;padding:3px 7px" title="전체 유권해석·지침 사전 표 보기">📚 사전</button>'
+      +'<button data-nodrag="1" onclick="clearFundChat()" style="font-size:11px;padding:3px 7px" title="대화 비우기">지우기</button>'
+      +'<button data-nodrag="1" onclick="closeFundChat()" style="font-size:12px;padding:2px 7px;font-weight:700" title="닫기 (Esc)">✕</button></div>'
+      +'<div id="kb-modal-log" style="flex:1;overflow-y:auto;padding:12px;background:#f8fafc"></div>'
+      +'<div style="padding:9px 10px;border-top:1px solid var(--line);background:#fff;display:flex;gap:6px;align-items:center">'
+      +'<input id="kb-modal-inp" placeholder="질문을 입력하고 Enter를 누르세요…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();askFundBot();}" style="flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">'
+      +'<button class="primary" onclick="askFundBot()" style="padding:8px 12px;white-space:nowrap">전송</button></div>';
+    document.body.appendChild(w);
+    bindKbChatDrag(w,$('kbChatHead'));
+  }
+  _refreshKbChatViews(true);
+  if(initQ){ askFundBot(initQ); }
+  else { var el=$('kb-modal-inp'); if(el) el.focus(); }
 }
 function renderFundKbPanel(){
   var H=$('app'), kb=_kbList(), cats=_kbCats();
@@ -1775,9 +1780,6 @@ function renderFundKbPanel(){
     +cats.map(function(c){
       return '<div class="'+(cat===c[0]?'on':'')+'" onclick="S.kbCat=\''+c[0]+'\';renderFundKbPanel()">'+esc(c[1])+' <span class="chip">'+cnt(c[0])+'</span></div>';
     }).join('')+'</div>';
-  var quick=_kbQuick().map(function(x){
-    return '<button onclick="askFundBot(\''+esc(x.q)+'\')" style="padding:3px 9px;font-size:11.5px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer">'+esc(x.q)+'</button>';
-  }).join(' ');
   var rows=hit.map(function(it,i){
     var oneLine=String(it.a||'').replace(/\s+/g,' ').slice(0,95);
     return '<tr>'+_ckTd()+'<td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
@@ -1793,26 +1795,22 @@ function renderFundKbPanel(){
     +'<span class="segbar"><button class="seg" onclick="S.libTab=\'\';renderLibrary()">📁 문서·발표 자료</button>'
     +'<button class="seg on" onclick="S.libTab=\'kb\';renderLibrary()">💬 유권해석·지침 챗봇 ('+kb.length+'건)</button></span>'
     +'<span style="flex:1"></span>'
-    +'<button onclick="openFundChat()">💬 팝업 창으로 열기</button> '
-    +'<button onclick="clearFundChat()">대화 초기화</button></div></div>'
-    +'<div class="panel" style="border:1px solid var(--acc);background:var(--acc-soft)">'
-    +'<div class="row" style="margin-bottom:6px"><b style="font-size:14px;color:var(--acc2)">💬 고용노동부 유권해석 · 근로복지공단 지침 · 법령·세무 질의응답 챗봇</b>'
-    +'<span class="muted" style="font-size:11.5px">근로복지기본법령 · 예규 제169호 · 공단 규정 제1375호 · 행정해석·국민신문고 회신 총정리</span></div>'
-    +'<div class="row" style="gap:5px;flex-wrap:wrap;margin-bottom:8px"><span class="muted" style="font-size:11.5px;font-weight:700">자주 묻는 질문:</span>'+quick+'</div>'
-    +'<div class="row" style="gap:6px;margin-bottom:8px">'
-    +'<input id="kb-ask-inp" placeholder="질문을 입력하세요 (예: 공단 지원금도 10% 기본재산 적립 의무가 있나요? / 사내기금 해산 시 모회사 귀속 회계처리는?)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();askFundBot();}" style="flex:1;padding:8px 11px;border:1px solid var(--acc);border-radius:8px;background:#fff;font-size:13px">'
-    +'<button class="primary" onclick="askFundBot()">💬 질문하기</button>'
-    +'<button onclick="askFundBot(null,true)" style="background:#fff" title="Claude AI 프록시로 근거 문서를 종합해 맞춤형 심층 답변을 생성합니다">🤖 AI 심층답변</button></div>'
-    +'<div id="kb-chat-box"></div></div>'
+    +'<button onclick="openFundChat()">💬 플로팅 채팅창 열기</button> '
+    +'<button onclick="clearFundChat()">대화 지우기</button></div></div>'
+    +'<div class="panel">'
+    +'<div id="kb-chat-box" style="max-height:320px;overflow-y:auto;padding:10px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;margin-bottom:8px"></div>'
+    +'<div class="row" style="gap:6px">'
+    +'<input id="kb-ask-inp" placeholder="궁금한 내용을 입력하고 Enter를 누르세요…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();askFundBot(null,true);}" style="flex:1;padding:8px 11px;border:1px solid var(--acc);border-radius:8px;background:#fff;font-size:13px">'
+    +'<button class="primary" onclick="askFundBot(null,true)">전송</button></div></div>'
     +'<div class="libwrap"><div class="panel">'+nav+'</div><div class="panel">'
     +'<div class="row" style="margin-bottom:8px">'
     +'<input id="kb-q" value="'+esc(q)+'" placeholder="🔍 유권해석·조문·문서번호·키워드 검색 (예: 퇴직연금복지과, 제169호, 특수관계, 준비금)" oninput="S.kbQ=this.value;clearTimeout(window._kbT);window._kbT=setTimeout(function(){renderFundKbPanel();var e=$(\'kb-q\');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},200)" style="width:320px;padding:5px 8px;border:1px solid var(--line);border-radius:8px">'
     +'<span class="muted" style="font-size:11.5px">검색 결과 '+hit.length+'건 / 전체 '+kb.length+'건</span></div>'
     +(hit.length
       ? '<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>분류</th><th>문서번호·근거</th><th>쟁점·제목</th><th>핵심 판시 요약</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-      : '<div class="muted" style="padding:24px;text-align:center">검색어와 일치하는 유권해석·지침이 없습니다 — 위 챗봇 질문창에 자연어로 질문해 보세요.</div>')
+      : '<div class="muted" style="padding:24px;text-align:center">검색어와 일치하는 유권해석·지침이 없습니다 — 위 채팅창에 질문해 보세요.</div>')
     +'</div></div>';
-  _refreshKbChatViews();
+  _refreshKbChatViews(true);
 }
 function mgrText(f){
   if(_hasMgrStruct(f)){
@@ -24579,7 +24577,7 @@ function _inTyping(e){ var t=e.target||document.activeElement;
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     if($('confirmbg'))return;                       // 확인창은 자체 처리
-    if($('modalbg')){ closeM(); return; }           // 1) 모달 닫기
+    if($('modalbg')){ closeM(); return; } if($('kbChatWin')){ closeFundChat(); return; }           // 1) 모달 닫기
     if(document.body.classList.contains('sideopen')){ closeSide(); return; }   // 1-2) 모바일 서랍 닫기
     var t=document.activeElement;
     if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT')){ t.blur(); return; } // 2) 입력 포커스 해제

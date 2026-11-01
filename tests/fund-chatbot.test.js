@@ -4,8 +4,11 @@
  *  ① 지식베이스(fund_kb.js)는 근로복지기본법령, 고용노동부 예규 제169호, 근로복지공단 업무처리규정(제1375호),
  *    행정해석·국민신문고 회신을 빠짐없이 갖추고, 모든 항목에 법령·문서번호 근거를 둔다.
  *  ② 챗봇 검색 엔진(PuFundAsk)은 핵심 실무 질의에 정확한 유권해석·지침 항목을 최상위로 찾고,
+ *    RAG 절 단위 발췌(extractRelevantChunk)로 질문에 필요한 절만 깔끔하게 뽑아내며,
  *    AI 응답에 없는 인용번호(환각)는 걸러낸다.
- *  ③ 등기임원 명부(officerPanel)는 감사 겸직 금지(예규 제169호 제8조④)를, 대부 대장(loanTab)은
+ *  ③ 챗봇 창(openFundChat)은 드래그 이동 가능한 플로팅 메신저 창(#kbChatWin)으로 열리고,
+ *    초기 화면에 질문 버튼 목록이나 불필요한 원문 카드 더미를 나열하지 않는다.
+ *  ④ 등기임원 명부(officerPanel)는 감사 겸직 금지(예규 제169호 제8조④)를, 대부 대장(loanTab)은
  *    이사의 자기거래 금지(법 제78조)를 현장에서 짚어 준다.
  */
 'use strict';
@@ -101,7 +104,7 @@ test('★★ 핵심 실무 질의 14가지에 대해 정확한 유권해석·지
   });
 });
 
-test('★★ PuFundAsk.localAnswer · makePrompt · parseReply 가 환각 인용을 걸러내고 안전하게 동작한다', () => {
+test('★★ PuFundAsk.localAnswer · extractRelevantChunk · makePrompt · parseReply 가 필요한 절만 발췌하고 환각 인용을 걸러낸다', () => {
   const W = loadKb();
   const picked = W.PuFundAsk.pick(W.FUND_KB, '감사 겸직 금지', { max: 2 });
   const loc = W.PuFundAsk.localAnswer(picked, '감사 겸직 금지');
@@ -120,6 +123,16 @@ test('★★ PuFundAsk.localAnswer · makePrompt · parseReply 가 환각 인용
   const parsed = W.PuFundAsk.parseReply('{"answer":"감사는 겸직할 수 없습니다.","cites":["MOEL-council-01","MOEL-FAKE-99"],"none":false}', picked);
   assert.deepEqual(Array.from(parsed.cites), ['MOEL-council-01']);
   assert.match(parsed.answer, /감사는 겸직할 수 없습니다/);
+
+  /* RAG 절(①·②·③) 단위 정밀 발췌: 질문과 관련된 절만 발췌하고 무관한 절·타 항목은 노출하지 않는다 */
+  const loanQ = '공단 지원금으로 근로자 대부사업을 할 수 있나요?';
+  const loanPicked = W.PuFundAsk.pick(W.FUND_KB, loanQ, { max: 2 });
+  assert.equal(loanPicked[0].id, 'COMWEL-sub-05');
+  const loanAns = W.PuFundAsk.localAnswer(loanPicked, loanQ);
+  assert.match(loanAns.answer, /대부사업/);
+  assert.doesNotMatch(loanAns.answer, /사업계획서 변경 사전신고 의무/, '질문과 무관한 ②절이 섞여 나오면 안 된다');
+  assert.doesNotMatch(loanAns.answer, /점검 후 사후관리/, '질문과 무관한 ③절이 섞여 나오면 안 된다');
+  assert.doesNotMatch(loanAns.answer, /심사점수 구간별 지원율/, '무관한 타 항목이 섞여 나오면 안 된다');
 });
 
 test('★★ 등기임원 명부(officerPanel)는 감사와 이사·위원 겸직(예규 제169호 제8조④)을 경고한다', () => {
@@ -182,12 +195,24 @@ test('★★ 대부 대장(loanSelfDealHits)은 등기임원(이사·감사)에�
   assert.equal(res[0].bal, 8000000);
 });
 
-test('★★ fund.html 에 법령·유권해석 챗봇과 자료실 탭이 배선되어 있다', () => {
+test('★★ fund.html 에 드래그 이동형 메신저 챗봇(#kbChatWin)과 자료실 탭이 배선되어 있다', () => {
   assert.match(SRC, /<script src="fund_kb\.js/, 'fund_kb.js 가 로드되지 않았다');
   assert.ok(SRC.includes('id="kbchatbtn"'), '상단바에 챗봇 단추가 없다');
   assert.ok(SRC.includes('function openFundChat('), 'openFundChat 함수가 없다');
+  assert.ok(SRC.includes('function closeFundChat('), 'closeFundChat 함수가 없다');
+  assert.ok(SRC.includes('function bindKbChatDrag('), '드래그 이동 함수 bindKbChatDrag 가 없다');
+  assert.ok(SRC.includes('id="kbChatHead"'), '드래그 헤더(#kbChatHead)가 없다');
   assert.ok(SRC.includes('function askFundBot('), 'askFundBot 함수가 없다');
   assert.ok(SRC.includes('function renderFundKbPanel('), 'renderFundKbPanel 함수가 없다');
   assert.ok(SRC.includes("'lib.chat':{t:"), 'lib.chat 도움말이 없다');
   assert.ok(SRC.includes("hlp('lib.chat')"), 'lib.chat 도움말 단추가 호출되지 않았다');
+
+  /* openFundChat 은 고정 모달(showModal)이나 질문 칩 목록(_kbQuick)을 화면에 깔지 않아야 한다 */
+  const openSrc = grabFn('openFundChat');
+  assert.doesNotMatch(openSrc, /showModal\(/, 'openFundChat 이 고정 모달을 열면 안 된다');
+  assert.doesNotMatch(openSrc, /_kbQuick\(/, 'openFundChat 초기 화면에 질문 목록을 나열하면 안 된다');
+
+  /* _kbTurnHtml 은 불필요한 원문 카드 더미(<details open>)를 자동 펼치지 않아야 한다 */
+  const turnSrc = grabFn('_kbTurnHtml');
+  assert.doesNotMatch(turnSrc, /<details/, '_kbTurnHtml 이 하단에 원문 카드 더미를 나열하면 안 된다');
 });
