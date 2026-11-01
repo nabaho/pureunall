@@ -130,7 +130,8 @@ test('★★ 복원은 되돌리기 꾸러미를 «먼저» 올리고 나서 덮
 
 test('★ 되돌리기 꾸러미도 비밀을 안 담는다 — 같은 모으기(collectLocal)를 쓴다', () => {
   const fn = stripJs(cutFn(NAS_RAW, 'async function doRestore('));
-  assert.match(fn, /collectLocal\(\)/, '★ 따로 모으면 거름망이 두 벌이 됩니다');
+  // collectLocalSealed 는 안에서 collectLocal 을 그대로 부른다(2026-11-01 — 잠근 판). 거름망은 여전히 한 벌.
+  assert.match(fn, /collectLocal(Sealed)?\(\)/, '★ 따로 모으면 거름망이 두 벌이 됩니다');
 });
 
 test('★★ 화면에 되돌리기 단추가 «실제로» 있다', () => {

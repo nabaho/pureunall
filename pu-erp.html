@@ -208,7 +208,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-ieum-public.js?v=2"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-billing.js?v=12"></script>
-<script src="js/pu-rrn-seal.js?v=2"></script>
+<script src="js/pu-rrn-seal.js?v=3"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
@@ -3723,12 +3723,14 @@ window.erpBackup = function(){
       var raw = _erpStoreGet(k);
       if(raw) try { backup.data[k] = JSON.parse(raw); } catch(e){}
     });
+    erpSealExport(backup).then(function(backup){
     var blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'pureun_erp_backup_'+todayYMD()+'.json';
+    a.download = erpLockedName('pureun_erp_backup_'+todayYMD()+'.json', backup);
     a.click();
     console.log('✅ 백업 다운로드 완료');
+    }).catch(erpSealFail);
   } catch(e){ console.log('❌ 백업 실패:', e.message); }
 };
 
@@ -3748,10 +3750,11 @@ window.erpBackupFull = function(){
       if(raw){ try { backup.data[k] = JSON.parse(raw); n++; } catch(e){} }
     });
     backup.keyCount = n;
+    erpSealExport(backup).then(function(backup){
     var blob = new Blob([JSON.stringify(backup)], {type:'application/json'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'pureun_erp_전체백업_'+todayYMD()+'.json';
+    a.download = erpLockedName('pureun_erp_전체백업_'+todayYMD()+'.json', backup);
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
     // 백업 이력 기록 — 기한 점검(erpBackupCheck)이 이걸 보고 알림을 멈춘다
@@ -3763,6 +3766,7 @@ window.erpBackupFull = function(){
     } catch(_){}
     try { showToast('전체 백업 다운로드 완료 ('+n+'개 항목) — 구글 드라이브에 보관하세요'); } catch(_){}
     console.log('✅ 전체 백업 다운로드 완료:', n, '개 항목');
+    }).catch(erpSealFail);
   } catch(e){ console.log('❌ 전체 백업 실패:', e.message); try { showToast('백업 실패: '+e.message); } catch(_){} }
 };
 
@@ -4098,7 +4102,7 @@ window.erpFbSafeKeys = erpFbSafeKeys; window.erpFbUnsafeKeys = erpFbUnsafeKeys;
 
 function erpSealSnap(snap){
   return erpBackupKey().then(function(key){
-    return PuRrnSeal.seal(snap.data || {}, key);
+    return PuRrnSeal.sealPii(snap.data || {}, key);   // 주민번호 + 계좌(2026-11-01)
   }).then(function(sealed){
     return { savedAt: snap.savedAt, version: snap.version, data: erpFbSafeKeys(sealed) };
   });
@@ -4117,6 +4121,51 @@ function erpUnsealSnap(snap){
     return snap;
   });
 }
+
+/* ══ 내려받는 파일·NAS 로 나가는 사본도 잠근다 (2026-11-01 개인정보 1단계, 대표 승인 시안) ══
+   안전성 확보조치 기준 제7조⑤ — 직원 PC·USB·NAS 에 주민번호를 저장하면 암호화해야 한다.
+   서버 백업만 잠그고, 정작 «밖으로 나가는» 내려받기 파일과 NAS 사본은 글자 그대로였다.
+   ★ 잠그는 것은 주민번호 + 계좌. 푸는 것은 이알피 안(복원)에서만 — 열쇠는 관리자만 읽는다.
+   ★ 브라우저 저장소 날것(값이 JSON «글자»)은 풀어서 잠그고 다시 글자로 되돌린다 — 그래야 잠긴다.
+   ⚠ 잠그지 못하면 «내려받지 않는다». 평문으로라도 주는 길을 만들지 말 것. */
+function _erpRawJsonKeys(map){
+  var ks = [];
+  Object.keys(map || {}).forEach(function(k){
+    var v = map[k];
+    if(typeof v === 'string' && /^\s*[\[{]/.test(v)){ try { map[k] = JSON.parse(v); ks.push(k); } catch(_){} }
+  });
+  return ks;
+}
+function _erpPackMap(o){ return (o && o.data && typeof o.data === 'object' && !Array.isArray(o.data)) ? o.data : o; }
+function erpSealExport(obj){
+  var copy = JSON.parse(JSON.stringify(obj || {}));
+  var raw = _erpRawJsonKeys(_erpPackMap(copy));
+  if(!window.PuRrnSeal) return Promise.reject(new Error('잠금 모듈(js/pu-rrn-seal.js)을 못 불러왔습니다'));
+  var back = function(o){ var m = _erpPackMap(o); raw.forEach(function(k){ m[k] = JSON.stringify(m[k]); }); return o; };
+  /* 잠글 것이 없으면 열쇠를 안 가져온다 — 열쇠 칸 권한 때문에 빈 백업까지 멎지 않게 */
+  if(!PuRrnSeal.countToSealPii(copy)) return Promise.resolve(back(copy));
+  return erpBackupKey().then(function(key){ return PuRrnSeal.sealPii(copy, key); }).then(back);
+}
+function erpUnsealImport(obj){
+  if(!obj || typeof obj !== 'object') return Promise.resolve(obj);
+  var txt; try { txt = JSON.stringify(obj); } catch(_){ return Promise.resolve(obj); }
+  if(txt.indexOf('enc:v1:') < 0) return Promise.resolve(obj);   // 잠기기 전 파일은 그대로
+  if(!window.PuRrnSeal) return Promise.reject(new Error('잠금 모듈을 못 불러와 잠긴 백업을 풀 수 없습니다'));
+  var copy = JSON.parse(txt);
+  var raw = _erpRawJsonKeys(_erpPackMap(copy));
+  return erpBackupKey().then(function(key){ return PuRrnSeal.unseal(copy, key); }).then(function(o){
+    var m = _erpPackMap(o); raw.forEach(function(k){ m[k] = JSON.stringify(m[k]); }); return o;
+  });
+}
+/* 잠긴 자리가 있으면 파일 이름 끝에 -잠금 을 붙인다 — 받은 사람이 «열어도 주민번호가 안 보이는 파일»임을 안다 */
+function erpLockedName(fname, obj){
+  return (window.PuRrnSeal && PuRrnSeal.countSealed(obj)) ? String(fname).replace(/\.json$/, '-잠금.json') : fname;
+}
+function erpSealFail(e){
+  var m = '🔒 주민번호·계좌를 잠그지 못해 내려받지 않았습니다 — ' + ((e && e.message) || e);
+  try { showToast(m); } catch(_){ console.log(m); }
+}
+window.erpSealExport = erpSealExport; window.erpUnsealImport = erpUnsealImport;
 
 function serverBackupWrite(id, snap){
   /* ⚠ 요약·id명부는 «원본» 으로 만든다(아래). 잠근 사본으로 만들면 요약이 달라진다. */
@@ -44111,13 +44160,14 @@ function BackupSection(){
         size += (k.length + v.length);
       }
     }
-    var json = JSON.stringify({ ts: new Date().toISOString(), data: data });
+    erpSealExport({ ts: new Date().toISOString(), data: data }).then(function(pack){
+    var json = JSON.stringify(pack);
     // 다운로드
     var blob = new Blob([json], { type:'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     var ts = new Date();
-    var fname = 'pureun-erp-backup-' + ts.getFullYear() + String(ts.getMonth()+1).padStart(2,'0') + String(ts.getDate()).padStart(2,'0') + '-' + String(ts.getHours()).padStart(2,'0') + String(ts.getMinutes()).padStart(2,'0') + '.json';
+    var fname = erpLockedName('pureun-erp-backup-' + ts.getFullYear() + String(ts.getMonth()+1).padStart(2,'0') + String(ts.getDate()).padStart(2,'0') + '-' + String(ts.getHours()).padStart(2,'0') + String(ts.getMinutes()).padStart(2,'0') + '.json', pack);
     // 모바일 + 공유 가능 환경(인앱·다음 등 다운로드 미지원 브라우저 대응): 공유 시트 우선
     var file = null;
     try { file = new File([blob], fname, { type:'application/json' }); } catch(_e){}
@@ -44137,6 +44187,7 @@ function BackupSection(){
     var newHistory = [rec].concat(history).slice(0, 50); // 최근 50건
     saveHistory(newHistory);
     showToast('백업 완료 (' + Object.keys(data).length + '키, ' + fmtBytes(json.length) + ')');
+    }).catch(erpSealFail);
   }
 
   function readTextFile(file){
@@ -44273,6 +44324,7 @@ function BackupSection(){
     try {
       parsed = JSON.parse(text);
       if(!parsed || !parsed.data || typeof parsed.data !== 'object') throw new Error('잘못된 형식');
+      parsed = await erpUnsealImport(parsed);   // 잠긴 백업(-잠금.json)은 이알피 안에서만 풀린다
     } catch(e){ showToast('복원 실패: ' + e.message); return; }
     var _bts = (typeof parsed.ts === 'number') ? parsed.ts : Date.parse(parsed.ts);
     if(isNaN(_bts)) _bts = 0;
@@ -45329,17 +45381,19 @@ function DataManagementSection(){
       var k = _lk[i];
       if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){ data[k] = erpLocalRaw(k); }
     }
-    var json = JSON.stringify({ ts:new Date().toISOString(), kind:'pre-migration', data:data });
+    erpSealExport({ ts:new Date().toISOString(), kind:'pre-migration', data:data }).then(function(pack){
+    var json = JSON.stringify(pack);
     var blob = new Blob([json], { type:'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     var ts = new Date();
     a.href = url;
-    a.download = 'pureun-erp-pre-migration-' + ts.getFullYear() + String(ts.getMonth()+1).padStart(2,'0') + String(ts.getDate()).padStart(2,'0') + '.json';
+    a.download = erpLockedName('pureun-erp-pre-migration-' + ts.getFullYear() + String(ts.getMonth()+1).padStart(2,'0') + String(ts.getDate()).padStart(2,'0') + '.json', pack);
     a.click();
     URL.revokeObjectURL(url);
     showToast('백업 다운로드 완료. 2단계로 이동.');
     setStep(2);
+    }).catch(erpSealFail);
   }
   function selectFile(e){
     var files = e.target.files;
@@ -45988,10 +46042,14 @@ function LostRecordsModal(props){
     rd.onload = function(ev){
       try {
         var obj = JSON.parse(String(ev.target.result));
-        var d = erpDiffBackupFile(obj);
-        d.fileName = f.name;
-        setBkDiff(d);
-        showToast(d.total > 0 ? ('📂 이 기기에 없는 레코드 ' + d.total + '건 발견') : '📂 차이 없음 — 이 파일의 모든 레코드가 이미 있습니다');
+        erpUnsealImport(obj).then(function(obj){
+          var d = erpDiffBackupFile(obj);
+          d.fileName = f.name;
+          setBkDiff(d);
+          showToast(d.total > 0 ? ('📂 이 기기에 없는 레코드 ' + d.total + '건 발견') : '📂 차이 없음 — 이 파일의 모든 레코드가 이미 있습니다');
+        }).catch(function(err){ showToast('❌ 잠긴 파일을 풀지 못했습니다: ' + (err && err.message || '')); })
+          .then(function(){ setBkBusy(false); });
+        return;
       } catch(err){ showToast('❌ 파일을 읽을 수 없습니다: ' + (err && err.message || '')); }
       setBkBusy(false);
     };
@@ -46925,7 +46983,12 @@ function NasBackupSettings(){
       if(SECRET_KEYS.test(k)){ 뺀것++; continue; }
       try{ data[k]=JSON.parse(erpLocalRaw(k)); }catch(e){ data[k]=erpLocalRaw(k); }
     }
-    return { json: JSON.stringify(data, null, 2), 뺀것: 뺀것 };
+    return { json: JSON.stringify(data, null, 2), 뺀것: 뺀것, data: data };
+  }
+  /* NAS 로 나가는 꾸러미는 «잠근 판»만 쓴다 (2026-11-01 개인정보 1단계 — 고시 제7조⑤) */
+  function collectLocalSealed(){
+    var 꾸러미 = collectLocal();
+    return erpSealExport(꾸러미.data).then(function(d){ return { json: JSON.stringify(d, null, 2), 뺀것: 꾸러미.뺀것 }; });
   }
 
   function doBackup(){
@@ -46933,12 +46996,11 @@ function NasBackupSettings(){
     setBusy(true);
     addLog('백업 시작...','info');
     var 열린세션 = null;
-    var 꾸러미 = collectLocal();                          // 비밀은 «빼고» 담는다(SECRET_KEYS)
-    var json = 꾸러미.json, 뺀것 = 꾸러미.뺀것;
+    var json = null, 뺀것 = 0;                           // 비밀은 «빼고» 담고(SECRET_KEYS), 주민번호·계좌는 잠근다
     var filename = 'pureun_erp_backup_'+todayYMD()+'.json';
     var latest = 'pureun_erp_latest.json';
 
-    nasLogin().then(function(sid){
+    collectLocalSealed().then(function(꾸러미){ json = 꾸러미.json; 뺀것 = 꾸러미.뺀것; return nasLogin(); }).then(function(sid){
       addLog('NAS 로그인 성공','ok');
       열린세션 = sid;
       // 폴더 먼저 생성 (이미 있어도 무시)
@@ -46981,7 +47043,7 @@ function NasBackupSettings(){
       return fetchT(url+encodeURIComponent(sid), {credentials:'omit'}, 60000).then(function(r){   // 백업 파일은 크다 — 넉넉히
         if(!r.ok) throw new Error(안내 || ('파일 없음: '+name));
         return r.json();
-      }).then(function(data){
+      }).then(erpUnsealImport).then(function(data){
         var count=0;
         Object.keys(data).forEach(function(k){
           if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
@@ -47007,7 +47069,7 @@ function NasBackupSettings(){
       세션 = sid;
       addLog('NAS 로그인 성공','ok');
       /* ① 되돌리기 꾸러미를 «먼저» — 이것이 안 올라가면 복원하지 않는다(돌아갈 길이 없는 복원은 안 한다) */
-      return nasUploadWith(cfg, sid, cfg.folder, 'pureun_erp_undo.json', new Blob([collectLocal().json],{type:'application/json'}))
+      return collectLocalSealed().then(function(꾸러미){ return nasUploadWith(cfg, sid, cfg.folder, 'pureun_erp_undo.json', new Blob([꾸러미.json],{type:'application/json'})); })
         .then(function(){ addLog('↩ 복원 직전 상태를 pureun_erp_undo.json 으로 올렸습니다','ok'); return sid; });
     }).then(restoreFrom('pureun_erp_latest.json', '파일 없음 (아직 백업 안 됨)'))
       .then(function(count){
@@ -47246,12 +47308,14 @@ function NasBackupSettings(){
                 if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;   /* 비밀은 안 담는다 */
                 try{ data[k]=JSON.parse(erpLocalRaw(k)); }catch(e){ data[k]=erpLocalRaw(k); }
               }
+              erpSealExport(data).then(function(data){
               var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
               var url=URL.createObjectURL(blob);
-              var a=document.createElement('a'); a.href=url; a.download='pureun_erp_backup_'+todayYMD()+'.json'; a.click();
+              var a=document.createElement('a'); a.href=url; a.download=erpLockedName('pureun_erp_backup_'+todayYMD()+'.json', data); a.click();
               URL.revokeObjectURL(url);
               addLog('수동 백업 파일 다운로드됨','ok');
               showToast('백업 파일 다운로드 완료');
+              }).catch(erpSealFail);
             }, style:btnS('#16a34a') }, '⬇️ 백업 파일 다운로드'),
             h('label', { style:Object.assign({},btnS('#2563eb'),{cursor:'pointer'}) }, '⬆️ 백업 파일 복원',
               h('input', { type:'file', accept:'.json', style:{display:'none'}, onChange:async function(e){
@@ -47260,7 +47324,7 @@ function NasBackupSettings(){
                 var rdr=new FileReader();
                 rdr.onload=function(ev){
                   try{
-                    var data=JSON.parse(ev.target.result);
+                    erpUnsealImport(JSON.parse(ev.target.result)).then(function(data){
                     var count=0;
                     Object.keys(data).forEach(function(k){
                       if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
@@ -47268,6 +47332,7 @@ function NasBackupSettings(){
                     addLog('파일 복원 완료: '+count+'개 항목','ok');
                     showToast('복원 완료 — 새로고침합니다');
                     setTimeout(function(){location.reload();},1500);
+                    }).catch(function(ex){ showToast('잠긴 파일을 풀지 못했습니다'); addLog('파일 오류: '+((ex&&ex.message)||ex),'err'); });
                   }catch(ex){ showToast('파일 형식 오류'); addLog('파일 오류: '+ex.message,'err'); }
                 };
                 rdr.readAsText(file);
@@ -74208,6 +74273,20 @@ function rtMove(fromSid, picks){
 }
 
 /* 콘솔 백업용 명부 — 주민번호·계좌·비밀번호·연락처를 뺀다 (사번을 되돌리는 데 필요 없는 칸) */
+/* 이 PC 의 명부 사본에서 주민번호·계좌만 지운다 — handleLogout(직접 로그아웃)이 부른다 */
+function erpScrubLocalPii(){
+  var DROP = ['rrn','rrnSeal','accountNo','accountHolder'];
+  var k = KEY + 'user_accounts';
+  var raw = localStorage.getItem(k);
+  if(!raw) return;
+  var list = JSON.parse(raw);
+  if(!Array.isArray(list)) return;
+  localStorage.setItem(k, JSON.stringify(list.map(function(u){
+    if(!u || typeof u !== 'object') return u;
+    var o = {}; Object.keys(u).forEach(function(f){ if(DROP.indexOf(f) < 0) o[f] = u[f]; }); return o;
+  })));
+  localStorage.removeItem(KEY + '_meta_user_accounts');
+}
 function erpNoPiiUsers(list){
   var DROP = ['rrn','rrnSeal','accountNo','accountHolder','loginPw','pwHash','phone','homePhone','emergencyPhone','emergencyContact','address','addressDetail','zipCode','email','birthDate'];
   return (list||[]).map(function(u){ if(!u||typeof u!=='object') return u; var o={}; Object.keys(u).forEach(function(k){ if(DROP.indexOf(k)<0) o[k]=u[k]; }); return o; });
@@ -91076,6 +91155,11 @@ function App(){
 
   function handleLogout(opts){
     try { if(typeof clearPresence === 'function') clearPresence(); } catch(_){}
+    /* 직접 로그아웃하면 이 PC 에 남은 명부 사본에서 주민번호·계좌를 지운다 (2026-11-01 개인정보 1단계, 고시 제7조⑤).
+       ⚠ 명부 «통째»를 지우지 않는다 — 로그인 화면이 이름·로그인 정보를 이 사본에서 읽을 수 있다.
+       ⚠ 받은 시각(_meta_)도 지운다 — 안 지우면 다시 로그인했을 때 «이미 최신»으로 보고 서버에서 안 받아
+         주민번호 칸이 빈 채로 남는다(같은 방법을 onWriteFail 도 쓴다). */
+    if(opts && opts.reload){ try { erpScrubLocalPii(); } catch(_){} }
     clearSession();
     clearAutoLogin();
     /* «지금 나갔다»를 모든 탭에 — 잠든 기업정보함·포털 탭도 깨어날 때 스스로 끊는다(2026-09-14) */
