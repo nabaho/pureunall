@@ -210,6 +210,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-staff-secret.js?v=2"></script>
+<script src="js/pu-pw-policy.js?v=1"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
@@ -1297,6 +1298,19 @@ window.addEventListener('keydown', function(e){
   } catch(_e){}
 });
 function defaultLoginPw(){ return encodePw('123456'); }
+/* 비밀번호를 바꾼 뒤 명부 loginPw 에는 «진짜 비밀번호의 해시»를 넣지 않는다 (2026-11-01 개인정보 4단계).
+   그 해시는 재무 권한자가 읽는 명부에 남아 «쉬운 숫자 비밀번호는 몇 초 만에» 풀린다. 이 칸은 «기본값이냐»를 가르는 데만 쓰인다
+   (isDefaultPwStored) — 표시 글자는 기본값 해시와 같을 수 없고 옛 Base64 로 풀어도 빈 글자라 늘 «기본값 아님»이다. */
+var PW_CHANGED_MARK = 'pw-changed';
+/* 바꾼 때를 «본인» 칸(uid_roles/{uid}/pwChangedAt)에 남긴다 — 명부(user_accounts)는 일반 직원이 못 쓰고 못 읽어
+   (user_dir 에는 이 표시가 없다) 지금까지 일반 직원은 «이미 바꿨는지»를 앱이 알 길이 없었다. */
+function markPwChanged(){
+  try {
+    var u = firebase.auth().currentUser;
+    if(!u || !u.uid || !firebase.database) return;
+    firebase.database().ref('uid_roles/' + u.uid + '/pwChangedAt').set(Date.now()).catch(function(){});
+  } catch(e){}
+}
 function isDefaultPwStored(stored){ return verifyPw('123456', stored) || verifyPw('1234', stored); }
 // 기본 비밀번호(123456) 사용 중인 계정 → 첫 로그인 시 변경 강제
 
@@ -43865,7 +43879,8 @@ function PasswordChangeSection(){
     var users = dbGet('user_accounts', []) || [];
     var u = users.find(function(x){ return x.sid === CURRENT_USER.sid; });
     if(!u){ setMsg('❌ 계정 정보를 찾을 수 없습니다.'); return; }
-    if(newPw.length < 4){ setMsg('❌ 새 비밀번호는 4자 이상이어야 합니다.'); return; }
+    var _weak = window.PuPwPolicy ? PuPwPolicy.weakReason(newPw, u.sid, oldPw) : (newPw.length < 10 ? '새 비밀번호는 10자 이상이어야 합니다.' : '');
+    if(_weak){ setMsg('❌ ' + _weak); return; }
     if(newPw !== confPw){ setMsg('❌ 새 비밀번호가 일치하지 않습니다.'); return; }
     // Firebase 비밀번호 변경 (현재 비번 재인증 후 갱신)
     var _email = sidToEmail(u.sid);
@@ -43879,9 +43894,10 @@ function PasswordChangeSection(){
       var u2 = dbGet('user_accounts', []) || [];
       var updated = u2.map(function(x){
         if(x.sid !== CURRENT_USER.sid) return x;
-        return Object.assign({}, x, { loginPw: encodePw(newPw), password: undefined, pwChangedFb: true });
+        return Object.assign({}, x, { loginPw: PW_CHANGED_MARK, password: undefined, pwChangedFb: true });
       });
       dbSet('user_accounts', updated);
+      markPwChanged();
       try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
       setOldPw(''); setNewPw(''); setConfPw('');
       setMsg('✅ 비밀번호가 변경되었습니다.');
@@ -88965,7 +88981,8 @@ function ChangePasswordModal(props){
     }
     if(!u){ setErr('아이디가 존재하지 않습니다.'); return; }
     if(!curPw){ setErr('현재 비밀번호를 입력하세요.'); return; }
-    if(!newPw || newPw.length < 4){ setErr('새 비밀번호는 4자 이상이어야 합니다.'); return; }
+    var _weakM = window.PuPwPolicy ? PuPwPolicy.weakReason(newPw, u.sid, curPw) : (!newPw || newPw.length < 10 ? '새 비밀번호는 10자 이상이어야 합니다.' : '');
+    if(_weakM){ setErr(_weakM); return; }
     if(newPw !== cfmPw){ setErr('새 비밀번호 확인이 일치하지 않습니다.'); return; }
     if(newPw === curPw){ setErr('현재 비밀번호와 동일합니다.'); return; }
     // Firebase 비밀번호 변경: 현재 비번으로 재인증 후 새 비번으로 갱신
@@ -88981,9 +88998,10 @@ function ChangePasswordModal(props){
       var users2 = dbGet('user_accounts', USERS_SEED) || [];
       var idx = users2.findIndex(function(x){ return x.sid === u.sid; });
       if(idx >= 0){
-        users2[idx] = Object.assign({}, users2[idx], { loginPw: encodePw(newPw), pwChangedFb: true });
+        users2[idx] = Object.assign({}, users2[idx], { loginPw: PW_CHANGED_MARK, pwChangedFb: true });
         dbSet('user_accounts', users2);
       }
+      markPwChanged();
       try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
       setOk(true);
       setTimeout(function(){ props.onClose && props.onClose(); }, 1200);
@@ -90548,16 +90566,39 @@ function ERPMain(props){
     try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){}
   }
   // 깃발이 있어도 실제 비밀번호가 이미 변경됐으면 팝업 불필요 → 깃발 제거 (재발 방지)
+  /* ★ 2026-11-01 개인정보 4단계 — 일반 직원은 명부 사본(user_dir 슬림판)에 loginPw·pwChangedFb 가 «없다».
+       예전에는 그 «없음»을 isDefaultPwStored('') = false 로 읽어 「이미 바꿨다」고 보고 깃발을 지웠다 →
+       일반 직원은 기본 비밀번호(123456)로 들어와도 변경창을 한 번도 못 봤다(8명이 그대로였다).
+       이제 «바꿨다는 증거»가 있을 때만 지운다: ① 명부에 기본값이 아닌 loginPw·pwChangedFb ② 본인 칸 uid_roles/{uid}/pwChangedAt.
+       증거를 «읽어 봐야» 아는 사람은 확인이 끝날 때까지 창을 띄우지 않는다(바꾼 사람에게 창이 번쩍이지 않게). */
+  var _fpAsync = false;
   if(_fpRaw){
     try {
       var _fpU = (dbGet('user_accounts', []) || []).find(function(x){ return x.sid === _fpRaw; });
-      if(_fpU && !isDefaultPwStored(_fpU.loginPw || _fpU.password || '')){
+      if(_fpU && (_fpU.pwChangedFb || ((_fpU.loginPw || _fpU.password) && !isDefaultPwStored(_fpU.loginPw || _fpU.password || '')))){
         _fpRaw = '';
         localStorage.removeItem('pureun_v6_force_pw');
+      } else if(_fpU && !_fpU.loginPw && !_fpU.password){
+        _fpAsync = true;           /* 증거가 사본에 없다 — 본인 칸을 읽어 본다 */
       }
     } catch(e){ window._erpErrLog && window._erpErrLog(e); }
   }
-  var fpcS = useState(_fpRaw); var forcePwSid = fpcS[0]; var setForcePwSid = fpcS[1];
+  var fpcS = useState(_fpAsync ? '' : _fpRaw); var forcePwSid = fpcS[0]; var setForcePwSid = fpcS[1];
+  useEffect(function(){
+    if(!_fpAsync || !_fpRaw) return;
+    var alive = true, sid = _fpRaw;
+    function ask(){ if(alive) setForcePwSid(sid); }
+    try {
+      var cu = firebase.auth().currentUser;
+      if(!cu || !cu.uid || typeof fbDb === 'undefined' || !fbDb){ ask(); return function(){ alive = false; }; }
+      fbDb.ref('uid_roles/' + cu.uid + '/pwChangedAt').once('value').then(function(snap){
+        if(!alive) return;
+        if(typeof snap.val() === 'number'){ try { localStorage.removeItem('pureun_v6_force_pw'); } catch(_e){} }
+        else ask();
+      }, ask);
+    } catch(e){ ask(); }
+    return function(){ alive = false; };
+  }, []);
   useEffect(function(){
     if(isAdminByUser(CURRENT_USER)) return;  // 관리자(권형하)는 접속 시 자동 투어 생략
     if(!localStorage.getItem('pureun_v6_erp_tour_done_v1')){
@@ -90918,7 +90959,7 @@ function ERPMain(props){
       onClose: function(){
         var us = dbGet('user_accounts', USERS_SEED) || [];
         var u = us.find(function(x){ return x.sid === forcePwSid; });
-        if(u && !isDefaultPwStored(u.loginPw || u.password || '')){ try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }
+        if(u && (u.pwChangedFb || ((u.loginPw || u.password) && !isDefaultPwStored(u.loginPw || u.password || '')))){ try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }
         setForcePwSid('');
       }
     })
@@ -91357,7 +91398,12 @@ function App(){
       status: acct.status || 'active',
       updatedAt: Date.now()
     };
-    firebase.database().ref('uid_roles/' + u.uid).set(rec).catch(function(){});
+    /* pwChangedAt 은 «본인이 비밀번호를 바꾼 때» — 이 기록이 통째로 다시 쓰일 때 지워지면 안 된다(2026-11-01) */
+    var _ur = firebase.database().ref('uid_roles/' + u.uid);
+    _ur.child('pwChangedAt').once('value').then(function(s){
+      var v = s.val(); if(typeof v === 'number') rec.pwChangedAt = v;
+      return _ur.set(rec);
+    }).catch(function(){ _ur.set(rec).catch(function(){}); });
   }
 
   /* ── [업무관리 연동] 종료·재개를 곧바로 반영한다 ──
