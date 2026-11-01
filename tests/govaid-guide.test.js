@@ -82,3 +82,11 @@ test('서버 덜어내기 — 이 PC 가 읽은 안내 자료(guideDone)는 오�
   assert.equal(r.updates['notices/a'], null);
   assert.equal('notices/b' in r.updates, false);
 });
+
+test('지역 자료는 고객사 지역(충남)만 읽는다 — 전국 자료는 늘 읽는다', () => {
+  const ns = { MOEL_GUIDE_2026: { id: 'MOEL_GUIDE_2026', guide: '지원 안내', guideDone: { at: 1 } },
+    nat: { id: 'nat', guide: '통합공고', area: { sido: [], sgg: [] } },
+    cn: { id: 'cn', guide: '통합공고', area: { sido: ['충남'], sgg: ['아산시'] } },
+    gg: { id: 'gg', guide: '통합공고', area: { sido: ['경기'], sgg: [] } } };
+  assert.deepEqual(G.pickGuides(ns, 2026).map((x) => x.id).sort(), ['cn', 'nat']);
+});
