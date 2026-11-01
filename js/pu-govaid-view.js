@@ -190,11 +190,49 @@
   }
   function noticeCount(noticesMap, progs, today) { return noticeRows(noticesMap, progs, { view: 'sug', openOnly: true, today: today }).length; }
   /* ★ 노무사 직접 사업 — 화면마다 같은 잣대(대표 지시 2026-10-13 「모든 영역에서」) */
+  /* 📤 넘긴 일 (4단계, 2026-11-01) — 진행(work·told·result)이 있는 검토만, 마감 가까운 것이 위·마감 모름은 아래.
+     stage: open(신청 대행 진행중) · notify(안내만) · done(업무관리에서 끝냄 또는 결과를 적음).
+     업무관리 상태는 읽기만 한다 — workStat[id] = {state, status}. 거기 없는 id 는 gone(업무관리에서 지워짐).
+     workStat 이 null 이면 «아직 못 읽음» — gone 으로 보지 않는다. targetOf(pid, review) 는 사업·공고를 찾아 준다 */
+  function handoffRows(reviews, profiles, targetOf, workStat) {
+    var pfOf = {}, out = [], known = workStat != null;
+    workStat = workStat || {};
+    (profiles || []).forEach(function (pf) { [pf.key].concat(pf.aliases || []).forEach(function (k) { pfOf[k] = pf; }); });
+    Object.keys(reviews || {}).forEach(function (k) {
+      var pf = pfOf[k], row = reviews[k] || {};
+      if (!pf) return;
+      Object.keys(row).forEach(function (pid) {
+        var r = row[pid], t;
+        if (!r || r._deleted || !(r.work || r.told || r.result)) return;
+        if (!(t = targetOf(pid, r))) return;
+        var w = r.work && r.work.id ? workStat[r.work.id] : null;
+        var stage = r.result ? 'done' : r.work ? (w && w.state === 'done' ? 'done' : 'open') : 'notify';
+        out.push({ pf: pf, target: t, review: r, mode: r.work ? 'apply' : 'notify', stage: stage,
+          due: clean(r.work && r.work.due), gone: known && !!(r.work && r.work.id && !w), work: w || null });
+      });
+    });
+    return out.sort(function (a, b) {
+      return (!a.due - !b.due) || (a.due < b.due ? -1 : a.due > b.due ? 1 : 0) || byName(a.pf, b.pf);
+    });
+  }
+  /* ✉ 안내문 — 회사 한 곳에 보낼 글 초안(보내지 않는다, 복사만). ★ 사업에만 «대행» 한 줄. 금액·근로자 이름은 넣지 않는다 */
+  function letterFor(coName, items) {
+    if (!items || !items.length) return '';
+    var L = [clean(coName) + ' 담당자님께', '', '푸른노무법인입니다. 귀사가 조건상 신청할 수 있는 정부·지자체 지원사업을 정리해 드립니다.', ''];
+    items.forEach(function (x, i) {
+      var due = clean(x.due);
+      L.push((i + 1) + '. ' + clean(x.name) + (x.agency ? ' (' + clean(x.agency) + ')' : '') + (due ? ' — 접수 마감 ' + due.slice(5).replace('-', '/') : ''));
+      if (x.docs && x.docs.length) L.push('   준비 서류: ' + x.docs.map(clean).join(', '));
+      L.push(x.star ? '   → 저희가 신청을 대행해 드릴 수 있습니다.' : '   → 담당 기관에 회사가 직접 신청하는 사업입니다.');
+    });
+    L.push('', '※ 최종 지원 여부와 금액은 각 기관 심사로 정해집니다. 공고 원문을 함께 확인해 주십시오.');
+    return L.join('\n');
+  }
   function isStar(p) { return !!(p && p.star && p.star.on === true); }
   function starOnly(progs, on) { return on ? progs.filter(isStar) : progs; }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
-  return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
+  return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf, handoffRows: handoffRows, letterFor: letterFor,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
     ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
     noticeRows: noticeRows, noticeCount: noticeCount, localNotices: localNotices, regionSummary: regionSummary, areaMatch: areaMatch, isStar: isStar, starOnly: starOnly };

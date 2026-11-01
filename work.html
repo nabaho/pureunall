@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=82"></script>
+<script src="js/pu-ontology.js?v=83"></script>
 <script src="js/pu-kakao-work.js?v=3"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=1"></script>
@@ -9138,6 +9138,8 @@ function wkOpenRuleRev(url){ try{ window.open(url,'_blank'); }catch(e){} }
     +'<button onclick="dMoreToggle()" title="푸른이알피 · 담당 변경 · 삭제">⋯</button>'
     +(S.dMore?'<div class="dmore">'
       +(it.src==='puerp'&&it.ref?'<button onclick="S.dMore=false;openPuerp(\''+escJ(it.ref.type)+'\')" title="푸른이알피 해당 메뉴로 이동">🔗 푸른이알피에서 열기</button>':'')
+      /* 정부지원금 «신청 대행»으로 넘어온 줄(2026-11-01) — 그 회사의 정부지원금 화면으로 */
+      +(it.src==='govaid'&&it.ga&&it.ga.key?'<button onclick="S.dMore=false;PuAppBar.goApp(\'pu-govaid.html?co='+escJ(encodeURIComponent(it.ga.key))+'\')" title="정부지원금에서 이 회사 보기">🎯 정부지원금에서 열기</button>':'')
       +'<button onclick="S.dMore=false;handoverModal(\''+id+'\')">🔄 담당 변경</button>'
       +'<button class="del" onclick="S.dMore=false;deleteItem(\''+id+'\')">🗑 삭제</button>'
       +'</div>':'')

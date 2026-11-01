@@ -28,10 +28,35 @@ test('저장 관문을 Firebase 초기화 전에 싣고, 강제 모드 관문으
 });
 
 /* 2026-10-12 📰 새 공고 — 공고 함(notices)에 «처리»를 적는 자리가 늘어 다섯 */
-test('쓰는 자리는 govaid 아래 다섯 곳뿐이다', () => {
+test('쓰는 자리는 govaid 아래 다섯 곳 + 업무관리 할 일(4단계 «신청 대행»)뿐이다', () => {
   const refs = [...NOC.matchAll(/gate\.(?:save|remove)\(fbDb\.ref\('([^']+)'/g)].map((m) => m[1]);
   assert.ok(refs.length >= 1);
-  refs.forEach((r) => assert.match(r, /^govaid\/(programs|prospects|extras|reviews|notices)\//, r));
+  refs.forEach((r) => assert.match(r, /^(govaid\/(programs|prospects|extras|reviews|notices)|work_erp\/items)\//, r));
+});
+
+test('[4단계] 업무관리에는 «새 줄일 때만» 쓴다 — 이미 있는 할 일(남이 적은 기록·상태)을 덮지 않는다', () => {
+  const ws = [...NOC.matchAll(/gate\.save\(fbDb\.ref\('work_erp\/items\/'[^\n]*/g)].map((m) => m[0]);
+  assert.ok(ws.length >= 1, '업무관리로 넘기는 저장이 없다');
+  ws.forEach((l) => assert.match(l, /expectedRevision:\s*-1/, l));
+  assert.doesNotMatch(NOC, /fbDb\.ref\('work_erp\/items\/'[^)]*\)\.(set|update|remove)\(/, '업무관리 줄을 관문 없이 고치지 않는다');
+});
+
+test('[4단계] «안내만»은 업무관리에 올리지 않는다 — 업무관리 쓰기는 신청 대행 갈래 안에만', () => {
+  const body = fnBody('saveHandoff');
+  const i = body.indexOf("work_erp/items/"), a = body.indexOf("if(H.mode==='apply')"), e = body.indexOf('} else {');
+  assert.ok(a >= 0 && i > a && i < e, '업무관리 쓰기가 apply 갈래 밖에 있다');
+});
+
+test('[4단계] 업무관리 상태는 넘긴 줄만 하나씩 읽는다 — 업무관리 전체를 내려받지 않는다', () => {
+  assert.doesNotMatch(NOC, /fbDb\.ref\('work_erp\/items'\)/);
+  assert.doesNotMatch(NOC, /fbDb\.ref\('work_erp'\)/);
+  assert.match(fnBody('loadWorkStat'), /fbDb\.ref\('work_erp\/items\/'\+id\)\.once\('value'\)/);
+});
+
+test('[4단계] 안내문은 보내지 않는다 — 복사만(메일·문자 보내기 함수를 부르지 않는다)', () => {
+  const body = fnBody('copyLetter') + fnBody('openLetter');
+  assert.match(body, /clipboard/);
+  assert.doesNotMatch(body, /fetch\(|sendMail|httpsCallable|functions\(\)/);
 });
 
 test('자료 표는 맨 왼쪽 ☐ + 번호 — 보기 전용 표만 예외(data-viewonly)', () => {
