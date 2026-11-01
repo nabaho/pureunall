@@ -1334,6 +1334,20 @@
     right: d => E.setPara(v => ({ right: Math.max(0, v.right + d) })),
     both: d => E.setPara(v => ({ left: Math.max(0, v.left + d), right: Math.max(0, v.right + d) })),
     firstLine: d => E.setPara(v => ({ indent: v.indent + d })),
+    // 빠른 내어쓰기: 둘째 줄부터 지금 커서 자리에 맞춤
+    quickHang: () => {
+      const b = E.currentBlock(); if (!b || !gsel().rangeCount) return;
+      const cs = getComputedStyle(b), rc = caretRect();
+      const px = rc.left - b.getBoundingClientRect().left - (parseFloat(cs.paddingLeft) || 0) * E.state.zoom;
+      const pt = Math.round(px / E.state.zoom * 0.75 * 10) / 10;
+      if (pt > 0) E.setPara(v => ({ indent: v.indent - pt }));
+    },
+    shiftTab: () => {
+      const td = E.currentCell(); if (!td) return KB.quickHang();
+      const cells = Array.from(td.closest('table').querySelectorAll('td,th')), p = cells[cells.indexOf(td) - 1];
+      if (p) E.caretAt(p.querySelector('p') || p);
+    },
+    styleNo: i => () => { const n = E.styleList()[i]; if (n) E.applyStyle(n); },
     // 표
     cellMove: (dr, dc) => {
       const td = E.currentCell(); if (!td) return;
@@ -1401,8 +1415,9 @@
       [['Ctrl+Alt+F5', 'Ctrl+Shift+E'], '왼쪽 여백 줄이기', C.outdent], [['Ctrl+Alt+F6', 'Ctrl+Shift+G'], '왼쪽 여백 늘이기', C.indent], [['Ctrl+Alt+F7', 'Ctrl+Shift+D'], '오른쪽 여백 늘이기', () => KB.right(10)],
       [['Ctrl+Alt+F8', 'Ctrl+Shift+F'], '오른쪽 여백 줄이기', () => KB.right(-10)], [['Ctrl+F5', 'Ctrl+Shift+O'], '첫 줄 내어쓰기', () => KB.firstLine(-10)], [['Ctrl+F6', 'Ctrl+Shift+I'], '첫 줄 들여 쓰기', () => KB.firstLine(10)],
       ['Ctrl+F7', '양쪽 여백 줄이기', () => KB.both(-10)], ['Ctrl+F8', '양쪽 여백 늘이기', () => KB.both(10)], [['Alt+Shift+Z', 'Ctrl+Shift+W'], '줄 간격 넓게', C.lineUp], [['Alt+Shift+A', 'Ctrl+Shift+Q'], '줄 간격 좁게', C.lineDown],
-      ['Ctrl+Shift+M', '양쪽 정렬', C.alignJ], ['Ctrl+Shift+L', '왼쪽 정렬', C.alignL], ['Ctrl+Shift+R', '오른쪽 정렬', C.alignR], ['Ctrl+Shift+C', '가운데 정렬', C.alignC], ['Ctrl+Shift+T', '배분 정렬', C.alignD],
+      [['Shift+Tab', 'Ctrl+Shift+Tab'], '빠른 내어쓰기 (표 안에서는 앞 셀로 이동)', KB.shiftTab], ['Ctrl+Shift+M', '양쪽 정렬', C.alignJ], ['Ctrl+Shift+L', '왼쪽 정렬', C.alignL], ['Ctrl+Shift+R', '오른쪽 정렬', C.alignR], ['Ctrl+Shift+C', '가운데 정렬', C.alignC], ['Ctrl+Shift+T', '배분 정렬', C.alignD],
     ]],
+    ['스타일', [...Array.from({ length: 10 }, (_, i) => [["Ctrl+" + ((i + 1) % 10), "Ctrl+Alt+" + ((i + 1) % 10)], '스타일 ' + (i + 1) + '번 적용 (스타일 목록 순서)', KB.styleNo(i)])]],
     ['쪽', [
       ['F7', '편집 용지', C.pageSetup], ['Ctrl+N,H', '머리말/꼬리말', C.headerDlg], ['Ctrl+N,P', '쪽 번호 매기기', C.pageNumDlg], [['Ctrl+Enter', 'Ctrl+J'], '쪽 나누기 (표 안에서는 줄 추가)', KB.inCell(C.rowBelow, C.pageBreak)],
     ]],
