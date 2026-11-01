@@ -84,10 +84,11 @@ test('넓은 낱말 — 「○○규정」·「변경신고」는 첨부가 있�
   assert.equal(P.isRulesMail(row({ s: '취업규칙 문의', a: 0 })), true, '좁은 낱말(취업규칙)은 첨부와 상관없이 그대로');
 });
 
-test('갈래 — 개정비교표는 신구대조표로, 노사협의회·근로계약서·4대보험 신고서·체크리스트는 기타로 가른다', () => {
+test('갈래 — 노사협의회·단체협약은 각각 분리하고, 개정비교표는 신구대조표로, 근로계약서·4대보험 신고서·체크리스트는 기타로 가른다', () => {
   const many = Array.from({ length: 12 }, (_, i) => '제' + (i + 1) + '조(가) 나').join('\n');
   assert.equal(P.kindOf('가나상사_취업규칙_개정비교표.hwp', many), '신구대조표');
-  assert.equal(P.kindOf('노사협의회 운영규정.hwp', many), '기타');
+  assert.equal(P.kindOf('노사협의회 운영규정.hwp', many), '노사협의회');
+  assert.equal(P.kindOf('2026년 단체협약서.hwp', many), '단체협약');
   assert.equal(P.kindOf('근로계약서_정규직.hwp', many), '기타');
   assert.equal(P.kindOf('취업규칙 작성_체크리스트.hwp', many), '기타');
   assert.equal(P.kindOf('국민연금, 건강보험_사업장소재지변경신고서.pdf', ''), '기타');

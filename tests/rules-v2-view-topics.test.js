@@ -364,23 +364,33 @@ test('⑧ 조별 문안의 한 줄 칸 — 넘치면 … ', () => {
   assert.match(HTML, /#topics \.ch2\{[^}]*white-space:nowrap/);
 });
 
-test('비규칙 문서(노사협의회·근로계약서·개정비교표)와 뒷장 별도 목적(제123조 본 장은…)은 총칙 목적에 섞이지 않는다', () => {
+test('노사협의회·단체협약은 취업규칙에서 분리되어 각자 갈래로 조회되고, 뒷장 별도 목적(제123조 본 장은…)은 총칙 목적에 섞이지 않는다', () => {
   const docs = {
     d1: D('d1', 1),
     dn: Object.assign(D('dn', 2), { name: '노사협의회 규정.hwp' }),
-    dc: Object.assign(D('dc', 3), { name: '취업규칙 개정비교표.hwp' }),
+    du: Object.assign(D('du', 3), { name: '2026년 단체협약서.hwp' }),
+    dc: Object.assign(D('dc', 4), { name: '취업규칙 개정비교표.hwp' }),
   };
   const texts = {
     d1: [
       '제1조(목적) 이 규칙은 가나상사 사원의 근로조건을 정한다.',
       '제123조(목적) 본 장은 사원의 기본적 생활을 보장하여 복지증진을 목적으로 한다.',
     ].join('\n'),
-    dn: '제1조(목적) 본 노사협의회는 근로자와 사용자 쌍방이 참여와 협력을 통하여 산업평화를 도모함을 목적으로 한다.',
+    dn: '제1조(목적) 본 노사협의회는 근로자와 사용자 쌍방이 참여와 협력을 통하여 산업평화를 도모함을 목적으로 한다.\n제6조(위원의 임기) 위원의 임기는 3년으로 한다.',
+    du: '제1조(유일교섭단체) 회사는 노동조합을 유일교섭단체로 인정한다.',
     dc: '제1조(목적) 현행 목적 조문 개정안 목적 조문',
   };
-  const m = V.model({ docs, human: { d1: linked('co1') }, rounds: {} }, texts, COS, STD, TODAY, CR);
-  assert.equal(m.docs, 1, '비교표·노사협의회 규정은 조별 문안 모수에서 빠진다');
-  assert.equal(m.byTopic['목적'].length, 1, '뒷장 제123조(목적) 본 장은… 이 총칙 목적에 섞이면 안 된다');
+  const mRule = V.model({ docs, human: { d1: linked('co1') }, rounds: {} }, texts, COS, STD, TODAY, CR, '규칙본문');
+  assert.equal(mRule.docs, 1, '노사협의회·단체협약·비교표는 취업규칙 모수에서 분리된다');
+  assert.equal(mRule.byTopic['목적'].length, 1, '뒷장 제123조(목적) 본 장은… 이 총칙 목적에 섞이면 안 된다');
+
+  const mNosa = V.model({ docs, human: {}, rounds: {} }, texts, COS, STD, TODAY, CR, '노사협의회');
+  assert.equal(mNosa.docs, 1, '노사협의회 규정은 노사협의회 갈래로 따로 모인다');
+  assert.ok(mNosa.byTopic['위원의임기'], '노사협의회 조별 문안이 따로 잡힌다');
+
+  const mUnion = V.model({ docs, human: {}, rounds: {} }, texts, COS, STD, TODAY, CR, '단체협약');
+  assert.equal(mUnion.docs, 1, '단체협약은 단체협약 갈래로 따로 모인다');
+  assert.ok(mUnion.byTopic['유일교섭단체'], '단체협약 조별 문안이 따로 잡힌다');
 });
 
 test('아래 문안이 원문자(①)로 시작해도 <ins> 바로 뒤에 빈 첫 줄(\\n)을 넣지 않는다', () => {

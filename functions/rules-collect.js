@@ -13,7 +13,7 @@ const X = require('./rules-collect-redact');
 const PDF = require('./rules-collect-pdf');   // 다시 보기 전에 pdf.js 를 실을 수 있는지 한 번 본다(받기 전에)
 const MR = require('./mail-receive');
 const LIB = 'rules_mgmt/library';
-const FILE_KINDS = ['규칙본문', '신구대조표'];
+const FILE_KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표'];
 /* 글도 안 담는 갈래 → 보류 까닭. 담는 것은 규칙본문·신구대조표뿐이다(조별 문안·우리 문안이 쓰는 것도 그 둘). */
 const NAMES = '근로자 이름·서명이 든 서류';
 const NO_TEXT_KINDS = {

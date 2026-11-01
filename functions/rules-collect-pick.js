@@ -22,7 +22,7 @@ function dirOf(src, slug, row) {
 /* 넓은 낱말 — 「○○규정」·「변경신고」 (대표 지시 2026-10-05 「지금까지 컨설팅했던것 모두 가지고 와라」).
    실측: 첨부가 있는데 위 낱말로는 놓친 메일 35통(규정 29 · 변경신고 4 · 단체협약 2 — 단체협약은 취업규칙이 아니라 뺐다).
    ⚠ 첨부가 있을 때만 — 「법 규정 안내」 소식지까지 열면 시간만 든다. 취업규칙이 아닌 첨부는 갈래 「기타」라 글을 안 담는다. */
-const BROAD_RE = /규정|변경\s*신고/;
+const BROAD_RE = /규정|변경\s*신고|노사\s*협의회|단체\s*협약|임금\s*협약|단협/;
 function isRulesMail(row) {
   if (!row) return false;
   const s = String(row.s || ''), p = String(row.p || '');
@@ -62,10 +62,14 @@ function kindOf(name, text) {
   const n = String(name || '');
   if (/신구|대조|비교표/.test(n)) return '신구대조표';
   if (/체크리스트/.test(n)) return '기타';
-  if (!/취업\s*규칙|사규/.test(n) && /국민연금|건강보험|고용보험|산재보험|4대보험|피보험자|소재지\s*변경|사업자등록|노사협의회|근로계약|연봉계약|서약|경업금지|비밀유지|협약|단체협약|정관/.test(n)) return '기타';
+  if (!/취업\s*규칙|취업\s*규정|사규/.test(n) && /국민연금|건강보험|고용보험|산재보험|4대보험|피보험자|소재지\s*변경|사업자등록|근로계약|연봉계약|서약|경업금지|비밀유지|정관/.test(n)) return '기타';
   if (/신고/.test(n)) return '신고서';
   if (/동의/.test(n)) return '동의서';
   if (/의견/.test(n)) return '의견청취';
+  if (!/취업\s*규칙|취업\s*규정|사규/.test(n)) {
+    if (/노사\s*협의회|협의회\s*(?:운영\s*)?규정/.test(n)) return '노사협의회';
+    if (/단체\s*협약|임금\s*협약|단협/.test(n)) return '단체협약';
+  }
   if (/취업\s*규칙|규정|규칙|사규/.test(n)) return '규칙본문';
   const arts = (String(text || '').match(/(^|\n)\s*제\s*\d+\s*조/g) || []).length;
   return arts >= 10 ? '규칙본문' : '기타';
