@@ -82,6 +82,43 @@
     return Object.assign(b, { id: b.id, star: { on: !!on, why: (why || cur.why || ''), by: actor, at: now } });
   }
 
+  /* 4단계 연계 (대표 2026-11-01 시안 → 「추천대로」)
+     «신청 대행»만 업무관리 할 일 한 줄. «안내만»은 검토 칸의 told 로만 남는다(업무관리 진행중이 쌓이지 않게).
+     결과(선정·탈락)도 검토 칸 — 금액은 적지 않는다. */
+  function safe(s) { return String(s == null ? '' : s).replace(/[.#$\[\]\/]/g, '_'); }
+  /* 같은 회사×사업은 언제나 같은 id — 두 번 눌러도 업무관리에 한 줄 */
+  function workKey(key, pid) { return 'GA-' + safe(key) + '-' + safe(pid); }
+  function workItem(o) {
+    o = o || {};
+    var s = o.subject || {}, t = o.target || {}, m = o.mgr || {}, title = String(t.name || t.short || '').trim();
+    var rec = { id: workKey(s.key, t.id), no: o.year + '-지원-' + safe(t.short || title).slice(0, 12), cat: '지원',
+      company: String(s.name || ''), co_id: s.kind === 'co' ? String(s.id || '') : '',
+      title: (title + ' — 신청 대행').slice(0, 200), status: '진행중', start: o.today || '', due: o.due || '',
+      brief: [String(o.note || '').trim(), '🎯 정부지원금에서 넘김'].filter(Boolean).join(' · ').slice(0, 300),
+      mgr_main: { sid: String(m.sid || ''), name: String(m.name || '') }, mgr_subs: [],
+      src: 'govaid', ga: { key: String(s.key || ''), pid: String(t.id || '') }, created_at: o.nowIso || '' };
+    if (s.kind === 'co' && s.id) rec.companyId = String(s.id);
+    if (!m.sid) rec.pe_nomgr = true;
+    return rec;
+  }
+  var TOLD_HOW = ['메일', '카톡', '전화', '방문'], RESULTS = ['selected', 'rejected'];
+  /* 검토 칸에 진행(work·told·result)을 얹는다 — 결정·사유·검토한 사람은 그대로. null 이면 그 칸을 비운다 */
+  function reviewPatched(prev, subject, pid, patch, actor, now, opt) {
+    patch = patch || {}; opt = opt || {}; subject = subject || {};
+    if (patch.told && TOLD_HOW.indexOf(patch.told.how) < 0) throw new Error('안내한 방법을 고르세요: ' + TOLD_HOW.join('·'));
+    if (patch.result && RESULTS.indexOf(patch.result.v) < 0) throw new Error('결과는 선정·탈락만 적습니다');
+    var b = Object.assign({}, prev || {}, { id: subject.key + '__' + pid, entityType: 'EligibilityReview', subjectKey: subject.key, programId: pid });
+    if (subject.kind === 'co') b.companyId = subject.id; else { b.sourceKind = 'govaidProspect'; b.sourceId = subject.id; }
+    if (opt.targetKind) b.targetKind = opt.targetKind;
+    if (opt.targetName) b.targetName = String(opt.targetName).slice(0, 200);
+    ['work', 'told', 'result'].forEach(function (k) {
+      if (!(k in patch)) return;
+      b[k] = patch[k] ? Object.assign({}, patch[k], { by: actor, at: patch[k].at || now }) : null;
+    });
+    return b;
+  }
+
   return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany, starred: starred,
-    noticeLinked: noticeLinked, noticeDecided: noticeDecided, programFromNotice: programFromNotice };
+    noticeLinked: noticeLinked, noticeDecided: noticeDecided, programFromNotice: programFromNotice,
+    workKey: workKey, workItem: workItem, reviewPatched: reviewPatched, TOLD_HOW: TOLD_HOW };
 });
