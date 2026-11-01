@@ -222,7 +222,14 @@ test('★★ 마우스 «오른쪽»에 둔다 — 모자라면 왼쪽, 그래�
 /* ══ ⑦ 화면에 달려 있나 ══ */
 test('★★ 줄에 달려 있다 — 본문 미리 받기(mbHoverPeek)와 «같이» 부른다 · 켜고 끄는 칩 · 다시 그릴 때·열 때 닫는다', () => {
   const app = strip(HTML);
-  assert.match(HTML, /onmouseenter="mbHoverPeek\('\$\{v\._slug\}','\$\{v\.u\}'\);mbCardEnter\(this,event,'\$\{v\._slug\}','\$\{v\.u\}'\)" onmouseleave="mbHoverCancel\(\);mbCardLeave\(\)"/, '줄에 안 달렸다');
+  /* ★ 대표 지시 2026-11-01 「팝업화면이 아무데서나 나오는데 현재 메일 내용에 대한 부분에 마우스가 올라갈 때 나오게」
+       — 줄 전체가 아니라 «제목(.sub)·미리보기 글(.pre)»에만 건다. 줄(.dm-row)·체크칸·별·보낸이·딱지·날짜에는 없다. */
+  assert.match(HTML, /const hov = `onmouseenter="mbHoverPeek\('\$\{v\._slug\}','\$\{v\.u\}'\);mbCardEnter\(this\.closest\('\.dm-row'\),event,'\$\{v\._slug\}','\$\{v\.u\}'\)" onmouseleave="mbHoverCancel\(\);mbCardLeave\(\)"`;/, '카드·미리 받기를 함께 부르는 묶음(hov)이 없다');
+  assert.match(HTML, /<span class="sub" \$\{hov\} /, '제목에 안 달렸다');
+  assert.match(HTML, /<span class="pre" \$\{hov\} /, '미리보기 글에 안 달렸다');
+  assert.equal((HTML.match(/\$\{hov\}/g) || []).length, 2, '제목·미리보기 말고 다른 곳에도 달렸다');
+  const rowTag = HTML.slice(HTML.indexOf('<div class="dm-row ${Number(v.r||0)'), HTML.indexOf('<input type="checkbox" class="chk" ${pickOn(sel,v._key)'));
+  assert.ok(rowTag.length > 50 && !/onmouseenter/.test(strip(rowTag)), '줄 전체에 마우스 올림이 달려 있다 — 아무 데서나 카드가 뜬다');
   assert.match(HTML, /class="dm-cardtog \$\{mbCardOn\(\)\?'on':''\}" onclick="mbCardToggle\(\)"/, '켜고 끄는 칩이 없다');
   assert.match(strip(fn('renderMailPage')), /mbCardHide\(\)/, '줄을 다시 그려도 카드가 남는다');
   assert.match(strip(fn('mbOpenMsg')), /mbCardHide\(\)/, '메일을 열어도 카드가 남는다');
