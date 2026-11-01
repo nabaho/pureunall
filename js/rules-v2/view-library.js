@@ -74,7 +74,7 @@
     var d = st.data || {};
     var items = O().merge(d.docs || {}, d.human || {});
     var no = O().numberOf(items);
-    var groups = O().companyGroups(items, d.rounds || {});
+    var groups = O().companyGroups(items, d.rounds || {}, d.ns);
     var info = {};                                    // docId → { ver, total, final, cand:[…], group }
     groups.forEach(function (g) {
       g.rows.forEach(function (v) {

@@ -88,13 +88,15 @@
     });
     return out;
   }
-  function companyGroups(items, rounds) {
-    var byCo = {};
+  /* ns — 분류(노사협의회·단체협약)별 회차 레코드 이름공간(lib-set.js). 취업규칙은 빈 글자라 회차 id 가 지금 그대로다(co_r202601).
+     ⚠ 이름공간이 없으면 한 사업장의 노사협의회 회차와 취업규칙 회차가 같은 id 를 써서 ★최종본 표시가 서로 덮는다 */
+  function companyGroups(items, rounds, ns) {
+    var byCo = {}, pre = ns ? String(ns) + '_' : '';
     items.forEach(function (it) { if (it.companyId) (byCo[it.companyId] = byCo[it.companyId] || []).push(it); });
     var out = [];
     Object.keys(byCo).forEach(function (co) {
       roundsOf(byCo[co]).forEach(function (r) {
-        var rid = co + '_' + r.roundKey, rec = (rounds || {})[rid] || {};
+        var rid = co + '_' + pre + r.roundKey, rec = (rounds || {})[rid] || {};
         // 최종본은 그 회차 안에 있는 문서일 때만 보인다 — 회차가 바뀌어 밖으로 나간 옛 표시는 무시
         var fin = rec.finalDocId && r.items.some(function (it) { return it.id === rec.finalDocId; }) ? rec.finalDocId : null;
         out.push({ companyId: co, roundKey: r.roundKey, roundId: rid, items: r.items, rows: versionsOf(r),

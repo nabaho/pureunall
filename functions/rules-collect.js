@@ -9,6 +9,7 @@
 'use strict';
 const crypto = require('crypto');
 const P = require('./rules-collect-pick');
+const SET = require('./rules-set-core/lib-set.js');   // 화면 js/rules-v2/lib-set.js 의 «글자 그대로» 사본(scripts/sync-rules-set-core.js)
 const X = require('./rules-collect-redact');
 const PDF = require('./rules-collect-pdf');   // 다시 보기 전에 pdf.js 를 실을 수 있는지 한 번 본다(받기 전에)
 const MR = require('./mail-receive');
@@ -64,11 +65,15 @@ function withTimeout(p, ms) {
 }
 /* 오류는 «이름표»만 남긴다 — 파서·창고 메시지가 글 조각을 인용할 수 있어 e.message 는 담지 않는다 */
 function errTag(e) { return String((e && (e.code || e.name)) || '오류').slice(0, 40); }
+/* set — 기업규정집 분류(취업규칙·노사협의회·단체협약, 2026-11-01). 이름·메일 제목으로 짐작한 값을 «찍는다».
+   글 머리까지 본 값은 담는 자리(body.set)가 먼저 넣는다. 사람이 고친 값(human.setFix)은 이것보다 앞선다(화면 lib-set.docSet). */
 function docRecord(o) {
+  const b = o.body || {};
   return Object.assign({
     id: o.id, entityType: 'RulesDocument', schemaVersion: 1, contractVersion: o.cv,
     createdAt: o.now, updatedAt: o.now, revision: 1,
-  }, o.body);
+    set: SET.setOfName(b.name, b.mail && b.mail.subject, ''),
+  }, b);
 }
 
 /* ══════ 이어 달리기 · 잠금 (2026-10-05 대표 지시 「지금까지 컨설팅했던것 모두 가지고 와라」) ══════
@@ -333,7 +338,7 @@ async function runOnce(o) {
         }
         up[LIB + '/text/' + id] = r.text;
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
-          { kind, sha, file, textLen: r.text.length,
+          { kind, sha, file, textLen: r.text.length, set: SET.setOfName(a.name, mail.subject, r.text),
             pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '', recheckV: RECHECK_V },
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}) });   // 쪽 한도(300)에 잘린 PDF 는 표시 — 뒤쪽은 담기지 않았다
         if (ext !== 'pdf' && kind === '규칙본문') { bodyStored = true; bodyIds.add(id); }

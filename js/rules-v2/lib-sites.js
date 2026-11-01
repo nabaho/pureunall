@@ -32,7 +32,7 @@
   function model(data, companies) {
     data = data || {};
     var items = O.merge(data.docs, data.human);
-    var groupsAll = O.companyGroups(items, data.rounds);
+    var groupsAll = O.companyGroups(items, data.rounds, data.ns);
     var groupsBy = {}, linkedBy = {}, candBy = {};
     groupsAll.forEach(function (g) { (groupsBy[g.companyId] = groupsBy[g.companyId] || []).push(g); });
     items.forEach(function (it) {

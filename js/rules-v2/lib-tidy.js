@@ -117,7 +117,7 @@
     data = data || {};
     var ORDER = [O.R_REPORT, O.R_NAME, O.R_AGREE];
     var items = O.merge(data.docs, data.human);
-    return O.companyGroups(items, data.rounds).filter(function (g) {
+    return O.companyGroups(items, data.rounds, data.ns).filter(function (g) {
       return g.rows.length && !g.finalDocId && !g.noFinal;
     }).map(function (g) {
       var pre = null;
