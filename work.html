@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=85"></script>
+<script src="js/pu-ontology.js?v=86"></script>
 <script src="js/pu-kakao-work.js?v=3"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=1"></script>
@@ -5923,7 +5923,9 @@ function mailFlag(it){
 function peFlag(it){
   var h='';
   if(it.pe_gone) h+=' <span style="color:var(--danger);font-weight:800;font-size:10px" title="푸른이알피에서 원본이 삭제되었습니다. 이 업무와 기록은 그대로 보존됩니다.">⚠ 원본 없음</span>';
-  if(it.pe_nomgr) h+=' <span style="color:var(--warn);font-weight:800;font-size:10px" title="푸른이알피에 주담당이 없어 대표에게 배치했습니다. 푸른이알피에서 담당을 지정하면 자동으로 옮겨집니다.">담당 미지정</span>';
+  if(it.pe_nomgr) h+=' <span style="color:var(--warn);font-weight:800;font-size:10px" title="'+(it.src==='govaid'?'기업정부지원금에서 넘길 때 담당을 정하지 않았습니다. ✏️ 수정에서 담당을 정하세요.':'푸른이알피에 주담당이 없어 대표에게 배치했습니다. 푸른이알피에서 담당을 지정하면 자동으로 옮겨집니다.')+'">담당 미지정</span>';
+  /* 기업정부지원금 «진행 카드»의 단계·다음 할 일(2026-11-01) — 그쪽에서 단계가 바뀌면 여기 칸(ga_stage·ga_next)과 마감이 같이 바뀐다 */
+  if(it.src==='govaid'&&it.ga_stage) h+=' <span style="color:#1e40af;font-weight:800;font-size:10px" title="'+esc('기업정부지원금 진행 — 다음: '+(it.ga_next||'—'))+'">🎯 '+esc(it.ga_stage)+'</span>';
   return h;
 }
 // 읽기용 칩 — 팀 전체·종료 화면에서 쓴다. 그 화면들에서는 상태를 바꾸지 않는다.

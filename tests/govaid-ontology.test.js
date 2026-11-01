@@ -9,7 +9,8 @@ test('정부지원금이 등록부에 있고 쓰는 자리 넷을 선언한다',
   const g = O.PROGRAMS.govaid;
   assert.ok(g, 'PROGRAMS.govaid 가 없다');
   assert.equal(g.file, 'pu-govaid.html');
-  assert.deepEqual(g.primaryRoots, ['govaid']);
+  assert.equal(g.primaryRoots[0], 'govaid');
+  assert.ok(g.primaryRoots.indexOf('govaid_money') >= 0, '받은 금액 자리(관리자·재무만)가 등록부에 없다');
   const paths = g.writeContracts.map((w) => w.path);
   ['programs', 'prospects', 'extras', 'reviews'].forEach((k) =>
     assert.ok(paths.some((p) => p.indexOf('govaid/' + k + '/') === 0), k + ' 쓰기 계약이 없다'));

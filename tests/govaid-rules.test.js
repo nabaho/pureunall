@@ -63,3 +63,24 @@ test('공고 함(notices) — 재직 직원 쓰기, 지우기 금지, 열쇠와 
   assert.equal(ev(G.notices.$id['.validate'], { newData: { id: 'PBLN_2' }, $id: 'PBLN_1' }), false);
   assert.equal(G.noticeLast['.write'], false);
 });
+
+/* 받은 지원금 금액(2026-11-01 진행 카드 «추천대로»: 금액은 관리자·재무만) — govaid 는 재직 직원 모두가 읽어 그 안에 둘 수 없다 */
+test('govaid_money — 관리자·재무 권한만 읽고 쓴다, 일반 직원·퇴사자는 못 본다, 지우기 금지·열쇠 일치', () => {
+  root.v.uid_roles.adminUid = { status: 'active', sid: 'P-001', isAdmin: true };
+  root.v.uid_roles.finUid = { status: 'active', sid: 'A-002', fin: true };
+  root.v.uid_roles.oldAdminUid = { status: 'retired', sid: 'P-009', isAdmin: true };
+  const M = rules.govaid_money;
+  assert.ok(M, '만들개에 rules.govaid_money 가 없다');
+  assert.equal(ev(M['.read'], { auth: auth('adminUid') }), true);
+  assert.equal(ev(M['.read'], { auth: auth('finUid') }), true);
+  assert.equal(ev(M['.read'], { auth: auth('staffUid') }), false, '일반 직원은 금액을 못 본다');
+  assert.equal(ev(M['.read'], { auth: auth('oldAdminUid') }), false, '퇴사한 관리자도 못 본다');
+  const w = M.$k.$p['.write'], v = M.$k.$p['.validate'];
+  assert.equal(ev(w, { auth: auth('finUid'), newData: { id: 'co_c1__gp-1' } }), true);
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'co_c1__gp-1' } }), false);
+  assert.equal(ev(w, { auth: auth('adminUid'), data: { id: 'x' } }), false, '지우기(빈 값)는 관리자도 못 한다');
+  assert.equal(ev(v, { newData: { id: 'co_c1__gp-1' }, $k: 'co_c1', $p: 'gp-1' }), true);
+  assert.equal(ev(v, { newData: { id: 'co_c2__gp-1' }, $k: 'co_c1', $p: 'gp-1' }), false);
+  /* govaid 안에는 금액 칸이 없어야 한다 — 거기 두면 전 직원이 읽는다 */
+  assert.equal(G.money, undefined);
+});

@@ -230,11 +230,67 @@
     L.push('', '※ 최종 지원 여부와 금액은 각 기관 심사로 정해집니다. 공고 원문을 함께 확인해 주십시오.');
     return L.join('\n');
   }
+  /* 📋 신청 대행 «진행 카드»(2026-11-01) — 서류 요청 → 검토 → 신청 → 심사 → 승인 → 지급 → 받음 → 사후관리.
+     서류 목록 = 사업 사전의 서류(d0, d1 … 차례) + 사람이 더한 서류(x…). 상태·메모는 검토 칸의 case.docs */
+  var STAGES = ['', '서류 요청', '서류 검토', '신청', '심사', '승인', '지급 신청', '받음', '사후관리'];
+  function caseDocs(program, review) {
+    var st = ((review || {}).case || {}).docs || {}, out = [];
+    M.list((program || {}).docs).forEach(function (d, i) {
+      if (!d) return;
+      var id = 'd' + i, x = st[id] || {}, def = M.DOCS[d.key];
+      out.push({ id: id, key: d.key || 'other', label: clean(x.label) || clean(d.label) || (def ? def.label : ''), stage: clean(d.stage), labor: !!(def && def.labor), st: clean(x.st), memo: clean(x.memo) });
+    });
+    Object.keys(st).filter(function (k) { return /^x\d+$/.test(k) && clean(st[k].label); }).sort(function (a, b) { return Number(a.slice(1)) - Number(b.slice(1)); })
+      .forEach(function (k) { var x = st[k]; out.push({ id: k, key: 'other', label: clean(x.label), stage: '', labor: false, st: clean(x.st), memo: clean(x.memo) }); });
+    return out;
+  }
+  function payState(c) {
+    var n = Number(c.payN) || 0, paid = 0, applied = 0, pays = c.pays || {};
+    for (var i = 1; i <= n; i++) { var p = pays[i] || {}; if (p.paidAt) paid++; if (p.appliedAt || p.paidAt) applied++; }
+    return { n: n, paid: paid, applied: applied };
+  }
+  function caseStage(review, program) {
+    var r = review || {}, c = r.case || {};
+    if (r.result && r.result.v === 'rejected') return { n: 0, label: '탈락' };
+    var ps = payState(c), approved = !!c.approvedAt || !!(r.result && r.result.v === 'selected'), n;
+    if (ps.n && ps.paid >= ps.n) n = c.keepUntil ? 8 : 7;
+    else if (approved) n = ps.applied ? 6 : 5;
+    else if (c.appliedAt) n = 4;
+    else {
+      var d = caseDocs(program, r);
+      n = d.length && d.every(function (x) { return x.st === 'ok'; }) ? 3 : d.some(function (x) { return ['got', 'ok', 'fix'].indexOf(x.st) >= 0; }) ? 2 : 1;
+    }
+    return { n: n, label: n === 6 ? '지급 ' + ps.paid + '/' + ps.n + '회' : STAGES[n] };
+  }
+  /* 다음 할 일 + 그 마감 — 업무관리 할 일의 마감(due)도 이것을 따른다 */
+  function caseNext(review, program) {
+    var r = review || {}, c = r.case || {}, s = caseStage(r, program), due = clean((r.work || {}).due), d = caseDocs(program, r);
+    var names = function (f) { return d.filter(f).map(function (x) { return x.label; }).slice(0, 2).join('·'); };
+    if (s.n === 0) return { text: '탈락 — 끝', due: '' };
+    if (s.n === 1) return { text: '서류 요청' + (d.length ? ': ' + names(function (x) { return !x.st || x.st === 'asked'; }) : ''), due: due };
+    if (s.n === 2) {
+      var fix = names(function (x) { return x.st === 'fix'; });
+      var got = names(function (x) { return x.st === 'got'; });
+      return { text: fix ? '서류 보완: ' + fix : got ? '서류 검토: ' + got : '남은 서류: ' + names(function (x) { return x.st !== 'ok'; }), due: due };
+    }
+    if (s.n === 3) return { text: '신청', due: due };
+    if (s.n === 4) return { text: '승인 기다림', due: '' };
+    var pays = c.pays || {}, N = Number(c.payN) || 0;
+    if (s.n === 5 || s.n === 6) {
+      for (var i = 1; i <= Math.max(N, 1); i++) {
+        var p = pays[i] || {};
+        if (p.paidAt) continue;
+        return { text: i + '회차 지급 ' + (p.appliedAt ? '기다림' : '신청'), due: p.appliedAt ? '' : clean(p.due) };
+      }
+    }
+    if (s.n === 8) return { text: '고용 유지 끝 ' + c.keepUntil, due: clean(c.keepUntil) };
+    return { text: '다 받음', due: '' };
+  }
   function isStar(p) { return !!(p && p.star && p.star.on === true); }
   function starOnly(progs, on) { return on ? progs.filter(isStar) : progs; }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
-  return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf, handoffRows: handoffRows, letterFor: letterFor,
+  return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf, handoffRows: handoffRows, letterFor: letterFor, caseDocs: caseDocs, caseStage: caseStage, caseNext: caseNext, CASE_STAGES: STAGES,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
     ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
     noticeRows: noticeRows, noticeCount: noticeCount, localNotices: localNotices, regionSummary: regionSummary, areaMatch: areaMatch, isStar: isStar, starOnly: starOnly };
