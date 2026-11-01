@@ -1513,6 +1513,10 @@ rules.rules_mgmt = {
     doneBy:  { '.validate': 'newData.isString() && newData.val().length <= 40' },
     ownerName: { '.validate': 'newData.isString() && newData.val().length <= 40' },
     from: { '.validate': "newData.isString() && newData.val().matches(/^(rules|chwieop)$/)" },
+    /* 📮 신고일·관할 노동청 (설계 2026-10-03-취업규칙-새로짓기-design.md §15-4, 2026-11-01) — 🏢 사업장 «마지막 신고» 칸이 무거운 done 대신 여기서 읽는다.
+       읽기는 위와 같이 로그인 직원(done 도 같은 사람이 이미 읽는다 — 넓어지지 않음). 신고 표시가 있을 때만 싣는다(PuRulesHistory.fit) */
+    filedAt: { '.validate': "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)" },
+    filedOffice: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other: { '.validate': false }
   } } },
   orig:    { '.read': LOGIN, $id: { '.write': origWrite } },

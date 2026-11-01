@@ -47,11 +47,12 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=2"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-sites.js?v=2"></script>
-<script src="js/rules-v2/store.js?v=5"></script>
+<script src="js/rules-v2/lib-sites.js?v=3"></script>
+<script src="js/rules-v2/store.js?v=6"></script>
 <script src="js/rules-v2/view-library.js?v=6"></script>
-<script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=11"></script>
+<script src="js/rules-v2/lib-status.js?v=1"></script>
+<script src="js/rules-v2/lib-sitecols.js?v=2"></script>
+<script src="js/rules-v2/view-sites.js?v=12"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -205,7 +206,7 @@ button{font:inherit;cursor:pointer}
 #sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
-.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:886px}
+.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:888px}
 /* ↑ min-width 는 «다른 칸 폭의 합 + 이름 칸 몫»이다 — 칸 폭은 view-sites.js 의 colgroup.
      ☐ 칸(28)을 더하며 886 — 1366px 노트북에서 표 자리가 약 889px 라, 그보다 넓으면 ★최종본 칸이 잘려 옆으로 밀어야 한다(2026-10-18 실측).
      800 이던 때 다른 칸 합이 754 라 이름 칸이 46px 만 남아 폰·좁은 PC 에서 「삼…」 한 글자만 보였다(2026-10-18).
@@ -231,6 +232,27 @@ button{font:inherit;cursor:pointer}
 #sites .k.cand{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
 #sites .k.none{color:#94a3b8;padding:0}
 #sites .fin{color:#166534;font-weight:700}
+/* 🏢 현황 한 줄 (설계 §15, 2026-11-01) — «진행»·«마지막 신고» 칸 · ⚠ 살펴볼 곳 · 오른쪽 「현황 한 줄」.
+   ⚠ 이름은 .sg — 모은 자료 표의 .st(갈래 상태 딱지)와 겹치지 않게 */
+#sites .sg{font-weight:600}
+#sites .sg.done{color:#166534}
+#sites .sg.go{color:#1e40af}
+#sites .sg.stop{color:#991b1b}
+#sites .sg.none{color:#94a3b8;font-weight:400}
+#sites .k.look{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+#sites .chip.look:not(.on){background:#fef2f2;border-color:#fecaca;color:#991b1b}
+#sites .fd{font-variant-numeric:tabular-nums}
+#sites .src{font-size:11px;color:#475569}
+#sites .snow{border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;margin-bottom:12px;background:#ffffff}
+#sites .snow .r{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:12.5px;white-space:nowrap;min-width:0}
+#sites .snow .r .l{flex:none;width:68px;color:#475569;font-size:12px}
+#sites .snow .r .v{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#sites .ssteps{display:flex;gap:3px;align-items:center;margin-top:6px;overflow-x:auto;scrollbar-width:none;color:#94a3b8;font-size:11.5px}
+#sites .ssteps::-webkit-scrollbar{display:none}
+#sites .ssteps em{font-style:normal;flex:none}
+#sites .ssteps i{font-style:normal;flex:none;padding:2px 7px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;white-space:nowrap}
+#sites .ssteps i.on{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+#sites .ssteps i.next{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:700}
 #sites .sside{padding:14px 16px;min-width:0;background:#ffffff}
 #sites .sside.empty{color:#475569;padding:30px 16px}
 #sites .sside h3{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -333,7 +355,8 @@ button{font:inherit;cursor:pointer}
   #sites .sites tbody tr::after{content:'';order:4;flex-basis:100%;height:0}
   #sites .sites td{display:block;padding:0;border:0;background:none;min-width:0}
   #sites .sites tr.sel td{background:none}
-  /* 1줄 ☐ · № · 사업장 · 취업규칙 자료 / 2줄 최근 · ★최종본 · 담당 · 규모 · 업태 (☐ 칸이 맨 앞이라 칸 번호가 하나씩 밀렸다) */
+  /* 1줄 ☐ · № · 사업장 · 진행 / 2줄 취업규칙 자료 · 마지막 신고 · ★최종본 · 담당 · 규모 · 업태 (설계 §15 — 칸 차례는 view-sites.js 의 listHtml)
+     칸 번호: 1 ☐ · 2 № · 3 사업장 · 4 규모 · 5 업태 · 6 담당 · 7 진행 · 8 마지막 신고 · 9 ★최종본 · 10 취업규칙 자료 */
   #sites .sites tbody tr.ck{background:#eff6ff}
   #sites .sites tr.ck td{background:none}
   #sites .sites td:nth-child(1){order:0;flex:0 0 30px}
@@ -341,15 +364,16 @@ button{font:inherit;cursor:pointer}
   #sites .sites td.pk input{width:22px;height:22px;margin:0}
   #sites .sites td:nth-child(2){order:1;flex:0 0 22px}
   #sites .sites td:nth-child(3){order:2;flex:1 1 0}
-  #sites .sites td:nth-child(7){order:3;flex:none}
-  #sites .sites td:nth-child(7) .btn{display:none}
-  #sites .sites td:nth-child(n+4):not(:nth-child(7)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
-  #sites .sites td:nth-child(8){order:5;margin-left:68px}
-  #sites .sites td:nth-child(9){order:6}
-  #sites .sites td:nth-child(6){order:7}
-  #sites .sites td:nth-child(4){order:8}
-  #sites .sites td:nth-child(5){order:9}
-  #sites .sites td:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(9)):has(> .k.none:only-child){display:none}
+  #sites .sites td:nth-child(7){order:3;flex:none;font-size:12.5px}
+  #sites .sites td:nth-child(10){order:5;flex:none;margin-left:56px}
+  #sites .sites td:nth-child(10) .btn{display:none}
+  #sites .sites td:nth-child(n+4):not(:nth-child(7)):not(:nth-child(10)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
+  #sites .sites td:nth-child(8){order:6}
+  #sites .sites td:nth-child(9){order:7}
+  #sites .sites td:nth-child(6){order:8}
+  #sites .sites td:nth-child(4){order:9}
+  #sites .sites td:nth-child(5){order:10}
+  #sites .sites td:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(8),:nth-child(9)):has(> .k.none:only-child){display:none}
   #sites .sites td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal}
   #sites .sside.empty{display:none}
   #sites .sside:not(.empty){position:fixed;inset:0;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:10px 10px 40px}
@@ -944,7 +968,7 @@ var H = {
     tFinalMany(list.map(function (r) { return { companyId: r.companyId, roundKey: r.roundKey, docId: T().ver[r.roundId] || r.pre }; }), '고른 ' + list.length + '회차');
   },
   /* ── 🏢 사업장 ── */
-  siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; ST.sites.page = 1; draw(); },
+  siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' || d.f === 'look' ? d.f : 'has'; ST.sites.page = 1; draw(); },
   sq: function (v) {
     /* 값은 바로 상태에 넣는다(다른 일로 다시 그려도 낡은 글이 안 보이게). 다시 그리는 것만 미룬다 —
        한글 조합 중($sites.__pdComposing)에는 그리지 않고, 조합이 끝나면 뷰가 한 번 더 부른다 */

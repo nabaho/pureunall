@@ -319,7 +319,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 새 자리뿐이다(읽기·쓰기 재직 + 관리자·위임관리인·재무권한, 지우기 금지). */
   /* ★ 2026-10-31 — /settle 게시 완료(rules-deploy.js --deploy, 대표 PC, 위 «통째 지우기 막기» 게시 뒤): 새로 1 · 바뀜 0 · 사라짐 0,
        문법 검사 통과·다시 읽어 같음 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-10-31.json(settle 까지 든 판) — 목록을 비운다. */
-  const PENDING = [];
+  /* 2026-11-01 게시 전 — 취업규칙 이력 색인에 📮 신고일·관할 노동청 두 칸(rules_mgmt/index/$site/$rev/filedAt·filedOffice)을 더했다
+     (설계 2026-10-03-취업규칙-새로짓기-design.md §15-4). 새로 생김 2 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 읽기는 그대로 로그인 직원
+     (같은 값이 든 rules_mgmt/done 도 이미 로그인 직원이 읽는다). 클라우드 방은 GitHub 「Firebase 배포」(rules=true)로 게시한 뒤
+     콘솔 원문을 새 판으로 갈아 끼우고 아래 두 줄을 뺄 것. 게시 전에는 📮 가 있는 회차의 색인 쓰기만 막힌다(다른 회차는 그대로). */
+  const PENDING = ['/rules_mgmt/index/$site/$rev/filedAt', '/rules_mgmt/index/$site/$rev/filedOffice'];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

@@ -23,7 +23,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-rules-history.js?v=3"></script>
+<script src="js/pu-rules-history.js?v=4"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/pu-rules-lawlink.js?v=2"></script>
 <script src="js/pu-rules-lawwatch.js?v=2"></script>
@@ -45,8 +45,8 @@
      lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-order.js?v=2"></script>
 <script src="js/rules-v2/lib-topics.js?v=2"></script>
-<script src="js/rules-v2/lib-sites.js?v=2"></script>
-<script src="js/rules-v2/store.js?v=5"></script>
+<script src="js/rules-v2/lib-sites.js?v=3"></script>
+<script src="js/rules-v2/store.js?v=6"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
 <script src="js/rules-v2/view-topics.js?v=5"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
@@ -5269,7 +5269,9 @@ function rulesIndexOf(rec){
     savedAt:rec.savedAt, savedBy:rec.savedBy,
     doneAt:rec.doneAt, doneBy:rec.doneBy,
     ownerUid:rec.ownerUid||myUid()||"",
-    ownerName:rec.ownerName, from:rec.from
+    ownerName:rec.ownerName, from:rec.from,
+    /* 📮 신고일 — 🏢 사업장 «마지막 신고» 칸이 이것을 읽는다(rules-v2 설계 §15-4). 바른 꼴일 때만 fit 이 싣는다 */
+    filedAt:rec.filedAt, filedOffice:rec.filedOffice
   });
 }
 function rulesIndexPath(rec){
@@ -5440,7 +5442,9 @@ function backfillRulesIndex(){
     Object.keys(STORE.done||{}).forEach(sk=>{
       const revs=STORE.done[sk]||{};
       Object.keys(revs).forEach(rv=>{
-        if(have[sk]&&have[sk][rv])return;                 // 이미 있다
+        const h=have[sk]&&have[sk][rv];
+        // 이미 있고 📮 신고일도 같으면 건너뛴다 — 신고일이 다르면(색인에 신고일 칸이 생기기 전에 적은 📮 등) 다시 쓴다
+        if(h&&String(h.filedAt||"")===String(revs[rv].filedAt||""))return;
         const r=Object.assign({},revs[rv],{siteKey:sk,rev:rv,id:sk+"@"+rv});
         if(!isOwner(r))return;                            // 남의 것은 못 쓴다
         todo.push(r);
@@ -6053,6 +6057,9 @@ async function saveFiled(sub){
   const next=Object.assign({},r);
   Object.keys(p.patch).forEach(k=>{ if(p.patch[k]==null)delete next[k]; else next[k]=p.patch[k]; });
   arr[i]=next; setLocal(arr); storePut(next);
+  /* 색인도 다시 쓴다 — 🏢 사업장 «마지막 신고»는 무거운 done 대신 색인을 읽는다(rules-v2 설계 §15-4).
+     실패해도 신고 표시는 이미 저장됐다(putRulesIndex 가 알리고 넘어간다). 다음에 규정관리를 열면 메우기가 다시 맞춘다 */
+  if(next.rev)putRulesIndex(next);
   closeOverlay($("ov-filed"));
   updateDoneBtn();
 }

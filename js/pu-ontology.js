@@ -294,7 +294,8 @@
     rulesv2:{ name:'취업규칙(새)', file:'rules-v2.html',
       portal:false, /* 포털 타일은 rules 하나 — 2026-10-04 두 앱 합치기, 세 갈래 단추로 들어옴.
                        ⚠ 등록은 지우지 말 것 — 쓰는 자리 선언(writeContracts)이 사라지면 관문이 저장을 거절한다 */
-      primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir'],
+      /* rules_mgmt/index — 규정관리(rules)의 «가벼운 이력 색인»을 빌려 읽는다(🏢 현황 한 줄의 📮 신고일·검토 완료, 2026-11-01 설계 §15-4). 쓰지 않는다 */
+      primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir','rules_mgmt/index'],
       entityTypes:['RulesDocument','RulesRound','Organization','Task'],
       /* 🤖 매일 정리(2026-10-31, 설계 §14) — 화면이 쓰는 자리 하나 더: auto/cfg = {mode:'off'|'dry'|'live', by, at}(스위치, 관리자·위임관리인 — 규칙 MGR).
          auto/last·auto/log/{날짜} 와 서류의 처리 담당(docs/{id}/owner)은 서버(collectRulesMail 회차 끝 rules-daily.js)만 쓴다 — 쓰기 계약이 아니다.

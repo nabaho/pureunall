@@ -5,13 +5,15 @@
 (function (root) {
   'use strict';
   var SIZE = 50;
-  var KEYS = ['band', 'biz', 'docs', 'last', 'fin'];
-  var SORT_OF = { name: 'name', band: 'size', biz: 'biz', who: 'who', docs: 'docs', last: 'last', fin: 'fin' };
+  /* «진행»·«마지막 신고»(설계 §15-1) — 값은 lib-status 가 줄에 붙인 r.stat 에서. 「최근」(last)은 표에서 뺐지만 셈은 남긴다(§15-1) */
+  var KEYS = ['band', 'biz', 'docs', 'last', 'fin', 'stage', 'filed'];
+  var SORT_OF = { name: 'name', band: 'size', biz: 'biz', who: 'who', docs: 'docs', last: 'last', fin: 'fin', stage: 'stage', filed: 'filed' };
   var BANDS = ['5인 미만', '5~9인', '10~29인', '30인 이상'];
   var LABEL_DOCS = { linked: '확정 있음', cand: '후보 있음', none: '자료 없음' };
   var LABEL_FIN = { set: '정함', none: '미정', '': '확정 자료 없음' };
-  var COL_NAME = { name: '사업장', band: '규모', biz: '업태', who: '담당', docs: '취업규칙 자료', last: '최근', fin: '★최종본' };
+  var COL_NAME = { name: '사업장', band: '규모', biz: '업태', who: '담당', docs: '취업규칙 자료', last: '최근', fin: '★최종본', stage: '진행', filed: '마지막 신고' };
   function str(v) { return v == null ? '' : String(v); }
+  function St() { return (root && root.PuRulesV2Status) || (typeof require === 'function' ? require('./lib-status.js') : null); }
   // 최근 메일 연도 — 한국 시간(서머타임 없음 +9시간)
   function yearOf(ms) { return Number(ms) > 0 ? String(new Date(Number(ms) + 9 * 36e5).getUTCFullYear()) : ''; }
 
@@ -20,6 +22,8 @@
     if (key === 'biz') return [str(r.bizType)];
     if (key === 'last') return [yearOf(r.last)];
     if (key === 'fin') return [str(r.fin && r.fin.state)];
+    if (key === 'stage') return St().stageTags(r);
+    if (key === 'filed') return [yearOf(r.stat && r.stat.filed && r.stat.filed.at)];
     if (key === 'docs') {
       var t = [];
       if (r.linked > 0) t.push('linked');
@@ -40,8 +44,9 @@
     });
   }
   function labelOf(key, v) {
-    if (v === '') return key === 'band' ? '(모름)' : key === 'last' ? '(없음)' : key === 'fin' ? LABEL_FIN[''] : '(비어 있음)';
+    if (v === '') return key === 'band' ? '(모름)' : (key === 'last' || key === 'filed') ? '(없음)' : key === 'fin' ? LABEL_FIN[''] : '(비어 있음)';
     if (key === 'docs') return LABEL_DOCS[v] || v;
+    if (key === 'stage') return St().STAGE_LABEL[v] || v;
     if (key === 'fin') return LABEL_FIN[v] || v;
     return v;
   }
@@ -54,7 +59,8 @@
     if (key === 'band') vs = BANDS.filter(function (v) { return v in n; }).concat('' in n ? [''] : []);
     else if (key === 'docs') vs = ['linked', 'cand', 'none'].filter(function (v) { return v in n; });
     else if (key === 'fin') vs = ['set', 'none', ''].filter(function (v) { return v in n; });
-    else if (key === 'last') vs = vs.filter(function (v) { return v; }).sort().reverse().concat('' in n ? [''] : []);
+    else if (key === 'stage') vs = St().STAGE_TAGS.filter(function (v) { return v in n; });
+    else if (key === 'last' || key === 'filed') vs = vs.filter(function (v) { return v; }).sort().reverse().concat('' in n ? [''] : []);
     else vs = vs.filter(function (v) { return v; }).sort(function (a, b) { return n[b] - n[a] || a.localeCompare(b, 'ko'); })
       .concat('' in n ? [''] : []);
     return vs.map(function (v) { return { v: v, label: labelOf(key, v), n: n[v] }; });
@@ -73,6 +79,9 @@
     // 자료 0건(확정·후보 둘 다 없음)은 «값 없음» — 오름·내림 모두 맨 끝 (규모 0 과 같다)
     if (key === 'docs') { var n = (r.linked || 0) + (r.cand || 0); return n > 0 ? n : null; }
     if (key === 'last') return r.last > 0 ? r.last : null;
+    // 진행 — «최근 서류 순»(그 회차 마지막 서류 날). 자료가 없으면 맨 끝
+    if (key === 'stage') return r.stat && r.stat.at > 0 ? r.stat.at : null;
+    if (key === 'filed') return r.stat && r.stat.filed && r.stat.filed.at > 0 ? r.stat.filed.at : null;
     // 오름: 정함 → 미정 → 없음 (없음은 내림에서도 끝)
     if (key === 'fin') return r.fin && r.fin.state === 'set' ? 1 : r.fin && r.fin.state === 'none' ? 2 : null;
     return null;
