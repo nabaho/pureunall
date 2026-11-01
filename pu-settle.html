@@ -132,7 +132,13 @@ main{padding:12px 16px 40px}
 .t tr.none td{color:var(--mute)}
 .t input.amt[data-m]{width:118px}
 .t tr.on td{background:var(--bg);font-weight:700}
-.t tr.grp td.grp-tr{font-weight:400;color:var(--ink2)}
+/* 정산표 — 사업장마다 상자 하나(사람별 금액 + 송금 줄). 폰에서는 상자 한 겹(옆 테두리 걷음) */
+.site{border:1px solid var(--line);border-radius:10px;margin:10px;overflow:hidden;background:var(--card)}
+.site .sh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--blue-bg);color:var(--blue-d)}
+.site .sh b{max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site .t.tr1 td{background:var(--bg);border-bottom:0}
+.site .trow{padding:8px 12px;background:var(--bg)}
+button.sent{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
 .t input.amt.dirty{background:var(--amber-bg);border-color:var(--amber-m)}
 .pill.role-lead{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
 /* 송금 방향(대표 지시 2026-10-31 「권형하가 더 받은것이면 추가로 담당자에게 더 지급 … 담당자가 더받은것이면 반환」) — 반환은 노랑, 추가 지급은 초록 */
@@ -197,7 +203,8 @@ details.dep textarea{min-height:64px}
   .t[data-name=run] tbody td[data-k="diff"]:not(:empty)::before{content:'차액 '}
   .t[data-name=run] tbody td[data-k="adj"]:not(:empty)::before{content:'조정 '}
   .t[data-name=run] tbody td[data-k="final"]::before{content:'최종 '}
-  .t[data-name] tbody tr.grp td.grp-tr{flex:0 0 100%;text-align:left}
+  .site{margin:8px 0;border-left:0;border-right:0;border-radius:0}
+  .t[data-name=transfers] tbody td[data-k="paid"]{order:6}
   .t[data-name=deposits] tbody td[data-k="pick"]{order:7;flex:0 0 100%}
   .t[data-name=deposits] tbody td[data-k="exp"]::before{content:'예상 '}
   .t[data-name=deposits] tbody td[data-k="diff"]:not(:empty)::before{content:'차이 '}
@@ -326,7 +333,7 @@ details.dep textarea{min-height:64px}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-settle-core.js?v=9"></script>
-<script src="js/pu-settle-view.js?v=11"></script>
+<script src="js/pu-settle-view.js?v=12"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -974,6 +981,9 @@ document.addEventListener('click', async function(ev){
     if(!DEP.sid){ toast('누구 통장인지 먼저 고르세요'); drawRuns(); return; } depRematch(dr); drawRuns(); toast('붙여 넣은 글에서 금액 '+DEP.found.length+'개를 찾았습니다'); return; }
   if(t.closest('#dep_pull')){ await pullLedger(); return; }
   if(t.closest('#dep_apply')){ await applyDeposits(); return; }
+  /* 송금 줄 «보냄 표시» — 누르면 보냄, 이미 보냄이면 물어보고 지운다 */
+  if((b=t.closest('[data-paid-btn]'))){ var pi=Number(b.getAttribute('data-paid-btn')), kr=D.runs[CUR_RUN], pt=kr&&C.toArr(kr.transfers)[pi]; if(!pt) return;
+    if(pt.paid && !window.confirm('«보냄» 표시를 지울까요?')) return; await setPaid(CUR_RUN, [pi], !pt.paid); return; }
   if((b=t.closest('[data-act]'))){
     var act=b.getAttribute('data-act');
     if(act==='draftSave') await saveDraft(CUR_RUN);
@@ -1059,7 +1069,6 @@ document.addEventListener('change', async function(ev){
     cr[cp[1]]=t.value; if(cp[1]==='role' && t.value==='lead') delete cr.rate; calcPrefill(); saveCalc(); drawCalc(); return; }
   if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries' }[kind]; if(!kind) return;
     var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
-  if(t.matches('input[data-paid]')){ await setPaid(CUR_RUN, [Number(t.getAttribute('data-paid'))], t.checked); return; }
   if(t.id==='file'){ var f=t.files&&t.files[0]; t.value=''; await onFile(f); return; }
   if(t.id==='upType'){ lsSet('upType', t.value); return; }
   if(t.id==='mx_addType' && t.value){ var nt=t.value; WORK.types.push(nt);

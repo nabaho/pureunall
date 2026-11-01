@@ -71,13 +71,14 @@ test('정산표 — 사업장은 묶음 머리에 한 번(누가 누구에게 �
   assert.doesNotMatch(hv, /사업장|구분|요율|차액|조정/, '빠진 칸이 머리에 남았다');
   assert.match(hv, /이름[\s\S]*세전[\s\S]*원천징수[\s\S]*세후[\s\S]*통장 실입금[\s\S]*몫[\s\S]*정산액[\s\S]*최종/);
   const v = visible(h);
-  assert.match(v, /가나상사 · 1차 · 세후 합계/);
-  assert.match(v, /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동 87,915원/);
+  assert.match(v, /가나상사\s+1차 · 세후 합계/);
+  assert.match(v, /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동\s+87,915/);
   assert.match(v, /주관/);
   assert.match(v, /담당 25%/);
   assert.match(v, /테스트사업 \(테스트재단\)/);
-  const body = visible(h.slice(h.indexOf('data-name="run"'), h.indexOf('data-name="transfers"')));
-  assert.equal((body.match(/가나상사/g) || []).length, 1, '사업장 이름이 줄마다 되풀이된다');
+  assert.equal((v.match(/가나상사/g) || []).length, 1, '사업장 이름은 상자 머리에 한 번 — 송금 목록에 다시 나오지 않는다');
+  assert.doesNotMatch(v, /송금 목록/);
+  assert.match(h, /<div class="site"><div class="sh"><b title="가나상사">가나상사<\/b>/);
   const r = fakeRun('draft');
   const a = r.sites[0].members.find((m) => m.sid === 'T-A'); a.adjust = -5; a.settle -= 5;
   const hv2 = visible(V.runDetail(r, NAMES).slice(0, V.runDetail(r, NAMES).indexOf('</thead>')));
@@ -108,8 +109,8 @@ test('정산표 — 확인 필요가 있으면 «확정» 단추가 잠긴다', 
 test('송금 목록 — ☐·번호·보냄 칸, 보내는 사람 → 받는 사람 이름', () => {
   const h = V.runDetail(fakeRun('confirmed'), NAMES);
   const t = h.slice(h.indexOf('data-name="transfers"'));
-  assert.match(t, /data-all="transfers"/);
-  assert.match(t, /data-paid="0"/);
+  assert.match(t, /data-ck="t0"/);
+  assert.match(t, /data-paid-btn="0"[^>]*>보냄 표시</);
   assert.match(visible(t), /87,915/);
 });
 
@@ -119,8 +120,8 @@ test('계산만인 달도 송금 목록을 미리 보여 주되 «보냄»은 �
   const t = h.slice(h.indexOf('data-name="transfers"'));
   assert.ok(h.indexOf('data-name="transfers"') > 0, '미리보기 송금 표가 없다');
   assert.match(visible(t), /87,915/);
-  assert.match(t, /data-paid="0" disabled/);
-  assert.match(visible(h), /미리보기/);
+  assert.doesNotMatch(t, /data-paid-btn=/);
+  assert.match(visible(t), /확정하면 송금/);
 });
 
 test('입금 대조 상자 — ☐·번호, 찾은 입금 고르기, 일치·금액 다름 표시, 사번은 화면에 없다', () => {
@@ -223,15 +224,15 @@ test('안내 파일 목록·이월 목록도 ☐ 다음 번호', () => {
 
 test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받았으면 «추가 지급»(묶음 머리·송금 목록·뜻 풀이·카톡·계산기)', () => {
   const back = V.runDetail(fakeRun('draft'), NAMES);
-  assert.match(visible(back), /&lt;b&gt;김가나&lt;\/b&gt; → 홍길동 87,915원\s+반환/);
+  assert.match(visible(back), /반환\s+&lt;b&gt;김가나&lt;\/b&gt; → 홍길동\s+87,915/);
   assert.match(visible(back), /반환\s+담당 → 주관\(홍길동\)/);
   assert.match(visible(back), /추가 지급\s+주관\(홍길동\) → 담당/);
   const tb = back.slice(back.indexOf('data-name="transfers"'));
-  assert.match(visible(tb.slice(0, tb.indexOf('</thead>'))), /구분/);
+  assert.match(tb, /data-k="lbl">송금</);
   assert.match(tb, /data-k="dir"><span class="pill dir-back">반환</);
   /* 40% 면 담당 몫(1,371,390)이 받은 세후(945,033)보다 크다 → 주관이 더 줌 */
   const more = V.runDetail(fakeRun('draft', 40), NAMES);
-  assert.match(visible(more), /홍길동 → &lt;b&gt;김가나&lt;\/b&gt; 426,357원\s+추가 지급/);
+  assert.match(visible(more), /추가 지급\s+홍길동 → &lt;b&gt;김가나&lt;\/b&gt;\s+426,357/);
   assert.match(more, /class="pill dir-more">추가 지급</);
   /* 확정한 달 — 저장된 송금에는 방향 칸이 없다. 받는 사람이 주관이면 반환 */
   const c = V.runDetail(fakeRun('confirmed'), NAMES);
