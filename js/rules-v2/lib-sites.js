@@ -32,9 +32,13 @@
   function model(data, companies) {
     data = data || {};
     var items = O.merge(data.docs, data.human);
-    var groupsAll = O.companyGroups(items, data.rounds);
-    var groupsBy = {}, linkedBy = {}, candBy = {}, otherBy = {};
-    groupsAll.forEach(function (g) { (groupsBy[g.companyId] = groupsBy[g.companyId] || []).push(g); });
+    var groupsBy = { '취업규칙': {}, '노사협의회': {}, '단체협약': {} };
+    ['취업규칙', '노사협의회', '단체협약'].forEach(function (s) {
+      O.companyGroups(items, data.rounds, s).forEach(function (g) {
+        (groupsBy[s][g.companyId] = groupsBy[s][g.companyId] || []).push(g);
+      });
+    });
+    var linkedBy = {}, candBy = {}, otherBy = {};
     items.forEach(function (it) {
       if (it.companyId) {
         if (kindOk(it)) (linkedBy[it.companyId] = linkedBy[it.companyId] || []).push(it);
@@ -57,21 +61,30 @@
     (companies || []).forEach(function (co) {
       if (!co || !co.id) return;
       var linked = linkedBy[co.id] || [], cand = candBy[co.id] || [];
+      var ob = otherBy[co.id] || { '노사협의회': [], '단체협약': [] };
+      var nosa = ob['노사협의회'].slice().sort(function (a, b) { return b.date - a.date; });
+      var danche = ob['단체협약'].slice().sort(function (a, b) { return b.date - a.date; });
       var closed = co.status === 'closed';
-      if (closed && !(linked.length + cand.length)) return;
+      if (closed && !(linked.length + cand.length + nosa.length + danche.length)) return;
       var mails = {}; cand.forEach(function (it) { mails[O.mailKey(it)] = 1; });
       var last = 0;
       linked.concat(cand).forEach(function (it) { if (it.date > last) last = it.date; });
-      var groups = (groupsBy[co.id] || []).slice().sort(function (a, b) { return b.last - a.last; });
+      var groups = (groupsBy['취업규칙'][co.id] || []).slice().sort(function (a, b) { return b.last - a.last; });
+      var nosaGroups = (groupsBy['노사협의회'][co.id] || []).slice().sort(function (a, b) { return b.last - a.last; });
+      var dancheGroups = (groupsBy['단체협약'][co.id] || []).slice().sort(function (a, b) { return b.last - a.last; });
       var size = Number(co.employmentInsuredCount) || 0;
-      var ob = otherBy[co.id] || { '노사협의회': [], '단체협약': [] };
       rows.push({ id: co.id, name: str(co.name), bizNo: str(co.bizNo), size: size, band: band(size),
         bizType: str(co.bizType), closed: closed, linked: linked.length, cand: cand.length,
         candIds: cand.map(function (it) { return it.id; }), candMails: Object.keys(mails).length,
         last: last, groups: groups, fin: finOf(linked.length, groups),
         otherSets: {
-          '노사협의회': ob['노사협의회'].slice().sort(function (a, b) { return b.date - a.date; }),
-          '단체협약': ob['단체협약'].slice().sort(function (a, b) { return b.date - a.date; })
+          '노사협의회': nosa,
+          '단체협약': danche
+        },
+        sets: {
+          '취업규칙': { count: linked.length, groups: groups, fin: finOf(linked.length, groups) },
+          '노사협의회': { count: nosa.length, groups: nosaGroups, fin: finOf(nosa.length, nosaGroups) },
+          '단체협약': { count: danche.length, groups: dancheGroups, fin: finOf(danche.length, dancheGroups) }
         },
         // 담당 — 업체관리의 «사번»(주 managerMain · 부 managerSubs). 이름으로 맞추지 않는다
         mgr: str(co.managerMain).trim(), subs: (Array.isArray(co.managerSubs) ? co.managerSubs : []).map(str).filter(Boolean) });
@@ -95,9 +108,10 @@
     return { state: 'set', at: at, docId: g.finalDocId };
   }
 
-  // 개정을 시작할 문서 — 최종본이 있으면 그것, 없으면 마지막 판(notFinal 로 알린다)
-  function startDoc(row) {
-    var g = latestWithRules(row && row.groups);
+  // 개정을 시작하거나 현재 규정을 확인할 문서 — 최종본이 있으면 그것, 없으면 마지막 판(notFinal 로 알린다)
+  function startDoc(row, set) {
+    var groups = (set && set !== '취업규칙' && row && row.sets && row.sets[set]) ? row.sets[set].groups : (row && row.groups);
+    var g = latestWithRules(groups);
     if (!g) return null;
     if (g.finalDocId) return { docId: g.finalDocId, roundKey: g.roundKey, notFinal: false };
     var lastRow = g.rows[g.rows.length - 1];

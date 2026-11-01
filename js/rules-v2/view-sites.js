@@ -111,16 +111,38 @@
     var d = f.src === 'mark' ? f.day : ymd(f.at);
     return td('', filedTitle(f), '<span class="fd">' + esc(String(d).slice(2)) + '</span> <span class="src">' + (f.src === 'mark' ? '📮' : '✉') + '</span>');
   }
+  function setCheckBtns(st, r) {
+    var sel = (st.sites || {}).sel || '', curSet = (st.sites || {}).set || '취업규칙';
+    var rCnt = r.linked || 0;
+    var nCnt = (r.sets && r.sets['노사협의회'] && r.sets['노사협의회'].count) || (r.otherSets && r.otherSets['노사협의회'] && r.otherSets['노사협의회'].length) || 0;
+    var dCnt = (r.sets && r.sets['단체협약'] && r.sets['단체협약'].count) || (r.otherSets && r.otherSets['단체협약'] && r.otherSets['단체협약'].length) || 0;
+    var defs = [
+      { set: '취업규칙', short: '규칙', cnt: rCnt },
+      { set: '노사협의회', short: '노사', cnt: nCnt },
+      { set: '단체협약', short: '단협', cnt: dCnt }
+    ];
+    return defs.map(function (x) {
+      var has = x.cnt > 0, on = sel === r.id && curSet === x.set;
+      var tip = x.set + (has ? ' ' + x.cnt + '건 — 누르면 오른쪽에서 현재 ' + x.set + ' 규정을 확인합니다' : ' 자료 없음');
+      return '<button class="sck' + (has ? ' has' : '') + (on ? ' on' : '') + '" data-act="siteSetSel" data-co="' + esc(r.id) + '" data-set="' + esc(x.set) + '" title="' + esc(tip) + '">'
+        + (has ? '☑' : '☐') + esc(x.short) + (has ? '<b>' + x.cnt + '</b>' : '') + '</button>';
+    }).join('');
+  }
   function listHtml(st, rows, opt) {
     var sel = (st.sites || {}).sel || '', off = opt ? opt.offset || 0 : 0, picked = (st.sites || {}).picked;
     var allOn = !!(rows && rows.length && picked && rows.every(function (r) { return picked.has(r.id); }));
     var body = (rows || []).map(function (r, i) {
       var size = r.size > 0 ? r.size + '명' + (r.band ? ' · ' + r.band : '') : '';
       var doc = [], docT = [];
-      if (r.linked) { doc.push('<span class="k ok">확정 ' + r.linked + '</span>'); docT.push('확정 ' + r.linked); }
+      var nCnt = (r.sets && r.sets['노사협의회'] && r.sets['노사협의회'].count) || 0;
+      var dCnt = (r.sets && r.sets['단체협약'] && r.sets['단체협약'].count) || 0;
+      if (r.linked) { doc.push('<span class="k ok">확정 ' + r.linked + '</span>'); docT.push('취업규칙 확정 ' + r.linked); }
+      if (nCnt) docT.push('노사협의회 ' + nCnt);
+      if (dCnt) docT.push('단체협약 ' + dCnt);
       if (r.cand) { doc.push('<span class="k cand">후보 ' + r.cand + '</span>'); docT.push('후보 ' + r.cand + '(메일 ' + r.candMails + '통)'); }
       if (r.cand) doc.push(linkBtn(r, r.linked > 0));
       if (!doc.length) doc.push('<span class="k none">자료 없음</span>');
+      var checks = setCheckBtns(st, r);
       var fin = r.fin && r.fin.state === 'set'
         ? td('', '★최종본 ' + (r.fin.at ? ymd(r.fin.at) : ''), '<span class="fin">★' + (r.fin.at ? ' ' + esc(ymd(r.fin.at).slice(2, 7)) : '') + '</span>')
         : r.fin && r.fin.state === 'none' ? td('', '최종본을 아직 안 정했습니다', '<span class="k none">미정</span>')
@@ -136,7 +158,7 @@
         + ownerCell(st, r)
         + stageCell(r) + filedCell(r)
         + fin
-        + td('', docT.join(' · ') || '자료 없음', doc.join(' '))
+        + td('', docT.join(' · ') || '자료 없음', checks + ' ' + doc.join(' '))
         + '</tr>';
     }).join('');
     var condOn = opt && SC().conditions(opt.cols).length > 0;
@@ -144,8 +166,8 @@
     /* 칸 폭 — 사업장 이름(폭 없는 칸)은 «남는 자리»를 받는다. 표의 min-width(rules-v2.html .sites)가 다른 칸 합보다
        넉넉해야 이름이 산다 — 모자라면 이름이 「삼…」 한 글자만 남는다(2026-10-18 폰 실측). # 칸 폭은 .sites 의
        이름 칸 고정(left)과 같아야 한다 — tests/rules-sites-compact.test.js 가 견준다 */
-    /* «진행»·«마지막 신고»를 「최근」 자리에 넣고(설계 §15-1) 규모·업태·담당·자료를 좁혔다 — 다른 칸 합 748 + 이름 몫 140 = .sites min-width */
-    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:60px"><col style="width:68px"><col style="width:70px"><col style="width:120px"><col style="width:96px"><col style="width:70px"><col style="width:200px"></colgroup>'
+    /* «진행»·«마지막 신고»를 「최근」 자리에 넣고(설계 §15-1) 체크항목(규칙·노사·단협)을 함께 담아 다른 칸 합 808 + 이름 몫 140 = .sites min-width(948) */
+    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:60px"><col style="width:68px"><col style="width:70px"><col style="width:120px"><col style="width:96px"><col style="width:70px"><col style="width:260px"></colgroup>'
       + (opt ? headHtml(st, opt, allOn) : '<thead><tr><th class="c pk"></th><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>진행</th><th>마지막 신고</th><th>★최종본</th><th>취업규칙 자료</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
   }
@@ -267,6 +289,7 @@
       var nm = (f ? '★ ' : '') + it.name;
       return '<div><span class="nm' + (f ? ' f' : '') + '" title="' + esc(nm + ' · ' + it.kind) + '">' + esc(nm) + '</span>'
         + '<span class="d">' + esc(md(it.date) + ' ' + (it.dir || '')) + (it.status === '보류' ? ' (보류)' : '') + '</span>'
+        + (it.status !== '보류' ? '<button class="lnk" data-act="sitePreview" data-id="' + esc(it.id) + '" title="이 오른쪽 창에서 바로 규정 본문을 확인합니다">📖 규정 보기</button>' : '')
         + '<button class="lnk" data-act="siteDoc" data-id="' + esc(it.id) + '" title="모은 자료에서 가린 글을 봅니다">📥 에서 보기</button>'
         + '<a class="lnk" href="' + esc(Lib().mailHref(g.companyId)) + '" target="_blank" rel="noopener">✉ 메일</a></div>';
     }).join('');
@@ -311,6 +334,7 @@
           var kl = it.kind === x.bodyKind ? x.bodyLabel : it.kind;
           return '<div><span class="nm" title="' + esc(it.name + ' · ' + kl) + '">[' + esc(kl) + '] ' + esc(it.name) + '</span>'
             + '<span class="d">' + esc(md(it.date) + ' ' + (it.dir || '')) + (it.status === '보류' ? ' (보류)' : '') + '</span>'
+            + (it.status !== '보류' ? '<button class="lnk" data-act="sitePreview" data-id="' + esc(it.id) + '" title="이 오른쪽 창에서 바로 규정 본문을 확인합니다">📖 규정 보기</button>' : '')
             + '<button class="lnk" data-act="siteDoc" data-id="' + esc(it.id) + '" title="모은 자료에서 가린 글을 봅니다">📥 에서 보기</button></div>';
         }).join('');
         return '<div class="round"><div class="rh"><b>' + x.icon + ' ' + esc(x.set) + ' (' + x.items.length + '건)</b>'
@@ -319,19 +343,74 @@
           + '<div class="items">' + rows + '</div></div>';
       }).join('') + '</div>';
   }
+  function curDocOf(st, row, curSet) {
+    var s = (st && st.sites) || {};
+    var docs = ((st && st.data) || {}).docs || {};
+    if (s.previewId && docs[s.previewId]) {
+      return { docId: s.previewId, notFinal: true, preview: true };
+    }
+    var sd = Sx().startDoc(row, curSet);
+    if (sd) return sd;
+    if (curSet && curSet !== '취업규칙' && row && row.otherSets && row.otherSets[curSet]) {
+      var stored = row.otherSets[curSet].filter(function (it) { return it.status !== '보류'; });
+      if (stored.length) return { docId: stored[0].id, notFinal: true, fallback: true };
+    }
+    return null;
+  }
+  function setTabsHtml(st, row, curSet) {
+    var rCnt = row.linked || 0;
+    var nCnt = (row.sets && row.sets['노사협의회'] && row.sets['노사협의회'].count) || (row.otherSets && row.otherSets['노사협의회'] && row.otherSets['노사협의회'].length) || 0;
+    var dCnt = (row.sets && row.sets['단체협약'] && row.sets['단체협약'].count) || (row.otherSets && row.otherSets['단체협약'] && row.otherSets['단체협약'].length) || 0;
+    var tabs = [
+      { set: '취업규칙', icon: '📜', cnt: rCnt },
+      { set: '노사협의회', icon: '🤝', cnt: nCnt },
+      { set: '단체협약', icon: '⚖️', cnt: dCnt }
+    ];
+    return '<div class="ssets">' + tabs.map(function (t) {
+      var has = t.cnt > 0, on = curSet === t.set;
+      return '<button class="stab' + (has ? ' has' : '') + (on ? ' on' : '') + '" data-act="siteSetSel" data-co="' + esc(row.id) + '" data-set="' + esc(t.set) + '" title="'
+        + esc(t.set + (has ? ' ' + t.cnt + '건 — 누르면 현재 ' + t.set + ' 규정과 이력을 확인합니다' : ' 자료 없음')) + '">'
+        + (has ? '☑ ' : '☐ ') + esc(t.set) + ' <b>' + t.cnt + '</b></button>';
+    }).join('') + '</div>';
+  }
+  function curRegHtml(st, row, curSet) {
+    var cd = curDocOf(st, row, curSet);
+    if (!cd) {
+      return curSet === '취업규칙' ? '' : '<div class="scur empty">아직 이 사업장의 <b>' + esc(curSet) + '</b> 규정 자료가 없습니다.</div>';
+    }
+    var doc = (((st && st.data) || {}).docs || {})[cd.docId] || {};
+    var nm = doc.name || cd.docId;
+    var dt = ymd((doc.mail || {}).date);
+    var badge = cd.preview ? '<span class="k ok">선택한 판</span>'
+      : cd.notFinal ? '<span class="k cand">최근 판 (최종본 미정)</span>'
+      : '<span class="k ok">★ 현재 최종본</span>';
+    var txtObj = st && st.siteText;
+    var hasTxt = txtObj && txtObj.id === cd.docId;
+    var bodyHtml = hasTxt
+      ? '<pre class="stxt">' + esc(txtObj.body || '(본문 글이 비어 있습니다)') + '</pre>'
+      : '<div class="stxt-bar"><button class="btn sm" data-act="sitePreview" data-id="' + esc(cd.docId) + '">📖 현재 ' + esc(curSet) + ' 본문 펼치기</button></div>';
+    return '<div class="scur" data-cur-doc="' + esc(cd.docId) + '">'
+      + '<div class="sch"><b>📖 현재 ' + esc(curSet) + ' 규정</b> ' + badge
+      + '<button class="lnk" data-act="siteDoc" data-id="' + esc(cd.docId) + '" style="margin-left:auto">📥 에서 보기</button></div>'
+      + '<div class="scnm" title="' + esc(nm + ' · ' + dt) + '">' + esc(nm) + ' <span class="d">' + esc(dt) + '</span></div>'
+      + bodyHtml + '</div>';
+  }
   function sideHtml(st, row) {
     if (!row) return '<div class="sside empty">사업장을 고르면 여기에 취업규칙 이력과 「✏️ 이 사업장 개정 시작」이 보입니다</div>';
+    var curSet = ((st && st.sites) || {}).set || '취업규칙';
     var sub = [row.bizNo, row.size > 0 ? row.size + '명' + (row.band ? '(' + row.band + ')' : '') : '', row.bizType].filter(Boolean).join(' · ');
-    var hist = row.groups.map(roundHtml).join('');
-    if (row.cand) hist += candHtml(st, row);
-    if (!hist) hist = '<div class="none">아직 이 사업장의 취업규칙 자료가 없습니다.</div>';
+    var setGroups = curSet !== '취업규칙' && row.sets && row.sets[curSet] ? row.sets[curSet].groups : row.groups;
+    var hist = (setGroups || []).map(roundHtml).join('');
+    if (curSet === '취업규칙' && row.cand) hist += candHtml(st, row);
+    if (!hist) hist = '<div class="none">아직 이 사업장의 ' + esc(curSet) + ' 자료가 없습니다.</div>';
     /* 「← 목록」 — 폰(900px 이하)에서만 보인다. 폰에서는 이 칸이 화면을 덮는 판으로 뜨므로 닫을 길이 있어야 한다
        (PC 는 왼쪽 표가 늘 보여 다른 줄을 누르면 된다 — CSS 가 숨긴다). 고른 것을 비우는 손잡이(siteSel)를 그대로 쓴다 */
     return '<div class="sside">'
       + '<button class="lnk sback" data-act="siteSel" data-co="" title="사업장 목록으로 돌아갑니다">← 목록</button>'
       + '<h3 title="' + esc(row.name) + '">' + esc(row.name) + '</h3>'
       + '<div class="sub" title="' + esc(sub) + '">' + esc(sub || '사업자번호·인원 모름') + '</div>'
-      + nowHtml(st, row) + startHtml(st, row) + hist + otherSetsHtml(row) + '</div>';
+      + setTabsHtml(st, row, curSet)
+      + nowHtml(st, row) + startHtml(st, row) + curRegHtml(st, row, curSet) + hist + otherSetsHtml(row) + '</div>';
   }
   /* 「현황 한 줄」(설계 §15-3) — 현행본 · 마지막 신고 · 지금 · 단계 줄 */
   function nowHtml(st, row) {
@@ -432,7 +511,7 @@
   }
 
   var api = { render: render, listHtml: listHtml, sideHtml: sideHtml, filterHtml: filterHtml, nowHtml: nowHtml,
-    headHtml: headHtml, popHtml: popHtml, condHtml: condHtml, pagerHtml: pagerHtml, bulkHtml: bulkHtml };
+    headHtml: headHtml, popHtml: popHtml, condHtml: condHtml, pagerHtml: pagerHtml, bulkHtml: bulkHtml, curDocOf: curDocOf };
   if (root) root.PuRulesV2SitesView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

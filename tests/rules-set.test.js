@@ -162,4 +162,19 @@ test('⑤ 사업장별 순서(companyTable)에서도 3분류 칩과 본문 판(�
   assert.match(side, /🤝 노사협의회/);
   assert.match(side, /📜 단체협약/);
   assert.match(side, /data-act="siteSetLib" data-set="노사협의회"/);
+
+  // ⑥ 🏢 사업장 표에 규칙·노사·단협 체크항목(siteSetSel)이 표시되고, 클릭 시 현재 규정 본문을 바로 확인할 수 있다
+  const listH = SitesView.listHtml({ data: { docs, human, rounds }, companies: cos, sites: { sel: 'co1', set: '노사협의회' } }, rows);
+  assert.match(listH, /data-act="siteSetSel" data-co="co1" data-set="취업규칙"/);
+  assert.match(listH, /data-act="siteSetSel" data-co="co1" data-set="노사협의회"/);
+  assert.match(listH, /data-act="siteSetSel" data-co="co1" data-set="단체협약"/);
+
+  const sideNosa = SitesView.sideHtml({
+    data: { docs, human, rounds }, companies: cos,
+    sites: { sel: 'co1', set: '노사협의회' },
+    siteText: { id: 'n1', body: '제1조(목적) 본 노사협의회 규정은...' }
+  }, rows[0]);
+  assert.match(sideNosa, /📖 현재 노사협의회 규정/);
+  assert.match(sideNosa, /가나_노사협의회규정_최종\.hwp/);
+  assert.match(sideNosa, /제1조\(목적\) 본 노사협의회 규정은/);
 });

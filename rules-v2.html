@@ -48,12 +48,12 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/lib-set.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=4"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-sites.js?v=5"></script>
+<script src="js/rules-v2/lib-sites.js?v=6"></script>
 <script src="js/rules-v2/store.js?v=8"></script>
-<script src="js/rules-v2/view-library.js?v=9"></script>
+<script src="js/rules-v2/view-library.js?v=10"></script>
 <script src="js/rules-v2/lib-status.js?v=1"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=2"></script>
-<script src="js/rules-v2/view-sites.js?v=13"></script>
+<script src="js/rules-v2/view-sites.js?v=14"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -210,7 +210,7 @@ button{font:inherit;cursor:pointer}
 #sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
-.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:888px}
+.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:948px}
 /* ↑ min-width 는 «다른 칸 폭의 합 + 이름 칸 몫»이다 — 칸 폭은 view-sites.js 의 colgroup.
      ☐ 칸(28)을 더하며 886 — 1366px 노트북에서 표 자리가 약 889px 라, 그보다 넓으면 ★최종본 칸이 잘려 옆으로 밀어야 한다(2026-10-18 실측).
      800 이던 때 다른 칸 합이 754 라 이름 칸이 46px 만 남아 폰·좁은 PC 에서 「삼…」 한 글자만 보였다(2026-10-18).
@@ -269,6 +269,21 @@ button{font:inherit;cursor:pointer}
 #sites .round.cand{border-color:#fde68a}
 #sites .sother{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0}
 #sites .sother .sh2{font-size:12px;font-weight:700;color:#475569;margin-bottom:8px}
+#sites .sck{display:inline-flex;align-items:center;gap:2px;height:20px;padding:0 5px;margin-right:2px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:11px;white-space:nowrap}
+#sites .sck.has{background:#f0fdf4;border-color:#bbf7d0;color:#166534;font-weight:600}
+#sites .sck.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
+#sites .sck b{margin-left:2px;font-size:10.5px}
+#sites .ssets{display:flex;gap:6px;margin-bottom:12px}
+#sites .stab{flex:1;height:30px;padding:0 6px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sites .stab.has{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
+#sites .stab.on{border-color:#1e40af;background:#1e40af;color:#ffffff;font-weight:700}
+#sites .scur{border:1px solid #bfdbfe;border-radius:12px;background:#ffffff;margin-bottom:12px;overflow:hidden}
+#sites .scur.empty{padding:10px 12px;color:#475569;font-size:12px;background:#f8fafc;border-color:#e2e8f0}
+#sites .scur .sch{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:12.5px;white-space:nowrap}
+#sites .scur .scnm{padding:6px 12px;font-size:12px;color:#1e293b;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sites .scur .scnm .d{color:#475569;margin-left:4px}
+#sites .scur .stxt{margin:0;padding:10px 12px;max-height:280px;overflow:auto;font:12px/1.75 inherit;white-space:pre-wrap;background:#f8fafc;color:#1e293b}
+#sites .scur .stxt-bar{padding:8px 12px;background:#f8fafc}
 #sites .rh{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 #sites .rh b{font-size:13px}
 #sites .rh .m{color:#475569}
@@ -660,6 +675,27 @@ function openSide(id) {
   S.text(id).then(function (t) { if (ST.sel === id) { ST.text = { id: id, body: t }; draw(); } },
     function (e) { if (ST.sel === id) { ST.text = { id: id, body: '(가린 글을 못 읽었습니다: ' + ((e && e.message) || e) + ')' }; draw(); } });
 }
+/* 🏢 사업장 오른쪽 상세창 — 고른 사업장·규정 분류의 현재 규정 본문을 읽어 바로 보여준다 */
+function loadSiteText(id) {
+  if (!id || !S) { ST.siteText = null; draw(); return; }
+  if (ST.siteText && ST.siteText.id === id && !ST.siteText.loading) { draw(); return; }
+  ST.siteText = { id: id, body: '규정 본문을 불러오는 중…', loading: true }; draw();
+  S.text(id).then(function (t) {
+    if (ST.siteText && ST.siteText.id === id) { ST.siteText = { id: id, body: t || '(본문 글이 비어 있습니다)' }; draw(); }
+  }, function (e) {
+    if (ST.siteText && ST.siteText.id === id) { ST.siteText = { id: id, body: '(가린 글을 못 읽었습니다: ' + ((e && e.message) || e) + ')' }; draw(); }
+  });
+}
+function openSiteReg(co, setName) {
+  ST.sites.sel = co || '';
+  ST.sites.set = setName || '취업규칙';
+  ST.sites.previewId = '';
+  if (!ST.sites.sel) { ST.siteText = null; draw(); return; }
+  var row = siteRow(ST.sites.sel);
+  var cd = row && PuRulesV2SitesView.curDocOf ? PuRulesV2SitesView.curDocOf(ST, row, ST.sites.set) : null;
+  if (cd && cd.docId) loadSiteText(cd.docId);
+  else { ST.siteText = null; draw(); }
+}
 /* 「앞 판과 달라진 조」 — 두 판의 가린 글을 읽어 조 단위로 견준다(두 파일 견주기와 같은 부품) */
 function diffOf(id, prev) {
   return busy('앞 판과 견주는 중…', Promise.all([S.text(prev), S.text(id)])).then(function (t) {
@@ -980,6 +1016,12 @@ var H = {
     tFinalMany(list.map(function (r) { return { companyId: r.companyId, roundKey: r.roundKey, docId: T().ver[r.roundId] || r.pre }; }), '고른 ' + list.length + '회차');
   },
   /* ── 🏢 사업장 ── */
+  autoLinkName: function () {
+    var am = PuRulesV2Lib.autoMatches(ST);
+    if (!am.groups.length) return;
+    if (!confirm('메일 제목·첨부파일 이름이 기업 이름과 일치하는 미확정 자료 ' + am.totalDocs + '건(메일 ' + am.totalMails + '통)을\n각 거래처로 자동 연결합니다. 진행할까요?')) return;
+    tLinkMany(am.groups, '기업일치 ' + am.totalMails + '통');
+  },
   siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' || d.f === 'look' ? d.f : 'has'; ST.sites.page = 1; draw(); },
   sq: function (v) {
     /* 값은 바로 상태에 넣는다(다른 일로 다시 그려도 낡은 글이 안 보이게). 다시 그리는 것만 미룬다 —
@@ -992,7 +1034,9 @@ var H = {
       var q = $sites.querySelector(ST.sites.pop === 'name' ? '.cpop [data-role="sq"]' : '[data-role="sq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
     }, 200);
   },
-  siteSel: function (d) { ST.sites.sel = d.co || ''; draw(); },
+  siteSel: function (d) { openSiteReg(d.co || '', ST.sites.set || '취업규칙'); },
+  siteSetSel: function (d) { openSiteReg(d.co || ST.sites.sel || '', d.set || '취업규칙'); },
+  sitePreview: function (d) { if (!d.id) return; ST.sites.previewId = d.id; loadSiteText(d.id); },
   sm: function (v) { ST.sites.who = String(v || ''); ST.sites.page = 1; draw(); },
   /* 머리줄 거르기·순서·쪽 (설계 §12) — 조건이 바뀌면 1쪽으로. siteSel(고르기)·reload() 는 쪽을 안 건드린다(그리는 쪽이 없는 쪽을 당긴다) */
   colOpen: function (d, ev) {
