@@ -23,9 +23,13 @@ const B = (() => {
   const box = {};
   new Function([
     "var RESERVE_ACCTS=['고유목적사업준비금1','고유목적사업준비금2'];",
-    grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'),
+    "var _SIDO_ABBR={'충청남도':'충남','충청북도':'충북','경상남도':'경남','경상북도':'경북','전라남도':'전남','전라북도':'전북','경기도':'경기','강원도':'강원','강원특별자치도':'강원','제주특별자치도':'제주','서울특별시':'서울','부산광역시':'부산','대구광역시':'대구','인천광역시':'인천','광주광역시':'광주','대전광역시':'대전','울산광역시':'울산','세종특별자치시':'세종','전북특별자치도':'전북'};",
+    "var TAX_MAP={'충남 천안시':'천안세무서','충남 예산군':'예산세무서','충북 청주시 흥덕구':'청주세무서'};",
+    grabFn('esc'), grabFn('num'), grabFn('_addrParts'), grabFn('_localGovFromAddr'), grabFn('guessTax'), grabFn('f15CSS'),
+    grabFn('_splitsOf'), grabFn('expandSplits'),
     grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('whtBookCash'), grabFn('splitPL'), grabFn('taxPrep'), grabFn('taxText'),
-    'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText; this.wsum=whtItemsSum; this.wof=whtItemsOf; this.wbook=whtBookCash;',
+    grabFn('taxOfficeTo'), grabFn('taxLocalTo'), grabFn('whtAutoRows'), grabFn('taxFormsPages'), grabFn('taxFormsDoc'),
+    'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText; this.wsum=whtItemsSum; this.wof=whtItemsOf; this.wbook=whtBookCash; this.officeTo=taxOfficeTo; this.localTo=taxLocalTo; this.autoRows=whtAutoRows; this.pages=taxFormsPages; this.doc=taxFormsDoc;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -214,4 +218,53 @@ test('★ 결산 화면 — 「건별 입력」 단추, 건별이 있으면 합�
   assert.match(SRC, /onclick="whtItemsOpen\(\)"/);
   assert.match(SRC, /w\.items\.length\s*\n?\s*\?'<input value="'\+esc\(w\.corp\.toLocaleString\(\)\)\+'" readonly/);
   assert.match(SRC, /\/funds\/'\+fid\+'\/years\/'\+yr\+'\/wht'\)\.update\(o\)/, '건별 저장은 update — 합계 칸만 있던 자료를 통째로 덮지 않는다');
+});
+
+test('★★ 날인용 법인세·법인지방소득세 신고서 — A4 4쪽(제56호/제1호 · 제27호 · 제10호 · 제43호의6/제43호) + 직인 날인란·환급계좌·장부 자동행', () => {
+  /* 1) 관할 세무서장·지자체장 수신처 */
+  assert.equal(B.officeTo({ tax_office: '천안세무서' }), '천안세무서장 귀하');
+  assert.equal(B.officeTo({ address: '충청남도 예산군 예산읍 아리랑로 1' }), '예산세무서장 귀하');
+  assert.equal(B.localTo({ address: '충청남도 천안시 서북구 번영로 1' }), '천안시 서북구청장 귀하');
+  assert.equal(B.localTo({ address: '충청남도 예산군 예산읍 아리랑로 1' }), '예산군수 귀하');
+  assert.equal(B.localTo({ address: '충청남도 보령시 대천동 1' }), '보령시장 귀하');
+
+  /* 2) 건별 미입력(합계만 입력) 시 장부 이자수익 입금 내역으로 별지 제10호 행을 자동 구성 */
+  const P56 = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000], 선납세금: [154000, 0] }), resvExp: 1000000 },
+    Object.assign({ bank: '가나다은행', acct: '000-0000-0000-00' }, WHT), 2025,
+    Object.assign({ chairman: '홍길동', address: '충청남도 예산군 예산읍 아리랑로 1' }, F), '고유목적사업준비금1');
+  assert.equal(P56.bank, '가나다은행');
+  assert.equal(P56.acct, '000-0000-0000-00');
+  const auto = B.autoRows(INT, P56);
+  assert.equal(auto.length, 1);
+  assert.equal(auto[0].int, 1000000);
+  assert.equal(auto[0].corp, 140000);
+  assert.equal(auto[0].local, 14000);
+
+  /* 3) A4 4쪽 날인용 신고서 생성 검증(이자만 있는 기금 — 제56호·제27호·제10호·제43호의6) */
+  const pg = B.pages(P56, Object.assign({ chairman: '홍길동', address: '충청남도 예산군 예산읍 아리랑로 1' }, F), INT);
+  const pages56 = pg.p1 + pg.p2 + pg.p3 + pg.p4;
+  assert.match(pages56, /별지 제56호서식/);
+  assert.match(pages56, /별지 제27호서식/);
+  assert.match(pages56, /별지 제10호서식\(갑\)/);
+  assert.match(pages56, /별지 제43호의6서식/);
+  assert.match(pages56, /\(서명 또는 인\)/);
+  assert.match(pages56, /홍길동/);
+  assert.match(pages56, /예산군수 귀하/);
+  assert.match(pages56, /국세환급금<br>계좌신고/);
+  assert.match(pages56, /지방세환급금<br>계좌신고/);
+  assert.match(pages56, /000-0000-0000-00/);
+
+  /* 4) 대부이자·잡수익 일반신고(제1호·제3호·제15호 + 제43호) */
+  const arr1 = INT.concat([{ _id: 't2', approved: true, deposit: 300000, debit: '현금성자산', credit: '대부이자수익' }]);
+  const P1 = B.prep(arr1, { tb: tbOf({ 이자수익: [0, 1000000], 대부이자수익: [0, 300000] }), resvExp: 1300000 }, WHT, 2025, F, '고유목적사업준비금1');
+  const doc1 = B.doc(P1, F, arr1);
+  assert.match(doc1, /<!doctype html>/i);
+  assert.match(doc1, /\[별지 제1호서식\] · \[별지 제3호서식\] · \[별지 제15호서식\]/);
+  assert.match(doc1, /\[별지 제43호서식\] · \[별지 제43호의2서식\] · \[별지 제43호의5서식\]/);
+
+  /* 5) 화면 단추 및 제출 묶음(ZIP) 08번 파일 연결 */
+  assert.match(SRC, /onclick="printTaxForms\(\)"/);
+  assert.match(SRC, /onclick="previewTaxForms\(\)"/);
+  assert.match(SRC, /onclick="taxSaveRefundAcct\(\)"/);
+  assert.match(SRC, /08\. 법인세·지방소득세 신고서\(날인용\)/);
 });

@@ -21118,6 +21118,8 @@ function _flowZipInto(z,dir,fid,yr,d,has){
   return Promise.all([wb.xlsx.writeBuffer(),buildTaxWb([{P:taxP,f:f}]).xlsx.writeBuffer()]).then(function(bb){ var buf=bb[0];
     z.file(dir+'01. '+yr+' 결산서+'+(yr+1)+' 사업계획서.xlsx',buf);
     z.file(dir+'06. 법인세·지방소득세 신고 준비표 '+yr+'.xlsx',bb[1]);
+    if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
+    if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
     var R=buildF15(arrC,fid,yr,d.rep,d.sites,d.welf), P=f15Pages(R);
     z.file(dir+'02. 운영상황보고서(별지 제15호) '+yr+'.html','<!doctype html><meta charset=utf-8><title>운영상황보고서 '+yr+'</title><style>'
       +f15CSS('',true)+'</style>'+P.p1+P.p2+'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px">인쇄 / PDF 저장</button>');
@@ -21648,6 +21650,8 @@ function taxPrep(arrC,fin,wht,yr,f,acctInt,prevRsv1,openRsv1){
     ['산출세액',ltax,''],
     ['특별징수세액(지방소득세)',local,whtSrc==='book'?'[추정]':''],
     [P.lpay<0?'환급받을 세액':'차감 납부할 세액',Math.abs(P.lpay),'']];
+  P.bank=String((wht&&wht.bank)||(f&&f.bank_name)||'').trim();
+  P.acct=String((wht&&wht.acct)||(f&&f.bank_acct)||'').trim();
   return P;
 }
 /* 화면 — 결산 후 진행 8단계 「법인세·지방소득세」에서 연다. 그 해 자료를 따로 읽는다(_flowLoad — 제출 묶음과 같은 자료) */
@@ -21664,7 +21668,9 @@ function rsv1UseOf(arr,acct){
 function taxPrepOf(fid,yr,d){
   var arrC=closeArr(d.arr,fid,yr), fin=computeFin(arrC,fid,yr);
   var ai=_rsvRoles(fid).interest, op=_openingOf(fid,yr);
-  return taxPrep(arrC,fin,_rsvWhtOf(fid,yr),yr,funds[fid]||{},ai,(d&&d.prevRsv1)||null,ai===RESERVE_ACCTS[1]?op.reserve2:op.reserve);
+  var P=taxPrep(arrC,fin,_rsvWhtOf(fid,yr),yr,funds[fid]||{},ai,(d&&d.prevRsv1)||null,ai===RESERVE_ACCTS[1]?op.reserve2:op.reserve);
+  P._arrC=arrC;
+  return P;
 }
 function taxPrepOpen(){
   var fid=S.fundId, yr=S.year;
@@ -21682,6 +21688,18 @@ function _taxTable(rows,pre){
         +'<td><button onclick="taxCopy(\''+pre+'\','+i+')" style="padding:1px 7px;font-size:11px" title="숫자만 복사(쉼표 없이)">복사</button></td>'
         +'<td class="mo muted" style="font-size:11px">'+esc(r[2]||'')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
+function taxSaveRefundAcct(){
+  var P=_taxP; if(!P||!P.fid) return;
+  var b=$('tax-rf-bank'), a=$('tax-rf-acct');
+  var bank=String(b?b.value:'').trim(), acct=String(a?a.value:'').trim();
+  P.bank=bank; P.acct=acct;
+  var fid=P.fid, yr=P.yr;
+  fbDb.ref(NS+'/funds/'+fid+'/years/'+yr+'/wht').update({bank:bank||null,acct:acct||null}).then(function(){
+    var Y=((funds[fid]=funds[fid]||{}).years=funds[fid].years||{}); Y[yr]=Y[yr]||{};
+    Y[yr].wht=Object.assign({},Y[yr].wht||{},{bank:bank,acct:acct});
+    toast('환급계좌 정보가 저장되었습니다 — 날인용 신고서에 반영됩니다');
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
 function taxPrepShow(){
   var P=_taxP; if(!P) return;
   var tone=P.kind==='none'?'':P.kind==='56'?'ok':'warn';
@@ -21690,7 +21708,12 @@ function taxPrepShow(){
   showModal('<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px"><h2 style="margin:0">'+P.yr+'년 법인세·지방소득세 신고 준비</h2>'+hlp('close.tax')
     +'<span class="chip '+tone+'">'+lbl+'</span><span class="chip">법인세 '+dd(P.due.corp)+'</span><span class="chip">지방소득세 '+dd(P.due.local)+'</span></div>'
     +'<div class="msg '+(P.kind==='1'?'warn':'ok')+'" style="font-size:12.5px;margin:0 0 8px">'+esc(P.decision)+'</div>'
-    +(P.kind==='none'?'':'<h3 style="font-size:13px;margin:10px 0 4px">홈택스 — 법인세</h3><div style="overflow-x:auto">'+_taxTable(P.rows,'c')+'</div>'
+    +(P.kind==='none'?'':'<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 10px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;margin-bottom:8px">'
+      +'<b style="font-size:12px">🏦 국세·지방세 환급계좌(날인용 신고서 기재용)</b>'
+      +'<input id="tax-rf-bank" value="'+esc(P.bank||'')+'" placeholder="거래은행·지점명 (예: 하나은행 ○○지점)" style="width:190px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px">'
+      +'<input id="tax-rf-acct" value="'+esc(P.acct||'')+'" placeholder="환급받을 기금 계좌번호" style="width:190px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px">'
+      +'<button onclick="taxSaveRefundAcct()" style="padding:4px 9px;font-size:11.5px">계좌 저장</button></div>'
+      +'<h3 style="font-size:13px;margin:10px 0 4px">홈택스 — 법인세</h3><div style="overflow-x:auto">'+_taxTable(P.rows,'c')+'</div>'
       +'<h3 style="font-size:13px;margin:12px 0 4px">위택스 — 법인지방소득세</h3><div style="overflow-x:auto">'+_taxTable(P.lrows,'l')+'</div>'
       +(P.ledger&&P.ledger.rows.length?'<h3 style="font-size:13px;margin:12px 0 4px">준비금1 설정연도별 — 제27호(을)</h3><div style="overflow-x:auto"><table><thead><tr><th style="width:24px"><input type="checkbox"></th><th class="no">#</th><th>설정연도</th><th style="text-align:right">손금산입액</th><th style="text-align:right">직전까지 사용</th><th style="text-align:right">당기 사용</th><th style="text-align:right">잔액</th><th>사용 기한</th></tr></thead><tbody>'
         +P.ledger.rows.map(function(r,i){ var K=function(v){ return Number(v||0).toLocaleString(); };
@@ -21704,7 +21727,9 @@ function taxPrepShow(){
       +'<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:10px">'+P.forms.concat(P.lforms).map(function(x){ return '<span class="chip" style="font-size:10.5px">'+esc(x)+'</span>'; }).join('')+'</div>')
     +(P.notes.length?'<div class="msg warn" style="font-size:12px;line-height:1.6;margin-top:10px">'+P.notes.map(function(n){ return '• '+esc(n); }).join('<br>')+'</div>':'')
     +'<div class="row" style="flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:12px">'
-    +(P.kind==='none'?'':'<button onclick="taxCopyAll()">📋 전부 복사</button><button onclick="taxPrepXlsx()">⬇ 세무사용 엑셀</button>'
+    +(P.kind==='none'?'':'<button class="primary" onclick="printTaxForms()" title="대표자 직인만 날인하여 세무서·지자체에 바로 제출할 수 있는 A4 법정 신고서식 4종을 인쇄합니다">🖨 날인용 신고서 인쇄</button>'
+      +'<button onclick="previewTaxForms()" title="A4 법정 신고서식 4종을 화면에서 미리 봅니다">👁 신고서 미리보기</button>'
+      +'<button onclick="taxCopyAll()">📋 전부 복사</button><button onclick="taxPrepXlsx()">⬇ 세무사용 엑셀</button>'
       +'<button onclick="window.open(\'https://www.hometax.go.kr\',\'_blank\',\'noopener\')">홈택스 열기</button>'
       +'<button onclick="window.open(\'https://www.wetax.go.kr\',\'_blank\',\'noopener\')">위택스 열기</button>')
     +'<button onclick="closeM()">닫기</button></div>');
@@ -21772,6 +21797,264 @@ function taxPrepXlsx(){
     _dlBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
       '[신고준비] '+String(f.short_name||f.name||P.fid).replace(/\s+/g,'')+'_'+P.yr+'.xlsx');
   });
+}
+/* ══════════ 날인용 국세청(법인세)·지자체(법인지방소득세) A4 법정 신고서식 자동 생성 ══════════
+   회사(기금법인)에서 대표자 직인만 날인하여 관할 세무서·시군구청에 우편·방문 제출하거나
+   세무대리인에게 날인본으로 바로 넘길 수 있도록 A4 4쪽 법정 서식을 생성한다.
+   구성:
+     1쪽: 법인세 과세표준(조정계산) 및 세액신고서 (이자만=별지 제56호 / 일반=별지 제1호·제3호·제15호)
+     2쪽: 고유목적사업준비금 조정명세서(갑)·(을) [별지 제27호] + 구분경리 운영성과표 요약
+     3쪽: 원천납부세액명세서(갑) [별지 제10호] (건별 미입력 시 장부 이자입금 내역 자동 연동)
+     4쪽: 법인지방소득세 과세표준(조정계산) 및 세액신고서 + 특별징수세액명세서 [별지 제43호의6/제43호·제43호의5] */
+function taxOfficeTo(f){
+  var o=String((f&&f.tax_office)||(typeof guessTax==='function'?guessTax((f&&f.address)||''):'')||'').trim();
+  if(!o) return '○○세무서장 귀하';
+  return (o.slice(-1)==='장'?o:o+'장')+' 귀하';
+}
+function taxLocalTo(f){
+  var g=(typeof _localGovFromAddr==='function')?_localGovFromAddr((f&&f.address)||''):'';
+  if(!g) return '○○시장·군수·구청장 귀하';
+  return g.replace(/시청$/,'시장').replace(/군청$/,'군수').replace(/구청$/,'구청장')+' 귀하';
+}
+function whtAutoRows(arrC,P){
+  P=P||{};
+  if(P.f10&&P.f10.length){
+    return P.f10.map(function(r){ return {date:r.date||'',payer:r.payer||'',bizno:r.bizno||'',int:Math.round(num(r.int)||0),corp:Math.round(num(r.corp)||0),local:Math.round(num(r.local)||0),auto:false}; });
+  }
+  var cashRows=[];
+  if(typeof expandSplits==='function'){
+    expandSplits(arrC||[]).forEach(function(x){
+      if(!x||!x.approved||x.credit!=='이자수익') return;
+      if(x._split){ if(x._nocashSrc) return; }
+      else if(x.nocash) return;
+      var dep=Math.round(num(x.deposit)||num(x.amount)||0);
+      if(dep<=0) return;
+      var memo=String(x.memo||x.kind||'').trim();
+      var bk='';
+      var m=memo.match(/(하나|국민|신한|우리|기업|농협|새마을|신협|우체국|수협|대구|부산|경남|광주|전북|제주|씨티|SC|케이|카카오|토스|아이엠)[은행금고]*/);
+      if(m) bk=m[0]+(/은행|금고|우체국|신협/.test(m[0])?'':'은행');
+      cashRows.push({date:String(x.date||(P.yr+'-12-31')), payer:bk||'주거래 금융기관(원천징수영수증 참조)', bizno:'', dep:dep});
+    });
+  }
+  var totInt=Math.round(num(P.intCash)||0), totCorp=Math.round(num(P.corp)||0), totLoc=Math.round(num(P.local)||0);
+  if(!cashRows.length){
+    if(!(totInt||totCorp||totLoc)) return [];
+    return [{date:(P.yr||'')+'-12-31',payer:'주거래 금융기관(원천징수영수증 참조)',bizno:'',int:totInt,corp:totCorp,local:totLoc,auto:true}];
+  }
+  var sumDep=cashRows.reduce(function(a,r){ return a+r.dep; },0)||1;
+  var remInt=totInt, remCorp=totCorp, remLoc=totLoc;
+  return cashRows.map(function(r,idx){
+    var last=(idx===cashRows.length-1);
+    var rInt=last?remInt:Math.round(totInt*(r.dep/sumDep));
+    var rCorp=last?remCorp:Math.round(totCorp*(r.dep/sumDep));
+    var rLoc=last?remLoc:Math.round(totLoc*(r.dep/sumDep));
+    remInt-=rInt; remCorp-=rCorp; remLoc-=rLoc;
+    return {date:r.date,payer:r.payer,bizno:r.bizno,int:rInt,corp:rCorp,local:rLoc,auto:true};
+  });
+}
+function taxFormsPages(P,f,arrC){
+  P=P||{}; f=f||{};
+  var K=function(v){ return Math.round(Number(v||0)).toLocaleString(); };
+  var ceo=String(((typeof _boss==='function'?_boss(f):{})||{}).name||f.chairman||'').trim();
+  var biz=String(f.tax_id_no||'').trim(), corpNo=String(f.corp_reg_no||'').trim();
+  var addr=String(f.address||'').trim(), tel=String(f.phone||'').trim(), nm=String(f.name||'').trim();
+  var fy=P.yr+'. 1. 1. ~ '+P.yr+'. 12. 31.';
+  var bank=String(P.bank||f.bank_name||'').trim(), acct=String(P.acct||f.bank_acct||'').trim();
+  var taxTo=taxOfficeTo(f), locTo=taxLocalTo(f);
+  var is56=(P.kind!=='1');
+  var f10Rows=whtAutoRows(arrC||P._arrC||[],P);
+  var isAutoF10=f10Rows.some(function(r){ return r.auto; });
+
+  /* ── 1쪽: 법인세 과세표준(조정계산) 및 세액신고서 (별지 제56호 또는 별지 제1호·제3호·제15호) ── */
+  var p1='<div class="a4 pg1"><div class="a4b">'
+    +'<p class="law">■ 법인세법 시행규칙 '+(is56?'[별지 제56호서식] (이자소득만 있는 비영리법인 신고용)':'[별지 제1호서식] · [별지 제3호서식] · [별지 제15호서식]')+'</p>'
+    +'<div class="tt" style="margin:6px 0 4px">'+(is56?'법인세 과세표준(조정계산) 및 세액신고서':'법인세 과세표준 및 세액신고서 (겸 세액조정계산서)')+'</div>'
+    +'<div class="subrow"><span>'+(is56?'※ 이자소득만 있는 비영리내국법인(근로복지기금법인) 특례 신고용 (법인세법 제62조)':'※ 수익사업(대부이자·잡수익·미수이자 세무조정)이 있는 비영리법인 신고용 (법인세법 제60조)')+'</span><span>(4쪽 중 1쪽)</span></div>'
+    +'<table><colgroup><col style="width:16%"><col style="width:18%"><col style="width:32%"><col style="width:14%"><col style="width:20%"></colgroup>'
+    +'<tr><th class="sec" rowspan="4">1. 기본사항</th><th>① 법인명</th><td><b>'+esc(nm)+'</b></td><th>② 고유번호<br>(사업자번호)</th><td><b>'+esc(biz||'＿＿＿＿＿＿')+'</b></td></tr>'
+    +'<tr><th>③ 대표자 성명</th><td>'+esc(ceo||'＿＿＿＿')+'</td><th>④ 법인등록번호</th><td>'+esc(corpNo||'＿＿＿＿＿＿')+'</td></tr>'
+    +'<tr><th>⑤ 소재지</th><td colspan="2">'+esc(addr||'＿＿＿＿＿＿＿＿＿＿')+'</td><th>⑥ 전화번호</th><td>'+esc(tel||'＿＿＿＿')+'</td></tr>'
+    +'<tr><th>⑦ 사업연도</th><td colspan="2">'+esc(fy)+'</td><th>신고구분</th><td>[ √ ] 정기신고 ('+(is56?'제62조 특례':'제60조 일반')+')</td></tr></table>';
+
+  if(!is56){
+    p1+='<table><colgroup><col style="width:16%"><col style="width:44%"><col style="width:20%"><col style="width:20%"></colgroup>'
+      +'<tr><th class="sec" rowspan="5">2. 소득금액<br>조정합계<br>(별지 제15호)</th><th>구분 (수익사업 수입 및 세무조정)</th><th class="n">금액(원)</th><th>처분 / 비고</th></tr>'
+      +'<tr><td>수익사업 수입금액 합계 (예금이자 '+K(P.intCash)+(P.loanInt?' + 대부이자 '+K(P.loanInt):'')+(P.misc?' + 잡수익 '+K(P.misc):'')+')</td><td class="n"><b>'+K(P.income)+'</b></td><td>익금 산입 대상</td></tr>'
+      +'<tr><td>익금산입·손금불산입 (전기 미수이자 회수 '+K(P.accRev)+' / 준비금 한도초과 '+K(P.over)+')</td><td class="n">'+K((P.accRev||0)+(P.over||0))+'</td><td>유보 추인 / 유보</td></tr>'
+      +'<tr><td>손금산입·익금불산입 (당기 미수이자 '+K(P.accrued)+')</td><td class="n">'+K(P.accrued||0)+'</td><td>△유보 (원천징수 전)</td></tr>'
+      +'<tr class="b"><td>각 사업연도 소득금액 (준비금 손금산입 전)</td><td class="n">'+K(P.income)+'</td><td>별지 제27호 연동</td></tr></table>';
+  }
+
+  p1+='<table><colgroup><col style="width:16%"><col style="width:44%"><col style="width:20%"><col style="width:20%"></colgroup>'
+    +'<tr><th class="sec" rowspan="8">'+(is56?'2. 과세표준<br>및 세액계산':'3. 과세표준<br>및 세액계산')+'</th><th>항목</th><th class="n">금액(원)</th><th>산출 근거</th></tr>'
+    +'<tr><td>⑧ '+(is56?'이자소득금액 (원천징수 전 이자수익 총액)':'고유목적사업준비금 손금산입 전 소득금액')+'</td><td class="n"><b>'+K(P.income)+'</b></td><td>별지 제10호 합계 일치</td></tr>'
+    +'<tr><td>⑨ 고유목적사업준비금 손금산입액</td><td class="n"><b>'+K(P.deduct)+'</b></td><td>법 제29조① (한도 '+K(P.limit)+')</td></tr>'
+    +'<tr class="b"><td>⑩ 과세표준 (⑧ − ⑨)</td><td class="n">'+K(P.base)+'</td><td></td></tr>'
+    +'<tr><td>⑪ 세율</td><td class="n">'+esc(taxRateTxt(P.yr,false))+'</td><td>법인세법 제55조①</td></tr>'
+    +'<tr><td>⑫ 산출세액</td><td class="n">'+K(P.tax)+'</td><td></td></tr>'
+    +'<tr><td>⑬ 기납부세액 (원천납부세액)</td><td class="n"><b>'+K(P.corp)+'</b></td><td>별지 제10호 원천징수세액</td></tr>'
+    +'<tr class="b"><td>⑭ 차감 납부할 세액 (⑫ − ⑬, 음수(△)는 <b>환급받을 세액</b>)</td><td class="n" style="font-size:11px">'+(P.pay<0?'△ '+K(Math.abs(P.pay))+' (환급)':K(P.pay))+'</td><td>'+(P.pay<0?'전액 환급 대상':'납부 대상')+'</td></tr></table>'
+    +'<table><colgroup><col style="width:16%"><col style="width:18%"><col style="width:26%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    +'<tr><th class="sec" rowspan="2">'+(is56?'3. 국세환급금<br>계좌신고':'4. 국세환급금<br>계좌신고')+'</th><th>⑮ 금융회사(은행·지점)</th><td><b>'+esc(bank||'＿＿＿＿＿＿＿＿＿＿')+'</b></td><th>⑯ 계좌번호</th><td><b>'+esc(acct||'＿＿＿＿＿＿＿＿＿＿＿＿')+'</b></td></tr>'
+    +'<tr><th>⑰ 예금주(기금법인명)</th><td colspan="4">'+esc(nm)+' &nbsp;<span style="font-size:8.8px;color:#475569">※ 기금법인 명의 계좌로 신고해야 환급통지서 우편 수령 없이 계좌로 바로 입금됩니다.</span></td></tr></table>'
+    +'<p class="cite">신고인은 「법인세법」 제60조·제62조 및 「국세기본법」 제45조의2에 따라 위와 같이 법인세 과세표준 및 세액을 신고하며, 위 내용을 충분히 검토하였고 신고인이 알고 있는 사실 그대로를 정확하게 적었음을 확인합니다.</p>'
+    +'<p class="date">'+(P.yr+1)+'년 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3월 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 일</p>'
+    +'<p class="sign">신고인(대표자) &nbsp;&nbsp;<b>'+esc(ceo||'＿＿＿＿＿＿')+'</b>&nbsp;&nbsp;(서명 또는 인)</p>'
+    +'<p class="to">'+esc(taxTo)+'</p>'
+    +'<table><colgroup><col style="width:16%"><col style="width:64%"><col style="width:10%"><col style="width:10%"></colgroup>'
+    +'<tr><th class="sec">첨부서류</th><td>1. 고유목적사업준비금 조정명세서(갑)·(을) [별지 제27호서식] 각 1부<br>'
+    +'2. 원천납부세액명세서(갑) [별지 제10호서식] 및 금융회사 이자소득 원천징수영수증 사본 1부'
+    +(is56?'':'<br>3. 표준재무상태표·표준손익계산서(구분경리) 및 소득금액조정합계표 각 1부')+'</td>'
+    +'<th class="c">수수료</th><td style="text-align:center">없음</td></tr></table>'
+    +'</div><div class="a4f">210mm×297mm[백상지(80g/㎡)] · 법인세 신고기한: '+(P.yr+1)+'. 3. 31. (기한 내 신고 시에만 원천징수세액 환급 가능)</div></div>';
+
+  /* ── 2쪽: 고유목적사업준비금 조정명세서(갑)·(을) [별지 제27호] + 구분경리 요약 ── */
+  var lRows=(P.ledger&&P.ledger.rows)||[];
+  var sumSet=0, sumPre=0, sumNow=0, sumLeft=0;
+  var lHtml=lRows.map(function(r,i){
+    sumSet+=num(r.set)||0; sumPre+=num(r.usedBefore)||0; sumNow+=num(r.usedNow)||0; sumLeft+=num(r.left)||0;
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td style="text-align:center"><b>'+esc(r.y)+'년</b></td>'
+      +'<td class="n">'+K(r.set)+'</td><td class="n">'+K(r.usedBefore)+'</td><td class="n">'+K(r.usedNow)+'</td>'
+      +'<td class="n">'+(r.over?K(r.left):'0')+'</td><td class="n"><b>'+K(r.left)+'</b></td>'
+      +'<td style="text-align:center">'+esc(r.due||'—')+(r.over?' (기한경과)':'')+'</td></tr>';
+  }).join('');
+  if(!lHtml){
+    lHtml='<tr><td style="text-align:center">1</td><td style="text-align:center"><b>'+P.yr+'년</b></td><td class="n">'+K(P.deduct)+'</td><td class="n">0</td><td class="n">'+K(P.rsvUsed)+'</td><td class="n">0</td><td class="n"><b>'+K(P.remain)+'</b></td><td style="text-align:center">'+(P.yr+5)+'</td></tr>';
+    sumSet=P.deduct; sumNow=P.rsvUsed; sumLeft=P.remain;
+  }
+  var spRows=((P.split&&P.split.rows)||[]).map(function(r){
+    return '<tr'+(r.lv?' class="b"':'')+'><td>'+(r.lv?'':'&nbsp;&nbsp;&nbsp;')+esc(r.t)+'</td><td class="n">'+K(r.p)+'</td><td class="n">'+K(r.f)+'</td><td class="n">'+K(r.sum)+'</td></tr>';
+  }).join('');
+
+  var p2='<div class="a4 pg2"><div class="a4b">'
+    +'<p class="law">■ 법인세법 시행규칙 [별지 제27호서식(갑)·(을)] &lt;고유목적사업준비금 조정명세서&gt;</p>'
+    +'<div class="tt" style="margin:6px 0 4px">고유목적사업준비금 조정명세서 (갑)·(을)</div>'
+    +'<div class="subrow"><span>법인명: <b>'+esc(nm)+'</b> &nbsp;|&nbsp; 고유번호: <b>'+esc(biz||'—')+'</b> &nbsp;|&nbsp; 사업연도: '+esc(fy)+'</span><span>(4쪽 중 2쪽)</span></div>'
+    +'<table><colgroup><col style="width:16%"><col style="width:46%"><col style="width:18%"><col style="width:20%"></colgroup>'
+    +'<tr><th class="sec" rowspan="8">1. 손금산입<br>한도액 계산<br>[제27호(갑)]</th><th>구분</th><th class="n">금액(원)</th><th>법적 근거 · 산입률</th></tr>'
+    +'<tr><td>① 이자소득금액 (예금이자 원천징수 전 총액)</td><td class="n">'+K(P.intCash)+'</td><td>법 제29조①1호가목 (100%)</td></tr>'
+    +'<tr><td>② 특별법 설립 비영리법인 복지사업 대부이자</td><td class="n">'+K(P.loanInt)+'</td><td>법 제29조①1호다목 (100%)</td></tr>'
+    +'<tr><td>③ 그 밖의 수익사업 소득금액</td><td class="n">'+K(P.misc)+'</td><td>법 제29조①2호 (50%)</td></tr>'
+    +'<tr class="b"><td>④ 손금산입 한도액 합계 (① + ② + ③×50%)</td><td class="n">'+K(P.limit)+'</td><td></td></tr>'
+    +'<tr><td>⑤ 당기 결산서상 고유목적사업준비금1 계상액(전입액)</td><td class="n">'+K(P.booked)+'</td><td>기금관리회계 손비 계상</td></tr>'
+    +'<tr class="b"><td>⑥ 당기 손금산입액 (min(④, ⑤))</td><td class="n">'+K(P.deduct)+'</td><td>과세표준 차감액</td></tr>'
+    +'<tr><td>⑦ 한도초과액 (손금불산입 유보, ⑤ − ⑥)</td><td class="n">'+K(P.over)+'</td><td></td></tr></table>'
+    +'<table><colgroup><col style="width:6%"><col style="width:12%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:14%"><col style="width:13%"><col style="width:10%"></colgroup>'
+    +'<tr><th class="sec" colspan="8">2. 사업연도별 고유목적사업준비금 설정·지출 및 잔액 명세 [별지 제27호서식(을) — 5년 선입선출]</th></tr>'
+    +'<tr><th class="c">#</th><th class="c">설정 사업연도</th><th class="n">① 손금산입액<br>(설정액)</th><th class="n">② 직전연도까지<br>지출액</th><th class="n">③ 당기 고유목적<br>사업 지출액</th><th class="n">④ 5년 경과<br>익금산입액</th><th class="n">⑤ 기말 잔액<br>(①-②-③-④)</th><th class="c">5년 사용기한</th></tr>'
+    +lHtml
+    +'<tr class="b"><td colspan="2" style="text-align:center">합 계</td><td class="n">'+K(sumSet)+'</td><td class="n">'+K(sumPre)+'</td><td class="n">'+K(sumNow)+'</td><td class="n">0</td><td class="n">'+K(sumLeft)+'</td><td></td></tr></table>'
+    +(spRows?'<table><colgroup><col style="width:40%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>'
+      +'<tr><th class="sec" colspan="4">3. 구분경리 운영성과표 요약 (법인세법 제113조 · 시행규칙 제76조 — 공통 자산·부채는 기금관리회계 소속)</th></tr>'
+      +'<tr><th>계정과목</th><th class="n">목적사업회계(비영리)</th><th class="n">기금관리회계(수익사업)</th><th class="n">합계</th></tr>'
+      +spRows+'</table>':'')
+    +'</div><div class="a4f">210mm×297mm[백상지(80g/㎡)] · 법인세법 제29조제3항(선입선출) 및 제5항제4호(5년 이내 고유목적사업 사용)</div></div>';
+
+  /* ── 3쪽: 원천납부세액명세서(갑) [별지 제10호서식(갑)] ── */
+  var padRows=f10Rows.slice();
+  while(padRows.length<8) padRows.push({date:'',payer:'',bizno:'',int:0,corp:0,local:0,empty:true});
+  var f10Html=padRows.map(function(r,i){
+    if(r.empty) return '<tr><td style="text-align:center">'+(i+1)+'</td><td></td><td></td><td></td><td></td><td class="n"></td><td style="text-align:center"></td><td class="n"></td></tr>';
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td style="text-align:center">예금이자(법 제73조)</td>'
+      +'<td>'+esc(r.payer)+'</td><td style="text-align:center">'+esc(r.bizno||'영수증 참조')+'</td>'
+      +'<td style="text-align:center">'+esc(r.date)+'</td><td class="n">'+K(r.int)+'</td>'
+      +'<td style="text-align:center">14%</td><td class="n"><b>'+K(r.corp)+'</b></td></tr>';
+  }).join('');
+
+  var p3='<div class="a4 pg1"><div class="a4b">'
+    +'<p class="law">■ 법인세법 시행규칙 [별지 제10호서식(갑)] &lt;원천납부세액명세서&gt;</p>'
+    +'<div class="tt" style="margin:6px 0 4px">원천납부세액명세서 (갑)</div>'
+    +'<div class="subrow"><span>※ 금융회사로부터 교부받은 「이자·배당소득 원천징수영수증」 내역을 기재합니다.'+(isAutoF10?' (장부 이자입금 내역 자동연동 — 영수증 대조 확인)':'')+'</span><span>(4쪽 중 3쪽)</span></div>'
+    +'<table><colgroup><col style="width:16%"><col style="width:34%"><col style="width:18%"><col style="width:32%"></colgroup>'
+    +'<tr><th>법인명</th><td><b>'+esc(nm)+'</b></td><th>고유번호(사업자등록번호)</th><td><b>'+esc(biz||'＿＿＿＿＿＿')+'</b></td></tr>'
+    +'<tr><th>대표자 성명</th><td>'+esc(ceo||'＿＿＿＿')+'</td><th>사업연도</th><td>'+esc(fy)+'</td></tr></table>'
+    +'<table><colgroup><col style="width:6%"><col style="width:16%"><col style="width:22%"><col style="width:14%"><col style="width:12%"><col style="width:13%"><col style="width:6%"><col style="width:11%"></colgroup>'
+    +'<tr><th class="c">일련<br>번호</th><th class="c">① 적요<br>(소득구분)</th><th class="c">② 원천징수의무자<br>상호(금융회사명)</th><th class="c">③ 사업자등록번호</th><th class="c">④ 원천징수일<br>(지급일)</th><th class="n">⑤ 이자·배당금액<br>(원천징수 전 총액)</th><th class="c">⑥ 세율</th><th class="n">⑦ 원천징수<br>법인세액(원)</th></tr>'
+    +f10Html
+    +'<tr class="b"><td colspan="5" style="text-align:center">합 &nbsp;&nbsp;&nbsp;&nbsp; 계 (별지 제56호·제1호 기납부 원천납부세액과 일치)</td><td class="n">'+K(P.intCash)+'</td><td style="text-align:center">14%</td><td class="n">'+K(P.corp)+'</td></tr></table>'
+    +'<p class="cite">「법인세법」 제73조에 따라 원천징수된 세액 명세를 위와 같이 제출합니다.<br>'
+    +'※ 첨부서류: 거래 은행에서 발급한 해당 사업연도(1. 1. ~ 12. 31.) 전체 기간의 「이자·배당소득 원천징수영수증」 사본 각 1부.</p>'
+    +'<p class="date">'+(P.yr+1)+'년 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3월 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 일</p>'
+    +'<p class="sign">신고인(대표자) &nbsp;&nbsp;<b>'+esc(ceo||'＿＿＿＿＿＿')+'</b>&nbsp;&nbsp;(서명 또는 인)</p>'
+    +'<p class="to">'+esc(taxTo)+'</p>'
+    +'</div><div class="a4f">210mm×297mm[백상지(80g/㎡)] · 법인세법 시행규칙 별지 제10호서식(갑)</div></div>';
+
+  /* ── 4쪽: 법인지방소득세 과세표준(조정계산) 및 세액신고서 + 특별징수세액명세서 [별지 제43호의6 / 제43호 · 제43호의5] ── */
+  var l43Rows=f10Rows.length?f10Rows:[{date:P.yr+'-12-31',payer:'주거래 금융기관',bizno:'',int:P.intCash,corp:P.corp,local:P.local}];
+  var l43Html=l43Rows.map(function(r,i){
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc(r.payer)+'</td><td style="text-align:center">'+esc(r.bizno||'영수증 참조')+'</td>'
+      +'<td style="text-align:center">'+esc(r.date)+'</td><td class="n">'+K(r.int)+'</td><td class="n">'+K(r.corp)+'</td><td class="n"><b>'+K(r.local)+'</b></td></tr>';
+  }).join('');
+
+  var p4='<div class="a4 pg1"><div class="a4b">'
+    +'<p class="law">■ 지방세법 시행규칙 '+(is56?'[별지 제43호의6서식] · [별지 제43호의5서식]':'[별지 제43호서식] · [별지 제43호의2서식] · [별지 제43호의5서식]')+'</p>'
+    +'<div class="tt" style="margin:6px 0 4px">법인지방소득세 과세표준(조정계산) 및 세액신고서</div>'
+    +'<div class="subrow"><span>※ 「지방세법」 제103조의23에 따라 사업연도 종료일이 속하는 달의 말일부터 4개월 이내(4월 30일까지) 관할 시·군·구청에 신고합니다.</span><span>(4쪽 중 4쪽)</span></div>'
+    +'<table><colgroup><col style="width:16%"><col style="width:18%"><col style="width:32%"><col style="width:14%"><col style="width:20%"></colgroup>'
+    +'<tr><th class="sec" rowspan="4">1. 납세의무자<br>기본사항</th><th>① 법인명</th><td><b>'+esc(nm)+'</b></td><th>② 고유번호<br>(사업자번호)</th><td><b>'+esc(biz||'＿＿＿＿＿＿')+'</b></td></tr>'
+    +'<tr><th>③ 대표자 성명</th><td>'+esc(ceo||'＿＿＿＿')+'</td><th>④ 법인등록번호</th><td>'+esc(corpNo||'＿＿＿＿＿＿')+'</td></tr>'
+    +'<tr><th>⑤ 주사무소 소재지</th><td colspan="2">'+esc(addr||'＿＿＿＿＿＿＿＿＿＿')+'</td><th>⑥ 전화번호</th><td>'+esc(tel||'＿＿＿＿')+'</td></tr>'
+    +'<tr><th>⑦ 사업연도</th><td colspan="2">'+esc(fy)+'</td><th>신고구분</th><td>[ √ ] 정기신고</td></tr></table>'
+    +'<table><colgroup><col style="width:16%"><col style="width:44%"><col style="width:20%"><col style="width:20%"></colgroup>'
+    +'<tr><th class="sec" rowspan="8">2. 과세표준<br>및 세액계산</th><th>항목</th><th class="n">금액(원)</th><th>산출 근거</th></tr>'
+    +'<tr><td>⑧ '+(is56?'이자소득금액 (원천징수 전 총액)':'수익사업 소득금액')+'</td><td class="n"><b>'+K(P.income)+'</b></td><td>법인세 신고서와 동일</td></tr>'
+    +'<tr><td>⑨ 고유목적사업준비금 손금산입액</td><td class="n"><b>'+K(P.deduct)+'</b></td><td>법인세법 제29조①</td></tr>'
+    +'<tr class="b"><td>⑩ 법인지방소득세 과세표준 (⑧ − ⑨)</td><td class="n">'+K(P.base)+'</td><td></td></tr>'
+    +'<tr><td>⑪ 세율</td><td class="n">'+esc(taxRateTxt(P.yr,true))+'</td><td>지방세법 제103조의20①</td></tr>'
+    +'<tr><td>⑫ 산출세액</td><td class="n">'+K(P.ltax)+'</td><td></td></tr>'
+    +'<tr><td>⑬ 기납부 특별징수세액 (이자소득 지방소득세 1.4%)</td><td class="n"><b>'+K(P.local)+'</b></td><td>별지 제43호의5 명세 합계</td></tr>'
+    +'<tr class="b"><td>⑭ 차감 납부할 세액 (⑫ − ⑬, 음수(△)는 <b>환급받을 세액</b>)</td><td class="n" style="font-size:11px">'+(P.lpay<0?'△ '+K(Math.abs(P.lpay))+' (환급)':K(P.lpay))+'</td><td>'+(P.lpay<0?'전액 환급 대상':'납부 대상')+'</td></tr></table>'
+    +'<table><colgroup><col style="width:6%"><col style="width:24%"><col style="width:16%"><col style="width:14%"><col style="width:14%"><col style="width:13%"><col style="width:13%"></colgroup>'
+    +'<tr><th class="sec" colspan="7">3. 법인지방소득세 특별징수세액명세서 [별지 제43호의5서식 통합]</th></tr>'
+    +'<tr><th class="c">#</th><th class="c">특별징수의무자(금융회사)</th><th class="c">사업자등록번호</th><th class="c">특별징수일</th><th class="n">이자금액(총액)</th><th class="n">법인세(14%)</th><th class="n">지방소득세(1.4%)</th></tr>'
+    +l43Html
+    +'<tr class="b"><td colspan="4" style="text-align:center">합 계</td><td class="n">'+K(P.intCash)+'</td><td class="n">'+K(P.corp)+'</td><td class="n">'+K(P.local)+'</td></tr></table>'
+    +'<table><colgroup><col style="width:16%"><col style="width:18%"><col style="width:26%"><col style="width:14%"><col style="width:26%"></colgroup>'
+    +'<tr><th class="sec">4. 지방세환급금<br>계좌신고</th><th>금융회사(은행·지점)</th><td><b>'+esc(bank||'＿＿＿＿＿＿＿＿＿＿')+'</b></td><th>계좌번호</th><td><b>'+esc(acct||'＿＿＿＿＿＿＿＿＿＿＿＿')+'</b></td></tr></table>'
+    +'<p class="cite">신고인은 「지방세법」 제103조의23에 따라 위와 같이 법인지방소득세 과세표준 및 세액을 신고하며, 위 내용을 충분히 검토하였고 신고인이 알고 있는 사실 그대로를 정확하게 적었음을 확인합니다.</p>'
+    +'<p class="date">'+(P.yr+1)+'년 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4월 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 일</p>'
+    +'<p class="sign">신고인(대표자) &nbsp;&nbsp;<b>'+esc(ceo||'＿＿＿＿＿＿')+'</b>&nbsp;&nbsp;(서명 또는 인)</p>'
+    +'<p class="to">'+esc(locTo)+'</p>'
+    +'</div><div class="a4f">210mm×297mm[백상지(80g/㎡)] · 법인지방소득세 신고기한: '+(P.yr+1)+'. 4. 30. (위택스 또는 관할 시·군·구청)</div></div>';
+
+  return {p1:p1,p2:p2,p3:p3,p4:p4};
+}
+function taxFormsDoc(P,f,arrC){
+  var pg=taxFormsPages(P,f,arrC), nm=esc((f&&f.name)||'');
+  return '<!doctype html><meta charset=utf-8><title>법인세·법인지방소득세 신고서(날인용) '+P.yr+' — '+nm+'</title>'
+    +'<style>'+f15CSS('',true)+'</style>'+pg.p1+pg.p2+pg.p3+pg.p4
+    +'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px;font-size:13px">🖨 인쇄 / PDF 저장</button>';
+}
+function previewTaxForms(){
+  var P=_taxP; if(!P){ toast('먼저 신고 준비표를 열어 주세요','warn'); return; }
+  var b=$('tax-rf-bank'), a=$('tax-rf-acct');
+  if(b) P.bank=String(b.value||'').trim();
+  if(a) P.acct=String(a.value||'').trim();
+  var f=funds[P.fid]||{}, pg=taxFormsPages(P,f,P._arrC);
+  S.f15Zoom=0;
+  showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap;gap:6px"><h2 style="margin:0;font-size:15px">국세청(법인세) · 지자체(법인지방소득세) 날인용 신고서</h2>'+hlp('close.tax')
+    +'<span class="chip ok" style="font-size:10px">'+P.yr+'년도 · A4 세로 4쪽</span>'
+    +'<span class="chip" style="font-size:10px">'+(P.kind==='56'?'별지 제56호·제27호·제10호·제43호의6':'별지 제1호·제3호·제27호·제10호·제43호')+'</span>'
+    +'<span style="flex:1"></span>'
+    +'<span class="muted" style="font-size:11px">배율 <b id="f15ZoomLbl">—</b></span>'
+    +'<button onclick="toggleF15Zoom()" style="padding:3px 9px;font-size:11.5px">⤢ 배율</button>'
+    +'<button onclick="taxPrepShow()" style="padding:3px 9px;font-size:11.5px">← 준비표로</button>'
+    +'<button class="primary" onclick="printTaxForms()" style="padding:3px 10px">🖨 인쇄 / PDF</button></div>'
+    +'<div id="f15wrap" style="border:1px solid var(--line);border-radius:8px;background:#e2e8f0;padding:12px;max-height:72vh;overflow:auto">'
+    +'<style>'+f15CSS('#f15doc')+'</style>'
+    +'<div id="f15stage"><div id="f15doc" style="transform-origin:top left">'+pg.p1+pg.p2+pg.p3+pg.p4+'</div></div></div>'
+  ,{width:1020, after:fitF15});
+}
+function printTaxForms(){
+  var P=_taxP; if(!P){ toast('먼저 신고 준비표를 열어 주세요','warn'); return; }
+  var b=$('tax-rf-bank'), a=$('tax-rf-acct');
+  if(b) P.bank=String(b.value||'').trim();
+  if(a) P.acct=String(a.value||'').trim();
+  var f=funds[P.fid]||{};
+  var w=window.open('','_blank');
+  if(!w){ toast('팝업이 차단되었습니다 — 브라우저에서 팝업을 허용하세요','err'); return; }
+  w.document.write(taxFormsDoc(P,f,P._arrC));
+  w.document.close();
 }
 /* 홈 「결산 후 진행」에서 고른 기금들 — 한 장에 기금마다 한 줄 */
 function taxPrepMany(yr){
@@ -22130,11 +22413,12 @@ function _rsvIsAuto(x){ return RSV_AUTO_ID.test(String((x&&x._id)||'')); }
      (차) 선납세금 / (대) 이자수익  — 현금이 오가지 않는 대체분개(nocash), 준비금1 설정 기준에는 넣는다(wht).
    ⚠ 통장에 원천징수가 «따로 출금 줄»로 찍히는 기금은 이미 총액이 들어와 있다 — 그때는 칸을 비운다(두 번 잡힌다). */
 function _rsvWhtOf(fid,yr){
-  var w=((((funds[fid]||{}).years||{})[yr]||{}).wht)||{};
+  var f=funds[fid]||{}, w=(((f.years||{})[yr]||{}).wht)||{};
+  var bank=String(w.bank||f.bank_name||'').trim(), acct=String(w.acct||f.bank_acct||'').trim();
   /* 건별(별지 제10호)이 있으면 합계는 건별에서 낸다 — 합계 칸과 건별이 따로 놀지 않게 */
   var it=whtItemsOf(w), s=whtItemsSum(it);
-  if(s.n) return { corp:s.corp, local:s.local, items:it, int:s.int };
-  return { corp:Math.max(0,Math.round(num(w.corp)||0)), local:Math.max(0,Math.round(num(w.local)||0)), items:[] };
+  if(s.n) return { corp:s.corp, local:s.local, items:it, int:s.int, bank:bank, acct:acct };
+  return { corp:Math.max(0,Math.round(num(w.corp)||0)), local:Math.max(0,Math.round(num(w.local)||0)), items:[], bank:bank, acct:acct };
 }
 /* ★ 원천징수 건별 — 별지 제10호 원천납부세액명세서(책 대조 D5, 2026-10-08)
    은행 원천징수영수증 한 장 = 한 줄 {date 원천징수일, payer 징수의무자, bizno 사업자번호, int 이자 총액, corp 법인세, local 지방소득세}.
