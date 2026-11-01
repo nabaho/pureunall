@@ -153,7 +153,7 @@
     h += '</div><div class="kpis">'
       + '<div class="kpi"><span>세후 합계 · 입금 확인 ' + checkedN + '/' + paidN + '</span><b>' + won(T) + '원</b></div>'
       + '<div class="kpi"><span>담당 몫 합계</span><b>' + won(shares) + '원</b></div>'
-      + '<div class="kpi"><span>' + (draft ? '송금(확정하면)' : '송금') + '</span><b>' + tr.length + '건 · ' + won(trSum) + '원</b></div>'
+      + '<div class="kpi"><span>' + (draft ? '송금(확정하면)' : '송금 · 보냄 ' + tr.filter(function (t) { return t.paid; }).length + '/' + tr.length) + '</span><b>' + tr.length + '건 · ' + won(trSum) + '원</b></div>'
       + '<div class="kpi' + (iss.length ? ' bad' : '') + '"><span>확인 필요</span><b>' + iss.length + '건</b></div></div>';
     if (run.changed) h += '<div class="warn">새 안내 파일에서 이 달 금액이 바뀌었습니다 — 확정을 풀고 다시 계산하세요.</div>';
     if (iss.length) h += '<div class="warn">' + iss.map(esc).join(' · ') + '</div>';
@@ -165,14 +165,19 @@
     h += '<div class="bar legend"><span class="pill dir-back">반환</span><span class="hint">담당 → ' + lead + '</span>'
       + '<span class="pill dir-more">추가 지급</span><span class="hint">' + lead + ' → 담당</span>'
       + '<span class="hint">· 몫 = 사업장 세후 합계 × 요율 · 정산액 + 받을 돈 / − 보낼 돈</span></div>';
-    var cols = hasAdj ? 12 : 10, rows = [], idx = 0;
+    /* 사업장마다 상자 하나 — 사람별 금액 표 + 그 사업장의 송금 줄(대표 지시 2026-11-01 「사업장 송금목록과 사업장이 중복되어 있어 판단하기 어렵다 …
+       사업장별로 한번에 모두 정리」). 따로 있던 «송금 목록» 표는 없앴다.
+       송금 줄: 확정한 달은 run.transfers 의 그 사업장 것(☐·번호 = 송금 목록 안 자리 — «보냄» 저장 열쇠), 확정 전은 미리보기(«확정하면 송금») */
+    var thead = '<thead><tr>' + ckHead('members', false) + '<th>이름</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">통장 실입금</th><th class="r">몫</th>'
+      + (hasAdj ? '<th class="r">차액</th><th class="r">조정</th>' : '') + '<th class="r">정산액</th><th class="r">최종</th></tr></thead>';
+    var idx = 0;
+    h += '<div class="bulk" data-bulk="members"></div><div class="bulk" data-bulk="transfers"></div>';
     (run.sites || []).forEach(function (s, si) {
-      var st = draft ? previewTransfers([s]) : tr.filter(function (t) { return t.consultingId && s.consultingId ? t.consultingId === s.consultingId : t.company === s.company; });
-      var stOne = function (t) { return nameOf(names, t.fromSid) + ' → ' + nameOf(names, t.toSid) + ' ' + won(t.amount) + '원'; };
-      var stText = st.length ? st.map(function (t) { return stOne(t) + ' ' + C.DIR_KO[C.dirOf(t, leadBy[t.consultingId || t.company])]; }).join(' · ') : '주고받을 금액 없음';
-      rows.push('<tr class="grp"><td colspan="6" title="' + esc(s.company) + '">' + esc(s.company) + ' · ' + s.round + '차 · 세후 합계 ' + won(s.totalNet) + '원' + (s.issues.length ? ' · <span class="bad">확인 필요 ' + s.issues.length + '</span>' : '') + '</td>'
-        + '<td colspan="' + (cols - 6) + '" class="r grp-tr" title="' + esc(stText) + '">'
-        + (st.length ? st.map(function (t) { return esc(stOne(t)) + ' ' + dirTag(t); }).join(' · ') : esc(stText)) + '</td></tr>');
+      var st = draft ? previewTransfers([s]).map(function (t) { return { t: t, i: -1 }; })
+        : tr.map(function (t, i) { return { t: t, i: i }; }).filter(function (x) { return x.t.consultingId && s.consultingId ? x.t.consultingId === s.consultingId : x.t.company === s.company; });
+      h += '<div class="site"><div class="sh"><b title="' + esc(s.company) + '">' + esc(s.company) + '</b><span class="hint">' + s.round + '차 · 세후 합계 ' + won(s.totalNet) + '원</span>'
+        + (s.issues.length ? '<span class="bad">확인 필요 ' + s.issues.length + '</span>' : '') + '<span class="sp"></span>' + st.map(function (x) { return dirTag(x.t); }).join(' ') + '</div>';
+      var rows = [];
       s.members.forEach(function (m, mi) {
         var id = si + ':' + mi, key = s.consultingId + '|' + m.sid, nm = nameOf(names, m.sid, m.name), hasP = Object.prototype.hasOwnProperty.call(pend, key);
         var tag = m.role === 'lead' ? '<span class="pill role-lead">주관</span>' : '<span class="pill">' + ROLE_KO.staff + (m.rate == null ? '' : ' ' + esc(m.rate) + '%') + '</span>';
@@ -190,24 +195,21 @@
           + (hasAdj ? (m.role === 'lead' ? '<td class="r" data-k="diff"></td>' : num('diff', m.diff)) + '<td class="r" data-k="adj">' + (m.adjust ? esc(won(m.adjust)) : '') + '</td>' : '')
           + '<td class="r b" data-k="settle">' + esc(won(m.settle)) + '</td>' + num('final', m.final) + '</tr>');
       });
+      h += '<div class="scroll"><table class="t" data-name="run">' + thead + '<tbody>' + rows.join('') + '</tbody></table></div>';
+      if (!st.length) h += '<div class="trow hint">주고받을 금액 없음</div>';
+      else h += '<div class="scroll"><table class="t tr1" data-name="transfers"><tbody>' + st.map(function (x) {
+        var t = x.t;
+        return '<tr>' + (draft ? '<td class="c"></td><td class="n"></td>' : ckCell('t' + x.i, sel['t' + x.i]) + '<td class="n">' + (x.i + 1) + '</td>')
+          + '<td class="hint" data-k="lbl">송금</td><td class="nw" data-k="dir">' + dirTag(t) + '</td>'
+          + nw('who', nameOf(names, t.fromSid) + ' → ' + nameOf(names, t.toSid), 'ti') + num('amt', t.amount)
+          + '<td class="r" data-k="paid">' + (draft ? '<span class="hint">확정하면 송금</span>'
+            : '<button class="sm' + (t.paid ? ' sent' : '') + '" data-paid-btn="' + x.i + '" title="' + (t.paid ? '누르면 «보냄» 표시를 지운다' : '송금했으면 누른다') + '">'
+              + (t.paid ? '✓ 보냄 · ' + esc(kst(t.paidAt)) : '보냄 표시') + '</button>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+      h += '</div>';
     });
-    h += '<div class="bulk" data-bulk="members"></div><div class="scroll"><table class="t" data-name="run"><thead><tr>' + ckHead('members', false)
-      + '<th>이름</th><th class="r">세전</th><th class="r">원천징수</th><th class="r">세후</th><th class="r">통장 실입금</th><th class="r">몫</th>'
-      + (hasAdj ? '<th class="r">차액</th><th class="r">조정</th>' : '') + '<th class="r">정산액</th><th class="r">최종</th></tr></thead><tbody>'
-      + rows.join('') + '</tbody></table></div>';
     if (draft) h += '<div class="warn" id="pendNote"' + (nPend ? '' : ' style="display:none"') + '>저장 안 한 칸 ' + nPend + '개 — «임시저장»을 누르면 다른 PC에서도 이어서 할 수 있습니다</div>';
-    h += '<div class="sec">' + (draft ? '송금 목록 — 미리보기(확정하면 이대로 생깁니다)' : '송금 목록') + '</div>';
-    if (!tr.length) return h + '<div class="empty">주고받을 금액이 없습니다.</div>';
-    h += '<div class="bulk" data-bulk="transfers"></div><div class="scroll"><table class="t" data-name="transfers"><thead><tr>' + ckHead('transfers', false)
-      + '<th>사업장</th><th>구분</th><th>보내는 사람</th><th>받는 사람</th><th class="r">금액</th><th>보냄</th><th>보낸 때</th></tr></thead><tbody>';
-    tr.forEach(function (t, i) {
-      h += '<tr>' + ckCell('t' + i, sel['t' + i]) + '<td class="n">' + (i + 1) + '</td>' + nw('site', t.company) + '<td class="nw" data-k="dir">' + dirTag(t) + '</td>'
-        + nw('from', nameOf(names, t.fromSid), 'ti') + nw('to', nameOf(names, t.toSid))
-        + num('amt', t.amount)
-        + '<td data-k="paid"><label class="ck"><input type="checkbox" data-paid="' + i + '"' + (t.paid ? ' checked' : '') + (run.status === 'confirmed' ? '' : ' disabled') + '> 보냄</label></td>'
-        + '<td class="nw" data-k="at">' + esc(t.paid ? kst(t.paidAt) : '') + '</td></tr>';
-    });
-    return h + '</tbody></table></div>';
+    return h;
   }
 
   /* ── ③ 안내 파일 ── */

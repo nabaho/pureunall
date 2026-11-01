@@ -285,3 +285,10 @@ test('기존 % — 요율표 새 칸은 기존 %로 채우고(저장은 단추�
   assert.match(sv, /addRates\[sid\]=ex/);
   assert.ok(sv.indexOf("patchRecord('settle/rules/'+type") < sv.indexOf("patchRecord('settle/notices/'"), '요율표에 먼저 넣고 안내를 저장');
 });
+
+
+test('정산표 송금 줄 «보냄 표시» — 누르면 보냄, 보냄이면 물어보고 지운다(체크박스로 바로 저장하던 길은 없앴다)', () => {
+  assert.match(NOC, /if\(\(b=t\.closest\('\[data-paid-btn\]'\)\)\)\{[^}]*kr=D\.runs\[CUR_RUN\]/);
+  assert.match(NOC, /if\(pt\.paid && !window\.confirm\('«보냄» 표시를 지울까요\?'\)\) return; await setPaid\(CUR_RUN, \[pi\], !pt\.paid\);/);
+  assert.doesNotMatch(NOC, /input\[data-paid\]/);
+});
