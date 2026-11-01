@@ -291,6 +291,34 @@
     return '<div class="round cand"><div class="rh"><b>후보 자료</b><span class="m">' + row.cand + '건 · 메일 ' + row.candMails + '통</span>'
       + linkBtn(row) + '</div><div class="items">' + list + '</div></div>';
   }
+  function otherSetsHtml(row) {
+    var os = row && row.otherSets;
+    if (!os) return '';
+    var list = [
+      { set: '노사협의회', icon: '🤝', bodyKind: '노사협의회', bodyLabel: '규정 본문', items: os['노사협의회'] || [] },
+      { set: '단체협약', icon: '📜', bodyKind: '단체협약', bodyLabel: '협약 본문', items: os['단체협약'] || [] }
+    ].filter(function (x) { return x.items.length > 0; });
+    if (!list.length) return '';
+    return '<div class="sother"><div class="sh2">이 사업장의 다른 규정집 (노사협의회 · 단체협약)</div>'
+      + list.map(function (x) {
+        var byK = {};
+        x.items.forEach(function (it) {
+          var lb = it.kind === x.bodyKind ? x.bodyLabel : it.kind;
+          byK[lb] = (byK[lb] || 0) + 1;
+        });
+        var sumTxt = Object.keys(byK).map(function (k) { return k + ' ' + byK[k]; }).join(' · ');
+        var rows = x.items.map(function (it) {
+          var kl = it.kind === x.bodyKind ? x.bodyLabel : it.kind;
+          return '<div><span class="nm" title="' + esc(it.name + ' · ' + kl) + '">[' + esc(kl) + '] ' + esc(it.name) + '</span>'
+            + '<span class="d">' + esc(md(it.date) + ' ' + (it.dir || '')) + (it.status === '보류' ? ' (보류)' : '') + '</span>'
+            + '<button class="lnk" data-act="siteDoc" data-id="' + esc(it.id) + '" title="모은 자료에서 가린 글을 봅니다">📥 에서 보기</button></div>';
+        }).join('');
+        return '<div class="round"><div class="rh"><b>' + x.icon + ' ' + esc(x.set) + ' (' + x.items.length + '건)</b>'
+          + '<span class="m">' + esc(sumTxt) + '</span>'
+          + '<button class="lnk" data-act="siteSetLib" data-set="' + esc(x.set) + '" data-co="' + esc(row.name) + '">모은 자료에서 보기 →</button></div>'
+          + '<div class="items">' + rows + '</div></div>';
+      }).join('') + '</div>';
+  }
   function sideHtml(st, row) {
     if (!row) return '<div class="sside empty">사업장을 고르면 여기에 취업규칙 이력과 「✏️ 이 사업장 개정 시작」이 보입니다</div>';
     var sub = [row.bizNo, row.size > 0 ? row.size + '명' + (row.band ? '(' + row.band + ')' : '') : '', row.bizType].filter(Boolean).join(' · ');
@@ -303,7 +331,7 @@
       + '<button class="lnk sback" data-act="siteSel" data-co="" title="사업장 목록으로 돌아갑니다">← 목록</button>'
       + '<h3 title="' + esc(row.name) + '">' + esc(row.name) + '</h3>'
       + '<div class="sub" title="' + esc(sub) + '">' + esc(sub || '사업자번호·인원 모름') + '</div>'
-      + nowHtml(st, row) + startHtml(st, row) + hist + '</div>';
+      + nowHtml(st, row) + startHtml(st, row) + hist + otherSetsHtml(row) + '</div>';
   }
   /* 「현황 한 줄」(설계 §15-3) — 현행본 · 마지막 신고 · 지금 · 단계 줄 */
   function nowHtml(st, row) {

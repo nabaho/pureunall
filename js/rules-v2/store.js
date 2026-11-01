@@ -100,8 +100,9 @@
       setKind: function (id, kind) { return saveHuman(id, { kindFix: String(kind || '') }); },
       setSet: function (id, set) { return saveHuman(id, { setFix: String(set || ''), kindFix: '' }); },
       setRound: function (id, roundKey) { return saveHuman(id, { round: String(roundKey || '') }); },
-      setFinal: function (companyId, roundKey, docId) {
-        var rid = companyId + '_' + roundKey;
+      setFinal: function (companyId, roundKey, docId, set) {
+        var s = set && set !== '취업규칙' ? '_' + set + '_' : '_';
+        var rid = companyId + s + roundKey;
         return gw.save(db.ref(LIB + '/rounds/' + rid), function (prev) {
           // 최종본을 정하면 «최종본 없음»은 꺼진다 — 안 그러면 나중에 최종본을 풀 때 회차가 정리 목록에서 사라진다
           var patch = { id: rid, companyId: companyId, roundKey: roundKey,
@@ -111,8 +112,9 @@
         }, { entityType: 'RulesRound' });
       },
       // 「최종본 없음」 — 중간에 멈춘 회차를 정리하기 목록에서 닫는다. 최종본(finalDocId)은 건드리지 않는다.
-      setNoFinal: function (companyId, roundKey, on) {
-        var rid = companyId + '_' + roundKey;
+      setNoFinal: function (companyId, roundKey, on, set) {
+        var s = set && set !== '취업규칙' ? '_' + set + '_' : '_';
+        var rid = companyId + s + roundKey;
         return gw.save(db.ref(LIB + '/rounds/' + rid), function (prev) {
           return Object.assign({}, prev || {}, { id: rid, companyId: companyId, roundKey: roundKey, noFinal: on === true });
         }, { entityType: 'RulesRound' });

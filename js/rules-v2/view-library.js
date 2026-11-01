@@ -76,19 +76,23 @@
 
   /* ── 셈 한 번 — 그리는 함수들이 같은 셈을 본다 ── */
   function model(st) {
-    var d = st.data || {};
+    var d = st.data || {}, f = (st && st.filt) || {};
     var items = O().merge(d.docs || {}, d.human || {});
     var no = O().numberOf(items);
-    var groups = O().companyGroups(items, d.rounds || {});
-    var info = {};                                    // docId → { ver, total, final, cand:[…], group }
-    groups.forEach(function (g) {
-      g.rows.forEach(function (v) {
-        info[v.item.id] = { ver: v.no, total: g.rows.length ? g.rows[g.rows.length - 1].no : 0,
-          final: g.finalDocId === v.item.id, cand: g.cand[v.item.id] || [], group: g };
+    var curSet = f.set || '취업규칙';
+    var info = {}, groupsBySet = {};                  // docId → { ver, total, final, cand:[…], group }
+    ['취업규칙', '노사협의회', '단체협약'].forEach(function (s) {
+      var gs = O().companyGroups(items, d.rounds || {}, s);
+      groupsBySet[s] = gs;
+      gs.forEach(function (g) {
+        g.rows.forEach(function (v) {
+          info[v.item.id] = { ver: v.no, total: g.rows.length ? g.rows[g.rows.length - 1].no : 0,
+            final: g.finalDocId === v.item.id, cand: g.cand[v.item.id] || [], group: g };
+        });
+        g.items.forEach(function (it) { if (!info[it.id]) info[it.id] = { group: g, cand: [] }; });
       });
-      g.items.forEach(function (it) { if (!info[it.id]) info[it.id] = { group: g, cand: [] }; });
     });
-    return { items: items, no: no, groups: groups, info: info };
+    return { items: items, no: no, groups: groupsBySet[curSet] || [], groupsBySet: groupsBySet, info: info };
   }
   function flags(it, M) {
     var i = M.info[it.id] || {};
@@ -182,7 +186,12 @@
       + chip('only', 'cand', '최종본 후보', n.cand, f.only === 'cand')
       + chip('only', 'unlinked', '사업장 미확정', n.unlinked, f.only === 'unlinked')
       + chip('only', 'hold', '보류', n.hold, f.only === 'hold');
-    return '<div class="flt">' + seg + (st.view === 'company' || st.view === 'tidy' || st.view === 'daily' ? '' : chips)
+    var coChips = '';
+    if (st.view === 'company') {
+      var curCoSet = f.set || '취업규칙';
+      SETS.forEach(function (s) { coChips += chip('set', s, s, bySet[s] || 0, curCoSet === s); });
+    }
+    return '<div class="flt">' + seg + (st.view === 'tidy' || st.view === 'daily' ? '' : st.view === 'company' ? coChips : chips)
       + (st.view === 'tidy' || st.view === 'daily' ? '' : '<input class="q" data-role="q" placeholder="🔍 파일·회사·메일 제목" value="' + esc(f.q || '') + '">') + '</div>';
   }
 
@@ -262,7 +271,8 @@
       g.items.slice().sort(function (a, b) { return M.no[b.id] - M.no[a.id]; }).forEach(function (it) {
         var fl = flags(it, M), i = M.info[it.id] || {};
         var cls = [st.picked && st.picked.has(it.id) ? 'ck' : '', fl.hold ? 'hold' : '', fl.final ? 'fin' : '', st.sel === it.id ? 'sel' : ''].filter(Boolean).join(' ');
-        var pan = i.ver != null && it.kind === '규칙본문' ? (i.ver === 0 ? '현행' : i.ver + '판 / ' + i.total) : '—';
+        var isBody = it.kind === '규칙본문' || it.kind === '노사협의회' || it.kind === '단체협약';
+        var pan = i.ver != null && isBody ? (i.ver === 0 ? '현행' : i.ver + '판 / ' + i.total) : '—';
         var pii = piiLabel((it.doc.pii || {}).count);
         var setTag = it.set && it.set !== '취업규칙' && it.kind !== it.set ? it.set + ' · ' : '';
         var kText = setTag + (KIND_LABEL[it.kind] || it.kind);
@@ -286,8 +296,10 @@
       + '<thead><tr><th class="c"><input type="checkbox" data-act="pickAll" title="보이는 것 모두 고르기"></th><th class="c">번호</th><th>갈래</th><th>파일</th><th>사업장</th><th>판</th><th>최종본</th><th>가린 것</th><th>상태</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }
+  var BODY_TITLE = { '취업규칙': '규칙 본문', '노사협의회': '규정 본문', '단체협약': '협약 본문' };
   function companyTable(st) {
-    var M = model(st), q = String((st.filt || {}).q || '').trim().toLowerCase();
+    var M = model(st), f = st.filt || {}, curSet = f.set || '취업규칙', bodyTitle = BODY_TITLE[curSet] || '규칙 본문';
+    var q = String(f.q || '').trim().toLowerCase();
     var groups = M.groups.filter(function (g) { return !q || coName(st, g.companyId).toLowerCase().indexOf(q) >= 0; });
     var body = groups.map(function (g) {
       var nm = coName(st, g.companyId) || '(지운 업체)';
@@ -303,7 +315,12 @@
         var v = g.rows.filter(function (r) { return r.item.id === id; })[0];
         return (v ? (v.no ? v.no + '판' : '현행') : id) + ' — ' + g.cand[id].join(', ');
       }).join(' / ') : '';
-      var meta = roundLabel(g.roundKey) + ' · 메일 ' + Object.keys(mails).length + '통 · 규칙 본문 ' + g.rows.length + '개';
+      var subCounts = {};
+      g.items.forEach(function (it) {
+        if (it.kind !== '규칙본문' && it.kind !== '노사협의회' && it.kind !== '단체협약') subCounts[it.kind] = (subCounts[it.kind] || 0) + 1;
+      });
+      var subTxt = Object.keys(subCounts).map(function (k) { return (KIND_LABEL[k] || k) + ' ' + subCounts[k] + '건'; }).join(' · ');
+      var meta = roundLabel(g.roundKey) + ' · 메일 ' + Object.keys(mails).length + '통 · ' + bodyTitle + ' ' + g.rows.length + '개' + (subTxt ? ' · 부속: ' + subTxt : '');
       var rows = '<tr class="cohead"><td></td><td colspan="6" title="' + esc(nm + ' · ' + meta + (candTxt ? ' · ' + candTxt : '')) + '"><b>🏢 ' + esc(nm) + '</b>'
         + '<span class="meta">' + esc(meta) + '</span>'
         + (flow.length ? '<span class="flow">' + flow.join('→') + '</span>' : '')
@@ -318,8 +335,8 @@
             : '<button class="lnk" data-act="diff" data-id="' + esc(it.id) + '" data-prev="' + esc(prev.id) + '" title="앞 판과 조 단위로 견줍니다">…</button>';
         }
         var finHtml = fin ? '<span class="fin1">★ 최종본</span> <span class="why">' + esc([finalByName(st, g.finalBy), g.finalAt ? md(g.finalAt) : ''].filter(Boolean).join(' ')) + '</span>'
-          + ' <button class="lnk" data-act="unsetFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '">풀기</button>'
-          : '<button class="btn sm g" data-act="setFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '" data-id="' + esc(it.id) + '">★ 최종본으로</button>'
+          + ' <button class="lnk" data-act="unsetFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '" data-set="' + esc(g.set || '취업규칙') + '">풀기</button>'
+          : '<button class="btn sm g" data-act="setFinal" data-co="' + esc(g.companyId) + '" data-round="' + esc(g.roundKey) + '" data-set="' + esc(g.set || '취업규칙') + '" data-id="' + esc(it.id) + '">★ 최종본으로</button>'
             + (g.finalDocId ? ' <span class="fin0">이전 판</span>' : '');
         var cls = [st.picked && st.picked.has(it.id) ? 'ck' : '', fin ? 'fin' : '', st.sel === it.id ? 'sel' : ''].filter(Boolean).join(' ');
         rows += '<tr data-row="' + esc(it.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>'
@@ -336,7 +353,7 @@
     }).join('');
     if (!body) body = '<tr><td colspan="7" class="empty" title="">사업장이 확정된 자료가 아직 없습니다 — 「메일 순」에서 메일마다 「사업장 확정」을 누르세요</td></tr>';
     return '<table class="lib"><colgroup><col style="width:36px"><col style="width:48px"><col style="width:96px"><col><col style="width:104px"><col style="width:150px"><col style="width:190px"></colgroup>'
-      + '<thead><tr><th class="c"><input type="checkbox" data-act="pickAll" title="보이는 것 모두 고르기"></th><th class="c">순서</th><th>날짜</th><th>파일 (규칙 본문만)</th><th>보낸 쪽</th><th>앞 판과 달라진 조</th><th>최종본</th></tr></thead>'
+      + '<thead><tr><th class="c"><input type="checkbox" data-act="pickAll" title="보이는 것 모두 고르기"></th><th class="c">순서</th><th>날짜</th><th>파일 (' + esc(bodyTitle) + '만)</th><th>보낸 쪽</th><th>앞 판과 달라진 조</th><th>최종본</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }
 

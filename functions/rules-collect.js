@@ -123,10 +123,12 @@ function pdfTargets(docs) {
   const by = {};
   Object.keys(docs || {}).forEach((id) => {
     const d = docs[id];
-    if (!d || d.status !== '보류' || d.holdWhy !== PDF_HOLD.OLD) return;
+    if (!d || d.status !== '보류' || !d.sha || !d.mail) return;
     const subj = (d.mail && d.mail.subject) || '';
     const k0 = FILE_KINDS.indexOf(d.kind) >= 0 ? d.kind : P.kindOf(d.name, '', subj);
-    if (FILE_KINDS.indexOf(k0) < 0 || !isPdfName(d.name) || !d.sha || !d.mail) return;
+    const oldPdf = d.holdWhy === PDF_HOLD.OLD && isPdfName(d.name) && FILE_KINDS.indexOf(k0) >= 0;
+    const oldHeld = d.holdWhy === NO_TEXT_KINDS['기타'] && P.wantAtt(d.name) && (FILE_KINDS.indexOf(k0) >= 0 || k0 === '위원·고충');
+    if (!oldPdf && !oldHeld) return;
     const k = d.mail.src === 'imap' ? 'i_' + d.mail.box + '_' + d.mail.key : 'p_' + d.mail.key;
     (by[k] = by[k] || { mailKey: k, mail: d.mail, dir: d.dir, ids: [] }).ids.push(id);
   });
@@ -423,13 +425,14 @@ async function runOnce(o) {
     }
     try {
       const bySha = {};
-      (atts || []).forEach((a) => { if (a && a.data && isPdfName(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
+      (atts || []).forEach((a) => { if (a && a.data && P.wantAtt(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
       let noPdfJs = false, unknownOld = false;
       const snap = { stored: pdfSum.stored, held: pdfSum.held };   // 묶음을 버릴 때 이 묶음에서 센 것도 되돌린다
       for (const id of g.ids) {
         const d = docs[id], a = bySha[d.sha];
+        const ext = P.wantAtt(d && d.name) || 'pdf';
         if (!a) { close(up, id, { holdWhy: PDF_HOLD.LOST }); pdfSum.held++; continue; }
-        const r = await (o.redact || X.redactOne)(a.data, 'pdf');
+        const r = await (o.redact || X.redactOne)(a.data, ext);
         /* ★ env:true 는 «pdf.js 를 못 실은» 환경 문제다 — 문서가 아니라 서버 탓이므로 아무것도 안 쓴다.
            env 없는 옛 까닭(모르는 실패)은 이 문서 탓일 수 있다 — 이 묶음은 쓰지 않고 표시(n)를 남기되 다음 묶음은 계속 읽는다(STUCK_MAX 에 닿게) */
         if (!r.ok && r.holdWhy === PDF_HOLD.OLD && r.env) { noPdfJs = true; break; }
@@ -440,8 +443,14 @@ async function runOnce(o) {
         const kind = P.kindOf(d.name, r.text, subj);
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
         if (why) { close(up, id, { set, kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        let file = null;
+        if (ext !== 'pdf' && r.data && FILE_KINDS.indexOf(kind) >= 0) {
+          const p = 'rules_lib/' + id + '.' + ext;
+          await bucket.file(p).save(Buffer.from(r.data), { contentType: 'application/octet-stream', resumable: false });
+          file = { path: p, format: ext, size: r.data.length };
+        }
         up[LIB + '/text/' + id] = r.text;
-        close(up, id, Object.assign({ set, kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null, recheckV: RECHECK_V },
+        close(up, id, Object.assign({ set, kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file, recheckV: RECHECK_V },
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
         pdfSum.stored++;
       }

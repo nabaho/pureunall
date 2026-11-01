@@ -33,11 +33,15 @@
     data = data || {};
     var items = O.merge(data.docs, data.human);
     var groupsAll = O.companyGroups(items, data.rounds);
-    var groupsBy = {}, linkedBy = {}, candBy = {};
+    var groupsBy = {}, linkedBy = {}, candBy = {}, otherBy = {};
     groupsAll.forEach(function (g) { (groupsBy[g.companyId] = groupsBy[g.companyId] || []).push(g); });
     items.forEach(function (it) {
       if (it.companyId) {
         if (kindOk(it)) (linkedBy[it.companyId] = linkedBy[it.companyId] || []).push(it);
+        else if (it.kind !== '기타' && (it.set === '노사협의회' || it.set === '단체협약')) {
+          var ob = (otherBy[it.companyId] = otherBy[it.companyId] || { '노사협의회': [], '단체협약': [] });
+          ob[it.set].push(it);
+        }
         return;
       }
       if (!isOpenCand(it)) return;
@@ -60,10 +64,15 @@
       linked.concat(cand).forEach(function (it) { if (it.date > last) last = it.date; });
       var groups = (groupsBy[co.id] || []).slice().sort(function (a, b) { return b.last - a.last; });
       var size = Number(co.employmentInsuredCount) || 0;
+      var ob = otherBy[co.id] || { '노사협의회': [], '단체협약': [] };
       rows.push({ id: co.id, name: str(co.name), bizNo: str(co.bizNo), size: size, band: band(size),
         bizType: str(co.bizType), closed: closed, linked: linked.length, cand: cand.length,
         candIds: cand.map(function (it) { return it.id; }), candMails: Object.keys(mails).length,
         last: last, groups: groups, fin: finOf(linked.length, groups),
+        otherSets: {
+          '노사협의회': ob['노사협의회'].slice().sort(function (a, b) { return b.date - a.date; }),
+          '단체협약': ob['단체협약'].slice().sort(function (a, b) { return b.date - a.date; })
+        },
         // 담당 — 업체관리의 «사번»(주 managerMain · 부 managerSubs). 이름으로 맞추지 않는다
         mgr: str(co.managerMain).trim(), subs: (Array.isArray(co.managerSubs) ? co.managerSubs : []).map(str).filter(Boolean) });
     });
