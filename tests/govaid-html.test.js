@@ -286,3 +286,30 @@ test('★ 모두 지우기 — 탭 줄 단추, 확인 창을 거쳐 사업·공�
   assert.match(f, /govaid\/programs\//);
   assert.match(f, /govaid\/notices\//);
 });
+
+/* 한눈 표 접기·회사 ☐·★ (대표 지시 2026-11-01 「사업을 접었다 펴고 기업에 ㅁ 표시와 별표 체크 표시 넣어줘」 → 시안 → 「맞다. 진행」)
+   회사 ★ = «챙길 회사» — 법인 공용, govaid/extras/{회사 열쇠}.star 에 남는다(끈 것도 기록) */
+test('[한눈 표] 회사 줄 맨 왼쪽 ☐ + 번호 + ★ — 고른 회사는 ★ 한꺼번에 켜고 끈다', () => {
+  const f = fnBody('drawGrid');
+  assert.match(f, /data-all="grid"/, '한눈 표 머리에 모두 고르기 ☐ 가 없다');
+  assert.match(f, /data-ck="'\+esc\('grid\|'/, '회사 줄에 ☐ 가 없다');
+  assert.match(f, /coStarBtn\(/, '회사 줄에 ★ 가 없다');
+  assert.match(NOC, /STAR_TABLES=\{[^}]*grid:'c'/, '한눈 표 고르기가 회사 ★ 묶음으로 이어지지 않는다');
+});
+test('[한눈 표] 부처 머리를 누르면 접고 펴며, 접은 부처는 그 부처 후보 수만 한 칸에 — 이 기기에 기억', () => {
+  const f = fnBody('drawGrid');
+  assert.match(f, /data-gfold=/, '부처 머리에 접기 단추가 없다');
+  assert.match(f, /FOLD\[/, '접은 부처를 보지 않는다');
+  assert.match(fnBody('toggleFold'), /lsSet\('gridFold'/, '접은 상태를 기억하지 않는다');
+  assert.match(NOC, /data-gfoldall=/, '모두 접기·펴기가 없다');
+});
+test('[회사 ★] 법인 공용 기록 — govaid/extras 에 GovaidRecords.starred 로, 회사 중심 목록에도 같은 ★', () => {
+  const t = fnBody('saveCoStar');
+  assert.match(fnBody('toggleCoStar') + fnBody('starCos'), /saveCoStar\(/, '회사 ★ 를 켜고 끄는 길이 공용 저장(saveCoStar)을 안 거친다');
+  assert.match(t, /govaid\/extras\//);
+  assert.match(t, /GovaidRecords\.starred\(/);
+  assert.match(t, /entityType:\s*'Organization'|'Organization'/);
+  assert.match(fnBody('drawCo'), /coStarBtn\(/, '회사 중심 목록에 회사 ★ 가 없다');
+  assert.match(NOC, /id="gStar"/, '«★ 표시한 회사만» 스위치가 없다');
+  assert.match(fnBody('drawGrid'), /\$\('gStar'\)\.checked/);
+});
