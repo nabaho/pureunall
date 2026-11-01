@@ -442,3 +442,10 @@ body.drag-file::after { content: '여기에 놓으면 한글 문서를 엽니다
 .key-help .info-table td:first-child { white-space: nowrap; font-family: Consolas, monospace; padding-right: 16px; }
 
 td.cb-sel, th.cb-sel { box-shadow: inset 0 0 0 9999px rgba(47, 111, 224, .28); }
+
+/* 자동 저장된 문서 목록 */
+.as-list { max-height: 50vh; overflow-y: auto; margin-bottom: 8px; }
+.as-row { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.as-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.as-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.as-info span { color: var(--sub); font-size: 11px; }
