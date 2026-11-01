@@ -25593,7 +25593,7 @@ function mbDropRow(slug, uid){
    ⚠ 보이지 않는 탭(document.hidden)에서는 안 깨운다 — 안 쓰는 탭이 하루 종일 두드리면 그게 요금이다.
    ⚠ 실패해도 말하지 않는다 — 깨우기일 뿐이다. 메일 열기는 그대로 된다. */
 const MB_WARM_GAP = 150000;
-let _mbWarmAt = 0, _mbWarmTimer = 0;
+let _mbWarmAt = 0, _mbWarmTimer = 0, _mbWarmVis = false;
 function mbWarmPing(){
   if(typeof firebase==='undefined' || !firebase.auth) return;
   const u = firebase.auth().currentUser; if(!u || typeof u.getIdToken !== 'function') return;
@@ -25609,6 +25609,14 @@ function mbWarmStart(){
   /* ⚠ 이 함수는 «메일 화면을 그리는 길» 위에 있다 — 깨우기가 던지면 메일함이 안 그려진다. 모든 실패는 삼킨다 */
   try{
     mbWarmPing();
+    /* ★ 숨은 채로 열린 탭(새 탭으로 열었다가 나중에 보는 경우)은 위 첫 깨우기를 건너뛴다 — 그러면 최대 1분 뒤에야
+         깨워져서 «처음 누른 통»이 식은 채 3~5초 걸렸다(2026-11-01 실측). 보이게 되는 «그 순간» 바로 깨운다. */
+    if(!_mbWarmVis && document.addEventListener){
+      _mbWarmVis = true;
+      document.addEventListener('visibilitychange', ()=>{
+        if(!document.hidden && state.view === 'mail'){ try{ mbWarmPing(); }catch(_){ } }
+      });
+    }
     if(_mbWarmTimer) return;
     _mbWarmTimer = setInterval(()=>{
       if(state.view !== 'mail'){ clearInterval(_mbWarmTimer); _mbWarmTimer = 0; return; }
