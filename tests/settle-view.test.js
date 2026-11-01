@@ -239,8 +239,8 @@ test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받
   assert.match(c.slice(c.indexOf('data-name="transfers"')), /dir-back">반환</);
   /* 카톡 문구도 같은 말 */
   const rule = { title: '테스트사업', leadSid: 'T-LEAD' };
-  assert.match(C.buildMessages(fakeRun('confirmed'), rule, NAMES)[0].text, /반환: <b>김가나<\/b> → 홍길동 87,915원/);
-  assert.match(C.buildMessages(fakeRun('confirmed', 40), rule, NAMES)[0].text, /추가 지급: 홍길동 → <b>김가나<\/b> 426,357원/);
+  assert.match(C.buildMessages(fakeRun('confirmed'), rule, NAMES)[0].text, /▶ 반환 87,915원 \(<b>김가나<\/b> → 홍길동\)/);
+  assert.match(C.buildMessages(fakeRun('confirmed', 40), rule, NAMES)[0].text, /▶ 추가 지급 426,357원 \(홍길동 → <b>김가나<\/b>\)/);
   /* 계산기 */
   const calc = C.calcSite([{ name: '갑', role: 'lead', pre: 2568182 }, { name: '을', role: 'staff', pre: 977273, rate: 25 }]);
   assert.equal(calc.transfers[0].dir, 'back');
