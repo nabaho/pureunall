@@ -28,6 +28,9 @@
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-mail-obsidian.js?v=1"></script>
+<script src="js/pu-cal-obsidian.js?v=1"></script>
 <script src="js/pu-ieum-public.js?v=2"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -2263,6 +2266,62 @@ function 일정담당(ev){
   var sid = /^[A-Z]-\d{3}$/.test(String(sp || "")) ? String(sp) : (m ? m[1] : "");
   return sid && nameOf(sid) && nameOf(sid) !== sid ? sid : "";
 }
+/* ═════════════════════════════════════════════════════════════════
+   🪨 일정 → 옵시디언 (대표 승인 2026-11-01 「추천」 — docs/옵시디언-구글연동-설계.md S1)
+   ═════════════════════════════════════════════════════════════════
+   모아서 마크다운으로 바꾸고 폴더에 쓰는 일은 js/pu-cal-obsidian.js(+ 폴더 쓰기는 js/pu-mail-obsidian.js)가 한다.
+   여기는 «이 화면이 이미 아는 것»을 건네는 풀칠만 한다 — 담당자를 새로 판정하지 않는다(일정담당 · 만든이 메일→직원, 화면과 같다).
+   ⚠ 달력에 그려 둔 것(GCAL·ARCH)을 건드리지 않는다. 구글 공개 읽기(화면과 같은 열쇠)와 보관함을 «따로» 받아 쓰고 버린다.
+   ⚠ 총괄관리자만. 읽기만 한다(서버에 아무것도 안 쓴다). 설명 글·참석자·만든이 이메일은 담지 않는다. */
+var _옵시중 = false;
+function 옵시디언내보내기(){
+  if(_옵시중) return;
+  var PM = window.PuMailObsidian, PC = window.PuCalObsidian;
+  if(!관리자인가()){ toast("대표님만 내보낼 수 있습니다"); return; }
+  if(!PM || !PC){ toast("내보내기 도구를 못 불렀습니다"); return; }
+  if(!PM.supported()){ toast("크롬이나 엣지에서 열어 주세요(폴더에 바로 쓰기가 안 됩니다)"); return; }
+  if(!fbDb){ toast("서버에 연결된 뒤에 할 수 있습니다"); return; }
+  _옵시중 = true;
+  var 창 = PC.windowOf(Date.now());
+  /* ⚠ 폴더 고르기는 «누른 순간» 안에서 불러야 브라우저가 허락한다 — 맨 먼저 부른다 */
+  PM.pickVault().then(function(vault){
+    toast("일정을 읽는 중…");
+    var 목록 = [], 있음 = {};
+    var 쪽 = function(tok, n){
+      var url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(GCAL_CAL_ID) + "/events?key=" + GCAL_API_KEY
+        + "&timeMin=" + encodeURIComponent(창.from + "T00:00:00+09:00") + "&timeMax=" + encodeURIComponent(shiftDay(창.to, 1) + "T00:00:00+09:00")
+        + "&singleEvents=true&orderBy=startTime&maxResults=2500" + (tok ? "&pageToken=" + encodeURIComponent(tok) : "");
+      return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+        if(d && d.error) throw new Error(d.error.message || "구글 달력 오류");
+        (d.items || []).forEach(function(ev){ var e = PC.fromGoogle(ev); if(e){ 목록.push(e); 있음[e.id] = 1; } });
+        if(d.nextPageToken && n < 20) return 쪽(d.nextPageToken, n + 1);
+      });
+    };
+    return 쪽("", 0).then(function(){
+      /* 보관함 — 구글에서 지워진 일정을 «표시해서» 더한다. 구글에 아직 있는 것은 구글 쪽이 진실이다(담당 번호도 거기 있다). */
+      return fbDb.ref("data/gcal_archive").orderByChild("date").startAt(창.from).endAt(창.to).once("value").then(function(snap){
+        var v = snap.val() || {};
+        Object.keys(v).forEach(function(k){ var e = PC.fromArchive(v[k]); if(e && e.deleted && !있음[e.id]) 목록.push(e); });
+      });
+    }).then(function(){
+      var 담당이름 = function(raw){
+        if(!raw) return "";
+        var 구글 = !!raw.start;                                            /* 구글 원본 / 보관함 기록 */
+        var sid = 일정담당(구글 ? raw : { description: raw.description }) || gcalSidByMail(구글 ? ((raw.creator && raw.creator.email) || (raw.organizer && raw.organizer.email) || "") : (raw.creator || ""));
+        return sid ? nameOf(sid) : "";
+      };
+      var r = PC.build(목록, { ownerOf: 담당이름, window: 창, now: Date.now() });
+      var n = Object.keys(r.files).length;
+      toast("폴더에 쓰는 중… 0/" + n);
+      return PM.writeFiles(vault, r.files, function(i, all){ toast("폴더에 쓰는 중… " + i + "/" + all); }).then(function(){
+        toast("일정 " + r.stats.total + "건 → «" + (vault.name || "보관함") + "/일정» 파일 " + n + "개 (담당 미확인 " + r.stats.noOwner + "건)");
+      });
+    });
+  }).catch(function(e){
+    toast(e && e.name === "AbortError" ? "폴더 고르기를 취소했습니다" : "내보내지 못했습니다 — " + ((e && e.message) || e));
+  }).then(function(){ _옵시중 = false; });
+}
+
 function gcalToEvent(ev){
   var date = (ev.start.date || ev.start.dateTime || "").slice(0,10);
   var timeStr = ev.start.dateTime ? ev.start.dateTime.slice(11,16) : "";
@@ -2913,6 +2972,7 @@ function 폰머리Html(){
             var 켜짐 = S.filter === null || S.filter === undefined || S.filter === c[0];
             return '<button class="dcal" data-dcal="' + c[0] + '"><i class="dck' + (켜짐 ? ' on' : '') + '" style="--ck:' + c[2] + '">' + (켜짐 ? '✓' : '') + '</i>' + c[1] + '</button>'; }).join("")
         + '<hr><button class="dcal" data-dmono="1"><i class="dck' + (_모노() ? ' on' : '') + '" style="--ck:#87ac5c">' + (_모노() ? '✓' : '') + '</i>구글 앱 색(모두 초록)</button>'
+        + (관리자인가() ? '<button data-dobs="1" title="일정을 옵시디언 보관함의 «일정» 폴더에 적습니다(설명·참석자 제외)">🪨 옵시디언으로 내보내기</button>' : '')
         + '<button data-dreload="1">' + 선아이콘("refresh") + '새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
@@ -5997,7 +6057,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-cand],[data-gen],[data-sgo]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-dobs],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-cand],[data-gen],[data-sgo]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -6113,6 +6173,7 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-sback')){ S.srch = false; S.q = ''; render(); return; }
   if(t.hasAttribute('data-dclose')){ S.drawer = false; render(); return; }
+  if(t.hasAttribute('data-dobs')){ S.drawer = false; render(); 옵시디언내보내기(); return; }
   if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }
   if(t.hasAttribute('data-dmore')){ S.drawer = false; S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
