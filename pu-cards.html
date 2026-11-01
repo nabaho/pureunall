@@ -25377,6 +25377,7 @@ function openMailBox(id){
   if(!mbAuthOk()) return;
   /* 🔄 서버 회차를 듣기 시작한다 — 지운 것·새 것이 새로고침 없이 따라온다(mbLiveStart 머리글). 한 번만 붙는다. */
   mbLiveStart();
+  mbWarmStart();     /* ☕ 열고 있는 동안 서버를 깨워 둔다(일요일·밤에도) — mbWarmPing 머리글 */
   /* ★ 지난 메일이 «몇 통 담겼나»를 한 번 물어 둔다 — 옆줄에 그 칸을 내놓을지 정하는 값이다.
      ⚠★ 이것을 «그리는 함수»(renderPCSide) 안에서 부르지 않는다. 그리기는 자료를
        읽어 오는 자리가 아니다 — 그렇게 두었더니 그릴 때마다 서버를 두드리고,
@@ -25582,6 +25583,38 @@ function mbDropRow(slug, uid){
     if(!state.mbOpen) renderMailPage();
   }
   return true;
+}
+/* ☕ 메일함을 «열고 있는 동안» 서버(메일 열기·첨부 함수)를 깨워 둔다 (대표 승인 2026-11-01)
+   「메일함 전반적으로 모두 늦다 — 메일 열 때 등등」
+   ★ 실측 2026-11-01(일) 대표 PC 크롬: 서버가 따뜻할 때 한 통 0.45~0.55초, 식었을 때 첫 통 4.7초.
+     서버를 따뜻하게 두는 장치(mailKeepWarm)는 월~토 8~20시에만 돈다 — 일요일·밤에는 늘 식어 있다.
+   ★ 그래서 «화면이 열려 있는 동안만» 3분보다 짧게(2분 30초) 깨운다 — 아무도 안 쓸 때는 돈이 안 든다.
+     서버는 NOOP 한 번(수십 ms)이라 부담이 없고, 메일은 한 글자도 안 읽는다(읽음도 안 건드림).
+   ⚠ 보이지 않는 탭(document.hidden)에서는 안 깨운다 — 안 쓰는 탭이 하루 종일 두드리면 그게 요금이다.
+   ⚠ 실패해도 말하지 않는다 — 깨우기일 뿐이다. 메일 열기는 그대로 된다. */
+const MB_WARM_GAP = 150000;
+let _mbWarmAt = 0, _mbWarmTimer = 0;
+function mbWarmPing(){
+  if(typeof firebase==='undefined' || !firebase.auth) return;
+  const u = firebase.auth().currentUser; if(!u || typeof u.getIdToken !== 'function') return;
+  if(document.hidden) return;
+  if(Date.now() - _mbWarmAt < MB_WARM_GAP) return;
+  _mbWarmAt = Date.now();
+  u.getIdToken().then(tok=>['readMailMessage', 'readMailAttachment'].forEach(fn=>
+    fetch(MB_FN+fn, { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+      body: JSON.stringify({ warm:1 }) }).catch(()=>{}))).catch(()=>{});
+}
+function mbWarmStart(){
+  /* ⚠ 이 함수는 «메일 화면을 그리는 길» 위에 있다 — 깨우기가 던지면 메일함이 안 그려진다. 모든 실패는 삼킨다 */
+  try{
+    mbWarmPing();
+    if(_mbWarmTimer) return;
+    _mbWarmTimer = setInterval(()=>{
+      if(state.view !== 'mail'){ clearInterval(_mbWarmTimer); _mbWarmTimer = 0; return; }
+      try{ mbWarmPing(); }catch(_){ }
+    }, 60000);
+  }catch(_){ _mbWarmTimer = 0; }
 }
 let _mbLiveOn = false, _mbLiveAt = 0;
 function mbLiveStart(){
