@@ -865,9 +865,89 @@
     return score;
   }
 
+  function topicRoots(qRaw) {
+    var qLow = String(qRaw || '').toLowerCase();
+    var stop = {
+      '기금': 1, '기금법인': 1, '근로복지기금': 1, '사내근로복지기금': 1, '공동근로복지기금': 1,
+      '사내기금': 1, '공동기금': 1, '근로자': 1, '회사': 1, '기업': 1, '사업장': 1, '경우': 1,
+      '가능': 1, '가능한지': 1, '여부': 1, '기준': 1, '무엇': 1, '어떻게': 1, '대한': 1, '관련': 1,
+      '사업': 1, '지원사업': 1, '운영': 1, '법령': 1
+    };
+    var words = qLow.split(/[\s,·/?!()[\]"']+/).filter(function (w) { return w.length >= 2; });
+    var out = [];
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i].replace(/(은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만|까지|부터|인가요|할까요|하나요|되나요|있나요|인지|여부|대한|관련)$/, '');
+      if (w.length >= 2 && !stop[w] && out.indexOf(w) < 0) out.push(w);
+    }
+    return out;
+  }
+
+  function extractRelevantChunk(item, question) {
+    var aText = String((item && item.a) || '').trim();
+    var pts = Array.isArray(item && item.points) ? item.points : [];
+    var roots = topicRoots(question);
+    if (!roots.length) {
+      return { body: aText, points: pts.slice(0, 1) };
+    }
+
+    // 1. 번호 구분(① ② ③ ...)이 있는 경우 질문 핵심어와 일치하는 단락만 추출 (RAG 청크 필터링)
+    var body = aText;
+    var parts = aText.split(/(?=[①②③④⑤])/);
+    if (parts.length >= 2) {
+      var intro = '';
+      var clauses = [];
+      for (var pi = 0; pi < parts.length; pi++) {
+        var seg = parts[pi].trim();
+        if (!seg) continue;
+        if (!/^[①②③④⑤]/.test(seg)) {
+          intro = seg;
+        } else {
+          var sLow = seg.toLowerCase();
+          var sc = 0;
+          for (var ri = 0; ri < roots.length; ri++) {
+            if (sLow.indexOf(roots[ri]) >= 0) sc += (roots[ri].length >= 3 ? 3 : 2);
+          }
+          clauses.push({ text: seg, score: sc });
+        }
+      }
+      var maxSc = 0;
+      for (var ci = 0; ci < clauses.length; ci++) {
+        if (clauses[ci].score > maxSc) maxSc = clauses[ci].score;
+      }
+      if (maxSc > 0) {
+        var pickedClauses = clauses
+          .filter(function (c) { return c.score >= Math.max(2, Math.ceil(maxSc * 0.5)); })
+          .map(function (c) { return c.text; });
+        if (pickedClauses.length === 1) {
+          body = pickedClauses[0].replace(/^[①②③④⑤]\s*/, '');
+        } else if (pickedClauses.length > 0 && pickedClauses.length < clauses.length) {
+          body = (intro ? intro + ' ' : '') + pickedClauses.join('\n');
+        }
+      }
+    }
+
+    // 2. 실무 체크포인트도 질문 핵심어와 가장 밀접한 항목만 추출 (불필요한 부가 항목 제외)
+    var maxPtSc = 0;
+    var scoredPts = pts.map(function (p) {
+      var pLow = String(p || '').toLowerCase();
+      var sc = 0;
+      for (var rj = 0; rj < roots.length; rj++) {
+        if (pLow.indexOf(roots[rj]) >= 0) sc += (roots[rj].length >= 3 ? 3 : 2);
+      }
+      if (sc > maxPtSc) maxPtSc = sc;
+      return { text: p, score: sc };
+    });
+    var matchedPts = maxPtSc > 0
+      ? scoredPts.filter(function (x) { return x.score >= Math.max(2, Math.ceil(maxPtSc * 0.6)); }).map(function (x) { return x.text; })
+      : pts.slice(0, 1);
+    var finalPts = matchedPts.slice(0, 2);
+
+    return { body: body, points: finalPts };
+  }
+
   function pick(kb, question, opts) {
     var list = Array.isArray(kb) ? kb : FUND_KB;
-    var max = (opts && opts.max) || 5;
+    var max = (opts && opts.max) || 3;
     var cat = (opts && opts.cat && opts.cat !== 'all') ? opts.cat : '';
     var q = String(question || '').trim();
     if (!q) {
@@ -882,7 +962,11 @@
       if (s > 0) scored.push({ item: it, score: s });
     }
     scored.sort(function (a, b) { return b.score - a.score; });
-    return scored.slice(0, max).map(function (x) { return x.item; });
+    if (!scored.length) return [];
+    var topScore = scored[0].score;
+    var minCut = Math.max(12, Math.floor(topScore * 0.45));
+    var filtered = scored.filter(function (x) { return x.score >= minCut; });
+    return filtered.slice(0, max).map(function (x) { return x.item; });
   }
 
   function filter(kb, cat, query) {
@@ -902,28 +986,28 @@
 
   function makePrompt(picked, question) {
     var docs = (picked || []).map(function (x) {
+      var ch = extractRelevantChunk(x, question);
       return [
         '[' + x.id + '] ' + x.title,
-        '- 출처/문서번호: ' + x.source + ' (' + x.docNo + ', ' + x.date + ')',
+        '- 출처/문서번호: ' + x.source + ' (' + x.docNo + ')',
         '- 근거법령: ' + x.law,
-        '- 질의요지: ' + x.q,
-        '- 회답/기준: ' + x.a,
-        '- 실무핵심: ' + (x.points || []).join(' / ')
+        '- 핵심판시: ' + ch.body,
+        '- 체크포인트: ' + (ch.points || []).join(' / ')
       ].join('\n');
     }).join('\n\n');
 
     var system = [
-      '당신은 사내근로복지기금 및 공동근로복지기금 전문 법률·회계·세무 AI 자문관입니다.',
-      '반드시 아래 제공된 [고용노동부 유권해석·예규 및 근로복지공단 규정·지침 근거자료]에 기반하여 한국어로 명확하고 정확하게 답변하십시오.',
+      '당신은 사내·공동근로복지기금 전문 법률·회계·세무 AI 자문관입니다.',
+      '제공된 [근거자료]만을 바탕으로 사용자의 [질문]에 대해 채팅 답변을 작성하십시오.',
       '규칙:',
-      '1. 답변 첫머리에 결론(가능/불가/요건부 가능 등)을 명확히 제시하고, 근거 법령 조문과 행정해석 문서번호(예: 퇴직연금복지과-3866, 예규 제169호 제14조 등)를 정확히 인용하십시오.',
-      '2. 제공된 근거자료에 없는 문서번호나 법 조문을 임의로 지어내지 마십시오.',
-      '3. 응답은 반드시 아래 JSON 형식으로만 출력하십시오(마크다운 코드블록 없이 순수 JSON):',
-      '{"answer":"핵심 결론 및 상세 해설(줄바꿈은 \\n 사용)","cites":["인용한 자료의 id 배열"],"none":false}',
-      '4. 만약 질문이 기금과 전혀 무관하거나 근거자료로 답할 수 없으면 {"answer":"제공된 법령·유권해석 자료에서 해당 내용을 찾을 수 없습니다.","cites":[],"none":true} 로 답하십시오.'
+      '1. 질문한 내용에 대해서만 핵심 결론(가능/불가/요건)과 이유, 법적 근거(법령 조문 및 행정해석 문서번호)를 3~5문장 이내로 간결하고 명확하게 답변하십시오.',
+      '2. 사용자가 묻지 않은 부수적인 내용이나 불필요한 서론·인사말·장황한 부연설명은 절대 포함하지 마십시오.',
+      '3. 제공된 근거자료에 없는 문서번호나 법 조문을 임의로 지어내지 마십시오.',
+      '4. 응답은 반드시 아래 순수 JSON 형식으로만 출력하십시오:',
+      '{"answer":"간결한 핵심 답변(줄바꿈은 \\n 사용)","cites":["가장 직접 인용한 자료 id 1~2개"],"none":false}'
     ].join('\n');
 
-    var user = '[고용노동부 유권해석·예규 및 근로복지공단 규정·지침 근거자료]\n' +
+    var user = '[근거자료]\n' +
       (docs || '(근거자료 없음)') +
       '\n\n[질문]\n' + String(question || '').trim();
 
@@ -933,35 +1017,27 @@
   function localAnswer(picked, question) {
     if (!picked || !picked.length) {
       return {
-        answer: '질문하신 키워드와 일치하는 고용노동부 유권해석·공단 지침을 찾지 못했습니다. 검색어를 바꾸거나(예: 출연금 한도, 대부, 선택적복지, 준비금, 탈퇴, 4호 해산 등) 아래 분야별 자주 묻는 질문을 선택해 보세요.',
+        answer: '질문하신 내용과 직접 일치하는 고용노동부 유권해석·공단 지침을 찾지 못했습니다.\n핵심 키워드(예: 적자 기업 설립, 감사 겸직, 대부 자기거래, 출연금 한도, 공단 지원금, 선택적 복지, 준비금, 중간탈퇴, 4호 해산 등)를 포함해 질문해 주세요.',
         cites: [],
         none: true,
         mode: 'local'
       };
     }
     var top = picked[0];
+    var chunk = extractRelevantChunk(top, question);
     var lines = [];
-    lines.push('■ 핵심 결론 (' + top.title + ')');
-    lines.push(top.a);
-    if (top.points && top.points.length) {
+    lines.push(chunk.body);
+    if (chunk.points && chunk.points.length) {
       lines.push('');
-      lines.push('■ 실무 체크포인트');
-      for (var i = 0; i < top.points.length; i++) {
-        lines.push('• ' + top.points[i]);
+      for (var i = 0; i < chunk.points.length; i++) {
+        lines.push('• ' + chunk.points[i]);
       }
     }
     lines.push('');
-    lines.push('■ 관련 근거 법령 및 행정해석');
-    var cites = [];
-    var limit = Math.min(picked.length, 3);
-    for (var j = 0; j < limit; j++) {
-      var p = picked[j];
-      cites.push(p.id);
-      lines.push('• [' + p.docNo + '] ' + p.title + ' (' + p.law + ')');
-    }
+    lines.push('📌 근거: ' + top.law + ' (' + top.docNo + ')');
     return {
       answer: lines.join('\n'),
-      cites: cites,
+      cites: [top.id],
       none: false,
       mode: 'local',
       question: question
@@ -1014,6 +1090,7 @@
     scoreItem: scoreItem,
     makePrompt: makePrompt,
     localAnswer: localAnswer,
-    parseReply: parseReply
+    parseReply: parseReply,
+    extractRelevantChunk: extractRelevantChunk
   };
 })(typeof window !== 'undefined' ? window : globalThis);
