@@ -49,7 +49,7 @@ const DONE = [
   ['install.html', '설치안내'],
   ['rehab-ad.html', '회생광고'],
   ['gov-report.html', '컨설팅보고서'],
-  ['pu-govaid.html', '정부지원금'],
+  ['pu-govaid.html', '기업정부지원금'],
   ['pu-signboard.html', '전광판'],
   ['pu-settle.html', '컨설팅정산'],
 ];
