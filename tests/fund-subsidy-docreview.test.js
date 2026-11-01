@@ -174,3 +174,72 @@ test('배선 — 격자는 제출서류 탭 맨 위, 쓰기는 정한 자리만,
   assert.match(grabFn('rvCopyRemind'), /_copyText\(/);
   assert.ok(!/fetch\(|sendMail|mailto:/.test(grabFn('rvCopyRemind')));
 });
+
+/* ── 사진첩에 읽어 둔 값을 먼저 쓴다 (2026-11-01 실서류 시험 뒤) ── */
+const A = (() => {
+  const box = {};
+  new Function('PuPhotoStore', 'photoStoreReady', '_isBoss', '_subScanOf', 'parseBizReg', 'parseSmeCert', 'parseSiteReg', '_dataUrlToFile', 'imgCanvas', 'ocrCanvases', [
+    grabVar('RV_PICK'), grabVar('RV_ALBUM_KIND'), grabVar('RV_NEED'), 'var _rvAlbum={};',
+    grabFn('rvPickRead'), grabFn('_rvDate'), grabFn('rvFromFields'), grabFn('rvAlbumItems'), grabFn('rvAlbumRead'), grabFn('rvRead'),
+    'this.read=rvRead; this.from=rvFromFields; this.date=_rvDate; this.reset=function(){ _rvAlbum={}; };',
+  ].join('\n')).call(box, ...(() => {
+    const st = { calls: { ocr: 0, list: 0, full: 0 }, items: {}, listFail: false, ocrParsed: {} };
+    box.st = st;
+    const store = {
+      listYearAll: () => { st.calls.list++; return st.listFail ? Promise.reject(new Error('x')) : Promise.resolve(st.items); },
+      listYear: () => { st.calls.list++; return st.listFail ? Promise.reject(new Error('x')) : Promise.resolve(st.items); },
+      loadFullDetail: () => { st.calls.full++; return Promise.resolve({ src: 'data:image/jpeg;base64,AA' }); },
+    };
+    return [store, () => true, () => true, () => ({ owner: 'u1', year: 2026, id: 'p1' }),
+      () => st.ocrParsed, () => st.ocrParsed, () => st.ocrParsed,
+      () => Promise.resolve({}), () => Promise.resolve({}), () => { st.calls.ocr++; return Promise.resolve('text'); }];
+  })());
+  return box;
+})();
+
+test('사진첩 값 변환 — 사업자등록증·중소기업확인서 칸 이름을 맞추고 날짜 모양을 통일한다', () => {
+  assert.deepEqual(A.from('bizno', { bizno: '123-45-67890', company: '예시전자', ceo: '이○○', address: '충남 천안', openDate: '2020-01-01' }),
+    { biz_no: '123-45-67890', name: '예시전자', ceo: '이○○', address: '충남 천안' });
+  assert.deepEqual(A.from('sme', { smeType: '소기업', issueDate: '2026.4.1', expiry: '2027년 3월 31일', company: '예시전자' }),
+    { sme_cert: '소기업', sme_from: '2026-04-01', sme_to: '2027-03-31', name: '예시전자' });
+  assert.equal(A.from('sme', {}), null);                    // 빈 값은 «읽음»이 아니다 — 지어내지 않는다
+  assert.equal(A.from('reg', { company: 'x' }), null);      // 등기부는 사진첩에 읽어 둔 칸이 없다
+});
+
+test('★ 사진첩에 읽어 둔 값이 충분하면 OCR 을 다시 돌리지 않는다', async () => {
+  A.st.items = { p1: { read: { kind: 'bizreg', fields: { bizno: '1234567890', company: '예시전자', ceo: '이○○' } } } };
+  A.reset();
+  const r = await A.read('s1', 'bizno');
+  assert.equal(r.via, 'album');
+  assert.equal(r.read.biz_no, '1234567890'); assert.equal(r.read.ceo, '이○○');
+  assert.equal(A.st.calls.ocr, 0); assert.equal(A.st.calls.full, 0);
+});
+
+test('★ 모자라면 OCR 로 채우되 겹치는 칸은 사진첩 값이 이긴다', async () => {
+  A.st.calls.ocr = 0; A.st.calls.full = 0;
+  A.st.items = { p1: { read: { kind: 'bizreg', fields: { bizno: '1234567890', ceo: '이○○' } } } };     // 상호가 없다
+  A.st.ocrParsed = { biz_no: '9999999999', name: 'OCR상호', ceo: '이○' };
+  A.reset();
+  const r = await A.read('s1', 'bizno');
+  assert.equal(r.via, 'album+ocr'); assert.equal(A.st.calls.ocr, 1);
+  assert.equal(r.read.name, 'OCR상호');                    // 빈 칸은 OCR 이 채운다
+  assert.equal(r.read.biz_no, '1234567890');               // 겹치면 사진첩 값
+  assert.equal(r.read.ceo, '이○○');
+});
+
+test('사진첩 목록을 못 읽거나 다른 종류로 분류돼 있으면 그냥 OCR 로 간다', async () => {
+  A.reset(); A.st.calls.ocr = 0; A.st.listFail = true; A.st.ocrParsed = { biz_no: '1234567890', name: '예시' };
+  const a = await A.read('s1', 'bizno');
+  assert.equal(a.via, 'ocr'); assert.equal(A.st.calls.ocr, 1);
+  A.reset(); A.st.listFail = false; A.st.calls.ocr = 0;
+  A.st.items = { p1: { read: { kind: 'card', fields: { bizno: '1', company: 'x' } } } };           // 명함으로 분류된 장
+  const b = await A.read('s1', 'bizno');
+  assert.equal(b.via, 'ocr'); assert.equal(A.st.calls.ocr, 1);
+});
+
+test('저장에는 어디서 온 값인지만 더한다 — album 이면 ocr 아님', () => {
+  const sv = grabFn('rvSaveRead');
+  assert.match(sv, /ocr:!\(res&&res\.via==='album'\)/);
+  assert.match(sv, /rec\.via=res\.via/);
+  assert.ok(!/st:|cmp:/.test(sv));
+});
