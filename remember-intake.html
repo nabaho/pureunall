@@ -27,7 +27,7 @@
   「이미 모든 자료 다 가지고 왔다 — 최근 자료는 계속 업데이트해야 되는데 귀찮아서 자동화」
 
   어떻게 도나
-   ① 대표 크롬의 «푸른 리멤버 연결» 확장(tools/remember-ext)이 1시간마다 리멤버 탭을 새로 고친다.
+   ① 대표 크롬의 «푸른 리멤버 연결» 확장(tools/remember-ext)이 낮(09~18시) 30분마다·밤 00시/06시에 한 번씩 리멤버 탭을 새로 고친다.
    ② 리멤버 화면이 스스로 명함 목록을 부를 때 쓰는 머리를 그 자리에서 빌려, 수정순으로 지난번 뒤에 바뀐 명함만 받는다.
    ③ 확장이 그 명함들과 앞면 그림을 이 창(고정 탭)에 건넨다 — 이 창이 사진첩·기업정보함에 담는다.
       사진첩: PuPhotoStore.savePhoto (사진첩 「서류」, 판독 결과를 미리 적어 다시 판독하지 않음)
@@ -51,6 +51,7 @@ body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"
 .ok{background:var(--greenbg);color:var(--green);border:1px solid #bbf7d0;}
 .wait{background:var(--bluebg);color:var(--blue);border:1px solid #bfdbfe;}
 .bad{background:var(--redbg);color:var(--red);border:1px solid #fecaca;}
+.warn{background:var(--amberbg);color:var(--amber);border:1px solid #fde68a;}
 .muted{color:var(--sub);font-size:12px;line-height:1.7;}
 table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;table-layout:fixed;}
 td,th{padding:6px 8px;border-bottom:1px solid var(--bg);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -62,10 +63,10 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
 <div class="wrap">
   <div class="card"><div id="state" class="band wait">준비 중…</div>
     <p class="muted" style="margin-top:8px">이 탭은 «푸른 리멤버 연결» 확장이 쓰는 받는 창입니다 — 닫지 말고 고정해 두세요.
-      리멤버에서 새로 받거나 고친 명함이 1시간마다 사진첩과 기업정보함에 저절로 들어옵니다.
+      리멤버에서 새로 받거나 고친 명함이 낮(09~18시)에는 30분마다, 밤에는 00시·06시에 사진첩과 기업정보함에 저절로 들어옵니다.
       푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.</p></div>
   <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:110px"><col style="width:90px"><col><col style="width:150px"></colgroup>
-    <tr><th>받은 때</th><th>이름</th><th>회사</th><th>기업정보함</th></tr></table></div>
+    <tr><th>받은 때</th><th>이름</th><th>회사</th><th>결과</th></tr></table></div>
 </div>
 <script>
 (function () {
@@ -93,11 +94,34 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
   var S = { user: null, ready: false, status: null, busy: false };
   var day = function (t) { var d = new Date(Number(t) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
 
+  /* 확장이 도는 때 — tools/remember-ext/bg.js 와 «같은 일정»(낮 09~18시 30분마다 · 밤 00시·06시). 어긋나면 tests/remember-intake-schedule 이 알린다 */
+  var DAY_FROM = 9 * 60, DAY_TO = 18 * 60, EVERY_MIN = 30, NIGHT = [0, 6 * 60];
+  function slotsOfDay() {
+    var s = NIGHT.slice();
+    for (var m = DAY_FROM; m <= DAY_TO; m += EVERY_MIN) s.push(m);
+    return s.sort(function (a, b) { return a - b; });
+  }
+  function slotAt(base, dayShift, min) { return new Date(base.getFullYear(), base.getMonth(), base.getDate() + dayShift, 0, min, 0, 0).getTime(); }
+  function nextSlot(nowMs) {
+    var now = new Date(nowMs), s = slotsOfDay();
+    for (var d = 0; d < 2; d++) for (var i = 0; i < s.length; i++) { var t = slotAt(now, d, s[i]); if (t > nowMs) return t; }
+    return nowMs + EVERY_MIN * 60000;
+  }
+  function prevSlot(nowMs) {
+    var now = new Date(nowMs), s = slotsOfDay(), best = 0;
+    for (var d = -1; d <= 0; d++) for (var i = 0; i < s.length; i++) { var t = slotAt(now, d, s[i]); if (t <= nowMs && t > best) best = t; }
+    return best;
+  }
+  var hhmm = function (t) { var d = new Date(Number(t) || 0); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
+  /* «예정된 때를 지났는데(15분 여유) 그 때 이후 확인이 없다» = 멈춘 것 — 초록 「연결됨」으로 두면 몇 시간이고 모른다 */
+  function lateBy(st, nowMs) { var p = prevSlot(nowMs); return !!(st.at && p && Number(st.at) < p && nowMs - p > 15 * 60000); }
+
   function draw() {
     var st = S.status || {}, el = $('state');
     if (!S.user) { el.className = 'band bad'; el.textContent = '✕ 푸른 포털에 로그인되어 있지 않습니다 — 이 탭에서 로그인해 주세요'; return; }
     if (st.err === 'login') { el.className = 'band bad'; el.textContent = '✕ 리멤버 로그인이 풀렸습니다 — 크롬에서 리멤버(card.rememberapp.co.kr)에 다시 로그인해 주세요 · ' + day(st.errAt); }
-    else if (st.at) { el.className = 'band ok'; el.textContent = '● 연결됨 — 마지막 확인 ' + day(st.at) + ' · 지난번 새로 ' + (st.newN || 0) + '장 · 고침 ' + (st.updN || 0) + '장' + (st.total ? ' · 리멤버 전체 ' + Number(st.total).toLocaleString() + '장' : ''); }
+    else if (lateBy(st, Date.now())) { el.className = 'band warn'; el.textContent = '⚠ 확인이 늦습니다 — 마지막 확인 ' + day(st.at) + ' (예정 ' + hhmm(prevSlot(Date.now())) + ') · 크롬과 PC·확장이 켜져 있는지 봐 주세요'; }
+    else if (st.at) { el.className = 'band ok'; el.textContent = '● 연결됨 — 마지막 확인 ' + day(st.at) + ' · 다음 ' + hhmm(nextSlot(Date.now())) + ' · 지난번 새로 ' + (st.newN || 0) + '장 · 고침 ' + (st.updN || 0) + '장' + (st.total ? ' · 리멤버 전체 ' + Number(st.total).toLocaleString() + '장' : ''); }
     else { el.className = 'band wait'; el.textContent = '확장이 첫 회차를 보낼 때까지 기다리는 중입니다 (첫 회차는 기준만 잡습니다)'; }
     var rows = (st.recent || []).map(function (r) {
       return '<tr><td>' + esc(day(r.at)) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.company) + '</td><td>' + esc(r.what) + '</td></tr>';
@@ -142,13 +166,13 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       }) : Promise.resolve();
       return step.then(function () {
         var fields = PuRemember.toFields(c);
-        if (!fields.name && !fields.company) return { what: '이름·회사 없음 — 건너뜀' };
+        if (!fields.name && !fields.company) return { what: '📇 이름·회사 없음 — 건너뜀' };
         return PuDocFile.sendToCards({ kind: 'card', fields: fields, takenAt: Date.parse(c.createdAt) || now, byName: '리멤버',
           photoId: photo ? photo.id : '', photoYear: photo ? photo.year : '', photoOwner: photo ? photo.owner : '',
           full: pic ? pic.full : '', thumb: pic ? pic.thumb : '' })
           .then(function (r) {
-            return { what: r && r.created ? '새로 넣음' : (r && r.filled && r.filled.length ? '빈 칸 채움' : '이미 있음'), id: r && r.id };
-          }, function (e) { return { what: '못 넣음: ' + String((e && e.message) || e).slice(0, 40), err: true }; });
+            return { what: r && r.created ? '📇 새로 넣음' : (r && r.filled && r.filled.length ? '📇 빈 칸 채움' : '📇 이미 있음'), id: r && r.id };
+          }, function (e) { return { what: '📇 못 넣음: ' + String((e && e.message) || e).slice(0, 40), err: true }; });
       }).then(function (res) {
         var rec = { u: c.updatedAt, at: now, card: res.id || '' };
         if (c.front) rec.front = String(c.front).split('?')[0];
@@ -172,7 +196,7 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       done = p.todo.reduce(function (pr, c) {
         return pr.then(function (acc) {
           return one(c, (m.images || {})[c.rid], now).then(function (r) { if (!r.err) lastOk = Math.max(lastOk, c.updatedAt); acc.push(r); return acc; },
-            function (e) { acc.push({ name: c.name, company: c.company, what: '못 넣음: ' + String((e && e.message) || e).slice(0, 40), at: now, err: true }); return acc; });
+            function (e) { acc.push({ name: c.name, company: c.company, what: '📇 못 넣음: ' + String((e && e.message) || e).slice(0, 40), at: now, err: true }); return acc; });
         });
       }, Promise.resolve([]));
     }
@@ -378,6 +402,7 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       function () { S.ready = true; draw(); });
   });
   draw();
+  setInterval(draw, 5 * 60000);          /* 열어 둔 채로도 «늦음» 이 제때 드러나게 */
 })();
 </script>
 </body>
