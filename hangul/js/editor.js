@@ -105,7 +105,7 @@
   };
 
   const changed = () => { E.onChange && E.onChange(); };
-  function onInput() { normalizeRoot(); queueLayout(); changed(); }
+  function onInput() { lastEdit = Date.now(); normalizeRoot(); queueLayout(); changed(); }
 
   // ---------- 선택 영역 ----------
   E.focus = () => doc.focus();
@@ -312,7 +312,20 @@
   function queueLayout() {
     if (layoutQueued) return;
     layoutQueued = true;
-    nextFrame(() => { layoutQueued = false; paginate(); });
+    nextFrame(() => { layoutQueued = false; paginate(); keepCaretVisible(); });
+  }
+  // 글을 고친 뒤 쪽 나눔을 다시 그리면 화면이 커서를 놓칠 수 있어, 커서가 화면 밖이면 보이게 함 (스크롤을 일부러 옮긴 때는 건드리지 않음: 고친 직후에만)
+  let lastEdit = 0;
+  function keepCaretVisible() {
+    if (Date.now() - lastEdit > 1500) return; // 글을 고친 직후만
+    const s = getSelection();
+    if (!s.rangeCount || !s.isCollapsed || !doc.contains(s.anchorNode) || document.activeElement !== doc) return;
+    const desk = doc.closest('.desk'); if (!desk) return;
+    const rc = s.getRangeAt(0).getBoundingClientRect();
+    if (!rc.height && !rc.top) return;
+    const dk = desk.getBoundingClientRect(), pad = 40;
+    if (rc.bottom > dk.bottom - pad) desk.scrollTop += rc.bottom - dk.bottom + pad;
+    else if (rc.top < dk.top + pad) desk.scrollTop -= dk.top + pad - rc.top;
   }
   E.queueLayout = queueLayout;
 
@@ -554,15 +567,30 @@
   // 표 너비: 겹친 테두리 표는 맨 왼쪽·오른쪽 테두리 반쪽이 표 너비 안에 들어 칸이 그만큼 좁아짐(sample05: 칸마다 0.17% 좁아 칸 글이 넘침)
   //  → 한글처럼 칸 너비 합이 표 너비가 되게 그 반쪽만큼 표를 넓히고 왼쪽(오른쪽 정렬이면 오른쪽)으로 내어 둠
   function tableBorderWidths() {
-    for (const t of doc.querySelectorAll('table.hwp-tbl[data-wr]')) {
+    const sel = 'table.hwp-tbl[data-wr]';
+    const depth = t => { let d = 0; for (let p = t.parentElement && t.parentElement.closest(sel); p; p = p.parentElement && p.parentElement.closest(sel)) d++; return d; };
+    const levels = [];
+    for (const t of doc.querySelectorAll(sel)) {
       const rows = t.tBodies[0] ? t.tBodies[0].rows : [];
       if (!rows.length || !rows[0].cells.length) continue;
-      t.style.removeProperty('--tbl'); t.style.removeProperty('--tbr');
-      const sc = zf(), tr = t.getBoundingClientRect();
-      let bl = Infinity, br = Infinity;
-      for (const row of rows) { const cs = row.cells; if (!cs.length) continue; bl = Math.min(bl, (cs[0].getBoundingClientRect().left - tr.left) / sc); br = Math.min(br, (tr.right - cs[cs.length - 1].getBoundingClientRect().right) / sc); }
-      if (!(bl > 0.01) && !(br > 0.01)) continue;
-      t.style.setProperty('--tbl', Math.max(0, bl).toFixed(2) + 'px'); t.style.setProperty('--tbr', Math.max(0, br).toFixed(2) + 'px');
+      const d = depth(t); (levels[d] = levels[d] || []).push(t);
+    }
+    // 같은 깊이의 표끼리는 서로 가로 자리에 영향을 주지 않으므로 지우기 → 읽기 → 쓰기 순으로 한 번에
+    for (const list of levels) {
+      if (!list) continue;
+      for (const t of list) { t.style.removeProperty('--tbl'); t.style.removeProperty('--tbr'); }
+      const sc = zf();
+      const out = list.map(t => {
+        const tr = t.getBoundingClientRect();
+        let bl = Infinity, br = Infinity;
+        for (const row of t.tBodies[0].rows) { const cs = row.cells; if (!cs.length) continue; bl = Math.min(bl, (cs[0].getBoundingClientRect().left - tr.left) / sc); br = Math.min(br, (tr.right - cs[cs.length - 1].getBoundingClientRect().right) / sc); }
+        return [bl, br];
+      });
+      list.forEach((t, i) => {
+        const [bl, br] = out[i];
+        if (!(bl > 0.01) && !(br > 0.01)) return;
+        t.style.setProperty('--tbl', Math.max(0, bl).toFixed(2) + 'px'); t.style.setProperty('--tbr', Math.max(0, br).toFixed(2) + 'px');
+      });
     }
   }
   // 줄 끝 빈칸: 한글은 줄 끝 빈칸을 '줄에 드는 개수 + 1개'(적어도 2개)까지 그 줄에 두고 나머지는 다음 줄 첫머리로
@@ -582,12 +610,16 @@
       cand.get(p).push(n);
     }
     const z = zf();
+    // 읽기(줄 나눔 방식) → 왼쪽 정렬로 바꾸기 → 한꺼번에 재기 → 되돌리기 (문단마다 다시 배치하지 않게)
+    const todo = [];
     for (const [p, nodes] of cand) {
       const cs = getComputedStyle(p);
       if (cs.whiteSpace !== 'pre-wrap') continue; // 칸 '한 줄로 입력'(pre) 등은 줄을 나누지 않음
-      const ta = p.style.textAlign, tal = p.style.textAlignLast;
-      p.style.textAlign = 'left'; p.style.textAlignLast = 'auto';
-      const edge = p.getBoundingClientRect().right - ((parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderRightWidth) || 0)) * z;
+      todo.push({ p, nodes, pad: (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderRightWidth) || 0), ta: p.style.textAlign, tal: p.style.textAlignLast });
+    }
+    for (const x of todo) { x.p.style.textAlign = 'left'; x.p.style.textAlignLast = 'auto'; }
+    for (const { p, nodes, pad } of todo) {
+      const edge = p.getBoundingClientRect().right - pad * z;
       const queue = nodes.slice();
       while (queue.length) {
         const n = queue.shift(), re = / {2,}/g;
@@ -610,8 +642,8 @@
           break;
         }
       }
-      p.style.textAlign = ta; p.style.textAlignLast = tal;
     }
+    for (const x of todo) { x.p.style.textAlign = x.ta; x.p.style.textAlignLast = x.tal; }
     if (changed) restoreLogicalSel(sel);
   }
   // 칸 너비(%): 크롬은 칸마다 너비를 1/64px 로 내려 잘라 오른쪽 칸일수록 왼쪽으로 밀림(PUBL132 78칸 표: 끝 칸 앞에서 0.44px — 칸 글 줄 나눔이 달라짐)
@@ -1221,12 +1253,12 @@
       x.fillStyle = '#e7e9ee'; x.fillRect(0, 0, w, hgt);
       x.fillStyle = '#c9ced8'; x.fillRect(x0 - m.left * pmv, 3, effW() * pmv, hgt - 6);
       x.fillStyle = '#fff'; x.fillRect(x0, 3, bodyW, hgt - 6);
-      x.strokeStyle = '#7a8496'; x.fillStyle = '#4a5468'; x.font = '9px "맑은 고딕", sans-serif'; x.textAlign = 'center';
+      x.strokeStyle = '#7a8496'; x.fillStyle = '#111827'; x.font = 'bold 11px "맑은 고딕", sans-serif'; x.textAlign = 'center';
       x.beginPath();
       for (let mm = -Math.floor(m.left); mm <= effW() - m.left; mm++) {
         const px = Math.round(x0 + mm * pmv) + 0.5;
         if (px < 0 || px > w) continue;
-        if (mm % 10 === 0) { if (mm) x.fillText(String(Math.abs(mm / 10)), px, hgt - 6); }
+        if (mm % 10 === 0) { if (mm) x.fillText(String(Math.abs(mm / 10)), px, hgt - 5); }
         else if (mm % 5 === 0) { x.moveTo(px, hgt - 9); x.lineTo(px, hgt - 4); }
         else if (pmv > 2.5) { x.moveTo(px, hgt - 7); x.lineTo(px, hgt - 4); }
       }
@@ -1258,7 +1290,7 @@
       x.fillStyle = '#e7e9ee'; x.fillRect(0, 0, w, hgt);
       x.fillStyle = '#c9ced8'; x.fillRect(3, y0 - bodyTop() * pmv, w - 6, effH() * pmv);
       x.fillStyle = '#fff'; x.fillRect(3, y0, w - 6, bodyH);
-      x.strokeStyle = '#7a8496'; x.fillStyle = '#4a5468'; x.font = '9px "맑은 고딕", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.strokeStyle = '#7a8496'; x.fillStyle = '#111827'; x.font = 'bold 11px "맑은 고딕", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.beginPath();
       for (let mm = -Math.floor(bodyTop()); mm <= effH() - bodyTop(); mm++) {
         const py = Math.round(y0 + mm * pmv) + 0.5;
@@ -1422,7 +1454,7 @@
     document.execCommand(cmd, false, val);
     afterEdit();
   };
-  function afterEdit() { normalizeRoot(); queueLayout(); changed(); }
+  function afterEdit() { lastEdit = Date.now(); normalizeRoot(); queueLayout(); changed(); }
   E.afterEdit = afterEdit;
 
   // 선택 영역에 CSS 적용 (선택이 없으면 이후 입력에 적용)
