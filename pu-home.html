@@ -51,7 +51,7 @@
 <script src="js/pu-home-diff.js?v=10"></script>
 <script src="js/pu-home-fill.js?v=10"></script>
 <!-- 새 홈페이지를 «자료로» 그리는 부품. 명령줄(scripts/build-people.js)도 같은 것을 쓴다 -->
-<script src="js/pu-site-people.js?v=1"></script>
+<script src="js/pu-site-people.js?v=3"></script>
 <script src="js/pu-site-page.js?v=1"></script>
 <script src="js/pu-site-partner.js?v=3"></script>
 <style>
@@ -341,6 +341,17 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 /* ★ 딱지 둘을 «나란히» 놓는다 (대표 지적 2026-09-02 「2줄을 1줄로」).
    세로로 쌓으면 줄 키가 커지고, 그만큼 설명 자리를 빼앗아 지사장 설명이 잘렸다. */
 .tags{display:flex;align-items:center;gap:3px;flex:none;margin-left:auto}
+/* ★ 딱지 두 칸은 «열을 맞춘다» (대표 지시 2026-11-01 「항상 열은 일정하게」) — 칸 폭을 못 박아
+     딱지 길이가 달라도 같은 종류가 줄마다 같은 자리에서 시작한다. 비어도 자리를 지킨다. */
+.tags .tc{flex:none;width:86px;display:flex;overflow:hidden}
+.tags .tc .pill{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+/* 목록 끝 알림 한 줄 — 저절로 하지 않는 일을 «알리기만» 한다 */
+.hintline{padding:8px 14px;font-size:12px;color:#854d0e;background:#fffbeb;border-top:1px solid #fde68a;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 직원 가져오기 표 — 한 칸 한 줄 */
+table.imp{width:100%;border-collapse:collapse;margin-top:6px}
+table.imp th,table.imp td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:13px}
+table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
 
 /* 목록 번호 — 화면에서 세는 용도. 붙여넣을 글자에는 들어가지 않는다 */
 .num{width:20px;flex:none;text-align:right;color:var(--faint);font-size:12px;font-weight:800;
@@ -2507,53 +2518,246 @@ async function addPage() {
 }
 window.addPage = addPage;
 
-/* ══════ 직원(사무장·사무직)을 고치는 자리 만들기 ══════
-   대표 지시 2026-09-13 「일반직원도 변경하고 싶은데 도대체 어디서 변경해야 될지 모르겠다」.
+/* ══════ 직원(사무장·사무직) — 「직원」 탭 (대표 승인 2026-11-01 직원 소개 1단계) ══════
+   대표 지시 2026-10-31 「직원 내용도 수정 가능하게 하고 추후에 직원 얼굴과 경력도 넣을 수 있게」.
 
-   ★ 왜 «구성원 소개»에 없나 — 홈페이지가 둘을 다르게 만들어 놓았다(2026-09-13 실측).
-       노무사 : 게시판 «글»이다. 글 번호·얼굴 사진·눌러서 열리는 덧창이 있다.
-       직원   : 쪽 본문에 박힌 «글자»다. 글 번호도 사진도 덧창도 없다.
-     구성원 목록은 «글»만 본다. 그래서 직원은 거기 나올 수가 없다 — 고장이 아니다.
-   ★ 그럼 어디서 고치나 — 「주요업무」와 똑같이 «쪽»으로 고친다. 이 단추가 그 쪽을
-     관리 목록에 넣어 준다. 한 번만 누르면 그 뒤로는 왼쪽 목록에 늘 있다.
-   ⚠ 사람이 이름·번호를 짐작해 치게 하지 않는다 — people 은 우리가 실측으로 아는 이름이다. */
-const 직원쪽 = 'people';
-const 직원쪽이름 = '일반직원';
+   ★ 무엇이 바뀌었나 — 전에는 이 탭이 옛 홈페이지의 people «쪽 글자»를 고치는 자리였다(2026-09-14).
+     그런데 직원 이름은 그 쪽이 아니라 제작사 레이아웃에 박혀 있어, 그 탭으로는 실제로 바뀌는 것이 없었다.
+     이제 직원도 노무사처럼 «한 사람씩» 우리 자료(homepage/members, 구분 = 직원)로 고치고,
+     새 사이트의 직원 줄(이름·직급 두 칸)을 PuSitePeople 이 다시 찍어 낸다.
+   ★ 퇴사는 노무사와 같은 잣대(새홈페이지에갈사람)로 저절로 빠진다. 매달 1일 서버도 같은 일을 한다.
+   ⚠ 명부와 잇는 것은 «사람이 고른» 직원 번호(sid)뿐이다 — 이름이 같아도 저절로 잇지 않는다(온톨로지 규칙).
+   ⚠ 사진·경력은 2단계(본인 동의 뒤)다. 여기서는 받지 않는다. */
+const 직원쪽 = 'people';   // 옛 홈페이지의 직원 쪽 — 주요업무 목록에서 빼는 데만 쓴다
 
-function 직원쪽있나() { return !!(App.pageConfig && App.pageConfig[직원쪽]); }
-
-/* 「일반직원 수정」 탭이 세우는 «한 줄». 구성원 줄과 같은 칸(name·desc·status)을 채운다. */
-function 직원줄() {
-  const s = ((App.check && App.check.pages) || {})[직원쪽] || {};
-  const p = App.pages[직원쪽] || {};
-  const note = (s.status === 'unknown') ? ' · 홈페이지에서 못 읽음'
-    : (s.status === 'noBase') ? ' · 기준 없음 — 읽어온 내용을 기준으로 삼으십시오'
-    : (p.text ? '' : ' · 아직 내용 없음');
-  return { key: 직원쪽, name: '일반직원 (사무장·사무직)', kind: 'page',
-           desc: '/' + 직원쪽 + ' · 쪽에 박힌 글자' + note, status: s.status || '' };
+/* 명부 칸 딱지 — 이었나 / 안 이었나 / 이은 번호가 명부에 없나 */
+function 직원명부딱지(m) {
+  if (!Array.isArray(App.staff)) return null;            // 명부를 못 읽었다 — 지어내지 않는다
+  if (!m.sid) return { label: '명부 안 이음', cls: 'lv' };
+  return App.staff.some(s => s && s.sid === m.sid)
+    ? { label: '명부 연결', cls: 'posted' } : { label: '명부에 없음', cls: 'ask' };
 }
 
-/* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14 「구성원소개에 일반직원 수정으로 두고
-     탭변경으로 해라」). 묻지 않는다 — 탭을 누르면 그 자리가 열린다.
-   관리 목록(homepage/config/pages)에 people 이 없으면 «조용히» 넣는다. 홈페이지는
-   아무것도 안 바뀐다 — 우리 목록에만 들어간다. 그 뒤로는 대조가 이 쪽도 함께 본다. */
+/* 새 사이트 칸 딱지 — 안 올림 / 퇴사로 빠짐 / 올라감 / 고쳤는데 아직 안 올림.
+   ★ «올라감»은 지금 새 사이트 쪽에 같은 이름·직급 글자가 있나로 본다 — 글자를 견주는 것이지
+     사람을 잇는 것이 아니다(잇기는 sid 로만 한다). */
+function 직원사이트딱지(m, 쪽직원) {
+  if (offSiteOf(m)) return { label: '안 올림', cls: 'unposted' };
+  if (!새홈페이지에갈사람(m)) return { label: '퇴사 → 빠짐', cls: 'rm' };
+  if (!쪽직원) return { label: '확인 전', cls: 'none' };
+  const 이름 = String(m.name || '').trim(), 직급 = String(m.position1 || '').trim();
+  return 쪽직원.some(s => s.이름 === 이름 && s.직급 === 직급)
+    ? { label: '올라감', cls: 'posted' } : { label: '안 올린 고침', cls: 'lv' };
+}
+
+/* 「직원」 탭의 줄 — 새 사이트에 그려질 차례 그대로 */
+function 직원행들() {
+  const 쪽직원 = App.sitePeople ? PuSitePeople.직원읽기(App.sitePeople) : null;
+  return Object.keys(App.members).filter(k => PuSitePeople.직원인가(App.members[k]))
+    .map(k => Object.assign({}, App.members[k], { key: k }))
+    .sort(PuSitePeople.차례견주기)
+    .map((m, i) => ({ key: m.key, name: m.name || '(이름 없음)', mkind: 'staff', _no: i + 1,
+                      desc: String(m.position1 || ''), 명부: 직원명부딱지(m), 사이트: 직원사이트딱지(m, 쪽직원) }));
+}
+
+/* 명부에는 재직 직원인데 목록에 «이어진» 사람이 없는 수 — 알림 줄만 띄운다(저절로 넣지 않는다, 대표 결정 ④) */
+function 명부에만있는직원수() {
+  if (!Array.isArray(App.staff)) return 0;
+  const 이은 = {};
+  Object.keys(App.members).forEach(k => { const m = App.members[k] || {}; if (m.sid) 이은[m.sid] = true; });
+  return App.staff.filter(s => s && s.sid && !s.left && !s.onLeave
+    && 직급의갈래(s.title) === 'staff' && !이은[s.sid]).length;
+}
+
+/* 「직원」 탭 목록 — 딱지 두 칸은 «열을 맞춰» 세운다(대표 지시 2026-11-01 「항상 열은 일정하게」) */
+function 직원목록Html() {
+  const 줄 = 직원행들();
+  if (!줄.length) {
+    return '<div class="empty">아직 직원 자료가 없습니다.<br>'
+      + '<span class="sub">처음 한 번, 지금 새 사이트에 있는 직원을 가져와 명부와 잇습니다.</span>'
+      + '<div style="margin-top:9px"><button class="btn pri" onclick="직원가져오기열기()">새 사이트 직원 가져오기</button></div></div>';
+  }
+  const 딱지 = (x) => x ? '<span class="pill ' + x.cls + '">' + esc(x.label) + '</span>' : '';
+  let h = 줄.map(r => '<div class="r ' + (r.key === App.pick ? 'on' : '') + '" onclick="App.select(\'' + esc(r.key) + '\')">'
+    + '<span class="num">' + r._no + '</span>'
+    + '<div class="who"><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div>'
+    + '<div class="po" title="' + esc(r.desc) + '">' + esc(r.desc || '(직급 없음)') + '</div></div>'
+    + '<span class="tags"><span class="tc">' + 딱지(r.명부) + '</span><span class="tc">' + 딱지(r.사이트) + '</span></span>'
+    + '</div>').join('');
+  const 남은 = 명부에만있는직원수();
+  if (남은) {
+    h += '<div class="hintline" title="저절로 넣지 않습니다 — 넣을지는 사람이 정합니다">명부에는 재직 중인데 이 목록에 없는 직원이 '
+      + 남은 + '명 있습니다 → <a href="#" onclick="openRosterAdd();return false">＋ 명부에서 넣기</a></div>';
+  }
+  return h;
+}
+
+/* 「직원」 탭 — 묻지 않는다. 누르면 열린다.
+   ★ 「올라감」을 견주려면 새 사이트 쪽이 있어야 해서, 아직 안 읽었으면 저절로 읽는다. */
 async function 직원탭열기() {
   if (!(await leaveDraft())) return;
-  if (!직원쪽있나() && !refuseIfPageConfigUnread()) {
-    const orders = Object.keys(App.pageConfig || {}).map(k => Number((App.pageConfig[k] || {}).order) || 0);
-    const next = Object.assign({}, App.pageConfig);
-    next[직원쪽] = { label: 직원쪽이름, order: (orders.length ? Math.max.apply(null, orders) : 0) + 1 };
-    try { await savePageConfig(next); }
-    catch (e) { await say('자리를 만들지 못했습니다', esc((e && e.message) || e)); return; }
-  }
   App.group = 'members';
   App.filter = 'staff';
-  App.pick = 직원쪽;
+  const 줄 = 직원행들();
+  App.pick = 줄.length ? 줄[0].key : '';
   loadDraft();
-  쪽자동읽기();   // 쪽을 고르면 저절로 읽어온다
   App.render();
+  if (!App.sitePeople && !App.previewReading) readPeoplePage();
 }
 window.직원탭열기 = 직원탭열기;
+
+/* ══ 처음 한 번 — 새 사이트의 직원을 가져와 명부와 잇기 ══
+   ★ 새 사이트 쪽에서 «이름과 직급 글자만» 읽는다. 명부에서는 이름·직급·재직 여부만 본다.
+   ⚠★ 이름이 같아도 저절로 잇지 않는다 — 「이 사람 맞음」은 «꺼진 채» 시작한다(온톨로지 규칙:
+     이름으로 추정한 관계는 사람이 확정하기 전까지 저장하지 않는다). 안 이은 사람은 목록에
+     「명부 안 이음」 딱지로 남고, 편집칸에서 언제든 이을 수 있다. */
+function 직원가져오기열기() {
+  if (!App.sitePeople) {
+    readPeoplePage().then(() => { if (App.sitePeople) 직원가져오기열기(); });
+    return;
+  }
+  const 있는이름 = {};
+  Object.keys(App.members).forEach(k => {
+    const m = App.members[k] || {};
+    if (PuSitePeople.직원인가(m)) 있는이름[String(m.name || '').trim()] = true;
+  });
+  App.가져오기 = PuSitePeople.직원읽기(App.sitePeople).map(s => {
+    const 후보 = (App.staff || []).filter(p => p && p.sid && String(p.name || '').trim() === s.이름);
+    return { 이름: s.이름, 직급: s.직급, 넣기: !있는이름[s.이름], 이미: !!있는이름[s.이름],
+             후보: 후보, sid: 후보.length === 1 ? 후보[0].sid : '', 맞음: false };
+  });
+  직원가져오기그리기();
+}
+window.직원가져오기열기 = 직원가져오기열기;
+
+function 직원가져오기그리기() {
+  const 줄 = App.가져오기 || [];
+  let h = modalHead('새 사이트 직원 가져오기');
+  if (!줄.length) {
+    h += '<div class="bar warn">새 사이트 쪽에서 직원 칸을 찾지 못했습니다.</div>' + modalFoot('');
+    openModal(h); return;
+  }
+  h += '<div class="bar ok">새 사이트 쪽에서 <b>이름과 직급 글자만</b> 읽었습니다. '
+    + '명부에서는 <b>이름·직급·재직 여부</b>만 봅니다.</div>';
+  const 명부글 = (p) => esc(고름이름표(p, App.staff || [])) + ' · '
+    + (p.left ? '<b style="color:var(--bad)">퇴사</b>' : p.onLeave ? '휴직' : '재직');
+  h += '<table class="imp"><tr><th>☐</th><th>#</th><th>새 사이트 글자</th><th>명부 후보</th><th>확인</th></tr>'
+    + 줄.map((r, i) => '<tr>'
+      + '<td><input type="checkbox"' + (r.넣기 ? ' checked' : '') + (r.이미 ? ' disabled' : '')
+        + ' onchange="App.가져오기[' + i + '].넣기=this.checked;직원가져오기그리기()"></td>'
+      + '<td class="sub">' + (i + 1) + '</td>'
+      + '<td><b>' + esc(r.이름) + '</b> ' + esc(r.직급) + '</td>'
+      + '<td>' + (r.이미 ? '<span class="pill posted">이미 목록에 있음</span>'
+        : !r.후보.length ? '<span class="pill lv">후보 없음</span>'
+        : r.후보.length === 1 ? 명부글(r.후보[0])
+          + (String(r.후보[0].title || '').trim() && String(r.후보[0].title).trim() !== r.직급
+              ? ' <span class="pill lv">직급 다름</span>' : '')
+        : '<select onchange="App.가져오기[' + i + '].sid=this.value;App.가져오기[' + i + '].맞음=!!this.value;직원가져오기그리기()">'
+          + '<option value="">— 동명이인, 고르십시오 —</option>'
+          + r.후보.map(p => '<option value="' + esc(p.sid) + '"' + (p.sid === r.sid ? ' selected' : '') + '>'
+            + esc(고름이름표(p, r.후보)) + '</option>').join('') + '</select>') + '</td>'
+      + '<td>' + (r.이미 || !r.후보.length ? '<span class="sub">연결 없이 넣음</span>'
+        : '<label><input type="checkbox"' + (r.맞음 && r.sid ? ' checked' : '') + (r.sid ? '' : ' disabled')
+          + ' onchange="App.가져오기[' + i + '].맞음=this.checked;직원가져오기그리기()"> 이 사람 맞음</label>') + '</td>'
+      + '</tr>').join('') + '</table>';
+  const 넣을수 = 줄.filter(r => r.넣기 && !r.이미).length;
+  h += '<div class="sub" style="margin-top:8px">「이 사람 맞음」에 체크한 사람만 명부와 이어집니다. '
+    + '안 이은 사람은 퇴사해도 저절로 빠지지 않아, 목록에 「명부 안 이음」으로 계속 보여 드립니다.</div>';
+  h += '<div class="foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">닫기</button>'
+    + '<button class="btn pri" onclick="직원가져오기넣기()"' + (넣을수 ? '' : ' disabled') + '>'
+    + 넣을수 + '명 넣기</button></div>';
+  openModal(h);
+}
+window.직원가져오기그리기 = 직원가져오기그리기;
+
+/* 고른 줄을 직원 자료로 넣는다. ★ 새 사이트 글자(직급)를 그대로 쓴다 — 넣는 것만으로 사이트가 바뀌지 않게.
+   차례는 지금 쪽 순서를 잇는다(이미 있는 직원 뒤로). */
+async function 직원가져오기넣기() {
+  const 줄 = (App.가져오기 || []).filter(r => r.넣기 && !r.이미);
+  if (!줄.length) return;
+  const 차례들 = Object.keys(App.members).filter(k => PuSitePeople.직원인가(App.members[k]))
+    .map(k => Number((App.members[k] || {}).order)).filter(n => isFinite(n));
+  let 차례 = 차례들.length ? Math.max.apply(null, 차례들) : 0;
+  const 처음 = Date.now();
+  let 넣은 = 0;
+  try {
+    for (let i = 0; i < 줄.length; i++) {
+      const r = 줄[i];
+      const rec = { name: r.이름, kind: 'staff', position1: r.직급, position2: '',
+                    intro: '', srl: '', careers: [], duties: [], order: ++차례 };
+      if (r.맞음 && r.sid) rec.sid = r.sid;
+      const key = 'staff-' + 처음 + '-' + i;
+      App.members[key] = await saveRecord('member', key, rec);
+      넣은++;
+    }
+  } catch (e) {
+    await say('넣다가 멈췄습니다', esc(넣은 + '명은 넣었습니다. ' + ((e && e.message) || e)));
+  }
+  closeModal();
+  App.가져오기 = null;
+  App.group = 'members'; App.filter = 'staff';
+  const 첫 = 직원행들()[0];
+  App.pick = 첫 ? 첫.key : '';
+  loadDraft(); App.render();
+  if (넣은) toast(넣은 + '명을 넣었습니다 — 새 사이트는 그대로입니다. 고친 뒤 「새 사이트에 올리기」를 누르십시오.');
+}
+window.직원가져오기넣기 = 직원가져오기넣기;
+
+/* ══ 직원 편집칸 — 이름·직급·차례·명부·안 올림만 (사진·경력은 2단계) ══ */
+function 직원차례(d) {
+  if (!App.draft || App.draft.kind !== 'member') return;
+  const n = Number(App.draft.order);
+  App.draft.order = Math.max(1, (isFinite(n) && App.draft.order !== '' ? n : 0) + d);
+  App.dirty = true; App.render();
+}
+window.직원차례 = 직원차례;
+
+function 직원편집(d) {
+  const rec = App.members[d.key] || {};
+  const kept = keptOf(rec);
+  let h = '<div class="edit"><div class="esc">';
+  h += '<div class="fldbar"><b style="font-size:16px">' + esc(d.name || '(이름 없음)') + '</b>'
+    + '<label style="margin:0 0 0 10px">구분</label>'
+    + MEMBER_KINDS.map(mk =>
+        '<button class="chip' + (d.mkind === mk.key ? ' on' : '') + '"'
+        + ' onclick="kindSet(\'' + mk.key + '\')">' + esc(mk.label) + '</button>').join('')
+    + '</div>';
+  h += '<div class="two">'
+    + '<div class="inl" style="flex:0 0 178px"><b>이름</b>'
+    + '<input value="' + esc(d.name) + '" oninput="fieldEdit(\'name\',this.value)"></div>'
+    + '<div class="inl"><b>직급<span class="tip" title="새 사이트에 이 글자 그대로 적힙니다">?</span></b>'
+    + '<input value="' + esc(d.position1) + '" oninput="fieldEdit(\'position1\',this.value)"></div>'
+    + '<div class="inl" style="flex:0 0 150px"><b>차례</b>'
+    + '<input value="' + esc(d.order) + '" inputmode="numeric" oninput="fieldEdit(\'order\',this.value)">'
+    + '<button class="x" title="앞으로" onclick="직원차례(-1)">▲</button>'
+    + '<button class="x" title="뒤로" onclick="직원차례(1)">▼</button></div>'
+    + '</div>';
+  h += 직원연결칸Html(d);
+  h += '<label class="sub" style="display:flex;gap:6px;align-items:center;margin-top:8px;white-space:nowrap">'
+    + '<input type="checkbox"' + (d.offSite ? ' checked' : '') + ' onchange="offSiteSet(this.checked)">'
+    + '새 사이트에 안 올림 <span>(목록에는 남깁니다)</span></label>';
+  if (kept) {
+    h += '<div class="sub" style="margin-top:6px">퇴사해도 남김 — ' + esc(String(kept.why || '')) + '</div>';
+  }
+  h += '<div class="guide" style="margin-top:12px;color:var(--faint)">얼굴 사진 · 경력: 2단계에서 들어옵니다. '
+    + '본인 동의를 받은 분만 올립니다.</div>';
+  h += '<div class="sub" style="margin-top:10px">「저장」은 <b>우리 목록에만</b> 들어갑니다. 손님이 보는 새 사이트에는 '
+    + '「새 사이트에 올리기」를 누르거나, <b>매달 1일 아침에 저절로</b> 올라갑니다.</div>';
+  h += '</div>';   // .esc 끝
+  h += '<div class="eft">'
+    + '<button class="btn pri" onclick="saveDraft()">저장</button>'
+    + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">' + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
+    + '<details class="more"><summary class="btn">⋯</summary><div class="morebox">'
+    + '<button class="btn" onclick="openHistory()">되돌리기</button>'
+    + (kept
+        ? '<button class="btn keep" onclick="keepOnSiteClear()">퇴사해도 남김 풀기</button>'
+        : '<button class="btn keep" onclick="keepOnSiteAsk()">퇴사해도 남기기 (사유 남김)</button>')
+    + '</div></details>'
+    + '<span style="flex:1"></span>'
+    + '<span class="sub">' + (rec.updatedAt ? '마지막 수정: ' + esc(stamp(rec.updatedAt)) + ' · ' + esc(기록자이름(rec.updatedBy)) : '수정 기록 없음') + '</span>'
+    + '</div>';
+  return h + '</div>';
+}
 
 /* 오시는길·인사말은 왼쪽에서 «자기 갈래»를 하나씩 차지한다 — 분리하면 그 갈래가 통째로
    비어 버리고, 목록이 아예 비면 기본 8쪽이 되살아나 분리한 것이 없던 일이 된다. */
@@ -2612,7 +2816,10 @@ function rosterMarkOf(name) {
      「홈페이지 다시 확인」을 누를 때만 새로 붙는다)는 서로 다른 것이다. */
 function memberRows() {
   const st = (App.check && App.check.members) || {};
-  const keys = Object.keys(App.members).sort((a, b) => {
+  /* ★ 직원은 여기 «안» 세운다 (대표 승인 2026-11-01 직원 소개 1단계) — 「직원」 탭(직원행들)이 맡는다.
+       직원은 옛 홈페이지 게시판 글이 아니라서, 여기 섞이면 노무사 탭에 「새로 올릴 것」으로 떠
+       할 일 숫자만 부풀린다. */
+  const keys = Object.keys(App.members).filter(k => !PuSitePeople.직원인가(App.members[k])).sort((a, b) => {
     const na = Number(a), nb = Number(b);
     if (isFinite(na) && isFinite(nb)) return na - nb;
     return String(a).localeCompare(String(b), 'ko');
@@ -2715,15 +2922,8 @@ function loadDraft() {
   App.dirty = false;
   if (!App.pick) { App.draft = null; return; }
   if (App.group === 'members') {
-    /* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14 「구성원소개에 일반직원 수정으로 두고
-         탭변경으로 해라」) — 구성원 갈래 안에서 people «쪽»을 고친다.
-       직원은 게시판 글이 아니라 쪽 글자라 구성원 자료(App.members)에 없다.
-       그래서 여기서만 쪽 초안을 만든다 — 편집칸은 pageEdit 가 그대로 그린다. */
-    if (App.pick === 직원쪽) {
-      const p = App.pages[직원쪽] || {};
-      App.draft = { kind: 'page', key: 직원쪽, text: p.text || '' };
-      return;
-    }
+    /* ★ 직원도 구성원 자료(App.members, 구분 = 직원)다 (2026-11-01 직원 소개 1단계) —
+         전에는 여기서 people «쪽» 초안을 만들었다. 그 길은 실제로 바뀌는 것이 없어 걷었다. */
     const m = App.members[App.pick];
     if (!m) { App.draft = null; return; }   // 「홈페이지에만」 줄은 고칠 우리 자료가 없다
     App.draft = {
@@ -2735,6 +2935,8 @@ function loadDraft() {
       mkind: memberKind(m),
       /* 홈페이지에 올릴까 — 「안 올림」이면 올리기·미리보기·할 일에서 다 빠진다 */
       offSite: offSiteOf(m),
+      /* 직원 차례 — 새 사이트 직원 줄의 순서(2026-11-01). 노무사는 안 쓴다 */
+      order: (m.order === undefined || m.order === null) ? '' : m.order,
       duties: (m.duties || []).slice(),
       intro: m.intro || '', srl: m.srl || '', careers: (m.careers || []).slice()
     };
@@ -3145,6 +3347,13 @@ async function saveDraft(조용히) {
          경력 한 줄 고칠 때마다 예외가 조용히 사라지고, 퇴사 경고가 다시 쏟아진다. */
       const kept = (App.members[d.key] || {}).keepOnSite;
       if (kept) next.keepOnSite = kept;
+      /* 직원 차례 — 칸에 없으면 지우지 않고 그 전 값을 둔다(저장은 통째로 쓰기라 빠뜨리면 사라진다) */
+      if (d.mkind === 'staff') {
+        const n = Number(d.order);
+        const 전 = (App.members[d.key] || {}).order;
+        if (String(d.order).trim() !== '' && isFinite(n)) next.order = n;
+        else if (전 !== undefined && 전 !== null) next.order = 전;
+      }
       App.members[d.key] = await saveRecord('member', d.key, next);
     } else {
       const next = { text: d.text };
@@ -3155,7 +3364,9 @@ async function saveDraft(조용히) {
     markChanged(d.kind, d.key);
     App.render();
     if (조용히 !== true) {
-      toast(d.kind === 'member'
+      toast(d.kind === 'member' && d.mkind === 'staff'
+        ? '저장했습니다 — 새 사이트에는 「새 사이트에 올리기」나 매달 1일에 올라갑니다.'
+        : d.kind === 'member'
         ? '저장만 했습니다 — 홈페이지는 그대로입니다. 바꾸시려면 「저장하고 반영」을 누르십시오.'
         : '저장했습니다.');
     }
@@ -3594,7 +3805,9 @@ async function applyStatus(live, livePages, failed, 시작) {
   /* ★ srl(홈페이지 글 번호)을 «그대로 함께» 넘긴다. 짝짓기는 부품(PuHomeDiff)이
      글 번호로 하고, 돌려주는 열쇠는 우리 RTDB 열쇠 그대로다 — 편집·저장이 그 열쇠를 쓴다.
      key 를 뒤에 두는 것도 일부러다: 자료에 key 칸이 섞여 들어와도 우리 열쇠를 덮지 못한다. */
-  const ours = Object.keys(App.members).map(k => Object.assign({}, App.members[k], { key: k }));
+  /* ⚠ 직원은 옛 홈페이지 게시판과 견주지 않는다 — 거기 글이 없으니 늘 「새로 올릴 것」이 된다 (2026-11-01) */
+  const ours = Object.keys(App.members).filter(k => !PuSitePeople.직원인가(App.members[k]))
+    .map(k => Object.assign({}, App.members[k], { key: k }));
   const list = PuHomeDiff.memberStatus(ours, live, App.staff, todayString());
 
   const prev = App.check || {};
@@ -4103,7 +4316,8 @@ function 고름이름표(s, list) {
 function 직원연결칸Html(d) {
   /* 글 번호가 있는 글(퇴사 때 내려감) 또는 글 번호 없는 «새 노무사»(3단계 — 올릴 때 직원 번호가 열쇠다) */
   const 글있음 = Number(String((d && d.srl) || '').trim()) > 0;
-  if ((!글있음 && !(d && d.mkind === 'labor')) || !Array.isArray(App.staff)) return '';
+  /* ★ 직원(2026-11-01)도 잇는다 — 이어 두어야 새 사이트 직원 줄에서 퇴사 때 저절로 빠진다 */
+  if ((!글있음 && !(d && (d.mkind === 'labor' || d.mkind === 'staff'))) || !Array.isArray(App.staff)) return '';
   const rec = (App.members || {})[d.key] || {};
   const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;'
     + 'overflow:hidden;text-overflow:ellipsis;margin-top:6px"><b>푸른ERP 직원</b>' + 안 + '</div>';
@@ -6743,8 +6957,8 @@ function visibleRows(group) {
     if (!App.filter && !q) all = all.filter(r => r.posted !== '');
   }
   const f = App.filter;
-  /* ★ 「일반직원 수정」 탭 — 구성원 줄이 아니라 people «쪽» 한 줄만 세운다 */
-  if (group === 'members' && f === 'staff') return [직원줄()];
+  /* ★ 「직원」 탭 — 직원 자료만, 새 사이트에 그려질 차례대로 (2026-11-01 직원 소개 1단계) */
+  if (group === 'members' && f === 'staff') return 직원행들();
   /* ★ 홈페이지에서 «내려간» 퇴사자는 명단에서 자동으로 뺀다
        (대표 지시 2026-09-14 「퇴사 내려가면 모든 이름 다 보일 필요 없을 것 같다」).
      자문사의 「거래 종료」와 같은 규칙이다 — 할 일이 끝난 줄이 자리를 차지하면
@@ -6782,6 +6996,8 @@ function visibleRows(group) {
 /* 걸러 보기 딱지 줄 — «있는 것만» 내놓는다. 0건인 딱지를 늘어놓으면
    무엇을 눌러야 할지가 흐려진다. */
 function chipsHtml() {
+  /* 「직원」 탭에는 걸러 볼 딱지가 없다 — 다섯 줄이고, 줄마다 두 칸 딱지가 다 말한다 */
+  if (App.group === 'members' && App.filter === 'staff') return '';
   const s = statOf(App.group);
   /* ★ 세는 곳과 보이는 곳(visibleRows)이 «같은 규칙»을 써야 한다.
        · 거래가 끝난 곳은 뺀다 (2026-09-03)
@@ -6908,9 +7124,10 @@ function listCountHtml() {
          나뉘어 있다. 「구성원 | 일반직원 수정」은 한쪽은 이름, 한쪽은 할 일이라 짝이 안 맞았다.
        ⚠ 구성원 자료에 «직원» 구분이 하나라도 섞이면 첫 탭을 「노무사」라 부르면 거짓이다 —
          그때는 「구성원」으로 돌아간다.
-       ⚠ 직원 탭에는 숫자를 안 적는다. 직원은 쪽에 박힌 글자라 몇 명인지 셀 자료가 없다 —
-         모르는 숫자를 지어 적지 않는다. */
+       ★ 직원 탭 숫자 = 우리 직원 자료 수 (2026-11-01 직원 소개 1단계 — 이제 셀 자료가 있다).
+         ⚠ 아직 한 명도 안 가져왔으면 숫자를 안 적는다 — 0 은 「직원이 없다」로 읽힌다. */
     const 첫탭 = all.every(r => r.mkind !== 'staff') ? '노무사' : '구성원';
+    const 직원수 = 직원행들().length;
     /* ★ 탭 숫자 = 탭을 누르면 «실제로 보이는 줄 수»다 (2026-10-24). 「전체」 딱지를 걷었으니
          이 탭이 그 자리를 맡는다 — 「9」라 적고 눌러 보니 7줄이면 사람이 목록을 의심한다.
          내려가서 뺀 수와 전체 수는 탭에 마우스를 올리면 보인다(셈). */
@@ -6920,7 +7137,8 @@ function listCountHtml() {
       + 첫탭 + ' <b>' + 탭수 + '</b>'
       + (App.filter && !직원탭 ? '<span class="c">· ' + rows.length + '</span>' : '') + '</button>'
       + '<button class="' + (직원탭 ? 'on' : '') + '" onclick="직원탭열기()"'
-      + ' title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">직원</button>'
+      + ' title="사무장·사무직 이름과 직급 — 새 사이트 직원 칸을 한 사람씩 고칩니다">직원'
+      + (직원수 ? ' <b>' + 직원수 + '</b>' : '') + '</button>'
       + '</span>';
   }
   if (App.group === 'work') {
@@ -6948,9 +7166,15 @@ function listHtml() {
   h += '<div class="lh"><span id="listCount">' + listCountHtml() + '</span>'
     + '<span style="flex:1"></span>'
     + (App.group === 'members' ? '<button class="btn sm" onclick="addMember()">＋ 새 구성원</button>' : '')
+    /* ★ 직원 탭에서는 「새 사이트에 올리기」를 목록 머리에 꺼내 둔다 (승인 목업 2026-11-01) —
+         직원은 새 사이트에만 있어 이것이 «반영» 단추다. 사진은 직원에게 아직 없다(2단계). */
+    + (App.group === 'members' && App.filter === 'staff'
+        ? '<button class="btn sm pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '') + '>'
+          + (App.publishing ? '올리는 중…' : '새 사이트에 올리기') + '</button>'
+        : '')
     /* ★ 사진 여러 장 (대표 지시 2026-09-14 「여러 명도」) — 여러 사람 일이라
          한 사람 편집칸이 아니라 «목록 머리»가 제자리다. */
-    + (App.group === 'members'
+    + (App.group === 'members' && App.filter !== 'staff'
         ? '<button class="btn sm" onclick="사진여럿열기()"'
           + ' title="사진 여러 장을 한 번에 올립니다 — 파일 이름으로 주인을 찾아 드립니다">'
           + '📷 여러 장</button>'
@@ -6997,6 +7221,7 @@ function listHtml() {
 
 /* 줄 목록만. 찾기 칸에 글자를 칠 때 이 조각만 갈아 끼운다(커서가 튀지 않게). */
 function rowsHtml() {
+  if (App.group === 'members' && App.filter === 'staff') return 직원목록Html();
   const all = rowsOf(App.group);
   const rows = visibleRows(App.group);
   let h = '';
@@ -7051,7 +7276,9 @@ function rowsHtml() {
               + esc(r.key) + '\')"' + (i === rows.length - 1 ? ' disabled' : '') + '>▼</button>'
             + '</span>'
           : '')
-      + '<span class="tags">' + rosterPillHtml(r)
+      /* ★ 딱지 두 칸은 «열을 맞춰» 세운다 (대표 지시 2026-11-01 「항상 열은 일정하게」) —
+           한쪽이 비어도 칸은 자리를 지켜, 같은 종류 딱지가 줄마다 같은 자리에서 시작한다. */
+      + '<span class="tags"><span class="tc">' + rosterPillHtml(r) + '</span><span class="tc">'
       /* ★ 「안 올림」이면 대조 딱지 자리에 그것을 적는다 — 안 올릴 사람에게
          「새로 올릴 것」이 붙어 있으면 할 일인 줄 읽는다. 딱지를 셋 두면 너무 넓다. */
       /* ★ 「같음」이면 딱지를 안 단다 (2026-10-03 정리안 ④). 아홉 줄 중 다섯에 같은 회색
@@ -7062,7 +7289,7 @@ function rowsHtml() {
          : r.status === 'same' ? ''
          : '<span class="pill ' + (r.status || 'none') + '">'
            + esc(r.status ? pillShort(STATUS_TEXT[r.status] || r.status) : '확인 전') + '</span>'))
-      + '</span></div>';
+      + '</span></span></div>';
   }).join('');
   return h;
 }
@@ -7135,7 +7362,7 @@ function 미리보기HTML() {
         .map(function (k) { return Object.assign({}, App.members[k], { key: k }); });
       const 고른것 = PuSitePeople.올릴사람(App.sitePeople, ours);
       return { mid: 'people', 바탕: 사본바탕('people'),
-               html: PuSitePeople.쪽그리기(App.sitePeople, 고른것.갈것),
+               html: 직원까지그리기(App.sitePeople, PuSitePeople.쪽그리기(App.sitePeople, 고른것.갈것), ours).html,
                몇: 고른것.갈것.length };
     } catch (e) { return { why: '구성원 쪽을 만들지 못했습니다 — ' + (e && e.message) }; }
   }
@@ -7477,6 +7704,8 @@ function memberBandHtml(d, rec) {
 }
 
 function memberEdit(d) {
+  /* 직원은 이름·직급·차례만 고친다 — 글 번호·사진·경력은 노무사 카드의 것이다 (2026-11-01) */
+  if (d.mkind === 'staff' && (App.members[d.key] || {}).kind === 'staff') return 직원편집(d);
   const rec = App.members[d.key] || {};
   const rep = riskReport(d.careers, App.lineFormat);
   /* 머리는 고정, 가운데(.esc)만 구르고, 발(.eft)의 단추는 늘 같은 자리에 있다 */
@@ -7796,6 +8025,36 @@ function 새홈페이지에갈사람(rec) {
   return !(딱지 && 딱지.kind === 'left');
 }
 
+/* 직원 상자까지 그린다 (2026-11-01 직원 소개 1단계).
+   ★ 우리 자료에 직원이 한 명도 없으면 직원 줄은 «그대로» — 서버 매달 자동과 같은 잣대다.
+   ⚠ 직원을 모두 빼면 직원 줄이 통째로 사라진다 — 그런 쪽은 만들지 않고 던진다. */
+function 직원까지그리기(지금쪽, 새쪽, ours) {
+  const 있나 = Object.keys(App.members).some(k => PuSitePeople.직원인가(App.members[k]));
+  if (!있나) return { html: 새쪽, 전: null, 후: null };
+  const 후 = PuSitePeople.올릴직원(ours);
+  if (!후.length) throw new Error('올릴 직원이 한 명도 없습니다 — 모두 빼면 새 사이트의 직원 줄이 통째로 사라집니다');
+  return { html: PuSitePeople.직원그리기(새쪽, 후), 전: PuSitePeople.직원읽기(지금쪽), 후: 후 };
+}
+
+/* 올리기 확인 창에 적을 «직원이 어떻게 바뀌나». 이름은 esc 해서 넣는다. */
+function 직원바뀐것글(전, 후) {
+  if (!전 || !후) return '';
+  const 전표 = {}, 후표 = {};
+  전.forEach(s => { 전표[s.이름] = s.직급; });
+  후.forEach(s => { 후표[s.이름] = s.직급; });
+  const 바뀜 = 후.filter(s => 전표[s.이름] !== undefined && 전표[s.이름] !== s.직급);
+  const 새로 = 후.filter(s => 전표[s.이름] === undefined);
+  const 빠짐 = 전.filter(s => 후표[s.이름] === undefined);
+  const 줄 = 바뀜.map(s => '· ' + esc(s.이름) + ' ' + esc(전표[s.이름]) + ' → ' + esc(s.직급))
+    .concat(새로.map(s => '· ' + esc(s.이름) + ' ' + esc(s.직급) + ' — 새로'))
+    .concat(빠짐.map(s => '· ' + esc(s.이름) + ' ' + esc(s.직급) + ' — 빠짐'));
+  return '\n\n[직원] 바뀜 ' + 바뀜.length + ' · 새로 ' + 새로.length + ' · 빠짐 ' + 빠짐.length
+    + ' · 그대로 ' + (후.length - 바뀜.length - 새로.length)
+    + (줄.length ? '\n' + 줄.join('\n') : '')
+    /* 매달 자동이라면 멈췄을 만큼 빠지면 «한 번 더» 짚어 준다 — 손으로 올리는 것은 사람이 정한다 */
+    + (빠짐.length > 3 ? '\n⚠ 직원이 한 번에 ' + 빠짐.length + '명 빠집니다 — 맞는지 확인해 주십시오.' : '');
+}
+
 async function publishPeople() {
   if (App.publishing) return;
   if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
@@ -7822,7 +8081,8 @@ async function publishPeople() {
       return;
     }
 
-    const 새쪽 = PuSitePeople.쪽그리기(지금쪽, 고른것.갈것);
+    const 직원 = 직원까지그리기(지금쪽, PuSitePeople.쪽그리기(지금쪽, 고른것.갈것), ours);
+    const 새쪽 = 직원.html;
     if (새쪽 === 지금쪽) {
       await say('바뀐 것이 없습니다', '지금 올라가 있는 것과 같습니다 — 올리지 않았습니다.');
       return;
@@ -7834,11 +8094,13 @@ async function publishPeople() {
       고른것.갈것.map(p => '· ' + p.이름 + (p.직책1 ? ' ' + p.직책1 : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
       (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + x.이름 + ' — ' + x.why).join('\n') : '') +
       (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + n).join('\n') : '') +
+      직원바뀐것글(직원.전, 직원.후) +
       '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
     if (!ok) return;
 
     const 답 = await 올리기('site/people/index.html', 새쪽,
       '구성원 ' + 고른것.갈것.length + '명');
+    App.sitePeople = 새쪽;   // 직원 탭의 「올라감」 딱지가 방금 올린 것을 보게
     toast('올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다' + (답.commit ? ' (' + 답.commit + ')' : ''));
   } catch (e) {
     console.warn('[홈페이지 올리기]', e);

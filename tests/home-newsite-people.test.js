@@ -83,10 +83,11 @@ function 미리보기상자(members) {
   ctx.넘긴 = null;
   ctx.PuSitePeople = {
     올릴사람: (쪽, ours) => { ctx.넘긴 = ours.map(p => p.name); return { 갈것: ours, 못갈것: [] }; },
-    쪽그리기: (쪽, 갈것) => '<html>' + 갈것.map(p => p.name).join(',') + '</html>'
+    쪽그리기: (쪽, 갈것) => '<html>' + 갈것.map(p => p.name).join(',') + '</html>',
+    직원인가: (m) => !!m && m.kind === 'staff'   // 직원 상자(2026-11-01) — 이 예시에는 직원이 없다
   };
   ctx.사본바탕 = () => '';
-  vm.runInContext(fnSource('미리보기HTML'), ctx);
+  vm.runInContext(fnSource('직원까지그리기') + '\n' + fnSource('미리보기HTML'), ctx);
   return ctx;
 }
 

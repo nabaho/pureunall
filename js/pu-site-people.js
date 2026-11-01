@@ -151,6 +151,68 @@
     const 끝 = 카드[카드.length - 1].at + 카드[카드.length - 1].html.length;
     return html.slice(0, 처음) + 새것 + html.slice(끝);
   }
+  /* ── 직원인가 (2026-11-01 직원 소개 1단계) ──
+     노무사는 사진·경력이 있는 «카드», 직원은 이름·직급 두 칸뿐인 «상자»로 그린다.
+     ★ 상자로 가는 사람은 구분을 «직원»으로 저장한 사람(kind:'staff')뿐이다 — 직책에서 짐작하지 않는다.
+       직책이 비어 있는 옛 노무사 글을 직원으로 짐작하면, 그 사람이 카드에서 빠지고 직원 줄에 끼어든다.
+       화면의 memberKind(직책에서 읽어 내는 «보이는 구분»)와 일부러 다르다. */
+  function 직원인가(m) { return String((m || {}).kind || '') === 'staff'; }
+
+  /* 직원 상자 하나 = 그것을 감싼 칸(<div class="lg:col-2_5 col-6">) 통째.
+     ★ 상자만 갈아 끼우면 칸이 남거나 모자란다 — 감싼 칸째로 찍어 낸다. */
+  function 직원칸들(html) {
+    var out = [], i = 0, 표 = '<div class="people_box">';
+    while ((i = html.indexOf(표, i)) >= 0) {
+      var 칸시작 = html.lastIndexOf('<div', i - 1);
+      var blk = 칸시작 >= 0 ? 덩어리(html, 칸시작, 'div') : null;
+      if (!blk || 칸시작 + blk.length <= i) break;
+      out.push({ at: 칸시작, html: blk });
+      i = 칸시작 + blk.length;
+    }
+    return out;
+  }
+
+  function 직원읽기(html) {
+    return 직원칸들(html).map(function (c) {
+      return { 이름: 텍스트(사이글자(c.html, '<div class="text1">')),
+               직급: 텍스트(사이글자(c.html, '<div class="text2">')) };
+    });
+  }
+
+  /* 첫 상자를 본으로 사람 수만큼 찍어 낸다 — 노무사 카드와 같은 방식이라 모양이 달라질 자리가 없다.
+     ⚠ 빈 목록이면 그리지 않는다 — 직원 줄이 통째로 사라진 쪽을 내보내지 않는다. */
+  function 직원그리기(html, 직원들) {
+    var 칸 = 직원칸들(html);
+    if (!칸.length) throw new Error('본으로 삼을 직원 칸을 찾지 못했습니다');
+    if (!(직원들 || []).length) throw new Error('그릴 직원이 한 명도 없습니다');
+    var 본 = 칸[0].html;
+    /* 칸 사이 띄움은 지금 쪽 것을 그대로 쓴다 — 그래야 다시 그려도 글자 하나 안 바뀐다 */
+    var 사이 = 칸.length > 1 ? html.slice(칸[0].at + 칸[0].html.length, 칸[1].at) : '\n        ';
+    var 새것 = 직원들.map(function (p) {
+      return 본.replace(/(<div class="text1">)[\s\S]*?(<\/div>)/, function (_, a, b) { return a + 감싸기(p.이름) + b; })
+        .replace(/(<div class="text2">)[\s\S]*?(<\/div>)/, function (_, a, b) { return a + 감싸기(p.직급) + b; });
+    }).join(사이);
+    var 끝 = 칸[칸.length - 1];
+    return html.slice(0, 칸[0].at) + 새것 + html.slice(끝.at + 끝.html.length);
+  }
+
+  /* 우리 자료 → 올릴 직원. 차례(order)대로, 같으면 열쇠 순. 이름이 빈 줄은 안 그린다. */
+  function 차례값(m) {
+    var o = (m || {}).order;
+    return (o === '' || o == null || !isFinite(Number(o))) ? 1e9 : Number(o);
+  }
+  /* 화면 목록도 이 잣대로 줄을 세운다 — 목록 차례와 올라가는 차례가 같아야 한다 */
+  function 차례견주기(a, b) {
+    if (차례값(a) !== 차례값(b)) return 차례값(a) - 차례값(b);
+    var ka = String((a || {}).key || ''), kb = String((b || {}).key || '');
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  }
+  function 올릴직원(ours) {
+    return (ours || []).filter(function (m) { return 직원인가(m) && String(m.name || '').trim(); })
+      .slice().sort(차례견주기)
+      .map(function (m) { return { 이름: String(m.name).trim(), 직급: String(m.position1 || '').trim() }; });
+  }
+
   /* ★ 푸른ERP 자료 + 지금 쪽 → «올릴 자료».
      ERP 에는 사진이 없으므로 글 번호로 짝지어 지금 쪽의 사진을 이어받는다. */
   function 올릴사람(현재쪽, ours) {
@@ -158,6 +220,8 @@
     사람읽기(현재쪽).forEach(function (p) { 지금[p.srl] = p; });
     var 갈것 = [], 못갈것 = [];
     (ours || []).forEach(function (m) {
+      /* 직원은 카드가 아니라 상자로 간다(올릴직원) — 여기서 「글 번호 없음」으로 걸지 않는다 */
+      if (직원인가(m)) return;
       var srl = String(m.srl == null ? '' : m.srl).trim();
       var 옛 = srl && 지금[srl];
       if (!srl) {
@@ -185,6 +249,11 @@
     사람읽기: 사람읽기,
     쪽그리기: 쪽그리기,
     올릴사람: 올릴사람,
+    직원인가: 직원인가,
+    직원읽기: 직원읽기,
+    직원그리기: 직원그리기,
+    올릴직원: 올릴직원,
+    차례견주기: 차례견주기,
     카드들: 카드들,
     덩어리: 덩어리
   };

@@ -48,7 +48,7 @@ function 줄상자(줄들) {
            pageConfig: {}, pages: {} },
     rowsOf: () => 줄들.map(r => Object.assign({}, r)),
     feeMatch: () => true,
-    직원줄: () => ({ key: 'people', name: '일반직원' }),
+    직원행들: () => [],
     needsAttentionRow: (r) => !!r.status && r.status !== 'same' && r.status !== 'done',
     statOf: () => ({ hot: 0, own: {}, kept: 0 }),
     pillShort: (s) => String(s),
