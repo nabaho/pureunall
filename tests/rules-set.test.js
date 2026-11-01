@@ -118,7 +118,48 @@ test('④ 푸른메일함 수집기는 노사협의회·단체협약 메일을 �
       id: 'rd_nosa', name: '노사협의회 최종.pdf', kind: '기타',
       status: '보류', holdWhy: C.PDF_HOLD.OLD, sha: 'b'.repeat(64),
       dir: '받음', mail: { src: 'pop3', box: '', key: 'm2', subject: '노사협의회' }
+    },
+    rd_hwp_nosa: {
+      id: 'rd_hwp_nosa', name: '노사협의회(0513).hwp', kind: '기타',
+      status: '보류', holdWhy: C.NO_TEXT_KINDS['기타'], sha: 'c'.repeat(64),
+      dir: '받음', mail: { src: 'pop3', box: '', key: 'm3', subject: '노사협의회' }
     }
   });
-  assert.equal(targets.length, 2);
+  assert.ok(targets.length >= 3, '옛 보류 PDF 와 옛 기타로 보류됐던 노사협의회·단체협약 한글 파일도 다시 읽기 대상에 넣는다');
+});
+
+test('⑤ 사업장별 순서(companyTable)에서도 3분류 칩과 본문 판(현행·1판·★최종본)을 관리하고, 🏢 사업장 오른쪽 상세창에 다른 규정집(노사협의회·단체협약)을 함께 보여준다', () => {
+  const SitesView = require('../js/rules-v2/view-sites.js');
+  const docs = {
+    r1: { id: 'r1', name: '가나_취업규칙.hwp', kind: '규칙본문', status: '담김', dir: '받음', mail: { key: '1', date: 1000, subject: '취업규칙' } },
+    n0: { id: 'n0', name: '가나_노사협의회규정_초안.hwp', kind: '노사협의회', status: '담김', dir: '받음', mail: { key: '2', date: 2000, subject: '노사협의회' } },
+    n1: { id: 'n1', name: '가나_노사협의회규정_최종.hwp', kind: '노사협의회', status: '담김', dir: '보냄', mail: { key: '3', date: 3000, subject: '노사협의회' } },
+    nm: { id: 'nm', name: '가나_노사협의회_회의록.hwp', kind: '회의록', status: '담김', dir: '받음', mail: { key: '4', date: 3500, subject: '노사협의회' } },
+    d1: { id: 'd1', name: '가나_단체협약서.hwp', kind: '단체협약', status: '담김', dir: '보냄', mail: { key: '5', date: 4000, subject: '단체협약' } }
+  };
+  const human = {};
+  Object.keys(docs).forEach((k) => { human[k] = { companyId: 'co1', companyLinkStatus: 'linked' }; });
+  const rounds = { 'co1_노사협의회_r197001': { finalDocId: 'n1', finalBy: '홍길동', finalAt: 3100 } };
+  const cos = [{ id: 'co1', name: '가나상사', status: 'active', employmentInsuredCount: 35 }];
+
+  // 📥 모은 자료 › 사업장별 순서에서 노사협의회 선택 시
+  const stCoNosa = { data: { docs, human, rounds }, view: 'company', filt: { set: '노사협의회' }, picked: new Set(), sel: '', companies: cos };
+  const flt = V.filterHtml(stCoNosa);
+  assert.match(flt, /data-act="set" data-v="노사협의회"/, '사업장별 순서에서도 3분류 칩이 보인다');
+  const coTbl = V.tableHtml(stCoNosa);
+  assert.match(coTbl, /규정 본문/);
+  assert.match(coTbl, /회의록/);
+  assert.match(coTbl, /파일 \(규정 본문만\)/);
+  assert.match(coTbl, /data-set="노사협의회"/);
+  assert.match(coTbl, /★ 최종본/);
+
+  // 🏢 사업장 오른쪽 상세창에 노사협의회·단체협약 보유 자료 표시
+  const rows = Sites.model({ docs, human, rounds }, cos);
+  assert.ok(rows[0].otherSets['노사협의회'].length >= 2);
+  assert.ok(rows[0].otherSets['단체협약'].length >= 1);
+  const side = SitesView.sideHtml({ data: { docs, human, rounds }, companies: cos, sites: { sel: 'co1' } }, rows[0]);
+  assert.match(side, /이 사업장의 다른 규정집/);
+  assert.match(side, /🤝 노사협의회/);
+  assert.match(side, /📜 단체협약/);
+  assert.match(side, /data-act="siteSetLib" data-set="노사협의회"/);
 });

@@ -48,12 +48,12 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/lib-set.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=4"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-sites.js?v=4"></script>
-<script src="js/rules-v2/store.js?v=7"></script>
-<script src="js/rules-v2/view-library.js?v=8"></script>
+<script src="js/rules-v2/lib-sites.js?v=5"></script>
+<script src="js/rules-v2/store.js?v=8"></script>
+<script src="js/rules-v2/view-library.js?v=9"></script>
 <script src="js/rules-v2/lib-status.js?v=1"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=2"></script>
-<script src="js/rules-v2/view-sites.js?v=12"></script>
+<script src="js/rules-v2/view-sites.js?v=13"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -267,6 +267,8 @@ button{font:inherit;cursor:pointer}
 #sites .start small.warn{color:#854d0e}
 #sites .round{border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;margin-bottom:10px;overflow:hidden}
 #sites .round.cand{border-color:#fde68a}
+#sites .sother{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0}
+#sites .sother .sh2{font-size:12px;font-weight:700;color:#475569;margin-bottom:8px}
 #sites .rh{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 #sites .rh b{font-size:13px}
 #sites .rh .m{color:#475569}
@@ -757,7 +759,9 @@ function itemOf(id) {
 /* 최종본은 «그 사업장·그 회차»에 거는 것 — 회차는 사업장별 셈이 정한 것을 그대로 쓴다 */
 function groupOf(id) {
   var items = PuRulesV2Order.merge(ST.data.docs, ST.data.human);
-  return PuRulesV2Order.companyGroups(items, ST.data.rounds).filter(function (g) {
+  var it = items.filter(function (x) { return x.id === id; })[0];
+  var s = (it && it.set) || '취업규칙';
+  return PuRulesV2Order.companyGroups(items, ST.data.rounds, s).filter(function (g) {
     return g.rows.some(function (v) { return v.item.id === id; });
   })[0];
 }
@@ -879,14 +883,15 @@ var H = {
     var ids = pickedList();
     if (ids.length !== 1) { alert('최종본은 한 사업장·한 회차에 하나입니다 — 한 건만 고르세요.'); return; }
     var it = itemOf(ids[0]), g = groupOf(ids[0]);
-    if (!it || it.kind !== '규칙본문') { alert('최종본은 «규칙 본문»만 될 수 있습니다.'); return; }
+    var isBody = it && (it.kind === '규칙본문' || it.kind === '노사협의회' || it.kind === '단체협약');
+    if (!isBody) { alert('최종본은 «규칙 본문·노사협의회 규정 본문·단체협약 본문»만 될 수 있습니다.'); return; }
     if (!g) { alert('먼저 사업장을 확정하세요 — 최종본은 사업장·회차에 거는 것입니다.'); return; }
-    busy('최종본으로 두는 중…', S.setFinal(g.companyId, g.roundKey, ids[0])).then(function () { ST.picked.clear(); return reload(); });
+    busy('최종본으로 두는 중…', S.setFinal(g.companyId, g.roundKey, ids[0], g.set)).then(function () { ST.picked.clear(); return reload(); });
   },
-  setFinal: function (d) { busy('최종본으로 두는 중…', S.setFinal(d.co, d.round, d.id)).then(reload); },
+  setFinal: function (d) { busy('최종본으로 두는 중…', S.setFinal(d.co, d.round, d.id, d.set)).then(reload); },
   unsetFinal: function (d) {
     if (!confirm('이 회차의 최종본을 풉니다. (지우지 않고 «미정»으로 돌립니다)')) return;
-    busy('최종본을 푸는 중…', S.setFinal(d.co, d.round, null)).then(reload);
+    busy('최종본을 푸는 중…', S.setFinal(d.co, d.round, null, d.set)).then(reload);
   },
   /* ── 🧹 정리하기 ── */
   tidyStep: function (d) { T().step = d.s === 'final' ? 'final' : 'link'; T().picked.clear(); draw(); },
@@ -1078,6 +1083,10 @@ var H = {
   /* 서류 한 건을 📥 모은 자료에서 — 갈래를 바꾸고(뒤로가기로 🏢 에 돌아온다) 그 줄의 오른쪽 칸을 연다 */
   siteDoc: function (d) {
     history.pushState(null, '', '#lib'); rv2Route(); openSide(d.id);
+  },
+  siteSetLib: function (d) {
+    ST.filt.set = d.set || ''; ST.filt.kind = ''; ST.filt.q = d.co || '';
+    history.pushState(null, '', '#lib'); rv2Route(); draw();
   }
 };
 
