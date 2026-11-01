@@ -95,6 +95,7 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 - 고친 뒤 같은 화면의 다른 길을 한 번 더 본다 — 고침이 다른 곳을 깨 직원이 먼저 발견한 일이 있었다(2026-10-01).
 - 도구: `scripts/suggestion-watch.js` (`pending` · `show` · `reply`) — 답변 세 자리를 한 번에 쓰고 다시 읽어 확인한다. 손으로 세 번 쓰지 않는다.
 - 자동 감시 예약 작업(`suggestion-watch`)이 만드는 PR 은 제목이 `[보류]` 로 시작한다 — 자동 병합이 멈춘다. 대표가 보고 합친다.
+- 대표 폰 알림: `notify <id> --kind pr|decide|human|done --text "한 줄"` (서버 함수 `notifySuggestionWatch`), 건의함의 [🔔 테스트] (`pushSelfTest`). 쓴 사람을 보는 함수라 직원이 쓴 글은 막힌다.
 - 자세한 읽는 법·분석은 CLAUDE.md 의 같은 제목 절. 어긋나면 CLAUDE.md 가 이긴다.
 
 ---

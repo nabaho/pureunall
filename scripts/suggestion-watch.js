@@ -8,10 +8,11 @@
        ② suggestions_meta_private/{id}               미처리 판정 기준(status)
        ③ suggestions_resolved_private/{uid}/{id}     건의자 «내 건의 진행상황» (seen:false 일 때만 팝업)
      손으로 세 번 쓰면 한 번쯤 빠뜨린다. 이 도구는 한 번에 셋을 쓰고, 쓴 뒤 다시 읽어 확인한다.
-   ■ 하는 일 셋
+   ■ 하는 일 넷
      node scripts/suggestion-watch.js pending                 미처리 건의를 JSON 으로 («없음» 이면 [] 한 줄)
      node scripts/suggestion-watch.js show <id> [--out 폴더]  한 건의 글 + 붙은 캡처를 그림 파일로 내려 준다
      node scripts/suggestion-watch.js reply <id> --status ing|done --file 답변.txt [--seen true|false] [--again]
+     node scripts/suggestion-watch.js notify <id> --kind pr|decide|human|done --text "한 줄"   대표 «폰»으로 알린다
    ■ 막아 둔 것(거짓 완료·실수 방지)
      · 이미 done 인 건은 --again 이 없으면 덮지 않는다
      · done 인데 답이 짧으면(40자 미만) 거절 — 「처리함」 두 글자 답이 7~8월에 14건 있었다
@@ -63,6 +64,18 @@ function buildReplyWrites(o) {
   };
 }
 
+/* 폰 알림 한 줄 — suggestions_private/{id}/watchNotice 에 «쓰면» 서버 함수(notifySuggestionWatch)가 관리자 폰으로 보낸다.
+   kind: pr 수정안 준비됨 · decide 대표 결정 필요 · human 사람 확인 필요 · done 답변까지 끝남.
+   ⚠ 짧게 — 폰 알림 한 줄에 들어갈 글이다(120자까지만 담고 서버가 70자로 줄인다). */
+const NOTICE_KINDS = ['pr', 'decide', 'human', 'done'];
+function buildNotice(o) {
+  const kind = String(o && o.kind || '');
+  if (NOTICE_KINDS.indexOf(kind) < 0) throw new Error('kind 는 ' + NOTICE_KINDS.join('|') + ' 중 하나여야 합니다');
+  const text = String(o && o.text == null ? '' : o.text).replace(/\s+/g, ' ').trim();
+  if (!text) throw new Error('알림 글이 비어 있습니다 — 무엇을 알리는지 한 줄을 적으십시오');
+  return { kind, text: text.slice(0, 120), at: Number((o && o.now) || Date.now()) };
+}
+
 /* ── 파이어베이스 CLI ── */
 function fb(args, opt) {
   return execFileSync('firebase', args.concat(['--project', PROJECT]), Object.assign({
@@ -112,6 +125,17 @@ function cmdShow(id) {
   console.log(JSON.stringify(card, null, 2));
 }
 
+function cmdNotify(id) {
+  const kind = argOf('--kind'), text = argOf('--text');
+  if (!id || !kind) throw new Error('사용: notify <건의 번호> --kind pr|decide|human|done --text "한 줄"');
+  const n = buildNotice({ kind, text });
+  if (!getJson('/' + P_PRIVATE + '/' + id + '/title')) throw new Error('그 건의를 찾지 못했습니다: ' + id);
+  const f = path.join(os.tmpdir(), 'sgnotice-' + process.pid + '.json');
+  fs.writeFileSync(f, JSON.stringify(n), 'utf8');
+  try { fb(['database:push', '/' + P_PRIVATE + '/' + id + '/watchNotice', f]); } finally { try { fs.unlinkSync(f); } catch (_) { /* 임시 파일 */ } }
+  console.log('📲 폰 알림 요청을 남겼습니다(' + n.kind + ') — 서버 함수가 대표 폰으로 보냅니다: ' + id);
+}
+
 function cmdReply(id) {
   const status = argOf('--status'), file = argOf('--file');
   if (!id || !status || !file) throw new Error('사용: reply <건의 번호> --status ing|done --file 답변.txt [--seen true|false] [--again]');
@@ -137,11 +161,12 @@ if (require.main === module) {
     if (cmd === 'pending') cmdPending();
     else if (cmd === 'show') cmdShow(id);
     else if (cmd === 'reply') cmdReply(id);
-    else { console.log('사용: pending | show <id> [--out 폴더] | reply <id> --status ing|done --file 답변.txt [--seen true|false] [--again]'); process.exitCode = 2; }
+    else if (cmd === 'notify') cmdNotify(id);
+    else { console.log('사용: pending | show <id> [--out 폴더] | reply <id> --status ing|done --file 답변.txt [--seen true|false] [--again] | notify <id> --kind pr|decide|human|done --text "한 줄"'); process.exitCode = 2; }
   } catch (e) {
     console.error('✖ ' + (e && e.message ? e.message : e));
     process.exitCode = 1;
   }
 }
 
-module.exports = { pickPending, buildReplyWrites, MIN_DONE_REPLY };
+module.exports = { pickPending, buildReplyWrites, buildNotice, NOTICE_KINDS, MIN_DONE_REPLY };

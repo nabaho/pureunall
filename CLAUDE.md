@@ -170,7 +170,11 @@ phone-audit 와 같은 자(`measure.js`)로 잰다. 고치는 순서: 갈무리�
   재요청(`relatedId`)은 먼저 원본의 `resolvedAt` 과 재요청 시각을 비교한다 — 건의자가 이미 「해결됐어요」로 확인했으면 재요청은 풀린 것이다.
 - **자동 감시(2026-10-30 「건의함 자동감시」)**: 예약 작업 `suggestion-watch` 가 30분마다(07:22~22:52) 미처리를 훑는다.
   새 건이면 ① 「접수했습니다」(ing) ② 코드를 고칠 일이면 새 작업폴더에서 고쳐 검사·PR(**제목 맨 앞 `[보류]` — 자동 병합 브레이크, 대표가 보고 합친다**)
-  ③ 합쳐지고 배포되면 완료 답. 돈·정책·권한 판단은 ing 로 두고 대표에게 알린다. 한 건 2번 시도해도 안 되면 사람 확인으로 넘긴다.
+  ③ 합쳐지고 배포되면 완료 답. 돈·정책·권한 판단은 ing 로 두고 대표에게 알린다.
+  **알림은 `node scripts/suggestion-watch.js notify <id> --kind pr|decide|human|done --text "한 줄"`** — `suggestions_private/{id}/watchNotice` 에 쓰면
+  서버 함수 `notifySuggestionWatch` 가 대표 폰으로 보낸다(앱의 알림 도구가 없는 무인 실행에서도 닿는다). 새 건의 자체의 폰 알림은 예전부터 있는 `notifySuggestion`.
+  건의함 머리의 **[🔔 테스트]** 는 `pucards/config/pushTest/{내 uid}` 요청 → `pushSelfTest` 가 등록 기기 모두로 시험 알림 + 결과를 done 에 적는다.
+  ⚠ 두 함수 모두 «쓴 사람»을 본다(관리자·관리 도구만) — 직원도 쓸 수 있는 자리라서. 규칙·최상위 자리를 새로 만들지 않았다(함수만 올린다: `--only functions:notifySuggestionWatch,functions:pushSelfTest`). 한 건 2번 시도해도 안 되면 사람 확인으로 넘긴다.
   PC 와 데스크톱 앱이 켜져 있어야 돈다. 끄려면 예약 작업 `suggestion-watch` 를 비활성화한다.
 
 ## 만들기 전에 «이미 있는 것»부터 찾는다 (대표 승인 2026-10-18)
