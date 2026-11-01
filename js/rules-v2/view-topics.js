@@ -41,15 +41,28 @@
   }
   function todayKst() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); }
 
-  /* 「같은 글」 비교용 글은 줄바꿈이 다 걷혀 있다 — 읽을 때는 ①②… 앞에서 줄을 바꿔 준다 */
+  /* 「같은 글」 비교용 글은 줄바꿈이 다 걷혀 있다 — 읽을 때는 ①②… 앞에서 줄을 바꿔 준다.
+     ⚠ <ins>①…</ins> 처럼 맨 앞 태그 바로 뒤에 ① 이 올 때는 앞에 보이는 글자가 없으므로 빈 첫 줄을 넣지 않는다. */
   function lines(s) {
-    return String(s || '').replace(/ ?([①-⑳])/g, function (m, c, off) { return off === 0 ? c : '\n' + c; });
+    var raw = String(s || '');
+    return raw.replace(/ ?([①-⑳])/g, function (m, c, off) {
+      return raw.slice(0, off).replace(/<[^>]+>/g, '').trim() ? '\n' + c : c;
+    });
   }
 
   /* 표준에 장 머리가 없는 맨 앞 조들(목적·적용범위 …) — 표준 글에 「제1장 총칙」 줄이 빠져 있다 */
   var FIRST_CHAPTER = '제1장 총칙';
   var OTHER_CHAPTER = '그 밖의 조';
   var SIZE = '10인이상';
+  // 옛 수집기에서 규칙본문으로 들어온 비규칙 문서(개정비교표·노사협의회규정·근로계약서·체크리스트 등)와
+  // 한 문서 안의 뒷장(인사위원회·징계·복리후생 등) 별도 「목적·적용범위」 조문이 총칙에 섞이는 것을 막는다.
+  var NON_RULE_NAME_RE = /노사협의회|근로계약서|연봉계약서|비교표|대조표|체크리스트|신고서|제출서|동의서|의견청취|서약서|협약서|단체협약|정관/;
+  var SUB_PURPOSE_RE = /^(?:[①1.\s]*)(?:본|이)\s*(?:장|절|편|노사협의회)[은는](?![가-힣])|상기\s*乙[은는]|노사협의회\s*운영에\s*필요한/;
+  function isRuleBody(it) {
+    if (!it || it.kind !== '규칙본문' || it.status !== '담김') return false;
+    var nm = String((it.doc && it.doc.name) || it.name || '');
+    return !NON_RULE_NAME_RE.test(nm);
+  }
 
   /* «곳» 세기 — 사업장이 확정된 것은 회사 하나로, 미확정 문서는 문서 하나를 한 곳으로 센다.
      (같은 회사의 중간 판·최종본이 두 곳으로 부풀지 않게. 미확정은 누구인지 몰라 따로 센다) */
@@ -66,7 +79,7 @@
      criteria  : PuRulesCriteria(검사가 넣는다 — 없으면 전역) */
   function model(data, texts, companies, stdText, today, criteria) {
     var d = data || {}, tx = texts || {};
-    var items = O().merge(d.docs || {}, d.human || {}).filter(function (it) { return it.kind === '규칙본문' && it.status === '담김'; });
+    var items = O().merge(d.docs || {}, d.human || {}).filter(isRuleBody);
     // ★최종본 — 회차 레코드의 finalDocId 만(실제 RTDB 는 null 칸을 버린다 — 없으면 없는 것)
     var finals = {};
     Object.keys(d.rounds || {}).forEach(function (k) { var r = d.rounds[k] || {}; if (r.finalDocId) finals[r.finalDocId] = 1; });
@@ -77,9 +90,12 @@
     items.forEach(function (it) {
       if (tx[it.id] == null) return;                         // 못 받은 글은 빼고 나머지로
       docs++;
+      var seenTopic = Object.create(null);
       T().splitArticles(tx[it.id]).forEach(function (a) {
         var k = T().topicKey(a.title);
-        if (!k) return;                                       // 제목 없는 조는 주제로 못 모은다
+        if (!k || seenTopic[k]) return;                       // 제목 없는 조·같은 문서 안 중복 제목(장별 목적 등)은 건너뛴다
+        if ((k === '목적' || k === '적용범위') && (a.num > 10 || SUB_PURPOSE_RE.test(T().normText(a.body, '')))) return;
+        seenTopic[k] = 1;
         if (!byKey[k]) { byKey[k] = []; keys.push(k); }
         byKey[k].push({ docId: it.id, companyId: it.companyId || '',
           companyName: it.companyId ? (coName[it.companyId] || '') : '',
@@ -274,7 +290,7 @@
         if (C && C.useMatchFix) C.useMatchFix(function () { return f; });
         var docs = {};
         O().merge(data.docs || {}, data.human || {}).forEach(function (it) {
-          if (it.kind === '규칙본문' && it.status === '담김') docs[it.id] = it.doc;
+          if (isRuleBody(it)) docs[it.id] = it.doc;
         });
         if (first) { st.loaded = true; st.total = Object.keys(docs).length; drawAll(); }
         return ctx.S.texts(docs, ctx.cache, function (n, m) { if (first) { st.done = n; st.total = m; if (!st.M) drawAll(); } }).then(function (r) {

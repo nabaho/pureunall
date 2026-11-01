@@ -60,7 +60,9 @@ function wantAtt(name) {
 }
 function kindOf(name, text) {
   const n = String(name || '');
-  if (/신구|대조/.test(n)) return '신구대조표';
+  if (/신구|대조|비교표/.test(n)) return '신구대조표';
+  if (/체크리스트/.test(n)) return '기타';
+  if (!/취업\s*규칙|사규/.test(n) && /국민연금|건강보험|고용보험|산재보험|4대보험|피보험자|소재지\s*변경|사업자등록|노사협의회|근로계약|연봉계약|서약|경업금지|비밀유지|협약|단체협약|정관/.test(n)) return '기타';
   if (/신고/.test(n)) return '신고서';
   if (/동의/.test(n)) return '동의서';
   if (/의견/.test(n)) return '의견청취';
