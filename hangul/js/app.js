@@ -31,9 +31,11 @@
     updatePrintPage();
     desk.scrollTop = d.scroll || 0;
     document.title = d.name + (d.readOnly ? ' [읽기 전용]' : '') + ' - 푸른 한글편집기';
-    docEl.contentEditable = d.readOnly ? 'false' : 'true';
+    // 휴대폰 '보기' 모드(body.m-view)는 글을 고치지 않으므로 입력 상자(키보드)를 띄우지 않음
+    const mView = document.body.classList.contains('m-view');
+    docEl.contentEditable = d.readOnly || mView ? 'false' : 'true';
     document.body.classList.toggle('read-only', !!d.readOnly);
-    E.focus();
+    if (!mView) E.focus();
     E.caretAt(docEl.querySelector('p, td') || docEl, true);
     refreshAll();
   }
@@ -83,6 +85,29 @@
     $('fileInput').click();
   }
   $('fileInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) openBlob(f, null); });
+
+  // 한글 파일을 화면에 끌어다 놓으면 바로 열기 (여러 개면 차례로 모두)
+  const isHangulName = n => /\.(hwpx|hwp|hwt)$/i.test(n);
+  const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('drag-file'); } });
+  window.addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('drag-file'); } });
+  window.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  window.addEventListener('drop', async e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('drag-file');
+    const items = Array.from(e.dataTransfer.items || []).filter(it => it.kind === 'file');
+    // 핸들은 drop 처리 중에만 얻을 수 있으므로 먼저 모두 받아 둠 (.hwpx 는 같은 파일에 덮어쓰기 저장)
+    const got = await Promise.all(items.map(async it => {
+      const handlePromise = it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null);
+      const file = it.getAsFile();
+      const handle = await handlePromise;
+      return { file, handle: handle && handle.kind === 'file' ? handle : null };
+    }));
+    const ok = got.filter(x => x.file && isHangulName(x.file.name));
+    if (!ok.length) { toast('한글 문서(.hwpx · .hwp · .hwt) 파일만 열 수 있습니다.', true); return; }
+    for (const x of ok) await openBlob(x.file, x.handle);
+  });
 
   async function openBlob(file, handle) {
     // 서식 파일(.hwt)은 한글처럼 그 서식으로 새 문서를 만듦 (같은 이름으로 덮어쓰지 않고, '만든 날짜'는 오늘)
@@ -978,7 +1003,7 @@
       if (gi) out.push({ sep: true });
       for (const x of grp) {
         if (x.d) out.push({ label: x.l + ' ▸', icon: x.i, act: () => setTimeout(() => UI.menu(document.querySelector(`.menu-tab[data-key="${key}"]`), x.d()), 0) });
-        else out.push({ label: x.l, icon: x.i, checked: x.on && x.on(), act: x.a });
+        else out.push({ label: x.l, icon: x.i, checked: x.on && x.on(), act: () => { const r = x.a(); if (Array.isArray(r)) setTimeout(() => UI.menu(document.querySelector('.menu-tab[data-key="' + key + '"]'), r), 0); } });
       }
     });
     return out;
@@ -1014,7 +1039,7 @@
       for (const x of grp) {
         const b = h('button', { class: 'rb', title: x.l, html: I[x.i] || '' }, h('span', {}, x.l), x.d ? h('span', { class: 'caret' }, '▾') : null);
         b.addEventListener('mousedown', e => e.preventDefault());
-        b.addEventListener('click', () => { if (x.d) UI.menu(b, x.d()); else { x.a(); refreshAll(); } });
+        b.addEventListener('click', () => { if (x.d) UI.menu(b, x.d()); else { const r = x.a(); if (Array.isArray(r)) UI.menu(b, r); /* 펼침 목록을 돌려주는 단추(표·붙이기·글자 색…) */ refreshAll(); } });
         g2.append(b);
         ribbonButtons.push([b, x]);
       }
@@ -1262,5 +1287,5 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  window.PureunApp = { C, addDoc, docs: () => docs, current: () => cur, buildBytes };
+  window.PureunApp = { C, D, addDoc, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
 })();

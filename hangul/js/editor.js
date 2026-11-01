@@ -1404,7 +1404,8 @@
   };
   E.fitZoom = mode => {
     const pm = pxPerMm();
-    const availW = desk.clientWidth - 40, availH = desk.clientHeight - 40;
+    const gap = document.body.classList.contains('m') ? 16 : 40; // 휴대폰은 좌우 여백을 좁게
+    const availW = desk.clientWidth - gap, availH = desk.clientHeight - gap;
     const z = mode === 'width' ? availW / (effW() * pm) : Math.min(availW / (effW() * pm), availH / (effH() * pm));
     E.setZoom(Math.round(z * 100) / 100);
   };

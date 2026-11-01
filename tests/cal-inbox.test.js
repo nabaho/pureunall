@@ -260,8 +260,8 @@ test('④ 하루 한도 — 이미 다 썼으면 부르지 않고 «멈춤(day)�
 });
 
 test('④ 이번 달 AI 요금 한도 — 넘었으면 부르지 않는다(자동은 한도를 못 넘는다)', async () => {
-  const ym = 오늘.slice(0, 7);
-  const { r, fetchFn, db } = await 돌리기({ 처음: { ['ai_read_tally/' + ym + '/_all/n']: 10000000 } });
+  const 합계길 = DR.aiMonthPath(); // 코드는 «지금» 달을 읽는다 — 날짜를 박아 두면 달이 바뀔 때 깨진다
+  const { r, fetchFn, db } = await 돌리기({ 처음: { [합계길]: 10000000 } });
   assert.strictEqual(r.paused, 'budget');
   assert.strictEqual(fetchFn.calls.length, 0);
   assert.strictEqual(db.store['cal_inbox/state/paused'], 'budget');
