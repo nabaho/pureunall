@@ -419,7 +419,7 @@
       h('div', { class: 'frow', id: 'fMsg', style: { color: '#1e3a8a', minHeight: '18px' } }));
     const q = () => findDlg.$('#fFind').value, mc = () => findDlg.$('#fCase').checked;
     const msg = t => { findDlg.$('#fMsg').textContent = t; };
-    const buttons = [{ label: '다음 찾기', primary: true, stay: true, act: () => { if (!E.findNext(q(), mc(), findDlg.$('#fBack').checked)) msg('찾는 내용이 없습니다.'); else msg(`전체 ${E.countMatches(q(), mc())}곳`); } }];
+    const buttons = [{ label: '다음 찾기', primary: true, stay: true, act: () => { KB.lastFind = { q: q(), mc: mc() }; if (!E.findNext(q(), mc(), findDlg.$('#fBack').checked)) msg('찾는 내용이 없습니다.'); else msg(`전체 ${E.countMatches(q(), mc())}곳`); } }];
     if (replaceMode) {
       buttons.push({ label: '바꾸기', stay: true, act: () => { const ok = E.replaceCurrent(q(), findDlg.$('#fRepl').value, mc()); setDirty(); msg(ok ? '바꾸었습니다.' : '더 이상 없습니다.'); } });
       buttons.push({ label: '모두 바꾸기', stay: true, act: () => { const n = E.replaceAll(q(), findDlg.$('#fRepl').value, mc()); if (n) setDirty(); msg(`${n}곳을 바꾸었습니다.`); } });
@@ -751,7 +751,7 @@
   D.merge = () => [{ label: '오른쪽 셀과 합치기', act: C.mergeRight }, { label: '아래쪽 셀과 합치기', act: C.mergeDown }];
   D.bullets = () => [{ title: '글머리표 모양' }, ...E.BULLET_CHARS.map(ch => ({ label: ch + '  글머리표', act: () => E.toggleBullet(ch) })), { sep: true }, { label: '글머리표 없애기', act: () => E.setPara({ head: null }) }];
   D.numbers = () => [{ title: '문단 번호 모양' }, ...Object.keys(E.NUMBER_PRESETS).map(n => ({ label: n, act: () => E.toggleNumbering(n) })), { sep: true },
-    { label: '한 수준 증가', key: 'Ctrl+Num +', act: C.levelDown }, { label: '한 수준 감소', key: 'Ctrl+Num -', act: C.levelUp }, { label: '문단 번호 없애기', act: () => E.setPara({ head: null }) }];
+    { label: '한 수준 증가', key: 'Ctrl+Num -', act: C.levelDown }, { label: '한 수준 감소', key: 'Ctrl+Num +', act: C.levelUp }, { label: '문단 번호 없애기', act: () => E.setPara({ head: null }) }];
   D.outline = () => [1, 2, 3, 4, 5, 6, 7].map(l => ({ label: `개요 ${l}`, act: () => E.applyStyle('개요 ' + l) })).concat([{ sep: true }, { label: '개요 해제 (바탕글)', act: () => E.applyStyle('바탕글') }]);
   D.zoom = () => [50, 75, 100, 125, 150, 200, 300].map(z => ({ label: z + '%', checked: Math.round(E.state.zoom * 100) === z, act: () => setZoom(z / 100) }))
     .concat([{ sep: true }, { label: '쪽 맞춤', act: C.fitPage }, { label: '폭 맞춤', act: C.fitWidth }]);
@@ -1244,7 +1244,7 @@
       img ? { label: '그림 크기…', icon: 'image', act: () => imageSizeDlg(img) } : null, img ? { sep: true } : null,
       selShape ? { label: '개체 속성…', icon: 'shape', act: () => shapeDlg(selShape) } : null, selShape ? { label: '개체 지우기', act: () => removeShape(selShape) } : null, selShape ? { sep: true } : null,
       { label: '오려 두기', key: 'Ctrl+X', icon: 'cut', act: C.cut }, { label: '복사하기', key: 'Ctrl+C', icon: 'copy', act: C.copy }, { label: '붙이기', key: 'Ctrl+V', icon: 'paste', act: C.paste },
-      linkAt() ? { label: '하이퍼링크 고치기…', key: 'Ctrl+K', icon: 'link', act: C.link } : null,
+      linkAt() ? { label: '하이퍼링크 고치기…', key: 'Ctrl+K,H', icon: 'link', act: C.link } : null,
       e.target.closest('sup.note') ? { label: '주석 고치기…', icon: 'footnote', act: () => noteDlg(e.target.closest('sup.note').dataset.kind === 'end' ? 'end' : 'foot', e.target.closest('sup.note')) } : null,
       { sep: true }, { label: '글자 모양…', key: 'Alt+L', icon: 'charshape', act: C.charDlg }, { label: '문단 모양…', key: 'Alt+T', icon: 'parashape', act: C.paraDlg },
       inTable ? { sep: true } : null,
@@ -1257,22 +1257,308 @@
     ]);
   });
 
-  const KEYS = {
-    'Alt+N': C.new, 'Alt+O': C.open, 'Alt+S': C.save, 'Alt+V': C.saveAs, 'Alt+P': C.print, 'Alt+L': C.charDlg, 'Alt+T': C.paraDlg, 'Alt+C': C.painter,
-    'F7': C.pageSetup, 'Ctrl+F10': C.symbol, 'Ctrl+F': C.find, 'Ctrl+H': C.replace, 'Ctrl+Enter': C.pageBreak, 'Ctrl+S': C.save, 'Ctrl+O': C.open, 'Ctrl+P': C.print,
-    'Ctrl+Shift+L': C.alignL, 'Ctrl+Shift+C': C.alignC, 'Ctrl+Shift+R': C.alignR, 'Ctrl+Shift+M': C.alignJ, 'Ctrl+Shift+T': C.alignD,
-    'Alt+Shift+E': C.bigger, 'Alt+Shift+R': C.smaller, 'Ctrl+Z': C.undo, 'Ctrl+Y': C.redo, 'Ctrl+Shift+Z': C.redo, 'Insert': C.toggleOverwrite, 'Ctrl+F4': C.close, 'Ctrl+K': C.link, 'Ctrl+N,M': C.equation,
+  // =============== 단축키 (한/글 도움말 «단축키 일람» 기준) ===============
+  // 한글이 «글쇠 하나 → 명령 하나»로 정한 것만 연결한다. 우리 편집기에 없는 기능(조판 부호·한자·상용구·매크로·차례·책갈피 등)은 연결하지 않는다.
+  const gsel = () => getSelection();
+  const mod = (alter, dir, gran) => { E.focus(); gsel().modify(alter, dir, gran); };
+  const eraseSel = () => { E.checkpoint(); document.execCommand('delete'); E.afterEdit(); };
+  const caretRect = () => { const rg = gsel().rangeCount && gsel().getRangeAt(0); const rc = rg && rg.getClientRects()[0]; return rc || docEl.getBoundingClientRect(); };
+  const popAt = items => { const rc = caretRect(); UI.menu({ x: rc.left, y: rc.bottom + 4 }, items); };
+  const showCaret = () => { const n = gsel().anchorNode; const el = n && (n.nodeType === 1 ? n : n.parentElement); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); };
+  // 지우기
+  const KB = {
+    erase: () => { E.focus(); if (gsel().isCollapsed) mod('extend', 'forward', 'character'); if (!gsel().isCollapsed) eraseSel(); },
+    delLine: () => { E.focus(); mod('move', 'backward', 'lineboundary'); mod('extend', 'forward', 'lineboundary'); if (gsel().isCollapsed) mod('extend', 'forward', 'character'); eraseSel(); },
+    delLineEnd: () => { E.focus(); mod('extend', 'forward', 'lineboundary'); if (gsel().isCollapsed) mod('extend', 'forward', 'character'); eraseSel(); },
+    delWordFwd: () => { E.focus(); if (gsel().isCollapsed) mod('extend', 'forward', 'word'); if (!gsel().isCollapsed) eraseSel(); },
+    delWordBack: () => { E.focus(); if (gsel().isCollapsed) mod('extend', 'backward', 'word'); if (!gsel().isCollapsed) eraseSel(); },
+    // 커서 이동
+    docStart: () => { mod('move', 'backward', 'documentboundary'); showCaret(); },
+    docEnd: () => { mod('move', 'forward', 'documentboundary'); showCaret(); },
+    paraStart: () => mod('move', 'backward', 'paragraphboundary'),
+    paraEnd: () => mod('move', 'forward', 'paragraphboundary'),
+    paraUp: () => { mod('move', 'backward', 'paragraph'); showCaret(); },
+    paraDown: () => { mod('move', 'forward', 'paragraph'); showCaret(); },
+    wordLeft: () => mod('move', 'backward', 'word'),
+    wordRight: () => mod('move', 'forward', 'word'),
+    screenTop: () => KB.screenAt(false), screenBottom: () => KB.screenAt(true),
+    screenAt: bottom => {
+      const r = desk.getBoundingClientRect();
+      const cr = document.caretRangeFromPoint(r.left + r.width / 2, bottom ? r.bottom - 6 : r.top + 6);
+      if (cr && docEl.contains(cr.startContainer)) { E.focus(); gsel().removeAllRanges(); gsel().addRange(cr); }
+    },
+    pageUp: () => { desk.scrollBy({ top: -desk.clientHeight * 0.9 }); setTimeout(() => KB.screenAt(false), 30); },
+    pageDown: () => { desk.scrollBy({ top: desk.clientHeight * 0.9 }); setTimeout(() => KB.screenAt(false), 30); },
+    // 블록 설정 (F3: 낱말 → 한 문단 → 문서 전체)
+    f3: { n: 0, t: 0 },
+    block: () => {
+      E.focus();
+      const f = KB.f3, now = Date.now();
+      f.n = now - f.t < 3000 ? f.n + 1 : 1; f.t = now;
+      if (f.n === 1) { if (gsel().isCollapsed) { mod('move', 'backward', 'word'); mod('extend', 'forward', 'word'); } }
+      else if (f.n === 2) { mod('move', 'backward', 'paragraphboundary'); mod('extend', 'forward', 'paragraphboundary'); }
+      else C.selectAll();
+    },
+    // 문단 위·아래로 옮기기
+    moveBlock: down => {
+      const b = E.currentBlock(); if (!b || !gsel().rangeCount) return;
+      let sib = down ? b.nextElementSibling : b.previousElementSibling;
+      while (sib && sib.classList.contains('pg-gap')) sib = down ? sib.nextElementSibling : sib.previousElementSibling;
+      if (!sib || sib.tagName !== b.tagName) return;
+      E.checkpoint();
+      const r = gsel().getRangeAt(0).cloneRange();
+      if (down) sib.after(b); else sib.before(b);
+      gsel().removeAllRanges(); gsel().addRange(r);
+      E.afterEdit();
+    },
+    // 찾기
+    lastFind: null,
+    findAgain: back => {
+      const lf = KB.lastFind, q = lf ? lf.q : ($('quickFind').value || '');
+      if (!q) return C.find();
+      if (!E.findNext(q, lf ? lf.mc : false, back)) toast('찾는 내용이 없습니다.');
+    },
+    gotoPage: () => {
+      const n = E.pageCount(), sheets = () => Array.from(stackEl.querySelectorAll('.sheet'));
+      const d = UI.dialog({
+        title: '찾아가기', width: 340,
+        body: h('div', {}, h('div', { class: 'frow' }, h('label', {}, '쪽 번호'), h('input', { type: 'number', id: 'gPg', min: 1, max: n, value: 1 }), h('span', {}, ` / ${n}쪽`))),
+        buttons: [{ label: '가기', primary: true, act: () => { const s = sheets()[Math.max(1, Math.min(n, +d.$('#gPg').value || 1)) - 1]; if (s) { s.scrollIntoView({ block: 'start' }); setTimeout(() => KB.screenAt(false), 30); } } }, { label: '취소', cancel: true }],
+      });
+    },
+    // 글자 모양
+    fontStep: d => { const i = FONTS.indexOf(E.charState().font); E.setFont(FONTS[((i < 0 ? 0 : i) + d + FONTS.length) % FONTS.length]); },
+    spacing: d => E.setSpacing((E.charState().spacing || 0) + d),
+    supSub: () => { const s = E.charState(); if (s.sup) { C.sup(); C.sub(); } else if (s.sub) C.sub(); else C.sup(); },
+    // 문단 모양
+    right: d => E.setPara(v => ({ right: Math.max(0, v.right + d) })),
+    both: d => E.setPara(v => ({ left: Math.max(0, v.left + d), right: Math.max(0, v.right + d) })),
+    firstLine: d => E.setPara(v => ({ indent: v.indent + d })),
+    // 빠른 내어쓰기: 둘째 줄부터 지금 커서 자리에 맞춤
+    quickHang: () => {
+      const b = E.currentBlock(); if (!b || !gsel().rangeCount) return;
+      const cs = getComputedStyle(b), rc = caretRect();
+      const px = rc.left - b.getBoundingClientRect().left - (parseFloat(cs.paddingLeft) || 0) * E.state.zoom;
+      const pt = Math.round(px / E.state.zoom * 0.75 * 10) / 10;
+      if (pt > 0) E.setPara(v => ({ indent: v.indent - pt }));
+    },
+    shiftTab: () => {
+      const td = E.currentCell(); if (!td) return KB.quickHang();
+      const cells = Array.from(td.closest('table').querySelectorAll('td,th')), p = cells[cells.indexOf(td) - 1];
+      if (p) E.caretAt(p.querySelector('p') || p);
+    },
+    styleNo: i => () => { const n = E.styleList()[i]; if (n) E.applyStyle(n); },
+    // 쉬운 계산식: 현재 셀의 왼쪽(가로) 또는 위쪽(세로) 숫자 칸을 계산해 현재 셀에 씀
+    calc: (dir, op) => () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const tr = td.parentElement, t = td.closest('table');
+      const cells = dir === 'row' ? Array.from(tr.cells).slice(0, td.cellIndex) : Array.from(t.rows).slice(0, tr.rowIndex).map(r => r.cells[td.cellIndex]).filter(Boolean);
+      const v = cells.map(c => { const x = c.textContent.replace(/[​,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(x) ? parseFloat(x) : null; }).filter(x => x !== null);
+      if (!v.length) return toast('계산할 숫자 칸이 없습니다.', true);
+      const sum = v.reduce((a, b) => a + b, 0);
+      const res = op === 'sum' ? sum : op === 'avg' ? sum / v.length : v.reduce((a, b) => a * b, 1);
+      E.checkpoint();
+      (td.querySelector('p') || td).textContent = String(Math.round(res * 100) / 100);
+      E.afterEdit();
+    },
+    // 표 나누기(현재 줄 아래부터 새 표) · 표 붙이기(다음 표를 이어 붙임)
+    tableSplit: () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const tr = td.parentElement, t = td.closest('table'), body = tr.parentElement;
+      if (!tr.nextElementSibling) return toast('마지막 줄에서는 나눌 수 없습니다.', true);
+      const rows = Array.from(t.rows), at = tr.rowIndex;
+      if (rows.slice(0, at + 1).some((r, i) => Array.from(r.cells).some(c => i + c.rowSpan > at + 1))) return toast('합친 칸이 걸쳐 있어 여기서는 나눌 수 없습니다.', true);
+      E.checkpoint();
+      const nt = t.cloneNode(false);
+      Array.from(t.children).filter(c => c.tagName === 'COLGROUP').forEach(c => nt.append(c.cloneNode(true)));
+      const nb = body.cloneNode(false); nt.append(nb);
+      rows.slice(at + 1).forEach(r => nb.append(r));
+      t.after(nt);
+      E.afterEdit();
+    },
+    tableJoin: () => {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const t = td.closest('table'), nx = t.nextElementSibling;
+      if (!nx || nx.tagName !== 'TABLE') return toast('바로 아래에 붙일 표가 없습니다.', true);
+      E.checkpoint();
+      const body = t.tBodies[t.tBodies.length - 1];
+      Array.from(nx.rows).forEach(r => body.append(r));
+      nx.remove();
+      E.afterEdit();
+    },
+    // 표
+    cellMove: (dr, dc) => {
+      const td = E.currentCell(); if (!td) return;
+      const tr = td.parentElement, t = td.closest('table');
+      const to = dr ? (t.rows[tr.rowIndex + dr] || {}).cells : tr.cells;
+      const c = to && to[dr ? Math.min(td.cellIndex, to.length - 1) : td.cellIndex + dc];
+      if (c) E.caretAt(c.querySelector('p') || c);
+    },
+    cellSelect: () => { const td = E.currentCell(); if (!td) return; E.focus(); const r = document.createRange(); r.selectNodeContents(td); gsel().removeAllRanges(); gsel().addRange(r); },
+    inCell: (a, b) => () => (E.currentCell() ? a : b)(),
+    // 개체
+    nextShape: () => {
+      const ids = Array.from(new Set(Array.from(docEl.querySelectorAll('.gso[data-sid]')).map(e => e.dataset.sid)));
+      if (!ids.length) return toast('선택할 개체가 없습니다.');
+      selectShape(ids[(ids.indexOf(selShape) + 1) % ids.length]);
+    },
+    fix: () => { if (linkAt()) C.link(); else if (E.currentCell()) C.cellDlg(); else if (selShape) shapeDlg(selShape); },
+    // 기타
+    fullscreen: () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); },
+    nextDoc: () => { if (docs.length > 1) activate(docs[(docs.indexOf(cur) + 1) % docs.length]); },
+    ctx: () => { const rc = caretRect(); docEl.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rc.left, clientY: rc.bottom })); },
+    fileMenu: () => { const t = document.querySelector('.menu-tab.file .mt-label'); if (t) t.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); },
+    ins: t => () => E.insertText(t),
+    color: c => () => E.setColor(c),
   };
-  let chordN = false; // 한글의 Ctrl+N,T (표 만들기) · Ctrl+N,N (각주) · Ctrl+N,E (미주)
+  // 셀 블록 모드 (표 안에서 F5): 방향키로 셀 이동, F5/F3 확장, F7 칸 · F8 줄 전체, M 합치기, S 나누기, Delete 내용 지우기, Esc/Enter 끝
+  const CB = {
+    on: false, expand: false, table: null, r0: 0, c0: 0, r1: 0, c1: 0,
+    rect() { return { r0: Math.min(this.r0, this.r1), r1: Math.max(this.r0, this.r1), c0: Math.min(this.c0, this.c1), c1: Math.max(this.c0, this.c1) }; },
+    cells() {
+      const g = E.table.grid(CB.table), q = CB.rect(), out = new Set();
+      for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) if (g[r] && g[r][c]) out.add(g[r][c]);
+      return Array.from(out);
+    },
+    paint() { document.querySelectorAll('td.cb-sel, th.cb-sel').forEach(x => x.classList.remove('cb-sel')); if (CB.on) CB.cells().forEach(x => x.classList.add('cb-sel')); },
+    start() {
+      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      CB.table = td.closest('table'); E.table.grid(CB.table);
+      CB.on = true; CB.expand = false; CB.r0 = CB.r1 = td._r; CB.c0 = CB.c1 = td._c;
+      CB.paint(); toast('셀 블록 모드 — 방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Esc 끝');
+    },
+    end(toCell) {
+      const g = CB.on && E.table.grid(CB.table), td = g && g[CB.r0] && g[CB.r0][CB.c0];
+      CB.on = false; CB.paint();
+      if (toCell && td) E.caretAt(td.querySelector('p') || td);
+    },
+    merge() {
+      const g = E.table.grid(CB.table), q = CB.rect(), cs = CB.cells();
+      if (cs.length < 2) return toast('합칠 셀을 블록으로 잡으세요.', true);
+      if (cs.some(td => td._r < q.r0 || td._c < q.c0 || td._r + td.rowSpan - 1 > q.r1 || td._c + td.colSpan - 1 > q.c1)) return toast('블록 밖으로 걸친 셀이 있어 합칠 수 없습니다.', true);
+      const first = g[q.r0][q.c0];
+      CB.end(false);
+      E.checkpoint();
+      const empty = c => !c.textContent.replace(/​/g, '').trim() && !c.querySelector('img,table');
+      for (const td of cs) if (td !== first && !empty(td)) { if (empty(first)) first.innerHTML = ''; first.append(...td.childNodes); }
+      cs.forEach(td => { if (td !== first) td.remove(); });
+      first.rowSpan = q.r1 - q.r0 + 1; first.colSpan = q.c1 - q.c0 + 1;
+      E.afterEdit(); E.caretAt(first.querySelector('p') || first);
+    },
+    clear() { const cs = CB.cells(); CB.end(false); E.checkpoint(); cs.forEach(td => { td.innerHTML = '<p><br></p>'; }); E.afterEdit(); },
+    key(e) {
+      const g = E.table.grid(CB.table), R = g.length - 1, Cn = g[0].length - 1, k = e.key;
+      const done = () => { e.preventDefault(); e.stopImmediatePropagation(); return true; };
+      if (/^Arrow/.test(k) && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+        const dr = k === 'ArrowDown' ? 1 : k === 'ArrowUp' ? -1 : 0, dc = k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0, cl = (v, m) => Math.max(0, Math.min(m, v));
+        if (CB.expand) { CB.r1 = cl(CB.r1 + dr, R); CB.c1 = cl(CB.c1 + dc, Cn); }
+        else { CB.r0 = CB.r1 = cl(CB.r1 + dr, R); CB.c0 = CB.c1 = cl(CB.c1 + dc, Cn); }
+        CB.paint(); return done();
+      }
+      if (k === 'F5' || k === 'F3') { CB.expand = !CB.expand; toast(CB.expand ? '셀 확장 모드' : '셀 이동 모드'); return done(); }
+      if (k === 'F7') { CB.r0 = 0; CB.r1 = R; CB.expand = true; CB.paint(); return done(); }
+      if (k === 'F8') { CB.c0 = 0; CB.c1 = Cn; CB.expand = true; CB.paint(); return done(); }
+      if (k === 'Escape' || k === 'Enter') { CB.end(true); return done(); }
+      if (k === 'Delete' || (e.ctrlKey && (k === 'e' || k === 'E'))) { CB.clear(); return done(); }
+      if (!e.ctrlKey && !e.altKey && (k === 'm' || k === 'M')) { CB.merge(); return done(); }
+      if (!e.ctrlKey && !e.altKey && (k === 's' || k === 'S')) { CB.end(true); E.table.split(); return done(); }
+      if (!e.ctrlKey && !e.altKey && /^[cplCPL]$/.test(k)) { CB.end(true); C.cellDlg(); return done(); }
+      return false;
+    },
+  };
+  document.addEventListener('keydown', e => { if (CB.on && !e.isComposing && !['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) CB.key(e); }, true);
+  document.addEventListener('mousedown', () => { if (CB.on) CB.end(false); }, true);
+  // [단축키(여러 개면 배열), 이름, 명령] — 도움말(F1)의 목록도 이 표로 만든다
+  const SHORTCUTS = [
+    ['파일', [
+      ['Alt+N', '새 문서', C.new], ['Ctrl+Alt+T', '새 탭', C.new], ['Ctrl+Alt+N', '서식(문서마당)', C.showTpl], ['Alt+O', '불러오기', C.open], [['Alt+S', 'Ctrl+S'], '저장하기', C.save],
+      ['Alt+V', '다른 이름으로 저장하기', C.saveAs], [['Alt+P', 'Ctrl+P'], '인쇄', C.print], ['Alt+X', '끝', C.quit], ['Ctrl+F4', '문서 닫기', C.close], [['Ctrl+Q,I', 'Ctrl+Q,D'], '문서 정보', C.docInfo],
+    ]],
+    ['편집', [
+      ['Ctrl+Z', '되돌리기', C.undo], ['Ctrl+Shift+Z', '다시 실행', C.redo], ['Ctrl+Alt+V', '골라 붙이기', C.paste], ['Alt+C', '모양 복사', C.painter], ['Ctrl+E', '지우기', KB.erase], ['Ctrl+A', '모두 선택', C.selectAll],
+      ['F3', '블록 설정(낱말 → 문단 → 전체)', KB.block], ['Alt+Shift+Up', '문단 위로 이동', () => KB.moveBlock(false)], ['Alt+Shift+Down', '문단 아래로 이동', () => KB.moveBlock(true)],
+      [['Ctrl+Q,F', 'Ctrl+F', 'F2'], '찾기', C.find], [['Ctrl+F2', 'Ctrl+Q,A', 'Ctrl+H'], '찾아 바꾸기', C.replace], ['Ctrl+L', '다시 찾기', () => KB.findAgain(false)], ['Ctrl+Q,L', '거꾸로 찾기', () => KB.findAgain(true)],
+      ['Alt+G', '찾아가기', KB.gotoPage], ['Ctrl+N,K', '고치기', KB.fix],
+    ]],
+    ['지우기·커서 이동', [
+      [['Ctrl+Delete', 'Ctrl+T'], '한 단어 지우기', KB.delWordFwd], ['Ctrl+Backspace', '앞 단어 지우기', KB.inCell(C.delRow, KB.delWordBack)], ['Ctrl+Y', '한 줄 지우기', KB.delLine], ['Alt+Y', '줄 뒤 지우기', KB.delLineEnd],
+      ['Alt+Shift+Right', '한 단어 오른쪽으로', KB.wordRight], ['Alt+Shift+Left', '한 단어 왼쪽으로', KB.wordLeft], ['Ctrl+Up', '한 문단 위로', KB.paraUp], ['Ctrl+Down', '한 문단 아래로', KB.paraDown],
+      ['Alt+Home', '문단 처음으로', KB.paraStart], ['Alt+End', '문단 끝으로', KB.paraEnd], ['Ctrl+Home', '화면 첫 줄로', KB.screenTop], ['Ctrl+End', '화면 끝줄로', KB.screenBottom],
+      ['Alt+PageUp', '한 쪽 앞으로', KB.pageUp], ['Alt+PageDown', '한 쪽 뒤로', KB.pageDown], ['Ctrl+PageUp', '문서의 처음으로', KB.docStart], ['Ctrl+PageDown', '문서의 끝으로', KB.docEnd],
+    ]],
+    ['보기', [
+      ['Ctrl+G,T', '문단 부호 보이기/숨기기', C.toggleMarks], ['Ctrl+G,P', '화면 확대 쪽 맞춤', C.fitPage], ['Ctrl+G,W', '화면 확대 폭 맞춤', C.fitWidth], ['Ctrl+G,Q', '화면 확대 100%', () => setZoom(1)],
+      ['Shift+Num+', '화면 확대', C.zoomIn], ['Shift+Num-', '화면 축소', C.zoomOut], ['Ctrl+G,L', '쪽 윤곽', C.togglePageView], ['Ctrl+G,Z', '전체 화면', KB.fullscreen], ['Ctrl+Tab', '문서 탭 순환', KB.nextDoc],
+    ]],
+    ['입력', [
+      ['Ctrl+F10', '문자표', C.symbol], [['Ctrl+K,D', 'Ctrl+K,C'], '날짜/시간 문자열', () => D.date()[0].act()], ['Ctrl+K,F', '날짜/시간 형식', () => popAt(D.date())],
+      ['Ctrl+N,N', '각주', C.footnote], ['Ctrl+N,E', '미주', C.endnote], ['Ctrl+N,I', '그림', C.image], ['Ctrl+N,B', '글상자', C.textBox], ['Ctrl+N,M', '수식', C.equation],
+      ['Ctrl+K,H', '하이퍼링크', C.link], ['Ctrl+N,T', '표 만들기', C.tableDlg], ['Alt+Space', '고정폭 빈칸', KB.ins(' ')], ['Ctrl+Alt+Space', '묶음 빈칸', KB.ins(' ')], ['Ctrl+Shift+-', '무른 하이픈', KB.ins('­')],
+    ]],
+    ['서식', [
+      ['Alt+L', '글자 모양', C.charDlg], ['Alt+T', '문단 모양', C.paraDlg], ['Ctrl+K,N', '문단 번호 모양', () => popAt(D.numbers())], ['Ctrl+K,O', '개요 번호 모양', () => popAt(D.outline())], ['F6', '스타일', () => popAt(D.style())],
+      ['Ctrl+Shift+Insert', '문단 번호 적용/해제', C.numbering], ['Ctrl+Shift+Delete', '글머리표 적용/해제', C.bullet], ['Ctrl+Num-', '한 수준 증가', C.levelDown], ['Ctrl+Num+', '한 수준 감소', C.levelUp],
+    ]],
+    ['글자 모양', [
+      [['Alt+Shift+E', 'Ctrl+]'], '글씨 크게', C.bigger], [['Alt+Shift+R', 'Ctrl+['], '글씨 작게', C.smaller], ['Alt+Shift+W', '자간 넓게', () => KB.spacing(1)], ['Alt+Shift+N', '자간 좁게', () => KB.spacing(-1)],
+      [['Alt+Shift+U', 'Ctrl+U'], '밑줄', C.underline], [['Alt+Shift+B', 'Ctrl+B'], '진하게', C.bold], [['Alt+Shift+I', 'Ctrl+I'], '기울임', C.italic], ['Alt+Shift+P', '위 첨자', C.sup], ['Alt+Shift+S', '아래 첨자', C.sub],
+      ['Alt+Shift+C', '보통 모양', C.clearFormat], ['Alt+Shift+F', '다음 글꼴', () => KB.fontStep(1)], ['Alt+Shift+G', '이전 글꼴', () => KB.fontStep(-1)], ['Ctrl+Alt+A', '위 첨자/아래 첨자/보통', KB.supSub],
+      ['Ctrl+M,K', '검정 글자 색', KB.color('#000000')], ['Ctrl+M,R', '빨강 글자 색', KB.color('#ff0000')], ['Ctrl+M,B', '파랑 글자 색', KB.color('#0000ff')], ['Ctrl+M,D', '자주 글자 색', KB.color('#ff00ff')],
+      ['Ctrl+M,G', '초록 글자 색', KB.color('#00ff00')], ['Ctrl+M,Y', '노랑 글자 색', KB.color('#ffff00')], ['Ctrl+M,C', '청록 글자 색', KB.color('#00ffff')], ['Ctrl+M,W', '흰색 글자 색', KB.color('#ffffff')],
+    ]],
+    ['문단 모양', [
+      [['Ctrl+Alt+F5', 'Ctrl+Shift+E'], '왼쪽 여백 줄이기', C.outdent], [['Ctrl+Alt+F6', 'Ctrl+Shift+G'], '왼쪽 여백 늘이기', C.indent], [['Ctrl+Alt+F7', 'Ctrl+Shift+D'], '오른쪽 여백 늘이기', () => KB.right(10)],
+      [['Ctrl+Alt+F8', 'Ctrl+Shift+F'], '오른쪽 여백 줄이기', () => KB.right(-10)], [['Ctrl+F5', 'Ctrl+Shift+O'], '첫 줄 내어쓰기', () => KB.firstLine(-10)], [['Ctrl+F6', 'Ctrl+Shift+I'], '첫 줄 들여 쓰기', () => KB.firstLine(10)],
+      ['Ctrl+F7', '양쪽 여백 줄이기', () => KB.both(-10)], ['Ctrl+F8', '양쪽 여백 늘이기', () => KB.both(10)], [['Alt+Shift+Z', 'Ctrl+Shift+W'], '줄 간격 넓게', C.lineUp], [['Alt+Shift+A', 'Ctrl+Shift+Q'], '줄 간격 좁게', C.lineDown],
+      [['Shift+Tab', 'Ctrl+Shift+Tab'], '빠른 내어쓰기 (표 안에서는 앞 셀로 이동)', KB.shiftTab], ['Ctrl+Shift+M', '양쪽 정렬', C.alignJ], ['Ctrl+Shift+L', '왼쪽 정렬', C.alignL], ['Ctrl+Shift+R', '오른쪽 정렬', C.alignR], ['Ctrl+Shift+C', '가운데 정렬', C.alignC], ['Ctrl+Shift+T', '배분 정렬', C.alignD],
+    ]],
+    ['스타일', [...Array.from({ length: 10 }, (_, i) => [["Ctrl+" + ((i + 1) % 10), "Ctrl+Alt+" + ((i + 1) % 10)], '스타일 ' + (i + 1) + '번 적용 (스타일 목록 순서)', KB.styleNo(i)])]],
+    ['쪽', [
+      ['F7', '편집 용지', C.pageSetup], ['Ctrl+N,H', '머리말/꼬리말', C.headerDlg], ['Ctrl+N,P', '쪽 번호 매기기', C.pageNumDlg], [['Ctrl+Enter', 'Ctrl+J'], '쪽 나누기 (표 안에서는 줄 추가)', KB.inCell(C.rowBelow, C.pageBreak)],
+    ]],
+    ['도구', [
+      ['F8', '맞춤법', C.toggleSpell], ['Alt+M', '메일 머지 만들기', C.mailMerge], ['F1', '단축키 일람', () => KB.help()], ['F10', '메뉴', KB.fileMenu], ['Shift+F10', '빠른 메뉴', KB.ctx], ['F11', '개체 선택', KB.nextShape],
+    ]],
+    ['표', [
+      ['F5', '셀 블록 모드 (방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Delete 지우기 · Esc 끝)', () => CB.start()], ['Alt+Left', '셀 단위로 왼쪽 이동', () => KB.cellMove(0, -1)], ['Alt+Right', '셀 단위로 오른쪽 이동', () => KB.cellMove(0, 1)], ['Alt+Up', '셀 단위로 위로 이동', () => KB.cellMove(-1, 0)],
+      ['Alt+Down', '셀 단위로 아래로 이동', () => KB.cellMove(1, 0)], ['Ctrl+N,A', '표 나누기', KB.tableSplit], ['Ctrl+N,Z', '표 붙이기', KB.tableJoin], ['Ctrl+Shift+H', '가로 합계', KB.calc('row', 'sum')], ['Ctrl+Shift+V', '세로 합계', KB.calc('col', 'sum')], ['Ctrl+Shift+J', '가로 평균', KB.calc('row', 'avg')], ['Ctrl+Shift+B', '세로 평균', KB.calc('col', 'avg')], ['Ctrl+Shift+K', '가로 곱', KB.calc('row', 'mul')], ['Ctrl+Shift+N', '세로 곱', KB.calc('col', 'mul')], ['Alt+Insert', '줄 추가하기', C.rowBelow], ['Alt+Delete', '줄 지우기', C.delRow],
+    ]],
+    ['그대로 쓰는 것(브라우저 기본)', [
+      ['Ctrl+X / Shift+Delete', '오려 두기'], ['Ctrl+C / Ctrl+Insert', '복사하기'], ['Ctrl+V / Shift+Insert', '붙이기'], ['방향키 · Home · End · PageUp · PageDown', '커서 이동'], ['Shift+방향키', '블록 설정'], ['Tab · Shift+Tab', '표 안 셀 이동'],
+      ['Insert', '삽입/수정 전환'],
+    ]],
+  ];
+  KB.help = () => {
+    const body = h('div', { class: 'key-help' }, ...SHORTCUTS.flatMap(([sec, rows]) => [
+      h('div', { class: 'kh-sec' }, sec),
+      h('table', { class: 'info-table' }, ...rows.map(r => h('tr', {}, h('td', {}, (Array.isArray(r[0]) ? r[0] : [r[0]]).join('  /  ')), h('td', {}, r[1])))),
+    ]), h('div', { class: 'tp-note' }, '연결하지 못한 것: 조판 부호, 한자 입력, 상용구, 스크립트 매크로, 차례·색인, 책갈피·상호 참조, 셀 블록 모드의 일부 글쇠(블록 계산식·줄/칸 크기), 장평, 단·구역 나누기·감추기 — 이 편집기에 해당 기능이 없습니다. 브라우저가 가로채는 Ctrl+N·Ctrl+T·Ctrl+W·Ctrl+Q·Ctrl+Tab 은 «앱으로 설치(바로 가기 창)»해서 열어야 듣습니다.'));
+    UI.dialog({ title: '단축키 일람 (한/글 기준)', width: 560, body, buttons: [{ label: '닫기', cancel: true }] });
+  };
+  const KEYS = {}; // 이름 → 명령 (겹글쇠는 'Ctrl+N,T')
+  const CHORD_HEAD = new Set();
+  for (const [, rows] of SHORTCUTS) for (const [ks, , fn] of rows) {
+    if (!fn) continue;
+    for (const k of Array.isArray(ks) ? ks : [ks]) { KEYS[k] = fn; if (k.includes(',')) CHORD_HEAD.add(k.split(',')[0]); }
+  }
+  KEYS['Insert'] = C.toggleOverwrite;
+  KEYS['Ctrl+O'] = C.open; // 한/글의 Ctrl+O 는 «문서 끼워 넣기» — 그 기능이 없어 브라우저식 «열기» 로 둠
+  let chord = null; // 겹글쇠의 앞 글쇠 ('Ctrl+N' …) — 1.5초 안에 다음 글쇠가 와야 함
   document.addEventListener('keydown', e => {
-    if (e.isComposing) return;
-    const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key;
+    if (e.isComposing || e.key === 'Control' || e.key === 'Alt' || e.key === 'Shift' || e.key === 'Meta') return;
+    const num = e.code && e.code.startsWith('Numpad') && /^[-+]$/.test(e.key);
+    const k = num ? 'Num' + e.key : e.code === 'Space' ? 'Space' : e.code === 'Minus' ? '-' : /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) && !e.shiftKey ? e.code.slice(5) : /^Arrow/.test(e.key) ? e.key.slice(5) : e.key;
     const name = (e.ctrlKey || e.metaKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + k;
-    if (chordN) { chordN = false; const fn = { T: C.tableDlg, N: C.footnote, E: C.endnote, M: C.equation }[k]; if (fn) { e.preventDefault(); fn(); return; } }
-    if (name === 'Ctrl+N' && document.activeElement === docEl) { chordN = true; e.preventDefault(); return; }
-    // 입력 칸(대화상자·자동 채우기)에서는 되돌리기·모두 선택을 그 칸에 맡김
     const ae = document.activeElement || {};
-    if ((/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae.isContentEditable && ae !== docEl)) && /^Ctrl\+(Shift\+)?[ZYAK]$/.test(name)) return;
+    const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae.isContentEditable && ae !== docEl);
+    // 입력 칸(대화상자·자동 채우기)에서는 글 고치는 글쇠를 그 칸에 맡기고, 파일·찾기·인쇄·기능 글쇠만 받음
+    if (inField && !/^(Alt\+[NOSVPXM]|Ctrl\+[SOPFH]|(Ctrl\+)?(Alt\+)?(Shift\+)?F\d+)$/.test(name)) { chord = null; return; }
+    if (chord) {
+      const full = chord.head + ',' + k;
+      const t = chord.t; chord = null;
+      if (Date.now() - t < 1500 && KEYS[full]) { e.preventDefault(); e.stopPropagation(); KEYS[full](); refreshAll(); return; }
+    }
+    if (CHORD_HEAD.has(name) && (document.activeElement === docEl || !inField)) { chord = { head: name, t: Date.now() }; e.preventDefault(); e.stopPropagation(); return; }
     const fn = KEYS[name];
     if (fn) { e.preventDefault(); e.stopPropagation(); fn(); refreshAll(); }
   }, true);

@@ -1786,6 +1786,7 @@
       }
       afterEdit();
     },
+    grid,
     setBg(color) {
       E.checkpoint();
       const r = E.selRange() || savedRange;
