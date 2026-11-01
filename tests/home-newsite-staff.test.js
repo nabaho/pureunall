@@ -4,13 +4,12 @@
      ① 지금 쪽에서 직원을 읽어 «다시 그리면 똑같다» — 노무사 카드와 같은 약속.
      ② 직원을 빼거나 고쳐도 «직원 줄만» 바뀐다 — 노무사 카드·머리·발은 그대로.
      ③ 꺾쇠·$ 가 든 글자를 넣어도 태그·치환 문법이 되지 않는다.
-     ④ 갈래 판정이 화면(memberKind)과 부품(PuSitePeople.갈래)에서 «같다».
+     ④ 상자로 가는 사람은 구분을 «직원»으로 저장한 사람뿐이다 — 직책이 빈 옛 노무사 글을 직원으로 짐작하지 않는다.
    ★ 직원 수·직급은 쪽에서 읽어서 쓴다(지금 값을 박지 않는다). 이름은 지어낸 것. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 require(path.join(__dirname, '..', 'js', 'pu-site-people.js'));
 const P = globalThis.PuSitePeople;
@@ -52,7 +51,8 @@ test('★ 올릴직원 — 직원만, 차례대로, 이름 빈 줄은 뺀다', (
   const 줄 = P.올릴직원([
     { key: 'a', kind: 'staff', name: '최가상', position1: '주임', order: 3 },
     { key: 'b', kind: 'labor', name: '정모형', position2: '공인노무사' },
-    { key: 'c', name: '박보기', position1: '과장', order: 1 },
+    { key: 'c', kind: 'staff', name: '박보기', position1: '과장', order: 1 },
+    { key: 'f', name: '서샘플', position1: '과장', order: 0 },
     { key: 'd', kind: 'staff', name: ' ', position1: '대리', order: 2 },
     { key: 'e', kind: 'staff', name: '한보기', position1: '대리' }
   ]);
@@ -64,26 +64,20 @@ test('★ 올릴사람(노무사 카드)은 직원을 «못 감»으로 세지 �
   assert.equal(r.못갈것.length, 0, '★ 직원이 「글 번호 없음」으로 걸렸다');
 });
 
-/* 화면의 memberKind 를 떼어 와 같은 표로 견준다 */
-function fnSource(name, s) {
-  const re = new RegExp('(?:^|\\n)function\\s+' + name + '\\s*\\(');
-  const m = re.exec(s);
-  assert.ok(m, name + ' 를 찾지 못했습니다');
-  let depth = 0;
-  for (let i = s.indexOf('{', m.index); i < s.length; i++) {
-    if (s[i] === '{') depth++;
-    else if (s[i] === '}') { depth--; if (!depth) return s.slice(m.index, i + 1); }
-  }
-  assert.fail(name + ' 끝을 찾지 못했습니다');
-}
-test('★ 갈래 판정이 화면(memberKind)과 부품(갈래)에서 같다', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'pu-home.html'), 'utf8');
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(fnSource('memberKind', html), ctx);
-  const 표 = [
-    {}, { kind: 'labor' }, { kind: 'staff', position2: '공인노무사' }, { kind: 'x', position1: '대표노무사' },
-    { position2: '공인노무사' }, { position1: '사무장' }, { position1: '과장', position2: '' }, null
-  ];
-  표.forEach((m) => assert.equal(P.갈래(m), ctx.memberKind(m), JSON.stringify(m) + ' 의 갈래가 둘에서 다르다'));
+test('★ 직원인가 — 구분을 «직원»으로 저장한 사람만. 직책에서 짐작하지 않는다', () => {
+  assert.equal(P.직원인가({ kind: 'staff' }), true);
+  assert.equal(P.직원인가({ kind: 'labor' }), false);
+  assert.equal(P.직원인가({ position1: '사무장' }), false, '★ 구분 없는 옛 글을 직원으로 짐작했다 — 노무사 카드에서 빠진다');
+  assert.equal(P.직원인가({}), false);
+  assert.equal(P.직원인가(null), false);
+});
+
+test('★ 화면도 같은 잣대로 노무사 목록에서 직원을 뺀다 — 짐작(memberKind)으로 빼지 않는다', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'pu-home.html'), 'utf8')
+    .replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const i = html.indexOf('function memberRows(');
+  assert.ok(i >= 0, 'memberRows 를 찾지 못했다');
+  const 몸 = html.slice(i, html.indexOf('\n}', i));
+  assert.match(몸, /PuSitePeople\.직원인가\(/, '★ 노무사 목록이 직원을 무엇으로 가르는지가 부품과 다르다');
+  assert.doesNotMatch(몸, /memberKind\([^)]*\)\s*[!=]==\s*'staff'/);
 });

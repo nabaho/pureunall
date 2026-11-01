@@ -151,17 +151,12 @@
     const 끝 = 카드[카드.length - 1].at + 카드[카드.length - 1].html.length;
     return html.slice(0, 처음) + 새것 + html.slice(끝);
   }
-  /* ── 노무사 / 직원 갈래 (2026-11-01 직원 소개 1단계) ──
+  /* ── 직원인가 (2026-11-01 직원 소개 1단계) ──
      노무사는 사진·경력이 있는 «카드», 직원은 이름·직급 두 칸뿐인 «상자»로 그린다.
-     ⚠ 화면의 memberKind 와 «같은 잣대»다 — 옛 자료에는 kind 가 없어 직책에서 읽어 낸다.
-       둘이 갈라지면 화면에서 직원으로 보던 사람이 카드 쪽으로 가서 「글 번호 없음」으로 걸린다
-       (tests/home-newsite-staff.test.js 가 둘을 같은 표로 견준다). */
-  function 갈래(m) {
-    var k = String((m || {}).kind || '');
-    if (k === 'labor' || k === 'staff') return k;
-    var 직책 = String((m || {}).position1 || '') + ' ' + String((m || {}).position2 || '');
-    return /노무사/.test(직책) ? 'labor' : 'staff';
-  }
+     ★ 상자로 가는 사람은 구분을 «직원»으로 저장한 사람(kind:'staff')뿐이다 — 직책에서 짐작하지 않는다.
+       직책이 비어 있는 옛 노무사 글을 직원으로 짐작하면, 그 사람이 카드에서 빠지고 직원 줄에 끼어든다.
+       화면의 memberKind(직책에서 읽어 내는 «보이는 구분»)와 일부러 다르다. */
+  function 직원인가(m) { return String((m || {}).kind || '') === 'staff'; }
 
   /* 직원 상자 하나 = 그것을 감싼 칸(<div class="lg:col-2_5 col-6">) 통째.
      ★ 상자만 갈아 끼우면 칸이 남거나 모자란다 — 감싼 칸째로 찍어 낸다. */
@@ -206,13 +201,15 @@
     var o = (m || {}).order;
     return (o === '' || o == null || !isFinite(Number(o))) ? 1e9 : Number(o);
   }
+  /* 화면 목록도 이 잣대로 줄을 세운다 — 목록 차례와 올라가는 차례가 같아야 한다 */
+  function 차례견주기(a, b) {
+    if (차례값(a) !== 차례값(b)) return 차례값(a) - 차례값(b);
+    var ka = String((a || {}).key || ''), kb = String((b || {}).key || '');
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  }
   function 올릴직원(ours) {
-    return (ours || []).filter(function (m) { return 갈래(m) === 'staff' && String(m.name || '').trim(); })
-      .slice().sort(function (a, b) {
-        if (차례값(a) !== 차례값(b)) return 차례값(a) - 차례값(b);
-        var ka = String(a.key || ''), kb = String(b.key || '');
-        return ka < kb ? -1 : ka > kb ? 1 : 0;
-      })
+    return (ours || []).filter(function (m) { return 직원인가(m) && String(m.name || '').trim(); })
+      .slice().sort(차례견주기)
       .map(function (m) { return { 이름: String(m.name).trim(), 직급: String(m.position1 || '').trim() }; });
   }
 
@@ -224,7 +221,7 @@
     var 갈것 = [], 못갈것 = [];
     (ours || []).forEach(function (m) {
       /* 직원은 카드가 아니라 상자로 간다(올릴직원) — 여기서 「글 번호 없음」으로 걸지 않는다 */
-      if (갈래(m) === 'staff') return;
+      if (직원인가(m)) return;
       var srl = String(m.srl == null ? '' : m.srl).trim();
       var 옛 = srl && 지금[srl];
       if (!srl) {
@@ -252,10 +249,11 @@
     사람읽기: 사람읽기,
     쪽그리기: 쪽그리기,
     올릴사람: 올릴사람,
-    갈래: 갈래,
+    직원인가: 직원인가,
     직원읽기: 직원읽기,
     직원그리기: 직원그리기,
     올릴직원: 올릴직원,
+    차례견주기: 차례견주기,
     카드들: 카드들,
     덩어리: 덩어리
   };

@@ -82,7 +82,7 @@ function 고르기(지금쪽, members, roster) {
      ★ 빠짐 문턱은 노무사와 «따로» 센다(대표 결정 2026-11-01) — 직원은 다섯뿐이라 합쳐 세면 놓친다. */
   결과.직원지금 = PSP.직원읽기(지금쪽).length;
   결과.직원인원 = 0;
-  if (키들.some((k) => PSP.갈래(묶음[k]) === "staff")) {
+  if (키들.some((k) => PSP.직원인가(묶음[k]))) {
     if (!결과.직원지금) return Object.assign(결과, { ok: false, 실패: "새 사이트 쪽에서 직원 칸을 찾지 못했습니다" });
     const 직원들 = PSP.올릴직원(ours);
     결과.직원인원 = 직원들.length;
