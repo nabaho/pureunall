@@ -12,9 +12,7 @@
   'use strict';
 
   /* 카톡 문구 머리 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로」. {사업} 사업 이름 · {지급월} «2026년 10월» · {월} «10월» */
-  var DEFAULT_HEAD = '[컨설팅 비용 정산 안내]\n{사업} — {지급월}';
-  var HOW_TO = '※ 계산 방법 — 입금 금액(원천징수 뒤 세후)을 모두 더해 담당자 퍼센트를 곱한 것이 담당자 퍼센트 반영금액입니다(원 미만 버림). '
-    + '담당자가 받은 금액이 반영금액보다 많으면 차액을 반환하고, 적으면 차액을 추가로 지급받습니다. 담당자 입금 없이 주관에게만 입금됐으면 주관이 반영금액 전액을 지급합니다.';
+  var DEFAULT_HEAD = '[컨설팅 비용 정산 안내]\n{사업} · {지급월}';
   var DEFAULT_FOOT = '확인 부탁드립니다. 감사합니다.';
   var KST = 9 * 3600 * 1000;
 
@@ -303,23 +301,23 @@
     var s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return (n < 0 ? '−' : '') + s;
   }
-  /* 담당 기준 정산액 → 누가 누구에게(반환 / 추가 지급) */
+  /* 담당 기준 정산액 → «▶ 반환 / 추가 지급 금액 (누가 → 누구)» */
   function settleLine(prefix, v, staffName, leadName) {
-    if (v < 0) return prefix + '반환: ' + staffName + ' → ' + leadName + ' ' + fmt(-v) + '원 (송금 부탁드립니다)';
-    if (v > 0) return prefix + '추가 지급: ' + leadName + ' → ' + staffName + ' ' + fmt(v) + '원 (보내 드립니다)';
-    return prefix + '주고받을 금액이 없습니다';
+    if (v < 0) return prefix + '▶ 반환 ' + fmt(-v) + '원 (' + staffName + ' → ' + leadName + ') 송금 부탁드립니다';
+    if (v > 0) return prefix + '▶ 추가 지급 ' + fmt(v) + '원 (' + leadName + ' → ' + staffName + ') 보내 드립니다';
+    return prefix + '▶ 주고받을 금액이 없습니다';
   }
-  /* 입금자 한 줄 — 통장 확인 금액이 있으면 그것, 없으면 세전에서 원천징수를 뺀 계산값 */
-  function depositLine(m, nm) {
-    var w = '세전 ' + fmt(m.pre) + '원 − 원천징수 ' + taxOf(m.tax) + '% ' + fmt(m.inc + m.loc) + '원';
-    if (m.actual != null) return ' · ' + nm + ' ' + fmt(m.used) + '원 (' + (m.actual === m.net ? w : '통장 확인 금액 · 계산상 세후 ' + fmt(m.net) + '원') + ')';
-    if (!(m.pre > 0)) return ' · ' + nm + ' 0원';
-    return ' · ' + nm + ' ' + fmt(m.used) + '원 (' + w + ')';
+  /* 이름 뒤 «이/가» — 끝 글자에 받침이 있으면 «이» */
+  function iGa(name) { var c = String(name || '').slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? '이' : '가'; }
+  /* 계산 설명의 한 줄 — 세전 − 원천징수 = 세후(통장 확인 금액이 계산과 다르면 그것도) */
+  function calcLine(m, nm) {
+    var line = '   ' + nm + ' ' + fmt(m.pre) + ' − ' + fmt(m.inc + m.loc) + '(' + taxOf(m.tax) + '%) = ' + fmt(m.net);
+    return m.actual != null && m.actual !== m.net ? line + ' · 통장 확인 ' + fmt(m.actual) : line;
   }
-  /* 카톡 문구 — 대표 지시 2026-10-31 「카톡은 컨설팅 비용 정산 안내로 하고 입금자 입금금액 담당자 담당자 산정금액 % 등 계산방법등을 정리해서」,
-     「권형하 입금금액 얼마 박재원 얼마. 각각 세후 담당자 퍼센트 반영금액 담당자 받은금액 에대한 차액등으로」,
-     「담당자가 전혀 입금없이 권형하만 입금되는경우 … 권형하가 담당자에게 지급만 하면 된다 퍼센트에 따라」.
-     담당마다 한 통: 사업장마다 ① 입금 금액(세후, 사람마다) ② 담당자 퍼센트 반영금액(합계 × %) ③ 담당자 받은 금액 ④ 차액(반환 / 추가 지급), 끝에 계산 방법 */
+  /* 카톡 문구 — 대표 지시 2026-10-31~11-01: «컨설팅 비용 정산 안내», 「권형하 입금금액 얼마 박재원 얼마 … 퍼센트 반영금액 … 받은금액 … 차액」,
+     「담당자가 전혀 입금없이 권형하만 입금되는경우 … 퍼센트에 따라 지급」, 「카톡문자 표로 만들고 아래설명하는게 더 쉬워」 → «요약 위 · 설명 아래».
+     ⚠ 카톡은 글자 폭이 일정하지 않아 띄어쓰기로 칸을 맞춘 표는 폰에서 어긋난다 — 한 줄에 하나씩 적는다.
+     담당마다 한 통: 사업장마다 요약(입금 합계·사람별 입금·몫·받은 금액·차액 ▶ 반환/추가 지급), 여러 사업장이면 합계, 아래 [계산 설명] */
   function buildMessages(run, rule, names) {
     rule = rule || {}; names = names || {};
     var month = Number(String(run.monthKey || '').slice(5)) + '월', label = run.label || (String(run.monthKey || '').slice(0, 4) + '년 ' + month);
@@ -335,27 +333,34 @@
       });
     });
     return order.map(function (sid) {
-      var p = by[sid], L = [head, '', p.name + '님, ' + label + ' 지급분 컨설팅 비용 정산 내역을 안내드립니다.', ''], total = 0, leadName = '';
+      var p = by[sid], L = [head, p.name + '님 정산 내역입니다.', ''], total = 0, leadName = '', calc = [], rates = {}, many = p.items.length > 1;
+      var shown = function (s, m) { return s.members.filter(function (x) { return x.role === 'lead' || x.sid === m.sid || x.pre > 0 || x.actual != null; }); };
       p.items.forEach(function (it) {
         var s = it.s, m = it.m, lead = s.members.filter(function (x) { return x.role === 'lead'; })[0];
         var ln = (lead && nameOf(lead)) || names[rule.leadSid] || '주관';
-        leadName = leadName || ln;
+        leadName = leadName || ln; rates[m.rate] = 1;
         L.push('■ ' + s.company + ' (' + s.round + '차)');
-        L.push('① 입금 금액(세후)');
-        s.members.forEach(function (x) { if (x.role === 'lead' || x.sid === m.sid || x.pre > 0 || x.actual != null) L.push(depositLine(x, nameOf(x))); });
-        L.push(' · 합계 ' + fmt(s.totalNet) + '원');
-        L.push('② 담당자 퍼센트 반영금액 (' + p.name + ' ' + m.rate + '%)');
-        L.push(' · ' + fmt(s.totalNet) + '원 × ' + m.rate + '% = ' + fmt(m.share) + '원');
-        L.push('③ 담당자 받은 금액');
-        L.push(' · ' + p.name + ' ' + fmt(m.used) + '원' + (m.used > 0 ? '' : ' (입금 없음 — ' + ln + '에게 입금)'));
-        L.push('④ 차액');
-        L.push(' · ' + fmt(m.share) + '원 − ' + fmt(m.used) + '원' + (m.adjust ? ' + 이월·조정 ' + fmt(m.adjust) + '원' : '') + ' = ' + (m.settle > 0 ? '+' : '') + fmt(m.settle) + '원');
-        L.push(settleLine(' → ', m.settle, p.name, ln));
+        L.push('· 입금 합계(세후) ' + fmt(s.totalNet) + '원');
+        shown(s, m).forEach(function (x) { L.push('  - ' + nameOf(x) + ' ' + fmt(x.used) + '원'); });
+        L.push('· ' + p.name + ' 몫(' + m.rate + '%) ' + fmt(m.share) + '원');
+        L.push('· ' + p.name + ' 받은 금액 ' + fmt(m.used) + '원' + (m.used > 0 ? '' : ' (입금 없음)'));
+        if (m.adjust) L.push('· 이월·조정 ' + fmt(m.adjust) + '원');
+        L.push('· 차액 ' + (m.settle > 0 ? '+' : '') + fmt(m.settle) + '원');
+        L.push(settleLine('', m.settle, p.name, ln));
         L.push('');
         total += m.settle;
+        if (many) calc.push('   [' + s.company + ']');
+        shown(s, m).forEach(function (x) { if (x.pre > 0 || x.actual != null) calc.push(calcLine(x, nameOf(x))); });
       });
-      if (p.items.length > 1) { L.push(settleLine('■ 이번 지급분 합계 — ', total, p.name, leadName)); L.push(''); }
-      L.push(HOW_TO);
+      if (many) { L.push(settleLine('■ 이번 합계 ', total, p.name, leadName)); L.push(''); }
+      var rk = Object.keys(rates);
+      L.push('──────────');
+      L.push('[계산 설명]');
+      L.push('1) 입금 = 각자 통장에 들어온 금액(세전 − 원천징수)');
+      calc.forEach(function (x) { L.push(x); });
+      L.push('2) 몫 = 입금 합계 × ' + (rk.length === 1 ? rk[0] + '%' : '담당자 퍼센트') + ' (원 미만 버림)');
+      L.push('3) 차액 = 몫 − 받은 금액' + (p.items.some(function (it) { return it.m.adjust; }) ? ' + 이월·조정' : '') + '. −면 반환, +면 추가 지급');
+      L.push('   (담당자 입금이 없으면 ' + (leadName || '주관') + iGa(leadName || '주관') + ' 몫 전액을 지급)');
       L.push('');
       L.push(foot);
       return { sid: sid, name: p.name, text: L.join('\n') };
