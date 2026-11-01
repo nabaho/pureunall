@@ -102,7 +102,7 @@ function 화면(over) {
     clearInterval: (id) => log.cleared.push(id),
   }, over || {});
   vm.createContext(box);
-  vm.runInContext('const MB_WARM_GAP = 150000; let _mbWarmAt = 0, _mbWarmTimer = 0;\n'
+  vm.runInContext('const MB_WARM_GAP = 150000; let _mbWarmAt = 0, _mbWarmTimer = 0, _mbWarmVis = false;\n'
     + sliceFn(app, 'function mbWarmPing(') + '\n' + sliceFn(app, 'function mbWarmStart(')
     + '\n;this.ping = mbWarmPing; this.start = mbWarmStart;', box);
   return { box, log };
@@ -159,4 +159,33 @@ test('★★★ 깨우기가 터져도 메일 화면은 안 깨진다 — 시작
   const noToken = 화면({ firebase: { auth: () => ({ currentUser: {} }) } });
   assert.doesNotThrow(() => noToken.box.start());
   assert.equal(noToken.log.fetches.length, 0);
+});
+
+test('★★★ 숨은 채로 열린 탭이 «보이게 되는 순간» 바로 깨운다 — 최대 1분을 기다리지 않는다(2026-11-01 실측: 첫 통 3.4초)', async () => {
+  const handlers = [];
+  const doc = { hidden: true, addEventListener: (ev, fn) => handlers.push([ev, fn]) };
+  const { box, log } = 화면({ document: doc });
+  box.start();                       /* 숨은 채로 열림 — 첫 깨우기는 건너뛴다 */
+  await tick(); await tick();
+  assert.equal(log.fetches.length, 0, '숨은 탭이 깨웠다');
+  assert.equal(handlers.filter((h) => h[0] === 'visibilitychange').length, 1, '보이게 되는 때를 안 듣는다');
+  doc.hidden = false;                /* 사람이 그 탭을 눌렀다 */
+  handlers[0][1]();
+  await tick(); await tick();
+  assert.equal(log.fetches.length, 2, '보이게 됐는데 바로 안 깨운다');
+  box.start();                       /* 다시 시작해도 듣는 줄이 겹치지 않는다 */
+  assert.equal(handlers.length, 1, '듣는 줄이 겹쳐 붙었다');
+});
+
+test('★★ 메일 화면이 아닐 때 보이게 돼도 깨우지 않는다', async () => {
+  const handlers = [];
+  const doc = { hidden: false, addEventListener: (ev, fn) => handlers.push([ev, fn]) };
+  const { box, log } = 화면({ document: doc });
+  box.start(); await tick(); await tick();
+  log.fetches.length = 0;
+  vm.runInContext('_mbWarmAt = 0', box);   /* 간격에 막혀서 «안 깨운 것처럼» 보이지 않게 — 화면 검사만 본다 */
+  box.state.view = 'cards';
+  handlers[0][1]();
+  await tick(); await tick();
+  assert.equal(log.fetches.length, 0, '메일 화면이 아닌데 깨운다');
 });
