@@ -30,13 +30,13 @@ const data = () => ({
   human: { a1: { companyId: 'c1', companyLinkStatus: 'linked' }, a2: { companyId: 'c1', companyLinkStatus: 'linked' },
     b1: { companyId: 'c2', companyLinkStatus: 'linked' }, b0: { companyId: 'c2', companyLinkStatus: 'linked' } },
   rounds: {}, run: null,
-  index: { site_1111111111: { r1: { bizno: '111-11-11111', filedAt: '2024-03-15', filedOffice: '점검지방고용노동청', doneAt: '2024-03-01 10:00' } } }
+  index: { site_1231111111: { r1: { bizno: '123-11-11111', filedAt: '2024-03-15', filedOffice: '점검지방고용노동청', doneAt: '2024-03-01 10:00' } } }
 });
 const CO = [
-  { id: 'c1', name: '점검가나상사', bizNo: '111-11-11111', employmentInsuredCount: 30 },
-  { id: 'c2', name: '점검다라물류', bizNo: '222-22-22222', employmentInsuredCount: 52 },
-  { id: 'c3', name: '점검마바산업', bizNo: '333-33-33333', employmentInsuredCount: S.LOOK_SIZE + 2 },
-  { id: 'c4', name: '점검사아푸드', bizNo: '444-44-44444', employmentInsuredCount: S.LOOK_SIZE - 3 }
+  { id: 'c1', name: '점검가나상사', bizNo: '123-11-11111', employmentInsuredCount: 30 },
+  { id: 'c2', name: '점검다라물류', bizNo: '123-22-22222', employmentInsuredCount: 52 },
+  { id: 'c3', name: '점검마바산업', bizNo: '123-33-33333', employmentInsuredCount: S.LOOK_SIZE + 2 },
+  { id: 'c4', name: '점검사아푸드', bizNo: '123-44-44444', employmentInsuredCount: S.LOOK_SIZE - 3 }
 ];
 const st = (sites) => ({ data: data(), companies: CO, staff: {}, busy: '',
   sites: Object.assign({ f: 'all', q: '', sel: '', who: '', cols: {}, sort: null, page: 1, pop: '', picked: new Set() }, sites || {}) });
