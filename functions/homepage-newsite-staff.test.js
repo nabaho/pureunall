@@ -81,7 +81,7 @@ test('★★ 퇴사한 직원은 저절로 빠지고, 고친 직급이 그대로
   const 올라간 = PSP.직원읽기(올린것[0].html);
   assert.strictEqual(올라간.length, 지금직원.length - 1);
   assert.ok(!올라간.some((s) => s.이름 === 가짜이름[1]), '★ 퇴사한 직원이 새 사이트에 남았다');
-  assert.deepStrictEqual(올라간[0], { 이름: 가짜이름[0], 직급: '새직급' });
+  assert.deepStrictEqual(올라간[0], { 이름: 가짜이름[0], 직급: '새직급', 경력: [] });
   assert.strictEqual(PSP.사람읽기(올린것[0].html).length, 지금사람.length, '★ 직원을 고치다 노무사 카드가 바뀌었다');
   assert.strictEqual(쓴것['homepage/auto/newsite'].직원인원, 지금직원.length - 1);
 });
@@ -117,4 +117,15 @@ test('명부에 없는(안 이은) 직원은 이름으로 맞추지 않고 그�
   const r = HN.고르기(지금쪽, d.members, d.roster);
   assert.ok(PSP.직원읽기(r.새쪽).some((s) => s.이름 === 가짜이름[2]));
   assert.ok(r.연결없음수 >= 1);
+});
+
+test('★★ 매달 자동도 «동의한 직원만» 경력 창을 단다 (2026-11-01 직원 소개 2단계)', () => {
+  const d = 자료(true);
+  d.members['staff-0'].careers = ['現 경력 하나'];
+  d.members['staff-1'].careers = ['現 경력 둘'];
+  d.members['staff-1'].careerConsent = { at: '2026-11-01', how: '서면' };
+  const r = HN.고르기(지금쪽, d.members, d.roster);
+  const 올라간 = PSP.직원읽기(r.새쪽);
+  assert.deepStrictEqual(올라간[0].경력, [], '★★ 동의 없는 직원의 경력이 새 사이트로 갔다');
+  assert.deepStrictEqual(올라간[1].경력, ['現 경력 둘']);
 });

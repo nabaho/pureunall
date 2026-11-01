@@ -8,7 +8,7 @@
      ① 탭은 구성원 소개 «목록 머리»에 있고, 누르면 묻지 않고 열린다 — 다른 갈래로 넘기지 않는다.
      ② 직원 탭 목록은 직원 자료만, 딱지 두 칸은 «열을 맞춘다»(대표 지시 2026-11-01).
      ③ 처음 가져오기는 이름이 같아도 «저절로 잇지 않는다» — 사람이 「이 사람 맞음」을 눌러야 sid 가 들어간다.
-     ④ 직원 편집칸에는 글 번호·사진·경력이 없다(2단계). */
+     ④ 직원 편집칸에는 글 번호·사진이 없다. 경력은 공개 동의 칸과 함께만 있다(2단계, 2026-11-01). */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -197,10 +197,12 @@ test('★ 이미 목록에 있는 직원은 가져오기에서 또 넣지 않는
   assert.equal(ctx.App.가져오기[0].이미, true);
 });
 
-test('★ 직원 편집칸에는 글 번호·사진·경력 칸이 없다 — 2단계(본인 동의 뒤)다', () => {
+test('★ 직원 편집칸 — 글 번호·사진은 없고, 경력은 «공개 동의 칸»과 함께 있다', () => {
   const s = 주석뺀(fnSource('직원편집'));
   assert.doesNotMatch(s, /fieldEdit\(\\'srl\\'/, '직원 편집칸에 글 번호 칸이 있습니다');
-  assert.doesNotMatch(s, /사진칸Html|careerEdit|openPull/, '직원 편집칸에 사진·경력이 들어왔습니다');
+  assert.doesNotMatch(s, /사진칸Html|새사진넣기/, '직원 편집칸에 사진이 들어왔습니다 — 사진은 나중 단계입니다');
+  assert.match(s, /careerEdit\(/, '직원 편집칸에 경력 칸이 없습니다 (2단계, 대표 승인 2026-11-01)');
+  assert.match(s, /경력동의\(/, '★ 경력 공개 동의 칸이 없습니다 — 동의 없이 경력이 나갈 길이 생깁니다');
   assert.match(s, /fieldEdit\(\\'position1\\'/, '직급을 고칠 칸이 없습니다');
   assert.match(s, /직원연결칸Html\(d\)/, '명부와 잇는 줄이 없습니다 — 퇴사 때 저절로 빠지지 않습니다');
   assert.match(주석뺀(fnSource('memberEdit')), /mkind === 'staff'[\s\S]{0,80}직원편집\(d\)/);

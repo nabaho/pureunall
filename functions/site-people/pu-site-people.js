@@ -174,9 +174,42 @@
 
   function 직원읽기(html) {
     return 직원칸들(html).map(function (c) {
+      var 더 = 경력덩어리(c.html);
+      var 경력 = [];
+      if (더) {
+        var 안 = 사이글자(더.html, '<div class="desc">');
+        경력 = 안.replace(/^\s*<div>/, '').replace(/<\/div>\s*$/, '').split(/<br\s*\/?>/i).map(텍스트).filter(Boolean);
+      }
       return { 이름: 텍스트(사이글자(c.html, '<div class="text1">')),
-               직급: 텍스트(사이글자(c.html, '<div class="text2">')) };
+               직급: 텍스트(사이글자(c.html, '<div class="text2">')),
+               경력: 경력 };
     });
+  }
+
+  /* ── 직원 경력 창 (대표 승인 2026-11-01 직원 소개 2단계 A안 「눌러서 여는 창」) ──
+     ★ 상자 모양·크기는 그대로 두고 «경력 보기 ›» 한 줄과 창 하나를 덧붙인다.
+       창은 노무사 카드와 «같은 마크업»(bh_modal)이라 새 사이트 레이아웃 JS(bh_modal_toggle + data-target)가 연다.
+     ★ 우리가 붙인 것은 <div class="pu_staff_more"> 한 덩어리 — 다시 그릴 때 이것만 걷고 새로 붙인다.
+     ⚠ 경력은 «본인 동의를 받은 직원만» 온다(올릴직원이 거른다). 여기서는 받은 것만 그린다. */
+  var 더표 = '<div class="pu_staff_more">';
+  function 경력덩어리(칸html) {
+    var i = 칸html.indexOf(더표);
+    if (i < 0) return null;
+    var blk = 덩어리(칸html, i, 'div');
+    return blk ? { at: i, html: blk } : null;
+  }
+  function 경력창(p, 자리) {
+    var 표 = 'pu_staff_modal_' + 자리;
+    return 더표
+      + '<a class="bh_modal_toggle" data-target="' + 표 + '" role="button" tabindex="0"'
+      + ' style="display:inline-block;margin-top:6px;font-size:13px;color:#1e40af;cursor:pointer">경력 보기 ›</a>'
+      + '<div class="bh bh_modal ' + 표 + '"><div class="bh bh_modal_content" style="max-width: 600px;">'
+      + '<div class="bh bh_modal_close"><img src="../widgets/bh_gall_widget/skins/gall_people_sub/img/close.png" alt="close"></div>'
+      + '<div class="bh bh_modal_header"><div class="bh_title"><span>' + 감싸기(p.이름) + '<span class="pl-5"></span></span>'
+      + '<div class="position">' + 감싸기(p.직급) + '</div></div></div>'
+      + '<div class="bh bh_modal_body clearfix"><div class="career_title">경력사항</div>'
+      + '<div class="desc"><div>' + p.경력.map(감싸기).join('<br />\n') + '</div></div></div>'
+      + '</div><div class="bh bh_modal_dimmed"></div></div></div>';
   }
 
   /* 첫 상자를 본으로 사람 수만큼 찍어 낸다 — 노무사 카드와 같은 방식이라 모양이 달라질 자리가 없다.
@@ -186,14 +219,27 @@
     if (!칸.length) throw new Error('본으로 삼을 직원 칸을 찾지 못했습니다');
     if (!(직원들 || []).length) throw new Error('그릴 직원이 한 명도 없습니다');
     var 본 = 칸[0].html;
+    /* 본에 지난번 경력 창이 붙어 있으면 걷는다 — 안 걷으면 모든 직원에게 첫 사람 경력이 복사된다 */
+    var 옛더 = 경력덩어리(본);
+    if (옛더) 본 = 본.slice(0, 옛더.at) + 본.slice(옛더.at + 옛더.html.length);
     /* 칸 사이 띄움은 지금 쪽 것을 그대로 쓴다 — 그래야 다시 그려도 글자 하나 안 바뀐다 */
     var 사이 = 칸.length > 1 ? html.slice(칸[0].at + 칸[0].html.length, 칸[1].at) : '\n        ';
-    var 새것 = 직원들.map(function (p) {
+    var 새것 = 직원들.map(function (p, i) {
+      var 경력 = (p.경력 || []).filter(function (x) { return String(x || '').trim(); });
       return 본.replace(/(<div class="text1">)[\s\S]*?(<\/div>)/, function (_, a, b) { return a + 감싸기(p.이름) + b; })
-        .replace(/(<div class="text2">)[\s\S]*?(<\/div>)/, function (_, a, b) { return a + 감싸기(p.직급) + b; });
+        .replace(/(<div class="text2">)[\s\S]*?(<\/div>)/, function (_, a, b) {
+          return a + 감싸기(p.직급) + b + (경력.length ? 경력창({ 이름: p.이름, 직급: p.직급, 경력: 경력 }, i + 1) : '');
+        });
     }).join(사이);
     var 끝 = 칸[칸.length - 1];
     return html.slice(0, 칸[0].at) + 새것 + html.slice(끝.at + 끝.html.length);
+  }
+
+  /* 경력을 새 사이트에 보여도 되나 — 본인 동의(받은 날)가 적혀 있어야 한다 (대표 승인 2026-11-01).
+     ⚠ 동의가 없으면 경력은 우리 목록에만 남고, 새 사이트에는 이름·직급만 간다. */
+  function 경력공개(m) {
+    var c = (m || {}).careerConsent;
+    return !!(c && typeof c === 'object' && String(c.at || '').trim());
   }
 
   /* 우리 자료 → 올릴 직원. 차례(order)대로, 같으면 열쇠 순. 이름이 빈 줄은 안 그린다. */
@@ -210,7 +256,10 @@
   function 올릴직원(ours) {
     return (ours || []).filter(function (m) { return 직원인가(m) && String(m.name || '').trim(); })
       .slice().sort(차례견주기)
-      .map(function (m) { return { 이름: String(m.name).trim(), 직급: String(m.position1 || '').trim() }; });
+      .map(function (m) {
+        return { 이름: String(m.name).trim(), 직급: String(m.position1 || '').trim(),
+                 경력: 경력공개(m) ? (m.careers || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean) : [] };
+      });
   }
 
   /* ★ 푸른ERP 자료 + 지금 쪽 → «올릴 자료».
@@ -254,6 +303,7 @@
     직원그리기: 직원그리기,
     올릴직원: 올릴직원,
     차례견주기: 차례견주기,
+    경력공개: 경력공개,
     카드들: 카드들,
     덩어리: 덩어리
   };
