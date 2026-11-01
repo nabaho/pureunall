@@ -17,11 +17,12 @@ const MANY = Array.from({ length: 120 }, (_, i) => row(i + 1));
 function st(extra) { return { data: { docs: {}, human: {}, rounds: {} }, companies: [], staff: { 'P-001': '홍길동' }, me: '',
   sites: Object.assign({ f: 'all', q: '', sel: '', who: '', cols: {}, sort: null, page: 1, pop: '', popq: '', popPos: null }, extra || {}) }; }
 
-test('머리 — #을 뺀 일곱 칸이 단추, 걸린 칸은 on, 순서 화살표', () => {
+test('머리 — #을 뺀 여덟 칸이 단추, 걸린 칸은 on, 순서 화살표', () => {
   const h = V.listHtml(st({ cols: { biz: ['제조업'] }, sort: { key: 'size', dir: 'asc' } }), MANY.slice(0, 3),
     { offset: 0, cols: { biz: ['제조업'] }, sort: { key: 'size', dir: 'asc' }, pop: '' });
   const keys = [...h.matchAll(/data-act="colOpen"[^>]*data-key="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(keys.sort(), ['band', 'biz', 'docs', 'fin', 'last', 'name', 'who']);
+  // 「최근」 자리에 «진행»·«마지막 신고»가 들어왔다(설계 §15-1, 2026-11-01) — 최근 날짜는 «진행»의 title·순서로 남는다
+  assert.deepEqual(keys.sort(), ['band', 'biz', 'docs', 'filed', 'fin', 'name', 'stage', 'who']);
   assert.match(h, /<th class="[^"]*\bon\b[^"]*"[^>]*>\s*<button[^>]*data-key="biz"/, '걸린 업태 머리가 on');
   assert.match(h, /data-key="band"[^>]*>(?:(?!<\/button>)[\s\S])*▲/, '순서 걸린 규모에 ▲');
   assert.match(h, /<th class="c">#<\/th>/, '# 머리는 단추가 아니다');

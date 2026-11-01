@@ -1,6 +1,6 @@
 /* 폰 점검 — 취업규칙(rules-v2.html · rules.html) 지어낸 자료
  * ⚠ 모두 지어낸 것이다 — 업체는 「(주)가나다라…」, 사람은 「점검○○」.
- * 자리: data/companies (업체관리 원본 꼴 {v:[…]}) · rules_mgmt/library/{docs,human,rounds,run}
+ * 자리: data/companies (업체관리 원본 꼴 {v:[…]}) · rules_mgmt/library/{docs,human,rounds,run} · rules_mgmt/index(📮 신고일)
  * 표가 «꽉 찼을 때»를 보려고 업체 40곳·서류 90건, 긴 이름·여러 상태를 섞는다. */
 'use strict';
 
@@ -95,10 +95,21 @@ Object.keys(docs).slice(0, 30).forEach((id) => {
   text[id] = '제1조(목적) 이 규칙은 ' + docs[id].name + ' 의 근로조건을 정한다.\n제2조(적용범위) 이 규칙은 모든 근로자에게 적용한다.\n제3조(근로시간) 1일 8시간, 1주 40시간으로 한다.\n제4조(휴게) 4시간에 30분 이상 준다.\n';
 });
 
+/* 규정관리 «가벼운 색인»(rules_mgmt/index) — 🏢 사업장 «마지막 신고»의 📮 와 «✔ 검토 완료»(설계 §15-4). 사업자번호로만 잇는다 */
+const index = {};
+[1, 4, 9].forEach((i, n) => {
+  const co = companies[i];
+  index['site_' + co.bizNo.replace(/\D/g, '')] = { r202609: {
+    site: co.name, bizno: co.bizNo, asof: '2026-10-01', kind: '일부개정', changed: 3, arts: [], artsMore: 0,
+    savedAt: '2026-09-10 10:00', savedBy: '점검노무', doneAt: '2026-09-10 10:00', doneBy: '점검노무', ownerUid: 'u-seed', ownerName: '점검노무', from: 'rules',
+    ...(n < 2 ? { filedAt: '2026-09-1' + n, filedOffice: '점검지방고용노동청 점검지청' } : {}),
+  } };
+});
+
 module.exports = {
   data: {
     data: { companies: { v: companies } },
-    rules_mgmt: { library: { docs, human, rounds, text, auto, run: { at: T0, mails: 60, stored: 41, held: 3, dup: 2 } } },
+    rules_mgmt: { library: { docs, human, rounds, text, auto, run: { at: T0, mails: 60, stored: 41, held: 3, dup: 2 } }, index },
   },
   views: [
     { name: 'site', run: async (page) => { await page.click('#sites tbody tr[data-co]'); } },

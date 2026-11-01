@@ -88,6 +88,8 @@ test('읽기 — 서버 칸이 비어 있어도 빈 모양을 돌려준다', asy
   ['docs', 'human', 'rounds', 'run', 'auto'].forEach((k) => assert.ok(k in L, k + ' 가 없다'));
   assert.equal(L.run, null);
   assert.deepEqual(L.auto, {});
+  // 규정관리 가벼운 색인(설계 §15-4) — 비어 있어도 빈 모양(현황 한 줄이 메일 자료만으로 그린다)
+  assert.deepEqual(L.index, {});
   assert.equal(await S.text('rd_none'), '');
 });
 

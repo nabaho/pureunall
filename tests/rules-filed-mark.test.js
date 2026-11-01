@@ -98,3 +98,49 @@ test('화면 — 단추·창이 있고, 저장은 그 회차 자리에 update �
   assert.match(fn, /filedPatch\(/);
   assert.match(cut('function updateFiledBtn('), /isDone\(r\)&&isOwner\(r\)/, '남의 것·작업중에도 켜진다');
 });
+
+/* ⑦ 📮 를 적거나 지우면 «가벼운 색인»도 다시 쓴다 — 🏢 사업장 «마지막 신고»가 무거운 done 대신 색인을 읽는다(rules-v2 설계 §15-4).
+   saveFiled·backfillRulesIndex 를 떼어 가짜 DB 로 실제로 돌린다 */
+function 색인판(store, haveIdx) {
+  const sets = [];
+  const ctx = {
+    STORE: store, FILED_ID: 'site_A@r1', FBUSER: { uid: 'u1' },
+    FBDB: { ref: (p) => ({
+      update: () => Promise.resolve(),
+      set: (v) => { sets.push({ p, v }); return Promise.resolve(); },
+      once: () => Promise.resolve({ val: () => haveIdx })
+    }) },
+    $: () => ({ style: {}, classList: { add() {}, remove() {} }, disabled: false, innerHTML: '' }),
+    escapeH: (s) => String(s), myName: () => '홍', myUid: () => 'u1',
+    isOwner: (r) => r.ownerUid === 'u1', loadArch: () => [Object.assign({ id: 'site_A@r1', siteKey: 'site_A', rev: 'r1' }, store.done.site_A.r1)],
+    setLocal() {}, storePut() {}, closeOverlay() {}, updateDoneBtn() {}, console: { info() {}, warn() {} },
+    PuRulesHistory: { fit: (o) => o }, siteKeyOf: (id) => String(id).split('@')[0]
+  };
+  vm.createContext(ctx);
+  vm.runInContext(RAW.match(/const FILED_F=\[[^\]]*\];/)[0], ctx);
+  ['function fbPath(', 'function filedPatch(', 'function rulesIndexOf(', 'function rulesIndexPath(', 'function putRulesIndex(', 'async function saveFiled(']
+    .forEach((d) => vm.runInContext(cut(d), ctx));
+  vm.runInContext('let _idxFilled=false;\n' + cut('function backfillRulesIndex('), ctx);
+  ctx.itemKind = () => '유지';
+  return { ctx, sets };
+}
+test('⑦ 📮 저장 뒤 색인도 다시 쓴다 · 메우기는 신고일이 다른 내 회차만', async () => {
+  const rec = { site: '가나', bizno: '1234567890', asof: '2026-10-01', ownerUid: 'u1' };
+  const a = 색인판({ done: { site_A: { r1: Object.assign({}, rec) } } }, {});
+  await a.ctx.saveFiled({ at: '2026-10-05', office: '점검청', no: '' });
+  const w = a.sets.find((x) => x.p === 'rules_mgmt/index/site_A/r1');
+  assert.ok(w, '📮 저장 뒤 색인을 다시 쓰지 않는다');
+  assert.equal(w.v.filedAt, '2026-10-05');
+  assert.equal(w.v.filedOffice, '점검청');
+  // 메우기 — 색인에 신고일이 없는데 회차에는 있으면 다시 쓰고, 같으면 건드리지 않는다
+  const filed = Object.assign({ filedAt: '2026-10-05', filedOffice: '점검청' }, rec);
+  const b = 색인판({ done: { site_A: { r1: filed } } }, { site_A: { r1: { site: '가나' } } });
+  b.ctx.backfillRulesIndex(); await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(b.sets.length, 1, '신고일이 다른 색인을 메우지 않는다');
+  const c = 색인판({ done: { site_A: { r1: filed } } }, { site_A: { r1: { site: '가나', filedAt: '2026-10-05' } } });
+  c.ctx.backfillRulesIndex(); await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(c.sets.length, 0, '같은 색인을 또 쓴다');
+  const d = 색인판({ done: { site_A: { r1: Object.assign({}, filed, { ownerUid: 'u9' }) } } }, { site_A: { r1: { site: '가나' } } });
+  d.ctx.backfillRulesIndex(); await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(d.sets.length, 0, '남의 회차 색인을 쓴다');
+});

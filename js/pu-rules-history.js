@@ -58,6 +58,8 @@
       doneAt: String(v.doneAt || ''),
       doneBy: String(v.doneBy || ''),
       ownerName: String(v.ownerName || ''),
+      filedAt: String(v.filedAt || ''),
+      filedOffice: String(v.filedOffice || ''),
       from: v.from || 'rules'
     };
   }
@@ -160,13 +162,14 @@
      (docs/firebase-rules-…json 의 index 규칙과 같은 값 — 검사가 대조한다). */
   var LIMIT = { site: 120, bizno: 20, asof: 10, savedAt: 20, doneAt: 20,
                 savedBy: 40, doneBy: 40, ownerName: 40, art: 60,
-                arts: 4, changed: 1000 };
+                arts: 4, changed: 1000, filedOffice: 60 };
+  var FILED_RE = /^\d{4}-\d{2}-\d{2}$/;
   function cut(v, n) { return String(v == null ? '' : v).slice(0, n); }
   function fit(o) {
     o = o || {};
     var n = Number(o.changed);
     if (!isFinite(n) || n < 0) n = 0;
-    return {
+    var out = {
       site: cut(o.site, LIMIT.site),
       bizno: cut(o.bizno, LIMIT.bizno),
       asof: cut(o.asof, LIMIT.asof),
@@ -183,6 +186,14 @@
       ownerName: cut(o.ownerName, LIMIT.ownerName),
       from: (o.from === 'chwieop' ? 'chwieop' : 'rules')
     };
+    /* 📮 신고일(설계 §15-4) — 바른 꼴일 때만 싣는다. 빈 글자·틀린 꼴을 실으면 규칙이 그 회차 색인을 «통째로» 물리친다 */
+    var fa = String(o.filedAt == null ? '' : o.filedAt).trim();
+    if (FILED_RE.test(fa)) {
+      out.filedAt = fa;
+      var fo = cut(String(o.filedOffice == null ? '' : o.filedOffice).trim(), LIMIT.filedOffice);
+      if (fo) out.filedOffice = fo;
+    }
+    return out;
   }
 
   window.PuRulesHistory = {

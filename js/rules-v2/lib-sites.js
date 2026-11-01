@@ -115,7 +115,8 @@
   function filter(rows, f, q, who) {
     var list = (rows || []).filter(function (r) {
       if (!ownerOf(r, who)) return false;
-      return f === 'all' ? true : f === 'wait' ? r.cand > 0 : (r.linked + r.cand) > 0;
+      // 「⚠ 살펴볼 곳」(설계 §15-2) — lib-status 가 붙인 r.look 이 있는 줄만. 붙이지 않았으면 아무 줄도 아니다
+      return f === 'all' ? true : f === 'wait' ? r.cand > 0 : f === 'look' ? !!(r.look && r.look.length) : (r.linked + r.cand) > 0;
     });
     var nq = normName(q), digits = str(q).replace(/\D/g, '');
     if (!nq && digits.length < 3) return list;
@@ -125,8 +126,8 @@
     });
   }
   function counts(rows) {
-    var c = { has: 0, wait: 0, all: (rows || []).length };
-    (rows || []).forEach(function (r) { if (r.linked + r.cand > 0) c.has++; if (r.cand > 0) c.wait++; });
+    var c = { has: 0, wait: 0, look: 0, all: (rows || []).length };
+    (rows || []).forEach(function (r) { if (r.linked + r.cand > 0) c.has++; if (r.cand > 0) c.wait++; if (r.look && r.look.length) c.look++; });
     return c;
   }
 

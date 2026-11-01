@@ -33,8 +33,11 @@
       load: function () {
         /* 🤖 매일 정리 기록(auto) — 규칙 게시 전에는 못 읽는다. 그것 때문에 모은 자료 전체가 안 열리면 안 되므로 따로 받는다(설계 §14-3) */
         var autoP = val(LIB + '/auto').then(function (a) { return a || {}; }, function () { return { unreadable: true }; });
-        return Promise.all([val(LIB + '/docs'), val(LIB + '/human'), val(LIB + '/rounds'), val(LIB + '/run'), autoP])
-          .then(function (v) { return { docs: v[0] || {}, human: v[1] || {}, rounds: v[2] || {}, run: v[3] || null, auto: v[4] }; });
+        /* 규정관리 «가벼운 색인»(rules_mgmt/index) — 🏢 사업장 현황 한 줄의 📮 신고일·검토 완료 회차(설계 §15-4).
+           무거운 rules_mgmt/done(신구대조표 전문)은 읽지 않는다. 못 읽으면 빈 것 — 메일 자료만으로 그린다 */
+        var idxP = val('rules_mgmt/index').then(function (a) { return a || {}; }, function () { return {}; });
+        return Promise.all([val(LIB + '/docs'), val(LIB + '/human'), val(LIB + '/rounds'), val(LIB + '/run'), autoP, idxP])
+          .then(function (v) { return { docs: v[0] || {}, human: v[1] || {}, rounds: v[2] || {}, run: v[3] || null, auto: v[4], index: v[5] }; });
       },
       text: function (id) { return val(LIB + '/text/' + id).then(function (t) { return t == null ? '' : String(t); }); },
       // 가린 글 여럿 받기 — docs={id:doc}. 브라우저 칸(cache)에 같은 판(v)이 있으면 받지 않는다.

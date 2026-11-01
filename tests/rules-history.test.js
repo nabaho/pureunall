@@ -186,11 +186,30 @@ test('색인에 넣는 칸이 서버 규칙이 허용하는 칸과 정확히 같
   /* 소스를 긁지 않고 «서버로 보내는 그 함수»를 실제로 돌려 나온 칸을 견준다 —
      규정관리도 작성기도 이 함수를 거치므로, 여기만 맞으면 두 곳 다 맞는다.
      넘겨준 적 없는 칸(items 처럼 셈에만 쓰는 것)이 새어 나가는지도 함께 본다. */
-  const made = Object.keys(H.fit({
+  const base = {
     site: '가', asof: '2026-08-01', ownerUid: 'u1',
     items: [1, 2, 3], owner: 'a@b.c', enacted: true, status: '완료'
-  })).sort();
-  assert.deepEqual(made, allowed, '색인에 넣는 칸이 규칙이 허용하는 칸과 다르다');
+  };
+  // 📮 신고일·노동청은 «있을 때만» 싣는 칸이다(rules-v2 설계 §15-4) — 있으면 허용 칸 전부, 없으면 그 둘만 빠진다
+  const OPTIONAL = ['filedAt', 'filedOffice'];
+  const full = Object.keys(H.fit(Object.assign({ filedAt: '2026-10-05', filedOffice: '점검청', filedNo: '접수-1', filedBy: '홍' }, base))).sort();
+  assert.deepEqual(full, allowed, '색인에 넣는 칸이 규칙이 허용하는 칸과 다르다');
+  const plain = Object.keys(H.fit(base)).sort();
+  assert.deepEqual(plain, allowed.filter(k => !OPTIONAL.includes(k)), '신고 표시가 없는데 신고 칸을 싣는다 — 빈 글자는 규칙이 물리친다');
+});
+
+test('📮 신고일은 규칙이 받는 꼴일 때만 싣는다 — 틀린 꼴 하나가 회차 색인을 통째로 막지 않게', () => {
+  const rev = readJson(RULES_FULL).rules.rules_mgmt.index.$site.$rev;
+  const re = /matches\(\/(.+)\/\)/.exec(rev.filedAt['.validate']);
+  assert.ok(re, '신고일 규칙에서 꼴을 못 읽었다');
+  const rule = new RegExp(re[1]);
+  const ok = H.fit({ site: '가', asof: '2026-08-01', filedAt: ' 2026-10-05 ', filedOffice: '가'.repeat(500) });
+  assert.match(ok.filedAt, rule, '규칙이 받지 않는 꼴을 싣는다');
+  assert.ok(ok.filedOffice.length <= H.LIMIT.filedOffice, '노동청 이름이 한도를 넘었다');
+  ['', '2026-10', '26-10-05', '2026/10/05', null, undefined].forEach(v => {
+    const o = H.fit({ site: '가', asof: '2026-08-01', filedAt: v, filedOffice: '점검청' });
+    assert.ok(!('filedAt' in o) && !('filedOffice' in o), '틀린 신고일(' + v + ')을 싣는다');
+  });
 });
 
 test('규칙이 받아 주는 값만 코드가 넣는다 — 구분·보낸 곳은 정해진 낱말뿐', () => {
@@ -213,7 +232,7 @@ test('규칙이 정한 길이 한도와 코드가 쓰는 한도가 같다', () =
     const m = /length\s*<=\s*(\d+)/.exec((rev[k] || {})['.validate'] || '');
     return m ? Number(m[1]) : null;
   };
-  ['site', 'bizno', 'asof', 'savedAt', 'savedBy', 'doneAt', 'doneBy', 'ownerName'].forEach(k => {
+  ['site', 'bizno', 'asof', 'savedAt', 'savedBy', 'doneAt', 'doneBy', 'ownerName', 'filedOffice'].forEach(k => {
     assert.equal(H.LIMIT[k], maxOf(k), k + ' 한도가 규칙과 다르다');
   });
   assert.equal(H.LIMIT.art, maxOf.call(null, 'arts') || Number(/length\s*<=\s*(\d+)/.exec(rev.arts.$i['.validate'])[1]),

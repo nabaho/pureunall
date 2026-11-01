@@ -13,6 +13,7 @@
   'use strict';
 
   function Sx() { return root.PuRulesV2Sites; }
+  function St() { return root.PuRulesV2Status; }
   function O() { return root.PuRulesV2Order; }
   function Lib() { return root.PuRulesV2Lib; }
   function esc(v) { return Lib().esc(v); }
@@ -30,9 +31,11 @@
   function td(cls, title, html) {
     return '<td' + (cls ? ' class="' + cls + '"' : '') + ' title="' + esc(title) + '">' + html + '</td>';
   }
-  function linkBtn(row) {
+  /* short — 표 칸에 확정·후보 딱지가 함께 있을 때. 칸이 좁아져(설계 §15-1) 긴 글자면 단추가 잘린다 — 뜻은 title 에 그대로 */
+  function linkBtn(row, short) {
     return '<button class="btn sm g" data-act="siteLink" data-co="' + esc(row.id) + '" title="'
-      + esc('후보 ' + row.cand + '건(메일 ' + row.candMails + '통)을 이 사업장 자료로 확정합니다') + '">✓ 이 회사 자료 맞음</button>';
+      + esc('이 회사 자료 맞음 — 후보 ' + row.cand + '건(메일 ' + row.candMails + '통)을 이 사업장 자료로 확정합니다') + '">'
+      + (short ? '✓ 맞음' : '✓ 이 회사 자료 맞음') + '</button>';
   }
 
   /* ── 위 거르개 줄 ── */
@@ -64,6 +67,8 @@
        칩 글자는 짧게(「취업규칙」은 이 앱 이름이라 뺐다 — 뜻은 title 에), 새로고침은 폰에서 ↻ 만 */
     return '<div class="flt">'
       + chip('has', '자료 있는 곳', '', '취업규칙 자료가 있는 거래처') + chip('wait', '확정 기다림', 'warn', '후보 자료를 «이 회사 것이 맞다»고 확정하기를 기다리는 거래처')
+      + chip('look', '⚠ 살펴볼 곳', 'look', '피보험자 10명 이상인데 취업규칙 기록이 없는 곳 + 신고 없이 오래 멈춘 회차 (설계 §15-2)'
+        + (c.unlinked ? ' · 사업자번호가 없어 잇지 못한 📮 신고 표시 ' + c.unlinked + '건' : ''))
       + chip('all', '모든 거래처', '', '자료가 없는 곳까지 모든 거래처')
       + ownerSelect(st, oc)
       + '<input class="q" data-role="sq" placeholder="🔍 회사 이름 · 사업자번호" value="' + esc(s.q || '') + '">'
@@ -87,6 +92,25 @@
     return td('pk', on ? '고름 — 다시 누르면 풂' : '고르기 — 여러 곳을 한꺼번에 «자료 맞음»으로',
       '<label><input type="checkbox" data-pick="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></label>');
   }
+  /* «진행» 칸 — 가장 최근 회차의 단계·날수(설계 §15-1). 긴 말은 title */
+  function stageCell(r) {
+    var lb = St() ? St().label(r.stat) : { text: '—', title: '', cls: 'none' };
+    var t = lb.title + (r.last ? ' · 최근 메일 ' + ymd(r.last) : '');
+    if (lb.cls === 'look') return td('', t, '<span class="k look">' + esc(lb.text) + '</span>');
+    return td('', t || '취업규칙 자료 없음', '<span class="sg ' + lb.cls + '">' + esc(lb.text) + '</span>');
+  }
+  /* «마지막 신고» 칸 — 📮(사람이 적은 신고일)·✉(신고서가 오간 날) 가운데 늦은 것. 둘 다 title 에 */
+  function filedTitle(f) {
+    if (!f) return '신고 기록 없음';
+    if (f.src === 'mark') return '📮 신고일 ' + f.day + (f.office ? ' (' + f.office + ')' : '') + (f.mailAt ? ' · ✉ 신고서 메일 ' + ymd(f.mailAt) : '');
+    return '✉ 신고서가 오간 날(메일) ' + ymd(f.at) + ' — 노동청 접수일이 아닐 수 있습니다' + (f.markDay ? ' · 📮 ' + f.markDay : '');
+  }
+  function filedCell(r) {
+    var f = r.stat && r.stat.filed;
+    if (!f) return td('', '신고 기록 없음', '<span class="k none">—</span>');
+    var d = f.src === 'mark' ? f.day : ymd(f.at);
+    return td('', filedTitle(f), '<span class="fd">' + esc(String(d).slice(2)) + '</span> <span class="src">' + (f.src === 'mark' ? '📮' : '✉') + '</span>');
+  }
   function listHtml(st, rows, opt) {
     var sel = (st.sites || {}).sel || '', off = opt ? opt.offset || 0 : 0, picked = (st.sites || {}).picked;
     var allOn = !!(rows && rows.length && picked && rows.every(function (r) { return picked.has(r.id); }));
@@ -95,9 +119,8 @@
       var doc = [], docT = [];
       if (r.linked) { doc.push('<span class="k ok">확정 ' + r.linked + '</span>'); docT.push('확정 ' + r.linked); }
       if (r.cand) { doc.push('<span class="k cand">후보 ' + r.cand + '</span>'); docT.push('후보 ' + r.cand + '(메일 ' + r.candMails + '통)'); }
-      if (r.cand) doc.push(linkBtn(r));
+      if (r.cand) doc.push(linkBtn(r, r.linked > 0));
       if (!doc.length) doc.push('<span class="k none">자료 없음</span>');
-      var last = r.last ? ymd(r.last).slice(0, 7) : '—';
       var fin = r.fin && r.fin.state === 'set'
         ? td('', '★최종본 ' + (r.fin.at ? ymd(r.fin.at) : ''), '<span class="fin">★' + (r.fin.at ? ' ' + esc(ymd(r.fin.at).slice(2, 7)) : '') + '</span>')
         : r.fin && r.fin.state === 'none' ? td('', '최종본을 아직 안 정했습니다', '<span class="k none">미정</span>')
@@ -107,28 +130,30 @@
         + pickCell(picked, r)
         + td('no', String(off + i + 1), String(off + i + 1))
         + td('', r.name + (r.closed ? ' (폐업)' : ''), '<b>' + esc(r.name) + '</b>' + (r.closed ? ' <span class="k none">폐업</span>' : ''))
-        + td('', size || '인원 모름', size ? esc(size) : '<span class="k none">—</span>')
+        // 규모는 «34명»만 — 숫자가 이미 10명 이상인지 말한다. 띠는 title·머리 창(설계 §15-1)
+        + td('', size || '인원 모름', r.size > 0 ? esc(r.size + '명') : '<span class="k none">—</span>')
         + td('', r.bizType || '업태 모름', r.bizType ? esc(r.bizType) : '<span class="k none">—</span>')
         + ownerCell(st, r)
-        + td('', docT.join(' · ') || '자료 없음', doc.join(' '))
-        + td('', r.last ? '최근 메일 ' + ymd(r.last) : '자료 없음', esc(last))
+        + stageCell(r) + filedCell(r)
         + fin
+        + td('', docT.join(' · ') || '자료 없음', doc.join(' '))
         + '</tr>';
     }).join('');
     var condOn = opt && SC().conditions(opt.cols).length > 0;
-    if (!body) body = '<tr><td colspan="9" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
+    if (!body) body = '<tr><td colspan="10" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
     /* 칸 폭 — 사업장 이름(폭 없는 칸)은 «남는 자리»를 받는다. 표의 min-width(rules-v2.html .sites)가 다른 칸 합보다
        넉넉해야 이름이 산다 — 모자라면 이름이 「삼…」 한 글자만 남는다(2026-10-18 폰 실측). # 칸 폭은 .sites 의
        이름 칸 고정(left)과 같아야 한다 — tests/rules-sites-compact.test.js 가 견준다 */
-    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:120px"><col style="width:88px"><col style="width:76px"><col style="width:250px"><col style="width:72px"><col style="width:76px"></colgroup>'
-      + (opt ? headHtml(st, opt, allOn) : '<thead><tr><th class="c pk"></th><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>')
+    /* «진행»·«마지막 신고»를 「최근」 자리에 넣고(설계 §15-1) 규모·업태·담당·자료를 좁혔다 — 다른 칸 합 748 + 이름 몫 140 = .sites min-width */
+    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:60px"><col style="width:68px"><col style="width:70px"><col style="width:120px"><col style="width:96px"><col style="width:70px"><col style="width:200px"></colgroup>'
+      + (opt ? headHtml(st, opt, allOn) : '<thead><tr><th class="c pk"></th><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>진행</th><th>마지막 신고</th><th>★최종본</th><th>취업규칙 자료</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
   }
 
   /* ── 머리줄 거르기 (설계 §12) — 단추·창·띠·쪽 막대. 셈은 lib-sitecols.js ── */
   function SC() { return root.PuRulesV2SiteCols; }
-  /* 거르는 칸 머리 — 이름 · 규모 · 업태 · 담당 · 자료 · 최근 · ★최종본 (#은 아니다) */
-  var HEAD = [['name', '사업장'], ['band', '규모'], ['biz', '업태'], ['who', '담당'], ['docs', '취업규칙 자료'], ['last', '최근'], ['fin', '★최종본']];
+  /* 거르는 칸 머리 — 이름 · 규모 · 업태 · 담당 · 진행 · 마지막 신고 · ★최종본 · 자료 (#은 아니다) */
+  var HEAD = [['name', '사업장'], ['band', '규모'], ['biz', '업태'], ['who', '담당'], ['stage', '진행'], ['filed', '마지막 신고'], ['fin', '★최종본'], ['docs', '취업규칙 자료']];
   function colOn(opt, key, st) {
     var cols = opt.cols || {};
     if (key === 'name') return !!String(((st && st.sites) || {}).q || '').trim();
@@ -278,13 +303,35 @@
       + '<button class="lnk sback" data-act="siteSel" data-co="" title="사업장 목록으로 돌아갑니다">← 목록</button>'
       + '<h3 title="' + esc(row.name) + '">' + esc(row.name) + '</h3>'
       + '<div class="sub" title="' + esc(sub) + '">' + esc(sub || '사업자번호·인원 모름') + '</div>'
-      + startHtml(st, row) + hist + '</div>';
+      + nowHtml(st, row) + startHtml(st, row) + hist + '</div>';
+  }
+  /* 「현황 한 줄」(설계 §15-3) — 현행본 · 마지막 신고 · 지금 · 단계 줄 */
+  function nowHtml(st, row) {
+    var s = row.stat;
+    if (!s || !St()) return '';
+    var sd = Sx().startDoc(row), doc = sd ? (((st.data || {}).docs || {})[sd.docId] || {}) : null;
+    var cur = row.fin && row.fin.state === 'set' ? '★최종본 ' + (row.fin.at ? ymd(row.fin.at) : '')
+      : sd ? '최종본 미정 — 가장 최근 판 ' + ymd(((doc || {}).mail || {}).date) : '';
+    var f = s.filed, fv = !f ? '' : (f.src === 'mark' ? f.day + ' · 📮' + (f.office ? ' ' + f.office : '') : ymd(f.at) + ' · ✉ 신고서 메일');
+    var lb = St().label(s), now = lb.text + (s.round ? ' · ' + roundLabel(s.round) : '');
+    function line(l, v, t) {
+      return '<div class="r"><span class="l">' + l + '</span><span class="v" title="' + esc(t || v || '') + '">' + (v ? esc(v) : '<span class="k none">—</span>') + '</span></div>';
+    }
+    var steps = (s.steps || []).map(function (x) {
+      return '<i class="' + (x.on ? 'on' : x.next ? 'next' : '') + '" title="' + esc(x.t + (x.at ? ' ' + ymd(x.at) : ' — 아직')) + '">'
+        + esc(x.t + (x.at ? ' ' + md(x.at) : x.next ? ' ?' : '')) + '</i>';
+    }).join('<em>→</em>');
+    return '<div class="snow">' + line('현행본', cur) + line('마지막 신고', fv, filedTitle(f))
+      + '<div class="r"><span class="l">지금</span><span class="v sg ' + lb.cls + '" title="' + esc(lb.title) + '">' + esc(now) + '</span></div>'
+      + (steps ? '<div class="ssteps">' + steps + '</div>' : '') + '</div>';
   }
 
   /* ── 꽂기 — 셈은 그릴 때 한 번(거래처 수백 곳 — 가볍다) ── */
   function render(el, st, handlers) {
     var s = st.sites || {};
     var rows = Sx().model(st.data, st.companies);
+    // 현황 한 줄(설계 §15) — 줄마다 r.stat·r.look 를 붙인다. 색인(규정관리)은 읽기만 했다
+    var stat = St() ? St().apply(rows, (st.data || {}).index || {}, Date.now()) : { unlinked: 0 };
     var cols = s.cols || {};
     var base = Sx().filter(rows, s.f || 'has', s.q || '', s.who || '');        // 위쪽 칩·담당·검색
     var kept = SC().apply(base, cols);                                          // 머리줄 조건
@@ -302,7 +349,8 @@
     var popRows = s.pop === 'who' ? SC().apply(Sx().filter(rows, s.f || 'has', s.q || '', ''), cols) : base;
     var row = s.sel ? rows.filter(function (r) { return r.id === s.sel; })[0] : null;
     var opt = { offset: pg.from ? pg.from - 1 : 0, cols: cols, sort: s.sort, pop: s.pop };
-    el.innerHTML = filterHtml(st, Sx().counts(rows), Sx().ownerCounts(rows)) + condHtml(cols, kept.length) + bulkHtml(st, rows)
+    var cnt = Sx().counts(rows); cnt.unlinked = stat.unlinked;
+    el.innerHTML = filterHtml(st, cnt, Sx().ownerCounts(rows)) + condHtml(cols, kept.length) + bulkHtml(st, rows)
       + '<div class="swrap"><div class="stbl">' + listHtml(st, pg.items, opt) + pagerHtml(pg) + '</div>' + sideHtml(st, row) + '</div>'
       + (s.pop ? popHtml(st, s.pop, popRows) : '')
       + (st.busy ? '<div class="busy">' + esc(st.busy) + '</div>' : '');
@@ -355,7 +403,7 @@
     };
   }
 
-  var api = { render: render, listHtml: listHtml, sideHtml: sideHtml, filterHtml: filterHtml,
+  var api = { render: render, listHtml: listHtml, sideHtml: sideHtml, filterHtml: filterHtml, nowHtml: nowHtml,
     headHtml: headHtml, popHtml: popHtml, condHtml: condHtml, pagerHtml: pagerHtml, bulkHtml: bulkHtml };
   if (root) root.PuRulesV2SitesView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
