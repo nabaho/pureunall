@@ -139,6 +139,19 @@
   }
 
   function seal(data, key) { return mapAll(data, key, shouldSeal, sealOne); }
+
+  /* ── 계좌번호도 잠근다 (2026-11-01 개인정보 1단계) ──────────────────────
+     안전성 확보조치 기준 제7조⑤ — 직원 PC·USB·NAS 로 나가는 사본에 계좌가 글자 그대로 남았다.
+     ⚠ 주민번호와 달리 «모양»으로는 찾지 않는다 — 전화·사업자번호와 구별되지 않는다. 칸 이름이 딱 맞을 때만.
+     ⚠ seal() 은 그대로 둔다 — 다른 앱(급여아웃소싱 등)은 주민번호만 잠그는 약속으로 쓰고 있다.
+       계좌까지 잠그는 쪽은 sealPii() 를 따로 부른다. 푸는 unseal() 은 둘 다 같은 것으로 푼다. */
+  var ACCOUNT_FIELD = /^(account|accountNo|bankAccount|acctNo|계좌|계좌번호)$/i;
+  function shouldSealPii(k, v) {
+    if (shouldSeal(k, v)) return true;
+    return typeof v === 'string' && !!v.trim() && !isSealed(v) && ACCOUNT_FIELD.test(String(k == null ? '' : k));
+  }
+  function sealPii(data, key) { return mapAll(data, key, shouldSealPii, sealOne); }
+  function countToSealPii(data) { var sites = []; walk(data, '', sites, shouldSealPii); return sites.length; }
   function unseal(data, key) {
     return mapAll(data, key, function (k, v) { return isSealed(v); }, unsealOne);
   }
@@ -194,6 +207,7 @@
     isSealed: isSealed, looksLikeRrn: looksLikeRrn, isRrnField: isRrnField, shouldSeal: shouldSeal,
     newKeyB64: newKeyB64, importKey: importKey, keyFor: keyFor,
     sealOne: sealOne, unsealOne: unsealOne,
-    seal: seal, unseal: unseal, countSealed: countSealed, countToSeal: countToSeal
+    seal: seal, unseal: unseal, countSealed: countSealed, countToSeal: countToSeal,
+    shouldSealPii: shouldSealPii, sealPii: sealPii, countToSealPii: countToSealPii
   };
 })(typeof window !== 'undefined' ? window : globalThis);
