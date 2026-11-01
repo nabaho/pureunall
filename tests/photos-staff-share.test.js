@@ -323,7 +323,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      (설계 2026-10-03-취업규칙-새로짓기-design.md §15-4). 새로 생김 2 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 읽기는 그대로 로그인 직원
      (같은 값이 든 rules_mgmt/done 도 이미 로그인 직원이 읽는다). 클라우드 방은 GitHub 「Firebase 배포」(rules=true)로 게시한 뒤
      콘솔 원문을 새 판으로 갈아 끼우고 아래 두 줄을 뺄 것. 게시 전에는 📮 가 있는 회차의 색인 쓰기만 막힌다(다른 회차는 그대로). */
-  const PENDING = ['/rules_mgmt/index/$site/$rev/filedAt', '/rules_mgmt/index/$site/$rev/filedOffice'];
+  /* ★ 2026-11-01 — 게시 완료(GitHub 「Firebase 배포」 실행 41282633461 · rules-deploy.js --deploy, 클라우드 방): 새로 2 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-01.json — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
