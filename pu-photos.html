@@ -429,6 +429,19 @@ button{font-family:inherit;cursor:pointer}
   #readAskBar{gap:6px;padding:5px 8px}
   #readAskBar .d,#readAskBar .tly,#readAskBar .lg{display:none}
   #readAskBar .t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  /* 도구줄 안(2026-11-01)에서는 제목도 «폭 0 에서» 시작한다 — 글 길이가 띠의 최소 폭에
+     들어가면 「한꺼번에 올린 사진」·한도 띠가 줄을 넘겨 붙박이 줄이 두 배가 된다(재어 보고 찾음).
+     남는 자리를 다 받으므로 넉넉할 때는 그대로 다 보인다. */
+  #gridBar #readAskBar .t{width:0;flex:1 1 auto}
+  #gridBar #readAskBar{padding:3px 7px}
+}
+/* 폰 차례 고르개 — 켜진 칸 하나만 보이고, 누르면 다른 차례로 넘어간다 (대표 지시 2026-11-01).
+   두 칸이면 122px 라 「☑ 전부 · 판독 띠」와 한 줄에 안 든다.
+   ⚠ 폭 기준은 isPhone() 과 같은 820px — pickSort 가 그것으로 넘길지 정한다. 다르면
+     둘 다 보이는데 눌러서 넘어가거나, 하나만 보이는데 안 넘어가는 구간이 생긴다. */
+@media (max-width:820px){
+  #sortSeg button:not(.on){display:none}
+  #sortSeg button.on::after{content:' ⇅';opacity:.8}
 }
 /* ⏸ 판독 보류 딱지 — 「서류」 딱지와 **같은 자리**를 쓴다(칸 아래 20px 을 또 쓰지 않게).
    색은 위 띠와 같은 주황이라, 띠와 칸이 «같은 일»을 말하는 것으로 읽힌다. */
@@ -638,6 +651,15 @@ button{font-family:inherit;cursor:pointer}
   padding:7px 13px;font-size:12.5px;font-weight:700;font-family:inherit}
 #kinds button.on{border-color:var(--blue);background:var(--blue);color:#fff}
 #kinds button .n{font-weight:800;opacity:.75;margin-left:5px;font-size:11px}
+/* 넘칠 때만(fitKinds) — 짧은 이름 · 「＋」 · 조금 좁은 간격 */
+#kinds.tight{gap:5px}
+#kinds.tight button{padding:7px 11px}
+#kinds.tight button .n{margin-left:4px}
+#kinds.tight .lanes button{padding:7px 10px}
+/* 「전체」 장수는 바로 옆 갈래 스위치(📄 서류 N)와 같은 수다 — 좁을 때는 한 번만 적는다 */
+#kinds.tight button[data-key="all"] .n{display:none}
+#kinds.tight .wide-only{display:none}
+#kinds.tight .narrow-only{display:inline}
 /* ── 갈래 스위치 (사진 | 서류) — 탭 줄 맨 앞 (대표 결정 2026-09-09) ──
    ⚠ 분류 탭과 «다르게» 보여야 한다. 같은 알약이면 아홉 개 알약 가운데 둘일 뿐이고,
      사람은 그것이 «위의 축»이라는 것을 알 수가 없다. 그래서 둘을 한 덩이로 묶고
@@ -841,8 +863,11 @@ button{font-family:inherit;cursor:pointer}
     grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;
     border:none;background:none;color:var(--ink);
     padding:7px 9px;font-family:inherit;font-size:12.5px;font-weight:800;text-align:left}
-  #phSummaryBtn .doc{white-space:nowrap}
-  #phSummaryBtn .owner{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  /* ⚠ 칸을 못 박는다 — 「📑 문서」·상태는 할 말이 있을 때만 보인다. 안 박으면 빈 칸을 건너
+       자리가 한 칸씩 당겨져, 상태 딱지가 넓은 칸(1fr)에 앉아 길게 늘어났다(2026-11-01 실측). */
+  #phSummaryBtn .doc{white-space:nowrap;grid-column:1}
+  #phSummaryBtn .state{grid-column:3}
+  #phSummaryBtn .owner{grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     color:var(--sub);font-weight:700}
   #phSummaryBtn .state{white-space:nowrap;border-radius:999px;padding:3px 7px;
     background:#f8fafc;color:#1e40af;font-size:11.5px}
@@ -2188,7 +2213,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
         <button id="phSummaryBtn" onclick="openPhSheet()" aria-haspopup="dialog">
           <span class="doc" id="phSummaryDoc">📑 문서</span>
           <span class="owner" id="phSummaryOwner">내 사진</span>
-          <span class="state" id="phSummaryState">준비</span>
+          <span class="state" id="phSummaryState" style="display:none"></span>
         </button>
         <!-- ★ 「⚠ N」은 시트가 아니라 «손볼 사진»으로 곧장 간다 (대표 지시 2026-09-03).
              예전에는 요약 «안»의 글자라, 눌러도 시트가 열릴 뿐이었다 —
@@ -8420,6 +8445,9 @@ function saveAiBudget() {
 function renderReadAsk() {
   const el = $('readAskBar');
   if (!el) return;
+  /* 폰은 띠 «종류»를 보고 자리를 정한다(placeAskBar) — 다 그린 뒤라야 종류가 정해져 있다.
+     갈림길마다 return 이라 맨 앞에서 예약해 둔다(그리기가 끝난 바로 뒤, 화면에 나오기 전에 돈다). */
+  Promise.resolve().then(placeAskBar);
   /* ⚠ **한도가 이긴다.** 「서류입니다」라고 답해도 오늘은 못 읽는다 —
      물어 놓고 못 하는 것이 안 묻는 것보다 나쁘다. */
   if (readQuotaOut) {
@@ -10794,6 +10822,8 @@ function comparePhotosByTitle(a, b) {
 }
 
 function pickSort(mode) {
+  /* 폰은 켜진 칸 하나만 보인다(대표 지시 2026-11-01) — 그것을 누르면 다른 차례로 넘어간다 */
+  if (isPhone() && mode === gridSort) mode = mode === 'title' ? 'new' : 'title';
   gridSort = mode === 'title' ? 'title' : 'new';
   try { localStorage.setItem(GRID_SORT_LS, gridSort); } catch (_) { }
   /* 차례가 바뀌면 「더 보기」로 펼쳐 둔 만큼을 되돌린다 — 안 그러면 폰에서
@@ -12788,7 +12818,7 @@ function renderKindTabs() {
       '<span class="narrow-only">' + esc(short) + '</span>' +
       '<span class="n">' + (c[k] || 0) + '</span>' + pen + '</button>';
   }).join('') + (PuPhotoStore.amAdmin()
-    ? '<button class="add" onclick="openAddKind()" title="새 분류를 직접 만듭니다">+ 분류 추가</button>' : '');
+    ? '<button class="add" onclick="openAddKind()" title="분류 추가 — 새 분류를 직접 만듭니다">＋<span class="wide-only"> 분류 추가</span></button>' : '');
   /* 탭 줄 높이가 바뀌었을 수 있다(직접분류가 늘거나 폰에서 두 줄이 되는 등) —
      찾기 줄이 붙을 자리를 다시 잰다. 안 하면 찾기 줄이 탭을 덮는다. */
   syncStickyTop();
@@ -13295,9 +13325,20 @@ function retagPhotos(ids, tabKey) {
    ⚠ 0 은 «참»이다. 못 잰 것과 0 을 가르지 말 것.
    ⚠ 처음 그릴 때도 불러야 한다. 예전에는 resize 에만 걸려 있어서, 창 크기를
      한 번도 안 바꾼 사람은 **늘 기본값 44px** 를 보고 있었다. */
+/* ── 탭 줄이 넘치면 짧은 이름으로 (대표 지시 2026-11-01 「추천대로」) ──
+   1280~1400px 에서 끝의 탭 두엇이 둘째 줄로 떨어져 사진이 39px 아래로 밀렸다.
+   그럴 때만 짧은 이름(사업자등록증 → 사업자)과 「＋」로 줄인다 — 넓으면 긴 이름 그대로.
+   ⚠ 폭을 숫자로 정하지 않고 «실제로 넘치는가»를 잰다. 장수 자릿수·직접분류·숨긴 탭에
+     따라 넘치는 폭이 날마다 다르다. 늘 긴 이름으로 재 보고 정하므로 넓혀도 따라온다. */
+function fitKinds(el) {
+  el.classList.remove('tight');
+  const a = el.firstElementChild, z = el.lastElementChild;
+  if (a && z && z.getBoundingClientRect().top > a.getBoundingClientRect().top + 4) el.classList.add('tight');
+}
 function syncStickyTop() {
   const el = $('kinds');
   if (!el) return;
+  fitKinds(el);
   const h = el.getBoundingClientRect().height;   // 감춰져 있으면 0 — 그것이 맞다
   document.documentElement.style.setProperty('--kindsH', Math.round(h) + 'px');
 }
@@ -14939,6 +14980,7 @@ function renderGridBar() {
      칸 수로 세면 「5장」이라 해 놓고 「10장 지우기」가 되어 말이 어긋난다. */
   const shown = shownCount();
   const n = selected.size;
+  placeAskBar();
   /* ⚠ 예전에는 볼 사진이 없으면 이 줄을 통째로 숨겼다. 이제는 **찾기가 이 안에 있어서**
      숨기면 해 고르개까지 사라진다 — 사진 없는 해를 고른 순간 되돌아올 길이 없어진다.
      그래서 줄은 늘 두고, 볼 것이 없을 때 뜻이 없어지는 차례 고르개와 ? 만 접는다. */
@@ -20857,9 +20899,7 @@ function placeForWidth() {
     if (shr && ownDock && shr.parentNode !== ownDock) ownDock.appendChild(shr);
     if (up && upDock && up.parentNode !== upDock) upDock.appendChild(up);
     if (collect && collectDock && collect.parentNode !== collectDock) collectDock.appendChild(collect);
-    /* 판독 물음 띠 — 폰은 도구줄 «위» 제자리(도구줄 안에 두면 붙박이 줄이 두꺼워진다) */
-    const askP = $('readAskBar'), gbP = $('gridBar');
-    if (askP && gbP && gbP.parentNode && askP.parentNode !== gbP.parentNode) gbP.parentNode.insertBefore(askP, gbP);
+    placeAskBar();
     renderPhNeedBtn();
   } else {
     /* 넓히면 전부 대시보드 제자리로 — 사진은 맨 위, 서류는 row2 안 */
@@ -20882,19 +20922,33 @@ function placeForWidth() {
        viewPhotos 의 자식이 아닌 것 앞에 끼우면 insertBefore 가 터진다 — 이제 윗줄은 gridBar 다. */
     const collect2 = $('collectBar'), topRow = $('gridBar'), photos = $('viewPhotos');
     if (collect2 && collect2.parentNode !== photos && topRow) photos.insertBefore(collect2, topRow);
-    /* ── 판독 물음 띠를 도구줄 «안»으로 (대표 지시 2026-09-28 「이부분 한줄로 합쳐달라」) ──
-       띠와 찾기 줄이 두 줄을 먹었다. 넓은 화면에서는 「☑ 전부」 뒤·차례 고르개 앞에 끼운다.
-       ⚠ 차례 고르개(#sortSeg)가 margin-left:auto 로 오른쪽 끝에 붙으므로 그 «앞»이다. */
-    const ask2 = $('readAskBar'), sortSeg = $('sortSeg');
-    if (ask2 && topRow && sortSeg && sortSeg.parentNode === topRow && ask2.parentNode !== topRow) {
-      topRow.insertBefore(ask2, sortSeg);
-    }
+    placeAskBar();
     if (row2 && doc && doc.parentNode !== row2) row2.appendChild(doc);
   }
   /* 폰에서 찾기 줄은 🔍 를 눌렀을 때만 — 안 그러면 첫 화면에서 한 줄을 먹는다 */
   const fb = $('findBar');
   if (fb) fb.classList.toggle('hidden', phone && !phoneFindOn);
   renderPhSummary();
+}
+
+/* ── 판독 물음 띠의 자리 — 도구줄 «안»(차례 고르개 앞) 또는 «위» ──
+   넓은 화면은 늘 안이다(대표 지시 2026-09-28 「이부분 한줄로 합쳐달라」).
+   폰도 날마다 뜨는 「🔤 안 읽은 서류 N장」 띠는 안이다(대표 지시 2026-11-01 「추천대로」 —
+   사진 위 띠가 석 줄이라 첫 사진이 화면 28% 아래에서 시작했다). 차례 고르개가 단추 하나로
+   줄어 「☑ 전부 · 띠 · 최신순」이 412px 한 줄에 든다.
+   ⚠ 폰에서 «위»로 비키는 때 둘:
+     ① 사진을 고르면 — 고른 것에 쓰는 단추가 붙박이 도구줄을 두세 줄 채운다. 띠까지 얹히면
+        사진을 가린다. renderGridBar 가 고를 때마다 부른다.
+     ② 띠가 「서류입니까?」·한도일 때 — 한 줄에 넣으면 제목이 「🖼 한…」까지 잘려 무엇을
+        묻는지 안 보인다(412px 에서 재어 봄). 드물고, 말이 중요한 띠다. */
+function placeAskBar() {
+  const ask = $('readAskBar'), bar = $('gridBar'), sort = $('sortSeg');
+  if (!ask || !bar || !bar.parentNode) return;
+  if (!isPhone() || (!selected.size && ask.className === 'wait')) {
+    if (sort && sort.parentNode === bar && ask.parentNode !== bar) bar.insertBefore(ask, sort);
+  } else if (ask.parentNode !== bar.parentNode) {
+    bar.parentNode.insertBefore(ask, bar);
+  }
 }
 
 /* ── 폰 : 맨 윗줄의 올리기 ──
@@ -20959,8 +21013,11 @@ function renderPhSummary() {
     state.classList.add('busy');
     state.textContent = '올리는 중 ' + busy;
   } else {
-    state.textContent = '준비';
+    state.textContent = '';
   }
+  /* ★ 할 일이 없으면 «안 그린다» (대표 지시 2026-11-01 「추천대로」) — 「준비」는 아무것도
+       안 알려 주면서 늘 떠 있었다. 위 「📑 문서」와 같은 까닭(2026-09-03)이다. */
+  state.style.display = (failed || busy) ? '' : 'none';
   renderPhNeedBtn();
 }
 

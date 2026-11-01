@@ -31,6 +31,8 @@ function 재는함수() {
   vm.runInContext(
     'var document = { documentElement: { style: { setProperty: function(k, v){ 잰것 = v; } } } };\n' +
     'function $(id){ return { getBoundingClientRect: function(){ return { height: 높이 }; } }; }\n' +
+    /* ⚠ 2026-11-01 — 재기 전에 탭 이름 길이를 맞춘다(fitKinds). 그것은 tests/photos-rows-tidy.test.js 가 본다 */
+    'function fitKinds(){}\n' +
     body, ctx);
   return ctx;
 }

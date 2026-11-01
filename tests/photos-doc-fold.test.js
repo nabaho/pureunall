@@ -152,6 +152,9 @@ test('★ 도구줄이 장수를 쓴다 — 실제로 돌려 본다', () => {
     /* ⚠ 2026-09-18 — renderGridBar 가 «고른 사진 미리 받기»를 깨운다(끌어내기 채비).
        안 주면 그 자리에서 멎는다. 여기서는 받을 것이 없다고 둔다. */
     warmSelected() {},
+    /* ⚠ 2026-11-01 — 도구줄을 다시 그리면 판독 띠 자리를 다시 정한다(placeAskBar). 그 규칙은
+       tests/photos-ask-bar-one-line.test.js 가 본다 — 여기서는 빈 자리만 댄다. */
+    placeAskBar() {},
     $: mk
   };
   vm.createContext(ctx);

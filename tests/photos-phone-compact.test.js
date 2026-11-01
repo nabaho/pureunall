@@ -78,7 +78,9 @@ function runPlace(width, nodes) {
   const ctx = {
     window: { innerWidth: width, addEventListener() {} }, PHONE_MAX: 820,
     phoneFindOn: false, $: id => nodes[id] || null,
-    renderPhNeedBtn() {}, renderPhSummary() {}, closePhSheet() {}
+    renderPhNeedBtn() {}, renderPhSummary() {}, closePhSheet() {},
+    /* ⚠ 2026-11-01 — 판독 띠 자리는 placeAskBar 가 정한다(tests/photos-ask-bar-one-line.test.js 가 본다) */
+    placeAskBar() {}
   };
   ctx.isPhone = () => ctx.window.innerWidth <= ctx.PHONE_MAX;
   vm.createContext(ctx);
