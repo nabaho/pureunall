@@ -115,10 +115,64 @@
       if (!(k in patch)) return;
       b[k] = patch[k] ? Object.assign({}, patch[k], { by: actor, at: patch[k].at || now }) : null;
     });
+    if (patch.case) b.case = casePatched(b.case, patch.case, actor, now);
+    return b;
+  }
+
+  /* 신청 대행 «진행 카드»(대표 지시 2026-11-01 「필요서류 … 신청후 승인날경우 지원금 받는것 까지 한번에」 → 「추천대로」).
+     case = { docs:{d0…(사업 사전 서류 차례)·x…(더한 서류): {st, memo, label?}}, appliedAt, approvedAt, payN, pays:{1:{due, appliedAt, paidAt}}, keepUntil }
+     ⚠ 서류 파일은 여기 두지 않는다(메일·사진첩 서고) — 상태·메모만. ⚠ 금액은 여기 적지 않는다 — 전 직원이 읽는 칸이다(govaid_money 는 관리자·재무만).
+     칸별로 덧붙인다 — 한 서류·한 회차를 고쳐도 다른 서류·회차는 그대로. 빈 글자는 그 칸을 지운다 */
+  var DOC_ST = ['', 'asked', 'got', 'ok', 'fix'], DATE = /^\d{4}-\d{2}-\d{2}$/;
+  function day(v, what) {
+    var t = v == null ? '' : String(v).trim();
+    if (t && !DATE.test(t)) throw new Error(what + ' 날짜는 YYYY-MM-DD 꼴로 적습니다: ' + t);
+    return t;
+  }
+  function put(o, k, v) { if (v === '' || v == null) delete o[k]; else o[k] = v; }
+  function casePatched(prev, p, actor, now) {
+    var c = JSON.parse(JSON.stringify(prev || {}));
+    Object.keys(p.docs || {}).forEach(function (id) {
+      if (!/^[dx]\d{1,3}$/.test(id)) throw new Error('서류 번호가 맞지 않습니다: ' + id);
+      var x = p.docs[id], d = Object.assign({}, (c.docs || {})[id] || {});
+      if (x === null) { if (c.docs) delete c.docs[id]; return; }
+      if ('st' in x) { if (DOC_ST.indexOf(x.st || '') < 0) throw new Error('서류 상태는 요청함·받음·검토 끝·보완 필요만 적습니다'); put(d, 'st', x.st); }
+      if ('memo' in x) put(d, 'memo', String(x.memo || '').trim().slice(0, 300));
+      if ('label' in x) put(d, 'label', String(x.label || '').trim().slice(0, 120));
+      c.docs = c.docs || {}; c.docs[id] = d;
+    });
+    ['appliedAt', 'approvedAt', 'keepUntil'].forEach(function (k) { if (k in p) put(c, k, day(p[k], k === 'keepUntil' ? '고용 유지 끝나는' : k === 'appliedAt' ? '신청한' : '승인')); });
+    if ('payN' in p) { var n = Number(p.payN); if (!(n >= 1 && n <= 12 && Math.floor(n) === n)) throw new Error('지급 회차는 1~12 사이로 적습니다'); c.payN = n; }
+    Object.keys(p.pays || {}).forEach(function (n) {
+      if (!/^\d{1,2}$/.test(n)) throw new Error('지급 회차 번호가 맞지 않습니다: ' + n);
+      var x = p.pays[n] || {}, r = Object.assign({}, (c.pays || {})[n] || {});
+      Object.keys(x).forEach(function (k) {
+        if (['due', 'appliedAt', 'paidAt'].indexOf(k) < 0) throw new Error(k === 'amount' ? '금액은 이 칸에 적지 않습니다(관리자·재무만 보는 자리에)' : '모르는 칸: ' + k);
+        put(r, k, day(x[k], n + '회차'));
+      });
+      c.pays = c.pays || {}; c.pays[n] = r;
+    });
+    c.by = actor; c.at = now;
+    return c;
+  }
+  /* 받은 금액 — govaid_money/{회사 열쇠}/{사업 id} (관리자·재무만 읽고 쓴다). 회차별 원 단위 정수, 빈 값은 지운다 */
+  function moneyPatched(prev, subject, pid, n, amount, actor, now) {
+    subject = subject || {};
+    var b = Object.assign({}, prev || {}, { id: subject.key + '__' + pid, entityType: 'EligibilityReview', subjectKey: subject.key, programId: pid });
+    if (subject.kind === 'co') b.companyId = subject.id; else { b.sourceKind = 'govaidProspect'; b.sourceId = subject.id; }
+    if (!/^\d{1,2}$/.test(String(n))) throw new Error('지급 회차 번호가 맞지 않습니다');
+    var pays = JSON.parse(JSON.stringify(b.pays || {}));
+    if (amount === null || amount === '' || amount === undefined) delete pays[n];
+    else {
+      var a = Number(amount);
+      if (!(a >= 0 && Math.floor(a) === a && a < 1e11)) throw new Error('금액은 0 이상의 원 단위 숫자로 적습니다');
+      pays[n] = { amount: a, by: actor, at: now };
+    }
+    b.pays = pays;
     return b;
   }
 
   return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany, starred: starred,
     noticeLinked: noticeLinked, noticeDecided: noticeDecided, programFromNotice: programFromNotice,
-    workKey: workKey, workItem: workItem, reviewPatched: reviewPatched, TOLD_HOW: TOLD_HOW };
+    workKey: workKey, workItem: workItem, reviewPatched: reviewPatched, moneyPatched: moneyPatched, TOLD_HOW: TOLD_HOW, DOC_ST: DOC_ST };
 });

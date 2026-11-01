@@ -28,16 +28,22 @@ test('저장 관문을 Firebase 초기화 전에 싣고, 강제 모드 관문으
 });
 
 /* 2026-10-12 📰 새 공고 — 공고 함(notices)에 «처리»를 적는 자리가 늘어 다섯 */
-test('쓰는 자리는 govaid 아래 다섯 곳 + 업무관리 할 일(4단계 «신청 대행»)뿐이다', () => {
+test('쓰는 자리는 govaid 아래 다섯 곳 + 업무관리 할 일(4단계 «신청 대행») + 받은 금액(govaid_money, 관리자·재무만)뿐이다', () => {
   const refs = [...NOC.matchAll(/gate\.(?:save|remove)\(fbDb\.ref\('([^']+)'/g)].map((m) => m[1]);
   assert.ok(refs.length >= 1);
-  refs.forEach((r) => assert.match(r, /^(govaid\/(programs|prospects|extras|reviews|notices)|work_erp\/items)\//, r));
+  refs.forEach((r) => assert.match(r, /^(govaid\/(programs|prospects|extras|reviews|notices)|work_erp\/items|govaid_money)\//, r));
 });
 
-test('[4단계] 업무관리에는 «새 줄일 때만» 쓴다 — 이미 있는 할 일(남이 적은 기록·상태)을 덮지 않는다', () => {
-  const ws = [...NOC.matchAll(/gate\.save\(fbDb\.ref\('work_erp\/items\/'[^\n]*/g)].map((m) => m[0]);
-  assert.ok(ws.length >= 1, '업무관리로 넘기는 저장이 없다');
-  ws.forEach((l) => assert.match(l, /expectedRevision:\s*-1/, l));
+test('[4단계] 업무관리 할 일은 «새 줄일 때만» 만들고, 진행 카드는 단계·다음 할 일·마감만 고친다 — 남이 적은 기록·상태·담당은 그대로', () => {
+  const make = fnBody('saveHandoff').match(/gate\.save\(fbDb\.ref\('work_erp\/items\/'[^\n]*/g) || [];
+  assert.ok(make.length >= 1, '업무관리로 넘기는 저장이 없다');
+  make.forEach((l) => assert.match(l, /expectedRevision:\s*-1/, l));
+  const sync = fnBody('syncWork');
+  assert.match(sync, /_deleted\) return/, '업무관리에서 지운 줄을 되살리면 안 된다');
+  const keys = (sync.match(/Object\.assign\(\{\}, prev\|\|cur, \{([^}]*)\}/) || [])[1] || '';
+  assert.deepEqual((keys.match(/\b([a-z_]+):/g) || []).map((k) => k.slice(0, -1)).sort(), ['ga_next', 'ga_stage', 'id', 'up_at'], '진행 카드가 업무관리 줄의 다른 칸을 고친다');
+  assert.match(sync, /if\(nx\.due\) b\.due=nx\.due;/);
+  assert.equal([...NOC.matchAll(/gate\.save\(fbDb\.ref\('work_erp\/items\/'/g)].length, 2, '업무관리 줄을 쓰는 곳은 넘기기(새 줄)와 진행 카드(단계) 둘뿐이어야 한다');
   assert.doesNotMatch(NOC, /fbDb\.ref\('work_erp\/items\/'[^)]*\)\.(set|update|remove)\(/, '업무관리 줄을 관문 없이 고치지 않는다');
 });
 
@@ -312,4 +318,29 @@ test('[회사 ★] 법인 공용 기록 — govaid/extras 에 GovaidRecords.star
   assert.match(fnBody('drawCo'), /coStarBtn\(/, '회사 중심 목록에 회사 ★ 가 없다');
   assert.match(NOC, /id="gStar"/, '«★ 표시한 회사만» 스위치가 없다');
   assert.match(fnBody('drawGrid'), /\$\('gStar'\)\.checked/);
+});
+
+/* 신청 대행 «진행 카드» (대표 2026-11-01 → 「추천대로」: 파일은 메일·사진첩 · 금액은 관리자·재무만 · 수수료는 이번에 안 함) */
+test('[진행 카드] 넘긴 일 줄을 누르면 열리고, 서류 줄을 누르면 검토 메모 · 서류 상태는 고르기 묶음', () => {
+  assert.match(fnBody('rowClick'), /name==='handoff'\)\{ openCase\(id\)/);
+  assert.match(fnBody('rowClick'), /name==='caseDocs'\)\{ docMemo\(id\)/);
+  assert.match(NOC, /caseDocs:'docSt'/);
+  assert.match(fnBody('drawCase'), /tbl\('caseDocs'/, '서류 표가 ☐ + 번호 표가 아니다');
+  assert.match(fnBody('drawCase'), /GovaidView\.caseStage\(/);
+  assert.match(fnBody('drawCase'), /GovaidView\.caseNext\(/);
+  assert.match(fnBody('drawCase'), /drawBulk\(\)/, '진행 카드의 서류 고르기 띠가 안 그려진다');
+});
+test('[진행 카드] 금액은 관리자·재무만 — 직원에겐 «🔒», 금액 자리(govaid_money)는 ME.money 일 때만 읽고 쓴다', () => {
+  const d = fnBody('drawCase'), o = fnBody('openCase'), sv = fnBody('saveCaseRaw') + fnBody('saveCase');
+  assert.match(d, /ME\.money \?/);
+  assert.match(d, /🔒 관리자만/);
+  assert.match(o, /if\(ME\.money\)\{[^}]*govaid_money\//, '직원 화면에서 금액 자리를 읽으려 한다(규칙이 막아 오류)');
+  assert.match(sv, /moneyPatch && ME\.money/);
+  assert.match(sv, /GovaidRecords\.moneyPatched\(/);
+  assert.match(fnBody('staffSid'), /ME\.money = v\.isAdmin===true \|\| v\.fin===true/);
+});
+test('[진행 카드] 서류 파일은 올리지 않는다 — 이 화면에 파일 올리기(input file·창고)가 없다 · 서류 요청 글은 복사만', () => {
+  assert.doesNotMatch(NOC, /type="file"|firebase\.storage\(|storage\(\)\.ref/);
+  assert.match(fnBody('copyDocRequest'), /clipboard/);
+  assert.doesNotMatch(fnBody('copyDocRequest'), /fetch\(|sendMail|httpsCallable/);
 });

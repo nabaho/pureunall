@@ -232,7 +232,7 @@
          extras(원장에 없는 보충값, Organization) · reviews(EligibilityReview — 판정이 아니라 사람의 결정만).
        ★ 빌려 읽는 곳: data/companies(원장) · pubdata/co(국민연금·고용보험 인원, 사업자번호 열쇠) · uid_roles(사번·재직).
        ⚠ 예비 고객 → 업체 연결은 사업자번호가 같을 때만(validateCompanyLink) — 이름으로 잇지 않는다. */
-    govaid:{ name:'기업정부지원금', file:'pu-govaid.html', primaryRoots:['govaid'],
+    govaid:{ name:'기업정부지원금', file:'pu-govaid.html', primaryRoots:['govaid','govaid_money' /* 받은 금액 — 관리자·재무만(2026-11-01) */],
       sharedRoots:['data/companies','pubdata/co','uid_roles','work_erp/items'],
       writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
                       {path:'govaid/prospects/{id}',entityType:'Organization'},
@@ -241,7 +241,9 @@
                       /* 기업마당 공고 함(2026-10-12) — 서버 govaidNoticeWatch 가 쌓고, 화면은 «처리»(잇기·초안·관계없음)만 적는다 */
                       {path:'govaid/notices/{id}',entityType:'Document'},
                       /* 4단계 연계(2026-11-01) — «신청 대행»만 업무관리 할 일 한 줄(GA-회사-사업, 새 줄일 때만 만든다). 상태는 업무관리 것을 읽기만 */
-                      {path:'work_erp/items/{id}',entityType:'Task'}],
+                      {path:'work_erp/items/{id}',entityType:'Task'},
+                      /* 받은 지원금 금액(2026-11-01 진행 카드) — 관리자·재무만 읽고 쓰는 따로 자리 */
+                      {path:'govaid_money/{key}/{programId}',entityType:'EligibilityReview'}],
       entityTypes:['Organization','SupportProgram','EligibilityReview','Document','Task'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.

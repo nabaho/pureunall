@@ -1310,6 +1310,13 @@ rules.govaid = { '.read': LOGIN,
   notices:   { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   noticeLast: { '.write': false } };
 
+/* 받은 지원금 금액(대표 지시 2026-11-01 신청 대행 «진행 카드» → 「추천대로」: «금액은 적되 관리자(재무 권한)만 — 직원에겐 회차만»).
+   govaid 는 재직 직원 모두가 읽는다 — 실시간DB 읽기 권한은 아래로 내려가므로 그 안에 두면 막을 수 없다. 그래서 따로 최상위.
+   ★ 읽기·쓰기 = 관리자 또는 재무 권한(재직 직원 중). 지우기 금지(빈 값 쓰기 막음) · 열쇠와 id 가 맞아야 한다 */
+const GOVAID_MONEY = `(${LOGIN}) && ((${ADMIN}) || (${FIN}))`;
+rules.govaid_money = { '.read': GOVAID_MONEY,
+  $k: { $p: { '.write': `${GOVAID_MONEY} && newData.exists()`, '.validate': "newData.child('id').val() === $k + '__' + $p" } } };
+
 /* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
    설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 처음엔 대표 「대표 + 관리직원」.
    ★ 읽기·쓰기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).

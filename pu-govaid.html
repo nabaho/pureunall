@@ -123,8 +123,23 @@ table.t tr.open>td{padding:0;max-width:none;white-space:normal;background:var(--
 .det ul{margin:0;padding-left:18px}
 .det li{margin:3px 0}
 .labor{color:var(--blue-d);font-weight:600}
+/* 📋 진행 카드(2026-11-01) — 단계 띠 · 다음 할 일 · 두 칸 */
+.csteps{display:flex;padding:10px 12px 4px;overflow:auto}
+.cst{flex:1;min-width:92px;text-align:center;font-size:12px;padding:6px 3px;border:1px solid var(--line);background:var(--bg);color:var(--mute);white-space:nowrap}
+.cst+.cst{border-left:none}
+.cst.done{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+.cst.now{background:var(--blue);color:#ffffff;border-color:var(--blue);font-weight:700}
+.cst.rej{background:var(--red-bg);color:var(--red);border-color:var(--red-line);font-weight:700}
+.cst small{display:block;font-size:10.5px}
+.cnext{padding:4px 12px 10px;font-size:13px}
+.ctwo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-top:1px solid var(--line)}
+.ctwo input.cd{width:126px;padding:3px 5px;font-size:12px}
+.ctwo>div+div{border-left:1px solid var(--line)}
+@media (max-width:860px){ .ctwo{grid-template-columns:minmax(0,1fr)} .ctwo>div+div{border-left:none} }
 .prep{background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:8px;padding:6px 10px;margin-top:8px;font-size:12px;color:var(--blue-d)}
 .mbox.wide{max-width:1100px}
+/* 진행 카드는 두 칸(서류 · 지급 회차 표)이라 조금 더 넓게 */
+.mbox.wide.case{max-width:1240px}
 /* ★ 노무사 직접 사업(2026-10-13) — 주황(amber) 한 갈래만 쓴다 */
 button.star{border:none;background:none;padding:0 3px 0 0;color:var(--line2);font-size:14px;line-height:1;cursor:pointer}
 button.star:hover{color:var(--amber-m)}
@@ -339,7 +354,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=85"></script>
+<script src="js/pu-ontology.js?v=86"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -355,9 +370,9 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-govaid-match.js?v=9"></script>
-<script src="js/pu-govaid-view.js?v=9"></script>
+<script src="js/pu-govaid-view.js?v=10"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
-<script src="js/pu-govaid-records.js?v=5"></script>
+<script src="js/pu-govaid-records.js?v=6"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''}, YEAR=GovaidMatch.kstYear();
@@ -371,7 +386,7 @@ var VERDICT={candidate:'후보',unknown:'정보 부족',no:'안 맞음',unconfir
 /* ★ 한 번에 켜고 끌 수 있는 표 — 줄 id 가 사업 id(p)인지 공고 id(n)인지 */
 var STAR_TABLES={ dict:'p', check:'p', coCand:'p', coUnk:'p', coNo:'p', news:'n', coLocal:'n', grid:'c', coList:'c' };   /* c = 회사(챙길 회사 ★) */
 var BULK={ coCand:'review', coUnk:'review', coNo:'review', progCand:'review', progUnk:'review',
-  coList:'dropProspect', coLocal:'ignoreNotice', dict:'dropProgram', check:'confirmProgram', news:'ignoreNotice', handoff:'result', grid:'starOnly' };
+  coList:'dropProspect', coLocal:'ignoreNotice', dict:'dropProgram', check:'confirmProgram', news:'ignoreNotice', handoff:'result', caseDocs:'docSt', grid:'starOnly' };
 
 /* ═══ 작은 도구 ═══ */
 function $(id){ return document.getElementById(id); }
@@ -435,6 +450,7 @@ function drawBulk(){
       : kind==='dropProspect' ? '<button class="sm" data-bulkdo="'+name+'">예비 고객 빼기</button>'
       : kind==='dropProgram' ? '<button class="sm" data-bulkdo="'+name+'">사전에서 빼기</button>'
       : kind==='ignoreNotice' ? '<button class="sm" data-bulkdo="'+name+'">관계없음</button>'
+      : kind==='docSt' ? ['asked','got','ok','fix',''].map(function(v){ return '<button class="sm" data-bulkdo="'+name+'" data-d="'+v+'">'+(v?DOC_ST_TXT[v]:'표시 지우기')+'</button>'; }).join(' ')
       : kind==='result' ? ['selected','rejected',''].map(function(v){ return '<button class="sm" data-bulkdo="'+name+'" data-d="'+v+'">'+(RESULT[v]?'결과: '+RESULT[v]:'결과 지우기')+'</button>'; }).join(' ')
       : '<button class="sm" data-bulkdo="'+name+'">확정('+YEAR+' 기준)</button>';
     /* ★ 한 번에(대표 지시 2026-10-31 「모든 영역에서 별표 한번에 모두 클릭 하거나 별표 모두 색 안들어가게」) */
@@ -445,7 +461,7 @@ function drawBulk(){
 
 /* ═══ 창(모달) ═══ */
 function openModal(html){ $('mbox').innerHTML=html; $('modal').style.display='flex'; }
-function closeModal(){ $('modal').style.display='none'; $('mbox').innerHTML=''; $('mbox').classList.remove('wide'); SUBJ=null; JCTX=null; HCTX=null; LCTX=null; }
+function closeModal(){ $('modal').style.display='none'; $('mbox').innerHTML=''; $('mbox').classList.remove('wide','case'); SUBJ=null; JCTX=null; HCTX=null; LCTX=null; CCTX=null; dropPicked(['caseDocs']); }
 
 /* ═══ 불러오기 — 하나가 막혀도 나머지로 이어 간다. 못 읽은 자료에서 오는 값은 «모름» ═══ */
 async function reload(){
@@ -871,6 +887,15 @@ async function loadWorkStat(force){
   WORK_STAT=out;
 }
 function handRows(){ return GovaidView.handoffRows(D.reviews, PROFILES, targetOf, WORK_STAT); }
+/* 넘긴 일 한 줄의 진행 칸 — 단계 · 서류(검토 끝/전체 · 보완) · 다음 할 일 · 마감. 안내만은 진행 카드가 없다 */
+function handCase(r){
+  if(r.mode!=='apply'){ var rs=r.review.result; return [ rs ? '<span class="chip '+(rs.v==='selected'?'c-green':'')+'">'+esc(RESULT[rs.v]||'')+'</span>' : '<span class="hint">—</span>', '<span class="hint">—</span>', '<span class="hint">—</span>', r.target.due ? esc(mmdd(r.target.due)) : '<span class="hint">—</span>' ]; }
+  var prog=progById(r.target.id), sg=GovaidView.caseStage(r.review, prog), nx=GovaidView.caseNext(r.review, prog), d=GovaidView.caseDocs(prog, r.review);
+  var ok=d.filter(function(x){ return x.st==='ok'; }).length, fix=d.filter(function(x){ return x.st==='fix'; }).length;
+  return [ '<span class="chip '+(sg.n===0?'c-red':sg.n>=5?'c-green':'c-blue')+'">'+(sg.n?['①','②','③','④','⑤','⑥','⑦','⑧'][sg.n-1]+' ':'')+esc(sg.label)+'</span>',
+    d.length ? ok+'/'+d.length+(fix?' <span class="chip c-red">보완 '+fix+'</span>':'') : '<span class="hint">—</span>',
+    '<span title="'+esc(nx.text)+'">'+esc(nx.text)+'</span>', dueHtml(nx.due || (sg.n<=3 ? r.due : '')) ];
+}
 function handMgr(r){
   if(r.mode==='apply') return (r.work&&r.work.mgr) || nameOf(r.review.work.mgr) || '담당 미지정';
   return nameOf(r.review.told&&r.review.told.by) || '';
@@ -882,7 +907,7 @@ function drawHandoff(){
   sel.value=cur;
   var rows=all.filter(function(r){ return (!v || r.stage===v) && (!sel.value || handMgr(r)===sel.value); });
   $('hCount').textContent=rows.length+'건';
-  $('hBox').innerHTML = rows.length ? tbl('handoff',['사업장','지원사업','무엇을','담당','마감','업무관리 상태','결과','넘긴 날'], rows.map(function(r){
+  $('hBox').innerHTML = rows.length ? tbl('handoff',['사업장','지원사업','무엇을','담당','단계','서류','다음 할 일','마감','업무관리'], rows.map(function(r){
     var rv=r.review, st, what;
     if(r.mode!=='apply') st='<span class="hint">업무관리 없음</span>';
     else if(r.gone) st='<span class="chip c-red">업무관리에 없음</span>';
@@ -892,11 +917,145 @@ function drawHandoff(){
     return { id:r.pf.key+'|'+r.target.id, cells:[
       '<span class="lk" data-goco="'+esc(r.pf.key)+'" title="회사 중심에서 보기">'+esc(r.pf.name)+'</span>',
       (r.target.star?'<span class="staron">★</span> ':'')+'<span title="'+esc(r.target.name)+'">'+esc(r.target.name)+'</span>'+(r.target.kind==='notice'?' <span class="chip">공고</span>':''),
-      what, esc(handMgr(r)), r.mode==='apply' ? dueHtml(r.due) : (r.target.due ? esc(mmdd(r.target.due)) : '<span class="hint">—</span>'),
-      st, rv.result ? '<span class="chip '+(rv.result.v==='selected'?'c-green':'')+'">'+esc(RESULT[rv.result.v]||'')+'</span>' : '<span class="hint">—</span>',
-      esc(mmdd(ymd(rv.work ? rv.work.at : rv.told && rv.told.at))) ] };
+      what, esc(handMgr(r)) ].concat(handCase(r)).concat([ st ]) };
   })) : '<div class="empty">'+(all.length?'고른 조건에 맞는 줄이 없습니다':'아직 넘긴 일이 없습니다 — 회사 중심 후보 표에서 검토 «해당» 뒤 «→ 진행 정하기»를 누르세요')+'</div>';
 }
+/* ═══ 📋 신청 대행 «진행 카드» (대표 지시 2026-11-01 「필요서류등을 검토하고 진행 … 신청후 승인날경우 지원금 받는것 까지 한번에」 → 시안 → 「추천대로」)
+   서류 요청 → 검토 → 신청 → 심사 → 승인 → 지급(회차) → 받음 → 사후관리. 검토 칸(case)에 상태·날짜·메모만 —
+   ⚠ 서류 파일은 여기 두지 않는다(메일·사진첩 서고). ⚠ 금액은 govaid_money(관리자·재무만) — 직원에겐 회차만.
+   단계가 바뀌면 업무관리 할 일의 마감(due)·단계(ga_stage)·다음 할 일(ga_next)도 같이 고친다 ═══ */
+var CCTX=null, DOC_ST_TXT={'':'—',asked:'요청함',got:'받음',ok:'검토 끝',fix:'보완 필요'}, DOC_ST_CHIP={'':'',asked:'',got:'c-amber',ok:'c-green',fix:'c-red'};
+function caseRow(id){ var i=id.indexOf('|'); return handRows().filter(function(r){ return r.pf.key===id.slice(0,i) && r.target.id===id.slice(i+1); })[0]||null; }
+async function openCase(id){
+  var r=caseRow(id); if(!r||r.mode!=='apply'){ toast('신청 대행으로 넘긴 줄만 진행 카드가 있습니다'); return; }
+  var money=null;
+  if(ME.money){ try{ money=(await fbDb.ref('govaid_money/'+r.pf.key+'/'+r.target.id).once('value')).val(); }catch(e){ money=null; } }
+  CCTX={ id:id, key:r.pf.key, pid:r.target.id, money:money, payN:null, keep:null };
+  drawCase();
+}
+/* 다시 그릴 때 적던 날짜·금액을 잃지 않게 */
+function keepCase(){
+  var C=CCTX; if(!C||!$('cApplied')) return;
+  var k={ appliedAt:$('cApplied').value, approvedAt:$('cApproved').value, keepUntil:$('cKeep').value, pays:{}, amounts:{} };
+  document.querySelectorAll('[data-cpay]').forEach(function(el){ var n=el.getAttribute('data-cpay'), f=el.getAttribute('data-f'); if(f==='amount') k.amounts[n]=el.value; else (k.pays[n]=k.pays[n]||{})[f]=el.value; });
+  C.keep=k;
+}
+function drawCase(){
+  var C=CCTX; if(!C) return;
+  var r=caseRow(C.id); if(!r){ closeModal(); return; }
+  var pf=r.pf, t=r.target, rv=r.review, c=rv.case||{}, prog=progById(t.id), K=C.keep||{};
+  var st=GovaidView.caseStage(rv, prog), nx=GovaidView.caseNext(rv, prog), docs=GovaidView.caseDocs(prog, rv);
+  var N=C.payN||Number(c.payN)||0, src=prog&&prog.source&&/^https:\/\//.test(prog.source.url||'') ? prog.source.url : '';
+  var steps=GovaidView.CASE_STAGES.slice(1).map(function(lb,i){ var n=i+1, cls=st.n===0?'':n<st.n?' done':n===st.n?' now':'';
+    return '<div class="cst'+cls+'">'+['①','②','③','④','⑤','⑥','⑦','⑧'][i]+' '+esc(lb)+(n===st.n&&nx.due?'<small>'+esc(mmdd(nx.due))+'</small>':'')+'</div>'; }).join('');
+  var docRows=docs.map(function(d){ return { id:d.id, cells:[ (d.labor?'<span class="labor">★ ':'<span>')+esc(d.label)+'</span>', esc(d.stage||'—'),
+    '<span class="chip '+(DOC_ST_CHIP[d.st]||'')+'">'+esc(DOC_ST_TXT[d.st]||'—')+'</span>', d.memo?'<span title="'+esc(d.memo)+'">'+esc(d.memo)+'</span>':'<span class="hint">누르면 메모</span>' ] }; });
+  function v(k, cur){ return esc(K[k]!=null ? K[k] : (cur||'')); }
+  function pv(n, f){ var kp=(K.pays||{})[n]; return esc(kp&&kp[f]!=null ? kp[f] : ((c.pays||{})[n]||{})[f]||''); }
+  var pays=''; for(var n=1;n<=N;n++){
+    var am=(K.amounts||{})[n]!=null ? K.amounts[n] : (((C.money||{}).pays||{})[n]||{}).amount;
+    pays+='<tr><td class="n">'+n+'회</td><td><input type="date" class="cd" data-cpay="'+n+'" data-f="due" value="'+pv(n,'due')+'"></td><td><input type="date" class="cd" data-cpay="'+n+'" data-f="appliedAt" value="'+pv(n,'appliedAt')+'"></td><td><input type="date" class="cd" data-cpay="'+n+'" data-f="paidAt" value="'+pv(n,'paidAt')+'"></td>'
+      +'<td>'+(ME.money ? '<input type="number" min="0" step="1" class="cd" data-cpay="'+n+'" data-f="amount" value="'+esc(am==null?'':am)+'" placeholder="원">' : '<span class="hint">🔒 관리자만</span>')+'</td></tr>'; }
+  var payOpts='<option value="">—</option>'; for(var i=1;i<=12;i++) payOpts+='<option'+(i===N?' selected':'')+'>'+i+'</option>';
+  openModal('<div class="mhead"><h3>📋 '+esc(pf.name)+' × '+esc(t.name)+'</h3><span class="chip c-blue">신청 대행</span><span class="hint">담당 '+esc(handMgr(r))+'</span><span class="sp"></span>'
+      +(src?'<a class="sm" href="'+esc(src)+'" target="_blank" rel="noopener">공고 원문</a> ':'')+'<button class="sm" data-work="'+esc(rv.work.id)+'">업무관리에서 열기</button> <button class="sm" data-close="1">닫기</button></div>'
+    +'<div class="csteps">'+steps+(st.n===0?'<div class="cst rej">탈락</div>':'')+'</div>'
+    +'<div class="cnext">다음 할 일: <b>'+esc(nx.text)+'</b>'+(nx.due?' · '+dueHtml(nx.due):'')+'</div>'
+    +'<div class="ctwo"><div>'
+      +'<div class="sec">📄 필요서류 <span class="hint" title="서류 파일은 메일·사진첩(서고)에 두고 여기는 상태·메모만 적습니다">파일은 메일·사진첩에</span><span class="sp"></span><button class="sm" data-cadd="1">＋ 서류 더하기</button> <button class="sm" data-creq="1" title="아직 안 받은 서류를 회사에 요청하는 글 — 복사만 합니다">✉ 서류 요청 글</button></div>'
+      +(docRows.length ? tbl('caseDocs',['서류','언제','상태','검토 메모'],docRows) : '<div class="empty">이 사업은 사전에 필요서류가 아직 없습니다 — «＋ 서류 더하기»로 넣으세요</div>')
+    +'</div><div>'
+      +'<div class="sec">💰 신청·승인·지급</div>'
+      +'<div class="ed"><label class="k" for="cApplied">신청한 날</label><input id="cApplied" type="date" value="'+v('appliedAt',c.appliedAt)+'">'
+      +'<label class="k" for="cApproved">승인(선정)한 날</label><div><input id="cApproved" type="date" value="'+v('approvedAt',c.approvedAt)+'"> <button class="sm" data-creject="1" title="탈락 — 넘긴 일에서 «끝남»으로">탈락</button></div>'
+      +'<label class="k" for="cPayN">지급 회차 수</label><div><select id="cPayN" data-cpayn="1">'+payOpts+'</select> <span class="hint">장려금은 여러 번 나눠 지급 신청합니다</span></div></div>'
+      +(N ? '<div class="scroll"><table class="t" data-viewonly="1"><thead><tr><th class="n">회차</th><th>신청 기한</th><th>신청한 날</th><th>받은 날</th><th>금액</th></tr></thead><tbody>'+pays+'</tbody></table></div>' : '')
+      +'<div class="ed"><label class="k" for="cKeep">고용 유지 끝나는 날</label><div><input id="cKeep" type="date" value="'+v('keepUntil',c.keepUntil)+'"> <span class="hint">이날 전 감원하면 환수될 수 있음</span></div></div>'
+      +'<div class="mfoot"><button class="pri" data-csave="1">저장</button></div>'
+    +'</div></div>');
+  $('mbox').classList.add('wide','case');
+  drawBulk();
+}
+/* 저장 — 검토 칸(case) 한 번, 금액(관리자·재무) 한 번, 그다음 업무관리 할 일 */
+async function saveCaseRaw(patch, moneyPatch){
+  var C=CCTX, r=caseRow(C.id); if(!r) throw new Error('줄을 찾지 못했습니다');
+  await patchReview(r.pf, C.pid, r.review, patch, r.target.kind==='notice' ? { targetKind:'notice', targetName:r.target.name } : null);
+  if(moneyPatch && ME.money){
+    var now=Date.now();
+    await gate.save(fbDb.ref('govaid_money/'+r.pf.key+'/'+C.pid), function(prev){
+      var b=prev||C.money||null; Object.keys(moneyPatch).forEach(function(n){ b=GovaidRecords.moneyPatched(b, r.pf, C.pid, n, moneyPatch[n], ME.sid, now); }); return b; }, { entityType:'EligibilityReview' });
+    try{ C.money=(await fbDb.ref('govaid_money/'+r.pf.key+'/'+C.pid).once('value')).val(); }catch(e){}
+  }
+  await reloadReviews();
+  await syncWork(C.id);
+  C.keep=null; C.payN=null;
+}
+async function saveCase(){
+  keepCase();
+  var C=CCTX, K=C.keep||{}, r=caseRow(C.id), c=r.review.case||{}, N=Number($('cPayN').value)||0;
+  var patch={ case:{ appliedAt:K.appliedAt||'', approvedAt:K.approvedAt||'', keepUntil:K.keepUntil||'', pays:{} } }, money=null;
+  if(N) patch.case.payN=N;
+  Object.keys(K.pays||{}).forEach(function(n){ if(Number(n)<=N) patch.case.pays[n]=K.pays[n]; });
+  /* 승인한 날을 적으면 결과도 «선정» — 넘긴 일 표의 결과와 같은 칸 */
+  if(K.approvedAt && !(r.review.result && r.review.result.v)) patch.result={ v:'selected' };
+  if(ME.money){
+    Object.keys(K.amounts||{}).forEach(function(n){ var cur=(((C.money||{}).pays||{})[n]||{}).amount, nv=K.amounts[n]==='' ? null : Number(K.amounts[n]);
+      if(Number(n)<=N && (cur==null ? nv!=null : cur!==nv)) (money=money||{})[n]=nv; });
+  }
+  try{ await saveCaseRaw(patch, money); drawCase(); toast('저장했습니다'+(money?' · 금액은 관리자·재무만 봅니다':'')); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+/* 서류 상태 — 고르기 묶음에서. 같은 상태면 건너뛴다 */
+async function setDocSt(ids, st){
+  var docs={}; ids.forEach(function(id){ docs[id]={ st:st }; });
+  try{ await saveCaseRaw({ case:{ docs:docs } }); dropPicked(['caseDocs']); drawCase(); drawBulk(); toast(ids.length+'건 «'+(DOC_ST_TXT[st]||'표시 지움')+'»'); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+async function docMemo(id){
+  var r=caseRow(CCTX.id), d=GovaidView.caseDocs(progById(CCTX.pid), r.review).filter(function(x){ return x.id===id; })[0]; if(!d) return;
+  var m=prompt('«'+d.label+'» 검토 메모(노무사가 확인한 점)', d.memo||''); if(m==null) return;
+  try{ await saveCaseRaw({ case:{ docs:(function(o){ o[id]={ memo:m }; return o; })({}) } }); drawCase(); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+async function addDoc(){
+  var label=prompt('더할 서류 이름'); if(!label||!label.trim()) return;
+  var r=caseRow(CCTX.id), xs=Object.keys(((r.review.case||{}).docs)||{}).filter(function(k){ return /^x\d+$/.test(k); }).map(function(k){ return Number(k.slice(1)); });
+  var id='x'+((xs.length?Math.max.apply(null,xs):0)+1);
+  try{ await saveCaseRaw({ case:{ docs:(function(o){ o[id]={ label:label.trim(), st:'' }; return o; })({}) } }); drawCase(); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+/* ✉ 서류 요청 글 — 아직 안 받은 것·보완할 것. 보내지 않는다(복사만). 복사하면 아직 아무 표시 없던 서류는 «요청함» */
+async function copyDocRequest(){
+  var r=caseRow(CCTX.id), docs=GovaidView.caseDocs(progById(CCTX.pid), r.review), want=docs.filter(function(d){ return !d.st || d.st==='asked' || d.st==='fix'; });
+  if(!want.length){ toast('요청할 서류가 없습니다 — 모두 받았습니다'); return; }
+  var txt=r.pf.name+' 담당자님께\n\n'+r.target.name+' 신청에 필요한 서류를 보내 주십시오.\n\n'
+    + want.map(function(d,i){ return (i+1)+'. '+d.label+(d.st==='fix'?' — 보완: '+(d.memo||'다시 확인 필요'):''); }).join('\n')
+    + '\n\n개인정보(주민등록번호 등)가 담긴 서류는 메일 대신 따로 알려 드리는 방법으로 보내 주십시오.\n푸른노무법인 드림';
+  try{ await navigator.clipboard.writeText(txt); }catch(e){ prompt('아래 글을 복사하세요', txt); }
+  var asked={}; want.filter(function(d){ return !d.st; }).forEach(function(d){ asked[d.id]={ st:'asked' }; });
+  if(Object.keys(asked).length){ try{ await saveCaseRaw({ case:{ docs:asked } }); }catch(e){} }
+  drawCase(); toast('서류 요청 글을 복사했습니다 · '+want.length+'건');
+}
+async function rejectCase(){
+  if(!confirm('탈락으로 끝낼까요? 넘긴 일에서 «끝남»으로 갑니다.')) return;
+  try{ await saveCaseRaw({ result:{ v:'rejected' } }); drawCase(); }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+/* 업무관리 할 일 — 단계·다음 할 일·마감만 고친다(남이 적은 기록·상태·담당은 그대로). 업무관리에서 지운 줄이면 건드리지 않는다 */
+async function syncWork(id){
+  var r=caseRow(id); if(!r||!r.review.work||!r.review.work.id) return;
+  var wid=r.review.work.id, prog=progById(r.target.id), st=GovaidView.caseStage(r.review, prog), nx=GovaidView.caseNext(r.review, prog), cur;
+  try{ cur=(await fbDb.ref('work_erp/items/'+wid).once('value')).val(); }catch(e){ return; }
+  if(!cur || cur._deleted) return;
+  try{
+    await gate.save(fbDb.ref('work_erp/items/'+wid), function(prev){
+      var b=Object.assign({}, prev||cur, { id:wid, ga_stage:(st.n?['①','②','③','④','⑤','⑥','⑦','⑧'][st.n-1]+' ':'')+st.label, ga_next:nx.text, up_at:new Date().toISOString() });
+      if(nx.due) b.due=nx.due;
+      return b;
+    }, { entityType:'Task' });
+  }catch(e){ toast('업무관리 할 일은 못 고쳤습니다: '+(e&&e.message||e)); }
+  if(WORK_STAT) await loadWorkStat(true);
+}
+
 /* 결과(선정·탈락) — 넘긴 일 표의 고르기 묶음에서. id = 회사 열쇠|사업 id */
 function saveResult(id, v){
   var i=id.indexOf('|'), key=id.slice(0,i), pid=id.slice(i+1);
@@ -1348,6 +1507,7 @@ async function saveSubject(){
 /* ═══ 누르기·고르기 — 한 곳에서 받는다(인라인 onclick 에 열쇠를 넣지 않는다 — 따옴표가 깨진다) ═══ */
 document.addEventListener('change', function(e){
   var t=e.target;
+  if(t.matches('[data-cpayn]')){ keepCase(); CCTX.payN=Number(t.value)||0; drawCase(); return; }
   if(t.matches('input[data-ck]')){ var k=t.getAttribute('data-ck'); if(t.checked) SEL[k]=1; else delete SEL[k]; drawBulk(); return; }
   if(t.matches('input[data-all]')){ t.closest('table').querySelectorAll('input[data-ck]').forEach(function(c){ c.checked=t.checked; var k=c.getAttribute('data-ck'); if(t.checked) SEL[k]=1; else delete SEL[k]; }); drawBulk(); }
 });
@@ -1370,6 +1530,10 @@ function clickMore(t){
   if((b=t.closest('[data-gfold]'))){ toggleFold(b.getAttribute('data-gfold')); return true; }
   if((b=t.closest('[data-gfoldall]'))){ foldAll(b.getAttribute('data-gfoldall')==='1'); return true; }
   if((b=t.closest('[data-goco]'))){ TAB='co'; lsSet('tab',TAB); CUR_CO=b.getAttribute('data-goco'); draw(); return true; }
+  if((b=t.closest('[data-csave]'))){ saveCase(); return true; }
+  if((b=t.closest('[data-cadd]'))){ addDoc(); return true; }
+  if((b=t.closest('[data-creq]'))){ copyDocRequest(); return true; }
+  if((b=t.closest('[data-creject]'))){ rejectCase(); return true; }
   if((b=t.closest('[data-hopen]'))){ openHandoff(b.getAttribute('data-k'), b.getAttribute('data-hopen')); return true; }
   if((b=t.closest('[data-hmode]'))){ HCTX.mode=b.getAttribute('data-hmode'); drawHandoffModal(); return true; }
   if((b=t.closest('[data-hsave]'))){ saveHandoff(); return true; }
@@ -1413,7 +1577,8 @@ function rowClick(name,id){
   if(name==='dict'){ openEditor(id); return; }
   if(name==='check'){ OPEN_CK = OPEN_CK===id ? '' : id; drawCheck(); drawBulk(); return; }
   if(name==='news') return;   /* 공고 줄은 단추로만 처리한다 — 줄을 눌러 무언가 저절로 바뀌지 않게 */
-  if(name==='handoff') return;   /* 넘긴 일 줄도 단추로만(업무관리 열기·결과는 고르기 묶음) */
+  if(name==='handoff'){ openCase(id); return; }   /* 신청 대행 줄 → 진행 카드(2026-11-01) */
+  if(name==='caseDocs'){ docMemo(id); return; }   /* 서류 줄 → 검토 메모 */
   if(name==='coLocal') return;
   rowReview(name,id);
 }
@@ -1424,6 +1589,7 @@ function rowReview(name,id){
 async function bulkDo(name, d){
   var ids=picked(name); if(!ids.length) return;
   if(/^star:/.test(d||'')) return starMany(name, ids, d==='star:on');
+  if(BULK[name]==='docSt') return setDocSt(ids, d||'');
   var kind=BULK[name], jobs=[], label='';
   if(kind==='review'){ var r=reviewJobs(name, ids, d); jobs=r.jobs; label=r.label; }
   else if(kind==='result'){ label=d?'결과 «'+RESULT[d]+'»(으)로 적기':'결과 지우기'; jobs=ids.map(function(id){ return function(){ return saveResult(id, d); }; }); }
@@ -1451,7 +1617,7 @@ function reviewJobs(name, ids, d){
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
-async function staffSid(u){ try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.status==='active' && v.sid ? String(v.sid) : ''; }catch(e){ return ''; } }
+async function staffSid(u){ try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; ME.money = v.isAdmin===true || v.fin===true; return v.status==='active' && v.sid ? String(v.sid) : ''; }catch(e){ return ''; } }
 /* 사번 → «이름» (공개 명부 data/user_dir). 「누가 검토·확정했나」는 사번으로 저장하지만 화면에는 이름만 보인다(대표 결정 2026-10-25).
    명부에서 못 찾았는데 사번 꼴이면 빈 글자 — 사번을 이름 자리에 적지 않는다. 사번 꼴이 아닌 글(자동 수집 표시 등)은 그대로 둔다 */
 var NAMES={}, STAFF=[];
