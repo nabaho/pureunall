@@ -243,12 +243,124 @@
     });
   }
 
+  /* ══ 퇴직자 파기 (대표 승인 2026-11-01, 개인정보 3단계) ═══════════════════════════════
+     ★ 기준 — 대표 지시: 「퇴사하고 연락처 등은 3년, 주민번호·계좌 등은 5년. 재직 중이면 3년이 지나도 지우면 안 된다」
+       · 기산일 = 퇴직일, 그리고 «마지막 임금대장 기재월 다음 달 말» 중 늦은 날(근로기준법 시행령 제22조 임금대장은 마지막 기재일부터)
+       · «퇴직(retired)» 상태가 아니면 기한이 오지 않는다 — 재직·휴직·입사예정·퇴직예정은 몇 년이 지나도 아니다
+     ⚠ 파기는 대표가 화면에서 눌러야 일어난다. 이 파일은 «누가 대상인지»와 «무엇을 지우는지»만 안다. */
+  var YEARS_CONTACT = 3, YEARS_SECRET = 5;
+  /* 3년 칸 — 연락처·주소류 */
+  var CONTACT_FIELDS = ['phone', 'homePhone', 'email', 'address', 'addressDetail', 'zipCode', 'emergencyContact', 'emergencyPhone'];
+  /* 5년 칸 중 명부에 있는 것 — 외국인등록번호도 고유식별정보라 주민번호와 같은 기한이다 */
+  var SECRET_LIST_FIELDS = ['foreignerRegNo'];
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function ymdOk(v) { return /^\d{4}-\d{2}-\d{2}/.test(String(v || '')); }
+  function addYears(ymd, n) { return (parseInt(ymd.slice(0, 4), 10) + n) + ymd.slice(4, 10); }
+  /* 'YYYY-MM' → 그 다음 달 28일(마지막 임금 기재월의 지급 시점을 넉넉히 잡는다) */
+  function afterPayMonth(ym) {
+    var m = /^(\d{4})-(\d{2})/.exec(String(ym || ''));
+    if (!m) return '';
+    var y = parseInt(m[1], 10), mo = parseInt(m[2], 10) + 1;
+    if (mo > 12) { mo = 1; y++; }
+    return y + '-' + pad2(mo) + '-28';
+  }
+  /* user: 명부 한 줄 · lastPayYm: 그 사람 마지막 급여 기재월('YYYY-MM' 또는 '') · today: 'YYYY-MM-DD'
+     → {eligible, base, contactDate, secretDate, contactDue, secretDue} */
+  function purgeInfo(user, lastPayYm, today, yc, ys) {
+    var out = { eligible: false, base: '', contactDate: '', secretDate: '', contactDue: false, secretDue: false };
+    if (!user || user.status !== 'retired') return out;            /* ★ 재직 중이면 절대 아니다 */
+    if (!ymdOk(user.retireDate)) return out;                        /* 퇴직일을 모르면 셈하지 않는다 */
+    var base = String(user.retireDate).slice(0, 10);
+    var lp = afterPayMonth(lastPayYm);
+    if (lp && lp > base) base = lp;
+    out.eligible = true;
+    out.base = base;
+    out.contactDate = addYears(base, yc || YEARS_CONTACT);
+    out.secretDate = addYears(base, ys || YEARS_SECRET);
+    out.contactDue = String(today) >= out.contactDate;
+    out.secretDue = String(today) >= out.secretDate;
+    return out;
+  }
+  /* 3년 칸을 비우는 패치 — 파기한 날과 한 사람을 남긴다(내용은 안 남긴다) */
+  function contactPatch(todayYmd, byName) {
+    var p = {};
+    CONTACT_FIELDS.forEach(function (f) { p[f] = ''; });
+    p.piiPurgedAt = todayYmd; p.piiPurgedBy = byName || '';
+    return p;
+  }
+  /* 5년 칸 중 명부에 있는 것 — 금고는 purgeSecrets 가 지운다 */
+  function secretPatch(todayYmd, byName) {
+    var p = { hasRrn: false, hasAccount: false };
+    SECRET_LIST_FIELDS.forEach(function (f) { p[f] = ''; });
+    p.piiPurgedAt = todayYmd; p.piiPurgedBy = byName || '';
+    return p;
+  }
+  /* 금고에서 그 사람의 값이 있는 칸만 지운다(기록에 'clear' 가 남는다) — {ok, n} */
+  function purgeSecrets(db, sid, who) {
+    return readOne(db, sid).then(function (r) {
+      if (!r.ok) return r;
+      var s = {};
+      VAULT_FIELDS.forEach(function (f) { if (r.map[f]) s[f] = ''; });
+      if (!Object.keys(s).length) return { ok: true, n: 0 };
+      var all = {}; all[sid] = s;
+      return write(db, all, who);
+    });
+  }
+
+  /* ══ 열람 기록 점검표 ═══════════════════════════════════════════════════════════════ */
+  var ACT_LABEL = { view: '열람', save: '저장', clear: '지움' };
+  var FIELD_LABEL = { rrn: '주민번호', account: '계좌', holder: '예금주' };
+  /* 금고 전체의 기록을 모은다(최근 것이 앞) — [{sid, at, by, byName, act, field}] */
+  function readLogs(db) {
+    if (!db) return Promise.resolve({ ok: false, error: '연결 없음' });
+    return db.ref(ROOT).once('value').then(function (snap) {
+      var raw = (snap && snap.val()) || {}, rows = [];
+      Object.keys(raw).forEach(function (sid) {
+        var lg = raw[sid] && raw[sid]._log;
+        if (!lg) return;
+        Object.keys(lg).forEach(function (id) {
+          var r = lg[id];
+          if (r && typeof r === 'object') rows.push({ sid: sid, at: r.at || 0, by: r.by || '', byName: r.byName || '', act: r.act || '', field: r.field || '' });
+        });
+      });
+      rows.sort(function (a, b) { return b.at - a.at; });
+      return { ok: true, rows: rows };
+    }).catch(function (e) {
+      return denied(e) ? { ok: false, denied: true } : { ok: false, error: String((e && e.message) || e) };
+    });
+  }
+  /* range: 'all' | '30' | 'month' — {rows, counts:{view,save,clear}, flagged:[{day,who,n}]}
+     같은 사람이 같은 날 «열람»을 10번 넘게 했으면 flagged (보안 점검 신호) */
+  function summarize(rows, nowMs, range) {
+    var now = new Date(nowMs);
+    var from = 0;
+    if (range === '30') from = nowMs - 30 * 864e5;
+    else if (range === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    var pick = (rows || []).filter(function (r) { return r.at >= from; });
+    var counts = { view: 0, save: 0, clear: 0 }, per = {};
+    pick.forEach(function (r) {
+      if (counts[r.act] != null) counts[r.act]++;
+      if (r.act !== 'view') return;
+      var d = new Date(r.at), day = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      var k = day + '|' + (r.byName || r.by);
+      per[k] = (per[k] || 0) + 1;
+    });
+    var flagged = Object.keys(per).filter(function (k) { return per[k] > 10; }).map(function (k) {
+      var p = k.split('|'); return { day: p[0], who: p[1], n: per[k] };
+    });
+    return { rows: pick, counts: counts, flagged: flagged };
+  }
+
   var api = {
     ROOT: ROOT, MAP: MAP, USER_FIELDS: USER_FIELDS, FLAG: FLAG, VAULT_FIELDS: VAULT_FIELDS,
     birthFromRrn: birthFromRrn, genderFromRrn: genderFromRrn,
     strip: strip, splitUser: splitUser, splitList: splitList, splitPatch: splitPatch, merge: merge,
     maskRrn: maskRrn, maskAccount: maskAccount, maskPhone: maskPhone, maskEmail: maskEmail, maskAddress: maskAddress,
     readOne: readOne, readAll: readAll, write: write, logView: logView,
+    YEARS_CONTACT: YEARS_CONTACT, YEARS_SECRET: YEARS_SECRET, CONTACT_FIELDS: CONTACT_FIELDS, SECRET_LIST_FIELDS: SECRET_LIST_FIELDS,
+    purgeInfo: purgeInfo, contactPatch: contactPatch, secretPatch: secretPatch, purgeSecrets: purgeSecrets,
+    ACT_LABEL: ACT_LABEL, FIELD_LABEL: FIELD_LABEL, readLogs: readLogs, summarize: summarize,
     setKeyProvider: setKeyProvider, _resetCache: function () { cache = null; }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
