@@ -1618,6 +1618,11 @@ module.exports = function build(deps) {
   }
   async function warmReply(req, res) {
     if (!warmSigOk(req)) { reply(res, 403, { ok: false, warm: true }); return; }
+    return warmDo(res);
+  }
+  /* ☕ 두드림이 «하는 일» — 서명 두드림(mailKeepWarm)과 «직원이 메일함을 열고 있는 동안» 부르는 길(b.warm)이 같이 쓴다.
+     ⚠ 직원 길은 문지기(gate)를 «지난 뒤»에만 닿는다 — 재직 직원이 아니면 여기까지 못 온다. */
+  async function warmDo(res) {
     const out = { ok: false, warm: true, reused: false, paths: 0 };
     try { out.paths = await warmPaths(); } catch (e) { /* 폴더 주소는 열 때 물어도 된다 */ }
     const user = await deps.mailUserAsync();
@@ -1715,6 +1720,10 @@ module.exports = function build(deps) {
            서버끼리의 부름이다. 서명이 틀리면 403 이고, 맞아도 메일은 한 글자도 안 읽는다. */
       .https.onRequest((req, res) => warmAsked(req) ? warmReply(req, res) : gate(req, res, async () => {
         const b = req.body || {};
+        /* ☕ 메일함을 열고 있는 직원의 «깨우기» (2026-11-01 대표 승인) — 서명 두드림(월~토 업무 시간)이 안 도는
+             일요일·밤에는 첫 통이 4~5초 걸렸다(식은 그릇). 화면이 열려 있는 동안만 이 길로 깨운다.
+           ⚠ 메일은 한 글자도 안 읽는다(warmDo). 읽음 표시도 안 건드린다. */
+        if (b.warm) { await warmDo(res); return; }
         const slug = String(b.slug || '');
         const uid = String(b.uid || '');
         /* 미리 받기 — 읽는 동안 위·아래 통을 조용히 받아 둘 때 쓴다.
@@ -2343,6 +2352,7 @@ module.exports = function build(deps) {
          실측 MB_TIME connect 428~542ms · reused:false · 전체 약 2초. 서명 붙은 두드림만 문지기 앞에서 받는다. */
       .https.onRequest((req, res) => warmAsked(req) ? warmReply(req, res) : gate(req, res, async () => {
         const b = req.body || {};
+        if (b.warm) { await warmDo(res); return; }   /* ☕ 메일함을 열고 있는 직원의 깨우기 — readMailMessage 와 같다 */
         const slug = String(b.slug || '');
         const uid = String(b.uid || '');
         const idx = Number(b.index);
