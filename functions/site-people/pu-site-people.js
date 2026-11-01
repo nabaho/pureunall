@@ -235,6 +235,10 @@
     return html.slice(0, 칸[0].at) + 새것 + html.slice(끝.at + 끝.html.length);
   }
 
+  /* 새 사이트에 싣는 경력은 «맨 위 10줄»까지 — 맨 위가 최근이다 (대표 지시 2026-11-01 「최근것 10개 이하로」).
+     더 적어 둔 줄은 우리 목록에 남고, 새 사이트에만 안 간다. */
+  var 경력한도 = 10;
+
   /* 경력을 새 사이트에 보여도 되나 — 본인 동의(받은 날)가 적혀 있어야 한다 (대표 승인 2026-11-01).
      ⚠ 동의가 없으면 경력은 우리 목록에만 남고, 새 사이트에는 이름·직급만 간다. */
   function 경력공개(m) {
@@ -258,7 +262,9 @@
       .slice().sort(차례견주기)
       .map(function (m) {
         return { 이름: String(m.name).trim(), 직급: String(m.position1 || '').trim(),
-                 경력: 경력공개(m) ? (m.careers || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean) : [] };
+                 경력: 경력공개(m)
+                   ? (m.careers || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean).slice(0, 경력한도)
+                   : [] };
       });
   }
 
@@ -304,6 +310,7 @@
     올릴직원: 올릴직원,
     차례견주기: 차례견주기,
     경력공개: 경력공개,
+    경력한도: 경력한도,
     카드들: 카드들,
     덩어리: 덩어리
   };
