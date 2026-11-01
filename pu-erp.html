@@ -209,10 +209,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
+<script src="js/pu-staff-secret.js?v=1"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=83"></script>
+<script src="js/pu-ontology.js?v=84"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -5414,6 +5415,8 @@ function dbSet(k, v){
   if(k === 'trash_bin' && Array.isArray(v) && typeof _wsTrashStrip === 'function' && window.PuWorkerSecret) v = v.map(_wsTrashStrip);
   /* 일반 휴지통에 돈 기록이 섞이면 재무 전용 휴지통으로 옮긴다(재무 권한 기기만 — 아니면 그대로 둔다, 잃지 않게) */
   if(k === 'trash_bin' && Array.isArray(v) && typeof _trashFinSplit === 'function') v = _trashFinSplit(v);
+  /* 직원 주민번호·계좌·예금주 — 명부 통째 저장에서도 뗀다(통째 저장은 대표가 «고친» 사람만 금고로 간다 — 값이 실린 줄만 있다) */
+  if(typeof _ssOn === 'function' && _ssOn(k) && Array.isArray(v)){ var _ssD = PuStaffSecret.splitList(v); v = _ssD.list; _ssSend(_ssD.secrets); }
   /* 근로자명부는 번호 = 사번(사번 열쇠 지도로 바뀐 사람만 주고받는다 — 2026-10-10, 사번정리 뒤에도 맞게 늘 다시 붙인다) */
   if(k === 'user_accounts' && Array.isArray(v)){
     v = v.map(function(x){ return (x && typeof x === 'object' && x.sid && x.id !== x.sid) ? Object.assign({}, x, { id:String(x.sid) }) : x; });
@@ -6878,12 +6881,35 @@ function _wsSend(k, id, secrets){
   if(!fbDb){ _wsFail({ error:'연결 없음' }); return; }
   PuWorkerSecret.write(fbDb, k, id, secrets).then(function(r){ if(!r.ok) _wsFail(r); });
 }
+// ── 직원 주민번호·계좌·예금주 — 저장 «입구»에서 뗀다 (대표 승인 2026-11-01, 개인정보 2단계) ──────
+//   근로자명부는 재무 권한자가 통째로 읽는다. 그래서 이 셋은 명부에 안 싣고 staff_secret(대표만, 잠가서)으로 보낸다.
+//   입구 넷(dbSet·dbUpsert·dbPatch·dbUpsertMany)이 같은 도우미를 쓴다. 이 PC 사본(dbGet)에도 안 남는다.
+//   ⚠ 대표가 아니면 «떼기만» 한다 — 금고에는 이미 값이 있고, 그 사람은 쓸 수도 없다. 값을 넣으려 했으면 알린다.
+//   설계: status/2026-11-01-pii-stage2.md · js/pu-staff-secret.js
+function _ssOn(k){ return k === 'user_accounts' && !!window.PuStaffSecret; }
+var _ssToastAt = 0;
+function _ssFail(r){
+  console.warn('[직원 금고] 저장 못함', r && (r.error || (r.denied ? 'denied' : '')));
+  if(Date.now() - _ssToastAt < 30000) return;
+  _ssToastAt = Date.now();
+  try { showToast(r && r.denied
+    ? '🔒 직원 주민번호·계좌는 대표만 저장할 수 있습니다 — 그 칸은 저장되지 않았습니다'
+    : '⚠ 주민번호·계좌를 저장하지 못했습니다(연결·잠금 확인 후 다시 저장해 주세요)'); } catch(e){}
+}
+function _ssSend(secretsBySid){
+  if(!secretsBySid || !Object.keys(secretsBySid).length) return;
+  if(!(window.CURRENT_USER && CURRENT_USER.isAdmin)){ _ssFail({ denied:true }); return; }
+  if(typeof fbDb === 'undefined' || !fbDb){ _ssFail({ error:'연결 없음' }); return; }
+  PuStaffSecret.write(fbDb, secretsBySid, { sid: CURRENT_USER.sid, name: CURRENT_USER.name }).then(function(r){ if(!r.ok) _ssFail(r); });
+}
 // 1건 추가/수정. 반환 true=저장됨.
 function dbUpsert(k, item){
   if(!item || typeof item.id !== 'string' || !item.id){ console.warn('[dbUpsert] '+k+': id 없는 항목 거부'); return false; }
   /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로 보낸다(위 머리글) */
   var _wsSec = null;
   if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsS = PuWorkerSecret.split(k, item); if(_wsS.any){ item = _wsS.record; _wsSec = _wsS.secrets; } }
+  /* 직원 주민번호·계좌·예금주 — 명부에서 떼어 금고로(위 머리글) */
+  if(typeof _ssOn === 'function' && _ssOn(k)){ var _ssU = PuStaffSecret.splitUser(item); if(_ssU.any){ item = _ssU.user; if(_ssU.secrets){ var _ssM = {}; _ssM[item.sid] = _ssU.secrets; _ssSend(_ssM); } } }
   // 지운 명단에 오른 업체는 되살리지 않는다 — 되돌리기는 명단에서 먼저 뺀 뒤 부른다(coMergeUndo)
   if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(item.id)){ console.warn('[지운 명단] ' + item.id + ' — 합쳐서 없앤 업체라 다시 올리지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
@@ -6926,6 +6952,8 @@ function dbPatch(k, id, fields){
   /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로(dbUpsert 위 머리글) */
   var _wsSec = null;
   if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsP = PuWorkerSecret.splitPatch(k, fields); if(_wsP.any){ fields = _wsP.fields; _wsSec = _wsP.secrets; } }
+  /* 직원 주민번호·계좌·예금주 — 명부에서 떼어 금고로(dbUpsert 위 머리글). 칸 하나만 고치는 길은 빈 값 = 지우기 */
+  if(typeof _ssOn === 'function' && _ssOn(k)){ var _ssP = PuStaffSecret.splitPatch(fields); if(_ssP.any){ fields = _ssP.fields; if(_ssP.secrets){ var _ssPM = {}; _ssPM[id] = _ssP.secrets; _ssSend(_ssPM); } } }
   /* 지운 명단 업체의 칸만 고쳐 보내면 서버에 «껍데기» 업체가 되살아난다(칸 경로 쓰기는 없는 줄도 만든다) */
   if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(id)){ console.warn('[지운 명단] ' + id + ' — 합쳐서 없앤 업체라 고치지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
@@ -7013,6 +7041,8 @@ function dbUpsertMany(k, items){
       return s.record;
     });
   }
+  /* 직원 주민번호·계좌·예금주 — 명부에서 떼어 금고로(dbUpsert 위 머리글) */
+  if(typeof _ssOn === 'function' && _ssOn(k)){ var _ssL = PuStaffSecret.splitList(items); items = _ssL.list; _ssSend(_ssL.secrets); }
   // 지운 명단에 오른 업체는 빼고 나머지만 올린다(한 건 때문에 전부를 막지는 않는다)
   if(k === 'companies' && typeof _coTombStrip === 'function'){
     items = _coTombStrip(k, items);
@@ -73061,6 +73091,21 @@ function StaffRosterModal(props){
   useEffect(function(){ if(props.initialTab) setTab(props.initialTab); }, [props.initialTab]);
   // 부모가 user 갱신 시 폼 state 동기화 (저장 후 다음 탭 이동 시)
   useEffect(function(){ if(props.user && props.user.sid) setF(Object.assign({}, props.user)); }, [props.user && props.user.sid, props.initialTab]);
+  /* 직원 주민번호·계좌·예금주는 금고(대표만)에 있다 — 대표가 열면 받아 와 붙이고, 읽어 온 값을 기억해 두었다가
+     저장할 때 «바뀐 칸만» 보낸다(안 바뀐 칸까지 보내면 저장할 때마다 금고 기록이 쌓인다). 대표가 아니면 칸을 잠근다. */
+  var _ssAdmin = !!(window.CURRENT_USER && CURRENT_USER.isAdmin && window.PuStaffSecret);
+  var _ssLoaded = useRef(null);
+  useEffect(function(){
+    if(!_ssAdmin || !props.user || !props.user.sid || typeof fbDb === 'undefined' || !fbDb) return;
+    var alive = true, sid = props.user.sid;
+    PuStaffSecret.readOne(fbDb, sid).then(function(r){
+      if(!alive || !r.ok) return;
+      var one = {}; one[sid] = r.map;
+      _ssLoaded.current = { rrn: r.map.rrn || '', accountNo: r.map.account || '', accountHolder: r.map.holder || '' };
+      setF(function(prev){ return PuStaffSecret.merge(prev, one); });
+    });
+    return function(){ alive = false; };
+  }, [props.user && props.user.sid]);
   function set(k){ return function(e){ setF(function(prev){ return Object.assign({}, prev, (function(){var x={}; x[k]=e.target.value; return x;})()); }); }; }
   function setNum(k){ return function(e){ setF(function(prev){ return Object.assign({}, prev, (function(){var x={}; x[k]=parseInt(e.target.value.replace(/[^0-9]/g,''))||0; return x;})()); }); }; }
   function setSidType(type){ // type: 'P'(노무사) | 'A'(직원)
@@ -73074,7 +73119,16 @@ function StaffRosterModal(props){
 
   function save(opts){
     var goNext = opts && opts.next;
-    props.onSave(f, { keepOpen: goNext, nextTab: goNext ? opts.nextTab : null });
+    var out = f;
+    if(window.PuStaffSecret){
+      out = Object.assign({}, f);
+      PuStaffSecret.USER_FIELDS.forEach(function(k){
+        /* 대표가 아니면 이 칸은 아예 보내지 않는다(금고를 못 읽었으니 «모름»). 대표는 읽어 온 값과 같으면 보내지 않는다 */
+        if(!_ssAdmin) delete out[k];
+        else if(_ssLoaded.current && String(out[k] == null ? '' : out[k]) === _ssLoaded.current[k]) delete out[k];
+      });
+    }
+    props.onSave(out, { keepOpen: goNext, nextTab: goNext ? opts.nextTab : null });
     if(goNext){ var _tab=tabs2.find(function(t){return t.id===tab;}); showToast((_tab?_tab.label:'') + ' 저장됨'); }
   }
 
@@ -73146,9 +73200,11 @@ function StaffRosterModal(props){
         fld('생년월일', inp('birthDate','date')),
         fld('국적', sel('nationality', ['내국인','외국인']))
       ),
-      fld('주민등록번호', h('input', { type:'text', value:f.rrn||'', onChange:set('rrn'),
-        placeholder:'000000-0000000 (자동 하이픈)', maxLength:14,
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', fontFamily:'monospace', boxSizing:'border-box' } })),
+      fld('주민등록번호', h('input', { type:'text', value:_ssAdmin ? (f.rrn||'') : '', onChange:set('rrn'),
+        disabled: !_ssAdmin,
+        placeholder: _ssAdmin ? '000000-0000000 (자동 하이픈)' : (f.hasRrn ? '🔒 등록됨 — 대표만 열람·수정' : '🔒 대표만 입력합니다'), maxLength:14,
+        title: _ssAdmin ? '' : '주민번호·계좌는 대표만 보고 고칩니다(개인정보 보호)',
+        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', fontFamily:'monospace', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } })),
       h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#475569', margin:'8px 0 4px', paddingBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '연락처'),
       h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' } },
         fld('휴대전화', inp('phone','tel','010-0000-0000')),
@@ -73393,10 +73449,12 @@ function StaffRosterModal(props){
       ),
       h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' } },
         fld('은행', sel('bankName', BANK_LIST)),
-        fld('계좌번호', inp('accountNo','text','계좌번호'))
+        fld('계좌번호', h('input', { type:'text', value:_ssAdmin ? (f.accountNo||'') : '', onChange:set('accountNo'), disabled: !_ssAdmin,
+          placeholder: _ssAdmin ? '계좌번호' : (f.hasAccount ? '🔒 등록됨 — 대표만 열람·수정' : '🔒 대표만 입력합니다'),
+          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } }))
       ),
-      fld('예금주', h('input', { type:'text', value:f.accountHolder||'', onChange:set('accountHolder'), placeholder:'예금주 이름',
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
+      fld('예금주', h('input', { type:'text', value:_ssAdmin ? (f.accountHolder||'') : '', onChange:set('accountHolder'), disabled: !_ssAdmin, placeholder: _ssAdmin ? '예금주 이름' : '🔒 대표만 입력합니다',
+        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } })),
       fld('최종학력', sel('education', EDUCATION_LIST))
     );
   } else if(tab === 'insurance'){
@@ -73799,6 +73857,28 @@ function StaffRosterDetail(props){
   var u = props.user;
   var phS = useState(false); var perfHistOpen = phS[0]; var setPerfHistOpen = phS[1];   // ⭐ 성과 이력 창
   var srS = useState(false); var showRRN = srS[0]; var setShowRRN = srS[1];
+  /* 직원 주민번호·계좌·예금주는 금고(대표만) — «보기»를 누를 때만 받아 오고, 누를 때마다 기록이 남고, 30초 뒤 다시 가린다 */
+  var vtS = useState(null); var vaultVal = vtS[0]; var setVaultVal = vtS[1];
+  var _ssAdminD = !!(window.CURRENT_USER && CURRENT_USER.isAdmin && window.PuStaffSecret);
+  useEffect(function(){
+    if(!showRRN) return;
+    var t = setTimeout(function(){ setShowRRN(false); setVaultVal(null); }, 30000);
+    return function(){ clearTimeout(t); };
+  }, [showRRN]);
+  function ssToggle(){
+    if(showRRN){ setShowRRN(false); setVaultVal(null); return; }
+    if(!_ssAdminD){ if(u.rrn) setShowRRN(true); return; }       // 금고를 못 쓰는 옛 사본(이관 전)은 그대로
+    if(typeof fbDb === 'undefined' || !fbDb){ showToast('연결이 없어 열 수 없습니다'); return; }
+    PuStaffSecret.readOne(fbDb, u.sid).then(function(r){
+      if(!r.ok){ showToast('🔒 열 수 없습니다 — ' + (r.denied ? '대표만 볼 수 있습니다' : '연결을 확인해 주세요')); return; }
+      /* 기록이 먼저다 — 기록을 못 남기면 보여 주지 않는다(고시 제8조) */
+      var who = { sid: CURRENT_USER.sid, name: CURRENT_USER.name };
+      Promise.all([PuStaffSecret.logView(fbDb, u.sid, 'rrn', who), PuStaffSecret.logView(fbDb, u.sid, 'account', who)]).then(function(l){
+        if(!l[0].ok || !l[1].ok){ showToast('⚠ 열람 기록을 남기지 못해 보여 드리지 않습니다'); return; }
+        setVaultVal(r.map); setShowRRN(true);
+      });
+    });
+  }
   // 퇴사자 성과급 정산 — 쓰고 나면 tick 을 올려 dbGet 을 다시 읽는다
   var stS = useState(0);     var setlTick = stS[0];  var setSetlTick = stS[1];
   var sfS = useState(null);  var setlForm = sfS[0];  var setSetlForm = sfS[1];
@@ -73844,10 +73924,16 @@ function StaffRosterDetail(props){
         h('div', { style:{ fontSize:'13.5px', fontWeight:700, color:'#475569', marginBottom:'4px', paddingBottom:'4px', borderBottom:'2px solid #e2e8f0' } }, '기본 정보'),
         row('생년월일', u.birthDate),
         row('성별', erpGenderLabel(u.gender)),
-        u.rrn && h('div', { style:{ display:'flex', gap:'8px', padding:'6px 0', borderBottom:'1px solid #f8fafc', fontSize:'12.5px', alignItems:'center' } },
+        (u.rrn || u.hasRrn) && h('div', { style:{ display:'flex', gap:'8px', padding:'6px 0', borderBottom:'1px solid #f8fafc', fontSize:'12.5px', alignItems:'center' } },
           h('span', { style:{ color:'#94a3b8', minWidth:'110px', flexShrink:0 } }, '주민등록번호'),
-          h('span', { style:{ color:'#1e293b', fontWeight:500, fontFamily:'monospace', flex:1 } }, showRRN ? (typeof fmtRRN==='function'?fmtRRN(u.rrn):u.rrn) : (typeof maskRRN==='function'?maskRRN(u.rrn):(u.rrn||'').slice(0,7)+'******')),
-          h('button', { onClick:function(){ setShowRRN(!showRRN); },
+          h('span', { style:{ color:'#1e293b', fontWeight:500, fontFamily:'monospace', flex:1 } },
+            (function(){
+              var full = (vaultVal && vaultVal.rrn) || u.rrn || '';
+              if(showRRN && full) return (typeof fmtRRN==='function'?fmtRRN(full):full);
+              if(full) return (typeof maskRRN==='function'?maskRRN(full):full.slice(0,7)+'******');
+              return _ssAdminD ? '●●●●●●-●●●●●●●' : '🔒 등록됨 (대표만 열람)';
+            })()),
+          (_ssAdminD || u.rrn) && h('button', { onClick:ssToggle,
             style:{ padding:'2px 8px', fontSize:'12.5px', background: showRRN?'#fef2f2':'#f8fafc', border:'1px solid '+(showRRN?'#fecaca':'#cbd5e1'), borderRadius:'4px', color: showRRN?'#dc2626':'#475569', cursor:'pointer', fontWeight:600 } },
             showRRN ? '🙈 가리기' : '👁 공개')
         ),
@@ -73875,8 +73961,13 @@ function StaffRosterDetail(props){
         (u.workStart || u.workEnd) && row('근무시간', (u.workStart||'')+' ~ '+(u.workEnd||'')+(u.breakMinutes ? ' (휴게 '+u.breakMinutes+'분)' : '')),
         row('부양가족', u.dependents != null ? u.dependents+'명 (본인 포함)' : null),
         row('담당 직무', u.jobDuty),
-        row('은행/계좌', u.bankName && u.accountNo ? u.bankName + ' ' + u.accountNo : (u.bankName||null)),
-        row('예금주', u.accountHolder||null),
+        row('은행/계좌', (function(){
+          var acc = showRRN ? ((vaultVal && vaultVal.account) || u.accountNo || '') : '';
+          if(showRRN && acc) return (u.bankName ? u.bankName + ' ' : '') + acc;
+          if(u.hasAccount || u.accountNo) return (u.bankName ? u.bankName + ' ' : '') + (_ssAdminD || u.accountNo ? PuStaffSecret.maskAccount(u.accountNo || '0000') : '🔒 등록됨 (대표만 열람)');
+          return u.bankName || null;
+        })()),
+        row('예금주', showRRN ? ((vaultVal && vaultVal.holder) || u.accountHolder || null) : ((u.hasAccount || u.accountHolder) ? '●●●' : null)),
         row('최종학력', u.education),
         h('div', { style:{ fontSize:'13.5px', fontWeight:700, color:'#475569', margin:'10px 0 4px', paddingBottom:'4px', borderBottom:'2px solid #e2e8f0' } }, '4대보험'),
         row('국민연금', u.pensionNo),
@@ -74105,7 +74196,11 @@ function StaffRosterDetail(props){
           '↩ 재직 복귀'),
         u.status === 'retired' && h('button', { onClick:function(){
           // 이직확인서 자동 작성 — 새 탭 출력
-          var name = u.name||''; var rrn = u.rrn||''; var hd = u.hireDate||''; var rd = u.retireDate||''; var lr = u.leaveReason||'';
+          /* 이직확인서는 주민번호 «전체»가 꼭 들어가는 서식이다(고용보험법 시행규칙 제91조). 주민번호는 금고(대표만)에 있다 —
+             창은 «먼저» 열고(안 그러면 팝업이 막힌다), 대표가 받아 온 뒤 «열람 기록을 남기고서야» 채운다(고시 제8조). */
+          var _w0 = window.open('','_blank');
+          var _doPrint = function(rrn){
+          var name = u.name||''; var hd = u.hireDate||''; var rd = u.retireDate||''; var lr = u.leaveReason||'';
           var sal = (u.baseSalary||0).toLocaleString();
           var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>이직확인서</title>'
             +'<style>body{font-family:"맑은 고딕",sans-serif;font-size:12px;margin:20mm}table{width:100%;border-collapse:collapse}td,th{border:1px solid #000;padding:6px 10px}th{background:#f8fafc;text-align:center;font-weight:bold;white-space:nowrap;width:130px}.title{font-size:18px;font-weight:bold;text-align:center;margin:10px 0 4px}.sub{text-align:center;font-size:11px;color:#475569;margin-bottom:14px}@media print{.noprint{display:none}}</style>'
@@ -74125,7 +74220,18 @@ function StaffRosterDetail(props){
             +'<br><p style="text-align:right">'+new Date().toLocaleDateString('ko-KR')+'</p>'
             +'<p style="text-align:right">사업주: 권형하 (서명)</p>'
             +'</body></html>';
-          var w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); }
+          var w=_w0; if(w){ w.document.write(html); w.document.close(); }
+          };
+          if(u.rrn){ _doPrint(u.rrn); }
+          else if(_ssAdminD && typeof fbDb !== 'undefined' && fbDb){
+            PuStaffSecret.readOne(fbDb, u.sid).then(function(r){
+              if(!r.ok || !r.map.rrn){ _doPrint(''); return; }
+              PuStaffSecret.logView(fbDb, u.sid, 'rrn', { sid: CURRENT_USER.sid, name: CURRENT_USER.name }).then(function(l){
+                if(!l.ok){ try { if(_w0) _w0.close(); } catch(_){} showToast('⚠ 열람 기록을 남기지 못해 출력하지 않습니다'); return; }
+                _doPrint(r.map.rrn);
+              });
+            });
+          } else { _doPrint(''); }
         },
           style:{ padding:'7px 12px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', borderRadius:'5px', fontSize:'12px', fontWeight:700, cursor:'pointer' } },
           '📋 이직확인서'),
@@ -76549,11 +76655,19 @@ function calcIncomeTax2026(monthlyPay, dependents){
 
 // 직원 급여 자동계산
 // rrn(주민번호)→지급월 기준 만 나이 (없으면 null)
-function _ageFromRrn(rrn, ymStr){
+function _ageFromRrn(rrn, ymStr, birth){
   var d = String(rrn||'').replace(/[^0-9]/g,'');
-  if(d.length < 7) return null;
-  var yy = parseInt(d.slice(0,2),10), mm = parseInt(d.slice(2,4),10), c = d.charAt(6);
-  var by = (c==='1'||c==='2'||c==='5'||c==='6') ? 1900+yy : (c==='3'||c==='4'||c==='7'||c==='8') ? 2000+yy : (c==='9'||c==='0') ? 1800+yy : null;
+  var yy, mm, by;
+  if(d.length >= 7){
+    yy = parseInt(d.slice(0,2),10); mm = parseInt(d.slice(2,4),10); var c = d.charAt(6);
+    by = (c==='1'||c==='2'||c==='5'||c==='6') ? 1900+yy : (c==='3'||c==='4'||c==='7'||c==='8') ? 2000+yy : (c==='9'||c==='0') ? 1800+yy : null;
+  } else {
+    /* 주민번호는 금고(대표만)로 갔다 — 명부에 남은 생년월일(YYYY-MM-DD)로 셈한다(2026-11-01 개인정보 2단계) */
+    var bp = String(birth||'').split('-');
+    if(bp.length < 3) return null;
+    by = parseInt(bp[0],10); mm = parseInt(bp[1],10);
+    if(!by) by = null;
+  }
   if(by===null || mm<1 || mm>12) return null;
   var p = String(ymStr||'').split('-');
   if(p.length<2) return null;
@@ -76562,11 +76676,18 @@ function _ageFromRrn(rrn, ymStr){
   return ymY - by - (ymM < mm ? 1 : 0);
 }
 // rrn + 입사일 → 만 65세 이후 신규 입사 여부 (고용보험 실업급여 적용제외)
-function _hiredAfter65(rrn, hireDate){
+function _hiredAfter65(rrn, hireDate, birth){
   var d = String(rrn||'').replace(/[^0-9]/g,'');
-  if(d.length < 7) return false;
-  var yy = parseInt(d.slice(0,2),10), mm = parseInt(d.slice(2,4),10), dd = parseInt(d.slice(4,6),10), c = d.charAt(6);
-  var by = (c==='1'||c==='2'||c==='5'||c==='6') ? 1900+yy : (c==='3'||c==='4'||c==='7'||c==='8') ? 2000+yy : (c==='9'||c==='0') ? 1800+yy : null;
+  var mm, dd, by;
+  if(d.length >= 7){
+    var yy = parseInt(d.slice(0,2),10); mm = parseInt(d.slice(2,4),10); dd = parseInt(d.slice(4,6),10); var c = d.charAt(6);
+    by = (c==='1'||c==='2'||c==='5'||c==='6') ? 1900+yy : (c==='3'||c==='4'||c==='7'||c==='8') ? 2000+yy : (c==='9'||c==='0') ? 1800+yy : null;
+  } else {
+    var bp = String(birth||'').split('-');
+    if(bp.length < 3) return false;
+    by = parseInt(bp[0],10); mm = parseInt(bp[1],10); dd = parseInt(bp[2],10);
+    if(!by || !mm || !dd) return false;
+  }
   if(by===null) return false;
   var h = String(hireDate||'').split('-');
   if(h.length<3) return false;
@@ -76739,9 +76860,9 @@ function calcPayrollFresh(rec){
 
   // ★ 나이별 보험료 면제 판정 (rrn 기반)
   var _emp = (dbGet('user_accounts', USERS_SEED)||[]).find(function(u){ return u.sid===rec.empSid; });
-  var _age = _emp ? _ageFromRrn(_emp.rrn, rec.ym) : null;
+  var _age = _emp ? _ageFromRrn(_emp.rrn, rec.ym, _emp.birthDate) : null;
   var _pensionExempt = (_age != null && _age >= 60);
-  var _empInsExempt  = _emp ? _hiredAfter65(_emp.rrn, _emp.hireDate) : false;
+  var _empInsExempt  = _emp ? _hiredAfter65(_emp.rrn, _emp.hireDate, _emp.birthDate) : false;
 
   // 근로자 부담분
   /* ★ 기준소득월액은 천원 미만을 버린다(국민연금법 시행령). 보험료는 원 미만 절사, 소득세·지방세는 10원 미만 절사.
@@ -84369,7 +84490,12 @@ function PayrollLedger(props){
       } catch(err){ showToast('가져오기 실패: '+(err&&err.message)); }
       e.target.value='';
     };
-    reader.readAsArrayBuffer(file);
+    /* 주민번호는 금고(대표만)로 갔다 — 대표면 받아 와 «맞춰 보는 데만» 쓴다(기록에는 안 넣는다). 아니면 이름으로 맞춘다. */
+    if(window.PuStaffSecret && window.CURRENT_USER && CURRENT_USER.isAdmin && typeof fbDb !== 'undefined' && fbDb){
+      PuStaffSecret.readAll(fbDb).then(function(r){
+        if(r.ok) allUsers = allUsers.map(function(u){ return PuStaffSecret.merge(u, r.map); });
+      }).then(function(){ reader.readAsArrayBuffer(file); });
+    } else { reader.readAsArrayBuffer(file); }
   }
   function getRec(sid){
     var _recs = recs || []; var _users = users || [];
@@ -88103,7 +88229,8 @@ function StaffRoster(){
         try { console.log('[근로자명부 가져오기 백업]', JSON.stringify(erpNoPiiUsers(users))); } catch(_){}
         var arr = users.map(function(u){ return Object.assign({}, u); });
         var byRrn = {}, byName = {};
-        arr.forEach(function(u){ var d=digits(u.rrn); if(d) byRrn[d]=u; if(u.name) byName[u.name.trim()]=u; });
+        /* 주민번호는 금고(대표만)에 있다 — 맞춰 보기에만 쓰고 명부 줄에는 붙이지 않는다(붙이면 저장 때 전원이 금고로 간다) */
+        arr.forEach(function(u){ var d=digits(u.rrn || (_ssVault[u.sid] && _ssVault[u.sid].rrn)); if(d) byRrn[d]=u; if(u.name) byName[u.name.trim()]=u; });
         var maxA = 0;
         arr.forEach(function(u){ var m=/^A-(\d+)$/.exec(u.sid||''); if(m){ var n=parseInt(m[1],10); if(n>maxA) maxA=n; } });
         var filled=0, added=0, skipped=0, noTitle=0; var _retiredNow=[];
@@ -88124,7 +88251,7 @@ function StaffRoster(){
             // 기존 직원: 빈 칸만 채움 (덮어쓰기 금지)
             var did=false;
             if(hire && !hit.hireDate){ hit.hireDate=hire; did=true; }
-            if(rrn && !hit.rrn){ hit.rrn=rrn; did=true; }
+            if(rrn && !hit.rrn && !(_ssVault[hit.sid] && _ssVault[hit.sid].rrn)){ hit.rrn=rrn; did=true; }
             /* 직위도 «비어 있을 때만» 채운다 — 여기 있는 값이 명부보다 최신일 수 있다 */
             if(titleTxt && !String(hit.title||'').trim()){ hit.title=titleTxt; did=true; }
             if(isRetired){
@@ -88167,7 +88294,10 @@ function StaffRoster(){
       } catch(err){ showToast('가져오기 실패: '+(err&&err.message)); }
       e.target.value='';
     };
-    reader.readAsArrayBuffer(file);
+    var _ssVault = {};
+    if(window.PuStaffSecret && window.CURRENT_USER && CURRENT_USER.isAdmin && typeof fbDb !== 'undefined' && fbDb){
+      PuStaffSecret.readAll(fbDb).then(function(r){ if(r.ok) _ssVault = r.map; }).then(function(){ reader.readAsArrayBuffer(file); });
+    } else { reader.readAsArrayBuffer(file); }
   }
   function save(data, opts){
     if(modal.mode === 'add'){
@@ -88512,10 +88642,12 @@ function StaffRoster(){
                     }, '📅 입사예정')),
                   h('td', null, u.title||'-'),
                   h('td', { style:{ fontSize:'12px' } }, u.branch||'-'),
-                  h('td', { style:{ fontSize:'12px' } }, u.phone||'-'),
-                  h('td', { style:{ fontSize:'12px', color:'#475569' } }, u.email||'-'),
-                  h('td', { style:{ fontSize:'13.5px', color:'#475569', maxWidth:'140px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
-                    u.address ? (u.address + (u.addressDetail ? ' '+u.addressDetail : '')) : '-'),
+                  /* 목록에서는 연락처·이메일·주소를 가린다 — 화면 녹화·옆자리 시선·화면 공유로 새지 않게(2026-11-01 개인정보 2단계).
+                     직원을 눌러 상세로 들어가면 그대로 보인다. 한 칸은 한 줄(검색은 가리기 전 값으로 한다). */
+                  h('td', { style:{ fontSize:'12px', whiteSpace:'nowrap' }, title:'전체 번호는 직원을 눌러 상세에서 봅니다' }, window.PuStaffSecret ? (PuStaffSecret.maskPhone(u.phone) || '-') : (u.phone||'-')),
+                  h('td', { style:{ fontSize:'12px', color:'#475569', whiteSpace:'nowrap' }, title:'전체 이메일은 직원을 눌러 상세에서 봅니다' }, window.PuStaffSecret ? (PuStaffSecret.maskEmail(u.email) || '-') : (u.email||'-')),
+                  h('td', { style:{ fontSize:'13.5px', color:'#475569', maxWidth:'140px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }, title:'전체 주소는 직원을 눌러 상세에서 봅니다' },
+                    u.address ? (window.PuStaffSecret ? PuStaffSecret.maskAddress(u.address) : (u.address + (u.addressDetail ? ' '+u.addressDetail : ''))) : '-'),
                   h('td', { style:{ fontFamily:'monospace', fontSize:'13.5px' } }, u.hireDate||'-'),
                   statusTab === 'retired' && h('td', { style:{ fontFamily:'monospace', fontSize:'13.5px', color:'#dc2626' } }, u.retireDate||'-'),
                   h('td', null,
