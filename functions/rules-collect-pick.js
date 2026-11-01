@@ -1,11 +1,12 @@
-/* 취업규칙 모으기 — 고르기·갈래·사업장 후보 (2026-10-03 설계 §4-1·§4-4)
+/* 기업규정집 모으기 — 고르기·갈래·사업장 후보 (2026-10-03 설계 §4-1·§4-4 · 2026-11-01 노사협의회·단체협약 분리)
    순수 모듈이다(네트워크·DB 없음). 정한 것:
    ⚠ 사업장은 «주소·도메인 후보»만. 이름이 같다는 것만으로는 후보도 안 만든다(온톨로지 규칙).
    ⚠ 공용 도메인(naver 등)은 도메인으로 안 잇는다 — 한 도메인에 온 나라가 산다. */
 'use strict';
 const MR = require('./mail-receive');
+const S = require('./rules-daily-core/lib-set.js');
 
-const RULES_RE = /취업\s*규칙|사규|인사\s*규정|복무\s*규정|규정\s*(개정|정비|제정)/;
+const RULES_RE = /취업\s*규칙|사규|인사\s*규정|복무\s*규정|규정\s*(개정|정비|제정)|노사\s*협의회|단체\s*협약|임금\s*협약|단협|단체\s*교섭|노사\s*협의/;
 const SELF = '370-6@daum.net';
 const SKIP_BOX_RE = /^(Drafts|예약편지함|내게쓴편지함)-/;
 const SENT_BOX_RE = /^Sent Messages-/;
@@ -20,9 +21,8 @@ function dirOf(src, slug, row) {
   return MR.normEmail((row && row.e) || '') === SELF ? '보냄' : '받음';
 }
 /* 넓은 낱말 — 「○○규정」·「변경신고」 (대표 지시 2026-10-05 「지금까지 컨설팅했던것 모두 가지고 와라」).
-   실측: 첨부가 있는데 위 낱말로는 놓친 메일 35통(규정 29 · 변경신고 4 · 단체협약 2 — 단체협약은 취업규칙이 아니라 뺐다).
-   ⚠ 첨부가 있을 때만 — 「법 규정 안내」 소식지까지 열면 시간만 든다. 취업규칙이 아닌 첨부는 갈래 「기타」라 글을 안 담는다. */
-const BROAD_RE = /규정|변경\s*신고|노사\s*협의회|단체\s*협약|임금\s*협약|단협/;
+   ⚠ 첨부가 있을 때만 — 「법 규정 안내」 소식지까지 열면 시간만 든다. 규정집이 아닌 첨부는 갈래 「기타」라 글을 안 담는다. */
+const BROAD_RE = /규정|변경\s*신고|노사\s*협의회|단체\s*협약|임금\s*협약|단협|단체\s*교섭|노사\s*협의/;
 function isRulesMail(row) {
   if (!row) return false;
   const s = String(row.s || ''), p = String(row.p || '');
@@ -58,18 +58,24 @@ function wantAtt(name) {
   const m = String(name || '').toLowerCase().match(/\.(hwpx|hwp|docx|pdf)$/);
   return m ? m[1] : '';
 }
-function kindOf(name, text) {
+function setOf(name, subject) {
+  return S.setOf({ name: String(name || ''), mail: { subject: String(subject || '') } });
+}
+function kindOf(name, text, subject) {
   const n = String(name || '');
+  const s = setOf(n, subject);
+  if (s === '노사협의회' || s === '단체협약') {
+    const k = S.kindOf({ name: n, set: s, mail: { subject: String(subject || '') } });
+    if (k !== '기타') return k;
+    const arts = (String(text || '').match(/(^|\n)\s*제\s*\d+\s*조/g) || []).length;
+    return arts >= 5 ? s : '기타';
+  }
   if (/신구|대조|비교표/.test(n)) return '신구대조표';
   if (/체크리스트/.test(n)) return '기타';
   if (!/취업\s*규칙|취업\s*규정|사규/.test(n) && /국민연금|건강보험|고용보험|산재보험|4대보험|피보험자|소재지\s*변경|사업자등록|근로계약|연봉계약|서약|경업금지|비밀유지|정관/.test(n)) return '기타';
   if (/신고/.test(n)) return '신고서';
   if (/동의/.test(n)) return '동의서';
   if (/의견/.test(n)) return '의견청취';
-  if (!/취업\s*규칙|취업\s*규정|사규/.test(n)) {
-    if (/노사\s*협의회|협의회\s*(?:운영\s*)?규정/.test(n)) return '노사협의회';
-    if (/단체\s*협약|임금\s*협약|단협/.test(n)) return '단체협약';
-  }
   if (/취업\s*규칙|규정|규칙|사규/.test(n)) return '규칙본문';
   const arts = (String(text || '').match(/(^|\n)\s*제\s*\d+\s*조/g) || []).length;
   return arts >= 10 ? '규칙본문' : '기타';
@@ -114,5 +120,5 @@ function companyCandOf(m, coIndex, domIndex) {
 }
 function docIdOf(sha) { return 'rd_' + String(sha || '').slice(0, 24); }
 
-module.exports = { RULES_RE, SELF, PUBLIC_DOMAINS, mailKeyOf, dirOf, isRulesMail, pickMails, wantAtt,
-  kindOf, buildDomainIndex, companyCandOf, docIdOf };
+module.exports = { RULES_RE, BROAD_RE, SELF, PUBLIC_DOMAINS, mailKeyOf, dirOf, isRulesMail, pickMails, wantAtt,
+  setOf, kindOf, buildDomainIndex, companyCandOf, docIdOf };

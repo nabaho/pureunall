@@ -13,14 +13,15 @@ const X = require('./rules-collect-redact');
 const PDF = require('./rules-collect-pdf');   // 다시 보기 전에 pdf.js 를 실을 수 있는지 한 번 본다(받기 전에)
 const MR = require('./mail-receive');
 const LIB = 'rules_mgmt/library';
-const FILE_KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표'];
-/* 글도 안 담는 갈래 → 보류 까닭. 담는 것은 규칙본문·신구대조표뿐이다(조별 문안·우리 문안이 쓰는 것도 그 둘). */
+const FILE_KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표', '회의록', '합의·교섭'];
+/* 글도 안 담는 갈래 → 보류 까닭. 담는 것은 본문(규칙본문·노사협의회·단체협약)·신구대조표·회의록·합의·교섭. */
 const NAMES = '근로자 이름·서명이 든 서류';
 const NO_TEXT_KINDS = {
   '기타': '취업규칙 서류가 아님(갈래 「기타」) — 담지 않음',
   '동의서': NAMES + '(동의서) — 담지 않음',
   '신고서': NAMES + '(신고서) — 담지 않음',
   '의견청취': NAMES + '(의견청취) — 담지 않음',
+  '위원·고충': NAMES + '(위원·고충) — 담지 않음',
 };
 /* PDF (설계 §11) — 보류 까닭 글은 화면·검사가 본다. OLD 는 옛 까닭이자 «다시 보기» 대상 표시다. */
 const PDF_HOLD = {
@@ -123,7 +124,9 @@ function pdfTargets(docs) {
   Object.keys(docs || {}).forEach((id) => {
     const d = docs[id];
     if (!d || d.status !== '보류' || d.holdWhy !== PDF_HOLD.OLD) return;
-    if (FILE_KINDS.indexOf(d.kind) < 0 || !isPdfName(d.name) || !d.sha || !d.mail) return;
+    const subj = (d.mail && d.mail.subject) || '';
+    const k0 = FILE_KINDS.indexOf(d.kind) >= 0 ? d.kind : P.kindOf(d.name, '', subj);
+    if (FILE_KINDS.indexOf(k0) < 0 || !isPdfName(d.name) || !d.sha || !d.mail) return;
     const k = d.mail.src === 'imap' ? 'i_' + d.mail.box + '_' + d.mail.key : 'p_' + d.mail.key;
     (by[k] = by[k] || { mailKey: k, mail: d.mail, dir: d.dir, ids: [] }).ids.push(id);
   });
@@ -266,13 +269,14 @@ async function runOnce(o) {
         const ext = P.wantAtt(a.name);
         if (!ext) continue;
         const now = o.now();
-        const common = { name: String(a.name).slice(0, 200), mail, dir: m.dir, companyCand: cand,
+        const set = P.setOf ? P.setOf(a.name, mail.subject) : '취업규칙';
+        const common = { name: String(a.name).slice(0, 200), set, mail, dir: m.dir, companyCand: cand,
           companyId: null, companyLinkStatus: 'pending' };
         if (a.tooBig) {
           const id = 'rd_big_' + crypto.createHash('sha256').update(m.mailKey + '|' + a.name).digest('hex').slice(0, 20);
           if (!has(id)) {
             up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
-              { kind: P.kindOf(a.name, ''), sha: '', file: null, textLen: 0, pii: { count: {}, residual: 0 },
+              { kind: P.kindOf(a.name, '', mail.subject), sha: '', file: null, textLen: 0, pii: { count: {}, residual: 0 },
                 status: '보류', holdWhy: '20MB 넘음 — 메일에서 직접' }) });
             staged[id] = 1; c.held++;
           }
@@ -292,7 +296,7 @@ async function runOnce(o) {
         /* ★ PDF 글 뽑기는 CPU 일이라 withTimeout 으로 못 끊는다 — 받다가 예산이 다 됐으면 읽지 않고 옛 까닭으로 보류한다(다시 보기가 나중에 읽는다) */
         if (ext === 'pdf' && o.now() - t0 > o.budgetMs) {
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
-            { kind: P.kindOf(a.name, ''), sha, file: null, textLen: 0, pii: { count: {}, residual: 0 },
+            { kind: P.kindOf(a.name, '', mail.subject), sha, file: null, textLen: 0, pii: { count: {}, residual: 0 },
               status: '보류', holdWhy: PDF_HOLD.OLD }) });
           staged[id] = 1; c.held++; ids.push(id);
           continue;
@@ -302,12 +306,12 @@ async function runOnce(o) {
         if (!r.ok) {
           /* 무슨 까닭이든 ok:false 는 똑같이 보류 — 글·파일 아무것도 안 담는다 */
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
-            { kind: P.kindOf(a.name, ''), sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
+            { kind: P.kindOf(a.name, '', mail.subject), sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
               status: '보류', holdWhy: r.holdWhy }) });
           staged[id] = 1; c.held++; ids.push(id);
           continue;
         }
-        const kind = P.kindOf(a.name, r.text);
+        const kind = P.kindOf(a.name, r.text, mail.subject);
         /* ★★★ 취업규칙 서류가 아니면 «글을 담지 않는다» (2026-10-03 첫 회차 실측).
            본문에 「취업규칙」 이 든 메일이면 첨부를 다 받으므로, 징계 통지서·회의록처럼
            근로자 이름이 그대로 든 인사 기록이 섞여 들어왔다(47건 중 23건이 「기타」).
@@ -431,11 +435,13 @@ async function runOnce(o) {
         if (!r.ok && r.holdWhy === PDF_HOLD.OLD && r.env) { noPdfJs = true; break; }
         if (!r.ok && r.holdWhy === PDF_HOLD.OLD) { unknownOld = true; break; }
         if (!r.ok) { close(up, id, { holdWhy: r.holdWhy, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
-        const kind = P.kindOf(d.name, r.text);
+        const subj = (d.mail && d.mail.subject) || '';
+        const set = P.setOf ? P.setOf(d.name, subj) : '취업규칙';
+        const kind = P.kindOf(d.name, r.text, subj);
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
-        if (why) { close(up, id, { kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        if (why) { close(up, id, { set, kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
         up[LIB + '/text/' + id] = r.text;
-        close(up, id, Object.assign({ kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null, recheckV: RECHECK_V },
+        close(up, id, Object.assign({ set, kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null, recheckV: RECHECK_V },
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
         pdfSum.stored++;
       }

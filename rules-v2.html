@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>취업규칙</title>
+<title>기업규정집</title>
 <!-- 글꼴 — rules.html 과 같은 웹글꼴. 안 실으면 PC 글꼴로 그려져 같은 글자도 폭이 달라지고, 갈래 단추가 오갈 때 튄다(2026-10-05 실측 15px) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=86"></script>
+<script src="js/pu-ontology.js?v=87"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -45,11 +45,12 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
-<script src="js/rules-v2/lib-order.js?v=3"></script>
+<script src="js/rules-v2/lib-set.js?v=1"></script>
+<script src="js/rules-v2/lib-order.js?v=4"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-sites.js?v=3"></script>
-<script src="js/rules-v2/store.js?v=6"></script>
-<script src="js/rules-v2/view-library.js?v=7"></script>
+<script src="js/rules-v2/lib-sites.js?v=4"></script>
+<script src="js/rules-v2/store.js?v=7"></script>
+<script src="js/rules-v2/view-library.js?v=8"></script>
 <script src="js/rules-v2/lib-status.js?v=1"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=2"></script>
 <script src="js/rules-v2/view-sites.js?v=12"></script>
@@ -570,7 +571,7 @@ button{font:inherit;cursor:pointer}
 </head>
 <body>
 <div class="top rs-head">
-  <div class="logo rs-logo">규</div><b class="rs-name">취업규칙</b>
+  <div class="logo rs-logo">규</div><b class="rs-name">기업규정집</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
        🏢 사업장(③-ⓐⓑ 목업 2026-10-04)이 맨 앞 — 타일을 누르면 처음 나오는 화면이다.
        ✏️ 검토·개정은 rules.html 로 «같은 창»에서 간다. 🏢·📚·📥 는 이 파일 안 갈래라 주소 해시만 바꾼다(아래 rv2Route).
@@ -585,7 +586,7 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=38"></script>
+<script src="js/pu-appbar.js?v=39"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
@@ -595,7 +596,7 @@ button{font:inherit;cursor:pointer}
 /* 「준비중」 — 포털 타일의 준비중 딱지와 «짝»이다(주소를 직접 친 사람도 막는다).
    ⚠ 역할을 모르는 동안에는 안 씌운다 — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
 /* 이름은 포털 타일과 같게 — 「취업규칙」 타일 하나(두 앱 합치기 2026-10-04), rules.html 도 같은 이름 */
-try { PuGate.soonUnlessAdmin('취업규칙'); } catch (_) {}
+try { PuGate.soonUnlessAdmin('기업규정집'); } catch (_) {}
 </script>
 <script>
 var FB_CONFIG = {apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -778,6 +779,7 @@ var H = {
       T().step = n.groups === 0 && n.rounds > 0 ? 'final' : 'link';
     } if (ST.tidy) { ST.tidy.picked.clear(); ST.tidy.last = null; } draw();
   },
+  set: function (d) { ST.filt.set = ST.filt.set === d.v ? '' : (d.v || ''); ST.filt.kind = ''; draw(); },
   kind: function (d) { ST.filt.kind = d.v || ''; draw(); },
   /* ── 🤖 매일 정리 (설계 §14-4) — 그리기는 PuRulesV2DailyView, 셈은 PuRulesDaily(서버와 같은 판정) ── */
   dailySpan: function (d) { var t = PuRulesV2DailyView.ensure(ST); t.span = d.v === 'week' ? 'week' : 'today'; t.picked.clear(); draw(); },
@@ -863,13 +865,15 @@ var H = {
     });
   },
   bulkKind: function () {
-    var k = prompt('갈래를 무엇으로 고칠까요?\n규칙본문 · 신구대조표 · 신고서 · 동의서 · 의견청취 · 기타', '규칙본문');
+    var all = (window.PuRulesV2Set && window.PuRulesV2Set.ALL_KINDS) || ['규칙본문', '노사협의회', '단체협약', '신구대조표', '회의록', '위원·고충', '합의·교섭', '신고서', '동의서', '의견청취', '기타'];
+    var k = prompt('갈래를 무엇으로 고칠까요?\n' + all.join(' · '), '규칙본문');
     if (!k) return;
-    if (['규칙본문', '신구대조표', '신고서', '동의서', '의견청취', '기타'].indexOf(k.trim()) < 0) { alert('그런 갈래는 없습니다: ' + k); return; }
+    if (all.indexOf(k.trim()) < 0) { alert('그런 갈래는 없습니다: ' + k); return; }
     var ids = pickedList();
     busy('갈래를 고치는 중…', ids.reduce(function (p, id) { return p.then(function () { return S.setKind(id, k.trim()); }); }, Promise.resolve()))
       .then(function () { ST.picked.clear(); return reload(); });
   },
+  setSet: function (id, s) { busy('분류를 고치는 중…', S.setSet(id, s)).then(reload); },
   setKind: function (id, k) { busy('갈래를 고치는 중…', S.setKind(id, k)).then(reload); },
   bulkFinal: function () {
     var ids = pickedList();

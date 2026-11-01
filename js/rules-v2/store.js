@@ -98,6 +98,7 @@
         return db.ref(LIB + '/auto/cfg').set({ mode: mode, by: String(o.actor() || ''), at: o.now() });
       },
       setKind: function (id, kind) { return saveHuman(id, { kindFix: String(kind || '') }); },
+      setSet: function (id, set) { return saveHuman(id, { setFix: String(set || ''), kindFix: '' }); },
       setRound: function (id, roundKey) { return saveHuman(id, { round: String(roundKey || '') }); },
       setFinal: function (companyId, roundKey, docId) {
         var rid = companyId + '_' + roundKey;

@@ -22,7 +22,7 @@
       .replace(/[()（）]/g, '');
   }
 
-  function kindOk(it) { return it.kind !== '기타'; }
+  function kindOk(it) { return it.kind !== '기타' && (!it.set || it.set === '취업규칙'); }
   // 후보 — 아직 어느 사업장에도 안 이은 문서(이미 이었거나 «이을 필요 없음»으로 닫은 것은 제외)
   function isOpenCand(it) {
     var st = it.h && it.h.companyLinkStatus;
