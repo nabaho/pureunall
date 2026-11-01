@@ -22,7 +22,7 @@
     cur.scroll = desk.scrollTop;
   }
   function activate(d) {
-    if (cur && cur !== d) commit();
+    if (cur && cur !== d) { commit(); document.dispatchEvent(new Event('pu:leave')); } // 자동 저장: 떠나기 전 지금 문서를 저장
     cur = d;
     E.load({ html: d.html, page: d.page, header: d.header, footer: d.footer, pageNum: d.pageNum, numberings: d.numberings, bullets: d.bullets, outlineId: d.outlineId, columns: d.columns, pageBorders: d.pageBorders, masterPages: d.masterPages, compat: d.compat, sec: d.sec, styles: d.styles, fontInfo: d.fontInfo });
     wrapFields();
@@ -45,6 +45,7 @@
     const d = makeDoc(o || {});
     docs.push(d);
     activate(d);
+    document.dispatchEvent(new Event('pu:doc'));
     return d;
   }
   function closeDoc(d) {
@@ -58,6 +59,7 @@
   function setDirty() {
     if (!cur) return;
     cur.pristine = false;
+    document.dispatchEvent(new Event('pu:dirty'));
     if (!cur.dirty) { cur.dirty = true; renderTabs(); }
   }
   function renderTabs() {
@@ -991,7 +993,7 @@
     { label: '새 문서', key: 'Alt+N', icon: 'new', act: C.new }, { label: '불러오기…', key: 'Alt+O', icon: 'open', act: C.open }, { sep: true },
     { label: '저장하기', key: 'Alt+S', icon: 'save', act: C.save }, { label: '다른 이름으로 저장하기…', key: 'Alt+V', icon: 'saveas', act: C.saveAs }, { label: 'PDF로 저장하기', icon: 'pdf', act: C.pdf }, { sep: true },
     { label: '편집 용지…', key: 'F7', icon: 'pagesetup', act: C.pageSetup }, { label: '미리 보기', icon: 'preview', act: C.preview }, { label: '인쇄…', key: 'Alt+P', icon: 'print', act: C.print }, { sep: true },
-    { label: '문서 정보', icon: 'info', act: C.docInfo }, { label: '문서 닫기', icon: 'close', act: C.close }, { label: '끝', act: C.quit },
+    { label: '자동 저장된 문서…', icon: 'open', act: () => window.PureunAutosave && PureunAutosave.openList() }, { label: '문서 정보', icon: 'info', act: C.docInfo }, { label: '문서 닫기', icon: 'close', act: C.close }, { label: '끝', act: C.quit },
   ];
   const MENUS = [['file', '파일'], ['edit', '편집'], ['view', '보기'], ['insert', '입력'], ['format', '서식'], ['page', '쪽'], ['security', '보안'], ['review', '검토'], ['tools', '도구'], ['table', '표']];
   let ribbonKey = 'edit';
@@ -1605,5 +1607,5 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  window.PureunApp = { C, D, addDoc, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
+  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
 })();
