@@ -148,8 +148,8 @@ test('가림 글자', () => {
 });
 
 test('목록 가림: 연락처·이메일·주소는 가리고 한 줄이다', () => {
-  assert.strictEqual(S.maskPhone('010-4428-3706'), '010-****-3706');
-  assert.strictEqual(S.maskPhone('01044283706'), '010-****-3706');
+  assert.strictEqual(S.maskPhone('010-1200-0001'), '010-****-0001');
+  assert.strictEqual(S.maskPhone('01012000001'), '010-****-0001');
   assert.strictEqual(S.maskEmail('abc@example.com'), 'a**@example.com');
   assert.ok(!/\n/.test(S.maskAddress('충남 천안시 동남구 1길 2')));
   assert.ok(S.maskAddress('충남 천안시 동남구 1길 2').endsWith('***'));

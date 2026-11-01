@@ -73204,7 +73204,7 @@ function StaffRosterModal(props){
         disabled: !_ssAdmin,
         placeholder: _ssAdmin ? '000000-0000000 (자동 하이픈)' : (f.hasRrn ? '🔒 등록됨 — 대표만 열람·수정' : '🔒 대표만 입력합니다'), maxLength:14,
         title: _ssAdmin ? '' : '주민번호·계좌는 대표만 보고 고칩니다(개인정보 보호)',
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', fontFamily:'monospace', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f1f5f9' } })),
+        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', fontFamily:'monospace', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } })),
       h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#475569', margin:'8px 0 4px', paddingBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '연락처'),
       h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' } },
         fld('휴대전화', inp('phone','tel','010-0000-0000')),
@@ -73451,10 +73451,10 @@ function StaffRosterModal(props){
         fld('은행', sel('bankName', BANK_LIST)),
         fld('계좌번호', h('input', { type:'text', value:_ssAdmin ? (f.accountNo||'') : '', onChange:set('accountNo'), disabled: !_ssAdmin,
           placeholder: _ssAdmin ? '계좌번호' : (f.hasAccount ? '🔒 등록됨 — 대표만 열람·수정' : '🔒 대표만 입력합니다'),
-          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f1f5f9' } }))
+          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } }))
       ),
       fld('예금주', h('input', { type:'text', value:_ssAdmin ? (f.accountHolder||'') : '', onChange:set('accountHolder'), disabled: !_ssAdmin, placeholder: _ssAdmin ? '예금주 이름' : '🔒 대표만 입력합니다',
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f1f5f9' } })),
+        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box', background: _ssAdmin ? '#fff' : '#f8fafc' } })),
       fld('최종학력', sel('education', EDUCATION_LIST))
     );
   } else if(tab === 'insurance'){
