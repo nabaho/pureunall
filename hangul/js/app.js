@@ -86,6 +86,29 @@
   }
   $('fileInput').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) openBlob(f, null); });
 
+  // 한글 파일을 화면에 끌어다 놓으면 바로 열기 (여러 개면 차례로 모두)
+  const isHangulName = n => /\.(hwpx|hwp|hwt)$/i.test(n);
+  const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('drag-file'); } });
+  window.addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('drag-file'); } });
+  window.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  window.addEventListener('drop', async e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('drag-file');
+    const items = Array.from(e.dataTransfer.items || []).filter(it => it.kind === 'file');
+    // 핸들은 drop 처리 중에만 얻을 수 있으므로 먼저 모두 받아 둠 (.hwpx 는 같은 파일에 덮어쓰기 저장)
+    const got = await Promise.all(items.map(async it => {
+      const handlePromise = it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null);
+      const file = it.getAsFile();
+      const handle = await handlePromise;
+      return { file, handle: handle && handle.kind === 'file' ? handle : null };
+    }));
+    const ok = got.filter(x => x.file && isHangulName(x.file.name));
+    if (!ok.length) { toast('한글 문서(.hwpx · .hwp · .hwt) 파일만 열 수 있습니다.', true); return; }
+    for (const x of ok) await openBlob(x.file, x.handle);
+  });
+
   async function openBlob(file, handle) {
     // 서식 파일(.hwt)은 한글처럼 그 서식으로 새 문서를 만듦 (같은 이름으로 덮어쓰지 않고, '만든 날짜'는 오늘)
     const isTpl = /\.hwt$/i.test(file.name), isHwp = isTpl || /\.hwp$/i.test(file.name);
