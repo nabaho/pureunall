@@ -51,7 +51,7 @@
 <script src="js/pu-home-diff.js?v=10"></script>
 <script src="js/pu-home-fill.js?v=10"></script>
 <!-- 새 홈페이지를 «자료로» 그리는 부품. 명령줄(scripts/build-people.js)도 같은 것을 쓴다 -->
-<script src="js/pu-site-people.js?v=3"></script>
+<script src="js/pu-site-people.js?v=4"></script>
 <script src="js/pu-site-page.js?v=1"></script>
 <script src="js/pu-site-partner.js?v=3"></script>
 <style>
@@ -352,6 +352,9 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 table.imp{width:100%;border-collapse:collapse;margin-top:6px}
 table.imp th,table.imp td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:13px}
 table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
+/* 직원 경력 공개 동의 칸 — 동의 전은 노랑, 동의 뒤는 초록 */
+.consent{border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:9px 12px;margin-top:10px}
+.consent.ok{border-color:#cbd5e1;background:var(--ok-bg)}
 
 /* 목록 번호 — 화면에서 세는 용도. 붙여넣을 글자에는 들어가지 않는다 */
 .num{width:20px;flex:none;text-align:right;color:var(--faint);font-size:12px;font-weight:800;
@@ -2545,8 +2548,12 @@ function 직원사이트딱지(m, 쪽직원) {
   if (offSiteOf(m)) return { label: '안 올림', cls: 'unposted' };
   if (!새홈페이지에갈사람(m)) return { label: '퇴사 → 빠짐', cls: 'rm' };
   if (!쪽직원) return { label: '확인 전', cls: 'none' };
-  const 이름 = String(m.name || '').trim(), 직급 = String(m.position1 || '').trim();
-  return 쪽직원.some(s => s.이름 === 이름 && s.직급 === 직급)
+  /* «올라갈 모양»은 부품(올릴직원)이 만든 그대로 견준다 — 경력(동의한 것만)까지 같아야 올라간 것이다 */
+  const 갈것 = PuSitePeople.올릴직원([Object.assign({ kind: 'staff' }, m)])[0];
+  if (!갈것) return { label: '확인 전', cls: 'none' };
+  const 같다 = (s) => s.이름 === 갈것.이름 && s.직급 === 갈것.직급
+    && (s.경력 || []).join('\n') === 갈것.경력.join('\n');
+  return 쪽직원.some(같다)
     ? { label: '올라감', cls: 'posted' } : { label: '안 올린 고침', cls: 'lv' };
 }
 
@@ -2703,7 +2710,16 @@ async function 직원가져오기넣기() {
 }
 window.직원가져오기넣기 = 직원가져오기넣기;
 
-/* ══ 직원 편집칸 — 이름·직급·차례·명부·안 올림만 (사진·경력은 2단계) ══ */
+/* 경력 공개 동의 켜기·끄기 — 켜면 받은 날을 오늘로 채워 둔다(고칠 수 있다) */
+function 경력동의(켬) {
+  if (!App.draft || App.draft.kind !== 'member') return;
+  App.draft.consentOk = !!켬;
+  if (켬 && !App.draft.consentAt) App.draft.consentAt = todayString();
+  App.dirty = true; App.render();
+}
+window.경력동의 = 경력동의;
+
+/* ══ 직원 편집칸 — 이름·직급·차례·명부·안 올림 + 경력·공개 동의 (사진은 나중) ══ */
 function 직원차례(d) {
   if (!App.draft || App.draft.kind !== 'member') return;
   const n = Number(App.draft.order);
@@ -2711,6 +2727,12 @@ function 직원차례(d) {
   App.dirty = true; App.render();
 }
 window.직원차례 = 직원차례;
+
+/* 직원 편집칸의 「⤓ 경력관리에서 가져오기」 — 노무사 칸과 «같은 일·같은 이름»이다(openPull).
+   ⚠ 단추를 openPull 로 바로 걸지 않는 까닭: 가져오는 단추는 화면 원본에 «하나»만 두는 규칙
+     (tests/home-career-pull ⓑ)이 노무사 칸을 지킨다. 직원 칸은 이 손잡이를 거쳐 같은 길로 간다. */
+function 직원경력가져오기() { openPull(); }
+window.직원경력가져오기 = 직원경력가져오기;
 
 function 직원편집(d) {
   const rec = App.members[d.key] || {};
@@ -2739,8 +2761,36 @@ function 직원편집(d) {
   if (kept) {
     h += '<div class="sub" style="margin-top:6px">퇴사해도 남김 — ' + esc(String(kept.why || '')) + '</div>';
   }
-  h += '<div class="guide" style="margin-top:12px;color:var(--faint)">얼굴 사진 · 경력: 2단계에서 들어옵니다. '
-    + '본인 동의를 받은 분만 올립니다.</div>';
+  /* ── 경력 (대표 승인 2026-11-01 직원 소개 2단계, 사진 제외) ──
+     노무사 경력 칸과 같은 손잡이(現/前 딱지·▲▼·✕·경력관리에서 가져오기)를 쓴다. */
+  h += '<div class="fld" style="margin-top:12px"><div class="fldbar">'
+    + '<label style="margin:0">경력 — ' + d.careers.length + '줄</label>'
+    + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="직원경력가져오기()"'
+    + ' title="경력관리에 담긴 위촉장·학력·자격증에서 골라 넣습니다">⤓ 경력관리에서 가져오기</button></div>'
+    + '<div class="car" id="careerBox">'
+    + d.careers.map((line, i) =>
+        '<div class="l"><span class="no">' + (i + 1) + '</span>'
+        + eraPickHtml(PuHomeCareer.eraOf(line), k => 'careerEra(' + i + ',\'' + k + '\')')
+        + '<input value="' + esc(PuHomeCareer.eraBody(line)) + '" oninput="careerEdit(' + i + ',this.value)">'
+        + '<button class="x" title="위로" onclick="careerMove(' + i + ',-1)">▲</button>'
+        + '<button class="x" title="아래로" onclick="careerMove(' + i + ',1)">▼</button>'
+        + '<button class="x" title="줄 삭제" onclick="careerDel(' + i + ')">✕</button></div>').join('')
+    + '<div class="add" onclick="careerAdd()">＋ 줄 추가</div></div></div>';
+  /* ── 공개 동의 — 체크 + 받은 날 + 받은 방법. 받은 날이 없으면 경력은 우리 목록에만 남는다 ── */
+  h += '<div class="consent' + (d.consentOk ? ' ok' : '') + '">'
+    + '<label style="display:flex;gap:6px;align-items:center;white-space:nowrap">'
+    + '<input type="checkbox"' + (d.consentOk ? ' checked' : '') + ' onchange="경력동의(this.checked)">'
+    + '<b>본인이 경력 공개에 동의함</b></label>'
+    + (d.consentOk
+        ? '<div class="sub" style="display:flex;gap:6px;align-items:center;margin-top:6px;white-space:nowrap">받은 날'
+          + '<input type="date" value="' + esc(d.consentAt) + '" oninput="fieldEdit(\'consentAt\',this.value)">'
+          + '받은 방법<select onchange="fieldEdit(\'consentHow\',this.value)">'
+          + ['', '서면', '메신저', '구두'].map(v => '<option value="' + v + '"' + (d.consentHow === v ? ' selected' : '') + '>'
+              + (v || '— 고르십시오 —') + '</option>').join('')
+          + '</select></div>'
+        : '<div class="sub" style="margin-top:4px">체크가 없으면 경력은 <b>우리 목록에만</b> 남고, 새 사이트에는 이름·직급만 나갑니다.</div>')
+    + '</div>';
+  h += '<div class="guide" style="margin-top:12px;color:var(--faint)">얼굴 사진: 나중 단계입니다.</div>';
   h += '<div class="sub" style="margin-top:10px">「저장」은 <b>우리 목록에만</b> 들어갑니다. 손님이 보는 새 사이트에는 '
     + '「새 사이트에 올리기」를 누르거나, <b>매달 1일 아침에 저절로</b> 올라갑니다.</div>';
   h += '</div>';   // .esc 끝
@@ -2937,6 +2987,10 @@ function loadDraft() {
       offSite: offSiteOf(m),
       /* 직원 차례 — 새 사이트 직원 줄의 순서(2026-11-01). 노무사는 안 쓴다 */
       order: (m.order === undefined || m.order === null) ? '' : m.order,
+      /* 직원 경력 공개 동의 (2026-11-01 직원 소개 2단계) — 받은 날이 있어야 새 사이트에 경력이 간다 */
+      consentOk: !!(m.careerConsent && m.careerConsent.at),
+      consentAt: String((m.careerConsent || {}).at || ''),
+      consentHow: String((m.careerConsent || {}).how || ''),
       duties: (m.duties || []).slice(),
       intro: m.intro || '', srl: m.srl || '', careers: (m.careers || []).slice()
     };
@@ -3353,6 +3407,17 @@ async function saveDraft(조용히) {
         const 전 = (App.members[d.key] || {}).order;
         if (String(d.order).trim() !== '' && isFinite(n)) next.order = n;
         else if (전 !== undefined && 전 !== null) next.order = 전;
+        /* 경력 공개 동의 (2026-11-01) — 받은 날 없이 «동의함»만 켜 두면 저장하지 않는다.
+             언제 받았는지 모르는 동의로 경력을 내보내지 않기 위해서다. */
+        if (d.consentOk && !/^\d{4}-\d{2}-\d{2}$/.test(String(d.consentAt || ''))) {
+          await say('동의 받은 날을 적어 주십시오', '받은 날이 없으면 경력을 새 사이트에 올리지 않습니다 — 저장하지 않았습니다.');
+          return false;
+        }
+        /* 바뀐 것이 없으면 그 전 기록(누가·언제 적었나)을 그대로 둔다 */
+        const 옛동의 = (App.members[d.key] || {}).careerConsent || null;
+        next.careerConsent = !d.consentOk ? null
+          : (옛동의 && 옛동의.at === d.consentAt && String(옛동의.how || '') === String(d.consentHow || '')) ? 옛동의
+          : { at: d.consentAt, how: d.consentHow || '', by: currentUserName(), setAt: Date.now() };
       }
       App.members[d.key] = await saveRecord('member', d.key, next);
     } else {
@@ -8039,13 +8104,18 @@ function 직원까지그리기(지금쪽, 새쪽, ours) {
 /* 올리기 확인 창에 적을 «직원이 어떻게 바뀌나». 이름은 esc 해서 넣는다. */
 function 직원바뀐것글(전, 후) {
   if (!전 || !후) return '';
-  const 전표 = {}, 후표 = {};
-  전.forEach(s => { 전표[s.이름] = s.직급; });
+  const 전표 = {}, 후표 = {}, 전경력 = {};
+  전.forEach(s => { 전표[s.이름] = s.직급; 전경력[s.이름] = (s.경력 || []).join('\n'); });
   후.forEach(s => { 후표[s.이름] = s.직급; });
-  const 바뀜 = 후.filter(s => 전표[s.이름] !== undefined && 전표[s.이름] !== s.직급);
+  const 경력바뀜 = (s) => 전경력[s.이름] !== (s.경력 || []).join('\n');
+  const 바뀜 = 후.filter(s => 전표[s.이름] !== undefined && (전표[s.이름] !== s.직급 || 경력바뀜(s)));
   const 새로 = 후.filter(s => 전표[s.이름] === undefined);
   const 빠짐 = 전.filter(s => 후표[s.이름] === undefined);
-  const 줄 = 바뀜.map(s => '· ' + esc(s.이름) + ' ' + esc(전표[s.이름]) + ' → ' + esc(s.직급))
+  /* 경력은 동의한 분만 간다 — 「경력 N줄」 / 「경력 내림」으로 짧게 적는다 */
+  const 경력말 = (s) => !경력바뀜(s) ? ''
+    : ((s.경력 || []).length ? ' · 경력 ' + s.경력.length + '줄' : ' · 경력 내림');
+  const 줄 = 바뀜.map(s => '· ' + esc(s.이름) + ' '
+      + (전표[s.이름] !== s.직급 ? esc(전표[s.이름]) + ' → ' + esc(s.직급) : esc(s.직급)) + 경력말(s))
     .concat(새로.map(s => '· ' + esc(s.이름) + ' ' + esc(s.직급) + ' — 새로'))
     .concat(빠짐.map(s => '· ' + esc(s.이름) + ' ' + esc(s.직급) + ' — 빠짐'));
   return '\n\n[직원] 바뀜 ' + 바뀜.length + ' · 새로 ' + 새로.length + ' · 빠짐 ' + 빠짐.length
