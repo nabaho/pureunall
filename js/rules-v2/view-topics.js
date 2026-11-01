@@ -1,6 +1,6 @@
 /* 취업규칙(새) — 「📚 조별 문안」 그리기 (설계 §6-2 · 2026-10-04 목업 2 「추천대로」)
 
-   왼쪽에서 조 주제(표준취업규칙 차례·장 머리)를 고르면, 오른쪽에 우리 사무소가 쓴 문안을
+   왼쪽에서 문서 갈래(취업규칙 · 노사협의회 · 단체협약)와 조 주제를 고르면, 오른쪽에 우리 사무소가 쓴 문안을
    «같은 글끼리» 묶어 보인다. 맨 위 덩어리는 전문, 아래 덩어리는 «맨 위와 다른 곳만» 칠한다.
 
    셈은 lib-topics.js(PuRulesV2Topics)·lib-order.js(PuRulesV2Order), 견주기는 pu-rules-filecmp.js,
@@ -54,6 +54,11 @@
   var FIRST_CHAPTER = '제1장 총칙';
   var OTHER_CHAPTER = '그 밖의 조';
   var SIZE = '10인이상';
+  var DOC_KINDS = [
+    { k: '규칙본문', label: '취업규칙', ch: OTHER_CHAPTER },
+    { k: '노사협의회', label: '노사협의회', ch: '노사협의회 규정' },
+    { k: '단체협약', label: '단체협약', ch: '단체협약' }
+  ];
   // 옛 수집기에서 규칙본문으로 들어온 비규칙 문서(개정비교표·노사협의회규정·근로계약서·체크리스트 등)와
   // 한 문서 안의 뒷장(인사위원회·징계·복리후생 등) 별도 「목적·적용범위」 조문이 총칙에 섞이는 것을 막는다.
   var NON_RULE_NAME_RE = /노사협의회|근로계약서|연봉계약서|비교표|대조표|체크리스트|신고서|제출서|동의서|의견청취|서약서|협약서|단체협약|정관/;
@@ -62,6 +67,11 @@
     if (!it || it.kind !== '규칙본문' || it.status !== '담김') return false;
     var nm = String((it.doc && it.doc.name) || it.name || '');
     return !NON_RULE_NAME_RE.test(nm);
+  }
+  function isDocForKind(it, docKind) {
+    var dk = docKind || '규칙본문';
+    if (dk === '규칙본문') return isRuleBody(it);
+    return !!(it && it.kind === dk && it.status === '담김');
   }
 
   /* «곳» 세기 — 사업장이 확정된 것은 회사 하나로, 미확정 문서는 문서 하나를 한 곳으로 센다.
@@ -76,10 +86,12 @@
      data      : S.load() 의 {docs, human, rounds}
      texts     : S.texts() 의 {docId: 가린 글}
      companies : [{id, name}]   stdText : STD_2026.text   today : 'YYYY-MM-DD'
-     criteria  : PuRulesCriteria(검사가 넣는다 — 없으면 전역) */
-  function model(data, texts, companies, stdText, today, criteria) {
+     criteria  : PuRulesCriteria(검사가 넣는다 — 없으면 전역)
+     docKind   : '규칙본문'(기본) | '노사협의회' | '단체협약' */
+  function model(data, texts, companies, stdText, today, criteria, docKind) {
+    var dk = docKind || '규칙본문';
     var d = data || {}, tx = texts || {};
-    var items = O().merge(d.docs || {}, d.human || {}).filter(isRuleBody);
+    var items = O().merge(d.docs || {}, d.human || {}).filter(function (it) { return isDocForKind(it, dk); });
     // ★최종본 — 회차 레코드의 finalDocId 만(실제 RTDB 는 null 칸을 버린다 — 없으면 없는 것)
     var finals = {};
     Object.keys(d.rounds || {}).forEach(function (k) { var r = d.rounds[k] || {}; if (r.finalDocId) finals[r.finalDocId] = 1; });
@@ -94,7 +106,7 @@
       T().splitArticles(tx[it.id]).forEach(function (a) {
         var k = T().topicKey(a.title);
         if (!k || seenTopic[k]) return;                       // 제목 없는 조·같은 문서 안 중복 제목(장별 목적 등)은 건너뛴다
-        if ((k === '목적' || k === '적용범위') && (a.num > 10 || SUB_PURPOSE_RE.test(T().normText(a.body, '')))) return;
+        if ((k === '목적' || k === '적용범위') && (a.num > 10 || (dk === '규칙본문' && SUB_PURPOSE_RE.test(T().normText(a.body, ''))))) return;
         seenTopic[k] = 1;
         if (!byKey[k]) { byKey[k] = []; keys.push(k); }
         byKey[k].push({ docId: it.id, companyId: it.companyId || '',
@@ -104,13 +116,16 @@
     });
 
     var topics = [], inStd = {};
-    T().topicOrder(stdText).forEach(function (s) {
-      inStd[s.key] = 1;
-      if (!byKey[s.key]) return;
-      topics.push({ key: s.key, title: s.title, chapter: s.chapter || FIRST_CHAPTER, count: places(byKey[s.key]), other: false });
-    });
+    if (dk === '규칙본문') {
+      T().topicOrder(stdText).forEach(function (s) {
+        inStd[s.key] = 1;
+        if (!byKey[s.key]) return;
+        topics.push({ key: s.key, title: s.title, chapter: s.chapter || FIRST_CHAPTER, count: places(byKey[s.key]), other: false });
+      });
+    }
+    var otherCh = dk === '노사협의회' ? '노사협의회 규정' : dk === '단체협약' ? '단체협약' : OTHER_CHAPTER;
     keys.filter(function (k) { return !inStd[k]; }).map(function (k) {
-      return { key: k, title: byKey[k][0].title, chapter: OTHER_CHAPTER, count: places(byKey[k]), other: true };
+      return { key: k, title: byKey[k][0].title, chapter: otherCh, count: places(byKey[k]), other: true };
     }).sort(function (a, b) { return b.count - a.count || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0); })
       .forEach(function (t) { topics.push(t); });
 
@@ -121,7 +136,7 @@
       byTopic[t.key] = T().groupVariants(byKey[t.key]).map(function (g) { g.places = places(g.members); return g; })
         .sort(function (a, b) { return b.finals - a.finals || b.places - a.places || b.last - a.last; });
     });
-    return { topics: topics, byTopic: byTopic, docs: docs, today: today || todayKst(), criteria: criteria || CR(), prepared: Object.create(null) };
+    return { docKind: dk, topics: topics, byTopic: byTopic, docs: docs, today: today || todayKst(), criteria: dk === '규칙본문' ? (criteria || CR()) : null, prepared: Object.create(null) };
   }
 
   /* 덩어리 하나에 검토 기준 — 대표 문서의 그 조를 «한 조짜리 문서»로 판정한다.
@@ -159,6 +174,13 @@
       g.warns = warnsOf(g, M);
     });
     M.prepared[key] = true;
+  }
+
+  function catHtml(docKind) {
+    var dk = docKind || '규칙본문';
+    return '<div class="tcat" data-role="tcat">' + DOC_KINDS.map(function (x) {
+      return '<button class="tc' + (x.k === dk ? ' on' : '') + '" data-act="docKind" data-k="' + esc(x.k) + '">' + esc(x.label) + '</button>';
+    }).join('') + '</div>';
   }
 
   /* ── 왼쪽 — 주제 목록. 찾기 글은 주제 «이름»만 거른다 ── */
@@ -233,9 +255,9 @@
 
   /* ── 꽂기 ──
      ctx: { S, cache, companies, stdText, criteria?, loadFix?:()=>Promise(fix), today? }
-     돌려주는 것: { ready, select(key), search(q), toggle(key,gi), state } — 검사가 손잡이로 쓴다 */
+     돌려주는 것: { ready, select(key), selectKind(docKind), search(q), toggle(key,gi), state } — 검사가 손잡이로 쓴다 */
   function mount(el, ctx) {
-    var st = { M: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, loaded: false, err: '', dirty: false };
+    var st = { M: null, docKind: '규칙본문', byKind: Object.create(null), rawData: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, loaded: false, err: '', dirty: false };
     var C = ctx.criteria || CR();
 
     function part(role) { return el.querySelector ? el.querySelector('[data-role="' + role + '"]') : null; }
@@ -252,20 +274,34 @@
     function drawAll() {
       if (!st.M) { el.innerHTML = msgHtml(); return; }
       el.innerHTML = '<div class="tpx"><div class="left">'
+        + catHtml(st.docKind)
         + '<input class="tq" data-role="tq" placeholder="🔍 조 주제 찾기 (예: 연차)" value="' + esc(st.q) + '">'
         + '<div data-role="tlist">' + listHtml(st.M, st.sel, st.q) + '</div></div>'
         + '<div class="main" data-role="tmain">' + mainHtml() + '</div></div>';
     }
     // 찾기 칸은 그대로 두고 목록·본문만 바꾼다 — 통째로 다시 그리면 글을 치던 칸이 손을 놓친다
     function draw(listOnly) {
-      var L = part('tlist'), Mn = part('tmain');
+      var Ct = part('tcat'), L = part('tlist'), Mn = part('tmain');
       if (!st.M || !L || !Mn) { drawAll(); return; }
+      if (Ct) Ct.outerHTML = catHtml(st.docKind);
       L.innerHTML = listHtml(st.M, st.sel, st.q);
       if (!listOnly) Mn.innerHTML = mainHtml();
     }
     var api2 = {
       state: st,
       select: function (k) { st.sel = String(k || ''); draw(); },
+      selectKind: function (dk) {
+        dk = String(dk || '규칙본문');
+        if (st.docKind === dk && st.M) return Promise.resolve();
+        st.docKind = dk; st.q = '';
+        if (st.byKind[dk] && !st.dirty) {
+          st.M = st.byKind[dk];
+          st.sel = st.M.topics.length ? st.M.topics[0].key : '';
+          drawAll();
+          return Promise.resolve();
+        }
+        return build(false);
+      },
       search: function (q) { st.q = String(q || ''); draw(true); },
       toggle: function (k, gi) { var id = k + '|' + gi; if (st.open.has(id)) st.open.delete(id); else st.open.add(id); draw(); }
     };
@@ -274,7 +310,8 @@
       var b = ev.target && ev.target.closest && ev.target.closest('[data-act]');
       if (!b || !el.contains(b) || !st.M) return;
       var a = b.dataset.act;
-      if (a === 'topic') api2.select(b.dataset.k);
+      if (a === 'docKind') api2.selectKind(b.dataset.k);
+      else if (a === 'topic') api2.select(b.dataset.k);
       else if (a === 'who') api2.toggle(b.dataset.k, +b.dataset.g);
       else if (a === 'copy') copy(copyText(st.M, b.dataset.k, +b.dataset.g), b);
     };
@@ -287,16 +324,17 @@
     function build(first) {
       return Promise.all([ctx.S.load(), fix]).then(function (v) {
         var data = v[0] || {}, f = v[1];
+        st.rawData = data;
         if (C && C.useMatchFix) C.useMatchFix(function () { return f; });
         var docs = {};
         O().merge(data.docs || {}, data.human || {}).forEach(function (it) {
-          if (isRuleBody(it)) docs[it.id] = it.doc;
+          if (isDocForKind(it, st.docKind)) docs[it.id] = it.doc;
         });
         if (first) { st.loaded = true; st.total = Object.keys(docs).length; drawAll(); }
         return ctx.S.texts(docs, ctx.cache, function (n, m) { if (first) { st.done = n; st.total = m; if (!st.M) drawAll(); } }).then(function (r) {
           st.failed = r.failed || [];
           var keep = st.sel;
-          st.M = api.model(data, r.texts, ctx.companies, ctx.stdText, ctx.today, C);   // ★ 한 번만(저장 표시가 없으면 다시 셈하지 않는다)
+          st.M = st.byKind[st.docKind] = api.model(data, r.texts, ctx.companies, ctx.stdText, ctx.today, C, st.docKind);   // ★ 한 번만(저장 표시가 없으면 다시 셈하지 않는다)
           st.sel = st.M.topics.some(function (t) { return t.key === keep; }) ? keep : (st.M.topics.length ? st.M.topics[0].key : '');
           draw();
         });
@@ -304,7 +342,7 @@
     }
     api2.ready = build(true).catch(function (e) { st.err = '조별 문안을 못 만들었습니다: ' + ((e && e.message) || e); drawAll(); });
     // 📥 에서 사업장·★최종본·갈래·회차를 저장하면 이 모델은 낡았다 — 표시만 해 두고, 다시 들어올 때 새로 셈한다
-    api2.markDirty = function () { st.dirty = true; };
+    api2.markDirty = function () { st.dirty = true; st.byKind = Object.create(null); };
     api2.enter = function () {
       if (!st.dirty) return api2.ready;
       st.dirty = false;
@@ -342,7 +380,7 @@
   }
 
   var api = { model: model, listHtml: listHtml, topicHtml: topicHtml, copyText: copyText, mount: mount,
-    places: places, warnsOf: warnsOf, judgeWarns: judgeWarns, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER };
+    places: places, warnsOf: warnsOf, judgeWarns: judgeWarns, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER, DOC_KINDS: DOC_KINDS };
   if (root) root.PuRulesV2TopicsView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

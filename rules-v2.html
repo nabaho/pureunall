@@ -45,11 +45,11 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
-<script src="js/rules-v2/lib-order.js?v=2"></script>
+<script src="js/rules-v2/lib-order.js?v=3"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-sites.js?v=3"></script>
 <script src="js/rules-v2/store.js?v=6"></script>
-<script src="js/rules-v2/view-library.js?v=6"></script>
+<script src="js/rules-v2/view-library.js?v=7"></script>
 <script src="js/rules-v2/lib-status.js?v=1"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=2"></script>
 <script src="js/rules-v2/view-sites.js?v=12"></script>
@@ -64,7 +64,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="std_2026.js?v=2"></script>
 <script src="js/rules-v2/lib-topics.js?v=3"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
-<script src="js/rules-v2/view-topics.js?v=6"></script>
+<script src="js/rules-v2/view-topics.js?v=7"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0;color:#1e293b;font-size:13px}
@@ -156,7 +156,10 @@ button{font:inherit;cursor:pointer}
 #topics .msg{padding:60px 20px;text-align:center;color:#475569}
 #topics .tpx{display:grid;grid-template-columns:260px minmax(0,1fr)}
 #topics .left{border-right:1px solid #e2e8f0;background:#ffffff;position:sticky;top:52px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto;padding-bottom:12px}
-#topics .tq{display:block;width:calc(100% - 24px);margin:12px;height:34px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;background:#ffffff;color:#1e293b;font:inherit}
+#topics .tcat{display:flex;border:1px solid #cbd5e1;border-radius:9px;overflow:hidden;margin:12px 12px 0;background:#f8fafc}
+#topics .tcat .tc{flex:1;height:30px;border:0;background:transparent;color:#475569;font-size:12px;white-space:nowrap;padding:0 4px}
+#topics .tcat .tc.on{background:#1e40af;color:#ffffff;font-weight:700}
+#topics .tq{display:block;width:calc(100% - 24px);margin:10px 12px 12px;height:34px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;background:#ffffff;color:#1e293b;font:inherit}
 #topics .ch{padding:8px 16px 4px;font-size:11.5px;color:#475569;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #topics .tp{display:flex;align-items:center;width:100%;padding:6px 16px 6px 22px;gap:6px;white-space:nowrap;border:0;background:none;color:#1e293b;text-align:left}
 #topics .tp span{overflow:hidden;text-overflow:ellipsis;min-width:0}

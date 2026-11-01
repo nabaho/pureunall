@@ -7,10 +7,19 @@
   // 반년(183일) 넘게 비면 다른 회차로 본다
   var GAP = 183 * 864e5;
   function str(v) { return v == null ? '' : String(v); }
+  // 옛 수집기에서 규칙본문·기타로 들어온 서류 가운데 노사협의회 규정·단체협약은 따로 가른다(사람이 kindFix 로 고친 것은 그대로 둔다).
+  function inferKind(d) {
+    var k = str(d && d.kind), nm = str(d && d.name);
+    if ((k === '규칙본문' || k === '기타' || !k) && !/신구|대조|비교표|신고|제출|동의|의견|취업\s*규칙|취업\s*규정|사규/.test(nm)) {
+      if (/노사\s*협의회|협의회\s*(?:운영\s*)?규정/.test(nm)) return '노사협의회';
+      if (/단체\s*협약|임금\s*협약|단협/.test(nm)) return '단체협약';
+    }
+    return k;
+  }
   function merge(docs, human) {
     return Object.keys(docs || {}).map(function (id) {
       var d = docs[id] || {}, h = (human || {})[id] || {};
-      return { id: id, doc: d, h: h, kind: h.kindFix || d.kind, name: str(d.name), status: d.status, dir: d.dir,
+      return { id: id, doc: d, h: h, kind: h.kindFix || inferKind(d), name: str(d.name), status: d.status, dir: d.dir,
         companyId: h.companyLinkStatus === 'linked' && h.companyId ? str(h.companyId) : null,
         date: Number((d.mail && d.mail.date) || 0), round: str(h.round) };
     });
@@ -107,7 +116,7 @@
     });
     return out.sort(function (a, b) { return (a.finalDocId ? 1 : 0) - (b.finalDocId ? 1 : 0) || b.last - a.last; });
   }
-  var api = { merge: merge, numberOf: numberOf, byMail: byMail, roundsOf: roundsOf, versionsOf: versionsOf,
+  var api = { merge: merge, inferKind: inferKind, numberOf: numberOf, byMail: byMail, roundsOf: roundsOf, versionsOf: versionsOf,
     finalCandOf: finalCandOf, companyGroups: companyGroups, mailKey: mailKey, R_REPORT: R_REPORT, R_NAME: R_NAME, R_AGREE: R_AGREE };
   if (root) root.PuRulesV2Order = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

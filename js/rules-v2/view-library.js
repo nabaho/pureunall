@@ -90,9 +90,9 @@
     return { hold: it.status === '보류', final: !!i.final, cand: !!(i.cand && i.cand.length) && !i.final,
       unlinked: !it.companyId && it.h.companyLinkStatus !== 'not_required' };
   }
-  var KINDS = ['규칙본문', '신구대조표', '신고서', '동의서', '의견청취', '기타'];
+  var KINDS = ['규칙본문', '노사협의회', '단체협약', '신구대조표', '신고서', '동의서', '의견청취', '기타'];
   var KIND_LABEL = { '규칙본문': '규칙 본문' };
-  var KIND_CLS = { '규칙본문': 'rule', '신구대조표': 'cmp', '신고서': 'rep', '동의서': 'agr' };
+  var KIND_CLS = { '규칙본문': 'rule', '노사협의회': 'rule', '단체협약': 'rule', '신구대조표': 'cmp', '신고서': 'rep', '동의서': 'agr' };
   function passes(it, st, M) {
     var f = st.filt || {}, fl = flags(it, M);
     if (f.kind && it.kind !== f.kind) return false;
@@ -326,7 +326,7 @@
     var h = (d.human || {})[st.sel] || {};
     var co = h.companyLinkStatus === 'linked' ? h.companyId : '';
     var m = doc.mail || {};
-    var kind = h.kindFix || doc.kind;
+    var kind = h.kindFix || (O().inferKind ? O().inferKind(doc) : doc.kind);
     var pii = piiLabel((doc.pii || {}).count);
     var opts = KINDS.map(function (k) { return '<option value="' + esc(k) + '"' + (k === kind ? ' selected' : '') + '>' + esc(KIND_LABEL[k] || k) + '</option>'; }).join('');
     return '<div class="side">'

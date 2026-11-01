@@ -37,3 +37,14 @@
 - `node scripts/sync-rules-daily-core.js`로 `functions/rules-daily-core/lib-topics.js` 동기화 완료.
 - `rules-v2.html` · `rules.html`의 `lib-topics.js?v=3`, `view-topics.js?v=6` 판 올림.
 - `tests/rules-v2-topics.test.js` · `tests/rules-v2-view-topics.test.js` · `tests/rules-collect-pick.test.js` 회귀 검사 추가 및 통과.
+
+## 4. 노사협의회 규정 · 단체협약 분리 및 NAS/D드라이브 과거 자료 실측
+
+- **노사협의회 · 단체협약 분리 (`feat/rules-separate-nosa-danche`)**:
+  - `js/rules-v2/lib-order.js` `inferKind()`에서 이미 수집된 서류 중 노사협의회 규정·단체협약을 `규칙본문`/`기타`에서 자동 분리(`노사협의회` · `단체협약`).
+  - `js/rules-v2/view-library.js` `KINDS`에 `노사협의회` · `단체협약` 갈래 필터 칩·선택지를 추가.
+  - `js/rules-v2/view-topics.js` 왼쪽 상단에 **`취업규칙` | `노사협의회` | `단체협약`** 3단 갈래 단추(`.tcat`)를 두어 각 갈래별로 조별 문안을 따로 조회하도록 분리(실데이터 기준 노사협의회 27건 266개 주제, 단체협약 4건 116개 주제 즉시 조회).
+  - `functions/rules-collect-pick.js` · `functions/rules-collect.js`에서도 `노사협의회` · `단체협약`을 별도 갈래로 분류하고 가린 본문을 담도록 반영.
+- **NAS 및 D 드라이브 과거 자료 보유량 실측**:
+  - 현재 PC `D:\` 드라이브에 총 **1,438건**(취업규칙류 **1,185건** · 노사협의회 **143건** · 단체협약 **110건**)이 보관되어 있음(`D:\푸른노무법인\6. backup_synology` 시놀로지 NAS 백업 911건 · `5. 업무자료(개인별)` 259건 · `3. 자문사 관리(종합)` 40건 · `D:\20220623백업C` 195건).
+  - 사무실 시놀로지 NAS(`192.168.0.21:5000` / SMB `445`)도 현재 연결 살아 있음(`TcpTestSucceeded: True`).
