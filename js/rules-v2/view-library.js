@@ -125,6 +125,70 @@
     return true;
   }
 
+  /* ── 기업 이름·주소 단독 일치 자동 찾기 — 메일함 제목·첨부파일 이름이나 주소가 거래처 1곳과만 맞으면 한 번에 연결 ── */
+  function coreOfCo(name) {
+    var TP = root && root.PuRulesV2Topics;
+    if (TP && TP.coCore) return String(TP.coCore(name) || '').replace(/\s+/g, '').toLowerCase();
+    return String(name || '').replace(/^\s*(?:주식회사|유한회사|합자회사|사단법인|재단법인|사회복지법인|의료법인|학교법인|농업회사법인|영농조합법인|\(주\)|\(유\)|\(사\)|\(재\)|㈜|㈲)\s*/g, '')
+      .replace(/\s*(?:주식회사|유한회사|\(주\)|\(유\)|㈜|㈲)\s*$/g, '').replace(/\s+/g, '').toLowerCase();
+  }
+  function autoMatches(st) {
+    var d = (st && st.data) || {}, items = O().merge(d.docs || {}, d.human || {});
+    var live = (st && st.companies || []).filter(function (c) { return c && c.id && !c._deleted; });
+    if (!live.length) return { groups: [], totalDocs: 0, totalMails: 0 };
+    var byId = {}, coreCnt = {}, cores = [];
+    live.forEach(function (c) {
+      var id = String(c.id), cr = coreOfCo(c.name);
+      byId[id] = c;
+      if (cr.length >= 2 && cr !== '높은') {
+        coreCnt[cr] = (coreCnt[cr] || 0) + 1;
+        cores.push({ id: id, name: String(c.name || id), core: cr });
+      }
+    });
+    cores = cores.filter(function (c) { return coreCnt[c.core] === 1; });
+    function hitNames(txt) {
+      if (!txt) return [];
+      var hits = cores.filter(function (c) {
+        var t = c.core === '니스' ? String(txt).replace(/비즈니스/g, ' ') : String(txt);
+        var escRe = c.core.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp('(?:^|[^가-힣a-zA-Z0-9])' + escRe, 'i').test(t);
+      });
+      hits = hits.filter(function (c) { return !hits.some(function (o) { return o.core !== c.core && o.core.indexOf(c.core) >= 0; }); });
+      var seen = {}, out = [];
+      hits.forEach(function (c) { if (!seen[c.id]) { seen[c.id] = 1; out.push(c.id); } });
+      return out;
+    }
+    var byMail = {};
+    items.forEach(function (it) {
+      var mk = O().mailKey(it);
+      (byMail[mk] = byMail[mk] || []).push(it);
+    });
+    var groups = [], totalDocs = 0;
+    Object.keys(byMail).forEach(function (mk) {
+      var mItems = byMail[mk];
+      var open = mItems.filter(function (it) {
+        var h = it.h || {};
+        return !it.companyId && h.companyLinkStatus !== 'linked' && h.companyLinkStatus !== 'not_required' && !h.noAuto && !(h.linkedBy && h.linkedBy !== '자동');
+      });
+      if (!open.length) return;
+      var text = mItems.map(function (it) { return ((it.doc && it.doc.mail && it.doc.mail.subject) || '') + ' ' + (it.name || ''); }).join(' ');
+      var nh = hitNames(text);
+      var cands = {};
+      mItems.forEach(function (it) {
+        ((it.doc && it.doc.companyCand) || []).forEach(function (c) { if (c && c.companyId && byId[c.companyId]) cands[String(c.companyId)] = 1; });
+      });
+      var cKeys = Object.keys(cands);
+      var co = '';
+      if (nh.length === 1) co = nh[0];
+      else if (nh.length === 0 && cKeys.length === 1) co = cKeys[0];
+      if (!co || !byId[co]) return;
+      var ids = open.map(function (it) { return it.id; });
+      groups.push({ ids: ids, co: co, name: String(byId[co].name || co) });
+      totalDocs += ids.length;
+    });
+    return { groups: groups, totalDocs: totalDocs, totalMails: groups.length };
+  }
+
   /* ── 맨 위 — 마지막 모으기 ── */
   function runHtml(st) {
     var M = model(st), r = (st.data || {}).run || null;
@@ -136,6 +200,7 @@
       if (fl.final) c.final++;
       if (fl.cand) c.cand++;
     });
+    var am = autoMatches(st);
     var when = r && r.at ? ymd(r.at) + ' ' + new Date(Number(r.at) + 9 * 3600e3).toISOString().slice(11, 16) : '아직 없음';
     var last = r ? '이번에 메일 ' + (r.mails || 0) + '통 · 담음 ' + (r.stored || 0) + ' · 보류 ' + (r.held || 0) + ' · 겹침 ' + (r.dup || 0) : '';
     return '<div class="run">'
@@ -147,6 +212,7 @@
       + '<span class="k">최종본 후보<span class="v a">' + c.cand + '</span></span>'
       + (r && r.alert ? '<span class="st hold" title="사흘 넘게 담은 것이 없고 오류가 났습니다">⚠ 모으기 멈춤</span>' : '')
       + '<span class="sp"></span>'
+      + (am.totalDocs > 0 ? '<button class="btn sm g" data-act="autoLinkName" title="메일 제목·첨부파일 이름이 기업 이름과 일치하는 미확정 자료 ' + am.totalDocs + '건(메일 ' + am.totalMails + '통)을 자동으로 연결합니다">🏢 기업일치 ' + am.totalDocs + '건 자동연결</button>' : '')
       + '<button class="btn" data-act="reload">새로고침</button>'
       + (st.isAdmin ? '<button class="btn" data-act="ask" title="서버가 메일 60통을 더 훑습니다(1~2분)">⟳ 지금 더 모으기 <span class="adm">관리자</span></button>' : '')
       + '</div>';
@@ -176,12 +242,18 @@
         + (tleft ? '🧹 정리하기 <b>' + tleft + '</b>' : '✓ 정리 끝') + '</button>' : '')
       /* 🤖 매일 정리(설계 §14-4) — 서버가 매일 하는 정리(처리 담당·자동 확정)와 오늘 들어온 서류 */
       + (root.PuRulesV2DailyView ? '<button data-act="view" data-v="daily" class="' + (st.view === 'daily' ? 'on' : '') + '" title="오늘 들어온 서류의 사업장 정리·처리 담당과 매일 기록">🤖 매일 정리</button>' : '') + '</div>';
-    var setChips = '';
+    var setChips = chip('set', '', '모두', M.items.length, !f.set);
     SETS.forEach(function (s) { setChips += chip('set', s, s, bySet[s] || 0, f.set === s); });
     setChips += '<span class="sep"></span>';
-    var chips = setChips + chip('kind', '', '모두', n.all, !f.kind);
-    kindsFor(f.set).forEach(function (k) { if (byKind[k]) chips += chip('kind', k, kindLabel(k, f.set), byKind[k], f.kind === k); });
-    chips += '<span class="sep"></span>'
+    var kindChips = '';
+    if (f.set) {
+      kindChips += chip('kind', '', '전체 서식', n.all, !f.kind);
+      kindsFor(f.set).forEach(function (k) { if (byKind[k]) kindChips += chip('kind', k, kindLabel(k, f.set), byKind[k], f.kind === k); });
+      kindChips += '<span class="sep"></span>';
+    } else if (f.kind) {
+      kindChips += chip('kind', f.kind, kindLabel(f.kind, ''), byKind[f.kind] || 0, true) + '<span class="sep"></span>';
+    }
+    var chips = setChips + kindChips
       + chip('only', 'final', '★ 최종본만', n.final, f.only === 'final')
       + chip('only', 'cand', '최종본 후보', n.cand, f.only === 'cand')
       + chip('only', 'unlinked', '사업장 미확정', n.unlinked, f.only === 'unlinked')
@@ -437,7 +509,7 @@
 
   var api = { render: render, runHtml: runHtml, filterHtml: filterHtml, bulkHtml: bulkHtml, tableHtml: tableHtml,
     sideHtml: sideHtml, linkPickerHtml: linkPickerHtml, piiLabel: piiLabel, parseArticles: parseArticles,
-    companyList: companyList, mailHref: mailHref, ymd: ymd, esc: esc };
+    companyList: companyList, mailHref: mailHref, ymd: ymd, esc: esc, autoMatches: autoMatches };
   if (root) root.PuRulesV2Lib = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
