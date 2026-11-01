@@ -84256,7 +84256,8 @@ function PayrollLedger(props){
         var wb = XLSX.read(ev.target.result, { type:'array' });
         var monthSheets = wb.SheetNames.filter(function(n){ return /^20\d\d[.\-]\d{1,2}$/.test(n.trim()); });
         if(monthSheets.length === 0){ showToast('⚠️ 월별 시트(예: 2025.07) 없음'); e.target.value=''; return; }
-        try { console.log('[급여 가져오기 백업]', JSON.stringify(dbGet('payroll_monthly',[]))); } catch(_){}
+        /* 콘솔에 급여 통째를 찍지 않는다(2026-11-01 개인정보 검토, 고시 제7조⑤) — 되돌리기는 서버 매일 백업으로 한다. */
+        try { console.log('[급여 가져오기] 기존 ' + (dbGet('payroll_monthly',[])||[]).length + '건'); } catch(_){}
         var arr = (recs||[]).slice();
         var have = {}; arr.forEach(function(r){ have[(r.empSid||r.sid)+'|'+r.ym] = true; });
         // 연장/야간/휴일 근로 → overtime_records (월 1일자, 시간 소수점 그대로)
@@ -86542,7 +86543,8 @@ function PayrollIrregular(props){
   function importIrregularFiles(files){
     if(!files || !files.length) return;
     if(typeof XLSX === 'undefined'){ showToast('엑셀 모듈 로딩중'); return; }
-    try { console.log('[비정규직 가져오기 백업]', JSON.stringify(dbGet('payroll_irregular',[]))); } catch(_){}
+    /* 외부인 주민번호가 든 표를 콘솔에 통째로 찍지 않는다(2026-11-01) — 되돌리기는 서버 매일 백업으로 한다. */
+    try { console.log('[비정규직 가져오기] 기존 ' + (recs||[]).length + '건'); } catch(_){}
     var arr = recs.slice();
     var newIrrs = [];
     var have = {};
@@ -87939,10 +87941,11 @@ function StaffRoster(){
         /* ⚠ 콘솔 백업에 주민번호·계좌·비밀번호를 찍지 않는다 (2026-10-10 전수검토) — 콘솔은 화면 녹화·확장프로그램·
              옆사람에게 그대로 보인다. 사번을 되돌리는 데 필요한 것은 사번·이름·입사일뿐이다. */
         console.log('[사번정리 백업] user_accounts', JSON.stringify(erpNoPiiUsers(curUsers)));
-        console.log('[사번정리 백업] finance_income', JSON.stringify(fi));
-        console.log('[사번정리 백업] payroll_monthly', JSON.stringify(pay));
-        console.log('[사번정리 백업] overtime_records', JSON.stringify(ot));
-        console.log('[사번정리 백업] attendance_records', JSON.stringify(att));
+        /* 사번을 되돌리는 데는 «어느 기록이 어느 사번이었나»만 있으면 된다 — 금액·근태 내용은 찍지 않는다(2026-11-01). */
+        console.log('[사번정리 백업] finance_income', JSON.stringify(fi.map(function(x){ return { id:x.id, managerSid:x.managerSid, perfSids:(x.perfShares||[]).map(function(p){ return p.sid; }) }; })));
+        console.log('[사번정리 백업] payroll_monthly', JSON.stringify(pay.map(function(x){ return { id:x.id, empSid:x.empSid, ym:x.ym }; })));
+        console.log('[사번정리 백업] overtime_records', JSON.stringify(ot.map(function(x){ return { id:x.id, sid:x.sid }; })));
+        console.log('[사번정리 백업] attendance_records', JSON.stringify(att.map(function(x){ return { id:x.id, sid:x.sid }; })));
         ['companies','cases','consultings','funds','other_projects'].forEach(function(k){ console.log('[사번정리 백업] '+k, JSON.stringify(dbGet(k,[]))); });
       } catch(_){}
       // 1) user_accounts
