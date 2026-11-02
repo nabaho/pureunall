@@ -238,6 +238,14 @@ ok('screenRoster·screenCompliance 정의·노출',
   });
 ok('추출된 계약서 정보를 근로자명부·급여설정에 반영하는 함수가 있다',
   H.indexOf('function applyExtractedContract(') > -1 && H.indexOf('window.applyExtractedContract = applyExtractedContract') > -1);
+['evaluateLifecycleAlerts', 'diagnoseNonRegularRisk', 'buildWorkRulesFilingDocs', 'matchEmployerSubsidies',
+  'summarizeAnnualSettlement', 'buildContractDeliveryHtml'].forEach(function (fn) {
+    ok('화면이 코어의 ' + fn + '() 를 부른다', SCR.indexOf('LC.' + fn + '(') > -1);
+  });
+ok('근로계약서 전자교부·취업규칙 신고서류 복사·연간 대사표 함수가 노출되어 있다',
+  H.indexOf('window.sendContractEmail = sendContractEmail') > -1 &&
+  H.indexOf('window.copyWorkRulesFilingDocs = copyWorkRulesFilingDocs') > -1 &&
+  H.indexOf('window.copyAnnualSettleTSV = copyAnnualSettleTSV') > -1);
 
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
