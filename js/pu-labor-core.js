@@ -88,6 +88,11 @@
     if (!m) return null;
     return [Number(m[1]), Number(m[2]), Number(m[3])];
   }
+  /* 날짜 «객체»(UTC 자정)가 필요한 곳용 — ymd() 는 [년,월,일] 배열이라 .getTime()·.getUTCFullYear() 를 못 부른다 */
+  function ymdDate(s) {
+    var ms = toUTC(s);
+    return ms == null ? null : new Date(ms);
+  }
   function toUTC(s) {
     var a = ymd(s);
     if (!a) return null;
@@ -1048,13 +1053,13 @@
     checks.forEach(function (c, i) { if (!c.ok) miss.push(ROSTER_REQUIRED_FIELDS[i].label); });
     var keepUntil = null;
     if (r.퇴사일) {
-      var d = ymd(r.퇴사일);
+      var d = ymdDate(r.퇴사일);
       if (d) keepUntil = fmt(Date.UTC(d.getUTCFullYear() + 3, d.getUTCMonth(), d.getUTCDate()));
     }
     var contractRemind = null;
     if (r.계약종료일) {
-      var ed = ymd(r.계약종료일);
-      if (ed) contractRemind = fmt(ed.getTime() - 30 * DAY_MS);
+      var ed = ymdDate(r.계약종료일);
+      if (ed) contractRemind = fmt(ed.getTime() - 30 * DAY);
     }
     return {
       충족수: checks.length - miss.length,
@@ -1309,7 +1314,7 @@
         ⑥ 근로계약서 이메일 전자교부 본문 및 수령확인 증빙 생성
      ══════════════════════════════════════════════════════════════════ */
   function evaluateLifecycleAlerts(rows, asOf) {
-    var ref = ymd(asOf) || new Date();
+    var ref = ymdDate(asOf) || new Date();
     var refMs = ref.getTime();
     var alerts = [];
     (rows || []).forEach(function (r) {
@@ -1317,16 +1322,16 @@
       var nm = String(r.성명).trim();
       var empType = r.고용형태 || '정규직';
       if (r.입사일) {
-        var hd = ymd(r.입사일);
+        var hd = ymdDate(r.입사일);
         if (hd) {
           var probEnd = new Date(Date.UTC(hd.getUTCFullYear(), hd.getUTCMonth() + 3, hd.getUTCDate() - 1));
-          var dProb = Math.round((probEnd.getTime() - refMs) / DAY_MS);
+          var dProb = Math.round((probEnd.getTime() - refMs) / DAY);
           if (dProb >= -7 && dProb <= 30) {
             alerts.push({ 성명: nm, 구분: '수습 3개월 만료', 기준일: fmt(probEnd), 남은일수: dProb, 법근거: '근기법 26조 1호·최저임금법 5조', 안내: '3개월 경과 시 해고예고(30일 전) 의무 발생 및 수습 본채용 평가 시점' });
           }
           if (empType === '계약직' || empType === '단시간' || r.계약종료일) {
             var twoYr = new Date(Date.UTC(hd.getUTCFullYear() + 2, hd.getUTCMonth(), hd.getUTCDate() - 1));
-            var dTwo = Math.round((twoYr.getTime() - refMs) / DAY_MS);
+            var dTwo = Math.round((twoYr.getTime() - refMs) / DAY);
             if (dTwo >= -30 && dTwo <= 60) {
               alerts.push({ 성명: nm, 구분: '2년 무기계약 전환 도래', 기준일: fmt(twoYr), 남은일수: dTwo, 법근거: '기간제법 4조 2항', 안내: '2년 초과 계속 사용 시 기간의 정함이 없는 근로자(정규직)로 간주됨' });
             }
@@ -1334,19 +1339,19 @@
         }
       }
       if (r.계약종료일) {
-        var ed = ymd(r.계약종료일);
+        var ed = ymdDate(r.계약종료일);
         if (ed) {
-          var dEnd = Math.round((ed.getTime() - refMs) / DAY_MS);
+          var dEnd = Math.round((ed.getTime() - refMs) / DAY);
           if (dEnd >= -14 && dEnd <= 45) {
             alerts.push({ 성명: nm, 구분: '근로계약 만료 도래', 기준일: fmt(ed), 남은일수: dEnd, 법근거: '근기법 17조·기간제법 4조', 안내: '계약만료 전 갱신 여부 통보 및 재계약서 작성 필요(묵시적 갱신 주의)' });
           }
         }
       }
       if (r.생년월일) {
-        var bd = ymd(r.생년월일);
+        var bd = ymdDate(r.생년월일);
         if (bd) {
           var ret60 = new Date(Date.UTC(bd.getUTCFullYear() + 60, bd.getUTCMonth(), bd.getUTCDate()));
-          var dRet = Math.round((ret60.getTime() - refMs) / DAY_MS);
+          var dRet = Math.round((ret60.getTime() - refMs) / DAY);
           if (dRet >= -90 && dRet <= 180) {
             alerts.push({ 성명: nm, 구분: '만 60세 법정 정년 도래', 기준일: fmt(ret60), 남은일수: dRet, 법근거: '고령자고용법 19조', 안내: '정년퇴직 처리 또는 촉탁직(기간제) 재고용 계약·고령자 계속고용장려금 검토' });
           }
