@@ -508,11 +508,11 @@ async function autoCall(body, okMsg){
 function drawAuto(){
   var s=AUTO.settings, p=AUTO.preview||{}, items=p.items||[], skipped=p.skipped||[];
   var ac=$('autoChip'); if(ac){ ac.textContent='자동 '+(s.enabled?'켜짐':'꺼짐'); ac.className='chip '+(s.enabled?'c-green':'c-gray'); }
-  $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처만) '+
+  $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처·기업정보함) '+
     '<span class="chip '+(s.enabled?'c-green':'c-gray')+'" style="margin-left:0">'+(s.enabled?'켜짐':'꺼짐')+'</span>'+
     '<span style="color:var(--mute)">보낼 곳 '+items.length+'곳 · 오늘 건 '+(p.sentToday||0)+'/'+s.dailyCap+'통</span>';
   var rows=items.map(function(x){
-    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(x.ceo||'')+'</td><td>'+(x.willSend?'<span class="chip c-green" style="margin-left:0">걸었음</span>':'<span class="chip c-gray" style="margin-left:0">'+(s.enabled?'다음 실행 때':'꺼져 있어 안 보냄')+'</span>')+'</td></tr>';
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.email)+' <span style="color:var(--mute);font-size:11.5px">'+(x.basis==='cards'?'기업정보함':'거래처')+'</span></td><td>'+esc(x.ceo||'')+'</td><td>'+(x.willSend?'<span class="chip c-green" style="margin-left:0">걸었음</span>':'<span class="chip c-gray" style="margin-left:0">'+(s.enabled?'다음 실행 때':'꺼져 있어 안 보냄')+'</span>')+'</td></tr>';
   }).join('');
   var skip=skipped.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td colspan="3">'+esc(x.reason)+'</td></tr>'; }).join('');
   var rec=Object.keys(AUTO.recent||{}).map(function(k){ return AUTO.recent[k]; }).sort(function(a,b){ return (b.at||0)-(a.at||0); }).slice(0,10).map(function(x){

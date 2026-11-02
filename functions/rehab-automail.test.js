@@ -104,3 +104,67 @@ test("⑩ 파산 공고(kind: bankruptcy)도 회생과 같이 대상이 되고, 
   assert.match(row.payload.subject, /^\(광고\) \[푸른노무법인\] 파산절차 중/);
   assert.ok(!/재기컨설팅|12만원/.test(row.payload.body));
 });
+
+/* ═══ 2026-11-02 기업정보함 길(안전형) — basis:"cards" ═══ */
+const KA = "가나상사";   // 지어낸 이름
+const cardsOf = (rows) => M.buildIndex({ erpCompanies: { v: [] }, erpContracts: { v: [] }, cardsIdx: rows });
+const bizRow = (name, addr, email, extra) => Object.assign({ k: "biz", c: name, ad: addr, e: email, ceo: "홍길동" }, extra || {});
+const cardRow = (name, addr, emails) => ({ k: "card", c: name, ad: addr, em: emails, n: "김담당" });
+
+test("⑪ 기업정보함(사업자등록증)에 이름 + 시·군·구가 같고 회사 메일이 있으면 대상이다 — 근거는 cards", () => {
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: notice("a", KA, "서울 서초구 매헌로 16") },
+    index: cardsOf({ k1: bizRow(KA, "서울 서초구 서초대로 1", "Info@Gana.co.kr") }) });
+  assert.equal(p.candidates.length, 1);
+  assert.equal(p.candidates[0].email, "info@gana.co.kr");
+  assert.equal(p.candidates[0].basis, "cards");
+});
+
+test("⑫ 기업정보함에 이름만 같고 주소가 다르면 «후보» — 보내지 않는다(다른 회사일 수 있다)", () => {
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: notice("a", KA, "서울 서초구 1") },
+    index: cardsOf({ k1: bizRow(KA, "부산 해운대구 센텀로 1", "info@gana.co.kr") }) });
+  assert.equal(p.candidates.length, 0);
+  assert.ok(p.skipped.some((s) => s.id === "a" && /후보/.test(s.reason)));
+});
+
+test("⑬ 개인 웹메일(gmail·naver·daum …)은 뺀다 — 회사 메일과 섞여 있으면 회사 메일만, 개인뿐이면 보내지 않는다", () => {
+  const mixed = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: notice("a", KA, "서울 서초구 1") },
+    index: cardsOf({ k1: cardRow(KA, "서울 서초구 1", ["boss@gmail.com", "kim@Gana.co.kr", "x@naver.com"]) }) });
+  assert.equal(mixed.candidates.length, 1);
+  assert.equal(mixed.candidates[0].email, "kim@gana.co.kr");
+  const only = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: notice("a", KA, "서울 서초구 1") },
+    index: cardsOf({ k1: cardRow(KA, "서울 서초구 1", ["boss@gmail.com", "x@daum.net"]) }) });
+  assert.equal(only.candidates.length, 0);
+  assert.ok(only.skipped.some((s) => s.id === "a" && /개인 메일/.test(s.reason)));
+});
+
+test("⑭ 주소가 다른 항목의 메일은 쓰지 않는다 — 같은 이름의 두 항목 중 «주소가 맞는 쪽» 메일만", () => {
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: notice("a", KA, "서울 서초구 1") },
+    index: cardsOf({ k1: bizRow(KA, "서울 서초구 2", "right@gana.co.kr"), k2: bizRow(KA, "부산 해운대구 1", "wrong@other.co.kr") }) });
+  assert.equal(p.candidates.length, 1);
+  assert.equal(p.candidates[0].email, "right@gana.co.kr");
+});
+
+test("⑮ 거래중인 곳은 기업정보함에 있어도 근거가 trade 이고 거래처 메일을 쓴다", () => {
+  const index = M.buildIndex({ erpCompanies: { v: [erp(KA, "서울 서초구 1", "erp@gana.co.kr")] }, erpContracts: { v: [] },
+    cardsIdx: { k1: bizRow(KA, "서울 서초구 1", "card@gana.co.kr") } });
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true }, notices: { a: notice("a", KA, "서울 서초구 1") }, index });
+  assert.equal(p.candidates.length, 1);
+  assert.equal(p.candidates[0].basis, "trade");
+  assert.equal(p.candidates[0].email, "erp@gana.co.kr");
+});
+
+test("⑯ 기업정보함 길에도 같은 거름이 적용된다 — 수신거부·이미 보냄·대표 제외, 홈페이지에서 읽은 메일은 안 씀", () => {
+  const index = cardsOf({ k1: bizRow(KA, "서울 서초구 1", "info@gana.co.kr") });
+  const base = { nowMs: NOW, settings: { enabled: true }, notices: { a: notice("a", KA, "서울 서초구 1") }, index };
+  assert.equal(A.plan(Object.assign({}, base, { optout: { [A.emailKey("info@gana.co.kr")]: { at: 1 } } })).candidates.length, 0);
+  assert.equal(A.plan(Object.assign({}, base, { sent: { a: { email: "info@gana.co.kr", at: NOW - 1000 } } })).candidates.length, 0);
+  assert.equal(A.plan(Object.assign({}, base, { marks: { a: { status: "skip" } } })).candidates.length, 0);
+  const noMail = A.plan({ nowMs: NOW, settings: { enabled: true }, notices: { a: notice("a", KA, "서울 서초구 1") },
+    index: cardsOf({ k1: bizRow(KA, "서울 서초구 1", "") }), info: { a: { email: "scraped@site.kr" } } });
+  assert.equal(noMail.candidates.length, 0);
+});

@@ -1403,7 +1403,7 @@ async function rehabAutoRun(db, nowMs, opts) {
   }
   upd["rehab_ad/auto/preview"] = {
     at: nowMs, enabled: settings.enabled, cap: p.cap, sentToday: p.sentToday + queued.length, queued: queued.length,
-    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
+    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, basis: c.basis || "", willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
     skipped: p.skipped.slice(0, 40),
   };
   await db.ref().update(upd);
