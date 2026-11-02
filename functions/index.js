@@ -7532,6 +7532,13 @@ exports.gcalProxy = GPROXY.gcalProxy;
 /* ✏️·🗑 화면에서 구글 일정 고치기·지우기 — 대표 늘 연결로 대신(본인 일정만, 관리자는 모두). 같은 파일. */
 exports.gcalEdit = GPROXY.gcalEdit;
 
+/* 🏛 이음센터 근무 → 구글 공용 달력 «거울» (대표 질문 2026-11-02 「이음센터 근무가 왜 구글 캘린더와 연결이 안되나?」 → 「1」).
+   attendance_records 의 이음 근무(type:'eum-work')가 생기거나 고쳐지거나 지워지면 구글에도 같은 일을 한다. 실제 코드는 gcal-eum.js.
+   ⚠ 외부 협력자는 스위치(INCLUDE_EXTERNAL, 기본 끔) — 공용 달력은 누구나 읽는다. 한꺼번에 채우기는 gcalEumBackfill(관리자만, 기본 셈만). */
+const GEUM = require("./gcal-eum")({ functions, getDatabase, ownerAccess: GPROXY.ownerAccess });
+exports.gcalEum = GEUM.gcalEum;
+exports.gcalEumBackfill = GEUM.gcalEumBackfill;
+
 /* 🔗 구글 캘린더 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」) —
    서버가 사람마다 갱신 열쇠를 들고, 화면은 한 시간짜리 표만 받아 간다. 실제 코드는 gcal-link.js.
    ⚠ 여기 줄을 안 적으면 배포가 안 된다. 갱신 열쇠 자리(gcal_tokens)는 보안규칙에 «일부러» 없다. */
