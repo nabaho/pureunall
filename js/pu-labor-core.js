@@ -200,7 +200,7 @@
     return Math.max(0, mins) / 60;
   }
 
-  var LEAVE_TYPES = { annual: 1, half: 0.5, paid: 1, unpaid: 0, absent: 0 };
+  var LEAVE_TYPES = { annual: 1, half: 0.5, quarter: 0.25, hourleave: 0.125, paid: 1, unpaid: 0, absent: 0 };
 
   /* 월 근태 집계.
      holidays = ['2026-03-01', …] 공휴일·약정휴일. 주휴일(기본 일요일)은 자동. */
@@ -214,7 +214,7 @@
     var byWeek = {};       // 주 단위(월~일)로 모은다 — 연장·주휴 판정 기준
     var sum = {
       실근로: 0, 소정내: 0, 연장: 0, 야간: 0, 휴일8이내: 0, 휴일8초과: 0,
-      근로일수: 0, 결근일수: 0, 연차사용: 0, 유급휴가일수: 0, 무급휴가일수: 0, 휴일근로일수: 0
+      근로일수: 0, 결근일수: 0, 연차사용: 0, 연차사용시간: 0, 유급휴가일수: 0, 무급휴가일수: 0, 휴일근로일수: 0
     };
 
     (records || []).forEach(function (r) {
@@ -227,8 +227,10 @@
       var W = byWeek[wk];
 
       // 휴가·결근은 시간이 아니라 일수로 센다
-      if (t === 'annual') { sum.연차사용 += 1; return; }
-      if (t === 'half') { sum.연차사용 += 0.5; }
+      var dailyH = num(P.dailyContractHours) || 8;
+      if (t === 'annual') { sum.연차사용 += 1; sum.연차사용시간 += dailyH; return; }
+      if (t === 'half') { var hh = num(r.leaveHours) || (dailyH / 2); sum.연차사용 = Math.round((sum.연차사용 + hh / dailyH) * 1000) / 1000; sum.연차사용시간 += hh; }
+      if (t === 'quarter' || t === 'hourleave') { var lh = num(r.leaveHours) || (t === 'quarter' ? (dailyH / 4) : 1); sum.연차사용 = Math.round((sum.연차사용 + lh / dailyH) * 1000) / 1000; sum.연차사용시간 += lh; }
       if (t === 'absent') { sum.결근일수 += 1; W.결근 += 1; W.개근 = false; return; }
       if (t === 'paid') { sum.유급휴가일수 += 1; return; }
       if (t === 'unpaid') { sum.무급휴가일수 += 1; W.개근 = false; return; }
@@ -465,11 +467,17 @@
   /* 연차 대장 — 발생·이월·사용·잔여. 이월 정책은 사업장마다 다르다. */
   function annualLedger(o) {
     o = o || {};
-    var 발생 = num(o.발생일수), 사용 = num(o.사용일수), 이월 = num(o.이월일수);
+    var P = policyOf(o.policy);
+    var dailyH = num(o.dailyContractHours || P.dailyContractHours) || 8;
+    var 발생 = num(o.발생일수), 사용일 = num(o.사용일수), 사용시간 = num(o.사용시간), 이월 = num(o.이월일수);
+    var 사용 = Math.round((사용일 + (dailyH > 0 ? 사용시간 / dailyH : 0)) * 1000) / 1000;
     var 총한도 = 발생 + 이월;
     var 잔여 = 총한도 - 사용;
     return {
-      발생일수: 발생, 이월일수: 이월, 사용일수: 사용, 총한도: 총한도,
+      발생일수: 발생, 이월일수: 이월, 사용일수: 사용, 사용시간: 사용시간,
+      총사용시간: Math.round(사용 * dailyH * 100) / 100, 총한도: 총한도,
+      총시간: Math.round(총한도 * dailyH * 100) / 100, 일소정시간: dailyH,
+      잔여시간: Math.round(잔여 * dailyH * 100) / 100,
       잔여일수: Math.round(잔여 * 100) / 100,
       초과사용: 잔여 < 0 ? Math.round(-잔여 * 100) / 100 : 0,
       경고: 잔여 < 0 ? '초과 사용 ' + Math.round(-잔여 * 10) / 10 + '일 — 급여 공제 또는 무급 처리 검토' : ''
@@ -489,7 +497,7 @@
         근거: '사용촉진 적법 이행 — 미사용 연차 소멸, 수당 지급의무 없음(근기법 61조)' };
     }
     return {
-      금액: roundBy(일당 * days, P.rounding), 일수: days, 지급의무: days > 0,
+      금액: roundBy(o.미사용시간 != null ? (num(o.시급) * Math.max(0, num(o.미사용시간))) : (일당 * days), P.rounding), 일수: days, 지급의무: days > 0,
       일당: roundBy(일당, P.rounding),
       근거: '미사용 ' + days + '일 × 1일 통상임금(' + roundBy(일당, P.rounding).toLocaleString() + '원)'
         + (o.촉진적법 === false ? ' — 촉진 미이행이라 수당 지급 의무 있음' : '')

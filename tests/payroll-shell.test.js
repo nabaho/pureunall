@@ -448,6 +448,20 @@ test('★★ render() 를 다시 불러도 보기·사업장 목록·본문 스�
   vm.runInContext('render();', box);
   assert.equal(els.colRows.scrollTop, 320, '다른 회사를 골랐는데 사업장 목록 스크롤이 맨 위로 튀었습니다');
   assert.equal(els.main.scrollTop, 0, '다른 회사를 골랐을 때는 본문이 맨 위부터 시작해야 합니다');
+});
+
+test('★★ 모든 사업장·모든 사람 줄에 순번(1, 2, 3…) + ☐/☑ 체크 + ☆/★ 별표가 표시되고 필터·저장이 동작한다', () => {
+  const s = load({ App: { coId: 'c1' } });
+  const m = s.M();
+  const h = s.colistHtml(m);
+  assert.match(h, /<span class="rno">1<\/span>/, '사업장 목록에 1번 순번이 없습니다');
+  assert.match(h, /toggleRowMark\('co:c1','chk',event\)/, '사업장 체크(☐) 단추가 없습니다');
+  assert.match(h, /toggleRowMark\('co:c1','star',event\)/, '사업장 별표(☆) 단추가 없습니다');
+  assert.match(h, /setMarkFilter\('chk'\)/, '체크 필터 단추가 없습니다');
+  assert.match(h, /setMarkFilter\('star'\)/, '별표 필터 단추가 없습니다');
+  const bar = s.coBarHtml(m);
+  assert.match(bar, /toggleRowMark\('co:c1','chk',event\)/, '머리줄 회사 칸에 체크 단추가 없습니다');
+  assert.match(bar, /toggleRowMark\('co:c1','star',event\)/, '머리줄 회사 칸에 별표 단추가 없습니다');
   if ( !true ) {
     /* keep closing brace balanced */
   }

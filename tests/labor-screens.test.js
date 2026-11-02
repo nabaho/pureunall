@@ -213,6 +213,19 @@ ok('더존 전용이라 우기지 않는다(가져오기 매핑을 안내한다)
   SCR2.indexOf('프로그램마다 가져오기 열 순서가 다르다') > -1);
 ok('지급총액이 없으면 실수령+공제로 되살린다', SCR2.indexOf('Number(e.실수령) + Number(e.공제총액)') > -1);
 
+section('번호 + ㅁ 체크 + ★ 별표 저장·기록 및 연차 시간차(시간단위 연차)');
+ok('rowMarkBox·toggleRowMark·setMarkFilter·addLeaveHours 정의·노출',
+  H.indexOf('function rowMarkBox(') > -1 && H.indexOf('function toggleRowMark(') > -1 &&
+  H.indexOf('function setMarkFilter(') > -1 && H.indexOf('function addLeaveHours(') > -1 &&
+  H.indexOf('window.toggleRowMark=toggleRowMark') > -1 && H.indexOf('window.addLeaveHours=addLeaveHours') > -1);
+ok('체크·별표를 row_marks 키로 저장·기록한다', H.indexOf("dbSet('row_marks'") > -1);
+ok('연차 화면에 시간차(h) 열과 +1h/+2h/+4h 단추가 있다',
+  SCR.indexOf("'시간차(h)'") > -1 && SCR.indexOf('addLeaveHours(') > -1);
+ok('연차 대장에 사용시간을 넘기고 미사용수당에 미사용시간을 넘긴다',
+  SCR.indexOf('사용시간: Number(lv.사용시간 || 0)') > -1 && SCR.indexOf('미사용시간: Math.max(0, lg.잔여시간)') > -1);
+ok('근태 달력에 반반차(2h)·시간차(시간연차) 유형이 있다',
+  SCR.indexOf("key: 'quarter'") > -1 && SCR.indexOf("key: 'hourleave'") > -1);
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');
