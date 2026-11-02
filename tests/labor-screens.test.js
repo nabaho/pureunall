@@ -251,6 +251,17 @@ ok('2026 미입력 사업장 푸른메일(수신·발신) 자동수집·입력 �
   H.indexOf('window.autoSync2026FromMail = autoSync2026FromMail') > -1 &&
   H.indexOf('window.mailDigestPanelHtml = mailDigestPanelHtml') > -1);
 
+section('시간차 1시간 단위(1h~8h) 선택 및 소정근로시간(5h 등) 최대시간차 상한 관리');
+['maxHourLeaveOf', 'hourLeaveOptions', 'normalizeHourLeave'].forEach(function (fn) {
+  ok('화면이 코어의 ' + fn + '() 를 부른다', SCR.indexOf('LC.' + fn + '(') > -1);
+});
+ok('setLeaveHours·setSiteDailyHours·maxHourLeaveFor 정의·노출',
+  H.indexOf('function setLeaveHours(') > -1 &&
+  H.indexOf('function setSiteDailyHours(') > -1 &&
+  H.indexOf('function maxHourLeaveFor(') > -1 &&
+  H.indexOf('window.setLeaveHours=setLeaveHours') > -1 &&
+  H.indexOf('window.setSiteDailyHours=setSiteDailyHours') > -1);
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');
