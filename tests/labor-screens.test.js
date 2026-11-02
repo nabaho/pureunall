@@ -226,6 +226,19 @@ ok('연차 대장에 사용시간을 넘기고 미사용수당에 미사용시�
 ok('근태 달력에 반반차(2h)·시간차(시간연차) 유형이 있다',
   SCR.indexOf("key: 'quarter'") > -1 && SCR.indexOf("key: 'hourleave'") > -1);
 
+section('법정 근로자명부(근기법 41·42조) · 10인이하 법정점검 · 근로계약서·취업규칙 자동 검토');
+ok('TABS 에 근로자명부(roster)·계약·취업규칙(compliance) 탭이 있다',
+  H.indexOf("{id:'roster'") > -1 && H.indexOf("{id:'compliance'") > -1);
+ok('screenRoster·screenCompliance 정의·노출',
+  H.indexOf('function screenRoster(') > -1 && H.indexOf('function screenCompliance(') > -1 &&
+  H.indexOf('window.screenRoster = screenRoster') > -1 && H.indexOf('window.screenCompliance = screenCompliance') > -1);
+['evaluateRosterRow', 'evaluateWorkplaceCompliance', 'reviewLaborContract', 'reviewWorkRules',
+  'buildStandardContractText', 'buildStandardWorkRulesText'].forEach(function (fn) {
+    ok('화면이 코어의 ' + fn + '() 를 부른다', SCR.indexOf('LC.' + fn + '(') > -1);
+  });
+ok('추출된 계약서 정보를 근로자명부·급여설정에 반영하는 함수가 있다',
+  H.indexOf('function applyExtractedContract(') > -1 && H.indexOf('window.applyExtractedContract = applyExtractedContract') > -1);
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');
