@@ -246,6 +246,10 @@ ok('근로계약서 전자교부·취업규칙 신고서류 복사·연간 대�
   H.indexOf('window.sendContractEmail = sendContractEmail') > -1 &&
   H.indexOf('window.copyWorkRulesFilingDocs = copyWorkRulesFilingDocs') > -1 &&
   H.indexOf('window.copyAnnualSettleTSV = copyAnnualSettleTSV') > -1);
+ok('2026 미입력 사업장 푸른메일(수신·발신) 자동수집·입력 엔진 및 요약 패널이 노출되어 있다',
+  H.indexOf('js/pu-co-thread.js') > -1 &&
+  H.indexOf('window.autoSync2026FromMail = autoSync2026FromMail') > -1 &&
+  H.indexOf('window.mailDigestPanelHtml = mailDigestPanelHtml') > -1);
 
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
