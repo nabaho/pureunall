@@ -438,6 +438,20 @@ eq('2개월 과세보수총액 = 600만원 · 월평균보수 = 300만원', annS
 const delivHtml = L.buildContractDeliveryHtml('가람떡집', { 성명: '홍길동' }, '표준근로계약서 본문');
 ok('근로계약서 전자교부 HTML 에 근기법 17조 2항 명시', delivHtml.indexOf('제17조 제2항') > -1);
 
+section('시간차 1시간 단위 8시간 선택 및 소정근로시간(5시간 등) 최대시간차 상한 관리');
+eq('기본(8시간) 최대 시간차 = 8h', L.maxHourLeaveOf({ dailyContractHours: 8 }), 8);
+eq('기본(8시간) 1시간 단위 선택 목록 = 1~8h (8개)', L.hourLeaveOptions({ dailyContractHours: 8 }).join(','), '1,2,3,4,5,6,7,8');
+eq('소정근로시간 5시간 사업장 최대 시간차 = 5h', L.maxHourLeaveOf({ dailyContractHours: 5 }), 5);
+eq('소정근로시간 5시간 사업장 선택 목록 = 1~5h (5개)', L.hourLeaveOptions({ dailyContractHours: 5 }).join(','), '1,2,3,4,5');
+eq('개별 근로자 소정근로시간 5시간이면 최대 시간차 = 5h', L.maxHourLeaveOf({ dailyContractHours: 8 }, 5), 5);
+const norm5 = L.normalizeHourLeave({ 사용시간: 7, policy: { dailyContractHours: 5 } });
+eq('소정근로시간 5시간일 때 7시간 시간차 입력 시 5시간(최대시간차)으로 정리', norm5.사용시간, 5);
+eq('상한 초과 정리 표시 = true', norm5.상한초과정리됨, true);
+const lg5 = L.annualLedger({ 발생일수: 15, 이월일수: 0, 사용일수: 1, 사용시간: 8, policy: { dailyContractHours: 5 } });
+eq('5시간 사업장 연차대장 최대시간차 = 5h', lg5.최대시간차, 5);
+eq('5시간 사업장 연차대장 사용시간 8h → 5h로 상한 정리', lg5.사용시간, 5);
+eq('5시간 사업장 1일 + 시간차 5h(=1일) → 총 사용 2일', lg5.사용일수, 2);
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');
