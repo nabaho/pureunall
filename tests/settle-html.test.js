@@ -50,10 +50,10 @@ test('저장은 강제 모드 관문으로만 — 직접 쓰기·gate.remove 없
   assert.match(fnBody('function save('), /gate\.save\(fbDb\.ref\(path\)/);
 });
 
-test('쓰는 자리는 settle 아래 다섯 갈래뿐이다', () => {
+test('쓰는 자리는 settle 아래 일곱 갈래뿐이다(카톡 방·대기열 포함)', () => {
   const paths = [...NOC.matchAll(/(?:save|patchRecord|softDelete)\('(settle\/[a-z]+\/)/g)].map((m) => m[1]);
   assert.ok(paths.length >= 8, '저장 호출을 못 찾았다: ' + paths.join(','));
-  paths.forEach((p) => assert.match(p, /^settle\/(rules|links|notices|runs|adjusts)\/$/, p));
+  paths.forEach((p) => assert.match(p, /^settle\/(rules|links|notices|runs|adjusts|rooms|kakaoQueue)\/$/, p));
   assert.match(NOC, /softDelete\('settle\/'\+kind\+'\/'/, '여러 건 지우기도 settle 아래');
 });
 
@@ -291,4 +291,19 @@ test('정산표 송금 줄 «보냄 표시» — 누르면 보냄, 보냄이면 
   assert.match(NOC, /if\(\(b=t\.closest\('\[data-paid-btn\]'\)\)\)\{[^}]*kr=D\.runs\[CUR_RUN\]/);
   assert.match(NOC, /if\(pt\.paid && !window\.confirm\('«보냄» 표시를 지울까요\?'\)\) return; await setPaid\(CUR_RUN, \[pi\], !pt\.paid\);/);
   assert.doesNotMatch(NOC, /input\[data-paid\]/);
+});
+
+
+test('카톡 보내기 — 대표만 · 확정한 정산표만 · 방 이름이 있는 사람만, 대기 중이면 다시 넣지 않고, 확인 창 뒤에 대기열에 «새로 만들기만»', () => {
+  const fn = fnBody('async function kqSend(');
+  const firstSave = fn.indexOf("save('settle/kakaoQueue/'");
+  ["!ME.isAdmin", "run.status!=='confirmed'", "if(!room)", "k.status==='pending'", 'window.confirm('].forEach((x) =>
+    assert.ok(fn.indexOf(x) >= 0 && fn.indexOf(x) < firstSave, x + ' 이 저장보다 먼저가 아니다'));
+  assert.match(fn, /status:'pending'/);
+  assert.match(fn, /expectedRevision:-1/);
+  assert.match(fn, /createdBy:ME\.sid/);
+  const sr = fnBody('async function saveRoom(');
+  assert.ok(sr.indexOf('!ME.isAdmin') < sr.indexOf("patchRecord('settle/rooms/'"), '대표 확인이 저장보다 먼저가 아니다');
+  assert.match(NOC, /ME\.isAdmin=role\.isAdmin===true/);
+  assert.match(fnBody('async function reload('), /'rooms','kakaoQueue','agent'/);
 });

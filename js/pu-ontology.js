@@ -27,7 +27,7 @@
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
-      SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정',
+      SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -269,8 +269,10 @@
                       {path:'settle/links/{kind}/{key}',entityType:'SettleLink'},
                       {path:'settle/notices/{id}',entityType:'SettleNotice'},
                       {path:'settle/runs/{id}',entityType:'SettleRun'},
-                      {path:'settle/adjusts/{id}',entityType:'SettleAdjust'}],
-      entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust'] },
+                      {path:'settle/adjusts/{id}',entityType:'SettleAdjust'},
+                      {path:'settle/rooms/{sid}',entityType:'SettleRoom'},
+                      {path:'settle/kakaoQueue/{id}',entityType:'SettleKakao'}],
+      entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
