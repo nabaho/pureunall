@@ -1458,7 +1458,9 @@ exports.rehabAuto = functions
 exports.rehabWatch = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
-  .pubsub.schedule("every day 07:40")
+  /* 2026-11-02 대표 「매일 저녁에 수집 처리하고 … 1800 에 시작한다」 — 아침 07:40 → 저녁 18:00.
+     자동 메일(rehabAutoRun)이 같은 회차 끝에 붙어 있고 «오전 8시~오후 9시»에만 나가므로 18:00 시작이면 그날 안에 걸린다. */
+  .pubsub.schedule("every day 18:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const t0 = Date.now();
