@@ -67,4 +67,7 @@ test('예전 자료(항목 없음)는 예전 그대로 — 일당제 계산식�
 test('명세서 화면·한글 파일에 근로시간 줄이 실제로 들어간다', () => {
   assert.match(cut('slipHTML'), /r\.hours\?'<div class="calc">근로시간: '/);
   assert.match(cut('exportPayrollSlipsHwpx'), /근로시간: '\+r\.hours/);
+  assert.match(cut('slipHTML'), /leaveSlipBlockHtml\(site,month,e,payday\)/);
+  assert.match(cut('payslipMailHtml'), /leaveMailBlockHtml\(site, month, e\)/);
+  assert.match(cut('exportPayrollSlipsHwpx'), /연차유급휴가 현황\(급여일 기준\)/);
 });

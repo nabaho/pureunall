@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>급여관리</title>
+<title>급여아웃소싱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>💰</text></svg>">
 <!--
   급여 아웃소싱 앱 — 푸른통합시스템 타일(급여관리)
@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=87"></script>
+<script src="js/pu-ontology.js?v=88"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -267,7 +267,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=39"></script>
+<script src="js/pu-appbar.js?v=40"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
@@ -284,7 +284,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
    ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
    ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin.
    `tests/app-soon-gate.test.js` ①·⑨ 가 지킨다. */
-try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
+try { PuGate.soonUnlessAdmin('급여아웃소싱'); } catch(_){}
 </script>
 <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
      자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
@@ -299,7 +299,7 @@ try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>
 <div id="gate"><div class="box">
-  <h2>급여관리</h2>
+  <h2>급여아웃소싱</h2>
   <p id="gatep">로그인 확인 중…</p>
   <div id="loginform" style="display:none">
     <input id="email" type="email" placeholder="이메일" autocomplete="username">
@@ -311,7 +311,7 @@ try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
 
 <header>
   <button id="backbtn" class="out" style="display:none;margin-right:2px" onclick="goBack()">← 뒤로</button>
-  <span class="logo">급여관리</span><span class="env">푸른통합시스템 · payroll_os</span>
+  <span class="logo">급여아웃소싱</span><span class="env">푸른통합시스템 · payroll_os</span>
   <!-- 고른 회사의 이름·담당·지표 — 대표 지시 2026-10-05 「회사 관련 KPI 는 맨 위 파란 줄에」 -->
   <div id="coBar" class="cobar"></div>
   <div class="who"><span id="whoami"></span><span id="saveState" class="save-state saved" role="status" aria-live="polite">저장 완료</span><button class="out" onclick="doLogout()">로그아웃</button></div>
@@ -962,6 +962,59 @@ function paydayOf(site){
   var ks=Object.keys(set);
   return ks.length===1?ks[0]:'';
 }
+function leaveSummaryForSlip(site, month, e){
+  var nm=String((e&&e.성명)||'').trim();
+  if(!nm) return null;
+  var meta=(typeof empMeta==='function')?empMeta(site,nm):{};
+  var hire=meta.입사일||(e&&e.입사일)||'';
+  var yr=(typeof laborYearOfMonth==='function')?laborYearOfMonth(month):String(new Date().getFullYear());
+  var lv=(typeof leaveOf==='function')?leaveOf(site,yr,nm):{};
+  var P=(typeof policyFor==='function')?policyFor(site):{fiveOrMore:true,annualBase:15,annualCap:25};
+  var accrued=null;
+  if(lv.발생!=null&&lv.발생!=='') accrued=Number(lv.발생);
+  else if(hire&&typeof LC!=='undefined'&&LC&&LC.accrueAnnual){
+    var ac=LC.accrueAnnual({hireDate:hire,asOf:yr+'-12-31',policy:P});
+    if(ac&&ac.발생일수!=null) accrued=Number(ac.발생일수);
+  } else if(hire&&typeof annualLeaveOf==='function'){
+    var al=annualLeaveOf(hire,new Date());
+    if(al&&al.발생일수!=null) accrued=Number(al.발생일수);
+  }
+  var carry=Number(lv.이월||0);
+  var dates=[], calUsed=0;
+  var A=(typeof lmap==='function')?lmap('attend'):{};
+  var pre=site+'|', suf='|'+nm;
+  Object.keys(A).forEach(function(k){
+    if(k.indexOf(pre)!==0||k.slice(-suf.length)!==suf) return;
+    var row=A[k]||{};
+    (row.일별||[]).forEach(function(d){
+      if(!d||!d.date||String(d.date).slice(0,4)!==String(yr)) return;
+      if(d.type==='annual'){ calUsed+=1; dates.push(d.date+'(1일)'); }
+      else if(d.type==='half'){ calUsed+=0.5; dates.push(d.date+'(반차)'); }
+    });
+  });
+  dates.sort();
+  var curRec=(typeof attendOf==='function')?attendOf(site,month,nm):{};
+  var mUsed=Number(curRec.연차사용||0);
+  var used=(lv.사용!=null&&lv.사용!=='')?Number(lv.사용):(calUsed>0?calUsed:(mUsed>0?mUsed:(accrued!=null?0:null)));
+  var manualDates=String(lv.사용일||'').trim();
+  var usedDates=manualDates||(dates.length?dates.join(', '):(used?'대장 반영 ('+used+'일)':'없음'));
+  if(accrued==null&&used==null&&!hire&&!manualDates) return null;
+  var total=(accrued!=null)?(accrued+carry):null;
+  var remain=(total!=null&&used!=null)?Math.round((total-used)*100)/100:null;
+  return {입사일:hire||'-',발생:total!=null?total:(accrued!=null?accrued:'-'),사용:used!=null?used:0,잔여:remain!=null?remain:'-',사용일:usedDates};
+}
+function leaveSlipBlockHtml(site, month, e, payday){
+  var L=leaveSummaryForSlip(site,month,e);
+  if(!L) return '';
+  return '<div style="margin-top:11px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:#f8fafc;font-size:12px">'+
+    '<div style="font-weight:700;color:var(--navy);margin-bottom:4px">🌴 연차유급휴가 현황 안내 <span style="font-weight:400;color:var(--sub)">(급여일 '+(payday||'당월')+' 기준 · 입사일 '+L.입사일+')</span></div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;color:var(--ink)">'+
+    '<span><b>총 발생개수</b> '+L.발생+'일</span>'+
+    '<span><b>사용개수</b> '+L.사용+'일</span>'+
+    '<span><b>잔여개수</b> <b style="color:var(--navy)">'+L.잔여+'일</b></span>'+
+    '<span><b>사용일 내역</b> '+L.사용일+'</span>'+
+    '</div></div>';
+}
 function slipHTML(site,month,e,payday,notice,draft){
   var r=slipRows(e);
   function rows(rs){ return rs.map(function(p){return '<tr><td>'+p[0]+'</td><td class="n">'+won(p[1])+'</td></tr>';}).join(''); }
@@ -975,6 +1028,7 @@ function slipHTML(site,month,e,payday,notice,draft){
     '<div class="net">실수령액 <b>'+won(r.net)+'</b> 원</div>'+
     (r.calc?'<div class="calc">계산방법: '+r.calc+' = '+won(r.gross)+'원</div>':'')+
     (r.hours?'<div class="calc">근로시간: '+r.hours+'</div>':'')+
+    leaveSlipBlockHtml(site,month,e,payday)+
     (notice?'<div class="snote">'+notice+'</div>':'')+
     '<div class="foot">본 명세서는 근로기준법 제48조제2항에 따라 교부됩니다.</div></div>';
 }
@@ -1013,6 +1067,8 @@ function exportPayrollSlipsHwpx(){
         +HWPXDOC.moneyTable(null, [['실수령액', r.net]], null, doc, {strong:true});
       if(r.calc) body+=HWPXDOC.note('※ 계산방법: '+r.calc+' = '+won(r.gross)+'원');
       if(r.hours) body+=HWPXDOC.note('※ 근로시간: '+r.hours);
+      var lvInfo=leaveSummaryForSlip(App.site,App.month,e);
+      if(lvInfo) body+=HWPXDOC.note('※ 연차유급휴가 현황(급여일 기준): 총 발생 '+lvInfo.발생+'일 / 사용 '+lvInfo.사용+'일 / 잔여 '+lvInfo.잔여+'일 / 사용일: '+lvInfo.사용일);
       if(notice) body+=HWPXDOC.note('※ '+String(notice).replace(/\s*\n\s*/g,' '));
       body+=HWPXDOC.note('본 명세서는 근로기준법 제48조제2항에 따라 교부됩니다.');
     });
@@ -1639,7 +1695,8 @@ function screenInbox(){
   var now=new Date();
   if(!App.inboxMonth) App.inboxMonth=(now.getMonth()+1)+'월';
   var mnum=monthNum(App.inboxMonth);
-  var h='<h1>수신함</h1><div class="sub">사업장 자료 준비 현황 — 자료 수집·정리·독촉은 💼 급여데이터함에서 하고, 준비된 신호가 여기로 넘어옵니다</div>';
+  var h='<h1>수신함</h1><div class="sub">사업장 자료 준비 현황 — 푸른 메일(2.급여+사무대행)·카톡·급여데이터함 실시간 연동 및 입퇴사·근로시간 자동 정리</div>';
+  h+=inboxBridgeHtml(App.inboxMonth);
   h+='<div class="noprint" style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">기준 월 <input value="'+App.inboxMonth.replace(/"/g,'')+'" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:inherit" onchange="App.inboxMonth=this.value;render()"><span style="font-size:12px;color:var(--sub)">예: 7월</span></div>';
   /* ⚠ 급여 데이터가 없어도 수신함은 열려야 한다 — 자료가 막 도착한 때는 아직 급여를
      처리하기 **전**이고, 바로 그때 「무엇이 왔나」를 보는 곳이 여기다. 예전엔 급여
@@ -1887,7 +1944,15 @@ function postPayslip(payload) {
 /* 메일 본문 — 명세서 표를 그대로 담는다. 메일 클라이언트는 CSS 를 많이 지우므로
    표는 style 속성으로만 꾸민다(class 는 메일에서 사라진다). */
 function payslipMailHtml(site, month, e) {
-  var rows = slipRows(e) || [];
+  var sr = slipRows(e) || [];
+  var rows = Array.isArray(sr) ? sr : [].concat(
+    (sr.pay || []).map(function (p) { return ['[지급] ' + p[0], won(p[1]) + '원']; }),
+    sr.gross != null ? [['임금총액', won(sr.gross) + '원']] : [],
+    (sr.ded || []).map(function (p) { return ['[공제] ' + p[0], won(p[1]) + '원']; }),
+    sr.dedTotal != null ? [['공제총액', won(sr.dedTotal) + '원']] : [],
+    sr.net != null ? [['실수령액', won(sr.net) + '원']] : [],
+    sr.hours ? [['근로시간', sr.hours]] : []
+  );
   var tr = rows.map(function (r) {
     return '<tr><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0">' + (r[0] == null ? '' : r[0]) + '</td>' +
       '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;text-align:right">' + (r[1] == null ? '' : r[1]) + '</td></tr>';
@@ -1896,6 +1961,7 @@ function payslipMailHtml(site, month, e) {
     '<p>' + (e.성명 || '') + ' 님 안녕하세요.</p>' +
     '<p>' + site + ' ' + month + ' 임금명세서를 보내 드립니다. (근로기준법 48조 2항)</p>' +
     '<table style="border-collapse:collapse;font-size:13px;min-width:280px">' + tr + '</table>' +
+    leaveMailBlockHtml(site, month, e) +
     '<p style="font-size:12px;color:#64748b">문의는 담당자에게 회신해 주세요. 이 메일은 푸른노무법인이 사업장을 대행해 보냅니다.</p>' +
     '</div>';
 }
@@ -2025,6 +2091,174 @@ function exportLedgerCsv(site, month) {
 }
 window.sendSlipOne = sendSlipOne; window.sendSlipAll = sendSlipAll;
 window.exportLedgerXlsx = exportLedgerXlsx; window.exportLedgerCsv = exportLedgerCsv;
+
+function leaveMailBlockHtml(site, month, e){
+  var L=leaveSummaryForSlip(site, month, e);
+  if(!L) return '';
+  var pd=(typeof paydayOf==='function'&&paydayOf(site))||'당월 급여일';
+  return '<div style="margin:14px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:13px">' +
+    '<div style="font-weight:700;color:#1e40af;margin-bottom:6px">🌴 연차유급휴가 현황 안내 (기준: ' + pd + ' · 입사일 ' + L.입사일 + ')</div>' +
+    '<table style="border-collapse:collapse;font-size:12.5px;width:100%">' +
+    '<tr><td style="padding:4px 8px;border:1px solid #e2e8f0;background:#eff6ff;font-weight:700">총 발생개수</td><td style="padding:4px 8px;border:1px solid #e2e8f0">' + L.발생 + '일</td>' +
+    '<td style="padding:4px 8px;border:1px solid #e2e8f0;background:#eff6ff;font-weight:700">사용개수</td><td style="padding:4px 8px;border:1px solid #e2e8f0">' + L.사용 + '일</td>' +
+    '<td style="padding:4px 8px;border:1px solid #e2e8f0;background:#eff6ff;font-weight:700">잔여개수</td><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;color:#1e40af">' + L.잔여 + '일</td></tr>' +
+    '<tr><td style="padding:4px 8px;border:1px solid #e2e8f0;background:#eff6ff;font-weight:700">사용일 내역</td><td colspan="5" style="padding:4px 8px;border:1px solid #e2e8f0">' + L.사용일 + '</td></tr>' +
+    '</table></div>';
+}
+function openExtApp(key, fallbackUrl){
+  if(window.PuAppBar&&typeof PuAppBar.goApp==='function'){ PuAppBar.goApp(key, fallbackUrl); return; }
+  window.open(fallbackUrl, 'pu_'+key);
+}
+window.openExtApp = openExtApp;
+
+/* ── 푸른메일(2.급여+사무대행) · 급여데이터함 · 기업정보함 연동 및 카톡·출근부 OCR 추출 도구 ── */
+function inboxBridgeHtml(mLabel){
+  var map=inboxLog(), ids=Object.keys(map);
+  var mn=monthNum(mLabel);
+  var cnt={hire:0,leave:0,pay:0,att:0};
+  ids.forEach(function(id){
+    var a=map[id]; if(!a) return;
+    if(mn!=null&&a.월&&monthNum(a.월)!==mn) return;
+    var k=String((a.종류||'')+' '+(a.filename||''));
+    if(/입사|취득/.test(k)) cnt.hire++;
+    else if(/퇴사|상실|이직/.test(k)) cnt.leave++;
+    else if(/출근|근태|시간|카톡|연차/.test(k)) cnt.att++;
+    else cnt.pay++;
+  });
+  return '<div class="noprint" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
+    '<div><b style="color:var(--navy)">📬 푸른메일(2.급여+사무대행) · 급여데이터함 · 기업정보함 실시간 연동</b>' +
+    '<div style="font-size:12px;color:var(--sub);margin-top:2px">메일·카톡으로 들어온 입퇴사·급여·근로시간 자료를 자동 분류하고 기업정보(소정근로시간·급여일)와 연결합니다.</div></div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+    '<button class="btn" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'mail\',\'pu-cards.html?view=mail\')">✉️ 푸른 메일 (2.급여+사무대행)</button>' +
+    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'paydata\',\'pu-paydata.html\')">💼 급여데이터함 (입퇴사·급여정리)</button>' +
+    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'cards\',\'pu-cards.html\')">📇 기업정보함 (기업·근로시간)</button>' +
+    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="navTo({screen:\'report\',reportKind:\'hire\',site:null,month:null})">📋 입퇴사 자동정리 ('+(cnt.hire+cnt.leave)+'건)</button>' +
+    '</div></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px">' +
+    '<span class="badge" style="background:#eff6ff;color:#1e40af">급여대장·변동 '+cnt.pay+'건</span>' +
+    '<span class="badge" style="background:#f0fdf4;color:#166534">입사·취득 '+cnt.hire+'건</span>' +
+    '<span class="badge" style="background:#fef2f2;color:#dc2626">퇴사·상실 '+cnt.leave+'건</span>' +
+    '<span class="badge" style="background:#fffbeb;color:#854d0e">근무시간·카톡·출근부 '+cnt.att+'건</span>' +
+    '</div></div>';
+}
+
+var kakaoOcrDraft=[];
+function parseKakaoOcrLines(text, year, mon){
+  var lines=String(text||'').split(/\r?\n/), out=[];
+  var y=Number(year||new Date().getFullYear()), m=Number(mon||(new Date().getMonth()+1));
+  var pad=function(n){ return (n<10?'0':'')+n; };
+  lines.forEach(function(raw){
+    var s=raw.trim(); if(!s) return;
+    var nm='';
+    var mBr=s.match(/^\[([^\]]+)\]/);
+    if(mBr) nm=mBr[1].trim();
+    else {
+      var mNm=s.match(/^([가-힣]{2,4})\s*[:·\-]/);
+      if(mNm) nm=mNm[1].trim();
+    }
+    var dMatch=s.match(/(?:(20\d{2})[.\-\/])?(\d{1,2})[.\-\/월]\s*(\d{1,2})일?/);
+    var dateStr=dMatch?((dMatch[1]||y)+'-'+pad(Number(dMatch[2]))+'-'+pad(Number(dMatch[3]))):(y+'-'+pad(m)+'-01');
+    var tMatch=s.match(/(\d{1,2}:\d{2})\s*[~\-부터]\s*(\d{1,2}:\d{2})/);
+    var type='work', tin='', tout='', brk=60;
+    if(/반차/.test(s)) type='half';
+    else if(/연차|휴가/.test(s)) type='annual';
+    else if(/결근/.test(s)) type='absent';
+    else if(/휴일|특근/.test(s)) type='holiday';
+    if(tMatch){
+      var p1=tMatch[1].split(':'), p2=tMatch[2].split(':');
+      tin=pad(Number(p1[0]))+':'+p1[1];
+      tout=pad(Number(p2[0]))+':'+p2[1];
+    }
+    var bMatch=s.match(/휴게\s*(\d+)\s*분/);
+    if(bMatch) brk=Number(bMatch[1]);
+    if(nm||tMatch||type!=='work'){
+      out.push({name:nm,date:dateStr,type:type,in:tin||((type==='work'||type==='holiday')?'09:00':''),out:tout||((type==='work'||type==='holiday')?'18:00':''),breakMin:brk,raw:s});
+    }
+  });
+  return out;
+}
+function runKakaoOcrExtract(site, month){
+  var box=document.getElementById('kakaoOcrInput');
+  if(!box||!String(box.value||'').trim()){ alert('카톡 대화나 출근부 텍스트를 붙여넣어 주세요.'); return; }
+  var yr=(typeof laborYearOfMonth==='function')?laborYearOfMonth(month):String(new Date().getFullYear());
+  var mn=(typeof laborMonthNum==='function')?laborMonthNum(month):(new Date().getMonth()+1);
+  kakaoOcrDraft=parseKakaoOcrLines(box.value, yr, mn);
+  if(!kakaoOcrDraft.length){ alert('추출할 수 있는 근무시간·연차 줄을 찾지 못했습니다.\n예: [홍길동] 10/14 09:00~20:00 / [홍길동] 10/18 연차'); return; }
+  render();
+}
+function loadKakaoOcrFile(input){
+  var f=input&&input.files&&input.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    var box=document.getElementById('kakaoOcrInput');
+    if(box){
+      if(/\.(txt|csv|log)$/i.test(f.name)) box.value=String(r.result||'');
+      else box.value=(box.value?box.value+'\n':'')+'[첨부증빙:'+f.name+'] ';
+    }
+  };
+  if(/\.(txt|csv|log)$/i.test(f.name)) r.readAsText(f);
+  else r.readAsDataURL(f);
+}
+function applyKakaoOcrToAttend(site, month){
+  if(!site||!month){ alert('사업장과 귀속월을 먼저 선택하세요.'); return; }
+  if(!kakaoOcrDraft.length){ alert('먼저 [근무시간·연차 추출]을 눌러 주세요.'); return; }
+  var byEmp={};
+  kakaoOcrDraft.forEach(function(r){
+    var nm=String(r.name||'').trim();
+    if(!nm) return;
+    (byEmp[nm]=byEmp[nm]||[]).push(r);
+  });
+  var names=Object.keys(byEmp);
+  if(!names.length){ alert('직원 성명이 인식된 줄이 없습니다. 줄 앞에 [성명] 또는 성명: 형태로 적어 주세요.'); return; }
+  names.forEach(function(nm){
+    var list=(typeof dayRecords==='function')?dayRecords(site,month,nm).slice():[];
+    byEmp[nm].forEach(function(rec){
+      list=list.filter(function(x){ return x.date!==rec.date; });
+      var item={date:rec.date,type:rec.type,note:'카톡/OCR 추출'};
+      if(rec.type==='work'||rec.type==='holiday'){ item.in=rec.in; item.out=rec.out; item.breakMin=rec.breakMin; }
+      list.push(item);
+    });
+    list.sort(function(a,b){ return String(a.date)<String(b.date)?-1:1; });
+    lput('attend', site+'|'+month+'|'+nm, {일별:list});
+  });
+  lput('ocr_log', site+'|'+month+'|'+Date.now(), {site:site,month:month,count:kakaoOcrDraft.length,by:(me&&me.email)||'',at:Date.now()});
+  var applied=kakaoOcrDraft.length;
+  kakaoOcrDraft=[];
+  alert(names.length+'명 ('+applied+'건)의 출퇴근·연차 기록을 근태 달력과 급여 계산에 반영하고 증빙을 저장했습니다.');
+  render();
+}
+function kakaoOcrPanelHtml(site, month){
+  var s=esc(site||''), m=esc(month||'');
+  var preview='';
+  if(kakaoOcrDraft.length){
+    preview='<div style="margin-top:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#f8fafc">' +
+      '<tr style="background:#eff6ff"><th style="padding:5px 8px;text-align:left">성명</th><th style="padding:5px 8px;text-align:left">날짜</th><th style="padding:5px 8px;text-align:left">유형</th><th style="padding:5px 8px;text-align:left">출퇴근·휴게</th><th style="padding:5px 8px;text-align:left">원문 증빙</th></tr>' +
+      kakaoOcrDraft.map(function(r){
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name||'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
+          '<td style="padding:5px 8px">'+r.date+'</td><td style="padding:5px 8px">'+r.type+'</td>' +
+          '<td style="padding:5px 8px">'+(r.type==='work'||r.type==='holiday'?(r.in+'~'+r.out+' (휴게 '+r.breakMin+'분)'):'-')+'</td>' +
+          '<td style="padding:5px 8px;color:var(--sub)">'+esc(r.raw)+'</td></tr>';
+      }).join('') + '</table>' +
+      '<div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">' +
+      '<button class="btn sec" style="padding:5px 10px;font-size:12px" onclick="kakaoOcrDraft=[];render()">초기화</button>' +
+      '<button class="btn" style="padding:5px 12px;font-size:12px" onclick="applyKakaoOcrToAttend(\''+s+'\',\''+m+'\')">✅ 근태·급여·연차에 즉시 반영 및 증빙 저장</button>' +
+      '</div></div>';
+  }
+  return '<div class="noprint" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
+    '<div><b style="color:var(--navy)">💬 카톡·출근부 근무시간 OCR 시간추출 · 증빙 저장 · 급여 자동 연결</b>' +
+    '<span style="font-size:12px;color:var(--sub);margin-left:8px">카톡 대화·출근기록을 붙여넣으면 출퇴근 시간·연장·야간·연차사용일을 추출해 급여에 자동 반영합니다.</span></div>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+    '<label class="btn sec" style="padding:5px 10px;font-size:12px;cursor:pointer">📎 카톡·출근부 파일 불러오기<input type="file" accept=".txt,.csv,.log,image/*" style="display:none" onchange="loadKakaoOcrFile(this)"></label>' +
+    '<button class="btn" style="padding:5px 12px;font-size:12px" onclick="runKakaoOcrExtract(\''+s+'\',\''+m+'\')">🔍 근무시간·연차 추출</button>' +
+    '</div></div>' +
+    '<textarea id="kakaoOcrInput" rows="2" placeholder="예: [홍길동] 10/14 09:00~20:30 휴게 60분 연장근무 &#10;[홍길동] 10/18 연차 사용" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:12.5px"></textarea>' +
+    preview + '</div>';
+}
+window.runKakaoOcrExtract = runKakaoOcrExtract;
+window.loadKakaoOcrFile = loadKakaoOcrFile;
+window.applyKakaoOcrToAttend = applyKakaoOcrToAttend;
 
 var LC = (typeof PuLaborCore !== 'undefined') ? PuLaborCore : null;
 
@@ -3263,6 +3497,7 @@ function screenAttend() {
   if (laborRec(App.site, App.month) && !laborEmpsReady(App.site, App.month)) return '<h1>근태</h1>' + '<div class="sub"><a href="#" onclick="goBack();return false">← 돌아가기</a></div>' + '<div class="empty">직원 표를 받고 있습니다… 잠시만 기다려 주세요.</div>';
   var h2 = '<h1>근태</h1><div class="sub"><a href="#" onclick="goBack();return false">← ' + App.site + '</a> · <b>' + App.month + '</b> 근태·법정수당 (' + emps.length + '명)</div>';
   h2 += policyBar(App.site);
+  h2 += kakaoOcrPanelHtml(App.site, App.month);
   h2 += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">' +
     '<tr style="background:var(--paper)">' +
     ['성명', '통상임금월액', '시급', '연장h', '야간h', '휴일h', '결근', '연차사용', '연장수당', '야간수당', '휴일수당', '법정수당계'].map(function (c, i) {
@@ -3390,7 +3625,7 @@ function screenLeave() {
   h += policyBar(App.site);
   h += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">' +
     '<tr style="background:var(--paper)">' +
-    ['성명', '입사일', '근속', '발생', '이월', '사용', '잔여', '소멸일', '1차촉진', '2차촉진', '미사용수당'].map(function (c, i) {
+    ['성명', '입사일', '근속', '발생', '이월', '사용', '사용일(명세서 표기)', '잔여', '소멸일', '1차촉진', '2차촉진', '미사용수당'].map(function (c, i) {
       return '<th style="padding:8px;text-align:' + (i < 2 ? 'left' : 'right') + ';white-space:nowrap">' + c + '</th>';
     }).join('') + '</tr>';
   var totPay = 0, needPromo = 0;
@@ -3414,6 +3649,7 @@ function screenLeave() {
       '<td style="padding:6px 8px;font-weight:700" title="' + esc(ac.근거) + '">' + (ac.발생일수 || 0) + '</td>' +
       '<td style="padding:6px 8px">' + nInput(lv.이월, 'lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{이월:+this.value})', 48) + '</td>' +
       '<td style="padding:6px 8px">' + nInput(lv.사용, 'lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{사용:+this.value})', 48) + '</td>' +
+      '<td style="padding:6px 8px;text-align:left"><input type="text" value="' + esc(lv.사용일 || '') + '" placeholder="예: 10/14, 10/21" onchange="lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{사용일:this.value})" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px"></td>' +
       '<td style="padding:6px 8px;font-weight:700;color:' + (lg.잔여일수 < 0 ? 'var(--bad)' : (unused >= 10 ? 'var(--warn)' : 'inherit')) + '">' + lg.잔여일수 + '</td>' +
       '<td style="padding:6px 8px;color:var(--sub);white-space:nowrap">' + (ps ? ps.소멸일 : '-') + '</td>' +
       '<td style="padding:6px 8px;color:var(--sub);white-space:nowrap">' + (ps ? ps['1차촉진기한'] : '-') + '</td>' +
@@ -3421,7 +3657,7 @@ function screenLeave() {
       '<td style="padding:6px 8px" title="' + esc(up.근거) + '">' + won(up.금액) + '</td></tr>';
   });
   h += '<tr style="border-top:2px solid var(--line);background:var(--paper);text-align:right;font-weight:700">' +
-    '<td colspan="10" style="padding:8px">연차 미사용수당 합계</td><td style="padding:8px">' + won(totPay) + '</td></tr>';
+    '<td colspan="11" style="padding:8px">연차 미사용수당 합계</td><td style="padding:8px">' + won(totPay) + '</td></tr>';
   h += '</table></div>';
   if (needPromo) h += '<div class="note" style="border-left:3px solid var(--warn)"><b>사용촉진 대상 ' + needPromo + '명</b> — 잔여 10일 이상. ' +
     '1차·2차 촉진을 <b>서면으로 모두</b> 이행해야 미사용 연차가 소멸합니다(근기법 61조). 하나라도 빠지면 수당 지급 의무가 그대로 남습니다.</div>';

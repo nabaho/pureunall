@@ -222,7 +222,7 @@ test('⑦ 잣대가 «한 곳»이다 — 두 곳에 두면 한쪽만 고쳐진�
    준비중(흐리게 보이되 못 누름)과 다르다 — «대표 화면에서도» 타일이 아예 없다.
    앱 파일·안쪽 준비중 문은 남겨 두어, off 만 걷으면 준비중 타일로 돌아온다(②③④ 가 그 모습을 본다).
    취업규칙은 2026-10-30 대표 「다시 살려」로 off 를 걷었다 — ⑩ 이 지킨다. */
-const 안씀앱 = ['payroll', 'paydata'];
+const 안씀앱 = ['paydata'];
 test('⑨★★ 안 쓰는 앱은 누구 화면에도 타일이 없다 — 대표 포함 (대표 지시 2026-10-24)', () => {
   ['admin', 'member'].forEach(role => {
     const { 타일 } = 그려보기(role);
@@ -245,11 +245,14 @@ test('⑩★★ 취업규칙은 다시 보인다 — 감춤 없이 준비중 타
   const A = SRC.indexOf('var APPS = [');
   const 목록 = SRC.slice(A, SRC.indexOf('\n  ];', A));
   const 줄 = 목록.split('\n').find(l => l.indexOf("key:'rules'") >= 0);
+  const 급여줄 = 목록.split('\n').find(l => l.indexOf("key:'payroll'") >= 0);
+  assert.ok(급여줄 && !/off:\s*true/.test(급여줄) && /soon:\s*true/.test(급여줄) && /name:'급여아웃소싱'/.test(급여줄), '★★ 급여아웃소싱(준비중) 타일 설정이 올바르지 않다');
   assert.ok(줄, '★★ 취업규칙이 목록에서 사라졌다');
   assert.doesNotMatch(줄, /off:\s*true/, '★★ 취업규칙이 다시 감춰졌다 — 대표가 되살리라 하셨다');
   assert.match(줄, /soon:\s*true/, '★ 준비중 딱지까지 걷혔다 — 직원에게 여는 일은 따로 정한다');
   ['admin', 'member'].forEach(role => {
     const { 타일 } = 그려보기(role);
     assert.ok(타일.rules, '★★ ' + role + ' 화면에 취업규칙 타일이 없다');
+    assert.ok(타일.payroll, '★★ ' + role + ' 화면에 급여아웃소싱 타일이 없다');
   });
 });

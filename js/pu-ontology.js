@@ -311,7 +311,7 @@
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
       sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
-    payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
+    payroll:{ name:'급여아웃소싱', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },
     /* Task — 「입퇴사 할 일」(paydata/hrtask, 2026-10-03). 메일에서 매번 다시 세고 «사람이 누른 상태»만 적는다. */
     paydata:{ name:'급여데이터함', file:'pu-paydata.html', primaryRoots:['paydata'],
