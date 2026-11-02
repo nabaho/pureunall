@@ -118,6 +118,17 @@ const lg = L.annualLedger({ 발생일수: 15, 이월일수: 3, 사용일수: 20 
 eq('잔여 -2일', lg.잔여일수, -2);
 eq('초과사용 2일', lg.초과사용, 2);
 ok('초과사용 경고 문구 있음', !!lg.경고);
+const lgHr = L.annualLedger({ 발생일수: 15, 이월일수: 0, 사용일수: 2, 사용시간: 2, policy: { dailyContractHours: 8 } });
+eq('시간차 2h(8h 기준 0.25일) → 총 사용 2.25일', lgHr.사용일수, 2.25);
+eq('시간차 반영 잔여일수 12.75일', lgHr.잔여일수, 12.75);
+eq('시간차 반영 잔여시간 102h', lgHr.잔여시간, 102);
+eq('시간차 반영 미사용수당 102h × 1만 = 1,020,000', L.annualUnusedPay({ 미사용일수: lgHr.잔여일수, 미사용시간: lgHr.잔여시간, 시급: 10000 }).금액, 1020000);
+const attHr = L.summarizeAttendance([
+  { date: '2026-03-02', type: 'hourleave', leaveHours: 3, in: '13:00', out: '18:00', breakMin: 0 },
+  { date: '2026-03-03', type: 'quarter', leaveHours: 2 }
+]);
+eq('일별 시간차(3h) + 반반차(2h) = 연차사용시간 5h', attHr.합계.연차사용시간, 5);
+eq('일별 시간차(3h) + 반반차(2h) = 연차사용 0.625일', attHr.합계.연차사용, 0.625);
 const up = L.annualUnusedPay({ 미사용일수: 5, 시급: 10000 });
 eq('연차수당 5일 × 8h × 1만 = 400,000', up.금액, 400000);
 eq('촉진 적법 이행 → 수당 0 (61조)', L.annualUnusedPay({ 미사용일수: 5, 시급: 10000, 촉진적법: true }).금액, 0);
