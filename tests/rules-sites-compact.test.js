@@ -43,7 +43,7 @@ function mediaBlocks(css, kind) {
   }
   return out;
 }
-/* colgroup 의 칸 폭 — 폭 없는 칸(이름)은 null */
+/* colgroup 의 칸 폭 — 폭 없는 칸은 null (지금은 모든 칸에 폭이 있다 — ①) */
 function cols() {
   const h = V.listHtml(st(), []);
   const g = h.match(/<colgroup>([\s\S]*?)<\/colgroup>/);
@@ -54,21 +54,33 @@ function cols() {
   });
 }
 
-test('① 사업장 이름 칸이 «읽히는 폭»을 받는다 — 표 min-width 가 다른 칸 합보다 넉넉하다', () => {
+/* 사업장 이름 칸의 자리 — 머리의 「사업장」이 몇째 칸인지 그림에서 찾는다(칸이 늘어도 따라간다) */
+function nameIndex() {
+  const h = V.listHtml(st(), []);
+  const th = [...h.match(/<thead>([\s\S]*?)<\/thead>/)[1].matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').trim());
+  const i = th.findIndex((t) => t === '사업장');
+  assert.ok(i >= 0, '머리에 「사업장」이 없다');
+  return i;
+}
+
+test('① 모든 칸에 폭이 있다 — 폭 없는 칸이 남는 화면을 다 먹지 않는다 · 사업장은 읽히는 폭(NAME_MIN)을 받고 표 min-width 가 칸 폭 합이다', () => {
   const c = cols();
-  assert.equal(c.filter((w) => w === null).length, 1, '폭 없는 칸(남는 자리를 받는 이름 칸)은 하나여야 한다');
-  const fixed = c.reduce((a, w) => a + (w || 0), 0);
+  /* 폭 없는 칸이 하나 있으면 넓은 화면에서 남는 폭을 그 칸(사업장)이 다 먹는다 — 1920px 에서 사업장 480px · 업태 「도매 …」·자료 「후보 1…」 잘림
+     (2026-11-02 대표 「사업장 열 넓이 너무 넓다 줄여라 · 규모부터 취업규칙 자료 셀 좌우 조정」). 모두 폭이 있으면 남는 폭은 폭 비율대로 나뉜다 */
+  assert.equal(c.filter((w) => w === null).length, 0, '폭 없는 칸이 있다 — 넓은 화면에서 그 칸이 남는 자리를 다 먹는다');
+  const nameW = c[nameIndex()];
+  assert.ok(nameW >= NAME_MIN, '★ 사업장 칸 기본 폭이 ' + nameW + 'px 뿐이다 — 좁은 화면에서 「삼…」 한 글자만 보인다');
+  const sum = c.reduce((a, w) => a + w, 0);
   const m = CSS.match(/\.sites\{[^}]*min-width:\s*(\d+)px/);
   assert.ok(m, '.sites 에 min-width 가 없다');
-  const nameW = Number(m[1]) - fixed;
-  assert.ok(nameW >= NAME_MIN,
-    '★ 좁은 화면에서 사업장 이름 칸이 ' + nameW + 'px 뿐이다 — 「삼…」 한 글자만 보인다. '
-    + '.sites 의 min-width 를 «다른 칸 합(' + fixed + ') + ' + NAME_MIN + '» 이상으로 올리거나 다른 칸을 줄일 것');
+  assert.ok(Number(m[1]) >= sum, '★ .sites min-width(' + m[1] + ')가 칸 폭 합(' + sum + ')보다 작다 — 좁은 화면에서 칸이 줄어 이름이 짓눌린다');
+  // 사업장이 «표의 절반»을 넘게 가져가면 넓은 화면에서 다시 지나치게 넓어진다
+  assert.ok(nameW / sum <= 0.25, '사업장 칸 비율이 ' + Math.round(nameW / sum * 100) + '% 다 — 다른 칸 몫이 너무 작다');
 });
 
 test('② PC 표를 옆으로 밀어도 앞 칸들(☐ · # · 이름)은 남는다 — 칸마다 left 는 앞 칸 폭의 합, 폰 카드에는 안 건다', () => {
   const c = cols();
-  const name = c.indexOf(null);                                     // 폭 없는 칸 = 사업장 이름
+  const name = nameIndex();                                         // 「사업장」 머리의 자리 = 사업장 이름 칸
   assert.ok(name >= 1 && c.slice(0, name).every((w) => w > 0), '이름 앞 칸들은 폭이 있어야 고정 자리를 셀 수 있다');
   const pc = mediaBlocks(CSS, 'min').filter((b) => b.w >= 901).map((b) => b.body).join('\n');
   let sum = 0;
@@ -96,4 +108,33 @@ test('③ 폰 거르개 — 새로고침은 ↻ 만, 글자는 접고 title 에 
   assert.match(b[0], /<span class="rl-t">[^<]*새로고침<\/span>/);
   const phone = mediaBlocks(CSS).filter((b) => b.w <= 768).map((b) => b.body).join('\n');
   assert.match(phone, /#sites \.flt \.rl-t\{display:none\}/, '폰에서 「새로고침」 글자를 안 접는다');
+});
+
+/* ④ 자료 칸은 격자 — 규칙·노사·단협 · 확정 · 후보 · 맞음 이 줄마다 «같은 자리»에 선다 (대표 지시 2026-11-02 「취업규칙자료 안에 셀들 열을 정렬해라」)
+   값이 없는 자리는 비워 둔다 — 자리 번호(ds4·ds5·ds6)가 칸에 못 박혀 있어 앞 칸이 비어도 뒤 칸이 앞으로 밀리지 않는다 */
+test('④ 자료 칸 — 줄마다 같은 자리 번호에 서고, 격자 칸 수가 그림의 자리 수와 같다', () => {
+  const row = (extra) => Object.assign({ id: 'c1', name: '점검가나상사', bizNo: '', size: 12, band: '10~29인', bizType: '제조업', closed: false,
+    linked: 0, cand: 0, candIds: [], candMails: 0, last: 0, groups: [], fin: { state: '' }, mgr: '', subs: [] }, extra || {});
+  const rows = [row({ id: 'a', linked: 7 }), row({ id: 'b', cand: 1, candMails: 1 }), row({ id: 'c', linked: 3, cand: 2, candMails: 1 }), row({ id: 'd' })];
+  const h = V.listHtml(st(), rows);
+  const cell = (id) => (h.match(new RegExp('<tr data-act="siteSel" data-co="' + id + '"[\\s\\S]*?<span class="dc">([\\s\\S]*?)</span></td></tr>')) || [])[1] || '';
+  const slotsOf = (id) => [...cell(id).matchAll(/<span class="ds ds(\d)">/g)].map((m) => Number(m[1]));
+  assert.deepEqual(slotsOf('a'), [4], '확정만 — 넷째 자리');
+  assert.deepEqual(slotsOf('b'), [5, 6], '후보만 — 확정 자리를 비우고 다섯째·여섯째 자리 (앞으로 밀리면 줄마다 어긋난다)');
+  assert.deepEqual(slotsOf('c'), [4, 5, 6], '확정·후보·맞음 — 세 자리');
+  assert.deepEqual(slotsOf('d'), [4], '자료 없음 — 넷째 자리부터 걸쳐 놓는다');
+  assert.match(cell('d'), /ds-all/);
+  // 체크 단추 셋(규칙·노사·단협)은 어느 줄에나 같은 차례로 앞 세 자리를 채운다
+  ['a', 'b', 'c', 'd'].forEach((id) => {
+    const sh = [...cell(id).matchAll(/<button class="sck[^"]*"[^>]*data-set="([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(sh, ['취업규칙', '노사협의회', '단체협약'], id + ' 줄의 체크 단추 차례');
+  });
+  // CSS — 자리 번호마다 격자 칸이 있고, 격자는 여섯 칸이다
+  const g = CSS.match(/#sites \.dc\{[^}]*grid-template-columns:([^;}]*)/);
+  assert.ok(g, '자료 칸 격자(.dc)에 grid-template-columns 가 없다');
+  let n = 0;
+  const rest = g[1].replace(/repeat\((\d+),\s*minmax\([^)]*\)\)/g, (m0, k) => { n += Number(k); return ' '; });
+  n += (rest.match(/minmax\([^)]*\)/g) || []).length;
+  assert.equal(n, 6, '격자 칸이 여섯(체크 셋 + 확정·후보·맞음)이어야 한다: ' + n);
+  [4, 5, 6].forEach((n) => assert.match(CSS, new RegExp('#sites \\.dc \\.ds' + n + '\\{grid-column:' + n + '\\}'), n + '째 자리의 격자 칸 지정이 없다'));
 });
