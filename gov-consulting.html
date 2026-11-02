@@ -964,6 +964,67 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .ended-meta{font-size:10px;color:var(--t2);font-weight:600;margin-top:2px;}
 .restore-btn{padding:4px 10px;font-size:11px;font-weight:800;border:1.5px solid var(--ok);border-radius:6px;background:rgba(42,157,143,.08);color:var(--ok);cursor:pointer;font-family:inherit;}
 .restore-btn:hover{background:var(--ok);color:#fff;}
+/* ── 종료 사업장 관리 개편 (대표 지시 2026-11-02) — 한 사업이 «한 줄», 같은 정보는 같은 열 ── */
+.ended-tools2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 8px;}
+.ended-search{position:relative;flex:1;min-width:240px;max-width:430px;}
+.ended-search input{width:100%;padding:8px 30px 8px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;background:var(--surface);color:var(--text);outline:none;}
+.ended-search input:focus{border-color:var(--accent);}
+.ended-search .x{position:absolute;right:8px;top:7px;border:0;background:var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;display:none;}
+.ended-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px;border-bottom:2px solid var(--border);}
+.ended-tab{font-family:inherit;font-size:13px;font-weight:900;border:0;background:none;padding:9px 14px;border-radius:9px 9px 0 0;cursor:pointer;color:var(--t2);opacity:.7;margin-bottom:-2px;border-bottom:3px solid transparent;white-space:nowrap;}
+.ended-tab .n{display:inline-block;margin-left:6px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:999px;background:var(--sf2);color:var(--text);}
+.ended-tab.on{opacity:1;color:var(--accent);border-bottom-color:var(--accent);background:var(--surface);}
+.ended-tab.on .n{background:var(--accent);color:#fff;}
+.ended-tab.warn.on{color:#d97706;border-bottom-color:#d97706;}
+.ended-tab.warn.on .n{background:#d97706;}
+.ended-tab.dang.on{color:var(--danger);border-bottom-color:var(--danger);}
+.ended-tab.dang.on .n{background:var(--danger);}
+.ended-min{min-width:1200px;}
+.eg{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 132px 104px 138px 78px 78px 50px 44px 44px 78px 108px minmax(150px,1fr);}
+.eg2{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 132px 138px 56px minmax(260px,1fr) auto;}
+.eg3{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 170px 124px 84px 94px 118px minmax(180px,1fr);}
+.ecolhd{font-size:10.5px;font-weight:900;color:var(--t2);padding:0 14px 4px;}
+.ended-card2{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.ended-card2.del{border-left:4px solid var(--danger);}
+.ended-card2.mg{border-left:4px solid #94a3b8;background:var(--bg);}
+.ended-line2{padding:6px 14px;border-top:1px dashed var(--border);font-size:12px;font-weight:700;white-space:nowrap;}
+.ended-card2 .ended-line2:first-child{border-top:0;}
+.ended-line2>*{overflow:hidden;text-overflow:ellipsis;}
+.ended-line2>.ended-acts{overflow:visible;}
+.ended-acts{display:flex;gap:4px;justify-content:flex-end;align-items:center;}
+.ended-no2{font-size:11px;font-weight:900;color:var(--accent);text-align:center;}
+.ended-nm2{font-size:14px;font-weight:900;}
+.ended-mu{color:var(--t2);opacity:.85;}
+.ended-fl{display:inline-block;font-size:10.5px;font-weight:900;padding:2px 8px;border-radius:7px;white-space:nowrap;}
+.ended-fl.ok{background:rgba(42,157,143,.12);color:var(--ok);}
+.ended-fl.w{background:#fde68a;color:#854d0e;}
+.ended-fl.e{background:#fffbeb;color:#854d0e;border:1px solid #fbbf24;}
+.ended-fl.rv{background:#e2e8f0;color:#64748b;}
+.ended-note2{background:#fffbeb;color:#854d0e;border-top:1px dashed #fbbf24;padding:5px 14px 5px 62px;font-size:11.5px;font-weight:800;}
+.ended-intro{font-size:11.5px;color:var(--t2);font-weight:700;margin:0 0 8px;}
+.ended-rg{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.ended-rg-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#fffbeb;border-bottom:1px solid #fde68a;}
+.ended-rg-hd b{font-size:13px;}
+.ended-rg-hd .c{background:#d97706;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:1px 9px;}
+.ended-rg-hd .ex{flex:1;font-size:11.5px;color:#854d0e;font-weight:700;}
+.ended-reason{font-size:12px;font-weight:700;white-space:normal;}
+.ended-reason small{color:var(--t2);opacity:.85;font-weight:700;}
+.ended-more{padding:8px 14px;border-top:1px dashed var(--border);}
+.ended-fix{display:inline-flex;gap:4px;align-items:center;}
+.ended-fix input{padding:3px 6px;border:1.5px solid var(--accent);border-radius:7px;font-family:inherit;font-size:11.5px;font-weight:700;}
+.ended-sec{display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:900;margin:14px 0 6px;}
+.ended-sec .c{font-size:11px;color:#fff;border-radius:999px;padding:1px 9px;}
+.ended-warn{background:#fef2f2;color:#991b1b;font-size:11.5px;font-weight:800;padding:5px 14px;border-top:1px solid #fecaca;}
+.ended-bar{display:flex;gap:8px;align-items:center;background:var(--sf2);border:1px solid var(--border);border-radius:10px;padding:7px 12px;margin-bottom:8px;font-size:12px;}
+.ended-page mark{background:#fde68a;border-radius:3px;padding:0 1px;}
+.ended-opt{border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;margin-bottom:8px;cursor:pointer;background:var(--surface);}
+.ended-opt.on{border-color:var(--accent);background:rgba(37,99,235,.05);}
+.ended-opt .h{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:900;}
+.ended-opt .h i{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);display:inline-block;}
+.ended-opt.on .h i{border-color:var(--accent);background:radial-gradient(var(--accent) 45%,transparent 50%);}
+.ended-opt p{margin:3px 0 0 24px;font-size:11.5px;color:var(--t2);font-weight:700;}
+.ended-banner{background:#fffbeb;border:1.5px solid #fbbf24;color:#854d0e;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;margin-bottom:10px;}
+.ended-log{font-size:11.5px;color:var(--t2);font-weight:700;line-height:1.7;border-top:1px dashed var(--border);margin-top:10px;padding-top:8px;}
 @media(max-width:1180px){
   .ended-page{width:100%;max-width:none;padding:24px 20px;}
   .ended-columns{grid-template-columns:1fr;gap:24px;}
@@ -1766,14 +1827,26 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="set-page-hd">
       <div>
         <h2 style="font-size:18px;font-weight:900;">🔒 종료 사업장 관리</h2>
-        <p style="font-size:11px;color:var(--t2);margin-top:3px;">종료일·삭제일 기준으로 연도별 분류합니다. 담당자는 사업장 카드 안에 주/부로 함께 표시됩니다.</p>
+        <p style="font-size:11px;color:var(--t2);margin-top:3px;">종료 · 시기 검토 · 삭제를 따로 봅니다. 담당자는 사업장 줄에 주/부로 함께 표시됩니다.</p>
       </div>
       <div class="ended-tools">
         <span class="ended-tool-label">종료/삭제 연도</span>
         <select class="att-filter" id="endedYearFilter" onchange="setEndedYear(this.value)"></select>
       </div>
     </div>
-    <div id="endedList"></div>
+    <div class="ended-tools2">
+      <div class="ended-search"><input id="endedQ" placeholder="🔍 사업장·담당자·사업 이름으로 찾기" autocomplete="off" oninput="endedSetQ(this.value)"><button class="x" id="endedQx" title="지우기" onclick="endedClearQ()">✕</button></div>
+      <select class="att-filter" id="endedWho" onchange="endedSetWho(this.value)"></select>
+      <select class="att-filter" id="endedTyp" onchange="endedSetTyp(this.value)"></select>
+      <span class="ended-tool-label" id="endedQInfo"></span>
+    </div>
+    <div class="ended-tabs" id="endedTabs">
+      <button class="ended-tab on" data-et="end" onclick="endedSetTab('end')">🔒 종료 사업 <span class="n" id="endedNEnd"></span></button>
+      <button class="ended-tab warn" data-et="rev" onclick="endedSetTab('rev')">⚠ 종료 시기 검토 <span class="n" id="endedNRev"></span></button>
+      <button class="ended-tab dang" data-et="del" onclick="endedSetTab('del')">🗑 삭제·정리 <span class="n" id="endedNDel"></span></button>
+    </div>
+    <div id="endedBar"></div>
+    <div id="endedList" style="overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -2307,6 +2380,15 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
       <button class="btn btn-s" id="mCoCancelBtn">취소</button>
       <button class="btn btn-p" id="mCoSave">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- 종료 뒤 수정 창 (대표 지시 2026-11-02) -->
+<div class="mb" id="mbEndEdit">
+  <div class="modal md">
+    <div class="mhdr"><h3 id="endEditTitle">종료 뒤 수정</h3><button class="mcls" onclick="closeModal('mbEndEdit')">✕</button></div>
+    <div class="mbody" id="endEditBody"></div>
+    <div class="mfoot" id="endEditFoot"></div>
   </div>
 </div>
 
@@ -6338,6 +6420,9 @@ function showConfirm(msg, onYes){
 
 // 삭제 복귀
 async function restoreDeletedCo(coId){
+  /* 합치기로 숨은 곳은 «삭제»가 아니다 — 복귀하면 같은 회사가 두 줄이 된다(2026-11-02). 화면 단추를 안 만든 것만으로는 부족해서 여기서도 막는다. */
+  const _c0=getCos().find(c=>c.id===coId);
+  if(_c0&&_c0.mergedInto){toast('합치기로 숨은 사업장은 복귀할 수 없습니다 — 합쳐진 곳을 보세요','err');return;}
   if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
   const cos=getCos();const idx=cos.findIndex(c=>c.id===coId);
   if(idx===-1){releaseCompanyEditLock();return;}
@@ -6355,6 +6440,7 @@ const _purgingIds=new Set();
 async function purgeDeletedCo(coId){
   const co=getCos().find(c=>c.id===coId);
   if(!co)return;
+  if(co.mergedInto){toast('합치기로 숨은 사업장은 영구삭제할 수 없습니다 — 합친 흔적입니다','err');return;}
   if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
   // 즉시 영구삭제하지 않고, 화면에서 숨긴 뒤 3초 복귀 토스트. 3초 경과 시 실제 삭제.
   _purgingIds.add(coId);
@@ -6393,6 +6479,7 @@ function endConsulting(coId,typeId){
     if(idx===-1){releaseCompanyEditLock();return;}
     if(!cos[idx].endedTypes)cos[idx].endedTypes={};
     cos[idx].endedTypes[typeId]=todayStr();
+    if(cos[idx].reopened){ delete cos[idx].reopened[typeId]; if(!Object.keys(cos[idx].reopened).length)delete cos[idx].reopened; }   // 수정 중이던 사업을 다시 끝냈다
     setCos(cos);renderSummaryBar();renderDash();renderCal();
     if(q('#endedList'))renderEndedView();
     releaseCompanyEditLock();          // 이알피에 묻는 동안 사업장 잠금을 쥐고 있지 않는다
@@ -6492,133 +6579,452 @@ function setEndedYear(year){
 }
 
 // ===== 종료 사업장 뷰 =====
-function renderEndedView(){
-  const allCos=getCos();
-  const cos=allCos.filter(c=>c.active!==false&&!c.deleted);
-  const deletedAll=allCos.filter(c=>c.deleted&&!_purgingIds.has(c.id));
-  const types=getTypes();
-  const staff=getStaff();
-  const endedAll=cos.flatMap(co=>{
-    const ended=co.endedTypes||{};
-    return Object.keys(ended).map(tid=>({co,tid,endedDate:ended[tid]}));
-  });
-  const yearOf=ds=>String(ds||'').slice(0,4);
-  const years=[...new Set([
-    ...endedAll.map(item=>yearOf(item.endedDate)),
-    ...deletedAll.map(co=>yearOf(co.deletedDate))
-  ].filter(y=>/^\d{4}$/.test(y)))].sort((a,b)=>b.localeCompare(a));
-  let selectedYear=S.endedYear||'all';
-  if(selectedYear!=='all'&&!years.includes(selectedYear))selectedYear='all';
-  S.endedYear=selectedYear;
-  const yf=q('#endedYearFilter');
-  if(yf){
-    yf.innerHTML=`<option value="all">전체 연도</option>`+years.map(y=>`<option value="${y}">${y}년</option>`).join('');
-    yf.value=selectedYear;
+/* ══════ 종료 사업장 관리 개편 (대표 지시 2026-11-02, 시안 승인 「추천대로」) ══════
+   「종료사업장과 삭제사업장 다르게 분리 · 검색 · 종료 시기 검토 · 종료 이후에 수정으로 다시 재시도」
+
+   ■ 탭 셋 — 종료 사업 / 종료 시기 검토 / 삭제·정리. 종료는 «끝난 기록», 삭제는 «잘못 만든 것을 치운 것» 이라 따로 본다.
+     ★ 「삭제 사업장」 13곳 가운데 9곳은 삭제가 아니라 «합치기로 숨은 곳» 이었다(2026-11-02 실측). 같은 목록에 섞여
+       있어서 복귀를 누르면 같은 회사가 두 줄이 된다 — 그래서 갈라 읽기 전용으로 두고 함수로도 막는다.
+   ■ 종료 시기 검토 — 이상해 보이는 것만 규칙별로 모은다. 틀렸다는 뜻이 아니라 «사람이 한 번 보라» 는 표시다.
+     실측: 이알피는 진행 중인데 일정관리만 종료 11 · 같은 날 묶음 종료(하루 8건) · 일정 0회 종료 9 · 마지막 방문 뒤 30일 넘어 종료 12.
+   ■ 종료 뒤 수정 — «수정 중» 으로 원래 종료일을 보관(co.reopened)하고, 끝나면 「다시 종료」, 그만두면 「원래대로」.
+     ⚠ 수정 중에는 endedTypes 를 비운다 — 진행 사업처럼 일정을 고칠 수 있어야 해서다. 대신 이알피 따라 끝내기가
+       도로 끝내지 못하게 막는다(erpSyncClosedDown).
+   ■ 저장하는 모양에 undefined 를 남기지 않는다 — 실시간DB 가 통째로 거부한다(2026-08-17). 지울 때는 delete. */
+function endedRuleList(){
+  return [
+    {key:'erp',title:'일정관리만 종료 · 이알피는 진행 중',explain:'사후컨설팅이 남은 사업일 수 있습니다. 이알피 종료는 사람이 합니다(이알피는 안 건드립니다).'},
+    {key:'bulk',title:'같은 날 묶음 종료',explain:'하루에 3건 이상 «종료» 처리된 날 — 한꺼번에 눌렀을 수 있습니다.'},
+    {key:'late',title:'마지막 방문 뒤 30일 넘어 종료',explain:'종료 처리가 늦었을 수 있습니다 — 종료일을 실제로 끝난 날에 맞출지 봅니다.'},
+    {key:'short',title:'회차·방문 미달인데 종료',explain:'최대회차나 의무 방문에 못 미친 채 끝난 사업 — 정말 끝난 것인지 봅니다.'},
+    {key:'zero',title:'일정 0회로 종료',explain:'한 번도 진행하지 않고 끝낸 사업 — 안 한 것인지, 입력이 빠진 것인지 봅니다.'},
+    {key:'dl',title:'계약만료일과 30일 넘게 차이',explain:'종료일이 계약만료일과 한 달 넘게 어긋난 사업 — 사후컨설팅이었는지, 일찍 끝냈는지 봅니다.'}
+  ];
+}
+function endedDays(a,b){ return Math.round((Date.parse(b)-Date.parse(a))/86400000); }
+function endedMd(d){ return String(d||'').slice(5)||'-'; }
+/* 한 사업(사업장×종류)이 어떤 규칙에 걸리는지 «계산»으로 판정한다. info 는 이미 모아 둔 값이라 이 함수는 아무 것도 읽지 않는다. */
+function endedFlagsFor(info){
+  const out=[]; const end=info.endedDate||''; const checked=info.checked||[];
+  const dates=(info.scheds||[]).map(s=>s.date).filter(Boolean).sort();
+  const n=dates.length, last=dates[n-1]||'';
+  const field=(info.scheds||[]).filter(s=>s.isField).length;
+  const add=(rule,label,reason,hint,acts)=>{ if(checked.indexOf(rule)<0)out.push({rule,label,reason,hint,acts}); };
+  if(info.erp==='running')add('erp','이알피 진행 중',`이알피 「진행」 · 일정관리 종료 ${endedMd(end)}`,'사후컨설팅이 남은 사업이면 그대로 두세요. 아니면 이알피에서 종료해 주세요',['check']);
+  if((info.sameDay||0)>=3)add('bulk',`같은 날 ${info.sameDay}건`,`${endedMd(end)} 하루 ${info.sameDay}건 종료`+(n?` · 마지막 방문 ${endedMd(last)}`:' · 이 사업은 일정 0회'),n?`종료일 → ${endedMd(last)} (마지막 방문일)`:'일정이 없어 실제로 끝난 날을 알 수 없음',n?['fix','check']:['check']);
+  if(n&&end&&endedDays(last,end)>30)add('late',`${endedDays(last,end)}일 뒤 종료`,`마지막 방문 ${endedMd(last)} · 종료 ${endedMd(end)} (${endedDays(last,end)}일 뒤)`,`종료일 → ${endedMd(last)}`,['fix','check']);
+  if(n&&((info.maxR>0&&n<info.maxR)||(info.mandatory>0&&field<info.mandatory)))
+    add('short',`회차 ${n}/${info.maxR||'-'}`,`회차 ${n}/${info.maxR||'-'} · 방문 ${field}`+(info.mandatory?` (의무 ${info.mandatory})`:''),(info.maxR>n?`${info.maxR-n}회차 남음 → `:'')+'보완하거나 이대로 종료',['edit','check']);
+  if(!n)add('zero','일정 0회',`일정 0회 · 계약만료 ${info.deadline?endedMd(info.deadline):'없음'}`,'입력이 빠졌다면 회차를 보완하고, 안 한 것이면 이대로 두세요',['edit','check']);
+  if(info.deadline&&end&&Math.abs(endedDays(info.deadline,end))>30){
+    const g=endedDays(info.deadline,end);
+    add('dl',g>0?`만료보다 ${g}일 늦게`:`만료보다 ${-g}일 일찍`,`계약만료 ${endedMd(info.deadline)} · 종료 ${endedMd(end)}`,g>0?`${g}일 늦게 종료 — 사후컨설팅이었는지 확인`:`${-g}일 일찍 종료 — 정말 끝난 것인지 확인`,['check']);
   }
-  const inYear=ds=>selectedYear==='all'||yearOf(ds)===selectedYear;
-  const endedItems=endedAll.filter(item=>inYear(item.endedDate));
-  const deletedCos=deletedAll.filter(co=>inYear(co.deletedDate));
-  const endedCoCount=new Set(endedItems.map(item=>item.co.id)).size;
-  let deletedHtml='';
-  let endedHtml='';
-  // ① 삭제된 사업장 구역
-  if(deletedCos.length){
-    deletedHtml+=deletedCos.slice().sort((a,b)=>(b.deletedDate||'').localeCompare(a.deletedDate||'')||(a.name||'').localeCompare(b.name||'','ko')).map((co,i)=>{
-      const att=staff.find(a=>a.id===co.defAtt)||staff[0];
-      const subAtts=getCoAtts(co).map(id=>staff.find(a=>a.id===id)).filter(Boolean);
-      const staffTags=[
-        `<span class="ended-person-tag" style="background:${staffColor(att)}">주 ${att?.name||''}</span>`,
-        ...subAtts.map(c=>`<span class="ended-person-tag" style="background:${staffColor(c)}">부 ${c.name||''}</span>`)
-      ].join('');
-      const cnt=getScheds().filter(s=>s.coId===co.id).length;
-      return `<div class="ended-card" style="border-left:3px solid var(--danger);">
-        <div class="ended-card-hd">
-          <span class="ended-no danger">${i+1}</span>
-          <span class="att-dot" style="background:${staffColor(att)}"></span>
-          <div class="ended-co-name">${co.name}</div>
-          <div class="ended-staff-tags">${staffTags}</div>
-        </div>
-        <div class="ended-row">
-          <div class="ended-info">
-            <div class="ended-meta">총 ${cnt}회 진행 · 삭제일 ${co.deletedDate||'-'}</div>
-          </div>
-          <button class="restore-btn" onclick="restoreDeletedCo('${co.id}')">↩ 복귀</button>
-          <button class="restore-btn" style="background:var(--danger);color:#fff;border-color:var(--danger);" onclick="purgeDeletedCo('${co.id}')">🗑 완전삭제</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-  // ② 종료된 컨설팅 구역
-  if(endedItems.length){
-    const staffFallback={id:'unknown',name:'미지정',color:'#94a3b8'};
-    const assigneeList=co=>{
-      const ids=[co.defAtt,...getCoAtts(co)].filter(Boolean);
-      const uniq=[...new Set(ids.length?ids:(staff[0]?[staff[0].id]:['unknown']))];
-      return uniq.map((id,i)=>({att:staff.find(a=>a.id===id)||staffFallback,role:i===0?'주':'부'}));
-    };
-    const byCo={};
-    endedItems.forEach(item=>{
-      if(!byCo[item.co.id])byCo[item.co.id]={co:item.co,items:[]};
-      byCo[item.co.id].items.push(item);
+  return out;
+}
+/* 종료된 사업 + «수정 중» 인 사업을 모은다. 진행 중이거나 삭제된 사업장은 뺀다. */
+function endedInfos(){
+  const cos=getCos().filter(c=>c.active!==false&&!c.deleted);
+  const scheds=getScheds();
+  const tmap=getErpTypeMap();
+  const erpBy=(ERP&&ERP.loaded&&!ERP.stale)?erpConsByCo():{};
+  const list=[];
+  cos.forEach(co=>{
+    const tids=new Set([...Object.keys(co.endedTypes||{}),...Object.keys(co.reopened||{})]);
+    tids.forEach(tid=>{
+      const ended=(co.endedTypes&&co.endedTypes[tid])||'';
+      const re=ended?null:((co.reopened&&co.reopened[tid])||null);
+      if(!ended&&!re)return;
+      const my=scheds.filter(s=>s.coId===co.id&&s.typeId===tid);
+      const dates=my.map(s=>s.date).filter(Boolean).sort();
+      const erp=(erpBy[co.id]||[]).some(c=>{const code=erpConsCode(c);return code&&tmap[code]===tid;})?'running':'none';
+      list.push({co,tid,state:ended?'ended':'editing',endedDate:ended||(re&&re.was)||'',reopen:re,scheds:my,
+        start:dates[0]||'',last:dates[dates.length-1]||'',cnt:my.length,fieldCnt:my.filter(s=>s.isField).length,officeCnt:my.filter(s=>!s.isField).length,
+        deadline:(co.deadlines&&co.deadlines[tid])||'',maxR:getCoMaxRounds(co.id,tid),mandatory:getCoMandatory(co.id,tid),
+        erp,sameDay:0,flags:[]});
     });
-    endedHtml+=Object.values(byCo).sort((a,b)=>{
-      const ad=Math.max(...a.items.map(x=>Date.parse(x.endedDate)||0));
-      const bd=Math.max(...b.items.map(x=>Date.parse(x.endedDate)||0));
-      return bd-ad||(a.co.name||'').localeCompare(b.co.name||'','ko');
-    }).map(({co,items},i)=>{
-      const assignees=assigneeList(co);
-      const main=assignees[0]?.att||staffFallback;
-      const staffTags=assignees.map(({att,role})=>`<span class="ended-person-tag" style="background:${staffColor(att)}">${role} ${att.name||'미지정'}</span>`).join('');
-      const rows=items
-        .sort((a,b)=>(b.endedDate||'').localeCompare(a.endedDate||''))
-        .map(({tid,endedDate})=>{
-          const t=types.find(x=>x.id===tid);if(!t)return'';
-          const typeScheds=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
-          const cnt=typeScheds.length;
-          const startDate=typeScheds.map(s=>s.date).filter(Boolean).sort()[0]||'-';
-          const fieldCnt=typeScheds.filter(s=>s.isField).length;
-          const officeCnt=typeScheds.filter(s=>!s.isField).length;
-          const dl=co.deadlines?.[tid]||'';
-          return `<div class="ended-row ended-line">
-            <span class="type-bar" style="background:${t.color};height:30px;"></span>
-            <div class="ended-info">
-              <span class="ended-chip" style="background:${t.color}22;color:${t.color};border:1px solid ${t.color}55;">${t.fullName||t.name}</span>
-              ${t.agency?`<span class="ended-meta" style="margin-top:0;">${t.agency}</span>`:''}
-              <span class="ended-meta" style="margin-top:0;">시작일 ${startDate}</span>
-              <span class="ended-line-date">종료일 ${endedDate||'-'}</span>
-              <span class="ended-meta" style="margin-top:0;">총 ${cnt}회</span>
-              <span class="ended-meta" style="margin-top:0;">📍 현장 ${fieldCnt}회</span>
-              <span class="ended-meta" style="margin-top:0;">🏢 사무실 ${officeCnt}회</span>
-              ${dl?`<span class="ended-meta" style="margin-top:0;">계약만료 ${dl}</span>`:''}
-            </div>
-            <button class="restore-btn" onclick="restoreConsulting('${co.id}','${tid}')">↩ 재개</button>
-          </div>`;
-        }).join('');
-      return `<div class="ended-card">
-        <div class="ended-card-hd">
-          <span class="ended-no">${i+1}</span>
-          <span class="att-dot" style="background:${staffColor(main)}"></span>
-          <div class="ended-co-name">${co.name}</div>
-          <div class="ended-staff-tags">${staffTags}</div>
-        </div>
-        ${rows}
-      </div>`;
-    }).join('');
+  });
+  const byDate={};
+  list.forEach(i=>{ if(i.state==='ended')byDate[i.endedDate]=(byDate[i.endedDate]||0)+1; });
+  list.forEach(i=>{
+    if(i.state!=='ended')return;
+    i.sameDay=byDate[i.endedDate]||0;
+    i.flags=endedFlagsFor({endedDate:i.endedDate,scheds:i.scheds,maxR:i.maxR,mandatory:i.mandatory,deadline:i.deadline,erp:i.erp,sameDay:i.sameDay,checked:(i.co.endedChk&&i.co.endedChk[i.tid])||[]});
+  });
+  return list.sort((a,b)=>((b.state==='editing')-(a.state==='editing'))||String(b.endedDate).localeCompare(String(a.endedDate))||String(a.co.name||'').localeCompare(String(b.co.name||''),'ko'));
+}
+/* 찾기 — 사업장 이름 · 담당자(주·부) · 사업 이름 · 기관. 띄어쓰기·대소문자는 무시한다. */
+function endedMatches(info,f,ref){
+  const co=info.co, staff=ref.staff||[], types=ref.types||[];
+  const t=types.find(x=>x.id===info.tid)||{};
+  const nm=id=>(staff.find(a=>a.id===id)||{}).name||'';
+  const people=[co.defAtt,...(co.defCoAtts||[])].filter(Boolean).map(nm).filter(Boolean);
+  if(f.who&&people.indexOf(f.who)<0)return false;
+  if(f.typ&&f.typ!==t.name&&f.typ!==t.fullName)return false;
+  const qq=String(f.q||'').replace(/\s+/g,'').toLowerCase();
+  if(qq){
+    const hay=[co.name,...people,t.name,t.fullName,t.agency].filter(Boolean).join(' ').replace(/\s+/g,'').toLowerCase();
+    if(hay.indexOf(qq)<0)return false;
   }
-  if(!endedHtml&&!deletedHtml){
-    q('#endedList').innerHTML=`<div style="text-align:center;padding:40px;color:var(--t2);font-size:13px;">종료되거나 삭제된 사업장이 없습니다</div>`;
-    return;
+  return true;
+}
+/* ── 상태 옮기기 (순수 — 사업장 한 건을 고치고 «했는지 / 왜 못 했는지» 를 돌려준다) ── */
+function endedDateOk(d){ return /^\d{4}-\d{2}-\d{2}$/.test(String(d||'')); }
+function endedLogAdd(co,tid,who,text,today){
+  if(!co.endedLog)co.endedLog={};
+  const a=co.endedLog[tid]||(co.endedLog[tid]=[]);
+  a.push({d:today,by:who||'',t:text});
+  if(a.length>10)a.splice(0,a.length-10);
+}
+/* 근거가 바뀌었으니 그 사업의 «확인함» 은 비운다 */
+function endedClearChk(co,tid){
+  if(co.endedChk){ delete co.endedChk[tid]; if(!Object.keys(co.endedChk).length)delete co.endedChk; }
+}
+function endedFixDateOn(co,tid,date,who,today){
+  if(!endedDateOk(date))return {ok:false,msg:'날짜 모양이 맞지 않습니다 (예: 2026-10-18)'};
+  if(date>today)return {ok:false,msg:'오늘보다 뒤 날짜는 종료일로 쓸 수 없습니다'};
+  const was=co.endedTypes&&co.endedTypes[tid];
+  if(!was)return {ok:false,msg:'종료된 사업이 아닙니다'};
+  if(was===date)return {ok:false,msg:'종료일이 그대로입니다'};
+  co.endedTypes[tid]=date; endedClearChk(co,tid);
+  endedLogAdd(co,tid,who,`종료일 ${was} → ${date}`,today);
+  return {ok:true,from:was,to:date};
+}
+function endedStartEditOn(co,tid,who,today){
+  const was=co.endedTypes&&co.endedTypes[tid];
+  if(!was)return {ok:false,msg:'종료된 사업이 아닙니다'};
+  if(!co.reopened)co.reopened={};
+  co.reopened[tid]={was,at:today,by:who||''};
+  delete co.endedTypes[tid]; endedClearChk(co,tid);
+  endedLogAdd(co,tid,who,`수정 시작 — 원래 종료일 ${was} 보관`,today);
+  return {ok:true,was};
+}
+function endedFinishEditOn(co,tid,date,who,today){
+  const re=co.reopened&&co.reopened[tid];
+  if(!re||(co.endedTypes&&co.endedTypes[tid]))return {ok:false,msg:'수정 중인 사업이 아닙니다'};
+  if(!endedDateOk(date)||date>today)return {ok:false,msg:'종료일은 오늘 이전 날짜여야 합니다'};
+  if(!co.endedTypes)co.endedTypes={};
+  co.endedTypes[tid]=date;
+  delete co.reopened[tid]; if(!Object.keys(co.reopened).length)delete co.reopened;
+  endedClearChk(co,tid);
+  endedLogAdd(co,tid,who,`다시 종료 ${date}`+(date!==re.was?` (원래 ${re.was})`:''),today);
+  return {ok:true,was:re.was,to:date};
+}
+function endedRevertEditOn(co,tid,who,today){
+  const re=co.reopened&&co.reopened[tid];
+  if(!re||(co.endedTypes&&co.endedTypes[tid]))return {ok:false,msg:'수정 중인 사업이 아닙니다'};
+  if(!co.endedTypes)co.endedTypes={};
+  co.endedTypes[tid]=re.was;
+  delete co.reopened[tid]; if(!Object.keys(co.reopened).length)delete co.reopened;
+  endedLogAdd(co,tid,who,`수정 취소 — 원래 종료일 ${re.was} 로 복원`,today);
+  return {ok:true,was:re.was};
+}
+function endedCheckOn(co,tid,rule){
+  if(!co.endedChk)co.endedChk={};
+  const a=co.endedChk[tid]||(co.endedChk[tid]=[]);
+  if(a.indexOf(rule)<0)a.push(rule);
+  return {ok:true};
+}
+/* ── 화면 글자 만들기 ── */
+function endedHi(text,q){
+  const t=String(text==null?'':text);
+  if(!q)return escAttr(t);
+  const i=t.toLowerCase().indexOf(String(q).toLowerCase());
+  if(i<0)return escAttr(t);
+  return escAttr(t.slice(0,i))+'<mark>'+escAttr(t.slice(i,i+q.length))+'</mark>'+escAttr(t.slice(i+q.length));
+}
+function endedPeopleHtml(co,ref){
+  const staff=ref.staff||[];
+  const main=staff.find(a=>a.id===co.defAtt);
+  const subs=getCoAtts(co).filter(id=>id!==co.defAtt);
+  return (main?`<span class="ended-person-tag" style="background:${staffColor(main)}">주 ${escAttr(main.name||'')}</span>`:'')+(subs.length?`<span class="ended-person-tag" style="background:#94a3b8">+${subs.length}</span>`:'');
+}
+function endedListHtml(items,ref,q){
+  if(!items.length)return '<div class="ended-empty">찾는 종료 사업장이 없습니다</div>';
+  const groups=[]; const idx={};
+  items.forEach(it=>{ if(idx[it.co.id]==null){idx[it.co.id]=groups.length;groups.push({co:it.co,rows:[]});} groups[idx[it.co.id]].rows.push(it); });
+  let n=0;
+  const head=`<div class="ecolhd eg"><input type="checkbox" class="ended-ck-all" title="보이는 줄 모두 고르기" onchange="endedSelAll(this)"><span>번호</span><span>사업장</span><span>담당</span><span>사업</span><span>시작일</span><span>종료일</span><span>회차</span><span>현장</span><span>사무</span><span>계약만료</span><span>시기</span><span style="text-align:right">관리</span></div>`;
+  return head+groups.map(g=>`<div class="ended-card2">`+g.rows.map((it,ri)=>{
+    n++;
+    const t=(ref.types||[]).find(x=>x.id===it.tid)||{};
+    const col=t.color||'#94a3b8';
+    const k=`'${it.co.id}','${it.tid}'`;
+    let st,acts,note='';
+    if(it.state==='editing'){
+      st='<span class="ended-fl e">✏ 수정 중</span>';
+      acts=`<button class="btn btn-p" style="font-size:11px;padding:4px 9px" onclick="openEndEdit(${k})">다시 종료</button><button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="endedRevert(${k})">원래대로</button>`;
+      note=`<div class="ended-note2">✏️ 수정 중 — 원래 종료일 <b>${escAttr(it.endedDate)}</b> 보관됨 · 일정을 고친 뒤 「다시 종료」를 누르면 종료일을 그대로 두거나 오늘로 바꿀 수 있습니다</div>`;
+    }else{
+      const f0=it.flags[0];
+      st=f0?`<span class="ended-fl w" title="${escAttr(f0.reason)}">${escAttr(f0.label)}${it.flags.length>1?` 외 ${it.flags.length-1}`:''}</span>`:'<span class="ended-fl ok">정상</span>';
+      acts=`<button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="openEndEdit(${k})">✏️ 수정</button><button class="restore-btn" onclick="endedRestore(${k})">↩ 재개</button>`;
+    }
+    return `<div class="eg ended-line2"><input type="checkbox" class="ended-ck" data-ek="${it.co.id}|${it.tid}" onchange="endedSelChange()"><span class="ended-no2">${n}</span>
+      <span class="ended-nm2" style="${ri?'color:#94a3b8;font-weight:800;font-size:12px':''}">${ri?'↳ (같은 사업장)':endedHi(it.co.name,q)}</span>
+      <span>${ri?'':endedPeopleHtml(it.co,ref)}</span>
+      <span><span class="ended-chip" style="background:${col}22;color:${col};border:1px solid ${col}66;border-left:4px solid ${col}" title="${escAttr(t.agency||'')}">${endedHi(t.name||t.fullName||'',q)}</span></span>
+      <span class="ended-mu">${escAttr(it.start||'-')}</span><span class="ended-line-date">${escAttr(it.endedDate||'-')}</span>
+      <span>${it.cnt}/${it.maxR||'-'}</span><span>📍${it.fieldCnt}</span><span>🏢${it.officeCnt}</span><span class="ended-mu">${escAttr(it.deadline||'-')}</span>
+      <span>${st}</span><span class="ended-acts">${acts}</span></div>${note}`;
+  }).join('')+'</div>').join('');
+}
+/* 시기 검토 — 규칙마다 «걸린 사업»을 모은다. 걸린 것이 없는 규칙은 안 보인다. */
+function endedReviewGroups(items){
+  return endedRuleList().map(r=>({rule:r.key,title:r.title,explain:r.explain,
+    rows:items.filter(i=>i.state==='ended').map(i=>({info:i,flag:i.flags.find(f=>f.rule===r.key)})).filter(x=>x.flag)})).filter(g=>g.rows.length);
+}
+function endedReviewHtml(items,ref,q,ui){
+  const groups=endedReviewGroups(items);
+  if(!groups.length)return '<div class="ended-empty">검토할 항목이 없습니다 ✓</div>';
+  ui=ui||{fix:null,more:{}};
+  return groups.map(g=>{
+    const open=ui.more&&ui.more[g.rule];
+    const shown=open?g.rows:g.rows.slice(0,5);
+    return `<div class="ended-rg"><div class="ended-rg-hd"><b>${escAttr(g.title)}</b><span class="c">${g.rows.length}건</span><span class="ex">${escAttr(g.explain)}</span><button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="endedCheckGroup('${g.rule}')">이 묶음 모두 확인함</button></div>`
+    +shown.map((x,i)=>{
+      const it=x.info, t=(ref.types||[]).find(y=>y.id===it.tid)||{}, col=t.color||'#94a3b8';
+      const k=`'${it.co.id}','${it.tid}'`;
+      const fixing=ui.fix&&ui.fix.coId===it.co.id&&ui.fix.tid===it.tid;
+      const sug=(x.flag.acts.indexOf('fix')>=0&&it.last)?it.last:'';
+      const btns=fixing
+        ?`<span class="ended-fix"><input type="date" id="endedFixDate" value="${escAttr(sug)}" max="${escAttr(todayStr())}"><button class="btn btn-p" style="font-size:11px;padding:4px 9px" onclick="endedFixSave(${k})">저장</button><button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="endedFixCancel()">취소</button></span>`
+        :x.flag.acts.map(a=>a==='fix'?`<button class="btn btn-p" style="font-size:11px;padding:4px 9px" onclick="endedFixOpen(${k})">종료일 고치기</button>`
+          :a==='edit'?`<button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="openEndEdit(${k},2)">회차·사진 보완</button>`
+          :`<button class="restore-btn" onclick="endedCheck('${it.co.id}','${it.tid}','${g.rule}')">확인함</button>`).join('');
+      return `<div class="eg2 ended-line2"><input type="checkbox" class="ended-ck" data-ek="${it.co.id}|${it.tid}|${g.rule}" onchange="endedSelChange()"><span class="ended-no2">${i+1}</span>
+        <span class="ended-nm2">${endedHi(it.co.name,q)}</span>
+        <span><span class="ended-chip" style="background:${col}22;color:${col};border:1px solid ${col}66;border-left:4px solid ${col}">${endedHi(t.name||t.fullName||'',q)}</span></span>
+        <span class="ended-line-date">${escAttr(endedMd(it.endedDate))}</span>
+        <span class="ended-reason">${escAttr(x.flag.reason)}<br><small>${escAttr(x.flag.hint)}</small></span><span class="ended-acts">${btns}</span></div>`;
+    }).join('')
+    +(g.rows.length>shown.length?`<div class="ended-more"><button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="endedMore('${g.rule}')">… ${g.rows.length-shown.length}건 더 보기</button></div>`:'')+'</div>';
+  }).join('');
+}
+/* 삭제·정리 — 직접 삭제한 곳과 «합치기로 숨은 곳» 을 가른다 */
+function endedDeleteInfos(cos,scheds,f,ref){
+  const staff=ref.staff||[];
+  const nm=id=>(staff.find(a=>a.id===id)||{}).name||'';
+  const qq=String(f.q||'').replace(/\s+/g,'').toLowerCase();
+  const yearOk=ds=>!f.year||f.year==='all'||String(ds||'').slice(0,4)===f.year;
+  const out={direct:[],merged:[]};
+  cos.filter(c=>c.deleted&&!(typeof _purgingIds!=='undefined'&&_purgingIds.has(c.id))).forEach(co=>{
+    const people=[co.defAtt,...(co.defCoAtts||[])].filter(Boolean).map(nm).filter(Boolean);
+    if(f.who&&people.indexOf(f.who)<0)return;
+    if(qq&&[co.name,...people].filter(Boolean).join(' ').replace(/\s+/g,'').toLowerCase().indexOf(qq)<0)return;
+    if(!yearOk(co.deletedDate))return;
+    if(co.mergedInto){
+      const t=cos.find(c=>c.id===co.mergedInto);
+      out.merged.push({co,target:t?(t.name||''):'(없어짐)'});
+    }else out.direct.push({co,sc:scheds.filter(s=>s.coId===co.id).length});
+  });
+  const byDate=(a,b)=>String(b.co.deletedDate||'').localeCompare(String(a.co.deletedDate||''))||String(a.co.name||'').localeCompare(String(b.co.name||''),'ko');
+  out.direct.sort(byDate); out.merged.sort(byDate);
+  return out;
+}
+function endedDeleteHtml(d,ref,q){
+  const sec=(cls,title,cnt,hint)=>`<div class="ended-sec"><span style="color:${cls}">${title}</span><span class="c" style="background:${cls}">${cnt}곳</span><span class="ended-mu">${hint}</span></div>`;
+  const direct=d.direct.length
+    ?d.direct.map((x,i)=>{
+      const co=x.co;
+      return `<div class="ended-card2 del"><div class="eg3 ended-line2"><input type="checkbox" class="ended-ck" data-ek="${co.id}" onchange="endedSelChange()"><span class="ended-no2">${i+1}</span>
+        <span class="ended-nm2">${endedHi(co.name,q)}</span><span>${endedPeopleHtml(co,ref)}</span><span class="ended-mu">삭제 ${escAttr(endedMd(co.deletedDate))}</span><span>일정 ${x.sc}개</span>
+        <span><span class="ended-fl rv">직접 삭제</span></span>
+        <span class="ended-acts"><button class="restore-btn" onclick="restoreDeletedCo('${co.id}')">↩ 복귀</button><button class="restore-btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="purgeDeletedCo('${co.id}')">🗑 영구삭제</button></span></div>
+        ${x.sc?`<div class="ended-warn">⚠ 일정 ${x.sc}개(사진 포함)가 남아 있습니다 — 영구삭제하면 같이 사라집니다. 복귀를 먼저 살펴보세요.</div>`:''}</div>`;
+    }).join('')
+    :'<div class="ended-empty">직접 삭제한 사업장이 없습니다</div>';
+  const merged=d.merged.length
+    ?d.merged.map((x,i)=>`<div class="ended-card2 mg"><div class="eg3 ended-line2"><input type="checkbox" class="ended-ck" disabled><span class="ended-no2" style="color:#94a3b8">${i+1}</span>
+        <span class="ended-nm2" style="color:#64748b">${endedHi(x.co.name,q)}</span><span>${endedPeopleHtml(x.co,ref)}</span><span class="ended-mu">합침 ${escAttr(endedMd(x.co.deletedDate))}</span>
+        <span class="ended-mu" style="grid-column:span 2">→ 「${escAttr(x.target)}」 로 합쳐짐</span>
+        <span class="ended-acts"><button class="btn btn-s" style="font-size:11px;padding:4px 9px" data-name="${escAttr(x.target)}" onclick="endedGoDash(this.dataset.name)">합쳐진 곳 보기</button></span></div></div>`).join('')
+    :'<div class="ended-empty">합치기로 숨은 사업장이 없습니다</div>';
+  return sec('var(--danger)','🗑 직접 삭제한 사업장',d.direct.length,'복귀하거나 영구 삭제할 수 있습니다')+direct
+    +sec('#94a3b8','🧩 합치기로 숨은 사업장',d.merged.length,'삭제가 아닙니다 — 같은 회사를 한 곳으로 합친 흔적입니다. 복귀하면 같은 회사가 두 줄이 되어 막아 둡니다')+merged;
+}
+/* 진행 목록의 사업 줄에 «종료 수정 중» 을 알린다 — 고치다 잊고 두지 않게 */
+function dashReopenBadge(co,tid){
+  const re=co&&co.reopened&&co.reopened[tid];
+  return re?`<div class="round-badge" style="color:#854d0e" title="종료 사업장 관리에서 「다시 종료」 또는 「원래대로」를 눌러 마칩니다">✏ 종료 수정 중 · 원래 종료일 ${escAttr(re.was||'-')}</div>`:'';
+}
+
+/* ── 화면 ── */
+let _endedCur={items:[],ref:null,groups:[]};
+function endedFilterState(){
+  return {q:S.endedQ||'',who:S.endedWho||'',typ:S.endedTyp||'',year:S.endedYear||'all'};
+}
+function endedSetTab(t){ S.endedTab=t; S.endedFix=null; renderEndedView(); }
+function endedSetQ(v){ S.endedQ=String(v||'').trim(); renderEndedView(); }
+function endedClearQ(){ const i=q('#endedQ'); if(i)i.value=''; S.endedQ=''; renderEndedView(); }
+function endedSetWho(v){ S.endedWho=v||''; renderEndedView(); }
+function endedSetTyp(v){ S.endedTyp=v||''; renderEndedView(); }
+function endedMore(rule){ if(!S.endedMore)S.endedMore={}; S.endedMore[rule]=true; renderEndedView(); }
+function endedFixOpen(coId,tid){ S.endedFix={coId,tid}; renderEndedView(); }
+function endedFixCancel(){ S.endedFix=null; renderEndedView(); }
+function endedGoDash(name){
+  S.dashSearch=name||''; const i=q('#dashSearch'); if(i)i.value=S.dashSearch;
+  showTab('main'); renderDash();
+}
+function endedMyName(){ const me=getStaff().find(a=>a.id===myId()); return (me&&me.name)||''; }
+/* 사업장 한 건을 «잠그고 → 고치고 → 저장 → 풀기». 못 하면 까닭을 말한다. */
+async function endedMutate(coId,fn,okMsg){
+  if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return null;
+  const cos=getCos(); const co=cos.find(c=>c.id===coId);
+  if(!co){releaseCompanyEditLock();return null;}
+  const r=fn(co);
+  if(r&&r.ok){
+    setCos(cos); renderSummaryBar(); renderDash(); renderCal(); renderEndedView();
+    if(okMsg)toast(okMsg(r));
+  }else if(r&&r.msg)toast(r.msg,'err');
+  releaseCompanyEditLock();
+  return r;
+}
+async function endedCheck(coId,tid,rule){
+  return endedMutate(coId,co=>endedCheckOn(co,tid,rule),()=>'확인함으로 넘겼습니다');
+}
+function endedCheckGroup(rule){
+  const g=(_endedCur.groups||[]).find(x=>x.rule===rule); if(!g)return;
+  showConfirm(`「${escAttr(g.title)}」 ${g.rows.length}건을 모두 확인함으로 넘길까요?`,async()=>{
+    for(const x of g.rows)await endedMutate(x.info.co.id,co=>endedCheckOn(co,x.info.tid,rule));
+    toast(`${g.rows.length}건을 확인함으로 넘겼습니다`);
+  });
+}
+async function endedFixSave(coId,tid){
+  const v=(q('#endedFixDate')||{}).value||'';
+  const r=await endedMutate(coId,co=>endedFixDateOn(co,tid,v,endedMyName(),todayStr()),r=>`종료일을 ${r.from} → ${r.to} 로 고쳤습니다`);
+  if(r&&r.ok){S.endedFix=null;renderEndedView();}
+}
+function endedRestore(coId,tid){
+  const t=getTypes().find(x=>x.id===tid)||{};
+  showConfirm(`「${escAttr(t.fullName||t.name||'이')}」 컨설팅을 재개합니다 — 진행 목록으로 돌아갑니다. 계속할까요?`,()=>restoreConsulting(coId,tid));
+}
+async function endedRevert(coId,tid){
+  return endedMutate(coId,co=>endedRevertEditOn(co,tid,endedMyName(),todayStr()),r=>`원래 종료일 ${r.was} 로 되돌렸습니다`);
+}
+/* 고른 줄 — 머리 ☐ 는 «보이는 줄»만 고른다. 일괄 처리는 건수를 묻고 한 번에 한다. */
+function endedSelKeys(){ return qa('#endedList .ended-ck:checked').map(c=>c.dataset.ek); }
+function endedSelAll(el){ qa('#endedList .ended-ck:not(:disabled)').forEach(c=>{c.checked=el.checked;}); endedSelChange(); }
+function endedSelChange(){
+  const n=endedSelKeys().length; const bar=q('#endedBar'); if(!bar)return;
+  if(!n){bar.innerHTML='';return;}
+  const tab=S.endedTab||'end';
+  const act=tab==='end'?`<button class="btn btn-s" onclick="endedBatch('restore')">↩ 선택 ${n}건 재개</button>`
+    :tab==='rev'?`<button class="btn btn-s" onclick="endedBatch('check')">✓ 선택 ${n}건 확인함</button>`
+    :`<button class="btn btn-s" onclick="endedBatch('undelete')">↩ 선택 ${n}건 복귀</button>`;
+  bar.innerHTML=`<div class="ended-bar"><b>${n}건 선택</b>${act}<button class="btn btn-s" onclick="endedSelClear()">선택 해제</button></div>`;
+}
+function endedSelClear(){ qa('#endedList .ended-ck,#endedList .ended-ck-all').forEach(c=>{c.checked=false;}); endedSelChange(); }
+function endedBatch(kind){
+  const keys=endedSelKeys(); if(!keys.length)return;
+  const txt=kind==='restore'?`선택한 ${keys.length}건을 재개합니다 — 진행 목록으로 돌아갑니다.`:kind==='check'?`선택한 ${keys.length}건을 확인함으로 넘깁니다.`:`선택한 ${keys.length}곳을 복귀합니다.`;
+  showConfirm(txt+' 계속할까요?',async()=>{
+    for(const k of keys){
+      const [coId,tid,rule]=k.split('|');
+      if(kind==='restore')await endedMutate(coId,co=>{ if(co.endedTypes)delete co.endedTypes[tid]; return {ok:true}; });
+      else if(kind==='check')await endedMutate(coId,co=>endedCheckOn(co,tid,rule));
+      else await restoreDeletedCo(coId);
+    }
+    toast(`${keys.length}건을 처리했습니다`);
+  });
+}
+/* 종료 뒤 수정 창 */
+let _endEdit=null;
+function openEndEdit(coId,tid,opt){
+  const co=getCos().find(c=>c.id===coId); if(!co)return;
+  const ended=co.endedTypes&&co.endedTypes[tid]; const re=co.reopened&&co.reopened[tid];
+  if(!ended&&!re){toast('종료된 사업이 아닙니다','err');return;}
+  _endEdit={coId,tid,mode:ended?'ended':'editing',opt:opt||1,date:ended||'',fin:'keep',pick:''};
+  renderEndEdit(); q('#mbEndEdit').classList.add('open');
+}
+function endEditPick(k,v){ if(!_endEdit)return; _endEdit[k]=v; renderEndEdit(); }
+function renderEndEdit(){
+  const e=_endEdit; if(!e)return;
+  const co=getCos().find(c=>c.id===e.coId); if(!co)return;
+  const t=getTypes().find(x=>x.id===e.tid)||{};
+  const re=co.reopened&&co.reopened[e.tid]; const ended=co.endedTypes&&co.endedTypes[e.tid];
+  q('#endEditTitle').textContent=`종료 뒤 수정 — ${co.name} · ${t.fullName||t.name||''}`;
+  let body='',foot='';
+  if(e.mode==='ended'){
+    body=`<div class="ended-opt ${e.opt===1?'on':''}" onclick="endEditPick('opt',1)"><div class="h"><i></i>종료일만 고치기</div><p>잘못 적힌 종료일만 바꿉니다. 일정·사진은 그대로.</p>
+      ${e.opt===1?`<div style="margin:8px 0 0 24px;display:flex;gap:8px;align-items:center"><span class="ended-mu">현재 ${escAttr(ended)}</span><span>→</span><input type="date" id="endEditDate" value="${escAttr(e.date)}" max="${escAttr(todayStr())}" onclick="event.stopPropagation()" onchange="_endEdit.date=this.value"></div>`:''}</div>
+      <div class="ended-opt ${e.opt===2?'on':''}" onclick="endEditPick('opt',2)"><div class="h"><i></i>종료는 두고 회차·사진 보완</div><p>빠진 회차를 넣거나 사진을 고칩니다. 원래 종료일은 «보관»해 두고, 끝나면 「다시 종료」합니다. 그동안 진행 목록에 「수정 중」으로 보입니다.</p></div>
+      <div class="ended-opt ${e.opt===3?'on':''}" onclick="endEditPick('opt',3)"><div class="h"><i></i>종료 취소 (재개)</div><p>진행 목록으로 되돌립니다. «아직 안 끝난 것»일 때만 쓰세요.</p></div>`;
+    foot=`<button class="btn btn-s" onclick="closeModal('mbEndEdit')">취소</button><button class="btn btn-p" onclick="saveEndEdit()">저장</button>`;
+  }else{
+    body=`<div class="ended-banner">✏️ 수정 중 — 원래 종료일 <b>${escAttr(re.was)}</b> 은 보관돼 있습니다. 일정·사진을 고친 뒤 종료일을 정해 「다시 종료」하세요.</div>
+      <div class="ended-opt ${e.fin==='keep'?'on':''}" onclick="endEditPick('fin','keep')"><div class="h"><i></i>종료일 그대로 (${escAttr(re.was)})</div></div>
+      <div class="ended-opt ${e.fin==='today'?'on':''}" onclick="endEditPick('fin','today')"><div class="h"><i></i>종료일을 오늘로 (${escAttr(todayStr())})</div></div>
+      <div class="ended-opt ${e.fin==='pick'?'on':''}" onclick="endEditPick('fin','pick')"><div class="h"><i></i>종료일 직접 고르기</div>
+        ${e.fin==='pick'?`<div style="margin:8px 0 0 24px"><input type="date" id="endEditPickDate" value="${escAttr(e.pick)}" max="${escAttr(todayStr())}" onclick="event.stopPropagation()" onchange="_endEdit.pick=this.value"></div>`:''}</div>`;
+    foot=`<button class="btn btn-s" onclick="endedRevertFromModal()">원래대로</button><button class="btn btn-p" onclick="saveEndEdit()">다시 종료</button>`;
   }
-  q('#endedList').innerHTML=`<div class="ended-columns">
-    <section class="ended-col">
-      <div class="ended-col-title">🔒 종료 사업장/컨설팅 <span class="att-label" style="background:var(--t2);color:#fff">${endedCoCount}곳 · ${endedItems.length}건</span></div>
-      ${endedHtml||'<div class="ended-empty">종료 사업장이 없습니다</div>'}
-    </section>
-    <section class="ended-col">
-      <div class="ended-col-title danger">🗑️ 삭제 사업장 <span class="att-label" style="background:var(--danger);color:#fff">${deletedCos.length}곳</span></div>
-      ${deletedHtml||'<div class="ended-empty">삭제된 사업장이 없습니다</div>'}
-    </section>
-  </div>`;
+  const log=(co.endedLog&&co.endedLog[e.tid])||[];
+  body+=`<div class="ended-log"><b>수정 기록</b>${log.length?log.slice().reverse().map(l=>`<div>${escAttr(l.d)} ${escAttr(l.by||'')} · ${escAttr(l.t)}</div>`).join(''):'<div>아직 없습니다</div>'}</div>`;
+  q('#endEditBody').innerHTML=body; q('#endEditFoot').innerHTML=foot;
+}
+async function endedRevertFromModal(){
+  const e=_endEdit; if(!e)return;
+  const r=await endedRevert(e.coId,e.tid);
+  if(r&&r.ok)closeModal('mbEndEdit');
+}
+async function saveEndEdit(){
+  const e=_endEdit; if(!e)return; const today=todayStr(), who=endedMyName();
+  if(e.mode==='ended'){
+    if(e.opt===1){
+      const r=await endedMutate(e.coId,co=>endedFixDateOn(co,e.tid,e.date,who,today),r=>`종료일을 ${r.from} → ${r.to} 로 고쳤습니다`);
+      if(r&&r.ok)closeModal('mbEndEdit');
+    }else if(e.opt===2){
+      const r=await endedMutate(e.coId,co=>endedStartEditOn(co,e.tid,who,today),r=>`수정을 시작했습니다 — 원래 종료일 ${r.was} 는 보관됩니다. 끝나면 「다시 종료」를 눌러 주세요`);
+      if(r&&r.ok)closeModal('mbEndEdit');
+    }else{
+      closeModal('mbEndEdit'); endedRestore(e.coId,e.tid);
+    }
+  }else{
+    const co=getCos().find(c=>c.id===e.coId); const re=co&&co.reopened&&co.reopened[e.tid]; if(!re)return;
+    const date=e.fin==='keep'?re.was:e.fin==='today'?today:e.pick;
+    const r=await endedMutate(e.coId,c=>endedFinishEditOn(c,e.tid,date,who,today),r=>`다시 종료했습니다 — 종료일 ${r.to}`);
+    if(r&&r.ok)closeModal('mbEndEdit');
+  }
+}
+function renderEndedView(){
+  const f=endedFilterState();
+  if(!S.endedTab)S.endedTab='end';
+  const allCos=getCos(); const types=getTypes(); const staff=getStaff();
+  const ref={staff,types};
+  const all=endedInfos();
+  const dels=allCos.filter(c=>c.deleted&&!_purgingIds.has(c.id));
+  const yearOf=ds=>String(ds||'').slice(0,4);
+  const years=[...new Set([...all.map(i=>yearOf(i.endedDate)),...dels.map(c=>yearOf(c.deletedDate))].filter(y=>/^\d{4}$/.test(y)))].sort((a,b)=>b.localeCompare(a));
+  if(f.year!=='all'&&!years.includes(f.year)){f.year='all';S.endedYear='all';}
+  const yf=q('#endedYearFilter');
+  if(yf){ yf.innerHTML='<option value="all">전체 연도</option>'+years.map(y=>`<option value="${y}">${y}년</option>`).join(''); yf.value=f.year; }
+  const wf=q('#endedWho');
+  if(wf){ wf.innerHTML='<option value="">담당 전체</option>'+staff.filter(a=>!a.left).map(a=>`<option value="${escAttr(a.name)}">${escAttr(a.name)}</option>`).join(''); wf.value=f.who; }
+  const tf=q('#endedTyp');
+  if(tf){ tf.innerHTML='<option value="">사업 전체</option>'+types.filter(t=>t.active!==false).map(t=>`<option value="${escAttr(t.name)}">${escAttr(t.fullName||t.name)}</option>`).join(''); tf.value=f.typ; }
+  const inYear=ds=>f.year==='all'||yearOf(ds)===f.year;
+  const items=all.filter(i=>inYear(i.endedDate)&&endedMatches(i,f,ref));
+  const groups=endedReviewGroups(items);
+  const flagged=new Set(); groups.forEach(g=>g.rows.forEach(x=>flagged.add(x.info.co.id+'|'+x.info.tid)));
+  const del=endedDeleteInfos(allCos,getScheds(),f,ref);
+  _endedCur={items,ref,groups};
+  const set=(id,t)=>{const el=q(id); if(el)el.textContent=t;};
+  set('#endedNEnd',`${items.length}건 · ${new Set(items.map(i=>i.co.id)).size}곳`);
+  set('#endedNRev',`${flagged.size}건`);
+  set('#endedNDel',`${del.direct.length+del.merged.length}곳`);
+  qa('#endedTabs .ended-tab').forEach(b=>b.classList.toggle('on',b.dataset.et===S.endedTab));
+  const searching=!!(f.q||f.who||f.typ);
+  set('#endedQInfo',searching?(f.q?`「${f.q}」 — `:'')+`종료 ${items.length}건 · 검토 ${flagged.size}건 · 삭제·정리 ${del.direct.length+del.merged.length}곳에서 찾음`:'');
+  const qx=q('#endedQx'); if(qx)qx.style.display=f.q?'block':'none';
+  let html;
+  if(S.endedTab==='rev')html=endedReviewHtml(items,ref,f.q,{fix:S.endedFix,more:S.endedMore||{}});
+  else if(S.endedTab==='del')html=endedDeleteHtml(del,ref,f.q);
+  else html=endedListHtml(items,ref,f.q);
+  const intro=S.endedTab==='rev'?'<p class="ended-intro">종료한 날짜·상태가 «이상해 보이는 것»만 규칙별로 모았습니다. 틀렸다는 뜻이 아니라 <b>사람이 한 번 보시라</b>는 표시입니다. 「확인함」으로 넘기면 다음부터 안 뜹니다.</p>'
+    :S.endedTab==='del'?'<p class="ended-intro">여기는 <b>종료와 다릅니다</b> — 종료는 «끝난 기록», 삭제는 «잘못 만든 것을 치운 것»입니다. 복귀하거나 영구 삭제할 수 있습니다.</p>':'';
+  q('#endedList').innerHTML=intro+`<div class="ended-min">${html}</div>`;
+  endedSelChange();
 }
 
 // ===== 직원 관리 =====
@@ -7257,6 +7663,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
         <div class="type-info">
           <div class="type-name">${t.fullName||t.name}</div>
           ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
+          ${dashReopenBadge(co,tid)}
           <div class="round-badge" style="color:var(--t2)">${line1}</div>
           <div class="round-badge" style="color:${l2col}">${line2}</div>
           ${roundIssueBadge(co.id,tid)}
@@ -7285,6 +7692,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
       <div class="type-info">
         <div class="type-name">${t.fullName||t.name}</div>
         ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
+        ${dashReopenBadge(co,tid)}
         <div class="round-badge" style="color:var(--ok)">✓ 완료 ${prog}${fprog}</div>
       </div>
       <div style="display:flex;align-items:flex-end;">
@@ -7297,6 +7705,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
       <div class="type-info">
         <div class="type-name">${t.fullName||t.name}</div>
         ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
+        ${dashReopenBadge(co,tid)}
         <div class="round-badge" style="color:${progColor}">${nr>1?prog+fprog+' →':''} 다음 ${nr}회차</div>
         ${roundIssueBadge(co.id,tid)}
         ${deadlineBadge(co.deadlines?.[tid])}
@@ -11200,6 +11609,7 @@ function erpSyncClosedDown(){
     const co=findCoForErp(cos,c.id,String(c.companyName||'').trim(),tid).co;
     if(!co)return;                                     // 일정관리에 아직 안 들어온 건
     if(!(co.types||[]).includes(tid))return;
+    if(co.reopened&&co.reopened[tid])return;           // 종료 뒤 «수정 중» — 고치는 사이에 저절로 도로 끝내지 않는다 (2026-11-02)
     const k=co.id+'|'+tid;
     let b=bucket.get(k);
     if(!b){ b={co,tid,ends:[],living:0}; bucket.set(k,b); }
