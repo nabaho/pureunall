@@ -611,7 +611,8 @@ function postWorld(over) {
     closeModal: (id) => { calls.closed.push(id); c._st.els['#' + id].classList.remove('open'); },
   }, over || {}));
   vm.runInContext('var _post=null; var PHOTOS={};', c);
-  const orig = c.setScheds; c.setScheds = (v) => { calls.saves++; orig(v); };
+  calls.raw = [];
+  const orig = c.setScheds; c.setScheds = (v) => { calls.saves++; calls.raw.push(v); orig(v); };   // v 는 «날것» — JSON 을 거치면 undefined 가 사라져 안 보인다
   c._st.cos = [CO('c1', '가나상사', { types: ['t2'], endedTypes: { t2: '2026-10-24' } }), CO('c2', '라마바식품', { types: ['t2'] })];
   c._st.scheds = [D('c1', 't2', '2026-09-01', { round: 1, id: 'm1' }), D('c1', 't2', '2026-09-08', { round: 2, id: 'm2' }), D('c2', 't2', '2026-09-01', { round: 1, id: 'o1' })];
   c._calls = calls;
@@ -630,7 +631,7 @@ test('★ 사후 넣기 — 일정 한 줄이 늘고, 본 일정·사업(종료 
     { phase: 'post', date: '2026-11-05', coId: 'c1', typeId: 't2', round: 1, isField: true, memo: '임금 점검', attId: 'a1' });
   assert.strictEqual(mainOnly(c), beforeMain, '본 일정은 글자까지 그대로(회차 번호 포함)');
   assert.strictEqual(JSON.stringify(c._st.cos), beforeCos, '★ 사업은 종료 상태 그대로 — 진행 목록에 다시 올라오지 않는다');
-  assert.ok(!hasUndefined(J(c._st.scheds)), '저장 모양에 undefined 가 있으면 클라우드가 통째로 거부한다');
+  assert.ok(c._calls.raw.length >= 1 && c._calls.raw.every((v) => !hasUndefined(v)), '★ 저장하려고 넘긴 «날것»에 undefined 가 있으면 클라우드가 통째로 거부한다');
   assert.ok(c._calls.locks === 1 && c._calls.released === 1, '잠그고 → 저장 → 푼다');
   assert.ok(c._calls.rendered.includes('cal') && c._calls.rendered.includes('ended'), '달력과 종료 목록이 다시 그려진다');
 });
@@ -649,6 +650,8 @@ test('메모가 비면 메모 칸을 아예 두지 않는다(undefined 금지) �
   form(c, '2026-11-05', '  '); await c.postSave(false);
   const p = c._st.scheds.find((s) => s.phase === 'post');
   assert.strictEqual(p.isField, false); assert.ok(!('memo' in p), '빈 메모는 칸을 두지 않는다');
+  assert.ok(c._calls.raw.every((v) => !hasUndefined(v)), '★ 빈 메모를 undefined 로 넘기면 클라우드가 통째로 거부한다(JSON 을 거치면 가려지니 날것으로 본다)');
+  assert.ok(c._calls.raw.every((v) => v.every((s) => !('memo' in s) || typeof s.memo === 'string')));
 });
 
 test('★ 막는 것 — 날짜 모양 · 같은 날 같은 사업 중복 · 담당 하루 한도 · 같은 사업장 다른 사업 같은 날 · 불가 날짜 (저장 안 하고 까닭을 말한다)', async () => {
@@ -797,4 +800,77 @@ test('★ 일정을 «사전진단만 빼고» 거르는 곳은 전부 사후도
     fs.readFileSync(p, 'utf8').split(/\r?\n/).forEach((ln, i) => { if (re.test(ln) && !/post/i.test(ln)) bad.push(f + ':' + (i + 1)); });
   });
   assert.deepStrictEqual(bad, [], '이 줄들은 사전진단만 빼고 사후는 남긴다 — «&& phase !== \'post\'» 를 함께 쓴다(또는 isPostSched): ' + bad.join(', '));
+});
+
+/* ══ ⑭ 사진 흐름 연결 — 사후도 본 일정과 «같은 증빙 사진 흐름»을 탄다 ═══════════════ */
+
+test('★ 사진 창 제목·파일 이름이 사후를 말하고, 사진을 저장하면 서랍과 종료 목록의 사진 수가 다시 그려진다', () => {
+  assert.ok(/isPostSched\(sc\)/.test(grab('openStampModal')), '사진 창 제목에 「사후」 — 본 회차와 같은 숫자로 보이면 안 된다');
+  const save = grab('saveStamp');
+  assert.ok(/_post[\s\S]{0,80}renderPostDrawer\(\)/.test(save) && /renderEndedView\(\)/.test(save), '사진을 저장하면 열려 있는 서랍의 썸네일과 종료 목록의 📷 수를 다시 그린다');
+  const bad = [];
+  SRC.split(/\r?\n/).forEach((ln, i) => { if (/schedPhase\(sc\)==='pre'\?'사전진단'/.test(ln) && !/isPostSched/.test(ln)) bad.push(i + 1); });
+  assert.deepStrictEqual(bad, [], '사진 파일 이름에 「사전진단」 을 붙이는 줄은 「사후」 도 붙인다(본 회차 사진과 이름이 같아지면 덮어쓴다): 줄 ' + bad.join(', '));
+});
+
+test('사후 칩 모양 — 서랍 CSS 와 칩 표시가 있고, 새 색을 만들지 않는다(기존 변수만)', () => {
+  const css = (SRC.match(/\.ended-pbtn\{[\s\S]*?\n\.post-rule::before\{[^}]*\}/) || [''])[0];
+  assert.ok(css.length > 500, '사후컨설팅 CSS 덩어리가 있다');
+  assert.deepStrictEqual(css.match(/#[0-9a-fA-F]{3,8}\b/g) || [], [], '사후컨설팅 CSS 에 새 색(#rrggbb)을 쓰지 않는다 — 기존 변수(var(--accent) 등)만');
+  assert.ok(/\.chip\.is-post\{/.test(SRC) && /id="mbPost"/.test(SRC) && /id="postBody"/.test(SRC), '칩 표시와 서랍 뼈대');
+});
+
+/* ══ ⑮ 서랍이 «사업 상태»를 알아본다 · 사진 썸네일 ═══════════════════════════ */
+
+test('★ 서랍을 열면 사업 상태를 알아본다 — 종료: 입력칸 · 수정 중: 입력칸 + 원래 종료일 · 진행 중: 입력칸 없이 까닭', () => {
+  const c = postWorld();
+  c._st.cos.push(CO('c3', '사아정밀', { types: ['t2'], reopened: { t2: { was: '2026-10-10', at: '2026-11-01', by: '홍길동' } } }));
+  const html = () => c._st.els['#postBody'].innerHTML;
+  c.openPostDrawer('c1', 't2');
+  assert.ok(/id="postDate"/.test(html()) && /종료 2026-10-24/.test(html()), '종료된 사업');
+  c.openPostDrawer('c3', 't2');
+  assert.ok(/id="postDate"/.test(html()) && /수정 중/.test(html()) && /2026-10-10/.test(html()), '수정 중인 사업');
+  c.openPostDrawer('c2', 't2');
+  assert.ok(!/id="postDate"/.test(html()) && /종료된 사업에서만/.test(html()), '진행 중인 사업에는 사후를 넣을 수 없다');
+});
+
+test('★ 진행 중인 사업에는 «함수로도» 사후를 못 넣는다 — 서랍의 입력칸을 안 그린 것만으로는 부족하다', async () => {
+  const c = postWorld(); c.openPostDrawer('c2', 't2'); form(c, '2026-11-05');
+  await c.postSave(false);
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 0, '진행 중인 사업(c2)에 사후가 생겼다');
+  assert.ok(c._st.toasts.some((t) => /종료된 사업/.test(t)), '왜 안 되는지 말해 준다');
+});
+
+test('사진 썸네일 — 저장된 사진 두 칸을 작게 줄여 서랍에 보여 준다 (사진이 없으면 «사진 없음»)', () => {
+  const canvas = { width: 800, height: 600, toDataURL: () => 'data:image/jpeg;base64,BIG' };
+  const small = { width: 0, height: 0, getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,SMALL' };
+  const c = postWorld({ document: { createElement: () => Object.assign({}, small) } });
+  c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'pa', round: 1 }), P('c1', 't2', '2026-11-12', { id: 'pb', round: 2 }));
+  c.PHOTOS.pa = { c0: canvas, c1: canvas, o0: canvas };
+  c.openPostDrawer('c1', 't2');
+  const h = c._st.els['#postBody'].innerHTML;
+  assert.strictEqual((h.match(/<img src="data:image\/jpeg;base64,SMALL"/g) || []).length, 2, '사진 두 칸만 — 원본(o0)은 안 그린다 · 줄여서 글자로 바꾼다');
+  assert.ok(/사진 없음/.test(h), '사진이 없는 줄');
+});
+
+/* ══ ⑯ 변이 검사가 찾아낸 빈틈을 메우는 검사 ═══════════════════════════════ */
+
+test('★ 사후가 본 일정보다 «이른 날짜»여도 본 번호는 1부터 그대로다 — 단계 없는 종류·일터혁신 둘 다', () => {
+  const c = world(RO);
+  c._st.scheds = [P('c1', 't2', '2026-11-01'), D('c1', 't2', '2026-11-10'), D('c1', 't2', '2026-11-17')];
+  c.reorderRounds('c1', 't2');
+  assert.deepStrictEqual(roundsOf(c, 'c1', 't2', 'main'), [1, 2], '사후(11-01)가 먼저 와도 본은 1,2 — 사후가 번호를 하나 먹으면 2,3 이 된다');
+  assert.deepStrictEqual(roundsOf(c, 'c1', 't2', 'post'), [1]);
+  const d = world(RO);
+  d._st.scheds = [P('c1', 't1', '2026-11-01'), D('c1', 't1', '2026-11-10'), D('c1', 't1', '2026-11-17')];
+  d.reorderRounds('c1', 't1');
+  assert.deepStrictEqual(roundsOf(d, 'c1', 't1', 'main'), [1, 2]);
+  assert.deepStrictEqual(roundsOf(d, 'c1', 't1', 'post'), [1]);
+});
+
+test('★ 지우기는 «사후 줄만» 지운다 — 본 일정 번호가 섞여 들어와도(오래된 화면·잘못 만든 DOM) 본 일정은 남는다', async () => {
+  const c = postWorld(); c.openPostDrawer('c1', 't2');
+  c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'pa', round: 1 }));
+  await c.postRemove(['m1', 'pa', 'o1']);
+  assert.deepStrictEqual(c._st.scheds.map((s) => s.id).sort(), ['m1', 'm2', 'o1'], '사후(pa)만 사라지고 본 일정 셋은 그대로');
 });
