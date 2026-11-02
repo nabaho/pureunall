@@ -3033,8 +3033,8 @@ function _impPreview(data, fname){
   var LBL={inka_no:'인가번호',inka_date:'인가일',corp_reg_no:'법인등록번호',reg_date:'설립등기일',
     registry_office:'관할등기소',tax_id_no:'고유번호',tax_office:'관할세무서',address:'소재지',phone:'전화',
     chairman:'대표자',labor_office:'관할노동청',fy_start_md:'회계연도시작',fy_end_md:'회계연도종료',region:'지역',status:'상태'};
-  var rows=r.plan.slice(0,60).map(function(p){
-    return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(p.label)+'</td>'
+  var rows=r.plan.slice(0,60).map(function(p,i){
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(p.label)+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(p.names.map(function(n){return LBL[n.replace('(신규)','')]||n;}).join(', '))+'</td>'
       +'<td class="center">'+p.names.length+'</td></tr>';
   }).join('');
@@ -3045,7 +3045,7 @@ function _impPreview(data, fname){
     +'<input type="checkbox"'+(over?' checked':'')+' onchange="S._impOver=this.checked;_impPreview(window._impData,window._impFname)"> '
     +'<span>이미 값이 있는 칸도 <b>덮어쓰기</b> (기본: 빈 칸만 채움 — 웹에서 입력한 값 보호)</span></label>'
     +(r.plan.length
-      ? '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>기금</th><th>채울 항목</th><th class="center">칸</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      ? '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>채울 항목</th><th class="center">칸</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
         +(r.plan.length>60?'<p class="muted" style="font-size:11px;margin:6px 0 0">…상위 60개만 표시(전체 '+r.plan.length+'개 적용)</p>':'')
       : '<div class="msg warn">채울 항목이 없습니다. (이미 모두 입력돼 있거나 파일이 비어 있음)</div>')
     +'<p class="muted" style="font-size:11px;margin:8px 0 0">※ 연도별 결산·지원금·담당자·설립 진행·계약관계 데이터는 건드리지 않습니다. 이름·약칭·유형은 비어 있을 때만 채웁니다.</p>'
@@ -3093,8 +3093,8 @@ function bulkOffices(){
     if(any) rowsData.push({name:f.short_name||f.name,cell:cell});
   });
   if(!plan.length){ toast('자동 채울 대상이 없습니다(빈 칸+매핑 가능 기금 없음)','warn'); return; }
-  var rows=rowsData.map(function(r){
-    return '<tr><td style="font-weight:600">'+esc(r.name)+'</td>'
+  var rows=rowsData.map(function(r,i){
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(r.name)+'</td>'
       +BULK_OFFICES.map(function(o){
         return '<td'+(r.cell[o.key]?'':' class="muted"')+'>'+(r.cell[o.key]?esc(r.cell[o.key]):'—')+'</td>';
       }).join('')+'</tr>';
@@ -3106,7 +3106,7 @@ function bulkOffices(){
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">빈 칸만 채웁니다 — '+esc(sum)+'.'
     +(miss?'<br>표에 없어 제외: '+esc(miss):'')
     +(noAddr?'<br>소재지가 없어 제외 '+noAddr+'개':'')+'</p>'
-    +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>기금</th>'
+    +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
     +BULK_OFFICES.map(function(o){return '<th>'+o.head+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">취소</button><button class="primary" onclick="applyBulkOffices()">'+plan.length+'칸 채우기</button></div>');
   window._offPlan=plan;
@@ -3177,9 +3177,9 @@ function bulkFromCards(){
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">빈 칸만 채웁니다 — '+esc(sum)+'.'
     +(noCard.length?'<br>짝지을 카드가 없어 제외 '+noCard.length+'개: '+esc(noCard.slice(0,8).join(', '))+(noCard.length>8?' 외':''):'')+'</p>'
     +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr>'
-    +'<th>기금</th><th>기업정보함 카드</th>'+CARD_BULK.map(function(c){return '<th>'+c[2]+'</th>';}).join('')+'</tr></thead><tbody>'
-    +rows.map(function(r){
-      return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(r.name)+'</td>'
+    +'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>기업정보함 카드</th>'+CARD_BULK.map(function(c){return '<th>'+c[2]+'</th>';}).join('')+'</tr></thead><tbody>'
+    +rows.map(function(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(r.name)+'</td>'
         +'<td class="muted" style="white-space:nowrap">'+esc(r.card)+'</td>'
         +CARD_BULK.map(function(c){ return '<td'+(r.cell[c[1]]?'':' class="muted"')+' style="white-space:nowrap">'
           +(r.cell[c[1]]?esc(r.cell[c[1]]):'—')+'</td>'; }).join('')+'</tr>';
@@ -3280,8 +3280,8 @@ function _subImpPreview(d,fname){
       chkRows.push([funds[fid].short_name||funds[fid].name, yr+'년 서류', nf+'종 · 참여사 '+ns+'장']);
     });
   });
-  var tbl=function(rs){ return rs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><tbody>'
-    +rs.map(function(r){ return '<tr><td style="font-weight:600">'+esc(r[0])+'</td><td class="muted">'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'; }).join('')
+  var tbl=function(rs){ return rs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>구분</th><th>내역</th></tr></thead><tbody>'
+    +rs.map(function(r,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(r[0])+'</td><td class="muted">'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'; }).join('')
     +'</tbody></table></div>'):'<p class="muted" style="font-size:12px">채울 항목이 없습니다(이미 입력됨).</p>'; };
   window._subImp=d;
   showModal('<div class="row" style="margin:0 0 6px"><h2 style="margin:0">지원금 과거자료 가져오기</h2><span class="chip" style="font-size:10px">'+esc(fname)+'</span></div>'
@@ -4361,11 +4361,11 @@ function renderBilling(){
   arr=arr.filter(function(x){ return !(funds[x.fund_id]&&isTrashed(funds[x.fund_id])); });
   arr.sort(function(a,b2){return (b2.year||0)-(a.year||0)||(a.fund_id||'').localeCompare(b2.fund_id||'');});
   var tot=arr.reduce(function(s,x){return s+(num(x.amount)||0);},0), paid=arr.filter(function(x){return x.paid_date;}).reduce(function(s,x){return s+(num(x.amount)||0);},0);
-  var rows=arr.map(function(r){
+  var rows=arr.map(function(r,i){
     var fn=(funds[r.fund_id]&&(funds[r.fund_id].short_name||funds[r.fund_id].name))||r.fund_id;
     var st=r.paid_date?'<span class="chip ok">입금완료</span>':r.invoice_date?'<span class="chip warn">청구</span>':'<span class="chip dg">미청구</span>';
     function ip(k,t){return '<input value="'+esc(r[k]||'')+'" type="'+(t||'text')+'" onchange="patchBilling(\''+r._id+'\',\''+k+'\',this.value)" style="width:'+(t==='date'?'130':'100')+'px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px">';}
-    return '<tr><td style="font-weight:700">'+esc(fn)+'<div class="muted" style="font-size:11px">'+esc(r.item||'')+' · '+(r.year||'')+'</div></td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700">'+esc(fn)+'<div class="muted" style="font-size:11px">'+esc(r.item||'')+' · '+(r.year||'')+'</div></td>'
       +'<td>'+ip('amount')+'</td><td>'+ip('invoice_date','date')+'</td><td>'+ip('paid_date','date')+'</td><td>'+st+'</td>'
       +'<td><button onclick="delBilling(\''+r._id+'\')">삭제</button></td></tr>';
   }).join('');
@@ -4374,7 +4374,7 @@ function renderBilling(){
     +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">입금 '+paid.toLocaleString()+'원</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="addBilling()">+ 청구 추가</button></div>'
     +(trashedN?'<p class="muted" style="font-size:11.5px;margin:6px 0 0"><span class="chip warn" style="font-size:10px">삭제 보관 기금 청구 '+trashedN+'건 제외됨</span></p>':'')
-    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th>기금 · 항목</th><th>금액(원)</th><th>계산서일</th><th>입금일</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금 · 항목</th><th>금액(원)</th><th>계산서일</th><th>입금일</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
                 :'<div class="muted" style="padding:8px 0">청구 건이 없습니다. [+ 청구 추가]</div>')+'</div>';
   $('app').innerHTML='<div class="panel"><div class="row"><h1>청구 관리</h1>'
     +'<span style="flex:1"></span><button onclick="peReload()" title="푸른이알피에서 다시 불러오기">↻ 연동 새로고침</button></div>'
@@ -4401,28 +4401,28 @@ function renderPuerpBox(){
     function mgrN(sid){ if(!sid) return '—';
       var me=(_staffCache||[]).filter(function(u){return u.sid===sid;})[0];
       return esc(me?me.name:(_staffCache?'이름 미확인':'')); }
-    function rowW(r){
-      return '<tr><td>'+_peFundCell(r)+'</td>'
+    function rowW(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+_peFundCell(r)+'</td>'
         +'<td>'+esc(r.company||'—')+'<div class="muted mo" style="font-size:11px">'+esc(r.no||'')+(r.bizNo?' · '+esc(r.bizNo):'')+'</div></td>'
         +'<td>'+esc(r.item)+'</td><td style="text-align:right;font-variant-numeric:tabular-nums">'+r.amount.toLocaleString()+'</td>'
         +'<td class="mo muted">'+esc(r.date||'—')+'</td>'
         +'<td><span class="chip dg" style="font-size:10px">미입금</span>'+(r.pstatus==='closed'?' <span class="chip warn" style="font-size:10px">사무관리 종료</span>':'')+'</td>'
         +'<td class="mo muted">'+mgrN(r.mgr)+'</td></tr>';
     }
-    function rowD(r){
-      return '<tr><td>'+_peFundCell(r)+'</td>'
+    function rowD(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+_peFundCell(r)+'</td>'
         +'<td>'+esc(r.company||'—')+'<div class="muted mo" style="font-size:11px">'+esc(r.no||'')+'</div></td>'
         +'<td>'+esc(r.item)+'</td><td style="text-align:right;font-variant-numeric:tabular-nums">'+r.amount.toLocaleString()+'</td>'
         +'<td class="muted">'+esc(r.paid_date||'—')+'</td>'
         +'<td><span class="chip ok" style="font-size:10px">입금완료</span> <span class="muted mo" style="font-size:10.5px">부가세 '+esc(r.vat)+'</span></td>'
         +'<td class="mo muted">'+esc(r.mgr||'—')+'</td></tr>';
     }
-    var head='<tr><th>기금</th><th>푸른이알피 업체</th><th>항목</th><th style="text-align:right">금액(원)</th>'
+    var head='<tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>푸른이알피 업체</th><th>항목</th><th style="text-align:right">금액(원)</th>'
       +'<th'+(tab==='wait'?' class="mo"':'')+'>'+(tab==='wait'?'계약일':'입금일')+'</th><th>상태</th><th class="mo">담당</th></tr>';
     var list=(tab==='wait')?wait:(tab==='done'?done:unl);
     var body=list.length
       ? '<div style="overflow-x:auto"><table><thead>'+head+'</thead><tbody>'
-        +list.map(function(r){ return (tab==='done'||r.iid)?rowD(r):rowW(r); }).join('')+'</tbody></table></div>'
+        +list.map(function(r,i){ return (tab==='done'||r.iid)?rowD(r,i):rowW(r,i); }).join('')+'</tbody></table></div>'
       : '<div class="muted" style="padding:10px 0">'+(tab==='unl'?'연결되지 않은 청구가 없습니다 — 전부 기금에 붙었습니다.':'해당 건이 없습니다.')+'</div>';
     function tb(k,lbl,n){ return '<div class="tab'+(tab===k?' on':'')+'" onclick="peTab(\''+k+'\')">'+lbl+' <b>'+n+'</b></div>'; }
     box.innerHTML='<div class="panel"><div class="row"><h2 style="font-size:15px">① 푸른이알피 연동 청구</h2>'
@@ -6848,7 +6848,7 @@ function docsMatrixHTML(list){
     var apps=cols.filter(function(d){return !d[2]||d[2]===(f.fund_type||'');});
     var doneN=apps.filter(function(d){return edits&&edits[f._id]&&edits[f._id][d[0]];}).length;
     if(onlyMissing&&apps.length&&doneN>=apps.length) return '';
-    return '<tr><td class="no">'+(i+1)+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;white-space:nowrap;cursor:pointer" onclick="openFundDoc(\''+f._id+'\',\'\')">'+esc(f.short_name||f.name)
       +'<div class="muted" style="font-size:10.5px;font-weight:400">'+esc(f.fund_type||'')+(f.region?' · '+esc(f.region):'')+'</div></td>'
       +'<td class="center"><span class="chip '+(apps.length&&doneN>=apps.length?'ok':(doneN?'warn':'dg'))+'" style="font-size:10.5px">'+doneN+'/'+apps.length+'</span></td>'
@@ -6863,9 +6863,9 @@ function docsMatrixHTML(list){
     +'<span style="flex:1"></span><span class="muted mo" style="font-size:11px">🟢 저장본 · 📎 HWP · ⚪ 미작성</span></div>'
     +phBar
     +(edits===null?loadingHTML('저장본 확인 중…')
-      :'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>기금</th><th class="center">진행</th>'
+      :'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th class="center">진행</th>'
         +cols.map(function(d){return '<th class="center" style="font-size:10.5px;white-space:nowrap" title="'+esc(d[1])+'">'+esc(String(d[1]).replace(/\s*\(.*\)$/,'').slice(0,10))+'</th>';}).join('')
-        +'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+(cols.length+3)+'" class="center muted" style="padding:16px">'+(onlyMissing?'모두 완성되었습니다.':'표시할 기금이 없습니다.')+'</td></tr>')+'</tbody></table></div>')
+        +'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+(cols.length+4)+'" class="center muted" style="padding:16px">'+(onlyMissing?'모두 완성되었습니다.':'표시할 기금이 없습니다.')+'</td></tr>')+'</tbody></table></div>')
     +'</div>';
 }
 // 매트릭스 칸 클릭 → 그 기금 📑 서식 탭으로(서식 지정 시 해당 서식 미리보기)
@@ -12211,7 +12211,7 @@ function openSitePeoplePick(){
         /* ★ company 로 담는다 — 명부의 «소속 회사» 칸이 그 이름을 읽는다(_offRow). */
         _spkList.push({role:t[0],name:t[1],title:t[2]||'',birth:t[3]||'',company:t[5]||'',site:st.name||''});
         var dup=have[String(t[1]).trim()];
-        rows.push('<tr><td style="text-align:center"><input type="checkbox" id="spk-'+i+'"'+(dup?' disabled':'')+'></td>'
+        rows.push('<tr><td style="text-align:center"><input type="checkbox" id="spk-'+i+'"'+(dup?' disabled':'')+'></td><td class="no">'+(i+1)+'</td>'
           +'<td>'+esc(st.name||'')+'</td><td>'+esc(t[0])+'</td>'
           +'<td class="muted" style="font-size:11px">'+esc(t[4]||'')+'</td>'
           +'<td style="font-weight:600">'+esc(t[1])+'</td><td class="muted">'+esc(t[2]||'')+'</td>'
@@ -12222,7 +12222,7 @@ function openSitePeoplePick(){
     var b=$('spk-body'); if(!b) return;
     b.innerHTML = rows.length
       ? '<div style="max-height:56vh;overflow:auto"><table style="font-size:12.5px"><thead><tr>'
-        +'<th style="width:34px"></th><th>사업장</th><th>측</th><th title="그 사업장에서 어떤 자리의 사람인가">자리</th>'
+        +'<th style="width:34px"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th><th>측</th><th title="그 사업장에서 어떤 자리의 사람인가">자리</th>'
         +'<th>성명</th><th>직위</th><th>생년월일</th><th></th>'
         +'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
         +'<div class="row" style="justify-content:flex-end;margin-top:12px">'
@@ -13241,7 +13241,7 @@ function bizregBulkReview(){
     var on=!!(r.name&&!dup&&!r._err);
     r._on=on;
     return '<tr'+(on?'':' style="background:#f8fafc"')+'>'
-      +'<td style="text-align:center"><input type="checkbox" id="bb-on-'+i+'"'+(on?' checked':'')+'></td>'
+      +'<td style="text-align:center"><input type="checkbox" id="bb-on-'+i+'"'+(on?' checked':'')+'></td><td class="no">'+(i+1)+'</td>'
       +'<td><input id="bb-name-'+i+'" value="'+esc(r.name||'')+'" placeholder="상호"'
         +' style="width:130px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px"></td>'
       +'<td><input id="bb-ceo-'+i+'" value="'+esc(r.ceo||'')+'" placeholder="대표자"'
@@ -13258,7 +13258,7 @@ function bizregBulkReview(){
     +'<span class="chip warn" style="font-size:10.5px">OCR</span>'+hlp('site.bulkdoc')+'</div>'
     +'<div class="msg warn" style="font-size:12px">여기서 만든 <b>상호가 설립합의서·정관·기금출연확인서에 그대로</b> 나갑니다. 표에서 고친 뒤 만드세요.</div>'
     +'<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px">'
-    +'<table style="font-size:11.5px"><thead><tr><th style="width:34px">만듦</th><th>상호</th><th>대표자</th>'
+    +'<table style="font-size:11.5px"><thead><tr><th style="width:34px">만듦</th><th class="no">번호</th><th>상호</th><th>대표자</th>'
     +BB_COLS.slice(1).map(function(c){ return '<th>'+c[1]+'</th>'; }).join('')+'<th>판정</th></tr></thead>'
     +'<tbody>'+body+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:14px">'
@@ -13416,7 +13416,7 @@ function wrepBulkShow(){
   var sites=(_fundSitesId(B.fid)||[]).filter(function(s){ return s&&s.status!=='closed'; }), byId={}; sites.forEach(function(s){ byId[s._id]=s; });
   var opt=function(sel){ return '<option value="">— 넣지 않음 —</option>'+sites.map(function(s){ return '<option value="'+s._id+'"'+(sel===s._id?' selected':'')+'>'+esc(s.name||'')+'</option>'; }).join(''); };
   var body=B.rows.map(function(r,i){ var s=byId[r.sid], p=r.sid?_wrepBulkPatch(r.o,s,r.side||'w'):{};
-    return '<tr><td style="font-size:11px">'+esc(r.label)+(r.ocr?' <span class="chip warn" style="font-size:9.5px">OCR</span>':'')+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-size:11px">'+esc(r.label)+(r.ocr?' <span class="chip warn" style="font-size:9.5px">OCR</span>':'')+'</td>'
       +'<td>'+esc(r.o.wrep_name||'—')+'<div class="muted" style="font-size:10.5px">'+esc(r.o.wrep_co||'')+(r.o.wrep_title?' · '+esc(r.o.wrep_title):'')+'</div></td>'
       +'<td style="font-size:11px">'+(r.o.wrep_addr?esc(_relAddrMask(r.o.wrep_addr)):'<span class="muted">주소 없음</span>')+'</td>'
       +'<td><select onchange="_wrepBulk.rows['+i+'].sid=this.value;wrepBulkShow()" style="max-width:170px;font-size:11.5px">'+opt(r.sid)+'</select>'
@@ -13429,8 +13429,8 @@ function wrepBulkShow(){
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><h2 style="margin:0">📁 재직증명서 '+B.rows.length+'장 읽음</h2>'+hlp('wrep.bulk')
     +(B.fail.length?'<span class="chip dg" title="'+esc(B.fail.join('\n'))+'">못 읽음 '+B.fail.length+'</span>':'')+'</div>'
-    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th>서류</th><th>사람</th><th>집 주소(동까지)</th><th>사업장</th><th>역할</th><th>채울 칸</th></tr></thead><tbody>'
-    +(body||'<tr><td colspan="6" class="muted">읽은 사람이 없습니다</td></tr>')+'</tbody></table></div>'
+    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>서류</th><th>사람</th><th>집 주소(동까지)</th><th>사업장</th><th>역할</th><th>채울 칸</th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="8" class="muted">읽은 사람이 없습니다</td></tr>')+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_wrepBulk=null;closeM()">닫기</button>'
     +'<button class="primary" onclick="wrepBulkApply()"'+(n?'':' disabled')+'>'+n+'곳 채우기</button></div>',{wide:true});
 }
@@ -13568,7 +13568,7 @@ function cmImportShow(){
   var opt=function(sel){ return '<option value="">— 사업장 밖 —</option>'+sites.map(function(s){ return '<option value="'+s._id+'"'+(sel===s._id?' selected':'')+'>'+esc(s.name||'')+'</option>'; }).join(''); };
   var LB={wrep_name:'이름',urep_name:'이름',urep_same:'대표자와 같음',wrep_title:'직위',urep_title:'직위',wrep_birth:'생년월일',urep_birth:'생년월일'};
   var body=B.rows.map(function(r,i){ var p=r.sid?_cmPatch(r.p,byId[r.sid]):{};
-    return '<tr><td>'+esc(r.p.side)+'</td><td>'+esc(r.p.name)+'</td><td>'+esc(r.p.birth||'')+'</td><td>'+esc(r.p.title||'')+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(r.p.side)+'</td><td>'+esc(r.p.name)+'</td><td>'+esc(r.p.birth||'')+'</td><td>'+esc(r.p.title||'')+'</td>'
       +'<td><select onchange="_cmImp.rows['+i+'].sid=this.value;_cmImp.rows['+i+'].keep=!this.value;_cmImp.rows['+i+'].why=this.value?\'직접 고름\':\'사업장 밖\';cmImportShow()" style="max-width:170px;font-size:11.5px">'+opt(r.sid)+'</select>'
       +'<div class="muted" style="font-size:10.5px">'+esc(r.why||'')+'</div></td>'
       +'<td style="font-size:11px">'+(r.sid
@@ -13578,8 +13578,8 @@ function cmImportShow(){
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><h2 style="margin:0">📋 위원 '+B.rows.length+'명 읽음</h2>'+hlp('cm.import')
     +(B.fail.length?'<span class="chip dg" title="'+esc(B.fail.join('\n'))+'">못 읽음 '+B.fail.length+'</span>':'')+'</div>'
-    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>사업장</th><th>채울 칸</th></tr></thead><tbody>'
-    +(body||'<tr><td colspan="6" class="muted">읽은 위원이 없습니다</td></tr>')+'</tbody></table></div>'
+    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>사업장</th><th>채울 칸</th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="8" class="muted">읽은 위원이 없습니다</td></tr>')+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_cmImp=null;closeM()">닫기</button>'
     +'<button class="primary" onclick="cmImportApply()"'+((nS||nK)?'':' disabled')+'>'+nS+'곳 채우기'+(nK?' · '+nK+'명 담기':'')+'</button></div>',{wide:true});
 }
@@ -13616,10 +13616,10 @@ function cmExtraShow(){
   var fid=S.fundId, L=(funds[fid]||{}).prep_committee||[];
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0">사업장 밖 위원 '+L.length+'명</h2>'+hlp('cm.import')+'</div>'
-    +'<table><thead><tr><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>회사</th><th></th></tr></thead><tbody>'
-    +(L.map(function(o,i){ return '<tr><td>'+esc(o.side||'')+'</td><td>'+esc(o.name||'')+'</td><td>'+esc(o.birth||'')+'</td><td>'+esc(o.title||'')+'</td><td>'+esc(o.company||'')+'</td>'
+    +'<table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>회사</th><th></th></tr></thead><tbody>'
+    +(L.map(function(o,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(o.side||'')+'</td><td>'+esc(o.name||'')+'</td><td>'+esc(o.birth||'')+'</td><td>'+esc(o.title||'')+'</td><td>'+esc(o.company||'')+'</td>'
       +'<td><button onclick="cmExtraDel('+i+')" title="이 위원을 명단에서 뺍니다" style="padding:2px 7px;font-size:11px">✕</button></td></tr>'; }).join('')
-      ||'<tr><td colspan="6" class="muted">없습니다</td></tr>')+'</tbody></table>'
+      ||'<tr><td colspan="8" class="muted">없습니다</td></tr>')+'</tbody></table>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">닫기</button></div>');
 }
 function cmExtraDel(i){
@@ -13785,10 +13785,10 @@ function bulkSiteCards(){
     +(noCard.length?'<p class="muted" style="font-size:11.5px;margin:0 0 8px">짝지을 카드가 없어 제외 '+noCard.length+'곳: '
       +esc(noCard.slice(0,8).join(', '))+(noCard.length>8?' 외':'')+'</p>':'')
     +'<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table style="font-size:11.5px"><thead><tr>'
-    +'<th>사업장</th><th>기업정보함 카드</th>'+SITE_BULK.map(function(c){return '<th>'+c[1]+'</th>';}).join('')
+    +'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th><th>기업정보함 카드</th>'+SITE_BULK.map(function(c){return '<th>'+c[1]+'</th>';}).join('')
     +'<th>담당자</th></tr></thead><tbody>'
-    +rows.map(function(r){
-      return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(r.name||'')+'</td>'
+    +rows.map(function(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(r.name||'')+'</td>'
         +'<td class="muted" style="white-space:nowrap">'+esc(r.card||'')+'</td>'
         +SITE_BULK.map(function(c){ var v=r.cell[c[0]];
           return '<td'+(v?'':' class="muted"')+' style="white-space:nowrap">'+(v?esc(v):'—')+'</td>'; }).join('')
@@ -14013,16 +14013,18 @@ function renderCardPick(){
        사업자등록증 여러 장 길과 «같은 규칙»(bizDupOf)을 쓴다. */
   var multi=!!T.multi, sites=(S.sitesFor===_cardPick.fid&&S.sites)||{};
   b.innerHTML='<div style="overflow-x:auto"><table style="table-layout:auto;min-width:100%"><thead><tr>'
-    +(multi?'<th style="width:34px;text-align:center"><input type="checkbox" onchange="cardPickAll(this.checked)" title="보이는 것 모두"></th>':'')
+    +(multi?'<th style="width:34px;text-align:center"><input type="checkbox" onchange="cardPickAll(this.checked)" title="보이는 것 모두"></th>':'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th>')
+    +'<th class="no">번호</th>'
     +(many?'<th style="'+nw+'">종류</th>':'')+'<th style="'+nw+'">회사</th>'+(many?'<th style="'+nw+'">담당자</th>':'')
     +'<th style="'+nw+'">사업자번호</th><th style="'+nw+'">대표자</th><th class="mo">소재지</th><th></th></tr></thead><tbody>'
-    +list.slice(0,80).map(function(r){
+    +list.slice(0,80).map(function(r,i){
       var e=cardEffective(r);   // 명함이면 같은 회사 사업자등록증으로 빈 칸을 메운 값
       var dup=multi?bizDupOf({name:r.c,biz_no:e.bz},sites):null;
       return '<tr'+(dup?' style="background:#f8fafc"':'')+'>'
         +(multi?'<td style="text-align:center"><input type="checkbox" class="cardsel" value="'+esc(r._id)+'"'
             +(dup?' disabled title="이미 참여 중입니다 — '+esc(dup.name||'')+'"':'')
-            +' onchange="cardSelCount()"></td>':'')
+            +' onchange="cardSelCount()"></td>':'<td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td>')
+        +'<td class="no">'+(i+1)+'</td>'
         +(many?'<td style="'+nw+'">'+(r.k==='biz'?'<span class="chip ok" style="font-size:10px">사업자</span>'
                                  :'<span class="chip" style="font-size:10px">명함</span>')
             +(dup?' <span class="chip warn" style="font-size:9.5px">이미 있음</span>':'')+'</td>':'')
@@ -15191,7 +15193,7 @@ function sitesPeopleBody(arr){
         +' onclick="event.stopPropagation()" style="width:'+wd+';padding:2px 6px;font-size:11.5px">';
     };
     return '<tr>'
-      +'<td class="no">'+(i+1)+'</td>'
+      +'<td class="ckcol" onclick="event.stopPropagation()"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;cursor:pointer" onclick="editSite(\''+s._id+'\')" title="눌러서 사업장 편집">'+esc(s.name||'—')+'</td>'
       +'<td class="ph muted">'+esc(s.ceo||'—')+'</td>'
       +'<td class="ph muted">'+(c.name?esc(c.name)+(c.position?' · '+esc(c.position):''):'—')+'</td>'
@@ -15233,7 +15235,7 @@ function sitesPeopleBody(arr){
     +(nU<arr.length
       ? '<button onclick="repSameAll()" title="사용자대표를 «회사 대표자와 같음»으로 한 번에 켭니다 — 이름을 따로 적어 둔 곳은 건드리지 않습니다">👤 사용자대표 = 대표자 (한번에)</button>'
       : '')+hlp('site.reps')+'</div>'
-    +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>상호</th>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>상호</th>'
     +'<th class="ph" title="등기부·사업자등록증에 적힌 사람">대표자</th>'
     +'<th class="ph" title="실무 연락 담당자">담당자</th>'
     +'<th title="협의회에 사용자측으로 나오는 사람 — 대표자가 아닐 수 있습니다">사용자대표</th>'
@@ -15685,8 +15687,9 @@ function fundParentBox(f){
     +'<div style="font-size:12px;margin-bottom:10px">모든 사내근로복지기금에는 출연하는 회사가 있습니다. 기금과 회사는 따로 두고, 회사를 이 기금의 참여사업장으로 넣어 잇습니다.</div>';
   if(!_erpCos){ erpCoLoad(); return head+'<div class="muted" style="font-size:12px">업체관리에서 후보를 찾는 중…</div></div>'; }
   var cs=fundParentCands(f,_erpCos);
-  var rows=cs.map(function(x){ var c=x.co;
+  var rows=cs.map(function(x,i){ var c=x.co;
     return '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;white-space:nowrap;overflow:hidden">'
+      +'<input type="checkbox" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:18px;text-align:center">'+(i+1)+'</span>'
       +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">업체관리'
       +(c.puNo?' · '+esc(c.puNo):'')+(c.bizNo?' · '+esc(c.bizNo):'')+(c.ceo?' · 대표 '+esc(c.ceo):'')+'</span>'
       +x.why.map(function(w){ return '<span class="chip warn" style="font-size:10px">'+esc(w)+'</span>'; }).join('')
@@ -15735,8 +15738,9 @@ function erpPickRender(){
   if(!_erpCos){ box.innerHTML='<div class="muted" style="padding:10px">업체관리를 읽는 중…</div>'; return; }
   var hit=erpPickMatch(_erpCos,_erpPick.q);
   box.innerHTML=(hit.length?'':'<div class="muted" style="padding:10px">맞는 회사가 없습니다.</div>')
-    +hit.slice(0,30).map(function(c){
+    +hit.slice(0,30).map(function(c,i){
       return '<div onclick="erpPickChoose(\''+esc(c.id)+'\')" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden">'
+        +'<input type="checkbox" onclick="event.stopPropagation()" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:20px;text-align:center">'+(i+1)+'</span>'
         +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">'
         +[c.puNo,c.bizNo,c.ceo?('대표 '+c.ceo):''].filter(Boolean).map(esc).join(' · ')+'</span>'
         +(c.status&&c.status!=='active'?'<span class="chip dg" style="font-size:10px">'+esc(c.status==='closed'?'종료':c.status)+'</span>':'')+'</div>';
@@ -15905,16 +15909,16 @@ function sitesYearBody(arr){
       return '<td><input value="'+esc(d[c[0]]||'')+'" placeholder="0" onchange="sySet(\''+s._id+'\',\''+c[0]+'\',this.value)" '
         +'style="width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right"></td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(s.name||'—')+(s.partner?' <span class="chip warn" style="font-size:9.5px">협력</span>':'')+'</td>'+tds+'</tr>';
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(s.name||'—')+(s.partner?' <span class="chip warn" style="font-size:9.5px">협력</span>':'')+'</td>'+tds+'</tr>';
   }).join('');
   return '<div class="row" style="flex-wrap:wrap;margin:0 0 8px">'+hlp('site.years')
     +'<span class="muted" style="font-size:12px">'+S.year+'년</span>'+yearSel()
     +'<span class="stat">출연 '+_n(tot.contrib)+'원</span><span class="stat">근로자 '+_n(tot.workers)+'명</span>'
     +'<span style="flex:1"></span><button onclick="syCopyPrev()">↩ 작년 값 불러오기</button></div>'
-    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="no">번호</th><th>사업장</th>'
+    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th>'
       +SY_COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join('')+'</tr></thead><tbody>'+rows
       /* 번호 칸이 생겨 몸통은 5칸이다 — 합계 줄도 맞춰야 숫자가 한 칸씩 밀리지 않는다 */
-      +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="2">합계</td><td style="text-align:right">'+_n(tot.contrib)+'</td>'
+      +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td class="ckcol"></td><td colspan="2">합계</td><td style="text-align:right">'+_n(tot.contrib)+'</td>'
       +'<td style="text-align:right">'+_n(tot.workers)+'</td><td style="text-align:right">'+_n(tot.benef)+'</td></tr></tbody></table></div>'
       :'<div class="muted" style="padding:10px">사업장을 먼저 등록하세요.</div>');
 }
@@ -16061,8 +16065,8 @@ function renderSitePend(){
     +'<span class="muted" style="font-size:11.5px;margin-left:6px">인식된 열: '+_sitePend.cols.map(function(c){return LBL[c]||c;}).join(' · ')+'</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="commitSiteXlsx()" style="padding:4px 12px">＋ '+L.length+'개 등록</button>'
     +'<button onclick="_sitePend=null;renderSitePend();dzStat(\'dz-sites\',\'\')" style="padding:4px 10px;margin-left:4px">취소</button></div>'
-    +'<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th>상호</th><th>대표자</th><th>사업자번호</th><th>업종</th><th style="text-align:right">근로자</th><th>소재지</th></tr></thead><tbody>'
-    +show.map(function(s){ return '<tr><td style="font-weight:600">'+esc(s.name)+'</td><td>'+esc(s.ceo||'—')+'</td><td>'+esc(s.biz_no||'—')
+    +'<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>상호</th><th>대표자</th><th>사업자번호</th><th>업종</th><th style="text-align:right">근로자</th><th>소재지</th></tr></thead><tbody>'
+    +show.map(function(s,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+esc(s.seq_label||String(i+1))+'</td><td style="font-weight:600">'+esc(s.name)+'</td><td>'+esc(s.ceo||'—')+'</td><td>'+esc(s.biz_no||'—')
       +'</td><td>'+esc(s.biz_type||'—')+'</td><td style="text-align:right">'+esc(s.company_size||'—')+'</td>'
       +'<td class="muted" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.address||'—')+'</td></tr>'; }).join('')
     +'</tbody></table></div>'+(L.length>show.length?'<div class="muted" style="font-size:11.5px;margin-top:4px">…외 '+(L.length-show.length)+'개</div>':'')
@@ -16413,10 +16417,10 @@ function relatedPanel(f){
     +'<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">'+Object.keys(REL_TYPES).map(function(t){
       return '<span class="stat"'+(cnt[t]?' style="color:var(--'+(t==='office'||t==='contact'?'warn':'danger')+');font-weight:700"':'')+'>'+REL_TYPES[t]+' '+(cnt[t]||0)+'</span>'; }).join('')+'</div></div>';
   /* ① 신호 */
-  var sigs=sig.length?sig.map(function(g){ var r=RS[_relKey(g.key)]||{}, k=_relKey(g.key);
+  var sigs=sig.length?sig.map(function(g,i){ var r=RS[_relKey(g.key)]||{}, k=_relKey(g.key);
       var col=r.res==='none'?'var(--ok)':(g.level==='hi'?'var(--danger)':'var(--warn)');
       return '<div style="border:1px solid var(--line);border-left:4px solid '+col+';border-radius:9px;padding:8px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-        +'<span class="chip '+(r.res==='none'?'ok':g.level==='hi'?'dg':'')+'" style="white-space:nowrap">'+REL_TYPES[g.type]+'</span>'
+        +'<input type="checkbox" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:20px;text-align:center">'+(i+1)+'</span><span class="chip '+(r.res==='none'?'ok':g.level==='hi'?'dg':'')+'" style="white-space:nowrap">'+REL_TYPES[g.type]+'</span>'
         +'<div style="flex:1;min-width:220px;font-size:12.5px">'+esc(g.text)+(g.mask?' <span class="muted" style="font-size:11px">'+esc(g.mask)+'</span>':'')
         +'<div class="muted" style="font-size:11px">'+esc(g.why)+(r.res?' · <b>'+(r.res==='none'?'관계 없음':'특수관계 맞음')+'</b>'+(r.note?' — '+esc(r.note):'')+' ('+esc(r.by||'')+' '+esc(r.at||'')+')':'')+'</div></div>'
         +'<select onchange="relSigSave(\''+k+'\',this.value)" style="padding:3px 6px;font-size:12px">'
@@ -16433,15 +16437,15 @@ function relatedPanel(f){
   var nAddrMiss=relatedPeople(f,live).filter(function(p){ return !_relAddrKey(p.addr,true); }).length;
   var sec2='<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0;font-size:14px">①-2 사람 모아보기 — 집 주소로 묶기</h2>'
     +'<span class="muted" style="font-size:11px">집 주소가 있는 사람 '+P.length+'명 · 없는 사람 '+nAddrMiss+'명 — [참여사업장 › 👤 사람]에서 재직증명서를 읽거나 적으면 늘어납니다</span></div>'
-    +(keys.length?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>집 주소(동까지만)</th><th>사람</th><th>회사 · 역할</th></tr></thead><tbody>'
+    +(keys.length?(function(){ var pNo=0; return '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th>집 주소(동까지만)</th><th>사람</th><th>회사 · 역할</th></tr></thead><tbody>'
       +keys.map(function(k){ var L=g2[k], n=L.map(function(p){ return p.sid; }).filter(function(v,i,x){ return x.indexOf(v)===i; }).length;
-        return L.map(function(p,i){ return '<tr'+(n>1?' style="background:#fef2f2"':'')+'>'
+        return L.map(function(p,i){ return '<tr'+(n>1?' style="background:#fef2f2"':'')+'>'+_ckTd()+'<td class="no">'+(++pNo)+'</td>'
           +(i===0?'<td rowspan="'+L.length+'"><b>'+esc(_relAddrMask(p.addr))+'</b> '+(n>1?'<span class="chip dg">회사 '+n+'곳</span>':'')+'</td>':'')
           +'<td>'+esc(p.name)+'</td><td>'+esc(p.co)+' · '+esc(p.role)+'</td></tr>'; }).join(''); }).join('')
-      +'</tbody></table></div>':'<div class="muted" style="font-size:12px;margin-top:8px">아직 집 주소가 적힌 사람이 없습니다.</div>')+'</div>';
+      +'</tbody></table></div>'; })():'<div class="muted" style="font-size:12px;margin-top:8px">아직 집 주소가 적힌 사람이 없습니다.</div>')+'</div>';
   /* ② 회사별 확인표 */
-  var rows=live.map(function(s){ var c=RC[s._id]||{}, per=_relIsPersonal(s), n=sig.filter(function(g){ return g.sids.indexOf(s._id)>=0; }).length;
-    return '<tr><td style="text-align:left"><b>'+esc(s.name||'')+'</b>'+(n?' <span class="chip dg" style="font-size:10px">신호 '+n+'</span>':'')+(per?' <span class="muted" style="font-size:10.5px">개인사업자</span>':'')+'</td>'
+  var rows=live.map(function(s,i){ var c=RC[s._id]||{}, per=_relIsPersonal(s), n=sig.filter(function(g){ return g.sids.indexOf(s._id)>=0; }).length;
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="text-align:left"><b>'+esc(s.name||'')+'</b>'+(n?' <span class="chip dg" style="font-size:10px">신호 '+n+'</span>':'')+(per?' <span class="muted" style="font-size:10.5px">개인사업자</span>':'')+'</td>'
       +REL_COLS.map(function(col){ var v=c[col[0]]||((per&&(col[0]==='share'||col[0]==='reg'||col[0]==='invest'))?'na':'');
         return '<td><select onchange="relCoSave(\''+s._id+'\',\''+col[0]+'\',this.value)" style="padding:2px 4px;font-size:11.5px'+(v==='hit'?';color:var(--danger);font-weight:700':v==='sus'?';color:var(--warn);font-weight:700':v==='ok'?';color:var(--ok)':'')+'">'
           +Object.keys(REL_ST).map(function(o){ return '<option value="'+o+'"'+(v===o?' selected':'')+'>'+(col[0]==='cert'&&o==='ok'?'받음':REL_ST[o][0])+'</option>'; }).join('')+'</select></td>'; }).join('')+'</tr>'; }).join('');
@@ -16449,9 +16453,9 @@ function relatedPanel(f){
   var sec3='<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0;font-size:14px">② 회사별 확인표</h2>'
     +(hit>=2?'<span class="chip dg">「해당」이 '+hit+'곳 — 둘 이상이 특수관계면 지원 제외(운영규정 제7조③)</span>':'')
     +'<span class="muted" style="font-size:11px">칸을 고르면 바로 저장됩니다</span></div>'
-    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="text-align:left">회사</th>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th style="text-align:left">회사</th>'
     +REL_COLS.map(function(col){ return '<th style="text-align:center" title="'+esc(col[2])+'">'+col[1]+'<br><span style="font-weight:400;font-size:10px">'+col[2]+'</span></th>'; }).join('')
-    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="8" class="muted">참여사업장이 없습니다</td></tr>')+'</tbody></table></div></div>';
+    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="10" class="muted">참여사업장이 없습니다</td></tr>')+'</tbody></table></div></div>';
   return head+sec1+sec2+sec3;
 }
 function relSigSave(k,v){
@@ -17760,9 +17764,9 @@ function subsidyDocsPanel(f){
   // ── 기금 단위 11종(+선택 2종) ──
   var need=SUB_REQ_DOCS.filter(function(d){ return !d.opt; });
   var fundDocs=SUB_REQ_DOCS.filter(function(d){ return d.scope==='fund'; });
-  var frows=fundDocs.map(function(d){
+  var frows=fundDocs.map(function(d,i){
     var on=!!fchk[d.k];
-    return '<tr><td style="width:26px"><input type="checkbox"'+(on?' checked':'')+' onchange="subChkFund(\''+d.k+'\',this.checked)"></td>'
+    return '<tr><td style="width:26px"><input type="checkbox"'+(on?' checked':'')+' onchange="subChkFund(\''+d.k+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
       +'<td'+(on?' style="color:#166534;font-weight:600"':'')+'>'+esc(d.n)+(d.opt?' <span class="chip" style="font-size:9.5px">선택</span>':'')+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(d.note||'')+'</td>'
       /* 세 번째 인자는 «누른 사람이 있던 단계». 사업계획서처럼 ①인가와 ⑤지원금에
@@ -17773,7 +17777,7 @@ function subsidyDocsPanel(f){
   var fNeed=fundDocs.filter(function(d){ return !d.opt; }).length;
 
   // ── 참여사별 3종 격자 ──
-  var srows=act.map(function(s){
+  var srows=act.map(function(s,i){
     var d=schk[s._id]||{};
     /* 체크 옆에 사진첩 단추 — 붙어 있으면 📎(원본 보기), 없으면 🖼(사진첩에서 고르기).
        화면에 설명을 깔지 않고 단추의 도움말로 알린다. */
@@ -17785,7 +17789,7 @@ function subsidyDocsPanel(f){
         +'</td>';
     }).join('');
     var miss=SUB_SITE_DOCS.filter(function(c){ return !d[c[0]]; }).length;
-    return '<tr'+(miss?'':' style="background:var(--ok-bg,#f0fdf4)"')+'><td class="muted" style="width:44px">'+esc(s.seq_label||'')+'</td>'
+    return '<tr'+(miss?'':' style="background:var(--ok-bg,#f0fdf4)"')+'>'+_ckTd()+'<td class="no" style="width:44px">'+esc(s.seq_label||String(i+1))+'</td>'
       +'<td>'+esc(s.name||'')+'</td><td style="text-align:right" class="mo">'+((num(s.company_size)||0).toLocaleString())+'</td>'+tds
       +'<td style="text-align:center">'+(miss?'<span class="chip dg" style="font-size:10px">'+miss+'건 부족</span>':'<span class="chip ok" style="font-size:10px">완비</span>')+'</td></tr>';
   }).join('');
@@ -17815,7 +17819,7 @@ function subsidyDocsPanel(f){
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">📁 제출서류 — 기금 단위</h2>'+hlp('sub.docs')+yearSel()+'<span style="flex:1"></span>'
     +'<span class="muted" style="font-size:11px">공식 11종 = 기금 단위 '+fNeed+'종 + 참여사별 '+SUB_SITE_DOCS.length+'종</span>'
     +'<span class="stat'+(fDone===fNeed?' ok':'')+'">'+fDone+'/'+fNeed+'종</span></div>'
-    +'<div style="overflow-x:auto;margin-top:8px"><table><tbody>'+frows+'</tbody></table></div></div>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="width:26px">□</th><th class="no">번호</th><th>서류</th><th>방식</th><th></th></tr></thead><tbody>'+frows+'</tbody></table></div></div>'
 
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">🏢 참여사별 제출서류</h2>'
     +'<span class="muted" style="font-size:11px">중소기업확인서·등기부등본·사업자등록증은 참여사마다 각 1부</span><span style="flex:1"></span>'
@@ -17825,7 +17829,7 @@ function subsidyDocsPanel(f){
         +SUB_SITE_DOCS.map(function(c,i){ return '<button onclick="subChkCol(\''+c[0]+'\')" style="padding:2px 8px;font-size:11px" title="이 열 전체 켜기/끄기">'+esc(c[1])+' '+colDone[i]+'/'+act.length+'</button>'; }).join('')
         +(missSites.length?'<span style="flex:1"></span><button onclick="subCopyMissing()" style="padding:2px 8px;font-size:11px" title="미제출 사업장 명단을 복사(연락용)">📋 미제출 '+missSites.length+'개사 명단</button>':'')
         +'</div>'
-        +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>사업장</th><th style="text-align:right" class="mo">근로자</th>'
+        +'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th>사업장</th><th style="text-align:right" class="mo">근로자</th>'
         +SUB_SITE_DOCS.map(function(c){return '<th style="text-align:center">'+esc(c[1])+'</th>';}).join('')+'<th style="text-align:center">상태</th></tr></thead><tbody>'+srows+'</tbody></table></div>'
       : '<div class="muted" style="padding:12px 2px">참여사업장이 없습니다 — 참여사업장 탭에서 먼저 등록하세요.</div>')
     +'</div>'
@@ -18071,7 +18075,7 @@ function loanTab(f){
   var W=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
   var rows=arr.map(function(l,i){
     var bal=loanBal(l), py=num((l.paid||{})[yr])||0, iy=num((l.int||{})[yr])||0;
-    return '<tr><td class="no">'+(i+1)+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;white-space:nowrap">'+esc(l.name||'—')+'</td>'
       +'<td class="mo muted" style="white-space:nowrap">'+esc(l.site||'')+'</td>'
       +'<td style="white-space:nowrap">'+esc(l.date||'')+'</td>'
@@ -18109,11 +18113,11 @@ function loanTab(f){
       +' — 근로복지기본법 제78조(이사의 자기거래 금지) 위반 여부 또는 정관상 보편적 근로자 대부 요건 충족 여부를 점검하세요. '
       +'<button onclick="openFundKbItem(\'MOEL-council-02\')" style="padding:1px 7px;font-size:11px">📖 유권해석 보기</button></div>':'')
     +(arr.length
-      ? '<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th class="no">번호</th><th>차용자</th>'
+      ? '<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>차용자</th>'
         +'<th class="mo">사업장</th><th>실행일</th><th style="text-align:right">대부액</th>'
         +'<th style="text-align:right">'+yr+'년 상환</th><th style="text-align:right">'+yr+'년 이자</th><th style="text-align:right">상환 누계</th>'
         +'<th style="text-align:right">잔액</th><th>상태</th><th></th></tr></thead><tbody>'+rows
-        +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="4">합계</td>'
+        +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="5">합계</td>'
         +'<td style="text-align:right">'+W(t.amount)+'</td><td style="text-align:right">'+W(t.paidYr)+'</td><td style="text-align:right">'+W(t.intYr)+'</td>'
         +'<td style="text-align:right">'+W(t.paidAll)+'</td><td style="text-align:right">'+W(t.balance)+'</td>'
         +'<td colspan="2"></td></tr></tbody></table></div>'
@@ -19729,7 +19733,7 @@ function finCompareView(arr){
   var _tbl=function(title,rows,note){
     return '<div style="min-width:330px;flex:1"><div style="font-weight:700;margin-bottom:6px">'+title+'</div>'
       +'<table>'+head+'<tbody>'
-      +rows.map(function(r){
+      +rows.map(function(r,i){
         if(r.head) return '<tr style="background:var(--bg)"><td colspan="5" style="font-weight:700;letter-spacing:2px">'+esc(r.lbl)+'</td></tr>';
         var pad=r.lvl?('padding-left:'+(r.lvl*14+8)+'px'):'';
         var lbl='<span style="'+pad+'">'+esc(r.lbl)+'</span>';
@@ -21119,7 +21123,6 @@ function _flowZipInto(z,dir,fid,yr,d,has){
     z.file(dir+'01. '+yr+' 결산서+'+(yr+1)+' 사업계획서.xlsx',buf);
     z.file(dir+'06. 법인세·지방소득세 신고 준비표 '+yr+'.xlsx',bb[1]);
     if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
-    if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
     var R=buildF15(arrC,fid,yr,d.rep,d.sites,d.welf), P=f15Pages(R);
     z.file(dir+'02. 운영상황보고서(별지 제15호) '+yr+'.html','<!doctype html><meta charset=utf-8><title>운영상황보고서 '+yr+'</title><style>'
       +f15CSS('',true)+'</style>'+P.p1+P.p2+'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px">인쇄 / PDF 저장</button>');
@@ -21404,9 +21407,9 @@ function flowSealInfo(){
   var c=S.f15Close||{}, st=flowSealStat(c), yr=S.year;
   showModal('<div class="row" style="margin-bottom:8px"><h2 style="margin:0">'+yr+'년 날인본</h2>'+hlp('close.seal')
     +'<span class="chip '+(st.done?'ok':st.have.length?'warn':'')+'" style="font-size:11px">'+st.have.length+'/'+st.need.length+' 받음</span></div>'
-    +'<table><thead><tr><th class="no">#</th><th>서류</th><th>날인</th><th>받음</th><th></th></tr></thead><tbody>'
+    +'<table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">#</th><th>서류</th><th>날인</th><th>받음</th><th></th></tr></thead><tbody>'
     +FLOW_SEAL.map(function(s,i){ var k=FLOW_SEAL_KEYS[i], d=st.docs[k], need=st.need.indexOf(k)>=0;
-      return '<tr'+(need?'':' class="muted"')+'><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+(need?'':' <span class="muted" style="font-size:10.5px">(해당 없음)</span>')+'</td><td style="font-size:11.5px">'+esc(s[1])+'</td>'
+      return '<tr'+(need?'':' class="muted"')+'><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+(need?'':' <span class="muted" style="font-size:10.5px">(해당 없음)</span>')+'</td><td style="font-size:11.5px">'+esc(s[1])+'</td>'
         +'<td class="mo" style="white-space:nowrap">'+(d&&d.id?'<span class="chip ok" style="font-size:10px">✓ '+esc(String(d.at||'').slice(5))+'</span>':'—')+'</td>'
         +'<td style="white-space:nowrap">'+(d&&d.id
           ?'<button onclick="flowSealView(\''+k+'\')" style="padding:2px 8px;font-size:11px">보기</button> <button onclick="flowSealUnlink(\''+k+'\')" style="padding:2px 8px;font-size:11px;color:var(--danger)">빼기</button>'
@@ -22812,7 +22815,7 @@ function dueMatrixHTML(list0){
         return '<td'+go+' title="'+esc(x.what+' · 기한 '+x.due)+'"><span class="chip warn" style="font-size:10px">D-'+x.days+'</span></td>'; }
       return '<td'+go+' title="'+esc(x.what+' · 기한 '+x.due)+'" class="muted">·</td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="go(\'fund\',\''+f._id+'\')">'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="go(\'fund\',\''+f._id+'\')">'
       +esc(f.short_name||f.name)+'</td>'+tds+'</tr>';
   }).join('');
   var YS=[]; for(var y=yNow;y>=yNow-5;y--) YS.push(y);
@@ -22825,7 +22828,7 @@ function dueMatrixHTML(list0){
     +(worst?'<span class="muted" style="font-size:11.5px">가장 오래 밀린 것: <b>'+esc(worst.name)+'</b> '+esc(worst.what)+' '+worst.days+'일</span>':'')
     +'<span style="flex:1"></span><button onclick="_dueDirty();renderHome()">↻ 새로고침</button></div>'
     +(list.length
-      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="no">번호</th><th>기금</th>'
+      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
         +cols.map(function(t){return '<th style="text-align:center;white-space:nowrap">'+esc(DUE_SHORT[t[0]]||t[0])
           +'<div class="muted mo" style="font-weight:400;font-size:10px">'+esc(t[3][1])+'</div></th>';}).join('')
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
@@ -22863,7 +22866,7 @@ function closeMatrixHTML(list0){
         return '<td style="text-align:center;cursor:pointer" onclick="goClosing(\''+fid+'\','+y+')" title="작성 중"><span class="chip warn" style="font-size:10px">작성중</span></td>'; }
       return '<td style="text-align:center;cursor:pointer;color:var(--faint)" onclick="goClosing(\''+fid+'\','+y+')" title="자료 없음 — 눌러서 작성">·</td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer" onclick="go(\'fund\',\''+fid+'\')">'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer" onclick="go(\'fund\',\''+fid+'\')">'
       +esc(f.short_name||f.name)+'<div class="muted mo" style="font-weight:400;font-size:11px">'+esc(f.name||'')+'</div></td>'+tds+'</tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">결산 현황</h2>'+hlp('board.close')
@@ -22872,7 +22875,7 @@ function closeMatrixHTML(list0){
     +'<span class="stat" style="background:var(--warn-bg);color:var(--warn)">작성중 '+nDraft+'</span>'
     +'<span style="flex:1"></span><button onclick="S.cbLoaded=0;renderHome()">↻ 새로고침</button></div>'
     +(list.length
-      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>번호</th><th>기금</th>'
+      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
         +Y.map(function(y){return '<th style="text-align:center">'+y+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       : '<div class="muted" style="padding:12px">이 분류에 기금이 없습니다.</div>')+'</div>'
     /* 직전 회계연도의 «결산 후 진행» — 1~4월이 그 해 결산·제출 철이다 */
