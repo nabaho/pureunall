@@ -201,6 +201,30 @@ header .kpi{font-size:11px;background:#ffffff22;border:1px solid #ffffff55;borde
 header .kpi.ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
 header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 .tabs .chips{margin:0 0 0 auto;align-self:center}
+/* ══════ PC 틀·창 고정 (2026-11-02 대표 지시 「틀이나 창이 계속 움직인다 이부분 안움직이게 해라」) ══════
+   · 머리줄(header)이 회사 지표 수에 따라 1줄↔2줄(48px↔76px)로 뛰며 아래 3칸을 위아래로 밀었다.
+   · 본문(main) 길이에 따라 브라우저 전체 스크롤바가 생겼다 사라지며 화면 폭이 15px씩 흔들렸다.
+   · 첫 회사를 고를 때 ← 뒤로(#backbtn)가 갑자기 나타나며 로고와 회사 이름이 오른쪽으로 64px 밀렸다.
+   → PC(761px~)에서는 바깥 창을 고정(overflow:hidden)하고 머리줄은 48px 1줄로 잠그며, 3칸(보기·목록·본문)이 각자 칸 안에서만 굴러가게 한다. */
+@media (min-width:761px){
+  html,body{height:100%;overflow:hidden}
+  header{height:48px;min-height:48px;max-height:48px;padding:0 18px;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:20}
+  header .logo,header .env,header #backbtn,header .who{flex-shrink:0;white-space:nowrap}
+  header #backbtn[style*="none"]{display:inline-block!important;visibility:hidden;pointer-events:none}
+  header .cobar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;white-space:nowrap;gap:6px}
+  header .cobar::-webkit-scrollbar{display:none}
+  header .cobar>*{flex-shrink:0}
+  header .cobar .cn{max-width:220px;white-space:nowrap}
+  header .cobar .cm{white-space:nowrap}
+  header .cobar .kpis{flex-wrap:nowrap;flex-shrink:0;gap:4px}
+  header .kpi{padding:2px 8px;flex-shrink:0}
+  .layout{height:calc(100vh - 48px);min-height:0;overflow:hidden}
+  nav.viewbar{height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow-y:auto;scrollbar-gutter:stable;position:static}
+  #colist{height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow:hidden;position:static}
+  #colRows{overflow-y:auto;scrollbar-gutter:stable}
+  main{height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow-y:auto;scrollbar-gutter:stable;padding:14px 24px 22px}
+  main>.tabs{position:sticky;top:-14px;z-index:5;background:var(--paper);margin:-14px 0 14px;padding-top:12px;flex-wrap:nowrap}
+}
 @media (max-width:760px){
   header{flex-wrap:wrap}
   header .cobar{order:5;flex-basis:100%;flex-wrap:wrap;white-space:normal}
@@ -255,7 +279,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
   .cards{margin-left:-8px;margin-right:-8px;gap:8px}
   .c{border-radius:0;border-left:0;border-right:0;padding:10px 8px}
 }
-@media print{header,nav,#colist,.noprint{display:none !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
+@media print{header,nav,#colist,.noprint{display:none !important}html,body,.layout,main{height:auto !important;max-height:none !important;overflow:visible !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -3764,10 +3788,14 @@ function render(){
   var bb=document.getElementById('backbtn'); if(bb) bb.style.display=(navDepth>0)?'':'none';
   ensureCo();
   var model=(typeof PuSiteStaff!=='undefined')?shellModel():null;
-  document.getElementById('nav').innerHTML=model?viewbarHtml(model):'';
+  var navEl=document.getElementById('nav'), navTop=navEl?navEl.scrollTop:0;
+  if(navEl){ navEl.innerHTML=model?viewbarHtml(model):''; if(navTop) navEl.scrollTop=navTop; }
   var shell=App.screen==='shell', col=document.getElementById('colist');
-  col.hidden=!shell||!model; if(shell&&model) col.innerHTML=colistHtml(model);
-  var m=document.getElementById('main');
+  var oldRows=document.getElementById('colRows'), colTop=oldRows?oldRows.scrollTop:0;
+  col.hidden=!shell||!model; if(shell&&model){ col.innerHTML=colistHtml(model); var newRows=document.getElementById('colRows'); if(newRows&&colTop) newRows.scrollTop=colTop; }
+  var m=document.getElementById('main'), mainTop=m?m.scrollTop:0;
+  var mainKey=[App.screen,App.coId||'',App.loose||'',App.site||'',App.tab||'',App.month||'',App.emp||'',App.day||'',App.ym||''].join('|');
+  var sameMain=(render._mainKey===mainKey); render._mainKey=mainKey;
   if(shell){
     m.innerHTML=model?shellMainHtml(model):'<div class="empty">js/pu-site-staff.js 를 불러오지 못했습니다.</div>';
     if(App.tab==='report'&&App.site) addPayrollReportHwpxAction(m);
@@ -3781,6 +3809,7 @@ function render(){
   else if(App.screen==='slip') m.innerHTML=screenSlip();
   else if(App.screen==='report') { m.innerHTML=screenReport(); addPayrollReportHwpxAction(m); }
   else m.innerHTML=screenInbox();
+  if(m) m.scrollTop=sameMain?mainTop:0;
   var cb=document.getElementById('coBar');
   if(cb){ cb.innerHTML=(shell&&model)?coBarHtml(model):''; document.body.classList.toggle('has-co', !!cb.innerHTML); }
   /* 폰(760px 이하) 3칸 가르기 (폰화면관리 2026-10-18) — 3칸이 위아래로 쌓이는 폰에서는
