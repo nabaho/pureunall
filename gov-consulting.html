@@ -3655,6 +3655,7 @@ function photoSlotDefs(sc){
   return defs;
 }
 function schedHasPhoto(sid){ const p=PHOTOS[sid]; if(!p)return false; for(const k in p){ if(/^c\d+$/.test(k)&&p[k])return true; } return false; }
+function postPhotoCount(sid){ const p=PHOTOS[sid]; if(!p)return 0; let n=0; for(const k in p){ if(/^c\d+$/.test(k)&&p[k])n++; } return n; }
 function renderPhotoGal(){
   const date=q('#galDate').value, coF=q('#galCo').value;
   const cos=getCos(),types=getTypes(),staff=getStaff();
@@ -5184,7 +5185,7 @@ function openDayModal(date){
         const coAtts=coAttStaffList(sc);
         const hasPh=schedHasPhoto(sc.id);
         const ic=sc.isField?'📍 현장방문':'🏢 사무실';
-        const endedDate=co?.endedTypes?.[sc.typeId]||'';
+        const endedDate=endedDateForSchedule(sc);
         const hoverTitle=scheduleHoverTitle(sc,co,ty,att,coAtts,hasPh);
         return `<div class="day-item${endedDate?' is-ended':''}" data-sid="${sc.id}" title="${escAttr(hoverTitle)}">
           <div class="day-item-bar" style="background:${endedDate?'#7b8089':ty?.color||'#cbd5e1'}"></div>
@@ -5240,7 +5241,7 @@ function buildNotifications(){
       if(!admin&&co.defAtt!==me&&!getCoAtts(co).includes(me))return; // 내 담당만
       const t=types.find(x=>x.id===tid);if(!t)return;
       const dl=co.deadlines?.[tid];
-      const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
+      const done=getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
       const mf=getCoMandatory(co.id,tid);
       const maxR=getCoMaxRounds(co.id,tid);
       // 본컨설팅 기준(사전진단 제외) — 진척·의무방문 판정을 종료확인과 일치시킴
@@ -5292,7 +5293,7 @@ function buildNotifications(){
   const _sinceDay=_lgSince.slice(0,10);
   if(_sinceDay){
     getScheds().forEach(s=>{
-      if(!s||s.isField===false||!s.date)return;
+      if(!s||isPostSched(s)||s.isField===false||!s.date)return;   // 사후는 증빙을 사후컨설팅 창에서 직접 넣는다
       if(s.date>=today||s.date<_sinceDay)return;          // 오늘·미래, 그리고 기록보다 옛것
       if(!(admin||s.attId===me||getCoAtts(s).includes(me)))return;
       if(_lgHas[s.id])return;
@@ -5366,7 +5367,7 @@ function toggleNotifPanel(){
 }
 
 function renderSummaryBar(){
-  const scheds=getScheds(),cos=getCos(),types=getTypes();
+  const scheds=getMainScheds(),cos=getCos(),types=getTypes();   // 사후만 있는 사업이 「진행중」으로 세이면 안 된다
   const today=todayStr();
   let active=0,warn=0,mfail=0,done=0;
   cos.filter(c=>c.active!==false&&!c.deleted).forEach(co=>{
@@ -5496,12 +5497,12 @@ async function openSingleModal(coId,typeId){
      전문(사전진단 2회차)은 마우스를 올리면 나온다. */
 function usedRoundShort(sc){
   const r=(sc&&sc.round)||'?';
-  return schedPhase(sc)==='pre'?`사${r}`:`${r}회`;
+  return schedPhase(sc)==='pre'?`사${r}`:(isPostSched(sc)?`후${r}`:`${r}회`);
 }
 /* 마우스를 올렸을 때 짧게 — 「9월 15일 · 14회차 · 🏢 사무실」 (대표 지시 2026-09-17
    「날짜에 마우스를 올릴 경우 짧게 방문 사무실 몇 회 등이 나오면 훨씬 편할 것 같다」). */
 function usedDayTip(sc,m,d){
-  const ph=schedPhase(sc)==='pre'?'사전진단 ':'';
+  const ph=schedPhase(sc)==='pre'?'사전진단 ':(isPostSched(sc)?'사후 ':'');
   const r=(sc&&sc.round)||'?';
   return `${m+1}월 ${d}일 · ${ph}${r}회차 · ${sc&&sc.isField?'📍 방문':'🏢 사무실'}`;
 }
@@ -6321,9 +6322,19 @@ const PRE_ROUND_CAP=2; // 사전진단 최대 회차
 // 이 컨설팅 종류가 사전진단 단계를 쓰는지 (일터혁신)
 function isPrePhaseType(typeId){const ty=getTypes().find(t=>t.id===typeId);return !!ty&&(ty.id==='t1'||(ty.name||'').includes('일터혁신'));}
 // 특정 일정의 실효 단계 ('pre' | 'main'). 값 없으면 본컨설팅으로 간주(레거시)
-function schedPhase(sc){return sc&&sc.phase==='pre'?'pre':'main';}
+function schedPhase(sc){return sc&&sc.phase==='pre'?'pre':(sc&&sc.phase==='post'?'post':'main');}
+/* ══ 사후컨설팅 (대표 지시 2026-11-02) — 사업이 «끝난 뒤» 이어지는 후속 방문 ══
+   일정 레코드에 phase:'post' 로 둔다(사전진단 'pre'·본 'main' 과 같은 길). 사진·도장은 본 일정과 같은 증빙 흐름을 쓴다.
+   ■ 규칙 하나: «사업(프로그램) 규칙과 회차 집계»에서는 빠지고, «보이고·열리고·사진 찍고·지우고·합치는 곳»에서는 일반 일정과 같다.
+     - 본 회차(진척·종료 판정·목록 횟수·타임라인)에 안 들어간다 → 「사후 1회, 2회…」로 따로 센다.
+     - 같은 담당 하루 1건 · 기관 하루 1사업장 규칙에서는 빠진다. 담당 하루 한도와 «같은 사업장 같은 날»은 사람·사업장이 실제로 가는 날이라 그대로 센다.
+     - 종료 잠금이 안 걸린다(사업은 종료 상태 그대로 두고 입력한다 — 진행 목록에 다시 올라오지 않는다).
+   ⚠ getScheds() 는 «사후까지 전부» 돌려준다 — 거르면 읽고→고치고→setScheds 로 통째 쓰는 곳이 사후 줄을 조용히 지운다.
+     «본 회차를 세는 곳»만 getMainScheds() 로 센다(tests/gov-post-consult.test.js 가 센 곳을 쓸어 담아 빠뜨림을 잡는다). */
+function isPostSched(sc){return !!sc&&sc.phase==='post';}
+function getMainScheds(){return getScheds().filter(s=>!isPostSched(s));}
 // 완료·본컨설팅 진척 판정용: 일터혁신은 본컨설팅 단계만 집계(사전진단 제외). 그 외 종류는 전체.
-function mainPhaseScheds(list,typeId){return isPrePhaseType(typeId)?list.filter(s=>schedPhase(s)==='main'):list;}
+function mainPhaseScheds(list,typeId){return isPrePhaseType(typeId)?list.filter(s=>schedPhase(s)==='main'):list.filter(s=>!isPostSched(s));}
 // 이 사업장·종류의 현재 단계 (신규 등록이 어느 단계로 들어갈지)
 function curPhase(coId,typeId){
   if(!isPrePhaseType(typeId))return 'main';
@@ -6331,7 +6342,7 @@ function curPhase(coId,typeId){
   const ps=co&&co.phaseState&&co.phaseState[typeId];
   if(ps==='pre'||ps==='main')return ps;
   // 미설정: 기존 일정 있으면 본컨설팅(레거시 소급 제외), 없으면 사전진단(신규)
-  return getScheds().some(s=>s.coId===coId&&s.typeId===typeId)?'main':'pre';
+  return getMainScheds().some(s=>s.coId===coId&&s.typeId===typeId)?'main':'pre';
 }
 // 첫 등록 시 현재 단계를 사업장에 고정 (이후 curPhase가 흔들리지 않도록)
 function ensurePhaseState(coId,typeId,phase){
@@ -6353,7 +6364,7 @@ function startMainPhase(coId,typeId){
   });
 }
 // 단계별 회차 라벨 (사전진단은 접두어, 본컨설팅은 숫자만)
-function roundText(sc,suffix){return (schedPhase(sc)==='pre'?'사전진단 ':'')+(sc.round||0)+(suffix||'회');}
+function roundText(sc,suffix){return (schedPhase(sc)==='pre'?'사전진단 ':(isPostSched(sc)?'사후 ':''))+(sc.round||0)+(suffix||'회');}
 // 단계 인지 다음 회차. phase 생략 시 현재 단계 기준
 function nextRound(coId,typeId,phase){
   if(phase===undefined)phase=curPhase(coId,typeId);
@@ -6510,7 +6521,7 @@ function getEndConfirmItems(){
   if(!me)return[];
   const today=todayStr();
   const hidden=getEndConfirmHidden();
-  const scheds=getScheds();
+  const scheds=getMainScheds();
   const types=getTypes();
   const staff=getStaff();
   const items=[];
@@ -6625,7 +6636,7 @@ function endedFlagsFor(info){
 /* 종료된 사업 + «수정 중» 인 사업을 모은다. 진행 중이거나 삭제된 사업장은 뺀다. */
 function endedInfos(){
   const cos=getCos().filter(c=>c.active!==false&&!c.deleted);
-  const scheds=getScheds();
+  const all=getScheds(), scheds=all.filter(s=>!isPostSched(s));   // 시기 검토·횟수는 «본 일정만» — 사후는 posts 로 따로
   const tmap=getErpTypeMap();
   const erpBy=(ERP&&ERP.loaded&&!ERP.stale)?erpConsByCo():{};
   const list=[];
@@ -6636,12 +6647,13 @@ function endedInfos(){
       const re=ended?null:((co.reopened&&co.reopened[tid])||null);
       if(!ended&&!re)return;
       const my=scheds.filter(s=>s.coId===co.id&&s.typeId===tid);
+      const posts=all.filter(s=>isPostSched(s)&&s.coId===co.id&&s.typeId===tid).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.id).localeCompare(String(b.id)));
       const dates=my.map(s=>s.date).filter(Boolean).sort();
       const erp=(erpBy[co.id]||[]).some(c=>{const code=erpConsCode(c);return code&&tmap[code]===tid;})?'running':'none';
       list.push({co,tid,state:ended?'ended':'editing',endedDate:ended||(re&&re.was)||'',reopen:re,scheds:my,
         start:dates[0]||'',last:dates[dates.length-1]||'',cnt:my.length,fieldCnt:my.filter(s=>s.isField).length,officeCnt:my.filter(s=>!s.isField).length,
         deadline:(co.deadlines&&co.deadlines[tid])||'',maxR:getCoMaxRounds(co.id,tid),mandatory:getCoMandatory(co.id,tid),
-        erp,sameDay:0,flags:[]});
+        erp,sameDay:0,posts,postCnt:posts.length,postPhotoCnt:posts.reduce((n,s)=>n+postPhotoCount(s.id),0),flags:[]});
     });
   });
   const byDate={};
@@ -7553,7 +7565,7 @@ function dashPhaseBadges(co,types){
     if(co.endedTypes?.[tid])return;
     const t=types.find(x=>x.id===tid); if(!t||t.active===false)return;
     if(!isPrePhaseType(tid))return;          // 단계가 있는 컨설팅(일터혁신)만
-    const all=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
+    const all=getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
     const preDone=all.filter(s=>schedPhase(s)==='pre').length;
     const mainDone=mainPhaseScheds(all,tid).length;
     const cap=getCoMaxRounds(co.id,tid)||t.rounds||0;
@@ -7626,7 +7638,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
     // 종료된 컨설팅: 진행중 모드에선 숨김, 종료/전체 모드에선 회색 표시
     if(co.endedTypes?.[tid]){
       if(!showEnded)return'';
-      const cnt=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid).length;
+      const cnt=getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid).length;   // 「🔒 종료 (N회)」 — 사후는 본 회차가 아니다
       return `<div class="drow" style="opacity:.5;cursor:default;">
         <span class="drag-icon" style="opacity:.3">⠿</span>
         <span class="type-bar" style="background:${t.color}"></span>
@@ -7639,7 +7651,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
     }
     const nr=nextRound(co.id,tid);
     const isF=getFieldState(co.id,tid);
-    const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
+    const done=getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
     const fieldDone=done.filter(s=>s.isField).length;
     const officeDone=done.filter(s=>!s.isField).length;
     const maxR=getCoMaxRounds(co.id,tid);
@@ -7747,7 +7759,7 @@ function mpDate(ds){
 }
 function renderProg(){
   const box=q('#mpList'); if(!box)return;
-  const types=getTypes(), staff=getStaff(), scheds=getScheds(), today=todayStr();
+  const types=getTypes(), staff=getStaff(), scheds=getMainScheds(), today=todayStr();   // 이번 주 방문 수까지 본 일정만 — 진행 보기는 «본 회차의 진척»이다
   const status=q('#mpStatus')?.value||'active';
   const warnDays=getEnv().warnDeadlineDays||14;
   const nm=id=>staff.find(a=>a.id===id)?.name||'';
@@ -9234,7 +9246,7 @@ async function tlZoomCopy(){
   const co=getCos().find(c=>c.id===_tzKey.coId);
   const t=getTypes().find(x=>x.id===_tzKey.tid);
   if(!co||!t)return;
-  const done=getScheds().filter(x=>x.coId===co.id&&x.typeId===t.id)
+  const done=getMainScheds().filter(x=>x.coId===co.id&&x.typeId===t.id)
     .sort((a,b)=>a.date>b.date?1:-1);
   if(!done.length){ toast('복사할 날짜가 없습니다','err'); return; }
   const text=tlZoomCopyText(co,t,done);
@@ -9259,7 +9271,7 @@ function renderTlZoom(){
   const staff=getStaff();
   const an=(id)=>(staff.find(a=>a.id===id)||{}).name||"";
   const ac=(id)=>staffColor(staff.find(a=>a.id===id));
-  const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===t.id)
+  const done=getMainScheds().filter(s=>s.coId===co.id&&s.typeId===t.id)
     .sort((a,b)=>a.date>b.date?1:-1);
   const maxR=getCoMaxRounds(co.id,t.id);
   const fieldN=done.filter(s=>s.isField).length;
@@ -9349,7 +9361,7 @@ function renderTimeline(){
   fillTimelineTypeFilter(types);
   const tlType=q('#tlTypeFilter')?.value||'';
   const generalKw=(q('#tlGeneralSearch')?.value||'').trim().toLowerCase();
-  const scheds=getScheds();
+  const scheds=getMainScheds();   // 날짜 축(allDates)도 본 일정으로만 잡는다 — 사후 날짜가 축을 늘이면 점 위치가 다 밀린다
   const staff=getStaff();
   const today=todayStr();
   const [ty,tm]=today.split('-').map(Number);
@@ -9552,6 +9564,7 @@ function getISOWeek(d){
 }
 
 function endedDateForSchedule(sc){
+  if(isPostSched(sc))return '';   // 사후컨설팅은 «끝난 뒤» 이어지는 일이라 종료 잠금이 안 걸린다
   const co=getCos().find(c=>c.id===sc?.coId);
   return co?.endedTypes?.[sc?.typeId]||'';
 }
@@ -9565,14 +9578,15 @@ function scheduleHoverTitle(sc,co,ty,att,coAtts=[],hasPh=false){
   const endedDate=endedDateForSchedule(sc);
   const lines=[
     co?.name||'사업장',
-    `${ty?.fullName||ty?.name||'컨설팅'} ${sc?.round||''}회차`,
-    `상태: ${endedDate?'종료':'진행중'}${endedDate?` (${endedDate})`:''}`,
+    `${ty?.fullName||ty?.name||'컨설팅'} ${isPostSched(sc)?'사후 ':''}${sc?.round||''}회차`,
+    `상태: ${isPostSched(sc)?'사후컨설팅':(endedDate?'종료':'진행중')}${endedDate?` (${endedDate})`:''}`,
     `구분: ${schedulePlaceLabel(sc)}`,
     `담당: ${att?.name||'-'}${coAtts.length?' + '+coAtts.map(c=>c.name).join(', '):''}`
   ];
   if(hasPh)lines.push('사진 등록됨');
   if(sc?.memo)lines.push(`메모: ${sc.memo}`);
   if(endedDate)lines.push('종료 처리된 일정은 이동할 수 없습니다.');
+  if(isPostSched(sc))lines.push('눌러서 사후컨설팅 창에서 고칩니다 (끌어 옮길 수 없습니다).');
   return lines.join('\n');
 }
 
@@ -9653,6 +9667,7 @@ function gcalTint(hex){
 function chipRound(sc){
   const cur = sc && sc.round || 0;
   if(schedPhase(sc)==='pre') return '사전 '+cur;
+  if(isPostSched(sc)) return '사후 '+cur;
   const max = getCoMaxRounds(sc.coId, sc.typeId);
   return max>0 ? cur+'/'+max : cur+'회';
 }
@@ -9668,20 +9683,21 @@ function chipHtml(sc){
   const col=staffColor(att)||'#94a3b8';
   const tyShort=(ty?.name||'').slice(0,2);
   const hasPh=schedHasPhoto(sc.id);
-  const endedDate=co?.endedTypes?.[sc.typeId]||'';
+  const endedDate=endedDateForSchedule(sc);   // ⚠ co.endedTypes 를 여기서 따로 읽지 말 것 — 사후가 같이 잠긴다
   const ended=!!endedDate;
+  const post=isPostSched(sc);
   const mine=canEdit(sc);
-  const movable=mine&&!ended;
+  const movable=mine&&!ended&&!post;          // 사후는 끌어 옮기지 않는다 — 날짜는 사후컨설팅 창에서 고친다
   /* 구글 캘린더처럼 «연한 바탕 + 진한 글자» (대표 지시 2026-08-25).
      ⚠ 남의 일정을 opacity:.45 로 흐리게 하던 것을 뺐다 — 연한 바탕 위에서 반투명까지
        걸면 글자가 읽히지 않는다. 못 옮기는 것은 «커서»로 알린다(잡히지 않는다). */
   const tint=gcalTint(col);
   const chipStyle=ended?'':movable
     ?`background:${tint.bg};color:${tint.fg};cursor:grab;`
-    :`background:${tint.bg};color:${tint.fg};cursor:not-allowed;`;
-  const chipClass=`chip${ended?' is-ended':''}`;
+    :`background:${tint.bg};color:${tint.fg};cursor:${post?'pointer':'not-allowed'};`;
+  const chipClass=`chip${ended?' is-ended':''}${post?' is-post':''}`;
   const place=schedulePlaceShort(sc);
-  const statusText=ended?`종료·${place}`:place;
+  const statusText=ended?`종료·${place}`:(post?`사후·${place}`:place);
   const hoverTitle=scheduleHoverTitle(sc,co,ty,att,coAtts,hasPh)+(movable?'\n끌어서 날짜 이동 가능':'');
   /* ⚠ 회차는 «이름 칸 밖»에 둔다 — 안에 두면 예전처럼 같이 잘린다.
      📷·📝·부담당은 회차 «뒤»로 보낸다. 그것까지 붙박이로 두면 이름 자리가 없다. */
@@ -9744,6 +9760,7 @@ function moveChip(sid,newDate){
   const idx=scheds.findIndex(s=>s.id===sid);
   if(idx===-1)return;
   const sc=scheds[idx];
+  if(isPostSched(sc)){toast('사후컨설팅은 끌어서 옮길 수 없습니다 — 종료 사업장 관리의 「사후」 창에서 날짜를 고치세요','err');return;}
   const blockMsg=isBlocked(newDate,sc.typeId);
   if(blockMsg){toast(blockMsg,'err');return;}
   if(isEndedSchedule(sc)){toast('종료된 컨설팅은 이동할 수 없습니다','err');return;}
@@ -9820,7 +9837,7 @@ function renderDay(){
       const att=staff.find(a=>a.id===s.attId);
       const coAtts=getCoAtts(s).map(id=>staff.find(a=>a.id===id)).filter(Boolean);
       const hasPh=schedHasPhoto(s.id);
-      const endedDate=co?.endedTypes?.[s.typeId]||'';
+      const endedDate=endedDateForSchedule(s);
       const mine=canEdit(s)&&!endedDate;
       const cardStyle=endedDate?'opacity:.68;background:#f8fafc;cursor:not-allowed;':mine?'':'opacity:.55;background:rgba(0,0,0,.02);';
       const restBg=endedDate?'#f8fafc':mine?'':'rgba(0,0,0,.02)';
@@ -9829,7 +9846,7 @@ function renderDay(){
         <div style="width:4px;height:48px;border-radius:2px;background:${endedDate?'#7b8089':ty?.color||'#cbd5e1'};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:15px;font-weight:900;">${co?.name||'?'}${endedDate?` <span style="font-size:10px;color:#fff;background:#7b8089;border-radius:10px;padding:2px 7px;font-weight:800;">🔒 종료 ${endedDate}</span>`:mine?'':' <span style="font-size:10px;color:var(--t2);font-weight:700;">🔒</span>'}</div>
-          <div style="font-size:12px;color:var(--t2);margin-top:2px;">${ty?.fullName||ty?.name||'?'} ${s.round}회차 · ${s.isField?'📍 현장방문':'🏢 사무실'}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px;">${ty?.fullName||ty?.name||'?'} ${isPostSched(s)?'사후 ':''}${s.round}회차 · ${s.isField?'📍 현장방문':'🏢 사무실'}</div>
           ${s.memo?`<div style="font-size:11px;color:var(--text);margin-top:5px;padding:6px 8px;background:var(--sf2);border-radius:6px;border-left:2px solid var(--accent);white-space:pre-wrap;">📝 ${s.memo}</div>`:''}
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;background:${staffColor(att)};color:#fff;">${att?.name||'?'}</span>
@@ -9986,7 +10003,7 @@ function toggleConflict(a,b){const m=getConflictMatrix();const k=conflictKey(a,b
 // 특정 날짜에 '같은 날 불가'/'하루 1건' 위반이 실제로 있으면 안내 문구 반환(없으면 null) — 캘린더 경고 배지용
 function dayConflictMsg(date){
   const types=getTypes();
-  const day=getScheds().filter(s=>s.date===date);
+  const day=getScheds().filter(s=>s.date===date&&!isPostSched(s));
   // 같은 주담당(attId) + 같은 유형(중복불가) 이 2건 이상이면 경고
   for(let i=0;i<day.length;i++)for(let j=i+1;j<day.length;j++){
     const a=day[i],b=day[j];
@@ -10012,7 +10029,7 @@ function checkConflictMatrix(coId,typeId,date,excludeId=null){
   if(!mainAtt)return null;
   // 같은 날 · 같은 주담당 · 같은 유형 · 다른 사업장 일정
   const clash=getScheds().find(s=>
-    s.date===date&&s.id!==excludeId&&s.attId===mainAtt&&s.typeId===typeId&&s.coId!==coId
+    s.date===date&&s.id!==excludeId&&s.attId===mainAtt&&s.typeId===typeId&&s.coId!==coId&&!isPostSched(s)
   );
   if(clash){
     const t1=ty?.name||'?';
@@ -10033,7 +10050,7 @@ function checkAgencyExclusive(coId,typeId,date,excludeId=null){
   const t=getTypes().find(x=>x.id===typeId);
   if(!t||!t.agencyExclusiveDay)return null;
   const clash=getScheds().find(s=>
-    s.date===date&&s.id!==excludeId&&s.typeId===typeId&&s.coId!==coId
+    s.date===date&&s.id!==excludeId&&s.typeId===typeId&&s.coId!==coId&&!isPostSched(s)
   );
   if(!clash)return null;
   const co2=getCos().find(c=>c.id===clash.coId)?.name||'?';
@@ -10046,7 +10063,7 @@ function checkAgencyExclusive(coId,typeId,date,excludeId=null){
 function agencyOtherSiteOn(coId,typeId,ds,excludeId){
   const t=getTypes().find(x=>x.id===typeId);
   if(!t||!t.agencyExclusiveDay)return '';
-  const hit=getScheds().find(s=>s.typeId===typeId&&s.coId!==coId&&s.date===ds&&s.id!==excludeId);
+  const hit=getScheds().find(s=>s.typeId===typeId&&s.coId!==coId&&s.date===ds&&s.id!==excludeId&&!isPostSched(s));
   if(!hit)return '';
   return getCos().find(c=>c.id===hit.coId)?.name||'다른 사업장';
 }
@@ -10067,6 +10084,7 @@ function roundIsFixed(s){ return !!(s&&s.roundFixed); }
 /* 그 사업(단계별) 일정 목록 — 회차 셈의 단위다 */
 function roundPeers(coId,typeId,phase){
   return getScheds().filter(s=>s.coId===coId&&s.typeId===typeId
+    &&(phase==='post')===isPostSched(s)
     &&(!isPrePhaseType(typeId)||schedPhase(s)===phase));
 }
 /* 겹친 번호와 빈 번호를 찾는다. 손으로 정하다 보면 둘 다 생길 수 있다. */
@@ -10092,12 +10110,14 @@ function reorderRounds(coId,typeId){
       s.round=n;
     });
   };
+  const mainT=targets.filter(s=>!isPostSched(s));
   if(isPrePhaseType(typeId)){
     // 사전진단·본컨설팅을 각각 날짜순으로 1부터 독립 번호
-    ['pre','main'].forEach(ph=>run(targets.filter(s=>schedPhase(s)===ph)));
+    ['pre','main'].forEach(ph=>run(mainT.filter(s=>schedPhase(s)===ph)));
   }else{
-    run(targets);
+    run(mainT);
   }
+  run(targets.filter(isPostSched));   // 사후는 «사후 1회, 2회…» 로 따로 — 본 번호를 먹지도, 본 때문에 밀리지도 않는다
   setScheds(scheds);
 }
 /* 그 사업의 회차를 통째로 자동으로 되돌린다 — 어긋난 것을 한 번에 푸는 길 */
@@ -10106,6 +10126,7 @@ function unfixAllRounds(coId,typeId,phase){
   let n=0;
   scheds.forEach(s=>{
     if(s.coId!==coId||s.typeId!==typeId)return;
+    if(isPostSched(s)!==(phase==='post'))return;
     if(isPrePhaseType(typeId)&&phase&&schedPhase(s)!==phase)return;
     if(!roundIsFixed(s))return;
     delete s.roundFixed; n++;
@@ -10319,6 +10340,7 @@ function openEndedViewModal(sid){
 
 async function openEditModal(sid){
   const sc=getScheds().find(s=>s.id===sid);if(!sc)return;
+  if(isPostSched(sc)){openPostDrawer(sc.coId,sc.typeId,sid);return;}   // 본 일정 수정 창(회차·단계)이 사후에 열리면 안 된다
   if(isEndedSchedule(sc)){openEndedViewModal(sid);return;}
   if(!canEdit(sc)){openViewModal(sid);return;}
   if(!await acquireCompanyEditLock(sc.coId))return;

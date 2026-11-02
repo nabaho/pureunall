@@ -70,7 +70,7 @@ const TYPES = [
 function rowsWorld(over) {
   const ctx = vm.createContext(Object.assign({
     Set, Array, Object, JSON, Math, String, Number,
-    getScheds: () => [], getTypes: () => TYPES,
+    getScheds: () => [], getMainScheds: () => [], getTypes: () => TYPES,
     escAttr: esc,
     nextRound: (coId, tid) => (tid === 't4' ? 4 : 1),            // 기술보호는 3/3 을 채워 «완료» 줄이 된다
     getFieldState: () => true,

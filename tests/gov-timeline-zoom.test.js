@@ -52,7 +52,7 @@ const CO = { id: 'c1', name: '가나상사', types: ['t1'], endedTypes: {}, defA
 function world(scheds, over) {
   const out = {};
   const ctx = Object.assign({
-    getCos: () => [CO], getScheds: () => scheds, getTypes: () => TYPES, getStaff: () => STAFF,
+    getCos: () => [CO], getScheds: () => scheds, getMainScheds: () => scheds, getTypes: () => TYPES, getStaff: () => STAFF,
     getCoMaxRounds: () => TYPES[0].rounds,
     mainPhaseScheds: (list) => list,
     coAttStaffList: (o) => (o.defCoAtts || []).map((id) => STAFF.find((a) => a.id === id)).filter(Boolean),

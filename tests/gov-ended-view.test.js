@@ -197,7 +197,7 @@ function engine(over) {
   const st = { cos: [], scheds: [], staff: [], toasts: [], today: TODAY };
   const ctx = vm.createContext(Object.assign({
     console, JSON, Object, Array, String, Number, Date, Set, Math, Promise, RegExp, escAttr: esc,
-    ERP: { loaded: true, consultings: [], dir: [], types: [] }, ERP_LS_PREFIX: 'pureun_v6_',
+    ERP: { loaded: true, consultings: [], dir: [], types: [] }, ERP_LS_PREFIX: 'pureun_v6_', PHOTOS: {},
     localStorage: { getItem: () => null, setItem: () => {} }, FB_READY: false,
     getCos: () => J(st.cos), setCos: (v) => { st.cos = J(v); }, getScheds: () => J(st.scheds), setScheds: (v) => { st.scheds = J(v); },
     getStaff: () => J(st.staff), getTypes: () => [{ id: 't1', name: '기술보호', fullName: '기술보호울타리', agency: '가나협력재단', rounds: 3, mandatoryField: 2 }, { id: 't2', name: '현장클리닉', rounds: 3 }],
@@ -207,7 +207,7 @@ function engine(over) {
     erpSidName: () => '',
   }, over || {}));
   vm.runInContext(enLine + '\n' + S.slice(cc, ccEnd) + '\n' + S.slice(g, gEnd) + '\n' + S.slice(a, b) + '\n' +
-    ['endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos', 'endedMatches'].map(grab).join('\n'), ctx);
+    ['isPostSched', 'getMainScheds', 'postPhotoCount', 'endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos', 'endedMatches'].map(grab).join('\n'), ctx);
   ctx._st = st;
   return ctx;
 }

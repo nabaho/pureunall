@@ -46,7 +46,7 @@ function world(scheds) {
     getCos: () => COS,
   };
   vm.createContext(ctx);
-  vm.runInContext([grab('checkAgencyExclusive'), grab('agencyOtherSiteOn')].join('\n'), ctx);
+  vm.runInContext([grab('isPostSched'), grab('checkAgencyExclusive'), grab('agencyOtherSiteOn')].join('\n'), ctx);
   return ctx;
 }
 
