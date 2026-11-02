@@ -142,6 +142,9 @@ button.sent{background:var(--green-bg);border-color:var(--green-line);color:var(
 .t input.amt.dirty{background:var(--amber-bg);border-color:var(--amber-m)}
 .pill.role-lead{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
 /* 송금 방향(대표 지시 2026-10-31 「권형하가 더 받은것이면 추가로 담당자에게 더 지급 … 담당자가 더받은것이면 반환」) — 반환은 노랑, 추가 지급은 초록 */
+.pill.bad-pill{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
+.kqline{padding-top:0}
+.t input.room{width:300px}
 .pill.dir-back{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber)}
 .pill.dir-more{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
 button.pend{background:var(--amber-bg);border-color:var(--amber-m);color:var(--amber)}
@@ -308,6 +311,10 @@ details.dep textarea{min-height:64px}
   <section class="pane" id="pane-msgs">
     <div class="card"><div class="bar"><b>정산표</b><select id="msgPick"></select><span class="sp"></span><span class="hint">확정한 정산표는 복사해서 카톡에 붙여 넣으세요 — 확정 전은 미리보기</span></div></div>
     <div id="msgBox"></div>
+    <!-- 카톡 자동 발송(대표 지시 2026-11-02) — 심부름꾼 상태 · 카톡 방 · 보낸 기록 -->
+    <div class="card"><div id="kqAgent"></div>
+      <div class="bar"><b>카톡 방</b><span class="hint">담당마다 PC 카톡 창 맨 위 제목 그대로 — 이 이름과 똑같은 방에만 보냅니다(대표만 고칩니다)</span></div><div id="roomBox"></div></div>
+    <div class="card"><div class="bar"><b>보낸 기록</b><span class="hint">고른 해 정산표의 «카톡 보내기»</span></div><div id="kqBox"></div></div>
   </section>
 </main>
 <div class="modal" id="modal" style="display:none"></div>
@@ -317,7 +324,7 @@ details.dep textarea{min-height:64px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=88"></script>
+<script src="js/pu-ontology.js?v=89"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -333,19 +340,19 @@ details.dep textarea{min-height:64px}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-settle-core.js?v=10"></script>
-<script src="js/pu-settle-view.js?v=12"></script>
+<script src="js/pu-settle-view.js?v=13"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
 var C=SettleCore, V=SettleView;
-var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:{} };
+var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:{}, rooms:{}, kq:{}, agent:null };
 var ERP={ biz:[], consultings:[], people:[] };
 /* 사번 → 이름 — 기록은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
 var NAMES={};
 var TAB='calc', CUR_RUN='', CUR_NOTICE='', MSG_RUN='';
 /* 요율표 — 고치는 중인 사본. 저장하기 전까지는 D.rules(서버)와 따로 둔다. 다시 불러와도 «저장 안 한 변경»은 지키지 않고 버리지 않는다 */
 var WORK=null;
-var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{}, manual:{}, mentries:{} };
+var SEL={ runs:{}, members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{}, manual:{}, mentries:{}, rooms:{}, kq:{} };
 /* 계산기 — 저장하지 않는다. 고친 것을 잃지 않게 이 기기(localStorage)에만 기억한다(작은 글 한 덩이) */
 function calcDefault(){ return { type:'', siteId:'', rows:[{ sid:'', role:'lead', pre:'' }, { sid:'', role:'staff', pre:'', rate:'' }] }; }
 var CALC=calcDefault();
@@ -398,9 +405,10 @@ async function loadErp(){
 }
 async function reload(){
   try{
-    var r=await Promise.all(['rules','links','notices','runs','adjusts'].map(function(k){ return fbDb.ref('settle/'+k).once('value'); }));
+    var r=await Promise.all(['rules','links','notices','runs','adjusts','rooms','kakaoQueue','agent'].map(function(k){ return fbDb.ref('settle/'+k).once('value'); }));
     D.rules=r[0].val()||{}; var lk=r[1].val()||{}; D.links={ company:lk.company||{}, person:lk.person||{} };
     D.notices=r[2].val()||{}; D.runs=r[3].val()||{}; D.adjusts=r[4].val()||{};
+    D.rooms=r[5].val()||{}; D.kq=r[6].val()||{}; D.agent=r[7].val()||null;
     draw();
   }catch(e){ toast('불러오지 못했습니다: '+errMsg(e)); }
 }
@@ -787,7 +795,13 @@ function drawMsgs(){
   if(!MSG_RUN || !list.some(function(r){ return r.id===MSG_RUN; })) MSG_RUN=list.length?list[0].id:'';
   $('msgPick').innerHTML=list.map(function(r){ return '<option value="'+V.esc(r.id)+'"'+(r.id===MSG_RUN?' selected':'')+'>'+V.esc(r.label+' · '+bizName(r.typeCode)+(r.status==='draft'?' (확정 전 — 미리보기)':''))+'</option>'; }).join('')||'<option value="">정산표 없음</option>';
   var cur=MSG_RUN && D.runs[MSG_RUN];
-  $('msgBox').innerHTML=V.messagesBox(currentMsgs(), { preview:!!(cur && cur.status!=='confirmed') });
+  var canSend=!!(cur && cur.status==='confirmed' && ME.isAdmin);
+  $('msgBox').innerHTML=(canSend && currentMsgs().length>1 ? '<div class="bar"><span class="sp"></span><button class="sm pri" data-kq-all="1">모두 카톡 보내기</button></div>' : '')
+    +V.messagesBox(currentMsgs(), { preview:!!(cur && cur.status!=='confirmed'), rooms:roomMap(), last:cur?kqLast(cur.id):{}, canSend:canSend });
+  $('kqAgent').innerHTML=V.agentLine(D.agent, Date.now());
+  $('roomBox').innerHTML=V.roomsTable(roomPeople(), roomMap(), NAMES, SEL.rooms, ME.isAdmin);
+  var labels={}; Object.keys(D.runs).forEach(function(k){ labels[k]=(D.runs[k].label||k)+' · '+bizName(D.runs[k].typeCode); });
+  $('kqBox').innerHTML=V.kqTable(kqList().filter(function(k){ var r=D.runs[k.runId]; return !r || C.yearOf(r.monthKey)===YEAR; }), NAMES, labels, SEL.kq);
 }
 function currentMsgs(){
   var run=MSG_RUN && D.runs[MSG_RUN] ? C.normalizeRun(D.runs[MSG_RUN]) : null;
@@ -958,6 +972,46 @@ async function exportXlsx(rid){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tr), '송금 목록');
   XLSX.writeFile(wb, '컨설팅정산_'+bizName(run.typeCode)+'_'+run.label.replace(/[\\\/:*?"<>|]/g,'')+'.xlsx');
 }
+/* ═══ 카톡 자동 발송 — 대표 지시 2026-11-02 「카카오톡에 자동으로 보내는 기능 만들 수 없나」 → 「만들기」 ═══
+   «카톡 보내기»는 settle/kakaoQueue 에 줄을 «새로 만들기만» 한다 → 대표 PC 의 카톡 심부름꾼(scripts/kakao-agent)이 1분마다 가져가 PC 카톡으로 보내고 상태를 고친다.
+   ⚠ 대표(관리자)만 · 확정한 정산표만 · 카톡 방 이름이 등록된 사람만. 방 이름은 PC 카톡 창 제목과 똑같아야 심부름꾼이 보낸다(설계서 §7). */
+function roomOf(sid){ var r=D.rooms[sid]; return r && !r._deleted ? String(r.room||'').trim() : ''; }
+function roomMap(){ var o={}; Object.keys(D.rooms).forEach(function(s){ var r=roomOf(s); if(r) o[s]=r; }); return o; }
+function kqList(){ return vals(D.kq); }
+function kqLast(runId){ var o={}; kqList().filter(function(k){ return k.runId===runId; }).sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).forEach(function(k){ o[k.sid]=k; }); return o; }
+/* 요율표에 담당으로 든 사람(재직·퇴직 모두 — 지난 정산표 사람도 방을 등록할 수 있게) */
+function roomPeople(){ var seen={}, out=[]; ruleTypes().forEach(function(k){ Object.keys(D.rules[k].rates||{}).forEach(function(s){ if(!seen[s]){ seen[s]=1; out.push(s); } }); });
+  return out.sort(function(a,b){ var x=NAMES[a]||'', y=NAMES[b]||''; return x<y?-1:x>y?1:0; }); }
+async function saveRoom(sid){
+  if(!ME.isAdmin){ toast('카톡 방은 대표(관리자)만 고칩니다'); return; }
+  var el=document.querySelector('input[data-room="'+CSS.escape(sid)+'"]'), v=String(el&&el.value||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+  if(!v){ toast('방 이름을 적어 주세요'); return; }
+  if(v.length>80){ toast('방 이름이 너무 깁니다'); return; }
+  try{ await patchRecord('settle/rooms/'+sid, 'SettleRoom', D.rooms[sid]||null, { id:sid, entityType:'SettleRoom', sid:sid, room:v }); }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+  await reload(); toast((NAMES[sid]||'')+' 카톡 방을 저장했습니다');
+}
+/* 대기열에 넣기 — idxs: 지금 보이는 문구 카드 번호들 */
+async function kqSend(idxs){
+  var run=MSG_RUN && D.runs[MSG_RUN];
+  if(!ME.isAdmin){ toast('카톡 보내기는 대표(관리자)만 합니다'); return; }
+  if(!run || run.status!=='confirmed'){ toast('확정한 정산표만 보낼 수 있습니다'); return; }
+  var msgs=currentMsgs(), last=kqLast(MSG_RUN), todo=[], skip=[];
+  idxs.forEach(function(i){ var m=msgs[i]; if(!m) return; var room=roomOf(m.sid), k=last[m.sid];
+    if(!room){ skip.push(m.name+'(방 이름 없음)'); return; }
+    if(k && k.status==='pending'){ skip.push(m.name+'(이미 대기 중)'); return; }
+    todo.push({ m:m, room:room, again:!!(k && k.status==='sent' && !k.redirect) }); });
+  if(!todo.length){ toast('보낼 것이 없습니다'+(skip.length?' — '+skip.join(', '):'')); return; }
+  var again=todo.filter(function(x){ return x.again; }).map(function(x){ return x.m.name; });
+  if(!window.confirm(todo.length+'통을 대표 PC 카톡으로 보낼까요?\n'+todo.map(function(x){ return '· '+x.m.name+' → «'+x.room+'»'; }).join('\n')
+    +(again.length?'\n\n⚠ 이미 보낸 사람: '+again.join(', ')+' — 한 번 더 보냅니다':''))) return;
+  var done=0;
+  try{
+    for(var i=0;i<todo.length;i++){ var x=todo[i], id=newId('K');
+      await save('settle/kakaoQueue/'+id, 'SettleKakao', function(){ return { id:id, entityType:'SettleKakao', runId:MSG_RUN, sid:x.m.sid, room:x.room, text:x.m.text, status:'pending', tries:0, createdBy:ME.sid }; }, { expectedRevision:-1 });
+      done++; }
+  }catch(e){ toast('대기열에 넣지 못했습니다('+done+'/'+todo.length+'): '+errMsg(e)); await reload(); return; }
+  await reload(); toast(done+'통을 대기열에 넣었습니다 — 대표 PC 심부름꾼이 1분 안에 보냅니다'+(skip.length?' · 뺀 것: '+skip.join(', '):''));
+}
 function copyMsg(i){
   var cur=MSG_RUN && D.runs[MSG_RUN]; if(!cur || cur.status!=='confirmed'){ toast('확정한 정산표만 복사할 수 있습니다'); return; }
   var m=currentMsgs()[i]; if(!m) return;
@@ -1046,6 +1100,9 @@ document.addEventListener('click', async function(ev){
   if(t.closest('#a_add')){ await addAdjust(); return; }
   if((b=t.closest('[data-adj-del]'))){ var aid=b.getAttribute('data-adj-del'); if(!window.confirm('이 이월·조정을 지울까요?')) return; try{ await softDelete('settle/adjusts/'+aid, 'SettleAdjust', D.adjusts[aid]); }catch(e){ toast('지우지 못했습니다: '+errMsg(e)); } await reload(); return; }
   if((b=t.closest('[data-copy]'))){ copyMsg(Number(b.getAttribute('data-copy'))); return; }
+  if((b=t.closest('[data-kq]'))){ await kqSend([Number(b.getAttribute('data-kq'))]); return; }
+  if(t.closest('[data-kq-all]')){ await kqSend(currentMsgs().map(function(m, i){ return i; })); return; }
+  if((b=t.closest('[data-room-save]'))){ await saveRoom(b.getAttribute('data-room-save')); return; }
 });
 document.addEventListener('change', async function(ev){
   var t=ev.target;
@@ -1067,7 +1124,7 @@ document.addEventListener('change', async function(ev){
   if(t.id==='c_site'){ CALC.siteId=t.value; saveCalc(); return; }
   if(t.matches('select[data-c]')){ var cp=t.getAttribute('data-c').split('|'), cr=CALC.rows[+cp[0]]; if(!cr) return;
     cr[cp[1]]=t.value; if(cp[1]==='role' && t.value==='lead') delete cr.rate; calcPrefill(); saveCalc(); drawCalc(); return; }
-  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries' }[kind]; if(!kind) return;
+  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ runs:'runs', run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries', rooms:'rooms', kq:'kq' }[kind]; if(!kind) return;
     var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
   if(t.id==='file'){ var f=t.files&&t.files[0]; t.value=''; await onFile(f); return; }
   if(t.id==='upType'){ lsSet('upType', t.value); return; }
@@ -1136,7 +1193,7 @@ function boot(){
     PuGate.hide();
     var role=await staffRole(u);
     if(!canOpen(role)){ lock(role&&role.status==='active'?'재무관리 권한이 없는 계정입니다':'재직 중인 직원 계정이 아닙니다'); return; }
-    ME.sid=String(role.sid); gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:ME.sid });
+    ME.sid=String(role.sid); ME.isAdmin=role.isAdmin===true; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:ME.sid });
     $('lock').style.display='none'; $('app').style.display='';
     await loadErp();
     await reload(); setTab(TAB);

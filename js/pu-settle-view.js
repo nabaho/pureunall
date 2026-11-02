@@ -455,18 +455,69 @@
   }
 
   /* ── ⑤ 카톡 문구 ── */
-  /* opt.preview — 확정 전 정산표: 문구는 보여 주되 복사 단추 대신 안내(금액이 바뀔 수 있다) */
+  /* opt.preview — 확정 전 정산표: 문구는 보여 주되 복사 단추 대신 안내(금액이 바뀔 수 있다)
+     opt.rooms {sid: 방 이름} · opt.last {sid: 그 정산표의 마지막 대기열 줄} · opt.canSend(확정 + 대표) — 카드마다 방·발송 상태·«카톡 보내기»
+     (대표 지시 2026-11-02 「카카오톡에 자동으로 보내는 기능」 — 대표 PC 심부름꾼 scripts/kakao-agent 가 보낸다) */
   function messagesBox(msgs, opt) {
     opt = opt || {};
+    var rooms = opt.rooms || {}, last = opt.last || {};
     if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 정산표를 고르세요.</div>';
     return (opt.preview ? '<div class="warn">확정 전 미리보기입니다 — 금액이 바뀔 수 있어 복사는 정산표를 «확정»한 뒤에 됩니다.</div>' : '')
       + '<div class="cards">' + msgs.map(function (m, i) {
+      var room = rooms[m.sid] || '', k = last[m.sid];
       return '<div class="card cardp"><div class="bar"><b>' + esc(m.name) + '</b><span class="sp"></span>'
-        + (opt.preview ? '<span class="hint">확정하면 복사</span>' : '<button class="sm pri" data-copy="' + i + '">복사</button>') + '</div>'
+        + (opt.preview ? '<span class="hint">확정하면 복사</span>' : '<button class="sm" data-copy="' + i + '">복사</button>'
+          + (opt.canSend && room ? '<button class="sm pri" data-kq="' + i + '" title="대표 PC 카톡으로 «' + esc(room) + '» 방에 보낸다">카톡 보내기</button>' : '')) + '</div>'
+        + '<div class="bar kqline"><span class="hint" title="' + esc(room) + '">' + (room ? '💬 ' + esc(room) : '💬 카톡 방 이름이 없습니다 — 아래 «카톡 방»에서 등록') + '</span>'
+        + (k ? kqPill(k) : '') + '</div>'
         + '<textarea readonly rows="' + Math.min(30, String(m.text).split('\n').length + 1) + '" data-msg="' + i + '">' + esc(m.text) + '</textarea></div>';
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+  /* ── ⑤-1 카톡 자동 발송 — 대기열 상태 딱지 · 심부름꾼 상태 · 카톡 방 · 보낸 기록 ── */
+  function kqState(k) {
+    if (!k) return { cls: '', text: '' };
+    if (k.status === 'sent') return k.redirect ? { cls: 'st-draft', text: '시험 발송(' + k.redirect + ') · ' + kst(k.sentAt) } : { cls: 'st-confirmed', text: '✓ 보냄 · ' + kst(k.sentAt) };
+    if (k.status === 'failed') return { cls: 'bad-pill', text: '실패 — ' + (k.error || '') };
+    if (k.dryRunAt) return { cls: 'st-draft', text: '시험 모드 — 보내지 않음' };
+    return { cls: 'st-draft', text: '대기 중' + (k.note ? ' — ' + k.note : '') };
+  }
+  function kqPill(k) { var s = kqState(k); return '<span class="pill ' + s.cls + '" title="' + esc(s.text) + '">' + esc(s.text) + '</span>'; }
+  /* 심부름꾼 한 줄 — 마지막 응답이 10분 넘으면 경고(꺼졌거나 PC 카톡이 닫힌 것) */
+  function agentLine(a, now) {
+    if (!a || !a.agentSeenAt) return '<div class="warn">🤖 카톡 심부름꾼이 아직 한 번도 응답하지 않았습니다 — 대표 PC 에서 켜야 «카톡 보내기»가 나갑니다(그전까지는 대기열에 쌓입니다).</div>';
+    var mins = Math.max(0, Math.round((now - Number(a.agentSeenAt)) / 60000)), old = mins > 10;
+    var mode = a.mode === 'live' ? (a.redirect ? '실전 · 시험 방(' + a.redirect + ')으로만' : '실전') : '시험 모드(PC 카톡에 넣지 않음)';
+    return '<div class="' + (old ? 'warn' : 'bar') + '"><span class="hint">🤖 카톡 심부름꾼 — ' + esc(mode) + ' · 마지막 응답 ' + (mins < 1 ? '방금' : mins + '분 전') + (a.message ? ' · ' + esc(a.message) : '') + '</span></div>';
+  }
+  /* 카톡 방 — 담당마다 PC 카톡 창 제목 그대로(대표만 고친다) */
+  function roomsTable(people, rooms, names, sel, canEdit) {
+    sel = sel || {}; rooms = rooms || {}; names = names || {};
+    if (!(people || []).length) return '<div class="empty">요율표에 담당이 없습니다.</div>';
+    var h = '<div class="scroll"><table class="t" data-name="rooms"><thead><tr>' + ckHead('rooms', people.every(function (s) { return sel[s]; }))
+      + '<th>이름</th><th>카톡 방 이름 (PC 카톡 창 맨 위 제목 그대로)</th><th></th></tr></thead><tbody>';
+    people.forEach(function (sid, i) {
+      var r = rooms[sid] || '';
+      h += '<tr>' + ckCell(sid, sel[sid]) + '<td class="n">' + (i + 1) + '</td>' + nw('name', nameOf(names, sid), 'ti')
+        + '<td data-k="room">' + (canEdit ? '<input type="text" class="room" data-room="' + esc(sid) + '" value="' + esc(r) + '" placeholder="예: 김가나 공인노무사(푸른노무법인)">' : esc(r || '—')) + '</td>'
+        + '<td data-k="btn">' + (canEdit ? '<button class="sm" data-room-save="' + esc(sid) + '">저장</button>' : '') + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+  /* 보낸 기록 — 최근 것 위 */
+  function kqTable(items, names, runLabels, sel) {
+    sel = sel || {}; names = names || {}; runLabels = runLabels || {};
+    var list = (items || []).filter(function (k) { return k && k.id; }).sort(function (a, b) { return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+    if (!list.length) return '<div class="empty">아직 보낸 카톡이 없습니다.</div>';
+    var h = '<div class="scroll"><table class="t" data-name="kq"><thead><tr>' + ckHead('kq', list.every(function (k) { return sel[k.id]; }))
+      + '<th>받는 사람</th><th>정산표</th><th>상태</th><th>넣은 때</th></tr></thead><tbody>';
+    list.forEach(function (k, i) {
+      h += '<tr>' + ckCell(k.id, sel[k.id]) + '<td class="n">' + (i + 1) + '</td>' + nw('name', nameOf(names, k.sid), 'ti') + nw('run', runLabels[k.runId] || k.runId || '')
+        + '<td class="nw" data-k="st">' + kqPill(k) + '</td><td class="nw" data-k="at">' + esc(kst(k.createdAt)) + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  return { STATUS_KO: STATUS_KO, esc: esc, kqState: kqState, agentLine: agentLine, roomsTable: roomsTable, kqTable: kqTable, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
 });

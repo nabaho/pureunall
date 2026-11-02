@@ -342,3 +342,36 @@ test('요율표 — 빈 칸에 기존 %를 흐리게(placeholder), 제안이 있
   assert.match(visible(m), /25% \(기존\)/);
   assert.doesNotMatch(visible(m), /요율표에 없음/);
 });
+
+
+test('카톡 자동 발송 — 카드에 방 이름·발송 상태, 확정+대표만 «카톡 보내기», 방이 없으면 안내', () => {
+  const msgs = [{ sid: 'T-A', name: '김가나', text: 'x' }, { sid: 'T-B', name: '이다라', text: 'y' }];
+  const h = V.messagesBox(msgs, { rooms: { 'T-A': '김가나 노무사' }, last: { 'T-A': { status: 'sent', sentAt: Date.UTC(2026, 10, 2, 7, 0) } }, canSend: true });
+  assert.match(h, /data-kq="0"/);
+  assert.doesNotMatch(h, /data-kq="1"/, '방 없는 사람에게 보내기 단추가 있다');
+  assert.match(visible(h), /💬 김가나 노무사/);
+  assert.match(visible(h), /✓ 보냄 · 11-02 16:00/);
+  assert.match(visible(h), /카톡 방 이름이 없습니다/);
+  assert.doesNotMatch(V.messagesBox(msgs, { rooms: { 'T-A': '김가나 노무사' }, canSend: false }), /data-kq=/, '대표가 아니거나 확정 전인데 보내기 단추');
+  assert.doesNotMatch(V.messagesBox(msgs, { preview: true, rooms: { 'T-A': '김가나 노무사' }, canSend: true }), /data-kq=/, '미리보기에 보내기 단추');
+});
+
+test('카톡 상태 딱지·심부름꾼 줄·카톡 방 표·보낸 기록 — ☐·번호, 사번은 화면에 없다', () => {
+  assert.match(V.kqState({ status: 'pending' }).text, /대기 중/);
+  assert.match(V.kqState({ status: 'pending', dryRunAt: 1 }).text, /시험 모드/);
+  assert.match(V.kqState({ status: 'sent', redirect: '나의 채팅', sentAt: 1 }).text, /시험 발송\(나의 채팅\)/);
+  assert.match(V.kqState({ status: 'failed', error: '방 이름이 다릅니다' }).text, /실패 — 방 이름/);
+  assert.match(V.agentLine(null, 0), /한 번도 응답하지 않았습니다/);
+  const now = Date.UTC(2026, 10, 2, 7, 0);
+  assert.match(V.agentLine({ agentSeenAt: now - 3 * 60000, mode: 'dry-run' }, now), /^<div class="bar">.*시험 모드.*3분 전/);
+  assert.match(V.agentLine({ agentSeenAt: now - 30 * 60000, mode: 'live' }, now), /^<div class="warn">.*실전.*30분 전/);
+  const r = V.roomsTable(['T-A', 'T-B'], { 'T-A': '김가나 노무사' }, { 'T-A': '김가나', 'T-B': '이다라' }, {}, true);
+  assert.match(r, /data-all="rooms"/);
+  assert.match(r, /data-room="T-A" value="김가나 노무사"/);
+  assert.match(r, /data-room-save="T-B"/);
+  assert.doesNotMatch(V.roomsTable(['T-A'], {}, {}, {}, false), /<input type="text"|data-room-save/, '대표가 아닌데 고칠 칸');
+  const k = V.kqTable([{ id: 'K1', sid: 'T-A', runId: 'r1', status: 'pending', createdAt: 2 }, { id: 'K2', sid: 'T-B', runId: 'r1', status: 'sent', sentAt: 3, createdAt: 3 }], { 'T-A': '김가나', 'T-B': '이다라' }, { r1: '2026년 10월' }, {});
+  assert.match(k, /data-all="kq"/);
+  assert.ok(visible(k).indexOf('이다라') < visible(k).indexOf('김가나'), '최근 것이 위가 아니다');
+  [r, k].forEach((x) => assert.doesNotMatch(visible(x), /T-[A-Z]/));
+});
