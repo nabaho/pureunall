@@ -1502,6 +1502,14 @@ exports.rehabWatch = functions
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
     const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
 
+    /* ── 새로 담긴 공고를 «발송 예정»으로(우편 라벨 대상) — 사람이 이미 표시한 것은 그대로 (rehab-watch.js autoQueueMarks) ── */
+    try {
+      const marksNow = (await root.child("marks").once("value")).val() || {};
+      const q = RehabWatch.autoQueueMarks(result.added, marksNow, nowMs, OntologyServerWrite.CONTRACT_VERSION);
+      Object.assign(upd, q);
+      upd["runs/" + today].autoQueued = Object.keys(q).length;
+    } catch (e) { console.warn("[회생광고 자동 예정]", String((e && e.message) || e).slice(0, 120)); }
+
     /* ── 금융위 기업기본정보로 대표자·전화·팩스·홈페이지 채우기 (functions/rehab-fsc.js 머리말) ──
        «이름 + 시·군·구가 모두 맞는 하나»만 채운다. 실패해도 수집은 계속 — 호출이 실패한 곳은 저장하지 않아 내일 다시 본다. ── */
     try {

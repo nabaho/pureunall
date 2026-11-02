@@ -824,7 +824,7 @@ function draw(){
       '<td class="trd">'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td>'+
       '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
-      '<td class="lg">'+logCell(n.id)+'</td><td class="st'+(st==='new'?' st-new':'')+'"><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td>'+
+      '<td class="lg">'+logCell(n.id)+'</td><td class="st'+(st==='new'?' st-new':'')+'"><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span>'+((st==='send' && MARKS[n.id] && MARKS[n.id].autoQueued)?' <span title="매일 수집 때 서버가 자동으로 예정 표시했습니다 — 사람이 다시 표시하면 사라집니다">🤖</span>':'')+'</td>'+
       '<td class="mm">'+phoneMeta(n,ce,c)+'</td></tr>';
   }).join('');
   $('rows').innerHTML=html;
@@ -1039,13 +1039,13 @@ async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value'
 async function loadInfo(){ INFO=(await fbDb.ref('rehab_ad/info').once('value')).val()||{}; }
 async function loadFsc(){ try{ FSC=(await fbDb.ref('rehab_ad/fsc').once('value')).val()||{}; }catch(e){ FSC={}; } }
 async function setStatus(id, st){
-  try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
+  try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null), autoQueued:false }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
   catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
 }
 async function bulk(st){
   var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
   if(!confirm(list.length+'곳을 「'+STATUS[st]+'」(으)로 표시할까요?')) return;
-  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); }));
+  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null), autoQueued:false }; }); }));
   var fail=res.filter(function(r){ return r.status==='rejected'; });
   await loadMarks(); SEL={}; draw();
   toast(fail.length ? ((list.length-fail.length)+'곳 저장 · '+fail.length+'곳 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason)) : list.length+'곳을 「'+STATUS[st]+'」(으)로 표시했습니다');

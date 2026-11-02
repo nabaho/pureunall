@@ -261,6 +261,22 @@ function updatesOf(result, today, nowIso, nowMs) {
   return upd;
 }
 
+/* ★ 2026-11-02 대표 「매일 18:00 수집 후 새 공고를 자동으로 발송 예정」 — 이번 회차에 «새로 담긴» 공고를 «발송 예정»으로 표시한다.
+   ⚠ 사람이 이미 표시한(어떤 상태든) 공고는 건드리지 않는다 — 대표가 제외·보류·완료로 바꾼 것을 되돌리면 안 된다.
+   ⚠ 주소가 없는 공고는 우편 라벨을 못 만들므로 예정으로 올리지 않는다.
+   ⚠ «예정»은 우편 라벨 인쇄 대상이라는 표시일 뿐 — 이메일·팩스는 여기서 걸리지 않는다(정보통신망법 제50조).
+   표시 줄 모양은 화면의 saveMark 와 같다(Task·rehabOutreach) + autoQueued:true 로 «기계가 올린 것»을 구분한다. */
+function autoQueueMarks(added, marks, nowMs, contractVersion) {
+  const out = {};
+  (added || []).forEach((r) => {
+    if (!r || !r.id || (marks || {})[r.id] || !clean(r.address)) return;
+    out["marks/" + r.id] = { id: r.id, entityType: "Task", taskKind: "rehabOutreach", sourceKind: "rehabNotice", sourceId: r.id,
+      status: "send", statusAt: nowMs, sentAt: null, autoQueued: true, autoQueuedAt: nowMs,
+      schemaVersion: 3, contractVersion: contractVersion, createdAt: nowMs, updatedAt: nowMs, revision: 1 };
+  });
+  return out;
+}
+
 module.exports = { BASE, LIST, VIEW, HOME, UA, COURTS, TASK_CORP_REHAB, TASK_CORP_BANKRUPT, KINDS, DEFAULT_KINDS, MAX_NEW_DETAILS, TARGET, STAGES,
-  listBody, viewBody, isTarget, noticeKey, pickDetail, toRecord, run, updatesOf, ymd,
+  listBody, viewBody, isTarget, noticeKey, pickDetail, toRecord, run, updatesOf, autoQueueMarks, ymd,
   stageOfTitle, stageOfEvents, regionOf, counselOf };
