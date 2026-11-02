@@ -133,16 +133,21 @@
     var allOn = !!(rows && rows.length && picked && rows.every(function (r) { return picked.has(r.id); }));
     var body = (rows || []).map(function (r, i) {
       var size = r.size > 0 ? r.size + '명' + (r.band ? ' · ' + r.band : '') : '';
-      var doc = [], docT = [];
+      var docT = [];
       var nCnt = (r.sets && r.sets['노사협의회'] && r.sets['노사협의회'].count) || 0;
       var dCnt = (r.sets && r.sets['단체협약'] && r.sets['단체협약'].count) || 0;
-      if (r.linked) { doc.push('<span class="k ok">확정 ' + r.linked + '</span>'); docT.push('취업규칙 확정 ' + r.linked); }
+      /* 자료 칸은 «격자»다(.dc) — 규칙·노사·단협 · 확정 · 후보 · 맞음 이 줄마다 같은 자리에 선다(대표 지시 2026-11-02 「취업규칙자료 안에 셀들 열을 정렬」).
+         값이 없는 자리는 «비워 둔다»(자리 번호를 못 박아 둔 칸이라 밀리지 않는다) */
+      var slots = {};
+      if (r.linked) { slots[4] = '<span class="k ok">확정 ' + r.linked + '</span>'; docT.push('취업규칙 확정 ' + r.linked); }
       if (nCnt) docT.push('노사협의회 ' + nCnt);
       if (dCnt) docT.push('단체협약 ' + dCnt);
-      if (r.cand) { doc.push('<span class="k cand">후보 ' + r.cand + '</span>'); docT.push('후보 ' + r.cand + '(메일 ' + r.candMails + '통)'); }
-      if (r.cand) doc.push(linkBtn(r, r.linked > 0));
-      if (!doc.length) doc.push('<span class="k none">자료 없음</span>');
+      if (r.cand) { slots[5] = '<span class="k cand">후보 ' + r.cand + '</span>'; docT.push('후보 ' + r.cand + '(메일 ' + r.candMails + '통)'); slots[6] = linkBtn(r, true); }
+      // 확정도 후보도 없으면 «자료 없음» 한 마디가 넷째 자리부터 끝까지 — 글자가 칸 폭에 잘리지 않게 걸쳐 놓는다
+      if (!slots[4] && !slots[5]) slots[4] = '<span class="k none ds-all">자료 없음</span>';
       var checks = setCheckBtns(st, r);
+      var dcell = '<span class="dc">' + checks
+        + [4, 5, 6].map(function (n) { return slots[n] ? '<span class="ds ds' + n + '">' + slots[n] + '</span>' : ''; }).join('') + '</span>';
       var fin = r.fin && r.fin.state === 'set'
         ? td('', '★최종본 ' + (r.fin.at ? ymd(r.fin.at) : ''), '<span class="fin">★' + (r.fin.at ? ' ' + esc(ymd(r.fin.at).slice(2, 7)) : '') + '</span>')
         : r.fin && r.fin.state === 'none' ? td('', '최종본을 아직 안 정했습니다', '<span class="k none">미정</span>')
@@ -158,7 +163,7 @@
         + ownerCell(st, r)
         + stageCell(r) + filedCell(r)
         + fin
-        + td('', docT.join(' · ') || '자료 없음', checks + ' ' + doc.join(' '))
+        + td('', docT.join(' · ') || '자료 없음', dcell)
         + '</tr>';
     }).join('');
     var condOn = opt && SC().conditions(opt.cols).length > 0;
@@ -166,8 +171,11 @@
     /* 칸 폭 — 사업장 이름(폭 없는 칸)은 «남는 자리»를 받는다. 표의 min-width(rules-v2.html .sites)가 다른 칸 합보다
        넉넉해야 이름이 산다 — 모자라면 이름이 「삼…」 한 글자만 남는다(2026-10-18 폰 실측). # 칸 폭은 .sites 의
        이름 칸 고정(left)과 같아야 한다 — tests/rules-sites-compact.test.js 가 견준다 */
-    /* «진행»·«마지막 신고»를 「최근」 자리에 넣고(설계 §15-1) 체크항목(규칙·노사·단협)을 함께 담아 다른 칸 합 808 + 이름 몫 140 = .sites min-width(948) */
-    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:60px"><col style="width:68px"><col style="width:70px"><col style="width:120px"><col style="width:96px"><col style="width:70px"><col style="width:260px"></colgroup>'
+    /* «진행»·«마지막 신고»를 「최근」 자리에 넣고(설계 §15-1) 체크항목(규칙·노사·단협)을 함께 담았다.
+       ★ 모든 칸에 폭을 준다(2026-11-02 대표 「사업장 열 너무 넓다」) — 폭 없는 칸이 하나 있으면 넓은 화면에서 남는 폭을 그 칸(사업장)이 다 먹었다
+         (1920px 에서 사업장 480px · 업태 「도매 …」 잘림 · 자료 「후보 1…」 잘림). 칸이 모두 폭을 가지면 남는 폭은 «칸 폭 비율대로» 나뉜다.
+       폭 합 = .sites min-width(rules-v2.html) — 달라지면 좁은 화면에서 칸이 짓눌린다(tests/rules-sites-compact.test.js ①) */
+    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col style="width:140px"><col style="width:50px"><col style="width:66px"><col style="width:64px"><col style="width:110px"><col style="width:92px"><col style="width:68px"><col style="width:302px"></colgroup>'
       + (opt ? headHtml(st, opt, allOn) : '<thead><tr><th class="c pk"></th><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>진행</th><th>마지막 신고</th><th>★최종본</th><th>취업규칙 자료</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
   }
