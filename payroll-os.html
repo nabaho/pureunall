@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-labor-core.js?v=8"></script>
+<script src="js/pu-labor-core.js?v=9"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
@@ -1555,7 +1555,7 @@ window.copyReportTSV=copyReportTSV;
 function reportKindBtns(){
   var k=App.reportKind||'daily';
   function b(id,label){ return '<button class="btn'+(k===id?'':' sec')+'" style="padding:6px 14px;font-size:12.5px" onclick="App.reportKind=\''+id+'\';App.site=null;App.month=null;render()">'+label+'</button>'; }
-  return '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+b('daily','일용 매월신고')+b('hire','취득·상실')+b('sever','퇴직정산')+b('leave','연차 현황')+'</div>';
+  return '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+b('daily','일용 매월신고')+b('hire','취득·상실')+b('sever','퇴직정산')+b('leave','연차 현황')+b('annual','연간 보수총액·대사')+'</div>';
 }
 function reportRowsOf(rec, kind){
   var emps=dedupeEmps(rec.직원||[]);
@@ -1575,7 +1575,7 @@ function screenReport(){
   /* 신고는 직원 표가 다 있어야 센다 — 들어올 때 한 번 받는다. */
   ensureAllEmps();
   var kind=App.reportKind||'daily';
-  var TITLE={daily:'일용 근로내용확인신고 초안',hire:'4대보험 취득·상실 초안',sever:'퇴직정산(퇴직금 추정) 초안',leave:'연차 발생 현황(입사일 기준)'};
+  var TITLE={daily:'일용 근로내용확인신고 초안',hire:'4대보험 취득·상실 초안',sever:'퇴직정산(퇴직금 추정) 초안',leave:'연차 발생 현황(입사일 기준)',annual:'연간 4대보험 보수총액·연말정산·간이지급명세서 대사표'};
   var h='<h1>신고 — '+TITLE[kind]+'</h1>';
   if(!payHas()){ h+='<div class="sub">급여 데이터를 먼저 올리세요</div><div class="empty">급여 데이터가 서버에 없습니다.</div>'; return h; }
   if(allEmpsState!=='done'){
@@ -1590,22 +1590,23 @@ function screenReport(){
     var SUB={hire:'입사일·퇴사일이 신고월에 속한 직원을 자동 추출합니다(연도는 표에서 확인).',
              sever:'퇴사자(정식+추정)의 평균임금·퇴직금 추정을 자동 계산합니다(1년 미만 제외).',
              leave:'최신 월 명단의 재직자별 법정 연차 발생일수(입사일 기준)를 계산합니다.',
-             daily:'사업장 선택 → 신고월 → 초안 확인·복사. 일용(일당·시급) 있는 달만 표시됩니다.'};
+             daily:'사업장 선택 → 신고월 → 초안 확인·복사. 일용(일당·시급) 있는 달만 표시됩니다.',annual:'3월 4대보험 보수총액신고 · 2월 연말정산 · 매월 간이지급명세서용 직원별 연간 급여·과세·비과세·보험료 정산 예상액을 집계합니다.'};
     h+='<div class="sub">'+SUB[kind]+'</div>'+reportKindBtns()+'<div class="cards">';
     paySites().forEach(function(site, idx){
       var nMonths, tot;
       if(kind==='hire'){ var hm=hireMonths(pay,site); nMonths=hm.length; tot=hm.reduce(function(a,x){return a+x.n;},0); }
       else if(kind==='sever'){ var sm=severMonths(pay,site); nMonths=sm.length; tot=sm.reduce(function(a,x){return a+x.n;},0); }
-      else if(kind==='leave'){ var lr=leaveRows(pay,site,new Date()); tot=(lr.rows||[]).length; nMonths=tot?1:0; }
+      else if(kind==='leave'){ var lr=leaveRows(pay,site,new Date()); tot=(lr.rows||[]).length; nMonths=tot?1:0; } else if(kind==='annual'){ var ar=(pay.sites[site]||[]); nMonths=ar.length; tot=nMonths; }
       else { var months=(pay.sites[site]||[]).filter(function(r){return reportRowsOf(r,kind).length>0;});
              nMonths=months.length; tot=months.reduce(function(a,r){return a+reportRowsOf(r,kind).length;},0); }
       if(!nMonths) return;
-      var UNIT={hire:'취득·상실 '+tot+'건',sever:'퇴사자 '+tot+'명',daily:'일용 연 '+tot+'명',leave:'재직 상용 '+tot+'명'};
+      var UNIT={hire:'취득·상실 '+tot+'건',sever:'퇴사자 '+tot+'명',daily:'일용 연 '+tot+'명',leave:'재직 상용 '+tot+'명',annual:'누적 '+tot+'개월'};
       h+='<div class="c" style="cursor:pointer" onclick="navTo({site:\''+site.replace(/'/g,"")+'\'})">'+
-         '<div class="t">'+rowMarkBox('site:'+site, idx+1)+' '+site+'</div><div class="m">'+(kind==='leave'?UNIT[kind]:'신고월 '+nMonths+'건 · '+UNIT[kind])+'</div></div>';
+         '<div class="t">'+rowMarkBox('site:'+site, idx+1)+' '+site+'</div><div class="m">'+((kind==='leave'||kind==='annual')?UNIT[kind]:'신고월 '+nMonths+'건 · '+UNIT[kind])+'</div></div>';
     });
     h+='</div>'; return h;
   }
+  if(kind==='annual') return h+renderAnnualSettlementReport(pay,App.site);
   if(kind==='leave'){
     var L=leaveRows(pay,App.site,new Date()), lrows=L.rows||[];
     h+='<div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>'+App.site+'</b> 재직 상용 '+lrows.length+'명 <span style="color:var(--sub)">(기준 명단: '+L.기준명단+')</span> '+
@@ -3895,7 +3896,7 @@ function screenRoster() {
   if (laborRec(App.site) && !laborEmpsReady(App.site)) return '<h1>근로자명부</h1><div class="sub"><a href="#" onclick="goBack();return false">← 돌아가기</a></div><div class="empty">직원 표를 받고 있습니다… 잠시만 기다려 주세요.</div>';
   var emps = rosterEmployees(App.site), s = esc(App.site);
   var completeCnt = 0;
-  var rowsHtml = '';
+  var rowsHtml = '', rosterRowsForAlert = [];
   emps.forEach(function (e, idx) {
     var nm = String(e.성명 || '').trim(), nme = esc(nm), meta = empMeta(App.site, nm), sv = severOf(App.site, nm);
     var rrn = (typeof rrnRec === 'function') ? rrnRec(App.site, nm) : null;
@@ -3903,7 +3904,8 @@ function screenRoster() {
     var sex = meta.성별 || (rrn ? sexFromMask(rrn.mask) : '');
     var hire = meta.입사일 || e.입사일 || '';
     var leave = sv.퇴사일 || e.퇴사일 || '';
-    var rowObj = { 성명: nm, 성별: sex, 생년월일: birth, 주소: meta.주소 || '', 이력: meta.이력 || '', 종사업무: meta.직종 || '', 입사일: hire, 계약종료일: meta.계약종료일 || '', 퇴사일: leave, 퇴직사유: sv.퇴직사유 || '' };
+    var rowObj = { 성명: nm, 성별: sex, 생년월일: birth, 주소: meta.주소 || '', 이력: meta.이력 || '', 종사업무: meta.직종 || '', 고용형태: meta.고용형태 || '정규직', 입사일: hire, 계약종료일: meta.계약종료일 || '', 퇴사일: leave, 퇴직사유: sv.퇴직사유 || '' };
+    rosterRowsForAlert.push(rowObj);
     var ev = LC.evaluateRosterRow(rowObj);
     if (ev.완비여부) completeCnt++;
     var mk = "'" + s + '|' + nme + "'";
@@ -3930,6 +3932,17 @@ function screenRoster() {
   var h = '<h1>법정 근로자명부</h1><div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>' + App.site + '</b> 근로기준법 제41조·제42조·시행령 제20조 법정 서식 (' + emps.length + '명 · 필수항목 완비 ' + completeCnt + '/' + emps.length + '명) ' +
     '<button class="btn" style="margin-left:8px" onclick="copyRosterTSV(\'' + s + '\')">📋 명부 복사(엑셀/한글)</button> ' +
     '<button class="btn sec" style="margin-left:4px" onclick="window.print()">🖨 인쇄/PDF</button></div>';
+  var lcAlerts = LC.evaluateLifecycleAlerts(rosterRowsForAlert, (App.ym || ymNow()) + '-15');
+  h += '<div style="margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">' +
+    '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">' +
+    '<div><b>⏰ 인사·노무 법정 기한 도래 자동 경보 (D-30)</b> <span style="color:var(--sub);font-size:12px">— 수습 3개월 만료 · 근로계약 만료 · 기간제 2년 무기계약 전환(기간제법 4조) · 만 60세 법정 정년(고령자고용법 19조)</span></div>' +
+    '<span class="badge ' + (lcAlerts.긴급건수 ? 'warn' : 'ok') + '">전체 ' + lcAlerts.경보건수 + '건 · D-30 긴급 ' + lcAlerts.긴급건수 + '건</span></div>' +
+    (lcAlerts.alerts.length ? '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">순번·성명</th><th style="padding:6px 8px;text-align:left">경보 구분</th><th style="padding:6px 8px;text-align:left">도래일(D-Day)</th><th style="padding:6px 8px;text-align:left">법 근거·실무 조치 안내</th></tr>' +
+      lcAlerts.alerts.slice(0, 12).map(function (al, aIdx) {
+        var dTxt = al.dDay < 0 ? ('D+' + Math.abs(al.dDay) + ' 경과') : ('D-' + al.dDay);
+        var bCls = al.level === 'bad' ? 'background:#fef2f2;color:var(--bad)' : (al.level === 'warn' ? 'background:#fffbeb;color:var(--warn)' : '');
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('lcalert:' + App.site + '|' + al.성명 + '|' + al.kind, aIdx + 1) + ' ' + al.성명 + '</td><td style="padding:6px 8px;white-space:nowrap"><span class="badge" style="' + bCls + '">' + al.title + '</span></td><td style="padding:6px 8px;white-space:nowrap"><b>' + al.targetDate + '</b> (' + dTxt + ')</td><td style="padding:6px 8px;color:var(--sub)"><b>[' + al.law + ']</b> ' + al.note + '</td></tr>';
+      }).join('') + '</table></div>' : '<div style="padding:10px 14px;font-size:12px;color:var(--sub)">현재 도래 예정인 수습만료·계약만료·무기전환·정년 경보가 없습니다. (입사일·계약종료일·생년월일을 입력하면 자동 계산됩니다)</div>') + '</div>';
   h += policyBar(App.site);
   h += '<div style="margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px">' +
     '<b>+ 명부 직원 직접 추가</b> <span style="color:var(--sub);font-size:12px">(급여대장 업로드 전 신규 입사자도 바로 등록해 근로계약서·명부를 관리합니다)</span>' +
@@ -4016,6 +4029,126 @@ function fillStdWorkRules(site) {
   var rev = LC.reviewWorkRules(txt, { empCount: emps.length });
   lput('work_rules', site, { text: txt, ok: rev.적합여부, summary: rev.요약, updatedAt: Date.now(), by: (me && me.email) || '' });
 }
+function sendContractEmail(site, empName) {
+  var meta = empMeta(site, empName);
+  var emailEl = document.getElementById('contractEmpEmail');
+  var to = String((emailEl && emailEl.value) || meta.이메일 || '').trim();
+  if (!to || to.indexOf('@') < 0) { alert(empName + ' 근로자의 수신 이메일 주소를 입력해 주세요.'); return; }
+  if (emailEl && emailEl.value) lput('emp_meta', site + '|' + empName, { 이메일: to });
+  var ta = document.getElementById('contractTextArea');
+  var ct = lmap('labor_contracts')[site + '|' + empName] || {};
+  var txt = ta ? String(ta.value || '') : String(ct.text || '');
+  if (!txt) { alert('교부할 근로계약서 내용이 없습니다.'); return; }
+  var prev = (lmap('contract_sent')[site + '|' + empName]) || null;
+  var msg = empName + ' 님(' + to + ')에게\n[' + site + '] 근로계약서를 전자교부(이메일 발송)할까요?\n(근로기준법 제17조 제2항 서면·전자문서 교부 의무 이행 기록이 남습니다)';
+  if (prev) msg = '이미 ' + new Date(prev.at).toLocaleString() + ' 에 교부한 기록이 있습니다.\n\n' + msg;
+  if (!confirm(msg)) return;
+  var mailObj = LC.buildContractDeliveryHtml(site, { 성명: empName, 입사일: meta.입사일 || '' }, txt);
+  postPayslip({
+    to: to, name: empName, ym: (meta.입사일 || laborYear()),
+    subject: mailObj.subject, html: mailObj.html
+  }).then(function (d) {
+    if (d && d.ok) {
+      lput('contract_sent', site + '|' + empName, { at: Date.now(), to: to, by: (d.by || (me && me.email) || '') });
+      alert('근로계약서 전자교부 완료 → ' + to);
+      render();
+    } else {
+      alert('전자교부 발송 실패: ' + JSON.stringify((d && d.error) || d));
+    }
+  }).catch(function (err) { alert('발송 호출 실패: ' + ((err && err.message) || err)); });
+}
+function copyWorkRulesFilingDocs(site, docKey) {
+  var emps = rosterEmployees(site).map(function (e) {
+    var nm = String(e.성명 || '').trim(), meta = empMeta(site, nm), sv = severOf(site, nm);
+    return { 성명: nm, 입사일: meta.입사일 || e.입사일 || '', 직종: meta.직종 || '', 퇴사일: sv.퇴사일 || e.퇴사일 || '' };
+  });
+  var docs = LC.buildWorkRulesFilingDocs(site, emps, { filingDate: (App.ym || ymNow()) + '-15' });
+  var txt = docKey === 'all' ? (docs.신고서 + '\n\n' + docs.의견청취서 + '\n\n' + docs.신구대조표) : (docs[docKey] || docs.신고서);
+  var box = document.getElementById('wrFilingDocPreview');
+  if (box) { box.style.display = 'block'; box.value = txt; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(function () { alert('취업규칙 신고·의견청취·신구대조 서식이 클립보드에 복사되었습니다.'); }, function () {});
+  }
+}
+function buildSiteNonRegularRecords(site) {
+  var recs = (((payForReport() || {}).sites || {})[site] || []);
+  var byName = {};
+  recs.forEach(function (r) {
+    (dedupeEmps(r.직원 || [])).forEach(function (e) {
+      var nm = String(e.성명 || '').trim();
+      if (!nm) return;
+      var meta = empMeta(site, nm);
+      var b = byName[nm] = byName[nm] || { 성명: nm, 고용형태: meta.고용형태 || (isDailyEmp(e) ? '일용직' : '정규직'), 입사일: meta.입사일 || e.입사일 || '', 월별기록: [] };
+      var days = Number(e.근무일수 || (isDailyEmp(e) ? 8 : 20));
+      var hrs = Number(e.근무시간 || (days * (e.평균시간 || 8)));
+      b.월별기록.push({ 월: r.월, 근무일수: days, 근무시간: hrs, 지급액: Number(e.지급총액 || e.과세총액 || e.기본급 || 0), 국민연금: Number(e.국민연금 || 0), 건강보험: Number(e.건강보험 || 0), 고용보험: Number(e.고용보험 || 0), 소득세: Number(e.소득세 || 0) });
+    });
+  });
+  rosterEmployees(site).forEach(function (e) {
+    var nm = String(e.성명 || '').trim();
+    if (!nm || byName[nm]) return;
+    var meta = empMeta(site, nm);
+    byName[nm] = { 성명: nm, 고용형태: meta.고용형태 || '정규직', 입사일: meta.입사일 || e.입사일 || '', 월별기록: [] };
+  });
+  return Object.keys(byName).map(function (k) { return byName[k]; });
+}
+function copyAnnualSettleTSV(site) {
+  var pay = payForReport();
+  var recs = (((pay || {}).sites || {})[site] || []);
+  var res = LC.summarizeAnnualSettlement(recs, laborYear(), policyFor(site));
+  var head = ['순번', '성명', '근무월수', '연간지급총액', '과세보수총액(보수총액신고)', '비과세합계', '월평균보수', '기납부국민연금', '기납부건강보험', '기납부장기요양', '기납부고용보험', '기납부소득세', '기납부지방소득세', '건보정산예상차액', '고용정산예상차액'];
+  var lines = [head.join('\t')];
+  res.rows.forEach(function (r, i) {
+    lines.push([i + 1, r.성명, r.근무월수, r.연간지급총액, r.과세보수총액, r.비과세합계, r.월평균보수, r.국민연금합계, r.건강보험합계, r.장기요양합계, r.고용보험합계, r.소득세합계, r.지방세합계, r.건보정산예상, r.고용정산예상].join('\t'));
+  });
+  var tsv = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(tsv).then(function () { alert('연간 보수총액·연말정산 대사표 ' + res.rows.length + '명 복사됨 — 엑셀/EDI에 붙여넣으세요.'); }, function () { alert(tsv); });
+  } else alert(tsv);
+}
+function renderAnnualSettlementReport(pay, site) {
+  var recs = (((pay || {}).sites || {})[site] || []);
+  var yr = laborYear(), s = esc(site || '');
+  var res = LC.summarizeAnnualSettlement(recs, yr, policyFor(site));
+  var h = '<div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>' + site + '</b> · ' + yr + '년 귀속 연간 보수총액·연말정산·간이지급명세서 대사표 (' + res.인원수 + '명) ' +
+    '<button type="button" class="btn" style="margin-left:8px" onclick="copyAnnualSettleTSV(\'' + s + '\')">📋 대사표 복사(엑셀/EDI)</button></div>';
+  h += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">' +
+    '<tr style="background:var(--paper);text-align:right">' +
+    ['순번·성명', '근무월수', '연간지급총액', '과세보수총액(보수총액)', '비과세합계', '월평균보수', '국민연금', '건강+장기', '고용보험', '소득세+지방세', '건보·고용 정산예상'].map(function (c, i) {
+      return '<th style="padding:7px 8px;text-align:' + (i === 0 ? 'left' : 'right') + ';white-space:nowrap">' + c + '</th>';
+    }).join('') + '</tr>';
+  res.rows.forEach(function (r, idx) {
+    var diffSum = r.건보정산예상 + r.고용정산예상;
+    h += '<tr style="border-top:1px solid var(--line);text-align:right">' +
+      '<td style="padding:6px 8px;text-align:left;font-weight:600;white-space:nowrap">' + rowMarkBox('ann:' + site + '|' + r.성명, idx + 1) + ' ' + r.성명 + '</td>' +
+      '<td style="padding:6px 8px">' + r.근무월수 + '개월</td>' +
+      '<td style="padding:6px 8px;font-weight:700">' + won(r.연간지급총액) + '</td>' +
+      '<td style="padding:6px 8px;font-weight:700;color:var(--navy)">' + won(r.과세보수총액) + '</td>' +
+      '<td style="padding:6px 8px;color:var(--sub)">' + won(r.비과세합계) + '</td>' +
+      '<td style="padding:6px 8px">' + won(r.월평균보수) + '</td>' +
+      '<td style="padding:6px 8px">' + won(r.국민연금합계) + '</td>' +
+      '<td style="padding:6px 8px">' + won(r.건강보험합계 + r.장기요양합계) + '</td>' +
+      '<td style="padding:6px 8px">' + won(r.고용보험합계) + '</td>' +
+      '<td style="padding:6px 8px">' + won(r.소득세합계 + r.지방세합계) + '</td>' +
+      '<td style="padding:6px 8px;font-weight:600;color:' + (diffSum > 0 ? 'var(--warn)' : 'var(--ok)') + '">' + (diffSum > 0 ? '+' : '') + won(diffSum) + '</td></tr>';
+  });
+  if (!res.rows.length) {
+    h += '<tr><td colspan="11" style="padding:18px;text-align:center;color:var(--sub)">집계할 급여대장 월별 데이터가 없습니다.</td></tr>';
+  } else {
+    h += '<tr style="border-top:2px solid var(--line);background:var(--paper);text-align:right;font-weight:700">' +
+      '<td style="padding:7px 8px;text-align:left">연간 합계 (' + res.인원수 + '명)</td><td></td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.연간지급총액) + '</td>' +
+      '<td style="padding:7px 8px;color:var(--navy)">' + won(res.합계.과세보수총액) + '</td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.비과세합계) + '</td><td></td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.국민연금합계) + '</td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.건강보험합계 + res.합계.장기요양합계) + '</td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.고용보험합계) + '</td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.소득세합계 + res.합계.지방세합계) + '</td>' +
+      '<td style="padding:7px 8px">' + won(res.합계.건보정산예상 + res.합계.고용정산예상) + '</td></tr>';
+  }
+  h += '</table></div><div class="note"><b>연간 대사표 활용</b>: ① 매년 3월 10일 건강·고용·산재보험 보수총액신고(과세보수총액·근무월수) ② 매년 2월 근로소득 연말정산 기납부세액·4대보험료 공제 대사 ③ 매월/반기 간이지급명세서 누락 점검에 바로 사용합니다.</div>';
+  return h;
+}
 function screenCompliance() {
   if (!LC) return '<h1>계약·취업규칙·법정점검</h1><div class="empty">노동법 코어를 불러오지 못했습니다.</div>';
   if (!App.site) return pickSiteHtml('계약·취업규칙·법정점검', '사업장 선택 → 10인 이하 사업장 필수 법정사항 점검 · 근로계약서(17조)·취업규칙(93조) 자동 읽기·검토');
@@ -4100,7 +4233,10 @@ function screenCompliance() {
     '<button type="button" class="btn sec" onclick="fillStdContract(\'' + s + '\',\'' + curEmpEsc + '\')">📄 표준근로계약서 자동 채우기</button>' +
     '<label class="btn sec" style="cursor:pointer;display:inline-block">📂 계약서 파일 불러오기<input type="file" accept=".txt,.md,.html,.json,.csv" style="display:none" onchange="loadDocFileTo(this,\'contractTextArea\',\'contract\',\'' + s + '\',\'' + curEmpEsc + '\')"></label>' +
     '<button type="button" class="btn" onclick="saveContractReview(\'' + s + '\',\'' + curEmpEsc + '\')">🔍 읽고 자동 검토·저장</button>' +
-    '<button type="button" class="btn sec" onclick="applyExtractedContract(\'' + s + '\',\'' + curEmpEsc + '\')">⚡ 추출값 명부·급여에 반영</button></div>' +
+    '<button type="button" class="btn sec" onclick="applyExtractedContract(\'' + s + '\',\'' + curEmpEsc + '\')">⚡ 추출값 명부·급여에 반영</button>' +
+    '<input type="email" id="contractEmpEmail" value="' + esc(empMeta(site, curEmp).이메일 || '') + '" placeholder="근로자 이메일(전자교부용)" onchange="lput(\'emp_meta\',\'' + s + '|' + curEmpEsc + '\',{이메일:this.value})" style="width:170px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px">' +
+    '<button type="button" class="btn" onclick="sendContractEmail(\'' + s + '\',\'' + curEmpEsc + '\')">📧 계약서 이메일 전자교부</button>' +
+    ((lmap('contract_sent')[site + '|' + curEmp]) ? '<span class="badge ok">교부완료 ' + new Date(lmap('contract_sent')[site + '|' + curEmp].at).toLocaleDateString() + '</span>' : '') + '</div>' +
     '<textarea id="contractTextArea" rows="7" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:12.5px;line-height:1.55" placeholder="근로계약서 전문을 붙여넣거나 파일을 불러오면 성명·입사일·근로시간·임금을 자동으로 읽고 법 위반 여부를 검토합니다.">' + esc(ctText) + '</textarea>' +
     '<div style="margin-top:10px;padding:8px 12px;background:var(--paper);border-radius:8px;font-size:12px;display:flex;gap:14px;flex-wrap:wrap">' +
     '<b>자동 읽은 값:</b> ' +
@@ -4136,7 +4272,12 @@ function screenCompliance() {
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px">' +
     '<button type="button" class="btn sec" onclick="fillStdWorkRules(\'' + s + '\')">📘 표준 취업규칙·복무규정 자동 채우기</button>' +
     '<label class="btn sec" style="cursor:pointer;display:inline-block">📂 취업규칙 파일 불러오기<input type="file" accept=".txt,.md,.html,.json" style="display:none" onchange="loadDocFileTo(this,\'workRulesTextArea\',\'workrules\',\'' + s + '\',\'\')"></label>' +
-    '<button type="button" class="btn" onclick="saveWorkRulesReview(\'' + s + '\')">🔍 취업규칙 읽고 자동 검토·저장</button></div>' +
+    '<button type="button" class="btn" onclick="saveWorkRulesReview(\'' + s + '\')">🔍 취업규칙 읽고 자동 검토·저장</button>' +
+    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신고서\')">📋 노동부 신고서 생성·복사</button>' +
+    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'의견청취서\')">✍️ 과반수 의견청취·동의서(서명란)</button>' +
+    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신구대조표\')">📊 2025~2026 신·구 대조표</button>' +
+    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'all\')">📑 신고서류 3종 일괄복사</button></div>' +
+    '<textarea id="wrFilingDocPreview" rows="6" style="display:none;width:100%;margin-bottom:8px;border:1px solid var(--navy);border-radius:8px;padding:10px;background:#f8fafc;font-family:inherit;font-size:12px;line-height:1.5" readonly placeholder="위 신고서·의견청취서·신구대조표 버튼을 누르면 서식이 여기에 생성되고 클립보드에 자동 복사됩니다."></textarea>' +
     '<textarea id="workRulesTextArea" rows="8" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:12.5px;line-height:1.55" placeholder="취업규칙 또는 복무규정 전문을 붙여넣거나 파일을 불러오면 근기법 제93조 12대 필수항목과 최신 개정법(배우자출산휴가 20일·공휴일 유급화·감봉 한도 등) 위반 여부를 자동 검토합니다.">' + esc(wrText) + '</textarea>';
 
   if (wrRev.위법경고.length) {
@@ -4150,6 +4291,50 @@ function screenCompliance() {
       return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px">' + c.no + '</td><td style="padding:6px 8px;font-weight:600">' + c.title + '</td><td style="padding:6px 8px;color:var(--sub)">' + c.law + '</td>' +
         '<td style="padding:6px 8px">' + (c.ok ? '<span class="badge ok">✔ 기재 확인</span>' : '<span class="badge warn">⚠ 보완 필요</span>') + '</td></tr>';
     }).join('') + '</table></div></div></div>';
+
+  /* 4. 3.3% 사업소득·일용·단시간 근로자 상용전환·주휴·퇴직금·4대보험 직권가입 위험 자동 진단 */
+  var nrDiag = LC.diagnoseNonRegularRisk(buildSiteNonRegularRecords(site));
+  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
+    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+    '<div><b>④ 3.3%·일용·단시간 근로자 「상용직 전환 · 주휴수당 · 퇴직금 · 4대보험 직권가입」 위험 자동 진단</b></div>' +
+    '<span class="badge ' + (nrDiag.위험인원수 ? 'warn' : 'ok') + '">전체 ' + nrDiag.전체인원수 + '명 중 위험·점검 ' + nrDiag.위험인원수 + '명</span></div>' +
+    '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+    '<tr style="background:var(--paper)"><th style="padding:7px 8px;text-align:left">순번·성명</th><th style="padding:7px 8px;text-align:left">형태</th><th style="padding:7px 8px;text-align:right">누적월수</th><th style="padding:7px 8px;text-align:right">최대월일수/시간</th><th style="padding:7px 8px;text-align:right">주평균시간</th><th style="padding:7px 8px;text-align:left">자동 진단·법적 발생 의무</th></tr>' +
+    (nrDiag.rows.length ? nrDiag.rows.map(function (r, idx) {
+      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('nrrisk:' + site + '|' + r.성명, idx + 1) + ' ' + r.성명 + '</td>' +
+        '<td style="padding:6px 8px;white-space:nowrap">' + r.고용형태 + '</td>' +
+        '<td style="padding:6px 8px;text-align:right">' + r.누적근무월수 + '개월</td>' +
+        '<td style="padding:6px 8px;text-align:right">' + r.최대월근무일수 + '일 / ' + r.최대월근무시간 + 'h</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:600">' + r.주평균근로시간 + 'h</td>' +
+        '<td style="padding:6px 8px">' + (r.위험건수 ? r.위험목록.map(function (rk) { return '<div><span class="badge warn">' + rk.title + '</span> <span style="color:var(--sub);font-size:11.5px">[' + rk.law + '] ' + rk.msg + '</span></div>'; }).join('') : '<span class="badge ok">✔ 특이 위험 없음</span>') + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--sub)">진단할 직원 급여·명부 기록이 없습니다.</td></tr>') + '</table></div></div>';
+
+  /* 5. 모성보호·육아휴직·출산육아기 대체인력·고령자 계속고용 사업주 정부지원금 자동 매칭·산출 */
+  var agedCnt = emps.filter(function (e) {
+    var nm = String(e.성명 || '').trim(), meta = empMeta(site, nm), rrn = (typeof rrnRec === 'function') ? rrnRec(site, nm) : null;
+    var b = meta.생년월일 || (rrn ? birthOfMask(rrn.mask) : '');
+    return b && LC.fullYearsBetween(b, year + '-12-31') >= 60;
+  }).length;
+  var subMatch = LC.matchEmployerSubsidies({ empCount: emps.length, aged60PlusCount: agedCnt });
+  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
+    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+    '<div><b>⑤ 모성보호·육아휴직·출산육아기 대체인력·고령자 계속고용 사업주 정부지원금 자동 매칭</b> <span style="font-size:12px;color:var(--sub)">(' + subMatch.사업장구분 + ')</span></div>' +
+    '<span class="badge ok">1인 사유 발생 시 최대 예상 ' + won(subMatch.총예상지원금합계) + '원</span></div>' +
+    '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+    '<tr style="background:var(--paper)"><th style="padding:7px 8px;text-align:left">순번·지원금명</th><th style="padding:7px 8px;text-align:left">법 근거</th><th style="padding:7px 8px;text-align:right">월 지원액</th><th style="padding:7px 8px;text-align:right">최대 예상합계</th><th style="padding:7px 8px;text-align:left">요건·지급방식·필수 구비서류</th></tr>' +
+    subMatch.programs.map(function (p, idx) {
+      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('sub:' + site + '|' + p.id, idx + 1) + ' ' + p.title + '</td>' +
+        '<td style="padding:6px 8px;color:var(--sub);white-space:nowrap">' + p.law + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:700">' + won(p.monthlyAmount) + '원' + (p.specialMonthlyAmount ? '<div style="font-size:11px;color:var(--navy)">특례 ' + won(p.specialMonthlyAmount) + '원</div>' : '') + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--navy)">' + won(p.예상지원액) + '원</td>' +
+        '<td style="padding:6px 8px;font-size:11.5px"><div>' + p.targetDesc + ' · <b>' + p.paymentRule + '</b></div><div style="color:var(--sub)">구비서류: ' + p.docs.join(', ') + '</div></td></tr>';
+    }).join('') + '</table></div></div>';
+
+  /* 6. 연간 4대보험 보수총액신고 · 연말정산 · 간이지급명세서 직원별 대사표 */
+  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
+    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+    '<div><b>⑥ 연간 노무·세무 대사표 (3월 보수총액신고 · 2월 연말정산 · 간이지급명세서)</b></div></div>' +
+    '<div style="padding:12px 16px">' + renderAnnualSettlementReport(payForReport(), site) + '</div></div>';
   return h;
 }
 window.screenRoster = screenRoster; window.screenCompliance = screenCompliance;
@@ -4157,6 +4342,8 @@ window.addRosterEmp = addRosterEmp; window.copyRosterTSV = copyRosterTSV; window
 window.toggleCompCheck = toggleCompCheck; window.saveContractReview = saveContractReview; window.fillStdContract = fillStdContract;
 window.applyExtractedContract = applyExtractedContract; window.loadDocFileTo = loadDocFileTo;
 window.saveWorkRulesReview = saveWorkRulesReview; window.fillStdWorkRules = fillStdWorkRules;
+window.sendContractEmail = sendContractEmail; window.copyWorkRulesFilingDocs = copyWorkRulesFilingDocs;
+window.copyAnnualSettleTSV = copyAnnualSettleTSV; window.renderAnnualSettlementReport = renderAnnualSettlementReport;
 
 function render(){
   var bb=document.getElementById('backbtn'); if(bb) bb.style.display=(navDepth>0)?'':'none';
