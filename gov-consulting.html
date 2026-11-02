@@ -979,10 +979,62 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .ended-tab.warn.on .n{background:#d97706;}
 .ended-tab.dang.on{color:var(--danger);border-bottom-color:var(--danger);}
 .ended-tab.dang.on .n{background:var(--danger);}
-.ended-min{min-width:1200px;}
-.eg{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 132px 104px 138px 78px 78px 50px 44px 44px 78px 108px minmax(150px,1fr);}
+.ended-min{min-width:1300px;}
+.eg{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 132px 104px 138px 78px 78px 50px 44px 44px 96px 78px 108px minmax(150px,1fr);}
 .eg2{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 132px 138px 56px minmax(260px,1fr) auto;}
 .eg3{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 170px 124px 84px 94px 118px minmax(180px,1fr);}
+/* ══ 사후컨설팅 (대표 지시 2026-11-02) — 종료 목록의 열 · 오른쪽 서랍 · 달력 칩. 색은 기존 변수만 쓴다 ══ */
+.ended-pbtn{font:inherit;font-size:11px;font-weight:900;padding:3px 8px;border-radius:7px;border:1px dashed var(--border);background:transparent;color:var(--t2);cursor:pointer;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.ended-pbtn:hover{border-color:var(--accent);color:var(--accent);}
+.ended-pbtn.on{border-style:solid;border-color:var(--accent);background:var(--sf2);color:var(--accent);}
+.chip.is-post{box-shadow:inset 0 0 0 1px currentColor;}
+#mbPost{z-index:490;justify-content:flex-end;align-items:stretch;padding:0;}
+.post-modal{width:min(560px,100vw);max-width:none;height:100%;border-radius:16px 0 0 16px;display:flex;flex-direction:column;overflow:hidden;}
+.post-modal .mbody{flex:1;min-height:0;overflow:auto;padding:14px 16px;}
+.post-hd{margin-bottom:10px;}
+.post-co{font-size:16px;font-weight:900;}
+.post-sub{font-size:12px;font-weight:700;color:var(--t2);margin-top:2px;}
+.post-listhd,.post-row{display:grid;align-items:center;column-gap:8px;grid-template-columns:22px 28px 52px 70px auto minmax(60px,1fr) auto;}
+.post-listhd{font-size:10.5px;font-weight:900;color:var(--t2);padding:0 8px 4px;}
+.post-row{padding:6px 8px;border-top:1px dashed var(--border);font-size:12px;font-weight:700;white-space:nowrap;}
+.post-row.on{background:var(--sf2);border-radius:8px;}
+.post-row>*{overflow:hidden;text-overflow:ellipsis;}
+.post-no{text-align:center;font-size:11px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;}
+.post-ck,.post-ck-all{width:16px;height:16px;}
+.post-th{display:flex;gap:3px;align-items:center;}
+.post-th img{width:30px;height:30px;object-fit:cover;border-radius:5px;border:1px solid var(--border);}
+.post-mu{color:var(--t2);font-weight:700;font-size:11px;}
+.post-memo{color:var(--text);}
+.post-row>.post-acts{display:flex;gap:2px;justify-content:flex-end;overflow:visible;}
+.post-ib{border:none;background:transparent;font-size:15px;cursor:pointer;padding:3px 5px;border-radius:6px;}
+.post-ib:hover{background:var(--sf2);}
+.post-bar{display:flex;align-items:center;gap:8px;font-size:12px;}
+.post-bar:not(:empty){padding:6px 8px;margin:4px 0;background:var(--sf2);border-radius:8px;}
+.post-empty,.post-note{padding:16px;text-align:center;color:var(--t2);font-size:12px;font-weight:800;border:1px dashed var(--border);border-radius:10px;}
+.post-form{margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);}
+.post-ft{font-size:13px;font-weight:900;margin-bottom:8px;}
+.post-fl{display:block;font-size:11px;font-weight:800;color:var(--t2);margin-bottom:8px;}
+.post-fl input[type=date],.post-fl input[type=text]{display:block;width:100%;margin-top:3px;padding:8px 10px;font:inherit;font-size:16px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+.post-fld-btns{display:flex;gap:6px;margin-top:3px;}
+.post-fld{flex:1;padding:8px;font:inherit;font-size:13px;font-weight:800;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--t2);cursor:pointer;}
+.post-fld.on{border-color:var(--accent);background:var(--sf2);color:var(--accent);}
+.post-slots{display:flex;gap:6px;margin-bottom:4px;}
+.post-slot{flex:1;padding:14px 6px;font:inherit;font-size:12px;font-weight:800;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--t2);cursor:pointer;}
+.post-slot:hover{border-color:var(--accent);color:var(--accent);}
+.post-err{margin:6px 0;color:var(--danger);font-size:12px;font-weight:800;}
+.post-fbtn{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.post-rules{margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
+.post-rule{font-size:11.5px;font-weight:700;color:var(--t2);padding:3px 0 3px 12px;position:relative;line-height:1.5;}
+.post-rule::before{content:'•';position:absolute;left:2px;}
+@media (max-width:640px){
+  .post-modal{border-radius:0;}
+  .post-listhd{display:none;}
+  .post-row{grid-template-columns:22px 28px auto 1fr auto;row-gap:2px;}
+  .post-row>.post-acts{grid-column:5;grid-row:1;}
+  .post-row>.post-th{grid-column:3;grid-row:2;}
+  .post-row>.post-memo{grid-column:4/-1;grid-row:2;}
+  .post-ck,.post-ck-all{width:22px;height:22px;}
+}
 .ecolhd{font-size:10.5px;font-weight:900;color:var(--t2);padding:0 14px 4px;}
 .ended-card2{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;}
 .ended-card2.del{border-left:4px solid var(--danger);}
@@ -1497,7 +1549,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <script src="js/pu-hwp-engine.js?v=21"></script>
   <script src="js/pu-hwp-preview.js?v=2"></script>
   <script src="js/pu-gov-report.js?v=6"></script>
-  <script src="js/pu-gov-report-build.js?v=5"></script>
+  <script src="js/pu-gov-report-build.js?v=6"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
   <script src="js/pu-gov-report-ai.js?v=4"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
@@ -2389,6 +2441,14 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="mhdr"><h3 id="endEditTitle">종료 뒤 수정</h3><button class="mcls" onclick="closeModal('mbEndEdit')">✕</button></div>
     <div class="mbody" id="endEditBody"></div>
     <div class="mfoot" id="endEditFoot"></div>
+  </div>
+</div>
+
+<!-- 사후컨설팅 서랍 — 종료 사업장 관리의 「사후」 단추 · 달력의 「사후」 칩 -->
+<div class="mb" id="mbPost">
+  <div class="modal post-modal">
+    <div class="mhdr"><h3 id="postTitle">사후컨설팅</h3><button class="mcls" onclick="closePostDrawer()">✕</button></div>
+    <div class="mbody" id="postBody"></div>
   </div>
 </div>
 
@@ -3683,7 +3743,7 @@ function renderPhotoGal(){
       const cv=PHOTOS[sc.id]&&PHOTOS[sc.id][k];
       if(cv){
         const thumb=cv.toDataURL('image/jpeg',.7);
-        const fn=`${date}_${ty?.name||'컨설팅'}_${co?.name||'사업장'}_${schedPhase(sc)==='pre'?'사전진단':''}${sc.round||0}회_${slotFileLabel(sc,+k.slice(1))}.jpg`;
+        const fn=`${date}_${ty?.name||'컨설팅'}_${co?.name||'사업장'}_${schedPhase(sc)==='pre'?'사전진단':(isPostSched(sc)?'사후':'')}${sc.round||0}회_${slotFileLabel(sc,+k.slice(1))}.jpg`;
         return `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;">
           <div style="aspect-ratio:4/3;background:#000;cursor:zoom-in;" onclick="galView('${sc.id}','${k}','${escAttr(fn)}')"><img src="${thumb}" alt="${lbl} 사진" style="width:100%;height:100%;object-fit:cover;display:block;"></div>
           <div style="padding:6px 8px;display:flex;align-items:center;justify-content:space-between;">
@@ -3724,7 +3784,7 @@ async function galZip(){
   scheds.forEach(sc=>{
     const co=cos.find(c=>c.id===sc.coId), ty=types.find(t=>t.id===sc.typeId), att=staff.find(a=>a.id===sc.attId);
     const p=PHOTOS[sc.id]||{};
-    const ph=schedPhase(sc)==='pre'?'사전진단':'';
+    const ph=schedPhase(sc)==='pre'?'사전진단':(isPostSched(sc)?'사후':'');
     Object.keys(p).filter(k=>/^c\d+$/.test(k)&&p[k]).sort((a,b)=>+a.slice(1)-+b.slice(1)).forEach(k=>{
       const i=+k.slice(1);
       const b64=p[k].toDataURL('image/jpeg',.92).split(',')[1];
@@ -3854,7 +3914,7 @@ function renderEditPhotos(sid,sc){
       if(!stamped)stamped=await evEnsureLocal(sid,d.key);
       const orig=await getPhotoFromDB(sid,d.okey);
       const plain=await getPhotoFromDB(sid,plainKey(d.i));   // 「안 찍음」 표
-      const fn=`${tyNm}_${co?.name||'사업장'}_${schedPhase(sc)==='pre'?'사전진단':''}${sc?.round||'N'}회_${slotFileLabel(sc,d.i)}.jpg`.replace(/'/g,'');
+      const fn=`${tyNm}_${co?.name||'사업장'}_${schedPhase(sc)==='pre'?'사전진단':(isPostSched(sc)?'사후':'')}${sc?.round||'N'}회_${slotFileLabel(sc,d.i)}.jpg`.replace(/'/g,'');
       const cell=document.createElement('div');
       if(stamped){
         let h=`<div class="edit-photo-card"><div class="edit-photo-label">${d.label}</div>`;
@@ -6621,7 +6681,12 @@ function endedFlagsFor(info){
   const n=dates.length, last=dates[n-1]||'';
   const field=(info.scheds||[]).filter(s=>s.isField).length;
   const add=(rule,label,reason,hint,acts)=>{ if(checked.indexOf(rule)<0)out.push({rule,label,reason,hint,acts}); };
-  if(info.erp==='running')add('erp','이알피 진행 중',`이알피 「진행」 · 일정관리 종료 ${endedMd(end)}`,'사후컨설팅이 남은 사업이면 그대로 두세요. 아니면 이알피에서 종료해 주세요',['check']);
+  if(info.erp==='running'){
+    /* 사후가 입력돼 있으면 «이알피가 진행 중인 까닭»이 설명된다 — 규칙은 빼지 않고(이알피 종료 정리가 가려진다) 이름표와 근거만 바꾼다 */
+    const pc=info.postCnt||0;
+    add('erp',pc?'사후 진행 중':'이알피 진행 중',`이알피 「진행」 · 일정관리 종료 ${endedMd(end)}`+(pc?` · 사후 ${pc}회 입력됨`:''),
+      pc?'사후컨설팅이 이어지는 사업으로 보입니다 — 사후가 끝나면 이알피에서 종료해 주세요':'사후컨설팅이 남은 사업이면 그대로 두세요. 아니면 이알피에서 종료해 주세요',['check']);
+  }
   if((info.sameDay||0)>=3)add('bulk',`같은 날 ${info.sameDay}건`,`${endedMd(end)} 하루 ${info.sameDay}건 종료`+(n?` · 마지막 방문 ${endedMd(last)}`:' · 이 사업은 일정 0회'),n?`종료일 → ${endedMd(last)} (마지막 방문일)`:'일정이 없어 실제로 끝난 날을 알 수 없음',n?['fix','check']:['check']);
   if(n&&end&&endedDays(last,end)>30)add('late',`${endedDays(last,end)}일 뒤 종료`,`마지막 방문 ${endedMd(last)} · 종료 ${endedMd(end)} (${endedDays(last,end)}일 뒤)`,`종료일 → ${endedMd(last)}`,['fix','check']);
   if(n&&((info.maxR>0&&n<info.maxR)||(info.mandatory>0&&field<info.mandatory)))
@@ -6661,7 +6726,7 @@ function endedInfos(){
   list.forEach(i=>{
     if(i.state!=='ended')return;
     i.sameDay=byDate[i.endedDate]||0;
-    i.flags=endedFlagsFor({endedDate:i.endedDate,scheds:i.scheds,maxR:i.maxR,mandatory:i.mandatory,deadline:i.deadline,erp:i.erp,sameDay:i.sameDay,checked:(i.co.endedChk&&i.co.endedChk[i.tid])||[]});
+    i.flags=endedFlagsFor({endedDate:i.endedDate,scheds:i.scheds,postCnt:i.postCnt,maxR:i.maxR,mandatory:i.mandatory,deadline:i.deadline,erp:i.erp,sameDay:i.sameDay,checked:(i.co.endedChk&&i.co.endedChk[i.tid])||[]});
   });
   return list.sort((a,b)=>((b.state==='editing')-(a.state==='editing'))||String(b.endedDate).localeCompare(String(a.endedDate))||String(a.co.name||'').localeCompare(String(b.co.name||''),'ko'));
 }
@@ -6756,7 +6821,7 @@ function endedListHtml(items,ref,q){
   const groups=[]; const idx={};
   items.forEach(it=>{ if(idx[it.co.id]==null){idx[it.co.id]=groups.length;groups.push({co:it.co,rows:[]});} groups[idx[it.co.id]].rows.push(it); });
   let n=0;
-  const head=`<div class="ecolhd eg"><input type="checkbox" class="ended-ck-all" title="보이는 줄 모두 고르기" onchange="endedSelAll(this)"><span>번호</span><span>사업장</span><span>담당</span><span>사업</span><span>시작일</span><span>종료일</span><span>회차</span><span>현장</span><span>사무</span><span>계약만료</span><span>시기</span><span style="text-align:right">관리</span></div>`;
+  const head=`<div class="ecolhd eg"><input type="checkbox" class="ended-ck-all" title="보이는 줄 모두 고르기" onchange="endedSelAll(this)"><span>번호</span><span>사업장</span><span>담당</span><span>사업</span><span>시작일</span><span>종료일</span><span>회차</span><span>현장</span><span>사무</span><span>사후컨설팅</span><span>계약만료</span><span>시기</span><span style="text-align:right">관리</span></div>`;
   return head+groups.map(g=>`<div class="ended-card2">`+g.rows.map((it,ri)=>{
     n++;
     const t=(ref.types||[]).find(x=>x.id===it.tid)||{};
@@ -6777,7 +6842,7 @@ function endedListHtml(items,ref,q){
       <span>${ri?'':endedPeopleHtml(it.co,ref)}</span>
       <span><span class="ended-chip" style="background:${col}22;color:${col};border:1px solid ${col}66;border-left:4px solid ${col}" title="${escAttr(t.agency||'')}">${endedHi(t.name||t.fullName||'',q)}</span></span>
       <span class="ended-mu">${escAttr(it.start||'-')}</span><span class="ended-line-date">${escAttr(it.endedDate||'-')}</span>
-      <span>${it.cnt}/${it.maxR||'-'}</span><span>📍${it.fieldCnt}</span><span>🏢${it.officeCnt}</span><span class="ended-mu">${escAttr(it.deadline||'-')}</span>
+      <span>${it.cnt}/${it.maxR||'-'}</span><span>📍${it.fieldCnt}</span><span>🏢${it.officeCnt}</span><span>${postCellHtml(it)}</span><span class="ended-mu">${escAttr(it.deadline||'-')}</span>
       <span>${st}</span><span class="ended-acts">${acts}</span></div>${note}`;
   }).join('')+'</div>').join('');
 }
@@ -6874,6 +6939,194 @@ function endedSetTyp(v){ S.endedTyp=v||''; renderEndedView(); }
 function endedMore(rule){ if(!S.endedMore)S.endedMore={}; S.endedMore[rule]=true; renderEndedView(); }
 function endedFixOpen(coId,tid){ S.endedFix={coId,tid}; renderEndedView(); }
 function endedFixCancel(){ S.endedFix=null; renderEndedView(); }
+/* ══════ 사후컨설팅 서랍 (대표 지시 2026-11-02, 시안 승인 「추천대로」) ══════
+   종료된(또는 «수정 중»인) 사업 뒤에 이어지는 후속 방문을 «본 회차에 넣지 않고» 따로 입력한다.
+   ■ 일정 레코드 phase:'post' 한 줄 — 새 저장 칸·새 localStorage 키 없음(setScheds 한 자리). 사업은 종료 상태 그대로 둔다.
+   ■ 달력에는 「사후」 칩으로 나오고(잠기지 않는다), 칩을 누르면 이 서랍이 열린다. 날짜는 여기서 고친다(끌어 옮기지 않는다).
+   ■ 사진은 본 일정과 같은 증빙 흐름(openStampModal·PHOTOS) — 일정을 먼저 저장하고 사진 창을 연다.
+   ■ 번호(1,2,3)는 «보는 순서»이자 사후 회차다 — 날짜순으로 reorderRounds 가 다시 매긴다. */
+let _post=null;   // 서랍 상태 {coId,tid,editId,focusId,date,field,memo,err}
+function postListFor(coId,tid){
+  return getScheds().filter(s=>isPostSched(s)&&s.coId===coId&&s.typeId===tid)
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.id).localeCompare(String(b.id)));
+}
+/* 썸네일 — 큰 사진을 그대로 글자로 바꾸면 느리니 작게 줄여서 */
+function postThumbs(sid){
+  const p=PHOTOS[sid]; const out=[];
+  if(!p||typeof document==='undefined')return out;
+  ['c0','c1'].forEach(k=>{
+    const cv=p[k];
+    if(!cv||typeof cv.toDataURL!=='function'||!cv.width)return;
+    try{
+      const t=document.createElement('canvas'); t.width=64; t.height=Math.max(1,Math.round(64*cv.height/cv.width));
+      t.getContext('2d').drawImage(cv,0,0,t.width,t.height);
+      out.push(t.toDataURL('image/jpeg',.6));
+    }catch(e){}
+  });
+  return out;
+}
+/* 서랍에 그릴 값 — 이름만 보인다(사번·이메일은 화면에 안 적는다) */
+function postDrawerView(coId,tid){
+  const co=getCos().find(c=>c.id===coId)||{id:coId,name:''};
+  const ty=getTypes().find(t=>t.id===tid)||{id:tid,name:''};
+  const f=_post||{};
+  const ended=(co.endedTypes&&co.endedTypes[tid])||'';
+  const re=ended?null:((co.reopened&&co.reopened[tid])||null);
+  const staff=getStaff(); const posts=postListFor(coId,tid); const thumbs={};
+  posts.forEach(s=>{ thumbs[s.id]=postThumbs(s.id); });
+  return {co:{id:co.id,name:co.name||''},ty:{id:ty.id,name:ty.name||'',fullName:ty.fullName||''},
+    state:ended?'ended':(re?'editing':'active'),endedDate:ended||(re&&re.was)||'',focusId:f.focusId||'',
+    posts:posts.map(s=>({id:s.id,date:s.date||'',isField:!!s.isField,memo:s.memo||'',round:s.round||0,att:(staff.find(a=>a.id===s.attId)||{}).name||''})),
+    thumbs,form:{editId:f.editId||'',date:f.date||'',field:f.field!==false,memo:f.memo||'',err:f.err||''}};
+}
+function postDrawerHtml(v){
+  const e=escAttr, f=v.form||{}, posts=v.posts||[], thumbs=v.thumbs||{};
+  const stTxt=v.state==='ended'?`종료 ${e(v.endedDate)}`:v.state==='editing'?`✏ 수정 중 · 원래 종료일 ${e(v.endedDate)}`:'진행 중';
+  const head=`<div class="post-hd"><div class="post-co">${e(v.co.name)}</div><div class="post-sub">${e(v.ty.fullName||v.ty.name)} · ${stTxt}</div></div>`;
+  const rows=posts.map((p,i)=>{
+    const th=thumbs[p.id]||[]; const on=v.focusId===p.id||f.editId===p.id; const sid=e(p.id);
+    return `<div class="post-row${on?' on':''}" data-sid="${sid}"><input type="checkbox" class="post-ck" data-sid="${sid}" onchange="postSelChange()"><span class="post-no" title="사후 ${i+1}회">${i+1}</span>`+
+      `<span class="post-date">${e(String(p.date).slice(5))}</span><span class="post-kind">${p.isField?'📍 방문':'🏢 사무실'}</span>`+
+      `<span class="post-th">${th.length?th.map(u=>`<img src="${e(u)}" alt="사진">`).join(''):'<span class="post-mu">사진 없음</span>'}</span>`+
+      `<span class="post-memo" title="${e(p.memo)}">${e(p.memo)}</span>`+
+      `<span class="post-acts"><button class="post-ib" title="사진 넣기·바꾸기" onclick="postPhoto('${sid}')">📷</button><button class="post-ib" title="날짜·메모 고치기" onclick="postEdit('${sid}')">✏️</button><button class="post-ib" title="지우기" onclick="postDelete('${sid}')">🗑</button></span></div>`;
+  }).join('');
+  const bar=`<div id="postBar" class="post-bar"></div>`;   // 선택 막대 — 소스에 한 번만(같은 id 가 두 번 적히면 검사가 막는다)
+  const list=posts.length
+    ?`<div class="post-listhd"><input type="checkbox" class="post-ck-all" title="모두 고르기" onchange="postSelAll(this)"><span>번호</span><span>날짜</span><span>구분</span><span>사진</span><span>메모</span><span></span></div>${bar}${rows}`
+    :`<div class="post-empty">아직 입력한 사후컨설팅이 없습니다</div>${bar}`;
+  const editing=!!f.editId;
+  const form=v.state==='active'
+    ?`<div class="post-note">종료된 사업에서만 사후컨설팅을 넣을 수 있습니다. 이 사업은 아직 진행 중입니다.</div>`
+    :`<div class="post-form"><div class="post-ft">${editing?'✏️ 사후컨설팅 고치기':'＋ 사후컨설팅 추가'}</div>`+
+      `<label class="post-fl">날짜<input type="date" id="postDate" value="${e(f.date)}"></label>`+
+      `<div class="post-fl">방문 구분<div class="post-fld-btns"><button type="button" class="post-fld${f.field?' on':''}" onclick="postSetField(1)">📍 방문</button><button type="button" class="post-fld${f.field?'':' on'}" onclick="postSetField(0)">🏢 사무실</button></div></div>`+
+      `<label class="post-fl">메모<input type="text" id="postMemo" maxlength="200" placeholder="한 줄 메모 (선택)" value="${e(f.memo)}"></label>`+
+      (editing?'':`<div class="post-slots"><button type="button" class="post-slot" onclick="postSave(true)">📷 입장 사진</button><button type="button" class="post-slot" onclick="postSave(true)">🔧 활동 사진</button></div><div class="post-mu">사진 2칸은 저장한 뒤 시각 도장과 함께 넣습니다.</div>`)+
+      (f.err?`<div class="post-err">${e(f.err)}</div>`:'')+
+      `<div class="post-fbtn">${editing?`<button class="btn btn-p" onclick="postSave(false)">저장</button><button class="btn btn-s" onclick="postCancel()">취소</button>`:`<button class="btn btn-p" onclick="postSave(false)">＋ 사후컨설팅 추가</button><button class="btn btn-s" onclick="postSave(true)">추가하고 📷 사진 넣기</button>`}</div></div>`;
+  const rules=`<div class="post-rules"><div class="post-rule">사후컨설팅은 본 회차(예 3/3)에 들어가지 않습니다 — 「사후 1회, 2회…」로 따로 셉니다.</div>`+
+    `<div class="post-rule">사업은 종료 상태 그대로입니다 — 진행 목록에 다시 올라오지 않고, 기관 보고서·종료 판정에도 섞이지 않습니다.</div>`+
+    `<div class="post-rule">달력에는 「사후」 칩으로 나옵니다 — 칩을 누르면 이 창이 열리고, 날짜는 여기서 고칩니다.</div></div>`;
+  return head+list+form+rules;
+}
+/* 종료 목록의 「사후컨설팅」 칸 — 입력 전 「＋ 사후」, 입력 후 「사후 N회 · 📷M」 */
+function postCellHtml(it){
+  const k=`'${it.co.id}','${it.tid}'`;
+  return it.postCnt>0
+    ?`<button class="ended-pbtn on" onclick="openPostDrawer(${k})" title="사후컨설팅 ${it.postCnt}회 — 눌러서 보기·넣기">사후 ${it.postCnt}회${it.postPhotoCnt?` · 📷${it.postPhotoCnt}`:''}</button>`
+    :`<button class="ended-pbtn" onclick="openPostDrawer(${k})" title="사후컨설팅 넣기">＋ 사후</button>`;
+}
+function renderPostDrawer(){
+  if(!_post)return;
+  const m=q('#mbPost'); if(!m||!m.classList.contains('open'))return;   // 닫힌 서랍은 다시 그리지 않는다
+  const v=postDrawerView(_post.coId,_post.tid);
+  const t=q('#postTitle'); if(t)t.textContent=`📋 사후컨설팅 · ${v.co.name}`;
+  const b=q('#postBody'); if(b)b.innerHTML=postDrawerHtml(v);
+  postSelChange();
+}
+function openPostDrawer(coId,tid,sid){
+  _post={coId,tid,editId:'',focusId:sid||'',date:'',field:true,memo:'',err:''};
+  const m=q('#mbPost'); if(!m)return;
+  m.classList.add('open');
+  renderPostDrawer();
+}
+function closePostDrawer(){ closeModal('mbPost'); _post=null; }
+function postFormRead(){
+  if(!_post)return;
+  const d=q('#postDate'), m=q('#postMemo');
+  if(d)_post.date=String(d.value||'').trim();
+  if(m)_post.memo=String(m.value||'').trim();
+}
+function postSetField(on){ if(!_post)return; postFormRead(); _post.field=!!on; renderPostDrawer(); }
+function postEdit(sid){
+  const sc=getScheds().find(s=>s.id===sid&&isPostSched(s)); if(!sc||!_post)return;
+  _post.editId=sid; _post.focusId=sid; _post.date=sc.date||''; _post.field=sc.isField!==false; _post.memo=sc.memo||''; _post.err='';
+  renderPostDrawer();
+}
+function postCancel(){ if(!_post)return; _post.editId=''; _post.date=''; _post.memo=''; _post.err=''; renderPostDrawer(); }
+/* 못 넣는 까닭 — 비어 있으면 넣을 수 있다. 사업(프로그램) 규칙(같은 담당 하루 1건·기관 하루 1사업장)은 안 보고,
+   «사람·사업장이 실제로 가는 날»의 충돌(같은 날 같은 사업 · 같은 사업장 다른 사업 · 담당 하루 한도)만 본다. */
+function postProblem(co,tid,date,excludeId){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date)))return '날짜를 정해 주세요 (예 2026-11-05)';
+  const blocked=isBlocked(date,tid); if(blocked)return blocked;
+  if(getScheds().some(s=>s.id!==excludeId&&s.coId===co.id&&s.typeId===tid&&s.date===date))return `${date}에 이 사업의 일정이 이미 있습니다`;
+  const other=coOtherTypeOn(co.id,tid,date,excludeId); if(other)return `${date}에 같은 사업장의 다른 사업(${other})이 이미 있습니다`;
+  return checkAttLimit(coMainOf(co,tid)||myId()||'a1',date,excludeId)||'';
+}
+/* 일정 레코드 — 고칠 때는 «다른 칸(사진 설정 등)»을 그대로 두고 날짜·구분·메모만 바꾼다. 빈 메모는 칸을 두지 않는다(undefined 금지). */
+function postBuildSched(co,tid,f,existing){
+  const sc=Object.assign({},existing||{});
+  if(!existing){
+    sc.id=uid(); sc.coId=co.id; sc.typeId=tid; sc.round=0;
+    sc.attId=coMainOf(co,tid)||myId()||'a1'; sc.coAttIds=getCoAtts(co); sc.createdBy=myId()||'';
+  }
+  sc.phase='post'; sc.date=f.date; sc.isField=!!f.field;
+  if(f.memo)sc.memo=f.memo; else delete sc.memo;
+  return sc;
+}
+async function postSave(withPhoto){
+  if(!_post)return;
+  postFormRead();
+  const {coId,tid,editId,date,field,memo}=_post;
+  const co=getCos().find(c=>c.id===coId); if(!co)return;
+  const err=postProblem(co,tid,date,editId);
+  if(err){ _post.err=err; renderPostDrawer(); toast(err,'err'); return; }
+  if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
+  const scheds=getScheds();
+  const old=editId?scheds.find(s=>s.id===editId&&isPostSched(s)):null;
+  if(editId&&!old){
+    releaseCompanyEditLock(); _post.editId=''; _post.err='고치던 사후컨설팅을 찾을 수 없습니다 (이미 지워졌을 수 있습니다)';
+    renderPostDrawer(); toast(_post.err,'err'); return;
+  }
+  const sc=postBuildSched(co,tid,{date,field,memo},old);
+  if(old)scheds[scheds.indexOf(old)]=sc; else scheds.push(sc);
+  setScheds(scheds);
+  reorderRounds(coId,tid);          // 사후끼리 날짜순으로 1,2,3 — 본 일정 번호는 안 건드린다
+  releaseCompanyEditLock();
+  const fr=(getScheds().find(s=>s.id===sc.id)||{}).round||0;
+  _post.editId=''; _post.date=''; _post.memo=''; _post.err=''; _post.focusId=sc.id;
+  renderPostDrawer(); renderCal(); renderSummaryBar(); if(q('#endedList'))renderEndedView();
+  toast(old?'사후컨설팅을 고쳤습니다':`사후 ${fr}회를 넣었습니다`);
+  if(withPhoto)openStampModal(sc.id);
+}
+function postPhoto(sid){
+  const sc=getScheds().find(s=>s.id===sid&&isPostSched(s));
+  if(!sc){ toast('사후컨설팅을 찾을 수 없습니다','err'); return; }
+  openStampModal(sid);
+}
+function postDelete(sid){
+  const sc=getScheds().find(s=>s.id===sid&&isPostSched(s)); if(!sc)return;
+  showConfirm(`사후컨설팅 ${String(sc.date||'').slice(5)} 한 건을 지울까요?\n사진도 함께 지워집니다.`,()=>postRemove([sid]));
+}
+/* 지우기 — 사후 줄과 그 사진만. 사진 이력은 본 일정을 지울 때와 같이 남기고, 번호는 한 번에 다시 매긴다. */
+async function postRemove(ids){
+  if(!_post)return;
+  const coId=_post.coId, tid=_post.tid;
+  if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
+  const scheds=getScheds();
+  const gone=scheds.filter(s=>isPostSched(s)&&ids.includes(s.id)&&s.coId===coId&&s.typeId===tid);
+  if(!gone.length){ releaseCompanyEditLock(); return; }
+  for(const s of gone){ for(const i of [0,1]){ try{ const prev=await getPhotoFromDB(s.id,`c${i}`); if(prev)logPhoto('delete',s.id,i,prev); }catch(e){} } }
+  const keep=new Set(gone.map(s=>s.id));
+  setScheds(scheds.filter(s=>!keep.has(s.id)));
+  reorderRounds(coId,tid);
+  gone.forEach(s=>{ if(PHOTOS[s.id])delete PHOTOS[s.id]; deletePhotoFromDB(s.id); });
+  releaseCompanyEditLock();
+  _post.editId=''; _post.focusId='';
+  renderPostDrawer(); renderCal(); renderSummaryBar(); if(q('#endedList'))renderEndedView();
+  toast(`사후컨설팅 ${gone.length}건을 지웠습니다 · 번호를 다시 매겼습니다`);
+}
+function postSelKeys(){ return qa('#postBody .post-ck:checked').map(c=>c.dataset.sid); }
+function postSelAll(el){ qa('#postBody .post-ck:not(:disabled)').forEach(c=>{c.checked=el.checked;}); postSelChange(); }
+function postSelChange(){
+  const n=postSelKeys().length, b=q('#postBar'); if(!b)return;
+  b.innerHTML=n?`<b>${n}건 선택</b><button class="btn btn-s" style="font-size:11px;padding:4px 9px" onclick="postBatchDelete()">🗑 선택 삭제</button>`:'';
+}
+function postBatchDelete(){
+  const ids=postSelKeys(); if(!ids.length)return;
+  showConfirm(`사후컨설팅 ${ids.length}건을 지울까요?\n사진도 함께 지워지고 번호는 다시 매겨집니다.`,()=>postRemove(ids));
+}
 function endedGoDash(name){
   S.dashSearch=name||''; const i=q('#dashSearch'); if(i)i.value=S.dashSearch;
   showTab('main'); renderDash();
@@ -8394,7 +8647,7 @@ function grpStaffName(){
 async function grpCollect(coId,typeId){
   const co=getCos().find(function(c){ return c.id===coId; })||{id:coId,name:''};
   const t=getTypes().find(function(x){ return x.id===typeId; })||{id:typeId,name:''};
-  const scheds=getScheds().filter(function(s){ return s&&s.coId===coId&&s.typeId===typeId&&s.phase!=='pre'; })
+  const scheds=getScheds().filter(function(s){ return s&&s.coId===coId&&s.typeId===typeId&&s.phase!=='pre'&&s.phase!=='post'; })
     .map(function(s){ return {id:s.id,date:s.date,round:s.round,phase:s.phase||'',isField:s.isField,memo:s.memo||'',typeId:s.typeId,coId:s.coId}; });
   const cons=grpPickCons(coId,typeId);
   const today=todayStr();
@@ -8915,7 +9168,7 @@ function grpAiNames(st){
 }
 /* 회차마다 그날 일정 메모(사전진단 뺌) — 날짜로 잇는다. 보고서에서 더한 회차는 '' */
 function grpAiMemos(st){
-  const sc=((st.input&&st.input.scheds)||[]).filter(function(s){ return s&&s.phase!=='pre'; });
+  const sc=((st.input&&st.input.scheds)||[]).filter(function(s){ return s&&s.phase!=='pre'&&s.phase!=='post'; });
   return ((st.report&&st.report.rounds)||[]).map(function(r){
     const d=String((r&&r.date)||'');
     if(!d) return '';
@@ -13199,7 +13452,7 @@ function openStampModal(sid){
   const sc=getScheds().find(s=>s.id===sid);
   const co=sc?getCos().find(c=>c.id===sc.coId):null;
   const ty=sc?getTypes().find(t=>t.id===sc.typeId):null;
-  q('#mStampTitle').textContent=`📷 ${co?.name||'?'} · ${ty?.name||'?'} ${sc?.round||'?'}회차`;
+  q('#mStampTitle').textContent=`📷 ${co?.name||'?'} · ${ty?.name||'?'} ${isPostSched(sc)?'사후 ':''}${sc?.round||'?'}회차`;
   // 능률협회 산업일자리전환컨설팅 → 6시간 범위 기본 선택
   const tn=((ty?.fullName||ty?.name||'')+(ty?.agency||'')).replace(/\s/g,'');
   ST.rangeHr=(tn.includes('능률협회')&&tn.includes('산업일자리전환'))?6:2;
@@ -13513,7 +13766,7 @@ function renderRFs(){
         const cv=q(`#cv${ri}`);
         const co=getCos().find(c=>c.id===sc?.coId);
         const tyNm=getTypes().find(t=>t.id===sc?.typeId)?.name||'컨설팅';
-        const ph=schedPhase(sc)==='pre'?'사전진단':'';
+        const ph=schedPhase(sc)==='pre'?'사전진단':(isPostSched(sc)?'사후':'');
         const fn=`${tyNm}_${co?.name||'?'}_${ph}${sc?.round||'N'}회_${slotFileLabel(sc,ri)}.jpg`;
         if(cv)await saveCanvasAs(cv,fn);
         renderCal();
@@ -14201,7 +14454,7 @@ async function saveStamp(){
   const sc=getScheds().find(s=>s.id===ST.sid);
   const co=getCos().find(c=>c.id===sc?.coId);
   const tyNm=getTypes().find(t=>t.id===sc?.typeId)?.name||'컨설팅';
-  const slug=`${tyNm}_${co?.name||'?'}_${schedPhase(sc)==='pre'?'사전진단':''}${sc?.round||'N'}회`;
+  const slug=`${tyNm}_${co?.name||'?'}_${schedPhase(sc)==='pre'?'사전진단':(isPostSched(sc)?'사후':'')}${sc?.round||'N'}회`;
   const lblFn=i=>slotFileLabel(sc,i);
   if(!PHOTOS[ST.sid])PHOTOS[ST.sid]={};
   let saveFail=0;
@@ -14212,6 +14465,7 @@ async function saveStamp(){
   }
   if(saveFail){ toast(`${saveFail}장을 저장하지 못했습니다 — `+photoSaveFailMsg(),'err'); }
   closeModal('mbStamp');renderCal();
+  if(_post){ renderPostDrawer(); if(q('#endedList'))renderEndedView(); }   // 사후컨설팅 서랍의 사진과 종료 목록의 📷 수
   if(_photoQueue&&_photoQueue.length)setTimeout(runPhotoQueue,250);
   // 2) 파일 저장 (위치 선택, 순차)
   for(let i=0;i<N;i++){

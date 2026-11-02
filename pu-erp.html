@@ -16815,7 +16815,7 @@ function clinicGovHint(rec, scal, normFn, govMatch){
   var ids = {}; ids[co.id] = true;
   arr(scal.cos).forEach(function(c){ if(c && c.mergedInto === co.id) ids[c.id] = true; });
   var seen = {};
-  arr(scal.scheds).forEach(function(s){ if(s && ids[s.coId] && s.typeId === tt.id && s.date) seen[String(s.date).slice(0, 10)] = true; });
+  arr(scal.scheds).forEach(function(s){ if(s && ids[s.coId] && s.typeId === tt.id && s.phase !== 'post' && s.date) seen[String(s.date).slice(0, 10)] = true; });
   return { how: how, dates: Object.keys(seen).sort() };
 }
 window.clinicFyRange = clinicFyRange;
