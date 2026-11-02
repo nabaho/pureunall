@@ -133,7 +133,9 @@ test('관리자가 아니면 보기만 — 단추가 없다', () => {
 /* ══════ 도착 알림을 «읽는가» ══════ */
 
 test('★★ 시작할 때 도착 알림을 구독한다 — 나중에 온 알림도 들어간다', async () => {
-  const sandbox = { console, Date, JSON, Object, Promise, String };
+  /* afterLogin 이 읽은 뒤 setTimeout(…, 1200) 으로 2026 메일 자동 읽기를 예약한다(2026-11-02 #2911) —
+     브라우저에는 있는 setTimeout 이 이 가짜 환경에 없으면 그 줄에서 멈춰 «도착 알림 구독»까지 못 간다. 예약은 여기서 돌지 않게 비워 둔다. */
+  const sandbox = { console, Date, JSON, Object, Promise, String, setTimeout: () => 0 };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   new vm.Script([
