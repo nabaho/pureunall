@@ -329,7 +329,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      settle 아래 새로 생김 3(rooms · kakaoQueue · agent) · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — rooms·kakaoQueue 쓰기는 관리자만(settle 읽기 범위 안),
      kakaoQueue 는 새로 만들기만(pending), agent 는 화면 쓰기 없음(심부름꾼 CLI 전용). 게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤
      콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. 게시 전에는 «카톡 방 저장»·«카톡 보내기»만 권한 오류로 막힌다(나머지 정산은 그대로). */
-  const PENDING = ['/settle/agent', '/settle/kakaoQueue', '/settle/rooms'];
+  /* ★ 2026-11-02 — 카톡 자동 발송 세 자리 게시 완료(rules-deploy.js --deploy, 대표 PC, 대표 「게시하기」): 새로 3 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-02.json — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
