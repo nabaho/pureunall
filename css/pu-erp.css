@@ -1627,7 +1627,7 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   body[data-erp-group="fin"] main [style*="overflow: auto hidden"][style*="display: flex"]{ flex-wrap:wrap !important; overflow:visible !important; }
 
   /* ㉣ 🎤 — 작게·아래로 · 본문 맨 끝에 여백(마지막 줄이 가려지지 않게) */
-  body[data-erp-group="fin"] #erp-voice-btn{ width:40px !important; height:40px !important; right:8px !important; bottom:84px !important; font-size:17px !important; opacity:.9; }
+  body[data-erp-group="fin"] #erp-voice-btn{ width:36px !important; height:36px !important; right:6px !important; bottom:84px !important; font-size:15px !important; opacity:.55; }
   body[data-erp-group="fin"] main{ padding-bottom:84px; }
 
   /* ㉠ 표 — 들어가면 줄인다(fit) */
@@ -1719,7 +1719,7 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   /* 출금관리 도구줄 — 단추 여덟이 모양·폭이 제각각이라 줄마다 들쭉날쭉했다 → 같은 폭 셋씩 격자, 검색은 줄 폭 전체 */
   .fx-tools{ display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px !important; width:100%; flex:1 1 100% !important; }
   .fx-tools > .fx-sep{ display:none; }
-  .fx-tools > button, .fx-tools > div > button{ width:100%; min-height:38px; padding:4px 6px !important; font-size:13px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fx-tools > button, .fx-tools > div > button{ width:100%; min-height:38px; padding:4px 6px !important; font-size:13px !important; white-space:normal; line-height:1.2; }
   .fx-tools > div{ min-width:0; }
   .fx-tools > input{ grid-column:1 / -1; min-height:38px; }
   /* 접어 둔 요약 한 줄 — 잘리지 않고 두 줄까지 접는다(눌러 펼치는 것은 그대로) */
@@ -1785,4 +1785,21 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .fi-sel{ display:block; flex:1 1 auto; min-width:0; min-height:40px; font-size:15px; font-weight:700; padding:4px 8px;
     border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#1e293b; }
   .fi-tabs > .fi-imp{ margin-left:0 !important; min-height:40px; }
+
+  /* 세금계산서 «입금 대조» 줄 — 칸 폭을 못 박은 한 줄(82+96+132px)이라 업체명이 「(주)…」로 짓눌리고 날짜가 두 줄로 꺾였다
+     → 업체명·금액 / 날짜·상태 두 줄 격자 */
+  .ivm-row{ display:grid !important; grid-template-columns:minmax(0,1fr) auto; gap:2px 10px !important; align-items:baseline !important; padding:7px 8px !important; }
+  .ivm-row > .ivm-c{ grid-column:1; grid-row:1; white-space:normal !important; overflow:visible !important; text-overflow:clip !important; overflow-wrap:anywhere; }
+  .ivm-row > .ivm-a{ grid-column:2; grid-row:1; width:auto !important; white-space:nowrap; font-size:14px; }
+  .ivm-row > .ivm-d{ grid-column:1; grid-row:2; width:auto !important; font-size:12px; white-space:nowrap; }
+  .ivm-row > .ivm-r{ grid-column:2; grid-row:2; width:auto !important; font-size:12.5px; white-space:nowrap; }
+
+  /* 손익 분석 차트 — 열두 달이 옆으로 밀려 7월 이후가 잘렸다(최소 폭 480px) → 폰 폭에 열두 막대를 다 넣고 달 숫자만 둔다
+     (달별 순이익 숫자는 막대 위 title 과 「월별 손익」 탭에 있다) */
+  .pl-chart{ padding:10px 8px !important; }
+  .pl-bars{ min-width:0 !important; gap:3px !important; }
+  .pl-delta{ display:none !important; }
+  /* 거래내역 출금 — 카테고리 거르개가 «카테고리 전ᄎ» 로 잘렸다 */
+  .ld-xt .ld-x-catf{ flex:0 0 46%; min-width:0; }
+  .ld-xt .ld-x-catf select{ max-width:100% !important; width:100%; }
 }
