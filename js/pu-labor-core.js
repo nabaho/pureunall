@@ -1018,6 +1018,288 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════
+     G. 법정 근로자명부(근기법 41·42조) · 10인 이하 사업장 필수 기본사항 점검 ·
+        근로계약서(근기법 17조·기간제법 17조) · 취업규칙(근기법 93조) 자동 읽기·검토
+     ══════════════════════════════════════════════════════════════════ */
+  var ROSTER_REQUIRED_FIELDS = [
+    { key: '성명', label: '성명', law: '근기법 시행령 20조 1항 1호' },
+    { key: '성별', label: '성별', law: '근기법 시행령 20조 1항 2호' },
+    { key: '생년월일', label: '생년월일', law: '근기법 시행령 20조 1항 3호' },
+    { key: '주소', label: '주소', law: '근기법 시행령 20조 1항 4호' },
+    { key: '이력', label: '이력', law: '근기법 시행령 20조 1항 5호' },
+    { key: '종사업무', label: '종사하는 업무의 종류', law: '근기법 시행령 20조 1항 6호' },
+    { key: '입사일', label: '고용 또는 고용갱신 연월일·계약기간', law: '근기법 시행령 20조 1항 7호' },
+    { key: '퇴직일및사유', label: '해고·퇴직·사망 연월일과 그 사유', law: '근기법 시행령 20조 1항 8호' }
+  ];
+
+  function evaluateRosterRow(r) {
+    r = r || {};
+    var checks = [
+      { key: '성명', ok: !!String(r.성명 || '').trim() },
+      { key: '성별', ok: !!String(r.성별 || '').trim() },
+      { key: '생년월일', ok: !!String(r.생년월일 || '').trim() },
+      { key: '주소', ok: !!String(r.주소 || '').trim() },
+      { key: '이력', ok: !!String(r.이력 || '').trim() },
+      { key: '종사업무', ok: !!String(r.종사업무 || r.직종 || '').trim() },
+      { key: '입사일', ok: !!String(r.입사일 || '').trim() },
+      { key: '퇴직일및사유', ok: !r.퇴사일 || !!String(r.퇴직사유 || '').trim() }
+    ];
+    var miss = [];
+    checks.forEach(function (c, i) { if (!c.ok) miss.push(ROSTER_REQUIRED_FIELDS[i].label); });
+    var keepUntil = null;
+    if (r.퇴사일) {
+      var d = ymd(r.퇴사일);
+      if (d) keepUntil = fmt(Date.UTC(d.getUTCFullYear() + 3, d.getUTCMonth(), d.getUTCDate()));
+    }
+    var contractRemind = null;
+    if (r.계약종료일) {
+      var ed = ymd(r.계약종료일);
+      if (ed) contractRemind = fmt(ed.getTime() - 30 * DAY_MS);
+    }
+    return {
+      충족수: checks.length - miss.length,
+      전체수: checks.length,
+      누락항목: miss,
+      완비여부: miss.length === 0,
+      보존기한: keepUntil,
+      갱신알림일: contractRemind,
+      근거: '근기법 41조·42조·시행령 20조 (퇴직 후 3년 보존)'
+    };
+  }
+
+  var SMALL_BIZ_COMPLIANCE_ITEMS = [
+    { id: 'contract', scope: 'all', title: '근로계약서 서면 체결 및 교부', law: '근기법 17조 · 기간제법 17조', penalty: '미교부 500만원 이하 벌금 (기간제·단시간 즉시 과태료)', desc: '임금 구성항목·계산방법·지급방법, 소정근로시간, 주휴일, 연차유급휴가 명시 후 1부 교부 필수' },
+    { id: 'roster', scope: 'all', title: '근로자명부 작성 및 계약서류 3년 보존', law: '근기법 41조·42조 · 시행령 20조', penalty: '500만원 이하 과태료', desc: '성명·성별·생년월일·주소·이력·종사업무·고용연월일·퇴직사유 기재 (일용 30일 미만 제외), 3년 보존' },
+    { id: 'payslip', scope: 'all', title: '임금대장 작성 및 임금명세서 교부', law: '근기법 48조 1·2항', penalty: '500만원 이하 과태료', desc: '매월 급여 지급 시 임금 구성항목·계산방법(근로시간수)·공제내역 기재 명세서 교부' },
+    { id: 'minwage', scope: 'all', title: '최저임금 준수 및 최저임금 주지의무', law: '최저임금법 6조·11조', penalty: '위반 시 3년 이하 징역 또는 2천만원 이하 벌금', desc: '최저임금 이상 지급 + 수습 감액은 1년 이상 계약·단순노무직 외에만 3개월 90% 허용' },
+    { id: 'weeklyrest', scope: 'all', title: '주휴일(주 15h↑) 및 휴게시간(4h 30분·8h 1시간) 부여', law: '근기법 54조·55조 1항', penalty: '2년 이하 징역 또는 2천만원 이하 벌금', desc: '1주 15시간 이상 개근 시 유급 주휴일 부여, 휴게시간은 근로시간 도중에 자유 이용 보장' },
+    { id: 'severance', scope: 'all', title: '퇴직급여(퇴직금·퇴직연금) 지급 (1년↑·주15h↑)', law: '퇴직급여법 4조·8조·9조', penalty: '3년 이하 징역 또는 3천만원 이하 벌금', desc: '5인 미만도 100% 적용. 퇴직일로부터 14일 이내 지급(월급에 퇴직금 분할 포함 약정은 무효)' },
+    { id: 'dismissnotice', scope: 'all', title: '해고예고 (30일 전 예고 또는 30일분 통상임금 지급)', law: '근기법 26조', penalty: '2년 이하 징역 또는 2천만원 이하 벌금', desc: '★ 5인 미만·10인 이하 사업장도 해고예고는 적용됨 (계속근로 3개월 미만은 제외)' },
+    { id: 'mandatoryedu', scope: 'all', title: '법정 의무교육 (성희롱 예방·안전보건·개인정보)', law: '남녀고용평등법 13조 · 산안법 29조', penalty: '성희롱 교육 미실시 500만원 이하 과태료', desc: '★ 10인 미만 특례: 직장 내 성희롱 예방교육은 교육자료·홍보물을 게시·배포하는 방법으로 실시 가능' },
+    { id: 'overtime56', scope: '5plus', title: '연장·야간·휴일 가산수당(1.5배) 및 주 52시간 한도', law: '근기법 50조·53조·56조', penalty: '3년 이하 징역 또는 3천만원 이하 벌금', desc: '5인 이상 사업장 필수 (5인 미만은 가산수당·주52시간 미적용, 실근로 1.0배만 지급)' },
+    { id: 'annual60', scope: '5plus', title: '연차유급휴가(15~25일·시간차) 및 관공서 공휴일 유급 보장', law: '근기법 55조 2항·60조·61조', penalty: '2년 이하 징역 또는 2천만원 이하 벌금', desc: '5인 이상 필수 (1년 미만 최대 11일, 1년 이상 15~25일, 관공서 공휴일 유급휴일 의무)' },
+    { id: 'dismiss23', scope: '5plus', title: '정당한 이유 없는 해고 금지 및 해고 서면통지', law: '근기법 23조·27조', penalty: '부당해고 구제명령·이행강제금', desc: '5인 이상 사업장은 해고사유와 해고시기를 반드시 서면으로 통지해야 효력 발생' },
+    { id: 'harassment76', scope: '5plus', title: '직장 내 괴롭힘 금지 및 발생 시 조사·조치 의무', law: '근기법 76조의2·76조의3', penalty: '조사·조치 미이행 500만원 이하 과태료', desc: '5인 이상 적용 (신고자 불이익 처우 시 3년 이하 징역 또는 3천만원 이하 벌금)' },
+    { id: 'workrules93', scope: '10plus', title: '취업규칙 작성·고용노동부 신고 및 사업장 게시', law: '근기법 93조·14조', penalty: '미신고 500만원 이하 과태료', desc: '상시 10인 이상 신고 의무. 10인 미만은 신고 면제이나 분쟁 예방용 간이 복무규정 비치 권장' }
+  ];
+
+  function evaluateWorkplaceCompliance(ctx) {
+    ctx = ctx || {};
+    var n = num(ctx.empCount);
+    var five = (ctx.fiveOrMore != null) ? !!ctx.fiveOrMore : (n >= 5);
+    var ten = (ctx.tenOrMore != null) ? !!ctx.tenOrMore : (n >= 10);
+    var scale = !five ? '5인 미만 (10인 이하)' : (!ten ? '5인 이상 10인 미만 (10인 이하)' : '10인 이상');
+    var manual = ctx.manualChecks || {};
+    var out = [], reqCnt = 0, okCnt = 0, warnCnt = 0;
+    SMALL_BIZ_COMPLIANCE_ITEMS.forEach(function (it) {
+      var applicable = (it.scope === 'all') || (it.scope === '5plus' && five) || (it.scope === '10plus' && ten);
+      var autoStatus = null, detail = '';
+      if (it.id === 'contract') {
+        autoStatus = (num(ctx.contractCount) > 0 && num(ctx.contractCount) >= n && n > 0) ? 'ok' : (num(ctx.contractCount) > 0 ? 'partial' : 'warn');
+        detail = '등록·검토 ' + num(ctx.contractCount) + '/' + n + '명';
+      } else if (it.id === 'roster') {
+        autoStatus = (n > 0 && num(ctx.rosterCompleteCount) >= n) ? 'ok' : 'warn';
+        detail = '필수기재 완비 ' + num(ctx.rosterCompleteCount) + '/' + n + '명';
+      } else if (it.id === 'payslip') {
+        autoStatus = (num(ctx.payslipLockedCount) > 0) ? 'ok' : 'warn';
+        detail = '확정 명세서 ' + num(ctx.payslipLockedCount) + '개월';
+      } else if (it.id === 'minwage') {
+        autoStatus = (ctx.minWageViolationCount > 0) ? 'bad' : 'ok';
+        detail = (ctx.minWageViolationCount > 0) ? ('미달 의심 ' + ctx.minWageViolationCount + '명') : '위반 없음';
+      } else if (it.id === 'annual60' && five) {
+        autoStatus = (num(ctx.annualRecordedCount) > 0) ? 'ok' : 'warn';
+        detail = '연차 대장 기록 ' + num(ctx.annualRecordedCount) + '명';
+      } else if (it.id === 'workrules93') {
+        autoStatus = ctx.hasWorkRules ? 'ok' : (ten ? 'warn' : 'exempt');
+        detail = ctx.hasWorkRules ? '취업규칙·복무규정 등록됨' : (ten ? '10인 이상 필수 — 미등록' : '10인 미만 신고 면제 (간이규정 권장)');
+      }
+      var checked = !!manual[it.id];
+      var status = checked ? 'ok' : (!applicable ? 'exempt' : (autoStatus || 'check'));
+      if (applicable) {
+        reqCnt++;
+        if (status === 'ok') okCnt++;
+        else warnCnt++;
+      }
+      out.push({
+        id: it.id, scope: it.scope, applicable: applicable, status: status, checked: checked,
+        title: it.title, law: it.law, penalty: it.penalty, desc: it.desc, detail: detail
+      });
+    });
+    return { 규모구분: scale, 상시근로자수: n, 적용항목수: reqCnt, 완료항목수: okCnt, 주의항목수: warnCnt, 항목별: out };
+  }
+
+  function reviewLaborContract(text, opts) {
+    opts = opts || {};
+    var s = String(text || '');
+    var P = policyOf(opts.policy);
+    var mwH = num(opts.minWageHourly || 10320);
+
+    var mName = s.match(/(?:근로자|성\s*명)\s*[:：]\s*([가-힣]{2,5})/);
+    var dates = s.match(/20\d{2}\s*[.\-\/년]\s*\d{1,2}\s*[.\-\/월]\s*\d{1,2}/g) || [];
+    var normDate = function (raw) {
+      if (!raw) return '';
+      var m = String(raw).match(/(20\d{2})\s*[.\-\/년]\s*(\d{1,2})\s*[.\-\/월]\s*(\d{1,2})/);
+      return m ? (m[1] + '-' + pad2(Number(m[2])) + '-' + pad2(Number(m[3]))) : '';
+    };
+    var hireDate = normDate(dates[0]);
+    var endDate = dates.length > 1 && /계약기간|종료|까지/.test(s) ? normDate(dates[1]) : '';
+    var empType = /단시간|파트|알바/.test(s) ? '단시간' : (/일용/.test(s) ? '일용직' : (endDate || /기간제|계약직/.test(s) ? '계약직' : '정규직'));
+    var mJob = s.match(/(?:담당\s*업무|업무\s*내용|직\s*종)\s*[:：]\s*([^\n\r]+)/);
+    var mPlace = s.match(/(?:근무\s*장소|취업\s*장소)\s*[:：]\s*([^\n\r]+)/);
+    var mTime = s.match(/(\d{1,2}:\d{2})\s*[~\-부터]\s*(\d{1,2}:\d{2})/);
+    var mBreak = s.match(/휴게\s*(?:시간)?[^\d\n]{0,12}(\d{1,3})\s*분|휴게\s*(?:시간)?[^\d\n]{0,12}(\d(?:\.\d+)?)\s*시간/);
+    var breakMin = mBreak ? (mBreak[1] ? Number(mBreak[1]) : Number(mBreak[2]) * 60) : (/휴게/.test(s) ? 60 : 0);
+    var mWeekH = s.match(/주\s*(\d{1,2}(?:\.\d+)?)\s*시간/);
+    var mBase = s.match(/(?:월\s*급|기본급|임금\s*월액|월\s*보수)[^\d\n]{0,16}([\d,]{5,12})\s*원?/);
+    var mHourly = s.match(/시\s*급[^\d\n]{0,16}([\d,]{4,9})\s*원?/);
+    var mPayday = s.match(/(?:매월|임금\s*지급일|급여일)[^\d\n]{0,12}(\d{1,2}\s*일|말일)/);
+
+    var extracted = {
+      성명: mName ? mName[1].trim() : '',
+      입사일: hireDate,
+      계약종료일: endDate,
+      고용형태: empType,
+      직종: mJob ? mJob[1].trim().slice(0, 30) : '',
+      근무장소: mPlace ? mPlace[1].trim().slice(0, 30) : '',
+      출근시각: mTime ? mTime[1] : '',
+      퇴근시각: mTime ? mTime[2] : '',
+      휴게시간분: breakMin,
+      주소정근로시간: mWeekH ? Number(mWeekH[1]) : P.weeklyContractHours,
+      주휴일: /주휴일|일요일|주\s*1회\s*유급/.test(s) ? '명시됨' : '',
+      기본급: mBase ? Number(mBase[1].replace(/,/g, '')) : 0,
+      시급: mHourly ? Number(mHourly[1].replace(/,/g, '')) : 0,
+      급여일: mPayday ? mPayday[1].replace(/\s+/g, '') : ''
+    };
+
+    var checks = [
+      { key: '임금구성·지급방법', law: '근기법 17조 1항 1호', ok: !!(extracted.기본급 || extracted.시급) && /지급|계좌|통장|매월/.test(s), note: (extracted.기본급 || extracted.시급) ? '임금액 및 지급방법 확인' : '기본급/시급·지급일·지급방법(계좌이체 등) 명시 필요' },
+      { key: '소정근로시간', law: '근기법 17조 1항 2호', ok: !!(mTime || mWeekH || /소정근로시간/.test(s)), note: mTime ? (mTime[1] + '~' + mTime[2]) : '시업·종업시각 및 1일/1주 소정근로시간 명시 필요' },
+      { key: '휴게시간', law: '근기법 54조', ok: /휴게/.test(s) && breakMin >= 30, note: /휴게/.test(s) ? ('휴게 ' + breakMin + '분 명시') : '4시간 30분·8시간 1시간 이상 휴게시간 명시 필요' },
+      { key: '주휴일(유급휴일)', law: '근기법 17조 1항 3호·55조', ok: /주휴|유급휴일|휴일/.test(s), note: /주휴|유급휴일|휴일/.test(s) ? '휴일·주휴일 조항 있음' : '주휴일(주 15h 이상 유급) 명시 필요' },
+      { key: '연차유급휴가', law: '근기법 17조 1항 4호·60조', ok: !P.fiveOrMore || /연차/.test(s), note: P.fiveOrMore ? (/연차/.test(s) ? '연차휴가 조항 있음' : '5인 이상 사업장 — 연차유급휴가 부여 조항 필수') : '5인 미만 사업장(적용 제외 가능)' },
+      { key: '근무장소·담당업무', law: '근기법 시행령 8조', ok: !!(extracted.근무장소 || extracted.직종 || /장소|업무/.test(s)), note: '취업 장소 및 종사 업무 명시 여부' },
+      { key: '근로계약서 서면교부', law: '근기법 17조 2항', ok: /교부|수령|1부씩\s*보관|영수/.test(s), note: /교부|수령|1부씩\s*보관|영수/.test(s) ? '서면 교부·수령 확인 문구 있음' : '근로계약서 교부 확인 서명란 추가 권장(미교부 시 500만원 이하 벌금)' }
+    ];
+    if (empType === '단시간') {
+      checks.push({ key: '근로일 및 근로일별 근로시간(단시간)', law: '기간제법 17조 6호', ok: /요일|근로일별/.test(s), note: '단시간근로자는 근무 요일과 요일별 근로시간을 구체적으로 적지 않으면 즉시 과태료 대상' });
+    }
+
+    var warnings = [];
+    var effHourly = extracted.시급 || (extracted.기본급 ? hourlyOrdinary(extracted.기본급, P) : 0);
+    if (effHourly > 0 && effHourly < mwH) {
+      warnings.push({ code: 'MIN_WAGE', law: '최저임금법 6조', msg: '환산시급(' + Math.round(effHourly).toLocaleString() + '원)이 최저임금(' + mwH.toLocaleString() + '원)에 미달합니다.' });
+    }
+    if (/위약금|손해배상\s*예정|퇴사\s*시[^\n]{0,15}배상|무단결근\s*시[^\n]{0,15}공제/.test(s)) {
+      warnings.push({ code: 'PENALTY_BAN', law: '근기법 20조 (위약예정 금지)', msg: '위약금·손해배상액을 예정하거나 무단결근 시 일당 초과 공제하는 약정은 근로기준법 제20조 위반(무효·형사처벌)입니다.' });
+    }
+    if (/퇴직금[^\n]{0,15}(?:월급|급여)에\s*포함|퇴직금\s*분할\s*지급/.test(s)) {
+      warnings.push({ code: 'SEVERANCE_IN_WAGE', law: '퇴직급여법 8조 · 대법원 판례', msg: '퇴직금을 매월 급여에 분할 포함하여 지급하는 약정은 강행규정 위반으로 무효이며, 퇴직 시 퇴직금을 다시 전액 지급해야 합니다.' });
+    }
+    if (/수습[^\n]{0,20}(?:90%|10%\s*감액)/.test(s) && /개월\s*계약|6개월|3개월\s*계약/.test(s)) {
+      warnings.push({ code: 'PROBATION_MIN_WAGE', law: '최저임금법 5조 2항', msg: '1년 미만 기간제 근로계약 또는 단순노무직은 수습기간 중 최저임금 10% 감액이 금지됩니다(임금체불·최저임금 위반).' });
+    }
+    if (/포괄|고정\s*연장/.test(s) && !/\d+\s*시간/.test(s)) {
+      warnings.push({ code: 'FIXED_OT_HOURS', law: '근기법 17조·56조', msg: '고정연장수당(포괄임금) 약정 시에는 월 몇 시간분의 연장·야간·휴일수당인지 시간수를 명시해야 적법합니다.' });
+    }
+
+    var okCount = checks.filter(function (c) { return c.ok; }).length;
+    return {
+      추출: extracted,
+      필수점검: checks,
+      위법경고: warnings,
+      충족수: okCount,
+      전체수: checks.length,
+      적합여부: okCount === checks.length && warnings.length === 0,
+      요약: '필수기재 ' + okCount + '/' + checks.length + ' 충족 · 위법주의 ' + warnings.length + '건'
+    };
+  }
+
+  var WORK_RULES_93_ITEMS = [
+    { no: 1, title: '업무의 시작·종료 시각, 휴게시간, 휴일, 휴가 및 교대근로', law: '근기법 93조 1호', rx: /시업|종업|출근|퇴근|휴게|휴일|연차|휴가/ },
+    { no: 2, title: '임금의 결정·계산·지급 방법, 산정기간·지급시기 및 승급', law: '근기법 93조 2호', rx: /임금|급여|산정기간|지급일|지급방법|승급/ },
+    { no: 3, title: '가족수당의 계산·지급 방법', law: '근기법 93조 3호', rx: /가족수당|부양가족|수당/ },
+    { no: 4, title: '퇴직에 관한 사항 (퇴직사유·절차·정년)', law: '근기법 93조 4호', rx: /퇴직|사직|정년|당연퇴직/ },
+    { no: 5, title: '퇴직급여(퇴직금·퇴직연금), 상여 및 최저임금', law: '근기법 93조 5호', rx: /퇴직금|퇴직급여|퇴직연금|상여|최저임금/ },
+    { no: 6, title: '모성보호 및 일·가정 양립 지원 (출산전후휴가·육아휴직 등)', law: '근기법 93조 6호의2', rx: /출산|육아휴직|모성보호|배우자\s*출산|육아기/ },
+    { no: 7, title: '안전과 보건에 관한 사항', law: '근기법 93조 8호', rx: /안전|보건|건강진단|산업안전/ },
+    { no: 8, title: '성별·연령·신체적 조건에 따른 사업장 환경 개선', law: '근기법 93조 9호', rx: /환경\s*개선|차별\s*금지|성희롱|남녀고용/ },
+    { no: 9, title: '업무상과 업무 외의 재해부조', law: '근기법 93조 10호', rx: /재해|산재|부조|요양|보상/ },
+    { no: 10, title: '직장 내 괴롭힘의 예방 및 발생 시 조치', law: '근기법 93조 11호', rx: /괴롭힘/ },
+    { no: 11, title: '표창과 제재 (징계 사유·종류·소명기회)', law: '근기법 93조 12호', rx: /표창|징계|제재|감봉|견책|소명/ },
+    { no: 12, title: '그 밖에 해당 사업장 근로자 전체에 적용될 사항 (부칙·시행일)', law: '근기법 93조 13호', rx: /부칙|시행일|적용\s*범위/ }
+  ];
+
+  function reviewWorkRules(text, opts) {
+    opts = opts || {};
+    var s = String(text || '');
+    var empCount = num(opts.empCount);
+    var checks = WORK_RULES_93_ITEMS.map(function (it) {
+      var ok = it.rx.test(s);
+      return { no: it.no, title: it.title, law: it.law, ok: ok, note: ok ? '기재 확인됨' : '누락 의심 — 조항 보완 필요' };
+    });
+    var warnings = [];
+    if (/공휴일[^\n]{0,20}연차[^\n]{0,15}대체/.test(s)) {
+      warnings.push({ code: 'HOLIDAY_SUB', law: '근기법 55조 2항·62조', msg: '관공서 공휴일은 5인 이상 사업장 전면 법정 유급휴일이므로 연차휴가로 대체할 수 없습니다(구법 조항 삭제 필요).' });
+    }
+    if (/배우자\s*출산[^\n]{0,15}10\s*일/.test(s)) {
+      warnings.push({ code: 'PATERNITY_20', law: '남녀고용평등법 18조의2 (2025.2.23 개정)', msg: '배우자 출산휴가가 구법(10일)로 기재되어 있습니다 — 현행 법정 유급 20일로 개정해야 합니다.' });
+    }
+    if (/육아기\s*근로시간\s*단축[^\n]{0,20}8\s*세/.test(s)) {
+      warnings.push({ code: 'CHILDCARE_12', law: '남녀고용평등법 19조의2 (2025.2.23 개정)', msg: '육아기 근로시간 단축 대상 자녀 연령이 구법(만 8세 이하)으로 기재되어 있습니다 — 현행 만 12세(초6) 이하로 개정해야 합니다.' });
+    }
+    if (/감봉|감급/.test(s) && !/10분의\s*1|1\/10|2분의\s*1|1\/2/.test(s)) {
+      warnings.push({ code: 'WAGE_CUT_LIMIT', law: '근기법 95조 (제재 규정의 제한)', msg: '감봉(감급) 징계 규정에는 "1회 평균임금 1일분의 1/2 이하, 총액 1임금지급기 임금총액의 1/10 이하" 법정 한도를 명시해야 합니다.' });
+    }
+    var okCount = checks.filter(function (c) { return c.ok; }).length;
+    return {
+      필수점검: checks,
+      위법경고: warnings,
+      충족수: okCount,
+      전체수: checks.length,
+      신고의무여부: empCount >= 10,
+      적합여부: okCount >= 10 && warnings.length === 0,
+      요약: '근기법 93조 필수항목 ' + okCount + '/' + checks.length + ' 충족 · 법령개정·위법주의 ' + warnings.length + '건'
+    };
+  }
+
+  function buildStandardContractText(emp, policy) {
+    emp = emp || {};
+    var P = policyOf(policy);
+    var pay = num(emp.기본급 || emp.통상임금월액 || 2200000);
+    return [
+      '표준근로계약서 (' + (P.fiveOrMore ? '5인 이상' : '5인 미만·10인 이하') + ' 사업장용)',
+      '1. 근로자 성명: ' + (emp.성명 || '홍길동'),
+      '2. 근로계약기간: ' + (emp.입사일 || '2026-01-01') + ' 부터 기간의 정함이 없음',
+      '3. 근무장소: ' + (emp.근무장소 || '사업장 본사 지정 장소') + ' / 담당업무: ' + (emp.직종 || '일반 사무 및 운영'),
+      '4. 소정근로시간: 09:00 ~ 18:00 (휴게시간: 12:00~13:00, 60분 / 주 ' + P.weeklyContractHours + '시간)',
+      '5. 근무일 및 주휴일: 매주 월~금요일 근무, 주휴일은 매주 일요일(주 15시간 이상 개근 시 유급 주휴일 부여)',
+      '6. 임금: 월 기본급 ' + pay.toLocaleString() + '원 (매월 ' + (emp.급여일 || '25일') + ' 근로자 본인 명의 예금계좌로 직접 지급, 임금명세서 교부)',
+      '7. 연차유급휴가: ' + (P.fiveOrMore ? '근로기준법 제60조에 따라 연차유급휴가를 부여한다(시간차·반차·반반차 사용 가능).' : '상시 5인 미만 사업장으로 근로기준법 제60조 적용 대상 외이나 사업장 약정에 따른다.'),
+      '8. 근로계약서 교부: 사용자는 본 계약 체결 즉시 근로계약서 1부를 근로자에게 서면 교부하며 근로자는 이를 수령함(근로기준법 제17조 제2항).'
+    ].join('\n');
+  }
+
+  function buildStandardWorkRulesText(siteName, policy) {
+    var P = policyOf(policy);
+    return [
+      '[' + (siteName || '사업장') + '] 표준 취업규칙·복무규정 (' + (P.fiveOrMore ? '5인 이상·10인 이하 겸용' : '5인 미만 간이 복무규정') + ')',
+      '제1조(적용범위·부칙) 본 규칙은 사업장 전체 근로자에게 적용하며 2026-01-01부터 시행한다.',
+      '제2조(시업·종업시각 및 휴게시간) 시업 09:00, 종업 18:00, 휴게시간 12:00~13:00(60분, 8시간 근로 시 1시간 이상 근무 도중 자유 이용). 교대근로 시 별도 근무표에 따른다.',
+      '제3조(휴일 및 연차유급휴가) 주휴일(유급) 및 근로자의 날을 유급휴일로 하며, 5인 이상 사업장은 관공서 공휴일을 유급휴일로 보장하고 근로기준법 제60조에 따른 연차유급휴가(반차·반반차·시간차 포함)를 부여한다.',
+      '제4조(임금 및 가족수당) 임금은 기본급·법정수당·가족수당(해당 시)으로 구성하며 매월 산정기간을 정해 지정 지급일에 근로자 계좌로 전액 지급하고 임금명세서를 교부한다. 최저임금법상 최저임금 이상을 보장하며 승급 기준은 인사평정에 따른다.',
+      '제5조(퇴직 및 정년) 근로자가 사직하고자 할 때는 30일 전 통보하며 정년은 만 60세로 한다. 해고 시에는 30일 전에 예고하거나 30일분 이상의 통상임금을 지급한다.',
+      '제6조(퇴직급여 및 상여) 1년 이상 계속근로한 근로자(주 15시간 이상)가 퇴직할 때에는 퇴직급여법 제8조에 따라 퇴직금 또는 퇴직연금(DC/DB)을 퇴직일로부터 14일 이내에 지급한다.',
+      '제7조(모성보호 및 일·가정 양립 지원) 출산전후휴가(90일, 미숙아 100일, 다태아 120일), 배우자 출산휴가(유급 20일), 난임치료휴가(연 6일, 유급 2일), 육아휴직 및 육아기 근로시간 단축(만 12세 이하 또는 초등학교 6학년 이하)을 법령에 따라 보장한다.',
+      '제8조(안전과 보건 및 사업장 환경 개선) 산업안전보건법에 따른 안전보건교육·건강진단을 실시하고 성별·연령·신체적 조건에 따른 차별 없는 사업장 환경 개선 및 직장 내 성희롱 예방교육(10인 미만은 홍보물·자료 게시 배포 가능)을 실시한다.',
+      '제9조(업무상·업무외 재해부조) 업무상 재해는 산업재해보상보험법 및 근로기준법에 따라 요양·보상하며 재해부조 기준을 준수한다.',
+      '제10조(직장 내 괴롭힘의 예방 및 발생 시 조치) 직장 내 괴롭힘을 금지하며 신고 접수 시 지체 없이 객관적 조사를 실시하고 피해근로자 보호(유급휴가·근무장소 변경) 및 행위자 징계 조치를 취하며 신고자에게 불이익 처우를 하지 않는다.',
+      '제11조(표창과 제재) 우수 사원에게는 표창할 수 있으며, 징계(견책·감봉·정직·해고) 시에는 반드시 소명기회를 부여한다. 감봉(감급)은 1회 평균임금 1일분의 2분의 1을, 총액이 1임금지급기 임금총액의 10분의 1을 초과하지 못한다(근기법 제95조).'
+    ].join('\n');
+    if (0) return {
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
      내보내기
      ══════════════════════════════════════════════════════════════════ */
   var API = {
@@ -1050,7 +1332,12 @@
     // 간이세액표
     CHILD_CREDIT: CHILD_CREDIT, childCredit: childCredit, pickSimpleTaxTable: pickSimpleTaxTable,
     lookupSimpleTax: lookupSimpleTax, withholdingTax: withholdingTax,
-    monthlyPayroll: monthlyPayroll
+    monthlyPayroll: monthlyPayroll,
+    ROSTER_REQUIRED_FIELDS: ROSTER_REQUIRED_FIELDS, evaluateRosterRow: evaluateRosterRow,
+    SMALL_BIZ_COMPLIANCE_ITEMS: SMALL_BIZ_COMPLIANCE_ITEMS, evaluateWorkplaceCompliance: evaluateWorkplaceCompliance,
+    WORK_RULES_93_ITEMS: WORK_RULES_93_ITEMS,
+    reviewLaborContract: reviewLaborContract, reviewWorkRules: reviewWorkRules,
+    buildStandardContractText: buildStandardContractText, buildStandardWorkRulesText: buildStandardWorkRulesText
   };
 
   global.PuLaborCore = API;

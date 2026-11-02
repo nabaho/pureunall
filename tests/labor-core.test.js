@@ -374,6 +374,38 @@ eq('통합계산 소득세 = 3,510', mp26.공제.소득세, 3510);
 eq('통합계산 지방세 = 350 (10원 절사)', mp26.공제.지방세, 350);
 ok('지급 − 공제 = 실수령', mp26.지급.지급총액 - mp26.공제.공제총액 === mp26.실수령);
 
+section('근로자명부(근기법 41·42조) · 10인이하 법정점검 · 근로계약서·취업규칙 자동 검토');
+const rrOk = L.evaluateRosterRow({ 성명: '김철수', 성별: '남', 생년월일: '1988-05-12', 주소: '충남 천안시', 이력: '한식조리사', 종사업무: '조리', 입사일: '2024-03-01', 퇴사일: '2026-06-30', 퇴직사유: '자진퇴사' });
+eq('근로자명부 8대 법정항목 완비 = true', rrOk.완비여부, true);
+eq('퇴직 후 3년 보존기한 자동 계산 (2029-06-30)', rrOk.보존기한, '2029-06-30');
+const rrMiss = L.evaluateRosterRow({ 성명: '이영희', 입사일: '2025-01-01' });
+eq('미기재 항목 있으면 완비 = false', rrMiss.완비여부, false);
+ok('누락항목에 주소·생년월일 포함', rrMiss.누락항목.indexOf('주소') >= 0 && rrMiss.누락항목.indexOf('생년월일') >= 0);
+
+const comp4 = L.evaluateWorkplaceCompliance({ empCount: 4, fiveOrMore: false, contractCount: 4, rosterCompleteCount: 4, payslipLockedCount: 2 });
+eq('4인 사업장 규모구분 = 5인 미만 (10인 이하)', comp4.규모구분, '5인 미만 (10인 이하)');
+eq('5인 미만 적용 법정항목 = 8개 (해고예고·퇴직금·성희롱교육특례 포함)', comp4.적용항목수, 8);
+const comp8 = L.evaluateWorkplaceCompliance({ empCount: 8, fiveOrMore: true, contractCount: 8, rosterCompleteCount: 8, payslipLockedCount: 3, annualRecordedCount: 8 });
+eq('8인 사업장 규모구분 = 5인 이상 10인 미만 (10인 이하)', comp8.규모구분, '5인 이상 10인 미만 (10인 이하)');
+eq('5~9인 적용 법정항목 = 12개 (취업규칙 신고는 면제)', comp8.적용항목수, 12);
+
+const stdCt = L.buildStandardContractText({ 성명: '박민수', 입사일: '2026-03-01', 기본급: 2500000, 직종: '생산관리', 급여일: '25일' }, { fiveOrMore: true });
+const revCt = L.reviewLaborContract(stdCt, { policy: { fiveOrMore: true }, minWageHourly: 10320 });
+eq('표준근로계약서 자동 검토 적합 = true', revCt.적합여부, true);
+eq('계약서에서 성명 자동 추출', revCt.추출.성명, '박민수');
+eq('계약서에서 입사일 자동 추출', revCt.추출.입사일, '2026-03-01');
+eq('계약서에서 기본급 자동 추출', revCt.추출.기본급, 2500000);
+const badCt = L.reviewLaborContract('근로자: 최영수\n시급 9,000원 지급\n무단결근 시 위약금 50만원 배상 예정\n퇴직금은 매월 급여에 포함하여 지급', { minWageHourly: 10320 });
+eq('위법 계약서 적합 = false', badCt.적합여부, false);
+ok('최저임금 미달·위약예정·퇴직금 분할포함 3건 모두 적발', badCt.위법경고.length >= 3);
+
+const stdWr = L.buildStandardWorkRulesText('가람떡집', { fiveOrMore: true });
+const revWr = L.reviewWorkRules(stdWr, { empCount: 9 });
+eq('표준 취업규칙 근기법 93조 12대 항목 모두 충족', revWr.충족수, 12);
+eq('9인 사업장 취업규칙 신고의무 = false (10인 미만 면제)', revWr.신고의무여부, false);
+const badWr = L.reviewWorkRules('시업 09:00 임금 매월 25일 지급. 관공서 공휴일은 연차로 대체한다. 배우자 출산휴가 10일 부여. 감봉 징계 가능.', { empCount: 12 });
+ok('구법 공휴일 연차대체·배우자출산 10일·감봉 한도 미기재 경고 적발', badWr.위법경고.length >= 3);
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');
