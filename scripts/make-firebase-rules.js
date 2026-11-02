@@ -1356,13 +1356,23 @@ rules.signboard = { '.read': LOGIN,
    ⚠ 카톡 대기열(kakaoQueue)·채팅방(rooms)·심부름꾼 상태(agent)는 PR ② 에서 더한다 — 그때까지 기본 닫힘. */
 const SETTLE_R = `(${LOGIN}) && (${ADMIN} || ${SUB} || ${FIN})`;
 const SETTLE_W = `${SETTLE_R} && newData.exists()`;
+/* 카톡 자동 발송(대표 지시 2026-11-02 「카카오톡에 자동으로 보내는 기능」, 설계서 §6·§7):
+   rooms(담당마다 카톡 방 이름)·kakaoQueue(보낼 글) 쓰기는 «대표(관리자)만» — 대표 카톡 이름으로 나가는 글이라 위임관리인·재무권한자는 정산표까지만.
+   대기열 줄은 새로 만들기만(!data.exists(), 상태는 pending 으로만) — 상태(sent·failed)는 대표 PC 심부름꾼이 CLI(관리자 권한)로 고친다.
+   agent(심부름꾼 마지막 응답)는 화면이 쓰지 못한다(CLI 전용). 읽기는 settle 전체와 같다. */
+const SETTLE_KAKAO_W = `(${LOGIN}) && ${ADMIN} && newData.exists()`;
 rules.settle = { '.read': SETTLE_R,
   rules:   { $t:    { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $t" } },
   links:   { $kind: { $key: { '.write': SETTLE_W,
     '.validate': "newData.child('id').val() === $key && newData.child('kind').val() === $kind && ($kind === 'company' || $kind === 'person')" } } },
   notices: { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } },
   runs:    { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } },
-  adjusts: { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } } };
+  adjusts: { $id:   { '.write': SETTLE_W, '.validate': "newData.child('id').val() === $id" } },
+  rooms:   { $sid:  { '.write': SETTLE_KAKAO_W,
+    '.validate': "newData.child('id').val() === $sid && newData.child('room').isString() && newData.child('room').val().length > 0 && newData.child('room').val().length <= 80" } },
+  kakaoQueue: { $id: { '.write': `${SETTLE_KAKAO_W} && !data.exists()`,
+    '.validate': "newData.child('id').val() === $id && newData.child('status').val() === 'pending' && newData.child('text').isString() && newData.child('text').val().length <= 4000" } },
+  agent:   { '.write': false } };
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).

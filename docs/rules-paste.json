@@ -1840,6 +1840,21 @@
           ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('fin').val() == true) && newData.exists()",
           ".validate": "newData.child('id').val() === $id"
         }
+      },
+      "rooms": {
+        "$sid": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true && newData.exists()",
+          ".validate": "newData.child('id').val() === $sid && newData.child('room').isString() && newData.child('room').val().length > 0 && newData.child('room').val().length <= 80"
+        }
+      },
+      "kakaoQueue": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true && newData.exists() && !data.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('status').val() === 'pending' && newData.child('text').isString() && newData.child('text').val().length <= 4000"
+        }
+      },
+      "agent": {
+        ".write": false
       }
     },
     "rehab_ad": {

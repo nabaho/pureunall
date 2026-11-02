@@ -30,7 +30,8 @@ test('쓰기는 자리마다만 열리고(최상위 쓰기 없음), 모두 지�
   const w = writes(S, 'settle', []);
   ['settle/rules/$t', 'settle/links/$kind/$key', 'settle/notices/$id', 'settle/runs/$id', 'settle/adjusts/$id'].forEach((p) =>
     assert.ok(w.some(([at]) => at === p), p + ' 쓰기 자리가 없다'));
-  w.forEach(([at, rule]) => {
+  const KAKAO = ['settle/rooms/$sid', 'settle/kakaoQueue/$id', 'settle/agent'];
+  w.filter(([at]) => KAKAO.indexOf(at) < 0).forEach(([at, rule]) => {
     assert.match(rule, /newData\.exists\(\)/, at + ' 에서 지우기가 막혀 있지 않다');
     assert.match(rule, /'fin'\)\.val\(\) == true/, at);
   });
@@ -41,4 +42,18 @@ test('레코드 id 가 열쇠와 같아야 하고, 연결은 업체·사람 두 
   ['notices', 'runs', 'adjusts'].forEach((k) => assert.match(S[k].$id['.validate'], /newData\.child\('id'\)\.val\(\) === \$id/, k));
   const v = S.links.$kind.$key['.validate'];
   assert.match(v, /=== \$key/); assert.match(v, /'company'/); assert.match(v, /'person'/);
+});
+
+
+test('카톡 자동 발송 — 방 이름·대기열은 대표(관리자)만 쓰고 지우기 금지, 대기열은 새로 만들기만(pending), 심부름꾼 상태는 화면이 못 쓴다', () => {
+  const room = S.rooms.$sid, q = S.kakaoQueue.$id;
+  [room['.write'], q['.write']].forEach((w) => {
+    assert.match(w, /'isAdmin'\)\.val\(\) == true/);
+    assert.doesNotMatch(w, /'fin'\)|'isSubAdmin'\)/, '관리자 말고도 열렸다');
+    assert.match(w, /newData\.exists\(\)/);
+  });
+  assert.match(q['.write'], /!data\.exists\(\)/, '대기열 줄을 고칠 수 있다');
+  assert.match(q['.validate'], /'status'\)\.val\(\) === 'pending'/);
+  assert.match(room['.validate'], /=== \$sid/);
+  assert.equal(S.agent['.write'], false);
 });
