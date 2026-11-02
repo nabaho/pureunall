@@ -35,8 +35,8 @@ function fnBody(name) {
 const line = (re) => { const m = src.match(re); assert.ok(m, String(re) + ' 를 찾을 수 없습니다'); return m[0]; };
 
 /* 진짜 _norm·coKeyOf·digits 를 그대로 뜬다 — 대역을 쓰면 «진짜가 어떻게 이름을 보는가»를 못 잰다 */
-function build(items) {
-  const ctx = { console, Object, String, Number, Array, _coWatch: null, _coListMemo: null, _coInfo: {},
+function build(items, coInfo) {
+  const ctx = { console, Object, String, Number, Array, _coWatch: null, _coListMemo: null, _coInfo: coInfo || {},
     allItems: () => items,
     ErpMatch: { ready: true, match: () => null, matchAll: () => ({}) },
     taxInvoiceFromText: () => '', coEffectiveExtra: () => null,
@@ -106,4 +106,86 @@ test('등록증(원본)은 건드리지 않는다 — 세는 값만 바뀐다', 
   const before = JSON.stringify(items);
   build(items);
   assert.equal(JSON.stringify(items), before);
+});
+
+/* ══════ 완벽히 같은 «번호 없는» 줄은 저절로 한 줄 (대표 지시 2026-11-02 「완벽히 같은 회사는 그냥 삭제해라」) ══════ */
+
+test('★ 법인 꼬리표만 다른 번호 없는 두 줄은 저절로 한 줄이 된다 — 명함은 모두 남는다', () => {
+  const rows = build([CARD('c1', '(사)바사아모임'), CARD('c2', '사단법인 바사아모임'), CARD('c3', '사단법인 바사아모임')]);
+  assert.equal(rows.length, 1, '완벽히 같은 곳인데 줄이 둘이다');
+  assert.equal(rows[0].cards.length, 3, '접으면서 명함이 사라졌다');
+});
+
+test('★★ 사람이 손댄 칸이 «두 줄 모두»에 있으면 접지 않는다 — 어느 쪽을 남길지는 사람 몫', () => {
+  const info = { 'n사아바모임': { memo: '가' }, 'n사단법인사아바모임': { folder: 'f1' } };
+  const rows = build([CARD('c1', '사아바모임'), CARD('c2', '사단법인 사아바모임')], info);
+  assert.equal(rows.length, 2);
+});
+
+test('손댄 칸이 «한 줄에만» 있으면 그 줄이 남는다', () => {
+  const info = { 'n사단법인사아바모임': { folder: 'f1' } };
+  const rows = build([CARD('c1', '사아바모임'), CARD('c2', '사아바모임'), CARD('c3', '사단법인 사아바모임')], info);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].key, 'n사단법인사아바모임', '손댄 줄이 사라지면 그 폴더·메모가 안 보인다');
+});
+
+test('★ 지점·노조 이름은 접지 않는다 — 다른 곳이다', () => {
+  const rows = build([CARD('c1', '하늘과일센터'), CARD('c2', '하늘과일센터 동문점'), CARD('c3', '차카타공단'), CARD('c4', '차카타공단 노동조합')]);
+  assert.equal(rows.length, 4);
+});
+
+test('등록증이 있는 줄은 접지 않는다', () => {
+  const rows = build([BIZ('b1', '사단법인 자차카모임', '123-82-30001'), BIZ('b2', '재단법인 자차카모임', '123-82-30002')]);
+  assert.equal(rows.length, 2);
+});
+
+/* ══════ 🔎 같은 회사 의심 — 남은 의심을 사람에게 (대표 승인 2026-11-02) ══════ */
+function suspects(rows, info) {
+  const ctx = { console, Object, String, Number, Array, _coInfo: info || {}, coList: () => rows, fmtBizno: (v) => v || '' };
+  vm.createContext(ctx);
+  vm.runInContext([
+    line(/^const _norm = .*$/m).replace(/^const /, 'var '),
+    line(/^const CO_BRANCH_TAIL = .*$/m).replace(/^const /, 'var '),
+    fnBody('coStrongName'), 'var _susMemo = { list:null, out:null };', fnBody('coSuspectList')
+  ].join('\n'), ctx);
+  return ctx.coSuspectList();
+}
+const CO = (key, name, bizno, n) => ({ key, name, bizno: bizno || '', cards: new Array(n || 0).fill({}), docs: 0 });
+
+test('같은 이름에 번호가 둘 다 있고 다르면 B, 지점·노조 꼬리말이면 C', () => {
+  const out = suspects([CO('1238210001', '사단법인 다라마모임', '123-82-10001', 4), CO('1238210002', '재단법인 다라마모임', '123-82-10002', 2),
+    CO('1239801530', '하늘과일센터 (동문점)', '123-98-01530', 6), CO('nx', '하늘과일센터', '', 1),
+    CO('1238001095', '차카타공단 노동조합', '123-80-01095', 2), CO('ny', '차카타공단', '', 9)]);
+  const kinds = out.map((x) => x.k).sort().join('');
+  assert.equal(kinds, 'BCC', '갈래가 맞지 않습니다: ' + kinds);
+});
+
+test('뜻 없는 이름 겹침(「두레」/「두레전자」)은 의심에 올리지 않는다', () => {
+  const out = suspects([CO('na', '두레건설', '', 1), CO('nb', '두레건설산업', '', 1)]);
+  assert.equal(out.length, 0, '꼬리말이 없는 겹침까지 올리면 짐작으로 합치게 된다');
+});
+
+test('★ 「다른 곳」으로 표시한 쌍은 다시 안 올라온다 — 어느 쪽에 적어 둬도', () => {
+  const rows = [CO('nx', '하늘과일센터', '', 1), CO('1239801530', '하늘과일센터 (동문점)', '123-98-01530', 6)];
+  assert.equal(suspects(rows).length, 1);
+  assert.equal(suspects(rows, { nx: { notSame: '1239801530' } }).length, 0);
+  assert.equal(suspects(rows, { '1239801530': { notSame: 'nx' } }).length, 0);
+});
+
+test('짧은 이름(두 글자 이하)은 의심하지 않는다', () => {
+  assert.equal(suspects([CO('n1', '가나', '', 1), CO('n2', '가나점', '', 1)]).length, 0);
+});
+
+test('★ coStrongName 은 coListBuild 안의 _strong 과 «같은 잣대»다 — 한쪽만 고치면 화면이 거짓말한다', () => {
+  const inner = fnBody('coListBuild').match(/const _strong = s => _norm\(s\)\s*\.replace\((\/[^\n]*\/g), ''\)\s*\.replace\((\/[^\n]*\/g), ''\);/);
+  const outer = fnBody('coStrongName').match(/\.replace\((\/[^\n]*\/g), ''\)\s*\.replace\((\/[^\n]*\/g), ''\);/);
+  assert.ok(inner && outer, '두 함수의 정규식을 찾지 못했습니다');
+  assert.equal(inner[1], outer[1]);
+  assert.equal(inner[2], outer[2]);
+});
+
+test('설정 정리 목록·정리 센터·하위 화면 지도에 「같은 회사 의심」이 모두 걸려 있다', () => {
+  assert.match(src, /sub:'samecos'/);
+  assert.match(src, /samecos:openSameCoSuspects/);
+  assert.match(src, /_go\('samecos','openSameCoSuspects\(\)'\)/);
 });

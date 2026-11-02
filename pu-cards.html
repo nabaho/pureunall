@@ -17495,6 +17495,9 @@ function openCleanupCenter(){
          nameFixN,'건',_go('namefix','openNameFix()'),'검토');
   h+=row('🗂','규칙으로 한 번에 분류','폴더가 안 정해진 명함을 회사명 단어로 나눠 담습니다 — 미리보기 후 적용, 되돌리기 가능',
          rulesN,'장',_go('rules','openClassifyRules()'),'분류');
+  let susN=0; try{ susN=coSuspectList().length; }catch(e){ console.warn(e); }
+  h+=row('🔎','같은 회사 의심','이름이 거의 같은데 기업 상세에서 줄이 나뉜 곳 — 사람이 «같은 곳/다른 곳»을 정합니다(법인 꼬리표만 다른 것은 이미 저절로 한 줄)',
+         susN,'건',_go('samecos','openSameCoSuspects()'),'검토');
   /* 📋 읽어 놓고 기업상세로 안 옮긴 등록증 (2026-09-18) — 옮기는 데 판독 요금 0원 */
   let bizFillN=0; try{ bizFillN=bizFillCount(); }catch(e){ console.warn(e); }
   h+=row('📋','기업상세로 안 보낸 등록증','이미 읽어 둔 사업자등록증의 상호·대표자·업태·주소를 기업상세 <b>빈 칸에만</b> 옮깁니다 — 새로 읽지 않으므로 요금 0원',
@@ -32599,6 +32602,8 @@ function todoAll(){
       n:_todoN(()=>nameFixList().length) },
     { icon:'🗂', label:'규칙으로 한 번에 분류', unit:'장', sub:'rules',
       n:_todoN(()=>classifyPlan().targetN) },
+    { icon:'🔎', label:'같은 회사 의심', unit:'건', sub:'samecos',
+      n:_todoN(()=>coSuspectList().length) },
     { icon:'📋', label:'기업상세로 안 보낸 등록증', unit:'곳', sub:'bizfill',
       n:_todoN(()=>bizFillCount()) },
     { icon:'🗑', label:'휴지통',           unit:'건',   sub:'trash',
@@ -32708,7 +32713,7 @@ function closeSettingsPage(){ state.view='list'; render(); }
    ⚠ 여기 없는 이름으로 setSub 가 불리면 빈 칸만 남는다 — 그때는 목록으로 되돌린다. */
 function settingsSub(){
   return { dedup:openDedup, similar:openSimilar, mixed:openMixedFix, namefix:openNameFix,
-           trash:openTrash, erpname:openErpNameCheck, rules:openClassifyRules,
+           trash:openTrash, erpname:openErpNameCheck, rules:openClassifyRules, samecos:openSameCoSuspects,
            views:openViewManager, mailblock:openMailBlock, clean:openCleanupCenter };
 }
 /* 목록 한 줄 — 「이름 ····· 값 ›」. 설명은 title 로만 */
@@ -33197,6 +33202,34 @@ function coListBuild(){
       companyTel:it.companyTel, companyFax:it.companyFax }, '명함', _coStamp(it));
     o.cards.push(it);
   });
+  /* ②-㉮ 완벽히 같은 «번호 없는» 줄은 한 줄로 접는다 (대표 지시 2026-11-02 「완벽히 같은 회사는 그냥 삭제해라」)
+     법인 꼬리표·띄어쓰기·구두점만 다른 번호 없는 줄이 둘이면 «같은 곳»이다 — 사람에게 묻지 않고 한 줄로 모은다.
+     ⚠ «삭제»는 줄을 지우는 것이지 명함을 지우는 것이 아니다 — 두 줄의 명함이 남은 줄에 모두 모이고 원본은 그대로다.
+     ⚠ 사업자번호·등록증이 있는 줄은 건드리지 않는다(번호 있는 쪽은 위 ② 의 다리가 이미 이었다).
+     ⚠ 사람이 손댄 칸(폴더·탭·메모 등)이 «두 줄 모두»에 있으면 접지 않는다 — 어느 쪽을 남길지는 사람 몫이다.
+       한 줄에만 있으면 그 줄이 남는다. */
+  (function(){
+    const groups = {};
+    Object.keys(by).forEach(k=>{
+      const o = by[k];
+      if(String(o.bizno||'').trim() || o.bizs.length || o.docs) return;
+      const s = _strong(o.name);
+      if(s.length >= 3) (groups[s] || (groups[s] = [])).push(o);
+    });
+    const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+    const hasInfo = o => { const v = info[o.key]; return !!v && Object.keys(v).some(f => f !== 'src' && v[f] !== null && v[f] !== ''); };
+    Object.keys(groups).forEach(s=>{
+      const g = groups[s];
+      if(g.length < 2 || g.filter(hasInfo).length > 1) return;
+      g.sort((a,b)=> ((hasInfo(b)?1:0) - (hasInfo(a)?1:0)) || (b.cards.length - a.cards.length) || (a.key < b.key ? -1 : 1));
+      const keep = g[0];
+      g.slice(1).forEach(o=>{
+        o.cards.forEach(c=>keep.cards.push(c));
+        ['companyTel','companyFax'].forEach(f=>{ if(!keep[f] && o[f]) keep[f] = o[f]; });
+        delete by[o.key];
+      });
+    });
+  })();
   /* ③ 푸른이알피 — 업체유형·담당 노무사
      ⚠ 회사 «전체»를 한 번에 맞춘다(matchAll). 하나씩 맞추면 「이 업체 기록의 임자가
        따로 있는가」를 알 수 없어, 이름이 같아진 다른 회사가 남의 종료·담당을 물려받는다
@@ -39111,6 +39144,113 @@ function coUnmerge(key){
   const k = String(key || '');
   if(!k) return;
   coSaveInfoField(k, 'sameAs', '', '합친 것을 풀었습니다 — 다시 따로 선 줄이 됩니다');
+}
+/* ══════ 🔎 같은 회사 의심 (대표 승인 2026-11-02, 목업) ═══════════════════════════
+   자동으로 붙인 것(법인 꼬리표만 다른 번호 없는 줄)을 «뺀» 나머지 의심만 모아 사람이 정한다.
+     A 번호 없는 줄끼리 — 같은 이름인데 두 줄 다 사람이 손댄 칸이 있어 자동으로 못 접은 것
+     B 번호가 서로 다름 — 같은 이름에 사업자번호가 다르다(다른 회사일 수 있다)
+     C 지점·노조 의심 — 한 이름 뒤에 「…점·지사·공장·노동조합」이 붙었다(다른 곳일 가능성이 크다)
+   ⚠ 짐작으로 합치지 않는다 — 「같은 곳」은 사람이 누른 것만 sameAs 로 적는다(위 coDoMerge 와 같은 길).
+   ⚠ 「다른 곳」은 coInfo/{줄}/notSame 에 상대 열쇠를 적어 «다시 묻지 않는다».
+   ⚠ 원본 명함·등록증은 건드리지 않는다. */
+const CO_SUS_KIND = { A:'번호 없는 줄끼리', B:'번호가 서로 다름', C:'지점·노조 의심' };
+/* 가지·노조 꼬리말 — 이 말이 «뒤에 붙은» 이름만 C. 「두레」/「두레전자」처럼 뜻 없는 겹침은 C 가 아니다 */
+const CO_BRANCH_TAIL = /^(?:\([^)]*\)|[가-힣0-9]{0,8}(?:지점|분점|본점|지사|본사|공장|사무소|영업소|출장소|사업장|노동조합|노조)|[가-힣0-9]{1,4}점)$/;
+/* coListBuild 안의 _strong 과 «같은 잣대» — 그 함수는 밖의 것을 못 불러(검사들이 떠서 돌린다) 한 벌을 따로 둔다.
+   두 벌이 어긋나지 않는지는 tests/cards-co-strong-name.test.js 가 견준다. */
+function coStrongName(s){
+  return _norm(s)
+    .replace(/\((?:사|재|유|합|농|의|학|복)\)|사단법인|재단법인|유한회사|합자회사|농업회사법인|영농조합법인|어업회사법인|의료법인|학교법인|사회복지법인/g, '')
+    .replace(/[()·.\-_,[\]]/g, '');
+}
+let _susMemo = { list:null, out:null };
+function coSuspectList(){
+  const list = coList() || [];
+  if(_susMemo.list === list) return _susMemo.out;
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  const no = o => !String(o.bizno || '').trim();
+  const dismissed = (a, b) => String((info[a.key] || {}).notSame || '').split(',').indexOf(b.key) >= 0
+                           || String((info[b.key] || {}).notSame || '').split(',').indexOf(a.key) >= 0;
+  const out = [], seen = {};
+  const push = (k, a, b, why) => {
+    const id = [a.key, b.key].sort().join('|');
+    if(seen[id] || dismissed(a, b)) return;
+    seen[id] = 1; out.push({ k, a, b, why });
+  };
+  const rows = list.map(o => ({ o, s: coStrongName(o.name) })).filter(x => x.s.length >= 3);
+  /* A·B — 같은 이름(꼬리표 뗀) */
+  const g = {};
+  rows.forEach(x => { (g[x.s] || (g[x.s] = [])).push(x.o); });
+  Object.keys(g).forEach(s => {
+    const arr = g[s];
+    for(let i = 0; i < arr.length; i++) for(let j = i + 1; j < arr.length; j++){
+      const a = arr[i], b = arr[j];
+      if(!no(a) && !no(b)) push('B', a, b, '사업자번호가 서로 다릅니다 — 다른 곳일 수 있어요');
+      else push('A', a, b, no(a) && no(b) ? '이름은 같은데 두 줄 모두 사람이 적어 둔 것이 있어 자동으로 못 합쳤어요' : '이름은 같은데 한쪽만 사업자번호가 있어요');
+    }
+  });
+  /* C — 한 이름 뒤에 가지·노조 꼬리말이 붙은 것: 정렬해 두고 «이어지는 줄»만 훑는다(4천 줄을 서로 다 견주지 않는다) */
+  const sorted = rows.slice().sort((x, y) => x.s < y.s ? -1 : (x.s > y.s ? 1 : 0));
+  for(let i = 0; i < sorted.length; i++){
+    for(let j = i + 1; j < sorted.length && sorted[j].s.indexOf(sorted[i].s) === 0; j++){
+      if(sorted[j].s === sorted[i].s) continue;
+      const tail = sorted[j].s.slice(sorted[i].s.length);
+      if(CO_BRANCH_TAIL.test(tail)) push('C', sorted[i].o, sorted[j].o, '뒤에 「' + tail + '」이 붙었습니다 — 지점·노조는 다른 곳이에요');
+    }
+  }
+  _susMemo = { list, out };
+  return out;
+}
+let _susFilter = 'all';
+function coSusFilter(f){ _susFilter = f; openSameCoSuspects(); }
+function openSameCoSuspects(){
+  const all = coSuspectList();
+  const f = _susFilter;
+  const shown = all.filter(x => f === 'all' || x.k === f).slice(0, 100);
+  const n = k => all.filter(x => x.k === k).length;
+  const chip = (k, label) => `<button class="btn ${f === k ? 'primary' : 'ghost'}" style="padding:5px 12px;font-size:12.5px"
+      onclick="coSusFilter('${k}')">${label}</button>`;
+  const q = s => esc(String(s).replace(/'/g, "\\'"));
+  const side = o => `<div class="sv" style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+      title="${esc(o.name || '')}">${esc(o.name || '(이름 없음)')}</b>
+      <span class="se">${o.bizno ? esc(fmtBizno(o.bizno)) : '사업자번호 없음'}</span>
+      <span class="se">명함 ${(o.cards || []).length}장${o.docs ? ' · 서류 ' + o.docs + '건' : ''}</span></div>`;
+  const body = shown.map(x => `<div class="ditem" style="display:block;padding:9px 0">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:6px;align-items:center">${side(x.a)}<span style="text-align:center;color:var(--sub)">=?</span>${side(x.b)}</div>
+      <div class="setnote" style="margin:6px 0 4px">${esc(x.why)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn ghost" onclick="coSusSame('${q(x.a.key)}','${q(x.b.key)}')">같은 곳</button>
+        <button class="btn ghost" onclick="coSusDiff('${q(x.a.key)}','${q(x.b.key)}')">다른 곳</button></div></div>`).join('');
+  showPanel(`<div class="mhead"><b>🔎 같은 회사 의심</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 8px">이름이 거의 같은데 기업 상세에서 줄이 나뉜 곳입니다. <b>짐작으로 합치지 않고</b> 사람이 정합니다.
+      합쳐도 원본 명함·등록증은 그대로이고, 합친 줄에서 다시 풀 수 있습니다.<br>
+      법인 꼬리표·띄어쓰기만 다른 번호 없는 줄은 이미 <b>저절로 한 줄</b>이 됩니다.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${chip('all', '전체 ' + all.length)}${Object.keys(CO_SUS_KIND).map(k => chip(k, CO_SUS_KIND[k] + ' ' + n(k))).join('')}</div>
+    ${body || '<p class="setnote">이 갈래에는 남은 것이 없습니다.</p>'}
+    ${all.length > 100 ? `<p class="setnote">… 처음 100건만 보입니다 — 정리하면 다음 것이 올라옵니다</p>` : ''}`);
+}
+/* 같은 곳 — 번호 없는 쪽(둘 다 같으면 명함 적은 쪽)이 번호 있는 쪽으로 합쳐진다. coDoMerge 와 «같은 길» */
+function coSusSame(aKey, bKey){
+  const list = coList() || [];
+  const a = list.find(x => x.key === aKey), b = list.find(x => x.key === bKey);
+  if(!a || !b) return;
+  const aNo = !String(a.bizno || '').trim(), bNo = !String(b.bizno || '').trim();
+  const aMoves = (aNo !== bNo) ? aNo : ((a.cards || []).length <= (b.cards || []).length);
+  const from = aMoves ? a : b, to = aMoves ? b : a;
+  const diffNo = !aNo && !bNo;
+  if(!confirm(`「${from.name || from.key}」를 「${to.name || to.key}」와 «같은 곳»으로 합칩니다.\n\n`
+    + (diffNo ? '⚠ 두 곳의 사업자번호가 서로 다릅니다 — 정말 같은 곳인지 한 번 더 확인해 주세요.\n\n' : '')
+    + `명함 ${(from.cards || []).length}장 · 서류 ${from.docs || 0}건이 그쪽 줄로 옮겨갑니다.\n나중에 남은 줄에서 다시 풀 수 있습니다.`)) return;
+  Promise.resolve(coSaveInfoField(from.key, 'sameAs', to.key, `🔗 「${to.name || to.key}」와 한 줄로 합쳤습니다`))
+    .then(() => _refresh(openSameCoSuspects));
+}
+/* 다른 곳 — 다시 묻지 않는다(상대 열쇠를 적어 둔다) */
+function coSusDiff(aKey, bKey){
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  const have = String((info[aKey] || {}).notSame || '').split(',').filter(Boolean);
+  if(have.indexOf(bKey) < 0) have.push(bKey);
+  Promise.resolve(coSaveInfoField(aKey, 'notSame', have.join(','), '다른 곳으로 표시했습니다 — 다시 묻지 않습니다'))
+    .then(() => _refresh(openSameCoSuspects));
 }
 /* 합치는 길과 되돌리는 길을 «한 줄»에 둔다.
    ⚠ 「확인 필요」 카드에 넣지 «않는다» — 2026-09-12 에 넣어 봤다가 되돌렸다.
