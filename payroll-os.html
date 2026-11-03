@@ -27,7 +27,7 @@
 <script src="js/pu-labor-core.js?v=10"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
-<script src="js/pu-co-thread.js?v=1"></script>
+<script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -183,6 +183,7 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
 .mkwrap{display:inline-flex;align-items:center;gap:2px;vertical-align:middle;margin-right:4px}
 .hrbtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:5px;padding:1px 5px;font-size:10.5px;cursor:pointer;font-family:inherit;margin-left:2px}
 .hrbtn:hover{border-color:var(--navy);color:var(--navy)}
+.hrbtn.on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
 .cohead{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
 .cohead .ttl{font-size:19px;font-weight:800}
 .cohead .meta{font-size:12.5px;color:var(--sub);margin-top:4px}
@@ -751,15 +752,59 @@ function rowMarkBox(key, idx){
     +'<button type="button" class="rst'+(mk.star?' on':'')+'" title="별표(★) 표시 저장·기록" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'star\')">'+(mk.star?'\u2605':'\u2606')+'</button>'
     +'</span>';
 }
+function maxHourLeaveFor(site, name){
+  var P=(typeof policyFor==='function')?policyFor(site):{dailyContractHours:8};
+  var meta=(name&&typeof empMeta==='function')?empMeta(site,name):{};
+  var empH=Number(meta.일소정근로시간||meta.소정근로시간||0);
+  if(typeof LC!=='undefined'&&LC&&LC.maxHourLeaveOf) return LC.maxHourLeaveOf(P, empH);
+  var raw=empH>0?empH:Number(P.dailyContractHours||8);
+  return Math.max(1, Math.min(8, Math.floor(raw||8)));
+}
+function setLeaveHours(site, year, name, h){
+  var k=site+'|'+year+'|'+name, lv=leaveOf(site, year, name);
+  var maxH=maxHourLeaveFor(site, name);
+  var norm=(typeof LC!=='undefined'&&LC&&LC.normalizeHourLeave)
+    ? LC.normalizeHourLeave({사용시간:h, policy:policyFor(site), dailyContractHours:maxH})
+    : {사용시간:Math.max(0, Math.min(maxH, Math.round(Number(h)||0))), 최대시간차:maxH};
+  var nextH=norm.사용시간;
+  var patch={사용시간:nextH};
+  if(nextH>0){
+    var d=new Date(), tag=(d.getMonth()+1)+'/'+d.getDate()+'(시간차 '+nextH+'h)';
+    var curDates=String(lv.사용일||'').trim();
+    if(!curDates) patch.사용일=tag;
+  }
+  lput('leave', k, patch);
+}
 function addLeaveHours(site, year, name, dh){
   var k=site+'|'+year+'|'+name, lv=leaveOf(site, year, name);
-  var nextH=Math.max(0, Math.round((Number(lv.사용시간||0)+Number(dh||0))*100)/100);
-  var d=new Date(), tag=(d.getMonth()+1)+'/'+d.getDate()+'(시간차 '+dh+'h)';
+  var maxH=maxHourLeaveFor(site, name);
+  var step=Math.max(1, Math.min(maxH, Math.round(Number(dh)||1)));
+  var rawNext=Math.max(0, Math.round(Number(lv.사용시간||0)+step));
+  var norm=(typeof LC!=='undefined'&&LC&&LC.normalizeHourLeave)
+    ? LC.normalizeHourLeave({사용시간:rawNext, policy:policyFor(site), dailyContractHours:maxH})
+    : {사용시간:Math.min(maxH, rawNext), 최대시간차:maxH};
+  var nextH=norm.사용시간;
+  var d=new Date(), tag=(d.getMonth()+1)+'/'+d.getDate()+'(시간차 '+step+'h)';
   var curDates=String(lv.사용일||'').trim();
   var nextDates=curDates?(curDates+', '+tag):tag;
   lput('leave', k, {사용시간:nextH, 사용일:nextDates});
 }
-window.toggleRowMark=toggleRowMark; window.setMarkFilter=setMarkFilter; window.rowMarkBox=rowMarkBox; window.addLeaveHours=addLeaveHours;
+function setSiteDailyHours(site, h){
+  var maxH=Math.max(1, Math.min(8, Math.floor(Number(h)||8)));
+  lput('labor_policy', site, {dailyContractHours:maxH});
+  var L=lmap('leave'), pre=site+'|', changed=false;
+  Object.keys(L).forEach(function(k){
+    if(k.indexOf(pre)!==0) return;
+    var row=L[k]||{};
+    var curH=Number(row.사용시간||0);
+    if(curH>maxH||curH!==Math.round(curH)){
+      row.사용시간=Math.max(0, Math.min(maxH, Math.round(curH)));
+      L[k]=row; changed=true;
+    }
+  });
+  if(changed) dbSet('leave', L);
+}
+window.toggleRowMark=toggleRowMark; window.setMarkFilter=setMarkFilter; window.rowMarkBox=rowMarkBox; window.addLeaveHours=addLeaveHours; window.setLeaveHours=setLeaveHours; window.setSiteDailyHours=setSiteDailyHours; window.maxHourLeaveFor=maxHourLeaveFor;
 
 function screenPayroll(){
   var h='<h1>급여 처리</h1>';
@@ -1072,13 +1117,13 @@ function leaveSummaryForSlip(site, month, e){
     (row.일별||[]).forEach(function(d){
       if(!d||!d.date||String(d.date).slice(0,4)!==String(yr)) return;
       if(d.type==='annual'){ calUsed+=1; dates.push(d.date+'(1일)'); }
-      else if(d.type==='half'){ calUsed+=0.5; dates.push(d.date+'(반차)'); } else if(d.type==='quarter'){ calHours+=2; dates.push(d.date+'(반반차2h)'); } else if(d.type==='hourleave'){ var hh=Number(d.leaveHours||d.hours||1); calHours+=hh; dates.push(d.date+'(시간차'+hh+'h)'); }
+      else if(d.type==='half'){ calUsed+=0.5; dates.push(d.date+'(반차)'); } else if(d.type==='quarter'){ calHours+=2; dates.push(d.date+'(반반차2h)'); } else if(d.type==='hourleave'){ var maxDh=maxHourLeaveFor(site,nm); var hh=Math.min(maxDh,Math.max(1,Math.round(Number(d.leaveHours||d.hours||1)))); calHours+=hh; dates.push(d.date+'(시간차'+hh+'h)'); }
     });
   });
   dates.sort();
   var curRec=(typeof attendOf==='function')?attendOf(site,month,nm):{};
   var mUsed=Number(curRec.연차사용||0);
-  var dayH=(P&&P.dailyContractHours)?Number(P.dailyContractHours):8; var usedH=Number(lv.사용시간||0)+calHours; var used=(lv.사용!=null&&lv.사용!=='')?Math.round((Number(lv.사용)+usedH/dayH)*100)/100:((calUsed>0||usedH>0)?Math.round((calUsed+usedH/dayH)*100)/100:(mUsed>0?mUsed:(accrued!=null?0:null)));
+  var dayH=maxHourLeaveFor(site,nm); var usedH=Math.min(dayH,Math.max(0,Math.round(Number(lv.사용시간||0))))+calHours; var used=(lv.사용!=null&&lv.사용!=='')?Math.round((Number(lv.사용)+usedH/dayH)*100)/100:((calUsed>0||usedH>0)?Math.round((calUsed+usedH/dayH)*100)/100:(mUsed>0?mUsed:(accrued!=null?0:null)));
   var manualDates=String(lv.사용일||'').trim();
   var usedDates=manualDates||(dates.length?dates.join(', '):(used?'대장 반영 ('+used+'일)':'없음'));
   if(accrued==null&&used==null&&!hire&&!manualDates) return null;
@@ -3485,7 +3530,11 @@ function policyBar(site) {
     '<label>상시 <select onchange="lput(\'labor_policy\',\'' + s + '\',{fiveOrMore:this.value===\'1\'})" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px">' +
     '<option value="1"' + (P.fiveOrMore ? ' selected' : '') + '>5인 이상</option>' +
     '<option value="0"' + (!P.fiveOrMore ? ' selected' : '') + '>5인 미만</option></select></label>' +
-    '<label>1일 소정 ' + nInput(P.dailyContractHours || 8, 'lput(\'labor_policy\',\'' + s + '\',{dailyContractHours:+this.value})', 48) + 'h</label>' +
+    '<label title="1일 소정근로시간이 최대 시간차(h)가 됩니다 (예: 5시간이면 최대 시간차 5h)">1일 소정 <select onchange="setSiteDailyHours(\'' + s + '\',+this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px">' +
+    [1, 2, 3, 4, 5, 6, 7, 8].map(function (hh) {
+      var curD = LC.maxHourLeaveOf(P);
+      return '<option value="' + hh + '"' + (curD === hh ? ' selected' : '') + '>' + hh + '시간 (최대 시간차 ' + hh + 'h)</option>';
+    }).join('') + '</select></label>' +
     '<label>주 소정 ' + nInput(P.weeklyContractHours, 'lput(\'labor_policy\',\'' + s + '\',{weeklyContractHours:+this.value})', 56) + 'h</label>' +
     '<label>월 소정 ' + nInput(P.monthlyStdHours, 'lput(\'labor_policy\',\'' + s + '\',{monthlyStdHours:+this.value})', 62) + 'h</label>' +
     '<label>단수 <select onchange="lput(\'labor_policy\',\'' + s + '\',{rounding:this.value})" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px">' +
@@ -3653,7 +3702,10 @@ function saveDay(site, month, name) {
     rec.in = i.value; rec.out = o.value; rec.breakMin = Number(b.value || 0);
   }
   var lh = document.getElementById('dayLeaveHours');
-  if (type === 'hourleave' || type === 'quarter') rec.leaveHours = Number((lh && lh.value) || (type === 'quarter' ? 2 : 1));
+  if (type === 'hourleave' || type === 'quarter') {
+    var maxDayH = maxHourLeaveFor(site, name);
+    rec.leaveHours = Math.min(maxDayH, Math.max(1, Math.round(Number((lh && lh.value) || (type === 'quarter' ? 2 : 1)))));
+  }
   if (nt && nt.value) rec.note = nt.value;
   var list = dayRecords(site, month, name).filter(function (r) { return r.date !== rec.date; });
   list.push(rec);
@@ -3740,7 +3792,12 @@ function screenDayCalendar() {
       DAY_TYPES.map(function (t) {
         return '<option value="' + t.key + '"' + ((cur.type || 'work') === t.key ? ' selected' : '') + '>' + t.label + '</option>';
       }).join('') + '</select></label>' +
-      '<label title="시간차·반반차 사용 시간(h)">시간차(h) <input type="number" step="0.5" min="0" max="8" id="dayLeaveHours" value="' + (cur.leaveHours == null ? (cur.type === 'quarter' ? 2 : 1) : cur.leaveHours) + '" style="width:52px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;text-align:right"></label>' +
+      '<label title="시간차 1시간 단위 선택 (1일 소정근로시간이 최대 시간차)">시간차(h) <select id="dayLeaveHours" style="padding:5px 6px;border:1px solid var(--line);border-radius:6px">' +
+      LC.hourLeaveOptions(P, (empMeta(site, name) || {}).일소정근로시간).map(function (hh) {
+        var maxDayH = LC.maxHourLeaveOf(P, (empMeta(site, name) || {}).일소정근로시간);
+        var curVal = Math.min(maxDayH, Math.max(1, Math.round(Number(cur.leaveHours == null ? (cur.type === 'quarter' ? 2 : 1) : cur.leaveHours))));
+        return '<option value="' + hh + '"' + (curVal === hh ? ' selected' : '') + '>' + hh + '시간' + (hh === maxDayH ? ' (최대)' : '') + '</option>';
+      }).join('') + '</select></label>' +
       '<label>출근 <input type="time" id="dayIn" value="' + (cur.in || '09:00') + '" style="padding:5px 6px;border:1px solid var(--line);border-radius:6px"></label>' +
       '<label>퇴근 <input type="time" id="dayOut" value="' + (cur.out || '18:00') + '" style="padding:5px 6px;border:1px solid var(--line);border-radius:6px"></label>' +
       '<label>휴게(분) <input type="number" id="dayBreak" value="' + (cur.breakMin == null ? 60 : cur.breakMin) + '" style="width:64px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;text-align:right"></label>' +
@@ -3983,8 +4040,12 @@ function screenLeave() {
     var nm = esc(e.성명), meta = empMeta(App.site, e.성명), lv = leaveOf(App.site, year, e.성명);
     var hire = meta.입사일 || '';
     var asOf = year + '-12-31';
+    var maxH = LC.maxHourLeaveOf(P, meta.일소정근로시간);
+    var hrOpts = LC.hourLeaveOptions(P, meta.일소정근로시간);
+    var normH = LC.normalizeHourLeave({ 사용일수: Number(lv.사용 || 0), 사용시간: Number(lv.사용시간 || 0), policy: P, dailyContractHours: maxH });
+    var curH = normH.사용시간;
     var ac = hire ? LC.accrueAnnual({ hireDate: hire, asOf: asOf, policy: P }) : { 발생일수: 0, 근거: '입사일을 입력하세요', 구분: '' };
-    var lg = LC.annualLedger({ 발생일수: ac.발생일수, 이월일수: Number(lv.이월 || 0), 사용일수: Number(lv.사용 || 0), 사용시간: Number(lv.사용시간 || 0), policy: P });
+    var lg = LC.annualLedger({ 발생일수: ac.발생일수, 이월일수: Number(lv.이월 || 0), 사용일수: Number(lv.사용 || 0), 사용시간: Number(lv.사용시간 || 0), dailyContractHours: maxH, policy: P });
     var 통상 = Number(meta.통상임금월액 || e.기본급 || 0);
     var 시급 = LC.hourlyOrdinary(통상, P);
     var unused = Math.max(0, lg.잔여일수);
@@ -3999,7 +4060,17 @@ function screenLeave() {
       '<td style="padding:6px 8px;font-weight:700" title="' + esc(ac.근거) + '">' + (ac.발생일수 || 0) + '</td>' +
       '<td style="padding:6px 8px">' + nInput(lv.이월, 'lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{이월:+this.value})', 48) + '</td>' +
       '<td style="padding:6px 8px">' + nInput(lv.사용, 'lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{사용:+this.value})', 48) + '</td>' +
-      '<td style="padding:6px 8px;white-space:nowrap">' + nInput(lv.사용시간, 'lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{사용시간:+this.value})', 44) + ' <button type="button" class="hrbtn" title="1시간 시간차 추가" onclick="addLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',1)">+1h</button> <button type="button" class="hrbtn" title="반반차(2시간) 추가" onclick="addLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',2)">+2h</button> <button type="button" class="hrbtn" title="반차(4시간) 추가" onclick="addLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',4)">+4h</button></td>' +
+      '<td style="padding:6px 8px;white-space:nowrap">' +
+      '<select title="시간차 1시간 단위 선택 (최대 ' + maxH + 'h = 1일 소정근로시간)" onchange="setLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',+this.value)" style="padding:3px 4px;border:1px solid var(--line);border-radius:6px;font-size:12px;font-weight:600">' +
+      '<option value="0"' + (curH === 0 ? ' selected' : '') + '>0h</option>' +
+      hrOpts.map(function (hh) {
+        return '<option value="' + hh + '"' + (curH === hh ? ' selected' : '') + '>' + hh + 'h' + (hh === maxH ? '(최대)' : '') + '</option>';
+      }).join('') + '</select> ' +
+      hrOpts.map(function (hh) {
+        var active = (curH === hh);
+        return '<button type="button" class="hrbtn' + (active ? ' on' : '') + '" title="' + hh + '시간 시간차 선택 (최대 ' + maxH + 'h)" onclick="setLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',' + (active ? 0 : hh) + ')">' + hh + 'h</button>';
+      }).join('') +
+      ' <button type="button" class="hrbtn" title="1시간 추가 (최대 ' + maxH + 'h 상한)" onclick="addLeaveHours(\'' + s + '\',\'' + year + '\',\'' + nm + '\',1)">+1h</button></td>' +
       '<td style="padding:6px 8px;text-align:left"><input type="text" value="' + esc(lv.사용일 || '') + '" placeholder="예: 10/14, 10/21" onchange="lput(\'leave\',\'' + s + '|' + year + '|' + nm + '\',{사용일:this.value})" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px"></td>' +
       '<td style="padding:6px 8px;font-weight:700;white-space:nowrap;color:' + (lg.잔여일수 < 0 ? 'var(--bad)' : (unused >= 10 ? 'var(--warn)' : 'inherit')) + '" title="총 ' + lg.총사용일수 + '일(' + lg.총사용시간 + 'h) 사용">' + lg.잔여일수 + '일 <span style="font-size:11px;font-weight:400;color:var(--sub)">(' + lg.잔여시간 + 'h)</span></td>' +
       '<td style="padding:6px 8px;color:var(--sub);white-space:nowrap">' + (ps ? ps.소멸일 : '-') + '</td>' +
@@ -4013,7 +4084,7 @@ function screenLeave() {
   if (needPromo) h += '<div class="note" style="border-left:3px solid var(--warn)"><b>사용촉진 대상 ' + needPromo + '명</b> — 잔여 10일 이상. ' +
     '1차·2차 촉진을 <b>서면으로 모두</b> 이행해야 미사용 연차가 소멸합니다(근기법 61조). 하나라도 빠지면 수당 지급 의무가 그대로 남습니다.</div>';
   h += '<div class="note">연차 규칙 — 1년 미만: 1개월 개근당 1일(한도 11일) · 1년 이상: 15일 · 3년 이상: 2년마다 1일 가산(한도 25일) · ' +
-    '출근율 80% 미만: 개근 월수만큼(근기법 60조 2항) · 5인 미만 사업장: 미발생. 시간차(1h·2h 반반차·4h 반차)는 1일 소정근로시간 기준으로 자동 일수·수당 환산됩니다. 미사용수당 = 1일 통상임금 × 미사용일수(시급 × 미사용시간).</div>';
+    '출근율 80% 미만: 개근 월수만큼(근기법 60조 2항) · 5인 미만 사업장: 미발생. 시간차는 1시간 단위로 1일 소정근로시간(최대 8시간, 소정근로시간이 5시간이면 최대 5시간)까지 선택·관리되며 자동 일수·수당 환산됩니다. 미사용수당 = 1일 통상임금 × 미사용일수(시급 × 미사용시간).</div>';
   // 법정휴가 종류표 — 어떤 휴가가 유급인지 한눈에
   h += '<h2 style="margin:18px 0 8px;font-size:15px">법정휴가·휴직 종류</h2>';
   h += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">' +

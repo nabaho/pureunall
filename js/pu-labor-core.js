@@ -231,11 +231,11 @@
       if (!byWeek[wk]) byWeek[wk] = { 주시작: wk, 실근로: 0, 일연장: 0, 소정근로일: 0, 개근: true, 결근: 0, 휴일근로: 0 };
       var W = byWeek[wk];
 
-      // 휴가·결근은 시간이 아니라 일수로 센다
-      var dailyH = num(P.dailyContractHours) || 8;
+      // 휴가·결근은 시간이 아니라 일수로 센다 (시간차는 1시간 단위, 1일 소정근로시간이 최대시간차)
+      var dailyH = maxHourLeaveOf(P);
       if (t === 'annual') { sum.연차사용 += 1; sum.연차사용시간 += dailyH; return; }
-      if (t === 'half') { var hh = num(r.leaveHours) || (dailyH / 2); sum.연차사용 = Math.round((sum.연차사용 + hh / dailyH) * 1000) / 1000; sum.연차사용시간 += hh; }
-      if (t === 'quarter' || t === 'hourleave') { var lh = num(r.leaveHours) || (t === 'quarter' ? (dailyH / 4) : 1); sum.연차사용 = Math.round((sum.연차사용 + lh / dailyH) * 1000) / 1000; sum.연차사용시간 += lh; }
+      if (t === 'half') { var hh = Math.min(dailyH, num(r.leaveHours) || (dailyH / 2)); sum.연차사용 = Math.round((sum.연차사용 + hh / dailyH) * 1000) / 1000; sum.연차사용시간 += hh; }
+      if (t === 'quarter' || t === 'hourleave') { var lh = Math.min(dailyH, Math.max(1, Math.round(num(r.leaveHours) || (t === 'quarter' ? 2 : 1)))); sum.연차사용 = Math.round((sum.연차사용 + lh / dailyH) * 1000) / 1000; sum.연차사용시간 += lh; }
       if (t === 'absent') { sum.결근일수 += 1; W.결근 += 1; W.개근 = false; return; }
       if (t === 'paid') { sum.유급휴가일수 += 1; return; }
       if (t === 'unpaid') { sum.무급휴가일수 += 1; W.개근 = false; return; }
@@ -469,17 +469,55 @@
       근거: '회계연도 기준 첫해 비례 — ' + P.annualBase + '일 × ' + d + '/365' };
   }
 
+  /* 시간차 최대 시간(h) — 1시간 단위로 최대 8시간까지 선택하되,
+     1일 소정근로시간이 5시간이면 5시간이 최대시간차가 된다 (2026-11-02 대표 지시) */
+  function maxHourLeaveOf(policy, empDailyHours) {
+    var P = policyOf(policy);
+    var raw = num(empDailyHours) > 0 ? num(empDailyHours) : (num(P.dailyContractHours) || 8);
+    return Math.max(1, Math.min(8, Math.floor(raw)));
+  }
+
+  /* 시간차 선택 목록 — 1시간 단위 [1, 2, …, maxH] 배열 (8시간: 1~8h, 5시간: 1~5h) */
+  function hourLeaveOptions(policy, empDailyHours) {
+    var maxH = maxHourLeaveOf(policy, empDailyHours);
+    var list = [];
+    for (var h = 1; h <= maxH; h++) list.push(h);
+    return list;
+  }
+
+  /* 시간차 정리·관리 — 1시간 단위 정수로 맞추고 1일 소정근로시간(최대시간차)으로 상한 정리한다. */
+  function normalizeHourLeave(o) {
+    o = o || {};
+    var maxH = maxHourLeaveOf(o.policy, o.dailyContractHours || o.일소정근로시간);
+    var raw = num(o.사용시간 != null ? o.사용시간 : o.시간);
+    var unitH = Math.max(0, Math.round(raw));
+    var cappedH = Math.min(maxH, unitH);
+    var days = Math.max(0, num(o.사용일수));
+    return {
+      사용일수: days,
+      사용시간: cappedH,
+      원래시간: raw,
+      최대시간차: maxH,
+      일소정근로시간: maxH,
+      상한초과정리됨: unitH > maxH,
+      선택목록: hourLeaveOptions(o.policy, maxH),
+      일환산: Math.round((cappedH / maxH) * 1000) / 1000
+    };
+  }
+
   /* 연차 대장 — 발생·이월·사용·잔여. 이월 정책은 사업장마다 다르다. */
   function annualLedger(o) {
     o = o || {};
     var P = policyOf(o.policy);
-    var dailyH = num(o.dailyContractHours || P.dailyContractHours) || 8;
-    var 발생 = num(o.발생일수), 사용일 = num(o.사용일수), 사용시간 = num(o.사용시간), 이월 = num(o.이월일수);
+    var dailyH = maxHourLeaveOf(P, o.dailyContractHours || o.일소정근로시간);
+    var norm = normalizeHourLeave({ 사용일수: o.사용일수, 사용시간: o.사용시간, policy: P, dailyContractHours: dailyH });
+    var 발생 = num(o.발생일수), 사용일 = num(o.사용일수), 사용시간 = norm.사용시간, 이월 = num(o.이월일수);
     var 사용 = Math.round((사용일 + (dailyH > 0 ? 사용시간 / dailyH : 0)) * 1000) / 1000;
     var 총한도 = 발생 + 이월;
     var 잔여 = 총한도 - 사용;
     return {
       발생일수: 발생, 이월일수: 이월, 사용일수: 사용, 사용시간: 사용시간,
+      최대시간차: dailyH, 시간차선택목록: norm.선택목록, 시간차상한정리됨: norm.상한초과정리됨,
       총사용시간: Math.round(사용 * dailyH * 100) / 100, 총한도: 총한도,
       총시간: Math.round(총한도 * dailyH * 100) / 100, 일소정시간: dailyH,
       잔여시간: Math.round(잔여 * dailyH * 100) / 100,
@@ -1550,6 +1588,7 @@
     statutoryAllowances: statutoryAllowances, checkFixedOT: checkFixedOT, checkMinWage: checkMinWage,
     // 연차·휴가
     accrueAnnual: accrueAnnual, accrueAnnualFiscalFirstYear: accrueAnnualFiscalFirstYear,
+    maxHourLeaveOf: maxHourLeaveOf, hourLeaveOptions: hourLeaveOptions, normalizeHourLeave: normalizeHourLeave,
     annualLedger: annualLedger, annualUnusedPay: annualUnusedPay,
     promotionSchedule: promotionSchedule, leaveKind: leaveKind, compLeaveHours: compLeaveHours,
     // 퇴직
