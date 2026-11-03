@@ -379,6 +379,31 @@ section('UI 한화면 정리 · 계약/취업규칙 빈 상태 진입 · HTML/CS
   var sevDbHtml = ctx.screenSever();
   ok('직원의 퇴직금 제도를 DB형으로 바꾸면 DB형 확정급여형 퇴직연금 금액이 표시된다',
     sevDbHtml.indexOf('김철수 님의 선택 제도: DB형 퇴직연금') > -1);
+
+  // 5) 모든 월액·금액 입력란에 천단위 콤마(,)가 표시되는지 검증 (1200000 -> 1,200,000 / 2500000 -> 2,500,000)
+  ok('fmtComma가 1200000을 1,200,000으로, 2183740을 2,183,740으로 변환한다',
+    ctx.fmtComma(1200000) === '1,200,000' && ctx.fmtComma(2183740) === '2,183,740');
+  ctx.App.tab = 'attend';
+  ctx.App.site = '1일등한우';
+  ctx.App.month = '2026년 11월';
+  var attHtml = ctx.screenAttend();
+  ok('근태·수당 화면의 통상임금월액 입력란에 천단위 콤마(2,500,000)가 포함되어 렌더링된다',
+    attHtml.indexOf('value="2,500,000"') > -1);
+
+  // 6) 담당자 목록 좌측의 불필요한 빈 셀(<span class="fill")이 제거되었는지 검증
+  ok('담당자 목록(viewbarHtml)에 불필요한 빈 셀(.fill)이 없다',
+    H.indexOf('<span class="fill"') === -1);
+
+  // 7) 개인별 원본자료(카톡·문자·메일 캡쳐) 탐색·보관 및 좌·우 1:1 눈으로 비교 화면 검증
+  var evs = ctx.empEvidencesOf('1일등한우', '홍길동');
+  ok('각 개인마다 급여대장·카톡·메일 원본 자료를 자동으로 찾아 반환한다',
+    Array.isArray(evs) && evs.length >= 1);
+  var cmpHtml = ctx.renderEmpCompareStudio('1일등한우');
+  ok('좌·우 1:1 원본비교 스튜디오가 좌측 원본 뷰어와 우측 콤마 적용 급여·근태 대조표를 나란히 렌더링한다',
+    cmpHtml.indexOf('split-compare') > -1 && cmpHtml.indexOf('value="2,500,000"') > -1 && cmpHtml.indexOf('Ctrl + V') > -1);
+  var card360Html = ctx.renderEmp360Card('1일등한우');
+  ok('1인 종합카드(360°) 모드가 급여·연차·퇴직금·원본비교를 한 화면에 렌더링한다',
+    card360Html.indexOf('1인 종합 카드') > -1 && card360Html.indexOf('2,500,000원') > -1);
 })();
 
 console.log('\n════════════════════════════════');
