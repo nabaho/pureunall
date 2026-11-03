@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-labor-core.js?v=10"></script>
+<script src="js/pu-labor-core.js?v=12"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
@@ -52,7 +52,22 @@ header .out{background:#ffffff22;border:1px solid #ffffff66;color:#fff;border-ra
 nav{width:180px;background:#fff;border-right:1px solid var(--line);padding:14px 10px;flex-shrink:0}
 nav button{display:block;width:100%;text-align:left;border:none;background:none;border-radius:10px;padding:10px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);font-family:inherit}
 nav button.on{background:var(--navy);color:#fff;font-weight:700}
-main{flex:1;padding:22px 24px;overflow:auto}
+main{flex:1;padding:12px 18px;overflow:auto}
+.sum-grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.sum-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer}
+.sum-card:hover{border-color:var(--navy);background:#f8fafc}
+.dash-2col{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,0.95fr);gap:10px;align-items:start}
+.filing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.rrn-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.pay-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.pay-kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mpills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:10px;align-items:center}
+.mpill{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.mpill:hover{border-color:var(--navy);color:var(--navy)}
+.mpill.on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.subtab{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.subtab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 h1{font-size:20px;margin-bottom:4px}.sub{color:var(--sub);font-size:13px;margin-bottom:16px}
 .btn{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-size:13px;font-family:inherit}
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
@@ -199,6 +214,7 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
   nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
   nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px}
   #colist{width:100%;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
+  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis{grid-template-columns:1fr}
 }
 /* ══════ 머리줄 회사 칸 (2026-10-05) — 회사 이름·담당·지표를 맨 위 파란 줄에 ══════ */
 /* ⚠ 넘치면 잘라 버리지 않고 둘째 줄로 내린다 — 맨 끝의 「확정」 단추가 잘려 안 보이면 안 된다 */
@@ -807,15 +823,14 @@ function setSiteDailyHours(site, h){
 window.toggleRowMark=toggleRowMark; window.setMarkFilter=setMarkFilter; window.rowMarkBox=rowMarkBox; window.addLeaveHours=addLeaveHours; window.setLeaveHours=setLeaveHours; window.setSiteDailyHours=setSiteDailyHours; window.maxHourLeaveFor=maxHourLeaveFor;
 
 function screenPayroll(){
-  var h='<h1>급여 처리</h1>';
-  if(!payHas()){ h+='<div class="sub">급여 데이터를 서버에 올리세요</div>'+
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px"><h1 style="margin:0">💰 급여 처리 (웹 임금대장)</h1>';
+  if(!payHas()){ h+='</div><div class="sub">급여 데이터를 서버에 올리세요</div>'+
     '<button class="btn sec" onclick="importPayroll()">급여(JSON) 가져와 서버 저장</button>'+
     '<div class="empty" style="margin-top:14px">_harness_out\\payroll_all.json 을 올리면 전체 사업장 급여가 표시됩니다.<br>'+
     '(만드는 법: <code>python engine/build_payroll_all.py</code>)</div>'; return h; }
-  // 3단계 드릴다운
   if(!App.site){
-    h+='<div class="sub">사업장 선택 · 계산 결과를 3색 신호로 확인 → 확정 '+
-       '<button class="btn sec noprint" style="margin-left:10px;padding:4px 10px;font-size:12px" onclick="importPayroll()">데이터 다시 올리기</button></div>';
+    h+='<button class="btn sec noprint" style="padding:4px 10px;font-size:12px" onclick="importPayroll()">데이터 다시 올리기</button></div>';
+    h+='<div class="sub">사업장 선택 · 계산 결과를 3색 신호로 확인 → 확정</div>';
     h+='<div class="cards">';
     paySites().forEach(function(site, idx){
       var recs=payRecs(site); var cnt={green:0,orange:0,red:0,gray:0}; var locked=0, review=0;
@@ -830,63 +845,139 @@ function screenPayroll(){
         ['green','orange','red','gray'].map(function(k){return cnt[k]?'<span style="color:'+SIG[k]+'">●'+cnt[k]+' '+sigLabel(k)+'</span>':'';}).join('')+
         '</div></div>';
     });
-    h+='</div><div class="note">● 이상없음 ● 확인필요 ● 막힘(확정 전 해결) ● 데이터부족. '+
-       '<b>「검토 N건」 숫자만</b> 신경 쓰면 됩니다. 사업장을 눌러 → [초록 전부 확정]으로 안전한 건 한 번에 끝내고, 나머지만 눈으로 보세요.</div>';
+    h+='</div>';
     return h;
   }
-  var recs=payRecs(App.site);
-  if(!App.month){
-    var sEsc=App.site.replace(/'/g,"");
-    var greenN=recs.filter(function(r){return effSig(r)==='green'&&!isLocked(App.site,r.월);}).length;
-    var reviewN=recs.filter(function(r){return effSig(r)!=='green'&&!isLocked(App.site,r.월);}).length;
-    h+='<div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>'+App.site+'</b> 월별</div>';
-    h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
-       '<button class="btn" '+(greenN?'':'disabled style="background:#cbd5e1"')+' onclick="lockAllGreen(\''+sEsc+'\')">● 초록(이상없음) '+greenN+'건 전부 확정</button>'+
-       '<button class="btn sec" onclick="toggleOnlyReview()">'+(App.onlyReview?'전체 보기':'검토 필요만 보기 ('+reviewN+')')+'</button>'+
-       '<span style="font-size:12px;color:var(--sub)">초록은 버튼으로 한 번에 · 나머지만 눈으로 확인</span>'+
-       '</div>';
-    h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
-    var shown=0;
-    /* mfile — 파일 이름. 폰(760px 이하)에서는 접는다: 「(주)…_2026년 1월 급여대장(최종).xlsx」가 달마다 네댓 줄로 접혀
-       열두 달이 1,400px 이 됐고, 정작 «이슈»(최저임금 미달 등)는 그 아래로 밀렸다. 회사 이름은 머리에 이미 있다. */
-    recs.forEach(function(r){ var lk=isLocked(App.site,r.월); var s=effSig(r);
-      if(App.onlyReview && (lk || s==='green')) return;   // 검토 필요만: 확정·초록 숨김
-      shown++;
-      var extra=(s==='gray')?' · <span style="color:'+SIG.gray+'">데이터부족(확인)</span>':'';
-      h+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)">'+
-        '<span title="'+sigLabel(s)+'" style="width:11px;height:11px;border-radius:50%;background:'+SIG[s]+';flex-shrink:0"></span>'+
-        '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?'<span class="mfile"> · '+r.파일+'</span>':'')+extra+(r.이슈?' · '+r.이슈:'')+'</span></div>'+
-        (lk?'<span class="badge ok">확정됨</span> <button class="btn sec" onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')">되돌리기</button>'
-           :'<button class="btn" '+(s==='red'?'disabled style="background:#cbd5e1" title="빨강 해결 후 확정"':'onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')"')+'>확정</button>')+
-        '</div>';
-    });
-    if(!shown) h+='<div class="empty" style="padding:20px">'+(App.onlyReview?'검토할 항목이 없습니다. 모두 확정했거나 이상없음입니다. 👍':'표시할 월이 없습니다.')+'</div>';
-    h+='</div>'; return h;
+  var recs=payRecs(App.site)||[];
+  var sEsc=App.site.replace(/'/g,"");
+  var greenN=recs.filter(function(r){return effSig(r)==='green'&&!isLocked(App.site,r.월);}).length;
+  var reviewN=recs.filter(function(r){return effSig(r)!=='green'&&!isLocked(App.site,r.월);}).length;
+
+  // 현재 볼 귀속월 자동 선택: App.month 가 없으면 기준월(App.ym)에 맞는 달 또는 가장 최근 달을 바로 열어 엑셀 파일명 대신 HTML/CSS 임금대장을 즉시 보여준다
+  var activeMonth=App.month;
+  if(!activeMonth && recs.length){
+    var ymT=ymParts(App.ym||defaultYm());
+    var matched=ymT?recs.filter(function(r){ var x=ymOf(r); return x&&x.y===ymT.y&&x.m===ymT.m; })[0]:null;
+    activeMonth=matched?matched.월:recs[0].월;
   }
-  // 직원별 상세
-  var rec=recs.filter(function(r){return r.월===App.month;})[0]||{직원:[]};
-  /* ⚠ 직원 표는 **그 달을 열 때** 받는다(2026-08-17). 아직 안 왔으면 「받는 중」이라
-     말하고 끝낸다 — 빈 표를 그리면 「직원이 없다」로 읽혀 명세서가 0명으로 나간다. */
-  ensureEmps(rec);
-  var loaded=empsOf(rec);
-  if(!loaded){
-    h+='<div class="sub"><a href="#" onclick="goBack();return false">\u2190 '+App.site+'</a> \u00b7 <b>'+App.month+'</b></div>';
-    h+='<div class="empty" style="padding:24px">'+(empLoading[rec.id]?'\uc9c1\uc6d0 \ud45c\ub97c \ubc1b\ub294 \uc911\u2026':'\uc9c1\uc6d0 \ud45c\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \ub4e4\uc5b4\uc624\uc138\uc694.')+'</div>';
-    return h;
+  var rec=recs.filter(function(r){return r.월===activeMonth;})[0]||recs[0]||null;
+  if(rec) activeMonth=rec.월;
+  var mEsc=String(activeMonth||'').replace(/'/g,"");
+
+  h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
+     '<button class="btn" style="padding:5px 11px;font-size:12px;'+(greenN?'':'background:#cbd5e1')+'" '+(greenN?'':'disabled')+' onclick="lockAllGreen(\''+sEsc+'\')">● 초록 '+greenN+'건 일괄확정</button>'+
+     (activeMonth?'<button class="btn sec" style="padding:5px 10px;font-size:12px" onclick="exportLedgerXlsx(\''+sEsc+'\',\''+mEsc+'\')">📊 엑셀 다운로드</button><button class="btn sec" style="padding:5px 10px;font-size:12px" onclick="exportLedgerCsv(\''+sEsc+'\',\''+mEsc+'\')">📄 CSV 다운로드</button><button class="btn sec" style="padding:5px 10px;font-size:12px" onclick="pickTab(\'slip\')">📄 명세서 보기</button>':'')+
+     '</div></div>';
+
+  if(!recs.length){
+    return h+'<div class="empty">이 사업장에 등록된 급여 월별 데이터가 없습니다.</div>';
   }
-  var raw=loaded, emps=dedupeEmps(raw);
-  var dupNote=(raw.length>emps.length)?' <span style="color:var(--warn)">(중복 '+(raw.length-emps.length)+'건 정리)</span>':'';
-  h+='<div class="sub"><a href="#" onclick="goBack();return false">← '+App.site+'</a> · <b>'+App.month+'</b> 직원별 ('+emps.length+'명)'+dupNote+'</div>';
-  /* emptbl — 폰에서 칸이 한 줄이게(성명이 「점/검/누/리」 한 글자씩 쌓였다)·성명을 왼쪽에 붙여 두는 이름표(@media 760px) */
-  h+='<div style="overflow:auto"><table class="emptbl" style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">'+
-     '<tr style="background:var(--paper);text-align:right">'+['순번','성명','기본급','과세총액','소득세','지방세','국민연금','건강보험','고용보험','공제총액','실수령'].map(function(c,i){return '<th style="padding:8px 10px;'+(i<2?'text-align:left':'')+'">'+c+'</th>';}).join('')+'</tr>';
-  emps.forEach(function(e,i){
-    h+='<tr style="border-top:1px solid var(--line);text-align:right">'+
-      '<td style="padding:7px 10px;text-align:left;color:var(--sub);white-space:nowrap">'+rowMarkBox('emp:'+App.site+'|'+((typeof e!=='undefined'&&e)?e.성명:x.성명||''), i+1)+'</td>'+
-      '<td style="padding:7px 10px;text-align:left;font-weight:600">'+(e.성명||'')+'</td>'+
-      ['기본급','과세총액','소득세','지방세','국민연금','건강보험','고용보험','공제총액','실수령'].map(function(k){return '<td style="padding:7px 10px">'+won(e[k])+'</td>';}).join('')+'</tr>';
+
+  // 1) 월 선택 알약 바 (엑셀 파일명 나열 대신 깔끔한 월 탭 바)
+  h+='<div class="mpills"><b style="font-size:12px;color:var(--sub);margin-right:4px">귀속월 선택 ('+recs.length+'개월)</b>';
+  recs.forEach(function(r){
+    var lk=isLocked(App.site,r.월), sig=effSig(r), isOn=(r.월===activeMonth);
+    var dotCol=lk?'#166534':SIG[sig];
+    h+='<button type="button" class="mpill'+(isOn?' on':'')+'" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})" title="'+esc((r.파일||'')+(r.이슈?' · '+r.이슈:''))+'">'+
+      '<span style="width:8px;height:8px;border-radius:50%;background:'+(isOn?'#fff':dotCol)+';display:inline-block"></span>'+
+      '<span>'+r.월+'</span>'+
+      '<span style="font-size:10.5px;opacity:.85">('+empCount(r)+'명'+(lk?'·✔':'')+')</span></button>';
   });
-  h+='</table></div><div class="note">엔진 계산 규칙: 지방세=소득세×10% 10원절사 · 고용보험=과세×연도요율 · 연금/건보=고지액. 값은 골든(대장) 추출본.</div>';
+  h+='</div>';
+
+  // 2) 선택된 달의 HTML/CSS 웹 임금대장 (요약 카드 4칸 + 깔끔한 테이블 + 합계 줄)
+  if(rec){
+    ensureEmps(rec);
+    var loaded=empsOf(rec);
+    var lkCur=isLocked(App.site,rec.월), sigCur=effSig(rec);
+    if(!loaded){
+      h+='<div class="empty" style="padding:24px">'+(empLoading[rec.id]?'직원 급여표를 불러오는 중…':'직원 급여표를 불러오지 못했습니다. 잠시 후 다시 시도하세요.')+'</div>';
+    } else {
+      var raw=loaded, emps=dedupeEmps(raw);
+      var dupNote=(raw.length>emps.length)?' <span style="color:var(--warn)">(중복 '+(raw.length-emps.length)+'건 정리)</span>':'';
+      var totBase=0, totTaxable=0, totGross=0, totPen=0, totHlth=0, totEmp=0, totTax=0, totLoc=0, totDed=0, totNet=0;
+      emps.forEach(function(e){
+        var sr=slipRows(e);
+        totBase+=Number(e.기본급||0);
+        totTaxable+=Number(e.과세총액||e.기본급||0);
+        totGross+=Number(sr.gross||e.지급총액||e.과세총액||e.기본급||0);
+        totPen+=Number(e.국민연금||0);
+        totHlth+=Number(e.건강보험||0)+Number(e.장기요양||0);
+        totEmp+=Number(e.고용보험||0);
+        totTax+=Number(e.소득세||0);
+        totLoc+=Number(e.지방세||0);
+        totDed+=Number(sr.dedTotal!=null?sr.dedTotal:(e.공제총액||0));
+        totNet+=Number(sr.net!=null?sr.net:(e.실수령||0));
+      });
+
+      h+='<div class="pay-kpis">'+
+        '<div class="pay-kpi"><div style="font-size:11.5px;color:var(--sub);display:flex;justify-content:space-between;align-items:center"><span>귀속월 · 지급 인원</span>'+(lkCur?'<span class="badge ok">확정됨 ✔</span>':'<span class="badge warn">확정 전</span>')+'</div>'+
+        '<div style="font-size:17px;font-weight:800;margin-top:4px;display:flex;align-items:center;justify-content:space-between"><span>'+rec.월+' · '+emps.length+'명</span>'+
+        (lkCur?'<button class="btn sec" style="padding:3px 9px;font-size:11.5px" onclick="toggleLock(\''+sEsc+'\',\''+mEsc+'\')">되돌리기</button>'
+              :'<button class="btn" style="padding:3px 10px;font-size:11.5px;'+(sigCur==='red'?'background:#cbd5e1':'')+'" '+(sigCur==='red'?'disabled':'onclick="toggleLock(\''+sEsc+'\',\''+mEsc+'\')"')+'>이 달 확정</button>')+
+        '</div><div style="font-size:11px;color:var(--sub);margin-top:3px">상태: '+sigLabel(sigCur)+dupNote+'</div></div>'+
+        '<div class="pay-kpi"><div style="font-size:11.5px;color:var(--sub)">총 지급액 (세전 임금총액)</div><div style="font-size:17px;font-weight:800;color:var(--ink);margin-top:4px">'+won(Math.round(totGross))+'원</div><div style="font-size:11px;color:var(--sub);margin-top:3px">기본급 '+won(Math.round(totBase))+'원 · 과세 '+won(Math.round(totTaxable))+'원</div></div>'+
+        '<div class="pay-kpi"><div style="font-size:11.5px;color:var(--sub)">총 공제액 (4대보험·세금)</div><div style="font-size:17px;font-weight:800;color:var(--warn);margin-top:4px">'+won(Math.round(totDed))+'원</div><div style="font-size:11px;color:var(--sub);margin-top:3px">연금 '+manwon(totPen)+' · 건보 '+manwon(totHlth)+' · 세금 '+manwon(totTax+totLoc)+'</div></div>'+
+        '<div class="pay-kpi" style="background:#eff6ff;border-color:#bfdbfe"><div style="font-size:11.5px;color:#1e40af;font-weight:700">차인지급액 (실수령 총액)</div><div style="font-size:18px;font-weight:800;color:#1e40af;margin-top:4px">'+won(Math.round(totNet))+'원</div><div style="font-size:11px;color:#1e40af;margin-top:3px">1인 평균 실수령 '+(emps.length?won(Math.round(totNet/emps.length)):'0')+'원</div></div>'+
+        '</div>';
+
+      /* emptbl — 폰에서 칸이 한 줄이게·성명을 왼쪽에 붙여 두는 이름표(@media 760px) */
+      h+='<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">'+
+         '<div style="padding:8px 14px;background:var(--paper);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:12px">'+
+         '<div><b>📋 '+App.site+' — '+rec.월+' 직원별 임금대장 (HTML/CSS 화면표)</b> <span style="color:var(--sub);margin-left:6px">총 '+emps.length+'명</span></div>'+
+         '<span style="color:var(--sub)">엔진 검증: 지방세=소득세×10%(10원절사) · 고용보험=과세×0.9%</span></div>'+
+         '<div style="overflow:auto"><table class="emptbl" style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">'+
+         '<tr style="background:#f8fafc;text-align:right;border-bottom:2px solid var(--line)">'+['순번','성명','기본급','과세총액','소득세','지방세','국민연금','건강보험','고용보험','공제총액','실수령'].map(function(c,i){
+           var tone=(c==='실수령')?'color:#1e40af;background:#eff6ff;':(c==='공제총액'?'color:#854d0e;background:#fffbeb;':'');
+           return '<th style="padding:8px 10px;'+(i<2?'text-align:left;':'')+tone+'">'+c+'</th>';
+         }).join('')+'</tr>';
+      emps.forEach(function(e,i){
+        var nmStr=(typeof e!=='undefined'&&e)?(e.성명||''):'';
+        h+='<tr style="border-top:1px solid var(--line);text-align:right">'+
+          '<td style="padding:7px 10px;text-align:left;color:var(--sub);white-space:nowrap">'+rowMarkBox('emp:'+App.site+'|'+nmStr, i+1)+'</td>'+
+          '<td style="padding:7px 10px;text-align:left;font-weight:700;color:var(--ink)">'+nmStr+'</td>'+
+          ['기본급','과세총액','소득세','지방세','국민연금','건강보험','고용보험','공제총액','실수령'].map(function(k){
+            var st=(k==='실수령')?'font-weight:800;color:#1e40af;background:#eff6ff;':(k==='공제총액'?'font-weight:700;color:#854d0e;background:#fffbeb;':(k==='과세총액'?'font-weight:700;':''));
+            return '<td style="padding:7px 10px;font-variant-numeric:tabular-nums;'+st+'">'+won(e[k])+'</td>';
+          }).join('')+'</tr>';
+      });
+      h+='<tr style="border-top:2px solid var(--line);background:var(--paper);text-align:right;font-weight:800">'+
+         '<td colspan="2" style="padding:8px 10px;text-align:left">합계 ('+emps.length+'명)</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totBase))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totTaxable))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totTax))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totLoc))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totPen))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totHlth))+'</td>'+
+         '<td style="padding:8px 10px">'+won(Math.round(totEmp))+'</td>'+
+         '<td style="padding:8px 10px;color:#854d0e;background:#fffbeb">'+won(Math.round(totDed))+'</td>'+
+         '<td style="padding:8px 10px;color:#1e40af;background:#eff6ff">'+won(Math.round(totNet))+'</td></tr>';
+      h+='</table></div></div>';
+    }
+  }
+
+  // 3) 전체 월별 확정·이슈 관리 목록 (접기/펼치기로 깔끔하게 정리, mfile 클래스 유지)
+  h+='<details style="margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden"'+(App.onlyReview?' open':'')+'>'+
+     '<summary style="padding:9px 14px;cursor:pointer;font-size:12.5px;font-weight:700;background:var(--paper);display:flex;align-items:center;justify-content:space-between">'+
+     '<span>📁 전체 월별 확정·검토 현황 목록 ('+recs.length+'개월 · 미확정 초록 '+greenN+'건 · 검토필요 '+reviewN+'건)</span>'+
+     '<span style="font-size:11.5px;color:var(--sub);font-weight:400">클릭하여 펼치기/접기</span></summary>'+
+     '<div style="padding:8px 14px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center">'+
+     '<button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="toggleOnlyReview()">'+(App.onlyReview?'전체 월 보기':'검토 필요만 보기 ('+reviewN+')')+'</button>'+
+     '</div><div>';
+  var shown=0;
+  recs.forEach(function(r){ var lk=isLocked(App.site,r.월); var s=effSig(r);
+    if(App.onlyReview && (lk || s==='green')) return;
+    shown++;
+    var extra=(s==='gray')?' · <span style="color:'+SIG.gray+'">데이터부족(확인)</span>':'';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line);font-size:12.5px">'+
+      '<span title="'+sigLabel(s)+'" style="width:10px;height:10px;border-radius:50%;background:'+SIG[s]+';flex-shrink:0"></span>'+
+      '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?'<span class="mfile"> · '+r.파일+'</span>':'')+extra+(r.이슈?' · '+r.이슈:'')+'</span></div>'+
+      (lk?'<span class="badge ok">확정됨</span> <button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')">되돌리기</button>'
+         :'<button class="btn" style="padding:4px 10px;font-size:12px" '+(s==='red'?'disabled style="background:#cbd5e1" title="빨강 해결 후 확정"':'onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')"')+'>확정</button>')+
+      '</div>';
+  });
+  if(!shown) h+='<div class="empty" style="padding:16px">'+(App.onlyReview?'검토할 항목이 없습니다. 👍':'표시할 월이 없습니다.')+'</div>';
+  h+='</div></details>';
   return h;
 }
 /* ── 가져오기 (2026-08-17 나눠 올리기) ──
@@ -2288,43 +2379,40 @@ function mailDigestOf(co, sites){
 function mailDigestPanelHtml(co, sites){
   var d = mailDigestOf(co, sites);
   var siteName = (sites && sites[0]) || (co && co.name) || App.site || '';
-  var head = '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
-    '<div><b>📬 푸른메일함 수신·발신·첨부 자동수집·입력 내역 (2026)</b> <span style="font-size:12px;color:var(--sub)">— 받은메일·보낸메일·급여데이터함 첨부파일 자동 대조 및 2026 급여·입퇴사 반영</span></div>' +
-    '<button type="button" class="btn sec" style="padding:4px 10px;font-size:11.5px" onclick="autoSync2026FromMail(false)">🔄 푸른메일함 실시간 재검토·자동입력</button></div>';
-  var box = '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">' + head;
+  var head = '<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">' +
+    '<div><b>📬 푸른메일함 수신·발신 자동수집 (2026)</b></div>' +
+    '<button type="button" class="btn sec" style="padding:3px 8px;font-size:11px" onclick="autoSync2026FromMail(false)">🔄 재검토·자동입력</button></div>';
+  var box = '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px">' + head;
   if(!d){
-    return box + '<div style="padding:12px 16px;font-size:12.5px;color:var(--sub)">이 사업장의 2026 푸른메일(수신·발신) 자동수집 요약을 불러오거나 재검토할 수 있습니다. 상단 [🔄 푸른메일함 실시간 재검토·자동입력]을 누르세요.</div></div>';
+    return box + '<div style="padding:8px 12px;font-size:12px;color:var(--sub)">수집 요약 대기 중 — [🔄 재검토·자동입력]으로 즉시 동기화할 수 있습니다.</div></div>';
   }
-  var kpi = '<div style="padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;font-size:12px;background:var(--paper)">' +
-    '<span class="badge" style="background:#eff6ff;color:#1e40af">📥 수신 메일 '+(d.rxCount||0)+'건</span>' +
-    '<span class="badge" style="background:#f0fdf4;color:#166534">📤 발신 메일 '+(d.txCount||0)+'건</span>' +
-    '<span class="badge" style="background:#fffbeb;color:#854d0e">📎 첨부 급여·근태 엑셀 '+(d.fileCount||0)+'건</span>' +
-    '<span class="badge ok">입사·취득 추출 '+(d.hireCount||0)+'건</span>' +
-    '<span class="badge warn">퇴사·상실 추출 '+(d.leaveCount||0)+'건</span>' +
+  var kpi = '<div style="padding:7px 12px;display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;background:var(--paper)">' +
+    '<span class="badge" style="background:#eff6ff;color:#1e40af">📥 수신 '+(d.rxCount||0)+'건</span>' +
+    '<span class="badge" style="background:#f0fdf4;color:#166534">📤 발신 '+(d.txCount||0)+'건</span>' +
+    '<span class="badge" style="background:#fffbeb;color:#854d0e">📎 첨부엑셀 '+(d.fileCount||0)+'건</span>' +
+    '<span class="badge ok">입사 '+(d.hireCount||0)+'</span>' +
+    '<span class="badge warn">퇴사 '+(d.leaveCount||0)+'</span>' +
     '</div>';
   var rows = [];
-  (d.recentFiles||[]).slice(0,4).forEach(function(f){
-    rows.push({key:'mf:'+siteName+'|'+(f.id||f.filename), kind:'📎 첨부엑셀', ym:f.ym||'2026', title:f.filename||'급여자료.xlsx', who:f.note||'푸른메일 첨부파일', tone:'#854d0e', bg:'#fffbeb'});
+  (d.recentFiles||[]).slice(0,3).forEach(function(f){
+    rows.push({key:'mf:'+siteName+'|'+(f.id||f.filename), kind:'📎 첨부', ym:f.ym||'2026', title:f.filename||'급여자료.xlsx', who:f.note||'첨부파일', tone:'#854d0e', bg:'#fffbeb'});
   });
-  (d.recentRx||[]).slice(0,5).forEach(function(m){
-    rows.push({key:'mrx:'+siteName+'|'+(m.id||m.ts), kind:'📥 수신메일', ym:m.ym||'2026', title:m.subject||'(제목 없음)', who:m.from||'거래처 수신', tone:'#1e40af', bg:'#eff6ff'});
+  (d.recentRx||[]).slice(0,3).forEach(function(m){
+    rows.push({key:'mrx:'+siteName+'|'+(m.id||m.ts), kind:'📥 수신', ym:m.ym||'2026', title:m.subject||'(제목 없음)', who:m.from||'수신', tone:'#1e40af', bg:'#eff6ff'});
   });
-  (d.recentTx||[]).slice(0,4).forEach(function(m){
-    rows.push({key:'mtx:'+siteName+'|'+(m.id||m.ts), kind:'📤 발신메일', ym:m.ym||'2026', title:m.subject||'(발신 메일)', who:m.to||'거래처 발신', tone:'#166534', bg:'#f0fdf4'});
+  (d.recentTx||[]).slice(0,3).forEach(function(m){
+    rows.push({key:'mtx:'+siteName+'|'+(m.id||m.ts), kind:'📤 발신', ym:m.ym||'2026', title:m.subject||'(발신 메일)', who:m.to||'발신', tone:'#166534', bg:'#f0fdf4'});
   });
   if(!rows.length){
-    return box + kpi + '<div style="padding:10px 16px;font-size:12px;color:var(--sub)">2026 기본 급여·4대보험 명단이 자동 반영되었습니다.</div></div>';
+    return box + kpi + '</div>';
   }
-  var tbl = '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:6px 10px;text-align:left">순번·표시</th><th style="padding:6px 10px;text-align:left">구분</th><th style="padding:6px 10px;text-align:left">귀속월</th><th style="padding:6px 10px;text-align:left">메일 제목 · 첨부파일명</th><th style="padding:6px 10px;text-align:left">수신·발신처</th></tr>' +
+  var tbl = '<details style="border-top:1px solid var(--line)"><summary style="padding:6px 12px;font-size:11.5px;color:var(--sub);cursor:pointer">수신·발신·첨부 상세 내역 ('+rows.length+'건) 펼치기</summary><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">' +
     rows.map(function(r, idx){
       return '<tr style="border-top:1px solid var(--line)">' +
-        '<td style="padding:6px 10px;white-space:nowrap">' + rowMarkBox(r.key, idx+1) + '</td>' +
-        '<td style="padding:6px 10px;white-space:nowrap"><span class="badge" style="background:'+r.bg+';color:'+r.tone+'">'+r.kind+'</span></td>' +
-        '<td style="padding:6px 10px;white-space:nowrap;font-weight:600">'+esc(r.ym)+'</td>' +
-        '<td style="padding:6px 10px;font-weight:600">'+esc(r.title)+'</td>' +
-        '<td style="padding:6px 10px;color:var(--sub)">'+esc(r.who)+'</td></tr>';
-    }).join('') + '</table></div>';
+        '<td style="padding:4px 8px;white-space:nowrap">' + rowMarkBox(r.key, idx+1) + '</td>' +
+        '<td style="padding:4px 6px;white-space:nowrap"><span class="badge" style="background:'+r.bg+';color:'+r.tone+'">'+r.kind+'</span></td>' +
+        '<td style="padding:4px 6px;font-weight:600">'+esc(r.title)+'</td></tr>';
+    }).join('') + '</table></div></details>';
   return box + kpi + tbl + '</div>';
 }
 
@@ -3323,22 +3411,22 @@ function rrnPanelHtml(sites, ym){
   ensureRrn(site);
   var mr=monthRecsFor(sites, ym); if(!mr) return '';
   var emps=empsMonth(mr);
-  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">';
-  var head='<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>주민번호</b> <span style="font-size:12px;color:var(--sub)">잠가서 저장 · 가린 값만 보임 · 「보기」는 기록이 남습니다 ('+mr.y+'년 '+mr.m+'월 명단)</span></div>';
-  if(!emps||rrnBox[site]===undefined) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">불러오는 중…</div></div>';
+  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">';
+  var head='<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><b>🔐 주민번호</b> <span style="font-size:11.5px;color:var(--sub)">('+mr.y+'년 '+mr.m+'월 명단 · 암호화 저장)</span></div>';
+  if(!emps||rrnBox[site]===undefined) return box+head+'</div><div style="padding:8px 12px;font-size:12px;color:var(--sub)">불러오는 중…</div></div>';
   var have=emps.filter(function(e){ return rrnRec(site, e.성명); }).length;
-  var h=box+head+'<div style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid var(--line)">등록 '+have+' / '+emps.length+'명'
-    +(emps.length-have?(' · <span style="color:var(--warn)">없음 '+(emps.length-have)+'명</span>'):'')+'</div>';
+  var h=box+head+'<span style="font-size:11.5px">등록 <b>'+have+'/'+emps.length+'명</b>'
+    +(emps.length-have?(' · <span style="color:var(--warn)">미등록 '+(emps.length-have)+'</span>'):'')+'</span></div><div class="rrn-grid">';
   var RM=lmap('row_marks')||{};
   emps.forEach(function(e, idx){
     var nm=String(e.성명||'').trim(), rec=rrnRec(site, nm), q=esc(site), qn=esc(nm);
-    h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
-      +'<span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+((RM['emp:'+site+'|'+nm]||{}).chk?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'chk\',event)" title="체크 저장">'+((RM['emp:'+site+'|'+nm]||{}).chk?'☑':'☐')+'</button><button type="button" class="rst'+((RM['emp:'+site+'|'+nm]||{}).star?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'star\',event)" title="별표 저장">'+((RM['emp:'+site+'|'+nm]||{}).star?'★':'☆')+'</button><b style="width:110px">'+nm+'</b>'
-      +(rec?('<span style="font-family:monospace">'+rec.mask+'</span><span style="flex:1"></span><button class="btn sec" style="padding:2px 9px;font-size:12px" onclick="revealRrn(\''+q+'\',\''+qn+'\')">보기</button>')
-           :('<span style="color:var(--warn)">없음</span><span style="flex:1"></span><button class="btn" style="padding:2px 9px;font-size:12px" onclick="enterRrn(\''+q+'\',\''+qn+'\')">입력</button>'))
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);font-size:12px">'
+      +'<span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+((RM['emp:'+site+'|'+nm]||{}).chk?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'chk\',event)" title="체크 저장">'+((RM['emp:'+site+'|'+nm]||{}).chk?'☑':'☐')+'</button><button type="button" class="rst'+((RM['emp:'+site+'|'+nm]||{}).star?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'star\',event)" title="별표 저장">'+((RM['emp:'+site+'|'+nm]||{}).star?'★':'☆')+'</button><b style="min-width:56px">'+nm+'</b>'
+      +(rec?('<span style="font-family:monospace;font-size:11.5px;color:var(--sub)">'+rec.mask+'</span><span style="flex:1"></span><button class="btn sec" style="padding:1px 7px;font-size:11px" onclick="revealRrn(\''+q+'\',\''+qn+'\')">보기</button>')
+           :('<span style="color:var(--warn);font-size:11px">없음</span><span style="flex:1"></span><button class="btn" style="padding:1px 7px;font-size:11px" onclick="enterRrn(\''+q+'\',\''+qn+'\')">입력</button>'))
       +'</div>';
   });
-  return h+'</div>';
+  return h+'</div></div>';
 }
 /* 만 원 단위로 짧게 — 정확한 값은 알약에 손을 대면 보인다 */
 function manwon(n){ return (n==null)?'-':(Math.abs(n)>=10000?(Math.round(n/10000).toLocaleString()+'만원'):(won(n)+'원')); }
@@ -3414,7 +3502,8 @@ var TAB_FN={roster:function(){return screenRoster();},compliance:function(){retu
   sever:function(){return screenSever();},slip:function(){return screenSlip();},report:function(){return screenReport();}};
 function tabBodyHtml(m, co, sites){
   if(App.tab==='sum'||!TAB_FN[App.tab]) return shellSummary(m, co, sites);
-  if(!App.site&&(App.tab==='roster'||App.tab==='compliance')) App.site=(co&&co.name)||App.loose||'';
+  /* ★ 근로자명부(roster)·계약·취업규칙(compliance)은 급여 자료가 전혀 없는 사업장이라도 언제든 창이 열려야 한다 (2026-11-03 대표 지시) */
+  if(!App.site&&(App.tab==='roster'||App.tab==='compliance')) App.site=(co&&co.name)||App.loose||'선택 사업장';
   /* ⚠ 자료가 없는데 원래 화면을 부르면 「사업장 고르기」가 떠 버린다 — 여기서 막는다 */
   if(!App.site) return '<div class="empty">급여관리에 이 회사 급여 자료가 아직 없습니다.<br>'
     +'<span style="font-size:12px">급여 자료는 급여대장을 하네스로 올리면 생기고, 이번 달 도착 여부는 💼 급여데이터함의 「급여관리에 알리기」로 넘어옵니다.</span></div>';
@@ -3424,26 +3513,26 @@ function shellSummary(m, co, sites){
   var st=co?m.state[co.id]:coState(null, sites, m.ym, m.links);
   var arr=coArrivals(co, sites, m.ym, m.links);
   var c=sumCounts(sites);
-  function row(icon, label, text, tone, tab){
-    var col=tone==='warn'?'var(--warn)':(tone==='ok'?SIG.green:'var(--sub)');
-    return '<div onclick="pickTab(\''+tab+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer">'
-      +'<span style="width:22px;text-align:center">'+icon+'</span><b style="width:96px;flex-shrink:0">'+label+'</b>'
-      +'<span style="flex:1;font-size:12.5px;color:'+col+'">'+text+'</span><span style="font-size:12px;color:var(--sub)">\u203a</span></div>';
-  }
-  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
-  h+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><span style="width:22px;text-align:center">📥</span>'
-    +'<b style="width:96px;flex-shrink:0">'+ymText(m.ym)+'</b><span class="st '+st.key+'">'+st.label+'</span>'
-    +'<span style="flex:1;font-size:12.5px;color:var(--sub)">'+(arr.length?('데이터함 알림 '+arr.length+'건 · '+arr.map(function(a){return (a.종류||'자료')+(a.줄수?(' '+a.줄수+'줄'):'');}).join(', '))
-      :(st.key==='nodata'?'급여관리에 자료 없음':'이 달 도착 알림 없음 — 독촉은 💼 급여데이터함에서'))+'</span></div>';
-  h+=row('👤','근로자명부', '근기법 41·42조 법정 8대 필수기재사항(성명·성별·생년월일·주소·이력·업무·고용·퇴직) · 3년 보존 관리', 'ok', 'roster');
-  h+=row('📜','계약·취업규칙', '10인 이하 사업장 필수 법정 기본사항 점검 · 근로계약서(17조)·취업규칙(93조) 자동 읽기·검토', 'ok', 'compliance');
-  h+=row('💰','급여', c.months?(c.months+'개월 · 확정 '+c.lock+' · 검토할 것 '+c.review+'건'):'자료 없음', (c.months&&!c.review)?'ok':(c.review?'warn':''), 'payroll');
-  h+=row('🕒','근태', c.attend?(c.attend+'명분 입력됨'):'아직 입력 없음', c.attend?'ok':'', 'attend');
-  h+=row('🌴','연차·휴가', c.leave?(c.leave+'명분 기록됨'):'아직 기록 없음', c.leave?'ok':'', 'leave');
-  h+=row('🎓','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'', 'sever');
-  h+=row('📄','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'', 'slip');
-  h+=row('📑','신고', '일용 매월신고 · 취득상실 · 퇴직정산 · 연차', '', 'report');
-  return h+'</div>'+(typeof mailDigestPanelHtml==='function'?mailDigestPanelHtml(co, sites):'')+varianceHtml(sites, m.ym)+filingHtml(co)+rrnPanelHtml(sites, m.ym)+lockLogHtml(App.site);
+  var arrText=arr.length?('데이터함 알림 '+arr.length+'건'):(st.key==='nodata'?'급여관리에 자료 없음':'도착 알림 없음');
+  var h='<div class="sum-grid4">'
+    +'<div class="sum-card" onclick="pickTab(\'payroll\')"><div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--sub)"><span>📥 '+ymText(m.ym)+' 상태</span><span class="st '+st.key+'">'+st.label+'</span></div>'
+    +'<div style="font-weight:800;font-size:14px;margin-top:4px">'+(c.months?(c.months+'개월 급여대장'):'급여자료 미등록')+'</div>'
+    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">'+arrText+'</div></div>'
+    +'<div class="sum-card" onclick="pickTab(\'payroll\')"><div style="font-size:11.5px;color:var(--sub)">💰 급여 · 📄 명세서</div>'
+    +'<div style="font-weight:800;font-size:14px;margin-top:4px;color:'+(c.review?'var(--warn)':'var(--ink)')+'">확정 '+c.lock+' / '+c.months+'개월'+(c.review?(' · 검토 '+c.review):'')+'</div>'
+    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">웹 임금대장 표 · 명세서 즉시 발급 ›</div></div>'
+    +'<div class="sum-card" onclick="pickTab(\'leave\')"><div style="font-size:11.5px;color:var(--sub)">🕒 근태 · 🌴 연차 · 🎓 퇴직</div>'
+    +'<div style="font-weight:800;font-size:14px;margin-top:4px">근태 '+c.attend+' · 연차 '+c.leave+' · 퇴직 '+c.sever+'</div>'
+    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">시간차(1h단위) · 퇴직금 · 📑 신고 ›</div></div>'
+    +'<div class="sum-card" onclick="pickTab(\'compliance\')" style="background:#eff6ff;border-color:#bfdbfe"><div style="font-size:11.5px;color:#1e40af;font-weight:700">👤 근로자명부 · 📜 계약·취업규칙</div>'
+    +'<div style="font-weight:800;font-size:14px;color:#1e40af;margin-top:4px">계약서·취업규칙 자동검토 열기 ›</div>'
+    +'<div style="font-size:11px;color:#1e40af;margin-top:2px">자료 없어도 즉시 작성·검토 가능</div></div>'
+    +'</div>';
+  h+='<div class="dash-2col">'
+    +'<div>'+filingHtml(co)+varianceHtml(sites, m.ym)+lockLogHtml(App.site)+'</div>'
+    +'<div>'+rrnPanelHtml(sites, m.ym)+(typeof mailDigestPanelHtml==='function'?mailDigestPanelHtml(co, sites):'')+'</div>'
+    +'</div>';
+  return h;
 }
 /* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 ══════
    노무법인은 근로내용확인신고·4대보험을, 고객의 기장 세무사는 원천세·지급명세서를 맡는 경우가 많다.
@@ -3475,21 +3564,21 @@ window.setFiling=setFiling;
 function filingHtml(co){
   if(!co) return '';
   var f=filingOf(co.id), n=filingUnset(co.id);
-  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">'
-    +'<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>신고 담당</b> '
-    +'<span style="font-size:12px;color:var(--sub)">이 회사의 신고를 누가 하나 — 서로 미루다 빠지거나 두 번 내지 않게'+(n?(' · <span style="color:var(--warn)">미정 '+n+'</span>'):'')+'</span></div>';
+  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">'
+    +'<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px"><b>📌 신고 담당</b> '
+    +'<span style="font-size:11.5px;color:var(--sub)">우리 / 세무사 / 고객 역할 분담'+(n?(' · <span style="color:var(--warn)">미정 '+n+'</span>'):'')+'</span></div><div class="filing-grid">';
   FILINGS.forEach(function(x){
     var who=f[x.k]||'';
-    h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
-      +'<b style="width:170px;flex-shrink:0">'+x.label+'</b><span class="chips" style="margin:0">'
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);font-size:12px;flex-wrap:wrap">'
+      +'<b style="min-width:128px;flex:1">'+x.label+'</b><span class="chips" style="margin:0;gap:3px">'
       +FILING_WHO.map(function(w){
-        return '<button class="'+(who===w[0]?'on':'')+'" onclick="setFiling(\''+esc(co.id)+'\',\''+x.k+'\',\''+w[0]+'\')">'+w[1]+'</button>'; }).join('')
+        return '<button style="padding:1px 7px;font-size:11px" class="'+(who===w[0]?'on':'')+'" onclick="setFiling(\''+esc(co.id)+'\',\''+x.k+'\',\''+w[0]+'\')">'+w[1]+'</button>'; }).join('')
       +'</span>'
-      +(!who?'<span style="color:var(--warn);font-size:11.5px">미정</span>':'')
-      +((x.tax&&who==='us')?'<span style="color:var(--warn);font-size:11.5px" title="원천세·지급명세서 제출 대리는 세무대리 영역일 수 있습니다 — 담당 노무사 검토">\u26a0 세무대리 경계 확인</span>':'')
+      +(!who?'<span style="color:var(--warn);font-size:11px">미정</span>':'')
+      +((x.tax&&who==='us')?'<span style="color:var(--warn);font-size:11px" title="원천세·지급명세서 제출 대리는 세무대리 영역일 수 있습니다 — 담당 노무사 검토">\u26a0 세무대리 경계 확인</span>':'')
       +'</div>';
   });
-  return h+'</div>';
+  return h+'</div></div>';
 }
 function pickView(k){ navTo({screen:'shell',view:k,coId:null,loose:null,site:null,month:null,emp:null,day:null}); }
 function openCo(id){ navTo({screen:'shell',coId:id,loose:null,site:null,month:null,emp:null,day:null}); }
@@ -4231,8 +4320,18 @@ function openEmpContract(site, name) {
   App.tab = 'compliance';
   render();
 }
+function resolveActiveSite() {
+  if (App.site) return App.site;
+  if (App.loose) { App.site = App.loose; return App.site; }
+  if (App.coId && coData && Array.isArray(coData.companies)) {
+    var found = coData.companies.filter(function (c) { return c && String(c.id) === String(App.coId); })[0];
+    if (found && found.name) { App.site = found.name; return App.site; }
+  }
+  return '';
+}
 function screenRoster() {
   if (!LC) return '<h1>근로자명부</h1><div class="empty">노동법 코어를 불러오지 못했습니다.</div>';
+  resolveActiveSite();
   if (!App.site) return pickSiteHtml('근로자명부', '사업장 선택 → 근로기준법 제41조·제42조 법정 근로자명부 작성 및 3년 보존 관리');
   ensureRrn(App.site);
   if (laborRec(App.site) && !laborEmpsReady(App.site)) return '<h1>근로자명부</h1><div class="sub"><a href="#" onclick="goBack();return false">← 돌아가기</a></div><div class="empty">직원 표를 받고 있습니다… 잠시만 기다려 주세요.</div>';
@@ -4385,7 +4484,8 @@ function sendContractEmail(site, empName) {
   var msg = empName + ' 님(' + to + ')에게\n[' + site + '] 근로계약서를 전자교부(이메일 발송)할까요?\n(근로기준법 제17조 제2항 서면·전자문서 교부 의무 이행 기록이 남습니다)';
   if (prev) msg = '이미 ' + new Date(prev.at).toLocaleString() + ' 에 교부한 기록이 있습니다.\n\n' + msg;
   if (!confirm(msg)) return;
-  var mailObj = LC.buildContractDeliveryHtml(site, { 성명: empName, 입사일: meta.입사일 || '' }, txt);
+  var rawMail = LC.buildContractDeliveryHtml(site, { 성명: empName, 입사일: meta.입사일 || '' }, txt);
+  var mailObj = (typeof rawMail === 'string') ? { subject: '[' + site + '] 근로계약서 전자교부 (' + empName + ')', html: rawMail } : rawMail;
   postPayslip({
     to: to, name: empName, ym: (meta.입사일 || laborYear()),
     subject: mailObj.subject, html: mailObj.html
@@ -4491,8 +4591,11 @@ function renderAnnualSettlementReport(pay, site) {
   h += '</table></div><div class="note"><b>연간 대사표 활용</b>: ① 매년 3월 10일 건강·고용·산재보험 보수총액신고(과세보수총액·근무월수) ② 매년 2월 근로소득 연말정산 기납부세액·4대보험료 공제 대사 ③ 매월/반기 간이지급명세서 누락 점검에 바로 사용합니다.</div>';
   return h;
 }
+function setCompSub(sub) { App.compSub = sub; render(); }
+window.setCompSub = setCompSub;
 function screenCompliance() {
   if (!LC) return '<h1>계약·취업규칙·법정점검</h1><div class="empty">노동법 코어를 불러오지 못했습니다.</div>';
+  resolveActiveSite();
   if (!App.site) return pickSiteHtml('계약·취업규칙·법정점검', '사업장 선택 → 10인 이하 사업장 필수 법정사항 점검 · 근로계약서(17조)·취업규칙(93조) 자동 읽기·검토');
   var site = App.site, s = esc(site), P = policyFor(site);
   var emps = rosterEmployees(site);
@@ -4522,31 +4625,48 @@ function screenCompliance() {
     annualRecordedCount: cSum.leave, hasWorkRules: !!wrRec.text, manualChecks: manualChecks
   });
 
-  var h = '<h1>계약·취업규칙 · 10인 이하 사업장 필수 법정사항 점검</h1>' +
-    '<div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>' + site + '</b> · 규모 판정: <b>' + comp.규모구분 + '</b> (현재 명부 ' + emps.length + '명 · 적용 법정항목 ' + comp.완료항목수 + '/' + comp.적용항목수 + ' 충족)</div>';
+  var sub = App.compSub || 'contract';
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">' +
+    '<div><h1 style="margin:0">📜 계약·취업규칙 · 10인 이하 법정점검</h1>' +
+    '<div style="font-size:12px;color:var(--sub);margin-top:2px"><b>' + site + '</b> · 규모: <b>' + comp.규모구분 + '</b> (명부 ' + emps.length + '명 · 근로계약서 ' + contractCnt + '건 · 취업규칙 ' + (wrRec.text ? '등록됨' : '미등록·표준안 즉시작성 가능') + ')</div></div>' +
+    '</div>';
   h += policyBar(site);
 
+  // 한 화면 서브탭 바 — 계약서나 취업규칙이 없더라도 바로 들어가 작성·검토할 수 있게
+  var subTabs = [
+    { id: 'contract', label: '📜 근로계약서 작성·자동검토 (' + contractCnt + '/' + (emps.length || 1) + ')' },
+    { id: 'workrules', label: '📘 취업규칙·복무규정 검토·신고서 (' + (wrRec.text ? '등록됨' : '표준안') + ')' },
+    { id: 'check', label: '✅ 10인 이하 필수 법정점검표 (' + comp.완료항목수 + '/' + comp.적용항목수 + ')' },
+    { id: 'diag', label: '🛡 상용전환위험 · 정부지원금 · 연간대사표' },
+    { id: 'all', label: '📋 전체 한눈에 보기' }
+  ];
+  h += '<div class="subtabs">' + subTabs.map(function (st) {
+    return '<button type="button" class="subtab' + (sub === st.id ? ' on' : '') + '" onclick="setCompSub(\'' + st.id + '\')">' + st.label + '</button>';
+  }).join('') + '</div>';
+
   /* 1. 근로기준법상 10인 이하(5인 미만 / 5~9인) 및 10인 이상 필수 법정 기본사항 자동 점검표 */
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">' +
-    '<div><b>① 근로기준법 10인 이하 사업장 필수 기본사항 자동 점검표</b> <span style="font-size:12px;color:var(--sub)">— 5인 미만·5~9인(10인 이하)·10인 이상 사업장별 적용 법규 및 특례 자동 구분</span></div>' +
-    '<span class="badge ' + (comp.주의항목수 === 0 ? 'ok' : 'warn') + '">충족 ' + comp.완료항목수 + ' / ' + comp.적용항목수 + '</span></div>' +
-    '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:7px 10px;text-align:left">순번·점검</th><th style="padding:7px 8px;text-align:left">적용규모</th><th style="padding:7px 8px;text-align:left">법정 필수 사항</th><th style="padding:7px 8px;text-align:left">법 근거·과태료/벌칙</th><th style="padding:7px 8px;text-align:left">자동 진단·확인</th></tr>';
-  comp.항목별.forEach(function (it, idx) {
-    var scBadge = it.scope === 'all' ? '<span class="badge ok">전 사업장(1인↑)</span>' : (it.scope === '5plus' ? '<span class="badge">5인↑ (5~9인 포함)</span>' : '<span class="badge warn">10인↑ 의무</span>');
-    var stBadge = it.status === 'ok' ? '<span class="badge ok">✔ 충족</span>'
-      : (it.status === 'exempt' ? '<span class="badge" style="color:var(--sub)">적용제외/면제</span>'
-      : (it.status === 'bad' ? '<span class="badge" style="background:#fef2f2;color:var(--bad)">위반 주의</span>' : '<span class="badge warn">점검 필요</span>'));
-    h += '<tr style="border-top:1px solid var(--line)' + (!it.applicable ? ';color:var(--sub);background:#f8fafc' : '') + '">' +
-      '<td style="padding:6px 10px;white-space:nowrap">' + rowMarkBox('comp:' + site + '|' + it.id, idx + 1) + '</td>' +
-      '<td style="padding:6px 8px;white-space:nowrap">' + scBadge + '</td>' +
-      '<td style="padding:6px 8px"><b>' + it.title + '</b><div style="font-size:11.5px;color:var(--sub)">' + it.desc + '</div></td>' +
-      '<td style="padding:6px 8px;font-size:11.5px"><b>' + it.law + '</b><div style="color:var(--sub)">' + it.penalty + '</div></td>' +
-      '<td style="padding:6px 8px;white-space:nowrap">' + stBadge + (it.detail ? ' <span style="font-size:11.5px;color:var(--sub)">' + it.detail + '</span>' : '') +
-      ' <button type="button" class="hrbtn" onclick="toggleCompCheck(\'' + s + '\',\'' + it.id + '\')">' + (it.checked ? '확인취소' : '직접확인✔') + '</button></td></tr>';
-  });
-  h += '</table></div></div>';
+  if (sub === 'check' || sub === 'all') {
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">' +
+      '<div><b>① 근로기준법 10인 이하 사업장 필수 기본사항 자동 점검표</b> <span style="font-size:11.5px;color:var(--sub)">— 5인 미만·5~9인·10인 이상 적용 법규 자동 구분</span></div>' +
+      '<span class="badge ' + (comp.주의항목수 === 0 ? 'ok' : 'warn') + '">충족 ' + comp.완료항목수 + ' / ' + comp.적용항목수 + '</span></div>' +
+      '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">순번·점검</th><th style="padding:6px 8px;text-align:left">적용규모</th><th style="padding:6px 8px;text-align:left">법정 필수 사항</th><th style="padding:6px 8px;text-align:left">법 근거·과태료</th><th style="padding:6px 8px;text-align:left">자동 진단·확인</th></tr>';
+    comp.항목별.forEach(function (it, idx) {
+      var scBadge = it.scope === 'all' ? '<span class="badge ok">전 사업장(1인↑)</span>' : (it.scope === '5plus' ? '<span class="badge">5인↑ (5~9인 포함)</span>' : '<span class="badge warn">10인↑ 의무</span>');
+      var stBadge = it.status === 'ok' ? '<span class="badge ok">✔ 충족</span>'
+        : (it.status === 'exempt' ? '<span class="badge" style="color:var(--sub)">적용제외/면제</span>'
+        : (it.status === 'bad' ? '<span class="badge" style="background:#fef2f2;color:var(--bad)">위반 주의</span>' : '<span class="badge warn">점검 필요</span>'));
+      h += '<tr style="border-top:1px solid var(--line)' + (!it.applicable ? ';color:var(--sub);background:#f8fafc' : '') + '">' +
+        '<td style="padding:5px 8px;white-space:nowrap">' + rowMarkBox('comp:' + site + '|' + it.id, idx + 1) + '</td>' +
+        '<td style="padding:5px 8px;white-space:nowrap">' + scBadge + '</td>' +
+        '<td style="padding:5px 8px"><b>' + it.title + '</b><div style="font-size:11px;color:var(--sub)">' + it.desc + '</div></td>' +
+        '<td style="padding:5px 8px;font-size:11px"><b>' + it.law + '</b><div style="color:var(--sub)">' + it.penalty + '</div></td>' +
+        '<td style="padding:5px 8px;white-space:nowrap">' + stBadge + (it.detail ? ' <span style="font-size:11px;color:var(--sub)">' + it.detail + '</span>' : '') +
+        ' <button type="button" class="hrbtn" onclick="toggleCompCheck(\'' + s + '\',\'' + it.id + '\')">' + (it.checked ? '확인취소' : '직접확인✔') + '</button></td></tr>';
+    });
+    h += '</table></div></div>';
+  }
 
   /* 2. 근로계약서 자동 읽기 · 정보 추출 · 근기법 제17조 법정 필수기재사항 및 위법약정 자동 검토 */
   var curEmp = App.contractEmp || (emps[0] && emps[0].성명) || '홍길동';
@@ -4563,120 +4683,116 @@ function screenCompliance() {
   var ctRev = LC.reviewLaborContract(ctText, { policy: P, minWageHourly: mwH });
   var ex = ctRev.추출 || {};
 
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<div><b>② 근로계약서 자동 읽기·검토 (근기법 제17조·기간제법 제17조·위약예정 금지)</b></div>' +
-    '<span class="badge ' + (ctRev.적합여부 ? 'ok' : 'warn') + '">' + ctRev.요약 + '</span></div>' +
-    '<div style="padding:12px 16px">' +
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px">' +
-    '<b>대상 근로자</b> <select onchange="App.contractEmp=this.value;render()" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">' +
-    (emps.length ? emps.map(function (e) { var nm = String(e.성명 || '').trim(); return '<option value="' + esc(nm) + '"' + (nm === curEmp ? ' selected' : '') + '>' + nm + '</option>'; }).join('') : '<option value="홍길동">홍길동</option>') +
-    '</select>' +
-    '<button type="button" class="btn sec" onclick="fillStdContract(\'' + s + '\',\'' + curEmpEsc + '\')">📄 표준근로계약서 자동 채우기</button>' +
-    '<label class="btn sec" style="cursor:pointer;display:inline-block">📂 계약서 파일 불러오기<input type="file" accept=".txt,.md,.html,.json,.csv" style="display:none" onchange="loadDocFileTo(this,\'contractTextArea\',\'contract\',\'' + s + '\',\'' + curEmpEsc + '\')"></label>' +
-    '<button type="button" class="btn" onclick="saveContractReview(\'' + s + '\',\'' + curEmpEsc + '\')">🔍 읽고 자동 검토·저장</button>' +
-    '<button type="button" class="btn sec" onclick="applyExtractedContract(\'' + s + '\',\'' + curEmpEsc + '\')">⚡ 추출값 명부·급여에 반영</button>' +
-    '<input type="email" id="contractEmpEmail" value="' + esc(empMeta(site, curEmp).이메일 || '') + '" placeholder="근로자 이메일(전자교부용)" onchange="lput(\'emp_meta\',\'' + s + '|' + curEmpEsc + '\',{이메일:this.value})" style="width:170px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px">' +
-    '<button type="button" class="btn" onclick="sendContractEmail(\'' + s + '\',\'' + curEmpEsc + '\')">📧 계약서 이메일 전자교부</button>' +
-    ((lmap('contract_sent')[site + '|' + curEmp]) ? '<span class="badge ok">교부완료 ' + new Date(lmap('contract_sent')[site + '|' + curEmp].at).toLocaleDateString() + '</span>' : '') + '</div>' +
-    '<textarea id="contractTextArea" rows="7" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:12.5px;line-height:1.55" placeholder="근로계약서 전문을 붙여넣거나 파일을 불러오면 성명·입사일·근로시간·임금을 자동으로 읽고 법 위반 여부를 검토합니다.">' + esc(ctText) + '</textarea>' +
-    '<div style="margin-top:10px;padding:8px 12px;background:var(--paper);border-radius:8px;font-size:12px;display:flex;gap:14px;flex-wrap:wrap">' +
-    '<b>자동 읽은 값:</b> ' +
-    '<span>성명 <b>' + (ex.성명 || '-') + '</b></span>' +
-    '<span>고용형태 <b>' + (ex.고용형태 || '-') + '</b></span>' +
-    '<span>입사일 <b>' + (ex.입사일 || '-') + '</b></span>' +
-    '<span>근로시간 <b>' + (ex.출근시각 ? (ex.출근시각 + '~' + ex.퇴근시각) : '-') + ' (휴게 ' + (ex.휴게시간분 || 0) + '분 · 주 ' + (ex.주소정근로시간 || '-') + 'h)</b></span>' +
-    '<span>임금 <b>' + (ex.기본급 ? ('월 ' + won(ex.기본급) + '원') : (ex.시급 ? ('시급 ' + won(ex.시급) + '원') : '-')) + '</b></span>' +
-    '<span>급여일 <b>' + (ex.급여일 || '-') + '</b></span></div>';
-
-  if (ctRev.위법경고.length) {
-    h += '<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid var(--bad);border-radius:8px;font-size:12px;color:var(--bad)">' +
-      '<b>🚨 근로계약서 강행규정 위반·위험 조항 자동 적발 (' + ctRev.위법경고.length + '건)</b><ul style="margin:6px 0 0 18px;padding:0">' +
-      ctRev.위법경고.map(function (w) { return '<li><b>[' + w.law + ']</b> ' + w.msg + '</li>'; }).join('') + '</ul></div>';
+  if (sub === 'contract' || sub === 'all') {
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div><b>📜 근로계약서 작성·자동 읽기·검토 (근기법 제17조·기간제법 제17조)</b> ' +
+      (ctStored.text ? '<span class="badge ok">저장본 있음</span>' : '<span class="badge" style="background:#eff6ff;color:#1e40af">등록된 계약서 없음 → 표준근로계약서 초안 자동 표시 중</span>') + '</div>' +
+      '<span class="badge ' + (ctRev.적합여부 ? 'ok' : 'warn') + '">' + ctRev.요약 + '</span></div>' +
+      '<div style="padding:10px 14px">' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px">' +
+      '<b>대상 근로자</b> <select onchange="App.contractEmp=this.value;render()" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px">' +
+      (emps.length ? emps.map(function (e) { var nm = String(e.성명 || '').trim(); return '<option value="' + esc(nm) + '"' + (nm === curEmp ? ' selected' : '') + '>' + nm + '</option>'; }).join('') : '<option value="홍길동">홍길동 (신규/샘플)</option>') +
+      '</select>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="fillStdContract(\'' + s + '\',\'' + curEmpEsc + '\')">📄 표준근로계약서 자동 채우기</button>' +
+      '<label class="btn sec" style="padding:5px 10px;font-size:12px;cursor:pointer;display:inline-block">📂 계약서 파일 불러오기<input type="file" accept=".txt,.md,.html,.json,.csv" style="display:none" onchange="loadDocFileTo(this,\'contractTextArea\',\'contract\',\'' + s + '\',\'' + curEmpEsc + '\')"></label>' +
+      '<button type="button" class="btn" style="padding:5px 10px;font-size:12px" onclick="saveContractReview(\'' + s + '\',\'' + curEmpEsc + '\')">🔍 읽고 자동 검토·저장</button>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="applyExtractedContract(\'' + s + '\',\'' + curEmpEsc + '\')">⚡ 추출값 명부·급여에 반영</button>' +
+      '<input type="email" id="contractEmpEmail" value="' + esc(empMeta(site, curEmp).이메일 || '') + '" placeholder="근로자 이메일(전자교부용)" onchange="lput(\'emp_meta\',\'' + s + '|' + curEmpEsc + '\',{이메일:this.value})" style="width:155px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px">' +
+      '<button type="button" class="btn" style="padding:5px 10px;font-size:12px" onclick="sendContractEmail(\'' + s + '\',\'' + curEmpEsc + '\')">📧 이메일 전자교부</button>' +
+      ((lmap('contract_sent')[site + '|' + curEmp]) ? '<span class="badge ok">교부완료 ' + new Date(lmap('contract_sent')[site + '|' + curEmp].at).toLocaleDateString() + '</span>' : '') + '</div>' +
+      '<div class="dash-2col">' +
+      '<div><textarea id="contractTextArea" rows="10" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px;font-family:inherit;font-size:12px;line-height:1.5" placeholder="근로계약서 전문을 붙여넣거나 파일을 불러오면 성명·입사일·근로시간·임금을 자동으로 읽고 법 위반 여부를 검토합니다.">' + esc(ctText) + '</textarea>' +
+      '<div style="margin-top:6px;padding:7px 10px;background:var(--paper);border-radius:8px;font-size:11.5px;display:flex;gap:10px;flex-wrap:wrap">' +
+      '<b>자동 추출:</b> <span>성명 <b>' + (ex.성명 || '-') + '</b></span><span>형태 <b>' + (ex.고용형태 || '-') + '</b></span><span>입사 <b>' + (ex.입사일 || '-') + '</b></span><span>근로시간 <b>' + (ex.출근시각 ? (ex.출근시각 + '~' + ex.퇴근시각) : '-') + ' (주 ' + (ex.주소정근로시간 || '-') + 'h)</b></span><span>임금 <b>' + (ex.기본급 ? ('월 ' + won(ex.기본급) + '원') : (ex.시급 ? ('시급 ' + won(ex.시급) + '원') : '-')) + '</b></span></div></div>' +
+      '<div>' +
+      (ctRev.위법경고.length ? '<div style="margin-bottom:8px;padding:8px 10px;background:#fef2f2;border:1px solid var(--bad);border-radius:8px;font-size:11.5px;color:var(--bad)"><b>🚨 강행규정 위반·위험 조항 적발 (' + ctRev.위법경고.length + '건)</b><ul style="margin:4px 0 0 16px;padding:0">' + ctRev.위법경고.map(function (w) { return '<li><b>[' + w.law + ']</b> ' + w.msg + '</li>'; }).join('') + '</ul></div>' : '') +
+      '<table style="width:100%;border-collapse:collapse;font-size:11.5px;border:1px solid var(--line)"><tr style="background:var(--paper)"><th style="padding:5px 7px;text-align:left">필수기재 항목</th><th style="padding:5px 7px;text-align:left">판정</th><th style="padding:5px 7px;text-align:left">검토 의견</th></tr>' +
+      ctRev.필수점검.map(function (c) {
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 7px;font-weight:600">' + c.key + '<div style="font-size:10.5px;color:var(--sub);font-weight:400">' + c.law + '</div></td>' +
+          '<td style="padding:5px 7px;white-space:nowrap">' + (c.ok ? '<span class="badge ok">✔ 명시</span>' : '<span class="badge warn">⚠ 보완</span>') + '</td>' +
+          '<td style="padding:5px 7px;color:var(--sub)">' + c.note + '</td></tr>';
+      }).join('') + '</table></div></div></div></div>';
   }
-  h += '<div style="margin-top:10px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">법정 필수기재 항목</th><th style="padding:6px 8px;text-align:left">법 근거</th><th style="padding:6px 8px;text-align:left">판정</th><th style="padding:6px 8px;text-align:left">검토 의견</th></tr>' +
-    ctRev.필수점검.map(function (c) {
-      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600">' + c.key + '</td><td style="padding:6px 8px;color:var(--sub)">' + c.law + '</td>' +
-        '<td style="padding:6px 8px">' + (c.ok ? '<span class="badge ok">✔ 명시됨</span>' : '<span class="badge warn">⚠ 보완필요</span>') + '</td>' +
-        '<td style="padding:6px 8px;color:var(--sub)">' + c.note + '</td></tr>';
-    }).join('') + '</table></div></div></div>';
 
   /* 3. 취업규칙·간이 복무규정 자동 읽기 · 근기법 제93조 12대 필수사항 및 최신 개정법 자동 검토 */
   var wrText = (wrRec.text != null) ? wrRec.text : LC.buildStandardWorkRulesText(site, P);
   var wrRev = LC.reviewWorkRules(wrText, { empCount: emps.length });
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<div><b>③ 취업규칙·복무규정 자동 읽기·검토 (근기법 제93조 12대 필수기재사항 · 2025~2026 개정법 대조)</b> ' +
-    '<span class="badge ' + (wrRev.신고의무여부 ? 'warn' : 'ok') + '">' + (wrRev.신고의무여부 ? '상시 10인 이상 — 노동부 신고 의무' : '10인 이하(미만) — 신고 면제·간이규정 활용') + '</span></div>' +
-    '<span class="badge ' + (wrRev.적합여부 ? 'ok' : 'warn') + '">' + wrRev.요약 + '</span></div>' +
-    '<div style="padding:12px 16px">' +
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px">' +
-    '<button type="button" class="btn sec" onclick="fillStdWorkRules(\'' + s + '\')">📘 표준 취업규칙·복무규정 자동 채우기</button>' +
-    '<label class="btn sec" style="cursor:pointer;display:inline-block">📂 취업규칙 파일 불러오기<input type="file" accept=".txt,.md,.html,.json" style="display:none" onchange="loadDocFileTo(this,\'workRulesTextArea\',\'workrules\',\'' + s + '\',\'\')"></label>' +
-    '<button type="button" class="btn" onclick="saveWorkRulesReview(\'' + s + '\')">🔍 취업규칙 읽고 자동 검토·저장</button>' +
-    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신고서\')">📋 노동부 신고서 생성·복사</button>' +
-    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'의견청취서\')">✍️ 과반수 의견청취·동의서(서명란)</button>' +
-    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신구대조표\')">📊 2025~2026 신·구 대조표</button>' +
-    '<button type="button" class="btn sec" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'all\')">📑 신고서류 3종 일괄복사</button></div>' +
-    '<textarea id="wrFilingDocPreview" rows="6" style="display:none;width:100%;margin-bottom:8px;border:1px solid var(--navy);border-radius:8px;padding:10px;background:#f8fafc;font-family:inherit;font-size:12px;line-height:1.5" readonly placeholder="위 신고서·의견청취서·신구대조표 버튼을 누르면 서식이 여기에 생성되고 클립보드에 자동 복사됩니다."></textarea>' +
-    '<textarea id="workRulesTextArea" rows="8" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:12.5px;line-height:1.55" placeholder="취업규칙 또는 복무규정 전문을 붙여넣거나 파일을 불러오면 근기법 제93조 12대 필수항목과 최신 개정법(배우자출산휴가 20일·공휴일 유급화·감봉 한도 등) 위반 여부를 자동 검토합니다.">' + esc(wrText) + '</textarea>';
-
-  if (wrRev.위법경고.length) {
-    h += '<div style="margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid var(--bad);border-radius:8px;font-size:12px;color:var(--bad)">' +
-      '<b>🚨 취업규칙 법 위반·개정법 미반영 조항 자동 적발 (' + wrRev.위법경고.length + '건)</b><ul style="margin:6px 0 0 18px;padding:0">' +
-      wrRev.위법경고.map(function (w) { return '<li><b>[' + w.law + ']</b> ' + w.msg + '</li>'; }).join('') + '</ul></div>';
+  if (sub === 'workrules' || sub === 'all') {
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div><b>📘 취업규칙·복무규정 작성·자동 검토 (근기법 제93조 12대 필수사항 · 2025~2026 개정법)</b> ' +
+      '<span class="badge ' + (wrRev.신고의무여부 ? 'warn' : 'ok') + '">' + (wrRev.신고의무여부 ? '상시 10인 이상 — 노동부 신고 의무' : '10인 이하(미만) — 신고 면제·간이규정 활용') + '</span> ' +
+      (wrRec.text ? '<span class="badge ok">저장본 있음</span>' : '<span class="badge" style="background:#eff6ff;color:#1e40af">등록된 취업규칙 없음 → 표준 취업규칙 초안 자동 표시 중</span>') + '</div>' +
+      '<span class="badge ' + (wrRev.적합여부 ? 'ok' : 'warn') + '">' + wrRev.요약 + '</span></div>' +
+      '<div style="padding:10px 14px">' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px">' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="fillStdWorkRules(\'' + s + '\')">📘 표준 취업규칙·복무규정 자동 채우기</button>' +
+      '<label class="btn sec" style="padding:5px 10px;font-size:12px;cursor:pointer;display:inline-block">📂 취업규칙 파일 불러오기<input type="file" accept=".txt,.md,.html,.json" style="display:none" onchange="loadDocFileTo(this,\'workRulesTextArea\',\'workrules\',\'' + s + '\',\'\')"></label>' +
+      '<button type="button" class="btn" style="padding:5px 10px;font-size:12px" onclick="saveWorkRulesReview(\'' + s + '\')">🔍 읽고 자동 검토·저장</button>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신고서\')">📋 노동부 신고서 복사</button>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'의견청취서\')">✍️ 과반수 의견청취·동의서</button>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'신구대조표\')">📊 신·구 대조표</button>' +
+      '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px" onclick="copyWorkRulesFilingDocs(\'' + s + '\',\'all\')">📑 신고서류 3종 일괄복사</button></div>' +
+      '<textarea id="wrFilingDocPreview" rows="5" style="display:none;width:100%;margin-bottom:8px;border:1px solid var(--navy);border-radius:8px;padding:8px;background:#f8fafc;font-family:inherit;font-size:11.5px;line-height:1.45" readonly></textarea>' +
+      '<div class="dash-2col">' +
+      '<div><textarea id="workRulesTextArea" rows="12" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px;font-family:inherit;font-size:12px;line-height:1.5" placeholder="취업규칙 또는 복무규정 전문을 붙여넣거나 파일을 불러오면 근기법 제93조 12대 필수항목과 최신 개정법 위반 여부를 자동 검토합니다.">' + esc(wrText) + '</textarea></div>' +
+      '<div>' +
+      (wrRev.위법경고.length ? '<div style="margin-bottom:8px;padding:8px 10px;background:#fef2f2;border:1px solid var(--bad);border-radius:8px;font-size:11.5px;color:var(--bad)"><b>🚨 취업규칙 법 위반·개정법 미반영 (' + wrRev.위법경고.length + '건)</b><ul style="margin:4px 0 0 16px;padding:0">' + wrRev.위법경고.map(function (w) { return '<li><b>[' + w.law + ']</b> ' + w.msg + '</li>'; }).join('') + '</ul></div>' : '') +
+      '<table style="width:100%;border-collapse:collapse;font-size:11.5px;border:1px solid var(--line)"><tr style="background:var(--paper)"><th style="padding:4px 6px;text-align:left">호</th><th style="padding:4px 6px;text-align:left">근기법 제93조 필수 기재사항</th><th style="padding:4px 6px;text-align:left">판정</th></tr>' +
+      wrRev.필수점검.map(function (c) {
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:4px 6px">' + c.no + '</td><td style="padding:4px 6px;font-weight:600">' + c.title + ' <span style="color:var(--sub);font-weight:400;font-size:10.5px">(' + c.law + ')</span></td>' +
+          '<td style="padding:4px 6px;white-space:nowrap">' + (c.ok ? '<span class="badge ok">✔ 확인</span>' : '<span class="badge warn">⚠ 보완</span>') + '</td></tr>';
+      }).join('') + '</table></div></div></div></div>';
   }
-  h += '<div style="margin-top:10px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">호수</th><th style="padding:6px 8px;text-align:left">근기법 제93조 필수 기재사항</th><th style="padding:6px 8px;text-align:left">법 근거</th><th style="padding:6px 8px;text-align:left">판정</th></tr>' +
-    wrRev.필수점검.map(function (c) {
-      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px">' + c.no + '</td><td style="padding:6px 8px;font-weight:600">' + c.title + '</td><td style="padding:6px 8px;color:var(--sub)">' + c.law + '</td>' +
-        '<td style="padding:6px 8px">' + (c.ok ? '<span class="badge ok">✔ 기재 확인</span>' : '<span class="badge warn">⚠ 보완 필요</span>') + '</td></tr>';
-    }).join('') + '</table></div></div></div>';
 
-  /* 4. 3.3% 사업소득·일용·단시간 근로자 상용전환·주휴·퇴직금·4대보험 직권가입 위험 자동 진단 */
+  /* 4~6. 상용전환 위험진단 · 사업주 정부지원금 매칭 · 연간 보수총액 대사표 */
   var nrDiag = LC.diagnoseNonRegularRisk(buildSiteNonRegularRecords(site));
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<div><b>④ 3.3%·일용·단시간 근로자 「상용직 전환 · 주휴수당 · 퇴직금 · 4대보험 직권가입」 위험 자동 진단</b></div>' +
-    '<span class="badge ' + (nrDiag.위험인원수 ? 'warn' : 'ok') + '">전체 ' + nrDiag.전체인원수 + '명 중 위험·점검 ' + nrDiag.위험인원수 + '명</span></div>' +
-    '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:7px 8px;text-align:left">순번·성명</th><th style="padding:7px 8px;text-align:left">형태</th><th style="padding:7px 8px;text-align:right">누적월수</th><th style="padding:7px 8px;text-align:right">최대월일수/시간</th><th style="padding:7px 8px;text-align:right">주평균시간</th><th style="padding:7px 8px;text-align:left">자동 진단·법적 발생 의무</th></tr>' +
-    (nrDiag.rows.length ? nrDiag.rows.map(function (r, idx) {
-      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('nrrisk:' + site + '|' + r.성명, idx + 1) + ' ' + r.성명 + '</td>' +
-        '<td style="padding:6px 8px;white-space:nowrap">' + r.고용형태 + '</td>' +
-        '<td style="padding:6px 8px;text-align:right">' + r.누적근무월수 + '개월</td>' +
-        '<td style="padding:6px 8px;text-align:right">' + r.최대월근무일수 + '일 / ' + r.최대월근무시간 + 'h</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:600">' + r.주평균근로시간 + 'h</td>' +
-        '<td style="padding:6px 8px">' + (r.위험건수 ? r.위험목록.map(function (rk) { return '<div><span class="badge warn">' + rk.title + '</span> <span style="color:var(--sub);font-size:11.5px">[' + rk.law + '] ' + rk.msg + '</span></div>'; }).join('') : '<span class="badge ok">✔ 특이 위험 없음</span>') + '</td></tr>';
-    }).join('') : '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--sub)">진단할 직원 급여·명부 기록이 없습니다.</td></tr>') + '</table></div></div>';
-
-  /* 5. 모성보호·육아휴직·출산육아기 대체인력·고령자 계속고용 사업주 정부지원금 자동 매칭·산출 */
+  var nrRows = nrDiag.rows || nrDiag || [];
   var agedCnt = emps.filter(function (e) {
     var nm = String(e.성명 || '').trim(), meta = empMeta(site, nm), rrn = (typeof rrnRec === 'function') ? rrnRec(site, nm) : null;
     var b = meta.생년월일 || (rrn ? birthOfMask(rrn.mask) : '');
     return b && LC.fullYearsBetween(b, year + '-12-31') >= 60;
   }).length;
   var subMatch = LC.matchEmployerSubsidies({ empCount: emps.length, aged60PlusCount: agedCnt });
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<div><b>⑤ 모성보호·육아휴직·출산육아기 대체인력·고령자 계속고용 사업주 정부지원금 자동 매칭</b> <span style="font-size:12px;color:var(--sub)">(' + subMatch.사업장구분 + ')</span></div>' +
-    '<span class="badge ok">1인 사유 발생 시 최대 예상 ' + won(subMatch.총예상지원금합계) + '원</span></div>' +
-    '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-    '<tr style="background:var(--paper)"><th style="padding:7px 8px;text-align:left">순번·지원금명</th><th style="padding:7px 8px;text-align:left">법 근거</th><th style="padding:7px 8px;text-align:right">월 지원액</th><th style="padding:7px 8px;text-align:right">최대 예상합계</th><th style="padding:7px 8px;text-align:left">요건·지급방식·필수 구비서류</th></tr>' +
-    subMatch.programs.map(function (p, idx) {
-      return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('sub:' + site + '|' + p.id, idx + 1) + ' ' + p.title + '</td>' +
-        '<td style="padding:6px 8px;color:var(--sub);white-space:nowrap">' + p.law + '</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:700">' + won(p.monthlyAmount) + '원' + (p.specialMonthlyAmount ? '<div style="font-size:11px;color:var(--navy)">특례 ' + won(p.specialMonthlyAmount) + '원</div>' : '') + '</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--navy)">' + won(p.예상지원액) + '원</td>' +
-        '<td style="padding:6px 8px;font-size:11.5px"><div>' + p.targetDesc + ' · <b>' + p.paymentRule + '</b></div><div style="color:var(--sub)">구비서류: ' + p.docs.join(', ') + '</div></td></tr>';
-    }).join('') + '</table></div></div>';
+  var subProgs = subMatch.programs || subMatch.프로그램목록 || [];
 
-  /* 6. 연간 4대보험 보수총액신고 · 연말정산 · 간이지급명세서 직원별 대사표 */
-  h += '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px">' +
-    '<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<div><b>⑥ 연간 노무·세무 대사표 (3월 보수총액신고 · 2월 연말정산 · 간이지급명세서)</b></div></div>' +
-    '<div style="padding:12px 16px">' + renderAnnualSettlementReport(payForReport(), site) + '</div></div>';
+  if (sub === 'diag' || sub === 'all') {
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div><b>④ 3.3%·일용·단시간 근로자 「상용직 전환 · 주휴수당 · 퇴직금 · 4대보험 직권가입」 위험 자동 진단</b></div>' +
+      '<span class="badge ' + (nrDiag.위험인원수 ? 'warn' : 'ok') + '">전체 ' + (nrDiag.전체인원수 || nrRows.length) + '명 중 위험·점검 ' + (nrDiag.위험인원수 || 0) + '명</span></div>' +
+      '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">순번·성명</th><th style="padding:6px 8px;text-align:left">형태</th><th style="padding:6px 8px;text-align:right">누적월수</th><th style="padding:6px 8px;text-align:right">최대월일수/시간</th><th style="padding:6px 8px;text-align:right">주평균시간</th><th style="padding:6px 8px;text-align:left">자동 진단·법적 발생 의무</th></tr>' +
+      (nrRows.length ? nrRows.map(function (r, idx) {
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('nrrisk:' + site + '|' + r.성명, idx + 1) + ' ' + r.성명 + '</td>' +
+          '<td style="padding:5px 8px;white-space:nowrap">' + r.고용형태 + '</td>' +
+          '<td style="padding:5px 8px;text-align:right">' + (r.누적근무월수 || r.활동월수 || 0) + '개월</td>' +
+          '<td style="padding:5px 8px;text-align:right">' + (r.최대월근무일수 || r.월평균근로일수 || 0) + '일 / ' + (r.최대월근무시간 || 0) + 'h</td>' +
+          '<td style="padding:5px 8px;text-align:right;font-weight:600">' + (r.주평균근로시간 || r.주추정시간 || 0) + 'h</td>' +
+          '<td style="padding:5px 8px">' + ((r.위험건수 || r.위험수) ? (r.위험목록 || []).map(function (rk) { return '<div><span class="badge warn">' + rk.title + '</span> <span style="color:var(--sub);font-size:11px">[' + rk.law + '] ' + (rk.msg || rk.desc || '') + '</span></div>'; }).join('') : '<span class="badge ok">✔ 특이 위험 없음</span>') + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" style="padding:12px;text-align:center;color:var(--sub)">진단할 직원 급여·명부 기록이 없습니다.</td></tr>') + '</table></div></div>';
+
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div><b>⑤ 모성보호·육아휴직·출산육아기 대체인력·고령자 계속고용 사업주 정부지원금 자동 매칭</b> <span style="font-size:11.5px;color:var(--sub)">(' + (subMatch.사업장구분 || '우선지원대상기업 기준') + ')</span></div>' +
+      '<span class="badge ok">1인 사유 발생 시 최대 예상 ' + won(subMatch.총예상지원금합계 || 0) + '원</span></div>' +
+      '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<tr style="background:var(--paper)"><th style="padding:6px 8px;text-align:left">순번·지원금명</th><th style="padding:6px 8px;text-align:left">법 근거</th><th style="padding:6px 8px;text-align:right">월 지원액</th><th style="padding:6px 8px;text-align:right">최대 예상합계</th><th style="padding:6px 8px;text-align:left">요건·지급방식·필수 구비서류</th></tr>' +
+      subProgs.map(function (p, idx) {
+        var docsTxt = Array.isArray(p.docs) ? p.docs.join(', ') : String(p.docs || '');
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:600;white-space:nowrap">' + rowMarkBox('sub:' + site + '|' + p.id, idx + 1) + ' ' + p.title + '</td>' +
+          '<td style="padding:5px 8px;color:var(--sub);white-space:nowrap">' + p.law + '</td>' +
+          '<td style="padding:5px 8px;text-align:right;font-weight:700">' + won(p.monthlyAmount || p.월지원액) + '원' + (p.specialMonthlyAmount ? '<div style="font-size:10.5px;color:var(--navy)">특례 ' + won(p.specialMonthlyAmount) + '원</div>' : '') + '</td>' +
+          '<td style="padding:5px 8px;text-align:right;font-weight:700;color:var(--navy)">' + won(p.예상지원액 != null ? p.예상지원액 : p.예상총지원액) + '원</td>' +
+          '<td style="padding:5px 8px;font-size:11px"><div>' + (p.targetDesc || p.target || '') + ' · <b>' + (p.paymentRule || p.note || '') + '</b></div><div style="color:var(--sub)">구비서류: ' + docsTxt + '</div></td></tr>';
+      }).join('') + '</table></div></div>';
+
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div><b>⑥ 연간 노무·세무 대사표 (3월 보수총액신고 · 2월 연말정산 · 간이지급명세서)</b></div></div>' +
+      '<div style="padding:10px 14px">' + renderAnnualSettlementReport(payForReport(), site) + '</div></div>';
+  }
   return h;
 }
 window.screenRoster = screenRoster; window.screenCompliance = screenCompliance;
@@ -4697,7 +4813,7 @@ function render(){
   var oldRows=document.getElementById('colRows'), colTop=oldRows?oldRows.scrollTop:0;
   col.hidden=!shell||!model; if(shell&&model){ col.innerHTML=colistHtml(model); var newRows=document.getElementById('colRows'); if(newRows&&colTop) newRows.scrollTop=colTop; }
   var m=document.getElementById('main'), mainTop=m?m.scrollTop:0;
-  var mainKey=[App.screen,App.coId||'',App.loose||'',App.site||'',App.tab||'',App.month||'',App.emp||'',App.day||'',App.ym||''].join('|');
+  var mainKey=[App.screen,App.coId||'',App.loose||'',App.site||'',App.tab||'',App.compSub||'',App.contractEmp||'',App.month||'',App.emp||'',App.day||'',App.ym||''].join('|');
   var sameMain=(render._mainKey===mainKey); render._mainKey=mainKey;
   if(shell){
     m.innerHTML=model?shellMainHtml(model):'<div class="empty">js/pu-site-staff.js 를 불러오지 못했습니다.</div>';
