@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-labor-core.js?v=12"></script>
+<script src="js/pu-labor-core.js?v=13"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
@@ -68,6 +68,10 @@ main{flex:1;padding:12px 18px;overflow:auto}
 .subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .subtab{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
 .subtab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.sev-3col{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.sev-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink)}
+.sev-card:hover{border-color:var(--navy);background:#f8fafc}
+.sev-card.on{border:2px solid var(--navy);background:#eff6ff;color:#1e293b}
 h1{font-size:20px;margin-bottom:4px}.sub{color:var(--sub);font-size:13px;margin-bottom:16px}
 .btn{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-size:13px;font-family:inherit}
 .btn.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
@@ -3630,9 +3634,9 @@ function policyBar(site) {
     ['floor', 'ceil', 'round'].map(function (r) {
       return '<option value="' + r + '"' + (P.rounding === r ? ' selected' : '') + '>' + ({ floor: '절사', ceil: '올림', round: '반올림' }[r]) + '</option>';
     }).join('') + '</select></label>' +
-    '<label>퇴직연금 <select onchange="lput(\'labor_policy\',\'' + s + '\',{pensionType:this.value})" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px">' +
+    '<label>퇴직제도 <select onchange="lput(\'labor_policy\',\'' + s + '\',{pensionType:this.value})" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px">' +
     ['NONE', 'DC', 'DB'].map(function (r) {
-      return '<option value="' + r + '"' + (P.pensionType === r ? ' selected' : '') + '>' + ({ NONE: '미가입', DC: 'DC형', DB: 'DB형' }[r]) + '</option>';
+      return '<option value="' + r + '"' + (P.pensionType === r ? ' selected' : '') + '>' + ({ NONE: '법정퇴직금(미가입)', DC: 'DC형(확정기여형)', DB: 'DB형(확정급여형)' }[r]) + '</option>';
     }).join('') + '</select></label>' +
     (!P.fiveOrMore ? '<span style="color:var(--warn)">※ 5인 미만 — 가산수당·연차 미적용(근기법 56·60조)</span>' : '') +
     '</div>';
@@ -4190,67 +4194,269 @@ function screenLeave() {
 }
 
 /* ══════════════ ③ 퇴직 (퇴직금·퇴직연금·퇴직소득세) ══════════════ */
+var severFilterMode = 'all'; // 'all': 전체 직원 표시 · 'resigned': 퇴사일 입력자만
+function pickSeverEmp(name) {
+  App.sevEmp = String(name || '');
+  render();
+}
+function setEmpSeverType(site, name, type) {
+  var norm = LC ? LC.normalizeSeveranceType(type, policyFor(site)) : String(type || 'STATUTORY');
+  App.sevEmp = String(name || '');
+  lput('sever', site + '|' + name, { 유형: norm });
+}
+function setSiteSeverTypeAll(site, type) {
+  var norm = LC ? LC.normalizeSeveranceType(type, policyFor(site)) : String(type || 'STATUTORY');
+  var pVal = (norm === 'DC') ? 'DC' : ((norm === 'DB') ? 'DB' : 'NONE');
+  var emps = siteEmployees(site) || [];
+  var m = lmap('sever');
+  emps.forEach(function (e) {
+    if (!e || !e.성명) return;
+    var k = site + '|' + e.성명;
+    var cur = m[k] || {};
+    cur.유형 = norm;
+    m[k] = cur;
+  });
+  cache.sever = m;
+  lput('labor_policy', site, { pensionType: pVal });
+}
+function setSeverFilter(mode) {
+  severFilterMode = (mode === 'resigned') ? 'resigned' : 'all';
+  render();
+}
+window.pickSeverEmp = pickSeverEmp;
+window.setEmpSeverType = setEmpSeverType;
+window.setSiteSeverTypeAll = setSiteSeverTypeAll;
+window.setSeverFilter = setSeverFilter;
+
+function empBaseMonthlyWage(e, meta) {
+  return Number((meta && meta.통상임금월액) || (e && (e.과세총액 || e.지급총액 || e.기본급)) || 0);
+}
+
 function screenSever() {
   if (!LC) return '<h1>퇴직</h1><div class="empty">노동법 코어를 불러오지 못했습니다.</div>';
-  if (!App.site) return pickSiteHtml('퇴직', '사업장 선택 → 평균임금·퇴직금·퇴직소득세·DC 부담금 (퇴직급여법)');
+  if (!App.site) return pickSiteHtml('퇴직', '사업장 선택 → 직원 선택 시 법정퇴직금 · DC형 · DB형 해당 퇴직금 즉시 산정 (퇴직급여법)');
   var P = policyFor(App.site), emps = siteEmployees(App.site), s = esc(App.site);
   if (laborRec(App.site) && !laborEmpsReady(App.site)) return '<h1>퇴직</h1>' + '<div class="sub"><a href="#" onclick="goBack();return false">← 돌아가기</a></div>' + '<div class="empty">직원 표를 받고 있습니다… 잠시만 기다려 주세요.</div>';
-  var h = '<h1>퇴직</h1><div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>' + App.site + '</b> 퇴직금·퇴직연금 (' + emps.length + '명)</div>';
+
+  // 선택된 직원 (기본: 첫 번째 직원 자동 선택 → 화면 진입 즉시 퇴직금 금액이 표시됨)
+  var selEmpObj = null;
+  if (emps.length) {
+    selEmpObj = emps.filter(function (e) { return e.성명 === App.sevEmp; })[0] || emps[0];
+    App.sevEmp = selEmpObj.성명;
+  }
+
+  var h = '<h1>퇴직</h1><div class="sub"><a href="#" onclick="goBack();return false">← 사업장</a> · <b>' + App.site + '</b> 퇴직금·퇴직연금 (법정퇴직금 · DC형 · DB형 · ' + emps.length + '명)</div>';
   h += policyBar(App.site);
+
+  // ① 상단: 직원 선택 시 법정퇴직금 / DC형 / DB형 중 해당하는 퇴직금 금액 즉시 표시 카드
+  if (selEmpObj) {
+    var selName = selEmpObj.성명 || '';
+    var selEsc = esc(selName);
+    var selMk = "'" + s + '|' + selEsc + "'";
+    var selMeta = empMeta(App.site, selName);
+    var selSv = severOf(App.site, selName);
+    var selWage = empBaseMonthlyWage(selEmpObj, selMeta);
+    var selType = LC.normalizeSeveranceType(selSv.유형, P);
+    var selCalc = LC.calculateSeveranceByType({
+      유형: selType,
+      월급여: selWage,
+      일소정근로시간: selMeta.일소정근로시간,
+      입사일: selMeta.입사일 || '',
+      퇴사일: selSv.퇴사일 || '',
+      기간임금총액: selSv.삼개월임금,
+      기간일수: selSv.기간일수 || 91,
+      연간상여: selSv.연간상여,
+      연간연차수당: selSv.연간연차수당,
+      통상일급: selSv.통상일급,
+      연간임금총액: selSv.연간임금총액,
+      DC납입: selSv.DC납입,
+      DB적립: selSv.DB적립,
+      policy: P
+    });
+
+    h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<b style="font-size:13.5px;color:var(--navy)">👤 직원 선택 및 퇴직금 제도(법정 · DC형 · DB형) 지정</b>' +
+      '<select id="sevPick" onchange="pickSeverEmp(this.value)" style="padding:5px 10px;border:1px solid var(--navy);border-radius:8px;font-size:13px;font-weight:700;color:var(--navy);background:#eff6ff">' +
+      emps.map(function (e) {
+        return '<option value="' + esc(e.성명) + '"' + (e.성명 === selName ? ' selected' : '') + '>' + e.성명 + ' (' + won(empBaseMonthlyWage(e, empMeta(App.site, e.성명))) + '원)</option>';
+      }).join('') + '</select>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      [
+        { k: 'STATUTORY', label: '🏛 법정퇴직금' },
+        { k: 'DC', label: '📈 DC형 (확정기여형)' },
+        { k: 'DB', label: '🏦 DB형 (확정급여형)' }
+      ].map(function (t) {
+        var on = (selCalc.유형 === t.k);
+        return '<button type="button" class="subtab' + (on ? ' on' : '') + '" style="padding:5px 11px;font-size:12px" onclick="setEmpSeverType(\'' + s + '\',\'' + selEsc + '\',\'' + t.k + '\')">' + t.label + '</button>';
+      }).join('') +
+      '<button type="button" class="btn sec" style="padding:5px 9px;font-size:11.5px" onclick="setSiteSeverTypeAll(\'' + s + '\',\'' + selCalc.유형 + '\')" title="현재 선택한 퇴직금 제도를 이 사업장 전 직원에게 일괄 적용">전원 ' + selCalc.유형명 + ' 적용</button>' +
+      '</div></div>';
+
+    // 직원 빠른 선택 알약 줄
+    h += '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' +
+      emps.map(function (e) {
+        var on = (e.성명 === selName);
+        var eSv = severOf(App.site, e.성명);
+        var eType = LC.normalizeSeveranceType(eSv.유형, P);
+        var tBadge = (eType === 'DC') ? 'DC' : ((eType === 'DB') ? 'DB' : '법정');
+        return '<button type="button" class="mpill' + (on ? ' on' : '') + '" onclick="pickSeverEmp(\'' + esc(e.성명) + '\')">' +
+          e.성명 + ' <span style="font-size:10.5px;opacity:.85">[' + tBadge + ']</span></button>';
+      }).join('') + '</div>';
+
+    // 선택된 직원의 해당 퇴직금 메인 결과 배너
+    h += '<div style="background:#eff6ff;border:1px solid var(--navy);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+      '<div>' +
+      '<div style="font-size:12px;color:#1e40af;font-weight:700">' + selName + ' 님의 선택 제도: ' + selCalc.상세명 +
+      (selCalc.입사일미입력 ? ' <span class="badge warn" style="margin-left:6px">입사일 미입력 — 1년(365일)·월급여 기준 예상치</span>' : ' <span class="badge ok" style="margin-left:6px">재직 ' + selCalc.재직일수 + '일 (' + selCalc.근속년수 + '년)</span>') +
+      '</div>' +
+      '<div style="font-size:12px;color:#475569;margin-top:4px">산정 기준: ' + selCalc.산정식 + ' · ' + selCalc.비고 + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;text-align:right">' +
+      '<div><div style="font-size:11px;color:#475569">' + selCalc.유형명 + ' 해당 금액</div><div style="font-size:21px;font-weight:800;color:#1e40af">' + won(selCalc.금액) + '원</div></div>' +
+      '<div><div style="font-size:11px;color:#475569">예상 퇴직소득세</div><div style="font-size:14.5px;font-weight:700;color:#dc2626">' + won(selCalc.퇴직소득세) + '원</div></div>' +
+      '<div><div style="font-size:11px;color:#475569">세후 예상 수령액 (IRP 이전 시 세전 전액)</div><div style="font-size:16px;font-weight:800;color:#166534">' + won(selCalc.세후수령액) + '원</div></div>' +
+      '</div></div>';
+
+    // 3가지 퇴직금 제도(법정퇴직금 · DC형 · DB형) 동시 비교 및 클릭 선택 카드
+    var bStat = selCalc.별도집계.STATUTORY, bDc = selCalc.별도집계.DC, bDb = selCalc.별도집계.DB;
+    h += '<div class="sev-3col">' +
+      '<div class="sev-card' + (selCalc.유형 === 'STATUTORY' ? ' on' : '') + '" onclick="setEmpSeverType(\'' + s + '\',\'' + selEsc + '\',\'STATUTORY\')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12.5px">🏛 법정퇴직금 (퇴직급여법 8조)</b>' + (selCalc.유형 === 'STATUTORY' ? '<span class="badge ok">선택됨</span>' : '<span style="font-size:11px;color:var(--sub)">클릭 선택</span>') + '</div>' +
+        '<div style="font-size:18px;font-weight:800;color:var(--navy);margin:4px 0">' + won(bStat.금액) + '원</div>' +
+        '<div style="font-size:11px;color:var(--sub)">1일 평균임금(' + won(Math.round(selCalc.일평균임금)) + '원) × 30일 × ' + selCalc.재직일수 + '일/365 · 세후 ' + won(bStat.세후수령액) + '원</div>' +
+      '</div>' +
+      '<div class="sev-card' + (selCalc.유형 === 'DC' ? ' on' : '') + '" onclick="setEmpSeverType(\'' + s + '\',\'' + selEsc + '\',\'DC\')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12.5px">📈 DC형 퇴직연금 (확정기여형 20조)</b>' + (selCalc.유형 === 'DC' ? '<span class="badge ok">선택됨</span>' : '<span style="font-size:11px;color:var(--sub)">클릭 선택</span>') + '</div>' +
+        '<div style="font-size:18px;font-weight:800;color:var(--navy);margin:4px 0">' + won(bDc.금액) + '원</div>' +
+        '<div style="font-size:11px;color:var(--sub)">연간 임금총액(' + won(selCalc.연간임금총액) + '원)의 1/12 부담금 (1년 ' + won(bDc.연간최소부담금) + '원 · 부족액 ' + won(bDc.부족액) + '원)</div>' +
+      '</div>' +
+      '<div class="sev-card' + (selCalc.유형 === 'DB' ? ' on' : '') + '" onclick="setEmpSeverType(\'' + s + '\',\'' + selEsc + '\',\'DB\')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12.5px">🏦 DB형 퇴직연금 (확정급여형 15조)</b>' + (selCalc.유형 === 'DB' ? '<span class="badge ok">선택됨</span>' : '<span style="font-size:11px;color:var(--sub)">클릭 선택</span>') + '</div>' +
+        '<div style="font-size:18px;font-weight:800;color:var(--navy);margin:4px 0">' + won(bDb.금액) + '원</div>' +
+        '<div style="font-size:11px;color:var(--sub)">퇴직 전 3개월 평균임금 기준 30일분 × 근속년수 · 사외적립 부족액 ' + won(bDb.부족액) + '원</div>' +
+      '</div>' +
+    '</div>';
+
+    // 선택된 직원 산정기초 빠른 입력줄 (입사일·퇴사일·3개월임금·연간임금·납입액)
+    h += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px">' +
+      '<b>' + selName + ' 산정 입력:</b>' +
+      '<label>입사일 ' + dInput(selMeta.입사일 || '', 'lput(\'emp_meta\',' + selMk + ',{입사일:this.value})') + '</label>' +
+      '<label>퇴사(기준)일 <input type="date" id="sevDate" value="' + (selSv.퇴사일 || '') + '" onchange="lput(\'sever\',' + selMk + ',{퇴사일:this.value})" style="padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px"></label>' +
+      '<label>3개월 임금총액 ' + nInput(selSv.삼개월임금 != null ? selSv.삼개월임금 : selCalc.기간임금총액, 'lput(\'sever\',' + selMk + ',{삼개월임금:+this.value})', 96) + '</label>' +
+      '<label>연간 임금총액(DC 1/12) ' + nInput(selSv.연간임금총액 != null ? selSv.연간임금총액 : selCalc.연간임금총액, 'lput(\'sever\',' + selMk + ',{연간임금총액:+this.value})', 100) + '</label>' +
+      (selCalc.유형 === 'DC'
+        ? '<label>DC 실제납입액 ' + nInput(selSv.DC납입, 'lput(\'sever\',' + selMk + ',{DC납입:+this.value})', 92) + '</label>'
+        : (selCalc.유형 === 'DB'
+          ? '<label>DB 사외적립금 ' + nInput(selSv.DB적립, 'lput(\'sever\',' + selMk + ',{DB적립:+this.value})', 92) + '</label>'
+          : '<label>연간상여 ' + nInput(selSv.연간상여, 'lput(\'sever\',' + selMk + ',{연간상여:+this.value})', 84) + '</label>')) +
+      '<button class="btn" style="padding:5px 11px;font-size:12px" onclick="addSever(\'' + s + '\')">퇴사자 지정 반영</button>' +
+      '</div></div>';
+  }
+
+  // ② 전 직원 퇴직금(법정 · DC형 · DB형) 일람 및 정산표
+  var resignedCnt = emps.filter(function (e) { return !!(severOf(App.site, e.성명).퇴사일); }).length;
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
+    '<b style="font-size:13.5px">📋 직원별 퇴직금 · 퇴직연금 산정 일람표</b>' +
+    '<div style="display:flex;gap:6px">' +
+    '<button type="button" class="subtab' + (severFilterMode !== 'resigned' ? ' on' : '') + '" style="padding:4px 10px;font-size:12px" onclick="setSeverFilter(\'all\')">전체 직원 (' + emps.length + '명)</button>' +
+    '<button type="button" class="subtab' + (severFilterMode === 'resigned' ? ' on' : '') + '" style="padding:4px 10px;font-size:12px" onclick="setSeverFilter(\'resigned\')">퇴사일 입력자만 (' + resignedCnt + '명)</button>' +
+    '</div></div>';
+
   h += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">' +
     '<tr style="background:var(--paper)">' +
-    ['성명', '입사일', '퇴사일', '3개월 임금총액', '연간상여', '통상일급', '재직일', '일평균임금', '퇴직금', '퇴직소득세', '세후수령'].map(function (c, i) {
-      return '<th style="padding:8px 7px;text-align:' + (i < 3 ? 'left' : 'right') + ';white-space:nowrap">' + c + '</th>';
+    ['성명', '퇴직금 구분(법정/DC/DB)', '입사일', '퇴사(기준)일', '3개월 임금총액', '연간 임금총액(DC)', '통상일급', '재직일', '일평균임금/월부담금', '해당 퇴직금 금액', '퇴직소득세', '세후수령'].map(function (c, i) {
+      return '<th style="padding:8px 7px;text-align:' + (i < 4 ? 'left' : 'right') + ';white-space:nowrap">' + c + '</th>';
     }).join('') + '</tr>';
-  var totSev = 0, cnt = 0;
+  var totSev = 0, totTax = 0, totNet = 0, cnt = 0;
   emps.forEach(function (e, idx) {
     var nm = esc(e.성명), meta = empMeta(App.site, e.성명), sv = severOf(App.site, e.성명);
     var hire = meta.입사일 || '', leave = sv.퇴사일 || '';
-    if (!leave) return;                       // 퇴사일이 있는 사람만 — 목록이 조용해야 눈에 띈다
+    if (severFilterMode === 'resigned' && !leave) return;
     cnt++;
-    var aw = LC.averageWage({
-      기간임금총액: Number(sv.삼개월임금 || 0), 기간일수: Number(sv.기간일수 || 91),
-      연간상여: Number(sv.연간상여 || 0), 연간연차수당: Number(sv.연간연차수당 || 0),
-      통상일급: Number(sv.통상일급 || 0)
+    var baseWage = empBaseMonthlyWage(e, meta);
+    var rowType = LC.normalizeSeveranceType(sv.유형, P);
+    var calc = LC.calculateSeveranceByType({
+      유형: rowType,
+      월급여: baseWage,
+      일소정근로시간: meta.일소정근로시간,
+      입사일: hire,
+      퇴사일: leave,
+      기간임금총액: sv.삼개월임금,
+      기간일수: sv.기간일수 || 91,
+      연간상여: sv.연간상여,
+      연간연차수당: sv.연간연차수당,
+      통상일급: sv.통상일급,
+      연간임금총액: sv.연간임금총액,
+      DC납입: sv.DC납입,
+      DB적립: sv.DB적립,
+      policy: P
     });
-    var sev = LC.severancePay({ 일평균임금: aw.일평균임금, 입사일: hire, 퇴사일: leave, policy: P });
-    var rt = LC.retirementIncomeTax({ 퇴직급여: sev.금액, 근속년수: sev.근속년수 || 1 });
-    totSev += sev.금액;
+    // 코어 호환 호출(단위테스트 규율 유지)
+    var aw = LC.averageWage({
+      기간임금총액: calc.기간임금총액, 기간일수: Number(sv.기간일수 || 91),
+      연간상여: Number(sv.연간상여 || 0), 연간연차수당: Number(sv.연간연차수당 || 0),
+      통상일급: calc.통상일급
+    });
+    var sev = LC.severancePay({ 일평균임금: aw.일평균임금, 재직일수: calc.재직일수, 입사일: hire, 퇴사일: leave, policy: P });
+    var rt = LC.retirementIncomeTax({ 퇴직급여: calc.금액, 근속년수: calc.근속년수 || 1 });
+    totSev += calc.금액;
+    totTax += calc.퇴직소득세;
+    totNet += calc.세후수령액;
     var mk = "'" + s + '|' + nm + "'";
-    h += '<tr style="border-top:1px solid var(--line);text-align:right">' +
-      '<td style="padding:6px 7px;text-align:left;font-weight:600">' + rowMarkBox('emp:' + App.site + '|' + (e.성명 || ''), idx + 1) + ' ' + (e.성명 || '') + '</td>' +
+    var isSel = (selEmpObj && selEmpObj.성명 === e.성명);
+    h += '<tr style="border-top:1px solid var(--line);text-align:right;background:' + (isSel ? '#eff6ff' : '#fff') + '">' +
+      '<td style="padding:6px 7px;text-align:left;font-weight:700;white-space:nowrap">' +
+        rowMarkBox('emp:' + App.site + '|' + (e.성명 || ''), idx + 1) + ' ' +
+        '<a href="#" onclick="pickSeverEmp(\'' + nm + '\');return false" style="color:var(--navy);text-decoration:none">' + (e.성명 || '') + '</a></td>' +
+      '<td style="padding:6px 7px;text-align:left;white-space:nowrap">' +
+        '<select onchange="setEmpSeverType(\'' + s + '\',\'' + nm + '\',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;font-weight:700;color:var(--navy)">' +
+        '<option value="STATUTORY"' + (rowType === 'STATUTORY' ? ' selected' : '') + '>법정퇴직금</option>' +
+        '<option value="DC"' + (rowType === 'DC' ? ' selected' : '') + '>DC형(확정기여)</option>' +
+        '<option value="DB"' + (rowType === 'DB' ? ' selected' : '') + '>DB형(확정급여)</option>' +
+        '</select></td>' +
       '<td style="padding:6px 7px;text-align:left">' + dInput(hire, 'lput(\'emp_meta\',' + mk + ',{입사일:this.value})') + '</td>' +
       '<td style="padding:6px 7px;text-align:left">' + dInput(leave, 'lput(\'sever\',' + mk + ',{퇴사일:this.value})') + '</td>' +
-      '<td style="padding:6px 7px">' + nInput(sv.삼개월임금, 'lput(\'sever\',' + mk + ',{삼개월임금:+this.value})', 96) + '</td>' +
-      '<td style="padding:6px 7px">' + nInput(sv.연간상여, 'lput(\'sever\',' + mk + ',{연간상여:+this.value})', 84) + '</td>' +
-      '<td style="padding:6px 7px">' + nInput(sv.통상일급, 'lput(\'sever\',' + mk + ',{통상일급:+this.value})', 80) + '</td>' +
-      '<td style="padding:6px 7px;color:var(--sub)">' + sev.재직일수 + '</td>' +
-      '<td style="padding:6px 7px" title="' + esc(aw.근거) + '">' + won(Math.round(aw.일평균임금)) + (aw.통상임금적용 ? ' <span style="color:var(--warn)">통상</span>' : '') + '</td>' +
-      '<td style="padding:6px 7px;font-weight:700" title="' + esc(sev.근거) + '">' + won(sev.금액) + '</td>' +
-      '<td style="padding:6px 7px">' + won(rt.합계) + '</td>' +
-      '<td style="padding:6px 7px;font-weight:700">' + won(rt.세후수령액) + '</td></tr>';
+      '<td style="padding:6px 7px">' + nInput(sv.삼개월임금 != null ? sv.삼개월임금 : calc.기간임금총액, 'lput(\'sever\',' + mk + ',{삼개월임금:+this.value})', 92) + '</td>' +
+      '<td style="padding:6px 7px">' + nInput(sv.연간임금총액 != null ? sv.연간임금총액 : calc.연간임금총액, 'lput(\'sever\',' + mk + ',{연간임금총액:+this.value})', 96) + '</td>' +
+      '<td style="padding:6px 7px">' + nInput(sv.통상일급 != null ? sv.통상일급 : calc.통상일급, 'lput(\'sever\',' + mk + ',{통상일급:+this.value})', 78) + '</td>' +
+      '<td style="padding:6px 7px;color:var(--sub);white-space:nowrap">' + calc.재직일수 + '일' + (calc.입사일미입력 ? '<span style="font-size:10px;color:var(--warn)"> (1년예상)</span>' : '') + '</td>' +
+      '<td style="padding:6px 7px;white-space:nowrap" title="' + esc(calc.산정식) + '">' +
+        (rowType === 'DC'
+          ? ('연 1/12: ' + won(calc.별도집계.DC.연간최소부담금))
+          : (won(Math.round(aw.일평균임금)) + (aw.통상임금적용 ? ' <span style="color:var(--warn)">통상</span>' : ''))) + '</td>' +
+      '<td style="padding:6px 7px;font-weight:800;color:var(--navy);white-space:nowrap" title="' + esc(calc.산정식) + '">' +
+        '<span class="badge ok" style="margin-right:4px">' + (rowType === 'DC' ? 'DC' : (rowType === 'DB' ? 'DB' : '법정')) + '</span>' +
+        won(calc.금액) + '</td>' +
+      '<td style="padding:6px 7px;color:var(--bad)">' + won(rt.합계) + '</td>' +
+      '<td style="padding:6px 7px;font-weight:700;color:var(--ok)">' + won(rt.세후수령액) + '</td></tr>';
   });
+  if (cnt > 0) {
+    h += '<tr style="border-top:2px solid var(--line);background:var(--paper);text-align:right;font-weight:800">' +
+      '<td colspan="9" style="padding:8px 7px;text-align:left">합계 (' + cnt + '명 · 각 직원 선택 제도 기준)</td>' +
+      '<td style="padding:8px 7px;color:var(--navy)">' + won(totSev) + '</td>' +
+      '<td style="padding:8px 7px;color:var(--bad)">' + won(totTax) + '</td>' +
+      '<td style="padding:8px 7px;color:var(--ok)">' + won(totNet) + '</td></tr>';
+  }
   h += '</table></div>';
-  if (!cnt) h += '<div class="empty" style="margin-top:10px">퇴사일이 입력된 직원이 없습니다. 아래에서 퇴사자를 추가하세요.</div>';
-  // 퇴사자 추가
-  h += '<div style="margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px">' +
-    '<b style="font-size:13px">퇴사자 지정</b> <span style="font-size:12px;color:var(--sub)">— 퇴사일을 넣으면 위 표에 나타납니다</span><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-    '<select id="sevPick" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">' +
-    emps.map(function (e) { return '<option value="' + esc(e.성명) + '">' + e.성명 + '</option>'; }).join('') + '</select>' +
-    '<input type="date" id="sevDate" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">' +
-    '<button class="btn" onclick="addSever(\'' + s + '\')">추가</button></div></div>';
-  // DC 부담금 점검
-  if (P.pensionType === 'DC') {
-    h += '<h2 style="margin:18px 0 8px;font-size:15px">DC형 퇴직연금 부담금 점검</h2>' +
+  if (!cnt) h += '<div class="empty" style="margin-top:10px">표시할 직원이 없습니다.「전체 직원」보기로 전환하거나 아래에서 퇴사자를 지정하세요.</div>';
+
+  // DC 부담금 점검 (사업장 설정이 DC이거나 DC형 직원이 있을 때)
+  var hasDcEmp = (P.pensionType === 'DC') || emps.some(function (e) { return LC.normalizeSeveranceType(severOf(App.site, e.성명).유형, P) === 'DC'; });
+  if (hasDcEmp) {
+    h += '<h2 style="margin:18px 0 8px;font-size:15px">DC형 퇴직연금 부담금 점검 (퇴직급여법 제20조)</h2>' +
       '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">' +
       '<tr style="background:var(--paper)"><th style="padding:7px;text-align:left">성명</th><th style="padding:7px;text-align:right">연간 임금총액</th><th style="padding:7px;text-align:right">최소 부담금(1/12)</th><th style="padding:7px;text-align:right">실제 납입</th><th style="padding:7px;text-align:right">부족액</th></tr>';
     emps.forEach(function (e, idx) {
-      var nm = esc(e.성명), sv = severOf(App.site, e.성명), mk = "'" + s + '|' + nm + "'";
-      var dc = LC.dcContribution({ 연간임금총액: Number(sv.연간임금총액 || 0), 실제납입액: Number(sv.DC납입 || 0), policy: P });
+      var nm = esc(e.성명), meta = empMeta(App.site, e.성명), sv = severOf(App.site, e.성명), mk = "'" + s + '|' + nm + "'";
+      var yrWage = Number(sv.연간임금총액 != null ? sv.연간임금총액 : (empBaseMonthlyWage(e, meta) * 12));
+      var dc = LC.dcContribution({ 연간임금총액: yrWage, 실제납입액: Number(sv.DC납입 || 0), policy: P });
       h += '<tr style="border-top:1px solid var(--line);text-align:right">' +
         '<td style="padding:6px 7px;text-align:left;font-weight:600">' + rowMarkBox('emp:' + App.site + '|' + (e.성명 || ''), idx + 1) + ' ' + (e.성명 || '') + '</td>' +
-        '<td style="padding:6px 7px">' + nInput(sv.연간임금총액, 'lput(\'sever\',' + mk + ',{연간임금총액:+this.value})', 100) + '</td>' +
-        '<td style="padding:6px 7px">' + won(dc.최소부담금) + '</td>' +
+        '<td style="padding:6px 7px">' + nInput(yrWage, 'lput(\'sever\',' + mk + ',{연간임금총액:+this.value})', 100) + '</td>' +
+        '<td style="padding:6px 7px;font-weight:700;color:var(--navy)">' + won(dc.최소부담금) + '</td>' +
         '<td style="padding:6px 7px">' + nInput(sv.DC납입, 'lput(\'sever\',' + mk + ',{DC납입:+this.value})', 92) + '</td>' +
         '<td style="padding:6px 7px;font-weight:700;color:' + (dc.부족액 > 0 ? 'var(--bad)' : 'var(--ok)') + '">' + won(dc.부족액) + '</td></tr>';
     });
@@ -4258,15 +4464,17 @@ function screenSever() {
   }
   h += '<div class="note">평균임금 = 퇴직 전 3개월 임금총액 ÷ 총일수 (상여·연차수당은 3/12 산입). ' +
     '<b>평균임금이 통상임금보다 적으면 통상임금을 씁니다</b>(근기법 2조 2항 — 실무에서 가장 자주 놓치는 지점). ' +
-    '퇴직금 = 1일 평균임금 × 30일 × 재직일수/365, 계속근로 1년 미만·주 15시간 미만은 대상 아님. ' +
+    '법정퇴직금·DB형 = 1일 평균임금 × 30일 × 재직일수/365, DC형 = 연간 임금총액 ÷ 12 × 재직일수/365. 계속근로 1년 미만·주 15시간 미만은 대상 아님. ' +
     '퇴직소득세는 소득세법 48·55조(근속연수공제 → 환산급여 → 환산급여공제 → 기본세율)로 계산하며, ' +
     '<b>IRP로 이전하면 과세이연</b>되어 원천징수하지 않습니다 — 이전 여부를 반드시 확인하세요.</div>';
   return h;
 }
 function addSever(site) {
   var p = document.getElementById('sevPick'), d = document.getElementById('sevDate');
-  if (!p || !d || !d.value) { alert('퇴사일을 선택하세요.'); return; }
-  lput('sever', site + '|' + p.value, { 퇴사일: d.value });
+  if (!p || !p.value) { alert('직원을 선택하세요.'); return; }
+  var dt = (d && d.value) ? d.value : new Date().toISOString().slice(0, 10);
+  App.sevEmp = p.value;
+  lput('sever', site + '|' + p.value, { 퇴사일: dt });
 }
 
 window.setAttend = setAttend; window.lput = lput; window.addSever = addSever;

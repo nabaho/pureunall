@@ -765,6 +765,157 @@
     };
   }
 
+  /* ── 퇴직금 제도별(법정퇴직금 · DC형 · DB형) 통합 산정 (2026-11-03 대표 지시) ──
+     직원 선택 시 법정퇴직금(퇴직급여법 8조), DC형 확정기여형(퇴직급여법 20조),
+     DB형 확정급여형(퇴직급여법 15·16조) 중 선택한 제도에 해당하는 퇴직금 금액과
+     3가지 제도별 비교 금액을 즉시 계산해 돌려준다. */
+  function normalizeSeveranceType(raw, policy) {
+    var s = String(raw || '').toUpperCase().trim();
+    if (s === 'DC' || s === 'DC형' || s === '확정기여형') return 'DC';
+    if (s === 'DB' || s === 'DB형' || s === '확정급여형') return 'DB';
+    if (s === 'STATUTORY' || s === 'NONE' || s === '법정' || s === '법정퇴직금') return 'STATUTORY';
+    var pType = String((policy && policy.pensionType) || '').toUpperCase().trim();
+    if (pType === 'DC') return 'DC';
+    if (pType === 'DB') return 'DB';
+    return 'STATUTORY';
+  }
+
+  function calculateSeveranceByType(o) {
+    o = o || {};
+    var P = policyOf(o.policy);
+    var type = normalizeSeveranceType(o.유형 || o.pensionType || o.type, P);
+    var 월급여 = Math.max(0, num(o.월급여 != null ? o.월급여 : o.기본급));
+    var 기간일수 = num(o.기간일수) > 0 ? num(o.기간일수) : 91;
+    var 기간임금총액 = num(o.기간임금총액) > 0 ? num(o.기간임금총액) : (월급여 * 3);
+    var 연간상여 = Math.max(0, num(o.연간상여));
+    var 연간연차수당 = Math.max(0, num(o.연간연차수당));
+    var dailyH = maxHourLeaveOf(P, o.일소정근로시간);
+    var 자동통상일급 = 월급여 > 0 ? Math.round(hourlyOrdinary(월급여, P) * dailyH) : 0;
+    var 통상일급 = num(o.통상일급) > 0 ? num(o.통상일급) : 자동통상일급;
+
+    var 입사일 = String(o.입사일 || '').trim();
+    var 퇴사일 = String(o.퇴사일 || o.기준일 || fmt(Date.now())).trim();
+    var 입사일미입력 = !입사일;
+    var 실제일수 = 입사일 ? daysInclusive(입사일, 퇴사일) : 0;
+    var 재직일수 = o.재직일수 != null ? num(o.재직일수) : (입사일 ? 실제일수 : (num(o.기본재직일수) > 0 ? num(o.기본재직일수) : 365));
+
+    var aw = averageWage({
+      기간임금총액: 기간임금총액,
+      기간일수: 기간일수,
+      연간상여: 연간상여,
+      연간연차수당: 연간연차수당,
+      통상일급: 통상일급
+    });
+
+    // ① 법정퇴직금 (퇴직급여법 제8조: 1일 평균임금 × 30일 × 재직일수/365)
+    var sev = severancePay({
+      일평균임금: aw.일평균임금,
+      재직일수: 재직일수,
+      입사일: 입사일,
+      퇴사일: 퇴사일,
+      주소정근로시간: o.주소정근로시간,
+      policy: P
+    });
+    var sevTax = retirementIncomeTax({ 퇴직급여: sev.금액, 근속년수: sev.근속년수 || 1 });
+
+    // ② DC형 확정기여형 (퇴직급여법 제20조: 연간 임금총액 × 1/12 부담금)
+    var 기본연간임금 = (월급여 > 0 ? 월급여 * 12 : 기간임금총액 * 4) + 연간상여 + 연간연차수당;
+    var 연간임금총액 = num(o.연간임금총액) > 0 ? num(o.연간임금총액) : 기본연간임금;
+    var 실제납입액 = Math.max(0, num(o.DC납입 != null ? o.DC납입 : o.실제납입액));
+    var 운용수익 = num(o.DC운용수익 || 0);
+    var dcBase = dcContribution({
+      연간임금총액: 연간임금총액,
+      실제납입액: 실제납입액,
+      policy: P
+    });
+    var dc누적부담금 = sev.지급의무 ? roundBy((연간임금총액 / 12) * (재직일수 / 365), P.rounding) : 0;
+    var dc총금액 = Math.max(0, dc누적부담금 + 운용수익);
+    var dc부족액 = Math.max(0, dc누적부담금 - 실제납입액);
+    var dcTax = retirementIncomeTax({ 퇴직급여: dc총금액, 근속년수: sev.근속년수 || 1 });
+
+    // ③ DB형 확정급여형 (퇴직급여법 제15조·제16조: 퇴직일 기준 30일분 평균임금 × 근속년수)
+    var db = dbBenefit({
+      일평균임금: aw.일평균임금,
+      재직일수: 재직일수,
+      입사일: 입사일,
+      퇴사일: 퇴사일,
+      주소정근로시간: o.주소정근로시간,
+      policy: P
+    });
+    var db적립금 = Math.max(0, num(o.DB적립 != null ? o.DB적립 : o.적립금));
+    var db부족액 = Math.max(0, db.금액 - db적립금);
+    var db적립비율 = db.금액 > 0 ? Math.round((db적립금 / db.금액) * 1000) / 10 : 0;
+    var dbTax = retirementIncomeTax({ 퇴직급여: db.금액, 근속년수: db.근속년수 || 1 });
+
+    var byType = {
+      STATUTORY: {
+        유형: 'STATUTORY',
+        유형명: '법정퇴직금',
+        상세명: '법정퇴직금 (일시금 · 퇴직급여법 제8조)',
+        금액: sev.금액,
+        퇴직소득세: sevTax.합계,
+        세후수령액: sevTax.세후수령액,
+        산정식: sev.근거,
+        비고: '퇴직일로부터 14일 이내 지급(IRP 계좌 이전 원칙)'
+      },
+      DC: {
+        유형: 'DC',
+        유형명: 'DC형 (확정기여형)',
+        상세명: 'DC형 퇴직연금 (확정기여형 · 퇴직급여법 제20조)',
+        금액: dc총금액,
+        연간최소부담금: dcBase.최소부담금,
+        월환산부담금: roundBy(dcBase.최소부담금 / 12, P.rounding),
+        누적부담금: dc누적부담금,
+        실제납입액: 실제납입액,
+        부족액: dc부족액,
+        퇴직소득세: dcTax.합계,
+        세후수령액: dcTax.세후수령액,
+        산정식: sev.지급의무
+          ? ('연간 임금총액 ' + Math.round(연간임금총액).toLocaleString() + '원 ÷ 12 × (' + 재직일수 + '일/365일)' + (운용수익 ? ' + 운용수익 ' + Math.round(운용수익).toLocaleString() + '원' : ''))
+          : sev.근거,
+        비고: dc부족액 > 0 ? ('미납 부담금 ' + dc부족액.toLocaleString() + '원 추가 납입 필요') : '연간 임금총액의 1/12 이상 정기 납입'
+      },
+      DB: {
+        유형: 'DB',
+        유형명: 'DB형 (확정급여형)',
+        상세명: 'DB형 퇴직연금 (확정급여형 · 퇴직급여법 제15조)',
+        금액: db.금액,
+        적립금: db적립금,
+        부족액: db부족액,
+        적립비율: db적립비율,
+        퇴직소득세: dbTax.합계,
+        세후수령액: dbTax.세후수령액,
+        산정식: db.근거 + ' (확정급여형 사외적립)',
+        비고: db적립금 > 0 ? ('사외적립률 ' + db적립비율 + '% · 부족액 ' + db부족액.toLocaleString() + '원') : '퇴직 전 3개월 평균임금 × 30일 × 재직일수/365'
+      }
+    };
+
+    var chosen = byType[type] || byType.STATUTORY;
+    return {
+      유형: type,
+      유형명: chosen.유형명,
+      상세명: chosen.상세명,
+      금액: chosen.금액,
+      퇴직소득세: chosen.퇴직소득세,
+      세후수령액: chosen.세후수령액,
+      산정식: chosen.산정식,
+      비고: chosen.비고,
+      지급의무: sev.지급의무,
+      입사일: 입사일,
+      퇴사일: 퇴사일,
+      입사일미입력: 입사일미입력,
+      재직일수: 재직일수,
+      근속년수: sev.근속년수 || Math.round((재직일수 / 365) * 100) / 100,
+      일평균임금: aw.일평균임금,
+      산정평균임금: aw.산정평균임금,
+      통상일급: aw.통상일급,
+      통상임금적용: aw.통상임금적용,
+      기간임금총액: 기간임금총액,
+      연간임금총액: 연간임금총액,
+      별도집계: byType
+    };
+  }
+
   /* ══════════════════════════════════════════════════════════════════
      E. 4대보험 · 월 급여 통합
      ══════════════════════════════════════════════════════════════════ */
@@ -1652,6 +1803,7 @@
     averageWage: averageWage, severancePay: severancePay,
     dcContribution: dcContribution, dbBenefit: dbBenefit,
     retirementIncomeTax: retirementIncomeTax, basicTax: basicTax,
+    normalizeSeveranceType: normalizeSeveranceType, calculateSeveranceByType: calculateSeveranceByType,
     // 급여
     insuranceEmployee: insuranceEmployee, localIncomeTax: localIncomeTax,
     /* 그해 근로자 부담 요율 묶음 — 이알피 자기 직원 급여(pu-erp.html calcPayroll)가 같은 연도표를 쓴다 (2026-10-10) */
