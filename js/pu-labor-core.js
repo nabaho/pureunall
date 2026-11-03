@@ -1355,6 +1355,14 @@
     var ref = ymdDate(asOf) || new Date();
     var refMs = ref.getTime();
     var alerts = [];
+    function pushAlert(nm, kind, title, dt, dDay, law, note) {
+      alerts.push({
+        성명: nm, kind: kind, 구분: title, title: title,
+        기준일: dt, targetDate: dt, 남은일수: dDay, dDay: dDay,
+        법근거: law, law: law, 안내: note, note: note,
+        level: dDay <= 7 ? 'bad' : (dDay <= 30 ? 'warn' : 'ok')
+      });
+    }
     (rows || []).forEach(function (r) {
       if (!r || !r.성명 || r.퇴사일) return;
       var nm = String(r.성명).trim();
@@ -1365,13 +1373,13 @@
           var probEnd = new Date(Date.UTC(hd.getUTCFullYear(), hd.getUTCMonth() + 3, hd.getUTCDate() - 1));
           var dProb = Math.round((probEnd.getTime() - refMs) / DAY);
           if (dProb >= -7 && dProb <= 30) {
-            alerts.push({ 성명: nm, 구분: '수습 3개월 만료', 기준일: fmt(probEnd), 남은일수: dProb, 법근거: '근기법 26조 1호·최저임금법 5조', 안내: '3개월 경과 시 해고예고(30일 전) 의무 발생 및 수습 본채용 평가 시점' });
+            pushAlert(nm, 'probation', '수습 3개월 만료', fmt(probEnd), dProb, '근기법 26조 1호·최저임금법 5조', '3개월 경과 시 해고예고(30일 전) 의무 발생 및 수습 본채용 평가 시점');
           }
           if (empType === '계약직' || empType === '단시간' || r.계약종료일) {
             var twoYr = new Date(Date.UTC(hd.getUTCFullYear() + 2, hd.getUTCMonth(), hd.getUTCDate() - 1));
             var dTwo = Math.round((twoYr.getTime() - refMs) / DAY);
             if (dTwo >= -30 && dTwo <= 60) {
-              alerts.push({ 성명: nm, 구분: '2년 무기계약 전환 도래', 기준일: fmt(twoYr), 남은일수: dTwo, 법근거: '기간제법 4조 2항', 안내: '2년 초과 계속 사용 시 기간의 정함이 없는 근로자(정규직)로 간주됨' });
+              pushAlert(nm, 'two_year', '2년 무기계약 전환 도래', fmt(twoYr), dTwo, '기간제법 4조 2항', '2년 초과 계속 사용 시 기간의 정함이 없는 근로자(정규직)로 간주됨');
             }
           }
         }
@@ -1381,7 +1389,7 @@
         if (ed) {
           var dEnd = Math.round((ed.getTime() - refMs) / DAY);
           if (dEnd >= -14 && dEnd <= 45) {
-            alerts.push({ 성명: nm, 구분: '근로계약 만료 도래', 기준일: fmt(ed), 남은일수: dEnd, 법근거: '근기법 17조·기간제법 4조', 안내: '계약만료 전 갱신 여부 통보 및 재계약서 작성 필요(묵시적 갱신 주의)' });
+            pushAlert(nm, 'contract_end', '근로계약 만료 도래', fmt(ed), dEnd, '근기법 17조·기간제법 4조', '계약만료 전 갱신 여부 통보 및 재계약서 작성 필요(묵시적 갱신 주의)');
           }
         }
       }
@@ -1391,46 +1399,72 @@
           var ret60 = new Date(Date.UTC(bd.getUTCFullYear() + 60, bd.getUTCMonth(), bd.getUTCDate()));
           var dRet = Math.round((ret60.getTime() - refMs) / DAY);
           if (dRet >= -90 && dRet <= 180) {
-            alerts.push({ 성명: nm, 구분: '만 60세 법정 정년 도래', 기준일: fmt(ret60), 남은일수: dRet, 법근거: '고령자고용법 19조', 안내: '정년퇴직 처리 또는 촉탁직(기간제) 재고용 계약·고령자 계속고용장려금 검토' });
+            pushAlert(nm, 'retire60', '만 60세 법정 정년 도래', fmt(ret60), dRet, '고령자고용법 19조', '정년퇴직 처리 또는 촉탁직(기간제) 재고용 계약·고령자 계속고용장려금 검토');
           }
         }
       }
     });
     alerts.sort(function (a, b) { return a.남은일수 - b.남은일수; });
+    alerts.alerts = alerts;
+    alerts.경보건수 = alerts.length;
+    alerts.긴급건수 = alerts.filter(function (a) { return a.남은일수 <= 30; }).length;
     return alerts;
   }
 
   function diagnoseNonRegularRisk(records) {
-    var out = [];
+    var out = [], allRows = [];
     (records || []).forEach(function (r) {
       if (!r || !r.성명) return;
-      var months = num(r.활동월수);
-      var avgDays = num(r.월평균근로일수);
-      var avgHours = num(r.월평균근로시간);
-      var wkHours = num(r.주평균근로시간 || (avgHours > 0 ? avgHours / 4.345 : (avgDays * 8) / 4.345));
-      var isDailyOr33 = !!(r.일용여부 || r.고용형태 === '일용직' || r.고용형태 === '단시간' || r.고용형태 === '3.3%');
-      if (!isDailyOr33 && months < 12) return;
-      var risks = [];
-      if (isDailyOr33 && months >= 1 && (avgDays >= 8 || avgHours >= 60)) {
-        risks.push({ code: 'INS_MANDATORY', title: '4대보험(연금·건보) 상용 가입 대상', law: '국민연금법 8조·건보법 6조', desc: '1개월 이상 계속 근로하며 월 8일 이상 또는 월 60시간 이상 근무 시 상용(사업장가입자) 취득신고 대상' });
-      }
-      if (isDailyOr33 && wkHours >= 15) {
-        risks.push({ code: 'WEEKLY_REST_ANNUAL', title: '주휴수당·연차휴가 발생 대상', law: '근기법 18조 3항·55조·60조', desc: '4주 평균 1주 소정근로시간 15시간 이상이면 일용·단시간·3.3% 형식이라도 주휴수당·연차휴가 의무 발생' });
-      }
-      if (isDailyOr33 && months >= 3) {
-        risks.push({ code: 'DISMISS_NOTICE_3M', title: '해고예고(30일 전) 적용 대상', law: '근기법 26조', desc: '일용직이라도 3개월을 초과하여 계속 근무하면 해고 시 30일 전 예고 또는 30일분 통상임금 지급 의무' });
-      }
-      if (months >= 12 && wkHours >= 15) {
-        risks.push({ code: 'SEVERANCE_1Y', title: '퇴직금 지급 의무 발생 (1년 이상)', law: '퇴직급여법 4조·8조', desc: '일용·단시간·3.3%라도 1년(12개월) 이상·주 15시간 이상 계속 근로 시 퇴직금 100% 발생' });
-      }
-      if (risks.length) {
-        out.push({
-          성명: r.성명, 고용형태: r.고용형태 || (r.일용여부 ? '일용직' : '상용'),
-          활동월수: months, 월평균근로일수: Math.round(avgDays * 10) / 10, 주추정시간: Math.round(wkHours * 10) / 10,
-          위험수: risks.length, 위험목록: risks
+      var mRecs = Array.isArray(r.월별기록) ? r.월별기록 : null;
+      var months = num(r.활동월수 != null ? r.활동월수 : (r.누적근무월수 != null ? r.누적근무월수 : (mRecs ? mRecs.length : 0)));
+      var maxDays = 0, maxHours = 0, sumDays = 0, sumHours = 0;
+      if (mRecs && mRecs.length) {
+        mRecs.forEach(function (m) {
+          var d = num(m && m.근무일수), h = num(m && m.근무시간);
+          if (d > maxDays) maxDays = d;
+          if (h > maxHours) maxHours = h;
+          sumDays += d; sumHours += h;
         });
       }
+      var avgDays = num(r.월평균근로일수 != null ? r.월평균근로일수 : (mRecs && mRecs.length ? sumDays / mRecs.length : 0));
+      var avgHours = num(r.월평균근로시간 != null ? r.월평균근로시간 : (mRecs && mRecs.length ? sumHours / mRecs.length : 0));
+      if (!maxDays) maxDays = Math.round(avgDays);
+      if (!maxHours) maxHours = Math.round(avgHours);
+      var wkHours = num(r.주평균근로시간 || (avgHours > 0 ? avgHours / 4.345 : (avgDays * 8) / 4.345));
+      var isDailyOr33 = !!(r.일용여부 || r.고용형태 === '일용직' || r.고용형태 === '단시간' || r.고용형태 === '3.3%');
+      var risks = [];
+      if (isDailyOr33 && months >= 1 && (avgDays >= 8 || avgHours >= 60 || maxDays >= 8 || maxHours >= 60)) {
+        var d1 = '1개월 이상 계속 근로하며 월 8일 이상 또는 월 60시간 이상 근무 시 상용(사업장가입자) 취득신고 대상';
+        risks.push({ code: 'INS_MANDATORY', title: '4대보험(연금·건보) 상용 가입 대상', law: '국민연금법 8조·건보법 6조', desc: d1, msg: d1 });
+      }
+      if (isDailyOr33 && wkHours >= 15) {
+        var d2 = '4주 평균 1주 소정근로시간 15시간 이상이면 일용·단시간·3.3% 형식이라도 주휴수당·연차휴가 의무 발생';
+        risks.push({ code: 'WEEKLY_REST_ANNUAL', title: '주휴수당·연차휴가 발생 대상', law: '근기법 18조 3항·55조·60조', desc: d2, msg: d2 });
+      }
+      if (isDailyOr33 && months >= 3) {
+        var d3 = '일용직이라도 3개월을 초과하여 계속 근무하면 해고 시 30일 전 예고 또는 30일분 통상임금 지급 의무';
+        risks.push({ code: 'DISMISS_NOTICE_3M', title: '해고예고(30일 전) 적용 대상', law: '근기법 26조', desc: d3, msg: d3 });
+      }
+      if (months >= 12 && wkHours >= 15) {
+        var d4 = '일용·단시간·3.3%라도 1년(12개월) 이상·주 15시간 이상 계속 근로 시 퇴직금 100% 발생';
+        risks.push({ code: 'SEVERANCE_1Y', title: '퇴직금 지급 의무 발생 (1년 이상)', law: '퇴직급여법 4조·8조', desc: d4, msg: d4 });
+      }
+      var item = {
+        성명: r.성명, 고용형태: r.고용형태 || (r.일용여부 ? '일용직' : '정규직'),
+        활동월수: months, 누적근무월수: months,
+        월평균근로일수: Math.round(avgDays * 10) / 10,
+        최대월근무일수: maxDays, 최대월근무시간: maxHours,
+        주추정시간: Math.round(wkHours * 10) / 10, 주평균근로시간: Math.round(wkHours * 10) / 10,
+        위험수: risks.length, 위험건수: risks.length, 위험목록: risks
+      };
+      allRows.push(item);
+      if ((isDailyOr33 || months >= 12) && risks.length) {
+        out.push(item);
+      }
     });
+    out.rows = allRows;
+    out.전체인원수 = allRows.length;
+    out.위험인원수 = out.length;
     return out;
   }
 
@@ -1439,7 +1473,7 @@
     var site = siteName || '사업장';
     var emps = (rows || []).filter(function (r) { return r && r.성명 && !r.퇴사일; });
     var mode = opts.disadvantage ? '동의' : '의견청취';
-    var today = opts.date || '2026-11-02';
+    var today = opts.date || opts.filingDate || '2026-11-02';
     var signLines = emps.length ? emps.map(function (e, i) {
       return (i + 1) + '. 성명: ' + e.성명 + '   (직종: ' + (e.직종 || '일반') + ')   찬성/의견: [ 동의함 · 이견 없음 ]   (서명 또는 인)';
     }).join('\n') : '1. 성명: 홍길동   찬성/의견: [ 동의함 · 이견 없음 ]   (서명 또는 인)';
@@ -1478,21 +1512,22 @@
       '   - [개정(현행)] 관공서 공휴일 및 대체공휴일을 법정 유급휴일로 보장하며, 연차휴가는 반차(4h)·반반차(2h)·시간차(1h)로 분할 사용 가능'
     ].join('\n');
 
-    return { 신고서: filingForm, 의견동의서: consentForm, 신구대조표: diffTable, 과반수기준: Math.ceil((emps.length || 1) / 2) };
+    return { 신고서: filingForm, 의견동의서: consentForm, 의견청취서: consentForm, 신구대조표: diffTable, 과반수기준: Math.ceil((emps.length || 1) / 2) };
   }
 
   var EMPLOYER_SUBSIDY_PROGRAMS = [
-    { id: 'childcare_leave', title: '육아휴직 부여 지원금 (출산육아기 고용안정장려금)', monthlyWon: 300000, specialMonthlyWon: 2000000, law: '고용보험법 23조 · 시행령 29조', target: '근로자에게 육아휴직을 30일 이상 부여한 우선지원대상기업 사업주', note: '일반 월 30만원 · 만 12개월 이내 자녀 대상(특례) 첫 3개월 월 200만원 지원', docs: '육아휴직 확인서, 인사발령장, 임금대장' },
-    { id: 'childcare_short', title: '육아기 근로시간 단축 지원금', monthlyWon: 300000, specialMonthlyWon: 400000, law: '고용보험법 23조 · 시행령 29조', target: '근로자에게 주 15~30시간으로 육아기 근로시간 단축을 30일 이상 허용한 사업주', note: '월 30만원 (최초 허용 인센티브 해당 시 월 40만원)', docs: '단축 근로계약서, 출퇴근기록부, 월별 임금대장·이체확인증' },
-    { id: 'replace_worker', title: '출산육아기 대체인력 지원금', monthlyWon: 1200000, specialMonthlyWon: 1200000, law: '고용보험법 23조 · 시행령 29조', target: '출산전후휴가·육아휴직·육아기 단축 근로자의 대체인력을 신규 채용하거나 파견 사용한 사업주', note: '대체인력 1인당 월 최대 120만원 (인수인계기간 최대 2개월 포함)', docs: '대체인력 근로계약서(또는 파견계약서), 임금대장, 급여이체내역' },
-    { id: 'workload_share', title: '육아휴직·육아기 단축 동료 업무분담 지원금', monthlyWon: 200000, specialMonthlyWon: 200000, law: '고용보험법 시행령 29조 (신설 확대)', target: '육아휴직·단축근로자의 업무를 기존 동료 근로자에게 분담시키고 금전적 보상을 지급한 사업주', note: '휴직·단축자 1명당 월 최대 20만원 한도 사업주 지원', docs: '업무분담자 지정 문건(인사명령), 업무분담수당 지급 명세서·이체증' },
-    { id: 'senior_keep', title: '고령자 계속고용장려금 (정년 후 재고용·연장)', monthlyWon: 300000, specialMonthlyWon: 300000, law: '고령자고용법 · 고용보험법 23조', target: '정년(만 60세) 도래 근로자를 정년 후 계속고용(촉탁 재고용·정년 연장·폐지)한 중소·중견기업', note: '계속고용 근로자 1인당 월 30만원(분기 90만원, 최대 3년 1,080만원)', docs: '취업규칙(계속고용제도 명시), 재고용 근로계약서, 임금대장' }
+    { id: 'childcare_leave', title: '육아휴직 부여 지원금 (출산육아기 고용안정장려금)', monthlyWon: 300000, specialMonthlyWon: 2000000, law: '고용보험법 23조 · 시행령 29조', target: '근로자에게 육아휴직을 30일 이상 부여한 우선지원대상기업 사업주', note: '일반 월 30만원 · 만 12개월 이내 자녀 대상(특례) 첫 3개월 월 200만원 지원', docs: ['육아휴직 확인서', '인사발령장', '임금대장'] },
+    { id: 'childcare_short', title: '육아기 근로시간 단축 지원금', monthlyWon: 300000, specialMonthlyWon: 400000, law: '고용보험법 23조 · 시행령 29조', target: '근로자에게 주 15~30시간으로 육아기 근로시간 단축을 30일 이상 허용한 사업주', note: '월 30만원 (최초 허용 인센티브 해당 시 월 40만원)', docs: ['단축 근로계약서', '출퇴근기록부', '월별 임금대장·이체확인증'] },
+    { id: 'replace_worker', title: '출산육아기 대체인력 지원금', monthlyWon: 1200000, specialMonthlyWon: 1200000, law: '고용보험법 23조 · 시행령 29조', target: '출산전후휴가·육아휴직·육아기 단축 근로자의 대체인력을 신규 채용하거나 파견 사용한 사업주', note: '대체인력 1인당 월 최대 120만원 (인수인계기간 최대 2개월 포함)', docs: ['대체인력 근로계약서(또는 파견계약서)', '임금대장', '급여이체내역'] },
+    { id: 'workload_share', title: '육아휴직·육아기 단축 동료 업무분담 지원금', monthlyWon: 200000, specialMonthlyWon: 200000, law: '고용보험법 시행령 29조 (신설 확대)', target: '육아휴직·단축근로자의 업무를 기존 동료 근로자에게 분담시키고 금전적 보상을 지급한 사업주', note: '휴직·단축자 1명당 월 최대 20만원 한도 사업주 지원', docs: ['업무분담자 지정 문건(인사명령)', '업무분담수당 지급 명세서·이체증'] },
+    { id: 'senior_keep', title: '고령자 계속고용장려금 (정년 후 재고용·연장)', monthlyWon: 300000, specialMonthlyWon: 300000, law: '고령자고용법 · 고용보험법 23조', target: '정년(만 60세) 도래 근로자를 정년 후 계속고용(촉탁 재고용·정년 연장·폐지)한 중소·중견기업', note: '계속고용 근로자 1인당 월 30만원(분기 90만원, 최대 3년 1,080만원)', docs: ['취업규칙(계속고용제도 명시)', '재고용 근로계약서', '임금대장'] }
   ];
 
   function matchEmployerSubsidies(ctx) {
     ctx = ctx || {};
     var months = Math.max(1, num(ctx.months || 6));
     var infant12m = !!ctx.infantUnder12Months;
+    var totEst = 0;
     var items = EMPLOYER_SUBSIDY_PROGRAMS.map(function (p) {
       var est = 0;
       if (p.id === 'childcare_leave' && infant12m) {
@@ -1501,13 +1536,21 @@
       } else {
         est = months * p.monthlyWon;
       }
+      totEst += est;
+      var mWon = (p.id === 'childcare_leave' && infant12m) ? p.specialMonthlyWon : p.monthlyWon;
       return {
-        id: p.id, title: p.title, law: p.law, target: p.target, note: p.note, docs: p.docs,
-        월지원액: (p.id === 'childcare_leave' && infant12m) ? p.specialMonthlyWon : p.monthlyWon,
-        예상총지원액: est
+        id: p.id, title: p.title, law: p.law, target: p.target, targetDesc: p.target,
+        note: p.note, paymentRule: p.note, docs: p.docs,
+        월지원액: mWon, monthlyAmount: p.monthlyWon, specialMonthlyAmount: p.specialMonthlyWon !== p.monthlyWon ? p.specialMonthlyWon : 0,
+        예상총지원액: est, 예상지원액: est
       };
     });
-    return { 기간월수: months, 특례적용: infant12m, 프로그램목록: items };
+    return {
+      기간월수: months, 특례적용: infant12m,
+      사업장구분: '우선지원대상기업(중소기업) 기준 · ' + months + '개월 산출',
+      총예상지원금합계: totEst,
+      프로그램목록: items, programs: items
+    };
   }
 
   function summarizeAnnualSettlement(monthRecords, year, policy) {
@@ -1527,7 +1570,7 @@
         var nm = String(e.성명).trim();
         if (!nm) return;
         var row = byEmp[nm] || (byEmp[nm] = {
-          성명: nm, 근무월수: 0, 연간지급총액: 0, 연간과세총액: 0, 연간비과세: 0,
+          성명: nm, 근무월수: 0, 연간지급총액: 0, 연간과세총액: 0, 과세보수총액: 0, 연간비과세: 0, 비과세합계: 0,
           국민연금합계: 0, 건강보험합계: 0, 장기요양합계: 0, 고용보험합계: 0, 소득세합계: 0, 지방세합계: 0
         });
         row.근무월수 += 1;
@@ -1535,7 +1578,9 @@
         var taxPay = num(e.과세총액 != null ? e.과세총액 : gross);
         row.연간지급총액 += gross;
         row.연간과세총액 += taxPay;
+        row.과세보수총액 = row.연간과세총액;
         row.연간비과세 += Math.max(0, gross - taxPay);
+        row.비과세합계 = row.연간비과세;
         row.국민연금합계 += num(e.국민연금);
         row.건강보험합계 += num(e.건강보험);
         row.장기요양합계 += num(e.장기요양);
@@ -1544,6 +1589,7 @@
         row.지방세합계 += num(e.지방세);
       });
     });
+    var 합계 = { 연간지급총액: 0, 과세보수총액: 0, 비과세합계: 0, 국민연금합계: 0, 건강보험합계: 0, 장기요양합계: 0, 고용보험합계: 0, 소득세합계: 0, 지방세합계: 0, 건보정산예상: 0, 고용정산예상: 0 };
     var list = Object.keys(byEmp).sort().map(function (nm) {
       var r = byEmp[nm];
       r.월평균보수 = r.근무월수 > 0 ? Math.round(r.연간과세총액 / r.근무월수) : 0;
@@ -1552,9 +1598,20 @@
       var expEmpIns = roundBy(r.연간과세총액 * rates.empInsEE, P.rounding);
       r.건보정산예상 = (expHealth + expLong) - (r.건강보험합계 + r.장기요양합계);
       r.고용정산예상 = expEmpIns - r.고용보험합계;
+      합계.연간지급총액 += r.연간지급총액;
+      합계.과세보수총액 += r.과세보수총액;
+      합계.비과세합계 += r.비과세합계;
+      합계.국민연금합계 += r.국민연금합계;
+      합계.건강보험합계 += r.건강보험합계;
+      합계.장기요양합계 += r.장기요양합계;
+      합계.고용보험합계 += r.고용보험합계;
+      합계.소득세합계 += r.소득세합계;
+      합계.지방세합계 += r.지방세합계;
+      합계.건보정산예상 += r.건보정산예상;
+      합계.고용정산예상 += r.고용정산예상;
       return r;
     });
-    return { 연도: yr, 직원수: list.length, 행목록: list };
+    return { 연도: yr, 직원수: list.length, 인원수: list.length, 행목록: list, rows: list, 합계: 합계 };
   }
 
   function buildContractDeliveryHtml(siteName, emp, contractText) {
