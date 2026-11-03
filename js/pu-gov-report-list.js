@@ -58,7 +58,7 @@
     input = input || {};
     var types = {};
     list(input.types).forEach(function (t) { types[t.id] = t; });
-    var scheds = list(input.scheds).filter(function (s) { return s.phase !== 'pre' && isDay(s.date); });
+    var scheds = list(input.scheds).filter(function (s) { return s.phase !== 'pre' && s.phase !== 'post' && isDay(s.date); });
     var out = [];
     list(input.cos).forEach(function (co) {
       if (co.deleted) return;

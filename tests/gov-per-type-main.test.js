@@ -251,7 +251,7 @@ test('같은 날 중복 검사도 «그 종류의» 주담당으로 본다', () 
     getCos: () => [{ id: 'c1', defAtt: 'a1', typeAtts: { t2: 'a3' } }, { id: 'c2', defAtt: 'a9' }],
     getScheds: () => [{ id: 's9', date: '2026-09-10', attId: 'a3', typeId: 't2', coId: 'c2' }],
     getStaff: () => [{ id: 'a3', name: '박재원' }] });
-  vm.runInContext(grab('coMainOf') + '\n' + grab('checkConflictMatrix'), ctx);
+  vm.runInContext(grab('isPostSched') + '\n' + grab('coMainOf') + '\n' + grab('checkConflictMatrix'), ctx);
   const r = ctx.checkConflictMatrix('c1', 't2', '2026-09-10');
   assert.ok(r && r.includes('박재원'), '★ 산일충남은 박재원이 가는 사업인데 대표(권형하)로 검사해서 겹침을 못 잡습니다');
 });

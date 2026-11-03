@@ -45,7 +45,7 @@ function world(scheds, opt) {
     Math, Number, Set, String, Array, Object,
   };
   vm.createContext(ctx);
-  vm.runInContext([grab('schedPhase'), grab('roundIsFixed'), grab('roundPeers'),
+  vm.runInContext([grab('schedPhase'), grab('isPostSched'), grab('roundIsFixed'), grab('roundPeers'),
     grab('roundIssues'), grab('reorderRounds'), grab('unfixAllRounds')].join('\n'), ctx);
   return ctx;
 }
