@@ -5100,13 +5100,16 @@ function renderForms(){
       +inkaList.map(formRow).join('')
       +(isGong?'':'<p class="muted" style="font-size:11px;margin:8px 0 0">※ 설립합의서는 공동기금 전용 — 사내기금 목록에서 제외</p>')
       +tplRow(TPL.contribx)
+      +reqDocsBoxHTML('inka',cur,fundMode)
       +'</div>';
   } else if(S.formPhase==='reg'){
     body='<div class="panel">'+phaseHead('② 법인 설립등기 서식','forms.hwp','reg')
-      +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')+'</div>';
+      +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')
+      +reqDocsBoxHTML('reg',cur,fundMode)+'</div>';
   } else if(S.formPhase==='tax'){
     body='<div class="panel">'+phaseHead('③ 고유번호증(세무서) 서식','forms.tax','tax')
-      +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')+'</div>';
+      +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')
+      +reqDocsBoxHTML('tax',cur,fundMode)+'</div>';
   } else if(S.formPhase==='ops'){
     body='<div class="panel">'+phaseHead('④ 운영 단계 서식','forms.ops','ops')
       +docsFor(DOC_OPS,cur.fund_type||'공동').map(formRow).join('')
@@ -5117,7 +5120,7 @@ function renderForms(){
           +opsRow('정관변경·임원변경 서식','<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:4px 10px">🔁 변경 이벤트로 →</button>')
           +opsRow('연간 일정·총회/협의회','<button onclick="gotoFundTab(\'annual\')" style="padding:4px 10px">📅 연간 일정으로 →</button>')
         : opsRow('운영상황보고서·결산서·변경이벤트','<span class="muted" style="font-size:12px">실데이터 기반 — 각 기금의 <b>📑 서식</b>/해당 탭에서</span>'))
-      +'</div></div>';
+      +'</div>'+reqDocsBoxHTML('ops',cur,fundMode)+'</div>';
   } else if(S.formPhase==='dis'){
     body=dsLibHTML(cur,fundMode,docsFor(DOC_DIS,cur.fund_type||'공동').map(formRow).join(''));
   } else {
@@ -5126,7 +5129,8 @@ function renderForms(){
         '<span class="chip warn" style="font-size:10px;margin-left:6px">공동 전용</span>')
       +tplRow(TPL.subsidy)
       +(fundMode?opsRow('근복지원금 데이터 입력','<button class="primary" onclick="gotoFundTab(\'subsidy\')" style="padding:4px 10px">📊 근복지원금 입력으로 →</button>'):'')
-      +DOC_SUB.map(formRow).join('')+'</div>';
+      +DOC_SUB.map(formRow).join('')
+      +reqDocsBoxHTML('subsidy',cur,fundMode)+'</div>';
   }
   if(!EMB) $('crumb').textContent='서식 자료실';   // 단독 렌더는 항상 전사 표준서식
   // 머리말은 한 줄로 — 긴 설명은 ⓘ 팝업(forms.fund / forms.lib)
@@ -6799,6 +6803,7 @@ var DOC_PHASE=[['inka',DOC_KINDS],['reg',DOC_REG],['tax',DOC_TAX],
    (사업계획서는 ①인가와 ⑤지원금에 같이 있다). 그때는 있던 자리에서 열어야
    «왜 딴 데로 갔지» 하지 않는다. */
 function phaseOfDoc(kind,prefer){
+  if(/^req_(inka|reg|tax|ops|subsidy|dis)$/.test(String(kind||''))) return String(kind).slice(4);
   var hit=[];
   for(var i=0;i<DOC_PHASE.length;i++)
     for(var j=0;j<DOC_PHASE[i][1].length;j++)
@@ -6808,6 +6813,233 @@ function phaseOfDoc(kind,prefer){
 }
 /* 선택 기금 유형에 맞는 서식만 — 공동/사내 기본서식을 따로 검토 */
 function docsFor(list,ftype){ return list.filter(function(d){ return !d[2]||d[2]===ftype; }); }
+/* ══ 기본서식 외 기업 준비·첨부서류 목록 (전 단계 체크리스트 · A4 안내문) ══
+   과거자료·표준서식·매뉴얼 전수 대조:
+   · ① 인가: 별지 제7호 첨부서류 + 사내기금설립사전준비물.xlsx + 공동기금설립시 필요.xlsx + 누리공동기금 필요서류.hwp
+   · ② 법인설립: 법인등기관련.xlsx + 사내근로복지기금 필요서류 및 진행.xlsx + 등기서류 1~102
+   · ③ 고유번호증: 0. 준비서류 안내(세무서,은행).xlsx + 고유번호증 발급 자료 준비 안내
+   · ④ 운영: 별지 제10호·제11호·제15호 법정첨부 + 등기관련(이사변경,정관변경).xlsx + 결산·세무 매뉴얼
+   · ⑤ 근복지원금: 00. 지원금 신청시 필요서류.hwp + [붙임1]기금법인 제출증빙리스트
+   · ⑥ 해산·탈퇴: 별지 제14호·제14호의2 법정첨부 + 해산·청산등기 절차 정리 */
+var REQ_PHASE_LABELS={
+  inka:'① 노동부 설립인가 — 기업 준비·첨부서류 안내문',
+  reg:'② 법인 설립등기 — 등기소 첨부·임원 준비물 안내문',
+  tax:'③ 고유번호증·계좌개설 — 세무서·은행 구비서류 안내문',
+  ops:'④ 운영·결산·변경 — 연간 결산 및 변경보고·등기 구비서류 안내문',
+  subsidy:'⑤ 근복지원금 — 기금법인·참여기업 구비서류 안내문',
+  dis:'⑥ 해산·탈퇴 — 법정 첨부서류 및 청산·탈퇴 구비서류 안내문'
+};
+var REQ_DOCS={
+  inka:[
+    {id:'inka_wrep',badge:'법정첨부',cls:'dg',who:'노·사 준비위원',title:'설립준비위원 재직증명서 (또는 근로계약서 등 신분증명서)',desc:'노·사 설립준비위원 전원 각 1부(별지 제7호 첨부서류 2호). 성명·생년월일·집 주소·연락처·직책 반드시 기재',tab:'sites',siteCol:'재직증명서(노·사위원)'},
+    {id:'inka_bizreg',badge:'필수',cls:'warn',who:'참여기업별',title:'사업자등록증 사본',desc:'설립·참여사업장 각 1부 (상호·사업자등록번호·소재지·대표자·업종 대조용)',tab:'sites',siteCol:'사업자등록증 사본'},
+    {id:'inka_corpreg',badge:'법인필수',cls:'warn',who:'참여기업별',title:'법인등기부등본 (등기사항전부증명서)',desc:'법인 사업장 각 1부 (말소사항 포함·제출용, 등기상 대표자·본점·지점·납입자본금 확인용, 개인사업자 제외)',tab:'sites',siteCol:'법인등기부등본'},
+    {id:'inka_fin',badge:'필수',cls:'warn',who:'참여기업별',title:'직전년도 재무제표 (재무상태표·손익계산서)',desc:'직전 사업연도 납입자본금 및 법인세·소득세 차감 전 순이익, 출연 재원 확인용',tab:'sites',siteCol:'직전년도 재무제표'},
+    {id:'inka_ei',badge:'필수',cls:'warn',who:'참여기업별',title:'고용보험 가입자명부 (또는 4대보험 사업장 가입자명부)',desc:'사업장별 소속 상시근로자 수 산정 및 인가신청서·사업계획서 기재 인원 확인용',tab:'sites',siteCol:'고용보험 가입자명부'},
+    {id:'inka_pseal',badge:'날인도장',cls:'ok',who:'노·사 준비위원',title:'노·사 설립준비위원 개인도장 (막도장 가능)',desc:'정관·설립준비위원회 회의록·설립합의서 기명날인용 (노동부 인가 단계는 인감도장 불필요, 막도장 사용 가능)',tab:'info',siteCol:'준비위원 도장 날인'},
+    {id:'inka_cseal',badge:'날인도장',cls:'ok',who:'참여기업별',title:'설립·참여기업 법인(사용)도장 및 출연 증빙',desc:'기금출연확인서·설립합의서 대표자 직인 날인용 (현물·유가증권 출연 시 재산목록 및 가격 평가서류 추가 첨부)',tab:'sites',siteCol:'법인직인(출연확인서)'},
+    {id:'inka_fseal',badge:'필수',cls:'warn',who:'기금법인',title:'기금법인 직인(도장) 제작',desc:'「○○사내(공동)근로복지기금」 한글 명칭으로 제작 (설립인가신청서 날인 및 추후 등기소 법인인감 등록용)',tab:'info'},
+    {id:'inka_elect',badge:'해당시',cls:'',who:'근로자측',title:'근로자측 준비위원 선출·위촉 근거서류',desc:'노사협의회 위원 명부, 과반수 노동조합 추천서, 또는 근로자대표 선출 투표록·동의서 (해당 사업장 비치·제출)',tab:'sites'},
+    {id:'inka_match',badge:'공동·해당시',cls:'',who:'참여기업·지자체',title:'공동기금 참여신청서 및 지자체·원청 출연약정서(협약서)',desc:'신규 참여기업 모집 신청서(근로자대표·사용자 서명) 및 지자체·원청 대기업 매칭 출연 시 출연협약서 사본',tab:'sites',ftype:'공동'}
+  ],
+  reg:[
+    {id:'reg_inkacert',badge:'법정첨부',cls:'dg',who:'기금법인',title:'설립인가증 원본 (고용노동지청 발급 주무관청 인가서)',desc:'인가증 도달일로부터 3주 이내 주사무소 관할 등기소 제출 (원본 확인 후 환부 요청 또는 원본대조필 사본 편철)',tab:'info'},
+    {id:'reg_inseal_cert',badge:'필수',cls:'warn',who:'이사 전원',title:'이사 전원 개인인감증명서 (발급 3개월 이내)',desc:'사용자측 이사·근로자측 이사 전원 각 1부 (취임승낙서·법인인감신고서·협의회 명부 날인 대조용, 감사는 비등기임원으로 제외)',tab:'info',siteCol:'이사 개인인감증명서'},
+    {id:'reg_jumin',badge:'필수',cls:'warn',who:'이사 전원',title:'이사 전원 주민등록표 등본 또는 초본 (발급 3개월 이내)',desc:'이사 전원 각 1부 (성명·주민등록번호 전체 공개·주소 변동사항 포함, 등기부 임원사항 기재 대조용)',tab:'info',siteCol:'이사 주민등록초본(등본)'},
+    {id:'reg_inseal_stamp',badge:'날인도장',cls:'ok',who:'이사 전원',title:'이사 전원 개인인감도장 및 신분증 사본',desc:'취임승낙서·법인인감개인신고서(대표자)·협의회 위원명부·위임장에 개인인감증명서와 동일한 인감도장 날인',tab:'info',siteCol:'이사 개인인감 날인'},
+    {id:'reg_fseal',badge:'날인도장',cls:'ok',who:'기금법인',title:'기금법인 인감도장 (법인인감 등록용)',desc:'특수법인 설립등기신청서, 인감대지, 법인인감신고서, 인가 정관 간인 및 원본대조필 날인용',tab:'info'},
+    {id:'reg_charter',badge:'법정첨부',cls:'dg',who:'기금법인',title:'인가받은 정관 사본 (법인인감 간인·원본대조필)',desc:'고용노동지청 인가 정관에 기금법인 인감도장으로 전 페이지 간인 및 원본대조필 날인하여 편철',tab:'info'},
+    {id:'reg_minutes',badge:'법정첨부',cls:'dg',who:'기금법인',title:'설립준비위원회 의사록(회의록) 및 협의회 위원 명부 (위원 인감날인)',desc:'이사 선임 및 기본재산 확정 결의 증빙 (공증인법 시행령 제2조의3 및 법무부고시 제2010-700호 제161호에 따라 의사록 공증 면제)',tab:'info'},
+    {id:'reg_contrib',badge:'법정첨부',cls:'dg',who:'참여기업별',title:'기금출연확인서 (기본재산 총액 증명서류)',desc:'등기부상 기본재산(자본 총액) 등기 및 시·군·구청 세무과 등록면허세 산정 소명용',tab:'sites',siteCol:'기금출연확인서 원본'},
+    {id:'reg_taxfee',badge:'필수',cls:'warn',who:'기금법인',title:'등록면허세 영수필확인서 및 등기신청수수료(증지) 영수증',desc:'주사무소 관할 시·군·구청 세무과(또는 위택스) 등록면허세·지방교육세 납부필증 + 등기소 등기신청수수료 영수증',tab:'info'},
+    {id:'reg_sealcard',badge:'후속필수',cls:'ok',who:'기금법인',title:'법인인감카드 발급신청 준비 및 등기부등본·인감증명서 발급',desc:'설립등기 완료 직후 등기소에서 법인인감카드 발급 신청(비밀번호 숫자 6자리 지정) 및 세무서·은행 제출용 등기부등본·법인인감증명서 발급',tab:'info'}
+  ],
+  tax:[
+    {id:'tax_inkacert',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 설립인가증 사본 (설립인가 공문 포함)',desc:'관할 고용노동지청에서 교부받은 설립인가증 사본 1부 (법인설립신고 및 고유번호증 발급 신청 시 첨부)',tab:'info'},
+    {id:'tax_corpreg',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 등기사항전부증명서 (법인등기부등본)',desc:'관할 등기소 발급 원본 1부 (제출용, 말소사항 포함, 법인등록번호 가운데 71 확인)',tab:'info'},
+    {id:'tax_charter',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 정관 사본',desc:'고용노동지청 인가 정관 사본 1부 (비영리 특수법인 고유목적 확인용)',tab:'info'},
+    {id:'tax_lease',badge:'세무서필수',cls:'warn',who:'설립·대표기업',title:'주사무소 임대차계약서 사본 또는 무상사용승낙서·부동산 전대동의서',desc:'자가건물 내 무상사용 시 무상임대차계약서+건물등기부등본 / 임차건물 내 무상사용 시 건물주 부동산 전대 사용동의서+원임대차계약서 사본',tab:'info'},
+    {id:'tax_rep_seal',badge:'세무서필수',cls:'warn',who:'기금법인',title:'기금법인 대표자 신분증 사본 · 법인인감도장 · (대리인) 위임장',desc:'관할 세무서 방문 신청 시 법인인감도장 지참 (대리인 신청 시 위임장, 대리인 신분증, 법인인감증명서 추가)',tab:'info'},
+    {id:'tax_bank_id',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 세무서 발급 고유번호증 원본 (가운데 번호 82 확인)',desc:'고유번호증(xxx-82-xxxxx) 수령 후 은행 방문 — 기본재산 계좌·목적사업 계좌·(공동)공단지원금 전용 계좌 분리 개설 권장',tab:'info'},
+    {id:'tax_bank_certs',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 기금법인 등기부등본 · 법인인감증명서 (3개월 이내 원본)',desc:'은행 제출용 원본 각 1부 + 인가 정관 사본 + 설립인가증 사본 지참',tab:'info'},
+    {id:'tax_bank_seal',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 법인인감도장(통장 사용인감) · 대표자(대리인) 신분증 · 위임장',desc:'대표자 직접 방문 시 대표자 신분증·법인인감도장 / 대리인 방문 시 위임장(법인인감 날인)·대리인 신분증·재직증명서 추가',tab:'info'},
+    {id:'tax_handover',badge:'운영개시',cls:'',who:'기금·참여기업',title:'[설립 완료 후] 설립준비위원회 사무인계서 및 출연금 입금 통보',desc:'설립등기 후 지체 없이 이사에게 사무인계(인가증·정관·등기·인감·통장) 및 참여기업·지자체 출연금 기금계좌 입금 요청',tab:'closing',siteCol:'설립출연금 입금확인'}
+  ],
+  ops:[
+    {id:'ops_bank_tx',badge:'결산필수',cls:'dg',who:'기금법인',title:'[연간 결산] 기금법인 전체 계좌 연간 거래내역서 (1.1.~12.31. 엑셀·통장사본)',desc:'기본재산·목적사업·공단지원금·정기예금 등 보유 전 계좌의 회계연도 전체 입출금 내역 (회계·결산 탭 통장 자동분개용)',tab:'closing'},
+    {id:'ops_bank_bal',badge:'결산필수',cls:'dg',who:'기금법인',title:'[연간 결산] 결산 기준일(12.31.) 은행 예금 잔액증명서 (전 계좌)',desc:'보유 계좌별 회계연도 말일 기준 금융기관 잔액증명서 각 1부 (재무상태표 예금 잔액 대사 및 결산서 첨부용)',tab:'closing'},
+    {id:'ops_f15_att',badge:'법정첨부',cls:'dg',who:'기금법인',title:'[운영상황보고] 당해연도 결산 재무제표 · 감사보고서 · 차기 사업계획서(추정재무제표 포함)',desc:'별지 제15호 운영상황보고서 법정 첨부서류 (회계연도 종료 후 3개월 이내 관할 노동지청 제출)',tab:'closing'},
+    {id:'ops_site_stat',badge:'기업준비',cls:'warn',who:'참여기업별',title:'[운영상황보고] 설치·참여사업장 결산 기준일 근로자 수 · 납입자본금 · 직전 재무제표',desc:'별지 제15호 ⑨소속근로자 수·⑩협력업체근로자 수·⑪납입자본금 기재 및 출연금 사용한도(50/80/90%)·기본재산 사용한도 검증용',tab:'sites',siteCol:'결산일 근로자수·자본금'},
+    {id:'ops_welfare_ev',badge:'증빙보존',cls:'warn',who:'기금법인',title:'[내부비치·감사] 목적사업비 지급 증빙(이체확인증·영수증·수혜자명부) 및 대부원장·차용증',desc:'복지사업 수혜자별 지급내역·영수증·계좌이체내역 및 근로자 대부신청서·차용증·상환내역 (서류 5년 보존, 회의록 10년 보존)',tab:'welfare',siteCol:'수혜자명부·지급증빙'},
+    {id:'ops_tax_wh',badge:'세무신고',cls:'ok',who:'기금법인',title:'[법인세·환급] 금융기관 이자소득 원천징수영수증 (이자수익 발생 시)',desc:'회계연도 종료 후 3개월 이내 관할 세무서 법인세 과세표준 신고(고유목적사업준비금 손금산입) 및 원천징수 이자소득세 환급 신청용',tab:'closing'},
+    {id:'ops_asset_chg',badge:'변경보고',cls:'',who:'기금법인',title:'[기본재산 변경] 추가 출연금 입금확인증(은행 잔고증명서) · 변경된 기본재산 목록 · 회의록',desc:'추가 출연 등으로 기본재산 총액 변경 시 3주 이내 노동지청 보고(별지 제10호) 및 관할 등기소 기본재산 변경등기 소명자료',tab:'events',siteCol:'추가출연 입금확인증'},
+    {id:'ops_charter_chg',badge:'변경인가',cls:'',who:'기금법인',title:'[정관변경 인가] 정관변경 이유서 · 개정 정관(신·구조문대비표) · 협의회 회의록 · 기존 정관/인가증 원본',desc:'별지 제11호 정관변경 인가신청서 법정 첨부서류 (관할 노동지청 처리기한 7일, 변경된 정관에 노동지청 간인 수령)',tab:'events'},
+    {id:'ops_officer_chg',badge:'변경등기',cls:'',who:'이사·기금',title:'[임원변경 등기] 신임·중임 이사 취임승낙서 · 개인인감증명서 · 주민등록초본 · 협의회 회의록(도장 날인)',desc:'이사 변경 시 3주 이내 관할 등기소 변경등기 필수 (노동청 보고 의무 없음, 회의록·명부·취임승낙서에 서명 대신 인감도장 날인)',tab:'events'}
+  ],
+  subsidy:[
+    {id:'sub_fund_docs',badge:'기금필수',cls:'dg',who:'기금법인',title:'기금법인 설립인가증 사본 · 법인등기부등본(3개월 이내) · 고유번호증 사본 · 정관 사본',desc:'기금법인 기본 법정서류 4종 (법인등기부등본은 신청일 기준 3개월 이내 발급본, 집행실태 조사 시 2주 이내 발급본)',tab:'subsidy'},
+    {id:'sub_fund_bank',badge:'기금필수',cls:'dg',who:'기금법인',title:'기금법인 통장 사본 및 예금 잔액증명서 (출연금 입금 내역 확인서)',desc:'참여기업·지자체·원청 출연금이 실제 기금 계좌에 입금된 거래내역서 및 정부지원금 수령 전용 계좌 통장 사본',tab:'subsidy'},
+    {id:'sub_site_bizreg',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 사업자등록증 사본 (전체 참여기업 각 1부)',desc:'참여사업장 전체 각 1부 (상호·사업자등록번호·소재지·대표자·업종 및 휴·폐업 여부 대조용)',tab:'subsidy',siteCol:'사업자등록증 사본'},
+    {id:'sub_site_corpreg',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 법인등기부등본 사본 (신청일 기준 3개월 이내, 말소사항 포함)',desc:'법인 참여기업 각 1부 (임원 기재사항 포함 필수 — 대표자·임원 겸직·분할 여부 등 특수관계 대조용, 개인사업자 제외)',tab:'subsidy',siteCol:'법인등기부등본(3개월내)'},
+    {id:'sub_site_sme',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 중소기업확인서 (중소벤처기업부 발급, 유효기간 내)',desc:'중소기업 현황정보시스템(sminfo.mss.go.kr) 발급본 각 1부 (지원금 신청일 기준 유효기간 만료 여부 반드시 확인)',tab:'subsidy',siteCol:'중소기업확인서(유효)'},
+    {id:'sub_site_contrib',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 기금출연확인서 (대표자 직인 날인) 및 회사별 송금영수증',desc:'실제 출연한 금액을 한글·숫자 병기하여 대표자 직인 날인 + 각 회사에서 기금 계좌로 송금한 이체확인증',tab:'subsidy',siteCol:'출연확인서·송금증'},
+    {id:'sub_site_fin',badge:'참여기업',cls:'ok',who:'참여기업별',title:'참여기업별 직전년도 표준재무제표증명(손익계산서) 및 고용보험 가입자명부',desc:'참여기업 매출액·자본금 확인 및 사업장별 소속 근로자 수(심사 배점·1인당 지원한도 산정) 확인용',tab:'sites',siteCol:'재무제표·고용보험명부'},
+    {id:'sub_site_rel',badge:'특수관계',cls:'ok',who:'참여기업별',title:'특수관계인 해당 여부 확인서류 (주주명부 · 출자·친족·임원겸직 확인서)',desc:'공동자율점검 체크리스트 증빙 — 참여기업 간 출자(30%)·친족·임원 겸직·동일 공장 내 복수 공동기금 여부 확인용',tab:'subsidy',siteCol:'주주명부·특수관계확인'},
+    {id:'sub_match_docs',badge:'매칭출연',cls:'',who:'지자체·원청',title:'지자체·원청 대기업 출연 시: 기금출연약정서(협약서) · 출연확인서 · 사업자등록증 · 입금내역',desc:'대·중소기업 상생형 또는 지자체 매칭 공동기금 지원사업 신청 시 출연협약서 및 실제 출연 입금 증빙 첨부',tab:'subsidy'}
+  ],
+  dis:[
+    {id:'dis_prove',badge:'법정첨부1',cls:'dg',who:'기금·사업장',title:'[해산통지] 해산을 증명하는 서류 (폐업사실증명원 · 해산등기부 · 합병계약서 · 공동기금 인가증)',desc:'별지 제14호 첨부서류 1호 — 사업 폐지(폐업사실증명원), 기금 합병·분할(합병계약서·분할계획서), 공동기금 참여 해산(공동기금 설립인가증 사본)',tab:'events',siteCol:'해산·폐업 증명서류'},
+    {id:'dis_charter',badge:'법정첨부2',cls:'dg',who:'기금법인',title:'[해산통지] 해산 당시 정관 사본 및 기금법인 설립인가증 원본',desc:'별지 제14호 첨부서류 2호 — 해산 시점의 유효 정관 사본 1부 및 설립인가증 (청산인 취임 후 3주 이내 노동지청 제출)',tab:'events'},
+    {id:'dis_assets',badge:'법정첨부3',cls:'dg',who:'기금법인',title:'[해산통지] 해산 기준일 재산목록 및 전체 계좌 은행 예금 잔액증명서 (대부채권 명세 포함)',desc:'별지 제14호 첨부서류 3호 — 해산 결의일 기준 전 계좌 예금 잔액증명서, 미회수 근로자 대부금 잔액 명세서, 결산 재무상태표',tab:'closing'},
+    {id:'dis_plan_ev',badge:'법정첨부4',cls:'dg',who:'기금법인',title:'[해산통지] 재산의 처분방법 및 처분계획서 (미지급 임금 지급 시 청산무능력 증명서류 포함)',desc:'별지 제14호 첨부서류 4호 — 미지급 임금·퇴직금 우선 지급 시 사업주 재산 청산무능력 증빙, 생활안정자금(50% 이내) 배분명부, 잔여재산 귀속처 지정 근거',tab:'events'},
+    {id:'dis_liq_reg',badge:'해산등기',cls:'warn',who:'청산인·위원',title:'[해산등기] 해산 결의 및 청산인 선임 회의록 · 위원 명부 · 대표청산인 인감증명서·주민등록초본·인감도장',desc:'청산인 취임 후 3주 이내 주사무소 관할 등기소 해산 및 청산인 취임등기용 (회의록·명부·취임승낙서·인감대지·인감신고서·등록면허세 영수필증)',tab:'events'},
+    {id:'dis_close_ev',badge:'청산종결',cls:'ok',who:'청산인',title:'[청산종결] 채권신고 신문공고 증빙(2개월·3회 이상) · 잔여재산 인도(이체)확인증 · 청산종결 등기·신고',desc:'민법 제88조 채권신고 공고문 게재지 사본, 잔여재산 귀속·이체 완료 증빙, 청산종결 등기(3주 이내) 및 세무서 고유번호 폐지 신고',tab:'events'},
+    {id:'dis_leave_min',badge:'탈퇴첨부1',cls:'dg',who:'공동기금',title:'[중간탈퇴] 탈퇴 의결 공동근로복지기금협의회 회의록 사본 (탈퇴 사업주 노·사 위원 의결권 제외)',desc:'별지 제14호의2 첨부서류 1호 — 탈퇴 신청일로부터 3개월 이내 협의·결정 (탈퇴 신청 사업주의 사용자·근로자 위원은 의결 정족수에서 제외)',tab:'events',ftype:'공동'},
+    {id:'dis_leave_why',badge:'탈퇴첨부2',cls:'dg',who:'탈퇴사업장',title:'[중간탈퇴] 해당 사업주의 법정 탈퇴 사유 증명서류',desc:'별지 제14호의2 첨부서류 2호 — 도급·수급관계 종료 확인서 / 3회 이상 미출연+재고 50%↑·생산·매출 15%↓ 재무증빙 / 과반수 노조·근로자 과반수 탈퇴 요구서·서명부',tab:'sites',ftype:'공동',siteCol:'탈퇴사유 증명서류'},
+    {id:'dis_leave_calc',badge:'탈퇴첨부3',cls:'dg',who:'공동·탈퇴사',title:'[중간탈퇴] 배분 재산목록·산정내역서 · 이체확인증 · 사내기금 설치(출연) 증빙',desc:'별지 제14호의2 첨부서류 3호 — 출연비율 재산배분 계산서(정부·원청·지자체 지원금 제외), 송금확인증, 배분받은 사업주의 사내기금 설치·출연 확인서(폐업 시 제외)',tab:'events',ftype:'공동',siteCol:'배분금 수령·사내기금설치'}
+  ]
+};
+function reqDocsFor(phase,ftype){
+  var t=(ftype==='사내')?'사내':'공동';
+  return (REQ_DOCS[phase]||[]).filter(function(d){ return !d.ftype||d.ftype===t; }).map(function(d){
+    if(t!=='사내') return d;
+    return Object.assign({},d,{
+      who:String(d.who||'').replace('참여기업별','설립기업').replace('설립·대표기업','설립기업').replace('기금·참여기업','기금·설립기업'),
+      title:String(d.title||'').replace('설립·참여기업','설립기업').replace('설치·참여사업장','설치사업장'),
+      desc:String(d.desc||'').replace('설립·참여사업장','설립사업장').replace('참여기업·지자체','설립기업')
+    });
+  });
+}
+function _reqDocChkKey(cur){
+  return (S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample)?S.formFund:('_sample_'+(cur&&cur.fund_type==='사내'?'사내':'공동'));
+}
+function _reqDocChkMap(cur){
+  if(!S._reqDocChk) S._reqDocChk={};
+  var k=_reqDocChkKey(cur);
+  if(S._reqDocChk[k]===undefined){
+    S._reqDocChk[k]={};
+    if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+      var fid=S.formFund;
+      fbDb.ref(NS+'/req_docs/'+fid).once('value').then(function(sn){
+        S._reqDocChk[fid]=sn.val()||{};
+        try{ _formsRerender(); }catch(e){}
+      }).catch(function(){});
+    }
+  }
+  return S._reqDocChk[k]||{};
+}
+function _reqDocRefreshCnt(phase,cur){
+  var list=reqDocsFor(phase,cur&&cur.fund_type), mp=(_reqDocChkMap(cur)[phase])||{};
+  var doneN=list.filter(function(d){return !!mp[d.id];}).length;
+  var el=$('reqCnt_'+phase);
+  if(el){
+    el.textContent='확인 '+doneN+'/'+list.length;
+    el.className='chip '+(list.length&&doneN>=list.length?'ok':(doneN?'warn':''));
+  }
+  if(S._sideKind==='req_'+phase) sidePreview('req_'+phase);
+}
+function toggleReqDocChk(phase,id,checked){
+  var cur=curForm(), k=_reqDocChkKey(cur);
+  if(!S._reqDocChk) S._reqDocChk={};
+  if(!S._reqDocChk[k]) S._reqDocChk[k]={};
+  if(!S._reqDocChk[k][phase]) S._reqDocChk[k][phase]={};
+  if(checked) S._reqDocChk[k][phase][id]=true; else delete S._reqDocChk[k][phase][id];
+  if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+    fbDb.ref(NS+'/req_docs/'+S.formFund+'/'+phase+'/'+id).set(checked?true:null).catch(function(){});
+  }
+  _reqDocRefreshCnt(phase,cur);
+}
+function toggleReqDocAll(phase,checked){
+  var cur=curForm(), k=_reqDocChkKey(cur), list=reqDocsFor(phase,cur&&cur.fund_type);
+  if(!S._reqDocChk) S._reqDocChk={};
+  if(!S._reqDocChk[k]) S._reqDocChk[k]={};
+  var nx={}; if(checked) list.forEach(function(d){ nx[d.id]=true; });
+  S._reqDocChk[k][phase]=nx;
+  if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+    fbDb.ref(NS+'/req_docs/'+S.formFund+'/'+phase).set(checked?nx:null).catch(function(){});
+  }
+  _reqDocRefreshCnt(phase,cur);
+}
+function reqDocsBoxHTML(phase,cur,fundMode){
+  var ftype=(cur&&cur.fund_type==='사내')?'사내':'공동';
+  var list=reqDocsFor(phase,ftype);
+  if(!list.length) return '';
+  var mp=(_reqDocChkMap(cur)[phase])||{};
+  var doneN=list.filter(function(d){ return !!mp[d.id]; }).length;
+  var allOn=list.length>0&&doneN>=list.length;
+  var TAB_LBL={sites:'참여사업장',info:'기금 정보',closing:'회계·결산',welfare:'목적사업·대부',events:'변경 이벤트',subsidy:'근복지원금'};
+  var rKind='req_'+phase, isSel=(S._sideKind===rKind);
+  var rows=list.map(function(d,i){
+    var on=!!mp[d.id];
+    return '<tr'+(on?' class="ckon"':'')+'>'
+      +'<td class="ckcol"><input type="checkbox"'+(on?' checked':'')+' onchange="_ckRow(this);toggleReqDocChk(\''+phase+'\',\''+d.id+'\',this.checked)"></td>'
+      +'<td class="no">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip '+(d.cls||'')+'" style="font-size:10px">'+esc(d.badge)+'</span><div class="muted" style="font-size:10.5px;margin-top:2px">'+esc(d.who)+'</div></td>'
+      +'<td><div onclick="selectForm(\''+rKind+'\')" style="font-weight:700;font-size:12.5px;cursor:pointer" title="클릭하면 오른쪽에 기업 안내문·체크리스트(A4)를 엽니다">'+esc(d.title)+'</div>'
+      +'<div class="muted" style="font-size:11.5px;line-height:1.45;margin-top:2px">'+esc(d.desc)+'</div></td>'
+      +(fundMode?'<td class="center" style="white-space:nowrap">'+(d.tab?'<button onclick="gotoFundTab(\''+d.tab+'\')" style="padding:2px 8px;font-size:11px">'+esc(TAB_LBL[d.tab]||d.tab)+' →</button>':'—')+'</td>':'')
+      +'</tr>';
+  }).join('');
+  return '<div class="reqbox" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--line)">'
+    +'<div class="row" style="margin-bottom:8px;flex-wrap:wrap;gap:6px">'
+    +'<h3 style="margin:0;font-size:14px">📎 기업 준비·첨부서류 목록 <span class="muted" style="font-weight:400;font-size:11.5px">(기본서식 외 구비서류)</span></h3>'
+    +'<span class="chip" style="font-size:10.5px">'+esc(ftype)+'기금 '+list.length+'종</span>'
+    +'<span id="reqCnt_'+phase+'" class="chip '+(allOn?'ok':(doneN?'warn':''))+'" style="font-size:10.5px">확인 '+doneN+'/'+list.length+'</span>'
+    +hlp('forms.reqdocs')
+    +'<span style="flex:1"></span>'
+    +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:4px 10px" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
+    +(isSel?'▶ 오른쪽에 안내문 표시 중':'📋 기업 안내문 미리보기·인쇄')+'</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr>'
+    +'<th class="ckcol"><input type="checkbox"'+(allOn?' checked':'')+' onclick="toggleReqDocAll(\''+phase+'\',this.checked);_ckAll(this)" title="모두 선택"></th>'
+    +'<th class="no">번호</th><th style="white-space:nowrap">구분 · 준비처</th><th>기업 준비·첨부서류 및 세부 확인사항</th>'
+    +(fundMode?'<th class="center" style="white-space:nowrap">바로가기</th>':'')
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'</div>';
+}
+function reqDocSheetHTML(phase,f,sites){
+  f=f||{}; sites=sites||[];
+  var ftype=(f.fund_type==='사내')?'사내':'공동';
+  var list=reqDocsFor(phase,ftype);
+  var mp=(_reqDocChkMap(f)[phase])||{};
+  var PH_DOC={inka:DOC_KINDS,reg:DOC_REG,tax:DOC_TAX,ops:DOC_OPS,subsidy:DOC_SUB,dis:DOC_DIS};
+  var baseForms=docsFor(PH_DOC[phase]||[],ftype);
+  var title=REQ_PHASE_LABELS[phase]||('기업 준비·첨부서류 안내문');
+  var note="<p class='note docnote'>※ 이 안내문은 오른쪽 위 [🖨] 버튼으로 인쇄/PDF 저장하거나 [📄] 버튼으로 한글(HWPX) 파일로 내려받아 기업에 발송할 수 있습니다. 문구를 클릭해 직접 수정하고 저장할 수도 있습니다.</p>";
+  var baseRows=baseForms.map(function(d,i){
+    return "<tr><td class='center'>"+(i+1)+"</td><td><b>"+esc(d[1])+"</b></td><td class='center'>시스템 자동생성 (날인용)</td></tr>";
+  }).join('');
+  var reqRows=list.map(function(d,i){
+    var on=!!mp[d.id];
+    return "<tr><td class='center'>"+(on?'☑':'□')+"</td><td class='center'>"+(i+1)+"</td><td class='center'><b>"+esc(d.badge)+"</b><br><span style='font-size:9pt;color:#475569'>"+esc(d.who)+"</span></td>"
+      +"<td><b>"+esc(d.title)+"</b><br><span style='font-size:9.2pt;color:#475569'>"+esc(d.desc)+"</span></td></tr>";
+  }).join('');
+  var siteCols=list.filter(function(d){ return !!d.siteCol; });
+  var siteTbl='';
+  if(siteCols.length){
+    var liveSites=sites.length?sites:[{name:f._sample?'(샘플) ㈜가나산업':(f.name||'설립사업장'),ceo:f.chairman||'홍길동'}];
+    var sHdr=siteCols.map(function(c){ return "<th class='center' style='font-size:8.8pt'>"+esc(c.siteCol)+"</th>"; }).join('');
+    var sRows=liveSites.map(function(s,i){
+      return "<tr><td class='center'>□</td><td class='center'>"+(i+1)+"</td><td><b>"+esc(s.name||'')+"</b>"+(s.ceo?" ("+esc(s.ceo)+")":"")+"</td>"
+        +siteCols.map(function(){ return "<td class='center'>□</td>"; }).join('')+"</tr>";
+    }).join('');
+    siteTbl="<h2>3. 사업장별 준비서류 수합 점검표 ("+liveSites.length+"개소)</h2>"
+      +"<table><thead><tr><th style='width:28px' class='center'>확인</th><th style='width:34px' class='center'>번호</th><th>사업장명 (대표자)</th>"+sHdr+"</tr></thead><tbody>"+sRows+"</tbody></table>";
+  }
+  return note
+    +"<h1>"+esc(title)+"</h1>"
+    +"<table>"
+    +"<tr><th style='width:110px'>기금법인명</th><td><b>"+dgV(f.name,16)+"</b> ("+esc(ftype)+"근로복지기금)</td><th style='width:95px'>대표자(이사장)</th><td>"+dgV(f.chairman,8)+"</td></tr>"
+    +"<tr><th>주사무소 소재지</th><td colspan='3'>"+dgV(f.address,24)+"</td></tr>"
+    +"<tr><th>관할 노동청</th><td>"+dgV(f.labor_office,10)+"</td><th>관할 등기소·세무서</th><td>"+dgV([f.registry_office,f.tax_office].filter(Boolean).join(' / '),10)+"</td></tr>"
+    +"</table>"
+    +"<h2>1. 기본 생성서식 목록 (프로그램 자동생성 · 기명날인 서류 "+baseForms.length+"종)</h2>"
+    +"<table><thead><tr><th style='width:42px' class='center'>번호</th><th>기본서식 명칭</th><th style='width:140px' class='center'>작성·준비 방법</th></tr></thead><tbody>"+baseRows+"</tbody></table>"
+    +"<h2>2. 기업 준비·첨부서류 목록 (기본서식 외 구비서류 "+list.length+"종)</h2>"
+    +"<table><thead><tr><th style='width:36px' class='center'>확인</th><th style='width:38px' class='center'>번호</th><th style='width:96px' class='center'>구분 · 준비처</th><th>기업 준비·첨부서류 및 세부 확인사항</th></tr></thead><tbody>"+reqRows+"</tbody></table>"
+    +siteTbl
+    +"<p class='center' style='margin-top:16px'>"+dgToday()+"</p>";
+}
 // ── 🗂 서식 현황 대시보드 — 전체 기금 × 서식 준비 상태 비교 ──
 var DOC_PHASES=[['kinds','① 인가',function(){return DOC_KINDS;}],['reg','② 법인설립',function(){return DOC_REG;}],
   ['tax','③ 고유번호증',function(){return DOC_TAX;}],['ops','④ 운영',function(){return DOC_OPS;}],
@@ -6881,7 +7113,7 @@ function openFundDoc(fid,kind,prefer){
   }
   _go('fund',fid); S.tab='docs'; renderFund();
 }
-function docLabel(kind){ var m=DOC_ALL.filter(function(x){return x[0]===kind;})[0]; return m?m[1]:kind; }
+function docLabel(kind){ if(/^req_/.test(String(kind||''))&&REQ_PHASE_LABELS[String(kind).slice(4)]) return REQ_PHASE_LABELS[String(kind).slice(4)]; var m=DOC_ALL.filter(function(x){return x[0]===kind;})[0]; return m?m[1]:kind; }
 function dgV(x,w){ var s=String(x==null?'':x).trim(); return s?esc(s):'＿'.repeat(w||8); }
 function dgWon(x){ var n=num(x); return (n===''||n==null)?'＿＿＿＿＿＿':Number(n).toLocaleString(); }
 /* 법정 서식의 날짜 관례는 «2019. 12. 31.» 이다(실제 제출본도 그렇게 적었다) */
@@ -9479,6 +9711,7 @@ function docBody(kind,f,sites){
   /* 설립 서류(_estabKind 와 같은 규칙)만 탈퇴한 곳도 — 그 밖은 뺀다 */
   if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=sites.filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
+  if(/^req_(inka|reg|tax|ops|subsidy|dis)$/.test(String(kind||''))) return reqDocSheetHTML(String(kind).slice(4),f,sites);
   if(/^dis_/.test(String(kind||''))) return _dsDocHTML(kind,f,sites);
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
@@ -18302,7 +18535,8 @@ function dsLibHTML(cur,fundMode,formRows){
     +(fundMode?'<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:5px 11px">🔁 이 기금에서 진행(변경 이벤트) →</button>':'')+'</div>'
     +ways+'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>단계</th><th>기한</th><th>근거</th><th>서식</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
     +calc
-    +(formRows?'<h3 style="font-size:13px;margin:14px 0 4px">법정서식</h3>'+formRows:'')+'</div>';
+    +(formRows?'<h3 style="font-size:13px;margin:14px 0 4px">법정서식</h3>'+formRows:'')
+    +reqDocsBoxHTML('dis',cur,fundMode)+'</div>';
 }
 function dsCalc(){
   var g=function(id){ var el=$(id); return el?el.value:''; }, r=withdrawShare(g('ds-v'),g('ds-c'),g('ds-t')), o=$('ds-r');
@@ -24493,6 +24727,9 @@ var HELP={
    +'<p>사무소를 무상으로 쓰는 경우 <b>전대 사용동의서</b>를 함께 제출합니다.</p>'},
  'forms.ops':{t:'④ 운영 단계 서식',h:'<p>운영 중 제출·발급하는 서식입니다.</p><p>결산·변경이력이 필요한 서식은 아래 링크를 눌러 해당 탭에서 생성하세요 — 실데이터가 있어야 채워집니다.</p>'},
  'forms.sub':{t:'⑤ 근복지원금 신청 서식',h:'<p>매년 지원금을 신청할 때 제출하는 서식 묶음입니다.</p><p>금액·참여사업장은 <b>지원금 입력</b> 탭의 데이터로 채워집니다.</p>'},
+ 'forms.reqdocs':{t:'기업 준비·첨부서류 목록 (기본서식 외 구비서류)',h:'<p>시스템이 자동으로 만들어 주는 <b>기본서식(신청서·정관·회의록 등)</b> 외에, 각 단계마다 <b>설립·참여기업이나 임원이 직접 발급·준비해야 하는 첨부서류·도장·증빙 목록</b>입니다.</p>'
+   +'<p><b>□ 체크박스</b>로 서류 수합 여부를 하나씩 점검하면 이 기금에 자동 저장됩니다.</p>'
+   +'<p><b>[📋 기업 안내문 미리보기·인쇄]</b>를 누르면 오른쪽 미리보기 창에 <b>기본서식 + 기업 준비서류 + 사업장별 수합 점검표</b>가 A4 안내문으로 만들어져 바로 인쇄·PDF·한글(HWPX)로 기업에 보낼 수 있습니다.</p>'},
 /* 'forms.draft'(전체 초안 6종)는 뗐다 — 「번호 차례대로 전부」(estab.bundle)가 그 자리를 대신한다.
    화면에 안 놓인 도움말은 검사가 잡는다(내가 만든 규칙이다). */
  'sub.helper':{t:'근로복지넷 입력 도우미',h:'<p>근로복지넷은 <b>인증서·간편인증</b>으로 사람이 직접 로그인하는 곳이라, 앱이 대신 로그인하지 않습니다.</p>'
