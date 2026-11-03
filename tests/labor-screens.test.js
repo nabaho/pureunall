@@ -361,6 +361,24 @@ section('UI 한화면 정리 · 계약/취업규칙 빈 상태 진입 · HTML/CS
   ok('급여 처리가 엑셀 파일 클릭 없이도 즉시 HTML/CSS 웹 임금대장 표와 KPI 요약을 보여준다',
     payHtml.indexOf('pay-kpis') > -1 && payHtml.indexOf('mpills') > -1 &&
     payHtml.indexOf('<table class="emptbl"') > -1 && payHtml.indexOf('합계 (2명)') > -1);
+
+  // 4) 퇴직(screenSever)에서 직원을 선택하면 법정퇴직금·DC형·DB형 각 해당하는 퇴직금 금액이 즉시 표시된다
+  ctx.App.tab = 'sever';
+  ctx.App.site = '1일등한우';
+  ctx.pickSeverEmp('김철수');
+  var sevStatHtml = ctx.screenSever();
+  ok('퇴직 화면에서 직원을 선택하면 법정퇴직금·DC형·DB형 해당 퇴직금 금액이 즉시 표시된다',
+    sevStatHtml.indexOf('김철수 님의 선택 제도: 법정퇴직금') > -1 && sevStatHtml.indexOf('sev-3col') > -1);
+
+  ctx.setEmpSeverType('1일등한우', '김철수', 'DC');
+  var sevDcHtml = ctx.screenSever();
+  ok('직원의 퇴직금 제도를 DC형으로 바꾸면 DC형 확정기여형 퇴직연금 금액과 부담금 점검표가 표시된다',
+    sevDcHtml.indexOf('김철수 님의 선택 제도: DC형 퇴직연금') > -1 && sevDcHtml.indexOf('DC형 퇴직연금 부담금 점검') > -1);
+
+  ctx.setEmpSeverType('1일등한우', '김철수', 'DB');
+  var sevDbHtml = ctx.screenSever();
+  ok('직원의 퇴직금 제도를 DB형으로 바꾸면 DB형 확정급여형 퇴직연금 금액이 표시된다',
+    sevDbHtml.indexOf('김철수 님의 선택 제도: DB형 퇴직연금') > -1);
 })();
 
 console.log('\n════════════════════════════════');
