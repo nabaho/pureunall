@@ -80,7 +80,7 @@ function rowsWorld(over) {
     curPhase: () => 'main', schedPhase: () => 'main', PRE_ROUND_CAP: 2,
     roundIssueBadge: () => '', deadlineBadge: () => '',
   }, over || {}));
-  vm.runInContext(['dashActiveTypeIds', 'dashEndOnRows', 'dashRowBtns', 'renderDashTypeRows'].map(grab).join('\n'), ctx);
+  vm.runInContext(['dashActiveTypeIds', 'dashEndOnRows', 'dashRowBtns', 'dashReopenBadge', 'renderDashTypeRows'].map(grab).join('\n'), ctx);
   return ctx;
 }
 const endBtns = (html) => [...html.matchAll(/<button class="end-btn"[^>]*>/g)].map((m) => m[0]);
