@@ -282,7 +282,7 @@ test('★ 같은 사업장 같은 날 다른 사업 — 사후도 «센다» (�
 
 const VIEWS = ['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'curPhase', 'nextRound', 'dashActiveTypeIds', 'dashEndOnRows',
   'progCalc', 'mpDate', 'dashReopenBadge', 'renderDashTypeRows', 'renderProg', 'renderSummaryBar', 'renderTimeline', 'renderTlZoom', 'tlZoomCopyText', 'tlZoomCopy', 'endedDateForSchedule',
-  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle'];
+  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle', 'postListFor', 'postPhotoCount', 'postTypeDone', 'dashPostItem'];
 function scene(withPost) {
   const c = world(VIEWS, {
     PRE_ROUND_CAP: 2, S: { tlStatus: 'active' }, _mpMine: false, _mpOpen: '', _tzKey: { coId: 'c1', tid: 't2' },
@@ -314,7 +314,9 @@ function scene(withPost) {
 function paint(c) {
   const out = {};
   const types = c.getTypes();
-  c._st.cos.forEach((co) => { out['rows:' + co.id + ':on'] = c.renderDashTypeRows(co, types, true); out['rows:' + co.id + ':off'] = c.renderDashTypeRows(co, types, false); });
+  /* 진행 목록 줄의 「사후컨설팅」 항목(.post-item)은 «새로 얹은 칸»이다 — 본 회차 글자만 비교하려고 그 칸만 뺀다(⑰ 에서 따로 본다) */
+  const noPost = (h) => String(h).replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  c._st.cos.forEach((co) => { out['rows:' + co.id + ':on'] = noPost(c.renderDashTypeRows(co, types, true)); out['rows:' + co.id + ':off'] = noPost(c.renderDashTypeRows(co, types, false)); });
   c.renderSummaryBar(); c.renderTimeline(); c.renderTlZoom();
   ['active', 'ended'].forEach((s) => { c._st.els['#mpStatus'] = Object.assign(c._st.els['#mpStatus'] || {}, { value: s }); c.renderProg(); out['prog:' + s] = c._st.els['#mpList'].innerHTML + '|' + c._st.els['#mpSum'].innerHTML; });
   Object.keys(c._st.els).forEach((k) => { if (!/^#mp(List|Sum)$/.test(k)) out['el:' + k] = String(c._st.els[k].innerHTML) + '|' + String(c._st.els[k].textContent); });
@@ -597,7 +599,7 @@ test('서랍 — 메모·이름 속 HTML 글자는 무해하게 처리된다 · 
 
 /* ══ ⑪ 사후 넣기·고치기·지우기 — 실제로 저장된다 ═══════════════════════ */
 
-const POSTFN = ['isPostSched', 'getMainScheds', 'schedPhase', 'isPrePhaseType', 'roundIsFixed', 'reorderRounds', 'postListFor', 'postPhotoCount', 'schedHasPhoto',
+const POSTFN = ['isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone', 'schedPhase', 'isPrePhaseType', 'roundIsFixed', 'reorderRounds', 'postListFor', 'postPhotoCount', 'schedHasPhoto',
   'postProblem', 'postBuildSched', 'postDrawerView', 'postDrawerHtml', 'renderPostDrawer', 'openPostDrawer', 'closePostDrawer', 'postSetField', 'postEdit', 'postCancel',
   'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts'];
 function postWorld(over) {
@@ -831,7 +833,7 @@ test('★ 서랍을 열면 사업 상태를 알아본다 — 종료: 입력칸 �
   c.openPostDrawer('c3', 't2');
   assert.ok(/id="postDate"/.test(html()) && /수정 중/.test(html()) && /2026-10-10/.test(html()), '수정 중인 사업');
   c.openPostDrawer('c2', 't2');
-  assert.ok(!/id="postDate"/.test(html()) && /종료된 사업에서만/.test(html()), '진행 중인 사업에는 사후를 넣을 수 없다');
+  assert.ok(!/id="postDate"/.test(html()) && /본 회차를 모두 마쳤거나 종료된/.test(html()), '진행 중인 사업에는 사후를 넣을 수 없다');
 });
 
 test('★ 진행 중인 사업에는 «함수로도» 사후를 못 넣는다 — 서랍의 입력칸을 안 그린 것만으로는 부족하다', async () => {
@@ -873,4 +875,90 @@ test('★ 지우기는 «사후 줄만» 지운다 — 본 일정 번호가 섞�
   c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'pa', round: 1 }));
   await c.postRemove(['m1', 'pa', 'o1']);
   assert.deepStrictEqual(c._st.scheds.map((s) => s.id).sort(), ['m1', 'm2', 'o1'], '사후(pa)만 사라지고 본 일정 셋은 그대로');
+});
+
+/* ══ ⑰ 진행 목록 줄의 「사후컨설팅」 항목 (대표 지시 2026-11-03 — 사진 「✓ 완료 15/15회 · 방문 9/9회」 줄에 사후컨설팅 회수·사진 입력) ═════
+   본 회차를 «다 마쳤지만 아직 종료 전»인 사업에서도 사후를 넣는다. 줄에는 「＋ 사후컨설팅」 / 「사후 N회 · 📷M」 가 달리고, 누르면 서랍이 열린다.
+   ★ 이 항목은 «새로 얹은 칸»일 뿐 본 회차 숫자를 바꾸지 않는다 — 불변 검사는 이 칸만 빼고 비교한다. */
+
+const postItems = (html) => (html.match(/<div class="round-badge post-item">[\s\S]*?<\/div>/g) || []);
+function dashScene(withPost) {
+  const c = scene(withPost);
+  return c;
+}
+const rowOf = (c, coId, showEnded) => c.renderDashTypeRows(c._st.cos.find((x) => x.id === coId), c.getTypes(), showEnded !== false);
+
+test('★ 본 회차를 «다 마친» 사업 판정 — 최대 회차가 있고 본 일정이 그만큼일 때만 (사후·사전진단은 안 센다)', () => {
+  const c = world(['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone']);
+  c._st.cos = [CO('c1', '가나상사', { types: ['t2'] })];
+  const done3 = [1, 2, 3].map((i) => D('c1', 't2', '2026-09-0' + i, { round: i }));
+  c._st.scheds = done3.slice(0, 2).concat(P('c1', 't2', '2026-11-01'), P('c1', 't2', '2026-11-02'), P('c1', 't2', '2026-11-03'));
+  assert.strictEqual(c.postTypeDone(c.getCos()[0], 't2'), false, '본 2/3 — 사후가 셋 있어도 완료가 아니다');
+  c._st.scheds = done3;
+  assert.strictEqual(c.postTypeDone(c.getCos()[0], 't2'), true, '본 3/3');
+  const c2 = world(['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone'], { getCoMaxRounds: () => 0 });
+  c2._st.scheds = done3;
+  assert.strictEqual(c2.postTypeDone({ id: 'c1' }, 't2'), false, '최대 회차가 없으면(0) «다 마쳤다»를 말할 수 없다');
+  const c3 = world(['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone']);
+  c3._st.scheds = [D('c1', 't1', '2026-08-01', { phase: 'pre' }), D('c1', 't1', '2026-08-02', { phase: 'pre' }), D('c1', 't1', '2026-09-01'), D('c1', 't1', '2026-09-02')];
+  assert.strictEqual(c3.postTypeDone({ id: 'c1' }, 't1'), false, '일터혁신 본 2/4 — 사전진단 둘은 본이 아니다');
+});
+
+test('★ 진행 목록 줄 — 완료된 줄에 「＋ 사후컨설팅」, 아직 진행 중이고 사후도 없는 줄에는 없다', () => {
+  const c = dashScene(false);
+  const done = rowOf(c, 'c1');                     // 현장클리닉 3/3 — 완료 줄
+  assert.ok(/✓ 완료/.test(done), '대조: 이 줄은 완료 줄이다');
+  const it = postItems(done);
+  assert.strictEqual(it.length, 1, '완료 줄에 사후 항목 하나');
+  assert.ok(/＋ 사후컨설팅/.test(it[0]) && /openPostDrawer\('c1','t2'\)/.test(it[0]), it[0]);
+  assert.strictEqual(postItems(rowOf(c, 'c4')).length, 0, '본 2/3 — 아직 진행 중이고 사후도 없다');
+  assert.strictEqual(postItems(rowOf(c, 'c2')).length, 0, '일터혁신 본 2/4 — 진행 중');
+});
+
+test('★ 진행 목록 줄 — 사후가 있으면 「사후 N회 · 📷M」, 진행 중인 줄에도 보인다(이미 입력한 것을 잃지 않게)', () => {
+  const c = dashScene(true);
+  c.PHOTOS['c4t2post2026-10-28'] = { c0: 1, c1: 1 }; c.PHOTOS['c4t2post2026-11-30'] = { c0: 1 };
+  const it = postItems(rowOf(c, 'c4'));
+  assert.strictEqual(it.length, 1);
+  assert.ok(/사후 2회/.test(it[0]) && /📷3/.test(it[0]) && /openPostDrawer\('c4','t2'\)/.test(it[0]), it[0]);
+  const none = postItems(rowOf(dashScene(true), 'c2'));
+  assert.ok(/사후 2회/.test(none[0]) && !/📷/.test(none[0]), '사진이 없으면 📷 를 안 붙인다');
+});
+
+test('종료된 사업의 줄(종료·전체 보기)에도 사후 항목이 있다 — 진행 중 보기에서는 그 줄이 아예 없다', () => {
+  const c = dashScene(false);
+  const it = postItems(rowOf(c, 'c3', true));
+  assert.strictEqual(it.length, 1); assert.ok(/openPostDrawer\('c3','t2'\)/.test(it[0]));
+  assert.strictEqual(rowOf(c, 'c3', false), '', '진행 중 보기에서는 종료된 줄이 숨는다(예전 그대로)');
+});
+
+test('항목 단추는 줄을 끌거나 누르는 동작과 섞이지 않는다 · 항목은 본 회차 글자를 하나도 안 바꾼다', () => {
+  const c = dashScene(false);
+  const html = rowOf(c, 'c1');
+  assert.ok(/event\.stopPropagation\(\);openPostDrawer/.test(html), '줄 전체에 달린 동작(끌기·열기)과 겹치지 않게 막는다');
+  const stripped = html.replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  assert.ok(/✓ 완료 3\/3회/.test(stripped) && !/사후/.test(stripped), '항목을 빼면 예전 줄 그대로');
+});
+
+test('★ 서랍 — 본 회차를 다 마친 사업은 입력칸이 열린다(종료 전이어도) · 진행 중이면 까닭을 말한다', () => {
+  const c = postWorld();
+  c._st.cos.push(CO('c3', '사아정밀', { types: ['t2'] }));
+  c._st.scheds.push(...[1, 2, 3].map((i) => D('c3', 't2', '2026-09-0' + i, { round: i, id: 'x' + i })));
+  const html = () => c._st.els['#postBody'].innerHTML;
+  c.openPostDrawer('c3', 't2');
+  assert.ok(/id="postDate"/.test(html()) && /본 회차 완료/.test(html()), '완료(종료 전)');
+  c.openPostDrawer('c2', 't2');
+  assert.ok(!/id="postDate"/.test(html()) && /본 회차를 모두 마쳤거나 종료된/.test(html()), '진행 중: ' + html().slice(0, 120));
+});
+
+test('★ 본 회차를 다 마친 사업에는 «함수로도» 사후가 들어간다 — 사업은 그대로(종료되지 않는다)', async () => {
+  const c = postWorld();
+  c._st.cos.push(CO('c3', '사아정밀', { types: ['t2'] }));
+  c._st.scheds.push(...[1, 2, 3].map((i) => D('c3', 't2', '2026-09-0' + i, { round: i, id: 'x' + i })));
+  const beforeCos = JSON.stringify(c._st.cos);
+  c.openPostDrawer('c3', 't2'); form(c, '2026-11-05', '사후 상담'); await c.postSave(false);
+  const p = c._st.scheds.filter((s) => s.phase === 'post');
+  assert.deepStrictEqual(p.map((s) => s.coId + ':' + s.round + ':' + s.date), ['c3:1:2026-11-05']);
+  assert.strictEqual(JSON.stringify(c._st.cos), beforeCos, '★ 사업(종료 여부 포함)은 하나도 안 바뀐다');
+  assert.deepStrictEqual(c._st.scheds.filter((s) => s.coId === 'c3' && s.phase !== 'post').map((s) => s.round), [1, 2, 3], '본 회차 번호 그대로');
 });
