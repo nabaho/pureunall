@@ -83,6 +83,52 @@ module.exports = {
     cm3_work: J(work),
   },
   views: [
+    { name: 'application-pack', run: async (page) => {
+      const H=require('../../../hwpx_gen.js');
+      const asset=Buffer.from(H.build(H.tablePara([['성명',''],['연락처','']],H.cols([0.5,0.5])))).toString('base64');
+      await page.route('**/govApplicationRead',async(route)=>{
+        const body=route.request().postDataJSON();
+        await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body.file?{base64:asset,contentType:'application/octet-stream'}:{text:'제출서류\n신청서 1부\n이력서 1부\n자기소개서 1부\n자격증 사본\n납세증명서\n접수방법: 전자우편',files:[{name:'점검자동양식.hwpx',url:'https://www.chungnam.go.kr/qa.hwpx'}]})});
+      });
+      await page.evaluate(async () => {
+        if(document.getElementById('apDialog')?.open)KcApplication.close();
+        LS.set(NS+'profile_info',JSON.stringify({name:'점검지원자',phone:'010-0000-0000'}));
+        const source={sourceKind:'gov_watch',sourceId:'qa-notice-id',title:'점검기관 전문위원 모집',org:'점검기관',url:'https://www.chungnam.go.kr/qa',text:'제출서류\n신청서 1부\n이력서 1부\n자기소개서 1부\n자격증 사본\n납세증명서\n접수방법: 전자우편',uid:'pa-uid-1',token:'qa-application',at:Date.now()};
+        sessionStorage.setItem('pu_application_handoff',JSON.stringify(source));
+        history.replaceState(null,'','?go=form&application=qa-application');
+        await KcApplication.receive();
+      });
+      await page.waitForSelector('#apText',{state:'attached'});
+      if(!(await page.locator('#apNotes').inputValue()).includes('점검자동양식.hwpx'))throw new Error('공고 붙임 자동 읽기·채움 누락');
+      await page.locator('#apNotes').fill('점검 담당자 수정 내용');
+      await page.evaluate(async()=>{await KcApplication.save();});
+      if(!(await page.locator('#apNotice').textContent()).includes('저장했습니다'))throw new Error('지원 작업함 저장 실패');
+      await page.evaluate(async()=>{
+        LS.set(NS+'profile_info',JSON.stringify({name:'점검지원자',phone:'010-0000-0000'}));
+        const body=HWPX.tablePara([['성명',''],['연락처',''],['주민등록번호','']],HWPX.cols([0.5,0.5]));
+        const bytes=HWPX.build(body);
+        await KcApplication.upload([new File([bytes],'점검신청서.hwpx'),new File([bytes],'점검이력서.hwpx')]);
+        await KcApplication.fillAll();
+      });
+      const result=await page.locator('#apNotice').textContent();
+      if(!result.includes('곳 채움')||result.includes('파일 보관 실패'))throw new Error('한글 양식 묶음 채움 실패: '+result);
+      await page.evaluate(async()=>{await KcApplication.list();});
+      await page.getByRole('button',{name:'이어 작성',exact:true}).first().click();
+      await page.waitForSelector('#apNotes');
+      if(!(await page.locator('#apNotes').inputValue()).includes('점검 담당자 수정 내용'))throw new Error('수정 초안 재열기 실패');
+      await page.evaluate(()=>{const original=URL.createObjectURL.bind(URL);window.__qaRestoreUrl=()=>{URL.createObjectURL=original;};URL.createObjectURL=(blob)=>{window.__qaZipBlob=blob;return original(blob);};});
+      const downloadWait=page.waitForEvent('download');
+      await page.evaluate(async()=>{await KcApplication.download();});
+      const download=await downloadWait;
+      if(!download.suggestedFilename().endsWith('.zip'))throw new Error('서류 묶음 파일 형식 오류');
+      const zipNames=await page.evaluate(async()=>{const zip=await JSZip.loadAsync(await window.__qaZipBlob.arrayBuffer());window.__qaRestoreUrl();return Object.keys(zip.files);});
+      if(zipNames.filter(n=>n.startsWith('첨부/')&&n.endsWith('.hwpx')).length<2)throw new Error('채운 양식이 묶음에서 누락됨');
+      if(!zipNames.some(n=>n.includes('보완목록')))throw new Error('보완 목록 누락');
+      await page.evaluate(()=>{document.getElementById('apDialog').scrollTop=0;});
+
+
+    }, back:async(page)=>{await page.evaluate(()=>KcApplication.close());} },
+
     { name: 'wiccok', run: async (page) => { await page.evaluate(() => { navTile('page-wiccok'); window.scrollTo(0, 0); }); } },
     { name: 'wiccok-list', run: async (page) => { await page.evaluate(() => { const t = document.querySelector('#page-wiccok .dt, #page-wiccok table'); if (t) t.scrollIntoView(); }); } },
     { name: 'license', run: async (page) => { await page.evaluate(() => { navTile('page-license'); window.scrollTo(0, 0); }); } },

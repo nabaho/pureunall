@@ -95,17 +95,20 @@ test('★★ 이 문을 막지 말 것 — 막으면 정부사업신청 단추�
 
 /* ───────── 정부사업신청 쪽 «보내는 단추» ───────── */
 
-test('★ 공고 줄에 「📝 서식 채우기」 단추가 있다', () => {
+// 공고명 한 개를 URL로 넘기던 기능이 공고별 지원 준비로 확장됐다. 단추 문구 대신 전달 계약을 검사한다.
+test('공고 줄에서 경력관리의 지원 준비로 이어지는 입구가 있다', () => {
   assert.match(gov, /onclick="toForm\(/);
-  assert.match(gov, /title="서식 채우기 — 경력관리에서 열립니다"/, '무엇인지 알려 줘야 합니다');
+  assert.match(gov, /title="[^"]*경력관리[^"]*"/);
 });
-
-test('★ 넘길 때 공고명을 들려 보낸다', () => {
-  const m = gov.match(/function toForm\(id\)\{[\s\S]*?\n\}/);
-  assert.ok(m);
-  assert.match(m[0], /kcareer\.html\?go=form&t=/);
-  assert.match(m[0], /encodeURIComponent/, '주소에 그대로 붙이면 깨집니다');
-  assert.match(m[0], /slice\(0, *80\)/, '너무 긴 제목은 잘라 보냅니다');
+test('공고의 ID·제목·원문 링크를 같은 탭의 임시 전달함으로 넘긴다', () => {
+  const source={id:'qa-id',nm:'점검 지원 공고',org:'점검기관',url:'https://www.chungnam.go.kr/qa'};
+  let handoff;
+  const ctx={fbUid:'qa-owner',find:()=>({a:[source],i:0}),Date,Math,JSON,encodeURIComponent,location:{href:''},toast:()=>{},sessionStorage:{setItem:(k,v)=>{handoff=JSON.parse(v);}}};
+  const door=gov.match(/function applicationHandoff\(source\)\{[\s\S]*?\n\}/);
+  const send=gov.match(/function toForm\(id\)\{[\s\S]*?\n\}/);
+  assert.ok(door&&send);vm.runInNewContext(door[0]+'\n'+send[0]+'\ntoForm("qa-id");',ctx);
+  assert.equal(handoff.sourceId,source.id);assert.equal(handoff.title,source.nm);assert.equal(handoff.url,source.url);assert.equal(handoff.uid,ctx.fbUid);
+  assert.match(ctx.location.href,/kcareer\.html\?go=form&application=/);assert.ok(!ctx.location.href.includes(source.nm));
 });
 
 test('★★ 정부사업신청에 서식 채우기 «화면»을 짓지 않았다', () => {

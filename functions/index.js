@@ -8,6 +8,15 @@ const { getDatabase: getRawDatabase } = require("firebase-admin/database");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("crypto");   // 내려받기 토큰 발급용 (downloadUrl)
+/* 지원 작업함의 공개 공고 읽기 — 쿠키 없이 읽기만 하며 제출·양식 전송은 하지 않는다. */
+exports.govApplicationRead = functions.region('asia-northeast3').runWith({timeoutSeconds:60,memory:'256MB'}).https.onRequest(async (req,res)=>{
+  setCors(req,res);
+  if(req.method==='OPTIONS'){res.status(204).send('');return;}
+  if(req.method!=='POST'){res.status(405).json({error:'POST 요청만 허용합니다'});return;}
+  try{await requireStaff(req);}catch(e){res.status(e.status||401).json({error:'재직 계정으로 로그인해 주세요'});return;}
+  try{const reader=require('./gov-application-read'),body=req.body||{},result=await (body.file===true?reader.readFile:reader.read)(String(body.url||''));res.json(result);}
+  catch(e){res.status(400).json({error:String(e.message||e).slice(0,240)});}
+});
 const https = require("https");
 const { Resend } = require("resend");
 const {
