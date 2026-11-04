@@ -988,6 +988,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .ended-pbtn:hover{border-color:var(--accent);color:var(--accent);}
 .ended-pbtn.on{border-style:solid;border-color:var(--accent);background:var(--sf2);color:var(--accent);}
 .chip.is-post{box-shadow:inset 0 0 0 1px currentColor;}
+.post-item{margin-top:3px;}
 #mbPost{z-index:490;justify-content:flex-end;align-items:stretch;padding:0;}
 .post-modal{width:min(560px,100vw);max-width:none;height:100%;border-radius:16px 0 0 16px;display:flex;flex-direction:column;overflow:hidden;}
 .post-modal .mbody{flex:1;min-height:0;overflow:auto;padding:14px 16px;}
@@ -6975,13 +6976,13 @@ function postDrawerView(coId,tid){
   const staff=getStaff(); const posts=postListFor(coId,tid); const thumbs={};
   posts.forEach(s=>{ thumbs[s.id]=postThumbs(s.id); });
   return {co:{id:co.id,name:co.name||''},ty:{id:ty.id,name:ty.name||'',fullName:ty.fullName||''},
-    state:ended?'ended':(re?'editing':'active'),endedDate:ended||(re&&re.was)||'',focusId:f.focusId||'',
+    state:ended?'ended':(re?'editing':(postTypeDone(co,tid)?'done':'active')),endedDate:ended||(re&&re.was)||'',focusId:f.focusId||'',
     posts:posts.map(s=>({id:s.id,date:s.date||'',isField:!!s.isField,memo:s.memo||'',round:s.round||0,att:(staff.find(a=>a.id===s.attId)||{}).name||''})),
     thumbs,form:{editId:f.editId||'',date:f.date||'',field:f.field!==false,memo:f.memo||'',err:f.err||''}};
 }
 function postDrawerHtml(v){
   const e=escAttr, f=v.form||{}, posts=v.posts||[], thumbs=v.thumbs||{};
-  const stTxt=v.state==='ended'?`종료 ${e(v.endedDate)}`:v.state==='editing'?`✏ 수정 중 · 원래 종료일 ${e(v.endedDate)}`:'진행 중';
+  const stTxt=v.state==='ended'?`종료 ${e(v.endedDate)}`:v.state==='editing'?`✏ 수정 중 · 원래 종료일 ${e(v.endedDate)}`:v.state==='done'?'✓ 본 회차 완료 · 종료 전':'진행 중';
   const head=`<div class="post-hd"><div class="post-co">${e(v.co.name)}</div><div class="post-sub">${e(v.ty.fullName||v.ty.name)} · ${stTxt}</div></div>`;
   const rows=posts.map((p,i)=>{
     const th=thumbs[p.id]||[]; const on=v.focusId===p.id||f.editId===p.id; const sid=e(p.id);
@@ -6997,7 +6998,7 @@ function postDrawerHtml(v){
     :`<div class="post-empty">아직 입력한 사후컨설팅이 없습니다</div>${bar}`;
   const editing=!!f.editId;
   const form=v.state==='active'
-    ?`<div class="post-note">종료된 사업에서만 사후컨설팅을 넣을 수 있습니다. 이 사업은 아직 진행 중입니다.</div>`
+    ?`<div class="post-note">본 회차를 모두 마쳤거나 종료된 사업에서만 사후컨설팅을 넣을 수 있습니다. 이 사업은 아직 본 회차가 남아 있습니다.</div>`
     :`<div class="post-form"><div class="post-ft">${editing?'✏️ 사후컨설팅 고치기':'＋ 사후컨설팅 추가'}</div>`+
       `<label class="post-fl">날짜<input type="date" id="postDate" value="${e(f.date)}"></label>`+
       `<div class="post-fl">방문 구분<div class="post-fld-btns"><button type="button" class="post-fld${f.field?' on':''}" onclick="postSetField(1)">📍 방문</button><button type="button" class="post-fld${f.field?'':' on'}" onclick="postSetField(0)">🏢 사무실</button></div></div>`+
@@ -7006,9 +7007,22 @@ function postDrawerHtml(v){
       (f.err?`<div class="post-err">${e(f.err)}</div>`:'')+
       `<div class="post-fbtn">${editing?`<button class="btn btn-p" onclick="postSave(false)">저장</button><button class="btn btn-s" onclick="postCancel()">취소</button>`:`<button class="btn btn-p" onclick="postSave(false)">＋ 사후컨설팅 추가</button><button class="btn btn-s" onclick="postSave(true)">추가하고 📷 사진 넣기</button>`}</div></div>`;
   const rules=`<div class="post-rules"><div class="post-rule">사후컨설팅은 본 회차(예 3/3)에 들어가지 않습니다 — 「사후 1회, 2회…」로 따로 셉니다.</div>`+
-    `<div class="post-rule">사업은 종료 상태 그대로입니다 — 진행 목록에 다시 올라오지 않고, 기관 보고서·종료 판정에도 섞이지 않습니다.</div>`+
+    `<div class="post-rule">사업 상태는 그대로입니다 — 종료된 사업은 진행 목록에 다시 올라오지 않고, 기관 보고서·종료 판정에도 섞이지 않습니다.</div>`+
     `<div class="post-rule">달력에는 「사후」 칩으로 나옵니다 — 칩을 누르면 이 창이 열리고, 날짜는 여기서 고칩니다.</div></div>`;
   return head+list+form+rules;
+}
+/* 본 회차를 «다 마친» 사업인가 — 최대 회차가 있고 본 일정이 그만큼일 때(사후·사전진단은 안 센다). 종료 전이어도 사후를 넣을 수 있게 하는 기준이다. */
+function postTypeDone(co,tid){
+  const maxR=getCoMaxRounds(co.id,tid); if(!(maxR>0))return false;
+  return mainPhaseScheds(getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid),tid).length>=maxR;
+}
+/* 진행 목록 사업 줄의 「사후컨설팅」 항목 (대표 지시 2026-11-03 「✓ 완료 15/15회」 줄에 사후컨설팅 회수·사진 입력).
+   「＋ 사후컨설팅」 / 「사후 N회 · 📷M」 — 누르면 서랍(회수 보기 · 입력 · 사진). «새로 얹은 칸»일 뿐 본 회차 숫자를 바꾸지 않는다. */
+function dashPostItem(co,tid){
+  const posts=postListFor(co.id,tid), n=posts.length;
+  const ph=posts.reduce((a,s)=>a+postPhotoCount(s.id),0);
+  const k=`'${co.id}','${tid}'`;
+  return `<div class="round-badge post-item"><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회 — 눌러서 보기·넣기`:'사후컨설팅 넣기 (날짜·사진)'}">${n?`사후 ${n}회${ph?` · 📷${ph}`:''}`:'＋ 사후컨설팅'}</button></div>`;
 }
 /* 종료 목록의 「사후컨설팅」 칸 — 입력 전 「＋ 사후」, 입력 후 「사후 N회 · 📷M」 */
 function postCellHtml(it){
@@ -7048,8 +7062,9 @@ function postCancel(){ if(!_post)return; _post.editId=''; _post.date=''; _post.m
 /* 못 넣는 까닭 — 비어 있으면 넣을 수 있다. 사업(프로그램) 규칙(같은 담당 하루 1건·기관 하루 1사업장)은 안 보고,
    «사람·사업장이 실제로 가는 날»의 충돌(같은 날 같은 사업 · 같은 사업장 다른 사업 · 담당 하루 한도)만 본다. */
 function postProblem(co,tid,date,excludeId){
-  /* 서랍 화면이 입력칸을 감추는 것만으로는 부족하다 — 저장 함수에서도 막는다 */
-  if(!(co.endedTypes&&co.endedTypes[tid])&&!(co.reopened&&co.reopened[tid]))return '종료된 사업에서만 사후컨설팅을 넣을 수 있습니다';
+  /* 서랍 화면이 입력칸을 감추는 것만으로는 부족하다 — 저장 함수에서도 막는다.
+     넣을 수 있는 사업: 종료된 사업 · «수정 중» · 본 회차를 다 마친(완료) 사업 */
+  if(!(co.endedTypes&&co.endedTypes[tid])&&!(co.reopened&&co.reopened[tid])&&!postTypeDone(co,tid))return '본 회차를 모두 마쳤거나 종료된 사업에서만 사후컨설팅을 넣을 수 있습니다';
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date)))return '날짜를 정해 주세요 (예 2026-11-05)';
   const blocked=isBlocked(date,tid); if(blocked)return blocked;
   if(getScheds().some(s=>s.id!==excludeId&&s.coId===co.id&&s.typeId===tid&&s.date===date))return `${date}에 이 사업의 일정이 이미 있습니다`;
@@ -7901,6 +7916,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
           <div class="type-name">${t.fullName||t.name}</div>
           ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
           <div class="round-badge" style="color:var(--danger)">🔒 종료 (${cnt}회)</div>
+          ${dashPostItem(co,tid)}
         </div>
       </div>`;
     }
@@ -7911,6 +7927,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
     const officeDone=done.filter(s=>!s.isField).length;
     const maxR=getCoMaxRounds(co.id,tid);
     const mf=getCoMandatory(co.id,tid);
+    const postN=postListFor(co.id,tid).length;   // 사후컨설팅 항목을 달지(완료 줄이거나 이미 입력한 것이 있을 때)
     // 일터혁신: 사전진단·본컨설팅 단계 표시 + 전환 버튼
     if(isPrePhaseType(tid)){
       const phase=curPhase(co.id,tid);
@@ -7933,6 +7950,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
           ${dashReopenBadge(co,tid)}
           <div class="round-badge" style="color:var(--t2)">${line1}</div>
           <div class="round-badge" style="color:${l2col}">${line2}</div>
+          ${(mainFull||postN)?dashPostItem(co,tid):''}
           ${roundIssueBadge(co.id,tid)}
           ${deadlineBadge(co.deadlines?.[tid])}
         </div>
@@ -7961,6 +7979,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
         ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
         ${dashReopenBadge(co,tid)}
         <div class="round-badge" style="color:var(--ok)">✓ 완료 ${prog}${fprog}</div>
+        ${dashPostItem(co,tid)}
       </div>
       <div style="display:flex;align-items:flex-end;">
         ${dashRowBtns(co,tid,t,endRows)}
@@ -7974,6 +7993,7 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
         ${t.agency?`<div style="font-size:10px;color:var(--dash-t2);font-weight:700;">${t.agency}</div>`:''}
         ${dashReopenBadge(co,tid)}
         <div class="round-badge" style="color:${progColor}">${nr>1?prog+fprog+' →':''} 다음 ${nr}회차</div>
+        ${postN?dashPostItem(co,tid):''}
         ${roundIssueBadge(co.id,tid)}
         ${deadlineBadge(co.deadlines?.[tid])}
       </div>
