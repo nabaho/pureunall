@@ -216,3 +216,13 @@ test('★ 되풀이되는 «명단·일정»은 뺀다 — 게시판이지 소�
   assert.equal(B.노동글인가('노동차관 정년연장 입법 연내 마무리'), true,
     '★ 멀쩡한 기사를 걸러 냈다');
 });
+
+test('★ 새 공지를 올리면 sitemap 에도 «한 줄» 더해진다 — 두 번 불러도 한 줄', () => {
+  const xml = fs.readFileSync(path.join(__dirname, '..', 'site', 'sitemap.xml'), 'utf8');
+  const 센 = (x) => (x.match(/<loc>/g) || []).length;
+  const 새 = N.사이트맵더하기(xml, '9999', '2026-12-01');
+  assert.equal(센(새), 센(xml) + 1, '★ sitemap 에 새 공지가 안 더해졌다');
+  assert.match(새, /\/notice\/9999<\/loc><lastmod>2026-12-01</, '★ 주소·날짜가 틀렸다');
+  assert.equal(N.사이트맵더하기(새, '9999', '2026-12-01'), 새, '★ 두 번 불렀더니 두 줄이 됐다');
+  assert.equal(N.사이트맵더하기('<urlset></urlset>', '9999', '2026-12-01'), null, '★ /notice 줄이 없는데 억지로 넣었다');
+});
