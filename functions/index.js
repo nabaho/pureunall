@@ -6230,11 +6230,17 @@ exports.weeklyNewsBrief = functions
 
     const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
     const 사연글 = 사연("푸른ERP 자동 브리핑", "notice", 글.제목);
+    /* sitemap 에도 한 줄 — 안 더하면 «굳힌 쪽 수 = sitemap 수» 검사가 매주 빨개진다.
+       못 읽거나 /notice 줄이 없으면 sitemap 은 건드리지 않고 글만 올린다. */
+    const 올릴것 = [["site/notice/" + 새번호 + "/index.html", 글쪽]];
+    try {
+      const 새사이트맵 = NoticeLib.사이트맵더하기(await 새홈페이지쪽("sitemap.xml"), 새번호, 오늘);
+      if (새사이트맵) 올릴것.push(["site/sitemap.xml", 새사이트맵]);
+      else console.warn("[브리핑] sitemap 에서 /notice 줄을 못 찾아 sitemap 은 건너뜁니다");
+    } catch (e) { console.warn("[브리핑] sitemap 을 못 읽어 건너뜁니다", e.message); }
+    올릴것.push(["site/notice/index.html", 새목록]);
     /* 글 쪽을 «먼저» 올린다 — 목록에 먼저 실으면 «누르면 없는 쪽»이 잠깐 뜬다 */
-    for (const [자리이름, 내용] of [
-      ["site/notice/" + 새번호 + "/index.html", 글쪽],
-      ["site/notice/index.html", 새목록]
-    ]) {
+    for (const [자리이름, 내용] of 올릴것) {
       await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(자리이름), 내용, 사연글);
       try {
         await 올리기(githubRequest, 토큰, REPO, 자리이름, 내용, 사연글);
