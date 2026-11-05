@@ -1027,6 +1027,10 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .post-rules{margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
 .post-rule{font-size:11.5px;font-weight:700;color:var(--t2);padding:3px 0 3px 12px;position:relative;line-height:1.5;}
 .post-rule::before{content:'•';position:absolute;left:2px;}
+.post-target{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:12px;font-weight:800;color:var(--t2);}
+.post-target input{width:64px;padding:6px 8px;font:inherit;font-size:16px;font-weight:800;text-align:center;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+.post-tstat{margin-left:auto;font-weight:900;color:var(--accent);}
+.post-tstat.done{color:var(--ok);}
 @media (max-width:640px){
   .post-modal{border-radius:0;}
   .post-listhd{display:none;}
@@ -6447,6 +6451,13 @@ function getCoMandatory(coId,typeId){
   const t=getTypes().find(x=>x.id===typeId);
   return t?.mandatoryField||0;
 }
+/* 사후컨설팅 «목표 회수» — 사업장×종류 설정 customPost[종류] (대표 지시 2026-11-05 「횟수넣는것도 넣어라」).
+   비어 있으면 0(목표 없음) — 입력한 만큼만 센다. 최대회차·의무방문과 같은 «이 사업장 값»이다. */
+function getCoPostTarget(coId,typeId){
+  const co=getCos().find(c=>c.id===coId);
+  const v=co&&co.customPost&&co.customPost[typeId];
+  return v>0?Math.floor(+v):0;
+}
 
 // ===== 사업장 삭제 (소프트 삭제 + 3초 복귀) =====
 let _undoTimer=null, _pendingDelete=null;
@@ -6684,9 +6695,9 @@ function endedFlagsFor(info){
   const add=(rule,label,reason,hint,acts)=>{ if(checked.indexOf(rule)<0)out.push({rule,label,reason,hint,acts}); };
   if(info.erp==='running'){
     /* 사후가 입력돼 있으면 «이알피가 진행 중인 까닭»이 설명된다 — 규칙은 빼지 않고(이알피 종료 정리가 가려진다) 이름표와 근거만 바꾼다 */
-    const pc=info.postCnt||0;
-    add('erp',pc?'사후 진행 중':'이알피 진행 중',`이알피 「진행」 · 일정관리 종료 ${endedMd(end)}`+(pc?` · 사후 ${pc}회 입력됨`:''),
-      pc?'사후컨설팅이 이어지는 사업으로 보입니다 — 사후가 끝나면 이알피에서 종료해 주세요':'사후컨설팅이 남은 사업이면 그대로 두세요. 아니면 이알피에서 종료해 주세요',['check']);
+    const pc=info.postCnt||0, pt=info.postTarget||0, pdone=pt>0&&pc>=pt;
+    add('erp',pdone?'사후 목표 달성':pc?'사후 진행 중':'이알피 진행 중',`이알피 「진행」 · 일정관리 종료 ${endedMd(end)}`+(pc?` · 사후 ${pt>0?pc+'/'+pt:pc}회 입력됨`:''),
+      pdone?'사후컨설팅을 목표 회수만큼 마쳤습니다 — 이알피에서 종료해 주세요':pc?'사후컨설팅이 이어지는 사업으로 보입니다 — 사후가 끝나면 이알피에서 종료해 주세요':'사후컨설팅이 남은 사업이면 그대로 두세요. 아니면 이알피에서 종료해 주세요',['check']);
   }
   if((info.sameDay||0)>=3)add('bulk',`같은 날 ${info.sameDay}건`,`${endedMd(end)} 하루 ${info.sameDay}건 종료`+(n?` · 마지막 방문 ${endedMd(last)}`:' · 이 사업은 일정 0회'),n?`종료일 → ${endedMd(last)} (마지막 방문일)`:'일정이 없어 실제로 끝난 날을 알 수 없음',n?['fix','check']:['check']);
   if(n&&end&&endedDays(last,end)>30)add('late',`${endedDays(last,end)}일 뒤 종료`,`마지막 방문 ${endedMd(last)} · 종료 ${endedMd(end)} (${endedDays(last,end)}일 뒤)`,`종료일 → ${endedMd(last)}`,['fix','check']);
@@ -6719,7 +6730,7 @@ function endedInfos(){
       list.push({co,tid,state:ended?'ended':'editing',endedDate:ended||(re&&re.was)||'',reopen:re,scheds:my,
         start:dates[0]||'',last:dates[dates.length-1]||'',cnt:my.length,fieldCnt:my.filter(s=>s.isField).length,officeCnt:my.filter(s=>!s.isField).length,
         deadline:(co.deadlines&&co.deadlines[tid])||'',maxR:getCoMaxRounds(co.id,tid),mandatory:getCoMandatory(co.id,tid),
-        erp,sameDay:0,posts,postCnt:posts.length,postPhotoCnt:posts.reduce((n,s)=>n+postPhotoCount(s.id),0),flags:[]});
+        erp,sameDay:0,posts,postCnt:posts.length,postPhotoCnt:posts.reduce((n,s)=>n+postPhotoCount(s.id),0),postTarget:getCoPostTarget(co.id,tid),flags:[]});
     });
   });
   const byDate={};
@@ -6727,7 +6738,7 @@ function endedInfos(){
   list.forEach(i=>{
     if(i.state!=='ended')return;
     i.sameDay=byDate[i.endedDate]||0;
-    i.flags=endedFlagsFor({endedDate:i.endedDate,scheds:i.scheds,postCnt:i.postCnt,maxR:i.maxR,mandatory:i.mandatory,deadline:i.deadline,erp:i.erp,sameDay:i.sameDay,checked:(i.co.endedChk&&i.co.endedChk[i.tid])||[]});
+    i.flags=endedFlagsFor({endedDate:i.endedDate,scheds:i.scheds,postCnt:i.postCnt,postTarget:i.postTarget,maxR:i.maxR,mandatory:i.mandatory,deadline:i.deadline,erp:i.erp,sameDay:i.sameDay,checked:(i.co.endedChk&&i.co.endedChk[i.tid])||[]});
   });
   return list.sort((a,b)=>((b.state==='editing')-(a.state==='editing'))||String(b.endedDate).localeCompare(String(a.endedDate))||String(a.co.name||'').localeCompare(String(b.co.name||''),'ko'));
 }
@@ -6978,12 +6989,16 @@ function postDrawerView(coId,tid){
   return {co:{id:co.id,name:co.name||''},ty:{id:ty.id,name:ty.name||'',fullName:ty.fullName||''},
     state:ended?'ended':(re?'editing':(postTypeDone(co,tid)?'done':'active')),endedDate:ended||(re&&re.was)||'',focusId:f.focusId||'',
     posts:posts.map(s=>({id:s.id,date:s.date||'',isField:!!s.isField,memo:s.memo||'',round:s.round||0,att:(staff.find(a=>a.id===s.attId)||{}).name||''})),
-    thumbs,form:{editId:f.editId||'',date:f.date||'',field:f.field!==false,memo:f.memo||'',err:f.err||''}};
+    target:getCoPostTarget(coId,tid),thumbs,form:{editId:f.editId||'',date:f.date||'',field:f.field!==false,memo:f.memo||'',err:f.err||''}};
 }
 function postDrawerHtml(v){
   const e=escAttr, f=v.form||{}, posts=v.posts||[], thumbs=v.thumbs||{};
   const stTxt=v.state==='ended'?`종료 ${e(v.endedDate)}`:v.state==='editing'?`✏ 수정 중 · 원래 종료일 ${e(v.endedDate)}`:v.state==='done'?'✓ 본 회차 완료 · 종료 전':'진행 중';
   const head=`<div class="post-hd"><div class="post-co">${e(v.co.name)}</div><div class="post-sub">${e(v.ty.fullName||v.ty.name)} · ${stTxt}</div></div>`;
+  /* 목표 회수 — 사업장 설정이라 어느 상태(진행 중·완료·종료)에서도 넣을 수 있다. 입력한 회수와 견줘 남은 회수를 보여 준다. */
+  const tg=v.target||0, np=posts.length;
+  const tstat=tg>0?(np>=tg?`<span class="post-tstat done">✓ 목표 달성${np>tg?` (+${np-tg}회)`:''}</span>`:`<span class="post-tstat">입력 ${np}회 · 남은 ${tg-np}회</span>`):`<span class="post-tstat">목표 없음 — 입력한 만큼만 셉니다</span>`;
+  const target=`<div class="post-target"><label for="postTarget">사후컨설팅 목표 회수</label><input type="number" id="postTarget" min="0" max="20" inputmode="numeric" placeholder="없음" value="${tg||''}" onchange="postSetTarget(this.value)"><span>회</span>${tstat}</div>`;
   const rows=posts.map((p,i)=>{
     const th=thumbs[p.id]||[]; const on=v.focusId===p.id||f.editId===p.id; const sid=e(p.id);
     return `<div class="post-row${on?' on':''}" data-sid="${sid}"><input type="checkbox" class="post-ck" data-sid="${sid}" onchange="postSelChange()"><span class="post-no" title="사후 ${i+1}회">${i+1}</span>`+
@@ -7009,7 +7024,29 @@ function postDrawerHtml(v){
   const rules=`<div class="post-rules"><div class="post-rule">사후컨설팅은 본 회차(예 3/3)에 들어가지 않습니다 — 「사후 1회, 2회…」로 따로 셉니다.</div>`+
     `<div class="post-rule">사업 상태는 그대로입니다 — 종료된 사업은 진행 목록에 다시 올라오지 않고, 기관 보고서·종료 판정에도 섞이지 않습니다.</div>`+
     `<div class="post-rule">달력에는 「사후」 칩으로 나옵니다 — 칩을 누르면 이 창이 열리고, 날짜는 여기서 고칩니다.</div></div>`;
-  return head+list+form+rules;
+  return head+target+list+form+rules;
+}
+/* 사후컨설팅 목표 회수 고치기 (순수 — 사업장 한 건을 고치고 «했는지 / 왜 못 했는지» 를 돌려준다). 비우거나 0 이면 목표를 지운다.
+   ⚠ 빈 칸은 «키를 지운다» — undefined 값이나 빈 객체를 남기면 실시간DB가 저장을 거부한다. */
+function postTargetOn(co,tid,raw){
+  const s=String(raw==null?'':raw).trim();
+  const n=s===''?0:Number(s);
+  if(!Number.isInteger(n)||n<0||n>20)return {ok:false,msg:'사후컨설팅 목표 회수는 0~20 사이의 정수로 넣어 주세요 (비우면 목표 없음)'};
+  const was=(co.customPost&&co.customPost[tid])||0;
+  if(was===n)return {ok:false};
+  if(n>0){ if(!co.customPost)co.customPost={}; co.customPost[tid]=n; }
+  else{ delete co.customPost[tid]; if(!Object.keys(co.customPost).length)delete co.customPost; }
+  return {ok:true,from:was,to:n};
+}
+/* 사업장 수정 창의 칸(co_post)을 저장할 모양으로 — 1~20 정수만 남긴다(빈 칸·undefined·0·소수·20 초과는 목표 없음). */
+function postTargetsClean(map){
+  const out={};
+  Object.keys(map||{}).forEach(tid=>{ const n=Number(map[tid]); if(Number.isInteger(n)&&n>=1&&n<=20)out[tid]=n; });
+  return out;
+}
+/* 「사후 N회」 · 목표가 있으면 「사후 N/M회」 · 목표를 채우면 앞에 ✓ — 진행 목록·종료 목록·알림이 같은 글자를 쓰게 한 곳에서 만든다 */
+function postCountText(n,target){
+  return `${target>0&&n>=target?'✓ ':''}사후 ${target>0?`${n}/${target}`:n}회`;
 }
 /* 본 회차를 «다 마친» 사업인가 — 최대 회차가 있고 본 일정이 그만큼일 때(사후·사전진단은 안 센다). 종료 전이어도 사후를 넣을 수 있게 하는 기준이다. */
 function postTypeDone(co,tid){
@@ -7019,17 +7056,19 @@ function postTypeDone(co,tid){
 /* 진행 목록 사업 줄의 「사후컨설팅」 항목 (대표 지시 2026-11-03 「✓ 완료 15/15회」 줄에 사후컨설팅 회수·사진 입력).
    「＋ 사후컨설팅」 / 「사후 N회 · 📷M」 — 누르면 서랍(회수 보기 · 입력 · 사진). «새로 얹은 칸»일 뿐 본 회차 숫자를 바꾸지 않는다. */
 function dashPostItem(co,tid){
-  const posts=postListFor(co.id,tid), n=posts.length;
+  const posts=postListFor(co.id,tid), n=posts.length, tg=getCoPostTarget(co.id,tid);
   const ph=posts.reduce((a,s)=>a+postPhotoCount(s.id),0);
   const k=`'${co.id}','${tid}'`;
-  return `<div class="round-badge post-item"><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회 — 눌러서 보기·넣기`:'사후컨설팅 넣기 (날짜·사진)'}">${n?`사후 ${n}회${ph?` · 📷${ph}`:''}`:'＋ 사후컨설팅'}</button></div>`;
+  const tgTxt=tg?` (목표 ${tg}회)`:'';
+  const label=n?`${postCountText(n,tg)}${ph?` · 📷${ph}`:''}`:(tg?`＋ ${postCountText(0,tg)}`:'＋ 사후컨설팅');
+  return `<div class="round-badge post-item"><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회${tgTxt} — 눌러서 보기·넣기`:`사후컨설팅 넣기${tgTxt} (날짜·사진)`}">${label}</button></div>`;
 }
 /* 종료 목록의 「사후컨설팅」 칸 — 입력 전 「＋ 사후」, 입력 후 「사후 N회 · 📷M」 */
 function postCellHtml(it){
-  const k=`'${it.co.id}','${it.tid}'`;
+  const k=`'${it.co.id}','${it.tid}'`, tg=it.postTarget||0, tgTxt=tg?` (목표 ${tg}회)`:'';
   return it.postCnt>0
-    ?`<button class="ended-pbtn on" onclick="openPostDrawer(${k})" title="사후컨설팅 ${it.postCnt}회 — 눌러서 보기·넣기">사후 ${it.postCnt}회${it.postPhotoCnt?` · 📷${it.postPhotoCnt}`:''}</button>`
-    :`<button class="ended-pbtn" onclick="openPostDrawer(${k})" title="사후컨설팅 넣기">＋ 사후</button>`;
+    ?`<button class="ended-pbtn on" onclick="openPostDrawer(${k})" title="사후컨설팅 ${it.postCnt}회${tgTxt} — 눌러서 보기·넣기">${postCountText(it.postCnt,tg)}${it.postPhotoCnt?` · 📷${it.postPhotoCnt}`:''}</button>`
+    :`<button class="ended-pbtn" onclick="openPostDrawer(${k})" title="사후컨설팅 넣기${tgTxt}">＋ ${tg?postCountText(0,tg):'사후'}</button>`;
 }
 function renderPostDrawer(){
   if(!_post)return;
@@ -7059,6 +7098,13 @@ function postEdit(sid){
   renderPostDrawer();
 }
 function postCancel(){ if(!_post)return; _post.editId=''; _post.date=''; _post.memo=''; _post.err=''; renderPostDrawer(); }
+/* 목표 회수 저장 — 사업장 설정이라 사업장 한 건을 잠그고 고친다(endedMutate). 틀린 값이면 까닭을 말하고 칸을 원래 값으로 되돌린다. */
+async function postSetTarget(raw){
+  if(!_post)return;
+  const tid=_post.tid;
+  await endedMutate(_post.coId,co=>postTargetOn(co,tid,raw),r=>r.to?`사후컨설팅 목표를 ${r.to}회로 정했습니다`:'사후컨설팅 목표를 지웠습니다');
+  renderPostDrawer();
+}
 /* 못 넣는 까닭 — 비어 있으면 넣을 수 있다. 사업(프로그램) 규칙(같은 담당 하루 1건·기관 하루 1사업장)은 안 보고,
    «사람·사업장이 실제로 가는 날»의 충돌(같은 날 같은 사업 · 같은 사업장 다른 사업 · 담당 하루 한도)만 본다. */
 function postProblem(co,tid,date,excludeId){
@@ -7104,7 +7150,8 @@ async function postSave(withPhoto){
   const fr=(getScheds().find(s=>s.id===sc.id)||{}).round||0;
   _post.editId=''; _post.date=''; _post.memo=''; _post.err=''; _post.focusId=sc.id;
   renderPostDrawer(); renderCal(); renderSummaryBar(); if(q('#endedList'))renderEndedView();
-  toast(old?'사후컨설팅을 고쳤습니다':`사후 ${fr}회를 넣었습니다`);
+  const tg=getCoPostTarget(coId,tid), tot=postListFor(coId,tid).length;
+  toast(old?'사후컨설팅을 고쳤습니다':`사후 ${fr}회를 넣었습니다`+(tg?` (${tot}/${tg}회)`+(tot>=tg?' · 목표 달성':''):''));
   if(withPhoto)openStampModal(sc.id);
 }
 function postPhoto(sid){
@@ -10805,10 +10852,11 @@ async function deleteEdit(){
 let co_deadlines={};
 let co_rounds={};
 let co_mandatory={};
+let co_post={};
 let co_typeAtts={};
 
 async function openCoModal(editId=null){
-  co_editId=editId;co_selTypes=new Set();co_deadlines={};co_rounds={};co_mandatory={};co_typeAtts={};
+  co_editId=editId;co_selTypes=new Set();co_deadlines={};co_rounds={};co_mandatory={};co_post={};co_typeAtts={};
   const co=editId?getCos().find(c=>c.id===editId):null;
   if(editId&&!await acquireCompanyEditLock(editId))return;
   q('#mCoTitle').textContent=editId?'사업장 수정':'사업장 추가';
@@ -10822,6 +10870,7 @@ async function openCoModal(editId=null){
   if(co?.deadlines)co_deadlines={...co.deadlines};
   if(co?.customRounds)co_rounds={...co.customRounds};
   if(co?.customMandatory)co_mandatory={...co.customMandatory};
+  if(co?.customPost)co_post={...co.customPost};
   if(co?.typeAtts)co_typeAtts={...co.typeAtts};
   q('#mCoDelBtn').style.display=editId?'block':'none';
   renderCoTypes();
@@ -10889,6 +10938,7 @@ function renderCoTypes(){
     const dlVal=co_deadlines[tid]||'';
     const rndVal=co_rounds[tid]??'';
     const mfVal=co_mandatory[tid]??'';
+    const ptVal=co_post[tid]??'';
     const baseRounds=t.rounds||0;
     const baseMandatory=t.mandatoryField||0;
     const baseRoundText=baseRounds>0?`${baseRounds}회`:'무제한';
@@ -10917,6 +10967,12 @@ function renderCoTypes(){
         <label class="co-setting-field">
           <span class="co-setting-label">종료일</span>
           <input class="co-setting-input" type="date" value="${dlVal}" onchange="co_deadlines['${tid}']=this.value;renderCoTypes();">
+        </label>
+        <label class="co-setting-field">
+          <span class="co-setting-label">사후컨설팅 회수</span>
+          <input class="co-setting-input" type="number" min="0" max="20" value="${ptVal}" placeholder="없음"
+            title="사후컨설팅을 몇 번 하기로 했는지 — 비우면 목표 없이 입력한 만큼만 셉니다"
+            onchange="co_post['${tid}']=this.value===''?undefined:+this.value;renderCoTypes();">
         </label>
       </div>
       <div class="co-setting-note">적용값: <strong>최대 ${applyRoundText}</strong> · <strong>의무방문 ${applyMandatory}회</strong>${dlVal?` · 종료일 ${dlVal}`:''}</div>
@@ -11023,6 +11079,7 @@ async function saveCo(){
   if(co_editId)[...co_selTypes].forEach(tid=>{ const v=_old&&_old.typeAtts&&_old.typeAtts[tid]; if(v&&erpTypeMainFor(co_editId,tid))_keep[tid]=v; });
   const typeAtts=coTypeAttsToSave(defAtt,co_selTypes,co_typeAtts,_keep);
   const defCoAtts=coAttsWithTypeMains(defAtt,co_selCoAtts,typeAtts);
+  const postTargets=postTargetsClean(co_post);   // 사후 목표 회수 — 빈 칸이면 칸 자체를 두지 않는다
   const cos=getCos();
   if(co_editId){
     const idx=cos.findIndex(c=>c.id===co_editId);
@@ -11040,10 +11097,11 @@ async function saveCo(){
       delete next.defCoAtt;
       /* 사업별 칸이 비면 «칸 자체를 지운다» — 빈 객체·undefined 값은 실시간DB가 저장을 거부한다 */
       if(Object.keys(typeAtts).length)next.typeAtts=typeAtts; else delete next.typeAtts;
+      if(Object.keys(postTargets).length)next.customPost=postTargets; else delete next.customPost;
       cos[idx]=next;
     }
   }
-  else cos.push(stampNewCo({id:uid(),name,defAtt,defCoAtts,...(Object.keys(typeAtts).length?{typeAtts}:{}),types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},active:true}));
+  else cos.push(stampNewCo({id:uid(),name,defAtt,defCoAtts,...(Object.keys(typeAtts).length?{typeAtts}:{}),types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},...(Object.keys(postTargets).length?{customPost:postTargets}:{}),active:true}));
   const savedId=co_editId||cos[cos.length-1].id;
   setCos(cos);closeModal('mbCo');renderDash();renderCal();toast(co_editId?'수정됨':'추가됨');
   /* 여기가 거울이다 — 부담당을 더했든 뺐든 이알피에 그대로 옮긴다.
@@ -11459,7 +11517,7 @@ function mergeApplyOne(p,cos,scheds){
   p.gone.forEach(g0=>{
     const g=cos.find(c=>c.id===g0.id); if(!g)return;
     /* 없는 칸만 옮겨 담는다 — 남는 쪽 값을 덮지 않는다 */
-    ['deadlines','customRounds','customMandatory','phaseState'].forEach(k=>{
+    ['deadlines','customRounds','customMandatory','customPost','phaseState'].forEach(k=>{
       if(!g[k])return;
       keep[k]=keep[k]||{};
       Object.keys(g[k]).forEach(t=>{ if(keep[k][t]===undefined)keep[k][t]=g[k][t]; });

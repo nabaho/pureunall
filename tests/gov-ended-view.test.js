@@ -207,7 +207,7 @@ function engine(over) {
     erpSidName: () => '',
   }, over || {}));
   vm.runInContext(enLine + '\n' + S.slice(cc, ccEnd) + '\n' + S.slice(g, gEnd) + '\n' + S.slice(a, b) + '\n' +
-    ['isPostSched', 'getMainScheds', 'postPhotoCount', 'endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos', 'endedMatches'].map(grab).join('\n'), ctx);
+    ['isPostSched', 'getMainScheds', 'postPhotoCount', 'getCoPostTarget', 'endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos', 'endedMatches'].map(grab).join('\n'), ctx);
   ctx._st = st;
   return ctx;
 }
@@ -278,7 +278,7 @@ test('★ 찾기 — 사업장 이름·담당자(주·부)·사업 이름·기�
 
 /* ══ ④ 화면 글자 — 목록·검토·삭제 ═══════════════════════════════ */
 
-const VIEW = ['endedHi', 'endedPeopleHtml', 'postCellHtml', 'endedListHtml', 'endedReviewGroups', 'endedReviewHtml', 'endedDeleteInfos', 'endedDeleteHtml'];
+const VIEW = ['endedHi', 'endedPeopleHtml', 'postCellHtml', 'postCountText', 'endedListHtml', 'endedReviewGroups', 'endedReviewHtml', 'endedDeleteInfos', 'endedDeleteHtml'];
 function view() {
   const c = board();
   const w = load(['endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', ...VIEW], { staffColor: (a) => '#ef6c35', getCoAtts: (o) => (o && o.defCoAtts) || [], todayStr: () => TODAY });
@@ -423,7 +423,7 @@ function uiWorld(over) {
     'endedDateOk', 'endedClearChk', 'endedLogAdd', 'endedFixDateOn', 'endedStartEditOn', 'endedFinishEditOn', 'endedRevertEditOn', 'endedCheckOn',
     'endedCheck', 'endedCheckGroup', 'endedFixSave', 'endedRestore', 'endedRevert', 'endedSelKeys', 'endedSelAll', 'endedSelChange', 'endedSelClear', 'endedBatch',
     'openEndEdit', 'endEditPick', 'renderEndEdit', 'endedRevertFromModal', 'saveEndEdit', 'renderEndedView',
-    'endedHi', 'endedPeopleHtml', 'postCellHtml', 'endedListHtml', 'endedReviewGroups', 'endedReviewHtml', 'endedDeleteInfos', 'endedDeleteHtml'].map(grab).join('\n') +
+    'endedHi', 'endedPeopleHtml', 'postCellHtml', 'postCountText', 'endedListHtml', 'endedReviewGroups', 'endedReviewHtml', 'endedDeleteInfos', 'endedDeleteHtml'].map(grab).join('\n') +
     '\nvar _endedCur={items:[],ref:null,groups:[]}; var _endEdit=null;', ctx);
   const st = ctx._st;
   st.staff = [{ id: 'a1', name: '홍길동' }, { id: 'a2', name: '임꺽정' }];
