@@ -3707,12 +3707,21 @@ exports.readDoc = functions
          그쪽은 못 읽은 채 부르면 요금이 나갈 판이라 막았지만, 이쪽은 못 읽었다고
          판독을 통째로 세우면 그날 일이 멈춘다. 한도는 «사고를 막는 장치»이지
          일을 세우는 장치가 아니다. */
+    /* ★ 2026-11-05 「유료 API 통제」 — 판정은 DR.budgetGate 한 곳(자동은 한도, 사람이 누른 것도
+         한도의 1.2배에서 멈춤, 셈을 못 읽으면 자동만 멈춤). 위 «manual 은 통과»는 1.2배까지로 좁혀졌다. */
     const 몫 = await aiMonthSpend();
-    if (몫.known && 몫.over && !body.manual) {
-      res.status(429).json({ ok: false, overBudget: true, spent: 몫.spent, limit: 몫.limit,
-        error: "이번 달 AI 판독 한도(₩" + 몫.limit.toLocaleString("ko-KR") + ")를 다 썼습니다"
-          + " — 지금까지 약 ₩" + 몫.spent.toLocaleString("ko-KR") + ". 자동 판독을 멈췄습니다."
-          + " 급한 것은 사진을 열어 직접 눌러 주세요." });
+    const 판정 = DR.budgetGate(몫, !!body.manual);
+    if (판정.block) {
+      const 금액 = function (n) { return "₩" + Number(n || 0).toLocaleString("ko-KR"); };
+      res.status(429).json({ ok: false, overBudget: true, hard: 판정.hard, spent: 몫.spent, limit: 몫.limit,
+        error: 판정.why === "unknown"
+          ? "이번 달 AI 사용량을 확인하지 못해 자동 판독을 잠시 멈췄습니다. 급한 것은 사진을 열어 직접 눌러 주세요."
+          : 판정.hard
+            ? "이번 달 AI 판독 한도(" + 금액(몫.limit) + ")의 1.2배를 넘어 직접 누른 판독도 멈췄습니다"
+              + " — 지금까지 약 " + 금액(몫.spent) + ". 더 쓰려면 대표님이 한도를 올려 주세요."
+            : "이번 달 AI 판독 한도(" + 금액(몫.limit) + ")를 다 썼습니다"
+              + " — 지금까지 약 " + 금액(몫.spent) + ". 자동 판독을 멈췄습니다."
+              + " 급한 것은 사진을 열어 직접 눌러 주세요." });
       return;
     }
 
@@ -4048,8 +4057,9 @@ exports.photoEdit = functions
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
 
     // ★ 누가 부르는지 먼저 — 이 검사가 없으면 우리 열쇠가 공개 지우개가 된다.
+    let decoded;
     try {
-      await requireReader(req);
+      decoded = await requireReader(req);
     } catch (e) {
       res.status(e.status || 401).json({ ok: false, error: String(e.message || e) });
       return;
@@ -4058,11 +4068,39 @@ exports.photoEdit = functions
     const v = PE.validate((req.body && typeof req.body === "object") ? req.body : {});
     if (!v.ok) { res.status(400).json({ ok: false, error: v.error }); return; }
 
+    /* ★ 요금 관문 (2026-11-05 「유료 API 통제」) — 부르기 «전»에 막는다. 까닭은 photo-edit.js EDIT_READ_WEIGHT 머리.
+       ⚠ 판독과 달리 «사람이 누른 것»이라도 한도를 넘으면 멈춘다 — 편집은 급한 일이 아니다.
+       ⚠ 셈을 못 읽으면(known:false) 안 부른다(Vision 문턱과 같은 쪽). */
+    const 몫 = await aiMonthSpend();
+    if (!몫.known || 몫.over) {
+      res.status(429).json({ ok: false, overBudget: true, spent: 몫.spent, limit: 몫.limit,
+        error: 몫.known
+          ? "이번 달 AI 한도(₩" + 몫.limit.toLocaleString("ko-KR") + ")를 다 써서 AI 편집을 멈췄습니다."
+          : "이번 달 AI 사용량을 확인하지 못해 AI 편집을 잠시 멈췄습니다. 잠시 뒤 다시 해 주세요." });
+      return;
+    }
+    const 오늘자리 = PE.userDayPath(DR.ymdKST(), decoded.uid);
+    let 오늘 = null;
+    try { 오늘 = Number((await getDatabase().ref(오늘자리).once("value")).val()) || 0; } catch (_) { 오늘 = null; }
+    if (오늘 === null || 오늘 >= PE.EDIT_DAY_PER_USER) {
+      res.status(429).json({ ok: false, overBudget: true,
+        error: 오늘 === null ? "오늘 사용량을 확인하지 못해 AI 편집을 잠시 멈췄습니다."
+          : "AI 편집은 한 사람 하루 " + PE.EDIT_DAY_PER_USER + "장까지입니다 — 내일 다시 해 주세요." });
+      return;
+    }
+
     const key = await readGeminiKey();
     if (!key) { res.status(503).json({ ok: false, error: "AI 키가 설정되지 않았습니다 — 관리자에게 알려 주세요." }); return; }
 
     // 사람이 적은 말(want)을 함께 넘긴다 — 틀(지킴말)은 photo-edit.js 가 그대로 쥔다.
     const r = await PE.callEdit(fetch, key, v.data, v.mimeType, null, v.want);
+    /* ★ 요금이 붙은 만큼(200 으로 답한 수 × 무게) 같은 지갑에 센다 · 사람별 하루 셈도 올린다 */
+    if (r.billed > 0) {
+      await bumpReadTally("photoedit", "n", r.billed * PE.EDIT_READ_WEIGHT);
+      try {
+        await getDatabase().ref(오늘자리).transaction(function (cur) { return (Number(cur) || 0) + r.billed; });
+      } catch (e) { console.warn("AI 편집 사람별 셈 실패:", String((e && e.message) || e)); }
+    }
     if (!r.ok) {
       res.status(r.status && r.status >= 400 ? r.status : 502)
         .json({ ok: false, error: r.why || "AI가 응답하지 않습니다.", status: r.status || 0 });
