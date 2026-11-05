@@ -1608,5 +1608,104 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
+  // =============== 기금관리(fund.html) 직접 연결 브리지 ===============
+  let fundCtx = null;
+  function _b64ToBytes(b64) {
+    const bin = atob(String(b64 || ''));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function _bytesToB64(bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function _renderFundBridgeBar() {
+    let wrap = $('fundBridgeBar');
+    if (!fundCtx) { if (wrap) wrap.remove(); return; }
+    if (!wrap) {
+      wrap = h('div', { id: 'fundBridgeBar', style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginRight: '8px', padding: '2px 8px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '6px', fontSize: '12px' } });
+      const mb = $('menubar'), qf = $('quickFind');
+      if (mb) mb.insertBefore(wrap, qf || null);
+    }
+    wrap.innerHTML = '';
+    wrap.append(
+      h('span', { style: { color: '#065f46', fontWeight: '700' } }, '📋 기금연동: ' + (fundCtx.fundName || '기금') + (fundCtx.label ? ' · ' + fundCtx.label : '')),
+      h('button', {
+        style: { padding: '2px 9px', background: '#0f766e', color: '#fff', border: '1px solid #0f766e', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11.5px' },
+        title: '현재 편집한 문서를 기금관리 프로그램(fund.html) 해당 기금 서식에 즉시 저장·반영합니다',
+        onclick: () => saveToFund()
+      }, '💾 기금관리에 반영')
+    );
+  }
+  function saveToFund() {
+    if (!cur || !fundCtx) return toast('연결된 기금 서식 정보가 없습니다.', true);
+    commit();
+    let hwpxB64 = '';
+    try { hwpxB64 = _bytesToB64(buildBytes()); } catch (e) { console.warn('HWPX 빌드 경고', e); }
+    const msg = {
+      type: 'pureun_hangul_save',
+      fundId: fundCtx.fundId || '',
+      kind: fundCtx.kind || '',
+      label: fundCtx.label || cur.name || '서식',
+      name: cur.name || '서식',
+      html: E.getHtml(),
+      hwpxB64,
+      savedAt: Date.now()
+    };
+    try { localStorage.setItem('pureun_hangul_save', JSON.stringify(msg)); } catch (e) {}
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (e) {}
+    try { if (typeof BroadcastChannel !== 'undefined') new BroadcastChannel('pureun_hangul_channel').postMessage(msg); } catch (e) {}
+    cur.dirty = false; renderTabs();
+    toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
+  }
+  async function loadFromFundPayload(p) {
+    if (!p || typeof p !== 'object') return;
+    fundCtx = { fundId: p.fundId || '', fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' };
+    _renderFundBridgeBar();
+    const docName = (p.name || p.label || '기금서식').replace(/\.(hwpx|hwp|hwt)$/i, '');
+    if (p.b64) {
+      try {
+        const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
+        const bytes = _b64ToBytes(p.b64);
+        const file = new File([bytes], docName + '.' + ext, { type: ext === 'hwp' ? 'application/x-hwp' : 'application/hwp+zip' });
+        await openBlob(file, null);
+        return;
+      } catch (e) {
+        console.warn('HWP/HWPX 열기 폴백(HTML):', e);
+      }
+    }
+    if (p.html) {
+      const pg = Hx.defaultPage();
+      if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
+      addDoc({ name: docName, html: p.html, page: pg, pristine: false });
+      toast(`기금관리에서 '${docName}' 서식을 불러왔습니다.`);
+    }
+  }
+  try {
+    const raw = localStorage.getItem('pureun_hangul_bridge');
+    if (raw) {
+      localStorage.removeItem('pureun_hangul_bridge');
+      const p = JSON.parse(raw);
+      if (p && (new URLSearchParams(location.search).get('from') === 'fund' || Date.now() - (p.sentAt || 0) < 60000)) {
+        setTimeout(() => loadFromFundPayload(p), 60);
+      }
+    }
+  } catch (e) {}
+  window.addEventListener('message', e => {
+    const d = e && e.data;
+    if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+  });
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('pureun_hangul_channel');
+      bc.onmessage = e => {
+        const d = e && e.data;
+        if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+      };
+    }
+  } catch (e) {}
+  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund };
 })();
