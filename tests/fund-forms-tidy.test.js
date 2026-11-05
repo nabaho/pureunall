@@ -201,5 +201,5 @@ test('★★ ⑫ 기업 준비·첨부서류 실행 검증 — 사내·공동 �
   assert.ok(sheetHtml.includes('1. 기본 생성서식 목록'), '기본서식 섹션 포함');
   assert.ok(sheetHtml.includes('2. 기업 준비·첨부서류 목록'), '기업 준비·첨부서류 섹션 포함');
   assert.ok(sheetHtml.includes('3. 사업장별 준비서류 수합 점검표 (2개소)'), '사업장별 수합 점검표 포함');
-  assert.ok(sheetHtml.includes('(주)가나테크') && sheetHtml.includes('(주)다라물산'), '참여사업장 명단 자동 반영');
+  assert.ok(sheetHtml.includes('(주)가나테크') && sheetHtml.includes('(주)다라물산'), '참여사업장 명단 자동 반영'); assert.match(코드만(grabFn('tplRow')), /if\(fundMode\)\s*return\s*''/, '기금 상세(fundMode)에서는 엑셀 줄을 숨기고 서식 자료실에만 유지');
 });
