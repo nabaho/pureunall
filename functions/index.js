@@ -1423,8 +1423,7 @@ exports.rehabAuto = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
     try {

@@ -378,15 +378,16 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tilerow.fold .tile .ic{width:22px;height:22px;font-size:.92rem;margin:0;border:0;background:none;backdrop-filter:none;flex:none;transition:none;}
 .tilerow.fold .tile:hover .ic{transform:none;box-shadow:none;}
 .tilerow.fold .tile .ic svg{width:100%;height:100%;}
+.tilerow.fold .tile .tx{min-width:0;overflow:hidden;}
 .tilerow.fold .tile b{font-size:.78rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tilerow.fold .tile .tx span,.tilerow.fold .tile .newtab,.tilerow.fold .pin-star{display:none;}
 .tilerow.fold .tile.tile-soon-first{margin-left:0;}
-/* 빨간 딱지는 칩 «오른쪽 위 귀퉁이에 떠 있게» — 칩 안에 글자처럼 서면 그 칩만 넓어져 열이 어긋난다
+/* 빨간 딱지·준비중 딱지는 칩 «오른쪽 위 귀퉁이에 떠 있게» — 칩 안에 글자처럼 서면 글자가 두 줄로 꺾이거나 높이가 들쭉날쭉해진다
    (대표 2026-10-24 「빨간색 팝업은 어떻게 정리해야 칸넓게 안늘어나는지」). */
 .tilerow.fold .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;
   font-size:10px;border-width:2px;box-shadow:0 2px 6px rgba(185,28,28,.35);z-index:2;}
 .tilerow.fold .tile .nl-warn{position:absolute;right:-4px;top:-8px;transform:none;min-width:18px;height:18px;line-height:18px;padding:0 5px;z-index:2;}
-.tilerow.fold .tile .tile-soon-pill{position:static;transform:none;flex:none;}
+.tilerow.fold .tile .tile-soon-pill{position:absolute;left:auto;right:6px;top:-7px;transform:none;font-size:9px;padding:2px 5px;line-height:1;white-space:nowrap;z-index:2;}
 /* 별표 — 아이콘 오른쪽 아래 귀퉁이. 다른 딱지(오른쪽 위 경고 · 왼쪽 알림 · 가운데 준비중)와 안 겹친다. */
 .tile .ic{position:relative;}
 .pin-star{position:absolute;right:-5px;bottom:-5px;width:20px;height:20px;border-radius:50%;
