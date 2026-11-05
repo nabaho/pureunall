@@ -465,3 +465,42 @@ test('★★★ 사람이 다시 옮기거나 되돌리면 「AI가 짚었다」
     '사람이 손대도 AI 표가 안 지워집니다');
   assert.match(seg, /config\/mailPutBy/, '서버에도 지우러 가지 않습니다');
 });
+
+/* ══════ 「해당 없음」 길 — 분명치 않은 메일은 받은메일함에 남는다 (대표 지시 2026-11-05) ══════
+   「받은메일에 업무별·담당자별 분류가 안 된 부분은 받은메일에 남아 있어야 된다」
+   예전에는 칸 «중 하나를 반드시» 골라 받은메일함이 통째로 비었다(실측: AI 가 옮긴 236통, 사람이 정한 것 0통). */
+test('★★★ Jev 가 「해당 없음」을 고르면 «옮기지 않는다» — 그 메일은 받은메일함에 남는다', async () => {
+  const db = fakeDb(baseStore());
+  const fn = fetchFn(AC.NONE_NAME);
+  const r = await AC.classifyNewInbox({ getDatabase:()=>db }, { slug:'INBOX', rows:[row(1,'안내'), row(2,'문의')], fetchFn: fn });
+  assert.equal(r.tried, 2);
+  assert.equal(r.done, 0, '분명치 않다는데 옮겼다');
+  assert.equal(r.none, 2, '해당 없음 수를 안 센다');
+  const wrote = db._calls.updates.filter((u) => Object.keys(u[1] || {}).some((k) => /mailPut/.test(k)));
+  assert.equal(wrote.length, 0, '해당 없음인데 config/mailPut 에 적었다');
+});
+
+test('★★ 분명한 것만 옮기고 나머지는 남긴다 — 섞여 와도 줄마다 따로 정한다', async () => {
+  const db = fakeDb(baseStore());
+  const answers = ['1.자문사답변', AC.NONE_NAME, '2.급여+사무대행'];
+  let i = 0;
+  const fn = async (url, opt) => ({ ok: true, status: 200, json: async () => ({ ok: true, answers: { bin: { choice: answers[i++] } } }) });
+  const r = await AC.classifyNewInbox({ getDatabase:()=>db }, { slug:'INBOX', rows:[row(1,'a'), row(2,'b'), row(3,'c')], fetchFn: fn });
+  assert.equal(r.done, 2);
+  assert.equal(r.none, 1);
+  const put = db._tree.pucards.config.mailPut;
+  assert.ok(put['INBOX:1'] && !put['INBOX:2'] && put['INBOX:3'], '옮긴 줄이 어긋난다: ' + JSON.stringify(put));
+});
+
+test('★★★ Jev 에게 «해당 없음» 후보를 실제로 준다 — 분명한 칸만 고르라고 말한다', () => {
+  const q = AC.binQuestion([{ id: 'b1', name: '1.자문사답변' }]);
+  assert.ok(AC.NONE_NAME in q.bin.criteria, '해당 없음 후보가 없다 — 칸 하나를 반드시 고르게 된다');
+  assert.match(q.bin.instructions, /only if it clearly fits/, '분명할 때만 고르라는 말이 없다');
+  assert.ok(/^[\x00-\x7f]+$/.test(AC.NONE_NAME), '이름이 한글이면 사람이 붙인 칸 이름과 겹칠 수 있다');
+});
+
+test('★★ 사람이 붙인 칸 이름이 「해당 없음」 이름과 같아도 그 칸으로 옮기지 않는다(안전한 쪽)', async () => {
+  const db = fakeDb(baseStore({ 'pucards/config/mailBins': { b9: { n: AC.NONE_NAME } } }));
+  const r = await AC.classifyNewInbox({ getDatabase:()=>db }, { slug:'INBOX', rows:[row(1,'a')], fetchFn: fetchFn(AC.NONE_NAME) });
+  assert.equal(r.done, 0, '해당 없음 답이 칸으로 옮겨졌다');
+});

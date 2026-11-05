@@ -20732,6 +20732,12 @@ let _mbNoWho = null;       /* {폴더열쇠: 1} — 사람을 안 붙이는 칸 
 let _mbBoxWho = null;      /* {폴더열쇠: {who:[이름…], at, by}} */
 /* 이 칸을 보는 사람들 — 살아 있는 사람만, 차례 그대로(맨 앞이 주담당) */
 function mbBoxWhoList(slug){
+  /* ★ 받은메일함에는 «칸 담당»이 없다 (대표 지시 2026-11-05 「모든 부분을 권형하로 담당으로 넣지 마라」).
+       받은메일함은 업무 칸이 못 맡은 «나머지»라 칸이 무슨 일인지 모른다 — 그런데 2026-10-07 에 자동 규칙(㉯ 가장 넓게 맡음 42/94통)이
+       거기에 권형하를 걸어, AI 가 업무 칸으로 옮긴 메일까지 «칸 담당이 마지막 그물»(mbWhoOfRow ⑥)로 전부 권형하에게 갔다.
+     ⚠ 자료(config/mailBoxWho 의 받은메일함 줄)를 지워도 이 가드는 남긴다 — 누가 다시 걸어도 안 먹는다. */
+  const fo = mbFolderBy(String(slug||''));
+  if(fo && fo.kind === 'inbox') return [];
   const v = (_mbBoxWho||{})[String(slug||'')];
   const arr = (v && Array.isArray(v.who)) ? v.who : [];
   const out = [];
