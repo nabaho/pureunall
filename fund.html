@@ -5305,7 +5305,7 @@ function _openHwpBuf(buf,label,saveKind){
       +'<span style="font-size:11.5px;color:var(--sub)">한글 편집기(저장소 안) · 자료는 브라우저 밖으로 나가지 않습니다</span><span style="flex:1"></span>'
       +(_hwpSaveKind?'<button class="primary" onclick="hwpSaveToFund()">💾 이 기금에 보관</button>':'')
       +'<button onclick="hwpPasteClip()" title="복사해 둔 글·그림(서명·도장 등)을 문서에 붙여넣습니다 — 먼저 문서 안을 한 번 클릭해 커서를 두세요. 원본 앱(한글 등)에서 먼저 복사해 두세요.">🖼 붙여넣기</button>'
-      +'<button onclick="openPureunHangulFromHwpModal()" style="background:#0f766e;color:#fff;border-color:#0f766e" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 표·줄칸·여백·쪽나누기를 편집하고 이 기금에 저장합니다">🖋 푸른한글프로그램</button>'
+      +'<button onclick="openPureunHangulFromHwpModal()" style="background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 표·줄칸·여백·쪽나누기를 편집하고 이 기금에 저장합니다">🖋 푸른한글프로그램</button>'
       +'<button onclick="openHwpAiChat()">🤖 AI로 고치기</button>'
       +'<button'+(_hwpSaveKind?'':' class="primary"')+' onclick="hwpExport(\'hwp\')">💾 .hwp로 저장</button>'
       +'<button onclick="hwpExport(\'hwpx\')">💾 .hwpx로 저장</button>'
@@ -10816,7 +10816,7 @@ function previewDoc(kind){
   var f=curForm();
   var label=docLabel(kind), ftype=(f.fund_type==='사내')?'사내':'공동';
   showModal('<div class="row"><h2 style="margin:0">'+esc(label)+' — '+esc(f.short_name||f.name)+'</h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'
-    +'<button onclick="openPureunHangul(\''+kind+'\')" style="background:#0f766e;color:#fff;border-color:#0f766e" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
+    +'<button onclick="openPureunHangul(\''+kind+'\')" style="background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
     +'<button onclick="saveDocType(\''+kind+'\')" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button> '
     +'<button class="primary" onclick="saveDocEdit(\''+kind+'\')">💾 이 기금</button></div>'
     +'<div class="row" style="margin:6px 0 0;gap:6px"><span class="muted" style="font-size:11px">정렬</span>'+docAlignBar()+'</div>'
@@ -11179,7 +11179,7 @@ function hwpSidePreview(kind){
       +'<button onclick="syncSitesToHwpAll()" style="padding:3px 8px" title="참여사업장·기업정보함·출연금 정보를 한글 서식에 자동 채움">⚡ 사업장 자동채움</button> '
       +'<button onclick="S._sideHtml=\''+kind+'\';sidePreview(\''+kind+'\')" style="padding:3px 8px" title="예전 HTML 화면으로 보기">HTML로 보기</button> '
       +'<button onclick="hwpSideDownload()" style="padding:3px 8px" title="한글(HWPX)로 내려받기 — 한글에서 그대로 열립니다">⬇ 한글</button> '
-      +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 10px;background:#0f766e;color:#fff;border-color:#0f766e" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> '
+      +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 10px;background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> '
       +'<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:3px 10px" title="한글 편집기로 열어 고치고 이 기금에 보관합니다">✏ 한글로 고치기</button></div>'
       +'<div id="hwpSideNote" class="muted" style="font-size:11px;margin:0 0 6px"></div>'
       +'<div id="hwpSideView" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto">'+loadingHTML()+'</div>';
@@ -11246,7 +11246,7 @@ function sidePreview(kind){
   var backHwp=(HWP_TPL_KINDS[kind]&&_hwpTplHasFor(kind,f)&&_hwpTplFits(kind,f)&&!smp)
     ? '<button class="primary" onclick="S._sideHtml=null;sidePreview(\''+kind+'\')" style="padding:3px 8px" title="원본 한글 모양으로 돌아가기">📄 원본 한글로 보기</button> ' : '';
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'+backHwp
-    +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 9px;background:#0f766e;color:#fff;border-color:#0f766e" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
+    +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 9px;background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
     +(smp?'<p class="muted" style="font-size:11px;margin:0 0 6px">샘플(견본) 편집 중 — [💾 '+ftype+' 공통]이 모든 '+ftype+'기금 기본이 됩니다.</p>':'')
@@ -11393,7 +11393,7 @@ function estabBundle(phase){
     +'<span style="flex:1"></span>'
     +(nHwp&&!f._sample?'<button id="bundleHwpBtn" class="primary" onclick="estabBundleHwp(\''+ph[0]+'\')" style="padding:3px 10px" '
       +'title="한글 틀이 있는 '+nHwp+'종을 원본 모양으로 채워 한 묶음(ZIP)으로 받습니다 — 한글에서 열어 그대로 인쇄">⬇ 한글 원본 전부</button> ':'')
-    +'<button onclick="openPureunHangulBundle()" style="padding:3px 10px;background:#0f766e;color:#fff;border-color:#0f766e" title="현재 번호 차례 묶음을 푸른한글프로그램(hangul.html)에 직접 연결해 편집·인쇄합니다">🖋 푸른한글프로그램</button> '
+    +'<button onclick="openPureunHangulBundle()" style="padding:3px 10px;background:#166534;color:#fff;border-color:#166534" title="현재 번호 차례 묶음을 푸른한글프로그램(hangul.html)에 직접 연결해 편집·인쇄합니다">🖋 푸른한글프로그램</button> '
     +'<button class="primary" onclick="estabBundlePrint()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
     +'<div id="bundleGap"></div>'
     +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
