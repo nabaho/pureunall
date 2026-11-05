@@ -735,6 +735,17 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 @media(max-width:760px){.bz-mr{display:flex;flex-wrap:wrap}.bz-mr>.c{flex:1 1 100%}.bz-mr.bz-h{display:none}}
 .fd-row .c{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .fd-row:hover .c{color:var(--ink);text-decoration:underline}
+/* ⏳ 발송 대기 (대표 지시 2026-11-05) — 색은 변수만 쓴다(어두운 화면에서도 읽힌다) */
+.sq-band{border:1px solid var(--amber);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:var(--card)}
+.sq-band.sq-rev{border-color:var(--red)}
+.sq-head{font-weight:700;margin-bottom:6px;color:var(--ink)}
+.sq-card{border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:6px 0;background:var(--card)}
+.sq-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sq-t{flex:1;min-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sq-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.sq-ok,.sq-fact,.sq-warn{font-size:12px;border-radius:6px;padding:1px 8px;border:1px solid var(--border)}
+.sq-ok{color:var(--teal)}.sq-fact{color:var(--text-sub)}.sq-warn{color:var(--red);border-color:var(--red)}
+.sq-sub,.sq-note{font-size:12px;color:var(--text-mute)}
 .fd-miss{color:var(--amber);font-weight:700}
 .fd-empty{color:var(--text-mute);font-size:12px;padding:6px 0}
 /* 정산 표는 여섯 칸이라 폰 폭(375)보다 넓다(실측 469) — 감싸는 칸이 옆으로 밀리게 한다.
@@ -1481,6 +1492,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-formmap.js?v=23"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
+<script src="js/kcareer-sendq.js?v=1"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -2101,11 +2113,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <div id="cdBody"></div>
         </div>        </div>
         <div class="tabpanel" id="db-feedoc">
+        <div id="sqBand" style="display:none"></div>
         <div class="toolbar">
           <input class="tb-input" id="fdSearch" placeholder="종류·기관·메모 검색" style="min-width:200px">
           <select class="tb-select" id="fdOrgFilter"><option value="">전체 기관</option></select>
           <div class="tb-spacer"></div>
           <span class="cnt" id="fdCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn" type="button" onclick="sqToggleIntake()" title="기관에서 메일로 받은 한글 서류를 넣으면, 알던 양식은 채워서 «발송 대기»에 올립니다(보내지는 않습니다)">📥 메일에서 받은 서류 넣기</button>
           <button class="btn" type="button" onclick="navTile('page-feedoc')" title="기관이 보낸 한글 서식에 내 정보·계좌·도장을 채웁니다">✍️ 서식 채우기</button>
           <button class="btn primary" id="fdAddExisting">+ 받은 서류 추가</button>
         </div>
@@ -8466,6 +8480,7 @@ function _dsHeadDock(domain){
 }
 function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.getElementById(D.page); if(!sec) return;
   if(domain==='resume'||domain==='profile'||domain==='feedoc'||domain==='certdoc') _safe(_dsHeadPark);
+  if(domain==='feedoc') _safe(sqRender);
   _safe(function(){ dbToolsMount((typeof _dbDomain!=='undefined'&&_dbDomain)||'resume'); });
   const arr=get(D.store);
   const orgSel=document.getElementById(D.orgFilter); if(!orgSel) return; const cur=orgSel.value;
@@ -14996,6 +15011,232 @@ function renderFeeSettle(){
         +'<td>'+(없음?'-':(x.acct?'<span class="fs-pill">있음</span>'
             :'<button class="btn sm" onclick="feeSettleAcct(event,\''+W+'\')" title="가장 최근 건을 열어 입금계좌를 넣습니다">없음 → 넣기</button>'))+'</td></tr>'+속;
     }).join('')+'</tbody></table>';
+}
+
+/* ===== ⏳ 발송 대기 — 기관이 보낸 같은 꼴의 서류를 채워 두고 «한 번 눌러» 답장 (대표 지시 2026-11-05, 승인 시안) =====
+   판정·채우기·상태 전이는 모듈 한 곳(js/kcareer-sendq.js)이 한다 — 여기는 파일·창고·메일·화면만 맡는다.
+   ⚠ 자동으로 보내지 않는다. 채워서 «대기»에 올리고, 나가는 것은 «✉ 답장 보내기» 한 번이다(도장·주민번호가 든 서류).
+   ⚠ 양식이 지문과 «정확히 같을 때만» 채운다. 다르면 채우지 않고 «확인 필요»로 둔다 — 비슷한 서류 정책은 docs/kcareer-발송대기-비슷한서류.md.
+   ⚠ 메일함이 새 메일을 알아보고 넘기는 길은 «메일 방» 몫이다 — 지금은 받은 첨부를 사람이 «📥 메일에서 받은 서류 넣기»로 넣는다.
+     넘겨받는 자리(sqProcess)는 그대로 둔다 — 메일 방이 열쇠(mailKey)와 첨부를 주면 같은 길로 들어온다. */
+var SQ_STORE='sendq', SQ_RULES='sendq_rules';
+var SQ_MAIL_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/sendMaterialMail';
+var SQ_MAIL_BUCKET='gs://pureun-erp-photos';
+var _sq={ open:false, busy:false };
+function sqRules(){ var r=get(SQ_RULES); return (Array.isArray(r)&&r.length)?r:KcareerSendQ.DEFAULT_RULES.slice(); }
+function sqItems(){ var a=get(SQ_STORE); return Array.isArray(a)?a:[]; }
+function sqPut(it){ var a=sqItems(), i=a.findIndex(function(x){ return x.id===it.id; }); if(i>=0) a[i]=it; else a.unshift(it); set(SQ_STORE,a); }
+function sqFind(id){ return sqItems().filter(function(x){ return x.id===id; })[0]||null; }
+function sqWhen(iso){ var d=new Date(iso); if(isNaN(d)) return ''; var z=function(n){ return (n<10?'0':'')+n; }; return z(d.getMonth()+1)+'.'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
+
+function sqRender(){
+  var box=document.getElementById('sqBand'); if(!box) return;
+  var all=sqItems(), pend=all.filter(function(x){ return x.status==='pending'; }), rev=all.filter(function(x){ return x.status==='review'; }), hold=all.filter(function(x){ return x.status==='hold'; });
+  if(!pend.length && !rev.length && !hold.length && !_sq.open){ box.style.display='none'; box.innerHTML=''; return; }
+  var h='';
+  if(_sq.open){
+    var senders=[], orgs=[]; sqRules().forEach(function(r){ (r.senders||[]).forEach(function(s){ if(senders.indexOf(s)<0) senders.push(s); }); if(r.org&&orgs.indexOf(r.org)<0) orgs.push(r.org); });
+    sqItems().forEach(function(x){ if(x.org&&orgs.indexOf(x.org)<0) orgs.push(x.org); });
+    h+='<div class="sq-card"><div class="sq-head">📥 메일에서 받은 서류 넣기</div>'
+      +'<div class="sq-row"><input type="file" id="sqInFile" accept=".hwp,.hwpx" class="tb-input">'
+      +'<input class="tb-input" id="sqInFrom" list="sqInFromList" placeholder="보낸 사람 메일 주소" style="min-width:210px" value="'+escapeHtml(senders[0]||'')+'">'
+      +'<input class="tb-input" id="sqInOrg" list="sqInOrgList" placeholder="기관 이름 (저장 서류에서 묶입니다)" style="min-width:200px">'
+      +'<datalist id="sqInOrgList">'+orgs.map(function(s){ return '<option value="'+escapeHtml(s)+'">'; }).join('')+'</datalist>'
+      +'<datalist id="sqInFromList">'+senders.map(function(s){ return '<option value="'+escapeHtml(s)+'">'; }).join('')+'</datalist>'
+      +'<input class="tb-input" id="sqInSubj" placeholder="메일 제목 (답장 제목이 됩니다)" style="min-width:260px;flex:1">'
+      +'<button class="btn primary" type="button" onclick="sqIntakeGo()"'+(_sq.busy?' disabled':'')+'>'+(_sq.busy?'⏳ 읽는 중…':'넣기')+'</button>'
+      +'<button class="btn" type="button" onclick="sqToggleIntake()">닫기</button></div>'
+      +'<div class="sq-note">알던 양식이면 동의 ■·성명·날짜·도장을 채워 «발송 대기»에 올립니다. 보내지는 않습니다.</div></div>';
+  }
+  if(pend.length){
+    h+='<div class="sq-band"><div class="sq-head">⏳ 발송 대기 '+pend.length+'건</div>'+pend.map(function(it){
+      var f=it.facts||{}, pay=f.pay||{}, w=(f.payWarn||[]);
+      var chips='<span class="sq-ok">동의 ■ 2곳</span><span class="sq-ok">성명</span><span class="sq-ok">도장 찍음</span><span class="sq-ok">양식 같음</span><span class="sq-ok">받는 곳 '+escapeHtml(it.replyTo)+'</span>'
+        +(f.eduDate?'<span class="sq-fact">교육일 '+escapeHtml(f.eduDate)+'</span>':'')
+        +(pay.gross!=null?'<span class="sq-fact">강사비 '+_won(pay.gross)+' · 실지급 '+_won(pay.net)+'</span>':'')
+        +w.map(function(x){ return '<span class="sq-warn">'+escapeHtml(x)+'</span>'; }).join('');
+      return '<div class="sq-card"><div class="sq-row"><div class="sq-t"><b>'+escapeHtml(it.org||'기관')+'</b> · '+escapeHtml(it.subject||it.docName)+' · 받은 '+escapeHtml(sqWhen(it.createdAt))+'</div>'
+        +'<button class="btn sm" type="button" onclick="sqView(\''+_jsAttr(it.id)+'\',\'gen\')">👁 서류 보기</button></div>'
+        +'<div class="sq-chips">'+chips+'</div>'
+        +'<div class="sq-row"><button class="btn primary" type="button" onclick="sqSend(\''+_jsAttr(it.id)+'\')"'+(_sq.busy?' disabled':'')+'>✉ 답장 보내기</button>'
+        +'<button class="btn" type="button" onclick="sqAct(\''+_jsAttr(it.id)+'\',\'hold\')">⏸ 보류</button>'
+        +'<button class="btn" type="button" onclick="sqAct(\''+_jsAttr(it.id)+'\',\'dismiss\')" title="이 건을 대기에서 치웁니다(보낸 것이 아닙니다)">✕ 치우기</button>'
+        +'<span class="sq-sub">제목: '+escapeHtml('RE: '+KcareerSendQ.stripRe(it.subject))+'</span></div></div>';
+    }).join('')+'</div>';
+  }
+  if(rev.length){
+    h+='<div class="sq-band sq-rev"><div class="sq-head">❓ 확인 필요 '+rev.length+'건 <span class="sq-sub">— 채우지 않았습니다. 서식 채우기에서 직접 확인해 주세요</span></div>'+rev.map(function(it){
+      return '<div class="sq-card"><div class="sq-row"><div class="sq-t"><b>'+escapeHtml(it.org||it.from)+'</b> · '+escapeHtml(it.subject||it.docName)+' · '+escapeHtml(sqWhen(it.createdAt))+'</div>'
+        +'<button class="btn sm" type="button" onclick="sqView(\''+_jsAttr(it.id)+'\',\'orig\')">👁 원본 보기</button></div>'
+        +'<div class="sq-chips">'+(it.reasons||[]).map(function(x){ return '<span class="sq-warn">'+escapeHtml(x)+'</span>'; }).join('')+'</div>'
+        +'<div class="sq-row">'+(it.learn?'<button class="btn sm" type="button" onclick="sqLearn(\''+_jsAttr(it.id)+'\')" title="이 보낸 곳의 같은 양식은 다음부터 «알던 서류»로 읽습니다">✔ 이 기관도 같은 규칙으로</button>':'')
+        +'<button class="btn sm" type="button" onclick="navTile(\'page-feedoc\')">✍️ 서식 채우기</button>'
+        +'<button class="btn sm" type="button" onclick="sqAct(\''+_jsAttr(it.id)+'\',\'dismiss\')">✕ 치우기</button></div></div>';
+    }).join('')+'</div>';
+  }
+  if(hold.length){
+    h+='<div class="sq-band"><div class="sq-head">⏸ 보류 '+hold.length+'건</div>'+hold.map(function(it){
+      return '<div class="sq-card"><div class="sq-row"><div class="sq-t"><b>'+escapeHtml(it.org||it.from)+'</b> · '+escapeHtml(it.subject||it.docName)+'</div>'
+        +'<button class="btn sm" type="button" onclick="sqAct(\''+_jsAttr(it.id)+'\',\'resume\')">다시 대기로</button>'
+        +'<button class="btn sm" type="button" onclick="sqAct(\''+_jsAttr(it.id)+'\',\'dismiss\')">✕ 치우기</button></div></div>';
+    }).join('')+'</div>';
+  }
+  box.innerHTML=h; box.style.display='';
+}
+function sqToggleIntake(){ _sq.open=!_sq.open; sqRender(); }
+
+/* 넣기 — 파일·보낸 사람·제목을 읽어 sqProcess 로 넘긴다 */
+async function sqIntakeGo(){
+  if(_sq.busy) return;
+  var fi=document.getElementById('sqInFile'), f=fi&&fi.files&&fi.files[0];
+  var from=(document.getElementById('sqInFrom')||{}).value||'', subj=((document.getElementById('sqInSubj')||{}).value||'').trim();
+  if(!f){ toast('받은 한글 서류(.hwp / .hwpx)를 골라 주세요'); return; }
+  var 주소=KcareerSendQ.addrOf(from), 기관=((document.getElementById('sqInOrg')||{}).value||'').trim();
+  if(!주소){ toast('보낸 사람의 메일 주소를 적어 주세요'); return; }
+  _sq.busy=true; sqRender();
+  try{
+    var 결과=await sqProcess(new Uint8Array(await f.arrayBuffer()), f.name, { from:주소, subject:subj||f.name, org:기관, mailKey:'m:'+주소+'|'+subj+'|'+f.size });
+    _sq.open=false;
+    toast(결과.msg, 8000);
+  }catch(e){ console.warn('발송 대기 넣기', e); toast('⚠ 넣지 못했습니다 — '+((e&&e.message)||e), 10000); }
+  finally{ _sq.busy=false; sqRender(); }
+}
+
+/* 서류 한 통을 읽어 «대기 / 확인 필요»로 올린다. 돌려주는 것 = { action, msg } */
+async function sqProcess(bytes, name, meta){
+  var Q=KcareerSendQ, rules=sqRules();
+  var 맞춤=Q.matchMail({ from:meta.from, subject:meta.subject, atts:[name] }, rules);
+  var id=Q.itemId(meta.mailKey, name), 옛=sqFind(id);
+  var hwpx=await _rhToHwpx(bytes, name);
+  if(!hwpx) throw new Error('한글 파일(.hwp·.hwpx)이 아니거나 열 수 없습니다');
+  await _loadJSZip();
+  var zip=await JSZip.loadAsync(hwpx);
+  var 구역=Object.keys(zip.files).filter(function(n){ return /Contents\/section0\.xml$/i.test(n); })[0];
+  if(!구역) throw new Error('서류 속을 읽지 못했습니다');
+  var xml=await zip.file(구역).async('string');
+  var 규칙=맞춤.rule||rules[0], 검사=Q.checkForm(xml, 규칙);
+  /* 사람이 직접 넣었는데 규칙에 안 맞으면 «비슷한 서류»로 다룬다 — 양식이 다르면 어차피 확인 필요가 된다 */
+  if(맞춤.level==='none' && 검사.verdict!=='different') 맞춤={ level:'similar', rule:규칙, att:name, why:['등록된 규칙과 맞지 않지만 직접 넣으셨습니다'] };
+  var 정책=Q.similarPolicy(맞춤, 검사, 옛);
+  if(정책.action==='dup'){ return { action:'dup', msg:'ℹ '+정책.reasons[0] }; }
+  if(정책.action==='ignore'){ return { action:'ignore', msg:'ℹ 알던 서류가 아니라 넣지 않았습니다' }; }
+  var now=Date.now(), nm=(getProfileInfo()||{}).name||'', t=Q.todayKST(now);
+  var oid='sqo_'+now, 원본이름=name;
+  var okOrig=await saveFileWait(oid,{ id:oid, name:name, ext:(name.split('.').pop()||'').toLowerCase(), size:bytes.length, base64:abToB64(bytes), savedAt:new Date(now).toISOString() },{ noCache:true });
+  if(!okOrig) throw new Error('이 PC 보관함에 원본을 담지 못했습니다');
+  var 새={ ruleId:규칙.id, org:규칙.org||(meta.org||''), from:meta.from, subject:meta.subject, mailKey:meta.mailKey, attName:name, docName:name, origId:oid,
+    facts:Q.facts(xml), reasons:정책.reasons };
+  if(정책.learn) 새.learn=정책.learn;
+  if(정책.action==='review'){
+    var rv=Q.makeItem(Object.assign({ status:'review' }, 새), now); rv.origId=oid; if(정책.learn) rv.learn=정책.learn;
+    sqPut(rv);
+    return { action:'review', msg:'❓ 확인 필요로 올렸습니다 — '+정책.reasons.join(' · ') };
+  }
+  /* 채운다 — 어느 한 걸음이라도 안 되면 «확인 필요»로 돌린다(반쯤 채운 서류를 대기에 올리지 않는다) */
+  var 이유='';
+  var 도장=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
+  if(!nm.trim()) 이유='내 정보에 성명이 없습니다';
+  else if(!도장) 이유='도장(직인) 보관함에 도장이 없습니다';
+  var 채움=null;
+  if(!이유){
+    try{
+      var 글=Q.fillConsent(xml, { name:nm.trim(), month:t.month, day:t.day, rule:규칙 });
+      var f=await getFileAsync(도장.id);
+      if(!f||!f.base64) throw new Error('도장 그림을 찾을 수 없습니다');
+      var png=String(f.base64).replace(/^data:[^,]*,/,'');
+      var imgId=KcareerHwpStamp.nextImageId(Object.keys(zip.files));
+      var fit=stampFit(도장);
+      글=Q.stampSeal(글, KcareerHwpStamp, { imgId:imgId, px:await _rhStampPx(도장.id, png), size:fit.size, offX:3800+fit.dx, offY:fit.dy });
+      zip.file(구역, 글);
+      zip.file('BinData/'+imgId+'.png', png, { base64:true });
+      zip.file('Contents/content.hpf', KcareerHwpStamp.addToManifest(await zip.file('Contents/content.hpf').async('string'), imgId, 'BinData/'+imgId+'.png'));
+      /* 한글이 읽는 꼴로 다시 싼다 — mimetype 이 맨 앞·압축 없음 */
+      var 새zip=new JSZip();
+      var 이름들=Object.keys(zip.files).filter(function(n){ return !zip.files[n].dir; }).sort(function(a,b){ return a==='mimetype'?-1:b==='mimetype'?1:0; });
+      for(var i=0;i<이름들.length;i++) 새zip.file(이름들[i], await zip.file(이름들[i]).async('uint8array'), { compression:이름들[i]==='mimetype'?'STORE':'DEFLATE' });
+      채움=await 새zip.generateAsync({ type:'uint8array', compression:'DEFLATE', mimeType:'application/hwp+zip' });
+    }catch(e){ 이유=(e&&e.code==='anchor')?('양식 칸을 찾지 못했습니다 — '+e.message):((e&&e.message)||'채우지 못했습니다'); }
+  }
+  if(!채움){
+    var rv2=Q.makeItem(Object.assign({ status:'review' }, 새, { reasons:[이유] }), now); rv2.origId=oid;
+    sqPut(rv2);
+    return { action:'review', msg:'❓ 채우지 못해 확인 필요로 올렸습니다 — '+이유 };
+  }
+  var 파일이름=name.replace(/\.hwpx?$/i,'')+'_'+nm.trim()+' '+t.year+'. '+t.month+'. '+t.day+'.hwpx';
+  var gid='sqg_'+now;
+  var okGen=await saveFileWait(gid,{ id:gid, name:파일이름, ext:'hwpx', size:채움.length, base64:abToB64(채움), savedAt:new Date(now).toISOString() },{ noCache:true });
+  if(!okGen) throw new Error('이 PC 보관함에 완성본을 담지 못했습니다');
+  var st=채움.length<25*1024*1024 ? await kcFormUpload(gid, abToB64(채움), 'hwpx') : '';
+  var it=Q.makeItem(Object.assign({ status:'pending' }, 새, { docName:파일이름, fileId:gid, reasons:[] }), now); it.origId=oid; if(st) it.genStPath=st;
+  sqPut(it);
+  return { action:'queue', msg:'⏳ 발송 대기에 올렸습니다 — 내용을 보시고 «✉ 답장 보내기»를 눌러 주세요' };
+}
+
+function sqView(id, which){
+  var it=sqFind(id); if(!it) return;
+  var fid=(which==='orig')?it.origId:it.fileId;
+  if(!fid){ toast('보여 줄 파일이 없습니다'); return; }
+  showBig(fid);
+}
+function sqAct(id, action){
+  var it=sqFind(id); if(!it) return;
+  try{ sqPut(KcareerSendQ.transition(it, action)); }catch(e){ toast('⚠ '+e.message); return; }
+  sqRender();
+  toast(action==='hold'?'⏸ 보류했습니다':action==='resume'?'⏳ 다시 대기로 올렸습니다':'✕ 치웠습니다 (보낸 것이 아닙니다)');
+}
+/* 다른 기관인데 양식이 같다 — 사람이 «이 기관도»를 누르면 규칙에 그 주소를 더하고, 원본으로 다시 읽는다 */
+async function sqLearn(id){
+  var it=sqFind(id); if(!it||_sq.busy) return;
+  _sq.busy=true; sqRender();
+  try{
+    set(SQ_RULES, KcareerSendQ.addSender(sqRules(), it.ruleId, it.from));
+    var f=await getFileAsync(it.origId);
+    if(!f||!f.base64) throw new Error('원본을 찾을 수 없습니다');
+    var 결과=await sqProcess(new Uint8Array(b64ToAb(String(f.base64).replace(/^data:[^,]*,/,''))), it.attName||it.docName, { from:it.from, subject:it.subject, org:it.org, mailKey:it.mailKey });
+    toast('✔ 이 기관을 알던 규칙에 더했습니다 — '+결과.msg, 9000);
+  }catch(e){ toast('⚠ '+((e&&e.message)||e), 9000); }
+  finally{ _sq.busy=false; sqRender(); }
+}
+
+/* 답장 보내기 — 사람이 누른 «한 번»이다.
+   완성본을 메일 첨부 임시 자리에 올리고(서버가 꺼내 붙인다) → 보내는 서버를 부른다 → 보낸 뒤에 저장 서류에 기록.
+   ⚠ 첨부가 서버에서 빠졌을 수 있다(files=0) — 그러면 «보냈다»고만 하지 않고 크게 알린다. */
+async function sqSend(id){
+  if(_sq.busy) return;
+  var it=sqFind(id); if(!it) return;
+  if(it.status!=='pending'){ toast('⚠ 대기 중인 건만 보낼 수 있습니다'); return; }
+  var u=firebase.auth&&firebase.auth().currentUser;
+  if(!u){ toast('⚠ 로그인이 풀렸습니다 — 다시 로그인해 주세요'); return; }
+  _sq.busy=true; sqRender();
+  try{
+    var f=await getFileAsync(it.fileId);
+    if(!f||!f.base64) throw new Error('채운 서류를 찾을 수 없습니다');
+    var bin=new Uint8Array(b64ToAb(String(f.base64).replace(/^data:[^,]*,/,'')));
+    var 창고=firebase.app().storage(SQ_MAIL_BUCKET);
+    var 자리='pucards/mailout/'+u.uid+'/f'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+    await 창고.ref(자리).put(new Blob([bin],{type:'application/hwp+zip'}));
+    var 나=(getProfileInfo()||{}).name||'';
+    var 내용=KcareerSendQ.replyPayload(it, { name:나, fileName:it.docName, size:bin.length, path:자리 });
+    var tok=await u.getIdToken();
+    var res=await fetch(SQ_MAIL_FN,{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+tok }, body:JSON.stringify(내용) });
+    var j=await res.json().catch(function(){ return null; });
+    if(!res.ok||!j||!j.ok) throw new Error((j&&j.error)||('서버 응답 '+res.status));
+    /* 보냈다 — 이제부터 실패해도 «다시 보내기»가 되지 않도록 먼저 상태를 바꾼다 */
+    var now=new Date(), rid=SQ_STORE+'_rec_'+now.getTime(), 오늘=now.getFullYear()+'.'+('0'+(now.getMonth()+1)).slice(-2)+'.'+('0'+now.getDate()).slice(-2);
+    sqPut(KcareerSendQ.transition(it,'send',now.getTime(),{ to:it.replyTo, recordId:rid }));
+    var rule=sqRules().filter(function(r){ return r.id===it.ruleId; })[0]||{};
+    try{
+      var 기록={ id:rid, kind:rule.kind||'개인정보 동의서', year:String(now.getFullYear()), org:it.org||'', memo:'답장 발송 · '+(it.subject||'').slice(0,40),
+        genFileId:it.fileId, genName:it.docName, origFileId:it.origId||null, origName:it.attName||null,
+        submits:[{ date:오늘, method:'메일', memo:it.replyTo+' 답장 발송' }], savedAt:now.toISOString() };
+      if(it.genStPath) 기록.genStPath=it.genStPath;
+      set('feedoc', [기록].concat(get('feedoc')));
+      _safe(function(){ renderDocStore('feedoc'); });
+    }catch(e){ console.warn('발송 기록 저장', e); toast('⚠ 메일은 나갔지만 저장 서류에 기록하지 못했습니다 — 제출 기록을 직접 남겨 주세요', 12000); }
+    if(!(j.files>=1)) toast('⚠ 메일은 나갔지만 첨부가 빠졌을 수 있습니다 — 보낸메일함에서 첨부를 확인해 주세요', 15000);
+    else toast('✅ 답장을 보냈습니다 — 받는 곳 '+it.replyTo+' · 저장 서류에 기록했습니다', 9000);
+  }catch(e){ console.warn('발송 대기 보내기', e); toast('⚠ 보내지 못했습니다 — '+((e&&e.message)||e)+' (대기에 그대로 있습니다)', 12000); }
+  finally{ _sq.busy=false; sqRender(); }
 }
 
 /* ===== 이력서 생성·보관 — 내 정보로 채우기 + 임시저장 =====
