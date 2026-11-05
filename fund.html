@@ -7740,11 +7740,47 @@ function _splitTableToFit(tbl,body,limit){
   var rows=[];
   Array.prototype.forEach.call(tbl.rows,function(r){ if(r.closest('table')===tbl) rows.push({r:r,p:r.parentNode}); });
   var head=tbl.querySelector(':scope > thead');
-  var movable=rows.filter(function(x){ return !head||x.p!==head; });        // 머리행은 남긴다
+  var headRows=[];
+  if(!head){
+    for(var hi=0;hi<rows.length;hi++){
+      var hr=rows[hi].r;
+      if(hr.querySelector('th') && !hr.querySelector('td')) headRows.push(rows[hi]);
+      else break;
+    }
+  }
+  var movable=rows.filter(function(x){ return (!head||x.p!==head) && headRows.indexOf(x)<0; });        // 머리행은 남긴다
   if(movable.length<2) return null;
   var moved=[];
   while(movable.length>1 && body.scrollHeight>limit){                       // 최소 한 행은 남긴다
     var last=movable.pop(); last.r.remove(); moved.unshift(last);
+  }
+  var _popMore=true;
+  while(_popMore && movable.length>1){
+    _popMore=false;
+    for(var mi=1;mi<movable.length;mi++){
+      var mcs=movable[mi].r.children;
+      for(var ci=0;ci<mcs.length;ci++){
+        var rs=parseInt(mcs[ci].getAttribute('rowspan')||'1',10);
+        if(rs>1 && mi+rs>movable.length){
+          while(movable.length>mi){
+            var lp=movable.pop(); lp.r.remove(); moved.unshift(lp);
+          }
+          _popMore=true;
+          break;
+        }
+      }
+      if(_popMore) break;
+    }
+  }
+  if(movable.length){
+    var c0=movable[0].r.children;
+    for(var c0i=0;c0i<c0.length;c0i++){
+      var rs0=parseInt(c0[c0i].getAttribute('rowspan')||'1',10);
+      if(rs0>movable.length && body.childNodes.length>1){
+        moved.forEach(function(x){ x.p.appendChild(x.r); });
+        return null;
+      }
+    }
   }
   if(!moved.length) return null;
   if(body.scrollHeight>limit){                                              // 그래도 안 들어감 → 원복
@@ -7752,6 +7788,7 @@ function _splitTableToFit(tbl,body,limit){
     return null;
   }
   var rest=tbl.cloneNode(false);                                            // 테두리·너비 등 표 속성 유지
+  rest.removeAttribute('data-newpage');
   /* 열 폭 정의(colgroup)를 이어지는 표에도 복사한다. shallow clone은 자식을 안 가져오므로
      이걸 빼면 다음 쪽 표가 열 폭을 잃고 균등분할돼, 쪽마다 칸 폭이 달라지고
      좁은 칸의 글자가 칸을 넘쳐 표가 본문 폭을 벗어난다(사업자등록신청서 66열 실측). */
@@ -7759,6 +7796,9 @@ function _splitTableToFit(tbl,body,limit){
   if(cg) rest.appendChild(cg.cloneNode(true));
   if(head) rest.appendChild(head.cloneNode(true));                          // 머리행 반복
   var tb=document.createElement('tbody'); rest.appendChild(tb);
+  if(!head && headRows.length){
+    headRows.forEach(function(hx){ tb.appendChild(hx.r.cloneNode(true)); });
+  }
   moved.forEach(function(x){ tb.appendChild(x.r); });
   return rest;
 }
@@ -7771,6 +7811,23 @@ function paginateDoc(rawHTML){
   Array.prototype.forEach.call(holder.querySelectorAll('.a4b'),function(b){
     while(b.firstChild) b.parentNode.insertBefore(b.firstChild,b);
     b.remove();
+  });
+  Array.prototype.forEach.call(holder.querySelectorAll('.a4 .a4'),function(na){
+    var hasPrev=false, p=na.previousSibling;
+    while(p){ if(p.nodeType===1||(p.nodeType===3&&String(p.nodeValue||'').trim())){ hasPrev=true; break; } p=p.previousSibling; }
+    if(hasPrev && na.firstElementChild) na.firstElementChild.setAttribute('data-newpage','1');
+    while(na.firstChild) na.parentNode.insertBefore(na.firstChild,na);
+    na.remove();
+  });
+  Array.prototype.forEach.call(holder.querySelectorAll('div'),function(dv){
+    if(dv.classList&&(dv.classList.contains('a4')||dv.classList.contains('cbwrap')||dv.classList.contains('fmcols')||dv.classList.contains('sign')||dv.classList.contains('docnotes')||dv.classList.contains('msg'))) return;
+    if(dv.closest('td,th')) return;
+    if(!dv.querySelector('table')) return;
+    var np=dv.getAttribute('data-newpage'), kp=dv.getAttribute('data-kept');
+    if(np && dv.firstElementChild) dv.firstElementChild.setAttribute('data-newpage',np);
+    if(kp) Array.prototype.forEach.call(dv.children,function(c){ c.setAttribute('data-kept',kp); });
+    while(dv.firstChild) dv.parentNode.insertBefore(dv.firstChild,dv);
+    dv.remove();
   });
   /* 서식 이름표(dk-…) — 장마다 제 글자 크기를 쓰게 한다.
      ⚠ 묶음 인쇄는 서식마다 크기가 «다르다». 그래서 들어온 장에 이름표가 붙어 있으면
@@ -7808,80 +7865,15 @@ function paginateDoc(rawHTML){
       }
       body.appendChild(nd);
       if(!(limit>0 && body.scrollHeight>limit)) continue;                  // 들어갔다
-      var _isFlow=(dk==='dk-charter'||dk==='dk-charter_sane'||dk==='dk-bizplan'||dk==='dk-agreement');
-      if(_isFlow && nd.nodeType===1 && nd.tagName==='TABLE' && body.scrollHeight<=limit*1.22){
+      /* 고정 양식 표가 미세한 여백(8% 이내)으로 넘칠 때만 안쪽 여백을 살짝 다듬고,
+         그래도 넘치거나 다행 표(별지 명단·참석위원·서명표 등)면 즉시 행 단위로 다음 쪽에 넘긴다. */
+      if(nd.nodeType===1 && nd.tagName==='TABLE' && !nd.getAttribute('data-kept') && body.scrollHeight<=limit*1.08){
         [].slice.call(body.querySelectorAll('table')).forEach(function(tb){ tb.style.margin='2px 0'; });
         [].slice.call(body.querySelectorAll('td,th')).forEach(function(td){
           if(td.parentNode&&td.parentNode.getAttribute&&td.parentNode.getAttribute('data-hwp-sep')) return;
-          td.style.padding='2px 4px'; td.style.height='auto';
+          td.style.padding='2px 4px';
         });
-        [].slice.call(body.querySelectorAll('p')).forEach(function(p){
-          if(p.closest('td,th')){ p.style.lineHeight='125%'; p.style.margin='0'; }
-          else { p.style.margin='2px 0'; p.style.lineHeight='1.5'; }
-        });
-        if(body.scrollHeight<=limit+1) continue;
-      }
-      if(!_isFlow){
-        var _secRest=[];
-        while(queue.length){
-          var _nx=queue[0];
-          if(_nx.nodeType===1 && _nx.getAttribute && _nx.getAttribute('data-newpage')) break;
-          _secRest.push(queue.shift());
-        }
-        _secRest.forEach(function(x){ body.appendChild(x); });
-        var _trCnt=body.querySelectorAll('tr').length;
-        if(_trCnt<=55 && body.scrollHeight<=limit*1.68){
-          [].slice.call(body.querySelectorAll('table')).forEach(function(tb){ tb.style.margin='2px 0'; });
-          [].slice.call(body.querySelectorAll('h1,h2,p,div')).forEach(function(el){
-            if(el.tagName==='H1'){ el.style.margin='6px 0 4px'; }
-            else if(el.tagName==='H2'){ el.style.margin='6px 0 3px'; }
-            else if(el.tagName==='P'){
-              if(el.closest('td,th')){ el.style.lineHeight='125%'; el.style.margin='0'; }
-              else { el.style.margin='2px 0'; el.style.lineHeight='1.35'; }
-            } else if(el.classList&&el.classList.contains('sign')){ el.style.marginTop='10px'; el.style.lineHeight='1.6'; }
-          });
-          var _scaleH=Math.max(0.5, (limit/body.scrollHeight)*0.82);
-          [].slice.call(body.querySelectorAll('td,th')).forEach(function(td){
-            if(td.parentNode&&td.parentNode.getAttribute&&td.parentNode.getAttribute('data-hwp-sep')) return;
-            td.style.padding='2px 4px';
-            var st=td.getAttribute('style')||'';
-            var mh=/height\s*:\s*([\d.]+)\s*(pt|px)/i.exec(st);
-            if(mh){
-              var hv=parseFloat(mh[1]);
-              if(hv>110) td.style.height='auto';
-              else td.style.height=Math.max(10,Math.round(hv*_scaleH*10)/10)+mh[2];
-            }
-          });
-          if(body.scrollHeight>limit){
-            [].slice.call(body.querySelectorAll('td,th')).forEach(function(td){
-              if(td.parentNode&&td.parentNode.getAttribute&&td.parentNode.getAttribute('data-hwp-sep')) return;
-              td.style.height='auto'; td.style.padding='1px 3px'; td.style.lineHeight='1.2';
-            });
-            [].slice.call(body.querySelectorAll('p')).forEach(function(p){ p.style.lineHeight='1.18'; p.style.margin='0'; });
-          }
-          if(body.scrollHeight>limit){
-            var _fr=Math.max(0.72, (limit/body.scrollHeight)*0.95);
-            var _bf=parseFloat(window.getComputedStyle(body).fontSize)||13;
-            body.style.fontSize=Math.max(9.5,Math.round(_bf*_fr*10)/10)+'px';
-            body.style.lineHeight='1.18';
-            [].slice.call(body.querySelectorAll('td,th')).forEach(function(td){
-              if(td.parentNode&&td.parentNode.getAttribute&&td.parentNode.getAttribute('data-hwp-sep')) return;
-              td.style.fontSize=Math.max(9,Math.round(12*_fr*10)/10)+'px';
-              td.style.padding='1px 2px';
-            });
-          }
-          if(body.scrollHeight>limit){
-            var _zr=Math.max(0.68, Math.floor((limit/body.scrollHeight)*98)/100);
-            [].slice.call(body.children).forEach(function(ch){
-              if(ch.style) ch.style.zoom=String(_zr);
-            });
-          }
-          if(body.scrollHeight<=limit+1) continue;
-        }
-        for(var _ri=_secRest.length-1;_ri>=0;_ri--){
-          if(_secRest[_ri].parentNode===body) body.removeChild(_secRest[_ri]);
-          queue.unshift(_secRest[_ri]);
-        }
+        if(body.scrollHeight<=limit) continue;
       }
       // 넘쳤다 → ① 표면 행 단위로 잘라 이 장을 채우고 남은 행은 다음 장으로
       var rest=(nd.nodeType===1&&nd.tagName==='TABLE')?_splitTableToFit(nd,body,limit):null;
@@ -9376,7 +9368,10 @@ function fillChecklistDoc(root,f,sites){
         return sd?(sd+' '+군):군;
       })(),
       '공동기금법인명': f.name||'',
-      '공동기금참여회사': act.map(function(x){ return x.name; }).filter(Boolean).join(', '),
+      '공동기금참여회사': (function(){
+        var ns=act.map(function(x){ return x.name; }).filter(Boolean);
+        return ns.length>8?(ns.slice(0,5).join(', ')+' 외 '+(ns.length-5)+'개소'):ns.join(', ');
+      })(),
       '기금인가번호(인가일자)': f.inka_no?(f.inka_no+(f.inka_date?' ('+_dotDate(f.inka_date)+')':'')):'',
       '업종':          '',                                   // 기금 자료에 없다 — 사람이 적는다
       '참여회사근로자수': emp?emp+'명':'',
