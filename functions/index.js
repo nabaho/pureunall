@@ -3470,7 +3470,22 @@ exports.recordBillingAlert = functions
             if (v) byKey[k] = v;
           }
           const who = BA.spikeCulprit(byKey, nowMs);
-          await ref.set(Object.assign({}, hit, who ? { key: who.key, label: who.label } : {}));
+          /* ★ 그날 처음이면 대표 폰으로 한 번 (2026-11-05 「유료 API 통제 3단계」) — 까닭은 BA.spikePushPayload 머리.
+             ⚠ 보내기가 실패해도 아래 기록은 남긴다(pushedAt 없이 — 다음 쪽지 때 다시 시도). */
+          const prev = (await ref.once("value")).val();
+          const 알림 = BA.spikePushPayload(prev, hit, who);
+          let pushedAt = (prev && prev.day === hit.day && prev.pushedAt) || null;
+          if (알림) {
+            try {
+              const r = await PUSH.pushAdmins(db, getMessaging(), 알림);
+              if (r && r.sent > 0) pushedAt = Date.now();
+              console.log("recordBillingAlert: 폭주 폰 알림", { targets: r && r.targets, sent: r && r.sent });
+            } catch (e) {
+              console.error("recordBillingAlert: 폭주 폰 알림 실패", String((e && e.message) || e));
+            }
+          }
+          await ref.set(Object.assign({}, hit, who ? { key: who.key, label: who.label } : {},
+            pushedAt ? { pushedAt: pushedAt } : {}));
           console.warn("recordBillingAlert: 하루 폭주", hit, who || "");
         }
       } catch (e) {
@@ -3617,30 +3632,21 @@ exports.typeSafeEvaluate = functions
      넣은 뒤에는, DB 의 열쇠를 지우고 이 갈래도 지워야 완결된다.
      남겨 두면 열쇠가 DB 에 그대로 있어 지금 문제가 안 풀린다. */
 async function readGeminiKey() {
-  const fromSecret = String(process.env.GEMINI_KEY || "").trim();
-  /* ⚠ **어디서 왔는지**를 남긴다(값은 절대 안 남긴다). 금고를 걸었는데도 옛 갈래로
-     돌고 있으면, 실시간DB 의 열쇠를 지우는 순간 판독이 멈춘다 — 지우기 전에
-     이 줄로 확인한다: `keySource secret` 이면 금고에서 온 것이다. */
-  if (fromSecret) { console.log("keySource secret"); return fromSecret; }
-  const db = getDatabase();
-  const paths = ["pucards/config/geminiKey", "data/app_config/geminiKey"];
-  for (const p of paths) {
-    try {
-      const snap = await db.ref(p).once("value");
-      const v = String(snap.val() || "").trim();
-      if (v) { console.log("keySource rtdb", p); return v; }
-    } catch (e) { /* 다음 자리로 */ }
-  }
-  return "";
+  /* ★ 2026-11-05 「유료 API 통제 2단계」 — 열쇠는 «금고(GEMINI_KEY)» 하나뿐이다.
+     실시간DB 갈래(pucards/config/geminiKey · data/app_config/geminiKey)를 걷어냈다.
+     그 두 자리는 규칙상 «로그인한 직원 모두»가 읽는다 — 판독이 유료 등급이 된 뒤로
+     거기 열쇠가 있으면 누구든 꺼내 회사 한도 밖에서 쓸 수 있었다.
+     ⚠ 확인한 것: 이 함수를 부르는 서버 함수(readDoc·photoEdit·mailCardRead·suggestionAssist(Now)·
+       recruitWatch·뉴스레터 넷)는 모두 runWith secrets 에 GEMINI_KEY 를 건다
+       (tests/ai-key-vault-only.test.js 가 지킨다 — 빠뜨리면 그 함수만 「키 없음」으로 멎는다). */
+  return String(process.env.GEMINI_KEY || "").trim();
 }
 
 /* 2026-08-17 — 대표님이 `firebase functions:secrets:set GEMINI_KEY` 로 비밀을 넣으셨다.
    이제 열쇠는 **금고(Secret Manager)** 에서 온다.
    ⚠ 이 줄은 비밀이 **실제로 있을 때만** 걸 수 있다. 없는 비밀을 걸면 배포가 통째로
      막힌다(2026-08-17 에 실제로 막혔다: `Secret … GEMINI_KEY not found`).
-   ⚠ 실시간DB 갈래(readGeminiKey 안)는 **아직 남겨 둔다.** 금고가 실제로 도는 것을
-     사람이 확인하기 전에 지우면, 어긋났을 때 판독이 통째로 멈춘다.
-     확인 뒤에 DB 의 열쇠와 그 갈래를 함께 지운다. */
+   ⚠ 실시간DB 갈래는 2026-11-05 에 걷어냈다(readGeminiKey 머리 참고). */
 /* ⑪ 사진을 «무료로 뽑은 글자»로 갈음해 본다. 되면 바꾼 parts 를, 아니면 null 을 준다.
    ⚠⚠ 이 함수는 **한 번도 던지지 않는다.** 넘어지면 null 이고, 부르는 쪽은 사진 그대로
      보낸다 — 무료는 «덤»이지 판독의 조건이 아니다. 여기서 던지면 아끼려다

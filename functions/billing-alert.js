@@ -226,7 +226,27 @@ function spikeCulprit(historyByKey, nowMs) {
   return best;
 }
 
+/* ── 폭주를 대표 폰으로 (대표 지시 2026-11-05 「유료 API 통제 3단계」) ──────────────
+   여태 폭주 판정은 billing/spike 에 «적기만» 했다 — 포털을 열어야 보였다.
+   이제 그날 «처음» 폭주로 판정될 때 한 번 폰으로 보낸다.
+   ⚠ 하루 한 번 — 예산 쪽지는 하루에도 여러 번 온다. 같은 날 이미 보냈으면(prev.pushedAt) null.
+   ⚠ 금액은 「오늘 늘어난 액수 · 평소의 몇 배 · 어느 칸」만 — 고객 자료는 없다. */
+function spikePushPayload(prev, hit, who) {
+  if (!hit) return null;
+  if (prev && prev.day === hit.day && prev.pushedAt) return null;
+  const won = function (n) { return Math.round(Number(n) || 0).toLocaleString("ko-KR"); };
+  return {
+    title: "⚠ 오늘 클라우드 요금 급증",
+    body: "오늘 ₩" + won(hit.inc) + " — 평소(₩" + won(hit.avg) + ")의 " + hit.ratio + "배"
+      + (who && who.label ? " · " + who.label + "에서 늘고 있습니다" : "")
+      + ". 포털 💰 에서 확인해 주세요.",
+    tag: "pu-billing-spike",
+    url: "/pureunall/enter.html",
+  };
+}
+
 module.exports = {
+  spikePushPayload,
   BUDGET_KEYS, LABELS, parseAlert, shouldApply, historyEntry,
   SPIKE_RATIO, SPIKE_MIN_WON, SPIKE_BASE_DAYS, SPIKE_MIN_BASE,
   kstDay, dailyIncreases, spikeCheck, spikeCulprit,
