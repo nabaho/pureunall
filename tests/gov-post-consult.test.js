@@ -282,7 +282,7 @@ test('★ 같은 사업장 같은 날 다른 사업 — 사후도 «센다» (�
 
 const VIEWS = ['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'curPhase', 'nextRound', 'dashActiveTypeIds', 'dashEndOnRows',
   'progCalc', 'mpDate', 'dashReopenBadge', 'renderDashTypeRows', 'renderProg', 'renderSummaryBar', 'renderTimeline', 'renderTlZoom', 'tlZoomCopyText', 'tlZoomCopy', 'endedDateForSchedule',
-  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle', 'postListFor', 'postPhotoCount', 'postTypeDone', 'dashPostItem'];
+  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle', 'postListFor', 'postPhotoCount', 'postTypeDone', 'dashPostItem', 'getCoPostTarget', 'postCountText'];
 function scene(withPost) {
   const c = world(VIEWS, {
     PRE_ROUND_CAP: 2, S: { tlStatus: 'active' }, _mpMine: false, _mpOpen: '', _tzKey: { coId: 'c1', tid: 't2' },
@@ -357,7 +357,7 @@ function engine(over) {
     toast: (m) => st.toasts.push(String(m)), renderDash: () => {}, renderCal: () => {}, erpSidName: () => '',
   }, over || {}));
   vm.runInContext(enLine + '\n' + S.slice(cc, ccEnd) + '\n' + S.slice(g, gEnd) + '\n' + S.slice(a, b) + '\n' +
-    ['isPostSched', 'getMainScheds', 'schedHasPhoto', 'postPhotoCount', 'endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos'].filter(has).map(grab).join('\n'), ctx);
+    ['isPostSched', 'getMainScheds', 'schedHasPhoto', 'postPhotoCount', 'getCoPostTarget', 'endedRuleList', 'endedDays', 'endedMd', 'endedFlagsFor', 'endedInfos'].filter(has).map(grab).join('\n'), ctx);
   ctx._st = st;
   return ctx;
 }
@@ -487,7 +487,7 @@ test('endedInfos → endedFlagsFor 로 사후 건수가 넘어간다 (이알피 
 
 /* ══ ⑨ 종료 목록의 「사후컨설팅」 열 ═══════════════════════════════════ */
 
-const VIEW = ['endedHi', 'endedPeopleHtml', 'postCellHtml', 'endedListHtml'];
+const VIEW = ['endedHi', 'endedPeopleHtml', 'postCellHtml', 'postCountText', 'endedListHtml'];
 function viewWorld(withPost) {
   const c = endedBoard(withPost);
   vm.runInContext('PHOTOS = ' + JSON.stringify({ pa: { c0: 1, c1: 1 }, pb: { c0: 1 } }), c);
@@ -601,7 +601,8 @@ test('서랍 — 메모·이름 속 HTML 글자는 무해하게 처리된다 · 
 
 const POSTFN = ['isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone', 'schedPhase', 'isPrePhaseType', 'roundIsFixed', 'reorderRounds', 'postListFor', 'postPhotoCount', 'schedHasPhoto',
   'postProblem', 'postBuildSched', 'postDrawerView', 'postDrawerHtml', 'renderPostDrawer', 'openPostDrawer', 'closePostDrawer', 'postSetField', 'postEdit', 'postCancel',
-  'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts'];
+  'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts',
+  'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate'];
 function postWorld(over) {
   const calls = { locks: 0, released: 0, saves: 0, stamp: [], confirm: null, cb: null, delPhoto: [], rendered: [], closed: [] };
   let n = 0;
@@ -733,7 +734,7 @@ test('달력의 사후 칩에서 열면 그 사업 서랍이 열리고 그 줄�
 
 test('★ 사후 코드는 새 localStorage 키·클라우드 키를 만들지 않는다 (기존 일정 한 자리에 같이 저장)', () => {
   const names = ['postListFor', 'postPhotoCount', 'postProblem', 'postBuildSched', 'postDrawerView', 'postDrawerHtml', 'renderPostDrawer', 'openPostDrawer', 'closePostDrawer', 'postSetField',
-    'postEdit', 'postCancel', 'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'postCellHtml'];
+    'postEdit', 'postCancel', 'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'postCellHtml', 'getCoPostTarget', 'postTargetOn', 'postTargetsClean', 'postCountText'];
   names.forEach((n) => { const b = grab(n); assert.ok(!/lsSet\(|localStorage|fbPush\(|_fbDB\.ref\(|\.ref\(['"`]/.test(b), n + ' 이(가) 따로 저장하려 한다 — 일정(setScheds) 한 자리에만 쓴다'); });
 });
 
@@ -961,4 +962,178 @@ test('★ 본 회차를 다 마친 사업에는 «함수로도» 사후가 들�
   assert.deepStrictEqual(p.map((s) => s.coId + ':' + s.round + ':' + s.date), ['c3:1:2026-11-05']);
   assert.strictEqual(JSON.stringify(c._st.cos), beforeCos, '★ 사업(종료 여부 포함)은 하나도 안 바뀐다');
   assert.deepStrictEqual(c._st.scheds.filter((s) => s.coId === 'c3' && s.phase !== 'post').map((s) => s.round), [1, 2, 3], '본 회차 번호 그대로');
+});
+
+/* ══ ⑱ 사후컨설팅 «목표 회수» (대표 지시 2026-11-05 「횟수넣는것도 넣어라」) ═════════════════════════════
+   사업장×종류마다 «사후를 몇 번 하기로 했는지»를 넣는다 — 사업장 설정 customPost[종류] (최대회차·의무방문과 같은 자리).
+   넣으면 진행 목록·종료 목록·서랍이 「사후 N/M회」로 보이고, 채우면 ✓. 비우면 예전처럼 입력한 만큼만 센다.
+   ★ 목표는 «보는 숫자»일 뿐이다 — 본 회차 숫자·사후를 넣고 못 넣는 규칙은 바뀌지 않는다(목표를 넘겨도 막지 않는다). */
+
+test('★ 목표 회수 고치기 — 1~20 정수는 저장, 비우거나 0 은 «칸을 지운다», 틀린 값은 까닭과 함께 거절한다 (undefined·빈 객체를 안 남긴다)', () => {
+  const c = world(['postTargetOn']);
+  const co = { id: 'c1', name: '가나상사' };
+  assert.deepStrictEqual(J(c.postTargetOn(co, 't2', '3')), { ok: true, from: 0, to: 3 });
+  assert.deepStrictEqual(J(co.customPost), { t2: 3 });
+  c.postTargetOn(co, 't1', 5);
+  assert.deepStrictEqual(J(co.customPost), { t2: 3, t1: 5 }, '다른 종류의 목표는 서로 안 건드린다');
+  assert.strictEqual(c.postTargetOn(co, 't2', 3).ok, false, '같은 값이면 바뀐 것이 없다');
+  assert.strictEqual(c.postTargetOn(co, 't2', '20').ok, true, '20 은 허용(경계)');
+  ['21', '-1', '2.5', 'abc'].forEach((bad) => {
+    const r = c.postTargetOn(co, 't2', bad);
+    assert.strictEqual(r.ok, false, bad); assert.ok(/0~20/.test(r.msg), bad + ' → ' + r.msg);
+    assert.strictEqual(co.customPost.t2, 20, '틀린 값은 저장돼 있던 값을 건드리지 않는다: ' + bad);
+  });
+  assert.strictEqual(c.postTargetOn(co, 't2', '').ok, true);
+  assert.deepStrictEqual(J(co.customPost), { t1: 5 }, '빈 칸 = 그 종류 목표만 지운다');
+  c.postTargetOn(co, 't1', 0);
+  assert.ok(!('customPost' in co), '마지막 칸을 지우면 빈 객체도 남기지 않는다(실시간DB 가 거부한다)');
+  assert.ok(!hasUndefined(co));
+  assert.strictEqual(c.postTargetOn(co, 't1', '').ok, false, '지울 것이 없으면 아무 일도 안 한다');
+});
+
+test('★ 사업장 수정 창의 값 거르기(postTargetsClean) — 1~20 정수만 남고, 빈 칸·undefined·0·소수·20 초과는 «목표 없음»', () => {
+  const c = world(['postTargetsClean']);
+  const out = c.postTargetsClean({ a: 3, b: undefined, c: 0, d: 2.5, e: 21, f: '4', g: '', h: -1, i: 20, j: 1 });
+  assert.deepStrictEqual(J(out), { a: 3, f: 4, i: 20, j: 1 });
+  assert.ok(!hasUndefined(out));
+  assert.deepStrictEqual(J(c.postTargetsClean(undefined)), {});
+});
+
+test('getCoPostTarget — 사업장×종류 값을 읽고, 없거나 이상한 값은 «목표 없음(0)»이다', () => {
+  const c = world(['getCoPostTarget']);
+  c._st.cos = [CO('c1', '가나상사', { customPost: { t2: 3, t3: 'x', t1: 0 } }), CO('c2', '라마바식품')];
+  assert.strictEqual(c.getCoPostTarget('c1', 't2'), 3);
+  ['t3', 't1', 't9'].forEach((t) => assert.strictEqual(c.getCoPostTarget('c1', t), 0, t));
+  assert.strictEqual(c.getCoPostTarget('c2', 't2'), 0);
+  assert.strictEqual(c.getCoPostTarget('없는곳', 't2'), 0);
+});
+
+test('사후 회수 글자 — 목표가 없으면 「사후 N회」, 있으면 「사후 N/M회」, 채우면 앞에 ✓', () => {
+  const c = world(['postCountText']);
+  assert.strictEqual(c.postCountText(2, 0), '사후 2회');
+  assert.strictEqual(c.postCountText(0, 0), '사후 0회');
+  assert.strictEqual(c.postCountText(0, 3), '사후 0/3회');
+  assert.strictEqual(c.postCountText(1, 3), '사후 1/3회');
+  assert.strictEqual(c.postCountText(3, 3), '✓ 사후 3/3회');
+  assert.strictEqual(c.postCountText(4, 3), '✓ 사후 4/3회', '목표를 넘겨도 막지 않고 보여 준다');
+});
+
+test('★ 진행 목록 줄 — 목표가 있으면 「사후 N/M회」, 사후가 아직 없어도 「＋ 사후 0/M회」 (완료 줄)', () => {
+  const c = dashScene(false);
+  c._st.cos.find((x) => x.id === 'c1').customPost = { t2: 3 };      // c1 = 현장클리닉 3/3 완료 줄, 사후 없음
+  const none = postItems(rowOf(c, 'c1'));
+  assert.strictEqual(none.length, 1);
+  assert.ok(/＋ 사후 0\/3회/.test(none[0]) && /목표 3회/.test(none[0]) && /openPostDrawer\('c1','t2'\)/.test(none[0]), none[0]);
+  const d = dashScene(true);                                          // c4 = 사후 2건(진행 중 줄에도 보인다)
+  d._st.cos.find((x) => x.id === 'c4').customPost = { t2: 3 };
+  assert.ok(/사후 2\/3회/.test(postItems(rowOf(d, 'c4'))[0]) && !/✓/.test(postItems(rowOf(d, 'c4'))[0]), '목표 3 중 2 — 아직 ✓ 가 아니다');
+  d._st.cos.find((x) => x.id === 'c4').customPost = { t2: 2 };
+  assert.ok(/✓ 사후 2\/2회/.test(postItems(rowOf(d, 'c4'))[0]), '목표를 채우면 ✓');
+});
+
+test('★ 목표를 넣어도 진행 목록 줄의 «본 회차 글자»는 하나도 안 바뀐다 (사후 칸만 달라진다)', () => {
+  const noItem = (h) => String(h).replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  const a = dashScene(true), b = dashScene(true);
+  b._st.cos.forEach((co) => { co.customPost = { t1: 4, t2: 3, t3: 2 }; });
+  a._st.cos.forEach((co) => assert.strictEqual(noItem(rowOf(b, co.id)), noItem(rowOf(a, co.id)), co.id));
+  assert.notStrictEqual(rowOf(b, 'c1'), rowOf(a, 'c1'), '대조: 사후 칸 글자는 달라졌다');
+});
+
+test('★ 서랍 — 목표 칸이 있고(상태와 상관없이), 입력한 회수와 견줘 «남은 회수 / 목표 달성»을 말한다', () => {
+  const c = postWorld();
+  c._st.cos[0].customPost = { t2: 2 };                       // c1: 종료된 사업
+  const html = () => c._st.els['#postBody'].innerHTML;
+  c.openPostDrawer('c1', 't2');
+  assert.ok(/id="postTarget"/.test(html()) && /value="2"/.test(html()) && /max="20"/.test(html()) && /onchange="postSetTarget\(this\.value\)"/.test(html()), '목표 칸: ' + html().slice(0, 300));
+  assert.ok(/입력 0회 · 남은 2회/.test(html()), html().slice(0, 400));
+  c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'pa', round: 1 }));
+  c.openPostDrawer('c1', 't2');
+  assert.ok(/입력 1회 · 남은 1회/.test(html()));
+  c._st.scheds.push(P('c1', 't2', '2026-11-12', { id: 'pb', round: 2 }));
+  c.openPostDrawer('c1', 't2');
+  assert.ok(/✓ 목표 달성/.test(html()) && !/남은/.test(html()), html().slice(0, 400));
+  c._st.scheds.push(P('c1', 't2', '2026-11-19', { id: 'pc', round: 3 }));
+  c.openPostDrawer('c1', 't2');
+  assert.ok(/목표 달성 \(\+1회\)/.test(html()), '목표를 넘겨도 막지 않고 «+1회»로 보여 준다');
+  c.openPostDrawer('c2', 't2');                              // 진행 중인 사업도 설정은 할 수 있다(입력칸만 없다)
+  assert.ok(/id="postTarget"/.test(html()) && /value=""/.test(html()) && /목표 없음/.test(html()) && !/id="postDate"/.test(html()));
+});
+
+test('★ 서랍에서 목표를 넣고 고치고 지운다 — 사업장 한 건만 잠그고 저장하며, 일정(본·사후)은 하나도 안 바뀐다', async () => {
+  const c = postWorld(); c.openPostDrawer('c1', 't2');
+  const schedsBefore = JSON.stringify(c._st.scheds);
+  await c.postSetTarget('3');
+  assert.deepStrictEqual(J(c._st.cos[0].customPost), { t2: 3 });
+  assert.ok(c._calls.locks >= 1 && c._calls.locks === c._calls.released, '잠그고 → 풀었다(못 풀면 다른 사람이 못 고친다)');
+  assert.ok(/입력 0회 · 남은 3회/.test(c._st.els['#postBody'].innerHTML), '서랍이 바로 다시 그려진다');
+  assert.ok(c._st.toasts.some((t) => /3회로 정했습니다/.test(t)), c._st.toasts.join('|'));
+  assert.deepStrictEqual(J(c._st.cos[1]), J(CO('c2', '라마바식품', { types: ['t2'] })), '다른 사업장은 안 건드린다');
+  await c.postSetTarget('5');
+  assert.strictEqual(c._st.cos[0].customPost.t2, 5);
+  await c.postSetTarget('');
+  assert.ok(!('customPost' in c._st.cos[0]) && !hasUndefined(c._st.cos[0]), '비우면 칸 자체가 사라진다');
+  assert.strictEqual(JSON.stringify(c._st.scheds), schedsBefore, '일정은 그대로');
+});
+
+test('서랍에서 틀린 값을 넣으면 까닭을 말하고 아무것도 안 바뀐다 — 잠금은 풀린다', async () => {
+  const c = postWorld(); c._st.cos[0].customPost = { t2: 2 }; c.openPostDrawer('c1', 't2');
+  const before = JSON.stringify(c._st.cos);
+  await c.postSetTarget('99');
+  assert.strictEqual(JSON.stringify(c._st.cos), before);
+  assert.ok(c._st.toasts.some((t) => /0~20/.test(t)), c._st.toasts.join('|'));
+  assert.strictEqual(c._calls.locks, c._calls.released, '잠금이 남으면 그 사업장은 다른 사람이 못 고친다');
+  assert.ok(/value="2"/.test(c._st.els['#postBody'].innerHTML), '칸은 저장돼 있던 값으로 돌아온다');
+});
+
+test('사후를 넣을 때 알림이 목표 진행을 말한다 — 「(1/2회)」 → 「(2/2회) · 목표 달성」', async () => {
+  const c = postWorld(); c._st.cos[0].customPost = { t2: 2 }; c.openPostDrawer('c1', 't2');
+  form(c, '2026-11-05'); await c.postSave(false);
+  assert.ok(/\(1\/2회\)/.test(c._st.toasts[c._st.toasts.length - 1]) && !/목표 달성/.test(c._st.toasts[c._st.toasts.length - 1]), c._st.toasts.join('|'));
+  form(c, '2026-11-12'); await c.postSave(false);
+  assert.ok(/\(2\/2회\) · 목표 달성/.test(c._st.toasts[c._st.toasts.length - 1]), c._st.toasts.join('|'));
+  const c2 = postWorld(); c2.openPostDrawer('c1', 't2'); form(c2, '2026-11-05'); await c2.postSave(false);
+  assert.ok(!/\//.test(c2._st.toasts[c2._st.toasts.length - 1]), '목표가 없으면 예전 알림 그대로: ' + c2._st.toasts.join('|'));
+});
+
+test('★ 목표를 «넘겨도» 사후는 들어간다 — 목표는 보는 숫자일 뿐 막는 규칙이 아니다', async () => {
+  const c = postWorld(); c._st.cos[0].customPost = { t2: 1 }; c.openPostDrawer('c1', 't2');
+  form(c, '2026-11-05'); await c.postSave(false); form(c, '2026-11-12'); await c.postSave(false);
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 2);
+});
+
+test('★ 종료 목록 — 사후 칸이 「사후 N/M회」를 말하고, 목표를 채우면 이알피 규칙이 「사후 목표 달성」으로 바뀐다', () => {
+  const { w, c } = viewWorld(true);
+  c._st.cos.find((x) => x.id === 'c1').customPost = { t1: 3 };
+  c._st.cos.find((x) => x.id === 'c3').customPost = { t1: 2 };
+  const items = c.endedInfos();
+  const c1 = items.find((i) => i.co.id === 'c1'), c3 = items.find((i) => i.co.id === 'c3');
+  assert.strictEqual(c1.postTarget, 3);
+  assert.ok(/사후 2\/3회/.test(w.postCellHtml(c1)) && /목표 3회/.test(w.postCellHtml(c1)), w.postCellHtml(c1));
+  assert.ok(/＋ 사후 0\/2회/.test(w.postCellHtml(c3)), w.postCellHtml(c3));
+  const f1 = Array.from(c1.flags).find((x) => x.rule === 'erp');
+  assert.ok(f1 && /사후 진행 중/.test(f1.label) && /사후 2\/3회 입력됨/.test(f1.reason), JSON.stringify(f1));
+  c._st.cos.find((x) => x.id === 'c1').customPost = { t1: 2 };
+  const done = Array.from(c.endedInfos().find((i) => i.co.id === 'c1').flags).find((x) => x.rule === 'erp');
+  assert.ok(done && /사후 목표 달성/.test(done.label) && /이알피에서 종료/.test(done.hint), JSON.stringify(done));
+});
+
+test('목표가 없으면 종료 목록·이알피 규칙은 예전 글자 그대로다', () => {
+  const { w, c } = viewWorld(true);
+  const c1 = c.endedInfos().find((i) => i.co.id === 'c1');
+  assert.strictEqual(c1.postTarget, 0);
+  assert.ok(/사후 2회/.test(w.postCellHtml(c1)) && !/\d\/\d/.test(w.postCellHtml(c1)));
+  const f = Array.from(c1.flags).find((x) => x.rule === 'erp');
+  assert.ok(/사후 진행 중/.test(f.label) && /사후 2회 입력됨/.test(f.reason));
+});
+
+test('★ 사업장 수정 창 — 사후 회수 칸이 있고, 저장하는 두 길(고치기·새로 만들기)과 사업장 합치기가 customPost 를 잃지 않는다', () => {
+  const i = SRC.indexOf('function renderCoTypes()'); const body = SRC.slice(i, SRC.indexOf('\nfunction ', i + 20));
+  assert.ok(/사후컨설팅 회수/.test(body) && /co_post\['\$\{tid\}'\]=/.test(body) && /max="20"/.test(body), '칸과 값 틀');
+  const open = grab('openCoModal');
+  assert.ok(/co_post=\{\}/.test(open) && /co\?\.customPost[\s\S]{0,40}co_post=\{\.\.\.co\.customPost\}/.test(open), '열 때 비우고 → 있던 값을 불러온다');
+  const save = grab('saveCo');
+  assert.ok(/postTargetsClean\(co_post\)/.test(save), '저장 전에 거른다(undefined·범위 밖 제거)');
+  assert.ok(/next\.customPost=postTargets;\s*else delete next\.customPost/.test(save), '고칠 때: 있으면 쓰고, 비면 칸을 지운다');
+  assert.ok(/customMandatory:\{\.\.\.co_mandatory\},\.\.\.\(Object\.keys\(postTargets\)\.length\?\{customPost:postTargets\}:\{\}\)/.test(save), '새로 만들 때도 넣는다');
+  assert.ok(/\['deadlines','customRounds','customMandatory','customPost','phaseState'\]/.test(grab('mergeApplyOne')), '사업장 합칠 때 사라지는 쪽의 목표도 옮겨 담는다');
 });
