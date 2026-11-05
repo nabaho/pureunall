@@ -468,7 +468,7 @@
 
   C.cellDlg = ask(() => {
     const cells = E.table.targetCells();
-    if (!cells.length) return toast('표 안에 커서를 두세요.', true);
+    if (!cells.length) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
     const td = cells[0], table = td.closest('table');
     const cm = Dm.cellMargin(td); // 셀 안 여백(mm, 테두리 반쪽 보정한 한글 값)
     const pw = table.parentElement.clientWidth - parseFloat(getComputedStyle(table.parentElement).paddingLeft) - parseFloat(getComputedStyle(table.parentElement).paddingRight);
@@ -755,6 +755,7 @@
   D.numbers = () => [{ title: '문단 번호 모양' }, ...Object.keys(E.NUMBER_PRESETS).map(n => ({ label: n, act: () => E.toggleNumbering(n) })), { sep: true },
     { label: '한 수준 증가', key: 'Ctrl+Num -', act: C.levelDown }, { label: '한 수준 감소', key: 'Ctrl+Num +', act: C.levelUp }, { label: '문단 번호 없애기', act: () => E.setPara({ head: null }) }];
   D.outline = () => [1, 2, 3, 4, 5, 6, 7].map(l => ({ label: `개요 ${l}`, act: () => E.applyStyle('개요 ' + l) })).concat([{ sep: true }, { label: '개요 해제 (바탕글)', act: () => E.applyStyle('바탕글') }]);
+  D.multi = () => [{ label: '한 쪽 (고치기)', act: () => window.PureunMultiPage && PureunMultiPage.exit() }, { sep: true }, ...[2, 3, 4].map(n => ({ label: n + '쪽씩 보기', act: () => window.PureunMultiPage && PureunMultiPage.enter(n) }))];
   D.zoom = () => [50, 75, 100, 125, 150, 200, 300].map(z => ({ label: z + '%', checked: Math.round(E.state.zoom * 100) === z, act: () => setZoom(z / 100) }))
     .concat([{ sep: true }, { label: '쪽 맞춤', act: C.fitPage }, { label: '폭 맞춤', act: C.fitWidth }]);
   D.paste = () => [{ label: '붙이기', key: 'Ctrl+V', act: C.paste }, { label: '모양 없이 붙이기', act: C.paste }];
@@ -961,7 +962,7 @@
     ],
     view: [
       [it('pageview', '쪽 윤곽', C.togglePageView, { on: () => E.state.pageView }), it('marks', '문단 부호', C.toggleMarks, { on: () => E.state.marks }), it('ruler', '눈금자', C.toggleRuler, { on: () => !document.querySelector('.work').classList.contains('no-ruler') }), it('pane', '작업 창', C.togglePane, { on: () => !$('taskpane').hidden })],
-      [it('zoomin', '확대', C.zoomIn), it('zoomout', '축소', C.zoomOut), it('fitpage', '쪽 맞춤', C.fitPage), it('fitwidth', '폭 맞춤', C.fitWidth), it('find', '확대 비율', D.zoom)],
+      [it('pageview', '여러 쪽 보기', D.multi), it('zoomin', '확대', C.zoomIn), it('zoomout', '축소', C.zoomOut), it('fitpage', '쪽 맞춤', C.fitPage), it('fitwidth', '폭 맞춤', C.fitWidth), it('find', '확대 비율', D.zoom)],
     ],
     insert: [
       [it('table', '표', D.table), it('image', '그림', C.image), it('symbol', '문자표', C.symbol), it('date', '날짜/시간', D.date)],
@@ -1352,7 +1353,7 @@
     styleNo: i => () => { const n = E.styleList()[i]; if (n) E.applyStyle(n); },
     // 쉬운 계산식: 현재 셀의 왼쪽(가로) 또는 위쪽(세로) 숫자 칸을 계산해 현재 셀에 씀
     calc: (dir, op) => () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const tr = td.parentElement, t = td.closest('table');
       const cells = dir === 'row' ? Array.from(tr.cells).slice(0, td.cellIndex) : Array.from(t.rows).slice(0, tr.rowIndex).map(r => r.cells[td.cellIndex]).filter(Boolean);
       const v = cells.map(c => { const x = c.textContent.replace(/[​,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(x) ? parseFloat(x) : null; }).filter(x => x !== null);
@@ -1365,7 +1366,7 @@
     },
     // 표 나누기(현재 줄 아래부터 새 표) · 표 붙이기(다음 표를 이어 붙임)
     tableSplit: () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const tr = td.parentElement, t = td.closest('table'), body = tr.parentElement;
       if (!tr.nextElementSibling) return toast('마지막 줄에서는 나눌 수 없습니다.', true);
       const rows = Array.from(t.rows), at = tr.rowIndex;
@@ -1379,7 +1380,7 @@
       E.afterEdit();
     },
     tableJoin: () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const t = td.closest('table'), nx = t.nextElementSibling;
       if (!nx || nx.tagName !== 'TABLE') return toast('바로 아래에 붙일 표가 없습니다.', true);
       E.checkpoint();
@@ -1424,7 +1425,7 @@
     },
     paint() { document.querySelectorAll('td.cb-sel, th.cb-sel').forEach(x => x.classList.remove('cb-sel')); if (CB.on) CB.cells().forEach(x => x.classList.add('cb-sel')); },
     start() {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       CB.table = td.closest('table'); E.table.grid(CB.table);
       CB.on = true; CB.expand = false; CB.r0 = CB.r1 = td._r; CB.c0 = CB.c1 = td._c;
       CB.paint(); toast('셀 블록 모드 — 방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Esc 끝');
