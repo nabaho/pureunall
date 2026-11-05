@@ -5442,8 +5442,12 @@ body.portal-mode #moreFab{display:flex;}
           + '<div class="sgd-r">'+(it.reply ? sgEsc(it.reply) : '처리가 완료되었습니다.')
           + ((it.replyImages&&it.replyImages.length)? '<div style="margin-top:8px">'+it.replyImages.map(function(u){var su=sgImgSrc(u);return su?'<img src="'+su+'" style="max-width:100%;border-radius:8px;margin-top:6px;display:block">':'';}).join('')+'</div>':'')
           + '</div>'
-          + '<div class="sgd-ask" style="display:flex;gap:6px;margin-top:8px">'
-          + '<button type="button" class="sg-btn" data-sgd-ok="'+i+'" style="margin:0;flex:1;padding:8px">✅ 해결됐어요</button>'
+          /* ☑ 확인 칸을 체크해야 「완료」가 켜진다 (대표 지시 2026-11-05 「수정되었는지 체크박스 → 완료 버튼으로 종료, 안 고쳐지면 다시 수정요청 반복」).
+             체크 없이는 종료되지 않는다 — 안 고쳐졌으면 「아직 안 됐어요」로 재요청(원본과 relatedId 로 이어져 몇 번이고 반복). */
+          + '<label class="sgd-chk" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.8rem;cursor:pointer;min-height:36px">'
+          + '<input type="checkbox" data-sgd-chk="'+i+'" style="width:20px;height:20px;flex:none"> <span>✅ 해결됐어요 — 수정된 것을 확인했습니다</span></label>'
+          + '<div class="sgd-ask" style="display:flex;gap:6px;margin-top:6px">'
+          + '<button type="button" class="sg-btn" data-sgd-ok="'+i+'" disabled style="margin:0;flex:1;padding:8px;opacity:.5">완료</button>'
           + '<button type="button" class="sg-btn ghost" data-sgd-no="'+i+'" style="margin:0;flex:1;padding:8px">🙅 아직 안 됐어요</button></div>'
           + '<div class="sgd-fb" data-sgd-fb="'+i+'" hidden style="margin-top:8px">'
           + '<textarea data-sgd-txt="'+i+'" placeholder="어떤 부분이 해결되지 않았는지 자세히 적어주세요 — 그대로 재요청으로 접수됩니다" style="width:100%;min-height:72px;padding:8px;border:1px solid #fecaca;border-radius:8px;font-size:.78rem"></textarea>'
@@ -5462,7 +5466,10 @@ body.portal-mode #moreFab{display:flex;}
       function _row(i){ return $('sgDoneBody').querySelector('[data-sgd="'+i+'"]'); }
       items.forEach(function(it, i){
         var row=_row(i); if(!row) return;
-        row.querySelector('[data-sgd-ok="'+i+'"]').addEventListener('click', function(){
+        var okBtn=row.querySelector('[data-sgd-ok="'+i+'"]'), chk=row.querySelector('[data-sgd-chk="'+i+'"]');
+        chk.addEventListener('change', function(){ okBtn.disabled=!chk.checked; okBtn.style.opacity=chk.checked?'1':'.5'; });
+        okBtn.addEventListener('click', function(){
+          if(!chk.checked) return;
           _markSeen(it, { resolvedOk:true, resolvedAt:Date.now() });
           row.style.display='none'; sgUpdateBadge();
           if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
