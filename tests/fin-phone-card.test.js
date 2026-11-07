@@ -67,7 +67,10 @@ test('⑥ ★ 입금 확인 시트 — 바닥 시트 · 단추는 둘이면 반�
 
 test('⑦ ★★ 폰(≤640px)에만 건다 — 넓은 화면은 하나도 안 바뀐다', () => {
   assert.match(CSS.slice(open, open + 30), /@media \(max-width:640px\)/);
-  const outside = CSS.slice(CSS.lastIndexOf('/*', at)).replace(CSS.slice(open, end + 1), '').replace(/\/\*[\s\S]*?\*\//g, '');
+  /* 이 블록은 «다음 단계 블록의 머리 주석» 앞에서 끝난다 — 뒤에 붙는 2단계 블록은 tests/fin-phone-tables 가 따로 지킨다 */
+  const nextHead = CSS.indexOf('재무관리 폰 2단계', at);
+  const stop = nextHead > 0 ? CSS.lastIndexOf('/*', nextHead) : CSS.length;
+  const outside = CSS.slice(CSS.lastIndexOf('/*', at), stop).replace(CSS.slice(open, end + 1), '').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.doesNotMatch(outside, /\.ld-(tb|xt|hs)/, '★ 폭 조건 밖에 카드 규칙이 있습니다 — 넓은 화면이 바뀝니다');
 });
 

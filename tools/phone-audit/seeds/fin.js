@@ -4,8 +4,18 @@ const erp = require('./erp.js');
 /* 급여 줄(귀속월 딱지 + 긴 비고) — 대표 폰 캡처(2026-10-25 출금관리)를 그대로 재현한다. 이름은 지어낸 것 */
 const data = JSON.parse(JSON.stringify(erp.data));
 [['가나다', 3322622], ['라마바', 2009570], ['사아자', 2641808]].forEach(([n, a], i) => {
-  data.data.finance_expense.v['fe-payrow' + i] = { id: 'fe-payrow' + i, date: '2026-10-05', amount: a, category: 'exp-salary', payee: n,
+  data.data.finance_expense.v['fe-payrow' + i] = { id: 'fe-payrow' + i, date: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7) + '-05', amount: a, category: 'exp-salary', payee: n,
     note: '2026-09월 근무분 급여(2026-10 지급) 실수령액', createdAt: '2026-10-01T00:00:00.000Z' };
+});
+/* «이번 달» 줄 — 화면은 오늘 달로 열리므로 자료 달이 지나면 빈 화면만 찍힌다(2026-11 에 실제로 그랬다).
+   오늘 달 날짜로 입금 셋·출금 둘을 더 넣는다. 이름·금액은 지어낸 것 */
+const _now = new Date(Date.now() + 9 * 3600e3), _ym = _now.toISOString().slice(0, 7);
+[['가나산업점검', 3300000], ['다라물산점검', 12345000], ['마바상회점검', 220000]].forEach(([n, a], i) => {
+  data.data.finance_income.v['fi-now' + i] = { id: 'fi-now' + i, date: _ym + '-0' + (3 + i), amount: a, category: 'inc-advisory', sourceKind: 'manual',
+    sourceId: '', companyName: n, kind: '자문료', managerSid: 'P001', managerName: '점검대표', perfShares: [], createdAt: _ym + '-01T00:00:00.000Z' };
+});
+[['점검임대인', 3300000, 'exp-rent'], ['(주)마바정밀기계공업점검거래처', 1280000, 'exp-misc']].forEach(([n, a, c], i) => {
+  data.data.finance_expense.v['fe-now' + i] = { id: 'fe-now' + i, date: _ym + '-0' + (2 + i), amount: a, category: c, payee: n, memo: '점검출금', createdAt: _ym + '-01T00:00:00.000Z' };
 });
 /* 스크롤 — 목록이 «본문 상자 안»에서 구르므로 그 상자를 내려 아래쪽 줄도 갈무리한다 */
 function 내리기(name, px) {
@@ -23,10 +33,10 @@ module.exports = {
     erp.메뉴('fin/income', 3000),
     { name: 'income-confirm', wait: 2500, run: async (page) => { await page.locator('main').getByText('입금확정', { exact: true }).first().click(); }, back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(400); } },
     /* 입금관리 안의 탭 둘 — 기간 탭(월별·연도별·전체)이 따로 그려진다 */
-    { name: 'income-perf', wait: 2000, run: async (page) => { await page.locator('main').getByText('성과 미반영').first().click(); } },
-    { name: 'income-list', wait: 2000, run: async (page) => { await page.locator('main').getByText('입금 리스트').first().click(); } },
-    { name: 'income-case', wait: 2000, run: async (page) => { await page.locator('main').getByText('사건입금').first().click(); } },
-    { name: 'income-co', wait: 2000, run: async (page) => { await page.locator('main').getByText('업체입금').first().click(); } },
+    { name: 'income-perf', wait: 2000, run: async (page) => { await page.locator('.fi-sel').selectOption('unmatched'); } },
+    { name: 'income-list', wait: 2000, run: async (page) => { await page.locator('.fi-sel').selectOption('list'); } },
+    { name: 'income-case', wait: 2000, run: async (page) => { await page.locator('.fi-sel').selectOption('case'); } },
+    { name: 'income-co', wait: 2000, run: async (page) => { await page.locator('.fi-sel').selectOption('company'); } },
     내리기('income-co-s', 900),
     erp.메뉴('fin/expense', 3000),
     { name: 'expense-add', wait: 2000, run: async (page) => { await page.locator('main').getByText('출금 추가').first().click(); }, back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(400); } },
