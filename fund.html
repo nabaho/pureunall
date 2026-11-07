@@ -12461,7 +12461,7 @@ function renderSetupDash(){
   var trs=vis.map(function(r,i){ var f=r.f, st=r.st, on=SD.pop&&f._id===SD.sel, pct=Math.round(st.nD/st.steps.length*100), nSite=(SD.sites[f._id]||[]).filter(function(s){ return (s.status||'active')!=='closed'; }).length;
     var boxes=st.steps.map(function(t){ var d=st.isD(t[0]), nx=st.next&&st.next[0]===t[0];
       return '<span title="'+esc(_sdNo(t[0])+' '+t[1])+'" style="display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:2px;background:'+(d?'#16a34a':nx?'#fbbf24':'var(--line)')+'"></span>'; }).join('');
-    return '<tr class="'+(on?'rvon':'')+'" onclick="sdSel(\''+f._id+'\')" style="cursor:pointer'+(on?';background:var(--acc-soft)':'')+'">'
+    return '<tr class="'+(on?'rvon':'')+'" data-fid="'+esc(f._id)+'" onclick="sdSel(\''+f._id+'\')" style="cursor:pointer'+(on?';background:var(--acc-soft)':'')+'">'
       +_ckTd()+'<td class="no">'+(i+1)+'</td>'
       +'<td><b>'+esc(f.short_name||f.name||f._id)+'</b><div class="muted" style="font-size:11px">'+esc(f.name||'')+(f.fund_type==='사내'?'':' · 참여 '+nSite+'곳')+'</div></td>'
       +'<td><span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span></td>'
@@ -12472,7 +12472,9 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
   $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
-    +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button><button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
+    +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button>'
+    +(list.length?'<button onclick="sdTrash()" style="color:var(--danger)" title="□ 로 짚은 기금을 삭제 보관함으로 옮깁니다 — 잘못 만든 중복 기금 정리용. 언제든 복원할 수 있습니다">🗑 선택한 기금 삭제 보관</button>':'')
+    +'<button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
       ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
         +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">'+chips+'</div>'
@@ -12552,6 +12554,20 @@ function sdPop(){
   var nb=$('modalbox'); if(nb&&top) nb.scrollTop=top;
 }
 function sdTab(k){ SD.tab=k; sdPop(); }
+/* 잘못 만든 중복 기금 정리 — □ 로 짚은 줄을 한꺼번에 삭제 보관함으로(데이터는 그대로, 🗑 삭제 보관 탭에서 복원) */
+function sdTrash(){
+  var ids=[].slice.call(document.querySelectorAll('.sdwrap tbody tr')).filter(function(r){ var c=r.querySelector('.ckcol input'); return c&&c.checked; })
+    .map(function(r){ return r.getAttribute('data-fid'); }).filter(function(id){ return id&&funds[id]&&!isTrashed(funds[id]); });
+  if(!ids.length){ toast('삭제할 기금의 □ 를 먼저 짚어 주세요','warn'); return; }
+  var names=ids.map(function(id){ var f=funds[id]; return '· '+(f.short_name||f.name)+(f.name&&f.name!==f.short_name?' ('+f.name+')':''); }).join('\n');
+  confirmM('설립중 기금 '+ids.length+'곳을 삭제 보관함으로 옮길까요?\n\n'+names+'\n\n· 목록·집계에서 빠지지만 데이터는 그대로 보관됩니다.\n· [🗑 삭제 보관] 탭에서 언제든 복원할 수 있습니다.',{ok:'삭제 보관'}).then(function(ok){ if(!ok) return;
+    var v={deleted:true,deleted_at:ymd(),deleted_by:(S.user||'')}, bad=0;
+    Promise.all(ids.map(function(id){ return fbDb.ref(NS+'/funds/'+id).update(v).then(function(){ Object.assign(funds[id],v); },function(){ bad++; }); })).then(function(){
+      toast((ids.length-bad)+'곳을 삭제 보관함으로 옮겼습니다'+(bad?' — 실패 '+bad+'곳':''),bad?'warn':undefined);
+      if(S.view==='setup') renderSetupDash(); renderNav();
+    });
+  });
+}
 function sdMore(){ SD.more=true; sdPop(); }
 /* 단계 체크 — 기금 안 [🏗 설립 진행] 탭(toggleSetup)과 같은 자리·같은 모양으로 쓴다 */
 function sdToggle(fid,code,on){
@@ -25153,7 +25169,7 @@ var HELP={
    +'<p>기금을 열어 <b>[🏗 설립 진행]</b> 단계를 모두 마치면 <b>[✅ 운영 전환]</b>으로 정식 운영 기금이 됩니다.</p>'},
  'setup.dash':{t:'설립중 기금',h:'<p>인가·등기 절차를 밟는 기금만 모았습니다. 한 줄이 한 기금 — <b>다음 할 일 · 기한 · 빈 자료</b>만 보면 오늘 할 일이 보입니다.</p>'
    +'<p><b>기한</b>은 앱이 아는 날짜로만 셉니다 — 설립등기는 <b>인가일 + 3주</b>. 인가일을 적어야 나옵니다. <b>인가 기다림</b>은 ⑦ 인가신청을 끝낸 날부터 셉니다.</p>'
-   +'<p>줄을 누르면 <b>진행판</b>이 팝업으로 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
+   +'<p>잘못 만든 중복 기금은 □ 로 짚고 <b>[🗑 선택한 기금 삭제 보관]</b> — 삭제 보관함으로 옮기며 언제든 복원할 수 있습니다.</p><p>줄을 누르면 <b>진행판</b>이 팝업으로 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'
