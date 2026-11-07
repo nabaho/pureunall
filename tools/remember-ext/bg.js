@@ -37,8 +37,26 @@ function armIfNone() { chrome.alarms.get('pull', function (a) { if (!a || a.peri
 chrome.runtime.onInstalled.addListener(armIfNone);
 chrome.runtime.onStartup.addListener(armIfNone);
 chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'pull') { arm(); run(); } });
-/* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다 */
-chrome.action.onClicked.addListener(function () { run(); });
+
+/* ── 지킴이 (2026-11-07, 대표 「스스로 되살아나게」) ──
+   11/5 18:00 회차를 끝으로 «다음 때» 알람이 한 번도 안 울렸다 — 크롬은 켜져 있었고 받는 화면도
+   살아 있었다(11/7 메일 서명 처리). 다음 알람은 울릴 때만 다시 맞추고, 자동 갱신(selfUpdate)도
+   회차 안에서만 보므로 알람 하나가 사라지면 갱신까지 함께 멈췄다.
+   → 30분마다 도는 «반복» 알람 하나가 «다음 때» 알람을 살핀다:
+     없으면(사라졌으면) 다시 맞추고 지금 한 번 돌고, 울렸어야 할 때를 넘겼는데 그대로면 역시 지금 돈다.
+   ⚠ 확장이 깨어날 때마다(맨 아래 guard()) 지킴이 알람이 있는지도 본다 — 지킴이 자신이 사라져도 되살린다.
+   ⚠ 겹쳐 불려도 한 번만 돈다 — run() 이 running 으로 막는다. */
+var GUARD_MIN = 30, LATE_MS = 10 * 60000;
+function guard() {
+  chrome.alarms.get('guard', function (g) { if (!g) chrome.alarms.create('guard', { periodInMinutes: GUARD_MIN }); });
+  chrome.alarms.get('pull', function (a) {
+    if (!a || a.periodInMinutes || a.scheduledTime < Date.now() - LATE_MS) { arm(); run(); }
+  });
+}
+chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'guard') guard(); });
+/* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다
+   ⚠ 일정도 함께 살린다(2026-11-07) — 예전에는 한 번 돌 뿐, 사라진 알람은 그대로였다. */
+chrome.action.onClicked.addListener(function () { armIfNone(); run(); });
 function note(badge, why) {
   var at = new Date().toLocaleString('ko-KR');
   chrome.action.setBadgeText({ text: badge });
@@ -171,3 +189,6 @@ async function run() {
     note('!', '오류: ' + String((e && e.message) || e).slice(0, 80));
   } finally { running = false; }
 }
+
+/* 깨어날 때마다 지킴이 — 알람·아이콘·받는 화면 소식 무엇으로 깨어나든 일정이 살아 있는지 본다 */
+guard();
