@@ -1899,6 +1899,30 @@ rules.pu_docs = {
   } } }
 };
 
+/* ══ 작업 기록 — «누가 언제 무엇을 했나» 덧붙이기 장부 (견적·계약 자동화 계획 1) ═════
+   js/pu-worklog.js 가 pu_worklog/{YYYYMM}/{push} 에 쓴다.
+   ★ 읽기는 총괄관리자만 — 위임관리인·재무 권한자도 못 본다(직원 행동 기록이라서).
+   ★ 새로 쓰기만, 내 이름으로만 — 고치기·지우기 길이 규칙에 없어야 기록이 믿을 만하다.
+   ⚠ 칸 길이는 모듈(PuWorklog.entry)이 미리 자르는 값과 같아야 한다(target 120·note 200·auto 60). */
+rules.pu_worklog = {
+  '.read': ADMIN,
+  $m: {
+    '.validate': "$m.matches(/^[0-9]{6}$/)",
+    $id: {
+      '.write': `(${LOGIN}) && !data.exists()`,
+      '.validate': "newData.hasChildren(['kind','at','by'])",
+      kind:   { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      at:     { '.validate': 'newData.isNumber()' },
+      by:     { '.validate': 'newData.val() === auth.uid' },
+      byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+      target: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+      note:   { '.validate': 'newData.isString() && newData.val().length <= 200' },
+      auto:   { '.validate': 'newData.isString() && newData.val().length <= 60' },
+      $other: { '.validate': false }
+    }
+  }
+};
+
 /* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) ═════════════════
    사람마다 링크 하나: sign-contract.html?t={열쇠(128비트)}. 열쇠를 아는 사람만 그 칸(open/{t})을 읽는다 —
    open 은 «목록 읽기»가 막혀 있어 열쇠를 모르면 찾을 수 없다(위임장 링크처럼 meta 에 열쇠를 드러내지 않는다).

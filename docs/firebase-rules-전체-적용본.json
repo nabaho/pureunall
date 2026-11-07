@@ -2673,6 +2673,40 @@
         }
       }
     },
+    "pu_worklog": {
+      ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$m": {
+        ".validate": "$m.matches(/^[0-9]{6}$/)",
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists()",
+          ".validate": "newData.hasChildren(['kind','at','by'])",
+          "kind": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "by": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "byName": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "target": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "note": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "auto": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "pu_sign": {
       "req": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
