@@ -110,4 +110,33 @@ function queueRow(c, nowMs, sendAt) {
   };
 }
 
-module.exports = { DEFAULTS, RECENT_DAYS, SAME_ADDRESS_DAYS, kst, nextSendAt, emailKey, cleanSettings, plan, queueRow };
+/* ═══ 보낸 기록 — 2026-11-07 대표 「보낸 것들 언제 보냈는지 기록하고 확인할 수 있게」 ═══
+   예약 발송기(sendScheduledMail)는 메일이 나가면 대기열 줄을 «지운다». 그래서 자동 메일(by:"rehab-auto")이 나간 순간
+   그 회사의 표시(marks/<공고>/sendLog)에 «날짜+시각»을 남기고 「발송 완료」로 올린다 — 직접 적는 발송 기록과 같은 칸이라
+   표의 「발송·반응」 열과 상세 패널에 그대로 보인다(auto:true 로 기계가 적은 것을 구분).
+   ⚠ 대기열 줄 이름은 "rehab-<공고번호>-<시각36진수>"(rehabAutoRun)다. 공고번호는 c<법원6자리>_<사건번호>. */
+function noticeIdOfQueue(qid) {
+  const m = /^rehab-(c\d{6}_\d+)-[a-z0-9]+$/.exec(String(qid || ""));
+  return m ? m[1] : "";
+}
+function two(n) { return String(n).padStart(2, "0"); }
+/* 나간 순간의 발송 기록 한 줄(서울 시각) */
+function sentEntry(row, nowMs) {
+  const k = kst(nowMs);
+  const to = (row && row.payload && row.payload.to) || "";
+  return { d: k.ymd, t: two(k.hour) + ":" + two(k.min), m: "메일", r: "", n: "자동 메일 → " + to, auto: true };
+}
+/* 그 회사 표시에 «쓸 칸들»만 돌려준다(update 용) — 사람이 적은 다른 칸(연락처·메모·기록)은 건드리지 않는다.
+   표시가 아직 없으면 공용 관문이 요구하는 기본 칸을 함께 만든다. */
+function markUpdate(prev, entry, nowMs, noticeId, contractVersion) {
+  const had = prev && typeof prev === "object" && prev.id;
+  prev = had ? prev : {};
+  const old = Array.isArray(prev.sendLog) ? prev.sendLog : (prev.sendLog && typeof prev.sendLog === "object" ? Object.keys(prev.sendLog).map((k) => prev.sendLog[k]) : []);
+  const out = { sendLog: old.filter(Boolean).concat([entry]).slice(-30), autoQueued: false, updatedAt: nowMs, revision: (Number(prev.revision) || 0) + 1 };
+  if (prev.status !== "sent") { out.status = "sent"; out.statusAt = nowMs; out.sentAt = nowMs; }
+  if (!had) Object.assign(out, { id: noticeId, entityType: "Task", taskKind: "rehabOutreach", sourceKind: "rehabNotice", sourceId: noticeId,
+    schemaVersion: 3, contractVersion: contractVersion, createdAt: nowMs });
+  return out;
+}
+
+module.exports = { DEFAULTS, RECENT_DAYS, SAME_ADDRESS_DAYS, kst, nextSendAt, emailKey, cleanSettings, plan, queueRow, noticeIdOfQueue, sentEntry, markUpdate };
