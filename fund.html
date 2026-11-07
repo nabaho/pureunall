@@ -59,7 +59,7 @@
   .sitem.on .ncnt{color:var(--acc2)}
   #nav-setup{margin:0 10px 10px;border:1.5px solid #fbbf24;background:var(--warn-bg);color:var(--warn);font-weight:700}
   #nav-setup .ncnt{color:var(--warn);font-weight:800;font-size:12px}#nav-setup.on{background:#fde68a;color:var(--warn)}
-  @media(max-width:900px){.sdflow{grid-template-columns:1fr 1fr!important}.sdgrid{grid-template-columns:1fr!important}}
+  @media(max-width:900px){.sdflow{grid-template-columns:1fr 1fr!important}}
   /* 하위 묶음 — 왼쪽 실선으로 «기금 현황에 딸린 것»임을 보인다 */
   #navsub{margin:2px 0 2px 12px;border-left:1px solid var(--line);padding-left:6px}
   #navsub.hid{display:none}
@@ -149,11 +149,7 @@
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
     .ledgerwrap{overflow:visible}
     .ledgerwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px) + var(--closehead-h,156px));z-index:5;background:#f8fafc}
-    /* 🏗 설립중 기금 틀 고정(대표 2026-10-10): 제목·숫자·칩 → 목록 표 머리 → 진행판 제목·지금 할 일 띠. 높이 --sdhead-h 는 _syncTopbarH 가 잰다 */
-    .sdhead{position:sticky;top:var(--topbar-h,48px);z-index:12;margin-bottom:0}
-    .sdwrap{overflow:visible}
-    .sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:5;background:#f8fafc}
-    .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
+    /* 🏗 설립중 기금은 틀 고정을 하지 않는다(대표 2026-11-07 — 세 겹이 화면 위 300px 를 덮어 두 번째 줄이 가려졌다). 진행판은 팝업(sdPop) */
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
   /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
@@ -12215,7 +12211,6 @@ function _syncTopbarH(again){
   var fh=$('fundhead'), ch=document.querySelector('.closehead');
   if(fh){ var h2=Math.round(fh.getBoundingClientRect().height); if(h2>0) _setCssVar('--fundhead-h',h2+'px'); }
   if(ch){ var h3=Math.round(ch.getBoundingClientRect().height); if(h3>0) _setCssVar('--closehead-h',h3+'px'); }
-  var sd=document.querySelector('.sdhead'); if(sd){ var h4=Math.round(sd.getBoundingClientRect().height); if(h4>0) _setCssVar('--sdhead-h',h4+'px'); }
   if(!_topbarRO && window.ResizeObserver){
     _topbarRO=new ResizeObserver(function(){ _syncTopbarH(); });
     _topbarRO.observe(t);
@@ -12404,7 +12399,7 @@ function openFundForms(){ openFundDocs(); }   // 설립 단계 버튼 → 그 �
      12단계 체크리스트(EST_TMPL · funds/{기금}/setup) · 빈 자료(estabGaps) · 서류 묶음 ①~⑤(ESTAB_PHASES).
    ⚠ 사업장은 «설립중 기금 것만» 읽는다 — 몇 곳 안 된다. 못 읽은 기금은 빈 자료를 «?»로 둔다(0 이라고 하면 거짓말).
    ⚠ 기한은 앱이 이미 아는 날짜로만 센다 — 등기는 인가일 + 3주(EST-09 문구 그대로). 모르는 기한은 만들지 않는다. */
-var SD={sites:{}, loading:null, sel:'', flt:'all'};
+var SD={sites:{}, loading:null, sel:'', flt:'all', pop:false, tab:'gap', more:false};
 var SD_GROUPS=[['1. 준비',['EST-01','EST-02','EST-03','EST-04','EST-05','EST-06']],['2. 인가',['EST-07','EST-08']],
   ['3. 등기·세무',['EST-09','EST-10','EST-11']],['4. 운영 전환',['EST-12']]];
 /* 그 단계에서 낼 서류 묶음 — 「지금 할 일」 단추가 이것을 연다 */
@@ -12453,7 +12448,7 @@ function renderSetupDash(){
       return fbDb.ref(NS+'/sites/'+f._id).once('value').then(function(s){ var v=s.val()||{};
         SD.sites[f._id]=Object.keys(v).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }); },
         function(){ SD.sites[f._id]=null; });
-    })).then(function(){ SD.loading=null; if(S.view==='setup') renderSetupDash(); });
+    })).then(function(){ SD.loading=null; if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); } });
   }
   var today=ymd();
   var rows=list.map(function(f){ return {f:f, st:_sdState(f,SD.sites[f._id]||null,today)}; });
@@ -12463,7 +12458,7 @@ function renderSetupDash(){
   var kpi=function(l,n,c){ return '<div style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:96px"><div class="muted" style="font-size:11px">'+l+'</div><b style="font-size:17px'+(c?';color:'+c:'')+'">'+n+'</b></div>'; };
   var chips=SD_FLT.map(function(k){ var on=SD.flt===k[0];
     return '<button class="seg'+(on?' on':'')+'" onclick="sdFlt(\''+k[0]+'\')" style="padding:4px 11px;border-radius:14px'+(on?';background:var(--acc2);color:#fff;border-color:var(--acc2)':'')+'">'+k[1]+(k[0]==='mine'?'':' <b>'+cnt[k[0]]+'</b>')+'</button>'; }).join(' ');
-  var trs=vis.map(function(r,i){ var f=r.f, st=r.st, on=f._id===SD.sel, pct=Math.round(st.nD/st.steps.length*100), nSite=(SD.sites[f._id]||[]).filter(function(s){ return (s.status||'active')!=='closed'; }).length;
+  var trs=vis.map(function(r,i){ var f=r.f, st=r.st, on=SD.pop&&f._id===SD.sel, pct=Math.round(st.nD/st.steps.length*100), nSite=(SD.sites[f._id]||[]).filter(function(s){ return (s.status||'active')!=='closed'; }).length;
     var boxes=st.steps.map(function(t){ var d=st.isD(t[0]), nx=st.next&&st.next[0]===t[0];
       return '<span title="'+esc(_sdNo(t[0])+' '+t[1])+'" style="display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:2px;background:'+(d?'#16a34a':nx?'#fbbf24':'var(--line)')+'"></span>'; }).join('');
     return '<tr class="'+(on?'rvon':'')+'" onclick="sdSel(\''+f._id+'\')" style="cursor:pointer'+(on?';background:var(--acc-soft)':'')+'">'
@@ -12476,20 +12471,18 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap">'+_sdDueChip(st)+'</td><td>'+_sdGapChip(st)+'</td>'
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
-  var sel=rows.filter(function(r){ return r.f._id===SD.sel; })[0];
-  $('app').innerHTML='<div class="panel sdhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
+  $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
     +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button><button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
       ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
-        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0 0">'+chips+'</div></div><div class="panel">'
+        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">'+chips+'</div>'
         +(vis.length?'<div class="sdwrap"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
           :'<div class="msg ok" style="font-size:13px">이 거르기에 해당하는 기금이 없습니다.</div>')
-      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div></div><div class="panel" style="display:none">')
-    +'</div>'
-    +(sel?_sdBoard(sel.f,sel.st):'');
+      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div>')
+    +'</div>';
   if(typeof _syncTopbarH==='function') _syncTopbarH();   // 틀 고정 높이를 다시 잰다
 }
-/* 진행판 — 고른 기금 하나 */
+/* 진행판 — 고른 기금 하나. 팝업 안에서 한눈에: 머리 한 줄 → 지금 할 일 띠 → 12단계(4묶음) → 탭(빈 자료 · 서류 묶음) */
 function _sdBoard(f,st){
   var fid=f._id, nx=st.next, curG=nx?SD_GROUPS.filter(function(g){ return g[1].indexOf(nx[0])>=0; })[0]:null;
   var codes=st.steps.map(function(t){ return t[0]; });
@@ -12502,21 +12495,24 @@ function _sdBoard(f,st){
   var due=(st.due&&nx&&nx[0]==='EST-09'&&st.due.d!=null)?' — '+esc(st.due.date.slice(5).replace('-','/'))+'까지 ('+(st.due.d<0?'지남 '+(-st.due.d)+'일':'D-'+st.due.d)+')':'';
   var groups=SD_GROUPS.map(function(g){ var cs=g[1].filter(function(c){ return codes.indexOf(c)>=0; }); if(!cs.length) return '';
     var nd=cs.filter(st.isD).length, cur=curG===g;
-    return '<div style="border:'+(cur?'2px solid #fbbf24;background:var(--warn-bg)':'1px solid var(--line)')+';border-radius:9px;padding:8px 10px">'
-      +'<div class="row" style="justify-content:space-between;margin-bottom:6px"><b style="font-size:12.5px">'+g[0]+'</b><span class="chip '+(nd===cs.length?'ok':cur?'warn':'')+'" style="font-size:10.5px">'+nd+'/'+cs.length+'</span></div>'
+    return '<div style="border:'+(cur?'2px solid #fbbf24;background:var(--warn-bg)':'1px solid var(--line)')+';border-radius:9px;padding:6px 9px">'
+      +'<div class="row" style="justify-content:space-between;margin-bottom:3px"><b style="font-size:12px">'+g[0]+'</b><span class="chip '+(nd===cs.length?'ok':cur?'warn':'')+'" style="font-size:10.5px">'+nd+'/'+cs.length+'</span></div>'
       +cs.map(function(c){ var d=st.isD(c), isN=nx&&nx[0]===c, dt=(st.done[c]||{}).date||'';
-        return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:12px;padding:3px 0;cursor:pointer'+(d?';color:var(--faint);text-decoration:line-through':isN?';font-weight:700;color:var(--warn)':'')+'">'
+        return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:11.5px;padding:1px 0;cursor:pointer'+(d?';color:var(--faint);text-decoration:line-through':isN?';font-weight:700;color:var(--warn)':'')+'">'
           +'<input type="checkbox"'+(d?' checked':'')+' onchange="sdToggle(\''+fid+'\',\''+c+'\',this.checked)" style="margin-top:2px">'
           +'<span>'+_sdNo(c)+' '+esc(nm[c])+(d&&dt?' <small class="muted">'+esc(dt.slice(5).replace('-','/'))+'</small>':'')+'</span></label>'; }).join('')
-      +(g[1].indexOf('EST-12')>=0?'<button onclick="sdOpen(\''+fid+'\',\'setup\')"'+(st.nD>=st.steps.length?' class="primary" style="margin-top:6px"':' disabled style="margin-top:6px;opacity:.5"')+'>✅ 운영 전환 →</button>':'')
+      +(g[1].indexOf('EST-12')>=0?'<button onclick="sdOpen(\''+fid+'\',\'setup\')"'+(st.nD>=st.steps.length?' class="primary" style="margin-top:5px"':' disabled style="margin-top:5px;opacity:.5"')+'>✅ 운영 전환 →</button>':'')
       +'</div>'; }).join('');
+  var gapList=st.gaps||[], showN=(SD.more||gapList.length<=6)?gapList.length:5;
   var gaps=st.gaps==null?'<div class="muted" style="font-size:12px;padding:6px 2px">'+(SD.loading?'참여사업장을 읽는 중…':'참여사업장을 못 읽어 빈 자료를 세지 못했습니다.')+'</div>'
-    :!st.gaps.length?'<div class="msg ok" style="font-size:12px">서식이 읽는 자료가 모두 채워져 있습니다.</div>'
+    :!gapList.length?'<div class="msg ok" style="font-size:12px">서식이 읽는 자료가 모두 채워져 있습니다.</div>'
     :'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>비어 있는 것</th><th>적는 곳</th><th>읽는 서식</th><th></th></tr></thead><tbody>'
-      +st.gaps.map(function(g,i){ return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+esc(g.label)+'</b>'
+      +gapList.slice(0,showN).map(function(g,i){ return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+esc(g.label)+'</b>'
         +(g.site?' <span class="chip warn" style="font-size:10px">'+g.n+'/'+g.of+'곳</span>':'')+(g.est?' <span class="chip" style="font-size:10px">🧮 추정</span>':'')+'</td>'
         +'<td style="white-space:nowrap">'+esc(g.where)+'</td><td class="muted">'+esc(g.docs)+'</td>'
-        +'<td><button onclick="event.stopPropagation();sdOpen(\''+fid+'\',\''+(g.site||g.k==='_sites'?'sites':'info')+'\')" style="padding:2px 8px">✎ 적기</button></td></tr>'; }).join('')+'</tbody></table></div>';
+        +'<td><button onclick="event.stopPropagation();sdOpen(\''+fid+'\',\''+(g.site||g.k==='_sites'?'sites':'info')+'\')" style="padding:2px 8px">✎ 적기</button></td></tr>'; }).join('')
+      +(showN<gapList.length?'<tr><td colspan="6"><button onclick="sdMore()" style="padding:2px 10px">나머지 '+(gapList.length-showN)+'가지 더 보기</button></td></tr>':'')
+      +'</tbody></table></div>';
   var curPh=nx?SD_PHASE[nx[0]]:'';
   var phDone={kinds:'EST-07', reg:'EST-09', tax:'EST-10'};
   var bundles='<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>묶음</th><th>형편</th><th></th></tr></thead><tbody>'
@@ -12526,41 +12522,56 @@ function _sdBoard(f,st){
       return '<tr'+(cur?' style="background:var(--warn-bg)"':'')+'>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td>'+(cur?'<b>'+esc(p[1])+'</b>':esc(p[1]))+'</td><td>'+stt+'</td>'
         +'<td><button'+(cur?' class="primary"':'')+' onclick="event.stopPropagation();sdBundle(\''+fid+'\',\''+p[0]+'\')" style="padding:2px 9px">📑 열기</button></td></tr>'; }).join('')
     +'</tbody></table></div>';
-  return '<div class="panel"><div class="sdbhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
+  var tabs=[['gap','📝 빈 자료'+(st.nGap?' '+st.nGap:'')],['bundle','📑 서류 묶음 '+ESTAB_PHASES.length]];
+  var tab=SD.tab==='bundle'?'bundle':'gap';
+  return '<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
     +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
     +'<span style="flex:1"></span><button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
-    +'<button onclick="trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button></div>'
-    +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin:10px 0">'
+    +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
+    +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin:10px 0">'
       +'<span>지금 할 일</span><b style="font-size:14px">'+_sdNo(nx[0])+' '+esc(nx[1])+due+'</b><span style="flex:1"></span>'+act+'</div>'
       :'<div class="msg ok" style="margin:10px 0">12단계를 모두 마쳤습니다 — [📂 기금 열기]에서 [✅ 운영 전환]을 누르면 기금 현황으로 옮겨 갑니다.</div>')
-    +'</div><div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px">'+groups+'</div>'
-    +'<div class="sdgrid" style="display:grid;grid-template-columns:1.25fr 1fr;gap:12px">'
-    +'<div><div class="row" style="margin-bottom:6px"><b>📝 빈 자료'+(st.nGap?' '+st.nGap+'가지':'')+'</b>'+hlp('setup.gaps')+'</div>'+gaps+'</div>'
-    +'<div><div class="row" style="margin-bottom:6px"><b>📑 서류 묶음</b>'+hlp('estab.bundle')+'</div>'+bundles+'</div></div></div>';
+    +'<div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+groups+'</div>'
+    +'<div class="row" style="gap:2px;margin:12px 0 8px;border-bottom:1px solid var(--line)">'+tabs.map(function(t){ var on=t[0]===tab;
+      return '<button onclick="sdTab(\''+t[0]+'\')" style="border:0;border-bottom:2px solid '+(on?'var(--acc)':'transparent')+';border-radius:0;background:none;padding:5px 12px'+(on?';font-weight:700':';color:var(--sub)')+'">'+t[1]+'</button>'; }).join('')
+      +(tab==='gap'?hlp('setup.gaps'):hlp('estab.bundle'))+'</div>'
+    +(tab==='gap'?gaps:bundles);
 }
 function _sdPhaseLabel(k){ var p=ESTAB_PHASES.filter(function(x){ return x[0]===k; })[0]; return p?p[1]:k; }
-function sdFlt(k){ SD.flt=k; renderSetupDash(); }
-function sdSel(fid){ SD.sel=fid; renderSetupDash(); }
-function sdReload(){ SD.sites={}; renderSetupDash(); }
+function sdFlt(k){ closeM(); SD.flt=k; renderSetupDash(); }
+function sdReload(){ closeM(); SD.sites={}; renderSetupDash(); }
+/* 줄을 누르면 팝업 — 다시 그릴 때(체크·탭)는 스크롤 자리를 지킨다 */
+function sdSel(fid){ if(SD.sel!==fid){ SD.tab='gap'; SD.more=false; } SD.sel=fid; renderSetupDash(); sdPop(); }
+function sdPop(){
+  var f=funds[SD.sel]; if(!f){ closeM(); SD.pop=false; return; }
+  var box=$('modalbox'), top=box?box.scrollTop:0;
+  var st=_sdState(f,SD.sites[SD.sel]||null,ymd());
+  closeM();
+  showModal(_sdBoard(f,st),{width:920,onclose:function(){ SD.pop=false; if(S.view==='setup') renderSetupDash(); }});
+  SD.pop=true;
+  var nb=$('modalbox'); if(nb&&top) nb.scrollTop=top;
+}
+function sdTab(k){ SD.tab=k; sdPop(); }
+function sdMore(){ SD.more=true; sdPop(); }
 /* 단계 체크 — 기금 안 [🏗 설립 진행] 탭(toggleSetup)과 같은 자리·같은 모양으로 쓴다 */
 function sdToggle(fid,code,on){
   var v={done:!!on,date:on?ymd():''};
   fbDb.ref(NS+'/funds/'+fid+'/setup/'+code).set(v).then(function(){
     var t=funds[fid]; if(!t) return; if(!t.setup) t.setup={}; t.setup[code]=v;
-    if(S.view==='setup') renderSetupDash(); renderNav();
+    if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); } renderNav();
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
-function sdOpen(fid,tab){ S.fundId=fid; S.view='fund'; S.tab=tab||'setup'; closeSide(); _pushHist(); route(); }
+function sdOpen(fid,tab){ closeM(); S.fundId=fid; S.view='fund'; S.tab=tab||'setup'; closeSide(); _pushHist(); route(); }
 /* EST_LINK 단추를 그 기금에서 — 서식이면 서식 탭, 아니면 그 탭으로 */
 function sdLink(fid,code){
   var lk=EST_LINK[code]; if(!lk) return sdOpen(fid,'setup');
   var m=/goTab\('([a-z]+)'\)/.exec(lk.fn);
   if(m) return sdOpen(fid,m[1]);
-  S.fundId=fid; openFundDocs();
+  closeM(); S.fundId=fid; openFundDocs();
 }
 /* 서류 묶음 — 그 기금의 서식 탭을 연 뒤 묶음 화면을 세운다(묶음은 서식 탭 옆 칸에 그려진다) */
 function sdBundle(fid,phase){
-  S.fundId=fid; closeSide(); openFundDocs();
+  closeM(); S.fundId=fid; closeSide(); openFundDocs();
   var t0=Date.now();
   (function tick(){
     if(S.view==='fund'&&S.fundId===fid&&S.tab==='docs'&&$('formSide')) return estabBundle(phase);
@@ -25142,7 +25153,7 @@ var HELP={
    +'<p>기금을 열어 <b>[🏗 설립 진행]</b> 단계를 모두 마치면 <b>[✅ 운영 전환]</b>으로 정식 운영 기금이 됩니다.</p>'},
  'setup.dash':{t:'설립중 기금',h:'<p>인가·등기 절차를 밟는 기금만 모았습니다. 한 줄이 한 기금 — <b>다음 할 일 · 기한 · 빈 자료</b>만 보면 오늘 할 일이 보입니다.</p>'
    +'<p><b>기한</b>은 앱이 아는 날짜로만 셉니다 — 설립등기는 <b>인가일 + 3주</b>. 인가일을 적어야 나옵니다. <b>인가 기다림</b>은 ⑦ 인가신청을 끝낸 날부터 셉니다.</p>'
-   +'<p>줄을 누르면 아래에 <b>진행판</b>이 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
+   +'<p>줄을 누르면 <b>진행판</b>이 팝업으로 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'
