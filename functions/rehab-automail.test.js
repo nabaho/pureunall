@@ -168,3 +168,67 @@ test("⑯ 기업정보함 길에도 같은 거름이 적용된다 — 수신거�
     index: cardsOf({ k1: bizRow(KA, "서울 서초구 1", "") }), info: { a: { email: "scraped@site.kr" } } });
   assert.equal(noMail.candidates.length, 0);
 });
+
+/* ═══ 2026-11-07 보낸 기록 — 나간 순간의 날짜+시각을 그 공고의 발송 기록에 ═══ */
+test("⑰ 대기열 줄 이름에서 공고번호를 꺼낸다 — rehab-<공고번호>-<시각>, 다른 모양은 빈 값", () => {
+  assert.equal(A.noticeIdOfQueue("rehab-c000221_20262920001133-mh3k9a"), "c000221_20262920001133");
+  assert.equal(A.noticeIdOfQueue("rehab-c000221_1-0"), "c000221_1");
+  assert.equal(A.noticeIdOfQueue("news-123"), "");
+  assert.equal(A.noticeIdOfQueue(""), "");
+  assert.equal(A.noticeIdOfQueue(null), "");
+});
+
+test("⑱ 보낸 기록 한 줄 — 서울 날짜·시각, 방법 메일, 받는 주소, 기계가 적었다는 표시", () => {
+  const e = A.sentEntry({ payload: { to: "a@gana.co.kr" } }, Date.parse("2026-11-07T18:05:30+09:00"));
+  assert.equal(e.d, "2026-11-07");
+  assert.equal(e.t, "18:05");
+  assert.equal(e.m, "메일");
+  assert.equal(e.auto, true);
+  assert.match(e.n, /a@gana\.co\.kr/);
+  /* UTC 로는 전날인 서울 새벽도 서울 날짜로 */
+  const e2 = A.sentEntry({ payload: { to: "x@y.kr" } }, Date.parse("2026-11-07T00:09:00+09:00"));
+  assert.equal(e2.d, "2026-11-07");
+  assert.equal(e2.t, "00:09");
+});
+
+test("⑲ 표시 갱신 — 기록을 «쌓고» 발송 완료로 올리며, 사람이 적은 칸은 건드리지 않는다", () => {
+  const prev = { id: "n1", status: "send", autoQueued: true, revision: 3, contact: { ceo: "홍길동" }, memo: "메모", sendLog: [{ d: "2026-11-01", m: "우편", n: "직접" }] };
+  const e = A.sentEntry({ payload: { to: "a@gana.co.kr" } }, NOW);
+  const u = A.markUpdate(prev, e, NOW, "n1", 5);
+  assert.equal(u.status, "sent");
+  assert.equal(u.sentAt, NOW);
+  assert.equal(u.autoQueued, false);
+  assert.equal(u.revision, 4);
+  assert.equal(u.sendLog.length, 2);
+  assert.equal(u.sendLog[0].m, "우편");      // 사람이 적은 옛 기록이 그대로
+  assert.equal(u.sendLog[1].auto, true);
+  assert.equal(u.contact, undefined);         // 쓸 칸만 돌려준다 — 연락처·메모는 안 건드림
+  assert.equal(u.memo, undefined);
+});
+
+test("⑳ 이미 «발송 완료»면 완료 시각을 덮지 않고, 기록은 30건까지만 쌓는다", () => {
+  const log = Array.from({ length: 35 }, (_, i) => ({ d: "2026-10-01", m: "우편", n: String(i) }));
+  const u = A.markUpdate({ id: "n1", status: "sent", sentAt: 111, sendLog: log }, A.sentEntry({ payload: { to: "a@a.kr" } }, NOW), NOW, "n1", 5);
+  assert.equal(u.sentAt, undefined);
+  assert.equal(u.status, undefined);
+  assert.equal(u.sendLog.length, 30);
+  assert.equal(u.sendLog[29].auto, true);
+});
+
+test("㉑ 표시가 아직 없는 공고는 공용 관문이 요구하는 기본 칸을 함께 만든다", () => {
+  const u = A.markUpdate(null, A.sentEntry({ payload: { to: "a@a.kr" } }, NOW), NOW, "c000221_9", 5);
+  assert.equal(u.id, "c000221_9");
+  assert.equal(u.entityType, "Task");
+  assert.equal(u.taskKind, "rehabOutreach");
+  assert.equal(u.sourceKind, "rehabNotice");
+  assert.equal(u.sourceId, "c000221_9");
+  assert.equal(u.contractVersion, 5);
+  assert.equal(u.revision, 1);
+  assert.equal(u.status, "sent");
+});
+
+test("㉒ 기록이 객체({0:…})로 저장돼 있어도 읽어 이어 붙인다", () => {
+  const u = A.markUpdate({ id: "n1", sendLog: { 0: { d: "2026-10-01", m: "전화", n: "a" } } }, A.sentEntry({ payload: { to: "a@a.kr" } }, NOW), NOW, "n1", 5);
+  assert.equal(u.sendLog.length, 2);
+  assert.equal(u.sendLog[0].m, "전화");
+});

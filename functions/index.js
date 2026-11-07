@@ -1053,15 +1053,18 @@ exports.sendScheduledMail = functions
         if (r.ok) {
           await ref.remove();                    // 나갔으니 자리를 비운다
           sent++;
+          await rehabAutoNote(db, id, row, "sent");     // 회생광고 자동 메일이면 «보낸 시각»을 기록에 남긴다(던지지 않는다)
         } else {
           /* 일시 장애는 두 번 더 시도한다. 마지막 실패도 지우지 않되 at 을 먼 훗날로
              옮겨 다음 정상 메일의 앞길을 막지 않게 한다. */
           await ref.update(MB.deliveryFailure(row, Date.now(), r.error || "발송 실패"));
           failed++;
+          await rehabAutoNote(db, id, row, "failed", r.error);
         }
       } catch (e) {
         await ref.update(MB.deliveryFailure(row, Date.now(), (e && e.message) || e));
         failed++;
+        await rehabAutoNote(db, id, row, "failed", (e && e.message) || e);
       }
     }
     console.log("sendScheduledMail", { looked: ids.length, sent: sent, failed: failed });
@@ -1417,6 +1420,31 @@ async function rehabAutoRun(db, nowMs, opts) {
   };
   await db.ref().update(upd);
   return { enabled: settings.enabled, candidates: p.candidates.length, queued: queued.length, skipped: p.skipped.length };
+}
+
+/* 자동 메일(by:"rehab-auto")이 나가거나 실패한 순간을 회생광고 기록에 남긴다 — 2026-11-07 대표 「보낸 것들 언제 보냈는지 기록·확인」.
+   나간 것: 그 공고의 marks/<id>/sendLog 에 날짜+시각을 쌓고 「발송 완료」로 올린다(순수 계산은 rehab-automail.js markUpdate).
+   실패한 것: rehab_ad/auto/sent/<id> 에 state:"failed" 와 까닭만 적는다(화면이 «실패»로 보여 준다).
+   ⚠ 절대 던지지 않는다 — 기록 때문에 메일 발송 흐름이 깨지면 안 된다(이미 나간 메일이 «실패»로 처리될 수 있다). */
+async function rehabAutoNote(db, qid, row, state, why) {
+  try {
+    if (!row || row.by !== "rehab-auto") return;
+    const nid = RehabAutoMail.noticeIdOfQueue(qid);
+    if (!nid) return;
+    const nowMs = Date.now();
+    const root = db.ref("rehab_ad");
+    if (state === "sent") {
+      const prev = (await root.child("marks/" + nid).once("value")).val();
+      const mu = RehabAutoMail.markUpdate(prev, RehabAutoMail.sentEntry(row, nowMs), nowMs, nid, OntologyServerWrite.CONTRACT_VERSION);
+      const upd = {};
+      Object.keys(mu).forEach((k) => { upd["marks/" + nid + "/" + k] = mu[k]; });
+      upd["auto/sent/" + nid + "/state"] = "sent";
+      upd["auto/sent/" + nid + "/sentAt"] = nowMs;
+      await root.update(upd);
+    } else {
+      await root.child("auto/sent/" + nid).update({ state: "failed", error: String(why || "").slice(0, 120), failedAt: nowMs });
+    }
+  } catch (e) { console.warn("[회생광고 보낸 기록]", String((e && e.message) || e).slice(0, 120)); }
 }
 
 exports.rehabAuto = functions
