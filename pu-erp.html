@@ -33203,6 +33203,8 @@ function CaseJurMailPanel(props){
     setPick({ row:row, st:'ok', next:nx, note:note, picks:{} });
   }
 
+  // 순수 모듈 스크립트가 안 실렸으면(캐시·네트워크) 수정창 전체가 멈추지 않게 한 줄 안내만
+  if(!PJ) return h('div', { style:{ marginTop:'10px', padding:'8px 10px', fontSize:'11.5px', color:'#991b1b', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'4px' } }, '메일 가져오기 부품을 불러오지 못했습니다 — 화면을 새로 고친 뒤 다시 눌러 주세요.');
   var cand = PJ.candidates(box.rows, { now:Date.now(), chip:chip, query:query });
   var rows = (pick && pick.next) ? PJ.diff(props.cur, pick.next) : [];
   function pickOf(x){ return pick.picks[x.k] || (x.state === 'fill' ? 'new' : 'keep'); }
@@ -33230,7 +33232,7 @@ function CaseJurMailPanel(props){
   return h('div', { style:{ marginTop:'10px', paddingTop:'10px', borderTop:'1px dashed #cbd5e1' } },
     h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', marginBottom:'6px' } },
       chipBtn('labor', '🏛️ 노동 쪽'), chipBtn('all', '📬 전체'),
-      h('input', { type:'text', value:query, onChange:function(e){ setQuery(e.target.value); }, 'data-no-enter':'1', placeholder:'보낸 사람·제목 찾기',
+      h('input', { type:'search', value:query, onChange:function(e){ setQuery(e.target.value); }, 'data-no-enter':'1', placeholder:'보낸 사람·제목 찾기',
         style:{ flex:'1 1 140px', minWidth:0, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit', boxSizing:'border-box' } })),
     h('div', { style:{ maxHeight:'168px', overflowY:'auto', border:'1px solid #e2e8f0', borderRadius:'4px', background:'#fff' } },
       box.st === 'loading' ? h('div', { style:msgS }, '메일함을 불러오는 중…')
