@@ -417,7 +417,7 @@ function make(deps) {
       }
     });
 
-  return { gcalProxy, gcalEdit, proxyOne, removeOne, syncEdit, editOne };
+  return { gcalProxy, gcalEdit, proxyOne, removeOne, syncEdit, editOne, ownerAccess };   /* ownerAccess — gcal-eum.js(이음 근무 거울)도 같은 «대표 늘 연결»을 쓴다 */
 }
 
 module.exports = make;
