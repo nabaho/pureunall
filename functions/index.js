@@ -1412,7 +1412,7 @@ async function rehabAutoRun(db, nowMs, opts) {
   }
   upd["rehab_ad/auto/preview"] = {
     at: nowMs, enabled: settings.enabled, cap: p.cap, sentToday: p.sentToday + queued.length, queued: queued.length,
-    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
+    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, basis: c.basis || "", willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
     skipped: p.skipped.slice(0, 40),
   };
   await db.ref().update(upd);
@@ -1466,7 +1466,9 @@ exports.rehabAuto = functions
 exports.rehabWatch = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
-  .pubsub.schedule("every day 07:40")
+  /* 2026-11-02 대표 「매일 저녁에 수집 처리하고 … 1800 에 시작한다」 — 아침 07:40 → 저녁 18:00.
+     자동 메일(rehabAutoRun)이 같은 회차 끝에 붙어 있고 «오전 8시~오후 9시»에만 나가므로 18:00 시작이면 그날 안에 걸린다. */
+  .pubsub.schedule("every day 18:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const t0 = Date.now();
@@ -1507,6 +1509,14 @@ exports.rehabWatch = functions
     /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
     const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
+
+    /* ── 새로 담긴 공고를 «발송 예정»으로(우편 라벨 대상) — 사람이 이미 표시한 것은 그대로 (rehab-watch.js autoQueueMarks) ── */
+    try {
+      const marksNow = (await root.child("marks").once("value")).val() || {};
+      const q = RehabWatch.autoQueueMarks(result.added, marksNow, nowMs, OntologyServerWrite.CONTRACT_VERSION);
+      Object.assign(upd, q);
+      upd["runs/" + today].autoQueued = Object.keys(q).length;
+    } catch (e) { console.warn("[회생광고 자동 예정]", String((e && e.message) || e).slice(0, 120)); }
 
     /* ── 금융위 기업기본정보로 대표자·전화·팩스·홈페이지 채우기 (functions/rehab-fsc.js 머리말) ──
        «이름 + 시·군·구가 모두 맞는 하나»만 채운다. 실패해도 수집은 계속 — 호출이 실패한 곳은 저장하지 않아 내일 다시 본다. ── */
