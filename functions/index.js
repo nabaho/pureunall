@@ -7214,6 +7214,16 @@ exports.hanaMessageBridge = functions
             ? { sweepBatteryFree: body.batteryFree } : {}),
           /* 문자 «보내기» 권한 — 방문 안내 문자를 맡길 수 있는 폰인지 화면이 알 수 있게 (2026-10-15) */
           ...(typeof body.canSendSms === "boolean" ? { sweepCanSendSms: body.canSendSms } : {}),
+          /* 카톡 알림을 «센 숫자»(2.5.1~, 2026-11-07) — 업무방 알림이 왜 0건인지 화면이 말한다.
+             ⚠ 옛 판은 안 보낸다 — 안 보내면 «모름»으로 둔다(0 으로 적으면 멀쩡한 폰에 없는 고장을 씌운다).
+             ⚠ 방 이름은 받지도 적지도 않는다 — «어떻게 달랐나»만 정해진 낱말 둘로 받는다. */
+          ...(typeof body.kakaoSeen === "number" ? { kakaoSeen: Math.max(0, Math.floor(body.kakaoSeen)) } : {}),
+          ...(typeof body.kakaoListed === "number" ? { kakaoListed: Math.max(0, Math.floor(body.kakaoListed)) } : {}),
+          ...(typeof body.kakaoNear === "number" ? { kakaoNear: Math.max(0, Math.floor(body.kakaoNear)) } : {}),
+          ...(typeof body.kakaoNoRoom === "number" ? { kakaoNoRoom: Math.max(0, Math.floor(body.kakaoNoRoom)) } : {}),
+          ...(typeof body.kakaoSeenAt === "number" ? { kakaoSeenAt: Math.max(0, Math.floor(body.kakaoSeenAt)) } : {}),
+          ...(typeof body.kakaoNearKind === "string"
+            ? { kakaoNearKind: ["extra", "spacing"].includes(body.kakaoNearKind) ? body.kakaoNearKind : "" } : {}),
         }).catch(() => {});
         /* 카톡 업무방 목록을 함께 내려 준다 — 폰은 이 목록에 «정확히» 있는 방만 보낸다.
            ⚠ 못 읽으면 kakaoRooms 를 아예 안 싣는다(빈 목록과 다르다) — 폰은 가진 목록을 그대로 쓴다. */
@@ -7337,6 +7347,16 @@ exports.hanaMessageBridge = functions
              이 값이 채워지면 「입금이 앱 푸시로 온다」는 것이 기록으로 확인된 것이다. */
           lastPkg: String(d.lastPkg || ""),
           disabled: d.disabled === true,
+          /* 카톡 업무방 알림 길(2026-11-07) — 💬 카톡정리 맨 위 «폰 상태» 줄이 읽는다.
+             센 숫자(kakaoSeen…)는 2.5.1 부터 온다. 없으면 null = «모름»(옛 판). */
+          kakaoLastAt: Number(d.kakaoLastAt || 0),
+          kakaoLastSkip: d.kakaoLastSkip ? String(d.kakaoLastSkip) : "",
+          kakaoSeen: typeof d.kakaoSeen === "number" ? d.kakaoSeen : null,
+          kakaoListed: typeof d.kakaoListed === "number" ? d.kakaoListed : null,
+          kakaoNear: typeof d.kakaoNear === "number" ? d.kakaoNear : null,
+          kakaoNoRoom: typeof d.kakaoNoRoom === "number" ? d.kakaoNoRoom : null,
+          kakaoSeenAt: Number(d.kakaoSeenAt || 0),
+          kakaoNearKind: String(d.kakaoNearKind || ""),
         }));
         hanaJson(res, 200, { ok: true, devices }); return;
       }

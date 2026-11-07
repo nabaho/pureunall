@@ -20,7 +20,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=90"></script>
-<script src="js/pu-kakao-work.js?v=3"></script>
+<script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=1"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=1"></script>
@@ -836,6 +836,13 @@
     .kxt input[type=checkbox]{width:22px;height:22px}
     .kxt select,.kxt input[type=text]{font-size:16px;max-width:100%}
   }
+  /* 💬 대화 탭 맨 위 «폰 상태» 한 줄 (2026-11-07) — 업무방 알림이 왜 0건인지 */
+  .kkphone{border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin:0 0 10px;font-size:12.5px;line-height:1.6;background:var(--panel)}
+  .kkphone.ok{border-color:#bbf7d0}
+  .kkphone.warn{border-color:#fde68a;background:#fffbeb}
+  .kkphone.bad{border-color:var(--danger)}
+  .kkphone.bad b{color:var(--danger)}
+  .kkphone summary{cursor:pointer}
   .wsbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:0 0 10px}
   .wsbar .n{margin-left:auto;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
@@ -3273,10 +3280,31 @@ function renderKakao(){
   if(!KK.dlInit) kkDlInit();   /* 📂 카톡 폴더 — 열 때마다 새 저장본·받은 파일을 살핀다(2026-10-24) */
 }
 function kkTab(t){ KK.tab=t; KK.fSel={}; renderKakao(); if(t==='files') kkDlInit(); }
+/* 💬 대화 탭 맨 위 «폰 상태» 한 줄 (2026-11-07) — 대표 지시 「카톡 자료를 자동으로 가져오게, 가져와도 문제가 안 되게」.
+   위반 없는 자동 길은 폰 알림뿐인데 10/9 부터 0건이었다 — 그 까닭(PC 카톡 켜 두면 폰 알림 꺼짐 등)을 여기서 말한다.
+   ⚠ 판단은 js/pu-kakao-work.js 의 phoneDiagnosis 한 곳 — 여기서 다시 짓지 않는다.
+   ⚠ pairStatus 는 «내» 폰만 준다(재무 담당자 검사) — 못 읽으면 줄을 안 그리고 이 화면의 일은 그대로 둔다. */
+function kkPhoneLoad(){
+  if(KK.phoneBusy) return; KK.phoneBusy=true;
+  kkCall('pairStatus').then(function(j){ KK.phone=window.PuKakaoWork.pickPhone(j.devices||[]); })
+    .catch(function(){ KK.phone='err'; })
+    .then(function(){ KK.phoneBusy=false; if(S.view==='kakao'&&KK.tab==='talk') renderKakao(); });
+}
+function kkPhoneHtml(){
+  var K=window.PuKakaoWork; if(!K||!K.phoneDiagnosis) return '';
+  if(KK.phone===undefined){ kkPhoneLoad(); return ''; }
+  if(KK.phone==='err') return '';
+  var d=K.phoneDiagnosis(KK.phone,Date.now()), cls='kkphone '+(d.level==='ok'?'ok':d.level==='bad'?'bad':'warn');
+  if(!d.fix) return '<div class="'+cls+'">📱 <b>'+esc(d.title)+'</b></div>';
+  /* «고치는 법»은 접어 둔다 — 폰에서는 제목 한 줄만 보이고 눌러서 편다(폰 규칙: 긴 설명은 접는다). PC 는 펴 둔다. */
+  var wide=!window.matchMedia||!window.matchMedia('(max-width:640px)').matches;
+  return '<details class="'+cls+'"'+(wide?' open':'')+'><summary>📱 <b>'+esc(d.title)+'</b></summary>'
+    +'<div class="muted">'+esc(d.fix)+'</div></details>';
+}
 function kkTalkHtml(){
   if(KK.items===null&&!KK.busy&&!KK.err) kkLoad();
   var rows=kkRows();
-  var h=kkPickHtml()+(KK.dlH&&KK.dlOk?'':kkDropHtml())
+  var h=kkPhoneHtml()+kkPickHtml()+(KK.dlH&&KK.dlOk?'':kkDropHtml())
     +'<input type="file" id="kk-txt" accept=".txt,.csv,text/plain" style="display:none" onchange="kkTxtFiles(this.files);this.value=\'\'">';
   h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">'
     +[[1,'오늘'],[7,'7일'],[30,'30일']].map(function(d){
@@ -3893,6 +3921,7 @@ function route(){
   visBadge();
   kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
   if(S.view!=='kakao') kxReset();   /* 읽어 둔 대화 내용은 화면을 떠나면 버린다 */
+  if(S.view!=='kakao') KK.phone=undefined;   /* 다시 들어오면 폰 상태를 새로 읽는다 */
   /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
   var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
   wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */

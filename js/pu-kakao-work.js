@@ -361,7 +361,70 @@
     return /^\s?\(\d{1,3}\)$/.test(b.slice(base.length, b.length - ext.length));
   }
 
+  /* ── 폰 알림 길 점검 (2026-11-07) ────────────────────────────────────
+     대표 지시 2026-11-07 「카톡 자료를 자동으로 가져오게, 가져와도 문제가 안 되게」 → 위반 없는 자동 길은
+     폰 알림뿐이다. 실측(11/07): 받을 방을 10/9 에 정했는데 카톡 0건 — 폰 앱은 살아 있었다(문자는 들어옴).
+     그래서 화면이 «왜 0건인지»를 말한다. 폰은 2.5.1 부터 카톡 알림을 «센 숫자»만 보낸다(방 이름은 안 보냄).
+     ⚠ 센 숫자가 없으면(옛 판) «모름»이다 — 0 으로 읽으면 멀쩡한 폰에 없는 고장을 씌운다. */
+  var KAKAO_TALLY_SINCE = '2.5.1';
+  var PHONE_STALE_MS = 45 * 60 * 1000;      /* 15분마다 훑으므로 세 번 놓치면 멈춘 것으로 본다 */
+  var KAKAO_RECENT_MS = 3 * DAY_MS;         /* 업무방은 하루에도 여러 번 글이 오른다 — 사흘 조용하면 의심한다 */
+  var PC_SETTING = 'PC 카톡을 켜 두면 폰에 알림이 안 갑니다 — PC 카톡 «설정 › 알림 › 모바일 알림 설정»을 바꾸고, '
+    + '폰 카톡에서 업무방 알림이 켜져 있는지 봐 주세요(메뉴 이름은 카톡 판마다 조금 다릅니다)';
+
+  /* 폰 여럿이면 «가장 최근에 말을 건» 폰. 꺼 둔(disabled) 폰은 뺀다. */
+  function pickPhone(devices) {
+    var best = null;
+    (devices || []).forEach(function (d) {
+      if (!d || d.disabled) return;
+      var t = Math.max(Number(d.lastTalkAt) || 0, Number(d.lastSweepAt) || 0);
+      if (!best || t > best.t) best = { d: d, t: t };
+    });
+    return best ? best.d : null;
+  }
+
+  function hm(ms) {
+    var d = new Date(Number(ms) + KST_MS);
+    return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + ' ' + ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2);
+  }
+
+  /* 폰 한 대 → { level: 'ok'|'warn'|'bad'|'none', title, fix } */
+  function phoneDiagnosis(dev, now) {
+    now = now == null ? Date.now() : now;
+    if (!dev) return { level: 'none', title: '업무방 알림을 받을 폰이 연결돼 있지 않습니다',
+      fix: '하나문자 앱을 연결한 폰이 있어야 업무방 글이 저절로 들어옵니다' };
+    var alive = Math.max(Number(dev.lastSweepAt) || 0, Number(dev.lastTalkAt) || 0);
+    if (!alive || now - alive > PHONE_STALE_MS) {
+      return { level: 'bad', title: '폰 앱이 멈춘 것 같습니다' + (alive ? ' — 마지막 안부 ' + hm(alive) : ''),
+        fix: '폰에서 하나문자 앱을 한 번 열고, 배터리 절전 예외를 켜 주세요' };
+    }
+    var last = Number(dev.kakaoLastAt) || 0;
+    if (last && now - last <= KAKAO_RECENT_MS) {
+      return { level: 'ok', title: '폰이 업무방 알림을 보내고 있습니다 — 마지막 ' + hm(last), fix: '' };
+    }
+    var known = typeof dev.kakaoSeen === 'number';
+    if (known) {
+      var seen = dev.kakaoSeen, listed = Number(dev.kakaoListed) || 0, near = Number(dev.kakaoNear) || 0;
+      if (!seen) return { level: 'warn', title: '폰에 카톡 알림이 한 번도 안 떴습니다', fix: PC_SETTING };
+      if (!listed && near) {
+        return { level: 'bad', title: '업무방 알림은 오는데 방 이름 모양이 달라 폰이 버리고 있습니다'
+          + (dev.kakaoNearKind === 'extra' ? '(앞뒤에 글자가 더 붙음)' : dev.kakaoNearKind === 'spacing' ? '(띄어쓰기·기호만 다름)' : ''),
+          fix: '프로그램에서 고칠 일입니다 — 이 줄을 캡처해 개발 담당에게 보내 주세요' };
+      }
+      if (!listed) return { level: 'warn', title: '다른 방 알림만 왔고 업무방 알림은 안 왔습니다',
+        fix: '폰 카톡에서 업무방 알림이 꺼져 있지 않은지(방 ≡ › 알림) 봐 주세요 · ' + PC_SETTING };
+      return { level: 'warn', title: '업무방 알림을 봤지만 서버로 보내지 못했습니다',
+        fix: '폰의 인터넷 연결을 확인하고 하나문자 앱을 한 번 열어 주세요' };
+    }
+    var again = ' · 폰 앱을 ' + KAKAO_TALLY_SINCE + ' 이상으로 덮어 깔면 원인을 더 자세히 봅니다';
+    if (last) {
+      return { level: 'warn', title: '마지막 업무방 알림이 ' + Math.floor((now - last) / DAY_MS) + '일 전입니다', fix: PC_SETTING + again };
+    }
+    return { level: 'warn', title: '폰은 살아 있는데 업무방 카톡 알림을 한 번도 못 받았습니다', fix: PC_SETTING + again };
+  }
+
   return {
+    KAKAO_TALLY_SINCE: KAKAO_TALLY_SINCE, pickPhone: pickPhone, phoneDiagnosis: phoneDiagnosis,
     TEXT_MAX: TEXT_MAX, KEEP_DAYS: KEEP_DAYS, BURST_MS: BURST_MS, EXPIRE_DAYS: EXPIRE_DAYS,
     RRN_RE: RRN_RE, CARD_RE: CARD_RE, ACCOUNT_RE: ACCOUNT_RE, PHONE_RE: PHONE_RE,
     maskSensitive: maskSensitive, normRoom: normRoom, roomAllowed: roomAllowed,
