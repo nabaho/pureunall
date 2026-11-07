@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>목업 — 설립중 기금 팝업 · 서식 자동 채움 · 바뀐 칸 빨강</title>
+<style>
+:root{--ink:#0f172a;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#f1f5f9;--panel:#fff;--acc:#2563eb;--acc-soft:#eff6ff;--ok:#16a34a;--warn:#b45309;--warn-bg:#fffbeb;--danger:#dc2626}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "Malgun Gothic",system-ui,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:17px;margin:0 0 4px}h2{font-size:14px;margin:22px 0 8px}
+.note{background:#fff;border:1px dashed var(--faint);border-radius:8px;padding:8px 12px;color:var(--sub);font-size:12px;margin:6px 0 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:12px;padding:1px 8px;font-size:11px;background:#fff}
+.chip.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}.chip.warn{background:var(--warn-bg);border-color:#fde68a;color:var(--warn)}
+.chip.red{background:#fee2e2;border-color:#fecaca;color:var(--danger);font-weight:700}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;cursor:pointer}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:12.5px;vertical-align:middle}
+th{background:#f8fafc;color:var(--sub);font-weight:600;font-size:11.5px}
+tr.go{cursor:pointer}tr.go:hover{background:var(--acc-soft)}
+.bar{display:inline-block;width:70px;height:6px;background:var(--line);border-radius:3px;overflow:hidden;vertical-align:middle}.bar i{display:block;height:100%;background:var(--acc)}
+.sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:1px;background:var(--line)}.sq.d{background:var(--ok)}.sq.n{background:#fbbf24}
+.muted{color:var(--faint);font-size:11px}
+/* 팝업 */
+.veil{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:50;align-items:flex-start;justify-content:center;overflow:auto;padding:28px 12px}
+.veil.on{display:flex}
+.modal{background:#fff;border-radius:12px;width:min(920px,100%);padding:14px 16px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.now{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:9px;padding:8px 12px;margin:10px 0}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.grp{border:1px solid var(--line);border-radius:8px;padding:6px 8px}.grp.cur{border:2px solid #fbbf24;background:var(--warn-bg)}
+.grp b{font-size:11.5px}.grp label{display:flex;gap:5px;font-size:11.5px;padding:1px 0}
+.grp label.d{color:var(--faint);text-decoration:line-through}.grp label.n{font-weight:700;color:var(--warn)}
+.tabs{display:flex;gap:4px;margin:12px 0 8px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:5px 12px;background:none;color:var(--sub)}
+.tabs button.on{border-color:var(--acc);color:var(--ink);font-weight:700}
+.pane{display:none}.pane.on{display:block}
+/* 서식 미리보기 — 빨강 */
+.paper{background:#fff;border:1px solid #cbd5e1;padding:18px 22px;font-family:"Batang","Malgun Gothic",serif;font-size:12.5px;line-height:1.9;max-width:560px}
+.paper h3{text-align:center;font-size:15px;margin:0 0 8px}
+.paper table td{border:1px solid #475569;padding:3px 8px;font-size:12px}
+.paper td.k{background:#f1f5f9;width:26%;text-align:center}
+.v.new,.v.chg{color:var(--danger);font-weight:700}
+.v.chg::after{content:" ← 전: " attr(data-old);font-weight:400;font-size:10.5px;color:var(--danger)}
+.legend{font-size:11.5px;color:var(--sub);display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.steps{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+/* 인쇄: 빨강 → 검정 */
+.paper.bw .v{color:#000!important;font-weight:400}.paper.bw .v::after{content:none}
+@media print{.v.new,.v.chg{color:#000!important;font-weight:400}.v.chg::after{content:none}}
+</style></head><body><div class="wrap">
+<h1>목업 — 설립중 기금 팝업 · 서식 자동 채움 · 바뀐 칸 빨강</h1>
+<div class="note">⚠ 모양 확인용 가짜 화면입니다 — 기금·사람·번호는 모두 지어낸 것입니다. 승인하시면 이 모양으로 만듭니다. 줄을 눌러 팝업을 열어 보세요.</div>
+
+<h2>① 설립중 기금 — 틀 고정 없이 한 판에 (2곳 다 보임)</h2>
+<div class="panel">
+  <div class="row"><b style="font-size:15px">🏗 설립중 기금</b>ⓘ
+    <span class="chip">설립중 <b>2</b></span><span class="chip">기한 임박 <b>0</b></span><span class="chip">인가 기다림 <b>0</b></span><span class="chip warn">빈 자료 <b>2</b></span><span class="chip red">🔴 확인할 서식 <b>3</b></span>
+    <span style="flex:1"></span><button>↻ 다시 읽기</button><button class="primary">＋ 새 기금 등록</button></div>
+  <table style="margin-top:8px"><thead><tr><th style="width:26px">□</th><th style="width:28px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>서식</th></tr></thead><tbody>
+  <tr class="go" onclick="openM()"><td>□</td><td>1</td><td><b>예시1호</b><div class="muted">예시공동근로복지기금1호 · 참여 0곳</div></td><td><span class="chip">공동</span></td>
+    <td><span class="bar"><i style="width:0"></i></span> 0/12</td><td><span class="sq n"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span></td>
+    <td><b>①</b> 상담·유형 판정·수임 계약</td><td>—</td><td><span class="chip warn">14가지</span></td><td><span class="chip red">🔴 2</span></td></tr>
+  <tr class="go" onclick="openM()"><td>□</td><td>2</td><td><b>예시2호</b><div class="muted">예시사내근로복지기금 · 사내</div></td><td><span class="chip">사내</span></td>
+    <td><span class="bar"><i style="width:25%"></i></span> 3/11</td><td><span class="sq d"></span><span class="sq d"></span><span class="sq d"></span><span class="sq n"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span><span class="sq"></span></td>
+    <td><b>④</b> 출연 계획·재산목록 확정</td><td>—</td><td><span class="chip warn">6가지</span></td><td><span class="chip red">🔴 1</span></td></tr>
+  </tbody></table>
+</div>
+<div class="note">바뀐 점: ① 화면 맨 위에 붙어 있던 «제목·숫자·칩 / 표 머리 / 진행판 제목» 세 겹 고정을 없앱니다(지금은 이 세 겹이 화면을 가려 표가 잘립니다). ② 진행판은 아래로 길게 붙이지 않고 <b>줄을 누르면 팝업</b>으로 엽니다. ③ 표 끝에 «서식» 칸이 생기고, 새로 채워져 확인할 칸이 있으면 🔴 숫자가 보입니다.</div>
+
+<h2>② 팝업 — 컴팩트 진행판 (한눈에)</h2>
+<div class="note">위 표의 줄을 누르면 열립니다. 탭 셋(빈 자료·서류 묶음·서식 자동 채움)으로 나눠 길게 늘어놓지 않습니다.</div>
+<button onclick="openM()" class="primary">팝업 열어 보기</button>
+
+<h2>③ 인쇄하면 흑백</h2>
+<div class="grid2">
+  <div><div class="legend"><b>화면(검토용)</b></div>
+    <div class="paper"><h3>설립인가 신청서</h3><table>
+      <tr><td class="k">법인 이름</td><td><span class="v new">예시공동근로복지기금1호</span></td></tr>
+      <tr><td class="k">대표자</td><td><span class="v chg" data-old="김가나">김다라</span></td></tr>
+      <tr><td class="k">소재지</td><td>충남 예시시 예시로 1</td></tr>
+      <tr><td class="k">출연금</td><td><span class="v chg" data-old="1,000,000원">1,200,000원</span></td></tr></table></div></div>
+  <div><div class="legend"><b>인쇄·PDF·한글 파일(제출용)</b></div>
+    <div class="paper bw"><h3>설립인가 신청서</h3><table>
+      <tr><td class="k">법인 이름</td><td><span class="v new">예시공동근로복지기금1호</span></td></tr>
+      <tr><td class="k">대표자</td><td><span class="v chg" data-old="김가나">김다라</span></td></tr>
+      <tr><td class="k">소재지</td><td>충남 예시시 예시로 1</td></tr>
+      <tr><td class="k">출연금</td><td><span class="v chg" data-old="1,000,000원">1,200,000원</span></td></tr></table></div></div>
+</div>
+
+<h2>메모 — 이렇게 동작합니다</h2>
+<div class="panel" style="font-size:12.5px;line-height:1.8">
+<b>1. 설립중 기금 화면</b> — 틀 고정 세 겹을 없애고 표 한 판 + 팝업. 팝업은 «지금 할 일» 띠, 12단계 체크(4묶음), 탭 셋. 팝업 안에서도 체크·서류 묶음 열기·기금 열기가 그대로 됩니다.<br>
+<b>2. 자동 채움</b> — 기업정보(참여사·대표자·출연금 등)가 들어오거나 서류(사업자등록증·확인서 등)를 받아 값이 바뀌면, 그 기금의 서식이 <b>저절로 새 값으로 다시 채워집니다.</b> 지금은 사람이 서식 탭에서 열어야 채워지는데, 값이 바뀐 서식은 목록에서 «자동 채움 완료 · 🔴 N칸 확인»으로 바로 보입니다. 값이 모자라면 «자료 모자람»과 빈 칸 목록만 보여 줍니다.<br>
+<b>3. 빨간 표시</b> — 마지막으로 <u>사람이 확인한 값</u>과 비교해, <span class="v new" style="display:inline">새로 들어온 칸</span>은 빨강, <span class="v chg" style="display:inline" data-old="전 값">바뀐 칸</span>은 빨강 + «전 값»을 옆에 작게 보입니다. [확인] 한 번이면 그 서식의 빨강이 모두 검정으로 돌아갑니다(기금 확인함과 같은 기록).<br>
+<b>4. 인쇄는 흑백</b> — 빨강은 <u>화면 검토용</u>입니다. 인쇄·PDF·한글 파일로 내보내는 글자는 전부 검정이고, 전 값 표시도 나가지 않습니다. 확인하지 않은 빨강 칸이 남아 있으면 인쇄 전에 «아직 확인 안 한 칸이 N곳 있습니다 — 그래도 인쇄?»라고 한 번 묻습니다(기존 인쇄 관문과 같은 자리).<br>
+<b>5. 사람이 쓴 값은 기계가 못 덮습니다</b> — 기금 확인함의 기존 원칙 그대로입니다. 사람이 손으로 고친 칸은 자동 채움이 건드리지 않고, 새 자료와 다르면 빨강으로만 알려 줍니다.
+</div>
+</div>
+
+<div class="veil" id="veil" onclick="if(event.target===this)closeM()"><div class="modal">
+  <div class="row"><b style="font-size:16px">예시1호 — 진행판</b><span class="chip">공동</span><span class="chip warn">0/12</span><span class="chip red">🔴 서식 2</span><span style="flex:1"></span>
+    <button>📂 기금 열기</button><button style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>
+  <div class="now"><span>지금 할 일</span><b style="font-size:14px">① 상담·유형 판정(사내/공동)·수임 계약</b><span style="flex:1"></span><button class="primary">✓ 끝냄</button></div>
+  <div class="steps">
+    <div class="grp cur"><div class="row" style="justify-content:space-between"><b>1. 준비</b><span class="chip warn">0/6</span></div>
+      <label class="n"><input type="checkbox">① 상담·유형 판정·수임</label><label><input type="checkbox">② 참여사업장 모집·확정</label><label><input type="checkbox">③ 설립준비위원회 구성</label><label><input type="checkbox">④ 출연 계획·재산목록</label><label><input type="checkbox">⑤ 정관 작성</label><label><input type="checkbox">⑥ 설립준비위 회의 의결</label></div>
+    <div class="grp"><div class="row" style="justify-content:space-between"><b>2. 인가</b><span class="chip">0/2</span></div>
+      <label><input type="checkbox">⑦ 설립인가신청서 제출</label><label><input type="checkbox">⑧ 인가증 수령·번호 등록</label></div>
+    <div class="grp"><div class="row" style="justify-content:space-between"><b>3. 등기·세무</b><span class="chip">0/3</span></div>
+      <label><input type="checkbox">⑨ 설립등기 (인가 후 3주)</label><label><input type="checkbox">⑩ 법인등록번호·고유번호</label><label><input type="checkbox">⑪ 법인 계좌 개설·인감</label></div>
+    <div class="grp"><div class="row" style="justify-content:space-between"><b>4. 운영 전환</b><span class="chip">0/1</span></div>
+      <label><input type="checkbox">⑫ 최초 출연금 입금 → 전환</label><button disabled style="margin-top:6px;opacity:.5">✅ 운영 전환 →</button></div>
+  </div>
+  <div class="tabs"><button class="on" onclick="tab(this,'p3')">🖨 서식 자동 채움 <span class="chip red">🔴 2</span></button><button onclick="tab(this,'p1')">📝 빈 자료 14</button><button onclick="tab(this,'p2')">📑 서류 묶음 5</button></div>
+  <div class="pane on" id="p3"><table><thead><tr><th style="width:26px">□</th><th>#</th><th>서식</th><th>자동 채움</th><th>새로·바뀐 칸</th><th></th></tr></thead><tbody>
+    <tr><td>□</td><td>1</td><td>별지 제7호 설립인가신청서</td><td><span class="chip ok">자동 채움 완료</span> <span class="muted">11-07 13:58</span></td><td><span class="chip red">🔴 3칸</span></td><td><button>👁 미리보기</button> <button class="primary">✔ 확인</button></td></tr>
+    <tr><td>□</td><td>2</td><td>정관</td><td><span class="chip ok">자동 채움 완료</span> <span class="muted">11-07 13:58</span></td><td><span class="chip red">🔴 1칸</span></td><td><button>👁 미리보기</button> <button class="primary">✔ 확인</button></td></tr>
+    <tr><td>□</td><td>3</td><td>출연 확약서</td><td><span class="chip warn">자료 모자람</span> <span class="muted">출연금 1칸</span></td><td><span class="muted">—</span></td><td><button>✎ 적기</button></td></tr>
+    <tr><td>□</td><td>4</td><td>설립등기 신청서</td><td><span class="chip">인가 뒤</span></td><td><span class="muted">—</span></td><td></td></tr></tbody></table></div>
+  <div class="pane" id="p1"><table><thead><tr><th>□</th><th>#</th><th>비어 있는 것</th><th>적는 곳</th><th></th></tr></thead><tbody>
+    <tr><td>□</td><td>1</td><td><b>대표자 성명</b></td><td>기금 정보 › 인가·등기</td><td><button>✎ 적기</button></td></tr>
+    <tr><td>□</td><td>2</td><td><b>대표자 직책</b></td><td>기금 정보 › 설립</td><td><button>✎ 적기</button></td></tr>
+    <tr><td colspan="5" class="muted">… 처음 5개만 보이고 «더 보기»로 나머지(총 14)</td></tr></tbody></table></div>
+  <div class="pane" id="p2"><table><thead><tr><th>□</th><th>#</th><th>묶음</th><th>형편</th><th></th></tr></thead><tbody>
+    <tr><td>□</td><td>1</td><td><b>① 설립 준비 서류</b></td><td><span class="chip warn">지금</span></td><td><button class="primary">📑 열기</button></td></tr>
+    <tr><td>□</td><td>2</td><td>② 인가 신청 서류</td><td>—</td><td><button>📑 열기</button></td></tr></tbody></table></div>
+</div></div>
+<script>
+function openM(){document.getElementById('veil').classList.add('on')}
+function closeM(){document.getElementById('veil').classList.remove('on')}
+function tab(b,id){[].forEach.call(b.parentNode.children,function(x){x.classList.remove('on')});b.classList.add('on');[].forEach.call(document.querySelectorAll('.pane'),function(p){p.classList.remove('on')});document.getElementById(id).classList.add('on')}
+</script></body></html>
