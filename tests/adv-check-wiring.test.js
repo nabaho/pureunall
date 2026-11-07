@@ -6,15 +6,16 @@ const path = require('path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
 const code = html.replace(/\/\*[\s\S]*?\*\//g, '');
-const i0 = code.indexOf('function IncomeCompanyTab(');
-const tab = code.slice(i0, i0 + 90000);
+const { cutFn } = require('./cut-fn');
+// 고정 폭으로 자르지 않고 함수를 통째로 뽑는다(tests/cut-fn.js — 함수가 길어져도 끝까지 본다)
+const tab = cutFn(code, 'function IncomeCompanyTab(');
 
 test('스크립트가 실려 있다', () => {
   assert.match(html, /js\/pu-adv-check\.js\?v=\d+/);
 });
 
 test('★ 셈은 이 표의 함수를 넘긴다 — 약정액·중단·입금 찾기를 다시 만들지 않는다', () => {
-  const f = tab.slice(tab.indexOf('function _advOpts()'), tab.indexOf('function _advOpts()') + 900);
+  const f = cutFn(tab, 'function _advOpts()');
   assert.match(f, /erpFeeForMonth\(c, ym\)/);
   assert.match(f, /erpFeeStopped\(c, ym\)/);
   assert.match(f, /erpAdvisoryPaidFor\(c, ym, _advIdx\(\)\)/);
