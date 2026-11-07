@@ -248,9 +248,10 @@
 <script src="js/esign-hwp-tpl.js?v=8"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=22"></script>
-<script src="js/pu-contract-forms.js?v=68"></script>
+<script src="js/pu-contract-forms.js?v=69"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-office-store.js?v=10"></script>
+<script src="js/pu-worklog.js?v=1"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -272,7 +273,7 @@ var curUser = null;
    여기서 만든 이름은 저장되는 「올린 사람」·서명 요청서의 「요청」 줄로 나가므로 서명을 받는 바깥 사람에게도 보인다. */
 function meName() { var me = window.PuWhoami && PuWhoami.get(); return (me && me.name) || ''; }
 /* 원본 보관함(올린 사람 이름 포함) 설정 — 이름은 명부를 읽은 뒤에야 알려지므로, 알려지면 한 번 더 부른다(init 은 값만 바꾼다) */
-function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); }
+function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); PuWorklog.init({ db: db, uid: curUser.uid, name: meName() }); }
 var casesCache = {};
 var savePending = 0, saveFailed = false;
 function setSaveState(kind, text) {
@@ -402,9 +403,17 @@ function secretMoveCall(body) {
     });
   });
 }
-function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
+function archiveOriginal(file, from) {
+  return trackedWrite(PuOfficeStore.putOriginal(file, from)).then(function (r) {
+    PuWorklog.log('upload', { target: (r && r.fileId) || '', note: (file && file.name) || '' });   /* 작업 기록 — 기다리지 않는다 */
+    return r;
+  });
+}
 function downloadOriginal(fileId, name) {
-  return PuOfficeStore.download(fileId, name).catch(function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
+  return PuOfficeStore.download(fileId, name).then(function (r) {
+    PuWorklog.log('download', { target: fileId, note: name });
+    return r;
+  }, function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
 }
 function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
@@ -655,7 +664,10 @@ function formMailRecord(row, V, o) {
   var coName = String((V && V.회사명) || (row && row.c) || '').trim();
   if (o.await && o.kind === '계약서' && coName)
     jobs.push(trackedWrite(PuOfficeStore.markAwait({ coName: coName, bz: (row && row.bz) || (V && V.사업자번호) || '', at: at, how: o.how === '받기' ? '받기' : '메일', names: o.names })));
-  return Promise.all(jobs).then(function () { return keys.length; });
+  return Promise.all(jobs).then(function () {
+    PuWorklog.log(o.how === '받기' ? 'download' : 'mail_send', { target: coName, note: (o.names || []).join(', ') });
+    return keys.length;
+  });
 }
 /* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) — 자리·규칙은 js/pu-sign.js 머리말 ══
    만들기: 직원 칸(req) → 열쇠 칸(open) 차례(규칙이 open 제출 때 req 의 끝 4자리를 본다). 회사가 있으면 📬 서명본 대기에 「서명」으로.
@@ -673,7 +685,10 @@ function formSignCreate(req, open) {
       if (!req.co) return;
       return trackedWrite(PuOfficeStore.markAwait({ coName: req.co, at: req.at, how: '서명', names: [req.title] })).catch(function () {});
     })
-    .then(function () { return { id: id, link: PuSign.linkOf(location.origin + location.pathname, req.t) }; });
+    .then(function () {
+      PuWorklog.log('sign_request', { target: req.co, note: req.title });
+      return { id: id, link: PuSign.linkOf(location.origin + location.pathname, req.t) };
+    });
 }
 function formSignList() {
   return db.ref('pu_sign/req').orderByChild('at').limitToLast(300).once('value').then(function (s) {
@@ -925,7 +940,9 @@ async function formZip(files) {
   var JSZ = await _esignLoadJsZip();
   var z = new JSZ();
   files.forEach(function (f) { z.file(f.name, f.bytes); });
-  return z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  var out = await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  PuWorklog.log('download', { note: files.length + '개 파일 묶음' });   /* 묶음 이름은 이 함수가 모른다 — 개수로 남긴다 */
+  return out;
 }
 function formHwpShow(host, bytes, name) {
   if (!formIsXlsx(name)) return PureunHwp.renderPreview(host, bytes, name);
@@ -970,7 +987,7 @@ function showPane(name) {
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
-      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
+      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal, log: function (k, o) { return PuWorklog.log(k, o); },
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       openEsign: function (o) {
         if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign');

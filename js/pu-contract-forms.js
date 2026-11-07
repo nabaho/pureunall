@@ -2664,6 +2664,7 @@
         if (S.grp !== 'all' && !facetCounts(S.forms, S.kind, S.side).groups.some(function (g) { return g.name === S.grp; })) S.grp = 'all';
         drawTree(); drawMain();
         if (okMsg) toast(okMsg, undo);
+        host.log && host.log('form_save', { note: okMsg || '' });   /* 작업 기록 — 실패해도 저장은 그대로 */
         return list;
       }).catch(function (e) { toast('⚠ 저장 실패 — ' + ((e && e.message) || e)); throw e; });
     }
