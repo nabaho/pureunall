@@ -455,3 +455,40 @@ test('문구 — 담당자 입금 없이 주관에게만 입금됐으면 받은 
   assert.match(t, /2\) 몫 = 입금 합계 × 10% \(원 미만 버림\)/);
   assert.match(t, /담당자 입금이 없으면 홍길동이 몫 전액을 지급/);
 });
+
+/* ── 월별 관리·입금 자동 검토 (대표 지시 2026-11-07 「월별 년도별관리」 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) ── */
+test('한 달 할 일 — 정산 없음 / 임시저장·안 보낸 송금이 있으면 할 일 남음 / 모두 확정·보냄이면 끝, 지운 정산표는 뺀다', () => {
+  assert.equal(C.monthState([]).state, 'none');
+  assert.equal(C.monthState([{ status: 'draft', _deleted: true }]).state, 'none');
+  const d = C.monthState([{ status: 'draft' }, { status: 'confirmed', transfers: [{ paid: true }, { paid: false }] }]);
+  assert.deepEqual([d.state, d.runs, d.draft, d.transfers, d.paid, d.left], ['todo', 2, 1, 2, 1, 1]);
+  assert.equal(C.monthState([{ status: 'confirmed', transfers: [{ paid: false }] }]).state, 'todo', '안 보낸 송금');
+  assert.equal(C.monthState([{ status: 'confirmed', transfers: { 0: { paid: true } } }, { status: 'manual' }]).state, 'done');
+});
+
+test('입금 자동 검토 — 임시저장 정산표들의 주관 몫만 한꺼번에 맞추고, 입금 한 줄은 한 번만, 넣은 실입금은 «넣음», 확정한 정산표는 뺀다', () => {
+  const n = notice();
+  const mk = (key, status, actuals) => ({ id: 'cons-test_' + key, typeCode: 'cons-test', monthKey: key, status, sites: C.settleMonth(n, key, RULE, ctx({ actuals: actuals || {} })).sites });
+  const lead = { 'cons-test': 'T-LEAD' };
+  /* 10월 가나상사·9월 다라산업 — 주관 세후가 둘 다 2,483,442. 입금은 한 줄뿐 → 하나만 맞음 */
+  const found = [{ id: 'x1', amount: 2483442 }, { id: 'x2', amount: 550000 }];
+  const r = C.reviewMonth([mk('2026-10', 'draft'), mk('2026-09', 'draft')], lead, found);
+  assert.deepEqual(r.rows.map((x) => [x.runId, x.key, x.expected, x.kind, x.found && x.found.id]),
+    [['cons-test_2026-10', 'C-1|T-LEAD', 2483442, 'exact', 'x1'], ['cons-test_2026-09', 'C-2|T-LEAD', 2483442, 'none', null]]);
+  assert.deepEqual(r.counts, { exact: 1, near: 0, none: 1, saved: 0, other: 1 });
+  assert.equal(r.rows[0].id, 'cons-test_2026-10::C-1|T-LEAD');
+  /* 담당 몫은 맞추지 않는다(담당 개인 통장은 대표 통장에 없다) */
+  assert.ok(r.rows.every((x) => /\|T-LEAD$/.test(x.key)));
+  /* 이미 넣은 실입금 → «넣음», 다시 맞추지 않아 입금 줄이 남는다 */
+  const s = C.reviewMonth([mk('2026-10', 'draft', { 'C-1|T-LEAD': 2483442 })], lead, found);
+  assert.deepEqual(s.rows.map((x) => [x.kind, x.actual, x.found]), [['saved', 2483442, null]]);
+  assert.equal(s.counts.other, 1, '넣은 실입금과 같은 입금 한 줄은 쓴 것');
+  /* 한 정산표에 넣은 입금을 다른 정산표가 또 잡지 않는다 */
+  const twice = C.reviewMonth([mk('2026-10', 'draft', { 'C-1|T-LEAD': 2483442 }), mk('2026-09', 'draft')], lead, found);
+  assert.deepEqual(twice.rows.map((x) => [x.kind, x.found && x.found.id]), [['saved', null], ['none', null]]);
+  /* 확정한 정산표·주관이 없는 종류는 뺀다 */
+  assert.deepEqual(C.reviewMonth([mk('2026-10', 'confirmed')], lead, found).rows, []);
+  assert.deepEqual(C.reviewMonth([mk('2026-10', 'draft')], {}, found).rows, []);
+  /* 1% 안쪽은 «가까움» */
+  assert.deepEqual(C.reviewMonth([mk('2026-10', 'draft')], lead, [{ id: 'y', amount: 2483000 }]).rows.map((x) => [x.kind, x.diff]), [['near', -442]]);
+});
