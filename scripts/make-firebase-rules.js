@@ -1923,6 +1923,59 @@ rules.pu_worklog = {
   }
 };
 
+/* ══ 견적·계약 기록 + 금액 잠금 (견적·계약 자동화 계획 1) ═════════════════════════
+   js/pu-quotes.js 가 쓴다. 글(회사·날짜·종류·출처)은 pu_quotes, 금액은 pu_quote_amt 로 «따로» 둔다.
+   ★ 금액을 보는 사람: 대표·총괄관리자(isAdmin) · 재무(fin) · 그 건의 확정 담당자(owner). isSubAdmin·일반 직원은 못 본다.
+   ★ 파이어베이스는 부모에서 준 .read 를 아래에서 거둘 수 없다 — 그래서 pu_quote_amt 자리에는 isAdmin·fin 만 두고
+     (LOGIN 을 넣지 않는다), 확정 담당자 읽기는 한 건($q) 자리에만 둔다. 뿌리에도 .read 가 없어야 한다.
+   ★ 담당자(owner)를 바꾸는 것은 isAdmin 만 — 새로 쓸 때만 «나 또는 빈칸» 으로 넣을 수 있다.
+   ⚠ 칸 길이는 PuQuotes 가 미리 자르는 값과 같아야 한다(co 80·scope 300·period 60·ownerGuess 60·srcKey 200). */
+const 견적글 = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+rules.pu_quotes = {
+  '.read': LOGIN,
+  '.indexOn': ['srcKey', 'at'],
+  $q: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.hasChildren(['doc','type','co','date','src','review','by','at'])",
+    doc:    { '.validate': "newData.isString() && (newData.val() === 'quote' || newData.val() === 'contract')" },
+    type:   견적글(30),
+    co:     견적글(80),
+    coKey:  견적글(80),
+    date:   { '.validate': "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)" },
+    scope:  견적글(300),
+    period: 견적글(60),
+    staff:  { '.validate': 'newData.isNumber()' },
+    fileId: 견적글(120),
+    srcKey: 견적글(200),
+    src: {
+      '.validate': "newData.hasChild('how')",
+      how:  { '.validate': "newData.isString() && (newData.val() === 'mail' || newData.val() === 'window' || newData.val() === 'upload')" },
+      slug: 견적글(120),
+      key:  견적글(200),
+      $other: { '.validate': false }
+    },
+    ownerGuess: 견적글(60),
+    review: { '.validate': "newData.isString() && (newData.val() === 'ok' || newData.val() === 'check')" },
+    by:     { '.validate': 'newData.val() === auth.uid || newData.val() === data.val()' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+rules.pu_quote_amt = {
+  '.read': `auth != null && (${ADMIN} || ${FIN})`,
+  $q: {
+    '.read': `(${LOGIN}) && data.child('owner').val() === auth.uid`,
+    '.write': `(${LOGIN}) && ((!data.exists() && (newData.child('owner').val() === auth.uid || newData.child('owner').val() === '')) || ${ADMIN})`,
+    '.validate': "newData.hasChildren(['amount','vat','owner','by','at'])",
+    amount: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    vat:    { '.validate': "newData.isString() && (newData.val() === 'incl' || newData.val() === 'excl' || newData.val() === '')" },
+    owner:  { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    by:     { '.validate': 'newData.val() === auth.uid || newData.val() === data.val()' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+
 /* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) ═════════════════
    사람마다 링크 하나: sign-contract.html?t={열쇠(128비트)}. 열쇠를 아는 사람만 그 칸(open/{t})을 읽는다 —
    open 은 «목록 읽기»가 막혀 있어 열쇠를 모르면 찾을 수 없다(위임장 링크처럼 meta 에 열쇠를 드러내지 않는다).
