@@ -45,7 +45,8 @@ chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'pull') { arm();
    → 30분마다 도는 «반복» 알람 하나가 «다음 때» 알람을 살핀다:
      없으면(사라졌으면) 다시 맞추고 지금 한 번 돌고, 울렸어야 할 때를 넘겼는데 그대로면 역시 지금 돈다.
    ⚠ 확장이 깨어날 때마다(맨 아래 guard()) 지킴이 알람이 있는지도 본다 — 지킴이 자신이 사라져도 되살린다.
-   ⚠ 겹쳐 불려도 한 번만 돈다 — run() 이 running 으로 막는다. */
+   ⚠ 겹쳐 불려도 한 번만 돈다 — run() 이 running 으로 막는다.
+   ⚠ 지킴이가 울릴 때 새 판도 본다(selfUpdate) — 회차가 안 돌아도 새 코드가 30분 안에 들어온다. */
 var GUARD_MIN = 30, LATE_MS = 10 * 60000;
 function guard() {
   chrome.alarms.get('guard', function (g) { if (!g) chrome.alarms.create('guard', { periodInMinutes: GUARD_MIN }); });
@@ -53,7 +54,16 @@ function guard() {
     if (!a || a.periodInMinutes || a.scheduledTime < Date.now() - LATE_MS) { arm(); run(); }
   });
 }
-chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'guard') guard(); });
+chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'guard') { guard(); if (!running) selfUpdate(); } });
+/* 바깥에서 깨우기 (2026-11-07) — PC 예약 작업이 회차가 늦으면 확장 화면 kick.html 을 연다.
+   판 번호로 답해야 kick.js 가 «다시 시작»을 안 한다. ⚠ 확장 «자기 화면»이 보낸 것만 받는다 —
+   리멤버·푸른 탭의 다리(content script)가 보낸 말로는 돌지 않는다. */
+chrome.runtime.onMessage.addListener(function (m, s, send) {
+  if (!m || m.cmd !== 'kick' || !s || String(s.url || '').indexOf(chrome.runtime.getURL('')) !== 0) return false;
+  send({ ver: DISK_VER });
+  armIfNone(); run();
+  return false;
+});
 /* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다
    ⚠ 일정도 함께 살린다(2026-11-07) — 예전에는 한 번 돌 뿐, 사라진 알람은 그대로였다. */
 chrome.action.onClicked.addListener(function () { armIfNone(); run(); });
