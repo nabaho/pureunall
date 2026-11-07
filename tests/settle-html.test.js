@@ -71,13 +71,18 @@ test('잠금 — 재직·사번이 있고 관리자·위임관리인·재무권�
   assert.match(fnBody('async function staffRole('), /catch\(e\)\{ return null; \}/, '권한을 못 읽으면 잠가야 한다');
 });
 
-test('확정 — 다시 계산해 검산이 통과할 때만, 확인 창 뒤에, 남이 먼저 고쳤으면 접는다, 이월·조정을 붙인다', () => {
+test('확정 — 저장 안 한 칸이 없고 다시 계산한 검산이 통과할 때만, 확인 창 뒤에, 남이 먼저 고쳤으면 접는다, 이월·조정을 붙인다', () => {
+  const pc = fnBody('function prepConfirm(');
+  assert.match(pc, /pendCount\(rid\)/);
+  assert.match(pc, /C\.checkRun\(/);
+  assert.doesNotMatch(pc, /save\(|patchRecord\(/, '살펴보기만');
   const fn = fnBody('async function confirmRun(');
-  assert.match(fn, /C\.checkRun\(/);
-  assert.ok(fn.indexOf('C.checkRun(') < fn.indexOf('window.confirm('), '검산이 확인 창보다 먼저');
-  assert.match(fn, /if\(prev && Number\(prev\.revision\|\|0\)!==rev\)\{ lost=true; return undefined; \}/);
-  assert.match(fn, /appliedRunId:rid/);
-  assert.match(fn, /status:'confirmed'/);
+  assert.ok(fn.indexOf('prepConfirm(rid)') >= 0 && fn.indexOf('prepConfirm(rid)') < fn.indexOf('window.confirm('), '검산이 확인 창보다 먼저');
+  assert.ok(fn.indexOf('window.confirm(') < fn.indexOf('doConfirm('), '확인 창 뒤에 저장');
+  const dc = fnBody('async function doConfirm(');
+  assert.match(dc, /if\(prev && Number\(prev\.revision\|\|0\)!==rev\)\{ lost=true; return undefined; \}/);
+  assert.match(dc, /appliedRunId:rid/);
+  assert.match(dc, /status:'confirmed'/);
 });
 
 test('확정 풀기 — 보냄 표시를 지우고 붙었던 이월·조정을 되돌린다', () => {
@@ -113,10 +118,14 @@ test('업체 연결 후보는 고른 해(YEAR)에 걸친 그 사업 종류 컨�
   assert.match(fn, />=yearFrom\(\)/);
 });
 
-test('탭 넷 — 폰에서 한 줄(접지 않고 옆으로 민다), 입력칸 16px', () => {
-  ['runs', 'notices', 'rules', 'msgs'].forEach((t) => assert.match(NOC, new RegExp('data-tab="' + t + '"')));
+test('탭 셋(월별 정산·한 해 합계·설정) — 폰에서 한 줄(접지 않고 옆으로 민다), 입력칸 16px', () => {
+  ['month', 'year', 'setup'].forEach((t) => assert.match(NOC, new RegExp('data-tab="' + t + '"')));
+  assert.equal((NOC.match(/<button data-tab=/g) || []).length, 3, '탭은 셋');
+  ['rules', 'kakao', 'calc'].forEach((s) => assert.match(NOC, new RegExp('data-sub="' + s + '"')));
   assert.match(NOC, /@media \(max-width:640px\)\{[\s\S]*\.tabs\{flex-wrap:nowrap;overflow-x:auto/);
   assert.match(NOC, /@media \(max-width:768px\)\{ input,select,textarea\{font-size:16px\} \}/);
+  /* 옛 탭 이름을 기억한 기기도 열린다 — 모르는 값이면 월별 정산 */
+  assert.match(NOC, /if\(\['month','year','setup'\]\.indexOf\(t\)>=0\) TAB=t;/);
 });
 
 test('입금 대조 — 당겨오기는 재무관리 거래내역을 «읽기만», 붙여넣기는 계산 모듈로 읽고, 저장은 고른 줄을 한 번에', () => {
@@ -163,9 +172,9 @@ test('요율표 저장 — 주관 없음·요율 범위 밖이면 아무것도 �
   assert.doesNotMatch(NOC, /RULE_EDIT|readRuleForm|rulesBox/, '옛 규칙 상자가 남았다');
 });
 
-test('계산기 — 첫 탭·기본 탭이고, 계산 모듈 calcSite 로 계산하며 서버에 쓰지 않는다(이 기기에만 기억)', () => {
-  assert.ok(NOC.indexOf('data-tab="calc"') < NOC.indexOf('data-tab="runs"'), '계산기가 첫 탭');
-  assert.match(NOC, /var TAB='calc'/);
+test('계산기 — 설정 › 계산기, 계산 모듈 calcSite 로 계산하며 서버에 쓰지 않는다(이 기기에만 기억). 기본 탭은 월별 정산', () => {
+  assert.match(NOC, /<div class="sub" id="sub-calc"><div id="revBox"><\/div><div id="calcBox"><\/div><div id="calcOut"><\/div><\/div>/);
+  assert.match(NOC, /var TAB='month'/);
   assert.match(fnBody('function drawCalcOut('), /C\.calcSite\(calcRows\(\)\)/);
   ['function drawCalc(', 'function saveCalc(', 'function calcPrefill(', 'function drawCalcOut('].forEach((h) =>
     assert.doesNotMatch(fnBody(h), /gate\.save|patchRecord|save\('settle/, h + ' 가 서버에 쓴다'));
@@ -188,12 +197,11 @@ test('임시저장 — 통장 실입금은 칠 때 저장하지 않고 «임시�
   assert.equal((sv.match(/patchRecord\(/g) || []).length, 1);
   assert.ok(sv.indexOf("toast('금액을 숫자로") < sv.indexOf('patchRecord('), '검사가 저장보다 먼저');
   assert.match(sv, /delete PEND\[rid\]/);
-  assert.match(NOC, /act==='draftSave'\) await saveDraft\(CUR_RUN\)/);
+  assert.match(NOC, /act==='draftSave'\) await saveDraft\(rid\)/);
   /* 막기 — 확정·기록만 */
-  ['async function confirmRun(', 'async function setManual('].forEach((h) => {
-    const fn = fnBody(h);
-    assert.ok(fn.indexOf('pendCount(rid)') >= 0 && fn.indexOf('pendCount(rid)') < fn.indexOf('window.confirm('), h + ' 가 저장 안 한 칸을 안 본다');
-  });
+  assert.match(fnBody('function prepConfirm('), /if\(pendCount\(rid\)\) return \{ why:/);
+  const sm = fnBody('async function setManual(');
+  assert.ok(sm.indexOf('pendCount(rid)') >= 0 && sm.indexOf('pendCount(rid)') < sm.indexOf('window.confirm('), 'setManual 이 저장 안 한 칸을 안 본다');
   /* 고른 줄 비우기도 노란 칸으로만 */
   const clr = NOC.slice(NOC.indexOf("if(d==='clearActual')"));
   assert.doesNotMatch(clr.slice(0, clr.indexOf('return;\n')), /patchRecord/);
@@ -205,10 +213,26 @@ test('앱끼리 창은 새 탭(_blank)으로 열지 않는다', () => {
   assert.doesNotMatch(NOC, /window\.open\([^)]*_blank/);
 });
 
-test('정산 탭 두 칸 — 넓은 화면은 왼쪽 목록·오른쪽 정산표, 좁으면 위아래', () => {
-  assert.match(NOC, /<div class="runs2">\s*<div class="card runs-side"><div id="runsBox"><\/div><div id="yearBox"><\/div><\/div>\s*<div class="card runs-main" id="runCard">/);
-  assert.match(NOC, /@media \(min-width:1280px\)\{\s*\.runs2\{grid-template-columns:450px minmax\(0,1fr\)\}/);
-  assert.match(fnBody('function drawRuns('), /types:ruleTypes\(\)/);
+test('월별 정산 — 해 넘기기 · 열두 달 줄 · 고른 달의 ① 입금 확인 ② 정산 확인 ③ 카톡 보내기', () => {
+  ['yPrev', 'yearPick', 'yNext', 'inboxBtn', 'monthStrip', 'inbox', 'monthHead', 'step1', 'step2', 'step3'].forEach((id) => assert.match(NOC, new RegExp('id="' + id + '"'), id));
+  assert.ok(NOC.indexOf('id="step1"') < NOC.indexOf('id="step2"') && NOC.indexOf('id="step2"') < NOC.indexOf('id="step3"'), '①②③ 차례');
+  const dm = fnBody('function drawMonth(');
+  assert.match(dm, /V\.monthStrip\(YEAR, monthInfo\(\), CUR_MONTH\)/);
+  assert.match(dm, /V\.monthRuns\(runs/);
+  assert.match(dm, /drawAuto\(runs\)/);
+  assert.match(dm, /drawSend\(runs\)/);
+  assert.match(fnBody('function monthRunsOf('), /yearRuns\(\)\.filter\(function\(r\)\{ return r\.monthKey===key; \}\)/);
+  assert.match(fnBody('function monthInfo('), /C\.monthState\(/);
+  /* 달을 고르면 그 달로 — 펼친 정산표는 닫고, 이 기기에 기억 */
+  assert.match(NOC, /if\(\(b=t\.closest\('\[data-month\]'\)\)\)\{ ev\.preventDefault\(\); CUR_MONTH=b\.getAttribute\('data-month'\); lsSet\('month', CUR_MONTH\); CUR_RUN='';/);
+  /* 고른 달은 그 해 안에서 — 기억한 달이 다른 해면 할 일이 남은 최근 달 */
+  const pm = fnBody('function pickMonth(');
+  assert.match(pm, /C\.yearOf\(CUR_MONTH\)===YEAR/);
+  assert.match(pm, /state==='todo'/);
+  /* 펼친 정산표는 하나만(다시 누르면 접힘) */
+  assert.match(NOC, /CUR_RUN=CUR_RUN===rr\?'':rr;/);
+  /* 폰은 달 줄 여섯 칸 */
+  assert.match(NOC, /@media \(max-width:640px\)\{[\s\S]*\.mstrip\{grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
 });
 
 test('직접 입력 — 검사(주관·사업장·지급월·숫자·요율·엑셀 달 겹침)가 저장보다 먼저, 안내는 settle/notices/M_<종류>, 고른 연결을 잇고 정산표를 만든다', () => {
@@ -234,24 +258,27 @@ test('직접 입력 — 검사(주관·사업장·지급월·숫자·요율·엑
 });
 
 
-test('연도별 관리 — 탭 줄 «연도», 정산표·안내 파일·카톡 문구·직접 입력 목록은 그 해 것만, 왼쪽 아래 그 해 합계', () => {
+test('연도별 관리 — 맨 위 «‹ 해 ›», 정산표·안내 파일·카톡 문구·직접 입력 목록은 그 해 것만, «한 해 합계» 탭에 그 해 합계', () => {
   assert.match(NOC, /<select id="yearPick"/);
   assert.match(fnBody('function yearRuns('), /C\.yearOf\(r\.monthKey\)===YEAR/);
-  const dr = fnBody('function drawRuns(');
-  assert.match(dr, /V\.runsTable\(yearRuns\(\)/);
-  assert.match(dr, /V\.yearBox\(C\.yearSummary\(runsList\(\), YEAR\), NAMES\)/);
-  assert.match(fnBody('function confirmedRuns('), /yearRuns\(\)/);
+  const dy = fnBody('function drawYear(');
+  assert.match(dy, /V\.yearBox\(C\.yearSummary\(runsList\(\), YEAR\), NAMES\)/);
+  assert.match(dy, /V\.yearMonths\(/);
+  assert.match(dy, /C\.yearOf\(r\.monthKey\)===YEAR/, '보낸 기록도 그 해 것만');
   assert.match(fnBody('function drawNotices('), /filter\(noticeInYear\)/);
   assert.match(fnBody('function manualOpt('), /C\.yearOf\(e\.monthKey\)===YEAR/);
-  assert.match(fnBody('function drawTabs('), /yearRuns\(\)\.length/);
-  /* 바꾸면 그 해에 없는 정산표는 닫는다 */
-  assert.match(NOC, /if\(t\.id==='yearPick'\)\{ YEAR=t\.value; lsSet\('year', YEAR\); if\(CUR_RUN && D\.runs\[CUR_RUN\] && C\.yearOf\(D\.runs\[CUR_RUN\]\.monthKey\)!==YEAR\) CUR_RUN='';/);
-  /* 직접 입력 저장 뒤에는 그 지급월의 해로 옮겨 방금 만든 정산표가 보이게 */
+  /* 바꾸면 그 해에 없는 정산표는 닫는다 — 고르기·‹ › 모두 setYear 한 길 */
+  assert.match(NOC, /if\(t\.id==='yearPick'\)\{ setYear\(t\.value\); return; \}/);
+  assert.match(NOC, /if\(t\.closest\('#yPrev'\)\)\{ setYear\(String\(Number\(YEAR\)-1\)\); return; \}/);
+  assert.match(fnBody('function setYear('), /if\(CUR_RUN && D\.runs\[CUR_RUN\] && C\.yearOf\(D\.runs\[CUR_RUN\]\.monthKey\)!==YEAR\) CUR_RUN='';/);
+  /* 직접 입력 저장 뒤에는 그 지급월의 해·달로 옮겨 방금 만든 정산표가 보이게 */
   assert.match(fnBody('async function saveManual('), /YEAR=mk\.slice\(0,4\); lsSet\('year', YEAR\);/);
+  assert.match(fnBody('async function saveManual('), /CUR_MONTH=mk;/);
+  assert.match(fnBody('async function exportYear('), /await needXlsx\(\)/);
 });
 
 test('역계산 — 계산기 위 상자(저장 없음), 직접 입력 실수령액 칸은 세전을 채우고 저장 때 통장 실입금이 된다, 계산기는 세전을 비우면 실입금에서', () => {
-  assert.match(NOC, /<section class="pane" id="pane-calc"><div id="revBox"><\/div>/);
+  assert.match(NOC, /<div class="sub" id="sub-calc"><div id="revBox"><\/div>/);
   assert.match(NOC, /if\(t\.id==='r_net'\)\{ REV\.net=t\.value; lsSet\('rev'/);
   const inp = NOC.slice(NOC.indexOf("if(t.matches('input[data-m]'))"));
   const body = inp.slice(0, inp.indexOf('return; }') + 9);
@@ -268,11 +295,12 @@ test('역계산 — 계산기 위 상자(저장 없음), 직접 입력 실수령
   assert.match(fnBody('async function saveRules('), /JSON\.stringify\(\[o\.title\|\|'', C\.taxOf\(o\.tax\)/);
 });
 
-test('카톡 문구 탭 — 확정 전 정산표도 미리보기로 고를 수 있고, 복사는 확정한 정산표만', () => {
-  assert.match(fnBody('function msgRuns('), /confirmedRuns\(\)\.concat\(yearRuns\(\)\.filter\(function\(r\)\{ return r\.status==='draft'; \}\)/);
-  assert.match(fnBody('function drawMsgs('), /preview:!!\(cur && cur\.status!=='confirmed'\)/);
+test('카톡 문구(③) — 그 달 확정한 정산표 먼저·임시저장은 미리보기, 복사는 확정한 정산표만', () => {
+  const mi = fnBody('function monthItems(');
+  assert.match(mi, /status==='confirmed'[\s\S]*status==='draft'/);
+  assert.match(mi, /preview:r\.status!=='confirmed'/);
   const cp = fnBody('function copyMsg(');
-  assert.ok(cp.indexOf("cur.status!=='confirmed'") >= 0 && cp.indexOf("cur.status!=='confirmed'") < cp.indexOf('currentMsgs()'), '복사 전에 확정인지 본다');
+  assert.ok(cp.indexOf("run.status!=='confirmed'") >= 0 && cp.indexOf("run.status!=='confirmed'") < cp.indexOf('msgsOf('), '복사 전에 확정인지 본다');
 });
 
 
@@ -288,22 +316,53 @@ test('기존 % — 요율표 새 칸은 기존 %로 채우고(저장은 단추�
 
 
 test('정산표 송금 줄 «보냄 표시» — 누르면 보냄, 보냄이면 물어보고 지운다(체크박스로 바로 저장하던 길은 없앴다)', () => {
-  assert.match(NOC, /if\(\(b=t\.closest\('\[data-paid-btn\]'\)\)\)\{[^}]*kr=D\.runs\[CUR_RUN\]/);
-  assert.match(NOC, /if\(pt\.paid && !window\.confirm\('«보냄» 표시를 지울까요\?'\)\) return; await setPaid\(CUR_RUN, \[pi\], !pt\.paid\);/);
+  assert.match(NOC, /if\(\(b=t\.closest\('\[data-paid-btn\]'\)\)\)\{ var pr=b\.getAttribute\('data-rid'\)\|\|CUR_RUN,[^}]*kr=D\.runs\[pr\]/);
+  assert.match(NOC, /if\(pt\.paid && !window\.confirm\('«보냄» 표시를 지울까요\?'\)\) return; await setPaid\(pr, \[pi\], !pt\.paid\);/);
   assert.doesNotMatch(NOC, /input\[data-paid\]/);
 });
 
 
 test('카톡 보내기 — 대표만 · 확정한 정산표만 · 방 이름이 있는 사람만, 대기 중이면 다시 넣지 않고, 확인 창 뒤에 대기열에 «새로 만들기만»', () => {
+  const plan = fnBody('function kqPlan(');
+  ["run.status!=='confirmed'", 'if(!room)', "k.status==='pending'"].forEach((x) => assert.ok(plan.indexOf(x) >= 0, x));
+  assert.doesNotMatch(plan, /save\(|patchRecord\(/, '고르기만');
   const fn = fnBody('async function kqSend(');
-  const firstSave = fn.indexOf("save('settle/kakaoQueue/'");
-  ["!ME.isAdmin", "run.status!=='confirmed'", "if(!room)", "k.status==='pending'", 'window.confirm('].forEach((x) =>
-    assert.ok(fn.indexOf(x) >= 0 && fn.indexOf(x) < firstSave, x + ' 이 저장보다 먼저가 아니다'));
-  assert.match(fn, /status:'pending'/);
-  assert.match(fn, /expectedRevision:-1/);
-  assert.match(fn, /createdBy:ME\.sid/);
+  ['!ME.isAdmin', 'kqPlan(picks)', 'window.confirm('].forEach((x) => assert.ok(fn.indexOf(x) >= 0 && fn.indexOf(x) < fn.indexOf('kqPut('), x + ' 이 대기열 넣기보다 먼저가 아니다'));
+  const put = fnBody('async function kqPut(');
+  const firstSave = put.indexOf("save('settle/kakaoQueue/'");
+  ['!ME.isAdmin', "status!=='confirmed'"].forEach((x) => assert.ok(put.indexOf(x) >= 0 && put.indexOf(x) < firstSave, x + ' 이 저장보다 먼저가 아니다'));
+  assert.match(put, /status:'pending'/);
+  assert.match(put, /expectedRevision:-1/);
+  assert.match(put, /createdBy:ME\.sid/);
   const sr = fnBody('async function saveRoom(');
   assert.ok(sr.indexOf('!ME.isAdmin') < sr.indexOf("patchRecord('settle/rooms/'"), '대표 확인이 저장보다 먼저가 아니다');
   assert.match(NOC, /ME\.isAdmin=role\.isAdmin===true/);
   assert.match(fnBody('async function reload('), /'rooms','kakaoQueue','agent'/);
+});
+
+test('입금 자동 검토(①) — 재무관리 거래내역은 «읽기만», 같은 금액만 미리 ☐, 저장은 «체크한 줄 저장»으로 임시저장 정산표마다 한 번', () => {
+  const ld = fnBody('async function loadLedger(');
+  assert.match(ld, /fbDb\.ref\('data\/ledger_batches'\)\.once\('value'\)/);
+  assert.doesNotMatch(ld, /save\(|patchRecord\(/);
+  const da = fnBody('function drawAuto(');
+  assert.match(da, /C\.reviewMonth\(drafts, lead, found\)/);
+  assert.match(da, /if\(r\.kind==='exact'\) SEL\.auto\[r\.id\]=1;/);
+  assert.doesNotMatch(da, /save\(|patchRecord\(/, '그리기는 저장하지 않는다');
+  const sa = fnBody('async function saveAuto(');
+  assert.match(sa, /known\.status!=='draft'\) continue;/, '임시저장 정산표만');
+  assert.equal((sa.match(/patchRecord\(/g) || []).length, 1);
+  assert.match(sa, /patchRecord\('settle\/runs\/'\+rid/);
+  assert.match(NOC, /if\(t\.closest\('#auto_save'\)\)\{ await saveAuto\(\); return; \}/);
+  assert.match(NOC, /AUTO\.pasted=C\.parseDepositText\(AUTO\.text\)/);
+});
+
+test('한꺼번에(③ 머리 단추) — 확정할 수 있는 정산표만, 확인 창 한 번(되돌릴 수 없다는 말) 뒤에 확정 → 대표면 카톡 대기열', () => {
+  const fn = fnBody('async function confirmMonth(');
+  const conf = fn.indexOf('window.confirm(');
+  assert.ok(fn.indexOf('prepConfirm(') >= 0 && fn.indexOf('prepConfirm(') < conf, '검산이 확인 창보다 먼저');
+  assert.ok(conf < fn.indexOf('doConfirm('), '확인 창 뒤에 확정');
+  assert.ok(fn.indexOf('doConfirm(') < fn.indexOf('kqPut('), '확정 뒤에 카톡');
+  assert.match(fn, /보낸 카톡은 되돌릴 수 없습니다/);
+  assert.match(fn, /if\(!ME\.isAdmin\)\{ toast\(/, '대표가 아니면 확정만');
+  assert.match(NOC, /if\(t\.closest\('#monthGo'\)\)\{ await confirmMonth\(\); return; \}/);
 });
