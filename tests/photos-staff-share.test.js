@@ -334,7 +334,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* 2026-11-07 게시 전 — 외부 협력자 명단 data/external_staff 에 «이름만» 붙였다(서버 함수 gcalEum 이 글자 그대로 읽어 rules-data-named 가 잡음).
      새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 읽기·쓰기 조건이 $other 와 글자까지 같다(재직 직원).
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
-  const PENDING = ['/data/external_staff'];
+  /* ★ 2026-11-07 — 게시 완료(GitHub 「Firebase 배포」 실행 42382534463 · rules-deploy.js --deploy, 클라우드 방): 새로 1 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-07.json — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
