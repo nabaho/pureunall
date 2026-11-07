@@ -49,3 +49,6 @@
   ★ 권한은 «그대로» — 읽기·쓰기 조건이 기존 `$other` 와 글자까지 같다(검증함). 더 많이 보이게 된 사람 없음.
   콘솔에 올리는 것은 위 «함수 배포»와 함께 해도 되고, 안 올려도 동작은 같다($other 가 같은 권한).
 - 옛 CI 빨강 중 `payroll-names-link`·`shared-js-cache-version` 은 main 을 합치자 초록(main 쪽 사정이었다).
+- 같은 날 이어서: CI 가 규칙 사본 검사 셋(`rules-paste-copy`·`gov-report-rules`)과 콘솔 대조(`photos-staff-share`)를 잡았다.
+  → `docs/rules-paste.json` 도 생성기로 다시 만듦 · `photos-staff-share` 의 `PENDING` 에 `/data/external_staff` 를 «게시 전»으로 적음(정해진 방식).
+  ★ 게시 뒤 할 일: GitHub «Firebase 배포»(rules=true) → 콘솔 원문 새 판으로 갈아 끼우고 `PENDING` 비우기(작은 PR 하나).
