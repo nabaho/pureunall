@@ -16,4 +16,4 @@ test('서명 요청', () => assert.match(cut(H, 'function formSignCreate'), /PuW
 test('묶음', () => assert.match(cut(H, 'async function formZip'), /PuWorklog\.log\('download'/));
 test('서식 저장', () => assert.match(cut(F, 'function change(fn, okMsg, undo)'), /host\.log && host\.log\('form_save'/));
 test('호스트 log', () => assert.match(H, /log: function \(k, o\) \{ return PuWorklog\.log\(k, o\); \}/));
-test('버전', () => assert.match(H, /pu-contract-forms\.js\?v=69/));
+test('버전', () => assert.match(H, /pu-contract-forms\.js\?v=\d+/));

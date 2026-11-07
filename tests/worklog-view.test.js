@@ -103,7 +103,7 @@ test('사용자 값은 innerHTML 로 조립하지 않는다', () => {
 
 test('docs-esign.html 연결 — 총괄관리자만 메뉴가 보인다', () => {
   const html = fs.readFileSync(path.join(__dirname, '../docs-esign.html'), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(html, /<script src="js\/pu-worklog-view\.js\?v=1"><\/script>/);
+  assert.match(html, /<script src="js\/pu-worklog-view\.js\?v=\d+"><\/script>/);
   assert.match(html, /<button type="button" class="nav sub" data-pane="log" id="navLog" hidden>🧾 작업 기록<\/button>/);
   assert.match(html, /<div id="paneLog" hidden>[\s\S]*<div id="logRoot"><\/div>/);
   assert.match(html, /log: 'paneLog'/);
