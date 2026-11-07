@@ -33197,8 +33197,10 @@ function CaseJurMailPanel(props){
       }finally{ clearTimeout(timer); }
     }
     if(my !== seq.current) return;   // 그 사이 다른 메일을 골랐다
-    if(!note && row.a > 0 && (body.text.trim() || PJ.htmlToText(body.html)).length < 300) note = '본문이 짧고 첨부가 있습니다 — 첨부 파일 안의 내용은 읽지 않습니다.';
-    setPick({ row:row, st:'ok', next:PJ.extract({ who:row.who, from:row.from, subject:row.s, text:body.text, html:body.html }), note:note, picks:{} });
+    var nx = PJ.extract({ who:row.who, from:row.from, subject:row.s, text:body.text, html:body.html });
+    // 못 찾은 칸이 있고 본문이 짧은데 첨부가 있으면 — 단서가 첨부 안에 있을 수 있다(첨부 안은 읽지 않는다)
+    if(!note && row.a > 0 && PJ.FIELDS.some(function(k){ return !nx[k]; }) && (body.text.trim() || PJ.htmlToText(body.html)).length < 300) note = '본문이 짧고 첨부가 있습니다 — 첨부 파일 안의 내용은 읽지 않습니다.';
+    setPick({ row:row, st:'ok', next:nx, note:note, picks:{} });
   }
 
   var cand = PJ.candidates(box.rows, { now:Date.now(), chip:chip, query:query });
