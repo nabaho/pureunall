@@ -25,6 +25,7 @@ function boot(alarms, now) {
     runtime: {
       onInstalled: { addListener: (f) => listeners.installed.push(f) },
       onStartup: { addListener: (f) => listeners.startup.push(f) },
+      onMessage: { addListener: () => {} },   /* 깨우기(kick) 귀 — tests/remember-ext-watch.test.js 가 본다 */
       getURL: (p) => 'chrome-extension://x/' + p, reload: () => {}
     },
     action: {
