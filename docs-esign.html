@@ -42,6 +42,7 @@
   .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
   .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
   .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .nav[hidden]{display:none}
   .nav:hover{background:#eff6ff}
   .nav.on{background:#bfdbfe;color:#1e40af;font-weight:700}
   .nav:focus-visible{outline:2px solid #1e40af;outline-offset:1px}
@@ -169,6 +170,7 @@
   <div class="nav sub soon" id="navLib" aria-disabled="true" title="노무사 검토가 끝나면 열립니다">📚 서식집<i>검토 후</i></div>
   <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
   <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
+  <button type="button" class="nav sub" data-pane="log" id="navLog" hidden>🧾 작업 기록</button>
 </nav>
 <div class="main">
 <div id="paneEsign">
@@ -217,6 +219,13 @@
     <div id="arcRoot"></div>
   </div>
 </div>
+<!-- 🧾 작업 기록 — 총괄관리자만 (js/pu-worklog-view.js) -->
+<div id="paneLog" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>작업 기록</b></div>
+    <div id="logRoot"></div>
+  </div>
+</div>
 </div>
 </div>
 
@@ -252,6 +261,7 @@
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-worklog.js?v=1"></script>
+<script src="js/pu-worklog-view.js?v=1"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -329,21 +339,28 @@ firebase.auth().onAuthStateChanged(function (u) {
     Promise.all([softGet('data/user_dir'), softGet('data/leave_of_absence')]).then(function (r) { if (r[0]) PuFormCardFill.setLawyers(r[0], r[1]); });
   }
   loadCases();
+  /* 🧾 작업 기록 — 총괄관리자(isAdmin === true)만. 부관리자(isSubAdmin)는 안 된다 — DB 규칙과 같은 기준 */
+  adminOk = db.ref('uid_roles/' + u.uid).once('value').then(function (s) {
+    var r = s.val(); isAdmin = !!(r && r.isAdmin === true);
+    $('navLog').hidden = !isAdmin;
+  }, function () { isAdmin = false; });
   showPane(paneFromHash());
 });
 
 /* ── 왼쪽 목록: 사건관리(집단체불 위임장) ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
    주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
    ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 위임장만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
-var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', lib: 'paneLib' };
+var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', log: 'paneLog', lib: 'paneLib' };
 var libIndex = null;   /* 실린 서식 목록 — 비어 있으면 서식집 칸은 «없는 칸»이다 */
 var formsMounted = false, formsUi = null, mounted = {};
+var isAdmin = false, adminOk = Promise.resolve();
 var docBucket = null, photosReady = null;
 function paneFromHash() {
   var h = location.hash;
   if (h === '#forms' || h.indexOf('#forms:') === 0) return 'forms';
   if (h === '#co' || h === '#co:await') return 'co';   /* #co:await — 업무관리 「📬 서명본 대기」 알림에서 (2026-10-08) */
   if (h === '#arc') return 'arc';
+  if (h === '#log') return 'log';   /* 작업 기록 — 총괄관리자만(아니면 안내만) */
   if (h === '#lib' && libIndex && libIndex.length) return 'lib';
   if (h === '#esign') return 'esign';   /* 집단체불 위임장 — 사건계약 아래 단추 (2026-10-09) */
   return 'forms';
@@ -999,6 +1016,12 @@ function showPane(name) {
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
+  if (name === 'log' && !mounted.log) {
+    mounted.log = true;
+    /* 총괄관리자 확인이 끝난 뒤에만 읽는다 — 아니면 DB 규칙 대신 여기서 같은 안내(거절)로 막는다 */
+    PuWorklogView.mount($('logRoot'), { kinds: PuWorklog.KINDS, now: Date.now,
+      list: function (m) { return adminOk.then(function () { if (!isAdmin) throw new Error('permission_denied'); return PuWorklog.list(m); }); } });
+  }
   if (name === 'lib' && !mounted.lib && libIndex) {
     mounted.lib = true;
     PuFormLibrary.mount($('libRoot'), { index: libIndex, toast: showToast,
