@@ -989,6 +989,10 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .ended-pbtn.on{border-style:solid;border-color:var(--accent);background:var(--sf2);color:var(--accent);}
 .chip.is-post{box-shadow:inset 0 0 0 1px currentColor;}
 .post-item{margin-top:3px;}
+.post-item[draggable="true"]{cursor:grab;}
+.post-item[draggable="true"] .ended-pbtn::before{content:'⠿ ';opacity:.55;}
+.post-item.dragging{opacity:.4;}
+@media (hover:none){.post-item[draggable="true"] .ended-pbtn::before{content:none;}}
 #mbPost{z-index:490;justify-content:flex-end;align-items:stretch;padding:0;}
 .post-modal{width:min(560px,100vw);max-width:none;height:100%;border-radius:16px 0 0 16px;display:flex;flex-direction:column;overflow:hidden;}
 .post-modal .mbody{flex:1;min-height:0;overflow:auto;padding:14px 16px;}
@@ -7053,6 +7057,11 @@ function postTypeDone(co,tid){
   const maxR=getCoMaxRounds(co.id,tid); if(!(maxR>0))return false;
   return mainPhaseScheds(getMainScheds().filter(s=>s.coId===co.id&&s.typeId===tid),tid).length>=maxR;
 }
+/* 사후를 «넣을 수 있는» 사업인가 — 종료된 사업 · «수정 중» · 본 회차를 다 마친(완료) 사업.
+   서랍 저장(postProblem)과 달력 끌어 넣기(dashPostItem·handlePostDrop)가 «같은 기준»을 쓴다 — 한쪽만 고치면 끌어서는 들어가는데 서랍은 막는 일이 생긴다. */
+function postCanAdd(co,tid){
+  return !!((co.endedTypes&&co.endedTypes[tid])||(co.reopened&&co.reopened[tid])||postTypeDone(co,tid));
+}
 /* 진행 목록 사업 줄의 「사후컨설팅」 항목 (대표 지시 2026-11-03 「✓ 완료 15/15회」 줄에 사후컨설팅 회수·사진 입력).
    「＋ 사후컨설팅」 / 「사후 N회 · 📷M」 — 누르면 서랍(회수 보기 · 입력 · 사진). «새로 얹은 칸»일 뿐 본 회차 숫자를 바꾸지 않는다. */
 function dashPostItem(co,tid){
@@ -7061,7 +7070,10 @@ function dashPostItem(co,tid){
   const k=`'${co.id}','${tid}'`;
   const tgTxt=tg?` (목표 ${tg}회)`:'';
   const label=n?`${postCountText(n,tg)}${ph?` · 📷${ph}`:''}`:(tg?`＋ ${postCountText(0,tg)}`:'＋ 사후컨설팅');
-  return `<div class="round-badge post-item"><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회${tgTxt} — 눌러서 보기·넣기`:`사후컨설팅 넣기${tgTxt} (날짜·사진)`}">${label}</button></div>`;
+  /* 넣을 수 있는 사업(postCanAdd)이면 항목을 «끌어서» 달력 날짜에 놓아 넣는다(대표 지시 2026-11-05) — 어느 사업장·사업인지는 data-post-* 에 담는다. */
+  const drag=postCanAdd(co,tid);
+  const dragTip=drag?' · 달력 날짜로 끌어서 넣기':'';
+  return `<div class="round-badge post-item"${drag?` draggable="true" data-post-coid="${co.id}" data-post-tid="${tid}"`:''}><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회${tgTxt} — 눌러서 보기·넣기`:`사후컨설팅 넣기${tgTxt} (날짜·사진)`}${dragTip}">${label}</button></div>`;
 }
 /* 종료 목록의 「사후컨설팅」 칸 — 입력 전 「＋ 사후」, 입력 후 「사후 N회 · 📷M」 */
 function postCellHtml(it){
@@ -7110,7 +7122,7 @@ async function postSetTarget(raw){
 function postProblem(co,tid,date,excludeId){
   /* 서랍 화면이 입력칸을 감추는 것만으로는 부족하다 — 저장 함수에서도 막는다.
      넣을 수 있는 사업: 종료된 사업 · «수정 중» · 본 회차를 다 마친(완료) 사업 */
-  if(!(co.endedTypes&&co.endedTypes[tid])&&!(co.reopened&&co.reopened[tid])&&!postTypeDone(co,tid))return '본 회차를 모두 마쳤거나 종료된 사업에서만 사후컨설팅을 넣을 수 있습니다';
+  if(!postCanAdd(co,tid))return '본 회차를 모두 마쳤거나 종료된 사업에서만 사후컨설팅을 넣을 수 있습니다';
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date)))return '날짜를 정해 주세요 (예 2026-11-05)';
   const blocked=isBlocked(date,tid); if(blocked)return blocked;
   if(getScheds().some(s=>s.id!==excludeId&&s.coId===co.id&&s.typeId===tid&&s.date===date))return `${date}에 이 사업의 일정이 이미 있습니다`;
@@ -7127,6 +7139,11 @@ function postBuildSched(co,tid,f,existing){
   sc.phase='post'; sc.date=f.date; sc.isField=!!f.field;
   if(f.memo)sc.memo=f.memo; else delete sc.memo;
   return sc;
+}
+/* 「사후 N회를 넣었습니다 (K/M회 · 목표 달성)」 — 서랍 저장과 달력 끌어 넣기가 같은 글자를 쓴다(따로 만들면 어긋난다). */
+function postAddedText(coId,tid,fr){
+  const tg=getCoPostTarget(coId,tid), tot=postListFor(coId,tid).length;
+  return `사후 ${fr}회를 넣었습니다`+(tg?` (${tot}/${tg}회)`+(tot>=tg?' · 목표 달성':''):'');
 }
 async function postSave(withPhoto){
   if(!_post)return;
@@ -7150,9 +7167,40 @@ async function postSave(withPhoto){
   const fr=(getScheds().find(s=>s.id===sc.id)||{}).round||0;
   _post.editId=''; _post.date=''; _post.memo=''; _post.err=''; _post.focusId=sc.id;
   renderPostDrawer(); renderCal(); renderSummaryBar(); if(q('#endedList'))renderEndedView();
-  const tg=getCoPostTarget(coId,tid), tot=postListFor(coId,tid).length;
-  toast(old?'사후컨설팅을 고쳤습니다':`사후 ${fr}회를 넣었습니다`+(tg?` (${tot}/${tg}회)`+(tot>=tg?' · 목표 달성':''):''));
+  toast(old?'사후컨설팅을 고쳤습니다':postAddedText(coId,tid,fr));
   if(withPhoto)openStampModal(sc.id);
+}
+/* 진행 목록의 「사후컨설팅」 항목 끌기 (대표 지시 2026-11-05 「사후컨설팅도 진행하면 드래그하고 날짜에 넣게」).
+   dragItem 에 post:true 를 담아 달력 칸에 놓으면 dispatchCalDrop 이 handlePostDrop 으로 보낸다 — 본 회차 handleDrop 으로 가면 안 된다.
+   ⚠ stopPropagation — 항목은 본 회차 줄(.drow · 끌기=본 회차)과 카드(순서 바꾸기) «안»에 있다. 새면 본 회차 끌기가 같이 시작되거나 카드가 끌기를 취소한다(일정 칩 끌기와 같은 까닭). */
+function postDragStart(e,el){
+  e.stopPropagation();
+  dragItem={post:true,coId:el.dataset.postCoid,typeId:el.dataset.postTid};
+  e.dataTransfer.effectAllowed='copy';
+  e.dataTransfer.setData('text/plain','post');
+  el.classList.add('dragging');
+}
+function postDragEnd(el){
+  el.classList.remove('dragging');
+  dragItem=null;
+}
+/* 사후 항목을 달력 날짜에 놓았다 — 서랍의 「사후컨설팅 추가」와 «같은 규칙»(postProblem)·같은 저장·같은 알림으로 한 건 넣는다.
+   방문(📍)·메모 없음으로 들어가고, 구분·메모·사진은 달력 칩을 눌러 서랍에서 고친다. 본 회차 규칙(최대 회차·기관 하루 1건 등)은 사후에 안 쓴다. */
+async function handlePostDrop(date,item){
+  const co=getCos().find(c=>c.id===item.coId);
+  if(!co){toast('사업장을 찾을 수 없습니다','err');return;}
+  if(co.active===false){toast('비활성 사업장입니다','err');return;}
+  const err=postProblem(co,item.typeId,date,'');
+  if(err){toast(err,'err');return;}
+  if(!await acquireCompanyEditLock(co.id)||!await verifyCompanyEditLock(co.id))return;
+  const sc=postBuildSched(co,item.typeId,{date,field:true,memo:''},null);
+  const scheds=getScheds(); scheds.push(sc);
+  setScheds(scheds);
+  reorderRounds(co.id,item.typeId);          // 사후끼리 날짜순으로 1,2,3 — 본 일정 번호는 안 건드린다
+  releaseCompanyEditLock();
+  renderSummaryBar();renderCal();renderDash();if(q('#endedList'))renderEndedView();
+  const fr=(getScheds().find(s=>s.id===sc.id)||{}).round||0;
+  toast(`${date.slice(5)} · ${postAddedText(co.id,item.typeId,fr)}`);
 }
 function postPhoto(sid){
   const sc=getScheds().find(s=>s.id===sid&&isPostSched(s));
@@ -7181,7 +7229,7 @@ async function postRemove(ids){
   renderPostDrawer(); renderCal(); renderSummaryBar(); if(q('#endedList'))renderEndedView();
   toast(`사후컨설팅 ${gone.length}건을 지웠습니다 · 번호를 다시 매겼습니다`);
 }
-function postSelKeys(){ return qa('#postBody .post-ck:checked').map(c=>c.dataset.sid); }
+function postSelKeys(){ return Array.from(qa('#postBody .post-ck:checked')).map(c=>c.dataset.sid); }   // qa() 는 NodeList — map 이 없다
 function postSelAll(el){ qa('#postBody .post-ck:not(:disabled)').forEach(c=>{c.checked=el.checked;}); postSelChange(); }
 function postSelChange(){
   const n=postSelKeys().length, b=q('#postBar'); if(!b)return;
@@ -7232,7 +7280,7 @@ async function endedRevert(coId,tid){
   return endedMutate(coId,co=>endedRevertEditOn(co,tid,endedMyName(),todayStr()),r=>`원래 종료일 ${r.was} 로 되돌렸습니다`);
 }
 /* 고른 줄 — 머리 ☐ 는 «보이는 줄»만 고른다. 일괄 처리는 건수를 묻고 한 번에 한다. */
-function endedSelKeys(){ return qa('#endedList .ended-ck:checked').map(c=>c.dataset.ek); }
+function endedSelKeys(){ return Array.from(qa('#endedList .ended-ck:checked')).map(c=>c.dataset.ek); }   // qa() 는 NodeList — map 이 없다
 function endedSelAll(el){ qa('#endedList .ended-ck:not(:disabled)').forEach(c=>{c.checked=el.checked;}); endedSelChange(); }
 function endedSelChange(){
   const n=endedSelKeys().length; const bar=q('#endedBar'); if(!bar)return;
@@ -8354,6 +8402,12 @@ function renderDash(){
       row.classList.remove('dragging');
       isDragging=false;
     };
+  });
+
+  /* 사후컨설팅 항목 끌기 — 줄(.drow)의 «본 회차 끌기»와 따로 간다(postDragStart 가 줄·카드로 새지 않게 막는다). 달력 칸에 놓으면 사후가 들어간다. */
+  qa('#dashList .post-item[draggable="true"]').forEach(el=>{
+    el.ondragstart=e=>postDragStart(e,el);
+    el.ondragend=()=>postDragEnd(el);
   });
 
   // 종료 버튼
@@ -10052,10 +10106,17 @@ function initCalDrop(){
     q('#calBody .drop-hover')&&q('#calBody .drop-hover').classList.remove('drop-hover');
     if(!cell||!dragItem||cell.classList.contains('disabled'))return;
     const date=cell.dataset.date;
-    if(dragItem.moveId)moveChip(dragItem.moveId,date);
-    else handleDrop(date,dragItem);
+    dispatchCalDrop(date,dragItem);
     dragItem=null;
   };
+}
+
+/* 달력 칸에 놓인 것을 «무엇을 끌었나»에 따라 보낸다 — 일정 칩 = 옮기기 · 사후 항목 = 사후 넣기 · 본 회차 줄 = 본 회차 넣기.
+   ⚠ 사후(post)를 handleDrop 이 받으면 사후가 «본 회차»로 들어간다 — 그래서 갈림길을 한 곳에 두고 검사로 못 박았다. */
+function dispatchCalDrop(date,item){
+  if(item.moveId)moveChip(item.moveId,date);
+  else if(item.post)handlePostDrop(date,item);
+  else handleDrop(date,item);
 }
 
 function bindChipDrag(){
