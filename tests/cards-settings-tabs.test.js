@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8').split('\r\n').join('\n');
 
 const SUB_NAMES = ['openDedup', 'openSimilar', 'openMixedFix', 'openNameFix', 'openTrash',
-  'openErpNameCheck', 'openClassifyRules', 'openViewManager', 'openMailBlock', 'openCleanupCenter'];
+  'openErpNameCheck', 'openClassifyRules', 'openSameCoSuspects', 'openViewManager', 'openMailBlock', 'openCleanupCenter'];
 
 /* 함수 몸통 하나를 떠 온다 */
 function fnBody(name) {
@@ -62,6 +62,7 @@ function draw(opt) {
     mixedFixList: () => N(0), nameFixList: () => N(0),
     trashCount: () => Object.keys(trash).length,
     bizFillCount: () => 0,
+    coSuspectList: () => [],            /* 🔎 같은 회사 의심 (2026-11-02) — 이 검사는 «줄이 걸려 있는가»만 본다 */
     classifyPlan: () => ({ targetN: 0 })
   };
   SUB_NAMES.forEach(n => {
