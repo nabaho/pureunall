@@ -42,7 +42,7 @@ const 살아야 = ['js', 'css', 'vendor', 'enter.html', 'fund.html', 'work.html'
      아직 비어 있어도 «지우는 목록에 미리» 있어야 한다 — 나중에 스킬을 넣는 사람이
      배포 게이트까지 같이 고칠 것이라고 기대하면 안 된다. 안 지우면 인터넷에 공개된다. */
 const 사라져야 = ['.mcp.json', '.claude', '.agents', 'tests', 'docs', 'scripts', 'functions',
-  'fund-erp', 'CLAUDE.md', 'AGENTS.md', 'README.md', 'firebase.json', '.firebaserc'];
+  'fund-erp', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'firebase.json', '.firebaserc'];
 
 const 폴더 = new Set(['js', 'css', 'vendor', '.claude', '.agents', 'tests', 'docs', 'scripts',
   'functions', 'fund-erp']);

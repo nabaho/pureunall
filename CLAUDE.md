@@ -2,7 +2,7 @@
 
 푸른노무법인의 ERP — 인사노무 업무 자동화 플랫폼. 한국어 주석, 노무 용어를 지킨다(급여→임금, 직원→근로자).
 
-**대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어. 설정 `.claude/settings.json` 의 `"language": "korean"` 과 함께 간다.
+**대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어. 설정 `.claude/settings.json` 의 `"language": "korean"` 과 함께 간다. Gemini·Antigravity 는 `GEMINI.md`, 내 컴퓨터 개인설정은 `node scripts/korean-everywhere.js --apply` · 지킴: `tests/korean-everywhere.test.js` · 자세히: `docs/규칙/한국어로-대답.md`
 
 ## 이 파일은 짧게 둔다 — 방마다 «통째로» 실린다 (대표 지시 2026-11-07 「토큰 아껴쓰기」)
 
