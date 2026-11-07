@@ -135,4 +135,20 @@ function 글쪽만들기(본, 글) {
   return h;
 }
 
-module.exports = { 글읽기, 목록그리기, 글쪽만들기, 줄들, 본번호, 줄그리기 };
+/* sitemap.xml 에 새 공지 한 줄을 더한다 — 올리는 쪽이 글 쪽만 올리고 sitemap 을 안 고치면
+   «굳힌 쪽 수 = sitemap 수» 검사가 올릴 때마다 빨개진다(2026-11-02 notice/140).
+   · 이미 있으면 그대로 돌려준다(두 번 불려도 한 줄) · /notice 줄 바로 아래(새 글이 위)에 넣는다
+   · 주소 머리는 sitemap 에 적힌 /notice 줄에서 따온다 — 도메인을 여기에 박지 않는다
+   · /notice 줄을 못 찾으면 null — 호출하는 쪽이 sitemap 을 건드리지 않고 넘어간다 */
+function 사이트맵더하기(xml, 번호, 날짜) {
+  const 틀 = String(xml || '');
+  const m = /^([ \t]*)<url><loc>([^<]*?)\/notice<\/loc>[^\n]*\n/m.exec(틀);
+  if (!m || !/^\d+$/.test(String(번호))) return null;
+  const 주소 = m[2] + '/notice/' + 번호;
+  if (틀.indexOf('<loc>' + 주소 + '</loc>') >= 0) return 틀;
+  const 줄 = m[1] + '<url><loc>' + 주소 + '</loc><lastmod>' + 날짜 + '</lastmod></url>\n';
+  const 끝 = m.index + m[0].length;
+  return 틀.slice(0, 끝) + 줄 + 틀.slice(끝);
+}
+
+module.exports = { 사이트맵더하기, 글읽기, 목록그리기, 글쪽만들기, 줄들, 본번호, 줄그리기 };

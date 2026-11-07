@@ -69,19 +69,33 @@ test('★ 배선 — 새 기금 등록 바로 아래 칸, 화면 이동, 옛 길
   assert.match(SRC, /'setup\.dash':\{t:'설립중 기금'/);
 });
 
-test('★ 틀 고정 — 제목·숫자·칩 → 표 머리 → 진행판 띠, 높이를 재고, 넓은 화면(1000px~)만', () => {
+test('★ 틀 고정은 없다 — 세 겹이 화면을 덮었다(2026-11-07). 목록은 한 판, 진행판은 팝업', () => {
   const css = SRC.slice(SRC.indexOf('.ledgerwrap{overflow-x:auto}'), SRC.indexOf('table.fixcol{table-layout:fixed}'));
   assert.ok(css.includes('.sdwrap{overflow-x:auto;border:1px solid var(--line)'), '표 감싸는 칸 기본 모양이 없다');
-  assert.ok(css.includes('.sdhead{position:sticky;top:var(--topbar-h,48px)'), '머리가 안 붙는다');
-  assert.ok(css.includes('.sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '표 머리가 안 붙는다');
-  assert.ok(css.includes('.sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '진행판 띠가 안 붙는다');
-  assert.ok(css.indexOf('@media(min-width:1000px)') < css.indexOf('.sdhead{'), '폰에서도 붙는다(화면이 좁아 가려진다)');
-  assert.ok(fnSrc('_syncTopbarH').includes("_setCssVar('--sdhead-h'"), '머리 높이를 안 잰다');
+  assert.ok(!/\.sdhead|\.sdbhead|\.sdwrap thead/.test(css), '설립중 기금에 틀 고정이 되살아났다 — 화면 위쪽이 가려진다');
+  assert.ok(!fnSrc('_syncTopbarH').includes('--sdhead-h'), '쓰지 않는 높이를 잰다');
   const r = fnSrc('renderSetupDash');
-  assert.ok(r.includes('class="panel sdhead"') && r.includes('class="sdwrap"') && r.includes('_syncTopbarH()'));
-  assert.ok(fnSrc('_sdBoard').includes('<div class="sdbhead">'));
-  assert.ok(!/class="sdwrap" style=/.test(fnSrc('renderSetupDash')), '표 감싸는 칸에 직접 overflow 를 쓰면 틀 고정을 이긴다');
+  assert.ok(r.includes('class="sdwrap"') && r.includes('_syncTopbarH()') && !r.includes('sdhead'));
+  assert.ok(r.includes('onclick="sdSel('), '줄을 눌러 팝업을 열지 않는다');
+  assert.ok(!r.includes('_sdBoard('), '진행판이 목록 아래에 붙는다 — 팝업(sdPop)으로 열어야 한다');
+  const pop = fnSrc('sdPop');
+  assert.ok(pop.includes('showModal(_sdBoard(') && pop.includes('SD.pop=true') && pop.includes('scrollTop'), '팝업이 진행판을 안 연다');
+  for (const fn of ['sdOpen', 'sdBundle']) assert.ok(fnSrc(fn).includes('closeM();'), fn + ' 이 팝업을 안 닫고 화면을 옮긴다');
+  assert.ok(fnSrc('sdToggle').includes('if(SD.pop) sdPop();'), '체크하면 팝업이 낡은 채로 남는다');
+  assert.ok(!fnSrc('_sdBoard').includes('sdbhead'));
   /* 짝이 맞는가 — 판(panel) 여닫음이 어긋나면 아래 판이 안으로 말려 들어간다 */
   const cnt = (s, re) => (s.match(re) || []).length;
   for (const fn of ['renderSetupDash', '_sdBoard']) { const t = fnSrc(fn); assert.equal(cnt(t, /<div/g) - cnt(t, /<\/div>/g), 0, fn + ' div 가 안 맞는다'); }
+});
+
+test('★ 잘못 만든 중복 기금 정리 — □ 로 짚은 줄만, 확인 뒤, 삭제 «보관»(복원 가능)으로', () => {
+  const r = fnSrc('renderSetupDash');
+  assert.ok(r.includes('data-fid="') && r.includes('sdTrash()'), '줄에 기금 번호가 없거나 단추가 없다');
+  const t = fnSrc('sdTrash');
+  assert.ok(t.includes("querySelectorAll('.sdwrap tbody tr')") && t.includes('.ckcol input') && t.includes('c.checked'), '짚은 줄만 찾아야 한다');
+  assert.ok(t.includes('confirmM(') && t.indexOf('confirmM(') < t.indexOf('.update(v)'), '확인 없이 옮긴다');
+  assert.ok(t.includes('deleted:true,deleted_at:ymd(),deleted_by:'), '삭제 보관 표시가 trashFund 와 다르다');
+  assert.ok(!/\.remove\(|\.set\(null\)/.test(t), '영구 삭제를 한다 — 삭제 보관(복원 가능)만 써야 한다');
+  assert.ok(t.includes('!isTrashed(funds[id])'), '이미 보관된 기금을 또 건드린다');
+  assert.ok(t.includes("toast('삭제할 기금의 □ 를 먼저 짚어 주세요'"), '아무것도 안 짚었을 때 안내가 없다');
 });

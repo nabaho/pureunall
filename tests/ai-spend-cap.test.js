@@ -181,10 +181,11 @@ test('★ readDoc 은 한도를 넘으면 막는다 — 화면 말고 «서버»
   assert.match(fn, /429/, '★ 한도를 넘었을 때 돌려주는 값이 없습니다');
 });
 
-test('★ 사람이 누른 것(manual)은 «막지 않는다» — 급한 서류를 세울 수 없다', () => {
+test('★ 사람이 누른 것(manual)은 한도를 넘어도 «여유까지» 통과 — 끝은 있다(2026-11-05)', () => {
   const fn = cutExport(IDX, 'readDoc');
-  assert.match(fn, /!\s*body\.manual/,
-    '★ 사람이 눌러도 막고 있습니다 — 대표 결정은 「알려 주고 그대로 해 준다」였습니다');
+  /* 판정은 DR.budgetGate 한 곳 — readDoc 이 manual 을 거기에 넘겨야 사람/자동을 가린다 */
+  assert.match(fn, /budgetGate\(\s*몫\s*,\s*!!\s*body\.manual\s*\)/,
+    '★ readDoc 이 manual 을 판정에 안 넘깁니다 — 사람이 누른 급한 판독까지 막히거나, 반대로 끝없이 통과합니다');
   /* 「사람이 눌렀다」가 실제로 «서버로 보내는 몸통»에 실려야 서버가 가릴 수 있다.
      ⚠ 함수 «이름»으로 찾지 않는다 — 2026-09-13 에 askProxy 를 둘로 쪼개(지문 기억을
        앞에 두느라) 이 검사가 기능은 멀쩡한데 깨졌다. 보는 것은 「몸통에 실리는가」다. */
@@ -194,12 +195,14 @@ test('★ 사람이 누른 것(manual)은 «막지 않는다» — 급한 서류
     '★ 화면이 「사람이 눌렀다」를 안 보냅니다 — 서버는 전부 자동으로 봅니다');
 });
 
-test('★ 한도를 «못 읽었을 때»는 안 막는다 — Vision(무료 몫)과 일부러 반대다', () => {
+test('★ 한도를 «못 읽었을 때»는 사람이 누른 것만 통과 — 판독이 통째로 멎지 않는다', () => {
   const fn = cutFn(IDX, 'async function aiMonthSpend(');
   assert.match(fn, /known/, '★ 「알아냈나」를 안 가리면 못 읽은 것이 곧 차단이 됩니다');
-  const 부름 = cutExport(IDX, 'readDoc');
-  assert.match(부름, /known\s*&&/,
-    '★ 못 읽었는데 막으면, 규칙 한 줄이 빠진 날 판독이 통째로 멎습니다');
+  const DRm = require(path.join(R, 'functions', 'doc-read.js'));
+  assert.strictEqual(DRm.budgetGate({ known: false }, true).block, false,
+    '★ 못 읽었다고 사람이 누른 판독까지 막으면, DB 가 잠깐 흔들린 날 판독이 통째로 멎습니다');
+  assert.strictEqual(DRm.budgetGate({ known: false }, false).block, true,
+    '★ 못 읽은 채 자동이 돌면 폭주를 못 봅니다');
 });
 
 /* ══════ ⑥ 설정은 총괄 관리자만 고친다 ═══════════════════════════════════ */

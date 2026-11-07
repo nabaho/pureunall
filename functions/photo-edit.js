@@ -147,6 +147,9 @@ async function callEdit(fetchFn, key, data, mimeType, waits, want) {
   const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: body };
   const pauses = waits || [2000, 5000];
   let last = { status: 0, why: "" };
+  /* billed = 구글이 «200 으로 답한» 수 — 요금이 붙는 것은 이것이다(429·5xx 는 안 붙는다).
+     ⚠ 그림이 없는 200 도 센다 — 답을 만들었으니 요금은 나갔다. */
+  let billed = 0;
 
   for (const model of MODELS) {
     for (let attempt = 0; ; attempt++) {
@@ -158,9 +161,10 @@ async function callEdit(fetchFn, key, data, mimeType, waits, want) {
         break;
       }
       if (r && r.ok) {
+        billed++;
         const json = await r.json();
         const img = pickImage(json);
-        if (img) return { ok: true, image: img };
+        if (img) return { ok: true, image: img, billed: billed };
         /* 그림이 없다 — 다른 모델이 그려 줄 수도 있으니 넘어간다 */
         last = { status: 200, why: "AI가 고친 사진을 돌려주지 않았습니다" };
         break;
@@ -174,15 +178,29 @@ async function callEdit(fetchFn, key, data, mimeType, waits, want) {
         await new Promise(function (res) { setTimeout(res, pauses[attempt]); });
         continue;
       }
-      if (status === 401 || status === 403) return { ok: false, status: status, why: why };
+      if (status === 401 || status === 403) return { ok: false, status: status, why: why, billed: billed };
       break;
     }
   }
-  return { ok: false, status: last.status, why: last.why };
+  return { ok: false, status: last.status, why: last.why, billed: billed };
+}
+
+/* ── 요금 셈과 한도 (대표 지시 2026-11-05 「유료 API 통제 — 추천대로」) ──────────────
+   여태 AI 지우개는 «셈도 한도도» 없었다 — 그림을 만드는 모델이라 판독보다 훨씬 비싼데.
+   ① 판독과 «같은 지갑»(이번 달 한도)에 넣는다. 한 장을 판독 EDIT_READ_WEIGHT 번으로 친다
+      (그림 1장 ≈ US$0.04 ≈ ₩55~60 ÷ 판독 단가 ₩4 ≈ 15). 단가가 바뀌면 이 숫자만 고친다.
+   ② 한 사람 하루 EDIT_DAY_PER_USER 장 — 한 사람이 되풀이 눌러 달 몫을 다 태우지 못하게.
+   ③ 셈을 못 읽으면 «안 부른다» — 편집은 급한 일이 아니다(판독과 다르다). */
+const EDIT_READ_WEIGHT = 15;
+const EDIT_DAY_PER_USER = 20;
+/* 사람별 하루 셈 자리 — 규칙에 없는 최상위 자리라 브라우저는 못 읽고 못 쓴다(서버만). */
+function userDayPath(ymd, uid) {
+  return "ai_user_day/" + String(ymd) + "/" + String(uid).replace(/[.#$\[\]\/]/g, "_") + "/photoedit";
 }
 
 module.exports = {
   MODELS, MAX_IMAGE_BYTES, MAX_BODY_BYTES, MARK_COLOR, PROMPT,
   DEFAULT_WANT, MAX_WANT, wantOf, promptFor,
-  isTransient, validate, editBody, modelUrl, safeReason, pickImage, callEdit
+  isTransient, validate, editBody, modelUrl, safeReason, pickImage, callEdit,
+  EDIT_READ_WEIGHT, EDIT_DAY_PER_USER, userDayPath
 };

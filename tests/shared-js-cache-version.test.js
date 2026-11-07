@@ -38,7 +38,7 @@ var SKIP_DIRS = ['node_modules', '.git', '.codex-worktrees', 'dist', 'build',
                     우리 화면이 아니므로 캐시 번호 규칙을 들이대지 않는다 —
                     들이대면 남이 어떻게 짰는지를 우리가 못 고치는데 검사가 빨개진다.
                     (2026-09-03 공인노무사회 밑감을 넣으며 실제로 걸렸다) */
-                 'fixtures'];
+                 'fixtures', '_harness'];
 
 function htmlFiles(dir, out){
   out = out || [];

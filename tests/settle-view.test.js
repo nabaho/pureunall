@@ -23,17 +23,91 @@ function fakeRun(status, rate) {
     issues: res.issues, transfers: C.transfersOf(res.sites, 'T-LEAD').map((t) => Object.assign({ paid: false }, t)), changed: false };
 }
 
-test('정산표 목록 — 맨 왼쪽 ☐(보이는 것 모두) 다음 번호, 사업 종류마다 묶음 머리(사업 이름 전체)를 한 번만', () => {
-  const r2 = Object.assign(fakeRun(), { id: 'cons-test_2026-09', monthKey: '2026-09', label: '9월' });
-  const h = V.runsTable([fakeRun(), r2], {}, { 'cons-test': '테스트사업 (테스트재단)' }, 'cons-test_2026-10');
-  const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
-  assert.match(ths[0], /input type="checkbox" data-all=/);
+test('열두 달 줄 — 달마다 단추(data-month), 할 일 점·고른 달 표시, 정산 없는 달은 흐리게', () => {
+  const h = V.monthStrip('2026', { '2026-10': { state: 'todo', runs: 2, draft: 1, left: 0 }, '2026-07': { state: 'done', runs: 1 } }, '2026-10');
+  assert.equal((h.match(/data-month="2026-[01][0-9]"/g) || []).length, 12);
+  assert.match(h, /class="mo mo-todo on" data-month="2026-10" title="10월 — 정산표 2 · 임시저장 1 · 할 일 남음"/);
+  assert.match(h, /class="mo mo-done" data-month="2026-07"/);
+  assert.match(h, /class="mo mo-none" data-month="2026-01"/);
+  assert.match(visible(h), /할 일 남음[\s\S]*끝\(확정·송금 다 함\)[\s\S]*정산 없음/);
+});
+
+test('입금 확인 상자 — ☐·번호, 같은 금액은 ✓ 맞음, 고른 입금이 다르면 △ 차이, 없으면 ✕, 넣은 실입금은 «넣음»(☐ 없음), 담당 통장 안내', () => {
+  const rev = { rows: [
+    { id: 'r1::C-1|T-LEAD', runId: 'r1', typeCode: 'cons-test', key: 'C-1|T-LEAD', company: '<b>가나</b>상사', round: 1, expected: 2483442, actual: null, kind: 'exact' },
+    { id: 'r1::C-2|T-LEAD', runId: 'r1', typeCode: 'cons-test', key: 'C-2|T-LEAD', company: '다라산업', round: 2, expected: 1000000, actual: null, kind: 'near' },
+    { id: 'r2::C-3|T-LEAD', runId: 'r2', typeCode: 'cons-b', key: 'C-3|T-LEAD', company: '마바상사', round: 1, expected: 500000, actual: null, kind: 'none' },
+    { id: 'r2::C-4|T-LEAD', runId: 'r2', typeCode: 'cons-b', key: 'C-4|T-LEAD', company: '사아상사', round: 1, expected: 700000, actual: 700000, kind: 'saved' }] };
+  const found = [{ id: 'x1', amount: 2483442, date: '2026-10-21 10:00', memo: '가나재단' }, { id: 'x2', amount: 999000, date: '2026-10-22', memo: '' }];
+  const h = V.reviewBox(rev, { biz: { 'cons-test': '테스트사업', 'cons-b': '나다사업' }, found, sel: { 'r1::C-1|T-LEAD': 1 },
+    pick: { 'r1::C-1|T-LEAD': 'x1', 'r1::C-2|T-LEAD': 'x2' }, leadName: '홍길동', win: { from: '2026-10-01', to: '2026-11-20' } });
+  const t = h.slice(h.indexOf('data-name="auto"'));
+  const ths = [...t.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="auto"/);
   assert.match(ths[1], /번호/);
-  assert.match(h, /data-ck="cons-test_2026-10"/);
-  assert.match(visible(h), /임시저장/);
-  assert.equal((visible(h).match(/테스트사업 \(테스트재단\)/g) || []).length, 1, '사업 이름은 묶음 머리에 한 번, 줄이지 않고 전체');
-  assert.ok(h.indexOf('10월') < h.indexOf('9월'), '최근 달이 위');
-  assert.match(h, /<tr data-id="cons-test_2026-10" class="on">/, '열어 둔 달 표시');
+  const v = visible(h);
+  assert.match(v, /✓ 맞음 1[\s\S]*△ 확인 1[\s\S]*✕ 못 찾음 1[\s\S]*넣음 1/);
+  assert.match(v, /홍길동 통장\(재무관리\)/);
+  assert.match(v, /기간 10-01 ~ 11-20 · 입금 2건/);
+  assert.match(h, /data-ck="r1::C-1\|T-LEAD" checked/);
+  assert.match(v, /△ −1,000원 다름/);
+  assert.doesNotMatch(h, /data-ck="r2::C-4\|T-LEAD"/, '넣은 줄에 ☐');
+  assert.match(v, /담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아/);
+  assert.match(h, /id="auto_save"/);
+  assert.doesNotMatch(h, /<b>가나/);
+  assert.doesNotMatch(v, /T-[A-Z]/);
+  assert.match(visible(V.reviewBox({ rows: [] }, {})), /맞출 입금이 없습니다/);
+});
+
+test('정산 확인 상자 — 정산표마다 사업 이름·상태·송금 줄(반환/추가 지급·누가 누구에게·사업장), 임시저장은 «확정»·«확정하면 송금», 확정은 «보냄 표시»', () => {
+  const d = V.monthRuns([fakeRun('draft')], { names: NAMES, biz: { 'cons-test': '테스트사업 (테스트재단)' } });
+  const v = visible(d);
+  assert.match(v, /테스트사업 \(테스트재단\)\s+임시저장/);
+  assert.match(v, /반환\s+&lt;b&gt;김가나&lt;\/b&gt; → 홍길동\s+87,915원\s+가나상사/);
+  assert.match(v, /확정하면 송금/);
+  assert.match(d, /data-act="confirm" data-rid="cons-test_2026-10"/);
+  assert.match(d, /data-run="cons-test_2026-10">자세히 ▾/);
+  const c = V.monthRuns([fakeRun('confirmed')], { names: NAMES, biz: {}, cur: 'cons-test_2026-10', detail: '<p id="det"></p>' });
+  assert.match(c, /data-paid-btn="0" data-rid="cons-test_2026-10">보냄 표시/);
+  assert.doesNotMatch(c, /data-act="confirm"/);
+  assert.match(c, /접기 ▴[\s\S]*<div class="mdet"><p id="det"><\/p><\/div>/);
+  assert.doesNotMatch(v, /T-LEAD|T-A /);
+});
+
+test('한 해 합계 — 달마다 한 줄(달 이름은 그 달로 가는 단추), 정산 없는 달은 뺀다, 송금·카톡 보냄', () => {
+  const h = V.yearMonths([{ key: '2026-10', names: ['테스트사업', '<b>나다</b>'], state: { state: 'todo', runs: 2, transfers: 2, paid: 1 }, kq: { sent: 1, all: 2 } },
+    { key: '2026-08', names: [], state: { state: 'none', runs: 0 }, kq: {} }]);
+  assert.match(h, /data-month="2026-10">10월</);
+  assert.doesNotMatch(h, /2026-08/);
+  assert.match(visible(h), /테스트사업 · &lt;b&gt;나다&lt;\/b&gt;\s+할 일 남음\s+1 \/ 2\s+1 \/ 2/);
+  assert.match(visible(V.yearMonths([])), /이 해에 정산표가 없습니다/);
+});
+
+test('카톡 보내기 상자 — 요약은 펼치고 계산 설명은 접는다, 미리보기는 복사·보내기 없음, 확정+대표+방이면 «카톡 보내기», 방이 없으면 대표에게 등록 칸', () => {
+  const text = '[컨설팅 비용 정산 안내]\n요약 줄\n──────────\n[계산 설명]\n1) 설명';
+  assert.deepEqual(V.splitMsg(text), { summary: '[컨설팅 비용 정산 안내]\n요약 줄', explain: '[계산 설명]\n1) 설명' });
+  assert.deepEqual(V.splitMsg('한 줄'), { summary: '한 줄', explain: '' });
+  /* 계산 모듈 문구와 같은 줄로 나뉜다 */
+  const real = C.buildMessages(fakeRun('confirmed'), { title: '테스트사업', leadSid: 'T-LEAD' }, NAMES)[0].text;
+  assert.match(V.splitMsg(real).explain, /^\[계산 설명\]/);
+  const items = [{ rid: 'r1', i: 0, sid: 'T-A', name: '김가나', text, biz: '테스트사업' }, { rid: 'r1', i: 1, sid: 'T-B', name: '<i>이다라</i>', text: 'y', biz: '테스트사업' }];
+  const h = V.monthMsgs(items, { rooms: { 'T-A': '김가나 노무사' }, last: { r1: { 'T-A': { status: 'sent', sentAt: Date.UTC(2026, 10, 2, 7, 0) } } }, isAdmin: true, go: { label: '카톡 1통 보내기' } });
+  const v = visible(h);
+  assert.match(h, /data-copy="r1\|0"/);
+  assert.match(h, /data-kq="r1\|0"/);
+  assert.doesNotMatch(h, /data-kq="r1\|1"/, '방 없는 사람에게 보내기 단추');
+  assert.match(h, /data-room="T-B"[^>]*>[\s\S]*?data-room-save="T-B">방 등록/);
+  assert.match(v, /💬 김가나 노무사/);
+  assert.match(v, /✓ 보냄 · 11-02 16:00/);
+  assert.match(h, /<div class="msg">\[컨설팅 비용 정산 안내\]\n요약 줄<\/div><details class="why"><summary>계산 설명 펼치기<\/summary>/);
+  assert.match(h, /id="monthGo">카톡 1통 보내기</);
+  assert.doesNotMatch(h, /<i>이다라/);
+  assert.doesNotMatch(v, /T-[A-Z]/);
+  const pv = V.monthMsgs([Object.assign({}, items[0], { preview: true })], { rooms: { 'T-A': '김가나 노무사' }, isAdmin: true });
+  assert.match(visible(pv), /확정 전 미리보기/);
+  assert.doesNotMatch(pv, /data-copy=|data-kq=/);
+  assert.doesNotMatch(V.monthMsgs(items, { rooms: { 'T-A': '김가나 노무사' }, isAdmin: false }), /data-kq=|data-room-save=/, '대표가 아닌데 보내기·방 등록');
+  assert.match(visible(V.monthMsgs([], {})), /보낼 문구가 없습니다/);
 });
 
 test('정산표 — 한 칸 한 줄(<br> 없음), 사람이 적은 글은 막는다, 사번은 화면에 없다', () => {
@@ -204,13 +278,6 @@ test('계산 결과 — 사람별 세후·몫·정산액과 «누가 누구에�
   assert.equal(V.calcResult({ members: [] }), '');
 });
 
-test('카톡 문구 상자 — 사람마다 복사 단추', () => {
-  const h = V.messagesBox([{ sid: 'T-A', name: '김가나', text: '첫 줄\n둘째 줄' }, { sid: 'T-B', name: '이다라', text: 'x' }]);
-  assert.match(h, /data-copy="0"/);
-  assert.match(h, /data-copy="1"/);
-  assert.doesNotMatch(visible(h), /T-A|T-B/);
-});
-
 test('안내 파일 목록·이월 목록도 ☐ 다음 번호', () => {
   const n = V.noticesTable([{ id: 'N1', fileName: '비용지급 안내_시험.xlsx', receivedAt: Date.UTC(2026, 9, 30), months: [{ key: '2026-10', label: '10월' }], rows: [{}, {}], source: 'upload' }], {});
   const a = V.adjustsTable([{ id: 'A1', consultingId: 'C-1', sid: 'T-A', amount: -1000, memo: '이월', appliedRunId: null }], { 'C-1': '가나상사' }, NAMES, {});
@@ -245,14 +312,6 @@ test('송금 방향 — 담당이 더 받았으면 «반환», 주관이 더 받
   const calc = C.calcSite([{ name: '갑', role: 'lead', pre: 2568182 }, { name: '을', role: 'staff', pre: 977273, rate: 25 }]);
   assert.equal(calc.transfers[0].dir, 'back');
   assert.match(visible(V.calcResult(calc, {})), /을 → 갑\s+87,915원\s+반환/);
-});
-
-test('정산표 목록 — 규칙이 있는 컨설팅 종류는 정산표가 없어도 묶음으로 보이고 «+ 입력»이 붙는다', () => {
-  const h = V.runsTable([fakeRun()], {}, { 'cons-test': '테스트사업', 'cons-b': '나다사업 (나다협회)' }, '', { types: ['cons-test', 'cons-b'] });
-  assert.match(h, /data-manual="cons-b"/);
-  assert.match(h, /data-manual="cons-test"/);
-  assert.match(visible(h), /나다사업 \(나다협회\)[\s\S]*아직 정산표 없음/);
-  assert.equal((h.match(/<td class="n">\d+<\/td>/g) || []).length, 1, '번호는 정산표 줄에만');
 });
 
 test('직접 입력 상자 — ☐·번호, 주관은 규칙대로 못박고, 담당은 재직자 고르기·요율 표시, 세후 계산, 넣은 것 목록, 사번은 화면에 없다', () => {
@@ -322,15 +381,6 @@ test('직접 입력 상자 — 세율·실수령액 칸', () => {
   assert.match(visible(h.slice(h.indexOf('data-name="manual"'))), /세율[\s\S]*실수령액\(통장\)[\s\S]*세전[\s\S]*세후 계산/);
 });
 
-test('카톡 문구 상자 — 확정 전이면 미리보기 안내와 «확정하면 복사», 확정이면 복사 단추', () => {
-  const msgs = [{ sid: 'T-A', name: '김가나', text: '[컨설팅 비용 정산 안내]\n둘째 줄' }];
-  const pv = V.messagesBox(msgs, { preview: true });
-  assert.match(visible(pv), /확정 전 미리보기/);
-  assert.doesNotMatch(pv, /data-copy=/);
-  assert.match(V.messagesBox(msgs), /data-copy="0"/);
-});
-
-
 test('요율표 — 빈 칸에 기존 %를 흐리게(placeholder), 제안이 있으면 «빈 칸에 기존 % 넣기»', () => {
   const work = { types: ['cons-a', 'cons-b'], people: ['T-A'], rules: { 'cons-a': { leadSid: 'T-LEAD', rates: { 'T-A': '25' } }, 'cons-b': { leadSid: 'T-LEAD', rates: {} } } };
   const h = V.rateMatrix(work, { names: { 'T-A': '김가나' }, staff: [], suggest: { 'cons-b|T-A': 25 } });
@@ -341,4 +391,25 @@ test('요율표 — 빈 칸에 기존 %를 흐리게(placeholder), 제안이 있
     { types: [], staff: [{ sid: 'T-A', name: '김가나' }], names: { 'T-LEAD': '홍길동', 'T-A': '김가나' }, rates: {}, suggest: { 'T-A': 25 } });
   assert.match(visible(m), /25% \(기존\)/);
   assert.doesNotMatch(visible(m), /요율표에 없음/);
+});
+
+
+test('카톡 상태 딱지·심부름꾼 줄·카톡 방 표·보낸 기록 — ☐·번호, 사번은 화면에 없다', () => {
+  assert.match(V.kqState({ status: 'pending' }).text, /대기 중/);
+  assert.match(V.kqState({ status: 'pending', dryRunAt: 1 }).text, /시험 모드/);
+  assert.match(V.kqState({ status: 'sent', redirect: '나의 채팅', sentAt: 1 }).text, /시험 발송\(나의 채팅\)/);
+  assert.match(V.kqState({ status: 'failed', error: '방 이름이 다릅니다' }).text, /실패 — 방 이름/);
+  assert.match(V.agentLine(null, 0), /PC 카톡이 아직 연결되지 않았습니다/);
+  const now = Date.UTC(2026, 10, 2, 7, 0);
+  assert.match(V.agentLine({ agentSeenAt: now - 3 * 60000, mode: 'dry-run' }, now), /^<div class="bar">.*시험 모드.*3분 전/);
+  assert.match(V.agentLine({ agentSeenAt: now - 30 * 60000, mode: 'live' }, now), /^<div class="warn">.*연결됨.*30분 전.*끊긴 것 같습니다/);
+  const r = V.roomsTable(['T-A', 'T-B'], { 'T-A': '김가나 노무사' }, { 'T-A': '김가나', 'T-B': '이다라' }, {}, true);
+  assert.match(r, /data-all="rooms"/);
+  assert.match(r, /data-room="T-A" value="김가나 노무사"/);
+  assert.match(r, /data-room-save="T-B"/);
+  assert.doesNotMatch(V.roomsTable(['T-A'], {}, {}, {}, false), /<input type="text"|data-room-save/, '대표가 아닌데 고칠 칸');
+  const k = V.kqTable([{ id: 'K1', sid: 'T-A', runId: 'r1', status: 'pending', createdAt: 2 }, { id: 'K2', sid: 'T-B', runId: 'r1', status: 'sent', sentAt: 3, createdAt: 3 }], { 'T-A': '김가나', 'T-B': '이다라' }, { r1: '2026년 10월' }, {});
+  assert.match(k, /data-all="kq"/);
+  assert.ok(visible(k).indexOf('이다라') < visible(k).indexOf('김가나'), '최근 것이 위가 아니다');
+  [r, k].forEach((x) => assert.doesNotMatch(visible(x), /T-[A-Z]/));
 });

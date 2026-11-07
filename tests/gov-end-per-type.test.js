@@ -70,7 +70,7 @@ const TYPES = [
 function rowsWorld(over) {
   const ctx = vm.createContext(Object.assign({
     Set, Array, Object, JSON, Math, String, Number,
-    getScheds: () => [], getTypes: () => TYPES,
+    getScheds: () => [], getMainScheds: () => [], postListFor: () => [], dashPostItem: () => '', getTypes: () => TYPES,
     escAttr: esc,
     nextRound: (coId, tid) => (tid === 't4' ? 4 : 1),            // 기술보호는 3/3 을 채워 «완료» 줄이 된다
     getFieldState: () => true,
@@ -80,7 +80,7 @@ function rowsWorld(over) {
     curPhase: () => 'main', schedPhase: () => 'main', PRE_ROUND_CAP: 2,
     roundIssueBadge: () => '', deadlineBadge: () => '',
   }, over || {}));
-  vm.runInContext(['dashActiveTypeIds', 'dashEndOnRows', 'dashRowBtns', 'renderDashTypeRows'].map(grab).join('\n'), ctx);
+  vm.runInContext(['dashActiveTypeIds', 'dashEndOnRows', 'dashRowBtns', 'dashReopenBadge', 'renderDashTypeRows'].map(grab).join('\n'), ctx);
   return ctx;
 }
 const endBtns = (html) => [...html.matchAll(/<button class="end-btn"[^>]*>/g)].map((m) => m[0]);

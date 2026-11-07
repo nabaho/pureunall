@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=87"></script>
+<script src="js/pu-ontology.js?v=90"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -59,7 +59,7 @@
   .sitem.on .ncnt{color:var(--acc2)}
   #nav-setup{margin:0 10px 10px;border:1.5px solid #fbbf24;background:var(--warn-bg);color:var(--warn);font-weight:700}
   #nav-setup .ncnt{color:var(--warn);font-weight:800;font-size:12px}#nav-setup.on{background:#fde68a;color:var(--warn)}
-  @media(max-width:900px){.sdflow{grid-template-columns:1fr 1fr!important}.sdgrid{grid-template-columns:1fr!important}}
+  @media(max-width:900px){.sdflow{grid-template-columns:1fr 1fr!important}}
   /* 하위 묶음 — 왼쪽 실선으로 «기금 현황에 딸린 것»임을 보인다 */
   #navsub{margin:2px 0 2px 12px;border-left:1px solid var(--line);padding-left:6px}
   #navsub.hid{display:none}
@@ -149,11 +149,7 @@
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
     .ledgerwrap{overflow:visible}
     .ledgerwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px) + var(--closehead-h,156px));z-index:5;background:#f8fafc}
-    /* 🏗 설립중 기금 틀 고정(대표 2026-10-10): 제목·숫자·칩 → 목록 표 머리 → 진행판 제목·지금 할 일 띠. 높이 --sdhead-h 는 _syncTopbarH 가 잰다 */
-    .sdhead{position:sticky;top:var(--topbar-h,48px);z-index:12;margin-bottom:0}
-    .sdwrap{overflow:visible}
-    .sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:5;background:#f8fafc}
-    .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
+    /* 🏗 설립중 기금은 틀 고정을 하지 않는다(대표 2026-11-07 — 세 겹이 화면 위 300px 를 덮어 두 번째 줄이 가려졌다). 진행판은 팝업(sdPop) */
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
   /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
@@ -182,7 +178,7 @@
   /* 가로로 넘쳐 스크롤을 켠 상자에서는 붙어 있기가 통하지 않는다 — 헛되이 두지 않는다 */
   .tblwrap.scrollx thead th{position:static;box-shadow:none}
   tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
-  td.no{color:var(--faint);width:34px;font-variant-numeric:tabular-nums}
+  th.no,td.no{color:var(--faint);width:42px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}.reqbox th,.reqbox td{padding:8px 8px;vertical-align:middle}.reqbox th.ckcol,.reqbox td.ckcol{width:32px;padding:8px 4px;text-align:center}.reqbox th.no,.reqbox td.no{width:40px;padding:8px 4px;text-align:center;white-space:nowrap}
   .ckcol{width:30px;text-align:center}tr.ticked td{background:#bbf7d0}
   .chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px}
   .chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.dg{background:var(--danger-bg);color:var(--danger)}
@@ -523,7 +519,7 @@
   .libnav>div.on{background:var(--acc-soft);color:var(--acc)}
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=39"></script>
+  <script src="js/pu-appbar.js?v=40"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -2287,6 +2283,7 @@ function createFund(){
           }
           fbDb.ref(NS+'/name_locks/'+lockKey).update({fid:fid});
           funds[fid]=rec; closeM(); S.fundId=fid; S.tab=(entry==='new'?'setup':'info'); _go('fund',fid); S.tab=(entry==='new'?'setup':'info'); renderFund();
+          if(entry==='new') ciPost(fid,'consult');
           toast('새 기금 등록: '+short+(entry==='new'?' (설립부터)':' (운영부터)'));
         });
       })(nextFundId());
@@ -3033,8 +3030,8 @@ function _impPreview(data, fname){
   var LBL={inka_no:'인가번호',inka_date:'인가일',corp_reg_no:'법인등록번호',reg_date:'설립등기일',
     registry_office:'관할등기소',tax_id_no:'고유번호',tax_office:'관할세무서',address:'소재지',phone:'전화',
     chairman:'대표자',labor_office:'관할노동청',fy_start_md:'회계연도시작',fy_end_md:'회계연도종료',region:'지역',status:'상태'};
-  var rows=r.plan.slice(0,60).map(function(p){
-    return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(p.label)+'</td>'
+  var rows=r.plan.slice(0,60).map(function(p,i){
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(p.label)+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(p.names.map(function(n){return LBL[n.replace('(신규)','')]||n;}).join(', '))+'</td>'
       +'<td class="center">'+p.names.length+'</td></tr>';
   }).join('');
@@ -3045,7 +3042,7 @@ function _impPreview(data, fname){
     +'<input type="checkbox"'+(over?' checked':'')+' onchange="S._impOver=this.checked;_impPreview(window._impData,window._impFname)"> '
     +'<span>이미 값이 있는 칸도 <b>덮어쓰기</b> (기본: 빈 칸만 채움 — 웹에서 입력한 값 보호)</span></label>'
     +(r.plan.length
-      ? '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>기금</th><th>채울 항목</th><th class="center">칸</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      ? '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>채울 항목</th><th class="center">칸</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
         +(r.plan.length>60?'<p class="muted" style="font-size:11px;margin:6px 0 0">…상위 60개만 표시(전체 '+r.plan.length+'개 적용)</p>':'')
       : '<div class="msg warn">채울 항목이 없습니다. (이미 모두 입력돼 있거나 파일이 비어 있음)</div>')
     +'<p class="muted" style="font-size:11px;margin:8px 0 0">※ 연도별 결산·지원금·담당자·설립 진행·계약관계 데이터는 건드리지 않습니다. 이름·약칭·유형은 비어 있을 때만 채웁니다.</p>'
@@ -3093,8 +3090,8 @@ function bulkOffices(){
     if(any) rowsData.push({name:f.short_name||f.name,cell:cell});
   });
   if(!plan.length){ toast('자동 채울 대상이 없습니다(빈 칸+매핑 가능 기금 없음)','warn'); return; }
-  var rows=rowsData.map(function(r){
-    return '<tr><td style="font-weight:600">'+esc(r.name)+'</td>'
+  var rows=rowsData.map(function(r,i){
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(r.name)+'</td>'
       +BULK_OFFICES.map(function(o){
         return '<td'+(r.cell[o.key]?'':' class="muted"')+'>'+(r.cell[o.key]?esc(r.cell[o.key]):'—')+'</td>';
       }).join('')+'</tr>';
@@ -3106,7 +3103,7 @@ function bulkOffices(){
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">빈 칸만 채웁니다 — '+esc(sum)+'.'
     +(miss?'<br>표에 없어 제외: '+esc(miss):'')
     +(noAddr?'<br>소재지가 없어 제외 '+noAddr+'개':'')+'</p>'
-    +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>기금</th>'
+    +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
     +BULK_OFFICES.map(function(o){return '<th>'+o.head+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">취소</button><button class="primary" onclick="applyBulkOffices()">'+plan.length+'칸 채우기</button></div>');
   window._offPlan=plan;
@@ -3177,9 +3174,9 @@ function bulkFromCards(){
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">빈 칸만 채웁니다 — '+esc(sum)+'.'
     +(noCard.length?'<br>짝지을 카드가 없어 제외 '+noCard.length+'개: '+esc(noCard.slice(0,8).join(', '))+(noCard.length>8?' 외':''):'')+'</p>'
     +'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr>'
-    +'<th>기금</th><th>기업정보함 카드</th>'+CARD_BULK.map(function(c){return '<th>'+c[2]+'</th>';}).join('')+'</tr></thead><tbody>'
-    +rows.map(function(r){
-      return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(r.name)+'</td>'
+    +'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>기업정보함 카드</th>'+CARD_BULK.map(function(c){return '<th>'+c[2]+'</th>';}).join('')+'</tr></thead><tbody>'
+    +rows.map(function(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(r.name)+'</td>'
         +'<td class="muted" style="white-space:nowrap">'+esc(r.card)+'</td>'
         +CARD_BULK.map(function(c){ return '<td'+(r.cell[c[1]]?'':' class="muted"')+' style="white-space:nowrap">'
           +(r.cell[c[1]]?esc(r.cell[c[1]]):'—')+'</td>'; }).join('')+'</tr>';
@@ -3280,8 +3277,8 @@ function _subImpPreview(d,fname){
       chkRows.push([funds[fid].short_name||funds[fid].name, yr+'년 서류', nf+'종 · 참여사 '+ns+'장']);
     });
   });
-  var tbl=function(rs){ return rs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><tbody>'
-    +rs.map(function(r){ return '<tr><td style="font-weight:600">'+esc(r[0])+'</td><td class="muted">'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'; }).join('')
+  var tbl=function(rs){ return rs.length?('<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>구분</th><th>내역</th></tr></thead><tbody>'
+    +rs.map(function(r,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(r[0])+'</td><td class="muted">'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'; }).join('')
     +'</tbody></table></div>'):'<p class="muted" style="font-size:12px">채울 항목이 없습니다(이미 입력됨).</p>'; };
   window._subImp=d;
   showModal('<div class="row" style="margin:0 0 6px"><h2 style="margin:0">지원금 과거자료 가져오기</h2><span class="chip" style="font-size:10px">'+esc(fname)+'</span></div>'
@@ -4361,11 +4358,11 @@ function renderBilling(){
   arr=arr.filter(function(x){ return !(funds[x.fund_id]&&isTrashed(funds[x.fund_id])); });
   arr.sort(function(a,b2){return (b2.year||0)-(a.year||0)||(a.fund_id||'').localeCompare(b2.fund_id||'');});
   var tot=arr.reduce(function(s,x){return s+(num(x.amount)||0);},0), paid=arr.filter(function(x){return x.paid_date;}).reduce(function(s,x){return s+(num(x.amount)||0);},0);
-  var rows=arr.map(function(r){
+  var rows=arr.map(function(r,i){
     var fn=(funds[r.fund_id]&&(funds[r.fund_id].short_name||funds[r.fund_id].name))||r.fund_id;
     var st=r.paid_date?'<span class="chip ok">입금완료</span>':r.invoice_date?'<span class="chip warn">청구</span>':'<span class="chip dg">미청구</span>';
     function ip(k,t){return '<input value="'+esc(r[k]||'')+'" type="'+(t||'text')+'" onchange="patchBilling(\''+r._id+'\',\''+k+'\',this.value)" style="width:'+(t==='date'?'130':'100')+'px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px">';}
-    return '<tr><td style="font-weight:700">'+esc(fn)+'<div class="muted" style="font-size:11px">'+esc(r.item||'')+' · '+(r.year||'')+'</div></td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700">'+esc(fn)+'<div class="muted" style="font-size:11px">'+esc(r.item||'')+' · '+(r.year||'')+'</div></td>'
       +'<td>'+ip('amount')+'</td><td>'+ip('invoice_date','date')+'</td><td>'+ip('paid_date','date')+'</td><td>'+st+'</td>'
       +'<td><button onclick="delBilling(\''+r._id+'\')">삭제</button></td></tr>';
   }).join('');
@@ -4374,7 +4371,7 @@ function renderBilling(){
     +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">입금 '+paid.toLocaleString()+'원</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="addBilling()">+ 청구 추가</button></div>'
     +(trashedN?'<p class="muted" style="font-size:11.5px;margin:6px 0 0"><span class="chip warn" style="font-size:10px">삭제 보관 기금 청구 '+trashedN+'건 제외됨</span></p>':'')
-    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th>기금 · 항목</th><th>금액(원)</th><th>계산서일</th><th>입금일</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금 · 항목</th><th>금액(원)</th><th>계산서일</th><th>입금일</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
                 :'<div class="muted" style="padding:8px 0">청구 건이 없습니다. [+ 청구 추가]</div>')+'</div>';
   $('app').innerHTML='<div class="panel"><div class="row"><h1>청구 관리</h1>'
     +'<span style="flex:1"></span><button onclick="peReload()" title="푸른이알피에서 다시 불러오기">↻ 연동 새로고침</button></div>'
@@ -4401,28 +4398,28 @@ function renderPuerpBox(){
     function mgrN(sid){ if(!sid) return '—';
       var me=(_staffCache||[]).filter(function(u){return u.sid===sid;})[0];
       return esc(me?me.name:(_staffCache?'이름 미확인':'')); }
-    function rowW(r){
-      return '<tr><td>'+_peFundCell(r)+'</td>'
+    function rowW(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+_peFundCell(r)+'</td>'
         +'<td>'+esc(r.company||'—')+'<div class="muted mo" style="font-size:11px">'+esc(r.no||'')+(r.bizNo?' · '+esc(r.bizNo):'')+'</div></td>'
         +'<td>'+esc(r.item)+'</td><td style="text-align:right;font-variant-numeric:tabular-nums">'+r.amount.toLocaleString()+'</td>'
         +'<td class="mo muted">'+esc(r.date||'—')+'</td>'
         +'<td><span class="chip dg" style="font-size:10px">미입금</span>'+(r.pstatus==='closed'?' <span class="chip warn" style="font-size:10px">사무관리 종료</span>':'')+'</td>'
         +'<td class="mo muted">'+mgrN(r.mgr)+'</td></tr>';
     }
-    function rowD(r){
-      return '<tr><td>'+_peFundCell(r)+'</td>'
+    function rowD(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+_peFundCell(r)+'</td>'
         +'<td>'+esc(r.company||'—')+'<div class="muted mo" style="font-size:11px">'+esc(r.no||'')+'</div></td>'
         +'<td>'+esc(r.item)+'</td><td style="text-align:right;font-variant-numeric:tabular-nums">'+r.amount.toLocaleString()+'</td>'
         +'<td class="muted">'+esc(r.paid_date||'—')+'</td>'
         +'<td><span class="chip ok" style="font-size:10px">입금완료</span> <span class="muted mo" style="font-size:10.5px">부가세 '+esc(r.vat)+'</span></td>'
         +'<td class="mo muted">'+esc(r.mgr||'—')+'</td></tr>';
     }
-    var head='<tr><th>기금</th><th>푸른이알피 업체</th><th>항목</th><th style="text-align:right">금액(원)</th>'
+    var head='<tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th>푸른이알피 업체</th><th>항목</th><th style="text-align:right">금액(원)</th>'
       +'<th'+(tab==='wait'?' class="mo"':'')+'>'+(tab==='wait'?'계약일':'입금일')+'</th><th>상태</th><th class="mo">담당</th></tr>';
     var list=(tab==='wait')?wait:(tab==='done'?done:unl);
     var body=list.length
       ? '<div style="overflow-x:auto"><table><thead>'+head+'</thead><tbody>'
-        +list.map(function(r){ return (tab==='done'||r.iid)?rowD(r):rowW(r); }).join('')+'</tbody></table></div>'
+        +list.map(function(r,i){ return (tab==='done'||r.iid)?rowD(r,i):rowW(r,i); }).join('')+'</tbody></table></div>'
       : '<div class="muted" style="padding:10px 0">'+(tab==='unl'?'연결되지 않은 청구가 없습니다 — 전부 기금에 붙었습니다.':'해당 건이 없습니다.')+'</div>';
     function tb(k,lbl,n){ return '<div class="tab'+(tab===k?' on':'')+'" onclick="peTab(\''+k+'\')">'+lbl+' <b>'+n+'</b></div>'; }
     box.innerHTML='<div class="panel"><div class="row"><h2 style="font-size:15px">① 푸른이알피 연동 청구</h2>'
@@ -5030,7 +5027,7 @@ function renderForms(){
        패널을 없애고 이름도 짧게 줄인다 — 어느 기금인지는 화면 맨 위에 이미 있다.
      ⚠ 기능은 하나도 없애지 않는다. 등록·교체·삭제·채움·보기 모두 이 줄에 있다.
      ⚠ 긴 설명(hint)은 화면에 깔지 않고 ⓘ 로 접는다(이 시스템의 기존 규칙). */
-  function tplRow(t){
+  function tplRow(t){ if(fundMode) return '';
     var reg=has[t.key], 막힘=(t.gong&&!isGong);
     var btns=reg
       ? (막힘 ? '<span class="muted" style="font-size:11px">공동기금 전용</span>'
@@ -5050,27 +5047,27 @@ function renderForms(){
   /* 단계 머리줄 — 다섯 단계가 같은 모양이다. 늘 쓰는 [번호 차례대로 전부]는 오른쪽 위로 올리고,
      처음 한 번만 쓰는 [.hwp 여러 개]는 그 옆에 흐리게 둔다. ⓘ 는 제목 옆 하나로 모은다. */
   function phaseHead(title,helpKey,bundleKind,extraChip){
-    return '<div class="row"><h2 style="font-size:15px">'+title+'</h2>'
-      +(extraChip||'')+typeChip+hlp(helpKey)
+    return '<div class="row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:10px;margin-bottom:4px;border-bottom:2px solid var(--line)"><h2 style="font-size:15px;font-weight:800;margin:0;white-space:nowrap;letter-spacing:-0.3px">'+title+'</h2>'
+      +hlp(helpKey)+(extraChip||'')+typeChip
       +'<span style="flex:1"></span>'
-      +'<button class="primary" onclick="estabBundle(\''+bundleKind+'\')" style="padding:5px 11px" '
+      +'<button class="primary" onclick="estabBundle(\''+bundleKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" '
       +'title="그 단계 서류를 번호 차례대로 한 화면에 세우고 채울 자리가 몇 곳인지 셉니다 — 그대로 인쇄해 날인하세요">🖨 번호 차례대로 전부(날인용)</button>'
       +hlp('estab.bundle')
-      +'<button onclick="pickHwpBulk()" style="padding:5px 10px">📁 .hwp 여러 개</button></div>';
+      +'<button onclick="pickHwpBulk()" style="'+(fundMode?'display:none;':'')+'padding:5px 10px;font-size:11.5px;white-space:nowrap">📁 .hwp 여러 개</button></div>';
   }
   function formRow(d,i){
     var kind=d[0], tk=!!(HWP_TPL_KINDS[kind]&&_hwpTplFits(kind,cur)), label=(i+1)+'. '+d[1], reg=(S._hwpHas||{})[kind], on=(S._sideKind===kind);
-    return '<div onclick="selectForm(\''+kind+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;cursor:pointer;border-radius:7px'+(on?';background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn)':'')+'" onmouseover="if(!'+on+')this.style.background=\'var(--hover,#f8fafc)\'" onmouseout="this.style.background=\''+(on?'var(--warn-bg)':'')+'\'">'
-      +'<span style="flex:1;min-width:170px;font-size:13px;font-weight:600">'+esc(label)
+    return '<div onclick="selectForm(\''+kind+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:7px'+(on?';background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn)':'')+'" onmouseover="if(!'+on+')this.style.background=\'var(--hover,#f8fafc)\'" onmouseout="this.style.background=\''+(on?'var(--warn-bg)':'')+'\'">'
+      +'<span style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;font-weight:700"><span style="white-space:nowrap">'+esc(label)+'</span>'
       +(fundMode&&HWP_TPL_VALUES[kind]?' <span class="fgate" data-fk="'+kind+'"></span>':'')     // 서식 관문 — 🤖 미확인 N(_formGatePaint)
-      +' <span style="font-size:10.5px;color:var(--sub);font-weight:400">'+(on?'▶ 오른쪽에 표시 중':'클릭=미리보기')+'</span></span>'
-      +'<span onclick="event.stopPropagation()">'
+      +' <span style="font-size:11px;color:'+(on?'var(--warn)':'var(--sub)')+';font-weight:'+(on?'700':'400')+';white-space:nowrap">'+(on?'▶ 오른쪽에 표시 중':'클릭=미리보기')+'</span></span>'
+      +'<span onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap">'
       /* ★ 한글 틀이 있는 서식은 «틀에 채워 여는 것»이 첫째 길이다(2026-09-23) — 원본 한글과 같은 엔진이 그린다 */
       +(tk
         ? (_hwpTplHasFor(kind,cur)
-            ? '<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:4px 9px" title="원본 한글 틀에 이 기금 자료를 채워 한글 편집기로 엽니다">📄 한글로 채워 열기</button> '
-              +'<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:4px 8px" title="한글 틀 바꾸기">틀 교체</button>'+hlp('forms.hwptpl')+' '
-            : '<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:4px 9px">⬆ 한글 틀 올리기</button>'+hlp('forms.hwptpl')+' ')
+            ? '<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:5px 10px;font-size:12px;white-space:nowrap" title="원본 한글 틀에 이 기금 자료를 채워 한글 편집기로 엽니다">📄 한글로 채워 열기</button>'
+              +'<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:5px 8px;font-size:11.5px;white-space:nowrap" title="한글 틀 바꾸기">틀 교체</button>'+hlp('forms.hwptpl')
+            : '<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:5px 10px;font-size:12px;white-space:nowrap">⬆ 한글 틀 올리기</button>'+hlp('forms.hwptpl'))
         : '')
       +(reg?'<span class="chip ok" style="font-size:10px">HWP</span> <button'+(tk?'':' class="primary"')+' onclick="openHwpEditor(\''+kind+'\')" style="padding:4px 9px">📄 HWP 편집</button> <button onclick="pickHwp(\''+kind+'\')" style="padding:4px 8px">교체</button> <button onclick="clearHwp(\''+kind+'\')" style="padding:4px 8px">삭제</button>'
         :(tk?'':'<button onclick="pickHwp(\''+kind+'\')" style="padding:4px 9px">⬆ 원본 .hwp 등록</button>'))
@@ -5081,9 +5078,9 @@ function renderForms(){
   if(isGong) PH=PH.concat([['subsidy','⑤ 근복지원금']]);
   PH=PH.concat([['dis','⑥ 해산·탈퇴']]);   // 사내·공동 모두 — 갈래는 기금 유형으로 고른다(dsLibHTML)
   if(PH.map(function(p){return p[0];}).indexOf(S.formPhase)<0) S.formPhase='inka';
-  var phBar='<div class="tabbar">'+PH.map(function(p){return '<div class="tab'+(S.formPhase===p[0]?' on':'')+'" onclick="S.formPhase=\''+p[0]+'\';renderForms()">'+p[1]+'</div>';}).join('')+'</div>';
+  var phBar='<div class="tabbar" style="display:flex;align-items:center;gap:4px;margin:4px 0 12px">'+PH.map(function(p){return '<div class="tab'+(S.formPhase===p[0]?' on':'')+'" style="white-space:nowrap" onclick="S.formPhase=\''+p[0]+'\';renderForms()">'+p[1]+'</div>';}).join('')+'<span style="flex:1"></span>'+(EMB?'<span style="display:inline-flex;align-items:center;gap:6px;padding-bottom:6px;white-space:nowrap"><span class="muted" style="font-size:11.5px">이 기금 데이터로 채운 서식</span>'+hlp('forms.fund')+(fundMode?'<button class="primary" onclick="syncSitesToHwpAll()" style="padding:4px 11px;font-size:11.5px;white-space:nowrap" title="참여사업장·기업정보함·설립준비위원·연도별 출연금에서 기금·임원·사업장 빈칸을 자동으로 채워 한글본·HTML 서식에 반영합니다">⚡ 사업장 정보 자동채움</button>':'')+'</span>':'')+'</div>';
   // 공동/사내 기본서식을 구분해 보여주는 표시
-  var typeChip='<span class="chip '+(isGong?'warn':'dg')+'" style="font-size:10.5px;margin-left:6px">'+esc(cur.fund_type||'?')+'기금 기본서식</span>'+hlp('ftype.words');
+  var typeChip='<span class="chip '+(isGong?'warn':'dg')+'" style="font-size:10.5px;white-space:nowrap;flex-shrink:0">'+esc(cur.fund_type||'?')+'기금 기본서식</span>'+hlp('ftype.words');
   var hwpNote='';   // 설명은 제목 옆 ⓘ(forms.hwp)로 옮김 — 단계마다 반복 출력하던 3줄 안내 제거
   function opsRow(title,btns){ return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;min-width:180px;font-weight:600">'+title+'</span>'+btns+'</div>'; }
   var body;
@@ -5100,13 +5097,16 @@ function renderForms(){
       +inkaList.map(formRow).join('')
       +(isGong?'':'<p class="muted" style="font-size:11px;margin:8px 0 0">※ 설립합의서는 공동기금 전용 — 사내기금 목록에서 제외</p>')
       +tplRow(TPL.contribx)
+      +reqDocsBoxHTML('inka',cur,fundMode)
       +'</div>';
   } else if(S.formPhase==='reg'){
     body='<div class="panel">'+phaseHead('② 법인 설립등기 서식','forms.hwp','reg')
-      +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')+'</div>';
+      +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')
+      +reqDocsBoxHTML('reg',cur,fundMode)+'</div>';
   } else if(S.formPhase==='tax'){
     body='<div class="panel">'+phaseHead('③ 고유번호증(세무서) 서식','forms.tax','tax')
-      +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')+'</div>';
+      +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')
+      +reqDocsBoxHTML('tax',cur,fundMode)+'</div>';
   } else if(S.formPhase==='ops'){
     body='<div class="panel">'+phaseHead('④ 운영 단계 서식','forms.ops','ops')
       +docsFor(DOC_OPS,cur.fund_type||'공동').map(formRow).join('')
@@ -5117,7 +5117,7 @@ function renderForms(){
           +opsRow('정관변경·임원변경 서식','<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:4px 10px">🔁 변경 이벤트로 →</button>')
           +opsRow('연간 일정·총회/협의회','<button onclick="gotoFundTab(\'annual\')" style="padding:4px 10px">📅 연간 일정으로 →</button>')
         : opsRow('운영상황보고서·결산서·변경이벤트','<span class="muted" style="font-size:12px">실데이터 기반 — 각 기금의 <b>📑 서식</b>/해당 탭에서</span>'))
-      +'</div></div>';
+      +'</div>'+reqDocsBoxHTML('ops',cur,fundMode)+'</div>';
   } else if(S.formPhase==='dis'){
     body=dsLibHTML(cur,fundMode,docsFor(DOC_DIS,cur.fund_type||'공동').map(formRow).join(''));
   } else {
@@ -5126,18 +5126,20 @@ function renderForms(){
         '<span class="chip warn" style="font-size:10px;margin-left:6px">공동 전용</span>')
       +tplRow(TPL.subsidy)
       +(fundMode?opsRow('근복지원금 데이터 입력','<button class="primary" onclick="gotoFundTab(\'subsidy\')" style="padding:4px 10px">📊 근복지원금 입력으로 →</button>'):'')
-      +DOC_SUB.map(formRow).join('')+'</div>';
+      +DOC_SUB.map(formRow).join('')
+      +reqDocsBoxHTML('subsidy',cur,fundMode)+'</div>';
   }
   if(!EMB) $('crumb').textContent='서식 자료실';   // 단독 렌더는 항상 전사 표준서식
   // 머리말은 한 줄로 — 긴 설명은 ⓘ 팝업(forms.fund / forms.lib)
   var hdr=EMB
-    ? '<div class="row" style="margin:0 0 2px"><span class="muted" style="font-size:11.5px">이 기금 데이터로 채운 서식</span>'+hlp('forms.fund')+'</div>'
+    ? phBar
+      /* 상단 탭바 오른쪽에 통합 */
     : '<div class="panel" style="padding:11px 14px"><div class="row"><h1 style="font-size:18px">서식 자료실</h1>'
       +'<span class="chip warn" style="font-size:10.5px">전사 표준서식</span>'+hlp('forms.lib')
-      +'<span style="flex:1"></span>'+fsel+'</div></div>';
+      +'<span style="flex:1"></span>'+fsel+'</div></div>'+phBar;
   HOST.innerHTML=hdr
     +'<div id="formSplit" style="display:flex;align-items:stretch;flex-wrap:wrap">'
-    +'<div id="formLeft" style="width:'+(S.formSplitW?S.formSplitW+'px':'46%')+';min-width:300px">'+phBar+body+'</div>'
+    +'<div id="formLeft" style="width:'+(S.formSplitW?S.formSplitW+'px':'48%')+';min-width:340px">'+body+'</div>'
     +'<div id="formGutter" onmousedown="startFormDrag(event)" title="드래그해서 좌우 크기 조절" style="width:10px;flex:none;cursor:col-resize;display:flex;align-items:center;justify-content:center"><div style="width:3px;height:44px;background:var(--line);border-radius:3px"></div></div>'
     +'<div style="flex:1;min-width:300px;position:sticky;top:8px;align-self:flex-start" class="panel" id="formSide"><p class="muted" style="font-size:12.5px;padding:26px 16px;text-align:center">👈 왼쪽에서 <b>서식 이름을 클릭</b>하세요 '+hlp('forms.fund')+'</p></div>'
     +'</div>';
@@ -5300,6 +5302,7 @@ function _openHwpBuf(buf,label,saveKind){
       +'<span style="font-size:11.5px;color:var(--sub)">한글 편집기(저장소 안) · 자료는 브라우저 밖으로 나가지 않습니다</span><span style="flex:1"></span>'
       +(_hwpSaveKind?'<button class="primary" onclick="hwpSaveToFund()">💾 이 기금에 보관</button>':'')
       +'<button onclick="hwpPasteClip()" title="복사해 둔 글·그림(서명·도장 등)을 문서에 붙여넣습니다 — 먼저 문서 안을 한 번 클릭해 커서를 두세요. 원본 앱(한글 등)에서 먼저 복사해 두세요.">🖼 붙여넣기</button>'
+      +'<button onclick="openPureunHangulFromHwpModal()" style="background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 표·줄칸·여백·쪽나누기를 편집하고 이 기금에 저장합니다">🖋 푸른한글프로그램</button>'
       +'<button onclick="openHwpAiChat()">🤖 AI로 고치기</button>'
       +'<button'+(_hwpSaveKind?'':' class="primary"')+' onclick="hwpExport(\'hwp\')">💾 .hwp로 저장</button>'
       +'<button onclick="hwpExport(\'hwpx\')">💾 .hwpx로 저장</button>'
@@ -5412,6 +5415,165 @@ function closeHwp(){ if(_hwpEditor){ try{_hwpEditor.destroy();}catch(e){} _hwpEd
      편집기 복구본·이력도 함께 비워진다(서버 자료는 건드리지 않는다).
    ⚠ 다른 탭에서 편집기가 열려 있으면 브라우저가 지우기를 미룬다 — 오래 기다리지 않고 넘어간다(1.5초). */
 var HWP_STUDIO_DBS=['rhwpStudioAutosave','rhwpStudioRecent','rhwpStudioDocHistory'];
+/* ══════════ 🖋 푸른한글프로그램(hangul.html) 직접 연결 브리지 ══════════
+   기금관리 서식(HWP/HWPX 원본 틀 또는 HTML 자동생성 서식·묶음)을 푸른한글프로그램(hangul.html)에
+   직접 보내 표·줄칸·쪽나누기를 편집하고, [💾 기금관리에 반영] 시 이 기금 서식에 즉시 저장한다. */
+function _pureunHangulMarginOf(kind,f){
+  var m=(typeof DK_MARGIN!=='undefined'&&DK_MARGIN)?DK_MARGIN[_dkKeyOf(kind,f)]:null;
+  if(!m||m.length<4) return {top:20,bottom:15,left:20,right:20,header:0,footer:0};
+  return {top:m[0],bottom:m[1],left:m[2],right:m[3],header:0,footer:0};
+}
+function _pureunHangulHtmlFromEd(ed){
+  if(!ed) return '';
+  var pages=[].slice.call(ed.querySelectorAll('.a4 .a4b'));
+  if(!pages.length) return sanitizeDocHTML(ed.innerHTML||'');
+  return pages.map(function(b){ return b.innerHTML||''; }).join('<hr class="page-break" contenteditable="false">');
+}
+function _pureunHangulSend(payload,win){
+  payload=Object.assign({sentAt:Date.now()},payload||{});
+  try{ localStorage.setItem('pureun_hangul_bridge',JSON.stringify(payload)); }
+  catch(e){
+    try{
+      var lite=Object.assign({},payload); delete lite.b64;
+      localStorage.setItem('pureun_hangul_bridge',JSON.stringify(lite));
+    }catch(e2){}
+  }
+  var sendMsg=function(){
+    try{ if(win&&!win.closed) win.postMessage({type:'pureun_hangul_open',payload:payload},'*'); }catch(e){}
+    try{ if(typeof BroadcastChannel!=='undefined') new BroadcastChannel('pureun_hangul_channel').postMessage({type:'pureun_hangul_open',payload:payload}); }catch(e){}
+  };
+  setTimeout(sendMsg,350);
+  setTimeout(sendMsg,1100);
+}
+function openPureunHangulFromHwpModal(){
+  var win=window.open('hangul.html?from=fund','pureun_hangul_win');
+  if(!win){ toast('팝업이 차단되었습니다 — 브라우저 팝업 차단을 해제해 주세요','err'); return; }
+  var f=funds[S.formFund]||{}, kind=_hwpSaveKind||S._sideKind||S._docKind||'';
+  var label=_hwpName||(kind?docLabel(kind):'기금서식');
+  var sendBuf=function(buf,fmt){
+    var b64=(typeof _bytesToB64==='function')?_bytesToB64(new Uint8Array(buf)):'';
+    _pureunHangulSend({
+      fundId:S.formFund||'',
+      fundName:f.short_name||f.name||'',
+      kind:kind,
+      label:label,
+      name:(f.short_name||f.name||'기금')+'_'+label,
+      format:fmt||'hwpx',
+      b64:b64,
+      margin:_pureunHangulMarginOf(kind,f)
+    },win);
+    toast('푸른한글프로그램으로 문서를 열었습니다');
+  };
+  if(_hwpEditor&&typeof PureunHwp!=='undefined'&&PureunHwp.exportFrom){
+    PureunHwp.exportFrom(_hwpEditor,'hwpx').then(function(bytes){ sendBuf(bytes,'hwpx'); })
+      .catch(function(){ if(_hwpOriginalBuf) sendBuf(_hwpOriginalBuf,_hwpOriginalFormat||'hwp'); });
+  } else if(_hwpOriginalBuf){
+    sendBuf(_hwpOriginalBuf,_hwpOriginalFormat||'hwp');
+  }
+}
+function openPureunHangul(kind){
+  kind=kind||S._sideKind||S._docKind;
+  if(!kind){ toast('먼저 서식을 선택하세요','warn'); return; }
+  var win=window.open('hangul.html?from=fund','pureun_hangul_win');
+  if(!win){ toast('팝업이 차단되었습니다 — 브라우저 팝업 차단을 해제해 주세요','err'); return; }
+  var f=curForm()||{}, fid=S.formFund||'', label=docLabel(kind);
+  var fname=((f.short_name||f.name||'기금')+'_'+label).replace(/[\\/:*?"<>|]/g,'_');
+  var margin=_pureunHangulMarginOf(kind,f);
+  if(S._sideKind===kind && S._hwpSideBytes && !$('doced')){
+    var b64=(typeof _bytesToB64==='function')?_bytesToB64(new Uint8Array(S._hwpSideBytes)):'';
+    var fallbackHtml='';
+    try{ fallbackHtml=_splitDocNotes(sanitizeDocHTML(docBody(kind,f,S._hwpSideSites||[]))).body; }catch(e){}
+    _pureunHangulSend({fundId:fid,fundName:f.short_name||f.name||'',kind:kind,label:label,name:fname,format:'hwpx',b64:b64,html:fallbackHtml,margin:margin},win);
+    toast('푸른한글프로그램으로 「'+label+'」 서식을 열었습니다');
+    return;
+  }
+  var ed=$('doced');
+  if(ed && S._docKind===kind){
+    var html=_pureunHangulHtmlFromEd(ed), hwpxB64='';
+    try{
+      if(typeof HWPX!=='undefined'&&typeof HWPXDOC!=='undefined'){
+        var doc=HWPXDOC.begin('gov',{pageNum:true});
+        var body=HWPXDOC.fromHtml(ed,doc);
+        if(body){
+          var bytes=HWPX.build([{body:body,landscape:false,margin:doc.margin}]);
+          if(bytes&&typeof _bytesToB64==='function') hwpxB64=_bytesToB64(new Uint8Array(bytes));
+        }
+      }
+    }catch(e){}
+    _pureunHangulSend({fundId:fid,fundName:f.short_name||f.name||'',kind:kind,label:label,name:fname,format:'hwpx',b64:hwpxB64,html:html,margin:margin},win);
+    toast('푸른한글프로그램으로 「'+label+'」 서식을 열었습니다');
+    return;
+  }
+  _loadSites(fid,{withClosed:_estabKind(kind)}).catch(function(){ return []; }).then(function(sites){
+    var raw=_splitDocNotes(sanitizeDocHTML(docBody(kind,f,sites))).body;
+    _pureunHangulSend({fundId:fid,fundName:f.short_name||f.name||'',kind:kind,label:label,name:fname,format:'html',html:raw,margin:margin},win);
+    toast('푸른한글프로그램으로 「'+label+'」 서식을 열었습니다');
+  });
+}
+function openPureunHangulBundle(){
+  var ed=$('doced');
+  if(!ed){ toast('묶음 서식을 불러오는 중입니다 — 잠시 후 다시 눌러 주세요','warn'); return; }
+  var win=window.open('hangul.html?from=fund','pureun_hangul_win');
+  if(!win){ toast('팝업이 차단되었습니다 — 브라우저 팝업 차단을 해제해 주세요','err'); return; }
+  var f=curForm()||{}, fid=S.formFund||'';
+  var ph=ESTAB_PHASES.filter(function(p){ return p[0]===S._bundlePhase; })[0]||ESTAB_PHASES[0];
+  var label=ph[1]+' 묶음';
+  var fname=((f.short_name||f.name||'기금')+'_'+ph[1]).replace(/[\\/:*?"<>|]/g,'_');
+  var html=_pureunHangulHtmlFromEd(ed), hwpxB64='';
+  try{
+    if(typeof HWPX!=='undefined'&&typeof HWPXDOC!=='undefined'){
+      var doc=HWPXDOC.begin('gov',{pageNum:true});
+      var body=HWPXDOC.fromHtml(ed,doc);
+      if(body){
+        var bytes=HWPX.build([{body:body,landscape:false,margin:doc.margin}]);
+        if(bytes&&typeof _bytesToB64==='function') hwpxB64=_bytesToB64(new Uint8Array(bytes));
+      }
+    }
+  }catch(e){}
+  _pureunHangulSend({fundId:fid,fundName:f.short_name||f.name||'',kind:'',label:label,name:fname,format:'hwpx',b64:hwpxB64,html:html},win);
+  toast('푸른한글프로그램으로 「'+label+'」 전체를 열었습니다');
+}
+var _lastPureunSaveAt=0;
+function _applyPureunHangulSave(msg){
+  if(!msg||msg.type!=='pureun_hangul_save') return;
+  if(msg.savedAt && msg.savedAt<=_lastPureunSaveAt) return;
+  _lastPureunSaveAt=msg.savedAt||Date.now();
+  var fid=msg.fundId||S.formFund, kind=msg.kind||S._sideKind||S._docKind;
+  if(!fid||!kind||typeof fbDb==='undefined'||!fbDb) return;
+  var html=String(msg.html||'').replace(/<hr\b[^>]*class=["'][^"']*page-break[^"']*["'][^>]*>/gi,'<p data-newpage="1" data-kept="1"></p>');
+  var tasks=[];
+  if(html){
+    tasks.push(fbDb.ref(NS+'/doc_edits/'+fid+'/'+kind).set({html:html,saved:ymd()}).catch(function(){}));
+  }
+  if(msg.hwpxB64 && typeof _hwpDocRef==='function' && HWP_TPL_KINDS && HWP_TPL_KINDS[kind]){
+    tasks.push(_hwpDocRef(fid,kind).set({b64:msg.hwpxB64,saved:ymd(),by:S.user||''}).catch(function(){}));
+  }
+  Promise.all(tasks).then(function(){
+    S._dbEdits=undefined;
+    if(S.formFund===fid){
+      if($('doced')&&S._docKind===kind){
+        _showDocHTML(html);
+        var f=curForm()||{};
+        _setDocLayer('fund',(f.fund_type==='사내')?'사내':'공동');
+      } else if(S._sideKind===kind){
+        sidePreview(kind);
+      }
+    }
+    toast('푸른한글프로그램에서 고친 「'+(msg.label||docLabel(kind))+'」 내용을 이 기금에 저장했습니다');
+  });
+}
+window.addEventListener('message',function(e){ if(e&&e.data&&e.data.type==='pureun_hangul_save') _applyPureunHangulSave(e.data); });
+window.addEventListener('storage',function(e){
+  if(e&&e.key==='pureun_hangul_save'&&e.newValue){
+    try{ _applyPureunHangulSave(JSON.parse(e.newValue)); }catch(err){}
+  }
+});
+try{
+  if(typeof BroadcastChannel!=='undefined'){
+    var _phBC=new BroadcastChannel('pureun_hangul_channel');
+    _phBC.onmessage=function(e){ if(e&&e.data&&e.data.type==='pureun_hangul_save') _applyPureunHangulSave(e.data); };
+  }
+}catch(e){}
 function _hwpClearStudioStores(){
   if(typeof indexedDB==='undefined'||!indexedDB||!indexedDB.deleteDatabase) return Promise.resolve();
   return Promise.all(HWP_STUDIO_DBS.map(function(n){ return new Promise(function(res){
@@ -6598,10 +6760,73 @@ function _hwpRelayout(doc){
 }
 /* 서식마다 «표지 이름 → 값»을 내는 함수. 값은 HTML 서식이 쓰던 같은 셈에서 온다. 틀이 늘면 여기 는다 */
 function _hwpValuesFor(kind,f,sites){
+  if(typeof _sitesFill==='function') sites=_sitesFill(f,sites);
   var fn=HWP_TPL_VALUES[kind]||_hwpTplValues, x=_fundFill(f||{},sites||[]);
   var V=fn(x.f,sites||[],kind);                        // kind — 여러 서식이 한 값 함수를 쓸 때 서식별 안내를 가르려고
   if(x.notes.length&&V&&typeof V==='object') V._note=[V._note,'끌어온 값: '+x.notes.join(', ')].filter(Boolean).join(' · ');
   return V;
+}
+/* ★ 참여사업장 빈칸을 기업정보함(_cardIdx)·설립준비위원(prep_committee)·임원 명부(officers)·담당자(contacts)로 자동 보충 (사본 반환) */
+function _sitesFill(f,sites){
+  if(!Array.isArray(sites)||!sites.length) return sites||[];
+  f=f||{};
+  var _ck=function(c){ return String(c||'').replace(/\s|\(주\)|㈜|주식회사|\(유\)|유한회사/g,'').trim(); };
+  var _coMatch=function(a,b){
+    var ka=_ck(a), kb=_ck(b);
+    if(!ka||!kb) return false;
+    if(ka===kb) return true;
+    return ka.length>=2&&kb.length>=2&&(ka.indexOf(kb)>=0||kb.indexOf(ka)>=0);
+  };
+  var pool=[].concat(Array.isArray(f.prep_committee)?f.prep_committee:[],Array.isArray(f.officers)?f.officers:[]);
+  var sy=(typeof _docRok==='function'&&_docRok()&&_docRok().sy)||{};
+  return sites.map(function(s){
+    if(!s||typeof s!=='object') return s;
+    var s2=Object.assign({},s), k=_ck(s2.name);
+    /* 1) 기업정보함(_cardBySite)이 메모리에 있으면 빈 칸 보충 */
+    if(typeof _cardBySite==='function'&&typeof _cardIdx!=='undefined'&&_cardIdx){
+      var cd=_cardBySite(s2);
+      if(cd){
+        ['ceo','biz_no','corp_reg_no','address','phone','industry','company_size','capital',
+         'wrep_name','wrep_birth','wrep_title','urep_name','urep_birth','urep_title','urep_addr'].forEach(function(fld){
+          if(!String(s2[fld]==null?'':s2[fld]).trim()&&String(cd[fld]==null?'':cd[fld]).trim()) s2[fld]=cd[fld];
+        });
+      }
+    }
+    /* 2) 설립준비위원(prep_committee)·임원 명부(officers)에서 같은 회사 소속 근로자측·사용자측 대표 보충 */
+    if(k&&pool.length){
+      var wHas=typeof _siteWrep==='function'?!!_siteWrep(s2).name:!!String(s2.wrep_name||'').trim();
+      if(!wHas){
+        var wHit=pool.filter(function(o){ return o&&o.name&&_ck(o.company)===k&&(o.side==='근로자측'||/근로자/.test(o.role||'')); })[0]
+          ||pool.filter(function(o){ return o&&o.name&&_coMatch(o.company,s2.name)&&(o.side==='근로자측'||/근로자/.test(o.role||'')); })[0];
+        if(wHit){
+          s2.wrep_name=String(wHit.name).trim();
+          if(!String(s2.wrep_birth||'').trim()&&wHit.birth) s2.wrep_birth=wHit.birth;
+          if(!String(s2.wrep_title||'').trim()&&wHit.title) s2.wrep_title=wHit.title;
+        }
+      }
+      var uHas=!!String(s2.ceo||'').trim()||(typeof _siteUrep==='function'?!!_siteUrep(s2).name:!!String(s2.urep_name||'').trim());
+      if(!uHas){
+        var uHit=pool.filter(function(o){ return o&&o.name&&_ck(o.company)===k&&(o.side==='사용자측'||/사용자|이사장/.test(o.role||'')); })[0]
+          ||pool.filter(function(o){ return o&&o.name&&_coMatch(o.company,s2.name)&&(o.side==='사용자측'||/사용자|이사장/.test(o.role||'')); })[0];
+        if(uHit){
+          s2.ceo=String(uHit.name).trim();
+          if(!String(s2.urep_birth||'').trim()&&uHit.birth) s2.urep_birth=uHit.birth;
+          if(!String(s2.urep_title||'').trim()&&uHit.title) s2.urep_title=uHit.title;
+          if(!String(s2.urep_addr||'').trim()&&uHit.addr) s2.urep_addr=uHit.addr;
+        }
+      }
+    }
+    /* 3) 담당자(contacts)에 근로자대표로 적힌 사람이 있으면 근로자대표 보충 */
+    if(!(typeof _siteWrep==='function'?_siteWrep(s2).name:String(s2.wrep_name||'').trim())&&Array.isArray(s2.contacts)){
+      var cHit=s2.contacts.filter(function(c){ return c&&c.name&&/근로자\s*대표|노측\s*대표|노동조합\s*대표/.test((c.role||'')+' '+(c.dept||'')+' '+(c.memo||'')); })[0];
+      if(cHit) s2.wrep_name=String(cHit.name).trim();
+    }
+    /* 4) 연도별 기록(site_years)에 출연금이 있고 사업장 기본 출연금이 비어 있으면 보충 */
+    if(typeof num==='function'&&!(num(s2.contrib)>0)&&s2._id&&sy[s2._id]&&num(sy[s2._id].contrib)>0){
+      s2.contrib=num(sy[s2._id].contrib);
+    }
+    return s2;
+  });
 }
 /* ★ 비어 있는 기금 칸을 «이미 있는 자료»로 메운다 (2026-10-02 대표 「순서대로 모두」 — 서식 완전 자동화 ①②)
    ─ 소재지·전화: ★대표사업장의 것(사무국이 대표회사 안에 있는 것이 보통) — 대표사업장이 없으면 안 메운다
@@ -6615,7 +6840,7 @@ function _fundFill(f,sites){
   var lead=_leadSite(live);
   if(lead){
     if(blank('address')&&String(lead.address||'').trim()){ g.address=String(lead.address).trim(); notes.push('소재지(대표사업장)'); }
-    var ph=String(lead.phone||'').trim()||((lead.contacts||[]).filter(function(c){ return c&&c.phone; })[0]||{}).phone||'';
+    var ph=String(lead.phone||lead.company_tel||'').trim()||((lead.contacts||[]).filter(function(c){ return c&&(c.phone||c.mobile); })[0]||{}).phone||((lead.contacts||[]).filter(function(c){ return c&&c.mobile; })[0]||{}).mobile||'';
     if(blank('phone')&&String(ph).trim()){ g.phone=String(ph).trim(); notes.push('전화(대표사업장)'); }
   }
   [['labor_office',guessLabor,'관할 노동청'],['registry_office',guessRegistry,'등기소'],['tax_office',guessTax,'세무서']].forEach(function(o){
@@ -6623,11 +6848,11 @@ function _fundFill(f,sites){
     var v=''; try{ v=o[1](g.address)||''; }catch(e){}
     if(v){ g[o[0]]=v; notes.push(o[2]+'(소재지로)'); }
   });
-  var offs=_officersOf(g), i=-1;
+  var offs=_officersOf(g), i=-1, hit=null;
   offs.forEach(function(o,k){ if(i<0&&/이사장/.test(o.role||'')) i=k; });
   var boss=i>=0?offs[i]:(String(g.chairman||'').trim()?{role:'이사장',name:String(g.chairman).trim()}:null);
   if(boss&&_relNm(boss.name)){
-    var hit=live.filter(function(s){ var u=_siteUrep(s), ceo=String(s.ceo||'').split(/[,，]/).map(_relNm);
+    hit=live.filter(function(s){ var u=_siteUrep(s), ceo=String(s.ceo||'').split(/[,，]/).map(_relNm);
       var who=(u.same||!u.name)?ceo:[_relNm(u.name)];        /* 「대표자와 같음」·빈 사용자대표면 대표자(공동대표 낱낱) */
       return who.indexOf(_relNm(boss.name))>=0; })[0];
     var b2=Object.assign({},boss), got=[];
@@ -6636,12 +6861,95 @@ function _fundFill(f,sites){
     if(hit){
       if(!String(b2.birth||'').trim()&&String(hit.urep_birth||'').trim()){ b2.birth=hit.urep_birth; got.push('생년월일'); }
       if(!String(b2.addr||'').trim()&&String(hit.urep_addr||'').trim()){ b2.addr=hit.urep_addr; got.push('주소'); }
+      else if(!String(b2.addr||'').trim()&&String(hit.address||'').trim()){ b2.addr=String(hit.address).trim(); got.push('주소'); }
       if(!String(b2.title||'').trim()&&String(hit.urep_title||'').trim()){ b2.title=hit.urep_title; got.push('직책'); }
       if(got.length) notes.push('대표자 '+got.join('·')+'('+String(hit.name||'').trim()+')');
     }
+    if(blank('rep_position')&&String(b2.title||'').trim()) g.rep_position=String(b2.title).trim();
     if(JSON.stringify(b2)!==JSON.stringify(boss)) g.officers=i>=0?offs.map(function(o,k){ return k===i?b2:o; }):[b2].concat(offs);
   }
+  /* 다른 이사·감사도 참여사업장 대표자·사용자대표·근로자대표와 이름이 맞으면 생년월일·주소·직책을 메운다 */
+  if(Array.isArray(g.officers)&&live.length){
+    var chg=false;
+    var offs2=g.officers.map(function(o,k){
+      if(!o||/이사장/.test(o.role||'')||!_relNm(o.name)) return o;
+      var nm=_relNm(o.name), o2=Object.assign({},o);
+      var sh=live.filter(function(s){
+        var u=_siteUrep(s), ceo=String(s.ceo||'').split(/[,，]/).map(_relNm);
+        var uwho=(u.same||!u.name)?ceo:[_relNm(u.name)];
+        var wnm=_relNm(s.wrep_name||'');
+        return uwho.indexOf(nm)>=0||(wnm&&wnm===nm);
+      })[0];
+      if(!sh) return o;
+      var isW=_relNm(sh.wrep_name||'')===nm;
+      var br=isW?sh.wrep_birth:sh.urep_birth, ad=isW?(sh.wrep_addr||sh.address):(sh.urep_addr||sh.address), ti=isW?sh.wrep_title:sh.urep_title;
+      if(!String(o2.birth||'').trim()&&String(br||'').trim()){ o2.birth=String(br).trim(); chg=true; }
+      if(!String(o2.addr||'').trim()&&String(ad||'').trim()){ o2.addr=String(ad).trim(); chg=true; }
+      if(!String(o2.title||'').trim()&&String(ti||'').trim()){ o2.title=String(ti).trim(); chg=true; }
+      return chg?o2:o;
+    });
+    if(chg) g.officers=offs2;
+  }
+  /* 사무소 임대인(lease_lessor)·임대 소재지(lease_addr): 주사무소 소재지와 주소가 같은 참여사업장(또는 대표사업장·이사장 소속 사업장)으로 보충 */
+  if(blank('lease_lessor')&&!blank('address')&&live.length){
+    var _na=function(a){ return String(a||'').replace(/\s+/g,'').trim(); };
+    var lsite=live.filter(function(s){ return s&&_na(s.address)&&_na(s.address)===_na(g.address); })[0]||lead||hit;
+    if(lsite&&String(lsite.name||'').trim()){
+      g.lease_lessor=String(lsite.name).trim();
+      if(blank('lease_addr')) g.lease_addr=String(g.address).trim();
+    }
+  }
   return {f:g, notes:notes};
+}
+/* ★ [⚡ 사업장 정보 자동채움] — 참여사업장·기업정보함·설립준비위원·연도별 출연금에서 기금·임원·사업장 빈칸을 한 번에 채워 DB와 한글·HTML 서식에 즉시 반영 */
+function syncSitesToHwpAll(){
+  var fid=S.formFund, f=funds[fid];
+  if(!fid||!f||f._sample){ toast('기금을 먼저 선택하세요','warn'); return; }
+  var yr=S.year||new Date().getFullYear();
+  toast('참여사업장·기업정보함·출연금 정보를 서식에 동기화하는 중…');
+  Promise.all([
+    typeof _ensureCardIdx==='function'?_ensureCardIdx().catch(function(){}):Promise.resolve(),
+    _loadSites(fid,{withClosed:true}).catch(function(){ return []; }),
+    fbDb.ref(NS+'/site_years/'+fid+'/'+yr).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; }),
+    _docExtra(S._sideKind||'reg_apply',f).catch(function(){ return null; })
+  ]).then(function(res){
+    var rawSites=res[1]||[], sy=res[2]||{};
+    var enriched=_sitesFill(f,rawSites);
+    var siteUpdates={}, siteCnt=0;
+    enriched.forEach(function(s2,idx){
+      var s0=rawSites[idx]||{};
+      if(!s2||!s2._id) return;
+      if(!(num(s2.contrib)>0)&&sy[s2._id]&&num(sy[s2._id].contrib)>0) s2.contrib=num(sy[s2._id].contrib);
+      var diff={};
+      ['ceo','biz_no','corp_reg_no','address','phone','industry','company_size','capital',
+       'wrep_name','wrep_birth','wrep_title','urep_name','urep_birth','urep_title','urep_addr','contrib'].forEach(function(k){
+        if(!String(s0[k]==null?'':s0[k]).trim()&&String(s2[k]==null?'':s2[k]).trim()) diff[k]=s2[k];
+      });
+      if(Object.keys(diff).length){
+        siteCnt++;
+        Object.keys(diff).forEach(function(k){ siteUpdates[s2._id+'/'+k]=diff[k]; });
+      }
+    });
+    var filled=_fundFill(f,enriched).f, fundDiff={}, fundCnt=0;
+    ['address','phone','labor_office','registry_office','tax_office','rep_position','lease_lessor','lease_addr'].forEach(function(k){
+      if(!String(f[k]==null?'':f[k]).trim()&&String(filled[k]==null?'':filled[k]).trim()){
+        fundDiff[k]=filled[k]; f[k]=filled[k]; fundCnt++;
+      }
+    });
+    if(Array.isArray(filled.officers)&&JSON.stringify(filled.officers)!==JSON.stringify(f.officers||[])){
+      fundDiff.officers=filled.officers; f.officers=filled.officers; fundCnt++;
+    }
+    var ps=[];
+    if(Object.keys(siteUpdates).length) ps.push(fbDb.ref(NS+'/sites/'+fid).update(siteUpdates));
+    if(Object.keys(fundDiff).length) ps.push(fbDb.ref(NS+'/funds/'+fid).update(fundDiff));
+    return Promise.all(ps).then(function(){
+      S._sitesCache= S._sitesCache||{}; delete S._sitesCache[fid];
+      toast('⚡ 사업장 '+siteCnt+'곳 · 기금/임원 항목 '+fundCnt+'건 자동채움 완료 — 서식에 즉시 반영했습니다');
+      if(S._bundlePhase) estabBundle(S._bundlePhase);
+      else if(S._sideKind) sidePreview(S._sideKind);
+      else renderForms();
+    });
+  }).catch(function(e){ toast('자동채움 중 오류: '+((e&&e.message)||e),'err'); });
 }
 /* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
@@ -6799,6 +7107,7 @@ var DOC_PHASE=[['inka',DOC_KINDS],['reg',DOC_REG],['tax',DOC_TAX],
    (사업계획서는 ①인가와 ⑤지원금에 같이 있다). 그때는 있던 자리에서 열어야
    «왜 딴 데로 갔지» 하지 않는다. */
 function phaseOfDoc(kind,prefer){
+  if(/^req_(inka|reg|tax|ops|subsidy|dis)$/.test(String(kind||''))) return String(kind).slice(4);
   var hit=[];
   for(var i=0;i<DOC_PHASE.length;i++)
     for(var j=0;j<DOC_PHASE[i][1].length;j++)
@@ -6808,6 +7117,233 @@ function phaseOfDoc(kind,prefer){
 }
 /* 선택 기금 유형에 맞는 서식만 — 공동/사내 기본서식을 따로 검토 */
 function docsFor(list,ftype){ return list.filter(function(d){ return !d[2]||d[2]===ftype; }); }
+/* ══ 기본서식 외 기업 준비·첨부서류 목록 (전 단계 체크리스트 · A4 안내문) ══
+   과거자료·표준서식·매뉴얼 전수 대조:
+   · ① 인가: 별지 제7호 첨부서류 + 사내기금설립사전준비물.xlsx + 공동기금설립시 필요.xlsx + 누리공동기금 필요서류.hwp
+   · ② 법인설립: 법인등기관련.xlsx + 사내근로복지기금 필요서류 및 진행.xlsx + 등기서류 1~102
+   · ③ 고유번호증: 0. 준비서류 안내(세무서,은행).xlsx + 고유번호증 발급 자료 준비 안내
+   · ④ 운영: 별지 제10호·제11호·제15호 법정첨부 + 등기관련(이사변경,정관변경).xlsx + 결산·세무 매뉴얼
+   · ⑤ 근복지원금: 00. 지원금 신청시 필요서류.hwp + [붙임1]기금법인 제출증빙리스트
+   · ⑥ 해산·탈퇴: 별지 제14호·제14호의2 법정첨부 + 해산·청산등기 절차 정리 */
+var REQ_PHASE_LABELS={
+  inka:'① 노동부 설립인가 — 기업 준비·첨부서류 안내문',
+  reg:'② 법인 설립등기 — 등기소 첨부·임원 준비물 안내문',
+  tax:'③ 고유번호증·계좌개설 — 세무서·은행 구비서류 안내문',
+  ops:'④ 운영·결산·변경 — 연간 결산 및 변경보고·등기 구비서류 안내문',
+  subsidy:'⑤ 근복지원금 — 기금법인·참여기업 구비서류 안내문',
+  dis:'⑥ 해산·탈퇴 — 법정 첨부서류 및 청산·탈퇴 구비서류 안내문'
+};
+var REQ_DOCS={
+  inka:[
+    {id:'inka_wrep',badge:'법정첨부',cls:'dg',who:'노·사 준비위원',title:'설립준비위원 재직증명서 (또는 근로계약서 등 신분증명서)',desc:'노·사 설립준비위원 전원 각 1부(별지 제7호 첨부서류 2호). 성명·생년월일·집 주소·연락처·직책 반드시 기재',tab:'sites',siteCol:'재직증명서(노·사위원)'},
+    {id:'inka_bizreg',badge:'필수',cls:'warn',who:'참여기업별',title:'사업자등록증 사본',desc:'설립·참여사업장 각 1부 (상호·사업자등록번호·소재지·대표자·업종 대조용)',tab:'sites',siteCol:'사업자등록증 사본'},
+    {id:'inka_corpreg',badge:'법인필수',cls:'warn',who:'참여기업별',title:'법인등기부등본 (등기사항전부증명서)',desc:'법인 사업장 각 1부 (말소사항 포함·제출용, 등기상 대표자·본점·지점·납입자본금 확인용, 개인사업자 제외)',tab:'sites',siteCol:'법인등기부등본'},
+    {id:'inka_fin',badge:'필수',cls:'warn',who:'참여기업별',title:'직전년도 재무제표 (재무상태표·손익계산서)',desc:'직전 사업연도 납입자본금 및 법인세·소득세 차감 전 순이익, 출연 재원 확인용',tab:'sites',siteCol:'직전년도 재무제표'},
+    {id:'inka_ei',badge:'필수',cls:'warn',who:'참여기업별',title:'고용보험 가입자명부 (또는 4대보험 사업장 가입자명부)',desc:'사업장별 소속 상시근로자 수 산정 및 인가신청서·사업계획서 기재 인원 확인용',tab:'sites',siteCol:'고용보험 가입자명부'},
+    {id:'inka_pseal',badge:'날인도장',cls:'ok',who:'노·사 준비위원',title:'노·사 설립준비위원 개인도장 (막도장 가능)',desc:'정관·설립준비위원회 회의록·설립합의서 기명날인용 (노동부 인가 단계는 인감도장 불필요, 막도장 사용 가능)',tab:'info',siteCol:'준비위원 도장 날인'},
+    {id:'inka_cseal',badge:'날인도장',cls:'ok',who:'참여기업별',title:'설립·참여기업 법인(사용)도장 및 출연 증빙',desc:'기금출연확인서·설립합의서 대표자 직인 날인용 (현물·유가증권 출연 시 재산목록 및 가격 평가서류 추가 첨부)',tab:'sites',siteCol:'법인직인(출연확인서)'},
+    {id:'inka_fseal',badge:'필수',cls:'warn',who:'기금법인',title:'기금법인 직인(도장) 제작',desc:'「○○사내(공동)근로복지기금」 한글 명칭으로 제작 (설립인가신청서 날인 및 추후 등기소 법인인감 등록용)',tab:'info'},
+    {id:'inka_elect',badge:'해당시',cls:'',who:'근로자측',title:'근로자측 준비위원 선출·위촉 근거서류',desc:'노사협의회 위원 명부, 과반수 노동조합 추천서, 또는 근로자대표 선출 투표록·동의서 (해당 사업장 비치·제출)',tab:'sites'},
+    {id:'inka_match',badge:'공동·해당시',cls:'',who:'참여기업·지자체',title:'공동기금 참여신청서 및 지자체·원청 출연약정서(협약서)',desc:'신규 참여기업 모집 신청서(근로자대표·사용자 서명) 및 지자체·원청 대기업 매칭 출연 시 출연협약서 사본',tab:'sites',ftype:'공동'}
+  ],
+  reg:[
+    {id:'reg_inkacert',badge:'법정첨부',cls:'dg',who:'기금법인',title:'설립인가증 원본 (고용노동지청 발급 주무관청 인가서)',desc:'인가증 도달일로부터 3주 이내 주사무소 관할 등기소 제출 (원본 확인 후 환부 요청 또는 원본대조필 사본 편철)',tab:'info'},
+    {id:'reg_inseal_cert',badge:'필수',cls:'warn',who:'이사 전원',title:'이사 전원 개인인감증명서 (발급 3개월 이내)',desc:'사용자측 이사·근로자측 이사 전원 각 1부 (취임승낙서·법인인감신고서·협의회 명부 날인 대조용, 감사는 비등기임원으로 제외)',tab:'info',siteCol:'이사 개인인감증명서'},
+    {id:'reg_jumin',badge:'필수',cls:'warn',who:'이사 전원',title:'이사 전원 주민등록표 등본 또는 초본 (발급 3개월 이내)',desc:'이사 전원 각 1부 (성명·주민등록번호 전체 공개·주소 변동사항 포함, 등기부 임원사항 기재 대조용)',tab:'info',siteCol:'이사 주민등록초본(등본)'},
+    {id:'reg_inseal_stamp',badge:'날인도장',cls:'ok',who:'이사 전원',title:'이사 전원 개인인감도장 및 신분증 사본',desc:'취임승낙서·법인인감개인신고서(대표자)·협의회 위원명부·위임장에 개인인감증명서와 동일한 인감도장 날인',tab:'info',siteCol:'이사 개인인감 날인'},
+    {id:'reg_fseal',badge:'날인도장',cls:'ok',who:'기금법인',title:'기금법인 인감도장 (법인인감 등록용)',desc:'특수법인 설립등기신청서, 인감대지, 법인인감신고서, 인가 정관 간인 및 원본대조필 날인용',tab:'info'},
+    {id:'reg_charter',badge:'법정첨부',cls:'dg',who:'기금법인',title:'인가받은 정관 사본 (법인인감 간인·원본대조필)',desc:'고용노동지청 인가 정관에 기금법인 인감도장으로 전 페이지 간인 및 원본대조필 날인하여 편철',tab:'info'},
+    {id:'reg_minutes',badge:'법정첨부',cls:'dg',who:'기금법인',title:'설립준비위원회 의사록(회의록) 및 협의회 위원 명부 (위원 인감날인)',desc:'이사 선임 및 기본재산 확정 결의 증빙 (공증인법 시행령 제2조의3 및 법무부고시 제2010-700호 제161호에 따라 의사록 공증 면제)',tab:'info'},
+    {id:'reg_contrib',badge:'법정첨부',cls:'dg',who:'참여기업별',title:'기금출연확인서 (기본재산 총액 증명서류)',desc:'등기부상 기본재산(자본 총액) 등기 및 시·군·구청 세무과 등록면허세 산정 소명용',tab:'sites',siteCol:'기금출연확인서 원본'},
+    {id:'reg_taxfee',badge:'필수',cls:'warn',who:'기금법인',title:'등록면허세 영수필확인서 및 등기신청수수료(증지) 영수증',desc:'주사무소 관할 시·군·구청 세무과(또는 위택스) 등록면허세·지방교육세 납부필증 + 등기소 등기신청수수료 영수증',tab:'info'},
+    {id:'reg_sealcard',badge:'후속필수',cls:'ok',who:'기금법인',title:'법인인감카드 발급신청 준비 및 등기부등본·인감증명서 발급',desc:'설립등기 완료 직후 등기소에서 법인인감카드 발급 신청(비밀번호 숫자 6자리 지정) 및 세무서·은행 제출용 등기부등본·법인인감증명서 발급',tab:'info'}
+  ],
+  tax:[
+    {id:'tax_inkacert',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 설립인가증 사본 (설립인가 공문 포함)',desc:'관할 고용노동지청에서 교부받은 설립인가증 사본 1부 (법인설립신고 및 고유번호증 발급 신청 시 첨부)',tab:'info'},
+    {id:'tax_corpreg',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 등기사항전부증명서 (법인등기부등본)',desc:'관할 등기소 발급 원본 1부 (제출용, 말소사항 포함, 법인등록번호 가운데 71 확인)',tab:'info'},
+    {id:'tax_charter',badge:'세무서필수',cls:'dg',who:'기금법인',title:'기금법인 정관 사본',desc:'고용노동지청 인가 정관 사본 1부 (비영리 특수법인 고유목적 확인용)',tab:'info'},
+    {id:'tax_lease',badge:'세무서필수',cls:'warn',who:'설립·대표기업',title:'주사무소 임대차계약서 사본 또는 무상사용승낙서·부동산 전대동의서',desc:'자가건물 내 무상사용 시 무상임대차계약서+건물등기부등본 / 임차건물 내 무상사용 시 건물주 부동산 전대 사용동의서+원임대차계약서 사본',tab:'info'},
+    {id:'tax_rep_seal',badge:'세무서필수',cls:'warn',who:'기금법인',title:'기금법인 대표자 신분증 사본 · 법인인감도장 · (대리인) 위임장',desc:'관할 세무서 방문 신청 시 법인인감도장 지참 (대리인 신청 시 위임장, 대리인 신분증, 법인인감증명서 추가)',tab:'info'},
+    {id:'tax_bank_id',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 세무서 발급 고유번호증 원본 (가운데 번호 82 확인)',desc:'고유번호증(xxx-82-xxxxx) 수령 후 은행 방문 — 기본재산 계좌·목적사업 계좌·(공동)공단지원금 전용 계좌 분리 개설 권장',tab:'info'},
+    {id:'tax_bank_certs',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 기금법인 등기부등본 · 법인인감증명서 (3개월 이내 원본)',desc:'은행 제출용 원본 각 1부 + 인가 정관 사본 + 설립인가증 사본 지참',tab:'info'},
+    {id:'tax_bank_seal',badge:'은행개설',cls:'ok',who:'기금법인',title:'[은행 계좌개설] 법인인감도장(통장 사용인감) · 대표자(대리인) 신분증 · 위임장',desc:'대표자 직접 방문 시 대표자 신분증·법인인감도장 / 대리인 방문 시 위임장(법인인감 날인)·대리인 신분증·재직증명서 추가',tab:'info'},
+    {id:'tax_handover',badge:'운영개시',cls:'',who:'기금·참여기업',title:'[설립 완료 후] 설립준비위원회 사무인계서 및 출연금 입금 통보',desc:'설립등기 후 지체 없이 이사에게 사무인계(인가증·정관·등기·인감·통장) 및 참여기업·지자체 출연금 기금계좌 입금 요청',tab:'closing',siteCol:'설립출연금 입금확인'}
+  ],
+  ops:[
+    {id:'ops_bank_tx',badge:'결산필수',cls:'dg',who:'기금법인',title:'[연간 결산] 기금법인 전체 계좌 연간 거래내역서 (1.1.~12.31. 엑셀·통장사본)',desc:'기본재산·목적사업·공단지원금·정기예금 등 보유 전 계좌의 회계연도 전체 입출금 내역 (회계·결산 탭 통장 자동분개용)',tab:'closing'},
+    {id:'ops_bank_bal',badge:'결산필수',cls:'dg',who:'기금법인',title:'[연간 결산] 결산 기준일(12.31.) 은행 예금 잔액증명서 (전 계좌)',desc:'보유 계좌별 회계연도 말일 기준 금융기관 잔액증명서 각 1부 (재무상태표 예금 잔액 대사 및 결산서 첨부용)',tab:'closing'},
+    {id:'ops_f15_att',badge:'법정첨부',cls:'dg',who:'기금법인',title:'[운영상황보고] 당해연도 결산 재무제표 · 감사보고서 · 차기 사업계획서(추정재무제표 포함)',desc:'별지 제15호 운영상황보고서 법정 첨부서류 (회계연도 종료 후 3개월 이내 관할 노동지청 제출)',tab:'closing'},
+    {id:'ops_site_stat',badge:'기업준비',cls:'warn',who:'참여기업별',title:'[운영상황보고] 설치·참여사업장 결산 기준일 근로자 수 · 납입자본금 · 직전 재무제표',desc:'별지 제15호 ⑨소속근로자 수·⑩협력업체근로자 수·⑪납입자본금 기재 및 출연금 사용한도(50/80/90%)·기본재산 사용한도 검증용',tab:'sites',siteCol:'결산일 근로자수·자본금'},
+    {id:'ops_welfare_ev',badge:'증빙보존',cls:'warn',who:'기금법인',title:'[내부비치·감사] 목적사업비 지급 증빙(이체확인증·영수증·수혜자명부) 및 대부원장·차용증',desc:'복지사업 수혜자별 지급내역·영수증·계좌이체내역 및 근로자 대부신청서·차용증·상환내역 (서류 5년 보존, 회의록 10년 보존)',tab:'welfare',siteCol:'수혜자명부·지급증빙'},
+    {id:'ops_tax_wh',badge:'세무신고',cls:'ok',who:'기금법인',title:'[법인세·환급] 금융기관 이자소득 원천징수영수증 (이자수익 발생 시)',desc:'회계연도 종료 후 3개월 이내 관할 세무서 법인세 과세표준 신고(고유목적사업준비금 손금산입) 및 원천징수 이자소득세 환급 신청용',tab:'closing'},
+    {id:'ops_asset_chg',badge:'변경보고',cls:'',who:'기금법인',title:'[기본재산 변경] 추가 출연금 입금확인증(은행 잔고증명서) · 변경된 기본재산 목록 · 회의록',desc:'추가 출연 등으로 기본재산 총액 변경 시 3주 이내 노동지청 보고(별지 제10호) 및 관할 등기소 기본재산 변경등기 소명자료',tab:'events',siteCol:'추가출연 입금확인증'},
+    {id:'ops_charter_chg',badge:'변경인가',cls:'',who:'기금법인',title:'[정관변경 인가] 정관변경 이유서 · 개정 정관(신·구조문대비표) · 협의회 회의록 · 기존 정관/인가증 원본',desc:'별지 제11호 정관변경 인가신청서 법정 첨부서류 (관할 노동지청 처리기한 7일, 변경된 정관에 노동지청 간인 수령)',tab:'events'},
+    {id:'ops_officer_chg',badge:'변경등기',cls:'',who:'이사·기금',title:'[임원변경 등기] 신임·중임 이사 취임승낙서 · 개인인감증명서 · 주민등록초본 · 협의회 회의록(도장 날인)',desc:'이사 변경 시 3주 이내 관할 등기소 변경등기 필수 (노동청 보고 의무 없음, 회의록·명부·취임승낙서에 서명 대신 인감도장 날인)',tab:'events'}
+  ],
+  subsidy:[
+    {id:'sub_fund_docs',badge:'기금필수',cls:'dg',who:'기금법인',title:'기금법인 설립인가증 사본 · 법인등기부등본(3개월 이내) · 고유번호증 사본 · 정관 사본',desc:'기금법인 기본 법정서류 4종 (법인등기부등본은 신청일 기준 3개월 이내 발급본, 집행실태 조사 시 2주 이내 발급본)',tab:'subsidy'},
+    {id:'sub_fund_bank',badge:'기금필수',cls:'dg',who:'기금법인',title:'기금법인 통장 사본 및 예금 잔액증명서 (출연금 입금 내역 확인서)',desc:'참여기업·지자체·원청 출연금이 실제 기금 계좌에 입금된 거래내역서 및 정부지원금 수령 전용 계좌 통장 사본',tab:'subsidy'},
+    {id:'sub_site_bizreg',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 사업자등록증 사본 (전체 참여기업 각 1부)',desc:'참여사업장 전체 각 1부 (상호·사업자등록번호·소재지·대표자·업종 및 휴·폐업 여부 대조용)',tab:'subsidy',siteCol:'사업자등록증 사본'},
+    {id:'sub_site_corpreg',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 법인등기부등본 사본 (신청일 기준 3개월 이내, 말소사항 포함)',desc:'법인 참여기업 각 1부 (임원 기재사항 포함 필수 — 대표자·임원 겸직·분할 여부 등 특수관계 대조용, 개인사업자 제외)',tab:'subsidy',siteCol:'법인등기부등본(3개월내)'},
+    {id:'sub_site_sme',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 중소기업확인서 (중소벤처기업부 발급, 유효기간 내)',desc:'중소기업 현황정보시스템(sminfo.mss.go.kr) 발급본 각 1부 (지원금 신청일 기준 유효기간 만료 여부 반드시 확인)',tab:'subsidy',siteCol:'중소기업확인서(유효)'},
+    {id:'sub_site_contrib',badge:'참여기업',cls:'warn',who:'참여기업별',title:'참여기업별 기금출연확인서 (대표자 직인 날인) 및 회사별 송금영수증',desc:'실제 출연한 금액을 한글·숫자 병기하여 대표자 직인 날인 + 각 회사에서 기금 계좌로 송금한 이체확인증',tab:'subsidy',siteCol:'출연확인서·송금증'},
+    {id:'sub_site_fin',badge:'참여기업',cls:'ok',who:'참여기업별',title:'참여기업별 직전년도 표준재무제표증명(손익계산서) 및 고용보험 가입자명부',desc:'참여기업 매출액·자본금 확인 및 사업장별 소속 근로자 수(심사 배점·1인당 지원한도 산정) 확인용',tab:'sites',siteCol:'재무제표·고용보험명부'},
+    {id:'sub_site_rel',badge:'특수관계',cls:'ok',who:'참여기업별',title:'특수관계인 해당 여부 확인서류 (주주명부 · 출자·친족·임원겸직 확인서)',desc:'공동자율점검 체크리스트 증빙 — 참여기업 간 출자(30%)·친족·임원 겸직·동일 공장 내 복수 공동기금 여부 확인용',tab:'subsidy',siteCol:'주주명부·특수관계확인'},
+    {id:'sub_match_docs',badge:'매칭출연',cls:'',who:'지자체·원청',title:'지자체·원청 대기업 출연 시: 기금출연약정서(협약서) · 출연확인서 · 사업자등록증 · 입금내역',desc:'대·중소기업 상생형 또는 지자체 매칭 공동기금 지원사업 신청 시 출연협약서 및 실제 출연 입금 증빙 첨부',tab:'subsidy'}
+  ],
+  dis:[
+    {id:'dis_prove',badge:'법정첨부1',cls:'dg',who:'기금·사업장',title:'[해산통지] 해산을 증명하는 서류 (폐업사실증명원 · 해산등기부 · 합병계약서 · 공동기금 인가증)',desc:'별지 제14호 첨부서류 1호 — 사업 폐지(폐업사실증명원), 기금 합병·분할(합병계약서·분할계획서), 공동기금 참여 해산(공동기금 설립인가증 사본)',tab:'events',siteCol:'해산·폐업 증명서류'},
+    {id:'dis_charter',badge:'법정첨부2',cls:'dg',who:'기금법인',title:'[해산통지] 해산 당시 정관 사본 및 기금법인 설립인가증 원본',desc:'별지 제14호 첨부서류 2호 — 해산 시점의 유효 정관 사본 1부 및 설립인가증 (청산인 취임 후 3주 이내 노동지청 제출)',tab:'events'},
+    {id:'dis_assets',badge:'법정첨부3',cls:'dg',who:'기금법인',title:'[해산통지] 해산 기준일 재산목록 및 전체 계좌 은행 예금 잔액증명서 (대부채권 명세 포함)',desc:'별지 제14호 첨부서류 3호 — 해산 결의일 기준 전 계좌 예금 잔액증명서, 미회수 근로자 대부금 잔액 명세서, 결산 재무상태표',tab:'closing'},
+    {id:'dis_plan_ev',badge:'법정첨부4',cls:'dg',who:'기금법인',title:'[해산통지] 재산의 처분방법 및 처분계획서 (미지급 임금 지급 시 청산무능력 증명서류 포함)',desc:'별지 제14호 첨부서류 4호 — 미지급 임금·퇴직금 우선 지급 시 사업주 재산 청산무능력 증빙, 생활안정자금(50% 이내) 배분명부, 잔여재산 귀속처 지정 근거',tab:'events'},
+    {id:'dis_liq_reg',badge:'해산등기',cls:'warn',who:'청산인·위원',title:'[해산등기] 해산 결의 및 청산인 선임 회의록 · 위원 명부 · 대표청산인 인감증명서·주민등록초본·인감도장',desc:'청산인 취임 후 3주 이내 주사무소 관할 등기소 해산 및 청산인 취임등기용 (회의록·명부·취임승낙서·인감대지·인감신고서·등록면허세 영수필증)',tab:'events'},
+    {id:'dis_close_ev',badge:'청산종결',cls:'ok',who:'청산인',title:'[청산종결] 채권신고 신문공고 증빙(2개월·3회 이상) · 잔여재산 인도(이체)확인증 · 청산종결 등기·신고',desc:'민법 제88조 채권신고 공고문 게재지 사본, 잔여재산 귀속·이체 완료 증빙, 청산종결 등기(3주 이내) 및 세무서 고유번호 폐지 신고',tab:'events'},
+    {id:'dis_leave_min',badge:'탈퇴첨부1',cls:'dg',who:'공동기금',title:'[중간탈퇴] 탈퇴 의결 공동근로복지기금협의회 회의록 사본 (탈퇴 사업주 노·사 위원 의결권 제외)',desc:'별지 제14호의2 첨부서류 1호 — 탈퇴 신청일로부터 3개월 이내 협의·결정 (탈퇴 신청 사업주의 사용자·근로자 위원은 의결 정족수에서 제외)',tab:'events',ftype:'공동'},
+    {id:'dis_leave_why',badge:'탈퇴첨부2',cls:'dg',who:'탈퇴사업장',title:'[중간탈퇴] 해당 사업주의 법정 탈퇴 사유 증명서류',desc:'별지 제14호의2 첨부서류 2호 — 도급·수급관계 종료 확인서 / 3회 이상 미출연+재고 50%↑·생산·매출 15%↓ 재무증빙 / 과반수 노조·근로자 과반수 탈퇴 요구서·서명부',tab:'sites',ftype:'공동',siteCol:'탈퇴사유 증명서류'},
+    {id:'dis_leave_calc',badge:'탈퇴첨부3',cls:'dg',who:'공동·탈퇴사',title:'[중간탈퇴] 배분 재산목록·산정내역서 · 이체확인증 · 사내기금 설치(출연) 증빙',desc:'별지 제14호의2 첨부서류 3호 — 출연비율 재산배분 계산서(정부·원청·지자체 지원금 제외), 송금확인증, 배분받은 사업주의 사내기금 설치·출연 확인서(폐업 시 제외)',tab:'events',ftype:'공동',siteCol:'배분금 수령·사내기금설치'}
+  ]
+};
+function reqDocsFor(phase,ftype){
+  var t=(ftype==='사내')?'사내':'공동';
+  return (REQ_DOCS[phase]||[]).filter(function(d){ return !d.ftype||d.ftype===t; }).map(function(d){
+    if(t!=='사내') return d;
+    return Object.assign({},d,{
+      who:String(d.who||'').replace('참여기업별','설립기업').replace('설립·대표기업','설립기업').replace('기금·참여기업','기금·설립기업'),
+      title:String(d.title||'').replace('설립·참여기업','설립기업').replace('설치·참여사업장','설치사업장'),
+      desc:String(d.desc||'').replace('설립·참여사업장','설립사업장').replace('참여기업·지자체','설립기업')
+    });
+  });
+}
+function _reqDocChkKey(cur){
+  return (S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample)?S.formFund:('_sample_'+(cur&&cur.fund_type==='사내'?'사내':'공동'));
+}
+function _reqDocChkMap(cur){
+  if(!S._reqDocChk) S._reqDocChk={};
+  var k=_reqDocChkKey(cur);
+  if(S._reqDocChk[k]===undefined){
+    S._reqDocChk[k]={};
+    if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+      var fid=S.formFund;
+      fbDb.ref(NS+'/req_docs/'+fid).once('value').then(function(sn){
+        S._reqDocChk[fid]=sn.val()||{};
+        try{ _formsRerender(); }catch(e){}
+      }).catch(function(){});
+    }
+  }
+  return S._reqDocChk[k]||{};
+}
+function _reqDocRefreshCnt(phase,cur){
+  var list=reqDocsFor(phase,cur&&cur.fund_type), mp=(_reqDocChkMap(cur)[phase])||{};
+  var doneN=list.filter(function(d){return !!mp[d.id];}).length;
+  var el=$('reqCnt_'+phase);
+  if(el){
+    el.textContent='확인 '+doneN+'/'+list.length;
+    el.className='chip '+(list.length&&doneN>=list.length?'ok':(doneN?'warn':''));
+  }
+  if(S._sideKind==='req_'+phase) sidePreview('req_'+phase);
+}
+function toggleReqDocChk(phase,id,checked){
+  var cur=curForm(), k=_reqDocChkKey(cur);
+  if(!S._reqDocChk) S._reqDocChk={};
+  if(!S._reqDocChk[k]) S._reqDocChk[k]={};
+  if(!S._reqDocChk[k][phase]) S._reqDocChk[k][phase]={};
+  if(checked) S._reqDocChk[k][phase][id]=true; else delete S._reqDocChk[k][phase][id];
+  if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+    fbDb.ref(NS+'/req_docs/'+S.formFund+'/'+phase+'/'+id).set(checked?true:null).catch(function(){});
+  }
+  _reqDocRefreshCnt(phase,cur);
+}
+function toggleReqDocAll(phase,checked){
+  var cur=curForm(), k=_reqDocChkKey(cur), list=reqDocsFor(phase,cur&&cur.fund_type);
+  if(!S._reqDocChk) S._reqDocChk={};
+  if(!S._reqDocChk[k]) S._reqDocChk[k]={};
+  var nx={}; if(checked) list.forEach(function(d){ nx[d.id]=true; });
+  S._reqDocChk[k][phase]=nx;
+  if(S.formsCtx==='fund'&&S.formFund&&cur&&!cur._sample&&typeof fbDb!=='undefined'&&fbDb){
+    fbDb.ref(NS+'/req_docs/'+S.formFund+'/'+phase).set(checked?nx:null).catch(function(){});
+  }
+  _reqDocRefreshCnt(phase,cur);
+}
+function reqDocsBoxHTML(phase,cur,fundMode){
+  var ftype=(cur&&cur.fund_type==='사내')?'사내':'공동';
+  var list=reqDocsFor(phase,ftype);
+  if(!list.length) return '';
+  var mp=(_reqDocChkMap(cur)[phase])||{};
+  var doneN=list.filter(function(d){ return !!mp[d.id]; }).length;
+  var allOn=list.length>0&&doneN>=list.length;
+  var TAB_LBL={sites:'참여사업장',info:'기금 정보',closing:'회계·결산',welfare:'목적사업·대부',events:'변경 이벤트',subsidy:'근복지원금'};
+  var rKind='req_'+phase, isSel=(S._sideKind===rKind);
+  var rows=list.map(function(d,i){
+    var on=!!mp[d.id];
+    return '<tr'+(on?' class="ckon"':'')+'>'
+      +'<td class="ckcol"><input type="checkbox"'+(on?' checked':'')+' onchange="_ckRow(this);toggleReqDocChk(\''+phase+'\',\''+d.id+'\',this.checked)"></td>'
+      +'<td class="no">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip '+(d.cls||'')+'" style="font-size:10px">'+esc(d.badge)+'</span><div class="muted" style="font-size:10.5px;margin-top:2px">'+esc(d.who)+'</div></td>'
+      +'<td><div onclick="selectForm(\''+rKind+'\')" style="font-weight:700;font-size:12.5px;cursor:pointer" title="클릭하면 오른쪽에 기업 안내문·체크리스트(A4)를 엽니다">'+esc(d.title)+'</div>'
+      +'<div class="muted" style="font-size:11.5px;line-height:1.45;margin-top:2px">'+esc(d.desc)+'</div></td>'
+      +(fundMode?'<td class="center" style="white-space:nowrap">'+(d.tab?'<button onclick="gotoFundTab(\''+d.tab+'\')" style="padding:2px 8px;font-size:11px">'+esc(TAB_LBL[d.tab]||d.tab)+' →</button>':'—')+'</td>':'')
+      +'</tr>';
+  }).join('');
+  return '<div class="reqbox" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--line)">'
+    +'<div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;justify-content:space-between">'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><h3 style="margin:0;font-size:14px;font-weight:800;white-space:nowrap">📎 기업 준비·첨부서류 목록</h3>'
+    +'<span class="chip" style="font-size:10.5px">'+esc(ftype)+'기금 '+list.length+'종</span>'
+    +'<span id="reqCnt_'+phase+'" class="chip '+(allOn?'ok':(doneN?'warn':''))+'" style="font-size:10.5px">확인 '+doneN+'/'+list.length+'</span>'
+    +hlp('forms.reqdocs')+'</div>'
+    +'<span style="flex:1"></span>'
+    +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap;margin-left:auto" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
+    +(isSel?'▶ 오른쪽에 안내문 표시 중':'📋 기업 안내문 미리보기·인쇄')+'</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr>'
+    +'<th class="ckcol"><input type="checkbox"'+(allOn?' checked':'')+' onclick="toggleReqDocAll(\''+phase+'\',this.checked);_ckAll(this)" title="모두 선택"></th>'
+    +'<th class="no">번호</th><th style="white-space:nowrap;width:88px">구분 · 준비처</th><th>기업 준비·첨부서류 및 세부 확인사항</th>'
+    +(fundMode?'<th class="center" style="white-space:nowrap;width:96px">바로가기</th>':'')
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'</div>';
+}
+function reqDocSheetHTML(phase,f,sites){
+  f=f||{}; sites=sites||[];
+  var ftype=(f.fund_type==='사내')?'사내':'공동';
+  var list=reqDocsFor(phase,ftype);
+  var mp=(_reqDocChkMap(f)[phase])||{};
+  var PH_DOC={inka:DOC_KINDS,reg:DOC_REG,tax:DOC_TAX,ops:DOC_OPS,subsidy:DOC_SUB,dis:DOC_DIS};
+  var baseForms=docsFor(PH_DOC[phase]||[],ftype);
+  var title=REQ_PHASE_LABELS[phase]||('기업 준비·첨부서류 안내문');
+  var note="<p class='note docnote'>※ 이 안내문은 오른쪽 위 [🖨] 버튼으로 인쇄/PDF 저장하거나 [📄] 버튼으로 한글(HWPX) 파일로 내려받아 기업에 발송할 수 있습니다. 문구를 클릭해 직접 수정하고 저장할 수도 있습니다.</p>";
+  var baseRows=baseForms.map(function(d,i){
+    return "<tr><td class='center'>"+(i+1)+"</td><td><b>"+esc(d[1])+"</b></td><td class='center'>시스템 자동생성 (날인용)</td></tr>";
+  }).join('');
+  var reqRows=list.map(function(d,i){
+    var on=!!mp[d.id];
+    return "<tr><td class='center'>"+(on?'☑':'□')+"</td><td class='center'>"+(i+1)+"</td><td class='center'><b>"+esc(d.badge)+"</b><br><span style='font-size:9pt;color:#475569'>"+esc(d.who)+"</span></td>"
+      +"<td><b>"+esc(d.title)+"</b><br><span style='font-size:9.2pt;color:#475569'>"+esc(d.desc)+"</span></td></tr>";
+  }).join('');
+  var siteCols=list.filter(function(d){ return !!d.siteCol; });
+  var siteTbl='';
+  if(siteCols.length){
+    var liveSites=sites.length?sites:[{name:f._sample?'(샘플) ㈜가나산업':(f.name||'설립사업장'),ceo:f.chairman||'홍길동'}];
+    var sHdr=siteCols.map(function(c){ return "<th class='center' style='font-size:8.8pt'>"+esc(c.siteCol)+"</th>"; }).join('');
+    var sRows=liveSites.map(function(s,i){
+      return "<tr><td class='center'>□</td><td class='center'>"+(i+1)+"</td><td><b>"+esc(s.name||'')+"</b>"+(s.ceo?" ("+esc(s.ceo)+")":"")+"</td>"
+        +siteCols.map(function(){ return "<td class='center'>□</td>"; }).join('')+"</tr>";
+    }).join('');
+    siteTbl="<h2>3. 사업장별 준비서류 수합 점검표 ("+liveSites.length+"개소)</h2>"
+      +"<table><thead><tr><th style='width:28px' class='center'>확인</th><th style='width:34px' class='center'>번호</th><th>사업장명 (대표자)</th>"+sHdr+"</tr></thead><tbody>"+sRows+"</tbody></table>";
+  }
+  return note
+    +"<h1>"+esc(title)+"</h1>"
+    +"<table>"
+    +"<tr><th style='width:110px'>기금법인명</th><td><b>"+dgV(f.name,16)+"</b> ("+esc(ftype)+"근로복지기금)</td><th style='width:95px'>대표자(이사장)</th><td>"+dgV(f.chairman,8)+"</td></tr>"
+    +"<tr><th>주사무소 소재지</th><td colspan='3'>"+dgV(f.address,24)+"</td></tr>"
+    +"<tr><th>관할 노동청</th><td>"+dgV(f.labor_office,10)+"</td><th>관할 등기소·세무서</th><td>"+dgV([f.registry_office,f.tax_office].filter(Boolean).join(' / '),10)+"</td></tr>"
+    +"</table>"
+    +"<h2>1. 기본 생성서식 목록 (프로그램 자동생성 · 기명날인 서류 "+baseForms.length+"종)</h2>"
+    +"<table><thead><tr><th style='width:42px' class='center'>번호</th><th>기본서식 명칭</th><th style='width:140px' class='center'>작성·준비 방법</th></tr></thead><tbody>"+baseRows+"</tbody></table>"
+    +"<h2>2. 기업 준비·첨부서류 목록 (기본서식 외 구비서류 "+list.length+"종)</h2>"
+    +"<table><thead><tr><th style='width:36px' class='center'>확인</th><th style='width:38px' class='center'>번호</th><th style='width:96px' class='center'>구분 · 준비처</th><th>기업 준비·첨부서류 및 세부 확인사항</th></tr></thead><tbody>"+reqRows+"</tbody></table>"
+    +siteTbl
+    +"<p class='center' style='margin-top:16px'>"+dgToday()+"</p>";
+}
 // ── 🗂 서식 현황 대시보드 — 전체 기금 × 서식 준비 상태 비교 ──
 var DOC_PHASES=[['kinds','① 인가',function(){return DOC_KINDS;}],['reg','② 법인설립',function(){return DOC_REG;}],
   ['tax','③ 고유번호증',function(){return DOC_TAX;}],['ops','④ 운영',function(){return DOC_OPS;}],
@@ -6848,7 +7384,7 @@ function docsMatrixHTML(list){
     var apps=cols.filter(function(d){return !d[2]||d[2]===(f.fund_type||'');});
     var doneN=apps.filter(function(d){return edits&&edits[f._id]&&edits[f._id][d[0]];}).length;
     if(onlyMissing&&apps.length&&doneN>=apps.length) return '';
-    return '<tr><td class="no">'+(i+1)+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;white-space:nowrap;cursor:pointer" onclick="openFundDoc(\''+f._id+'\',\'\')">'+esc(f.short_name||f.name)
       +'<div class="muted" style="font-size:10.5px;font-weight:400">'+esc(f.fund_type||'')+(f.region?' · '+esc(f.region):'')+'</div></td>'
       +'<td class="center"><span class="chip '+(apps.length&&doneN>=apps.length?'ok':(doneN?'warn':'dg'))+'" style="font-size:10.5px">'+doneN+'/'+apps.length+'</span></td>'
@@ -6863,9 +7399,9 @@ function docsMatrixHTML(list){
     +'<span style="flex:1"></span><span class="muted mo" style="font-size:11px">🟢 저장본 · 📎 HWP · ⚪ 미작성</span></div>'
     +phBar
     +(edits===null?loadingHTML('저장본 확인 중…')
-      :'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>기금</th><th class="center">진행</th>'
+      :'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th><th class="center">진행</th>'
         +cols.map(function(d){return '<th class="center" style="font-size:10.5px;white-space:nowrap" title="'+esc(d[1])+'">'+esc(String(d[1]).replace(/\s*\(.*\)$/,'').slice(0,10))+'</th>';}).join('')
-        +'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+(cols.length+3)+'" class="center muted" style="padding:16px">'+(onlyMissing?'모두 완성되었습니다.':'표시할 기금이 없습니다.')+'</td></tr>')+'</tbody></table></div>')
+        +'</tr></thead><tbody>'+(rows||'<tr><td colspan="'+(cols.length+4)+'" class="center muted" style="padding:16px">'+(onlyMissing?'모두 완성되었습니다.':'표시할 기금이 없습니다.')+'</td></tr>')+'</tbody></table></div>')
     +'</div>';
 }
 // 매트릭스 칸 클릭 → 그 기금 📑 서식 탭으로(서식 지정 시 해당 서식 미리보기)
@@ -6881,7 +7417,7 @@ function openFundDoc(fid,kind,prefer){
   }
   _go('fund',fid); S.tab='docs'; renderFund();
 }
-function docLabel(kind){ var m=DOC_ALL.filter(function(x){return x[0]===kind;})[0]; return m?m[1]:kind; }
+function docLabel(kind){ if(/^req_/.test(String(kind||''))&&REQ_PHASE_LABELS[String(kind).slice(4)]) return REQ_PHASE_LABELS[String(kind).slice(4)]; var m=DOC_ALL.filter(function(x){return x[0]===kind;})[0]; return m?m[1]:kind; }
 function dgV(x,w){ var s=String(x==null?'':x).trim(); return s?esc(s):'＿'.repeat(w||8); }
 function dgWon(x){ var n=num(x); return (n===''||n==null)?'＿＿＿＿＿＿':Number(n).toLocaleString(); }
 /* 법정 서식의 날짜 관례는 «2019. 12. 31.» 이다(실제 제출본도 그렇게 적었다) */
@@ -6998,7 +7534,7 @@ function dgDocCss(){ return "@page{size:A4 portrait;margin:0}"
   +".a4f{flex:0 0 auto;text-align:center;font-size:11px;color:#475569;padding-top:4mm}"
   +"h1{text-align:center;font-size:21px;letter-spacing:6px;margin:24px 0}h2{font-size:15px;margin:20px 0 6px;text-align:center;letter-spacing:3px}"
   +".right{text-align:right}.center{text-align:center}table{border-collapse:collapse;width:100%;max-width:100%;margin:10px 0;table-layout:fixed}"
-  +"td,th{border:1px solid #1e293b;padding:5px 7px;font-size:12.5px;word-break:break-all;overflow-wrap:anywhere;vertical-align:middle}th{background:#f8fafc;font-weight:700}"
+  +"td,th{border:1px solid #1e293b;padding:5px 7px;font-size:12.5px;word-break:break-all;overflow-wrap:anywhere;vertical-align:middle;box-sizing:border-box}th{background:#f8fafc;font-weight:700}"
   +"td>table{margin:0;width:100%;border:none}"
   +".sign{margin-top:30px;text-align:right;line-height:2.4}.note{color:#64748b;font-size:11px}.fv{margin-left:14px;font-weight:600}"
   +".dgn{padding-left:1.5em;text-indent:-1.5em}.dgb{padding-left:3em;text-indent:-1.5em}blockquote{margin:0 0 0 2em}"
@@ -7140,7 +7676,7 @@ function dgDocCssIn(){ var s="#doced";
   +s+" .a4of{position:absolute;right:6mm;bottom:6mm;font-size:10.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:2px 6px}"
   +s+" h1{text-align:center;font-size:21px;letter-spacing:6px;margin:24px 0}"+s+" h2{font-size:15px;margin:20px 0 6px;text-align:center;letter-spacing:3px}"
   +s+" .right{text-align:right}"+s+" .center{text-align:center}"+s+" table{border-collapse:collapse;width:100%;max-width:100%;margin:10px 0;table-layout:fixed}"
-  +s+" td,"+s+" th{border:1px solid #1e293b;padding:4px 5px;font-size:12px;word-break:break-all;overflow-wrap:anywhere;vertical-align:middle}"+s+" th{background:#f8fafc;font-weight:700}"
+  +s+" td,"+s+" th{border:1px solid #1e293b;padding:4px 5px;font-size:12px;word-break:break-all;overflow-wrap:anywhere;vertical-align:middle;box-sizing:border-box}"+s+" th{background:#f8fafc;font-weight:700}"
   +s+" .sign{margin-top:30px;text-align:right;line-height:2.4}"+s+" .note{color:#64748b;font-size:11px}"
   +s+" .fv{margin-left:14px;font-weight:600}"
   // 원본 변환 서식: 중첩표(처리절차 등) 밀착·빈 칸 높이 확보
@@ -7201,11 +7737,47 @@ function _splitTableToFit(tbl,body,limit){
   var rows=[];
   Array.prototype.forEach.call(tbl.rows,function(r){ if(r.closest('table')===tbl) rows.push({r:r,p:r.parentNode}); });
   var head=tbl.querySelector(':scope > thead');
-  var movable=rows.filter(function(x){ return !head||x.p!==head; });        // 머리행은 남긴다
+  var headRows=[];
+  if(!head){
+    for(var hi=0;hi<rows.length;hi++){
+      var hr=rows[hi].r;
+      if(hr.querySelector('th') && !hr.querySelector('td')) headRows.push(rows[hi]);
+      else break;
+    }
+  }
+  var movable=rows.filter(function(x){ return (!head||x.p!==head) && headRows.indexOf(x)<0; });        // 머리행은 남긴다
   if(movable.length<2) return null;
   var moved=[];
   while(movable.length>1 && body.scrollHeight>limit){                       // 최소 한 행은 남긴다
     var last=movable.pop(); last.r.remove(); moved.unshift(last);
+  }
+  var _popMore=true;
+  while(_popMore && movable.length>1){
+    _popMore=false;
+    for(var mi=1;mi<movable.length;mi++){
+      var mcs=movable[mi].r.children;
+      for(var ci=0;ci<mcs.length;ci++){
+        var rs=parseInt(mcs[ci].getAttribute('rowspan')||'1',10);
+        if(rs>1 && mi+rs>movable.length){
+          while(movable.length>mi){
+            var lp=movable.pop(); lp.r.remove(); moved.unshift(lp);
+          }
+          _popMore=true;
+          break;
+        }
+      }
+      if(_popMore) break;
+    }
+  }
+  if(movable.length){
+    var c0=movable[0].r.children;
+    for(var c0i=0;c0i<c0.length;c0i++){
+      var rs0=parseInt(c0[c0i].getAttribute('rowspan')||'1',10);
+      if(rs0>movable.length && body.childNodes.length>1){
+        moved.forEach(function(x){ x.p.appendChild(x.r); });
+        return null;
+      }
+    }
   }
   if(!moved.length) return null;
   if(body.scrollHeight>limit){                                              // 그래도 안 들어감 → 원복
@@ -7213,6 +7785,7 @@ function _splitTableToFit(tbl,body,limit){
     return null;
   }
   var rest=tbl.cloneNode(false);                                            // 테두리·너비 등 표 속성 유지
+  rest.removeAttribute('data-newpage');
   /* 열 폭 정의(colgroup)를 이어지는 표에도 복사한다. shallow clone은 자식을 안 가져오므로
      이걸 빼면 다음 쪽 표가 열 폭을 잃고 균등분할돼, 쪽마다 칸 폭이 달라지고
      좁은 칸의 글자가 칸을 넘쳐 표가 본문 폭을 벗어난다(사업자등록신청서 66열 실측). */
@@ -7220,6 +7793,9 @@ function _splitTableToFit(tbl,body,limit){
   if(cg) rest.appendChild(cg.cloneNode(true));
   if(head) rest.appendChild(head.cloneNode(true));                          // 머리행 반복
   var tb=document.createElement('tbody'); rest.appendChild(tb);
+  if(!head && headRows.length){
+    headRows.forEach(function(hx){ tb.appendChild(hx.r.cloneNode(true)); });
+  }
   moved.forEach(function(x){ tb.appendChild(x.r); });
   return rest;
 }
@@ -7232,6 +7808,23 @@ function paginateDoc(rawHTML){
   Array.prototype.forEach.call(holder.querySelectorAll('.a4b'),function(b){
     while(b.firstChild) b.parentNode.insertBefore(b.firstChild,b);
     b.remove();
+  });
+  Array.prototype.forEach.call(holder.querySelectorAll('.a4 .a4'),function(na){
+    var hasPrev=false, p=na.previousSibling;
+    while(p){ if(p.nodeType===1||(p.nodeType===3&&String(p.nodeValue||'').trim())){ hasPrev=true; break; } p=p.previousSibling; }
+    if(hasPrev && na.firstElementChild) na.firstElementChild.setAttribute('data-newpage','1');
+    while(na.firstChild) na.parentNode.insertBefore(na.firstChild,na);
+    na.remove();
+  });
+  Array.prototype.forEach.call(holder.querySelectorAll('div'),function(dv){
+    if(dv.classList&&(dv.classList.contains('a4')||dv.classList.contains('cbwrap')||dv.classList.contains('fmcols')||dv.classList.contains('sign')||dv.classList.contains('docnotes')||dv.classList.contains('msg'))) return;
+    if(dv.closest('td,th')) return;
+    if(!dv.querySelector('table')) return;
+    var np=dv.getAttribute('data-newpage'), kp=dv.getAttribute('data-kept');
+    if(np && dv.firstElementChild) dv.firstElementChild.setAttribute('data-newpage',np);
+    if(kp) Array.prototype.forEach.call(dv.children,function(c){ c.setAttribute('data-kept',kp); });
+    while(dv.firstChild) dv.parentNode.insertBefore(dv.firstChild,dv);
+    dv.remove();
   });
   /* 서식 이름표(dk-…) — 장마다 제 글자 크기를 쓰게 한다.
      ⚠ 묶음 인쇄는 서식마다 크기가 «다르다». 그래서 들어온 장에 이름표가 붙어 있으면
@@ -7269,6 +7862,16 @@ function paginateDoc(rawHTML){
       }
       body.appendChild(nd);
       if(!(limit>0 && body.scrollHeight>limit)) continue;                  // 들어갔다
+      /* 고정 양식 표가 미세한 여백(8% 이내)으로 넘칠 때만 안쪽 여백을 살짝 다듬고,
+         그래도 넘치거나 다행 표(별지 명단·참석위원·서명표 등)면 즉시 행 단위로 다음 쪽에 넘긴다. */
+      if(nd.nodeType===1 && nd.tagName==='TABLE' && !nd.getAttribute('data-kept') && body.scrollHeight<=limit*1.08){
+        [].slice.call(body.querySelectorAll('table')).forEach(function(tb){ tb.style.margin='2px 0'; });
+        [].slice.call(body.querySelectorAll('td,th')).forEach(function(td){
+          if(td.parentNode&&td.parentNode.getAttribute&&td.parentNode.getAttribute('data-hwp-sep')) return;
+          td.style.padding='2px 4px';
+        });
+        if(body.scrollHeight<=limit) continue;
+      }
       // 넘쳤다 → ① 표면 행 단위로 잘라 이 장을 채우고 남은 행은 다음 장으로
       var rest=(nd.nodeType===1&&nd.tagName==='TABLE')?_splitTableToFit(nd,body,limit):null;
       if(rest){ queue.unshift(rest); }
@@ -7708,7 +8311,7 @@ function fillCommittee(root,f,sites){
        사용자대표·근로자대표도 위원이 되면서, 두 길이 서로 다른 명단을 보게 됐다 —
        원본 .hwp 에는 사업장 대표가 안 들어가고 초안에만 들어가는 꼴이었다.
        _prepCommittee 하나만 본다. */
-  var pick=function(side){ return _prepCommittee(f,side,sites); };
+  var pick=function(side){ return _prepCommittee(f,side,sites); }, hasGrid=false;
   var trs=[].slice.call(root.querySelectorAll('tr'));
   ['근로자측','사용자측'].forEach(function(side){
     var at=-1;
@@ -7717,7 +8320,7 @@ function fillCommittee(root,f,sites){
       if(t0.indexOf(side)>=0){ at=i; break; }
     }
     if(at<0) return;
-    var list=pick(side);
+    hasGrid=true; var list=pick(side);
     /* ★ 격자보다 많으면 «이름을 앞장에 흘리지 않는다» — 예순 명 중 셋만 찍히면
          서식이 다 찬 것처럼 보인 채로 관청에 나간다. 첫 줄에 「별지 명단과 같음」만 적고
          나머지 줄은 비워 둔다(뒷장의 별지가 진짜 명단이다). */
@@ -7740,6 +8343,7 @@ function fillCommittee(root,f,sites){
     }
   });
   /* 별지를 «뒷장»에 붙인다 — data-newpage 가 있으면 쪽 나누기가 새 장에서 시작한다 */
+  if(!hasGrid) return;
   if(_cmAnnexNeeded(f,sites)){
     var ax=document.createElement('div');
     ax.setAttribute('data-newpage','1'); ax.setAttribute('data-kept','1');
@@ -8761,7 +9365,10 @@ function fillChecklistDoc(root,f,sites){
         return sd?(sd+' '+군):군;
       })(),
       '공동기금법인명': f.name||'',
-      '공동기금참여회사': act.map(function(x){ return x.name; }).filter(Boolean).join(', '),
+      '공동기금참여회사': (function(){
+        var ns=act.map(function(x){ return x.name; }).filter(Boolean);
+        return ns.length>8?(ns.slice(0,5).join(', ')+' 외 '+(ns.length-5)+'개소'):ns.join(', ');
+      })(),
       '기금인가번호(인가일자)': f.inka_no?(f.inka_no+(f.inka_date?' ('+_dotDate(f.inka_date)+')':'')):'',
       '업종':          '',                                   // 기금 자료에 없다 — 사람이 적는다
       '참여회사근로자수': emp?emp+'명':'',
@@ -8987,6 +9594,8 @@ function fillFundTypeWords(root,ftype,kind,fname){
   walk(root);
 }
 function hwpFormHTML(kind,f,sites){
+  if(typeof _sitesFill==='function') sites=_sitesFill(f,sites);
+  if(typeof _fundFill==='function') f=_fundFill(f||{},sites||[]).f;
   var ftype=(f.fund_type==='사내')?'사내':'공동';
   var key=(kind==='charter'&&ftype==='사내')?'charter_sane':kind;   // 정관은 공동/사내 원본이 다름
   var T=(window.HWP_FORMS||{})[key]; if(!T) return null;
@@ -8996,6 +9605,11 @@ function hwpFormHTML(kind,f,sites){
                               .replace(/\[V\] 공동근로복지기금법인/g,'[ ] 공동근로복지기금법인');
   var d=document.createElement('div'); d.innerHTML=html;
   /* 공동/사내 말을 «맨 먼저» 맞춘다 — 아래 채우기들이 모두 맞춰진 글 위에서 돌게 한다 */
+  [].slice.call(d.querySelectorAll('tr')).forEach(function(tr){
+    if((tr.textContent||'').replace(/\s+/g,'')) return;
+    var hasH=[].some.call(tr.children,function(td){ return /height\s*:/.test(td.getAttribute('style')||''); });
+    if(!hasH) tr.setAttribute('data-hwp-sep','1');
+  });
   fillFundTypeWords(d,ftype,kind,f.name);
   /* 남의 값을 «가장 먼저» 걷어낸다 — 걷어낸 자리가 곧 채울 자리가 된다 */
   /* ⚠ 차례가 중요하다. 지원신청서는 «박힌 값을 우리 값으로 바꾸는» 방식이라
@@ -9172,6 +9786,8 @@ function fillDerived(root,f,sites,kind){
     ['reg_apply', _rx('^\\d+호(제한규정)'), function(){ return '제한규정'; }],
     /* 원본에 박힌 «남의 관할 등기소» — 밑줄이 아니라 글자로 남아 있어 걷어내기가 못 잡았다 */
     ['reg_apply', /서울남부지방법원 귀중/, function(){ return (f.registry_office||'＿＿＿＿＿＿')+' 귀중'; }],
+    ['reg_seal', /지방법원\s*등기소\s*귀중/, function(){ return f.registry_office?(f.registry_office+' 귀중'):''; }],
+    ['reg_sealcard', /(?:지방법원|법원)\s*등기소\s*귀중/, function(){ return f.registry_office?(f.registry_office+' 귀중'):''; }],
     ['reg_accept', _rx('본인은 '+W+' '), function(){ return meetD?'본인은 '+meetD+' ':''; }],
     ['reg_accept', _rx('서기 '+W), function(){ return '서기 '+todayDot; }],
     ['reg_roster', _rx('대표자 : '+W6+' \\(법인인감\\)'), function(){ return boss?'대표자 : '+boss+' (법인인감)':''; }],
@@ -9258,11 +9874,13 @@ function fillDerived(root,f,sites,kind){
   while((n=walker.nextNode())) nodes.push(n);
   nodes.forEach(function(tn){
     var t=tn.nodeValue; if(!t) return;
+    /* 한글 제어문자(\u0018 등) 제거 — 표 칸(td) 안에서도 줄맞춤이 어긋나지 않게 */
+    if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(t)){ t=t.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]+/g,' '); tn.nodeValue=t; }
     /* 「1004호」 — 남의 주소 끝 호수가 «혼자 선 글자마디»로 남아 있다. 앞 규칙은 밑줄과 같은
        마디에서만 물어 이걸 못 걷었고, 우리 주소 뒤에 「…대로 11004호」로 붙어 나갔다(실제로 그랬다).
        ⚠ 「제7호서식」「제1호 의안」은 마디에 다른 글자가 있어 여기 안 걸린다. */
     if(kind==='reg_apply'&&/^\s*\d+호\s*$/.test(t)){ tn.nodeValue=''; return; }
-    if(!/[＿_]{2,}|서울남부지방법원/.test(t)) return;
+    if(!/[＿_]{2,}|서울남부지방법원|등기소\s*귀중/.test(t)) return;
     var para=(tn.parentNode&&tn.parentNode.textContent)||'';
     RULES.forEach(function(r){
       /* '*' 는 «어느 서식에나» 같은 꼴로 나오는 자리다(날짜·서명). 서식마다 규칙을 따로
@@ -9358,6 +9976,95 @@ function fillDerived(root,f,sites,kind){
       if(kind==='tax_bizreg'&&lbl==='자본금'&&/^[＿_]+천원$/.test(t)&&amt) td.textContent=_K(amt)+'천원';
       else if(kind==='tax_bizreg'&&lbl==='사업연도'&&/^[＿_]+년도$/.test(t)) td.textContent=yr+'년도';
       else if(kind==='tax_lease'&&lbl==='법인번호'&&/^[＿_]{6}-[＿_]{7}$/.test(t)&&f.corp_reg_no) td.textContent=f.corp_reg_no;
+    });
+  }
+  /* ★ 표 안 제목 크기·자간 및 등기신청서(캡쳐2) 하단 신청인·대리인·관할등기소 열 정렬 보정 */
+  [].slice.call(root.querySelectorAll('td')).forEach(function(td){
+    var tr=td.parentNode, rIdx=(tr&&typeof tr.rowIndex==='number')?tr.rowIndex:99;
+    var tx=String(td.textContent||'').replace(/\s+/g,' ').trim();
+    if(rIdx<=2&&!td.querySelector('table,br')&&/^(?:특수법인\s*설립등기\s*신청|인감\s*[․·ㆍ]\s*개인\(改印\)\s*신고서|인감카드\s*등\s*\(재\)발급신청서|등록에\s*대한\s*등록면허세\s*신고서|(?:사내|공동|사내\(공동\))?근로복지기금(?:법인)?\s*(?:기본재산\s*총액\s*변경\s*내용\s*보고서|지원신청서|지원사업\s*착안사항\s*자율\s*체크리스트))$/.test(tx)){
+      td.style.fontSize='18px'; td.style.fontWeight='700'; td.style.letterSpacing='2px'; td.style.textAlign='center'; td.style.padding='8px 6px';
+    }
+    if(kind==='reg_apply'&&/1\.\s*취임승낙서|6\.\s*정관/.test(tx)){
+      td.style.lineHeight='175%'; td.style.padding='8px 12px'; td.style.verticalAlign='top';
+    }
+    if(kind==='reg_apply'&&/신청인[\s\S]*대리인[\s\S]*귀중/.test(tx)){
+      var rawLines=String(td.innerHTML||'').split(/<br\s*\/?>/i);
+      var dateH='', bodyH=[], courtH='';
+      rawLines.forEach(function(frag){
+        var tmp=document.createElement('div'); tmp.innerHTML=frag;
+        var ln=String(tmp.textContent||'').replace(/[\u0000-\u001f]+/g,' ').replace(/\s+/g,' ').trim();
+        if(!ln) return;
+        var m;
+        if(!dateH&&(/^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?$/.test(ln)||/^20[\s.\d＿_]+$/.test(ln))){
+          dateH='<div style="text-align:center;font-size:14px;letter-spacing:1.5px;margin:4px 0 12px">'+esc(ln)+'</div>';
+        } else if(/귀중$/.test(ln)){
+          courtH='<div style="margin-top:14px;text-align:center;font-size:16px;font-weight:700;letter-spacing:2px">'+esc(ln)+'</div>';
+        } else if((m=ln.match(/^신청인\s+상\s*호\s*(.*)$/))){
+          bodyH.push('<div style="display:flex;align-items:baseline"><span style="display:inline-block;width:58px;font-weight:600;flex:none">신청인 </span><span style="display:inline-block;width:74px;letter-spacing:1px;flex:none">상 호 </span><span style="flex:1;word-break:keep-all">'+esc(m[1]||'')+'</span></div>');
+        } else if((m=ln.match(/^본\s*점\s*(.*)$/))){
+          bodyH.push('<div style="display:flex;align-items:baseline"><span style="display:inline-block;width:58px;flex:none"></span><span style="display:inline-block;width:74px;letter-spacing:1px;flex:none">본 점 </span><span style="flex:1;word-break:keep-all">'+esc(m[1]||'')+'</span></div>');
+        } else if((m=ln.match(/^이사\s*성\s*명\s*(.*)$/))){
+          bodyH.push('<div style="display:flex;align-items:baseline"><span style="display:inline-block;width:58px;flex:none"></span><span style="display:inline-block;width:74px;flex:none">이사 성 명 </span><span style="flex:1">'+esc(m[1]||'')+'</span></div>');
+        } else if((m=ln.match(/^대리인\s*성\s*명\s*(.*)$/))){
+          bodyH.push('<div style="display:flex;align-items:baseline;margin-top:2px"><span style="display:inline-block;width:58px;font-weight:600;flex:none">대리인 </span><span style="display:inline-block;width:74px;flex:none">성 명 </span><span style="flex:1">'+esc(m[1]||'')+'</span></div>');
+        } else if((m=ln.match(/^주\s*소\s*(.*)$/))){
+          bodyH.push('<div style="display:flex;align-items:baseline"><span style="display:inline-block;width:58px;flex:none"></span><span style="display:inline-block;width:74px;letter-spacing:1px;flex:none">주 소 </span><span style="flex:1;word-break:keep-all">'+esc(m[1]||'')+'</span></div>');
+        } else {
+          bodyH.push('<div>'+esc(ln)+'</div>');
+        }
+      });
+      if(bodyH.length){
+        td.style.textAlign='left'; td.style.lineHeight='190%'; td.style.padding='10px 18px 14px'; td.style.verticalAlign='top'; td.style.height='auto';
+        td.innerHTML=dateH+'<div style="width:78%;margin:0 0 0 auto;text-align:left;font-size:13.5px;line-height:2.05">'+bodyH.join('')+'</div>'+courtH;
+      }
+    }
+  });
+  [].slice.call(root.querySelectorAll('tr[data-hwp-sep="1"]')).forEach(function(tr){
+    [].slice.call(tr.children).forEach(function(td){
+      td.style.height='2pt'; td.style.padding='0'; td.style.fontSize='0'; td.style.lineHeight='0';
+    });
+  });
+  [].slice.call(root.children).forEach(function(el){
+    if(el.tagName==='BR') el.remove();
+  });
+  var _topTbls=[].slice.call(root.querySelectorAll('table')).filter(function(t){ return !t.parentNode||!t.parentNode.closest('table'); });
+  if(kind==='reg_apply'){
+    if(_topTbls[0]){
+      [].slice.call(_topTbls[0].querySelectorAll('td')).forEach(function(td){
+        var st=td.getAttribute('style')||'';
+        var mh=/height\s*:\s*([\d.]+)\s*pt/i.exec(st);
+        if(mh && parseFloat(mh[1])>160){
+          td.style.height='auto';
+          [].slice.call(td.querySelectorAll('p')).forEach(function(p){ p.style.lineHeight='148%'; p.style.margin='1px 0'; });
+        }
+      });
+    }
+    if(_topTbls[1]){ _topTbls[1].setAttribute('data-newpage','1'); _topTbls[1].setAttribute('data-kept','1'); }
+  }
+  if((kind==='tax_bizreg'||kind==='tax_hometax')&&_topTbls[1]){
+    _topTbls[1].setAttribute('data-newpage','1'); _topTbls[1].setAttribute('data-kept','1');
+  }
+  if(kind==='ops_asset_change'){
+    [].slice.call(root.querySelectorAll('p')).forEach(function(p){
+      if(!p.closest('table')&&/기\s*본\s*재\s*산\s*목\s*록/.test(p.textContent||'')){
+        p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1');
+      }
+    });
+  }
+  if(kind==='minutes'){
+    [].slice.call(root.querySelectorAll('p')).forEach(function(p){
+      if(!p.closest('table')&&/^[\s\-–—]*의\s*안\s*1\s*호/.test((p.textContent||'').trim())){
+        p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1');
+      }
+    });
+    _topTbls.forEach(function(tb){
+      var tx=(tb.textContent||'');
+      if(/별지\s*제13호서식|\(\s*앞\s*쪽\s*\)/.test(tx)||tb.getAttribute('data-kept')==='1'){
+        tb.setAttribute('data-newpage','1'); tb.setAttribute('data-kept','1');
+      } else if(/^\s*\(\s*뒤\s*쪽\s*\)\s*$/.test(tx)){
+        [].slice.call(tb.querySelectorAll('td')).forEach(function(td){ td.style.height='auto'; td.style.padding='2px 4px'; });
+      }
     });
   }
 }
@@ -9476,9 +10183,12 @@ function _closeFigures(yr){
      글자 그대로 'note docnote' 를 쓴다. */
 function docBody(kind,f,sites){
   sites=sites||[];
+  if(typeof _sitesFill==='function') sites=_sitesFill(f,sites);
+  if(typeof _fundFill==='function') f=_fundFill(f||{},sites||[]).f;
   /* 설립 서류(_estabKind 와 같은 규칙)만 탈퇴한 곳도 — 그 밖은 뺀다 */
   if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=sites.filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
+  if(/^req_(inka|reg|tax|ops|subsidy|dis)$/.test(String(kind||''))) return reqDocSheetHTML(String(kind).slice(4),f,sites);
   if(/^dis_/.test(String(kind||''))) return _dsDocHTML(kind,f,sites);
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
@@ -10069,7 +10779,7 @@ function docBody(kind,f,sites){
   return "<p class='note'>※ 이 서식은 <b>원본 파일을 등록해야</b> 만들어집니다 — 자동생성 초안이 없는 서식입니다.</p>"
     +'<div class="msg warn" style="font-size:12.5px;line-height:1.6">'
     +'<b>'+esc(docLabel(kind))+'</b> 원본이 아직 등록되지 않았습니다.<br>'
-    +'왼쪽 <b>서식</b> 메뉴에서 원본(.hwp·.xlsx)을 한 번 등록하면, 그다음부터 이 자리에 원본 그대로 나오고 기금 자료가 자동으로 채워집니다.<br>'
+    +'왼쪽 <b>서식</b> 메뉴에서 원본 한글(.hwp·.hwpx)을 한 번 등록하면, 그다음부터 이 자리에 원본 그대로 나오고 기금 자료가 자동으로 채워집니다.<br>'
     +'<span class="muted">원본은 이 브라우저에만 보관됩니다(저장소·서버에 올라가지 않습니다). 다른 PC에서는 그 PC에서 한 번 더 등록해야 합니다.</span>'
     +'</div>'
     /* 왼쪽 메뉴의 서식 항목과 **같은 손짓**을 쓴다(352행) — 한쪽만 고치면 화면이 갈라진다 */
@@ -10098,7 +10808,7 @@ function previewDoc(kind){
   var f=curForm();
   var label=docLabel(kind), ftype=(f.fund_type==='사내')?'사내':'공동';
   showModal('<div class="row"><h2 style="margin:0">'+esc(label)+' — '+esc(f.short_name||f.name)+'</h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'
-    +'<button onclick="docPrintGated()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
+    +'<button onclick="openPureunHangul(\''+kind+'\')" style="background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 새 창에서 직접 연결해 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
     +'<button onclick="saveDocType(\''+kind+'\')" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button> '
     +'<button class="primary" onclick="saveDocEdit(\''+kind+'\')">💾 이 기금</button></div>'
     +'<div class="row" style="margin:6px 0 0;gap:6px"><span class="muted" style="font-size:11px">정렬</span>'+docAlignBar()+'</div>'
@@ -10404,7 +11114,9 @@ function _loadDocInto(kind){ var c=_docCtx(kind), f=c.f;
   var mine=function(){ return S._docToken===token && S._docKind===kind; };
   S._docKind=kind; S._docLayer=null;
   var sitesP=f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:_estabKind(kind)});
-  return Promise.all([sitesP,_docExtra(kind,f)]).then(function(_a){
+  var cardP=(!f._sample&&typeof _ensureCardIdx==='function')?_ensureCardIdx().catch(function(){}):Promise.resolve();
+  var extraP=(!DOC_NEEDS_LEDGER[kind]&&kind!=='bizplan'&&!_docRok())?_docExtra('contrib',f):_docExtra(kind,f);
+  return Promise.all([sitesP,extraP,cardP]).then(function(_a){
     var sites=_a[0];
     if(!mine())return;
     _showDocHTML(docBody(kind,f,sites)); _setDocLayer('gen',c.ftype);
@@ -10456,8 +11168,10 @@ function hwpSidePreview(kind){
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)
       +' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2>'
       +'<span id="hwpSideChip" class="chip ok" style="font-size:10px">원본 한글 틀</span>'+hlp('forms.hwptpl')+'<span style="flex:1"></span>'
+      +'<button onclick="syncSitesToHwpAll()" style="padding:3px 8px" title="참여사업장·기업정보함·출연금 정보를 한글 서식에 자동 채움">⚡ 사업장 자동채움</button> '
       +'<button onclick="S._sideHtml=\''+kind+'\';sidePreview(\''+kind+'\')" style="padding:3px 8px" title="예전 HTML 화면으로 보기">HTML로 보기</button> '
       +'<button onclick="hwpSideDownload()" style="padding:3px 8px" title="한글(HWPX)로 내려받기 — 한글에서 그대로 열립니다">⬇ 한글</button> '
+      +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 10px;background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> '
       +'<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:3px 10px" title="한글 편집기로 열어 고치고 이 기금에 보관합니다">✏ 한글로 고치기</button></div>'
       +'<div id="hwpSideNote" class="muted" style="font-size:11px;margin:0 0 6px"></div>'
       +'<div id="hwpSideView" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto">'+loadingHTML()+'</div>';
@@ -10469,9 +11183,14 @@ function hwpSidePreview(kind){
       note('전에 한글로 고쳐 보관한 것입니다 — 틀에서 새로 채우려면 [✏ 한글로 고치기]에서 고르세요');
       return _b64ToBytes(kept.b64);
     }
-    return _loadSites(fid,{withClosed:_estabKind(kind)}).catch(function(){ return []; }).then(function(sites){
+    return Promise.all([
+      _loadSites(fid,{withClosed:_estabKind(kind)}).catch(function(){ return []; }),
+      typeof _ensureCardIdx==='function'?_ensureCardIdx().catch(function(){}):Promise.resolve()
+    ]).then(function(_sr){
+      var sites=_sr[0];
       S._hwpSideSites=sites;
-      return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
+      var _ex=(!DOC_NEEDS_LEDGER[kind]&&kind!=='bizplan'&&!_docRok())?_docExtra('contrib',f):_docExtra(kind,f);
+      return _ex.catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
     }).then(function(r){
       var msg=[];
       /* ★ 2026-09-27 — 서식에 «다른 사람»이 찍히는 가장 흔한 까닭은 임원 명부의 이사장 줄이
@@ -10519,7 +11238,7 @@ function sidePreview(kind){
   var backHwp=(HWP_TPL_KINDS[kind]&&_hwpTplHasFor(kind,f)&&_hwpTplFits(kind,f)&&!smp)
     ? '<button class="primary" onclick="S._sideHtml=null;sidePreview(\''+kind+'\')" style="padding:3px 8px" title="원본 한글 모양으로 돌아가기">📄 원본 한글로 보기</button> ' : '';
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'+backHwp
-    +'<button onclick="docPrintGated()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
+    +'<button onclick="openPureunHangul(\''+kind+'\')" style="padding:3px 9px;background:#166534;color:#fff;border-color:#166534" title="푸른한글프로그램(hangul.html)을 직접 연결해 표·줄칸·쪽나누기를 편집합니다">🖋 푸른한글프로그램</button> <button onclick="docPrintGated()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
     +(smp?'<p class="muted" style="font-size:11px;margin:0 0 6px">샘플(견본) 편집 중 — [💾 '+ftype+' 공통]이 모든 '+ftype+'기금 기본이 됩니다.</p>':'')
@@ -10584,6 +11303,8 @@ var ESTAB_NEED_SITE=[
 ];
 /* 이 기금에서 «비어 있는» 것을 모은다 — 서식을 그리지 않고 자료만 본다(빠르다) */
 function estabGaps(f,sites){
+  if(typeof _sitesFill==='function') sites=_sitesFill(f,sites);
+  if(typeof _fundFill==='function') f=_fundFill(f||{},sites||[]).f;
   var out=[], live=estabLiveSites(sites);
   ESTAB_NEED.forEach(function(c){
     if(c[4](f||{})) out.push({k:c[0], label:c[1], where:c[2], docs:c[3], n:1, of:1, site:false});
@@ -10620,8 +11341,9 @@ function estabGapHTML(f,sites){
   if(!g.length) return '<div class="msg ok" style="font-size:12px;margin:0 0 8px">'
     +'서식이 읽는 자료가 <b>모두 채워져 있습니다.</b> 아래에 남은 빈칸은 관청이 적는 칸이거나 손으로 쓸 자리입니다.</div>';
   return '<div class="msg warn" style="font-size:12px;margin:0 0 8px">'
-    +'<b>아직 안 적은 자료 '+g.filter(function(x){ return !x.est; }).length+'가지</b> 때문에 아래 서류에 빈칸이 남습니다 — 여기를 채우면 서식이 따라옵니다.'
-    +(g.some(function(x){ return x.est; })?' <b>추정값</b>은 비어 있지 않지만 계산한 값이라 확인이 필요합니다.'+hlp('estab.est'):'')
+    +'<div class="row" style="gap:8px;flex-wrap:wrap"><span><b>아직 안 적은 자료 '+g.filter(function(x){ return !x.est; }).length+'가지</b> 때문에 아래 서류에 빈칸이 남습니다 — 여기를 채우면 서식이 따라옵니다.'
+    +(g.some(function(x){ return x.est; })?' <b>추정값</b>은 비어 있지 않지만 계산한 값이라 확인이 필요합니다.'+hlp('estab.est'):'')+'</span>'
+    +'<span style="flex:1"></span><button class="primary" onclick="syncSitesToHwpAll()" style="padding:2px 9px;font-size:11px">⚡ 사업장 정보 자동채움</button></div>'
     +'<div style="margin-top:6px;overflow-x:auto"><table style="font-size:11.5px">'
     +'<thead><tr><th>비어 있는 것</th><th>적는 곳</th><th>이 서식들이 읽습니다</th></tr></thead><tbody>'
     +g.map(function(x){
@@ -10663,6 +11385,7 @@ function estabBundle(phase){
     +'<span style="flex:1"></span>'
     +(nHwp&&!f._sample?'<button id="bundleHwpBtn" class="primary" onclick="estabBundleHwp(\''+ph[0]+'\')" style="padding:3px 10px" '
       +'title="한글 틀이 있는 '+nHwp+'종을 원본 모양으로 채워 한 묶음(ZIP)으로 받습니다 — 한글에서 열어 그대로 인쇄">⬇ 한글 원본 전부</button> ':'')
+    +'<button onclick="openPureunHangulBundle()" style="padding:3px 10px;background:#166534;color:#fff;border-color:#166534" title="현재 번호 차례 묶음을 푸른한글프로그램(hangul.html)에 직접 연결해 편집·인쇄합니다">🖋 푸른한글프로그램</button> '
     +'<button class="primary" onclick="estabBundlePrint()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
     +'<div id="bundleGap"></div>'
     +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
@@ -10676,11 +11399,14 @@ function estabBundle(phase){
      여기서 «먼저 한 번» 읽어 둔다 — 안 읽으면 그 서식들이 통째로 빈 채로 나간다. */
   var _need=docsFor(ph[2](),f.fund_type||'공동').some(function(d){ return DOC_NEEDS_LEDGER[d[0]]; });
   var _pre=_need ? _docExtra(docsFor(ph[2](),f.fund_type||'공동').filter(function(d){ return DOC_NEEDS_LEDGER[d[0]]; })[0][0], f)
-                 : Promise.resolve(null);
+                 : _docExtra('contrib', f);
   /* 사업계획서(① 인가·⑤ 지원금 묶음에 있다)의 추정재무상태표는 «앞 해 기말»이 바탕 — 묶음도 먼저 읽어 둔다 */
   if(docsFor(ph[2](),f.fund_type||'공동').some(function(d){ return d[0]==='bizplan'; })) _pre=_pre.catch(function(){ return null; }).then(function(){ return _bizBaseLoad(f); });
   _pre.catch(function(){ return null; }).then(function(){
-  return (f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:true}));
+  return Promise.all([
+    f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:true}),
+    (!f._sample&&typeof _ensureCardIdx==='function')?_ensureCardIdx().catch(function(){}):Promise.resolve()
+  ]).then(function(r){ return r[0]; });
   }).then(function(sites){
     /* 빈칸이 «왜» 비는지 먼저 말한다 — 날인은 되돌릴 수 없어서, 찍기 전에 알아야 한다 */
     var gp=$('bundleGap'); if(gp) gp.innerHTML=estabGapHTML(f,sites);
@@ -11486,7 +12212,6 @@ function _syncTopbarH(again){
   var fh=$('fundhead'), ch=document.querySelector('.closehead');
   if(fh){ var h2=Math.round(fh.getBoundingClientRect().height); if(h2>0) _setCssVar('--fundhead-h',h2+'px'); }
   if(ch){ var h3=Math.round(ch.getBoundingClientRect().height); if(h3>0) _setCssVar('--closehead-h',h3+'px'); }
-  var sd=document.querySelector('.sdhead'); if(sd){ var h4=Math.round(sd.getBoundingClientRect().height); if(h4>0) _setCssVar('--sdhead-h',h4+'px'); }
   if(!_topbarRO && window.ResizeObserver){
     _topbarRO=new ResizeObserver(function(){ _syncTopbarH(); });
     _topbarRO.observe(t);
@@ -11675,7 +12400,7 @@ function openFundForms(){ openFundDocs(); }   // 설립 단계 버튼 → 그 �
      12단계 체크리스트(EST_TMPL · funds/{기금}/setup) · 빈 자료(estabGaps) · 서류 묶음 ①~⑤(ESTAB_PHASES).
    ⚠ 사업장은 «설립중 기금 것만» 읽는다 — 몇 곳 안 된다. 못 읽은 기금은 빈 자료를 «?»로 둔다(0 이라고 하면 거짓말).
    ⚠ 기한은 앱이 이미 아는 날짜로만 센다 — 등기는 인가일 + 3주(EST-09 문구 그대로). 모르는 기한은 만들지 않는다. */
-var SD={sites:{}, loading:null, sel:'', flt:'all'};
+var SD={sites:{}, loading:null, sel:'', flt:'all', pop:false, tab:'gap', more:false, ci:{}};
 var SD_GROUPS=[['1. 준비',['EST-01','EST-02','EST-03','EST-04','EST-05','EST-06']],['2. 인가',['EST-07','EST-08']],
   ['3. 등기·세무',['EST-09','EST-10','EST-11']],['4. 운영 전환',['EST-12']]];
 /* 그 단계에서 낼 서류 묶음 — 「지금 할 일」 단추가 이것을 연다 */
@@ -11724,7 +12449,7 @@ function renderSetupDash(){
       return fbDb.ref(NS+'/sites/'+f._id).once('value').then(function(s){ var v=s.val()||{};
         SD.sites[f._id]=Object.keys(v).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }); },
         function(){ SD.sites[f._id]=null; });
-    })).then(function(){ SD.loading=null; if(S.view==='setup') renderSetupDash(); });
+    })).then(function(){ SD.loading=null; if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); } });
   }
   var today=ymd();
   var rows=list.map(function(f){ return {f:f, st:_sdState(f,SD.sites[f._id]||null,today)}; });
@@ -11734,10 +12459,10 @@ function renderSetupDash(){
   var kpi=function(l,n,c){ return '<div style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:96px"><div class="muted" style="font-size:11px">'+l+'</div><b style="font-size:17px'+(c?';color:'+c:'')+'">'+n+'</b></div>'; };
   var chips=SD_FLT.map(function(k){ var on=SD.flt===k[0];
     return '<button class="seg'+(on?' on':'')+'" onclick="sdFlt(\''+k[0]+'\')" style="padding:4px 11px;border-radius:14px'+(on?';background:var(--acc2);color:#fff;border-color:var(--acc2)':'')+'">'+k[1]+(k[0]==='mine'?'':' <b>'+cnt[k[0]]+'</b>')+'</button>'; }).join(' ');
-  var trs=vis.map(function(r,i){ var f=r.f, st=r.st, on=f._id===SD.sel, pct=Math.round(st.nD/st.steps.length*100), nSite=(SD.sites[f._id]||[]).filter(function(s){ return (s.status||'active')!=='closed'; }).length;
+  var trs=vis.map(function(r,i){ var f=r.f, st=r.st, on=SD.pop&&f._id===SD.sel, pct=Math.round(st.nD/st.steps.length*100), nSite=(SD.sites[f._id]||[]).filter(function(s){ return (s.status||'active')!=='closed'; }).length;
     var boxes=st.steps.map(function(t){ var d=st.isD(t[0]), nx=st.next&&st.next[0]===t[0];
       return '<span title="'+esc(_sdNo(t[0])+' '+t[1])+'" style="display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:2px;background:'+(d?'#16a34a':nx?'#fbbf24':'var(--line)')+'"></span>'; }).join('');
-    return '<tr class="'+(on?'rvon':'')+'" onclick="sdSel(\''+f._id+'\')" style="cursor:pointer'+(on?';background:var(--acc-soft)':'')+'">'
+    return '<tr class="'+(on?'rvon':'')+'" data-fid="'+esc(f._id)+'" onclick="sdSel(\''+f._id+'\')" style="cursor:pointer'+(on?';background:var(--acc-soft)':'')+'">'
       +_ckTd()+'<td class="no">'+(i+1)+'</td>'
       +'<td><b>'+esc(f.short_name||f.name||f._id)+'</b><div class="muted" style="font-size:11px">'+esc(f.name||'')+(f.fund_type==='사내'?'':' · 참여 '+nSite+'곳')+'</div></td>'
       +'<td><span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span></td>'
@@ -11747,20 +12472,20 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap">'+_sdDueChip(st)+'</td><td>'+_sdGapChip(st)+'</td>'
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
-  var sel=rows.filter(function(r){ return r.f._id===SD.sel; })[0];
-  $('app').innerHTML='<div class="panel sdhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
-    +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button><button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
+  $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
+    +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button>'
+    +(list.length?'<button onclick="sdTrash()" style="color:var(--danger)" title="□ 로 짚은 기금을 삭제 보관함으로 옮깁니다 — 잘못 만든 중복 기금 정리용. 언제든 복원할 수 있습니다">🗑 선택한 기금 삭제 보관</button>':'')
+    +'<button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
       ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
-        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0 0">'+chips+'</div></div><div class="panel">'
+        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">'+chips+'</div>'
         +(vis.length?'<div class="sdwrap"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
           :'<div class="msg ok" style="font-size:13px">이 거르기에 해당하는 기금이 없습니다.</div>')
-      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div></div><div class="panel" style="display:none">')
-    +'</div>'
-    +(sel?_sdBoard(sel.f,sel.st):'');
+      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div>')
+    +'</div>';
   if(typeof _syncTopbarH==='function') _syncTopbarH();   // 틀 고정 높이를 다시 잰다
 }
-/* 진행판 — 고른 기금 하나 */
+/* 진행판 — 고른 기금 하나. 팝업 안에서 한눈에: 머리 한 줄 → 지금 할 일 띠 → 12단계(4묶음) → 탭(빈 자료 · 서류 묶음) */
 function _sdBoard(f,st){
   var fid=f._id, nx=st.next, curG=nx?SD_GROUPS.filter(function(g){ return g[1].indexOf(nx[0])>=0; })[0]:null;
   var codes=st.steps.map(function(t){ return t[0]; });
@@ -11773,21 +12498,24 @@ function _sdBoard(f,st){
   var due=(st.due&&nx&&nx[0]==='EST-09'&&st.due.d!=null)?' — '+esc(st.due.date.slice(5).replace('-','/'))+'까지 ('+(st.due.d<0?'지남 '+(-st.due.d)+'일':'D-'+st.due.d)+')':'';
   var groups=SD_GROUPS.map(function(g){ var cs=g[1].filter(function(c){ return codes.indexOf(c)>=0; }); if(!cs.length) return '';
     var nd=cs.filter(st.isD).length, cur=curG===g;
-    return '<div style="border:'+(cur?'2px solid #fbbf24;background:var(--warn-bg)':'1px solid var(--line)')+';border-radius:9px;padding:8px 10px">'
-      +'<div class="row" style="justify-content:space-between;margin-bottom:6px"><b style="font-size:12.5px">'+g[0]+'</b><span class="chip '+(nd===cs.length?'ok':cur?'warn':'')+'" style="font-size:10.5px">'+nd+'/'+cs.length+'</span></div>'
+    return '<div style="border:'+(cur?'2px solid #fbbf24;background:var(--warn-bg)':'1px solid var(--line)')+';border-radius:9px;padding:6px 9px">'
+      +'<div class="row" style="justify-content:space-between;margin-bottom:3px"><b style="font-size:12px">'+g[0]+'</b><span class="chip '+(nd===cs.length?'ok':cur?'warn':'')+'" style="font-size:10.5px">'+nd+'/'+cs.length+'</span></div>'
       +cs.map(function(c){ var d=st.isD(c), isN=nx&&nx[0]===c, dt=(st.done[c]||{}).date||'';
-        return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:12px;padding:3px 0;cursor:pointer'+(d?';color:var(--faint);text-decoration:line-through':isN?';font-weight:700;color:var(--warn)':'')+'">'
+        return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:11.5px;padding:1px 0;cursor:pointer'+(d?';color:var(--faint);text-decoration:line-through':isN?';font-weight:700;color:var(--warn)':'')+'">'
           +'<input type="checkbox"'+(d?' checked':'')+' onchange="sdToggle(\''+fid+'\',\''+c+'\',this.checked)" style="margin-top:2px">'
           +'<span>'+_sdNo(c)+' '+esc(nm[c])+(d&&dt?' <small class="muted">'+esc(dt.slice(5).replace('-','/'))+'</small>':'')+'</span></label>'; }).join('')
-      +(g[1].indexOf('EST-12')>=0?'<button onclick="sdOpen(\''+fid+'\',\'setup\')"'+(st.nD>=st.steps.length?' class="primary" style="margin-top:6px"':' disabled style="margin-top:6px;opacity:.5"')+'>✅ 운영 전환 →</button>':'')
+      +(g[1].indexOf('EST-12')>=0?'<button onclick="sdOpen(\''+fid+'\',\'setup\')"'+(st.nD>=st.steps.length?' class="primary" style="margin-top:5px"':' disabled style="margin-top:5px;opacity:.5"')+'>✅ 운영 전환 →</button>':'')
       +'</div>'; }).join('');
+  var gapList=st.gaps||[], showN=(SD.more||gapList.length<=6)?gapList.length:5;
   var gaps=st.gaps==null?'<div class="muted" style="font-size:12px;padding:6px 2px">'+(SD.loading?'참여사업장을 읽는 중…':'참여사업장을 못 읽어 빈 자료를 세지 못했습니다.')+'</div>'
-    :!st.gaps.length?'<div class="msg ok" style="font-size:12px">서식이 읽는 자료가 모두 채워져 있습니다.</div>'
+    :!gapList.length?'<div class="msg ok" style="font-size:12px">서식이 읽는 자료가 모두 채워져 있습니다.</div>'
     :'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>비어 있는 것</th><th>적는 곳</th><th>읽는 서식</th><th></th></tr></thead><tbody>'
-      +st.gaps.map(function(g,i){ return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+esc(g.label)+'</b>'
+      +gapList.slice(0,showN).map(function(g,i){ return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+esc(g.label)+'</b>'
         +(g.site?' <span class="chip warn" style="font-size:10px">'+g.n+'/'+g.of+'곳</span>':'')+(g.est?' <span class="chip" style="font-size:10px">🧮 추정</span>':'')+'</td>'
         +'<td style="white-space:nowrap">'+esc(g.where)+'</td><td class="muted">'+esc(g.docs)+'</td>'
-        +'<td><button onclick="event.stopPropagation();sdOpen(\''+fid+'\',\''+(g.site||g.k==='_sites'?'sites':'info')+'\')" style="padding:2px 8px">✎ 적기</button></td></tr>'; }).join('')+'</tbody></table></div>';
+        +'<td><button onclick="event.stopPropagation();sdOpen(\''+fid+'\',\''+(g.site||g.k==='_sites'?'sites':'info')+'\')" style="padding:2px 8px">✎ 적기</button></td></tr>'; }).join('')
+      +(showN<gapList.length?'<tr><td colspan="6"><button onclick="sdMore()" style="padding:2px 10px">나머지 '+(gapList.length-showN)+'가지 더 보기</button></td></tr>':'')
+      +'</tbody></table></div>';
   var curPh=nx?SD_PHASE[nx[0]]:'';
   var phDone={kinds:'EST-07', reg:'EST-09', tax:'EST-10'};
   var bundles='<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>묶음</th><th>형편</th><th></th></tr></thead><tbody>'
@@ -11797,41 +12525,125 @@ function _sdBoard(f,st){
       return '<tr'+(cur?' style="background:var(--warn-bg)"':'')+'>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td>'+(cur?'<b>'+esc(p[1])+'</b>':esc(p[1]))+'</td><td>'+stt+'</td>'
         +'<td><button'+(cur?' class="primary"':'')+' onclick="event.stopPropagation();sdBundle(\''+fid+'\',\''+p[0]+'\')" style="padding:2px 9px">📑 열기</button></td></tr>'; }).join('')
     +'</tbody></table></div>';
-  return '<div class="panel"><div class="sdbhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
-    +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
+  var tabs=[['gap','📝 빈 자료'+(st.nGap?' '+st.nGap:'')],['bundle','📑 서류 묶음 '+ESTAB_PHASES.length]];
+  var tab=SD.tab==='bundle'?'bundle':'gap';
+  return '<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
+    +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'+ciChip(fid)
     +'<span style="flex:1"></span><button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
-    +'<button onclick="trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button></div>'
-    +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin:10px 0">'
+    +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
+    +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin:10px 0">'
       +'<span>지금 할 일</span><b style="font-size:14px">'+_sdNo(nx[0])+' '+esc(nx[1])+due+'</b><span style="flex:1"></span>'+act+'</div>'
       :'<div class="msg ok" style="margin:10px 0">12단계를 모두 마쳤습니다 — [📂 기금 열기]에서 [✅ 운영 전환]을 누르면 기금 현황으로 옮겨 갑니다.</div>')
-    +'</div><div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px">'+groups+'</div>'
-    +'<div class="sdgrid" style="display:grid;grid-template-columns:1.25fr 1fr;gap:12px">'
-    +'<div><div class="row" style="margin-bottom:6px"><b>📝 빈 자료'+(st.nGap?' '+st.nGap+'가지':'')+'</b>'+hlp('setup.gaps')+'</div>'+gaps+'</div>'
-    +'<div><div class="row" style="margin-bottom:6px"><b>📑 서류 묶음</b>'+hlp('estab.bundle')+'</div>'+bundles+'</div></div></div>';
+    +'<div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+groups+'</div>'
+    +'<div class="row" style="gap:2px;margin:12px 0 8px;border-bottom:1px solid var(--line)">'+tabs.map(function(t){ var on=t[0]===tab;
+      return '<button onclick="sdTab(\''+t[0]+'\')" style="border:0;border-bottom:2px solid '+(on?'var(--acc)':'transparent')+';border-radius:0;background:none;padding:5px 12px'+(on?';font-weight:700':';color:var(--sub)')+'">'+t[1]+'</button>'; }).join('')
+      +(tab==='gap'?hlp('setup.gaps'):hlp('estab.bundle'))+'</div>'
+    +(tab==='gap'?gaps:bundles);
 }
 function _sdPhaseLabel(k){ var p=ESTAB_PHASES.filter(function(x){ return x[0]===k; })[0]; return p?p[1]:k; }
-function sdFlt(k){ SD.flt=k; renderSetupDash(); }
-function sdSel(fid){ SD.sel=fid; renderSetupDash(); }
-function sdReload(){ SD.sites={}; renderSetupDash(); }
+function sdFlt(k){ closeM(); SD.flt=k; renderSetupDash(); }
+function sdReload(){ closeM(); SD.sites={}; renderSetupDash(); }
+/* 줄을 누르면 팝업 — 다시 그릴 때(체크·탭)는 스크롤 자리를 지킨다 */
+function sdSel(fid){ if(SD.sel!==fid){ SD.tab='gap'; SD.more=false; } SD.sel=fid; renderSetupDash(); sdPop(); }
+function sdPop(){
+  var f=funds[SD.sel]; if(!f){ closeM(); SD.pop=false; return; }
+  ciLoad(SD.sel);
+  var box=$('modalbox'), top=box?box.scrollTop:0;
+  var st=_sdState(f,SD.sites[SD.sel]||null,ymd());
+  closeM();
+  showModal(_sdBoard(f,st),{width:920,onclose:function(){ SD.pop=false; if(S.view==='setup') renderSetupDash(); }});
+  SD.pop=true;
+  var nb=$('modalbox'); if(nb&&top) nb.scrollTop=top;
+}
+function sdTab(k){ SD.tab=k; sdPop(); }
+/* 잘못 만든 중복 기금 정리 — □ 로 짚은 줄을 한꺼번에 삭제 보관함으로(데이터는 그대로, 🗑 삭제 보관 탭에서 복원) */
+function sdTrash(){
+  var ids=[].slice.call(document.querySelectorAll('.sdwrap tbody tr')).filter(function(r){ var c=r.querySelector('.ckcol input'); return c&&c.checked; })
+    .map(function(r){ return r.getAttribute('data-fid'); }).filter(function(id){ return id&&funds[id]&&!isTrashed(funds[id]); });
+  if(!ids.length){ toast('삭제할 기금의 □ 를 먼저 짚어 주세요','warn'); return; }
+  var names=ids.map(function(id){ var f=funds[id]; return '· '+(f.short_name||f.name)+(f.name&&f.name!==f.short_name?' ('+f.name+')':''); }).join('\n');
+  confirmM('설립중 기금 '+ids.length+'곳을 삭제 보관함으로 옮길까요?\n\n'+names+'\n\n· 목록·집계에서 빠지지만 데이터는 그대로 보관됩니다.\n· [🗑 삭제 보관] 탭에서 언제든 복원할 수 있습니다.',{ok:'삭제 보관'}).then(function(ok){ if(!ok) return;
+    var v={deleted:true,deleted_at:ymd(),deleted_by:(S.user||'')}, bad=0;
+    Promise.all(ids.map(function(id){ return fbDb.ref(NS+'/funds/'+id).update(v).then(function(){ Object.assign(funds[id],v); },function(){ bad++; }); })).then(function(){
+      toast((ids.length-bad)+'곳을 삭제 보관함으로 옮겼습니다'+(bad?' — 실패 '+bad+'곳':''),bad?'warn':undefined);
+      if(S.view==='setup') renderSetupDash(); renderNav();
+    });
+  });
+}
+function sdMore(){ SD.more=true; sdPop(); }
+
+/* ── 📄 푸른이알피 계약관리 «대기함» (대표 승인 2026-11-07 — 기금 설립을 계약관리 후보로 올린다) ──
+   ⚠ 푸른이알피 장부(contracts)에는 쓰지 않는다 — 우리 쪽 fund_erp/contract_inbox/{기금} 에만 쓴다(장부를 지키려는 오래된 원칙).
+   가져오기·무시·가져온 계약번호(erp·ignored)는 푸른이알피가 적고, 여기서는 읽기만 한다. 금액·수수료는 올리지 않는다.
+   상태는 두 가지뿐: 상담접수(consult) · 계약확정(signed). 계약협의는 푸른이알피에서만 쓴다. */
+var CI_STAGE={consult:'상담접수',signed:'계약확정'};
+function ciRec(f,stage,by){
+  var nm=String(f.name||f.short_name||''), short=String(f.short_name||nm);
+  var co=nm.replace(/\s*(사내|공동)?\s*근로복지기금.*$/,'').replace(/㈜|\(주\)|주식회사/g,'').trim()||nm;
+  return { fundName:nm, shortName:short, fundType:f.fund_type||'', company:co,
+    manager:(f.mgr_main&&f.mgr_main.name)||f.manager||'', brief:(short+' 설립 인가 신청').slice(0,40), stage:stage, by:by||'' };
+}
+/* 후보를 올리거나 상태를 갱신 — 무시된 후보는 건드리지 않고, 이미 가져간 것은 상태만 바꾼다 */
+function ciPost(fid,stage){
+  var f=funds[fid]; if(!f) return Promise.resolve();
+  var ref=fbDb.ref(NS+'/contract_inbox/'+fid);
+  return ref.once('value').then(function(sn){
+    var cur=sn.val()||null;
+    if(cur&&cur.ignored) return cur;
+    var rec=(cur&&cur.erp)?{stage:stage}:ciRec(f,stage,S.user||'');
+    rec.updatedAt=ymd(); if(!cur) rec.createdAt=ymd();
+    return ref.update(rec).then(function(){ return Object.assign({},cur||{},rec); });
+  }).then(function(v){ SD.ci[fid]=v; if(SD.pop&&SD.sel===fid) sdPop(); return v; })
+    .catch(function(e){ toast('계약관리 대기함에 올리지 못했습니다: '+((e&&e.message)||e),'warn'); });
+}
+/* 단계 ① 체크가 바뀔 때 — 이미 올린 후보가 있을 때만 상태를 맞춘다(없는 기금을 몰래 올리지 않는다) */
+function ciStage(fid,on){
+  fbDb.ref(NS+'/contract_inbox/'+fid).once('value').then(function(sn){ if(sn.val()) return ciPost(fid,on?'signed':'consult'); })
+    .catch(function(){});
+}
+function ciLoad(fid){
+  if(SD.ci[fid]!==undefined) return;
+  SD.ci[fid]=0;
+  fbDb.ref(NS+'/contract_inbox/'+fid).once('value').then(function(sn){ SD.ci[fid]=sn.val()||null; if(SD.pop&&SD.sel===fid) sdPop(); },
+    function(){ SD.ci[fid]=undefined; });
+}
+function ciChip(fid){
+  var v=SD.ci[fid]; if(v===0||v===undefined) return '';
+  if(!v) return '<span class="chip" title="푸른이알피 계약관리 대기함에 아직 올리지 않았습니다" style="font-size:10.5px">📄 계약관리: 올리지 않음</span><button onclick="ciUp(\''+fid+'\')" style="padding:1px 8px;font-size:11px">올리기</button>';
+  if(v.ignored) return '<span class="chip" title="푸른이알피에서 «무시»한 후보입니다" style="font-size:10.5px">📄 계약관리: 무시됨</span>';
+  if(v.erp) return '<span class="chip blue" title="푸른이알피 계약관리로 가져왔습니다" style="font-size:10.5px;background:var(--acc-soft);border-color:#bfdbfe">📄 계약관리: 가져옴'+(v.erp.contractNo?' · '+esc(v.erp.contractNo):'')+'</span>';
+  return '<span class="chip warn" title="푸른이알피 계약관리의 «기금 설립에서 온 후보» 띠에서 가져옵니다" style="font-size:10.5px">📄 계약관리: 대기함에 올림('+esc(CI_STAGE[v.stage]||'')+')</span><button onclick="ciDown(\''+fid+'\')" style="padding:1px 8px;font-size:11px">거두기</button>';
+}
+function ciUp(fid){
+  var f=funds[fid]; if(!f) return;
+  ciPost(fid,(f.setup&&f.setup['EST-01']&&f.setup['EST-01'].done)?'signed':'consult').then(function(v){ if(v) toast('계약관리 대기함에 올렸습니다'); });
+}
+function ciDown(fid){
+  var v=SD.ci[fid]; if(!v||v.erp) return;      // 이미 가져간 것은 거둘 수 없다 — 푸른이알피에서 정리
+  confirmM('계약관리 대기함에서 이 후보를 거둘까요?',{ok:'거두기'}).then(function(ok){ if(!ok) return;
+    fbDb.ref(NS+'/contract_inbox/'+fid).remove().then(function(){ SD.ci[fid]=null; if(SD.pop&&SD.sel===fid) sdPop(); toast('후보를 거뒀습니다'); },
+      function(e){ toast('거두지 못했습니다: '+((e&&e.message)||e),'err'); }); });
+}
 /* 단계 체크 — 기금 안 [🏗 설립 진행] 탭(toggleSetup)과 같은 자리·같은 모양으로 쓴다 */
 function sdToggle(fid,code,on){
   var v={done:!!on,date:on?ymd():''};
   fbDb.ref(NS+'/funds/'+fid+'/setup/'+code).set(v).then(function(){
     var t=funds[fid]; if(!t) return; if(!t.setup) t.setup={}; t.setup[code]=v;
-    if(S.view==='setup') renderSetupDash(); renderNav();
+    if(code==='EST-01') ciStage(fid,on);
+    if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); } renderNav();
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
-function sdOpen(fid,tab){ S.fundId=fid; S.view='fund'; S.tab=tab||'setup'; closeSide(); _pushHist(); route(); }
+function sdOpen(fid,tab){ closeM(); S.fundId=fid; S.view='fund'; S.tab=tab||'setup'; closeSide(); _pushHist(); route(); }
 /* EST_LINK 단추를 그 기금에서 — 서식이면 서식 탭, 아니면 그 탭으로 */
 function sdLink(fid,code){
   var lk=EST_LINK[code]; if(!lk) return sdOpen(fid,'setup');
   var m=/goTab\('([a-z]+)'\)/.exec(lk.fn);
   if(m) return sdOpen(fid,m[1]);
-  S.fundId=fid; openFundDocs();
+  closeM(); S.fundId=fid; openFundDocs();
 }
 /* 서류 묶음 — 그 기금의 서식 탭을 연 뒤 묶음 화면을 세운다(묶음은 서식 탭 옆 칸에 그려진다) */
 function sdBundle(fid,phase){
-  S.fundId=fid; closeSide(); openFundDocs();
+  closeM(); S.fundId=fid; closeSide(); openFundDocs();
   var t0=Date.now();
   (function tick(){
     if(S.view==='fund'&&S.fundId===fid&&S.tab==='docs'&&$('formSide')) return estabBundle(phase);
@@ -11918,6 +12730,7 @@ function toggleSetup(code,on){ var _fid=S.fundId;
   fbDb.ref(NS+'/funds/'+_fid+'/setup/'+code).set({done:on,date:on?ymd():''}).then(function(){
     var t=funds[_fid]; if(!t) return;   // 다른 탭에서 삭제됐으면 로컬 반영 생략(유령 객체 방지)
     if(!t.setup)t.setup={}; t.setup[code]={done:on,date:on?ymd():''};
+    if(code==='EST-01') ciStage(_fid,on);
     if(S.fundId===_fid) renderFund();
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
@@ -12211,7 +13024,7 @@ function openSitePeoplePick(){
         /* ★ company 로 담는다 — 명부의 «소속 회사» 칸이 그 이름을 읽는다(_offRow). */
         _spkList.push({role:t[0],name:t[1],title:t[2]||'',birth:t[3]||'',company:t[5]||'',site:st.name||''});
         var dup=have[String(t[1]).trim()];
-        rows.push('<tr><td style="text-align:center"><input type="checkbox" id="spk-'+i+'"'+(dup?' disabled':'')+'></td>'
+        rows.push('<tr><td style="text-align:center"><input type="checkbox" id="spk-'+i+'"'+(dup?' disabled':'')+'></td><td class="no">'+(i+1)+'</td>'
           +'<td>'+esc(st.name||'')+'</td><td>'+esc(t[0])+'</td>'
           +'<td class="muted" style="font-size:11px">'+esc(t[4]||'')+'</td>'
           +'<td style="font-weight:600">'+esc(t[1])+'</td><td class="muted">'+esc(t[2]||'')+'</td>'
@@ -12222,7 +13035,7 @@ function openSitePeoplePick(){
     var b=$('spk-body'); if(!b) return;
     b.innerHTML = rows.length
       ? '<div style="max-height:56vh;overflow:auto"><table style="font-size:12.5px"><thead><tr>'
-        +'<th style="width:34px"></th><th>사업장</th><th>측</th><th title="그 사업장에서 어떤 자리의 사람인가">자리</th>'
+        +'<th style="width:34px"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th><th>측</th><th title="그 사업장에서 어떤 자리의 사람인가">자리</th>'
         +'<th>성명</th><th>직위</th><th>생년월일</th><th></th>'
         +'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
         +'<div class="row" style="justify-content:flex-end;margin-top:12px">'
@@ -13241,7 +14054,7 @@ function bizregBulkReview(){
     var on=!!(r.name&&!dup&&!r._err);
     r._on=on;
     return '<tr'+(on?'':' style="background:#f8fafc"')+'>'
-      +'<td style="text-align:center"><input type="checkbox" id="bb-on-'+i+'"'+(on?' checked':'')+'></td>'
+      +'<td style="text-align:center"><input type="checkbox" id="bb-on-'+i+'"'+(on?' checked':'')+'></td><td class="no">'+(i+1)+'</td>'
       +'<td><input id="bb-name-'+i+'" value="'+esc(r.name||'')+'" placeholder="상호"'
         +' style="width:130px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px"></td>'
       +'<td><input id="bb-ceo-'+i+'" value="'+esc(r.ceo||'')+'" placeholder="대표자"'
@@ -13258,7 +14071,7 @@ function bizregBulkReview(){
     +'<span class="chip warn" style="font-size:10.5px">OCR</span>'+hlp('site.bulkdoc')+'</div>'
     +'<div class="msg warn" style="font-size:12px">여기서 만든 <b>상호가 설립합의서·정관·기금출연확인서에 그대로</b> 나갑니다. 표에서 고친 뒤 만드세요.</div>'
     +'<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px">'
-    +'<table style="font-size:11.5px"><thead><tr><th style="width:34px">만듦</th><th>상호</th><th>대표자</th>'
+    +'<table style="font-size:11.5px"><thead><tr><th style="width:34px">만듦</th><th class="no">번호</th><th>상호</th><th>대표자</th>'
     +BB_COLS.slice(1).map(function(c){ return '<th>'+c[1]+'</th>'; }).join('')+'<th>판정</th></tr></thead>'
     +'<tbody>'+body+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:14px">'
@@ -13416,7 +14229,7 @@ function wrepBulkShow(){
   var sites=(_fundSitesId(B.fid)||[]).filter(function(s){ return s&&s.status!=='closed'; }), byId={}; sites.forEach(function(s){ byId[s._id]=s; });
   var opt=function(sel){ return '<option value="">— 넣지 않음 —</option>'+sites.map(function(s){ return '<option value="'+s._id+'"'+(sel===s._id?' selected':'')+'>'+esc(s.name||'')+'</option>'; }).join(''); };
   var body=B.rows.map(function(r,i){ var s=byId[r.sid], p=r.sid?_wrepBulkPatch(r.o,s,r.side||'w'):{};
-    return '<tr><td style="font-size:11px">'+esc(r.label)+(r.ocr?' <span class="chip warn" style="font-size:9.5px">OCR</span>':'')+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-size:11px">'+esc(r.label)+(r.ocr?' <span class="chip warn" style="font-size:9.5px">OCR</span>':'')+'</td>'
       +'<td>'+esc(r.o.wrep_name||'—')+'<div class="muted" style="font-size:10.5px">'+esc(r.o.wrep_co||'')+(r.o.wrep_title?' · '+esc(r.o.wrep_title):'')+'</div></td>'
       +'<td style="font-size:11px">'+(r.o.wrep_addr?esc(_relAddrMask(r.o.wrep_addr)):'<span class="muted">주소 없음</span>')+'</td>'
       +'<td><select onchange="_wrepBulk.rows['+i+'].sid=this.value;wrepBulkShow()" style="max-width:170px;font-size:11.5px">'+opt(r.sid)+'</select>'
@@ -13429,8 +14242,8 @@ function wrepBulkShow(){
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><h2 style="margin:0">📁 재직증명서 '+B.rows.length+'장 읽음</h2>'+hlp('wrep.bulk')
     +(B.fail.length?'<span class="chip dg" title="'+esc(B.fail.join('\n'))+'">못 읽음 '+B.fail.length+'</span>':'')+'</div>'
-    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th>서류</th><th>사람</th><th>집 주소(동까지)</th><th>사업장</th><th>역할</th><th>채울 칸</th></tr></thead><tbody>'
-    +(body||'<tr><td colspan="6" class="muted">읽은 사람이 없습니다</td></tr>')+'</tbody></table></div>'
+    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>서류</th><th>사람</th><th>집 주소(동까지)</th><th>사업장</th><th>역할</th><th>채울 칸</th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="8" class="muted">읽은 사람이 없습니다</td></tr>')+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_wrepBulk=null;closeM()">닫기</button>'
     +'<button class="primary" onclick="wrepBulkApply()"'+(n?'':' disabled')+'>'+n+'곳 채우기</button></div>',{wide:true});
 }
@@ -13568,7 +14381,7 @@ function cmImportShow(){
   var opt=function(sel){ return '<option value="">— 사업장 밖 —</option>'+sites.map(function(s){ return '<option value="'+s._id+'"'+(sel===s._id?' selected':'')+'>'+esc(s.name||'')+'</option>'; }).join(''); };
   var LB={wrep_name:'이름',urep_name:'이름',urep_same:'대표자와 같음',wrep_title:'직위',urep_title:'직위',wrep_birth:'생년월일',urep_birth:'생년월일'};
   var body=B.rows.map(function(r,i){ var p=r.sid?_cmPatch(r.p,byId[r.sid]):{};
-    return '<tr><td>'+esc(r.p.side)+'</td><td>'+esc(r.p.name)+'</td><td>'+esc(r.p.birth||'')+'</td><td>'+esc(r.p.title||'')+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(r.p.side)+'</td><td>'+esc(r.p.name)+'</td><td>'+esc(r.p.birth||'')+'</td><td>'+esc(r.p.title||'')+'</td>'
       +'<td><select onchange="_cmImp.rows['+i+'].sid=this.value;_cmImp.rows['+i+'].keep=!this.value;_cmImp.rows['+i+'].why=this.value?\'직접 고름\':\'사업장 밖\';cmImportShow()" style="max-width:170px;font-size:11.5px">'+opt(r.sid)+'</select>'
       +'<div class="muted" style="font-size:10.5px">'+esc(r.why||'')+'</div></td>'
       +'<td style="font-size:11px">'+(r.sid
@@ -13578,8 +14391,8 @@ function cmImportShow(){
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><h2 style="margin:0">📋 위원 '+B.rows.length+'명 읽음</h2>'+hlp('cm.import')
     +(B.fail.length?'<span class="chip dg" title="'+esc(B.fail.join('\n'))+'">못 읽음 '+B.fail.length+'</span>':'')+'</div>'
-    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>사업장</th><th>채울 칸</th></tr></thead><tbody>'
-    +(body||'<tr><td colspan="6" class="muted">읽은 위원이 없습니다</td></tr>')+'</tbody></table></div>'
+    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>사업장</th><th>채울 칸</th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="8" class="muted">읽은 위원이 없습니다</td></tr>')+'</tbody></table></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_cmImp=null;closeM()">닫기</button>'
     +'<button class="primary" onclick="cmImportApply()"'+((nS||nK)?'':' disabled')+'>'+nS+'곳 채우기'+(nK?' · '+nK+'명 담기':'')+'</button></div>',{wide:true});
 }
@@ -13616,10 +14429,10 @@ function cmExtraShow(){
   var fid=S.fundId, L=(funds[fid]||{}).prep_committee||[];
   closeM();   /* 고를 때마다 다시 그린다 — 앞 창(읽는 중 창 포함)을 닫아야 겹쳐 쌓이지 않는다 */
   showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0">사업장 밖 위원 '+L.length+'명</h2>'+hlp('cm.import')+'</div>'
-    +'<table><thead><tr><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>회사</th><th></th></tr></thead><tbody>'
-    +(L.map(function(o,i){ return '<tr><td>'+esc(o.side||'')+'</td><td>'+esc(o.name||'')+'</td><td>'+esc(o.birth||'')+'</td><td>'+esc(o.title||'')+'</td><td>'+esc(o.company||'')+'</td>'
+    +'<table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>측</th><th>성명</th><th>생년월일</th><th>직책</th><th>회사</th><th></th></tr></thead><tbody>'
+    +(L.map(function(o,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(o.side||'')+'</td><td>'+esc(o.name||'')+'</td><td>'+esc(o.birth||'')+'</td><td>'+esc(o.title||'')+'</td><td>'+esc(o.company||'')+'</td>'
       +'<td><button onclick="cmExtraDel('+i+')" title="이 위원을 명단에서 뺍니다" style="padding:2px 7px;font-size:11px">✕</button></td></tr>'; }).join('')
-      ||'<tr><td colspan="6" class="muted">없습니다</td></tr>')+'</tbody></table>'
+      ||'<tr><td colspan="8" class="muted">없습니다</td></tr>')+'</tbody></table>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">닫기</button></div>');
 }
 function cmExtraDel(i){
@@ -13785,10 +14598,10 @@ function bulkSiteCards(){
     +(noCard.length?'<p class="muted" style="font-size:11.5px;margin:0 0 8px">짝지을 카드가 없어 제외 '+noCard.length+'곳: '
       +esc(noCard.slice(0,8).join(', '))+(noCard.length>8?' 외':'')+'</p>':'')
     +'<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table style="font-size:11.5px"><thead><tr>'
-    +'<th>사업장</th><th>기업정보함 카드</th>'+SITE_BULK.map(function(c){return '<th>'+c[1]+'</th>';}).join('')
+    +'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th><th>기업정보함 카드</th>'+SITE_BULK.map(function(c){return '<th>'+c[1]+'</th>';}).join('')
     +'<th>담당자</th></tr></thead><tbody>'
-    +rows.map(function(r){
-      return '<tr><td style="font-weight:600;white-space:nowrap">'+esc(r.name||'')+'</td>'
+    +rows.map(function(r,i){
+      return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600;white-space:nowrap">'+esc(r.name||'')+'</td>'
         +'<td class="muted" style="white-space:nowrap">'+esc(r.card||'')+'</td>'
         +SITE_BULK.map(function(c){ var v=r.cell[c[0]];
           return '<td'+(v?'':' class="muted"')+' style="white-space:nowrap">'+(v?esc(v):'—')+'</td>'; }).join('')
@@ -14013,16 +14826,18 @@ function renderCardPick(){
        사업자등록증 여러 장 길과 «같은 규칙»(bizDupOf)을 쓴다. */
   var multi=!!T.multi, sites=(S.sitesFor===_cardPick.fid&&S.sites)||{};
   b.innerHTML='<div style="overflow-x:auto"><table style="table-layout:auto;min-width:100%"><thead><tr>'
-    +(multi?'<th style="width:34px;text-align:center"><input type="checkbox" onchange="cardPickAll(this.checked)" title="보이는 것 모두"></th>':'')
+    +(multi?'<th style="width:34px;text-align:center"><input type="checkbox" onchange="cardPickAll(this.checked)" title="보이는 것 모두"></th>':'<th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th>')
+    +'<th class="no">번호</th>'
     +(many?'<th style="'+nw+'">종류</th>':'')+'<th style="'+nw+'">회사</th>'+(many?'<th style="'+nw+'">담당자</th>':'')
     +'<th style="'+nw+'">사업자번호</th><th style="'+nw+'">대표자</th><th class="mo">소재지</th><th></th></tr></thead><tbody>'
-    +list.slice(0,80).map(function(r){
+    +list.slice(0,80).map(function(r,i){
       var e=cardEffective(r);   // 명함이면 같은 회사 사업자등록증으로 빈 칸을 메운 값
       var dup=multi?bizDupOf({name:r.c,biz_no:e.bz},sites):null;
       return '<tr'+(dup?' style="background:#f8fafc"':'')+'>'
         +(multi?'<td style="text-align:center"><input type="checkbox" class="cardsel" value="'+esc(r._id)+'"'
             +(dup?' disabled title="이미 참여 중입니다 — '+esc(dup.name||'')+'"':'')
-            +' onchange="cardSelCount()"></td>':'')
+            +' onchange="cardSelCount()"></td>':'<td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td>')
+        +'<td class="no">'+(i+1)+'</td>'
         +(many?'<td style="'+nw+'">'+(r.k==='biz'?'<span class="chip ok" style="font-size:10px">사업자</span>'
                                  :'<span class="chip" style="font-size:10px">명함</span>')
             +(dup?' <span class="chip warn" style="font-size:9.5px">이미 있음</span>':'')+'</td>':'')
@@ -15191,7 +16006,7 @@ function sitesPeopleBody(arr){
         +' onclick="event.stopPropagation()" style="width:'+wd+';padding:2px 6px;font-size:11.5px">';
     };
     return '<tr>'
-      +'<td class="no">'+(i+1)+'</td>'
+      +'<td class="ckcol" onclick="event.stopPropagation()"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;cursor:pointer" onclick="editSite(\''+s._id+'\')" title="눌러서 사업장 편집">'+esc(s.name||'—')+'</td>'
       +'<td class="ph muted">'+esc(s.ceo||'—')+'</td>'
       +'<td class="ph muted">'+(c.name?esc(c.name)+(c.position?' · '+esc(c.position):''):'—')+'</td>'
@@ -15233,7 +16048,7 @@ function sitesPeopleBody(arr){
     +(nU<arr.length
       ? '<button onclick="repSameAll()" title="사용자대표를 «회사 대표자와 같음»으로 한 번에 켭니다 — 이름을 따로 적어 둔 곳은 건드리지 않습니다">👤 사용자대표 = 대표자 (한번에)</button>'
       : '')+hlp('site.reps')+'</div>'
-    +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>상호</th>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>상호</th>'
     +'<th class="ph" title="등기부·사업자등록증에 적힌 사람">대표자</th>'
     +'<th class="ph" title="실무 연락 담당자">담당자</th>'
     +'<th title="협의회에 사용자측으로 나오는 사람 — 대표자가 아닐 수 있습니다">사용자대표</th>'
@@ -15685,8 +16500,9 @@ function fundParentBox(f){
     +'<div style="font-size:12px;margin-bottom:10px">모든 사내근로복지기금에는 출연하는 회사가 있습니다. 기금과 회사는 따로 두고, 회사를 이 기금의 참여사업장으로 넣어 잇습니다.</div>';
   if(!_erpCos){ erpCoLoad(); return head+'<div class="muted" style="font-size:12px">업체관리에서 후보를 찾는 중…</div></div>'; }
   var cs=fundParentCands(f,_erpCos);
-  var rows=cs.map(function(x){ var c=x.co;
+  var rows=cs.map(function(x,i){ var c=x.co;
     return '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;white-space:nowrap;overflow:hidden">'
+      +'<input type="checkbox" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:18px;text-align:center">'+(i+1)+'</span>'
       +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">업체관리'
       +(c.puNo?' · '+esc(c.puNo):'')+(c.bizNo?' · '+esc(c.bizNo):'')+(c.ceo?' · 대표 '+esc(c.ceo):'')+'</span>'
       +x.why.map(function(w){ return '<span class="chip warn" style="font-size:10px">'+esc(w)+'</span>'; }).join('')
@@ -15735,8 +16551,9 @@ function erpPickRender(){
   if(!_erpCos){ box.innerHTML='<div class="muted" style="padding:10px">업체관리를 읽는 중…</div>'; return; }
   var hit=erpPickMatch(_erpCos,_erpPick.q);
   box.innerHTML=(hit.length?'':'<div class="muted" style="padding:10px">맞는 회사가 없습니다.</div>')
-    +hit.slice(0,30).map(function(c){
+    +hit.slice(0,30).map(function(c,i){
       return '<div onclick="erpPickChoose(\''+esc(c.id)+'\')" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden">'
+        +'<input type="checkbox" onclick="event.stopPropagation()" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:20px;text-align:center">'+(i+1)+'</span>'
         +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">'
         +[c.puNo,c.bizNo,c.ceo?('대표 '+c.ceo):''].filter(Boolean).map(esc).join(' · ')+'</span>'
         +(c.status&&c.status!=='active'?'<span class="chip dg" style="font-size:10px">'+esc(c.status==='closed'?'종료':c.status)+'</span>':'')+'</div>';
@@ -15905,16 +16722,16 @@ function sitesYearBody(arr){
       return '<td><input value="'+esc(d[c[0]]||'')+'" placeholder="0" onchange="sySet(\''+s._id+'\',\''+c[0]+'\',this.value)" '
         +'style="width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right"></td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(s.name||'—')+(s.partner?' <span class="chip warn" style="font-size:9.5px">협력</span>':'')+'</td>'+tds+'</tr>';
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:600">'+esc(s.name||'—')+(s.partner?' <span class="chip warn" style="font-size:9.5px">협력</span>':'')+'</td>'+tds+'</tr>';
   }).join('');
   return '<div class="row" style="flex-wrap:wrap;margin:0 0 8px">'+hlp('site.years')
     +'<span class="muted" style="font-size:12px">'+S.year+'년</span>'+yearSel()
     +'<span class="stat">출연 '+_n(tot.contrib)+'원</span><span class="stat">근로자 '+_n(tot.workers)+'명</span>'
     +'<span style="flex:1"></span><button onclick="syCopyPrev()">↩ 작년 값 불러오기</button></div>'
-    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="no">번호</th><th>사업장</th>'
+    +(arr.length?'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>사업장</th>'
       +SY_COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join('')+'</tr></thead><tbody>'+rows
       /* 번호 칸이 생겨 몸통은 5칸이다 — 합계 줄도 맞춰야 숫자가 한 칸씩 밀리지 않는다 */
-      +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="2">합계</td><td style="text-align:right">'+_n(tot.contrib)+'</td>'
+      +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td class="ckcol"></td><td colspan="2">합계</td><td style="text-align:right">'+_n(tot.contrib)+'</td>'
       +'<td style="text-align:right">'+_n(tot.workers)+'</td><td style="text-align:right">'+_n(tot.benef)+'</td></tr></tbody></table></div>'
       :'<div class="muted" style="padding:10px">사업장을 먼저 등록하세요.</div>');
 }
@@ -16061,8 +16878,8 @@ function renderSitePend(){
     +'<span class="muted" style="font-size:11.5px;margin-left:6px">인식된 열: '+_sitePend.cols.map(function(c){return LBL[c]||c;}).join(' · ')+'</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="commitSiteXlsx()" style="padding:4px 12px">＋ '+L.length+'개 등록</button>'
     +'<button onclick="_sitePend=null;renderSitePend();dzStat(\'dz-sites\',\'\')" style="padding:4px 10px;margin-left:4px">취소</button></div>'
-    +'<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th>상호</th><th>대표자</th><th>사업자번호</th><th>업종</th><th style="text-align:right">근로자</th><th>소재지</th></tr></thead><tbody>'
-    +show.map(function(s){ return '<tr><td style="font-weight:600">'+esc(s.name)+'</td><td>'+esc(s.ceo||'—')+'</td><td>'+esc(s.biz_no||'—')
+    +'<div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>상호</th><th>대표자</th><th>사업자번호</th><th>업종</th><th style="text-align:right">근로자</th><th>소재지</th></tr></thead><tbody>'
+    +show.map(function(s,i){ return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+esc(s.seq_label||String(i+1))+'</td><td style="font-weight:600">'+esc(s.name)+'</td><td>'+esc(s.ceo||'—')+'</td><td>'+esc(s.biz_no||'—')
       +'</td><td>'+esc(s.biz_type||'—')+'</td><td style="text-align:right">'+esc(s.company_size||'—')+'</td>'
       +'<td class="muted" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.address||'—')+'</td></tr>'; }).join('')
     +'</tbody></table></div>'+(L.length>show.length?'<div class="muted" style="font-size:11.5px;margin-top:4px">…외 '+(L.length-show.length)+'개</div>':'')
@@ -16413,10 +17230,10 @@ function relatedPanel(f){
     +'<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">'+Object.keys(REL_TYPES).map(function(t){
       return '<span class="stat"'+(cnt[t]?' style="color:var(--'+(t==='office'||t==='contact'?'warn':'danger')+');font-weight:700"':'')+'>'+REL_TYPES[t]+' '+(cnt[t]||0)+'</span>'; }).join('')+'</div></div>';
   /* ① 신호 */
-  var sigs=sig.length?sig.map(function(g){ var r=RS[_relKey(g.key)]||{}, k=_relKey(g.key);
+  var sigs=sig.length?sig.map(function(g,i){ var r=RS[_relKey(g.key)]||{}, k=_relKey(g.key);
       var col=r.res==='none'?'var(--ok)':(g.level==='hi'?'var(--danger)':'var(--warn)');
       return '<div style="border:1px solid var(--line);border-left:4px solid '+col+';border-radius:9px;padding:8px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-        +'<span class="chip '+(r.res==='none'?'ok':g.level==='hi'?'dg':'')+'" style="white-space:nowrap">'+REL_TYPES[g.type]+'</span>'
+        +'<input type="checkbox" onchange="this.parentNode.classList.toggle(\'ckon\',this.checked)" title="검토 체크"><span class="no" style="font-weight:700;min-width:20px;text-align:center">'+(i+1)+'</span><span class="chip '+(r.res==='none'?'ok':g.level==='hi'?'dg':'')+'" style="white-space:nowrap">'+REL_TYPES[g.type]+'</span>'
         +'<div style="flex:1;min-width:220px;font-size:12.5px">'+esc(g.text)+(g.mask?' <span class="muted" style="font-size:11px">'+esc(g.mask)+'</span>':'')
         +'<div class="muted" style="font-size:11px">'+esc(g.why)+(r.res?' · <b>'+(r.res==='none'?'관계 없음':'특수관계 맞음')+'</b>'+(r.note?' — '+esc(r.note):'')+' ('+esc(r.by||'')+' '+esc(r.at||'')+')':'')+'</div></div>'
         +'<select onchange="relSigSave(\''+k+'\',this.value)" style="padding:3px 6px;font-size:12px">'
@@ -16433,15 +17250,15 @@ function relatedPanel(f){
   var nAddrMiss=relatedPeople(f,live).filter(function(p){ return !_relAddrKey(p.addr,true); }).length;
   var sec2='<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0;font-size:14px">①-2 사람 모아보기 — 집 주소로 묶기</h2>'
     +'<span class="muted" style="font-size:11px">집 주소가 있는 사람 '+P.length+'명 · 없는 사람 '+nAddrMiss+'명 — [참여사업장 › 👤 사람]에서 재직증명서를 읽거나 적으면 늘어납니다</span></div>'
-    +(keys.length?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>집 주소(동까지만)</th><th>사람</th><th>회사 · 역할</th></tr></thead><tbody>'
+    +(keys.length?(function(){ var pNo=0; return '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th>집 주소(동까지만)</th><th>사람</th><th>회사 · 역할</th></tr></thead><tbody>'
       +keys.map(function(k){ var L=g2[k], n=L.map(function(p){ return p.sid; }).filter(function(v,i,x){ return x.indexOf(v)===i; }).length;
-        return L.map(function(p,i){ return '<tr'+(n>1?' style="background:#fef2f2"':'')+'>'
+        return L.map(function(p,i){ return '<tr'+(n>1?' style="background:#fef2f2"':'')+'>'+_ckTd()+'<td class="no">'+(++pNo)+'</td>'
           +(i===0?'<td rowspan="'+L.length+'"><b>'+esc(_relAddrMask(p.addr))+'</b> '+(n>1?'<span class="chip dg">회사 '+n+'곳</span>':'')+'</td>':'')
           +'<td>'+esc(p.name)+'</td><td>'+esc(p.co)+' · '+esc(p.role)+'</td></tr>'; }).join(''); }).join('')
-      +'</tbody></table></div>':'<div class="muted" style="font-size:12px;margin-top:8px">아직 집 주소가 적힌 사람이 없습니다.</div>')+'</div>';
+      +'</tbody></table></div>'; })():'<div class="muted" style="font-size:12px;margin-top:8px">아직 집 주소가 적힌 사람이 없습니다.</div>')+'</div>';
   /* ② 회사별 확인표 */
-  var rows=live.map(function(s){ var c=RC[s._id]||{}, per=_relIsPersonal(s), n=sig.filter(function(g){ return g.sids.indexOf(s._id)>=0; }).length;
-    return '<tr><td style="text-align:left"><b>'+esc(s.name||'')+'</b>'+(n?' <span class="chip dg" style="font-size:10px">신호 '+n+'</span>':'')+(per?' <span class="muted" style="font-size:10.5px">개인사업자</span>':'')+'</td>'
+  var rows=live.map(function(s,i){ var c=RC[s._id]||{}, per=_relIsPersonal(s), n=sig.filter(function(g){ return g.sids.indexOf(s._id)>=0; }).length;
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="text-align:left"><b>'+esc(s.name||'')+'</b>'+(n?' <span class="chip dg" style="font-size:10px">신호 '+n+'</span>':'')+(per?' <span class="muted" style="font-size:10.5px">개인사업자</span>':'')+'</td>'
       +REL_COLS.map(function(col){ var v=c[col[0]]||((per&&(col[0]==='share'||col[0]==='reg'||col[0]==='invest'))?'na':'');
         return '<td><select onchange="relCoSave(\''+s._id+'\',\''+col[0]+'\',this.value)" style="padding:2px 4px;font-size:11.5px'+(v==='hit'?';color:var(--danger);font-weight:700':v==='sus'?';color:var(--warn);font-weight:700':v==='ok'?';color:var(--ok)':'')+'">'
           +Object.keys(REL_ST).map(function(o){ return '<option value="'+o+'"'+(v===o?' selected':'')+'>'+(col[0]==='cert'&&o==='ok'?'받음':REL_ST[o][0])+'</option>'; }).join('')+'</select></td>'; }).join('')+'</tr>'; }).join('');
@@ -16449,9 +17266,9 @@ function relatedPanel(f){
   var sec3='<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="margin:0;font-size:14px">② 회사별 확인표</h2>'
     +(hit>=2?'<span class="chip dg">「해당」이 '+hit+'곳 — 둘 이상이 특수관계면 지원 제외(운영규정 제7조③)</span>':'')
     +'<span class="muted" style="font-size:11px">칸을 고르면 바로 저장됩니다</span></div>'
-    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="text-align:left">회사</th>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th style="text-align:left">회사</th>'
     +REL_COLS.map(function(col){ return '<th style="text-align:center" title="'+esc(col[2])+'">'+col[1]+'<br><span style="font-weight:400;font-size:10px">'+col[2]+'</span></th>'; }).join('')
-    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="8" class="muted">참여사업장이 없습니다</td></tr>')+'</tbody></table></div></div>';
+    +'</tr></thead><tbody>'+(rows||'<tr><td colspan="10" class="muted">참여사업장이 없습니다</td></tr>')+'</tbody></table></div></div>';
   return head+sec1+sec2+sec3;
 }
 function relSigSave(k,v){
@@ -17760,9 +18577,9 @@ function subsidyDocsPanel(f){
   // ── 기금 단위 11종(+선택 2종) ──
   var need=SUB_REQ_DOCS.filter(function(d){ return !d.opt; });
   var fundDocs=SUB_REQ_DOCS.filter(function(d){ return d.scope==='fund'; });
-  var frows=fundDocs.map(function(d){
+  var frows=fundDocs.map(function(d,i){
     var on=!!fchk[d.k];
-    return '<tr><td style="width:26px"><input type="checkbox"'+(on?' checked':'')+' onchange="subChkFund(\''+d.k+'\',this.checked)"></td>'
+    return '<tr><td style="width:26px"><input type="checkbox"'+(on?' checked':'')+' onchange="subChkFund(\''+d.k+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
       +'<td'+(on?' style="color:#166534;font-weight:600"':'')+'>'+esc(d.n)+(d.opt?' <span class="chip" style="font-size:9.5px">선택</span>':'')+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(d.note||'')+'</td>'
       /* 세 번째 인자는 «누른 사람이 있던 단계». 사업계획서처럼 ①인가와 ⑤지원금에
@@ -17773,7 +18590,7 @@ function subsidyDocsPanel(f){
   var fNeed=fundDocs.filter(function(d){ return !d.opt; }).length;
 
   // ── 참여사별 3종 격자 ──
-  var srows=act.map(function(s){
+  var srows=act.map(function(s,i){
     var d=schk[s._id]||{};
     /* 체크 옆에 사진첩 단추 — 붙어 있으면 📎(원본 보기), 없으면 🖼(사진첩에서 고르기).
        화면에 설명을 깔지 않고 단추의 도움말로 알린다. */
@@ -17785,7 +18602,7 @@ function subsidyDocsPanel(f){
         +'</td>';
     }).join('');
     var miss=SUB_SITE_DOCS.filter(function(c){ return !d[c[0]]; }).length;
-    return '<tr'+(miss?'':' style="background:var(--ok-bg,#f0fdf4)"')+'><td class="muted" style="width:44px">'+esc(s.seq_label||'')+'</td>'
+    return '<tr'+(miss?'':' style="background:var(--ok-bg,#f0fdf4)"')+'>'+_ckTd()+'<td class="no" style="width:44px">'+esc(s.seq_label||String(i+1))+'</td>'
       +'<td>'+esc(s.name||'')+'</td><td style="text-align:right" class="mo">'+((num(s.company_size)||0).toLocaleString())+'</td>'+tds
       +'<td style="text-align:center">'+(miss?'<span class="chip dg" style="font-size:10px">'+miss+'건 부족</span>':'<span class="chip ok" style="font-size:10px">완비</span>')+'</td></tr>';
   }).join('');
@@ -17815,7 +18632,7 @@ function subsidyDocsPanel(f){
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">📁 제출서류 — 기금 단위</h2>'+hlp('sub.docs')+yearSel()+'<span style="flex:1"></span>'
     +'<span class="muted" style="font-size:11px">공식 11종 = 기금 단위 '+fNeed+'종 + 참여사별 '+SUB_SITE_DOCS.length+'종</span>'
     +'<span class="stat'+(fDone===fNeed?' ok':'')+'">'+fDone+'/'+fNeed+'종</span></div>'
-    +'<div style="overflow-x:auto;margin-top:8px"><table><tbody>'+frows+'</tbody></table></div></div>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="width:26px">□</th><th class="no">번호</th><th>서류</th><th>방식</th><th></th></tr></thead><tbody>'+frows+'</tbody></table></div></div>'
 
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">🏢 참여사별 제출서류</h2>'
     +'<span class="muted" style="font-size:11px">중소기업확인서·등기부등본·사업자등록증은 참여사마다 각 1부</span><span style="flex:1"></span>'
@@ -17825,7 +18642,7 @@ function subsidyDocsPanel(f){
         +SUB_SITE_DOCS.map(function(c,i){ return '<button onclick="subChkCol(\''+c[0]+'\')" style="padding:2px 8px;font-size:11px" title="이 열 전체 켜기/끄기">'+esc(c[1])+' '+colDone[i]+'/'+act.length+'</button>'; }).join('')
         +(missSites.length?'<span style="flex:1"></span><button onclick="subCopyMissing()" style="padding:2px 8px;font-size:11px" title="미제출 사업장 명단을 복사(연락용)">📋 미제출 '+missSites.length+'개사 명단</button>':'')
         +'</div>'
-        +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>사업장</th><th style="text-align:right" class="mo">근로자</th>'
+        +'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">번호</th><th>사업장</th><th style="text-align:right" class="mo">근로자</th>'
         +SUB_SITE_DOCS.map(function(c){return '<th style="text-align:center">'+esc(c[1])+'</th>';}).join('')+'<th style="text-align:center">상태</th></tr></thead><tbody>'+srows+'</tbody></table></div>'
       : '<div class="muted" style="padding:12px 2px">참여사업장이 없습니다 — 참여사업장 탭에서 먼저 등록하세요.</div>')
     +'</div>'
@@ -18071,7 +18888,7 @@ function loanTab(f){
   var W=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
   var rows=arr.map(function(l,i){
     var bal=loanBal(l), py=num((l.paid||{})[yr])||0, iy=num((l.int||{})[yr])||0;
-    return '<tr><td class="no">'+(i+1)+'</td>'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td>'
       +'<td style="font-weight:700;white-space:nowrap">'+esc(l.name||'—')+'</td>'
       +'<td class="mo muted" style="white-space:nowrap">'+esc(l.site||'')+'</td>'
       +'<td style="white-space:nowrap">'+esc(l.date||'')+'</td>'
@@ -18109,11 +18926,11 @@ function loanTab(f){
       +' — 근로복지기본법 제78조(이사의 자기거래 금지) 위반 여부 또는 정관상 보편적 근로자 대부 요건 충족 여부를 점검하세요. '
       +'<button onclick="openFundKbItem(\'MOEL-council-02\')" style="padding:1px 7px;font-size:11px">📖 유권해석 보기</button></div>':'')
     +(arr.length
-      ? '<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th class="no">번호</th><th>차용자</th>'
+      ? '<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>차용자</th>'
         +'<th class="mo">사업장</th><th>실행일</th><th style="text-align:right">대부액</th>'
         +'<th style="text-align:right">'+yr+'년 상환</th><th style="text-align:right">'+yr+'년 이자</th><th style="text-align:right">상환 누계</th>'
         +'<th style="text-align:right">잔액</th><th>상태</th><th></th></tr></thead><tbody>'+rows
-        +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="4">합계</td>'
+        +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="5">합계</td>'
         +'<td style="text-align:right">'+W(t.amount)+'</td><td style="text-align:right">'+W(t.paidYr)+'</td><td style="text-align:right">'+W(t.intYr)+'</td>'
         +'<td style="text-align:right">'+W(t.paidAll)+'</td><td style="text-align:right">'+W(t.balance)+'</td>'
         +'<td colspan="2"></td></tr></tbody></table></div>'
@@ -18298,7 +19115,8 @@ function dsLibHTML(cur,fundMode,formRows){
     +(fundMode?'<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:5px 11px">🔁 이 기금에서 진행(변경 이벤트) →</button>':'')+'</div>'
     +ways+'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>단계</th><th>기한</th><th>근거</th><th>서식</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
     +calc
-    +(formRows?'<h3 style="font-size:13px;margin:14px 0 4px">법정서식</h3>'+formRows:'')+'</div>';
+    +(formRows?'<h3 style="font-size:13px;margin:14px 0 4px">법정서식</h3>'+formRows:'')
+    +reqDocsBoxHTML('dis',cur,fundMode)+'</div>';
 }
 function dsCalc(){
   var g=function(id){ var el=$(id); return el?el.value:''; }, r=withdrawShare(g('ds-v'),g('ds-c'),g('ds-t')), o=$('ds-r');
@@ -19729,7 +20547,7 @@ function finCompareView(arr){
   var _tbl=function(title,rows,note){
     return '<div style="min-width:330px;flex:1"><div style="font-weight:700;margin-bottom:6px">'+title+'</div>'
       +'<table>'+head+'<tbody>'
-      +rows.map(function(r){
+      +rows.map(function(r,i){
         if(r.head) return '<tr style="background:var(--bg)"><td colspan="5" style="font-weight:700;letter-spacing:2px">'+esc(r.lbl)+'</td></tr>';
         var pad=r.lvl?('padding-left:'+(r.lvl*14+8)+'px'):'';
         var lbl='<span style="'+pad+'">'+esc(r.lbl)+'</span>';
@@ -21119,7 +21937,6 @@ function _flowZipInto(z,dir,fid,yr,d,has){
     z.file(dir+'01. '+yr+' 결산서+'+(yr+1)+' 사업계획서.xlsx',buf);
     z.file(dir+'06. 법인세·지방소득세 신고 준비표 '+yr+'.xlsx',bb[1]);
     if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
-    if(taxP&&taxP.kind!=='none') z.file(dir+'08. 법인세·지방소득세 신고서(날인용) '+yr+'.html',taxFormsDoc(taxP,f,arrC));
     var R=buildF15(arrC,fid,yr,d.rep,d.sites,d.welf), P=f15Pages(R);
     z.file(dir+'02. 운영상황보고서(별지 제15호) '+yr+'.html','<!doctype html><meta charset=utf-8><title>운영상황보고서 '+yr+'</title><style>'
       +f15CSS('',true)+'</style>'+P.p1+P.p2+'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px">인쇄 / PDF 저장</button>');
@@ -21404,9 +22221,9 @@ function flowSealInfo(){
   var c=S.f15Close||{}, st=flowSealStat(c), yr=S.year;
   showModal('<div class="row" style="margin-bottom:8px"><h2 style="margin:0">'+yr+'년 날인본</h2>'+hlp('close.seal')
     +'<span class="chip '+(st.done?'ok':st.have.length?'warn':'')+'" style="font-size:11px">'+st.have.length+'/'+st.need.length+' 받음</span></div>'
-    +'<table><thead><tr><th class="no">#</th><th>서류</th><th>날인</th><th>받음</th><th></th></tr></thead><tbody>'
+    +'<table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">#</th><th>서류</th><th>날인</th><th>받음</th><th></th></tr></thead><tbody>'
     +FLOW_SEAL.map(function(s,i){ var k=FLOW_SEAL_KEYS[i], d=st.docs[k], need=st.need.indexOf(k)>=0;
-      return '<tr'+(need?'':' class="muted"')+'><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+(need?'':' <span class="muted" style="font-size:10.5px">(해당 없음)</span>')+'</td><td style="font-size:11.5px">'+esc(s[1])+'</td>'
+      return '<tr'+(need?'':' class="muted"')+'><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+(need?'':' <span class="muted" style="font-size:10.5px">(해당 없음)</span>')+'</td><td style="font-size:11.5px">'+esc(s[1])+'</td>'
         +'<td class="mo" style="white-space:nowrap">'+(d&&d.id?'<span class="chip ok" style="font-size:10px">✓ '+esc(String(d.at||'').slice(5))+'</span>':'—')+'</td>'
         +'<td style="white-space:nowrap">'+(d&&d.id
           ?'<button onclick="flowSealView(\''+k+'\')" style="padding:2px 8px;font-size:11px">보기</button> <button onclick="flowSealUnlink(\''+k+'\')" style="padding:2px 8px;font-size:11px;color:var(--danger)">빼기</button>'
@@ -22812,7 +23629,7 @@ function dueMatrixHTML(list0){
         return '<td'+go+' title="'+esc(x.what+' · 기한 '+x.due)+'"><span class="chip warn" style="font-size:10px">D-'+x.days+'</span></td>'; }
       return '<td'+go+' title="'+esc(x.what+' · 기한 '+x.due)+'" class="muted">·</td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="go(\'fund\',\''+f._id+'\')">'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="go(\'fund\',\''+f._id+'\')">'
       +esc(f.short_name||f.name)+'</td>'+tds+'</tr>';
   }).join('');
   var YS=[]; for(var y=yNow;y>=yNow-5;y--) YS.push(y);
@@ -22825,7 +23642,7 @@ function dueMatrixHTML(list0){
     +(worst?'<span class="muted" style="font-size:11.5px">가장 오래 밀린 것: <b>'+esc(worst.name)+'</b> '+esc(worst.what)+' '+worst.days+'일</span>':'')
     +'<span style="flex:1"></span><button onclick="_dueDirty();renderHome()">↻ 새로고침</button></div>'
     +(list.length
-      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="no">번호</th><th>기금</th>'
+      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
         +cols.map(function(t){return '<th style="text-align:center;white-space:nowrap">'+esc(DUE_SHORT[t[0]]||t[0])
           +'<div class="muted mo" style="font-weight:400;font-size:10px">'+esc(t[3][1])+'</div></th>';}).join('')
         +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
@@ -22863,7 +23680,7 @@ function closeMatrixHTML(list0){
         return '<td style="text-align:center;cursor:pointer" onclick="goClosing(\''+fid+'\','+y+')" title="작성 중"><span class="chip warn" style="font-size:10px">작성중</span></td>'; }
       return '<td style="text-align:center;cursor:pointer;color:var(--faint)" onclick="goClosing(\''+fid+'\','+y+')" title="자료 없음 — 눌러서 작성">·</td>';
     }).join('');
-    return '<tr><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer" onclick="go(\'fund\',\''+fid+'\')">'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer" onclick="go(\'fund\',\''+fid+'\')">'
       +esc(f.short_name||f.name)+'<div class="muted mo" style="font-weight:400;font-size:11px">'+esc(f.name||'')+'</div></td>'+tds+'</tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">결산 현황</h2>'+hlp('board.close')
@@ -22872,7 +23689,7 @@ function closeMatrixHTML(list0){
     +'<span class="stat" style="background:var(--warn-bg);color:var(--warn)">작성중 '+nDraft+'</span>'
     +'<span style="flex:1"></span><button onclick="S.cbLoaded=0;renderHome()">↻ 새로고침</button></div>'
     +(list.length
-      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>번호</th><th>기금</th>'
+      ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
         +Y.map(function(y){return '<th style="text-align:center">'+y+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       : '<div class="muted" style="padding:12px">이 분류에 기금이 없습니다.</div>')+'</div>'
     /* 직전 회계연도의 «결산 후 진행» — 1~4월이 그 해 결산·제출 철이다 */
@@ -24409,7 +25226,7 @@ var HELP={
    +'<p>기금을 열어 <b>[🏗 설립 진행]</b> 단계를 모두 마치면 <b>[✅ 운영 전환]</b>으로 정식 운영 기금이 됩니다.</p>'},
  'setup.dash':{t:'설립중 기금',h:'<p>인가·등기 절차를 밟는 기금만 모았습니다. 한 줄이 한 기금 — <b>다음 할 일 · 기한 · 빈 자료</b>만 보면 오늘 할 일이 보입니다.</p>'
    +'<p><b>기한</b>은 앱이 아는 날짜로만 셉니다 — 설립등기는 <b>인가일 + 3주</b>. 인가일을 적어야 나옵니다. <b>인가 기다림</b>은 ⑦ 인가신청을 끝낸 날부터 셉니다.</p>'
-   +'<p>줄을 누르면 아래에 <b>진행판</b>이 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
+   +'<p>잘못 만든 중복 기금은 □ 로 짚고 <b>[🗑 선택한 기금 삭제 보관]</b> — 삭제 보관함으로 옮기며 언제든 복원할 수 있습니다.</p><p>줄을 누르면 <b>진행판</b>이 팝업으로 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'
@@ -24490,6 +25307,9 @@ var HELP={
    +'<p>사무소를 무상으로 쓰는 경우 <b>전대 사용동의서</b>를 함께 제출합니다.</p>'},
  'forms.ops':{t:'④ 운영 단계 서식',h:'<p>운영 중 제출·발급하는 서식입니다.</p><p>결산·변경이력이 필요한 서식은 아래 링크를 눌러 해당 탭에서 생성하세요 — 실데이터가 있어야 채워집니다.</p>'},
  'forms.sub':{t:'⑤ 근복지원금 신청 서식',h:'<p>매년 지원금을 신청할 때 제출하는 서식 묶음입니다.</p><p>금액·참여사업장은 <b>지원금 입력</b> 탭의 데이터로 채워집니다.</p>'},
+ 'forms.reqdocs':{t:'기업 준비·첨부서류 목록 (기본서식 외 구비서류)',h:'<p>시스템이 자동으로 만들어 주는 <b>기본서식(신청서·정관·회의록 등)</b> 외에, 각 단계마다 <b>설립·참여기업이나 임원이 직접 발급·준비해야 하는 첨부서류·도장·증빙 목록</b>입니다.</p>'
+   +'<p><b>□ 체크박스</b>로 서류 수합 여부를 하나씩 점검하면 이 기금에 자동 저장됩니다.</p>'
+   +'<p><b>[📋 기업 안내문 미리보기·인쇄]</b>를 누르면 오른쪽 미리보기 창에 <b>기본서식 + 기업 준비서류 + 사업장별 수합 점검표</b>가 A4 안내문으로 만들어져 바로 인쇄·PDF·한글(HWPX)로 기업에 보낼 수 있습니다.</p>'},
 /* 'forms.draft'(전체 초안 6종)는 뗐다 — 「번호 차례대로 전부」(estab.bundle)가 그 자리를 대신한다.
    화면에 안 놓인 도움말은 검사가 잡는다(내가 만든 규칙이다). */
  'sub.helper':{t:'근로복지넷 입력 도우미',h:'<p>근로복지넷은 <b>인증서·간편인증</b>으로 사람이 직접 로그인하는 곳이라, 앱이 대신 로그인하지 않습니다.</p>'

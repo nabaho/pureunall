@@ -92,7 +92,7 @@ test('③ 종료는 «사업장 + 그 종류»에만 걸린다 — 다른 종류
     { id: 'co1', endedTypes: { ty1: '2026-08-01' } },
     { id: 'co2' }
   ];
-  const box = run([fnSrc('endedDateForSchedule'), fnSrc('isEndedSchedule')], {
+  const box = run([fnSrc('isPostSched'), fnSrc('endedDateForSchedule'), fnSrc('isEndedSchedule')], {
     getCos: () => COS
   });
 

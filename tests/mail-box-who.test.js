@@ -40,6 +40,7 @@ function box(o) {
     _mbWork: null, _mbWorkLink: {}, _mbBizSubs: {},
     mbWhoKey: (s) => String(s || '').toLowerCase().replace(/[.#$/[\]]/g, ','),
     mbDomOf: (e) => { const i = String(e).lastIndexOf('@'); return i < 0 ? '' : String(e).slice(i + 1); },
+    mbFolderBy: (s) => (o.folders || {})[s] || null,
     mbRetired: (w) => !!(o.retired || {})[w],
     mbSuccOf: (w) => (o.succ || {})[w] || '',
     mbPerson: (s) => s,
@@ -271,4 +272,20 @@ test('★★★ 서버가 읽는 자리 수와 사건 자료 자리가 어긋나
   assert.ok(/const FIXED_PATHS = paths\.length;/.test(src),
     '고정 자리 수를 손으로 세면 자리가 하나 늘 때마다 사건 자료가 조용히 0건이 된다');
   assert.ok(/snaps\[FIXED_PATHS \+ i\]/.test(src));
+});
+
+/* ══ ⑨ 받은메일함에는 «칸 담당»이 없다 (대표 지시 2026-11-05 「모든 부분을 권형하로 담당으로 넣지 마라」) ══
+   2026-10-07 자동 규칙이 받은메일함에 권형하를 걸어, AI 가 업무 칸으로 옮긴 메일(_slug 는 받은메일함)이
+   «칸 담당이 마지막 그물»로 전부 권형하에게 갔다. 받은메일함은 업무 칸이 못 맡은 «나머지»라 칸이 무엇인지 모른다. */
+test('★★★ 받은메일함의 칸 담당은 걸려 있어도 안 먹는다 — 모든 메일이 한 사람에게 몰리지 않는다', () => {
+  const { ctx } = box({ boxWho: { 'INBOX-1': { who: ['권형하'], by: '자동' } }, folders: { 'INBOX-1': { kind: 'inbox' } } });
+  assert.deepEqual(Array.from(ctx.mbBoxWhoList('INBOX-1')), [], '받은메일함에 칸 담당이 먹는다');
+  assert.equal(ctx.mbWhoOfRow(ROW('x@unknown.kr', 'INBOX-1')), '', '담당을 모르는 받은메일함 메일이 권형하로 간다');
+});
+
+test('★★ 업무 칸(받은메일함이 아닌 칸)의 칸 담당은 그대로 먹는다', () => {
+  const { ctx } = box({ boxWho: { 'S-3': { who: ['박한별'], by: '대표' } },
+    folders: { 'INBOX-1': { kind: 'inbox' }, 'S-3': { kind: 'custom' } } });
+  assert.deepEqual(Array.from(ctx.mbBoxWhoList('S-3')), ['박한별']);
+  assert.equal(ctx.mbWhoOfRow(ROW('y@unknown.kr', 'S-3')), '박한별');
 });

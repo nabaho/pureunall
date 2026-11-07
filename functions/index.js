@@ -8,6 +8,15 @@ const { getDatabase: getRawDatabase } = require("firebase-admin/database");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("crypto");   // 내려받기 토큰 발급용 (downloadUrl)
+/* 지원 작업함의 공개 공고 읽기 — 쿠키 없이 읽기만 하며 제출·양식 전송은 하지 않는다. */
+exports.govApplicationRead = functions.region('asia-northeast3').runWith({timeoutSeconds:60,memory:'256MB'}).https.onRequest(async (req,res)=>{
+  setCors(req,res);
+  if(req.method==='OPTIONS'){res.status(204).send('');return;}
+  if(req.method!=='POST'){res.status(405).json({error:'POST 요청만 허용합니다'});return;}
+  try{await requireStaff(req);}catch(e){res.status(e.status||401).json({error:'재직 계정으로 로그인해 주세요'});return;}
+  try{const reader=require('./gov-application-read'),body=req.body||{},result=await (body.file===true?reader.readFile:reader.read)(String(body.url||''));res.json(result);}
+  catch(e){res.status(400).json({error:String(e.message||e).slice(0,240)});}
+});
 const https = require("https");
 const { Resend } = require("resend");
 const {
@@ -1044,15 +1053,18 @@ exports.sendScheduledMail = functions
         if (r.ok) {
           await ref.remove();                    // 나갔으니 자리를 비운다
           sent++;
+          await rehabAutoNote(db, id, row, "sent");     // 회생광고 자동 메일이면 «보낸 시각»을 기록에 남긴다(던지지 않는다)
         } else {
           /* 일시 장애는 두 번 더 시도한다. 마지막 실패도 지우지 않되 at 을 먼 훗날로
              옮겨 다음 정상 메일의 앞길을 막지 않게 한다. */
           await ref.update(MB.deliveryFailure(row, Date.now(), r.error || "발송 실패"));
           failed++;
+          await rehabAutoNote(db, id, row, "failed", r.error);
         }
       } catch (e) {
         await ref.update(MB.deliveryFailure(row, Date.now(), (e && e.message) || e));
         failed++;
+        await rehabAutoNote(db, id, row, "failed", (e && e.message) || e);
       }
     }
     console.log("sendScheduledMail", { looked: ids.length, sent: sent, failed: failed });
@@ -1403,19 +1415,43 @@ async function rehabAutoRun(db, nowMs, opts) {
   }
   upd["rehab_ad/auto/preview"] = {
     at: nowMs, enabled: settings.enabled, cap: p.cap, sentToday: p.sentToday + queued.length, queued: queued.length,
-    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
+    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, basis: c.basis || "", willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
     skipped: p.skipped.slice(0, 40),
   };
   await db.ref().update(upd);
   return { enabled: settings.enabled, candidates: p.candidates.length, queued: queued.length, skipped: p.skipped.length };
 }
 
+/* 자동 메일(by:"rehab-auto")이 나가거나 실패한 순간을 회생광고 기록에 남긴다 — 2026-11-07 대표 「보낸 것들 언제 보냈는지 기록·확인」.
+   나간 것: 그 공고의 marks/<id>/sendLog 에 날짜+시각을 쌓고 「발송 완료」로 올린다(순수 계산은 rehab-automail.js markUpdate).
+   실패한 것: rehab_ad/auto/sent/<id> 에 state:"failed" 와 까닭만 적는다(화면이 «실패»로 보여 준다).
+   ⚠ 절대 던지지 않는다 — 기록 때문에 메일 발송 흐름이 깨지면 안 된다(이미 나간 메일이 «실패»로 처리될 수 있다). */
+async function rehabAutoNote(db, qid, row, state, why) {
+  try {
+    if (!row || row.by !== "rehab-auto") return;
+    const nid = RehabAutoMail.noticeIdOfQueue(qid);
+    if (!nid) return;
+    const nowMs = Date.now();
+    const root = db.ref("rehab_ad");
+    if (state === "sent") {
+      const prev = (await root.child("marks/" + nid).once("value")).val();
+      const mu = RehabAutoMail.markUpdate(prev, RehabAutoMail.sentEntry(row, nowMs), nowMs, nid, OntologyServerWrite.CONTRACT_VERSION);
+      const upd = {};
+      Object.keys(mu).forEach((k) => { upd["marks/" + nid + "/" + k] = mu[k]; });
+      upd["auto/sent/" + nid + "/state"] = "sent";
+      upd["auto/sent/" + nid + "/sentAt"] = nowMs;
+      await root.update(upd);
+    } else {
+      await root.child("auto/sent/" + nid).update({ state: "failed", error: String(why || "").slice(0, 120), failedAt: nowMs });
+    }
+  } catch (e) { console.warn("[회생광고 보낸 기록]", String((e && e.message) || e).slice(0, 120)); }
+}
+
 exports.rehabAuto = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
     try {
@@ -1458,7 +1494,9 @@ exports.rehabAuto = functions
 exports.rehabWatch = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
-  .pubsub.schedule("every day 07:40")
+  /* 2026-11-02 대표 「매일 저녁에 수집 처리하고 … 1800 에 시작한다」 — 아침 07:40 → 저녁 18:00.
+     자동 메일(rehabAutoRun)이 같은 회차 끝에 붙어 있고 «오전 8시~오후 9시»에만 나가므로 18:00 시작이면 그날 안에 걸린다. */
+  .pubsub.schedule("every day 18:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const t0 = Date.now();
@@ -1499,6 +1537,14 @@ exports.rehabWatch = functions
     /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
     const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
+
+    /* ── 새로 담긴 공고를 «발송 예정»으로(우편 라벨 대상) — 사람이 이미 표시한 것은 그대로 (rehab-watch.js autoQueueMarks) ── */
+    try {
+      const marksNow = (await root.child("marks").once("value")).val() || {};
+      const q = RehabWatch.autoQueueMarks(result.added, marksNow, nowMs, OntologyServerWrite.CONTRACT_VERSION);
+      Object.assign(upd, q);
+      upd["runs/" + today].autoQueued = Object.keys(q).length;
+    } catch (e) { console.warn("[회생광고 자동 예정]", String((e && e.message) || e).slice(0, 120)); }
 
     /* ── 금융위 기업기본정보로 대표자·전화·팩스·홈페이지 채우기 (functions/rehab-fsc.js 머리말) ──
        «이름 + 시·군·구가 모두 맞는 하나»만 채운다. 실패해도 수집은 계속 — 호출이 실패한 곳은 저장하지 않아 내일 다시 본다. ── */
@@ -3462,7 +3508,22 @@ exports.recordBillingAlert = functions
             if (v) byKey[k] = v;
           }
           const who = BA.spikeCulprit(byKey, nowMs);
-          await ref.set(Object.assign({}, hit, who ? { key: who.key, label: who.label } : {}));
+          /* ★ 그날 처음이면 대표 폰으로 한 번 (2026-11-05 「유료 API 통제 3단계」) — 까닭은 BA.spikePushPayload 머리.
+             ⚠ 보내기가 실패해도 아래 기록은 남긴다(pushedAt 없이 — 다음 쪽지 때 다시 시도). */
+          const prev = (await ref.once("value")).val();
+          const 알림 = BA.spikePushPayload(prev, hit, who);
+          let pushedAt = (prev && prev.day === hit.day && prev.pushedAt) || null;
+          if (알림) {
+            try {
+              const r = await PUSH.pushAdmins(db, getMessaging(), 알림);
+              if (r && r.sent > 0) pushedAt = Date.now();
+              console.log("recordBillingAlert: 폭주 폰 알림", { targets: r && r.targets, sent: r && r.sent });
+            } catch (e) {
+              console.error("recordBillingAlert: 폭주 폰 알림 실패", String((e && e.message) || e));
+            }
+          }
+          await ref.set(Object.assign({}, hit, who ? { key: who.key, label: who.label } : {},
+            pushedAt ? { pushedAt: pushedAt } : {}));
           console.warn("recordBillingAlert: 하루 폭주", hit, who || "");
         }
       } catch (e) {
@@ -3609,30 +3670,21 @@ exports.typeSafeEvaluate = functions
      넣은 뒤에는, DB 의 열쇠를 지우고 이 갈래도 지워야 완결된다.
      남겨 두면 열쇠가 DB 에 그대로 있어 지금 문제가 안 풀린다. */
 async function readGeminiKey() {
-  const fromSecret = String(process.env.GEMINI_KEY || "").trim();
-  /* ⚠ **어디서 왔는지**를 남긴다(값은 절대 안 남긴다). 금고를 걸었는데도 옛 갈래로
-     돌고 있으면, 실시간DB 의 열쇠를 지우는 순간 판독이 멈춘다 — 지우기 전에
-     이 줄로 확인한다: `keySource secret` 이면 금고에서 온 것이다. */
-  if (fromSecret) { console.log("keySource secret"); return fromSecret; }
-  const db = getDatabase();
-  const paths = ["pucards/config/geminiKey", "data/app_config/geminiKey"];
-  for (const p of paths) {
-    try {
-      const snap = await db.ref(p).once("value");
-      const v = String(snap.val() || "").trim();
-      if (v) { console.log("keySource rtdb", p); return v; }
-    } catch (e) { /* 다음 자리로 */ }
-  }
-  return "";
+  /* ★ 2026-11-05 「유료 API 통제 2단계」 — 열쇠는 «금고(GEMINI_KEY)» 하나뿐이다.
+     실시간DB 갈래(pucards/config/geminiKey · data/app_config/geminiKey)를 걷어냈다.
+     그 두 자리는 규칙상 «로그인한 직원 모두»가 읽는다 — 판독이 유료 등급이 된 뒤로
+     거기 열쇠가 있으면 누구든 꺼내 회사 한도 밖에서 쓸 수 있었다.
+     ⚠ 확인한 것: 이 함수를 부르는 서버 함수(readDoc·photoEdit·mailCardRead·suggestionAssist(Now)·
+       recruitWatch·뉴스레터 넷)는 모두 runWith secrets 에 GEMINI_KEY 를 건다
+       (tests/ai-key-vault-only.test.js 가 지킨다 — 빠뜨리면 그 함수만 「키 없음」으로 멎는다). */
+  return String(process.env.GEMINI_KEY || "").trim();
 }
 
 /* 2026-08-17 — 대표님이 `firebase functions:secrets:set GEMINI_KEY` 로 비밀을 넣으셨다.
    이제 열쇠는 **금고(Secret Manager)** 에서 온다.
    ⚠ 이 줄은 비밀이 **실제로 있을 때만** 걸 수 있다. 없는 비밀을 걸면 배포가 통째로
      막힌다(2026-08-17 에 실제로 막혔다: `Secret … GEMINI_KEY not found`).
-   ⚠ 실시간DB 갈래(readGeminiKey 안)는 **아직 남겨 둔다.** 금고가 실제로 도는 것을
-     사람이 확인하기 전에 지우면, 어긋났을 때 판독이 통째로 멈춘다.
-     확인 뒤에 DB 의 열쇠와 그 갈래를 함께 지운다. */
+   ⚠ 실시간DB 갈래는 2026-11-05 에 걷어냈다(readGeminiKey 머리 참고). */
 /* ⑪ 사진을 «무료로 뽑은 글자»로 갈음해 본다. 되면 바꾼 parts 를, 아니면 null 을 준다.
    ⚠⚠ 이 함수는 **한 번도 던지지 않는다.** 넘어지면 null 이고, 부르는 쪽은 사진 그대로
      보낸다 — 무료는 «덤»이지 판독의 조건이 아니다. 여기서 던지면 아끼려다
@@ -3699,12 +3751,21 @@ exports.readDoc = functions
          그쪽은 못 읽은 채 부르면 요금이 나갈 판이라 막았지만, 이쪽은 못 읽었다고
          판독을 통째로 세우면 그날 일이 멈춘다. 한도는 «사고를 막는 장치»이지
          일을 세우는 장치가 아니다. */
+    /* ★ 2026-11-05 「유료 API 통제」 — 판정은 DR.budgetGate 한 곳(자동은 한도, 사람이 누른 것도
+         한도의 1.2배에서 멈춤, 셈을 못 읽으면 자동만 멈춤). 위 «manual 은 통과»는 1.2배까지로 좁혀졌다. */
     const 몫 = await aiMonthSpend();
-    if (몫.known && 몫.over && !body.manual) {
-      res.status(429).json({ ok: false, overBudget: true, spent: 몫.spent, limit: 몫.limit,
-        error: "이번 달 AI 판독 한도(₩" + 몫.limit.toLocaleString("ko-KR") + ")를 다 썼습니다"
-          + " — 지금까지 약 ₩" + 몫.spent.toLocaleString("ko-KR") + ". 자동 판독을 멈췄습니다."
-          + " 급한 것은 사진을 열어 직접 눌러 주세요." });
+    const 판정 = DR.budgetGate(몫, !!body.manual);
+    if (판정.block) {
+      const 금액 = function (n) { return "₩" + Number(n || 0).toLocaleString("ko-KR"); };
+      res.status(429).json({ ok: false, overBudget: true, hard: 판정.hard, spent: 몫.spent, limit: 몫.limit,
+        error: 판정.why === "unknown"
+          ? "이번 달 AI 사용량을 확인하지 못해 자동 판독을 잠시 멈췄습니다. 급한 것은 사진을 열어 직접 눌러 주세요."
+          : 판정.hard
+            ? "이번 달 AI 판독 한도(" + 금액(몫.limit) + ")의 1.2배를 넘어 직접 누른 판독도 멈췄습니다"
+              + " — 지금까지 약 " + 금액(몫.spent) + ". 더 쓰려면 대표님이 한도를 올려 주세요."
+            : "이번 달 AI 판독 한도(" + 금액(몫.limit) + ")를 다 썼습니다"
+              + " — 지금까지 약 " + 금액(몫.spent) + ". 자동 판독을 멈췄습니다."
+              + " 급한 것은 사진을 열어 직접 눌러 주세요." });
       return;
     }
 
@@ -4040,8 +4101,9 @@ exports.photoEdit = functions
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
 
     // ★ 누가 부르는지 먼저 — 이 검사가 없으면 우리 열쇠가 공개 지우개가 된다.
+    let decoded;
     try {
-      await requireReader(req);
+      decoded = await requireReader(req);
     } catch (e) {
       res.status(e.status || 401).json({ ok: false, error: String(e.message || e) });
       return;
@@ -4050,11 +4112,39 @@ exports.photoEdit = functions
     const v = PE.validate((req.body && typeof req.body === "object") ? req.body : {});
     if (!v.ok) { res.status(400).json({ ok: false, error: v.error }); return; }
 
+    /* ★ 요금 관문 (2026-11-05 「유료 API 통제」) — 부르기 «전»에 막는다. 까닭은 photo-edit.js EDIT_READ_WEIGHT 머리.
+       ⚠ 판독과 달리 «사람이 누른 것»이라도 한도를 넘으면 멈춘다 — 편집은 급한 일이 아니다.
+       ⚠ 셈을 못 읽으면(known:false) 안 부른다(Vision 문턱과 같은 쪽). */
+    const 몫 = await aiMonthSpend();
+    if (!몫.known || 몫.over) {
+      res.status(429).json({ ok: false, overBudget: true, spent: 몫.spent, limit: 몫.limit,
+        error: 몫.known
+          ? "이번 달 AI 한도(₩" + 몫.limit.toLocaleString("ko-KR") + ")를 다 써서 AI 편집을 멈췄습니다."
+          : "이번 달 AI 사용량을 확인하지 못해 AI 편집을 잠시 멈췄습니다. 잠시 뒤 다시 해 주세요." });
+      return;
+    }
+    const 오늘자리 = PE.userDayPath(DR.ymdKST(), decoded.uid);
+    let 오늘 = null;
+    try { 오늘 = Number((await getDatabase().ref(오늘자리).once("value")).val()) || 0; } catch (_) { 오늘 = null; }
+    if (오늘 === null || 오늘 >= PE.EDIT_DAY_PER_USER) {
+      res.status(429).json({ ok: false, overBudget: true,
+        error: 오늘 === null ? "오늘 사용량을 확인하지 못해 AI 편집을 잠시 멈췄습니다."
+          : "AI 편집은 한 사람 하루 " + PE.EDIT_DAY_PER_USER + "장까지입니다 — 내일 다시 해 주세요." });
+      return;
+    }
+
     const key = await readGeminiKey();
     if (!key) { res.status(503).json({ ok: false, error: "AI 키가 설정되지 않았습니다 — 관리자에게 알려 주세요." }); return; }
 
     // 사람이 적은 말(want)을 함께 넘긴다 — 틀(지킴말)은 photo-edit.js 가 그대로 쥔다.
     const r = await PE.callEdit(fetch, key, v.data, v.mimeType, null, v.want);
+    /* ★ 요금이 붙은 만큼(200 으로 답한 수 × 무게) 같은 지갑에 센다 · 사람별 하루 셈도 올린다 */
+    if (r.billed > 0) {
+      await bumpReadTally("photoedit", "n", r.billed * PE.EDIT_READ_WEIGHT);
+      try {
+        await getDatabase().ref(오늘자리).transaction(function (cur) { return (Number(cur) || 0) + r.billed; });
+      } catch (e) { console.warn("AI 편집 사람별 셈 실패:", String((e && e.message) || e)); }
+    }
     if (!r.ok) {
       res.status(r.status && r.status >= 400 ? r.status : 502)
         .json({ ok: false, error: r.why || "AI가 응답하지 않습니다.", status: r.status || 0 });
@@ -6222,11 +6312,17 @@ exports.weeklyNewsBrief = functions
 
     const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
     const 사연글 = 사연("푸른ERP 자동 브리핑", "notice", 글.제목);
+    /* sitemap 에도 한 줄 — 안 더하면 «굳힌 쪽 수 = sitemap 수» 검사가 매주 빨개진다.
+       못 읽거나 /notice 줄이 없으면 sitemap 은 건드리지 않고 글만 올린다. */
+    const 올릴것 = [["site/notice/" + 새번호 + "/index.html", 글쪽]];
+    try {
+      const 새사이트맵 = NoticeLib.사이트맵더하기(await 새홈페이지쪽("sitemap.xml"), 새번호, 오늘);
+      if (새사이트맵) 올릴것.push(["site/sitemap.xml", 새사이트맵]);
+      else console.warn("[브리핑] sitemap 에서 /notice 줄을 못 찾아 sitemap 은 건너뜁니다");
+    } catch (e) { console.warn("[브리핑] sitemap 을 못 읽어 건너뜁니다", e.message); }
+    올릴것.push(["site/notice/index.html", 새목록]);
     /* 글 쪽을 «먼저» 올린다 — 목록에 먼저 실으면 «누르면 없는 쪽»이 잠깐 뜬다 */
-    for (const [자리이름, 내용] of [
-      ["site/notice/" + 새번호 + "/index.html", 글쪽],
-      ["site/notice/index.html", 새목록]
-    ]) {
+    for (const [자리이름, 내용] of 올릴것) {
       await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(자리이름), 내용, 사연글);
       try {
         await 올리기(githubRequest, 토큰, REPO, 자리이름, 내용, 사연글);
@@ -7156,6 +7252,16 @@ exports.hanaMessageBridge = functions
             ? { sweepBatteryFree: body.batteryFree } : {}),
           /* 문자 «보내기» 권한 — 방문 안내 문자를 맡길 수 있는 폰인지 화면이 알 수 있게 (2026-10-15) */
           ...(typeof body.canSendSms === "boolean" ? { sweepCanSendSms: body.canSendSms } : {}),
+          /* 카톡 알림을 «센 숫자»(2.5.1~, 2026-11-07) — 업무방 알림이 왜 0건인지 화면이 말한다.
+             ⚠ 옛 판은 안 보낸다 — 안 보내면 «모름»으로 둔다(0 으로 적으면 멀쩡한 폰에 없는 고장을 씌운다).
+             ⚠ 방 이름은 받지도 적지도 않는다 — «어떻게 달랐나»만 정해진 낱말 둘로 받는다. */
+          ...(typeof body.kakaoSeen === "number" ? { kakaoSeen: Math.max(0, Math.floor(body.kakaoSeen)) } : {}),
+          ...(typeof body.kakaoListed === "number" ? { kakaoListed: Math.max(0, Math.floor(body.kakaoListed)) } : {}),
+          ...(typeof body.kakaoNear === "number" ? { kakaoNear: Math.max(0, Math.floor(body.kakaoNear)) } : {}),
+          ...(typeof body.kakaoNoRoom === "number" ? { kakaoNoRoom: Math.max(0, Math.floor(body.kakaoNoRoom)) } : {}),
+          ...(typeof body.kakaoSeenAt === "number" ? { kakaoSeenAt: Math.max(0, Math.floor(body.kakaoSeenAt)) } : {}),
+          ...(typeof body.kakaoNearKind === "string"
+            ? { kakaoNearKind: ["extra", "spacing"].includes(body.kakaoNearKind) ? body.kakaoNearKind : "" } : {}),
         }).catch(() => {});
         /* 카톡 업무방 목록을 함께 내려 준다 — 폰은 이 목록에 «정확히» 있는 방만 보낸다.
            ⚠ 못 읽으면 kakaoRooms 를 아예 안 싣는다(빈 목록과 다르다) — 폰은 가진 목록을 그대로 쓴다. */
@@ -7279,6 +7385,16 @@ exports.hanaMessageBridge = functions
              이 값이 채워지면 「입금이 앱 푸시로 온다」는 것이 기록으로 확인된 것이다. */
           lastPkg: String(d.lastPkg || ""),
           disabled: d.disabled === true,
+          /* 카톡 업무방 알림 길(2026-11-07) — 💬 카톡정리 맨 위 «폰 상태» 줄이 읽는다.
+             센 숫자(kakaoSeen…)는 2.5.1 부터 온다. 없으면 null = «모름»(옛 판). */
+          kakaoLastAt: Number(d.kakaoLastAt || 0),
+          kakaoLastSkip: d.kakaoLastSkip ? String(d.kakaoLastSkip) : "",
+          kakaoSeen: typeof d.kakaoSeen === "number" ? d.kakaoSeen : null,
+          kakaoListed: typeof d.kakaoListed === "number" ? d.kakaoListed : null,
+          kakaoNear: typeof d.kakaoNear === "number" ? d.kakaoNear : null,
+          kakaoNoRoom: typeof d.kakaoNoRoom === "number" ? d.kakaoNoRoom : null,
+          kakaoSeenAt: Number(d.kakaoSeenAt || 0),
+          kakaoNearKind: String(d.kakaoNearKind || ""),
         }));
         hanaJson(res, 200, { ok: true, devices }); return;
       }

@@ -179,6 +179,8 @@ public final class HanaSweepWorker extends Worker {
             /* ★ 이 폰이 «문자를 보낼 수 있나» (2026-10-15) — 서버는 «보낼 수 있다»고 말한 폰에만
                방문 안내 문자 일을 내준다. 권한이 없는 폰이 일을 받아 가면 줄만 «보내는 중»에 갇힌다. */
             ping.put("canSendSms", VisitSmsSender.canSend(context));
+            /* 카톡 알림을 «센 숫자»(방 이름 없음) — 업무방 알림이 왜 0건인지 화면이 말한다(2026-11-07) */
+            KakaoTally.put(context, ping);
             /* 답에 카톡 업무방 목록이 실려 온다(2026-10-09) — 받아 적는다. */
             JSONObject pong = HanaUploadWorker.post(ping, token);
             KakaoRooms.absorb(context, pong);

@@ -212,7 +212,7 @@
     if (!t) return [];
     var names = {};
     list(input.staff).forEach(function (s) { names[s.id] = str(s.name); });
-    var sc = list(input.scheds).filter(function (s) { return s.typeId === typeId && s.phase !== 'pre' && isDay(s.date); });
+    var sc = list(input.scheds).filter(function (s) { return s.typeId === typeId && s.phase !== 'pre' && s.phase !== 'post' && isDay(s.date); });
     var out = [];
     list(input.cos).forEach(function (co) {
       if (co.deleted || !(Array.isArray(co.types) && co.types.indexOf(typeId) >= 0)) return;

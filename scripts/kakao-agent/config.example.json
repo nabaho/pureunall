@@ -1,0 +1,7 @@
+{
+  "liveEnabled": false,
+  "redirectRoom": "",
+  "project": "pureun-erp",
+  "pollSec": 60,
+  "maxPerRound": 10
+}

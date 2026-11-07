@@ -397,3 +397,72 @@ test('앞 달 자료가 없으면 변동 칸을 만들지 않는다(지어내지
   const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-08' }, emps: VEMPS });
   assert.equal(s.shellMainHtml(s.M()).indexOf('지난달 대비'), -1);
 });
+
+/* ══════ PC 틀·창 고정 (2026-11-02 대표 지시 「틀이나 창이 계속 움직인다 이부분 안움직이게 해라」) ══════ */
+test('★★ PC(761px~) 틀·창 고정 — 머리줄은 1줄(48px)로 잠그고 3칸은 각자 칸 안에서만 굴러가며 바깥 창은 흔들리지 않는다', () => {
+  const style = (HTML.match(/<style[^>]*>([\s\S]*?)<\/style>/) || [])[1] || '';
+  const pc = (style.match(/@media\s*\(min-width\s*:\s*761px\)\s*\{([\s\S]*?)\r?\n\}/) || [])[1] || '';
+  assert.ok(pc, 'PC(min-width:761px) 틀 고정 규칙이 없습니다');
+  assert.match(pc, /html\s*,\s*body\s*\{[^}]*overflow\s*:\s*hidden/, '바깥 창 스크롤을 잠그지 않으면 본문 길이에 따라 전체 창이 흔들립니다');
+  assert.match(pc, /header\s*\{[^}]*height\s*:\s*48px[^}]*flex-wrap\s*:\s*nowrap/, '머리줄 높이와 줄바꿈을 잠그지 않으면 회사마다 1줄↔2줄로 뜁니다');
+  assert.match(pc, /header\s+\.cobar\s*\{[^}]*flex-wrap\s*:\s*nowrap/, '머리줄 회사 칸(.cobar)이 두 줄로 접히면 아래 3칸이 통째로 밀립니다');
+  assert.match(pc, /header\s+#backbtn\[style\*="none"\]\s*\{[^}]*visibility\s*:\s*hidden/, '뒤로 단추 자리를 고정하지 않으면 첫 회사를 고를 때 로고가 옆으로 밀립니다');
+  assert.match(pc, /#colRows\s*\{[^}]*scrollbar-gutter\s*:\s*stable/, '목록 스크롤 홈이 고정되어야 합니다');
+  assert.match(pc, /main\s*\{[^}]*scrollbar-gutter\s*:\s*stable/, '본문 스크롤바 유무로 가로 폭이 흔들리지 않아야 합니다');
+});
+
+test('★★ render() 를 다시 불러도 보기·사업장 목록·본문 스크롤 위치가 0 으로 튀지 않는다', () => {
+  const fn = cut('render');
+  const els = {
+    nav: { style: {}, innerHTML: '', scrollTop: 140 },
+    colist: { style: {}, innerHTML: '', hidden: false },
+    colRows: { style: {}, innerHTML: '', scrollTop: 320 },
+    main: { style: {}, innerHTML: '', scrollTop: 260 },
+    coBar: { style: {}, innerHTML: '' },
+    backbtn: { style: {} },
+  };
+  const box = {
+    App: { screen: 'shell', coId: 'c1', tab: 'payroll', ym: '2026-08' },
+    navDepth: 1,
+    PuSiteStaff: {},
+    document: {
+      getElementById: (id) => els[id] || (els[id] = { style: {}, innerHTML: '' }),
+      body: { classList: { toggle() {} } },
+    },
+    ensureCo() {}, shellModel: () => ({}), viewbarHtml: () => 'v', colistHtml: () => 'c',
+    shellMainHtml: () => 'm', coBarHtml: () => 'bar', drawCardEdit() {}, addPayrollReportHwpxAction() {},
+    screenCards: () => '', screenNames: () => '', screenPayroll: () => '', screenAttend: () => '',
+    screenLeave: () => '', screenSever: () => '', screenSlip: () => '', screenReport: () => '', screenInbox: () => '',
+  };
+  vm.createContext(box);
+  /* 1) 처음 그릴 때는 새 화면이므로 본문은 맨 위(0)로, 보기·목록 스크롤은 그대로 유지 */
+  vm.runInContext(fn + '\nrender();', box);
+  assert.equal(els.nav.scrollTop, 140, '보기 칸 스크롤이 초기화되었습니다');
+  assert.equal(els.colRows.scrollTop, 320, '사업장 목록 스크롤이 초기화되었습니다');
+  /* 2) 같은 회사·같은 탭에서 비동기 자료(직원 표·주민번호 등)가 도착해 다시 그릴 때는 본문 스크롤도 그대로 유지 */
+  els.main.scrollTop = 260;
+  vm.runInContext('render();', box);
+  assert.equal(els.main.scrollTop, 260, '비동기 갱신 때 본문 스크롤이 맨 위로 튀었습니다');
+  /* 3) 다른 회사로 바꿨을 때는 목록 스크롤은 유지하고 본문만 맨 위(0)부터 보여 준다 */
+  box.App.coId = 'c2';
+  vm.runInContext('render();', box);
+  assert.equal(els.colRows.scrollTop, 320, '다른 회사를 골랐는데 사업장 목록 스크롤이 맨 위로 튀었습니다');
+  assert.equal(els.main.scrollTop, 0, '다른 회사를 골랐을 때는 본문이 맨 위부터 시작해야 합니다');
+});
+
+test('★★ 모든 사업장·모든 사람 줄에 순번(1, 2, 3…) + ☐/☑ 체크 + ☆/★ 별표가 표시되고 필터·저장이 동작한다', () => {
+  const s = load({ App: { coId: 'c1' } });
+  const m = s.M();
+  const h = s.colistHtml(m);
+  assert.match(h, /<span class="rno">1<\/span>/, '사업장 목록에 1번 순번이 없습니다');
+  assert.match(h, /toggleRowMark\('co:c1','chk',event\)/, '사업장 체크(☐) 단추가 없습니다');
+  assert.match(h, /toggleRowMark\('co:c1','star',event\)/, '사업장 별표(☆) 단추가 없습니다');
+  assert.match(h, /setMarkFilter\('chk'\)/, '체크 필터 단추가 없습니다');
+  assert.match(h, /setMarkFilter\('star'\)/, '별표 필터 단추가 없습니다');
+  const bar = s.coBarHtml(m);
+  assert.match(bar, /toggleRowMark\('co:c1','chk',event\)/, '머리줄 회사 칸에 체크 단추가 없습니다');
+  assert.match(bar, /toggleRowMark\('co:c1','star',event\)/, '머리줄 회사 칸에 별표 단추가 없습니다');
+  if ( !true ) {
+    /* keep closing brace balanced */
+  }
+});

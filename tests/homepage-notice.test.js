@@ -126,7 +126,9 @@ test('★ 새 글을 얹어도 «있던 글»은 그대로다 — 조회수까�
   옛조회.forEach(n => assert.ok(새조회.indexOf(n) >= 0, '★ 있던 글의 조회수가 사라졌다: ' + n));
   /* ★ 새 글은 0 부터 — 본으로 쓴 줄의 숫자를 물려받으면 첫날부터 「31번 읽음」이 된다 */
   assert.equal(새조회[0], '0', '★ 새 글이 남의 조회수를 물려받았다: ' + 새조회[0]);
-  assert.deepEqual(N.글읽기(새목록).map(g => g.차례), ['4', '3', '2', '1'],
+  /* 차례는 «지금 글 수 + 새 글 1»부터 1 까지 큰 수 순이다 — 글 수를 박지 않는다(공지를 올릴 때마다 한 개씩 는다) */
+  const 개수 = 글.length + 1;
+  assert.deepEqual(N.글읽기(새목록).map(g => g.차례), Array.from({ length: 개수 }, (_, i) => String(개수 - i)),
     '★ 차례가 위에서부터 큰 수가 아니다');
 });
 
@@ -213,4 +215,14 @@ test('★ 되풀이되는 «명단·일정»은 뺀다 — 게시판이지 소�
     '★ 「인사노무」까지 걸러 냈다 — 뺄말을 너무 넓게 잡았다');
   assert.equal(B.노동글인가('노동차관 정년연장 입법 연내 마무리'), true,
     '★ 멀쩡한 기사를 걸러 냈다');
+});
+
+test('★ 새 공지를 올리면 sitemap 에도 «한 줄» 더해진다 — 두 번 불러도 한 줄', () => {
+  const xml = fs.readFileSync(path.join(__dirname, '..', 'site', 'sitemap.xml'), 'utf8');
+  const 센 = (x) => (x.match(/<loc>/g) || []).length;
+  const 새 = N.사이트맵더하기(xml, '9999', '2026-12-01');
+  assert.equal(센(새), 센(xml) + 1, '★ sitemap 에 새 공지가 안 더해졌다');
+  assert.match(새, /\/notice\/9999<\/loc><lastmod>2026-12-01</, '★ 주소·날짜가 틀렸다');
+  assert.equal(N.사이트맵더하기(새, '9999', '2026-12-01'), 새, '★ 두 번 불렀더니 두 줄이 됐다');
+  assert.equal(N.사이트맵더하기('<urlset></urlset>', '9999', '2026-12-01'), null, '★ /notice 줄이 없는데 억지로 넣었다');
 });

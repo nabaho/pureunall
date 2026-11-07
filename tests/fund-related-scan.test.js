@@ -128,4 +128,15 @@ test('★★ 체크리스트 「특수관계인 해당여부」 — 끝난 판�
   assert.equal(h.rel, '해당', '두 곳 이상에 「해당」이 있으면 해당'); assert.equal(h.plant, '비해당');
   assert.match(gF('_hwpSubValues'), /V\.특수관계=rj\.rel; V\.동일공장=rj\.plant;/);
   assert.match(gF('_docExtra'), /\/\^sub\/\.test\(kind\)&&S\._relFor!==fid/, '★ 점검 화면을 안 열면 체크리스트가 기록을 못 읽는다');
+  const fns = [
+    'relatedPanel', 'sitesTab', 'sitesPeopleBody', 'sitesYearBody', 'subsidyDocsPanel',
+    'openSitePeoplePick', 'bizregBulkReview', 'wrepBulkShow', 'cmImportShow', 'cmExtraShow',
+    'bulkSiteCards', 'renderCardPick', 'renderSitePend', 'dueMatrixHTML', 'closeMatrixHTML',
+    'docsMatrixHTML', 'loanTab', 'flowSealInfo',
+  ];
+  for (const fn of fns) {
+    const body = gF(fn);
+    assert.ok(body.includes('type="checkbox"') || body.includes('_ckTd()'), fn + ' 에 검토용 체크박스가 없다');
+    assert.ok(body.includes('class="no"') || body.includes('>번호<') || body.includes('>#<'), fn + ' 에 넘버링(번호) 칸이 없다');
+  }
 });

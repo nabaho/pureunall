@@ -37,37 +37,95 @@
     return out;
   }
 
-  /* ── ① 지급월 정산표 목록 — 사업 종류마다 묶음 머리(사업 이름 전체) 아래 지급월 줄 ──
-     대표 지시 2026-10-31 「깔끔하게 볼수 있게」 「사업 이름 정확하게 알아야 된다」 — 줄마다 긴 사업 이름을 되풀이하지 않는다 */
-  /* 대표 지시 2026-10-31 「여러가지 다양한 컨설팅이 있을 가능성 … 추가로 정리가능하게」 — opt.types(규칙이 있는 사업 종류)는 정산표가 아직 없어도
-     묶음 머리로 보이고, 묶음마다 «+ 입력»(안내 엑셀 없는 컨설팅의 직접 입력)을 단다 */
-  function runsTable(runs, sel, bizNames, cur, opt) {
-    sel = sel || {}; bizNames = bizNames || {}; opt = opt || {};
-    var bnOf = function (code) { return bizNames[code] || code || ''; };
-    var list = (runs || []).filter(function (r) { return r && !r._deleted; });
-    var types = [], seen = {};
-    list.map(function (r) { return r.typeCode; }).concat(opt.types || []).forEach(function (c) { if (c && !seen[c]) { seen[c] = 1; types.push(c); } });
-    types.sort(function (a, b) { return bnOf(a) < bnOf(b) ? -1 : bnOf(a) > bnOf(b) ? 1 : 0; });
-    if (!types.length) return '<div class="empty">아직 정산표가 없습니다. «📥 안내 파일»에서 비용지급 안내를 올리거나, «⚙️ 규칙·요율»에서 컨설팅 종류를 더한 뒤 직접 입력하세요.</div>';
-    var allOn = list.length > 0 && list.every(function (r) { return sel[r.id]; }), i = 0;
-    var h = '<div class="bulk" data-bulk="runs"></div><div class="scroll"><table class="t" data-name="runs"><thead><tr>' + ckHead('runs', allOn)
-      + '<th>지급월</th><th class="r">사업장</th><th>상태</th><th class="r">송금 남음</th></tr></thead><tbody>';
-    types.forEach(function (code) {
-      h += '<tr class="grp"><td colspan="5" title="' + esc(bnOf(code)) + '">' + esc(bnOf(code)) + '</td>'
-        + '<td class="r"><button class="sm" data-manual="' + esc(code) + '" title="안내 엑셀이 없는 지급분을 직접 넣는다">+ 입력</button></td></tr>';
-      var mine = list.filter(function (r) { return r.typeCode === code; }).sort(function (a, b) { return a.monthKey < b.monthKey ? 1 : -1; });
-      if (!mine.length) h += '<tr class="none"><td></td><td></td><td colspan="4" class="hint">아직 정산표 없음 — «+ 입력» 또는 «📥 안내 파일»</td></tr>';
-      mine.forEach(function (r) { i++; h += runRow(r, i); });
-    });
-    return h + '</tbody></table></div>';
-    function runRow(r, i) {
-      var tr = r.transfers || [], left = tr.filter(function (t) { return !t.paid; }).length;
-      return '<tr data-id="' + esc(r.id) + '"' + (r.id === cur ? ' class="on"' : '') + '>' + ckCell(r.id, sel[r.id]) + '<td class="n">' + i + '</td>'
-        + '<td class="ti"><a href="#" data-run="' + esc(r.id) + '" title="' + esc(r.label) + '">' + esc(r.label || r.monthKey) + '</a></td>'
-        + '<td class="r" data-k="cnt">' + (r.sites || []).length + '</td>'
-        + '<td class="nw" data-k="st"><span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? ' <span class="pill st-chg">바뀜</span>' : '') + '</td>'
-        + '<td class="r" data-k="left">' + (r.status === 'confirmed' && tr.length ? left + ' / ' + tr.length : '') + '</td></tr>';
+  /* ── ① 열두 달 줄 — 달마다 할 일 점, 누르면 그 달(대표 지시 2026-11-07 「정산표나 카톡문구를 월별 년도별관리 … ui 쉽고 직관적으로」) ──
+     info = {'YYYY-MM': C.monthState 결과}. 지급월 목록 표(옛 runsTable)를 대신한다 */
+  var MSTATE_KO = { none: '정산 없음', todo: '할 일 남음', done: '끝' };
+  function monthStrip(year, info, cur) {
+    info = info || {};
+    var h = '<div class="mstrip">';
+    for (var m = 1; m <= 12; m++) {
+      var k = year + '-' + (m < 10 ? '0' : '') + m, s = info[k] || { state: 'none', runs: 0 };
+      var tip = m + '월 — ' + (s.runs ? '정산표 ' + s.runs + (s.draft ? ' · 임시저장 ' + s.draft : '') + (s.left ? ' · 송금 남음 ' + s.left : '') + ' · ' : '') + MSTATE_KO[s.state];
+      h += '<button class="mo mo-' + s.state + (k === cur ? ' on' : '') + '" data-month="' + k + '" title="' + esc(tip) + '" aria-label="' + esc(tip) + '">' + m + '월<i class="dot"></i></button>';
     }
+    return h + '</div><div class="hint mleg"><i class="dot dot-todo"></i>할 일 남음 <i class="dot dot-done"></i>끝(확정·송금 다 함) <i class="dot"></i>정산 없음</div>';
+  }
+  /* 한 달 화면의 단계 머리 — 동그라미 번호 · 제목 · 한 줄 설명 · 오른쪽 단추/딱지 */
+  function stepHead(n, title, hint, right) {
+    return '<div class="stephd"><span class="num">' + n + '</span><b>' + esc(title) + '</b>' + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '<span class="sp"></span>' + (right || '') + '</div>';
+  }
+
+  /* ── ①-1 입금 확인(한 달 1단계) — 그 달 임시저장 정산표들의 주관 몫을 통장 입금과 자동으로 맞춘 결과 ──
+     rev = C.reviewMonth 결과. opt = {biz:{종류:이름}, found:[입금 줄], sel:{id:1}(☐), pick:{id: 고른 입금 id}, leadName,
+       src:'ledger'|'paste', at(읽은 때), err, loading, win:{from,to}, text(붙여 넣은 글), pasteOpen}
+     ⚠ 판정은 «지금 고른 입금»으로 다시 낸다(고르기를 바꾸면 딱지도 바뀐다). 저장은 «체크한 줄 저장»으로만(화면이 같은 금액만 미리 ☐).
+     ⚠ 담당 개인 통장은 대표 통장에 없어 안내 금액으로 계산한다는 말을 늘 붙인다 */
+  var AUTO_KO = { exact: '✓ 맞음', near: '△ 금액 다름', none: '✕ 못 찾음', saved: '넣음' };
+  function reviewBox(rev, opt) {
+    rev = rev || { rows: [] }; opt = opt || {};
+    var rows = rev.rows || [], found = opt.found || [], sel = opt.sel || {}, pick = opt.pick || {}, biz = opt.biz || {}, byId = {};
+    found.forEach(function (f) { byId[f.id] = f; });
+    var kindOf = function (r) { if (r.kind === 'saved') return 'saved'; var f = byId[pick[r.id]]; return !f ? 'none' : f.amount === r.expected ? 'exact' : 'near'; };
+    var cnt = { exact: 0, near: 0, none: 0, saved: 0 };
+    rows.forEach(function (r) { cnt[kindOf(r)]++; });
+    var pills = rows.length ? '<span class="pill st-confirmed">✓ 맞음 ' + cnt.exact + '</span><span class="pill st-draft">△ 확인 ' + cnt.near + '</span><span class="pill bad-pill">✕ 못 찾음 ' + cnt.none + '</span>'
+      + (cnt.saved ? '<span class="pill">넣음 ' + cnt.saved + '</span>' : '') : '';
+    var h = stepHead(1, '입금 확인', (opt.leadName || '대표') + ' 통장(재무관리)에 들어온 돈을 정산표와 자동으로 맞춥니다', pills);
+    var src = opt.loading ? '재무관리 거래내역을 읽는 중…'
+      : (opt.src === 'paste' ? '붙여 넣은 글' : '재무관리 거래내역 자동 읽음' + (opt.at ? ' · ' + kst(opt.at) : ''))
+        + (opt.win ? ' · 기간 ' + opt.win.from.slice(5) + ' ~ ' + opt.win.to.slice(5) : '') + ' · 입금 ' + found.length + '건';
+    h += (opt.err ? '<div class="warn">' + esc(opt.err) + '</div>' : '')
+      + '<div class="bar"><span class="hint">' + esc(src) + '</span><span class="sp"></span><button class="sm" id="auto_reload">재무관리 다시 읽기</button></div>'
+      + '<details class="dep" data-auto-paste' + (opt.pasteOpen ? ' open' : '') + '><summary class="hint">통장 글 붙여넣기 — 인터넷뱅킹·입금 문자·엑셀 줄</summary>'
+      + '<div class="fr"><textarea id="auto_text" rows="3" placeholder="거래내역을 복사해 붙여 넣으세요">' + esc(opt.text || '') + '</textarea></div>'
+      + '<div class="bar"><button class="sm" id="auto_read">붙여 넣은 글로 맞추기</button></div></details>';
+    if (!rows.length) return h + '<div class="empty">맞출 입금이 없습니다 — 이 달에 임시저장인 정산표가 없거나, 요율표에 주관이 없습니다.</div>';
+    var open = rows.filter(function (r) { return r.kind !== 'saved'; });
+    h += '<div class="scroll"><table class="t" data-name="auto"><thead><tr>' + ckHead('auto', open.length > 0 && open.every(function (r) { return sel[r.id]; }))
+      + '<th>사업</th><th>사업장</th><th class="r">예상 세후</th><th>찾은 입금</th><th>판정</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      var k = kindOf(r), f = byId[pick[r.id]];
+      var verdict = k === 'near' ? '△ ' + C.fmt(f.amount - r.expected) + '원 다름' : k === 'saved' && r.actual !== r.expected ? '넣음 · 차이 ' + C.fmt(r.actual - r.expected) : AUTO_KO[k];
+      h += '<tr>' + (k === 'saved' ? '<td class="c"></td>' : ckCell(r.id, sel[r.id])) + '<td class="n">' + (i + 1) + '</td>'
+        + nw('biz', biz[r.typeCode] || r.typeCode || '') + nw('site', r.company + ' ' + r.round + '차', 'ti') + num('exp', r.expected)
+        + '<td data-k="pick">' + (k === 'saved' ? esc(won(r.actual)) : '<select data-auto-pick="' + esc(r.id) + '"><option value="">— 없음 —</option>'
+          + found.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === pick[r.id] ? ' selected' : '') + '>' + esc(C.fmt(x.amount) + '원 · ' + String(x.date || '').slice(5, 16) + (x.memo ? ' · ' + x.memo : '')) + '</option>'; }).join('')
+          + '</select>') + '</td>'
+        + '<td class="nw" data-k="st"><span class="pill ' + ({ exact: 'st-confirmed', near: 'st-draft', none: 'bad-pill', saved: '' }[k]) + '">' + esc(verdict) + '</span></td></tr>';
+    });
+    return h + '</tbody></table></div><div class="bar"><span class="hint">담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아 안내 파일 금액으로 계산합니다</span><span class="sp"></span>'
+      + '<button class="pri" id="auto_save">체크한 줄 저장</button></div>';
+  }
+
+  /* ── ①-2 정산 확인(한 달 2단계) — 정산표마다 한 덩이: 사업 이름 · 상태 · 송금 줄(누가 누구에게 얼마 · 보냄) · 확정 · 자세히 ──
+     opt = {names, biz:{종류:이름}, cur(자세히를 펼친 정산표), detail(그 정산표의 runDetail 글)} */
+  function monthRuns(runs, opt) {
+    opt = opt || {};
+    var names = opt.names || {}, biz = opt.biz || {};
+    var list = (runs || []).filter(function (r) { return r && !r._deleted; });
+    var h = stepHead(2, '정산 확인', '사업장별 자세한 표·통장 실입금 고치기는 «자세히»', '');
+    if (!list.length) return h + '<div class="empty">정산표가 없습니다.</div>';
+    list.forEach(function (r) {
+      var draft = r.status === 'draft', tr = draft ? previewTransfers(r.sites) : (r.transfers || []), open = r.id === opt.cur, iss = issuesOf(r).length, leadBy = {};
+      (r.sites || []).forEach(function (s) { s.members.forEach(function (m) { if (m.role === 'lead') leadBy[s.consultingId || s.company] = m.sid; }); });
+      var bn = biz[r.typeCode] || r.typeCode || '';
+      h += '<div class="mrun' + (open ? ' on' : '') + '"><div class="mrun-h"><b title="' + esc(bn) + '">' + esc(bn) + '</b>'
+        + '<span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? '<span class="pill st-chg">바뀜</span>' : '')
+        + (iss ? '<span class="pill bad-pill">확인 필요 ' + iss + '</span>' : '') + '<span class="sp"></span>'
+        + (draft ? '<button class="sm pri" data-act="confirm" data-rid="' + esc(r.id) + '">확정</button>' : '')
+        + '<button class="sm" data-run="' + esc(r.id) + '">' + (open ? '접기 ▴' : '자세히 ▾') + '</button></div>';
+      if (r.status === 'manual') h += '<div class="trow hint">기록만 — 손으로 정산을 끝낸 달</div>';
+      else if (!tr.length) h += '<div class="trow hint">주고받을 금액 없음</div>';
+      else h += '<div class="mtr">' + tr.map(function (t, i) {
+        var d = C.dirOf(t, leadBy[t.consultingId || t.company]);
+        return '<div class="mtr-r"><span class="pill dir-' + d + '">' + C.DIR_KO[d] + '</span><span class="who">' + esc(nameOf(names, t.fromSid) + ' → ' + nameOf(names, t.toSid)) + '</span>'
+          + '<b class="amt">' + esc(C.fmt(t.amount)) + '원</b><span class="hint co" title="' + esc(t.company) + '">' + esc(t.company) + '</span><span class="sp"></span>'
+          + (draft ? '<span class="hint">확정하면 송금</span>' : '<button class="sm' + (t.paid ? ' sent' : '') + '" data-paid-btn="' + i + '" data-rid="' + esc(r.id) + '">'
+            + (t.paid ? '✓ 보냄 · ' + esc(kst(t.paidAt)) : '보냄 표시') + '</button>') + '</div>';
+      }).join('') + '</div>';
+      h += (open ? '<div class="mdet">' + (opt.detail || '') + '</div>' : '') + '</div>';
+    });
+    return h;
   }
 
   /* ── ①-1 직접 입력 — 안내 엑셀이 없는 컨설팅(대표 선택 2026-10-31) ──
@@ -454,19 +512,95 @@
     return h + '</tbody></table></div>';
   }
 
-  /* ── ⑤ 카톡 문구 ── */
-  /* opt.preview — 확정 전 정산표: 문구는 보여 주되 복사 단추 대신 안내(금액이 바뀔 수 있다) */
-  function messagesBox(msgs, opt) {
+  /* ── ①-3 한 해 합계 탭 — 달마다 한 줄(정산표·상태·송금 보냄·카톡 보냄), 달 이름을 누르면 그 달로 ──
+     rows = [{key:'YYYY-MM', names:[사업 이름], state:C.monthState 결과, kq:{sent, all}}]. 보기 전용 요약(고르기 칸 없음 — yearBox 와 같은 예외) */
+  function yearMonths(rows) {
+    var list = (rows || []).filter(function (r) { return r && r.state && r.state.runs; });
+    var h = '<div class="sec">달마다</div>';
+    if (!list.length) return h + '<div class="empty">이 해에 정산표가 없습니다.</div>';
+    h += '<div class="scroll"><table class="t" data-name="ymonths"><thead><tr><th>달</th><th>정산표</th><th>상태</th><th class="r">송금 보냄</th><th class="r">카톡 보냄</th></tr></thead><tbody>';
+    list.forEach(function (r) {
+      var s = r.state, kq = r.kq || {};
+      h += '<tr><td class="nw" data-k="mon"><a href="#" data-month="' + esc(r.key) + '">' + Number(String(r.key).slice(5)) + '월</a></td>' + nw('runs', (r.names || []).join(' · '), 'ti')
+        + '<td class="nw" data-k="st"><span class="pill ' + (s.state === 'done' ? 'st-confirmed' : 'st-draft') + '">' + esc(MSTATE_KO[s.state]) + '</span></td>'
+        + '<td class="r" data-k="paid">' + (s.transfers ? s.paid + ' / ' + s.transfers : '') + '</td>'
+        + '<td class="r" data-k="kq">' + (kq.all ? kq.sent + ' / ' + kq.all : '') + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  /* ── ⑤ 카톡 보내기(한 달 3단계) — 그 달 정산표의 담당별 문구를 펼쳐 보이고(계산 설명은 접음), 카드마다 방·발송 상태·복사·보내기 ──
+     대표 지시 2026-11-07 「ui 너무 불편하다 쉽고 직관적으로」 — 좁은 글상자를 굴려 읽지 않게 요약은 그대로 펼친다.
+     items = [{rid, i(그 정산표 문구 번호), sid, name, text, biz, preview(확정 전)}]
+     opt = {rooms:{sid:방}, last:{rid:{sid:대기열 줄}}, isAdmin, agent(PC 카톡 연결 줄 글), go:{label}(한꺼번에 단추), multi(정산표가 여럿 — 카드에 사업 이름)}
+     ⚠ 확정 전은 미리보기 — 복사·보내기 없음. 보내기는 대표 + 방 이름이 있을 때만. 방이 없으면 대표에게 그 자리에 등록 칸 */
+  var MSG_SEP = '\n──────────\n';
+  function splitMsg(text) {
+    var s = String(text == null ? '' : text), cut = s.indexOf(MSG_SEP);
+    return cut < 0 ? { summary: s, explain: '' } : { summary: s.slice(0, cut), explain: s.slice(cut + MSG_SEP.length) };
+  }
+  function monthMsgs(items, opt) {
     opt = opt || {};
-    if (!(msgs || []).length) return '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 정산표를 고르세요.</div>';
-    return (opt.preview ? '<div class="warn">확정 전 미리보기입니다 — 금액이 바뀔 수 있어 복사는 정산표를 «확정»한 뒤에 됩니다.</div>' : '')
-      + '<div class="cards">' + msgs.map(function (m, i) {
-      return '<div class="card cardp"><div class="bar"><b>' + esc(m.name) + '</b><span class="sp"></span>'
-        + (opt.preview ? '<span class="hint">확정하면 복사</span>' : '<button class="sm pri" data-copy="' + i + '">복사</button>') + '</div>'
-        + '<textarea readonly rows="' + Math.min(30, String(m.text).split('\n').length + 1) + '" data-msg="' + i + '">' + esc(m.text) + '</textarea></div>';
+    var rooms = opt.rooms || {}, last = opt.last || {};
+    var h = stepHead(3, '카톡 보내기', '확정한 정산표만 보냅니다 · 보낸 기록은 이 달에 남습니다', opt.go ? '<button class="pri" id="monthGo">' + esc(opt.go.label) + '</button>' : '') + (opt.agent || '');
+    if (!(items || []).length) return h + '<div class="empty">보낼 문구가 없습니다 — 담당노무사 정산이 있는 정산표가 생기면 여기에 나옵니다.</div>';
+    return h + '<div class="kcards">' + items.map(function (x) {
+      var room = rooms[x.sid] || '', k = (last[x.rid] || {})[x.sid], p = splitMsg(x.text), ref = x.rid + '|' + x.i;
+      return '<div class="kcard"><div class="kh"><b>' + esc(x.name) + '</b>' + (opt.multi ? '<span class="hint" title="' + esc(x.biz) + '">' + esc(x.biz) + '</span>' : '') + '<span class="sp"></span>'
+        + (x.preview ? '<span class="pill st-draft">확정 전 미리보기</span>'
+          : '<button class="sm" data-copy="' + esc(ref) + '">복사</button>' + (opt.isAdmin && room ? '<button class="sm pri" data-kq="' + esc(ref) + '" title="대표 PC 카톡으로 «' + esc(room) + '» 방에 보낸다">카톡 보내기</button>' : ''))
+        + '</div><div class="kst">' + (room ? '<span class="pill st-confirmed" title="' + esc(room) + '">💬 ' + esc(room) + '</span>' : '<span class="pill st-draft">카톡 방 없음</span>') + (k ? kqPill(k) : '') + '</div>'
+        + (!room && opt.isAdmin ? '<div class="kroom"><input type="text" class="room" data-room="' + esc(x.sid) + '" placeholder="PC 카톡에서 이 사람 대화방 맨 위 이름"><button class="sm" data-room-save="' + esc(x.sid) + '">방 등록</button></div>' : '')
+        + '<div class="msg">' + esc(p.summary) + '</div>'
+        + (p.explain ? '<details class="why"><summary>계산 설명 펼치기</summary><div class="msg">' + esc(p.explain) + '</div></details>' : '') + '</div>';
     }).join('') + '</div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, runsTable: runsTable, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
-    rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable, messagesBox: messagesBox };
+  /* ── ⑤-1 카톡 자동 발송 — 대기열 상태 딱지 · 심부름꾼 상태 · 카톡 방 · 보낸 기록 ── */
+  function kqState(k) {
+    if (!k) return { cls: '', text: '' };
+    if (k.status === 'sent') return k.redirect ? { cls: 'st-draft', text: '시험 발송(' + k.redirect + ') · ' + kst(k.sentAt) } : { cls: 'st-confirmed', text: '✓ 보냄 · ' + kst(k.sentAt) };
+    if (k.status === 'failed') return { cls: 'bad-pill', text: '실패 — ' + (k.error || '') };
+    if (k.dryRunAt) return { cls: 'st-draft', text: '시험 모드 — 보내지 않음' };
+    return { cls: 'st-draft', text: '대기 중' + (k.note ? ' — ' + k.note : '') };
+  }
+  function kqPill(k) { var s = kqState(k); return '<span class="pill ' + s.cls + '" title="' + esc(s.text) + '">' + esc(s.text) + '</span>'; }
+  /* PC 카톡 연결 한 줄 — 심부름꾼 상태를 쉬운 말로(대표 지시 2026-11-07 「쉽고 직관적으로」). 마지막 응답이 10분 넘으면 경고(꺼졌거나 PC 카톡이 닫힌 것) */
+  function agentLine(a, now) {
+    if (!a || !a.agentSeenAt) return '<div class="warn">🔌 대표님 PC 카톡이 아직 연결되지 않았습니다 — 연결 전에는 «복사»로 보내세요(«카톡 보내기»는 기다렸다가 연결되면 나갑니다).</div>';
+    var mins = Math.max(0, Math.round((now - Number(a.agentSeenAt)) / 60000)), old = mins > 10;
+    var mode = a.mode === 'live' ? (a.redirect ? '연결됨 · 시험 방(' + a.redirect + ')으로만 보냄' : '연결됨') : '시험 모드(PC 카톡에 넣지 않음)';
+    return '<div class="' + (old ? 'warn' : 'bar') + '"><span class="hint">🔌 PC 카톡 — ' + esc(mode) + ' · 마지막 확인 ' + (mins < 1 ? '방금' : mins + '분 전')
+      + (old ? ' — 연결이 끊긴 것 같습니다(대표 PC·카톡이 켜져 있는지 보세요)' : '') + (a.message ? ' · ' + esc(a.message) : '') + '</span></div>';
+  }
+  /* 카톡 방 — 담당마다 PC 카톡 창 제목 그대로(대표만 고친다) */
+  function roomsTable(people, rooms, names, sel, canEdit) {
+    sel = sel || {}; rooms = rooms || {}; names = names || {};
+    if (!(people || []).length) return '<div class="empty">요율표에 담당이 없습니다.</div>';
+    var h = '<div class="scroll"><table class="t" data-name="rooms"><thead><tr>' + ckHead('rooms', people.every(function (s) { return sel[s]; }))
+      + '<th>이름</th><th>카톡 방 이름 — PC 카톡에서 그 사람 대화방을 열면 맨 위에 보이는 이름</th><th></th></tr></thead><tbody>';
+    people.forEach(function (sid, i) {
+      var r = rooms[sid] || '';
+      h += '<tr>' + ckCell(sid, sel[sid]) + '<td class="n">' + (i + 1) + '</td>' + nw('name', nameOf(names, sid), 'ti')
+        + '<td data-k="room">' + (canEdit ? '<input type="text" class="room" data-room="' + esc(sid) + '" value="' + esc(r) + '" placeholder="예: 김가나 공인노무사(푸른노무법인)">' : esc(r || '—')) + '</td>'
+        + '<td data-k="btn">' + (canEdit ? '<button class="sm" data-room-save="' + esc(sid) + '">저장</button>' : '') + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+  /* 보낸 기록 — 최근 것 위 */
+  function kqTable(items, names, runLabels, sel) {
+    sel = sel || {}; names = names || {}; runLabels = runLabels || {};
+    var list = (items || []).filter(function (k) { return k && k.id; }).sort(function (a, b) { return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+    if (!list.length) return '<div class="empty">아직 보낸 카톡이 없습니다.</div>';
+    var h = '<div class="scroll"><table class="t" data-name="kq"><thead><tr>' + ckHead('kq', list.every(function (k) { return sel[k.id]; }))
+      + '<th>받는 사람</th><th>정산표</th><th>상태</th><th>넣은 때</th></tr></thead><tbody>';
+    list.forEach(function (k, i) {
+      h += '<tr>' + ckCell(k.id, sel[k.id]) + '<td class="n">' + (i + 1) + '</td>' + nw('name', nameOf(names, k.sid), 'ti') + nw('run', runLabels[k.runId] || k.runId || '')
+        + '<td class="nw" data-k="st">' + kqPill(k) + '</td><td class="nw" data-k="at">' + esc(kst(k.createdAt)) + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  return { STATUS_KO: STATUS_KO, esc: esc, kqState: kqState, agentLine: agentLine, roomsTable: roomsTable, kqTable: kqTable, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, monthStrip: monthStrip, reviewBox: reviewBox, monthRuns: monthRuns, monthMsgs: monthMsgs, splitMsg: splitMsg, yearMonths: yearMonths, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+    rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable };
 });

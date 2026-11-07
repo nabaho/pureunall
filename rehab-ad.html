@@ -12,7 +12,7 @@
      방식 결정 「추천대로」 = ① 서버가 매일 모은다 ② 사람이 고른다 ③ 우편으로 보낸다.
 
      ★ 자료가 오는 길
-       서버 rehabWatch(functions/rehab-watch.js, 매일 07:40)가 전국 회생 관할 법원 공고에서
+       서버 rehabWatch(functions/rehab-watch.js, 매일 18:00 — 2026-11-02 부터. 그전 07:40)가 전국 회생 관할 법원 공고에서
        «법인회생 · 포괄적 금지명령» 사건을 rehab_ad/notices 에 담고, 같은 사건의 개시결정·인가 같은 공고는 «이력(events)»과
        «단계(stage)»로 붙인다. 회사 연락처는 rehab_ad/info 에 담긴다(functions/rehab-contact.js — 홈페이지·업체 정보에서만).
        이 화면은 notices·info 를 «읽기만» 한다. 사람이 정하는 것(상태·메모·손으로 고친 연락처)만 rehab_ad/marks 에 쓴다.
@@ -73,6 +73,14 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .mbody iframe{flex:1;border:0;background:#ffffff}
 .mbody pre{flex:1;margin:0;padding:14px 18px;overflow:auto;white-space:pre-wrap;word-break:keep-all;font:13.5px/1.7 -apple-system,'Malgun Gothic',sans-serif}
 .mfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:9px 14px;border-top:1px solid var(--line)}
+table.lgt{width:100%;border-collapse:collapse;font-size:13px}
+table.lgt th{position:sticky;top:0;background:var(--bg);text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);font-weight:600;color:var(--ink2)}
+table.lgt td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.lgt tr[data-id]{cursor:pointer}
+table.lgt tr[data-id]:hover{background:var(--blue-bg)}
+table.lgt td.nw{white-space:nowrap}
+table.lgt td.co{white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+table.lgt td.memo{max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mfoot .hint{flex:1;font-size:12px;color:var(--mute)}
 @media (min-width:1101px){
   th.ck,td.ck{position:sticky;left:0;z-index:1;background:var(--card)}
@@ -332,6 +340,7 @@ td.mm{display:none}
     <span class="sub">법인회생(포괄적 금지명령) → 우편 안내</span>
     <span id="who"></span>
     <span class="sp"></span>
+    <button class="sm" onclick="openLogs()" title="보낸 메일·우편 기록 모아 보기">📜 발송 기록</button>
     <button class="sm pri" onclick="openForm()">📄 홍보양식<span class="wide-only"> 보기</span></button>
     <button class="sm" id="refreshBtn" onclick="reload()" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
@@ -457,19 +466,33 @@ td.mm{display:none}
     </div>
   </div>
 </div>
+<div class="modal" id="logModal" onclick="if(event.target===this) closeLogs()">
+  <div class="mbox" role="dialog" aria-modal="true" aria-label="발송 기록">
+    <div class="mhead">
+      <h3>📜 발송 기록</h3>
+      <select id="lgDays" onchange="drawLogs()" aria-label="기간"><option value="0">전체 기간</option><option value="1">오늘</option><option value="7">최근 7일</option><option value="30">최근 30일</option></select>
+      <span id="lgSum" style="font-size:12.5px;color:var(--ink2)"></span>
+      <span class="sp"></span>
+      <button class="sm" onclick="downloadLogCsv()">⬇ CSV</button>
+      <button class="sm" onclick="closeLogs()">닫기 ✕</button>
+    </div>
+    <div class="mbody" id="lgBody" style="display:block;overflow:auto"></div>
+    <div class="mfoot"><span class="hint">줄을 누르면 그 회사의 상세로 갑니다. 🤖 = 서버가 자동으로 보낸 메일(보낸 시각이 그대로 기록됩니다). 직접 적은 기록은 상세 패널의 「발송 기록」에서 고칩니다.</span></div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=87"></script>
+<script src="js/pu-ontology.js?v=90"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
      없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=39"></script>
+<script src="js/pu-appbar.js?v=40"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -508,11 +531,11 @@ async function autoCall(body, okMsg){
 function drawAuto(){
   var s=AUTO.settings, p=AUTO.preview||{}, items=p.items||[], skipped=p.skipped||[];
   var ac=$('autoChip'); if(ac){ ac.textContent='자동 '+(s.enabled?'켜짐':'꺼짐'); ac.className='chip '+(s.enabled?'c-green':'c-gray'); }
-  $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처만) '+
+  $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처·기업정보함) '+
     '<span class="chip '+(s.enabled?'c-green':'c-gray')+'" style="margin-left:0">'+(s.enabled?'켜짐':'꺼짐')+'</span>'+
     '<span style="color:var(--mute)">보낼 곳 '+items.length+'곳 · 오늘 건 '+(p.sentToday||0)+'/'+s.dailyCap+'통</span>';
   var rows=items.map(function(x){
-    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(x.ceo||'')+'</td><td>'+(x.willSend?'<span class="chip c-green" style="margin-left:0">걸었음</span>':'<span class="chip c-gray" style="margin-left:0">'+(s.enabled?'다음 실행 때':'꺼져 있어 안 보냄')+'</span>')+'</td></tr>';
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.email)+' <span style="color:var(--mute);font-size:11.5px">'+(x.basis==='cards'?'기업정보함':'거래처')+'</span></td><td>'+esc(x.ceo||'')+'</td><td>'+(x.willSend?'<span class="chip c-green" style="margin-left:0">걸었음</span>':'<span class="chip c-gray" style="margin-left:0">'+(s.enabled?'다음 실행 때':'꺼져 있어 안 보냄')+'</span>')+'</td></tr>';
   }).join('');
   var skip=skipped.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td colspan="3">'+esc(x.reason)+'</td></tr>'; }).join('');
   var rec=Object.keys(AUTO.recent||{}).map(function(k){ return AUTO.recent[k]; }).sort(function(a,b){ return (b.at||0)-(a.at||0); }).slice(0,10).map(function(x){
@@ -579,7 +602,7 @@ function logCell(id){
 function logSection(n){
   var id=n.id, all=logOf(id).map(function(x,i){ return { x:x, i:i }; }).sort(function(a,b){ return String(b.x.d||'').localeCompare(String(a.x.d||'')); });
   var rows=all.map(function(o){
-    return '<div class="lgrow"><span class="d">'+esc(o.x.d||'')+'</span><b>'+esc(o.x.m||'')+'</b>'+
+    return '<div class="lgrow"><span class="d">'+esc(o.x.d||'')+(o.x.t?' '+esc(o.x.t):'')+'</span><b>'+esc(o.x.m||'')+(o.x.auto?' <span title="서버가 자동으로 보냈습니다">🤖</span>':'')+'</b>'+
       '<select onchange="setLogReaction('+o.i+',this.value)" aria-label="반응">'+REACTIONS.map(function(r){ return '<option value="'+esc(r)+'"'+(r===(o.x.r||'')?' selected':'')+'>'+(r||'반응 없음 표시')+'</option>'; }).join('')+'</select>'+
       '<span style="flex:1;color:var(--ink2)">'+esc(o.x.n||'')+'</span>'+
       '<button class="sm" onclick="delLog('+o.i+')" title="이 기록 지우기">✕</button></div>';
@@ -824,7 +847,7 @@ function draw(){
       '<td class="trd">'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td>'+
       '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
-      '<td class="lg">'+logCell(n.id)+'</td><td class="st'+(st==='new'?' st-new':'')+'"><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td>'+
+      '<td class="lg">'+logCell(n.id)+'</td><td class="st'+(st==='new'?' st-new':'')+'"><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span>'+((st==='send' && MARKS[n.id] && MARKS[n.id].autoQueued)?' <span title="매일 수집 때 서버가 자동으로 예정 표시했습니다 — 사람이 다시 표시하면 사라집니다">🤖</span>':'')+'</td>'+
       '<td class="mm">'+phoneMeta(n,ce,c)+'</td></tr>';
   }).join('');
   $('rows').innerHTML=html;
@@ -1039,13 +1062,13 @@ async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value'
 async function loadInfo(){ INFO=(await fbDb.ref('rehab_ad/info').once('value')).val()||{}; }
 async function loadFsc(){ try{ FSC=(await fbDb.ref('rehab_ad/fsc').once('value')).val()||{}; }catch(e){ FSC={}; } }
 async function setStatus(id, st){
-  try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
+  try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null), autoQueued:false }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
   catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
 }
 async function bulk(st){
   var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
   if(!confirm(list.length+'곳을 「'+STATUS[st]+'」(으)로 표시할까요?')) return;
-  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); }));
+  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null), autoQueued:false }; }); }));
   var fail=res.filter(function(r){ return r.status==='rejected'; });
   await loadMarks(); SEL={}; draw();
   toast(fail.length ? ((list.length-fail.length)+'곳 저장 · '+fail.length+'곳 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason)) : list.length+'곳을 「'+STATUS[st]+'」(으)로 표시했습니다');
@@ -1121,6 +1144,54 @@ function downloadCsv(){
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 
+/* ═══ 발송 기록 모아 보기 — 직접 적은 기록(marks/<id>/sendLog) + 자동 메일이 나간 기록을 한 표로 (2026-11-07 대표 요청) ═══
+   자동 메일은 서버(sendScheduledMail)가 보낸 «시각»을 그 회사의 sendLog 에 남기고 「발송 완료」로 표시한다(auto:true).
+   아직 안 나갔거나 실패한 자동 메일은 rehab_ad/auto/sent 의 상태로 함께 보여 준다. */
+var SENT={};
+function kstParts(ms){ var d=new Date(Number(ms)+9*3600e3).toISOString(); return { d:d.slice(0,10), t:d.slice(11,16) }; }
+function allLogRows(){
+  var rows=[];
+  Object.keys(NOTICES).forEach(function(id){ var n=NOTICES[id]; if(!n||n._deleted) return;
+    logOf(id).forEach(function(x){ rows.push({ id:id, name:n.debtorName, d:x.d||'', t:x.t||'', m:x.m||'', n:x.n||'', r:x.r||'', auto:!!x.auto }); }); });
+  Object.keys(SENT).forEach(function(id){ var s=SENT[id], n=NOTICES[id]; if(!s||!n||s.state==='sent') return;
+    var p=kstParts(s.sendAt||s.at||0);
+    rows.push({ id:id, name:n.debtorName, d:p.d, t:p.t, m:'메일', r:'', auto:true,
+      n:'자동 메일 → '+(s.email||'')+(s.state==='failed'?' · 발송 실패'+(s.error?': '+s.error:''):' · 발송 대기'), bad:s.state==='failed', wait:s.state!=='failed' }); });
+  rows.sort(function(a,b){ return (b.d+' '+(b.t||'00:00')).localeCompare(a.d+' '+(a.t||'00:00')); });
+  return rows;
+}
+function logRowsNow(){
+  var days=Number($('lgDays').value)||0, since=days?daysAgo(days):'';
+  return allLogRows().filter(function(r){ return !since || r.d>=since; });
+}
+async function openLogs(){
+  $('logModal').classList.add('on');
+  $('lgBody').innerHTML='<div style="padding:16px;color:var(--mute)">불러오는 중…</div>';
+  try{ SENT=(await fbDb.ref('rehab_ad/auto/sent').once('value')).val()||{}; await loadMarks(); }catch(e){ SENT={}; }
+  drawLogs();
+}
+function closeLogs(){ $('logModal').classList.remove('on'); $('lgBody').innerHTML=''; }
+function drawLogs(){
+  var rows=logRowsNow(), auto=rows.filter(function(r){ return r.auto; }).length;
+  $('lgSum').textContent='전체 '+rows.length+'건 · 자동 메일 '+auto+'건 · 직접 기록 '+(rows.length-auto)+'건';
+  if(!rows.length){ $('lgBody').innerHTML='<div style="padding:18px;color:var(--mute)">아직 발송 기록이 없습니다. 자동 메일이 나가거나, 상세 패널에서 「기록 추가」를 하면 여기에 모입니다.</div>'; return; }
+  $('lgBody').innerHTML='<table class="lgt"><thead><tr><th>보낸 때</th><th>회사</th><th>방법</th><th>받는 곳·메모</th><th>반응</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      return '<tr data-id="'+esc(r.id)+'"><td class="nw">'+esc(r.d)+(r.t?' '+esc(r.t):'')+'</td><td class="co">'+esc(r.name)+'</td>'+
+        '<td class="nw">'+esc(r.m)+(r.auto?' <span title="서버가 자동으로 보냈습니다">🤖</span>':'')+'</td>'+
+        '<td class="memo" title="'+esc(r.n)+'">'+(r.bad?'<span class="chip c-red" style="margin-left:0">실패</span> ':r.wait?'<span class="chip c-amber" style="margin-left:0">대기</span> ':'')+esc(r.n)+'</td>'+
+        '<td class="nw">'+reactChip(r.r)+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function downloadLogCsv(){
+  var rows=logRowsNow(); if(!rows.length){ toast('내려받을 기록이 없습니다'); return; }
+  var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  var body=rows.map(function(r){ return [r.d,r.t,r.name,r.m,r.auto?'자동':'직접',r.n,r.r].map(q).join(','); });
+  var blob=new Blob(['﻿'+['보낸 날,시각,회사명,방법,구분,받는 곳·메모,반응'].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_발송기록_'+seoulToday()+'_'+rows.length+'건.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
 /* ═══ 불러오기 ═══ */
 async function reload(){
   try{
@@ -1164,6 +1235,7 @@ function boot(){
   }
   $('funnel').addEventListener('click',funnelHandler);
   $('funnelMore').addEventListener('click',funnelHandler);
+  $('lgBody').addEventListener('click',function(e){ var tr=e.target.closest('tr[data-id]'); if(!tr) return; var id=tr.getAttribute('data-id'); closeLogs(); openDetail(id); });
   $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
   $('rows').addEventListener('click',function(e){
     var sc=e.target.closest('td.sr'); if(sc){ toggleStar(sc.getAttribute('data-star')); return; }

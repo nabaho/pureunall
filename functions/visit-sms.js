@@ -129,6 +129,7 @@ function planToday(src) {
   arr(src.scheds).forEach((s) => {
     if (!s || s.date !== src.date) return;
     if (s.isField !== true) return;                      // 사무실 일정은 안 보낸다
+    if (s.phase === "post") return;                      // 사후컨설팅(끝난 사업의 후속 방문)은 안내 문자를 만들지 않는다 — 보내려면 대표 결정 뒤에 뺀다
     if (s._deleted === true || s.deleted === true) return;
     if (!targets.has(String(s.attId))) return;           // 대상 담당자의 일정만
     const k = String(s.coId || "");
