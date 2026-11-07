@@ -3,9 +3,13 @@
 푸른노무법인 ERP. 빌드 단계가 없는 **순수 HTML/JS 앱 열아홉 개**를
 GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 
-- **자세한 규칙과 그 «까닭»은 `CLAUDE.md` 에 있다.** 이 파일은 그 요약이자,
+- **규칙은 `CLAUDE.md` 에, 그 «까닭»·사례·명령 설명은 `docs/규칙/` 에 있다.** 이 파일은 그 요약이자,
   Codex·Copilot 처럼 `CLAUDE.md` 를 안 읽는 도구를 위한 같은 내용의 문이다.
+  어떤 일을 하기 전에 `CLAUDE.md` 의 그 절이 가리키는 `docs/규칙/` 문서를 먼저 읽는다.
 - 두 파일이 어긋나면 **`CLAUDE.md` 가 이긴다.** 고칠 때는 둘 다 고친다.
+- `CLAUDE.md` 는 짧게 둔다(대화마다 통째로 실린다) — 새 규칙은 지킬 것 한두 줄만 넣고 까닭은 `docs/규칙/` 에.
+- **대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어.
+  Gemini·Antigravity 는 `GEMINI.md` 를 읽는다. 개인설정(Claude Code·Gemini·Antigravity·Codex): `node scripts/korean-everywhere.js --apply` · 자세히: `docs/규칙/한국어로-대답.md`
 - **한국어로 쓴다** — 주석·커밋·검사 이름·화면 글자 전부. 노무 용어를 지킨다
   (급여→임금, 직원→근로자).
 

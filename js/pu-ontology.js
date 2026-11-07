@@ -35,7 +35,7 @@
       /* 취업규칙 새로 짓기 ① (2026-10-03) — 메일에서 모아 가린 취업규칙 서류와, 사업장의 개정 «회차».
          회차 레코드가 ★최종본(finalDocId) 하나를 갖는다 — 「회차에 하나」가 저절로 지켜진다. */
       RulesDocument:'취업규칙 서류', RulesRound:'취업규칙 회차',
-      CareerRecord:'경력 실적',
+      CareerRecord:'경력 실적', ApplicationPack:'공고별 지원 준비',
       /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
          관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
       ViewState:'보던 자리'
@@ -207,7 +207,8 @@
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],
-      entityTypes:['Person','Employment','Project','Document'] },
+      entityTypes:['Person','Employment','Project','Document','ApplicationPack'],
+      writeContracts:[{path:'kcareer/{uid}/applicationPacks/{id}',entityType:'ApplicationPack'}] },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-05).
        ⚠ 경력관리와 «다른 집»이다. 여기 담기는 것은 «아직 안 한 일»(공고·기회)이고
          경력관리는 «이미 한 일»(실적)이다. 섞으면 지원서에 안 한 일이 실적으로 들어간다.
@@ -574,6 +575,7 @@
       gives:'취업규칙 서류·회차 (고객사 규칙 원문 — 통합 진단에서 읽지 않는다)'},
     fund_core:{program:'fund',strategy:'local',path:'data/funds',parser:'erp'},
     work_items:{program:'work',strategy:'remote',path:'work_erp/items',parser:'workItems'},
+    career_application_packs:{program:'career',strategy:'in_app',path:'kcareer/{uid}/applicationPacks',parser:'coverage',gives:'본인 전용 지원 준비·초안·증빙 연결'},
     career_counts:{program:'career',strategy:'remote',path:'kcareer/{uid}/counts',parser:'coverage'},
     /* ⚠★ strategy:'local' 이다 — gov/{uid} 안에는 공공데이터포털·기업마당 «인증키»가 있다.
        remote 로 바꾸면 통합진단이 열쇠를 통째로 읽어 간다. 바꾸지 말 것. */

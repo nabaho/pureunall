@@ -75,7 +75,7 @@ test('★★★ 사업별로 묶으면 «그 사업 줄만» 보인다', () => {
      ⚠ 하나씩 채우면 소스가 곁일을 하나 더 부르는 순간 또 헛돈다 —
        모르는 이름은 무해한 함수로 받는다. */
   const known = {
-    getScheds: () => [], getFieldState: () => false, nextRound: () => 1,
+    getScheds: () => [], getMainScheds: () => [], getFieldState: () => false, nextRound: () => 1,
     getTypes: () => [], escAttr: (x) => String(x == null ? '' : x),
     String, Number, Math, Array, Object, JSON, Boolean, Date, RegExp, isNaN,
   };

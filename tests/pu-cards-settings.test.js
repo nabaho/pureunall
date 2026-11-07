@@ -46,6 +46,7 @@ function makeCtx(counts, panelTarget){
     /* 📋 등록증 → 기업상세 (2026-09-18). 세는 «규칙»은
        tests/cards-bizfill-coinfo.test.js 가 가짜 서버에 물려 본다 — 여기서는 숫자만 준다. */
     bizFillCount(){ return counts.bizFill || 0; },
+    coSuspectList(){ return new Array(counts.sus || 0).fill({}); },   /* 🔎 같은 회사 의심 (2026-11-02) — 목록 계산은 tests/cards-co-strong-name 이 본다 */
     toast(){}
   };
   vm.createContext(c);
@@ -117,7 +118,7 @@ function makeCtx(counts, panelTarget){
   t('★ 이상 없음은 초록', /color:var\(--green\)">✓ 이상 없음/.test(h), true);
 }
 {
-  const { c, written } = makeCtx({ dup: 7, sim: 12, empty: 2, moji: 1, nameFix: 3, mixedFix: 4, trash: 5, bizFill: 9 }, 'inline');
+  const { c, written } = makeCtx({ dup: 7, sim: 12, empty: 2, moji: 1, nameFix: 3, mixedFix: 4, trash: 5, bizFill: 9, sus: 6 }, 'inline');
   // ★ 규칙 분류(Task 3) 항목도 걸리는 게 있어야 이 줄만 "이상 없음"으로 남지 않는다 —
   //   기본 규칙(CLASSIFY_DEFAULTS)의 '노무' 단어가 걸리도록 미분류 명함 하나를 심는다.
   c.state.items = { x1: { id:'x1', kind:'card', company:'노무법인테스트', group:'' } };

@@ -593,6 +593,49 @@
     });
     return { year: String(year), counts: n, people: order.map(function (k) { return by[k]; }), leads: leads };
   }
+  /* 한 달의 할 일 — 그 달 정산표들(지운 것 뺌)로 none(정산 없음) / todo(할 일 남음) / done(끝)
+     (대표 지시 2026-11-07 「정산표나 카톡문구를 월별 년도별관리가능하게」). 끝 = 임시저장이 없고 확정한 정산표의 송금이 모두 «보냄» */
+  function monthState(runs) {
+    var list = (runs || []).filter(function (r) { return r && !r._deleted; });
+    var n = { runs: list.length, draft: 0, transfers: 0, paid: 0, left: 0 };
+    list.forEach(function (r) {
+      if (r.status === 'draft') n.draft++;
+      if (r.status === 'confirmed') toArr(r.transfers).forEach(function (t) { n.transfers++; if (t.paid) n.paid++; else n.left++; });
+    });
+    n.state = !n.runs ? 'none' : (n.draft || n.left) ? 'todo' : 'done';
+    return n;
+  }
+  /* 한 달 입금 자동 검토(대표 지시 2026-11-07 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) — 그 달 «임시저장» 정산표들의
+     주관 몫(대표 통장으로 들어오는 돈)을 통장 입금과 한꺼번에 맞춘다. 입금 한 줄은 한 번만 쓴다(정산표가 여럿이어도).
+     leadOf = {사업 종류: 주관 사번}. ⚠ 담당 개인 통장은 대표 통장 거래내역에 없다 — 주관만 본다.
+     ⚠ 이미 넣은 통장 실입금은 kind 'saved' 로만 보이고 다시 맞추지 않는다. 맞추기만 한다(저장은 화면 단추로만). */
+  function reviewMonth(runs, leadOf, found) {
+    var rows = [], todo = [];
+    (runs || []).forEach(function (run) {
+      if (!run || run._deleted || run.status !== 'draft') return;
+      var lead = (leadOf || {})[run.typeCode];
+      if (!lead) return;
+      expectedFor(run, lead).forEach(function (e) {
+        var r = { id: run.id + '::' + e.key, runId: run.id, typeCode: run.typeCode, key: e.key, company: e.company, round: e.round, expected: e.amount, actual: e.actual,
+          found: null, kind: e.actual == null ? 'none' : 'saved', diff: null };
+        rows.push(r);
+        if (e.actual == null) todo.push(r);
+      });
+    });
+    /* 이미 넣은 실입금과 같은 금액의 입금 한 줄은 «쓴 것»으로 뺀다 — 남은 줄이 같은 입금을 또 잡지 않게 */
+    var pool = (found || []).slice();
+    rows.forEach(function (r) {
+      if (r.kind !== 'saved') return;
+      for (var i = 0; i < pool.length; i++) if (pool[i].amount === r.actual) { pool.splice(i, 1); return; }
+    });
+    matchDeposits(todo.map(function (r, i) { return { key: String(i), company: r.company, amount: r.expected }; }), pool).forEach(function (o, i) {
+      todo[i].found = o.found; todo[i].kind = o.kind; todo[i].diff = o.diff;
+    });
+    var used = {}, counts = { exact: 0, near: 0, none: 0, saved: 0 };
+    rows.forEach(function (r) { counts[r.kind]++; if (r.found) used[r.found.id] = 1; });
+    counts.other = pool.filter(function (f) { return !used[f.id]; }).length;
+    return { rows: rows, counts: counts };
+  }
 
   return {
     DEFAULT_HEAD: DEFAULT_HEAD, DEFAULT_FOOT: DEFAULT_FOOT,
@@ -603,6 +646,7 @@
     parseDepositText: parseDepositText, ledgerDeposits: ledgerDeposits, depositWindow: depositWindow, expectedFor: expectedFor, matchDeposits: matchDeposits,
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
     manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
-    TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate
+    TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate,
+    monthState: monthState, reviewMonth: reviewMonth
   };
 });

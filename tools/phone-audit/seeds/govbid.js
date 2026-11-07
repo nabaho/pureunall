@@ -24,6 +24,13 @@ module.exports = {
   localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
   data: { gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
   views: [
+    { name:'application-handoff',run:async(p)=>{
+      await p.evaluate(()=>{localStorage.setItem('cm3_owner_uid','pa-uid-1');toForm(get('feed')[0].id);});
+      await p.waitForSelector('#apDialog[open]',{timeout:25000});
+      if(!(await p.locator('#apHeading').textContent()).includes('지원 준비'))throw new Error('정부사업신청에서 경력관리로 연결되지 않음');
+    },back:async(p)=>{await p.goto(new URL('gov.html',p.url()).href);await p.waitForTimeout(1500);} },
+
+    { name:'application-pick',run:async(p)=>{await p.evaluate(()=>pickOpen());},back:async(p)=>{await p.evaluate(()=>popClose());} },
     { name: 'sel', run: async (p) => { for (const k of [1, 2, 3]) await p.click('#tb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'pop', run: async (p) => { await p.click('#tb tr:nth-child(2) td.nm'); }, back: async (p) => { await p.evaluate(() => popClose()); } },
     { name: 'plan', run: async (p) => { await p.click('#tbPlan'); } },

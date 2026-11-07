@@ -49,6 +49,9 @@ public final class HanaNotificationListener extends NotificationListenerService 
 
     private void onKakao(StatusBarNotification sbn) {
         KakaoNotice.Parsed parsed = KakaoNotice.parse(sbn);
+        /* 거르기 «전에» 센다 — 버린 것도 세어야 업무방 알림이 왜 0건인지 화면이 말할 수 있다(2026-11-07).
+           ⚠ 방 이름은 세는 곳에도 남지 않는다(KakaoTally 머리말). */
+        KakaoTally.record(this, parsed == null ? null : parsed.room);
         if (parsed == null || !KakaoRooms.allowed(this, parsed.room)) return;
         java.util.List<KakaoNotice.Item> fresh = new java.util.ArrayList<>();
         for (KakaoNotice.Item item : parsed.items) {

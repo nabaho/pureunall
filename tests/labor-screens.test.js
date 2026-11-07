@@ -262,6 +262,150 @@ ok('setLeaveHours·setSiteDailyHours·maxHourLeaveFor 정의·노출',
   H.indexOf('window.setLeaveHours=setLeaveHours') > -1 &&
   H.indexOf('window.setSiteDailyHours=setSiteDailyHours') > -1);
 
+section('UI 한화면 정리 · 계약/취업규칙 빈 상태 진입 · HTML/CSS 웹 급여대장 런타임 검증');
+(function () {
+  var vm = require('vm');
+  var ctx = {
+    console: console, Math: Math, Date: Date, JSON: JSON, Object: Object, Array: Array,
+    String: String, Number: Number, Boolean: Boolean, RegExp: RegExp,
+    parseInt: parseInt, parseFloat: parseFloat, isNaN: isNaN, isFinite: isFinite,
+    encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent,
+    setTimeout: function () {}, clearTimeout: function () {},
+    PuLaborCore: LC,
+    ROOT: 'payroll_os',
+    cache: {
+      companies: {
+        empty_co: { id: 'empty_co', name: '㈜경보엔지니어링', typeCode: '급여', status: 'active' },
+        hanwoo_co: { id: 'hanwoo_co', name: '1일등한우', typeCode: '급여', status: 'active' }
+      }
+    },
+    fbDb: {
+      ref: function () {
+        return {
+          set: function () { return Promise.resolve(); },
+          once: function () { return Promise.resolve({ val: function () { return {}; } }); },
+          push: function () {}
+        };
+      }
+    },
+    me: { email: 'admin@pureun.co.kr' },
+    ready: true,
+    isAdminUser: true,
+    render: function () {},
+    localStorage: { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} },
+    document: {
+      getElementById: function () { return { innerHTML: '', scrollTop: 0, className: '', textContent: '' }; },
+      querySelector: function () { return null; },
+      querySelectorAll: function () { return []; },
+      addEventListener: function () {}
+    },
+    addEventListener: function () {},
+    history: { replaceState: function () {}, pushState: function () {}, back: function () {} },
+    location: { search: '', href: 'https://nabaho.github.io/pureunall/payroll-os.html' },
+    navigator: { clipboard: { writeText: function () { return Promise.resolve(); } } }
+  };
+  ctx.window = ctx;
+  ctx.self = ctx;
+  vm.createContext(ctx);
+  var fullAppCode = H.slice(H.indexOf('function dbGet(k,fb)'), H.indexOf('function render()'));
+  vm.runInContext(fullAppCode, ctx);
+
+  ctx.payIdx = {
+    '1일등한우': [
+      { id: 'r1', 월: '2026년 11월', 파일: '2026년 11월_1일등한우_급여대장.xlsx', 신호: 'green', 직원수: 2 }
+    ]
+  };
+  ctx.empBox = {
+    'r1': [
+      { 순번: 1, 성명: '홍길동', 기본급: 2500000, 과세총액: 2500000, 소득세: 30000, 지방세: 3000, 국민연금: 112500, 건강보험: 88620, 고용보험: 22500, 공제총액: 256620, 실수령: 2243380 },
+      { 순번: 2, 성명: '김철수', 기본급: 2500000, 과세총액: 2500000, 소득세: 30000, 지방세: 3000, 국민연금: 112500, 건강보험: 88620, 고용보험: 22500, 공제총액: 256620, 실수령: 2243380 }
+    ]
+  };
+
+  // 1) 자료가 전혀 없는 빈 사업장에서도 계약·취업규칙(screenCompliance)과 근로자명부(screenRoster)가 에러 없이 열린다
+  ctx.App.coId = 'empty_co';
+  ctx.App.site = null;
+  ctx.App.tab = 'compliance';
+  var compEmptyHtml = ctx.screenCompliance();
+  ok('자료가 전혀 없는 사업장에서도 계약·취업규칙(screenCompliance) 창이 에러 없이 열린다',
+    typeof compEmptyHtml === 'string' && compEmptyHtml.indexOf('계약 · 취업규칙 법정검토') > -1 && compEmptyHtml.indexOf('표준근로계약서 초안') > -1);
+
+  ctx.setCompView('rules');
+  var compRulesHtml = ctx.screenCompliance();
+  ok('취업규칙이 없어도 취업규칙 서브탭이 표준 취업규칙 초안과 함께 열린다',
+    compRulesHtml.indexOf('취업규칙 · 10인 미만 복무규정') > -1 && compRulesHtml.indexOf('표준안 채우기') > -1);
+
+  ctx.App.tab = 'roster';
+  ctx.App.site = null;
+  var rosterEmptyHtml = ctx.screenRoster();
+  ok('직원이 0명인 빈 사업장에서도 근로자명부(screenRoster) 창이 에러 없이 열린다',
+    typeof rosterEmptyHtml === 'string' && rosterEmptyHtml.indexOf('법정 근로자명부') > -1);
+
+  // 2) 직원이 있는 사업장에서 계약·취업규칙 전체 서브탭 및 근로자명부가 에러 없이 열린다
+  ctx.App.coId = 'hanwoo_co';
+  ctx.App.site = '1일등한우';
+  ctx.setCompView('all');
+  var compFullHtml = ctx.screenCompliance();
+  ok('직원이 있는 사업장에서 계약·취업규칙 전체보기가 에러 없이 렌더링된다',
+    compFullHtml.indexOf('상용직 간주 위험') > -1 && compFullHtml.indexOf('연간 4대보험·원천세 정산 대사표') > -1);
+
+  var rosterFullHtml = ctx.screenRoster();
+  ok('직원이 있는 사업장에서 근로자명부가 생애주기 알림과 함께 에러 없이 렌더링된다',
+    rosterFullHtml.indexOf('홍길동') > -1 && rosterFullHtml.indexOf('근로자 생애주기 법정 알림') > -1);
+
+  // 3) 급여 처리(screenPayroll)가 첫 진입 즉시 HTML/CSS 웹 임금대장(KPI 카드 + 월 알약 + 급여표 + 합계행)을 렌더링한다
+  ctx.App.tab = 'payroll';
+  ctx.App.site = '1일등한우';
+  ctx.App.month = null;
+  var payHtml = ctx.screenPayroll();
+  ok('급여 처리가 엑셀 파일 클릭 없이도 즉시 HTML/CSS 웹 임금대장 표와 KPI 요약을 보여준다',
+    payHtml.indexOf('pay-kpis') > -1 && payHtml.indexOf('mpills') > -1 &&
+    payHtml.indexOf('<table class="emptbl"') > -1 && payHtml.indexOf('합계 (2명)') > -1);
+
+  // 4) 퇴직(screenSever)에서 직원을 선택하면 법정퇴직금·DC형·DB형 각 해당하는 퇴직금 금액이 즉시 표시된다
+  ctx.App.tab = 'sever';
+  ctx.App.site = '1일등한우';
+  ctx.pickSeverEmp('김철수');
+  var sevStatHtml = ctx.screenSever();
+  ok('퇴직 화면에서 직원을 선택하면 법정퇴직금·DC형·DB형 해당 퇴직금 금액이 즉시 표시된다',
+    sevStatHtml.indexOf('김철수 님의 선택 제도: 법정퇴직금') > -1 && sevStatHtml.indexOf('sev-3col') > -1);
+
+  ctx.setEmpSeverType('1일등한우', '김철수', 'DC');
+  var sevDcHtml = ctx.screenSever();
+  ok('직원의 퇴직금 제도를 DC형으로 바꾸면 DC형 확정기여형 퇴직연금 금액과 부담금 점검표가 표시된다',
+    sevDcHtml.indexOf('김철수 님의 선택 제도: DC형 퇴직연금') > -1 && sevDcHtml.indexOf('DC형 퇴직연금 부담금 점검') > -1);
+
+  ctx.setEmpSeverType('1일등한우', '김철수', 'DB');
+  var sevDbHtml = ctx.screenSever();
+  ok('직원의 퇴직금 제도를 DB형으로 바꾸면 DB형 확정급여형 퇴직연금 금액이 표시된다',
+    sevDbHtml.indexOf('김철수 님의 선택 제도: DB형 퇴직연금') > -1);
+
+  // 5) 모든 월액·금액 입력란에 천단위 콤마(,)가 표시되는지 검증 (1200000 -> 1,200,000 / 2500000 -> 2,500,000)
+  ok('fmtComma가 1200000을 1,200,000으로, 2183740을 2,183,740으로 변환한다',
+    ctx.fmtComma(1200000) === '1,200,000' && ctx.fmtComma(2183740) === '2,183,740');
+  ctx.App.tab = 'attend';
+  ctx.App.site = '1일등한우';
+  ctx.App.month = '2026년 11월';
+  var attHtml = ctx.screenAttend();
+  ok('근태·수당 화면의 통상임금월액 입력란에 천단위 콤마(2,500,000)가 포함되어 렌더링된다',
+    attHtml.indexOf('value="2,500,000"') > -1);
+
+  // 6) 담당자 목록 좌측의 불필요한 빈 셀(<span class="fill")이 제거되었는지 검증
+  ok('담당자 목록(viewbarHtml)에 불필요한 빈 셀(.fill)이 없다',
+    H.indexOf('<span class="fill"') === -1);
+
+  // 7) 개인별 원본자료(카톡·문자·메일 캡쳐) 탐색·보관 및 좌·우 1:1 눈으로 비교 화면 검증
+  var evs = ctx.empEvidencesOf('1일등한우', '홍길동');
+  ok('각 개인마다 급여대장·카톡·메일 원본 자료를 자동으로 찾아 반환한다',
+    Array.isArray(evs) && evs.length >= 1);
+  var cmpHtml = ctx.renderEmpCompareStudio('1일등한우');
+  ok('좌·우 1:1 원본비교 스튜디오가 좌측 원본 뷰어와 우측 콤마 적용 급여·근태 대조표를 나란히 렌더링한다',
+    cmpHtml.indexOf('split-compare') > -1 && cmpHtml.indexOf('value="2,500,000"') > -1 && cmpHtml.indexOf('Ctrl + V') > -1);
+  var card360Html = ctx.renderEmp360Card('1일등한우');
+  ok('1인 종합카드(360°) 모드가 급여·연차·퇴직금·원본비교를 한 화면에 렌더링한다',
+    card360Html.indexOf('1인 종합 카드') > -1 && card360Html.indexOf('2,500,000원') > -1);
+})();
+
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);
 console.log('════════════════════════════════');

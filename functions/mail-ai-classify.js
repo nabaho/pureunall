@@ -139,10 +139,19 @@ function binsOf(mailBins, customFolders) {
 /* Jev 에게 물을 모양 — 이름을 그대로 «후보(criteria)」로 준다.
    ⚠ 업무 검토용 물음(questions())과는 완전히 다른 물음이다 — 「긴급한가」가 아니라
      「어느 칸인가」다. typesafe-evaluate.evaluate 의 qs 자리에 이것을 끼운다. */
+/* ★ 「해당 없음」 길 (대표 지시 2026-11-05 「받은메일에 업무별·담당자별 분류가 안 된 부분은 받은메일에 남아 있어야 된다」)
+     예전에는 «칸 중에 하나»를 «반드시» 고르게 했다 — 분명치 않은 메일도 아무 칸에나 들어가 받은메일함이 통째로 비었다
+     (실측 2026-11-05: AI 가 옮긴 236통이 전부, 사람이 정한 것은 0통). 이제 «분명히 맞는 칸이 있을 때만» 옮기고,
+     아니면 이 항목을 고르게 해서 받은메일함에 둔다 — 받은메일함은 원래 「업무별로 배분한 나머지」다.
+   ⚠ 이 이름은 영어다 — 사람이 붙인 칸 이름(한글)과 겹칠 수 없다(겹치면 그 칸이 안 옮겨진다). */
+const NONE_NAME = "None of these folders";
 function binQuestion(bins) {
   const criteria = {};
-  bins.forEach((b) => { criteria[b.name] = "This mail belongs to the folder named \"" + b.name + "\"."; });
-  return { bin: { type: "choice", instructions: "Which folder best fits this mail?", criteria: criteria } };
+  bins.forEach((b) => { criteria[b.name] = "This mail clearly belongs to the folder named \"" + b.name + "\"."; });
+  criteria[NONE_NAME] = "No listed folder clearly fits: the mail is general, ambiguous, mixed, or a person should decide where it goes.";
+  return { bin: { type: "choice",
+    instructions: "Which folder clearly fits this mail? Pick a folder only if it clearly fits; otherwise pick \"" + NONE_NAME + "\".",
+    criteria: criteria } };
 }
 
 /* 하루 문 — 사람 몫(typesafe_tally)과 «다른 자리»에 센다. 사람이 쓰는 하루 30·전체 200을
@@ -202,7 +211,7 @@ async function classifyNewInbox(deps, opts) {
   const qs = binQuestion(bins);
 
   const slug = String(o.slug || "");
-  const ran = { ran: true, tried: 0, done: 0, skipped: 0 };
+  const ran = { ran: true, tried: 0, done: 0, skipped: 0, none: 0 };
   const upPut = {}, upBy = {};
   const fetchFn = o.fetchFn || global.fetch;
 
@@ -223,6 +232,7 @@ async function classifyNewInbox(deps, opts) {
     if (!r || !r.ok) continue;
 
     const choice = String((r.answers && r.answers.bin && (r.answers.bin.choice != null ? r.answers.bin.choice : r.answers.bin.value)) || "");
+    if (choice === NONE_NAME) { ran.none++; continue; }          /* 분명치 않다 — 받은메일함에 남긴다 */
     const binId = byName[choice];
     if (!binId) continue;                                        /* 모르는 이름을 답했다 — 쓰지 않는다 */
 
@@ -238,6 +248,6 @@ async function classifyNewInbox(deps, opts) {
 }
 
 module.exports = {
-  DEFAULTS, loadGate, redactNames, namesOf, loadNameLists, binsOf, binQuestion,
+  DEFAULTS, NONE_NAME, loadGate, redactNames, namesOf, loadNameLists, binsOf, binQuestion,
   mailTallyPath, mailDayLeft, bumpMailTally, classifyNewInbox, AI_BY, MAIL_ROOT,
 };

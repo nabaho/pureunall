@@ -468,7 +468,7 @@
 
   C.cellDlg = ask(() => {
     const cells = E.table.targetCells();
-    if (!cells.length) return toast('표 안에 커서를 두세요.', true);
+    if (!cells.length) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
     const td = cells[0], table = td.closest('table');
     const cm = Dm.cellMargin(td); // 셀 안 여백(mm, 테두리 반쪽 보정한 한글 값)
     const pw = table.parentElement.clientWidth - parseFloat(getComputedStyle(table.parentElement).paddingLeft) - parseFloat(getComputedStyle(table.parentElement).paddingRight);
@@ -755,6 +755,7 @@
   D.numbers = () => [{ title: '문단 번호 모양' }, ...Object.keys(E.NUMBER_PRESETS).map(n => ({ label: n, act: () => E.toggleNumbering(n) })), { sep: true },
     { label: '한 수준 증가', key: 'Ctrl+Num -', act: C.levelDown }, { label: '한 수준 감소', key: 'Ctrl+Num +', act: C.levelUp }, { label: '문단 번호 없애기', act: () => E.setPara({ head: null }) }];
   D.outline = () => [1, 2, 3, 4, 5, 6, 7].map(l => ({ label: `개요 ${l}`, act: () => E.applyStyle('개요 ' + l) })).concat([{ sep: true }, { label: '개요 해제 (바탕글)', act: () => E.applyStyle('바탕글') }]);
+  D.multi = () => [{ label: '한 쪽 (고치기)', act: () => window.PureunMultiPage && PureunMultiPage.exit() }, { sep: true }, ...[2, 3, 4].map(n => ({ label: n + '쪽씩 보기', act: () => window.PureunMultiPage && PureunMultiPage.enter(n) }))];
   D.zoom = () => [50, 75, 100, 125, 150, 200, 300].map(z => ({ label: z + '%', checked: Math.round(E.state.zoom * 100) === z, act: () => setZoom(z / 100) }))
     .concat([{ sep: true }, { label: '쪽 맞춤', act: C.fitPage }, { label: '폭 맞춤', act: C.fitWidth }]);
   D.paste = () => [{ label: '붙이기', key: 'Ctrl+V', act: C.paste }, { label: '모양 없이 붙이기', act: C.paste }];
@@ -961,7 +962,7 @@
     ],
     view: [
       [it('pageview', '쪽 윤곽', C.togglePageView, { on: () => E.state.pageView }), it('marks', '문단 부호', C.toggleMarks, { on: () => E.state.marks }), it('ruler', '눈금자', C.toggleRuler, { on: () => !document.querySelector('.work').classList.contains('no-ruler') }), it('pane', '작업 창', C.togglePane, { on: () => !$('taskpane').hidden })],
-      [it('zoomin', '확대', C.zoomIn), it('zoomout', '축소', C.zoomOut), it('fitpage', '쪽 맞춤', C.fitPage), it('fitwidth', '폭 맞춤', C.fitWidth), it('find', '확대 비율', D.zoom)],
+      [it('pageview', '여러 쪽 보기', D.multi), it('zoomin', '확대', C.zoomIn), it('zoomout', '축소', C.zoomOut), it('fitpage', '쪽 맞춤', C.fitPage), it('fitwidth', '폭 맞춤', C.fitWidth), it('find', '확대 비율', D.zoom)],
     ],
     insert: [
       [it('table', '표', D.table), it('image', '그림', C.image), it('symbol', '문자표', C.symbol), it('date', '날짜/시간', D.date)],
@@ -1352,7 +1353,7 @@
     styleNo: i => () => { const n = E.styleList()[i]; if (n) E.applyStyle(n); },
     // 쉬운 계산식: 현재 셀의 왼쪽(가로) 또는 위쪽(세로) 숫자 칸을 계산해 현재 셀에 씀
     calc: (dir, op) => () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const tr = td.parentElement, t = td.closest('table');
       const cells = dir === 'row' ? Array.from(tr.cells).slice(0, td.cellIndex) : Array.from(t.rows).slice(0, tr.rowIndex).map(r => r.cells[td.cellIndex]).filter(Boolean);
       const v = cells.map(c => { const x = c.textContent.replace(/[​,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(x) ? parseFloat(x) : null; }).filter(x => x !== null);
@@ -1365,7 +1366,7 @@
     },
     // 표 나누기(현재 줄 아래부터 새 표) · 표 붙이기(다음 표를 이어 붙임)
     tableSplit: () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const tr = td.parentElement, t = td.closest('table'), body = tr.parentElement;
       if (!tr.nextElementSibling) return toast('마지막 줄에서는 나눌 수 없습니다.', true);
       const rows = Array.from(t.rows), at = tr.rowIndex;
@@ -1379,7 +1380,7 @@
       E.afterEdit();
     },
     tableJoin: () => {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const t = td.closest('table'), nx = t.nextElementSibling;
       if (!nx || nx.tagName !== 'TABLE') return toast('바로 아래에 붙일 표가 없습니다.', true);
       E.checkpoint();
@@ -1424,7 +1425,7 @@
     },
     paint() { document.querySelectorAll('td.cb-sel, th.cb-sel').forEach(x => x.classList.remove('cb-sel')); if (CB.on) CB.cells().forEach(x => x.classList.add('cb-sel')); },
     start() {
-      const td = E.currentCell(); if (!td) return toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       CB.table = td.closest('table'); E.table.grid(CB.table);
       CB.on = true; CB.expand = false; CB.r0 = CB.r1 = td._r; CB.c0 = CB.c1 = td._c;
       CB.paint(); toast('셀 블록 모드 — 방향키 이동 · F5 확장 · F7 칸 · F8 줄 · M 합치기 · S 나누기 · Esc 끝');
@@ -1607,5 +1608,104 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates };
+  // =============== 기금관리(fund.html) 직접 연결 브리지 ===============
+  let fundCtx = null;
+  function _b64ToBytes(b64) {
+    const bin = atob(String(b64 || ''));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function _bytesToB64(bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function _renderFundBridgeBar() {
+    let wrap = $('fundBridgeBar');
+    if (!fundCtx) { if (wrap) wrap.remove(); return; }
+    if (!wrap) {
+      wrap = h('div', { id: 'fundBridgeBar', style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginRight: '8px', padding: '2px 8px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '6px', fontSize: '12px' } });
+      const mb = $('menubar'), qf = $('quickFind');
+      if (mb) mb.insertBefore(wrap, qf || null);
+    }
+    wrap.innerHTML = '';
+    wrap.append(
+      h('span', { style: { color: '#065f46', fontWeight: '700' } }, '📋 기금연동: ' + (fundCtx.fundName || '기금') + (fundCtx.label ? ' · ' + fundCtx.label : '')),
+      h('button', {
+        style: { padding: '2px 9px', background: '#0f766e', color: '#fff', border: '1px solid #0f766e', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11.5px' },
+        title: '현재 편집한 문서를 기금관리 프로그램(fund.html) 해당 기금 서식에 즉시 저장·반영합니다',
+        onclick: () => saveToFund()
+      }, '💾 기금관리에 반영')
+    );
+  }
+  function saveToFund() {
+    if (!cur || !fundCtx) return toast('연결된 기금 서식 정보가 없습니다.', true);
+    commit();
+    let hwpxB64 = '';
+    try { hwpxB64 = _bytesToB64(buildBytes()); } catch (e) { console.warn('HWPX 빌드 경고', e); }
+    const msg = {
+      type: 'pureun_hangul_save',
+      fundId: fundCtx.fundId || '',
+      kind: fundCtx.kind || '',
+      label: fundCtx.label || cur.name || '서식',
+      name: cur.name || '서식',
+      html: E.getHtml(),
+      hwpxB64,
+      savedAt: Date.now()
+    };
+    try { localStorage.setItem('pureun_hangul_save', JSON.stringify(msg)); } catch (e) {}
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (e) {}
+    try { if (typeof BroadcastChannel !== 'undefined') new BroadcastChannel('pureun_hangul_channel').postMessage(msg); } catch (e) {}
+    cur.dirty = false; renderTabs();
+    toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
+  }
+  async function loadFromFundPayload(p) {
+    if (!p || typeof p !== 'object') return;
+    fundCtx = { fundId: p.fundId || '', fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' };
+    _renderFundBridgeBar();
+    const docName = (p.name || p.label || '기금서식').replace(/\.(hwpx|hwp|hwt)$/i, '');
+    if (p.b64) {
+      try {
+        const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
+        const bytes = _b64ToBytes(p.b64);
+        const file = new File([bytes], docName + '.' + ext, { type: ext === 'hwp' ? 'application/x-hwp' : 'application/hwp+zip' });
+        await openBlob(file, null);
+        return;
+      } catch (e) {
+        console.warn('HWP/HWPX 열기 폴백(HTML):', e);
+      }
+    }
+    if (p.html) {
+      const pg = Hx.defaultPage();
+      if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
+      addDoc({ name: docName, html: p.html, page: pg, pristine: false });
+      toast(`기금관리에서 '${docName}' 서식을 불러왔습니다.`);
+    }
+  }
+  try {
+    const raw = localStorage.getItem('pureun_hangul_bridge');
+    if (raw) {
+      localStorage.removeItem('pureun_hangul_bridge');
+      const p = JSON.parse(raw);
+      if (p && (new URLSearchParams(location.search).get('from') === 'fund' || Date.now() - (p.sentAt || 0) < 60000)) {
+        setTimeout(() => loadFromFundPayload(p), 60);
+      }
+    }
+  } catch (e) {}
+  window.addEventListener('message', e => {
+    const d = e && e.data;
+    if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+  });
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('pureun_hangul_channel');
+      bc.onmessage = e => {
+        const d = e && e.data;
+        if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+      };
+    }
+  } catch (e) {}
+  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund };
 })();

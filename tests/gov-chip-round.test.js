@@ -41,6 +41,7 @@ function box(maxByType) {
   const b = {
     console,
     schedPhase: sc => (sc && sc.phase === 'pre' ? 'pre' : 'main'),
+    isPostSched: sc => !!sc && sc.phase === 'post',
     getCoMaxRounds: (coId, tid) => (maxByType || {})[tid] || 0,
     String, Number, Math,
   };

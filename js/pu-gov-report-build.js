@@ -81,7 +81,7 @@
     if (cc && !company.name) src['업체명'] = '';
 
     /* 회차 — 사전진단 빼고 날짜순(같은 날짜는 회차 번호순) */
-    var sc = (input.scheds || []).filter(function (s) { return s && s.phase !== 'pre'; });
+    var sc = (input.scheds || []).filter(function (s) { return s && s.phase !== 'pre' && s.phase !== 'post'; });
     sc = sc.map(function (s, i) { return { s: s, i: i }; }).sort(function (a, b) {
       var da = str(a.s.date), db = str(b.s.date);
       return da < db ? -1 : da > db ? 1 : ((a.s.round || 0) - (b.s.round || 0)) || (a.i - b.i);

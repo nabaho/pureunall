@@ -190,3 +190,34 @@ test("⑮ 기본으로는 회생만 모은다 — 파산은 잠시 멈춤(DEFAUL
   assert.equal(r.added[0].kind, "rehab");
   assert.ok(!calls.some((c) => c[1] === "5"), "파산 업무구분(5)은 부르지 않는다");
 });
+
+/* ═══ 2026-11-02 새 공고 자동 «발송 예정» ═══ */
+test("자동 예정 ① 새로 담긴 공고는 «발송 예정»(send)으로 표시되고, 기계가 올린 것이라고 적힌다", () => {
+  const q = W.autoQueueMarks([{ id: "c1_1", address: "서울 서초구 1" }], {}, 123, 5);
+  const m = q["marks/c1_1"];
+  assert.equal(m.status, "send");
+  assert.equal(m.autoQueued, true);
+  assert.equal(m.sentAt, null);
+  assert.equal(m.entityType, "Task");
+  assert.equal(m.taskKind, "rehabOutreach");
+  assert.equal(m.sourceKind, "rehabNotice");
+  assert.equal(m.sourceId, "c1_1");
+  assert.equal(m.contractVersion, 5);
+  assert.equal(m.revision, 1);
+});
+
+test("자동 예정 ② 사람이 이미 표시한 공고는 «어떤 상태든» 건드리지 않는다 — 제외·보류·완료를 되돌리면 안 된다", () => {
+  const added = ["a", "b", "c", "d", "e"].map((x) => ({ id: "c1_" + x, address: "서울 서초구 1" }));
+  const marks = { c1_a: { status: "skip" }, c1_b: { status: "hold" }, c1_c: { status: "sent" }, c1_d: { status: "new" } };
+  assert.deepEqual(Object.keys(W.autoQueueMarks(added, marks, 1, 5)), ["marks/c1_e"]);
+});
+
+test("자동 예정 ③ 주소가 없는 공고는 예정으로 올리지 않는다(우편 라벨을 못 만든다)", () => {
+  const q = W.autoQueueMarks([{ id: "c1_1", address: "" }, { id: "c1_2" }, { id: "c1_3", address: "  " }], {}, 1, 5);
+  assert.deepEqual(q, {});
+});
+
+test("자동 예정 ④ 새 공고가 없으면 아무것도 안 만든다(이미 담겨 있던 공고는 대상이 아니다)", () => {
+  assert.deepEqual(W.autoQueueMarks([], {}, 1, 5), {});
+  assert.deepEqual(W.autoQueueMarks(null, null, 1, 5), {});
+});
