@@ -30,6 +30,8 @@ function grab(n) {
 }
 const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const J = (x) => JSON.parse(JSON.stringify(x));
+/* 진짜 qa() 는 NodeList 를 돌려준다 — map·filter·some 이 없다. 가짜를 배열로 만들면 진짜 화면에서만 터진다(endedSelKeys 가 그랬다). */
+const nl = (a) => Object.assign(Object.create({ forEach(f, t) { a.forEach(f, t); }, item(i) { return a[i] || null; }, [Symbol.iterator]() { return a[Symbol.iterator](); } }), a, { length: a.length });
 function hasUndefined(v) {
   if (v === undefined) return true;
   if (Array.isArray(v)) return v.some(hasUndefined);
@@ -413,7 +415,7 @@ function uiWorld(over) {
   const checks = [];
   const ctx = engine(Object.assign({
     S: { endedTab: 'end', endedQ: '', endedWho: '', endedTyp: '', endedYear: 'all', endedFix: null, endedMore: {} },
-    q: (s) => el(s), qa: (s) => (/ended-ck:checked/.test(s) ? checks.filter((c) => c.checked) : /ended-tab/.test(s) ? [] : checks),
+    q: (s) => el(s), qa: (s) => nl(/ended-ck:checked/.test(s) ? checks.filter((c) => c.checked) : /ended-tab/.test(s) ? [] : checks),
     staffColor: () => '#ef6c35', _purgingIds: new Set(), showConfirm: (m, cb) => { ctx._confirm = m; ctx._cb = cb; },
     acquireCompanyEditLock: async () => true, verifyCompanyEditLock: async () => true, releaseCompanyEditLock: () => {},
     renderSummaryBar: () => {}, restoreConsulting: async () => {}, restoreDeletedCo: async (id) => { ctx._undeleted = (ctx._undeleted || []).concat(id); },

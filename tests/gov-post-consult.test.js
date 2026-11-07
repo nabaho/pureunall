@@ -35,6 +35,9 @@ function grab(n) {
 }
 const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const J = (x) => JSON.parse(JSON.stringify(x));
+/* 진짜 qa() 는 NodeList 를 돌려준다 — forEach·length·[i] 는 되지만 map·filter·some 은 없다.
+   가짜를 «배열»로 만들면 .map 이 있는 것처럼 보여 진짜 화면에서만 터진다(2026-11-05 postSelKeys·endedSelKeys 가 그랬다 — 서랍을 열기만 해도 그리기 끝에서 오류). */
+const nl = (a) => Object.assign(Object.create({ forEach(f, t) { a.forEach(f, t); }, item(i) { return a[i] || null; }, [Symbol.iterator]() { return a[Symbol.iterator](); } }), a, { length: a.length });
 function hasUndefined(v) {
   if (v === undefined) return true;
   if (Array.isArray(v)) return v.some(hasUndefined);
@@ -63,7 +66,7 @@ function world(names, over) {
     getStaff: () => J(st.staff), getTypes: () => J(types), getEnv: () => st.env, todayStr: () => TODAY, myId: () => 'a1',
     getCoMaxRounds: (coId, tid) => ((types.find((t) => t.id === tid) || {}).rounds || 0), getCoMandatory: () => 0,
     getConflictMatrix: () => st.matrix, p2: (n) => String(n).padStart(2, '0'),
-    q: (s) => el(s), qa: () => [], toast: (m) => st.toasts.push(String(m)), staffColor: () => '#ef6c35', isAdmin: () => true,
+    q: (s) => el(s), qa: () => nl([]), toast: (m) => st.toasts.push(String(m)), staffColor: () => '#ef6c35', isAdmin: () => true,
     PHOTOS: {}, canEdit: () => true, coIsMine: () => true, myVisible: () => true,
   }, over || {}));
   vm.runInContext(names.filter((n) => has(n)).map(grab).join('\n'), ctx);
@@ -282,7 +285,7 @@ test('★ 같은 사업장 같은 날 다른 사업 — 사후도 «센다» (�
 
 const VIEWS = ['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', 'mainPhaseScheds', 'curPhase', 'nextRound', 'dashActiveTypeIds', 'dashEndOnRows',
   'progCalc', 'mpDate', 'dashReopenBadge', 'renderDashTypeRows', 'renderProg', 'renderSummaryBar', 'renderTimeline', 'renderTlZoom', 'tlZoomCopyText', 'tlZoomCopy', 'endedDateForSchedule',
-  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle', 'postListFor', 'postPhotoCount', 'postTypeDone', 'dashPostItem', 'getCoPostTarget', 'postCountText'];
+  'roundText', 'chipRound', 'schedulePlaceLabel', 'schedulePlaceShort', 'scheduleHoverTitle', 'postListFor', 'postPhotoCount', 'postTypeDone', 'dashPostItem', 'getCoPostTarget', 'postCountText', 'postCanAdd'];
 function scene(withPost) {
   const c = world(VIEWS, {
     PRE_ROUND_CAP: 2, S: { tlStatus: 'active' }, _mpMine: false, _mpOpen: '', _tzKey: { coId: 'c1', tid: 't2' },
@@ -315,7 +318,7 @@ function paint(c) {
   const out = {};
   const types = c.getTypes();
   /* 진행 목록 줄의 「사후컨설팅」 항목(.post-item)은 «새로 얹은 칸»이다 — 본 회차 글자만 비교하려고 그 칸만 뺀다(⑰ 에서 따로 본다) */
-  const noPost = (h) => String(h).replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  const noPost = (h) => String(h).replace(/<div class="round-badge post-item"[^>]*>[\s\S]*?<\/div>/g, '');
   c._st.cos.forEach((co) => { out['rows:' + co.id + ':on'] = noPost(c.renderDashTypeRows(co, types, true)); out['rows:' + co.id + ':off'] = noPost(c.renderDashTypeRows(co, types, false)); });
   c.renderSummaryBar(); c.renderTimeline(); c.renderTlZoom();
   ['active', 'ended'].forEach((s) => { c._st.els['#mpStatus'] = Object.assign(c._st.els['#mpStatus'] || {}, { value: s }); c.renderProg(); out['prog:' + s] = c._st.els['#mpList'].innerHTML + '|' + c._st.els['#mpSum'].innerHTML; });
@@ -602,7 +605,7 @@ test('서랍 — 메모·이름 속 HTML 글자는 무해하게 처리된다 · 
 const POSTFN = ['isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone', 'schedPhase', 'isPrePhaseType', 'roundIsFixed', 'reorderRounds', 'postListFor', 'postPhotoCount', 'schedHasPhoto',
   'postProblem', 'postBuildSched', 'postDrawerView', 'postDrawerHtml', 'renderPostDrawer', 'openPostDrawer', 'closePostDrawer', 'postSetField', 'postEdit', 'postCancel',
   'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts',
-  'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate'];
+  'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate', 'postCanAdd', 'postAddedText', 'postDragStart', 'postDragEnd', 'handlePostDrop'];
 function postWorld(over) {
   const calls = { locks: 0, released: 0, saves: 0, stamp: [], confirm: null, cb: null, delPhoto: [], rendered: [], closed: [] };
   let n = 0;
@@ -711,7 +714,7 @@ test('★ 사후 지우기 — 그 줄과 사진만 지우고 번호를 다시 �
 
 test('★ 일괄 삭제 — 고른 것만, 건수를 묻고, 저장은 «한 번에»', async () => {
   const checks = [{ checked: true, dataset: { sid: 'pa' } }, { checked: false, dataset: { sid: 'pb' } }, { checked: true, dataset: { sid: 'pc' } }];
-  const c = postWorld({ qa: (s) => (/post-ck:checked/.test(s) ? checks.filter((x) => x.checked) : checks) }); c.openPostDrawer('c1', 't2');
+  const c = postWorld({ qa: (s) => nl(/post-ck:checked/.test(s) ? checks.filter((x) => x.checked) : checks) }); c.openPostDrawer('c1', 't2');
   c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'pa', round: 1 }), P('c1', 't2', '2026-11-12', { id: 'pb', round: 2 }), P('c1', 't2', '2026-11-19', { id: 'pc', round: 3 }));
   assert.strictEqual(c.postSelKeys().length, 2);
   c.postBatchDelete(); assert.ok(/2건/.test(c._calls.confirm), '건수를 묻는다');
@@ -882,7 +885,7 @@ test('★ 지우기는 «사후 줄만» 지운다 — 본 일정 번호가 섞�
    본 회차를 «다 마쳤지만 아직 종료 전»인 사업에서도 사후를 넣는다. 줄에는 「＋ 사후컨설팅」 / 「사후 N회 · 📷M」 가 달리고, 누르면 서랍이 열린다.
    ★ 이 항목은 «새로 얹은 칸»일 뿐 본 회차 숫자를 바꾸지 않는다 — 불변 검사는 이 칸만 빼고 비교한다. */
 
-const postItems = (html) => (html.match(/<div class="round-badge post-item">[\s\S]*?<\/div>/g) || []);
+const postItems = (html) => (html.match(/<div class="round-badge post-item"[^>]*>[\s\S]*?<\/div>/g) || []);
 function dashScene(withPost) {
   const c = scene(withPost);
   return c;
@@ -937,7 +940,7 @@ test('항목 단추는 줄을 끌거나 누르는 동작과 섞이지 않는다 
   const c = dashScene(false);
   const html = rowOf(c, 'c1');
   assert.ok(/event\.stopPropagation\(\);openPostDrawer/.test(html), '줄 전체에 달린 동작(끌기·열기)과 겹치지 않게 막는다');
-  const stripped = html.replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  const stripped = html.replace(/<div class="round-badge post-item"[^>]*>[\s\S]*?<\/div>/g, '');
   assert.ok(/✓ 완료 3\/3회/.test(stripped) && !/사후/.test(stripped), '항목을 빼면 예전 줄 그대로');
 });
 
@@ -1032,7 +1035,7 @@ test('★ 진행 목록 줄 — 목표가 있으면 「사후 N/M회」, 사후�
 });
 
 test('★ 목표를 넣어도 진행 목록 줄의 «본 회차 글자»는 하나도 안 바뀐다 (사후 칸만 달라진다)', () => {
-  const noItem = (h) => String(h).replace(/<div class="round-badge post-item">[\s\S]*?<\/div>/g, '');
+  const noItem = (h) => String(h).replace(/<div class="round-badge post-item"[^>]*>[\s\S]*?<\/div>/g, '');
   const a = dashScene(true), b = dashScene(true);
   b._st.cos.forEach((co) => { co.customPost = { t1: 4, t2: 3, t3: 2 }; });
   a._st.cos.forEach((co) => assert.strictEqual(noItem(rowOf(b, co.id)), noItem(rowOf(a, co.id)), co.id));
@@ -1136,4 +1139,130 @@ test('★ 사업장 수정 창 — 사후 회수 칸이 있고, 저장하는 두
   assert.ok(/next\.customPost=postTargets;\s*else delete next\.customPost/.test(save), '고칠 때: 있으면 쓰고, 비면 칸을 지운다');
   assert.ok(/customMandatory:\{\.\.\.co_mandatory\},\.\.\.\(Object\.keys\(postTargets\)\.length\?\{customPost:postTargets\}:\{\}\)/.test(save), '새로 만들 때도 넣는다');
   assert.ok(/\['deadlines','customRounds','customMandatory','customPost','phaseState'\]/.test(grab('mergeApplyOne')), '사업장 합칠 때 사라지는 쪽의 목표도 옮겨 담는다');
+});
+
+/* ══ ⑲ 진행 목록의 「사후컨설팅」을 끌어 달력 날짜에 넣는다 (대표 지시 2026-11-05 「사후컨설팅도 진행하면 드래그하고 날짜에 넣게」) ═════
+   본 회차 끌기(.drow → handleDrop)와 «같은 몸짓»이지만 만드는 것은 사후 일정이다.
+   ★ 가장 위험한 실수 — 사후 항목을 끌었는데 «본 회차»(handleDrop)로 들어가는 것. 갈림길(dispatchCalDrop)을 실제로 돌려 못 박는다. */
+
+const dragAttr = (it) => /<div class="round-badge post-item"[^>]*\sdraggable="true"/.test(it);
+const DROP = (coId, typeId) => ({ post: true, coId, typeId });
+const lastToast = (c) => c._st.toasts[c._st.toasts.length - 1] || '';
+
+test('★ 사후를 넣을 수 있는 사업 — 종료된 사업 · 수정 중 · 본 회차를 다 마친 사업만 (진행 중이면 아니다) · 서랍 저장과 «같은 기준»', () => {
+  const c = postWorld();
+  const co = (o) => Object.assign({ id: 'cx', types: ['t2'] }, o);
+  c._st.scheds = [];
+  assert.strictEqual(c.postCanAdd(co({ endedTypes: { t2: '2026-10-24' } }), 't2'), true, '종료');
+  assert.strictEqual(c.postCanAdd(co({ reopened: { t2: { was: '2026-10-10' } } }), 't2'), true, '수정 중');
+  assert.strictEqual(c.postCanAdd(co({}), 't2'), false, '진행 중(본 0/3)');
+  assert.strictEqual(c.postCanAdd(co({ endedTypes: { t3: '2026-10-24' } }), 't2'), false, '다른 사업이 종료된 것은 이 사업과 상관없다');
+  c._st.scheds = [1, 2, 3].map((i) => D('cx', 't2', '2026-09-0' + i, { round: i }));
+  assert.strictEqual(c.postCanAdd(co({}), 't2'), true, '본 3/3 완료');
+  const same = (o) => c.postCanAdd(co(o), 't2') === !/본 회차를 모두 마쳤거나/.test(c.postProblem(co(o), 't2', '2026-11-05'));
+  c._st.scheds = [];
+  assert.ok(same({}) && same({ endedTypes: { t2: '2026-10-24' } }) && same({ reopened: { t2: { was: 'x' } } }), '서랍 저장(postProblem)이 막는 것과 끌기가 허락하는 것이 어긋나면 안 된다');
+});
+
+test('★ 진행 목록 — 사후 항목은 «넣을 수 있는 사업»에서만 끌린다 (완료·종료·수정 중 줄 예, 진행 중 줄 아니오) · 어느 사업장·사업인지 달려 있다', () => {
+  const c = dashScene(true);
+  const done = postItems(rowOf(c, 'c1'))[0];
+  assert.ok(dragAttr(done) && /data-post-coid="c1"/.test(done) && /data-post-tid="t2"/.test(done), '완료 줄: ' + done);
+  const ended = postItems(rowOf(c, 'c3', true))[0];
+  assert.ok(dragAttr(ended) && /data-post-coid="c3"/.test(ended) && /data-post-tid="t2"/.test(ended), '종료 줄: ' + ended);
+  const reopened = postItems(rowOf(c, 'c4'))[0];
+  assert.ok(dragAttr(reopened) && /data-post-coid="c4"/.test(reopened), '수정 중 줄: ' + reopened);
+  const going = postItems(rowOf(c, 'c2'))[0];
+  assert.ok(going && !dragAttr(going) && !/data-post-/.test(going), '진행 중(본 2/4)인 줄은 사후 항목이 있어도 끌리지 않는다 — 끌어 놓아도 서랍과 같은 까닭으로 막힐 일이다: ' + going);
+  assert.ok(/끌어/.test(done) && !/끌어/.test(going), '끌 수 있을 때만 «끌어서 넣기»를 알린다');
+});
+
+test('★ 끌기 시작 — 사후 표시와 사업장·사업이 담기고, 줄·카드의 끌기로 새지 않는다(본 회차 끌기가 같이 시작되면 안 된다)', () => {
+  const c = postWorld(); vm.runInContext('var dragItem=null;', c);
+  const marks = [];
+  const ev = { stopped: false, stopPropagation() { this.stopped = true; }, dataTransfer: { effectAllowed: '', data: {}, setData(k, v) { this.data[k] = v; } } };
+  const el = { dataset: { postCoid: 'c1', postTid: 't2' }, classList: { add: (x) => marks.push('+' + x), remove: (x) => marks.push('-' + x) } };
+  c.postDragStart(ev, el);
+  assert.deepStrictEqual(J(vm.runInContext('dragItem', c)), { post: true, coId: 'c1', typeId: 't2' });
+  assert.strictEqual(ev.stopped, true, '★ 안쪽 끌기가 바깥 줄(.drow = 본 회차 끌기)·카드(순서 바꾸기)로 새면 안 된다');
+  assert.strictEqual(ev.dataTransfer.effectAllowed, 'copy'); assert.ok(ev.dataTransfer.data['text/plain'], 'setData 가 있어야 일부 브라우저에서 끌기가 시작된다');
+  assert.deepStrictEqual(marks, ['+dragging']);
+  c.postDragEnd(el); assert.strictEqual(vm.runInContext('dragItem', c), null, '끝나면 비운다'); assert.deepStrictEqual(marks, ['+dragging', '-dragging']);
+});
+
+test('★★ 달력에 놓았을 때의 갈림길 — 사후 항목은 «사후 넣기»로만 가고 본 회차 넣기(handleDrop)로는 절대 안 간다 · 일정 칩은 옮기기 · 본 회차 줄은 예전 그대로', () => {
+  const calls = [];
+  const c = world(['dispatchCalDrop'], { handleDrop: (d, i) => calls.push(['main', d, i.coId]), handlePostDrop: (d, i) => calls.push(['post', d, i.coId]), moveChip: (id, d) => calls.push(['move', id, d]) });
+  c.dispatchCalDrop('2026-11-05', DROP('c1', 't2'));
+  c.dispatchCalDrop('2026-11-06', { coId: 'c2', typeId: 't2', round: 3, isField: true });
+  c.dispatchCalDrop('2026-11-07', { moveId: 's1', coId: 'c1', typeId: 't2' });
+  assert.deepStrictEqual(calls, [['post', '2026-11-05', 'c1'], ['main', '2026-11-06', 'c2'], ['move', 's1', '2026-11-07']]);
+  const drop = grab('initCalDrop');
+  assert.ok(/dispatchCalDrop\(date,dragItem\)/.test(drop) && !/handleDrop\(/.test(drop), '달력 ondrop 은 갈림길 하나만 부른다 — 직접 handleDrop 을 부르면 사후가 본 회차로 샌다');
+});
+
+test('★ 사후를 날짜에 놓으면 — 사후 일정이 «한 줄» 생기고 본 일정·사업 상태는 글자까지 그대로다 (방문으로 들어간다)', async () => {
+  const c = postWorld();
+  const beforeMain = mainOnly(c), beforeCos = JSON.stringify(c._st.cos);
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  const posts = c._st.scheds.filter((s) => s.phase === 'post');
+  assert.strictEqual(posts.length, 1);
+  assert.deepStrictEqual({ phase: posts[0].phase, date: posts[0].date, coId: posts[0].coId, typeId: posts[0].typeId, round: posts[0].round, isField: posts[0].isField, attId: posts[0].attId },
+    { phase: 'post', date: '2026-11-05', coId: 'c1', typeId: 't2', round: 1, isField: true, attId: 'a1' });
+  assert.ok(!('memo' in posts[0]), '메모 칸을 두지 않는다(undefined 금지)');
+  assert.strictEqual(mainOnly(c), beforeMain, '본 일정은 글자까지 그대로');
+  assert.strictEqual(JSON.stringify(c._st.cos), beforeCos, '★ 사업은 종료 상태 그대로 — 진행 목록에 다시 올라오지 않는다');
+  assert.ok(c._calls.raw.length >= 1 && c._calls.raw.every((v) => !hasUndefined(v)), '저장하려고 넘긴 «날것»에 undefined 가 있으면 클라우드가 통째로 거부한다');
+  assert.ok(c._calls.locks === 1 && c._calls.released === 1, '잠그고 → 저장 → 푼다');
+  ['cal', 'dash', 'sum', 'ended'].forEach((k) => assert.ok(c._calls.rendered.includes(k), k + ' 을(를) 다시 그린다 — 진행 목록의 「사후 N회」·달력 칩·요약줄이 바로 바뀐다'));
+  assert.ok(/사후 1회를 넣었습니다/.test(lastToast(c)) && /11-05|11\/5|11\/05/.test(lastToast(c)), '무엇을 어느 날에 넣었는지 알린다: ' + lastToast(c));
+});
+
+test('사후를 연달아 놓으면 — 이른 날짜를 나중에 놓아도 사후끼리 날짜순으로 1,2 를 다시 매기고 «목표 N/M회»를 알린다', async () => {
+  const c = postWorld(); c._st.cos[0].customPost = { t2: 2 };
+  await c.handlePostDrop('2026-11-12', DROP('c1', 't2'));
+  assert.ok(/\(1\/2회\)/.test(lastToast(c)) && !/목표 달성/.test(lastToast(c)), lastToast(c));
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.ok(/\(2\/2회\) · 목표 달성/.test(lastToast(c)), lastToast(c));
+  const posts = c._st.scheds.filter((s) => s.phase === 'post').sort((a, b) => (a.date < b.date ? -1 : 1));
+  assert.deepStrictEqual(posts.map((s) => s.date + ':' + s.round), ['2026-11-05:1', '2026-11-12:2']);
+});
+
+test('★ 못 놓는 곳 — 진행 중 사업 · 불가 날짜 · 같은 날 같은 사업 · 담당 하루 한도 · 같은 사업장 다른 사업 같은 날 · 쉰 사업장 (저장 안 하고 까닭을 말한다, 잠그지도 않는다)', async () => {
+  const refused = async (c, item, re, why) => {
+    const before = JSON.stringify(c._st.scheds);
+    await c.handlePostDrop('2026-11-05', item || DROP('c1', 't2'));
+    assert.strictEqual(JSON.stringify(c._st.scheds), before, why + ' — 저장하면 안 된다');
+    assert.strictEqual(c._calls.saves, 0, why); assert.strictEqual(c._calls.locks, 0, why + ' — 막힌 것은 잠그기 전에 끝난다');
+    assert.ok(re.test(lastToast(c)), why + ' — 까닭: ' + lastToast(c));
+  };
+  await refused(postWorld(), DROP('c2', 't2'), /본 회차를 모두 마쳤거나/, '진행 중 사업(본 1/3)');
+  await refused(postWorld({ isBlocked: () => '불가 날짜입니다' }), null, /불가 날짜/, '불가 날짜');
+  let c = postWorld(); c._st.scheds.push(P('c1', 't2', '2026-11-05', { id: 'dup', round: 1 })); await refused(c, null, /이미 있습니다/, '같은 날 같은 사업');
+  c = postWorld(); c._st.env = { maxDailyPerAtt: 1 }; c._st.scheds.push(D('c2', 't2', '2026-11-05', { id: 'busy' })); await refused(c, null, /이미 1건/, '담당 하루 한도');
+  c = postWorld(); c._st.cos[0].types = ['t2', 't3']; c._st.scheds.push(D('c1', 't3', '2026-11-05', { id: 'other' })); await refused(c, null, /다른 사업/, '같은 사업장 다른 사업');
+  c = postWorld(); c._st.cos[0].active = false; await refused(c, null, /비활성/, '쉬는 사업장');
+  await refused(postWorld(), DROP('nobody', 't2'), /사업장/, '없는 사업장');
+});
+
+test('잠금을 못 잡으면 놓아도 아무 것도 저장하지 않는다', async () => {
+  const c = postWorld({ acquireCompanyEditLock: async () => false });
+  const before = JSON.stringify(c._st.scheds); await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.strictEqual(JSON.stringify(c._st.scheds), before); assert.strictEqual(c._calls.saves, 0);
+});
+
+test('★ 줄에서 끌기 시작이 달력 칸과 이어진다 — 진행 목록이 항목을 묶고, 끌 수 있다는 모양(손 커서)이 있고, 끌기 때 줄이 따라 흐려지지 않는다', () => {
+  const dash = grab('renderDash');
+  assert.ok(/\.post-item\[draggable="true"\]/.test(dash) && /postDragStart\(e,/.test(dash) && /postDragEnd\(/.test(dash), '진행 목록 그릴 때 사후 항목에 끌기를 묶는다');
+  assert.ok(/\.post-item\[draggable="true"\]\{[^}]*cursor:grab/.test(SRC), '끌 수 있는 항목은 손 커서');
+  assert.ok(/\.post-item\.dragging\{[^}]*opacity/.test(SRC), '끄는 동안 항목이 흐려진다');
+});
+
+test('★ qa() 는 NodeList 다 — 결과에 map·filter·some 같은 «배열 함수»를 바로 부르는 곳이 이 화면에 없다 (진짜 화면에서만 터진다)', () => {
+  /* 2026-11-05 — postSelKeys·endedSelKeys 가 qa(...).map 을 불러, 사후 서랍을 열기만 해도·종료 목록을 그리기만 해도 «그리기 끝에서» 오류가 났다.
+     검사의 가짜 qa 가 배열이라 몰랐다(위 nl). 같은 모양이 다시 생기면 이름과 함께 걸린다. 고치는 법: Array.from(qa(...)).map(...) */
+  const re = /\bqa\((?:'[^']*'|"[^"]*"|`[^`]*`)\)\s*\.(map|filter|some|every|reduce|find|findIndex|slice|concat|includes|indexOf|sort|flatMap|join)\(/g;
+  const hits = []; let m;
+  while ((m = re.exec(S))) hits.push(S.slice(Math.max(0, m.index - 40), m.index).split('\n').pop().trim() + ' … ' + m[0]);
+  assert.deepStrictEqual(hits, [], 'NodeList 에 배열 함수를 바로 부른 곳: ' + hits.join(' | '));
 });
