@@ -118,6 +118,17 @@ const lg = L.annualLedger({ 발생일수: 15, 이월일수: 3, 사용일수: 20 
 eq('잔여 -2일', lg.잔여일수, -2);
 eq('초과사용 2일', lg.초과사용, 2);
 ok('초과사용 경고 문구 있음', !!lg.경고);
+const lgHr = L.annualLedger({ 발생일수: 15, 이월일수: 0, 사용일수: 2, 사용시간: 2, policy: { dailyContractHours: 8 } });
+eq('시간차 2h(8h 기준 0.25일) → 총 사용 2.25일', lgHr.사용일수, 2.25);
+eq('시간차 반영 잔여일수 12.75일', lgHr.잔여일수, 12.75);
+eq('시간차 반영 잔여시간 102h', lgHr.잔여시간, 102);
+eq('시간차 반영 미사용수당 102h × 1만 = 1,020,000', L.annualUnusedPay({ 미사용일수: lgHr.잔여일수, 미사용시간: lgHr.잔여시간, 시급: 10000 }).금액, 1020000);
+const attHr = L.summarizeAttendance([
+  { date: '2026-03-02', type: 'hourleave', leaveHours: 3, in: '13:00', out: '18:00', breakMin: 0 },
+  { date: '2026-03-03', type: 'quarter', leaveHours: 2 }
+]);
+eq('일별 시간차(3h) + 반반차(2h) = 연차사용시간 5h', attHr.합계.연차사용시간, 5);
+eq('일별 시간차(3h) + 반반차(2h) = 연차사용 0.625일', attHr.합계.연차사용, 0.625);
 const up = L.annualUnusedPay({ 미사용일수: 5, 시급: 10000 });
 eq('연차수당 5일 × 8h × 1만 = 400,000', up.금액, 400000);
 eq('촉진 적법 이행 → 수당 0 (61조)', L.annualUnusedPay({ 미사용일수: 5, 시급: 10000, 촉진적법: true }).금액, 0);
@@ -362,6 +373,106 @@ const mp26 = L.monthlyPayroll({ 기본급: 3500000, 간이세액표: T26, 부양
 eq('통합계산 소득세 = 3,510', mp26.공제.소득세, 3510);
 eq('통합계산 지방세 = 350 (10원 절사)', mp26.공제.지방세, 350);
 ok('지급 − 공제 = 실수령', mp26.지급.지급총액 - mp26.공제.공제총액 === mp26.실수령);
+
+section('근로자명부(근기법 41·42조) · 10인이하 법정점검 · 근로계약서·취업규칙 자동 검토');
+const rrOk = L.evaluateRosterRow({ 성명: '김철수', 성별: '남', 생년월일: '1988-05-12', 주소: '충남 천안시', 이력: '한식조리사', 종사업무: '조리', 입사일: '2024-03-01', 퇴사일: '2026-06-30', 퇴직사유: '자진퇴사' });
+eq('근로자명부 8대 법정항목 완비 = true', rrOk.완비여부, true);
+eq('퇴직 후 3년 보존기한 자동 계산 (2029-06-30)', rrOk.보존기한, '2029-06-30');
+const rrMiss = L.evaluateRosterRow({ 성명: '이영희', 입사일: '2025-01-01' });
+eq('미기재 항목 있으면 완비 = false', rrMiss.완비여부, false);
+ok('누락항목에 주소·생년월일 포함', rrMiss.누락항목.indexOf('주소') >= 0 && rrMiss.누락항목.indexOf('생년월일') >= 0);
+
+const comp4 = L.evaluateWorkplaceCompliance({ empCount: 4, fiveOrMore: false, contractCount: 4, rosterCompleteCount: 4, payslipLockedCount: 2 });
+eq('4인 사업장 규모구분 = 5인 미만 (10인 이하)', comp4.규모구분, '5인 미만 (10인 이하)');
+eq('5인 미만 적용 법정항목 = 8개 (해고예고·퇴직금·성희롱교육특례 포함)', comp4.적용항목수, 8);
+const comp8 = L.evaluateWorkplaceCompliance({ empCount: 8, fiveOrMore: true, contractCount: 8, rosterCompleteCount: 8, payslipLockedCount: 3, annualRecordedCount: 8 });
+eq('8인 사업장 규모구분 = 5인 이상 10인 미만 (10인 이하)', comp8.규모구분, '5인 이상 10인 미만 (10인 이하)');
+eq('5~9인 적용 법정항목 = 12개 (취업규칙 신고는 면제)', comp8.적용항목수, 12);
+
+const stdCt = L.buildStandardContractText({ 성명: '박민수', 입사일: '2026-03-01', 기본급: 2500000, 직종: '생산관리', 급여일: '25일' }, { fiveOrMore: true });
+const revCt = L.reviewLaborContract(stdCt, { policy: { fiveOrMore: true }, minWageHourly: 10320 });
+eq('표준근로계약서 자동 검토 적합 = true', revCt.적합여부, true);
+eq('계약서에서 성명 자동 추출', revCt.추출.성명, '박민수');
+eq('계약서에서 입사일 자동 추출', revCt.추출.입사일, '2026-03-01');
+eq('계약서에서 기본급 자동 추출', revCt.추출.기본급, 2500000);
+const badCt = L.reviewLaborContract('근로자: 최영수\n시급 9,000원 지급\n무단결근 시 위약금 50만원 배상 예정\n퇴직금은 매월 급여에 포함하여 지급', { minWageHourly: 10320 });
+eq('위법 계약서 적합 = false', badCt.적합여부, false);
+ok('최저임금 미달·위약예정·퇴직금 분할포함 3건 모두 적발', badCt.위법경고.length >= 3);
+
+const stdWr = L.buildStandardWorkRulesText('가람떡집', { fiveOrMore: true });
+const revWr = L.reviewWorkRules(stdWr, { empCount: 9 });
+eq('표준 취업규칙 근기법 93조 12대 항목 모두 충족', revWr.충족수, 12);
+eq('9인 사업장 취업규칙 신고의무 = false (10인 미만 면제)', revWr.신고의무여부, false);
+const badWr = L.reviewWorkRules('시업 09:00 임금 매월 25일 지급. 관공서 공휴일은 연차로 대체한다. 배우자 출산휴가 10일 부여. 감봉 징계 가능.', { empCount: 12 });
+ok('구법 공휴일 연차대체·배우자출산 10일·감봉 한도 미기재 경고 적발', badWr.위법경고.length >= 3);
+
+section('추가 6대 노무·급여 실무 자동 진단 (기간제·상용전환위험·취업규칙서식·지원금·보수총액·전자교부)');
+const lcAlerts = L.evaluateLifecycleAlerts([
+  { 성명: '김수습', 입사일: '2026-08-15', 고용형태: '정규직' },
+  { 성명: '이계약', 입사일: '2024-12-01', 계약종료일: '2026-11-30', 고용형태: '계약직' },
+  { 성명: '박정년', 입사일: '2015-03-01', 생년월일: '1967-01-10', 고용형태: '정규직' }
+], '2026-11-02');
+ok('수습 3개월·계약만료·2년 무기전환·정년 도래 경보가 모두 잡힌다', lcAlerts.length >= 4);
+
+const nrRisks = L.diagnoseNonRegularRisk([
+  { 성명: '최일용', 고용형태: '일용직', 일용여부: true, 활동월수: 14, 월평균근로일수: 20, 월평균근로시간: 160 }
+]);
+eq('14개월·월20일 근무 일용직 위험 진단 대상 = 1명', nrRisks.length, 1);
+eq('4대보험 상용가입·주휴연차·해고예고·퇴직금 4대 위험 모두 적발', nrRisks[0].위험수, 4);
+
+const wrDocs = L.buildWorkRulesFilingDocs('가람떡집', [{ 성명: '갑' }, { 성명: '을' }, { 성명: '병' }], { disadvantage: true, date: '2026-11-02' });
+eq('3인 사업장 과반수 기준 = 2명', wrDocs.과반수기준, 2);
+ok('취업규칙 신고서·동의서·신구대조표 3종 생성됨', wrDocs.신고서.indexOf('신고서') > -1 && wrDocs.의견동의서.indexOf('동의서') > -1 && wrDocs.신구대조표.indexOf('대조표') > -1);
+
+const subMatch = L.matchEmployerSubsidies({ months: 6, infantUnder12Months: true });
+eq('출산육아기·고령자 정부지원금 5종 매칭', subMatch.프로그램목록.length, 5);
+eq('만 12개월 이내 특례 육아휴직 지원금 6개월 = 200만×3 + 30만×3 = 690만원', subMatch.프로그램목록[0].예상총지원액, 6900000);
+
+const annSettle = L.summarizeAnnualSettlement([
+  { 월: '1월', 직원: [{ 성명: '홍길동', 지급총액: 3200000, 과세총액: 3000000, 국민연금: 142500, 건강보험: 100000, 장기요양: 13000, 고용보험: 27000, 소득세: 50000, 지방세: 5000 }] },
+  { 월: '2월', 직원: [{ 성명: '홍길동', 지급총액: 3200000, 과세총액: 3000000, 국민연금: 142500, 건강보험: 100000, 장기요양: 13000, 고용보험: 27000, 소득세: 50000, 지방세: 5000 }] }
+], '2026');
+eq('연간 보수총액 대사표 직원 1명 집계', annSettle.직원수, 1);
+eq('2개월 과세보수총액 = 600만원 · 월평균보수 = 300만원', annSettle.행목록[0].연간과세총액 + '/' + annSettle.행목록[0].월평균보수, '6000000/3000000');
+
+const delivHtml = L.buildContractDeliveryHtml('가람떡집', { 성명: '홍길동' }, '표준근로계약서 본문');
+ok('근로계약서 전자교부 HTML 에 근기법 17조 2항 명시', delivHtml.indexOf('제17조 제2항') > -1);
+
+section('시간차 1시간 단위 8시간 선택 및 소정근로시간(5시간 등) 최대시간차 상한 관리');
+eq('기본(8시간) 최대 시간차 = 8h', L.maxHourLeaveOf({ dailyContractHours: 8 }), 8);
+eq('기본(8시간) 1시간 단위 선택 목록 = 1~8h (8개)', L.hourLeaveOptions({ dailyContractHours: 8 }).join(','), '1,2,3,4,5,6,7,8');
+eq('소정근로시간 5시간 사업장 최대 시간차 = 5h', L.maxHourLeaveOf({ dailyContractHours: 5 }), 5);
+eq('소정근로시간 5시간 사업장 선택 목록 = 1~5h (5개)', L.hourLeaveOptions({ dailyContractHours: 5 }).join(','), '1,2,3,4,5');
+eq('개별 근로자 소정근로시간 5시간이면 최대 시간차 = 5h', L.maxHourLeaveOf({ dailyContractHours: 8 }, 5), 5);
+const norm5 = L.normalizeHourLeave({ 사용시간: 7, policy: { dailyContractHours: 5 } });
+eq('소정근로시간 5시간일 때 7시간 시간차 입력 시 5시간(최대시간차)으로 정리', norm5.사용시간, 5);
+eq('상한 초과 정리 표시 = true', norm5.상한초과정리됨, true);
+const lg5 = L.annualLedger({ 발생일수: 15, 이월일수: 0, 사용일수: 1, 사용시간: 8, policy: { dailyContractHours: 5 } });
+eq('5시간 사업장 연차대장 최대시간차 = 5h', lg5.최대시간차, 5);
+eq('5시간 사업장 연차대장 사용시간 8h → 5h로 상한 정리', lg5.사용시간, 5);
+eq('5시간 사업장 1일 + 시간차 5h(=1일) → 총 사용 2일', lg5.사용일수, 2);
+
+section('직원 선택 시 법정퇴직금 · DC형 · DB형 해당 퇴직금 금액 산정 (calculateSeveranceByType)');
+const sevStat = L.calculateSeveranceByType({
+  유형: 'STATUTORY', 입사일: '2024-01-01', 퇴사일: '2025-12-31',
+  기간임금총액: 9100000, 기간일수: 91, 통상일급: 90000, 연간임금총액: 36000000
+});
+eq('법정퇴직금 선택 시 유형 = STATUTORY', sevStat.유형, 'STATUTORY');
+eq('법정퇴직금 금액 (일평균 10만 × 30 × 731/365) = 6,008,219원', sevStat.금액, 6008219);
+const sevDc = L.calculateSeveranceByType({
+  유형: 'DC', 입사일: '2024-01-01', 퇴사일: '2025-12-31',
+  기간임금총액: 9100000, 기간일수: 91, 통상일급: 90000, 연간임금총액: 36000000
+});
+eq('DC형 선택 시 유형 = DC', sevDc.유형, 'DC');
+eq('DC형 연간 최소부담금 (3,600만 ÷ 12) = 3,000,000원', sevDc.별도집계.DC.연간최소부담금, 3000000);
+eq('DC형 731일 누적 부담금 (300만 × 731/365) = 6,008,219원', sevDc.금액, 6008219);
+const sevDb = L.calculateSeveranceByType({
+  유형: 'DB', 입사일: '2024-01-01', 퇴사일: '2025-12-31',
+  기간임금총액: 9100000, 기간일수: 91, 통상일급: 90000, 연간임금총액: 36000000, DB적립: 4000000
+});
+eq('DB형 선택 시 유형 = DB', sevDb.유형, 'DB');
+eq('DB형 확정급여 퇴직금액 = 6,008,219원', sevDb.금액, 6008219);
+eq('DB형 적립부족액 (6,008,219 - 4,000,000) = 2,008,219원', sevDb.별도집계.DB.부족액, 2008219);
 
 console.log('\n════════════════════════════════');
 console.log('  통과 ' + pass + ' · 실패 ' + fail);

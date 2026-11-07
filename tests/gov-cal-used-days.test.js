@@ -48,7 +48,7 @@ function drawCal(scheds, y, m, opt) {
       : { set textContent(v) { out.month = v; } },
   };
   vm.createContext(box);
-  vm.runInContext([fnSrc('p2'), fnSrc('escAttr'), fnSrc('schedPhase'),
+  vm.runInContext([fnSrc('p2'), fnSrc('escAttr'), fnSrc('schedPhase'), fnSrc('isPostSched'),
     fnSrc('usedRoundShort'), fnSrc('usedDayTip'), fnSrc('coOtherTypeOn'),
     // 기관 하루1건(agencyExclusiveDay) — renderSingleCal 이 부른다
     fnSrc('agencyOtherSiteOn'),
@@ -100,7 +100,7 @@ test('★ 사전진단 회차는 본컨설팅 회차와 «구분»된다 — 숫
      늘 다르게 나와서, 정작 둘이 똑같이 적혀도 통과해 버린다(실제로 그랬다). */
   const box = { console, String };
   vm.createContext(box);
-  vm.runInContext([fnSrc('schedPhase'), fnSrc('usedRoundShort')].join('\n'), box);
+  vm.runInContext([fnSrc('schedPhase'), fnSrc('isPostSched'), fnSrc('usedRoundShort')].join('\n'), box);
   assert.notEqual(
     box.usedRoundShort(S('2026-08-04', 1, true, 'pre')),
     box.usedRoundShort(S('2026-08-18', 1, true, 'main')),
@@ -117,7 +117,7 @@ test('★ 사전진단 회차는 본컨설팅 회차와 «구분»된다 — 숫
 test('★ 쪽지에 날짜·회차·방문/사무실이 «다» 들어간다', () => {
   const box = { console, String };
   vm.createContext(box);
-  vm.runInContext([fnSrc('schedPhase'), fnSrc('usedDayTip')].join('\n'), box);
+  vm.runInContext([fnSrc('schedPhase'), fnSrc('isPostSched'), fnSrc('usedDayTip')].join('\n'), box);
 
   const t1 = box.usedDayTip(S('2026-09-15', 14, false), 8, 15);
   assert.match(t1, /9월/, '★ 몇 월인지가 없습니다');

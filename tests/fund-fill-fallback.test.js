@@ -18,8 +18,8 @@ const A = (() => {
   new Function([
     gV('REGISTRY_MAP'), gV('_SIDO_ABBR'), gV('TAX_MAP'), gV('LABOR_MAP'),
     gF('_addrParts'), gF('guessLabor'), gF('guessRegistry'), gF('guessTax'),
-    gF('_officersOf'), gF('_siteUrep'), gF('_relNm'), gF('_leadSite'), gF('_fundFill'),
-    'this.fill=_fundFill; this.labor=guessLabor;',
+    gF('_officersOf'), gF('_siteUrep'), gF('_siteWrep'), gF('_relNm'), gF('_leadSite'), gF('_sitesFill'), gF('_fundFill'),
+    'this.fill=_fundFill; this.sfill=_sitesFill; this.labor=guessLabor;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -77,6 +77,28 @@ test('대표자 직책 — 명부 → 기금 정보 «대표자 직책»(rep_pos
   const sites = [{ _id: 's1', ceo: '홍길동', urep_same: true, urep_title: '대표이사' }];
   assert.equal(A.fill({ chairman: '홍길동', rep_position: '회장' }, sites).f.officers[0].title, '회장');
   assert.equal(A.fill({ chairman: '홍길동' }, sites).f.officers[0].title, '대표이사');
+  assert.equal(A.fill({ chairman: '홍길동' }, sites).f.rep_position, '대표이사', '사업장에서 찾은 직책을 기금 rep_position 에도 채운다');
   assert.equal(A.fill({ chairman: '홍길동', rep_position: '회장' }, []).f.officers[0].title, '회장', '사업장에 없어도 적어 둔 직책');
   assert.equal(A.fill({ chairman: '홍길동' }, []).f.officers, undefined, '바꿀 것이 없으면 명부를 만들지 않는다');
+});
+
+test('★★ 사업장 소재지 폴백·임대인 자동채움·위원명부→사업장 자동 보충·등기신청서 정렬', () => {
+  const sites = [
+    { _id: 's1', name: '(주)가나건설', ceo: '장대표', urep_same: true, urep_birth: '1965-03-10', urep_title: '대표이사', address: ADDR, lead: true },
+    { _id: 's2', name: '(주)다라산업', ceo: '이이사', urep_same: true, urep_birth: '1970-05-05', address: '충청남도 천안시 서북구 가상로 2' },
+  ];
+  const f0 = {
+    chairman: '장대표',
+    officers: [{ role: '이사장', name: '장대표' }, { role: '사용자측 이사', name: '이이사' }],
+    prep_committee: [{ side: '근로자측', company: '다라산업', name: '박근로', birth: '1980-01-01', title: '반장' }],
+  };
+  const sf = A.sfill(f0, sites);
+  assert.equal(sf[1].wrep_name, '박근로', '설립준비위원 명부에서 같은 회사의 근로자대표를 자동 보충');
+  const r = A.fill(f0, sf);
+  assert.equal(r.f.officers[0].addr, ADDR, 'urep_addr 가 비어도 사업장 소재지(address)로 대표자 주소 보충');
+  assert.equal(r.f.officers[1].addr, '충청남도 천안시 서북구 가상로 2', '다른 이사도 소속 사업장 주소로 보충');
+  assert.equal(r.f.lease_lessor, '(주)가나건설', '주사무소 소재지 사업장으로 임대인 자동 보충');
+  assert.match(gF('hwpFormHTML'), /_fundFill\(/, 'HTML 서식도 _fundFill 을 거친다');
+  assert.match(gF('estabGaps'), /_fundFill\(/, '빈칸 점검도 _fundFill 을 거친다');
+  assert.match(gF('fillDerived'), /신청인\[\\s\\S\]\*대리인\[\\s\\S\]\*귀중/, '등기신청서 하단 신청인·대리인·관할등기소 정렬 보정이 있다');
 });

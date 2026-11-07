@@ -1718,7 +1718,7 @@
     cell: () => E.currentCell(),
     insertRow(below) {
       E.checkpoint();
-      const td = E.currentCell(); if (!td) return UI.toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const table = td.closest('table'), g2 = grid(table);
       const r = below ? td._r + td.rowSpan : td._r;
       const tr = document.createElement('tr');
@@ -1734,7 +1734,7 @@
     },
     insertCol(right) {
       E.checkpoint();
-      const td = E.currentCell(); if (!td) return UI.toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const table = td.closest('table'), g2 = grid(table);
       const c = right ? td._c + td.colSpan : td._c;
       const done = new Set();
@@ -1791,7 +1791,7 @@
     },
     merge(dir) {
       E.checkpoint();
-      const td = E.currentCell(); if (!td) return UI.toast('표 안에 커서를 두세요.', true);
+      const td = E.currentCell(); if (!td) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const table = td.closest('table'), g2 = grid(table);
       const other = dir === 'down' ? (g2[td._r + td.rowSpan] || [])[td._c] : g2[td._r][td._c + td.colSpan];
       if (!other || other === td) return UI.toast('합칠 셀이 없습니다.', true);
@@ -1823,7 +1823,7 @@
       E.checkpoint();
       const r = E.selRange() || savedRange;
       const cells = r && !r.collapsed ? Array.from(doc.querySelectorAll('td,th')).filter(c => r.intersectsNode(c)) : [E.currentCell()].filter(Boolean);
-      if (!cells.length) return UI.toast('표 안에 커서를 두세요.', true);
+      if (!cells.length) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       cells.forEach(c => { c.style.backgroundColor = color || ''; });
       afterEdit();
     },
@@ -1832,7 +1832,7 @@
       E.checkpoint();
       const r = E.selRange() || savedRange;
       const cells = r && !r.collapsed ? Array.from(doc.querySelectorAll('td,th')).filter(c => r.intersectsNode(c)) : [E.currentCell()].filter(Boolean);
-      if (!cells.length) return UI.toast('표 안에 커서를 두세요.', true);
+      if (!cells.length) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       const side = (type, width) => ({ type, width, color: '#000000' });
       for (const c of cells) {
         const curB = Dm.decodeBorders(c.dataset.border) || { l: H.DEFAULT_SIDE, r: H.DEFAULT_SIDE, t: H.DEFAULT_SIDE, b: H.DEFAULT_SIDE };
@@ -1853,7 +1853,7 @@
     },
     setProps(p, given) {
       const cells = (given || E.table.targetCells()).filter(c => doc.contains(c));
-      if (!cells.length) return UI.toast('표 안에 커서를 두세요.', true);
+      if (!cells.length) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       E.checkpoint();
       if (p.tableWidth) cells[0].closest('table').style.setProperty('--w', Math.max(10, Math.min(100, p.tableWidth)) + '%'); // 너비는 --w (그릴 때 바깥 테두리 반쪽을 더함)
       for (const c of cells) {

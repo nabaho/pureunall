@@ -536,7 +536,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=87"></script>
+<script src="js/pu-ontology.js?v=90"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -544,7 +544,7 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=39"></script>
+<script src="js/pu-appbar.js?v=40"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -1192,6 +1192,7 @@ function pickRow(x, i){
   var due=x.due||{}, link=x.url ? (x.kind==='hit' ? '<a class="tlink" href="'+esc(x.url)+'" onclick="return recOpenPost(\''+esc(x.ref)+'\')">'+esc(x.title)+'</a>'
       : '<a class="tlink" href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title)+'</a>') : '<b>'+esc(x.title)+'</b>';
   var acts='';
+  if(x.kind!=='org') acts+='<label class="btn sm"><input type="checkbox" aria-label="지원 준비" onchange="applicationFromPick(this)" data-key="'+esc(x.key)+'"> 지원</label>';
   if(x.kind==='feed'){ acts+='<button class="btn sm" onclick="pickStar(\''+esc(x.ref)+'\')" title="공고 모아보기에서 ★ 관심으로 — 이 목록에서는 빠집니다">☆ 관심</button>'; }
   if(x.kind==='org'){ acts+='<button class="btn sm" onclick="pickGoRec()">🧑‍💼 지원 이력 보기</button>'; }
   acts+='<button class="btn sm" onclick="pickOff(\''+esc(x.key)+'\')" title="이 팝업에서만 뺍니다 — 공고·모집 글은 그대로입니다">🙈 숨기기</button>';
@@ -1345,7 +1346,7 @@ function draw(){
       +'<td class="act">'
         +'<button class="btn sm" onclick="star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button> '
         +(r.url?'<button class="btn sm" onclick="open2(\''+id+'\')">🔗</button> ':'')
-        +'<button class="btn sm" title="서식 채우기 — 경력관리에서 열립니다" onclick="toForm(\''+id+'\')">📝</button> '
+        +'<button class="btn sm" title="지원 준비 — 경력관리에서 서류를 함께 준비합니다" onclick="toForm(\''+id+'\')">📝</button> '
         +(r.hidden ? '<button class="btn sm" title="되살리기" onclick="unhide(\''+id+'\')">↩</button>'
                    : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
   }).join('') : '<tr><td colspan="13" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
@@ -1420,7 +1421,7 @@ function feedPop(id){
     +'<div class="bar" style="margin:12px 0">'
     +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\');feedPop(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★ 관심 끄기':'☆ 관심')+'</button>'
     +(r.url?'<button class="btn sm" onclick="open2(\''+esc(r.id)+'\')">🔗 원문 공고</button>':'')
-    +'<button class="btn sm" onclick="toForm(\''+esc(r.id)+'\')">📝 서식 채우기</button>'
+    +'<button class="btn sm" onclick="toForm(\''+esc(r.id)+'\')">☑ 지원 준비</button>'
     +(r.hidden?'<button class="btn sm" onclick="unhide(\''+esc(r.id)+'\')">↩ 되살리기</button>'
               :'<button class="btn sm" onclick="hide(\''+esc(r.id)+'\');popClose()">🚫 숨기기</button>')
     +'</div>'
@@ -1456,11 +1457,29 @@ function hide(id){ var h=find(id); if(!h) return;
    ⚠★ 여기에 서식 채우기 화면을 «짓지 말 것». 그 화면은 경력관리에 이미 있고
       함수 60개 + 한글 엔진 7MB 짜리다. 두 곳에 두면 한쪽만 고쳐져 어느 쪽이
       맞는지 알 수 없게 된다 — 이 저장소가 «보관함 다섯 자리»로 크게 앓았던 병이다.
-   ⚠ 공고명만 들려 보낸다(공개된 공고 제목이다). 개인정보는 주소에 싣지 않는다. */
+   ⚠ 공개 공고의 ID·제목·원문 링크만 같은 탭의 임시 전달함으로 넘긴다. 개인정보는 주소에 싣지 않는다. */
+function applicationHandoff(source){
+  if(!fbUid){ toast('로그인한 뒤 지원을 선택해 주세요'); return; }
+  source.uid=fbUid; source.at=Date.now(); source.token='AP-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  try{ sessionStorage.setItem('pu_application_handoff',JSON.stringify(source)); }
+  catch(e){ toast('공고를 전달하지 못했습니다. 브라우저 저장공간을 확인해 주세요'); return; }
+  location.href='kcareer.html?go=form&application='+encodeURIComponent(source.token);
+}
+function applicationFromPick(input){
+  if(!input.checked) return;
+  var x=pickRank().items.filter(function(r){ return r.key===input.dataset.key; })[0];
+  if(!x||x.kind==='org'){ input.checked=false; return; }
+  if(x.kind==='feed'){ toForm(x.ref); return; }
+  var hit=recWatchHits().filter(function(r){ return r.key===x.ref; })[0]||{};
+  applicationHandoff({sourceKind:'gov_watch',sourceId:x.ref,title:x.title,org:x.org||hit.boardName||'',url:x.url||hit.href||'',deadline:(hit.per&&hit.per.to)||'',docs:hit.docs||[],text:hit.body||hit.text||''});
+}
+function applicationFromHit(key){
+  var hit=recWatchHits().filter(function(r){return r.key===key;})[0];if(!hit)return;
+  applicationHandoff({sourceKind:'gov_watch',sourceId:key,title:hit.title,org:hit.boardName||hit.org||'',url:hit.href||'',deadline:(hit.per&&hit.per.to)||'',docs:hit.docs||[],text:hit.body||hit.text||''});
+}
 function toForm(id){
-  var h=find(id); if(!h) return;
-  var t=String(h.a[h.i].nm||'').slice(0,80);
-  location.href='kcareer.html?go=form&t='+encodeURIComponent(t);
+  var h=find(id); if(!h) return; var r=h.a[h.i];
+  applicationHandoff({sourceKind:'gov_feed',sourceId:r.id,title:r.nm,org:r.org,url:r.url,deadline:r.closeDt||'',docs:[],text:r.body||r.text||''});
 }
 /* 출처가 빠진 채 담긴 옛 줄을 되살린다(2026-10-03 첫 실사용 32건). 멱등 — 있으면 건드리지 않는다. */
 function srcBackfill(){
@@ -2208,7 +2227,7 @@ function recWatchHtml(grp){
       +matchCell(function(){ return matchTargetHit(x); })
       +docsCell(x)
       +recDueCell(pp)
-      +'<td class="act">'
+      +'<td class="act">'+recSupportInput(x.key)
       +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button>'
       +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
   recSelShown(grp, shown.map(function(x){ return x.key; }));
@@ -2224,6 +2243,9 @@ function recWatchHtml(grp){
 }
 /* 공고를 팝업 창으로 — 한 창을 돌려 쓴다(누를 때마다 창이 쌓이지 않게). 연 글은 «봤음»으로 적는다.
    ⚠ 팝업이 막히면 새 탭으로 연다(a 의 href 가 그대로 산다 — return true). */
+function recSupportInput(key){
+  return '<label class="btn sm"><input type="checkbox" data-key="'+esc(key)+'" onchange="if(this.checked)applicationFromHit(this.dataset.key)"> 지원</label>';
+}
 function recOpenPost(key){
   var x=recWatchHits().filter(function(h){ return h.key===key; })[0];
   if(!x || !/^https:\/\//.test(x.href||'')) return false;

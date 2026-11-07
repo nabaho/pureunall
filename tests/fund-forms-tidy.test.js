@@ -133,3 +133,73 @@ test('★ ⑩ 엑셀 줄 모양이 CSS 에 있다 — 줄이 깨지면 이름·�
   assert.match(SRC, /\.xlrow \.fn\{[^}]*text-overflow:ellipsis/,
     '★ 긴 파일 이름이 줄을 밀어냅니다.');
 });
+
+test('★★ ⑪ 기본서식 외 기업 준비·첨부서류 목록 — 전 단계(①~⑥) 번호·체크박스와 A4 안내문 미리보기가 배선되어 있다', () => {
+  ['inka', 'reg', 'tax', 'ops', 'subsidy'].forEach((ph) => {
+    assert.ok(서식탭.includes("reqDocsBoxHTML('" + ph + "',cur,fundMode)"), '★ 서식 탭에서 첨부서류 목록 누락: ' + ph);
+  });
+  assert.ok(grabFn('dsLibHTML').includes("reqDocsBoxHTML('dis',cur,fundMode)"), '★ ⑥ 해산·탈퇴에서 첨부서류 목록 누락');
+  const boxFn = grabFn('reqDocsBoxHTML');
+  assert.ok(boxFn.includes('<th class="ckcol">') && boxFn.includes('<th class="no">번호</th>'), '★ 첨부서류 표 머리글 □·번호 누락');
+  assert.ok(boxFn.includes('<td class="ckcol">') && boxFn.includes('<td class="no">'), '★ 첨부서류 표 본문 □·번호 누락');
+  assert.ok(grabFn('docBody').includes('reqDocSheetHTML('), '★ 오른쪽 A4 안내문 미리보기 배선 누락');
+});
+
+test('★★ ⑫ 기업 준비·첨부서류 실행 검증 — 사내·공동 유형별 필터링, 체크 상태 반영, 사업장별 수합 점검표 생성', () => {
+  const vm = require('node:vm');
+  function grabVar(name) {
+    const i = SRC.indexOf('var ' + name + '=');
+    assert.ok(i >= 0, '변수 없음: ' + name);
+    let d = 0;
+    for (let j = SRC.indexOf('=', i) + 1; j < SRC.length; j++) {
+      const c = SRC[j];
+      if (c === '{' || c === '[') d++;
+      else if (c === '}' || c === ']') d--;
+      else if (c === ';' && !d) return SRC.slice(i, j + 1);
+    }
+    throw new Error('변수 끝 없음: ' + name);
+  }
+  const ctx = {
+    S: { formsCtx: 'fund', formFund: 'F1', _sideKind: null, _reqDocChk: { F1: { inka: { inka_wrep: true, inka_bizreg: true } } } },
+    esc: (s) => String(s == null ? '' : s),
+    dgV: (s) => String(s || '＿＿＿'),
+    dgToday: () => '2026년 11월 3일',
+    hlp: () => 'ⓘ',
+    curForm: () => ({ name: '가나다사내근로복지기금', fund_type: '사내' }),
+    $: () => null,
+    sidePreview: () => {},
+  };
+  vm.createContext(ctx);
+  vm.runInContext([
+    grabVar('DOC_KINDS'), grabVar('DOC_REG'), grabVar('DOC_TAX'), grabVar('DOC_OPS'), grabVar('DOC_SUB'), grabVar('DOC_DIS'),
+    grabFn('docsFor'), grabVar('REQ_PHASE_LABELS'), grabVar('REQ_DOCS'),
+    grabFn('reqDocsFor'), grabFn('_reqDocChkKey'), grabFn('_reqDocChkMap'), grabFn('_reqDocRefreshCnt'),
+    grabFn('toggleReqDocChk'), grabFn('toggleReqDocAll'), grabFn('reqDocsBoxHTML'), grabFn('reqDocSheetHTML'),
+  ].join('\n'), ctx);
+
+  // 1) 사내 vs 공동 필터링 및 명칭 변환 확인
+  const saneInka = ctx.reqDocsFor('inka', '사내');
+  const gongInka = ctx.reqDocsFor('inka', '공동');
+  assert.equal(saneInka.length, 9, '사내기금 인가 첨부서류 9종(공동기금 전용 제외)');
+  assert.equal(gongInka.length, 10, '공동기금 인가 첨부서류 10종');
+  assert.ok(saneInka.some((d) => d.who === '설립기업'), '사내기금에서는 참여기업별 → 설립기업으로 표시');
+
+  const saneDis = ctx.reqDocsFor('dis', '사내');
+  const gongDis = ctx.reqDocsFor('dis', '공동');
+  assert.equal(saneDis.length, 6, '사내기금 해산 첨부서류 6종');
+  assert.equal(gongDis.length, 9, '공동기금 해산·중간탈퇴 첨부서류 9종');
+
+  // 2) reqDocsBoxHTML 렌더링 확인 (체크 상태 2건 반영)
+  const boxHtml = ctx.reqDocsBoxHTML('inka', { name: '가나다사내근로복지기금', fund_type: '사내' }, true);
+  assert.ok(boxHtml.includes('확인 2/9'), '체크된 2건 집계 표시');
+  assert.ok(boxHtml.includes('설립준비위원 재직증명서'), '필수 첨부서류 제목 포함');
+
+  // 3) reqDocSheetHTML A4 안내문 및 사업장별 수합 점검표 확인
+  const sheetHtml = ctx.reqDocSheetHTML('inka',
+    { name: '가나다공동근로복지기금', fund_type: '공동', chairman: '홍길동', address: '서울특별시 중구 세종대로 1' },
+    [{ name: '(주)가나테크', ceo: '김철수' }, { name: '(주)다라물산', ceo: '이영희' }]);
+  assert.ok(sheetHtml.includes('1. 기본 생성서식 목록'), '기본서식 섹션 포함');
+  assert.ok(sheetHtml.includes('2. 기업 준비·첨부서류 목록'), '기업 준비·첨부서류 섹션 포함');
+  assert.ok(sheetHtml.includes('3. 사업장별 준비서류 수합 점검표 (2개소)'), '사업장별 수합 점검표 포함');
+  assert.ok(sheetHtml.includes('(주)가나테크') && sheetHtml.includes('(주)다라물산'), '참여사업장 명단 자동 반영'); assert.match(코드만(grabFn('tplRow')), /if\(fundMode\)\s*return\s*''/, '기금 상세(fundMode)에서는 엑셀 줄을 숨기고 서식 자료실에만 유지');
+});

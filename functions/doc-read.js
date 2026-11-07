@@ -85,7 +85,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
@@ -158,6 +158,32 @@ function aiBudgetOf(raw) {
   };
 }
 function aiMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/n"; }
+
+/* ── 한도 판정 한 곳 (대표 지시 2026-11-05 「유료 API 통제 — 추천대로」) ─────────────
+   여태 «사람이 누른 판독(manual)»은 한도를 넘어도 끝없이 통과했다 — 화면 하나가
+   manual 을 실어 되풀이하면 상한이 없었다. 이제 두 줄로 막는다.
+     ① 한도(limit)를 넘으면 «자동»은 멈춘다 — 예전 그대로.
+     ② 한도의 MANUAL_CEIL 배(1.2배)를 넘으면 «사람이 누른 것»도 멈춘다.
+        급한 서류를 위한 여유(₩1만)는 남기되, 끝은 있게 한다.
+        더 써야 하면 대표가 한도 설정을 올린다(ai_read_budget — 관리자만 쓴다).
+     ③ 셈을 «못 읽으면»(known:false) 자동은 멈추고 사람이 누른 것만 통과시킨다.
+        못 읽은 채 자동이 돌면 폭주를 못 본다. 사람이 누른 것은 한 장씩이라 크게 안 샌다.
+   돌려주는 것: { block, hard, why } — hard 는 「사람이 눌러도 막혔다」. */
+const MANUAL_CEIL = 1.2;
+function budgetGate(spend, manual) {
+  const m = spend || {};
+  const limit = Number(m.limit) || 0;
+  const spent = Number(m.spent) || 0;
+  if (!m.known) {
+    return manual ? { block: false, hard: false, why: "" }
+      : { block: true, hard: false, why: "unknown" };
+  }
+  if (limit > 0 && spent >= Math.round(limit * MANUAL_CEIL)) {
+    return { block: true, hard: true, why: "ceil" };
+  }
+  if (m.over && !manual) return { block: true, hard: false, why: "over" };
+  return { block: false, hard: false, why: "" };
+}
 
 function tallyPaths(app, ymd, kind) {
   const k = TALLY_KINDS.indexOf(kind) >= 0 ? kind : "n";
@@ -341,6 +367,8 @@ module.exports = {
   APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS,
   /* AI 판독 이번 달 요금 한도 (대표 결정 2026-09-10) — 까닭은 AI_BUDGET_PATH 머리에 */
   AI_BUDGET_PATH, AI_BUDGET_DEFAULT, aiBudgetOf, aiSpentWon, aiMonthPath,
+  /* 한도 판정 한 곳 (2026-11-05) — 까닭은 MANUAL_CEIL 머리에 */
+  MANUAL_CEIL, budgetGate,
   /* 달 몫 문턱 — 까닭은 ymKST 머리에 */
   ymKST, VISION_FREE_MONTH, visionMonthPath,
   /* ⑪ 무료로 글자 먼저 — 까닭은 TABLE_DOC_WORDS 머리에 */

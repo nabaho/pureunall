@@ -309,3 +309,11 @@ test('★★ ①-7 사용자대표를 안 적은 사업장은 회사 대표자(�
   assert.deepEqual(b.fromSites(ss, '사용자측').map((o) => o.name), ['이계옥', '박상무']);
   assert.equal(b.fromSites(ss, '근로자측').length, 0);
 });
+
+test('★★ ⑫ 별지 명단 래퍼(div[data-newpage])를 벗겨 표(table)가 행 단위로 다음 쪽에 넘어가게 한다 — 셀 중간에서 잘리면 안 된다', () => {
+  const pg = 코드만(grabFn('paginateDoc'));
+  assert.match(pg, /!dv\.querySelector\('table'\)/, '★ 표를 감싼 div를 벗기지 않으면 _splitTableToFit 이 돌지 못해 셀이 잘립니다.');
+  assert.match(pg, /dv\.firstElementChild\.setAttribute\('data-newpage',np\)/, '★ 래퍼의 data-newpage 를 첫 자식(제목)에 물려주어야 새 장에서 시작합니다.');
+  const sp = 코드만(grabFn('_splitTableToFit'));
+  assert.match(sp, /headRows/, '★ thead 없는 표(별지 명단·서명표)의 th 머리행을 다음 쪽에도 반복해야 열 폭과 머리글이 유지됩니다.');
+});

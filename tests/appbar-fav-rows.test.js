@@ -102,7 +102,7 @@ test('ⓕ 「지금 안 씀」(off) 앱은 앱 막대 목록에도 없다 — �
   ['admin', 'staff'].forEach((role) => {
     const { B } = load(role);
     const k = keys(B);
-    ['payroll', 'paydata'].forEach((x) => assert.ok(!k.includes(x), role + ' 앱 막대에 ' + x + ' 가 남았다'));
+    ['paydata'].forEach((x) => assert.ok(!k.includes(x), role + ' 앱 막대에 ' + x + ' 가 남았다'));
     ['erp', 'cards', 'photos', 'docs'].forEach((x) => assert.ok(k.includes(x), x + ' 까지 사라졌다'));
   });
   const { B } = load('admin');
@@ -114,5 +114,6 @@ test('ⓖ 되살린 취업규칙은 앱 막대에도 돌아온다 — 포털 타
   ['admin', 'staff'].forEach((role) => {
     const { B } = load(role);
     assert.ok(keys(B).includes('rules'), role + ' 앱 막대에 취업규칙이 없다');
+    assert.ok(keys(B).includes('payroll'), role + ' 앱 막대에 급여아웃소싱이 없다');
   });
 });

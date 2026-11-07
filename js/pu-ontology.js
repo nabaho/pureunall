@@ -27,7 +27,7 @@
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
-      SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정',
+      SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -35,7 +35,7 @@
       /* 취업규칙 새로 짓기 ① (2026-10-03) — 메일에서 모아 가린 취업규칙 서류와, 사업장의 개정 «회차».
          회차 레코드가 ★최종본(finalDocId) 하나를 갖는다 — 「회차에 하나」가 저절로 지켜진다. */
       RulesDocument:'취업규칙 서류', RulesRound:'취업규칙 회차',
-      CareerRecord:'경력 실적',
+      CareerRecord:'경력 실적', ApplicationPack:'공고별 지원 준비',
       /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
          관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
       ViewState:'보던 자리'
@@ -207,7 +207,8 @@
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],
-      entityTypes:['Person','Employment','Project','Document'] },
+      entityTypes:['Person','Employment','Project','Document','ApplicationPack'],
+      writeContracts:[{path:'kcareer/{uid}/applicationPacks/{id}',entityType:'ApplicationPack'}] },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-05).
        ⚠ 경력관리와 «다른 집»이다. 여기 담기는 것은 «아직 안 한 일»(공고·기회)이고
          경력관리는 «이미 한 일»(실적)이다. 섞으면 지원서에 안 한 일이 실적으로 들어간다.
@@ -269,8 +270,10 @@
                       {path:'settle/links/{kind}/{key}',entityType:'SettleLink'},
                       {path:'settle/notices/{id}',entityType:'SettleNotice'},
                       {path:'settle/runs/{id}',entityType:'SettleRun'},
-                      {path:'settle/adjusts/{id}',entityType:'SettleAdjust'}],
-      entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust'] },
+                      {path:'settle/adjusts/{id}',entityType:'SettleAdjust'},
+                      {path:'settle/rooms/{sid}',entityType:'SettleRoom'},
+                      {path:'settle/kakaoQueue/{id}',entityType:'SettleKakao'}],
+      entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -311,7 +314,7 @@
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
       sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
-    payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
+    payroll:{ name:'급여아웃소싱', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },
     /* Task — 「입퇴사 할 일」(paydata/hrtask, 2026-10-03). 메일에서 매번 다시 세고 «사람이 누른 상태»만 적는다. */
     paydata:{ name:'급여데이터함', file:'pu-paydata.html', primaryRoots:['paydata'],
@@ -572,6 +575,7 @@
       gives:'취업규칙 서류·회차 (고객사 규칙 원문 — 통합 진단에서 읽지 않는다)'},
     fund_core:{program:'fund',strategy:'local',path:'data/funds',parser:'erp'},
     work_items:{program:'work',strategy:'remote',path:'work_erp/items',parser:'workItems'},
+    career_application_packs:{program:'career',strategy:'in_app',path:'kcareer/{uid}/applicationPacks',parser:'coverage',gives:'본인 전용 지원 준비·초안·증빙 연결'},
     career_counts:{program:'career',strategy:'remote',path:'kcareer/{uid}/counts',parser:'coverage'},
     /* ⚠★ strategy:'local' 이다 — gov/{uid} 안에는 공공데이터포털·기업마당 «인증키»가 있다.
        remote 로 바꾸면 통합진단이 열쇠를 통째로 읽어 간다. 바꾸지 말 것. */

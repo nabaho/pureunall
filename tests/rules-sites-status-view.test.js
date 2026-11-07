@@ -132,14 +132,15 @@ test('⑤ 폰 카드 — «진행»은 첫 줄(::after 앞), 칸 차례는 그�
   assert.ok(orderOf(filed) !== null && orderOf(filed) > after, '마지막 신고는 둘째 줄');
 });
 
-test('⑥ 확정·후보가 함께 있는 줄은 단추 글자를 줄인다 — 좁아진 자료 칸에서 단추가 잘리지 않게, 뜻은 title 에', () => {
+test('⑥ 표의 확정 단추는 늘 짧은 글자 — 자료 칸의 «맞음» 자리(격자 여섯째 칸)가 좁다. 뜻은 title 에', () => {
   const s = st(), rows = rowsOf(s);
   const both = Object.assign({}, rows.find((r) => r.id === 'c1'), { cand: 2, candMails: 1, candIds: [] });
   const only = Object.assign({}, rows.find((r) => r.id === 'c3'), { linked: 0, cand: 1, candMails: 1, candIds: [] });
   const h = V.listHtml(s, [both, only]);
-  const b1 = (trOf(h, 'c1').match(/<button[^>]*data-act="siteLink"[^>]*>([^<]*)<\/button>/) || [])[0] || '';
-  const b3 = (trOf(h, 'c3').match(/<button[^>]*data-act="siteLink"[^>]*>([^<]*)<\/button>/) || [])[0] || '';
-  assert.ok(b1 && b3, '후보가 있는 줄에 확정 단추가 없다');
-  assert.ok(b1.replace(/<[^>]*>/g, '').length < b3.replace(/<[^>]*>/g, '').length, '확정 딱지와 함께 있는 단추 글자가 줄지 않았다');
-  assert.match(b1, /title="[^"]*이 회사 자료 맞음/, '줄인 단추는 title 에 뜻을 남겨야 한다');
+  [['c1', both], ['c3', only]].forEach(([id]) => {
+    const b = (trOf(h, id).match(/<button[^>]*data-act="siteLink"[^>]*>([^<]*)<\/button>/) || [])[0] || '';
+    assert.ok(b, id + ' 줄에 후보가 있는데 확정 단추가 없다');
+    assert.ok(b.replace(/<[^>]*>/g, '').length <= 6, id + ' 줄의 확정 단추 글자가 길다 — 좁은 칸에서 잘린다');
+    assert.match(b, /title="[^"]*이 회사 자료 맞음/, '줄인 단추는 title 에 뜻을 남겨야 한다');
+  });
 });
