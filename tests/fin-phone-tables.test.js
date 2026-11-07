@@ -80,7 +80,11 @@ test('⑧ ★ 출금관리 도구줄은 같은 폭 격자 · 월말 마감 단�
 });
 
 test('⑨ 🎤 단추가 목록 끝 줄을 덮지 않는다 — 작게·아래로 · 본문 맨 끝 여백', () => {
-  assert.match(BLOCK, /body\[data-erp-group="fin"\] #erp-voice-btn\{[^}]*width:40px !important/);
+  /* 크기를 못 박지 않는다 — «작게(40px 이하)·덜 가리게(투명도)»가 규칙이다 */
+  const mic = BLOCK.match(/body\[data-erp-group="fin"\] #erp-voice-btn\{([^}]*)\}/);
+  assert.ok(mic, '🎤 규칙이 없습니다');
+  assert.ok(+(mic[1].match(/width:(\d+)px !important/) || [0, 99])[1] <= 40, '★ 🎤 단추가 큽니다');
+  assert.match(mic[1], /opacity:\.\d+/, '★ 🎤 가 목록 끝 줄을 그대로 가립니다');
   assert.match(BLOCK, /body\[data-erp-group="fin"\] main\{ padding-bottom:8\d?px; \}/);
 });
 
@@ -124,3 +128,16 @@ test('⑭ ★ 입금관리 탭 여덟 개는 폰에서 고르개 하나 + 가져
   assert.match(HTML, /className:'fi-sel'[\s\S]{0,200}SUBTABS\.map\(function\(t\)\{ return h\('option'/);
   assert.match(HTML, /className:'fi-imp'/);
 });
+
+test('⑮ ★ 전체 검토(2026-11-02) — 손익 차트는 열두 달이 폰 폭에 다 들어가고, 입금 대조 줄은 업체명이 짓눌리지 않는다', () => {
+  assert.match(BLOCK_ALL(), /\.pl-bars\{ min-width:0 !important;/, '★ 차트 최소 폭(480px)이 남아 7월 이후가 잘립니다');
+  assert.match(BLOCK_ALL(), /\.pl-delta\{ display:none !important; \}/);
+  assert.match(BLOCK_ALL(), /\.ivm-row\{ display:grid !important; grid-template-columns:minmax\(0,1fr\) auto;/, '★ 입금 대조 줄이 폭 고정 한 줄입니다 — 업체명이 「(주)…」로 짓눌립니다');
+  ['pl-chart', 'pl-chartbox', 'pl-bars', 'pl-delta', 'ivm-row', 'ivm-d', 'ivm-c', 'ivm-a', 'ivm-r'].forEach((c) =>
+    assert.ok(HTML.includes("'" + c + "'"), '★ 마크업에 ' + c + ' 손잡이가 없습니다'));
+  assert.doesNotMatch(BLOCK_ALL(), /\.fx-tools > button[^}]*text-overflow:ellipsis/, '★ 출금 도구 단추 글자를 …로 자릅니다(「가져오기...」)');
+  // 오늘 달 자료 — 자료 달이 지나면 빈 화면만 찍힌다(2026-11 에 실제로 그랬다)
+  const seed = fs.readFileSync(path.join(ROOT, 'tools', 'phone-audit', 'seeds', 'fin.js'), 'utf8');
+  assert.match(seed, /fi-now/); assert.match(seed, /fe-now/); assert.match(seed, /\.fi-sel/);
+});
+function BLOCK_ALL(){ return CSS.slice(CSS.indexOf('재무관리 폰 2단계')).replace(/\/\*[\s\S]*?\*\//g, ''); }

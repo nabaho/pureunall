@@ -64864,14 +64864,14 @@ function FinanceInvoice(){
         h('div', { style:{ fontSize:'13px', color:fg } }, amt.toLocaleString() + '원'));
     }
     function rowLine(key, co, date, amt, right, tone){
-      return h('div', { key:key, style:{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px',
+      return h('div', { key:key, className:'ivm-row', style:{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px',
           borderBottom:'1px solid #f8fafc', fontSize:'13.5px' } },
-        h('span', { style:{ color:'#94a3b8', width:'82px', flex:'none' } }, date || '-'),
-        h('span', { style:{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+        h('span', { className:'ivm-d', style:{ color:'#94a3b8', width:'82px', flex:'none' } }, date || '-'),
+        h('span', { className:'ivm-c', style:{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           fontWeight:600, color:'#1e293b' } }, co || '(업체명 없음)'),
-        h('span', { style:{ width:'96px', flex:'none', textAlign:'right', fontWeight:700,
+        h('span', { className:'ivm-a', style:{ width:'96px', flex:'none', textAlign:'right', fontWeight:700,
           fontVariantNumeric:'tabular-nums' } }, (amt||0).toLocaleString()),
-        h('span', { style:{ width:'132px', flex:'none', textAlign:'right', color:tone, fontWeight:700 } }, right));
+        h('span', { className:'ivm-r', style:{ width:'132px', flex:'none', textAlign:'right', color:tone, fontWeight:700 } }, right));
     }
     return h('div', null,
       h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'12px' } },
@@ -69830,7 +69830,7 @@ function FinancePnL(){
     ) : null,
 
     // 📊 분석 차트 탭 (법인 대시보드의 분석 차트와 동일)
-    viewMode==='chart' ? h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'16px 20px'}},
+    viewMode==='chart' ? h('div',{className:'pl-chart',style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'16px 20px'}},
       // 차트 타이틀 + 범례
       h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
         h('div',{style:{fontWeight:700,fontSize:'13px',color:'#1e293b'}},selYear+'년 월별 매출·지출·순이익'),
@@ -69843,8 +69843,8 @@ function FinancePnL(){
       // 바 차트
       (function(){
         var maxVal = Math.max.apply(null, monthlyData.map(function(d){ return Math.max(d.revenue, d.expense); }).concat([1]));
-        return h('div',{style:{overflowX:'auto'}},
-          h('div',{style:{display:'flex',alignItems:'flex-end',gap:'8px',height:'180px',minWidth:'480px',paddingBottom:'4px'}},
+        return h('div',{className:'pl-chartbox',style:{overflowX:'auto'}},
+          h('div',{className:'pl-bars',style:{display:'flex',alignItems:'flex-end',gap:'8px',height:'180px',minWidth:'480px',paddingBottom:'4px'}},
             monthlyData.map(function(d){
               var revH = maxVal>0 ? Math.round(d.revenue/maxVal*100) : 0;
               var expH = maxVal>0 ? Math.round(d.expense/maxVal*100) : 0;
@@ -69857,7 +69857,7 @@ function FinancePnL(){
                   h('div',{style:{flex:1,height:(expH||0)+'%',background:'#dc2626',borderRadius:'2px 2px 0 0',minHeight:d.expense>0?'2px':'0'},
                     title:'지출 '+d.expense.toLocaleString()+'원'})
                 ),
-                h('div',{style:{fontSize:'12px',fontFamily:'monospace',fontWeight:700,
+                h('div',{className:'pl-delta',title:hasData ? ('순이익 '+d.profit.toLocaleString()+'원') : '',style:{fontSize:'12px',fontFamily:'monospace',fontWeight:700,
                   color:!hasData?'#cbd5e1':d.profit>=0?'#16a34a':'#dc2626',textAlign:'center',whiteSpace:'nowrap'}},
                   hasData ? (d.profit>=0?'+':'')+(d.profit/10000).toFixed(0)+'만' : '-'),
                 h('div',{style:{fontSize:'12.5px',color:'#94a3b8',fontWeight:500,textAlign:'center'}},d.month+'월')
