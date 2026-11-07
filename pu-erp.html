@@ -213,6 +213,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-staff-secret.js?v=2"></script>
 <script src="js/pu-pw-policy.js?v=1"></script>
+<script src="js/pu-adv-check.js?v=1"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
@@ -60294,6 +60295,7 @@ function IncomeCompanyTab(){
   var todayAlerted = useState(false); var cmsAlerted = todayAlerted[0]; var setCmsAlerted = todayAlerted[1];
   var showCmsAlert = useState(false); var cmsAlertOpen = showCmsAlert[0]; var setCmsAlertOpen = showCmsAlert[1];
   var suo = useState(false); var showUnpaidOnly = suo[0]; var setShowUnpaidOnly = suo[1];
+  var ckS = useState(false); var chkOpen = ckS[0]; var setChkOpen = ckS[1];       // 🔎 확인 필요 창 (2026-11-07)
   var mfS = useState('all'); var mgrFilter = mfS[0]; var setMgrFilter = mfS[1];
   var cmsFS = useState('all'); var cmsFilter = cmsFS[0]; var setCmsFilter = cmsFS[1];
   // 통장 자동 입금표시 모달 {applied, review, checked}
@@ -60434,6 +60436,38 @@ function IncomeCompanyTab(){
     });
     var f = parseInt(fee,10)||0;
     return { got:got, cnt:n, fee:f, full:(n>0 && (f<=0 || got>=f)), partial:(n>0 && f>0 && got<f) };
+  }
+  /* ── 자문료 입금확인 (대표 승인 2026-11-07 · js/pu-adv-check.js) ───────────────────────────────
+     엑셀 «자문료입금현황»에 날짜를 손으로 적던 일을 대신한다. 이 표(업체입금)가 이미 원천이므로 새 화면을 만들지 않고
+     ① 사람이 볼 «입금 없음·금액 어긋남» 칸만 모아 보여 주고 ② 엑셀 양식으로 내려받게 한다.
+     ⚠ 입금표시를 «만들지» 않는다 — 읽고 알려 줄 뿐이다. 셈(약정액·중단·입금 찾기)은 이 표와 같은 함수를 넘긴다(두 벌 금지). */
+  function _advOpts(){
+    return {
+      list:SOURCE_LIST, year:selYear, nowYear:nowYear, nowMonth:nowMonth, nowDay:nowDay,
+      feeFor:function(c, ym){ return erpFeeForMonth(c, ym); },
+      stopped:function(c, ym){ return erpFeeStopped(c, ym); },
+      paid:function(c, ym){
+        var got=0, n=0;
+        erpAdvisoryPaidFor(c, ym, _advIdx()).forEach(function(i){ got += parseInt(i.amount,10)||0; n++; });
+        return { cnt:n, got:got };
+      },
+      paidDates:function(c, ym){ return erpAdvisoryPaidFor(c, ym, _advIdx()).map(function(i){ return i.date; }); }
+    };
+  }
+  var advChk = window.PuAdvCheck ? PuAdvCheck.checkList(_advOpts()) : [];
+  /* 업체 번호가 없는 자문료 입금 — 어느 업체 칸에도 안 앉는다(표에서 «받았나»를 번호로 견주므로) */
+  var advUnlinked = (incomes || []).filter(function(i){
+    return erpIncomeLive(i) && erpIsAdvisoryIncome(i) && !i.companyId && erpAdvisoryYmOf(i).slice(0,4) === String(selYear) && (parseInt(i.amount,10)||0) > 0;
+  });
+  function exportAdvExcel(){
+    if(!window.PuAdvCheck || typeof XLSX === 'undefined'){ showToast('엑셀 모듈 로딩중'); return; }
+    var aoa = PuAdvCheck.excelRows(_advOpts());
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:26},{wch:10},{wch:7}].concat(MONTHS.map(function(){ return {wch:11}; })).concat([{wch:42}]);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, selYear + '년');
+    XLSX.writeFile(wb, '자문료입금현황_' + selYear + '_' + todayYMD() + '.xlsx');
+    showToast('📥 자문료입금현황 ' + (aoa.length - 1) + '곳을 내려받았습니다 (지금 보이는 업체)');
   }
   // ── Phase 2: 건별 저장 — 그 건들만 서버 반영 ──
   function refreshIncomes(){ setIncomes(dbGet('finance_income', []).slice()); }
@@ -61253,6 +61287,16 @@ function IncomeCompanyTab(){
           borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',fontWeight:showUnpaidOnly?700:500,
           whiteSpace:'nowrap'}},
         showUnpaidOnly?'🔴 미납만 ('+SOURCE_LIST.length+'개)':'⬜ 미납만'),
+      /* 🔎 입금이 없거나 금액이 어긋난 칸만 — 엑셀을 손으로 맞추던 일의 «사람이 볼 부분» (2026-11-07) */
+      h('button',{onClick:function(){setChkOpen(true);},
+        title:'지난 달까지 입금이 없거나 금액이 어긋난 칸만 모아 봅니다(이번 달은 지정일 + 5일 뒤부터)',
+        style:{padding:'3px 8px',border:'1px solid '+((advChk.length+advUnlinked.length)?'#dc2626':'#e2e8f0'),
+          background:(advChk.length+advUnlinked.length)?'#fef2f2':'#fff',color:(advChk.length+advUnlinked.length)?'#dc2626':'#64748b',
+          borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',fontWeight:(advChk.length+advUnlinked.length)?700:500,whiteSpace:'nowrap'}},
+        '🔎 확인 필요 ' + (advChk.length + advUnlinked.length)),
+      h('button',{onClick:exportAdvExcel, title:'엑셀 «자문료입금현황» 양식으로 내려받기 — 지금 보이는 업체(필터 적용)',
+        style:{padding:'3px 8px',border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',fontWeight:500,whiteSpace:'nowrap'}},
+        '📥 엑셀'),
       // 필터 초기화
       (query||mgrFilter!=='all'||cmsFilter!=='all'||showUnpaidOnly) && h('button',{
         onClick:function(){ setQuery(''); setMgrFilter('all'); setCmsFilter('all'); setShowUnpaidOnly(false); },
@@ -61723,6 +61767,54 @@ function IncomeCompanyTab(){
     ),
 
     // ── 🤖 통장내역 자동 입금표시 확인 모달 ──
+    chkOpen && (function(){
+      var by = window.PuAdvCheck ? PuAdvCheck.summarize(advChk) : { none:0, partial:0, over:0 };
+      var shown = advChk.slice(0, 300);
+      var thS = { textAlign:'left', fontWeight:600, color:'#64748b', borderBottom:'1px solid #e2e8f0', padding:'5px 8px', whiteSpace:'nowrap', fontSize:'12px' };
+      var tdS = { padding:'5px 8px', borderBottom:'1px solid #f8fafc', whiteSpace:'nowrap', fontSize:'12.5px' };
+      var pill = function(t, c){ return h('span', { key:t, style:{ fontSize:'12px', padding:'2px 10px', borderRadius:'10px', border:'1px solid #e2e8f0', color:c, fontWeight:600 } }, t); };
+      return h('div', { className:'modal-bg', onClick:function(){ setChkOpen(false); } },
+        h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ width:'820px', maxWidth:'96vw', maxHeight:'88vh', display:'flex', flexDirection:'column' } },
+          h('div', { className:'modal-h' }, h('div', { className:'t' }, '🔎 자문료 입금 확인 필요 — ' + selYear + '년'), h('button', { className:'x', onClick:function(){ setChkOpen(false); } }, '×')),
+          h('div', { className:'modal-b', style:{ flex:1, overflowY:'auto' } },
+            h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px' } },
+              pill('입금 없음 ' + by.none, '#dc2626'), pill('금액 부족 ' + by.partial, '#854d0e'), pill('금액 초과 ' + by.over, '#854d0e'),
+              pill('업체 번호 없는 입금 ' + advUnlinked.length, '#475569')),
+            h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'8px' } },
+              '지금 보이는 업체(필터 적용)만 봅니다. 계약 시작 전·중단 뒤·앞으로 올 달은 뺐고, 이번 달은 지정일 + 5일이 지난 업체만 올립니다. 이 창은 읽기만 합니다 — 입금표시를 저절로 만들지 않습니다.'),
+            h('div', { style:{ overflowX:'auto' } },
+              h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+                h('thead', null, h('tr', null, ['달', '업체', '담당', '이유', '약정', '받은 금액', ''].map(function(t){ return h('th', { key:t, style:thS }, t); }))),
+                h('tbody', null,
+                  shown.length === 0 && advUnlinked.length === 0
+                    ? h('tr', null, h('td', { colSpan:7, style:Object.assign({}, tdS, { color:'#94a3b8', textAlign:'center' }) }, '확인할 칸이 없습니다 — 지난 달까지 모두 맞습니다'))
+                    : shown.map(function(r, i){
+                      return h('tr', { key:r.id + r.ym + i },
+                        h('td', { style:Object.assign({}, tdS, { fontFamily:'monospace' }) }, r.ym),
+                        h('td', { style:Object.assign({}, tdS, { fontWeight:600 }) }, r.name),
+                        h('td', { style:tdS }, r.mainName || '-'),
+                        h('td', { style:Object.assign({}, tdS, { color: r.reason === 'none' ? '#dc2626' : '#854d0e', fontWeight:600 }) }, PuAdvCheck.REASON[r.reason]),
+                        h('td', { style:Object.assign({}, tdS, { textAlign:'right', fontFamily:'monospace' }) }, r.fee.toLocaleString()),
+                        h('td', { style:Object.assign({}, tdS, { textAlign:'right', fontFamily:'monospace' }) }, r.got ? r.got.toLocaleString() : '-'),
+                        h('td', { style:tdS }, h('button', { onClick:function(){ setQuery(r.name); setChkOpen(false); },
+                          style:{ padding:'2px 8px', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', borderRadius:'4px', cursor:'pointer', fontSize:'12px' } }, '이 업체만 보기')));
+                    }),
+                  advUnlinked.slice(0, 50).map(function(i, k){
+                    return h('tr', { key:'u' + (i.id || k) },
+                      h('td', { style:Object.assign({}, tdS, { fontFamily:'monospace' }) }, erpAdvisoryYmOf(i)),
+                      h('td', { style:Object.assign({}, tdS, { fontWeight:600 }) }, i.companyName || '(이름 없음)'),
+                      h('td', { style:tdS }, '-'),
+                      h('td', { style:Object.assign({}, tdS, { color:'#475569', fontWeight:600 }) }, '업체 번호 없음'),
+                      h('td', { style:tdS }, ''),
+                      h('td', { style:Object.assign({}, tdS, { textAlign:'right', fontFamily:'monospace' }) }, (parseInt(i.amount,10)||0).toLocaleString()),
+                      h('td', { style:tdS }, ''));
+                  }))))),
+          h('div', { className:'modal-f', style:{ display:'flex', gap:'8px', alignItems:'center', padding:'10px 16px', borderTop:'1px solid #e2e8f0' } },
+            advChk.length > shown.length && h('span', { style:{ fontSize:'12px', color:'#94a3b8' } }, '앞의 300건만 보입니다(전체 ' + advChk.length + '건)'),
+            h('div', { style:{ flex:1 } }),
+            h('button', { className:'btn-secondary', onClick:exportAdvExcel }, '📥 엑셀로 내려받기'),
+            h('button', { className:'btn-secondary', onClick:function(){ setChkOpen(false); } }, '닫기'))));
+    })(),
     autoMarkModal && h('div',{
       style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.45)',zIndex:9500,display:'flex',alignItems:'center',justifyContent:'center'}},
       h('div',{onClick:function(e){e.stopPropagation();},
