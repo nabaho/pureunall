@@ -226,3 +226,18 @@ test('★ 새 공지를 올리면 sitemap 에도 «한 줄» 더해진다 — �
   assert.equal(N.사이트맵더하기(새, '9999', '2026-12-01'), 새, '★ 두 번 불렀더니 두 줄이 됐다');
   assert.equal(N.사이트맵더하기('<urlset></urlset>', '9999', '2026-12-01'), null, '★ /notice 줄이 없는데 억지로 넣었다');
 });
+
+test('★ 홈페이지 저장소 sitemap 에 빠진 공지도 «함께» 채운다 — 덮어쓰기로 사라지지 않게(2026-11-08 notice/140)', () => {
+  const xml = [
+    '<urlset>',
+    '  <url><loc>https://x.kr/notice</loc><lastmod>2026-08-31</lastmod></url>',
+    '  <url><loc>https://x.kr/notice/139</loc><lastmod>2026-08-31</lastmod></url>',
+    '  <url><loc>https://x.kr/notice/138</loc><lastmod>2026-08-31</lastmod></url>',
+    '</urlset>', ''].join('\n');
+  const 새 = N.사이트맵채우기(xml, '141', ['140', '139', '138', '12'], '2026-11-09');
+  const 번호 = [...새.matchAll(/\/notice\/(\d+)<\/loc>/g)].map(m => m[1]);
+  assert.deepEqual(번호, ['141', '140', '139', '138'],
+    '★ 빠진 140 을 안 채웠거나, 새 글이 맨 위가 아니거나, 원래 안 싣던 옛 공지(12)까지 넣었다');
+  assert.equal(N.사이트맵채우기(새, '141', ['140'], '2026-11-09'), 새, '★ 두 번 불렀더니 줄이 늘었다');
+  assert.equal(N.사이트맵채우기('<urlset></urlset>', '141', [], '2026-11-09'), null);
+});
