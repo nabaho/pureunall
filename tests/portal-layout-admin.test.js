@@ -10,9 +10,11 @@
       직원·폰·제자리에 놓은 끌기는 서버를 부르지도 않는다.
    ④ 서버가 거절하면 화면을 되돌리고 까닭을 말한다(조용히 실패하지 않는다).
    ⑤ 저장된 공용 배치가 있으면 모두가 그것을 따르고(영역·순서·준비중은 맨 끝), 없을 때만 예전 개인 저장값을 따른다.
-   ⑥ 직원 화면에는 편집 단추·줄·📌 가 «아예 없다». 위임관리인도 같다(서버 규칙이 관리자만 쓰게 한다).
+   ⑥ 직원 화면에는 편집 단추·줄·«이 줄 고정» 단추가 «아예 없다». 위임관리인도 같다(서버 규칙이 관리자만 쓰게 한다).
+      앱마다 붙이는 📌 표시는 «없다» — 고정 표시는 줄 머리 오른쪽 끝 단추 하나뿐이다(대표 지시 2026-11-08).
    ⑦ 설정 창 저장(cfgSave)이 같은 자리의 배치를 지우지 않는다 — 배치를 못 읽으면 저장하지 않는다.
-   ⑨ 줄 머리 «📌 이 줄 고정» — 그 줄 앱을 한꺼번에 틀 고정/풀기(건수를 묻고), 고정한 뒤엔 줄 밖으로 못 나간다. 직원·폰에는 안 보인다.
+   ⑨ 줄 머리 «📌 이 줄 고정» — 그 줄 앱을 한꺼번에 틀 고정/풀기. «묻지 않고» 그냥 클릭으로 켜고 끈다(대표 지시 「팝업 필요없다」).
+      고정한 뒤엔 줄 밖으로 못 나간다. 직원·폰에는 안 보인다.
    ⑧ 저장 자리(data/app_config)의 쓰기 규칙은 «관리자만» — 위임관리인·직원은 못 쓴다(규칙을 넓히지 않았다는 증거).
 
    ⚠ 글자만 찾는 검사가 아니다 — 원본의 함수를 «떠서» 가짜 화면 위에서 돌려 본다(STATUS 「검사가 헛돈다」). */
@@ -33,8 +35,8 @@ const FN = [
   'function layoutAdminOk(', 'function layoutEditing(', 'function layoutCanDrag(', 'function layModelFromDom(', 'function layModelToDom(',
   'function layoutSay(', 'function layoutCacheRead(', 'function layoutCacheSave(', 'function layoutPublish(',
   'function layoutCommit(', 'function layoutApply(', 'function tilesToDefault(', 'function layoutRepaint(',
-  'function layoutLoad(', 'function layoutFreezeToggle(', 'function layoutResetDefault(', 'function onFreezeClick(',
-  'function ensureLayoutMarks(', 'function layoutMarksPaint(', 'function layoutUiPaint(', 'function layoutEditToggle(',
+  'function layoutLoad(', 'function layoutResetDefault(',
+  'function layoutUiPaint(', 'function layoutEditToggle(',
   'function soonToEnd(', 'function savedRowOf(', 'function applyTileOrder(', 'function persistOrderFromDom(',
   'function updateLockUi(', 'function onTileDragStart(', 'function onTileDragEnd(', 'function onTileDragOver(',
   'function rowExists(', 'function appRowOf(',
@@ -385,18 +387,19 @@ test('④ 서버가 거절하면 화면을 되돌리고 «까닭을 말한다»'
   assert.equal(vm.runInContext('_layoutWriting', w), 0, '★ 쓰는 중 표시가 안 내려가면 서버 읽기가 영원히 막힌다');
 });
 
-test('③ 📌 틀 고정 누르기 — 관리자만, 켜고 끄는 값이 서버에 간다', () => {
-  const w = world(BASE); admin(w);
-  w.layoutFreezeToggle('erp');
+test('③ 목록 창의 📌 단추 — 관리자만, 켜고 끄는 값이 서버에 간다(앱 하나만 고정하는 길은 이것뿐이다)', () => {
+  const frzOf = (w, k) => w.lpBodyClick({ target: { closest: () => ({ disabled: false, dataset: { act: 'frz', key: k } }) } });
+  const w = world(BASE); admin(w, false);
+  frzOf(w, 'erp');
   let rec = w.calls.filter((c) => c.op === 'set').pop().rec;
   assert.deepEqual(rec.frozen, { erp: true }, '★ 틀 고정이 저장되지 않았다');
   assert.equal(rec.rows.erp, 'client', '★ 틀 고정한 앱의 영역(지금 있는 곳)이 함께 저장돼야 한다');
-  w.layoutFreezeToggle('erp');
+  frzOf(w, 'erp');
   rec = w.calls.filter((c) => c.op === 'set').pop().rec;
   assert.equal(rec.frozen, undefined, '★ 풀었는데 틀 고정이 남았다');
-  const s = world(BASE);
-  s.layoutFreezeToggle('erp');
-  assert.equal(s.calls.length, 0, '★★ 직원 화면에서 틀 고정이 서버에 갔다');
+  const staff = world(BASE);
+  frzOf(staff, 'erp');
+  assert.equal(staff.calls.length, 0, '★★ 직원 화면에서 틀 고정이 서버에 갔다');
 });
 
 test('③ 「처음 자리로」 — 기본 배치를 «새로 저장»한다(지우지 않는다) · 묻고 아니라면 안 한다', () => {
@@ -536,20 +539,19 @@ test('⑨ 줄 머리에 «📌 이 줄 고정» 단추가 있다 — 줄마다 �
 test('⑨ 줄 고정 — 그 줄 앱만 한꺼번에 틀 고정하고(건수를 묻고) 한 번에 저장한다 · 다시 누르면 푼다', () => {
   const w = rowBtnWorld();
   w.layoutRowFreezeToggle('client');
-  assert.equal(w.asked.length, 1, '★ 한꺼번에 하는 일인데 묻지 않았다');
-  assert.match(w.asked[0], /의뢰인 업무/); assert.match(w.asked[0], /4개/, '★ 건수를 알려야 한다: ' + w.asked[0]);
+  assert.equal(w.asked.length, 0, '★★ 팝업(확인 창)이 떴다 — 줄 고정은 «그냥 클릭»이다(대표 지시)');
   const sets = w.calls.filter((c) => c.op === 'set');
   assert.equal(sets.length, 1, '★ 한 번에 저장해야 한다');
   assert.deepEqual(Object.keys(sets[0].rec.frozen).sort(), ['cal', 'erp', 'govaid', 'payroll'], '★ 그 줄 앱만, 모두 틀 고정이어야 한다(다른 줄 앱이 딸려 가면 안 된다)');
   assert.equal(sets[0].rec.rows.erp, 'client', '★ 고정한 앱의 영역(지금 있는 곳)이 함께 저장돼야 한다');
-  w.layoutMarksPaint();
+  w.layoutRowBtnPaint();
   assert.equal(btnOf(w, 'client').textContent, '📌 줄 고정 중 · 풀기');
   assert.equal(btnOf(w, 'client').classList.contains('on'), true);
   assert.equal(btnOf(w, 'store').textContent, '📌 이 줄 고정', '★ 안 한 줄이 한 줄처럼 보인다');
   w.layoutRowFreezeToggle('client');
   const un = w.calls.filter((c) => c.op === 'set').pop().rec;
   assert.equal(un.frozen, undefined, '★ 다시 눌렀는데 틀 고정이 남았다');
-  assert.match(w.asked[1], /모두 풉니다/);
+  assert.equal(w.asked.length, 0, '★★ 풀 때도 팝업이 떴다 — 그냥 클릭으로 풀어야 한다');
 });
 
 test('⑨ 줄 고정을 하고 나면 그 줄 앱은 정말 «줄 밖으로 못 나간다» — 줄 안 순서는 된다', () => {
@@ -566,20 +568,17 @@ test('⑨ 줄 고정을 하고 나면 그 줄 앱은 정말 «줄 밖으로 못 
   assert.equal(other.parentNode.dataset.row, 'inside', '★ 고정 안 한 줄의 앱까지 막혔다');
 });
 
-test('⑨ 아니오 하면 안 바뀐다 · 직원·폰에는 단추가 안 보이고 눌려도 서버를 안 부른다 · 앱 없는 줄엔 안 보인다', () => {
-  const w = rowBtnWorld(); w.confirm = () => false;
-  w.layoutRowFreezeToggle('store');
-  assert.equal(w.calls.length, 0, '★ 아니오 했는데 저장했다');
+test('⑨ 직원·폰에는 줄 단추가 안 보이고 눌려도 서버를 안 부른다 · 앱 없는 줄엔 안 보인다', () => {
   const staff = rowBtnWorld(); vm.runInContext('_layoutAdmin = false;', staff);
-  staff.layoutMarksPaint();
+  staff.layoutRowBtnPaint();
   assert.ok(staff.btns.every((b) => b.hidden), '★★ 직원 화면에 «이 줄 고정» 단추가 보인다');
   staff.layoutRowFreezeToggle('client');
   assert.equal(staff.calls.length, 0, '★★ 직원이 줄 고정을 눌러 서버에 썼다');
   const phone = rowBtnWorld({ mobile: true });
-  phone.layoutMarksPaint();
+  phone.layoutRowBtnPaint();
   assert.ok(phone.btns.every((b) => b.hidden), '★ 폰에는 끌기가 없다 — 줄 단추도 목록 창으로 대신한다');
   const empty = rowBtnWorld(); empty.conts[2].children.splice(0);   // 영업관리 줄이 빔
-  empty.layoutMarksPaint();
+  empty.layoutRowBtnPaint();
   assert.equal(btnOf(empty, 'sales').hidden, true, '★ 앱이 없는 줄에 고정 단추가 있다');
   assert.equal(btnOf(empty, 'client').hidden, false);
 });
@@ -601,7 +600,7 @@ function uiWorld(role, mobile) {
 }
 const marks = (w) => w.allTiles().filter((t) => t.ic._mk).length;
 
-test('⑥ 직원 화면에는 편집 단추·편집 줄·내 메뉴 항목·📌 가 «아예 없다» (위임관리인도 같다)', () => {
+test('⑥ 직원 화면에는 편집 단추·편집 줄·내 메뉴 항목이 «아예 없다» (위임관리인도 같다)', () => {
   const w = uiWorld('staff', false);
   w.updateLockUi();
   assert.equal(w.els.layoutEditBtn.hidden, true, '★★ 직원 화면에 편집 단추가 보인다');
@@ -616,15 +615,15 @@ test('⑥ 직원 화면에는 편집 단추·편집 줄·내 메뉴 항목·📌
   assert.ok(/_layoutAdmin = \(role === 'admin'\)/.test(E), '★ 관리자 판정이 role === admin 에서 벗어났다(위임관리인은 서버가 막는다)');
 });
 
-test('⑥ 관리자: PC 는 편집 단추 + 켜면 편집 줄·📌, 폰은 단추 없이 내 메뉴 항목으로 목록 창', () => {
+test('⑥ 관리자: PC 는 편집 단추 + 켜면 편집 줄, 폰은 단추 없이 내 메뉴 항목으로 목록 창', () => {
   const pc = uiWorld('admin', false);
   pc.updateLockUi();
   assert.equal(pc.els.layoutEditBtn.hidden, false, '★ 관리자 PC 에 편집 단추가 없다');
   assert.equal(pc.els.layoutBar.hidden, true, '편집을 켜기 전에는 편집 줄이 없다');
   assert.equal(pc.els.meLayout.hidden, false);
-  assert.equal(marks(pc), pc.allTiles().length, '★ 관리자 화면 타일마다 📌 가 있어야 한다');
+  assert.equal(marks(pc), 0, '★★ 앱마다 📌 표시를 붙였다 — 고정 표시는 줄 머리 오른쪽 끝 하나뿐이어야 한다(대표 지시)');
   pc.updateLockUi();
-  assert.equal(marks(pc), pc.allTiles().length, '★ 다시 불러도 📌 가 겹쳐 생기면 안 된다');
+  assert.equal(marks(pc), 0);
   pc.layoutEditToggle();
   assert.equal(vm.runInContext('_layoutEdit', pc), true);
   assert.equal(pc.els.layoutBar.hidden, false, '★ 편집을 켰는데 편집 줄이 안 뜬다');
