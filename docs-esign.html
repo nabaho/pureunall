@@ -170,6 +170,7 @@
   <div class="nav sub soon" id="navLib" aria-disabled="true" title="노무사 검토가 끝나면 열립니다">📚 서식집<i>검토 후</i></div>
   <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
   <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
+  <button type="button" class="nav sub" data-pane="quotes" id="navQuotes">💼 지난 견적·계약</button>
   <button type="button" class="nav sub" data-pane="log" id="navLog" hidden>🧾 작업 기록</button>
 </nav>
 <div class="main">
@@ -219,6 +220,13 @@
     <div id="arcRoot"></div>
   </div>
 </div>
+<!-- 💼 지난 견적·계약 — 업무 종류별, 금액은 대표·총괄·재무·확정 담당자만 (js/pu-quotes-view.js) -->
+<div id="paneQuotes" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>지난 견적·계약</b></div>
+    <div id="quotesRoot"></div>
+  </div>
+</div>
 <!-- 🧾 작업 기록 — 총괄관리자만 (js/pu-worklog-view.js) -->
 <div id="paneLog" hidden>
   <div class="card">
@@ -262,6 +270,8 @@
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-worklog.js?v=1"></script>
 <script src="js/pu-worklog-view.js?v=1"></script>
+<script src="js/pu-quotes.js?v=1"></script>
+<script src="js/pu-quotes-view.js?v=1"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -283,7 +293,7 @@ var curUser = null;
    여기서 만든 이름은 저장되는 「올린 사람」·서명 요청서의 「요청」 줄로 나가므로 서명을 받는 바깥 사람에게도 보인다. */
 function meName() { var me = window.PuWhoami && PuWhoami.get(); return (me && me.name) || ''; }
 /* 원본 보관함(올린 사람 이름 포함) 설정 — 이름은 명부를 읽은 뒤에야 알려지므로, 알려지면 한 번 더 부른다(init 은 값만 바꾼다) */
-function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); PuWorklog.init({ db: db, uid: curUser.uid, name: meName() }); }
+function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); PuWorklog.init({ db: db, uid: curUser.uid, name: meName() }); PuQuotes.init({ db: db, uid: curUser.uid, name: meName() }); }
 var casesCache = {};
 var savePending = 0, saveFailed = false;
 function setSaveState(kind, text) {
@@ -341,25 +351,27 @@ firebase.auth().onAuthStateChanged(function (u) {
   loadCases();
   /* 🧾 작업 기록 — 총괄관리자(isAdmin === true)만. 부관리자(isSubAdmin)는 안 된다 — DB 규칙과 같은 기준 */
   adminOk = db.ref('uid_roles/' + u.uid).once('value').then(function (s) {
-    var r = s.val(); isAdmin = !!(r && r.isAdmin === true);
+    var r = s.val(); isAdmin = !!(r && r.isAdmin === true); isFin = !!(r && r.fin === true);
     $('navLog').hidden = !isAdmin;
-  }, function () { isAdmin = false; });
+  }, function () { isAdmin = false; isFin = false; });
   showPane(paneFromHash());
 });
 
 /* ── 왼쪽 목록: 사건관리(집단체불 위임장) ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
    주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
    ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 위임장만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
-var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', log: 'paneLog', lib: 'paneLib' };
+var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', quotes: 'paneQuotes', log: 'paneLog', lib: 'paneLib' };
 var libIndex = null;   /* 실린 서식 목록 — 비어 있으면 서식집 칸은 «없는 칸»이다 */
 var formsMounted = false, formsUi = null, mounted = {};
-var isAdmin = false, adminOk = Promise.resolve();
+var isAdmin = false, isFin = false, adminOk = Promise.resolve();
+var quotesUi = null;
 var docBucket = null, photosReady = null;
 function paneFromHash() {
   var h = location.hash;
   if (h === '#forms' || h.indexOf('#forms:') === 0) return 'forms';
   if (h === '#co' || h === '#co:await') return 'co';   /* #co:await — 업무관리 「📬 서명본 대기」 알림에서 (2026-10-08) */
   if (h === '#arc') return 'arc';
+  if (h === '#quotes') return 'quotes';   /* 지난 견적·계약 — 직원 모두(금액은 권한자만) */
   if (h === '#log') return 'log';   /* 작업 기록 — 총괄관리자만(아니면 안내만) */
   if (h === '#lib' && libIndex && libIndex.length) return 'lib';
   if (h === '#esign') return 'esign';   /* 집단체불 위임장 — 사건계약 아래 단추 (2026-10-09) */
@@ -405,6 +417,40 @@ function fetchSecretDoc(fileId, qid) {
   }).then(function (r) {
     if (r.ok) return r.blob();
     return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
+  });
+}
+/* 💼 지난 견적·계약 — 그 견적의 원본 파일 열기. 🔒 파일이면 서버(puDocSecret)에 견적 번호를 함께 보낸다
+   (총괄관리자 · 재무 · 그 건의 확정 담당자만 서버가 내준다). 보통 파일은 원본 보관함과 같은 길. */
+function quotesOpenFile(rec) {
+  return PuOfficeStore.getOriginal(rec.fileId).then(function (o) {
+    if (!o) throw new Error('보관함에 없는 파일입니다');
+    var done = function () { PuWorklog.log('download', { target: rec.fileId, note: o.name }); };
+    if (PuOfficeStore.isSecret(o)) {
+      return fetchSecretDoc(rec.fileId, rec.id).then(function (blob) { PuOfficeStore.saveBlob(blob, o.name); done(); });
+    }
+    return PuOfficeStore.download(rec.fileId, o.name).then(done);
+  });
+}
+/* 💼 담당 확정에서 고르는 직원 — 재직(uid_roles) + 이름(직원 명부). 이름만 쓴다(사번·아이디는 화면에 안 적는다 — 대표 2026-10-25) */
+function quotesStaff() {
+  var softGet = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
+  return Promise.all([softGet('uid_roles'), softGet('data/user_dir')]).then(function (r) {
+    var roles = r[0] || {}, dir = r[1], list = dir && dir.v !== undefined ? dir.v : dir;
+    if (list && !Array.isArray(list) && typeof list === 'object') list = Object.keys(list).map(function (k) { return list[k]; });
+    if (!Array.isArray(list)) return [];
+    var norm = function (v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+    var bySid = {};
+    list.forEach(function (p) { if (p && p.sid && (!bySid[norm(p.sid)] || (p.status || 'active') === 'active')) bySid[norm(p.sid)] = p; });
+    var out = [];
+    Object.keys(roles).forEach(function (uid) {
+      var ro = roles[uid] || {};
+      if (ro.status !== 'active') return;
+      var p = bySid[norm(ro.sid)];
+      if (!p || !p.name || (p.status && p.status !== 'active')) return;
+      out.push({ uid: uid, name: String(p.name) });
+    });
+    out.sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+    return out;
   });
 }
 /* 🔒 서명본으로 옮기기 — 서버 함수 puDocSecretMove(총괄관리자만). 원본 보관함 규칙이 «새로 쓰기만»이라 화면은 못 옮긴다 */
@@ -1018,6 +1064,18 @@ function showPane(name) {
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
+  if (name !== 'quotes' && quotesUi) quotesUi.clearSelection();   /* 화면을 떠나면 고른 것을 비운다 */
+  if (name === 'quotes' && !mounted.quotes) {
+    mounted.quotes = true;
+    /* 역할(총괄관리자·재무)을 읽은 뒤에 그린다 — 먼저 그리면 금액이 «비공개» 로 잘못 나온다 */
+    adminOk.then(function () {
+      quotesUi = PuQuotesView.mount($('quotesRoot'), {
+        list: PuQuotes.list, amounts: PuQuotes.amounts, confirmOwners: PuQuotes.confirmOwners,
+        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast,
+        role: { isAdmin: isAdmin, fin: isFin }, uid: curUser ? curUser.uid : ''
+      });
+    });
+  }
   if (name === 'log' && !mounted.log) {
     mounted.log = true;
     /* 총괄관리자 확인이 끝난 뒤에만 읽는다 — 아니면 DB 규칙 대신 여기서 같은 안내(거절)로 막는다 */
