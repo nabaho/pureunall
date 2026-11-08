@@ -28394,13 +28394,20 @@ function consTypeIsPersonal(code){
   var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
   return !!(t && t.personalDeposit);
 }
-function erpPersonalDepositInfo(item){
-  if(!item) return { on:false, why:'' };
+/* 원본(컨설팅·계약)의 «컨설팅 유형» 코드 — 컨설팅은 typeCode, 여러 종류를 품은 계약은 typeCodes.consulting.
+   개인입금 판정과 컨설팅정산 판정(erpSettlePerfType)이 같은 잣대를 쓴다. */
+function erpConsTypeCodeOf(item){
+  if(!item) return '';
   var code = item.typeCode || '';
   if(!code && item.typeCodes){
     var ks = item.kinds || (item.kind ? [item.kind] : []);
     if(ks.indexOf('consulting') >= 0) code = item.typeCodes.consulting || '';
   }
+  return code;
+}
+function erpPersonalDepositInfo(item){
+  if(!item) return { on:false, why:'' };
+  var code = erpConsTypeCodeOf(item);
   var typeOn = consTypeIsPersonal(code);
   var mode = item.personalDepositMode || '';
   if(mode === 'on') return { on:true, why:'manual', typeOn:typeOn };
@@ -28412,6 +28419,75 @@ function erpIsPersonalDeposit(item){ return erpPersonalDepositInfo(item).on; }
 function erpInitDeductions(item, vatType){
   if(item && erpIsPersonalDeposit(item)) return { personalRevenue:true, vatIncluded:false };
   return (vatType === 'inclusive') ? { vatIncluded:true } : {};
+}
+/* ══ 🧾 컨설팅정산이 맡은 사업 — 개인수익으로 확정해도 성과급을 만들지 않는다 (대표 선택 2026-10-31) ══
+   설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §8.
+   개인 통장으로 들어오는 정부사업(일터혁신 등)은 컨설팅정산 앱(pu-settle.html)이 주관·담당 몫을 따로 정산한다.
+   여기서도 성과급을 만들면 담당에게 «두 번» 나간다. 그래서 그 사업 종류의 «개인수익» 입금에는 성과급을 만들지 않고
+   perfSettleType(사업 종류 코드)을 남겨 «🧾 컨설팅정산에서 개별정산»으로 보인다.
+   ★ 맡은 사업 종류 = settle/rules 의 열쇠(_deleted 아닌 것). 컨설팅정산 «설정 › 요율·규칙»에서 규칙을 만들고 지우면 저절로 따라간다 — 푸는 길도 거기다.
+   ★ «법인 매출»로 확정하는 길은 그대로 — 돈이 법인에 들어왔으면 보통 성과급이 맞다.
+   ★ 이미 만들어진 성과급은 건드리지 않는다(돈 기록 자동 변경 금지) — erpSettleOverlapType 으로 «겹칠 수 있음»만 알린다.
+   ⚠ 규칙을 아직 못 읽었으면(null) 막지 못한다 — 로그인 확인 직후 읽어 두고, 못 읽었으면 판단할 때마다 다시 묻는다.
+     못 읽은 채 만들어진 성과급은 «겹칠 수 있음» 표시가 나중에 잡는다. */
+var ERP_SETTLE_TYPES = null;          // { 사업종류코드: 규칙 이름 } — null = 아직 못 읽음
+var _erpSettleRef = null, _erpSettleFailAt = 0;
+function erpSettleTypesFrom(rules){
+  var o = {};
+  Object.keys(rules || {}).forEach(function(k){
+    var r = rules[k];
+    if(r && typeof r === 'object' && !r._deleted) o[k] = String(r.title || '');
+  });
+  return o;
+}
+function erpSettleTypesLoad(){
+  if(_erpSettleRef || typeof fbDb === 'undefined' || !fbDb) return;
+  if(Date.now() - _erpSettleFailAt < 60000) return;     // 권한 없음·끊김 — 1분 안에는 다시 묻지 않는다
+  try{
+    if(typeof firebase !== 'undefined' && firebase.auth && !firebase.auth().currentUser) return;   // 로그인 확인 전 — 나중에 다시
+    var ref = _erpSettleRef = fbDb.ref('settle/rules');
+    ref.on('value', function(s){ ERP_SETTLE_TYPES = erpSettleTypesFrom(s.val()); },
+      function(){ _erpSettleRef = null; _erpSettleFailAt = Date.now(); });
+  }catch(_e){ _erpSettleRef = null; _erpSettleFailAt = Date.now(); }
+}
+/* 이 원본(컨설팅·계약)의 이 공제가 «개인수익»이고 사업 종류를 컨설팅정산이 맡았으면 그 코드, 아니면 ''.
+   types 를 안 주면 읽어 둔 규칙(ERP_SETTLE_TYPES)을 쓴다 — 검사는 types 를 넘겨 돌린다. */
+function erpSettlePerfType(src, ded, types){
+  if(!src || !ded || !ded.personalRevenue) return '';
+  if(types === undefined){ if(ERP_SETTLE_TYPES === null) erpSettleTypesLoad(); types = ERP_SETTLE_TYPES; }
+  var code = erpConsTypeCodeOf(src);
+  return (code && types && Object.prototype.hasOwnProperty.call(types, code)) ? code : '';
+}
+/* 확정된 입금 한 건이 «지금» 컨설팅정산 몫인가 — «⭐ 반영»(성과급 얹기)을 막고 목록에 🧾 로 보일 때 쓴다.
+   남겨 둔 표시(perfSettleType)가 있으면 그 규칙이 아직 있는지(못 읽었으면 있다고 본다), 표시가 없으면 원본 사업 종류로 다시 본다.
+   ★ 푸는 길: 컨설팅정산에서 그 사업 규칙을 지우면 표시가 남아 있어도 풀린다. src 를 안 주면 원본(컨설팅·계약)을 찾아 본다. */
+function erpSettleOfIncome(fi, src, types){
+  if(!fi) return '';
+  if(types === undefined){ if(ERP_SETTLE_TYPES === null) erpSettleTypesLoad(); types = ERP_SETTLE_TYPES; }
+  var st = fi.perfSettleType;
+  if(st) return (!types || Object.prototype.hasOwnProperty.call(types, st)) ? st : '';
+  if(!(fi.deductions && fi.deductions.personalRevenue)) return '';      // 개인수익이 아니면 볼 것도 없다(목록마다 부르므로 먼저 거른다)
+  return erpSettlePerfType(src === undefined ? erpSettleSrcOf(fi) : src, fi.deductions, types);
+}
+/* 입금의 원본 — 컨설팅정산 사업 종류는 컨설팅(typeCode)·계약(typeCodes.consulting)에만 있다 */
+function erpSettleSrcOf(fi){
+  var store = { consulting:'consultings', contract:'contracts' }[fi && fi.sourceKind];
+  if(!store || !fi.sourceId) return null;
+  return (dbGet(store, []) || []).find(function(x){ return x && x.id === fi.sourceId; }) || null;
+}
+/* 이 막음보다 «먼저» 만들어진 성과급 — 컨설팅정산 사업의 개인수익인데 성과급이 붙어 있다. 고치지 않고 알리기만 한다. */
+function erpSettleOverlapType(fi, src, types){
+  if(!fi || fi.perfSettleType || !(fi.perfShares || []).length) return '';
+  if(!(fi.deductions && fi.deductions.personalRevenue)) return '';
+  return erpSettlePerfType(src === undefined ? erpSettleSrcOf(fi) : src, fi.deductions, types);
+}
+function erpSettleLabel(code){
+  var t = (ERP_SETTLE_TYPES && ERP_SETTLE_TYPES[code]) || '';
+  if(!t && code){
+    var b = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
+    t = (b && b.name) || '';
+  }
+  return '🧾 컨설팅정산에서 개별정산' + (t ? ' (' + t + ')' : '');
 }
 function calcDeductions(amount, ded){
   ded = ded || {};
@@ -39420,7 +39496,10 @@ function personalReclassPatch(fi, src, toPersonal){
   var subs = ((src && src.managerSubs) || []).filter(Boolean);
   var mainPct = fi.splitMainPct != null ? fi.splitMainPct : 100;
   var shares = [];
-  if(main){
+  /* 🧾 컨설팅정산이 맡은 사업으로 «개인수익» 이 되면 성과급을 만들지 않는다(입금확정 창과 같은 함수).
+     법인 매출로 되돌리면 표시를 지운다 — 그때는 예전처럼 성과급을 나눈다. */
+  var settleType = toPersonal ? erpSettlePerfType(src, ded) : '';
+  if(main && !settleType){
     if(toPersonal){
       var users = dbGet('user_accounts', []) || [];
       var nameOf = function(sid){ var u = users.find(function(x){ return x.sid === sid; }); return u ? u.name : erpNoName(sid); };
@@ -39436,7 +39515,7 @@ function personalReclassPatch(fi, src, toPersonal){
     }
   }
   return { deductions:ded, perfBaseAmount:calc.perfBaseAmount, isPersonalIncome:!!toPersonal,
-    perfShares:shares, perfExclude: !!toPersonal && shares.length === 0 };
+    perfShares:shares, perfExclude: !!toPersonal && shares.length === 0, perfSettleType: settleType || undefined };
 }
 function PersonalDepositBulkModal(props){
   useEscClose(props.onClose);
@@ -39471,7 +39550,11 @@ function PersonalDepositBulkModal(props){
         '👤 ' + (props.name || props.code) + ' → ' + (props.on ? '개인입금 사업으로' : '법인 입금으로') + ' 바꿨습니다'),
       h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'6px' } },
         '아직 입금 안 된 계약·컨설팅은 저절로 따라갑니다. 아래는 이 유형으로 «이미 확정된 입금» 가운데 분류가 다른 것입니다 — '
-        + (props.on ? '개인수익으로 바꾸면 법인 매출·부가세에서 빠지고 성과급만 반영됩니다.' : '법인 매출로 바꾸면 매출·부가세에 다시 들어갑니다.')),
+        + (props.on
+            ? (erpSettlePerfType({ typeCode:props.code }, { personalRevenue:true })
+                ? '개인수익으로 바꾸면 법인 매출·부가세에서 빠집니다. 🧾 컨설팅정산이 맡은 사업이라 성과급은 만들지 않습니다(그 앱이 따로 정산).'
+                : '개인수익으로 바꾸면 법인 매출·부가세에서 빠지고 성과급만 반영됩니다.')
+            : '법인 매출로 바꾸면 매출·부가세에 다시 들어갑니다.')),
       rows.length === 0
         ? h('div', { style:{ padding:'14px', textAlign:'center', color:'#64748b', fontSize:'12.5px' } }, '바꿀 확정 입금이 없습니다 — 스위치만 바뀌었습니다.')
         : h('div', { style:{ maxHeight:'50vh', overflow:'auto' } },
@@ -51429,6 +51512,7 @@ var HANA_APK_VER = '2.5.1';
 
 function FinanceLedger(props){
   props = props || {};
+  try{ erpSettleTypesLoad(); }catch(_st){}   // 🧾 컨설팅정산이 맡은 사업 — 통장 줄로 확정하기 «전에» 읽어 둔다(한 번만 붙는다)
   /* ── 미입금 대기 목록 (입금 매칭 후보) ──
      2026-08-07 김보람 건의: 「일반 자문료 입금건은 매칭이 안 되고 컨설팅·사건만 된다」
      확인해 보니 후보를 만드는 항목 이름이 실제 자료와 여러 군데 어긋나 있었다.
@@ -52541,7 +52625,7 @@ function FinanceLedger(props){
     /* ⚡ 자동확정이면 성과급까지 여기서 나눈다.
        그냥 두면 perfShares 가 빈 채로 저장돼 「성과 미반영」에 쌓인다 — 창을 거친 건과 같은 결과가 되게 한다.
        부가세 포함 계약이면 1/11 을 뺀 금액이 성과 기준 (입금관리 calcDeductions 와 같은 셈). */
-    var _perfShares = [], _ded = {}, _perfBase = row.amount;
+    var _perfShares = [], _ded = {}, _perfBase = row.amount, _settle = '';
     if(opts.withPerf && !isAdv){
       try{
         var _it = pItem.item||{};
@@ -52554,7 +52638,9 @@ function FinanceLedger(props){
            (지금 개인입금이 표시된 계약은 없다. 이 줄은 그런 계약이 생겼을 때를 위한 것이다.) */
         _ded = erpInitDeductions(_it, opts.vatIncluded ? 'inclusive' : 'separate');
         _perfBase = calcDeductions(row.amount, _ded).perfBaseAmount;
-        if(_main){
+        /* 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 만들지 않는다 — 입금확정 창과 «같은 함수»(erpSettlePerfType) */
+        _settle = erpSettlePerfType(_it, _ded);
+        if(_main && !_settle){
           /* 창을 안 거치는 길이다. 기본 분할을 여기서도 «같은 함수» 로 낸다 —
              안 그러면 통장에서 자동 확정한 건만 주담당 100% 로 남아,
              주담당이 요율 0%(대표님) 면 성과급이 통째로 사라진다. */
@@ -52588,6 +52674,7 @@ function FinanceLedger(props){
       managerSid: isAdv ? undefined : ((pItem.item||{}).managerMain || (pItem.item||{}).manager || ''),
       deductions: _ded, perfBaseAmount: _perfBase,
       isPersonalIncome: _isPersonal || undefined,
+      perfExclude: _settle ? true : undefined, perfSettleType: _settle || undefined,   // 🧾 컨설팅정산에서 개별정산
       autoConfirmed: opts.withPerf ? true : undefined,
       perfShares:_perfShares, confirmedAt:new Date().toISOString(), confirmedBy:CURRENT_USER?CURRENT_USER.sid:''});
     if(_saved === false) throw new Error('입금을 저장하지 못했습니다 (입금 마감된 달이거나 저장 실패)');
@@ -57757,6 +57844,9 @@ function FinanceLedger(props){
               cursor:'pointer',padding:'0 4px',lineHeight:1}},'×')),
           h('div',{style:{padding:'14px',fontSize:'13.5px',borderBottom:'1px solid #e2e8f0',color:'#64748b'}},
             '입금 ',(fi.amount||0).toLocaleString(),'원 · ',fi.date||'-',' · 성과 기준액 ',perfBase.toLocaleString(),'원'),
+          /* 🧾 컨설팅정산 몫이면 알린다 — 손으로 고치는 창이라 막지는 않는다(담당 바꾸기·기존 성과급 정리는 여기서 한다) */
+          erpSettleOfIncome(fi, srcItem) && h('div',{style:{padding:'8px 14px',fontSize:'13px',fontWeight:700,color:'#854d0e',background:'#fffbeb',borderBottom:'1px solid #fde68a'}},
+            '⚠ ' + erpSettleLabel(erpSettleOfIncome(fi, srcItem)) + ' 건입니다 — 여기서 성과급을 넣으면 담당에게 두 번 나갈 수 있습니다'),
           h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',flex:1,overflow:'hidden'}},
             // 왼쪽: 변경 전
             h('div',{style:{padding:'14px',borderRight:'1px solid #e2e8f0',background:'#fef2f2',overflowY:'auto'}},
@@ -57976,6 +58066,8 @@ function IncomeUnmatchedTab(props){
   // 사유별 분류 (group: check=점검필요, advisory=자문료, other=기타)
   function classify(fi){
     var noShare = !(fi.perfShares||[]).length;
+    // 🧾 컨설팅정산에서 개별정산 — 빠뜨린 게 아니라 «따로 정산»이라 점검할 것이 아니다
+    if(noShare && erpSettleOfIncome(fi)) return { tag:'🧾 컨설팅정산', color:'#854d0e', bg:'#fffbeb', priority:4, group:'other' };
     if(fi.perfExclude === true) return { tag:'⛔ 명시적 제외', color:'#991b1b', bg:'#fef2f2', priority:2, group:'check' };
     // 담당자는 정해져 있는데 아무도 못 받은 건 — 분할이나 요율을 봐야 한다
     if(erpPerfPaidZero(fi)) return { tag:'💸 지급액 0원', color:'#991b1b', bg:'#fef2f2', priority:1, group:'check' };
@@ -58014,6 +58106,12 @@ function IncomeUnmatchedTab(props){
   // 강제 리렌더 (성과 반영 토글 후)
   var rfS = useState(0); var refreshKey = rfS[0]; var setRefreshKey = rfS[1];
   async function reEnablePerf(fi){
+    /* 🧾 컨설팅정산에서 개별정산하는 건 — 여기서 성과급을 얹으면 담당에게 두 번 나간다(erpSettlePerfType 머리글) */
+    var _st = erpSettleOfIncome(fi);
+    if(_st){
+      showToast(erpSettleLabel(_st) + ' 건이라 성과급을 얹지 않습니다 — 컨설팅정산 «설정 › 요율·규칙»에서 그 사업을 빼면 다시 할 수 있습니다');
+      return;
+    }
     var isPersonal = fi.isPersonalIncome;
     var msg = isPersonal
       ? '이 입금건을 성과에 반영하시겠습니까?\n\n→ 개인소득 항목: 담당자 성과율로 분배됩니다.\n→ 미반영 표시가 제거됩니다.'
@@ -58242,7 +58340,10 @@ function IncomeUnmatchedTab(props){
                     })(),
                     h('td', {style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:800,color:'#2563eb'})}, perfTotal>0 ? perfTotal.toLocaleString()+'원' : '0'),
                     h('td', {style:Object.assign({},tdS,{textAlign:'center'})},
-                      fi.perfExclude
+                      fi.perfExclude && erpSettleOfIncome(fi)
+                        ? h('span', { title: erpSettleLabel(erpSettleOfIncome(fi)) + ' — 담당 몫은 컨설팅정산 앱이 따로 정산합니다',
+                            style:{ fontSize:'12px', color:'#854d0e', whiteSpace:'nowrap' } }, '🧾 정산')
+                      : fi.perfExclude
                         ? h('button', {
                             onClick: function(){ reEnablePerf(fi); },
                             title: 'perfExclude 해제 + 주담당/부담당 자동 분배',
@@ -58262,6 +58363,7 @@ function IncomeUnmatchedTab(props){
 // ── 미입금 대기 탭 (재무관리에서 입금확정 게이트키퍼) ──
 function IncomePendingTab(props){
   props = props || {};
+  try{ erpSettleTypesLoad(); }catch(_st){}   // 🧾 컨설팅정산이 맡은 사업 — 입금확정 «전에» 읽어 둔다(한 번만 붙는다)
   var onNavigate = props.onNavigate || function(){};
   var users = getActiveUsers();
   function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
@@ -58587,8 +58689,12 @@ function IncomePendingTab(props){
     // 성과급 미반영 옵션 ON 시 또는 개인수익이면 perfShares 빈 배열 + perfExclude=true
     // 단, 개인수익이면서 perfAdjPctMap이 있으면 직책요율% 조정 분배 적용
     var isPersonalRev = !!deductions.personalRevenue;
+    /* 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 만들지 않는다 — 그 앱이 담당 몫을 따로 정산한다(erpSettlePerfType 머리글) */
+    var settleType = isPersonalRev ? erpSettlePerfType(it, deductions) : '';
     var perfShares;
-    if(isPersonalRev){
+    if(settleType){
+      perfShares = [];
+    } else if(isPersonalRev){
       var adjPctMap = (confirmModal && confirmModal.perfAdjPctMap) || {};
       var _usersPR = dbGet('user_accounts', []);
       var _nameOfPR = function(sid){ var u = _usersPR.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
@@ -58641,6 +58747,7 @@ function IncomePendingTab(props){
       deductions: deductions, perfBaseAmount: calc.perfBaseAmount,
       isPersonalIncome: !!(deductions.bizIncomeTax || deductions.etcIncomeTax || deductions.personalRevenue),
       perfExclude: !perfEnabled || (isPersonalRev && perfShares.length === 0),
+      perfSettleType: settleType || undefined,   // 🧾 컨설팅정산에서 개별정산 — 성과급 안 만듦
       // ★ override 정보 보관
       rateOverride: hasOverride ? {
         main: rateOpts.mainRateOverride,
@@ -59187,6 +59294,8 @@ function IncomePendingTab(props){
       var _perfBase = calcDeductions(_cmPay, _cmDed).perfBaseAmount;
       // 성과급 미리보기가 이것들을 보므로 «옵션 칸보다 먼저» 정해 둔다 (기본 ON)
       var _perfOn = confirmModal.perfEnabled !== false;
+      // 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 안 만든다 — 저장(settleType)과 같은 함수로 미리 보인다
+      var _cmSettle = erpSettlePerfType(it, _cmDed);
 
       /* ── 누가 성과급을 받을 수 있고, 못 받으면 «왜» 인지 (2026-08-16 대표 지시) ──────
          지금까지 이 창은 「합계가 100인가」만 봤다. 그래서 아무도 못 받는 건이
@@ -59489,6 +59598,8 @@ function IncomePendingTab(props){
               (function(){
                 if(!_perfOn) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
                   '성과급 자동 반영을 껐습니다 — 이 건은 성과에 잡히지 않습니다');
+                if(_cmSettle) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
+                  erpSettleLabel(_cmSettle) + ' — 성과급을 만들지 않습니다');
                 if(_cmDed.personalRevenue) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
                   '👤 개인수익 — 성과 배분은 아래 개인수익 칸에서 정합니다');
                 if(!mainSid) return h('div', { style:{fontSize:'13.5px',color:'#991b1b',fontWeight:700} },
@@ -59747,8 +59858,12 @@ function IncomePendingTab(props){
                     erpIsPersonalDeposit(it) && h('span', { style:{fontSize:'12px',color:'#854d0e',opacity:.85} },
                       erpPersonalDepositInfo(it).why === 'type' ? '· 개인입금 사업' : '· 계약에 개인입금'))
                 ),
+                /* 🧾 컨설팅정산이 맡은 사업이면 조정 칸 대신 «성과급 안 만듦»만 — 담당 몫은 그 앱이 따로 정산한다 */
+                ded.personalRevenue && erpSettlePerfType(it, ded) && h('div', { style:{ marginTop:'8px', padding:'8px 12px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'5px', fontSize:'13px', color:'#854d0e' } },
+                  h('div', { style:{ fontWeight:700 } }, erpSettleLabel(erpSettlePerfType(it, ded)) + ' — 성과급을 만들지 않습니다'),
+                  h('div', { style:{ fontSize:'12.5px', color:'#92400e', marginTop:'2px' } }, '담당 몫은 컨설팅정산 앱이 따로 정산합니다. 여기서도 성과급을 만들면 두 번 나갑니다.')),
                 // 👤 개인수익 체크 시: 성과급 조정 영역 (개인 직책요율 % 조정)
-                ded.personalRevenue && (function(){
+                ded.personalRevenue && !erpSettlePerfType(it, ded) && (function(){
                   var pctMap = confirmModal.perfAdjPctMap || {};
                   var _u = dbGet('user_accounts', []);
                   var _nm = function(sid){ var u = _u.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
@@ -59858,7 +59973,8 @@ function IncomePendingTab(props){
             (function(){
               var ded = (confirmModal.deductions || {});
               var isPersonal = !!(ded.bizIncomeTax || ded.etcIncomeTax || ded.personalRevenue);
-              var perfTxt = confirmModal.perfEnabled !== false ? '성과급 반영' : '성과급 미반영';
+              var perfTxt = erpSettlePerfType(it, ded) ? '성과급 없음 (🧾 컨설팅정산)'
+                : (confirmModal.perfEnabled !== false ? '성과급 반영' : '성과급 미반영');
               var line = isPersonal
                 ? '🏢 개인소득 — 법인 매출 미반영 · ' + perfTxt
                 : '✓ 확정 시 — 입금 기록 + 원장 확정 표시 · ' + perfTxt
@@ -75968,6 +76084,7 @@ function PerfManagement(props){
         var isMain = srcMain && (srcMain === sid || byName(srcMain));
         var isSub = !isMain && srcSubs.some(function(s){ return s === sid || byName(s); });
         if(isMain || isSub){
+          var _stl = erpSettleOfIncome(fi, src || null);
           items.push({
             fiId:fi.id, sourceKind:fi.sourceKind, sourceId:fi.sourceId, sourceSubKind:fi.sourceSubKind,
             date:fi.date, companyName:fi.companyName, kind:fi.kind,
@@ -75978,7 +76095,8 @@ function PerfManagement(props){
             pct: 0, amount: 0,
             isPersonalIncome:false, ym:(fi.date||'').slice(0,7),
             category:'unmatched',
-            unmatchReason: fi.perfExclude ? '명시적 제외' : '분배 누락'
+            settle: _stl,    // 🧾 컨설팅정산에서 개별정산 — 빠진 게 아니라 «따로 정산»
+            unmatchReason: _stl ? '🧾 컨설팅정산' : (fi.perfExclude ? '명시적 제외' : '분배 누락')
           });
         }
       }
@@ -76283,6 +76401,7 @@ function PerfManagement(props){
                       h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:'#475569',fontWeight:600})},(it.grossAmount||0).toLocaleString()),
                       h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:'#1e40af',fontWeight:700})},(it.baseAmount||0).toLocaleString()),
                       h('td',{style:Object.assign({},tdS,{textAlign:'center'})},
+                        it.settle ? h('span',{title:erpSettleLabel(it.settle)+' — 담당 몫은 컨설팅정산 앱이 따로 정산합니다',style:{fontSize:'12px',color:'#854d0e',whiteSpace:'nowrap'}},'🧾 정산') :
                         h('button',{onClick:function(e){e.stopPropagation();var fi=allIncomes.find(function(x){return x.id===it.fiId;});if(fi)reEnablePerf(fi);},
                           style:{padding:'3px 8px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}},'⭐ 반영'))
                     );
@@ -76605,6 +76724,11 @@ function PerfManagement(props){
         if(selSid && !matchSid(fi, selSid)) return false;
         return (fi.date||'').slice(0,7) === selYm;
       }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+      /* 🧾 컨설팅정산이 따로 정산하는 사업의 개인수익인데 성과급이 붙은 건 — 막음(erpSettlePerfType)보다 먼저 확정된 것.
+         ★ 돈 기록은 자동으로 고치지 않는다 — «겹칠 수 있음»만 알리고 사람이 바로잡기에서 정리한다. */
+      var overlapOf = {};
+      monthPersonal.forEach(function(fi){ var ot = erpSettleOverlapType(fi); if(ot) overlapOf[fi.id] = ot; });
+      var overlapN = Object.keys(overlapOf).length;
 
       function dedAmount(fi){ return (fi.amount||0) - (fi.perfBaseAmount || fi.amount || 0); }
       function dedLabel(fi){
@@ -76682,6 +76806,9 @@ function PerfManagement(props){
             style:{padding:'4px 10px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'13px', fontWeight:700, cursor:'pointer'} },
             '✕ ' + userName(selSid) + ' 필터 해제')
         ),
+        overlapN > 0 && h('div', { style:{marginBottom:'10px', padding:'8px 12px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', fontSize:'13px', color:'#854d0e'} },
+          h('b', null, '⚠ 컨설팅정산과 겹칠 수 있는 성과급 ' + overlapN + '건'),
+          ' — 컨설팅정산이 따로 정산하는 사업의 개인수익인데 성과급이 붙어 있습니다. 자동으로 고치지 않습니다. 두 번 나가지 않는지 확인하고, 필요하면 거래내역 «🛠 바로잡기 › 담당/성과»에서 정리해 주세요.'),
         // 명세 테이블
         rows.length === 0
           ? h('div', { style:{padding:'40px 20px', textAlign:'center', background:'#f8fafc', border:'1px dashed #cbd5e1', borderRadius:'8px'} },
@@ -76713,7 +76840,11 @@ function PerfManagement(props){
                       h('td', {style:Object.assign({},tdS,{fontFamily:'monospace',color:'#475569'})}, fi.date || '-'),
                       isAdmin && !selSid && h('td', {style:Object.assign({},tdS,{color:'#1e293b',fontWeight:600})}, r.name),
                       h('td', {style:tdS}, roleTag),
-                      h('td', {style:Object.assign({},tdS,{fontWeight:600,color:'#1e293b'})}, fi.companyName || '-'),
+                      h('td', {style:Object.assign({},tdS,{fontWeight:600,color:'#1e293b'})},
+                        h('span', {style:{display:'inline-flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}},
+                          fi.companyName || '-',
+                          overlapOf[fi.id] && h('span', { title:erpSettleLabel(overlapOf[fi.id]) + ' 사업 — 이 성과급과 컨설팅정산이 겹칠 수 있습니다',
+                            style:{fontSize:'12px',fontWeight:700,color:'#854d0e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'8px',padding:'0 6px'} }, '⚠ 정산 겹침?'))),
                       h('td', {style:Object.assign({},tdS,{color:'#475569'})}, fi.kind || '-'),
                       h('td', {style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,color:'#2563eb'})}, (r.src==='adjust' ? r.displayGross : r.gross).toLocaleString()),
                       h('td', {style:Object.assign({},tdS,{fontSize:'12.5px',color:'#64748b'})}, dedLabel(fi)),
