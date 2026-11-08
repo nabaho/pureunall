@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=40">
+<link rel="stylesheet" href="css/pu-erp.css?v=41">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -25622,6 +25622,193 @@ function BlockedRequestsModal(props){
   );
 }
 
+/* ══════ 📄 기금관리 «대기함» → 계약관리 «기금 설립에서 온 후보» 띠 (대표 승인 2026-11-07, 목업 B안) ══════
+   기금관리(fund.html)는 신규 설립 기금을 등록하면 `fund_erp/contract_inbox/{기금}` 에 «후보»를 올린다(#2952).
+   여기는 그 후보를 «읽고», 사람이 [가져오기] 를 누르면 계약관리에 계약 한 건을 만든다.
+
+   ■ 지키는 것
+     · 기금관리가 푸른이알피 장부(contracts)에 직접 쓰지 않는다 — 여기서 «사람이 눌렀을 때만» 만든다.
+     · 가져옴·무시·가져온 계약번호는 «여기서» 적는다(`erp`·`ignored`). 기금관리는 읽기만 한다.
+     · 계약은 여느 계약과 «같은 문»(persistOne — 월 잠금·업체 연결·주담당 검증)을 지난다. 흉내 내지 않는다.
+     · 업체는 이름으로 ID 를 채우지 않는다 — 업체관리에 이어진 업체가 없으면 «연결 보류»(erpDeferCoLinkIfNew).
+       후보의 업체 이름은 기금 이름에서 뗀 «짐작»이라 틀릴 수 있다 → 확인 창에서 알리고, 가져온 뒤 사람이 잇는다.
+     · 주담당은 후보에 «이름»만 있다 → 이름으로 사번을 채우지 않는다(온톨로지 — 자동 ID 대입 금지).
+       사람이 고른다. 이름이 같은 직원만 ★ 로 앞에 올려 «고르기 쉽게»만 한다.
+     · 금액·수수료는 후보에 없다 — 만들지 않는다(사람이 계약에서 입력).
+     · 같은 후보가 두 번 생기지 않게 ① 계약에 `fundInboxId` 를 적고 ② `erp` 자리를 «트랜잭션으로» 먼저 잡는다.
+       잡고 나서 멈춘 흔적(계약번호 없이 5분 넘음)은 다시 «대기»로 돌린다.
+     · 계약협의 단계는 여기서만 쓴다 — 기금관리가 올리는 상태는 상담접수·계약확정 둘뿐이다.
+     · 가져온 뒤 기금관리에서 «계약확정»이 되어도 계약 상태를 «저절로» 바꾸지 않는다 — 🔔 [반영] 을 사람이 누른다. */
+var ERP_FIB_PATH = 'fund_erp/contract_inbox';
+var ERP_FIB_CLAIM_TTL = 5 * 60 * 1000;
+var ERP_FIB_STAGE = { consult:'상담접수', signed:'계약확정' };
+var ERP_FIB_TYPE_BY_FUND = { '사내':'fund-single', '공동':'fund-joint' };
+var _erpFibBusy = false;      // 겹쳐 돌지 않게 — 겹치면 같은 후보로 계약이 둘 생길 수 있다
+
+/* 자리를 «지금 누가 쥐고 있나» — 계약번호가 적혔거나 방금(5분 안) 잡은 것 */
+function erpFibTaken(erp, now){
+  if(!erp || typeof erp !== 'object') return false;
+  if(erp.contractId || erp.contractNo) return true;
+  return (now - (Number(erp.claimedAt) || 0)) < ERP_FIB_CLAIM_TTL;
+}
+function erpFibEntries(all){
+  var out = [];
+  if(!all || typeof all !== 'object') return out;
+  Object.keys(all).forEach(function(fid){
+    var rec = all[fid];
+    if(rec && typeof rec === 'object' && (rec.fundName || rec.shortName)) out.push({ fid:fid, rec:rec });
+  });
+  return out;
+}
+function erpFibByNewest(a, b){
+  var x = String(b.rec.createdAt || ''), y = String(a.rec.createdAt || '');
+  return x < y ? -1 : x > y ? 1 : (a.fid < b.fid ? -1 : 1);
+}
+/* 가져올 후보 — 무시한 것·이미 가져간 것(또는 지금 가져오는 중인 것)은 뺀다 */
+function erpFibPending(all, now){
+  return erpFibEntries(all).filter(function(r){ return !r.rec.ignored && !erpFibTaken(r.rec.erp, now); }).sort(erpFibByNewest);
+}
+function erpFibIgnored(all, now){
+  return erpFibEntries(all).filter(function(r){ return !!r.rec.ignored && !erpFibTaken(r.rec.erp, now); }).sort(erpFibByNewest);
+}
+/* 🔔 «기금관리에서는 계약확정이 됐는데 계약은 아직 상담접수·계약협의인 것».
+   ⚠ 위로 올라간 것만 본다 — 사람이 이미 확정한 계약을 기금관리가 «되돌렸다고» 알릴 일은 없다. */
+function erpFibNotices(all, contracts){
+  var out = [];
+  erpFibEntries(all).forEach(function(r){
+    var e = r.rec.erp;
+    if(!e || !e.contractId || r.rec.stage !== 'signed' || e.ackStage === 'signed') return;
+    var ct = (contracts || []).find(function(c){ return c && !c._deleted && c.id === e.contractId; });
+    if(ct && (ct.status === 'consult' || ct.status === 'review')) out.push({ fid:r.fid, rec:r.rec, contract:ct });
+  });
+  return out.sort(erpFibByNewest);
+}
+/* 후보 → 새 계약 서식. 빈 서식은 모달·자동 등록과 «같은 것»(erpBlankContractForm)을 쓴다. */
+function erpFibForm(rec, fid, mgrSid, types){
+  var form = erpBlankContractForm();
+  var nm = String(rec.company || '').trim();
+  form.company.name = nm;
+  form.companyName = nm;
+  form.kinds = ['fund'];
+  var code = ERP_FIB_TYPE_BY_FUND[String(rec.fundType || '')] || '';
+  /* ⚠ 지금 유형표에 «있는 것»만 — 지웠거나 숨긴 유형을 찍으면 어느 화면에도 안 나온다 */
+  if(code && (types || []).some(function(t){ return t && t.code === code && !t.hidden; })) form.typeCodes.fund = code;
+  form.briefs.fund = briefTrim(rec.brief);
+  form.managerMain = String(mgrSid || '');
+  form.status = rec.stage === 'signed' ? 'signed' : 'consult';
+  form.fundInboxId = String(fid || '');
+  form.note = '🏗 기금 설립(기금관리)에서 가져옴 — ' + String(rec.fundName || rec.shortName || '')
+    + (rec.manager ? ' · 기금관리 담당 ' + rec.manager : '');
+  return form;
+}
+/* 같은 업체의 «진행 중인 기금 계약» — 있으면 새로 만들지 않고 «이어 붙이게» 한다(목업 메모 4).
+   ⚠ 다른 기금 후보로 만든 계약(fundInboxId 가 다름)은 뺀다 — 한 회사의 사내기금·공동기금은 따로다. */
+function erpFibMatches(form, fid, contracts){
+  return erpContractDupBlock(form, contracts).filter(function(c){ return !c.fundInboxId || c.fundInboxId === fid; });
+}
+
+function ErpFundInboxStrip(props){
+  var openS = usePersistedState('contract_fibstrip_open', true); var open = openS[0] !== false; var setOpen = openS[1];
+  var mS = useState({}); var mgrPick = mS[0]; var setMgrPick = mS[1];
+  var sS = useState({}); var sel = sS[0]; var setSel = sS[1];
+  var igS = useState(false); var showIg = igS[0]; var setShowIg = igS[1];
+  var now = Date.now();
+  var pending = erpFibPending(props.all, now);
+  var notices = erpFibNotices(props.all, props.contracts);
+  var ignored = erpFibIgnored(props.all, now);
+  if(!pending.length && !notices.length && !ignored.length) return null;
+  var users = (props.users || []).filter(function(u){ return u && u.sid; });
+  var selIds = pending.filter(function(r){ return sel[r.fid]; }).map(function(r){ return r.fid; });
+  var allOn = pending.length > 0 && selIds.length === pending.length;
+  function toggleAll(){ var nx = {}; if(!allOn) pending.forEach(function(r){ nx[r.fid] = true; }); setSel(nx); }
+  function toggleOne(fid){ setSel(function(p){ var nx = Object.assign({}, p); if(nx[fid]) delete nx[fid]; else nx[fid] = true; return nx; }); }
+  function pickMgr(fid, sid){ setMgrPick(function(p){ var nx = Object.assign({}, p); nx[fid] = sid; return nx; }); }
+  function btn(label, onClick, kind, title, disabled){
+    var c = kind === 'main' ? { background:'#1e40af', color:'#fff', border:'1px solid #1e40af' }
+          : kind === 'warn' ? { background:'#fff', color:'#854d0e', border:'1px solid #fbbf24' }
+          : { background:'#fff', color:'#475569', border:'1px solid #cbd5e1' };
+    return h('button', { onClick:onClick, title:title || label, disabled:!!disabled,
+      style:Object.assign({ padding:'4px 10px', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap',
+        cursor:disabled ? 'not-allowed' : 'pointer', opacity:disabled ? 0.5 : 1 }, c) }, label);
+  }
+  function stChip(rec){
+    var signed = rec.stage === 'signed';
+    return h('span', { className:'fib-chip' + (signed ? ' fib-chip-ok' : ''), title:'기금관리가 올린 상태 — ' + (ERP_FIB_STAGE[rec.stage] || '상담접수') },
+      ERP_FIB_STAGE[rec.stage] || '상담접수');
+  }
+  function pendingRow(r, i){
+    var rec = r.rec, fid = r.fid;
+    var hint = String(rec.manager || '');
+    var matches = erpFibMatches(erpFibForm(rec, fid, '', []), fid, props.contracts);
+    var picked = mgrPick[fid] || '';
+    var sorted = users.slice().sort(function(a, b){ return (a.name === hint ? 0 : 1) - (b.name === hint ? 0 : 1); });
+    var shortNm = String(rec.shortName || rec.fundName || '');
+    var meta = [rec.company, hint ? '담당 ' + hint : '', String(rec.createdAt || '').slice(5)].filter(erpNoteWorth);
+    return h('div', { key:fid },
+      h('div', { className:'fib-row' },
+        h('span', { className:'fib-ck' }, h('input', { type:'checkbox', checked:!!sel[fid], onChange:function(){ toggleOne(fid); }, title:'고르기' })),
+        h('span', { className:'fib-no' }, i + 1),
+        h('span', { className:'fib-main' },
+          h('span', { className:'fib-fund', title:String(rec.fundName || '') }, shortNm),
+          stChip(rec)),
+        h('span', { className:'fib-co', title:String(rec.company || '') }, String(rec.company || '')),
+        h('span', { className:'fib-mg', title:hint ? '기금관리의 담당자' : '' }, hint),
+        h('span', { className:'fib-dt' }, String(rec.createdAt || '').slice(5)),
+        h('span', { className:'fib-meta', title:meta.join(' · ') }, meta.join(' · ')),
+        h('span', { className:'fib-act' },
+          h('select', { value:picked, onChange:function(e){ pickMgr(fid, e.target.value); },
+            title:'주담당을 직접 골라 주세요 — 이름으로 대신 채우지 않습니다(★ = 기금관리 담당자와 같은 이름)' },
+            h('option', { value:'' }, '주담당 고르기'),
+            sorted.map(function(u){ return h('option', { key:u.sid, value:u.sid }, (u.name === hint ? '★ ' : '') + u.name); })),
+          btn(matches.length ? '새 계약으로' : '가져오기', function(){ props.onImport(fid, picked); }, matches.length ? 'plain' : 'main',
+            matches.length ? '같은 업체의 기금 계약이 이미 있습니다 — 그래도 새로 만들 때만 누르세요' : '계약관리에 계약 한 건을 만듭니다', !picked),
+          btn('무시', function(){ props.onIgnore([fid]); }, 'plain', '이 후보를 다시 묻지 않습니다'))),
+      matches.length > 0 && h('div', { className:'fib-sub' },
+        h('span', null, '⚠ 같은 업체의 기금 계약이 이미 있습니다 →'),
+        matches.slice(0, 3).map(function(c){
+          return btn('「' + (c.contractNo || '번호 없음') + '」에 연결', function(){ props.onLink(fid, c.id); }, 'warn',
+            '이 계약은 건드리지 않고, 기금관리에 «가져옴(계약번호)» 로만 알립니다');
+        }),
+        matches.length > 3 && h('span', null, '…외 ' + (matches.length - 3) + '건')));
+  }
+  function noticeRow(n){
+    var ct = n.contract;
+    var msg = '🔔 ' + String(n.rec.shortName || n.rec.fundName || '') + ' — 기금 설립에서 «수임 계약 체결»이 끝났습니다. ' + (ct.contractNo || '계약') + ' 지금 상태: '
+      + (contractStatusInfo(ct.status).label) + ' → 계약확정으로 반영할까요?';
+    return h('div', { key:'n-' + n.fid, className:'fib-nt' },
+      h('span', { className:'fib-nt-t', title:msg }, msg),
+      btn('반영', function(){ props.onApply(n.fid); }, 'main', '이 계약을 계약확정으로 옮깁니다'),
+      btn('그대로 두기', function(){ props.onKeep(n.fid); }, 'plain', '상태를 바꾸지 않고 이 알림만 닫습니다'));
+  }
+  var head = h('div', { className:'fib-h' },
+    h('button', { className:'fib-tg', onClick:function(){ setOpen(!open); }, title:open ? '접기' : '펴기' }, open ? '▾' : '▸'),
+    h('span', { className:'fib-ttl' }, '🏗 기금 설립에서 온 계약 후보 ' + pending.length + '건'),
+    notices.length > 0 && h('span', { className:'fib-bell', title:'기금관리에서 계약확정이 된 계약 ' + notices.length + '건 — 아래 «반영»을 누르면 계약 상태를 옮깁니다' }, '🔔 ' + notices.length),
+    h('span', { className:'fib-info', title:'기금관리에서 신규 설립으로 올린 기금입니다. [가져오기]를 누르면 계약관리에 계약 한 건이 생깁니다(금액·수수료는 사람이 입력). 푸른이알피 장부는 누르기 전까지 바뀌지 않습니다.' }, 'ⓘ'));
+  return h('div', { className:'fib' },
+    head,
+    open && h('div', { className:'fib-body' },
+      pending.length > 0 && h('div', { className:'fib-row fib-th' },
+        h('span', { className:'fib-ck' }, h('input', { type:'checkbox', checked:allOn, onChange:toggleAll, title:'지금 보이는 줄 모두 고르기' })),
+        h('span', { className:'fib-no' }, '№'), h('span', { className:'fib-main' }, '기금'), h('span', { className:'fib-co' }, '업체(고객)'),
+        h('span', { className:'fib-mg' }, '담당'), h('span', { className:'fib-dt' }, '올라온 날'), h('span', { className:'fib-act' }, '')),
+      selIds.length > 0 && h('div', { className:'fib-bulk' },
+        h('b', null, selIds.length + '건 선택'),
+        btn('선택 가져오기', function(){ props.onImportMany(selIds.map(function(fid){ return { fid:fid, mgr:mgrPick[fid] || '' }; })).then(function(){ setSel({}); }); }, 'main',
+          '주담당을 고른 것만 만듭니다 — 같은 업체의 기금 계약이 있거나 주담당이 비어 있는 것은 건너뜁니다'),
+        btn('선택 무시', function(){ props.onIgnore(selIds).then(function(ok){ if(ok) setSel({}); }); }, 'plain'),
+        btn('선택 풀기', function(){ setSel({}); }, 'plain')),
+      pending.map(pendingRow),
+      notices.map(noticeRow),
+      ignored.length > 0 && h('div', { className:'fib-ig' },
+        h('button', { className:'fib-tg', onClick:function(){ setShowIg(!showIg); } }, (showIg ? '▾ ' : '▸ ') + '무시한 후보 ' + ignored.length + '건'),
+        showIg && ignored.map(function(r){
+          return h('div', { key:'i-' + r.fid, className:'fib-igrow' },
+            h('span', { className:'fib-ig-t', title:String(r.rec.fundName || '') }, String(r.rec.shortName || r.rec.fundName || '') + (r.rec.company ? ' · ' + r.rec.company : '')),
+            btn('되돌리기', function(){ props.onRestore(r.fid); }, 'plain', '다시 «가져올 후보» 로 돌립니다'));
+        }))));
+}
+
 function ContractManagement(props){
   props = props || {};
   var existing = dbGet('contracts', null);
@@ -26075,6 +26262,191 @@ function ContractManagement(props){
     fbDb.ref('data/contract_requests/' + key).remove()
       .then(function(){ showToast('🗑 요청을 지웠습니다'); })
       .catch(function(){ showToast('❌ 지우기 실패'); });
+  }
+
+  /* ══════ 📄 기금 설립 후보 가져오기 (규칙·까닭은 ErpFundInboxStrip 위 머리글) ══════
+     후보 자료는 `fund_erp/contract_inbox/{기금}` — 기금관리가 «올리고», 여기서는 `erp`·`ignored` 만 «적는다».
+     ⚠ 후보 한 건의 «고치기»는 전부 fibTx(그 기금 한 칸 트랜잭션)로 한다 — 기금관리가 그 사이 후보를 거두었으면
+       (지웠으면) 아무것도 안 쓴다. 그냥 .set 하면 지워진 후보 자리에 «가져옴»만 남은 유령이 생긴다. */
+  var fibS = useState(null); var fibAll = fibS[0]; var setFibAll = fibS[1];
+  useEffect(function(){
+    if(!fbDb) return;
+    var ref = fbDb.ref(ERP_FIB_PATH);
+    var cb = ref.on('value', function(snap){ setFibAll(snap.val() || {}); }, function(){ setFibAll(null); });
+    return function(){ try{ ref.off('value', cb); }catch(_){} };
+  }, []);
+  function fibWho(){ return (CURRENT_USER && CURRENT_USER.sid) || ''; }
+  async function fibTx(fid, mutate){
+    var res = await fbDb.ref(ERP_FIB_PATH + '/' + fid).transaction(function(cur){
+      if(cur === null || cur === undefined) return null;   // 아직 못 받았거나 없다 — 받았으면 서버 값으로 다시 부른다
+      return mutate(JSON.parse(JSON.stringify(cur)));      // undefined 를 돌려주면 그만둔다
+    });
+    return { committed:!!(res && res.committed), val:(res && res.snapshot && res.snapshot.val()) || null };
+  }
+  /* 가져올 «자리»를 먼저 잡는다 — 둘이 동시에 눌러도 한 사람만 잡힌다 */
+  async function fibClaim(fid){
+    var claim = { claimedAt:Date.now(), bySid:fibWho() };
+    var r = await fibTx(fid, function(c){
+      if(c.ignored || erpFibTaken(c.erp, Date.now())) return;
+      c.erp = claim; return c;
+    });
+    return (r.committed && r.val && r.val.erp && r.val.erp.claimedAt === claim.claimedAt && r.val.erp.bySid === claim.bySid) ? claim : null;
+  }
+  async function fibUnclaim(fid, claim){
+    try{ await fibTx(fid, function(c){
+      if(!c.erp || c.erp.claimedAt !== claim.claimedAt || c.erp.contractId) return;
+      delete c.erp; return c;
+    }); }catch(_){}
+  }
+  async function fibMark(fid, ct, linked){
+    var r = await fibTx(fid, function(c){
+      var e = Object.assign({}, c.erp || {}, { contractId:ct.id, contractNo:ct.contractNo || '', at:(new Date()).toISOString(), bySid:fibWho() });
+      delete e.claimedAt; if(linked) e.linked = true;
+      c.erp = e; return c;
+    });
+    return !!(r.committed && r.val && r.val.erp && r.val.erp.contractId === ct.id);
+  }
+  function fibReady(){
+    if(!fbDb) return false;
+    if(!Array.isArray(dbGet('companies', null)) || !Array.isArray(dbGet('contracts', null))){ showToast('⏳ 아직 자료를 받는 중입니다 — 잠시 후 다시 눌러 주세요'); return false; }
+    if(_erpFibBusy){ showToast('⏳ 처리 중입니다 — 잠시 후 다시 눌러 주세요'); return false; }
+    return true;
+  }
+  /* 후보 «한 건»을 계약으로 만든다 — 한 건씩 누르는 길도, 여럿을 고른 길(quiet)도 «이 함수 하나»다.
+     결과: { made } 만듦 · { linked } 이미 만든 계약에 이음 · { cancelled } · { why, skip } 못 함 */
+  async function fibImportOne(fid, mgrSid, quiet){
+    var snap = await fbDb.ref(ERP_FIB_PATH + '/' + fid).once('value');
+    var rec = snap.val();
+    if(!rec) return { why:'기금관리가 이 후보를 거두었습니다' };
+    if(rec.ignored) return { why:'무시한 후보입니다' };
+    if(erpFibTaken(rec.erp, Date.now())) return { why:'이미 가져왔습니다' };
+    var cts = dbGet('contracts', []) || [];
+    /* 계약은 만들어졌는데 «가져옴» 표시만 못 적은 흔적 — 새로 만들지 않고 이어 붙인다 */
+    var had = cts.find(function(c){ return c && !c._deleted && c.fundInboxId === fid; });
+    if(had) return (await fibMark(fid, had, false)) ? { linked:had } : { why:'기금관리에 «가져옴»을 알리지 못했습니다' };
+    if(!users.some(function(u){ return u.sid === mgrSid; })) return { why:'주담당을 골라 주세요', skip:true };
+    var form = erpFibForm(rec, fid, mgrSid, getKindTypes('fund'));
+    if(!form.company.name) return { why:'후보에 업체 이름이 없습니다' };
+    if(quiet && erpFibMatches(form, fid, cts).length) return { why:'같은 업체의 기금 계약이 이미 있습니다 — 한 건씩 확인해 주세요', skip:true };
+    form = erpDeferCoLinkIfNew(form) || form;
+    var ym = String(form.signDate || '').slice(0, 7);
+    if(ym && isContractLocked(ym)) return { why:ym + ' 이 잠겨 있어 계약을 만들 수 없습니다' };
+    if(!quiet){
+      var O = window.PuOntology, cands = [];
+      try{ if(O && typeof O.companyLinkCandidates === 'function') cands = O.companyLinkCandidates(form, dbGet('companies', []) || [], '') || []; }catch(_){}
+      var ok = await popConfirm('「' + form.company.name + '」 기금 계약을 «' + (ERP_FIB_STAGE[rec.stage] || '상담접수') + '» 단계로 만듭니다.\n\n'
+        + '· 기금: ' + (rec.fundName || rec.shortName || '') + '\n'
+        + '· 주담당: ' + userName(mgrSid) + '\n'
+        + '· 금액·수수료는 넣지 않습니다(계약에서 직접 입력).\n'
+        + (form.companyLinkStatus === 'pending'
+            ? '· 업체는 «연결 보류»로 만듭니다 — 업체 이름은 기금 이름에서 뗀 것이라 틀릴 수 있습니다.\n'
+              + (cands.length ? '  업체관리에 비슷한 업체: ' + cands.slice(0, 3).map(function(c){ return c.name; }).join(', ') + (cands.length > 3 ? ' 외 ' + (cands.length - 3) + '곳' : '') + '\n' : '')
+              + '  가져온 뒤 계약을 열어 «업체 연결 확인»에서 이어 주세요.\n'
+            : ''),
+        { okText:'가져오기', cancelText:'닫기', danger:false });
+      if(!ok) return { cancelled:true };
+    }
+    var claim = await fibClaim(fid);
+    if(!claim) return { why:'다른 분이 방금 가져갔거나 후보가 바뀌었습니다' };
+    var newOne = Object.assign({}, form, {
+      id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      contractNo: genContractNo(),
+      transferredTo: null,
+      regAt: (new Date()).toISOString()
+    });
+    var saved = false;
+    try{ saved = persistOne(newOne); }catch(e){ saved = false; }
+    if(!saved){ await fibUnclaim(fid, claim); return { why:'계약관리가 저장을 막았습니다 — 방금 뜬 알림의 까닭(업체 연결·주담당·월 잠금)을 확인해 주세요' }; }
+    var marked = await fibMark(fid, newOne, false);
+    return marked ? { made:newOne } : { made:newOne, warn:true };
+  }
+  async function fibImport(fid, mgrSid){
+    if(!fibReady()) return;
+    _erpFibBusy = true;
+    var r;
+    try{ r = await fibImportOne(fid, mgrSid, false); }
+    catch(e){ r = { why:'오류 — ' + ((e && e.message) || e) }; }
+    finally{ _erpFibBusy = false; }
+    if(r.cancelled) return;
+    if(r.made) showToast('✔ ' + (r.made.companyName || '') + ' 기금 계약을 만들었습니다 — ' + r.made.contractNo + (r.warn ? ' (기금관리에 «가져옴» 표시는 아직 못 적었습니다 — 잠시 뒤 다시 열면 이어집니다)' : '') + ' · 업체 연결·금액을 확인해 주세요', 9000);
+    else if(r.linked) showToast('✔ 이미 만든 계약(' + (r.linked.contractNo || '') + ')에 이어 붙였습니다');
+    else showToast('⚠ 가져오지 못했습니다 — ' + r.why, 9000);
+  }
+  async function fibImportMany(items){
+    if(!fibReady() || !items || !items.length) return;
+    var ok = await popConfirm('고른 후보 ' + items.length + '건을 계약관리로 가져옵니다.\n\n'
+      + '· 주담당을 고른 것만 만듭니다.\n· 같은 업체의 기금 계약이 이미 있는 것은 건너뜁니다(한 건씩 «연결»·«새 계약으로»).\n· 금액·수수료는 넣지 않습니다.',
+      { okText:'가져오기', cancelText:'닫기', danger:false });
+    if(!ok) return;
+    _erpFibBusy = true;
+    var made = 0, skipped = [], failed = [];
+    try{
+      for(var i = 0; i < items.length; i++){
+        var r;
+        try{ r = await fibImportOne(items[i].fid, items[i].mgr, true); }catch(e){ r = { why:'오류 — ' + ((e && e.message) || e) }; }
+        if(r.made || r.linked) made++;
+        else if(r.skip) skipped.push(r.why);
+        else if(!r.cancelled) failed.push(r.why);
+      }
+    } finally { _erpFibBusy = false; }
+    showToast('📄 ' + made + '건 가져왔습니다' + (skipped.length ? ' · 건너뜀 ' + skipped.length + '건(' + skipped[0] + ')' : '') + (failed.length ? ' · 못 함 ' + failed.length + '건(' + failed[0] + ')' : ''), 9000);
+  }
+  async function fibLink(fid, contractId){
+    if(!fibReady()) return;
+    var ct = (dbGet('contracts', []) || []).find(function(x){ return x && !x._deleted && x.id === contractId; });
+    if(!ct){ showToast('그 계약을 찾지 못했습니다 — 화면을 새로 열어 주세요'); return; }
+    if(!(await popConfirm('「' + (ct.contractNo || '') + ' · ' + (ct.companyName || '') + '」 계약에 이 후보를 이어 붙입니다.\n\n'
+      + '· 계약 내용은 바꾸지 않습니다.\n· 기금관리에는 «가져옴(계약번호)» 로만 표시됩니다.',
+      { okText:'이어 붙이기', cancelText:'닫기', danger:false }))) return;
+    _erpFibBusy = true;
+    try{
+      var claim = await fibClaim(fid);
+      if(!claim){ showToast('⚠ 다른 분이 방금 가져갔거나 후보가 바뀌었습니다'); return; }
+      if(await fibMark(fid, ct, true)) showToast('✔ ' + (ct.contractNo || '') + ' 계약에 이어 붙였습니다');
+      else { await fibUnclaim(fid, claim); showToast('⚠ 기금관리에 알리지 못했습니다 — 다시 눌러 주세요'); }
+    } catch(e){ showToast('⚠ 이어 붙이지 못했습니다 — ' + ((e && e.message) || e)); }
+    finally { _erpFibBusy = false; }
+  }
+  async function fibIgnore(fids){
+    fids = [].concat(fids || []);
+    if(!fids.length || !fbDb) return false;
+    var names = fids.map(function(f){ var r = (fibAll || {})[f]; return r ? '· ' + (r.shortName || r.fundName || f) : ''; }).filter(Boolean).slice(0, 8).join('\n');
+    if(!(await popConfirm('기금 설립 후보 ' + fids.length + '건을 «무시»할까요?\n\n' + names + '\n\n· 이 후보는 다시 묻지 않습니다.\n· 띠 아래 «무시한 후보»에서 되돌릴 수 있습니다.',
+      { okText:'무시', cancelText:'닫기', danger:false }))) return false;
+    var at = (new Date()).toISOString(), by = fibWho(), bad = 0;
+    for(var i = 0; i < fids.length; i++){
+      try{
+        var r = await fibTx(fids[i], function(c){ if(c.erp) return; c.ignored = { at:at, bySid:by }; return c; });
+        if(!(r.committed && r.val && r.val.ignored)) bad++;
+      }catch(_){ bad++; }
+    }
+    showToast(bad ? '⚠ ' + (fids.length - bad) + '건 무시 · ' + bad + '건은 못 했습니다(이미 가져갔거나 기금관리가 거둠)' : '✔ ' + fids.length + '건을 무시했습니다');
+    return !bad;
+  }
+  async function fibRestore(fid){
+    try{
+      var r = await fibTx(fid, function(c){ if(!c.ignored) return; delete c.ignored; return c; });
+      showToast(r.committed && r.val && !r.val.ignored ? '✔ 다시 가져올 후보로 돌렸습니다' : '⚠ 되돌리지 못했습니다');
+    }catch(e){ showToast('⚠ 되돌리지 못했습니다'); }
+  }
+  /* 🔔 알림을 닫는다 — 어느 단계까지 알렸는지(ackStage)만 적는다 */
+  async function fibAck(fid){
+    try{
+      var r = await fibTx(fid, function(c){ if(!c.erp) return; c.erp.ackStage = 'signed'; return c; });
+      if(!(r.committed && r.val && r.val.erp && r.val.erp.ackStage === 'signed')) showToast('⚠ 알림을 닫지 못했습니다');
+    }catch(e){ showToast('⚠ 알림을 닫지 못했습니다'); }
+  }
+  /* [반영] — 계약 상태를 «사람이 눌러» 계약확정으로 옮긴다(옮기는 길은 단계 이동 단추와 «같은» moveStatus) */
+  async function fibApply(fid){
+    var rec = (fibAll || {})[fid], e = rec && rec.erp;
+    if(!e || !e.contractId) return;
+    var ct = (dbGet('contracts', []) || []).find(function(x){ return x && !x._deleted && x.id === e.contractId; });
+    if(ct && (ct.status === 'consult' || ct.status === 'review')){
+      moveStatus(ct.id, 'signed');
+      var after = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === ct.id; });
+      if(!after || after.status !== 'signed') return;      // 월 잠금 등으로 못 옮겼다 — 알림은 그대로 둔다
+    }
+    await fibAck(fid);
   }
 
   function openPrintModal(c){ setPrintModal(c); }
@@ -26927,6 +27299,10 @@ function ContractManagement(props){
         var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
         return t ? t.name : (code || '-');
       } }),
+    /* 📄 기금 설립에서 온 계약 후보 — 없으면 아무것도 안 그린다(ErpFundInboxStrip) */
+    h(ErpFundInboxStrip, { all:fibAll, contracts:contracts, users:users,
+      onImport:fibImport, onImportMany:fibImportMany, onLink:fibLink, onIgnore:fibIgnore, onRestore:fibRestore,
+      onApply:fibApply, onKeep:fibAck }),
     // (종류 탭은 아래 툴바 드롭다운으로 통합)
     // 툴바+담당자 필터 영역 틀고정
     /* 🧊 폰에서도 붙인다 (대표 지시 2026-10-23 「틀 고정」) — 전에는 폰만 static 이라 목록을 내리면 검색·거르개가 사라졌다. */
