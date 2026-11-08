@@ -362,6 +362,10 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 #layoutBar button:hover{background:#eff6ff;}
 .lay-say{font-size:.72rem;font-weight:700;color:#166534;}
 .lay-say.bad{color:#991b1b;}
+.lay-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9980;max-width:min(92vw,560px);padding:9px 16px;border-radius:99px;
+  background:#1e293b;color:#fff;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.3);text-align:center;}
+.lay-toast.bad{background:#991b1b;}
+.lay-toast[hidden]{display:none;}
 body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
 /* 📌 틀 고정 — 편집 중에만 보인다(아이콘 왼쪽 아래 귀퉁이 · 별표 ☆ 는 오른쪽 아래). 자주 쓰는 앱 복제본에는 안 뜬다.
    ⚠ 선택자를 «.tile .lay-freeze» 로 세웠다 — 폭 380px 이하의 `.tile span{display:block}` 이 더 세서 폰에서 편집 중이 아닌데도 보였다. */
@@ -1433,7 +1437,7 @@ body.portal-mode #moreFab{display:flex;}
            ⚠ 기본은 감춘 채(hidden)다 — JS 가 관리자로 확인한 뒤에만 켠다. 직원 화면에는 단추도 끌기도 없다.
            긴 안내는 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
       <button id="layoutEditBtn" type="button" aria-describedby="tileHint" hidden></button>
-      <span id="tileHint" hidden>배치 편집을 켜면 마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
+      <span id="tileHint" hidden>관리자는 앱을 마우스로 바로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 배치 편집을 켜면 📌 틀 고정을 누를 수 있습니다. 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
     </div>
     <!-- 편집 중 안내 줄(관리자·PC) — 목록으로 편집(폰과 같은 창) · 처음 자리로 · 끝내기 -->
     <div id="layoutBar" role="group" aria-label="앱 배치 편집" hidden>
@@ -1682,6 +1686,9 @@ body.portal-mode #moreFab{display:flex;}
     </div>
   </div>
 </div>
+
+<!-- 편집 줄·목록 창이 안 보일 때 배치를 바꿨다/못 바꿨다를 알리는 떠 있는 알림(관리자 화면에서만 켜진다) -->
+<div id="layoutToast" class="lay-toast" role="status" aria-live="polite" hidden></div>
 
 <!-- ── 📋 앱 배치 편집 창 (관리자만 · 폰은 내 메뉴에서, PC 는 편집 줄의 «목록으로 편집») ──
      ⚠ body 바로 아래에 둔다 — overflow·backdrop-filter 가 있는 조상 안의 fixed 창은 폰에서 통째로 잘린다(STATUS 「열려 있는데 안 보인다」).
@@ -3821,8 +3828,8 @@ body.portal-mode #moreFab{display:flex;}
       var box = c.closest ? c.closest('.tilerow') : c.parentNode;
       /* 감춰 둔 타일(권한 기다리는 직원 인사·재무)은 «없는 것»으로 센다 */
       var shown = Array.prototype.some.call(c.children, function(t){ return !t.style || t.style.display !== 'none'; });
-      /* 배치 편집 중에는 빈 영역도 보인다 — 비었다고 감추면 그 영역으로 앱을 옮길 수 없다 */
-      if(box) box.style.display = (shown || layoutEditing()) ? '' : 'none';
+      /* 끌어 옮길 수 있는 관리자 화면에는 빈 영역도 보인다 — 비었다고 감추면 그 영역으로 앱을 옮길 수 없다 */
+      if(box) box.style.display = (shown || layoutCanDrag() || layoutEditing()) ? '' : 'none';
     });
   }
 
@@ -4518,6 +4525,11 @@ body.portal-mode #moreFab{display:flex;}
 
   function layoutAdminOk(){ return _layoutAdmin === true; }
   function layoutEditing(){ return _layoutAdmin === true && _layoutEdit === true; }
+  /* 이 사람이 PC 에서 앱을 «끌어 옮길 수 있는가» — 관리자(권형하)는 편집 단추를 안 눌러도 «바로» 끌린다.
+     (대표 보고 2026-11-08 「마우스로 이동이 안된다」: 처음엔 «배치 편집»을 먼저 켜야 끌리게 했는데, 그걸 모르고 끌면
+      아무 일도 없었다. 예전 「이동 가능」 칩은 바로 끌렸다.) 편집을 켜면 📌 틀 고정·점선 영역·편집 줄이 «더» 보일 뿐이다.
+     ⚠ 폰은 끌기가 없다(목록 창). 관리자가 아니면 언제나 아니오 — 서버 규칙이 한 번 더 막는다. */
+  function layoutCanDrag(){ return _layoutAdmin === true && !isMobile(); }
 
   /* 화면(DOM) ⇄ 모델 */
   function layModelFromDom(){
@@ -4549,6 +4561,14 @@ body.portal-mode #moreFab{display:flex;}
       el.textContent = msg || '';
       el.classList.toggle('bad', !!bad);
     });
+    /* 편집 줄·목록 창이 «안 보일 때»(편집을 안 켠 채 끌었을 때)는 떠 있는 알림으로 알린다 — 조용히 저장되면 모두의 배치가 바뀐 줄 모른다 */
+    var tt = $('layoutToast');
+    if(tt){
+      var pn = $('layoutPanel'), br = $('layoutBar');
+      tt.textContent = msg || '';
+      tt.hidden = !msg || !!(pn && !pn.hidden) || !!(br && !br.hidden);
+      tt.classList.toggle('bad', !!bad);
+    }
     clearTimeout(_layoutSayT);
     if(msg) _layoutSayT = setTimeout(function(){ layoutSay(''); }, 6000);
   }
@@ -4680,8 +4700,8 @@ body.portal-mode #moreFab{display:flex;}
       b.classList.toggle('editing', edit);
       b.setAttribute('aria-pressed', edit ? 'true' : 'false');
       b.setAttribute('aria-label', edit ? '앱 배치 편집 끝내기' : '앱 배치 편집 시작');
-      b.title = edit ? '눌러서 편집을 끝냅니다'
-        : '앱을 끌어 위아래·다른 영역으로 옮기고 📌 틀 고정합니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영) — 눌러서 편집 시작';
+      b.title = edit ? '눌러서 편집 도구(📌·점선·편집 줄)를 끕니다'
+        : '앱은 마우스로 «바로» 끌어 옮길 수 있습니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영). 눌러서 📌 틀 고정·점선 영역·목록 편집을 켭니다';
     }
     var bar = $('layoutBar'); if(bar) bar.hidden = !(admin && pc && edit);
     var me = $('meLayout'); if(me) me.hidden = !admin;
@@ -4917,9 +4937,9 @@ body.portal-mode #moreFab{display:flex;}
   }
   function persistOrderFromDom(){
     soonToEnd();   /* 끌어 옮긴 뒤에도 준비중은 오른쪽 끝 — 그 자리를 저장한다 */
-    /* ★ 공용 배치는 «관리자가 배치 편집 중일 때만» 쓴다(2026-11-08). 직원의 끌기는 ★ 줄에 넣는 일뿐이라 배치는 안 바뀐다.
+    /* ★ 공용 배치는 «끌 수 있는 관리자»만 쓴다(2026-11-08). 직원의 끌기는 ★ 줄에 넣는 일뿐이라 배치는 안 바뀐다.
        예전에는 여기서 사람마다 자기 순서(tilePrefs.order·rows)를 저장했다 — 그 저장은 걷었다. */
-    if(!layoutEditing()){ _dragBefore = null; return; }
+    if(!layoutCanDrag()){ _dragBefore = null; return; }
     var m = layModelFromDom();
     /* 끌었는데 «제자리에 놓았다»면 쓰지 않는다 — 아직 공용 배치가 없을 때 아무것도 안 옮겼는데 내 화면 순서가 모두에게 퍼지면 안 된다 */
     if(_dragBefore !== null){
@@ -4943,7 +4963,7 @@ body.portal-mode #moreFab{display:flex;}
     _dragEl = this;
     _dragWarned = false;
     /* 끌기 시작할 때의 배치 지문 — 끝났을 때 달라졌는지 본다(persistOrderFromDom) */
-    _dragBefore = layoutEditing() ? laySig(layBuild(layModelFromDom(), _layout)) : null;
+    _dragBefore = layoutCanDrag() ? laySig(layBuild(layModelFromDom(), _layout)) : null;
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', this.dataset.key || ''); } catch(_){}
@@ -4953,8 +4973,8 @@ body.portal-mode #moreFab{display:flex;}
     if(_dragEl){ _dragEl = null; persistOrderFromDom(); }
   }
   function onTileDragOver(e){
-    /* 배치 편집 중인 관리자만 앱 사이로 옮긴다. 직원의 끌기는 여기서 «아무것도 안 한다»(★ 줄 쪽이 따로 받는다) */
-    if(!_dragEl || !layoutEditing()) return;
+    /* 끌 수 있는 관리자만 앱 사이로 옮긴다. 직원의 끌기는 여기서 «아무것도 안 한다»(★ 줄 쪽이 따로 받는다) */
+    if(!_dragEl || !layoutCanDrag()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     // 옮길 수 있는 범위: 📌 틀 고정한 앱은 «자기 영역 안에서만», 아니면 모든 영역.
@@ -4995,7 +5015,7 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   function onTileKeyDown(e){
-    if(!layoutEditing() || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if(!layoutCanDrag() || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
     // 키보드 이동은 자기 줄 안에서만 (끝에 닿으면 더 안 간다)
     var cont = this.parentNode;
     var target = e.key === 'ArrowLeft' ? this.previousElementSibling : this.nextElementSibling;
