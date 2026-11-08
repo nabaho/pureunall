@@ -78,6 +78,8 @@ function getDatabase() {
 /* 「재직 직원인가」 공용 문 — requireStaff·requireReader 가 함께 쓴다 (2026-10-14).
    가입이 열려 있어 «비밀번호로 들어왔다»만으로는 우리 직원이 아니다. 자세한 까닭은 staff-gate.js 머리말. */
 const STAFF_GATE = require("./staff-gate").makeStaffGate({ getDatabase });
+/* 🔒 서명본·견적서를 누가 열 수 있나 (puDocSecret) — 총괄관리자 + 견적 길 파일의 재무·확정 담당자 */
+const SECRET_ACCESS = require("./doc-secret-access");
 
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
@@ -7931,6 +7933,8 @@ exports.logLoginAttempt = functions
 
 /* ══ 문서관리 🔒 서명본 열기 — puDocSecret (설계 2026-10-03-계약서류-표준-기록 §3.1, 대표 「추천대로」) ══
    서명본·EDI 위임장에는 대표자 주민번호(일부)·계좌가 들어 있다 — 대표·관리자만 연다.
+   ★ 단 하나의 예외(2026-11-08, 견적·계약 자동화 계획 1): 견적 길로 올린 🔒 원본(from.kind 'quote')은 재무와 그 건의 «확정» 담당자도
+     연다 — 요청에 견적 번호(qid)를 함께 보내야 하고, 규칙은 functions/doc-secret-access.js 한 곳에 있다(서명본 같은 다른 🔒 파일은 그대로 총괄관리자만).
    창고 규칙은 «관리자인가»를 못 본다. 그래서 창고 pu_docs/secret/… 는 읽기 false 이고,
    이 함수가 uid_roles 로 총괄관리자인지 본 뒤 «파일 바이트»를 직접 내준다.
    ⚠ 토큰 주소·서명 주소를 만들지 않는다 — 주소가 한 번 새면 누구나 연다(사진첩 서류와 같은 원칙).
@@ -7948,11 +7952,17 @@ exports.puDocSecret = functions
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
     const fileId = String((req.body && req.body.fileId) || "");
     if (!/^[-_A-Za-z0-9]{10,40}$/.test(fileId)) { res.status(400).json({ ok: false, error: "파일 번호가 올바르지 않습니다." }); return; }
+    /* 견적 번호(선택) — 견적 길로 올린 🔒 원본을 재무·확정 담당자가 열 때만 쓴다(doc-secret-access.js) */
+    const rawQid = req.body && req.body.qid;
+    const qid = (rawQid === undefined || rawQid === null || rawQid === "") ? "" : String(rawQid);
+    if (qid && !SECRET_ACCESS.isQid(qid)) { res.status(400).json({ ok: false, error: "견적 번호가 올바르지 않습니다." }); return; }
     const db = getDatabase();
     try {
       const roleSnap = await db.ref("uid_roles/" + me.uid).once("value");
-      if (((roleSnap && roleSnap.val()) || {}).isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "🔒 서명본은 대표·관리자만 열 수 있습니다." });
+      const role = (roleSnap && roleSnap.val()) || {};
+      /* 총괄관리자가 아니면 견적 번호가 있어야 한다 — 없으면 읽을 것도 없이 거절 */
+      if (role.isAdmin !== true && !qid) {
+        res.status(403).json({ ok: false, error: SECRET_ACCESS.DENY_MESSAGE });
         return;
       }
       const rec = (await db.ref("pu_docs/originals/" + fileId).once("value")).val();
@@ -7960,8 +7970,21 @@ exports.puDocSecret = functions
         res.status(404).json({ ok: false, error: "서명본 보관함에 없는 파일입니다." });
         return;
       }
+      if (role.isAdmin !== true) {
+        const [quoteSnap, amtSnap] = await Promise.all([
+          db.ref("pu_quotes/" + qid).once("value"),
+          db.ref("pu_quote_amt/" + qid).once("value"),
+        ]);
+        const ok = SECRET_ACCESS.canOpenSecret({
+          role: role, uid: me.uid, fileId: fileId, file: rec,
+          quote: (quoteSnap && quoteSnap.val()) || null, amt: (amtSnap && amtSnap.val()) || null,
+        });
+        if (!ok) { res.status(403).json({ ok: false, error: SECRET_ACCESS.DENY_MESSAGE }); return; }
+      }
       const [buf] = await getStorage().bucket(PHOTO_BUCKET).file(rec.path).download();
-      await db.ref("pu_docs/secret_log").push({ fileId: fileId, by: me.uid, at: Date.now() });
+      const logRow = { fileId: fileId, by: me.uid, at: Date.now() };
+      if (qid) logRow.qid = qid;
+      await db.ref("pu_docs/secret_log").push(logRow);
       res.set("Cache-Control", "no-store");
       res.set("Content-Type", String(rec.type || "application/octet-stream"));
       res.set("X-File-Name", encodeURIComponent(String(rec.name || "file")));

@@ -393,13 +393,15 @@ function formFromHash() {
 }
 /* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
    토큰·서명 주소를 만들지 않는다 — 받은 바이트는 이 창 안에서만 쓴다. */
-function fetchSecretDoc(fileId) {
+function fetchSecretDoc(fileId, qid) {
   var u = firebase.auth().currentUser;
   if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  /* qid(견적 번호)는 «지난 견적·계약»의 견적서를 재무·확정 담당자가 열 때만 함께 보낸다 — 서명본은 늘 총괄관리자만 */
+  var body = qid ? { fileId: fileId, qid: qid } : { fileId: fileId };
   return u.getIdToken().then(function (tok) {
     return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecret', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-      body: JSON.stringify({ fileId: fileId }) });
+      body: JSON.stringify(body) });
   }).then(function (r) {
     if (r.ok) return r.blob();
     return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
