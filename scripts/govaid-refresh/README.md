@@ -33,6 +33,16 @@ node scripts/govaid-refresh/load-yearly.js <결과폴더>
 node scripts/govaid-refresh/load-yearly.js <결과폴더> --go
 ```
 
+## 예약 작업 다시 만들기 (2026-11-08 — Windows 재설치로 이 PC 예약 작업이 사라져서)
+예약 작업은 이 PC(Claude 데스크톱 앱의 «예약됨»)에만 있어 PC를 새로 깔면 없어진다. 그 본문을 여기에 둔다.
+| 작업 이름(taskId) | 언제(cron, 한국 시간) | 본문 |
+|---|---|---|
+| `govaid-monthly-closure` | 매월 1일 09:30 (`30 9 1 * *`) | `TASK-monthly.md` |
+| `govaid-yearly-refresh` | 매년 1월 20일 10:00 (`0 10 20 1 *`) | `TASK-yearly.md` |
+- 다시 만들 때: 데스크톱 앱 «예약됨»에서 새 작업 → 위 이름·일정 → 본문 파일 내용을 그대로 붙인다(또는 Claude에게 «이 두 파일로 예약 작업을 다시 만들어 줘»).
+- 본문은 기준본 `C:\Users\user\Desktop\github\pureunall` 에서 `origin/main` 을 임시 폴더로 꺼내 돌린다 — 다른 PC면 경로만 바꾼다. firebase CLI 로그인이 필요하다.
+- 본문을 고치면 이 파일과 예약 작업을 «함께» 고친다.
+
 ## 지키는 것
 - 모두 «초안·확인 필요»로만 들어간다. 확정은 노무사가 앱(⏳ 확인할 조건)에서 원문과 맞춰 본 뒤 한다.
 - 사람이 표시하거나 고친 것은 덮지 않는다(접수 상태 by · 사업 updatedBy 가 `AI-조사초안`·`자동(기업마당)` 이 아니면 그대로).
