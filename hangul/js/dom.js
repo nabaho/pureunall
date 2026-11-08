@@ -28,6 +28,7 @@
   const FONT_ALT = { 'HY그래픽M': 'HYGraphic', 'HY그래픽': 'HYGraphic', 'HY신명조': 'HYSinMyeongJo', 'HY중고딕': 'HYGothic', 'HY헤드라인M': 'HYHeadLine', 'HY궁서B': 'HYGungSo', 'HY목각파임B': 'HYPMokGak', 'HY얕은샘물M': 'HYShortSamul', 'HY엽서L': 'HYPost', 'HY엽서M': 'HYPost' };
   // 한글은 없는 글꼴을 한컴바탕으로 바꿔 계산 (한글 시험: 없는 이름·한양신명조·신명 신명조의 가·i·M·a·1·( 폭이 한컴바탕과 같음)
   const MISSING_FONT = '한컴바탕';
+  const DEFAULT_STACK = `'${DEFAULT_FONT}','HCR Batang','바탕','Batang',serif`; // app.css 의 .doc 글꼴 목록과 같게
   const availCache = new Map();
   function fontAvail(font) {
     if (typeof document === 'undefined') return true;
@@ -61,6 +62,10 @@
   // 글꼴 하나의 CSS 이름 목록: 한글 전용 글꼴이면 대체 TTF, 브라우저에 없으면 대체 이름, 그다음 한컴바탕
   //  글꼴에 없는 글자도 한글은 한컴바탕 폭으로 계산 (한글 시험: HyhwpEQ·Times New Roman·Arial·Verdana·HancomEQN 의 '가'·'한'·'①' 이 1em — 함초롬바탕은 0.97em)
   function fontList(font) {
+    // 기본 글꼴(함초롬바탕)은 글자 조각에 font-family 를 따로 주지 않아 CSS 기본 목록(app.css .doc)으로 그려진다.
+    //  재는 쪽도 «같은 목록»이어야 한다 — 함초롬바탕이 PC 에 없으면 그리기는 '바탕'으로, 재기는 브라우저 기본 글꼴로 갈려
+    //  빈칸 폭 보정(word-spacing)이 어긋나 글이 4~5% 넓게 그려지고 줄이 더 접혔다(2026-11-08, 이 PC 에서 확인).
+    if (font === DEFAULT_FONT) return DEFAULT_STACK;
     const fs = [font];
     if (hftSubst.has(font)) fs.push(hftSubst.get(font));
     if (!fontAvail(font) && FONT_ALT[font]) fs.push(FONT_ALT[font]);
@@ -124,6 +129,9 @@
     const hs = hftSymEm(ch, font);
     if (hs) return hs;
     ch = normCh(ch);
+    // 함초롬바탕이 PC 에 없으면 대체 글꼴(바탕)의 폭(1em)이 아니라 한글의 값: 한글 글자 0.968em (한컴 줄 정보와 rhwp 로 확인: 0.967~0.979)
+    //  → advFix 가 그만큼 자간을 줄여 줄 길이가 한글과 같아진다. 글꼴이 있으면 재서 나오는 값과 같으므로 그대로 둔다.
+    if (ch === '가' && font === DEFAULT_FONT && !fontAvail(font)) return 0.968;
     const key = ch + '|' + fontList(font) + (bold ? '|b' : '');
     if (charCache.has(key)) return charCache.get(key);
     let v = 0.3;
@@ -550,6 +558,30 @@
     return size * Math.max(...hs, 1);
   }
 
+  /* 글꼴에 어울리는 줄 높이 (2026-11-08 «줄칸 높이가 달라요») — 한컴이 .hwp 에 저장한 줄 정보(LINE_SEG)로 확인
+     (바탕화면 .hwp 220개·문단 4.6만 개): 이 옵션이 «꺼져 있으면» 줄 높이는 모든 글꼴에서 글자 크기와 같고(배율 1.000),
+     «켜져 있으면» 글꼴 고유 배율이 곱해진다 — 함초롬바탕 1.300 · 맑은 고딕 1.331 · 휴먼명조 1.055 ·
+     나눔고딕 Light 1.151 이고 바탕·굴림·돋움·한양 계열 같은 옛 글꼴은 1.000. 줄 간격 %는 이 높이에 곱한다(130% → 줄 간격 = 높이 × 1.3).
+     편집기는 이 옵션을 무시해 함초롬바탕 12pt·130% 문단이 줄 간격 20.8px(한컴 27.0px)로 23% 좁게 그려졌다.
+     ⚠ 브라우저로 재면 안 된다 — 크롬은 굴림·바탕·돋움을 1.15 로 재지만 한컴은 1.0 이고, 한컴 글꼴은 없어서 1.15 로 폴백한다.
+     ⚠ 글이 없는 문단(문단 끝 표시만)은 옵션이 켜져 있어도 글자 크기 그대로다(같은 문서에서 확인). */
+  // 표본: 1,400개 문서·27만 줄(배율이 문서마다 똑같이 나옴) — 함초롬바탕 1.300(1,918) · 함초롬돋움 1.300(492) · 맑은 고딕 1.331(1,201) · 휴먼명조 1.055(1,968) · 신협나눔 보통 1.322(45) · 나눔고딕 Light 1.151(38) ·
+  // 나눔고딕 ExtraBold 1.150 · -윤명조120 1.085. 한컴바탕·바탕·굴림·돋움·한양·HY 는 1.000 (표에 없으면 1)
+  const NATURAL_FACTOR = { '함초롬바탕': 1.300, '함초롬돋움': 1.300, '맑은 고딕': 1.331, '휴먼명조': 1.055, '신협나눔 보통': 1.322, '나눔고딕 Light': 1.151, '나눔고딕 ExtraBold': 1.150, '-윤명조120': 1.085 };
+  const naturalFactor = font => NATURAL_FACTOR[font] || 1;
+  // 글자 조각 높이(pt): 영문 글자는 영문 글꼴, 한글 글자는 한글 글꼴의 배율 (큰 쪽)
+  function naturalRunHeight(r) {
+    const size = r.size || 10, font = r.font || DEFAULT_FONT, t = r.text || '';
+    const f = r.langs && g.PureunHwpx.parseLangs(r.langs).f;
+    const latin = f && f[0] === font ? f[1] : font;
+    const hs = [];
+    if (!t || LATIN_CH.test(t)) hs.push(naturalFactor(latin));
+    if (NON_LATIN_CH.test(t)) hs.push(naturalFactor(font));
+    return size * Math.max(...hs, 1);
+  }
+  const FLH_ON = /"fontLineHeight":\s*1\b/;
+  const fontLineHeightOn = b => (!b.lineType || b.lineType === 'PERCENT') && typeof b.pp === 'string' && FLH_ON.test(b.pp) && (b.runs || []).some(r => r.text);
+
   // 한글의 '내어쓰기'는 첫 줄이 왼쪽 여백에 있고 둘째 줄부터 들어감 → CSS 는 margin 을 더 주고 text-indent 를 음수로
   // 줄 간격 종류: 고정 값 / 최소 / 여백만 은 pt 로 (정확한 값은 data-lt·data-lv 에 보관)
   function lineCss(b) {
@@ -557,6 +589,13 @@
     // 문단 끝 글자 모양(endMark)의 크기도 줄 높이에 들어감 (한글 시험 문서로 확인)
     const sizes = (b.runs || []).filter(r => r.text).map(r => r.size || 10).concat(b.endMark ? [b.endMark.size || 10] : []);
     const maxSize = sizes.length ? Math.max(...sizes) : (b.mark && b.mark.size) || 10;
+    // 글꼴에 어울리는 줄 높이(문단 모양 pp.fontLineHeight=1)가 켜진 «글이 있는» 문단(비율 줄 간격): 줄 높이 = 글자 크기 × 글꼴 고유 배율, 줄 간격 %는 그 높이에 곱함
+    if (!wordMode && fontLineHeightOn(b)) {
+      const texts = (b.runs || []).filter(r => r.text);
+      let hMax = Math.max(...texts.map(naturalRunHeight));
+      if (b.endMark) hMax = Math.max(hMax, naturalRunHeight({ size: b.endMark.size, font: b.endMark.font, text: '가' }));
+      return `line-height:${Math.round(hMax * (b.lineSpacing || 160)) / 100}pt`;
+    }
     if (wordMode) {
       // MS 워드 호환 문서: 글자 높이 = 크기 × 글꼴 고유 줄 높이 배율 (문단에서 가장 큰 것). 비율 줄 간격도 그 높이에 곱함 (한글로 확인)
       // 문단 끝 글자 모양이 글자보다 높으면: 그 높이 + 글자의 기준선 아래 길이 (16가지 글꼴 조합으로 확인)
@@ -785,6 +824,12 @@
     else { delete el.dataset.lt; delete el.dataset.lv; }
     // 워드 호환 문서: 문단의 실제 글자(크기·글꼴)로 줄 높이를 셈
     let lv = v;
+    const ppStr = v.pp || el.dataset.pp;
+    if (!wordMode && ppStr && FLH_ON.test(ppStr) && (!v.lineType || v.lineType === 'PERCENT') && el.textContent) {
+      // 글꼴에 어울리는 줄 높이: 문단의 실제 글자(크기·글꼴)로 줄 높이를 셈
+      const c = getComputedStyle(el);
+      lv = Object.assign({}, v, { pp: ppStr, runs: [{ text: el.textContent, size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') }] });
+    }
     if (wordMode) {
       const c = getComputedStyle(el);
       lv = Object.assign({}, v, { runs: [{ text: el.textContent || ' ', size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') }] });
