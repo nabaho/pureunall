@@ -246,7 +246,7 @@ ok('근로계약서 전자교부·취업규칙 신고서류 복사·연간 대�
   H.indexOf('window.sendContractEmail = sendContractEmail') > -1 &&
   H.indexOf('window.copyWorkRulesFilingDocs = copyWorkRulesFilingDocs') > -1 &&
   H.indexOf('window.copyAnnualSettleTSV = copyAnnualSettleTSV') > -1);
-ok('2026 미입력 사업장 푸른메일(수신·발신) 자동수집·입력 엔진 및 요약 패널이 노출되어 있다',
+ok('푸른메일(수신·발신) 요약 모으기와 요약 패널이 노출되어 있다(급여 자동입력은 2026-11-08 제거 — payroll-no-fake-autofill)',
   H.indexOf('js/pu-co-thread.js') > -1 &&
   H.indexOf('window.autoSync2026FromMail = autoSync2026FromMail') > -1 &&
   H.indexOf('window.mailDigestPanelHtml = mailDigestPanelHtml') > -1);
