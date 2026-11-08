@@ -64,21 +64,128 @@
     return files;
   }
 
-  // 압축 해제 — HWP 스트림은 압축 끝 뒤에 채움 바이트가 붙는 경우가 있어, 그때까지 풀린 내용을 사용
-  async function inflate(data) {
+  /* 압축 해제 — ⚠★ 절대 «잘린 결과»를 «성공»으로 돌려주지 않는다 (2026-11-08).
+     한컴이 저장한 HWP 의 압축 스트림(DocInfo·BodyText·BinData) 끝에는 8바이트 꼬리(CRC32 + 풀린 크기)가 붙어 있다.
+     브라우저의 DecompressionStream 은 이 꼬리를 «Junk found after end of compressed data» 로 거절하는데,
+     옛 코드는 «그때까지 풀린 내용을 사용» 했다 → 이미 읽어 둔 첫 128KB 만 건지고 나머지는 버려져
+     큰 문서는 본문 글이 약 5%(편람: 문단 1,974개 중 411개)만 읽히고, DocInfo(글자·문단 모양)와 큰 그림도 잘렸다.
+     그래서 ① 통째로 풀어 보고 ② 오류면 꼬리 8바이트를 떼고(풀린 크기가 꼬리에 적힌 크기와 «같을 때만» 받는다)
+     ③ 그래도 안 되면 자체 해제기(inflateRawJs — 압축 끝에서 멈추고 뒤의 자투리는 보지 않는다)로 푼다. */
+  async function nativeInflate(data) {
     const ds = new DecompressionStream('deflate-raw');
     const w = ds.writable.getWriter();
     w.write(data).catch(() => {});
     w.close().catch(() => {});
     const reader = ds.readable.getReader(), chunks = [];
     let total = 0;
-    try {
-      for (;;) { const { value, done } = await reader.read(); if (done) break; chunks.push(value); total += value.length; }
-    } catch (e) { if (!total) throw e; }
+    for (;;) { const { value, done } = await reader.read(); if (done) break; chunks.push(value); total += value.length; } // 오류가 나면 그대로 던진다(일부만 돌려주지 않는다)
     const out = new Uint8Array(total);
     let o = 0;
     for (const c of chunks) { out.set(c, o); o += c.length; }
     return out;
+  }
+  // RFC 1951 inflate — 압축 끝(마지막 블록)에서 멈춘다. 느리지만(한 비트씩) 브라우저 해제기가 거절하는 자투리 있는 자료의 마지막 보루.
+  function inflateRawJs(src) {
+    let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.max(4096, src.length * 4)), op = 0;
+    const bits = n => {
+      while (bitCnt < n) { if (pos >= src.length) throw new Error('압축 자료가 중간에 끝났습니다.'); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }
+      const v = bitBuf & ((1 << n) - 1);
+      bitBuf >>>= n; bitCnt -= n;
+      return v;
+    };
+    const build = (lens, n) => {
+      const count = new Uint16Array(16), offs = new Uint16Array(16), symbol = new Uint16Array(n);
+      for (let i = 0; i < n; i++) count[lens[i]]++;
+      count[0] = 0;
+      for (let l = 1; l < 15; l++) offs[l + 1] = offs[l] + count[l];
+      for (let i = 0; i < n; i++) if (lens[i]) symbol[offs[lens[i]]++] = i;
+      return { count, symbol };
+    };
+    const decode = h => {
+      let code = 0, first = 0, index = 0;
+      for (let len = 1; len <= 15; len++) {
+        code |= bits(1);
+        const c = h.count[len];
+        if (code - c < first) return h.symbol[index + (code - first)];
+        index += c; first += c; first <<= 1; code <<= 1;
+      }
+      throw new Error('압축 자료가 잘못됐습니다.');
+    };
+    const LBASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+    const LEXT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+    const DBASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+    const DEXT = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+    const grow = n => { if (op + n > out.length) { const t = new Uint8Array(Math.max(out.length * 2, op + n)); t.set(out.subarray(0, op)); out = t; } };
+    const codes = (lh, dh) => {
+      for (;;) {
+        const sym = decode(lh);
+        if (sym < 256) { grow(1); out[op++] = sym; continue; }
+        if (sym === 256) return;
+        const li = sym - 257;
+        if (li >= 29) throw new Error('압축 자료가 잘못됐습니다.');
+        const len = LBASE[li] + bits(LEXT[li]);
+        const ds = decode(dh);
+        if (ds >= 30) throw new Error('압축 자료가 잘못됐습니다.');
+        const dist = DBASE[ds] + bits(DEXT[ds]);
+        if (dist > op) throw new Error('압축 자료가 잘못됐습니다.');
+        grow(len);
+        for (let i = 0; i < len; i++, op++) out[op] = out[op - dist];
+      }
+    };
+    let fixed = null;
+    for (let last = 0; !last;) {
+      last = bits(1);
+      const type = bits(2);
+      if (type === 0) {
+        bitBuf = 0; bitCnt = 0; // 바이트 경계로
+        if (pos + 4 > src.length) throw new Error('압축 자료가 중간에 끝났습니다.');
+        const len = src[pos] | (src[pos + 1] << 8), nlen = src[pos + 2] | (src[pos + 3] << 8);
+        if ((len ^ 0xffff) !== nlen) throw new Error('압축 자료가 잘못됐습니다.');
+        pos += 4;
+        if (pos + len > src.length) throw new Error('압축 자료가 중간에 끝났습니다.');
+        grow(len); out.set(src.subarray(pos, pos + len), op); op += len; pos += len;
+      } else if (type === 1) {
+        if (!fixed) {
+          const l = new Uint8Array(288);
+          for (let i = 0; i < 144; i++) l[i] = 8;
+          for (let i = 144; i < 256; i++) l[i] = 9;
+          for (let i = 256; i < 280; i++) l[i] = 7;
+          for (let i = 280; i < 288; i++) l[i] = 8;
+          fixed = { lh: build(l, 288), dh: build(new Uint8Array(30).fill(5), 30) };
+        }
+        codes(fixed.lh, fixed.dh);
+      } else if (type === 2) {
+        const nlen = bits(5) + 257, ndist = bits(5) + 1, ncode = bits(4) + 4;
+        if (nlen > 286 || ndist > 30) throw new Error('압축 자료가 잘못됐습니다.');
+        const ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+        const lens = new Uint8Array(320);
+        for (let i = 0; i < ncode; i++) lens[ORDER[i]] = bits(3);
+        const ch = build(lens.subarray(0, 19), 19);
+        lens.fill(0);
+        for (let i = 0; i < nlen + ndist;) {
+          const sym = decode(ch);
+          if (sym < 16) { lens[i++] = sym; continue; }
+          let rep, val = 0;
+          if (sym === 16) { if (!i) throw new Error('압축 자료가 잘못됐습니다.'); val = lens[i - 1]; rep = 3 + bits(2); }
+          else if (sym === 17) rep = 3 + bits(3);
+          else rep = 11 + bits(7);
+          if (i + rep > nlen + ndist) throw new Error('압축 자료가 잘못됐습니다.');
+          while (rep--) lens[i++] = val;
+        }
+        if (!lens[256]) throw new Error('압축 자료가 잘못됐습니다.');
+        codes(build(lens.subarray(0, nlen), nlen), build(lens.subarray(nlen, nlen + ndist), ndist));
+      } else throw new Error('압축 자료가 잘못됐습니다.');
+    }
+    return out.slice(0, op);
+  }
+  async function inflate(data) {
+    let err;
+    try { return await nativeInflate(data); } catch (e) { err = e; }
+    if (data.length > 8) { // 한컴 꼬리: CRC32(4) + 풀린 크기(4)
+      const isize = u32(data, data.length - 4);
+      try { const out = await nativeInflate(data.subarray(0, data.length - 8)); if (out.length === isize) return out; } catch (e) { /* 아래로 */ }
+    }
+    try { return inflateRawJs(data); } catch (e) { throw err || e; }
   }
 
   // ---------------- 레코드 ----------------
@@ -513,7 +620,9 @@
         const va = (flags >> 5) & 3;
         cells.push({
           col: u16(d, base), row: u16(d, base + 2), colSpan: u16(d, base + 4) || 1, rowSpan: u16(d, base + 6) || 1,
-          width: u32(d, base + 8), height: mm(u32(d, base + 12)), hh: u32(d, base + 12),
+          // ⚠ 셀 높이는 «부호 있는» 32비트다 — 음수(예: -282)를 u32 로 읽으면 약 4,294,967,014 HWPUNIT(≈1,515만 mm)이 돼
+          //   표 한 칸이 브라우저 한계(33,554,428px)까지 늘어나 쪽 수가 157 → 29,445 로 터졌다(2026-11-08). 음수는 «높이 지정 없음»(내용에 맞춤)으로 본다.
+          width: u32(d, base + 8), height: mm(Math.max(0, i32(d, base + 12))), hh: Math.max(0, i32(d, base + 12)),
           // 셀 여백: 속성 16비트(셀 여백 지정)가 켜졌을 때만 셀 자체 값, 아니면 표의 안쪽 여백 (서식 예제 33568칸으로 확인)
           margin: (flags >> 16) & 1 ? marginAt(d, base + 16) : tblMargin,
           ...(fill => ({ bg: fill ? fill.bg : null, borders: fill ? H.compactBorders(fill.borders) : null }))(info.fills[u16(d, base + 24) - 1]),

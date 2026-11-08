@@ -6,7 +6,7 @@
   const LEAF = 'p,h1,h2,h3,h4,h5,h6,li';
   const E = { onChange: null, onSelection: null };
   let doc, stack, sheets, desk, hruler, vruler, probe, underlay, overlay;
-  let savedRange = null, painter = null, layoutQueued = false, pageCount = 1, cachedChars = -1;
+  let savedRange = null, painter = null, layoutQueued = false, pageCount = 1, cachedChars = -1, lastPaginateMs = 0, layoutTimer = 0;
 
   E.state = { page: H.defaultPage(), header: null, footer: null, pageNum: null, zoom: 1, pageView: true, marks: false, ctrlMarks: false, overwrite: false };
   // 화면 배율 (stack 의 CSS zoom) — getBoundingClientRect 값 ÷ 이 값 = CSS px. offsetWidth 는 정수라 배율을 재면 0.1% 가까이 틀림(쪽 너비 567px)
@@ -343,7 +343,15 @@
     setTimeout(run, 60);
   }
   E.nextFrame = nextFrame;
+  /* 쪽 나눔이 오래 걸리는 큰 문서는(마지막에 0.25초 넘게 걸림) 글자를 칠 때마다 돌리면 화면이 멈춘 것처럼 되므로
+     입력이 잠깐 멈춘 뒤 한 번만 돌린다(걸린 시간의 절반, 최대 1.2초). 작은 문서는 전처럼 다음 화면 그리기 때 바로. */
   function queueLayout() {
+    if (lastPaginateMs > 250) {
+      clearTimeout(layoutTimer);
+      layoutQueued = true;
+      layoutTimer = setTimeout(() => { layoutQueued = false; paginate(); keepCaretVisible(); }, Math.min(1200, Math.round(lastPaginateMs / 2)));
+      return;
+    }
     if (layoutQueued) return;
     layoutQueued = true;
     nextFrame(() => { layoutQueued = false; paginate(); keepCaretVisible(); });
@@ -908,7 +916,12 @@
     }
   }
 
+  // 쪽 나눔 한 번에 걸린 시간 — 큰 문서(편람 450쪽 ≈ 5초)에서 글자를 칠 때마다 돌리지 않으려고 queueLayout 이 본다
   function paginate() {
+    const t0 = performance.now();
+    try { paginateNow(); } finally { lastPaginateMs = performance.now() - t0; }
+  }
+  function paginateNow() {
     shapeReserves();
     updateHeads();
     numberNotes();
