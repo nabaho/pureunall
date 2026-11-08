@@ -200,11 +200,20 @@
     try {
       if (!as && !forceFmt && cur.handle) {
         const hFmt = /\.hwp$/i.test(cur.handle.name) ? 'hwp' : 'hwpx';
-        const bytes = buildBytes(hFmt);
-        const w = await cur.handle.createWritable();
-        await w.write(bytes); await w.close();
-        cur.format = hFmt;
-        return done(cur.handle.name);
+        if (hFmt === 'hwp' && !cur.handleFromSave) {
+          // 열어 온 .hwp 원본은 «저장하기» 로 조용히 덮어쓰지 않는다 (2026-11-08 대표 «막고 진행»).
+          //  이 편집기가 읽은 내용이 원본보다 적을 수 있고(큰 문서는 일부만 읽힘), 저장하면 일부 그림이 빠질 수 있어
+          //  덮어쓰면 되돌릴 수 없다. 새 이름(제안: .hwpx)으로 저장하게 한다 — «다른 이름으로 저장» 은 그대로.
+          //  저장 창에서 사용자가 직접 고른 파일(handleFromSave)은 그 뒤로 «저장하기» 로 덮어써도 된다.
+          toast('열어 온 .hwp 원본은 덮어쓰지 않습니다 — 새 이름으로 저장해 주세요.');
+          fmt = 'hwpx';
+        } else {
+          const bytes = buildBytes(hFmt);
+          const w = await cur.handle.createWritable();
+          await w.write(bytes); await w.close();
+          cur.format = hFmt;
+          return done(cur.handle.name);
+        }
       }
       if (window.showSaveFilePicker) {
         const handle = await showSaveFilePicker({
@@ -216,6 +225,7 @@
         const w = await handle.createWritable();
         await w.write(bytes); await w.close();
         cur.handle = handle;
+        cur.handleFromSave = true;
         cur.format = fmt;
         cur.name = handle.name.replace(/\.(hwpx|hwp)$/i, '');
         return done(handle.name);
