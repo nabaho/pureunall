@@ -373,6 +373,19 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
   font-size:.7rem;line-height:20px;text-align:center;box-shadow:0 1px 4px rgba(20,30,80,.18);cursor:pointer;filter:grayscale(1);opacity:.75;}
 body.lay-editing .tile .lay-freeze{display:block;}
 .tile .lay-freeze.on{background:#1e40af;filter:none;opacity:1;}
+/* 마우스가 있는 화면(관리자 PC)에서는 «편집을 안 켜도» 앱에 마우스를 올리면 📌 가 뜬다 — 틀 고정한 앱은 늘 보인다
+   (대표 질문 2026-11-08 「한 행에서 고정되면 다른 행으로 못 움직이게 고정기능 만들 수 없나?」 — 이미 있었는데 편집을 켠 뒤에만 보여 못 찾으셨다).
+   ⚠ .lay-freeze 는 관리자 화면에만 만들어진다 — 직원 화면에는 이 규칙이 닿을 것이 없다. */
+@media (hover:hover){
+  .tile:hover .lay-freeze,.tile:focus-within .lay-freeze,.tile .lay-freeze.on{display:block;}
+}
+/* 줄 머리 오른쪽 «📌 이 줄 고정» — 그 줄 앱을 한 번에 틀 고정(관리자 PC 만). 줄 머리(접기 단추)와 «형제»로 둔다 — 단추 안에 단추를 넣지 않는다 */
+.row-freeze{position:absolute;right:6px;top:0;display:inline-flex;align-items:center;gap:4px;border:1px solid #bfdbfe;background:rgba(255,255,255,.85);color:#1e40af;
+  border-radius:99px;padding:2px 10px;font-size:.66rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.row-freeze:hover{background:#eff6ff;}
+.row-freeze.on{background:#1e40af;border-color:#1e40af;color:#fff;}
+.row-freeze[hidden]{display:none;}
+.row-freeze:focus-visible{outline:2px solid #1e40af;outline-offset:1px;}
 .tile .lay-freeze:focus-visible{outline:2px solid #1e40af;}
 #pinTiles .lay-freeze{display:none !important;}
 .tilerow.fold .tile .lay-freeze{left:-4px;bottom:-6px;width:16px;height:16px;line-height:16px;font-size:.58rem;}
@@ -423,7 +436,7 @@ body.lay-editing .tile .lay-freeze{display:block;}
 .tile:not(.lock)[draggable="true"]{cursor:grab;}
 .tile:not(.lock)[draggable="true"]:active{cursor:grabbing;}
 .tiles{display:flex;flex-wrap:wrap;gap:8px 4px;justify-content:flex-start;}
-.tilerow{margin-bottom:6px;}
+.tilerow{margin-bottom:6px;position:relative;}
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
 /* ══ 접었다 펴는 줄 · 자주 쓰는 앱 (대표 2026-10-24 시안 2 「추천대로」) ══
@@ -3810,6 +3823,8 @@ body.portal-mode #moreFab{display:flex;}
         + '<div class="tilerow-h" role="button" tabindex="0" aria-expanded="true" data-fold-row="' + r.id + '">'
         + '<span class="fold-chev" aria-hidden="true">▾</span>'
         + '<span class="tilerow-t">' + r.label + '</span><span class="tilerow-n"></span></div>'
+        /* 📌 이 줄 고정 — 관리자 PC 에서만 JS 가 켠다(기본은 감춤). 줄 머리와 형제다(머리는 접기 단추라 그 안에 단추를 못 넣는다) */
+        + '<button type="button" class="row-freeze" data-row-freeze="' + r.id + '" hidden></button>'
         + '<div class="tiles" id="appTiles_' + r.id + '" data-row="' + r.id + '"'
         + ' aria-label="' + r.label + ' 목록"></div></div>';
     }).join('');
@@ -4649,6 +4664,41 @@ body.portal-mode #moreFab{display:flex;}
     if(!r.ok){ layoutSay('· ' + r.why, true); return; }
     layoutApply(r);
   }
+  /* 줄 머리의 «📌 이 줄 고정» — 그 줄에 지금 있는 앱을 한꺼번에 틀 고정(전부 고정이면 한꺼번에 풂).
+     한꺼번에 하는 일이라 건수를 묻고 한 번에 저장한다. 안 그려진 앱(권한 밖·지금 안 씀)은 건드리지 않는다. */
+  function layoutRowFreezeToggle(rowId){
+    if(!layoutAdminOk()) return;
+    var m = layModelFromDom(), keys = (m.rows && m.rows[rowId]) || [];
+    if(!keys.length){ layoutSay('· 이 줄에는 앱이 없습니다', true); return; }
+    var all = keys.every(function(k){ return m.frozen[k]; });
+    var r = layBulk(m, keys, all ? 'unfreeze' : 'freeze');
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    var label = lpRowLabel(rowId);
+    var msg = all ? ('「' + label + '」 줄의 틀 고정 ' + r.moved + '개를 모두 풉니다.')
+                  : ('「' + label + '」 줄의 앱 ' + r.moved + '개를 틀 고정합니다 — 이 줄 밖으로는 못 나가고, 줄 안 순서만 바꿀 수 있습니다.');
+    if(!confirm(msg + '\n모든 직원 화면에 같이 반영됩니다. 계속할까요?')) return;
+    layoutApply(r);
+    layoutSay(all ? ('✔ 「' + label + '」 줄의 틀 고정을 풀었습니다') : ('✔ 「' + label + '」 줄 ' + r.moved + '개를 틀 고정했습니다 (모든 직원 화면에 반영)'));
+  }
+  /* 줄 머리 단추를 지금 형편에 맞춘다 — 끌 수 있는 관리자 화면에서, 앱이 있는 줄에만 보인다 */
+  function layoutRowBtnPaint(){
+    var host = $('appRows'); if(!host || !host.querySelectorAll) return;
+    var show = layoutCanDrag(), m = show ? layModelFromDom() : null;
+    Array.prototype.forEach.call(host.querySelectorAll('[data-row-freeze]'), function(b){
+      var keys = (m && m.rows && m.rows[b.dataset.rowFreeze]) || [];
+      var all = keys.length > 0 && keys.every(function(k){ return m.frozen[k]; });
+      var some = keys.some(function(k){ return m.frozen[k]; });
+      var vis = show && keys.length > 0;
+      if(b.hidden === vis) b.hidden = !vis;
+      var txt = all ? '📌 줄 고정 중 · 풀기' : (some ? '📌 이 줄 모두 고정' : '📌 이 줄 고정');
+      if(b.textContent !== txt) b.textContent = txt;
+      b.classList.toggle('on', all);
+      var say = all ? '이 줄의 앱이 모두 틀 고정입니다 — 눌러서 모두 풀기' : '눌러서 이 줄의 앱을 모두 틀 고정 — 줄 밖으로 못 나가고 줄 안 순서만 바꿀 수 있습니다';
+      if(b.title !== say){ b.title = say; b.setAttribute('aria-label', say); }
+      var pr = all ? 'true' : 'false';
+      if(b.getAttribute('aria-pressed') !== pr) b.setAttribute('aria-pressed', pr);
+    });
+  }
   function layoutResetDefault(){
     if(!layoutAdminOk()) return;
     if(!confirm('모든 앱을 처음 자리(기본 배치)로 되돌립니다.\n📌 틀 고정도 모두 풀립니다.\n모든 직원 화면에 같이 반영됩니다. 계속할까요?')) return;
@@ -4689,6 +4739,7 @@ body.portal-mode #moreFab{display:flex;}
       var pr = on ? 'true' : 'false';
       if(mk.getAttribute('aria-pressed') !== pr) mk.setAttribute('aria-pressed', pr);
     });
+    layoutRowBtnPaint();   // 줄 머리 «📌 이 줄 고정» 도 같은 때에 맞춘다
   }
   /* 편집 줄·단추를 지금 형편에 맞춘다 — 직원 화면은 «전부 감춘 채» 둔다 */
   function layoutUiPaint(){
@@ -4701,7 +4752,7 @@ body.portal-mode #moreFab{display:flex;}
       b.setAttribute('aria-pressed', edit ? 'true' : 'false');
       b.setAttribute('aria-label', edit ? '앱 배치 편집 끝내기' : '앱 배치 편집 시작');
       b.title = edit ? '눌러서 편집 도구(📌·점선·편집 줄)를 끕니다'
-        : '앱은 마우스로 «바로» 끌어 옮길 수 있습니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영). 눌러서 📌 틀 고정·점선 영역·목록 편집을 켭니다';
+        : '앱은 마우스로 «바로» 끌어 옮길 수 있습니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영). 앱에 마우스를 올리면 📌 틀 고정, 줄 오른쪽 «📌 이 줄 고정»은 줄 전체. 눌러서 점선 영역·목록 편집을 켭니다';
     }
     var bar = $('layoutBar'); if(bar) bar.hidden = !(admin && pc && edit);
     var me = $('meLayout'); if(me) me.hidden = !admin;
@@ -4869,6 +4920,11 @@ body.portal-mode #moreFab{display:flex;}
     on('lpBulkFreeze', 'click', function(){ lpBulk('freeze'); });
     on('lpBulkUnfreeze', 'click', function(){ lpBulk('unfreeze'); });
     on('lpBulkClear', 'click', function(){ _lpSel = {}; lpRender(); });
+    on('appRows', 'click', function(e){
+      var b = e.target.closest && e.target.closest('[data-row-freeze]'); if(!b) return;
+      e.preventDefault(); e.stopPropagation();
+      layoutRowFreezeToggle(b.dataset.rowFreeze);
+    });
     var ov = $('layoutPanel');
     if(ov){
       ov.addEventListener('mousedown', function(e){ if(e.target === ov) layoutPanelClose(); });

@@ -12,6 +12,7 @@
    ⑤ 저장된 공용 배치가 있으면 모두가 그것을 따르고(영역·순서·준비중은 맨 끝), 없을 때만 예전 개인 저장값을 따른다.
    ⑥ 직원 화면에는 편집 단추·줄·📌 가 «아예 없다». 위임관리인도 같다(서버 규칙이 관리자만 쓰게 한다).
    ⑦ 설정 창 저장(cfgSave)이 같은 자리의 배치를 지우지 않는다 — 배치를 못 읽으면 저장하지 않는다.
+   ⑨ 줄 머리 «📌 이 줄 고정» — 그 줄 앱을 한꺼번에 틀 고정/풀기(건수를 묻고), 고정한 뒤엔 줄 밖으로 못 나간다. 직원·폰에는 안 보인다.
    ⑧ 저장 자리(data/app_config)의 쓰기 규칙은 «관리자만» — 위임관리인·직원은 못 쓴다(규칙을 넓히지 않았다는 증거).
 
    ⚠ 글자만 찾는 검사가 아니다 — 원본의 함수를 «떠서» 가짜 화면 위에서 돌려 본다(STATUS 「검사가 헛돈다」). */
@@ -37,6 +38,7 @@ const FN = [
   'function soonToEnd(', 'function savedRowOf(', 'function applyTileOrder(', 'function persistOrderFromDom(',
   'function updateLockUi(', 'function onTileDragStart(', 'function onTileDragEnd(', 'function onTileDragOver(',
   'function rowExists(', 'function appRowOf(',
+  'function layoutRowFreezeToggle(', 'function layoutRowBtnPaint(', 'function buildAppRows(',
   'function lpEsc(', 'function lpApp(', 'function lpRowLabel(', 'function lpPicked(', 'function lpRender(',
   'function lpBodyClick(', 'function lpBodyChange(', 'function lpBulk(',
 ];
@@ -506,6 +508,80 @@ test('📋 목록 창 한꺼번에 — 고르기만으로는 안 바뀌고, 묻�
   assert.equal(sets[sets.length - 1].rec.rows.mail, 'inside');
   assert.equal(sets[sets.length - 1].rec.rows.erp, 'client', '★★ 틀 고정한 앱이 일괄 옮기기에 딸려 갔다');
   assert.equal(vm.runInContext('Object.keys(_lpSel).length', w), 0, '★ 한 뒤에는 고른 것을 비워야 한다');
+});
+
+/* ══ ⑨ 줄 머리 «📌 이 줄 고정» ═══════════════════════════════════════ */
+function rowBtnWorld(opts) {
+  const w = world(BASE, opts); admin(w, false);
+  const btns = vm.runInContext('APP_ROWS', w).map((r) => fakeEl({ hidden: true, dataset: { rowFreeze: r.id } }));
+  w.els.appRows = fakeEl({ querySelectorAll: () => btns });
+  w.btns = btns;
+  w.asked = [];
+  w.confirm = (m) => { w.asked.push(m); return true; };
+  return w;
+}
+const btnOf = (w, id) => w.btns.find((b) => b.dataset.rowFreeze === id);
+
+test('⑨ 줄 머리에 «📌 이 줄 고정» 단추가 있다 — 줄마다 하나, 기본은 감춤, 줄 머리(접기 단추) «안»이 아니라 옆에', () => {
+  const host = fakeEl({ innerHTML: '' });
+  const w = world({}); w.els.appRows = host;
+  w.buildAppRows();
+  const ids = JSON.parse(vm.runInContext('JSON.stringify(APP_ROWS.map(function(r){ return r.id; }))', w));
+  const found = [...host.innerHTML.matchAll(new RegExp('<button type="button" class="row-freeze" data-row-freeze="([a-z]+)" hidden></button>', 'g'))].map((m) => m[1]);
+  assert.deepEqual(found, ids, '★ 영역마다 «감춘 채»의 줄 고정 단추가 하나씩 있어야 한다');
+  assert.ok(host.innerHTML.indexOf('</div><button type="button" class="row-freeze"') > 0,
+    '★ 단추가 줄 머리(role=button 인 접기 단추) 안에 들어가면 «단추 속 단추»가 된다 — 머리 밖(형제)에 둔다');
+});
+
+test('⑨ 줄 고정 — 그 줄 앱만 한꺼번에 틀 고정하고(건수를 묻고) 한 번에 저장한다 · 다시 누르면 푼다', () => {
+  const w = rowBtnWorld();
+  w.layoutRowFreezeToggle('client');
+  assert.equal(w.asked.length, 1, '★ 한꺼번에 하는 일인데 묻지 않았다');
+  assert.match(w.asked[0], /의뢰인 업무/); assert.match(w.asked[0], /4개/, '★ 건수를 알려야 한다: ' + w.asked[0]);
+  const sets = w.calls.filter((c) => c.op === 'set');
+  assert.equal(sets.length, 1, '★ 한 번에 저장해야 한다');
+  assert.deepEqual(Object.keys(sets[0].rec.frozen).sort(), ['cal', 'erp', 'govaid', 'payroll'], '★ 그 줄 앱만, 모두 틀 고정이어야 한다(다른 줄 앱이 딸려 가면 안 된다)');
+  assert.equal(sets[0].rec.rows.erp, 'client', '★ 고정한 앱의 영역(지금 있는 곳)이 함께 저장돼야 한다');
+  w.layoutMarksPaint();
+  assert.equal(btnOf(w, 'client').textContent, '📌 줄 고정 중 · 풀기');
+  assert.equal(btnOf(w, 'client').classList.contains('on'), true);
+  assert.equal(btnOf(w, 'store').textContent, '📌 이 줄 고정', '★ 안 한 줄이 한 줄처럼 보인다');
+  w.layoutRowFreezeToggle('client');
+  const un = w.calls.filter((c) => c.op === 'set').pop().rec;
+  assert.equal(un.frozen, undefined, '★ 다시 눌렀는데 틀 고정이 남았다');
+  assert.match(w.asked[1], /모두 풉니다/);
+});
+
+test('⑨ 줄 고정을 하고 나면 그 줄 앱은 정말 «줄 밖으로 못 나간다» — 줄 안 순서는 된다', () => {
+  const w = rowBtnWorld();
+  w.layoutRowFreezeToggle('client');
+  admin(w, false);
+  const cal = w.origTile('cal');
+  dragOver(w, cal, 50, 3 * 200 + 50);
+  assert.equal(cal.parentNode.dataset.row, 'client', '★★ 줄 고정한 줄의 앱이 다른 줄로 갔다');
+  dragOver(w, cal, 250, 50);
+  assert.equal(cal.parentNode.dataset.row, 'client');
+  const other = w.origTile('mail');                       // 고정 안 한 줄의 앱은 그대로 움직인다
+  dragOver(w, other, 50, 3 * 200 + 50);
+  assert.equal(other.parentNode.dataset.row, 'inside', '★ 고정 안 한 줄의 앱까지 막혔다');
+});
+
+test('⑨ 아니오 하면 안 바뀐다 · 직원·폰에는 단추가 안 보이고 눌려도 서버를 안 부른다 · 앱 없는 줄엔 안 보인다', () => {
+  const w = rowBtnWorld(); w.confirm = () => false;
+  w.layoutRowFreezeToggle('store');
+  assert.equal(w.calls.length, 0, '★ 아니오 했는데 저장했다');
+  const staff = rowBtnWorld(); vm.runInContext('_layoutAdmin = false;', staff);
+  staff.layoutMarksPaint();
+  assert.ok(staff.btns.every((b) => b.hidden), '★★ 직원 화면에 «이 줄 고정» 단추가 보인다');
+  staff.layoutRowFreezeToggle('client');
+  assert.equal(staff.calls.length, 0, '★★ 직원이 줄 고정을 눌러 서버에 썼다');
+  const phone = rowBtnWorld({ mobile: true });
+  phone.layoutMarksPaint();
+  assert.ok(phone.btns.every((b) => b.hidden), '★ 폰에는 끌기가 없다 — 줄 단추도 목록 창으로 대신한다');
+  const empty = rowBtnWorld(); empty.conts[2].children.splice(0);   // 영업관리 줄이 빔
+  empty.layoutMarksPaint();
+  assert.equal(btnOf(empty, 'sales').hidden, true, '★ 앱이 없는 줄에 고정 단추가 있다');
+  assert.equal(btnOf(empty, 'client').hidden, false);
 });
 
 /* ══ ⑥ 직원 화면 ═════════════════════════════════════════════════════ */
