@@ -1805,3 +1805,54 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .ld-xt .ld-x-catf{ flex:0 0 46%; min-width:0; }
   .ld-xt .ld-x-catf select{ max-width:100% !important; width:100%; }
 }
+
+/* ── 📄 기금 설립에서 온 계약 후보 띠 — 계약관리 위 (대표 승인 2026-11-07 목업 B안)
+   표의 한 칸은 «한 줄»(넘치면 … + title) · 맨 왼쪽은 ☐ 고르기 칸(28px) + 번호(36px) ·
+   폰(≤768px)은 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로). PC 는 그대로다. */
+.fib{margin:0 0 8px;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:6px 10px}
+.fib-h{display:flex;align-items:center;gap:6px;min-height:28px}
+.fib-ttl{font-size:12.5px;font-weight:800;color:#854d0e;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fib-info{font-size:12px;color:#854d0e;cursor:help;flex:0 0 auto}
+.fib-tg{border:0;background:transparent;cursor:pointer;font-size:12px;font-weight:700;color:#854d0e;padding:2px 4px;flex:0 0 auto}
+.fib-body{margin-top:4px}
+.fib-row{display:grid;grid-template-columns:28px 36px minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.8fr) 52px auto;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #fde68a;font-size:12px}
+.fib-th{font-size:11px;font-weight:700;color:#854d0e}
+.fib-ck{display:flex;align-items:center;justify-content:center}
+.fib-ck input{width:16px;height:16px;cursor:pointer}
+.fib-no{text-align:right;font-variant-numeric:tabular-nums;color:#64748b}
+.fib-main{display:flex;align-items:center;gap:6px;min-width:0}
+.fib-fund{font-weight:700;color:#1e293b;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fib-co,.fib-mg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fib-dt{color:#64748b;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fib-meta{display:none}
+.fib-chip{flex:0 0 auto;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;white-space:nowrap}
+.fib-chip-ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.fib-act{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.fib-act select{max-width:130px;padding:3px 6px;font-size:11.5px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;color:#475569;font-family:inherit}
+.fib-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 0 6px 70px;font-size:11.5px;color:#854d0e}
+.fib-nt{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #fde68a;font-size:12px}
+.fib-nt-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#854d0e}
+.fib-bulk{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 0;border-top:1px solid #fde68a;font-size:12px;color:#854d0e}
+.fib-ig{border-top:1px solid #fde68a;margin-top:2px;padding-top:2px}
+.fib-igrow{display:flex;align-items:center;gap:8px;padding:2px 0 2px 16px;font-size:12px}
+.fib-ig-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b}
+.fib-bell{flex:0 0 auto;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;background:#fde68a;color:#854d0e;border:1px solid #fbbf24;white-space:nowrap}
+@media (max-width: 768px) {
+  .fib{margin:0 0 6px;padding:6px 8px}
+  .fib-th{display:none}
+  /* 폰은 세 줄 카드 — ① 기금 이름 + 상태 ② 업체 · 담당 · 날짜 ③ 주담당 고르기 · 가져오기 · 무시.
+     ☐·№ 는 맨 왼쪽 첫 줄 높이에 붙는다(이름 칸이 126px 뿐이라 이름이 «점검공동…» 으로 잘리던 것을 고쳤다). */
+  .fib-row{grid-template-columns:28px 32px minmax(0,1fr);grid-template-areas:"ck no main" "ck no meta" "ck no act";gap:3px 6px;align-items:start}
+  .fib-ck{grid-area:ck;align-self:start;padding-top:1px}
+  .fib-no{grid-area:no;align-self:start;padding-top:2px}
+  .fib-main{grid-area:main}
+  .fib-meta{grid-area:meta;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:#64748b}
+  .fib-co,.fib-mg,.fib-dt{display:none}
+  .fib-act{grid-area:act;display:flex;align-items:center;gap:4px;justify-content:flex-start;min-width:0}
+  .fib-act select{flex:1 1 auto;min-width:0;max-width:none;font-size:16px;padding:6px 2px 6px 6px;min-height:36px}
+  .fib-act button,.fib-sub button,.fib-nt button,.fib-bulk button,.fib-igrow button{min-height:36px;padding:6px 10px!important;font-size:12.5px!important}
+  .fib-tg{min-height:32px;min-width:32px}
+  .fib-sub{padding-left:0}
+  .fib-nt{flex-wrap:wrap}
+  .fib-nt-t{flex-basis:100%;white-space:normal;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+}
