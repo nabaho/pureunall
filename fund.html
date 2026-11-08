@@ -152,6 +152,17 @@
     /* 🏗 설립중 기금은 틀 고정을 하지 않는다(대표 2026-11-07 — 세 겹이 화면 위 300px 를 덮어 두 번째 줄이 가려졌다). 진행판은 팝업(sdPop) */
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
+  /* 🖨 서식 자동 채움 — 새로·바뀐 칸 빨강(화면 검토용). 인쇄하면 검정, 전 값 표시는 안 나간다 */
+  .fcpaper{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;max-width:640px}
+  .fctitle{text-align:center;font-weight:700;font-size:14px;margin:0 0 8px}
+  .fcpaper table{width:100%;border-collapse:collapse}
+  .fcpaper td{border:1px solid #94a3b8;padding:3px 8px;font-size:12px}
+  .fcpaper td.fck{background:#f8fafc;width:30%;text-align:center}
+  .fcpaper td.fcsec{background:#e2e8f0;font-weight:700;font-size:11.5px}
+  .fcv.fcnew,.fcv.fcchg{color:var(--danger);font-weight:700}
+  .fcold{color:var(--danger);font-size:10.5px;font-weight:400}
+  @media(max-width:860px){ .row.sdtabs{flex-wrap:nowrap;overflow-x:auto;gap:0}.row.sdtabs button{white-space:nowrap;padding:5px 6px!important;font-size:12px} }   /* 폰 — 탭은 한 줄(넘치면 옆으로 밀어 본다) */
+  @media print{.fcv.fcnew,.fcv.fcchg{color:#000!important;font-weight:400}.fcold{display:none}}
   /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
   @media(min-width:1850px){
     .closesplit.hasside{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;align-items:start}
@@ -11224,7 +11235,7 @@ function hwpSidePreview(kind){
 function hwpSideDownload(){
   if(!S._hwpSideBytes){ toast('아직 채우는 중입니다','warn'); return; }
   var G=(typeof _oneGateOf==='function')?_oneGateOf(S._sideKind):null; if(!G) return _hwpOneDl(0);   // 확인 안 된 값이 있으면 관문
-  S._gate={fid:G.fid, items:G.items, P:G.P, after:'hwpone'};
+  S._gate={fid:G.fid, items:G.items, P:G.P, snaps:G.snaps, after:'hwpone'};
   _gateModal(G.items,'받기','_hwpOneDl('+G.items.length+')');
 }
 function sidePreview(kind){
@@ -11415,6 +11426,7 @@ function estabBundle(phase){
       fbDb.ref(NS+'/prov/'+_gfid).once('value').then(function(sn){ var P=sn.val()||{};
         if(S.formFund!==_gfid||S._bundlePhase!==ph[0]) return;   // 그 사이 다른 단계를 열었다
         S._bundleGate={phase:ph[0], fid:_gfid, P:P, items:_formUnconfMany(_kinds,f,sites,P)};
+        _fcBundleRed(S._bundleGate,_kinds,f,sites);   // 🔴 설립중 기금의 새로·바뀐 칸을 같은 목록에
       }).catch(function(){}); }
     // 서식마다 A4 한 장 — 화면에서도 낱장으로 보이고 인쇄 시 그대로 페이지가 나뉜다
     var lst=docsFor(ph[2](),f.fund_type||'공동'), tot=0, chips=[];
@@ -11557,7 +11569,7 @@ function _formGatePaint(){
 function estabBundlePrint(){
   var f=curForm(), G=S._bundleGate;
   if(!f||f._sample||!G||G.fid!==S.formFund||G.phase!==S._bundlePhase||!G.items.length) return printDoc();
-  S._gate={phase:G.phase, fid:G.fid, items:G.items, P:G.P, after:'print'};
+  S._gate={phase:G.phase, fid:G.fid, items:G.items, P:G.P, snaps:G.snaps, after:'print'};
   _gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})');
 }
 /* 맨 위 창만 닫는다 — closeM 은 «첫» 창을 닫아, 편집 창(previewDoc) 위에 뜬 관문을 닫으면 편집 창이 사라졌다(코드 검토 2026-10-09) */
@@ -11566,11 +11578,12 @@ function _closeTopM(){ var all=document.querySelectorAll('#modalbg'), m=all[all.
 /* 관문 창 — 한글 묶음·전부 인쇄·한 장 인쇄·한 장 한글이 같은 세 갈래(취소 · 「초안」 표시 넣어 ○○ · N칸 확인하고 ○○) */
 function _gateModal(its,verb,draftCall){
   var rows=its.slice(0,40).map(function(it){
+    if(it.red) return _fcGateRow(it);   // 🔴 새로·바뀐 칸 — 서식 자동 채움(_fcGateRed)
     return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
       +' <span class="muted" style="font-size:11px">— '+esc((it.forms||[]).join(' · '))+'</span></div>';
   }).join('')+(its.length>40?'<div class="muted" style="font-size:11.5px;padding-top:4px">외 '+(its.length-40)+'칸 — 확인함에서 모두 볼 수 있습니다</div>':'');
   showModal('<h3 style="margin:0 0 4px">날인·제출용으로 '+verb+' 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
-    +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 '+verb+', 아직이면 「초안」 표시로 '+verb+'.</div>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:8px">'+_gateWhy(its)+' 맞으면 확인하고 '+verb+', 아직이면 「초안」 표시로 '+verb+'.</div>'
     +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
     +'<button onclick="_closeTopM()">취소</button>'
@@ -11584,16 +11597,18 @@ function _oneGatePrep(kind){
   S._oneGate=null;
   var f=curForm(), fid=S.formFund;
   if(!f||f._sample||!fid||S.formsCtx!=='fund') return;
-  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
+  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; }),
+    _fcIsSetup(f)?fbDb.ref(NS+'/form_ok/'+fid).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; }):Promise.resolve({})]).then(function(r){
     if(S.formFund!==fid||(S._docKind!==kind&&S._sideKind!==kind)) return;   // 그 사이 다른 서식을 열었다
     var its=(_formUnconf(kind,f,r[0],r[1])||[]).map(function(it){ return Object.assign({forms:[docLabel(kind)]},it); });
-    S._oneGate={kind:kind, fid:fid, P:r[1], items:its};
+    var R=_fcGateRed([kind],f,r[0],r[2],its);   // 🔴 설립중 기금의 새로·바뀐 칸
+    S._oneGate={kind:kind, fid:fid, P:r[1], items:its.concat(R.items), snaps:R.snaps};
   }).catch(function(){});
 }
 function _oneGateOf(kind){ var G=S._oneGate, f=curForm(); return (f&&!f._sample&&G&&G.kind===kind&&G.fid===S.formFund&&G.items.length)?G:null; }
 function docPrintGated(){
   var G=_oneGateOf(S._docKind); if(!G) return printDoc();
-  S._gate={fid:G.fid, items:G.items, P:G.P, after:'print'};
+  S._gate={fid:G.fid, items:G.items, P:G.P, snaps:G.snaps, after:'print'};
   _gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})');
 }
 /* 한 장 한글 받기 — 「초안」은 한글 묶음과 같은 머리말 글상자(_hwpDraftMark). 못 넣으면 받지 않는다(초안이 제출본처럼 나가면 안 된다) */
@@ -11609,16 +11624,20 @@ function estabBundleHwp(phase){
   var ph=ESTAB_PHASES.filter(function(p){ return p[0]===phase; })[0]||ESTAB_PHASES[0];
   var plan=_bundleHwpPlan(ph,f), fid=S.formFund;
   if(!plan.use.length) return _estabBundleHwpGo(phase,0);
-  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
+  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; }),
+    _fcIsSetup(f)?fbDb.ref(NS+'/form_ok/'+fid).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; }):Promise.resolve({})]).then(function(r){
     var its=_formUnconfMany(plan.use.map(function(u){ return u.d; }),f,r[0],r[1]);
+    var R=_fcGateRed(plan.use.map(function(u){ return u.d[0]; }),f,r[0],r[2],its);   // 🔴 설립중 기금의 새로·바뀐 칸
+    its=its.concat(R.items);
     if(!its.length) return _estabBundleHwpGo(phase,0);
-    S._gate={phase:phase, fid:fid, items:its, P:r[1]};
+    S._gate={phase:phase, fid:fid, items:its, P:r[1], snaps:R.snaps};
     var rows=its.slice(0,40).map(function(it){
+      if(it.red) return _fcGateRow(it);
       return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
         +' <span class="muted" style="font-size:11px">— '+esc(it.forms.join(' · '))+(it.forms.length>1?' (같은 값 — 한 번 확인하면 모두)':'')+'</span></div>';
     }).join('')+(its.length>40?'<div class="muted" style="font-size:11.5px;padding-top:4px">외 '+(its.length-40)+'칸 — 확인함에서 모두 볼 수 있습니다</div>':'');
     showModal('<h3 style="margin:0 0 4px">날인용으로 묶기 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
-      +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 받고, 아직이면 「초안」 표시로 받으세요.</div>'
+      +'<div class="muted" style="font-size:12px;margin-bottom:8px">'+_gateWhy(its)+' 맞으면 확인하고 받고, 아직이면 「초안」 표시로 받으세요.</div>'
       +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
       +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
       +'<button onclick="closeM()">취소</button>'
@@ -11631,21 +11650,24 @@ function formGateOk(){
   var G=S._gate; if(!G) return;
   var pw=G.after==='print'?window.open('','_blank'):null;   // 누른 그 순간 연다 — 저장을 기다린 뒤 열면 팝업으로 막힌다
   if(G.after==='print'&&!pw){ toast('팝업이 차단되었습니다','err'); return; }
-  var up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0, ev=[];
+  var up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0, nR=0, ev=[];
   G.items.forEach(function(it){
+    if(it.red){ nR++; return; }   // 🔴 새로·바뀐 칸 — 아래 snaps(확인 기록 form_ok)로 쓴다. 출처 기록(prov)은 안 건드린다
     if(it.est){ up['sites/'+G.fid+'/'+it.sid+'/contrib']=it.v; cells.push({path:'sites/'+G.fid+'/'+it.sid+'/contrib', a:it.v, m:1, src:'calc:rate', how:'list'}); nE++; }
     else { up['prov/'+G.fid+'/'+it.key+'/ok']={by:by,at:at}; nP++;
       var _p=(G.P||{})[it.key]; if(_p&&typeof _trProvRk==='function') ev.push({rk:_trProvRk(_p.src,it.key), o:1, f:G.fid, r:it.key}); }
   });
+  (G.snaps||[]).forEach(function(sn){ up['form_ok/'+G.fid+'/'+sn.kind]={v:sn.v, by:by, at:at}; });
   fbDb.ref(NS).update(up).then(function(){
     if(cells.length&&typeof _track==='function') _track(cells,{what:'추정 출연금 확정(서식 관문)', ok:true});
-    _audit(G.fid,'서식 관문 확인',(nP?'칸 '+nP:'')+(nP&&nE?' · ':'')+(nE?'출연금 '+nE+'곳':''));
+    _audit(G.fid,'서식 관문 확인',[nP?'칸 '+nP:'', nE?'출연금 '+nE+'곳':'', nR?'새로·바뀐 칸 '+nR+'(서식 '+(G.snaps||[]).length+'종)':''].filter(Boolean).join(' · '));
+    (G.snaps||[]).forEach(function(sn){ SD.fok[G.fid]=SD.fok[G.fid]||{}; SD.fok[G.fid][sn.kind]=up['form_ok/'+G.fid+'/'+sn.kind]; });
     if(nE) S.sitesFor=null;
     if(typeof RV!=='undefined') RV.at=0;
     if(typeof _trEv==='function') _trEv(ev);   // 🛡 서식 관문에서 «맞음»도 규칙마다 센다
     FG.at=0; _closeTopM();
-    S._oneGate=null;
-    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else if(G.after==='hwpx') _docToHwpxRun(G.kind,0); else _estabBundleHwpGo(G.phase,0);
+    S._oneGate=null; S._bundleGate=null;   // 확인한 목록은 다시 묻지 않는다(다음에 열 때 새로 모은다)
+    if(G.after==='print'){ printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else if(G.after==='hwpx') _docToHwpxRun(G.kind,0); else _estabBundleHwpGo(G.phase,0);
   }).catch(function(e){ try{ if(pw) pw.close(); }catch(x){} toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 /* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색(팔레트 #CBD5E1). 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
@@ -11712,7 +11734,7 @@ function _hwpDraftMark(bytes,text){
 /* [📄 한글(HWPX)] — 화면에서 편집한 HTML 을 한글로. 한 장 인쇄와 같은 관문(대표 「계속 진행」 2026-10-09 — 관문 없던 마지막 출구) */
 function docToHwpx(kind){
   var G=(typeof _oneGateOf==='function')?_oneGateOf(kind):null; if(!G) return _docToHwpxRun(kind,0);
-  S._gate={fid:G.fid, items:G.items, P:G.P, after:'hwpx', kind:kind};
+  S._gate={fid:G.fid, items:G.items, P:G.P, snaps:G.snaps, after:'hwpx', kind:kind};
   _gateModal(G.items,'받기','_docToHwpxRun(\''+kind+'\','+G.items.length+')');
 }
 /* n — 「초안 · 미확인 n」을 머리말 글상자로(한글 묶음과 같은 _hwpDraftMark). 못 넣으면 받지 않는다 */
@@ -12400,7 +12422,7 @@ function openFundForms(){ openFundDocs(); }   // 설립 단계 버튼 → 그 �
      12단계 체크리스트(EST_TMPL · funds/{기금}/setup) · 빈 자료(estabGaps) · 서류 묶음 ①~⑤(ESTAB_PHASES).
    ⚠ 사업장은 «설립중 기금 것만» 읽는다 — 몇 곳 안 된다. 못 읽은 기금은 빈 자료를 «?»로 둔다(0 이라고 하면 거짓말).
    ⚠ 기한은 앱이 이미 아는 날짜로만 센다 — 등기는 인가일 + 3주(EST-09 문구 그대로). 모르는 기한은 만들지 않는다. */
-var SD={sites:{}, loading:null, sel:'', flt:'all', pop:false, tab:'gap', more:false, ci:{}};
+var SD={sites:{}, loading:null, sel:'', flt:'all', pop:false, tab:'gap', more:false, ci:{}, fok:{}, prov:{}, kept:{}, fcv:''};
 var SD_GROUPS=[['1. 준비',['EST-01','EST-02','EST-03','EST-04','EST-05','EST-06']],['2. 인가',['EST-07','EST-08']],
   ['3. 등기·세무',['EST-09','EST-10','EST-11']],['4. 운영 전환',['EST-12']]];
 /* 그 단계에서 낼 서류 묶음 — 「지금 할 일」 단추가 이것을 연다 */
@@ -12446,14 +12468,15 @@ function renderSetupDash(){
   var need=list.filter(function(f){ return !Object.prototype.hasOwnProperty.call(SD.sites,f._id); });
   if(need.length&&!SD.loading){
     SD.loading=Promise.all(need.map(function(f){
-      return fbDb.ref(NS+'/sites/'+f._id).once('value').then(function(s){ var v=s.val()||{};
+      return Promise.all([fbDb.ref(NS+'/sites/'+f._id).once('value').then(function(s){ var v=s.val()||{};
         SD.sites[f._id]=Object.keys(v).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }); },
-        function(){ SD.sites[f._id]=null; });
+        function(){ SD.sites[f._id]=null; }), _fcLoad(f._id)]);   // 확인 기록(form_ok)·출처 기록(prov)도 함께 — 서식 «새로·바뀐 칸»을 재려면 둘 다 필요
     })).then(function(){ SD.loading=null; if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); } });
   }
   var today=ymd();
-  var rows=list.map(function(f){ return {f:f, st:_sdState(f,SD.sites[f._id]||null,today)}; });
+  var rows=list.map(function(f){ var st=_sdState(f,SD.sites[f._id]||null,today); return {f:f, st:st, fc:_fcOf(f,st)}; });
   var cnt={}; SD_FLT.forEach(function(k){ cnt[k[0]]=rows.filter(function(r){ return _sdMatch(r.st,r.f,k[0]); }).length; });
+  cnt.fc=rows.filter(function(r){ return r.fc&&r.fc.nForm; }).length;
   var vis=rows.filter(function(r){ return _sdMatch(r.st,r.f,SD.flt); });
   if(!vis.some(function(r){ return r.f._id===SD.sel; })) SD.sel=vis.length?vis[0].f._id:'';
   var kpi=function(l,n,c){ return '<div style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:96px"><div class="muted" style="font-size:11px">'+l+'</div><b style="font-size:17px'+(c?';color:'+c:'')+'">'+n+'</b></div>'; };
@@ -12469,7 +12492,7 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap"><div style="height:7px;width:90px;background:var(--line);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--acc)"></div></div><span class="muted" style="font-size:11px">'+st.nD+'/'+st.steps.length+'</span></td>'
       +'<td style="white-space:nowrap">'+boxes+'</td>'
       +'<td>'+(st.next?'<b>'+_sdNo(st.next[0])+'</b> '+esc(st.next[1].split(' — ')[0].split(' (')[0]):'<span class="chip ok" style="font-size:10.5px">✅ 운영 전환만 남음</span>')+'</td>'
-      +'<td style="white-space:nowrap">'+_sdDueChip(st)+'</td><td>'+_sdGapChip(st)+'</td>'
+      +'<td style="white-space:nowrap">'+_sdDueChip(st)+'</td><td>'+_sdGapChip(st)+'</td><td style="white-space:nowrap">'+_fcChip(r.fc)+'</td>'
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
   $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
@@ -12477,9 +12500,9 @@ function renderSetupDash(){
     +(list.length?'<button onclick="sdTrash()" style="color:var(--danger)" title="□ 로 짚은 기금을 삭제 보관함으로 옮깁니다 — 잘못 만든 중복 기금 정리용. 언제든 복원할 수 있습니다">🗑 선택한 기금 삭제 보관</button>':'')
     +'<button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
-      ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
+      ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+kpi('🔴 확인할 서식 있는 곳',cnt.fc,cnt.fc?'var(--danger)':'')+'</div>'
         +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">'+chips+'</div>'
-        +(vis.length?'<div class="sdwrap"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
+        +(vis.length?'<div class="sdwrap"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>서식</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
           :'<div class="msg ok" style="font-size:13px">이 거르기에 해당하는 기금이 없습니다.</div>')
       :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div>')
     +'</div>';
@@ -12525,28 +12548,32 @@ function _sdBoard(f,st){
       return '<tr'+(cur?' style="background:var(--warn-bg)"':'')+'>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td>'+(cur?'<b>'+esc(p[1])+'</b>':esc(p[1]))+'</td><td>'+stt+'</td>'
         +'<td><button'+(cur?' class="primary"':'')+' onclick="event.stopPropagation();sdBundle(\''+fid+'\',\''+p[0]+'\')" style="padding:2px 9px">📑 열기</button></td></tr>'; }).join('')
     +'</tbody></table></div>';
-  var tabs=[['gap','📝 빈 자료'+(st.nGap?' '+st.nGap:'')],['bundle','📑 서류 묶음 '+ESTAB_PHASES.length]];
-  var tab=SD.tab==='bundle'?'bundle':'gap';
+  var fc=_fcOf(f,st);
+  var tabs=[['gap','📝 빈 자료'+(st.nGap?' '+st.nGap:'')],['fill','🖨 서식 자동 채움'+(fc&&fc.nCell?' <b style="color:var(--danger)">🔴 '+fc.nCell+'</b>':'')],['bundle','📑 서류 묶음 '+ESTAB_PHASES.length]];
+  var tab=SD.tab==='bundle'?'bundle':SD.tab==='fill'?'fill':'gap';
   return '<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
-    +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'+ciChip(fid)
+    +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
+    +(fc&&fc.nForm?'<span class="chip dg" style="font-size:10.5px">🔴 서식 '+fc.nForm+'</span>':'')+ciChip(fid)
     +'<span style="flex:1"></span><button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
     +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
     +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin:10px 0">'
       +'<span>지금 할 일</span><b style="font-size:14px">'+_sdNo(nx[0])+' '+esc(nx[1])+due+'</b><span style="flex:1"></span>'+act+'</div>'
       :'<div class="msg ok" style="margin:10px 0">12단계를 모두 마쳤습니다 — [📂 기금 열기]에서 [✅ 운영 전환]을 누르면 기금 현황으로 옮겨 갑니다.</div>')
     +'<div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+groups+'</div>'
-    +'<div class="row" style="gap:2px;margin:12px 0 8px;border-bottom:1px solid var(--line)">'+tabs.map(function(t){ var on=t[0]===tab;
+    +'<div class="row sdtabs" style="gap:2px;margin:12px 0 8px;border-bottom:1px solid var(--line)">'+tabs.map(function(t){ var on=t[0]===tab;
       return '<button onclick="sdTab(\''+t[0]+'\')" style="border:0;border-bottom:2px solid '+(on?'var(--acc)':'transparent')+';border-radius:0;background:none;padding:5px 12px'+(on?';font-weight:700':';color:var(--sub)')+'">'+t[1]+'</button>'; }).join('')
-      +(tab==='gap'?hlp('setup.gaps'):hlp('estab.bundle'))+'</div>'
-    +(tab==='gap'?gaps:bundles);
+      +(tab==='gap'?hlp('setup.gaps'):tab==='fill'?hlp('setup.fill'):hlp('estab.bundle'))+'</div>'
+    +(tab==='gap'?gaps:tab==='fill'?_fcTab(f,fc):bundles);
 }
 function _sdPhaseLabel(k){ var p=ESTAB_PHASES.filter(function(x){ return x[0]===k; })[0]; return p?p[1]:k; }
 function sdFlt(k){ closeM(); SD.flt=k; renderSetupDash(); }
-function sdReload(){ closeM(); SD.sites={}; renderSetupDash(); }
+function sdReload(){ closeM(); SD.sites={}; SD.fok={}; SD.prov={}; SD.kept={}; renderSetupDash(); }
 /* 줄을 누르면 팝업 — 다시 그릴 때(체크·탭)는 스크롤 자리를 지킨다 */
-function sdSel(fid){ if(SD.sel!==fid){ SD.tab='gap'; SD.more=false; } SD.sel=fid; renderSetupDash(); sdPop(); }
+function sdSel(fid){ if(SD.sel!==fid){ SD.tab='gap'; SD.more=false; SD.fcv=''; } SD.sel=fid; renderSetupDash(); sdPop(); }
 function sdPop(){
+  /* ⚠ funds[…] 값에는 _id 가 없다(키가 곧 번호) — 그대로 _sdBoard 에 주면 단추마다 기금 번호가 «undefined» 로 나간다 */
   var f=funds[SD.sel]; if(!f){ closeM(); SD.pop=false; return; }
+  f=Object.assign({},f,{_id:SD.sel});
   ciLoad(SD.sel);
   var box=$('modalbox'), top=box?box.scrollTop:0;
   var st=_sdState(f,SD.sites[SD.sel]||null,ymd());
@@ -12555,7 +12582,7 @@ function sdPop(){
   SD.pop=true;
   var nb=$('modalbox'); if(nb&&top) nb.scrollTop=top;
 }
-function sdTab(k){ SD.tab=k; sdPop(); }
+function sdTab(k){ SD.tab=k; SD.fcv=''; sdPop(); }
 /* 잘못 만든 중복 기금 정리 — □ 로 짚은 줄을 한꺼번에 삭제 보관함으로(데이터는 그대로, 🗑 삭제 보관 탭에서 복원) */
 function sdTrash(){
   var ids=[].slice.call(document.querySelectorAll('.sdwrap tbody tr')).filter(function(r){ var c=r.querySelector('.ckcol input'); return c&&c.checked; })
@@ -12649,6 +12676,301 @@ function sdBundle(fid,phase){
     if(S.view==='fund'&&S.fundId===fid&&S.tab==='docs'&&$('formSide')) return estabBundle(phase);
     if(Date.now()-t0<8000) setTimeout(tick,200);
   })();
+}
+/* ══ 🖨 서식 자동 채움 · 바뀐 칸 빨강 (대표 승인 2026-11-07 — 목업 «설립중팝업·자동채움·빨간표시» 2~5번) ══
+   서식은 열 때마다 «지금 자료»로 새로 채워진다 — 그것이 자동 채움이다. 여기서는 서식을 열지 않고도
+   «무엇이 새로 들어오거나 바뀌었는지»를 보이고, 사람이 한 번 보고 [✔ 확인]하게 한다.
+   · 잣대는 그 서식이 «실제로 읽는 자료 칸»(_formDeps 와 같은 엿보기) — 대표사업장 등으로 채운 «뒤»의 값이다.
+     마지막 [✔ 확인] 때의 값(form_ok/{기금}/{서식})과 견준다: 없던 값 = 새로(빨강) · 다른 값 = 바뀜(빨강 + 전 값).
+   · 오늘 날짜처럼 자료가 아닌 값은 견주지 않는다(자료 칸만 본다) — 날마다 빨개지지 않는다.
+   · 🤖 기계가 넣고 원본 대조 전인 칸도 빨강에 넣는다 — [✔ 확인]이 확인함과 같은 자리(prov/…/ok)에 «맞음»을 붙인다.
+   · 자료 값은 한 글자도 안 고친다. 쓰는 곳은 form_ok(확인 기록)와 prov/…/ok 뿐.
+   · 빨강은 화면 검토용이다 — 서식 본문(인쇄·PDF·한글)에는 넣지 않는다. 인쇄 관문이 «아직 확인 안 한 칸 N곳»을 한 번 묻는다.
+   · 사람이 고쳐 보관한 서식본(doc_edits·hwp_docs)은 덮지 않는다 — «✋ 고친 본»으로 알리고 다름은 빨강으로만 보인다.
+   ⚠ 생년월일·주소와 명단·묶음 칸은 확인 기록에 값 대신 지문(#)만 남긴다 — 전 값은 «바뀜»으로만 보인다.
+   ⚠ 설립중 기금(setup_stage 설립준비)의 ①인가·②등기·③세무 서식만 — 운영 기금은 확인 기록이 없어 모든 칸이 빨개진다. */
+var FC_PH={kinds:['①',''], reg:['②','EST-08'], tax:['③','EST-09']};   // 묶음 → [표, 이 단계를 끝내야 그 서식을 잰다]
+var FC_LOCK={'EST-08':'인가 뒤','EST-09':'등기 뒤'};
+var FC_SKIP={_id:1,id:1,status:1,setup:1,setup_stage:1,mgr_main:1,mgr_subs:1,manager:1,name_hist:1,deleted:1,deleted_at:1,deleted_by:1,createdAt:1,updatedAt:1,entityType:1};
+var FC_SECRET=/birth|addr|jumin|rrn/i;   // 확인 기록에 값을 남기지 않는 칸(개인정보)
+var FC_LBL={years:'연도별 기록', end_date:'종료일', end_reason:'종료 사유', wrep_doc:'근로자대표 재직증명서'};
+function _fcIsSetup(f){ return !!(f&&!f._sample&&f.setup_stage==='설립준비'); }
+/* 설립중 기금이 낼 서식 — [{kind,label,ph,lock}] · 한글 값 함수가 있는 것만(자료 칸을 잴 수 있는 것) */
+function _fcForms(f){
+  var out=[], done=(f&&f.setup)||{};
+  ESTAB_PHASES.forEach(function(p){ var q=FC_PH[p[0]]; if(!q) return;
+    var lock=(q[1]&&!(done[q[1]]&&done[q[1]].done))?FC_LOCK[q[1]]:'';
+    docsFor(p[2](),(f&&f.fund_type)||'공동').forEach(function(d){
+      if(typeof HWP_TPL_VALUES[_hwpTplKey(d[0],f)]==='function') out.push({kind:d[0], label:d[1], ph:q[0], lock:lock});
+    });
+  });
+  return out;
+}
+function _fcLabel(k,site){
+  var L=site?[SITE_FIELDS,WREP_FIELDS,UREP_FIELDS,SME_FIELDS]:[FIELDS];
+  for(var i=0;i<L.length;i++){ var c=(L[i]||[]).filter(function(x){ return x[0]===k; })[0]; if(c) return c[1]; }
+  return FC_LBL[k]||_rvLabel(k);
+}
+/* 서식 하나가 읽는 자료 칸 — [{k:'f|칸'|'s|사업장|칸', fk, lab, val, sid?, nm?}] · 값 함수가 없으면 null */
+function _fcCells(kind,f,sites){
+  var key=_hwpTplKey(kind,f), fn=HWP_TPL_VALUES[key];
+  if(typeof fn!=='function'||typeof Proxy==='undefined') return null;
+  if(!_estabKind(kind)) sites=(sites||[]).filter(function(s){ return s&&(s.status||'active')!=='closed'; });   // hwpTplFill 과 같은 규칙
+  var keep=S._docR, F={}, SS={}, ss=[], x={};
+  S._docR=null;          // 그 해 장부 곁값(연도별 출연금)은 보는 화면마다 다르다 — 어디서 재도 같은 잣대로
+  try{
+    ss=_sitesFill(f||{},sites||[]); x=_fundFill(f||{},ss).f;
+    var spy=function(o,bag){ return new Proxy(o||{},{get:function(t,k){ if(typeof k==='string') bag[k]=1; return t[k]; }}); };
+    var ps=ss.map(function(s){ var id=(s&&s._id)||''; return spy(s,SS[id]=SS[id]||{}); });
+    try{ fn(spy(x,F),ps,key); }catch(e){}
+  } finally { S._docR=keep; }
+  var use=function(k){ return !FC_SKIP[k]&&k.charAt(0)!=='_'; }, out=[];
+  Object.keys(F).filter(use).forEach(function(k){ out.push({k:'f|'+k, fk:k, lab:_fcLabel(k), val:x[k]}); });
+  ss.forEach(function(s){ var id=s&&s._id, bag=id&&SS[id]; if(!bag) return;
+    Object.keys(bag).filter(use).sort(function(a,b){ return (a==='name'?0:1)-(b==='name'?0:1); })   // 상호를 맨 위에
+      .forEach(function(k){ out.push({k:'s|'+id+'|'+k, fk:k, lab:_fcLabel(k,1), val:s[k], sid:id, nm:String(s.name||'사업장')}); });
+  });
+  return out;
+}
+function _fcHash(s){ var h=0x811c9dc5; s=String(s); for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return ('0000000'+h.toString(16)).slice(-8); }
+function _fcStable(v){
+  if(v==null) return ''; if(typeof v!=='object') return String(v);
+  if(Array.isArray(v)) return '['+v.map(_fcStable).join(',')+']';
+  return '{'+Object.keys(v).sort().map(function(k){ return JSON.stringify(k)+':'+_fcStable(v[k]); }).join(',')+'}';
+}
+/* 확인 기록에 남기는 꼴 — 빈 값 '=' · 보통 값 '='+값 · 개인정보·긴 값 '#'+지문 · 명단·묶음 '#'+지문+'|'+건수 */
+function _fcRec(k,v){
+  if(v==null) return '=';
+  if(typeof v==='object'){ var n=Array.isArray(v)?v.length:Object.keys(v).length; return n?'#'+_fcHash(_fcStable(v))+'|'+n:'='; }
+  var s=String(v).trim(); if(!s) return '=';
+  return (FC_SECRET.test(k)||s.length>200)?'#'+_fcHash(s):'='+s;
+}
+function _fcShow(v){
+  if(v==null) return '';
+  if(Array.isArray(v)){ if(!v.length) return '';
+    var nm=v.map(function(o){ return (o&&typeof o==='object')?String(o.name||''):String(o); }).filter(function(s){ return s.trim(); });
+    return v.length+'건'+(nm.length?' — '+nm.slice(0,4).join('·')+(nm.length>4?' 외':''):''); }
+  if(typeof v==='object'){ var n=Object.keys(v).length; return n?'(자료 '+n+'가지)':''; }
+  return String(v).trim();
+}
+function _fcOld(w){ w=String(w||''); if(w.charAt(0)==='=') return w.slice(1)||'(비어 있음)'; var m=/\|(\d+)$/.exec(w); return m?m[1]+'건':'(값은 남기지 않는 칸)'; }
+/* 지금 칸 ↔ 마지막 확인 기록 — 빨강 [{k, how:'new'|'chg'|'gone', c?, old?, nm?}] · 기록이 없으면 값 있는 칸은 모두 «새로» */
+function _fcDiff(cells,ok){
+  var V=(ok&&ok.v)||{}, red=[], sids={}, gone={};
+  (cells||[]).forEach(function(c){
+    if(c.sid) sids[c.sid]=1;
+    var now=_fcRec(c.fk,c.val), was=V[c.k];
+    if(now==='='){ if(was&&was!=='=') red.push({k:c.k, c:c, how:'chg', old:was}); return; }   // 있던 값이 지워졌다
+    if(!was||was==='=') red.push({k:c.k, c:c, how:'new'});
+    else if(was!==now) red.push({k:c.k, c:c, how:'chg', old:was});
+  });
+  /* 확인 때 서식에 있던 사업장이 지금은 없다 — 빠진 것도 바뀐 것이다 */
+  Object.keys(V).forEach(function(k){ var p=k.split('|'); if(p[0]!=='s'||!p[2]||sids[p[1]]||gone[p[1]]||V[k]==='=') return;
+    gone[p[1]]=1; var nm=V['s|'+p[1]+'|name'];
+    red.push({k:'s|'+p[1], how:'gone', nm:(nm&&nm.charAt(0)==='='&&nm.length>1)?nm.slice(1):'사업장'}); });
+  return red;
+}
+function _fcSnap(cells){ var v={}; (cells||[]).forEach(function(c){ v[c.k]=_fcRec(c.fk,c.val); }); return v; }
+function _fcItLab(r){ return r.how==='gone'?r.nm+' · 참여 빠짐':((r.c&&r.c.sid)?r.c.nm+' · ':'')+((r.c&&r.c.lab)||r.k); }
+/* 사업장이 하나도 없을 때 — 이 서식이 사업장을 읽는 서식인가(가짜 사업장 하나로 재 본다) */
+function _fcReadsSites(kind,f){ try{ return (_fcCells(kind,f,[{_id:'~probe',name:'가'}])||[]).some(function(c){ return !!c.sid; }); }catch(e){ return false; } }
+/* 자료 모자람 — 빈 자료(estabGaps) 가운데 이 서식이 읽는 것만 */
+function _fcMiss(kind,f,cells,gaps){
+  var F={}, Sk={};
+  (cells||[]).forEach(function(c){ if(c.sid) Sk[c.fk]=1; else F[c.fk]=1; });
+  return (gaps||[]).filter(function(g){
+    if(g.est) return false;                                   // 추정 출연금은 비어 있는 것이 아니다(빈 자료 탭에서 따로)
+    if(g.k==='_sites') return _fcReadsSites(kind,f);
+    return g.site?!!Sk[g.k]:!!F[g.k];
+  });
+}
+/* 서식 하나의 형편 — 빨강(red) · 🤖(bot: 칸 열쇠 → 미확인 항목) · 자료 모자람(miss) · n = 확인할 칸 수 */
+function _fcState(f,fm,sites,okAll,P,gaps){
+  var r={kind:fm.kind, label:fm.label, ph:fm.ph, lock:fm.lock, cells:[], red:[], bot:{}, n:0, miss:[], ok:(okAll||{})[fm.kind]||null};
+  if(fm.lock) return r;
+  var cells=null; try{ cells=_fcCells(fm.kind,f,sites); }catch(e){}
+  if(!cells){ r.err=1; return r; }
+  r.cells=cells; r.red=_fcDiff(cells,r.ok);
+  var rk={}; r.red.forEach(function(x){ rk[x.k]=1; });
+  if(P){ try{ (_formUnconf(fm.kind,f,sites,P)||[]).forEach(function(it){ if(!it.est) r.bot[it.key]=it; }); }catch(e){} }
+  r.n=r.red.length+Object.keys(r.bot).filter(function(k){ return !rk[k]; }).length;
+  r.miss=_fcMiss(fm.kind,f,cells,gaps);
+  return r;
+}
+/* 설립중 기금 하나의 서식 형편 — 목록 칸·팝업 탭이 함께 쓴다. 자료를 다 못 읽었으면 null */
+function _fcFund(f,sites,okAll,P,gaps){
+  if(!_fcIsSetup(f)||!sites||!okAll) return null;
+  var list=_fcForms(f).map(function(fm){ return _fcState(f,fm,sites,okAll,P,gaps); });
+  return {list:list, nForm:list.filter(function(x){ return x.n>0; }).length, nCell:list.reduce(function(a,x){ return a+x.n; },0)};
+}
+function _fcOf(f,st){ return _fcFund(f,SD.sites[f._id]||null,SD.fok[f._id],SD.prov[f._id],st&&st.gaps); }
+/* 목록 «서식» 칸 */
+function _fcChip(fc){
+  if(!fc) return '<span class="chip" style="font-size:10.5px" title="참여사업장·확인 기록을 읽는 중이거나 못 읽었습니다">'+(SD.loading?'…':'?')+'</span>';
+  return fc.nForm?'<span class="chip dg" style="font-size:10.5px" title="새로 들어오거나 바뀐 칸이 있는 서식 — 팝업 › 🖨 서식 자동 채움에서 봅니다">🔴 '+fc.nForm+'</span>'
+    :'<span class="chip ok" style="font-size:10.5px">없음</span>';
+}
+/* 사람이 고쳐 보관한 서식본이 있는가 — 저장 날짜 한 칸만 읽는다(본문은 크다) */
+function _fcKeptLoad(fid,list){
+  if(SD.kept[fid]) return;
+  var K=SD.kept[fid]={}, ps=[];
+  list.forEach(function(x){ if(x.lock) return;
+    ps.push(fbDb.ref(NS+'/doc_edits/'+fid+'/'+x.kind+'/saved').once('value').then(function(sn){ if(sn.val()) K[x.kind]=String(sn.val()); }).catch(function(){}));
+    ps.push(_hwpDocRef(fid,x.kind).child('saved').once('value').then(function(sn){ if(sn.val()&&!K[x.kind]) K[x.kind]=String(sn.val()); }).catch(function(){}));
+  });
+  Promise.all(ps).then(function(){ if(Object.keys(K).length&&SD.pop&&SD.sel===fid&&SD.tab==='fill') sdPop(); });
+}
+/* 팝업 탭 — 서식 목록(□·#) 또는 한 서식의 확인 화면 */
+function _fcTab(f,fc){
+  var fid=f._id;
+  if(!fc) return '<div class="muted" style="font-size:12px;padding:6px 2px">'+(SD.loading?'서식 자료를 읽는 중…':'참여사업장·확인 기록을 못 읽어 서식을 재지 못했습니다 — 목록의 [↻ 다시 읽기]')+'</div>';
+  if(SD.fcv){ var one=fc.list.filter(function(x){ return x.kind===SD.fcv&&!x.lock&&!x.err; })[0]; if(one) return _fcSheet(f,one); SD.fcv=''; }
+  _fcKeptLoad(fid,fc.list);
+  var K=SD.kept[fid]||{};
+  var rows=fc.list.map(function(x,i){
+    var kept=K[x.kind]?' <span class="chip" style="font-size:10px" title="사람이 고쳐 보관한 서식본('+esc(K[x.kind])+')이 있어 자동 채움 값이 그 본에는 들어가지 않습니다 — 빨간 칸은 그 본에서 고치세요">✋ 고친 본</span>':'';
+    var stt=x.lock?'<span class="muted">'+esc(x.lock)+'</span>'
+      :x.err?'<span class="chip" style="font-size:10.5px">재지 못함</span>'
+      :x.miss.length?'<span class="chip warn" style="font-size:10.5px;cursor:help" title="비어 있는 자료: '+esc(x.miss.map(function(g){ return g.label+'('+g.where+')'; }).join(' · '))+'">자료 모자람 '+x.miss.length+'</span>'
+      :'<span class="chip ok" style="font-size:10.5px">자동 채움 완료</span>';
+    var red=x.lock||x.err?'<span class="muted">—</span>'
+      :x.n?'<span class="chip dg" style="font-size:10.5px">🔴 '+x.n+'칸</span>'
+      :x.ok?'<span class="muted" title="'+esc((x.ok.by||'')+' '+(x.ok.at||''))+'">✔ '+esc(String(x.ok.at||'').slice(5,16))+'</span>':'<span class="muted">—</span>';
+    var g0=x.miss[0], bt=x.lock||x.err?''
+      :'<button onclick="fcView(\''+x.kind+'\')" style="padding:2px 8px">👁 미리보기</button>'
+        +(x.n?' <button class="primary" onclick="fcOk(\''+fid+'\',[\''+x.kind+'\'])" style="padding:2px 8px">✔ 확인</button>':'')
+        +(g0?' <button onclick="sdOpen(\''+fid+'\',\''+(g0.site||g0.k==='_sites'?'sites':'info')+'\')" style="padding:2px 8px">✎ 적기</button>':'');
+    return '<tr data-kind="'+esc(x.kind)+'">'+_ckTd()+'<td class="no">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="muted">'+x.ph+'</span> '+(x.n?'<b>'+esc(x.label)+'</b>':esc(x.label))+'</td>'
+      +'<td style="white-space:nowrap">'+stt+kept+'</td><td style="white-space:nowrap">'+red+'</td><td style="white-space:nowrap">'+bt+'</td></tr>';
+  }).join('');
+  return '<div class="row" style="gap:8px;flex-wrap:wrap;margin:0 0 6px"><span class="muted" style="font-size:12px">'+(fc.nCell?'새로·바뀐 칸 <b style="color:var(--danger)">'+fc.nCell+'</b>곳 · 서식 '+fc.nForm+'종':'새로·바뀐 칸 없음')+'</span>'
+    +'<span style="flex:1"></span><button onclick="fcOkPicked(\''+fid+'\')" style="padding:2px 10px" title="□ 로 짚은 서식의 빨간 칸을 한꺼번에 확인합니다">✔ 고른 서식 확인</button></div>'
+    +'<div class="fcwrap" style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>서식</th><th>자동 채움</th><th>새로·바뀐 칸</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+/* 한 서식의 확인 화면 — 서식이 읽는 칸을 종이처럼 늘어놓고 새로·바뀐 칸만 빨강(전 값은 옆에 작게). 인쇄하면 검정 */
+function _fcSheet(f,x){
+  var fid=f._id, R={}, B=x.bot, K=SD.kept[fid]||{};
+  x.red.forEach(function(r){ R[r.k]=r; });
+  var row=function(c){ var r=R[c.k], b=B[c.k], v=_fcShow(c.val);
+    var val=v?'<span class="fcv'+(r?' fc'+r.how:b?' fcnew':'')+'">'+esc(v)+'</span>':'<span class="muted">(비어 있음)</span>';
+    if(r&&r.how==='chg') val+=' <span class="fcold">← 전: '+esc(_fcOld(r.old))+'</span>';
+    if(b) val+=' <span title="기계가 넣고 아직 원본과 대조하지 않은 값 — 확인하면 «원본과 맞음»으로 둡니다">🤖</span>';
+    return '<tr><td class="fck">'+esc(c.lab)+'</td><td style="white-space:nowrap">'+val+'</td></tr>'; };
+  var body='', sec='';
+  x.cells.forEach(function(c){
+    var s=c.sid?'s:'+c.sid:'f';
+    if(s!==sec){ sec=s; body+='<tr><td colspan="2" class="fcsec">'+(c.sid?'참여사업장 · '+esc(c.nm):'기금')+'</td></tr>'; }
+    body+=row(c);
+  });
+  var have={}; x.cells.forEach(function(c){ have[c.k]=1; });
+  x.red.filter(function(r){ return r.how==='gone'; }).forEach(function(r){
+    body+='<tr><td class="fck">'+esc(r.nm)+'</td><td style="white-space:nowrap"><span class="fcv fcchg">(서식에서 빠짐)</span> <span class="fcold">← 전: 참여</span></td></tr>'; });
+  Object.keys(B).filter(function(k){ return !have[k]; }).forEach(function(k){
+    body+='<tr><td class="fck">'+esc(B[k].lab)+'</td><td style="white-space:nowrap"><span class="fcv fcnew">가져온 자료</span> 🤖</td></tr>'; });
+  var nNew=x.red.filter(function(r){ return r.how==='new'; }).length, nChg=x.red.length-nNew, nBot=Object.keys(B).length;
+  return '<div class="row" style="gap:6px;flex-wrap:wrap;margin:0 0 8px"><button onclick="fcBack()" style="padding:2px 10px">← 서식 목록</button>'
+    +'<b style="font-size:14px">'+esc(x.label)+'</b>'
+    +(x.n?'<span class="chip dg" style="font-size:10.5px">🔴 '+x.n+'칸</span>':'<span class="chip ok" style="font-size:10.5px">확인할 칸 없음</span>')
+    +'<span class="muted" style="font-size:11px">새로 '+nNew+' · 바뀜 '+nChg+(nBot?' · 🤖 '+nBot:'')+'</span>'
+    +'<span style="flex:1"></span><button onclick="fcOpenForm(\''+fid+'\',\''+x.kind+'\')" style="padding:2px 10px" title="서식 탭에서 이 서식을 엽니다(인쇄·한글 받기)">📄 서식 열기</button>'
+    +(x.n?'<button class="primary" onclick="fcOk(\''+fid+'\',[\''+x.kind+'\'])" style="padding:2px 10px" title="값은 그대로 두고 «지금 값을 봤다»는 기록만 남깁니다">✔ 확인 — 빨강 '+x.n+'칸을 검정으로</button>':'')+'</div>'
+    +(K[x.kind]?'<div class="msg warn" style="font-size:12px;margin:0 0 8px">✋ 이 기금에 사람이 고쳐 보관한 «'+esc(x.label)+'»('+esc(K[x.kind])+')이 있습니다 — 자동 채움은 그 본을 덮지 않습니다. 빨간 칸은 그 본에서 직접 고치세요.</div>':'')
+    +(x.miss.length?'<div class="msg warn" style="font-size:12px;margin:0 0 8px">자료 모자람 — '+x.miss.map(function(g){ return '<b>'+esc(g.label)+'</b>('+esc(g.where)+')'; }).join(' · ')+'</div>':'')
+    +'<div class="fcpaper"><div class="fctitle">'+esc(x.label)+'</div><table>'+(body||'<tr><td class="muted">이 서식이 읽는 자료 칸이 아직 없습니다.</td></tr>')+'</table></div>';
+}
+function fcView(kind){ SD.fcv=kind; SD.tab='fill'; sdPop(); }
+function fcBack(){ SD.fcv=''; sdPop(); }
+/* 서식 탭에서 그 서식을 연다 — 묶음(sdBundle)과 같은 길 */
+function fcOpenForm(fid,kind){
+  closeM(); S.fundId=fid; closeSide(); openFundDocs();
+  var t0=Date.now();
+  (function tick(){
+    if(S.view==='fund'&&S.fundId===fid&&S.tab==='docs'&&$('formSide')) return sidePreview(kind);
+    if(Date.now()-t0<8000) setTimeout(tick,200);
+  })();
+}
+/* [✔ 확인] — 그 서식들의 지금 값을 확인 기록(form_ok)으로 · 🤖 칸은 확인함과 같은 자리에 «맞음». 자료 값은 안 건드린다.
+   여러 종이면 건수를 묻고 한 번에 쓴다. */
+function fcOk(fid,kinds,asked){
+  var f=funds[fid]; if(!f) return;
+  var fc=_fcFund(Object.assign({},f,{_id:fid}),SD.sites[fid]||null,SD.fok[fid],SD.prov[fid],[]);
+  if(!fc){ toast('서식 자료를 아직 못 읽었습니다 — 잠시 뒤 다시','warn'); return; }
+  var pick=fc.list.filter(function(x){ return kinds.indexOf(x.kind)>=0&&!x.lock&&!x.err&&x.n>0; });
+  if(!pick.length){ toast('고른 서식에 확인할 칸이 없습니다','warn'); return; }
+  var nCell=pick.reduce(function(a,x){ return a+x.n; },0), bot={};
+  pick.forEach(function(x){ Object.keys(x.bot).forEach(function(k){ bot[k]=1; }); });
+  var nBot=Object.keys(bot).length;
+  if(pick.length>1&&!asked){
+    confirmM('서식 '+pick.length+'종 · 빨간 칸 '+nCell+'곳을 확인으로 둘까요?\n\n값은 그대로 두고, 다음부터는 지금 값과 견줍니다.'+(nBot?'\n🤖 기계가 넣은 칸 '+nBot+'곳은 «원본과 맞음»으로 둡니다.':''),{ok:'확인으로 두기'})
+      .then(function(ok){ if(ok) fcOk(fid,kinds,1); });
+    return;
+  }
+  var up={}, at=_nowStamp(), by=S.user||'', ev=[], P=SD.prov[fid]||{};
+  pick.forEach(function(x){ up['form_ok/'+fid+'/'+x.kind]={v:_fcSnap(x.cells), by:by, at:at}; });
+  Object.keys(bot).forEach(function(k){ up['prov/'+fid+'/'+k+'/ok']={by:by,at:at};
+    var _p=P[k]; if(_p&&typeof _trProvRk==='function') ev.push({rk:_trProvRk(_p.src,k), o:1, f:fid, r:k}); });
+  fbDb.ref(NS).update(up).then(function(){
+    SD.fok[fid]=SD.fok[fid]||{};
+    pick.forEach(function(x){ SD.fok[fid][x.kind]=up['form_ok/'+fid+'/'+x.kind]; });
+    Object.keys(bot).forEach(function(k){ if(P[k]&&typeof P[k]==='object') P[k].ok={by:by,at:at}; });
+    if(typeof RV!=='undefined') RV.at=0;          // 확인함 숫자도 다시 센다
+    if(typeof FG!=='undefined') FG.at=0;
+    if(ev.length&&typeof _trEv==='function') _trEv(ev);
+    toast('서식 '+pick.length+'종 확인 — 빨간 칸 '+nCell+'곳이 검정으로 돌아갔습니다');
+    SD.fcv=''; if(S.view==='setup'){ renderSetupDash(); if(SD.pop) sdPop(); }
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function fcOkPicked(fid){
+  var ks=[].slice.call(document.querySelectorAll('.fcwrap tbody tr')).filter(function(r){ var c=r.querySelector('.ckcol input'); return c&&c.checked; })
+    .map(function(r){ return r.getAttribute('data-kind'); }).filter(Boolean);
+  if(!ks.length){ toast('확인할 서식의 □ 를 먼저 짚어 주세요','warn'); return; }
+  fcOk(fid,ks);
+}
+/* 확인 기록·출처 기록 읽기 — 설립중 기금 것만(몇 곳 안 된다). 못 읽으면 null(«없음»이라 하지 않는다) */
+function _fcLoad(fid){
+  return Promise.all([
+    fbDb.ref(NS+'/form_ok/'+fid).once('value').then(function(sn){ SD.fok[fid]=sn.val()||{}; },function(){ SD.fok[fid]=null; }),
+    fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ SD.prov[fid]=sn.val()||{}; },function(){ SD.prov[fid]=null; })
+  ]);
+}
+/* ── 인쇄 관문에 🔴 를 — 서식 관문(🤖)과 같은 창에서 «아직 확인 안 한 칸 N곳»을 함께 묻는다 ──
+   items: 🤖 에 이미 있는 칸은 빼고 · snaps: [N칸 확인하고 ○○]을 누르면 쓸 확인 기록(서식마다) */
+function _fcGateRed(kinds,f,sites,okMap,its){
+  var out={items:[], snaps:[]}; if(!_fcIsSetup(f)) return out;
+  var have={}, by={}, fm={};
+  (its||[]).forEach(function(it){ have[it.key]=1; });
+  _fcForms(f).forEach(function(x){ fm[x.kind]=x; });
+  kinds.forEach(function(k){ var x=fm[k]; if(!x||x.lock) return;
+    var cells=null; try{ cells=_fcCells(k,f,sites); }catch(e){} if(!cells) return;
+    out.snaps.push({kind:k, v:_fcSnap(cells)});
+    _fcDiff(cells,(okMap||{})[k]).forEach(function(r){ if(have[r.k]) return;
+      if(by[r.k]){ by[r.k].forms.push(x.label); return; }
+      var it={key:r.k, red:1, how:r.how, old:r.old, lab:_fcItLab(r), val:r.c?r.c.val:'', forms:[x.label]};
+      by[r.k]=it; out.items.push(it); });
+  });
+  return out;
+}
+function _fcGateRow(it){
+  return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b style="color:var(--danger)">'+esc(it.how==='gone'?'(빠짐)':(_fcShow(it.val)||'(비어 있음)'))+'</b> 🔴'
+    +(it.how==='chg'?' <span class="muted" style="font-size:11px">← 전: '+esc(_fcOld(it.old))+'</span>':'')
+    +' <span class="muted" style="font-size:11px">— '+esc((it.forms||[]).join(' · '))+'</span></div>';
+}
+/* 관문 창 안내 — 🤖(기계가 넣고 원본 대조 전)와 🔴(마지막 확인 뒤 새로·바뀜)를 있는 만큼만 말한다 */
+function _gateWhy(its){
+  var red=(its||[]).some(function(it){ return it.red; }), bot=(its||[]).some(function(it){ return !it.red; });
+  return (bot?'기계가 넣고 아직 아무도 원본과 대조하지 않은 값(🤖/🧮)':'')+(bot&&red?'이거나, ':'')
+    +(red?'마지막 확인 뒤 새로 들어오거나 바뀐 값(🔴)':'')+'입니다.';
+}
+/* 묶음(① 인가 …)의 🔴 — 확인 기록을 읽어 관문 목록(G.items)에 붙인다. 아직 못 읽었을 때 누르면 🔴 없이 지난다(🤖 관문과 같다) */
+function _fcBundleRed(G,kinds,f,sites){
+  G.snaps=[];
+  if(!_fcIsSetup(f)) return;
+  fbDb.ref(NS+'/form_ok/'+G.fid).once('value').then(function(sn){
+    if(S._bundleGate!==G) return;   // 그 사이 다른 단계를 열었다
+    var r=_fcGateRed(kinds.map(function(d){ return d[0]; }),f,sites,sn.val()||{},G.items);
+    G.items=G.items.concat(r.items); G.snaps=r.snaps;
+  }).catch(function(){});
 }
 // ── 기금 설립 진행 (신규 기금 대시보드) ──
 function setupTab(f){
@@ -25227,6 +25549,9 @@ var HELP={
  'setup.dash':{t:'설립중 기금',h:'<p>인가·등기 절차를 밟는 기금만 모았습니다. 한 줄이 한 기금 — <b>다음 할 일 · 기한 · 빈 자료</b>만 보면 오늘 할 일이 보입니다.</p>'
    +'<p><b>기한</b>은 앱이 아는 날짜로만 셉니다 — 설립등기는 <b>인가일 + 3주</b>. 인가일을 적어야 나옵니다. <b>인가 기다림</b>은 ⑦ 인가신청을 끝낸 날부터 셉니다.</p>'
    +'<p>잘못 만든 중복 기금은 □ 로 짚고 <b>[🗑 선택한 기금 삭제 보관]</b> — 삭제 보관함으로 옮기며 언제든 복원할 수 있습니다.</p><p>줄을 누르면 <b>진행판</b>이 팝업으로 열립니다 — 단계 체크는 기금 안 [🏗 설립 진행] 탭과 같은 기록입니다. 12단계를 다 마치면 [✅ 운영 전환]으로 기금 현황에 들어갑니다.</p>'},
+ 'setup.fill':{t:'서식 자동 채움 · 바뀐 칸 빨강',h:'<p>서식은 열 때마다 <b>지금 자료로 새로 채워집니다.</b> 여기서는 서식을 열지 않고도 마지막으로 사람이 확인한 뒤 <b>새로 들어오거나 바뀐 자료 칸</b>을 빨강으로 보입니다(바뀐 칸은 전 값이 옆에 작게).</p>'
+   +'<p>[✔ 확인]은 값을 고치지 않고 «지금 값을 봤다»는 기록만 남깁니다 — 그러면 빨강이 검정으로 돌아갑니다. 🤖(기계가 넣고 원본 대조 전) 칸도 «원본과 맞음»으로 함께 둡니다.</p>'
+   +'<p>빨강은 <b>화면 검토용</b>이라 인쇄·PDF·한글 파일에는 나가지 않습니다. 확인하지 않은 빨강이 남아 있으면 인쇄·받기 전에 한 번 묻습니다. 사람이 고쳐 보관한 서식본(✋)은 덮어쓰지 않습니다.</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'

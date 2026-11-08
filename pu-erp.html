@@ -25622,6 +25622,193 @@ function BlockedRequestsModal(props){
   );
 }
 
+/* ══════ 📄 기금관리 «대기함» → 계약관리 «기금 설립에서 온 후보» 띠 (대표 승인 2026-11-07, 목업 B안) ══════
+   기금관리(fund.html)는 신규 설립 기금을 등록하면 `fund_erp/contract_inbox/{기금}` 에 «후보»를 올린다(#2952).
+   여기는 그 후보를 «읽고», 사람이 [가져오기] 를 누르면 계약관리에 계약 한 건을 만든다.
+
+   ■ 지키는 것
+     · 기금관리가 푸른이알피 장부(contracts)에 직접 쓰지 않는다 — 여기서 «사람이 눌렀을 때만» 만든다.
+     · 가져옴·무시·가져온 계약번호는 «여기서» 적는다(`erp`·`ignored`). 기금관리는 읽기만 한다.
+     · 계약은 여느 계약과 «같은 문»(persistOne — 월 잠금·업체 연결·주담당 검증)을 지난다. 흉내 내지 않는다.
+     · 업체는 이름으로 ID 를 채우지 않는다 — 업체관리에 이어진 업체가 없으면 «연결 보류»(erpDeferCoLinkIfNew).
+       후보의 업체 이름은 기금 이름에서 뗀 «짐작»이라 틀릴 수 있다 → 확인 창에서 알리고, 가져온 뒤 사람이 잇는다.
+     · 주담당은 후보에 «이름»만 있다 → 이름으로 사번을 채우지 않는다(온톨로지 — 자동 ID 대입 금지).
+       사람이 고른다. 이름이 같은 직원만 ★ 로 앞에 올려 «고르기 쉽게»만 한다.
+     · 금액·수수료는 후보에 없다 — 만들지 않는다(사람이 계약에서 입력).
+     · 같은 후보가 두 번 생기지 않게 ① 계약에 `fundInboxId` 를 적고 ② `erp` 자리를 «트랜잭션으로» 먼저 잡는다.
+       잡고 나서 멈춘 흔적(계약번호 없이 5분 넘음)은 다시 «대기»로 돌린다.
+     · 계약협의 단계는 여기서만 쓴다 — 기금관리가 올리는 상태는 상담접수·계약확정 둘뿐이다.
+     · 가져온 뒤 기금관리에서 «계약확정»이 되어도 계약 상태를 «저절로» 바꾸지 않는다 — 🔔 [반영] 을 사람이 누른다. */
+var ERP_FIB_PATH = 'fund_erp/contract_inbox';
+var ERP_FIB_CLAIM_TTL = 5 * 60 * 1000;
+var ERP_FIB_STAGE = { consult:'상담접수', signed:'계약확정' };
+var ERP_FIB_TYPE_BY_FUND = { '사내':'fund-single', '공동':'fund-joint' };
+var _erpFibBusy = false;      // 겹쳐 돌지 않게 — 겹치면 같은 후보로 계약이 둘 생길 수 있다
+
+/* 자리를 «지금 누가 쥐고 있나» — 계약번호가 적혔거나 방금(5분 안) 잡은 것 */
+function erpFibTaken(erp, now){
+  if(!erp || typeof erp !== 'object') return false;
+  if(erp.contractId || erp.contractNo) return true;
+  return (now - (Number(erp.claimedAt) || 0)) < ERP_FIB_CLAIM_TTL;
+}
+function erpFibEntries(all){
+  var out = [];
+  if(!all || typeof all !== 'object') return out;
+  Object.keys(all).forEach(function(fid){
+    var rec = all[fid];
+    if(rec && typeof rec === 'object' && (rec.fundName || rec.shortName)) out.push({ fid:fid, rec:rec });
+  });
+  return out;
+}
+function erpFibByNewest(a, b){
+  var x = String(b.rec.createdAt || ''), y = String(a.rec.createdAt || '');
+  return x < y ? -1 : x > y ? 1 : (a.fid < b.fid ? -1 : 1);
+}
+/* 가져올 후보 — 무시한 것·이미 가져간 것(또는 지금 가져오는 중인 것)은 뺀다 */
+function erpFibPending(all, now){
+  return erpFibEntries(all).filter(function(r){ return !r.rec.ignored && !erpFibTaken(r.rec.erp, now); }).sort(erpFibByNewest);
+}
+function erpFibIgnored(all, now){
+  return erpFibEntries(all).filter(function(r){ return !!r.rec.ignored && !erpFibTaken(r.rec.erp, now); }).sort(erpFibByNewest);
+}
+/* 🔔 «기금관리에서는 계약확정이 됐는데 계약은 아직 상담접수·계약협의인 것».
+   ⚠ 위로 올라간 것만 본다 — 사람이 이미 확정한 계약을 기금관리가 «되돌렸다고» 알릴 일은 없다. */
+function erpFibNotices(all, contracts){
+  var out = [];
+  erpFibEntries(all).forEach(function(r){
+    var e = r.rec.erp;
+    if(!e || !e.contractId || r.rec.stage !== 'signed' || e.ackStage === 'signed') return;
+    var ct = (contracts || []).find(function(c){ return c && !c._deleted && c.id === e.contractId; });
+    if(ct && (ct.status === 'consult' || ct.status === 'review')) out.push({ fid:r.fid, rec:r.rec, contract:ct });
+  });
+  return out.sort(erpFibByNewest);
+}
+/* 후보 → 새 계약 서식. 빈 서식은 모달·자동 등록과 «같은 것»(erpBlankContractForm)을 쓴다. */
+function erpFibForm(rec, fid, mgrSid, types){
+  var form = erpBlankContractForm();
+  var nm = String(rec.company || '').trim();
+  form.company.name = nm;
+  form.companyName = nm;
+  form.kinds = ['fund'];
+  var code = ERP_FIB_TYPE_BY_FUND[String(rec.fundType || '')] || '';
+  /* ⚠ 지금 유형표에 «있는 것»만 — 지웠거나 숨긴 유형을 찍으면 어느 화면에도 안 나온다 */
+  if(code && (types || []).some(function(t){ return t && t.code === code && !t.hidden; })) form.typeCodes.fund = code;
+  form.briefs.fund = briefTrim(rec.brief);
+  form.managerMain = String(mgrSid || '');
+  form.status = rec.stage === 'signed' ? 'signed' : 'consult';
+  form.fundInboxId = String(fid || '');
+  form.note = '🏗 기금 설립(기금관리)에서 가져옴 — ' + String(rec.fundName || rec.shortName || '')
+    + (rec.manager ? ' · 기금관리 담당 ' + rec.manager : '');
+  return form;
+}
+/* 같은 업체의 «진행 중인 기금 계약» — 있으면 새로 만들지 않고 «이어 붙이게» 한다(목업 메모 4).
+   ⚠ 다른 기금 후보로 만든 계약(fundInboxId 가 다름)은 뺀다 — 한 회사의 사내기금·공동기금은 따로다. */
+function erpFibMatches(form, fid, contracts){
+  return erpContractDupBlock(form, contracts).filter(function(c){ return !c.fundInboxId || c.fundInboxId === fid; });
+}
+
+function ErpFundInboxStrip(props){
+  var openS = usePersistedState('contract_fibstrip_open', true); var open = openS[0] !== false; var setOpen = openS[1];
+  var mS = useState({}); var mgrPick = mS[0]; var setMgrPick = mS[1];
+  var sS = useState({}); var sel = sS[0]; var setSel = sS[1];
+  var igS = useState(false); var showIg = igS[0]; var setShowIg = igS[1];
+  var now = Date.now();
+  var pending = erpFibPending(props.all, now);
+  var notices = erpFibNotices(props.all, props.contracts);
+  var ignored = erpFibIgnored(props.all, now);
+  if(!pending.length && !notices.length && !ignored.length) return null;
+  var users = (props.users || []).filter(function(u){ return u && u.sid; });
+  var selIds = pending.filter(function(r){ return sel[r.fid]; }).map(function(r){ return r.fid; });
+  var allOn = pending.length > 0 && selIds.length === pending.length;
+  function toggleAll(){ var nx = {}; if(!allOn) pending.forEach(function(r){ nx[r.fid] = true; }); setSel(nx); }
+  function toggleOne(fid){ setSel(function(p){ var nx = Object.assign({}, p); if(nx[fid]) delete nx[fid]; else nx[fid] = true; return nx; }); }
+  function pickMgr(fid, sid){ setMgrPick(function(p){ var nx = Object.assign({}, p); nx[fid] = sid; return nx; }); }
+  function btn(label, onClick, kind, title, disabled){
+    var c = kind === 'main' ? { background:'#1e40af', color:'#fff', border:'1px solid #1e40af' }
+          : kind === 'warn' ? { background:'#fff', color:'#854d0e', border:'1px solid #fbbf24' }
+          : { background:'#fff', color:'#475569', border:'1px solid #cbd5e1' };
+    return h('button', { onClick:onClick, title:title || label, disabled:!!disabled,
+      style:Object.assign({ padding:'4px 10px', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap',
+        cursor:disabled ? 'not-allowed' : 'pointer', opacity:disabled ? 0.5 : 1 }, c) }, label);
+  }
+  function stChip(rec){
+    var signed = rec.stage === 'signed';
+    return h('span', { className:'fib-chip' + (signed ? ' fib-chip-ok' : ''), title:'기금관리가 올린 상태 — ' + (ERP_FIB_STAGE[rec.stage] || '상담접수') },
+      ERP_FIB_STAGE[rec.stage] || '상담접수');
+  }
+  function pendingRow(r, i){
+    var rec = r.rec, fid = r.fid;
+    var hint = String(rec.manager || '');
+    var matches = erpFibMatches(erpFibForm(rec, fid, '', []), fid, props.contracts);
+    var picked = mgrPick[fid] || '';
+    var sorted = users.slice().sort(function(a, b){ return (a.name === hint ? 0 : 1) - (b.name === hint ? 0 : 1); });
+    var shortNm = String(rec.shortName || rec.fundName || '');
+    var meta = [rec.company, hint ? '담당 ' + hint : '', String(rec.createdAt || '').slice(5)].filter(erpNoteWorth);
+    return h('div', { key:fid },
+      h('div', { className:'fib-row' },
+        h('span', { className:'fib-ck' }, h('input', { type:'checkbox', checked:!!sel[fid], onChange:function(){ toggleOne(fid); }, title:'고르기' })),
+        h('span', { className:'fib-no' }, i + 1),
+        h('span', { className:'fib-main' },
+          h('span', { className:'fib-fund', title:String(rec.fundName || '') }, shortNm),
+          stChip(rec)),
+        h('span', { className:'fib-co', title:String(rec.company || '') }, String(rec.company || '')),
+        h('span', { className:'fib-mg', title:hint ? '기금관리의 담당자' : '' }, hint),
+        h('span', { className:'fib-dt' }, String(rec.createdAt || '').slice(5)),
+        h('span', { className:'fib-meta', title:meta.join(' · ') }, meta.join(' · ')),
+        h('span', { className:'fib-act' },
+          h('select', { value:picked, onChange:function(e){ pickMgr(fid, e.target.value); },
+            title:'주담당을 직접 골라 주세요 — 이름으로 대신 채우지 않습니다(★ = 기금관리 담당자와 같은 이름)' },
+            h('option', { value:'' }, '주담당 고르기'),
+            sorted.map(function(u){ return h('option', { key:u.sid, value:u.sid }, (u.name === hint ? '★ ' : '') + u.name); })),
+          btn(matches.length ? '새 계약으로' : '가져오기', function(){ props.onImport(fid, picked); }, matches.length ? 'plain' : 'main',
+            matches.length ? '같은 업체의 기금 계약이 이미 있습니다 — 그래도 새로 만들 때만 누르세요' : '계약관리에 계약 한 건을 만듭니다', !picked),
+          btn('무시', function(){ props.onIgnore([fid]); }, 'plain', '이 후보를 다시 묻지 않습니다'))),
+      matches.length > 0 && h('div', { className:'fib-sub' },
+        h('span', null, '⚠ 같은 업체의 기금 계약이 이미 있습니다 →'),
+        matches.slice(0, 3).map(function(c){
+          return btn('「' + (c.contractNo || '번호 없음') + '」에 연결', function(){ props.onLink(fid, c.id); }, 'warn',
+            '이 계약은 건드리지 않고, 기금관리에 «가져옴(계약번호)» 로만 알립니다');
+        }),
+        matches.length > 3 && h('span', null, '…외 ' + (matches.length - 3) + '건')));
+  }
+  function noticeRow(n){
+    var ct = n.contract;
+    var msg = '🔔 ' + String(n.rec.shortName || n.rec.fundName || '') + ' — 기금 설립에서 «수임 계약 체결»이 끝났습니다. ' + (ct.contractNo || '계약') + ' 지금 상태: '
+      + (contractStatusInfo(ct.status).label) + ' → 계약확정으로 반영할까요?';
+    return h('div', { key:'n-' + n.fid, className:'fib-nt' },
+      h('span', { className:'fib-nt-t', title:msg }, msg),
+      btn('반영', function(){ props.onApply(n.fid); }, 'main', '이 계약을 계약확정으로 옮깁니다'),
+      btn('그대로 두기', function(){ props.onKeep(n.fid); }, 'plain', '상태를 바꾸지 않고 이 알림만 닫습니다'));
+  }
+  var head = h('div', { className:'fib-h' },
+    h('button', { className:'fib-tg', onClick:function(){ setOpen(!open); }, title:open ? '접기' : '펴기' }, open ? '▾' : '▸'),
+    h('span', { className:'fib-ttl' }, '🏗 기금 설립에서 온 계약 후보 ' + pending.length + '건'),
+    notices.length > 0 && h('span', { className:'fib-bell', title:'기금관리에서 계약확정이 된 계약 ' + notices.length + '건 — 아래 «반영»을 누르면 계약 상태를 옮깁니다' }, '🔔 ' + notices.length),
+    h('span', { className:'fib-info', title:'기금관리에서 신규 설립으로 올린 기금입니다. [가져오기]를 누르면 계약관리에 계약 한 건이 생깁니다(금액·수수료는 사람이 입력). 푸른이알피 장부는 누르기 전까지 바뀌지 않습니다.' }, 'ⓘ'));
+  return h('div', { className:'fib' },
+    head,
+    open && h('div', { className:'fib-body' },
+      pending.length > 0 && h('div', { className:'fib-row fib-th' },
+        h('span', { className:'fib-ck' }, h('input', { type:'checkbox', checked:allOn, onChange:toggleAll, title:'지금 보이는 줄 모두 고르기' })),
+        h('span', { className:'fib-no' }, '№'), h('span', { className:'fib-main' }, '기금'), h('span', { className:'fib-co' }, '업체(고객)'),
+        h('span', { className:'fib-mg' }, '담당'), h('span', { className:'fib-dt' }, '올라온 날'), h('span', { className:'fib-act' }, '')),
+      selIds.length > 0 && h('div', { className:'fib-bulk' },
+        h('b', null, selIds.length + '건 선택'),
+        btn('선택 가져오기', function(){ props.onImportMany(selIds.map(function(fid){ return { fid:fid, mgr:mgrPick[fid] || '' }; })).then(function(){ setSel({}); }); }, 'main',
+          '주담당을 고른 것만 만듭니다 — 같은 업체의 기금 계약이 있거나 주담당이 비어 있는 것은 건너뜁니다'),
+        btn('선택 무시', function(){ props.onIgnore(selIds).then(function(ok){ if(ok) setSel({}); }); }, 'plain'),
+        btn('선택 풀기', function(){ setSel({}); }, 'plain')),
+      pending.map(pendingRow),
+      notices.map(noticeRow),
+      ignored.length > 0 && h('div', { className:'fib-ig' },
+        h('button', { className:'fib-tg', onClick:function(){ setShowIg(!showIg); } }, (showIg ? '▾ ' : '▸ ') + '무시한 후보 ' + ignored.length + '건'),
+        showIg && ignored.map(function(r){
+          return h('div', { key:'i-' + r.fid, className:'fib-igrow' },
+            h('span', { className:'fib-ig-t', title:String(r.rec.fundName || '') }, String(r.rec.shortName || r.rec.fundName || '') + (r.rec.company ? ' · ' + r.rec.company : '')),
+            btn('되돌리기', function(){ props.onRestore(r.fid); }, 'plain', '다시 «가져올 후보» 로 돌립니다'));
+        }))));
+}
+
 function ContractManagement(props){
   props = props || {};
   var existing = dbGet('contracts', null);
@@ -26075,6 +26262,191 @@ function ContractManagement(props){
     fbDb.ref('data/contract_requests/' + key).remove()
       .then(function(){ showToast('🗑 요청을 지웠습니다'); })
       .catch(function(){ showToast('❌ 지우기 실패'); });
+  }
+
+  /* ══════ 📄 기금 설립 후보 가져오기 (규칙·까닭은 ErpFundInboxStrip 위 머리글) ══════
+     후보 자료는 `fund_erp/contract_inbox/{기금}` — 기금관리가 «올리고», 여기서는 `erp`·`ignored` 만 «적는다».
+     ⚠ 후보 한 건의 «고치기»는 전부 fibTx(그 기금 한 칸 트랜잭션)로 한다 — 기금관리가 그 사이 후보를 거두었으면
+       (지웠으면) 아무것도 안 쓴다. 그냥 .set 하면 지워진 후보 자리에 «가져옴»만 남은 유령이 생긴다. */
+  var fibS = useState(null); var fibAll = fibS[0]; var setFibAll = fibS[1];
+  useEffect(function(){
+    if(!fbDb) return;
+    var ref = fbDb.ref(ERP_FIB_PATH);
+    var cb = ref.on('value', function(snap){ setFibAll(snap.val() || {}); }, function(){ setFibAll(null); });
+    return function(){ try{ ref.off('value', cb); }catch(_){} };
+  }, []);
+  function fibWho(){ return (CURRENT_USER && CURRENT_USER.sid) || ''; }
+  async function fibTx(fid, mutate){
+    var res = await fbDb.ref(ERP_FIB_PATH + '/' + fid).transaction(function(cur){
+      if(cur === null || cur === undefined) return null;   // 아직 못 받았거나 없다 — 받았으면 서버 값으로 다시 부른다
+      return mutate(JSON.parse(JSON.stringify(cur)));      // undefined 를 돌려주면 그만둔다
+    });
+    return { committed:!!(res && res.committed), val:(res && res.snapshot && res.snapshot.val()) || null };
+  }
+  /* 가져올 «자리»를 먼저 잡는다 — 둘이 동시에 눌러도 한 사람만 잡힌다 */
+  async function fibClaim(fid){
+    var claim = { claimedAt:Date.now(), bySid:fibWho() };
+    var r = await fibTx(fid, function(c){
+      if(c.ignored || erpFibTaken(c.erp, Date.now())) return;
+      c.erp = claim; return c;
+    });
+    return (r.committed && r.val && r.val.erp && r.val.erp.claimedAt === claim.claimedAt && r.val.erp.bySid === claim.bySid) ? claim : null;
+  }
+  async function fibUnclaim(fid, claim){
+    try{ await fibTx(fid, function(c){
+      if(!c.erp || c.erp.claimedAt !== claim.claimedAt || c.erp.contractId) return;
+      delete c.erp; return c;
+    }); }catch(_){}
+  }
+  async function fibMark(fid, ct, linked){
+    var r = await fibTx(fid, function(c){
+      var e = Object.assign({}, c.erp || {}, { contractId:ct.id, contractNo:ct.contractNo || '', at:(new Date()).toISOString(), bySid:fibWho() });
+      delete e.claimedAt; if(linked) e.linked = true;
+      c.erp = e; return c;
+    });
+    return !!(r.committed && r.val && r.val.erp && r.val.erp.contractId === ct.id);
+  }
+  function fibReady(){
+    if(!fbDb) return false;
+    if(!Array.isArray(dbGet('companies', null)) || !Array.isArray(dbGet('contracts', null))){ showToast('⏳ 아직 자료를 받는 중입니다 — 잠시 후 다시 눌러 주세요'); return false; }
+    if(_erpFibBusy){ showToast('⏳ 처리 중입니다 — 잠시 후 다시 눌러 주세요'); return false; }
+    return true;
+  }
+  /* 후보 «한 건»을 계약으로 만든다 — 한 건씩 누르는 길도, 여럿을 고른 길(quiet)도 «이 함수 하나»다.
+     결과: { made } 만듦 · { linked } 이미 만든 계약에 이음 · { cancelled } · { why, skip } 못 함 */
+  async function fibImportOne(fid, mgrSid, quiet){
+    var snap = await fbDb.ref(ERP_FIB_PATH + '/' + fid).once('value');
+    var rec = snap.val();
+    if(!rec) return { why:'기금관리가 이 후보를 거두었습니다' };
+    if(rec.ignored) return { why:'무시한 후보입니다' };
+    if(erpFibTaken(rec.erp, Date.now())) return { why:'이미 가져왔습니다' };
+    var cts = dbGet('contracts', []) || [];
+    /* 계약은 만들어졌는데 «가져옴» 표시만 못 적은 흔적 — 새로 만들지 않고 이어 붙인다 */
+    var had = cts.find(function(c){ return c && !c._deleted && c.fundInboxId === fid; });
+    if(had) return (await fibMark(fid, had, false)) ? { linked:had } : { why:'기금관리에 «가져옴»을 알리지 못했습니다' };
+    if(!users.some(function(u){ return u.sid === mgrSid; })) return { why:'주담당을 골라 주세요', skip:true };
+    var form = erpFibForm(rec, fid, mgrSid, getKindTypes('fund'));
+    if(!form.company.name) return { why:'후보에 업체 이름이 없습니다' };
+    if(quiet && erpFibMatches(form, fid, cts).length) return { why:'같은 업체의 기금 계약이 이미 있습니다 — 한 건씩 확인해 주세요', skip:true };
+    form = erpDeferCoLinkIfNew(form) || form;
+    var ym = String(form.signDate || '').slice(0, 7);
+    if(ym && isContractLocked(ym)) return { why:ym + ' 이 잠겨 있어 계약을 만들 수 없습니다' };
+    if(!quiet){
+      var O = window.PuOntology, cands = [];
+      try{ if(O && typeof O.companyLinkCandidates === 'function') cands = O.companyLinkCandidates(form, dbGet('companies', []) || [], '') || []; }catch(_){}
+      var ok = await popConfirm('「' + form.company.name + '」 기금 계약을 «' + (ERP_FIB_STAGE[rec.stage] || '상담접수') + '» 단계로 만듭니다.\n\n'
+        + '· 기금: ' + (rec.fundName || rec.shortName || '') + '\n'
+        + '· 주담당: ' + userName(mgrSid) + '\n'
+        + '· 금액·수수료는 넣지 않습니다(계약에서 직접 입력).\n'
+        + (form.companyLinkStatus === 'pending'
+            ? '· 업체는 «연결 보류»로 만듭니다 — 업체 이름은 기금 이름에서 뗀 것이라 틀릴 수 있습니다.\n'
+              + (cands.length ? '  업체관리에 비슷한 업체: ' + cands.slice(0, 3).map(function(c){ return c.name; }).join(', ') + (cands.length > 3 ? ' 외 ' + (cands.length - 3) + '곳' : '') + '\n' : '')
+              + '  가져온 뒤 계약을 열어 «업체 연결 확인»에서 이어 주세요.\n'
+            : ''),
+        { okText:'가져오기', cancelText:'닫기', danger:false });
+      if(!ok) return { cancelled:true };
+    }
+    var claim = await fibClaim(fid);
+    if(!claim) return { why:'다른 분이 방금 가져갔거나 후보가 바뀌었습니다' };
+    var newOne = Object.assign({}, form, {
+      id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      contractNo: genContractNo(),
+      transferredTo: null,
+      regAt: (new Date()).toISOString()
+    });
+    var saved = false;
+    try{ saved = persistOne(newOne); }catch(e){ saved = false; }
+    if(!saved){ await fibUnclaim(fid, claim); return { why:'계약관리가 저장을 막았습니다 — 방금 뜬 알림의 까닭(업체 연결·주담당·월 잠금)을 확인해 주세요' }; }
+    var marked = await fibMark(fid, newOne, false);
+    return marked ? { made:newOne } : { made:newOne, warn:true };
+  }
+  async function fibImport(fid, mgrSid){
+    if(!fibReady()) return;
+    _erpFibBusy = true;
+    var r;
+    try{ r = await fibImportOne(fid, mgrSid, false); }
+    catch(e){ r = { why:'오류 — ' + ((e && e.message) || e) }; }
+    finally{ _erpFibBusy = false; }
+    if(r.cancelled) return;
+    if(r.made) showToast('✔ ' + (r.made.companyName || '') + ' 기금 계약을 만들었습니다 — ' + r.made.contractNo + (r.warn ? ' (기금관리에 «가져옴» 표시는 아직 못 적었습니다 — 잠시 뒤 다시 열면 이어집니다)' : '') + ' · 업체 연결·금액을 확인해 주세요', 9000);
+    else if(r.linked) showToast('✔ 이미 만든 계약(' + (r.linked.contractNo || '') + ')에 이어 붙였습니다');
+    else showToast('⚠ 가져오지 못했습니다 — ' + r.why, 9000);
+  }
+  async function fibImportMany(items){
+    if(!fibReady() || !items || !items.length) return;
+    var ok = await popConfirm('고른 후보 ' + items.length + '건을 계약관리로 가져옵니다.\n\n'
+      + '· 주담당을 고른 것만 만듭니다.\n· 같은 업체의 기금 계약이 이미 있는 것은 건너뜁니다(한 건씩 «연결»·«새 계약으로»).\n· 금액·수수료는 넣지 않습니다.',
+      { okText:'가져오기', cancelText:'닫기', danger:false });
+    if(!ok) return;
+    _erpFibBusy = true;
+    var made = 0, skipped = [], failed = [];
+    try{
+      for(var i = 0; i < items.length; i++){
+        var r;
+        try{ r = await fibImportOne(items[i].fid, items[i].mgr, true); }catch(e){ r = { why:'오류 — ' + ((e && e.message) || e) }; }
+        if(r.made || r.linked) made++;
+        else if(r.skip) skipped.push(r.why);
+        else if(!r.cancelled) failed.push(r.why);
+      }
+    } finally { _erpFibBusy = false; }
+    showToast('📄 ' + made + '건 가져왔습니다' + (skipped.length ? ' · 건너뜀 ' + skipped.length + '건(' + skipped[0] + ')' : '') + (failed.length ? ' · 못 함 ' + failed.length + '건(' + failed[0] + ')' : ''), 9000);
+  }
+  async function fibLink(fid, contractId){
+    if(!fibReady()) return;
+    var ct = (dbGet('contracts', []) || []).find(function(x){ return x && !x._deleted && x.id === contractId; });
+    if(!ct){ showToast('그 계약을 찾지 못했습니다 — 화면을 새로 열어 주세요'); return; }
+    if(!(await popConfirm('「' + (ct.contractNo || '') + ' · ' + (ct.companyName || '') + '」 계약에 이 후보를 이어 붙입니다.\n\n'
+      + '· 계약 내용은 바꾸지 않습니다.\n· 기금관리에는 «가져옴(계약번호)» 로만 표시됩니다.',
+      { okText:'이어 붙이기', cancelText:'닫기', danger:false }))) return;
+    _erpFibBusy = true;
+    try{
+      var claim = await fibClaim(fid);
+      if(!claim){ showToast('⚠ 다른 분이 방금 가져갔거나 후보가 바뀌었습니다'); return; }
+      if(await fibMark(fid, ct, true)) showToast('✔ ' + (ct.contractNo || '') + ' 계약에 이어 붙였습니다');
+      else { await fibUnclaim(fid, claim); showToast('⚠ 기금관리에 알리지 못했습니다 — 다시 눌러 주세요'); }
+    } catch(e){ showToast('⚠ 이어 붙이지 못했습니다 — ' + ((e && e.message) || e)); }
+    finally { _erpFibBusy = false; }
+  }
+  async function fibIgnore(fids){
+    fids = [].concat(fids || []);
+    if(!fids.length || !fbDb) return false;
+    var names = fids.map(function(f){ var r = (fibAll || {})[f]; return r ? '· ' + (r.shortName || r.fundName || f) : ''; }).filter(Boolean).slice(0, 8).join('\n');
+    if(!(await popConfirm('기금 설립 후보 ' + fids.length + '건을 «무시»할까요?\n\n' + names + '\n\n· 이 후보는 다시 묻지 않습니다.\n· 띠 아래 «무시한 후보»에서 되돌릴 수 있습니다.',
+      { okText:'무시', cancelText:'닫기', danger:false }))) return false;
+    var at = (new Date()).toISOString(), by = fibWho(), bad = 0;
+    for(var i = 0; i < fids.length; i++){
+      try{
+        var r = await fibTx(fids[i], function(c){ if(c.erp) return; c.ignored = { at:at, bySid:by }; return c; });
+        if(!(r.committed && r.val && r.val.ignored)) bad++;
+      }catch(_){ bad++; }
+    }
+    showToast(bad ? '⚠ ' + (fids.length - bad) + '건 무시 · ' + bad + '건은 못 했습니다(이미 가져갔거나 기금관리가 거둠)' : '✔ ' + fids.length + '건을 무시했습니다');
+    return !bad;
+  }
+  async function fibRestore(fid){
+    try{
+      var r = await fibTx(fid, function(c){ if(!c.ignored) return; delete c.ignored; return c; });
+      showToast(r.committed && r.val && !r.val.ignored ? '✔ 다시 가져올 후보로 돌렸습니다' : '⚠ 되돌리지 못했습니다');
+    }catch(e){ showToast('⚠ 되돌리지 못했습니다'); }
+  }
+  /* 🔔 알림을 닫는다 — 어느 단계까지 알렸는지(ackStage)만 적는다 */
+  async function fibAck(fid){
+    try{
+      var r = await fibTx(fid, function(c){ if(!c.erp) return; c.erp.ackStage = 'signed'; return c; });
+      if(!(r.committed && r.val && r.val.erp && r.val.erp.ackStage === 'signed')) showToast('⚠ 알림을 닫지 못했습니다');
+    }catch(e){ showToast('⚠ 알림을 닫지 못했습니다'); }
+  }
+  /* [반영] — 계약 상태를 «사람이 눌러» 계약확정으로 옮긴다(옮기는 길은 단계 이동 단추와 «같은» moveStatus) */
+  async function fibApply(fid){
+    var rec = (fibAll || {})[fid], e = rec && rec.erp;
+    if(!e || !e.contractId) return;
+    var ct = (dbGet('contracts', []) || []).find(function(x){ return x && !x._deleted && x.id === e.contractId; });
+    if(ct && (ct.status === 'consult' || ct.status === 'review')){
+      moveStatus(ct.id, 'signed');
+      var after = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === ct.id; });
+      if(!after || after.status !== 'signed') return;      // 월 잠금 등으로 못 옮겼다 — 알림은 그대로 둔다
+    }
+    await fibAck(fid);
   }
 
   function openPrintModal(c){ setPrintModal(c); }
@@ -26927,6 +27299,10 @@ function ContractManagement(props){
         var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
         return t ? t.name : (code || '-');
       } }),
+    /* 📄 기금 설립에서 온 계약 후보 — 없으면 아무것도 안 그린다(ErpFundInboxStrip) */
+    h(ErpFundInboxStrip, { all:fibAll, contracts:contracts, users:users,
+      onImport:fibImport, onImportMany:fibImportMany, onLink:fibLink, onIgnore:fibIgnore, onRestore:fibRestore,
+      onApply:fibApply, onKeep:fibAck }),
     // (종류 탭은 아래 툴바 드롭다운으로 통합)
     // 툴바+담당자 필터 영역 틀고정
     /* 🧊 폰에서도 붙인다 (대표 지시 2026-10-23 「틀 고정」) — 전에는 폰만 static 이라 목록을 내리면 검색·거르개가 사라졌다. */
@@ -28394,13 +28770,20 @@ function consTypeIsPersonal(code){
   var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
   return !!(t && t.personalDeposit);
 }
-function erpPersonalDepositInfo(item){
-  if(!item) return { on:false, why:'' };
+/* 원본(컨설팅·계약)의 «컨설팅 유형» 코드 — 컨설팅은 typeCode, 여러 종류를 품은 계약은 typeCodes.consulting.
+   개인입금 판정과 컨설팅정산 판정(erpSettlePerfType)이 같은 잣대를 쓴다. */
+function erpConsTypeCodeOf(item){
+  if(!item) return '';
   var code = item.typeCode || '';
   if(!code && item.typeCodes){
     var ks = item.kinds || (item.kind ? [item.kind] : []);
     if(ks.indexOf('consulting') >= 0) code = item.typeCodes.consulting || '';
   }
+  return code;
+}
+function erpPersonalDepositInfo(item){
+  if(!item) return { on:false, why:'' };
+  var code = erpConsTypeCodeOf(item);
   var typeOn = consTypeIsPersonal(code);
   var mode = item.personalDepositMode || '';
   if(mode === 'on') return { on:true, why:'manual', typeOn:typeOn };
@@ -28412,6 +28795,75 @@ function erpIsPersonalDeposit(item){ return erpPersonalDepositInfo(item).on; }
 function erpInitDeductions(item, vatType){
   if(item && erpIsPersonalDeposit(item)) return { personalRevenue:true, vatIncluded:false };
   return (vatType === 'inclusive') ? { vatIncluded:true } : {};
+}
+/* ══ 🧾 컨설팅정산이 맡은 사업 — 개인수익으로 확정해도 성과급을 만들지 않는다 (대표 선택 2026-10-31) ══
+   설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §8.
+   개인 통장으로 들어오는 정부사업(일터혁신 등)은 컨설팅정산 앱(pu-settle.html)이 주관·담당 몫을 따로 정산한다.
+   여기서도 성과급을 만들면 담당에게 «두 번» 나간다. 그래서 그 사업 종류의 «개인수익» 입금에는 성과급을 만들지 않고
+   perfSettleType(사업 종류 코드)을 남겨 «🧾 컨설팅정산에서 개별정산»으로 보인다.
+   ★ 맡은 사업 종류 = settle/rules 의 열쇠(_deleted 아닌 것). 컨설팅정산 «설정 › 요율·규칙»에서 규칙을 만들고 지우면 저절로 따라간다 — 푸는 길도 거기다.
+   ★ «법인 매출»로 확정하는 길은 그대로 — 돈이 법인에 들어왔으면 보통 성과급이 맞다.
+   ★ 이미 만들어진 성과급은 건드리지 않는다(돈 기록 자동 변경 금지) — erpSettleOverlapType 으로 «겹칠 수 있음»만 알린다.
+   ⚠ 규칙을 아직 못 읽었으면(null) 막지 못한다 — 로그인 확인 직후 읽어 두고, 못 읽었으면 판단할 때마다 다시 묻는다.
+     못 읽은 채 만들어진 성과급은 «겹칠 수 있음» 표시가 나중에 잡는다. */
+var ERP_SETTLE_TYPES = null;          // { 사업종류코드: 규칙 이름 } — null = 아직 못 읽음
+var _erpSettleRef = null, _erpSettleFailAt = 0;
+function erpSettleTypesFrom(rules){
+  var o = {};
+  Object.keys(rules || {}).forEach(function(k){
+    var r = rules[k];
+    if(r && typeof r === 'object' && !r._deleted) o[k] = String(r.title || '');
+  });
+  return o;
+}
+function erpSettleTypesLoad(){
+  if(_erpSettleRef || typeof fbDb === 'undefined' || !fbDb) return;
+  if(Date.now() - _erpSettleFailAt < 60000) return;     // 권한 없음·끊김 — 1분 안에는 다시 묻지 않는다
+  try{
+    if(typeof firebase !== 'undefined' && firebase.auth && !firebase.auth().currentUser) return;   // 로그인 확인 전 — 나중에 다시
+    var ref = _erpSettleRef = fbDb.ref('settle/rules');
+    ref.on('value', function(s){ ERP_SETTLE_TYPES = erpSettleTypesFrom(s.val()); },
+      function(){ _erpSettleRef = null; _erpSettleFailAt = Date.now(); });
+  }catch(_e){ _erpSettleRef = null; _erpSettleFailAt = Date.now(); }
+}
+/* 이 원본(컨설팅·계약)의 이 공제가 «개인수익»이고 사업 종류를 컨설팅정산이 맡았으면 그 코드, 아니면 ''.
+   types 를 안 주면 읽어 둔 규칙(ERP_SETTLE_TYPES)을 쓴다 — 검사는 types 를 넘겨 돌린다. */
+function erpSettlePerfType(src, ded, types){
+  if(!src || !ded || !ded.personalRevenue) return '';
+  if(types === undefined){ if(ERP_SETTLE_TYPES === null) erpSettleTypesLoad(); types = ERP_SETTLE_TYPES; }
+  var code = erpConsTypeCodeOf(src);
+  return (code && types && Object.prototype.hasOwnProperty.call(types, code)) ? code : '';
+}
+/* 확정된 입금 한 건이 «지금» 컨설팅정산 몫인가 — «⭐ 반영»(성과급 얹기)을 막고 목록에 🧾 로 보일 때 쓴다.
+   남겨 둔 표시(perfSettleType)가 있으면 그 규칙이 아직 있는지(못 읽었으면 있다고 본다), 표시가 없으면 원본 사업 종류로 다시 본다.
+   ★ 푸는 길: 컨설팅정산에서 그 사업 규칙을 지우면 표시가 남아 있어도 풀린다. src 를 안 주면 원본(컨설팅·계약)을 찾아 본다. */
+function erpSettleOfIncome(fi, src, types){
+  if(!fi) return '';
+  if(types === undefined){ if(ERP_SETTLE_TYPES === null) erpSettleTypesLoad(); types = ERP_SETTLE_TYPES; }
+  var st = fi.perfSettleType;
+  if(st) return (!types || Object.prototype.hasOwnProperty.call(types, st)) ? st : '';
+  if(!(fi.deductions && fi.deductions.personalRevenue)) return '';      // 개인수익이 아니면 볼 것도 없다(목록마다 부르므로 먼저 거른다)
+  return erpSettlePerfType(src === undefined ? erpSettleSrcOf(fi) : src, fi.deductions, types);
+}
+/* 입금의 원본 — 컨설팅정산 사업 종류는 컨설팅(typeCode)·계약(typeCodes.consulting)에만 있다 */
+function erpSettleSrcOf(fi){
+  var store = { consulting:'consultings', contract:'contracts' }[fi && fi.sourceKind];
+  if(!store || !fi.sourceId) return null;
+  return (dbGet(store, []) || []).find(function(x){ return x && x.id === fi.sourceId; }) || null;
+}
+/* 이 막음보다 «먼저» 만들어진 성과급 — 컨설팅정산 사업의 개인수익인데 성과급이 붙어 있다. 고치지 않고 알리기만 한다. */
+function erpSettleOverlapType(fi, src, types){
+  if(!fi || fi.perfSettleType || !(fi.perfShares || []).length) return '';
+  if(!(fi.deductions && fi.deductions.personalRevenue)) return '';
+  return erpSettlePerfType(src === undefined ? erpSettleSrcOf(fi) : src, fi.deductions, types);
+}
+function erpSettleLabel(code){
+  var t = (ERP_SETTLE_TYPES && ERP_SETTLE_TYPES[code]) || '';
+  if(!t && code){
+    var b = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
+    t = (b && b.name) || '';
+  }
+  return '🧾 컨설팅정산에서 개별정산' + (t ? ' (' + t + ')' : '');
 }
 function calcDeductions(amount, ded){
   ded = ded || {};
@@ -39420,7 +39872,10 @@ function personalReclassPatch(fi, src, toPersonal){
   var subs = ((src && src.managerSubs) || []).filter(Boolean);
   var mainPct = fi.splitMainPct != null ? fi.splitMainPct : 100;
   var shares = [];
-  if(main){
+  /* 🧾 컨설팅정산이 맡은 사업으로 «개인수익» 이 되면 성과급을 만들지 않는다(입금확정 창과 같은 함수).
+     법인 매출로 되돌리면 표시를 지운다 — 그때는 예전처럼 성과급을 나눈다. */
+  var settleType = toPersonal ? erpSettlePerfType(src, ded) : '';
+  if(main && !settleType){
     if(toPersonal){
       var users = dbGet('user_accounts', []) || [];
       var nameOf = function(sid){ var u = users.find(function(x){ return x.sid === sid; }); return u ? u.name : erpNoName(sid); };
@@ -39436,7 +39891,7 @@ function personalReclassPatch(fi, src, toPersonal){
     }
   }
   return { deductions:ded, perfBaseAmount:calc.perfBaseAmount, isPersonalIncome:!!toPersonal,
-    perfShares:shares, perfExclude: !!toPersonal && shares.length === 0 };
+    perfShares:shares, perfExclude: !!toPersonal && shares.length === 0, perfSettleType: settleType || undefined };
 }
 function PersonalDepositBulkModal(props){
   useEscClose(props.onClose);
@@ -39471,7 +39926,11 @@ function PersonalDepositBulkModal(props){
         '👤 ' + (props.name || props.code) + ' → ' + (props.on ? '개인입금 사업으로' : '법인 입금으로') + ' 바꿨습니다'),
       h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'6px' } },
         '아직 입금 안 된 계약·컨설팅은 저절로 따라갑니다. 아래는 이 유형으로 «이미 확정된 입금» 가운데 분류가 다른 것입니다 — '
-        + (props.on ? '개인수익으로 바꾸면 법인 매출·부가세에서 빠지고 성과급만 반영됩니다.' : '법인 매출로 바꾸면 매출·부가세에 다시 들어갑니다.')),
+        + (props.on
+            ? (erpSettlePerfType({ typeCode:props.code }, { personalRevenue:true })
+                ? '개인수익으로 바꾸면 법인 매출·부가세에서 빠집니다. 🧾 컨설팅정산이 맡은 사업이라 성과급은 만들지 않습니다(그 앱이 따로 정산).'
+                : '개인수익으로 바꾸면 법인 매출·부가세에서 빠지고 성과급만 반영됩니다.')
+            : '법인 매출로 바꾸면 매출·부가세에 다시 들어갑니다.')),
       rows.length === 0
         ? h('div', { style:{ padding:'14px', textAlign:'center', color:'#64748b', fontSize:'12.5px' } }, '바꿀 확정 입금이 없습니다 — 스위치만 바뀌었습니다.')
         : h('div', { style:{ maxHeight:'50vh', overflow:'auto' } },
@@ -51429,6 +51888,7 @@ var HANA_APK_VER = '2.5.1';
 
 function FinanceLedger(props){
   props = props || {};
+  try{ erpSettleTypesLoad(); }catch(_st){}   // 🧾 컨설팅정산이 맡은 사업 — 통장 줄로 확정하기 «전에» 읽어 둔다(한 번만 붙는다)
   /* ── 미입금 대기 목록 (입금 매칭 후보) ──
      2026-08-07 김보람 건의: 「일반 자문료 입금건은 매칭이 안 되고 컨설팅·사건만 된다」
      확인해 보니 후보를 만드는 항목 이름이 실제 자료와 여러 군데 어긋나 있었다.
@@ -52541,7 +53001,7 @@ function FinanceLedger(props){
     /* ⚡ 자동확정이면 성과급까지 여기서 나눈다.
        그냥 두면 perfShares 가 빈 채로 저장돼 「성과 미반영」에 쌓인다 — 창을 거친 건과 같은 결과가 되게 한다.
        부가세 포함 계약이면 1/11 을 뺀 금액이 성과 기준 (입금관리 calcDeductions 와 같은 셈). */
-    var _perfShares = [], _ded = {}, _perfBase = row.amount;
+    var _perfShares = [], _ded = {}, _perfBase = row.amount, _settle = '';
     if(opts.withPerf && !isAdv){
       try{
         var _it = pItem.item||{};
@@ -52554,7 +53014,9 @@ function FinanceLedger(props){
            (지금 개인입금이 표시된 계약은 없다. 이 줄은 그런 계약이 생겼을 때를 위한 것이다.) */
         _ded = erpInitDeductions(_it, opts.vatIncluded ? 'inclusive' : 'separate');
         _perfBase = calcDeductions(row.amount, _ded).perfBaseAmount;
-        if(_main){
+        /* 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 만들지 않는다 — 입금확정 창과 «같은 함수»(erpSettlePerfType) */
+        _settle = erpSettlePerfType(_it, _ded);
+        if(_main && !_settle){
           /* 창을 안 거치는 길이다. 기본 분할을 여기서도 «같은 함수» 로 낸다 —
              안 그러면 통장에서 자동 확정한 건만 주담당 100% 로 남아,
              주담당이 요율 0%(대표님) 면 성과급이 통째로 사라진다. */
@@ -52588,6 +53050,7 @@ function FinanceLedger(props){
       managerSid: isAdv ? undefined : ((pItem.item||{}).managerMain || (pItem.item||{}).manager || ''),
       deductions: _ded, perfBaseAmount: _perfBase,
       isPersonalIncome: _isPersonal || undefined,
+      perfExclude: _settle ? true : undefined, perfSettleType: _settle || undefined,   // 🧾 컨설팅정산에서 개별정산
       autoConfirmed: opts.withPerf ? true : undefined,
       perfShares:_perfShares, confirmedAt:new Date().toISOString(), confirmedBy:CURRENT_USER?CURRENT_USER.sid:''});
     if(_saved === false) throw new Error('입금을 저장하지 못했습니다 (입금 마감된 달이거나 저장 실패)');
@@ -57757,6 +58220,9 @@ function FinanceLedger(props){
               cursor:'pointer',padding:'0 4px',lineHeight:1}},'×')),
           h('div',{style:{padding:'14px',fontSize:'13.5px',borderBottom:'1px solid #e2e8f0',color:'#64748b'}},
             '입금 ',(fi.amount||0).toLocaleString(),'원 · ',fi.date||'-',' · 성과 기준액 ',perfBase.toLocaleString(),'원'),
+          /* 🧾 컨설팅정산 몫이면 알린다 — 손으로 고치는 창이라 막지는 않는다(담당 바꾸기·기존 성과급 정리는 여기서 한다) */
+          erpSettleOfIncome(fi, srcItem) && h('div',{style:{padding:'8px 14px',fontSize:'13px',fontWeight:700,color:'#854d0e',background:'#fffbeb',borderBottom:'1px solid #fde68a'}},
+            '⚠ ' + erpSettleLabel(erpSettleOfIncome(fi, srcItem)) + ' 건입니다 — 여기서 성과급을 넣으면 담당에게 두 번 나갈 수 있습니다'),
           h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',flex:1,overflow:'hidden'}},
             // 왼쪽: 변경 전
             h('div',{style:{padding:'14px',borderRight:'1px solid #e2e8f0',background:'#fef2f2',overflowY:'auto'}},
@@ -57976,6 +58442,8 @@ function IncomeUnmatchedTab(props){
   // 사유별 분류 (group: check=점검필요, advisory=자문료, other=기타)
   function classify(fi){
     var noShare = !(fi.perfShares||[]).length;
+    // 🧾 컨설팅정산에서 개별정산 — 빠뜨린 게 아니라 «따로 정산»이라 점검할 것이 아니다
+    if(noShare && erpSettleOfIncome(fi)) return { tag:'🧾 컨설팅정산', color:'#854d0e', bg:'#fffbeb', priority:4, group:'other' };
     if(fi.perfExclude === true) return { tag:'⛔ 명시적 제외', color:'#991b1b', bg:'#fef2f2', priority:2, group:'check' };
     // 담당자는 정해져 있는데 아무도 못 받은 건 — 분할이나 요율을 봐야 한다
     if(erpPerfPaidZero(fi)) return { tag:'💸 지급액 0원', color:'#991b1b', bg:'#fef2f2', priority:1, group:'check' };
@@ -58014,6 +58482,12 @@ function IncomeUnmatchedTab(props){
   // 강제 리렌더 (성과 반영 토글 후)
   var rfS = useState(0); var refreshKey = rfS[0]; var setRefreshKey = rfS[1];
   async function reEnablePerf(fi){
+    /* 🧾 컨설팅정산에서 개별정산하는 건 — 여기서 성과급을 얹으면 담당에게 두 번 나간다(erpSettlePerfType 머리글) */
+    var _st = erpSettleOfIncome(fi);
+    if(_st){
+      showToast(erpSettleLabel(_st) + ' 건이라 성과급을 얹지 않습니다 — 컨설팅정산 «설정 › 요율·규칙»에서 그 사업을 빼면 다시 할 수 있습니다');
+      return;
+    }
     var isPersonal = fi.isPersonalIncome;
     var msg = isPersonal
       ? '이 입금건을 성과에 반영하시겠습니까?\n\n→ 개인소득 항목: 담당자 성과율로 분배됩니다.\n→ 미반영 표시가 제거됩니다.'
@@ -58242,7 +58716,10 @@ function IncomeUnmatchedTab(props){
                     })(),
                     h('td', {style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:800,color:'#2563eb'})}, perfTotal>0 ? perfTotal.toLocaleString()+'원' : '0'),
                     h('td', {style:Object.assign({},tdS,{textAlign:'center'})},
-                      fi.perfExclude
+                      fi.perfExclude && erpSettleOfIncome(fi)
+                        ? h('span', { title: erpSettleLabel(erpSettleOfIncome(fi)) + ' — 담당 몫은 컨설팅정산 앱이 따로 정산합니다',
+                            style:{ fontSize:'12px', color:'#854d0e', whiteSpace:'nowrap' } }, '🧾 정산')
+                      : fi.perfExclude
                         ? h('button', {
                             onClick: function(){ reEnablePerf(fi); },
                             title: 'perfExclude 해제 + 주담당/부담당 자동 분배',
@@ -58262,6 +58739,7 @@ function IncomeUnmatchedTab(props){
 // ── 미입금 대기 탭 (재무관리에서 입금확정 게이트키퍼) ──
 function IncomePendingTab(props){
   props = props || {};
+  try{ erpSettleTypesLoad(); }catch(_st){}   // 🧾 컨설팅정산이 맡은 사업 — 입금확정 «전에» 읽어 둔다(한 번만 붙는다)
   var onNavigate = props.onNavigate || function(){};
   var users = getActiveUsers();
   function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
@@ -58587,8 +59065,12 @@ function IncomePendingTab(props){
     // 성과급 미반영 옵션 ON 시 또는 개인수익이면 perfShares 빈 배열 + perfExclude=true
     // 단, 개인수익이면서 perfAdjPctMap이 있으면 직책요율% 조정 분배 적용
     var isPersonalRev = !!deductions.personalRevenue;
+    /* 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 만들지 않는다 — 그 앱이 담당 몫을 따로 정산한다(erpSettlePerfType 머리글) */
+    var settleType = isPersonalRev ? erpSettlePerfType(it, deductions) : '';
     var perfShares;
-    if(isPersonalRev){
+    if(settleType){
+      perfShares = [];
+    } else if(isPersonalRev){
       var adjPctMap = (confirmModal && confirmModal.perfAdjPctMap) || {};
       var _usersPR = dbGet('user_accounts', []);
       var _nameOfPR = function(sid){ var u = _usersPR.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
@@ -58641,6 +59123,7 @@ function IncomePendingTab(props){
       deductions: deductions, perfBaseAmount: calc.perfBaseAmount,
       isPersonalIncome: !!(deductions.bizIncomeTax || deductions.etcIncomeTax || deductions.personalRevenue),
       perfExclude: !perfEnabled || (isPersonalRev && perfShares.length === 0),
+      perfSettleType: settleType || undefined,   // 🧾 컨설팅정산에서 개별정산 — 성과급 안 만듦
       // ★ override 정보 보관
       rateOverride: hasOverride ? {
         main: rateOpts.mainRateOverride,
@@ -59187,6 +59670,8 @@ function IncomePendingTab(props){
       var _perfBase = calcDeductions(_cmPay, _cmDed).perfBaseAmount;
       // 성과급 미리보기가 이것들을 보므로 «옵션 칸보다 먼저» 정해 둔다 (기본 ON)
       var _perfOn = confirmModal.perfEnabled !== false;
+      // 🧾 컨설팅정산이 맡은 사업의 개인수익이면 성과급을 안 만든다 — 저장(settleType)과 같은 함수로 미리 보인다
+      var _cmSettle = erpSettlePerfType(it, _cmDed);
 
       /* ── 누가 성과급을 받을 수 있고, 못 받으면 «왜» 인지 (2026-08-16 대표 지시) ──────
          지금까지 이 창은 「합계가 100인가」만 봤다. 그래서 아무도 못 받는 건이
@@ -59489,6 +59974,8 @@ function IncomePendingTab(props){
               (function(){
                 if(!_perfOn) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
                   '성과급 자동 반영을 껐습니다 — 이 건은 성과에 잡히지 않습니다');
+                if(_cmSettle) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
+                  erpSettleLabel(_cmSettle) + ' — 성과급을 만들지 않습니다');
                 if(_cmDed.personalRevenue) return h('div', { style:{fontSize:'13.5px',color:'#854d0e',fontWeight:700} },
                   '👤 개인수익 — 성과 배분은 아래 개인수익 칸에서 정합니다');
                 if(!mainSid) return h('div', { style:{fontSize:'13.5px',color:'#991b1b',fontWeight:700} },
@@ -59747,8 +60234,12 @@ function IncomePendingTab(props){
                     erpIsPersonalDeposit(it) && h('span', { style:{fontSize:'12px',color:'#854d0e',opacity:.85} },
                       erpPersonalDepositInfo(it).why === 'type' ? '· 개인입금 사업' : '· 계약에 개인입금'))
                 ),
+                /* 🧾 컨설팅정산이 맡은 사업이면 조정 칸 대신 «성과급 안 만듦»만 — 담당 몫은 그 앱이 따로 정산한다 */
+                ded.personalRevenue && erpSettlePerfType(it, ded) && h('div', { style:{ marginTop:'8px', padding:'8px 12px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'5px', fontSize:'13px', color:'#854d0e' } },
+                  h('div', { style:{ fontWeight:700 } }, erpSettleLabel(erpSettlePerfType(it, ded)) + ' — 성과급을 만들지 않습니다'),
+                  h('div', { style:{ fontSize:'12.5px', color:'#92400e', marginTop:'2px' } }, '담당 몫은 컨설팅정산 앱이 따로 정산합니다. 여기서도 성과급을 만들면 두 번 나갑니다.')),
                 // 👤 개인수익 체크 시: 성과급 조정 영역 (개인 직책요율 % 조정)
-                ded.personalRevenue && (function(){
+                ded.personalRevenue && !erpSettlePerfType(it, ded) && (function(){
                   var pctMap = confirmModal.perfAdjPctMap || {};
                   var _u = dbGet('user_accounts', []);
                   var _nm = function(sid){ var u = _u.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); };
@@ -59858,7 +60349,8 @@ function IncomePendingTab(props){
             (function(){
               var ded = (confirmModal.deductions || {});
               var isPersonal = !!(ded.bizIncomeTax || ded.etcIncomeTax || ded.personalRevenue);
-              var perfTxt = confirmModal.perfEnabled !== false ? '성과급 반영' : '성과급 미반영';
+              var perfTxt = erpSettlePerfType(it, ded) ? '성과급 없음 (🧾 컨설팅정산)'
+                : (confirmModal.perfEnabled !== false ? '성과급 반영' : '성과급 미반영');
               var line = isPersonal
                 ? '🏢 개인소득 — 법인 매출 미반영 · ' + perfTxt
                 : '✓ 확정 시 — 입금 기록 + 원장 확정 표시 · ' + perfTxt
@@ -75968,6 +76460,7 @@ function PerfManagement(props){
         var isMain = srcMain && (srcMain === sid || byName(srcMain));
         var isSub = !isMain && srcSubs.some(function(s){ return s === sid || byName(s); });
         if(isMain || isSub){
+          var _stl = erpSettleOfIncome(fi, src || null);
           items.push({
             fiId:fi.id, sourceKind:fi.sourceKind, sourceId:fi.sourceId, sourceSubKind:fi.sourceSubKind,
             date:fi.date, companyName:fi.companyName, kind:fi.kind,
@@ -75978,7 +76471,8 @@ function PerfManagement(props){
             pct: 0, amount: 0,
             isPersonalIncome:false, ym:(fi.date||'').slice(0,7),
             category:'unmatched',
-            unmatchReason: fi.perfExclude ? '명시적 제외' : '분배 누락'
+            settle: _stl,    // 🧾 컨설팅정산에서 개별정산 — 빠진 게 아니라 «따로 정산»
+            unmatchReason: _stl ? '🧾 컨설팅정산' : (fi.perfExclude ? '명시적 제외' : '분배 누락')
           });
         }
       }
@@ -76283,6 +76777,7 @@ function PerfManagement(props){
                       h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:'#475569',fontWeight:600})},(it.grossAmount||0).toLocaleString()),
                       h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:'#1e40af',fontWeight:700})},(it.baseAmount||0).toLocaleString()),
                       h('td',{style:Object.assign({},tdS,{textAlign:'center'})},
+                        it.settle ? h('span',{title:erpSettleLabel(it.settle)+' — 담당 몫은 컨설팅정산 앱이 따로 정산합니다',style:{fontSize:'12px',color:'#854d0e',whiteSpace:'nowrap'}},'🧾 정산') :
                         h('button',{onClick:function(e){e.stopPropagation();var fi=allIncomes.find(function(x){return x.id===it.fiId;});if(fi)reEnablePerf(fi);},
                           style:{padding:'3px 8px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}},'⭐ 반영'))
                     );
@@ -76605,6 +77100,11 @@ function PerfManagement(props){
         if(selSid && !matchSid(fi, selSid)) return false;
         return (fi.date||'').slice(0,7) === selYm;
       }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+      /* 🧾 컨설팅정산이 따로 정산하는 사업의 개인수익인데 성과급이 붙은 건 — 막음(erpSettlePerfType)보다 먼저 확정된 것.
+         ★ 돈 기록은 자동으로 고치지 않는다 — «겹칠 수 있음»만 알리고 사람이 바로잡기에서 정리한다. */
+      var overlapOf = {};
+      monthPersonal.forEach(function(fi){ var ot = erpSettleOverlapType(fi); if(ot) overlapOf[fi.id] = ot; });
+      var overlapN = Object.keys(overlapOf).length;
 
       function dedAmount(fi){ return (fi.amount||0) - (fi.perfBaseAmount || fi.amount || 0); }
       function dedLabel(fi){
@@ -76682,6 +77182,9 @@ function PerfManagement(props){
             style:{padding:'4px 10px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'13px', fontWeight:700, cursor:'pointer'} },
             '✕ ' + userName(selSid) + ' 필터 해제')
         ),
+        overlapN > 0 && h('div', { style:{marginBottom:'10px', padding:'8px 12px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', fontSize:'13px', color:'#854d0e'} },
+          h('b', null, '⚠ 컨설팅정산과 겹칠 수 있는 성과급 ' + overlapN + '건'),
+          ' — 컨설팅정산이 따로 정산하는 사업의 개인수익인데 성과급이 붙어 있습니다. 자동으로 고치지 않습니다. 두 번 나가지 않는지 확인하고, 필요하면 거래내역 «🛠 바로잡기 › 담당/성과»에서 정리해 주세요.'),
         // 명세 테이블
         rows.length === 0
           ? h('div', { style:{padding:'40px 20px', textAlign:'center', background:'#f8fafc', border:'1px dashed #cbd5e1', borderRadius:'8px'} },
@@ -76713,7 +77216,11 @@ function PerfManagement(props){
                       h('td', {style:Object.assign({},tdS,{fontFamily:'monospace',color:'#475569'})}, fi.date || '-'),
                       isAdmin && !selSid && h('td', {style:Object.assign({},tdS,{color:'#1e293b',fontWeight:600})}, r.name),
                       h('td', {style:tdS}, roleTag),
-                      h('td', {style:Object.assign({},tdS,{fontWeight:600,color:'#1e293b'})}, fi.companyName || '-'),
+                      h('td', {style:Object.assign({},tdS,{fontWeight:600,color:'#1e293b'})},
+                        h('span', {style:{display:'inline-flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}},
+                          fi.companyName || '-',
+                          overlapOf[fi.id] && h('span', { title:erpSettleLabel(overlapOf[fi.id]) + ' 사업 — 이 성과급과 컨설팅정산이 겹칠 수 있습니다',
+                            style:{fontSize:'12px',fontWeight:700,color:'#854d0e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'8px',padding:'0 6px'} }, '⚠ 정산 겹침?'))),
                       h('td', {style:Object.assign({},tdS,{color:'#475569'})}, fi.kind || '-'),
                       h('td', {style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,color:'#2563eb'})}, (r.src==='adjust' ? r.displayGross : r.gross).toLocaleString()),
                       h('td', {style:Object.assign({},tdS,{fontSize:'12.5px',color:'#64748b'})}, dedLabel(fi)),

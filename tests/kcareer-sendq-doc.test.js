@@ -26,6 +26,17 @@ test('문서가 말한 «다른 기관 + 같은 양식 → 이 기관도» 가 �
   assert.ok(rows.some((r) => /다른 기관/.test(r[2]) && /이 기관도/.test(r[3] + r[4])));
   assert.equal(Q.similarPolicy({ level: 'similar', why: [] }, { verdict: 'same', warn: [] }).learn.type, 'addSender');
 });
+test('문서가 말한 «보낸 곳 빼기» 가 코드에서 참이다 — 단추가 있고, 규칙은 남고, 다시 더할 수 있다', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
+  const 단추 = (/«(⚙[^»]+)»/.exec(doc.slice(doc.indexOf('규칙을 잘못 더했으면'))) || [])[1];
+  assert.ok(단추, '문서가 빼는 단추 이름을 적어야 한다');
+  assert.ok(html.indexOf('>' + 단추 + '</button>') >= 0, '문서가 말한 «' + 단추 + '» 단추가 화면에 있다');
+  assert.ok(!/되돌리는 단추는 아직 없다/.test(doc), '단추가 생겼으니 «아직 없다»는 낡은 안내다');
+  const rule = { id: 'r1', senders: ['a@example.test'] };
+  const out = Q.removeSenders([rule], [{ ruleId: 'r1', email: 'a@example.test' }]);
+  assert.equal(out.length, 1, '규칙은 지우지 않는다'); assert.deepEqual(out[0].senders, []);
+  assert.deepEqual(Q.addSender(out, 'r1', 'a@example.test')[0].senders, ['a@example.test'], '«이 기관도»로 다시 더할 수 있다');
+});
 test('문서가 말한 «금액·연도는 지문에 넣지 않는다» 가 코드에서 참이다', () => {
   assert.ok(/금액·날짜는 «양식 지문»에 넣지 않는다/.test(doc));
   const mk = (gross, year) => '<hp:p id="0"><hp:run><hp:t>지급확인서 및 개인정보 동의서</hp:t></hp:run></hp:p><hp:p id="0"><hp:run><hp:t>강사비 ' + gross + '원</hp:t></hp:run></hp:p>'

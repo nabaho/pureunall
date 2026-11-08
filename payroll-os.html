@@ -517,7 +517,8 @@ function afterLogin(){
     payIdx=r[2].val()||null;
     payOld=r[4].val()||null;
     ready=true; navSeed(); render();
-    setTimeout(function(){ if(typeof autoSync2026FromMail==='function') autoSync2026FromMail(true); }, 1200);
+    /* ⚠ 로그인 뒤 «2026 메일 자동수집»을 저절로 돌리지 않는다(2026-11-08) — 빈 달에 지어낸 근로자를 써 넣던 길이다.
+       메일 요약은 수신함·회사 화면의 단추로만 사람이 다시 모은다. */
     fbDb.ref(ROOT+'/payroll_locked').on('value',function(ss){
       if(ready){ cache.payroll_locked=ss.val()||{}; render(); }
     });
@@ -589,7 +590,9 @@ function payForReport(){
   return {sites:sites};
 }
 function paySites(){ return payIdx?Object.keys(payIdx):(payOld?Object.keys(payOld):[]); }
-function payRecs(site){ return (payIdx&&payIdx[site])||(payOld&&payOld[site])||[]; }
+/* ⚠ 지난 자동수집이 넣은 지어낸 줄(isFakeAutoRec)은 여기서 거른다 — 급여 처리·근태·연차·퇴직·명세서·신고 추정이
+   모두 이 길로 읽으므로, 가짜 근로자가 «취득·상실 추정»이나 명세서에 섞이지 않는다. 서버에서 지우기 전까지의 막음이다. */
+function payRecs(site){ return ((payIdx&&payIdx[site])||(payOld&&payOld[site])||[]).filter(function(r){ return !isFakeAutoRec(r); }); }
 
 /* 그 줄의 직원 표 — 이미 손에 있으면 그것, 없으면 null(부르는 쪽이 받아 온다). */
 function empsOf(rec){
@@ -719,7 +722,17 @@ function recComplete(r){
   });
   return ok>=Math.ceil(emps.length*0.5);
 }
+/* ⚠ 2026-11-02~11-08 「2026 메일 자동수집」이 빈 달마다 **코드에 박힌 지어낸 근로자 3명**을
+   초록(이상없음)으로 넣었다(줄 id 가 r_auto_ 로 시작, 출처 '푸른메일자동수집'). 원본 급여대장이 아니다.
+   쓰는 길은 2026-11-08 에 끊었고, 이미 서버에 들어간 줄은 지우기 전까지 payRecs 가 거른다.
+   effSig 의 «막힘»은 혹시 다른 길로 그 줄이 보일 때의 뒷막이다. */
+function isFakeAutoRec(r){
+  return !!r && (String(r.id||'').indexOf('r_auto_')===0 || r.출처==='푸른메일자동수집');
+}
+var FAKE_AUTO_NOTE='지어낸 자료(원본 아님·확정 막힘) — 지난 자동수집이 넣은 가짜 줄';
+function recIssue(r){ return isFakeAutoRec(r) ? FAKE_AUTO_NOTE : (r&&r.이슈)||''; }
 function effSig(r){
+  if(isFakeAutoRec(r)) return 'red';
   if(r.신호==='red') return 'red';
   /* ⚠ 직원 표를 아직 안 받았으면 **미리 세어 둔 값**을 쓴다(생성기의 표시신호).
      안 그러면 목록의 모든 줄이 「데이터부족」 회색으로 보여, 멀쩡한 달까지
@@ -898,7 +911,7 @@ function screenPayroll(){
   recs.forEach(function(r){
     var lk=isLocked(App.site,r.월), sig=effSig(r), isOn=(r.월===activeMonth);
     var dotCol=lk?'#166534':SIG[sig];
-    h+='<button type="button" class="mpill'+(isOn?' on':'')+'" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})" title="'+esc((r.파일||'')+(r.이슈?' · '+r.이슈:''))+'">'+
+    h+='<button type="button" class="mpill'+(isOn?' on':'')+'" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})" title="'+esc((r.파일||'')+(recIssue(r)?' · '+recIssue(r):''))+'">'+
       '<span style="width:8px;height:8px;border-radius:50%;background:'+(isOn?'#fff':dotCol)+';display:inline-block"></span>'+
       '<span>'+r.월+'</span>'+
       '<span style="font-size:10.5px;opacity:.85">('+empCount(r)+'명'+(lk?'·✔':'')+')</span></button>';
@@ -991,7 +1004,7 @@ function screenPayroll(){
     var extra=(s==='gray')?' · <span style="color:'+SIG.gray+'">데이터부족(확인)</span>':'';
     h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line);font-size:12.5px">'+
       '<span title="'+sigLabel(s)+'" style="width:10px;height:10px;border-radius:50%;background:'+SIG[s]+';flex-shrink:0"></span>'+
-      '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?'<span class="mfile"> · '+r.파일+'</span>':'')+extra+(r.이슈?' · '+r.이슈:'')+'</span></div>'+
+      '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?'<span class="mfile"> · '+r.파일+'</span>':'')+extra+(recIssue(r)?' · '+esc(recIssue(r)):'')+'</span></div>'+
       (lk?'<span class="badge ok">확정됨</span> <button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')">되돌리기</button>'
          :'<button class="btn" style="padding:4px 10px;font-size:12px" '+(s==='red'?'disabled style="background:#cbd5e1" title="빨강 해결 후 확정"':'onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')"')+'>확정</button>')+
       '</div>';
@@ -2374,18 +2387,18 @@ function inboxBridgeHtml(mLabel){
     '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'paydata\',\'pu-paydata.html\')">💼 급여데이터함 (입퇴사·급여정리)</button>' +
     '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'cards\',\'pu-cards.html\')">📇 기업정보함 (기업·근로시간)</button>' +
     '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="navTo({screen:\'report\',reportKind:\'hire\',site:null,month:null})">📋 입퇴사 자동정리 ('+(cnt.hire+cnt.leave)+'건)</button>' +
-    '<button class="btn" style="padding:6px 11px;font-size:12px" onclick="autoSync2026FromMail(false)">🤖 2026 미입력 사업장 푸른메일(수신·발신) 자동수집·입력</button>' +
+    '<button class="btn" style="padding:6px 11px;font-size:12px" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">📬 푸른메일 수신·발신 요약 다시 모으기</button>' +
     '</div></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px">' +
     '<span class="badge" style="background:#eff6ff;color:#1e40af">급여대장·변동 '+cnt.pay+'건</span>' +
     '<span class="badge" style="background:#f0fdf4;color:#166534">입사·취득 '+cnt.hire+'건</span>' +
     '<span class="badge" style="background:#fef2f2;color:#dc2626">퇴사·상실 '+cnt.leave+'건</span>' +
     '<span class="badge" style="background:#fffbeb;color:#854d0e">근무시간·카톡·출근부 '+cnt.att+'건</span>' +
-    '<span class="badge ok">2026 전 사업장('+Object.keys(lmap('mail_digest_2026')).length+'곳) 수신·발신 메일 자동연결 완료</span>' +
+    '<span class="badge">메일 요약 '+Object.keys(lmap('mail_digest_2026')).length+'곳 (업체 이름으로 찾은 짐작)</span>' +
     '</div></div>';
 }
 
-/* ── 2026 미입력 사업장 자동 탐지 및 푸른메일함(수신·발신·첨부) 전수 검토·자동입력 엔진 (2026-11-02 대표 지시) ── */
+/* ── 푸른메일함(수신·발신) 사업장별 요약 (2026-11-02 대표 지시 · 2026-11-08 급여 자동입력 제거) ── */
 var autoSyncBusy = false;
 function mailDigestOf(co, sites){
   var md = lmap('mail_digest_2026');
@@ -2401,10 +2414,10 @@ function mailDigestPanelHtml(co, sites){
   var siteName = (sites && sites[0]) || (co && co.name) || App.site || '';
   var head = '<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">' +
     '<div><b>📬 푸른메일함 수신·발신 자동수집 (2026)</b></div>' +
-    '<button type="button" class="btn sec" style="padding:3px 8px;font-size:11px" onclick="autoSync2026FromMail(false)">🔄 재검토·자동입력</button></div>';
+    '<button type="button" class="btn sec" style="padding:3px 8px;font-size:11px" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">🔄 메일 요약 다시 모으기</button></div>';
   var box = '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px">' + head;
   if(!d){
-    return box + '<div style="padding:8px 12px;font-size:12px;color:var(--sub)">수집 요약 대기 중 — [🔄 재검토·자동입력]으로 즉시 동기화할 수 있습니다.</div></div>';
+    return box + '<div style="padding:8px 12px;font-size:12px;color:var(--sub)">메일 요약이 아직 없습니다 — [🔄 메일 요약 다시 모으기]를 누르면 모읍니다.</div></div>';
   }
   var kpi = '<div style="padding:7px 12px;display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;background:var(--paper)">' +
     '<span class="badge" style="background:#eff6ff;color:#1e40af">📥 수신 '+(d.rxCount||0)+'건</span>' +
@@ -2436,91 +2449,44 @@ function mailDigestPanelHtml(co, sites){
   return box + kpi + tbl + '</div>';
 }
 
-function autoSync2026FromMail(silent){
+/* ⚠ 2026-11-08 고침 — 이 함수는 «메일 요약(mail_digest_2026)»만 다시 모은다.
+   예전(#2911)에는 2026년 빈 달마다 코드에 박힌 지어낸 근로자 3명을 초록으로 써 넣고
+   (payroll/emp·payroll/index), 업체 이름으로 사업장·설정카드·짝(site_co_link)까지 만들었다.
+   급여 값은 급여데이터함이 사람 확인을 거쳐 넘긴다(payroll-STATUS.md §10) — 여기서 급여 칸에 쓰지 않는다.
+   로그인 때 저절로 돌지 않고, 단추로만 부른다. */
+function autoSync2026FromMail(){
   if(autoSyncBusy || !fbDb || !window.PuSiteStaff) return;
   ensureCo();
   if(!coData){
-    if(!silent) setTimeout(function(){ autoSync2026FromMail(silent); }, 600);
+    setTimeout(function(){ autoSync2026FromMail(); }, 600);
     return;
   }
   var S = window.PuSiteStaff;
   var cos = S.payrollCos(coData.companies || []);
   if(!cos.length) return;
   var links = lmap('site_co_link');
-  var curMonth = new Date().getMonth() + 1;
-  var targetMonths = [];
-  for(var tm=1; tm<=Math.max(10, curMonth); tm++) targetMonths.push(tm);
-
-  // Check which active companies are missing a linked site or missing any 2026 month
   var sitesByCo = {};
   paySites().forEach(function(site){
     var st = S.staffFor(site, {companies:coData.companies, dir:coData.dir, links:links});
     if(st && st.coId && !st.업체아님) (sitesByCo[st.coId] = sitesByCo[st.coId] || []).push(site);
   });
-  var missingCos = cos.filter(function(co){
-    var sites = sitesByCo[co.id] || [];
-    if(!sites.length) return true;
-    return targetMonths.some(function(m){
-      return !sites.some(function(s){
-        return (payRecs(s)||[]).some(function(r){ var x=ymOf(r); return x && x.y===2026 && x.m===m; });
-      });
-    });
-  });
-
-  if(silent && !missingCos.length) return;
   autoSyncBusy = true;
-  setSaveState('saving', '푸른메일 2026 자동수집 중…');
+  setSaveState('saving', '푸른메일 요약 모으는 중…');
 
   Promise.all([
     fbDb.ref('paydata/maillog').limitToLast(500).once('value').catch(function(){return {val:function(){return {};}}; }),
     fbDb.ref('pucards/sentBox').limitToLast(500).once('value').catch(function(){return {val:function(){return {};}}; }),
-    fbDb.ref('mailbox/msgs').limitToLast(1500).once('value').catch(function(){return {val:function(){return {};}}; }),
-    fbDb.ref('pucards/coInfo').once('value').catch(function(){return {val:function(){return {};}}; })
+    fbDb.ref('mailbox/msgs').limitToLast(1500).once('value').catch(function(){return {val:function(){return {};}}; })
   ]).then(function(snaps){
     var maillog = snaps[0].val() || {};
     var sentBox = snaps[1].val() || {};
     var mailMsgs = snaps[2].val() || {};
-    var coInfo = snaps[3].val() || {};
     var nowTs = Date.now();
-    var pIdx = Object.assign({}, payIdx || {});
-    var empPatch = {};
-    var linkPatch = Object.assign({}, links);
-    var inboxPatch = Object.assign({}, inboxLog());
     var digestPatch = Object.assign({}, lmap('mail_digest_2026'));
-    var cardsArr = (dbGet('site_cards', []) || []).slice();
-    var cardBySite = {};
-    cardsArr.forEach(function(c){ if(c && c.사업장) cardBySite[c.사업장] = c; });
-    var dirMap = S.nameBySid(coData.dir);
+    var touched = 0;
 
-    var todoList = silent ? missingCos : cos;
-    var updatedCos = 0, addedMonths = 0;
-
-    todoList.forEach(function(co){
+    cos.forEach(function(co){
       var sites = sitesByCo[co.id] || [];
-      if(!sites.length){
-        var sName = String(co.name || '').trim();
-        if(!sName) return;
-        if(!pIdx[sName]) pIdx[sName] = [];
-        linkPatch[sName] = {coId:co.id, coName:co.name, by:'푸른메일자동수집', at:nowTs};
-        sites = [sName];
-        sitesByCo[co.id] = sites;
-      }
-      var primarySite = sites[0];
-      if(!cardBySite[primarySite]){
-        var nc = {
-          사업장: primarySite,
-          담당자: co.managerMain ? (dirMap[co.managerMain] || co.managerMain) : '',
-          규모: {직원레코드: Number(co.workers || 3), 월수: targetMonths.length},
-          급여일: co.payday ? (String(co.payday).replace(/일$/,'')+'일') : '25일',
-          산정기간: '1일~말일',
-          고용보험: {단수처리:'절사', 요율:'0.900%'},
-          확인필요: []
-        };
-        cardBySite[primarySite] = nc;
-        cardsArr.push(nc);
-      }
-
-      // Match mails for this company
       var core = S.coreName(co.name);
       var rxList = [], txList = [];
       Object.keys(mailMsgs).forEach(function(mid){
@@ -2551,7 +2517,7 @@ function autoSync2026FromMail(silent){
         digestPatch[co.id] = {
           companyId: co.id,
           companyName: co.name,
-          site: primarySite,
+          site: sites[0] || prevD.site || '',
           rxCount: Math.max(prevD.rxCount||0, rxList.length),
           txCount: Math.max(prevD.txCount||0, txList.length),
           fileCount: prevD.fileCount || 0,
@@ -2562,68 +2528,22 @@ function autoSync2026FromMail(silent){
           recentFiles: prevD.recentFiles || [],
           updatedAt: nowTs
         };
+        touched++;
       }
-
-      // Ensure 2026 months exist
-      var existingRecs = pIdx[primarySite] || [];
-      var baseEmps = [
-        {성명:'김민수', 입사일:'2025-03-01', 기본급:2300000, 과세총액:2400000, 국민연금:114000, 건강보험:86280, 장기요양:11330, 고용보험:21600, 소득세:24500, 지방세:2450, 공제총액:260160, 실수령:2139840},
-        {성명:'이영희', 입사일:'2025-04-01', 기본급:2200000, 과세총액:2300000, 국민연금:109250, 건강보험:82680, 장기요양:10860, 고용보험:20700, 소득세:21200, 지방세:2120, 공제총액:246810, 실수령:2053190},
-        {성명:'박지훈', 입사일:'2025-06-01', 기본급:2500000, 과세총액:2600000, 국민연금:123500, 건강보험:93470, 장기요양:12280, 고용보험:23400, 소득세:31000, 지방세:3100, 공제총액:286750, 실수령:2313250}
-      ];
-      for(var ti=targetMonths.length-1; ti>=0; ti--){
-        var m = targetMonths[ti];
-        var hasM = sites.some(function(s){
-          return (pIdx[s]||[]).some(function(r){ var x=ymOf(r); return x && x.y===2026 && x.m===m; });
-        });
-        if(!hasM){
-          var rid = 'r_auto_' + String(co.id).replace(/[^A-Za-z0-9_]/g,'_') + '_2026_' + m;
-          empPatch[rid] = baseEmps;
-          empBox[rid] = baseEmps;
-          existingRecs.unshift({
-            id: rid,
-            월: '2026년 '+m+'월',
-            파일: '2026년 '+m+'월 급여대장_'+primarySite+'.xlsx',
-            직원수: baseEmps.length,
-            신호: 'green',
-            표시신호: 'green',
-            이슈: '',
-            확정: false,
-            출처: '푸른메일자동수집'
-          });
-          addedMonths++;
-          updatedCos++;
-        }
-      }
-      pIdx[primarySite] = existingRecs;
     });
 
-    var jobs = [];
-    if(Object.keys(empPatch).length) jobs.push(fbDb.ref(ROOT+'/payroll/emp').update(empPatch));
-    if(addedMonths > 0){
-      jobs.push(fbDb.ref(ROOT+'/payroll/index').set(pIdx));
-      jobs.push(fbDb.ref(ROOT+'/site_co_link').set(linkPatch));
-      jobs.push(fbDb.ref(ROOT+'/site_cards').set(cardsArr));
-    }
-    jobs.push(fbDb.ref(ROOT+'/mail_digest_2026').set(digestPatch));
-    return Promise.all(jobs).then(function(){
-      payIdx = pIdx;
-      horizonMemo = {of:null, v:null};
-      cache.site_co_link = linkPatch;
-      cache.site_cards = cardsArr;
+    return fbDb.ref(ROOT+'/mail_digest_2026').set(digestPatch).then(function(){
       cache.mail_digest_2026 = digestPatch;
       autoSyncBusy = false;
       setSaveState('saved', '저장 완료');
       render();
-      if(!silent){
-        alert('푸른메일함(수신·발신·첨부) 전수 검토 및 2026 데이터 자동입력 완료!\n\n• 전체 관리 사업장: '+cos.length+'곳\n• 2026 미입력 보완 월수: '+addedMonths+'건\n• 모든 사업장의 2026년 급여·명부·수신함 연결이 최신 상태입니다.');
-      }
+      alert('푸른메일 수신·발신 요약을 다시 모았습니다 ('+touched+'곳).\n\n급여 자료는 넣지 않습니다 — 급여대장은 급여데이터함에서 확인해 올립니다.');
     });
   }).catch(function(err){
     autoSyncBusy = false;
     setSaveState('saved', '저장 완료');
-    console.warn('[푸른메일 2026 자동수집]', err);
-    if(!silent) alert('자동수집 중 오류: ' + ((err && err.message) || err));
+    console.warn('[푸른메일 요약]', err);
+    alert('메일 요약을 모으다 오류: ' + ((err && err.message) || err));
   });
 }
 window.autoSync2026FromMail = autoSync2026FromMail;
@@ -5091,7 +5011,6 @@ function toggleVerifyEmpEvidence(site, name, evId) {
   dbSet('emp_evidence', m);
 }
 function autoFindEmpEvidence(site, name) {
-  if (typeof autoSync2026FromMail === 'function') autoSync2026FromMail(true);
   var list = empEvidencesOf(site, name);
   alert(site + ' · ' + name + ' 님의 푸른메일·카톡·출근부·급여대장 원본 자료 ' + list.length + '건을 찾아서 연결했습니다.');
   render();
