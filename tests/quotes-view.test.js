@@ -334,3 +334,55 @@ test('소스 — innerHTML 은 비울 때만, 폰 구간·한 줄 칸·입력칸
   assert.match(S, /\.c-open \.btn:before\{content:"📂"/);
   assert.match(S, /setAttribute\('title', '원본 열기'\)/);
 });
+
+/* ── 📨 견적 자동 감지 스위치 (견적·계약 자동화 계획 3 · 작업 3) — 켜는 길·푸는 길이 이 한 단추다 ── */
+test('자동 감지 줄 — 총괄관리자에게만, 연결돼 있을 때만 · 켜짐 여부는 화면을 열 때 한 번만 읽는다', async () => {
+  let gets = 0;
+  const watch = { get: () => { gets++; return Promise.resolve(false); }, set: () => Promise.resolve() };
+  const a = await mountWith({ role: { isAdmin: true }, watch }, {});
+  assert.ok(btnByText(a.root, '📨 자동 감지 켜기'));
+  assert.match(textOf(a.root), /꺼짐 — 지금은 자동으로 올리지 않습니다/);
+  assert.strictEqual(gets, 1);
+  const f = await mountWith({ role: { fin: true }, watch }, {});
+  assert.ok(!btnByText(f.root, '📨 자동 감지 켜기') && !btnByText(f.root, '📨 자동 감지 끄기'), '재무·직원에게는 없다');
+  const n = await mountWith({ role: { isAdmin: true } }, {});
+  assert.ok(!btnByText(n.root, '📨 자동 감지 켜기'), '연결이 없으면 줄이 없다');
+});
+test('자동 감지 켜기 — 묻고(금액은 안 올라간다고 알림), 쓰고, 문장·단추가 «끄기» 로 바뀐다 · 작업 기록은 호스트가 남긴다', async () => {
+  const set = []; let asked = '';
+  const watch = { get: () => Promise.resolve(false), set: (on) => { set.push(on); return Promise.resolve(); } };
+  const m = await mountWith({ role: { isAdmin: true }, watch, ask: (q) => { asked = q; return true; } }, {});
+  fire(btnByText(m.root, '📨 자동 감지 켜기'), 'click');
+  await settle();
+  assert.deepStrictEqual(set, [true]);
+  assert.match(asked, /금액은 올라가지 않습니다/);
+  assert.match(asked, /이알피를 열 때/);
+  assert.ok(btnByText(m.root, '📨 자동 감지 끄기'));
+  assert.match(textOf(m.root), /켜짐 — 보낸메일함에 견적서·계약서가 나가면 이알피에 요청이 올라갑니다/);
+  assert.ok(m.h.calls.toast.some((t) => /켰습니다/.test(t)));
+});
+test('자동 감지 — 묻는 창에서 취소하면 아무것도 쓰지 않는다 · 끄는 길도 같은 단추', async () => {
+  const set = [];
+  const watch = { get: () => Promise.resolve(true), set: (on) => { set.push(on); return Promise.resolve(); } };
+  const no = await mountWith({ role: { isAdmin: true }, watch, ask: () => false }, {});
+  fire(btnByText(no.root, '📨 자동 감지 끄기'), 'click');
+  await settle();
+  assert.deepStrictEqual(set, [], '취소했다');
+  const yes = await mountWith({ role: { isAdmin: true }, watch, ask: () => true }, {});
+  fire(btnByText(yes.root, '📨 자동 감지 끄기'), 'click');
+  await settle();
+  assert.deepStrictEqual(set, [false]);
+  assert.ok(btnByText(yes.root, '📨 자동 감지 켜기'));
+});
+test('자동 감지 — 켜짐 여부를 못 읽으면 단추를 못 누른다(모르는 채로 바꾸지 않는다) · 쓰기가 실패하면 상태를 그대로 두고 알린다', async () => {
+  const bad = { get: () => Promise.reject(new Error('읽기 실패')), set: () => Promise.resolve() };
+  const m = await mountWith({ role: { isAdmin: true }, watch: bad }, {});
+  const b = btnByText(m.root, '📨 자동 감지 켜기');
+  assert.ok(b && b.attrs.disabled === 'disabled');
+  const fail = { get: () => Promise.resolve(false), set: () => Promise.reject(new Error('권한 없음')) };
+  const m2 = await mountWith({ role: { isAdmin: true }, watch: fail, ask: () => true }, {});
+  fire(btnByText(m2.root, '📨 자동 감지 켜기'), 'click');
+  await settle();
+  assert.ok(btnByText(m2.root, '📨 자동 감지 켜기'), '실패하면 «꺼짐» 그대로');
+  assert.ok(m2.h.calls.toast.some((t) => /바꾸지 못했습니다 — 권한 없음/.test(t)));
+});

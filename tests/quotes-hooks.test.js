@@ -69,6 +69,7 @@ test('가져오기 스크립트 — 주민번호 지우개가 판독 층보다 �
   assert.ok(at('pu-rrn-mask.js') > 0, 'AI 로 글자를 보내는 화면은 주민번호 지우개를 싣는다');
   assert.ok(at('pu-doc-read.js') > 0 && at('pu-quote-import.js') > 0);
   assert.ok(at('pu-quote-import.js') > at('pu-quotes.js'), 'PuQuoteImport 는 PuQuotes 를 쓴다');
+  assert.ok(at('pu-quote-detect.js') > 0 && at('pu-quote-import.js') > at('pu-quote-detect.js'), 'PuQuoteImport 는 PuQuoteDetect(감지 한 벌)를 먼저 실어야 한다');
 });
 test('판독 층 캐시 번호 — 이 파일을 싣는 모든 화면이 올린 번호를 쓴다(안 올리면 옛 파일이 남아 readTextWithPrompt 가 없다)', () => {
   const root = path.join(__dirname, '..');

@@ -17,7 +17,7 @@ function load() {
   const box = { console, Date, Math, JSON, Promise, Object, Array, String, Number, Error, RegExp, isFinite };
   box.window = box;
   vm.createContext(box);
-  ['js/pu-quotes.js', 'js/pu-quote-import.js'].forEach((f) => vm.runInContext(read(f), box));
+  ['js/pu-quotes.js', 'js/pu-quote-detect.js', 'js/pu-quote-import.js'].forEach((f) => vm.runInContext(read(f), box));
   return box;
 }
 const I = load().PuQuoteImport;

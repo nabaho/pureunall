@@ -163,3 +163,14 @@
 2. 완전 무인이 아니라는 선(후보를 모아 주고 최종 반영은 사람)과 spec 의 «모두 자동등록»을 어떻게 읽을지 — 이 계획은 «견적 감지→상담접수 간략 카드»는 자동, «계약확정»은 사람으로 읽었다.
 3. ~~비교견적~~ — 대표가 모두 정하셨다(Task 5 참고). 남은 것은 구현 세부(어떤 메일을 계약서 메일·비교견적 메일로 볼지의 낱말 규칙)뿐이다.
 4. 감지 훅을 어느 설정 화면에서 켜고 끌지.
+
+## 구현 현황 (2026-11-08, 대표 「계획 3 시작」 — 사진첩 방 전언)
+
+- [x] **Task 1 감지기 한 곳** — `js/pu-quote-detect.js` + 서버 사본 `functions/quote-detect-core/` (`scripts/sync-quote-detect-core.js`), 총괄관리자 가져오기(`pu-quote-import.js`)가 이 한 벌을 쓴다. `compareHint`(비교견적 단서: bundle·asked·reply)와 `addrsOf`·`domainOf` 포함. 시험 `tests/quote-detect.test.js`·`quote-detect-core-in-sync.test.js`.
+- [x] **Task 2 이알피 처리** — `erpQuoteLanePlan`(읽기만 하는 계획)·`processQuoteLaneRequest`(기존 문 `persistOne`·`patchOne`로 저장)·걸린 요청 창의 «담당자 고르기·연결 보류로 등록». 요청 모양은 `pu-erp.html` 의 «견적 길 요청 계획» 머리글에 적었다. 시험 `tests/erp-quote-lane.test.js`.
+- [x] **Task 3 서버 감지 훅** — `functions/mail-quote-watch.js`(기본 꺼짐, `pucards/config/quoteWatch/on`) + `mail-sync.js` 훅. 켜는 길·푸는 길은 계약서등관리 「지난 견적·계약」의 총괄관리자용 «📨 자동 감지 켜기/끄기» 단추(`tests/quote-watch-switch.test.js` 가 화면 칸 = 서버 칸임을 지킨다).
+- [ ] Task 4 앱에서 보낸 서류의 신호 (나) · Task 5 비교견적 표시 · Task 6 서명본 → 계약확정 후보 띠 · Task 7 `contract_requests` 규칙 — 아직 안 만들었다(다음 PR).
+
+**실제 확인한 것(가짜 파이어베이스 + 지어낸 자료, 내장 브라우저)**: 이알피를 열면 업체를 이은 요청이 «담당자를 정해 주세요»로 걸리고 → 걸린 요청 창에서 담당자를 골라 «다시 시도» → 같은 업체에 상담접수 카드가 이미 있으면 **새로 만들지 않고 그 카드 메모에 덧붙인다**(기존 메모·종류·금액 그대로) · 업체를 못 찾은 요청은 «연결 보류»를 켜지 않으면 **이름이 같아도 안 만든다** → 켜고 «다시 시도»하면 «상담접수·연결 보류·금액 0» 카드가 한 장 생긴다.
+
+**아직 못 한 것**: 진짜 파이어베이스·진짜 메일로의 확인(서버 함수는 배포 전이라 훅이 돌지 않는다), 계약 저장의 온톨로지 쓰기 관문(`srcMails` 칸)이 진짜 서버에서 거절하지 않는지, 규칙 게시.

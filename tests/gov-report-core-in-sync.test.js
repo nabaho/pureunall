@@ -65,7 +65,7 @@ test('배포에 사본 폴더가 빠지지 않는다 — firebase.json functions
 test('다른 사본 규칙과 부딪히지 않는다 — vendor 의 «바이트까지 같아야» 검사(gov-feed 3벌)는 vendor 폴더 파일만 본다 · 같은 낱말을 두 폴더에 두지 않는다', () => {
   const vendor = fs.readdirSync(path.join(뿌리, 'functions', 'vendor'));
   옮길것.forEach((f) => assert.ok(!vendor.includes(f), f + ' 가 vendor 에도 있다'));
-  ['mail-fill-core', 'mgr-watch-core', 'news-lib', 'kakao-lib'].forEach((d) => {
+  ['mail-fill-core', 'mgr-watch-core', 'news-lib', 'kakao-lib', 'quote-detect-core'].forEach((d) => {
     const 안 = fs.readdirSync(path.join(뿌리, 'functions', d));
     옮길것.forEach((f) => assert.ok(!안.includes(f), f + ' 가 ' + d + ' 에도 있다'));
   });

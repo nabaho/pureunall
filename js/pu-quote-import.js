@@ -21,44 +21,18 @@
     + '- 직원수: 의뢰처(고객사) 직원 수 숫자만.';
 
   var TEXT_MAX = 20000;                 /* AI 로 보내는 글자 상한 — 받는 만큼이 요금이다 */
-  var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신)|견적\s*(의뢰|요청)|상품\s*견적|루나랩/;
-  var CONTRACT = /(자문|위임|용역|컨설팅|교육|위탁|대행)\s*계약서/;
-  var NOT_CONTRACT = /근로계약서/;
+  /* 우리 견적서·계약서인지 «고르는 셈»은 서버 감지 훅과 한 벌이다 — js/pu-quote-detect.js (먼저 실려 있어야 한다) */
+  var D = w.PuQuoteDetect;
+  if (!D) throw new Error('PuQuoteDetect(js/pu-quote-detect.js)가 pu-quote-import.js 보다 먼저 실려야 합니다');
   var DOC_EXT = /\.(pdf|hwp|hwpx)$/i;
   var NAME_CUT = 60;                    /* 메일 줄(an)의 첨부 이름은 60자에서 잘려 있다(functions/mail-box.js attNames) */
   var QUOTA = /한도|quota|429|RESOURCE_EXHAUSTED/i;
   var DENIED = /permission[_ ]denied/i;
 
-  function s(v) { return String(v == null ? '' : v); }
-  function nfc(v) { var t = s(v); return t.normalize ? t.normalize('NFC') : t; }
-
-  /* 메일 줄의 첨부 이름 → 배열. 배열·«0,1,2» 열쇠 지도·JSON 글자 셋 다 받는다 */
-  function namesOf(an) {
-    var v = an;
-    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return []; } }
-    if (v && !Array.isArray(v) && typeof v === 'object') v = Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; });
-    return Array.isArray(v) ? v.map(s).filter(Boolean) : [];
-  }
-  function joined(attNames) { return namesOf(attNames).join(' '); }
-
-  /* 제목·첨부 이름에 «견적» — 단 남의 견적(비교견적 요청·견적 의뢰·물품 견적)은 제목으로 거른다 */
-  function isOurQuote(subject, attNames) {
-    var subj = s(subject);
-    if (EXCL_QUOTE.test(subj)) return false;
-    return /견적/.test(subj + ' ' + joined(attNames));
-  }
-  /* 「자문·위임·용역·컨설팅·교육·위탁·대행 계약서」 — 근로계약서는 아니다 */
-  function isOurContract(subject, attNames) {
-    var subj = s(subject);
-    if (NOT_CONTRACT.test(subj)) return false;
-    return CONTRACT.test(subj + ' ' + joined(attNames));
-  }
-  /* 한 메일이 견적도 계약서도 말하면 계약서가 이긴다(메일 하나에 기록 하나) */
-  function docOf(subject, attNames) {
-    if (isOurContract(subject, attNames)) return 'contract';
-    if (isOurQuote(subject, attNames)) return 'quote';
-    return '';
-  }
+  /* 글자 다듬기·첨부 이름 읽기·견적/계약서 고르기 — 모두 한 벌(PuQuoteDetect)을 그대로 쓴다.
+     (제목·첨부 이름에 «견적» — 남의 견적은 거름 · 「자문·위임·… 계약서」 — 근로계약서는 아님 · 둘 다면 계약서가 이김) */
+  var s = D.s, nfc = D.nfc, namesOf = D.namesOf;
+  var isOurQuote = D.isOurQuote, isOurContract = D.isOurContract, docOf = D.docOf;
   /* 이름이 60자에서 잘렸으면 확장자를 알 수 없다 — 받아 보고 정한다(지금은 후보로 둔다) */
   function okExt(name) { return DOC_EXT.test(name) || name.length >= NAME_CUT; }
 

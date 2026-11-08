@@ -27,6 +27,7 @@ const MAILFILL = require('./mail-fill');
 const MAILCARD = require('./mail-card');            /* 📬 처음 보는 보낸 사람의 서명 → 기업정보함 명함 줄 세우기(2026-10-24) */            /* 📥 회사 도메인이 같은 업체 담당자로 채우기(점검 ③-A) */
 const GONE = require('./gone-watch');            /* 🏚 반송 메일 → 없어진 듯한 곳 근거 */
 const MYMAIL = require('./mail-owner');             /* 📬 내 담당 메일 → 그 담당자 폰 알림 */
+const QUOTEWATCH = require('./mail-quote-watch');   /* 📨 보낸메일함의 우리 견적서·계약서 → 이알피 계약 요청(계획 3, 기본 꺼짐) */
 
 const ROOT = 'mailbox';
 
@@ -611,6 +612,20 @@ async function runSync(deps, opts) {
                 if (gb.found) console.log('gone-bounce', JSON.stringify(gb));
               } catch (e) {
                 console.warn('gone-bounce 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+            }
+            /* ── 📨 보낸메일함의 우리 견적서·계약서 → 이알피 «계약 요청» (견적·계약 자동화 계획 3, 2026-11-08) ──
+               ⚠ 보낸편지함(sent)에 «새로 받아온»(fresh) 줄만 본다 — 옛것 채우기(back)로 몇 달 전 견적이 몰려 올라가면 안 된다.
+               ⚠ 기본 «꺼짐»(pucards/config/quoteWatch/on 이 true 일 때만). 켜는 길·푸는 길은 이 한 칸이다.
+               ⚠ 계약을 만드는 일은 이알피를 사람이 열 때 이알피가 한다 — 여기서는 «요청»만 남긴다(까닭·규칙은 mail-quote-watch.js).
+               ⚠ 실패해도 던지지 않는다 — 감지가 죽어도 동기화는 계속된다. */
+            if (r.dir === 'fresh' && held.length && MB.folderKind(p.box) === 'sent') {
+              try {
+                const qw = await QUOTEWATCH.watchSentMail(deps, { slug: p.slug, rows: held.map((g) => g.row),
+                  readCompanies: readCompanies, self: [String(user || '').toLowerCase()], now: Date.now() });
+                if (qw.ran) console.log('mail-quote-watch', JSON.stringify(qw));
+              } catch (e) {
+                console.warn('mail-quote-watch 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
             }
             /* ── 📬 내 담당 메일 → 그 담당자 폰 알림 (대표 승인 목업 2026-10-05) ──
