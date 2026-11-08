@@ -341,7 +341,33 @@
       node('hp:outMargin', { left: '56', right: '56', top: '0', bottom: '0' }), cm, sc]);
   }
 
+  function createForm(kind, wMm, hMm, opts = {}) {
+    const id = String(Date.now() % 1e9 + (++seq));
+    const w = Math.max(200, Math.round((wMm || 25) * HU_PER_MM)), h = Math.max(200, Math.round((hMm || 6) * HU_PER_MM));
+    const attrs = {
+      name: opts.name || (kind + '_' + seq), foreColor: opts.foreColor || '#000000', backColor: opts.backColor || '#FFFFFF',
+      groupName: opts.groupName || '', tabStop: '1', editable: '1', tabOrder: '0', enabled: '1', borderTypeIDRef: '0',
+      drawFrame: kind === 'checkBtn' || kind === 'radioBtn' ? '0' : '1', printable: '1', command: '',
+    };
+    const kids = [node('hp:formCharPr', { charPrIDRef: '0', followContext: '0', autoSz: '0', wordWrap: '0' })];
+    if (kind === 'checkBtn' || kind === 'radioBtn') {
+      Object.assign(attrs, { caption: opts.caption || (kind === 'checkBtn' ? '선택' : '항목'), value: opts.checked ? 'CHECKED' : 'UNCHECKED', radioGroupName: opts.groupName || 'grp1', triState: '0', backStyle: 'TRANSPARENT' });
+    } else if (kind === 'btn') {
+      Object.assign(attrs, { caption: opts.caption || '단추', radioGroupName: '', triState: '0', backColor: opts.backColor || '#F0F0F0' });
+    } else if (kind === 'edit') {
+      Object.assign(attrs, { multiLine: '0', passwordChar: '', maxLength: '2147483647', scrollBars: 'NONE', tabKeyBehavior: 'NEXT_OBJECT', numOnly: '0', readOnly: '0', alignText: 'LEFT' });
+      const t = node('hp:text'); t.txt = opts.text || ''; kids.push(t);
+    } else if (kind === 'comboBox') {
+      Object.assign(attrs, { listBoxRows: '10', listBoxWidth: '0', editEnable: '1', selectedValue: opts.text || '항목 1' });
+      kids.push(node('hp:listItem', { displayText: opts.text || '항목 1', value: opts.text || '항목 1' }));
+    }
+    kids.push(node('hp:sz', { width: String(w), widthRelTo: 'ABSOLUTE', height: String(h), heightRelTo: 'ABSOLUTE', protect: '0' }),
+      node('hp:pos', { treatAsChar: '1', affectLSpacing: '0', flowWithText: '1', allowOverlap: '0', holdAnchorAndSO: '0', vertRelTo: 'PARA', horzRelTo: 'PARA', vertAlign: 'TOP', horzAlign: 'LEFT', vertOffset: '0', horzOffset: '0' }),
+      node('hp:outMargin', { left: '56', right: '56', top: '0', bottom: '0' }));
+    return node('hp:' + kind, attrs, kids);
+  }
+
   const clone = n => JSON.parse(JSON.stringify(n, (k, v) => (v instanceof Uint8Array ? { __bytes: Array.from(v) } : v)), (k, v) => (v && v.__bytes ? new Uint8Array(v.__bytes) : v));
 
-  g.PureunShape = { isShapeTag, local, kid, kidsOf, sizeOf, posOf, toSvg, create, createEquation, resize, setAttr, clone, HU_PER_MM, PX_PER_HU, escA };
+  g.PureunShape = { isShapeTag, local, kid, kidsOf, sizeOf, posOf, toSvg, create, createEquation, createForm, resize, setAttr, clone, HU_PER_MM, PX_PER_HU, escA };
 })(typeof window !== 'undefined' ? window : globalThis);
