@@ -1,0 +1,164 @@
+# 견적·계약 자동화 — 계획 3: 견적 감지 → 이알피 상담접수 → 계약협의 → 계약확정 Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 푸른 메일 보낸메일함에 견적서가 나가면 받는 주소로 사업장을 찾아 이알피 계약관리에 «상담접수»로 간략하게 올리고, 계약이 진행되면 «계약협의»로 옮기며, 서명본이 오면 담당자가 한 번 눌러 «계약확정»으로 넘긴다. 금액은 대기열에 싣지 않는다.
+
+**Architecture:** 감지기를 한 벌의 순수 코어(`js/pu-quote-detect.js` + 서버 사본)로 모으고, 서버는 메일 동기화 뒤 훅(`functions/mail-quote-watch.js`)에서 «요청»만 `data/contract_requests` 에 남긴다. 계약을 만들고 옮기는 일은 이알피(`pu-erp.html`)의 `processOneContractRequest` 한 곳에서 기존 검증(업체 연결·중복·월 잠금)을 그대로 받으며 한다. 앱에서 직접 보낸 서류는 `formMailRecord`(docs-esign.html)가 같은 대기열에 신호를 남긴다.
+
+**Tech Stack:** 바닐라 JS(IIFE + UMD 코어), Firebase RTDB, Cloud Functions(node 22), 테스트 `node:test` + `vm`(함수를 떠서 «돌려» 본다 — STATUS 되풀이된 실수 2).
+
+**Spec:** `docs/superpowers/specs/2026-11-07-quote-contract-auto-design.md` §4 단계 3·4, §7, 그리고 이 계획이 더한 «계획 3 반영 (2026-11-08)». 계획 2(서류 만들기 창)·4(이알피 금액 잠금)는 이 계획 밖이다.
+
+## 대표가 정한 것 (지키는 선)
+
+- 견적서를 메일로 «보낼 때» 감지 → 계약관리에 «간략하게»(상담접수) 올리고 «관련 사업장을 찾아서» 넣는다. 계약이 «진행되면» 계약협의로 자동 이동. (2026-11-08 말씀, 사진첩 방 전언)
+- 계약 진행 신호: (가) 같은 사업장 앞으로 계약서 첨부 메일이 보낸메일함에서 나갈 때, (나) 계약서등관리에서 계약서를 만들어 보낼 때는 자동. (다) 담당자가 손으로 옮기는 길은 늘 열어 둔다. 서명본 → 계약확정은 담당자가 한 번 눌러 확정한다. **[확인 필요]** — 이 확정은 사진첩 방이 전한 것이고, 이 방이 대표께 직접 확인하지 않았다. Task 2 를 시작하기 전에 한 줄로 확인한다.
+- 사업장을 못 찾거나 여럿이면 `blocked` + 사유로 두고 사람이 고른다. 이름이 비슷하다고 자동 연결하지 않는다.
+- 금액은 대기열에 담지 않는다. 같은 사업장에 진행 중 카드가 있으면 새로 만들지 않고 덧붙인다.
+- 대표 말씀(원문, 사진첩 방 전언): 「가끔 비교견적을 요청해서 나가는 경우가 있다. 그럴 경우 비교견적 요청에 따른 것으로 표시해서 추후 결정할 수 있게 해달라.」 대표는 «요청 받거나 요청하는 경우 모두 있다»고 하셨다 — 비교견적은 **두 방향**이다: (받음) 고객이 비교견적을 요청해 우리가 견적을 내는 경우 · (보냄) 우리가 다른 업체에 비교견적을 «달라고» 메일을 보내는 경우. 두 방향 모두 «비교견적 요청에 따른 것»으로 표시해 두고 사람이 나중에 정한다. **(보냄)에서 무엇을 정하는지, 계약관리에 무엇을 올리는지는 대표 답 전이라 비어 있다(Task 5). 대표 답 전에는 만들지 않는다.**
+
+## 지금 코드에서 확인한 사실 (main 5e5113d5 이후)
+
+- 계약을 만드는 일은 사람이 이알피를 열 때 브라우저에서 돈다(`runContractRequests`, `pu-erp.html` 26196). 서버가 계약 배열(`data/contracts` 한 덩어리)을 직접 고치는 길은 없다. → 계획 3 의 «자동»은 «감지는 서버가 바로, 계약 반영은 다음에 이알피가 열릴 때»다. 이 말을 화면·문서에 숨기지 않는다.
+- 한 건 처리는 `processOneContractRequest` 하나(`pu-erp.html` 26168)이고, 걸린 요청의 「↻ 다시 시도」도 같은 함수를 쓴다. 규칙 `ctReqWhy`(26129)는 사업자번호·컨설팅 유형·주담당이 없으면 막는다 — 사진첩·중진공용 문턱이다.
+- `data/contract_requests` 는 규칙상 로그인한 누구나 읽고 쓴다(`scripts/make-firebase-rules.js` 232). 새 종류(`quote`·`advance`·`confirm`)가 들어오면 «아무나 쓴 요청이 계약을 확정시키는» 길이 생길 수 있다 → Task 7 에서 막는다.
+- 서버는 메일 동기화 뒤에 훅을 건다(`functions/mail-sync.js` 552~629). 각 훅은 `fresh` 방향·폴더 종류로 거르고 `try/catch` 로 «동기화는 계속합니다». 보낸편지함 종류는 `MB.folderKind(box) === 'sent'`.
+- 받는 주소 → 업체는 이미 공용 코어 `js/pu-mail-fill-core.js`(서버 사본 `functions/mail-fill-core/`)의 `domTable`·`domCo` 가 한다: 사람이 적은 주소만 근거로 삼고, 무료메일·공공기관 도메인은 빼고, 업체가 «한 곳»일 때만 짚는다. 이것이 대표 선(이름으로 안 잇는다)과 맞는다.
+- 사본을 두는 방식: 코어를 `js/` 와 `functions/<이름>-core/` 에 «같은 글자»로 두고, 사본은 `scripts/sync-<이름>.js` 가 만든다(손으로 고치지 않는다). 코어마다 자기 «같은 글자» 시험이 따로 있다(예: `tests/mail-fill-core-in-sync.test.js`). `tests/gov-report-core-in-sync.test.js` 는 사본 폴더끼리 파일 이름이 겹치지 않는지만 본다. 서버 사본이 바뀌면 그것을 쓰는 함수(`syncMailbox`)를 다시 올려야 한다.
+- 이알피의 계약 상태는 `consult` 상담접수 → `review` 계약협의 → `signed` 계약확정(`pu-erp.html` 16048 부근). 기금 설립 «가져오기 띠»(다른 방)는 상담접수·계약확정만 올리고 계약협의는 «여기서만 쓴다»(25640) — 같은 약속을 따른다.
+- 내 감지기(`js/pu-quote-import.js` 44~59행 `isOurQuote`·`isOurContract`·`docOf`)와 사진첩·메일함의 `js/pu-doc-pick.js` 45행 «빼는 말»(「견적」 포함)은 따로 있다. 둘은 목적이 다르다(견적서는 기업정보함 서류가 아님 / 우리 견적서 찾기). 이 계획은 «우리 견적·계약 메일 찾기»를 코어 한 곳에 두고, `pu-doc-pick.js` 는 건드리지 않는다.
+
+## Global Constraints
+
+- 작업 폴더는 지금 이 작업 폴더(`.claude/worktrees/contracts-c286c5`)다. 새 가지 `claude/quote-plan3`(main 기준).
+- **서버 훅은 AI 를 부르지 않는다.** 제목·첨부 이름·받는 주소만 본다(하루 한도·비용 0). 금액·기간 읽기는 지금처럼 총괄관리자 가져오기(`pu-quote-import.js`)가 한다.
+- 훅은 «기본 꺼짐»이고 켜는 길과 끄는 길을 함께 만든다(STATUS 되풀이된 실수 4). 스위치 자리는 Task 3 에서 정한다.
+- 같은 메일은 한 번만 요청한다 — 요청 열쇠를 `srcKey`(메일 폴더 슬러그 + uid)에서 만들고 이미 있으면 안 쓴다(트랜잭션).
+- 요청에는 금액·본문·첨부 내용을 담지 않는다: `{kind, srcKey, subject(60자), docKind, atts(이름만), to(주소 목록), at, companyId?, why?}`.
+- 업체는 `domCo` 가 «한 곳»일 때만 `companyId` 를 채운다. 아니면 `state:'blocked'`, `why:'사업장을 찾지 못했습니다'` 또는 `'사업장이 둘 이상입니다(후보 N곳)'`.
+- 새 상태 칸·표시 칸을 만들 때는 «누가 언제 켜는지»를 먼저 적는다(되풀이된 실수 10).
+- 모든 자동 처리는 작업 기록(`PuWorklog`)에 남긴다(spec 단계 0). 서버가 남기는 줄은 `by:'server'`.
+- 규칙은 `scripts/make-firebase-rules.js` 에만 고친다. 게시는 `node scripts/rules-deploy.js`(미리보기) → 대표 승인 → `--deploy`.
+- 바꾼 화면은 캐시 번호(`?v=`)를 올린다. 같은 줄을 다른 방도 올리면 «큰 쪽 +1».
+- 화면 글은 쉬운 우리말, 노무 용어(급여→임금, 직원→근로자).
+- 테스트: `node --test tests/<파일>.test.js`, 전체 `node --test "tests/*.test.js" "functions/*.test.js"`(윈도는 따옴표로 묶는다).
+
+## Review Focus
+
+1. **같은 메일을 두 번 처리할 때** — 훅이 다시 돌아도·사람이 다시 눌러도 계약 카드가 둘 생기지 않는다. → Task 2·3 시험.
+2. **사업장을 못 찾거나 둘 이상일 때** — 자동으로 고르지 않고 `blocked` + 사유. 이름·주소로 업체 ID 를 채우지 않는다. → Task 3 시험.
+3. **같은 사업장에 진행 중 카드가 있을 때** — 새 카드 대신 덧붙임. 이미 확정된 사업장이면 «재계약» 표시 새 카드. → Task 2 시험.
+4. **금액이 대기열에 실리지 않는다** — 요청 객체에 금액 계열 칸이 없음을 시험으로 지킨다. → Task 3·7.
+5. **아무나 쓴 요청이 계약을 확정시키지 못한다** — `confirm` 은 «사람이 한 번 눌러야» 바뀌고, 규칙이 새 종류의 모양을 검사한다. → Task 6·7.
+6. **비교견적 낱말** — 낱말만으로 가르지 않고 방향(보낸메일함·첨부가 우리 견적서·받는 이가 고객 사업장)과 함께 본다. 지금 제외어(`비교견적서 요청·견적 요청·견적의뢰·물품 견적`)는 «우리가 남에게 달라고 하는 메일»을 거르는데, 대표가 (보냄) 방향도 표시 대상이라고 하셨으므로 «제외»가 아니라 «표시» 갈래로 나눠야 할 수 있다. 헷갈리면 사람이 표시한다. → Task 1·5.
+7. **서버 훅이 죽어도** 메일 동기화는 계속된다(try/catch). → Task 3.
+8. **감지기 사본이 어긋나지 않는다** — 브라우저·서버 코어가 같은 글자. → Task 1.
+
+---
+
+### Task 1: 감지기 한 곳 — 순수 코어 + 서버 사본
+
+**Files:**
+- Create: `js/pu-quote-detect.js` (UMD, `window.PuQuoteDetect`), `scripts/sync-quote-detect-core.js`(사본을 만드는 스크립트 — `scripts/sync-mail-fill-core.js` 와 같은 모양, `옮길것` 을 내보낸다), `functions/quote-detect-core/pu-quote-detect.js` (스크립트가 만든 같은 글자 사본)
+- Modify: `js/pu-quote-import.js` (코어를 쓰게), `tests/gov-report-core-in-sync.test.js` 의 «다른 사본 폴더와 파일 이름이 겹치지 않는다» 목록에 `quote-detect-core` 를 더한다(그 시험은 새 코어를 지켜 주는 시험이 아니라 «겹침 방지» 시험이다), 캐시 번호(`docs-esign.html`)
+- Test: `tests/quote-detect.test.js`, `tests/quote-detect-core-in-sync.test.js`(`tests/mail-fill-core-in-sync.test.js` 방식 — 사본이 원본과 한 글자까지 같다 · 배포에 사본 폴더가 빠지지 않는다)
+
+- [ ] 코어가 내놓는 것: `isOurQuote(subject, atts)`, `isOurContract(subject, atts)`, `docOf(subject, atts)`, `looksCompareRequest(row)`(받는 요청 «후보»), `outbound(row)`(보낸메일함 행이고 받는 이가 외부인지)
+- [ ] 지금 `pu-quote-import.js` 의 제외어(`EXCL_QUOTE`)·계약서 낱말(`CONTRACT`·`NOT_CONTRACT`)을 그대로 옮기고, 먼저 «옮기기 전과 같은 답»을 내는 시험(보낸메일 실제 모양의 지어낸 행 20개 이상)을 쓴다.
+- [ ] `PuQuoteImport` 의 공개 함수 이름은 그대로 두고 안쪽만 코어로 바꾼다(`tests/quote-import.test.js` 가 그대로 통과해야 한다).
+- [ ] 방향 규칙 시험: 같은 «비교견적» 낱말이라도 ① 보낸메일함 + 첨부가 우리 견적서 + 받는 이가 외부 → «비교견적 후보», ② 우리가 «견적 요청»을 보낸 메일(제목에 요청·의뢰) → 우리 견적이 아님.
+- [ ] 사본 스크립트와 «같은 글자»·«배포에 폴더가 빠지지 않음» 시험을 더하고(`mail-fill-core` 와 같은 방식), 겹침 방지 시험 목록에 새 폴더를 넣고 전체 시험을 돌린다.
+
+### Task 2: 이알피 — `kind:'quote'` / `'advance'` 처리
+
+**Files:**
+- Modify: `pu-erp.html` (`ctReqForm`, `ctReqWhy`, `processOneContractRequest`, 걸린 요청 화면)
+- Test: `tests/erp-quote-requests.test.js`
+
+- [ ] `ctReqForm` 이 `req.kind === 'quote'` 이면: 업체는 `companyId` 가 있으면 업체관리에서 읽어 채우고(`bizNo` 포함), 상태는 `consult`, `kinds` 는 업무 종류에서 옮긴다(아래 표). 금액은 0 으로 두되 «모름»이라 적지 않는다(금액 칸을 안 건드린다).
+- [ ] 업무 종류 → `kinds` 표는 `CONTRACT_KINDS`(`pu-erp.html` 16081)와 낱말을 맞춰 정한다 — 노무자문→`company`, 컨설팅·교육·조사→`consulting`, 사건 대리→`case`, 기금→`fund`, 모르면 `consult`. **[확인 필요]** 표의 세부는 이 Task 에서 화면 낱말과 대조해 확정한다.
+- [ ] `ctReqWhy` 는 `quote`·`advance` 일 때만 사업자번호·컨설팅 유형 문턱을 푼다(사진첩·중진공 요청의 문턱은 그대로). 주담당은 «직원 명부에 있는 사람»일 때만 채우고, 모르면 `blocked` + `'담당자를 정해 주세요'`.
+- [ ] 중복: `erpContractDupBlock` 결과가 있으면 새 카드를 만들지 않고 그 카드의 `quoteRefs`(견적 기록 id 목록)에 덧붙인다. 그 카드가 `signed` 뿐이면 «재계약» 표시 새 카드(spec §7). **함수를 떠서 돌려** 확인한다(셋 모두).
+- [ ] `advance`: 같은 사업장의 `consult` 카드가 «하나»일 때만 `review` 로 옮긴다. 둘 이상이면 `blocked`. 이미 `review`·`signed` 면 아무것도 안 하고 요청만 지운다. 비교견적 표시가 있으면 옮기지 않고 «선정 후보» 표시만 붙인다(Task 5 가 정하면 따른다).
+- [ ] 걸린 요청 화면: `blocked` 이유가 «담당자»일 때 직원 고르기 칸 + 「↻ 다시 시도」. 고른 값은 요청의 `managerMain` 에 적고 같은 `processOneContractRequest` 를 부른다.
+- [ ] 걸림·만듦·덧붙임·재계약을 `PuWorklog` 로 남긴다(`by` 는 이알피를 연 사람).
+
+### Task 3: 서버 감지 훅 `mail-quote-watch`
+
+**Files:**
+- Create: `functions/mail-quote-watch.js`, `functions/mail-quote-watch.test.js`
+- Modify: `functions/mail-sync.js` (보낸편지함 훅, 다른 훅과 같은 `try/catch`), `functions/index.js`(필요 시)
+- Test: `functions/mail-quote-watch.test.js`
+
+- [ ] `fresh` 방향 + `folderKind === 'sent'` 일 때만, `held` 줄에 코어 `docOf` 를 적용한다. `quote` 면 `kind:'quote'`, `contract` 면 `kind:'advance'` 요청을 만든다.
+- [ ] 받는 주소마다 `domCo` 로 업체를 찾는다. 한 곳이면 `companyId`, 아니면 `state:'blocked'` + 사유. 여러 주소가 서로 다른 업체면 `blocked`.
+- [ ] 요청 열쇠는 `srcKey` 에서 만든 고정 값 + 트랜잭션 «없을 때만 쓰기».
+- [ ] 스위치: `pucards/config/quoteWatch.on`(기본 꺼짐). 켜는 길·끄는 길 — 기존 설정 화면 중 어디에 둘지 이 Task 에서 정하고 화면 단추를 함께 만든다. **[확인 필요]** 어느 화면에 둘지.
+- [ ] 서버 온톨로지 관찰 관문(`functions/ontology-write-server.js`)을 거쳐 쓴다.
+- [ ] 시험: 요청에 금액 계열 칸이 없음 · 같은 메일 두 번 → 한 번 · 못 찾음/여럿 → `blocked` · 훅이 던져도 동기화 계속(호출부 시험).
+
+### Task 4: 앱에서 보낸 서류의 신호 (나)
+
+**Files:**
+- Modify: `docs-esign.html` (`formMailRecord`), `js/pu-quotes.js` 또는 새 `js/pu-erp-signal.js`
+- Test: `tests/erp-signal.test.js`
+
+- [ ] 보낸 서류의 종류 값은 둘뿐이다 — `'제안서'`(서식 묶음 «제안서·견적서»)와 `'계약서'`(`PuFormCardFill.SENT_KIND_OF`, `js/pu-form-cardfill.js` 481). «견적서»라는 종류 값은 없다. 그래서 `'제안서'` 에서 견적서만 가르려면 서식 id(spec §3 의 견적서 서식 `fm-pq-01·03~09` 등)를 함께 봐야 한다. **[확인 필요]** 어느 서식이 견적서인지는 이 Task 에서 서식 목록과 대조해 정한다(제안 공문 `fm-pq-08` 등은 견적이 아닐 수 있다).
+- [ ] `formMailRecord` 에서 견적서로 판정되면 `quote`, `'계약서'` 이면 `advance` 신호를 대기열에 남긴다. 계약을 골라 만들었으면(`o.contract.id`) 요청에 `contractId` 를 싣고, 그것이 가장 믿을 만한 근거다.
+- [ ] 받는 주소는 이 길에도 없다(기업정보함 «보낸 서류» 원칙) — 사업장은 서류의 사업자번호(`row.bz`)·계약 id 로 찾고, 이름으로 잇지 않는다.
+- [ ] 보낸 사람은 `sentDocs.by` 처럼 로그인한 직원이므로 `managerMain` 후보가 된다(설계 판단: 앱에서 보낸 견적은 보낸 직원이 «확정 담당자»).
+- [ ] 신호 실패가 메일 발송·기록을 막지 않는다(`PuWorklog.log` 와 같은 약속).
+
+### Task 5: 비교견적 표시 **(대표 확인 뒤에 시작)**
+
+대표는 비교견적이 **두 방향**이라고 하셨다(사진첩 방 전언, 2026-11-08). 두 방향 모두 «비교견적 요청에 따른 것»으로 표시하고 사람이 나중에 결정하게 한다.
+
+- **(받음)** 고객이 비교견적을 요청해 우리가 견적을 내는 경우 — 계약관리 간략 카드(상담접수)에 «비교견적 요청 건» 표시를 달고, 사람이 나중에 선정(→ 계약협의) 또는 탈락·포기(→ 닫기)로 정한다. 이 방향의 해석은 사진첩 방이 처음 낸 것이고 대표가 «요청 받는 경우도 있다»고 하셨다. 세부는 아직 대표 확인 전이다.
+- **(보냄)** 우리가 다른 업체에 비교견적을 «달라고» 메일을 보내는 경우 — **비어 있다.** 대표 답이 필요한 것: 나중에 무엇을 정하는지(어느 업체로 할지·고객에게 어느 안을 권할지·계속할지), 계약관리에 무엇을 올리는지(우리가 낸 견적은 없고 요청 메일만 있다). 설계에 영향이 있을 수 있다 — 지금 제외어가 거르는 메일이 이번에는 «표시해서 담을 대상»이 된다.
+
+- [ ] **내 권고((받음) 방향만, 대표 확인 필요):** 비교견적 표시가 달린 건에 계약서 메일 발송 신호 (가)(나)가 와도 표시를 자동으로 풀지 않는다. 사람이 «선정»을 한 번 누른다 — 계약서를 보냈다고 뽑힌 것은 아닐 수 있다. 신호는 «선정 후보» 띠만 띄운다. 이 권고 질문은 뜻이 확정된 뒤 대표께 다시 여쭙는다(사진첩 방).
+- [ ] 칸 후보: 견적 기록에 `compare`(참/거짓)·`compareState`(대기·선정·탈락·포기)·`compareBy`·`compareAt`, 이알피 카드에는 같은 표시 칸. **이알피 상태값(`consult/review/signed`)은 늘리지 않는다.** 누가 언제 켜는지: 자동은 Task 1 의 «후보» 판정, 수동은 담당자가 계약 카드·지난 견적 화면에서.
+- [ ] 얼마 뒤 «실제로 켜졌는지 세어 본다»(되풀이된 실수 10) — 한 달 뒤 확인할 날짜를 STATUS 에 적는다.
+
+### Task 6: 서명본 → 계약확정 (단계 4)
+
+**Files:**
+- Modify: `docs-esign.html`(전자서명 완료 저장·서명본 올리기 지점 `gotAwait`), `pu-erp.html`(확정 후보 띠), 메일함 «서명본 대기»(`pu-cards.html` `_mbAwait`)와의 관계는 먼저 읽어 본 뒤 정한다
+- Test: `tests/erp-confirm-candidate.test.js`
+
+- [ ] 신호: 전자서명 완료 저장·서명본 올리기. 그 서류의 `sourceContractId/No` 로 이알피 카드를 찾는다.
+- [ ] **자동으로 확정하지 않는다.** 이알피에 «서명본이 왔어요 — 계약확정으로 옮길까요?» 후보 띠를 띄우고 담당자가 한 번 눌러 확정한다(대표 선). 확정은 기존 계약확정 길을 그대로 탄다(월 잠금·업체 연결·관계 검증).
+- [ ] 계약번호가 없거나, 계약서와 견적 기록의 금액이 다르거나(금액 권한이 있는 사람 화면에서만 비교), 회사가 다르면 후보로 띄우지 않고 «확인 필요»로 남긴다. 금액을 못 읽었으면 «확인 필요».
+- [ ] 메일함의 서명본 대기(`_mbAwait`)를 확정 후보의 근거로 쓸 수 있는지 먼저 코드를 읽어 본다 — 새로 짓기 전에.
+
+### Task 7: 규칙 — `contract_requests` 새 종류의 모양을 막는다
+
+**Files:**
+- Modify: `scripts/make-firebase-rules.js`, 규칙 적용본 `docs/rules-paste.json`·`docs/firebase-rules-전체-적용본.json`
+- Test: `tests/contract-requests-rules.test.js`
+
+- [ ] `kind` 가 `quote`·`advance`·`confirm` 이면: 허용 값 목록, 금액 계열 칸 없음, 길이 한도, `confirm` 은 `state` 가 `pending` 으로 시작하지 못하게(확정은 사람이 누른 뒤에만) — 정확한 검사는 이 Task 에서 규칙 문법으로 쓰고 시험이 지킨다.
+- [ ] 기존 요청(사진첩·중진공·기금) 쓰기는 그대로 통과함을 시험으로 지킨다 — 이 Task 가 다른 방 흐름을 막으면 안 된다.
+- [ ] 게시는 미리보기 → 대표 승인 → `--deploy`. 게시 전에 `tests/photos-staff-share.test.js` 의 `PENDING` 에 새 경로를 적고, 게시 뒤 비운다.
+
+### Task 8: 마무리 — 문서·기록·PR
+
+- [ ] 설계 문서 «계획 3 반영 (2026-11-08)» 에 결과(실제로 만든 것, 바뀐 것)를 적는다. 이미 적은 단계 3 변경 표시는 그대로 둔다.
+- [ ] `status/2026-11-08-quote-plan3.md` 새 파일 한 개, `STATUS.md` 「2. 지금 손이 필요한 것」 갱신.
+- [ ] 전체 시험, 폰·PC 화면 확인(걸린 요청 화면의 담당 고르기, 확정 후보 띠 — 가짜 파이어베이스와 지어낸 자료로), PR. 서버 함수는 GitHub 「Firebase 배포」(functions)로 올리고 미리보기 결과를 보고에 적는다.
+- [ ] 보고에는 «이알피는 사람이 열 때 반영한다»를 적는다.
+
+## 이 계획 밖 (남는 것)
+
+- 계획 2(서류 만들기 창)·4(이알피 금액 잠금).
+- 보낸 사람 서명을 읽어 «담당(추정)» 을 채우는 것(spec §7).
+- 2026-08-05 이전에 보낸 견적서를 어디서 가져올지(spec §8 열린 질문 1).
+- 사진첩 쪽 연결(글자 없는 스캔 계약서 판독을 같은 대기열로 보내는 부분)은 사진첩 방이 필요할 때 요청한다.
+
+## 대표·사진첩 방에 확인할 것
+
+1. «계약이 진행됨» 신호와 단계 매핑이 정말 대표의 답인지(이 방은 전언만 받았다).
+2. 완전 무인이 아니라는 선(후보를 모아 주고 최종 반영은 사람)과 spec 의 «모두 자동등록»을 어떻게 읽을지 — 이 계획은 «견적 감지→상담접수 간략 카드»는 자동, «계약확정»은 사람으로 읽었다.
+3. 비교견적 — (받음) 방향의 해석과 권고(자동으로 풀지 않음), (보냄) 방향에서 나중에 무엇을 정하고 계약관리에 무엇을 올리는지.
+4. 감지 훅을 어느 설정 화면에서 켜고 끌지.
