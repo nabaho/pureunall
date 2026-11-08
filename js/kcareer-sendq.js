@@ -235,9 +235,47 @@
       return c;
     });
   }
+  /* 잘못 더한 보낸 곳을 규칙에서 뺀다(2026-11-08 「규칙 빼기 단추」) — 고친 «새 사본»을 돌려준다.
+     picks = [{ ruleId, email }] — 여럿을 한 번에 빼고 한 번에 저장하도록 배열로 받는다.
+     · 뺄 것이 하나도 없으면 «같은 배열»을 그대로 돌려준다(부르는 쪽이 저장을 건너뛸 수 있게).
+     · 규칙 자체는 지우지 않는다 — 보낸 곳이 비어도 규칙(양식 지문)은 남아 «확인 필요 + 이 기관도»로 다시 더할 수 있다.
+     · 이미 대기에 올라간 건은 건드리지 않는다(여기는 규칙만 고친다). */
+  function removeSenders(rules, picks) {
+    var by = {}, any = false;
+    (isArr(picks) ? picks : []).forEach(function (p) {
+      var a = addrOf(p && p.email); if (!a || !p.ruleId) return;
+      (by[p.ruleId] = by[p.ruleId] || {})[a] = true;
+    });
+    var out = (rules || []).map(function (r) {
+      var drop = r && by[r.id]; if (!drop) return r;
+      var keep = (r.senders || []).filter(function (s) { return !drop[str(s).toLowerCase()]; });
+      if (keep.length === (r.senders || []).length) return r;
+      any = true;
+      var c = {}; Object.keys(r).forEach(function (k) { c[k] = r[k]; });
+      c.senders = keep;
+      return c;
+    });
+    return any ? out : rules;
+  }
+  /* 규칙 화면에 보일 줄 — 규칙 차례 · 등록 차례 그대로. waiting = 그 보낸 곳에서 와 «대기·보류» 중인 건 수 */
+  function senderRows(rules, items) {
+    var rows = [];
+    (isArr(rules) ? rules : []).forEach(function (r) {
+      if (!r) return;
+      (r.senders || []).forEach(function (s) {
+        var a = str(s).toLowerCase();
+        var waiting = (isArr(items) ? items : []).filter(function (x) {
+          return x && x.ruleId === r.id && addrOf(x.from || x.replyTo) === a && (x.status === 'pending' || x.status === 'hold');
+        }).length;
+        rows.push({ ruleId: str(r.id), label: str(r.label || r.id), email: a, waiting: waiting });
+      });
+    });
+    return rows;
+  }
 
   var api = { DEFAULT_RULES: DEFAULT_RULES, STATUS: STATUS, addrOf: addrOf, matchMail: matchMail, textOf: textOf, checkForm: checkForm,
     facts: facts, checkPay: checkPay, fillConsent: fillConsent, stampSeal: stampSeal, todayKST: todayKST, itemId: itemId, makeItem: makeItem,
-    transition: transition, replyPayload: replyPayload, similarPolicy: similarPolicy, addSender: addSender, stripRe: stripRe };
+    transition: transition, replyPayload: replyPayload, similarPolicy: similarPolicy, addSender: addSender, removeSenders: removeSenders,
+    senderRows: senderRows, stripRe: stripRe };
   if (isNode) module.exports = api; else root.KcareerSendQ = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
