@@ -230,10 +230,10 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
-### 💼 견적·계약 자동화 계획 1 — 규칙 게시·실제 화면 확인 대기 (2026-11-08, PR 제목 `[보류]`)
+### 💼 견적·계약 자동화 계획 1 — 함수 배포·실제 화면 확인 대기 (2026-11-08 규칙은 게시함, PR 제목 `[보류]`)
 
 계약서등관리에 「🧾 작업 기록」(총괄관리자) · 「💼 지난 견적·계약」(직원 모두, 금액은 대표·총괄·재무·확정 담당자만) · 「📥 보낸메일에서 가져오기」(총괄관리자)를 더했다(`status/2026-11-07-quote-auto-design.md`, 설계 `docs/superpowers/specs/2026-11-07-quote-contract-auto-design.md`).
-- [ ] 규칙 게시 — 새 자리 3(`pu_worklog`·`pu_quotes`·`pu_quote_amt`) + 원본 보관함 `from.kind` 에 `quote`. 대표 PC `node scripts/rules-deploy.js --deploy` 또는 GitHub 「Firebase 배포」 rules=true. 게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 `tests/photos-staff-share.test.js` `PENDING` 네 줄을 뺀다
+- [x] 규칙 게시 — 2026-11-08 완료(대표 「네, 게시」, 이 PC `rules-deploy.js --deploy`): 새로 3(`pu_worklog`·`pu_quotes`·`pu_quote_amt`) · 바뀜 1(원본 보관함 `from.kind` 에 `quote`) · 사라짐 0 · 넓어짐 0, 다시 읽어 같음. 새 기준 `docs/firebase-rules-콘솔원문-2026-11-08.json` · `PENDING` 비움
 - [ ] 함수 배포 — `puDocSecret`(재무·확정 담당자도 견적 원본 열기). 배포 전에는 총괄관리자만 연다(안전한 쪽)
 - [ ] 실제 화면에서 「📥 보낸메일에서 가져오기」 한 번 해 보기(총괄관리자) — AI 하루 한도에 걸리면 «남은 N건» 이 뜨고 다시 누르면 이어서 한다
 - [ ] 합쳐도 되는지 판단 후 PR 제목의 `[보류]` 풀기. 계획 2(서류 만들기 창)·3(이알피 자동 등록·확정)·4(이알피 금액 잠금)는 아직 안 했다

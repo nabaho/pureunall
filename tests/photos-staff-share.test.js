@@ -336,19 +336,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
   /* ★ 2026-11-07 — 게시 완료(GitHub 「Firebase 배포」 실행 42382534463 · rules-deploy.js --deploy, 클라우드 방): 새로 1 · 바뀜 0 · 사라짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-07.json — 목록을 비운다. */
-  /* 2026-11-07 게시 전 — 견적·계약 자동화 계획 1의 세 자리(작업 기록 pu_worklog · 견적 기록 pu_quotes · 견적 금액 pu_quote_amt)를
-     만들개에 넣었다(계획 docs/superpowers/plans/2026-11-07-quote-auto-plan1-worklog-quotes.md Task 1·4). 새로 생김 3 · 바뀜 0 · 사라짐 0.
-     넓어지는 권한 없음 — 새 자리뿐이다(pu_worklog 읽기 총괄관리자, pu_quotes 읽기 재직 직원, pu_quote_amt 읽기 총괄관리자·재무 + 그 건의 확정 담당자).
-     위 2026-11-07 콘솔 원문에는 아직 없다. 게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤
-     콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
-  /* 2026-11-08 게시 전 — 같은 계획의 Task 7(보낸메일에서 견적 원본 가져오기): 원본 보관함 from.kind 에 'quote' 한 값을 더했다.
-     바뀜 1 · 새로 0 · 사라짐 0. 쓰기 조건(재직 직원·새로 쓰기만)은 그대로 — 받는 «값»만 하나 는다(rules-deploy 는 「판단못함」으로 보여만 준다).
-     게시 전에는 «보낸메일에서 가져오기»의 🔒 원본 저장만 권한 오류로 막힌다. 위 세 자리와 함께 게시한 뒤 이 줄도 뺄 것. */
+  /* ★ 2026-11-08 — 견적·계약 자동화 계획 1 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「네, 게시」): 새로 3(pu_worklog·pu_quotes·pu_quote_amt) ·
+       바뀜 1(원본 보관함 from.kind 에 'quote' 한 값 — 쓰기 조건은 그대로, 받는 값만 하나 늚) · 사라짐 0 · 넓어짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-08.json — 목록을 비운다. */
   const PENDING = [
-    '/pu_docs/originals/$id/from/kind/.validate',
-    '/pu_quote_amt',
-    '/pu_quotes',
-    '/pu_worklog',
   ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
