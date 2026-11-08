@@ -329,4 +329,8 @@ test('소스 — innerHTML 은 비울 때만, 폰 구간·한 줄 칸·입력칸
   assert.match(S, /text-overflow:ellipsis/);
   assert.match(S, /input\[type=search\],\.pqv select\{font-size:16px\}/);
   assert.match(S, /font-variant-numeric:tabular-nums/);
+  /* 폰 카드 — 둘째 줄(meta)이 카드 전체 폭, 열기는 그림 단추 + title(저장소 폰 규칙) */
+  assert.match(S, /"chk no meta meta meta"/);
+  assert.match(S, /\.c-open \.btn:before\{content:"📂"/);
+  assert.match(S, /setAttribute\('title', '원본 열기'\)/);
 });

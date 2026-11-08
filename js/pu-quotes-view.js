@@ -89,7 +89,8 @@
     return n;
   }
 
-  var COLS = '28px 36px 88px minmax(110px,1.1fr) 44px minmax(120px,2fr) 88px 52px 150px 140px 56px';
+  /* 금액 칸은 «4,000,000원 (부가세 별도)» 가 한 줄에 다 보이는 폭(176px) — 좁으면 부가세 말이 잘려 별도·포함이 안 보인다 */
+  var COLS = '28px 36px 88px minmax(110px,1.1fr) 44px minmax(120px,2fr) 88px 52px 176px 140px 56px';
   var CSS = '.pqv{font-size:13px}.pqv button,.pqv select,.pqv input[type=search]{font-family:inherit;font-size:13px}'
     + '.pqv-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}'
     + '.pqv-tools input[type=search]{border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;min-width:180px}'
@@ -100,7 +101,7 @@
     + '.pqv-imp{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc}'
     + '.pqv-sel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe}'
     + '.pqv-g{margin:12px 0 4px;font-weight:700;color:#1e293b}.pqv-g i{font-style:normal;font-weight:400;color:#64748b;margin-left:6px}'
-    + '.pqv-wrap{overflow-x:auto}.pqv-list{min-width:960px}'
+    + '.pqv-wrap{overflow-x:auto}.pqv-list{min-width:990px}'
     + '.pqv-row{display:grid;grid-template-columns:' + COLS + ';align-items:center;column-gap:6px;padding:5px 4px;border-bottom:1px solid #e2e8f0}'
     + '.pqv-row>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pqv-head{font-weight:700;color:#475569;background:#f8fafc;border-bottom:1px solid #cbd5e1}'
@@ -111,9 +112,12 @@
     + '.pqv .empty{padding:18px;color:#64748b;text-align:center}.pqv .msg{margin:6px 0;color:#334155}'
     + '@media(max-width:700px){'
     + '.pqv input[type=search],.pqv select{font-size:16px}.pqv-tools input[type=search]{min-width:0;flex:1 1 140px}'
-    + '.pqv-selall{display:inline-flex;align-items:center;gap:6px}'
+    + '.pqv-selall{display:inline-flex;align-items:center;gap:6px}.pqv-selall input[type=checkbox]{width:24px;height:24px;margin:0}'
     + '.pqv-wrap{overflow-x:visible}.pqv-list{min-width:0}.pqv-head{display:none}'
-    + '.pqv-row{grid-template-columns:28px 30px minmax(0,1fr) auto;grid-template-areas:"chk no co amt" "chk no meta open";row-gap:2px}'
+    /* 첫 줄: 의뢰처 · 금액 · (열기 그림 단추) / 둘째 줄: 날짜·구분·과업… 을 카드 «전체 폭»으로 — 금액에 밀려 일찍 잘리지 않게 */
+    + '.pqv-row{grid-template-columns:28px 30px minmax(0,1fr) auto auto;grid-template-areas:"chk no co amt open" "chk no meta meta meta";row-gap:2px}'
+    + '.pqv-row .c-amt{font-size:12px}'
+    + '.pqv-row .c-open .btn{font-size:0;min-width:32px;min-height:32px;padding:0;line-height:1}.pqv-row .c-open .btn:before{content:"📂";font-size:16px}'
     + '.pqv-row .c-chk{grid-area:chk}.pqv-row .c-no{grid-area:no}.pqv-row .c-co{grid-area:co;font-weight:600}.pqv-row .c-amt{grid-area:amt;text-align:right}'
     + '.pqv-row .c-meta{grid-area:meta;display:block;color:#64748b}.pqv-row .c-open{grid-area:open}'
     + '.pqv-row .c-date,.pqv-row .c-doc,.pqv-row .c-scope,.pqv-row .c-period,.pqv-row .c-staff,.pqv-row .c-who{display:none}'
@@ -264,7 +268,11 @@
       function cell(cls, text) { var c = el('span', { 'class': cls, text: text }); c.setAttribute('title', text); return c; }
       var chk = el('span', { 'class': 'c-chk' }, [checkbox(!!st.sel[r.id], no + '번 고르기', function (on) { toggle(r.id, on); draw(); })]);
       var open = el('span', { 'class': 'c-open' });
-      if (canOpen(r, amt, role, host.uid)) open.appendChild(btn('열기', function () { openFile(r); }));
+      if (canOpen(r, amt, role, host.uid)) {
+        var ob = btn('열기', function () { openFile(r); });
+        ob.setAttribute('title', '원본 열기'); ob.setAttribute('aria-label', '원본 열기');   /* 폰에서는 📂 그림만 보인다 */
+        open.appendChild(ob);
+      }
       var row = el('div', { 'class': 'pqv-row', role: 'row' }, [
         chk, el('span', { 'class': 'c-no pqv-no', text: String(no) }),
         cell('c-date', r.date || NONE), cell('c-co', r.co || NONE), cell('c-doc', docTxt),
