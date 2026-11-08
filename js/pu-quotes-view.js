@@ -131,7 +131,8 @@
     var toast = typeof host.toast === 'function' ? host.toast : function () {};
     var ask = typeof host.ask === 'function' ? host.ask : function (m) { return w.confirm ? w.confirm(m) : true; };
     var st = { rows: null, amts: {}, amtErr: false, names: {}, staff: [], staffAsked: false, err: false,
-      text: '', doc: '', sel: {}, pick: '', busy: false, msg: '', impBusy: false, impMsg: '', seq: 0 };
+      text: '', doc: '', sel: {}, pick: '', busy: false, msg: '', impBusy: false, impMsg: '', seq: 0,
+      watchOn: null, watchBusy: false };
 
     if (w.document && w.document.head && !(w.document.getElementById && w.document.getElementById('pqv-css'))) {
       var s = w.document.createElement('style'); s.id = 'pqv-css'; s.textContent = CSS; w.document.head.appendChild(s);
@@ -254,6 +255,24 @@
     var impEl = null;
     function drawImpOnly() { if (impEl) impEl.textContent = st.impMsg; }
 
+    /* 📨 견적 자동 감지 스위치 — 켜는 길·끄는 길이 «이 한 단추»다(총괄관리자만, 서버 감지 훅과 같은 칸 pucards/config/quoteWatch/on).
+       켜면 보낸메일함에 우리 견적서·계약서가 나갈 때마다 이알피에 «요청»이 올라간다(이알피를 사람이 열 때 반영). 금액은 올라가지 않는다. */
+    function toggleWatch() {
+      var wt = host.watch;
+      if (!wt || st.watchBusy || st.watchOn === null) return;
+      var next = !st.watchOn;
+      var q = next
+        ? '켜면 푸른메일 보낸메일함에 우리 견적서·계약서가 나갈 때마다 이알피 계약관리에 «요청»이 올라가고, 이알피를 열 때 «상담접수» 카드가 만들어지거나 «계약협의»로 옮겨집니다.\n금액은 올라가지 않습니다. 사업장을 못 찾으면 «걸린 요청»에 남아 사람이 고릅니다.\n\n켤까요?'
+        : '끄면 새로 나가는 견적서·계약서는 더 이상 이알피에 요청으로 올라가지 않습니다. (이미 올라간 요청은 그대로 남습니다)\n\n끌까요?';
+      if (!ask(q)) return;
+      st.watchBusy = true; draw();
+      Promise.resolve().then(function () { return wt.set(next); }).then(function () {
+        st.watchBusy = false; st.watchOn = next; toast(next ? '📨 견적 자동 감지를 켰습니다' : '📨 견적 자동 감지를 껐습니다'); draw();
+      }, function (e) {
+        st.watchBusy = false; toast('바꾸지 못했습니다 — ' + ((e && e.message) || e)); draw();
+      });
+    }
+
     function rowEl(r, no) {
       var amt = st.amts[r.id] || null;
       var o = ownerInfo(r, amt, st.names);
@@ -292,6 +311,15 @@
         var ib = btn('📥 보낸메일에서 가져오기', runImport); if (st.impBusy) ib.setAttribute('disabled', 'disabled');
         impEl = el('span', { 'class': 'msg', text: st.impMsg || '' });
         box.appendChild(el('div', { 'class': 'pqv-imp' }, [ib, impEl]));
+      }
+      /* 📨 견적 자동 감지 줄 — 총괄관리자만, 켜고 끄는 길(host.watch)이 연결돼 있을 때만. 읽는 중(null)이면 단추를 못 누른다 */
+      if (host.watch && role.isAdmin === true) {
+        var wbtn = btn(st.watchOn ? '📨 자동 감지 끄기' : '📨 자동 감지 켜기', toggleWatch);
+        if (st.watchBusy || st.watchOn === null) wbtn.setAttribute('disabled', 'disabled');
+        var wmsg = st.watchOn === null ? '켜짐 여부를 확인하는 중…'
+          : (st.watchOn ? '켜짐 — 보낸메일함에 견적서·계약서가 나가면 이알피에 요청이 올라갑니다(이알피를 열 때 반영, 금액은 올라가지 않음)'
+            : '꺼짐 — 지금은 자동으로 올리지 않습니다');
+        box.appendChild(el('div', { 'class': 'pqv-imp pqv-watch' }, [wbtn, el('span', { 'class': 'msg', text: wmsg })]));
       }
 
       if (st.err) {
@@ -371,6 +399,11 @@
     }
 
     load();
+    /* 자동 감지가 켜졌는지는 «화면을 열 때» 한 번 읽는다 — 총괄관리자에게만 보이는 줄이다 */
+    if (host.watch && typeof host.watch.get === 'function' && role.isAdmin === true) {
+      Promise.resolve().then(function () { return host.watch.get(); }).then(function (v) { st.watchOn = v === true; draw(); },
+        function () { st.watchOn = null; draw(); });
+    }
     return {
       reload: load,
       clearSelection: function () { if (selIds().length) { st.sel = {}; st.pick = ''; draw(); } },

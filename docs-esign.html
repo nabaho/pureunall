@@ -274,8 +274,9 @@
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=52"></script>
 <script src="js/pu-quotes.js?v=1"></script>
-<script src="js/pu-quote-import.js?v=1"></script>
-<script src="js/pu-quotes-view.js?v=3"></script>
+<script src="js/pu-quote-detect.js?v=1"></script>
+<script src="js/pu-quote-import.js?v=2"></script>
+<script src="js/pu-quotes-view.js?v=4"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -537,6 +538,16 @@ var quoteImporter = {
     return (quotePending ? Promise.resolve(quotePending) : quotePendingList()).then(function (list) {
       quotePending = null;
       return PuQuoteImport.runImport(list, quoteImportHost(), onStep);
+    });
+  }
+};
+/* 📨 견적 자동 감지 스위치 — 서버 감지 훅(functions/mail-quote-watch.js)이 읽는 칸 pucards/config/quoteWatch/on.
+   켜는 길·푸는 길이 이 한 곳이다(기본 꺼짐). 쓰기는 규칙이 총괄관리자만 허용한다. 켜고 끈 일은 작업 기록에 남긴다. */
+var quoteWatchSwitch = {
+  get: function () { return db.ref('pucards/config/quoteWatch/on').once('value').then(function (s) { return s.val() === true; }); },
+  set: function (on) {
+    return db.ref('pucards/config/quoteWatch/on').set(!!on).then(function () {
+      PuWorklog.log('auto_detect', { note: on ? '견적 자동 감지 켬' : '견적 자동 감지 끔' });
     });
   }
 };
@@ -1158,7 +1169,7 @@ function showPane(name) {
     adminOk.then(function () {
       quotesUi = PuQuotesView.mount($('quotesRoot'), {
         list: PuQuotes.list, amounts: PuQuotes.amounts, confirmOwners: PuQuotes.confirmOwners,
-        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast, importer: quoteImporter,
+        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast, importer: quoteImporter, watch: quoteWatchSwitch,
         role: { isAdmin: isAdmin, fin: isFin }, uid: curUser ? curUser.uid : ''
       });
     });
