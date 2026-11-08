@@ -151,4 +151,28 @@ function 사이트맵더하기(xml, 번호, 날짜) {
   return 틀.slice(0, 끝) + 줄 + 틀.slice(끝);
 }
 
-module.exports = { 사이트맵더하기, 글읽기, 목록그리기, 글쪽만들기, 줄들, 본번호, 줄그리기 };
+/* sitemap 의 «빈 공지»까지 채운다 (2026-11-08 notice/140 사고).
+   올리는 쪽은 홈페이지 저장소(pureun-site)의 sitemap 을 읽어 고쳐 «두 저장소에 다 올린다».
+   그런데 그쪽 sitemap 에 140 이 빠져 있었다 — 그래서 141 을 더한 판이 이 저장소의 멀쩡한 sitemap(140 있음)을
+   덮어써 140 이 사라졌고, «굳힌 쪽 수 = sitemap 수» 검사가 빨개졌다.
+   ★ 새 번호뿐 아니라, 목록에 있는 공지 가운데 sitemap 에 이미 실린 가장 작은 번호 «이상»인데 빠진 것을 함께 넣는다.
+     더 오래된 공지(sitemap 에 원래 안 싣는 것)는 건드리지 않는다.
+   · 작은 번호부터 넣는다 — 넣을 때마다 /notice 바로 아래로 가므로, 큰 번호(새 글)가 맨 위에 남는다.
+   · /notice 줄을 못 찾으면 null(사이트맵더하기와 같다). */
+function 사이트맵채우기(xml, 새번호, 목록번호들, 날짜) {
+  let 틀 = String(xml || '');
+  const 실린 = [...틀.matchAll(/\/notice\/(\d+)<\/loc>/g)].map(function (m) { return Number(m[1]); });
+  const 새 = Number(새번호);
+  const 바닥 = 실린.length ? Math.min.apply(null, 실린) : 새;
+  const 넣을 = (목록번호들 || []).map(Number).filter(function (n) { return n >= 바닥; }).concat(새)
+    .filter(function (n, i, a) { return Number.isFinite(n) && n > 0 && a.indexOf(n) === i; })
+    .sort(function (a, b) { return a - b; });
+  for (const n of 넣을) {
+    const r = 사이트맵더하기(틀, String(n), 날짜);
+    if (r == null) return null;
+    틀 = r;
+  }
+  return 틀;
+}
+
+module.exports = { 사이트맵더하기, 사이트맵채우기, 글읽기, 목록그리기, 글쪽만들기, 줄들, 본번호, 줄그리기 };

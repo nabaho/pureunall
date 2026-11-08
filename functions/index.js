@@ -6318,7 +6318,9 @@ exports.weeklyNewsBrief = functions
        못 읽거나 /notice 줄이 없으면 sitemap 은 건드리지 않고 글만 올린다. */
     const 올릴것 = [["site/notice/" + 새번호 + "/index.html", 글쪽]];
     try {
-      const 새사이트맵 = NoticeLib.사이트맵더하기(await 새홈페이지쪽("sitemap.xml"), 새번호, 오늘);
+      /* ⚠ 사이트맵채우기 — 홈페이지 저장소 sitemap 에 빠진 공지(2026-11-08: 140)까지 함께 채운다. 까닭은 notice-lib.js */
+      const 새사이트맵 = NoticeLib.사이트맵채우기(await 새홈페이지쪽("sitemap.xml"), 새번호,
+        있던글.map((g) => g.번호), 오늘);
       if (새사이트맵) 올릴것.push(["site/sitemap.xml", 새사이트맵]);
       else console.warn("[브리핑] sitemap 에서 /notice 줄을 못 찾아 sitemap 은 건너뜁니다");
     } catch (e) { console.warn("[브리핑] sitemap 을 못 읽어 건너뜁니다", e.message); }
