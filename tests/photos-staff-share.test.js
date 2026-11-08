@@ -341,7 +341,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      넓어지는 권한 없음 — 새 자리뿐이다(pu_worklog 읽기 총괄관리자, pu_quotes 읽기 재직 직원, pu_quote_amt 읽기 총괄관리자·재무 + 그 건의 확정 담당자).
      위 2026-11-07 콘솔 원문에는 아직 없다. 게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤
      콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
+  /* 2026-11-08 게시 전 — 같은 계획의 Task 7(보낸메일에서 견적 원본 가져오기): 원본 보관함 from.kind 에 'quote' 한 값을 더했다.
+     바뀜 1 · 새로 0 · 사라짐 0. 쓰기 조건(재직 직원·새로 쓰기만)은 그대로 — 받는 «값»만 하나 는다(rules-deploy 는 「판단못함」으로 보여만 준다).
+     게시 전에는 «보낸메일에서 가져오기»의 🔒 원본 저장만 권한 오류로 막힌다. 위 세 자리와 함께 게시한 뒤 이 줄도 뺄 것. */
   const PENDING = [
+    '/pu_docs/originals/$id/from/kind/.validate',
     '/pu_quote_amt',
     '/pu_quotes',
     '/pu_worklog',

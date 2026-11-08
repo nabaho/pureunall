@@ -15,7 +15,33 @@ const GEN = JSON.parse(execFileSync(process.execPath, [path.join(R, 'scripts/mak
 test('견적 기록 읽기는 재직 직원, 지우기는 관리자', () => {
   const r = GEN.rules.pu_quotes;
   assert.match(r['.read'], /status/);
-  assert.match(r.$q['.write'], /newData\.exists\(\) \|\| .*isAdmin/);
+  assert.match(r.$q['.write'], /isAdmin/);
+  /* 지우기(newData 없음)는 isAdmin 갈래로만 — 새로 쓰기·고치기 갈래는 둘 다 newData.exists() 를 요구한다 */
+  assert.match(r.$q['.write'], /!data\.exists\(\) && newData\.exists\(\)/);
+});
+test('★★ 견적 기록 고치기는 만든 사람·isAdmin 만 — 남이 fileId 를 바꿔 끼우지 못한다(검토 2026-11-08)', () => {
+  const w = GEN.rules.pu_quotes.$q['.write'];
+  assert.match(w, /newData\.exists\(\) && data\.child\('by'\)\.val\(\) === auth\.uid/);
+});
+test('★★ 금액 칸을 처음 만드는 것은 그 견적 기록을 만든 사람만(또는 isAdmin)', () => {
+  const w = GEN.rules.pu_quote_amt.$q['.write'];
+  assert.match(w, /root\.child\('pu_quotes'\)\.child\(\$q\)\.child\('by'\)\.val\(\) === auth\.uid/,
+    '이게 없으면 다른 직원이 남의 견적에 «담당 = 나» 로 금액 칸을 먼저 심어 금액·🔒 원본을 연다');
+});
+test('온톨로지 — 견적 기록은 id·entityType·createdAt·updatedAt 을 갖고, createdAt 은 안 바뀐다', () => {
+  const q = GEN.rules.pu_quotes.$q;
+  ['id', 'entityType', 'createdAt', 'updatedAt'].forEach((k) => assert.ok(q['.validate'].includes("'" + k + "'"), k + ' 가 꼭 있어야 한다'));
+  assert.match(q.id['.validate'], /\$q/);
+  assert.match(q.entityType['.validate'], /'Document'/);
+  assert.match(q.createdAt['.validate'], /newData\.val\(\) === data\.val\(\)/);
+});
+test('금액 칸 — 금액은 비어도 된다(담당만 먼저 정하는 건), 담당·쓴 사람·시각은 꼭', () => {
+  const v = GEN.rules.pu_quote_amt.$q['.validate'];
+  assert.doesNotMatch(v, /'amount'/);
+  ['owner', 'by', 'at'].forEach((k) => assert.ok(v.includes("'" + k + "'"), k));
+});
+test('🔒 견적 원본 — 원본 보관함 from.kind 에 quote 가 있다(puDocSecret 이 견적 길 파일을 가린다)', () => {
+  assert.match(GEN.rules.pu_docs.originals.$id.from.kind['.validate'], /'quote'/);
 });
 test('★★ 금액 전체 읽기는 isAdmin·fin 만', () => {
   const r = GEN.rules.pu_quote_amt['.read'];
@@ -52,7 +78,9 @@ test('견적 기록 칸 길이 · by 는 내 이름 또는 그대로', () => {
   assert.match(q.srcKey['.validate'], /<= 200/);
   assert.match(q.staff['.validate'], /isNumber/);
   assert.match(q.by['.validate'], /auth\.uid/);
-  assert.deepStrictEqual(GEN.rules.pu_quotes['.indexOn'], ['srcKey', 'at']);
+  assert.match(q.staff['.validate'], />= 0/);
+  /* 가져오기가 같은 메일을 두 번 넣지 않게 srcKey 로 찾는다(findBySrc) — 색인이 있어야 한다 */
+  assert.ok(GEN.rules.pu_quotes['.indexOn'].includes('srcKey'));
 });
 test('적용본이 만들개와 같다', () => {
   assert.deepStrictEqual(APPLY.rules.pu_quotes, GEN.rules.pu_quotes);

@@ -2458,7 +2458,7 @@
           "from": {
             ".validate": "newData.hasChild('kind')",
             "kind": {
-              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'"
+              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote'"
             },
             "$f": {
               ".validate": "newData.isString() && newData.val().length <= 200"
@@ -2715,11 +2715,17 @@
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".indexOn": [
         "srcKey",
-        "at"
+        "createdAt"
       ],
       "$q": {
-        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
-        ".validate": "newData.hasChildren(['doc','type','co','date','src','review','by','at'])",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists()) || (newData.exists() && data.child('by').val() === auth.uid) || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".validate": "newData.hasChildren(['id','entityType','doc','type','co','date','src','review','by','createdAt','updatedAt'])",
+        "id": {
+          ".validate": "newData.val() === $q"
+        },
+        "entityType": {
+          ".validate": "newData.val() === 'Document'"
+        },
         "doc": {
           ".validate": "newData.isString() && (newData.val() === 'quote' || newData.val() === 'contract')"
         },
@@ -2742,7 +2748,7 @@
           ".validate": "newData.isString() && newData.val().length <= 60"
         },
         "staff": {
-          ".validate": "newData.isNumber()"
+          ".validate": "newData.isNumber() && newData.val() >= 0"
         },
         "fileId": {
           ".validate": "newData.isString() && newData.val().length <= 120"
@@ -2774,7 +2780,10 @@
         "by": {
           ".validate": "newData.val() === auth.uid || newData.val() === data.val()"
         },
-        "at": {
+        "createdAt": {
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() === data.val())"
+        },
+        "updatedAt": {
           ".validate": "newData.isNumber()"
         },
         "$other": {
@@ -2786,8 +2795,8 @@
       ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('fin').val() == true)",
       "$q": {
         ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && data.child('owner').val() === auth.uid",
-        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && (newData.child('owner').val() === auth.uid || newData.child('owner').val() === '')) || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
-        ".validate": "newData.hasChildren(['amount','vat','owner','by','at'])",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && root.child('pu_quotes').child($q).child('by').val() === auth.uid && (newData.child('owner').val() === auth.uid || newData.child('owner').val() === '')) || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".validate": "newData.hasChildren(['owner','by','at'])",
         "amount": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },

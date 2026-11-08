@@ -38,8 +38,16 @@ function fakeDb(opts) {
     return found ? JSON.parse(JSON.stringify(o)) : null;
   }
   const db = {
-    store, order,
+    store, order, updates: [],
     ref(p) {
+      /* 뿌리 ref() — 여러 자리 한 번에 쓰기(update)만 흉내 낸다 */
+      if (!p) {
+        return { update(up) {
+          db.updates.push(up);
+          Object.keys(up).forEach((k) => { noUndef(up[k], k); store[k] = JSON.parse(JSON.stringify(up[k])); });
+          return Promise.resolve();
+        } };
+      }
       return {
         key: p.split('/').pop(),
         push(v) { seq++; const r = db.ref(p + '/q' + seq); if (v !== undefined) { noUndef(v, p); store[p + '/q' + seq] = JSON.parse(JSON.stringify(v)); } return r; },
@@ -96,7 +104,11 @@ test('save — 금액은 따로, undefined 없음, 기록 먼저', async () => {
   assert.ok(rec, '기록이 없다');
   assert.ok(!('amount' in rec) && !('amt' in rec), '기록에 금액 칸이 있다');
   assert.strictEqual(rec.coKey, b.PuOfficeStore.coKey('(주)가나상사'));
-  assert.strictEqual(rec.by, 'u1'); assert.strictEqual(typeof rec.at, 'number');
+  assert.strictEqual(rec.by, 'u1'); assert.strictEqual(typeof rec.createdAt, 'number');
+  assert.strictEqual(rec.updatedAt, rec.createdAt);
+  assert.strictEqual(rec.id, qid, '온톨로지 — id 는 열쇠와 같다');
+  assert.strictEqual(rec.entityType, 'Document');
+  assert.ok(!('at' in rec), '옛 칸(at) 대신 createdAt·updatedAt');
   assert.ok(!('scope' in rec));
   assert.strictEqual(amt.amount, 4000000); assert.strictEqual(amt.vat, 'excl');
   assert.strictEqual(amt.owner, ''); assert.strictEqual(amt.by, 'u1'); assert.strictEqual(typeof amt.at, 'number');
@@ -143,12 +155,57 @@ test('amounts — 거절이 아닌 오류는 그대로 던진다', async () => {
   await assert.rejects(() => b.PuQuotes.amounts(['q1']), /network down/);
 });
 
-test('confirmOwner — owner 칸만 쓰고 기록을 남긴다', async () => {
+test('confirmOwner — 금액 칸이 있으면 owner 칸만 쓰고, 기록에는 uid 대신 이름', async () => {
   const b = load(); const db = fakeDb();
+  db.store['pu_quote_amt/q1'] = { amount: 5, vat: '', owner: '', by: 'adm', at: 1 };
   b.PuQuotes.init({ db, uid: 'adm' }); b.PuWorklog.init({ db, uid: 'adm' });
-  await b.PuQuotes.confirmOwner('q1', 'u7');
+  await b.PuQuotes.confirmOwner('q1', 'u7', '박한별');
   assert.strictEqual(db.store['pu_quote_amt/q1/owner'], 'u7');
-  assert.ok(worklog(db).some((e) => e.kind === 'owner_confirm' && e.target === 'q1'));
+  const e = worklog(db).find((x) => x.kind === 'owner_confirm');
+  assert.ok(e && e.target === 'q1');
+  assert.ok(e.note.includes('박한별') && !e.note.includes('u7'), '작업 기록에 아이디(uid)를 적지 않는다');
+});
+test('confirmOwners — 금액 칸이 없는 건은 담당만 있는 칸을 만들고, 여러 건을 한 번에 쓴다', async () => {
+  const b = load(); const db = fakeDb();
+  db.store['pu_quote_amt/q1'] = { amount: 5, vat: '', owner: '', by: 'adm', at: 1 };
+  b.PuQuotes.init({ db, uid: 'adm' });
+  await b.PuQuotes.confirmOwners(['q1', 'q2'], 'u7', '박한별');
+  assert.strictEqual(db.updates.length, 1, '한 번에(원자적으로) 써야 한다');
+  assert.strictEqual(db.store['pu_quote_amt/q1/owner'], 'u7');
+  const n = db.store['pu_quote_amt/q2'];
+  assert.strictEqual(n.owner, 'u7'); assert.strictEqual(n.by, 'adm'); assert.strictEqual(typeof n.at, 'number');
+  assert.ok(!('amount' in n), '모르는 금액을 0 으로 채우지 않는다');
+});
+test('confirmOwners — 번호나 담당이 없으면 거절', async () => {
+  const b = load(); b.PuQuotes.init({ db: fakeDb(), uid: 'adm' });
+  await assert.rejects(() => b.PuQuotes.confirmOwners([], 'u7'));
+  await assert.rejects(() => b.PuQuotes.confirmOwner('q1', ''));
+});
+test('dateOf — 여러 모양을 YYYY-MM-DD 로, 숫자(ms)는 한국 시간', () => {
+  const d = load().PuQuotes.dateOf;
+  assert.strictEqual(d('2026-11-07'), '2026-11-07');
+  assert.strictEqual(d('2026.3.5'), '2026-03-05');
+  assert.strictEqual(d('2026년 3월 5일'), '2026-03-05');
+  assert.strictEqual(d(Date.UTC(2026, 9, 31, 16, 0)), '2026-11-01');
+  assert.strictEqual(d('어제'), ''); assert.strictEqual(d('2026-13-01'), ''); assert.strictEqual(d(undefined), '');
+});
+test('save — 날짜를 모르면 아무것도 안 쓰고 거절', async () => {
+  const b = load(); const db = fakeDb();
+  b.PuQuotes.init({ db, uid: 'u1' });
+  await assert.rejects(() => b.PuQuotes.save({ co: 'A', date: '', src: { how: 'mail' } }), /날짜/);
+  assert.deepStrictEqual(Object.keys(db.store).filter((k) => k.indexOf('pu_quotes/') === 0), []);
+});
+test('save — 금액은 모르고 담당만 있으면 담당 칸만(금액 칸 없이) 만든다', async () => {
+  const b = load(); const db = fakeDb();
+  b.PuQuotes.init({ db, uid: 'u1' });
+  const qid = await b.PuQuotes.save({ co: 'A', date: '2026-11-01', src: { how: 'window' } }, { owner: 'u1' });
+  const a = db.store['pu_quote_amt/' + qid];
+  assert.strictEqual(a.owner, 'u1'); assert.ok(!('amount' in a));
+});
+test('save — 음수·글자 금액은 거절', async () => {
+  const b = load(); b.PuQuotes.init({ db: fakeDb(), uid: 'u1' });
+  await assert.rejects(() => b.PuQuotes.save({ co: 'A', date: '2026-11-01' }, { amount: -1 }));
+  await assert.rejects(() => b.PuQuotes.save({ co: 'A', date: '2026-11-01' }, { amount: '사백만' }));
 });
 
 test('findBySrc — 있으면 id, 없으면 null', async () => {
