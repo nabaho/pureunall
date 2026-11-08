@@ -241,7 +241,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=90"></script>
+<script src="js/pu-ontology.js?v=91"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -270,8 +270,12 @@
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-worklog.js?v=1"></script>
 <script src="js/pu-worklog-view.js?v=1"></script>
+<!-- 보낸메일 가져오기(총괄관리자만): 한글·PDF 글자를 AI 에 맡긴다 — 주민번호 지우개(pu-rrn-mask)가 없으면 판독 층이 멈춘다 -->
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-doc-read.js?v=52"></script>
 <script src="js/pu-quotes.js?v=1"></script>
-<script src="js/pu-quotes-view.js?v=1"></script>
+<script src="js/pu-quote-import.js?v=1"></script>
+<script src="js/pu-quotes-view.js?v=2"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -453,6 +457,89 @@ function quotesStaff() {
     return out;
   });
 }
+/* 💼 보낸메일에서 지난 견적·계약 가져오기 — 총괄관리자만(화면이 role 로 단추를 가린다). 판단은 js/pu-quote-import.js,
+   여기는 «메일 줄 읽기 · 첨부 받기 · 🔒 보관 · 글자 뽑기 · AI» 를 이어 주는 자리다.
+   ⚠ 건수는 «누를 때» 센다 — 보낸메일함 줄(약 2천 통)을 읽어야 해서 화면을 열 때마다 하지 않는다(비용 절감). */
+var QUOTE_MAIL_FN = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
+var quotePending = null, quoteReaderReady = false;
+function quoteSentSlug() {
+  return db.ref('mailbox/folders').once('value').then(function (s) {
+    var v = s.val() || {}, keys = Object.keys(v).filter(function (k) { return /^Sent Messages-/.test(k); });
+    if (!keys.length) throw new Error('보낸메일함을 찾지 못했습니다 — 푸른 메일을 한 번 열어 동기화한 뒤 다시 해 주세요');
+    return keys[0];
+  });
+}
+/* 아직 안 가져온 후보 — 이미 가져온 것은 srcKey 로 뺀다(다시 눌러도 안전) */
+function quotePendingList() {
+  return quoteSentSlug().then(function (slug) {
+    return Promise.all([
+      db.ref('mailbox/msgs/' + slug).orderByChild('d').limitToLast(4000).once('value'),
+      PuQuotes.list()
+    ]).then(function (r) {
+      var have = {}; r[1].forEach(function (q) { if (q.srcKey) have[q.srcKey] = 1; });
+      quotePending = PuQuoteImport.candidates(r[0].val() || {}, slug).filter(function (c) { return !have[c.srcKey]; });
+      return quotePending;
+    });
+  });
+}
+/* 첨부 받기 — 서버의 첨부 번호가 메일 줄(이름 5개·60자)의 순서와 다를 수 있다. 받은 파일 이름이 기대한 이름과 같은지 보고, 다르면 다른 번호를 시도한다 */
+function quoteFetchAtt(c) {
+  var u = firebase.auth().currentUser;
+  if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  var want = PuQuoteImport.nfc(c.attName), order = [c.attIndex];
+  for (var i = 0; i < Math.min(Math.max(c.attCount || 1, c.attIndex + 1), 8); i++) if (order.indexOf(i) < 0) order.push(i);
+  return u.getIdToken().then(function (tok) {
+    function tryAt(k) {
+      if (k >= order.length) return Promise.reject(new Error('첨부 파일 이름이 맞지 않아 받지 못했습니다'));
+      return fetch(QUOTE_MAIL_FN + 'readMailAttachment', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ slug: c.slug, uid: c.uid, index: order[k] }) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok || !j.ok) { if (r.status === 404) return tryAt(k + 1); throw new Error(j.error || ('첨부를 받지 못했습니다 (' + r.status + ')')); }
+            var got = PuQuoteImport.nfc(j.name);
+            if (got !== want && got.slice(0, PuQuoteImport.NAME_CUT) !== want) return tryAt(k + 1);
+            var bin = atob(j.b64 || ''), bytes = new Uint8Array(bin.length);
+            for (var q = 0; q < bin.length; q++) bytes[q] = bin.charCodeAt(q);
+            return { name: String(j.name || c.attName), type: String(j.mime || ''), bytes: bytes };
+          });
+        });
+    }
+    return tryAt(0);
+  });
+}
+/* 글자 뽑기 — 한글·PDF(글자층). 못 뽑으면 빈 글자(그러면 AI 를 부르지 않는다) */
+function quoteExtractText(bytes) {
+  return new Promise(function (resolve) {
+    try { PuContractForms.extractTemplateText(new Blob([bytes]), function (t, err) { resolve(err ? '' : (t || '')); }); }
+    catch (e) { resolve(''); }
+  });
+}
+function quoteImportHost() {
+  if (!quoteReaderReady) {
+    PuDocRead.init(Object.assign({ fetch: window.fetch.bind(window) }, PuDocRead.keysFrom(db, { auth: firebase.auth() })));
+    quoteReaderReady = true;
+  }
+  return {
+    have: function (srcKey) { return PuQuotes.findBySrc(srcKey).then(function (q) { return !!q; }); },
+    fetchAtt: quoteFetchAtt,
+    store: function (file) { return PuOfficeStore.putOriginal(file, { kind: 'quote' }, { secret: true }).then(function (r) { return r.fileId; }); },
+    extractText: quoteExtractText,
+    readText: function (prompt, text) { return PuDocRead.readTextWithPrompt(prompt, text, {}); },
+    save: function (rec, amt) { return PuQuotes.save(rec, amt); },
+    log: function (k, o) { return PuWorklog.log(k, o); },
+    now: Date.now
+  };
+}
+var quoteImporter = {
+  count: function () { return quotePendingList().then(function (l) { return l.length; }); },
+  run: function (onStep) {
+    return (quotePending ? Promise.resolve(quotePending) : quotePendingList()).then(function (list) {
+      quotePending = null;
+      return PuQuoteImport.runImport(list, quoteImportHost(), onStep);
+    });
+  }
+};
 /* 🔒 서명본으로 옮기기 — 서버 함수 puDocSecretMove(총괄관리자만). 원본 보관함 규칙이 «새로 쓰기만»이라 화면은 못 옮긴다 */
 function secretMoveCall(body) {
   var u = firebase.auth().currentUser;
@@ -1071,7 +1158,7 @@ function showPane(name) {
     adminOk.then(function () {
       quotesUi = PuQuotesView.mount($('quotesRoot'), {
         list: PuQuotes.list, amounts: PuQuotes.amounts, confirmOwners: PuQuotes.confirmOwners,
-        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast,
+        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast, importer: quoteImporter,
         role: { isAdmin: isAdmin, fin: isFin }, uid: curUser ? curUser.uid : ''
       });
     });

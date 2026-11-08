@@ -32,6 +32,10 @@ function canOpenSecret(o) {
   const fileId = o.fileId, quote = o.quote, amt = o.amt, uid = o.uid;
   if (!isQuoteFile(o.file)) return false;
   if (!fileId || !quote || quote.fileId !== fileId) return false;
+  /* ★ 견적을 «만든 사람»이 그 파일을 «올린 사람»이어야 한다 — 원본 보관함 목록은 직원 누구나 읽어 파일 번호를 알 수 있다.
+     이 줄이 없으면 아무 직원이 남이 올린 견적 원본의 번호를 자기 견적 기록에 적고, 자기를 담당으로 둬(만든 사람은 자기를
+     담당으로 둘 수 있다) 그 파일을 열 수 있다 — 금액 잠금이 뚫린다. 두 값 모두 서버·규칙이 «내 이름으로만» 쓰게 막은 값이다. */
+  if (!o.file.by || !quote.by || o.file.by !== quote.by) return false;
   if (role.fin === true) return true;
   /* uid 가 비면 owner 의 빈칸('')과 «같다»고 나오지 않게 uid 부터 본다 */
   return !!(uid && amt && typeof amt.owner === "string" && amt.owner && amt.owner === uid);

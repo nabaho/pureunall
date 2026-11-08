@@ -6,7 +6,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const A = require("./doc-secret-access");
 
-const QFILE = { secret: true, from: { kind: "quote" } };
+const QFILE = { secret: true, from: { kind: "quote" }, by: "u9" };
 const quote = (fileId) => ({ fileId, by: "u9" });
 
 test("총괄관리자는 어떤 🔒 파일이든 연다", () => {
@@ -36,6 +36,17 @@ test("★ 견적 길로 올린 파일이 아니면(서명본·위임장 등) 재
   assert.equal(A.canOpenSecret({ role: { fin: true }, uid: "f", fileId: "f1", file: other, quote: quote("f1") }), false);
   assert.equal(A.canOpenSecret({ role: {}, uid: "u7", fileId: "f1", file: other, quote: quote("f1"), amt: { owner: "u7" } }), false);
   assert.equal(A.canOpenSecret({ role: { fin: true }, uid: "f", fileId: "f1", file: { secret: true }, quote: quote("f1") }), false);
+});
+test("★★ 남이 올린 견적 원본을 자기 견적 기록에 끼워 넣어도 못 연다(담당을 자기로 해도, 재무라도)", () => {
+  /* 파일은 u9(총괄)가 올렸고, 악의 직원 evil 이 자기 견적 기록(by: evil)에 그 파일 번호를 적고 자기를 담당으로 뒀다 */
+  const evilQuote = { fileId: "f1", by: "evil" };
+  assert.equal(A.canOpenSecret({ role: {}, uid: "evil", fileId: "f1", file: QFILE, quote: evilQuote, amt: { owner: "evil" } }), false);
+  assert.equal(A.canOpenSecret({ role: { fin: true }, uid: "evil", fileId: "f1", file: QFILE, quote: evilQuote }), false);
+  /* 파일 기록이나 견적 기록에 만든 사람이 없어도 열지 않는다 */
+  assert.equal(A.canOpenSecret({ role: { fin: true }, uid: "f", fileId: "f1", file: { secret: true, from: { kind: "quote" } }, quote: quote("f1") }), false);
+  assert.equal(A.canOpenSecret({ role: { fin: true }, uid: "f", fileId: "f1", file: QFILE, quote: { fileId: "f1" } }), false);
+  /* 총괄관리자는 늘 연다 */
+  assert.equal(A.canOpenSecret({ role: { isAdmin: true }, uid: "a", fileId: "f1", file: QFILE, quote: evilQuote }), true);
 });
 test("부관리자(isSubAdmin 만)·일반 직원·역할 없음은 못 연다", () => {
   assert.equal(A.canOpenSecret({ role: { isSubAdmin: true }, uid: "s", fileId: "f1", file: QFILE, quote: quote("f1") }), false);

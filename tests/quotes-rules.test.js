@@ -28,6 +28,12 @@ test('★★ 금액 칸을 처음 만드는 것은 그 견적 기록을 만든 �
   assert.match(w, /root\.child\('pu_quotes'\)\.child\(\$q\)\.child\('by'\)\.val\(\) === auth\.uid/,
     '이게 없으면 다른 직원이 남의 견적에 «담당 = 나» 로 금액 칸을 먼저 심어 금액·🔒 원본을 연다');
 });
+test('★★ 견적 기록의 원본 파일(fileId)은 내가 올린 파일 또는 총괄관리자 — 남의 🔒 파일 번호를 끼워 넣지 못한다', () => {
+  const v = GEN.rules.pu_quotes.$q.fileId['.validate'];
+  assert.match(v, /root\.child\('pu_docs\/originals'\)\.child\(newData\.val\(\)\)\.child\('by'\)\.val\(\) === auth\.uid/);
+  assert.match(v, /isAdmin/);
+  assert.match(v, /<= 120/);
+});
 test('온톨로지 — 견적 기록은 id·entityType·createdAt·updatedAt 을 갖고, createdAt 은 안 바뀐다', () => {
   const q = GEN.rules.pu_quotes.$q;
   ['id', 'entityType', 'createdAt', 'updatedAt'].forEach((k) => assert.ok(q['.validate'].includes("'" + k + "'"), k + ' 가 꼭 있어야 한다'));

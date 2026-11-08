@@ -131,7 +131,7 @@ test('filterRows — 글자(의뢰처·과업)와 견적/계약', () => {
 });
 test('importResultText — 한 문장', () => {
   const t = load().PuQuotesView.importResultText;
-  assert.strictEqual(t({ done: 12, skipped: 3, failed: 1, left: 0 }), '12건을 가져왔습니다 · 이미 있어 건너뜀 3건 · 읽지 못함 1건');
+  assert.strictEqual(t({ done: 12, check: 4, skipped: 3, failed: 1, left: 0 }), '12건을 가져왔습니다 · 확인 필요 4건 · 이미 있어 건너뜀 3건 · 가져오지 못함 1건');
   assert.strictEqual(t({ done: 5, left: 20, stopped: 'AI 하루 한도' }), '5건을 가져왔습니다 · 남은 20건 — 멈춤: AI 하루 한도');
 });
 
@@ -271,11 +271,12 @@ test('업무 종류 묶음 머리줄에 건수', async () => {
 });
 
 /* ── 가져오기(작업 7이 채운다) ── */
-test('가져오기 줄 — 총괄관리자에게만, 연결돼 있을 때만', async () => {
-  const importer = { count: () => Promise.resolve(63), run: () => Promise.resolve({ done: 0 }) };
+test('가져오기 줄 — 총괄관리자에게만, 연결돼 있을 때만 · 화면을 열 때는 세지 않는다(메일 천 통을 읽어야 해서)', async () => {
+  let counted = 0;
+  const importer = { count: () => { counted++; return Promise.resolve(63); }, run: () => Promise.resolve({ done: 0 }) };
   const a = await mountWith({ role: { isAdmin: true }, importer }, {});
   assert.ok(btnByText(a.root, '📥 보낸메일에서 가져오기'));
-  assert.ok(/63건/.test(textOf(a.root)));
+  assert.strictEqual(counted, 0, '열 때 건수를 세면 매번 메일 줄을 다 읽는다');
   const f = await mountWith({ role: { fin: true }, importer }, {});
   assert.ok(!btnByText(f.root, '📥 보낸메일에서 가져오기'));
   const n = await mountWith({ role: { isAdmin: true } }, {});
@@ -295,6 +296,27 @@ test('가져오기 — 묻는 창에서 아니라고 하면 시작하지 않는�
   const { root } = await mountWith({ role: { isAdmin: true }, ask: () => false, importer: { run: () => { ran++; return Promise.resolve({}); } } }, {});
   fire(btnByText(root, '📥 보낸메일에서 가져오기'), 'click'); await settle();
   assert.strictEqual(ran, 0);
+  assert.ok(btnByText(root, '📥 보낸메일에서 가져오기').attrs.disabled === undefined, '아니라고 했으면 다시 누를 수 있다');
+});
+test('가져오기 — 누를 때 건수를 세어 묻는 말에 넣는다 · 새로 가져올 것이 0 이면 묻지도 않는다', async () => {
+  const asked = []; let ran = 0;
+  const importer = { count: () => Promise.resolve(63), run: () => { ran++; return Promise.resolve({ done: 63 }); } };
+  const a = await mountWith({ role: { isAdmin: true }, importer, ask: (m) => { asked.push(m); return true; } }, {});
+  fire(btnByText(a.root, '📥 보낸메일에서 가져오기'), 'click'); await settle();
+  assert.ok(/63건/.test(asked[0]), '묻는 말에 건수가 있어야 한다');
+  assert.strictEqual(ran, 1);
+  const none = [];
+  const z = await mountWith({ role: { isAdmin: true }, ask: (m) => { none.push(m); return true; },
+    importer: { count: () => Promise.resolve(0), run: () => { ran++; return Promise.resolve({}); } } }, {});
+  fire(btnByText(z.root, '📥 보낸메일에서 가져오기'), 'click'); await settle();
+  assert.strictEqual(none.length, 0); assert.strictEqual(ran, 1);
+  assert.ok(/새로 가져올 견적·계약이 없습니다/.test(textOf(z.root)));
+});
+test('가져오기 — 건수를 못 세거나 가져오다 실패해도 죽지 않고 알린다(다시 누를 수 있다)', async () => {
+  const { root } = await mountWith({ role: { isAdmin: true }, importer: { count: () => Promise.reject(new Error('메일을 읽지 못했습니다')), run: () => Promise.resolve({}) } }, {});
+  fire(btnByText(root, '📥 보낸메일에서 가져오기'), 'click'); await settle();
+  assert.ok(/가져오지 못했습니다 — 메일을 읽지 못했습니다/.test(textOf(root)));
+  assert.ok(btnByText(root, '📥 보낸메일에서 가져오기').attrs.disabled === undefined);
 });
 
 /* ── 소스 글자 지킴 ── */

@@ -69,8 +69,9 @@
   function importResultText(r) {
     r = r || {};
     var p = [(r.done || 0) + '건을 가져왔습니다'];
+    if (r.check) p.push('확인 필요 ' + r.check + '건');
     if (r.skipped) p.push('이미 있어 건너뜀 ' + r.skipped + '건');
-    if (r.failed) p.push('읽지 못함 ' + r.failed + '건');
+    if (r.failed) p.push('가져오지 못함 ' + r.failed + '건');
     if (r.left) p.push('남은 ' + r.left + '건');
     var s = p.join(' · ');
     if (r.stopped) s += ' — 멈춤: ' + r.stopped;
@@ -126,7 +127,7 @@
     var toast = typeof host.toast === 'function' ? host.toast : function () {};
     var ask = typeof host.ask === 'function' ? host.ask : function (m) { return w.confirm ? w.confirm(m) : true; };
     var st = { rows: null, amts: {}, amtErr: false, names: {}, staff: [], staffAsked: false, err: false,
-      text: '', doc: '', sel: {}, pick: '', busy: false, msg: '', impCount: null, impBusy: false, impMsg: '', seq: 0 };
+      text: '', doc: '', sel: {}, pick: '', busy: false, msg: '', impBusy: false, impMsg: '', seq: 0 };
 
     if (w.document && w.document.head && !(w.document.getElementById && w.document.getElementById('pqv-css'))) {
       var s = w.document.createElement('style'); s.id = 'pqv-css'; s.textContent = CSS; w.document.head.appendChild(s);
@@ -172,12 +173,6 @@
         st.staff.forEach(function (x) { if (x && x.uid && x.name) st.names[x.uid] = x.name; });
         draw();
       }, function () { st.staff = []; draw(); });
-    }
-    function loadCount() {
-      if (!host.importer || role.isAdmin !== true || typeof host.importer.count !== 'function') return;
-      var p;
-      try { p = Promise.resolve(host.importer.count()); } catch (e) { p = Promise.reject(e); }
-      p.then(function (n) { st.impCount = typeof n === 'number' ? n : null; draw(); }, function () { st.impCount = null; });
     }
 
     function btn(label, fn, extra) {
@@ -228,18 +223,26 @@
       });
     }
 
+    /* 건수는 «누를 때» 센다 — 메일 줄을 천 통 넘게 읽어야 알 수 있어서, 화면을 열 때마다 하지 않는다(비용 절감).
+       importer.count() 가 «새로 가져올 건수»를 돌려주고, 0 이면 물을 것도 없다. 없으면 건수 없이 묻는다. */
     function runImport() {
       var imp = host.importer;
       if (!imp || st.impBusy) return;
-      var n = st.impCount;
-      if (!ask('보낸메일함에서 지난 견적·계약' + (n != null ? ' ' + n + '건' : '') + '을 가져옵니다. 파일을 하나씩 받아 AI 가 읽으므로 시간이 걸립니다. 진행할까요?')) return;
-      st.impBusy = true; st.impMsg = '시작합니다…'; draw();
-      var p;
-      try { p = Promise.resolve(imp.run(function (step) { st.impMsg = String(step || ''); drawImpOnly(); })); } catch (e) { p = Promise.reject(e); }
-      p.then(function (r) {
-        st.impBusy = false; st.impMsg = importResultText(r);
-        load(); loadCount();
-      }, function (e) {
+      st.impBusy = true; st.impMsg = '가져올 메일을 찾는 중…'; draw();
+      var cp;
+      try { cp = typeof imp.count === 'function' ? Promise.resolve(imp.count()) : Promise.resolve(null); } catch (e) { cp = Promise.reject(e); }
+      cp.then(function (n) {
+        if (n === 0) { st.impBusy = false; st.impMsg = '새로 가져올 견적·계약이 없습니다'; draw(); return null; }
+        var q = '보낸메일함에서 지난 견적·계약' + (typeof n === 'number' ? ' ' + n + '건' : '') + '을 가져옵니다. 파일을 하나씩 받아 AI 가 읽으므로 시간이 걸립니다. 진행할까요?';
+        if (!ask(q)) { st.impBusy = false; st.impMsg = ''; draw(); return null; }
+        st.impMsg = '시작합니다…'; draw();
+        var p;
+        try { p = Promise.resolve(imp.run(function (step) { st.impMsg = String(step || ''); drawImpOnly(); })); } catch (e) { p = Promise.reject(e); }
+        return p.then(function (r) {
+          st.impBusy = false; st.impMsg = importResultText(r);
+          load();
+        });
+      }).catch(function (e) {
         st.impBusy = false; st.impMsg = '가져오지 못했습니다 — ' + ((e && e.message) || e);
         draw();
       });
@@ -278,8 +281,7 @@
 
       /* 가져오기 줄 — 총괄관리자만, 가져오는 길(importer)이 연결돼 있을 때만 */
       if (host.importer && role.isAdmin === true) {
-        var label = '📥 보낸메일에서 가져오기' + (st.impCount != null ? ' (' + st.impCount + '건)' : '');
-        var ib = btn(label, runImport); if (st.impBusy) ib.setAttribute('disabled', 'disabled');
+        var ib = btn('📥 보낸메일에서 가져오기', runImport); if (st.impBusy) ib.setAttribute('disabled', 'disabled');
         impEl = el('span', { 'class': 'msg', text: st.impMsg || '' });
         box.appendChild(el('div', { 'class': 'pqv-imp' }, [ib, impEl]));
       }
@@ -360,7 +362,7 @@
       if (f && f.focus) { f.focus(); try { var n = f.value.length; f.setSelectionRange(n, n); } catch (e) { /* 일부 종류는 못 한다 */ } }
     }
 
-    load(); loadCount();
+    load();
     return {
       reload: load,
       clearSelection: function () { if (selIds().length) { st.sel = {}; st.pick = ''; draw(); } },

@@ -63,6 +63,51 @@ test('담당 고르기 목록 — 재직 직원의 «이름»만(사번·아이�
   assert.match(f, /out\.push\(\{ uid: uid, name: String\(p\.name\) \}\)/);
   assert.doesNotMatch(f, /out\.push\([^)]*sid/, '목록에 사번을 싣지 않는다');
 });
+/* ── 보낸메일 가져오기(작업 7) ── */
+test('가져오기 스크립트 — 주민번호 지우개가 판독 층보다 «같이» 실린다(없으면 글자 판독이 멈춘다)', () => {
+  const at = (f) => H.indexOf('<script src="js/' + f + '?v=');
+  assert.ok(at('pu-rrn-mask.js') > 0, 'AI 로 글자를 보내는 화면은 주민번호 지우개를 싣는다');
+  assert.ok(at('pu-doc-read.js') > 0 && at('pu-quote-import.js') > 0);
+  assert.ok(at('pu-quote-import.js') > at('pu-quotes.js'), 'PuQuoteImport 는 PuQuotes 를 쓴다');
+});
+test('판독 층 캐시 번호 — 이 파일을 싣는 모든 화면이 올린 번호를 쓴다(안 올리면 옛 파일이 남아 readTextWithPrompt 가 없다)', () => {
+  const root = path.join(__dirname, '..');
+  const pages = fs.readdirSync(root).filter((f) => /\.html$/.test(f));
+  const vs = [];
+  pages.forEach((f) => { const m = fs.readFileSync(path.join(root, f), 'utf8').match(/js\/pu-doc-read\.js\?v=(\d+)/); if (m) vs.push({ f, v: Number(m[1]) }); });
+  assert.ok(vs.length >= 7, '판독 층을 싣는 화면을 못 찾았습니다');
+  const behind = vs.filter((x) => x.v < 52);
+  assert.deepStrictEqual(behind, [], 'readTextWithPrompt 를 더한 뒤(v=52) 번호를 안 올린 화면: ' + behind.map((x) => x.f).join(', '));
+});
+test('가져오기 — 🔒 보관(secret) + 견적 길 표시(kind quote), 글자판 AI(readTextWithPrompt), 저장은 PuQuotes', () => {
+  const f = cut(H, 'function quoteImportHost');
+  assert.match(f, /putOriginal\(file, \{ kind: 'quote' \}, \{ secret: true \}\)/);
+  assert.match(f, /PuDocRead\.readTextWithPrompt\(prompt, text, \{\}\)/);
+  assert.doesNotMatch(f, /readWithPrompt\(/, '원본 사진·PDF 를 그대로 보내는 길을 쓰지 않는다');
+  assert.match(f, /PuQuotes\.save\(rec, amt\)/);
+  assert.match(f, /PuQuotes\.findBySrc\(srcKey\)/);
+  assert.match(f, /PuDocRead\.keysFrom\(db, \{ auth: firebase\.auth\(\) \}\)/);
+});
+test('가져오기 — 첨부는 받은 파일 이름을 기대한 이름과 견주고, 다르면 다른 번호를 시도한다', () => {
+  const f = cut(H, 'function quoteFetchAtt');
+  assert.match(f, /readMailAttachment/);
+  assert.match(f, /PuQuoteImport\.nfc\(j\.name\)/);
+  assert.match(f, /got\.slice\(0, PuQuoteImport\.NAME_CUT\) !== want\) return tryAt\(k \+ 1\)/);
+  assert.match(f, /r\.status === 404\) return tryAt\(k \+ 1\)/);
+});
+test('가져오기 — 건수는 누를 때 센다(열 때 메일 줄을 읽지 않는다) · 화면에 importer 를 넘긴다', () => {
+  const sp = cut(H, 'function showPane');
+  assert.match(sp, /importer: quoteImporter/);
+  const imp = H.slice(H.indexOf('var quoteImporter'), H.indexOf('var quoteImporter') + 400);
+  assert.match(imp, /count: function \(\) \{ return quotePendingList\(\)/);
+  /* 화면을 여는 길(mount 호출)에서 메일 줄을 읽는 함수를 직접 부르지 않는다 */
+  assert.doesNotMatch(sp, /quotePendingList\(|quoteSentSlug\(/);
+});
+test('가져오기 — 보낸메일함은 «Sent Messages-» 로 찾고, 줄은 날짜 색인(d)으로 읽는다', () => {
+  assert.match(cut(H, 'function quoteSentSlug'), /\^Sent Messages-/);
+  assert.match(cut(H, 'function quotePendingList'), /orderByChild\('d'\)\.limitToLast\(\d+\)/);
+});
+
 test('담당 확정은 총괄관리자 화면에서만 — 호스트가 confirmOwners 를 넘겨도 화면이 role 로 가린다', () => {
   const V = read('js/pu-quotes-view.js');
   assert.match(V, /role\.isAdmin === true && typeof host\.confirmOwners === 'function'/);

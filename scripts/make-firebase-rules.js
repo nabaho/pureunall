@@ -1956,7 +1956,9 @@ rules.pu_quotes = {
     scope:  견적글(300),
     period: 견적글(60),
     staff:  { '.validate': 'newData.isNumber() && newData.val() >= 0' },
-    fileId: 견적글(120),
+    /* ★ 견적 기록에 적는 원본 파일은 «내가 올린 것»(또는 총괄관리자) — 직원 누구나 원본 보관함 목록을 읽어 파일 번호를 알 수 있다.
+       남이 올린 🔒 견적 원본 번호를 자기 견적에 적고 자기를 담당으로 두면 그 파일의 금액이 열리는 것을 규칙에서도 막는다(서버 puDocSecret 이 한 겹 더). */
+    fileId: { '.validate': `newData.isString() && newData.val().length <= 120 && (root.child('pu_docs/originals').child(newData.val()).child('by').val() === auth.uid || ${ADMIN})` },
     srcKey: 견적글(200),
     src: {
       '.validate': "newData.hasChild('how')",

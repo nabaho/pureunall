@@ -1164,6 +1164,23 @@
     });
   }
 
+  /* 글자 + 부르는 쪽의 판독 사전 → { ok:true, data } 또는 { ok:false, why } — readWithPrompt 의 «글자판»
+     (견적·계약 가져오기: 한글·PDF 에서 뽑은 글자를 AI 에 맡긴다).
+     ⚠ 마지막 문지기 — 주민번호를 «여기서» 한 번 더 지운다. 부르는 쪽이 지우는 것을 잊어도 AI 로는 안 나간다.
+        지우개(js/pu-rrn-mask.js)가 화면에 없으면 멈춘다(NO_SCRUB). 글자는 사진과 달리 자리를 틀릴 일이 없다.
+     ⚠ afterRead 를 안 탄다 · 저장하지 않는다 — 이 층의 원칙 그대로다. */
+  function readTextWithPrompt(prompt, text, opts) {
+    if (!deps.fetch) return Promise.resolve({ ok: false, why: '판독 준비가 되지 않았습니다' });
+    var p = String(prompt == null ? '' : prompt).trim();
+    if (!p) return Promise.resolve({ ok: false, why: '판독 사전이 없습니다' });
+    var body = String(text == null ? '' : text).trim();
+    /* 빈 글자로 AI 를 부르면 헛돈이고 답도 쓸 수 없다 */
+    if (!body) return Promise.resolve({ ok: false, why: '읽을 글자가 없습니다' });
+    body = rrnScrub(body);
+    if (body === null) return Promise.resolve({ ok: false, why: NO_SCRUB });
+    return runRawParts([{ text: p }, { text: body }], opts || {});
+  }
+
   /* 답을 «그대로» 돌려주는 길 — runDocParts 와 달리 afterRead 를 안 탄다 */
   function runRawParts(parts, opts) {
     var 마무리 = function (j) {
@@ -2238,6 +2255,8 @@
     read: read,
     /* 서류 종류마다 사전이 다른 앱을 위한 입구(경력관리) — 위 설명 참고 */
     readWithPrompt: readWithPrompt,
+    /* 글자판 — 한글·PDF 에서 뽑은 글자 + 부르는 쪽의 사전(견적·계약 가져오기). 주민번호는 여기서 한 번 더 지운다 */
+    readTextWithPrompt: readTextWithPrompt,
     readDocText: readDocText,
     appName: appName, APP_KO: APP_KO,   /* ⑤ 앱별 판독 셈 — 검사가 이것을 겨눈다 */
     visionText: visionText,    /* 글자만 뽑기 — 몫이 Gemini 와 따로다 (2026-09-08) */
