@@ -42,6 +42,7 @@
   .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
   .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
   .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .nav[hidden]{display:none}
   .nav:hover{background:#eff6ff}
   .nav.on{background:#bfdbfe;color:#1e40af;font-weight:700}
   .nav:focus-visible{outline:2px solid #1e40af;outline-offset:1px}
@@ -169,6 +170,8 @@
   <div class="nav sub soon" id="navLib" aria-disabled="true" title="노무사 검토가 끝나면 열립니다">📚 서식집<i>검토 후</i></div>
   <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
   <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
+  <button type="button" class="nav sub" data-pane="quotes" id="navQuotes">💼 지난 견적·계약</button>
+  <button type="button" class="nav sub" data-pane="log" id="navLog" hidden>🧾 작업 기록</button>
 </nav>
 <div class="main">
 <div id="paneEsign">
@@ -217,6 +220,20 @@
     <div id="arcRoot"></div>
   </div>
 </div>
+<!-- 💼 지난 견적·계약 — 업무 종류별, 금액은 대표·총괄·재무·확정 담당자만 (js/pu-quotes-view.js) -->
+<div id="paneQuotes" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>지난 견적·계약</b></div>
+    <div id="quotesRoot"></div>
+  </div>
+</div>
+<!-- 🧾 작업 기록 — 총괄관리자만 (js/pu-worklog-view.js) -->
+<div id="paneLog" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>작업 기록</b></div>
+    <div id="logRoot"></div>
+  </div>
+</div>
 </div>
 </div>
 
@@ -224,7 +241,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=90"></script>
+<script src="js/pu-ontology.js?v=91"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -248,9 +265,17 @@
 <script src="js/esign-hwp-tpl.js?v=8"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=22"></script>
-<script src="js/pu-contract-forms.js?v=68"></script>
+<script src="js/pu-contract-forms.js?v=69"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-office-store.js?v=10"></script>
+<script src="js/pu-worklog.js?v=1"></script>
+<script src="js/pu-worklog-view.js?v=1"></script>
+<!-- 보낸메일 가져오기(총괄관리자만): 한글·PDF 글자를 AI 에 맡긴다 — 주민번호 지우개(pu-rrn-mask)가 없으면 판독 층이 멈춘다 -->
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-doc-read.js?v=52"></script>
+<script src="js/pu-quotes.js?v=1"></script>
+<script src="js/pu-quote-import.js?v=1"></script>
+<script src="js/pu-quotes-view.js?v=3"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -272,7 +297,7 @@ var curUser = null;
    여기서 만든 이름은 저장되는 「올린 사람」·서명 요청서의 「요청」 줄로 나가므로 서명을 받는 바깥 사람에게도 보인다. */
 function meName() { var me = window.PuWhoami && PuWhoami.get(); return (me && me.name) || ''; }
 /* 원본 보관함(올린 사람 이름 포함) 설정 — 이름은 명부를 읽은 뒤에야 알려지므로, 알려지면 한 번 더 부른다(init 은 값만 바꾼다) */
-function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); }
+function officeInit() { PuOfficeStore.init({ db: db, storage: docBucket, uid: curUser.uid, name: meName(), secretFetch: fetchSecretDoc }); PuWorklog.init({ db: db, uid: curUser.uid, name: meName() }); PuQuotes.init({ db: db, uid: curUser.uid, name: meName() }); }
 var casesCache = {};
 var savePending = 0, saveFailed = false;
 function setSaveState(kind, text) {
@@ -328,21 +353,30 @@ firebase.auth().onAuthStateChanged(function (u) {
     Promise.all([softGet('data/user_dir'), softGet('data/leave_of_absence')]).then(function (r) { if (r[0]) PuFormCardFill.setLawyers(r[0], r[1]); });
   }
   loadCases();
+  /* 🧾 작업 기록 — 총괄관리자(isAdmin === true)만. 부관리자(isSubAdmin)는 안 된다 — DB 규칙과 같은 기준 */
+  adminOk = db.ref('uid_roles/' + u.uid).once('value').then(function (s) {
+    var r = s.val(); isAdmin = !!(r && r.isAdmin === true); isFin = !!(r && r.fin === true);
+    $('navLog').hidden = !isAdmin;
+  }, function () { isAdmin = false; isFin = false; });
   showPane(paneFromHash());
 });
 
 /* ── 왼쪽 목록: 사건관리(집단체불 위임장) ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
    주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
    ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 위임장만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
-var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', lib: 'paneLib' };
+var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc', quotes: 'paneQuotes', log: 'paneLog', lib: 'paneLib' };
 var libIndex = null;   /* 실린 서식 목록 — 비어 있으면 서식집 칸은 «없는 칸»이다 */
 var formsMounted = false, formsUi = null, mounted = {};
+var isAdmin = false, isFin = false, adminOk = Promise.resolve();
+var quotesUi = null;
 var docBucket = null, photosReady = null;
 function paneFromHash() {
   var h = location.hash;
   if (h === '#forms' || h.indexOf('#forms:') === 0) return 'forms';
   if (h === '#co' || h === '#co:await') return 'co';   /* #co:await — 업무관리 「📬 서명본 대기」 알림에서 (2026-10-08) */
   if (h === '#arc') return 'arc';
+  if (h === '#quotes') return 'quotes';   /* 지난 견적·계약 — 직원 모두(금액은 권한자만) */
+  if (h === '#log') return 'log';   /* 작업 기록 — 총괄관리자만(아니면 안내만) */
   if (h === '#lib' && libIndex && libIndex.length) return 'lib';
   if (h === '#esign') return 'esign';   /* 집단체불 위임장 — 사건계약 아래 단추 (2026-10-09) */
   return 'forms';
@@ -375,18 +409,137 @@ function formFromHash() {
 }
 /* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
    토큰·서명 주소를 만들지 않는다 — 받은 바이트는 이 창 안에서만 쓴다. */
-function fetchSecretDoc(fileId) {
+function fetchSecretDoc(fileId, qid) {
   var u = firebase.auth().currentUser;
   if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  /* qid(견적 번호)는 «지난 견적·계약»의 견적서를 재무·확정 담당자가 열 때만 함께 보낸다 — 서명본은 늘 총괄관리자만 */
+  var body = qid ? { fileId: fileId, qid: qid } : { fileId: fileId };
   return u.getIdToken().then(function (tok) {
     return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecret', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-      body: JSON.stringify({ fileId: fileId }) });
+      body: JSON.stringify(body) });
   }).then(function (r) {
     if (r.ok) return r.blob();
     return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
   });
 }
+/* 💼 지난 견적·계약 — 그 견적의 원본 파일 열기. 🔒 파일이면 서버(puDocSecret)에 견적 번호를 함께 보낸다
+   (총괄관리자 · 재무 · 그 건의 확정 담당자만 서버가 내준다). 보통 파일은 원본 보관함과 같은 길. */
+function quotesOpenFile(rec) {
+  return PuOfficeStore.getOriginal(rec.fileId).then(function (o) {
+    if (!o) throw new Error('보관함에 없는 파일입니다');
+    var done = function () { PuWorklog.log('download', { target: rec.fileId, note: o.name }); };
+    if (PuOfficeStore.isSecret(o)) {
+      return fetchSecretDoc(rec.fileId, rec.id).then(function (blob) { PuOfficeStore.saveBlob(blob, o.name); done(); });
+    }
+    return PuOfficeStore.download(rec.fileId, o.name).then(done);
+  });
+}
+/* 💼 담당 확정에서 고르는 직원 — 재직(uid_roles) + 이름(직원 명부). 이름만 쓴다(사번·아이디는 화면에 안 적는다 — 대표 2026-10-25) */
+function quotesStaff() {
+  var softGet = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
+  return Promise.all([softGet('uid_roles'), softGet('data/user_dir')]).then(function (r) {
+    var roles = r[0] || {}, dir = r[1], list = dir && dir.v !== undefined ? dir.v : dir;
+    if (list && !Array.isArray(list) && typeof list === 'object') list = Object.keys(list).map(function (k) { return list[k]; });
+    if (!Array.isArray(list)) return [];
+    var norm = function (v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+    var bySid = {};
+    list.forEach(function (p) { if (p && p.sid && (!bySid[norm(p.sid)] || (p.status || 'active') === 'active')) bySid[norm(p.sid)] = p; });
+    var out = [];
+    Object.keys(roles).forEach(function (uid) {
+      var ro = roles[uid] || {};
+      if (ro.status !== 'active') return;
+      var p = bySid[norm(ro.sid)];
+      if (!p || !p.name || (p.status && p.status !== 'active')) return;
+      out.push({ uid: uid, name: String(p.name) });
+    });
+    out.sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+    return out;
+  });
+}
+/* 💼 보낸메일에서 지난 견적·계약 가져오기 — 총괄관리자만(화면이 role 로 단추를 가린다). 판단은 js/pu-quote-import.js,
+   여기는 «메일 줄 읽기 · 첨부 받기 · 🔒 보관 · 글자 뽑기 · AI» 를 이어 주는 자리다.
+   ⚠ 건수는 «누를 때» 센다 — 보낸메일함 줄(약 2천 통)을 읽어야 해서 화면을 열 때마다 하지 않는다(비용 절감). */
+var QUOTE_MAIL_FN = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
+var quotePending = null, quoteReaderReady = false;
+function quoteSentSlug() {
+  return db.ref('mailbox/folders').once('value').then(function (s) {
+    var v = s.val() || {}, keys = Object.keys(v).filter(function (k) { return /^Sent Messages-/.test(k); });
+    if (!keys.length) throw new Error('보낸메일함을 찾지 못했습니다 — 푸른 메일을 한 번 열어 동기화한 뒤 다시 해 주세요');
+    return keys[0];
+  });
+}
+/* 아직 안 가져온 후보 — 이미 가져온 것은 srcKey 로 뺀다(다시 눌러도 안전) */
+function quotePendingList() {
+  return quoteSentSlug().then(function (slug) {
+    return Promise.all([
+      db.ref('mailbox/msgs/' + slug).orderByChild('d').limitToLast(4000).once('value'),
+      PuQuotes.list()
+    ]).then(function (r) {
+      var have = {}; r[1].forEach(function (q) { if (q.srcKey) have[q.srcKey] = 1; });
+      quotePending = PuQuoteImport.candidates(r[0].val() || {}, slug).filter(function (c) { return !have[c.srcKey]; });
+      return quotePending;
+    });
+  });
+}
+/* 첨부 받기 — 서버의 첨부 번호가 메일 줄(이름 5개·60자)의 순서와 다를 수 있다. 받은 파일 이름이 기대한 이름과 같은지 보고, 다르면 다른 번호를 시도한다 */
+function quoteFetchAtt(c) {
+  var u = firebase.auth().currentUser;
+  if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  var want = PuQuoteImport.nfc(c.attName), order = [c.attIndex];
+  for (var i = 0; i < Math.min(Math.max(c.attCount || 1, c.attIndex + 1), 8); i++) if (order.indexOf(i) < 0) order.push(i);
+  return u.getIdToken().then(function (tok) {
+    function tryAt(k) {
+      if (k >= order.length) return Promise.reject(new Error('첨부 파일 이름이 맞지 않아 받지 못했습니다'));
+      return fetch(QUOTE_MAIL_FN + 'readMailAttachment', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ slug: c.slug, uid: c.uid, index: order[k] }) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok || !j.ok) { if (r.status === 404) return tryAt(k + 1); throw new Error(j.error || ('첨부를 받지 못했습니다 (' + r.status + ')')); }
+            var got = PuQuoteImport.nfc(j.name);
+            if (got !== want && got.slice(0, PuQuoteImport.NAME_CUT) !== want) return tryAt(k + 1);
+            var bin = atob(j.b64 || ''), bytes = new Uint8Array(bin.length);
+            for (var q = 0; q < bin.length; q++) bytes[q] = bin.charCodeAt(q);
+            return { name: String(j.name || c.attName), type: String(j.mime || ''), bytes: bytes };
+          });
+        });
+    }
+    return tryAt(0);
+  });
+}
+/* 글자 뽑기 — 한글·PDF(글자층). 못 뽑으면 빈 글자(그러면 AI 를 부르지 않는다) */
+function quoteExtractText(bytes) {
+  return new Promise(function (resolve) {
+    try { PuContractForms.extractTemplateText(new Blob([bytes]), function (t, err) { resolve(err ? '' : (t || '')); }); }
+    catch (e) { resolve(''); }
+  });
+}
+function quoteImportHost() {
+  if (!quoteReaderReady) {
+    PuDocRead.init(Object.assign({ fetch: window.fetch.bind(window) }, PuDocRead.keysFrom(db, { auth: firebase.auth() })));
+    quoteReaderReady = true;
+  }
+  return {
+    have: function (srcKey) { return PuQuotes.findBySrc(srcKey).then(function (q) { return !!q; }); },
+    fetchAtt: quoteFetchAtt,
+    store: function (file) { return PuOfficeStore.putOriginal(file, { kind: 'quote' }, { secret: true }).then(function (r) { return r.fileId; }); },
+    extractText: quoteExtractText,
+    readText: function (prompt, text) { return PuDocRead.readTextWithPrompt(prompt, text, {}); },
+    save: function (rec, amt) { return PuQuotes.save(rec, amt); },
+    log: function (k, o) { return PuWorklog.log(k, o); },
+    now: Date.now
+  };
+}
+var quoteImporter = {
+  count: function () { return quotePendingList().then(function (l) { return l.length; }); },
+  run: function (onStep) {
+    return (quotePending ? Promise.resolve(quotePending) : quotePendingList()).then(function (list) {
+      quotePending = null;
+      return PuQuoteImport.runImport(list, quoteImportHost(), onStep);
+    });
+  }
+};
 /* 🔒 서명본으로 옮기기 — 서버 함수 puDocSecretMove(총괄관리자만). 원본 보관함 규칙이 «새로 쓰기만»이라 화면은 못 옮긴다 */
 function secretMoveCall(body) {
   var u = firebase.auth().currentUser;
@@ -402,9 +555,17 @@ function secretMoveCall(body) {
     });
   });
 }
-function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
+function archiveOriginal(file, from) {
+  return trackedWrite(PuOfficeStore.putOriginal(file, from)).then(function (r) {
+    PuWorklog.log('upload', { target: (r && r.fileId) || '', note: (file && file.name) || '' });   /* 작업 기록 — 기다리지 않는다 */
+    return r;
+  });
+}
 function downloadOriginal(fileId, name) {
-  return PuOfficeStore.download(fileId, name).catch(function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
+  return PuOfficeStore.download(fileId, name).then(function (r) {
+    PuWorklog.log('download', { target: fileId, note: name });
+    return r;
+  }, function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
 }
 function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
@@ -655,7 +816,10 @@ function formMailRecord(row, V, o) {
   var coName = String((V && V.회사명) || (row && row.c) || '').trim();
   if (o.await && o.kind === '계약서' && coName)
     jobs.push(trackedWrite(PuOfficeStore.markAwait({ coName: coName, bz: (row && row.bz) || (V && V.사업자번호) || '', at: at, how: o.how === '받기' ? '받기' : '메일', names: o.names })));
-  return Promise.all(jobs).then(function () { return keys.length; });
+  return Promise.all(jobs).then(function () {
+    PuWorklog.log(o.how === '받기' ? 'download' : 'mail_send', { target: coName, note: (o.names || []).join(', ') });
+    return keys.length;
+  });
 }
 /* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) — 자리·규칙은 js/pu-sign.js 머리말 ══
    만들기: 직원 칸(req) → 열쇠 칸(open) 차례(규칙이 open 제출 때 req 의 끝 4자리를 본다). 회사가 있으면 📬 서명본 대기에 「서명」으로.
@@ -673,7 +837,10 @@ function formSignCreate(req, open) {
       if (!req.co) return;
       return trackedWrite(PuOfficeStore.markAwait({ coName: req.co, at: req.at, how: '서명', names: [req.title] })).catch(function () {});
     })
-    .then(function () { return { id: id, link: PuSign.linkOf(location.origin + location.pathname, req.t) }; });
+    .then(function () {
+      PuWorklog.log('sign_request', { target: req.co, note: req.title });
+      return { id: id, link: PuSign.linkOf(location.origin + location.pathname, req.t) };
+    });
 }
 function formSignList() {
   return db.ref('pu_sign/req').orderByChild('at').limitToLast(300).once('value').then(function (s) {
@@ -925,7 +1092,9 @@ async function formZip(files) {
   var JSZ = await _esignLoadJsZip();
   var z = new JSZ();
   files.forEach(function (f) { z.file(f.name, f.bytes); });
-  return z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  var out = await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  PuWorklog.log('download', { note: files.length + '개 파일 묶음' });   /* 묶음 이름은 이 함수가 모른다 — 개수로 남긴다 */
+  return out;
 }
 function formHwpShow(host, bytes, name) {
   if (!formIsXlsx(name)) return PureunHwp.renderPreview(host, bytes, name);
@@ -970,7 +1139,7 @@ function showPane(name) {
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
-      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
+      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal, log: function (k, o) { return PuWorklog.log(k, o); },
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       openEsign: function (o) {
         if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign');
@@ -982,6 +1151,24 @@ function showPane(name) {
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
+  if (name !== 'quotes' && quotesUi) quotesUi.clearSelection();   /* 화면을 떠나면 고른 것을 비운다 */
+  if (name === 'quotes' && !mounted.quotes) {
+    mounted.quotes = true;
+    /* 역할(총괄관리자·재무)을 읽은 뒤에 그린다 — 먼저 그리면 금액이 «비공개» 로 잘못 나온다 */
+    adminOk.then(function () {
+      quotesUi = PuQuotesView.mount($('quotesRoot'), {
+        list: PuQuotes.list, amounts: PuQuotes.amounts, confirmOwners: PuQuotes.confirmOwners,
+        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast, importer: quoteImporter,
+        role: { isAdmin: isAdmin, fin: isFin }, uid: curUser ? curUser.uid : ''
+      });
+    });
+  }
+  if (name === 'log' && !mounted.log) {
+    mounted.log = true;
+    /* 총괄관리자 확인이 끝난 뒤에만 읽는다 — 아니면 DB 규칙 대신 여기서 같은 안내(거절)로 막는다 */
+    PuWorklogView.mount($('logRoot'), { kinds: PuWorklog.KINDS, now: Date.now,
+      list: function (m) { return adminOk.then(function () { if (!isAdmin) throw new Error('permission_denied'); return PuWorklog.list(m); }); } });
+  }
   if (name === 'lib' && !mounted.lib && libIndex) {
     mounted.lib = true;
     PuFormLibrary.mount($('libRoot'), { index: libIndex, toast: showToast,

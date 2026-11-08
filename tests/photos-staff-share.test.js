@@ -336,7 +336,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
   /* ★ 2026-11-07 — 게시 완료(GitHub 「Firebase 배포」 실행 42382534463 · rules-deploy.js --deploy, 클라우드 방): 새로 1 · 바뀜 0 · 사라짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-07.json — 목록을 비운다. */
-  const PENDING = [];
+  /* ★ 2026-11-08 — 견적·계약 자동화 계획 1 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「네, 게시」): 새로 3(pu_worklog·pu_quotes·pu_quote_amt) ·
+       바뀜 1(원본 보관함 from.kind 에 'quote' 한 값 — 쓰기 조건은 그대로, 받는 값만 하나 늚) · 사라짐 0 · 넓어짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-08.json — 목록을 비운다. */
+  const PENDING = [
+  ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

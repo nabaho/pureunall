@@ -309,9 +309,12 @@
                       {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
                       {path:'rules_mgmt/library/ask/{id}',entityType:'Task'},
                       {path:'rules_mgmt/library/auto/cfg',entityType:'Task'}] },
-    docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign'],
+    docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign','pu_worklog','pu_quotes','pu_quote_amt'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
-         2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
+         2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다
+         2026-11-08 견적·계약 자동화 계획 1 — 작업 기록(pu_worklog, 총괄관리자만 읽기) · 지난 견적·계약 기록(pu_quotes, entityType 'Document') ·
+           그 금액·담당(pu_quote_amt, 대표·총괄·재무·확정 담당만) — 이 프로그램이 정본으로 쓴다.
+           ⚠ 금액은 관계 색인에 넣지 않는다(financial 권한 칸 — 원본보다 넓게 공개 금지). */
       sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여아웃소싱', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],

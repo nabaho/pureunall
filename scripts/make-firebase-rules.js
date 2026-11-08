@@ -1806,7 +1806,8 @@ rules.pu_docs = {
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     from:   {
       '.validate': "newData.hasChild('kind')",
-      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'" },
+      /* 'quote' — 보낸메일에서 가져온 견적·계약 원본(🔒, 견적·계약 자동화 계획 1). puDocSecret 이 «견적 길» 파일인지 이 값으로 가린다 */
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote'" },
       $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
     },
     $other: { '.validate': false }
@@ -1901,6 +1902,94 @@ rules.pu_docs = {
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other: { '.validate': false }
   } } }
+};
+
+/* ══ 작업 기록 — «누가 언제 무엇을 했나» 덧붙이기 장부 (견적·계약 자동화 계획 1) ═════
+   js/pu-worklog.js 가 pu_worklog/{YYYYMM}/{push} 에 쓴다.
+   ★ 읽기는 총괄관리자만 — 위임관리인·재무 권한자도 못 본다(직원 행동 기록이라서).
+   ★ 새로 쓰기만, 내 이름으로만 — 고치기·지우기 길이 규칙에 없어야 기록이 믿을 만하다.
+   ⚠ 칸 길이는 모듈(PuWorklog.entry)이 미리 자르는 값과 같아야 한다(target 120·note 200·auto 60). */
+rules.pu_worklog = {
+  '.read': ADMIN,
+  $m: {
+    '.validate': "$m.matches(/^[0-9]{6}$/)",
+    $id: {
+      '.write': `(${LOGIN}) && !data.exists()`,
+      '.validate': "newData.hasChildren(['kind','at','by'])",
+      kind:   { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      at:     { '.validate': 'newData.isNumber()' },
+      by:     { '.validate': 'newData.val() === auth.uid' },
+      byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+      target: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+      note:   { '.validate': 'newData.isString() && newData.val().length <= 200' },
+      auto:   { '.validate': 'newData.isString() && newData.val().length <= 60' },
+      $other: { '.validate': false }
+    }
+  }
+};
+
+/* ══ 견적·계약 기록 + 금액 잠금 (견적·계약 자동화 계획 1) ═════════════════════════
+   js/pu-quotes.js 가 쓴다. 글(회사·날짜·종류·출처)은 pu_quotes, 금액은 pu_quote_amt 로 «따로» 둔다.
+   ★ 금액을 보는 사람: 대표·총괄관리자(isAdmin) · 재무(fin) · 그 건의 확정 담당자(owner). isSubAdmin·일반 직원은 못 본다.
+   ★ 파이어베이스는 부모에서 준 .read 를 아래에서 거둘 수 없다 — 그래서 pu_quote_amt 자리에는 isAdmin·fin 만 두고
+     (LOGIN 을 넣지 않는다), 확정 담당자 읽기는 한 건($q) 자리에만 둔다. 뿌리에도 .read 가 없어야 한다.
+   ★ 담당자(owner)를 바꾸는 것은 isAdmin 만 — 새로 쓸 때만 «나 또는 빈칸» 으로 넣을 수 있다.
+   ★★ 금액 칸을 «처음 만드는» 것은 그 견적 기록을 만든 사람(pu_quotes/{q}/by)만 — 아니면 다른 직원이
+      남의 견적에 «담당 = 나» 로 금액 칸을 먼저 심어 그 견적의 금액·🔒 원본(puDocSecret)을 열 수 있다(검토 2026-11-08).
+   ★★ 견적 기록을 «고치는» 것은 만든 사람·isAdmin 만 — 남이 fileId 를 바꿔 끼우면 확정 담당자가 다른 🔒 파일을 연다.
+   ★ 온톨로지 원칙 — 새 레코드는 id·entityType·createdAt·updatedAt 을 갖는다(id 는 열쇠와 같고, createdAt 은 안 바뀐다).
+   ⚠ 칸 길이는 PuQuotes 가 미리 자르는 값과 같아야 한다(co 80·scope 300·period 60·ownerGuess 60·srcKey 200). */
+const 견적글 = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+rules.pu_quotes = {
+  '.read': LOGIN,
+  '.indexOn': ['srcKey', 'createdAt'],
+  $q: {
+    '.write': `(${LOGIN}) && ((!data.exists() && newData.exists()) || (newData.exists() && data.child('by').val() === auth.uid) || ${ADMIN})`,
+    '.validate': "newData.hasChildren(['id','entityType','doc','type','co','date','src','review','by','createdAt','updatedAt'])",
+    id:         { '.validate': 'newData.val() === $q' },
+    entityType: { '.validate': "newData.val() === 'Document'" },
+    doc:    { '.validate': "newData.isString() && (newData.val() === 'quote' || newData.val() === 'contract')" },
+    type:   견적글(30),
+    co:     견적글(80),
+    coKey:  견적글(80),
+    date:   { '.validate': "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)" },
+    scope:  견적글(300),
+    period: 견적글(60),
+    staff:  { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    /* ★ 견적 기록에 적는 원본 파일은 «내가 올린 것»(또는 총괄관리자) — 직원 누구나 원본 보관함 목록을 읽어 파일 번호를 알 수 있다.
+       남이 올린 🔒 견적 원본 번호를 자기 견적에 적고 자기를 담당으로 두면 그 파일의 금액이 열리는 것을 규칙에서도 막는다(서버 puDocSecret 이 한 겹 더). */
+    fileId: { '.validate': `newData.isString() && newData.val().length <= 120 && (root.child('pu_docs/originals').child(newData.val()).child('by').val() === auth.uid || ${ADMIN})` },
+    srcKey: 견적글(200),
+    src: {
+      '.validate': "newData.hasChild('how')",
+      how:  { '.validate': "newData.isString() && (newData.val() === 'mail' || newData.val() === 'window' || newData.val() === 'upload')" },
+      slug: 견적글(120),
+      key:  견적글(200),
+      $other: { '.validate': false }
+    },
+    ownerGuess: 견적글(60),
+    review: { '.validate': "newData.isString() && (newData.val() === 'ok' || newData.val() === 'check')" },
+    by:     { '.validate': 'newData.val() === auth.uid || newData.val() === data.val()' },
+    createdAt: { '.validate': 'newData.isNumber() && (!data.exists() || newData.val() === data.val())' },
+    updatedAt: { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+/* 금액(amount)·부가세(vat)는 비어 있을 수 있다 — 금액을 못 읽은 견적(「확인 필요」)에도 담당은 먼저 정할 수 있어야 해서. */
+rules.pu_quote_amt = {
+  '.read': `auth != null && (${ADMIN} || ${FIN})`,
+  $q: {
+    '.read': `(${LOGIN}) && data.child('owner').val() === auth.uid`,
+    '.write': `(${LOGIN}) && ((!data.exists() && root.child('pu_quotes').child($q).child('by').val() === auth.uid`
+      + ` && (newData.child('owner').val() === auth.uid || newData.child('owner').val() === '')) || ${ADMIN})`,
+    '.validate': "newData.hasChildren(['owner','by','at'])",
+    amount: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    vat:    { '.validate': "newData.isString() && (newData.val() === 'incl' || newData.val() === 'excl' || newData.val() === '')" },
+    owner:  { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    by:     { '.validate': 'newData.val() === auth.uid || newData.val() === data.val()' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
 };
 
 /* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) ═════════════════

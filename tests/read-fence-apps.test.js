@@ -134,6 +134,12 @@ const GATED = {
   'pu-photos.html': ['startRead', 'readPhoto', 'imgChunkMakers', 'readDocChunked',
     'runReadChunks', 'textChunkMakers', 'freeReadTry', 'freeReadAsk'],
   'gov-consulting.html': ['refCapRead'],      // 아는 채로 열어 둔 곳(KNOWN_OPEN)
+  /* 계약서등관리 — 보낸메일 견적·계약 가져오기(총괄관리자만, 견적·계약 자동화 계획 1 · 2026-11-08).
+     ★ 한글·PDF 에서 «뽑은 글자»만 보낸다 — 사진·원본 파일을 그대로 보내는 readWithPrompt 는 쓰지 않는다
+       (tests/quotes-hooks.test.js 가 지킨다). 주민번호는 readTextWithPrompt 가 «한 번 더» 지우고, 지우개가 없으면 멈춘다.
+       이 화면은 js/pu-rrn-mask.js 도 싣는다(위 첫 검사). 글자를 못 뽑은 파일(스캔본)은 AI 를 아예 부르지 않는다.
+     ⚠ 부르는 자리는 quoteImportHost 하나뿐이다. 다른 자리에서 또 부르면 여기서 걸린다. */
+  'docs-esign.html': ['quoteImportHost'],
   /* 경력관리 — 위촉장·자격증·경력증명서를 읽는다(대표 지시 2026-09-06 「사진첩 판독기로 바꿔라」).
      ⚠ 부르는 자리는 _kcReader 하나뿐이다. 이 층을 다른 곳에서 또 부르면 여기서 걸린다 —
        그래야 «사진이 어디로 나가는지»를 한 자리에서 볼 수 있다. */
