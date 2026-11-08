@@ -171,3 +171,50 @@ test('기본 규칙 — 모양만 있고 실제 기관·메일 주소는 없다(
   assert.ok(!/@/.test(JSON.stringify(Q.DEFAULT_RULES)), '코드에 메일 주소를 박지 않는다 — 보낸 곳은 사람이 «이 기관도»로 더한다');
   assert.equal(r.senders.length, 0);
 });
+
+/* ── 보낸 곳 빼기 (2026-11-08 「규칙 빼기 단추」) — 더하는 길만 있으면 잘못 더한 것이 영영 남는다 ── */
+test('보낸 곳 빼기 — 고른 규칙의 고른 주소만 빠지고, 새 사본을 돌려준다', () => {
+  const two = Object.assign({}, RULE, { senders: ['rule@example.test', 'wrong@example.test'] });
+  const other = { id: 'other', senders: ['wrong@example.test'] };
+  const rules = [two, other];
+  const out = Q.removeSenders(rules, [{ ruleId: 'r-test', email: 'wrong@example.test' }]);
+  assert.deepEqual(out[0].senders, ['rule@example.test']);
+  assert.deepEqual(two.senders, ['rule@example.test', 'wrong@example.test'], '원본 규칙은 그대로');
+  assert.equal(out[1], other, '다른 규칙의 같은 주소는 건드리지 않는다');
+  assert.equal(out[0].id, 'r-test'); assert.deepEqual(out[0].attachAll, RULE.attachAll, '규칙의 나머지 칸은 그대로');
+});
+test('보낸 곳 빼기 — 대소문자·«이름 <주소>» 꼴도 같은 주소로 본다 · 여럿을 한 번에', () => {
+  const r = Object.assign({}, RULE, { senders: ['a@example.test', 'b@example.test', 'c@example.test'] });
+  const out = Q.removeSenders([r], [{ ruleId: 'r-test', email: '가 <A@Example.TEST>' }, { ruleId: 'r-test', email: 'c@example.test' }]);
+  assert.deepEqual(out[0].senders, ['b@example.test']);
+});
+test('보낸 곳 빼기 — 뺄 것이 없으면 같은 배열을 돌려준다(저장을 건너뛸 수 있게)', () => {
+  const rules = [RULE];
+  assert.equal(Q.removeSenders(rules, []), rules);
+  assert.equal(Q.removeSenders(rules, [{ ruleId: 'r-test', email: 'none@example.test' }]), rules);
+  assert.equal(Q.removeSenders(rules, [{ ruleId: 'other', email: 'rule@example.test' }]), rules, '규칙이 다르면 빼지 않는다');
+  assert.equal(Q.removeSenders(rules, [{ ruleId: 'r-test', email: '주소아님' }]), rules);
+  assert.equal(Q.removeSenders(rules, null), rules);
+});
+test('보낸 곳을 다 빼도 규칙(양식 지문)은 남는다 — 같은 곳이 다시 보내면 «확인 필요 + 이 기관도»', () => {
+  const out = Q.removeSenders([RULE], [{ ruleId: 'r-test', email: 'rule@example.test' }]);
+  assert.equal(out.length, 1); assert.deepEqual(out[0].senders, []);
+  const mail = { from: 'rule@example.test', subject: '지급확인서 서명 및 회신', atts: ['지급확인서 및 동의서.hwpx'] };
+  assert.equal(Q.matchMail(mail, [RULE]).level, 'known', '빼기 전에는 알던 곳');
+  const m = Q.matchMail(mail, out);
+  assert.equal(m.level, 'similar', '뺀 뒤에는 알던 곳이 아니다');
+  assert.equal(Q.similarPolicy(m, { verdict: 'same', warn: [] }).learn.type, 'addSender', '다시 더하는 길이 열려 있다');
+  assert.deepEqual(Q.addSender(out, 'r-test', 'rule@example.test')[0].senders, ['rule@example.test'], '더하기 ↔ 빼기가 맞물린다');
+});
+test('규칙 화면 줄 — 규칙 이름·주소와 «대기·보류» 중인 건수만 센다', () => {
+  const r = Object.assign({}, RULE, { label: '점검 서류', senders: ['rule@example.test', 'b@example.test'] });
+  const it = (status, from, ruleId) => ({ status, from, replyTo: Q.addrOf(from), ruleId: ruleId || 'r-test' });
+  const items = [it('pending', '가 <Rule@example.test>'), it('hold', 'rule@example.test'), it('sent', 'rule@example.test'),
+    it('review', 'rule@example.test'), it('dismissed', 'rule@example.test'), it('pending', 'rule@example.test', 'other')];
+  const rows = Q.senderRows([r], items);
+  assert.deepEqual(rows.map((x) => x.email), ['rule@example.test', 'b@example.test']);
+  assert.equal(rows[0].label, '점검 서류'); assert.equal(rows[0].ruleId, 'r-test');
+  assert.equal(rows[0].waiting, 2, '대기·보류만 센다 — 보낸 것·확인 필요·치운 것·다른 규칙은 빼고');
+  assert.equal(rows[1].waiting, 0);
+  assert.deepEqual(Q.senderRows(Q.DEFAULT_RULES, items), [], '기본 규칙에는 보낸 곳이 없다');
+});

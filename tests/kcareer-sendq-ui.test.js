@@ -73,11 +73,16 @@ function world(o) {
     fetch: async (url, init) => { sent.push({ url, body: JSON.parse(init.body), auth: init.headers.Authorization });
       return { ok: o.mailFails ? false : true, status: o.mailFails ? 500 : 200, json: async () => (o.mailFails ? { ok: false, error: '서버 거절' } : { ok: true, files: o.noFiles ? 0 : 1 }) }; },
     navTile: () => {}, showBig: (id) => toasts.push('big:' + id),
+    /* 확인 쪽지 — 물은 것을 적어 두고, askNo 면 «아니오» */
+    kcAskDelete: (btn, opt, onYes) => { asks.push(opt); if (!o.askNo) onYes(); },
   };
+  const asks = [];
+  const rawSet = ctx.set; let ruleSaves = 0;
+  ctx.set = (k, v) => { if (k === 'sendq_rules') ruleSaves++; rawSet(k, v); };
   files.set('st1', { base64: PNG.toString('base64') });
   vm.createContext(ctx);
   vm.runInContext(BLOCK, ctx);
-  return { ctx, ls, files, toasts, sent, uploads, el, items: () => ctx.get('sendq'), feedoc: () => ctx.get('feedoc') };
+  return { ctx, ls, files, toasts, sent, uploads, el, asks, ruleSaves: () => ruleSaves, items: () => ctx.get('sendq'), feedoc: () => ctx.get('feedoc') };
 }
 const META = { from: 'rule@example.test', subject: '지급확인서 서명 및 회신 요청', mailKey: 'mk1' };
 const RULES = [{ id: 'r-test', org: '가나다복지협회', senders: ['rule@example.test'], subjectAny: ['지급확인서'], attachAll: ['지급확인서', '동의서'], kind: '개인정보 동의서' }];
@@ -193,4 +198,130 @@ test('띠 그리기 — 대기 카드에 받는 곳·금액·답장 단추 · �
   assert.match(h, /발송 대기 1건/); assert.match(h, /rule@example\.test/); assert.match(h, /답장 보내기/); assert.match(h, /100000원|100,000원|강사비/);
   assert.ok(!/<b>지급확인서<\/b>/.test(h), '메일 제목의 태그가 그대로 들어가면 안 된다');
   assert.match(h, /&lt;b&gt;지급확인서&lt;\/b&gt;/, '대신 글자로 보인다');
+});
+
+/* ── ⚙ 발송 대기 규칙 — 보낸 곳 보기·빼기 (2026-11-08 「규칙 빼기 단추」) ── */
+/* 그려진 HTML 에서 ☐ 를 떠 «가짜 상자»를 만든다 — 속성 이스케이프가 되돌아오는지까지 본다 */
+function ruleBox(w) {
+  const html = w.el.sqBand.innerHTML;
+  const at0 = html.indexOf('id="sqRuleBox"');
+  assert.ok(at0 >= 0, '규칙 창이 그려지지 않았다');
+  const part = html.slice(at0);
+  const un = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const chks = [...part.matchAll(/<input type="checkbox" class="sq-rchk"([^>]*)>/g)].map((m) => {
+    const at = (n) => { const x = new RegExp('(?:^|\\s)' + n + '="([^"]*)"').exec(m[1]); return x ? un(x[1]) : null; };
+    const c = { checked: / checked[\s>=]/.test(m[0]), value: at('value'), getAttribute: at };
+    c.row = { querySelector: (s) => (s === '.sq-rchk' ? c : null) };
+    return c;
+  });
+  const head = { checked: false, indeterminate: false };
+  w.el.sqRuleBox = {
+    querySelectorAll: (s) => (s === '.sq-rchk:checked' ? chks.filter((c) => c.checked) : s === '.sq-rchk' ? chks : []),
+    querySelector: (s) => (s === '.sq-rall' ? head : null),
+  };
+  const btnOf = (c) => ({ closest: (s) => (s === 'tr' ? c.row : null) });
+  return { html: part, chks, head, btnOf };
+}
+const R3 = [Object.assign({}, RULES[0], { label: '점검 지급확인서', senders: ['rule@example.test', 'wrong@example.test', 'third@example.test'] })];
+
+test('규칙 창 — 단추로 열고 닫는다 · 대기 건이 없어도 열면 보인다', () => {
+  assert.match(html.slice(html.indexOf('id="db-feedoc"'), html.indexOf('id="fdBody"')), /onclick="sqRuleBoxToggle\(\)"/, '비용 서류 도구줄에 여는 단추가 있다');
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRender();
+  assert.equal(w.el.sqBand.style.display, 'none', '처음에는 닫혀 있다');
+  w.ctx.sqRuleBoxToggle();
+  assert.equal(w.el.sqBand.style.display, ''); assert.match(w.el.sqBand.innerHTML, /id="sqRuleBox"/);
+  w.ctx.sqRuleBoxToggle();
+  assert.equal(w.el.sqBand.style.display, 'none', '닫으면 숨는다');
+});
+test('규칙 창 — 줄마다 ☐ 와 보이는 번호 · 주소 · 대기 건수 · 꺾쇠·따옴표는 글자로', async () => {
+  const w = world();
+  w.ctx.set('sendq_rules', [Object.assign({}, R3[0], { label: '<b>점검</b>', senders: ['rule@example.test', 'q"x\'y@example.test'] })]);
+  await w.ctx.sqProcess(await hwpx(), NAME, META);   /* rule@ 에서 온 건이 대기에 하나 */
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  assert.equal(b.chks.length, 2);
+  assert.ok(b.chks.every((c) => !c.checked), '새로 그리면 아무것도 골라져 있지 않다');
+  assert.deepEqual(b.chks.map((c) => c.value), ['rule@example.test', 'q"x\'y@example.test'], '속성에 넣은 주소가 그대로 되돌아온다');
+  assert.ok(b.chks.every((c) => c.getAttribute('data-rule') === 'r-test'));
+  const nums = [...b.html.matchAll(/<td class="sq-n">(\d+)<\/td>/g)].map((m) => Number(m[1]));
+  assert.deepEqual(nums, nums.map((_, i) => i + 1), '번호는 보이는 차례대로 1부터');
+  assert.match(b.html, /class="sq-rall"/, '머리줄 ☐');
+  assert.ok(!/<b>점검<\/b>/.test(b.html) && /&lt;b&gt;점검/.test(b.html), '규칙 이름의 태그는 글자로');
+  assert.ok(!/q"x'y@/.test(b.html), '주소의 따옴표가 날것으로 들어가지 않는다');
+  const firstRow = b.html.slice(b.html.indexOf('value="rule@example.test"'));
+  assert.match(firstRow.slice(0, firstRow.indexOf('</tr>')), /1건/, '그 곳에서 와 대기 중인 건수');
+});
+test('★ 고르기만으로는 아무것도 안 바뀐다 — 「N곳 선택」 띠만 뜬다', () => {
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w), before = JSON.stringify(w.ctx.get('sendq_rules'));
+  b.chks[0].checked = true; b.chks[2].checked = true; w.ctx.sqRuleBoxSync();
+  assert.equal(w.el.sqRuleSel.style.display, '', '선택 띠가 보인다');
+  assert.match(w.el.sqRuleSelCnt.textContent, /^2\D/);
+  assert.equal(b.head.indeterminate, true, '머리줄 ☐ 는 «일부»');
+  assert.equal(JSON.stringify(w.ctx.get('sendq_rules')), before); assert.equal(w.ruleSaves(), 1, '처음 넣은 한 번뿐 — 고르기로 저장하지 않는다');
+  w.ctx.sqRuleBoxAll(true); assert.ok(b.chks.every((c) => c.checked)); assert.equal(b.head.checked, true);
+  w.ctx.sqRuleBoxAll(false); assert.equal(w.el.sqRuleSel.style.display, 'none');
+});
+test('★ 고른 곳 빼기 — 건수를 묻고, «예»면 한 번에 저장한다', () => {
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  b.chks[1].checked = true; b.chks[2].checked = true;
+  w.ctx.sqRuleBoxPicked({});
+  assert.equal(w.asks.length, 1, '한 번 묻는다');
+  assert.match(w.asks[0].title, /2곳/, '몇 곳인지 묻는다');
+  assert.match(w.asks[0].detail, /wrong@example\.test/);
+  assert.deepEqual(w.ctx.get('sendq_rules')[0].senders, ['rule@example.test']);
+  assert.equal(w.ruleSaves(), 2, '처음 넣은 한 번 + 빼기 한 번');
+  assert.ok(w.toasts.some((t) => /2곳/.test(t)), '몇 곳을 뺐는지 알린다');
+  assert.ok(!/wrong@example\.test/.test(w.el.sqBand.innerHTML), '창을 다시 그려 뺀 곳이 사라진다');
+});
+test('«아니오»면 아무것도 안 바뀐다 · 고른 것이 없으면 묻지도 않는다', () => {
+  const w = world({ askNo: true }); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  w.ctx.sqRuleBoxPicked({});
+  assert.equal(w.asks.length, 0, '고른 것이 없으면 묻지 않는다');
+  b.chks[0].checked = true; w.ctx.sqRuleBoxPicked({});
+  assert.equal(w.asks.length, 1);
+  assert.equal(w.ctx.get('sendq_rules')[0].senders.length, 3); assert.equal(w.ruleSaves(), 1);
+});
+test('한 줄 «✕ 빼기» — 그 줄만 빠진다', () => {
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  b.chks[0].checked = true;                 /* 다른 줄을 골라 둔 채로 눌러도 */
+  w.ctx.sqRuleBoxOne(b.btnOf(b.chks[1]));
+  assert.match(w.asks[0].title, /1곳/);
+  assert.deepEqual(w.ctx.get('sendq_rules')[0].senders, ['rule@example.test', 'third@example.test'], '누른 줄만 빠진다');
+});
+test('★ 대기 중인 건은 그대로 두고 쪽지에 알린다 · 뺀 뒤 같은 곳 서류는 채우지 않고 확인 필요', async () => {
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  await w.ctx.sqProcess(await hwpx(), NAME, META);
+  assert.equal(w.items()[0].status, 'pending');
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  w.ctx.sqRuleBoxOne(b.btnOf(b.chks[0]));
+  assert.match(w.asks[0].detail, /1건은 그대로/, '대기 중인 건수를 알린다');
+  assert.equal(w.items()[0].status, 'pending', '이미 대기 중인 건은 건드리지 않는다');
+  const r = await w.ctx.sqProcess(await hwpx(), NAME, Object.assign({}, META, { mailKey: 'mk-after' }));
+  assert.equal(r.action, 'review', '뺀 곳에서 온 서류는 채우지 않는다');
+  const it = w.items().filter((x) => x.mailKey === 'mk-after')[0];
+  assert.equal(it.fileId, ''); assert.equal(it.learn.type, 'addSender', '다시 더하는 길(이 기관도)은 열려 있다');
+});
+test('이미 빠진 곳을 다시 빼려 하면 묻지 않고 알린다(다른 기기에서 먼저 뺀 경우)', () => {
+  const w = world(); w.ctx.set('sendq_rules', R3);
+  w.ctx.sqRuleBoxToggle();
+  const b = ruleBox(w);
+  w.ctx.set('sendq_rules', [Object.assign({}, R3[0], { senders: ['rule@example.test'] })]);   /* 그 사이 다른 기기가 뺐다 */
+  b.chks[2].checked = true; w.ctx.sqRuleBoxPicked({});
+  assert.equal(w.asks.length, 0); assert.ok(w.toasts.some((t) => /이미 규칙에 없는/.test(t)));
+});
+test('보낸 곳이 없으면 «어떻게 더하는지»를 알린다', () => {
+  const w = world();   /* 기본 규칙 — 보낸 곳 없음 */
+  w.ctx.sqRuleBoxToggle();
+  assert.match(w.el.sqBand.innerHTML, /이 기관도 같은 규칙으로/);
+  assert.ok(!/class="sq-rchk"/.test(w.el.sqBand.innerHTML));
 });
