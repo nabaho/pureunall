@@ -265,6 +265,10 @@ rules.data = {
        마감 해제·일괄 정리 같은 관리자 길이 함께 막힌다. */
   attendance_records: { '.read': LOGIN, '.write': LOGIN },   /* 연차·반차·출장·이음 근무 */
   my_schedules:       { '.read': LOGIN, '.write': LOGIN },   /* 일정 */
+  /* 외부 협력자 명단(이음센터 등) — 근무달력·이알피가 쓴다. 2026-11-07 서버 함수 gcalEum 이
+     구글 달력 제목의 이름을 찾으려고 «글자 그대로» 읽게 되면서 이름을 붙였다.
+     ★ 권한은 «그대로»(여태 $other: 재직 직원 읽기·쓰기) — 이름만 적는다. 동작은 안 바뀐다. */
+  external_staff:     { '.read': LOGIN, '.write': LOGIN },
   presence_hours: { '.read': LOGIN, '.write': LOGIN },   /* 근무 시간 */
   /* 우리 법인 자신의 정보 — 법인명·대표·사업자번호·법인등록번호·사무소 주소·전화·팩스·직인.
      2026-09-13 경력관리가 기관 서식의 「노무법인」 칸을 채우려고 «읽기» 시작하면서 이름을 붙였다.

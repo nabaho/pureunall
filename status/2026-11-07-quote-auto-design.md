@@ -1,6 +1,6 @@
 # 2026-11-07 · 견적·계약 자동화 — 계획 1 (작업 기록 + 지난 견적 모음)
 
-상태: 진행 중 — 계획 1 과제 1~4 끝, 5~7 남음 · PR 은 `[보류]` 초안(자동 병합 안 됨)
+상태: 진행 중 — 계획 1 과제 1~4 끝, 5~7 남음 · PR #2954 는 제목 `[보류]` 라 자동 병합 안 됨
 
 - 가지: `claude/quote-auto-design`
 - 설계: `docs/superpowers/specs/2026-11-07-quote-contract-auto-design.md`
@@ -37,4 +37,8 @@
 - 실시간DB 규칙 세 자리는 만들개(`scripts/make-firebase-rules.js`)에만 있고 콘솔 게시 여부는 이 가지 기록으로 확인되지 않는다 [확인 필요].
   게시는 `node scripts/rules-deploy.js --deploy` 뒤 콘솔 원문을 새 판으로 갈아 끼우고 `PENDING` 세 줄을 뺀다.
 - 과제 2·3 의 화면 고리가 이미 들어 있으므로, 합치는 때는 남은 과제와 규칙 게시를 마친 뒤로 한다(그래서 `[보류]`).
-- 검사: 이 PC(윈도)에서 `node --test tests/*.test.js functions/*.test.js` — 맞춘 뒤 결과는 PR 설명에 적는다.
+- 2026-11-08 `main`(`d8d516ff`, 콘솔 원문 2026-11-07 판·게시 전 목록 비움)을 합쳤다. 부딪힌 곳은 `tests/photos-staff-share.test.js` 의 `PENDING` 하나 —
+  main 의 «external_staff 게시 완료» 주석을 살리고 이 가지의 세 자리를 그 뒤에 남겼다. 자동으로 합쳐진 `docs/firebase-rules-전체-적용본.json` 은 만들개 출력과 같음을 확인했다.
+  main 의 `f20f756a`(재무 폰 검토)가 `css/pu-erp.css` 를 고치고 `pu-erp.html` 의 `?v=40` 을 안 올려 커밋 전 점검(`check-cache-version.js`)이 멈췄다 —
+  훅을 건너뛰지 않고 `?v=41` 로 올렸다(그래야 그 CSS 가 브라우저에 닿는다).
+- 검사: 이 PC(윈도)에서 `node --test tests/*.test.js functions/*.test.js` — main 을 합친 뒤 29,195개 중 실패 0 · 건너뜀 7.

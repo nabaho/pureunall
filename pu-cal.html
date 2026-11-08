@@ -2385,6 +2385,9 @@ function gcalToEvent(ev){
     gTime: 제목에서 ? 구글시각 : "",
     /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
     mail:mail, mailSid:mailSid || "",
+    /* 이음 근무 거울 — 서버(functions/gcal-eum.js)가 우리 기록의 거울로 넣은 구글 일정은 기록 번호를 shared.puEum 에 단다.
+       우리 기록이 살아 있으면 eventsOn 이 이 구글 사본은 안 그린다(두 번 안 뜨게) */
+    eumRec: (ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puEum) || "",
     color:color, gcalUrl:ev.htmlLink || "",
     /* ★ 상세 창에 낼 것 — 장소·설명을 «통째로» 들고 온다.
        tip 은 칩에 마우스를 올렸을 때 쓰는 짧은 글이라 두 줄로 자른다. 상세는 다 보여 준다. */
@@ -2496,8 +2499,16 @@ function eventsOn(ymd, eumOnly){
   if(!eumOnly && (S.filter === null || S.filter === "gcal")){
     /* 여러 날 일정은 «걸친 날마다» 든다 — 구글처럼 막대로 잇는 것은 그리는 쪽(줄배치)이 한다 */
     var 구글들 = typeof 구글목록 === "function" ? 구글목록() : GCAL.evs;   /* 검색 «결과 목록»일 때만 다른 달도 섞인다 */
+    var 거울 = null;   /* 구글에 거울로 둔 이음 근무 — 우리 기록이 «살아 있으면» 구글 사본은 안 그린다(두 번 안 뜨게). 구글만 거르개에서는 구글 것이 그대로 보인다 */
     for(var gi = 0; gi < 구글들.length; gi++){
       var ge = 구글들[gi];
+      if(ge.eumRec && S.filter !== "gcal"){
+        if(!거울){
+          거울 = {};
+          arr(D.attendance_records).forEach(function(r){ if(r && r.type === "eum-work" && !r._deleted && r.id) 거울[r.id] = 1; });
+        }
+        if(거울[ge.eumRec]) continue;
+      }
       if(ge.date === ymd || (ge.end && ge.date < ymd && ymd <= ge.end)) out.push(ge);
     }
     /* 🗄 보관함 — 구글을 못 받았으면 보관본 전부, 스위치가 켜져 있으면 «지워진 것»만 더한다 */

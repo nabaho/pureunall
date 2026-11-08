@@ -73,11 +73,13 @@ module.exports = {
     settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts },
   },
   views: [
-    { name: 'run', run: async (p) => { await p.click('#runsBox [data-run]'); } },
-    { name: 'sel', run: async (p) => { const c = await p.$$('#runBox input[data-ck]'); for (const x of c.slice(0, 2)) await x.click(); } },
-    { name: 'notices', run: async (p) => { await p.click('#tabs button[data-tab=notices]'); } },
+    { name: 'run', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step2 [data-run]'); } },
+    { name: 'sel', run: async (p) => { const c = await p.$$('#step2 input[data-ck]'); for (const x of c.slice(0, 2)) await x.click(); } },
+    { name: 'sent', run: async (p) => { await p.click('#monthStrip [data-month="2026-09"]'); } },
+    { name: 'inbox', run: async (p) => { await p.click('#inboxBtn'); } },
     { name: 'link', run: async (p) => { await p.click('#noticesBox [data-notice]'); } },
-    { name: 'rules', run: async (p) => { await p.click('#tabs button[data-tab=rules]'); } },
-    { name: 'msgs', run: async (p) => { await p.click('#tabs button[data-tab=msgs]'); } },
+    { name: 'year', run: async (p) => { await p.click('#tabs button[data-tab=year]'); } },
+    { name: 'rules', run: async (p) => { await p.click('#tabs button[data-tab=setup]'); } },
+    { name: 'kakao', run: async (p) => { await p.click('#subtabs button[data-sub=kakao]'); } },
   ],
 };

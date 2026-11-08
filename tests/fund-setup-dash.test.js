@@ -87,3 +87,15 @@ test('★ 틀 고정은 없다 — 세 겹이 화면을 덮었다(2026-11-07). �
   const cnt = (s, re) => (s.match(re) || []).length;
   for (const fn of ['renderSetupDash', '_sdBoard']) { const t = fnSrc(fn); assert.equal(cnt(t, /<div/g) - cnt(t, /<\/div>/g), 0, fn + ' div 가 안 맞는다'); }
 });
+
+test('★ 잘못 만든 중복 기금 정리 — □ 로 짚은 줄만, 확인 뒤, 삭제 «보관»(복원 가능)으로', () => {
+  const r = fnSrc('renderSetupDash');
+  assert.ok(r.includes('data-fid="') && r.includes('sdTrash()'), '줄에 기금 번호가 없거나 단추가 없다');
+  const t = fnSrc('sdTrash');
+  assert.ok(t.includes("querySelectorAll('.sdwrap tbody tr')") && t.includes('.ckcol input') && t.includes('c.checked'), '짚은 줄만 찾아야 한다');
+  assert.ok(t.includes('confirmM(') && t.indexOf('confirmM(') < t.indexOf('.update(v)'), '확인 없이 옮긴다');
+  assert.ok(t.includes('deleted:true,deleted_at:ymd(),deleted_by:'), '삭제 보관 표시가 trashFund 와 다르다');
+  assert.ok(!/\.remove\(|\.set\(null\)/.test(t), '영구 삭제를 한다 — 삭제 보관(복원 가능)만 써야 한다');
+  assert.ok(t.includes('!isTrashed(funds[id])'), '이미 보관된 기금을 또 건드린다');
+  assert.ok(t.includes("toast('삭제할 기금의 □ 를 먼저 짚어 주세요'"), '아무것도 안 짚었을 때 안내가 없다');
+});

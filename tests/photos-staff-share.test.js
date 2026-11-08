@@ -331,10 +331,16 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. 게시 전에는 «카톡 방 저장»·«카톡 보내기»만 권한 오류로 막힌다(나머지 정산은 그대로). */
   /* ★ 2026-11-02 — 카톡 자동 발송 세 자리 게시 완료(rules-deploy.js --deploy, 대표 PC, 대표 「게시하기」): 새로 3 · 바뀜 0 · 사라짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-02.json — 목록을 비운다. */
+  /* 2026-11-07 게시 전 — 외부 협력자 명단 data/external_staff 에 «이름만» 붙였다(서버 함수 gcalEum 이 글자 그대로 읽어 rules-data-named 가 잡음).
+     새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 읽기·쓰기 조건이 $other 와 글자까지 같다(재직 직원).
+     게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
+  /* ★ 2026-11-07 — 게시 완료(GitHub 「Firebase 배포」 실행 42382534463 · rules-deploy.js --deploy, 클라우드 방): 새로 1 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-07.json — 목록을 비운다. */
   /* 2026-11-07 게시 전 — 견적·계약 자동화 계획 1의 세 자리(작업 기록 pu_worklog · 견적 기록 pu_quotes · 견적 금액 pu_quote_amt)를
      만들개에 넣었다(계획 docs/superpowers/plans/2026-11-07-quote-auto-plan1-worklog-quotes.md Task 1·4). 새로 생김 3 · 바뀜 0 · 사라짐 0.
      넓어지는 권한 없음 — 새 자리뿐이다(pu_worklog 읽기 총괄관리자, pu_quotes 읽기 재직 직원, pu_quote_amt 읽기 총괄관리자·재무 + 그 건의 확정 담당자).
-     게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
+     위 2026-11-07 콘솔 원문에는 아직 없다. 게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤
+     콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
   const PENDING = [
     '/pu_quote_amt',
     '/pu_quotes',

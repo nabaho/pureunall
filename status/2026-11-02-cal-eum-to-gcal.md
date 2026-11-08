@@ -1,0 +1,54 @@
+상태: 완료
+이어하기시도: 0
+작업폴더: C:\Users\fair0\Documents\pu-wt-cal-fit (가지 feat/cal-eum-to-gcal)
+
+# 2026-11-02 · 이음센터 근무 → 구글 공용 달력 «서버가 대신 넣기» (feat/cal-eum-to-gcal)
+
+대표 질문 「이음센터 근무가 왜 구글 캘린더와 연결이 안되나?」 → 설명 후 「1」(= 구글 공용 달력에 새로 넣기).
+
+## 사실 (조사)
+- 이음 근무는 `data/attendance_records/v/{id}` (type:'eum-work') 에만 있다. 푸른 캘린더 `이음넣기()` 주석: 「구글 달력에는 안 만든다」.
+- 서버 대신 넣기(`functions/gcal-proxy.js`)는 `my_schedules` 만 본다. 외부 협력자(externalId) 일정은 원래 안 보낸다.
+- 이음 근무는 구글 대신 공개 링크(`ieum_public`)로 나간다(이름·날짜·구분만).
+- 2026-11-01~12-05 구글 공용 달력 49건 중 «이음»이 든 것 2건(손으로 적은 것) — 화면의 이음 근무 약 30건은 구글에 없다.
+- 구글 공용 달력은 열쇠 하나로 «누구나 읽는» 달력이다(열쇠·달력 번호가 공개 페이지에 있다) → 구글에 넣는 이름은 사실상 공개.
+
+## 설계 (이 가지)
+- 새 파일 `functions/gcal-eum.js` — `data/attendance_records/v/{id}` onWrite. type 이 eum-work 인 것만.
+  · 구글 일정 번호는 기록 번호에서 «정해진 값»(`pueum`+해시) — 우리 기록에 아무것도 안 적는다(표 없음·순환 없음·두 번 넣기 없음).
+    넣기 = insert, 이미 있으면(409) 덮어쓰기(지웠던 번호도 되살림). 지우기 = DELETE(404·410 은 끝난 것).
+  · 제목 「이름 이음센터」(화면 칩과 같은 글) · 종일 · 설명 없음 · `shared.puEum`=기록 번호(화면이 «이 일정은 우리 기록의 거울»임을 안다) · `shared.puSid`=사번(내부 직원).
+  · 내부 직원만이 기본, 외부 협력자는 스위치(`INCLUDE_EXTERNAL`) — [확인 필요] 대표 결정.
+  · 실패는 `gcal_proxy/eumErr/{기록}` 에 적고(서버만 쓰는 자리) 기록은 그대로 둔다.
+- 화면(pu-cal.html): 구글 일정에 `puEum` 이 있고 «같은 기록이 살아 있으면» 구글 사본은 안 그린다(두 번 뜨지 않게). 구글만 거르개에서는 그대로 보인다.
+- 근태관리 「캘린더 연동」(pu-erp gcalAttClassify)이 이 제목을 다시 근태로 읽지 않는지 검사로 못 박는다(순환 방지).
+- 이미 있는 이음 근무는 «새로 쓰이거나 고칠 때»만 넣어진다 → 한꺼번에 채우기(backfill)는 따로 — [확인 필요] 범위(이번 달부터?)와 대표 승인 뒤.
+
+## 하지 않는 것 (승인 전)
+- 함수 배포 · 구글 공용 달력에 실제로 넣는 일 · 한꺼번에 채우기 — 대표 승인 뒤에만.
+
+## 한 것 (코드 — 배포는 아직)
+- functions/gcal-eum.js 새로 · gcal-proxy.js 가 ownerAccess 를 내놓음 · index.js 에 gcalEum(onWrite)·gcalEumBackfill(관리자만·기본 셈만) 등록
+- pu-cal.html — gcalToEvent 가 shared.puEum 을 eumRec 로 들고 옴 · eventsOn 이 «우리 기록이 살아 있으면» 거울 구글 사본을 안 그림(구글만 거르개는 그대로)
+
+## 검사
+- tests/gcal-eum.test.js 24 — 번호 정해짐 · 넣을 것/안 넣을 것 · 만들기/409 덮어쓰기/옮기기/지우기 · 기록 안 건드림 · 안 바뀌면 안 부름 · 채우기(셈만·관리자만) · 근태 연동 순환 없음(실제 분류 함수) · 화면 두 번 안 뜸
+- 일부러 망가뜨려 35곳 확인 — 모두 잡힘.
+- gcal·functions·pu-cal 을 읽는 396 파일 5,886건 · pin-guard · 팔레트 · 온톨로지 계약 통과.
+
+## 사람이 할 일 (대표 결정 · 승인 전에는 아무것도 안 나간다)
+1. **함수 배포 승인** — `firebase deploy --only functions:gcalEum,functions:gcalEumBackfill` (이름 지정). 배포하면 «그때부터» 새로 넣거나 고치는 이음 근무가 구글 공용 달력에 생긴다.
+2. **외부 협력자(변호사·노무사)도 구글에 넣을지** — 기본 «안 넣음». 화면의 이음 근무 중 회색 칩이 외부인일 가능성이 크다. 공용 달력은 누구나 읽는다.
+3. **이미 있는 이음 근무 채우기** — 어느 날부터? (제안: 이번 달 1일부터). 먼저 «셈만»으로 몇 건인지 보고 승인받는다. 채우기를 부르는 단추는 아직 없다(관리자 로그인 표로 부르는 길만 있음).
+4. 근무 기록을 지우면 구글 일정도 지워진다 — 구글 앱에서 직접 지운 것은 우리 기록이 그대로면 다음 «고침» 때 되살아난다(번호가 같아서).
+
+## 2026-11-07 마무리 — main 합침 · 검사 빨강 고침
+- main(94커밋 뒤처짐)을 합쳤다 — 충돌 없음.
+- `tests/rules-data-named.test.js` 빨강: 새 함수가 `data/external_staff` 를 글자 그대로 읽어 «규칙에 이름 없는 자리»로 잡혔다.
+  → `scripts/make-firebase-rules.js` 근태·일정 묶음에 `external_staff` 이름만 붙임, 생성기로 `docs/firebase-rules-전체-적용본.json` 다시 만듦.
+  ★ 권한은 «그대로» — 읽기·쓰기 조건이 기존 `$other` 와 글자까지 같다(검증함). 더 많이 보이게 된 사람 없음.
+  콘솔에 올리는 것은 위 «함수 배포»와 함께 해도 되고, 안 올려도 동작은 같다($other 가 같은 권한).
+- 옛 CI 빨강 중 `payroll-names-link`·`shared-js-cache-version` 은 main 을 합치자 초록(main 쪽 사정이었다).
+- 같은 날 이어서: CI 가 규칙 사본 검사 셋(`rules-paste-copy`·`gov-report-rules`)과 콘솔 대조(`photos-staff-share`)를 잡았다.
+  → `docs/rules-paste.json` 도 생성기로 다시 만듦 · `photos-staff-share` 의 `PENDING` 에 `/data/external_staff` 를 «게시 전»으로 적음(정해진 방식).
+  ★ 게시 뒤 할 일: GitHub «Firebase 배포»(rules=true) → 콘솔 원문 새 판으로 갈아 끼우고 `PENDING` 비우기(작은 PR 하나).
