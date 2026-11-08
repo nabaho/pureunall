@@ -346,12 +346,75 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .cfg-tool[hidden]{display:none;}
 .sec{font-size:.82rem;font-weight:700;color:var(--sub);margin:24px 4px 12px;display:flex;align-items:center;gap:10px;}
 .sec h2{font:inherit;color:inherit;}
-/* 타일 순서 고정 토글 */
-#tileLockBtn{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(10,20,60,.14);background:rgba(255,255,255,.6);
+/* ✏️ 앱 배치 편집 — 관리자만 보이는 단추 (대표 지시 2026-11-08). 직원 화면에는 아예 안 그린다([hidden]) */
+#layoutEditBtn{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(10,20,60,.14);background:rgba(255,255,255,.6);
   color:var(--sub);border-radius:99px;padding:4px 12px;font-size:.68rem;font-weight:700;font-family:inherit;cursor:pointer;transition:.12s;}
-#tileLockBtn:hover{border-color:var(--accent);color:var(--accent);}
-#tileLockBtn.locked{background:#1e40af;border-color:#1e40af;color:#fff;}
+#layoutEditBtn:hover{border-color:var(--accent);color:var(--accent);}
+#layoutEditBtn.editing{background:#1e40af;border-color:#1e40af;color:#fff;}
+#layoutEditBtn[hidden],#layoutBar[hidden],#layoutPanel[hidden],#lpSelBar[hidden]{display:none;}
 #tileHint{font-size:.66rem;color:var(--mute);font-weight:500;}
+/* 편집 중 알림 줄 · 편집 중에는 영역마다 점선 — 어디에 놓을 수 있는지 보이게(빈 영역도 한 칸 높이는 둔다) */
+#layoutBar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 4px 10px;padding:8px 12px;border-radius:12px;
+  background:rgba(239,246,255,.85);border:1px solid rgba(30,64,175,.25);font-size:.74rem;color:#1e40af;}
+#layoutBar .lb-hint{flex:1 1 240px;min-width:0;color:#475569;font-weight:500;}
+#layoutBar button{border:1px solid rgba(30,64,175,.35);background:#fff;color:#1e40af;border-radius:99px;padding:4px 12px;
+  font-size:.7rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+#layoutBar button:hover{background:#eff6ff;}
+.lay-say{font-size:.72rem;font-weight:700;color:#166534;}
+.lay-say.bad{color:#991b1b;}
+body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
+/* 📌 틀 고정 — 편집 중에만 보인다(아이콘 왼쪽 아래 귀퉁이 · 별표 ☆ 는 오른쪽 아래). 자주 쓰는 앱 복제본에는 안 뜬다.
+   ⚠ 선택자를 «.tile .lay-freeze» 로 세웠다 — 폭 380px 이하의 `.tile span{display:block}` 이 더 세서 폰에서 편집 중이 아닌데도 보였다. */
+.tile .lay-freeze{display:none;position:absolute;left:-5px;bottom:-5px;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.95);
+  font-size:.7rem;line-height:20px;text-align:center;box-shadow:0 1px 4px rgba(20,30,80,.18);cursor:pointer;filter:grayscale(1);opacity:.75;}
+body.lay-editing .tile .lay-freeze{display:block;}
+.tile .lay-freeze.on{background:#1e40af;filter:none;opacity:1;}
+.tile .lay-freeze:focus-visible{outline:2px solid #1e40af;}
+#pinTiles .lay-freeze{display:none !important;}
+.tilerow.fold .tile .lay-freeze{left:-4px;bottom:-6px;width:16px;height:16px;line-height:16px;font-size:.58rem;}
+/* 📋 배치 편집 창 — 영역별 목록(☐ 고르기 + 번호 + ▲▼ + 영역 + 📌). 폰에서는 줄마다 두 줄 카드 */
+.lp-overlay{position:fixed;inset:0;z-index:9990;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:14px;}
+.lp-overlay[hidden]{display:none;}
+.lp-box{background:#fff;border-radius:16px;width:min(760px,100%);max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);
+  display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;color:#1e293b;}
+.lp-hd{display:flex;align-items:center;gap:8px 10px;padding:12px 14px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}
+.lp-hd b{font-size:.95rem;}
+.lp-sub{font-size:.7rem;color:#64748b;flex:1 1 220px;min-width:0;}
+.lp-x{border:0;background:#e2e8f0;border-radius:99px;width:34px;height:34px;cursor:pointer;font-size:.9rem;flex:none;margin-left:auto;}
+.lp-selbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:.76rem;}
+.lp-selbar b{color:#1e40af;}
+.lp-selbar button,.lp-ft button{border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:6px 12px;min-height:34px;
+  font-size:.74rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.lp-selbar select{height:34px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;font-family:inherit;max-width:100%;}
+.lp-body{overflow:auto;padding:4px 12px 10px;flex:1 1 auto;min-height:120px;}
+.lp-area{margin:8px 0 4px;}
+.lp-ah{display:flex;align-items:center;padding:4px 0;font-size:.8rem;font-weight:800;color:#1e293b;border-bottom:1px solid #cbd5e1;}
+.lp-an{white-space:nowrap;}
+.lp-ac{margin-left:8px;font-size:.7rem;font-weight:600;color:#64748b;}
+.lp-row{display:flex;align-items:center;gap:6px;min-height:44px;border-bottom:1px solid #e2e8f0;}
+.lp-ckc{flex:0 0 28px;width:28px;min-height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.lp-ckc input{width:18px;height:18px;margin:0;cursor:pointer;}
+.lp-no{flex:0 0 36px;width:36px;text-align:right;padding-right:6px;font-variant-numeric:tabular-nums;color:#64748b;font-size:.76rem;}
+.lp-ic{flex:0 0 24px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;}
+.lp-ic svg{width:100%;height:100%;}
+.lp-nm{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.84rem;font-weight:600;}
+.lp-soon{flex:none;font-size:.6rem;font-weight:700;color:#854d0e;background:#fffbeb;border-radius:99px;padding:2px 6px;white-space:nowrap;}
+.lp-ctl{display:flex;align-items:center;gap:4px;flex:none;}
+.lp-b{width:34px;height:34px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;font-size:.8rem;line-height:1;padding:0;font-family:inherit;color:#475569;}
+.lp-b[disabled]{opacity:.35;cursor:not-allowed;}
+.lp-b.on{background:#1e40af;border-color:#1e40af;color:#fff;}
+.lp-sel{height:34px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;font-family:inherit;width:118px;max-width:100%;}
+.lp-sel[disabled]{opacity:.5;cursor:not-allowed;}
+.lp-ft{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #e2e8f0;flex-wrap:wrap;}
+.lp-ft #lpSay{flex:1 1 200px;min-width:0;}
+.lp-b:focus-visible,.lp-sel:focus-visible,.lp-selbar button:focus-visible,.lp-ft button:focus-visible,.lp-x:focus-visible{outline:2px solid #1e40af;outline-offset:1px;}
+@media (max-width:520px){
+  .lp-overlay{padding:8px;}
+  .lp-body{padding:2px 8px 8px;}
+  .lp-row{flex-wrap:wrap;row-gap:0;}
+  .lp-ctl{flex:1 0 100%;padding:0 0 6px 70px;}
+  .lp-sel{flex:1 1 0;width:auto;min-width:0;}
+}
 .tile.dragging{opacity:.35;}
 .tile:not(.lock)[draggable="true"]{cursor:grab;}
 .tile:not(.lock)[draggable="true"]:active{cursor:grabbing;}
@@ -1331,6 +1394,8 @@ body.portal-mode #moreFab{display:flex;}
           <span class="of" id="aiOf"></span>
         </button>
       </div>
+      <!-- ✏️ 앱 배치 편집 — 관리자에게만(JS 가 켠다). 폰은 끌 수 없어 이 길로 «목록 창»을 열어 단추로 옮긴다(대표 지시 2026-11-08). -->
+      <button type="button" class="me-item" id="meLayout" hidden>✏️ 앱 배치 편집<span class="me-go" aria-hidden="true">관리자 · 열기 ›</span></button>
       <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
       <button type="button" class="logout me-logout" id="meLogout">로그아웃</button>
       </div>
@@ -1363,9 +1428,21 @@ body.portal-mode #moreFab{display:flex;}
     </div>
 
     <div class="sec"><h2 id="portalHeading">업무 시스템</h2>
-      <button id="tileLockBtn" type="button" aria-describedby="tileHint"></button>
-      <!-- 긴 안내는 «이동 가능» 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
-      <span id="tileHint" hidden>마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서)</span>
+      <!-- ✏️ 배치 편집 — 관리자(권형하)만, PC 에서만 보인다(대표 지시 2026-11-08 「이 부분은 관리자인 권형하만 가능하게」).
+           예전 「🔓 이동 가능」은 사람마다 «자기 화면만» 바꾸는 단추였다 — 이제 배치는 한 벌이라 관리자만 바꾼다.
+           ⚠ 기본은 감춘 채(hidden)다 — JS 가 관리자로 확인한 뒤에만 켠다. 직원 화면에는 단추도 끌기도 없다.
+           긴 안내는 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
+      <button id="layoutEditBtn" type="button" aria-describedby="tileHint" hidden></button>
+      <span id="tileHint" hidden>배치 편집을 켜면 마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
+    </div>
+    <!-- 편집 중 안내 줄(관리자·PC) — 목록으로 편집(폰과 같은 창) · 처음 자리로 · 끝내기 -->
+    <div id="layoutBar" role="group" aria-label="앱 배치 편집" hidden>
+      <b>✏️ 배치 편집 중</b>
+      <span class="lb-hint">앱을 끌어 놓으세요 — 다른 영역에도 놓을 수 있습니다. 앱 아래 📌 를 누르면 틀 고정(그 영역 안에서만 움직임). 모든 직원 화면에 같이 반영됩니다.</span>
+      <span id="layoutSay" class="lay-say" role="status" aria-live="polite"></span>
+      <button id="layoutListBtn" type="button" title="목록에서 ▲▼·영역·📌 를 단추로 바꾸고, 여러 개를 한꺼번에 옮깁니다">📋 목록으로 편집</button>
+      <button id="layoutResetBtn" type="button" title="모든 앱을 처음 자리로 되돌리고 틀 고정을 모두 풉니다">↩ 처음 자리로</button>
+      <button id="layoutDoneBtn" type="button">끝내기</button>
     </div>
     <!-- 줄은 APP_ROWS 에서 «만들어» 넣는다 (대표 결정 2026-08-29, 안 ㉮).
          여태는 여기에 손으로 두 줄을 적어 두어, 줄을 늘리려면 화면·자바스크립트
@@ -1577,13 +1654,12 @@ body.portal-mode #moreFab{display:flex;}
         규정관리 · 정부사업일정에 함께 적용됩니다. <b>비워두면 60분</b>이고,
         안전을 위해 10분~480분(8시간) 범위만 적용됩니다.</p>
 
-      <label for="cfgTileCross">업무 시스템 — 줄 사이 이동</label>
-      <select id="cfgTileCross" style="width:200px">
-        <option value="">막음 (기본)</option>
-        <option value="1">허용</option>
-      </select>
-      <p class="cfg-help">포털 타일을 <b>업무지원 ↔ 직접업무</b> 줄 사이로 옮길 수 있게 할지 정합니다.
-        막아 두면 각자 자기 줄 안에서만 순서를 바꿉니다. <b>전 직원에게 함께 적용</b>됩니다.</p>
+      <!-- 「줄 사이 이동」 허용·막음 칸(cfgTileCross)은 걷었다 — 2026-11-08 앱 배치는 «관리자만 한 벌로» 바꾸고
+           영역 이동은 앱마다 📌 틀 고정으로 가른다. 이 칸이 남아 있으면 눌러도 아무 일이 없는 «죽은 스위치»가 된다. -->
+      <label>업무 시스템 — 앱 배치</label>
+      <p class="cfg-help">앱을 위아래·다른 영역으로 옮기고 <b>📌 틀 고정</b>하는 일은 포털 첫 화면의
+        <b>✏️ 배치 편집</b>(폰은 내 메뉴 › 앱 배치 편집)에서 합니다. 관리자만 바꿀 수 있고
+        <b>바꾼 배치는 전 직원 화면에 같이 반영</b>됩니다. 이 창에서 저장해도 배치는 지워지지 않습니다.</p>
 
       <div class="cfg-extra">
         <div class="cfg-extra-hd">
@@ -1603,6 +1679,32 @@ body.portal-mode #moreFab{display:flex;}
       <span style="flex:1"></span>
       <button class="sg-btn ghost" id="cfgCancel" type="button" style="margin-top:0;width:auto;padding:9px 16px">닫기</button>
       <button class="sg-btn" id="cfgSave" type="button" style="margin-top:0;width:auto;padding:9px 20px">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 📋 앱 배치 편집 창 (관리자만 · 폰은 내 메뉴에서, PC 는 편집 줄의 «목록으로 편집») ──
+     ⚠ body 바로 아래에 둔다 — overflow·backdrop-filter 가 있는 조상 안의 fixed 창은 폰에서 통째로 잘린다(STATUS 「열려 있는데 안 보인다」).
+     목록 안 줄은 JS(lpRender)가 영역별로 그린다 — ☐ 고르기 · № · 이름 · 📌 · ▲▼ · 영역. 기본은 감춘 채(hidden). -->
+<div id="layoutPanel" class="lp-overlay" role="dialog" aria-modal="true" aria-labelledby="lpTitle" hidden>
+  <div class="lp-box">
+    <div class="lp-hd">
+      <b id="lpTitle">✏️ 앱 배치 편집</b>
+      <span class="lp-sub">관리자만 바꿀 수 있습니다 · 바꾸면 모든 직원 화면에 같이 반영됩니다(직원은 새로고침하면 보입니다)</span>
+      <button type="button" id="lpClose" class="lp-x" aria-label="닫기" title="닫기">✕</button>
+    </div>
+    <div id="lpSelBar" class="lp-selbar" hidden>
+      <b id="lpSelN"></b>
+      <select id="lpBulkRow" aria-label="보낼 영역"></select>
+      <button type="button" id="lpBulkMove">영역으로 보내기</button>
+      <button type="button" id="lpBulkFreeze">📌 틀 고정</button>
+      <button type="button" id="lpBulkUnfreeze">📌 풀기</button>
+      <button type="button" id="lpBulkClear">선택 해제</button>
+    </div>
+    <div id="lpBody" class="lp-body"></div>
+    <div class="lp-ft">
+      <span id="lpSay" class="lay-say" role="status" aria-live="polite"></span>
+      <button type="button" id="lpReset" title="모든 앱을 처음 자리로 되돌리고 틀 고정을 모두 풉니다">↩ 처음 자리로</button>
     </div>
   </div>
 </div>
@@ -3544,6 +3646,12 @@ body.portal-mode #moreFab{display:flex;}
       puIdentityBand('');
     }
 
+    /* 앱 배치를 바꿀 수 있는 사람 — 규칙(app_config 쓰기 = uid_roles.isAdmin)과 «같은 사람»인 관리자(권형하)뿐이다.
+       ⚠ 위임관리인(admin-delegate)은 안 된다 — 서버가 쓰기를 막는다. 화면은 1차 방어, 진짜 잠금은 규칙이다.
+       다시 그릴 때마다 편집 중이던 것은 꺼 둔다(다른 계정으로 바뀌었을 수 있다). */
+    _layoutAdmin = (role === 'admin') || (typeof sgIsAdmin === 'function' && sgIsAdmin());
+    _layoutEdit = false;
+    layoutPanelClose();
     tileConts().forEach(function(c){ c.innerHTML = ''; });
     wireCamFab();
     APPS.forEach(function(app){
@@ -3666,7 +3774,7 @@ body.portal-mode #moreFab{display:flex;}
     hideEmptyRows();
     뉴스레터경고달기();
 
-    // 타일 드래그 재배치 + 순서 고정 (사용자별 저장)
+    // 앱 배치 — 관리자가 저장한 공용 배치를 따르고(관리자만 편집·📌 틀 고정), 즐겨찾기·접힘은 사람별 저장
     initTileOrder();
     // 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
     initFold();
@@ -3682,9 +3790,9 @@ body.portal-mode #moreFab{display:flex;}
     portalHanaPaintBadge();
   }
 
-  // ══════════ 타일 순서: 드래그 이동 + 고정 (사용자별, 기기 간 동기화) ══════════
-  // 타일은 두 줄(업무지원 / 직접업무)로 나뉜 각각의 상자에 담긴다.
-  // 상자가 따로라 줄 사이 이동이 저절로 막힌다 — 관리자가 설정에서 허용하면 그때만 넘나든다.
+  // ══════════ 앱 배치: 관리자만 끌어 옮김 + 📌 틀 고정 (공용 한 벌 · 즐겨찾기·접힘은 사람별) ══════════
+  // 타일은 영역(APP_ROWS)마다 각각의 상자에 담긴다. 영역 사이 이동은 관리자가 «배치 편집» 중에만 하고,
+  // 📌 틀 고정한 앱은 자기 영역 밖으로 못 나간다(2026-11-08 — 자세히 「🧩 앱 배치」 머리글).
   /* 줄 뼈대를 APP_ROWS 대로 만든다 — 한 번만. */
   function buildAppRows(){
     var host = $('appRows'); if(!host || host.dataset.built) return;
@@ -3713,7 +3821,8 @@ body.portal-mode #moreFab{display:flex;}
       var box = c.closest ? c.closest('.tilerow') : c.parentNode;
       /* 감춰 둔 타일(권한 기다리는 직원 인사·재무)은 «없는 것»으로 센다 */
       var shown = Array.prototype.some.call(c.children, function(t){ return !t.style || t.style.display !== 'none'; });
-      if(box) box.style.display = shown ? '' : 'none';
+      /* 배치 편집 중에는 빈 영역도 보인다 — 비었다고 감추면 그 영역으로 앱을 옮길 수 없다 */
+      if(box) box.style.display = (shown || layoutEditing()) ? '' : 'none';
     });
   }
 
@@ -3755,10 +3864,8 @@ body.portal-mode #moreFab{display:flex;}
     tileConts().forEach(function(c){ Array.prototype.forEach.call(c.children, function(t){ out.push(t); }); });
     return out;
   }
-  // 줄 사이 이동 허용 — 관리자가 ⚙ 시스템 설정에서 켠다(전 직원 공통)
-  function tileCrossOk(){
-    try { return !!(window.PU_CFG && String(window.PU_CFG.tileCrossRow) === '1'); } catch(e){ return false; }
-  }
+  /* (2026-11-08) 예전 「줄 사이 이동 허용」(tileCrossOk · PU_CFG.tileCrossRow)은 걷었다 —
+     이제 영역 이동은 관리자만 하고, 못 가게 막을 앱은 앱마다 📌 틀 고정으로 가른다. 저장돼 있던 옛 값은 읽지 않는다. */
   var tilePrefs = { order: null, locked: false, homeApp: null };
   var _curRole = 'member';   // 현재 로그인 사용자 역할 (바로가기 권한 판정용)
   var _curName = '';         // 현재 로그인 사용자 이름 — 인증 앱에 뜨는 계정 이름(이메일·사번 대신)
@@ -4268,6 +4375,499 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('mouseup', up);
     document.addEventListener('touchend', up);
   })();
+  /* ══════ 🧩 앱 배치 — 관리자만 옮기고, 모든 직원이 같은 배치를 본다 (대표 지시 2026-11-08) ══════
+     「화면에서 프로그램을 위아래로 이동가능하게 해라. 서로 다른 영역을 정리할 수 있게 하고 틀 고정하게 하면
+       각 영역에서만 움직이게 해라. 만약 의뢰인 업무를 내부관리로 보내고 틀고정으로 하면 내부관리에서만 움직이게
+       하는 것이다. 이 부분은 관리자인 권형하만 가능하게 해라.」
+
+     ★ 저장 자리: data/app_config/portalLayout — 이미 «읽기 직원 · 쓰기 관리자만(uid_roles.isAdmin)» 인 자리(규칙 app_config)다.
+       그래서 보안규칙은 새로 만들지도 넓히지도 않았다. 직원 화면에서 감추는 것은 1차 방어이고, 진짜 잠금은 서버 규칙이다.
+     ★ 모양: { v:1, order:[앱 key …], rows:{ 앱 key: 영역 id }, frozen:{ 앱 key:true }, updatedAt }
+       frozen(📌 틀 고정) 인 앱은 «지금 있는 영역 안에서만» 움직인다 — 끌기·▲▼ 단추·영역 고르기·일괄 옮기기 모두.
+     ⚠ 설정 창(cfgSave)은 data/app_config 를 «통째로 바꾼다»(set). 저장 때 portalLayout 을 다시 얹지 않으면 배치가 지워진다 — cfgSave 가 얹는다.
+     ⚠ 공용 배치가 «아직 없을 때»는 예전처럼 각자 옛 저장값(tilePrefs.order·rows)을 따른다. 관리자가 처음 옮기는 순간부터 모두 같은 배치다.
+       「처음 자리로」는 저장값을 지우는 것이 아니라 «기본 배치를 새로 저장»한다 — 그래야 직원의 옛 개인 저장값이 되살아나지 않는다.
+     ⚠ 즐겨찾기 ★(자주 쓰는 앱)·줄 접기는 «개인 설정»이라 그대로 각자 것이다 — 배치와 별개. 직원도 앱을 끌어 ★ 줄에 넣을 수는 있다(배치는 안 바뀐다).
+     ⚠ 계산(lay…)은 화면을 안 만지는 순수 함수다 — tests/portal-layout-admin.test.js 가 떠서 «돌려» 본다. 이름을 lay 로 시작하게 둔 것도 그래서다. */
+  var LAYOUT_PATH = 'data/app_config/portalLayout';
+  var LAYOUT_CACHE = 'pu_portal_layout_v1';
+  var _layout = null;          // 서버에 있는 «공용 배치»(정리한 것) — null 이면 아직 정한 적 없음
+  var _layoutAdmin = false;    // 이 사람이 배치를 바꿀 수 있는가(render 가 채운다)
+  var _layoutEdit = false;     // 지금 «배치 편집» 중인가 — 저장하지 않는다(화면을 열 때마다 꺼진 채 시작)
+  var _layoutWriting = 0;      // 쓰는 중인 저장 수 — 쓰는 도중 서버 읽기가 덮어쓰지 않게
+  var _layoutSayT = 0, _dragBefore = null, _dragWarned = false;
+  var _lpSel = {}, _lpLast = null, _lpBulkRow = '', _layoutWired = false;
+
+  /* 서버·기기에서 읽은 값을 한 모양으로 정리한다 — 틀린 것은 버린다. 순서가 비면 «배치 없음»(null). */
+  function layClean(raw){
+    if(!raw || typeof raw !== 'object') return null;
+    var seen = {}, order = [];
+    (Array.isArray(raw.order) ? raw.order : []).forEach(function(k){
+      if(typeof k === 'string' && k && !seen[k]){ seen[k] = 1; order.push(k); }
+    });
+    if(!order.length) return null;
+    var rows = {}, frozen = {};
+    if(raw.rows && typeof raw.rows === 'object') Object.keys(raw.rows).forEach(function(k){
+      if(typeof raw.rows[k] === 'string' && raw.rows[k]) rows[k] = raw.rows[k];
+    });
+    if(raw.frozen && typeof raw.frozen === 'object') Object.keys(raw.frozen).forEach(function(k){
+      if(raw.frozen[k] === true) frozen[k] = true;
+    });
+    return { order: order, rows: rows, frozen: frozen };
+  }
+  /* 두 배치가 «같은가» 보는 지문 — 같으면 다시 쓰지 않는다. */
+  function laySig(L){
+    if(!L) return 'null';
+    var rk = Object.keys(L.rows || {}).sort().map(function(k){ return k + '=' + L.rows[k]; });
+    var fk = Object.keys(L.frozen || {}).filter(function(k){ return L.frozen[k]; }).sort();
+    return JSON.stringify([L.order || [], rk, fk]);
+  }
+  function layIsFrozen(L, key){
+    return !!(L && L.frozen && Object.prototype.hasOwnProperty.call(L.frozen, key) && L.frozen[key] === true);
+  }
+  /* 저장된 영역 — 지금 없는 영역 이름이면 앱의 제자리(dflt)로 보낸다(타일이 사라지면 안 된다). */
+  function layRowOf(L, key, dflt){
+    var r = (L && L.rows && Object.prototype.hasOwnProperty.call(L.rows, key)) ? L.rows[key] : '';
+    return (r && rowExists(r)) ? r : dflt;
+  }
+  /* 앱 처음 자리 — 영역은 앱이 정한 제자리, 순서는 APPS 순서, 틀 고정 없음 */
+  function layoutDefault(){
+    var order = [], rows = {};
+    APPS.forEach(function(a){ order.push(a.key); rows[a.key] = appRowOf(a); });
+    return { order: order, rows: rows, frozen: {} };
+  }
+
+  /* ── 순수 계산: 모델 = { rowIds:[영역 id…], rows:{영역 id:[앱 key…]}, frozen:{key:true}, tail:{key:true(준비중 — 늘 영역 맨 끝)} } ──
+     모델을 «복사해서» 고친다(원본은 그대로) — 일괄 작업은 미리 돌려 보고 건수를 물은 뒤에 적용한다. */
+  function layCopy(m){
+    var rows = {}, fz = {};
+    (m.rowIds || []).forEach(function(id){ rows[id] = ((m.rows || {})[id] || []).slice(); });
+    Object.keys(m.frozen || {}).forEach(function(k){ if(m.frozen[k]) fz[k] = true; });
+    return { rowIds: (m.rowIds || []).slice(), rows: rows, frozen: fz, tail: m.tail || {} };
+  }
+  function layFind(m, key){
+    for(var i = 0; i < m.rowIds.length; i++){
+      var at = m.rows[m.rowIds[i]].indexOf(key);
+      if(at > -1) return { row: m.rowIds[i], at: at };
+    }
+    return null;
+  }
+  /* how: 'up'·'down'(같은 영역 안 순서) · 'row'(arg=영역 id, 다른 영역으로) · 'freeze'·'unfreeze'(📌)
+     ⚠ 틀 고정한 앱은 'row' 가 «안 된다» — 영역을 못 벗어난다. 순서 바꾸기는 된다.
+     ⚠ 준비중 앱은 늘 줄 맨 끝이다(대표 2026-10-09) — 그 앞뒤를 건너뛰는 순서 바꾸기는 안 된다. */
+  function layMove(model, key, how, arg){
+    var m = layCopy(model), at = layFind(m, key), soon = m.tail || {};
+    if(!at) return { ok:false, why:'이 앱은 지금 화면에 없습니다' };
+    var list = m.rows[at.row];
+    if(how === 'freeze'){
+      if(m.frozen[key]) return { ok:false, why:'이미 틀 고정입니다' };
+      m.frozen[key] = true; return { ok:true, model:m };
+    }
+    if(how === 'unfreeze'){
+      if(!m.frozen[key]) return { ok:false, why:'틀 고정이 아닙니다' };
+      delete m.frozen[key]; return { ok:true, model:m };
+    }
+    if(how === 'up' || how === 'down'){
+      var to = at.at + (how === 'up' ? -1 : 1);
+      if(to < 0) return { ok:false, why:'이미 이 영역의 맨 위입니다' };
+      if(to >= list.length) return { ok:false, why:'이미 이 영역의 맨 아래입니다' };
+      if(!!soon[key] !== !!soon[list[to]]) return { ok:false, why:'준비중 앱은 늘 영역 맨 끝에 있습니다' };
+      var t = list[to]; list[to] = list[at.at]; list[at.at] = t;
+      return { ok:true, model:m };
+    }
+    if(how === 'row'){
+      if(!Object.prototype.hasOwnProperty.call(m.rows, arg)) return { ok:false, why:'없는 영역입니다' };
+      if(arg === at.row) return { ok:false, why:'이미 그 영역에 있습니다' };
+      if(m.frozen[key]) return { ok:false, why:'📌 틀 고정한 앱은 다른 영역으로 못 갑니다 — 먼저 틀 고정을 풀어 주세요' };
+      list.splice(at.at, 1);
+      var dest = m.rows[arg], pos = dest.length;
+      if(!soon[key]){ while(pos > 0 && soon[dest[pos - 1]]) pos--; }   // 준비중 앞에 끼운다
+      dest.splice(pos, 0, key);
+      return { ok:true, model:m };
+    }
+    return { ok:false, why:'알 수 없는 동작입니다' };
+  }
+  /* 여럿을 한꺼번에 — 틀 고정은 건너뛰고 건수를 센다. moved 가 0 이면 ok:false. */
+  function layBulk(model, keys, how, arg){
+    var cur = model, moved = 0, frozenSkip = 0, noop = 0;
+    keys.forEach(function(k){
+      var at = layFind(cur, k);
+      if(how === 'row' && at && cur.frozen[k] && at.row !== arg){ frozenSkip++; return; }
+      var r = layMove(cur, k, how, arg);
+      if(r.ok){ cur = r.model; moved++; } else noop++;
+    });
+    return { ok: moved > 0, model: cur, moved: moved, frozenSkip: frozenSkip, noop: noop,
+      why: moved ? '' : (frozenSkip ? '고른 앱이 모두 틀 고정이라 옮기지 못했습니다' : '바뀐 것이 없습니다') };
+  }
+  /* 모델 → 저장할 배치. 화면에 안 그린 앱(지금 안 씀·권한 밖)의 자리는 «버리지 않고» 뒤에 이어 붙인다. */
+  function layBuild(model, old){
+    var order = [], rows = {}, seen = {};
+    model.rowIds.forEach(function(id){
+      (model.rows[id] || []).forEach(function(k){ order.push(k); rows[k] = id; seen[k] = 1; });
+    });
+    var o = old || { order: [], rows: {} };
+    (o.order || []).forEach(function(k){
+      if(seen[k]) return;
+      seen[k] = 1; order.push(k);
+      if(o.rows && Object.prototype.hasOwnProperty.call(o.rows, k)) rows[k] = o.rows[k];
+    });
+    var frozen = {};
+    Object.keys(model.frozen || {}).forEach(function(k){ if(model.frozen[k]) frozen[k] = true; });
+    return { order: order, rows: rows, frozen: frozen };
+  }
+
+  function layoutAdminOk(){ return _layoutAdmin === true; }
+  function layoutEditing(){ return _layoutAdmin === true && _layoutEdit === true; }
+
+  /* 화면(DOM) ⇄ 모델 */
+  function layModelFromDom(){
+    var m = { rowIds: [], rows: {}, frozen: {}, tail: {} };
+    tileConts().forEach(function(c){
+      var id = c.dataset.row; if(!id) return;
+      m.rowIds.push(id); m.rows[id] = [];
+      Array.prototype.forEach.call(c.children, function(t){
+        var k = t.dataset && t.dataset.key; if(!k) return;
+        m.rows[id].push(k);
+        if(t.dataset.soonApp === '1') m.tail[k] = true;
+      });
+    });
+    var fz = (_layout && _layout.frozen) || {};
+    Object.keys(fz).forEach(function(k){ if(fz[k]) m.frozen[k] = true; });
+    return m;
+  }
+  function layModelToDom(m){
+    m.rowIds.forEach(function(id){
+      (m.rows[id] || []).forEach(function(k){ var t = origTile(k); if(t) tileCont(id).appendChild(t); });
+    });
+    soonToEnd();
+    hideEmptyRows();
+  }
+
+  function layoutSay(msg, bad){
+    ['layoutSay', 'lpSay'].forEach(function(id){
+      var el = $(id); if(!el) return;
+      el.textContent = msg || '';
+      el.classList.toggle('bad', !!bad);
+    });
+    clearTimeout(_layoutSayT);
+    if(msg) _layoutSayT = setTimeout(function(){ layoutSay(''); }, 6000);
+  }
+  function layoutCacheRead(){
+    try { return layClean(JSON.parse(localStorage.getItem(LAYOUT_CACHE) || 'null')); } catch(e){ return null; }
+  }
+  function layoutCacheSave(L){
+    try { if(L) localStorage.setItem(LAYOUT_CACHE, JSON.stringify(L)); else localStorage.removeItem(LAYOUT_CACHE); } catch(e){}
+  }
+
+  /* 공용 배치를 «서버에 쓴다» — 관리자만. 화면·기기 저장은 먼저(곧바로 보이게), 서버가 거절하면 되돌린다.
+     ⚠ 관리자가 아니면 서버를 «부르지도 않는다» — 직원 화면에서 어떻게든 불려도 쓰기는 안 나간다(규칙이 한 번 더 막는다). */
+  function layoutPublish(next){
+    if(!layoutAdminOk() || !db) return Promise.resolve(false);
+    var rec = { v: 1, order: next.order.slice(), rows: {}, updatedAt: new Date().toISOString() };
+    Object.keys(next.rows).forEach(function(k){ rec.rows[k] = next.rows[k]; });
+    var fk = Object.keys(next.frozen || {}).filter(function(k){ return next.frozen[k]; });
+    if(fk.length){ rec.frozen = {}; fk.forEach(function(k){ rec.frozen[k] = true; }); }
+    var prev = _layout;
+    _layout = layClean(rec);
+    layoutCacheSave(_layout);
+    layoutMarksPaint();
+    _layoutWriting++;
+    return db.ref(LAYOUT_PATH).set(rec).then(function(){
+      layoutSay('✔ 저장했습니다 — 모든 직원 화면에 같이 반영됩니다');
+      return true;
+    }).catch(function(e){
+      _layout = prev; layoutCacheSave(prev);
+      layoutRepaint();
+      var denied = !!(e && (e.code === 'PERMISSION_DENIED' || /permission/i.test(String(e.message || ''))));
+      layoutSay('⚠ 저장하지 못했습니다 — ' + (denied ? '관리자(권형하) 계정으로 로그인했는지 확인해 주세요' : '인터넷 연결을 확인하고 다시 해 주세요'), true);
+      return false;
+    }).then(function(ok){ _layoutWriting--; return ok; });
+  }
+  /* 화면을 모델로 보고 «바뀐 것이 있을 때만» 쓴다 */
+  function layoutCommit(model){
+    var next = layBuild(model, _layout);
+    if(_layout && laySig(next) === laySig(_layout)) return Promise.resolve(false);
+    return layoutPublish(next);
+  }
+  /* 모델 바꾸기 결과(layMove·layBulk)를 화면에 반영하고 저장한다 */
+  function layoutApply(r){
+    layModelToDom(r.model);
+    var p = layoutCommit(r.model);
+    layoutMarksPaint();
+    var panel = $('layoutPanel'); if(panel && !panel.hidden) lpRender();
+    return p;
+  }
+  function tilesToDefault(){
+    /* ⚠ 타일을 그리는 대목과 «같은 글자»로 시작하지 않게 매개변수 이름을 달리했다 —
+       검사(tests/portal-soon-locked.test.js)가 그 글자로 대목을 찾아 뜬다(STATUS 「이름이 남의 검사 잣대에 걸린다」). */
+    APPS.forEach(function(ap){
+      var t = origTile(ap.key); if(!t) return;
+      tileCont(t.dataset.row || appRowOf(ap)).appendChild(t);
+    });
+  }
+  /* 배치가 바뀐 뒤 다시 맞춘다 — 기본 자리로 한 번 놓고 지금 배치를 얹는다(배치가 «없어진» 경우도 되돌아가게) */
+  function layoutRepaint(){
+    tilesToDefault();
+    applyTileOrder();
+    updateLockUi();
+    var panel = $('layoutPanel'); if(panel && !panel.hidden) lpRender();
+  }
+  function layoutLoad(){
+    if(!auth.currentUser) return;
+    db.ref(LAYOUT_PATH).once('value').then(function(s){
+      if(_layoutWriting) return;
+      var L = layClean(s.val());
+      if(laySig(L) === laySig(_layout)) return;
+      _layout = L; layoutCacheSave(L); layoutRepaint();
+    }).catch(function(){ /* 못 읽으면 이 기기가 마지막으로 받아 둔 배치 그대로 */ });
+  }
+
+  function layoutFreezeToggle(key){
+    if(!layoutAdminOk()) return;
+    var m = layModelFromDom();
+    var r = layMove(m, key, m.frozen[key] ? 'unfreeze' : 'freeze');
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    layoutApply(r);
+  }
+  function layoutResetDefault(){
+    if(!layoutAdminOk()) return;
+    if(!confirm('모든 앱을 처음 자리(기본 배치)로 되돌립니다.\n📌 틀 고정도 모두 풀립니다.\n모든 직원 화면에 같이 반영됩니다. 계속할까요?')) return;
+    layoutPublish(layoutDefault());
+    layoutRepaint();
+  }
+  function onFreezeClick(ev){
+    ev.preventDefault();     // 폰: 타일 주소로 넘어가지 않게
+    ev.stopPropagation();    // PC: 타일에 붙은 «열기»가 함께 돌지 않게
+    layoutFreezeToggle(this.dataset.freezeKey);
+  }
+  /* 📌 를 타일 아이콘에 단다 — 관리자 화면에만(직원 화면에는 만들지도 않는다). 이미 있으면 그냥 둔다. */
+  function ensureLayoutMarks(){
+    var admin = layoutAdminOk();
+    allTiles().forEach(function(t){
+      var ic = t.querySelector('.ic'); if(!ic) return;
+      var mk = ic.querySelector('.lay-freeze');
+      if(!admin){ if(mk) mk.parentNode.removeChild(mk); return; }
+      if(mk) return;
+      mk = document.createElement('span');
+      mk.className = 'lay-freeze';
+      mk.setAttribute('role', 'button');
+      mk.tabIndex = 0;
+      mk.textContent = '📌';
+      mk.dataset.freezeKey = t.dataset.key;
+      mk.addEventListener('click', onFreezeClick);
+      mk.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' || ev.key === ' ') onFreezeClick.call(this, ev); });
+      ic.appendChild(mk);
+    });
+  }
+  function layoutMarksPaint(){
+    allTiles().forEach(function(t){
+      var mk = t.querySelector ? t.querySelector('.lay-freeze') : null; if(!mk) return;
+      var on = layIsFrozen(_layout, t.dataset.key);
+      if(mk.classList.contains('on') !== on) mk.classList.toggle('on', on);
+      var say = on ? '틀 고정 중 — 이 영역 안에서만 움직입니다 (누르면 풀기)' : '틀 고정 — 누르면 이 앱이 지금 영역 안에서만 움직입니다';
+      if(mk.title !== say){ mk.title = say; mk.setAttribute('aria-label', say); }
+      var pr = on ? 'true' : 'false';
+      if(mk.getAttribute('aria-pressed') !== pr) mk.setAttribute('aria-pressed', pr);
+    });
+  }
+  /* 편집 줄·단추를 지금 형편에 맞춘다 — 직원 화면은 «전부 감춘 채» 둔다 */
+  function layoutUiPaint(){
+    var admin = layoutAdminOk(), edit = layoutEditing(), pc = !isMobile();
+    var b = $('layoutEditBtn');
+    if(b){
+      b.hidden = !(admin && pc);
+      b.textContent = edit ? '✅ 편집 끝내기' : '✏️ 배치 편집';
+      b.classList.toggle('editing', edit);
+      b.setAttribute('aria-pressed', edit ? 'true' : 'false');
+      b.setAttribute('aria-label', edit ? '앱 배치 편집 끝내기' : '앱 배치 편집 시작');
+      b.title = edit ? '눌러서 편집을 끝냅니다'
+        : '앱을 끌어 위아래·다른 영역으로 옮기고 📌 틀 고정합니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영) — 눌러서 편집 시작';
+    }
+    var bar = $('layoutBar'); if(bar) bar.hidden = !(admin && pc && edit);
+    var me = $('meLayout'); if(me) me.hidden = !admin;
+    if(document.body) document.body.classList.toggle('lay-editing', edit);
+  }
+  /* 칩(PC)을 누르면 편집을 켜고 끈다. 폰은 끌 수 없어 «목록 창»을 바로 연다. */
+  function layoutEditToggle(){
+    if(!layoutAdminOk()) return;
+    if(isMobile()){ layoutPanelOpen(); return; }
+    _layoutEdit = !_layoutEdit;
+    layoutSay('');
+    updateLockUi();
+  }
+
+  /* ── 📋 목록 창 — 영역별 목록. ☐ 고르기 · № · 이름 · 📌 · ▲▼ · 영역 (모든 줄이 «같은 길»(layMove)로 바뀐다) ── */
+  function lpEsc(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function lpApp(key){
+    /* ⚠ APPS 는 중간에 «쉼표만 있는 자리»가 하나 있어 빈 칸(undefined)이 낀다 — forEach 는 건너뛰지만 for 는 걸린다 */
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i] && APPS[i].key === key) return APPS[i]; }
+    return null;
+  }
+  function lpRowLabel(id){
+    for(var i = 0; i < APP_ROWS.length; i++){ if(APP_ROWS[i].id === id) return APP_ROWS[i].label; }
+    return id;
+  }
+  function lpPicked(m){      // 지금 목록 순서대로 고른 앱
+    var out = [];
+    m.rowIds.forEach(function(id){ m.rows[id].forEach(function(k){ if(_lpSel[k]) out.push(k); }); });
+    return out;
+  }
+  function lpRender(){
+    var body = $('lpBody'); if(!body) return;
+    var m = layModelFromDom(), html = [], keep = null, ae = document.activeElement;
+    if(ae && ae.dataset && ae.dataset.act && body.contains(ae)) keep = '[data-act="' + ae.dataset.act + '"][data-key="' + ae.dataset.key + '"]';
+    var scroll = body.scrollTop;
+    var opts = m.rowIds.map(function(rid){ return { id: rid, label: lpRowLabel(rid) }; });
+    m.rowIds.forEach(function(id){
+      var label = lpRowLabel(id), list = m.rows[id];
+      var allOn = list.length > 0 && list.every(function(k){ return _lpSel[k]; });
+      html.push('<section class="lp-area" aria-label="' + lpEsc(label) + '">'
+        + '<div class="lp-ah"><label class="lp-ckc"><input type="checkbox" data-area="' + id + '"' + (allOn ? ' checked' : '')
+        + ' aria-label="' + lpEsc(label) + ' 전체 고르기"></label>'
+        + '<span class="lp-an">' + lpEsc(label) + '</span><span class="lp-ac">' + list.length + '개</span></div>');
+      list.forEach(function(k, i){
+        var a = lpApp(k) || { name: k, icon: '' }, frz = !!m.frozen[k], soon = !!m.tail[k];
+        var canUp = layMove(m, k, 'up').ok, canDn = layMove(m, k, 'down').ok;
+        var nm = lpEsc(a.name);
+        html.push('<div class="lp-row" data-key="' + lpEsc(k) + '">'
+          + '<label class="lp-ckc"><input type="checkbox" class="lp-ck" data-key="' + lpEsc(k) + '"' + (_lpSel[k] ? ' checked' : '') + ' aria-label="' + nm + ' 고르기"></label>'
+          + '<span class="lp-no">' + (i + 1) + '</span>'
+          + '<span class="lp-ic" aria-hidden="true">' + (a.icon || '') + '</span>'
+          + '<span class="lp-nm" title="' + nm + (a.desc ? ' — ' + lpEsc(a.desc) : '') + '">' + nm + '</span>'
+          + (soon ? '<span class="lp-soon">준비중</span>' : '')
+          + '<span class="lp-ctl">'
+          + '<button type="button" class="lp-b' + (frz ? ' on' : '') + '" data-act="frz" data-key="' + lpEsc(k) + '" aria-pressed="' + (frz ? 'true' : 'false') + '"'
+          + ' title="' + (frz ? '틀 고정 중 — 이 영역 안에서만 움직입니다 (누르면 풀기)' : '틀 고정 — 누르면 이 영역 안에서만 움직입니다') + '"'
+          + ' aria-label="' + nm + (frz ? ' 틀 고정 풀기' : ' 틀 고정') + '">📌</button>'
+          + '<button type="button" class="lp-b" data-act="up" data-key="' + lpEsc(k) + '" title="위로" aria-label="' + nm + ' 위로"' + (canUp ? '' : ' disabled') + '>▲</button>'
+          + '<button type="button" class="lp-b" data-act="down" data-key="' + lpEsc(k) + '" title="아래로" aria-label="' + nm + ' 아래로"' + (canDn ? '' : ' disabled') + '>▼</button>'
+          + '<select class="lp-sel" data-act="row" data-key="' + lpEsc(k) + '" aria-label="' + nm + ' 영역 옮기기"'
+          + (frz ? ' disabled title="틀 고정한 앱은 다른 영역으로 못 갑니다 — 📌 를 눌러 풀어 주세요"' : ' title="다른 영역으로 옮기기"') + '>'
+          + opts.map(function(o){ return '<option value="' + o.id + '"' + (o.id === id ? ' selected' : '') + '>' + lpEsc(o.label) + '</option>'; }).join('')
+          + '</select></span></div>');
+      });
+      html.push('</section>');
+    });
+    body.innerHTML = html.join('');
+    body.scrollTop = scroll;
+    if(keep){ var again = body.querySelector(keep); if(again && !again.disabled) try { again.focus(); } catch(e){} }
+    /* 고른 건수 띠 — 고르기만으로는 아무것도 안 바뀐다. 「N건 선택」과 할 일을 띄운다. */
+    var picked = lpPicked(m), bar = $('lpSelBar');
+    if(bar){
+      bar.hidden = picked.length === 0;
+      var n = $('lpSelN'); if(n) n.textContent = picked.length + '건 선택';
+      var sel = $('lpBulkRow');
+      if(sel){
+        sel.innerHTML = '<option value="">보낼 영역 고르기…</option>'
+          + opts.map(function(o){ return '<option value="' + o.id + '">' + lpEsc(o.label) + '</option>'; }).join('');
+        sel.value = _lpBulkRow; if(sel.value !== _lpBulkRow) sel.value = '';
+      }
+    }
+  }
+  function lpBodyClick(e){
+    var b = e.target.closest && e.target.closest('button[data-act]');
+    if(!b || b.disabled || !layoutAdminOk()) return;
+    var key = b.dataset.key, act = b.dataset.act, m = layModelFromDom();
+    var r = layMove(m, key, act === 'frz' ? (m.frozen[key] ? 'unfreeze' : 'freeze') : act);
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    layoutApply(r);
+  }
+  function lpBodyChange(e){
+    var t = e.target; if(!t || !layoutAdminOk()) return;
+    if(t.matches && t.matches('select[data-act="row"]')){
+      var r = layMove(layModelFromDom(), t.dataset.key, 'row', t.value);
+      if(!r.ok){ layoutSay('· ' + r.why, true); lpRender(); return; }   // 안 되면 고르개를 제자리로
+      layoutApply(r);
+      layoutSay('✔ ' + (lpApp(t.dataset.key) || { name: t.dataset.key }).name + ' → ' + lpRowLabel(t.value) + ' (모든 직원 화면에 반영)');
+      return;
+    }
+    if(t.classList && t.classList.contains('lp-ck')){
+      if(t.checked) _lpSel[t.dataset.key] = true; else delete _lpSel[t.dataset.key];
+      lpRender(); return;
+    }
+    if(t.dataset && t.dataset.area){
+      var m = layModelFromDom();
+      (m.rows[t.dataset.area] || []).forEach(function(k){ if(t.checked) _lpSel[k] = true; else delete _lpSel[k]; });
+      lpRender();
+    }
+  }
+  /* 여럿 한꺼번에 — 먼저 «미리 돌려» 건수를 묻고, 확인하면 한 번에 저장한다(반쯤 하다 멈추지 않게) */
+  function lpBulk(how){
+    if(!layoutAdminOk()) return;
+    var m = layModelFromDom(), keys = lpPicked(m);
+    if(!keys.length) return;
+    var arg = '';
+    if(how === 'row'){
+      arg = ($('lpBulkRow') || {}).value || '';
+      if(!arg){ layoutSay('· 보낼 영역을 먼저 골라 주세요', true); return; }
+    }
+    var r = layBulk(m, keys, how, arg);
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    var what = how === 'row' ? ('「' + lpRowLabel(arg) + '」로 보냅니다') : (how === 'freeze' ? '📌 틀 고정합니다' : '📌 틀 고정을 풉니다');
+    var msg = '고른 ' + keys.length + '개 중 ' + r.moved + '개를 ' + what + '.'
+      + (r.frozenSkip ? '\n(📌 틀 고정한 ' + r.frozenSkip + '개는 옮기지 않습니다)' : '')
+      + (r.noop ? '\n(이미 그 상태인 ' + r.noop + '개는 그대로 둡니다)' : '')
+      + '\n모든 직원 화면에 같이 반영됩니다. 계속할까요?';
+    if(!confirm(msg)) return;
+    _lpSel = {};
+    layoutApply(r);
+    layoutSay('✔ ' + r.moved + '개를 바꿨습니다 (모든 직원 화면에 반영)');
+  }
+  function layoutPanelOpen(){
+    if(!layoutAdminOk()) return;
+    var p = $('layoutPanel'); if(!p) return;
+    _lpSel = {}; _lpBulkRow = '';
+    _lpLast = document.activeElement;
+    layoutSay('');
+    p.hidden = false;
+    lpRender();
+    var x = $('lpClose'); if(x) x.focus();
+  }
+  function layoutPanelClose(){
+    var p = $('layoutPanel'); if(!p || p.hidden) return;
+    p.hidden = true;
+    _lpSel = {};         // 고른 것은 화면을 떠나면 비운다
+    if(_lpLast && _lpLast.focus){ try { _lpLast.focus(); } catch(e){} }
+    _lpLast = null;
+  }
+  /* 단추·창 연결 — 한 번만. 고정된 마크업(id)에만 붙인다. */
+  function layoutWire(){
+    if(_layoutWired) return;
+    _layoutWired = true;
+    var on = function(id, ev, fn){ var el = $(id); if(el) el.addEventListener(ev, fn); };
+    on('layoutEditBtn', 'click', layoutEditToggle);
+    on('layoutDoneBtn', 'click', layoutEditToggle);
+    on('layoutListBtn', 'click', layoutPanelOpen);
+    on('layoutResetBtn', 'click', layoutResetDefault);
+    on('lpReset', 'click', layoutResetDefault);
+    on('meLayout', 'click', layoutPanelOpen);
+    on('lpClose', 'click', layoutPanelClose);
+    on('lpBody', 'click', lpBodyClick);
+    on('lpBody', 'change', lpBodyChange);
+    on('lpBulkRow', 'change', function(){ _lpBulkRow = this.value; });
+    on('lpBulkMove', 'click', function(){ lpBulk('row'); });
+    on('lpBulkFreeze', 'click', function(){ lpBulk('freeze'); });
+    on('lpBulkUnfreeze', 'click', function(){ lpBulk('unfreeze'); });
+    on('lpBulkClear', 'click', function(){ _lpSel = {}; lpRender(); });
+    var ov = $('layoutPanel');
+    if(ov){
+      ov.addEventListener('mousedown', function(e){ if(e.target === ov) layoutPanelClose(); });
+      /* Tab 이 창 밖으로 새지 않게 — 창 안에서만 돈다 */
+      ov.addEventListener('keydown', function(e){
+        if(e.key !== 'Tab') return;
+        var f = Array.prototype.filter.call(ov.querySelectorAll('button, select, input'), function(x){ return !x.disabled && x.offsetParent !== null; });
+        if(!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    document.addEventListener('keydown', function(e){
+      var p = $('layoutPanel');
+      if(e.key === 'Escape' && p && !p.hidden){ e.preventDefault(); layoutPanelClose(); }
+    });
+  }
+
   function tilePrefLocalKey(){ return 'pu_portal_tiles_uid_' + ((auth.currentUser && auth.currentUser.uid) || '_'); }
   function tilePrefLegacyLocalKey(){ return 'pu_portal_tiles_' + sgEmailKey((auth.currentUser && auth.currentUser.email) || ''); }
   function tilePrefPath(){ return 'data/portal_prefs_uid/' + ((auth.currentUser && auth.currentUser.uid) || '_'); }
@@ -4295,53 +4895,55 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
   function applyTileOrder(){
-    if(!tilePrefs.order || !tilePrefs.order.length){ soonToEnd(); return; }
+    /* ★ 관리자가 저장한 «공용 배치»(_layout)가 있으면 모두 그것을 따른다(2026-11-08). 없을 때만 옛 개인 저장값. */
+    var L = _layout;
+    var order = L ? L.order : tilePrefs.order;
+    if(!order || !order.length){ soonToEnd(); return; }
     var all = allTiles();
     var byKey = {};
     all.forEach(function(t){ byKey[t.dataset.key] = t; });
     var seq = [];
-    tilePrefs.order.forEach(function(k){ if(byKey[k]){ seq.push(byKey[k]); delete byKey[k]; } });
+    order.forEach(function(k){ if(byKey[k]){ seq.push(byKey[k]); delete byKey[k]; } });
     all.forEach(function(t){ if(byKey[t.dataset.key] === t) seq.push(t); });  // 저장에 없던 새 타일
     // 저장된 순서대로 다시 담되, 각 타일은 자기 줄 상자로 보낸다.
-    // (관리자가 줄 사이 이동을 허용해 옮겨 둔 것은 저장된 줄을 따른다)
     seq.forEach(function(t){
       /* 사람이 옮겨 둔 자리를 쓰되, 지금 없는 줄 이름이면 앱의 제자리로 보낸다.
-         (옛 「support/direct」 가 저장돼 있는 사람이 있다 — 2026-08-29 에 줄이 바뀌었다) */
-      var row = savedRowOf(t.dataset.key, t.dataset.row);
+         (옛 「support/direct」 가 저장돼 있는 사람이 있다 — 2026-08-29 에 줄이 바뀌었다)
+         공용 배치의 줄은 관리자가 «일부러 둔 자리»라 옛 줄 되돌림(ROW_MOVED_FROM)을 타지 않는다. */
+      var row = L ? layRowOf(L, t.dataset.key, t.dataset.row) : savedRowOf(t.dataset.key, t.dataset.row);
       tileCont(row).appendChild(t);
     });
     soonToEnd();
   }
   function persistOrderFromDom(){
     soonToEnd();   /* 끌어 옮긴 뒤에도 준비중은 오른쪽 끝 — 그 자리를 저장한다 */
-    var order = [], rows = {};
-    tileConts().forEach(function(c){
-      /* 옛 기본값 support 는 이제 없는 줄이다 — 첫 줄로 되돌린다. */
-      var row = c.dataset.row || (APP_ROWS[0] ? APP_ROWS[0].id : '');
-      Array.prototype.forEach.call(c.children, function(t){
-        var k = t.dataset.key || ''; if(!k) return;
-        order.push(k); rows[k] = row;
-      });
-    });
-    tilePrefs.order = order;
-    tilePrefs.rows = rows;      // 어느 줄에 뒀는지도 함께 기억
-    saveTilePrefs();
+    /* ★ 공용 배치는 «관리자가 배치 편집 중일 때만» 쓴다(2026-11-08). 직원의 끌기는 ★ 줄에 넣는 일뿐이라 배치는 안 바뀐다.
+       예전에는 여기서 사람마다 자기 순서(tilePrefs.order·rows)를 저장했다 — 그 저장은 걷었다. */
+    if(!layoutEditing()){ _dragBefore = null; return; }
+    var m = layModelFromDom();
+    /* 끌었는데 «제자리에 놓았다»면 쓰지 않는다 — 아직 공용 배치가 없을 때 아무것도 안 옮겼는데 내 화면 순서가 모두에게 퍼지면 안 된다 */
+    if(_dragBefore !== null){
+      var same = laySig(layBuild(m, _layout)) === _dragBefore;
+      _dragBefore = null;
+      if(same) return;
+    }
+    layoutCommit(m);
   }
   function updateLockUi(){
-    var b = $('tileLockBtn');
-    b.textContent = tilePrefs.locked ? '🔒 고정됨' : '🔓 이동 가능';
-    b.classList.toggle('locked', tilePrefs.locked);
-    b.setAttribute('aria-pressed', tilePrefs.locked ? 'true' : 'false');
-    b.setAttribute('aria-label', tilePrefs.locked ? '타일 순서 고정 해제' : '타일 순서 고정');
-    b.title = tilePrefs.locked ? '눌러서 순서 고정 풀기'
-      : '마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서) — 눌러서 고정';
-    allTiles().forEach(function(t){ t.draggable = !tilePrefs.locked; });
+    ensureLayoutMarks();   // 📌 — 관리자 화면에만 만든다(직원 화면에서는 있던 것도 걷는다)
+    layoutUiPaint();       // 편집 단추·줄·내 메뉴 항목 — 직원은 전부 감춘 채
+    layoutMarksPaint();
+    /* 앱은 PC 에서 «누구나» 끌 수 있다 — 직원은 ★ 줄에 넣으려고(배치는 안 바뀐다), 관리자는 배치 편집 중에 옮기려고 */
+    allTiles().forEach(function(t){ t.draggable = !isMobile(); });
+    hideEmptyRows();
   }
 
   var _dragEl = null, _tileDragWired = false;
   function onTileDragStart(e){
-    if(tilePrefs.locked){ e.preventDefault(); return; }
     _dragEl = this;
+    _dragWarned = false;
+    /* 끌기 시작할 때의 배치 지문 — 끝났을 때 달라졌는지 본다(persistOrderFromDom) */
+    _dragBefore = layoutEditing() ? laySig(layBuild(layModelFromDom(), _layout)) : null;
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', this.dataset.key || ''); } catch(_){}
@@ -4351,18 +4953,32 @@ body.portal-mode #moreFab{display:flex;}
     if(_dragEl){ _dragEl = null; persistOrderFromDom(); }
   }
   function onTileDragOver(e){
-    if(!_dragEl) return;
+    /* 배치 편집 중인 관리자만 앱 사이로 옮긴다. 직원의 끌기는 여기서 «아무것도 안 한다»(★ 줄 쪽이 따로 받는다) */
+    if(!_dragEl || !layoutEditing()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    // 옮길 수 있는 범위: 기본은 자기 줄 안에서만. 관리자가 허용하면 두 줄 모두.
+    // 옮길 수 있는 범위: 📌 틀 고정한 앱은 «자기 영역 안에서만», 아니면 모든 영역.
     var own = _dragEl.parentNode;
-    if(!tileCrossOk() && own){
-      // 커서가 자기 줄 밖이면 아무것도 하지 않는다.
-      // (이 가드가 없으면 아래 줄로 끌 때 제 줄 맨 끝으로 튀어 엉뚱하게 순서가 바뀐다)
+    var frozen = layIsFrozen(_layout, _dragEl.dataset.key);
+    if(frozen && own){
+      // 커서가 자기 영역 밖이면 아무것도 하지 않는다 — 틀 고정은 영역을 못 벗어난다.
+      // (이 가드가 없으면 다른 영역으로 끌 때 제 영역 맨 끝으로 튀어 엉뚱하게 순서가 바뀐다)
       var orr = own.getBoundingClientRect(), pad = 12;
-      if(e.clientY < orr.top - pad || e.clientY > orr.bottom + pad) return;
+      if(e.clientY < orr.top - pad || e.clientY > orr.bottom + pad){
+        if(!_dragWarned){ _dragWarned = true; layoutSay('📌 틀 고정한 앱은 이 영역 밖으로 옮길 수 없습니다 — 📌 를 눌러 풀면 됩니다', true); }
+        return;
+      }
     }
-    var conts = tileCrossOk() ? tileConts() : [own].filter(Boolean);
+    var conts = frozen ? [own].filter(Boolean) : tileConts();
+    // 빈 영역으로 끌어올 때: 커서가 그 상자 안이면 그냥 담는다(다른 앱이 하나도 없는 영역)
+    var emptyHit = null;
+    conts.forEach(function(cont){
+      var others = Array.prototype.filter.call(cont.children, function(c){ return c !== _dragEl; });
+      if(others.length || emptyHit) return;
+      var r = cont.getBoundingClientRect();
+      if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) emptyHit = cont;
+    });
+    if(emptyHit){ if(_dragEl.parentNode !== emptyHit) emptyHit.appendChild(_dragEl); return; }
     var target = null, before = true, dist = Infinity, hitCont = null;
     conts.forEach(function(cont){
       Array.prototype.forEach.call(cont.children, function(c){
@@ -4373,24 +4989,13 @@ body.portal-mode #moreFab{display:flex;}
         if(d < dist){ dist = d; target = c; hitCont = cont; before = (Math.abs(dy) > r.height/2) ? (dy < 0) : (dx < 0); }
       });
     });
-    // 빈 줄로 끌어올 때: 커서가 그 상자 안이면 그냥 담는다
-    if(tileCrossOk() && !target){
-      conts.forEach(function(cont){
-        if(cont.children.length) return;
-        var r = cont.getBoundingClientRect();
-        if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
-          cont.appendChild(_dragEl);
-        }
-      });
-      return;
-    }
     if(target && target !== _dragEl && hitCont){
       hitCont.insertBefore(_dragEl, before ? target : target.nextSibling);
     }
   }
 
   function onTileKeyDown(e){
-    if(tilePrefs.locked || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if(!layoutEditing() || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
     // 키보드 이동은 자기 줄 안에서만 (끝에 닿으면 더 안 간다)
     var cont = this.parentNode;
     var target = e.key === 'ArrowLeft' ? this.previousElementSibling : this.nextElementSibling;
@@ -4403,9 +5008,8 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   function initTileOrder(){
-    var btn = $('tileLockBtn');
-    // 모바일: HTML5 드래그 미지원 → 버튼·힌트 숨김, 저장된 순서만 적용
-    if(isMobile()){ btn.style.display = 'none'; $('tileHint').style.display = 'none'; }
+    layoutWire();   // 배치 편집 단추·목록 창 연결(한 번만) — 관리자가 아니면 단추가 안 켜진다
+    // 모바일: HTML5 드래그 미지원 → 끌기 배선은 건너뛰고(편집은 내 메뉴 › 목록 창), 저장된 배치만 적용
     // 1) 로컬 캐시로 즉시 적용 (깜빡임 없이) — 캐시 없으면 기본값으로 리셋(이전 사용자 설정 잔존 방지)
     try {
       var rawPref = localStorage.getItem(tilePrefLocalKey());
@@ -4415,10 +5019,12 @@ body.portal-mode #moreFab{display:flex;}
       }
       tilePrefs = tilePrefsFrom(JSON.parse(rawPref || 'null'));
     } catch(e){}
+    _layout = layoutCacheRead();   // 관리자가 저장한 공용 배치(이 기기에 마지막으로 받아 둔 것) — 곧바로 그린다
     applyTileOrder();
+    updateLockUi();
     if(!isMobile()){
-      updateLockUi();
-      // 2) 드래그 배선 (컨테이너 이벤트는 1회만) — 두 줄 상자 모두
+      // 2) 드래그 배선 (컨테이너 이벤트는 1회만) — 영역 상자 모두
+      //    ⚠ 직원 화면에도 배선한다 — 앱을 끌어 ★ 자주 쓰는 앱 줄에 넣는 길이 이것을 쓴다. 배치는 onTileDragOver 가 관리자 편집 중에만 바꾼다.
       allTiles().forEach(function(t){
         t.addEventListener('dragstart', onTileDragStart);
         t.addEventListener('dragend', onTileDragEnd);
@@ -4430,14 +5036,10 @@ body.portal-mode #moreFab{display:flex;}
           c.addEventListener('dragover', onTileDragOver);
           c.addEventListener('drop', function(e){ e.preventDefault(); });
         });
-        btn.addEventListener('click', function(){
-          tilePrefs.locked = !tilePrefs.locked;
-          saveTilePrefs();
-          updateLockUi();
-        });
       }
     }
-    // 3) 서버 저장분과 동기화 (다른 기기에서 바꾼 순서 반영)
+    layoutLoad();   // 서버의 공용 배치와 맞춘다(다른 기기·다른 사람이 바꾼 것)
+    // 3) 서버 저장분과 동기화 (다른 기기에서 바꾼 개인 설정 — 별표·접힘)
     if(auth.currentUser){
       db.ref(tilePrefPath()).once('value').then(function(s){
         var p = s.val();
@@ -4454,7 +5056,7 @@ body.portal-mode #moreFab{display:flex;}
           tilePrefs = tilePrefsFrom(p);
           try { localStorage.setItem(tilePrefLocalKey(), JSON.stringify(tilePrefs)); } catch(e){}
           applyTileOrder();
-          if(!isMobile()) updateLockUi();
+          updateLockUi();
           refreshFoldUi();   // 다른 기기에서 고른 별표·접힘도 곧바로
         }
       }).catch(function(){});
@@ -4575,7 +5177,7 @@ body.portal-mode #moreFab{display:flex;}
       c.removeAttribute('data-key');
       c.removeAttribute('id');
       c.removeAttribute('target');
-      c.draggable = !tilePrefs.locked && !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기
+      c.draggable = !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기 (예전 「고정됨」 잠금은 걷었다 — 개인 ★ 순서는 늘 바꿀 수 있다)
       c.classList.remove('dragging', 'tile-soon-first');
       Array.prototype.forEach.call(c.querySelectorAll('[id]'), function(n){ n.removeAttribute('id'); });
       c.dataset.pinOf = orig.dataset.key;
@@ -4771,7 +5373,7 @@ body.portal-mode #moreFab{display:flex;}
       });
       pt.addEventListener('dragstart', function(e){
         var c = e.target.closest && e.target.closest('[data-pin-of]');
-        if(!c || tilePrefs.locked){ e.preventDefault(); return; }
+        if(!c){ e.preventDefault(); return; }
         _pinDrag = c;
         c.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
@@ -4803,7 +5405,7 @@ body.portal-mode #moreFab{display:flex;}
         new MutationObserver(function(ms){
           var real = ms.some(function(m){
             var t = m.target && m.target.nodeType === 3 ? m.target.parentNode : m.target;
-            return !(t && t.closest && t.closest('.pin-star, .tilerow-h'));
+            return !(t && t.closest && t.closest('.pin-star, .tilerow-h, .lay-freeze'));
           });
           if(!real) return;
           clearTimeout(_foldTimer);
@@ -4985,7 +5587,7 @@ body.portal-mode #moreFab{display:flex;}
   var CFG_PATH = 'data/app_config';
   /* ⚠ Gemini 키 칸은 뺐다(2026-11-05 「유료 API 통제」) — 판독이 유료 등급이고 이 자리는 직원 모두가 읽는다.
      열쇠는 서버 금고(GEMINI_KEY)에만 둔다. 저장은 set(통째로 바꾸기)이라, 다음에 저장하면 옛 값도 함께 지워진다. */
-  var CFG_FIELDS = [['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes'], ['cfgTileCross','tileCrossRow']];
+  var CFG_FIELDS = [['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes']];
 
   function cfgShowFab(){
     var b = $('cfgFab'), admin = sgIsAdmin();
@@ -5074,7 +5676,14 @@ body.portal-mode #moreFab{display:flex;}
     }
     rec.extra = ex.obj;
     $('cfgSave').disabled = true; $('cfgStat').textContent = '저장 중…';
-    db.ref(CFG_PATH).set(rec).then(function(){
+    /* ⚠★ 이 자리(data/app_config)는 «통째로» 바꾼다(set). 포털 앱 배치(portalLayout, 2026-11-08)도 같은 자리에 있어
+       저장 때 다시 얹지 않으면 이 창에서 키 하나만 고쳐도 모든 직원의 배치가 지워진다.
+       배치를 못 읽으면 «저장하지 않는다» — 모르는 채로 덮어쓰면 지워지기 때문이다. */
+    db.ref(LAYOUT_PATH).once('value').then(function(snap){
+      var keep = snap.val();
+      if(keep) rec.portalLayout = keep;
+      return db.ref(CFG_PATH).set(rec);
+    }).then(function(){
       $('cfgStat').textContent = '저장됐습니다 — 각 프로그램에서 새로고침하면 반영됩니다';
       setTimeout(cfgClose, 1200);
     }).catch(function(e){
