@@ -146,6 +146,27 @@ test('③ 낱말은 두는 것을 지킨다 — 3천안공장·10만기일·천�
     assert.strictEqual(t(keep), keep, keep);
   }
 });
+/* ── 최종 재검증 2026-11-09 — ReDoS(겹치는 반복)·낱말 끝 한글 숫자 오인 ── */
+test('③ ★ 정규식이 폭주하지 않는다 — 「1십  십  십…X」·「백…백X」·공백·숫자 반복도 즉시 끝난다(길이는 1000자까지만 본다)', () => {
+  const t = D.scrubMoney;
+  const cases = ['1' + '십  '.repeat(18) + 'X', '1' + '십  '.repeat(300) + 'X', '백'.repeat(4000) + 'X', '백 '.repeat(2000) + 'X', '1'.repeat(4000) + 'X',
+    '1,'.repeat(2000) + 'X', '1만'.repeat(2000) + 'X', '3천5백 '.repeat(500) + 'X', '1' + ' '.repeat(5000) + 'X', '1천 '.repeat(1500)];
+  for (const c of cases) { const a = Date.now(); t(c); const ms = Date.now() - a; assert.ok(ms < 200, c.slice(0, 12) + '… ' + ms + 'ms'); }
+  assert.ok(t('가'.repeat(5000) + '400만원').length <= 1000, '긴 글은 앞 1000자까지만 본다(뒤는 버린다 — 새지 않는 쪽)');
+});
+test('③ ★ 낱말 끝의 한글 숫자(법정의무교육만·고객사만·본사만·평일만·며칠만·추천만·이천 사업장)는 금액으로 가리지 않는다', () => {
+  const t = D.scrubMoney;
+  for (const keep of ['법정의무교육만 실시', '고객사만 참석', '본사만 대상', '평일만 근무', '며칠만 연장', '추천만 받음', '이천 사업장 방문', '천안 방문', '이천시 견적서']) assert.strictEqual(t(keep), keep, keep);
+  /* 그래도 금액이면 가린다 — 앞이 한글이 아닐 때의 «사백만»·«삼천오백만 원»·붙여 쓴 «금액사백만원» */
+  for (const [a, b] of [['견적서 금액 사백만.pdf', '견적서 금액 ○○.pdf'], ['삼천오백만 원', '○○'], ['금액사백만원', '금액○○'], ['사백만원', '○○'], ['견적서 사백만입니다', '견적서 ○○입니다']]) assert.strictEqual(t(a), b, a);
+});
+test('⑦ 제목에 견적이 없어도 첨부 «견적서_요청.pdf»·「견적요청서.pdf」·비교견적서만이면 우리 견적의 근거가 아니다 — 우리 견적서가 함께 붙으면 맞다', () => {
+  assert.ok(!D.isOurQuote('자료 송부', ['견적서_요청.pdf']));
+  assert.ok(!D.isOurQuote('자료 송부', ['견적요청서.pdf']));
+  assert.ok(!D.isOurQuote('자료 송부', ['견적서-의뢰.hwp', '비교견적서_다라.pdf']));
+  assert.ok(D.isOurQuote('자료 송부', ['견적서_요청.pdf', '견적서_가나기관.pdf']));
+  assert.ok(D.isOurQuote('견적서 송부의 건', ['견적요청서.pdf']), '제목이 견적서 송부면 그대로 우리 견적(첨부 이름은 근거가 아니다)');
+});
 test('⑦ 첨부 «이름»의 구분자(_ - .)가 끼어도 요청서다 — 「견적서_요청.pdf」·「견적서-의뢰.hwp」· 비교견적서만 붙은 메일은 우리 견적의 근거가 아니다', () => {
   assert.ok(!D.isOurQuote('RE: 견적서 요청드립니다', ['견적서_요청.pdf']));
   assert.ok(!D.isOurQuote('RE: 견적서 요청드립니다', ['견적서-의뢰.hwp']));

@@ -222,9 +222,10 @@ function wrap(env) {
     erpDeferCoLinkIfNew: (f) => Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' }),
     isContractLocked: (ym) => ym === (env.lockedYm || ''),
     genContractNo: () => '계약-2026-196',
-    setTimeout, clearTimeout, _recLastWrite: null,
+    setTimeout, clearTimeout, _recLastWrite: null, _erpQuoteUnlanded: {},
     /* env.write — 저장 층이 «서버 쓰기 약속»을 남기는 것을 흉내 낸다(실제 _recServerWrite 처럼 저장 직후 같은 틱에 남긴다) */
-    persistOne: (o) => { calls.persist.push(o); if (env.write) ctx._recLastWrite = env.write(calls); return env.persistOk !== false; },
+    /* env.localCache — 저장 층이 «이 기기 캐시에 먼저 적는» 것을 흉내 낸다(서버가 거절해도 캐시에는 남는다) */
+    persistOne: (o) => { calls.persist.push(o); if (env.localCache) env.localCache(o); if (env.write) ctx._recLastWrite = env.write(calls); return env.persistOk !== false; },
     patchOne: (id, f) => { calls.patch.push({ id, f }); if (env.write) ctx._recLastWrite = env.write(calls); return env.patchOk !== false; },
   }, env.extra || {});
   vm.createContext(ctx);
@@ -392,7 +393,7 @@ test('⑲ 직접 쓰기 길이 아니면(약속 없음 — 통째 저장 폴백)
   const body = cutFn(SRC, 'async function processQuoteLaneRequest(');
   /* 세 저장 자리가 모두 «비우기 → 저장 → 닿음 확인 → 지우기» 순서다 */
   assert.equal((body.match(/clearWrite\(\);/g) || []).length, 3);
-  assert.equal((body.match(/if\(!\(await landed\(takeWrite\(\)\)\)\) return await stop\(NOT_LANDED\);/g) || []).length, 3);
+  assert.equal((body.match(/if\(!\(await settle\(\)\)\) return await stop\(NOT_LANDED\);/g) || []).length, 3);
 });
 
 test('⑲ 저장 층 — _recServerWrite 가 서버 쓰기 약속을 남기고(받으면 끝남 · 거절이면 실패로 끝남) 실패 때의 되돌림·알림은 그대로다', async () => {
@@ -462,6 +463,37 @@ test('㉔ 이 화면이 열려 있는 동안 — 1분마다 멈춘 요청을 다
   const run = cutFn(SRC, 'async function runContractRequests(');
   assert.ok(run.includes('quoteOnly === true && !erpQuoteLaneReq(r)'), '열려 있는 동안 도는 길은 견적 길만');
   assert.ok(SRC.includes('useEffect(function(){ runContractRequests(false); }, []);'), '열 때는 사진첩·중진공도 한 번 처리한다(그대로)');
+});
+
+/* ── 최종 재검증 2026-11-09 — 서버 거절 뒤 «같은 화면» 다시 시도가 요청을 지우지 않는다 ── */
+test('㉕ ★ 서버가 거절한 뒤 같은 화면에서 «다시 시도» — 로컬 캐시의 srcMails 를 «이미 반영»으로 믿어 요청을 지우지 않는다(새로고침하면 서버 값으로 판단)', async () => {
+  const data = { companies: [CO], contracts: [] };
+  const w = wrap({ data, write: () => Promise.reject(new Error('거절(가짜)')), localCache: (o) => data.contracts.push(o) });
+  const r1 = await w.run('k1', req());
+  assert.match(r1.why, /서버에 저장되었는지 확인하지 못했습니다/); assert.equal(w.calls.remove, 0);
+  assert.equal(data.contracts.length, 1, '이 화면의 캐시에는 카드가 남아 있다(서버는 거절했다)');
+  /* 같은 화면에서 다시 시도 — plan 은 로컬 srcMails 를 보고 noop 이지만 요청은 지우지 않고 새로고침을 안내한다 */
+  const r2 = await w.run('k1', req());
+  assert.ok(!r2.noop, 'noop 으로 끝내면 서버에 없는 요청이 지워진다'); assert.match(r2.why, /새로고침/);
+  assert.equal(w.calls.remove, 0, '요청을 지우지 않는다'); assert.equal(w.store.cur.state, 'blocked');
+  assert.equal(w.calls.persist.length, 1, '같은 카드를 또 만들지도 않는다');
+  /* 새로고침한 화면(서버 값에 카드가 있다)은 «이미 반영»으로 정리한다 */
+  const fresh = wrap({ data: { companies: [CO], contracts: [card({ srcMails: ['Sent|1001'] })] }, reqNode: req({ state: 'blocked' }) });
+  const r3 = await fresh.run('k1', req({ state: 'blocked' }));
+  assert.ok(r3.noop); assert.equal(fresh.calls.remove, 1);
+});
+
+test('㉕ 나중에 서버가 받았다고 알려 오면(늦게 닿음) 표시를 풀어 «이미 반영»으로 정리한다 · 닿은 저장은 표시를 남기지 않는다', async () => {
+  const data = { companies: [CO], contracts: [] };
+  let late; const slow = new Promise((r) => { late = r; });
+  const w = wrap({ data, write: () => slow, localCache: (o) => data.contracts.push(o), extra: { setTimeout: (fn) => { fn(); return 1; }, clearTimeout() {} } });
+  const r1 = await w.run('k1', req());
+  assert.match(r1.why, /서버에 저장되었는지 확인하지 못했습니다/);
+  late(); await new Promise((r) => setTimeout(r, 10));
+  const r2 = await w.run('k1', req());
+  assert.ok(r2.noop, '서버가 받은 뒤에는 이미 반영으로 정리한다'); assert.equal(w.calls.remove, 1);
+  const ok = wrap({ data: { companies: [CO], contracts: [] }, write: () => Promise.resolve() });
+  assert.ok((await ok.run('k1', req())).made);
 });
 
 /* ── 길 연결: 사진첩 길은 그대로, 견적 길만 갈라 보낸다 ── */

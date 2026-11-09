@@ -116,7 +116,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
      JSZip 은 쓸 때만 vendor 에서 불러온다(서식을 안 쓰는 날에는 안 받는다). -->
 <!-- 폰 뒤로가기 — 창·메뉴를 한 걸음씩 물러선다 (대표 지시 2026-08-30) -->
-<script src="js/pu-quote-detect.js?v=4"></script>
+<script src="js/pu-quote-detect.js?v=5"></script>
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-form-fill.js?v=2"></script>
 <script src="js/pu-form-auto.js?v=1"></script>
@@ -20898,6 +20898,9 @@ function erpContractDraftKey(cur){
 var _erpCtReqBusy = false;
 /* 걸린 요청 창에서 «요청에 적는» 고침(담당자·업체·이름·연결 보류)이 서버에 닿기 전에 「다시 시도」가 돌지 않게 — 적는 중인 약속들을 모아 두었다가 다시 시도가 먼저 기다린다 */
 var _erpCtReqPatches = [];
+/* 이 화면이 저장했지만 «서버에 닿았는지 확인하지 못한» 견적 길 요청의 열쇠 — 그 사이 이 화면의 로컬 캐시에는 카드가 남아 있어서, 같은 화면의 「다시 시도」가 그것을 «이미 반영»으로 읽고
+   서버에는 없는 요청을 지우면 안 된다(검토 2026-11-09 최종). 새로고침하면(캐시가 서버 값으로 돌아오면) 자연히 비워진다. 나중에 서버가 받았다고 알려 오면 그때 비운다. */
+var _erpQuoteUnlanded = {};
 
 function ContractModal(props){
   useEscClose(props.onClose);
@@ -26368,7 +26371,15 @@ function ContractManagement(props){
       clearTimeout(tid);
       return r === true;
     };
-    var NOT_LANDED = '서버에 저장되었는지 확인하지 못했습니다 (연결·권한) — 잠시 뒤 «다시 시도»하면 이어서 처리합니다';
+    var NOT_LANDED = '서버에 저장되었는지 확인하지 못했습니다 (연결·권한) — 화면을 새로고침한 뒤 «다시 시도»해 주세요(서버에 이미 있으면 그때 자동으로 정리됩니다)';
+    /* 저장 «직후 같은 틱»에 부른다 — 서버에 닿았으면 true. 아니면 «못 닿음» 표시를 남기고 false(나중에 서버가 받았다고 알려 오면 표시를 푼다) */
+    var settle = async function(){
+      var p = takeWrite();
+      if(await landed(p)){ delete _erpQuoteUnlanded[key]; return true; }
+      _erpQuoteUnlanded[key] = true;
+      if(p && typeof p.then === 'function') p.then(function(){ delete _erpQuoteUnlanded[key]; }, function(){});
+      return false;
+    };
     var stop = async function(why){
       await ref.update({ state:'blocked', why:why, handledAt:Date.now(), claimedAt:null, claimedBy:null }).catch(function(){});
       return { lane:'quote', why:why };
@@ -26388,12 +26399,16 @@ function ContractManagement(props){
     if(!mine || mine.state !== 'processing' || mine.claimedAt !== stamp) return { lane:'quote', noop:'다른 화면이 처리 중이거나 이미 처리된 요청입니다' };
     req = mine;
     var plan = erpQuoteLanePlan(req, dbGet('companies', []) || [], dbGet('contracts', []) || [], getActiveUsers());
-    if(plan.action === 'noop'){ await drop(); return { lane:'quote', noop:plan.why }; }
+    if(plan.action === 'noop'){
+      /* 이 화면의 저장이 서버에 닿았는지 확인하지 못한 요청이면, 지금 «이미 반영»으로 보이는 것은 이 화면의 로컬 캐시일 뿐이다 — 지우지 않는다 */
+      if(_erpQuoteUnlanded[key]) return await stop('이 화면에서 저장했지만 서버에 닿았는지 확인하지 못했습니다 — 화면을 새로고침한 뒤 다시 시도해 주세요(서버에 이미 있으면 그때 자동으로 정리됩니다)');
+      await drop(); return { lane:'quote', noop:plan.why };
+    }
     if(plan.action === 'blocked') return await stop(plan.why);
     if(plan.action === 'advance'){
       clearWrite();
       if(!patchOne(plan.target.id, { status:'review', orderTs:Date.now() })) return await stop('계약관리가 저장을 막았습니다 (월 잠금 등)');
-      if(!(await landed(takeWrite()))) return await stop(NOT_LANDED);
+      if(!(await settle())) return await stop(NOT_LANDED);
       await drop();
       return { lane:'quote', advanced:plan.target };
     }
@@ -26406,7 +26421,7 @@ function ContractManagement(props){
       if(plan.mark && !t.compare) upd.compare = { state:'wait' };   // 비교견적서가 붙어 나간 메일 — 사람이 «선정»할 건으로 표시
       clearWrite();
       if(!persistOne(upd)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
-      if(!(await landed(takeWrite()))) return await stop(NOT_LANDED);
+      if(!(await settle())) return await stop(NOT_LANDED);
       await drop();
       return { lane:'quote', attached:t };
     }
@@ -26423,7 +26438,7 @@ function ContractManagement(props){
     });
     clearWrite();
     if(!persistOne(newOne)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
-    if(!(await landed(takeWrite()))) return await stop(NOT_LANDED);
+    if(!(await settle())) return await stop(NOT_LANDED);
     await drop();
     return { lane:'quote', made:newOne };
   }
