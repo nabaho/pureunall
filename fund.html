@@ -163,6 +163,29 @@
   .fcold{color:var(--danger);font-size:10.5px;font-weight:400}
   @media(max-width:860px){ .row.sdtabs{flex-wrap:nowrap;overflow-x:auto;gap:0}.row.sdtabs button{white-space:nowrap;padding:5px 6px!important;font-size:12px} }   /* 폰 — 탭은 한 줄(넘치면 옆으로 밀어 본다) */
   @media print{.fcv.fcnew,.fcv.fcchg{color:#000!important;font-weight:400}.fcold{display:none}}
+  .pmdoc tr.pmsec{background:#e2e8f0}   /* 단계 줄 배경은 줄(tr)에 — 폰에서 줄이 flex 로 바뀌어도 끊기지 않는다 */
+  /* ✉ 기업에 설립시 준비서류 — 폰에서는 줄마다 «카드»(☐·번호는 왼쪽 끝, 받는 사람은 한 줄 꽉, 단추는 오른쪽 끝). PC 는 그대로 */
+  @media(max-width:860px){
+    .pmco select,.pmco input[type=text],#pmSubj,#pmBody{font-size:16px!important}
+    .pmco table,.pmco tbody,.pmco tr,.pmco td,.pmdoc table,.pmdoc tbody,.pmdoc tr,.pmdoc td{display:block}
+    .pmco thead{display:none}
+    .pmco td.pmempty{padding:14px!important}
+    .pmco button{padding:7px 12px!important;font-size:13px}
+    .pmco input[type=checkbox],.pmdoc input[type=checkbox]{width:20px;height:20px}
+    .pmco tr,.pmdoc tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:6px;border-bottom:1px solid var(--line)}
+    .pmco td,.pmdoc td{border:0!important;padding:0!important;max-width:none!important}
+    .pmco td:nth-child(3){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .pmco td:nth-child(7){order:3}
+    .pmco td:nth-child(4){order:4;flex:1 1 100%}
+    .pmco td:nth-child(4)>span{flex-wrap:wrap;width:100%;gap:6px}
+    .pmco td:nth-child(4) select,.pmco td:nth-child(4) input{flex:1 1 100%;min-width:0;width:100%!important;max-width:none!important}
+    .pmco td:nth-child(5){order:5}
+    .pmco td:nth-child(6){order:6}
+    .pmco td:nth-child(8){order:7;margin-left:auto}
+    .pmdoc td:nth-child(4){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pmdoc td:nth-child(5){order:4}
+    .pmdoc td:nth-child(3){order:5;flex:1 1 100%;padding-left:64px!important}
+  }
   /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
   @media(min-width:1850px){
     .closesplit.hasside{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;align-items:start}
@@ -12554,7 +12577,9 @@ function _sdBoard(f,st){
   return '<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
     +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
     +(fc&&fc.nForm?'<span class="chip dg" style="font-size:10.5px">🔴 서식 '+fc.nForm+'</span>':'')+ciChip(fid)
-    +'<span style="flex:1"></span><button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
+    +(_pmSentN(f,SD.sites[fid])?'<span class="chip ok" style="font-size:10.5px" title="기업에 설립시 준비서류 요청 메일을 «보냈음»으로 표시한 곳">✉ 준비서류 '+_pmSentN(f,SD.sites[fid])+'곳 보냄</span>':'')
+    +'<span style="flex:1"></span><button data-fid="'+esc(fid)+'" onclick="pmOpen(this.dataset.fid)" title="설립에 필요한 서류와 함께 정할 사항을 정리해 기업에 보내는 메일을 만듭니다 — 기업 정보·받는 사람은 기업정보함에서">✉ 기업에 설립시 준비서류</button>'
+    +'<button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
     +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
     +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin:10px 0">'
       +'<span>지금 할 일</span><b style="font-size:14px">'+_sdNo(nx[0])+' '+esc(nx[1])+due+'</b><span style="flex:1"></span>'+act+'</div>'
@@ -12676,6 +12701,348 @@ function sdBundle(fid,phase){
     if(S.view==='fund'&&S.fundId===fid&&S.tab==='docs'&&$('formSide')) return estabBundle(phase);
     if(Date.now()-t0<8000) setTimeout(tick,200);
   })();
+}
+/* ══ ✉ 기업에 설립시 준비서류 보내기 (대표 지시 2026-11-09 「기업에 요청해야 되는 서류·관련 사항을 메일로 한번에 · 기업정보는 기업정보함에서」) ══
+   설립 준비 중인 기금의 참여사업장(기업)에 «달라고 해야 할 서류와 함께 정할 사항»을 한 통으로 정리해 푸른메일함 쓰기 창에 채워 연다.
+   · 서류 목록은 새로 짓지 않는다 — 서식 탭의 «기업 준비·첨부서류 목록»(REQ_DOCS ①인가 ②등기 ③세무·은행)을 그대로 쓴다.
+     준비처가 «기금법인»인 줄은 우리가 진행하는 일이라 기본으로 빼고, 서식 탭에서 이미 «확인»한 서류도 기본으로 뺀다(□ 로 다시 넣는다).
+   · 기업 정보(상호·대표자·사업자등록번호·소재지)와 받는 사람은 기업정보함에서 가져온다 — 사업자등록증 카드(_siteCardMatch) · 같은 회사 명함 · 회사 메일(coInfo).
+     참여사업장에 적힌 담당자가 맨 앞이고, 못 찾은 값은 비운다(짐작으로 채우지 않는다). 읽기만 한다.
+   · 기업정보함에 사업자등록증이 이미 있는 회사에는 «사업자등록증 사본»을 달라고 하지 않는다.
+   · 앱은 메일을 «보내지 않는다» — 받는 사람·제목·본문을 푸른메일함 쓰기 창에 채워 열고, 보내기는 메일함에서 사람이 누른다(결산 후 진행 flowMail 과 같은 길).
+     본문이 길어 주소에는 싣지 않는다 — 떠 있는 쓰기 창에 직접 넘기고, 안 되면 받는이·제목만 주소로 싣고 본문은 복사해 둔다.
+   · 쓰는 곳은 [✔ 보냈음 표시]를 눌렀을 때의 funds/{기금}/prep_mail/{사업장} 한 줄(날짜·누른 사람)과 감사 기록(_audit)뿐이다. 받는 주소는 남기지 않는다.
+   ⚠ 문안은 초안이다 — 메일함 쓰기 창에서 담당자가 읽고 고쳐 보낸다. */
+var PM=null;   // 열려 있는 창의 상태 {fid,f,rows,secs,sel,cur,cardsErr,loading,shown}
+/* 단계 · 메일에 쓸 제목 · 시기 설명(앱이 이미 아는 말만 — 등기는 인가증 받은 날부터 3주, 서류 발급 3개월은 서식 탭 문구 그대로) */
+var PM_PH=[['inka','지금 준비해 주실 서류 — 노동부 설립인가 신청용','설립인가신청서(별지 제7호)에 붙이는 서류입니다.'],
+  ['reg','설립인가를 받은 뒤 준비해 주실 서류 — 법인 설립등기용','설립인가증을 받은 날부터 3주 이내에 등기를 신청해야 합니다. 발급일부터 3개월 이내의 것이어야 하는 서류는 인가를 받은 직후에 발급받아 주세요.'],
+  ['tax','설립등기를 마친 뒤 준비해 주실 서류 — 고유번호증 발급·은행 계좌개설용','세무서 고유번호증 발급과 은행 계좌개설에 필요합니다. 미리 알아 두시도록 함께 적었습니다.']];
+var PM_SHORT={inka:'① 지금 — 노동부 인가', reg:'② 인가 뒤 — 법인 등기', tax:'③ 등기 뒤 — 세무·은행'};
+var PM_MAIL_RE=/^[^\s@,;<>"'()]+@[^\s@,;<>"'()]+\.[^\s@,;<>"'()]+$/;
+var PM_SRC={site:'참여사업장 담당자', card:'기업정보함 명함', co:'기업정보함 회사 메일', hand:'직접 입력'};
+/* 준비처는 «기금법인»(우리가 서류를 만들어 진행)이지만 도장 준비·날인·납부처럼 «기업 쪽 협조»가 꼭 필요한 줄 — 기본으로 요청에 넣고
+   메일에서는 «협조해 주실 사항»으로 따로 적는다(2026-11-09 대표 지적 「인가·등기 때 사업장이 준비할 부분이 왜 없나」).
+   설립인가증 원본·인가 정관 간인은 사업장이 할 일이 없어 넣지 않았다. ③ 세무·은행의 대표자 신분증·도장 줄도 이번에는 넣지 않았다 — 필요하면 여기에 더한다. */
+var PM_COOP={inka_fseal:1, reg_fseal:1, reg_minutes:1, reg_taxfee:1, reg_sealcard:1};
+var PM_COOP_TAG={inka:'인가 신청 때', reg:'법인 설립등기 때'};
+var PM_COOP_LABEL='도장·날인·납부 등 협조해 주실 사항';
+var PM_COOP_NOTE='아래 서류는 저희가 작성·신청을 진행하지만, 도장 준비·날인·납부에는 기업의 협조가 필요합니다. 일정은 따로 조율해 주세요.';
+var PM_UI={help:'setup.prepmail'};   // 이 창이 펼치는 도움말 항목(HELP) — 공용 hlp() 는 창을 겹쳐 띄워 쓰지 않는다
+function _pmId(s){ return String(s==null?'':s).replace(/[^\w-]/g,''); }
+/* 요청할 서류 — 설립 3단계(REQ_DOCS)를 그대로. ask: 기업이 준비할 줄(준비처가 «기금법인»이 아닌 것) · got: 서식 탭에서 이미 확인한 것 · on: 기본으로 고른 것 */
+function _pmDocs(ftype,chk){
+  chk=chk||{};
+  return PM_PH.map(function(p){
+    var mp=chk[p[0]]||{};
+    return {ph:p[0], label:p[1], note:p[2], docs:reqDocsFor(p[0],ftype).map(function(d){
+      var coop=!!PM_COOP[d.id], ask=String(d.who||'').trim()!=='기금법인'||coop, got=!!mp[d.id];
+      return {id:d.id, ph:p[0], title:String(d.title||''), desc:String(d.desc||''), who:String(d.who||''), ask:ask, coop:coop, got:got, on:ask&&!got, siteBiz:d.id==='inka_bizreg'};
+    })};
+  });
+}
+/* 받는 사람 후보 — 참여사업장 담당자(대표 연락처가 맨 앞) → 기업정보함 같은 회사 명함 → 기업정보함 회사 메일. 이메일 꼴이 아니면 버리고 같은 주소는 한 번만 */
+function _pmCands(site,cards,co){
+  var out=[], seen={};
+  var add=function(email,name,pos,src){
+    email=String(email==null?'':email).trim(); if(!PM_MAIL_RE.test(email)) return;
+    var k=email.toLowerCase(); if(seen[k]) return; seen[k]=1;
+    out.push({email:email, name:String(name==null?'':name).trim(), pos:String(pos==null?'':pos).trim(), src:src});
+  };
+  var pc=_primaryContact(site||{}), ord=pc.list.map(function(c,i){ return i; });
+  if(pc.idx>0){ ord.splice(ord.indexOf(pc.idx),1); ord.unshift(pc.idx); }
+  ord.forEach(function(i){ var c=pc.list[i]||{}; add(c.email,c.name,c.position||c.title,'site'); });
+  (cards||[]).forEach(function(r){ add(r&&r.e, r&&r.n, r&&r.ti, 'card'); });
+  if(co) add(co.e,'','','co');
+  return out;
+}
+/* 메일에 적는 «기업 정보» — 기업정보함 값이 먼저, 없으면 참여사업장에 적힌 값. 빈 줄은 뺀다(빈칸을 «미정»으로 메우지 않는다) */
+function _pmInfo(site,biz,co){
+  site=site||{}; biz=biz||{}; co=co||{};
+  var pick=function(){ for(var i=0;i<arguments.length;i++){ var v=String(arguments[i]==null?'':arguments[i]).trim(); if(v) return v; } return ''; };
+  var bz=pick(biz.bz,co.bz,site.biz_no), d=bz.replace(/\D/g,'');
+  if(d.length===10) bz=d.slice(0,3)+'-'+d.slice(3,5)+'-'+d.slice(5);   // 사업자등록번호는 000-00-00000 로
+  return [['상호',pick(biz.c,site.name)],['대표자',pick(biz.ceo,co.ceo,site.ceo)],['사업자등록번호',bz],['소재지',pick(biz.ad,co.ad,site.address)]]
+    .filter(function(r){ return !!r[1]; });
+}
+/* 메일 한 통의 제목·본문 — 순수 함수(검사 대상). o={name,pos,mgr,info,secs:[{label,note,docs:[{title,desc,who}]}]} */
+function pmText(f,co,o){
+  f=f||{}; o=o||{};
+  var fn=String(f.name||f.short_name||'기금').trim()+(f.name_temp?'(가칭)':''), cn=String(co==null?'':co).trim();
+  var who=o.name?(String(o.name).trim()+(o.pos?' '+String(o.pos).trim():'')+'님'):(cn?cn+' 담당자님':'');
+  var L=[(who?who+' ':'')+'안녕하세요.', o.mgr?('푸른노무법인 '+o.mgr+'입니다.'):'푸른노무법인입니다.','',
+    fn+' 설립을 위해 기업에서 준비해 주셔야 할 서류와 함께 정할 사항을 정리해 보내드립니다.',
+    '서류마다 필요한 시기가 달라 「지금 준비할 것」과 「인가·등기 뒤에 준비할 것」으로 나누어 적었습니다.'];
+  if(o.info&&o.info.length){
+    L.push('','■ 기업 정보 확인','푸른노무법인에 등록된 귀사 정보입니다. 다른 부분이 있으면 알려 주세요.');
+    o.info.forEach(function(r){ L.push('- '+r[0]+': '+r[1]); });
+  }
+  var n=0;
+  (o.secs||[]).forEach(function(s){
+    if(!s||!s.docs||!s.docs.length) return;
+    n++; L.push('','■ '+n+'. '+s.label); if(s.note) L.push(s.note);
+    s.docs.forEach(function(d,i){ var tg=(d.tag!==undefined)?d.tag:(d.who?'준비: '+d.who:''); L.push((i+1)+') '+d.title+(tg?'  ('+tg+')':''), '   - '+d.desc); });
+  });
+  L.push('','■ 함께 정해 주실 사항',
+    '- 설립준비위원: 사용자측과 근로자측 위원을 같은 수로 정해 성명·직책을 알려 주세요.',
+    '- 출연 계획: 출연할 금액과 출연 예정일을 알려 주세요.',
+    '- 정관·설립합의서·회의록 등 설립 서식은 저희가 작성해 보내드립니다. 검토하신 뒤 설립준비위원회 회의와 날인 일정을 정해 주세요.',
+    '','서류는 준비되는 대로 스캔본(PDF)이나 사진으로 이 메일에 회신해 주시면 됩니다. 이미 갖고 계신 서류나 해당되지 않는 항목이 있으면 알려 주세요.',
+    '궁금하신 점은 편하게 연락 주십시오. 감사합니다.','','푸른노무법인 드림');
+  /* 기금 이름에 회사 이름이 이미 들어 있으면(사내기금) 제목에 회사 이름을 또 붙이지 않는다 */
+  var cp=cn.replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s/g,''), dup=!!cp&&fn.replace(/\s/g,'').indexOf(cp)>=0;
+  return {subject:'[푸른노무법인] '+((cn&&!dup)?cn+' ':'')+fn+' 설립 시 준비서류 안내 및 요청', body:L.join('\n')};
+}
+/* 푸른메일함 쓰기 창 주소 — 받는이·이름·제목만(본문은 주소에 싣지 않는다: 길고, 주소창·기록에 남는다) */
+function pmMailUrl(to,name,subject){
+  return 'pu-cards.html?view=mail&to='+encodeURIComponent(to||'')+'&name='+encodeURIComponent(name||'')+'&subject='+encodeURIComponent(subject||'');
+}
+/* 참여사업장 하나의 줄 — 기업정보함 카드·같은 회사 명함·회사 메일로 받는 사람과 기업 정보를 채운다 */
+function _pmRow(site,idx,co,fund){
+  site=site||{};
+  var biz=(idx&&idx.length)?_siteCardMatch(site,idx):null;
+  var key=_cardFundKey(biz?biz.c:site.name);
+  var cards=(key.length>=3)?(idx||[]).filter(function(r){ return r.k==='card'&&_cardFundKey(r.c)===key; }):[];
+  var cands=_pmCands(site,cards,co), sent=(((fund||{}).prep_mail||{})[site._id])||null;
+  return {sid:String(site._id||''), name:String(site.name||'').trim(), site:site, biz:!!biz, nCard:cards.length, co:co||{},
+    cands:cands, pick:cands.length?0:-1, manual:'', on:!sent, info:_pmInfo(site,biz,co), sent:sent};
+}
+function _pmTo(r){
+  if(!r) return {email:'',name:'',pos:'',src:'hand'};
+  var c=(r.pick>=0)?r.cands[r.pick]:null;
+  return c||{email:String(r.manual||'').trim(), name:'', pos:'', src:'hand'};
+}
+function _pmK(r){ return r.key||_pmId(r.sid); }   // 화면 번호 — 줄마다 "r0·r1…" 로 따로 매긴다(사업장 키를 걸러 쓰면 서로 다른 키가 같아져 엉뚱한 기업에 적용될 수 있다)
+function _pmRowOf(P,k){ var a=(P&&P.rows)||[]; for(var i=0;i<a.length;i++) if(a[i].key===k||a[i].sid===k) return a[i]; return null; }
+/* 이 기업에 보낼 메일 — 고른 서류에서, 기업정보함에 사업자등록증이 이미 있는 회사는 «사업자등록증 사본»을 뺀다 */
+function _pmMail(P,r){
+  var to=_pmTo(r), nDoc=0, coop=[], secs=P.secs.map(function(s){
+    var docs=[];
+    s.docs.forEach(function(d){
+      if(!P.sel[d.id]||(d.siteBiz&&r.biz)) return;
+      /* 협조 항목은 단계별 서류와 섞지 않고 «협조해 주실 사항» 한 단락으로 — 그 서류의 준비처(기금법인)를 기업에 «준비하라»고 적지 않는다 */
+      if(d.coop) coop.push({title:d.title, desc:d.desc, who:d.who, tag:PM_COOP_TAG[s.ph]?'시기: '+PM_COOP_TAG[s.ph]:''});
+      else docs.push(d);
+    });
+    nDoc+=docs.length; return {label:s.label, note:s.note, docs:docs};
+  });
+  if(coop.length){ nDoc+=coop.length; secs.push({label:PM_COOP_LABEL, note:PM_COOP_NOTE, docs:coop}); }
+  var f=P.f, t=pmText(f,r.name,{name:to.name, pos:to.pos, mgr:(f.mgr_main&&f.mgr_main.name)||f.manager||'', info:r.info, secs:secs});
+  return {to:to.email, name:r.name, subject:t.subject, body:t.body, nDoc:nDoc};
+}
+function _pmCopy(txt){ try{ return navigator.clipboard.writeText(txt).then(function(){ return true; },function(){ return false; }); }catch(e){ return Promise.resolve(false); } }
+/* 푸른메일함 쓰기 창을 «채워서» 연다 — 떠 있는 창에 직접 넘기고(주소 길이 한도 없음), 안 되면 받는이·제목만 주소로 싣고 본문은 복사.
+   ⚠ 복사는 창을 열기 «전에» 시작한다 — 열고 나면 이 쪽이 초점을 잃어 복사를 거절당한다. */
+function _pmOpenMail(m){
+  var copyP=_pmCopy(m.body), w=null, ok=false;
+  try{ w=window.open('','puMailWrite'); }catch(e){ w=null; }
+  if(!w){ toast('쓰기 창이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn'); return; }
+  try{ if(w!==window&&typeof w.puMailComposeTo==='function') ok=!!w.puMailComposeTo({card:'',to:m.to,name:m.name,subject:m.subject,body:m.body}); }catch(e){ ok=false; }
+  if(!ok){
+    var u=pmMailUrl(m.to,m.name,m.subject);
+    try{ w.location.href=u; }catch(e){ try{ w=window.open(u,'puMailWrite')||w; }catch(x){} }
+  }
+  try{ w.focus(); }catch(e){}
+  copyP.then(function(copied){
+    if(ok) toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — 읽어 보고 보내세요');
+    else toast(copied?'쓰기 창을 열었습니다 — 본문은 복사해 두었으니 붙여 넣으세요':'쓰기 창을 열었습니다 — 본문은 [📋 제목·본문 복사]로 복사해 붙여 넣으세요',copied?undefined:'warn');
+  });
+}
+function pmOpen(fid){
+  var f=funds[fid]; if(!f){ toast('기금을 찾을 수 없습니다','warn'); return; }
+  f=Object.assign({},f,{_id:fid});
+  var secs=_pmDocs(f.fund_type,null), sel={};
+  secs.forEach(function(s){ s.docs.forEach(function(d){ sel[d.id]=d.on; }); });
+  var P=PM={fid:fid, f:f, rows:null, secs:secs, sel:sel, cur:'', cardsErr:'', loading:true, shown:false};
+  pmRender();
+  var idxP=loadCardIdx().then(function(x){ return x||[]; },function(e){ P.cardsErr=String((e&&e.message)||'읽지 못했습니다'); return []; });
+  return Promise.all([_loadSites(fid), idxP, fbDb.ref(NS+'/req_docs/'+fid).once('value').then(function(s){ return s.val()||{}; },function(){ return {}; })]).then(function(a){
+    var sites=a[0]||[], idx=a[1]||[], chk=a[2]||{};
+    if(PM!==P) return null;
+    P.secs=_pmDocs(f.fund_type,chk); P.sel={}; P.secs.forEach(function(s){ s.docs.forEach(function(d){ P.sel[d.id]=d.on; }); });
+    /* 참여사업장이 아직 없으면(설립 초기) 기금 이름에서 뗀 회사 하나 — 기업정보함에서 이름으로 찾는다 */
+    if(!sites.length){
+      var co=String(f.name||f.short_name||'').replace(/\s*(사내|공동)?\s*근로복지기금.*$/,'').replace(/㈜|\(주\)|주식회사/g,'').trim();
+      if(co) sites=[{_id:'_fund', name:co}];
+    }
+    return Promise.all(sites.map(function(s){
+      var biz=idx.length?_siteCardMatch(s,idx):null;
+      return loadCardCo(biz||{c:s.name, bz:s.biz_no}).catch(function(){ return {}; }).then(function(co){ return _pmRow(s,idx,co,f); });
+    }));
+  }).then(function(rows){
+    if(!rows||PM!==P) return;
+    rows.forEach(function(r,i){ r.key='r'+i; });   // 화면 번호(걸러 쓰지 않는다)
+    P.rows=rows; P.loading=false;
+    var first=rows.filter(function(r){ return r.on; })[0]||rows[0]; P.cur=first?first.sid:'';
+    pmRender();
+  }).catch(function(e){ if(PM===P){ P.loading=false; P.rows=[]; P.cardsErr=String((e&&e.message)||e); pmRender(); } });
+}
+function _pmHTML(P){
+  var f=P.f, fid=P.fid;
+  var head='<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px;overflow-wrap:anywhere">✉ 기업에 설립시 준비서류 — '+esc(f.short_name||f.name||fid)+'</h2>'
+    +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span>'
+    /* ⓘ 는 «이 창 안»에서 펼친다 — 공용 showHelp 는 창을 겹쳐 띄워, 닫을 때 «뒤» 준비서류 창이 먼저 닫힌다(closeM 은 첫 #modalbg 를 지운다) */
+    +'<button class="hbtn" id="pmHelpBtn" aria-expanded="'+(P.help?'true':'false')+'" aria-controls="pmHelp" onclick="pmHelp()" title="설명 보기 — 이 창 안에서 펼칩니다">ⓘ</button>'
+    +'<span style="flex:1"></span><button onclick="pmBack()">← 진행판</button><button onclick="closeM()">✕ 닫기</button></div>'
+    +'<div class="muted" style="font-size:12px;margin:6px 0 10px">푸른메일함 쓰기 창에 받는 사람·제목·본문을 채워 엽니다 — <b>보내기는 메일함에서 직접</b> 누릅니다. 기업 정보와 받는 사람은 기업정보함에서 가져옵니다.</div>'
+    +'<div id="pmHelp" class="helpbody" style="display:'+(P.help?'block':'none')+';background:var(--acc-soft);border-radius:9px;padding:8px 12px;margin:0 0 10px">'+((typeof HELP!=='undefined'&&HELP[PM_UI.help])?HELP[PM_UI.help].h:'')+'</div>';
+  if(P.loading||!P.rows) return head+'<div class="muted" style="padding:14px 2px">참여사업장과 기업정보함을 읽는 중…</div>';
+  var rows=P.rows, nOn=rows.filter(function(r){ return r.on; }).length, nSent=rows.filter(function(r){ return !!r.sent; }).length;
+  var recv=function(r){
+    var id=_pmK(r);
+    var opts=r.cands.map(function(c,i){ return '<option value="'+i+'"'+(r.pick===i?' selected':'')+'>'+esc((c.name?c.name+(c.pos?' '+c.pos:'')+' · ':'')+c.email+' — '+PM_SRC[c.src])+'</option>'; }).join('')
+      +'<option value="-1"'+(r.pick<0?' selected':'')+'>'+(r.cands.length?'직접 입력…':'직접 입력 — 이메일이 없습니다')+'</option>';
+    return '<span style="display:inline-flex;gap:4px;align-items:center;white-space:nowrap"><select data-pmk="rs_'+id+'" onchange="pmPick(\''+id+'\',this.value)" style="width:'+(r.pick<0?'96':'236')+'px" aria-label="'+esc((r.name||'기업')+' 받는 사람')+'" title="'+esc(_pmTo(r).email||'')+'">'+opts+'</select>'
+      +(r.pick<0?'<input type="text" value="'+esc(r.manual)+'" oninput="pmManual(\''+id+'\',this.value)" onchange="pmManual(\''+id+'\',this.value)" placeholder="이메일 주소" aria-label="'+esc((r.name||'기업')+' 받는 사람 이메일 직접 입력')+'" style="width:136px;font-size:16px">':'')+'</span>';
+  };
+  var body=rows.map(function(r,i){
+    var id=_pmK(r), m=_pmMail(P,r), cur=r.sid===P.cur;
+    return '<tr id="pmR_'+id+'"'+(cur?' style="background:var(--acc-soft)" aria-current="true"':'')+'><td class="ckcol"><input type="checkbox" data-pmk="rt_'+id+'"'+(r.on?' checked':'')+' aria-label="'+esc((r.name||'기업')+' 메일 쓸 기업으로 고르기')+'" onchange="pmTick(\''+id+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
+      +'<td tabindex="0" role="button" data-pmk="rn_'+id+'" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-weight:700" title="'+esc(r.name)+' — 눌러서 아래에서 메일을 미리 봅니다" onclick="pmCur(\''+id+'\')" onkeydown="pmKey(event,\''+id+'\')">'+esc(r.name||'(이름 없음)')+'</td>'
+      +'<td>'+recv(r)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip'+(r.biz?' ok':'')+'" style="font-size:10.5px" title="'+(r.biz?'기업정보함에 사업자등록증이 있어 «사업자등록증 사본»은 요청하지 않습니다':'기업정보함에서 사업자등록증을 찾지 못했습니다 — 사본을 요청합니다')+'">'+(r.biz?'등록증 ✓':'등록증 없음')+'</span> <span class="muted" style="font-size:11px">명함 '+r.nCard+'</span></td>'
+      +'<td id="pmN_'+id+'" style="white-space:nowrap"><span class="muted">'+m.nDoc+'종</span></td>'
+      +'<td style="white-space:nowrap">'+(r.sent?'<span class="chip ok" style="font-size:10.5px" title="'+esc((r.sent.by||'')+' '+(r.sent.at||''))+'">✔ '+esc(String(r.sent.at||'').slice(5).replace('-','/'))+'</span>':'<span class="muted">—</span>')+'</td>'
+      +'<td style="white-space:nowrap"><button class="primary" data-pmk="rw_'+id+'" onclick="pmCompose(\''+id+'\')" style="padding:2px 9px" aria-label="'+esc((r.name||'기업')+' 메일 쓰기 창 열기')+'" title="이 기업의 메일을 푸른메일함 쓰기 창에 채워 엽니다">✉ 쓰기</button> '
+      +'<button data-pmk="rd_'+id+'" onclick="pmSent(\''+id+'\','+(r.sent?'false':'true')+')" style="padding:2px 9px" aria-label="'+esc((r.name||'기업')+(r.sent?' 보냄 표시 취소':' 보냈음 표시'))+'" title="'+(r.sent?'보냄 표시를 취소합니다':'메일함에서 실제로 보낸 뒤 누르세요 — 날짜와 누른 사람만 기록합니다')+'">'+(r.sent?'↩ 취소':'✔ 보냈음')+'</button></td></tr>';
+  }).join('');
+  var co='<div class="row" style="gap:8px;margin:0 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">① 받는 기업</b><span class="chip" style="font-size:10.5px">'+rows.length+'곳</span>'
+    +'<span class="muted" style="font-size:12px">고름 '+nOn+'곳 · 보냄 표시 '+nSent+'곳</span>'
+    +(P.cardsErr?'<span class="chip warn" style="font-size:10.5px" title="'+esc(P.cardsErr)+'">기업정보함을 읽지 못했습니다 — 참여사업장에 적힌 값만 씁니다</span>':'')
+    +'<span style="flex:1"></span><button class="primary" data-pmk="nx" onclick="pmNext()" title="고른 기업 가운데 아직 보냄 표시가 없는 다음 곳의 쓰기 창을 엽니다">▶ 다음 기업 메일 쓰기</button></div>'
+    +'<div class="pmco" id="pmCo" style="overflow:auto;max-height:360px;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox"'+(nOn&&nOn===rows.length?' checked':'')+' title="모두 짚기" data-pmk="ha" aria-label="받는 기업 모두 고르기" onclick="pmTickAll(this.checked)"></th><th style="width:36px">#</th><th>기업</th><th>받는 사람 (기업정보함)</th><th>기업정보함</th><th>요청</th><th>보냄</th><th></th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="8" class="center muted pmempty" style="padding:14px">참여사업장이 없습니다 — 참여사업장 탭에 기업을 먼저 등록해 주세요.</td></tr>')+'</tbody></table></div>';
+  var docs='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">② 요청할 서류</b><span class="muted" style="font-size:12px">기금법인이 준비하는 서류와 서식 탭에서 이미 확인한 서류는 기본으로 뺐습니다 — 도장·날인·납부처럼 기업 협조가 필요한 줄(협조)은 넣었습니다</span></div>'
+    +'<div id="pmDocs" class="pmdoc" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><tbody>'
+    +P.secs.map(function(s){
+      var nOnS=s.docs.filter(function(d){ return P.sel[d.id]; }).length;
+      return '<tr class="pmsec"><td class="ckcol"><input type="checkbox" data-pmk="sc_'+s.ph+'" id="pmSck_'+s.ph+'"'+(nOnS&&nOnS===s.docs.length?' checked':'')+' title="이 단계 모두 짚기" aria-label="'+esc((PM_SHORT[s.ph]||s.ph)+' 서류 모두 고르기')+'" onclick="pmDocAll(\''+s.ph+'\',this.checked)"></td>'
+        +'<td colspan="4" style="font-weight:700;font-size:11.5px;white-space:nowrap">'+esc(PM_SHORT[s.ph]||s.ph)+' <span class="muted" style="font-weight:400" id="pmS_'+s.ph+'">'+nOnS+'/'+s.docs.length+'종</span></td></tr>'
+        +s.docs.map(function(d,i){
+          var st=d.got?'<span class="chip ok" style="font-size:10px" title="서식 탭에서 이미 확인한 서류입니다">받음</span>'
+            :d.coop?'<span class="chip warn" style="font-size:10px" title="준비처는 기금법인이지만 도장 준비·날인·납부에 기업의 협조가 필요해 메일에 «협조해 주실 사항»으로 넣습니다">협조</span>'
+            :!d.ask?'<span class="chip" style="font-size:10px" title="준비처가 기금법인 — 우리가 진행하는 서류라 기본으로 요청하지 않습니다">우리 진행</span>':'';
+          return '<tr><td class="ckcol"><input type="checkbox" data-pmk="d_'+_pmId(d.id)+'"'+(P.sel[d.id]?' checked':'')+' aria-label="'+esc(d.title+' 요청에 넣기')+'" onchange="pmDoc(\''+_pmId(d.id)+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
+            +'<td style="white-space:nowrap"><span class="muted" style="font-size:11px">'+esc(d.who)+'</span></td>'
+            +'<td style="max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.title+' — '+d.desc)+'">'+esc(d.title)+'</td>'
+            +'<td style="white-space:nowrap">'+st+'</td></tr>';
+        }).join('');
+    }).join('')+'</tbody></table></div>';
+  var cr=_pmRowOf(P,P.cur)||rows[0], m=cr?_pmMail(P,cr):null;
+  var pv='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">③ 메일 미리보기</b><span class="muted" id="pmWho" style="font-size:12px;overflow-wrap:anywhere">'+_pmWho(cr,m)+'</span>'
+    +'<span style="flex:1"></span><button onclick="pmCopy()" style="white-space:nowrap" title="받는 사람·제목·본문을 복사합니다">📋 제목·본문 복사</button></div>'
+    +'<input id="pmSubj" readonly aria-label="메일 제목(읽기 전용)" value="'+esc(m?m.subject:'')+'" style="width:100%;margin:0 0 4px;font-size:16px">'
+    +'<textarea id="pmBody" readonly aria-label="메일 본문(읽기 전용)" rows="12" style="width:100%;font-size:12.5px;font-family:inherit;word-break:keep-all">'+esc(m?m.body:'')+'</textarea>'
+    +'<div class="muted" style="font-size:11.5px;margin-top:4px">문안을 고치려면 메일함 쓰기 창에서 고칩니다. 이 창에서는 읽기만 됩니다.</div>';
+  return head+co+docs+pv;
+}
+function _pmWho(r,m){
+  if(!r||!m) return '';
+  return esc(r.name)+' — 받는 사람 '+(m.to?esc(m.to):'<b style="color:var(--danger)">이메일 없음</b>')+' · 요청 서류 '+m.nDoc+'종';
+}
+function pmRender(){
+  var P=PM; if(!P) return;
+  var html=_pmHTML(P), box=$('modalbox');
+  if(P.shown&&box){
+    var top=box.scrollTop, ds=$('pmDocs'), dt=ds?ds.scrollTop:0, cs=$('pmCo'), ct=cs?cs.scrollTop:0, fk='';
+    try{ var ae=(typeof document!=='undefined')?document.activeElement:null; fk=(ae&&ae.getAttribute&&ae.getAttribute('data-pmk'))||''; }catch(e){}
+    box.innerHTML=html; box.scrollTop=top;
+    var ds2=$('pmDocs'); if(ds2) ds2.scrollTop=dt;
+    var cs2=$('pmCo'); if(cs2) cs2.scrollTop=ct;   // 기업이 많을 때 스크롤이 맨 위로 튀지 않게
+    /* 키보드로 누르던 칸을 다시 그린 뒤에도 그대로 잡는다 — 안 그러면 Tab 순서가 처음으로 돌아간다 */
+    if(fk&&box.querySelector){ var el=box.querySelector('[data-pmk="'+fk+'"]'); if(el&&el.focus) el.focus(); }
+    return;
+  }
+  closeM();
+  showModal(html,{width:1040,onclose:function(){ if(PM===P) PM=null; }});
+  P.shown=true;
+  var nb=$('modalbox'); if(nb&&nb.setAttribute){ nb.setAttribute('role','dialog'); nb.setAttribute('aria-modal','true'); nb.setAttribute('aria-label','기업에 설립시 준비서류 보내기'); }
+}
+/* 미리보기만 다시 그린다 — 서류 □ 를 누를 때마다 창 전체를 다시 그리면 목록 스크롤이 튄다 */
+function pmPreview(){
+  var P=PM; if(!P||!P.rows) return;
+  var cr=_pmRowOf(P,P.cur)||P.rows[0], m=cr?_pmMail(P,cr):null;
+  var s=$('pmSubj'), b=$('pmBody'), w=$('pmWho');
+  if(s) s.value=m?m.subject:''; if(b) b.value=m?m.body:''; if(w) w.innerHTML=_pmWho(cr,m);
+  /* 서류 □ 를 눌러도 «요청 N종»·단계 머리의 n/m종·단계 □ 가 같이 바뀐다 — 창을 다시 그리지 않고 그 자리만 고친다 */
+  P.rows.forEach(function(r){
+    var id=_pmK(r), n=$('pmN_'+id), t=$('pmR_'+id);
+    if(n) n.innerHTML='<span class="muted">'+_pmMail(P,r).nDoc+'종</span>';
+    var is=(r.sid===(cr&&cr.sid));
+    if(t){ t.style.background=is?'var(--acc-soft)':''; if(t.setAttribute){ if(is) t.setAttribute('aria-current','true'); else t.removeAttribute('aria-current'); } }
+  });
+  P.secs.forEach(function(sc){
+    var k=sc.docs.filter(function(d){ return P.sel[d.id]; }).length, e=$('pmS_'+sc.ph), c=$('pmSck_'+sc.ph);
+    if(e) e.textContent=k+'/'+sc.docs.length+'종'; if(c) c.checked=!!k&&k===sc.docs.length;
+  });
+}
+function pmHelp(){
+  var P=PM; if(!P) return;
+  P.help=!P.help;
+  var e=$('pmHelp'), b=$('pmHelpBtn');
+  if(e) e.style.display=P.help?'block':'none';
+  if(b&&b.setAttribute) b.setAttribute('aria-expanded',P.help?'true':'false');
+}
+function pmKey(e,sid){ if(e&&(e.key==='Enter'||e.key===' ')){ if(e.preventDefault) e.preventDefault(); pmCur(sid); } }
+function pmBack(){
+  var fid=PM&&PM.fid; closeM();
+  if(fid&&funds[fid]){ SD.sel=fid; sdPop(); }
+}
+function pmTick(sid,on){ var r=_pmRowOf(PM,sid); if(r){ r.on=!!on; pmRender(); } }
+function pmTickAll(on){ if(PM&&PM.rows){ PM.rows.forEach(function(r){ r.on=!!on; }); pmRender(); } }
+function pmCur(sid){ var r=_pmRowOf(PM,sid); if(r){ PM.cur=r.sid; pmRender(); } }
+function pmPick(sid,v){ var r=_pmRowOf(PM,sid); if(!r) return; var i=parseInt(v,10); r.pick=(i>=0&&i<r.cands.length)?i:-1; PM.cur=r.sid; pmRender(); }
+function pmManual(sid,v){ var r=_pmRowOf(PM,sid); if(!r) return; r.manual=String(v||'').trim(); r.pick=-1; PM.cur=r.sid; pmPreview(); }   // 다시 그리면 바로 이어 누른 [✉ 쓰기]가 사라진다(칸이 빠지며 click 이 증발)
+function pmDoc(id,on){ if(!PM) return; PM.sel[id]=!!on; pmPreview(); }
+function pmDocAll(ph,on){
+  if(!PM) return;
+  PM.secs.forEach(function(s){ if(s.ph===ph) s.docs.forEach(function(d){ PM.sel[d.id]=!!on; }); });
+  pmRender();
+}
+function pmCopy(){
+  var P=PM; if(!P||!P.rows) return;
+  var cr=_pmRowOf(P,P.cur)||P.rows[0];
+  if(!cr){ toast('복사할 메일이 없습니다 — 받는 기업이 없습니다','warn'); return; }
+  var m=_pmMail(P,cr);
+  _pmCopy((m.to?'받는 사람: '+m.to+'\n':'')+'제목: '+m.subject+'\n\n'+m.body).then(function(ok){ toast(ok?'복사했습니다 — 메일함 쓰기 창에 붙여 넣으세요':'복사하지 못했습니다 — 본문을 직접 복사하세요',ok?undefined:'warn'); });
+}
+/* 한 기업의 메일 쓰기 창을 연다 — 받는 사람이 이메일 꼴이 아니거나 요청할 서류가 없으면 열지 않고 알린다 */
+function pmCompose(sid){
+  var P=PM, r=_pmRowOf(P,sid); if(!r) return;
+  var m=_pmMail(P,r);
+  if(!PM_MAIL_RE.test(m.to)){ toast('«'+r.name+'» 받는 사람 이메일이 없거나 올바르지 않습니다 — 받는 사람 칸에서 고르거나 적어 주세요','warn'); return; }
+  if(!m.nDoc){ toast('요청할 서류를 하나 이상 골라 주세요','warn'); return; }
+  P.cur=r.sid; r.opened=true; _pmOpenMail(m); pmRender();
+}
+/* 고른 기업 가운데 아직 보냄 표시가 없고 «이 창에서 아직 쓰기 창을 안 연» 첫 곳 — 누를 때마다 다음 기업으로 넘어간다 */
+function pmNext(){
+  var P=PM; if(!P||!P.rows) return;
+  if(!P.rows.length){ toast('받는 기업이 없습니다 — 참여사업장 탭에서 기업을 먼저 등록해 주세요','warn'); return; }
+  var todo=P.rows.filter(function(r){ return r.on&&!r.sent; });
+  if(!todo.length){ toast('고른 기업은 모두 보냄 표시가 되어 있습니다','warn'); return; }
+  var nx=todo.filter(function(r){ return !r.opened; })[0];
+  if(!nx){ toast('고른 기업의 쓰기 창을 모두 열었습니다 — 메일함에서 보낸 뒤 [✔ 보냈음]을 눌러 주세요. 다시 열려면 기업 줄의 [✉ 쓰기]를 누르세요','warn'); return; }
+  pmCompose(nx.sid);
+}
+/* [✔ 보냈음] — 메일함에서 실제로 보낸 뒤 사람이 누른다. 날짜와 누른 사람만 남기고 받는 주소는 남기지 않는다 */
+function pmSent(sid,on){
+  var P=PM, r=_pmRowOf(P,sid); if(!r) return;
+  sid=r.sid;   // 화면에서 걸러 넘긴 번호가 아니라 «진짜 사업장 키»로 쓴다
+  P.busy=P.busy||{}; if(P.busy[sid]) return; P.busy[sid]=true;   // 저장이 끝나기 전 두 번 눌러도 한 번만(기록·감사가 겹치지 않게)
+  var fid=P.fid, v=on?{at:ymd(), by:(S.user||'')}:null;
+  fbDb.ref(NS+'/funds/'+fid+'/prep_mail/'+sid).set(v).then(function(){
+    P.busy[sid]=false;
+    var t=funds[fid]; if(t){ t.prep_mail=t.prep_mail||{}; if(v) t.prep_mail[sid]=v; else delete t.prep_mail[sid]; }
+    r.sent=v; if(v) r.on=false;
+    _audit(fid,'설립 준비서류 요청 메일',r.name+(v?' — 보냈음 표시':' — 보냄 표시 취소'));
+    if(PM===P) pmRender();
+    toast(v?'«'+r.name+'» 보냈음으로 표시했습니다':'보냄 표시를 취소했습니다');
+  }).catch(function(e){ P.busy[sid]=false; toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 진행판 칩에 셀 «보냈음 표시한 곳» 수 — 참여사업장이 아직 없을 때 임시로 쓴 줄(_fund)은 실제 사업장이 생기면 세지 않는다 */
+function _pmSentN(f,sites){
+  var m=(f&&f.prep_mail)||{}, hasSites=!!(sites&&sites.length);
+  return Object.keys(m).filter(function(k){ return k!=='_fund'||!hasSites; }).length;
 }
 /* ══ 🖨 서식 자동 채움 · 바뀐 칸 빨강 (대표 승인 2026-11-07 — 목업 «설립중팝업·자동채움·빨간표시» 2~5번) ══
    서식은 열 때마다 «지금 자료»로 새로 채워진다 — 그것이 자동 채움이다. 여기서는 서식을 열지 않고도
@@ -25552,6 +25919,11 @@ var HELP={
  'setup.fill':{t:'서식 자동 채움 · 바뀐 칸 빨강',h:'<p>서식은 열 때마다 <b>지금 자료로 새로 채워집니다.</b> 여기서는 서식을 열지 않고도 마지막으로 사람이 확인한 뒤 <b>새로 들어오거나 바뀐 자료 칸</b>을 빨강으로 보입니다(바뀐 칸은 전 값이 옆에 작게).</p>'
    +'<p>[✔ 확인]은 값을 고치지 않고 «지금 값을 봤다»는 기록만 남깁니다 — 그러면 빨강이 검정으로 돌아갑니다. 🤖(기계가 넣고 원본 대조 전) 칸도 «원본과 맞음»으로 함께 둡니다.</p>'
    +'<p>빨강은 <b>화면 검토용</b>이라 인쇄·PDF·한글 파일에는 나가지 않습니다. 확인하지 않은 빨강이 남아 있으면 인쇄·받기 전에 한 번 묻습니다. 사람이 고쳐 보관한 서식본(✋)은 덮어쓰지 않습니다.</p>'},
+ 'setup.prepmail':{t:'기업에 설립시 준비서류 보내기',h:'<p>설립 준비 중인 기금의 <b>참여사업장(기업)에 달라고 해야 할 서류와 함께 정할 사항</b>을 한 통의 메일로 정리해 푸른메일함 쓰기 창에 채워 엽니다. <b>보내기는 메일함에서 직접</b> 누릅니다 — 앱이 몰래 보내지 않습니다.</p>'
+   +'<p>서류 목록은 서식 탭의 «기업 준비·첨부서류 목록»(① 인가 ② 등기 ③ 세무·은행)과 같습니다. 준비처가 «기금법인»인 줄은 우리가 진행하는 일이라 기본으로 빼고, 서식 탭에서 이미 «확인»한 서류도 기본으로 뺍니다. □ 로 다시 넣을 수 있습니다.</p>'
+   +'<p>다만 준비처가 기금법인이어도 <b>도장 제작·위원 날인·등록면허세 납부·인감카드 준비</b>처럼 기업 협조가 꼭 필요한 줄(«협조» 표시)은 기본으로 넣고, 메일에서는 «도장·날인·납부 등 협조해 주실 사항» 단락으로 따로 적습니다.</p>'
+   +'<p>받는 사람과 기업 정보(상호·대표자·사업자등록번호·소재지)는 <b>기업정보함</b>에서 가져옵니다 — 참여사업장 담당자 · 같은 회사 명함 · 회사 메일 가운데 고릅니다. 기업정보함에 사업자등록증이 이미 있는 회사에는 «사업자등록증 사본»을 달라고 하지 않습니다.</p>'
+   +'<p>문안은 초안입니다 — 메일함 쓰기 창에서 읽고 고쳐 보내세요. 메일을 보낸 뒤 [✔ 보냈음]을 누르면 날짜와 누른 사람만 기록합니다(받는 주소는 남기지 않습니다).</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'
