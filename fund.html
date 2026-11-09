@@ -12721,6 +12721,13 @@ var PM_PH=[['inka','지금 준비해 주실 서류 — 노동부 설립인가 �
 var PM_SHORT={inka:'① 지금 — 노동부 인가', reg:'② 인가 뒤 — 법인 등기', tax:'③ 등기 뒤 — 세무·은행'};
 var PM_MAIL_RE=/^[^\s@,;<>"'()]+@[^\s@,;<>"'()]+\.[^\s@,;<>"'()]+$/;
 var PM_SRC={site:'참여사업장 담당자', card:'기업정보함 명함', co:'기업정보함 회사 메일', hand:'직접 입력'};
+/* 준비처는 «기금법인»(우리가 서류를 만들어 진행)이지만 도장 준비·날인·납부처럼 «기업 쪽 협조»가 꼭 필요한 줄 — 기본으로 요청에 넣고
+   메일에서는 «협조해 주실 사항»으로 따로 적는다(2026-11-09 대표 지적 「인가·등기 때 사업장이 준비할 부분이 왜 없나」).
+   설립인가증 원본·인가 정관 간인은 사업장이 할 일이 없어 넣지 않았다. ③ 세무·은행의 대표자 신분증·도장 줄도 이번에는 넣지 않았다 — 필요하면 여기에 더한다. */
+var PM_COOP={inka_fseal:1, reg_fseal:1, reg_minutes:1, reg_taxfee:1, reg_sealcard:1};
+var PM_COOP_TAG={inka:'인가 신청 때', reg:'법인 설립등기 때'};
+var PM_COOP_LABEL='도장·날인·납부 등 협조해 주실 사항';
+var PM_COOP_NOTE='아래 서류는 저희가 작성·신청을 진행하지만, 도장 준비·날인·납부에는 기업의 협조가 필요합니다. 일정은 따로 조율해 주세요.';
 var PM_UI={help:'setup.prepmail'};   // 이 창이 펼치는 도움말 항목(HELP) — 공용 hlp() 는 창을 겹쳐 띄워 쓰지 않는다
 function _pmId(s){ return String(s==null?'':s).replace(/[^\w-]/g,''); }
 /* 요청할 서류 — 설립 3단계(REQ_DOCS)를 그대로. ask: 기업이 준비할 줄(준비처가 «기금법인»이 아닌 것) · got: 서식 탭에서 이미 확인한 것 · on: 기본으로 고른 것 */
@@ -12729,8 +12736,8 @@ function _pmDocs(ftype,chk){
   return PM_PH.map(function(p){
     var mp=chk[p[0]]||{};
     return {ph:p[0], label:p[1], note:p[2], docs:reqDocsFor(p[0],ftype).map(function(d){
-      var ask=String(d.who||'').trim()!=='기금법인', got=!!mp[d.id];
-      return {id:d.id, ph:p[0], title:String(d.title||''), desc:String(d.desc||''), who:String(d.who||''), ask:ask, got:got, on:ask&&!got, siteBiz:d.id==='inka_bizreg'};
+      var coop=!!PM_COOP[d.id], ask=String(d.who||'').trim()!=='기금법인'||coop, got=!!mp[d.id];
+      return {id:d.id, ph:p[0], title:String(d.title||''), desc:String(d.desc||''), who:String(d.who||''), ask:ask, coop:coop, got:got, on:ask&&!got, siteBiz:d.id==='inka_bizreg'};
     })};
   });
 }
@@ -12774,7 +12781,7 @@ function pmText(f,co,o){
   (o.secs||[]).forEach(function(s){
     if(!s||!s.docs||!s.docs.length) return;
     n++; L.push('','■ '+n+'. '+s.label); if(s.note) L.push(s.note);
-    s.docs.forEach(function(d,i){ L.push((i+1)+') '+d.title+(d.who?'  (준비: '+d.who+')':''), '   - '+d.desc); });
+    s.docs.forEach(function(d,i){ var tg=(d.tag!==undefined)?d.tag:(d.who?'준비: '+d.who:''); L.push((i+1)+') '+d.title+(tg?'  ('+tg+')':''), '   - '+d.desc); });
   });
   L.push('','■ 함께 정해 주실 사항',
     '- 설립준비위원: 사용자측과 근로자측 위원을 같은 수로 정해 성명·직책을 알려 주세요.',
@@ -12809,10 +12816,17 @@ function _pmK(r){ return r.key||_pmId(r.sid); }   // 화면 번호 — 줄마다
 function _pmRowOf(P,k){ var a=(P&&P.rows)||[]; for(var i=0;i<a.length;i++) if(a[i].key===k||a[i].sid===k) return a[i]; return null; }
 /* 이 기업에 보낼 메일 — 고른 서류에서, 기업정보함에 사업자등록증이 이미 있는 회사는 «사업자등록증 사본»을 뺀다 */
 function _pmMail(P,r){
-  var to=_pmTo(r), nDoc=0, secs=P.secs.map(function(s){
-    var docs=s.docs.filter(function(d){ return P.sel[d.id]&&!(d.siteBiz&&r.biz); });
+  var to=_pmTo(r), nDoc=0, coop=[], secs=P.secs.map(function(s){
+    var docs=[];
+    s.docs.forEach(function(d){
+      if(!P.sel[d.id]||(d.siteBiz&&r.biz)) return;
+      /* 협조 항목은 단계별 서류와 섞지 않고 «협조해 주실 사항» 한 단락으로 — 그 서류의 준비처(기금법인)를 기업에 «준비하라»고 적지 않는다 */
+      if(d.coop) coop.push({title:d.title, desc:d.desc, who:d.who, tag:PM_COOP_TAG[s.ph]?'시기: '+PM_COOP_TAG[s.ph]:''});
+      else docs.push(d);
+    });
     nDoc+=docs.length; return {label:s.label, note:s.note, docs:docs};
   });
+  if(coop.length){ nDoc+=coop.length; secs.push({label:PM_COOP_LABEL, note:PM_COOP_NOTE, docs:coop}); }
   var f=P.f, t=pmText(f,r.name,{name:to.name, pos:to.pos, mgr:(f.mgr_main&&f.mgr_main.name)||f.manager||'', info:r.info, secs:secs});
   return {to:to.email, name:r.name, subject:t.subject, body:t.body, nDoc:nDoc};
 }
@@ -12892,13 +12906,13 @@ function _pmHTML(P){
       +'<td style="white-space:nowrap"><button class="primary" data-pmk="rw_'+id+'" onclick="pmCompose(\''+id+'\')" style="padding:2px 9px" aria-label="'+esc((r.name||'기업')+' 메일 쓰기 창 열기')+'" title="이 기업의 메일을 푸른메일함 쓰기 창에 채워 엽니다">✉ 쓰기</button> '
       +'<button data-pmk="rd_'+id+'" onclick="pmSent(\''+id+'\','+(r.sent?'false':'true')+')" style="padding:2px 9px" aria-label="'+esc((r.name||'기업')+(r.sent?' 보냄 표시 취소':' 보냈음 표시'))+'" title="'+(r.sent?'보냄 표시를 취소합니다':'메일함에서 실제로 보낸 뒤 누르세요 — 날짜와 누른 사람만 기록합니다')+'">'+(r.sent?'↩ 취소':'✔ 보냈음')+'</button></td></tr>';
   }).join('');
-  var co='<div class="row" style="gap:8px;margin:0 0 4px"><b style="font-size:13px">① 받는 기업</b><span class="chip" style="font-size:10.5px">'+rows.length+'곳</span>'
+  var co='<div class="row" style="gap:8px;margin:0 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">① 받는 기업</b><span class="chip" style="font-size:10.5px">'+rows.length+'곳</span>'
     +'<span class="muted" style="font-size:12px">고름 '+nOn+'곳 · 보냄 표시 '+nSent+'곳</span>'
     +(P.cardsErr?'<span class="chip warn" style="font-size:10.5px" title="'+esc(P.cardsErr)+'">기업정보함을 읽지 못했습니다 — 참여사업장에 적힌 값만 씁니다</span>':'')
     +'<span style="flex:1"></span><button class="primary" data-pmk="nx" onclick="pmNext()" title="고른 기업 가운데 아직 보냄 표시가 없는 다음 곳의 쓰기 창을 엽니다">▶ 다음 기업 메일 쓰기</button></div>'
     +'<div class="pmco" id="pmCo" style="overflow:auto;max-height:360px;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox"'+(nOn&&nOn===rows.length?' checked':'')+' title="모두 짚기" data-pmk="ha" aria-label="받는 기업 모두 고르기" onclick="pmTickAll(this.checked)"></th><th style="width:36px">#</th><th>기업</th><th>받는 사람 (기업정보함)</th><th>기업정보함</th><th>요청</th><th>보냄</th><th></th></tr></thead><tbody>'
     +(body||'<tr><td colspan="8" class="center muted pmempty" style="padding:14px">참여사업장이 없습니다 — 참여사업장 탭에 기업을 먼저 등록해 주세요.</td></tr>')+'</tbody></table></div>';
-  var docs='<div class="row" style="gap:8px;margin:14px 0 4px"><b style="font-size:13px">② 요청할 서류</b><span class="muted" style="font-size:12px">기금법인이 준비하는 서류와 서식 탭에서 이미 확인한 서류는 기본으로 빼 두었습니다</span></div>'
+  var docs='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">② 요청할 서류</b><span class="muted" style="font-size:12px">기금법인이 준비하는 서류와 서식 탭에서 이미 확인한 서류는 기본으로 뺐습니다 — 도장·날인·납부처럼 기업 협조가 필요한 줄(협조)은 넣었습니다</span></div>'
     +'<div id="pmDocs" class="pmdoc" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><tbody>'
     +P.secs.map(function(s){
       var nOnS=s.docs.filter(function(d){ return P.sel[d.id]; }).length;
@@ -12906,6 +12920,7 @@ function _pmHTML(P){
         +'<td colspan="4" style="font-weight:700;font-size:11.5px;white-space:nowrap">'+esc(PM_SHORT[s.ph]||s.ph)+' <span class="muted" style="font-weight:400" id="pmS_'+s.ph+'">'+nOnS+'/'+s.docs.length+'종</span></td></tr>'
         +s.docs.map(function(d,i){
           var st=d.got?'<span class="chip ok" style="font-size:10px" title="서식 탭에서 이미 확인한 서류입니다">받음</span>'
+            :d.coop?'<span class="chip warn" style="font-size:10px" title="준비처는 기금법인이지만 도장 준비·날인·납부에 기업의 협조가 필요해 메일에 «협조해 주실 사항»으로 넣습니다">협조</span>'
             :!d.ask?'<span class="chip" style="font-size:10px" title="준비처가 기금법인 — 우리가 진행하는 서류라 기본으로 요청하지 않습니다">우리 진행</span>':'';
           return '<tr><td class="ckcol"><input type="checkbox" data-pmk="d_'+_pmId(d.id)+'"'+(P.sel[d.id]?' checked':'')+' aria-label="'+esc(d.title+' 요청에 넣기')+'" onchange="pmDoc(\''+_pmId(d.id)+'\',this.checked)"></td><td class="no">'+(i+1)+'</td>'
             +'<td style="white-space:nowrap"><span class="muted" style="font-size:11px">'+esc(d.who)+'</span></td>'
@@ -12914,8 +12929,8 @@ function _pmHTML(P){
         }).join('');
     }).join('')+'</tbody></table></div>';
   var cr=_pmRowOf(P,P.cur)||rows[0], m=cr?_pmMail(P,cr):null;
-  var pv='<div class="row" style="gap:8px;margin:14px 0 4px"><b style="font-size:13px">③ 메일 미리보기</b><span class="muted" id="pmWho" style="font-size:12px;overflow-wrap:anywhere">'+_pmWho(cr,m)+'</span>'
-    +'<span style="flex:1"></span><button onclick="pmCopy()" title="받는 사람·제목·본문을 복사합니다">📋 제목·본문 복사</button></div>'
+  var pv='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">③ 메일 미리보기</b><span class="muted" id="pmWho" style="font-size:12px;overflow-wrap:anywhere">'+_pmWho(cr,m)+'</span>'
+    +'<span style="flex:1"></span><button onclick="pmCopy()" style="white-space:nowrap" title="받는 사람·제목·본문을 복사합니다">📋 제목·본문 복사</button></div>'
     +'<input id="pmSubj" readonly aria-label="메일 제목(읽기 전용)" value="'+esc(m?m.subject:'')+'" style="width:100%;margin:0 0 4px;font-size:16px">'
     +'<textarea id="pmBody" readonly aria-label="메일 본문(읽기 전용)" rows="12" style="width:100%;font-size:12.5px;font-family:inherit;word-break:keep-all">'+esc(m?m.body:'')+'</textarea>'
     +'<div class="muted" style="font-size:11.5px;margin-top:4px">문안을 고치려면 메일함 쓰기 창에서 고칩니다. 이 창에서는 읽기만 됩니다.</div>';
@@ -25906,6 +25921,7 @@ var HELP={
    +'<p>빨강은 <b>화면 검토용</b>이라 인쇄·PDF·한글 파일에는 나가지 않습니다. 확인하지 않은 빨강이 남아 있으면 인쇄·받기 전에 한 번 묻습니다. 사람이 고쳐 보관한 서식본(✋)은 덮어쓰지 않습니다.</p>'},
  'setup.prepmail':{t:'기업에 설립시 준비서류 보내기',h:'<p>설립 준비 중인 기금의 <b>참여사업장(기업)에 달라고 해야 할 서류와 함께 정할 사항</b>을 한 통의 메일로 정리해 푸른메일함 쓰기 창에 채워 엽니다. <b>보내기는 메일함에서 직접</b> 누릅니다 — 앱이 몰래 보내지 않습니다.</p>'
    +'<p>서류 목록은 서식 탭의 «기업 준비·첨부서류 목록»(① 인가 ② 등기 ③ 세무·은행)과 같습니다. 준비처가 «기금법인»인 줄은 우리가 진행하는 일이라 기본으로 빼고, 서식 탭에서 이미 «확인»한 서류도 기본으로 뺍니다. □ 로 다시 넣을 수 있습니다.</p>'
+   +'<p>다만 준비처가 기금법인이어도 <b>도장 제작·위원 날인·등록면허세 납부·인감카드 준비</b>처럼 기업 협조가 꼭 필요한 줄(«협조» 표시)은 기본으로 넣고, 메일에서는 «도장·날인·납부 등 협조해 주실 사항» 단락으로 따로 적습니다.</p>'
    +'<p>받는 사람과 기업 정보(상호·대표자·사업자등록번호·소재지)는 <b>기업정보함</b>에서 가져옵니다 — 참여사업장 담당자 · 같은 회사 명함 · 회사 메일 가운데 고릅니다. 기업정보함에 사업자등록증이 이미 있는 회사에는 «사업자등록증 사본»을 달라고 하지 않습니다.</p>'
    +'<p>문안은 초안입니다 — 메일함 쓰기 창에서 읽고 고쳐 보내세요. 메일을 보낸 뒤 [✔ 보냈음]을 누르면 날짜와 누른 사람만 기록합니다(받는 주소는 남기지 않습니다).</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
