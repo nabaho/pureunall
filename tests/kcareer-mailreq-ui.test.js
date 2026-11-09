@@ -21,7 +21,7 @@ test('화면 자리 — 모듈 불러오기 · 알림 띠 · 화면 · 옆줄 �
   assert.ok(START > 0 && END > START, '요청 메일 코드 덩어리를 못 찾았다');
   assert.match(html, /<script src="js\/kcareer-mailreq\.js\?v=\d+"><\/script>/);
   assert.match(html, /id="mrBanner"/); assert.match(html, /id="page-mailreq"/); assert.match(html, /id="mrBody"/);
-  assert.match(html, /\{g:'요청 메일', items:\[\['page-mailreq'/, '옆줄에 «요청 메일» 묶음');
+  assert.ok(/\{g:'이력서관리', items:\[(?:\['[^']*','[^']*'\],)*\['page-mailreq','📬 요청 메일'\]\]\}/.test(html), '옆줄 «이력서관리» 묶음 안에 «요청 메일»');
   assert.match(html, /if\(page==='mailreq'\) return[^\n]*mrNavCount/, '옆줄 숫자');
   assert.match(html, /if\(id==='page-mailreq'\)[^\n]*mrEnter/, '화면에 들어오면 다시 그린다');
   assert.match(html, /mrLeave/, '화면을 떠나면 고른 것을 비운다');
@@ -34,11 +34,15 @@ test('시작은 «안전 모드가 아닌» 로그인 분기 안에 있다 — �
   assert.ok(safe > 0 && at - safe < 1500, 'mrStart 가 if(!KC_SAFE){…} 안에 있어야 한다');
   assert.match(BLOCK, /KC_SAFE/, 'mrStart 자신도 안전 모드를 본다');
 });
-test('옆줄 묶음 순서 — 사업관리는 이력서관리 «바로 아래» 그대로(요청 메일은 그 뒤)', () => {
+test('옆줄 — «요청 메일»은 이력서관리 묶음 안(네 번째)이고 따로 묶음이 없다 · 첫 자리(서류 만들기)·사업관리 순서는 그대로', () => {
   const nav = html.slice(html.indexOf('let NAV=['), html.indexOf('];', html.indexOf('let NAV=[')));
-  const i = nav.indexOf("{g:'이력서관리'"), b = nav.indexOf("{g:'사업관리'"), m = nav.indexOf("{g:'요청 메일'");
-  assert.ok(i < b && b < m, '이력서관리 → 사업관리 → 요청 메일');
-  assert.equal(nav.indexOf('{g:', i + 1), b);
+  const i = nav.indexOf("{g:'이력서관리'"), b = nav.indexOf("{g:'사업관리'");
+  const own = nav.slice(i, b);
+  assert.ok(own.indexOf('page-mailreq') > own.indexOf('page-profile1'), '이력서관리 안, 프로필 1장 뒤');
+  assert.ok(own.indexOf("['page-resume-hub'") < own.indexOf("['page-docbox'") && own.indexOf("['page-docbox'") < own.indexOf('page-mailreq'), '첫 자리는 서류 만들기 그대로(묶음을 누르면 거기가 열린다)');
+  assert.ok(nav.indexOf("{g:'요청 메일'") < 0, '요청 메일 따로 묶음이 없다');
+  assert.equal(nav.indexOf('{g:', i + 1), b, '사업관리는 이력서관리 바로 아래');
+  assert.match(html, /function navGroupCount\(g\)\{[\s\S]{0,200}if\(p\[0\]==='page-mailreq'\) return;/, '요청 메일의 진행 중 건수를 이력서관리 숫자에 섞지 않는다(이력서 개수로 읽힌다)');
 });
 test('기기별 설정(알림 켬·띠 닫음)은 자료 통(cm3_*)에 두지 않는다 — 두면 클라우드로 간다', () => {
   assert.ok(!/LS\.(set|get)\([^)]*mailreq/.test(BLOCK), 'LS(cm3_*)에 두지 않는다');
@@ -68,6 +72,9 @@ function world(o) {
   o = o || {};
   const db = liveDb({ mailbox: { folders: { [IN]: { kind: 'inbox' } }, msgs: { [IN]: Object.assign({ '101': mailRow(), '102': mailRow({ s: '회의 일정 공유', an: [], p: '내일 회의', a: 0 }) }, o.msgs || {}) } } });
   const toasts = [], asks = [], timers = [], bodyCalls = [], els = {}, prefs = {};
+  /* 옆줄 숫자 자리 — 이력서관리 상위 단추의 .gcnt(제 부모에 title) · 펼친 묶음의 «요청 메일» 줄 .ncnt */
+  const cls = () => { const s = new Set(); return { toggle: (c, on) => (on ? s.add(c) : s.delete(c)), contains: (c) => s.has(c) }; };
+  const navTop = { textContent: '', classList: cls(), parentNode: { title: '' } }, navSub = { textContent: '', classList: cls() };
   const el = (id) => (els[id] = els[id] || { id, innerHTML: '', textContent: '', style: {}, className: '', checked: false, indeterminate: false, classList: { contains: (c) => (id === 'page-mailreq' ? !!o.onPage : false) }, querySelectorAll: () => [] });
   const ctx = {
     KcareerMailReq: Q, console, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, isNaN, parseFloat,
@@ -82,11 +89,12 @@ function world(o) {
     localStorage: { getItem: (k) => (k in prefs ? prefs[k] : null), setItem: (k, v) => { prefs[k] = String(v); }, removeItem: (k) => { delete prefs[k]; } },
     Notification: undefined,
     document: { hidden: false, title: '경력관리', getElementById: el, addEventListener: () => {}, removeEventListener: () => {},
-      querySelector: () => null, querySelectorAll: () => [] },
+      querySelector: (sel) => (/data-g="이력서관리"\] \.gcnt/.test(sel) ? navTop : (/data-id="page-mailreq"\] \.ncnt/.test(sel) ? navSub : null)), querySelectorAll: () => [] },
+    navInfo: (id) => ({ label: '📬 요청 메일', grp: id === 'page-mailreq' ? '이력서관리' : null }),
   };
   vm.createContext(ctx); vm.runInContext(BLOCK, ctx);
   const run = () => { const q = timers.splice(0); q.forEach((t) => t.fn && t.fn()); };
-  return { ctx, db, toasts, asks, timers, run, bodyCalls, els, prefs, items: () => db.읽기('kcareer/U1/mailreq/items') || {} };
+  return { ctx, db, toasts, asks, timers, run, bodyCalls, els, prefs, navTop, navSub, items: () => db.읽기('kcareer/U1/mailreq/items') || {} };
 }
 const settle = () => new Promise((r) => setImmediate(r));
 async function started(o) { const w = world(o); w.ctx.mrStart(); await settle(); await settle(); await settle(); return w; }
@@ -141,6 +149,16 @@ test('새 요청 알림 — 처음 받은 판은 조용하고 · 새로 나타�
 test('이미 답장한 메일은 «새 요청»으로 울리지 않는다', async () => {
   const w = world({ msgs: { '101': mailRow({ w: 1 }) } }); w.ctx.mrStart(); await settle(); await settle(); await settle(); w.run();
   assert.equal(w.items()[IN + '~101'].st, 'doing'); assert.equal(w.toasts.filter((t) => /새 요청 메일/.test(t)).length, 0);
+});
+test('옆줄 — 알릴 것이 있으면 이력서관리 단추에 붉은 «📬 N» · 묶음 안 «요청 메일» 줄 숫자도 붉게 · 알릴 것이 없으면 건드리지 않는다', async () => {
+  const w = await started(); w.ctx.mrPaintNav();
+  assert.equal(w.navTop.textContent, '📬 1'); assert.ok(w.navTop.classList.contains('mr-alarm'));
+  assert.match(w.navTop.parentNode.title, /^이력서관리 · 요청 메일/);
+  assert.ok(w.navSub.classList.contains('mr-alarm'), '펼친 묶음의 줄 숫자도 붉게');
+  await w.ctx.mrSet([IN + '~101'], 'done'); await settle(); w.navTop.textContent = '';   // navPaintCounts 가 원래 숫자(없음)를 다시 칠한 상태
+  w.ctx.mrPaintNav();
+  assert.ok(!w.navTop.classList.contains('mr-alarm') && w.navTop.textContent === '', '알릴 것이 없으면 붉은 표시도 «📬» 글자도 남기지 않는다');
+  assert.ok(!w.navSub.classList.contains('mr-alarm'));
 });
 test('탭 제목에 알릴 건수가 붙고, 없으면 원래대로', async () => {
   const w = await started(); assert.match(w.ctx.document.title, /^\(\d+\) 경력관리$/);

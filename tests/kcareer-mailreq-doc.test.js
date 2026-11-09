@@ -40,7 +40,8 @@ test('문서가 말한 저장 자리를 코드가 실제로 쓴다 — items · 
   assert.ok(!/\/ls\b|'\/at'/.test(mod), '모듈이 자료 통(ls)·at 을 건드리면 안 된다');
 });
 test('문서가 말한 화면 요소가 실제로 있다 — 옆줄 이름 · 단추 · 「나중에」 · 포털 딱지', () => {
-  assert.match(kc, /\{g:'요청 메일', items:\[\['page-mailreq','📬 요청 메일'\]\]\}/);
+  assert.ok(/\{g:'이력서관리', items:\[(?:\['[^']*','[^']*'\],)*\['page-mailreq','📬 요청 메일'\]\]\}/.test(kc), '옆줄 이력서관리 묶음 안에 요청 메일');
+  assert.match(doc, /이력서관리 › 📬 요청 메일/, '문서가 메뉴 자리를 이력서관리 안이라고 적는다');
   assert.ok(kc.indexOf('<span class="mr-btx"> 메일함 열기</span>') >= 0 && /📬 메일함 열기/.test(doc));
   assert.ok(kc.indexOf('나중에</a>') >= 0 && /«나중에»/.test(doc));
   assert.ok(kc.indexOf("단추('ignored','🚫','아님'") >= 0 && /«🚫 아님»/.test(doc));

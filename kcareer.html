@@ -771,6 +771,7 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-banner a{font-weight:800;margin-left:10px;color:inherit;text-decoration:underline;cursor:pointer;padding:4px 2px}
 .mr-banner a:focus-visible,.mr-pill:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .mr-banner a.mr-x{font-weight:400;opacity:.65;text-decoration:none}
+#nav .nav-item .ncnt.mr-alarm{color:#f87171;font-weight:800}
 .g-title.top .gcnt.mr-alarm{color:#f87171;font-weight:800}   /* 어두운 옆줄 바탕 위 대비 5:1 — var(--red) 는 3:1 이라 모자란다. 골라 둔 칸(.gsel)은 기본 남색 그대로 */
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
@@ -6316,12 +6317,10 @@ async function exportEditedHwpx(){
 let NAV=[
   /* 「이력서 생성·보관」이 첫 자리다 — 대표가 가장 자주 쓰는 화면이다(2026-08-29 지시).
      ⚠ 빠른 이력서를 «지우지는» 않는다. 순서만 바꾼다. */
-  {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함'],['page-profile1','👤 프로필 1장']]},
+  /* ★ 요청 메일 — 법인 메일함에 온 경력 요청·동의서·서류 제출 요청 (대표 지시 2026-11-09 「이력서관리 안에」). 첫 자리(서류 만들기)는 그대로 둔다 */
+  {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함'],['page-profile1','👤 프로필 1장'],['page-mailreq','📬 요청 메일']]},
   /* ★ 사업관리 — 이력서관리 «아래» (대표 지시 2026-10-05). 개인 지원과 갈라 법인 사업(입찰·용역·공모)을 따로 */
   {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizperf','🏆 수행 실적'],['page-bizmail','📮 결과보고서 메일'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
-  /* ★ 요청 메일 — 법인 메일함에 온 경력 요청·동의서·서류 제출 요청 (대표 지시 2026-11-09). 한 칸짜리 묶음이라 상위 단추가 곧 이 화면이다.
-     ⚠ 사업관리는 이력서관리 «바로 아래»여야 한다(tests/kcareer-biz) — 그 사이에 끼우지 말고 사업관리 아래에 둔다. 순서는 사람이 끌어 바꿀 수 있다 */
-  {g:'요청 메일', items:[['page-mailreq','📬 요청 메일']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
@@ -6558,7 +6557,7 @@ function navCountsSoon(){
 }
 function navGroupCount(g){
   var n=0, 있나=false;
-  navItemsOf(g).forEach(function(p){ var c=navCount(p[0]); if(c!=null){ n+=c; 있나=true; } });
+  navItemsOf(g).forEach(function(p){ if(p[0]==='page-mailreq') return; var c=navCount(p[0]); if(c!=null){ n+=c; 있나=true; } });   /* 요청 메일 숫자는 섞지 않는다 — 이력서 개수로 읽힌다 */
   return 있나 ? n : null;
 }
 function buildNav(){
@@ -15188,10 +15187,17 @@ function mrPaint(){
 }
 function mrBannerClose(){ mrLocal('banner', mrAlarmSig()); mrPaint(); }
 function mrPaintNav(){
-  var el=document.querySelector('#nav .g-title.top[data-g="요청 메일"] .gcnt'); if(!el) return;
-  var sm=KcareerMailReq.summary(_mr.items, Date.now());
-  el.classList.toggle('mr-alarm', !!sm.alarm);
-  var t=el.parentNode; if(t && sm.alarm) t.title='요청 메일 · '+KcareerMailReq.summaryText(sm).replace(/^📬 /,'');
+  if(typeof KcareerMailReq==='undefined') return;
+  var sm=KcareerMailReq.summary(_mr.items, Date.now()), grp=(typeof navInfo==='function')?navInfo('page-mailreq').grp:null;
+  /* 상위 단추(이력서관리) — 알릴 것이 있을 때만 «📬 N». 없으면 navPaintCounts 가 칠한 그대로(이력서관리의 원래 숫자) */
+  var el=grp?document.querySelector('#nav .g-title.top[data-g="'+grp+'"] .gcnt'):null;
+  if(el){
+    el.classList.toggle('mr-alarm', !!sm.alarm);
+    if(sm.alarm){ el.textContent='📬 '+sm.alarm; var t=el.parentNode; if(t) t.title=grp+' · 요청 메일 '+KcareerMailReq.summaryText(sm).replace(/^📬 /,''); }
+  }
+  /* 묶음이 펼쳐져 있으면 «요청 메일» 줄의 숫자(진행 중)도 알릴 것이 있을 때 붉게 */
+  var sub=document.querySelector('#nav .nav-item[data-id="page-mailreq"] .ncnt');
+  if(sub) sub.classList.toggle('mr-alarm', !!sm.alarm);
 }
 
 /* ── 목록 ── */
