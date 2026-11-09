@@ -5,11 +5,12 @@
   function maskPii(rawText) {
     if (!rawText) return '';
     return String(rawText)
-      .replace(/(\d{6})[-\s]?([1-8]\d{6})/g, '$1-*******')
-      .replace(/(01[016789])[-.\s]?(\d{3,4})[-.\s]?(\d{4})/g, '$1-****-$3')
+      .replace(/(\d{6})[-\s]?([1-8]\d{6})/g, '******-*******')
+      .replace(/(01[016789])[-.\s]?(\d{3,4})[-.\s]?(\d{4})/g, '$1-****-****')
       .replace(/(\d{3,4})-(\d{2,6})-(\d{4,6})(-\d{1,3})?/g, function(m, p1, p2, p3, p4) {
         return p1 + '-****-****' + (p4 || '');
-      });
+      })
+      .replace(/\d{10,16}/g, '************');
   }
 
   function matchCompany(mailObj, companies) {
