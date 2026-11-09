@@ -109,6 +109,14 @@ test('★★ 설정 파일이 JSON null 이거나 확장 경로가 글자가 아
   assert.ok(r && r.profile === 'Profile 3', '★★ 이상한 프로필 때문에 멀쩡한 프로필을 못 찾습니다');
 });
 
+test('★★ 확장 경로가 빈 글자(내장 확장 등)면 «지금 작업 폴더»로 착각하지 않는다 — 예약 작업은 작업 폴더가 이 폴더다', () => {
+  const pc = fakePc({ ego: [{ profile: 'Profile 1', path: '', id: 'builtin' }] });
+  const before = process.cwd();
+  let r;
+  try { process.chdir(DIR); r = withPc(pc, () => sync.findExt()); } finally { process.chdir(before); }
+  assert.strictEqual(r, null, '★★ 빈 경로의 확장이 우리 확장으로 보입니다 — 예약 작업에서 엉뚱한 확장 화면을 열게 됩니다');
+});
+
 test('★★ 깨우기 계획 — 그 브라우저·그 프로필로, 확장 자기 화면(kick.html)을 연다', () => {
   const plan = sync.kickPlan({ browser: '에고라이트', exe: FAKE_EGO, profile: 'Profile 1', id: ID });
   assert.strictEqual(plan.exe, FAKE_EGO);

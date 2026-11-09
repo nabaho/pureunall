@@ -173,7 +173,8 @@ function findExt() {
       try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, 'Secure Preferences'), 'utf8')); } catch (e) { continue; }
       const set = (j && j.extensions && j.extensions.settings) || {};   // 설정 파일이 JSON null 이어도 던지지 않는다
       for (const id of Object.keys(set)) {
-        if (set[id] && typeof set[id].path === 'string' && path.resolve(set[id].path).toLowerCase() === want) return { browser: b.name, exe: firstFile(b.exes), profile: d, id: id };
+        /* 빈 경로(''·내장 확장)는 건너뛴다 — path.resolve('') 는 «지금 작업 폴더»라, 예약 작업(작업 폴더 = 이 폴더)에서는 엉뚱한 확장이 우리 것으로 보인다 */
+        if (set[id] && typeof set[id].path === 'string' && set[id].path !== '' && path.resolve(set[id].path).toLowerCase() === want) return { browser: b.name, exe: firstFile(b.exes), profile: d, id: id };
       }
     }
   }
