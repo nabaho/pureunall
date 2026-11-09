@@ -15333,7 +15333,6 @@ function mrBatch(btn, st){
    ② 고치는 것은 종류·기한·메모뿐 — 고친 칸만 한 번에 저장하고, 고친 칸에는 fixed 표시가 남아 다음 훑기가 덮지 않는다(모듈 editUpdate).
    ③ 입력 중인 칸은 «다시 그리지 않는다» — 내용이 늦게 도착해도 내용 상자만 바꾼다. */
 var _mrBodies={};
-function mrDetOpen_(){ var ov=document.getElementById('modalMr'); return !!(ov && ov.classList && ov.classList.contains('open')); }
 function mrOpen(id){
   var x=_mr.items[id]; if(!x) return;
   _mr.detId=id; _mr.detFrom=document.activeElement||null;
