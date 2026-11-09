@@ -213,7 +213,9 @@ test('보낸 사람은 이름으로 나온다 — 계정을 자르지 않는다'
   const side = fnBody('mailSideHtml');
   assert.match(side, /staffName\(/, '왼쪽 메뉴가 이름을 안 씁니다');
   assert.ok(!/b\.split\('@'\)/.test(side), '아직 계정을 잘라 씁니다');
-  assert.match(fnBody('sentBoxHtml'), /staffName\(v\.by\)/, '보낸 메일 표가 이름을 안 씁니다');
+  /* 보낸 메일 줄의 칸은 sentTdsHtml 한 벌이다(낱줄·묶음 안쪽 줄이 함께 쓴다, 2026-11-09 sentFold) */
+  assert.match(fnBody('sentBoxHtml') + fnBody('sentTdsHtml'), /staffName\(v\.by\)/, '보낸 메일 표가 이름을 안 씁니다');
+  assert.match(fnBody('sentBoxHtml'), /sentTdsHtml\(/, '낱줄이 칸 한 벌(sentTdsHtml)을 안 씁니다');
   assert.match(fnBody('schedBoxHtml'), /staffName\(v\.by\)/, '예약 메일 표가 이름을 안 씁니다');
 });
 
