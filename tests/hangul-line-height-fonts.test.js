@@ -110,6 +110,30 @@ test('★★ 함초롬바탕이 PC 에 없으면 한글 글자 폭은 0.968em, �
   assert.strictEqual(charEm('한', '함초롬바탕', false), 1, '글꼴이 있으면 재서 나온 값을 따릅니다');
 });
 
+test('★★ 문단 모양 대화상자가 줄 높이를 다시 셀 때: 글 조각마다 크기·글꼴을 보고, 문단 번호(.phead)는 글로 치지 않는다 (자동 검토 «낮음»)', () => {
+  const mkHost = (fontSize, family, inPhead) => ({ closest: sel => (sel === '.phead' && inPhead ? {} : null), _c: { fontSize, fontFamily: family } });
+  const nodes = [
+    { nodeValue: '1.', parentElement: mkHost('13.333px', '"맑은 고딕", sans-serif', true) },   // 문단 번호 — 건너뜀
+    { nodeValue: '본문 열 포인트', parentElement: mkHost('13.333px', '"함초롬바탕", serif', false) },
+    { nodeValue: '큰 글자', parentElement: mkHost('18.667px', '"맑은 고딕", sans-serif', false) },
+    { nodeValue: '', parentElement: mkHost('13.333px', 'x', false) },
+  ];
+  let i = 0;
+  const doc = { createTreeWalker: () => ({ nextNode: () => nodes[i++] || null }) };
+  const fn = new Function('document', 'NodeFilter', 'getComputedStyle', cutFn(CODE, 'function paraTextRuns(') + '\nreturn paraTextRuns;')(
+    doc, { SHOW_TEXT: 4 }, host => host._c);
+  const runs = fn({ closest: () => null });
+  assert.deepStrictEqual(runs.map(r => r.text), ['본문 열 포인트', '큰 글자'], '문단 번호·빈 글 조각은 빼야 합니다');
+  assert.deepStrictEqual(runs.map(r => Math.round(r.size)), [10, 14]);
+  assert.deepStrictEqual(runs.map(r => r.font), ['함초롬바탕', '맑은 고딕'], '글꼴은 따옴표를 벗긴 첫 이름');
+  // 가장 높은 조각이 줄 높이를 정한다 → 14pt 맑은 고딕 × 1.331 × 1.3
+  const lineCss = loadLineCss();
+  assert.ok(Math.abs(pt(lineCss({ runs, lineSpacing: 130, pp: '{"fontLineHeight":1}' })) - 14 * 1.331 * 1.3) < 0.02);
+  // 문단 번호뿐인 문단은 글 조각이 없다 → 건드리지 않는 쪽으로
+  i = 0; nodes.length = 1;
+  assert.deepStrictEqual(fn({ closest: () => null }), []);
+});
+
 test('★ 소스에 남아 있다 — 글이 있는 비율 줄 간격 문단만, 워드 호환이 아닐 때', () => {
   const fn = cutFn(CODE, 'function lineCss(');
   assert.match(fn, /!wordMode && fontLineHeightOn\(b\)/);

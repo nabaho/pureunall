@@ -579,6 +579,17 @@
     if (NON_LATIN_CH.test(t)) hs.push(naturalFactor(font));
     return size * Math.max(...hs, 1);
   }
+  // 문단 요소의 글 조각들 — 글자 크기·글꼴은 그 글이 놓인 요소의 계산 값(문단 모양 대화상자가 줄 높이를 다시 셀 때). 문단 번호(.phead)는 글이 아니다.
+  function paraTextRuns(el) {
+    const runs = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const host = n.parentElement || el;
+      if (!n.nodeValue || host.closest('.phead')) continue;
+      const c = getComputedStyle(host);
+      runs.push({ text: n.nodeValue, size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') });
+    }
+    return runs;
+  }
   const FLH_ON = /"fontLineHeight":\s*1\b/;
   const fontLineHeightOn = b => (!b.lineType || b.lineType === 'PERCENT') && typeof b.pp === 'string' && FLH_ON.test(b.pp) && (b.runs || []).some(r => r.text);
 
@@ -825,10 +836,10 @@
     // 워드 호환 문서: 문단의 실제 글자(크기·글꼴)로 줄 높이를 셈
     let lv = v;
     const ppStr = v.pp || el.dataset.pp;
-    if (!wordMode && ppStr && FLH_ON.test(ppStr) && (!v.lineType || v.lineType === 'PERCENT') && el.textContent) {
-      // 글꼴에 어울리는 줄 높이: 문단의 실제 글자(크기·글꼴)로 줄 높이를 셈
-      const c = getComputedStyle(el);
-      lv = Object.assign({}, v, { pp: ppStr, runs: [{ text: el.textContent, size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') }] });
+    if (!wordMode && ppStr && FLH_ON.test(ppStr) && (!v.lineType || v.lineType === 'PERCENT')) {
+      // 글꼴에 어울리는 줄 높이: 문단의 실제 글 조각(크기·글꼴)으로 줄 높이를 셈 (글이 없거나 문단 번호뿐이면 건드리지 않음)
+      const runs = paraTextRuns(el);
+      if (runs.length) lv = Object.assign({}, v, { pp: ppStr, runs });
     }
     if (wordMode) {
       const c = getComputedStyle(el);

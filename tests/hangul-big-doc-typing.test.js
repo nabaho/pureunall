@@ -86,13 +86,25 @@ test('★★ paginate 는 걸린 시간을 기억한다 — 오류가 나도 기
   let t = 1000;
   const perf = { now: () => (t += 700) };
   let boom = false;
-  const make = new Function('performance', 'paginateNow', 'let lastPaginateMs = 0;\n' + code + '\nreturn { paginate, ms: () => lastPaginateMs };');
-  const api = make(perf, () => { if (boom) throw new Error('쪽 나눔 실패'); });
+  const make = new Function('performance', 'paginateNow', 'clearTimeout', 'let lastPaginateMs = 0, layoutQueued = false, layoutTimer = 0;\n' + code + '\nreturn { paginate, ms: () => lastPaginateMs };');
+  const api = make(perf, () => { if (boom) throw new Error('쪽 나눔 실패'); }, () => {});
   api.paginate();
   assert.strictEqual(api.ms(), 700, '걸린 시간을 기억하지 않습니다');
   boom = true;
   assert.throws(() => api.paginate(), /쪽 나눔 실패/);
   assert.strictEqual(api.ms(), 700);
+});
+
+test('★★ 지금 바로 나누면(탭 바꾸기·되돌리기) 미뤄 둔 예약을 지운다 — 뒤늦게 한 번 더 돌거나 다음 예약을 막지 않는다 (자동 검토 «낮음»)', () => {
+  const code = cutFn(CODE, 'function paginate(');
+  const cleared = [];
+  const make = new Function('performance', 'paginateNow', 'clearTimeout',
+    'let lastPaginateMs = 9999, layoutQueued = true, layoutTimer = 77;\n' + code + '\nreturn { paginate, queued: () => layoutQueued, timer: () => layoutTimer };');
+  const api = make({ now: () => 0 }, () => {}, id => cleared.push(id));
+  api.paginate();
+  assert.deepStrictEqual(cleared, [77], '대기 중이던 타이머(77)를 지우지 않았습니다');
+  assert.strictEqual(api.queued(), false, '«예약됨» 표시가 남아 다음 queueLayout 을 막습니다');
+  assert.strictEqual(api.timer(), 0);
 });
 
 test('★ 소스: paginate 는 paginateNow 를 감싸고, 변수는 파일 위쪽에서 한꺼번에 선언한다(선언 전에 쓰지 않는다)', () => {

@@ -71,21 +71,30 @@
      큰 문서는 본문 글이 약 5%(편람: 문단 1,974개 중 411개)만 읽히고, DocInfo(글자·문단 모양)와 큰 그림도 잘렸다.
      그래서 ① 통째로 풀어 보고 ② 오류면 꼬리 8바이트를 떼고(풀린 크기가 꼬리에 적힌 크기와 «같을 때만» 받는다)
      ③ 그래도 안 되면 자체 해제기(inflateRawJs — 압축 끝에서 멈추고 뒤의 자투리는 보지 않는다)로 푼다. */
-  async function nativeInflate(data) {
+  /* ⚠ 압축 폭탄 막기(2026-11-09 자동 검토 «중간»): 해제 결과에 상한이 없어 16KB 가 16MB(1,029배)로 불어나는 파일을 열면 탭이 멎을 수 있었다.
+     한 줄기(스트림)는 128MB, 문서 전체는 256MB 까지만 푼다(실제 문서: 바탕화면 .hwp 18,287개 중 가장 큰 한 줄기 37MB, 문서 합 38MB). 넘으면 «다시 시도하지 않고» 바로 던진다. */
+  const MAX_INFLATE_STREAM = 128 * 1024 * 1024, MAX_INFLATE_DOC = 256 * 1024 * 1024;
+  const tooBig = () => Object.assign(new Error('압축을 푼 크기가 너무 큽니다. (손상됐거나 악의적으로 만든 파일일 수 있어 열지 않습니다)'), { tooBig: true });
+  async function nativeInflate(data, limit) {
     const ds = new DecompressionStream('deflate-raw');
     const w = ds.writable.getWriter();
     w.write(data).catch(() => {});
     w.close().catch(() => {});
     const reader = ds.readable.getReader(), chunks = [];
     let total = 0;
-    for (;;) { const { value, done } = await reader.read(); if (done) break; chunks.push(value); total += value.length; } // 오류가 나면 그대로 던진다(일부만 돌려주지 않는다)
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break; // 오류가 나면 그대로 던진다(일부만 돌려주지 않는다)
+      total += value.length;
+      if (total > limit) { Promise.resolve().then(() => reader.cancel()).catch(() => {}); throw tooBig(); }
+      chunks.push(value);
+    }
     const out = new Uint8Array(total);
     let o = 0;
     for (const c of chunks) { out.set(c, o); o += c.length; }
     return out;
   }
   // RFC 1951 inflate — 압축 끝(마지막 블록)에서 멈춘다. 느리지만(한 비트씩) 브라우저 해제기가 거절하는 자투리 있는 자료의 마지막 보루.
-  function inflateRawJs(src) {
+  function inflateRawJs(src, limit = MAX_INFLATE_STREAM) {
     let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.max(4096, src.length * 4)), op = 0;
     const bits = n => {
       while (bitCnt < n) { if (pos >= src.length) throw new Error('압축 자료가 중간에 끝났습니다.'); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }
@@ -115,7 +124,7 @@
     const LEXT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
     const DBASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
     const DEXT = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
-    const grow = n => { if (op + n > out.length) { const t = new Uint8Array(Math.max(out.length * 2, op + n)); t.set(out.subarray(0, op)); out = t; } };
+    const grow = n => { if (op + n > limit) throw tooBig(); if (op + n > out.length) { const t = new Uint8Array(Math.max(out.length * 2, op + n)); t.set(out.subarray(0, op)); out = t; } };
     const codes = (lh, dh) => {
       for (;;) {
         const sym = decode(lh);
@@ -178,14 +187,14 @@
     }
     return out.slice(0, op);
   }
-  async function inflate(data) {
+  async function inflate(data, limit = MAX_INFLATE_STREAM) {
     let err;
-    try { return await nativeInflate(data); } catch (e) { err = e; }
+    try { return await nativeInflate(data, limit); } catch (e) { if (e && e.tooBig) throw e; err = e; }
     if (data.length > 8) { // 한컴 꼬리: CRC32(4) + 풀린 크기(4)
       const isize = u32(data, data.length - 4);
-      try { const out = await nativeInflate(data.subarray(0, data.length - 8)); if (out.length === isize) return out; } catch (e) { /* 아래로 */ }
+      try { const out = await nativeInflate(data.subarray(0, data.length - 8), limit); if (out.length === isize) return out; } catch (e) { if (e && e.tooBig) throw e; /* 아래로 */ }
     }
-    try { return inflateRawJs(data); } catch (e) { throw err || e; }
+    try { return inflateRawJs(data, limit); } catch (e) { if (e && e.tooBig) throw e; throw err || e; }
   }
 
   // ---------------- 레코드 ----------------
@@ -518,14 +527,14 @@
     return d.subarray(off, off + 16);
   }
   // ViewText 구역 → 평문 레코드 자료
-  async function viewTextSection(raw, compressed) {
+  async function viewTextSection(raw, compressed, inflater = inflate) {
     const h = u32(raw, 0), tag = h & 0x3ff;
     let size = h >>> 20, o = 4;
     if (size === 0xfff) { size = u32(raw, 4); o = 8; }
     if (tag !== 28 || size < 256) throw new Error('배포용 문서 자료를 찾지 못했습니다.');
     const key = distributeKey(raw.subarray(o, o + 256));
     const plain = AES.decryptECB(key, raw.subarray(o + size));
-    return compressed ? inflate(plain) : plain;
+    return compressed ? inflater(plain) : plain;
   }
 
   // opts.docDate: 서식 파일(HWT)로 새로 만든 문서의 만든 날짜 (ISO 문자열) — '만든 날짜' 필드를 저장할 때 이 날짜로 채움
@@ -539,7 +548,10 @@
     if (props & 2) throw new Error('암호가 걸린 문서입니다. 한글 2022에서 암호를 해제한 뒤 여세요.');
     const distributed = !!(props & 4); // 배포용 문서: 본문이 ViewText 에 암호화돼 있음
     const compressed = !!(props & 1);
-    const load = async name => { const raw = files[name]; if (!raw) return null; return compressed ? inflate(raw) : raw; };
+    // 문서 전체에서 푼 크기를 합쳐 상한을 지킨다(압축 폭탄: 줄기를 여럿으로 쪼개 한 줄기 상한을 피하는 길도 막음)
+    let inflatedTotal = 0;
+    const inflateDoc = async d => { const out = await inflate(d, Math.min(MAX_INFLATE_STREAM, MAX_INFLATE_DOC - inflatedTotal)); inflatedTotal += out.length; return out; };
+    const load = async name => { const raw = files[name]; if (!raw) return null; return compressed ? inflateDoc(raw) : raw; };
 
     const info = parseDocInfo(records(await load('DocInfo')));
     const binFiles = {};
@@ -581,7 +593,7 @@
       const name = ('BIN' + binId.toString(16).toUpperCase().padStart(4, '0') + '.' + ext).toUpperCase();
       let data = binFiles[name];
       if (!data) return null;
-      if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflate(data); } catch (e) { /* 압축 안 된 그림 */ } }
+      if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflateDoc(data); } catch (e) { if (e && e.tooBig) throw e; /* 압축 안 된 그림 */ } }
       return { mime, data: new Uint8Array(data), w: mm(w), h: mm(h) };
     }
 
@@ -1134,7 +1146,7 @@
     }
 
     for (let s = 0; files[(distributed ? 'ViewText/Section' : 'BodyText/Section') + s]; s++) {
-      const data = distributed ? await viewTextSection(files['ViewText/Section' + s], compressed) : await load('BodyText/Section' + s);
+      const data = distributed ? await viewTextSection(files['ViewText/Section' + s], compressed, inflateDoc) : await load('BodyText/Section' + s);
       const recs = tree(records(data));
       const blocks = await parseParas(recs);
       if (s > 0 && blocks[0]) blocks[0].pageBreak = true; // 구역이 바뀌면 새 쪽에서 시작 (한글과 같음)

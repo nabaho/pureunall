@@ -918,6 +918,8 @@
 
   // 쪽 나눔 한 번에 걸린 시간 — 큰 문서(편람 450쪽 ≈ 5초)에서 글자를 칠 때마다 돌리지 않으려고 queueLayout 이 본다
   function paginate() {
+    // 지금 바로 나누므로 미뤄 둔 예약(큰 문서의 입력 대기 타이머)은 필요 없다 — 남겨 두면 탭을 바꾼 뒤에도 뒤늦게 한 번 더 돌고 다음 예약을 막는다(자동 검토 «낮음»)
+    clearTimeout(layoutTimer); layoutTimer = 0; layoutQueued = false;
     const t0 = performance.now();
     try { paginateNow(); } finally { lastPaginateMs = performance.now() - t0; }
   }

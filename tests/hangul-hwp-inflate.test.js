@@ -36,6 +36,7 @@ function chromeLikeDS() {
       let step = 0, res = null;
       this.readable = {
         getReader: () => ({
+          cancel: async () => {},
           read: async () => {
             if (!res) {
               const buf = Buffer.concat(parts);
@@ -56,9 +57,11 @@ function chromeLikeDS() {
   };
 }
 const u32 = (d, o) => (o + 4 <= d.length ? new DataView(d.buffer, d.byteOffset, d.byteLength).getUint32(o, true) : 0);
-function load() {
-  const code = cutFn(CODE, 'async function nativeInflate(') + '\n' + cutFn(CODE, 'function inflateRawJs(') + '\n' + cutFn(CODE, 'async function inflate(');
-  return new Function('DecompressionStream', 'u32', code + '\nreturn { inflate, inflateRawJs, nativeInflate };')(chromeLikeDS(), u32);
+const oneLine = re => { const m = re.exec(CODE); assert.ok(m, '선언을 못 찾았습니다: ' + re); return m[0]; };
+function load(DS) {
+  const code = [oneLine(/const MAX_INFLATE_STREAM = [^\n]*/), oneLine(/const tooBig = [^\n]*/),
+    cutFn(CODE, 'async function nativeInflate('), cutFn(CODE, 'function inflateRawJs('), cutFn(CODE, 'async function inflate(')].join('\n');
+  return new Function('DecompressionStream', 'u32', code + '\nreturn { inflate, inflateRawJs, nativeInflate };')(DS || chromeLikeDS(), u32);
 }
 /* 옛 함수(오류를 삼키고 «그때까지 풀린 것»을 돌려줌) — 대조용 */
 function loadOld() {
@@ -178,7 +181,7 @@ test('★★ 자체 해제기는 깨진 자료에서 던진다 (끝없이 돌거
 test('★ 일부만 돌려주는 길이 없다 — nativeInflate 는 오류를 삼키지 않는다', () => {
   const fn = cutFn(CODE, 'async function nativeInflate(');
   assert.ok(!/\btry\b/.test(fn), 'nativeInflate 가 오류를 삼키면(try) 잘린 결과가 «성공»으로 돌아갑니다');
-  assert.match(cutFn(CODE, 'async function inflate('), /nativeInflate\(data\.subarray\(0, data\.length - 8\)\)/, '한컴 꼬리(8바이트)를 뗀 시도가 있어야 합니다');
+  assert.match(cutFn(CODE, 'async function inflate('), /nativeInflate\(data\.subarray\(0, data\.length - 8\), limit\)/, '한컴 꼬리(8바이트)를 뗀 시도가 있어야 합니다');
 });
 
 /* ---- 처음부터 끝까지: 꼬리 붙은 큰 HWP 를 읽는다 ---- */
@@ -223,7 +226,7 @@ test('★★★ 처음부터 끝까지: 꼬리 붙은 큰 HWP(DocInfo·본문 �
 });
 
 test('★★ 대조: 옛 읽기는 같은 파일에서 문단 일부만 읽는다 (또는 아예 못 연다) — 처음부터 끝까지 검사가 헛돌지 않는다', async () => {
-  const oldSrc = SRC.replace(/async function nativeInflate\(data\) \{[\s\S]*?\n  \}\n  \/\/ RFC 1951/, `async function nativeInflate(data) {
+  const oldSrc = SRC.replace(/async function nativeInflate\(data, limit\) \{[\s\S]*?\n  \}\n  \/\/ RFC 1951/, `async function nativeInflate(data, limit) {
     const ds = new DecompressionStream('deflate-raw');
     const w = ds.writable.getWriter();
     w.write(data).catch(() => {});
@@ -236,7 +239,7 @@ test('★★ 대조: 옛 읽기는 같은 파일에서 문단 일부만 읽는�
     for (const c of chunks) { out.set(c, o); o += c.length; }
     return out;
   }
-  // RFC 1951`).replace(/async function inflate\(data\) \{[\s\S]*?\n  \}\n/, 'async function inflate(data) { return nativeInflate(data); }\n');
+  // RFC 1951`).replace(/async function inflate\(data, limit = MAX_INFLATE_STREAM\) \{[\s\S]*?\n  \}\n/, 'async function inflate(data, limit) { return nativeInflate(data, limit); }\n');
   assert.notStrictEqual(oldSrc, SRC, '옛 읽기로 되돌리지 못했습니다 — 이 검사의 바꿔치기를 고쳐야 합니다');
   const ctx = sandbox(chromeLikeDS());
   const { packed } = bigHancomLike(ctx, 3000);
@@ -247,4 +250,46 @@ test('★★ 대조: 옛 읽기는 같은 파일에서 문단 일부만 읽는�
   let blocks = 0;
   try { blocks = (await ctxOld.PureunHwp.readHwp(arrBuf(packed))).blocks.length; } catch (e) { blocks = -1; }
   assert.ok(blocks < 3000, '옛 읽기가 전부 읽었다면 이 검사는 고장을 못 잡습니다(' + blocks + ')');
+});
+
+/* ---- 압축 폭탄 막기 (2026-11-09 자동 검토 «중간»: 해제 크기 상한이 없었다) ---- */
+test('★★★ 압축 폭탄: 상한을 넘으면 «바로» 던진다 — 자체 해제기로 다시 시도하지 않는다', async () => {
+  const bomb = zlib.deflateRawSync(Buffer.alloc(40 * 1024 * 1024)); // 40MB 가 수십 KB 로
+  assert.ok(bomb.length < 100_000, '시험 자료가 폭탄처럼 압축되지 않았습니다: ' + bomb.length);
+  let made = 0;
+  const Base = chromeLikeDS();
+  const Counting = class extends Base { constructor(f) { super(f); made++; } };
+  const { inflate } = load(Counting);
+  await assert.rejects(() => inflate(new Uint8Array(bomb), 1024 * 1024), e => e && e.tooBig === true && /너무 큽니다/.test(e.message));
+  assert.strictEqual(made, 1, '상한을 넘었는데 해제를 ' + made + '번 시도했습니다(한 번에 멈춰야 합니다)');
+});
+
+test('★★ 자체 해제기도 상한을 지킨다 — 상한 밖으로는 버퍼를 키우지 않는다', () => {
+  const { inflateRawJs } = load();
+  const bomb = zlib.deflateRawSync(Buffer.alloc(30 * 1024 * 1024));
+  assert.throws(() => inflateRawJs(new Uint8Array(bomb), 2 * 1024 * 1024), e => e && e.tooBig === true);
+  const ok = zlib.deflateRawSync(Buffer.alloc(1024 * 1024, 7));
+  assert.strictEqual(inflateRawJs(new Uint8Array(ok), 2 * 1024 * 1024).length, 1024 * 1024, '상한 안이면 그대로 풀립니다');
+});
+
+test('★★ 상한은 실제 문서가 걸리지 않을 만큼 넉넉하다 — 한 줄기 ≥ 64MB(실측 최대 37MB), 문서 전체 ≥ 한 줄기, 1GB 미만', () => {
+  const m = /const MAX_INFLATE_STREAM = ([^,]+), MAX_INFLATE_DOC = ([^;]+);/.exec(CODE);
+  assert.ok(m, '상한 선언을 못 찾았습니다');
+  const STREAM = eval(m[1]), DOC = eval(m[2]);
+  assert.ok(STREAM >= 64 * 1024 * 1024, '정상 문서(한 줄기 37MB)가 걸립니다');
+  assert.ok(DOC >= STREAM);
+  assert.ok(DOC < 1024 * 1024 * 1024, '상한이 너무 큽니다');
+});
+
+test('★★ 문서 전체 상한: 줄기를 여럿으로 쪼개도 합쳐서 막는다 — 처음부터 끝까지 읽기가 거절한다', async () => {
+  const smallCap = SRC.replace(/MAX_INFLATE_DOC = [^;]+;/, 'MAX_INFLATE_DOC = 300 * 1024;');
+  assert.notStrictEqual(smallCap, SRC, '문서 전체 상한 선언을 못 찾았습니다');
+  const ctxA = sandbox(chromeLikeDS());
+  const { packed } = bigHancomLike(ctxA, 3000); // DocInfo 235KB + 본문 454KB = 690KB 로 풀림
+  const ctx = vm.createContext(Object.assign({}, ctxA));
+  ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx; ctx.PureunHwp = undefined;
+  vm.runInContext(smallCap, ctx, { filename: 'hwp-small-cap' });
+  await assert.rejects(() => ctx.PureunHwp.readHwp(arrBuf(packed)), e => e && e.tooBig === true, '문서 전체 상한을 넘었는데 읽혔습니다');
+  const ok = await ctxA.PureunHwp.readHwp(arrBuf(packed)); // 진짜 상한(256MB)에서는 읽힘
+  assert.strictEqual(ok.blocks.length, 3000);
 });
