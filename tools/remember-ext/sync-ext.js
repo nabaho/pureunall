@@ -27,12 +27,24 @@ function verOf(files) {
   return h.digest('hex').slice(0, 12);
 }
 
-/* 권한·적용 주소 «모양» — 이것이 달라지면 사람이 본다 */
+/* 권한·적용 범위 «모양» — 이것이 달라지면 사람이 본다.
+   ⚠ «허용 목록»이 아니라 «제외 목록» 방식이다: 글자만 바뀌는 칸(이름·설명·판 번호·툴바 문구)만 빼고 «나머지 전부»를 견준다.
+     예전에는 permissions·host_permissions·content_scripts(matches·js·world)·background 만 봐서, optional_host_permissions 나
+     content_scripts 의 all_frames·match_about_blank 같은 «범위를 넓히는 칸»이 늘어도 «같다»고 통과했다(2026-11-09 보안 검토).
+     이제는 새 칸이 생겨도 저절로 «달라짐»으로 잡힌다. 배열은 순서가 달라도 같은 것으로 본다. */
+const SHAPE_FREE = ['version', 'version_name', 'name', 'description'];
+function canon(v) {
+  if (Array.isArray(v)) return v.map((x) => JSON.stringify(canon(x))).sort();
+  if (v && typeof v === 'object') { const o = {}; Object.keys(v).sort().forEach((k) => { o[k] = canon(v[k]); }); return o; }
+  return v;
+}
 function shape(manifestText) {
   const m = JSON.parse(manifestText);
-  const set = (a) => (a || []).slice().sort();
-  return JSON.stringify({ v: m.manifest_version, p: set(m.permissions), h: set(m.host_permissions),
-    c: (m.content_scripts || []).map((c) => ({ m: set(c.matches), j: set(c.js), w: c.world || '' })), b: m.background });
+  const c = {};
+  Object.keys(m).filter((k) => SHAPE_FREE.indexOf(k) < 0).forEach((k) => {
+    c[k] = k === 'action' && m[k] && typeof m[k] === 'object' ? canon(Object.assign({}, m[k], { default_title: undefined })) : canon(m[k]);
+  });
+  return JSON.stringify(canon(c));
 }
 
 /* files: {이름: Buffer} · oldManifestText: 지금 설치된 manifest(없으면 null) → {ok, why} */
@@ -107,11 +119,11 @@ function decide(st, nowMs, state) {
 /* 대표 「⚠ 장애 알림」에 올릴 말 — «무엇을 하면 되는지»가 먼저다 */
 function alertText(reason, st) {
   if (reason === 'login') {
-    return '📇 리멤버 연결 — 리멤버 로그인이 풀렸습니다. 크롬(권형하)의 리멤버 탭(card.rememberapp.co.kr)에서 다시 로그인해 주세요. 로그인하면 30분 안에 저절로 이어집니다.';
+    return '📇 리멤버 연결 — 리멤버 로그인이 풀렸습니다. 확장을 깐 브라우저(에고라이트·크롬)의 리멤버 탭(card.rememberapp.co.kr)에서 다시 로그인해 주세요. 로그인하면 30분 안에 저절로 이어집니다.';
   }
   return '📇 리멤버 연결이 ' + when(st && st.at) + ' 뒤로 멈췄습니다(PC 가 두 번 깨워 봄). ' +
-    '① 크롬(권형하)이 켜져 있나 ② 「📇 리멤버 받기」 탭이 푸른에 로그인돼 있나 ③ 리멤버 탭이 로그인돼 있나 ' +
-    '④ 크롬 오른쪽 위 「푸른 리멤버 연결」 아이콘 한 번 — 그래도 안 되면 클로드에게 「리멤버 점검」.';
+    '① 확장을 깐 브라우저(에고라이트·크롬)가 켜져 있나 ② 「📇 리멤버 받기」 탭이 푸른에 로그인돼 있나 ③ 리멤버 탭이 로그인돼 있나 ' +
+    '④ 브라우저 오른쪽 위 「푸른 리멤버 연결」 아이콘 한 번 — 그래도 안 되면 클로드에게 「리멤버 점검」.';
 }
 
 /* firebase CLI — node 가 .cmd 를 직접 못 띄우므로 CLI 의 진짜 JS 를 부른다 */
@@ -131,34 +143,54 @@ function writeAlert(uid, patch) {
   try { fbCli(['database:update', '/systemAlerts/' + uid + '/remember-stall', tmp, '--force']); } finally { try { fs.unlinkSync(tmp); } catch (e) { /* 남아도 해 없다 */ } }
 }
 
-/* 확장이 깔린 크롬 프로필과 확장 번호를 찾는다 — 프로필 이름·번호를 박아 두지 않는다 */
+/* 확장을 깔 수 있는 «크롬 계열» 브라우저 — 앞에 있는 것이 먼저 찾힌다(대표 2026-11-09: 평소 쓰는 브라우저는 에고라이트).
+   ⚠ 환경변수는 «부를 때» 읽는다(시험이 가짜 폴더로 돌릴 수 있게). 프로필 이름·번호·확장 번호는 박지 않는다 — 설정 파일에서 찾는다. */
+function browsers() {
+  const L = process.env.LOCALAPPDATA || '';
+  const P = process.env.ProgramFiles || 'C:\\Program Files';
+  const X = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  return [
+    { name: '에고라이트', root: path.join(L, 'Citro Labs', 'ego lite', 'User Data'),
+      exes: [path.join(P, 'Citro Labs', 'ego lite', 'Application', 'ego.exe'), path.join(X, 'Citro Labs', 'ego lite', 'Application', 'ego.exe'),
+        path.join(L, 'Citro Labs', 'ego lite', 'Application', 'ego.exe')] },
+    { name: '크롬', root: path.join(L, 'Google', 'Chrome', 'User Data'),
+      exes: [path.join(P, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(X, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(L, 'Google', 'Chrome', 'Application', 'chrome.exe')] },
+  ];
+}
+function firstFile(list) {
+  return list.find((p) => { try { return fs.statSync(p).isFile(); } catch (e) { return false; } }) || '';
+}
+/* 확장이 깔린 브라우저·프로필과 확장 번호를 찾는다 — 못 찾으면 null.
+   돌려주는 것: { browser, exe, profile, id }  (exe 는 못 찾으면 '') */
 function findExt() {
-  const root = path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'User Data');
-  let dirs = [];
-  try { dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) { return null; }
   const want = path.resolve(DIR).toLowerCase();
-  for (const d of dirs) {
-    let j;
-    try { j = JSON.parse(fs.readFileSync(path.join(root, d, 'Secure Preferences'), 'utf8')); } catch (e) { continue; }
-    const set = (j.extensions && j.extensions.settings) || {};
-    for (const id of Object.keys(set)) {
-      if (set[id] && set[id].path && path.resolve(set[id].path).toLowerCase() === want) return { profile: d, id: id };
+  for (const b of browsers()) {
+    let dirs = [];
+    try { dirs = fs.readdirSync(b.root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) { continue; }
+    for (const d of dirs) {
+      let j;
+      try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, 'Secure Preferences'), 'utf8')); } catch (e) { continue; }
+      const set = (j && j.extensions && j.extensions.settings) || {};   // 설정 파일이 JSON null 이어도 던지지 않는다
+      for (const id of Object.keys(set)) {
+        if (set[id] && typeof set[id].path === 'string' && path.resolve(set[id].path).toLowerCase() === want) return { browser: b.name, exe: firstFile(b.exes), profile: d, id: id };
+      }
     }
   }
   return null;
 }
-function chromeExe() {
-  const c = [path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-    path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe')];
-  return c.find((p) => { try { return fs.statSync(p).isFile(); } catch (e) { return false; } }) || '';
+/* 깨우기 계획(순수) — 어느 브라우저를 어느 프로필로 어떤 화면과 함께 켤지. 못 하면 { why } */
+function kickPlan(ext) {
+  if (!ext) return { why: '확장이 깔린 프로필을 못 찾음(에고라이트·크롬)' };
+  if (!ext.exe) return { why: ext.browser + ' 실행 파일을 못 찾음' };
+  return { exe: ext.exe, args: ['--profile-directory=' + ext.profile, 'chrome-extension://' + ext.id + '/kick.html'], browser: ext.browser };
 }
-/* 깨우기 — 크롬이 꺼져 있으면 그 프로필로 켜고, 켜져 있으면 탭 하나를 열었다 곧 닫는다 */
+/* 깨우기 — 브라우저가 꺼져 있으면 그 프로필로 켜고, 켜져 있으면 탭 하나를 열었다 곧 닫는다 */
 function kick(why) {
-  const ext = findExt(), exe = chromeExe();
-  if (!ext || !exe) { log('깨우기 못 함 — ' + (!ext ? '확장이 깔린 프로필을 못 찾음' : '크롬을 못 찾음')); return false; }
-  spawn(exe, ['--profile-directory=' + ext.profile, 'chrome-extension://' + ext.id + '/kick.html'], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
-  log('깨움(' + why + ')');
+  const plan = kickPlan(findExt());
+  if (!plan.exe) { log('깨우기 못 함 — ' + plan.why); return false; }
+  spawn(plan.exe, plan.args, { detached: true, stdio: 'ignore', windowsHide: false }).unref();
+  log('깨움(' + why + ' · ' + plan.browser + ')');
   return true;
 }
 
@@ -214,5 +246,5 @@ function main() {
   watch(dry);
 }
 
-module.exports = { FILES, verOf, shape, judge, slotsOfDay, prevSlot, isLate, decide, alertText };
+module.exports = { FILES, verOf, shape, judge, slotsOfDay, prevSlot, isLate, decide, alertText, browsers, findExt, kickPlan };
 if (require.main === module) main();
