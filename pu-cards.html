@@ -2026,6 +2026,12 @@ table.sbox tr.sfold{cursor:pointer}
 table.sbox tr.sfold td{background:#eff6ff}
 table.sbox tr.sfold:hover td{background:#bfdbfe}
 table.sbox tr.sfold td.a button{border-color:#bfdbfe;color:#1e40af}
+/* 보내는 중 · 못 보낸 줄 — 보낸 창 맨 위 (sendPendHtml). 옅은 파랑 = 가는 중, 옅은 빨강 = 못 감 */
+table.sbox tr.sendpend.ing td{background:#eff6ff}
+table.sbox tr.sendpend.fail td{background:#fef2f2}
+table.sbox td .pst{color:#1e40af;font-size:11.5px;white-space:nowrap}
+table.sbox td .pst.bad{color:#991b1b;font-weight:700;margin-right:4px}
+table.sbox td.pe{color:#991b1b;font-size:11.5px;white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}
 table.sbox tr.sfsub td{background:#f8fafc}
 table.sbox tr.sfsub td:nth-child(4){padding-left:14px;white-space:nowrap}   /* 받는 곳 이름·주소는 한 줄 — 모자라는 자리는 제목 칸이 줄바꿈으로 내준다 */
 table.sbox td span.sn{display:inline-block;min-width:22px;color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums}
@@ -4603,6 +4609,7 @@ const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', e
   mailSent: mailFirstScreen(),
   sentBox:{}, schedBox:{}, sentQ:'', sentMine:false, sentCat:'', sentBy:'',
   sentFlat:false, sentOpen:{},   /* 한 번에 보낸 것 «묶어 보기»(기본) ↔ 낱낱이 · 펼친 묶음 — sentFold */
+  sendPend:[],                   /* 보내는 중·못 보낸 메일 줄 — 보낸 창 맨 위(sendPendHtml) */
   showBcc:false, draftAt:'', matPick:'',
   edMode:'editor',   /* 2026-08-24: 가짜였던 bodyFont/Size/Bold/Italic 없앰 · 2026-08-30: 자료 서랍 값(drawerW·drawerQ·drawerOpen·mailDrawer) 없앰 */
   /* ★ 첫 화면 (대표 화면 2026-08-24 「3만 나오게 해달라」)
@@ -7394,6 +7401,18 @@ async function sendCompose(){
   }
   _sending = true;
   lockSendButtons(true);
+  /* ★ 메일함에서 «지금 보내기»는 쓰기 화면에 붙잡아 두지 않는다 (대표 지시 2026-11-09
+       「메일 보내면 보낸창으로 바로 넘어가고 기다리게」). 누르는 즉시 「보낸 메일」 창으로 가고,
+       그 맨 위 «보내는 중… N초» 줄로 기다린다. 서버는 4~6초 걸린다(2026-11-09 서버 로그: 6.1초·4.2초).
+     ⚠ 쓴 글(c)은 줄(pend.snap)이 들고 있다 — 실패하면 「다시 쓰기」로 그대로 되살린다.
+       임시저장은 «나간 뒤에만» 지운다(아래) — 중간에 창이 닫혀도 글이 남는다.
+     ⚠ 예약(sendAt)은 서버가 자리만 잡고 곧바로 답하므로 예전 그대로다. 메일함이 아닌 곳(자료함 보내기 창)도 예전 그대로. */
+  const wasMail = (state.view==='mail');
+  const direct = wasMail && !(Number(c.sendAt||0) > 0);
+  const pend = direct ? sendPendAdd(c) : null;
+  /* ⚠ 비우기 «전에» 지금 글을 임시저장한다 — 마지막 자동저장(30초) 뒤에 고친 글도 남아야, 보내는 중에
+       창이 닫히거나 새로고침돼도 «중간에 창이 닫혀도 글이 남는다»가 참이다. pid 로 «이 편지 것»임을 적어 둔다. */
+  if(direct){ saveDraft(true, pend.id); _compose = null; openSentBox(); }
   /* 첨부가 크면 오래 걸린다 — 몇 초째인지 보여 준다. 숫자가 움직이면 멈춘 게 아니라는 걸 안다. */
   const t0 = Date.now();
   const tick = setInterval(()=>{
@@ -7402,6 +7421,7 @@ async function sendCompose(){
       if(b.dataset.send!=='1') return;
       b.textContent = `보내는 중… ${s}초`;
     });
+    sendPendTick();
   }, 1000);
   try{
     const r = await postAutoMail({
@@ -7416,7 +7436,7 @@ async function sendCompose(){
            서버가 있는 쪽을 쓴다(위 addLocalFiles 머리글). 지우면 큰 첨부가 조용히 빠진다. */
       files: (c.files||[]).map(f=>({ name:f.name, dataUrl:f.dataUrl, path:f.path }))
     });
-    const cardId = c.cardId, wasMail = (state.view==='mail');
+    const cardId = c.cardId;
     const lost = (c.files||[]).length;
     /* ⚠ 답장이었으면 «원래 메일»에 답장 표를 켠다 (대표 지시 2026-09-03).
          다음메일은 우리가 SMTP 로 보낸 것을 「그 메일의 답장」인 줄 모르므로,
@@ -7425,8 +7445,11 @@ async function sendCompose(){
        ⚠ 예약이면 안 켠다 — 아직 안 나갔다. 그때 sendScheduledMail 이 보내고,
          다음 회차 동기화가 다음메일의 표를 그대로 가져온다. */
     const rep = (!r.scheduled && c.replyTo) ? c.replyTo : null;
-    _compose = null;
-    clearDraft();          /* 나갔으니 쓰다 만 글은 지운다 — 안 지우면 다음에 또 뜬다 */
+    if(!direct) _compose = null;   /* 바로 보낸 길은 이미 비웠다 — 그 사이 새로 쓰기 시작한 글을 건드리지 않는다 */
+    /* 나갔으니 쓰다 만 글은 지운다 — 안 지우면 다음에 또 뜬다.
+       ⚠ 바로 보낸 길은 «이 편지의 저장본»만 지운다(clearDraftIf) — 그 사이 새 메일을 열었어도(비어 있든 쓰고 있든)
+         나간 글의 저장본은 지워야 다음에 「이어서 쓸까요?」로 또 뜨지 않고, 새로 쓴 글의 저장본은 남는다. */
+    if(direct) clearDraftIf(pend.id); else clearDraft();
     if(r.scheduled){
       toast(`⏰ ${esc(fmtWhen(r.at))} 에 보내도록 맡겼습니다 — 창을 닫아도 나갑니다`
         + (lost?`\n⚠ 💻 내 PC 파일 ${lost}개는 예약에 담기지 않습니다 — 그때 직접 붙여 보내세요`:''),
@@ -7441,12 +7464,16 @@ async function sendCompose(){
        ⚠ 실패해도 «보내기는 성공»이다 — 표시 하나 때문에 보낸 것이 실패로 보이면 안 된다.
          다음 회차 동기화가 다음메일 쪽 표를 다시 읽어 오므로 스스로 맞춰지기도 한다. */
     if(rep && rep.slug && rep.uid) mbAnswered(rep.slug, rep.uid);
-    /* 보낸 뒤에는 보낸 메일함을 보여 준다 — 방금 것이 실제로 남았는지 그 자리에서 확인된다 */
-    if(wasMail) openSentBox(); else closeSendMat();
+    /* 보낸 뒤에는 보낸 메일함을 보여 준다 — 방금 것이 실제로 남았는지 그 자리에서 확인된다.
+       바로 보낸 길(direct)은 창이 이미 열려 있다 — 목록만 다시 읽어 «보내는 중» 줄을 실제 기록으로 바꾼다. */
+    if(direct) sentAfterSend(pend);
+    else if(wasMail) openSentBox(); else closeSendMat();
     /* 명함 없이 쓴 메일(cardId 없음)은 명함 기록이 없다 — 기록은 명함에 붙는다 */
     if(cardId) loadSendLog(cardId, ()=>{ const box=$('dSendLog'); if(box) box.innerHTML = sendLogHtml(cardId); });
   }catch(e){
-    /* ⚠ 화면을 닫지 않는다. 쓴 글이 그대로 남아 있어야 고쳐서 다시 보낼 수 있다. */
+    /* ⚠ 화면을 닫지 않는다. 쓴 글이 그대로 남아 있어야 고쳐서 다시 보낼 수 있다.
+       바로 보낸 길은 쓰기 화면을 이미 떠났다 — 보낸 창에 붉은 줄 + 「다시 쓰기」로 글을 되살린다(sendPendFail). */
+    if(pend) sendPendFail(pend, e);
     alert('보내지 못했습니다.\n\n' + ((e&&e.message)||'알 수 없는 오류'));
   }finally{
     clearInterval(tick);
@@ -8475,7 +8502,9 @@ function openMailPage(pre){
      ⚠ puAsk 는 confirm 과 달리 «JS를 안 멈춘다». 그래서 뒤에 오던 일을 통째로
        mailPageBuild 로 떼어 내고, 답을 받은 뒤에 부른다. 안 그러면 물어보는 동안
        화면이 먼저 그려져 «답하기 전에» 새 편지가 열린다. */
-  if(!_compose && !pre){
+  /* ⚠ 보내는 중(_sending)이면 임시저장은 «지금 나가는 그 글»이다 — 이어 쓰자고 묻지 않는다.
+       (보낸 창에서 기다리는 사이 「새 메일」을 눌러도 같은 글이 또 열려 두 번 나가는 길을 막는다. 실패하면 임시저장이 남아 있다.) */
+  if(!_compose && !pre && !_sending){
     const d = loadDraft();
     if(d && composeTouched(d)){
       const when = new Date(d.at).toTimeString().slice(0,5);
@@ -8488,6 +8517,8 @@ function openMailPage(pre){
       }).then(yes=>{
         if(yes){
           _compose = Object.assign({ picking:true }, d);
+          /* 못 보낸 줄에서 나온 저장본이면 그 붉은 줄을 거둔다 — 줄과 편집기가 같은 글을 두 벌로 들지 않게 */
+          if(d.pid) state.sendPend = (state.sendPend||[]).filter(x=>x.id!==d.pid);
           state.draftAt = when;
           if(d.lostFiles && d.lostFiles.length)
             setTimeout(()=>toast(`💻 내 PC 파일(${d.lostFiles.join(' · ')})은 다시 붙여 주세요 — 임시저장에는 담기지 않습니다`, 9000), 400);
@@ -9684,7 +9715,9 @@ function composeTouched(c){
   if(String(c.body||'')    !== String(base.body||''))    return true;
   return false;
 }
-function saveDraft(quiet){
+/* pid — 「지금 나가는 그 편지의 임시저장」 표(보내는 중 줄 번호). 있으면 저장본에 함께 적는다.
+   나간 뒤 «이 표가 붙은 저장본만» 지운다(clearDraftIf) — 그 사이 새로 쓴 글의 저장본은 건드리지 않는다. */
+function saveDraft(quiet, pid){
   grabCompose();
   if(!_compose) return;
   if(!composeTouched(_compose)){
@@ -9694,7 +9727,9 @@ function saveDraft(quiet){
     return;
   }
   try{
-    localStorage.setItem(DRAFT_LS, JSON.stringify(draftOf(_compose)));
+    const rec = draftOf(_compose);
+    if(pid) rec.pid = String(pid);
+    localStorage.setItem(DRAFT_LS, JSON.stringify(rec));
     state.draftAt = new Date().toTimeString().slice(0,5);
     if(!quiet) toast('임시저장했습니다 — 다음에 「메일 쓰기」로 오면 이어서 씁니다', 6000);
     else { const el=document.querySelector('.mauto'); if(el) el.textContent='자동저장 '+state.draftAt; }
@@ -9709,6 +9744,14 @@ function loadDraft(){
   }catch(_){ return null; }
 }
 function clearDraft(){ try{ localStorage.removeItem(DRAFT_LS); }catch(_){} state.draftAt=''; }
+/* 저장본이 «그 편지 것»일 때만 지운다 — 보내는 사이 새로 쓴 글이 자동저장으로 저장본을 덮었으면 그것은 남긴다. */
+function clearDraftIf(pid){
+  if(!pid) return;
+  try{
+    const v = JSON.parse(localStorage.getItem(DRAFT_LS)||'null');
+    if(v && String(v.pid||'') === String(pid)) clearDraft();
+  }catch(_){}
+}
 /* 30초마다 조용히 담아 둔다 — 자리를 비운 사이 창이 닫혀도 글이 남는다 */
 setInterval(()=>{ if(state.view==='mail' && !state.mailSent && _compose && composeTouched(_compose)) saveDraft(true); }, 30000);
 
@@ -10259,6 +10302,79 @@ function sentFoldToggle(key){
   renderMailPage();
 }
 function sentFlatToggle(){ state.sentFlat = !state.sentFlat; renderMailPage(); }
+/* ══════ 보내는 중 — 쓰기 화면이 아니라 «보낸 창»에서 기다린다 (대표 지시 2026-11-09) ══════
+   「메일 보내면 보낸창으로 바로 넘어가고 기다리게 했으면 좋겠다」
+   ★ 까닭 — 서버가 한 통 보내는 데 4~6초 걸린다(서버 로그 2026-11-09: 6.1초·4.2초). 그동안 쓰기 화면에
+     «보내는 중… N초» 단추만 남아 아무것도 못 했다. 이제 누르는 즉시 보낸 창으로 가고 맨 위 줄이 기다린다.
+   ★ 줄은 세 모양이다 — ⏳ 보내는 중(초가 올라감) → 나가면 실제 기록(sentBox)으로 바뀐다 / ❌ 못 보냄(까닭 + 「다시 쓰기」).
+   ⚠ 쓴 글은 줄이 들고 있다(snap) — 실패하면 「다시 쓰기」가 그대로 되살린다. 임시저장은 «나간 뒤에만» 지운다.
+   ⚠ 보내는 동안 다른 메일은 못 보낸다(_sending) — 같은 메일이 두 번 나가는 길을 막는다. */
+function sendPendAdd(c){
+  const it = (state.items||{})[c.cardId] || {};
+  const names = (c.ids||[]).map(id=>String((_matMeta[id]||{}).name||'')).concat((c.files||[]).map(f=>String((f&&f.name)||''))).filter(Boolean);
+  const p = { id:'sp'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), t0:Date.now(),
+              to:String(c.to||''), toName:String(it.name||it.company||''), subject:String(c.subject||''),
+              names:names, status:'sending', error:'', snap:c };
+  (state.sendPend || (state.sendPend = [])).unshift(p);
+  return p;
+}
+/* 초가 올라가게 — 줄을 다시 그리지 않고 숫자만 바꾼다(누르는 중인 단추가 안 흔들리게) */
+function sendPendTick(){
+  document.querySelectorAll('.sendpend .sec').forEach(el=>{
+    el.textContent = Math.max(0, Math.round((Date.now()-Number(el.dataset.t0||0))/1000));
+  });
+}
+function sendPendRedraw(){ if(state.view==='mail' && state.mailSent===true) renderMailPage(); }
+function sendPendFail(p, e){
+  p.status = 'failed';
+  p.error = String((e&&e.message)||'알 수 없는 오류');
+  sendPendRedraw();
+}
+/* 나갔다 — 목록을 다시 읽고, 읽은 뒤에 «보내는 중» 줄을 거둔다(그 사이 줄이 비어 보이지 않게) */
+function sentAfterSend(p){
+  loadSentBox(()=>{
+    state.sendPend = (state.sendPend||[]).filter(x=>!p || x.id!==p.id);
+    if(state.view==='mail' && state.mailSent===true){ renderPCSide(); renderMailPage(); }
+  });
+}
+function sendPendDrop(id){
+  state.sendPend = (state.sendPend||[]).filter(x=>x.id!==id);
+  clearDraftIf(id);   /* 못 보낸 글을 «버리겠다»는 뜻 — 그 저장본이 「이어서 쓸까요?」로 또 뜨지 않게 */
+  sendPendRedraw();
+}
+/* 못 보낸 글을 쓰기 화면에 그대로 되살린다 */
+function sendPendRetry(id){
+  const p = (state.sendPend||[]).find(x=>x.id===id);
+  if(!p || p.status!=='failed') return;
+  if(_compose && _compose!==p.snap && composeTouched(_compose)
+     && !confirm('지금 쓰고 있는 메일이 있습니다.\n못 보낸 메일로 바꿀까요? (쓰던 글은 사라집니다)')) return;
+  _compose = p.snap;
+  state.sendPend = state.sendPend.filter(x=>x.id!==id);
+  state.mailSent = false; render();
+}
+/* 값(id)은 data 속성에 «자료로만» 싣는다 — onclick 에 글자로 박지 않는다(묶음 줄과 같은 약속) */
+function sendPendHtml(){
+  return (state.sendPend||[]).map(p=>{
+    const ing = p.status==='sending';
+    const names = esc((p.names||[]).join(' · ')||'첨부 없음');
+    const sec = Math.max(0, Math.round((Date.now()-p.t0)/1000));
+    const row = `
+    <tr class="sendpend ${ing?'ing':'fail'}">
+      <td class="numonly">${ing?'⏳':'❌'}</td>
+      <td class="w">${fmtDate(p.t0)}<span>${sentHm(p.t0)}</span></td>
+      <td class="b">${esc(staffName(myEmail))}</td>
+      <td><b>${esc(p.toName||'')}</b><span class="e">${esc(p.to||'')}</span></td>
+      <td>${esc(p.subject||'')}<span class="e">${names}</span></td>
+      <td class="a">${ing
+        ? `<span class="pst">보내는 중… <b class="sec" data-t0="${p.t0}">${sec}</b>초</span>`
+        : `<span class="pst bad">보내지 못함</span>
+        <button type="button" data-pid="${esc(p.id)}" onclick="sendPendRetry(this.dataset.pid)">다시 쓰기</button>
+        <button type="button" data-pid="${esc(p.id)}" onclick="sendPendDrop(this.dataset.pid)">지우기</button>`}</td>
+    </tr>`;
+    return ing ? row : row + `
+    <tr class="sendpend fail"><td class="numonly"></td><td colspan="5" class="pe" role="alert">${esc(p.error||'')}</td></tr>`;
+  }).join('');
+}
 const sentHm = ts => new Date(ts||0).toTimeString().slice(0,5);
 /* 줄의 «번호 뒤» 다섯 칸 — 낱줄과 펼친 묶음 안쪽 줄이 한 벌을 쓴다(칸을 늘릴 때 한 곳만 고친다).
    sub 는 묶음 안쪽 줄의 번호(1…) — 있으면 받는 곳 앞에 흐리게 붙인다. */
@@ -10301,6 +10417,7 @@ function sentBoxHtml(){
   /* 2026-08-23 대표 지시: "모낸메일 은 체크표시 필요없고 번호만 있으면 된다"
      보낸 메일은 「이미 나간 기록」이라 골라서 지울 일이 없다. ☐ 를 거두고 번호만 둔다.
      예약 메일·자료함은 골라서 취소·이동·삭제를 하니 ☐ 를 그대로 둔다. */
+  const pendHtml = sendPendHtml();   /* 보내는 중·못 보낸 줄 — 거르기·찾기와 상관없이 맨 위 */
   const body = items.length ? items.map((it,i)=>{
     if(it.fold) return sentFoldHtml(it, i, !!open[it.key]);
     const v = it.row;
@@ -10309,7 +10426,7 @@ function sentBoxHtml(){
       <td class="numonly">${i+1}</td>${sentTdsHtml(v)}
     </tr>`;
   }).join('')
-    : `<tr><td colspan="6" class="none">${q||mine?'찾은 메일이 없습니다.':'아직 보낸 메일이 없습니다.'}</td></tr>`;
+    : (pendHtml ? '' : `<tr><td colspan="6" class="none">${q||mine?'찾은 메일이 없습니다.':'아직 보낸 메일이 없습니다.'}</td></tr>`);
   return `
     <div class="mboxbar">
       <button class="setback" onclick="mailBack()">← 목록으로</button>
@@ -10328,7 +10445,7 @@ function sentBoxHtml(){
     </div>
     <table class="sbox tight"><thead><tr>
       <th class="numonly"></th><th>보낸 때</th><th>보낸 사람</th><th>받는 곳</th><th>제목 · 첨부</th><th></th>
-    </tr></thead><tbody>${body}</tbody></table>
+    </tr></thead><tbody>${pendHtml}${body}</tbody></table>
     <p style="font-size:11.5px;color:#94a3b8;line-height:1.7;margin-top:12px">
       ※ 명함 없이 보낸 것도 남습니다. 명함 상세에는 그 사람 것만 추려 보입니다.<br>
       ※ 같은 제목을 여러 곳에 한 번에 보낸 것은 한 줄로 묶었습니다 — 줄을 누르면 받은 곳이 펼쳐집니다(기록은 지우지 않았습니다).</p>`;

@@ -43,11 +43,12 @@ function makeEnv(stateInit) {
     sliceFn(cards, 'function sentFlatToggle()'),
     sliceFn(cards, 'function sentTdsHtml(v, sub)'),
     sliceFn(cards, 'function sentFoldHtml(g, i, isOpen)'),
+    sliceFn(cards, 'function sendPendHtml()'),   /* 보낸 창이 맨 위에 «보내는 중» 줄을 함께 그린다 */
     sliceFn(cards, 'function sentBoxHtml()'),
     '({ sentFold, sentFoldToggle, sentFlatToggle, sentBoxHtml, sentVisibleRows, GAP: SENT_FOLD_GAP_MS, MIN: SENT_FOLD_MIN })',
   ];
   const ctx = {
-    state: Object.assign({ sentBox: {}, sentQ: '', sentMine: false, sentCat: '', sentBy: '', sentFlat: false, sentOpen: {} }, stateInit || {}),
+    state: Object.assign({ sentBox: {}, sentQ: '', sentMine: false, sentCat: '', sentBy: '', sentFlat: false, sentOpen: {}, sendPend: [] }, stateInit || {}),
     myEmail: 'me@example.invalid', _matMeta: {}, matCat: () => '',
     staffName: (e) => ({ 'p@example.invalid': '보낸이가' }[String(e || '')] || ''),
     esc: (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
