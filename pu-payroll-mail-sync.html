@@ -626,7 +626,7 @@ git push origin main</pre>
             const hangulWords = line.match(/[가-힣]{2,4}/g) || [];
             const stopWords = ['안녕하세요', '과장님', '대리님', '주임님', '노무사님', '담당자님', '신규입사자', '입사자', '퇴사자', '주민번호', '주민등록번호', '연락처', '입사일', '퇴사일', '월보수액', '월급여', '기본급', '자진퇴사', '개인사정', '취득신고', '상실신고', '부탁드립니다'];
             for (let w of hangulWords) {
-              if (stopWords.indexOf(w) === -1) {
+              if (stopWords.indexOf(w) === -1 && !/신고|부탁|주민|번호|퇴사|입사|취득|상실|사직|연락|계좌|급여|보수|근태|사업장|신규|자진|안내|문의|처리|요청/.test(w)) {
                 empName = w;
                 break;
               }
@@ -658,7 +658,7 @@ git push origin main</pre>
             phone_raw: phoneRaw,
             date: dtStr,
             pay: payVal || 0,   /* 없는 급여액을 지어내지 않는다 — 화면은 0 이면 '-' */
-            note: PuPayrollMailBridge.maskNames(maskPersonalInfoText(line), PuPayrollMailBridge.findNames(rawText)).slice(0, 65)
+            note: PuPayrollMailBridge.maskNames(maskPersonalInfoText(line), [empName].concat(PuPayrollMailBridge.findNames(rawText))).slice(0, 65)
           });
         }
       }
@@ -1037,7 +1037,9 @@ git push origin main</pre>
       const bodyStr = document.getElementById('simBody').value;
 
       const matched = matchWorkplaceForMail(fromStr, subjStr, bodyStr);
-      const masked = PuPayrollMailBridge.maskNames(maskPersonalInfoText(bodyStr), PuPayrollMailBridge.findNames(bodyStr));
+      const previewNames = parseMailEntities(bodyStr).map(function(it) { return it.emp_name; })
+        .concat(PuPayrollMailBridge.findNames(bodyStr + '\n' + subjStr));
+      const masked = PuPayrollMailBridge.maskNames(maskPersonalInfoText(bodyStr), previewNames);
 
       document.getElementById('simMaskedPreview').textContent = masked;
       if (matched) {
@@ -1415,9 +1417,10 @@ git push origin main</pre>
           return;
         }
         const parsedItems = parseMailEntities(bodyStr);
-        const maskedBody = PuPayrollMailBridge.maskNames(
-          maskPersonalInfoText(bodyStr),
-          parsedItems.map(function(it) { return it.emp_name; }).concat(PuPayrollMailBridge.findNames(bodyStr)));
+        const personNames = parsedItems.map(function(it) { return it.emp_name; })
+          .concat(PuPayrollMailBridge.findNames(bodyStr + '\n' + subjStr));
+        const maskedBody = PuPayrollMailBridge.maskNames(maskPersonalInfoText(bodyStr), personNames);
+        const maskedSubject = PuPayrollMailBridge.maskNames(maskPersonalInfoText(subjStr), personNames);
 
         const newMail = {
           id: 'mail_sim_' + Date.now(),
@@ -1425,7 +1428,7 @@ git push origin main</pre>
           from_email: maskEmailText((fromStr.match(/<([^>]+)>/) || [null, targetComp.pay_mail || 'cl***@daum.net'])[1]),
           to_email: '37***@hanmail.net',
           received_at: '2026-11-08 방금 도착',
-          subject: maskPersonalInfoText(subjStr),
+          subject: maskedSubject,
           attachments: [targetComp.name + '_입퇴사근태_원본첨부.xlsx'],
           raw_body: bodyStr,
           masked_body: maskedBody,
@@ -1439,7 +1442,7 @@ git push origin main</pre>
 
         document.getElementById('mailSimulatorModal').classList.add('hidden');
         document.getElementById('mailBridgeStatusText').innerHTML =
-          '방금 수신: <strong class="text-white">' + esc(targetComp.name) + ' (담당: ' + esc(targetComp.staff) + ')</strong> — 「' + esc(maskPersonalInfoText(subjStr)) + '」 자체 마스킹 및 원본자료함 전송 완료';
+          '방금 수신: <strong class="text-white">' + esc(targetComp.name) + ' (담당: ' + esc(targetComp.staff) + ')</strong> — 「' + esc(maskedSubject) + '」 자체 마스킹 및 원본자료함 전송 완료';
         renderAll();
         showToast('#' + targetComp.seq + ' ' + targetComp.name + '(담당: ' + targetComp.staff + ')으로 마스킹 가공본 및 개인정보 원본이 자동 전송되었습니다!');
       });
