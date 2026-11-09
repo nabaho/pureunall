@@ -22,6 +22,12 @@ test('자리가 있다 — 모듈 불러오기 · 로그인 뒤 시작 · 타일
   assert.match(html, /portalHanaPaintBadge\(\);\s*initPortalMrAlerts\(role, acct\);/, '타일을 새로 그린 직후 시작(이미 돌고 있으면 딱지만 다시 붙인다)');
   assert.match(html, /stopPortalHanaAlerts\(\);\s*stopPortalMrAlerts\(\);/, '로그아웃하면 멈춘다');
 });
+test('자주 쓰는 앱 줄(복제본)의 딱지도 키보드로 열린다 — 복제본은 리스너가 없어 줄 위임이 «딱지»도 받아야 한다 · 포커스 표시', () => {
+  /* ⚠ 큰 파일(enter.html)에 assert.match 를 쓰면 실패할 때 파일 전체가 쏟아진다 — ok(test) 로 */
+  assert.ok(/pt\.addEventListener\('keydown', function\(e\)\{[\s\S]{0,300}contains\('tile-alert'\)\)\) onPinCloneClick\(e\);/.test(html), '복제본 딱지에 키보드 위임이 없다');
+  assert.ok(/\.tile-alert:focus-visible\{[^}]*outline:/.test(html), '키보드로 닿았을 때 보이는 표시가 없다');
+  assert.ok(/var badge = e\.target\.closest\('\.nl-warn, \.tile-alert'\);[\s\S]{0,200}ob\.click\(\)/.test(html), '복제본 딱지를 누르면 원본 딱지를 누르는 길이 없다(키보드도 이 길을 탄다)');
+});
 test('★ 창을 띄우지 않는다 — 모달·alert·confirm 없이 딱지만(하던 일을 가로막지 않는다)', () => {
   assert.ok(!/alert\(|confirm\(|showPortal|modal|\.style\.display\s*=\s*'flex'/i.test(BLOCK), '창을 띄우는 코드가 없어야 한다');
   assert.match(BLOCK, /className = 'tile-alert'/);

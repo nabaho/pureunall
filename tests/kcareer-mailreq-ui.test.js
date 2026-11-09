@@ -159,6 +159,19 @@ test('목록 — 한 줄 칸(제목은 … + title 전문) · ☐ + № · 탭 �
   assert.match(h, /class="mr-btx"/, '단추 말은 폰에서 숨긴다');
   assert.match(html, /@media \(max-width:760px\)\{[^}]*\.mr-btx\{display:none\}/, '폰에서 단추 말 숨김(CSS)');
 });
+test('알 수 없는 상태값이면 칩도 단추도 «새 요청»으로 맞는다(칩은 새 요청인데 되돌림 단추만 나오면 안 된다)', async () => {
+  const w = await started({ onPage: true });
+  await w.db.ref('kcareer/U1/mailreq/items/' + IN + '~101').update({ st: 'zzz' });
+  w.ctx.mrTab('all');
+  const h = w.els.mrBody.innerHTML;
+  assert.match(h, /class="mr-chip new">새 요청</); assert.match(h, /mrOne\('[^']*','doing'\)/, '확인 단추'); assert.match(h, /mrOne\('[^']*','ignored'\)/);
+  assert.ok(!/되돌림/.test(h.slice(h.indexOf('<tbody>'))), '새 요청으로 그려졌으니 되돌림 단추가 나오면 안 된다');
+});
+test('칩은 «자기 바탕»을 가진다 — 어두운 판에서도 표 바탕은 흰색이라 글자색만 뒤집는 규칙이 없다', () => {
+  const css = html.slice(html.indexOf('.mr-chip{'), html.indexOf('#mrBody .btn:disabled'));
+  assert.ok(!/html\.dark \.mr-chip/.test(css), '어두운 판에서 칩 글자만 밝게 바꾸면 흰 표 위에서 안 보인다');
+  ['new', 'doing', 'done', 'red'].forEach((k) => assert.match(css, new RegExp('\\.mr-chip\\.' + k + '\\{[^}]*background:#[0-9a-f]{6};[^}]*color:#[0-9a-f]{6}'), k + ' 칩에 바탕과 글자색이 같이 있어야 한다'));
+});
 test('키보드로 닿는다 — 탭은 단추(button) · 띠 링크는 href 가 있고 · 고르기 칸에는 이름이 붙는다 · 도구줄은 .toolbar(제목 중복 없음)', async () => {
   const w = await started({ onPage: true }); w.ctx.mrRender();
   const h = w.els.mrBody.innerHTML;

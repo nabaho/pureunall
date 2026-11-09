@@ -195,10 +195,11 @@
     var dl = deadlineOf(opt.text ? opt.text : (subj + '\n' + pre), opt.refMs || row.d);
     /* 「RE:」·「회신:」 — 우리가 보낸 것에 상대가 답한 메일. «달라는 말»(ASK)이나 새 기한이 없으면(서명해 돌려보낸 사본 등) 요청이 아니다 */
     var isReply = /^\s*(?:re|회신|답장)\s*[:：]/i.test(subj);
+    if (isReply && !ASK.test(subj + ' ' + body) && !dl) return null;     // 모든 종류에 — 본문 단서·기타 요청도 답장이면 «달라는 말»이나 새 기한이 있어야 한다
     var weak = {};
     ['consent', 'career'].forEach(function (k) { if (!strong[k]) { var m = WORDS[k].exec(body); if (m) weak[k] = m[0]; } });
     ['consent', 'career'].forEach(function (k) {
-      if (strong[k] && (act || forms.length || dl) && !(isReply && !ASK.test(subj + ' ' + body) && !dl)) kinds.push(k);
+      if (strong[k] && (act || forms.length || dl)) kinds.push(k);
       else if (weak[k] && act && (forms.length || dl)) { kinds.push(k); why.push('본문에 «' + cut(weak[k], 14) + '»'); }
     });
     if (!kinds.length && WORDS.other.test(head + ' ' + body) && act && (dl || forms.length || actInSubj)) {

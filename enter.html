@@ -159,7 +159,7 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=1"></script>
+<script src="js/kcareer-mailreq.js?v=2"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -566,6 +566,7 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
   writing-mode:vertical-rl;cursor:pointer;
   box-shadow:0 3px 9px rgba(185,28,28,.42);}
 .tile-alert:hover{background:#991b1b;}
+.tile-alert:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px #1e40af;}   /* 키보드로 닿았을 때 */
 .tile.lock{opacity:.5;cursor:default;}
 .tile.lock:hover{background:none;}
 .tile.lock:hover .ic{transform:none;box-shadow:none;border-color:var(--card-border);}
@@ -5426,7 +5427,7 @@ body.portal-mode #moreFab{display:flex;}
       var pt = $('pinTiles');
       pt.addEventListener('click', onPinCloneClick);
       pt.addEventListener('keydown', function(e){
-        if((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pin-star')) onPinCloneClick(e);
+        if((e.key === 'Enter' || e.key === ' ') && e.target.classList && (e.target.classList.contains('pin-star') || e.target.classList.contains('tile-alert'))) onPinCloneClick(e);   // 딱지(요청 N)도 — 복제본 딱지는 리스너가 없다
       });
       $('foldAllBtn').addEventListener('click', foldAllToggle);
       /* 폰: 앱을 «꾹 누르면» 자주 쓰는 앱 넣기·빼기 (대표 2026-10-24 「꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것」).

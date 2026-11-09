@@ -777,12 +777,11 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
 .mr-st{font-size:11.5px;color:var(--text-mute);margin:0 0 8px;word-break:keep-all}
 .mr-note{font-size:11.5px;color:var(--text-mute);line-height:1.6;margin-top:10px;word-break:keep-all}
-.mr-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-mute);white-space:nowrap}
-.mr-chip.new{color:#854d0e;border-color:var(--amber)}   /* 글자는 짙은 호박색 — var(--amber) 글자는 흰 바탕에서 3.2:1 이라 모자란다 */
-.mr-chip.doing{color:var(--blue);border-color:var(--blue)}
-.mr-chip.done{color:var(--teal);border-color:var(--teal)}
-.mr-chip.red{color:var(--red);border-color:var(--red)}
-html.dark .mr-chip.new{color:#fde68a}html.dark .mr-chip.doing{color:#bfdbfe}html.dark .mr-chip.done{color:#bbf7d0}html.dark .mr-chip.red{color:#fecaca}   /* 어두운 판 — 카드 바탕 위 대비 */
+.mr-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid var(--border);background:#f8fafc;color:#475569;white-space:nowrap}   /* 칩은 «자기 바탕»을 가진다 — 어두운 판에서도 표 바탕은 흰색이라 글자색만 뒤집으면 안 보인다 */
+.mr-chip.new{background:#fffbeb;color:#854d0e;border-color:var(--amber)}   /* 글자는 짙은 호박색 — var(--amber) 글자는 흰 바탕에서 3.2:1 이라 모자란다 */
+.mr-chip.doing{background:#eff6ff;color:#1e40af;border-color:var(--blue)}
+.mr-chip.done{background:#f0fdf4;color:#166534;border-color:var(--teal)}
+.mr-chip.red{background:#fef2f2;color:#991b1b;border-color:var(--red)}
 #mrBody .btn:disabled{opacity:.5;cursor:default}
 #mrBody tr.mr-over td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 #mrBody tr.mr-soon td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
@@ -1538,7 +1537,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=1"></script>
+<script src="js/kcareer-mailreq.js?v=2"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -15221,8 +15220,8 @@ function mrRowHtml(x, i, now){
   else 기한='<span style="color:var(--text-mute)" title="'+(x.bodyAt?'본문에서 기한 말과 가까운 날짜를 찾지 못했습니다 — 메일을 열어 확인해 주세요':((Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'본문을 열지 못했습니다 — 메일을 열어 확인해 주세요':'본문을 읽는 중입니다'))+'">'+(x.bodyAt||(Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'기한 모름':'읽는 중…')+'</span>';
   var id=_jsAttr(x.id);
   var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };
-  var 관리=(x.st==='new'?단추('doing','👀','확인','확인함으로 표시 — 아직 처리 전입니다')+' ':'')
-    +(x.st==='new'||x.st==='doing'?단추('done','✔','완료','처리 완료로 표시')+' '+단추('ignored','🚫','아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩','되돌림','진행 중으로 되돌립니다'));
+  var 관리=(st==='new'?단추('doing','👀','확인','확인함으로 표시 — 아직 처리 전입니다')+' ':'')
+    +(st==='new'||st==='doing'?단추('done','✔','완료','처리 완료로 표시')+' '+단추('ignored','🚫','아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩','되돌림','진행 중으로 되돌립니다'));
   return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
     +'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" aria-label="'+escapeHtml(String(x.s||'').slice(0,40))+' 고르기"'+(_mr.sel[x.id]?' checked':'')+' onclick="mrPick(\''+id+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
     +'<td style="white-space:nowrap" title="'+escapeHtml(Q.kindsLabel(x.kinds))+'">'+(종류.length?'<span class="tag navy">'+종류[0].icon+' '+escapeHtml(종류[0].label)+(종류.length>1?' +'+(종류.length-1):'')+'</span>':'')+'</td>'

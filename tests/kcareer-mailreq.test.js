@@ -66,6 +66,13 @@ test('답장(RE:)은 요청 말투나 새 기한이 없으면 요청이 아니�
   const dl = Q.detect({ s: 'RE: 개인정보 동의서', an: ['동의서.hwp'], p: '', d: NOW }, { text: '제출기한이 2026-11-20 로 연장되었습니다', refMs: NOW });
   assert.ok(dl, '새 기한이 적힌 답장은 요청이다');
 });
+test('답장 제외는 «모든 종류»에 — 본문 단서·기타 요청도 RE: 이면 달라는 말이나 새 기한이 있어야 한다', () => {
+  assert.equal(Q.detect({ s: 'RE: 사업자등록증 사본 제출', an: ['사업자등록증.pdf'], p: '첨부합니다', d: NOW }), null, '기타 요청(서류 말) 답장');
+  assert.equal(Q.detect({ s: 'RE: 안내드립니다', an: ['동의서.hwp'], p: '', d: NOW }, { text: '개인정보 동의서를 작성하여 보냅니다', refMs: NOW }), null, '본문 단서 + 요청 말투 + 양식인데 달라는 말·새 기한이 없는 답장');
+  assert.ok(Q.detect({ s: 'RE: 안내드립니다', an: [], p: '', d: NOW }, { text: '개인정보 동의서를 11월 20일까지 작성해 보냅니다', refMs: NOW }), '새 기한이 적힌 답장은 요청이다');
+  const ask = Q.detect({ s: 'RE: 사업자등록증 사본 제출', an: ['사업자등록증.pdf'], p: '다시 제출 부탁드립니다', d: NOW });
+  assert.ok(ask && ask.kinds.includes('other'), '달라는 말이 있는 답장은 요청이다');
+});
 test('첨부가 «있기만» 하다고 요청이 아니다 — 양식 파일이거나 요청 말투·기한이 있어야 한다', () => {
   assert.equal(Q.detect({ s: '경력확인서 관련', an: ['IMG_0001.jpg'], a: 1, p: '', d: NOW }), null, '사진 한 장 첨부');
   assert.equal(Q.detect({ s: '경력확인서 관련', an: [], a: 3, p: '', d: NOW }), null, '첨부 이름을 모르는 메일도 첨부 수만으로는 안 올린다');
