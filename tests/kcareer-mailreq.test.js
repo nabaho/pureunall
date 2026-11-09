@@ -209,6 +209,42 @@ test('상태 바꾸기 — 한 번에 쓰는 update 모양 · st 와 시각만 �
   assert.deepEqual(Q.stateUpdate([IN + '~1'], 'nope', NOW), {}, '모르는 상태는 쓰지 않는다');
 });
 
+/* ── 직접 고치기(팝업) ── */
+test('직접 고치기 — 고친 칸만 쓰고, 고친 칸에는 fixed 표시 · 상태·제목·보낸이는 건드리지 않는다', () => {
+  const r = Q.editUpdate('INBOX~1', { kinds: ['career', 'consent'], deadline: { date: '2026-11-30', time: '17:30' }, memo: ' 담당자에게 전화 ' }, NOW);
+  assert.ok(r.ok);
+  assert.deepEqual(r.update['INBOX~1/kinds'], ['consent', 'career'], '정해진 차례로');
+  assert.deepEqual(r.update['INBOX~1/deadline'], { date: '2026-11-30', time: '17:30', text: '직접 입력' });
+  assert.equal(r.update['INBOX~1/memo'], '담당자에게 전화'); assert.equal(r.update['INBOX~1/fixed/kinds'], 1); assert.equal(r.update['INBOX~1/fixed/deadline'], 1);
+  assert.equal(r.update['INBOX~1/updatedAt'], NOW);
+  Object.keys(r.update).forEach((k) => assert.ok(!/\/(st|s|f|e|d|an|why|replyTo|slug|uid|createdAt)$/.test(k), k + ' 은 고치지 않는다'));
+  const only = Q.editUpdate('INBOX~1', { memo: '메모만' }, NOW);
+  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다');
+});
+test('직접 고치기 — 기한을 «없음»으로 고칠 수 있고(null) · 없는 날짜·잘못된 시각·빈 종류·긴 메모는 거절한다', () => {
+  const none = Q.editUpdate('INBOX~1', { deadline: null }, NOW);
+  assert.ok(none.ok); assert.equal(none.update['INBOX~1/deadline'], null); assert.equal(none.update['INBOX~1/fixed/deadline'], 1, '없음으로 고친 것도 fixed(다시 찾아 채우지 않게)');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '2026-02-30', time: '' } }, NOW).ok, false, '없는 날짜');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '', time: '10:00' } }, NOW).ok, false, '날짜 없이 시각만');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '2026-11-30', time: '25:00' } }, NOW).ok, false, '없는 시각');
+  assert.equal(Q.editUpdate('INBOX~1', { kinds: [] }, NOW).ok, false, '종류는 하나 이상');
+  assert.equal(Q.editUpdate('INBOX~1', { kinds: ['x'] }, NOW).ok, false, '모르는 종류만이면 하나도 없는 것');
+  assert.equal(Q.editUpdate('INBOX~1', { memo: 'ㄱ'.repeat(Q.MEMO_MAX + 1) }, NOW).ok, false, '긴 메모');
+  assert.equal(Q.editUpdate('INBOX~1', {}, NOW).ok, false, '바뀐 것이 없다');
+  assert.equal(Q.editUpdate('a b/c~1', { memo: 'x' }, NOW).ok, false, '이상한 건 번호');
+  const empty = Q.editUpdate('INBOX~1', { memo: '   ' }, NOW); assert.equal(empty.update['INBOX~1/memo'], null, '빈 메모는 지운다');
+});
+test('직접 고치기 — 사람이 고친 기한·종류는 다음 본문 보강(훑기)이 덮지 않는다', async () => {
+  const f = db(); await scan(f);                                                     // 101 이 올라옴(본문은 아직 안 읽음)
+  const fix = Q.editUpdate(IN + '~101', { kinds: ['other'], deadline: { date: '2026-12-24', time: '09:00' } }, NOW + 1);
+  await f.ref('kcareer/U1/mailreq/items').update(fix.update);
+  await scan(f, { readBody: read(BODY) });                                           // 본문에는 다른 기한·동의서 단서가 있다
+  const x = items(f)[IN + '~101'];
+  assert.ok(x.bodyAt, '본문은 열었다(회신 주소 등은 채운다)'); assert.equal(x.replyTo, 'reply@example.org');
+  assert.equal(x.deadline.date, '2026-12-24', '고친 기한이 그대로'); assert.deepEqual(x.kinds, ['other'], '고친 종류가 그대로');
+  assert.equal(x.st, 'new');
+});
+
 /* ── 훑기 — 가짜 DB 에서 실제로 돌린다 ──
    ⚠ 가짜 DB 는 열쇠를 «글자 차례»로 센다 → 번호는 세 자리로 맞춘다(진짜는 숫자 차례). 모듈은 숫자로 비교한다. */
 /* 폴더 열쇠는 서버가 «안전한 이름-해시»로 만든다(functions/mail-box.js slugOf) — 점(.)이 없다 */
@@ -299,6 +335,23 @@ test('본문 보강 — 본문에서 종류가 더해지면 정해진 차례(동
   const f = db(); await f.ref('mailbox/msgs/' + IN + '/106').set(row({ s: '강사 이력서 제출 요청', an: [], a: 0, p: '', d: at(11, 9, 14) }));
   await scan(f, { readBody: read('개인정보 수집·이용 동의서도 작성 후 회신 바랍니다. 2026년 11월 20일까지') });
   assert.deepEqual(items(f)[IN + '~106'].kinds, ['consent', 'career']);
+});
+test('★ 본문을 «기다리는 사이» 사람이 팝업에서 고쳐 저장한 기한·종류를 뒤늦은 보강이 덮지 않는다(최신 기록에 원자적으로 적용)', async () => {
+  const f = db(); await scan(f);
+  const slow = async () => {                                                          // 본문이 오는 사이에 사람이 팝업에서 저장한다
+    await f.ref('kcareer/U1/mailreq/items').update(Q.editUpdate(IN + '~101', { kinds: ['other'], deadline: { date: '2026-12-24', time: '09:00' }, memo: '내가 고침' }, NOW + 9).update);
+    return { text: BODY };
+  };
+  await Q.scan({ db: f, uid: 'U1', now: NOW, readBody: slow });
+  const x = items(f)[IN + '~101'];
+  assert.equal(x.deadline.date, '2026-12-24', '기다리는 사이 고친 기한이 그대로'); assert.deepEqual(x.kinds, ['other'], '고친 종류가 그대로'); assert.equal(x.memo, '내가 고침');
+  assert.ok(x.bodyAt, '본문 보강은 했다(회신 주소 등)'); assert.equal(x.replyTo, 'reply@example.org');
+});
+test('본문 보강 — 그새 지워진 건은 되살리지 않는다', async () => {
+  const f = db(); await scan(f);
+  const gone = async () => { await f.ref('kcareer/U1/mailreq/items/' + IN + '~101').set(null); return { text: BODY }; };
+  const r = await Q.scan({ db: f, uid: 'U1', now: NOW, readBody: gone });
+  assert.ok(!(IN + '~101' in items(f)), '지워진 건이 보강으로 되살아나면 안 된다'); assert.ok(!r.enriched.includes(IN + '~101'));
 });
 test('본문 보강 — 사람이 «확인함»으로 바꾼 뒤에 채워도 상태는 그대로', async () => {
   const f = db(); await scan(f);
