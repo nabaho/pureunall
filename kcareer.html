@@ -764,6 +764,33 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
   .sq-rt .sq-x{width:52px}
   .sq-btx{display:none}
 }
+/* 📬 요청 메일 (2026-11-09) — 알림 띠 · 목록. 표는 공용 .dt(폰 카드) 규칙을 그대로 탄다.
+   ⚠ 색은 팔레트 안 값·변수만 — tests/color-palette-apps.test.js */
+.mr-banner{flex-shrink:0;background:#f8fafc;color:#854d0e;border-bottom:1px solid #fbbf24;padding:8px 14px;font-size:12.5px;text-align:center;font-weight:600;word-break:keep-all}
+.mr-banner.red{color:#991b1b;border-bottom-color:#fecaca}
+.mr-banner a{font-weight:800;margin-left:10px;color:inherit;text-decoration:underline;cursor:pointer;padding:4px 2px}
+.mr-banner a:focus-visible,.mr-pill:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.mr-banner a.mr-x{font-weight:400;opacity:.65;text-decoration:none}
+.g-title.top .gcnt.mr-alarm{color:#f87171;font-weight:800}   /* 어두운 옆줄 바탕 위 대비 5:1 — var(--red) 는 3:1 이라 모자란다. 골라 둔 칸(.gsel)은 기본 남색 그대로 */
+.mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
+.mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
+.mr-st{font-size:11.5px;color:var(--text-mute);margin:0 0 8px;word-break:keep-all}
+.mr-note{font-size:11.5px;color:var(--text-mute);line-height:1.6;margin-top:10px;word-break:keep-all}
+.mr-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-mute);white-space:nowrap}
+.mr-chip.new{color:#854d0e;border-color:var(--amber)}   /* 글자는 짙은 호박색 — var(--amber) 글자는 흰 바탕에서 3.2:1 이라 모자란다 */
+.mr-chip.doing{color:var(--blue);border-color:var(--blue)}
+.mr-chip.done{color:var(--teal);border-color:var(--teal)}
+.mr-chip.red{color:var(--red);border-color:var(--red)}
+html.dark .mr-chip.new{color:#fde68a}html.dark .mr-chip.doing{color:#bfdbfe}html.dark .mr-chip.done{color:#bbf7d0}html.dark .mr-chip.red{color:#fecaca}   /* 어두운 판 — 카드 바탕 위 대비 */
+#mrBody .btn:disabled{opacity:.5;cursor:default}
+#mrBody tr.mr-over td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+#mrBody tr.mr-soon td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+@media (max-width:760px){
+  /* 폰: 단추는 그림 + title(말은 숨김) — 카드 오른쪽 세로 단추 칸이 좁다 */
+  .mr-btx{display:none}
+  .mr-banner{font-size:12px;padding:7px 10px}
+}
 .fd-miss{color:var(--amber);font-weight:700}
 .fd-empty{color:var(--text-mute);font-size:12px;padding:6px 0}
 /* 정산 표는 여섯 칸이라 폰 폭(375)보다 넓다(실측 469) — 감싸는 칸이 옆으로 밀리게 한다.
@@ -1511,6 +1538,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
+<script src="js/kcareer-mailreq.js?v=1"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1599,6 +1627,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <a href="#" onclick="backupExport();return false" style="font-weight:800;color:#854d0e;margin-left:10px;text-decoration:underline">💾 지금 백업</a>
   <a href="#" onclick="document.getElementById('bkNotice').style.display='none';return false" style="color:#854d0e;margin-left:12px;opacity:.6;font-weight:400">나중에</a>
 </div>
+<!-- 📬 요청 메일 알림 띠 (대표 지시 2026-11-09) — 법인 메일함에 새 요청이 오거나 기한이 코앞이면. 그리는 곳: mrPaint -->
+<div id="mrBanner" class="mr-banner" role="status" style="display:none"></div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand" id="brand" style="cursor:pointer">푸른노무법인 경력관리<small>푸른노무법인 · 요약 보기</small></div>
@@ -2143,6 +2173,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn primary" id="fdAddExisting">+ 받은 서류 추가</button>
         </div>
         <div id="fdBody"></div>        </div>
+      </div></section>
+      <!-- 📬 요청 메일 (대표 지시 2026-11-09 「법인메일로 경력요청 및 동의서 등 기타 메일로 요청사항이 있을경우 자동으로 감지하고 경력관리에 정리하면서 알람으로」)
+           알아보는 일은 js/kcareer-mailreq.js 한 곳. 여기는 «정리한 목록»만 그린다(mrRender). 보내거나 채우지 않는다. 문서: docs/kcareer-요청메일.md -->
+      <section class="page-view" id="page-mailreq"><div class="page">
+        <div class="page-head"><div class="page-title">📬 요청 메일</div>
+          <div class="page-desc">법인 메일함에 온 경력 요청·동의서·서류 제출 요청을 자동으로 알아보고 정리합니다 — 보내거나 채우지는 않습니다</div></div>
+        <div id="mrBody"></div>
       </div></section>
       <!-- ★ 🏢 사업관리 (대표 지시 2026-10-05 「이력서 관리 아래에 사업관리를 별도로 — 대시보드로」 → 목업 1+2 승인)
            법인으로 내는 입찰·용역·수행기관·공모 사업. 계약한 것만이 아니라 «입찰에 넣었던 서식·서류 전부»를
@@ -6283,6 +6320,9 @@ let NAV=[
   {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함'],['page-profile1','👤 프로필 1장']]},
   /* ★ 사업관리 — 이력서관리 «아래» (대표 지시 2026-10-05). 개인 지원과 갈라 법인 사업(입찰·용역·공모)을 따로 */
   {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizperf','🏆 수행 실적'],['page-bizmail','📮 결과보고서 메일'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
+  /* ★ 요청 메일 — 법인 메일함에 온 경력 요청·동의서·서류 제출 요청 (대표 지시 2026-11-09). 한 칸짜리 묶음이라 상위 단추가 곧 이 화면이다.
+     ⚠ 사업관리는 이력서관리 «바로 아래»여야 한다(tests/kcareer-biz) — 그 사이에 끼우지 말고 사업관리 아래에 둔다. 순서는 사람이 끌어 바꿀 수 있다 */
+  {g:'요청 메일', items:[['page-mailreq','📬 요청 메일']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
@@ -6459,6 +6499,8 @@ function navCount(id){
     /* 사업관리 — 숫자는 «사업 목록» 한 줄에만(한눈에·서류 찾기는 같은 사업을 다시 세는 것이라 안 단다) */
     if(page==='bizlist') return (typeof bizAll==='function') ? bizAll().length : null;
     if(page==='bizdash' || page==='bizdocs' || page==='bizperf' || page==='bizmail') return null;
+    /* 요청 메일 — «진행 중»(새 요청 + 확인함) 건수. 아직 못 읽었으면 숫자를 안 단다(0 으로 읽히지 않게) */
+    if(page==='mailreq') return (typeof mrNavCount==='function') ? mrNavCount() : null;
     /* 외부기관 실적은 담긴 통이 없다 — 실적 넷에서 «수행기관이 적힌» 것을 모은 화면이다 */
     if(page==='puagency'){
       if(typeof PU_SYNC_STORES==='undefined' || typeof _isExternal!=='function') return null;
@@ -6493,6 +6535,8 @@ function navPaintCounts(){
       if(s) s.textContent=(n!=null)?n.toLocaleString():'';
       t.title=g+((n!=null)?' · '+n+'건':'');
     });
+    /* 요청 메일 단추의 숫자는 알릴 것이 있으면 붉게 — 그리는 곳은 한 곳(mrPaintNav) */
+    try{ if(typeof mrPaintNav==='function') mrPaintNav(); }catch(e){}
     /* ⚠ «펼친 그룹» 칸을 먼저 찾고 그 안을 본다 — 한 줄짜리 자손 고르개(A B)를 쓰지 않는다.
        즐겨찾기 줄도 .nav-item 이라 통째로 훑으면 거기에도 숫자가 붙는다(buildNav 는 안 붙인다). */
     nav.querySelectorAll('.nav-group.g-open').forEach(function(box){
@@ -6666,6 +6710,8 @@ function nav_to(id,label,grp){
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
+  /* 요청 메일 — 들어올 때 다시 그리고, 떠나면 고른 것을 비운다(대표 지시 2026-10-05 목록 규칙) */
+  if(id==='page-mailreq') _safe(function(){ mrEnter(); }); else _safe(function(){ if(typeof mrLeave==='function') mrLeave(); });
   if(id==='page-bizdash' || id==='page-bizperf' || id==='page-bizmail') _safe(renderBizDash);
   if(id==='page-profile1') _safe(renderProfile1);
   if(id==='page-bizlist') _safe(renderBizList);
@@ -6829,6 +6875,14 @@ function goForm(title){
      그래서 잠금이 풀릴 때까지 기다렸다가 연다(최대 8초, 그 뒤엔 조용히 그만둔다). */
 function kcOpenFromUrl(tries){
   try{
+    /* 포털 경력관리 타일의 「요청 N」 딱지 → 요청 메일 화면 (대표 본인으로 확인된 뒤에만 연다) */
+    if(/[?&]go=mailreq(?:&|$)/.test(location.search)){
+      var lk0=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
+      if(lk0!=='owner'){ if((tries||0)<20) setTimeout(function(){ kcOpenFromUrl((tries||0)+1); },400); return; }
+      navTile('page-mailreq');
+      try{ history.replaceState(null,'',location.pathname); }catch(e){}
+      return;
+    }
     if(/[?&]go=add(?:&|$)/.test(location.search)) return kcAddFromHandoff(tries);
     if(!/[?&]go=form/.test(location.search)) return;
     var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
@@ -15032,6 +15086,221 @@ function renderFeeSettle(){
     }).join('')+'</tbody></table>';
 }
 
+/* ===== 📬 요청 메일 — 법인 메일함에 온 경력 요청·동의서·기타 서류 요청을 알아보고, 정리하고, 알린다 (대표 지시 2026-11-09) =====
+   「법인메일로 경력요청 및 동의서 등 기타 메일로 요청사항이 있을경우 자동으로 감지하고 경력관리에 정리하면서 알람으로 정리해달라」
+   알아보는 일(말·기한·셈·훑기)은 모듈(js/kcareer-mailreq.js) 한 곳이 한다 — 여기는 화면·알림·로그인만 맡는다. 문서: docs/kcareer-요청메일.md
+   ⚠ 보내거나 채우지 않는다. 메일을 «읽기만»(peek) 한다. 상태(확인함·처리 완료·요청 아님)는 사람이 누른다.
+   ⚠ 저장 자리는 kcareer/{uid}/mailreq — 자료 통(ls)과 «따로»다. at 을 안 건드려 다른 기기에 «새 저장» 띠가 안 뜬다. 보안규칙은 그대로.
+   ⚠ 기기마다 다른 설정(알림 켬·띠 닫음)은 localStorage 에 직접 둔다 — LS(cm3_*)에 두면 자료 통에 실려 클라우드로 간다. */
+var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0 };
+function mrBase(){ return 'kcareer/'+fbUid+'/mailreq'; }
+function mrLocal(k, v){ try{ if(v===undefined) return localStorage.getItem('kc_mr_'+k); if(v===null) localStorage.removeItem('kc_mr_'+k); else localStorage.setItem('kc_mr_'+k, v); }catch(e){} return null; }
+function mrNavCount(){ return _mr.ready ? KcareerMailReq.summary(_mr.items, Date.now()).open : null; }
+function mrVisible(){ var s=document.getElementById('page-mailreq'); return !!(s && s.classList.contains('active')); }
+function mrEnter(){ _mr.sel={}; mrBannerPaint(); mrRender(); if(_mr.started && Date.now()-_mr.last>60000) mrScan(true); }
+function mrLeave(){ _mr.sel={}; mrBannerPaint(); }
+
+/* 시작 — 대표 본인으로 확인된 뒤에만. 직원 보기(사본)·안전 모드에서는 훑지도 쓰지도 않는다 */
+function mrStart(){
+  if(_mr.started || typeof KcareerMailReq==='undefined') return;
+  if(typeof KC_SAFE!=='undefined' && KC_SAFE) return;
+  if(!fbDb || !fbUid) return;
+  if(kcOwnerState()!=='owner'){ if(_mr.tries++<30) setTimeout(mrStart, 1000); return; }   /* 신원 확인(resolveMe)을 기다린다 */
+  _mr.started=true; _mr.seen=null;
+  try{
+    _mr.ref=fbDb.ref(mrBase()+'/items');
+    _mr.fn=function(s){ mrOnData(s.val()||{}); };
+    _mr.ref.on('value', _mr.fn, function(e){ console.warn('[요청 메일] 읽지 못했습니다', e); _mr.err='저장된 요청 목록을 읽지 못했습니다'; mrRender(); });
+  }catch(e){ console.warn('[요청 메일] 시작', e); _mr.started=false; return; }
+  mrScan(true);
+  _mr.timer=setInterval(function(){ if(!document.hidden) mrScan(true); }, KcareerMailReq.POLL_MS);
+  document.addEventListener('visibilitychange', mrVis);
+}
+function mrStop(){
+  try{ if(_mr.ref && _mr.fn) _mr.ref.off('value', _mr.fn); }catch(e){}
+  if(_mr.timer) clearInterval(_mr.timer);
+  document.removeEventListener('visibilitychange', mrVis);
+  if(_mr.freshT) clearTimeout(_mr.freshT);
+  _mr.ref=null; _mr.fn=null; _mr.timer=0; _mr.started=false; _mr.ready=false; _mr.items={}; _mr.seen=null; _mr.sel={}; _mr.tries=0; _mr.freshQ=[]; _mr.freshT=0;
+  mrPaint();
+}
+function mrVis(){ if(!document.hidden && _mr.started && Date.now()-_mr.last>KcareerMailReq.POLL_MS/2) mrScan(true); }
+
+/* 자료가 바뀔 때마다(이 기기·다른 기기·포털이 쓴 것 모두) — 새로 «나타난» 새 요청이 알림 거리다 */
+function mrOnData(v){
+  var list=KcareerMailReq.toList(v), prev=_mr.seen, ids={};
+  list.forEach(function(x){ ids[x.id]=1; });
+  _mr.items=v; _mr.ready=true; _mr.err='';
+  /* 처음 받은 판은 «조용히» — 열 때마다 알림이 쏟아지면 안 된다. 그 몫은 띠가 말한다 */
+  /* 건이 하나씩 들어와도(건마다 저장) 알림은 «한 번에 모아» — 처음 훑을 때 알림이 건수만큼 깜박이지 않게 */
+  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ; _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }
+  _mr.seen=ids;
+  mrPaint(); mrRender();
+}
+function mrAnnounce(fresh){
+  var Q=KcareerMailReq, one=fresh.length===1?fresh[0]:null;
+  var msg=one ? ('📬 새 요청 메일 · '+Q.kindsLabel(one.kinds)+' — '+one.s) : ('📬 새 요청 메일 '+fresh.length+'건');
+  toast(msg, 9000);
+  if(mrNotifyOn() && document.hidden){
+    try{ var n=new Notification(one?'📬 새 요청 메일':'📬 새 요청 메일 '+fresh.length+'건', { body:one?(Q.kindsLabel(one.kinds)+'\n'+one.s):fresh.slice(0,3).map(function(x){ return x.s; }).join('\n'), tag:'kc-mailreq' });
+      n.onclick=function(){ try{ window.focus(); }catch(e){} navTile('page-mailreq'); n.close(); }; }catch(e){ console.warn('[요청 메일] 브라우저 알림', e); }
+  }
+}
+function mrNotifyOn(){ return typeof Notification!=='undefined' && Notification.permission==='granted' && mrLocal('notify')==='1'; }
+function mrNotifyToggle(){
+  if(typeof Notification==='undefined'){ toast('이 브라우저는 알림을 지원하지 않습니다'); return; }
+  if(mrNotifyOn()){ mrLocal('notify', null); toast('🔕 브라우저 알림을 껐습니다'); mrRender(); return; }
+  if(Notification.permission==='denied'){ toast('브라우저 설정에서 이 사이트의 알림을 «허용»으로 바꿔야 합니다', 7000); return; }
+  Notification.requestPermission().then(function(p){ if(p==='granted'){ mrLocal('notify','1'); toast('🔔 다른 탭을 보고 있을 때 새 요청이 오면 브라우저 알림으로 알립니다', 7000); } else toast('알림을 허용하지 않아 켜지 않았습니다'); mrRender(); });
+}
+
+/* 훑기 — 새로 온 메일만(모듈이 «어디까지 봤는지»를 클라우드에 적는다). 겹쳐 돌지 않는다 */
+async function mrScan(quiet){
+  if(_mr.busy || !_mr.started) return;
+  _mr.busy=true; mrRender();
+  try{
+    var r=await KcareerMailReq.scan({ db:fbDb, uid:fbUid, readBody:KcareerMailReq.makeReadBody(_bizMbCall) });
+    _mr.last=Date.now(); _mr.lastRes={ folders:r.folders, scanned:r.scanned, found:r.found, errors:r.errors.length };
+    if(r.errors.length) console.warn('[요청 메일] 훑기', r.errors);
+    /* 찾았으면 «새 요청» 알림(mrAnnounce)이 이미 말했다 — 같은 자리 알림이라 덮어쓰지 않는다 */
+    if(!quiet && (r.errors.length || !r.created.length)) toast(r.errors.length ? ('⚠ 일부 폴더를 읽지 못했습니다 ('+r.errors.length+'곳)') : '새 요청 메일이 없습니다', 5000);
+  }catch(e){ console.warn('[요청 메일] 훑기 실패', e); _mr.err='메일함을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,60); if(!quiet) toast('⚠ '+_mr.err, 6000); }
+  finally{ _mr.busy=false; mrRender(); }
+}
+function mrScanNow(){ mrScan(false); }
+/* 푸른메일함 열기 — 앱끼리 여는 공용 길(같은 창을 다시 쓴다). «이름 없는 새 탭»은 누를 때마다 탭이 쌓인다(tests/one-window-per-app) */
+function mrOpenMail(){ var u='pu-cards.html?sso=1&view=mail'; if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(u); else window.open(u,'pu_pu_cards'); }
+
+/* ── 알림 — 띠 · 옆줄 숫자 · 탭 제목. 한 곳(mrPaint)에서 «같은 셈»으로 그린다 ── */
+function mrAlarmSig(){ return KcareerMailReq.alarmItems(_mr.items, Date.now()).map(function(x){ return x.id; }).sort().join(','); }
+/* 띠 — 알릴 것이 있고, 「나중에」를 안 눌렀고, 이 화면에 있지 않을 때만. 「나중에」는 «그때 알린 건들»을 기억한다(새 건이 오거나 기한이 임박해 알릴 건이 바뀌면 다시 뜬다) */
+function mrBannerPaint(){
+  var b=document.getElementById('mrBanner'); if(!b || typeof KcareerMailReq==='undefined') return;
+  var Q=KcareerMailReq, sm=Q.summary(_mr.items, Date.now()), txt=Q.summaryText(sm);
+  if(!txt || mrLocal('banner')===mrAlarmSig() || mrVisible()){ b.style.display='none'; b.innerHTML=''; return; }
+  b.className='mr-banner'+(sm.tone==='red'?' red':'');
+  b.innerHTML='<span>'+escapeHtml(txt)+'</span><a href="#" onclick="navTile(\'page-mailreq\');return false">보기</a><a href="#" class="mr-x" onclick="mrBannerClose();return false">나중에</a>';
+  b.style.display='block';
+}
+function mrPaint(){
+  mrBannerPaint();
+  try{ var n=KcareerMailReq.summary(_mr.items, Date.now()).alarm; document.title=(n?('('+n+') '):'')+'경력관리'; }catch(e){}
+  try{ if(typeof navCountsSoon==='function') navCountsSoon(); }catch(e){}
+}
+function mrBannerClose(){ mrLocal('banner', mrAlarmSig()); mrPaint(); }
+function mrPaintNav(){
+  var el=document.querySelector('#nav .g-title.top[data-g="요청 메일"] .gcnt'); if(!el) return;
+  var sm=KcareerMailReq.summary(_mr.items, Date.now());
+  el.classList.toggle('mr-alarm', !!sm.alarm);
+  var t=el.parentNode; if(t && sm.alarm) t.title='요청 메일 · '+KcareerMailReq.summaryText(sm).replace(/^📬 /,'');
+}
+
+/* ── 목록 ── */
+function mrTab(k){ _mr.tab=k; _mr.sel={}; mrRender(); }
+function mrWhen(ms){ var d=new Date(ms); if(!ms||isNaN(d)) return '-'; var z=function(n){ return (n<10?'0':'')+n; }; return z(d.getMonth()+1)+'.'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
+function mrDlText(dl){
+  if(!dl||!dl.date) return '';
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dl.date); if(!m) return '';
+  var wd='일월화수목금토'[new Date(Number(m[1]),Number(m[2])-1,Number(m[3])).getDay()];
+  return m[2]+'.'+m[3]+'('+wd+')'+(dl.time?' '+dl.time:'');
+}
+function mrStatusLine(){
+  if(_mr.err) return '<span style="color:var(--red)">⚠ '+escapeHtml(_mr.err)+'</span>';
+  if(!_mr.ready) return '불러오는 중…';
+  var r=_mr.lastRes, 때=_mr.last?mrWhen(_mr.last):'';
+  return (때?'마지막 확인 '+때:'아직 메일함을 확인하지 않았습니다')+(r?(' · 폴더 '+r.folders+'곳'+(r.scanned?' · 새로 읽은 메일 '+r.scanned+'통':'')+(r.errors?' · <span style="color:var(--red)">못 읽은 폴더 '+r.errors+'곳</span>':'')):'')
+    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다';
+}
+function mrRowHtml(x, i, now){
+  var Q=KcareerMailReq, u=Q.urgency(x, now), dd=Q.ddayOf(x.deadline, now), 종류=(x.kinds||[]).map(Q.kindMeta).filter(Boolean), st=Q.STATES[x.st]?x.st:'new';   /* 아는 상태만 — 클래스에 DB 값이 그대로 들어가지 않게 */
+  var 보낸=x.f||x.e||'-', 보낸전체=(x.f?x.f+' ':'')+(x.e?'<'+x.e+'>':'');
+  var 툴팁=[x.s, '보낸이: '+보낸전체, x.an&&x.an.length?'📎 '+x.an.join(' · '):'', x.replyTo?'↩ 회신 주소: '+x.replyTo:'', x.why&&x.why.length?'알아본 까닭: '+x.why.join(' / '):''].filter(Boolean).join('\n');
+  var 기한;
+  if(x.deadline&&x.deadline.date) 기한='<span title="'+escapeHtml((x.deadline.text?'메일 속 「'+x.deadline.text+'」':'')+(x.deadline.guess?'\n연도가 없어 받은 날 기준으로 짐작했습니다':''))+'">'+escapeHtml(mrDlText(x.deadline))+(x.deadline.guess?'*':'')+'</span> '
+    +(dd.label&&(x.st==='new'||x.st==='doing')?'<span class="mr-chip '+(u==='overdue'?'red':(u==='soon'?'new':'ignored'))+'">'+dd.label+'</span>':'');
+  else 기한='<span style="color:var(--text-mute)" title="'+(x.bodyAt?'본문에서 기한 말과 가까운 날짜를 찾지 못했습니다 — 메일을 열어 확인해 주세요':((Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'본문을 열지 못했습니다 — 메일을 열어 확인해 주세요':'본문을 읽는 중입니다'))+'">'+(x.bodyAt||(Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'기한 모름':'읽는 중…')+'</span>';
+  var id=_jsAttr(x.id);
+  var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };
+  var 관리=(x.st==='new'?단추('doing','👀','확인','확인함으로 표시 — 아직 처리 전입니다')+' ':'')
+    +(x.st==='new'||x.st==='doing'?단추('done','✔','완료','처리 완료로 표시')+' '+단추('ignored','🚫','아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩','되돌림','진행 중으로 되돌립니다'));
+  return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
+    +'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" aria-label="'+escapeHtml(String(x.s||'').slice(0,40))+' 고르기"'+(_mr.sel[x.id]?' checked':'')+' onclick="mrPick(\''+id+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
+    +'<td style="white-space:nowrap" title="'+escapeHtml(Q.kindsLabel(x.kinds))+'">'+(종류.length?'<span class="tag navy">'+종류[0].icon+' '+escapeHtml(종류[0].label)+(종류.length>1?' +'+(종류.length-1):'')+'</span>':'')+'</td>'
+    +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(툴팁)+'"><b>'+escapeHtml(x.s||'(제목 없음)')+'</b>'+(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</td>'
+    +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
+    +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
+    +'<td style="white-space:nowrap">'+기한+'</td>'
+    +'<td style="white-space:nowrap"><span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span></td>'
+    +'<td onclick="event.stopPropagation()" style="white-space:nowrap"><span style="display:inline-flex;gap:4px;flex-wrap:nowrap">'+관리+'</span></td></tr>';
+}
+/* 지금 탭에서 «보이는» 줄 — 그리기와 「전체 선택」이 같은 목록을 본다. 줄이 한없이 쌓이지 않게 한도를 둔다(오래 쓰면 완료 탭이 길어진다) */
+var MR_ROWS=200;
+function mrList(now){ var Q=KcareerMailReq, all=Q.sortItems(Q.filterItems(_mr.items, _mr.tab), now); return { all:all.length, rows:all.slice(0, MR_ROWS) }; }
+function mrRender(){
+  var box=document.getElementById('mrBody'); if(!box || !mrVisible()) return;
+  var Q=KcareerMailReq, now=Date.now(), all=Q.toList(_mr.items), sm=Q.summary(all, now);
+  var ml=mrList(now), list=ml.rows;
+  var vis={}; list.forEach(function(x){ vis[x.id]=1; }); Object.keys(_mr.sel).forEach(function(k){ if(!vis[k]) delete _mr.sel[k]; });   /* 안 보이게 된 건은 선택에서 뺀다 */
+  var cnt={ open:sm.open, done:sm.done, ignored:sm.ignored, all:sm.total };
+  var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')">'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
+    +'<div class="tb-spacer"></div>'
+    +'<button class="btn" type="button" onclick="mrScanNow()"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
+    +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
+    +'<button class="btn" type="button" onclick="mrOpenMail()" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
+    +'<div class="mr-st">'+mrStatusLine()+'</div>';
+  var n=Object.keys(_mr.sel).length;
+  h+='<div class="sel-bar" id="mrSel"'+(n?'':' style="display:none"')+'><b><span id="mrSelCnt">'+n+'</span>건 선택</b>'
+    +'<button class="btn sm" type="button" onclick="mrBatch(this,\'doing\')" title="고른 건을 확인함으로">👀 확인함</button>'
+    +'<button class="btn sm" type="button" onclick="mrBatch(this,\'done\')" title="고른 건을 처리 완료로">✔ 처리 완료</button>'
+    +'<button class="btn sm" type="button" onclick="mrBatch(this,\'ignored\')" title="고른 건은 요청이 아닙니다 — 목록에서 치웁니다">🚫 요청 아님</button>'
+    +'<button class="btn sm" type="button" onclick="mrPickClear()">선택 해제</button></div>';
+  if(!list.length){
+    h+='<div class="fd-box"><div style="font-size:12.5px;line-height:1.7;color:var(--text-mute)">'
+      +(all.length?'이 탭에는 건이 없습니다.':'아직 알아본 요청 메일이 없습니다.<br>법인 메일함에 «동의서·경력 확인·이력서 제출» 같은 요청 메일이 오면 몇 분 안에 여기 올라오고, 위에 알림 띠가 뜹니다. 처음에는 최근 '+KcareerMailReq.WINDOW_DAYS+'일 안의 메일을 훑습니다.')
+      +'</div></div>';
+  }else{
+    h+='<div class="dt" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="mrAll" onclick="mrPickAll(this.checked)" title="지금 보이는 줄 전체 선택"> №</th>'
+      +'<th>종류</th><th>제목</th><th>보낸이</th><th>받은 날</th><th>기한</th><th>상태</th><th>관리</th></tr></thead><tbody>'
+      +list.map(function(x,i){ return mrRowHtml(x, i, now); }).join('')+'</tbody></table></div>'
+      +(ml.all>list.length?'<div class="mr-st">앞의 '+list.length+'건만 보입니다 — 전체 '+ml.all+'건</div>':'');
+  }
+  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.</div>';
+  box.innerHTML=h;
+  try{ stampCellLabels(box); }catch(e){}
+  mrSelSync();
+}
+/* 고르기 — 고르기만으로는 아무것도 안 바뀐다. 「N건 선택」과 할 일을 띄울 뿐 */
+function mrPick(id, on){ if(on) _mr.sel[id]=1; else delete _mr.sel[id]; mrSelSync(); }
+function mrPickAll(on){ _mr.sel={}; if(on) mrList(Date.now()).rows.forEach(function(x){ _mr.sel[x.id]=1; });   /* 지금 «보이는» 줄만 */
+  document.querySelectorAll('#mrBody .row-chk').forEach(function(c){ c.checked=!!on; }); mrSelSync(); }
+function mrPickClear(){ _mr.sel={}; document.querySelectorAll('#mrBody .row-chk').forEach(function(c){ c.checked=false; }); mrSelSync(); }
+function mrSelSync(){
+  var n=Object.keys(_mr.sel).length, bar=document.getElementById('mrSel'), c=document.getElementById('mrSelCnt'), all=document.getElementById('mrAll');
+  if(bar) bar.style.display=n?'':'none'; if(c) c.textContent=n;
+  if(all){ var rows=document.querySelectorAll('#mrBody .row-chk').length; all.checked=n>0&&n===rows; all.indeterminate=n>0&&n<rows; }
+}
+/* 바꾸기 — 한 번에 «한 번» 저장(여러 건도 update 한 번). 이미 그 상태인 건은 건너뛴다 */
+function mrSet(ids, st){
+  var Q=KcareerMailReq, 바뀔=ids.filter(function(id){ var x=_mr.items[id]; return x && x.st!==st; });
+  if(!바뀔.length){ toast('ℹ 이미 그 상태입니다'); return Promise.resolve(0); }
+  return fbDb.ref(mrBase()+'/items').update(Q.stateUpdate(바뀔, st, Date.now())).then(function(){
+    toast((st==='done'?'✔ 처리 완료로 바꿨습니다':(st==='ignored'?'🚫 요청 아님으로 치웠습니다':'👀 진행 중으로 표시했습니다'))+' — '+바뀔.length+'건', 4000);
+    return 바뀔.length;
+  }, function(e){ toast('⚠ 저장하지 못했습니다 — '+String((e&&e.message)||e).slice(0,80), 7000); return 0; });
+}
+function mrOne(id, st){ mrSet([id], st); }
+function mrBatch(btn, st){
+  var ids=Object.keys(_mr.sel); if(!ids.length){ toast('고른 건이 없습니다'); return; }
+  var 이름={ doing:'확인함', done:'처리 완료', ignored:'요청 아님' }[st]||'', 으로={ doing:'으로', done:'로', ignored:'으로' }[st]||'로';   /* 받침 따라 으로·로 */
+  var 건=ids.map(function(id){ return _mr.items[id]; }).filter(function(x){ return x && x.st!==st; });
+  if(!건.length){ toast('ℹ 고른 건이 이미 그 상태입니다'); return; }
+  kcAskDelete(btn, { title:'📬 요청 메일 '+건.length+'건을 «'+이름+'»'+으로+' 바꿉니다',
+      detail:건.slice(0,4).map(function(x){ return escapeHtml(String(x.s).slice(0,34)); }).join('<br>')+(건.length>4?'<br>… 외 '+(건.length-4)+'건':'')
+        +(st==='ignored'?'<br>목록의 «요청 아님» 탭에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
+      yes:'«'+이름+'»'+으로+' 바꾸기' },
+    function(){ mrSet(건.map(function(x){ return x.id; }), st).then(function(){ _mr.sel={}; mrRender(); }); });
+}
+
 /* ===== ⏳ 발송 대기 — 기관이 보낸 같은 꼴의 서류를 채워 두고 «한 번 눌러» 답장 (대표 지시 2026-11-05, 승인 시안) =====
    판정·채우기·상태 전이는 모듈 한 곳(js/kcareer-sendq.js)이 한다 — 여기는 파일·창고·메일·화면만 맡는다.
    ⚠ 자동으로 보내지 않는다. 채워서 «대기»에 올리고, 나가는 것은 «✉ 답장 보내기» 한 번이다(도장·주민번호가 든 서류).
@@ -22358,9 +22627,12 @@ function fbInit(){ if(location.protocol==='file:') return; if(typeof firebase===
           if(typeof loadFirmInfo==='function'){ try{ loadFirmInfo(); }catch(e){} }
           if(typeof navSyncWatch==='function'){ try{ navSyncWatch(); }catch(e){} }
           if(typeof fbCheckLoss==='function'){ try{ fbCheckLoss(); }catch(e){} }
+          /* 📬 요청 메일 — 대표 본인으로 확인된 뒤 법인 메일함의 새 요청을 알아본다(안 되면 스스로 물러난다) */
+          if(typeof mrStart==='function'){ try{ mrStart(); }catch(e){ console.warn('요청 메일', e); } }
         }
       }
       else { _me={resolved:false,name:'',sid:'',role:'',isAdmin:true}; _fbWatching=false; _fbBase=null;
+        if(typeof mrStop==='function'){ try{ mrStop(); }catch(e){} }
         if(typeof navSyncStop==='function'){ try{ navSyncStop(); }catch(e){} }
         /* sso=1로 갓 진입한 경우엔 공유 세션이 잡힐 시간을 잠깐 준 뒤 잠금 판단 */
         if(/[?&]sso=1/.test(location.search) && !window._ssoRetried){ window._ssoRetried=true;
