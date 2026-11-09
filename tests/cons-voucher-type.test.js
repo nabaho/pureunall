@@ -42,8 +42,8 @@ test('★ 사전에 바우처가 없으면 «한 줄» 얹고 표시를 남긴�
   assert.equal(r2.filter(x => /바우처/.test(x.name)).length, 1, '두 번 불렀더니 두 줄이 됐습니다');
 });
 
-test('★ 이미 바우처가 있거나(숨김 포함), 대표님이 지운 뒤(표시 있음)에는 손대지 않는다', () => {
-  const a = make({ biz_cons_types: [{ code: 'v', name: '혁신바우처', hidden: true }] });
+test('★ 이미 바우처가 있거나(숨김 포함), 대표님이 지운 뒤(표시 있음)에는 새로 얹지 않는다', () => {
+  const a = make({ biz_cons_types: [{ code: 'v', name: '혁신바우처', hidden: true, agency: '중소벤처기업진흥공단' }] });
   a.f(a.store.biz_cons_types);
   assert.deepEqual(a.writes, []);
   const b = make({ biz_cons_types: [{ code: 'x', name: '인사노무' }], biz_cons_voucher_seeded: true });
@@ -64,4 +64,26 @@ test('같은 번호(cons-voucher)가 다른 이름으로 이미 쓰이면 번호
   const r = t.f(t.store.biz_cons_types);
   const v = r.find(x => /바우처/.test(x.name));
   assert.notEqual(v.code, 'cons-voucher');
+});
+
+test('★ 이미 있는 바우처 유형의 «빈 기관»만 중진공으로 한 번 채운다 — 적힌 기관·이름은 그대로', () => {
+  const t = make({ biz_cons_types: [
+    { code: 'v1', short: '바처', name: '바우처컨설팅', agency: '' },
+    { code: 'x', short: '인노', name: '인사노무', agency: '' }] });
+  const r = t.f(t.store.biz_cons_types);
+  const v = r.find(x => x.code === 'v1');
+  assert.match(v.agency, /중소벤처기업진흥공단/);
+  assert.equal(v.name, '바우처컨설팅', '이름을 바꿨습니다');
+  assert.equal(r.find(x => x.code === 'x').agency, '', '바우처가 아닌 유형까지 고쳤습니다');
+  assert.equal(r.length, 2, '한 줄을 더 얹었습니다 — 이미 있으면 얹지 않습니다');
+  assert.equal(t.store.biz_cons_voucher_agency, true);
+  /* 대표님이 기관을 지운 뒤에는 다시 안 채운다 */
+  t.store.biz_cons_types = r.map(x => Object.assign({}, x, { agency: '' }));
+  t.writes.length = 0;
+  t.f(t.store.biz_cons_types);
+  assert.deepEqual(t.writes, []);
+  /* 이미 다른 기관이 적혀 있으면 바꾸지 않는다 */
+  const u = make({ biz_cons_types: [{ code: 'v', name: '혁신바우처', agency: '기술보증기금' }] });
+  u.f(u.store.biz_cons_types);
+  assert.deepEqual(u.writes, []);
 });
