@@ -75,3 +75,41 @@ test('서버가 쓰는 모듈이므로 금액·본문을 읽는 낱말이 없다
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', 'pu-quote-detect.js'), 'utf8');
   assert.ok(!/금액|amount|\.body|\.p\b/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')), '코드에 금액·본문을 읽는 줄이 있다');
 });
+
+/* ── 검토 2026-11-09 반영 ── */
+test('⑦ 우리가 업체에 견적을 «달라고» 보낸 메일은 우리 견적이 아니다 — 「견적서 요청」처럼 견적 다음에 «서»가 껴도 거른다', () => {
+  for (const s of ['[푸른노무법인] ○○ 견적서 요청의 건', '견적서 요청드립니다', '견적서 의뢰드립니다', '견적 요청드립니다', '견적의뢰의 건']) {
+    assert.ok(!D.isOurQuote(s, []), '우리 견적으로 읽었다: ' + s);
+    assert.strictEqual(D.docOf(s, []), '', s);
+  }
+  /* 거꾸로 — 우리가 «요청받아 보내는» 견적서는 그대로 우리 견적이다 */
+  assert.ok(D.isOurQuote('[푸른노무법인] 요청하신 견적서 송부의 건', []));
+  assert.ok(D.isOurQuote('[푸른노무법인] 산업안전 컨설팅 견적서 송부의 건', ['견적서_가나기관.pdf']));
+});
+
+test('⑦ 비교견적서 «제출»도 남이 낸 것이다 — 우리 견적(bundle)으로 잘못 읽지 않는다', () => {
+  assert.ok(!D.isOurQuote('비교견적서 제출', []));
+  assert.strictEqual(D.compareHint('비교견적서 제출', []), 'reply');
+  assert.strictEqual(D.compareHint('RE: [다라노무법인] 비교견적서 제출의 건', []), 'reply');
+});
+
+test('③ 금액이 든 글자를 가린다 — 제목·첨부 이름(「견적서_400만원.pdf」)이 직원 모두가 읽는 곳으로 가기 전에', () => {
+  const t = D.scrubMoney;
+  assert.strictEqual(t('견적서_400만원.pdf'), '견적서_○○.pdf');
+  assert.strictEqual(t('견적서 4,000,000원 송부'), '견적서 ○○ 송부');
+  assert.strictEqual(t('1.2억 컨설팅'), '○○ 컨설팅');
+  assert.strictEqual(t('견적서(120만 원).hwp'), '견적서(○○).hwp');
+  assert.strictEqual(t('월 50만원 자문'), '월 ○○ 자문');
+  assert.strictEqual(t('자문료 3,500,000'), '자문료 ○○');
+  assert.strictEqual(t('2천만원'), '○○');
+  assert.strictEqual(t('300원'), '○○');
+});
+
+test('③ 금액이 아닌 숫자(날짜·쪽수·개월·인원)는 건드리지 않는다', () => {
+  const t = D.scrubMoney;
+  for (const keep of ['견적서_가나기관_261106.pdf', '견적서_2026-11-06.pdf', '쪽수 12쪽', '컨설팅 3개월 30인', '직무분석 컨설팅 견적서 송부의 건', '원본.pdf', '100원짜리 동전', '2026년 자문계약서']) {
+    assert.strictEqual(t(keep), keep, keep);
+  }
+  assert.strictEqual(t(null), '');
+  assert.strictEqual(t(undefined), '');
+});

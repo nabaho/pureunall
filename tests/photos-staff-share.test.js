@@ -339,7 +339,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-08 — 견적·계약 자동화 계획 1 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「네, 게시」): 새로 3(pu_worklog·pu_quotes·pu_quote_amt) ·
        바뀜 1(원본 보관함 from.kind 에 'quote' 한 값 — 쓰기 조건은 그대로, 받는 값만 하나 늚) · 사라짐 0 · 넓어짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-08.json — 목록을 비운다. */
+  /* 2026-11-09 — 견적 자동 감지 스위치 규칙(pu_docs/config/quoteWatch, 총괄관리자만 쓰기)은 «아직 게시 전»(대표 승인 뒤 rules-deploy.js --deploy).
+       게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 안전하다 — 규칙이 없으면 단추의 쓰기가 거절돼 «켜지지 않는다». */
   const PENDING = [
+    '/pu_docs/config',
   ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

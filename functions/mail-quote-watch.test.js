@@ -24,6 +24,7 @@ function fakeDb(tree, opts) {
     tree,
     ref: (p) => ({
       once: async () => ({ val: () => { const v = get(p); return v === undefined ? null : JSON.parse(JSON.stringify(v)); } }),
+      set: async (v) => { if (o.failWrite) throw new Error('쓰기 실패(가짜)'); put(p, v); },
       transaction: async (fn) => {
         if (o.failWrite) throw new Error('쓰기 실패(가짜)');
         const cur = get(p);
@@ -40,7 +41,7 @@ const row = (o) => Object.assign({ u: '1001', s: '[푸른노무법인] 가나기
   an: ['견적서_가나기관.pdf'], a: 1 }, o || {});
 async function run(rows, cos, over) {
   const o = over || {};
-  const db = fakeDb({ pucards: { config: { quoteWatch: { on: o.on === undefined ? true : o.on } } }, data: { contract_requests: {} } }, o.db);
+  const db = fakeDb({ pu_docs: { config: { quoteWatch: { on: o.on === undefined ? true : o.on } } }, data: { contract_requests: {} } }, o.db);
   const res = await W.watchSentMail({ getDatabase: () => db }, { slug: 'Sent Messages-6d8c6b35', rows, now: NOW,
     readCompanies: async () => (cos === undefined ? [co()] : cos), self: o.self || ['370-6@daum.net'] });
   return { res, reqs: db.tree.data.contract_requests, db };
@@ -78,7 +79,7 @@ test('계약서 → kind:advance(계약협의로 이동 신호)', async () => {
 });
 
 test('① 같은 메일을 두 번 처리해도 요청은 하나다(없을 때만 쓴다)', async () => {
-  const db = fakeDb({ pucards: { config: { quoteWatch: { on: true } } }, data: { contract_requests: {} } });
+  const db = fakeDb({ pu_docs: { config: { quoteWatch: { on: true } } }, data: { contract_requests: {} } });
   const call = () => W.watchSentMail({ getDatabase: () => db }, { slug: 's1', rows: [row()], now: NOW, readCompanies: async () => [co()], self: [] });
   const a = await call(); const b = await call();
   assert.equal(a.made, 1); assert.equal(b.made, 0); assert.equal(b.skipped, 1);
@@ -180,4 +181,54 @@ test('메일 동기화가 «보낸편지함의 새로 받은 줄»에서만, try
 test('서버가 쓰는 두 사본(quote-detect-core·mail-fill-core)이 배포 폴더 안에 있다', () => {
   assert.ok(fs.existsSync(path.join(__dirname, 'quote-detect-core', 'pu-quote-detect.js')));
   assert.ok(fs.existsSync(path.join(__dirname, 'mail-fill-core', 'pu-mail-fill-core.js')));
+});
+
+/* ── 검토 2026-11-09 반영 ── */
+test('스위치 칸은 pu_docs/config/quoteWatch/on — 옛 자리(pucards/config)에 켜 놓아도 돌지 않는다', async () => {
+  assert.equal(W.CFG, 'pu_docs/config/quoteWatch');
+  const db = fakeDb({ pucards: { config: { quoteWatch: { on: true } } }, data: { contract_requests: {} } });
+  const r = await W.watchSentMail({ getDatabase: () => db }, { slug: 's', rows: [row()], now: NOW, readCompanies: async () => [co()] });
+  assert.equal(r.ran, false, '옛 자리(직원 누구나 쓸 수 있는 칸)의 값은 믿지 않는다');
+  assert.deepEqual(db.tree.data.contract_requests, {});
+});
+
+test('③ ★ 제목·첨부 이름에 든 금액 글자는 요청에 가려서 싣는다(대기열은 직원 모두가 읽는다)', async () => {
+  const { reqs } = await run([row({ s: '[푸른노무법인] 컨설팅 견적서 400만원 송부', an: ['견적서_400만원.pdf', '견적서 4,000,000원.hwp', '사업자등록증.pdf'] })]);
+  const r = out(Object.values(reqs)[0]);
+  const j = JSON.stringify(r);
+  assert.ok(!/400만|4,000,000/.test(j), '금액 글자가 요청에 실렸다: ' + j);
+  assert.match(r.subject, /○○/);
+  assert.deepEqual(r.atts, ['견적서_○○.pdf', '견적서 ○○.hwp', '사업자등록증.pdf']);
+});
+
+test('② 비교견적서가 붙어 나간 우리 견적은 compare:bundle 표시를 달아 올린다(사람이 «선정»할 건) — 아닌 것은 칸이 없다', async () => {
+  const b = out(Object.values((await run([row({ s: '[푸른노무법인] 산업안전 컨설팅 견적서 송부의 건 (비교견적서 2부 추가)', an: ['견적서_가나기관.pdf', '다라법인_비교견적서.pdf'] })])).reqs)[0]);
+  assert.equal(b.compare, 'bundle'); assert.equal(b.kind, 'quote');
+  const plain = out(Object.values((await run([row()])).reqs)[0]);
+  assert.ok(!('compare' in plain));
+  /* 계약서 메일에는 표시를 안 단다 — 표시는 «우리 견적 카드»에 다는 것이다 */
+  const c = out(Object.values((await run([row({ s: '[푸른노무법인] 자문계약서 송부의 건 (비교견적서 포함)', an: ['자문계약서_가나기관.pdf'] })])).reqs)[0]);
+  assert.equal(c.kind, 'advance'); assert.ok(!('compare' in c));
+});
+
+test('⑨ ★ 이알피가 요청을 지운 뒤에 같은 메일이 «새로» 다시 들어와도 요청이 되살아나지 않는다(본 메일 표식)', async () => {
+  const db = fakeDb({ pu_docs: { config: { quoteWatch: { on: true } } }, data: { contract_requests: {} } });
+  const call = () => W.watchSentMail({ getDatabase: () => db }, { slug: 's9', rows: [row()], now: NOW, readCompanies: async () => [co()], self: [] });
+  const a = await call();
+  assert.equal(a.made, 1);
+  const key = W.reqKey('s9|1001');
+  assert.ok(db.tree.pu_docs.config.quoteSeen[key], '본 메일 표식이 남는다');
+  delete db.tree.data.contract_requests[key];                 /* 이알피가 처리하고 지웠다(또는 사람이 걸린 요청에서 지웠다) */
+  const b = await call();
+  assert.equal(b.made, 0); assert.equal(b.skipped, 1);
+  assert.deepEqual(db.tree.data.contract_requests, {}, '지운 요청이 되살아났다');
+});
+
+test('⑨ 쓰기가 실패하면 표식을 안 남긴다 — 다음 회차에 그 메일을 다시 본다', async () => {
+  const db = fakeDb({ pu_docs: { config: { quoteWatch: { on: true } } }, data: { contract_requests: {} } }, { failWrite: true });
+  await W.watchSentMail({ getDatabase: () => db }, { slug: 's10', rows: [row()], now: NOW, readCompanies: async () => [co()], self: [] });
+  assert.ok(!db.tree.pu_docs.config.quoteSeen || !db.tree.pu_docs.config.quoteSeen[W.reqKey('s10|1001')]);
+  const db2 = fakeDb(db.tree);                                  /* 쓰기가 되살아난 뒤 */
+  const r = await W.watchSentMail({ getDatabase: () => db2 }, { slug: 's10', rows: [row()], now: NOW, readCompanies: async () => [co()], self: [] });
+  assert.equal(r.made, 1);
 });

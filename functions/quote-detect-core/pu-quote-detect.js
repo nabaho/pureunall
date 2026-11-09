@@ -17,7 +17,9 @@
   'use strict';
 
   /* 남의 견적(우리가 «달라고» 하는 메일·견적 의뢰·물품 견적)은 우리 견적이 아니다 */
-  var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신)|견적\s*(의뢰|요청)|상품\s*견적|루나랩/;
+  /* ⚠ 「견적서 요청드립니다」·「○○ 견적서 요청의 건」처럼 견적 «다음에 서가 끼는» 말도 거른다(견적서? — 서는 있어도 없어도).
+     비교견적서 «제출»도 남이 낸 것이다 — 빠지면 우리 견적(bundle)으로 잘못 읽는다. */
+  var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신|제출)|견적서?\s*(의뢰|요청)|상품\s*견적|루나랩/;
   var CONTRACT = /(자문|위임|용역|컨설팅|교육|위탁|대행)\s*계약서/;
   var NOT_CONTRACT = /근로계약서/;
   /* 비교견적 — 제목에 «견적서 요청/작성»이 있으면 우리가 남에게 달라고 한 것, «회신/제출»이면 남이 낸 것 */
@@ -71,6 +73,12 @@
     return '';
   }
 
+  /* 제목·첨부 이름에 «금액»이 든 글자(「견적서_400만원.pdf」·「4,000,000원」·「1.2억」)를 가린다.
+     요청 대기열(data/contract_requests)과 이알피 카드 비고는 직원 모두가 읽는다 — 금액 비공개 선을 파일 이름으로 우회하면 안 된다.
+     ⚠ 날짜(261106)·사업자번호·쪽수처럼 «원·만·억 단위 낱말 없이» 쉼표도 없는 숫자는 건드리지 않는다. */
+  var MONEY_RE = /\d[\d,.]*\s*(?:천만|백만|억|만|천)(?:\s*원)?|\d[\d,.]*\s*원(?![가-힣])|\d{1,3}(?:,\d{3})+/g;
+  function scrubMoney(text) { return s(text).replace(MONEY_RE, '○○'); }
+
   /* 받는 주소 줄(t) → 소문자 주소 목록(중복 없이). «이름 <주소>» 모양도 받는다 */
   function addrsOf(t) {
     var out = [];
@@ -86,6 +94,6 @@
   return {
     EXCL_QUOTE: EXCL_QUOTE, CONTRACT: CONTRACT, NOT_CONTRACT: NOT_CONTRACT,
     s: s, nfc: nfc, namesOf: namesOf, isOurQuote: isOurQuote, isOurContract: isOurContract, docOf: docOf,
-    compareHint: compareHint, addrsOf: addrsOf, domainOf: domainOf
+    compareHint: compareHint, addrsOf: addrsOf, domainOf: domainOf, scrubMoney: scrubMoney
   };
 });

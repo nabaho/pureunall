@@ -274,9 +274,9 @@
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=52"></script>
 <script src="js/pu-quotes.js?v=1"></script>
-<script src="js/pu-quote-detect.js?v=1"></script>
+<script src="js/pu-quote-detect.js?v=2"></script>
 <script src="js/pu-quote-import.js?v=2"></script>
-<script src="js/pu-quotes-view.js?v=4"></script>
+<script src="js/pu-quotes-view.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=38"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=22"></script>
@@ -541,12 +541,14 @@ var quoteImporter = {
     });
   }
 };
-/* 📨 견적 자동 감지 스위치 — 서버 감지 훅(functions/mail-quote-watch.js)이 읽는 칸 pucards/config/quoteWatch/on.
-   켜는 길·푸는 길이 이 한 곳이다(기본 꺼짐). 쓰기는 규칙이 총괄관리자만 허용한다. 켜고 끈 일은 작업 기록에 남긴다. */
+/* 📨 견적 자동 감지 스위치 — 서버 감지 훅(functions/mail-quote-watch.js)이 읽는 칸 pu_docs/config/quoteWatch/on.
+   켜는 길·푸는 길이 이 한 곳이다(기본 꺼짐). 쓰기는 규칙(rules.pu_docs.config.quoteWatch)이 총괄관리자만 허용한다 —
+   ⚠ 그 규칙을 게시하기 전에는 이 단추의 쓰기도 거절된다(안전한 쪽). 옛 자리 pucards/config 는 직원 누구나 쓸 수 있어 쓰지 않는다.
+   켜고 끈 일은 작업 기록에 남긴다. */
 var quoteWatchSwitch = {
-  get: function () { return db.ref('pucards/config/quoteWatch/on').once('value').then(function (s) { return s.val() === true; }); },
+  get: function () { return db.ref('pu_docs/config/quoteWatch/on').once('value').then(function (s) { return s.val() === true; }); },
   set: function (on) {
-    return db.ref('pucards/config/quoteWatch/on').set(!!on).then(function () {
+    return db.ref('pu_docs/config/quoteWatch').set({ on: !!on, at: Date.now(), by: curUser ? curUser.uid : '' }).then(function () {
       PuWorklog.log('auto_detect', { note: on ? '견적 자동 감지 켬' : '견적 자동 감지 끔' });
     });
   }
