@@ -90,6 +90,12 @@ test('③ 사람이 «연결 보류»를 켠 요청만 이름 그대로 연결 �
   assert.equal(dup.action, 'blocked', '이름만 같은 카드에 자동으로 붙였다'); assert.match(dup.why, /이름이 같은 진행 중 카드/);
 });
 
+test('③ ★ 연결 보류 카드의 사업장 이름에 금액 글자가 오면 가려서 만든다(요청이 직접 쓴 이름도 한 번 더 지난다)', () => {
+  const p = P.erpQuoteLanePlan(req({ companyId: '', companyName: '다라상사(400만원)', deferLink: true }), [CO], [], USERS);
+  assert.equal(p.action, 'create');
+  assert.ok(!JSON.stringify(p.form).includes('400만'), '금액 글자가 카드에 들어갔다'); assert.match(p.form.company.name, /^다라상사\(○○\)$/);
+});
+
 test('④ 업체를 이은 요청 → 상담접수 카드(kinds consult) — 업체 정보는 업체관리에서, 금액은 0', () => {
   const p = P.erpQuoteLanePlan(req(), [CO], [], USERS);
   assert.equal(p.action, 'create');
@@ -216,8 +222,10 @@ function wrap(env) {
     erpDeferCoLinkIfNew: (f) => Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' }),
     isContractLocked: (ym) => ym === (env.lockedYm || ''),
     genContractNo: () => '계약-2026-196',
-    persistOne: (o) => { calls.persist.push(o); return env.persistOk !== false; },
-    patchOne: (id, f) => { calls.patch.push({ id, f }); return env.patchOk !== false; },
+    setTimeout, clearTimeout, _recLastWrite: null,
+    /* env.write — 저장 층이 «서버 쓰기 약속»을 남기는 것을 흉내 낸다(실제 _recServerWrite 처럼 저장 직후 같은 틱에 남긴다) */
+    persistOne: (o) => { calls.persist.push(o); if (env.write) ctx._recLastWrite = env.write(calls); return env.persistOk !== false; },
+    patchOne: (id, f) => { calls.patch.push({ id, f }); if (env.write) ctx._recLastWrite = env.write(calls); return env.patchOk !== false; },
   }, env.extra || {});
   vm.createContext(ctx);
   vm.runInContext(WRAP + '\nthis.run=processQuoteLaneRequest;', ctx);
@@ -327,6 +335,135 @@ test('⑧ 요청이 이미 사라졌거나 거래가 실패하면 아무것도 �
   assert.ok((await bad.run('k1', req())).noop); assert.equal(bad.calls.persist.length, 0);
 });
 
+/* ── ★ 서버에 닿은 뒤에만 요청을 지운다 (2차 검토 2026-11-09) ── */
+test('⑲ ★ 저장이 서버에 «닿은 뒤에» 요청을 지운다 — 약속이 끝나기 전에는 지우지 않는다(만들기·덧붙이기·계약협의 이동 모두)', async () => {
+  const cases = [
+    ['만들기', { data: { companies: [CO], contracts: [] } }, req()],
+    ['덧붙이기', { data: { companies: [CO], contracts: [card()] } }, req({ managerMain: '' })],
+    ['이동', { data: { companies: [CO], contracts: [card()] } }, req({ kind: 'advance', docKind: 'contract', managerMain: '' })],
+  ];
+  for (const [name, env, rq] of cases) {
+    const order = [];
+    let open;
+    const w = wrap(Object.assign({}, env, { reqNode: rq, write: () => new Promise((r) => { open = () => { order.push('닿음'); r(true); }; }) }));
+    const origRemove = w.calls.remove;
+    const done = w.run('k1', rq).then((x) => { order.push('끝:' + (x.made ? '만듦' : x.attached ? '덧붙임' : x.advanced ? '이동' : '?')); return x; });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(w.calls.remove, 0, name + ' — 서버에 닿기 전에는 요청을 지우지 않는다');
+    assert.deepEqual(out(order), [], name + ' — 아직 기다리는 중');
+    open();
+    const r = await done;
+    assert.ok(r.made || r.attached || r.advanced, name);
+    assert.equal(w.calls.remove, 1, name + ' — 닿은 뒤에 지운다');
+    assert.equal(order[0], '닿음');
+  }
+});
+
+test('⑲ ★ 서버가 거절(약속이 실패로 끝남)하면 요청을 지우지 않고 «걸림»으로 남긴다 — 카드도 요청도 없는 메일이 생기지 않는다', async () => {
+  const cases = [
+    ['만들기', { data: { companies: [CO], contracts: [] } }, req()],
+    ['덧붙이기', { data: { companies: [CO], contracts: [card()] } }, req({ managerMain: '' })],
+    ['이동', { data: { companies: [CO], contracts: [card()] } }, req({ kind: 'advance', docKind: 'contract', managerMain: '' })],
+  ];
+  for (const [name, env, rq] of cases) {
+    const w = wrap(Object.assign({}, env, { reqNode: rq, write: () => Promise.reject(new Error('거절(가짜)')) }));
+    const r = await w.run('k1', rq);
+    assert.ok(!r.made && !r.attached && !r.advanced, name);
+    assert.match(r.why, /서버에 저장되었는지 확인하지 못했습니다/);
+    assert.equal(w.calls.remove, 0, name + ' — 지우지 않는다');
+    assert.equal(w.store.cur.state, 'blocked'); assert.ok(!('claimedAt' in w.store.cur), '맡았다 표시는 푼다');
+  }
+});
+
+test('⑲ ★ 8초 안에 끝나지 않으면(연결 끊김) 닿았다고 보지 않는다 — 요청을 남긴다 · 약속이 던져도 같다', async () => {
+  const hang = wrap({ data: { companies: [CO], contracts: [] }, write: () => new Promise(() => {}), extra: { setTimeout: (fn) => { fn(); return 1; }, clearTimeout() {} } });
+  const r = await hang.run('k1', req());
+  assert.match(r.why, /서버에 저장되었는지 확인하지 못했습니다/); assert.equal(hang.calls.remove, 0);
+  const boom = wrap({ data: { companies: [CO], contracts: [] }, write: () => Promise.reject(new Error('rules')) });
+  const r2 = await boom.run('k1', req());
+  assert.match(r2.why, /서버에 저장되었는지 확인하지 못했습니다/); assert.equal(boom.calls.remove, 0);
+});
+
+test('⑲ 직접 쓰기 길이 아니면(약속 없음 — 통째 저장 폴백) 그대로 지난다 · 저장 직전에 «지난 약속»을 비운다', async () => {
+  const old = Promise.reject(new Error('옛 거절')); old.catch(() => {});   // 실제 저장 층도 거절에 처리기를 달아 둔다
+  const stale = wrap({ data: { companies: [CO], contracts: [] }, extra: { _recLastWrite: old } });
+  const r = await stale.run('k1', req());
+  assert.ok(r.made, '남의 지난 약속(실패)에 끌려가지 않는다'); assert.equal(stale.calls.remove, 1);
+  const body = cutFn(SRC, 'async function processQuoteLaneRequest(');
+  /* 세 저장 자리가 모두 «비우기 → 저장 → 닿음 확인 → 지우기» 순서다 */
+  assert.equal((body.match(/clearWrite\(\);/g) || []).length, 3);
+  assert.equal((body.match(/if\(!\(await landed\(takeWrite\(\)\)\)\) return await stop\(NOT_LANDED\);/g) || []).length, 3);
+});
+
+test('⑲ 저장 층 — _recServerWrite 가 서버 쓰기 약속을 남기고(받으면 끝남 · 거절이면 실패로 끝남) 실패 때의 되돌림·알림은 그대로다', async () => {
+  const body = cutFn(SRC, 'function _recServerWrite(');
+  assert.ok(SRC.includes('var _recLastWrite = null;'));
+  const toasts = []; const store = {};
+  const mk = (fail) => {
+    const ctx = { console, Date, Object, Promise, parseInt, String, KEY: 'K', _recLastWrite: null,
+      localStorage: { getItem: () => '5', setItem: (k, v) => { store[k] = v; } },
+      fbDb: { ref: () => ({ update: () => (fail ? Promise.reject(new Error('거절')) : Promise.resolve()) }) },
+      fbSyncFail: (e) => toasts.push(e.message) };
+    vm.createContext(ctx); vm.runInContext(body + '\nthis.run=_recServerWrite;', ctx); return ctx;
+  };
+  const ok = mk(false); ok.run('contracts', { a: { id: 'a' } });
+  await ok._recLastWrite;   // 받으면 그냥 끝난다
+  const bad = mk(true); bad.run('contracts', { a: { id: 'a' } });
+  await assert.rejects(() => bad._recLastWrite, /거절/);   // 거절이면 실패로 끝난다
+  assert.deepEqual(out(toasts), ['거절'], '실패 알림은 그대로');
+  assert.equal(store['K_meta_contracts'], '5', '실패하면 시각을 되돌린다(그대로)');
+});
+
+/* ── 2차 검토 2026-11-09 — 화면·계약 id 일치·열려 있는 동안 처리 ── */
+test('㉑ ★ 계약 id 를 가리키는 계약 진행 신호 — 요청의 업체와 그 계약의 업체가 같을 때만 옮긴다(다르거나 업체가 안 이어져 있으면 사람이 정한다)', () => {
+  const t = card({ id: 'ct-9', companyId: 'co1' });
+  const ok = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-9', managerMain: '' }), [CO], [t], USERS);
+  assert.equal(ok.action, 'advance'); assert.equal(ok.target.id, 'ct-9');
+  const other = card({ id: 'ct-9', companyId: 'co9', company: { name: '마바상사', companyId: 'co9' } });
+  const diff = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-9', managerMain: '' }), [CO], [other], USERS);
+  assert.equal(diff.action, 'blocked'); assert.match(diff.why, /업체와 요청의 업체가 다릅니다/);
+  const loose = card({ id: 'ct-9', companyId: '', company: { name: '가나기관', bizNo: '1234567890' } });
+  const lo = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-9', managerMain: '' }), [CO], [loose], USERS);
+  assert.equal(lo.action, 'blocked'); assert.match(lo.why, /업체가 이어져 있지 않습니다/);
+  /* 이미 계약협의인 다른 업체 카드도 «조용한 noop» 이 아니라 막는다(다른 업체를 지우듯 끝내지 않는다) */
+  assert.equal(P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-9', managerMain: '' }), [CO], [Object.assign({}, other, { status: 'review' })], USERS).action, 'blocked');
+  /* 요청에 업체가 없으면(계약 id 만) 그 계약을 그대로 옮긴다 — 앱에서 보낸 신호의 길 */
+  assert.equal(P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-9', companyId: '', managerMain: '' }), [CO], [t], USERS).action, 'advance');
+});
+
+test('㉒ 걸린 요청 창 — 닫기에 이름표(aria-label)·입력칸에 key(요청이 고쳐지면 지금 값으로 다시 그림)·업체를 골라도 후보 이름을 지우지 않는다·멈춘 요청은 말로 알려 준다', () => {
+  const at = SRC.indexOf('function BlockedRequestsModal(props){');
+  const body = SRC.slice(at, at + 9000);
+  assert.ok(body.includes("'aria-label':'닫기'"), '닫기 단추에 이름표');
+  assert.ok(body.includes("key:'mgr-' + (r.managerMain || '')") && body.includes("key:'nm-' + (r.companyName || '')") && body.includes("key:'df-' + (r.deferLink ? '1' : '0')"), '입력칸 key');
+  assert.ok(body.includes('props.onPatchReq(r._key, { companyId:e.target.value, deferLink:false })'), '업체를 골라도 companyName 을 지우지 않는다');
+  assert.ok(!body.includes("companyName:'', deferLink:false"));
+  assert.ok(body.includes('처리하다 멈춘 요청입니다') && body.includes("r.state === 'processing' ? '시작 '"), '멈춘 요청은 까닭·시각을 보인다');
+});
+
+test('㉓ 「다시 시도」 — 입력칸을 쓰는 중이어도 «칸을 벗어나게» 한 뒤 저장을 기다린다(blur → 기다림 순서)', async () => {
+  const body = cutFn(SRC, 'async function retryBlockedRequest(');
+  assert.ok(body.indexOf('_fe.blur()') >= 0 && body.indexOf('_fe.blur()') < body.indexOf('Promise.all(_erpCtReqPatches.splice(0))'));
+  const order = [];
+  const fe = { tagName: 'INPUT', blur() { order.push('blur'); ctx._erpCtReqPatches.push(new Promise((r) => setTimeout(() => { order.push('고침 닿음'); r(); }, 10))); } };
+  const ctx = { console, Promise, Array, _erpCtReqBusy: false, document: { activeElement: fe }, _erpCtReqPatches: [],
+    showToast() {}, dbGet: () => [], processOneContractRequest: async () => { order.push('처리'); return { made: { companyName: 'x' } }; } };
+  vm.createContext(ctx); vm.runInContext(body + '\nthis.run=retryBlockedRequest;', ctx);
+  await ctx.run('k', {});
+  assert.deepEqual(out(order), ['blur', '고침 닿음', '처리']);
+});
+
+test('㉔ 이 화면이 열려 있는 동안 — 1분마다 멈춘 요청을 다시 계산하고, 견적 길의 기다리는·멈춘 요청이 있으면 이어서 처리한다(사진첩 요청은 건드리지 않는다)', () => {
+  const at = SRC.indexOf('var lastAll = {};');
+  const hook = SRC.slice(at, at + 3600);
+  assert.ok(hook.includes('var timer = setInterval(function(){') && hook.includes('}, 60000);'));
+  assert.ok(hook.includes('clearInterval(timer)'), '화면을 닫으면 시계를 멈춘다');
+  assert.ok(hook.includes('runContractRequests(true)'));
+  const run = cutFn(SRC, 'async function runContractRequests(');
+  assert.ok(run.includes('quoteOnly === true && !erpQuoteLaneReq(r)'), '열려 있는 동안 도는 길은 견적 길만');
+  assert.ok(SRC.includes('useEffect(function(){ runContractRequests(false); }, []);'), '열 때는 사진첩·중진공도 한 번 처리한다(그대로)');
+});
+
 /* ── 길 연결: 사진첩 길은 그대로, 견적 길만 갈라 보낸다 ── */
 test('⑱ processOneContractRequest 가 견적 길을 먼저 가르고, 사진첩·중진공 요청의 문턱(ctReqWhy)은 그대로다', () => {
   const body = cutFn(SRC, 'async function processOneContractRequest(');
@@ -380,9 +517,9 @@ test('⑳ 걸린 요청 창 — 견적 길 요청은 업체·담당자 고르기
   assert.match(text(coSel[2]), /이은 업체 풀기/);
   assert.ok(String(coSel[2].props.key).includes('co1'), '요청이 고쳐져 다시 그려질 때 «지금 값»으로 다시 만들어지게 key 에 값을 넣는다');
   coSel[0].props.onChange({ target: { value: 'co1' } });
-  assert.deepEqual(out(patches[0]), ['q1', { companyId: 'co1', companyName: '', deferLink: false }], '고르면 요청이 그 업체의 id 를 가리킨다');
+  assert.deepEqual(out(patches[0]), ['q1', { companyId: 'co1', deferLink: false }], '고르면 요청이 그 업체의 id 를 가리킨다');
   coSel[2].props.onChange({ target: { value: 'co2' } });
-  assert.deepEqual(out(patches[1]), ['l1', { companyId: 'co2', companyName: '', deferLink: false }], '이은 업체를 다른 업체로 바꿀 수 있다');
+  assert.deepEqual(out(patches[1]), ['l1', { companyId: 'co2', deferLink: false }], '이은 업체를 다른 업체로 바꿀 수 있다');
   coSel[2].props.onChange({ target: { value: '' } });
   assert.deepEqual(out(patches[2]), ['l1', { companyId: null }], '비우면 이은 업체를 푼다');
   const mgr = selects.filter((s) => !coSel.includes(s))[0];
@@ -435,9 +572,10 @@ test('② 업체를 이은 카드가 하나 있으면 «미연결 카드 확인�
 test('⑳ 멈춘 요청(processing 5분 넘음)도 걸린 요청 창에 보이고, 가리키는 것이 없어도 다시 맡는다 — 어디에도 안 보이는 고아가 없다', () => {
   const run = cutFn(SRC, 'async function runContractRequests(');
   assert.ok(run.includes('return stuck || !!(r.companyId || r.contractId || r.companyName)'));
-  const at = SRC.indexOf("var ref = fbDb.ref('data/contract_requests');");
-  const hook = SRC.slice(at, at + 900);
-  assert.ok(hook.includes("q.state === 'blocked' || (erpQuoteLaneReq(q) && q.state === 'processing' && (Date.now() - (Number(q.claimedAt) || 0)) > 300000)"));
+  const at = SRC.indexOf('var lastAll = {};');
+  const hook = SRC.slice(at, at + 1800);
+  assert.ok(hook.includes("function isStuck(q){ return erpQuoteLaneReq(q) && q.state === 'processing' && (Date.now() - (Number(q.claimedAt) || 0)) > 300000; }"));
+  assert.ok(hook.includes("q.state === 'blocked' || isStuck(q)"), '걸린 것 + 멈춘 흔적을 같은 창에 보인다');
 });
 
 test('⑤ 「다시 시도」는 요청에 적는 고침(사업장 이름 등)이 서버에 닿은 뒤에 돈다 — 쓰다가 바로 눌러도 빈 이름으로 다시 막히지 않는다', async () => {

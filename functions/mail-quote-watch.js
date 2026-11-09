@@ -101,7 +101,8 @@ function reqKey(srcKey) { return "mq-" + crypto.createHash("sha1").update(String
 function nameGuess(tn) {
   const t = String(tn == null ? "" : tn).trim();
   if (!t || t.indexOf("@") >= 0 || t.length > 40) return "";
-  return t;
+  /* 받는 이 표시 이름에도 금액 글자가 들 수 있다(「가나기관(400만원)」) — 요청에 싣기 전에 가린다(직원 모두가 읽는 곳) */
+  return DETECT.scrubMoney(t);
 }
 
 /* 부르는 곳: mail-sync.js — 보낸메일함(sent)에 «새로 적은» 줄을 다 적은 뒤.

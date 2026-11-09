@@ -96,6 +96,13 @@ test('② 사업장을 못 찾으면 blocked + 까닭, 표시 이름은 «미리
   assert.equal(noName.companyName, '', '주소가 그대로 표시 이름이면 이름 후보로 쓰지 않는다');
 });
 
+test('③ ★ 사업장 이름 후보(받는 이 표시 이름)에 든 금액 글자도 요청에 가려서 싣는다', async () => {
+  const { reqs } = await run([row({ t: 'who@unknown.example', tn: '다라상사(견적 400만원)' })]);
+  const r = out(Object.values(reqs)[0]);
+  assert.ok(!/400만/.test(JSON.stringify(r)), '금액 글자가 요청에 실렸다: ' + JSON.stringify(r));
+  assert.match(r.companyName, /○○/); assert.match(r.companyName, /^다라상사/);
+});
+
 test('② 같은 도메인을 쓰는 업체가 둘이면 안 짚는다(blocked)', async () => {
   const cos = [co({ id: 'a1', contacts: [{ email: 'x@twin.example' }] }), co({ id: 'a2', name: '쌍둥이상사', contacts: [{ email: 'y@twin.example' }] })];
   const { reqs } = await run([row({ t: 'z@twin.example' })], cos);

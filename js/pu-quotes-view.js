@@ -336,7 +336,15 @@
       /* 거르기 — 글자(의뢰처·과업 내용) · 견적/계약 */
       var search = el('input', { type: 'search', placeholder: '의뢰처·과업 내용 찾기', 'aria-label': '의뢰처·과업 내용 찾기' });
       search.value = st.text;
-      search.addEventListener('input', function () { st.text = search.value; redrawKeepFocus(); });
+      /* 한글 «조합 중»(IME)에는 다시 그리지 않는다 — 입력칸을 새로 만들면 조합이 끊겨 글자가 깨진다(검토 2026-11-09).
+         조합이 끝나는 순간(compositionend)에 한 번 그린다. 영문·숫자처럼 조합이 없는 입력은 그대로 바로 거른다. */
+      search.addEventListener('compositionstart', function () { st.composing = true; });
+      search.addEventListener('compositionend', function () { st.composing = false; st.text = search.value; redrawKeepFocus(); });
+      search.addEventListener('input', function (ev) {
+        st.text = search.value;
+        if (st.composing || (ev && ev.isComposing)) return;
+        redrawKeepFocus();
+      });
       var allOn = ordered().length > 0 && ordered().every(function (r) { return st.sel[r.id]; });
       var selAll = el('label', { 'class': 'pqv-selall' }, [checkbox(allOn, '보이는 것 모두 고르기', toggleAllVisible), el('span', { text: '모두 고르기' })]);
       function chip(label, on, fn) { var b = el('button', { type: 'button', 'class': 'chip' + (on ? ' on' : ''), text: label }); b.addEventListener('click', fn); return b; }

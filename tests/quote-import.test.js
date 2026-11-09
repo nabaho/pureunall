@@ -182,6 +182,12 @@ test('runImport — 정상: 받기 → 🔒 저장 → 글자 → AI → 기록 
   assert.strictEqual(h.calls.log[0].o.target, 'q1');
   assert.match(h.calls.steps[0], /^1\/2 · 견적서 a/);
 });
+test('③ ★ runImport — 보관함에 두는 «파일 이름»의 금액 글자는 가려서 저장한다(글자 뽑기는 원래 이름 그대로)', async () => {
+  const h = host({ fetchAtt: (c) => Promise.resolve({ name: '견적서_400만원.pdf', type: 'application/pdf', bytes: new Uint8Array([1, 2, 3]) }) });
+  await I.runImport([C('a')], h);
+  assert.strictEqual(h.calls.store[0].name, '견적서_○○.pdf');
+  assert.deepStrictEqual(h.calls.text, ['견적서_400만원.pdf'], '확장자 판별용 원래 이름은 그대로 쓴다');
+});
 test('★ runImport — 이미 가져온 메일(같은 srcKey)은 건너뛴다: 받기·AI·저장을 안 한다', async () => {
   const h = host({ have: (k) => Promise.resolve(k === SLUG + '|a') });
   const r = await I.runImport([C('a'), C('b')], h);

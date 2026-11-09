@@ -143,7 +143,7 @@
     function prepare(c) {
       if (c.attIndex < 0) return Promise.resolve({ fields: null, fileId: '' });   /* 첨부가 없다 — 기록만(확인 필요) */
       return Promise.resolve().then(function () { return host.fetchAtt(c); }).then(function (a) {
-        return Promise.resolve(host.store({ name: a.name, size: a.bytes.length, type: a.type || '', bytes: a.bytes }, c)).then(function (fileId) {
+        return Promise.resolve(host.store({ name: D.scrubMoney(a.name) || a.name, size: a.bytes.length, type: a.type || '', bytes: a.bytes }, c)).then(function (fileId) {
           return Promise.resolve(host.extractText(a.bytes, a.name)).then(function (t) { return trim(t) ? s(t).trim() : ''; }, function () { return ''; })
             .then(function (text) {
               if (!text) return { fields: null, fileId: fileId };       /* 글자를 못 뽑았다 — AI 를 부르지 않는다 */
