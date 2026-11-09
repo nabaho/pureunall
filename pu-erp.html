@@ -16521,7 +16521,26 @@ var CONTRACT_DEMO_SEED = [];
    ⚠ 유형 «목록»에 한 줄 더할 뿐, 계약·금액은 건드리지 않는다. */
 function consEnsureVoucher(arr){
   var list = Array.isArray(arr) ? arr : [];
-  if(list.some(function(x){ return x && /바우처/.test(String(x.name || '')); })) return list;
+  var isV = function(x){ return x && /바우처/.test(String(x.name || '')); };
+  if(list.some(isV)){
+    /* 이미 있는 바우처 유형의 «수행기관이 비어 있으면» 중진공으로 한 번 채운다 (대표 지시 2026-11-09 「이알피 니가 고쳐」).
+       ⚠ 이미 적힌 기관은 바꾸지 않는다 · 한 번 채운 뒤 표시(biz_cons_voucher_agency) — 대표님이 지우면 다시 안 채운다.
+       ⚠ 쓰기 조건은 아래 «얹기»와 같다(받은 사전이 있을 때만, bizTypeApply). 이름·약어·번호는 그대로. */
+    if(dbGet('biz_cons_voucher_agency', false)) return list;
+    if(!list.some(function(x){ return isV(x) && !String(x.agency || '').trim(); })) return list;
+    if(dbGet('biz_cons_types', null) == null || typeof bizTypeApply !== 'function') return list;
+    var seedA = (BIZ_CONS_SEED.find(function(x){ return x.code === 'cons-voucher'; }) || {}).agency || '';
+    if(!seedA) return list;
+    var nextA = bizTypeApply('biz_cons_types', [], function(cur){
+      return cur.map(function(x){
+        if(!isV(x) || String(x.agency || '').trim()) return x;
+        return bizTypeHist(Object.assign({}, x, { agency:seedA }), 'edit', x, '자동 채움(대표 지시 2026-11-09)');
+      });
+    });
+    if(!nextA) return list;
+    dbSet('biz_cons_voucher_agency', true);
+    return nextA;
+  }
   if(dbGet('biz_cons_voucher_seeded', false)) return list;
   /* ⚠ 이 기기에 «서버에서 받은» 사전이 있을 때만 쓴다 — 없으면 씨앗 위에 얹어 서버 사전을 덮는다(2026-10-26 사고).
      조용히 넘어가고, 사전을 받은 뒤 다음에 읽을 때 넣는다. */
