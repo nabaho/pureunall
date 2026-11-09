@@ -616,7 +616,7 @@ async function runSync(deps, opts) {
             }
             /* ── 📨 보낸메일함의 우리 견적서·계약서 → 이알피 «계약 요청» (견적·계약 자동화 계획 3, 2026-11-08) ──
                ⚠ 보낸편지함(sent)에 «새로 받아온»(fresh) 줄만 본다 — 옛것 채우기(back)로 몇 달 전 견적이 몰려 올라가면 안 된다.
-               ⚠ 기본 «꺼짐»(pucards/config/quoteWatch/on 이 true 일 때만). 켜는 길·푸는 길은 이 한 칸이다.
+               ⚠ 기본 «꺼짐»(pu_docs/config/quoteWatch/on 이 true 일 때만 — 총괄관리자만 쓰는 칸). 켜는 길·푸는 길은 이 한 칸이다.
                ⚠ 계약을 만드는 일은 이알피를 사람이 열 때 이알피가 한다 — 여기서는 «요청»만 남긴다(까닭·규칙은 mail-quote-watch.js).
                ⚠ 실패해도 던지지 않는다 — 감지가 죽어도 동기화는 계속된다. */
             if (r.dir === 'fresh' && held.length && MB.folderKind(p.box) === 'sent') {

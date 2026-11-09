@@ -33,7 +33,7 @@ const NEWINQ = require("./mail-new-inquiry");
 const CFG = "pu_docs/config/quoteWatch";
 const SEEN_ROOT = "pu_docs/config/quoteSeen";
 const REQ_ROOT = "data/contract_requests";
-const MAX_PER_RUN = 30;
+const MAX_PER_RUN = 100;   /* 한 회차에 넘는 후보는 «새로 받은 줄은 한 번만 온다» 라 다음 회차에 못 본다 — 넘치면 skipped 로 세어 로그에 남긴다 */
 const MAX_AGE_MS = 30 * 24 * 3600 * 1000;   /* 한 달 넘은 메일은 안 본다 — 켜자마자 옛 메일이 몰려 올라가지 않게 */
 
 /* 개인 메일 도메인(naver·gmail 등)은 도메인으로는 업체를 못 잇는다 — 주소째 맞을 때만 */
@@ -117,6 +117,7 @@ async function watchSentMail(deps, opts) {
   const rows = (Array.isArray(o.rows) ? o.rows : []).filter((r) => r && r.u != null && now - (Number(r.d) || now) <= MAX_AGE_MS);
   const cands = rows.map((r) => ({ r, doc: DETECT.docOf(r.s, r.an) })).filter((x) => x.doc);
   out.seen = cands.length;
+  out.overflow = Math.max(0, cands.length - MAX_PER_RUN);   /* 한도를 넘어 못 본 후보 수 — mail-sync 가 로그로 남긴다(조용히 버리지 않는다) */
   if (!cands.length) return out;
   out.ran = true;
 

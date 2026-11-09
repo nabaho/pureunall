@@ -74,10 +74,11 @@ test('② ★★ 이름·주소·대표자가 같은 «다른 업체»의 카드
   const adv = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract' }), [CO], [bCard], USERS);
   assert.equal(adv.action, 'blocked', '남의 카드를 계약협의로 옮겼다');
   assert.match(adv.why, /옮길 상담접수 카드가 없습니다/);
-  /* 업체를 못 이은(companyId 없는) 카드는 «이름이 같아도» 후보가 아니다 */
+  /* 업체를 못 이은(companyId 없는) 카드는 «이름이 같아도» 후보가 아니다 — 자동으로 붙이지도 옮기지도 않는다.
+     (같은 사업장일 수 있으니 «만들지도 않고» 사람이 정하게 막는 것은 아래 «업체 미연결 카드» 시험) */
   const noId = card({ id: 'ct-N', companyId: '', company: { name: '가나기관', bizNo: '1234567890' } });
-  assert.equal(P.erpQuoteLanePlan(req(), [CO], [noId], USERS).action, 'create');
-  assert.equal(P.erpQuoteLanePlan(req({ kind: 'advance' }), [CO], [noId], USERS).action, 'blocked');
+  assert.notEqual(P.erpQuoteLanePlan(req(), [CO], [noId], USERS).action, 'attach', '업체 미연결 카드에 이름으로 덧붙였다');
+  assert.notEqual(P.erpQuoteLanePlan(req({ kind: 'advance' }), [CO], [noId], USERS).action, 'advance', '업체 미연결 카드를 이름으로 옮겼다');
 });
 
 test('③ 사람이 «연결 보류»를 켠 요청만 이름 그대로 연결 보류 카드로 만든다 — 이름이 같은 진행 중 카드가 있으면 붙이지 않고 사람이 정한다', () => {
@@ -151,7 +152,9 @@ test('⑨ 계약 진행 신호(advance) — 상담접수 카드가 «하나일 �
   const two = P.erpQuoteLanePlan(adv(), [CO], [card(), card({ id: 'ct-2' })], USERS);
   assert.equal(two.action, 'blocked'); assert.match(two.why, /2건/);
   assert.equal(P.erpQuoteLanePlan(adv(), [CO], [card({ status: 'review' })], USERS).action, 'noop', '이미 계약협의면 아무것도 안 한다');
-  assert.equal(P.erpQuoteLanePlan(adv(), [CO], [card({ status: 'signed' })], USERS).action, 'noop');
+  const onlySigned = P.erpQuoteLanePlan(adv(), [CO], [card({ status: 'signed' })], USERS);
+  assert.equal(onlySigned.action, 'blocked', '계약확정 카드만 있는 사업장의 신호를 조용히 지우면 재계약을 놓친다(검토 2026-11-09)');
+  assert.match(onlySigned.why, /계약확정 카드만 있습니다/);
   const none = P.erpQuoteLanePlan(adv(), [CO], [], USERS);
   assert.equal(none.action, 'blocked'); assert.match(none.why, /상담접수 카드가 없습니다/);
   assert.equal(P.erpQuoteLanePlan(adv({ contractId: 'ct-9' }), [CO], [card({ id: 'ct-9' }), card({ id: 'ct-8' })], USERS).target.id, 'ct-9');
@@ -334,7 +337,7 @@ test('⑱ processOneContractRequest 가 견적 길을 먼저 가르고, 사진�
 
 test('⑲ runContractRequests — 견적 길 요청은 «업체·계약을 가리킬 때만» 돌리고(멈춘 processing 도 다시 맡는다), 결과를 사진첩 길과 따로 센다', () => {
   const body = cutFn(SRC, 'async function runContractRequests(');
-  assert.match(body, /erpQuoteLaneReq\(r\)\) return !!\(r\.companyId \|\| r\.contractId \|\| r\.companyName\)/);
+  assert.ok(body.includes('if(erpQuoteLaneReq(r)) return stuck || !!(r.companyId || r.contractId || r.companyName)'));
   assert.match(body, /r\.state === 'processing'/); assert.match(body, /300000/);
   assert.match(body, /madeQ|doneQ|blockedQ/); assert.match(body, /견적·계약 메일에서 온 요청/);
 });
@@ -365,23 +368,30 @@ test('⑳ 걸린 요청 창 — 견적 길 요청은 업체·담당자 고르기
   assert.match(t, /컨설팅 유형: 유형이름/, '사진첩 요청은 그대로');
   assert.match(t, /가나기관/, '업체를 이은 요청은 업체 이름을 업체관리에서 읽어 보여 준다');
   const selects = find(tree, (n) => n.tag === 'select');
-  /* 담당자 select 3(견적 길 요청 셋) + 업체 select 2(업체를 못 이은 요청 둘: quote·advance) */
-  assert.equal(selects.length, 5);
-  const coSel = selects.filter((s) => find(s, (n) => n.tag === 'option' && /업체관리에서 고르기/.test(text(n))).length);
-  assert.equal(coSel.length, 2, '업체를 못 이은 견적·계약 신호 둘에만 업체 고르개가 뜬다');
+  /* 견적 길 요청 셋(quote·advance·업체를 이은 quote) 모두에 담당자 select + 업체 select = 6.
+     업체 고르개는 «이은 뒤에도 계속 보인다» — 잘못 고르면 바꿀 수 있어야 한다(검토 2026-11-09 Antigravity ①) */
+  assert.equal(selects.length, 6);
+  const isCo = (s) => find(s, (n) => n.tag === 'option' && /업체관리에서 고르기|이은 업체 풀기/.test(text(n))).length > 0;
+  const coSel = selects.filter(isCo);
+  assert.equal(coSel.length, 3, '견적·계약 신호 셋 모두에 업체 고르개가 뜬다(이은 요청도 바꿀 수 있어야 한다)');
   assert.equal(find(coSel[0], (n) => n.tag === 'option').length, 1 + COS.length);
   assert.match(text(coSel[0]), /가나기관 · 사업자번호 끝 7890/);
+  assert.equal(coSel[2].props.defaultValue, 'co1', '이은 요청은 지금 업체가 선택돼 있다');
+  assert.match(text(coSel[2]), /이은 업체 풀기/);
+  assert.ok(String(coSel[2].props.key).includes('co1'), '요청이 고쳐져 다시 그려질 때 «지금 값»으로 다시 만들어지게 key 에 값을 넣는다');
   coSel[0].props.onChange({ target: { value: 'co1' } });
   assert.deepEqual(out(patches[0]), ['q1', { companyId: 'co1', companyName: '', deferLink: false }], '고르면 요청이 그 업체의 id 를 가리킨다');
-  coSel[0].props.onChange({ target: { value: '' } });
-  assert.equal(patches.length, 1, '빈 값을 고르면 아무것도 안 쓴다');
+  coSel[2].props.onChange({ target: { value: 'co2' } });
+  assert.deepEqual(out(patches[1]), ['l1', { companyId: 'co2', companyName: '', deferLink: false }], '이은 업체를 다른 업체로 바꿀 수 있다');
+  coSel[2].props.onChange({ target: { value: '' } });
+  assert.deepEqual(out(patches[2]), ['l1', { companyId: null }], '비우면 이은 업체를 푼다');
   const mgr = selects.filter((s) => !coSel.includes(s))[0];
   mgr.props.onChange({ target: { value: 'A-001' } });
-  assert.deepEqual(out(patches[1]), ['q1', { managerMain: 'A-001' }]);
+  assert.deepEqual(out(patches[3]), ['q1', { managerMain: 'A-001' }]);
   const defer = find(tree, (n) => n.tag === 'input' && n.props.type === 'checkbox');
-  assert.equal(defer.length, 1, '연결 보류는 «업체를 못 이은 견적 요청»에만');
+  assert.equal(defer.length, 1, '연결 보류는 «업체를 못 이은 견적 요청»에만(이은 요청·계약 신호에는 없다)');
   defer[0].props.onChange({ target: { checked: true } });
-  assert.deepEqual(out(patches[2]), ['q1', { deferLink: true }]);
+  assert.deepEqual(out(patches[4]), ['q1', { deferLink: true }]);
   assert.match(t, /업체관리에 없으면 연결 보류로 등록/);
   /* 담당자 칸의 선택지에 사번이 새지 않는다(이름이 없으면 «이름 미확인») */
   assert.ok(!/P-005|A-001/.test(text(mgr)), '사번이 화면에 보인다');
@@ -393,4 +403,71 @@ test('⑳ 업체 고르개는 사번·전체 사업자번호를 보이지 않는
   const parent = SRC.slice(SRC.indexOf('showBlockedReqs && h(BlockedRequestsModal'), SRC.indexOf('showBlockedReqs && h(BlockedRequestsModal') + 2200);
   assert.match(parent, /slice\(-4\)/, '사업자번호를 끝 4자리로 줄여 넘긴다');
   assert.match(parent, /closed\|terminated\|inactive/, '끝난 업체는 고르개에 안 올린다');
+});
+
+/* ── 검토 2026-11-09 (사진첩 방 2건 + Antigravity) ── */
+test('② ★ 업체 «미연결» 진행 카드(연결 보류·예전 카드)가 같은 사업장이면 — 자동으로 만들지도 붙이지도 옮기지도 않고 사람이 정하게 막는다(카드가 둘 생기지 않는다)', () => {
+  /* 이름·주소가 같고 companyId 가 없는 상담접수 카드 */
+  const loose = card({ id: 'ct-L', companyId: '', company: { name: '가나기관', bizNo: '1234567890', address: CO.address, ceo: CO.ceo } });
+  const q = P.erpQuoteLanePlan(req(), [CO], [loose], USERS);
+  assert.equal(q.action, 'blocked'); assert.match(q.why, /업체가 이어져 있지 않습니다/); assert.match(q.why, /이름 모양으로 자동으로 붙이지 않습니다/);
+  const a = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', managerMain: '' }), [CO], [loose], USERS);
+  assert.equal(a.action, 'blocked'); assert.match(a.why, /업체가 이어져 있지 않습니다/); assert.match(a.why, /자동으로 옮기지 않습니다/);
+  /* 계약협의 단계의 미연결 카드도 같다 */
+  assert.equal(P.erpQuoteLanePlan(req(), [CO], [Object.assign({}, loose, { status: 'review' })], USERS).action, 'blocked');
+  /* 업체가 «다른» 업체(companyId 가 다름)인 카드는 여기 안 든다 — 다른 업체다 */
+  const other = card({ id: 'ct-O', companyId: 'co9', company: { name: '가나기관', bizNo: '1234567890', address: CO.address, ceo: CO.ceo, companyId: 'co9' } });
+  assert.equal(P.erpQuoteLanePlan(req(), [CO], [other], USERS).action, 'create');
+  /* 이름이 아주 다른 미연결 카드는 상관없다 */
+  const far = card({ id: 'ct-F', companyId: '', company: { name: '마바상사', bizNo: '9999999999' }, companyName: '마바상사' });
+  assert.equal(P.erpQuoteLanePlan(req(), [CO], [far], USERS).action, 'create');
+  /* 끝난 카드(계약확정·종료)는 «진행 중»이 아니라 막지 않는다 — 다만 새 카드 메모에 재계약 확인을 적는다 */
+  const looseSigned = P.erpQuoteLanePlan(req(), [CO], [Object.assign({}, loose, { status: 'signed' })], USERS);
+  assert.equal(looseSigned.action, 'create');
+  assert.match(looseSigned.form.note, /이름·주소가 같은 계약확정 카드가 있음\(업체 미연결\) — 재계약인지 확인/);
+});
+
+test('② 업체를 이은 카드가 하나 있으면 «미연결 카드 확인»보다 그 카드가 먼저다 — 덧붙인다(기존 동작 유지)', () => {
+  const linked = card(); const loose = card({ id: 'ct-L', companyId: '', company: { name: '가나기관', bizNo: '1234567890' } });
+  assert.equal(P.erpQuoteLanePlan(req(), [CO], [linked, loose], USERS).action, 'attach');
+});
+
+test('⑳ 멈춘 요청(processing 5분 넘음)도 걸린 요청 창에 보이고, 가리키는 것이 없어도 다시 맡는다 — 어디에도 안 보이는 고아가 없다', () => {
+  const run = cutFn(SRC, 'async function runContractRequests(');
+  assert.ok(run.includes('return stuck || !!(r.companyId || r.contractId || r.companyName)'));
+  const at = SRC.indexOf("var ref = fbDb.ref('data/contract_requests');");
+  const hook = SRC.slice(at, at + 900);
+  assert.ok(hook.includes("q.state === 'blocked' || (erpQuoteLaneReq(q) && q.state === 'processing' && (Date.now() - (Number(q.claimedAt) || 0)) > 300000)"));
+});
+
+test('⑤ 「다시 시도」는 요청에 적는 고침(사업장 이름 등)이 서버에 닿은 뒤에 돈다 — 쓰다가 바로 눌러도 빈 이름으로 다시 막히지 않는다', async () => {
+  const body = cutFn(SRC, 'async function retryBlockedRequest(');
+  assert.ok(body.includes('await Promise.all(_erpCtReqPatches.splice(0))'));
+  const at = SRC.indexOf('showBlockedReqs && h(BlockedRequestsModal');
+  const parent = SRC.slice(at, at + 2800);
+  assert.ok(parent.includes('_erpCtReqPatches.push(p)')); assert.ok(parent.includes('return p;'));
+  /* 실제로 돌려 본다 — 저장이 늦게 닿는 가짜 약속이 끝난 «뒤에» 처리 함수가 불린다 */
+  const order = [];
+  const ctx = { console, Promise, Array, _erpCtReqBusy: false,
+    _erpCtReqPatches: [new Promise((r) => setTimeout(() => { order.push('고침 닿음'); r(); }, 20))],
+    showToast() {}, dbGet: () => [], processOneContractRequest: async () => { order.push('처리'); return { made: { companyName: 'x' } }; } };
+  vm.createContext(ctx); vm.runInContext(body + '\nthis.run=retryBlockedRequest;', ctx);
+  await ctx.run('k', {});
+  assert.deepEqual(out(order), ['고침 닿음', '처리']);
+});
+
+test('⑥ 삭제 확인창 — 견적·계약 메일 요청은 «다시 생기지 않는다», 사진첩 요청은 «다시 누르면 생긴다»', async () => {
+  const body = cutFn(SRC, 'async function removeBlockedRequest(');
+  const asked = [];
+  const ctx = { console, Promise, fbDb: { ref: () => ({ remove: () => Promise.resolve() }) }, showToast() {}, popConfirm: async (m) => { asked.push(m); return false; } };
+  vm.createContext(ctx); vm.runInContext(body + '\nthis.run=removeBlockedRequest;', ctx);
+  await ctx.run('k1', '다라상사', true); await ctx.run('k2', '가나상사', false);
+  assert.ok(asked[0].includes('«본 메일»로 적혀 있어 지워도 다시 생기지 않습니다')); assert.ok(!asked[0].includes('사진첩에서 다시 누르면'));
+  assert.ok(asked[1].includes('사진첩에서 다시 누르면 요청이 새로 생깁니다'));
+  assert.ok(SRC.includes('props.onRemove(r._key, co, quoteLane)'));
+});
+
+test('⑧ 토스트 — «이미 반영한 메일·다른 화면이 처리 중»(noop)은 한 일로 세지 않는다', () => {
+  assert.ok(cutFn(SRC, 'async function runContractRequests(').includes('else if(r.attached || r.advanced) doneQ++; else if(!r.noop) blockedQ++'));
+  assert.ok(cutFn(SRC, 'async function retryBlockedRequest(').includes("else if(r.noop) showToast('ℹ ' + r.noop"));
 });

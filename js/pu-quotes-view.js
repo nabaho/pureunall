@@ -107,7 +107,7 @@
     + '.pqv-head{font-weight:700;color:#475569;background:#f8fafc;border-bottom:1px solid #cbd5e1}'
     + '.pqv-no{font-variant-numeric:tabular-nums;color:#64748b;text-align:right}'
     + '.pqv-row input[type=checkbox]{width:16px;height:16px;margin:0}'
-    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#94a3b8}.pqv-amt.chk{color:#b45309}'
+    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#64748b}.pqv-amt.chk{color:#b45309}'
     + '.pqv-meta{display:none}'
     + '.pqv .empty{padding:18px;color:#64748b;text-align:center}.pqv .msg{margin:6px 0;color:#334155}'
     + '@media(max-width:700px){'
