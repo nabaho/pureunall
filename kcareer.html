@@ -15355,6 +15355,7 @@ function mrDetClose(){
     for(var i=0;i<ls.length;i++){ if(ls[i].getAttribute('data-mr')===id){ again=ls[i]; break; } }
     if(!again && back && back.isConnected!==false) again=back;
     if(!again && ls.length) again=ls[0];
+    if(!again && document.querySelector) again=document.querySelector('#mrBody .mr-pill.on');   /* 목록이 비었다(마지막 건을 다른 탭으로 옮김) — 지금 탭 단추로 */
     if(again && again.focus) again.focus();
   }catch(e){}
 }

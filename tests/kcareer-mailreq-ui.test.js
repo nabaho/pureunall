@@ -330,6 +330,12 @@ test('닫을 때 «그 건의 단추»로 초점이 돌아간다 — 저장·상
   w2.ctx.mrOpen(ID); await settle(); w.focused.length = 0; w2.ctx.mrDetClose();   // mkBtn 의 초점 기록은 첫 번째 세계(w)에 쌓인다
   assert.equal(w.focused.at(-1), 'btn:x~9', '그 건이 목록에서 빠졌으면(완료로 바꾼 뒤 등) 목록의 첫 단추로');
   assert.match(html, /data-mr="'\+escapeHtml\(x\.id\)\+'"/, '목록 단추에 건 번호가 붙는다');
+  /* 목록이 비었으면(마지막 건을 다른 탭으로 옮김) 지금 탭 단추로 — 초점이 갈 곳 없이 사라지지 않게 */
+  const w3 = await popup({ openers: [] }); w3.ctx.mrDetClose();
+  w3.ctx.document.activeElement = { isConnected: false, focus() { w3.focused.push('detached'); } };
+  w3.ctx.document.querySelector = (sel) => (/mr-pill\.on/.test(sel) ? { focus() { w3.focused.push('tab-pill'); } } : null);
+  w3.ctx.mrOpen(ID); await settle(); w3.focused.length = 0; w3.ctx.mrDetClose();
+  assert.equal(w3.focused.at(-1), 'tab-pill', '비면 탭 단추로');
 });
 test('날짜 칸에 없는 날짜·덜 친 날짜를 넣으면 «기한 없음»으로 지우지 않고 말한다(칸 값이 빈 글자가 되는 브라우저 동작)', async () => {
   const w = await popup(); fillForm(w); const before = w.db.writes();
