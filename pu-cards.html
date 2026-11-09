@@ -10200,8 +10200,9 @@ function loadSentBox(cb){
    그리는 곳과 「골라서 한 번에」가 **같은 목록**을 봐야 한다. 따로 세면 개수가 어긋난다. */
 function sentVisibleRows(){
   const q = String(state.sentQ||'').trim().toLowerCase().replace(/\s/g,'');
+  /* ⚠ 기록 열쇠(id)가 «이긴다» — 기록 안에 id 칸이 들어 있어도 열쇠를 못 덮는다(그 값이 단추에 실린다) */
   let rows = Object.entries(state.sentBox||{})
-    .map(([id,v])=>Object.assign({id}, v||{}))
+    .map(([id,v])=>Object.assign({}, v||{}, {id}))
     .filter(v=>v.at)
     .sort((a,b)=>(b.at||0)-(a.at||0));
   if(state.sentMine) rows = rows.filter(v=>String(v.by||'').toLowerCase()===String(myEmail||'').toLowerCase());
@@ -10234,7 +10235,7 @@ function sentFold(rows){
   list.forEach((v,i)=>{
     const subj = String((v&&v.subject)||'').replace(/\s+/g,' ').trim();
     if(!subj){ of.push(null); return; }
-    const k = String(v.by||'')+'\u0001'+subj, at = Number(v.at||0);
+    const k = String(v.by||'').trim().toLowerCase()+'\u0001'+subj, at = Number(v.at||0);
     let r = runs[k];
     if(!r || Math.abs(r.last-at) > SENT_FOLD_GAP_MS) r = runs[k] = { idx:[], last:at };
     r.idx.push(i); r.last = at; of.push(r);
@@ -10268,21 +10269,21 @@ function sentTdsHtml(v, sub){
       <td>${sub?`<span class="sn">${sub}</span>`:''}<b>${esc(v.toName||'')}</b><span class="e">${esc(v.to||'')}</span></td>
       <td>${esc(v.subject||'')}<span class="e">${v.set?'📦 '+esc(v.set)+' · ':''}${esc((v.names||[]).join(' · ')||'첨부 없음')}</span></td>
       <td class="a">
-        <button onclick="event.stopPropagation();resendFrom('${v.id}')">다시 쓰기</button>
-        ${v.cardId?`<button onclick="event.stopPropagation();openDetail('${v.cardId}')">명함</button>`:''}
+        <button data-id="${esc(v.id)}" onclick="event.stopPropagation();resendFrom(this.dataset.id)">다시 쓰기</button>
+        ${v.cardId?`<button data-cid="${esc(v.cardId)}" onclick="event.stopPropagation();openDetail(this.dataset.cid)">명함</button>`:''}
       </td>`;
 }
 /* 묶음 줄 — 같은 칸 구성(번호·때·보낸 사람·받는 곳·제목·단추). 한 줄에 «몇 곳에 한 번에 보냈나»만 말한다. */
 function sentFoldHtml(g, i, isOpen){
   const a = g.rows[0], z = g.rows[g.rows.length-1];      /* 가장 최근 · 가장 먼저 나간 줄 */
   const head = `
-    <tr class="sfold ${isOpen?'on':''}" onclick="sentFoldToggle('${esc(g.key)}')" title="한 번에 보낸 ${g.n}곳 — 누르면 받은 곳을 ${isOpen?'접습니다':'펼칩니다'}">
+    <tr class="sfold ${isOpen?'on':''}" data-k="${esc(g.key)}" onclick="sentFoldToggle(this.dataset.k)" title="한 번에 보낸 ${g.n}곳 — 누르면 받은 곳을 ${isOpen?'접습니다':'펼칩니다'}">
       <td class="numonly">${i+1}</td>
       <td class="w">${fmtDate(a.at)}<span>${sentHm(z.at)}~${sentHm(a.at)}</span></td>
       <td class="b">${esc(staffName(a.by))}</td>
       <td><b>📨 ${g.n}곳</b><span class="e">한 번에 보냄</span></td>
       <td>${esc(a.subject||'')}<span class="e">${a.set?'📦 '+esc(a.set)+' · ':''}${esc((a.names||[]).join(' · ')||'첨부 없음')}</span></td>
-      <td class="a"><button type="button">${isOpen?'▾ 접기':'▸ 받은 곳 보기'}</button></td>
+      <td class="a"><button type="button" aria-expanded="${isOpen?'true':'false'}">${isOpen?'▾ 접기':'▸ 받은 곳 보기'}</button></td>
     </tr>`;
   if(!isOpen) return head;
   /* 펼치면 나간 차례(오래된 것부터)로 — 발송기가 돈 순서가 그대로 보인다 */

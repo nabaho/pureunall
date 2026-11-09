@@ -196,7 +196,7 @@ test('④ 「낱낱이 보기」는 예전처럼 줄마다 한 줄', () => {
   /* 낱줄마다 받는 곳 이름·주소와 「다시 쓰기」가 그대로 있다 — 묶기 때문에 낱줄의 쓸모가 줄지 않는다 */
   rows.forEach((r) => {
     assert.ok(html.includes(r.toName) && html.includes(r.to), '낱줄에 받는 곳이 안 나옵니다: ' + r.toName);
-    assert.ok(html.includes("resendFrom('" + r.id + "')"), '낱줄에 「다시 쓰기」가 없습니다: ' + r.toName);
+    assert.ok(html.includes('data-id="' + r.id + '"') && html.includes('resendFrom(this.dataset.id)'), '낱줄에 「다시 쓰기」가 없습니다: ' + r.toName);
   });
 });
 
@@ -231,6 +231,61 @@ test('묶음 줄을 누르면 펴고 접는다 — 같은 줄을 다시 누르�
   assert.equal(ctx.redraws, 2, '누르면 다시 그려야 합니다');
   api.sentFlatToggle();
   assert.equal(ctx.state.sentFlat, true);
+});
+
+/* ── 보안: 기록 열쇠·명함 번호가 «글자로 코드에 실리지» 않는다 (2026-11-09 보안 검토 지적) ──
+   HTML 속성값의 엔터티(&#39; 등)는 «이벤트가 실행되기 전에» 되살아난다. 그래서 onclick="f('${esc(값)}')" 은 값에
+   작은따옴표가 있으면 코드 밖으로 빠져나온다. 파이어베이스 열쇠는 ' ( ) ; 를 허용하고, 로그인한 쓰기 길이 있다.
+   → 값은 data 속성에 «자료로만» 싣고 onclick 은 this.dataset 으로 읽는다. */
+const EVIL = "x');globalThis.proof=1;//";
+const unescapeHtml = (s) => String(s).replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const onclicks = (html) => (html.match(/onclick="[^"]*"/g) || []).map((a) => unescapeHtml(a));
+
+test('★★ 악성 기록 열쇠가 단추 코드에 실리지 않는다 — 묶음 줄·낱줄·펼친 안쪽 줄 모두', () => {
+  const rows = bulk(8, BASE);
+  desc(rows)[0].id = EVIL;                                    /* 묶음 열쇠(가장 최근 줄)가 악성 */
+  rows[3].id = EVIL + '2'; rows[3].cardId = EVIL + 'card';    /* 안쪽 줄의 id·명함 번호도 악성 */
+  const lone = row(BASE + 9999 * MIN, { subject: '낱줄', id: EVIL + '3', cardId: EVIL + 'c3' });
+  const all = rows.concat([lone]);
+  const key = desc(all).find((r) => r.subject === rows[0].subject).id;
+  [{}, { sentOpen: { [key]: true } }, { sentFlat: true }].forEach((st) => {
+    const { html } = box(all, st);
+    const codes = onclicks(html);
+    assert.ok(codes.length > 0, 'onclick 이 하나도 없어 검사가 헛돕니다');
+    codes.forEach((c) => assert.ok(!c.includes('globalThis.proof'), '★★ 기록 열쇠가 코드로 새어 나왔습니다: ' + c));
+    /* 값은 data 속성에 «글자 그대로(엔터티로 가려서)» 들어 있다 */
+    assert.ok(!html.includes(EVIL), '악성 열쇠가 가려지지 않고 그대로 찍혔습니다(속성 밖으로 샐 수 있음)');
+  });
+});
+
+test('★★ 단추는 data 속성을 읽는다 — 값을 문자열로 코드에 박지 않는다', () => {
+  ['function sentFoldHtml(g, i, isOpen)', 'function sentTdsHtml(v, sub)'].forEach((h) => {
+    const body = sliceFn(cards, h).replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.ok(!/onclick="[^"]*\('\$\{/.test(body), h + ' 의 onclick 이 값을 따옴표 문자열로 박습니다 — this.dataset 으로 읽으세요');
+    assert.match(body, /this\.dataset\./, h + ' 이 data 속성을 안 읽습니다');
+  });
+});
+
+test('★ 기록 안에 id 칸이 들어 있어도 기록 열쇠가 이긴다', () => {
+  const r = row(BASE, { id: 'fake-from-record' });
+  const { api } = makeEnv({ sentBox: { realkey: r } });
+  const rows = api.sentVisibleRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, 'realkey', '★ 기록 안의 id 가 열쇠를 덮었습니다 — 「다시 쓰기」가 엉뚱한 기록을 엽니다');
+});
+
+test('보낸이는 대소문자·앞뒤 공백이 달라도 같은 사람으로 묶는다', () => {
+  const { api } = makeEnv();
+  const rows = [];
+  for (let i = 0; i < api.MIN + 2; i++) rows.push(row(BASE + i * 1000, { by: i % 2 ? ' P@Example.INVALID ' : 'p@example.invalid' }));
+  assert.equal(api.sentFold(desc(rows)).filter((x) => x.fold).length, 1, '표기만 다른 같은 보낸이가 갈라졌습니다');
+});
+
+test('묶음 단추는 펼침 상태를 보조기기에 알린다(aria-expanded)', () => {
+  const rows = bulk(10, BASE);
+  const closed = box(rows).html, opened = box(rows, { sentOpen: { [desc(rows)[0].id]: true } }).html;
+  assert.match(closed, /aria-expanded="false"/);
+  assert.match(opened, /aria-expanded="true"/);
 });
 
 /* ── 소스 지킴 ── */
