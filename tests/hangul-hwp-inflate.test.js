@@ -293,3 +293,38 @@ test('★★ 문서 전체 상한: 줄기를 여럿으로 쪼개도 합쳐서 �
   const ok = await ctxA.PureunHwp.readHwp(arrBuf(packed)); // 진짜 상한(256MB)에서는 읽힘
   assert.strictEqual(ok.blocks.length, 3000);
 });
+
+/* ---- 재검증 «중간»: 자체 해제기가 «출력 길이»만 막고 버퍼를 상한 밖으로 잡던 것 (2026-11-09) ---- */
+function loadSpy(log) {
+  const Spy = class extends Uint8Array { constructor(a, b, c) { super(a, b, c); if (typeof a === 'number') log.push(a); } };
+  const code = [oneLine(/const MAX_INFLATE_STREAM = [^\n]*/), oneLine(/const tooBig = [^\n]*/), cutFn(CODE, 'function inflateRawJs(')].join('\n');
+  return new Function('Uint8Array', code + '\nreturn inflateRawJs;')(Spy);
+}
+const biggest = log => log.reduce((a, b) => Math.max(a, b), 0);
+
+test('★★★ 자체 해제기는 첫 버퍼를 상한 안에서만 잡는다 — 빈 압축 뒤에 큰 자투리를 붙여도 입력 길이의 4배를 잡지 않는다', () => {
+  const log = [];
+  const inflateRawJs = loadSpy(log);
+  const LIMIT = 5000;
+  const empty = zlib.deflateRawSync(Buffer.alloc(0));
+  const src = new Uint8Array(Buffer.concat([empty, Buffer.alloc(1024 * 1024, 9)])); // 입력 1MB → 옛 코드는 4MB 를 한꺼번에 잡았다
+  const out = inflateRawJs(src, LIMIT);
+  assert.strictEqual(out.length, 0, '빈 압축은 빈 결과');
+  assert.ok(biggest(log) <= LIMIT, '버퍼를 ' + biggest(log) + ' 바이트 잡았습니다(상한 ' + LIMIT + ')');
+});
+
+test('★★ 늘릴 때도 상한을 넘지 않는다 — 두 배로 키우다 상한 밖으로 나가지 않는다', () => {
+  const log = [];
+  const inflateRawJs = loadSpy(log);
+  const LIMIT = 5000;
+  const data = Buffer.alloc(4500, 3); // 4096 으로 시작해 4500 이 되려면 늘려야 한다(옛 코드는 8192 로 키웠다)
+  const out = inflateRawJs(new Uint8Array(zlib.deflateRawSync(data)), LIMIT);
+  assert.strictEqual(out.length, 4500);
+  assert.ok(biggest(log) <= LIMIT, '늘린 버퍼가 ' + biggest(log) + ' 바이트(상한 ' + LIMIT + ')');
+});
+
+test('★★ 상한 0(문서 전체 상한을 다 쓴 뒤)에서도 던지지 터지지 않는다', () => {
+  const inflateRawJs = loadSpy([]);
+  assert.throws(() => inflateRawJs(new Uint8Array(zlib.deflateRawSync(Buffer.alloc(10, 1))), 0), e => e && e.tooBig === true);
+  assert.strictEqual(inflateRawJs(new Uint8Array(zlib.deflateRawSync(Buffer.alloc(0))), 0).length, 0);
+});

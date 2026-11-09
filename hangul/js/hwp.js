@@ -95,7 +95,8 @@
   }
   // RFC 1951 inflate — 압축 끝(마지막 블록)에서 멈춘다. 느리지만(한 비트씩) 브라우저 해제기가 거절하는 자투리 있는 자료의 마지막 보루.
   function inflateRawJs(src, limit = MAX_INFLATE_STREAM) {
-    let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.max(4096, src.length * 4)), op = 0;
+    // ⚠ 첫 버퍼도 늘릴 때도 상한(limit)을 넘지 않는다 — 압축 입력이 크면 4배(수백 MB)를 한꺼번에 잡던 것을 막음(2026-11-09 재검증 «중간»)
+    let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.min(limit, Math.max(4096, src.length * 4))), op = 0;
     const bits = n => {
       while (bitCnt < n) { if (pos >= src.length) throw new Error('압축 자료가 중간에 끝났습니다.'); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }
       const v = bitBuf & ((1 << n) - 1);
@@ -124,7 +125,7 @@
     const LEXT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
     const DBASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
     const DEXT = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
-    const grow = n => { if (op + n > limit) throw tooBig(); if (op + n > out.length) { const t = new Uint8Array(Math.max(out.length * 2, op + n)); t.set(out.subarray(0, op)); out = t; } };
+    const grow = n => { if (op + n > limit) throw tooBig(); if (op + n > out.length) { const t = new Uint8Array(Math.min(limit, Math.max(out.length * 2, op + n))); t.set(out.subarray(0, op)); out = t; } };
     const codes = (lh, dh) => {
       for (;;) {
         const sym = decode(lh);
