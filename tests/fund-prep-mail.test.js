@@ -74,14 +74,14 @@ function world(o) {
 /* 가짜 자료 — 가나산업: 기업정보함 사업자등록증·명함·참여사업장 담당자 모두 있음 / 다라전자: 담당자 없음·명함+회사 메일 / 마바상사: 기업정보함에 없음 */
 const SITES = [
   { _id: 's1', name: '가나산업', ceo: '김가나', biz_no: '123-81-20098', contacts: [{ name: '정자차', position: '대리', email: 'jung@ganasan.test' }, { name: '박마바', position: '과장', email: 'park@ganasan.test', isPrimary: true }] },
-  { _id: 's2', name: '다라전자', biz_no: '220-81-00001' },
+  { _id: 's2', name: '다라전자', biz_no: '123-81-20099' },
   { _id: 's3', name: '마바상사', ceo: '이사아', address: '충남 검증시 나로 2' },
 ];
 const IDX = [
   { k: 'biz', c: '가나산업(주)', bz: '1238120098', ceo: '김가나', ad: '충남 검증시 가로 1' },
   { k: 'card', c: '가나산업', n: '최사아', ti: '주임', e: 'choi@ganasan.test' },
   { k: 'card', c: '가나산업', n: '정자차', ti: '대리', e: 'JUNG@ganasan.test' },
-  { k: 'biz', c: '다라전자', bz: '2208100001', ceo: '정다라', ad: '충남 검증시 다로 3' },
+  { k: 'biz', c: '다라전자', bz: '1238120099', ceo: '정다라', ad: '충남 검증시 다로 3' },
   { k: 'card', c: '다라전자', n: '오차카', ti: '부장', e: 'oh@dara.test' },
   { k: 'card', c: '다라전자', n: '메일없음', e: '이메일 아님' },
 ];
