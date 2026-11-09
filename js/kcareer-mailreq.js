@@ -310,6 +310,46 @@
     return u;
   }
 
+  /* 직접 고치기 — 팝업에서 사람이 종류·기한·메모를 고친다(대표 지시 2026-11-09 「팝업창 보고 고치게」).
+     edit = { kinds?: ['consent', …], deadline?: { date:'YYYY-MM-DD', time:'HH:MM'|'' } | null, memo?: '글' } — 고친 칸만 넣는다.
+     돌려주는 것: { ok:true, update: 한 번에 쓰는 update 모양 } 또는 { ok:false, error }.
+     ⚠ 고친 칸에는 «fixed» 표시를 남긴다 — 본문 보강(enrich)이 사람이 고친 기한·종류를 다시 덮지 않게.
+     ⚠ 상태(st)·제목·보낸이는 여기서 안 고친다(상태는 stateUpdate, 나머지는 메일에서 온 사실이다). */
+  var MEMO_MAX = 300;
+  function editUpdate(id, edit, now) {
+    var fail = function (m) { return { ok: false, error: m }; };
+    if (typeof id !== 'string' || !/^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id)) return fail('건을 찾을 수 없습니다');
+    edit = obj(edit) ? edit : {};
+    var u = {}, n = now > 0 ? now : Date.now();
+    if (has(edit, 'kinds')) {
+      var want = Array.isArray(edit.kinds) ? edit.kinds : [];
+      var ks = KINDS.map(function (k) { return k.key; }).filter(function (k) { return want.indexOf(k) >= 0; });
+      if (!ks.length) return fail('종류를 하나 이상 골라 주세요');
+      u[id + '/kinds'] = ks; u[id + '/fixed/kinds'] = 1;
+    }
+    if (has(edit, 'deadline')) {
+      var d = edit.deadline;
+      if (d === null) u[id + '/deadline'] = null;                    // 「기한 없음」으로 고침
+      else {
+        var m = obj(d) ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(str(d.date)) : null;
+        if (!m) return fail('기한 날짜를 골라 주세요');
+        if (!validYMD(Number(m[1]), Number(m[2]), Number(m[3]))) return fail('없는 날짜입니다');
+        var tm = str(d.time);
+        if (tm && !/^([01]\d|2[0-3]):[0-5]\d$/.test(tm)) return fail('시각은 «시:분»으로 적어 주세요');
+        u[id + '/deadline'] = { date: str(d.date), time: tm, text: '직접 입력' };
+      }
+      u[id + '/fixed/deadline'] = 1;
+    }
+    if (has(edit, 'memo')) {
+      var memo = str(edit.memo).replace(/\r/g, '');
+      if (memo.length > MEMO_MAX) return fail('메모는 ' + MEMO_MAX + '자까지 적을 수 있습니다');
+      u[id + '/memo'] = memo || null;
+    }
+    if (!Object.keys(u).length) return fail('바뀐 것이 없습니다');
+    u[id + '/updatedAt'] = n;
+    return { ok: true, update: u };
+  }
+
   /* ── 폴더 고르기 ── */
   function boxesOf(folders) {
     if (!obj(folders)) return [];
@@ -386,10 +426,12 @@
         var text = bodyOf(await env.readBody(x.slug, x.uid)), hit = detect({ s: x.s, an: x.an, f: x.f, e: x.e, a: (x.an || []).length, d: x.d }, { text: text, refMs: x.d });
         var patch = { bodyAt: now, bodyTry: null };
         if (hit) {
-          patch.deadline = hit.deadline || x.deadline || null;      // 본문에서 못 찾아도 미리보기에서 찾은 기한은 지우지 않는다
+          /* ⚠ 사람이 팝업에서 직접 고친 칸(fixed)은 덮지 않는다 — 고쳐 둔 기한·종류가 다음 훑기에 되돌아오면 안 된다 */
+          var fx = obj(x.fixed) ? x.fixed : {};
+          if (!fx.deadline) patch.deadline = hit.deadline || x.deadline || null;      // 본문에서 못 찾아도 미리보기에서 찾은 기한은 지우지 않는다
           patch.replyTo = hit.replyTo || null;
           var order = KINDS.map(function (k) { return k.key; });
-          patch.kinds = (x.kinds || []).concat(hit.kinds.filter(function (k) { return (x.kinds || []).indexOf(k) < 0; }))
+          if (!fx.kinds) patch.kinds = (x.kinds || []).concat(hit.kinds.filter(function (k) { return (x.kinds || []).indexOf(k) < 0; }))
             .sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
           patch.why = hit.why.map(function (w) { return cut(w, 48); });
         } else if (text) { patch.deadline = x.deadline || null; }
@@ -413,6 +455,7 @@
     detect: detect, deadlineOf: deadlineOf, dueMs: dueMs, ddayOf: ddayOf, replyOf: replyOf, htmlText: htmlText, bodyOf: bodyOf,
     kindMeta: kindMeta, kindsLabel: kindsLabel, idOf: idOf, makeItem: makeItem,
     urgency: urgency, alarmItems: alarmItems, summary: summary, summaryText: summaryText, sortItems: sortItems, filterItems: filterItems, stateUpdate: stateUpdate,
+    editUpdate: editUpdate, MEMO_MAX: MEMO_MAX,
     boxesOf: boxesOf, scan: scan, makeReadBody: makeReadBody, toList: toList
   };
   if (isNode) module.exports = api; else root.KcareerMailReq = api;

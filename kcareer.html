@@ -778,6 +778,17 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
 .mr-st{font-size:11.5px;color:var(--text-mute);margin:0 0 8px;word-break:keep-all}
 .mr-note{font-size:11.5px;color:var(--text-mute);line-height:1.6;margin-top:10px;word-break:keep-all}
+.mr-open{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.mr-open:hover b{text-decoration:underline}
+.mr-open:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* 한 건 보기·고치기 팝업 (2026-11-09) — 어두운 판에서는 .modal 이 var(--card) 로 바뀌니 글자는 var(--text)·var(--text-mute) 만 쓴다 */
+.mr-det-row{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.mr-det-l{flex:0 0 74px;color:var(--text-mute);font-size:12px;font-weight:700}
+.mr-det-v{min-width:0;flex:1;word-break:keep-all;overflow-wrap:anywhere}
+.mr-k{display:inline-flex;align-items:center;gap:4px;margin-right:12px;cursor:pointer;font-size:13px}
+.mr-det-mail{max-height:240px;overflow:auto;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6;margin-top:6px}
+#modalMr input[type=date],#modalMr input[type=time],#modalMr textarea{font-size:16px}
+#modalMr textarea{width:100%;min-height:56px;resize:vertical}
 .mr-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid var(--border);background:#f8fafc;color:#475569;white-space:nowrap}   /* 칩은 «자기 바탕»을 가진다 — 어두운 판에서도 표 바탕은 흰색이라 글자색만 뒤집으면 안 보인다 */
 .mr-chip.new{background:#fffbeb;color:#854d0e;border-color:var(--amber)}   /* 글자는 짙은 호박색 — var(--amber) 글자는 흰 바탕에서 3.2:1 이라 모자란다 */
 .mr-chip.doing{background:#eff6ff;color:#1e40af;border-color:var(--blue)}
@@ -3101,6 +3112,15 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-h" id="p1PickTitle">⭐ 중요 고르기</div>
     <div class="modal-b" id="p1PickBody"></div>
     <div class="modal-foot"><span id="p1PickSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" onclick="p1PickClose()">취소</button><button class="btn primary" onclick="p1PickSave()">저장</button></div>
+  </div>
+</div>
+<!-- 📬 요청 메일 한 건 보기·고치기 (대표 지시 2026-11-09 「내용도 넣고 팝업창 보고 고치게」) — 메일 내용·알아본 까닭을 보고 종류·기한·메모를 고친다.
+     그리는 곳: mrOpen · mrDetRender. 메일 내용은 열 때 «읽기만(peek)» 해서 이 창에만 보이고 저장하지 않는다 -->
+<div class="modal-ov" id="modalMr" role="dialog" aria-modal="true" aria-labelledby="mrDetTitle">
+  <div class="modal" style="width:720px;max-width:96vw">
+    <div class="modal-h" id="mrDetTitle">📬 요청 메일</div>
+    <div class="modal-b" id="mrDetBody"></div>
+    <div class="modal-foot" id="mrDetFoot"></div>
   </div>
 </div>
 <!-- 🗓 연도별 보기 (2026-10-07) — 홈 KPI 를 누르면 뜬다. 읽기만 하는 창이라 바깥을 눌러도 닫힌다 -->
@@ -15090,7 +15110,7 @@ function renderFeeSettle(){
    ⚠ 보내거나 채우지 않는다. 메일을 «읽기만»(peek) 한다. 상태(확인함·처리 완료·요청 아님)는 사람이 누른다.
    ⚠ 저장 자리는 kcareer/{uid}/mailreq — 자료 통(ls)과 «따로»다. at 을 안 건드려 다른 기기에 «새 저장» 띠가 안 뜬다. 보안규칙은 그대로.
    ⚠ 기기마다 다른 설정(알림 켬·띠 닫음)은 localStorage 에 직접 둔다 — LS(cm3_*)에 두면 자료 통에 실려 클라우드로 간다. */
-var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0 };
+var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0, detId:'', detFrom:null };
 function mrBase(){ return 'kcareer/'+fbUid+'/mailreq'; }
 function mrLocal(k, v){ try{ if(v===undefined) return localStorage.getItem('kc_mr_'+k); if(v===null) localStorage.removeItem('kc_mr_'+k); else localStorage.setItem('kc_mr_'+k, v); }catch(e){} return null; }
 function mrNavCount(){ return _mr.ready ? KcareerMailReq.summary(_mr.items, Date.now()).open : null; }
@@ -15120,6 +15140,7 @@ function mrStop(){
   document.removeEventListener('visibilitychange', mrVis);
   if(_mr.freshT) clearTimeout(_mr.freshT);
   _mr.ref=null; _mr.fn=null; _mr.timer=0; _mr.started=false; _mr.ready=false; _mr.items={}; _mr.seen=null; _mr.sel={}; _mr.tries=0; _mr.freshQ=[]; _mr.freshT=0;
+  _mrBodies={}; try{ mrDetClose(); }catch(e){}
   mrPaint();
 }
 function mrVis(){ if(!document.hidden && _mr.started && Date.now()-_mr.last>KcareerMailReq.POLL_MS/2) mrScan(true); }
@@ -15129,6 +15150,7 @@ function mrOnData(v){
   var list=KcareerMailReq.toList(v), prev=_mr.seen, ids={};
   list.forEach(function(x){ ids[x.id]=1; });
   _mr.items=v; _mr.ready=true; _mr.err='';
+  if(_mr.detId && !v[_mr.detId]) mrDetClose();      /* 보던 건이 사라졌다(다른 곳에서 지움) — 팝업을 닫는다 */
   /* 처음 받은 판은 «조용히» — 열 때마다 알림이 쏟아지면 안 된다. 그 몫은 띠가 말한다 */
   /* 건이 하나씩 들어와도(건마다 저장) 알림은 «한 번에 모아» — 처음 훑을 때 알림이 건수만큼 깜박이지 않게 */
   if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ; _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }
@@ -15231,7 +15253,7 @@ function mrRowHtml(x, i, now){
   return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
     +'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" aria-label="'+escapeHtml(String(x.s||'').slice(0,40))+' 고르기"'+(_mr.sel[x.id]?' checked':'')+' onclick="mrPick(\''+id+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
     +'<td style="white-space:nowrap" title="'+escapeHtml(Q.kindsLabel(x.kinds))+'">'+(종류.length?'<span class="tag navy">'+종류[0].icon+' '+escapeHtml(종류[0].label)+(종류.length>1?' +'+(종류.length-1):'')+'</span>':'')+'</td>'
-    +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(툴팁)+'"><b>'+escapeHtml(x.s||'(제목 없음)')+'</b>'+(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</td>'
+    +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(툴팁)+'"><button type="button" class="mr-open" onclick="mrOpen(\''+id+'\')" aria-label="'+escapeHtml('내용 보기·고치기: '+String(x.s||'').slice(0,40))+'"><b>'+escapeHtml(x.s||'(제목 없음)')+'</b></button>'+(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</td>'
     +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
     +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
     +'<td style="white-space:nowrap">'+기한+'</td>'
@@ -15304,6 +15326,99 @@ function mrBatch(btn, st){
         +(st==='ignored'?'<br>목록의 «요청 아님» 탭에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
       yes:'«'+이름+'»'+으로+' 바꾸기' },
     function(){ mrSet(건.map(function(x){ return x.id; }), st).then(function(){ _mr.sel={}; mrRender(); }); });
+}
+
+/* ── 🔎 한 건 보기·고치기 팝업 (대표 지시 2026-11-09 「내용도 넣고 팝업창 보고 고치게」) ──
+   ① 메일 «내용»은 열 때 푸른메일함과 같은 함수(readMailMessage, peek)로 읽어 이 창에만 보인다 — 저장하지 않는다(메모리에만, 로그아웃하면 비운다).
+   ② 고치는 것은 종류·기한·메모뿐 — 고친 칸만 한 번에 저장하고, 고친 칸에는 fixed 표시가 남아 다음 훑기가 덮지 않는다(모듈 editUpdate).
+   ③ 입력 중인 칸은 «다시 그리지 않는다» — 내용이 늦게 도착해도 내용 상자만 바꾼다. */
+var _mrBodies={};
+function mrDetOpen_(){ var ov=document.getElementById('modalMr'); return !!(ov && ov.classList && ov.classList.contains('open')); }
+function mrOpen(id){
+  var x=_mr.items[id]; if(!x) return;
+  _mr.detId=id; _mr.detFrom=document.activeElement||null;
+  mrDetRender(x);
+  var ov=document.getElementById('modalMr'); if(ov) ov.classList.add('open');
+  document.removeEventListener('keydown', mrDetKey); document.addEventListener('keydown', mrDetKey);
+  mrDetLoadBody(x, false);
+  var f=document.getElementById('mrDetDate'); if(f && f.focus) f.focus();
+}
+function mrDetClose(){
+  var ov=document.getElementById('modalMr'); if(ov && ov.classList) ov.classList.remove('open');
+  document.removeEventListener('keydown', mrDetKey);
+  var back=_mr.detFrom; _mr.detId=''; _mr.detFrom=null;
+  try{ if(back && back.focus) back.focus(); }catch(e){}     /* 열었던 단추로 돌아간다(키보드로 쓰는 사람이 길을 잃지 않게) */
+}
+function mrDetKey(e){ if(e.key==='Escape' && _mr.detId){ e.preventDefault(); mrDetClose(); } }
+function mrDetRender(x){
+  var Q=KcareerMailReq, now=Date.now(), dl=x.deadline||{}, dd=Q.ddayOf(x.deadline, now), st=Q.STATES[x.st]?x.st:'new', fx=(x.fixed&&typeof x.fixed==='object')?x.fixed:{};
+  var t=document.getElementById('mrDetTitle'); if(t) t.textContent='📬 요청 메일 · '+Q.STATES[st];
+  var kinds=Q.KINDS.map(function(k){ return '<label class="mr-k"><input type="checkbox" id="mrDetK_'+k.key+'"'+((x.kinds||[]).indexOf(k.key)>=0?' checked':'')+'> '+k.icon+' '+escapeHtml(k.label)+'</label>'; }).join('');
+  var 행=function(이름, 값){ return '<div class="mr-det-row"><span class="mr-det-l">'+이름+'</span><span class="mr-det-v">'+값+'</span></div>'; };
+  var 보낸=(x.f?escapeHtml(x.f)+' ':'')+(x.e?'&lt;'+escapeHtml(x.e)+'&gt;':'');
+  var 기한말=dl.date?(fx.deadline?'직접 입력한 기한':(dl.text?'메일 속 「'+escapeHtml(dl.text)+'」'+(dl.guess?' — 연도는 받은 날 기준으로 짐작':''):'')):(x.bodyAt?'메일에서 기한을 못 찾았습니다':'본문을 읽는 중이거나 아직 못 읽었습니다');
+  var h='<div class="mr-det">'
+    +'<div style="font-weight:700;font-size:15px;line-height:1.5;margin-bottom:6px;word-break:keep-all;overflow-wrap:anywhere">'+escapeHtml(x.s||'(제목 없음)')+'</div>'
+    +행('종류', kinds)
+    +행('기한', '<input type="date" id="mrDetDate" value="'+escapeHtml(dl.date||'')+'" aria-label="기한 날짜"> <input type="time" id="mrDetTime" value="'+escapeHtml(dl.time||'')+'" aria-label="기한 시각"> '
+        +'<button class="btn sm" type="button" onclick="mrDetNoDeadline()" title="이 요청에는 기한이 없습니다">기한 없음</button>'
+        +'<div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">'+(dd.label?escapeHtml(dd.label)+' · ':'')+기한말+'</div>')
+    +행('보낸이', 보낸)+행('받은 날', escapeHtml(mrWhen(x.d)))
+    +(x.an&&x.an.length?행('첨부', x.an.map(function(n){ return '📎 '+escapeHtml(n); }).join('<br>')):'')
+    +(x.replyTo?행('회신 주소', escapeHtml(x.replyTo)):'')
+    +(x.why&&x.why.length?행('알아본 까닭', x.why.map(escapeHtml).join(' · ')):'')
+    +행('메모', '<textarea id="mrDetMemo" maxlength="'+Q.MEMO_MAX+'" placeholder="예) 담당자에게 전화함 · 서류는 11월 둘째 주에 보냄" aria-label="메모">'+escapeHtml(x.memo||'')+'</textarea>')
+    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><b style="font-size:13px">메일 내용</b>'
+    +'<button class="btn sm" type="button" onclick="mrDetLoadBody(_mr.items[_mr.detId], true)" title="메일 내용을 다시 읽습니다">↻ 다시 읽기</button>'
+    +'<span style="font-size:11.5px;color:var(--text-mute)">읽기만 합니다 — 읽음 표시·저장은 안 합니다</span></div>'
+    +'<div class="mr-det-mail" id="mrDetMail" tabindex="0" aria-label="메일 내용"></div></div>';
+  var b=document.getElementById('mrDetBody'); if(b) b.innerHTML=h;
+  /* 상태 단추 — 폰에서는 그림만(말은 .mr-btx 가 숨는다) 보여 닫기·저장과 한 줄에 들어오게 한다. 말은 title·aria-label 로 남는다 */
+  var 단추=function(s, 글, 설명){ var 그림=글.split(' ')[0], 말=글.slice(그림.length); return '<button class="btn" type="button" title="'+설명+'" aria-label="'+글+'" onclick="mrDetState(\''+s+'\')">'+그림+'<span class="mr-btx">'+말+'</span></button>'; };
+  var f=document.getElementById('mrDetFoot');
+  if(f) f.innerHTML='<span style="margin-right:auto;display:inline-flex;gap:6px;flex-wrap:wrap">'
+    +(st==='new'?단추('doing','👀 확인함','확인함으로 표시 — 아직 처리 전입니다'):'')
+    +(st==='new'||st==='doing'?단추('done','✔ 처리 완료','처리 완료로 표시')+단추('ignored','🚫 요청 아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩ 되돌림','진행 중으로 되돌립니다'))
+    +'</span><button class="btn" type="button" onclick="mrDetClose()">닫기</button><button class="btn primary" type="button" onclick="mrDetSave()">저장</button>';
+  mrDetBodyPaint();
+}
+async function mrDetLoadBody(x, force){
+  if(!x) return;
+  var id=x.id, c=_mrBodies[id];
+  if(c && c.st==='ok' && !force){ mrDetBodyPaint(); return; }
+  _mrBodies[id]={ st:'loading' }; mrDetBodyPaint();
+  try{
+    var j=await _bizMbCall('readMailMessage', { slug:x.slug, uid:x.uid, peek:1 });
+    _mrBodies[id]={ st:'ok', text:KcareerMailReq.bodyOf(j) };
+  }catch(e){ _mrBodies[id]={ st:'err', err:String((e&&e.message)||e).slice(0,80) }; }
+  if(_mr.detId===id) mrDetBodyPaint();
+}
+function mrDetBodyPaint(){
+  var box=document.getElementById('mrDetMail'); if(!box || !_mr.detId) return;
+  var c=_mrBodies[_mr.detId]||{ st:'loading' };
+  if(c.st==='loading') box.textContent='메일 내용을 불러오는 중…';
+  else if(c.st==='err') box.textContent='메일 내용을 읽지 못했습니다 — '+c.err+' · 「↻ 다시 읽기」를 누르거나 푸른메일함에서 열어 주세요';
+  else{ var t=String(c.text||'').trim(); box.textContent=t?(t.length>4000?t.slice(0,4000)+'\n…(앞 4000자만 보입니다 — 나머지는 푸른메일함에서)':t):'본문이 비어 있습니다(그림·첨부만 있는 메일일 수 있습니다)'; }
+}
+function mrDetNoDeadline(){ var d=document.getElementById('mrDetDate'), t=document.getElementById('mrDetTime'); if(d) d.value=''; if(t) t.value=''; }
+function mrDetState(st){ var id=_mr.detId; if(!id) return; mrSet([id], st).then(function(n){ if(n) mrDetClose(); }); }
+/* 저장 — «고친 칸만» 모아 한 번에. 아무것도 안 고쳤으면 저장하지 않는다 */
+function mrDetSave(){
+  var id=_mr.detId, x=id?_mr.items[id]:null; if(!x) return Promise.resolve(false);
+  var Q=KcareerMailReq, val=function(i){ var e=document.getElementById(i); return e?String(e.value||''):''; }, on=function(i){ var e=document.getElementById(i); return !!(e && e.checked); };
+  var kinds=Q.KINDS.filter(function(k){ return on('mrDetK_'+k.key); }).map(function(k){ return k.key; });
+  var date=val('mrDetDate').trim(), time=val('mrDetTime').trim(), memo=val('mrDetMemo'), o=x.deadline||{}, edit={};
+  if(kinds.join()!==(x.kinds||[]).slice().sort(function(a,b){ return Q.KINDS.map(function(k){ return k.key; }).indexOf(a)-Q.KINDS.map(function(k){ return k.key; }).indexOf(b); }).join()) edit.kinds=kinds;
+  if(date!==(o.date||'') || time!==(o.time||'')){
+    if(!date && time){ toast('⚠ 기한 날짜를 먼저 골라 주세요', 5000); return Promise.resolve(false); }
+    edit.deadline=date?{ date:date, time:time }:null;
+  }
+  if(memo.trim()!==String(x.memo||'')) edit.memo=memo;
+  if(!Object.keys(edit).length){ toast('ℹ 바뀐 것이 없습니다'); return Promise.resolve(false); }
+  var r=Q.editUpdate(id, edit, Date.now());
+  if(!r.ok){ toast('⚠ '+r.error, 6000); return Promise.resolve(false); }
+  return fbDb.ref(mrBase()+'/items').update(r.update).then(function(){ toast('✔ 저장했습니다', 3000); mrDetClose(); return true; },
+    function(e){ toast('⚠ 저장하지 못했습니다 — '+String((e&&e.message)||e).slice(0,80), 7000); return false; });
 }
 
 /* ===== ⏳ 발송 대기 — 기관이 보낸 같은 꼴의 서류를 채워 두고 «한 번 눌러» 답장 (대표 지시 2026-11-05, 승인 시안) =====

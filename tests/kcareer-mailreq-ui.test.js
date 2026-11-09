@@ -75,12 +75,14 @@ function world(o) {
   /* 옆줄 숫자 자리 — 이력서관리 상위 단추의 .gcnt(제 부모에 title) · 펼친 묶음의 «요청 메일» 줄 .ncnt */
   const cls = () => { const s = new Set(); return { toggle: (c, on) => (on ? s.add(c) : s.delete(c)), contains: (c) => s.has(c) }; };
   const navTop = { textContent: '', classList: cls(), parentNode: { title: '' } }, navSub = { textContent: '', classList: cls() };
-  const el = (id) => (els[id] = els[id] || { id, innerHTML: '', textContent: '', style: {}, className: '', checked: false, indeterminate: false, classList: { contains: (c) => (id === 'page-mailreq' ? !!o.onPage : false) }, querySelectorAll: () => [] });
+  const cl = new Set(), focused = [], docListeners = {};
+  const el = (id) => (els[id] = els[id] || { id, innerHTML: '', textContent: '', value: '', style: {}, className: '', checked: false, indeterminate: false, focus() { focused.push(id); },
+    classList: { contains: (c) => (id === 'page-mailreq' ? !!o.onPage : cl.has(id + ':' + c)), add: (c) => cl.add(id + ':' + c), remove: (c) => cl.delete(id + ':' + c) }, querySelectorAll: () => [] });
   const ctx = {
     KcareerMailReq: Q, console, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, isNaN, parseFloat,
     fbDb: db, fbUid: 'U1', KC_SAFE: !!o.safe, _me: { resolved: true },
     kcOwnerState: () => (o.state || 'owner'), kcNoPush: () => false,
-    _bizMbCall: async (fn, body) => { bodyCalls.push([fn, body]); if (o.bodyFails) throw new Error('메일 서버 응답 없음'); return { ok: true, text: BODY }; },
+    _bizMbCall: async (fn, body) => { bodyCalls.push([fn, body]); if (o.bodyFails) throw new Error('메일 서버 응답 없음'); return { ok: true, text: o.bodyText != null ? o.bodyText : BODY }; },
     toast: (m, ms) => toasts.push(String(m)), escapeHtml: (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
     _jsAttr: (s) => String(s == null ? '' : s), stampCellLabels: () => {}, navTile: () => {}, navCountsSoon: () => {},
     kcAskDelete: (btn, opt, onYes) => { asks.push(opt); if (!o.askNo) onYes(); },
@@ -88,13 +90,13 @@ function world(o) {
     setInterval: () => 99, clearInterval: () => {},
     localStorage: { getItem: (k) => (k in prefs ? prefs[k] : null), setItem: (k, v) => { prefs[k] = String(v); }, removeItem: (k) => { delete prefs[k]; } },
     Notification: undefined,
-    document: { hidden: false, title: '경력관리', getElementById: el, addEventListener: () => {}, removeEventListener: () => {},
+    document: { hidden: false, title: '경력관리', getElementById: el, addEventListener: (ev, fn) => { docListeners[ev] = fn; }, removeEventListener: (ev) => { delete docListeners[ev]; }, activeElement: { focus() { focused.push('opener'); } },
       querySelector: (sel) => (/data-g="이력서관리"\] \.gcnt/.test(sel) ? navTop : (/data-id="page-mailreq"\] \.ncnt/.test(sel) ? navSub : null)), querySelectorAll: () => [] },
     navInfo: (id) => ({ label: '📬 요청 메일', grp: id === 'page-mailreq' ? '이력서관리' : null }),
   };
   vm.createContext(ctx); vm.runInContext(BLOCK, ctx);
   const run = () => { const q = timers.splice(0); q.forEach((t) => t.fn && t.fn()); };
-  return { ctx, db, toasts, asks, timers, run, bodyCalls, els, prefs, navTop, navSub, items: () => db.읽기('kcareer/U1/mailreq/items') || {} };
+  return { ctx, db, toasts, asks, timers, run, bodyCalls, els, prefs, navTop, navSub, focused, docListeners, items: () => db.읽기('kcareer/U1/mailreq/items') || {} };
 }
 const settle = () => new Promise((r) => setImmediate(r));
 async function started(o) { const w = world(o); w.ctx.mrStart(); await settle(); await settle(); await settle(); return w; }
@@ -231,6 +233,84 @@ test('★ 메일함 열기는 앱끼리 여는 공용 길(PuAppBar.goApp)로 —
   assert.match(BLOCK, /function mrOpenMail\(\)\{[^}]*PuAppBar\.goApp\(u\)/);
   assert.match(BLOCK, /onclick="mrOpenMail\(\)"/);
   assert.ok(!/'_blank'/.test(BLOCK), '누를 때마다 탭이 쌓이는 _blank 가 없어야 한다');
+});
+/* ── 한 건 보기·고치기 팝업 ── */
+const ID = IN + '~101', KMAX = Q.MEMO_MAX;
+const fillForm = (w, over) => {      // 화면에 그려진 입력칸의 «처음 값»을 가짜 칸에 옮긴다(진짜 화면이면 브라우저가 해 주는 일). 칸은 앱이 찾을 때 만들어지므로 같은 길로 찾는다
+  const x = w.items()[ID], dl = x.deadline || {}, E = (id) => w.ctx.document.getElementById(id); over = over || {};
+  E('mrDetDate').value = over.date !== undefined ? over.date : (dl.date || ''); E('mrDetTime').value = over.time !== undefined ? over.time : (dl.time || '');
+  E('mrDetMemo').value = over.memo !== undefined ? over.memo : (x.memo || '');
+  ['consent', 'career', 'other'].forEach((k) => { E('mrDetK_' + k).checked = over.kinds ? over.kinds.includes(k) : (x.kinds || []).includes(k); });
+};
+async function popup(o) { const w = await started(Object.assign({ onPage: true }, o || {})); w.ctx.mrRender(); w.ctx.mrOpen(ID); await settle(); await settle(); return w; }
+test('팝업 — 제목을 누르면 열리고, 내용·알아본 까닭·기한·첨부·회신 주소가 보인다 · 메일 내용은 «읽기만» 해서 보인다', async () => {
+  const w = await popup(); const h = w.els.mrDetBody.innerHTML;
+  assert.ok(w.els.modalMr.classList.contains('open'), '팝업이 열렸다');
+  assert.match(w.els.mrDetTitle.textContent, /요청 메일 · 새 요청/);
+  assert.match(h, /참여 사전동의서/); assert.match(h, /req@example\.org/); assert.match(h, /📎 \(양식\)참여 동의서\.hwp/); assert.match(h, /reply@example\.org/);
+  assert.match(h, /알아본 까닭[\s\S]*제목에 «동의서»/); assert.match(h, /<input type="date" id="mrDetDate" value="\d{4}-\d{2}-\d{2}"/); assert.match(h, /id="mrDetTime" value="18:00"/);
+  assert.match(w.els.mrDetMail.textContent, /사전동의서를 첨부하여 송부드립니다/, '메일 내용이 보인다');
+  assert.ok(w.bodyCalls.length >= 1 && w.bodyCalls.every((c) => c[0] === 'readMailMessage' && c[1].peek === 1), '읽기만(peek)');
+  assert.ok(!JSON.stringify(w.items()).includes('송부드립니다'), '메일 내용은 저장하지 않는다');
+  assert.ok(w.focused.includes('mrDetDate'), '첫 입력칸으로 초점');
+  assert.match(html, /<div class="modal-ov" id="modalMr" role="dialog" aria-modal="true" aria-labelledby="mrDetTitle">/);
+});
+test('★ 메일 내용·제목·보낸이를 화면에 «글자로만» 넣는다(태그가 있어도 안 심긴다)', async () => {
+  const w = await popup({ bodyText: '안내 <img src=x onerror=alert(1)> <script>alert(2)</script> 제출 부탁', msgs: { '101': mailRow({ s: '동의서 <b>제출</b>', f: '<i>가</i>' }) } });
+  assert.equal(w.els.mrDetMail.innerHTML, '', '내용 상자에는 innerHTML 을 쓰지 않는다(textContent 만)');
+  assert.match(w.els.mrDetMail.textContent, /<img src=x onerror=alert\(1\)>/, '태그는 글자 그대로 보인다');
+  const h = w.els.mrDetBody.innerHTML;
+  assert.ok(!/<b>제출<\/b>|<i>가<\/i>/.test(h), '제목·보낸이의 태그가 그대로 들어가면 안 된다'); assert.match(h, /&lt;b&gt;제출&lt;\/b&gt;/);
+});
+test('팝업 — 내용을 못 읽어도 열린다(말하고 다시 읽기 길을 준다) · 길면 앞부분만', async () => {
+  const bad = await popup({ bodyFails: true });
+  assert.ok(bad.els.modalMr.classList.contains('open')); assert.match(bad.els.mrDetMail.textContent, /읽지 못했습니다[\s\S]*다시 읽기/);
+  assert.match(bad.els.mrDetBody.innerHTML, /↻ 다시 읽기/);
+  const long = await popup({ bodyText: '가'.repeat(5000) });
+  assert.ok(long.els.mrDetMail.textContent.length < 4200 && /앞 4000자만/.test(long.els.mrDetMail.textContent));
+  const empty = await popup({ bodyText: '' }); assert.match(empty.els.mrDetMail.textContent, /본문이 비어 있습니다/);
+});
+test('★ 고친 칸만 한 번에 저장한다 — 안 고쳤으면 저장하지 않고 · 메모만 고치면 기한·종류에 fixed 가 안 붙는다', async () => {
+  const w = await popup(); fillForm(w); const before = w.db.writes();
+  await w.ctx.mrDetSave(); assert.equal(w.db.writes(), before, '바뀐 게 없으면 저장하지 않는다'); assert.ok(w.toasts.some((m) => /바뀐 것이 없습니다/.test(m)));
+  fillForm(w, { memo: '담당자에게 전화함' }); await w.ctx.mrDetSave(); await settle();
+  assert.equal(w.db.writes(), before + 1, '저장은 한 번'); const x = w.items()[ID];
+  assert.equal(x.memo, '담당자에게 전화함'); assert.ok(!x.fixed, '메모만 고쳤으니 fixed 없음'); assert.equal(x.st, 'new', '상태는 그대로');
+  assert.ok(!w.els.modalMr.classList.contains('open'), '저장하면 닫힌다');
+});
+test('기한·종류를 고치면 그 칸에 fixed 가 붙고, 「기한 없음」·되돌릴 수 있다', async () => {
+  const w = await popup(); fillForm(w, { date: '2026-12-24', time: '09:30', kinds: ['career'] });
+  await w.ctx.mrDetSave(); await settle(); let x = w.items()[ID];
+  assert.deepEqual(x.deadline, { date: '2026-12-24', time: '09:30', text: '직접 입력' }); assert.deepEqual(x.kinds, ['career']); assert.deepEqual(x.fixed, { deadline: 1, kinds: 1 });
+  w.ctx.mrOpen(ID); await settle(); w.ctx.mrDetNoDeadline(); assert.equal(w.ctx.document.getElementById('mrDetDate').value, ''); assert.equal(w.ctx.document.getElementById('mrDetTime').value, '');
+  fillForm(w, { date: '', time: '' }); await w.ctx.mrDetSave(); await settle(); x = w.items()[ID];
+  assert.ok(!x.deadline, '「기한 없음」으로 고쳤다'); assert.equal(x.fixed.deadline, 1);
+});
+test('잘못 고친 것은 저장하지 않고 말한다 — 시각만 · 종류 없음 · 긴 메모', async () => {
+  const w = await popup(); const before = w.db.writes();
+  fillForm(w, { date: '', time: '10:00' }); await w.ctx.mrDetSave(); assert.ok(w.toasts.some((m) => /날짜를 먼저/.test(m)));
+  fillForm(w, { kinds: [] }); await w.ctx.mrDetSave(); assert.ok(w.toasts.some((m) => /종류를 하나 이상/.test(m)));
+  fillForm(w, { memo: '가'.repeat(KMAX + 1) }); await w.ctx.mrDetSave(); assert.ok(w.toasts.some((m) => /메모는/.test(m)));
+  assert.equal(w.db.writes(), before, '저장하지 않았다'); assert.ok(w.els.modalMr.classList.contains('open'), '팝업은 열려 있어 고칠 수 있다');
+});
+test('저장이 거절되면 말하고 팝업을 닫지 않는다(고친 것이 사라지지 않게)', async () => {
+  const w = await popup(); const real = w.ctx.fbDb.ref;
+  w.ctx.fbDb.ref = (p) => Object.assign({}, real(p), { update: async () => { throw new Error('PERMISSION_DENIED'); } });
+  fillForm(w, { memo: '고침' }); const ok = await w.ctx.mrDetSave();
+  assert.equal(ok, false); assert.ok(w.toasts.some((m) => /저장하지 못했습니다/.test(m))); assert.ok(w.els.modalMr.classList.contains('open'));
+});
+test('팝업의 상태 단추 — 처리 완료로 바꾸면 닫힌다 · Esc 로 닫히고 열었던 단추로 돌아간다 · 보던 건이 사라지면 닫힌다', async () => {
+  const w = await popup(); assert.ok(w.docListeners.keydown, 'Esc 를 듣는다');
+  await w.ctx.mrDetState('done'); await settle(); assert.equal(w.items()[ID].st, 'done'); assert.ok(!w.els.modalMr.classList.contains('open'));
+  const e = await popup(); e.docListeners.keydown({ key: 'Escape', preventDefault() {} });
+  assert.ok(!e.els.modalMr.classList.contains('open')); assert.equal(e.docListeners.keydown, undefined, '닫으면 듣기를 놓는다'); assert.equal(e.focused[e.focused.length - 1], 'opener');
+  const g = await popup(); await g.db.ref('kcareer/U1/mailreq/items/' + ID).set(null); await settle();
+  assert.ok(!g.els.modalMr.classList.contains('open'), '지워진 건을 보여 주고 있으면 안 된다');
+});
+test('목록의 제목은 «누르는 단추»다(키보드로도) · 팝업 입력칸은 폰에서 확대되지 않게 16px', async () => {
+  const w = await started({ onPage: true }); w.ctx.mrRender(); const h = w.els.mrBody.innerHTML;
+  assert.match(h, /<button type="button" class="mr-open" onclick="mrOpen\('[^']+'\)" aria-label="내용 보기·고치기: [^"]*동의서/);
+  assert.match(html, /#modalMr input\[type=date\],#modalMr input\[type=time\],#modalMr textarea\{font-size:16px\}/);
 });
 test('★ 고르기만으로는 아무것도 저장되지 않는다 — 「N건 선택」과 할 일만 띄운다', async () => {
   const w = await started({ onPage: true }); const before = w.db.writes();

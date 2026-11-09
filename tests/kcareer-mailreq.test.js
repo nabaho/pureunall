@@ -209,6 +209,42 @@ test('상태 바꾸기 — 한 번에 쓰는 update 모양 · st 와 시각만 �
   assert.deepEqual(Q.stateUpdate([IN + '~1'], 'nope', NOW), {}, '모르는 상태는 쓰지 않는다');
 });
 
+/* ── 직접 고치기(팝업) ── */
+test('직접 고치기 — 고친 칸만 쓰고, 고친 칸에는 fixed 표시 · 상태·제목·보낸이는 건드리지 않는다', () => {
+  const r = Q.editUpdate('INBOX~1', { kinds: ['career', 'consent'], deadline: { date: '2026-11-30', time: '17:30' }, memo: ' 담당자에게 전화 ' }, NOW);
+  assert.ok(r.ok);
+  assert.deepEqual(r.update['INBOX~1/kinds'], ['consent', 'career'], '정해진 차례로');
+  assert.deepEqual(r.update['INBOX~1/deadline'], { date: '2026-11-30', time: '17:30', text: '직접 입력' });
+  assert.equal(r.update['INBOX~1/memo'], '담당자에게 전화'); assert.equal(r.update['INBOX~1/fixed/kinds'], 1); assert.equal(r.update['INBOX~1/fixed/deadline'], 1);
+  assert.equal(r.update['INBOX~1/updatedAt'], NOW);
+  Object.keys(r.update).forEach((k) => assert.ok(!/\/(st|s|f|e|d|an|why|replyTo|slug|uid|createdAt)$/.test(k), k + ' 은 고치지 않는다'));
+  const only = Q.editUpdate('INBOX~1', { memo: '메모만' }, NOW);
+  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다');
+});
+test('직접 고치기 — 기한을 «없음»으로 고칠 수 있고(null) · 없는 날짜·잘못된 시각·빈 종류·긴 메모는 거절한다', () => {
+  const none = Q.editUpdate('INBOX~1', { deadline: null }, NOW);
+  assert.ok(none.ok); assert.equal(none.update['INBOX~1/deadline'], null); assert.equal(none.update['INBOX~1/fixed/deadline'], 1, '없음으로 고친 것도 fixed(다시 찾아 채우지 않게)');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '2026-02-30', time: '' } }, NOW).ok, false, '없는 날짜');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '', time: '10:00' } }, NOW).ok, false, '날짜 없이 시각만');
+  assert.equal(Q.editUpdate('INBOX~1', { deadline: { date: '2026-11-30', time: '25:00' } }, NOW).ok, false, '없는 시각');
+  assert.equal(Q.editUpdate('INBOX~1', { kinds: [] }, NOW).ok, false, '종류는 하나 이상');
+  assert.equal(Q.editUpdate('INBOX~1', { kinds: ['x'] }, NOW).ok, false, '모르는 종류만이면 하나도 없는 것');
+  assert.equal(Q.editUpdate('INBOX~1', { memo: 'ㄱ'.repeat(Q.MEMO_MAX + 1) }, NOW).ok, false, '긴 메모');
+  assert.equal(Q.editUpdate('INBOX~1', {}, NOW).ok, false, '바뀐 것이 없다');
+  assert.equal(Q.editUpdate('a b/c~1', { memo: 'x' }, NOW).ok, false, '이상한 건 번호');
+  const empty = Q.editUpdate('INBOX~1', { memo: '   ' }, NOW); assert.equal(empty.update['INBOX~1/memo'], null, '빈 메모는 지운다');
+});
+test('직접 고치기 — 사람이 고친 기한·종류는 다음 본문 보강(훑기)이 덮지 않는다', async () => {
+  const f = db(); await scan(f);                                                     // 101 이 올라옴(본문은 아직 안 읽음)
+  const fix = Q.editUpdate(IN + '~101', { kinds: ['other'], deadline: { date: '2026-12-24', time: '09:00' } }, NOW + 1);
+  await f.ref('kcareer/U1/mailreq/items').update(fix.update);
+  await scan(f, { readBody: read(BODY) });                                           // 본문에는 다른 기한·동의서 단서가 있다
+  const x = items(f)[IN + '~101'];
+  assert.ok(x.bodyAt, '본문은 열었다(회신 주소 등은 채운다)'); assert.equal(x.replyTo, 'reply@example.org');
+  assert.equal(x.deadline.date, '2026-12-24', '고친 기한이 그대로'); assert.deepEqual(x.kinds, ['other'], '고친 종류가 그대로');
+  assert.equal(x.st, 'new');
+});
+
 /* ── 훑기 — 가짜 DB 에서 실제로 돌린다 ──
    ⚠ 가짜 DB 는 열쇠를 «글자 차례»로 센다 → 번호는 세 자리로 맞춘다(진짜는 숫자 차례). 모듈은 숫자로 비교한다. */
 /* 폴더 열쇠는 서버가 «안전한 이름-해시»로 만든다(functions/mail-box.js slugOf) — 점(.)이 없다 */
