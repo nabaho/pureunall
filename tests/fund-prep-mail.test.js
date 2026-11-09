@@ -99,14 +99,57 @@ test('★ 서류 목록은 새로 짓지 않는다 — 서식 탭의 «기업 �
   assert.ok(ids.length >= 10, '설립 서류가 거의 없다');
 });
 
-test('★ 기본으로 고르는 것 — 기업이 준비하는 줄만(기금법인 준비분·이미 확인한 서류는 뺀다)', () => {
+const COOP = ['inka_fseal', 'reg_fseal', 'reg_minutes', 'reg_taxfee', 'reg_sealcard'];   // 준비처는 «기금법인»이지만 도장·날인·납부에 기업 협조가 필요한 줄
+test('★ 기본으로 고르는 것 — 기업이 준비하는 줄 + 도장·날인·납부 «협조» 줄(기금법인 준비분의 나머지·이미 확인한 서류는 뺀다)', () => {
   const w = world();
   const all = w.api._pmDocs('공동', null).flatMap((s) => s.docs);
-  all.forEach((d) => { assert.equal(d.ask, d.who !== '기금법인', d.id); assert.equal(d.on, d.ask, d.id + ' — 기업이 준비하는 줄만 기본으로 고른다'); });
+  all.forEach((d) => {
+    assert.equal(d.coop, COOP.includes(d.id), d.id + ' — 협조 줄은 정해진 다섯뿐');
+    assert.equal(d.ask, d.who !== '기금법인' || d.coop, d.id);
+    assert.equal(d.on, d.ask, d.id + ' — 기업이 준비하는 줄과 협조 줄만 기본으로 고른다');
+  });
+  COOP.forEach((id) => { const d = all.filter((x) => x.id === id)[0]; assert.ok(d && d.who === '기금법인' && d.on, id + ' — 준비처는 기금법인이어도 기본으로 고른다'); });
+  ['reg_inkacert', 'reg_charter'].forEach((id) => assert.ok(!all.filter((x) => x.id === id)[0].on, id + ' — 사업장이 할 일 없는 줄은 뺀다'));
   assert.ok(all.some((d) => d.on) && all.some((d) => !d.on), '고른 것과 안 고른 것이 둘 다 있어야 한다');
   const got = w.api._pmDocs('공동', { inka: { inka_bizreg: true, inka_ei: true }, reg: { reg_jumin: true } }).flatMap((s) => s.docs);
   ['inka_bizreg', 'inka_ei', 'reg_jumin'].forEach((id) => { const d = got.filter((x) => x.id === id)[0]; assert.ok(d.got && !d.on, id + ' — 서식 탭에서 이미 확인한 서류는 기본으로 뺀다'); });
   assert.ok(got.filter((x) => x.id === 'inka_wrep')[0].on, '확인 안 한 서류는 그대로 고른다');
+});
+
+test('★ 협조 줄은 메일에서 «도장·날인·납부 등 협조해 주실 사항» 한 단락으로 따로 — 단계별 서류와 섞지 않고, 기업에 «준비: 기금법인»이라 적지 않는다', async () => {
+  const w = await opened();
+  const P = w.api.getPM();
+  const m = w.api._pmMail(P, P.rows[0]);
+  const L = m.body.split('\n');
+  const idx = (re) => L.findIndex((x) => re.test(x));
+  const head = idx(/^■ \d+\. 도장·날인·납부 등 협조해 주실 사항$/);
+  assert.ok(head > 0, '협조 단락이 없다');
+  assert.ok(head > idx(/^■ 3\. 설립등기를 마친 뒤/), '협조 단락은 단계별 서류 뒤에 온다');
+  assert.ok(idx(/^■ 함께 정해 주실 사항/) > head, '함께 정할 사항은 협조 단락 뒤');
+  assert.ok(L[head + 1].startsWith('아래 서류는 저희가 작성·신청을 진행하지만'), '협조 단락의 취지 글이 없다');
+  const part = L.slice(head, idx(/^■ 함께 정해 주실 사항/)).join('\n');
+  assert.match(part, /기금법인 직인\(도장\) 제작 {2}\(시기: 인가 신청 때\)/);
+  assert.match(part, /설립준비위원회 의사록\(회의록\) 및 협의회 위원 명부 \(위원 인감날인\) {2}\(시기: 법인 설립등기 때\)/);
+  ['기금법인 인감도장', '등록면허세 영수필확인서', '법인인감카드 발급신청'].forEach((t) => assert.ok(part.includes(t), t + ' 이(가) 협조 단락에 없다'));
+  const before = L.slice(0, head).join('\n');
+  COOP.forEach((id) => { const d = P.secs.flatMap((s) => s.docs).filter((x) => x.id === id)[0]; assert.ok(!before.includes(d.title), d.title + ' 이(가) 단계별 서류 단락에도 들어갔다(중복)'); });
+  assert.ok(!/준비: 기금법인/.test(m.body), '기업에 «준비: 기금법인»이라 적었다 — 기업이 준비할 서류로 읽힌다');
+  ['설립인가증 원본', '인가받은 정관 사본'].forEach((t) => assert.ok(!m.body.includes(t), t + ' — 사업장이 할 일이 없는 줄이 들어갔다'));
+  /* 요청 N종 에 협조 줄도 센다 · 모두 끄면 단락이 사라진다 */
+  const n = m.nDoc; COOP.forEach((id) => w.api.pmDoc(id, false));
+  const m2 = w.api._pmMail(P, P.rows[0]);
+  assert.equal(m2.nDoc, n - COOP.length, '요청 N종이 협조 줄을 세지 않는다'); assert.ok(!/협조해 주실 사항/.test(m2.body), '협조 줄을 모두 껐는데 단락이 남았다');
+  COOP.slice(0, 1).forEach((id) => w.api.pmDoc(id, true));
+  const m3 = w.api._pmMail(P, P.rows[0]); assert.match(m3.body, /■ \d+\. 도장·날인·납부 등 협조해 주실 사항/); assert.equal(m3.body.split('\n').filter((x) => /^\d+\) /.test(x)).length - m2.body.split('\n').filter((x) => /^\d+\) /.test(x)).length, 1);
+});
+
+test('화면 — 협조 줄에는 «협조» 표시(기금법인 준비분이라도 □ 가 켜져 있다) · 안내 문구', async () => {
+  const w = await opened();
+  const h = w.els.modalbox.innerHTML;
+  assert.equal((h.match(/class="chip warn" style="font-size:10px" title="준비처는 기금법인이지만[^"]*">협조<\/span>/g) || []).length, COOP.length, '협조 표시가 다섯 줄에 있어야 한다');
+  assert.ok((h.match(/>우리 진행<\/span>/g) || []).length >= 3, '협조가 아닌 기금법인 줄은 «우리 진행»으로 남는다');
+  assert.ok(h.includes('<input type="checkbox" data-pmk="d_inka_fseal" checked'), '협조 줄 □ 가 기본으로 켜져 있어야 한다');
+  assert.ok(h.includes('(협조)은 넣었습니다'), '목록 위 안내 문구가 협조 줄을 설명한다');
 });
 
 test('사내기금은 «참여기업» 말을 «설립기업»으로 · 공동 전용 서류는 없다(reqDocsFor 를 따른다)', () => {
