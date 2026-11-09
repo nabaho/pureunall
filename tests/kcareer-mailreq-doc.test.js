@@ -57,7 +57,7 @@ test('문서가 말한 팝업이 코드에서 참이다 — 메모 글자 수 ·
   assert.equal(Number(/메모\((\d+)자\)/.exec(doc)[1]), Q.MEMO_MAX);
   assert.equal(Number(/앞 (\d+)자\)/.exec(doc)[1]), 4000);
   assert.ok(kc.indexOf("t.length>4000?t.slice(0,4000)") >= 0, '문서가 말한 «앞 4000자»가 화면 코드와 같다');
-  assert.ok(kc.indexOf("class=\"mr-open\" onclick=\"mrOpen(") >= 0 && /제목을 누르면/.test(doc));
+  assert.ok(kc.indexOf('class="mr-open" data-mr=') >= 0 && kc.indexOf('onclick="mrOpen(') >= 0 && /제목을 누르면/.test(doc));
   assert.match(doc, /`fixed`/); assert.match(mod, /fixed/);
   assert.match(doc, /읽기만/); assert.ok(kc.indexOf("readMailMessage', { slug:x.slug, uid:x.uid, peek:1 }") >= 0, '내용은 peek 로 읽는다');
   assert.match(doc, /저장하지 않는다/);

@@ -336,6 +336,23 @@ test('본문 보강 — 본문에서 종류가 더해지면 정해진 차례(동
   await scan(f, { readBody: read('개인정보 수집·이용 동의서도 작성 후 회신 바랍니다. 2026년 11월 20일까지') });
   assert.deepEqual(items(f)[IN + '~106'].kinds, ['consent', 'career']);
 });
+test('★ 본문을 «기다리는 사이» 사람이 팝업에서 고쳐 저장한 기한·종류를 뒤늦은 보강이 덮지 않는다(최신 기록에 원자적으로 적용)', async () => {
+  const f = db(); await scan(f);
+  const slow = async () => {                                                          // 본문이 오는 사이에 사람이 팝업에서 저장한다
+    await f.ref('kcareer/U1/mailreq/items').update(Q.editUpdate(IN + '~101', { kinds: ['other'], deadline: { date: '2026-12-24', time: '09:00' }, memo: '내가 고침' }, NOW + 9).update);
+    return { text: BODY };
+  };
+  await Q.scan({ db: f, uid: 'U1', now: NOW, readBody: slow });
+  const x = items(f)[IN + '~101'];
+  assert.equal(x.deadline.date, '2026-12-24', '기다리는 사이 고친 기한이 그대로'); assert.deepEqual(x.kinds, ['other'], '고친 종류가 그대로'); assert.equal(x.memo, '내가 고침');
+  assert.ok(x.bodyAt, '본문 보강은 했다(회신 주소 등)'); assert.equal(x.replyTo, 'reply@example.org');
+});
+test('본문 보강 — 그새 지워진 건은 되살리지 않는다', async () => {
+  const f = db(); await scan(f);
+  const gone = async () => { await f.ref('kcareer/U1/mailreq/items/' + IN + '~101').set(null); return { text: BODY }; };
+  const r = await Q.scan({ db: f, uid: 'U1', now: NOW, readBody: gone });
+  assert.ok(!(IN + '~101' in items(f)), '지워진 건이 보강으로 되살아나면 안 된다'); assert.ok(!r.enriched.includes(IN + '~101'));
+});
 test('본문 보강 — 사람이 «확인함»으로 바꾼 뒤에 채워도 상태는 그대로', async () => {
   const f = db(); await scan(f);
   await f.ref('kcareer/U1/mailreq/items').update(Q.stateUpdate([IN + '~101'], 'doing', NOW + 5));

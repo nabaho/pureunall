@@ -772,6 +772,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-banner a:focus-visible,.mr-pill:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .mr-banner a.mr-x{font-weight:400;opacity:.65;text-decoration:none}
 #nav .nav-item .ncnt.mr-alarm{color:#f87171;font-weight:800}
+.g-title.top.gsel .gcnt.mr-alarm{color:#1e293b}   /* 고른 단추는 파란 바탕 — 붉은 글자는 1:1 이라 안 보인다. «📬» 글자와 굵기로 알린다 */
+#modalMr .mr-det-v input,#modalMr .mr-det-v .btn{margin:2px 4px 2px 0}   /* 좁은 폰에서 기한 칸이 줄바꿈돼도 위아래가 맞닿지 않게 */
 .g-title.top .gcnt.mr-alarm{color:#f87171;font-weight:800}   /* 어두운 옆줄 바탕 위 대비 5:1 — var(--red) 는 3:1 이라 모자란다. 골라 둔 칸(.gsel)은 기본 남색 그대로 */
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
@@ -6553,8 +6555,6 @@ function navPaintCounts(){
       if(s) s.textContent=(n!=null)?n.toLocaleString():'';
       t.title=g+((n!=null)?' · '+n+'건':'');
     });
-    /* 요청 메일 단추의 숫자는 알릴 것이 있으면 붉게 — 그리는 곳은 한 곳(mrPaintNav) */
-    try{ if(typeof mrPaintNav==='function') mrPaintNav(); }catch(e){}
     /* ⚠ «펼친 그룹» 칸을 먼저 찾고 그 안을 본다 — 한 줄짜리 자손 고르개(A B)를 쓰지 않는다.
        즐겨찾기 줄도 .nav-item 이라 통째로 훑으면 거기에도 숫자가 붙는다(buildNav 는 안 붙인다). */
     nav.querySelectorAll('.nav-group.g-open').forEach(function(box){
@@ -6566,6 +6566,8 @@ function navPaintCounts(){
         s.textContent=c.toLocaleString();
       });
     });
+    /* 요청 메일 숫자는 알릴 것이 있으면 붉게 — 그리는 곳은 한 곳(mrPaintNav). ⚠ 줄 숫자(.ncnt)를 «다 만든 뒤에» 부른다(먼저 부르면 막 만든 줄에 안 붙는다) */
+    try{ if(typeof mrPaintNav==='function') mrPaintNav(); }catch(e){}
   }catch(e){ console.warn('옆줄 숫자', e); }
 }
 /* 자료가 바뀔 때마다 부른다 — 한 번에 여러 번 바뀌어도(스캔·일괄등록) 끝에 한 번만 칠한다 */
@@ -15253,7 +15255,7 @@ function mrRowHtml(x, i, now){
   return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
     +'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" aria-label="'+escapeHtml(String(x.s||'').slice(0,40))+' 고르기"'+(_mr.sel[x.id]?' checked':'')+' onclick="mrPick(\''+id+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
     +'<td style="white-space:nowrap" title="'+escapeHtml(Q.kindsLabel(x.kinds))+'">'+(종류.length?'<span class="tag navy">'+종류[0].icon+' '+escapeHtml(종류[0].label)+(종류.length>1?' +'+(종류.length-1):'')+'</span>':'')+'</td>'
-    +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(툴팁)+'"><button type="button" class="mr-open" onclick="mrOpen(\''+id+'\')" aria-label="'+escapeHtml('내용 보기·고치기: '+String(x.s||'').slice(0,40))+'"><b>'+escapeHtml(x.s||'(제목 없음)')+'</b></button>'+(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</td>'
+    +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(툴팁)+'"><button type="button" class="mr-open" data-mr="'+escapeHtml(x.id)+'" onclick="mrOpen(\''+id+'\')" aria-label="'+escapeHtml('내용 보기·고치기: '+String(x.s||'').slice(0,40))+'"><b>'+escapeHtml(x.s||'(제목 없음)')+'</b></button>'+(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</td>'
     +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
     +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
     +'<td style="white-space:nowrap">'+기한+'</td>'
@@ -15345,10 +15347,29 @@ function mrOpen(id){
 function mrDetClose(){
   var ov=document.getElementById('modalMr'); if(ov && ov.classList) ov.classList.remove('open');
   document.removeEventListener('keydown', mrDetKey);
-  var back=_mr.detFrom; _mr.detId=''; _mr.detFrom=null;
-  try{ if(back && back.focus) back.focus(); }catch(e){}     /* 열었던 단추로 돌아간다(키보드로 쓰는 사람이 길을 잃지 않게) */
+  var id=_mr.detId, back=_mr.detFrom; _mr.detId=''; _mr.detFrom=null;
+  /* 열었던 단추로 돌아간다(키보드로 쓰는 사람이 길을 잃지 않게). 저장·상태 변경으로 목록이 다시 그려지면 그 단추는 화면에서 떨어져 나갔으니
+     «그 건의 단추»를 다시 찾고, 그 건이 목록에서 빠졌으면(완료로 바꾼 뒤 등) 목록의 첫 단추로 */
+  try{
+    var ls=document.querySelectorAll?document.querySelectorAll('#mrBody .mr-open'):[], again=null;
+    for(var i=0;i<ls.length;i++){ if(ls[i].getAttribute('data-mr')===id){ again=ls[i]; break; } }
+    if(!again && back && back.isConnected!==false) again=back;
+    if(!again && ls.length) again=ls[0];
+    if(again && again.focus) again.focus();
+  }catch(e){}
 }
-function mrDetKey(e){ if(e.key==='Escape' && _mr.detId){ e.preventDefault(); mrDetClose(); } }
+function mrDetKey(e){
+  if(!_mr.detId) return;
+  if(e.key==='Escape'){ e.preventDefault(); mrDetClose(); return; }
+  if(e.key!=='Tab') return;
+  /* 팝업 안 초점을 가둔다 — aria-modal 이라 뒤 화면으로 Tab 이 빠지면 안 된다 */
+  var ov=document.getElementById('modalMr'); if(!ov || !ov.querySelectorAll) return;
+  var list=Array.prototype.filter.call(ov.querySelectorAll('input,textarea,button,[tabindex="0"]'), function(n){ return !n.disabled; });
+  if(!list.length) return;
+  var first=list[0], last=list[list.length-1], cur=document.activeElement, inside=ov.contains?ov.contains(cur):true;
+  if(e.shiftKey && (cur===first || !inside)){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (cur===last || !inside)){ e.preventDefault(); first.focus(); }
+}
 function mrDetRender(x){
   var Q=KcareerMailReq, now=Date.now(), dl=x.deadline||{}, dd=Q.ddayOf(x.deadline, now), st=Q.STATES[x.st]?x.st:'new', fx=(x.fixed&&typeof x.fixed==='object')?x.fixed:{};
   var t=document.getElementById('mrDetTitle'); if(t) t.textContent='📬 요청 메일 · '+Q.STATES[st];
@@ -15406,6 +15427,8 @@ function mrDetSave(){
   var id=_mr.detId, x=id?_mr.items[id]:null; if(!x) return Promise.resolve(false);
   var Q=KcareerMailReq, val=function(i){ var e=document.getElementById(i); return e?String(e.value||''):''; }, on=function(i){ var e=document.getElementById(i); return !!(e && e.checked); };
   var kinds=Q.KINDS.filter(function(k){ return on('mrDetK_'+k.key); }).map(function(k){ return k.key; });
+  var bad=function(i){ var e=document.getElementById(i); return !!(e && e.validity && e.validity.badInput); };
+  if(bad('mrDetDate') || bad('mrDetTime')){ toast('⚠ 기한 날짜·시각을 끝까지(없는 날짜가 아니게) 적어 주세요', 5000); return Promise.resolve(false); }   /* 없는 날짜를 치면 칸 값이 비어 «기한 없음»으로 지워진다 */
   var date=val('mrDetDate').trim(), time=val('mrDetTime').trim(), memo=val('mrDetMemo'), o=x.deadline||{}, edit={};
   if(kinds.join()!==(x.kinds||[]).slice().sort(function(a,b){ return Q.KINDS.map(function(k){ return k.key; }).indexOf(a)-Q.KINDS.map(function(k){ return k.key; }).indexOf(b); }).join()) edit.kinds=kinds;
   if(date!==(o.date||'') || time!==(o.time||'')){

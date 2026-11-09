@@ -424,18 +424,25 @@
       var x = todo[i], p = base + '/items/' + x.id;
       try {
         var text = bodyOf(await env.readBody(x.slug, x.uid)), hit = detect({ s: x.s, an: x.an, f: x.f, e: x.e, a: (x.an || []).length, d: x.d }, { text: text, refMs: x.d });
-        var patch = { bodyAt: now, bodyTry: null };
-        if (hit) {
-          /* ⚠ 사람이 팝업에서 직접 고친 칸(fixed)은 덮지 않는다 — 고쳐 둔 기한·종류가 다음 훑기에 되돌아오면 안 된다 */
-          var fx = obj(x.fixed) ? x.fixed : {};
-          if (!fx.deadline) patch.deadline = hit.deadline || x.deadline || null;      // 본문에서 못 찾아도 미리보기에서 찾은 기한은 지우지 않는다
-          patch.replyTo = hit.replyTo || null;
-          var order = KINDS.map(function (k) { return k.key; });
-          if (!fx.kinds) patch.kinds = (x.kinds || []).concat(hit.kinds.filter(function (k) { return (x.kinds || []).indexOf(k) < 0; }))
-            .sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
-          patch.why = hit.why.map(function (w) { return cut(w, 48); });
-        } else if (text) { patch.deadline = x.deadline || null; }
-        await db.ref(p).update(patch);
+        /* ⚠ «본문을 기다린 뒤의 최신 기록»에 적용한다(transaction) — 읽기 전에 모아 둔 x 로 patch 를 만들어 update 하면,
+          본문이 오는 사이 사람이 팝업에서 고쳐 저장한 기한·종류(fixed)를 뒤늦게 덮는다(자동 검토 지적). 첫 호출이 null 이면 그대로 돌려줘 서버 값으로 다시 불리게 한다 */
+        var tr = await db.ref(p).transaction(function (c) {
+          if (c === null) return c;
+          if (!obj(c)) return;
+          var fx = obj(c.fixed) ? c.fixed : {};
+          c.bodyAt = now; delete c.bodyTry;
+          if (hit) {
+            if (!fx.deadline && hit.deadline) c.deadline = hit.deadline;     // 본문에서 못 찾아도 미리보기에서 찾은 기한은 지우지 않는다
+            if (hit.replyTo) c.replyTo = hit.replyTo; else delete c.replyTo;
+            if (!fx.kinds) {
+              var order = KINDS.map(function (k) { return k.key; }), have = Array.isArray(c.kinds) ? c.kinds : [];
+              c.kinds = have.concat(hit.kinds.filter(function (k) { return have.indexOf(k) < 0; })).sort(function (p1, p2) { return order.indexOf(p1) - order.indexOf(p2); });
+            }
+            c.why = hit.why.map(function (w) { return cut(w, 48); });
+          }
+          return c;
+        });
+        if (!tr || !tr.committed || !tr.snapshot || tr.snapshot.val() === null) continue;     // 그새 사라진 건은 세지 않는다
         res.bodyRead++; res.enriched.push(x.id);
       } catch (e) {
         res.bodyErr++; res.errors.push(x.id + ': ' + cut(e && e.message || e, 60));

@@ -91,7 +91,8 @@ function world(o) {
     localStorage: { getItem: (k) => (k in prefs ? prefs[k] : null), setItem: (k, v) => { prefs[k] = String(v); }, removeItem: (k) => { delete prefs[k]; } },
     Notification: undefined,
     document: { hidden: false, title: '경력관리', getElementById: el, addEventListener: (ev, fn) => { docListeners[ev] = fn; }, removeEventListener: (ev) => { delete docListeners[ev]; }, activeElement: { focus() { focused.push('opener'); } },
-      querySelector: (sel) => (/data-g="이력서관리"\] \.gcnt/.test(sel) ? navTop : (/data-id="page-mailreq"\] \.ncnt/.test(sel) ? navSub : null)), querySelectorAll: () => [] },
+      querySelectorAll: (sel) => (/#mrBody \.mr-open/.test(sel) ? (o.openers || []) : []),
+      querySelector: (sel) => (/data-g="이력서관리"\] \.gcnt/.test(sel) ? navTop : (/data-id="page-mailreq"\] \.ncnt/.test(sel) ? navSub : null)) },
     navInfo: (id) => ({ label: '📬 요청 메일', grp: id === 'page-mailreq' ? '이력서관리' : null }),
   };
   vm.createContext(ctx); vm.runInContext(BLOCK, ctx);
@@ -307,9 +308,46 @@ test('팝업의 상태 단추 — 처리 완료로 바꾸면 닫힌다 · Esc �
   const g = await popup(); await g.db.ref('kcareer/U1/mailreq/items/' + ID).set(null); await settle();
   assert.ok(!g.els.modalMr.classList.contains('open'), '지워진 건을 보여 주고 있으면 안 된다');
 });
+test('★ 팝업 안에서만 Tab 이 돈다(aria-modal) — 끝에서 Tab 은 처음으로, 처음에서 Shift+Tab 은 끝으로, 팝업 밖에 있으면 안으로', async () => {
+  const w = await popup(); const mk = (n) => ({ n, focus() { w.focused.push(n); } });
+  const a = mk('A'), b = mk('B'), c = mk('C'); const ov = w.ctx.document.getElementById('modalMr');
+  ov.querySelectorAll = () => [a, b, c]; ov.contains = (n) => [a, b, c].includes(n);
+  const press = (cur, shift) => { w.ctx.document.activeElement = cur; let pd = 0; w.docListeners.keydown({ key: 'Tab', shiftKey: !!shift, preventDefault() { pd++; } }); return pd; };
+  assert.equal(press(c, false), 1); assert.equal(w.focused.at(-1), 'A', '끝에서 Tab → 처음');
+  assert.equal(press(a, true), 1); assert.equal(w.focused.at(-1), 'C', '처음에서 Shift+Tab → 끝');
+  assert.equal(press(b, false), 0, '가운데서는 브라우저가 알아서(막지 않는다)'); assert.equal(press(b, true), 0);
+  assert.equal(press({ n: '뒤 화면' }, false), 1); assert.equal(w.focused.at(-1), 'A', '팝업 밖에 있으면 안으로');
+});
+test('닫을 때 «그 건의 단추»로 초점이 돌아간다 — 저장·상태 변경으로 목록이 다시 그려져 열었던 단추가 떨어져 나가도', async () => {
+  const mkBtn = (id) => ({ id, focus() { w.focused.push('btn:' + id); }, getAttribute: (k) => (k === 'data-mr' ? id : null), isConnected: true });
+  const w = await popup({ openers: [mkBtn('other~1'), mkBtn(ID)] });
+  w.ctx.mrDetClose();
+  w.ctx.document.activeElement = { isConnected: false, focus() { w.focused.push('detached'); } };   // 열었던 단추는 다시 그려져 DOM 에서 떨어져 나갔다
+  w.ctx.mrOpen(ID); await settle(); w.focused.length = 0; w.ctx.mrDetClose();
+  assert.equal(w.focused.at(-1), 'btn:' + ID, '떨어져 나간 노드가 아니라 «같은 건의 새 단추»로'); assert.ok(!w.focused.includes('detached'));
+  const w2 = await popup({ openers: [mkBtn('x~9'), mkBtn('y~8')] }); w2.ctx.mrDetClose();
+  w2.ctx.document.activeElement = { isConnected: false, focus() { w2.focused.push('detached'); } };
+  w2.ctx.mrOpen(ID); await settle(); w.focused.length = 0; w2.ctx.mrDetClose();   // mkBtn 의 초점 기록은 첫 번째 세계(w)에 쌓인다
+  assert.equal(w.focused.at(-1), 'btn:x~9', '그 건이 목록에서 빠졌으면(완료로 바꾼 뒤 등) 목록의 첫 단추로');
+  assert.match(html, /data-mr="'\+escapeHtml\(x\.id\)\+'"/, '목록 단추에 건 번호가 붙는다');
+});
+test('날짜 칸에 없는 날짜·덜 친 날짜를 넣으면 «기한 없음»으로 지우지 않고 말한다(칸 값이 빈 글자가 되는 브라우저 동작)', async () => {
+  const w = await popup(); fillForm(w); const before = w.db.writes();
+  w.ctx.document.getElementById('mrDetDate').value = ''; w.ctx.document.getElementById('mrDetDate').validity = { badInput: true };
+  await w.ctx.mrDetSave();
+  assert.equal(w.db.writes(), before, '저장하지 않았다'); assert.ok(w.items()[ID].deadline, '있던 기한이 지워지지 않았다'); assert.ok(w.toasts.some((m) => /끝까지/.test(m)));
+  assert.ok(w.els.modalMr.classList.contains('open'), '팝업은 열려 있어 고칠 수 있다');
+});
+test('옆줄 숫자 — 줄 숫자(.ncnt)를 다 만든 «뒤에» 붉은 표시를 칠한다 · 고른 단추(.gsel) 위에서는 남색 그대로 · 좁은 폰에서 기한 칸 간격', () => {
+  const f = html.slice(html.indexOf('function navPaintCounts(){'), html.indexOf('var _navCntT=null;'));
+  assert.ok(f.indexOf('mrPaintNav()') > f.indexOf("s.className='ncnt'"), 'mrPaintNav 는 .ncnt 를 만든 뒤에 불러야 막 만든 줄에도 붉은 표시가 붙는다');
+  assert.equal((f.match(/mrPaintNav\(\)/g) || []).length, 1, '한 번만');
+  assert.match(html, /\.g-title\.top\.gsel \.gcnt\.mr-alarm\{color:#1e293b\}/, '파란 바탕 위 붉은 글자(1:1)는 안 보인다');
+  assert.match(html, /#modalMr \.mr-det-v input,#modalMr \.mr-det-v \.btn\{margin:2px 4px 2px 0\}/);
+});
 test('목록의 제목은 «누르는 단추»다(키보드로도) · 팝업 입력칸은 폰에서 확대되지 않게 16px', async () => {
   const w = await started({ onPage: true }); w.ctx.mrRender(); const h = w.els.mrBody.innerHTML;
-  assert.match(h, /<button type="button" class="mr-open" onclick="mrOpen\('[^']+'\)" aria-label="내용 보기·고치기: [^"]*동의서/);
+  assert.match(h, /<button type="button" class="mr-open" data-mr="[^"]+" onclick="mrOpen\('[^']+'\)" aria-label="내용 보기·고치기: [^"]*동의서/);
   assert.match(html, /#modalMr input\[type=date\],#modalMr input\[type=time\],#modalMr textarea\{font-size:16px\}/);
 });
 test('★ 고르기만으로는 아무것도 저장되지 않는다 — 「N건 선택」과 할 일만 띄운다', async () => {
