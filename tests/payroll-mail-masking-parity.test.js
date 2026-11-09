@@ -38,11 +38,13 @@ const server = loadServer();
 
 /* 지어낸 입력들 — 계좌는 마디 수·길이·0으로 시작하는 마디까지 여러 모양으로 */
 const MASK_INPUTS = [
-  '920719-1357924', '9207191357924', 'x-920719-1357924',
-  '010-5582-3374', '010 5582 3374', '010.5582.3374', '02-1234-5678', '041-556-0035',
+  '920719-1234567', '9207191234567', 'x-920719-1234567',
+  '010-1111-2222', '010 1111 2222', '010.1111.2222', '02-1234-5678', '041-556-0035',
   '352-1234-5678-83', '110-123-456789', '110123456789', '3333-12-1234567', '9002-1234-5678-1',
   '012-1234-5678-99', '123-01-1234-5678', '3333-01-1234567', '123-456789-01-1', '123-456-1234567',
-  '계좌:352-1234-5678-83,010-5582-3374/041-556-0035',
+  '계좌:352-1234-5678-83,010-1111-2222/041-556-0035',
+  '계좌 123 456 789012', '계좌번호: 123.456.789012', '농협 123456789', '신현주대표 <a@example.invalid>', '홍길동(가람떡집) <a@example.invalid>',
+  '920719-1234567-입사', '110-123-456789-농협', '010-1234-5678-본인', '3521234567890-신한', '0101234567-',
   '2026-11-02', '입사 2026-11-02 급여 2,600,000원', '월 3200000원', '11월 10-20일',
   'sample@example.invalid', '이철 <lee1234@example.invalid>', '홍길동 (010-1234-5678)'
 ];
@@ -96,7 +98,11 @@ const COMPANIES = [
   { id: 'h', name: '우리와(곱창회관)' },
   { id: 'i', name: '써브웨이 서산호수공원점' },
   { id: 'j', name: '써브웨이 서울역점' },
-  { id: 'k', name: '단독상회', pay_mail: 'only@example.invalid' }
+  { id: 'k', name: '단독상회', pay_mail: 'only@example.invalid' },
+  { id: 'm', name: '주식회사 세창이엔지' },
+  { id: 'n', name: '농업회사법인 주식회사 유명육가공(양념육지점)' },
+  { id: 'o', name: '고려면옥 아산점→보리촌 바지락 해물 칼국수' },
+  { id: 'q', name: '(주)화덕고등어(천안점)' }
 ];
 const MATCH_CASES = [
   ['shared1@example.invalid', '늘봄반찬(배방점) 11월', 'a'],
@@ -111,6 +117,10 @@ const MATCH_CASES = [
   ['other@example.invalid', '우리와 곱창회관', 'h'],
   ['other@example.invalid', '써브웨이서울역점', 'j'],              // 예외 없이 같은 점수 규칙
   ['other@example.invalid', '써브웨이 서산호수공원점', 'i'],
+  ['other@example.invalid', '[세창이엔지] 11월 급여', 'm'],         // 주식회사를 빼고 써도 찾는다
+  ['other@example.invalid', '유명육가공(양념육지점) 10월분 근태', 'n'], // 농업회사법인·주식회사를 빼고 써도 찾는다
+  ['other@example.invalid', '[보리촌 바지락 해물 칼국수] 11월 급여', 'o'], // 바뀐 이름(→ 뒤)으로 써도 찾는다
+  ['other@example.invalid', '화덕고등어 천안점 11월', 'q'],          // (주)가 붙은 지점
   ['only@example.invalid', '제목없음', 'k'],                      // 주소가 하나뿐이면 그곳
   ['nobody@example.invalid', '아무 이름 없음', null]
 ];
@@ -137,6 +147,22 @@ test('서버 함수: 못 정한 메일은 미분류, uid 는 안전한 형식만
   assert.equal(server.validUid(7), '7');
 });
 
+test('서버 함수: 저장하는 마스킹본에 번호·이름·메일이 남지 않는다', async () => {
+  written.length = 0;
+  const body = '- 성명: 박지훈\n- 주민등록번호: 940815-1234567\n퇴사자 이영희\n연락처 010-1234-5678-본인\n계좌 3333-12-1234567\n입사일 2026-11-01 월보수액 2,600,000원';
+  await server.routeIncomingPureunMail({ uid: 'u9', from: '홍길동 <hong@example.invalid>', subject: '성명: 박지훈 입사', body }, COMPANIES);
+  const masked = written.find((w) => /inbox_masked/.test(w[0]))[1];
+  const all = JSON.stringify(masked);
+  for (const secret of ['박지훈', '이영희', '940815', '1234567', '010-1234', 'hong@', '홍길동']) {
+    assert.ok(all.indexOf(secret) === -1, '마스킹본에 남음: ' + secret);
+  }
+  assert.ok(masked.maskedBody.includes('주민등록번호'), '라벨이 훼손되면 안 됩니다');
+  assert.ok(masked.maskedBody.includes('2026-11-01') && masked.maskedBody.includes('2,600,000'), '날짜·금액은 남아야 합니다');
+  // 화면용 모듈과 같은 결과
+  const names = bridge.findNames(body + '\n성명: 박지훈 입사');
+  assert.equal(masked.maskedBody, bridge.maskNames(bridge.maskPii(body), names));
+});
+
 test('서버 함수: 한국시간 기준 연월', () => {
   assert.equal(server.monthKey('2026-11-01T08:00:00+09:00'), '2026_11');
   assert.equal(server.monthKey('2026-10-31T16:00:00Z'), '2026_11');
@@ -161,9 +187,12 @@ test('공개 저장소로 사업장 마스터를 보내는 길이 막혀 있다'
   const html = read('pu-payroll-mail-sync.html');
   const at = html.indexOf("getElementById('btnExecuteGithubPush').addEventListener");
   assert.ok(at > 0, '단추 핸들러를 찾지 못했습니다');
-  const body = html.slice(at, at + 1800);
-  const guard = body.indexOf('return;');
-  const call = body.indexOf('api.github.com');
-  assert.ok(guard > 0, '핸들러 첫머리에 막는 return 이 있어야 합니다');
-  assert.ok(call === -1 || guard < call, 'GitHub 호출보다 먼저 막아야 합니다');
+  // 핸들러 첫머리부터 «안전 페이로드를 만드는 줄» 앞까지에, 조건 없는 return(들여쓰기 8칸)이 있어야 한다.
+  // (조건부 if (...) { return; } 는 인정하지 않는다 — 이전 검사는 그것 때문에 차단 블록을 지워도 통과했다)
+  const end = html.indexOf('buildGithubSafeCompaniesPayload();', at);
+  assert.ok(end > at, '안전 페이로드 줄을 찾지 못했습니다');
+  const head = html.slice(at, end);
+  assert.ok(/\n {8}return;\n/.test(head), '핸들러 첫머리에 조건 없는 return 이 있어야 합니다');
+  assert.ok(/보안 차단/.test(head), '막은 까닭을 사용자에게 보여 주어야 합니다');
+  assert.ok(head.indexOf('api.github.com') === -1, 'GitHub 호출이 막는 return 보다 앞에 있으면 안 됩니다');
 });

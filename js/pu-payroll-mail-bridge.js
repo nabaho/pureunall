@@ -19,7 +19,7 @@
   //  · 날짜(2026-11-02)는 그대로, 전화(0으로 시작하는 9~11자리)는 앞 마디만 남기고,
   //  · 하이픈이 있고 숫자가 8개 이상이면 계좌·번호로 보고 가리고, 하이픈이 없으면 10개 이상일 때 가린다.
   function maskDigitRuns(s) {
-    return s.replace(/(^|[^\d])(\d[\d-]*\d)(?![\d-])/g, function(m, pre, run) {
+    return s.replace(/(^|[^\d])(\d[\d-]*\d)/g, function(m, pre, run) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(run)) return m;
       var digits = run.replace(/-/g, '');
       var phone = /^(0\d{1,2})-?(\d{3,4})-?(\d{4})$/.exec(run);
@@ -33,9 +33,14 @@
     if (!rawText) return '';
     var s = maskEmail(rawText);
     // 주민번호(생년월일까지)
-    s = s.replace(/(^|[^\d])(\d{6})[-\s]?([1-8]\d{6})(?![\d-])/g, function(m, pre) { return pre + '******-*******'; });
+    s = s.replace(/(^|[^\d])(\d{6})[-\s]?([1-8]\d{6})(?!\d)/g, function(m, pre) { return pre + '******-*******'; });
     // 점·공백으로 나눈 전화(010 1234 5678, 010.1234.5678)
-    s = s.replace(/(^|[^\d])(0\d{1,2})[.\s](\d{3,4})[.\s](\d{4})(?![\d-])/g, function(m, pre, p1) { return pre + p1 + '-****-****'; });
+    s = s.replace(/(^|[^\d])(0\d{1,2})[.\s](\d{3,4})[.\s](\d{4})(?!\d)/g, function(m, pre, p1) { return pre + p1 + '-****-****'; });
+    // 은행·계좌 라벨 바로 뒤 번호는 공백·점으로 나뉘었거나 9자리여도 가린다(날짜는 제외)
+    s = s.replace(/(계좌번호|계좌|통장|입금|농협|국민|신한|우리|하나|기업|카카오뱅크|카카오|토스|새마을|우체국)(\s*[:：]?\s*)(\d[\d .-]*\d)/g, function(m, label, gap, num) {
+      if (/^\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(num)) return m;
+      return num.replace(/\D/g, '').length >= 8 ? label + gap + '***-****-****' : m;
+    });
     return maskDigitRuns(s);
   }
 
@@ -56,8 +61,8 @@
   }
 
   // 본문에서 «성명: 홍길동», «입사자 홍길동» 처럼 라벨 뒤에 적힌 이름을 모두 찾는다(마스킹본에서 가릴 이름들)
-  var NAME_LABEL = /(?:성명|이름|입사자|퇴사자|파트타임|보조)\s*[:：]?\s*([가-힣]{2,4})/g;
-  var NOT_A_NAME = ['없음', '미정', '확인', '해당없음', '주민등록', '연락처', '입사일', '퇴사일', '월급여', '월보수액', '급여계좌', '실무확인'];
+  var NAME_LABEL = /(?:신규입사자|신규입사|입사자|퇴사자|성명|이름|파트타임|보조)\s*[:：]?\s*([가-힣]{2,4})/g;
+  var NOT_A_NAME = ['없음', '미정', '확인', '해당없음', '주민등록', '연락처', '입사일', '퇴사일', '월급여', '월보수액', '급여계좌', '실무확인', '신규입사', '입사', '퇴사', '취득', '상실'];
   function findNames(text) {
     var found = [], m;
     var re = new RegExp(NAME_LABEL.source, 'g');
@@ -70,7 +75,9 @@
 
   // 보낸이 줄: 주소·전화·번호를 가리고, 따로 떨어진 한글 이름(2~4자)은 가운데 글자를 가린다
   function maskFrom(from) {
-    return maskPii(from).replace(/(^|[\s"(])([가-힣]{2,4})(?=$|[\s")<])/g, function(m, pre, w) { return pre + maskName(w); });
+    return maskPii(from)
+      .replace(/(^|[\s"])([가-힣]{2,4})(대표님|대표|사장님|사장|과장님|과장|부장님|부장|팀장님|팀장|실장님|실장|이사님|이사|사모님|사모|대리님|대리|주임님|주임|원장님|원장)(?=$|[\s")<(])/g, function(m, pre, w, t) { return pre + maskName(w) + t; })
+      .replace(/(^|[\s"])([가-힣]{2,4})(?=$|[\s")<(])/g, function(m, pre, w) { return pre + maskName(w); });
   }
 
   // ── 사업장 자동 매칭 ──
@@ -78,14 +85,24 @@
   //  ② 이름 점수: 괄호·㈜·공백을 뺀 «전체 이름(지점 포함)»이 글에 있으면 1000+길이,
   //     지점·㈜(주)를 뗀 «머리 이름»만 맞으면 길이. 점수가 같은 사업장이 둘이면(같은 이름의 지점 둘) «못 정함».
   //  ③ 못 찾았거나 모호하면 null — 엉뚱한 사업장에 붙이지 않는다.
-  function squeeze(s) { return String(s || '').replace(/[()\[\]㈜]/g, '').replace(/\s+/g, ''); }
-  function headName(c) { return String(c.name || c.sort_key || '').replace(/\(.*?\)/g, '').replace(/㈜/g, '').replace(/\s+/g, '').trim(); }
+  var CORP = /\(주\)|㈜|주식회사|농업회사법인|유한회사|합자회사|재단법인|사단법인/g;
+  function rawSqueeze(s) { return String(s || '').replace(/\(주\)|㈜/g, '').replace(/[()\[\]]/g, '').replace(/\s+/g, ''); }   // 회사 형태 표기(주식회사 등)는 «남긴다»
+  function squeeze(s) { return String(s || '').replace(CORP, '').replace(/[()\[\]]/g, '').replace(/\s+/g, ''); }
+  function headOf(s) { return String(s || '').replace(/\(.*?\)/g, '').replace(CORP, '').replace(/\s+/g, '').trim(); }
+  // «고려면옥 아산점→보리촌 바지락» 처럼 이름이 바뀐 표기는 양쪽 모두를 이름으로 본다
+  function nameForms(c) {
+    var forms = String(c.name || '').split('→');
+    if (c.sort_key) forms.push(c.sort_key);
+    return forms;
+  }
 
   function matchCompany(mailObj, companies) {
     var list = companies || root.PU_PAYROLL_COMPANIES || [];
     mailObj = mailObj || {};
     var fromLower = String(mailObj.from || '').toLowerCase();
-    var combined = squeeze(String(mailObj.from || '') + ' ' + String(mailObj.subject || '') + ' ' + String(mailObj.body || ''));
+    var text = String(mailObj.from || '') + ' ' + String(mailObj.subject || '') + ' ' + String(mailObj.body || '');
+    var combinedRaw = rawSqueeze(text);
+    var combined = squeeze(text);
 
     var byMail = list.filter(function(c) {
       return c && c.pay_mail && fromLower.indexOf(String(c.pay_mail).toLowerCase()) !== -1;
@@ -97,11 +114,18 @@
     for (var j = 0; j < pool.length; j++) {
       var c = pool[j];
       if (!c) continue;
-      var full = squeeze(c.name || c.sort_key);
-      var head = headName(c);
+      var forms = nameForms(c);
       var score = 0;
-      if (full.length >= 2 && combined.indexOf(full) !== -1) score = 1000 + full.length;
-      else if (head.length >= 2 && combined.indexOf(head) !== -1) score = head.length;
+      for (var k = 0; k < forms.length; k++) {
+        var full = squeeze(forms[k]);
+        var head = headOf(forms[k]);
+        var raw = rawSqueeze(forms[k]);
+        var s = 0;
+        if (raw.length >= 2 && combinedRaw.indexOf(raw) !== -1) s = 2000 + raw.length;          // 회사 형태 표기까지 그대로 맞음
+        else if (full.length >= 2 && combined.indexOf(full) !== -1) s = 1000 + full.length;    // 표기를 떼고 맞음
+        else if (head.length >= 2 && combined.indexOf(head) !== -1) s = head.length;           // 지점·표기를 뗀 머리 이름만 맞음
+        if (s > score) score = s;
+      }
       if (score > bestScore) { best = c; bestScore = score; tie = false; }
       else if (score > 0 && score === bestScore) tie = true;
     }

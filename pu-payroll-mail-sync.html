@@ -612,8 +612,9 @@ git push origin main</pre>
         const rrnMatch = line.match(rrnRegex);
         const isJoin = /입사|취득|신규/.test(line);
         const isLeave = /퇴사|상실|사직/.test(line);
-        const nameLabelMatch = line.match(/(?:성명|이름|입사자|퇴사자|파트타임|보조)\s*[:：]?\s*([가-힣]{2,4})/);
-        if (nameLabelMatch && PuPayrollMailBridge.findNames(line).length) lastLabelName = nameLabelMatch[1];
+        const lineNames = PuPayrollMailBridge.findNames(line);
+        const nameLabelMatch = lineNames.length ? [null, lineNames[0]] : null;
+        if (nameLabelMatch) lastLabelName = nameLabelMatch[1];
 
         if (rrnMatch || isJoin || isLeave) {
           let empName = '실무확인대상';
@@ -657,7 +658,7 @@ git push origin main</pre>
             phone_raw: phoneRaw,
             date: dtStr,
             pay: payVal || 0,   /* 없는 급여액을 지어내지 않는다 — 화면은 0 이면 '-' */
-            note: maskPersonalInfoText(line).slice(0, 65)
+            note: PuPayrollMailBridge.maskNames(maskPersonalInfoText(line), PuPayrollMailBridge.findNames(rawText)).slice(0, 65)
           });
         }
       }
@@ -671,7 +672,7 @@ git push origin main</pre>
           phone_raw: '-',
           date: '2026-11-08',
           pay: 0,
-          note: maskPersonalInfoText(rawText).slice(0, 65)
+          note: PuPayrollMailBridge.maskNames(maskPersonalInfoText(rawText), PuPayrollMailBridge.findNames(rawText)).slice(0, 65)
         });
       }
       return items;
@@ -1438,7 +1439,7 @@ git push origin main</pre>
 
         document.getElementById('mailSimulatorModal').classList.add('hidden');
         document.getElementById('mailBridgeStatusText').innerHTML =
-          '방금 수신: <strong class="text-white">' + esc(targetComp.name) + ' (담당: ' + esc(targetComp.staff) + ')</strong> — 「' + esc(subjStr) + '」 자체 마스킹 및 원본자료함 전송 완료';
+          '방금 수신: <strong class="text-white">' + esc(targetComp.name) + ' (담당: ' + esc(targetComp.staff) + ')</strong> — 「' + esc(maskPersonalInfoText(subjStr)) + '」 자체 마스킹 및 원본자료함 전송 완료';
         renderAll();
         showToast('#' + targetComp.seq + ' ' + targetComp.name + '(담당: ' + targetComp.staff + ')으로 마스킹 가공본 및 개인정보 원본이 자동 전송되었습니다!');
       });

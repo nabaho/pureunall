@@ -25,7 +25,7 @@ function maskEmailServer(s) {
 
 // 숫자·하이픈 «덩어리» 단위: 날짜는 그대로, 전화는 앞 마디만, 하이픈 계좌는 숫자 8개 이상이면 통째로, 하이픈 없는 10자리 이상도 통째로
 function maskDigitRuns(s) {
-  return s.replace(/(^|[^\d])(\d[\d-]*\d)(?![\d-])/g, (m, pre, run) => {
+  return s.replace(/(^|[^\d])(\d[\d-]*\d)/g, (m, pre, run) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(run)) return m;
     const digits = run.replace(/-/g, '');
     const phone = /^(0\d{1,2})-?(\d{3,4})-?(\d{4})$/.exec(run);
@@ -38,8 +38,13 @@ function maskDigitRuns(s) {
 function maskPiiServer(rawText) {
   if (!rawText) return '';
   let s = maskEmailServer(rawText);
-  s = s.replace(/(^|[^\d])(\d{6})[-\s]?([1-8]\d{6})(?![\d-])/g, (m, pre) => pre + '******-*******');            // 주민번호(생년월일까지)
-  s = s.replace(/(^|[^\d])(0\d{1,2})[.\s](\d{3,4})[.\s](\d{4})(?![\d-])/g, (m, pre, p1) => pre + p1 + '-****-****'); // 점·공백 전화
+  s = s.replace(/(^|[^\d])(\d{6})[-\s]?([1-8]\d{6})(?!\d)/g, (m, pre) => pre + '******-*******');            // 주민번호(생년월일까지)
+  s = s.replace(/(^|[^\d])(0\d{1,2})[.\s](\d{3,4})[.\s](\d{4})(?!\d)/g, (m, pre, p1) => pre + p1 + '-****-****'); // 점·공백 전화
+  // 은행·계좌 라벨 바로 뒤 번호는 공백·점으로 나뉘었거나 9자리여도 가린다(날짜는 제외)
+  s = s.replace(/(계좌번호|계좌|통장|입금|농협|국민|신한|우리|하나|기업|카카오뱅크|카카오|토스|새마을|우체국)(\s*[:：]?\s*)(\d[\d .-]*\d)/g, (m, label, gap, num) => {
+    if (/^\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(num)) return m;
+    return num.replace(/\D/g, '').length >= 8 ? label + gap + '***-****-****' : m;
+  });
   return maskDigitRuns(s);
 }
 
@@ -50,23 +55,59 @@ function maskNameServer(s) {
   return t.charAt(0) + '*'.repeat(t.length - 2 || 1) + (t.length > 2 ? t.charAt(t.length - 1) : '');
 }
 
+// 글 안에서 «이미 알고 있는 이름들»을 가린다
+function maskNamesServer(text, names) {
+  let out = String(text || '');
+  (names || []).forEach((n) => {
+    if (/^[가-힣]{2,4}$/.test(String(n || ''))) out = out.split(n).join(maskNameServer(n));
+  });
+  return out;
+}
+
+// 본문에서 «성명: 홍길동», «입사자 홍길동» 처럼 라벨 뒤에 적힌 이름을 모두 찾는다
+const NAME_LABEL_SRC = '(?:신규입사자|신규입사|입사자|퇴사자|성명|이름|파트타임|보조)\\s*[:：]?\\s*([가-힣]{2,4})';
+const NOT_A_NAME = ['없음', '미정', '확인', '해당없음', '주민등록', '연락처', '입사일', '퇴사일', '월급여', '월보수액', '급여계좌', '실무확인', '신규입사', '입사', '퇴사', '취득', '상실'];
+function findNamesServer(text) {
+  const found = [];
+  const re = new RegExp(NAME_LABEL_SRC, 'g');
+  const str = String(text || '');
+  let m;
+  while ((m = re.exec(str)) !== null) {
+    if (NOT_A_NAME.indexOf(m[1]) === -1 && found.indexOf(m[1]) === -1) found.push(m[1]);
+  }
+  return found;
+}
+
 // 보낸이 줄: 주소·전화·번호를 가리고, 따로 떨어진 한글 이름(2~4자)은 가운데 글자를 가린다
 function maskFromServer(from) {
-  return maskPiiServer(from).replace(/(^|[\s"(])([가-힣]{2,4})(?=$|[\s")<])/g, (m, pre, w) => pre + maskNameServer(w));
+  return maskPiiServer(from)
+    .replace(/(^|[\s"])([가-힣]{2,4})(대표님|대표|사장님|사장|과장님|과장|부장님|부장|팀장님|팀장|실장님|실장|이사님|이사|사모님|사모|대리님|대리|주임님|주임|원장님|원장)(?=$|[\s")<(])/g, (m, pre, w, t) => pre + maskNameServer(w) + t)
+    .replace(/(^|[\s"])([가-힣]{2,4})(?=$|[\s")<(])/g, (m, pre, w) => pre + maskNameServer(w));
 }
 
 // ── 사업장 매칭 (브릿지와 같은 규칙) ──
 //  ① 발신 주소(pay_mail)가 겹치는 사업장이 «하나뿐»이면 그곳, 여럿이면 그 안에서만 이름으로 고른다
-//  ② 괄호·㈜·공백을 뺀 «전체 이름(지점 포함)»이 글에 있으면 1000+길이, 지점·㈜를 뗀 «머리 이름»만 맞으면 길이.
+//  ② 회사 형태 표기까지 그대로 «전체 이름(지점 포함)»이 글에 있으면 2000+길이, 표기(㈜·(주)·주식회사 등)를 떼고 맞으면 1000+길이,
+//     지점까지 뗀 «머리 이름»만 맞으면 길이.
 //     점수가 같은 사업장이 둘이면(같은 이름의 지점 둘) «못 정함». 못 찾았거나 모호하면 null.
-function squeeze(s) { return String(s || '').replace(/[()\[\]㈜]/g, '').replace(/\s+/g, ''); }
-function headName(c) { return String(c.name || c.sort_key || '').replace(/\(.*?\)/g, '').replace(/㈜/g, '').replace(/\s+/g, '').trim(); }
+const CORP = /\(주\)|㈜|주식회사|농업회사법인|유한회사|합자회사|재단법인|사단법인/g;
+function rawSqueeze(s) { return String(s || '').replace(/\(주\)|㈜/g, '').replace(/[()\[\]]/g, '').replace(/\s+/g, ''); }   // 회사 형태 표기(주식회사 등)는 «남긴다»
+function squeeze(s) { return String(s || '').replace(CORP, '').replace(/[()\[\]]/g, '').replace(/\s+/g, ''); }
+function headOf(s) { return String(s || '').replace(/\(.*?\)/g, '').replace(CORP, '').replace(/\s+/g, '').trim(); }
+// «고려면옥 아산점→보리촌 바지락» 처럼 이름이 바뀐 표기는 양쪽 모두를 이름으로 본다
+function nameForms(c) {
+  const forms = String(c.name || '').split('→');
+  if (c.sort_key) forms.push(c.sort_key);
+  return forms;
+}
 
 function pickCompany(mail, companies) {
   const list = Array.isArray(companies) ? companies : [];
   const m = mail || {};
   const fromLower = String(m.from || '').toLowerCase();
-  const combined = squeeze(String(m.from || '') + ' ' + String(m.subject || '') + ' ' + String(m.body || ''));
+  const text = String(m.from || '') + ' ' + String(m.subject || '') + ' ' + String(m.body || '');
+  const combinedRaw = rawSqueeze(text);
+  const combined = squeeze(text);
 
   const byMail = list.filter((c) => c && c.pay_mail && fromLower.indexOf(String(c.pay_mail).toLowerCase()) !== -1);
   if (byMail.length === 1) return byMail[0];
@@ -77,11 +118,17 @@ function pickCompany(mail, companies) {
   let tie = false;
   for (const c of pool) {
     if (!c) continue;
-    const full = squeeze(c.name || c.sort_key);
-    const head = headName(c);
     let score = 0;
-    if (full.length >= 2 && combined.indexOf(full) !== -1) score = 1000 + full.length;
-    else if (head.length >= 2 && combined.indexOf(head) !== -1) score = head.length;
+    for (const form of nameForms(c)) {
+      const full = squeeze(form);
+      const head = headOf(form);
+      const raw = rawSqueeze(form);
+      let sc = 0;
+      if (raw.length >= 2 && combinedRaw.indexOf(raw) !== -1) sc = 2000 + raw.length;          // 회사 형태 표기까지 그대로 맞음
+      else if (full.length >= 2 && combined.indexOf(full) !== -1) sc = 1000 + full.length;    // 표기를 떼고 맞음
+      else if (head.length >= 2 && combined.indexOf(head) !== -1) sc = head.length;           // 지점·표기를 뗀 머리 이름만 맞음
+      if (sc > score) score = sc;
+    }
     if (score > bestScore) { best = c; bestScore = score; tie = false; }
     else if (score > 0 && score === bestScore) tie = true;
   }
@@ -106,6 +153,8 @@ function validUid(v) {
 exports.maskEmailServer = maskEmailServer;
 exports.maskPiiServer = maskPiiServer;
 exports.maskNameServer = maskNameServer;
+exports.maskNamesServer = maskNamesServer;
+exports.findNamesServer = findNamesServer;
 exports.maskFromServer = maskFromServer;
 exports.pickCompany = pickCompany;
 exports.monthKey = monthKey;
@@ -122,7 +171,8 @@ exports.routeIncomingPureunMail = async function(mailItem, companiesMaster) {
 
   const db = admin.database();
   const rawBody = String(mailItem.body || '');
-  const maskedBody = maskPiiServer(rawBody);
+  const names = findNamesServer(rawBody + '\n' + String(mailItem.subject || ''));
+  const maskedBody = maskNamesServer(maskPiiServer(rawBody), names);
   const month = monthKey(mailItem.date);
 
   const matchedComp = pickCompany(mailItem, master);
@@ -134,7 +184,7 @@ exports.routeIncomingPureunMail = async function(mailItem, companiesMaster) {
   await db.ref(`payroll_outsourcing/${month}/companies/${targetId}/inbox_masked/${uid}`).set({
     uid: uid,
     from: maskFromServer(mailItem.from),
-    subject: maskPiiServer(mailItem.subject || ''),
+    subject: maskNamesServer(maskPiiServer(mailItem.subject || ''), names),
     receivedAt: mailItem.date || new Date().toISOString(),
     maskedBody: maskedBody,
     assignedStaff: assignedStaff,
