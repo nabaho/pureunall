@@ -116,6 +116,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
      JSZip 은 쓸 때만 vendor 에서 불러온다(서식을 안 쓰는 날에는 안 받는다). -->
 <!-- 폰 뒤로가기 — 창·메뉴를 한 걸음씩 물러선다 (대표 지시 2026-08-30) -->
+<script src="js/pu-quote-detect.js?v=5"></script>
 <script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-form-fill.js?v=2"></script>
 <script src="js/pu-form-auto.js?v=1"></script>
@@ -6739,6 +6740,9 @@ function _recLocalSave(k, arr){
   scheduleAutoSnap();
   return true;
 }
+/* ★ 마지막 «서버 쓰기» 약속 — 견적 길(processQuoteLaneRequest)처럼 «서버에 닿은 뒤에만 다음 걸음»을 해야 하는 곳이 읽는다.
+   서버가 받으면 끝나고, 거절·끊김이면 거절로 끝난다(실패 처리는 아래 그대로). 읽는 쪽은 저장 «직후 같은 틱»에 읽어야 남의 쓰기와 안 섞인다. */
+var _recLastWrite = null;
 function _recServerWrite(k, childPaths){ // childPaths: { '{id}' 또는 '{id}/{field}' : 값(null=삭제) }
   var ts = Date.now();
   var _pre = parseInt(localStorage.getItem(KEY+'_meta_'+k) || '0', 10);
@@ -6757,10 +6761,12 @@ function _recServerWrite(k, childPaths){ // childPaths: { '{id}' 또는 '{id}/{f
     updates['data/'+k+'/v/'+p] = val;
   });
   updates['data/'+k+'/u'] = ts;
-  fbDb.ref().update(updates).catch(function(e){
+  var _w = fbDb.ref().update(updates);
+  _w.catch(function(e){
     try { localStorage.setItem(KEY+'_meta_'+k, String(_pre)); } catch(_){}
     fbSyncFail(e);
   });
+  _recLastWrite = _w;
 }
 function _recCanDirect(k){
   /* ledger_batches 는 이 코드가 만든 id 지도임이 확정돼 있다. 서버형식 표식이 아직 안 온
@@ -20731,17 +20737,26 @@ function erpQuoteDay(ms){
   var n = Number(ms) || 0; if(!n) return '';
   return new Date(n + 9*3600e3).toISOString().slice(0,10);   // 한국 날짜
 }
+/* 제목·첨부 이름에 든 금액 글자(「견적서_400만원.pdf」)를 가린다 — 카드 비고는 직원 모두가 읽는다.
+   가리는 셈은 감지 한 벌(PuQuoteDetect.scrubMoney)을 쓴다. 그 한 벌이 안 실려 있으면 «글자를 아예 안 옮긴다»(안전한 쪽). */
+function erpQuoteScrub(t){
+  var D = (typeof window !== 'undefined') ? window.PuQuoteDetect : null;
+  return (D && typeof D.scrubMoney === 'function') ? D.scrubMoney(t) : '';
+}
 function erpQuoteNote(req){
   var r = req || {};
   var day = erpQuoteDay(r.at);
   var lines = ['📧 푸른메일 보낸메일함에서 올림 — ' + (r.docKind === 'contract' ? '계약서' : '견적서') + ' 송부' + (day ? ' ' + day : '')];
-  var subj = String(r.subject || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  var subj = erpQuoteScrub(String(r.subject || '').replace(/\s+/g, ' ').trim()).slice(0, 60);
   if(subj) lines.push('제목: ' + subj);
-  var atts = (Array.isArray(r.atts) ? r.atts : []).map(function(x){ return String(x || '').slice(0, 40); }).filter(Boolean).slice(0, 3);
+  var atts = (Array.isArray(r.atts) ? r.atts : []).map(function(x){ return erpQuoteScrub(String(x || '')).slice(0, 40); }).filter(Boolean).slice(0, 3);
   if(atts.length) lines.push('첨부: ' + atts.join(' · '));
+  if(r.compare === 'bundle') lines.push('비교견적서가 함께 나갔음 — 사람이 «선정»할 건(자동으로 계약협의로 옮기지 않음).');
   lines.push('금액은 이 칸에 적지 않았음(계약서등관리 「지난 견적·계약」).');
   return lines.join('\n');
 }
+/* 카드가 가리키는 업체 id — 검사 길(erpValidateContractCompany)이 두 군데에 적는다 */
+function erpCardCoId(c){ return String((c && (c.companyId || (c.company && c.company.companyId))) || ''); }
 function erpQuoteLanePlan(req, cos, cts, users){
   var r = req || {};
   var kind = r.kind;
@@ -20750,40 +20765,75 @@ function erpQuoteLanePlan(req, cos, cts, users){
   var srcKey = String(r.srcKey || '');
   if(srcKey && all.some(function(c){ return (c.srcMails || []).indexOf(srcKey) >= 0; }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
-  /* 대상 업체 — 요청이 «가리키는» 업체만 믿는다 */
+  /* 대상 업체 — 요청이 «가리키는» 업체(companyId)만 믿는다. 요청에 미리 적힌 이름(companyName)은 사람이 보는 «미리 채운 값»일 뿐
+     카드를 고르는 데 쓰지 않는다 — 이름·주소가 비슷한 다른 업체의 카드에 붙거나 옮겨지는 것을 막는다(온톨로지). */
   var co = null;
   if(r.companyId){
     co = (cos || []).find(function(x){ return x && !x._deleted && String(x.id) === String(r.companyId); }) || null;
     if(!co) return { action:'blocked', why:'요청이 가리키는 업체가 업체관리에 없습니다' };
   }
-  var cname = co ? String(co.name || '').trim() : String(r.companyName || '').trim();
-  var probe = { company:{ name:cname, bizNo:(co && co.bizNo) || '', address:(co && co.address) || '', ceo:(co && co.ceo) || '' } };
+  /* 업체를 «이은 요청»인데 같은 사업장 카드가 «업체 미연결»(연결 보류·예전 카드, companyId 없음)로 있을 수 있다 — companyId 로는 안 보인다.
+     이름·주소가 같은 그런 카드는 자동으로 붙이거나 옮기지도, 새로 하나 더 만들지도 않고 «사람이 정하게» blocked 로 둔다(이름으로 잇는 게 아니라 «확인만 요청»).
+     companyId 가 «다른» 업체인 카드는 여기 안 든다(다른 업체다). */
+  var loose = function(statuses){
+    if(!co) return [];
+    var probe = { company:{ name:String(co.name || ''), bizNo:co.bizNo || '', address:co.address || '', ceo:co.ceo || '' } };
+    return all.filter(function(c){ return !erpCardCoId(c) && statuses.indexOf(c.status) >= 0 && erpSameCompany(probe, c); });
+  };
+  var waiting = function(c){ return !!(c && c.compare && c.compare.state === 'wait'); };
+  var WAIT_WHY = '비교견적 건입니다 — 사람이 «선정»해 계약협의로 옮겨 주세요(자동으로 옮기지 않습니다)';
   if(kind === 'advance'){
     if(r.contractId){
       var t = all.find(function(c){ return c.id === r.contractId; });
       if(!t) return { action:'blocked', why:'요청이 가리키는 계약이 없습니다' };
-      if(t.status === 'consult') return { action:'advance', target:t };
-      return { action:'noop', why:'이미 ' + (t.status === 'review' ? '계약협의' : '진행된') + ' 카드입니다' };
+      /* 요청에 업체(companyId)도 적혀 있으면 «그 계약의 업체와 같을 때만» 옮긴다 — 계약 id 만 믿고 다른 업체 카드를 옮기지 않는다.
+         계약에 업체가 안 이어져 있으면(연결 보류·예전 카드) 이름으로 «같다고 치지» 않고 사람이 정하게 막는다. */
+      if(co){
+        var tcid = erpCardCoId(t);
+        if(!tcid) return { action:'blocked', why:'요청이 가리키는 계약은 업체가 이어져 있지 않습니다 — 그 카드에 업체를 이은 뒤 다시 시도하거나 직접 옮겨 주세요' };
+        if(tcid !== String(co.id)) return { action:'blocked', why:'요청이 가리키는 계약의 업체와 요청의 업체가 다릅니다 — 확인해 주세요(자동으로 옮기지 않습니다)' };
+      }
+      if(t.status !== 'consult') return { action:'noop', why:'이미 ' + (t.status === 'review' ? '계약협의' : '진행된') + ' 카드입니다' };
+      if(waiting(t)) return { action:'blocked', why:WAIT_WHY };
+      return { action:'advance', target:t };
     }
-    if(!cname) return { action:'blocked', why:'사업장을 정해 주세요' };
-    var same0 = all.filter(function(c){ return erpSameCompany(probe, c); });
+    if(!co) return { action:'blocked', why:'사업장을 정해 주세요 — 업체를 골라야 옮길 카드를 찾습니다' };
+    var same0 = all.filter(function(c){ return erpCardCoId(c) === String(co.id); });
     var cons = same0.filter(function(c){ return c.status === 'consult'; });
-    if(cons.length === 1) return { action:'advance', target:cons[0] };
+    if(cons.length === 1) return waiting(cons[0]) ? { action:'blocked', why:WAIT_WHY } : { action:'advance', target:cons[0] };
     if(cons.length > 1) return { action:'blocked', why:'같은 사업장에 상담접수 카드가 ' + cons.length + '건 있습니다 — 어느 카드인지 정해 주세요' };
-    if(same0.some(function(c){ return c.status === 'review' || c.status === 'signed'; })) return { action:'noop', why:'이미 계약협의 이상으로 진행된 사업장입니다' };
+    var lc = loose(['consult']);
+    if(lc.length) return { action:'blocked', why:'이름·주소가 같은 상담접수 카드가 ' + lc.length + '건 있는데 업체가 이어져 있지 않습니다 — 그 카드에 업체를 이은 뒤 다시 시도하거나 직접 옮겨 주세요(이름 모양으로 자동으로 옮기지 않습니다)' };
+    /* 이미 «계약협의»로 옮겨진 카드가 있으면 할 일이 없다(조용히 끝). 계약확정 카드만 있는 사업장은 «재계약일 수 있다» — 조용히 지우지 않고 사람이 본다 */
+    if(same0.some(function(c){ return c.status === 'review'; })) return { action:'noop', why:'이미 계약협의로 진행된 사업장입니다' };
+    if(same0.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; })) return { action:'blocked', why:'옮길 상담접수 카드가 없고 계약확정 카드만 있습니다 — 재계약이면 상담접수 카드를 먼저 만들어 주세요' };
     return { action:'blocked', why:'옮길 상담접수 카드가 없습니다' };
   }
   /* kind === 'quote' */
+  /* 업체를 못 이은 요청의 사업장 이름 — 서버가 가렸어도 «이알피 쪽에서도» 한 번 더 가린다(요청에 적혀 온 글자에 금액이 들 수 있다).
+     사람이 걸린 요청 창에서 적은 이름도 같은 한 벌을 지난다 — 업체 이름에 금액 모양 글자가 들 일은 거의 없다. */
+  var cname = co ? String(co.name || '').trim() : erpQuoteScrub(String(r.companyName || '').trim());
   if(!cname) return { action:'blocked', why:'사업장을 정해 주세요 — 업체를 이을 수 없었습니다' };
   if(!co && !r.deferLink) return { action:'blocked', why:'사업장을 못 찾았습니다 — 업체를 고르거나 「연결 보류로 등록」을 켜 주세요' };
+  var note = erpQuoteNote(r);
+  var mark = r.compare === 'bundle';
+  if(co){
+    var same = all.filter(function(c){ return erpCardCoId(c) === String(co.id); });
+    var open = same.filter(function(c){ return c.status === 'consult' || c.status === 'review'; });
+    /* «기존 카드에 덧붙이기»는 담당자를 쓰지 않는다 — 담당자 검사는 새 카드를 만들 때만 한다 */
+    if(open.length === 1) return { action:'attach', target:open[0], note:note, mark:mark };
+    if(open.length > 1) return { action:'blocked', why:'같은 사업장에 진행 중 카드가 ' + open.length + '건 있습니다 — 어느 카드에 붙일지 정해 주세요' };
+    var lo = loose(['consult', 'review']);
+    if(lo.length) return { action:'blocked', why:'이름·주소가 같은 진행 중 카드가 ' + lo.length + '건 있는데 업체가 이어져 있지 않습니다 — 그 카드에 업체를 이은 뒤 다시 시도하거나 직접 적어 주세요(이름 모양으로 자동으로 붙이지 않습니다)' };
+  } else {
+    /* 업체를 못 이어 «연결 보류»로 올리는 요청 — 이름이 같은 진행 중 카드에 자동으로 붙이지 않는다(이름으로 잇는 것). 사람이 정한다 */
+    var probe = { company:{ name:cname, bizNo:'', address:'', ceo:'' } };
+    var dupName = all.filter(function(c){ return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c); });
+    if(dupName.length) return { action:'blocked', why:'이름이 같은 진행 중 카드가 ' + dupName.length + '건 있습니다 — 업체를 고르거나 그 카드에 직접 적어 주세요' };
+  }
   var sid = String(r.managerMain || '');
   if(!sid) return { action:'blocked', why:'담당자를 정해 주세요' };
   if(!(users || []).some(function(x){ return x && x.sid === sid; })) return { action:'blocked', why:'담당자가 직원 명부에 없습니다' };
-  var same = all.filter(function(c){ return erpSameCompany(probe, c); });
-  var open = same.filter(function(c){ return c.status === 'consult' || c.status === 'review'; });
-  var note = erpQuoteNote(r);
-  if(open.length === 1) return { action:'attach', target:open[0], note:note };
-  if(open.length > 1) return { action:'blocked', why:'같은 사업장에 진행 중 카드가 ' + open.length + '건 있습니다 — 어느 카드에 붙일지 정해 주세요' };
   var form = erpBlankContractForm();
   if(co){
     ['name', 'bizNo', 'ceo', 'address', 'phone', 'email', 'fax'].forEach(function(k){ if(co[k]) form.company[k] = co[k]; });
@@ -20798,8 +20848,11 @@ function erpQuoteLanePlan(req, cos, cts, users){
   form.status = 'consult';
   form.managerMain = sid;
   form.srcMails = srcKey ? [srcKey] : [];
-  var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; });
-  form.note = note + (renewal ? '\n재계약일 수 있음 — 이 사업장에 이미 계약확정된 계약이 있음.' : '');
+  if(mark) form.compare = { state:'wait' };
+  var renewal = co && all.some(function(c){ return erpCardCoId(c) === String(co.id) && (c.status === 'signed' || c.status === 'transferred'); });
+  var looseSigned = co && loose(['signed', 'transferred']).length > 0;
+  form.note = note + (renewal ? '\n재계약일 수 있음 — 이 사업장에 이미 계약확정된 계약이 있음.' : '')
+    + (!renewal && looseSigned ? '\n이름·주소가 같은 계약확정 카드가 있음(업체 미연결) — 재계약인지 확인해 주세요.' : '');
   return { action:'create', form:form };
 }
 
@@ -20890,6 +20943,11 @@ function erpContractDraftKey(cur){
 /* 두 번 겹쳐 돌지 않게 — 화면이 다시 그려져도 처리는 한 번이다.
    ⚠ 겹쳐 돌면 같은 요청으로 계약이 둘 생긴다(요청을 지우기 «전»에 둘째가 읽는다). */
 var _erpCtReqBusy = false;
+/* 걸린 요청 창에서 «요청에 적는» 고침(담당자·업체·이름·연결 보류)이 서버에 닿기 전에 「다시 시도」가 돌지 않게 — 적는 중인 약속들을 모아 두었다가 다시 시도가 먼저 기다린다 */
+var _erpCtReqPatches = [];
+/* 이 화면이 저장했지만 «서버에 닿았는지 확인하지 못한» 견적 길 요청의 열쇠 — 그 사이 이 화면의 로컬 캐시에는 카드가 남아 있어서, 같은 화면의 「다시 시도」가 그것을 «이미 반영»으로 읽고
+   서버에는 없는 요청을 지우면 안 된다(검토 2026-11-09 최종). 새로고침하면(캐시가 서버 값으로 돌아오면) 자연히 비워진다. 나중에 서버가 받았다고 알려 오면 그때 비운다. */
+var _erpQuoteUnlanded = {};
 
 function ContractModal(props){
   useEscClose(props.onClose);
@@ -25732,22 +25790,36 @@ function BlockedRequestsModal(props){
     /* 견적 길에서 걸린 요청을 «사람이 풀 수 있게» — 담당자·연결 보류만 요청에 적고, 반영은 「다시 시도」가 같은 문으로 한다 */
     var quoteFix = !quoteLane ? null : h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', marginTop:'8px', fontSize:'12px' } },
       h('label', { style:{ display:'flex', gap:'4px', alignItems:'center' } }, '담당자',
-        h('select', { defaultValue:r.managerMain || '', style:{ padding:'4px 6px', fontSize:'12px' },
+        h('select', { key:'mgr-' + (r.managerMain || ''), defaultValue:r.managerMain || '', style:{ padding:'4px 6px', fontSize:'12px' },
           onChange:function(e){ props.onPatchReq(r._key, { managerMain:e.target.value }); } },
           h('option', { value:'' }, '— 고르기 —'),
           users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name || '이름 미확인'); }))),
+      /* 업체관리에 «이미 있는» 업체를 고른다 — 고르면 요청이 그 업체의 id 를 가리킨다(이름 모양으로 잇지 않는다). 계약 진행 신호(advance)도 같다 */
+      /* ★ 고른 뒤에도 «계속 보인다» — 잘못 고르면 다시 바꿀 수 있어야 하고, 업체가 이어진 채 다른 까닭으로 걸린 요청도 업체를 바꿀 수 있어야 한다
+         (key 에 지금 값을 넣어, 요청이 고쳐져 다시 그려질 때 선택 상자가 «지금 값»으로 다시 만들어지게 한다). 비우면 이은 업체를 푼다 */
+      h('label', { style:{ display:'flex', gap:'4px', alignItems:'center', minWidth:0, maxWidth:'100%' } }, '업체 고르기',
+        h('select', { key:'co-' + (r.companyId || ''), defaultValue:r.companyId || '', style:{ padding:'4px 6px', fontSize:'12px', maxWidth:'100%', minWidth:0 },
+          onChange:function(e){
+            /* companyName 은 «지우지 않는다» — 이은 업체를 풀었을 때 처음 후보 이름이 남아 있어야 한다(업체를 이은 요청은 이름을 안 쓰므로 해가 없다) */
+            if(e.target.value) props.onPatchReq(r._key, { companyId:e.target.value, deferLink:false });
+            else props.onPatchReq(r._key, { companyId:null });
+          } },
+          h('option', { value:'' }, r.companyId ? '— 이은 업체 풀기 —' : '— 업체관리에서 고르기 —'),
+          (props.companies || []).map(function(c){ return h('option', { key:c.id, value:c.id }, c.name + (c.biz ? ' · 사업자번호 끝 ' + c.biz : '')); }))),
       (r.kind === 'quote' && !r.companyId) ? h('label', { style:{ display:'flex', gap:'4px', alignItems:'center' } }, '사업장 이름',
-        h('input', { type:'text', defaultValue:r.companyName || '', placeholder:'사업장 이름', style:{ padding:'4px 6px', fontSize:'12px', width:'170px' },
+        h('input', { type:'text', key:'nm-' + (r.companyName || ''), defaultValue:r.companyName || '', placeholder:'사업장 이름', style:{ padding:'4px 6px', fontSize:'12px', width:'170px' },
           onBlur:function(e){ props.onPatchReq(r._key, { companyName:e.target.value.trim() }); } })) : null,
       (r.kind === 'quote' && !r.companyId) ? h('label', { style:{ display:'flex', gap:'4px', alignItems:'center' }, title:'업체관리에 없으면 업체 마스터에는 쓰지 않고 이름만 적은 «연결 보류» 카드로 만듭니다' },
-        h('input', { type:'checkbox', defaultChecked:!!r.deferLink, onChange:function(e){ props.onPatchReq(r._key, { deferLink:!!e.target.checked }); } }),
+        h('input', { type:'checkbox', key:'df-' + (r.deferLink ? '1' : '0'), defaultChecked:!!r.deferLink, onChange:function(e){ props.onPatchReq(r._key, { deferLink:!!e.target.checked }); } }),
         '업체관리에 없으면 연결 보류로 등록') : null);
     return h('div', { key:r._key, style:{ border:'1px solid #fecaca', background:'#fef2f2',
       borderRadius:'8px', padding:'12px 14px', marginBottom:'10px' } },
       h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:'8px' } },
         h('span', { style:{ fontWeight:700, fontSize:'13.5px', color:'#1e293b' } }, co),
-        h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap' } }, fmtWhen(r.handledAt))),
-      h('div', { style:{ fontSize:'12px', color:'#991b1b', marginTop:'4px', fontWeight:600 } }, '⚠ ' + (r.why || '까닭 없음')),
+        h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap' } }, (r.state === 'processing' ? '시작 ' : '') + fmtWhen(r.handledAt || r.claimedAt))),
+      /* 처리하다 «멈춘» 요청(processing 5분 넘음)은 까닭이 없다 — 무엇이 일어났는지 말해 준다 */
+      h('div', { style:{ fontSize:'12px', color:'#991b1b', marginTop:'4px', fontWeight:600 } },
+        '⚠ ' + (r.why || (r.state === 'processing' ? '처리하다 멈춘 요청입니다 — 5분 넘게 «처리 중»으로 남아 있습니다. 「다시 시도」하면 이어서 처리합니다(같은 메일은 두 번 반영되지 않습니다)' : '까닭 없음'))),
       h('div', { style:{ fontSize:'11.5px', color:'#475569', marginTop:'6px', lineHeight:'1.6' } },
         quoteLane
           ? ((r.kind === 'advance' ? '계약 진행 신호' : '견적서 송부') + (r.subject ? ' · 메일 제목: 「' + r.subject + '」' : ''))
@@ -25759,7 +25831,7 @@ function BlockedRequestsModal(props){
         h('button', { onClick:function(){ props.onRetry(r._key, r); },
           style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1',
             borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '↻ 다시 시도'),
-        h('button', { onClick:function(){ props.onRemove(r._key, co); },
+        h('button', { onClick:function(){ props.onRemove(r._key, co, quoteLane); },
           style:{ padding:'6px 12px', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca',
             borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '🗑 요청 지우기')));
   }
@@ -25767,7 +25839,7 @@ function BlockedRequestsModal(props){
     h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'640px' } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, '⚠ 걸린 계약 등록·이동 요청 (' + reqs.length + '건) — 사진첩·중진공·견적 메일'),
-        h('button', { className:'x', onClick:props.onClose }, '×')
+        h('button', { className:'x', onClick:props.onClose, 'aria-label':'닫기', title:'닫기' }, '×')
       ),
       h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto' } },
         reqs.length ? reqs.map(card)
@@ -26329,15 +26401,61 @@ function ContractManagement(props){
   async function processQuoteLaneRequest(key, req){
     var ref = fbDb.ref('data/contract_requests/' + key);
     var drop = function(){ return ref.remove().catch(function(){}); };
+    /* ★ 저장이 서버에 «닿았는지» 확인한 뒤에만 요청을 지운다 — persistOne·patchOne 은 이 기기에 먼저 적고 true 를 돌려줄 뿐,
+       서버가 거절(규칙·연결 끊김)해도 모른다. 그 사이 요청을 지워 버리면 «카드도 요청도 없는» 메일이 생긴다.
+       · 저장 직전에 비워 두고 · 저장 «직후 같은 틱»에 약속을 집고 · 8초 안에 «받았다»로 끝나야 «닿음».
+       · 직접 쓰기 길이 아니면(통째 저장 폴백) 약속이 없다 — 그 길은 자체 보류·재전송이 있으니 그대로 지난다.
+       · 못 닿으면 요청을 «걸림»으로 남긴다 — 다시 시도하면 srcMails 로 «이미 반영»을 알아본다(같은 메일이 둘이 되지 않는다). */
+    var clearWrite = function(){ if(typeof _recLastWrite !== 'undefined') _recLastWrite = null; };
+    var takeWrite = function(){ return (typeof _recLastWrite !== 'undefined') ? _recLastWrite : null; };
+    var landed = async function(p){
+      if(!p) return true;
+      var tid;
+      var r = await Promise.race([
+        Promise.resolve(p).then(function(){ return true; }, function(){ return false; }),
+        new Promise(function(res){ tid = setTimeout(function(){ res(false); }, 8000); })
+      ]);
+      clearTimeout(tid);
+      return r === true;
+    };
+    var NOT_LANDED = '서버에 저장되었는지 확인하지 못했습니다 (연결·권한) — 화면을 새로고침한 뒤 «다시 시도»해 주세요(서버에 이미 있으면 그때 자동으로 정리됩니다)';
+    /* 저장 «직후 같은 틱»에 부른다 — 서버에 닿았으면 true. 아니면 «못 닿음» 표시를 남기고 false(나중에 서버가 받았다고 알려 오면 표시를 푼다) */
+    var settle = async function(){
+      var p = takeWrite();
+      if(await landed(p)){ delete _erpQuoteUnlanded[key]; return true; }
+      _erpQuoteUnlanded[key] = true;
+      if(p && typeof p.then === 'function') p.then(function(){ delete _erpQuoteUnlanded[key]; }, function(){});
+      return false;
+    };
     var stop = async function(why){
-      await ref.update({ state:'blocked', why:why, handledAt:Date.now() }).catch(function(){});
+      await ref.update({ state:'blocked', why:why, handledAt:Date.now(), claimedAt:null, claimedBy:null }).catch(function(){});
       return { lane:'quote', why:why };
     };
+    /* ★ «내가 맡았다» 표시를 트랜잭션으로 먼저 단다(pending·blocked → processing) — 직원 둘이 거의 동시에 이알피를 열어도
+       한 화면만 처리한다(잠금 _erpCtReqBusy 는 탭 하나 안에서만 듣는다). 5분 넘게 processing 이면 멈춘 흔적이라 다시 잡는다.
+       ⚠ 처음 부름(아직 못 받음)에는 «지금 값 없음 → 그대로 두기(null)» 로 답한다 — undefined 로 답하면 서버 값으로 다시 안 불리고 그만둔다. */
+    var stamp = Date.now();
+    var tx = await ref.transaction(function(cur){
+      if(cur === null || cur === undefined) return null;
+      var stale = cur.state === 'processing' && (stamp - (Number(cur.claimedAt) || 0)) > 300000;
+      if(cur.state === 'pending' || cur.state === 'blocked' || stale)
+        return Object.assign({}, cur, { state:'processing', claimedAt:stamp, claimedBy:(CURRENT_USER && CURRENT_USER.sid) || '' });
+      return;
+    }).catch(function(){ return null; });
+    var mine = tx && tx.committed && tx.snapshot && tx.snapshot.val();
+    if(!mine || mine.state !== 'processing' || mine.claimedAt !== stamp) return { lane:'quote', noop:'다른 화면이 처리 중이거나 이미 처리된 요청입니다' };
+    req = mine;
     var plan = erpQuoteLanePlan(req, dbGet('companies', []) || [], dbGet('contracts', []) || [], getActiveUsers());
-    if(plan.action === 'noop'){ await drop(); return { lane:'quote', noop:plan.why }; }
+    if(plan.action === 'noop'){
+      /* 이 화면의 저장이 서버에 닿았는지 확인하지 못한 요청이면, 지금 «이미 반영»으로 보이는 것은 이 화면의 로컬 캐시일 뿐이다 — 지우지 않는다 */
+      if(_erpQuoteUnlanded[key]) return await stop('이 화면에서 저장했지만 서버에 닿았는지 확인하지 못했습니다 — 화면을 새로고침한 뒤 다시 시도해 주세요(서버에 이미 있으면 그때 자동으로 정리됩니다)');
+      await drop(); return { lane:'quote', noop:plan.why };
+    }
     if(plan.action === 'blocked') return await stop(plan.why);
     if(plan.action === 'advance'){
+      clearWrite();
       if(!patchOne(plan.target.id, { status:'review', orderTs:Date.now() })) return await stop('계약관리가 저장을 막았습니다 (월 잠금 등)');
+      if(!(await settle())) return await stop(NOT_LANDED);
       await drop();
       return { lane:'quote', advanced:plan.target };
     }
@@ -26347,7 +26465,10 @@ function ContractManagement(props){
         note: (t.note ? t.note + '\n\n' : '') + plan.note,
         srcMails: (t.srcMails || []).concat(req.srcKey ? [String(req.srcKey)] : [])
       });
+      if(plan.mark && !t.compare) upd.compare = { state:'wait' };   // 비교견적서가 붙어 나간 메일 — 사람이 «선정»할 건으로 표시
+      clearWrite();
       if(!persistOne(upd)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
+      if(!(await settle())) return await stop(NOT_LANDED);
       await drop();
       return { lane:'quote', attached:t };
     }
@@ -26362,7 +26483,9 @@ function ContractManagement(props){
       transferredTo: null,
       regAt: (new Date()).toISOString()
     });
+    clearWrite();
     if(!persistOne(newOne)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
+    if(!(await settle())) return await stop(NOT_LANDED);
     await drop();
     return { lane:'quote', made:newOne };
   }
@@ -26396,7 +26519,7 @@ function ContractManagement(props){
     return { why: why };
   }
 
-  async function runContractRequests(){
+  async function runContractRequests(quoteOnly){
     if(_erpCtReqBusy || !fbDb) return;
     var cos = dbGet('companies', null);
     var cts = dbGet('contracts', null);
@@ -26408,15 +26531,20 @@ function ContractManagement(props){
       var all = snap.val() || {};
       var keys = Object.keys(all).filter(function(k){
         var r = all[k];
-        if(!r || r.state !== 'pending') return false;
-        if(erpQuoteLaneReq(r)) return !!(r.companyId || r.contractId || r.companyName);   // 견적 길 — 업체·계약을 가리키는 요청만
+        if(!r) return false;
+        if(quoteOnly === true && !erpQuoteLaneReq(r)) return false;   // 열려 있는 동안 도는 길은 견적 길만(사진첩·중진공은 열 때 한 번)
+        /* 견적 길은 5분 넘게 processing 인 것(멈춘 흔적)도 다시 맡는다 */
+        var stuck = erpQuoteLaneReq(r) && r.state === 'processing' && (Date.now() - (Number(r.claimedAt) || 0)) > 300000;
+        if(r.state !== 'pending' && !stuck) return false;
+        if(erpQuoteLaneReq(r)) return stuck || !!(r.companyId || r.contractId || r.companyName);   // 견적 길 — 업체·계약을 가리키는 요청만(멈춘 흔적은 가리키는 것이 없어도 다시 맡아 blocked 로 돌려 보인다)
         return !!(r.company && r.company.name);
       });
       for(var i = 0; i < keys.length; i++){
         var key = keys[i];
         var r = await processOneContractRequest(key, all[key]);
         if(r.lane === 'quote'){
-          if(r.made) madeQ++; else if(r.attached || r.advanced || r.noop) doneQ++; else blockedQ++;
+          /* noop(이미 반영한 메일·다른 화면이 처리 중)은 «한 일»이 아니다 — 토스트에 세지 않는다 */
+          if(r.made) madeQ++; else if(r.attached || r.advanced) doneQ++; else if(!r.noop) blockedQ++;
         } else if(r.made) made.push(r.made); else blocked++;
       }
     } catch(e){
@@ -26433,7 +26561,7 @@ function ContractManagement(props){
     if(madeQ || doneQ) showToast('📧 견적·계약 메일에서 온 요청을 반영했습니다 — 새 상담접수 ' + madeQ + '건 · 덧붙임·이동 ' + doneQ + '건', 9000);
     if(blockedQ) showToast('⚠ 견적·계약 메일에서 온 요청 ' + blockedQ + '건이 걸렸습니다 — 「걸린 요청」에서 사업장·담당자를 정해 주세요', 11000);
   }
-  useEffect(function(){ runContractRequests(); }, []);
+  useEffect(function(){ runContractRequests(false); }, []);
 
   /* ══════ 걸린 요청을 «보는» 화면 (대표 지시 2026-09-19 「다음」→「걸린 요청을 보는 화면」) ══════
      지금까지는 걸려도 토스트 한 줄로 끝났다 — 화면을 새로고침하면 무엇이 걸렸는지
@@ -26443,19 +26571,39 @@ function ContractManagement(props){
   var sbrS = useState(false); var showBlockedReqs = sbrS[0]; var setShowBlockedReqs = sbrS[1];
   useEffect(function(){
     if(!fbDb) return;
-    var ref = fbDb.ref('data/contract_requests');
-    var cb = ref.on('value', function(snap){
-      var all = snap.val() || {};
-      var list = Object.keys(all)
-        .filter(function(k){ return all[k] && all[k].state === 'blocked'; })
-        .map(function(k){ return Object.assign({ _key:k }, all[k]); })
-        .sort(function(a,b){ return (b.handledAt||0) - (a.handledAt||0); });
+    var lastAll = {};
+    /* 견적 길에서 «멈춘 흔적»(processing 5분 넘음) — 멈춘 요청이 어디에도 안 보이는 고아가 되지 않게 같은 창에서 다시 시도·지우기 */
+    function isStuck(q){ return erpQuoteLaneReq(q) && q.state === 'processing' && (Date.now() - (Number(q.claimedAt) || 0)) > 300000; }
+    function recompute(){
+      var list = Object.keys(lastAll)
+        .filter(function(k){ var q = lastAll[k]; return q && (q.state === 'blocked' || isStuck(q)); })
+        .map(function(k){ return Object.assign({ _key:k }, lastAll[k]); })
+        .sort(function(a,b){ return (b.handledAt || b.claimedAt || 0) - (a.handledAt || a.claimedAt || 0); });
       setBlockedReqs(list);
-    });
-    return function(){ try{ ref.off('value', cb); }catch(_){} };
+    }
+    var ref = fbDb.ref('data/contract_requests');
+    var cb = ref.on('value', function(snap){ lastAll = snap.val() || {}; recompute(); });
+    /* ★ 1분마다 시계로 다시 본다 — «멈춘 흔적»은 시간이 지나야 멈춘 것이 되는데, 서버 값이 안 바뀌면 위 듣기는 다시 계산하지 않는다.
+       이 화면이 «열려 있는 동안» 견적·계약 메일에서 온 요청이 기다리거나(pending) 멈춰 있으면(5분 넘은 processing) 이어서 처리한다 —
+       전에는 화면을 «열 때» 한 번만 처리해서, 열어 둔 채로는 새 요청이 다음에 열 때까지 쌓였다. 사진첩·중진공 요청은 건드리지 않는다(quoteOnly).
+       읽기를 늘리지 않는다: 이미 듣고 있는 값(lastAll)만 보고, 할 일이 있을 때만 처리 함수를 부른다(그 함수가 «맡았다» 표시로 동시 처리를 막는다). */
+    var timer = setInterval(function(){
+      recompute();
+      var work = Object.keys(lastAll).some(function(k){
+        var q = lastAll[k];
+        if(!erpQuoteLaneReq(q)) return false;
+        return q.state === 'pending' ? !!(q.companyId || q.contractId || q.companyName) : isStuck(q);
+      });
+      if(work) runContractRequests(true);
+    }, 60000);
+    return function(){ try{ ref.off('value', cb); }catch(_){} clearInterval(timer); };
   }, []);
   async function retryBlockedRequest(key, req){
     if(_erpCtReqBusy){ showToast('⏳ 처리 중입니다 — 잠시 후 다시 눌러 주세요'); return; }
+    /* 사업장 이름 칸은 «칸을 벗어날 때» 저장한다 — 쓰다가 바로 다시 시도를 눌러도 저장이 서버에 닿은 뒤에 처리한다.
+       ⚠ 키보드로 단추를 누르면 입력칸이 «아직 칸을 안 벗어났을» 수 있다 — 기다리기 «전에» 칸을 벗어나게 해 그 저장이 목록에 먼저 들어오게 한다 */
+    try { var _fe = (typeof document !== 'undefined') ? document.activeElement : null; if(_fe && _fe.tagName === 'INPUT' && typeof _fe.blur === 'function') _fe.blur(); } catch(e){}
+    try { await Promise.all(_erpCtReqPatches.splice(0)); } catch(e){}
     var cos = dbGet('companies', null);
     var cts = dbGet('contracts', null);
     if(!Array.isArray(cos) || !Array.isArray(cts)){ showToast('⏳ 아직 자료를 받는 중입니다'); return; }
@@ -26463,13 +26611,18 @@ function ContractManagement(props){
     try {
       var r = await processOneContractRequest(key, req);
       if(r.made) showToast('✔ ' + (r.made.companyName || '') + ' 계약을 등록했습니다 — 기간·금액을 넣어 주세요', 8000);
-      else if(r.attached || r.advanced || r.noop) showToast('✔ 반영했습니다' + (r.noop ? ' — ' + r.noop : ''), 7000);
+      else if(r.attached || r.advanced) showToast('✔ 반영했습니다', 7000);
+      else if(r.noop) showToast('ℹ ' + r.noop, 7000);
       else showToast('⚠ 여전히 막힙니다 — ' + r.why, 9000);
     } finally { _erpCtReqBusy = false; }
   }
-  async function removeBlockedRequest(key, companyName){
+  async function removeBlockedRequest(key, companyName, quoteLane){
     if(!fbDb) return;
-    if(!(await popConfirm('「' + (companyName || '이 요청') + '」 요청을 지울까요?\n사진은 그대로 남습니다 — 사진첩에서 다시 누르면 요청이 새로 생깁니다.'))) return;
+    /* 견적·계약 메일에서 온 요청은 «본 메일» 표식이 남아 있어 지워도 다시 생기지 않는다 — 사진첩 요청과 말이 다르다 */
+    var tail = quoteLane
+      ? '이 메일은 «본 메일»로 적혀 있어 지워도 다시 생기지 않습니다. 필요하면 이알피에서 카드를 직접 등록해 주세요.'
+      : '사진은 그대로 남습니다 — 사진첩에서 다시 누르면 요청이 새로 생깁니다.';
+    if(!(await popConfirm('「' + (companyName || '이 요청') + '」 요청을 지울까요?\n' + tail))) return;
     fbDb.ref('data/contract_requests/' + key).remove()
       .then(function(){ showToast('🗑 요청을 지웠습니다'); })
       .catch(function(){ showToast('❌ 지우기 실패'); });
@@ -27511,9 +27664,15 @@ function ContractManagement(props){
         var c = (dbGet('companies', []) || []).find(function(x){ return x && !x._deleted && String(x.id) === String(id); });
         return c ? String(c.name || '') : '';
       },
+      companies:(dbGet('companies', []) || []).filter(function(c){
+          return c && c.id && !c._deleted && !/closed|terminated|inactive/.test(String(c.status || '')) && String(c.name || '').trim();
+        }).map(function(c){ return { id:String(c.id), name:String(c.name), biz:String(c.bizNo || '').replace(/\D/g, '').slice(-4) }; })
+        .sort(function(a, b){ return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); }),
       onPatchReq:function(key, patch){
         if(!fbDb) return;
-        fbDb.ref('data/contract_requests/' + key).update(patch).catch(function(){ showToast('❌ 요청을 고치지 못했습니다'); });
+        var p = fbDb.ref('data/contract_requests/' + key).update(patch).catch(function(){ showToast('❌ 요청을 고치지 못했습니다'); });
+        _erpCtReqPatches.push(p);   // 「다시 시도」가 이 저장이 닿은 뒤에 돈다
+        return p;
       },
       consTypeName:function(code){
         var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });

@@ -1817,6 +1817,19 @@ rules.pu_docs = {
     '.validate': "$h.matches(/^[0-9a-f]{64}$/) && newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()"
       + " && root.child('pu_docs/originals').child(newData.val()).child('sha256').val() === $h"
   } },
+  /* 📨 견적 자동 감지 스위치 (견적·계약 자동화 계획 3, 2026-11-09) — 켜고 끄는 것은 총괄관리자만.
+     서버 감지 훅(functions/mail-quote-watch.js)은 관리자 SDK 라 규칙과 무관하게 읽는다. 읽기는 위 pu_docs 의 LOGIN 을 그대로 따른다.
+     ⚠ 처음에는 pucards/config/quoteWatch 에 두었으나, pucards 의 $k 아래 $k2 가 '.write': LOGIN 이라 «직원 누구나» 쓸 수 있었다
+       (tests/quote-watch-switch.test.js 가 규칙 «판정»으로 지킨다). 이름 붙은 칸에 ADMIN 만 쓰게 하고 여기로 옮겼다.
+     ⚠ quoteSeen(«본 메일» 표식)은 서버(관리자 SDK)만 쓴다 — 쓰기 규칙이 없어 직원은 못 쓴다(기본 거부). */
+  config: { quoteWatch: {
+    '.write': ADMIN,
+    '.validate': "newData.hasChildren(['on'])",
+    on: { '.validate': 'newData.isBoolean()' },
+    at: { '.validate': 'newData.isNumber()' },
+    by: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    $other: { '.validate': false }
+  } },
   co: { $k: {
     '.write': LOGIN,
     '.validate': "newData.hasChildren(['name','n'])",

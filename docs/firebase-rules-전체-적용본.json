@@ -2475,6 +2475,24 @@
           ".validate": "$h.matches(/^[0-9a-f]{64}$/) && newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists() && root.child('pu_docs/originals').child(newData.val()).child('sha256').val() === $h"
         }
       },
+      "config": {
+        "quoteWatch": {
+          ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+          ".validate": "newData.hasChildren(['on'])",
+          "on": {
+            ".validate": "newData.isBoolean()"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "by": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "co": {
         "$k": {
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",

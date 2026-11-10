@@ -107,7 +107,7 @@
     + '.pqv-head{font-weight:700;color:#475569;background:#f8fafc;border-bottom:1px solid #cbd5e1}'
     + '.pqv-no{font-variant-numeric:tabular-nums;color:#64748b;text-align:right}'
     + '.pqv-row input[type=checkbox]{width:16px;height:16px;margin:0}'
-    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#94a3b8}.pqv-amt.chk{color:#b45309}'
+    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#64748b}.pqv-amt.chk{color:#b45309}'
     + '.pqv-meta{display:none}'
     + '.pqv .empty{padding:18px;color:#64748b;text-align:center}.pqv .msg{margin:6px 0;color:#334155}'
     + '@media(max-width:700px){'
@@ -262,7 +262,7 @@
       if (!wt || st.watchBusy || st.watchOn === null) return;
       var next = !st.watchOn;
       var q = next
-        ? '켜면 푸른메일 보낸메일함에 우리 견적서·계약서가 나갈 때마다 이알피 계약관리에 «요청»이 올라가고, 이알피를 열 때 «상담접수» 카드가 만들어지거나 «계약협의»로 옮겨집니다.\n금액은 올라가지 않습니다. 사업장을 못 찾으면 «걸린 요청»에 남아 사람이 고릅니다.\n\n켤까요?'
+        ? '켜면 푸른메일 보낸메일함에 우리 견적서·계약서가 나갈 때마다 이알피 계약관리에 «요청»이 올라가고, 이알피를 열 때 «상담접수» 카드가 만들어지거나 «계약협의»로 옮겨집니다.\n금액은 올라가지 않습니다. 사업장을 못 찾으면 «걸린 요청»에 남아 사람이 고릅니다.\n⚠ 비교견적 건은 «사람이 선정»합니다 — 비교견적서가 붙어 나간 견적은 표시를 달아 자동으로 계약협의로 옮기지 않지만, 표시가 달리기 전의 비교견적 건은 가려내지 못합니다.\n\n켤까요?'
         : '끄면 새로 나가는 견적서·계약서는 더 이상 이알피에 요청으로 올라가지 않습니다. (이미 올라간 요청은 그대로 남습니다)\n\n끌까요?';
       if (!ask(q)) return;
       st.watchBusy = true; draw();
@@ -336,7 +336,15 @@
       /* 거르기 — 글자(의뢰처·과업 내용) · 견적/계약 */
       var search = el('input', { type: 'search', placeholder: '의뢰처·과업 내용 찾기', 'aria-label': '의뢰처·과업 내용 찾기' });
       search.value = st.text;
-      search.addEventListener('input', function () { st.text = search.value; redrawKeepFocus(); });
+      /* 한글 «조합 중»(IME)에는 다시 그리지 않는다 — 입력칸을 새로 만들면 조합이 끊겨 글자가 깨진다(검토 2026-11-09).
+         조합이 끝나는 순간(compositionend)에 한 번 그린다. 영문·숫자처럼 조합이 없는 입력은 그대로 바로 거른다. */
+      search.addEventListener('compositionstart', function () { st.composing = true; });
+      search.addEventListener('compositionend', function () { st.composing = false; st.text = search.value; redrawKeepFocus(); });
+      search.addEventListener('input', function (ev) {
+        st.text = search.value;
+        if (st.composing || (ev && ev.isComposing)) return;
+        redrawKeepFocus();
+      });
       var allOn = ordered().length > 0 && ordered().every(function (r) { return st.sel[r.id]; });
       var selAll = el('label', { 'class': 'pqv-selall' }, [checkbox(allOn, '보이는 것 모두 고르기', toggleAllVisible), el('span', { text: '모두 고르기' })]);
       function chip(label, on, fn) { var b = el('button', { type: 'button', 'class': 'chip' + (on ? ' on' : ''), text: label }); b.addEventListener('click', fn); return b; }

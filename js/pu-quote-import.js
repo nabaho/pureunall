@@ -17,7 +17,7 @@
   var QUOTE_PROMPT = '이 문서는 푸른노무법인이 보낸 견적서 또는 계약서입니다. 아래 칸만 JSON 으로 답하세요. 문서에 없으면 빈 문자열.\n'
     + '{"의뢰처":"", "업무종류":"", "금액":"", "부가세":"포함|별도|", "기간":"", "과업내용":"", "직원수":""}\n'
     + '- 금액: 총액을 원 단위 숫자만(쉼표·원 빼고). 여러 안이면 첫 안.\n'
-    + '- 과업내용: 150자 안으로 요약.\n'
+    + '- 과업내용: 150자 안으로 요약. 금액·보수·비용 이야기는 쓰지 마세요(금액은 위 «금액» 칸에만).\n'
     + '- 직원수: 의뢰처(고객사) 직원 수 숫자만.';
 
   var TEXT_MAX = 20000;                 /* AI 로 보내는 글자 상한 — 받는 만큼이 요금이다 */
@@ -85,11 +85,15 @@
     var amount = moneyOf(f.금액);
     var type = Q.typeOf(f.업무종류);
     if (!f.업무종류 || type === 'other') type = Q.typeOf(c.subject + ' ' + c.attName);
-    var rec = { doc: c.doc, type: type, co: trim(f.의뢰처) || trim(c.toName) || domainOf(c.to),
+    /* ★ 지난 견적·계약 «기록»(pu_quotes)은 직원 모두가 읽는다 — 금액은 따로 잠긴 칸(pu_quote_amt)에 있다.
+       그런데 AI 가 쓴 글(의뢰처·기간·과업내용)에 「컨설팅 총액 400만원」 같은 금액이 섞여 오면 그 잠금이 뚫린다(검토 2026-11-09 Codex).
+       그래서 «공개 칸에 쓰기 직전» 금액 글자를 가린다(제목·첨부 이름과 같은 한 벌 PuQuoteDetect.scrubMoney). */
+    var pub = function (x) { return D.scrubMoney(trim(x)); };
+    var rec = { doc: c.doc, type: type, co: pub(f.의뢰처) || pub(c.toName) || pub(domainOf(c.to)),
       date: Q.dateOf(c.date || now), review: amount != null ? 'ok' : 'check',
       src: { how: 'mail', slug: c.slug, key: c.key }, srcKey: c.srcKey };
-    if (trim(f.과업내용)) rec.scope = trim(f.과업내용);
-    if (trim(f.기간)) rec.period = trim(f.기간);
+    if (pub(f.과업내용)) rec.scope = pub(f.과업내용);
+    if (pub(f.기간)) rec.period = pub(f.기간);
     var st = staffOf(f.직원수); if (st !== undefined) rec.staff = st;
     if (fileId) rec.fileId = fileId;
     if (c.ownerGuess) rec.ownerGuess = c.ownerGuess;
@@ -139,7 +143,7 @@
     function prepare(c) {
       if (c.attIndex < 0) return Promise.resolve({ fields: null, fileId: '' });   /* 첨부가 없다 — 기록만(확인 필요) */
       return Promise.resolve().then(function () { return host.fetchAtt(c); }).then(function (a) {
-        return Promise.resolve(host.store({ name: a.name, size: a.bytes.length, type: a.type || '', bytes: a.bytes }, c)).then(function (fileId) {
+        return Promise.resolve(host.store({ name: D.scrubMoney(a.name) || a.name, size: a.bytes.length, type: a.type || '', bytes: a.bytes }, c)).then(function (fileId) {
           return Promise.resolve(host.extractText(a.bytes, a.name)).then(function (t) { return trim(t) ? s(t).trim() : ''; }, function () { return ''; })
             .then(function (text) {
               if (!text) return { fields: null, fileId: fileId };       /* 글자를 못 뽑았다 — AI 를 부르지 않는다 */
