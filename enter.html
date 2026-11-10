@@ -138,6 +138,8 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
 <script src="js/pu-logout-why.js?v=1"></script>
+<!-- 「내 기기에서 30일간 로그인 유지」 — 30일 상한 검사·유지 끔 보호·로그아웃 때 표시 지움 (대표 요청 2026-11-10) -->
+<script src="js/pu-keep-login.js?v=1"></script>
 <!-- 2단계 인증 모듈은 필요한 순간에만 불러온다. 카카오 복귀 시 두 번째 Auth 인스턴스를 만들지 않는다. -->
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
@@ -1311,8 +1313,11 @@ body.portal-mode #moreFab{display:flex;}
            ★ 끄면 창(브라우저)을 닫는 순간 로그아웃. 처음 쓰는 PC 는 꺼진 채, 처음 쓰는 폰은 켜진 채
              시작하고(아래 줄), 그 뒤로는 마지막에 고른 대로 기억한다(pu_portal_auto).
            ⚠ id 는 예전 그대로 autoLogin — 비밀번호 로그인·유휴 타이머가 이 이름을 본다. -->
+      <!-- ★ 30일 (대표 요청 2026-11-10 「본인 컴퓨터인 경우 30일 로그인 유지 + 체크」) — 켜면 이 기기에서 30일 동안
+             다시 로그인하지 않아도 된다. 30일이 지나면 스스로 로그아웃한다(js/pu-keep-login.js).
+           ⚠ 공용 PC 는 끄는 것이 맞다 — 아래 한 줄이 말해 준다. 끄면 창(브라우저)을 닫는 순간 로그아웃. -->
       <div class="ck" style="justify-content:center;margin-top:10px;font-size:13px;color:var(--sub);">
-        <label><input type="checkbox" id="autoLogin"> 이 기기에서 로그인 유지</label>
+        <label title="내 컴퓨터·폰에서만 켜세요. 공용 PC 에서는 끄세요."><input type="checkbox" id="autoLogin"> 내 기기에서 30일간 로그인 유지</label>
       </div>
       <div id="keepHint" style="text-align:center;font-size:.72rem;margin-top:3px;color:#64748b;"></div>
       <!-- 아이디·비밀번호 — 이 기기에서 카카오로 들어온 적이 있으면 «접는다» (없애지 않는다).
@@ -2270,8 +2275,8 @@ body.portal-mode #moreFab{display:flex;}
   function keepHintPaint(){
     var cb = $('autoLogin'), el = $('keepHint');
     if(!cb || !el) return;
-    el.textContent = cb.checked ? '창을 닫아도 로그인이 남습니다'
-                                : '창을 닫으면 저절로 로그아웃됩니다 — 내 PC 면 켜 두세요';
+    el.textContent = cb.checked ? '창을 닫아도 30일간 유지 · 공용 PC 에서는 끄세요'
+                                : '창을 닫으면 로그아웃 · 내 컴퓨터면 켜 두세요';
     el.style.color = cb.checked ? '#64748b' : '#854d0e';   // 팔레트 «주의» 글자색
   }
 
@@ -2439,6 +2444,9 @@ body.portal-mode #moreFab{display:flex;}
   auth.onAuthStateChanged(function(user){
       if(!window.__puAuthObservedAt) window.__puAuthObservedAt = Date.now();
       if(user && user.email){
+        /* 「30일간 로그인 유지」 가 30일을 넘긴 로그인은 포털을 열지 않고 끊는다 — 끊기면 곧바로 «미로그인» 신호가 와서
+           로그인 화면이 열리고, 까닭은 로그인 화면 한 줄(PuLogoutWhy)에 남는다. */
+        try { if(window.PuKeepLogin && PuKeepLogin.guard(user)) return; } catch(_k){}
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
         if(_handled && _portalUid && user.uid !== _portalUid){
           // 다른 사람이 들어온 경우 이전 사람의 타일을 다시 드러내지 않는다.
@@ -2596,6 +2604,8 @@ body.portal-mode #moreFab{display:flex;}
           kkFirebasePerfAt = window.performance.now();
           kkFirebaseHidden = !!document.hidden;
         } catch(_t){}
+        /* 30일 상한의 시작 — 로그인 «직전»에 적는다(끝난 뒤에 적으면 옛 표시로 방금 들어온 사람을 내보낼 수 있다) */
+        try { if(window.PuKeepLogin) PuKeepLogin.stamp(keep); } catch(_k){}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
@@ -2985,6 +2995,9 @@ body.portal-mode #moreFab{display:flex;}
     var persistence = wantsAutoLogin
       ? firebase.auth.Auth.Persistence.LOCAL
       : firebase.auth.Auth.Persistence.SESSION;
+    /* 로그인 «직전»에 고른 것과 시각을 적는다(30일 상한의 시작) — 비밀번호 로그인·2단계 인증 길 모두 여기를 지난다.
+       ⚠ setPersistence «앞»이어야 한다 — 유지를 끈 기기에서 LOCAL 을 SESSION 으로 낮추는 보호가 이 값을 본다. */
+    try { if(window.PuKeepLogin) PuKeepLogin.begin(wantsAutoLogin); } catch(_k){}
 
     // 응답 감시: 얼어있던 탭에서 인증 모듈이 응답을 못 하면 버튼이 비활성으로
     // 영원히 멈춤 — 12초 내 결과가 없으면 새로고침으로 깨운다.
@@ -5555,6 +5568,8 @@ body.portal-mode #moreFab{display:flex;}
       localStorage.removeItem('pureun_v6_autologin_sid');
       sessionStorage.removeItem('pureun_v6_session_sid');
     } catch(e){}
+    /* 「30일간 로그인 유지」 표시도 함께 지운다 — 로그아웃 단추·유휴 로그아웃이 모두 여기를 지난다 */
+    try { if(window.PuKeepLogin) PuKeepLogin.clear(); } catch(_k){}
   }
   $('logoutBtn').addEventListener('click', function(){
     try { window.PuLogoutWhy && PuLogoutWhy.why('로그아웃 단추 누름'); } catch(_w){}
