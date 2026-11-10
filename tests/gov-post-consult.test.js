@@ -202,19 +202,22 @@ function chipWorld() {
   return c;
 }
 
-test('★ 달력 칩 — 종료된 사업의 «본» 칩은 🔒·취소선·끌기 막기, «사후» 칩은 그 어느 것도 아니다', () => {
+test('★ 달력 칩 — 종료된 사업의 «본» 칩은 🔒·취소선·끌기 막기, «사후» 칩은 잠기지 않고 «끌어 옮길 수 있다»', () => {
   const c = chipWorld();
   const main = c.chipHtml(D('c1', 't2', '2026-10-01', { round: 1 }));
   assert.ok(/is-ended/.test(main) && /🔒/.test(main) && /data-ended="1"/.test(main), '본 칩은 그대로 잠긴다');
   const post = c.chipHtml(P('c1', 't2', '2026-11-05', { round: 1 }));
   assert.ok(!/is-ended/.test(post) && !/🔒/.test(post) && /data-ended="0"/.test(post), '사후 칩은 잠기지 않는다: ' + post.slice(0, 160));
   assert.ok(/사후/.test(post), '칩에 «사후» 가 보인다');
-  assert.ok(/draggable="false"/.test(post), '사후 칩은 끌어 옮기지 않는다(날짜는 서랍에서 고친다)');
+  assert.ok(/draggable="true"/.test(post) && /data-mine="1"/.test(post), '★ 사후 칩도 끌어 옮긴다(2026-11-10 대표 지시) — 끌 수 없으면 글자만 선택된다: ' + post.slice(0, 200));
+  assert.ok(/끌어서 날짜 이동 가능/.test(post), '말풍선으로 알린다');
+  const mainEnded = c.chipHtml(D('c1', 't2', '2026-10-01', { round: 1 }));
+  assert.ok(/draggable="false"/.test(mainEnded), '종료된 본 칩은 여전히 못 끈다');
 });
 
-test('★ 사후 칩을 눌러도 본 일정 수정 창이 아니라 «사후컨설팅 서랍»이 열린다 · 끌어 옮기기는 막힌다', async () => {
+test('★ 사후 칩을 눌러도 본 일정 수정 창이 아니라 «사후컨설팅 서랍»이 열린다 · 본 칩은 예전 그대로', async () => {
   const opened = []; const edits = [];
-  const c = world(['isPostSched', 'isEndedSchedule', 'endedDateForSchedule', 'openEditModal', 'moveChip'], {
+  const c = world(['isPostSched', 'isEndedSchedule', 'endedDateForSchedule', 'openEditModal'], {
     openPostDrawer: (coId, tid, sid) => opened.push([coId, tid, sid]), openEndedViewModal: (sid) => edits.push('ended:' + sid),
     openViewModal: () => edits.push('view'), acquireCompanyEditLock: async () => { edits.push('lock'); return true; },
     isBlocked: () => '', checkExclusiveDay: () => null, checkConflictMatrix: () => null, checkAgencyExclusive: () => null, checkAttLimit: () => null,
@@ -226,10 +229,6 @@ test('★ 사후 칩을 눌러도 본 일정 수정 창이 아니라 «사후컨
   assert.deepStrictEqual(edits, [], '본 일정 수정 창·잠금이 열리면 회차·단계를 건드릴 수 있다');
   await c.openEditModal('mX');
   assert.deepStrictEqual(edits, ['ended:mX'], '본 일정은 예전 그대로 «종료된 컨설팅»');
-  const before = JSON.stringify(c._st.scheds);
-  c.moveChip('pX', '2026-11-06');
-  assert.strictEqual(JSON.stringify(c._st.scheds), before, '끌어 옮겨도 날짜가 안 바뀐다');
-  assert.ok(c._st.toasts.some((t) => /사후/.test(t)), '왜 안 되는지 말해 준다: ' + c._st.toasts.join('|'));
 });
 
 /* ══ ⑤ 충돌 검사 — 사업 규칙에서는 빠지고, 물리적 충돌은 그대로 ════════ */
@@ -434,6 +433,9 @@ const COUNT_OK = {
   saveSingle: '같은 날 같은 사업 중복 방지 — 사후도 센다',
   saveMultiSingle: '같은 날 같은 사업 중복 방지 — 사후도 센다',
   revertRoundChange: '되돌릴 날짜에 같은 일정이 있는지 보는 중복 방지',
+  movePost: '일부러 «사후만» 센다(isPostSched 로 거른다) — 옮긴 뒤 사후끼리 번호가 바뀌었는지 본다',
+  moveDayProblem: '같은 날 같은 사업 중복 방지 — 사후도 센다(본 칩을 옮길 때 사후와 겹치면 안 된다)',
+  mainDropProblem: '같은 날 같은 사업 중복 방지 — 사후도 센다(본 회차를 놓을 때 사후와 겹치면 안 된다)',
   stepExtraPhotos: '추가 사진 칸을 같은 사업의 일정에 같이 적용 — 사진 설정이지 회차 셈이 아니다',
 };
 function allFns() {
@@ -625,18 +627,22 @@ const POSTFN = ['isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone
   'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts',
   'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate', 'postCanAdd', 'postAddedText', 'postDragStart', 'postDragEnd', 'handlePostDrop',
   /* 2026-11-10 — 사후도 «같은 정부사업 하루 규칙»(같은 담당 하루 1건 · 기관 하루 1사업장)을 따른다 · 끌 때 방문/사무실 */
-  'checkConflictMatrix', 'checkAgencyExclusive', 'isConflictPair', 'conflictKey', 'getPostFieldState', 'setPostFieldState', 'postPickField'];
+  'checkConflictMatrix', 'checkAgencyExclusive', 'isConflictPair', 'conflictKey', 'getPostFieldState', 'setPostFieldState', 'postPickField',
+  /* 2026-11-10 — 겹치면 팝업으로 알리고 다른 날짜로 옮겨 다시 한다 · 사후 칩 끌어 옮기기 */
+  'postFail', 'dupWho', 'movePost', 'moveChip', 'moveDayProblem', 'isEndedSchedule', 'endedDateForSchedule', 'mainDropProblem', 'handleDrop'];
 /* 가짜 localStorage — 방문/사무실 기억(p_fieldState)을 실제로 읽고 쓰게 한다. 새 키가 생기면 lsKeys 에 보인다. */
 function fakeLs() {
   const m = {}; const writes = [];
   return { m, writes, ls: { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } }, lsSet: (k, v) => { m[k] = String(v); writes.push(k); }, fbPush: (k, v) => writes.push('fb:' + k) };
 }
 function postWorld(over) {
-  const calls = { locks: 0, released: 0, saves: 0, stamp: [], confirm: null, cb: null, delPhoto: [], rendered: [], closed: [] };
+  const calls = { locks: 0, released: 0, saves: 0, stamp: [], confirm: null, cb: null, delPhoto: [], rendered: [], closed: [], popups: [], logs: [] };
   let n = 0;
   const fl = fakeLs();
   const c = world(POSTFN, Object.assign({
     localStorage: fl.ls, lsSet: fl.lsSet, fbPush: fl.fbPush,
+    dupPopupOpen: (o) => { calls.popups.push(o); c._st.toasts.push('[팝업] ' + String(o.msg).split(String.fromCharCode(10)).join(' ')); },
+    checkExclusiveDay: () => null, canEdit: () => true, ensurePhaseState: () => {}, curPhase: () => 'main', logRoundChange: (...a) => calls.logs.push(a), showBigAlert: (m) => c._st.toasts.push('[큰알림] ' + m), showConfirm: (m, cb) => { calls.confirm = m; calls.cb = cb; },
     uid: () => 'new' + (++n), acquireCompanyEditLock: async () => { calls.locks++; return true; }, verifyCompanyEditLock: async () => true, releaseCompanyEditLock: () => { calls.released++; },
     showConfirm: (m, cb) => { calls.confirm = m; calls.cb = cb; }, openStampModal: (sid) => calls.stamp.push(sid), deletePhotoFromDB: (sid) => calls.delPhoto.push(sid),
     getPhotoFromDB: async () => null, logPhoto: () => {}, isBlocked: () => '', coMainOf: (co) => co.defAtt, myId: () => 'a1',
@@ -1443,10 +1449,12 @@ test('★ 「같은 담당 하루 1건」을 켠 사업 — 같은 주담당의 
 });
 
 test('★ 반대쪽 — 본 방문을 넣거나 옮길 때도 사후와 같은 날이면 막힌다 (본 방문을 넣는 모든 길이 같은 규칙 함수를 쓴다)', () => {
-  ['handleDrop', 'moveChip', 'saveSingle', 'saveMultiSingle', 'postProblem'].forEach((n) => {
+  ['mainDropProblem', 'moveDayProblem', 'saveSingle', 'saveMultiSingle', 'postProblem'].forEach((n) => {
     const b = grab(n);
     assert.ok(/checkConflictMatrix\(/.test(b) && /checkAgencyExclusive\(/.test(b), n + ' — 같은 담당 하루 1건·기관 하루 1사업장을 «둘 다» 묻는다');
   });
+  assert.ok(/mainDropProblem\(/.test(grab('handleDrop')), '본 회차 놓기(handleDrop)는 판정을 mainDropProblem 한 곳에서 받는다');
+  assert.ok(/moveDayProblem\(/.test(grab('moveChip')) && /movePost\(/.test(grab('moveChip')), '칩 옮기기(moveChip)는 본 칩은 moveDayProblem · 사후 칩은 movePost(postProblem)');
   ['checkConflictMatrix', 'checkAgencyExclusive', 'agencyOtherSiteOn', 'dayConflictMsg'].forEach((n) => {
     assert.ok(!/!\s*isPostSched\(/.test(grab(n)), n + ' — 사후를 걸러 내면(!isPostSched) 사후와 본 방문이 같은 날 겹쳐도 통과한다');
   });
@@ -1469,4 +1477,262 @@ test('★ 이미 겹쳐 있는 예전 사후는 «날짜를 안 바꾸면» 구�
 
 test('진행 목록 줄을 눌러 «본 회차 등록 창»이 열리는 길에서 사후 항목(단추·빈틈)은 빠진다', () => {
   assert.ok(/closest\('\.post-item'\)/.test(grab('renderDash')), '사후 항목을 눌러도 본 회차 등록 창이 열리지 않는다');
+});
+
+/* ══ ㉑ 사후 칩 끌어 옮기기 + 날짜 겹침 «팝업» (대표 지시 2026-11-10) ═════════════════════════════════════
+   「동일 컨설팅 날짜일 경우 중복된다고 팝업으로 경고표시 만들고 날짜 옮길 수 있게」 + 「각 사업 마우스 드래그 앤드랍이 제대로 안 된다」
+   ① 달력의 「사후」 칩이 끌리지 않아(draggable=false) 끌려 하면 글자만 선택되던 것 → 사후 칩도 끌어 옮긴다(movePost, 서랍에서 고치는 것과 같은 규칙).
+   ② 날짜가 겹쳐 못 넣거나 못 옮기면 작은 알림이 아니라 팝업 — 왜 겹치는지, 가까운 빈 날짜, 다른 날짜를 골라 «같은 일»을 다시 한다. */
+
+const POP = ['dupShift', 'dupNearest', 'dupDayLabel', 'dupWho', 'dupIsOverlap', 'dupPopupOpen', 'dupPick', 'dupClose', 'dupGo'];
+function popWorld(over) {
+  const c = world(POP, over);
+  vm.runInContext('var _dup=null;', c);
+  c._st.cos = [CO('c1', '가나상사')];
+  return c;
+}
+const dupEl = (c, id) => c._st.els['#' + id];
+
+test('날짜 도우미 — 하루씩 앞뒤로 가며 «되는 날»을 찾는다 (달·해 경계, 없으면 빈 글자)', () => {
+  const c = popWorld();
+  assert.strictEqual(c.dupShift('2026-11-30', 1), '2026-12-01'); assert.strictEqual(c.dupShift('2026-01-01', -1), '2025-12-31'); assert.strictEqual(c.dupShift('2028-02-28', 1), '2028-02-29', '윤년');
+  assert.strictEqual(c.dupShift('', 1), '', '모양이 틀리면 빈 글자');
+  const bad = new Set(['2026-11-12', '2026-11-13', '2026-11-14']);
+  const probe = (d) => (bad.has(d) ? '겹침' : '');
+  assert.strictEqual(c.dupNearest(probe, '2026-11-12', 1, 30), '2026-11-15', '뒤로 가장 가까운 되는 날');
+  assert.strictEqual(c.dupNearest(probe, '2026-11-14', -1, 30), '2026-11-11', '앞으로 가장 가까운 되는 날');
+  assert.strictEqual(c.dupNearest(() => '안 됨', '2026-11-12', 1, 5), '', '한도 안에 없으면 빈 글자');
+  assert.strictEqual(c.dupDayLabel('2026-11-17'), '11-17(화)');
+});
+
+test('★ 겹침 팝업 — 까닭·누구 것인지·가까운 날짜가 뜨고, 날짜칸에는 «뒤로 가장 가까운 되는 날»이 미리 들어간다', () => {
+  const c = popWorld(); const bad = new Set(['2026-11-12', '2026-11-13']);
+  c.dupPopupOpen({ who: '가나상사 · 현장클리닉', msg: '2026-11-12에 이 사업의 일정이 이미 있습니다', date: '2026-11-12', probe: (d) => (bad.has(d) ? 'x' : ''), retry: () => {}, verb: '옮기기' });
+  assert.ok(dupEl(c, 'mbDup').classList.contains('open'), '팝업이 열린다');
+  assert.strictEqual(dupEl(c, 'dupTitle').textContent, '같은 날짜에 일정이 중복됩니다');
+  assert.strictEqual(dupEl(c, 'dupWho').textContent, '가나상사 · 현장클리닉');
+  assert.ok(/이미 있습니다/.test(dupEl(c, 'dupMsg').textContent), '까닭');
+  assert.strictEqual(dupEl(c, 'dupDate').value, '2026-11-14', '12·13 은 안 되니 14 가 미리 들어간다');
+  assert.ok(/dupPick\('2026-11-11'\)/.test(dupEl(c, 'dupNear').innerHTML) && /dupPick\('2026-11-14'\)/.test(dupEl(c, 'dupNear').innerHTML), '앞·뒤 가까운 날 단추');
+  assert.strictEqual(dupEl(c, 'dupGo').textContent, '이 날짜로 옮기기', '단추 글자는 하려던 일(옮기기/넣기)을 따른다');
+  c.dupPopupOpen({ msg: '불가 날짜입니다', date: '2026-11-12', probe: () => '', retry: () => {}, verb: '넣기' });
+  assert.strictEqual(dupEl(c, 'dupTitle').textContent, '이 날짜에는 넣을 수 없습니다', '겹침이 아닌 까닭(불가 날짜·한도)은 제목이 다르다');
+  assert.strictEqual(dupEl(c, 'dupGo').textContent, '이 날짜로 넣기');
+});
+
+test('★ 팝업에서 날짜를 고르면 — 먼저 그 날짜가 되는지 팝업 안에서 보고(안 되면 닫지 않고 까닭), 되면 닫고 «원래 하려던 일»을 그 날짜로 다시 한다', async () => {
+  const c = popWorld(); const calls = []; const bad = new Set(['2026-11-12', '2026-11-13']);
+  const open = () => c.dupPopupOpen({ msg: '겹침', date: '2026-11-12', probe: (d) => (bad.has(d) ? `${d}에는 이미 있습니다` : ''), retry: (d) => calls.push(d), verb: '넣기' });
+  open();
+  const go = async (v) => { dupEl(c, 'dupDate').value = v; await c.dupGo(); };
+  await go(''); assert.ok(/날짜를 정해/.test(dupEl(c, 'dupErr').textContent) && dupEl(c, 'mbDup').classList.contains('open'), '빈 날짜');
+  await go('2026-11-12'); assert.ok(/겹치는 그 날짜/.test(dupEl(c, 'dupErr').textContent), '같은 날짜를 또 고름');
+  await go('2026-11-13'); assert.ok(/2026-11-13에는 이미 있습니다/.test(dupEl(c, 'dupErr').textContent) && dupEl(c, 'mbDup').classList.contains('open'), '되지 않는 날짜는 닫지 않고 까닭을 적는다');
+  assert.deepStrictEqual(calls, [], '아직 아무것도 다시 하지 않았다');
+  await go('2026-11-16');
+  assert.deepStrictEqual(calls, ['2026-11-16'], '되는 날짜로 원래 일을 다시 한다');
+  assert.ok(!dupEl(c, 'mbDup').classList.contains('open'), '닫힌다');
+  c.dupPopupOpen({ msg: 'x', date: '2026-11-12', probe: () => '', retry: (d) => calls.push('b' + d), verb: '넣기' });
+  c.dupClose(); await c.dupGo(); assert.deepStrictEqual(calls, ['2026-11-16'], '닫은 뒤에는 다시 하지 않는다');
+  open(); c.dupPick('2026-11-20'); assert.strictEqual(dupEl(c, 'dupDate').value, '2026-11-20', '가까운 날 단추를 누르면 날짜칸이 바뀐다');
+});
+
+test('★ 사후를 «놓았는데» 겹치면 — 알림이 아니라 팝업, 다른 날짜로 옮기면 그 날짜로 들어간다 (본 방문과 같은 날 → 가까운 빈 날)', async () => {
+  const c = t3World(); c._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' }));
+  await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't3', isField: false });
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 0, '저장하지 않았다');
+  assert.strictEqual(c._calls.popups.length, 1, '팝업이 한 번 열렸다: ' + c._st.toasts.join('|'));
+  const p = c._calls.popups[0];
+  assert.ok(/하루에 한 사업장만/.test(p.msg) && /라마바식품/.test(p.msg), p.msg);
+  assert.ok(/사후컨설팅/.test(p.who) && /가나상사/.test(p.who), '누구 것인지: ' + p.who);
+  assert.strictEqual(p.date, '2026-11-05'); assert.strictEqual(p.verb, '넣기');
+  assert.ok(p.probe('2026-11-05') && !p.probe('2026-11-06'), '팝업의 날짜 판정은 놓기와 같다 — 겹치는 날 아니오 · 다른 날 예');
+  await p.retry('2026-11-06');
+  const post = c._st.scheds.find((s) => s.phase === 'post');
+  assert.ok(post && post.date === '2026-11-06' && post.isField === false, '고른 날짜로, 처음 끌 때의 구분(사무실) 그대로 들어간다: ' + JSON.stringify(post));
+});
+
+test('날짜와 상관없이 안 되는 일(진행 중 사업)은 팝업이 아니라 알림이다 — 날짜를 옮겨도 소용없다', async () => {
+  const c = postWorld(); await c.handlePostDrop('2026-11-05', DROP('c2', 't2'));
+  assert.deepStrictEqual(c._calls.popups, [], '팝업이 열리면 안 된다');
+  assert.ok(/본 회차를 모두 마쳤거나/.test(lastToast(c)), lastToast(c));
+});
+
+test('서랍에서 «저장»했는데 겹치면 — 팝업이 뜨고, 다른 날짜를 고르면 서랍의 날짜칸이 바뀌어 저장된다', async () => {
+  const c = t3World(); c._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' }));
+  c.openPostDrawer('c1', 't3'); form(c, '2026-11-05', '메모'); await c.postSave(false);
+  assert.strictEqual(c._calls.popups.length, 1); assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 0);
+  assert.strictEqual(c._calls.popups[0].verb, '넣기');
+  c._st.els['#postMemo'] = { value: '메모' };
+  await c._calls.popups[0].retry('2026-11-09');
+  const post = c._st.scheds.find((s) => s.phase === 'post');
+  assert.ok(post && post.date === '2026-11-09' && post.memo === '메모', '고른 날짜로 저장: ' + JSON.stringify(post));
+  assert.strictEqual(c._st.els['#postDate'].value, '2026-11-09', '서랍의 날짜칸도 고른 날짜로');
+  const c2 = t3World(); c2.openPostDrawer('c1', 't3'); form(c2, '', ''); await c2.postSave(false);
+  assert.deepStrictEqual(c2._calls.popups, [], '날짜가 비었으면 팝업이 아니라 입력 안내(알림·서랍 오류칸)');
+  assert.ok(/날짜를 정해 주세요/.test(lastToast(c2)), lastToast(c2));
+});
+
+/* ── 사후 칩 끌어 옮기기 ── */
+const moveWorld = (extra) => {
+  const c = t3World(extra); c.openPostDrawer('c1', 't3');
+  c._st.scheds.push(P('c1', 't3', '2026-11-05', { id: 'pa', round: 1, isField: false, memo: '임금 점검' }), P('c1', 't3', '2026-11-12', { id: 'pb', round: 2 }));
+  return c;
+};
+
+test('★ 사후 칩을 다른 날짜로 끌어 옮기면 — 날짜만 바뀌고 구분·메모는 그대로, 본 일정·사업 상태는 글자까지 그대로, 사후끼리 번호를 다시 매긴다', async () => {
+  const c = moveWorld(); const beforeMain = mainOnly(c), beforeCos = JSON.stringify(c._st.cos);
+  c.moveChip('pa', '2026-11-19'); await new Promise((r) => setTimeout(r, 20));
+  const posts = c._st.scheds.filter((s) => s.phase === 'post').sort((a, b) => (a.date < b.date ? -1 : 1));
+  assert.deepStrictEqual(posts.map((s) => s.id + ':' + s.date + ':' + s.round), ['pb:2026-11-12:1', 'pa:2026-11-19:2'], '옮겨 간 사후가 뒤로 가면 사후끼리 번호가 날짜순으로 다시 매겨진다');
+  const pa = posts.find((s) => s.id === 'pa'); assert.strictEqual(pa.isField, false); assert.strictEqual(pa.memo, '임금 점검');
+  assert.strictEqual(mainOnly(c), beforeMain, '본 일정은 글자까지 그대로(번호 포함)');
+  assert.strictEqual(JSON.stringify(c._st.cos), beforeCos, '사업 상태 그대로');
+  assert.ok(c._calls.raw.every((v) => !hasUndefined(v)), '저장하는 모양에 undefined 가 없다');
+  assert.ok(c._calls.locks === 1 && c._calls.released === 1, '잠그고 → 저장 → 푼다');
+  ['cal', 'dash', 'sum', 'ended'].forEach((k) => assert.ok(c._calls.rendered.includes(k), k + ' 을(를) 다시 그린다'));
+  assert.ok(/11-05 → 11-19/.test(lastToast(c)) && /사후 번호를 날짜순으로 다시/.test(lastToast(c)), lastToast(c));
+  assert.deepStrictEqual(c._calls.logs, [], '본 회차 변경 이력은 안 남긴다');
+  assert.deepStrictEqual(c._calls.popups, []);
+});
+
+test('사후 칩을 옮겨도 번호가 안 바뀌면 «다시 매겼다»는 말이 없다 · 같은 날짜로 놓으면 아무 일도 없다', async () => {
+  const c = moveWorld(); c.moveChip('pb', '2026-11-13'); await new Promise((r) => setTimeout(r, 20));
+  assert.ok(/11-12 → 11-13/.test(lastToast(c)) && !/다시 매겼/.test(lastToast(c)), lastToast(c));
+  const before = JSON.stringify(c._st.scheds), n = c._st.toasts.length;
+  c.moveChip('pb', '2026-11-13'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(JSON.stringify(c._st.scheds), before); assert.strictEqual(c._st.toasts.length, n, '같은 날짜면 조용히 끝');
+});
+
+test('★ 사후 칩을 겹치는 날로 끌면 — 팝업(저장 안 함), 팝업에서 다른 날을 고르면 그 날로 옮겨진다 · 같은 사업장 같은 사업 일정(본·사후)이 있는 날도 겹침이다', async () => {
+  const c = moveWorld(); c._st.scheds.push(D('c2', 't3', '2026-11-18', { id: 'o3' }));
+  const before = JSON.stringify(c._st.scheds);
+  c.moveChip('pa', '2026-11-18'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(JSON.stringify(c._st.scheds), before, '옮기지 않았다'); assert.strictEqual(c._calls.locks, 0, '막힌 것은 잠그기 전에 끝난다');
+  assert.strictEqual(c._calls.popups.length, 1); const p = c._calls.popups[0];
+  assert.ok(/하루에 한 사업장만/.test(p.msg) && /라마바식품/.test(p.msg) && p.verb === '옮기기', p.msg + ' / ' + p.verb);
+  assert.ok(p.probe('2026-11-18'), '겹치는 날은 안 된다');
+  assert.ok(!p.probe('2026-11-20'), '다른 날은 된다');
+  await p.retry('2026-11-20'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(c._st.scheds.find((s) => s.id === 'pa').date, '2026-11-20');
+  const c2 = moveWorld(); c2.moveChip('pa', '2026-11-12'); await new Promise((r) => setTimeout(r, 20));    // 같은 사업장 같은 사업의 다른 «사후»가 있는 날
+  assert.strictEqual(c2._calls.popups.length, 1); assert.ok(/이미 있습니다/.test(c2._calls.popups[0].msg), c2._calls.popups[0].msg);
+  const c3 = moveWorld(); c3._st.scheds.push(D('c1', 't3', '2026-11-17', { id: 'mx', round: 1 })); c3.moveChip('pa', '2026-11-17'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(c3._calls.popups.length, 1, '같은 사업장 같은 사업의 «본» 방문일도 겹침'); assert.ok(/이 사업의 일정이 이미 있습니다/.test(c3._calls.popups[0].msg), c3._calls.popups[0].msg);
+});
+
+test('사후 칩을 못 옮기는 경우 — 남의 일정 · 이미 지워진 사후 · 없는 사업장은 알림이다', async () => {
+  let c = moveWorld({ canEdit: () => false }); const before = JSON.stringify(c._st.scheds);
+  c.moveChip('pa', '2026-11-19'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(JSON.stringify(c._st.scheds), before); assert.ok(/타인 일정/.test(lastToast(c)), lastToast(c));
+  c = moveWorld(); c._st.cos = []; c.moveChip('pa', '2026-11-19'); await new Promise((r) => setTimeout(r, 20));
+  assert.ok(/사업장을 찾을 수 없습니다/.test(lastToast(c)), lastToast(c));
+  c = moveWorld({ acquireCompanyEditLock: async () => false }); const b2 = JSON.stringify(c._st.scheds);
+  c.moveChip('pa', '2026-11-19'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(JSON.stringify(c._st.scheds), b2, '잠금을 못 잡으면 저장하지 않는다');
+});
+
+test('★ 본 일정 칩·본 회차 줄도 같은 팝업을 쓴다 — 사후가 있는 날로 옮기거나 놓으면 팝업(막힘), 다른 날은 예전처럼 된다', async () => {
+  const c = t3World(); c._st.cos[0].endedTypes = {}; c._st.cos[0].types = ['t3'];
+  c._st.scheds.push(D('c1', 't3', '2026-11-01', { id: 'mv1', round: 1 }), P('c2', 't3', '2026-11-18', { id: 'pz' }));
+  c.moveChip('mv1', '2026-11-18'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(c._st.scheds.find((s) => s.id === 'mv1').date, '2026-11-01', '옮기지 않았다');
+  assert.strictEqual(c._calls.popups.length, 1); assert.ok(/사후컨설팅이 있습니다/.test(c._calls.popups[0].msg), c._calls.popups[0].msg);
+  assert.strictEqual(c._calls.popups[0].verb, '옮기기');
+  assert.ok(c._calls.popups[0].probe('2026-11-18') && !c._calls.popups[0].probe('2026-11-20'));
+  await c.handleDrop('2026-11-18', { coId: 'c1', typeId: 't3', round: 2, isField: true });
+  assert.strictEqual(c._calls.popups.length, 2, '본 회차를 놓을 때도 팝업'); assert.strictEqual(c._calls.popups[1].verb, '넣기');
+  assert.ok(c._calls.popups[1].probe('2026-11-18') && !c._calls.popups[1].probe('2026-11-20'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.coId === 'c1' && s.typeId === 't3' && s.phase !== 'post').length, 1, '본 일정이 늘지 않았다');
+  c._st.scheds.push(D('c1', 't3', '2026-11-03', { id: 'dupday', round: 2 }));
+  await c.handleDrop('2026-11-03', { coId: 'c1', typeId: 't3', round: 3, isField: true });
+  assert.ok(/동일 일정이 이미 있습니다/.test(c._calls.popups[2].msg), '같은 날 같은 사업의 본 일정: ' + c._calls.popups[2].msg);
+});
+
+test('본 회차 줄을 놓는 «날짜와 상관없는» 거절(비활성 사업장 · 등록 안 된 사업 · 종료된 사업)은 알림 그대로다', async () => {
+  const c = t3World(); c._st.cos[0].active = false; await c.handleDrop('2026-11-20', { coId: 'c1', typeId: 't3', round: 1, isField: true });
+  assert.ok(/비활성/.test(lastToast(c)) && c._calls.popups.length === 0, lastToast(c));
+  const d = t3World(); await d.handleDrop('2026-11-20', { coId: 'c1', typeId: 't3', round: 1, isField: true });
+  assert.ok(/종료된 컨설팅/.test(lastToast(d)) && d._calls.popups.length === 0, lastToast(d));
+});
+
+test('팝업 뼈대 — 화면에 있고(z-index 가 서랍 위·알림창 아래), 서랍이 열린 채로도 보이며, 색은 기존 변수만 쓴다', () => {
+  assert.ok(/id="mbDup"/.test(SRC) && /id="dupDate"/.test(SRC) && /id="dupMsg"/.test(SRC) && /id="dupNear"/.test(SRC) && /id="dupErr"/.test(SRC) && /onclick="dupGo\(\)"/.test(SRC), '팝업 뼈대');
+  const z = Number((SRC.match(/id="mbDup" style="z-index:(\d+)/) || [])[1]);
+  assert.ok(z > 490 && z < 600, '서랍(mbPost 490)보다 위, 알림창(mbAlert 600)보다 아래: ' + z);
+  const css = (SRC.match(/\/\* 날짜 겹침 팝업\(#mbDup\)[\s\S]*?\.dup-foot\{[^}]*\}/) || [''])[0];
+  assert.ok(css.length > 300, '팝업 CSS 덩어리'); assert.deepStrictEqual(css.match(/#[0-9a-fA-F]{3,8}\b/g) || [], [], '새 색(#rrggbb) 없음');
+  assert.ok(/\.dup-pick input\{[^}]*font-size:16px/.test(css), '입력칸 16px 이상(폰에서 확대 방지)');
+});
+
+test('Esc·✕ 로 닫을 수 있다 — 팝업이 «.mb» 창이라 공용 Esc 처리(closeTopOverlay)가 열린 .mb 를 모두 모아 맨 위를 닫는다', () => {
+  assert.ok(/<div class="mb" id="mbDup"/.test(SRC), '.mb 창');
+  assert.ok(grab('openOverlayList').includes(".mb.open"), '열린 .mb 를 모은다');
+  assert.ok(SRC.includes('onclick="dupClose()"'), '닫기 단추');
+});
+
+test('★ 옮기기 팝업은 «지금 그 일정이 있는 날짜»를 옮길 곳으로 권하지도 고르게 두지도 않는다 (제자리라 아무 일도 안 된다)', async () => {
+  const c = popWorld(); const calls = [];
+  c.dupPopupOpen({ msg: '겹침', date: '2026-11-12', probe: () => '', retry: (d) => calls.push(d), verb: '옮기기', skip: '2026-11-13' });
+  assert.strictEqual(dupEl(c, 'dupDate').value, '2026-11-14', '12 가 겹친 날이고 13 은 지금 있는 날이니 14 가 미리 들어간다');
+  assert.ok(!/dupPick\('2026-11-13'\)/.test(dupEl(c, 'dupNear').innerHTML), '지금 날짜는 가까운 날 단추에 없다');
+  dupEl(c, 'dupDate').value = '2026-11-13'; await c.dupGo();
+  assert.ok(/지금 이 일정이 있는 날짜/.test(dupEl(c, 'dupErr').textContent) && calls.length === 0, '고르려 해도 막고 까닭을 적는다');
+  const w = moveWorld(); w._st.scheds.push(D('c2', 't3', '2026-11-18', { id: 'o3' }));
+  w.moveChip('pa', '2026-11-18'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(w._calls.popups[0].skip, '2026-11-05', '사후 칩 옮기기: 원래 날짜를 넘긴다');
+  const m = t3World(); m._st.cos[0].endedTypes = {}; m._st.cos[0].types = ['t3'];
+  m._st.scheds.push(D('c1', 't3', '2026-11-01', { id: 'mv1', round: 1 }), P('c2', 't3', '2026-11-18', { id: 'pz' }));
+  m.moveChip('mv1', '2026-11-18'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(m._calls.popups[0].skip, '2026-11-01', '본 칩 옮기기도 원래 날짜를 넘긴다');
+  const n = t3World(); n._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' }));
+  await n.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't3', isField: true });
+  assert.ok(!('skip' in n._calls.popups[0]) || n._calls.popups[0].skip === undefined, '넣기에는 «제자리»가 없다');
+});
+
+test('★ 같은 사업장·같은 사업의 «사후»가 있는 날로 본 칩을 옮기거나 본 회차를 놓아도 팝업이다 (사후도 같은 날 동일 일정)', async () => {
+  const c = t3World(); c._st.cos[0].endedTypes = {}; c._st.cos[0].types = ['t3'];
+  c._st.scheds.push(D('c1', 't3', '2026-11-01', { id: 'mv1', round: 1 }), P('c1', 't3', '2026-11-18', { id: 'pself' }));
+  c.moveChip('mv1', '2026-11-18'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(c._st.scheds.find((s) => s.id === 'mv1').date, '2026-11-01', '옮기지 않았다');
+  assert.strictEqual(c._calls.popups.length, 1, '팝업: ' + c._st.toasts.join('|')); assert.ok(/동일 일정이 이미 있습니다/.test(c._calls.popups[0].msg), c._calls.popups[0].msg);
+  await c.handleDrop('2026-11-18', { coId: 'c1', typeId: 't3', round: 2, isField: true });
+  assert.strictEqual(c._calls.popups.length, 2); assert.ok(/동일 일정이 이미 있습니다/.test(c._calls.popups[1].msg), c._calls.popups[1].msg);
+});
+
+test('★ 불가 날짜에 본 회차를 놓거나 본 칩을 옮겨도 팝업이다 — 겹침이 아닌 까닭이라 제목은 «넣을 수 없습니다», 다른 날을 고르면 된다', async () => {
+  const isBlocked = (d) => (d === '2026-11-21' ? '불가 날짜입니다 (휴무)' : '');
+  const c = t3World({ isBlocked }); c._st.cos[0].endedTypes = {}; c._st.cos[0].types = ['t3'];
+  c._st.scheds.push(D('c1', 't3', '2026-11-01', { id: 'mv1', round: 1 }));
+  await c.handleDrop('2026-11-21', { coId: 'c1', typeId: 't3', round: 2, isField: true });
+  assert.strictEqual(c._calls.popups.length, 1); assert.ok(/불가 날짜/.test(c._calls.popups[0].msg));
+  assert.ok(c._calls.popups[0].probe('2026-11-21') && !c._calls.popups[0].probe('2026-11-23'), '불가 날짜는 안 되고 다른 날은 된다');
+  c.moveChip('mv1', '2026-11-21'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(c._calls.popups.length, 2); assert.ok(/불가 날짜/.test(c._calls.popups[1].msg));
+  assert.strictEqual(c._st.scheds.find((s) => s.id === 'mv1').date, '2026-11-01');
+  const p = popWorld(); p.dupPopupOpen({ msg: '불가 날짜입니다 (휴무)', date: '2026-11-21', probe: () => '', retry: () => {}, verb: '넣기' });
+  assert.strictEqual(dupEl(p, 'dupTitle').textContent, '이 날짜에는 넣을 수 없습니다');
+});
+
+test('서랍에서 «이미 있는» 사후의 날짜를 고치다 겹치면 — 팝업 단추는 「옮기기」이고 지금 날짜는 권하지 않는다 (새로 넣을 때는 「넣기」)', async () => {
+  const c = t3World(); c._st.scheds.push(D('c2', 't3', '2026-11-12', { id: 'o3' }), P('c1', 't3', '2026-11-05', { id: 'pold', round: 1 }));
+  c.openPostDrawer('c1', 't3'); c.postEdit('pold'); form(c, '2026-11-12', '');
+  await c.postSave(false);
+  assert.strictEqual(c._calls.popups.length, 1); assert.strictEqual(c._calls.popups[0].verb, '옮기기'); assert.strictEqual(c._calls.popups[0].skip, '2026-11-05');
+  const n = t3World(); n._st.scheds.push(D('c2', 't3', '2026-11-12', { id: 'o3' }));
+  n.openPostDrawer('c1', 't3'); form(n, '2026-11-12', ''); await n.postSave(false);
+  assert.strictEqual(n._calls.popups[0].verb, '넣기'); assert.ok(!n._calls.popups[0].skip, '새로 넣을 때는 제자리 날짜가 없다');
+});
+
+test('본 칩을 «제자리»에 놓으면 — 그 날짜가 불가 날짜여도 아무 일도 없다 (팝업·알림 없음)', async () => {
+  const c = t3World({ isBlocked: (d) => (d === '2026-11-21' ? '불가 날짜입니다' : '') }); c._st.cos[0].endedTypes = {}; c._st.cos[0].types = ['t3'];
+  c._st.scheds.push(D('c1', 't3', '2026-11-21', { id: 'onblocked', round: 1 }));
+  const before = JSON.stringify(c._st.scheds), n = c._st.toasts.length;
+  c.moveChip('onblocked', '2026-11-21'); await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(JSON.stringify(c._st.scheds), before); assert.strictEqual(c._st.toasts.length, n); assert.deepStrictEqual(c._calls.popups, []);
+});
+
+test('팝업 접근성 — 대화상자 역할·제목 연결, 가까운 날짜 단추는 손가락으로 누르기 쉬운 크기', () => {
+  assert.ok(/id="mbDup"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="dupTitle"/.test(SRC), '대화상자 속성');
+  assert.ok(/\.dup-chip\{[^}]*padding:8px 14px/.test(SRC), '칩 크기');
 });
