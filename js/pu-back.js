@@ -24,6 +24,54 @@
   'use strict';
 
   var 층 = [];          /* [{ id, name, close }] — 맨 뒤가 «맨 위» 다 */
+  var 탭층 = [];        /* [Element] — 앱 안에서 눌러 옮긴 탭 기록 */
+  var 손길심었나 = false; /* 사람 손길(터치·클릭) 위에서 걸음을 다졌는가 (안드로이드 크롬 보호) */
+  var _탭되돌리는중 = false;
+  var _마지막백키시각 = 0;
+  var 나가기대기초 = 2500;
+
+  function 손길다지기() {
+    if (!심었나) 심기();
+    if (손길심었나) return;
+    손길심었나 = true;
+    try {
+      history.pushState({ puBack: 2 }, '', location.href);
+      심었나 = true;
+    } catch (e) {}
+  }
+
+  function 나가기토스트(말) {
+    try {
+      var d = global.document;
+      if (!d || typeof d.createElement !== 'function' || !d.body) return;
+      var 옛 = d.getElementById ? d.getElementById('pu-back-exit-toast') : null;
+      if (옛 && 옛.remove) 옛.remove();
+      var el = d.createElement('div');
+      el.id = 'pu-back-exit-toast';
+      el.setAttribute('role', 'status');
+      el.textContent = 말;
+      el.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);'
+        + 'z-index:2147483646;background:rgba(15,23,42,.92);color:#fff;padding:10px 18px;'
+        + 'border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;'
+        + 'box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;'
+        + 'font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;';
+      d.body.appendChild(el);
+      setTimeout(function () { try { if (el && el.remove) el.remove(); } catch (_) {} }, 나가기대기초);
+    } catch (e) {}
+  }
+
+  function 나가기확인필요() {
+    if (global.__puDoubleBack === false) return false;
+    if (!global.navigator || !global.document || typeof global.document.createElement !== 'function') return false;
+    var 지금 = Date.now ? Date.now() : +new Date();
+    if (_마지막백키시각 && (지금 - _마지막백키시각) < 나가기대기초) {
+      _마지막백키시각 = 0;
+      return false;
+    }
+    _마지막백키시각 = 지금;
+    나가기토스트('뒤로가기를 한 번 더 누르면 통합시스템으로 나갑니다');
+    return true;
+  }
   var 심었나 = false;   /* 빈 걸음을 심어 두었는가 */
   var 번호 = 0;
   var 돌아갈곳 = 'enter.html';
@@ -41,6 +89,7 @@
        포털을 건너뛰고 카카오 로그인 화면까지 돌아갈 수 있다(PC·폰 공통).
        앱 안의 빈 걸음은 이미 밟았다. 그 뒤에는 기록을 추측하지 않고 내부 포털로 간다. */
   function 나가기() {
+    try { if (global.sessionStorage) global.sessionStorage.setItem('pu_skip_home', '1'); } catch (e) {}
     try { location.replace(돌아갈곳); } catch (e) { location.href = 돌아갈곳; }
   }
 
@@ -59,7 +108,9 @@
       심기();                          /* 파수꾼이 있으면 늘 다시 심는다 */
       return;
     }
-    if (물어보기()) { 심기(); return; }  /* 옛 화면의 덮개를 하나 닫았다 — 앱에 남는다 */
+    if (물어보기()) { _마지막백키시각 = 0; 심기(); return; }  /* 옛 화면의 덮개를 하나 닫았다 — 앱에 남는다 */
+    if (탭물러서기()) { _마지막백키시각 = 0; 심기(); return; } /* 방금 옮긴 탭을 이전 탭으로 되돌린다 */
+    if (나가기확인필요()) { 심기(); return; }                 /* 한 번 더 눌러야 나간다 */
     나가기();
   }
 
@@ -114,7 +165,63 @@
      ★ 왜 단추를 누르나 — 그 앱이 닫을 때 하는 일(고른 것 비우기·되돌리기·저장 묻기)을
        그대로 태우기 위해서다. display 만 감추면 다음에 열 때 지난 자취가 남는다.
      ⚠ 「저장」·「확인」 같은 단추는 절대 안 누른다. 뒤로가기는 «그만두기»이지 «하기»가 아니다. */
-  var 닫기말 = ['닫기', '취소', '✕', '×', '✖', 'X', '뒤로'];
+  var 탭선택자 = '[role="tab"],[data-tab],[data-stab],[data-view],[data-mode],.tab,.sub-tab,.set-tab,.nav-tab,.seg-btn,.m-tab,.view-tab';
+  function 탭켜졌나(el) {
+    if (!el || !el.classList) return false;
+    if (el.classList.contains('active') || el.classList.contains('on') || el.classList.contains('selected')) return true;
+    if (el.getAttribute && el.getAttribute('aria-selected') === 'true') return true;
+    return false;
+  }
+  function 탭갈래찾기(el) {
+    if (!el || !el.closest) return null;
+    try { return el.closest(탭선택자); } catch (e) { return null; }
+  }
+  function 같은줄켜진탭(탭) {
+    var 어미 = 탭 && 탭.parentElement;
+    if (!어미 || !어미.querySelectorAll) return null;
+    try {
+      var 형제 = 어미.querySelectorAll(탭선택자);
+      for (var i = 0; i < 형제.length; i++) {
+        if (형제[i] !== 탭 && 형제[i].parentElement === 어미 && 탭켜졌나(형제[i])) return 형제[i];
+      }
+    } catch (e) {}
+    return null;
+  }
+  function 탭누름감시(ev) {
+    if (_탭되돌리는중) return;
+    var 대상 = 탭갈래찾기(ev && ev.target);
+    if (!대상 || 탭켜졌나(대상)) return;
+    var 이전탭 = 같은줄켜진탭(대상);
+    if (!이전탭) return;
+    var 전깊이 = 층.length;
+    setTimeout(function () {
+      try {
+        if (!탭켜졌나(대상) || 탭켜졌나(이전탭)) return;
+        if (층.length !== 전깊이) return;
+        if (탭층.length && 탭층[탭층.length - 1] === 이전탭) return;
+        탭층.push(이전탭);
+        if (탭층.length > 15) 탭층.shift();
+        심기();
+      } catch (e) {}
+    }, 0);
+  }
+  function 탭물러서기() {
+    while (탭층.length) {
+      var 이전 = 탭층.pop();
+      if (!이전 || !보이나(이전) || 탭켜졌나(이전)) continue;
+      try {
+        _탭되돌리는중 = true;
+        이전.click();
+        _탭되돌리는중 = false;
+        return true;
+      } catch (e) {
+        _탭되돌리는중 = false;
+      }
+    }
+    return false;
+  }
+
+  var 닫기말 = ['닫기', '취소', '✕', '×', '✖', 'X', '뒤로', '← 목록', '← 목록으로', '목록으로', '돌아가기', '← 뒤로', '‹ 목록'];
 
   function 보이나(el) {
     if (!el || el.hidden) return false;
@@ -214,6 +321,14 @@
   function once(name, close) { return open(name, close); }
 
   try { window.addEventListener('popstate', onPop); } catch (e) {}
+  try {
+    if (global.document && typeof global.document.addEventListener === 'function') {
+      global.document.addEventListener('click', 탭누름감시, true);
+      ['touchstart', 'pointerdown', 'mousedown', 'keydown'].forEach(function (ev) {
+        global.document.addEventListener(ev, 손길다지기, { capture: true, passive: true });
+      });
+    }
+  } catch (e) {}
 
   var api = { open: open, close: close, once: once, guard: guard, closeTopVisible: closeTopVisible,
               depth: depth, top: top, exitTo: exitTo, _pop: onPop };

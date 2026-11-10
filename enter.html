@@ -2495,6 +2495,24 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 서버 함수(functions/passkey.js)·규칙의 passkey 칸은 그대로 남아 있다(지금 아무도 부르지 않는다).
        되살릴 때는 git 이력(이 커밋의 앞)에서 화면을 가져온다. */
   try { localStorage.removeItem('pu_passkey_sid'); localStorage.removeItem('pu_passkey_later'); } catch(e){}
+  /* ★ 앱에서 뒤로가기·홈으로 돌아왔을 때 「로그인 상태 확인 중…」 대기 없이 즉시 포털 타일을 표시한다 (2026-11-10):
+     같은 탭(sessionStorage)에 방금 확인된 인증 힌트와 직원 프로필 사본이 있고 로그아웃 신호가 없으면
+     IndexedDB 복원을 기다리지 않고 즉시 포털 화면을 연다. 뒤이어 onAuthStateChanged 가 도착하면 이어받는다. */
+  (function _instantReturnFromApp(){
+    try {
+      if(_handled || window.__kkReturning || _kkLoginStarting) return;
+      if(sessionStorage.getItem('pu_auth_hint') !== '1') return;
+      var raw = sessionStorage.getItem('pu_portal_fast_acct');
+      if(!raw) return;
+      var cached = JSON.parse(raw);
+      if(!cached || !cached.uid || !cached.email || !cached.acct) return;
+      var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
+      if(logoutAt && (!cached.at || logoutAt >= cached.at)) return;
+      window._puAuthAt = Date.now();
+      _handled = true;
+      enterPortal({ uid: cached.uid, email: cached.email }, { acct: cached.acct, all: cached.all || [] });
+    } catch(_ir){}
+  })();
 
   /* ══ 카카오로 로그인 (2026-09-27, 대표 「추천대로」) ══════════════════════════
      ★ 지문과 달리 «이 기기에 등록했나» 가 아니라 «내 카카오 계정을 이 직원 계정에
@@ -3239,6 +3257,22 @@ body.portal-mode #moreFab{display:flex;}
       _portalReady = true;
       armKakaoPortalHistory();
       try {
+        if(m && m.acct){
+          var _fastAcct = JSON.stringify({ uid:user.uid||'', email:String(user.email||'').toLowerCase(), acct:m.acct, all:m.all||[], at:Date.now() });
+          sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
+          localStorage.setItem('pu_portal_fast_acct', _fastAcct);
+        }
+      } catch(_fc){}
+      try {
+        if(!auth.currentUser && auth.onAuthStateChanged){
+          var _unFast = auth.onAuthStateChanged(function(u){
+            if(!u || u.uid !== _portalUid) return;
+            try { if(typeof _unFast === 'function') _unFast(); } catch(_){}
+            try { renderPortal(m.acct, { email:(u.email||''), all:m.all, via:_via }); } catch(_){}
+          });
+        }
+      } catch(_fa){}
+      try {
         var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
         if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
           timing.portalMs = timing.at ? Date.now() - timing.at : timing.totalMs;
@@ -3270,6 +3304,20 @@ body.portal-mode #moreFab{display:flex;}
       _show(verifiedProfile);
       return;
     }
+    /* 같은 계정의 최근 확인된 명부 사본이 있으면 3.5초 서버 명부 조회를 기다리지 않고 즉시 타일을 먼저 그린다 */
+    try {
+      var _fastRaw = sessionStorage.getItem('pu_portal_fast_acct') || localStorage.getItem('pu_portal_fast_acct');
+      if(_fastRaw){
+        var _fp = JSON.parse(_fastRaw);
+        if(_fp && _fp.acct && _fp.acct.status === 'active'
+           && _fp.uid === (user.uid || '')
+           && _fp.email === String(user.email || '').toLowerCase()
+           && (Date.now() - Number(_fp.at || 0) < 12 * 3600 * 1000)){
+          _show({ acct: _fp.acct, all: _fp.all || [_fp.acct] });
+          return;
+        }
+      }
+    } catch(_fe){}
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){
       var read = null;
@@ -5571,6 +5619,8 @@ body.portal-mode #moreFab{display:flex;}
     try {
       localStorage.setItem('pu_auth_logout_at', String(Date.now()));
       localStorage.removeItem('pu_auth_uid');
+      localStorage.removeItem('pu_portal_fast_acct');
+      sessionStorage.removeItem('pu_portal_fast_acct');
       localStorage.removeItem('pureun_v6_autologin_sid');
       sessionStorage.removeItem('pureun_v6_session_sid');
     } catch(e){}
