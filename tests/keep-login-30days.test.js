@@ -414,6 +414,19 @@ test('정부사업일정(자체 로그인 칸): «기본으로 체크된» 자�
   assert.match(g, /<script src="js\/pu-keep-login\.js\?v=\d+"><\/script>/, '정부사업일정이 모듈을 안 싣습니다 — 유지 끔 보호·30일 상한이 안 걸립니다');
 });
 
+test('정부사업일정 ★ 외부 검토 3차: 「유지 끔」 기기는 앱을 바로 열어도 옛 자동 세션을 못 읽는다 — 앱이 읽기 «전에» 지운다', () => {
+  const saved = '{"id":"x","name":"점검"}';
+  const off = world({ store: { pu_portal_auto: '0', p_autoSession: saved } });
+  assert.equal(off.store.p_autoSession, undefined, '유지 끔 기기에 앱 쪽 자동 세션이 남아 다음 사람이 이어 받습니다');
+  for (const store of [{ pu_portal_auto: '1', p_autoSession: saved }, { p_autoSession: saved }]) {
+    const w = world({ store });
+    assert.equal(w.store.p_autoSession, saved, '유지 끔이 «아닌» 기기의 자동 세션까지 지웠습니다');
+  }
+  /* 앱의 본 스크립트가 그 열쇠를 처음 읽는 줄(_pgs)보다 이 파일이 먼저 실린다 */
+  const g = stripComments(read('gov-consulting.html'));
+  assert.ok(g.search(/js\/pu-keep-login\.js\?v=\d+/) > 0 && g.search(/js\/pu-keep-login\.js\?v=\d+/) < g.indexOf("localStorage.getItem('p_autoSession')"), '이 파일이 앱이 자동 세션을 읽은 뒤에 실립니다');
+});
+
 test('정부사업일정 ★ 외부 검토 2차: 포털에서 「유지 끔」을 고른 기기는 «기본 체크»가 있어도 앱 자체 세션(p_autoSession)을 안 남긴다', () => {
   const g = stripComments(read('gov-consulting.html'));
   const i = g.indexOf('const remember=');
