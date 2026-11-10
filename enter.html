@@ -2062,6 +2062,7 @@ body.portal-mode #moreFab{display:flex;}
        2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
+    { key:'aliounion', name:'공공기관 단협', desc:'알리오 노조·단체협약 비교분석', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
 ,
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
@@ -3373,6 +3374,10 @@ body.portal-mode #moreFab{display:flex;}
     catch(e){ try { ref.location.href = url; } catch(_){} }
   }
   function openPortalApp(app, url){
+    if(app && app.key === 'aliounion' && typeof window !== 'undefined' && window.PuAlioUnion && typeof window.PuAlioUnion.openModal === 'function'){
+      window.PuAlioUnion.openModal();
+      return null;
+    }
     var winName = portalAppWindowName(app.key);
     var ref = portalAppWindows[app.key];
 
@@ -3885,6 +3890,20 @@ body.portal-mode #moreFab{display:flex;}
 
     hideEmptyRows();
     뉴스레터경고달기();
+    (function(){
+      var t = origTile('aliounion');
+      if(!t) return;
+      var nt = t.querySelector('.newtab');
+      if(nt) nt.textContent = '팝업 열기 ⊞';
+      if(isMobile()){
+        t.addEventListener('click', function(ev){
+          if(window.PuAlioUnion && typeof window.PuAlioUnion.openModal === 'function'){
+            ev.preventDefault();
+            window.PuAlioUnion.openModal();
+          }
+        });
+      }
+    })();
 
     // 앱 배치 — 관리자가 저장한 공용 배치를 따르고(관리자만 편집·📌 틀 고정), 즐겨찾기·접힘은 사람별 저장
     initTileOrder();
@@ -7259,5 +7278,6 @@ window.PU_TYPESAFE_MOUNT = function(){
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
+<script src="js/pu-alio-union.js?v=1"></script>
 </body>
 </html>

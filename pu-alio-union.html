@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>공공기관 단협 - 푸른통합시스템</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🤝</text></svg>">
+<!-- ══════════════════════════════════════════════════════════════
+     푸른노무법인 공공기관 단협 (pu-alio-union.html)
+     대한민국 기획재정부 공공기관 경영정보 공개시스템(ALIO)의
+     전체 중앙공공기관(355개) 노동조합 현황 및 단체협약·임금협약·별도합의·내부규정
+     통합 조회·13대 핵심 쟁점 비교 매트릭스·조문 Side-by-Side 대조 프로그램.
+     포털(enter.html)에서는 모달 레이어 팝업(PuAlioUnion.openModal)으로 바로 열리며,
+     팝업 안의 「↗ 전체 창으로 열기」 단추로 이 단독 화면에서도 열 수 있다.
+     ══════════════════════════════════════════════════════════════ -->
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#0f172a}
+#alioAppRoot{height:100vh;display:flex;flex-direction:column}
+/* 폰에서 입력칸에 손을 대도 화면이 커지지 않게(포털 앱 공통 규칙) */
+@media (max-width:768px){
+  input,select,textarea{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div id="alioAppRoot"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=92"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-appbar.js?v=41"></script>
+<script src="js/pu-active.js?v=1"></script>
+<script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script src="js/pu-back.js?v=3"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script src="js/pu-alio-data.js?v=1"></script>
+<script src="js/pu-alio-union.js?v=1"></script>
+<script>
+(function(){
+  'use strict';
+  var FB_CONFIG={
+    apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',
+    authDomain:'pureun-erp.firebaseapp.com',
+    databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId:'pureun-erp',
+    appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',
+    messagingSenderId:'936817166182'
+  };
+  var rootEl = document.getElementById('alioAppRoot');
+  try{ if(window.PuWhoami) PuWhoami.mount(false); }catch(e){}
+  if(rootEl && window.PuAlioUnion){
+    window.PuAlioUnion.mount(rootEl, { isModal: false });
+  }
+  try{
+    if(location.protocol !== 'file:' && typeof firebase !== 'undefined' && firebase.auth){
+      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+      try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+      firebase.auth().onAuthStateChanged(function(u){
+        if(!u){
+          PuGate.show();
+          return;
+        }
+        PuGate.hide();
+      });
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
