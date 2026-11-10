@@ -15,14 +15,16 @@
    ② 「유지 끔」 을 앱이 몰래 뒤집지 못하게 — 경력관리·정부사업·홈페이지관리 등 여러 앱이 시작할 때
       setPersistence(LOCAL) 을 «무조건» 부른다. 파이어베이스는 그때 지금 로그인을 LOCAL 로 «옮긴다» —
       공용 PC 에서 유지를 끈 사람이 앱을 한 번 열면 «영원히 남는» 로그인이 돼 버린다.
-      그래서 이 기기가 「유지 끔」(pu_portal_auto='0')이면 LOCAL 요청을 SESSION 으로 낮춘다.
-      (고른 적이 없으면 건드리지 않는다. 앱이 자기 로그인 칸에서 «유지»를 고른 경우는 begin(true) 로 먼저 말한다.)
+      그래서 이 기기가 「유지 끔」(pu_portal_auto='0')이면 LOCAL 요청을 SESSION 으로 낮추고, 앱 안의 따로 있는 로그인 칸
+      (signInWith…)도 로그인 직전에 SESSION 을 먼저 못 박는다.
+      · 고른 적이 없는 기기는 지속 방식에 손대지 않는다. 다만 파이어베이스 기본이 LOCAL 이므로 30일 상한은 건다.
+      · ⚠ 다른 앱의 «기본으로 체크된 자동 로그인» 칸이 기기 전체의 「유지 끔」을 뒤집지 못한다 — 유지는 포털 체크칸에서만 고른다.
    ③ 로그아웃하면 표시(pu_keep_login_at)도 지운다 — 로그아웃은 «어디서 불러도» 파이어베이스 signOut 을
       지나므로 한 곳에서 감싼다(pu-logout-why.js 와 같은 방식).
 
    ── 안 하는 것 ───────────────────────────────────────────────
    ⚠ 비밀번호·토큰을 저장하지 않는다 — 시각 하나(숫자)만 적는다. 로그인 지속은 파이어베이스 몫이다.
-   ⚠ 「유지 켬」 이 «기록 없이» 켜져 있던 기기(이 기능 이전에 로그인한 기기)는 지금부터 30일을 센다.
+   ⚠ 로그인 시각 «기록이 없는» 로그인(이 기능 이전 · 포털을 안 거친 로그인)은 처음 본 때부터 30일을 센다.
    ⚠ 로그인 시각의 기준은 «진짜 로그인» 이다. 토큰이 새로 고쳐지거나 앱을 여는 것은 시각을 미루지 않는다.
    ⚠ 급여·관리자 화면을 더 강하게 지키는 일(2중 로그인·자리비움 잠금)은 여기서 하지 않는다 — 별개 결정이다.
    ══════════════════════════════════════════════════════════════ */
@@ -30,7 +32,7 @@
   'use strict';
 
   var KEEP_KEY = 'pu_portal_auto';        // 포털 「로그인 유지」 칸의 선택 '1'/'0' (기존 열쇠 — 다른 파일이 같이 본다)
-  var AT_KEY = 'pu_keep_login_at';        // 로그인한 때(ms) — 이 기기에서 «유지»로 로그인한 때만 있다
+  var AT_KEY = 'pu_keep_login_at';        // 로그인한 때(ms) — 「유지 끔」이 아닌 로그인에만 있다
   var LOGOUT_KEY = 'pu_auth_logout_at';   // pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다
   var KEEP_DAYS = 30;                     // 대표 요청 «30일» — 바꾸려면 화면 글귀(enter.html)도 함께
   var DAY = 864e5;
@@ -42,7 +44,11 @@
   function lsDel(k) { try { global.localStorage.removeItem(k); } catch (e) { } }
   function now() { return Date.now(); }
 
-  function isKeep() { return lsGet(KEEP_KEY) === '1'; }
+  /* 「유지 끔」 — 이 기기가 «창을 닫으면 끝나는 로그인»(세션 지속)을 골랐다.
+     ⚠ 「유지 켬」이 아니라 「끔이 아니다」로 가른다 — 고른 적이 없는 기기(포털을 거치지 않고 앱의 자체 로그인 칸으로 들어온 경우)도
+       파이어베이스 기본이 LOCAL 이라 «영원히 남는» 로그인이다. 그것을 상한 없이 두면 구멍이다. */
+  function isOff() { return lsGet(KEEP_KEY) === '0'; }
+  function isKeep() { return !isOff(); }
 
   /* 로그인한 때를 적는다(켰을 때만) — 끄면 지운다. 로그인 «직전»에 부른다:
      로그인이 끝나는 순간 파이어베이스가 곧바로 상태를 알리므로, 뒤에 적으면 옛 표시로 «방금 로그인한 사람»을
@@ -73,13 +79,13 @@
   /* 지금 이 사람의 유지가 어떤 상태인가
        'none'    사람이 아니다(로그인 없음·익명)
        'off'     유지를 껐다 — 창을 닫으면 끝나는 로그인(세션 지속)이라 시각을 안 본다
-       'started' 유지를 켰는데 시각 기록이 없다(이 기능 이전 로그인) — 지금부터 센다
+       'started' 시각 기록이 없다(이 기능 이전 로그인·포털을 안 거친 로그인) — 지금부터 센다
        'ok'      30일 안이다
        'expired' 30일이 지났다 */
   function judge(user, at) {
     var t = at == null ? now() : at;
     if (!user || user.isAnonymous) return 'none';
-    if (!isKeep()) return 'off';
+    if (isOff()) return 'off';
     var mark = Number(lsGet(AT_KEY)) || 0;
     if (!mark) { lsSet(AT_KEY, t); return 'started'; }
     /* 표시보다 «더 새 로그인»이 있으면 그것이 기준이다 — 앱이 자기 로그인 칸으로 새로 들어온 경우
@@ -93,40 +99,56 @@
     try { return (global.firebase && global.firebase.auth && global.firebase.auth()) || null; } catch (e) { return null; }
   }
 
-  /* 다른 탭·앱에 «지금 나갔다» 를 알린다 — authsync 가 있으면 그쪽 길(같은 열쇠)을 그대로 쓴다 */
-  function broadcast() {
-    try {
-      if (global.PuAuthSync && typeof global.PuAuthSync.broadcastLogout === 'function') { global.PuAuthSync.broadcastLogout(); return; }
-    } catch (e) { }
-    lsSet(LOGOUT_KEY, now());
+  /* 「지금 나갔다」 신호 — 다른 탭·포털이 알아듣는다(pu-authsync.js 의 LOGOUT_KEY 와 같은 열쇠).
+     ⚠ 신호만 «먼저» 적는다. pu_auth_uid(누가 로그인해 있었나)는 끊긴 «뒤»에 지운다 — 먼저 지우면 이 탭의 authsync 가
+       「로그인해 있던 화면이었나」를 몰라 로그인 화면으로 밀어내지 않는다(외부 검토 지적). */
+  function signalOut() { lsSet(LOGOUT_KEY, now()); }
+  /* 끊긴 뒤의 뒷정리 — 파이어베이스와 «따로» 들고 있는 앱 쪽 로그인 열쇠까지 지운다(앱이 등록을 잊어도 남의 세션이 살아남지 않게).
+     푸른이알피(pureun_v6_*)·정부사업일정(p_autoSession·p_session) 이 그런 열쇠다. */
+  function wipeApps() {
     lsDel('pu_auth_uid');
     lsDel('pureun_v6_autologin_sid');
+    lsDel('p_autoSession');
     try { global.sessionStorage.removeItem('pureun_v6_session_sid'); } catch (e) { }
+    try { global.sessionStorage.removeItem('p_session'); } catch (e) { }
   }
 
   var expiring = false;
+  var retries = 0;
   /* 30일이 지났다 — 이 기기의 로그인을 끊는다(모든 탭·앱까지). 두 번 부르지 않는다. */
   function expire() {
     if (expiring) return false;
     expiring = true;
+    /* 끊기가 «실패»하면 표시를 되돌린다 — 잃으면 다음 검사가 「처음 본 사람」으로 오해해 새 30일을 준다(외부 검토 지적) */
+    var prev = Number(lsGet(AT_KEY)) || 0;
     try { if (global.PuLogoutWhy) global.PuLogoutWhy.why('로그인 유지 ' + KEEP_DAYS + '일 만료'); } catch (e) { }
-    broadcast();
-    clear();
+    signalOut();
     var a = authOrNull();
-    /* 끊기가 끝나면(사람이 없어지면) 다시 «다음 로그인»을 받을 수 있게 푼다 — 안 풀면 같은 화면에서 새로 로그인한 사람을 막는다 */
-    var done = function () { expiring = false; };
+    var ok = function () { expiring = false; retries = 0; wipeApps(); };
+    var bad = function () {
+      if (prev && !(Number(lsGet(AT_KEY)) || 0)) lsSet(AT_KEY, prev);
+      expiring = false;
+      if (retries++ < 3) { try { global.setTimeout(recheck, 2000); } catch (e) { } }   // 다시 끊어 본다(새 30일은 주지 않는다)
+    };
     try {
-      var r = (a && typeof a.signOut === 'function') ? a.signOut() : null;
-      if (r && typeof r.then === 'function') r.then(done, done); else done();
-    } catch (e) { done(); }
+      if (!a || typeof a.signOut !== 'function') bad();
+      else {
+        var r = a.signOut();
+        if (r && typeof r.then === 'function') r.then(ok, bad); else ok();
+      }
+    } catch (e) { bad(); }
     /* 로그인 화면으로 보내는 일은 앱마다 다르다 — authsync 를 싣는 앱은 스스로 밀어낸다.
-       그것이 안 일어난 화면(authsync 없는 앱)만 «로그인이 필요합니다» 화면을 씌우거나 포털로 보낸다.
-       ⚠ 로그인 칸이 있는 화면(포털·정부사업일정)은 제 화면이 로그인 칸을 보여 주니 건드리지 않는다. */
+       그것이 안 일어난 화면(authsync 없는 앱)만 「로그인이 필요합니다」 화면을 씌우거나 포털로 보낸다.
+       ⚠ 그 사이 «다시 로그인했으면»(다른 탭 포함) 건드리지 않는다. 로그인 칸이 «보이는» 화면(포털)도 제 화면이 보여 준다 —
+         숨은 칸(정부사업일정의 닫힌 로그인 창)은 해당 없다. */
     try {
       global.setTimeout(function () {
         try {
+          var c = authOrNull();
+          if (c && c.currentUser && !c.currentUser.isAnonymous) return;
           var d = global.document;
-          if (d && d.getElementById && d.getElementById('loginPw')) return;
+          var f = d && d.getElementById && d.getElementById('loginPw');
+          if (f && f.offsetParent !== null) return;
           if (global.PuAuthSync && global.PuAuthSync._wasKicked && global.PuAuthSync._wasKicked()) return;
           if (global.PuGate && typeof global.PuGate.show === 'function') { global.PuGate.show(); return; }
           global.location.replace('enter.html?v=' + now());
@@ -148,7 +170,7 @@
   function pickPersistence(p) {
     try {
       var P = global.firebase.auth.Auth.Persistence;
-      if (p === P.LOCAL && lsGet(KEEP_KEY) === '0') return P.SESSION;
+      if (p === P.LOCAL && isOff()) return P.SESSION;
     } catch (e) { }
     return p;
   }
@@ -170,7 +192,8 @@
   /* ②-2 앱 «안에» 따로 있는 로그인 칸(푸른이알피·급여아웃소싱·정부사업·경력관리)은 setPersistence 를 안 부르거나
      부르기 전에 로그인한다 — 파이어베이스 기본은 LOCAL(영원히 남음)이라, 「유지 끔」 기기에서 그 칸으로 들어오면 공용 PC 에 남는다.
      그래서 이 기기가 「유지 끔」이면 로그인 «직전»에 SESSION 을 먼저 못 박는다.
-     ⚠ 못 박기가 실패해도 로그인은 막지 않는다 — 이 파일 때문에 아무도 못 들어오면 안 된다(저장소가 막혔으면 파이어베이스가 알아서 알린다). */
+     ⚠ 못 박기가 «거절»되면 로그인도 하지 않는다 — 세션으로 못 정한 채 들어가면 공용 PC 에 영구 로그인이 남을 수 있다(포털도 같다,
+       외부 검토 지적). 반대로 «이 파일 자신의 오류»(동기 예외)로는 로그인을 막지 않는다 — 이 파일 때문에 아무도 못 들어오면 안 된다. */
   function hookSignIn(name) {
     var A = global.firebase && global.firebase.auth && global.firebase.auth.Auth;
     var P = A && A.prototype;
@@ -180,12 +203,11 @@
     var wrapped = function () {
       var self = this, args = arguments;
       var go = function () { return orig.apply(self, args); };
+      var r = null;
       try {
-        if (lsGet(KEEP_KEY) === '0' && typeof P.setPersistence === 'function') {
-          var r = P.setPersistence.call(self, global.firebase.auth.Auth.Persistence.SESSION);
-          if (r && typeof r.then === 'function') return r.then(go, go);
-        }
-      } catch (e) { }
+        if (isOff() && typeof P.setPersistence === 'function') r = P.setPersistence.call(self, global.firebase.auth.Auth.Persistence.SESSION);
+      } catch (e) { r = null; }
+      if (r && typeof r.then === 'function') return r.then(go);   // 거절되면 그 오류 그대로 — 로그인하지 않는다
       return go();
     };
     wrapped.__puKeep = true;

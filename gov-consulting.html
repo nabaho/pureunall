@@ -6174,9 +6174,9 @@ async function doLogin(){
   let portalAuto=false;
   try{ portalAuto=localStorage.getItem('pu_portal_auto')==='1'; }catch(_){}
   const remember=!!q('#loginRemember')?.checked || portalAuto;
-  /* 이 화면에서 «유지»를 골랐다고 먼저 알린다 — 포털에서 「유지 끔」을 고른 기기는 LOCAL 요청이 SESSION 으로 낮춰지고(js/pu-keep-login.js),
-     30일 상한의 시작 시각도 여기서 적힌다. */
-  try{ if(remember && window.PuKeepLogin) PuKeepLogin.begin(true); }catch(_){}
+  /* ⚠ 여기서 PuKeepLogin.begin() 을 부르지 않는다 — 이 칸은 «기본으로 체크»돼 있어, 부르면 사람이 안 보고 지나친 체크가 기기 전체의
+     「유지 끔」(공용 PC)을 뒤집는다(외부 검토 지적). 유지는 포털 체크칸에서만 고른다. 포털에서 「유지 끔」을 고른 기기는 아래 LOCAL 요청이
+     SESSION 으로 낮춰지고(js/pu-keep-login.js), 그 밖의 기기는 30일 상한이 걸린다. */
   try{
     // 자동로그인 지속성
     const persist=remember?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION;

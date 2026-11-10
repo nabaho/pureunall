@@ -48,7 +48,13 @@ function world(opt) {
   };
   Auth.prototype.signInWithEmailAndPassword = function () { log.push('signin'); return Promise.resolve('cred'); };
   Auth.prototype.signInWithCustomToken = function () { log.push('signin-token'); return Promise.resolve('cred'); };
-  Auth.prototype.signOut = function () { log.push('signout'); const u = this.currentUser; this.currentUser = null; return Promise.resolve(u); };
+  const atSignOut = {};
+  Auth.prototype.signOut = function () {
+    log.push('signout');
+    atSignOut.logoutKey = store.pu_auth_logout_at; atSignOut.uid = store.pu_auth_uid;   // 끊는 «순간»의 저장소
+    if (opt.signOutFails) return Promise.reject(new Error('끊기 실패'));
+    const u = this.currentUser; this.currentUser = null; return Promise.resolve(u);
+  };
   const inst = new Auth();
   inst.onAuthStateChanged = (fn) => { listeners.push(fn); };
   const ctx = {
@@ -61,16 +67,16 @@ function world(opt) {
     clearInterval() {},
     addEventListener() {},
     location: { replace: (u) => log.push('go:' + u) },
-    document: { hidden: false, addEventListener() {}, getElementById: () => (opt.loginForm ? {} : null) },
+    document: { hidden: false, addEventListener() {}, getElementById: () => (opt.loginForm ? { offsetParent: {} } : opt.hiddenLogin ? { offsetParent: null } : null) },
   };
   if (!opt.late) ctx.firebase = { auth: Object.assign(() => inst, { Auth }) };
   if (opt.why !== false) ctx.PuLogoutWhy = { why: (r) => log.push('why:' + r) };
-  if (opt.authsync) ctx.PuAuthSync = { broadcastLogout: () => { log.push('broadcast'); store.pu_auth_logout_at = String(clock.t); }, _wasKicked: () => !!opt.kicked };
+  if (opt.authsync) ctx.PuAuthSync = { _wasKicked: () => !!opt.kicked };
   if (opt.gate) ctx.PuGate = { show: () => log.push('gate') };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(MOD, ctx);
-  return { ctx, store, session, log, timers, listeners, clock, Auth, inst, K: ctx.PuKeepLogin };
+  return { ctx, store, session, log, timers, listeners, clock, Auth, inst, atSignOut, K: ctx.PuKeepLogin };
 }
 const user = (extra) => Object.assign({ uid: 'u1', email: 'a@example.com', metadata: {} }, extra || {});
 
@@ -94,8 +100,12 @@ test('① ★★ 유지를 끈 로그인은 시각을 안 본다(세션 지속 �
   const off = world({ store: { pu_portal_auto: '0', pu_keep_login_at: String(T0 - 400 * DAY) } });
   assert.equal(off.K.judge(user()), 'off');
   assert.equal(off.K.guard(user()), false, '유지를 끈 사람을 30일 검사로 내보냈습니다');
+  /* 고른 적이 없는 기기(포털을 안 거치고 앱의 자체 로그인 칸으로 들어온 경우)는 «끔이 아니다» — 파이어베이스 기본이 LOCAL 이라 상한이 걸린다 */
   const unset = world({ store: {} });
-  assert.equal(unset.K.judge(user()), 'off', '고른 적이 없으면 건드리지 않습니다');
+  assert.equal(unset.K.judge(user()), 'started', '고른 적 없는 기기의 영구 로그인이 상한 없이 남습니다');
+  assert.equal(unset.store.pu_keep_login_at, String(T0));
+  const unsetOld = world({ store: { pu_keep_login_at: String(T0 - 31 * DAY) } });
+  assert.equal(unsetOld.K.judge(user()), 'expired', '고른 적 없는 기기가 상한을 넘겼는데 안 내보냅니다');
   const w = world({ store: { pu_portal_auto: '1', pu_keep_login_at: String(T0 - 400 * DAY) } });
   assert.equal(w.K.judge(null), 'none');
   assert.equal(w.K.judge({ uid: 'x', isAnonymous: true }), 'none', '익명(전자서명 등)은 사람 로그인이 아닙니다');
@@ -124,16 +134,24 @@ test('① ★ 앱이 자기 로그인 칸으로 새로 들어온 사람은 옛 �
 
 test('① ★★ 상한을 넘기면: 까닭을 남기고 모든 탭에 알리고 표시를 지우고 파이어베이스를 끊는다 — 딱 한 번', async () => {
   const D = world().K.DAYS;
-  const w = world({ authsync: true, store: { pu_portal_auto: '1', pu_keep_login_at: String(T0 - (D + 1) * DAY) } });
+  const w = world({ authsync: true,
+    store: { pu_portal_auto: '1', pu_keep_login_at: String(T0 - (D + 1) * DAY), pu_auth_uid: 'u-keep', p_autoSession: '{"id":"x"}', pureun_v6_autologin_sid: 'S1' },
+    session: { p_session: '{"id":"x"}' } });
   const who = w.inst.currentUser;   // 끊으면 currentUser 가 비므로 «그 사람»을 먼저 잡아 둔다
   assert.equal(w.K.guard(who), true);
   assert.equal(w.K.guard(who), true, '끊는 중에 다시 불려도 같은 답이어야 합니다');
-  const order = w.log.filter((x) => /^(why|broadcast|signout)/.test(x));
-  assert.deepEqual(order.map((x) => x.split(':')[0]), ['why', 'broadcast', 'signout'], '까닭 → 알림 → 끊기 순서가 아닙니다: ' + order.join(' / '));
+  const order = w.log.filter((x) => /^(why|signout)/.test(x));
+  assert.deepEqual(order.map((x) => x.split(':')[0]), ['why', 'signout'], '까닭 → 끊기 순서가 아닙니다 · 두 번 끊었습니다: ' + order.join(' / '));
   assert.match(order[0], /만료/, '로그인 화면에 보일 까닭에 «만료» 가 없습니다');
   assert.equal(w.store.pu_keep_login_at, undefined, '만료한 뒤 표시가 남았습니다');
-  assert.ok(w.store.pu_auth_logout_at, '다른 탭에 «지금 나갔다» 를 안 알렸습니다');
-  await Promise.resolve(); await Promise.resolve();
+  assert.ok(w.atSignOut.logoutKey, '끊기 «전에» 다른 탭에 「지금 나갔다」 를 안 알렸습니다');
+  /* ★ 외부 검토 지적: pu_auth_uid 를 끊기 전에 지우면 이 탭의 authsync 가 「로그인해 있던 화면이었나」 를 몰라 로그인 화면으로 안 밀어낸다 */
+  assert.equal(w.atSignOut.uid, 'u-keep', '끊는 순간 pu_auth_uid 가 이미 지워졌습니다 — authsync 가 이 탭을 로그인 화면으로 못 밀어냅니다');
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(w.store.pu_auth_uid, undefined, '끊긴 뒤 이 기기에 남은 로그인 열쇠를 안 지웠습니다');
+  assert.equal(w.store.p_autoSession, undefined, '앱 쪽 자동 세션(p_autoSession)이 남았습니다');
+  assert.equal(w.session.p_session, undefined);
+  assert.equal(w.store.pureun_v6_autologin_sid, undefined, '이알피 자동 로그인 열쇠가 남았습니다');
   /* 끊김이 끝나면 풀려, 같은 화면에서 새로 로그인한 사람은 다시 검사받는다(막히지 않는다) */
   w.inst.currentUser = user();
   w.store.pu_portal_auto = '1';
@@ -156,10 +174,38 @@ test('① ★ authsync 가 없는 앱: 밀어내기가 안 일어나면 «로그
   const kicked = mk({ authsync: true, kicked: true, gate: true });
   kicked.K.guard(kicked.inst.currentUser); kicked.timers.find((t) => t.kind === 'timeout').fn();
   assert.ok(!kicked.log.includes('gate') && !kicked.log.some((x) => /^go:/.test(x)), 'authsync 가 이미 밀어냈는데 또 움직였습니다');
-  /* 로그인 칸이 있는 화면(포털)은 제 화면이 로그인 칸을 보여 주니 건드리지 않는다 */
+  /* 로그인 칸이 «보이는» 화면(포털)은 제 화면이 로그인 칸을 보여 주니 건드리지 않는다 */
   const portal = mk({ loginForm: true, gate: true });
   portal.K.guard(portal.inst.currentUser); portal.timers.find((t) => t.kind === 'timeout').fn();
   assert.ok(!portal.log.includes('gate') && !portal.log.some((x) => /^go:/.test(x)), '로그인 칸이 있는 화면을 또 옮겼습니다');
+  /* ★ 외부 검토 지적: 로그인 칸이 «숨어 있는» 화면(정부사업일정의 닫힌 로그인 창)은 해당 없다 — 대비가 멈추면 만료한 화면이 열려 있다 */
+  const hidden = mk({ hiddenLogin: true });
+  hidden.K.guard(hidden.inst.currentUser); hidden.timers.find((t) => t.kind === 'timeout').fn();
+  assert.ok(hidden.log.some((x) => /^go:enter\.html/.test(x)), '숨은 로그인 칸 때문에 대비가 멈췄습니다');
+});
+
+test('① ★★ 외부 검토: 만료 뒤 4초 사이에 «다시 로그인»했으면(다른 탭 포함) 그 화면을 건드리지 않는다', () => {
+  const D = world().K.DAYS;
+  const w = world({ gate: true, store: { pu_portal_auto: '1', pu_keep_login_at: String(T0 - (D + 1) * DAY) } });
+  w.K.guard(w.inst.currentUser);
+  w.inst.currentUser = user();            // 그 사이 새로 로그인했다
+  w.timers.find((t) => t.kind === 'timeout').fn();
+  assert.ok(!w.log.includes('gate') && !w.log.some((x) => /^go:/.test(x)), '새로 로그인한 사람의 화면에 «로그인이 필요합니다» 를 씌웠습니다');
+});
+
+test('① ★★ 외부 검토: 끊기가 «실패»해도 새 30일을 주지 않는다 — 표시를 되돌리고 다시 끊어 본다', async () => {
+  const D = world().K.DAYS;
+  const old = String(T0 - (D + 3) * DAY);
+  const w = world({ signOutFails: true, store: { pu_portal_auto: '1', pu_keep_login_at: old } });
+  const who = w.inst.currentUser;
+  assert.equal(w.K.guard(who), true);
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(w.store.pu_keep_login_at, old, '끊기가 실패했는데 표시가 지워졌습니다 — 다음 검사가 「처음 본 사람」 으로 오해해 새 30일을 줍니다');
+  assert.equal(w.K.judge(who), 'expired', '끊기 실패 뒤 다시 보니 만료가 아닙니다');
+  assert.ok(w.timers.some((t) => t.kind === 'timeout' && t.ms === 2000), '끊기 실패 뒤 다시 끊어 보는 장치가 없습니다');
+  /* 다시 불리면 다시 끊는다(막힌 채 «끊는 중» 으로 남지 않는다) */
+  assert.equal(w.K.guard(who), true);
+  assert.equal(w.log.filter((x) => x === 'signout').length, 2, '다시 끊지 않았습니다');
 });
 
 /* ───────── 켜기·끄기·로그아웃 ───────── */
@@ -197,7 +243,7 @@ test('② ★★ 「유지 끔」 기기에서는 앱이 부른 LOCAL 이 SESSIO
     ['0', 'local', 'session'],   // 공용 PC: 앱이 LOCAL 을 요구해도 세션으로
     ['0', 'session', 'session'],
     ['1', 'local', 'local'],     // 유지 켬: 그대로
-    [undefined, 'local', 'local'], // 고른 적 없음: 건드리지 않는다
+    [undefined, 'local', 'local'], // 고른 적 없음: 지속 방식은 건드리지 않는다(상한은 별개로 건다)
     ['1', 'session', 'session'],
   ]) {
     const w = world({ store: saved === undefined ? {} : { pu_portal_auto: saved } });
@@ -220,9 +266,13 @@ test('② ★★ 앱 안의 따로 있는 로그인 칸도 「유지 끔」이�
     await new w.Auth().signInWithEmailAndPassword('a', 'b');
     assert.deepEqual(w.log.filter((x) => /^(persist|signin)/.test(x)), ['signin'], '유지 켬·미정인데 로그인에 손댔습니다');
   }
-  /* ⚠ 못 박기가 실패해도 로그인은 막지 않는다 */
+  /* ★ 외부 검토: 세션으로 못 정하면(저장소 거절) 로그인하지 않는다 — 못 정한 채 들어가면 공용 PC 에 영구 로그인이 남을 수 있다 */
   const bad = world({ store: { pu_portal_auto: '0' }, persistFails: true });
-  assert.equal(await new bad.Auth().signInWithEmailAndPassword('a', 'b'), 'cred', '저장소 오류가 로그인을 막았습니다');
+  await assert.rejects(() => new bad.Auth().signInWithEmailAndPassword('a', 'b'), /저장소 막힘/, '세션으로 못 박지 못했는데 로그인했습니다');
+  assert.ok(!bad.log.includes('signin'), '세션으로 못 박지 못했는데 로그인이 진행됐습니다');
+  /* 유지 켬·미정인 기기는 이 못 박기를 안 하므로 저장소 오류와 무관하다 */
+  const free = world({ store: { pu_portal_auto: '1' }, persistFails: true });
+  assert.equal(await new free.Auth().signInWithEmailAndPassword('a', 'b'), 'cred');
 });
 
 test('⑤ 파이어베이스가 늦게 실려도 감싸고 검사를 시작한다', () => {
@@ -341,9 +391,9 @@ test('포털 ★ 모듈은 로그아웃 까닭 파일 «뒤», 포털 본 스크
   assert.ok(why > 0 && keep > why && keep < main, '실리는 순서가 어긋났습니다');
 });
 
-test('정부사업일정(자체 로그인 칸): 「유지」를 고르면 먼저 알려 유지 끔 보호에 안 걸리고 시작 시각도 적힌다', () => {
+test('정부사업일정(자체 로그인 칸): «기본으로 체크된» 자동 로그인 칸이 기기 전체의 「유지 끔」을 뒤집지 않는다', () => {
   const g = stripComments(read('gov-consulting.html'));
-  const begin = g.indexOf('PuKeepLogin.begin(true)');
-  const persist = g.indexOf('setPersistence(persist)');
-  assert.ok(begin > 0 && begin < persist, '자체 로그인 칸의 «유지» 선택이 보호에 막힙니다');
+  /* 외부 검토: 그 칸은 HTML 에서 기본 checked 라, begin(true) 를 부르면 사람이 안 보고 지나친 체크가 공용 PC 의 유지 끔을 유지 켬으로 바꾼다 */
+  assert.ok(!/PuKeepLogin\.begin\(/.test(g), '자체 로그인 칸이 기기 전체의 유지 선택을 덮어씁니다 — 유지는 포털 체크칸에서만 고릅니다');
+  assert.match(g, /<script src="js\/pu-keep-login\.js\?v=\d+"><\/script>/, '정부사업일정이 모듈을 안 싣습니다 — 유지 끔 보호·30일 상한이 안 걸립니다');
 });
