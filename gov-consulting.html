@@ -988,8 +988,14 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .ended-pbtn:hover{border-color:var(--accent);color:var(--accent);}
 .ended-pbtn.on{border-style:solid;border-color:var(--accent);background:var(--sf2);color:var(--accent);}
 .chip.is-post{box-shadow:inset 0 0 0 1px currentColor;}
-.post-item{margin-top:3px;}
+.post-item{margin-top:3px;display:flex;flex-wrap:wrap;align-items:center;gap:3px 4px;}
 .post-item[draggable="true"]{cursor:grab;}
+/* 본 회차 줄의 「방문 | 사무실」(.fmtog)과 같은 모양을 한 줄로 줄인 것 — 끌어 넣을 사후의 구분. 색은 .fmt-btn 과 같은 변수. */
+.post-fmtog{display:inline-flex;border:1px solid var(--dash-border);border-radius:6px;overflow:hidden;flex-shrink:0;}
+.post-fmt-btn{padding:2px 6px;border:none;background:transparent;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--dash-t2);}
+.post-fmt-btn.on{background:var(--accent);color:var(--surface);}
+.post-fmt-btn.on.office{background:var(--info);}
+.post-next{font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;}
 .post-item[draggable="true"] .ended-pbtn::before{content:'⠿ ';opacity:.55;}
 .post-item.dragging{opacity:.4;}
 @media (hover:none){.post-item[draggable="true"] .ended-pbtn::before{content:none;}}
@@ -5142,6 +5148,20 @@ function setFieldState(coId,typeId,v){
   lsSet('p_fieldState',JSON.stringify(map));
   fbPush('p_fieldState',map);
 }
+/* 사후컨설팅 «끌어 넣기»의 방문/사무실 (대표 지시 2026-11-10 「방문이나 사무실은 기존 컨설팅과 같이 드래그 앤 드롭」).
+   본 회차와 «따로» 기억한다 — 한 줄에서 본 회차는 방문, 사후는 사무실로 끌 수 있어야 한다.
+   같은 p_fieldState 자리에 키만 `사업장_사업_post` 로 더한다(새 저장 칸·새 localStorage 키·새 규칙 없음). 값이 없으면 방문. */
+function getPostFieldState(coId,typeId){
+  let map={}; try{ map=JSON.parse(localStorage.getItem('p_fieldState')||'{}')||{}; }catch(e){ map={}; }
+  const v=map[`${coId}_${typeId}_post`];
+  return v===undefined?true:!!v;
+}
+function setPostFieldState(coId,typeId,v){
+  let map={}; try{ map=JSON.parse(localStorage.getItem('p_fieldState')||'{}')||{}; }catch(e){ map={}; }
+  map[`${coId}_${typeId}_post`]=!!v;
+  lsSet('p_fieldState',JSON.stringify(map));
+  fbPush('p_fieldState',map);
+}
 
 // Drag data
 let dragItem=null;
@@ -6396,7 +6416,8 @@ function schedPhase(sc){return sc&&sc.phase==='pre'?'pre':(sc&&sc.phase==='post'
    일정 레코드에 phase:'post' 로 둔다(사전진단 'pre'·본 'main' 과 같은 길). 사진·도장은 본 일정과 같은 증빙 흐름을 쓴다.
    ■ 규칙 하나: «사업(프로그램) 규칙과 회차 집계»에서는 빠지고, «보이고·열리고·사진 찍고·지우고·합치는 곳»에서는 일반 일정과 같다.
      - 본 회차(진척·종료 판정·목록 횟수·타임라인)에 안 들어간다 → 「사후 1회, 2회…」로 따로 센다.
-     - 같은 담당 하루 1건 · 기관 하루 1사업장 규칙에서는 빠진다. 담당 하루 한도와 «같은 사업장 같은 날»은 사람·사업장이 실제로 가는 날이라 그대로 센다.
+     - 같은 담당 하루 1건 · 기관 하루 1사업장 규칙은 «처음엔» 사후를 뺐지만, 대표 지시 2026-11-10 「동일 정부사업에서 사후컨설팅과 기존 사업장 방문일은 중복되면 안 되게」로
+       이제 «센다» — 그 규칙을 켜 둔 사업은 사후도 본 방문과 같은 날 겹칠 수 없다(양쪽 모두: 사후를 넣을 때 · 본 방문을 넣거나 옮길 때). 담당 하루 한도와 «같은 사업장 같은 날»도 그대로 센다.
      - 종료 잠금이 안 걸린다(사업은 종료 상태 그대로 두고 입력한다 — 진행 목록에 다시 올라오지 않는다).
    ⚠ getScheds() 는 «사후까지 전부» 돌려준다 — 거르면 읽고→고치고→setScheds 로 통째 쓰는 곳이 사후 줄을 조용히 지운다.
      «본 회차를 세는 곳»만 getMainScheds() 로 센다(tests/gov-post-consult.test.js 가 센 곳을 쓸어 담아 빠뜨림을 잡는다). */
@@ -7027,7 +7048,8 @@ function postDrawerHtml(v){
       `<div class="post-fbtn">${editing?`<button class="btn btn-p" onclick="postSave(false)">저장</button><button class="btn btn-s" onclick="postCancel()">취소</button>`:`<button class="btn btn-p" onclick="postSave(false)">＋ 사후컨설팅 추가</button><button class="btn btn-s" onclick="postSave(true)">추가하고 📷 사진 넣기</button>`}</div></div>`;
   const rules=`<div class="post-rules"><div class="post-rule">사후컨설팅은 본 회차(예 3/3)에 들어가지 않습니다 — 「사후 1회, 2회…」로 따로 셉니다.</div>`+
     `<div class="post-rule">사업 상태는 그대로입니다 — 종료된 사업은 진행 목록에 다시 올라오지 않고, 기관 보고서·종료 판정에도 섞이지 않습니다.</div>`+
-    `<div class="post-rule">달력에는 「사후」 칩으로 나옵니다 — 칩을 누르면 이 창이 열리고, 날짜는 여기서 고칩니다.</div></div>`;
+    `<div class="post-rule">달력에는 「사후」 칩으로 나옵니다 — 칩을 누르면 이 창이 열리고, 날짜는 여기서 고칩니다.</div>`+
+    `<div class="post-rule">진행 목록의 「사후」 항목을 달력 날짜로 끌어 넣어도 됩니다 — 방문·사무실은 항목 옆 단추로 고릅니다. 같은 사업장의 같은 사업 방문일에는 못 넣고, 「기관 하루 1건」·「같은 담당 하루 1건」으로 켜 둔 사업은 다른 사업장의 방문일에도 못 넣습니다.</div></div>`;
   return head+target+list+form+rules;
 }
 /* 사후컨설팅 목표 회수 고치기 (순수 — 사업장 한 건을 고치고 «했는지 / 왜 못 했는지» 를 돌려준다). 비우거나 0 이면 목표를 지운다.
@@ -7073,7 +7095,28 @@ function dashPostItem(co,tid){
   /* 넣을 수 있는 사업(postCanAdd)이면 항목을 «끌어서» 달력 날짜에 놓아 넣는다(대표 지시 2026-11-05) — 어느 사업장·사업인지는 data-post-* 에 담는다. */
   const drag=postCanAdd(co,tid);
   const dragTip=drag?' · 달력 날짜로 끌어서 넣기':'';
-  return `<div class="round-badge post-item"${drag?` draggable="true" data-post-coid="${co.id}" data-post-tid="${tid}"`:''}><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회${tgTxt} — 눌러서 보기·넣기`:`사후컨설팅 넣기${tgTxt} (날짜·사진)`}${dragTip}">${label}</button></div>`;
+  /* 본 회차 줄처럼 «방문 | 사무실» 단추 + 다음 회차를 곁들인다(대표 지시 2026-11-10). 끌 수 있을 때만 — 끌 수 없는 줄에는 아무것도 안 얹는다.
+     ⚠ 안에 div 를 두지 않는다(span·button 만) — 항목 «하나»를 한 덩어리로 떠 내는 검사가 있다. 단추는 줄 전체의 「눌러 열기」로 새지 않게 막는다. */
+  let extra='';
+  if(drag){
+    const isF=getPostFieldState(co.id,tid);
+    const fN=posts.filter(s=>s.isField).length, oN=n-fN;
+    const pk=f=>`event.stopPropagation();postPickField('${co.id}','${tid}',${f})`;
+    extra=`<span class="post-fmtog" data-coid="${co.id}" data-typeid="${tid}" title="끌어 넣을 사후컨설팅의 구분 · 지금까지 📍방문 ${fN}회 · 🏢사무실 ${oN}회">`
+      +`<button type="button" class="post-fmt-btn${isF?' on':''}" data-f="1" onclick="${pk(1)}">방문</button>`
+      +`<button type="button" class="post-fmt-btn${isF?'':' on office'}" data-f="0" onclick="${pk(0)}">사무실</button></span>`
+      +(tg>0&&n>=tg?'':`<span class="post-next">다음 사후 ${n+1}회차</span>`);
+  }
+  return `<div class="round-badge post-item"${drag?` draggable="true" data-post-coid="${co.id}" data-post-tid="${tid}"`:''}><button class="ended-pbtn${n?' on':''}" onclick="event.stopPropagation();openPostDrawer(${k})" title="${n?`사후컨설팅 ${n}회${tgTxt} — 눌러서 보기·넣기`:`사후컨설팅 넣기${tgTxt} (날짜·사진)`}${dragTip}">${label}</button>${extra}</div>`;
+}
+/* 사후 항목의 «방문 | 사무실» 단추 — 기억하고(본 회차와 따로), 같은 사업장·사업의 단추 모양을 모두 맞춘다(묶어 보기에 카드가 둘 이상일 수 있다). */
+function postPickField(coId,tid,isF){
+  const on=!!isF;
+  setPostFieldState(coId,tid,on);
+  qa(`#dashList .post-fmtog[data-coid="${coId}"][data-typeid="${tid}"] .post-fmt-btn`).forEach(b=>{
+    const f=b.dataset.f==='1';
+    b.className='post-fmt-btn'+(f===on?(f?' on':' on office'):'');
+  });
 }
 /* 종료 목록의 「사후컨설팅」 칸 — 입력 전 「＋ 사후」, 입력 후 「사후 N회 · 📷M」 */
 function postCellHtml(it){
@@ -7117,9 +7160,11 @@ async function postSetTarget(raw){
   await endedMutate(_post.coId,co=>postTargetOn(co,tid,raw),r=>r.to?`사후컨설팅 목표를 ${r.to}회로 정했습니다`:'사후컨설팅 목표를 지웠습니다');
   renderPostDrawer();
 }
-/* 못 넣는 까닭 — 비어 있으면 넣을 수 있다. 사업(프로그램) 규칙(같은 담당 하루 1건·기관 하루 1사업장)은 안 보고,
-   «사람·사업장이 실제로 가는 날»의 충돌(같은 날 같은 사업 · 같은 사업장 다른 사업 · 담당 하루 한도)만 본다. */
-function postProblem(co,tid,date,excludeId){
+/* 못 넣는 까닭 — 비어 있으면 넣을 수 있다. «사람·사업장이 실제로 가는 날»의 충돌(같은 날 같은 사업 · 같은 사업장 다른 사업 · 담당 하루 한도)과,
+   같은 정부사업의 하루 규칙(같은 담당 하루 1건 · 기관 하루 1사업장 — 켜 둔 사업만)을 본다. 본 방문(다른 사업장 포함)과 같은 날이면 못 넣는다
+   (대표 지시 2026-11-10 「동일 정부사업에서 사후컨설팅과 기존 사업장 방문일은 중복되면 안 되게」).
+   keepDay — 이미 있는 사후를 «날짜는 그대로» 고칠 때(구분·메모)는 새 규칙(위 하루 규칙)을 다시 묻지 않는다: 규칙이 생기기 전에 넣은 사후가 겹쳐 있어도 메모 한 줄은 고칠 수 있어야 한다. */
+function postProblem(co,tid,date,excludeId,keepDay){
   /* 서랍 화면이 입력칸을 감추는 것만으로는 부족하다 — 저장 함수에서도 막는다.
      넣을 수 있는 사업: 종료된 사업 · «수정 중» · 본 회차를 다 마친(완료) 사업 */
   if(!postCanAdd(co,tid))return '본 회차를 모두 마쳤거나 종료된 사업에서만 사후컨설팅을 넣을 수 있습니다';
@@ -7127,6 +7172,11 @@ function postProblem(co,tid,date,excludeId){
   const blocked=isBlocked(date,tid); if(blocked)return blocked;
   if(getScheds().some(s=>s.id!==excludeId&&s.coId===co.id&&s.typeId===tid&&s.date===date))return `${date}에 이 사업의 일정이 이미 있습니다`;
   const other=coOtherTypeOn(co.id,tid,date,excludeId); if(other)return `${date}에 같은 사업장의 다른 사업(${other})이 이미 있습니다`;
+  if(!keepDay){
+    /* 본 방문을 넣을 때 쓰는 두 규칙을 «그대로» 쓴다 — 어긋나면 사후는 들어가는데 본 방문은 막히는 날이 생긴다. 글은 한 줄로(알림·서랍 오류칸에 그린다). */
+    const dayErr=checkConflictMatrix(co.id,tid,date,excludeId)||checkAgencyExclusive(co.id,tid,date,excludeId);
+    if(dayErr)return String(dayErr).replace(/\s*\n\s*/g,' ');
+  }
   return checkAttLimit(coMainOf(co,tid)||myId()||'a1',date,excludeId)||'';
 }
 /* 일정 레코드 — 고칠 때는 «다른 칸(사진 설정 등)»을 그대로 두고 날짜·구분·메모만 바꾼다. 빈 메모는 칸을 두지 않는다(undefined 금지). */
@@ -7150,7 +7200,8 @@ async function postSave(withPhoto){
   postFormRead();
   const {coId,tid,editId,date,field,memo}=_post;
   const co=getCos().find(c=>c.id===coId); if(!co)return;
-  const err=postProblem(co,tid,date,editId);
+  const prev=editId?getScheds().find(s=>s.id===editId&&isPostSched(s)):null;
+  const err=postProblem(co,tid,date,editId,!!(prev&&prev.date===date));   // 날짜를 안 바꾸고 고치면 하루 규칙은 다시 안 묻는다
   if(err){ _post.err=err; renderPostDrawer(); toast(err,'err'); return; }
   if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
   const scheds=getScheds();
@@ -7175,7 +7226,8 @@ async function postSave(withPhoto){
    ⚠ stopPropagation — 항목은 본 회차 줄(.drow · 끌기=본 회차)과 카드(순서 바꾸기) «안»에 있다. 새면 본 회차 끌기가 같이 시작되거나 카드가 끌기를 취소한다(일정 칩 끌기와 같은 까닭). */
 function postDragStart(e,el){
   e.stopPropagation();
-  dragItem={post:true,coId:el.dataset.postCoid,typeId:el.dataset.postTid};
+  /* isField — 항목 옆 «방문 | 사무실» 단추의 지금 값(본 회차 줄의 방문/사무실과 따로). 끌기 «시작할 때» 읽는다. */
+  dragItem={post:true,coId:el.dataset.postCoid,typeId:el.dataset.postTid,isField:getPostFieldState(el.dataset.postCoid,el.dataset.postTid)};
   e.dataTransfer.effectAllowed='copy';
   e.dataTransfer.setData('text/plain','post');
   el.classList.add('dragging');
@@ -7185,7 +7237,8 @@ function postDragEnd(el){
   dragItem=null;
 }
 /* 사후 항목을 달력 날짜에 놓았다 — 서랍의 「사후컨설팅 추가」와 «같은 규칙»(postProblem)·같은 저장·같은 알림으로 한 건 넣는다.
-   방문(📍)·메모 없음으로 들어가고, 구분·메모·사진은 달력 칩을 눌러 서랍에서 고친다. 본 회차 규칙(최대 회차·기관 하루 1건 등)은 사후에 안 쓴다. */
+   방문(📍)/사무실(🏢)은 항목 옆 단추(item.isField)를 따르고(없으면 방문), 메모는 없이 들어간다 — 메모·사진은 달력 칩을 눌러 서랍에서 고친다.
+   본 회차처럼 방문이고 환경설정 「현장 등록 시 타임스탬프 자동 팝업」(autoStampOnField)이 켜져 있으면 사진 창을 연다. 본 회차 규칙(최대 회차 등)은 사후에 안 쓴다. */
 async function handlePostDrop(date,item){
   const co=getCos().find(c=>c.id===item.coId);
   if(!co){toast('사업장을 찾을 수 없습니다','err');return;}
@@ -7193,14 +7246,16 @@ async function handlePostDrop(date,item){
   const err=postProblem(co,item.typeId,date,'');
   if(err){toast(err,'err');return;}
   if(!await acquireCompanyEditLock(co.id)||!await verifyCompanyEditLock(co.id))return;
-  const sc=postBuildSched(co,item.typeId,{date,field:true,memo:''},null);
+  const isF=item.isField!==false;
+  const sc=postBuildSched(co,item.typeId,{date,field:isF,memo:''},null);
   const scheds=getScheds(); scheds.push(sc);
   setScheds(scheds);
   reorderRounds(co.id,item.typeId);          // 사후끼리 날짜순으로 1,2,3 — 본 일정 번호는 안 건드린다
   releaseCompanyEditLock();
   renderSummaryBar();renderCal();renderDash();if(q('#endedList'))renderEndedView();
   const fr=(getScheds().find(s=>s.id===sc.id)||{}).round||0;
-  toast(`${date.slice(5)} · ${postAddedText(co.id,item.typeId,fr)}`);
+  toast(`${date.slice(5)} · ${isF?'📍 방문':'🏢 사무실'} · ${postAddedText(co.id,item.typeId,fr)}`);
+  if(isF&&getEnv().autoStampOnField)setTimeout(()=>openStampModal(sc.id),200);
 }
 function postPhoto(sid){
   const sc=getScheds().find(s=>s.id===sid&&isPostSched(s));
@@ -8370,7 +8425,7 @@ function renderDash(){
     let isDragging=false;
     row.onclick=e=>{
       if(isDragging)return;
-      if(e.target.closest('.fmtog')||e.target.closest('.end-btn')||e.target.closest('.co-del-btn'))return;
+      if(e.target.closest('.fmtog')||e.target.closest('.end-btn')||e.target.closest('.co-del-btn')||e.target.closest('.post-item'))return;   // 사후 항목(단추·빈틈)을 눌러도 «본 회차 등록 창»이 열리지 않는다
       openSingleModal(row.dataset.coid,row.dataset.typeid);
     };
     row.ondragstart=e=>{
@@ -10386,7 +10441,7 @@ function toggleConflict(a,b){const m=getConflictMatrix();const k=conflictKey(a,b
 // 특정 날짜에 '같은 날 불가'/'하루 1건' 위반이 실제로 있으면 안내 문구 반환(없으면 null) — 캘린더 경고 배지용
 function dayConflictMsg(date){
   const types=getTypes();
-  const day=getScheds().filter(s=>s.date===date&&!isPostSched(s));
+  const day=getScheds().filter(s=>s.date===date);   // 사후도 센다 — 같은 정부사업에서 사후와 본 방문이 같은 날 겹치면 경고(2026-11-10)
   // 같은 주담당(attId) + 같은 유형(중복불가) 이 2건 이상이면 경고
   for(let i=0;i<day.length;i++)for(let j=i+1;j<day.length;j++){
     const a=day[i],b=day[j];
@@ -10410,15 +10465,15 @@ function checkConflictMatrix(coId,typeId,date,excludeId=null){
   // 등록/이동하려는 일정의 주담당 = 그 «사업의» 주담당(사업별 칸이 없으면 사업장 주담당)
   const mainAtt=coMainOf(getCos().find(c=>c.id===coId),typeId);
   if(!mainAtt)return null;
-  // 같은 날 · 같은 주담당 · 같은 유형 · 다른 사업장 일정
+  // 같은 날 · 같은 주담당 · 같은 유형 · 다른 사업장 일정 — 사후도 일정이다(대표 지시 2026-11-10: 같은 정부사업에서 사후와 본 방문은 겹치면 안 된다)
   const clash=getScheds().find(s=>
-    s.date===date&&s.id!==excludeId&&s.attId===mainAtt&&s.typeId===typeId&&s.coId!==coId&&!isPostSched(s)
+    s.date===date&&s.id!==excludeId&&s.attId===mainAtt&&s.typeId===typeId&&s.coId!==coId
   );
   if(clash){
     const t1=ty?.name||'?';
     const co2=getCos().find(c=>c.id===clash.coId)?.name||'?';
     const attNm=getStaff().find(a=>a.id===mainAtt)?.name||'주담당';
-    return `[${t1}]은 같은 주담당(${attNm})이 같은 날 중복 진행할 수 없습니다.\n${date}에 이미 [${co2}] 일정이 있습니다.`;
+    return `[${t1}]은 같은 주담당(${attNm})이 같은 날 중복 진행할 수 없습니다.\n${date}에 이미 [${co2}] ${isPostSched(clash)?'사후컨설팅':'일정'}이 있습니다.`;
   }
   return null;
 }
@@ -10432,12 +10487,13 @@ function checkConflictMatrix(coId,typeId,date,excludeId=null){
 function checkAgencyExclusive(coId,typeId,date,excludeId=null){
   const t=getTypes().find(x=>x.id===typeId);
   if(!t||!t.agencyExclusiveDay)return null;
+  /* 사후컨설팅도 «그 날 기관이 그 사업장에 가는 날»이다 — 본 방문과 같은 날 겹치면 안 된다(대표 지시 2026-11-10 「동일 정부사업에서 사후컨설팅과 기존 사업장 방문일은 중복되면 안 되게」). */
   const clash=getScheds().find(s=>
-    s.date===date&&s.id!==excludeId&&s.typeId===typeId&&s.coId!==coId&&!isPostSched(s)
+    s.date===date&&s.id!==excludeId&&s.typeId===typeId&&s.coId!==coId
   );
   if(!clash)return null;
   const co2=getCos().find(c=>c.id===clash.coId)?.name||'?';
-  return `[${t.fullName||t.name}]${t.agency?'('+t.agency+')':''}은 하루에 한 사업장만 가능합니다.\n${date}에 이미 [${co2}] 일정이 있습니다.`;
+  return `[${t.fullName||t.name}]${t.agency?'('+t.agency+')':''}은 하루에 한 사업장만 가능합니다.\n${date}에 이미 [${co2}] ${isPostSched(clash)?'사후컨설팅':'일정'}이 있습니다.`;
 }
 /* checkAgencyExclusive 와 같은 규칙을 «달력 칸 표시용»으로 — 저장 전에 미리
    막고(dis busy), 마우스를 올리면 어느 사업장 때문인지 보여준다. 반환은
@@ -10446,7 +10502,7 @@ function checkAgencyExclusive(coId,typeId,date,excludeId=null){
 function agencyOtherSiteOn(coId,typeId,ds,excludeId){
   const t=getTypes().find(x=>x.id===typeId);
   if(!t||!t.agencyExclusiveDay)return '';
-  const hit=getScheds().find(s=>s.typeId===typeId&&s.coId!==coId&&s.date===ds&&s.id!==excludeId&&!isPostSched(s));
+  const hit=getScheds().find(s=>s.typeId===typeId&&s.coId!==coId&&s.date===ds&&s.id!==excludeId);   // 사후도 센다(checkAgencyExclusive 와 같은 규칙)
   if(!hit)return '';
   return getCos().find(c=>c.id===hit.coId)?.name||'다른 사업장';
 }

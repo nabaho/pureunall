@@ -7,7 +7,8 @@
      · ★ 사후를 넣어도 본 회차 숫자(종료 목록·진행 목록·진척·타임라인·요약줄)는 «글자까지 똑같다».
      · 사업은 종료 상태 그대로 둔다 — 사후를 넣었다고 진행 목록에 다시 올라오지 않는다.
      · 달력에서 사후 칩은 잠기지 않는다(취소선·🔒 없음). 대신 끌어 옮기지 않고, 눌러도 본 일정 수정 창이 아니라 사후컨설팅 서랍이 열린다.
-     · 사업(프로그램) 규칙(같은 담당 하루 1건 · 기관 하루 1사업장)에서는 빠지고, 물리적 충돌(담당 하루 한도 · 같은 사업장 같은 날)은 일반 일정과 같다.
+     · 같은 정부사업의 하루 규칙(같은 담당 하루 1건 · 기관 하루 1사업장)과 물리적 충돌(담당 하루 한도 · 같은 사업장 같은 날)은 «일반 일정과 같다» —
+       사후와 본 방문은 같은 날 겹칠 수 없다(대표 지시 2026-11-10 「동일 정부사업에서 사후컨설팅과 기존 사업장 방문일은 중복되면 안 되게」. 처음엔 사후를 이 두 규칙에서 뺐다).
      · 기관 보고서·방문 안내 문자·현장클리닉 회차 제안에는 «안 섞인다».
      · 저장하는 모양에 undefined 를 남기지 않는다 · 새 localStorage 키를 만들지 않는다.
 
@@ -241,30 +242,44 @@ function cfWorld() {
   return c;
 }
 
-test('★ 같은 담당 하루 1건 — 다른 사업장의 «사후»는 걸림돌이 아니다, «본»은 그대로 걸림돌이다', () => {
+/* ★ 2026-11-10 대표 지시 「동일 정부사업에서 사후컨설팅과 기존 사업장 방문일은 중복되면 안 되게」 —
+   처음엔 사후를 이 두 규칙에서 «뺐다». 이제는 «센다»: 그 규칙을 켜 둔 사업은 사후와 본 방문이 같은 날 겹칠 수 없다(다른 사업장끼리도). */
+test('★ 같은 담당 하루 1건 — 다른 사업장의 «사후»도 «본»과 똑같이 걸림돌이다 (까닭에 «사후컨설팅» 이라고 적는다)', () => {
   const c = cfWorld();
   c._st.scheds = [P('c2', 't2', '2026-11-05')];
-  assert.strictEqual(c.checkConflictMatrix('c1', 't2', '2026-11-05'), null, '사후는 사업(프로그램) 규칙에서 빠진다');
+  const msg = c.checkConflictMatrix('c1', 't2', '2026-11-05') || '';
+  assert.ok(/같은 날 중복/.test(msg) && /라마바식품/.test(msg) && /사후컨설팅/.test(msg), '사후도 막고, 사후라고 말해 준다: ' + msg);
   c._st.scheds = [D('c2', 't2', '2026-11-05')];
-  assert.ok(/같은 날 중복/.test(c.checkConflictMatrix('c1', 't2', '2026-11-05') || ''), '본 일정은 예전 그대로 막는다');
+  const main = c.checkConflictMatrix('c1', 't2', '2026-11-05') || '';
+  assert.ok(/같은 날 중복/.test(main) && /일정이 있습니다/.test(main) && !/사후/.test(main), '본 일정은 예전 글자 그대로: ' + main);
+  c._st.scheds = [P('c2', 't2', '2026-11-06')];
+  assert.strictEqual(c.checkConflictMatrix('c1', 't2', '2026-11-05'), null, '다른 날이면 통과');
+  c._st.scheds = [P('c1', 't2', '2026-11-05')];
+  assert.strictEqual(c.checkConflictMatrix('c1', 't2', '2026-11-05'), null, '같은 사업장끼리는 이 규칙이 아니다(같은 날 같은 사업 중복 방지가 따로 막는다)');
 });
 
-test('★ 기관 하루 1사업장 — 다른 사업장의 사후는 걸림돌이 아니고, 달력 칸 표시(agencyOtherSiteOn)도 같다', () => {
+test('★ 기관 하루 1사업장 — 다른 사업장의 사후도 걸림돌이고, 달력 칸 표시(agencyOtherSiteOn)도 같다', () => {
   const c = cfWorld();
   c._st.scheds = [P('c2', 't3', '2026-11-05', { typeId: 't3' })];
-  assert.strictEqual(c.checkAgencyExclusive('c1', 't3', '2026-11-05'), null);
-  assert.strictEqual(c.agencyOtherSiteOn('c1', 't3', '2026-11-05'), '');
+  const msg = c.checkAgencyExclusive('c1', 't3', '2026-11-05') || '';
+  assert.ok(/하루에 한 사업장만/.test(msg) && /라마바식품/.test(msg) && /사후컨설팅/.test(msg), msg);
+  assert.strictEqual(c.agencyOtherSiteOn('c1', 't3', '2026-11-05'), '라마바식품', '등록 달력에서도 그 날이 막힌다');
   c._st.scheds = [D('c2', 't3', '2026-11-05')];
-  assert.ok(c.checkAgencyExclusive('c1', 't3', '2026-11-05'), '본 일정은 막는다');
+  const main = c.checkAgencyExclusive('c1', 't3', '2026-11-05') || '';
+  assert.ok(main && /일정이 있습니다/.test(main) && !/사후/.test(main), '본 일정은 예전 글자 그대로: ' + main);
   assert.strictEqual(c.agencyOtherSiteOn('c1', 't3', '2026-11-05'), '라마바식품');
+  c._st.scheds = [P('c2', 't2', '2026-11-05')];
+  assert.strictEqual(c.checkAgencyExclusive('c1', 't2', '2026-11-05'), null, '이 규칙을 켜지 않은 사업(t2)은 예전처럼 안 막는다');
 });
 
-test('달력의 «같은 날 중복» 경고 배지에도 사후는 안 센다', () => {
+test('달력의 «같은 날 중복» 경고 배지에도 사후가 센다 (같은 담당 하루 1건 사업의 본 방문과 사후가 겹치면 경고)', () => {
   const c = cfWorld();
   c._st.scheds = [D('c1', 't2', '2026-11-05'), P('c2', 't2', '2026-11-05')];
-  assert.strictEqual(c.dayConflictMsg('2026-11-05'), null);
+  assert.ok(c.dayConflictMsg('2026-11-05'), '본 + 다른 사업장 사후 → 경고');
+  c._st.scheds = [D('c1', 't2', '2026-11-05'), P('c1', 't2', '2026-11-05')];
+  assert.strictEqual(c.dayConflictMsg('2026-11-05'), null, '같은 사업장의 본 + 사후는 이 배지가 아니다(단순 중복은 따로)');
   c._st.scheds = [D('c1', 't2', '2026-11-05'), D('c2', 't2', '2026-11-05')];
-  assert.ok(c.dayConflictMsg('2026-11-05'), '본 둘이면 경고');
+  assert.ok(c.dayConflictMsg('2026-11-05'), '본 둘이면 예전처럼 경고');
 });
 
 test('★ 담당 하루 한도 — 사후도 «센다» (사람이 실제로 가는 날이다)', () => {
@@ -289,7 +304,7 @@ const VIEWS = ['isPrePhaseType', 'schedPhase', 'isPostSched', 'getMainScheds', '
 function scene(withPost) {
   const c = world(VIEWS, {
     PRE_ROUND_CAP: 2, S: { tlStatus: 'active' }, _mpMine: false, _mpOpen: '', _tzKey: { coId: 'c1', tid: 't2' },
-    getFieldState: () => true, roundIssueBadge: () => '', deadlineBadge: () => '', dashRowBtns: () => '', deadlineBadgeCompact: () => '',
+    getFieldState: () => true, getPostFieldState: () => true, roundIssueBadge: () => '',deadlineBadge: () => '', dashRowBtns: () => '', deadlineBadgeCompact: () => '',
     bindCalNav: () => {}, renderNotifBadge: () => {}, tlMineOnlyOn: () => false, fillTimelineTypeFilter: () => {}, tlRowHasAtt: () => true,
     coMainOf: (co) => co.defAtt, getCoAtts: (o) => (o && o.defCoAtts) || [], coAttStaffList: () => [], schedHasPhoto: () => false,
     openEditModal: () => {}, openTlZoom: () => {}, closeModal: () => {}, dashHeadAtts: (co) => ({ main: co.defAtt, subs: [] }), tzDow: () => '월', getHoliday: () => '',
@@ -567,8 +582,11 @@ test('★ 서랍 — 입력한 사후 목록(날짜·방문/사무실·메모·�
   assert.ok(/postEdit\('pa'\)/.test(h) && /postDelete\('pa'\)/.test(h) && /postPhoto\('pa'\)/.test(h), '수정·삭제·사진 단추');
   assert.ok(/id="postDate"/.test(h) && /id="postMemo"/.test(h) && /postSetField\(1\)/.test(h) && /postSetField\(0\)/.test(h), '날짜·방문/사무실·메모 입력칸');
   assert.ok(/＋ 사후컨설팅 추가/.test(h) && /postSave\(false\)/.test(h) && /postSave\(true\)/.test(h), '추가 단추(사진 넣기와 함께 / 따로)');
-  assert.strictEqual((h.match(/class="post-rule"/g) || []).length, 3, '규칙 안내 세 줄');
+  assert.ok((h.match(/class="post-rule"/g) || []).length >= 3, '규칙 안내 줄');
   assert.ok(/본 회차/.test(h) && /종료/.test(h) && /달력/.test(h), '안내 내용: 본 회차에 안 들어감 · 종료 그대로 · 달력 칩');
+  const rules = (h.match(/<div class="post-rule">[\s\S]*?<\/div>/g) || []).join(' ');
+  assert.ok(/끌어 넣어도/.test(rules) && /방문·사무실은 항목 옆 단추/.test(rules), '안내: 진행 목록 항목을 끌어 넣고 방문/사무실은 항목 옆 단추로 고른다');
+  assert.ok(/같은 사업장의 같은 사업 방문일에는 못 넣고/.test(rules) && /기관 하루 1건/.test(rules) && /다른 사업장의 방문일에도 못 넣습니다/.test(rules), '안내: 겹침 규칙(같은 사업장·켜 둔 사업은 다른 사업장도)');
 });
 
 test('★ 서랍 목록도 ☐ + 번호가 맨 왼쪽 — 고르면 「N건 선택 · 삭제」를 띄우는 자리가 있다 (자료 목록 규칙)', () => {
@@ -605,11 +623,20 @@ test('서랍 — 메모·이름 속 HTML 글자는 무해하게 처리된다 · 
 const POSTFN = ['isPostSched', 'getMainScheds', 'mainPhaseScheds', 'postTypeDone', 'schedPhase', 'isPrePhaseType', 'roundIsFixed', 'reorderRounds', 'postListFor', 'postPhotoCount', 'schedHasPhoto',
   'postProblem', 'postBuildSched', 'postDrawerView', 'postDrawerHtml', 'renderPostDrawer', 'openPostDrawer', 'closePostDrawer', 'postSetField', 'postEdit', 'postCancel',
   'postFormRead', 'postSave', 'postDelete', 'postRemove', 'postThumbs', 'postBatchDelete', 'postSelKeys', 'postSelChange', 'postSelAll', 'postPhoto', 'coOtherTypeOn', 'checkAttLimit', 'getCoAtts',
-  'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate', 'postCanAdd', 'postAddedText', 'postDragStart', 'postDragEnd', 'handlePostDrop'];
+  'getCoPostTarget', 'postCountText', 'postTargetOn', 'postSetTarget', 'endedMutate', 'postCanAdd', 'postAddedText', 'postDragStart', 'postDragEnd', 'handlePostDrop',
+  /* 2026-11-10 — 사후도 «같은 정부사업 하루 규칙»(같은 담당 하루 1건 · 기관 하루 1사업장)을 따른다 · 끌 때 방문/사무실 */
+  'checkConflictMatrix', 'checkAgencyExclusive', 'isConflictPair', 'conflictKey', 'getPostFieldState', 'setPostFieldState', 'postPickField'];
+/* 가짜 localStorage — 방문/사무실 기억(p_fieldState)을 실제로 읽고 쓰게 한다. 새 키가 생기면 lsKeys 에 보인다. */
+function fakeLs() {
+  const m = {}; const writes = [];
+  return { m, writes, ls: { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } }, lsSet: (k, v) => { m[k] = String(v); writes.push(k); }, fbPush: (k, v) => writes.push('fb:' + k) };
+}
 function postWorld(over) {
   const calls = { locks: 0, released: 0, saves: 0, stamp: [], confirm: null, cb: null, delPhoto: [], rendered: [], closed: [] };
   let n = 0;
+  const fl = fakeLs();
   const c = world(POSTFN, Object.assign({
+    localStorage: fl.ls, lsSet: fl.lsSet, fbPush: fl.fbPush,
     uid: () => 'new' + (++n), acquireCompanyEditLock: async () => { calls.locks++; return true; }, verifyCompanyEditLock: async () => true, releaseCompanyEditLock: () => { calls.released++; },
     showConfirm: (m, cb) => { calls.confirm = m; calls.cb = cb; }, openStampModal: (sid) => calls.stamp.push(sid), deletePhotoFromDB: (sid) => calls.delPhoto.push(sid),
     getPhotoFromDB: async () => null, logPhoto: () => {}, isBlocked: () => '', coMainOf: (co) => co.defAtt, myId: () => 'a1',
@@ -621,10 +648,10 @@ function postWorld(over) {
   const orig = c.setScheds; c.setScheds = (v) => { calls.saves++; calls.raw.push(v); orig(v); };   // v 는 «날것» — JSON 을 거치면 undefined 가 사라져 안 보인다
   c._st.cos = [CO('c1', '가나상사', { types: ['t2'], endedTypes: { t2: '2026-10-24' } }), CO('c2', '라마바식품', { types: ['t2'] })];
   c._st.scheds = [D('c1', 't2', '2026-09-01', { round: 1, id: 'm1' }), D('c1', 't2', '2026-09-08', { round: 2, id: 'm2' }), D('c2', 't2', '2026-09-01', { round: 1, id: 'o1' })];
-  c._calls = calls;
+  c._calls = calls; c._ls = fl;
   return c;
 }
-const form = (c, date, memo) => { c._st.els['#postDate'] = { value: date }; c._st.els['#postMemo'] = { value: memo || '' }; };
+const form =(c, date, memo) => { c._st.els['#postDate'] = { value: date }; c._st.els['#postMemo'] = { value: memo || '' }; };
 const mainOnly = (c) => JSON.stringify(c._st.scheds.filter((s) => s.phase !== 'post'));
 
 test('★ 사후 넣기 — 일정 한 줄이 늘고, 본 일정·사업(종료 상태)은 하나도 안 바뀐다', async () => {
@@ -1183,7 +1210,7 @@ test('★ 끌기 시작 — 사후 표시와 사업장·사업이 담기고, 줄
   const ev = { stopped: false, stopPropagation() { this.stopped = true; }, dataTransfer: { effectAllowed: '', data: {}, setData(k, v) { this.data[k] = v; } } };
   const el = { dataset: { postCoid: 'c1', postTid: 't2' }, classList: { add: (x) => marks.push('+' + x), remove: (x) => marks.push('-' + x) } };
   c.postDragStart(ev, el);
-  assert.deepStrictEqual(J(vm.runInContext('dragItem', c)), { post: true, coId: 'c1', typeId: 't2' });
+  assert.deepStrictEqual(J(vm.runInContext('dragItem', c)), { post: true, coId: 'c1', typeId: 't2', isField: true }, '단추를 안 눌렀으면 방문');
   assert.strictEqual(ev.stopped, true, '★ 안쪽 끌기가 바깥 줄(.drow = 본 회차 끌기)·카드(순서 바꾸기)로 새면 안 된다');
   assert.strictEqual(ev.dataTransfer.effectAllowed, 'copy'); assert.ok(ev.dataTransfer.data['text/plain'], 'setData 가 있어야 일부 브라우저에서 끌기가 시작된다');
   assert.deepStrictEqual(marks, ['+dragging']);
@@ -1265,4 +1292,181 @@ test('★ qa() 는 NodeList 다 — 결과에 map·filter·some 같은 «배열 
   const hits = []; let m;
   while ((m = re.exec(S))) hits.push(S.slice(Math.max(0, m.index - 40), m.index).split('\n').pop().trim() + ' … ' + m[0]);
   assert.deepStrictEqual(hits, [], 'NodeList 에 배열 함수를 바로 부른 곳: ' + hits.join(' | '));
+});
+
+/* ══ ⑳ 사후컨설팅 «방문 | 사무실» 끌기 + 같은 정부사업 하루 겹침 금지 (대표 지시 2026-11-10) ═════════════════════
+   ① 「사후컨설팅 회차 넣고 방문이나 사무실은 기존 컨설팅과 같이 드래그 앤 드롭으로」 — 본 회차 줄의 「방문 | 사무실」처럼 사후 항목 옆 단추로 고르고, 끌어 놓으면 그 구분으로 들어간다.
+      본 회차의 방문/사무실(getFieldState)과는 «따로» 기억한다 — 한 줄에서 본 회차는 방문, 사후는 사무실로 끌 수 있어야 한다.
+   ② 「동일 정부사업에서 사후컨설팅과 기존의 사업장 방문일은 중복되면 안 되게」 — 사후도 본 방문과 같은 날 겹칠 수 없다(같은 사업장 · 하루 규칙을 켜 둔 사업은 다른 사업장도). */
+
+const lsMap = (c) => JSON.parse(c._ls.m.p_fieldState || '{}');
+const divCount = (h) => (String(h).match(/<div\b/g) || []).length;
+
+test('★ 진행 목록 사후 항목 — 끌 수 있을 때만 «방문 | 사무실» 단추와 「다음 사후 N회차」가 붙는다 · 항목 안에 div 가 없다', () => {
+  const c = dashScene(true);
+  const done = postItems(rowOf(c, 'c1'))[0];            // 완료 줄 — 사후 2회(방문 1 · 사무실 1), 목표 없음
+  assert.ok(dragAttr(done), '대조: 끌 수 있는 항목이다');
+  assert.ok(/<span class="post-fmtog" data-coid="c1" data-typeid="t2"/.test(done), '단추 묶음이 사업장·사업을 달고 있다: ' + done);
+  assert.ok(/class="post-fmt-btn on" data-f="1"[^>]*>방문</.test(done) && /class="post-fmt-btn" data-f="0"[^>]*>사무실</.test(done), '처음엔 방문이 켜져 있다');
+  assert.ok(/다음 사후 3회차/.test(done), '이미 2회 → 다음은 3회차: ' + done);
+  assert.ok(/방문 1회/.test(done) && /사무실 1회/.test(done), '지금까지의 방문·사무실 횟수는 말풍선으로: ' + done);
+  assert.ok(/event\.stopPropagation\(\);postPickField\('c1','t2',1\)/.test(done) && /event\.stopPropagation\(\);postPickField\('c1','t2',0\)/.test(done), '단추가 줄 전체의 「눌러 열기」로 새지 않는다');
+  assert.strictEqual(divCount(done), 1, '항목 안에 div 를 또 두지 않는다 — 항목 하나를 한 덩어리로 떠 내는 검사가 있다');
+  const going = postItems(rowOf(c, 'c2'))[0];           // 일터혁신 본 2/4 — 진행 중이라 끌 수 없다
+  assert.ok(going && !dragAttr(going) && !/post-fmtog|다음 사후/.test(going), '끌 수 없는 줄에는 단추도 «다음 회차»도 얹지 않는다: ' + going);
+});
+
+test('사후 항목 — 목표를 채우면 「다음 사후 N회차」는 사라지고(단추는 남는다), 목표가 남아 있으면 다음 회차를 말한다 · 사무실이 켜져 있으면 사무실 쪽이 켜진다', () => {
+  const c = dashScene(true);
+  c._st.cos.find((x) => x.id === 'c1').customPost = { t2: 2 };
+  let it = postItems(rowOf(c, 'c1'))[0];
+  assert.ok(!/다음 사후/.test(it) && /post-fmtog/.test(it) && /✓ 사후 2\/2회/.test(it), '목표 달성: ' + it);
+  c._st.cos.find((x) => x.id === 'c1').customPost = { t2: 5 };
+  assert.ok(/다음 사후 3회차/.test(postItems(rowOf(c, 'c1'))[0]), '목표 5 → 아직 남음');
+  c.getPostFieldState = () => false;
+  it = postItems(rowOf(c, 'c1'))[0];
+  assert.ok(/class="post-fmt-btn" data-f="1"/.test(it) && /class="post-fmt-btn on office" data-f="0"/.test(it), '사무실이 켜진다: ' + it);
+});
+
+test('★ 단추를 누르면 — 사후만의 값으로 기억하고(본 회차 값은 안 건드린다), 같은 사업장·사업의 단추 모양을 모두 맞춘다', () => {
+  const btns = [{ dataset: { f: '1' }, className: 'post-fmt-btn on' }, { dataset: { f: '0' }, className: 'post-fmt-btn' }];
+  const c = postWorld({ qa: () => nl(btns) });
+  c._ls.m.p_fieldState = JSON.stringify({ c1_t2: false });            // 본 회차 줄은 사무실로 해 둔 상태
+  assert.strictEqual(c.getPostFieldState('c1', 't2'), true, '사후 값이 없으면 방문');
+  c.postPickField('c1', 't2', 0);
+  assert.strictEqual(c.getPostFieldState('c1', 't2'), false);
+  assert.deepStrictEqual(lsMap(c), { c1_t2: false, c1_t2_post: false }, '키만 더한다 — 본 회차 키(c1_t2)는 그대로, 새 localStorage 키 없음');
+  assert.deepStrictEqual(Object.keys(c._ls.m), ['p_fieldState'], '새 localStorage 키를 만들지 않았다');
+  assert.ok(c._ls.writes.includes('fb:p_fieldState') && c._ls.writes.includes('p_fieldState'), '본 회차 단추와 같은 길(로컬 + 클라우드 동기)로 저장');
+  assert.deepStrictEqual(btns.map((b) => b.className), ['post-fmt-btn', 'post-fmt-btn on office'], '사무실이 켜진 모양');
+  c.postPickField('c1', 't2', 1);
+  assert.deepStrictEqual(btns.map((b) => b.className), ['post-fmt-btn on', 'post-fmt-btn']);
+  assert.strictEqual(lsMap(c).c1_t2, false, '본 회차 값은 끝까지 그대로');
+  assert.strictEqual(c.getPostFieldState('c2', 't2'), true, '다른 사업장은 영향 없다');
+  const bad = postWorld(); bad._ls.m.p_fieldState = '{깨진 글자';
+  assert.strictEqual(bad.getPostFieldState('c1', 't2'), true, '저장값이 깨져 있어도 던지지 않고 방문으로');
+  bad.setPostFieldState('c1', 't2', false);
+  assert.deepStrictEqual(lsMap(bad), { c1_t2_post: false }, '깨진 것은 버리고 새로 쓴다');
+});
+
+test('★ 끌기를 시작하면 — 그 순간의 «방문/사무실» 값이 담긴다', () => {
+  const c = postWorld(); vm.runInContext('var dragItem=null;', c);
+  const ev = () => ({ stopPropagation() {}, dataTransfer: { setData() {} } });
+  const el = { dataset: { postCoid: 'c1', postTid: 't2' }, classList: { add() {}, remove() {} } };
+  c.setPostFieldState('c1', 't2', false); c.postDragStart(ev(), el);
+  assert.strictEqual(J(vm.runInContext('dragItem', c)).isField, false, '사무실로 해 두고 끌면 사무실');
+  c.setPostFieldState('c1', 't2', true); c.postDragStart(ev(), el);
+  assert.strictEqual(J(vm.runInContext('dragItem', c)).isField, true);
+});
+
+test('★ 놓으면 — 항목 옆 단추대로 방문(📍)·사무실(🏢)이 저장되고 알림에도 적힌다 · 단추 값이 없는 예전 끌기(DROP)는 방문', async () => {
+  let c = postWorld(); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't2', isField: false });
+  let p = c._st.scheds.find((s) => s.phase === 'post');
+  assert.strictEqual(p.isField, false, '사무실로 들어간다');
+  assert.ok(/사무실/.test(lastToast(c)) && /사후 1회를 넣었습니다/.test(lastToast(c)), lastToast(c));
+  c = postWorld(); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't2', isField: true });
+  assert.strictEqual(c._st.scheds.find((s) => s.phase === 'post').isField, true);
+  assert.ok(/방문/.test(lastToast(c)), lastToast(c));
+  c = postWorld(); await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.strictEqual(c._st.scheds.find((s) => s.phase === 'post').isField, true, '값이 없으면 방문(예전 그대로)');
+  assert.ok(c._calls.raw.every((v) => !hasUndefined(v)), '저장하는 모양에 undefined 가 없다');
+});
+
+test('방문으로 놓으면 본 회차처럼 사진 창이 열린다(환경설정 «현장 등록 시 타임스탬프 자동 팝업»이 켜져 있을 때) · 사무실이거나 꺼져 있으면 안 열린다', async () => {
+  const mk = (env) => { const c = postWorld({ setTimeout: (f) => f() }); c._st.env = env; return c; };
+  let c = mk({ autoStampOnField: true }); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't2', isField: true });
+  const sid = c._st.scheds.find((s) => s.phase === 'post').id;
+  assert.deepStrictEqual(c._calls.stamp, [sid], '방문 + 켜짐 → 방금 만든 사후로 사진 창');
+  c = mk({ autoStampOnField: true }); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't2', isField: false });
+  assert.deepStrictEqual(c._calls.stamp, [], '사무실은 사진 창을 안 연다');
+  c = mk({}); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c1', typeId: 't2', isField: true });
+  assert.deepStrictEqual(c._calls.stamp, [], '꺼져 있으면 안 연다');
+  c = mk({ autoStampOnField: true }); await c.handlePostDrop('2026-11-05', { post: true, coId: 'c2', typeId: 't2', isField: true });
+  assert.deepStrictEqual(c._calls.stamp, [], '못 놓은 날(진행 중 사업)은 사진 창도 없다');
+});
+
+/* ── ② 같은 정부사업 하루 겹침 금지 ── */
+const t3World = (extra) => {                          // c1·c2 가 «기관 하루 1사업장»을 켠 사업(t3)을 한다 — c1 은 그 사업이 종료돼 사후를 넣는다
+  const c = postWorld(extra);
+  c._st.cos[0].types = ['t2', 't3']; c._st.cos[0].endedTypes = { t2: '2026-10-24', t3: '2026-10-24' }; c._st.cos[1].types = ['t2', 't3'];
+  return c;
+};
+
+test('★ 같은 사업장의 같은 사업 본 방문일에는 사후를 못 넣는다 — 서랍·끌어 놓기 둘 다 (예전부터 막혀 있던 것을 못 박는다)', async () => {
+  for (const how of ['drop', 'drawer']) {
+    const c = postWorld(); const before = JSON.stringify(c._st.scheds);
+    if (how === 'drop') await c.handlePostDrop('2026-09-08', DROP('c1', 't2'));
+    else { c.openPostDrawer('c1', 't2'); form(c, '2026-09-08'); await c.postSave(false); }
+    assert.strictEqual(JSON.stringify(c._st.scheds), before, how + ' — 저장하면 안 된다');
+    assert.ok(/이 사업의 일정이 이미 있습니다/.test(lastToast(c)), how + ': ' + lastToast(c));
+  }
+});
+
+test('★ 「기관 하루 1사업장」을 켠 사업 — 다른 사업장의 본 방문일에는 사후를 못 넣는다 (서랍 · 끌어 놓기), 다른 날은 넣는다', async () => {
+  for (const how of ['drop', 'drawer']) {
+    const c = t3World(); c._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' })); const before = JSON.stringify(c._st.scheds);
+    if (how === 'drop') await c.handlePostDrop('2026-11-05', DROP('c1', 't3'));
+    else { c.openPostDrawer('c1', 't3'); form(c, '2026-11-05'); await c.postSave(false); }
+    assert.strictEqual(JSON.stringify(c._st.scheds), before, how + ' — 저장하면 안 된다');
+    assert.strictEqual(c._calls.locks, 0, how + ' — 막힌 것은 잠그기 전에 끝난다');
+    const msg = lastToast(c);
+    assert.ok(/하루에 한 사업장만/.test(msg) && /라마바식품/.test(msg) && !/\n/.test(msg), how + ' — 까닭(한 줄)에 어느 사업장 때문인지: ' + msg);
+  }
+  const c = t3World(); c._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' }));
+  await c.handlePostDrop('2026-11-06', DROP('c1', 't3'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 1, '다른 날이면 들어간다: ' + lastToast(c));
+});
+
+test('기관 하루 1사업장 — 다른 사업장의 «사후»와도 같은 날 못 넣는다 (그 날 기관이 두 곳에 갈 수는 없다)', async () => {
+  const c = t3World(); c._st.scheds.push(P('c2', 't3', '2026-11-05', { id: 'op3' }));
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't3'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 1, '새로 들어가지 않았다(원래 있던 c2 의 사후 하나뿐)');
+  assert.ok(/하루에 한 사업장만/.test(lastToast(c)) && /사후컨설팅/.test(lastToast(c)), lastToast(c));
+});
+
+test('이 규칙을 켜지 않은 사업(t2)은 다른 사업장의 방문일과 겹쳐도 사후가 들어간다 (본 방문끼리도 되는 것과 같다)', async () => {
+  const c = postWorld(); c._st.scheds.push(D('c2', 't2', '2026-11-05', { id: 'o2', attId: 'a2' }));
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 1, lastToast(c));
+});
+
+test('★ 「같은 담당 하루 1건」을 켠 사업 — 같은 주담당의 다른 사업장 방문일에는 사후를 못 넣고, 담당이 다르면 넣는다', async () => {
+  let c = postWorld(); c._st.matrix = { t2__t2: true };
+  c._st.scheds.push(D('c2', 't2', '2026-11-05', { id: 'o2', attId: 'a1' }));
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 0);
+  assert.ok(/같은 날 중복/.test(lastToast(c)) && /라마바식품/.test(lastToast(c)) && !/\n/.test(lastToast(c)), lastToast(c));
+  c = postWorld(); c._st.matrix = { t2__t2: true };
+  c._st.scheds.push(D('c2', 't2', '2026-11-05', { id: 'o2', attId: 'a2' }));
+  await c.handlePostDrop('2026-11-05', DROP('c1', 't2'));
+  assert.strictEqual(c._st.scheds.filter((s) => s.phase === 'post').length, 1, '주담당이 다르면 이 규칙이 아니다: ' + lastToast(c));
+});
+
+test('★ 반대쪽 — 본 방문을 넣거나 옮길 때도 사후와 같은 날이면 막힌다 (본 방문을 넣는 모든 길이 같은 규칙 함수를 쓴다)', () => {
+  ['handleDrop', 'moveChip', 'saveSingle', 'saveMultiSingle', 'postProblem'].forEach((n) => {
+    const b = grab(n);
+    assert.ok(/checkConflictMatrix\(/.test(b) && /checkAgencyExclusive\(/.test(b), n + ' — 같은 담당 하루 1건·기관 하루 1사업장을 «둘 다» 묻는다');
+  });
+  ['checkConflictMatrix', 'checkAgencyExclusive', 'agencyOtherSiteOn', 'dayConflictMsg'].forEach((n) => {
+    assert.ok(!/!\s*isPostSched\(/.test(grab(n)), n + ' — 사후를 걸러 내면(!isPostSched) 사후와 본 방문이 같은 날 겹쳐도 통과한다');
+  });
+});
+
+test('★ 이미 겹쳐 있는 예전 사후는 «날짜를 안 바꾸면» 구분·메모를 고칠 수 있다 — 겹치는 날로 옮기려 하면 막힌다 (새 규칙이 예전 자료를 가두지 않는다)', async () => {
+  const c = t3World();
+  c._st.scheds.push(D('c2', 't3', '2026-11-05', { id: 'o3' }), P('c1', 't3', '2026-11-05', { id: 'old', round: 1, isField: true }));   // 규칙이 생기기 전에 넣은 겹침
+  c.openPostDrawer('c1', 't3'); c.postEdit('old'); c.postSetField(0);
+  form(c, '2026-11-05', '구분·메모만 고침');
+  await c.postSave(false);
+  const p = c._st.scheds.find((s) => s.id === 'old');
+  assert.strictEqual(p.memo, '구분·메모만 고침', lastToast(c)); assert.strictEqual(p.isField, false, '날짜는 그대로, 구분·메모는 바뀐다');
+  c._st.scheds.push(D('c2', 't3', '2026-11-12', { id: 'o3b' }));
+  c.postEdit('old'); form(c, '2026-11-12', '');
+  await c.postSave(false);
+  assert.strictEqual(c._st.scheds.find((s) => s.id === 'old').date, '2026-11-05', '겹치는 새 날짜로는 못 옮긴다');
+  assert.ok(/하루에 한 사업장만/.test(lastToast(c)), lastToast(c));
+});
+
+test('진행 목록 줄을 눌러 «본 회차 등록 창»이 열리는 길에서 사후 항목(단추·빈틈)은 빠진다', () => {
+  assert.ok(/closest\('\.post-item'\)/.test(grab('renderDash')), '사후 항목을 눌러도 본 회차 등록 창이 열리지 않는다');
 });
