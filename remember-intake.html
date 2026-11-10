@@ -9,7 +9,7 @@
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=92"></script>
+<script src="js/pu-ontology.js?v=93"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -114,13 +114,13 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
   }
   var hhmm = function (t) { var d = new Date(Number(t) || 0); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
   /* «예정된 때를 지났는데(15분 여유) 그 때 이후 확인이 없다» = 멈춘 것 — 초록 「연결됨」으로 두면 몇 시간이고 모른다 */
-  function lateBy(st, nowMs) { var p = prevSlot(nowMs); return !!(st.at && p && Number(st.at) < p && nowMs - p > 15 * 60000); }
+  function lateBy(st, nowMs) { var p = prevSlot(nowMs - 15 * 60000); return !!(st.at && p && Number(st.at) < p); }
 
   function draw() {
     var st = S.status || {}, el = $('state');
     if (!S.user) { el.className = 'band bad'; el.textContent = '✕ 푸른 포털에 로그인되어 있지 않습니다 — 이 탭에서 로그인해 주세요'; return; }
     if (st.err === 'login') { el.className = 'band bad'; el.textContent = '✕ 리멤버 로그인이 풀렸습니다 — 크롬에서 리멤버(card.rememberapp.co.kr)에 다시 로그인해 주세요 · ' + day(st.errAt); }
-    else if (lateBy(st, Date.now())) { el.className = 'band warn'; el.textContent = '⚠ 확인이 늦습니다 — 마지막 확인 ' + day(st.at) + ' (예정 ' + hhmm(prevSlot(Date.now())) + ') · 크롬과 PC·확장이 켜져 있는지 봐 주세요'; }
+    else if (lateBy(st, Date.now())) { el.className = 'band warn'; el.textContent = '⚠ 확인이 늦습니다 — 마지막 확인 ' + day(st.at) + ' (예정 ' + hhmm(prevSlot(Date.now() - 15 * 60000)) + ') · 크롬과 PC·확장이 켜져 있는지 봐 주세요'; }
     else if (st.at) { el.className = 'band ok'; el.textContent = '● 연결됨 — 마지막 확인 ' + day(st.at) + ' · 다음 ' + hhmm(nextSlot(Date.now())) + ' · 지난번 새로 ' + (st.newN || 0) + '장 · 고침 ' + (st.updN || 0) + '장' + (st.total ? ' · 리멤버 전체 ' + Number(st.total).toLocaleString() + '장' : ''); }
     else { el.className = 'band wait'; el.textContent = '확장이 첫 회차를 보낼 때까지 기다리는 중입니다 (첫 회차는 기준만 잡습니다)'; }
     var rows = (st.recent || []).map(function (r) {

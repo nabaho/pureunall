@@ -44,7 +44,7 @@ test('제때 돌았으면 초록(늦지 않음)', () => {
 
 test('예정된 때를 지났는데 확인이 없으면 늦음', () => {
   const { lateBy } = pageFns();
-  assert.strictEqual(lateBy({ at: at(9, 0) }, at(9, 50)), true);         // 09:30 회차가 없다
+  assert.strictEqual(lateBy({ at: at(9, 0) }, at(9, 50)), true); assert.strictEqual(lateBy({ at: at(9, 0) }, at(10, 2)), true); assert.strictEqual(lateBy({ at: at(18, 1, 1) }, at(9, 2, 2)), true);
   assert.strictEqual(lateBy({ at: at(18, 1, 1) }, at(6, 30, 2)), true);  // 00:00·06:00 회차가 없다
   assert.strictEqual(lateBy({ at: at(12, 0, 1) }, at(12, 20, 2)), true); // 하루가 지났다
 });

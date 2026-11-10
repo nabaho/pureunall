@@ -49,7 +49,7 @@ test('★★★ 예정이 15분 넘게 늦으면 깨운다 — 25분 안에 또 
   const a = sync.decide({ at: T(13, 0) }, T(14, 20), {});
   assert.deepStrictEqual(a.act, ['kick'], '★★★ 늦었는데 안 깨웁니다');
   /* ⚠ 14:28 — 아직 «늦음» 안이다(14:00 예정 + 15분 지남). 14:30 으로 재면 늦음이 아니라 헛돈다 */
-  const b = sync.decide({ at: T(13, 0) }, T(14, 28), a.state);
+  const b = sync.decide({ at: T(13, 0) }, T(14, 32), a.state); assert.ok(b.state.lateSince > 0, '★★★ 14:32(새 슬롯 2분 뒤)에 늦음이 풀려 버립니다');
   assert.deepStrictEqual(b.act, [], '★ 8분 만에 또 깨웁니다 — 탭이 자꾸 열립니다');
   const c = sync.decide({ at: T(13, 0) }, T(14, 50), b.state);
   assert.deepStrictEqual(c.act, ['kick']);

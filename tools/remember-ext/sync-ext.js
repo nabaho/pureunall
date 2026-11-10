@@ -94,8 +94,8 @@ function prevSlot(nowMs) {
   return best;
 }
 function isLate(st, nowMs) {
-  const p = prevSlot(nowMs);
-  return !!(p && nowMs - p > GRACE_MS && !((Number(st && st.at) || 0) >= p));
+  const p = prevSlot(nowMs - GRACE_MS);
+  return !!(p && !((Number(st && st.at) || 0) >= p));
 }
 const when = (ms) => { const d = new Date(Number(ms) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
 
@@ -113,7 +113,7 @@ function decide(st, nowMs, state) {
   if (!loginLost && nowMs - s.lastKick >= KICK_GAP_MS) { act.push('kick'); s.lastKick = nowMs; }
   const reason = loginLost ? 'login' : 'stuck';
   if (s.alerted !== reason && (loginLost || nowMs - s.lateSince >= ALERT_AFTER_MS)) { act.push('alert:' + reason); s.alerted = reason; }
-  return { act: act, state: s, why: '늦음 — 마지막 ' + when(st && st.at) + ', 예정 ' + when(prevSlot(nowMs)) + (loginLost ? ' · 리멤버 로그인 풀림' : '') };
+  return { act: act, state: s, why: '늦음 — 마지막 ' + when(st && st.at) + ', 예정 ' + when(prevSlot(nowMs - GRACE_MS)) + (loginLost ? ' · 리멤버 로그인 풀림' : '') };
 }
 
 /* 대표 「⚠ 장애 알림」에 올릴 말 — «무엇을 하면 되는지»가 먼저다 */
@@ -168,9 +168,9 @@ function findExt() {
   for (const b of browsers()) {
     let dirs = [];
     try { dirs = fs.readdirSync(b.root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) { continue; }
-    for (const d of dirs) {
+    for (const d of dirs) for (const pf of ['Secure Preferences', 'Preferences']) {
       let j;
-      try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, 'Secure Preferences'), 'utf8')); } catch (e) { continue; }
+      try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, pf), 'utf8')); } catch (e) { continue; }
       const set = (j && j.extensions && j.extensions.settings) || {};   // 설정 파일이 JSON null 이어도 던지지 않는다
       for (const id of Object.keys(set)) {
         /* 빈 경로(''·내장 확장)는 건너뛴다 — path.resolve('') 는 «지금 작업 폴더»라, 예약 작업(작업 폴더 = 이 폴더)에서는 엉뚱한 확장이 우리 것으로 보인다 */
