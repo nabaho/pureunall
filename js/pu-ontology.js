@@ -204,7 +204,7 @@
        저장 뿌리·쓰기 계약이 없다. 자료가 서버로 가지 않는다는 것이 이 앱의 약속이다(주민번호가 든 서식). */
     hangul:{ name:'한글 편집기', file:'hangul.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
       note:'한글 문서를 이 PC 안에서 열고 고치는 도구 — 파이어베이스에 쓰지 않는다' },
-    aliounion:{ name:'공공기관 단협', file:'pu-alio-union.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
+    aliounion:{ name:'공공임단협', file:'pu-alio-union.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
       note:'알리오 공공기관 노동조합·단체협약 비교분석 도구 — 파이어베이스에 쓰지 않는다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },

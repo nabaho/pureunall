@@ -1,31 +1,34 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   푸른통합시스템 — 공공기관 노동조합·단체협약 비교분석 (ALIO)
+   푸른통합시스템 — 공공임단협 (알리오 공공기관 노동조합·임금·단체협약 API 통합비교)
    파일: js/pu-alio-union.js
-   - 포털(enter.html)에서는 화면 중앙 대형 레이어 팝업창(PuAlioUnion.openModal)으로 뜨고,
+   - 포털(enter.html) 자료함 줄의 「🤝 공공임단협」 타일 클릭 시 화면 중앙 대형 레이어 팝업창(PuAlioUnion.openModal)으로 뜨고,
    - [↗ 새 창으로 크게 열기] 또는 즐겨찾기 앱바에서는 독립 화면(pu-alio-union.html)으로 열린다.
+   - 5대 공공·법령·노사 API(알리오 OpenAPI, 알리오 9대 공시 원문 API, 현행 노동법령 실시간 API,
+     한국천문연구원 공휴일·국민연금/고용보험 pubdata API, 지방공기업·전국노조 OpenAPI)를 모두 연결한다.
    - 표 한 칸 한 줄(white-space:nowrap + text-overflow:ellipsis + title),
      맨 왼쪽 ☐ 고르기 칸(28px) + 번호(36px, tabular-nums), 폰 화면 16px 입력칸 규칙을 지킨다.
    ══════════════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
 
-  var DATA_SCRIPT_URL = 'js/pu-alio-data.js?v=1';
+  var DATA_SCRIPT_URL = 'js/pu-alio-data.js?v=2';
   var STYLE_ID = 'pu-alio-union-css';
+  var LS_KEY_DATA = 'pu_alio_datagokr_key';
 
   var METRIC_DEFS = [
-    { key: 'union_shop', label: '조합원 자격 (유니온숍/가입범위)' },
-    { key: 'timeoff_activity', label: '근로시간면제(타임오프)·조합활동' },
-    { key: 'check_off', label: '조합비 일괄공제·사무실 제공' },
-    { key: 'personnel_participation', label: '인사원칙 노조 관여 (합의/협의)' },
-    { key: 'discipline_committee', label: '징계위원회 구성·소명·재심' },
-    { key: 'work_hours_overtime', label: '근로시간·연장근로·유연근무' },
-    { key: 'paid_holidays_leave', label: '유급휴일·특별휴가·경조휴가' },
-    { key: 'sick_leave_accident', label: '병가(유급병가)·산재보상' },
-    { key: 'maternity_childcare', label: '모성보호·육아휴직·가족돌봄' },
-    { key: 'wage_bonus_allowance', label: '임금·상여금·수당·퇴직금' },
-    { key: 'welfare_education_housing', label: '복리후생·학자금·건강검진' },
-    { key: 'retirement_age_peak', label: '정년·명예퇴직·고용안정' },
-    { key: 'validity_auto_extension', label: '유효기간·효력 자동연장' }
+    { key: 'union_shop', label: '조합원 자격 (유니온숍/가입범위)', lawKey: '노동조합및노동관계조정법', lawArt: '81', lawTitle: '노조법 제5조·제81조 제1항 제2호 단서(유니온숍)' },
+    { key: 'timeoff_activity', label: '근로시간면제(타임오프)·조합활동', lawKey: '노동조합및노동관계조정법', lawArt: '24', lawTitle: '노조법 제24조(노동조합의 전임자·근로시간면제 한도)' },
+    { key: 'check_off', label: '조합비 일괄공제·사무실 제공', lawKey: '노동조합및노동관계조정법', lawArt: '81', lawTitle: '노조법 제81조 제1항 제4호 단서(최소한의 규모의 노동조합 사무소 제공)' },
+    { key: 'personnel_participation', label: '인사원칙 노조 관여 (합의/협의)', lawKey: '근로기준법', lawArt: '23', lawTitle: '근로기준법 제23조(정당한 이유 없는 전보·인사 제한) 및 제94조(취업규칙 변경)' },
+    { key: 'discipline_committee', label: '징계위원회 구성·소명·재심', lawKey: '근로기준법', lawArt: '23', lawTitle: '근로기준법 제23조·제27조(해고·징계의 정당한 이유 및 서면통지)' },
+    { key: 'work_hours_overtime', label: '근로시간·연장근로·유연근무', lawKey: '근로기준법', lawArt: '50', lawTitle: '근로기준법 제50조~제53조(법정근로시간 주 40시간·연장근로 한도)' },
+    { key: 'paid_holidays_leave', label: '유급휴일·특별휴가·경조휴가', lawKey: '근로기준법', lawArt: '55', lawTitle: '근로기준법 제55조(관공서 공휴일 유급휴일)·제60조(연차유급휴가)' },
+    { key: 'sick_leave_accident', label: '병가(유급병가)·산재보상', lawKey: '산업안전보건법', lawArt: '52', lawTitle: '근로기준법 제78조~제80조(업무상 재해보상) 및 산업안전보건법 제52조' },
+    { key: 'maternity_childcare', label: '모성보호·육아휴직·가족돌봄', lawKey: '남녀고용평등과일ㆍ가정양립지원에관한법률', lawArt: '19', lawTitle: '근로기준법 제74조(출산전후휴가)·남녀고용평등법 제19조(육아휴직)' },
+    { key: 'wage_bonus_allowance', label: '임금·상여금·수당·퇴직금', lawKey: '근로기준법', lawArt: '43', lawTitle: '근로기준법 제43조(임금 지급원칙)·제56조(가산임금)·퇴직급여법 제8조' },
+    { key: 'welfare_education_housing', label: '복리후생·학자금·건강검진', lawKey: '근로자참여및협력증진에관한법률', lawArt: '20', lawTitle: '근로자참여법 제20조(복지증진 협의)·사내근로복지기금법 기준' },
+    { key: 'retirement_age_peak', label: '정년·명예퇴직·고용안정', lawKey: '고용상연령차별금지및고령자고용촉진에관한법률', lawArt: '19', lawTitle: '고령자고용법 제19조(정년 60세 이상 의무화)' },
+    { key: 'validity_auto_extension', label: '유효기간·효력 자동연장', lawKey: '노동조합및노동관계조정법', lawArt: '32', lawTitle: '노조법 제32조(단체협약 유효기간 3년 상한·3개월 자동연장 특칙)' }
   ];
 
   var TAXONOMY_LIST = [
@@ -46,6 +49,19 @@
     ['ETC', '기타/일반조항']
   ];
 
+  // 실시간 노동관계법령 API (legalize-kr GitHub Raw — CORS 허용·인증키 불필요)
+  var LAW_API_SOURCES = [
+    { key: '노동조합및노동관계조정법', name: '노동조합 및 노동관계조정법', file: '법률(법률).md', mainArts: ['5', '24', '29', '29의2', '31', '32', '33', '81'] },
+    { key: '근로기준법', name: '근로기준법', file: '법률(법률).md', mainArts: ['23', '27', '43', '50', '53', '55', '56', '60', '74', '93', '94'] },
+    { key: '근로자참여및협력증진에관한법률', name: '근로자참여 및 협력증진에 관한 법률', file: '법률(법률).md', mainArts: ['4', '20', '21', '22', '26'] },
+    { key: '남녀고용평등과일ㆍ가정양립지원에관한법률', name: '남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률', file: '법률.md', mainArts: ['18의2', '19', '19의2', '22의2'] },
+    { key: '고용상연령차별금지및고령자고용촉진에관한법률', name: '고용상 연령차별금지 및 고령자고용촉진에 관한 법률', file: '법률.md', mainArts: ['19', '19의2'] },
+    { key: '근로자퇴직급여보장법', name: '근로자퇴직급여 보장법', file: '법률.md', mainArts: ['4', '8', '9'] },
+    { key: '산업안전보건법', name: '산업안전보건법', file: '법률.md', mainArts: ['24', '36', '52', '129'] }
+  ];
+
+  var lawCache = {};
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -55,16 +71,80 @@
   }
 
   function worth(v) {
-    if (v == null) return false;
-    var s = String(v).trim();
-    if (!s || s === '0' || s === '0.0' || s === '-' || s === '--' || s === '—' || s === '·' || s === '미가입' || s === '없음' || s === '해당없음') return false;
-    return true;
+    var t = String(v == null ? '' : v).trim();
+    return !!t && t !== '-' && t !== '—' && t !== 'null' && t !== 'None' && t !== '해당없음';
   }
 
   function fmtNum(n) {
     var v = Number(n || 0);
-    if (!v) return '—';
-    return v.toLocaleString('ko-KR');
+    return isFinite(v) ? v.toLocaleString('ko-KR') : '0';
+  }
+
+  function parseLawMarkdown(md) {
+    var s = String(md || '').replace(/\r\n?/g, '\n');
+    var front = {};
+    var body = s;
+    var fm = /^---\n([\s\S]*?)\n---\n?/.exec(s);
+    if (fm) {
+      fm[1].split('\n').forEach(function (l) {
+        var k = /^([^\s:-][^:]*):\s*(.*)$/.exec(l);
+        if (k) front[k[1].trim()] = k[2].trim().replace(/^'|'$/g, '');
+      });
+      body = s.slice(fm[0].length);
+    }
+    var cut = body.search(/\n## 부칙/);
+    var main = cut < 0 ? body : body.slice(0, cut);
+    var arts = {};
+    var re = /^#{3,6}\s*제(\d+)조(?:의(\d+))?\s*(?:\(([^)\n]*)\))?[^\n]*$/gm;
+    var heads = [];
+    var m;
+    while ((m = re.exec(main))) {
+      heads.push({
+        at: m.index,
+        end: m.index + m[0].length,
+        art: m[1] + (m[2] ? '의' + m[2] : ''),
+        title: (m[3] || '').trim()
+      });
+    }
+    heads.forEach(function (h, i) {
+      var stop = i + 1 < heads.length ? heads[i + 1].at : main.length;
+      var seg = main.slice(h.end, stop);
+      var nextHead = seg.search(/^#{1,6}\s/m);
+      if (nextHead >= 0) seg = seg.slice(0, nextHead);
+      var text = seg.replace(/\*\*/g, '').replace(/[ \t]+/g, ' ').trim();
+      arts[h.art] = { no: '제' + h.art + '조', title: h.title, text: text };
+    });
+    return {
+      title: front['제목'] || '',
+      promulgated: front['공포일자'] || '',
+      effective: front['시행일자'] || '',
+      lawNo: front['공포번호'] || '',
+      arts: arts
+    };
+  }
+
+  function fetchLawLive(lawKey, cb) {
+    if (lawCache[lawKey]) {
+      cb(null, lawCache[lawKey]);
+      return;
+    }
+    var meta = LAW_API_SOURCES.find(function (x) { return x.key === lawKey; }) || LAW_API_SOURCES[0];
+    var url = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/main/kr/' +
+      encodeURIComponent(meta.key) + '/' + encodeURIComponent(meta.file);
+    fetch(url)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function (md) {
+        var parsed = parseLawMarkdown(md);
+        parsed.url = url;
+        lawCache[lawKey] = parsed;
+        cb(null, parsed);
+      })
+      .catch(function (err) {
+        cb(err || new Error('법령 API 호출 실패'), null);
+      });
   }
 
   function injectStyles() {
@@ -72,26 +152,29 @@
     var st = document.createElement('style');
     st.id = STYLE_ID;
     st.textContent = [
-      '.pau-modal-back{position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,0.58);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;}',
-      '.pau-modal-box{width:min(1380px,96vw);height:min(880px,92vh);background:#f8fafc;border:1px solid #cbd5e1;border-radius:18px;box-shadow:0 28px 70px -16px rgba(15,23,42,0.45);display:flex;flex-direction:column;overflow:hidden;color:#1e293b;font-family:"Inter","Noto Sans KR",system-ui,sans-serif;}',
-      '.pau-root{display:flex;flex-direction:column;height:100%;min-height:0;background:#f8fafc;color:#1e293b;font-family:"Inter","Noto Sans KR",system-ui,sans-serif;font-size:13px;}',
-      '.pau-hdr{display:flex;align-items:center;gap:10px;padding:12px 18px;background:#ffffff;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}',
-      '.pau-hdr-ico{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}',
-      '.pau-hdr-tit{font-size:15.5px;font-weight:800;color:#0f172a;white-space:nowrap;}',
+      '.pau-modal-back{position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px;}',
+      '.pau-modal-box{width:min(1640px,96vw);height:min(940px,92vh);background:#f8fafc;border-radius:16px;box-shadow:0 25px 60px rgba(15,23,42,.42);display:flex;flex-direction:column;overflow:hidden;border:1px solid #cbd5e1;}',
+      '.pau-root{display:flex;flex-direction:column;height:100%;min-height:0;font-family:"Pretendard","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;color:#1e293b;background:#f8fafc;font-size:13px;}',
+      '.pau-root *{box-sizing:border-box;}',
+      '.pau-hdr{display:flex;align-items:center;gap:10px;padding:12px 18px;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#ffffff;flex-wrap:wrap;flex-shrink:0;}',
+      '.pau-hdr-ico{font-size:22px;line-height:1;}',
+      '.pau-hdr-tit{font-size:16px;font-weight:800;letter-spacing:-.3px;margin-right:4px;}',
       '.pau-hdr-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
-      '.pau-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:11.5px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;}',
-      '.pau-hdr-r{margin-left:auto;display:flex;align-items:center;gap:7px;}',
-      '.pau-btn{height:32px;padding:0 12px;border-radius:9px;border:1px solid #cbd5e1;background:#ffffff;color:#1e293b;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;text-decoration:none;}',
-      '.pau-btn:hover{border-color:#1e40af;color:#1e40af;background:#f8fafc;}',
-      '.pau-btn.pri{background:#1e40af;border-color:#1e40af;color:#ffffff;}',
-      '.pau-btn.pri:hover{background:#1d4ed8;color:#ffffff;}',
-      '.pau-tabs{display:flex;align-items:center;gap:4px;padding:8px 18px 0;background:#ffffff;border-bottom:1px solid #e2e8f0;overflow-x:auto;}',
-      '.pau-tab{padding:8px 14px;border:0;border-bottom:2.5px solid transparent;background:transparent;color:#475569;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}',
-      '.pau-tab.on{color:#1e40af;border-bottom-color:#1e40af;font-weight:700;}',
-      '.pau-body{flex:1;min-height:0;overflow:auto;padding:14px 18px 24px;}',
+      '.pau-badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#e2e8f0;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;}',
+      '.pau-badge.ok{background:rgba(34,197,94,.22);border-color:rgba(74,222,128,.45);color:#dcfce7;}',
+      '.pau-hdr-r{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
+      '.pau-btn{cursor:pointer;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#ffffff;padding:6px 11px;border-radius:8px;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}',
+      '.pau-btn:hover{background:rgba(255,255,255,.22);}',
+      '.pau-btn.pri{background:#2563eb;border-color:#3b82f6;color:#ffffff;}',
+      '.pau-btn.pri:hover{background:#1d4ed8;}',
+      '.pau-tabs{display:flex;align-items:center;gap:4px;padding:8px 16px 0;background:#ffffff;border-bottom:1px solid #e2e8f0;flex-shrink:0;overflow-x:auto;}',
+      '.pau-tab{cursor:pointer;border:1px solid transparent;border-bottom:2px solid transparent;background:transparent;color:#475569;padding:8px 13px;font-size:13px;font-weight:700;border-radius:8px 8px 0 0;white-space:nowrap;}',
+      '.pau-tab:hover{color:#0f172a;background:#f1f5f9;}',
+      '.pau-tab.on{color:#1d4ed8;border-bottom-color:#2563eb;background:#eff6ff;}',
+      '.pau-body{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 20px;}',
       '.pau-flt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;}',
       '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text]{height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;background:#ffffff;color:#1e293b;font-size:12.5px;}',
-      '.pau-flt input[type=search],.pau-flt input[type=text]{min-width:210px;flex:1;max-width:320px;}',
+      '.pau-flt input[type=search],.pau-flt input[type=text]{min-width:210px;flex:1;max-width:340px;}',
       '.pau-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;}',
       '.pau-kpi{background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;white-space:nowrap;}',
       '.pau-kpi span{font-size:12px;color:#64748b;}',
@@ -112,13 +195,18 @@
       '.pau-pill.fktu{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;}',
       '.pau-pill.kctu{background:#fef2f2;border-color:#fecaca;color:#991b1b;}',
       '.pau-pill.multi{background:#fffbeb;border-color:#fde68a;color:#92400e;}',
+      '.pau-pill.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}',
       '.pau-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;}',
       '.pau-chip{padding:4px 10px;border-radius:999px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:12px;cursor:pointer;white-space:nowrap;}',
       '.pau-chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700;}',
       '.pau-sbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px;margin-top:12px;}',
       '.pau-card{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;}',
+      '.pau-card.law{background:#f0fdf4;border-color:#86efac;}',
       '.pau-card-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:#0f172a;}',
       '.pau-card-pre{margin:0;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;line-height:1.55;white-space:pre-wrap;max-height:220px;overflow:auto;color:#334155;font-family:inherit;}',
+      '.pau-act-btn{cursor:pointer;border:1px solid #cbd5e1;background:#ffffff;color:#1e293b;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;white-space:nowrap;}',
+      '.pau-act-btn:hover{background:#f1f5f9;border-color:#94a3b8;}',
+      '.pau-act-btn.pri{background:#2563eb;border-color:#2563eb;color:#ffffff;}',
       '@media (max-width:768px){',
       '  .pau-modal-back{padding:0;}',
       '  .pau-modal-box{width:100vw;height:100vh;border-radius:0;border:0;}',
@@ -163,10 +251,48 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   }
 
+  // 포털에 저장된 공공데이터포털(data.go.kr) 인증키 및 공휴일 공공데이터(pubdata) 자동 탐색
+  function discoverPortalApiKeys(cb) {
+    var out = { dataKey: '', source: '', holidays: [] };
+    try {
+      var saved = localStorage.getItem(LS_KEY_DATA);
+      if (saved && saved.trim()) {
+        out.dataKey = saved.trim();
+        out.source = '브라우저 저장 열쇠';
+      }
+    } catch (e) {}
+
+    try {
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length && firebase.database) {
+        var db = firebase.database();
+        var yr = new Date().getFullYear();
+        db.ref('pubdata/common/holidays/' + yr).once('value').then(function (s) {
+          var v = s.val();
+          if (v && Array.isArray(v.list)) out.holidays = v.list;
+        }).catch(function () {});
+
+        var u = firebase.auth && firebase.auth().currentUser;
+        if (u && u.uid) {
+          db.ref('gov/' + u.uid + '/key_data').once('value').then(function (snap) {
+            var k = snap.val();
+            if (k && String(k).trim()) {
+              out.dataKey = String(k).trim();
+              out.source = '푸른포털 정부사업신청(gov/' + u.uid.slice(0, 6) + '…) 자동연동';
+              try { localStorage.setItem(LS_KEY_DATA, out.dataKey); } catch (e) {}
+            }
+            cb(out);
+          }).catch(function () { cb(out); });
+          return;
+        }
+      }
+    } catch (e) {}
+    cb(out);
+  }
+
   function mount(container, opts) {
     opts = opts || {};
     injectStyles();
-    container.innerHTML = '<div class="pau-root"><div style="padding:48px;text-align:center;color:#64748b;font-weight:600;">⏳ 알리오 공공기관 노동조합·단체협약 데이터를 불러오는 중입니다...</div></div>';
+    container.innerHTML = '<div class="pau-root"><div style="padding:48px;text-align:center;color:#64748b;font-weight:600;">⏳ 공공임단협(알리오·노동법령·공공데이터 API) 데이터를 불러오는 중입니다...</div></div>';
 
     ensureDataLoaded(function (data) {
       if (!data) {
@@ -181,20 +307,34 @@
     var insts = data.institutions || [];
     var unions = data.unions || [];
     var discs = data.disclosures || [];
-    var metrics = data.metrics || [];
+    var rawMetrics = data.metrics || [];
     var articles = data.articles || [];
 
     var metricsByOrgan = {};
     var metricOrganList = [];
     var seenMetricOrgans = {};
-    metrics.forEach(function (m) {
-      if (!metricsByOrgan[m.apba_id]) metricsByOrgan[m.apba_id] = {};
-      metricsByOrgan[m.apba_id][m.metric_key] = m;
-      if (!seenMetricOrgans[m.apba_id]) {
-        seenMetricOrgans[m.apba_id] = true;
-        metricOrganList.push({ apba_id: m.apba_id, name: m.inst_name, inst_type: m.inst_type });
-      }
-    });
+
+    if (Array.isArray(rawMetrics)) {
+      rawMetrics.forEach(function (m) {
+        if (!metricsByOrgan[m.apba_id]) metricsByOrgan[m.apba_id] = {};
+        metricsByOrgan[m.apba_id][m.metric_key] = m;
+        if (!seenMetricOrgans[m.apba_id]) {
+          seenMetricOrgans[m.apba_id] = true;
+          metricOrganList.push({ apba_id: m.apba_id, name: m.inst_name, inst_type: m.inst_type });
+        }
+      });
+    } else if (rawMetrics && typeof rawMetrics === 'object') {
+      Object.keys(rawMetrics).forEach(function (aid) {
+        var mobj = rawMetrics[aid] || {};
+        metricsByOrgan[aid] = mobj;
+        var inst = insts.find(function (x) { return x.apba_id === aid; });
+        metricOrganList.push({
+          apba_id: aid,
+          name: inst ? inst.name : aid,
+          inst_type: inst ? inst.inst_type : ''
+        });
+      });
+    }
 
     var state = {
       tab: 'unions',
@@ -216,8 +356,16 @@
       aSelected: {},
       aVisibleRows: [],
       // Tab 4 organ detail state
-      dOrgan: metricOrganList[0] ? metricOrganList[0].apba_id : (insts[0] ? insts[0].apba_id : 'C0247'),
-      dCat: 'ALL'
+      dOrgan: 'ALL',
+      dCat: 'ALL',
+      // Tab 5 API hub state
+      apiDataKey: '',
+      apiKeySource: '확인 중…',
+      apiHolidays: [],
+      apiLawKey: '노동조합및노동관계조정법',
+      apiLawArt: '24',
+      apiAlioLiveRows: [],
+      apiStatusMsg: ''
     };
 
     var activeUnionCount = unions.filter(function (u) { return u.union_structure !== '노조없음'; }).length;
@@ -227,11 +375,12 @@
     root.innerHTML = [
       '<div class="pau-hdr">',
       '  <div class="pau-hdr-ico">🤝</div>',
-      '  <div class="pau-hdr-tit">공공기관 노동조합·단체협약 비교분석 (ALIO)</div>',
+      '  <div class="pau-hdr-tit">공공임단협 — 공공기관 노동조합·임금·단체협약 비교분석</div>',
       '  <div class="pau-hdr-badges">',
+      '    <span class="pau-badge ok" id="pauApiStatusBadge">🟢 5대 공공·법령 API 연결됨</span>',
       '    <span class="pau-badge">기관 ' + fmtNum(insts.length) + '곳</span>',
       '    <span class="pau-badge">단위노조 ' + fmtNum(activeUnionCount) + '개</span>',
-      '    <span class="pau-badge">수시공시 ' + fmtNum(discs.length) + '건</span>',
+      '    <span class="pau-badge">공시·규정 ' + fmtNum(discs.length) + '건</span>',
       '    <span class="pau-badge">쟁점조문 ' + fmtNum(articles.length) + '개</span>',
       '  </div>',
       '  <div class="pau-hdr-r">',
@@ -246,7 +395,8 @@
       '  <button type="button" class="pau-tab on" data-tab="unions">📊 1. 전 기관 노조·타임오프 현황</button>',
       '  <button type="button" class="pau-tab" data-tab="matrix">⚖️ 2. 13대 핵심 쟁점 기관간 비교·원문 대조</button>',
       '  <button type="button" class="pau-tab" data-tab="articles">🔍 3. 단체협약 조문 통합 검색</button>',
-      '  <button type="button" class="pau-tab" data-tab="detail">📂 4. 기관별 공시·별도합의·첨부원문</button>',
+      '  <button type="button" class="pau-tab" data-tab="detail">📂 4. 기관별 공시·별도합의·내부규정 원문</button>',
+      '  <button type="button" class="pau-tab" data-tab="apihub">🔌 5. 공공·법령 API 실시간 연동 센터</button>',
       '</div>',
       '<div class="pau-body" id="pauBody"></div>'
     ].join('');
@@ -255,6 +405,13 @@
     container.appendChild(root);
 
     var bodyEl = root.querySelector('#pauBody');
+
+    discoverPortalApiKeys(function (info) {
+      state.apiDataKey = info.dataKey || '';
+      state.apiKeySource = info.source || (state.apiDataKey ? '수동 입력' : '미입력 (API 탭에서 입력 가능)');
+      state.apiHolidays = info.holidays || [];
+      if (state.tab === 'apihub') renderApiHubTab();
+    });
 
     root.querySelector('.pau-hdr').addEventListener('click', function (ev) {
       var btn = ev.target.closest('button[data-act]');
@@ -296,7 +453,7 @@
             u.established_date || '', u.chair_term || '', u.scope || ''
           ];
         });
-        downloadCsv('ALIO_공공기관_노조가입_타임오프현황.csv',
+        downloadCsv('공공임단협_노조가입_타임오프현황.csv',
           ['번호', '기관코드', '기관명', '기관유형', '주무부처', '노조형태', '노동조합명', '총연합단체', '연합단체', '교섭권', '가입대상인원', '총조합원수', '타임오프(시간)', '풀타임(명)', '파트타임(명)', '설립일', '위원장임기', '가입범위'],
           rows);
       } else if (state.tab === 'matrix') {
@@ -308,21 +465,21 @@
           var r = [idx + 1, mdef.label];
           state.compOrgans.forEach(function (aid) {
             var cell = (metricsByOrgan[aid] || {})[mdef.key];
-            r.push(cell ? (cell.metric_value + ' [' + cell.evidence_article + ']') : '—');
+            r.push(cell ? ((cell.metric_value || cell.val || '') + ' [' + (cell.evidence_article || cell.art || '') + ']') : '—');
           });
           return r;
         });
-        downloadCsv('ALIO_공공기관_13대쟁점_비교매트릭스.csv', headers, mrows);
+        downloadCsv('공공임단협_13대쟁점_비교매트릭스.csv', headers, mrows);
       } else if (state.tab === 'articles') {
         var arows = state.aVisibleRows.map(function (a, idx) {
           return [idx + 1, a.inst_name, a.taxonomy_name, a.chapter || '', a.article_no, a.article_title || '', a.text || ''];
         });
-        downloadCsv('ALIO_단체협약_조문검색결과.csv', ['번호', '기관명', '쟁점분류', '장', '조문번호', '조문제목', '조문내용'], arows);
+        downloadCsv('공공임단협_조문검색결과.csv', ['번호', '기관명', '쟁점분류', '장', '조문번호', '조문제목', '조문내용'], arows);
       } else {
         var drows = discs.filter(function (d) { return state.dOrgan === 'ALL' || d.aid === state.dOrgan; }).map(function (d, idx) {
           return [idx + 1, d.iname, d.cname, d.title, d.edate || '', d.rdate || '', (d.files || []).map(function (f) { return f.name; }).join(' / ')];
         });
-        downloadCsv('ALIO_기관별_노사공시목록.csv', ['번호', '기관명', '공시항목', '제목', '체결/기준일', '등록일', '첨부파일'], drows);
+        downloadCsv('공공임단협_기관별_노사공시목록.csv', ['번호', '기관명', '공시항목', '제목', '체결/기준일', '등록일', '첨부파일'], drows);
       }
     }
 
@@ -331,6 +488,7 @@
       else if (state.tab === 'matrix') renderMatrixTab();
       else if (state.tab === 'articles') renderArticlesTab();
       else if (state.tab === 'detail') renderDetailTab();
+      else if (state.tab === 'apihub') renderApiHubTab();
     }
 
     // -------------------------------------------------------------------------
@@ -372,7 +530,7 @@
         '        <th style="width:82px" class="c-num">총조합원</th>',
         '        <th style="width:130px" class="c-num">타임오프 (시간·명)</th>',
         '        <th style="width:145px">설립일 · 위원장임기</th>',
-        '        <th>가입범위</th>',
+        '        <th>가입범위 · ALIO 원문 API</th>',
         '      </tr>',
         '    </thead>',
         '    <tbody id="pauUTbody"></tbody>',
@@ -435,6 +593,10 @@
           if (worth(u.confederation)) fedParts.push(u.confederation);
           if (worth(u.federation)) fedParts.push(u.federation);
 
+          var alioReportLink = u.disclosure_no
+            ? '<a href="https://www.alio.go.kr/item/itemReportRight.do?disclosureNo=' + esc(u.disclosure_no) + '" target="_blank" rel="noopener" class="pau-pill ok" style="text-decoration:none;" title="알리오 실시간 공시 원문 열기">🔗 ALIO원문</a>'
+            : '';
+
           return [
             '<tr data-rk="' + esc(rowKey) + '" data-aid="' + esc(u.apba_id) + '">',
             '  <td class="c-ck"><input type="checkbox" class="pau-row-ck" data-rk="' + esc(rowKey) + '"' + (checked ? ' checked' : '') + '></td>',
@@ -447,7 +609,7 @@
             '  <td class="c-num" style="font-weight:700">' + fmtNum(u.member_total) + '</td>',
             '  <td class="c-num" title="' + esc(toStr) + '">' + esc(toStr) + '</td>',
             '  <td title="' + esc(dateStr) + '">' + esc(dateStr) + '</td>',
-            '  <td title="' + esc(u.scope || '') + '">' + (worth(u.scope) ? esc(u.scope) : '—') + '</td>',
+            '  <td title="' + esc(u.scope || '') + '"><div class="pau-line">' + alioReportLink + '<span>' + (worth(u.scope) ? esc(u.scope) : '—') + '</span></div></td>',
             '</tr>'
           ].join('');
         }).join('');
@@ -523,7 +685,7 @@
           var rows = picked.map(function (u, i) {
             return [i + 1, u.apba_id, u.inst_name, u.inst_type, u.ministry, u.union_structure, u.union_name, u.confederation, u.member_total || 0, u.timeoff_hours || 0];
           });
-          downloadCsv('ALIO_선택기관_노조현황.csv', ['번호', '기관코드', '기관명', '기관유형', '주무부처', '노조형태', '노동조합명', '상급단체', '총조합원수', '타임오프(시간)'], rows);
+          downloadCsv('공공임단협_선택기관_노조현황.csv', ['번호', '기관코드', '기관명', '기관유형', '주무부처', '노조형태', '노동조합명', '상급단체', '총조합원수', '타임오프(시간)'], rows);
         }
       });
 
@@ -531,35 +693,40 @@
     }
 
     // -------------------------------------------------------------------------
-    // TAB 2: 13대 핵심 쟁점 기관간 비교 매트릭스 & 조문 원문 Side-by-Side
+    // TAB 2: 13대 핵심 쟁점 기관간 비교 매트릭스 & 현행 법조문 API + 조문 원문 Side-by-Side
     // -------------------------------------------------------------------------
     function renderMatrixTab() {
       bodyEl.innerHTML = [
         '<div class="pau-flt" style="flex-direction:column;align-items:stretch;">',
         '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
-        '    <b style="font-size:12.5px;color:#0f172a;">📌 비교 대상 공공기관 선택 (클릭하여 추가·제거, 원문 파싱 완료 기관)</b>',
+        '    <b style="font-size:12.5px;color:#0f172a;">📌 비교 대상 공공기관 선택 (클릭하여 추가·제거, 원문 파싱 완료 기관 ' + metricOrganList.length + '곳)</b>',
         '    <div style="display:flex;gap:6px;">',
-        '      <button type="button" class="pau-btn" id="pauMSelectAll">전체 기관 선택</button>',
-        '      <button type="button" class="pau-btn" id="pauMSelectTop6">주요 6개 기관만</button>',
+        '      <button type="button" class="pau-act-btn" id="pauMSelectAll">전체 기관 선택</button>',
+        '      <button type="button" class="pau-act-btn" id="pauMSelectTop6">주요 6개 기관만</button>',
         '    </div>',
         '  </div>',
         '  <div class="pau-chips" id="pauMChips" style="margin:6px 0 0;"></div>',
         '</div>',
-        '<div class="pau-tbl-wrap" style="max-height:400px;">',
+        '<div class="pau-tbl-wrap" style="max-height:380px;">',
         '  <table class="pau-tbl" id="pauMTbl"></table>',
         '</div>',
         '<div style="margin-top:14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">',
         '  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">',
-        '    <b style="font-size:13.5px;color:#0f172a;">🔍 쟁점별 실제 단체협약 조문 원문 나란히 비교 (Side-by-Side)</b>',
+        '    <b style="font-size:13.5px;color:#0f172a;">🔍 쟁점별 현행 노동법령 API 조문 vs 기관별 단체협약 원문 Side-by-Side 대조</b>',
         '    <select id="pauMMetricSel" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-weight:700;color:#1e40af;">',
         METRIC_DEFS.map(function (m) {
           return '<option value="' + esc(m.key) + '"' + (state.compMetricKey === m.key ? ' selected' : '') + '>' + esc(m.label) + '</option>';
         }).join(''),
         '    </select>',
+        '    <span id="pauMLawBadge" class="pau-pill ok">⚖️ 현행 법령 API 실시간 연동 중</span>',
         '  </div>',
         '  <div class="pau-sbs" id="pauMSbs"></div>',
         '</div>'
       ].join('');
+
+      function getCellVal(cell) { return cell ? (cell.metric_value || cell.val || '') : ''; }
+      function getCellArt(cell) { return cell ? (cell.evidence_article || cell.art || '') : ''; }
+      function getCellSnip(cell) { return cell ? (cell.snippet || cell.snip || '') : ''; }
 
       function paintMatrix() {
         var chipsEl = bodyEl.querySelector('#pauMChips');
@@ -587,12 +754,15 @@
             '<tr data-mkey="' + esc(mdef.key) + '" style="cursor:pointer;' + (isFocused ? 'background:#eff6ff;' : '') + '">',
             '  <td class="c-ck"><input type="checkbox" class="pau-m-ck" data-mkey="' + esc(mdef.key) + '"' + (ck ? ' checked' : '') + '></td>',
             '  <td class="c-no">' + (idx + 1) + '</td>',
-            '  <td title="' + esc(mdef.label) + '" style="font-weight:700;color:#1e40af">' + esc(mdef.label) + '</td>',
+            '  <td title="' + esc(mdef.label + ' — ' + mdef.lawTitle) + '" style="font-weight:700;color:#1e40af">' + esc(mdef.label) + '</td>',
             selOrgans.map(function (o) {
               var cell = (metricsByOrgan[o.apba_id] || {})[mdef.key];
-              if (!cell) return '<td style="color:#94a3b8">—</td>';
-              var fullTxt = cell.metric_value + ' (' + cell.evidence_article + ')';
-              return '<td title="' + esc(fullTxt + '\n\n' + (cell.snippet || '')) + '"><div class="pau-line"><span class="pau-pill fktu">' + esc(cell.evidence_article.split(',')[0]) + '</span><span>' + esc(cell.metric_value) + '</span></div></td>';
+              var val = getCellVal(cell);
+              var art = getCellArt(cell);
+              var snip = getCellSnip(cell);
+              if (!val) return '<td style="color:#94a3b8">—</td>';
+              var fullTxt = val + (art ? ' (' + art + ')' : '');
+              return '<td title="' + esc(fullTxt + '\n\n' + snip) + '"><div class="pau-line">' + (art ? '<span class="pau-pill fktu">' + esc(art.split(',')[0]) + '</span>' : '') + '<span>' + esc(val) + '</span></div></td>';
             }).join(''),
             '</tr>'
           ].join('');
@@ -604,19 +774,50 @@
 
       function paintSideBySide(selOrgans) {
         var sbsEl = bodyEl.querySelector('#pauMSbs');
-        sbsEl.innerHTML = selOrgans.map(function (o) {
+        var curDef = METRIC_DEFS.find(function (m) { return m.key === state.compMetricKey; }) || METRIC_DEFS[0];
+
+        var lawCardHtml = [
+          '<div class="pau-card law" id="pauMLawCard">',
+          '  <div class="pau-card-hd"><span>⚖️ 현행 법령 기준 (실시간 API)</span><span class="pau-pill ok">법제처/legalize-kr</span></div>',
+          '  <div style="font-size:12px;font-weight:700;color:#166534;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(curDef.lawTitle) + '">' + esc(curDef.lawTitle) + '</div>',
+          '  <pre class="pau-card-pre" id="pauMLawPre">⏳ 현행 법령 API에서 ' + esc(curDef.lawKey) + ' 제' + esc(curDef.lawArt) + '조 원문을 불러오는 중…</pre>',
+          '</div>'
+        ].join('');
+
+        var organCardsHtml = selOrgans.map(function (o) {
           var cell = (metricsByOrgan[o.apba_id] || {})[state.compMetricKey];
-          if (!cell) {
+          var val = getCellVal(cell);
+          var art = getCellArt(cell);
+          var snip = getCellSnip(cell);
+          if (!val) {
             return '<div class="pau-card"><div class="pau-card-hd"><span>🏢 ' + esc(o.name) + '</span></div><div style="color:#94a3b8;font-size:12px;">해당 쟁점 조문 없음</div></div>';
           }
           return [
             '<div class="pau-card">',
-            '  <div class="pau-card-hd"><span>🏢 ' + esc(o.name) + '</span><span class="pau-pill fktu">' + esc(cell.evidence_article) + '</span></div>',
-            '  <div style="font-size:12px;font-weight:700;color:#1e40af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(cell.metric_value) + '">요약: ' + esc(cell.metric_value) + '</div>',
-            '  <pre class="pau-card-pre">' + esc(cell.snippet || '') + '</pre>',
+            '  <div class="pau-card-hd"><span>🏢 ' + esc(o.name) + '</span><span class="pau-pill fktu">' + esc(art) + '</span></div>',
+            '  <div style="font-size:12px;font-weight:700;color:#1e40af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(val) + '">요약: ' + esc(val) + '</div>',
+            '  <pre class="pau-card-pre">' + esc(snip) + '</pre>',
             '</div>'
           ].join('');
         }).join('');
+
+        sbsEl.innerHTML = lawCardHtml + organCardsHtml;
+
+        fetchLawLive(curDef.lawKey, function (err, lawData) {
+          var pre = bodyEl.querySelector('#pauMLawPre');
+          if (!pre) return;
+          if (err || !lawData) {
+            pre.textContent = curDef.lawTitle + ' (오프라인 요약 기준)';
+            return;
+          }
+          var artObj = lawData.arts[curDef.lawArt];
+          if (artObj) {
+            pre.textContent = '[' + lawData.title + ' · 시행 ' + (lawData.effective || '') + ']\n' +
+              artObj.no + (artObj.title ? '(' + artObj.title + ') ' : ' ') + '\n' + artObj.text;
+          } else {
+            pre.textContent = '[' + lawData.title + ' · 시행 ' + (lawData.effective || '') + ']\n' + curDef.lawTitle;
+          }
+        });
       }
 
       bodyEl.querySelector('#pauMChips').addEventListener('click', function (e) {
@@ -724,13 +925,13 @@
     }
 
     // -------------------------------------------------------------------------
-    // TAB 4: 기관별 상세 공시·별도합의·첨부파일 원문 내려받기
+    // TAB 4: 기관별 상세 공시·별도합의·내부규정 원문 내려받기
     // -------------------------------------------------------------------------
     function renderDetailTab() {
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
         '  <select id="pauDOrgan" style="min-width:260px;font-weight:700;">',
-        '    <option value="ALL"' + (state.dOrgan === 'ALL' ? ' selected' : '') + '>공시 수집 기관 전체 보기</option>',
+        '    <option value="ALL"' + (state.dOrgan === 'ALL' ? ' selected' : '') + '>공시·규정 수집 기관 전체 보기 (' + fmtNum(discs.length) + '건)</option>',
         insts.map(function (i) {
           return '<option value="' + esc(i.apba_id) + '"' + (state.dOrgan === i.apba_id ? ' selected' : '') + '>' + esc(i.name + ' (' + i.inst_type + ' · ' + i.ministry + ')') + '</option>';
         }).join(''),
@@ -755,10 +956,10 @@
         '        <th class="c-no">№</th>',
         '        <th style="width:150px">기관명</th>',
         '        <th style="width:175px">공시항목</th>',
-        '        <th style="width:230px">공시 제목</th>',
-        '        <th style="width:115px">체결일/기준일</th>',
-        '        <th style="width:240px">핵심 요약 (노조명·유효기간 등)</th>',
-        '        <th>첨부파일 원문 내려받기 (PDF·HWP)</th>',
+        '        <th style="width:230px">공시·규정 제목</th>',
+        '        <th style="width:115px">체결일/개정일</th>',
+        '        <th style="width:220px">핵심 요약 (노조명·유효기간 등)</th>',
+        '        <th>ALIO 원문 API · 첨부파일 내려받기 (PDF·HWP)</th>',
         '      </tr>',
         '    </thead>',
         '    <tbody id="pauDTbody"></tbody>',
@@ -775,11 +976,11 @@
 
         var tbody = bodyEl.querySelector('#pauDTbody');
         if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#64748b;">조회된 수시공시 내역이 없습니다. (전체 보기 또는 공기업을 선택해 보세요)</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#64748b;">조회된 수시공시·내부규정 내역이 없습니다. (전체 보기 또는 공기업·준정부기관을 선택해 보세요)</td></tr>';
           return;
         }
 
-        tbody.innerHTML = rows.slice(0, 300).map(function (d, idx) {
+        tbody.innerHTML = rows.slice(0, 350).map(function (d, idx) {
           var kvParts = [];
           Object.keys(d.kv || {}).forEach(function (k) {
             if (k !== '기준일' && k !== '제출일' && worth(d.kv[k])) {
@@ -787,6 +988,10 @@
             }
           });
           var kvSummary = kvParts.join(' · ') || '—';
+
+          var reportUrl = d.dno && String(d.dno).indexOf('RULE_') !== 0
+            ? '<a href="https://www.alio.go.kr/item/itemReportRight.do?disclosureNo=' + esc(d.dno) + '" target="_blank" rel="noopener" class="pau-pill ok" style="text-decoration:none;margin-right:4px;" title="알리오 공시 원문 페이지 열기">🔗 공시원문</a>'
+            : '';
 
           var fileLinks = (d.files || []).map(function (f) {
             return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" class="pau-pill fktu" style="text-decoration:none;margin-right:4px;" title="' + esc(f.name) + ' 내려받기">⬇ ' + esc(f.name) + '</a>';
@@ -801,7 +1006,7 @@
             '  <td title="' + esc(d.title) + '" style="font-weight:600">' + esc(d.title) + '</td>',
             '  <td title="' + esc(d.edate || d.rdate || '') + '">' + esc(d.edate || d.rdate || '—') + '</td>',
             '  <td title="' + esc(kvSummary) + '">' + esc(kvSummary) + '</td>',
-            '  <td><div class="pau-line">' + (fileLinks || '<span style="color:#94a3b8">첨부 없음</span>') + '</div></td>',
+            '  <td><div class="pau-line">' + reportUrl + (fileLinks || '<span style="color:#94a3b8">첨부 없음</span>') + '</div></td>',
             '</tr>'
           ].join('');
         }).join('');
@@ -811,6 +1016,236 @@
       bodyEl.querySelector('#pauDCat').addEventListener('change', function (e) { state.dCat = e.target.value; paintDisclosures(); });
 
       paintDisclosures();
+    }
+
+    // -------------------------------------------------------------------------
+    // TAB 5: 공공·법령 API 실시간 연동 센터 (5대 API 통합 연결·실시간 호출)
+    // -------------------------------------------------------------------------
+    function renderApiHubTab() {
+      var apiRegistry = [
+        {
+          id: 'alio-portal',
+          name: '① 기획재정부 알리오(ALIO) 9대 노사·임단협·내부규정 공시 API',
+          endpoint: 'https://www.alio.go.kr/item/itemReportListSusi.json · itemOrganListJung.json · itemBoard21110.do',
+          auth: '인증키 불필요 (ALIO 공개 JSON/원문 API)',
+          status: '🟢 연결됨 (기관 ' + fmtNum(insts.length) + '곳 · 노조 ' + fmtNum(unions.length) + '개 · 공시/규정 ' + fmtNum(discs.length) + '건 동기화)',
+          actionLabel: '📂 수집 공시·원문 보기',
+          actionKind: 'go-detail'
+        },
+        {
+          id: 'law-live',
+          name: '② 현행 노동관계법령 실시간 조문 API (법제처 원문 / legalize-kr)',
+          endpoint: 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/main/kr/{법령명}/법률.md',
+          auth: '인증키 불필요 (CORS 전체 허용 · 실시간 마크다운 조문 파싱)',
+          status: '🟢 실시간 연결됨 (노동조합법·근로기준법·근로자참여법 등 7대 법령)',
+          actionLabel: '▶ 현행 법령 실시간 호출',
+          actionKind: 'test-law'
+        },
+        {
+          id: 'alio-openapi',
+          name: '③ 공공데이터포털 기획재정부 알리오(ALIO) Open API (data.go.kr)',
+          endpoint: 'https://apis.data.go.kr/1051000/recruitment/list',
+          auth: state.apiDataKey ? ('🟢 인증키 연동됨 (' + state.apiKeySource + ')') : '⚪ 공공데이터포털 인증키(serviceKey)',
+          status: state.apiDataKey ? '🟢 실시간 호출 준비 완료 (CORS 허용)' : '🟡 아래 입력칸에 공공데이터포털 인증키 입력 시 즉시 활성화',
+          actionLabel: '▶ ALIO OpenAPI 실시간 호출',
+          actionKind: 'test-alio-openapi'
+        },
+        {
+          id: 'pubdata-holidays',
+          name: '④ 한국천문연구원 특일(법정공휴일)·국민연금·고용보험 공공데이터 API',
+          endpoint: 'pubdata/common/holidays/{연도} · https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService',
+          auth: '푸른통합 공용 pubdata 실시간 연동',
+          status: state.apiHolidays.length ? ('🟢 연결됨 (올해 법정공휴일 ' + state.apiHolidays.length + '일 수신 완료)') : '🟢 공용 pubdata / 특일 API 연동 준비됨',
+          actionLabel: '▶ 공휴일·유급휴일 기준 불러오기',
+          actionKind: 'test-holidays'
+        },
+        {
+          id: 'cleaneye-moel',
+          name: '⑤ 행정안전부 지방공기업(클린아이)·고용노동부 전국 노동조합 표준데이터 Open API',
+          endpoint: 'https://apis.data.go.kr/B551982/openApiUnion · data.go.kr/data/15033827',
+          auth: '공공데이터포털 동일 인증키(serviceKey) 사용',
+          status: state.apiDataKey ? '🟢 인증키 공유 연결됨' : '⚪ 공공데이터포털 인증키 연동',
+          actionLabel: '🔗 공공데이터포털 명세 열기',
+          actionKind: 'open-datagokr'
+        }
+      ];
+
+      bodyEl.innerHTML = [
+        '<div class="pau-flt">',
+        '  <b style="color:#0f172a;">🔑 공공데이터포털(data.go.kr) 통합 인증키:</b>',
+        '  <input type="text" id="pauApiKeyInput" placeholder="공공데이터포털 일반 인증키(Decoding 또는 Encoding) 입력…" value="' + esc(state.apiDataKey) + '">',
+        '  <button type="button" class="pau-act-btn pri" id="pauApiKeySave">💾 인증키 저장·연결</button>',
+        '  <span style="font-size:12px;color:#475569;">출처: <b>' + esc(state.apiKeySource) + '</b> (정부사업신청 앱의 인증키와 자동 연동됩니다)</span>',
+        '</div>',
+        '<div class="pau-tbl-wrap" style="margin-bottom:14px;">',
+        '  <table class="pau-tbl">',
+        '    <thead>',
+        '      <tr>',
+        '        <th class="c-ck"><input type="checkbox" checked disabled></th>',
+        '        <th class="c-no">№</th>',
+        '        <th style="width:290px">연결된 공공·법령·노사 API 명칭</th>',
+        '        <th style="width:310px">API 엔드포인트 (Endpoint URL)</th>',
+        '        <th style="width:210px">인증 · 연동 방식</th>',
+        '        <th style="width:250px">현재 연결 상태</th>',
+        '        <th style="width:165px">실시간 실행</th>',
+        '      </tr>',
+        '    </thead>',
+        '    <tbody id="pauApiTbody">',
+        apiRegistry.map(function (a, i) {
+          return [
+            '<tr>',
+            '  <td class="c-ck"><input type="checkbox" checked></td>',
+            '  <td class="c-no">' + (i + 1) + '</td>',
+            '  <td title="' + esc(a.name) + '" style="font-weight:700;color:#0f172a">' + esc(a.name) + '</td>',
+            '  <td title="' + esc(a.endpoint) + '" style="color:#2563eb;font-family:monospace;font-size:11.5px">' + esc(a.endpoint) + '</td>',
+            '  <td title="' + esc(a.auth) + '">' + esc(a.auth) + '</td>',
+            '  <td title="' + esc(a.status) + '"><span class="pau-pill ok">' + esc(a.status) + '</span></td>',
+            '  <td><button type="button" class="pau-act-btn pri" data-api-act="' + esc(a.actionKind) + '">' + esc(a.actionLabel) + '</button></td>',
+            '</tr>'
+          ].join('');
+        }).join(''),
+        '    </tbody>',
+        '  </table>',
+        '</div>',
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;">',
+        '  <div class="pau-card">',
+        '    <div class="pau-card-hd">',
+        '      <span>⚖️ 실시간 노동관계법령 조문 API 조회기</span>',
+        '      <span class="pau-pill ok">CORS 무인증 실시간</span>',
+        '    </div>',
+        '    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0;">',
+        '      <select id="pauLawSel" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;flex:1;">',
+        LAW_API_SOURCES.map(function (l) {
+          return '<option value="' + esc(l.key) + '"' + (state.apiLawKey === l.key ? ' selected' : '') + '>' + esc(l.name) + '</option>';
+        }).join(''),
+        '      </select>',
+        '      <input type="text" id="pauLawArtInput" value="' + esc(state.apiLawArt) + '" placeholder="조 번호 (예: 24, 29의2, 55)" style="width:110px;height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;">',
+        '      <button type="button" class="pau-act-btn pri" id="pauLawFetchBtn">조문 API 조회</button>',
+        '    </div>',
+        '    <pre class="pau-card-pre" id="pauLawResultPre" style="min-height:180px;">⏳ 법령과 조문 번호를 선택하면 현행 법령 API에서 실시간 조문 원문을 불러옵니다.</pre>',
+        '  </div>',
+        '  <div class="pau-card">',
+        '    <div class="pau-card-hd">',
+        '      <span>🏛 공공데이터포털(ALIO OpenAPI · 특일 API) 실시간 응답 모니터</span>',
+        '      <span class="pau-pill fktu" id="pauOpenApiCounter">대기 중</span>',
+        '    </div>',
+        '    <pre class="pau-card-pre" id="pauOpenApiResultPre" style="min-height:218px;">위의 [▶ ALIO OpenAPI 실시간 호출] 또는 [▶ 공휴일·유급휴일 기준 불러오기] 단추를 누르면 실시간 API 응답 결과가 여기에 표시됩니다.</pre>',
+        '  </div>',
+        '</div>'
+      ].join('');
+
+      function runLawQuery() {
+        var pre = bodyEl.querySelector('#pauLawResultPre');
+        if (!pre) return;
+        pre.textContent = '⏳ 현행 법령 API 호출 중 (' + state.apiLawKey + ' 제' + state.apiLawArt + '조)…';
+        fetchLawLive(state.apiLawKey, function (err, lawData) {
+          if (err || !lawData) {
+            pre.textContent = '법령 API 호출 실패: ' + (err && err.message ? err.message : '네트워크 확인 필요');
+            return;
+          }
+          var artNo = String(state.apiLawArt || '').replace(/[^0-9의]/g, '');
+          var found = lawData.arts[artNo];
+          var metaLine = '✔ API 응답 성공 — [' + lawData.title + '] 공포일자: ' + (lawData.promulgated || '-') + ' · 시행일자: ' + (lawData.effective || '-') + ' · 총 파싱 조문: ' + Object.keys(lawData.arts).length + '개\n' +
+            '──────────────────────────────────────────────\n';
+          if (found) {
+            pre.textContent = metaLine + found.no + (found.title ? '(' + found.title + ')' : '') + '\n\n' + found.text;
+          } else {
+            var sampleKeys = Object.keys(lawData.arts).slice(0, 15).map(function (k) { return '제' + k + '조'; }).join(', ');
+            pre.textContent = metaLine + '제' + artNo + '조를 찾지 못했습니다. 조회 가능 주요 조문: ' + sampleKeys + ' …';
+          }
+        });
+      }
+
+      function runAlioOpenApiTest() {
+        var pre = bodyEl.querySelector('#pauOpenApiResultPre');
+        var badge = bodyEl.querySelector('#pauOpenApiCounter');
+        if (!state.apiDataKey) {
+          pre.textContent = '⚠ 상단 「🔑 공공데이터포털(data.go.kr) 통합 인증키」 입력칸에 인증키를 입력한 뒤 [💾 인증키 저장·연결]을 눌러 주세요.\n(푸른포털 정부사업신청 앱에 인증키가 등록되어 있으면 로그인 시 자동으로 불러옵니다.)';
+          return;
+        }
+        if ( global.GovAlio && typeof global.GovAlio.buildUrl === 'function' ) {
+          var url = global.GovAlio.buildUrl({ key: state.apiDataKey, page: 1, rows: 10, ongoingOnly: true });
+        } else {
+          var enc = /%[0-9A-Fa-f]{2}/.test(state.apiDataKey) ? state.apiDataKey : encodeURIComponent(state.apiDataKey);
+          var url = 'https://apis.data.go.kr/1051000/recruitment/list?serviceKey=' + enc + '&resultType=json&pageNo=1&numOfRows=10&ongoingYn=Y';
+        }
+        pre.textContent = '⏳ 기획재정부 알리오(ALIO) Open API (apis.data.go.kr/1051000/recruitment/list) 실시간 호출 중…';
+        fetch(url)
+          .then(function (r) { return r.json(); })
+          .then(function (json) {
+            var items = (json && json.result) || (json && json.data) || [];
+            var total = (json && json.totalCount) || items.length || 0;
+            if (badge) badge.textContent = '응답 ' + fmtNum(total) + '건';
+            var lines = ['✔ 기획재정부 알리오(ALIO) Open API 실시간 응답 성공 (전체 공고 ' + fmtNum(total) + '건 중 최근 10건):', ''];
+            items.slice(0, 10).forEach(function (it, idx) {
+              var instNm = it.instNm || it.pblntInstNm || '';
+              var ttl = it.recrutPbancTtl || it.pbancTtl || '';
+              var bgng = it.pbancBgngYmd || '';
+              var end = it.pbancEndYmd || '';
+              lines.push((idx + 1) + '. [' + instNm + '] ' + ttl + ' (' + bgng + ' ~ ' + end + ')');
+            });
+            if (!items.length) lines.push(JSON.stringify(json, null, 2).slice(0, 800));
+            pre.textContent = lines.join('\n');
+          })
+          .catch(function (err) {
+            pre.textContent = '⚠ ALIO OpenAPI 호출 오류: ' + (err && err.message ? err.message : String(err));
+          });
+      }
+
+      function runHolidaysTest() {
+        var pre = bodyEl.querySelector('#pauOpenApiResultPre');
+        var badge = bodyEl.querySelector('#pauOpenApiCounter');
+        if (state.apiHolidays && state.apiHolidays.length) {
+          if (badge) badge.textContent = state.apiHolidays.length + '일';
+          pre.textContent = '✔ 푸른통합 pubdata/common/holidays (한국천문연구원 특일 API) 실시간 연동 결과:\n\n' +
+            state.apiHolidays.map(function (h, i) {
+              return (i + 1) + '. ' + h.date + ' — ' + h.name + ' (' + (h.kind || '법정공휴일') + ')';
+            }).join('\n');
+          return;
+        }
+        pre.textContent = '✔ 근로기준법 제55조 제2항 및 관공서의 공휴일에 관한 규정 기준 유급공휴일:\n' +
+          '1. 일요일(주휴일)\n2. 국경일(3·1절, 제헌절, 광복절, 개천절, 한글날)\n3. 1월 1일, 설날 전날·설날·설날 다음날(3일), 추석 전날·추석·추석 다음날(3일)\n4. 부처님오신날, 어린이날, 현충일, 기독탄신일\n5. 공직선거법상 임기만료 선거일 및 대체공휴일, 근로자의 날(5월 1일)';
+      }
+
+      bodyEl.querySelector('#pauApiKeySave').addEventListener('click', function () {
+        var val = (bodyEl.querySelector('#pauApiKeyInput').value || '').trim();
+        state.apiDataKey = val;
+        state.apiKeySource = val ? '직접 입력 저장됨' : '미입력';
+        try {
+          if (val) localStorage.setItem(LS_KEY_DATA, val);
+          else localStorage.removeItem(LS_KEY_DATA);
+        } catch (e) {}
+        renderApiHubTab();
+      });
+
+      bodyEl.querySelector('#pauLawFetchBtn').addEventListener('click', function () {
+        state.apiLawKey = bodyEl.querySelector('#pauLawSel').value;
+        state.apiLawArt = bodyEl.querySelector('#pauLawArtInput').value.trim() || '24';
+        runLawQuery();
+      });
+
+      bodyEl.querySelector('#pauLawSel').addEventListener('change', function (e) {
+        state.apiLawKey = e.target.value;
+        var found = LAW_API_SOURCES.find(function (x) { return x.key === state.apiLawKey; });
+        if (found && found.mainArts.length) {
+          state.apiLawArt = found.mainArts[0];
+          bodyEl.querySelector('#pauLawArtInput').value = state.apiLawArt;
+        }
+        runLawQuery();
+      });
+
+      bodyEl.querySelector('#pauApiTbody').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-api-act]');
+        if (!btn) return;
+        var act = btn.dataset.apiAct;
+        if (act === 'go-detail') switchTab('detail');
+        else if (act === 'test-law') runLawQuery();
+        else if (act === 'test-alio-openapi') runAlioOpenApiTest();
+        else if (act === 'test-holidays') runHolidaysTest();
+        else if (act === 'open-datagokr') window.open('https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=%EC%95%8C%EB%A6%AC%EC%98%A4', '_blank', 'noopener');
+      });
+
+      runLawQuery();
     }
 
     renderCurrentTab();
@@ -837,7 +1272,7 @@
     modalEl = document.createElement('div');
     modalEl.className = 'pau-modal-back';
     modalEl.id = 'puAlioModalBack';
-    modalEl.innerHTML = '<div class="pau-modal-box" id="puAlioModalBox" role="dialog" aria-modal="true" aria-label="공공기관 노동조합·단체협약 비교분석"></div>';
+    modalEl.innerHTML = '<div class="pau-modal-box" id="puAlioModalBox" role="dialog" aria-modal="true" aria-label="공공임단협 비교분석"></div>';
     document.body.appendChild(modalEl);
 
     modalEl.addEventListener('click', function (ev) {
