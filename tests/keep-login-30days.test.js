@@ -44,6 +44,7 @@ function world(opt) {
   Auth.Persistence = { LOCAL: 'local', SESSION: 'session', NONE: 'none' };
   Auth.prototype.setPersistence = function (p) {
     log.push('persist:' + p);
+    if (opt.persistThrows) throw new Error('저장소 동기 오류');
     return opt.persistFails ? Promise.reject(new Error('저장소 막힘')) : Promise.resolve();
   };
   Auth.prototype.signInWithEmailAndPassword = function () { log.push('signin'); return Promise.resolve('cred'); };
@@ -143,11 +144,11 @@ test('① ★★ 상한을 넘기면: 까닭을 남기고 모든 탭에 알리�
   const order = w.log.filter((x) => /^(why|signout)/.test(x));
   assert.deepEqual(order.map((x) => x.split(':')[0]), ['why', 'signout'], '까닭 → 끊기 순서가 아닙니다 · 두 번 끊었습니다: ' + order.join(' / '));
   assert.match(order[0], /만료/, '로그인 화면에 보일 까닭에 «만료» 가 없습니다');
-  assert.equal(w.store.pu_keep_login_at, undefined, '만료한 뒤 표시가 남았습니다');
   assert.ok(w.atSignOut.logoutKey, '끊기 «전에» 다른 탭에 「지금 나갔다」 를 안 알렸습니다');
   /* ★ 외부 검토 지적: pu_auth_uid 를 끊기 전에 지우면 이 탭의 authsync 가 「로그인해 있던 화면이었나」 를 몰라 로그인 화면으로 안 밀어낸다 */
   assert.equal(w.atSignOut.uid, 'u-keep', '끊는 순간 pu_auth_uid 가 이미 지워졌습니다 — authsync 가 이 탭을 로그인 화면으로 못 밀어냅니다');
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(w.store.pu_keep_login_at, undefined, '만료한 뒤 표시가 남았습니다');
   assert.equal(w.store.pu_auth_uid, undefined, '끊긴 뒤 이 기기에 남은 로그인 열쇠를 안 지웠습니다');
   assert.equal(w.store.p_autoSession, undefined, '앱 쪽 자동 세션(p_autoSession)이 남았습니다');
   assert.equal(w.session.p_session, undefined);
@@ -237,6 +238,17 @@ test('③ ★★ 로그아웃은 어디서 불러도 표시를 지우고, 로그
   assert.ok(again.Auth.prototype.signOut.__puKeep);
 });
 
+test('③ ★★ 외부 검토 2차: 로그아웃이 «실패»하면 표시를 지우지 않는다 — 사람이 남았는데 새 30일을 주면 안 된다', async () => {
+  const mark = String(T0 - 3 * DAY);
+  const w = world({ signOutFails: true, store: { pu_portal_auto: '1', pu_keep_login_at: mark } });
+  const who = w.inst.currentUser;
+  await assert.rejects(() => new w.Auth().signOut(), /끊기 실패/, '원래 signOut 의 실패를 삼켰습니다');
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(w.store.pu_keep_login_at, mark, '로그아웃이 실패했는데 표시가 지워졌습니다');
+  assert.equal(w.K.judge(who), 'ok');
+  assert.equal(w.store.pu_keep_login_at, mark, '실패 뒤 다음 검사가 새 시각으로 덮었습니다');
+});
+
 /* ───────── ② 유지 끔을 앱이 뒤집지 못한다 ───────── */
 test('② ★★ 「유지 끔」 기기에서는 앱이 부른 LOCAL 이 SESSION 으로 낮춰진다 · 켬·미정이면 건드리지 않는다', () => {
   for (const [saved, ask, want] of [
@@ -270,6 +282,10 @@ test('② ★★ 앱 안의 따로 있는 로그인 칸도 「유지 끔」이�
   const bad = world({ store: { pu_portal_auto: '0' }, persistFails: true });
   await assert.rejects(() => new bad.Auth().signInWithEmailAndPassword('a', 'b'), /저장소 막힘/, '세션으로 못 박지 못했는데 로그인했습니다');
   assert.ok(!bad.log.includes('signin'), '세션으로 못 박지 못했는데 로그인이 진행됐습니다');
+  /* ★ 외부 검토 2차: 동기 오류도 «못 정했다» — 로그인하지 않는다 */
+  const thr = world({ store: { pu_portal_auto: '0' }, persistThrows: true });
+  await assert.rejects(() => new thr.Auth().signInWithEmailAndPassword('a', 'b'), /동기 오류/, '세션 못 박기가 동기 오류를 냈는데 로그인했습니다');
+  assert.ok(!thr.log.includes('signin'), '세션 못 박기가 동기 오류를 냈는데 로그인이 진행됐습니다');
   /* 유지 켬·미정인 기기는 이 못 박기를 안 하므로 저장소 오류와 무관하다 */
   const free = world({ store: { pu_portal_auto: '1' }, persistFails: true });
   assert.equal(await new free.Auth().signInWithEmailAndPassword('a', 'b'), 'cred');
@@ -396,4 +412,14 @@ test('정부사업일정(자체 로그인 칸): «기본으로 체크된» 자�
   /* 외부 검토: 그 칸은 HTML 에서 기본 checked 라, begin(true) 를 부르면 사람이 안 보고 지나친 체크가 공용 PC 의 유지 끔을 유지 켬으로 바꾼다 */
   assert.ok(!/PuKeepLogin\.begin\(/.test(g), '자체 로그인 칸이 기기 전체의 유지 선택을 덮어씁니다 — 유지는 포털 체크칸에서만 고릅니다');
   assert.match(g, /<script src="js\/pu-keep-login\.js\?v=\d+"><\/script>/, '정부사업일정이 모듈을 안 싣습니다 — 유지 끔 보호·30일 상한이 안 걸립니다');
+});
+
+test('정부사업일정 ★ 외부 검토 2차: 포털에서 「유지 끔」을 고른 기기는 «기본 체크»가 있어도 앱 자체 세션(p_autoSession)을 안 남긴다', () => {
+  const g = stripComments(read('gov-consulting.html'));
+  const i = g.indexOf('const remember=');
+  assert.ok(i > 0, '자체 로그인 칸의 remember 계산을 못 찾았습니다');
+  const line = g.slice(i, i + 200);
+  assert.match(g.slice(i - 400, i), /pu_portal_auto'\)==='0'/, '「유지 끔」(0)을 읽지 않습니다');
+  assert.match(line, /const remember=\s*portalOff\s*\?\s*false\s*:/, '유지 끔이 기본 체크보다 앞서지 않습니다 — 공용 PC 에 이름·역할이 담긴 자동 세션이 남습니다');
+  assert.match(g.slice(i, i + 400), /removeItem\('p_autoSession'\)/, '유지 끔 기기에 이미 남은 자동 세션을 안 지웁니다');
 });

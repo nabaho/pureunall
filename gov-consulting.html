@@ -6171,9 +6171,12 @@ async function doLogin(){
   q('#loginBtn').disabled=true; err.classList.remove('on');
   // 포털에서 자동로그인을 선택한 세션은 이 화면의 독립 로그인 때문에
   // SESSION으로 낮아지지 않게 한다(Firebase 인증 저장소는 같은 주소에서 공유됨).
-  let portalAuto=false;
-  try{ portalAuto=localStorage.getItem('pu_portal_auto')==='1'; }catch(_){}
-  const remember=!!q('#loginRemember')?.checked || portalAuto;
+  let portalAuto=false, portalOff=false;
+  try{ portalAuto=localStorage.getItem('pu_portal_auto')==='1'; portalOff=localStorage.getItem('pu_portal_auto')==='0'; }catch(_){}
+  /* 포털에서 「유지 끔」(공용 PC)을 고른 기기는 이 칸의 «기본 체크»가 있어도 유지하지 않는다 — 파이어베이스는 SESSION 인데
+     이 앱 자체 세션(p_autoSession: 이름·역할)만 남으면 다음 사람이 그 화면을 이어 받는다(외부 검토 2차 지적). 이미 남은 것도 지운다. */
+  const remember=portalOff ? false : (!!q('#loginRemember')?.checked || portalAuto);
+  if(portalOff){ try{ localStorage.removeItem('p_autoSession'); }catch(_){} }
   /* ⚠ 여기서 PuKeepLogin.begin() 을 부르지 않는다 — 이 칸은 «기본으로 체크»돼 있어, 부르면 사람이 안 보고 지나친 체크가 기기 전체의
      「유지 끔」(공용 PC)을 뒤집는다(외부 검토 지적). 유지는 포털 체크칸에서만 고른다. 포털에서 「유지 끔」을 고른 기기는 아래 LOCAL 요청이
      SESSION 으로 낮춰지고(js/pu-keep-login.js), 그 밖의 기기는 30일 상한이 걸린다. */

@@ -124,7 +124,7 @@
     try { if (global.PuLogoutWhy) global.PuLogoutWhy.why('로그인 유지 ' + KEEP_DAYS + '일 만료'); } catch (e) { }
     signalOut();
     var a = authOrNull();
-    var ok = function () { expiring = false; retries = 0; wipeApps(); };
+    var ok = function () { expiring = false; retries = 0; clear(); wipeApps(); };
     var bad = function () {
       if (prev && !(Number(lsGet(AT_KEY)) || 0)) lsSet(AT_KEY, prev);
       expiring = false;
@@ -192,8 +192,8 @@
   /* ②-2 앱 «안에» 따로 있는 로그인 칸(푸른이알피·급여아웃소싱·정부사업·경력관리)은 setPersistence 를 안 부르거나
      부르기 전에 로그인한다 — 파이어베이스 기본은 LOCAL(영원히 남음)이라, 「유지 끔」 기기에서 그 칸으로 들어오면 공용 PC 에 남는다.
      그래서 이 기기가 「유지 끔」이면 로그인 «직전»에 SESSION 을 먼저 못 박는다.
-     ⚠ 못 박기가 «거절»되면 로그인도 하지 않는다 — 세션으로 못 정한 채 들어가면 공용 PC 에 영구 로그인이 남을 수 있다(포털도 같다,
-       외부 검토 지적). 반대로 «이 파일 자신의 오류»(동기 예외)로는 로그인을 막지 않는다 — 이 파일 때문에 아무도 못 들어오면 안 된다. */
+     ⚠ 못 박기가 «거절»되거나 «동기 오류»를 내면 로그인도 하지 않는다 — 세션으로 못 정한 채 들어가면 공용 PC 에 영구 로그인이 남을 수 있다
+       (포털도 같다, 외부 검토 지적 두 번). 못 박을 수단(setPersistence)이 아예 없으면 그대로 로그인한다 — 이 파일 때문에 아무도 못 들어오면 안 된다. */
   function hookSignIn(name) {
     var A = global.firebase && global.firebase.auth && global.firebase.auth.Auth;
     var P = A && A.prototype;
@@ -204,9 +204,10 @@
       var self = this, args = arguments;
       var go = function () { return orig.apply(self, args); };
       var r = null;
-      try {
-        if (isOff() && typeof P.setPersistence === 'function') r = P.setPersistence.call(self, global.firebase.auth.Auth.Persistence.SESSION);
-      } catch (e) { r = null; }
+      if (isOff() && typeof P.setPersistence === 'function') {
+        try { r = P.setPersistence.call(self, global.firebase.auth.Auth.Persistence.SESSION); }
+        catch (e) { return Promise.reject(e); }   // 동기 오류도 «못 정했다» — 로그인하지 않는다
+      }
       if (r && typeof r.then === 'function') return r.then(go);   // 거절되면 그 오류 그대로 — 로그인하지 않는다
       return go();
     };
@@ -214,7 +215,8 @@
     P[name] = wrapped;
     return true;
   }
-  /* ③ 어디서 로그아웃하든 표시를 지운다 */
+  /* ③ 어디서 로그아웃하든 표시를 지운다 — 끊기가 «성공한 뒤에만». 부르는 순간 지우면 끊기가 실패해 사람이 남았을 때
+     다음 검사가 「처음 본 사람」으로 오해해 새 30일을 준다(외부 검토 2차 지적). */
   function hookSignOut() {
     var A = global.firebase && global.firebase.auth && global.firebase.auth.Auth;
     var P = A && A.prototype;
@@ -222,8 +224,16 @@
     if (P.signOut.__puKeep) return true;
     var orig = P.signOut;
     var wrapped = function () {
-      try { if (this && this.currentUser && !this.currentUser.isAnonymous) clear(); } catch (e) { }
-      return orig.apply(this, arguments);
+      var person = false;
+      try { person = !!(this && this.currentUser && !this.currentUser.isAnonymous); } catch (e) { }
+      var r = orig.apply(this, arguments);
+      if (person) {
+        try {
+          if (r && typeof r.then === 'function') r.then(function () { clear(); }, function () { });
+          else clear();
+        } catch (e) { }
+      }
+      return r;
     };
     wrapped.__puKeep = true;
     P.signOut = wrapped;
