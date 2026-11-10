@@ -996,6 +996,21 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .post-fmt-btn.on{background:var(--accent);color:var(--surface);}
 .post-fmt-btn.on.office{background:var(--info);}
 .post-next{font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;}
+/* 날짜 겹침 팝업(#mbDup) — 색은 기존 변수만 */
+.dup-modal{max-width:420px;}
+.dup-body{text-align:center;padding:22px 20px 8px;}
+.dup-ic{font-size:36px;margin-bottom:6px;}
+.dup-title{font-size:16px;font-weight:900;color:var(--danger);}
+.dup-who{margin-top:4px;font-size:12px;font-weight:800;color:var(--t2);}
+.dup-msg{margin-top:10px;font-size:14px;font-weight:700;color:var(--text);line-height:1.6;white-space:pre-line;word-break:keep-all;}
+.dup-pick{margin-top:14px;display:flex;flex-direction:column;gap:4px;align-items:stretch;text-align:left;}
+.dup-pick label{font-size:12px;font-weight:800;color:var(--t2);}
+.dup-pick input{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+.dup-near{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
+.dup-chip{font:inherit;font-size:13px;font-weight:800;padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--sf2);color:var(--accent);cursor:pointer;}
+.dup-chip:hover{border-color:var(--accent);}
+.dup-err{min-height:18px;margin-top:8px;font-size:12px;font-weight:800;color:var(--danger);line-height:1.5;}
+.dup-foot{justify-content:center;gap:8px;}
 .post-item[draggable="true"] .ended-pbtn::before{content:'⠿ ';opacity:.55;}
 .post-item.dragging{opacity:.4;}
 @media (hover:none){.post-item[draggable="true"] .ended-pbtn::before{content:none;}}
@@ -2336,6 +2351,25 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     </div>
     <div class="mfoot" style="justify-content:center;">
       <button class="btn btn-p" id="mAlertOk" style="min-width:120px;">확인</button>
+    </div>
+  </div>
+</div>
+<!-- 날짜 겹침 팝업 (대표 지시 2026-11-10 「동일 컨설팅 날짜면 중복된다고 팝업으로 경고하고 날짜를 옮길 수 있게」)
+     — 달력에 끌어 놓거나 옮길 때 그 날짜가 겹쳐 못 넣으면, 왜 겹치는지 크게 알리고 «같은 자리에서» 다른 날짜로 바꿔 다시 한다. 서랍(mbPost 490)보다 위, 알림창(mbAlert 600)보다 아래. -->
+<div class="mb" id="mbDup" style="z-index:560;" role="dialog" aria-modal="true" aria-labelledby="dupTitle">
+  <div class="modal sm dup-modal">
+    <div class="mbody dup-body">
+      <div class="dup-ic">⚠️</div>
+      <div class="dup-title" id="dupTitle">같은 날짜에 일정이 중복됩니다</div>
+      <div class="dup-who" id="dupWho"></div>
+      <div class="dup-msg" id="dupMsg"></div>
+      <div class="dup-pick"><label for="dupDate">다른 날짜로 옮기기</label><input type="date" id="dupDate" onkeydown="if(event.key==='Enter'){event.preventDefault();dupGo();}"></div>
+      <div class="dup-near" id="dupNear"></div>
+      <div class="dup-err" id="dupErr" role="alert"></div>
+    </div>
+    <div class="mfoot dup-foot">
+      <button type="button" class="btn btn-s" onclick="dupClose()">닫기</button>
+      <button type="button" class="btn btn-p" id="dupGo" onclick="dupGo()">이 날짜로 옮기기</button>
     </div>
   </div>
 </div>
@@ -6517,6 +6551,60 @@ function showBigAlert(msg,icon){
   q('#mAlertMsg').textContent=msg;
   q('#mbAlert').classList.add('open');
 }
+/* ══ 날짜 겹침 팝업 (대표 지시 2026-11-10 「동일 컨설팅 날짜일 경우 중복된다고 팝업으로 경고표시 만들고 날짜 옮길 수 있게」) ══
+   달력에 끌어 놓거나(본 회차·사후) 옮길 때(본 일정 칩·사후 칩) 그 날짜가 겹쳐 못 넣으면 «작은 알림»이 아니라 팝업으로 왜 겹치는지 알리고,
+   같은 자리에서 다른 날짜로 바꿔 «다시» 한다. 가까운 빈 날짜(앞·뒤)를 눌러 고를 수도 있다.
+   ■ probe(날짜) — 그 날짜로 되는지 «왜 안 되는지» 글자(비면 됨). 가까운 날짜 찾기와 팝업 안 검사에 쓴다. 놓기·옮기기와 «같은 판정 함수»여야 한다.
+   ■ retry(날짜) — 골라서 확인하면 부르는 «원래 하려던 일»(놓기·옮기기·저장). 그 안에서 한 번 더 판정하므로 팝업이 판정을 대신하지 않는다.
+   ⚠ 날짜를 바꿔도 안 되는 일(진행 중 사업·비활성 사업장 등)은 이 팝업이 아니라 알림으로 말한다. */
+let _dup=null;
+function dupShift(ds,n){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ds||'')); if(!m)return '';
+  return new Date(Date.UTC(+m[1],+m[2]-1,+m[3])+n*864e5).toISOString().slice(0,10);
+}
+/* from 의 앞(step -1)·뒤(+1)에서 가장 가까운 «되는» 날짜 — 없으면 ''. 하루씩 최대 limit 일 */
+function dupNearest(probe,from,step,limit){
+  for(let i=1;i<=limit;i++){ const d=dupShift(from,step*i); if(d&&!probe(d))return d; }
+  return '';
+}
+function dupDayLabel(ds){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(ds); return m?`${m[2]}-${m[3]}(${'일월화수목금토'.charAt(new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).getUTCDay())})`:ds; }
+/* 겹침 때문인가(작은 제목을 «중복됩니다»로) — 불가 날짜·담당 한도 같은 까닭이면 «넣을 수 없습니다» */
+function dupWho(coId,typeId,what){
+  const co=getCos().find(c=>c.id===coId)||{}, ty=getTypes().find(t=>t.id===typeId)||{};
+  return `${co.name||''} · ${ty.fullName||ty.name||''}${what?' · '+what:''}`;
+}
+function dupIsOverlap(msg){ return /이미 있습니다|중복|하루에 한 사업장만|동일 일정/.test(String(msg||'')); }
+function dupPopupOpen(o){
+  const msg=String(o&&o.msg||'').replace(/\s*\n\s*/g,'\n');
+  /* skip — «옮기기»일 때 그 일정이 지금 있는 날짜. 옮길 곳으로 권하지도, 고르게 두지도 않는다(제자리라 아무 일도 안 된다). */
+  const probe=o.probe?(o.skip?(d=>(d===o.skip?'지금 이 일정이 있는 날짜입니다':o.probe(d))):o.probe):null;
+  const near=[]; const nx=probe?dupNearest(probe,o.date,1,120):'', pv=probe?dupNearest(probe,o.date,-1,120):'';
+  _dup={msg,date:o.date,probe,retry:o.retry,verb:o.verb||'옮기기',who:o.who||''};
+  q('#dupTitle').textContent=dupIsOverlap(msg)?'같은 날짜에 일정이 중복됩니다':'이 날짜에는 넣을 수 없습니다';
+  q('#dupWho').textContent=_dup.who;
+  q('#dupMsg').textContent=msg;
+  q('#dupDate').value=nx||pv||'';
+  q('#dupErr').textContent='';
+  if(pv)near.push(`<button type="button" class="dup-chip" onclick="dupPick('${pv}')">◀ ${dupDayLabel(pv)}</button>`);
+  if(nx)near.push(`<button type="button" class="dup-chip" onclick="dupPick('${nx}')">${dupDayLabel(nx)} ▶</button>`);
+  q('#dupNear').innerHTML=near.length?near.join(''):'<span class="dup-err" style="min-height:0;color:var(--t2)">앞뒤 넉 달 안에 비는 날짜가 없습니다 — 날짜를 직접 고르세요</span>';
+  q('#dupGo').textContent=`이 날짜로 ${_dup.verb}`;
+  q('#mbDup').classList.add('open');
+  const i=q('#dupDate'); if(i&&i.focus)i.focus();
+}
+function dupPick(d){ const i=q('#dupDate'); if(i)i.value=d; const e=q('#dupErr'); if(e)e.textContent=''; }
+function dupClose(){ _dup=null; q('#mbDup').classList.remove('open'); }
+/* 고른 날짜로 «원래 하려던 일»을 다시 한다 — 먼저 이 팝업 안에서 되는 날짜인지 보고, 안 되면 닫지 않고 까닭을 적는다 */
+async function dupGo(){
+  if(!_dup)return;
+  const d=String((q('#dupDate')||{}).value||'').trim(); const err=q('#dupErr');
+  const say=m=>{ if(err)err.textContent=m; };
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||isNaN(Date.parse(d))){ say('날짜를 정해 주세요 (예 2026-11-17)'); return; }
+  if(d===_dup.date){ say('겹치는 그 날짜입니다 — 다른 날짜를 골라 주세요'); return; }
+  const why=_dup.probe?_dup.probe(d):''; if(why){ say(String(why).replace(/\s*\n\s*/g,' ')); return; }
+  const retry=_dup.retry; dupClose();
+  await retry(d);
+}
 function showConfirm(msg, onYes){
   const t=q('#toast');
   t.innerHTML=`${msg} <button id="cfYes" style="pointer-events:auto;margin-left:10px;background:#fff;color:var(--accent);border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;">확인</button><button id="cfNo" style="pointer-events:auto;margin-left:6px;background:rgba(255,255,255,.25);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;">취소</button>`;
@@ -7179,6 +7267,12 @@ function postProblem(co,tid,date,excludeId,keepDay){
   }
   return checkAttLimit(coMainOf(co,tid)||myId()||'a1',date,excludeId)||'';
 }
+/* 사후를 못 넣거나 못 옮길 때 알리는 길 — 날짜 때문이면(겹침·불가 날짜·하루 한도) 팝업으로 «다른 날짜로 옮겨 다시» 하게 하고,
+   날짜를 바꿔도 안 되는 일(진행 중 사업 등 postCanAdd 가 아님)은 알림으로만 말한다. retry(날짜)는 원래 하려던 일이다. */
+function postFail(co,tid,date,excludeId,err,retry,verb,skip){
+  if(!postCanAdd(co,tid)||!/^\d{4}-\d{2}-\d{2}$/.test(String(date||''))){ toast(err,'err'); return; }   // 날짜 칸이 비었거나 모양이 틀린 것은 «옮길 날짜»가 아니라 입력 안내다
+  dupPopupOpen({who:dupWho(co.id,tid,'사후컨설팅'),msg:err,date,probe:d=>postProblem(co,tid,d,excludeId),retry,verb,skip});
+}
 /* 일정 레코드 — 고칠 때는 «다른 칸(사진 설정 등)»을 그대로 두고 날짜·구분·메모만 바꾼다. 빈 메모는 칸을 두지 않는다(undefined 금지). */
 function postBuildSched(co,tid,f,existing){
   const sc=Object.assign({},existing||{});
@@ -7202,7 +7296,12 @@ async function postSave(withPhoto){
   const co=getCos().find(c=>c.id===coId); if(!co)return;
   const prev=editId?getScheds().find(s=>s.id===editId&&isPostSched(s)):null;
   const err=postProblem(co,tid,date,editId,!!(prev&&prev.date===date));   // 날짜를 안 바꾸고 고치면 하루 규칙은 다시 안 묻는다
-  if(err){ _post.err=err; renderPostDrawer(); toast(err,'err'); return; }
+  if(err){
+    _post.err=err; renderPostDrawer();
+    /* 날짜 때문이면 팝업(다른 날짜로 옮겨 «이 저장»을 다시), 아니면 알림. 서랍의 날짜칸도 고른 날짜로 바꾼다. */
+    postFail(co,tid,date,editId,err,d=>{ if(_post)_post.date=d; const i=q('#postDate'); if(i)i.value=d; return postSave(withPhoto); },editId?'옮기기':'넣기',prev?prev.date:'');   // 이미 있는 사후를 고치는 중이면 «옮기기» — 지금 날짜는 권하지 않는다
+    return;
+  }
   if(!await acquireCompanyEditLock(coId)||!await verifyCompanyEditLock(coId))return;
   const scheds=getScheds();
   const old=editId?scheds.find(s=>s.id===editId&&isPostSched(s)):null;
@@ -7244,7 +7343,7 @@ async function handlePostDrop(date,item){
   if(!co){toast('사업장을 찾을 수 없습니다','err');return;}
   if(co.active===false){toast('비활성 사업장입니다','err');return;}
   const err=postProblem(co,item.typeId,date,'');
-  if(err){toast(err,'err');return;}
+  if(err){ postFail(co,item.typeId,date,'',err,d=>handlePostDrop(d,item),'넣기'); return; }   // 겹침이면 팝업 — 다른 날짜로 옮겨 다시 넣는다
   if(!await acquireCompanyEditLock(co.id)||!await verifyCompanyEditLock(co.id))return;
   const isF=item.isField!==false;
   const sc=postBuildSched(co,item.typeId,{date,field:isF,memo:''},null);
@@ -10118,7 +10217,7 @@ function chipHtml(sc){
   const ended=!!endedDate;
   const post=isPostSched(sc);
   const mine=canEdit(sc);
-  const movable=mine&&!ended&&!post;          // 사후는 끌어 옮기지 않는다 — 날짜는 사후컨설팅 창에서 고친다
+  const movable=mine&&!ended;                 // 사후 칩도 끌어 옮긴다(2026-11-10) — 옮기기는 moveChip → movePost 가 사후 규칙으로 맡는다
   /* 구글 캘린더처럼 «연한 바탕 + 진한 글자» (대표 지시 2026-08-25).
      ⚠ 남의 일정을 opacity:.45 로 흐리게 하던 것을 뺐다 — 연한 바탕 위에서 반투명까지
        걸면 글자가 읽히지 않는다. 못 옮기는 것은 «커서»로 알린다(잡히지 않는다). */
@@ -10192,26 +10291,55 @@ function bindChipDrag(){
   });
 }
 
+/* 본 일정 칩을 그 날짜로 옮길 때 «날짜 때문에» 막히는 까닭 — 비어 있으면 된다. moveChip 과 겹침 팝업(가까운 날짜 찾기·팝업 안 검사)이 같은 판정을 쓴다. */
+function moveDayProblem(sc,date){
+  const blockMsg=isBlocked(date,sc.typeId); if(blockMsg)return blockMsg;
+  if(getScheds().some(s=>s.id!==sc.id&&s.date===date&&s.coId===sc.coId&&s.typeId===sc.typeId))return '해당 날짜에 동일 일정이 이미 있습니다';
+  return checkExclusiveDay(sc.coId,sc.typeId,date,sc.id)||checkConflictMatrix(sc.coId,sc.typeId,date,sc.id)||checkAgencyExclusive(sc.coId,sc.typeId,date,sc.id)||'';
+}
+/* 사후컨설팅 칩을 다른 날짜로 끌어 옮긴다 — 서랍에서 날짜를 고치는 것과 «같은 규칙»(postProblem)·같은 저장(사업장 잠금 + postBuildSched + 사후끼리 번호).
+   본 회차 번호·사업 상태·회차 변경 이력은 건드리지 않는다. 겹치면 팝업으로 다른 날짜를 골라 다시 옮긴다. */
+async function movePost(sc,newDate){
+  if(!canEdit(sc)){toast('타인 일정은 이동할 수 없습니다','err');return;}
+  const co=getCos().find(c=>c.id===sc.coId);
+  if(!co){toast('사업장을 찾을 수 없습니다','err');return;}
+  if(sc.date===newDate)return;
+  const err=postProblem(co,sc.typeId,newDate,sc.id);
+  if(err){ postFail(co,sc.typeId,newDate,sc.id,err,d=>moveChip(sc.id,d),'옮기기',sc.date); return; }
+  if(!await acquireCompanyEditLock(co.id)||!await verifyCompanyEditLock(co.id))return;
+  const scheds=getScheds();
+  const old=scheds.find(s=>s.id===sc.id&&isPostSched(s));
+  if(!old){ releaseCompanyEditLock(); toast('옮기려던 사후컨설팅을 찾을 수 없습니다 (이미 지워졌을 수 있습니다)','err'); return; }
+  const from=old.date;
+  const before={}; scheds.filter(s=>isPostSched(s)&&s.coId===co.id&&s.typeId===sc.typeId).forEach(s=>{before[s.id]=s.round;});
+  scheds[scheds.indexOf(old)]=postBuildSched(co,sc.typeId,{date:newDate,field:old.isField!==false,memo:old.memo||''},old);
+  setScheds(scheds);
+  reorderRounds(co.id,sc.typeId);          // 사후끼리 날짜순으로 1,2,3 — 본 일정 번호는 안 건드린다
+  releaseCompanyEditLock();
+  const after=getScheds().filter(s=>isPostSched(s)&&s.coId===co.id&&s.typeId===sc.typeId);
+  const renum=after.some(s=>s.id!==sc.id&&before[s.id]!==s.round);
+  renderSummaryBar();renderCal();renderDash();if(q('#endedList'))renderEndedView();
+  if(_post&&_post.coId===co.id&&_post.tid===sc.typeId)renderPostDrawer();
+  const fr=(after.find(s=>s.id===sc.id)||{}).round||0;
+  toast(`사후 ${fr}회 ${String(from).slice(5)} → ${newDate.slice(5)} 로 옮겼습니다${renum?' · 사후 번호를 날짜순으로 다시 매겼습니다':''}`);
+}
 function moveChip(sid,newDate){
   /* ⚠ 일정을 먼저 찾는다 — 날짜만 보고 막으면 「사업별로 연 날」로 못 옮긴다 */
   const scheds=getScheds();
   const idx=scheds.findIndex(s=>s.id===sid);
   if(idx===-1)return;
   const sc=scheds[idx];
-  if(isPostSched(sc)){toast('사후컨설팅은 끌어서 옮길 수 없습니다 — 종료 사업장 관리의 「사후」 창에서 날짜를 고치세요','err');return;}
-  const blockMsg=isBlocked(newDate,sc.typeId);
-  if(blockMsg){toast(blockMsg,'err');return;}
-  if(isEndedSchedule(sc)){toast('종료된 컨설팅은 이동할 수 없습니다','err');return;}
+  /* 사후컨설팅 칩도 끌어 옮긴다(대표 지시 2026-11-10) — 사후 규칙(postProblem: 종료 잠금 없음·사후끼리 번호)은 movePost 가 맡고, 본 회차 재정렬·이력과 섞지 않는다. */
+  if(isPostSched(sc))return movePost(sc,newDate);
+  /* 날짜가 겹쳐 못 옮기면 작은 알림이 아니라 «겹침 팝업» — 다른 날짜를 골라 같은 옮기기를 다시 한다 */
+  const fail=msg=>dupPopupOpen({who:dupWho(sc.coId,sc.typeId,`${sc.round||'?'}회차 옮기기`),msg,date:newDate,probe:d=>moveDayProblem(sc,d),retry:d=>moveChip(sid,d),verb:'옮기기',skip:sc.date});
   const oldDate=sc.date;
-  if(oldDate===newDate)return;
-  const dup=scheds.find(s=>s.id!==sid&&s.date===newDate&&s.coId===sc.coId&&s.typeId===sc.typeId);
-  if(dup){toast('해당 날짜에 동일 일정이 이미 있습니다','err');return;}
-  const exErr=checkExclusiveDay(sc.coId,sc.typeId,newDate,sid);
-  if(exErr){toast(exErr,'err');return;}
-  const mxErr=checkConflictMatrix(sc.coId,sc.typeId,newDate,sid);
-  if(mxErr){showBigAlert(mxErr);return;}
-  const agErr=checkAgencyExclusive(sc.coId,sc.typeId,newDate,sid);
-  if(agErr){showBigAlert(agErr);return;}
+  if(oldDate===newDate)return;                  // 제자리에 놓았다 — 불가 날짜에 이미 있는 일정이어도 아무 일도 없다
+  const blockMsg=isBlocked(newDate,sc.typeId);
+  if(blockMsg){fail(blockMsg);return;}
+  if(isEndedSchedule(sc)){toast('종료된 컨설팅은 이동할 수 없습니다','err');return;}
+  const dayErr=moveDayProblem(sc,newDate);   // 같은 날 동일 일정 → 같은 담당·기관 하루 규칙(사후 포함)
+  if(dayErr){fail(dayErr);return;}
   // 변경 전 회차 스냅샷 → 시뮬레이션(날짜 변경 + 날짜순 재정렬) → 영향 회차 산출
   const mvPhase=schedPhase(sc);
   const before={};
@@ -10715,26 +10843,28 @@ function revertRoundChange(id){
   });
 }
 
+/* 본 회차 줄을 그 날짜에 놓을 때 «날짜 때문에» 막히는 까닭 — 비어 있으면 그 날짜로 넣을 수 있다.
+   놓기(handleDrop)와 겹침 팝업(가까운 날짜 찾기·팝업 안 검사)이 «같은 판정»을 쓴다. 순서: 불가 날짜 → 같은 날 동일 일정(사후 포함) → 기관·담당 하루 규칙 → 담당 하루 한도. */
+function mainDropProblem(item,date){
+  const blockMsg=isBlocked(date,item.typeId); if(blockMsg)return blockMsg;
+  if(getScheds().find(s=>s.date===date&&s.coId===item.coId&&s.typeId===item.typeId))return '해당 날짜에 동일 일정이 이미 있습니다';
+  const exErr=checkExclusiveDay(item.coId,item.typeId,date); if(exErr)return exErr;
+  const mxErr=checkConflictMatrix(item.coId,item.typeId,date); if(mxErr)return mxErr;
+  const agErr=checkAgencyExclusive(item.coId,item.typeId,date); if(agErr)return agErr;
+  const co=getCos().find(c=>c.id===item.coId);
+  return checkAttLimit((co&&coMainOf(co,item.typeId))||myId()||'a1',date)||'';
+}
 async function handleDrop(date,item){
-  const blockMsg=isBlocked(date,item.typeId);
-  if(blockMsg){toast(blockMsg,'err');return;}
   const co=getCos().find(c=>c.id===item.coId);
   if(!co||co.active===false){toast('비활성 사업장입니다','err');return;}
   if(!co.types?.includes(item.typeId)){toast('이 사업장에 등록되지 않은 컨설팅입니다','err');return;}
   if(co.endedTypes?.[item.typeId]){toast('종료된 컨설팅입니다','err');return;}
-  const dup=getScheds().find(s=>s.date===date&&s.coId===item.coId&&s.typeId===item.typeId);
-  if(dup){toast('해당 날짜에 동일 일정이 이미 있습니다','err');return;}
-  const exErr=checkExclusiveDay(item.coId,item.typeId,date);
-  if(exErr){toast(exErr,'err');return;}
-  const mxErr=checkConflictMatrix(item.coId,item.typeId,date);
-  if(mxErr){showBigAlert(mxErr);return;}
-  const agErr=checkAgencyExclusive(item.coId,item.typeId,date);
-  if(agErr){showBigAlert(agErr);return;}
+  /* 날짜가 겹쳐(또는 불가 날짜라) 못 넣으면 작은 알림이 아니라 «겹침 팝업» — 다른 날짜를 골라 같은 넣기를 다시 한다(대표 지시 2026-11-10) */
+  const dayErr=mainDropProblem(item,date);
+  if(dayErr){ dupPopupOpen({who:dupWho(item.coId,item.typeId,`${item.round||'?'}회차 넣기`),msg:dayErr,date,probe:d=>mainDropProblem(item,d),retry:d=>handleDrop(d,item),verb:'넣기'}); return; }
   const ty=getTypes().find(t=>t.id===item.typeId);
   const defA=coMainOf(co,item.typeId)||myId()||'a1';
   const defCoAs=getCoAtts(co);
-  const attErr=checkAttLimit(defA,date);
-  if(attErr){toast(attErr,'err');return;}
   if(!await acquireCompanyEditLock(item.coId))return;
   const newId=uid();
   const scheds=getScheds();
