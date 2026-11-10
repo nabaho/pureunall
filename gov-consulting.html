@@ -1554,7 +1554,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=40"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-keep-login.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
@@ -6174,6 +6174,9 @@ async function doLogin(){
   let portalAuto=false;
   try{ portalAuto=localStorage.getItem('pu_portal_auto')==='1'; }catch(_){}
   const remember=!!q('#loginRemember')?.checked || portalAuto;
+  /* 이 화면에서 «유지»를 골랐다고 먼저 알린다 — 포털에서 「유지 끔」을 고른 기기는 LOCAL 요청이 SESSION 으로 낮춰지고(js/pu-keep-login.js),
+     30일 상한의 시작 시각도 여기서 적힌다. */
+  try{ if(remember && window.PuKeepLogin) PuKeepLogin.begin(true); }catch(_){}
   try{
     // 자동로그인 지속성
     const persist=remember?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION;
