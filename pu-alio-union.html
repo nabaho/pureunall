@@ -57,6 +57,7 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
     messagingSenderId:'936817166182'
   };
   var rootEl = document.getElementById('alioAppRoot');
+  try{ if(window.PuWhoami) PuWhoami.mount(false); }catch(e){}
   if(rootEl && window.PuAlioUnion){
     window.PuAlioUnion.mount(rootEl, { isModal: false });
   }
