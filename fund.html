@@ -1059,7 +1059,17 @@ function start(){
   bindNavDrag(); loadNavOrder();      // 사이드바 메뉴 순서(사용자가 드래그로 정한 순서) 복원
   setTimeout(function(){ _rvLoad().then(_rvNavCount).catch(function(){}); }, 5000);   // ✅ 확인함 숫자
   if(typeof _trSub==='function') _trSub();   // 🛡 자동 규칙(켜진 것) — 가져오기·칸 채우기가 곧바로 쓴다
-  try{ history.replaceState({view:'home'}, ''); }catch(e){}
+  var _wantChat = /[?&]chat=1(?:&|$)/.test(location.search || '');
+  try{
+    if(_wantChat){
+      var _cu = new URL(location.href);
+      _cu.searchParams.delete('chat');
+      history.replaceState({view:'home'}, '', _cu.pathname + _cu.search + _cu.hash);
+    } else {
+      history.replaceState({view:'home'}, '');
+    }
+  }catch(e){}
+  if(_wantChat) setTimeout(function(){ if(typeof openFundChat==='function') openFundChat(); }, 120);
   fbDb.ref(NS+'/funds').on('value', function(snap){ funds=snap.val()||{};
     if(snap.exists()||_fbOnline) S._fundsSynced=true;   // 서버 값을 받은 뒤에만 '기금 없음'이라고 말한다
     if(appHasFocus()){ S._pendingRender=true; return; }   // 입력 중엔 재렌더 보류(값 소실 방지)
