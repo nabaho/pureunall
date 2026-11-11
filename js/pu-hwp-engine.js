@@ -325,6 +325,7 @@
     pickVer: pickVer,
     verNewer: verNewer,
     config: config,
+    loadCore: loadCore,
     detectFormat: detectFormat,
     validate: validate,
     inspect: inspect,
