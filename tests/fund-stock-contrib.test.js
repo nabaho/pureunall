@@ -61,24 +61,31 @@ function loadEngine() {
   new Function([
     grabDecl('ACCT_CHART'), grabDecl('PURPOSE_ACCTS'), grabDecl('OPEN_ACCT'),
     grabDecl('ADMIN_ACCTS'), grabDecl('RESERVE_ACCTS'), grabDecl('F15_ROWS'),
-    grabDecl('BF_KINDS'), grabDecl('STOCK_RETIRE_KINDS'),
-    'var funds={}, S={fundId:"F_TEST", year:2026};',
-    grabFn('num'), grabFn('esc'),
+    grabDecl('BF_KINDS'), grabDecl('STOCK_RETIRE_KINDS'), grabDecl('CLOSE_SUBS'),
+    'var funds={}, S={fundId:"F_TEST", year:2026, closeSub:"stocks", stocksFor:"F_TEST", stocks:{}};',
+    'function hlp(k){ return "<span data-hlp=\\""+k+"\\"></span>"; }',
+    'function loadingHTML(m){ return "<div>"+m+"</div>"; }',
+    grabFn('num'), grabFn('esc'), grabFn('_n'), grabFn('won'),
+    grabFn('_ckTh'), grabFn('_ckTd'),
     grabFn('dsDue'),
     grabFn('scrubStockPii'), grabFn('isStockSensitivePage'), grabFn('maskHolderName'),
     grabFn('_stockNum'), grabFn('_stockIsoDate'), grabFn('_stockSliceAfter'), grabFn('_stockPickMoney'),
     grabFn('parseStockCertPage'), grabFn('parseStockRosterPage'), grabFn('parseStockPages'),
     grabFn('parseStockPaste'), grabFn('calcStockBatch'), grabFn('calcStockRetire'),
+    grabFn('_stockListOf'), grabFn('_stockListModalHTML'),
+    grabFn('stockAsOfYear'), grabFn('isStockTxn'), grabFn('_stockJrKindOf'),
+    grabFn('stockJournalRows'), grabFn('stocksCloseView'),
     grabFn('acctType'), grabFn('isDrAcct'), grabFn('_openingOf'),
     grabFn('_splitsOf'), grabFn('expandSplits'), grabFn('journalOf'), grabFn('acctMoves'),
     grabFn('openingMoves'), grabFn('computeFin'), grabFn('guessBfKind'), grabFn('_k1000'),
     grabFn('_txnDone'), grabFn('_splitSum'), grabFn('_contribOf'),
     grabFn('_openAssets'), grabFn('bfMovesOf'), grabFn('bfDays'), grabFn('bfReason'), grabFn('_dotDate'),
     grabFn('buildF15'),
-    'this.o={scrubStockPii,isStockSensitivePage,maskHolderName,parseStockCertPage,parseStockRosterPage,',
+    'this.o={CLOSE_SUBS,S,scrubStockPii,isStockSensitivePage,maskHolderName,parseStockCertPage,parseStockRosterPage,',
     '  parseStockPages,parseStockPaste,calcStockBatch,calcStockRetire,',
+    '  stockAsOfYear,isStockTxn,stockJournalRows,stocksCloseView,',
     '  expandSplits,journalOf,computeFin,guessBfKind,_contribOf,bfMovesOf,bfDays,bfReason,buildF15,',
-    '  setFund:function(id,o){funds[id]=o;}};'
+    '  setFund:function(id,o){funds[id]=o;}, setStocks:function(st){S.stocks=st;S.stocksFor=S.fundId;}};'
   ].join('\n')).call(box);
   return box.o;
 }
@@ -485,4 +492,119 @@ test('경계값·모달·원장 삭제 무결성 — 2열 단가/총액 구분 �
   assert.equal(up['txns/F1/2026/sr_r1_2'], null);
   assert.equal(up['closing/F1/2026/report/bf/sr_r1_1#2'], null);
   assert.equal(up['events/F1/ev_r1'], null);
+});
+
+test('회계·결산 › 주식출연·소각 전용 하위 탭 — 일반 통장 거래와 분리하여 주식 분개·원장·매도가능증권 대사만 별도로 보여준다', () => {
+  const E = loadEngine();
+
+  /* 1) 하위 탭 바(CLOSE_SUBS) 및 closeBodyHTML 배선 검증 */
+  assert.ok(E.CLOSE_SUBS.some(x => x[0] === 'stocks' && x[1] === '주식출연·소각'), 'CLOSE_SUBS 에 주식출연·소각 전용 탭이 있어야 한다');
+  assert.match(grabFn('closeBodyHTML'), /case 'stocks':\s*return stocksCloseView\(arr\);/, 'closeBodyHTML 에서 stocks 하위 탭을 전용 화면으로 분기해야 한다');
+  assert.match(grabFn('closingTab'), /S\.closeSub==='stocks'/, '주식출연·소각 전용 탭에서는 일반 결산 준비금 경고를 비워 전용 화면만 깔끔하게 보여야 한다');
+
+  /* 2) 주식원장 및 혼합 장부(일반 거래 + 주식 현물출연 + 유상소각 분할입금 + 원천세) 시나리오 */
+  E.setFund('F_TEST', {
+    name: '가나사내근로복지기금',
+    years: {
+      2026: { opening: { cash: 10000000, secu: 0, basic: 10000000 } },
+      2027: { opening: { cash: 36920000, secu: 30000000, basic: 60000000 } }
+    }
+  });
+  E.setStocks({
+    b1: {
+      date: '2026-04-10',
+      due_date: '2026-05-01',
+      issuer: '가나주식회사',
+      bf_kind: 'other',
+      total_shares: 2000,
+      book_amount: 50000000,
+      remain_shares: 1200,
+      remain_book: 30000000,
+      holders: [
+        { holder: '홍길동', kind: '보통주식', shares: 1200, ratio: 6, par_price: 500, eval_price: 25000, eval_amount: 30000000 },
+        { holder: '김철수', kind: '보통주식', shares: 800, ratio: 4, par_price: 500, eval_price: 25000, eval_amount: 20000000 }
+      ],
+      retirements: {
+        r1: {
+          date: '2026-09-15',
+          kind: 'profit_retire',
+          shares: 800,
+          principal_book: 20000000,
+          gross_cash: 28000000,
+          wht_tax: 1080000,
+          net_cash: 26920000,
+          gain: 8000000,
+          loss: 0,
+          gain_mode: 'revenue',
+          report_required: false
+        }
+      }
+    }
+  });
+
+  const mixedArr = [
+    /* 일반 통장 거래 — 전용 탭 분개 표에 절대 섞이면 안 된다 */
+    { _id: 'tx_norm_1', date: '2026-03-05', memo: '근로자 건강검진 지원금 지급', deposit: 0, withdraw: 3500000, debit: '건강증진지원', credit: '현금성자산', approved: true },
+    { _id: 'tx_norm_2', date: '2026-06-30', memo: '정기예금 결산이자 입금', deposit: 150000, withdraw: 0, debit: '현금성자산', credit: '이자수익', approved: true },
+    /* 주식 현물출연 대체분개 */
+    { _id: 'st_b1', date: '2026-04-10', memo: '가나주식회사 주주(2명) 주식출연 2,000주', deposit: 0, withdraw: 0, amount: 50000000, nocash: 1, debit: '매도가능증권', credit: '기본재산', approved: true, stock_batch: 'b1' },
+    /* 보유주식 유상소각 입금 분할분개(원금 2,000만 + 차익 692만) + 원천세 선납세금(108만) */
+    {
+      _id: 'sr_r1_1', date: '2026-09-15', memo: '가나주식회사 유상·이익소각(800주) 대금 입금',
+      deposit: 26920000, withdraw: 0, debit: '현금성자산', credit: '',
+      splits: [{ acct: '매도가능증권', amount: 20000000 }, { acct: '잡수익', amount: 6920000 }],
+      approved: true, stock_batch: 'b1', stock_retire: 'r1'
+    },
+    { _id: 'sr_r1_2', date: '2026-09-15', memo: '가나주식회사 유상·이익소각 원천징수세액(소각차익분)', deposit: 0, withdraw: 0, amount: 1080000, nocash: 1, debit: '선납세금', credit: '잡수익', approved: true, stock_batch: 'b1', stock_retire: 'r1' }
+  ];
+
+  const jr = E.stockJournalRows(mixedArr);
+  assert.equal(jr.rawCount, 3, '일반 거래 2건은 제외되고 주식 관련 원본 거래 3건만 선택되어야 한다');
+  assert.equal(jr.rows.length, 4, '분할 입금 거래가 원금회수·수익금차익 2줄로 펼쳐져 총 4줄이 되어야 한다');
+  assert.equal(jr.apprSum, 50000000 + 20000000 + 6920000 + 1080000);
+
+  const html2026 = E.stocksCloseView(mixedArr);
+  assert.ok(!html2026.includes('근로자 건강검진 지원금 지급'), '일반 목적사업 지출 거래가 주식 전용 탭에 섞이면 안 된다');
+  assert.ok(!html2026.includes('정기예금 결산이자 입금'), '일반 이자수익 거래가 주식 전용 탭에 섞이면 안 된다');
+  assert.match(html2026, /주식 현물출연 \(기본재산 편입\)/);
+  assert.match(html2026, /주식 소각·처분 \(원금 현금전환\)/);
+  assert.match(html2026, /주식 소각·처분차익 \(수익금\)/);
+  assert.match(html2026, /의제배당 원천징수 \(선납세금\)/);
+  assert.match(html2026, /✅ 매도가능증권 장부·원장 대사 일치 \(30,000,000원\)/, '재무상태표 매도가능증권(3,000만원)과 원장 기말장부가(3,000만원)가 일치해야 한다');
+  assert.ok(html2026.includes('홍○동') && !html2026.includes('홍길동'), '전용 회계 탭에서도 개인 주주 성명은 기본 마스킹되어야 한다');
+
+  /* 3) 연도별 시점 대사: 출연 전 연도(2025)는 0원, 이월 연도(2027)는 전기이월 3,000만원과 중복 없이 일치 */
+  E.S.year = 2025;
+  const sum2025 = E.stockAsOfYear([{ date: '2026-04-10', total_shares: 2000, book_amount: 50000000, remain_shares: 1200, remain_book: 30000000 }], 2025);
+  assert.equal(sum2025.asOfShares, 0);
+  assert.equal(sum2025.asOfBook, 0);
+
+  E.S.year = 2027;
+  const html2027 = E.stocksCloseView([]);
+  assert.match(html2027, /2027년 기말 보유 1,200주/);
+  assert.match(html2027, /✅ 매도가능증권 장부·원장 대사 일치 \(30,000,000원\)/, '다음 연도로 넘어갔을 때 전기이월 유가증권(3,000만원)과 원장 잔액이 중복 합산 없이 일치해야 한다');
+
+  /* 만약 분개가 누락되어 장부 매도가능증권이 0원이면 즉시 불일치 경고를 띄워야 한다 */
+  E.S.year = 2026;
+  const htmlMismatch = E.stocksCloseView([]);
+  assert.match(htmlMismatch, /⚠ 장부 매도가능증권 0원 ↔ 원장 30,000,000원 \(차이 -30,000,000원\)/);
+
+  /* 4) 구시스템 기초 유가증권(1,000만) + 전년도 원장(3,000만) 합산 이월(opening.secu=4,000만) 공존 시에도 정확히 대사 */
+  E.setFund('F_TEST', {
+    name: '가나사내근로복지기금',
+    years: { 2027: { opening: { cash: 10000000, secu: 40000000, basic: 50000000 } } }
+  });
+  E.S.year = 2027;
+  const htmlLegacy = E.stocksCloseView([]);
+  assert.match(htmlLegacy, /✅ 매도가능증권 장부·원장 대사 일치 \(40,000,000원\)/);
+
+  /* 5) 개별 주주 행 음수 입력 차단 · 변경 재산목록 날짜 이중 이스케이프 방지 · 탭 경합 가드 · 모달 포커스 보존 */
+  const negChk = E.calcStockBatch([
+    { holder: '홍길동', shares: 1000, par_price: 500, eval_price: 10000, eval_amount: 10000000 },
+    { holder: '김철수', shares: -100, par_price: 500, eval_price: 10000, eval_amount: -1000000 }
+  ], { date: '2026-04-10', basis: 'eval' });
+  assert.equal(negChk.has_negative, true, '개별 주주 행에 음수가 있으면 has_negative 로 감지하여 저장을 막아야 한다');
+  assert.doesNotMatch(grabFn('openStockAssetListPrint'), /esc\(dgToday\(\)\)/, 'dgToday() 의 &nbsp; 를 esc() 로 이중 이스케이프하면 인쇄물에 &nbsp; 문자열이 노출된다');
+  assert.match(grabFn('_loadStocks'), /S\._stocksPromise/, '원장 비동기 로딩 중 탭 전환 경합을 막기 위해 진행 중 Promise 를 공유해야 한다');
+  assert.match(grabFn('_stockModalRender'), /prevFk/, '모달 재렌더링 시 data-fk 로 입력 포커스를 복원해야 한다');
 });
