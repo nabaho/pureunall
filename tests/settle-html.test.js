@@ -385,7 +385,19 @@ test('개인입금 사업 자동 연결 — 이알피의 개인입금 종류를 
   vm.runInContext(fnBody('function autoUntouched(') + '; this.f = autoUntouched;', ctx);
   const base = () => ({ leadSid: '', rates: {}, title: '', msgHead: '', msgFoot: '', siteRates: {}, tax: '3.3', active: true });
   assert.equal(ctx.f(base()), true);
-  [{ leadSid: 'S1' }, { rates: { S1: '25' } }, { msgHead: '문구' }, { siteRates: { C1: { S1: '10' } } }, { tax: '8.8' }, { active: false }, { title: '이름' }]
+  [{ leadSid: 'S1' }, { rates: { S1: '25' } }, { msgHead: '문구' }, { siteRates: { C1: { S1: '10' } } }, { tax: '8.8' }, { title: '이름' }]
     .forEach((patch) => assert.equal(ctx.f(Object.assign(base(), patch)), false, JSON.stringify(patch)));
+  /* 켜짐만 끈 것은 «맡지 않겠다» — 이알피는 켜짐을 안 보고 규칙이 있으면 성과급을 막으므로 규칙을 만들지 않는다 */
+  assert.equal(ctx.f(Object.assign(base(), { active: false })), true, '켜짐만 끈 자동 칸');
   assert.equal(ctx.f(Object.assign(base(), { rates: { S1: '  ' } })), true, '빈 칸에 공백만 있으면 안 건드린 것');
+  /* «빈 칸에 기존 % 넣기»·제안은 안 건드린 자동 칸을 채우지 않는다 — 채우면 «건드림»이 돼 다른 칸 저장까지 막힌다 */
+  const ctx2 = { C: require('../js/pu-settle-core.js'), WORK: null };
+  vm.createContext(ctx2);
+  vm.runInContext(fnBody('function autoUntouched(') + fnBody('function rateSuggest(') + '; this.f = rateSuggest;', ctx2);
+  const mk = (extra) => Object.assign({ leadSid: '', rates: {}, title: '', msgHead: '', msgFoot: '', siteRates: {}, tax: '3.3', active: true }, extra);
+  ctx2.WORK = { types: ['T-OLD', 'T-NEW', 'T-OLD2'], people: ['S1'], rules: {
+    'T-OLD': mk({ leadSid: 'L', rates: { S1: '25' } }), 'T-OLD2': mk({ leadSid: 'L' }), 'T-NEW': mk({ auto: { why: 'type' } }) } };
+  assert.deepEqual(Object.keys(ctx2.f()), ['T-OLD2|S1'], '보통 칸만 제안, 안 건드린 자동 칸(T-NEW)은 뺀다');
+  ctx2.WORK.rules['T-NEW'].leadSid = 'L';
+  assert.deepEqual(Object.keys(ctx2.f()).sort(), ['T-NEW|S1', 'T-OLD2|S1'], '주관을 고른(건드린) 자동 칸은 보통 칸처럼');
 });

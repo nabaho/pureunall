@@ -643,6 +643,8 @@
        · 컨설팅 한 건: personalDepositMode 'off' = 법인(예외) · 'on' = 개인입금 · 옛 personalDeposit:true = 개인입금 · 아니면 유형을 따른다
          → 개인입금인 컨설팅이 range(그 해)에 걸쳐 있으면 그 컨설팅의 사업 종류도 올린다(why 'consulting')
      biz = [{code, personal}] — 숨김·합친 유형은 부르는 쪽에서 이미 뺀다. 모르는 코드(biz 에 없는 종류)는 이름을 못 붙이므로 올리지 않는다.
+     종류 코드는 이알피 erpConsTypeCodeOf 와 같다 — typeCode, 없으면 typeCodes.consulting(그 건이 consulting 을 품을 때만).
+     ⚠ 컨설팅정산은 data/consultings(컨설팅)만 읽는다 — 이알피가 개인입금으로 보는 «계약»은 여기서 보지 않는다.
      돌려주는 것 = [{code, why, count}] (biz 순서). count = range 에 걸친 개인입금 컨설팅 수. 읽기만 한다 — 아무것도 저장하지 않는다. */
   function personalTypes(biz, consultings, range) {
     var typeOn = {}, order = [], from = range && range.from, to = range && range.to;
@@ -655,7 +657,8 @@
     var count = {}, viaConsulting = {};
     (consultings || []).forEach(function (c) {
       if (!c || c._deleted) return;
-      var code = String(c.typeCode || (c.typeCodes && c.typeCodes.consulting) || '');
+      var ks = c.kinds || (c.kind ? [c.kind] : []);
+      var code = String(c.typeCode || (c.typeCodes && ks.indexOf('consulting') >= 0 ? c.typeCodes.consulting : '') || '');
       if (!code || !own(typeOn, code)) return;
       var mode = c.personalDepositMode || '';
       var on = mode === 'on' ? true : mode === 'off' ? false : c.personalDeposit ? true : typeOn[code];

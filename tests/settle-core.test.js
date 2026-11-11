@@ -523,8 +523,10 @@ test('개인입금 사업 종류 — 법인 예외(off)·지운 건·해에 안 
   ], range);
   assert.deepEqual(none, []);
   /* 계약이 품은 종류(typeCodes.consulting)도 같은 길 · 끝나는 날이 없으면 «진행 중» */
-  const ct = C.personalTypes(biz, [{ id: 5, typeCodes: { consulting: 'T-B' }, personalDepositMode: 'on', startDate: '2025-06-01' }], range);
+  const ct = C.personalTypes(biz, [{ id: 5, typeCodes: { consulting: 'T-B' }, kinds: ['consulting'], personalDepositMode: 'on', startDate: '2025-06-01' }], range);
   assert.deepEqual(ct.map((x) => x.code), ['T-A', 'T-B']);
+  /* consulting 을 품었다는 표시(kinds)가 없으면 typeCodes.consulting 을 쓰지 않는다 — 이알피 erpConsTypeCodeOf 와 같다 */
+  assert.deepEqual(C.personalTypes(biz, [{ id: 7, typeCodes: { consulting: 'T-B' }, personalDepositMode: 'on', startDate: '2025-06-01' }], range).map((x) => x.code), ['T-A']);
   /* 빈 자료 · range 없음 */
   assert.deepEqual(C.personalTypes(null, null), []);
   assert.deepEqual(C.personalTypes(biz, [{ id: 6, typeCode: 'T-B', personalDepositMode: 'on', startDate: '2001-01-01', endDate: '2001-02-01' }]).map((x) => x.code), ['T-A', 'T-B']);

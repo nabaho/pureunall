@@ -929,7 +929,10 @@ function buildWork(){
    요율표(고치는 사본 WORK)의 빈 칸마다 그 사람이 다른 컨설팅에서 쓰는 % → {'종류|사번': %}. 넣지는 않고 흐리게 보여 준다 */
 function rateSuggest(){
   var out={}; if(!WORK) return out;
-  WORK.types.forEach(function(c){ WORK.people.forEach(function(sid){
+  WORK.types.forEach(function(c){
+    /* 안 건드린 자동 개인입금 칸은 제안·«빈 칸에 기존 % 넣기»에서 뺀다 — 채워지면 «건드림»이 돼 저장이 «주관을 고르세요»로 막힌다 */
+    if(WORK.rules[c].auto && autoUntouched(WORK.rules[c])) return;
+    WORK.people.forEach(function(sid){
     var v=(WORK.rules[c].rates||{})[sid]; if(v!=null && String(v).trim()!=='') return;
     var e=C.existingRate(WORK.rules, sid, c); if(e!=null) out[c+'|'+sid]=e;
   }); });
@@ -948,11 +951,13 @@ function drawRules(){
 }
 function markDirty(){ if(!WORK) return; WORK.dirty=true; var b=$('mx_save'); if(b) b.disabled=false; }
 /* 자동으로 올라온 개인입금 칸을 사람이 아직 안 건드렸나 — 주관·요율·문구·예외 요율·세금·켜짐이 처음 그대로면 true.
-   하나라도 건드렸으면 false → 보통 칸처럼 검사(주관이 없으면 «주관을 고르세요») */
+   하나라도 건드렸으면 false → 보통 칸처럼 검사(주관이 없으면 «주관을 고르세요»).
+   ⚠ «켜짐»은 건드림으로 보지 않는다 — 이알피는 켜짐(active)을 안 보고 규칙이 있으면 성과급을 막는다(erpSettleTypesFrom).
+     켜짐을 끈 채 저장해도 성과급이 빠지므로, 켜짐만 끈 자동 칸은 «맡지 않겠다»로 보고 규칙을 만들지 않는다. */
 function autoUntouched(w){
   if(!w) return true;
   var any=function(o){ return Object.keys(o||{}).some(function(k){ return String(o[k]).trim()!==''; }); };
-  return !w.leadSid && !any(w.rates) && !w.title && !w.msgHead && !w.msgFoot && Object.keys(w.siteRates||{}).length===0 && C.taxOf(w.tax)==='3.3' && w.active!==false;
+  return !w.leadSid && !any(w.rates) && !w.title && !w.msgHead && !w.msgFoot && Object.keys(w.siteRates||{}).length===0 && C.taxOf(w.tax)==='3.3';
 }
 /* 요율표 «저장» — 바뀐 사업 종류만, 한 사업씩 관문으로. 주관이 없거나 요율이 0~100 숫자가 아니면 아무것도 저장하지 않는다 */
 async function saveRules(){
