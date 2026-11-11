@@ -632,13 +632,13 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.equal(noEmailUnv.hasSigned, false);
   assert.equal(noEmailUnv.targetStage, 'review');
 
-  /* 생산자(autoRequestContractFromPhoto) → 소비자(processPhotoContractRequest) 전 구간에서 발신 미검증 / lifecycle.targetStage=review 수신 메일이 알려진 유효 사업자번호(312-82-15421)를 담고 있어도 업체 연결·계약확정·기존 카드 병합이 모두 차단되는지 검증 */
+  /* 생산자(autoRequestContractFromPhoto) → 소비자(processPhotoContractRequest) 전 구간에서 발신 미검증 / lifecycle.targetStage=review 수신 메일이 알려진 유효 사업자번호(123-82-15423)를 담고 있어도 업체 연결·계약확정·기존 카드 병합이 모두 차단되는지 검증 */
   prodCtx.PuDocFile.init({
     db: {
       ref: (p) => ({
         once: () => Promise.resolve({
           val: () => {
-            if (p.indexOf('companies') >= 0) return { v: { co1: { id: 'co1', name: '가나기관', bizNo: '312-82-15421', managerMain: 'P-005' } } };
+            if (p.indexOf('companies') >= 0) return { v: { co1: { id: 'co1', name: '가나기관', bizNo: '123-82-15423', managerMain: 'P-005' } } };
             if (p.indexOf('user_dir') >= 0) return { v: USERS };
             return null;
           }
@@ -650,7 +650,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   });
   const prodResUnv = await prodCtx.PuDocFile.autoRequestContractFromPhoto({
     id: 'ph-unv-207', year: '2026', owner: 'u1', by: '박재원',
-    fields: { company: '가나기관', bizno: '312-82-15421', docName: '위임계약서', fee: '330만원' },
+    fields: { company: '가나기관', bizno: '123-82-15423', docName: '위임계약서', fee: '330만원' },
     mailMeta: {
       dir: 'recv', srcKey: 'INBOX|207',
       lifecycle: { targetStage: ganaUnv.targetStage, srcMails: ganaUnv.srcMails }
@@ -727,7 +727,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
               return {
                 v: {
                   coGana: { id: 'coGana', name: '가나기관', status: 'active', email: 'kim@gana.example', managerMain: 'P-005' },
-                  coBasa: { id: 'coBasa', name: '바사테크', status: 'active', email: 'hr@basa.example', bizNo: '312-82-15421', managerMain: 'P-005' }
+                  coBasa: { id: 'coBasa', name: '바사테크', status: 'active', email: 'hr@basa.example', bizNo: '123-82-15423', managerMain: 'P-005' }
                 }
               };
             }
@@ -747,7 +747,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   /* 업체 간 신뢰 전이(Cross-Company Trust Confusion) 차단: 발신 검증된 A업체(coGana) 메일 첨부 계약서에 B업체(coBasa) 상호·유효 사업자번호가 적혀 있어도 B업체 계약을 signed 로 확정·연결하지 않는다 */
   await prodCtx.PuDocFile.autoRequestContractFromPhoto({
     id: 'ph-cross-co', year: '2026', owner: 'u1', by: '박재원',
-    fields: { company: '바사테크', bizno: '312-82-15421', docName: '위임계약서', fee: '330만원' },
+    fields: { company: '바사테크', bizno: '123-82-15423', docName: '위임계약서', fee: '330만원' },
     mailMeta: {
       dir: 'recv', senderVerified: true, srcKey: 'INBOX|555',
       companyId: 'coGana', companyName: '가나기관',
@@ -777,7 +777,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   /* senderVerified/lifecycle 누락된 수신메일(mailMeta={dir:recv,srcKey:INBOX|999}) 및 targetStatus=review 단독 요청도 유효 사업자번호로 업체 연결·기존 카드 병합·signed 승격되지 않는다 */
   await prodCtx.PuDocFile.autoRequestContractFromPhoto({
     id: 'ph-bare-recv', year: '2026', owner: 'u1', by: '박재원',
-    fields: { company: '가나기관', bizno: '312-82-15421', docName: '위임계약서', fee: '330만원' },
+    fields: { company: '가나기관', bizno: '123-82-15423', docName: '위임계약서', fee: '330만원' },
     mailMeta: { dir: 'recv', srcKey: 'INBOX|999' }
   });
   const savedBareRecv = out(prodWrites['data/contract_requests/ctphoto-2026_ph-bare-recv']);
@@ -832,13 +832,13 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   const rPromote = await ctx.run('k-basa-signed', {
     source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
     srcKey: 'INBOX|201', srcMails: basa.srcMails, synthesizedNote: basa.synthesizedNote,
-    company: { name: '바사테크', bizNo: '312-82-15421' },
+    company: { name: '바사테크', bizNo: '123-82-15423' },
     contractFields: { docName: '위임계약서', scope: '취업규칙 변경 및 노무컨설팅', fee: '330만원(부가세 포함)', signDate: '2026-10-25' }
   });
   assert.ok(rPromote.made);
   assert.equal(rPromote.made.id, 'ct-basa-open', '새 카드를 중복 생성하지 않고 기존 카드를 승격');
   assert.equal(rPromote.made.status, 'signed', '계약확정(signed)으로 자동 승격');
-  assert.equal(rPromote.made.bizNo, '312-82-15421', '체결 계약서의 검증된 사업자번호 반영');
+  assert.equal(rPromote.made.bizNo, '123-82-15423', '체결 계약서의 검증된 사업자번호 반영');
   assert.deepEqual(out(rPromote.made.srcMails), ['Sent|101', 'Sent|102', 'INBOX|201']);
   assert.match(rPromote.made.note, /①보낸견적서 → ②보낸계약서양식 → ③체결계약서회신/);
 });
