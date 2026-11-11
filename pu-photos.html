@@ -48,7 +48,7 @@
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-quote-detect.js?v=2"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
-<script src="js/pu-doc-file.js?v=39"></script>
+<script src="js/pu-doc-file.js?v=40"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -17027,6 +17027,7 @@ function autoSendContractToErp(id, yearHint, job) {
     owner: owner,
     by: PuPhotoStore.myName() || '',
     fields: f,
+    bizNoOk: read.bizNoOk,
     mailMeta: mailMeta
   }).then(function (res) {
     if (!res || !res.ok) return;

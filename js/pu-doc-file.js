@@ -1772,7 +1772,8 @@
           var adm = staffList.filter(function (u) { return u.role === 'admin' || u.name === '권형하'; })[0] || staffList[0];
           if (adm) mgrSid = adm.sid;
         }
-        var targetStatus = (mm && mm.dir === 'sent') ? 'review' : 'signed';
+        var targetStatus = (mm && (mm.dir === 'sent' || mm.dir === 'out')) ? 'review' : 'signed';
+        var allowCoLink = !!(res[0] || mm.companyId || f.bizno);
         var rec = {
           id: key,
           source: 'photo_contract',
@@ -1781,10 +1782,10 @@
           by: String(o.by || mm.managerName || ''),
           targetStatus: targetStatus,
           managerMain: String(mgrSid || ''),
-          companyId: matchedCo ? String(matchedCo.id || '') : '',
+          companyId: allowCoLink && matchedCo ? String(matchedCo.id || mm.companyId || '') : String(mm.companyId || ''),
           company: {
             name: compName,
-            bizNo: String(((!res[0] || f.biznoOk === false) && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || f.bizno || (matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || '').trim(),
+            bizNo: String((allowCoLink && (!res[0] || o.bizNoOk === false || f.biznoOk === false) && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || (o.bizNoOk === false || f.biznoOk === false ? '' : f.bizno) || (allowCoLink && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || '').trim(),
             ceo: String(f.ceo || (matchedCo && matchedCo.rec && matchedCo.rec.ceo) || '').trim(),
             corpRegNo: String(f.corpno || (matchedCo && matchedCo.rec && matchedCo.rec.corpRegNo) || '').trim(),
             address: String(f.address || (matchedCo && matchedCo.rec && matchedCo.rec.address) || '').trim(),
@@ -1813,7 +1814,8 @@
             name: String(f.docName || '계약서').trim()
           }
         };
-        var pCoInfo = (!res[0] && rec.company.bizNo) ? sendToCoInfo({ kind: 'contract', fields: Object.assign({}, f, { company: compName, bizno: rec.company.bizNo }), photo: { id: String(o.id || ''), year: year, owner: String(o.owner || '') }, byName: rec.by }).catch(function () {}) : Promise.resolve();
+        var canCoInfo = !!(rec.company.bizNo && (!global.PuDocRead || !global.PuDocRead.bizNoOk || global.PuDocRead.bizNoOk(rec.company.bizNo)));
+        var pCoInfo = canCoInfo ? sendToCoInfo({ kind: 'contract', fields: Object.assign({}, f, { company: compName, bizno: rec.company.bizNo }), photo: { id: String(o.id || ''), year: year, owner: String(o.owner || '') }, byName: rec.by }).catch(function () {}) : Promise.resolve();
         return Promise.all([reqRef.set(rec), pCoInfo]).then(function () {
           return { ok: true, id: key, targetStatus: targetStatus };
         });
@@ -1960,6 +1962,11 @@
                   source: 'mail_quote_watch',
                   kind: docKind === 'contract' ? 'advance' : 'quote',
                   allowCreateReview: docKind === 'contract',
+                  companyName: coName,
+                  docKind: docKind,
+                  subject: subj.slice(0, 60),
+                  atts: an.slice(0, 3),
+                  to: [String(m.t || '')].filter(Boolean),
                   state: 'pending',
                   at: Date.now(),
                   srcKey: srcKey,

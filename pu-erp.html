@@ -26489,10 +26489,11 @@ function ContractManagement(props){
     var cms = erpCmsFromDoc(cf);
     var probe = { company:{ name:cname, bizNo:String(rCo.bizNo || ''), address:String(rCo.address || ''), ceo:String(rCo.ceo || '') } };
     var sameOpen = all.filter(function(c){
-      return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c);
+      return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c) && (!(c.kinds && c.kinds.length) || (c.kinds || []).indexOf('consult') >= 0 || (c.kinds || []).indexOf(kv) >= 0);
     });
     sameOpen.sort(function(a, b){ return (a.status === 'review' ? 0 : 1) - (b.status === 'review' ? 0 : 1); });
-    if(sameOpen.length >= 1){
+    if(sameOpen.length > 1) return await stop('같은 사업장에 진행 중 카드가 ' + sameOpen.length + '건 있습니다 — 어느 카드인지 정해 주세요');
+    if(sameOpen.length === 1){
       var cur = sameOpen[0];
       var nextCo = Object.assign({}, cur.company || {});
       Object.keys(rCo).forEach(function(k){
@@ -26552,8 +26553,8 @@ function ContractManagement(props){
       }
     }
     if(!form.companyId){
-      var byIdOrName = (req.companyId ? cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId); })[0] : null)
-        || (function(){ var nh = cos.filter(function(x){ return x && !x._deleted && erpCoNameKey(x.name) === erpCoNameKey(cname); }); return nh.length === 1 ? nh[0] : null; })();
+      var byIdOrName = req.companyId ? cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId); })[0] : null;
+
       if(byIdOrName && erpCoNameKey(byIdOrName.name) === erpCoNameKey(cname)){
         form.companyId = String(byIdOrName.id);
         form.company.companyId = String(byIdOrName.id);
