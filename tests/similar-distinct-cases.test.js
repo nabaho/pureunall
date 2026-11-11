@@ -213,13 +213,13 @@ test('방안 A-1: 같은 회사·같은 사건유형이어도 심급·단계(초
 test('방안 A-2: 관할기관 공식 사건번호(stages[].caseNo)가 다르면 별건이지만, ERP 내부 관리번호(rec.caseNo)만 다른 건 여전히 중복으로 잡는다', () => {
   const ctx = makeEngineCtx({
     cases: [
-      { id: 'k1', caseNo: '부해-2026-001', companyName: '다라물류', bizNo: '222-33-44444',
+      { id: 'k1', caseNo: '부해-2026-001', companyName: '다라물류', bizNo: '123-10-00001',
         typeCode: 'case-dismiss', status: 'pending', stages: [{ code: 'lrc-local', caseNo: '충남2026부해219' }] },
-      { id: 'k2', caseNo: '부해-2026-002', companyName: '다라물류', bizNo: '222-33-44444',
+      { id: 'k2', caseNo: '부해-2026-002', companyName: '다라물류', bizNo: '123-10-00001',
         typeCode: 'case-dismiss', status: 'pending', stages: [{ code: 'lrc-local', caseNo: '충남2026부해305' }] },
-      { id: 'k3', caseNo: '산재-2026-001', companyName: '마바제조', bizNo: '333-44-55555',
+      { id: 'k3', caseNo: '산재-2026-001', companyName: '마바제조', bizNo: '123-10-00002',
         typeCode: 'case-wc', status: 'pending' },
-      { id: 'k4', caseNo: '산재-2026-002', companyName: '마바제조', bizNo: '333-44-55555',
+      { id: 'k4', caseNo: '산재-2026-002', companyName: '마바제조', bizNo: '123-10-00002',
         typeCode: 'case-wc', status: 'pending' }
     ]
   });
@@ -235,19 +235,19 @@ test('방안 A-3: 대상 근로자 명단이 둘 다 있고 겹치는 사람이 
   const ctx = makeEngineCtx({
     cases: [
       // 0명 겹침 → 별건
-      { id: 'a1', caseNo: '부해-2026-011', companyName: '가나운수', bizNo: '111-22-33333',
+      { id: 'a1', caseNo: '부해-2026-011', companyName: '가나운수', bizNo: '123-10-00003',
         typeCode: 'case-dismiss', status: 'pending', workers: [{ name: '홍길동' }] },
-      { id: 'a2', caseNo: '부해-2026-012', companyName: '가나운수', bizNo: '111-22-33333',
+      { id: 'a2', caseNo: '부해-2026-012', companyName: '가나운수', bizNo: '123-10-00003',
         typeCode: 'case-dismiss', status: 'pending', workers: [{ name: '임꺽정' }] },
       // 일부 겹침 → 중복
-      { id: 'b1', caseNo: '부해-2026-021', companyName: '다라택시', bizNo: '444-55-66666',
+      { id: 'b1', caseNo: '부해-2026-021', companyName: '다라택시', bizNo: '123-10-00004',
         typeCode: 'case-dismiss', status: 'pending', workers: [{ name: '홍길동' }, { name: '임꺽정' }] },
-      { id: 'b2', caseNo: '부해-2026-022', companyName: '다라택시', bizNo: '444-55-66666',
+      { id: 'b2', caseNo: '부해-2026-022', companyName: '다라택시', bizNo: '123-10-00004',
         typeCode: 'case-dismiss', status: 'pending', workers: [{ name: '임꺽정' }] },
       // 한쪽 비어 있음 → 안전하게 중복 유지
-      { id: 'c1', caseNo: '부해-2026-031', companyName: '사아식품', bizNo: '777-88-99999',
+      { id: 'c1', caseNo: '부해-2026-031', companyName: '사아식품', bizNo: '123-10-00005',
         typeCode: 'case-dismiss', status: 'pending', workers: [{ name: '홍길동' }] },
-      { id: 'c2', caseNo: '부해-2026-032', companyName: '사아식품', bizNo: '777-88-99999',
+      { id: 'c2', caseNo: '부해-2026-032', companyName: '사아식품', bizNo: '123-10-00005',
         typeCode: 'case-dismiss', status: 'pending', workers: [] }
     ]
   });
@@ -267,14 +267,14 @@ test('방안 A-4: 같은 본사 사업자번호 아래 지점·공장·종사업
       { id: 's2', no: '인사노무-2026-002', companyName: '(주)가나테크 홍성영업소', bizNo: '123-45-67890',
         typeCode: 'cons-hr', status: 'in_progress' },
       // 종사업장번호 구분
-      { id: 's3', no: '인사노무-2026-003', companyName: '(주)자차산업', bizNo: '555-66-77777', subBizNo: '0001',
+      { id: 's3', no: '인사노무-2026-003', companyName: '(주)자차산업', bizNo: '123-10-00006', subBizNo: '0001',
         typeCode: 'cons-hr', status: 'in_progress' },
-      { id: 's4', no: '인사노무-2026-004', companyName: '(주)자차산업', bizNo: '555-66-77777', subBizNo: '0002',
+      { id: 's4', no: '인사노무-2026-004', companyName: '(주)자차산업', bizNo: '123-10-00006', subBizNo: '0002',
         typeCode: 'cons-hr', status: 'in_progress' },
       // 한쪽만 공장 표기 → 실수 중복일 수 있으므로 중복 유지
-      { id: 's5', no: '인사노무-2026-005', companyName: '(주)카타전자', bizNo: '888-99-00000',
+      { id: 's5', no: '인사노무-2026-005', companyName: '(주)카타전자', bizNo: '123-10-00007',
         typeCode: 'cons-hr', status: 'in_progress' },
-      { id: 's6', no: '인사노무-2026-006', companyName: '(주)카타전자 천안공장', bizNo: '888-99-00000',
+      { id: 's6', no: '인사노무-2026-006', companyName: '(주)카타전자 천안공장', bizNo: '123-10-00007',
         typeCode: 'cons-hr', status: 'in_progress' }
     ]
   });
@@ -341,12 +341,12 @@ test('방안 A-6: 관리번호가 같거나 같은 이관 대상을 가리키는
 test('방안 B-1: 중복 훑기에서 「별건 확인」을 누르면 distinctIds 가 저장되어 다음 훑기부터 별건으로 기억하고, 「별건 해제」로 되돌린다', () => {
   const ctx = makeEngineCtx({
     contracts: [
-      { id: 'ct-a', contractNo: '계약-2026-001', companyName: '다라테크', bizNo: '321-54-98765',
+      { id: 'ct-a', contractNo: '계약-2026-001', companyName: '다라테크', bizNo: '123-20-00001',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed',
-        company: { name: '다라테크', bizNo: '321-54-98765' } },
-      { id: 'ct-b', contractNo: '계약-2026-002', companyName: '다라테크', bizNo: '321-54-98765',
+        company: { name: '다라테크', bizNo: '123-20-00001' } },
+      { id: 'ct-b', contractNo: '계약-2026-002', companyName: '다라테크', bizNo: '123-20-00001',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed',
-        company: { name: '다라테크', bizNo: '321-54-98765' } }
+        company: { name: '다라테크', bizNo: '123-20-00001' } }
     ]
   });
 
@@ -427,12 +427,12 @@ test('방안 B-1: 중복 훑기에서 「별건 확인」을 누르면 distinctI
   // 계약에서 연속 실패로 ct-half-1 에만 반쪽 distinctIds 가 남은 채 사건·컨설팅으로 이관해도 fail-closed 유지
   const ctxHalf = makeEngineCtx({
     contracts: [
-      { id: 'ct-h1', contractNo: '계약-2026-301', companyName: '마바테크', bizNo: '654-32-10987',
+      { id: 'ct-h1', contractNo: '계약-2026-301', companyName: '마바테크', bizNo: '123-20-00002',
         kinds: ['case', 'consulting'], typeCodes: { case: 'case-dismiss', consulting: 'cons-hr' },
-        distinctIds: ['ct-h2'], status: 'signed', company: { name: '마바테크', bizNo: '654-32-10987' } },
-      { id: 'ct-h2', contractNo: '계약-2026-302', companyName: '마바테크', bizNo: '654-32-10987',
+        distinctIds: ['ct-h2'], status: 'signed', company: { name: '마바테크', bizNo: '123-20-00002' } },
+      { id: 'ct-h2', contractNo: '계약-2026-302', companyName: '마바테크', bizNo: '123-20-00002',
         kinds: ['case', 'consulting'], typeCodes: { case: 'case-dismiss', consulting: 'cons-hr' },
-        distinctIds: [], status: 'signed', company: { name: '마바테크', bizNo: '654-32-10987' } }
+        distinctIds: [], status: 'signed', company: { name: '마바테크', bizNo: '123-20-00002' } }
     ]
   });
   assert.equal(ctxHalf.dupSweepScan({ kinds: ['contract'] }).groups.length, 2,
@@ -447,12 +447,12 @@ test('방안 B-1: 중복 훑기에서 「별건 확인」을 누르면 distinctI
   // 반대로 신규 계약 저장 창에서 단건 확인한 confirmedOverlapIds 는 이관 뒤에도 정상 승계된다
   const ctxConf = makeEngineCtx({
     contracts: [
-      { id: 'ct-o1', contractNo: '계약-2026-401', companyName: '사아물류', bizNo: '765-43-21098',
+      { id: 'ct-o1', contractNo: '계약-2026-401', companyName: '사아물류', bizNo: '123-20-00003',
         kinds: ['consulting'], typeCodes: { consulting: 'cons-hr' }, status: 'signed',
-        company: { name: '사아물류', bizNo: '765-43-21098' } },
-      { id: 'ct-o2', contractNo: '계약-2026-402', companyName: '사아물류', bizNo: '765-43-21098',
+        company: { name: '사아물류', bizNo: '123-20-00003' } },
+      { id: 'ct-o2', contractNo: '계약-2026-402', companyName: '사아물류', bizNo: '123-20-00003',
         kinds: ['consulting'], typeCodes: { consulting: 'cons-hr' }, confirmedOverlapIds: ['ct-o1'], status: 'signed',
-        company: { name: '사아물류', bizNo: '765-43-21098' } }
+        company: { name: '사아물류', bizNo: '123-20-00003' } }
     ]
   });
   assert.equal(ctxConf.dupSweepScan({ kinds: ['contract'] }).groups.length, 0);
@@ -464,9 +464,9 @@ test('방안 B-1: 중복 훑기에서 「별건 확인」을 누르면 distinctI
   // 묶음 안의 한 행이 저장소에서 이미 삭제된 상태이면 반쪽 저장 없이 즉시 거부한다
   const ctxMissing = makeEngineCtx({
     contracts: [
-      { id: 'ct-m1', contractNo: '계약-2026-501', companyName: '아자테크', bizNo: '876-54-32109',
+      { id: 'ct-m1', contractNo: '계약-2026-501', companyName: '아자테크', bizNo: '123-20-00004',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed' },
-      { id: 'ct-m2', contractNo: '계약-2026-502', companyName: '아자테크', bizNo: '876-54-32109',
+      { id: 'ct-m2', contractNo: '계약-2026-502', companyName: '아자테크', bizNo: '123-20-00004',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed' }
     ]
   });
@@ -478,9 +478,9 @@ test('방안 B-1: 중복 훑기에서 「별건 확인」을 누르면 distinctI
   // 원복 dbPatch 가 true 를 돌려주면서 비배열('CORRUPTED')을 남기더라도 sameArrVal 이 불일치를 잡아낸다
   const ctxCorrupt = makeEngineCtx({
     contracts: [
-      { id: 'ct-k1', contractNo: '계약-2026-601', companyName: '차카테크', bizNo: '987-65-43210',
+      { id: 'ct-k1', contractNo: '계약-2026-601', companyName: '차카테크', bizNo: '123-20-00005',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed' },
-      { id: 'ct-k2', contractNo: '계약-2026-602', companyName: '차카테크', bizNo: '987-65-43210',
+      { id: 'ct-k2', contractNo: '계약-2026-602', companyName: '차카테크', bizNo: '123-20-00005',
         kinds: ['case'], typeCodes: { case: 'case-dismiss' }, status: 'signed' }
     ]
   });
