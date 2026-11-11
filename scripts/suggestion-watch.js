@@ -146,6 +146,21 @@ function pickAck(all, o) {
   return out;
 }
 
+/* 재요청이면 원본의 건의자 확인 상태 — 진행함은 직원이 쓸 수 있는 자리라 «값의 모양을 고정» 해서 넘긴다
+   (resolvedOk 는 true/false/null 만, 시각은 숫자만, status 는 허용 목록만 — 무인 AI 입력에 긴 글·이상한 값이 못 들어가게). */
+function buildRelated(rec, orig) {
+  if (!rec || !rec.relatedId) return null;
+  if (!isSafeKey(rec.relatedId) || !isSafeKey(rec.authorUid)) return { id: null, unsafe: true };
+  const o = (orig && typeof orig === 'object') ? orig : {};
+  return {
+    id: rec.relatedId,
+    status: (o.status === 'new' || o.status === 'ing' || o.status === 'done') ? o.status : null,
+    resolvedOk: o.resolvedOk === true ? true : (o.resolvedOk === false ? false : null),
+    resolvedAt: Number(o.resolvedAt) || null,
+    feedbackAt: Number(o.feedbackAt) || null
+  };
+}
+
 /* ── 파이어베이스 CLI ── */
 function fb(args, opt) {
   /* 모든 파이어베이스 호출의 «길목» — DB 자리(/로 시작)는 안전한 글자만. 셸 글자가 섞인 번호는 여기서 멈춘다. */
@@ -220,15 +235,9 @@ function cmdShow(id) {
   });
   /* 재요청이면 «원본의 건의자 확인 상태» 를 도구가 대신 읽어 준다. relatedId 는 직원이 쓴 값이라 AI 가 그대로 명령에 넣으면 안 된다
      (외부 보안 검토 2026-11-11). 확인 기록(resolvedOk·resolvedAt)은 건의자 진행함에만 있다 — suggestions_private 에는 없다. */
-  let related = null;
-  if (rec.relatedId) {
-    if (!isSafeKey(rec.relatedId) || !isSafeKey(rec.authorUid)) related = { id: null, unsafe: true };
-    else {
-      const o = getJson('/' + P_RESOLVED + '/' + rec.authorUid + '/' + rec.relatedId) || {};
-      related = { id: rec.relatedId, status: o.status || null, resolvedOk: o.resolvedOk === undefined ? null : o.resolvedOk,
-        resolvedAt: o.resolvedAt || null, feedbackAt: o.feedbackAt || null };
-    }
-  }
+  const orig = (rec.relatedId && isSafeKey(rec.relatedId) && isSafeKey(rec.authorUid))
+    ? getJson('/' + P_RESOLVED + '/' + rec.authorUid + '/' + rec.relatedId) : null;
+  const related = buildRelated(rec, orig);
   const card = { id, status: rec.status, cat: cleanText(rec.cat, 20), title: cleanText(rec.title, 200), author: cleanText(rec.author, 40), authorUid: rec.authorUid,
     createdAt: rec.createdAt, relatedId: (related && related.id) || null, related, content: rec.content, reply: rec.reply || '',
     images: files, imageUrls: imgs.filter((u) => !/^data:/.test(String(u || ''))), assist: rec.assist || null };
@@ -252,7 +261,7 @@ function cmdReply(id) {
   if (!id || !status || !file) throw new Error('사용: reply <건의 번호> --status ing|done --file 답변.txt [--seen true|false] [--again]');
   assertSafeKey(id);
   const rec = getJson('/' + P_PRIVATE + '/' + id);
-  if (rec) assertSafeKey(rec.authorUid, '건의자 uid');          /* 경로에 들어가는 값 — 레코드에서 읽은 것도 믿지 않는다 */
+  if (rec && rec.authorUid) assertSafeKey(rec.authorUid, '건의자 uid');          /* 경로에 들어가는 값 — 레코드에서 읽은 것도 믿지 않는다 */
   const seenArg = argOf('--seen');
   const w = buildReplyWrites({ id, rec, status, reply: fs.readFileSync(file, 'utf8'),
     seen: seenArg === undefined ? undefined : seenArg === 'true', again: process.argv.indexOf('--again') >= 0 });
@@ -285,4 +294,4 @@ if (require.main === module) {
 }
 
 module.exports = { pickPending, buildReplyWrites, buildNotice, NOTICE_KINDS, MIN_DONE_REPLY, pickAck, ackStage, ACK_ESCALATE_AFTER_H,
-  ACK_MAX_WAITING, isSafeKey, assertSafeKey, cleanText, fb };
+  ACK_MAX_WAITING, isSafeKey, assertSafeKey, cleanText, fb, buildRelated };
