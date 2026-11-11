@@ -239,6 +239,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm{margin-right:auto;}
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
+.pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
 /* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
    예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
@@ -678,6 +679,8 @@ body.portal-mode #camFab{display:flex;}
    한 줄을 지키려면 여기서 한 치수 더 줄여야 한다. 줄이 늘어나는 것보다 낫다. */
 @media (max-width:380px){
   .pbar{gap:4px 6px;padding:2px 2px 8px;}
+  .pbar #chatFab{padding:5px 8px;}
+  .pbar #chatFab .chat-lb{display:none;}
   .pbar .nm small{display:none;}
   .pbar .pmeta{font-size:.68rem;gap:5px;}
   .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
@@ -714,6 +717,15 @@ body.portal-mode #camFab{display:flex;}
 .connection-status[data-state="offline"]{color:#991b1b;}
 .statusbadge .clock{color:var(--mute);border-left:1px solid rgba(10,20,60,.14);padding-left:9px;}
 @media(max-width:520px){ .topfix{display:none;} }
+/* ── 푸른 통합 AI 챗봇 — 머리줄 건의하기 왼쪽 동그란 파란 단추 ── */
+#chatFab{position:relative;display:none;align-items:center;gap:5px;white-space:nowrap;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;border:none;padding:8px 15px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;font-family:inherit;cursor:pointer;box-shadow:0 5px 14px -3px rgba(37,99,235,.45),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
+#chatFab:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(37,99,235,.52);}
+#chatFab:active{transform:translateY(0) scale(.97);}
+#chatFab[aria-expanded="true"]{outline:2px solid #bfdbfe;outline-offset:1px;}
+@media(max-width:520px){
+  #chatFab{min-height:30px;padding:5px 10px;font-size:.72rem;border-radius:999px;flex:0 0 auto;}
+  .pbar #chatFab{order:4;}
+}
 /* ── 프로그램 건의함 — 헤더 바(캡쳐2) 안 왼쪽, 브랜드 옆 동그란 눈에 띄는 버튼 ── */
 #sgFab{position:relative;display:none;align-items:center;gap:6px;white-space:nowrap;background:linear-gradient(135deg,#d97706,#dc2626);color:#fff;border:none;padding:8px 16px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;cursor:pointer;box-shadow:0 5px 14px -3px rgba(239,68,68,.5),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
 #sgFab:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(239,68,68,.55);}
@@ -1388,6 +1400,7 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
+      <button id="chatFab" type="button" aria-label="푸른 통합 챗봇" aria-haspopup="dialog" aria-expanded="false" title="시스템 사용법·노동법·지원금·기금 법령 통합 AI 챗봇">🤖 <span class="chat-lb">챗봇</span></button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
@@ -2470,6 +2483,7 @@ body.portal-mode #moreFab{display:flex;}
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
         // 실제 로그아웃 신호가 있으면 기다리지 않는다.
+        try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
         _loginGuard.cover();
         if(_authRecheckTimer) clearTimeout(_authRecheckTimer);
         var logoutAt = 0;
@@ -3461,6 +3475,22 @@ body.portal-mode #moreFab{display:flex;}
     try { ref.focus(); } catch(e){}
     return ref;
   }
+
+  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일 표시·비활성·권한을 그대로 지킨다) ── */
+  window.portalLaunchApp = function(key, extraQuery){
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === key){ app = APPS[i]; break; } }
+    if(!app || app.off) return false;
+    var tile = document.querySelector('#appRows .tile[data-key="' + key + '"]') || document.querySelector('.tile[data-key="' + key + '"]');
+    if(!tile || tile.style.display === 'none' || tile.getAttribute('aria-disabled') === 'true' || tile.getAttribute('href') === '#') return false;
+    if(typeof app.act === 'function'){ app.act(); return true; }
+    var v = Math.floor(Date.now() / 600000);
+    var q = String(extraQuery || '').replace(/^[?&]+/, '');
+    var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + v + (q ? '&' + q : '');
+    if(isMobile()) location.href = url;
+    else openPortalApp(app, url);
+    return true;
+  };
 
   // ── 하나은행·하나카드 입금 확인 알림 (총괄관리자 전용) ──
   // 큰 거래표를 감시하지 않고 작은 서버 요약만 로그인 때 1회, 이후 3분마다 확인한다.
@@ -5640,6 +5670,7 @@ body.portal-mode #moreFab{display:flex;}
      그 시각을 보고 스스로 끊는다(js/pu-authsync.js). 포털은 authsync 를 안 싣으므로 같은 열쇠를 직접 적는다.
      ⚠ 열쇠 이름은 pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다 — tests/authsync-global-logout.test.js 가 견준다. */
   function broadcastLogout(){
+    try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
     try {
       localStorage.setItem('pu_auth_logout_at', String(Date.now()));
       localStorage.removeItem('pu_auth_uid');
@@ -5770,6 +5801,7 @@ body.portal-mode #moreFab{display:flex;}
     SG.email = (auth.currentUser && auth.currentUser.email) || '';
     SG.role = acct ? acct.role : 'member';
     $('sgFab').style.display = 'inline-flex';
+    if($('chatFab')) $('chatFab').style.display = 'inline-flex';
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
     sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
@@ -7352,5 +7384,8 @@ window.PU_TYPESAFE_MOUNT = function(){
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=1"></script>
+<script src="js/pu-chatbot.js?v=1"></script>
 </body>
 </html>
