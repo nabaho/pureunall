@@ -336,7 +336,10 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     genContractNo: () => '계약-2026-197',
     persistOne: (o) => { calls.persist.push(o); return true; }
   };
+  const DOCREAD_BOOT = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8');
+  ctx.window = ctx; ctx.global = ctx; ctx.setTimeout = setTimeout;
   vm.createContext(ctx);
+  vm.runInContext(DOCREAD_BOOT, ctx);
   vm.runInContext(FN + '\nthis.run=processPhotoContractRequest;', ctx);
   const r = await ctx.run('k-ct1', {
     source: 'photo_contract',
@@ -523,8 +526,17 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.equal(builtNoLib.targetStatus, 'review', 'PuDocRead 미로딩 시에도 검산 실패 번호는 review 로 격리한다');
 
   calls.persist.length = 0;
+  const rSynthWithLib = await ctx.run('k-synth-withlib', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', confirmed: true, managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '1234567890' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  assert.equal(rSynthWithLib.made.status, 'review', 'confirmed:true 가 있어도 검산 실패 번호는 review 로 격리한다');
+
+  delete ctx.PuDocRead;
+  calls.persist.length = 0;
   const rSynthInvalid = await ctx.run('k-synth-badbiz', {
-    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', confirmed: true, managerMain: 'P-005',
     company: { name: '가나기관', bizNo: '1234567890' },
     contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
   });

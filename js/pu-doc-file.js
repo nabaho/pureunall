@@ -1747,10 +1747,10 @@
         return { ok: true, id: key, already: true };
       }
       var checkBizNo = function (v) {
+        var d = digits(v);
+        if (d.length !== 10 || /^0+$/.test(d)) return false;
         if (global.PuDocRead && typeof global.PuDocRead.bizNoValid === 'function') return !!global.PuDocRead.bizNoValid(v);
         if (global.PuDocRead && typeof global.PuDocRead.bizNoOk === 'function') return !!global.PuDocRead.bizNoOk(v);
-        var d = digits(v);
-        if (d.length !== 10) return false;
         var w = [1, 3, 7, 1, 3, 7, 1, 3, 5], s = 0;
         for (var i = 0; i < 9; i++) s += parseInt(d.charAt(i), 10) * w[i];
         s += Math.floor(parseInt(d.charAt(8), 10) * 5 / 10);
