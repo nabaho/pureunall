@@ -20,7 +20,7 @@ function t(name, got, want){
 }
 const a = src.indexOf('function IncomeListTab(){');
 t('IncomeListTab 함수를 찾았다', a >= 0, true);
-const F = src.slice(a, a + 20000);
+const F = src.slice(a, a + 26000);   // 함수가 길어져 창을 넉넉히 (cutFn 은 이 함수의 중괄호 짝을 못 세어 쓰지 못한다)
 
 console.log('\n■ 유형 칸에 FunnelBtn — 기존 부품 재사용');
 t('유형 칸에 FunnelBtn 이 붙었다', /'유형',\n\s*h\(FunnelBtn, \{ label:'유형', mini:true/.test(F), true);
