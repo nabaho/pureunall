@@ -1196,6 +1196,53 @@
       });
   }
 
+  /* ── 자동 판단 ③ 고객사·업무 추천용 맥락 읽기 (2026-11-11) ──
+     화면(pu-photos.html)은 다른 앱의 루트(data/companies·scal_*)를 직접 만지지 않는다.
+     저장 층에서 한 번만 읽어 가벼운 요약({ gov, clients, uidBySid })으로 돌려준다. */
+  var _matchCtxCache = null;
+  function parseClientRows(wrap) {
+    var raw = (wrap && wrap.v !== undefined) ? wrap.v : wrap;
+    var out = [];
+    if (!raw) return out;
+    var visit = function (co, rawKey) {
+      if (!co || !co.name) return;
+      var sids = [];
+      if (co.managerMain) sids.push(normSid(co.managerMain));
+      (co.managerSubs || []).forEach(function (s) {
+        var ns = normSid(s);
+        if (ns && sids.indexOf(ns) < 0) sids.push(ns);
+      });
+      out.push({
+        id: String(co.id || rawKey || '').trim(),
+        name: String(co.name).trim(),
+        bizNo: String(co.bizNo || '').trim(),
+        mgrSids: sids
+      });
+    };
+    if (Array.isArray(raw)) {
+      for (var i = 0; i < raw.length; i++) visit(raw[i], String(i));
+    } else if (typeof raw === 'object') {
+      Object.keys(raw).forEach(function (k) { visit(raw[k], k); });
+    }
+    return out;
+  }
+
+  function loadMatchContext(force) {
+    if (_matchCtxCache && !force) return Promise.resolve(_matchCtxCache);
+    if (!deps.db) return Promise.resolve({ gov: null, clients: [], uidBySid: {} });
+    var gen = identityGeneration;
+    if (force) _govCache = null;
+    var erpCoP = deps.db.ref('data/companies').once('value')
+      .then(function (s) { return parseClientRows(s.val()); })
+      .catch(function () { return []; });
+    return Promise.all([govLoad(), erpCoP, uidBySid()]).then(function (r) {
+      if (gen !== identityGeneration) return { gov: null, clients: [], uidBySid: {} };
+      var built = { gov: r[0] || null, clients: r[1] || [], uidBySid: r[2] || {} };
+      _matchCtxCache = built;
+      return built;
+    });
+  }
+
   /* 여러 장을 한꺼번에 — 열 것이 없으면 아무 일도 안 한다.
      rows: [{ id, year, meta, owner }] · 돌려주는 것 { photos, opened, byWho, rest } */
   var GOV_CAP = 200;     // 한 판에 이만큼만 — 남은 것은 다음에 열 때 이어 한다
@@ -1999,6 +2046,8 @@
     deps.uid = '';
     deps.isAdmin = false;
     deps.name = '';
+    _govCache = null;
+    _matchCtxCache = null;
   }
 
   /* ── 로그인한 사람 ──
@@ -2015,6 +2064,8 @@
 
   function signIn(uid, email, fallbackName) {
     var generation = ++identityGeneration;
+    _govCache = null;
+    _matchCtxCache = null;
     var signedUid = uid || '';
     var signedDb = deps.db;
     /* 이름만 쓴다 — 이름을 못 찾았다고 로그인 이메일·사번(p001)을 이름 자리에 넣지 않는다.
@@ -2631,6 +2682,7 @@
     govBuild: govBuild,
     govPlan: govPlan,
     onGovShare: onGovShare,
+    loadMatchContext: loadMatchContext,
     listSharedToMe: listSharedToMe,
     watchSharedCount: watchSharedCount,
     fillSharedNames: fillSharedNames,

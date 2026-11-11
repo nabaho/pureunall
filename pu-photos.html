@@ -25,7 +25,7 @@
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=36"></script>
+<script src="js/pu-photo-store.js?v=38"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -44,6 +44,7 @@
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
 <script src="js/pu-doc-read.js?v=53"></script>
 <script src="js/pu-photo-look.js?v=1"></script>
+<script src="js/pu-photo-judge.js?v=3"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-quote-detect.js?v=2"></script>
@@ -889,6 +890,7 @@ button{font-family:inherit;cursor:pointer}
   .dochint,.row2{display:none!important}
   /* 대시보드에 남는 것은 「누구 사진」과 올리는 중 표시뿐 */
   #side{padding-bottom:0}
+  #judgeBtn{display:none}          /* 폰에서는 사진 작업 시트(#phJudgeBtn)로 들어간다 */
   #trashBtn{display:none}          /* 휴지통은 설정 안으로 */
   #setBtn{display:none}            /* 설정은 제목줄 아이콘으로 */
   .sidefill{display:none}
@@ -1991,6 +1993,71 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ 🤖 사진 자동 판단 (분류 · 품질/베스트컷 · 고객사/일정 매칭) ══ */
+#phJudgeBtn.phjudge{width:100%;margin:8px 0 2px;padding:10px 12px;border-radius:10px;
+  border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-size:13px;font-weight:700;
+  font-family:inherit;cursor:pointer;text-align:center;word-break:keep-all}
+#phJudgeBtn.phjudge:active{background:#bfdbfe}
+#camRevGrid .rc .jtag{position:absolute;top:6px;left:6px;max-width:calc(100% - 42px);
+  padding:2px 6px;border-radius:6px;background:rgba(30,41,59,.86);color:#f8fafc;
+  font-size:11px;font-weight:700;line-height:1.35;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;pointer-events:none}
+#camRevGrid .rc .jtag.best{background:#166534;color:#fff}
+#camRevJudge{margin:0 0 8px;padding:8px 10px;border-radius:9px;background:#eff6ff;
+  border:1px solid #bfdbfe;color:#1e40af;font-size:12.5px;line-height:1.5;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#camRevJudge .jb{border:1px solid #2563eb;background:#fff;color:#1e40af;border-radius:7px;
+  padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap}
+#readPanel .judgebox{margin:10px 0 0;background:#f8fafc;border:1.5px solid #cbd5e1;
+  border-radius:10px;padding:10px 12px}
+#readPanel .judgebox .jt{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:12.5px;font-weight:800;color:#1e293b;margin-bottom:6px}
+#readPanel .judgebox .jt .zero{font-size:11px;font-weight:700;color:#475569}
+#readPanel .judgebox .jl{font-size:12px;color:#1e293b;line-height:1.6;margin:4px 0;word-break:keep-all}
+#readPanel .judgebox .jl.warn{color:#854d0e;font-weight:700}
+#readPanel .judgebox .jpill{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid #bfdbfe;
+  font-size:11px;font-weight:700;background:#eff6ff;color:#1e40af;margin-right:5px;white-space:nowrap}
+#readPanel .judgebox .jpill.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+#readPanel .judgebox .jpill.warn{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+#readPanel .judgebox .jacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+#readPanel .judgebox .jbtn{border:1px solid #bfdbfe;background:#fff;color:#1e40af;max-width:100%;
+  border-radius:7px;padding:6px 10px;min-height:32px;font-size:12px;font-weight:700;
+  font-family:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#readPanel .judgebox .jbtn.pri{background:#1e40af;border-color:#1e40af;color:#fff}
+#judgeModal{display:none;position:fixed;inset:0;z-index:60;background:rgba(30,41,59,.48);
+  align-items:center;justify-content:center;padding:14px}
+#judgeModal .jpop{background:#fff;width:100%;max-width:620px;max-height:86vh;
+  border-radius:14px;box-shadow:0 20px 50px rgba(30,41,59,.28);display:flex;flex-direction:column;overflow:hidden}
+#judgeModal .jhd{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:13px 16px;border-bottom:1px solid var(--line);background:#f8fafc}
+#judgeModal .jhd b{font-size:15px;color:#1e293b;word-break:keep-all}
+#judgeModal #judgeModalX{min-width:34px;min-height:34px;border:1px solid #cbd5e1;
+  background:#fff;color:#475569;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
+#judgeModal .jbd{padding:14px 16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+#judgeModal .jsec{border:1px solid #e2e8f0;border-radius:11px;padding:12px 13px;background:#fff}
+#judgeModal .jsec .shd{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:13.5px;font-weight:800;color:#1e293b;margin-bottom:5px;flex-wrap:wrap}
+#judgeModal .jsec .sdesc{font-size:12px;color:#475569;line-height:1.6;margin:0 0 8px;word-break:keep-all}
+#judgeModal .jlist{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+#judgeModal .jitem{display:flex;align-items:center;gap:9px;padding:8px 9px;flex-wrap:wrap;
+  border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc}
+#judgeModal .jitem img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex:0 0 auto;background:#e2e8f0}
+#judgeModal .jitem .ji{flex:1 1 160px;min-width:0;font-size:12px;color:#475569;line-height:1.5}
+#judgeModal .jitem .ji b{display:block;color:#1e293b;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#judgeModal .jgo{border:1px solid #1e40af;background:#1e40af;color:#fff;border-radius:8px;max-width:100%;
+  padding:8px 12px;min-height:34px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#judgeModal .jgo.sub{background:#fff;color:#1e40af;border-color:#bfdbfe}
+#judgeModal .jgo.danger{background:#fff;color:#991b1b;border-color:#fecaca}
+#judgeModal .jgo:disabled,#readPanel .judgebox .jbtn:disabled{opacity:.5;cursor:default}
+#judgeModal button:focus-visible,#readPanel .judgebox button:focus-visible,#phJudgeBtn:focus-visible,#camRevJudge .jb:focus-visible{
+  outline:2px solid #2563eb;outline-offset:2px}
+@media (max-width:560px){
+  #judgeModal{padding:10px}
+  #judgeModal .jbd{padding:12px 12px 16px}
+  #judgeModal .jitem .ji{flex:1 1 calc(100% - 58px)}
+  #judgeModal .jitem .jgo{width:100%;text-align:center}
+}
 </style>
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
@@ -2192,6 +2259,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          위 내용이 길어져도 자리가 밀리지 않게 사이에 빈 칸을 넣어 밀어 내린다.
          휴지통 장수는 단추에 늘 붙는다 — 열어 보지 않아도 몇 장인지 알아야 한다. -->
     <div class="sidefill"></div>
+    <button id="judgeBtn" class="setbtn" onclick="openAutoJudge()">🤖 자동 판단</button>
     <button id="trashBtn" class="setbtn" onclick="showView('trash')">
       🗑 휴지통 <span class="n" id="trashCount"></span>
     </button>
@@ -2622,6 +2690,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
         </div>
         <div id="phOwner"></div>
       </div>
+      <button id="phJudgeBtn" class="phjudge" type="button" onclick="closePhSheet();openAutoJudge()">🤖 사진 자동 판단 (분류·베스트컷·업체 추천)</button>
       <div id="phCollectDock"></div>
       <div id="phUpDock"></div>
       <!-- 예전 분류 시트 배선은 넓은 화면 호환을 위해 빈 자리로 남긴다. -->
@@ -2784,6 +2853,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
            판독으로 갔다. 여기서 한 번 더 보이게 하고, 그 값을 그대로 싣는다.
            ⚠ 「그냥 사진」이어도 **화질은 서류와 같게** 담는다(2560px). 뒤에 「서류였다」고
              누를 수 있어야 하고, 그때 1600px 로 담아 두었으면 글자를 못 읽는다. -->
+      <div id="camRevJudge" style="display:none"></div>
       <div class="kindrow">
         <span class="q">무엇을 찍었습니까?</span>
         <button type="button" id="camKindDoc" onclick="setCamUpKind('doc')">📄 서류·명함 — 판독</button>
@@ -2886,6 +2956,17 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
         <button id="kindPopupCancel" onclick="closeKindPopup()">취소</button>
         <button class="pri" id="kindPopupOk"></button>
       </div>
+    </div>
+  </div>
+
+  <!-- 🤖 사진 자동 판단 모달 (기기 안 · 0원 · 1·2·3 모두) -->
+  <div id="judgeModal" style="display:none" onclick="if(event.target===this) closeAutoJudge()" onkeydown="onJudgeModalKey(event)">
+    <div class="jpop" role="dialog" aria-modal="true" aria-labelledby="judgeModalTitle">
+      <div class="jhd">
+        <b id="judgeModalTitle">🤖 사진 자동 판단 (기기 안 · 0원)</b>
+        <button id="judgeModalX" type="button" onclick="closeAutoJudge()" title="닫기" aria-label="닫기">✕</button>
+      </div>
+      <div class="jbd" id="judgeModalBody" aria-live="polite"></div>
     </div>
   </div>
 
@@ -3161,6 +3242,7 @@ window.addEventListener('pagehide', function () { camStop(); });
 firebase.auth().onAuthStateChanged(u => {
   const authGeneration = ++photoAuthGeneration;
   if (photoBootTimer) { clearTimeout(photoBootTimer); photoBootTimer = null; }
+  if (typeof syncAutoJudgeAuth === 'function') syncAutoJudgeAuth(u ? u.uid : '');
   const signedIn = !!(u && u.email);
   $('who').textContent = signedIn ? (u.displayName || '') : '';   // ⚠ 이메일(사번에서 만든 아이디)은 안 적는다 — 이름은 아래 signIn 뒤에 채운다 (대표 결정 2026-10-25)
   /* ⚠★ 로그아웃 화면은 «모든 앱이 같은 것»을 쓴다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
@@ -3445,13 +3527,17 @@ async function shareSave() {
   try {
     /* 담기는 addFiles 단일 통로 — 축소·대기열·재시도·자동 판독을 그대로 탄다.
        ⚠ isDoc = true : 밖에서 들어온 것은 끌어다 놓기·붙여넣기와 같은 취급이다.
-       카톡으로 오는 것은 명함·사업자등록증이 많아 글씨를 읽어야 한다. */
+       카톡으로 오는 것은 명함·사업자등록증이 많아 글씨를 읽어야 한다.
+       ★ 기기 안에서 명백한 현장·회의 사진(확률 88% 이상)으로 판별된 그림은
+         화질은 그대로 담되 구글 AI 판독만 건너뛰도록(__metaKind='photo') 표를 단다. */
+    if (typeof judgeSharePicked === 'function') await judgeSharePicked(picked);
+    const allScene = picked.length > 0 && picked.every(function (s) { return s.isImg && s._judgeSceneOnly; });
     const files = picked.map(function (s) {
       return new File([s.blob], s.name, { type: s.type || 'image/jpeg' });
     });
     const dropped = shareShots.length - picked.length;
     shareClose();
-    await addFiles(files, true, { via: 'share' });   /* 공유로 받음 */
+    await addFiles(files, true, { via: 'share', metaKind: allScene ? 'photo' : 'doc' });   /* 공유로 받음 */
     if (dropped) toast('안 고른 ' + dropped + '장은 버렸습니다');
   } finally {
     btn.disabled = false;
@@ -4634,6 +4720,7 @@ function showShotConfirm(shot, askBack) {
     ? '✓ 명함만 잘라내고 바로 세웠습니다'
     : '⚠ 테두리를 못 찾아 «자르지 않고» 그대로 담습니다 — 배경이 넓으면 글씨가 흐려집니다';
   box.style.display = 'flex';
+  if (typeof judgeShotConfirm === 'function') judgeShotConfirm(shot);
   return true;
 }
 
@@ -5515,6 +5602,7 @@ function openCamReview() {
   setCamUpKind(camCaptureMode === 'document' ? 'doc' : 'photo');
   renderCamReview();
   $('camRev').style.display = 'flex';
+  if (typeof judgeCamShotsNow === 'function') judgeCamShotsNow();
 }
 
 /* 담는 갈래를 고른다 — 고른 쪽만 색이 든다(둘 다 흐리면 사람은 안 고르고 만다). */
@@ -5523,6 +5611,7 @@ function setCamUpKind(k) {
   const d = $('camKindDoc'), p = $('camKindPic');
   if (d) d.className = camUpKind === 'doc' ? 'on' : '';
   if (p) p.className = camUpKind === 'photo' ? 'on' : '';
+  if (typeof renderCamJudgeHint === 'function') renderCamJudgeHint();
 }
 
 /* ══════ 포털 카메라 단추에서 곧바로 찍은 한 장 ══════
@@ -5660,14 +5749,17 @@ function renderCamReview() {
        그것을 못 가리면 「모두 보기」를 만들어도 고를 수가 없다. */
     const bad = s.small ? '작게 ' + (s.shortEdge || '?') + 'px'
       : (s.blurry ? '흐림' : '');
+    const jtag = typeof camShotJudgeTag === 'function' ? camShotJudgeTag(s, i) : '';
     return '<div class="rc' + (s.sel ? ' on' : '') + (bad ? ' bad' : '') +
       '" onclick="camToggle(' + i + ')">' +
       '<img src="' + s.url + '" alt="" draggable="false"><span class="ck">✓</span>' +
+      jtag +
       (bad ? '<span class="bad">' + esc(bad) + '</span>' : '') + '</div>';
   }).join('');
   $('camRevCnt').textContent = camShots.length + '장 중 ' + n + '장 고름';
   $('camRevUp').disabled = !n;
   $('camRevUp').textContent = n ? '⬆ ' + n + '장 올리기' : '올릴 사진을 골라 주세요';
+  if (typeof renderCamJudgeHint === 'function') renderCamJudgeHint();
 }
 function camToggle(i) {
   if (!camShots[i]) return;
@@ -6912,6 +7004,13 @@ async function addFiles(fileList, isDoc, opts) {
            내려받는다 — 줄이려던 비용이 오히려 늘어난다. 글자는 저장 층이 따로
            담는다(texts/…). 여기에는 「있다」는 한 글자만 남긴다. */
       if (f.__pdfText) meta.hasText = true;
+      if (window.PuPhotoJudge && !f.__pdfDoc && !f.__pdfText && thumb && thumb.dataUrl) {
+        try {
+          const jd = await PuPhotoJudge.judgeImage(thumb.dataUrl);
+          const pk = jd && PuPhotoJudge.packMetaJudge(jd);
+          if (pk) meta.judge = pk;
+        } catch (_) { }
+      }
       await queue.enqueue({
         _fromCam: !!(opts && opts.fromCam),
         /* ⚠ 참/거짓이 아니라 «이번 도착의 표»다 — 디스크에 남은 옛 작업과 가르는 열쇠 */
@@ -18093,7 +18192,9 @@ function renderReadPanel(it) {
     el.innerHTML = '<div class="box">' + actsRow('글자 판독하기', false, it) +
       '<p class="note" style="margin:0">' +
       (isDoc ? '아직 판독하지 않은 서류입니다.' : '명함·사업자등록증이면 글자를 읽어 정보를 뽑아냅니다.') +
-      '</p>' + whenBox(it) + customKindNote(it) + myNoteBox(it) + shareBox(it) + '</div>';
+      '</p>' +
+      (typeof autoJudgePanelBox === 'function' ? autoJudgePanelBox(it) : '') +
+      whenBox(it) + customKindNote(it) + myNoteBox(it) + shareBox(it) + '</div>';
     applySplit();
     return;
   }
@@ -18342,6 +18443,7 @@ function renderReadPanel(it) {
     (read.mailed && read.mailed.at
       ? '<p class="sent">✉️ ' + esc(read.mailed.to || '') + ' 님께 보냈습니다 · ' +
         esc(whenText(read.mailed.at)) + ' · ' + esc(read.mailed.by || '') + '</p>' : '') +
+    (typeof autoJudgePanelBox === 'function' ? autoJudgePanelBox(it) : '') +
     whenBox(it) +
     customKindNote(it) +
     myNoteBox(it) +
@@ -21369,6 +21471,8 @@ function clearAllFilters() {
    ⚠ 그래서 처리기를 **하나로 모았다.** 위에서부터 하나만 하고 곧바로 끝낸다.
      따로 두면 순서에 기대게 되고, 그 순서는 코드를 옮기는 순간 조용히 깨진다. */
 function escOnce() {
+  const jm = $('judgeModal');
+  if (jm && jm.style.display === 'flex') { closeAutoJudge(); return; }
   if ($('kindPopup').style.display === 'flex') { closeKindPopup(); return; }
   if (viewerId) { closeViewer(); return; }   // 탭·찾기는 그대로 둔다
   /* 카메라·확인 화면은 저마다 닫는 길이 따로 있다 — 여기서 건드리지 않는다 */
@@ -22447,6 +22551,791 @@ function runProbe() {
     console.warn('[probe]', e);
     out.textContent = '점검을 실행하지 못했습니다.\n잠시 뒤 다시 시도해 주세요. 계속 같은 화면이면 개발자에게 알려 주세요.';
   });
+}
+
+/* ══════ 🤖 사진 자동 판단 (1·2·3 모두 — 기기 안 · 요금 0원) ══════
+   ① 사진 종류 자동 분류: 현장·회의 사진 / 명함 / 서류·문서 확률(%) 산출 및 AI 한도 절약
+   ② 품질·연사(중복) 선별: 흔들림(선명도)·어두움 알림 + 64비트 dHash 연사 묶기 & ★ 베스트 컷 추천
+   ③ 고객사·업무 매칭: 촬영일 일정·상호·메모·내 폴더를 엮어 사업장 폴더·담당 공유 원클릭 연결
+   ⚠ 스스로 지우지 않는다 — 여벌을 휴지통(30일 보관)으로 보내는 일은 반드시 사람이 확인해 누른다. */
+let _judgeMem = {};
+let _judgeFailed = {};
+let _matchCtxMem = null;
+let _viewerJudgeTargets = [];
+let _modalState = null;
+let _judgePrevFocus = null;
+let _judgeScanSeq = 0;
+let _camJudgeSeq = 0;
+let _shotJudgeSeq = 0;
+let _judgeAuthGen = 0;
+let _judgeLastUid = '';
+
+function resetAutoJudgeState() {
+  _judgeAuthGen++;
+  _judgeMem = {};
+  _judgeFailed = {};
+  _matchCtxMem = null;
+  _viewerJudgeTargets = [];
+  _modalState = null;
+  const modal = $('judgeModal');
+  if (modal && modal.style.display !== 'none') closeAutoJudge();
+}
+
+function syncAutoJudgeAuth(nextUid) {
+  const uid = String(nextUid || '');
+  if (!uid || (_judgeLastUid && _judgeLastUid !== uid)) {
+    resetAutoJudgeState();
+  }
+  _judgeLastUid = uid;
+}
+
+/* 썸네일 주소를 img src 속성에 넣기 전에 공백·따옴표·비정상 data URL을 엄격히 걸러내고,
+   넣는 자리에서도 반드시 esc()를 한 번 더 씌운다(저장형 속성 이탈 XSS 원천 차단). */
+function judgeSafeImgSrc(raw) {
+  const s = safeSrc(raw);
+  if (!s) return '';
+  if (/[\s"'<>`\\]/.test(s)) return '';
+  if (s.indexOf('data:') === 0) {
+    if (!/^data:image\/(?:png|jpeg|jpg|webp|gif|bmp|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(s)) return '';
+  }
+  return s;
+}
+
+function judgeIconOf(choice) {
+  if (choice === 'card') return '📇';
+  if (choice === 'doc') return '📄';
+  if (choice === 'scene') return '🏞';
+  return '🔎';
+}
+
+function getCachedJudge(it) {
+  if (!it || !it.id) return null;
+  if (_judgeMem[it.id]) return _judgeMem[it.id];
+  if (window.PuPhotoJudge && it.meta && it.meta.judge) {
+    const u = PuPhotoJudge.unpackMetaJudge(it.meta.judge);
+    if (u) { _judgeMem[it.id] = u; delete _judgeFailed[it.id]; return u; }
+  }
+  return null;
+}
+
+function ensureItemJudge(it) {
+  const cached = getCachedJudge(it);
+  if (cached) return Promise.resolve(cached);
+  if (!window.PuPhotoJudge || !it || !it.id) return Promise.resolve(null);
+  const src = judgeSafeImgSrc(it.thumb);
+  if (!src) {
+    _judgeFailed[it.id] = true;
+    return Promise.resolve(null);
+  }
+  const gen = _judgeAuthGen;
+  return PuPhotoJudge.judgeImage(src).then(function (j) {
+    if (gen !== _judgeAuthGen) return null;
+    if (j) {
+      _judgeMem[it.id] = j;
+      delete _judgeFailed[it.id];
+    } else {
+      _judgeFailed[it.id] = true;
+    }
+    return j;
+  }).catch(function () {
+    if (gen === _judgeAuthGen) _judgeFailed[it.id] = true;
+    return null;
+  });
+}
+
+function ensureMatchCtx(force) {
+  if (_matchCtxMem && !force) return Promise.resolve(_matchCtxMem);
+  if (!window.PuPhotoStore || !PuPhotoStore.loadMatchContext) {
+    return Promise.resolve({ gov: null, clients: [], uidBySid: {} });
+  }
+  const gen = _judgeAuthGen;
+  return PuPhotoStore.loadMatchContext(!!force).then(function (ctx) {
+    if (gen !== _judgeAuthGen) return { gov: null, clients: [], uidBySid: {} };
+    _matchCtxMem = ctx || { gov: null, clients: [], uidBySid: {} };
+    return _matchCtxMem;
+  }).catch(function () {
+    return { gov: null, clients: [], uidBySid: {} };
+  });
+}
+
+function fullMatchCtx() {
+  const base = _matchCtxMem || { gov: null, clients: [], uidBySid: {} };
+  return {
+    gov: base.gov,
+    clients: base.clients,
+    uidBySid: base.uidBySid,
+    folders: FOLDERS || {},
+    meUid: (window.PuPhotoStore && PuPhotoStore.myUid && PuPhotoStore.myUid()) || ''
+  };
+}
+
+function canAutoSharePhoto(it) {
+  if (!it) return false;
+  if (typeof maskForced === 'function' && maskForced(it)) return false;
+  const r = it.meta && it.meta.read;
+  if (typeof PuPhotoJudge !== 'undefined' && PuPhotoJudge && PuPhotoJudge.isSensitiveReadMeta && PuPhotoJudge.isSensitiveReadMeta(r)) return false;
+  if (r && r.rrn) return false;
+  return true;
+}
+
+/* ── 촬영 직후 확인(#camOk)·촬영 검토(#camRev)·공유 받기(#shareRev) ── */
+function judgeShotConfirm(shot) {
+  if (!window.PuPhotoJudge || !shot || !shot.url) return;
+  const seq = ++_shotJudgeSeq;
+  PuPhotoJudge.judgeImage(shot.url).then(function (j) {
+    if (!j || seq !== _shotJudgeSeq) return;
+    shot._judge = j;
+    const box = $('camOk'), note = $('camOkNote');
+    if (!box || !note || box.style.display !== 'flex') return;
+    if (j.quality !== 'ok') {
+      note.className = 'ok-hd warn';
+      note.textContent = '⚠ ' + j.qualityLabel + ' 감지(선명도 ' + j.sharp + '점) — 글씨가 흐리면 재촬영을 권합니다';
+    }
+  }).catch(function () {});
+}
+
+async function judgeSharePicked(picked) {
+  if (!window.PuPhotoJudge || !Array.isArray(picked)) return;
+  for (let i = 0; i < picked.length; i++) {
+    const s = picked[i];
+    if (!s || !s.isImg || !s.url) continue;
+    try {
+      const j = await PuPhotoJudge.judgeImage(s.url);
+      if (j && j.choice === 'scene' && j.prob >= 0.88) s._judgeSceneOnly = true;
+    } catch (_) {}
+  }
+}
+
+function judgeCamShotsNow() {
+  if (!window.PuPhotoJudge || !camShots.length) return;
+  const seq = ++_camJudgeSeq;
+  Promise.all(camShots.map(function (s) {
+    if (!s || !s.url) return Promise.resolve(null);
+    if (s._judge) return Promise.resolve(s._judge);
+    return PuPhotoJudge.judgeImage(s.url).then(function (j) {
+      if (j) s._judge = j;
+      return j;
+    }).catch(function () { return null; });
+  })).then(function () {
+    if (seq !== _camJudgeSeq) return;
+    const rev = $('camRev');
+    if (rev && rev.style.display === 'flex') renderCamReview();
+  });
+}
+
+function camBurstBestMap() {
+  const best = {}, extra = {};
+  if (!window.PuPhotoJudge || camShots.length < 2) return { best: best, extra: extra };
+  const fakeItems = [];
+  const jmap = {};
+  const now = Date.now();
+  camShots.forEach(function (s, idx) {
+    if (!s || !s._judge || !s._judge.dhash) return;
+    const id = 'cam_' + idx;
+    fakeItems.push({ id: id, idx: idx, meta: { takenAt: now + idx * 500 }, owner: 'me' });
+    jmap[id] = s._judge;
+  });
+  if (fakeItems.length < 2) return { best: best, extra: extra };
+  const groups = PuPhotoJudge.groupBursts(fakeItems, jmap, { windowMs: 180000, maxDist: 10 });
+  groups.forEach(function (g) {
+    if (g.best && typeof g.best.idx === 'number') best[g.best.idx] = true;
+    (g.extras || []).forEach(function (x) { if (typeof x.idx === 'number') extra[x.idx] = true; });
+  });
+  return { best: best, extra: extra };
+}
+
+function camShotJudgeTag(s, idx) {
+  if (!s || !s._judge) return '';
+  const bm = camBurstBestMap();
+  if (bm.best[idx]) return '<span class="jtag best">★ 베스트 ' + s._judge.sharp + '점</span>';
+  const j = s._judge;
+  if (j.choice === 'unsure') return '';
+  const shortLbl = j.choice === 'card' ? '📇 명함' : (j.choice === 'doc' ? '📄 서류' : '🏞 현장');
+  return '<span class="jtag">' + esc(shortLbl + ' ' + j.pct + '%') + '</span>';
+}
+
+function renderCamJudgeHint() {
+  const el = $('camRevJudge');
+  if (!el) return;
+  const judged = camShots.filter(function (s) { return s && s.sel && s._judge; });
+  if (!judged.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const bm = camBurstBestMap();
+  const selExtras = camShots.map(function (s, i) { return (s && s.sel && bm.extra[i]) ? i : -1; })
+    .filter(function (i) { return i >= 0; });
+  const allScene = judged.length >= 1 && judged.every(function (s) {
+    return s._judge.choice === 'scene' && s._judge.prob >= 0.80;
+  });
+  const allDocOrCard = judged.length >= 1 && judged.every(function (s) {
+    return (s._judge.choice === 'card' || s._judge.choice === 'doc') && s._judge.prob >= 0.80;
+  });
+
+  if (selExtras.length) {
+    el.style.display = 'flex';
+    el.innerHTML = '<span>📸 비슷한 연사 중 <b>★ 베스트 컷</b>만 남기고 여벌 ' + selExtras.length + '장을 뺄 수 있습니다</span>' +
+      '<button type="button" class="jb" onclick="camUnselectBurstExtras()">여벌 ' + selExtras.length + '장 빼기</button>';
+    return;
+  }
+  if (camUpKind === 'doc' && allScene) {
+    el.style.display = 'flex';
+    el.innerHTML = '<span>🏞 찍은 사진이 <b>현장·회의 사진</b>으로 보입니다 — 판독 안 함으로 바꾸면 AI 한도를 아낍니다</span>' +
+      '<button type="button" class="jb" onclick="setCamUpKind(\'photo\')">그냥 사진으로 전환</button>';
+    return;
+  }
+  if (camUpKind === 'photo' && allDocOrCard) {
+    el.style.display = 'flex';
+    el.innerHTML = '<span>📄 찍은 사진이 <b>명함·서류</b>로 보입니다 — 글자를 읽으려면 서류·명함으로 바꾸세요</span>' +
+      '<button type="button" class="jb" onclick="setCamUpKind(\'doc\')">서류·명함으로 전환</button>';
+    return;
+  }
+  el.style.display = 'none';
+  el.innerHTML = '';
+}
+
+function camUnselectBurstExtras() {
+  const bm = camBurstBestMap();
+  let dropped = 0;
+  camShots.forEach(function (s, i) {
+    if (s && s.sel && bm.extra[i]) { s.sel = false; dropped++; }
+  });
+  renderCamReview();
+  if (dropped) toast('★ 베스트 컷만 남기고 연사 여벌 ' + dropped + '장을 뺐습니다');
+}
+
+/* ── 크게 보기(#readPanel) 안 자동 판단 상자 ── */
+function autoJudgePanelBox(it) {
+  if (!window.PuPhotoJudge || !it || !it.id) return '';
+  const j = getCachedJudge(it);
+  const needPixel = !j && !_judgeFailed[it.id];
+  if (needPixel || !_matchCtxMem) {
+    const vid = it.id;
+    const gen = _judgeAuthGen;
+    Promise.all([needPixel ? ensureItemJudge(it) : Promise.resolve(j), ensureMatchCtx(false)]).then(function () {
+      if (gen !== _judgeAuthGen || viewerId !== vid) return;
+      const host = $('judgeInlineBox');
+      if (host) host.outerHTML = autoJudgePanelBoxRender(it);
+    });
+  }
+  return autoJudgePanelBoxRender(it);
+}
+
+function autoJudgePanelBoxRender(it) {
+  const j = getCachedJudge(it);
+  const failed = !!_judgeFailed[it.id];
+  if (!j && !failed) {
+    return '<div class="judgebox" id="judgeInlineBox" aria-live="polite">' +
+      '<div class="jt"><span>🤖 자동 판단</span><span class="zero">기기 안 분석 중… · 0원</span></div>' +
+      '<div class="jl">사진 종류·선명도·추천 업체를 살피고 있습니다…</div></div>';
+  }
+  const m = it.meta || {};
+  const canEdit = mayTouch(it.id);
+  const mineOnly = isMinePhoto(it.id);
+
+  let pillsHtml = '';
+  let unreadDocAsScene = false;
+  let burstHtml = '';
+
+  if (j) {
+    const clsPill = '<span class="jpill">' + esc(judgeIconOf(j.choice) + ' ' + j.label + ' ' + j.pct + '%') + '</span>';
+    unreadDocAsScene = canEdit && !m.read && laneOf(it) === 'doc' && j.choice === 'scene' && j.prob >= 0.78;
+    const qCls = j.quality === 'ok' ? 'jpill ok' : 'jpill warn';
+    const qPill = '<span class="' + qCls + '">' +
+      esc((j.quality === 'ok' ? '✓ 선명도 ' : '⚠ 선명도 ') + j.sharp + '점 · ' + j.qualityLabel) + '</span>';
+    pillsHtml = '<div class="jl">' + clsPill + qPill + '</div>';
+
+    const readyItems = gridItems.filter(function (x) { return x && getCachedJudge(x); })
+      .map(function (x) { return { id: x.id, meta: x.meta, owner: photoOwner(x.id) }; });
+    if (readyItems.length >= 2) {
+      const groups = PuPhotoJudge.groupBursts(readyItems, _judgeMem);
+      const hitG = groups.find(function (g) {
+        return g.members.some(function (mb) { return mb.id === it.id; });
+      });
+      if (hitG) {
+        if (hitG.best && hitG.best.id === it.id) {
+          burstHtml = '<div class="jl">📸 비슷한 연사 ' + hitG.members.length + '장 중 <b>★ 베스트 컷</b>입니다</div>';
+        } else if (hitG.best) {
+          burstHtml = '<div class="jl">📸 비슷한 연사 ' + hitG.members.length + '장 중 여벌입니다 · ' +
+            '<button type="button" class="jbtn" data-vid="' + esc(hitG.best.id) + '" onclick="openViewer(this.dataset.vid)">★ 베스트 컷 보기</button></div>';
+        }
+      }
+    }
+  } else {
+    pillsHtml = '<div class="jl"><span class="jpill warn">⚠ 미리보기 없음 · 픽셀 분석 생략</span></div>';
+  }
+
+  /* ③ 고객사·업무 추천 (미리보기가 없어도 촬영일·상호 단서로 추천 가능) */
+  const recs = _matchCtxMem
+    ? PuPhotoJudge.recommendTargets({ id: it.id, meta: m, owner: photoOwner(it.id) }, j, fullMatchCtx())
+    : [];
+  _viewerJudgeTargets = recs;
+
+  let recHtml = '';
+  if (recs.length) {
+    const top = recs[0];
+    recHtml = '<div class="jl">🏢 추천: <b title="' + esc(top.name) + '">' + esc(top.name) + '</b> (' + top.pct + '% · ' + esc(top.why) + ')</div>';
+  }
+
+  let acts = '';
+  if (unreadDocAsScene) {
+    acts += '<button type="button" class="jbtn" onclick="moveToPicLane()">🏞 그냥 사진 확정 (AI 한도 절약)</button>';
+  }
+  if (recs.length && recs[0].actionable) {
+    const top0 = recs[0];
+    const allowShare = canAutoSharePhoto(it) && top0.shareUids && top0.shareUids.length > 0;
+    if (mineOnly && top0.needFolder) {
+      const fTitle = '📁 「' + top0.folderName + '」 폴더 담기';
+      acts += '<button type="button" class="jbtn pri" title="' + esc(fTitle) + '" onclick="applyViewerTargetFolder(0, this)">' +
+        esc(fTitle) + '</button>';
+    }
+    if (canEdit && (top0.needCo || allowShare)) {
+      acts += '<button type="button" class="jbtn" title="' + esc(top0.name + ' 업체·담당 연결') + '" onclick="applyViewerTargetCo(0, this)">🏢 업체·담당 연결</button>';
+    }
+  }
+
+  return '<div class="judgebox" id="judgeInlineBox" aria-live="polite">' +
+    '<div class="jt"><span>🤖 자동 판단</span><span class="zero">기기 안 · 0원</span></div>' +
+    pillsHtml +
+    burstHtml +
+    recHtml +
+    (acts ? '<div class="jacts">' + acts + '</div>' : '') +
+    '</div>';
+}
+
+async function ensureFolderByName(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return '';
+  const key = PuPhotoJudge.normCoKey(clean);
+  const fids = Object.keys(FOLDERS || {});
+  for (let i = 0; i < fids.length; i++) {
+    const fo = FOLDERS[fids[i]];
+    if (fo && PuPhotoJudge.normCoKey(fo.name) === key) return fids[i];
+  }
+  const created = await PuPhotoStore.addFolder(clean, null);
+  await loadFolders();
+  return (created && created.id) || '';
+}
+
+async function applyViewerTargetFolder(idx, btnEl) {
+  const rec = _viewerJudgeTargets[idx];
+  const it = gridItems.find(function (x) { return x.id === viewerId; });
+  if (!rec || !it || !isMinePhoto(it.id)) return;
+  if (btnEl) btnEl.disabled = true;
+  try {
+    const fid = rec.folderId || await ensureFolderByName(rec.folderName || rec.name);
+    if (!fid) return;
+    await PuPhotoStore.setFolder(photoYearOf(it.id), it.id, fid);
+    it.meta = Object.assign({}, it.meta, { folder: fid });
+    renderFolders();
+    renderGrid();
+    renderReadPanel(it);
+    toast('📁 「' + (rec.folderName || rec.name) + '」 폴더에 담았습니다');
+  } catch (e) {
+    if (btnEl) btnEl.disabled = false;
+    alert('폴더에 담지 못했습니다 — ' + ((e && e.message) || e));
+  }
+}
+
+async function applyViewerTargetCo(idx, btnEl) {
+  const rec = _viewerJudgeTargets[idx];
+  const it = gridItems.find(function (x) { return x.id === viewerId; });
+  if (!rec || !it || !mayTouch(it.id)) return;
+  const willShare = canAutoSharePhoto(it) && Array.isArray(rec.shareUids) && rec.shareUids.length > 0 && !!PuPhotoStore.addShare;
+  if (willShare) {
+    const msg = '「' + rec.name + '」 사업장을 연결하고 해당 일정·업체 담당자에게 공유를 엽니다(민감 서류 제외).\n\n계속할까요?';
+    if (!confirm(msg)) return;
+  }
+  if (btnEl) btnEl.disabled = true;
+  try {
+    if (rec.needCo) {
+      const note = (it.meta && it.meta.note) || '';
+      await PuPhotoStore.saveNote(photoYearOf(it.id), it.id, { company: rec.name, note: note }, photoOwner(it.id));
+      it.meta = Object.assign({}, it.meta, { company: rec.name });
+    }
+    if (willShare) {
+      const added = await PuPhotoStore.addShare(
+        photoYearOf(it.id), it.id, rec.shareUids, photoOwner(it.id), rec.shareWhy || (rec.name + ' 담당')
+      );
+      if (added && added.length) {
+        const sw = Object.assign({}, (it.meta && it.meta.shareWith) || {});
+        added.forEach(function (u) { sw[u] = true; });
+        it.meta = Object.assign({}, it.meta, { shareWith: sw });
+      }
+    }
+    renderGrid();
+    renderReadPanel(it);
+    toast('🏢 「' + rec.name + '」 업체를 연결했습니다');
+  } catch (e) {
+    if (btnEl) btnEl.disabled = false;
+    alert('업체 연결 중 문제가 생겼습니다 — ' + ((e && e.message) || e));
+  }
+}
+
+/* ── 일괄 자동 판단 모달(#judgeModal) ── */
+let _judgeBackTok = null;
+function onJudgeModalKey(ev) {
+  if (!ev || ev.key !== 'Tab') return;
+  const modal = $('judgeModal');
+  if (!modal || modal.style.display === 'none') return;
+  const focusables = Array.prototype.slice.call(
+    modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+  ).filter(function (el) { return el.offsetWidth > 0 || el.offsetHeight > 0; });
+  if (!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (ev.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+    ev.preventDefault();
+    last.focus();
+  } else if (!ev.shiftKey && document.activeElement === last) {
+    ev.preventDefault();
+    first.focus();
+  }
+}
+
+function openAutoJudge() {
+  const modal = $('judgeModal'), body = $('judgeModalBody');
+  if (!modal || !body) return;
+  if (!window.PuPhotoJudge) {
+    alert('자동 판단 도구를 아직 불러오지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.');
+    return;
+  }
+  _judgePrevFocus = document.activeElement;
+  modal.style.display = 'flex';
+  if (_judgeBackTok == null && window.PuBack && PuBack.open) {
+    _judgeBackTok = PuBack.open('자동 판단', closeAutoJudge);
+  }
+  const xBtn = $('judgeModalX');
+  if (xBtn) xBtn.focus();
+  runAutoJudgeScan();
+}
+
+function closeAutoJudge() {
+  const modal = $('judgeModal');
+  if (!modal) return;
+  _judgeScanSeq++;
+  modal.style.display = 'none';
+  if (_judgeBackTok != null && window.PuBack && PuBack.close) {
+    const t = _judgeBackTok;
+    _judgeBackTok = null;
+    PuBack.close(t);
+  }
+  const prev = _judgePrevFocus;
+  _judgePrevFocus = null;
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    try { prev.focus(); return; } catch (_) {}
+  }
+  const jb = $('judgeBtn');
+  if (jb && typeof jb.focus === 'function') { try { jb.focus(); } catch (_) {} }
+}
+
+async function runAutoJudgeScan() {
+  const body = $('judgeModalBody');
+  if (!body) return;
+  const seq = ++_judgeScanSeq;
+  const gen = _judgeAuthGen;
+  const items = gridItems.slice();
+  if (!items.length) {
+    body.innerHTML = '<div class="jsec"><div class="shd">분석할 사진이 없습니다</div>' +
+      '<p class="sdesc">먼저 사진을 올리거나 다른 연도를 골라 주세요.</p></div>';
+    return;
+  }
+
+  body.innerHTML = '<div class="jsec"><div class="shd">🔎 기기 안에서 사진을 살피는 중… (0 / ' + items.length + '장)</div>' +
+    '<p class="sdesc">바깥 서버로 보내지 않고 이 화면 안에서 바로 계산합니다(요금 0원).</p></div>';
+
+  const ctxP = ensureMatchCtx(false);
+  let done = 0;
+  const BATCH = 8;
+  for (let i = 0; i < items.length; i += BATCH) {
+    if (seq !== _judgeScanSeq || gen !== _judgeAuthGen) return;
+    const slice = items.slice(i, i + BATCH);
+    await Promise.all(slice.map(function (it) { return ensureItemJudge(it); }));
+    done = Math.min(items.length, i + BATCH);
+    const hd = body.querySelector('.shd');
+    if (hd) hd.textContent = '🔎 기기 안에서 사진을 살피는 중… (' + done + ' / ' + items.length + '장)';
+  }
+  await ctxP;
+  if (seq !== _judgeScanSeq || gen !== _judgeAuthGen) return;
+
+  buildAndRenderAutoJudgeModal(items);
+}
+
+function buildAndRenderAutoJudgeModal(items) {
+  const body = $('judgeModalBody');
+  if (!body) return;
+
+  let cntCard = 0, cntDoc = 0, cntScene = 0, cntNoImg = 0;
+  const unreadScenes = [];
+  const blurryDocs = [];
+  const mCtx = fullMatchCtx();
+  const targetGroupsMap = {};
+
+  items.forEach(function (it) {
+    const m = it.meta || {};
+    const j = getCachedJudge(it);
+    if (j) {
+      if (j.choice === 'card') cntCard++;
+      else if (j.choice === 'doc') cntDoc++;
+      else if (j.choice === 'scene') cntScene++;
+
+      if (mayTouch(it.id) && !m.read && !(m.doc && m.doc.group) && laneOf(it) === 'doc' &&
+          j.choice === 'scene' && j.prob >= 0.80) {
+        unreadScenes.push(it);
+      }
+      if (j.quality !== 'ok' && (laneOf(it) === 'doc' || j.choice === 'doc' || j.choice === 'card')) {
+        blurryDocs.push({ it: it, j: j });
+      }
+    } else {
+      cntNoImg++;
+    }
+
+    const recs = PuPhotoJudge.recommendTargets({ id: it.id, meta: m, owner: photoOwner(it.id) }, j, mCtx);
+    if (recs.length && recs[0].prob >= 0.65 && recs[0].actionable) {
+      const top = recs[0];
+      const mine = isMinePhoto(it.id);
+      const touch = mayTouch(it.id);
+      const rowNeedFolder = mine && top.needFolder;
+      const rowNeedCo = touch && top.needCo;
+      const rowShareUids = (touch && canAutoSharePhoto(it) && Array.isArray(top.shareUids)) ? top.shareUids.slice() : [];
+      if (!rowNeedFolder && !rowNeedCo && !rowShareUids.length) return;
+
+      const gk = top.groupKey || PuPhotoJudge.normCoKey(top.name);
+      if (!targetGroupsMap[gk]) {
+        targetGroupsMap[gk] = {
+          name: top.name,
+          folderId: top.folderId,
+          folderName: top.folderName,
+          pct: top.pct,
+          why: top.why,
+          items: []
+        };
+      }
+      const grp = targetGroupsMap[gk];
+      if (top.pct > grp.pct) grp.pct = top.pct;
+      grp.items.push({
+        it: it,
+        rec: top,
+        rowShareUids: rowShareUids,
+        rowShareWhy: top.shareWhy || (top.name + ' 담당')
+      });
+    }
+  });
+
+  const burstInputs = items.filter(function (it) { return !!getCachedJudge(it); })
+    .map(function (it) { return { id: it.id, thumb: it.thumb, meta: it.meta, owner: photoOwner(it.id) }; });
+  const bursts = PuPhotoJudge.groupBursts(burstInputs, _judgeMem);
+  const dropIds = [];
+  bursts.forEach(function (g) {
+    (g.extras || []).forEach(function (ex) {
+      if (mayTouch(ex.id) && !isUsed(ex.meta)) dropIds.push(ex.id);
+    });
+  });
+
+  const targetGroups = Object.keys(targetGroupsMap).map(function (k) { return targetGroupsMap[k]; })
+    .sort(function (a, b) { return (b.items.length - a.items.length) || (b.pct - a.pct); });
+
+  _modalState = {
+    unreadSceneIds: unreadScenes.map(function (x) { return x.id; }),
+    burstDropIds: dropIds,
+    targetGroups: targetGroups
+  };
+
+  const skipNote = cntNoImg > 0 ? (' · 미리보기 없음 ' + cntNoImg + '장 제외') : '';
+
+  /* ① 사진 종류 자동 분류 카드 */
+  let sec1 = '<div class="jsec">' +
+    '<div class="shd"><span>① 사진 종류 자동 분류</span>' +
+    '<span style="font-size:12px;font-weight:700;color:#475569">📇 명함 ' + cntCard + ' · 📄 서류 ' + cntDoc + ' · 🏞 현장 ' + cntScene + esc(skipNote) + '</span></div>' +
+    '<p class="sdesc">종이 비율·글자 획·명함 테두리를 기기 안에서 재어 현장 사진을 먼저 가려냅니다(구글 AI 판독 한도 절약).</p>';
+  if (unreadScenes.length) {
+    sec1 += '<button type="button" class="jgo" onclick="applyModalUnreadScenes(this)">' +
+      '🏞 안 읽은 현장 사진 ' + unreadScenes.length + '장 확정 (한도 절약)</button>';
+  } else if (cntNoImg > 0 && cntCard + cntDoc + cntScene === 0) {
+    sec1 += '<div style="font-size:12px;color:#854d0e;font-weight:700">⚠ 미리보기를 불러오지 못해 픽셀 분류를 건너뛰었습니다(' + cntNoImg + '장).</div>';
+  } else {
+    sec1 += '<div style="font-size:12px;color:#166534;font-weight:700">✓ 지금 서류 칸에 섞여 있는 안 읽은 현장 사진이 없습니다' +
+      (cntNoImg > 0 ? (' (미리보기 없음 ' + cntNoImg + '장 제외)') : '') + '.</div>';
+  }
+  sec1 += '</div>';
+
+  /* ② 품질·연사(베스트 컷) 선별 카드 */
+  let sec2 = '<div class="jsec">' +
+    '<div class="shd"><span>② 품질 · 연사(★ 베스트 컷) 선별</span>' +
+    '<span style="font-size:12px;font-weight:700;color:#475569">연사 ' + bursts.length + '묶음 · 흐림 ' + blurryDocs.length + '장' + esc(skipNote) + '</span></div>' +
+    '<p class="sdesc">비슷하게 찍힌 연사 묶음에서 가장 또렷한 <b>★ 베스트 컷</b>을 남기고, 여벌만 골라 휴지통(30일 보관)으로 보냅니다. 증빙으로 쓴 사진은 늘 남깁니다.</p>';
+  if (bursts.length) {
+    sec2 += '<div class="jlist">' + bursts.slice(0, 6).map(function (g) {
+      const bThumb = judgeSafeImgSrc(g.best && g.best.thumb);
+      const title = coNameOf(g.best) || readLabel(g.best && g.best.meta && g.best.meta.read) || '현장·연사 묶음';
+      const headTxt = '★ 베스트 유지: ' + title + ' (선명도 ' + g.bestSharp + '점)';
+      return '<div class="jitem">' +
+        (bThumb ? '<img draggable="false" src="' + esc(bThumb) + '" alt="">' : '') +
+        '<div class="ji"><b title="' + esc(headTxt) + '">' + esc(headTxt) + '</b>' +
+        '<span>' + (g.skip ? esc(g.skip) : ('총 ' + g.members.length + '장 중 여벌 ' + g.extras.length + '장 정리 가능')) + '</span></div>' +
+        '<button type="button" class="jgo sub" data-vid="' + esc(g.best.id) + '" onclick="closeAutoJudge();openViewer(this.dataset.vid)">보기</button>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+  if (dropIds.length) {
+    sec2 += '<div style="margin-top:9px"><button type="button" class="jgo danger" id="judgeBurstBtn" onclick="applyModalBurstClean()">' +
+      '🧹 연사 여벌 ' + dropIds.length + '장 휴지통 이동 (★ 베스트 유지)</button></div>';
+  }
+  if (blurryDocs.length) {
+    sec2 += '<div class="jlist" style="margin-top:8px">' + blurryDocs.slice(0, 4).map(function (x) {
+      const th = judgeSafeImgSrc(x.it.thumb);
+      const nm = coNameOf(x.it) || readLabel(x.it.meta && x.it.meta.read) || '서류 사진';
+      const warnHead = '⚠ ' + x.j.qualityLabel + ' (선명도 ' + x.j.sharp + '점) · ' + nm;
+      return '<div class="jitem">' +
+        (th ? '<img draggable="false" src="' + esc(th) + '" alt="">' : '') +
+        '<div class="ji"><b title="' + esc(warnHead) + '">' + esc(warnHead) + '</b>' +
+        '<span>글씨가 잘 읽히는지 크게 열어 확인해 보세요</span></div>' +
+        '<button type="button" class="jgo sub" data-vid="' + esc(x.it.id) + '" onclick="closeAutoJudge();openViewer(this.dataset.vid)">확인</button>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+  if (!bursts.length && !blurryDocs.length) {
+    if (cntNoImg > 0 && cntCard + cntDoc + cntScene === 0) {
+      sec2 += '<div style="font-size:12px;color:#854d0e;font-weight:700">⚠ 미리보기가 없어 품질·연사 비교를 건너뛰었습니다(' + cntNoImg + '장).</div>';
+    } else {
+      sec2 += '<div style="font-size:12px;color:#166534;font-weight:700">✓ 정리할 중복 연사나 흔들린 서류가 없습니다' +
+        (cntNoImg > 0 ? (' (미리보기 없음 ' + cntNoImg + '장 제외)') : '') + '.</div>';
+    }
+  }
+  sec2 += '</div>';
+
+  /* ③ 고객사·업무 자동 매칭 카드 */
+  let sec3 = '<div class="jsec">' +
+    '<div class="shd"><span>③ 고객사 · 일정 · 폴더 자동 매칭</span>' +
+    '<span style="font-size:12px;font-weight:700;color:#475569">추천 ' + targetGroups.length + '곳</span></div>' +
+    '<p class="sdesc">촬영일 정부사업·방문 일정과 판독 상호·메모를 대조해 어느 사업장 사진인지 확률(%)과 함께 추천합니다.</p>';
+  if (targetGroups.length) {
+    sec3 += '<div class="jlist">' + targetGroups.slice(0, 8).map(function (grp, idx) {
+      const th = judgeSafeImgSrc(grp.items[0] && grp.items[0].it && grp.items[0].it.thumb);
+      const anyMine = grp.items.some(function (row) { return isMinePhoto(row.it.id) && row.rec.needFolder; });
+      const actLabel = anyMine
+        ? ('📁 폴더·업체 연결 (' + grp.items.length + '장)')
+        : ('🏢 업체·담당 연결 (' + grp.items.length + '장)');
+      const gHead = '🏢 ' + grp.name + ' · ' + grp.pct + '% (' + grp.items.length + '장)';
+      return '<div class="jitem">' +
+        (th ? '<img draggable="false" src="' + esc(th) + '" alt="">' : '') +
+        '<div class="ji"><b title="' + esc(gHead) + '">' + esc(gHead) + '</b>' +
+        '<span>' + esc(grp.why) + '</span></div>' +
+        '<button type="button" class="jgo" title="' + esc(grp.name + ' ' + actLabel) + '" onclick="applyModalTargetGroup(' + idx + ', this)">' + esc(actLabel) + '</button>' +
+        '</div>';
+    }).join('') + '</div>';
+  } else {
+    sec3 += '<div style="font-size:12px;color:#475569">새로 연결할 추천 사업장·폴더 항목이 없습니다.</div>';
+  }
+  sec3 += '</div>';
+
+  body.innerHTML = sec1 + sec2 + sec3;
+}
+
+function applyModalUnreadScenes(btnEl) {
+  if (!_modalState || !_modalState.unreadSceneIds || !_modalState.unreadSceneIds.length) return;
+  const ids = _modalState.unreadSceneIds.slice();
+  if (ids.length >= 2) {
+    if (!confirm('안 읽은 현장·회의 사진 ' + ids.length + '장을 서류 판독 없이 현장 사진으로 확정할까요?')) return;
+  }
+  if (btnEl) btnEl.disabled = true;
+  retagPhotos(ids, 'meeting');
+  closeAutoJudge();
+}
+
+function applyModalBurstClean() {
+  if (!_modalState || !_modalState.burstDropIds || !_modalState.burstDropIds.length) return;
+  const ids = _modalState.burstDropIds.filter(function (id) {
+    const it = gridItems.find(function (x) { return x.id === id; });
+    return it && mayTouch(id) && !isUsed(it.meta);
+  });
+  if (!ids.length) return;
+  if (blockedIfOther(ids)) return;
+  if (!confirm('비슷하게 찍힌 연사 여벌 ' + ids.length + '장을 휴지통으로 보냅니다.\n\n' +
+    '· 묶음마다 가장 또렷한 ★ 베스트 컷은 그대로 남습니다.\n' +
+    '· 증빙으로 쓴 사진은 건드리지 않습니다.\n' +
+    '· 휴지통에서 ' + PuPhotoStore.TRASH_DAYS + '일 안에 언제든 되살릴 수 있습니다.\n\n계속할까요?')) return;
+
+  const btn = $('judgeBurstBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '휴지통으로 옮기는 중… 0/' + ids.length; }
+  let moved = 0;
+  ids.reduce(function (chain, id) {
+    return chain.then(function () {
+      return PuPhotoStore.deletePhoto(photoYearOf(id), id, '연사 여벌 — 사람이 치움', photoOwner(id))
+        .then(function () {
+          moved++;
+          gridItems = gridItems.filter(function (x) { return x.id !== id; });
+          if (btn) btn.textContent = '휴지통으로 옮기는 중… ' + moved + '/' + ids.length;
+        })
+        .catch(function (e) { console.warn('[연사 여벌 정리]', id, e); });
+    });
+  }, Promise.resolve()).then(function () {
+    renderKindTabs();
+    renderGrid();
+    renderGridBar();
+    refreshTrashCount();
+    toast('🧹 연사 여벌 ' + moved + '장을 휴지통으로 옮겼습니다 (★ 베스트 컷 유지)');
+    runAutoJudgeScan();
+  });
+}
+
+async function applyModalTargetGroup(idx, btnEl) {
+  if (!_modalState || !_modalState.targetGroups || !_modalState.targetGroups[idx]) return;
+  const grp = _modalState.targetGroups[idx];
+  const anyMineNeedFolder = grp.items.some(function (row) { return isMinePhoto(row.it.id) && row.rec.needFolder; });
+  const sharePhotoCnt = grp.items.filter(function (row) {
+    return mayTouch(row.it.id) && canAutoSharePhoto(row.it) && row.rowShareUids && row.rowShareUids.length > 0;
+  }).length;
+
+  if (grp.items.length >= 2 || sharePhotoCnt > 0) {
+    const lines = [
+      '「' + grp.name + '」 사업장으로 사진 ' + grp.items.length + '장을 연결합니다.',
+      anyMineNeedFolder ? '· 내 사진은 「' + (grp.folderName || grp.name) + '」 폴더에 담습니다.' : '',
+      sharePhotoCnt > 0 ? ('· 각 사진의 해당 일정·업체 담당자에게만 공유를 엽니다(' + sharePhotoCnt + '장, 민감 서류 제외).') : ''
+    ].filter(Boolean).join('\n');
+    if (!confirm(lines + '\n\n계속할까요?')) return;
+  }
+
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '연결 중…'; }
+  try {
+    let fid = grp.folderId || '';
+    if (anyMineNeedFolder && !fid) {
+      fid = await ensureFolderByName(grp.folderName || grp.name);
+    }
+    let done = 0;
+    for (let i = 0; i < grp.items.length; i++) {
+      const row = grp.items[i];
+      const it = gridItems.find(function (x) { return x.id === row.it.id; });
+      if (!it) continue;
+      if (isMinePhoto(it.id) && fid && row.rec.needFolder) {
+        await PuPhotoStore.setFolder(photoYearOf(it.id), it.id, fid);
+        it.meta = Object.assign({}, it.meta, { folder: fid });
+      }
+      if (mayTouch(it.id) && row.rec.needCo) {
+        const note = (it.meta && it.meta.note) || '';
+        await PuPhotoStore.saveNote(photoYearOf(it.id), it.id, { company: grp.name, note: note }, photoOwner(it.id));
+        it.meta = Object.assign({}, it.meta, { company: grp.name });
+      }
+      /* ⚠ 그룹 합집합이나 autoShareByCo 우회 폴백 없이 «그 사진(row)에 실제로 추천된 담당자(rowShareUids)»만 사진별로 연다 */
+      const rowUids = (mayTouch(it.id) && canAutoSharePhoto(it) && Array.isArray(row.rowShareUids))
+        ? row.rowShareUids
+        : [];
+      if (rowUids.length && PuPhotoStore.addShare) {
+        const added = await PuPhotoStore.addShare(
+          photoYearOf(it.id), it.id, rowUids, photoOwner(it.id), row.rowShareWhy || (grp.name + ' 담당')
+        );
+        if (added && added.length) {
+          const sw = Object.assign({}, (it.meta && it.meta.shareWith) || {});
+          added.forEach(function (u) { sw[u] = true; });
+          it.meta = Object.assign({}, it.meta, { shareWith: sw });
+        }
+      }
+      done++;
+    }
+    renderFolders();
+    renderGrid();
+    toast('🏢 「' + grp.name + '」에 ' + done + '장을 연결했습니다');
+    runAutoJudgeScan();
+  } catch (e) {
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '다시 시도'; }
+    alert('사업장 연결 중 문제가 생겼습니다 — ' + ((e && e.message) || e));
+  }
 }
 </script>
 <!-- ── 폰 뒤로가기 — 창을 한 걸음씩 닫는다 (대표 지시 2026-08-30) ──
