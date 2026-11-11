@@ -1,5 +1,5 @@
 'use strict';
-/* 공공임단협(aliounion) — 포털(enter.html) 자료함 타일 + 대형 모달 레이어 팝업 + 단독 창(pu-alio-union.html) + 5대 공공·법령 API 연동 검증 */
+/* 공공임단협(aliounion) — 푸른통합시스템 별개 독립 프로그램(pu-alio-union.html) + 포털(enter.html)·앱바(pu-appbar.js) 연동 + 기관별 상세 팝업 + 5대 공공·법령 API 검증 */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,31 +7,37 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const enterSrc = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+const appbarSrc = fs.readFileSync(path.join(ROOT, 'js', 'pu-appbar.js'), 'utf8');
 const standaloneSrc = fs.readFileSync(path.join(ROOT, 'pu-alio-union.html'), 'utf8');
 const uiSrc = fs.readFileSync(path.join(ROOT, 'js', 'pu-alio-union.js'), 'utf8');
 const dataMod = require('../js/pu-alio-data.js');
 
-test('① 포털(enter.html) 자료함(store) 줄에 전 근로자 공개로 「공공임단협」 타일이 등록되어 있다', () => {
+test('① 포털(enter.html) 자료함(store) 줄과 앱바(pu-appbar.js)에 별개 독립 프로그램으로 「공공임단협(pu-alio-union.html)」이 등록되어 있다', () => {
   assert.match(enterSrc, /\{\s*key:'aliounion',\s*name:'공공임단협'[^}]*icon:'🤝',\s*url:'pu-alio-union\.html',\s*roles:null,\s*row:'store'\s*\}/);
-  assert.match(enterSrc, /<script src="js\/pu-alio-union\.js\?v=\d+"><\/script>/);
+  assert.match(appbarSrc, /\{\s*key:\s*'aliounion',\s*row:\s*'store',\s*name:\s*'공공임단협',\s*icon:\s*'🤝',\s*url:\s*'pu-alio-union\.html'/);
+  // 포털 안에서 인라인 모달로 가로채지 않고 openPortalApp 표준 창 열기(pureun-aliounion)를 그대로 탄다
+  assert.doesNotMatch(enterSrc, /app\.key === 'aliounion' && typeof window !== 'undefined' && window\.PuAlioUnion/);
 });
 
-test('② 포털에서 「공공임단협」 타일을 누르면 화면을 벗어나지 않고 모달 레이어 팝업(PuAlioUnion.openModal)이 열린다', () => {
-  assert.match(enterSrc, /app\.key === 'aliounion' && typeof window !== 'undefined' && window\.PuAlioUnion && typeof window\.PuAlioUnion\.openModal === 'function'/);
-  assert.match(enterSrc, /window\.PuAlioUnion\.openModal\(\)/);
-  assert.match(uiSrc, /global\.PuAlioUnion\s*=\s*\{\s*openModal:\s*openModal,\s*closeModal:\s*closeModal,\s*mount:\s*mount\s*\}/);
+test('② 독립 프로그램 화면(pu-alio-union.html)은 푸른통합시스템 표준 부품(pu-gate, pu-authsync, pu-appbar, pu-whoami, pu-back)을 갖추고 마운트한다', () => {
+  assert.match(standaloneSrc, /<title>푸른노무법인 공공임단협<\/title>/);
+  assert.match(standaloneSrc, /<script src="js\/pu-gate\.js\?v=\d+"><\/script>/);
+  assert.match(standaloneSrc, /<script src="js\/pu-authsync\.js\?v=\d+"><\/script>/);
+  assert.match(standaloneSrc, /<script src="js\/pu-appbar\.js\?v=\d+"><\/script>/);
+  assert.match(standaloneSrc, /<script src="js\/pu-whoami\.js\?v=\d+"><\/script>/);
+  assert.match(standaloneSrc, /PuWhoami\.mount\('#who'\)/);
+  assert.match(standaloneSrc, /window\.PuAlioUnion\.mount\(rootEl,\s*\{\s*isModal:\s*false\s*\}\)/);
 });
 
-test('③ 모달 레이어 팝업과 단독 화면은 5대 핵심 탭(노조·13대쟁점·조문검색·공시원문·API 센터)·☐ 고르기 칸·№ 일련번호·한 줄 말줄임(title)·새 창으로 크게 열기 단추를 갖춘다', () => {
+test('③ 독립 프로그램(js/pu-alio-union.js)은 5대 핵심 탭·기관별 종합 상세 팝업(openOrganDetailModal)·☐ 고르기 칸·№ 일련번호·한 줄 말줄임(title)을 갖춘다', () => {
   assert.match(uiSrc, /전 기관 노조·타임오프 현황/);
   assert.match(uiSrc, /13대 핵심 쟁점 기관간 비교·원문 대조/);
   assert.match(uiSrc, /단체협약 조문 통합 검색/);
   assert.match(uiSrc, /기관별 공시·별도합의·내부규정 원문/);
   assert.match(uiSrc, /공공·법령 API 실시간 연동 센터/);
-  assert.match(uiSrc, /새 창으로 크게 열기/);
+  assert.match(uiSrc, /function openOrganDetailModal\(aid\)/);
   assert.match(uiSrc, /class="c-ck"/);
   assert.match(uiSrc, /class="c-no"/);
-  assert.match(standaloneSrc, /window\.PuAlioUnion\.mount\(/);
 });
 
 test('④ 내장된 ALIO 공공임단협 데이터(pu-alio-data.js)에 전체 중앙공공기관·단위노조·수시공시/내부규정·13대 쟁점 지표·조문이 실려 있다', () => {

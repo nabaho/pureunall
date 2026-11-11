@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>공공임단협 - 푸른통합시스템</title>
+<title>푸른노무법인 공공임단협</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🤝</text></svg>">
 <!-- ══════════════════════════════════════════════════════════════
-     푸른노무법인 공공기관 단협 (pu-alio-union.html)
+     푸른노무법인 공공임단협 (pu-alio-union.html)
+     푸른통합시스템의 별개 독립 프로그램(창 이름 pureun-aliounion).
      대한민국 기획재정부 공공기관 경영정보 공개시스템(ALIO)의
      전체 중앙공공기관(355개) 노동조합 현황 및 단체협약·임금협약·별도합의·내부규정
-     통합 조회·13대 핵심 쟁점 비교 매트릭스·조문 Side-by-Side 대조 프로그램.
-     포털(enter.html)에서는 모달 레이어 팝업(PuAlioUnion.openModal)으로 바로 열리며,
-     팝업 안의 「↗ 전체 창으로 열기」 단추로 이 단독 화면에서도 열 수 있다.
+     통합 조회·13대 핵심 쟁점 비교 매트릭스·조문 Side-by-Side 대조·5대 공공/법령 API 연동 프로그램.
+     포털(enter.html) 자료함의 「🤝 공공임단협」 타일 또는 오른쪽 앱바(pu-appbar.js)에서 바로 열린다.
      ══════════════════════════════════════════════════════════════ -->
 <style>
 *{box-sizing:border-box}
@@ -35,6 +35,7 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-authsync.js?v=5"></script>
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-appbar.js?v=42"></script>
@@ -42,9 +43,9 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
 <script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script src="js/pu-back.js?v=5"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#pauOrganDetailModal,#puAlioModalBack'); }); }catch(e){}</script>
 <script src="js/pu-alio-data.js?v=2"></script>
-<script src="js/pu-alio-union.js?v=2"></script>
+<script src="js/pu-alio-union.js?v=3"></script>
 <script>
 (function(){
   'use strict';
@@ -57,15 +58,27 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
     messagingSenderId:'936817166182'
   };
   var rootEl = document.getElementById('alioAppRoot');
-  try{ if(window.PuWhoami) PuWhoami.mount(false); }catch(e){}
   if(rootEl && window.PuAlioUnion){
     window.PuAlioUnion.mount(rootEl, { isModal: false });
   }
+  function mountWho(){
+    try{
+      if(window.PuWhoami && document.getElementById('who')){
+        PuWhoami.mount('#who');
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  if(!mountWho()) document.addEventListener('DOMContentLoaded', mountWho);
+
   try{
     if(location.protocol !== 'file:' && typeof firebase !== 'undefined' && firebase.auth){
       if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);
       try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
       firebase.auth().onAuthStateChanged(function(u){
+        var outBtn = document.getElementById('outBtn');
+        if(outBtn) outBtn.style.display = u ? '' : 'none';
         if(!u){
           PuGate.show();
           return;
