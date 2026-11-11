@@ -417,3 +417,40 @@ test('브라우저 알림 — 허락과 설정이 있고 «다른 탭을 보고 
   await w.ctx.mrScan(true); await settle(); w.run();
   assert.equal(shown.length, 1, '꺼 두면 안 띄운다');
 });
+
+test('★ 닫기(나중에) 개선 — 일부 건을 완료해 건수가 줄어도 다시 튀어나오지 않고, 클라우드(mute)로 폰·PC가 같이 닫힌다', async () => {
+  const pc = await started({ msgs: { '103': mailRow({ s: '강사 이력서 제출 요청', an: [], a: 0, e: 'c@example.org' }) } });
+  assert.equal(pc.els.mrBanner.style.display, 'block');
+  assert.match(pc.els.mrBanner.innerHTML, /2건/);
+  pc.ctx.mrBannerClose(); await settle();
+  assert.equal(pc.els.mrBanner.style.display, 'none', 'PC에서 닫음');
+  await pc.ctx.mrSet([IN + '~101'], 'done'); await settle();
+  assert.equal(pc.els.mrBanner.style.display, 'none', '2건 중 1건을 완료해 1건으로 줄어도 닫았던 띠가 되살아나지 않는다');
+  /* 같은 클라우드 DB 를 다른 기기(폰, 빈 localStorage)에서 열었을 때도 닫힌 상태가 그대로 동기화된다 */
+  const savedMute = pc.db.읽기('kcareer/U1/mailreq/mute');
+  assert.ok(savedMute && savedMute.ids, '클라우드 mute 에 닫은 상태가 저장됨');
+  const phone = world();
+  await phone.db.ref('kcareer/U1/mailreq').set(pc.db.읽기('kcareer/U1/mailreq'));
+  phone.ctx.mrStart(); await settle(); await settle();
+  assert.equal(phone.els.mrBanner.style.display, 'none', 'PC에서 닫았으면 폰에서도 뜨지 않는다');
+  /* 폰에서 상단 띠를 다시 켜면(mrBannerHideSet(false)) 기존에 닫았던 PC에서도 로컬 캐시가 비워지며 즉시 다시 살아난다 */
+  phone.ctx.mrBannerHideSet(false); await settle();
+  await pc.db.ref('kcareer/U1/mailreq/mute').set(phone.db.읽기('kcareer/U1/mailreq/mute'));
+  await settle();
+  assert.equal(pc.els.mrBanner.style.display, 'block', '다른 기기에서 다시 켜면 기존 기기에서도 띠가 살아난다');
+});
+
+test('★ 상단 띠 끄기·켜기 및 폰 한 줄 스타일 — 띠를 꺼 두면 새 요청이 와도 옆줄 숫자로만 알리고, 폰에서는 세부 내역을 접어 한 줄을 지킨다', async () => {
+  const w = await started();
+  assert.equal(w.els.mrBanner.style.display, 'block');
+  w.ctx.mrBannerHideSet(true); await settle();
+  assert.equal(w.els.mrBanner.style.display, 'none', '띠 끄기 즉시 숨김');
+  await w.db.ref('mailbox/msgs/' + IN + '/105').set(mailRow({ s: '위원 서약서 제출 요청', an: [], a: 0, e: 'd@example.org' }));
+  await w.ctx.mrScan(true); await settle();
+  assert.equal(w.els.mrBanner.style.display, 'none', '띠 끄기 상태에서는 새 요청이 와도 상단 띠가 안 뜬다');
+  w.ctx.mrPaintNav();
+  assert.equal(w.navTop.textContent, '📬 2', '옆줄 숫자 배지는 그대로 살아 있다');
+  w.ctx.mrBannerHideSet(false); await settle();
+  assert.equal(w.els.mrBanner.style.display, 'block', '다시 켜면 상단 띠가 살아난다');
+  assert.match(html, /@media \(max-width:760px\)\{[\s\S]*?\.mr-bn-in\{justify-content:space-between;flex-wrap:nowrap[^}]*\}[\s\S]*?\.mr-bn-sub\{display:none\}/, '폰 폭에서는 한 줄 고정 + 세부 내역 숨김');
+});

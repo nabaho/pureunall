@@ -388,3 +388,63 @@ test('본문 열기 도우미 — 푸른메일함과 같은 서버 함수 이름
   await rb('INBOX', '101');
   assert.deepEqual(seen, [['readMailMessage', { slug: 'INBOX', uid: '101', peek: 1 }]]);
 });
+
+/* ── 2026-11-11 오탐·가짜 기한·중복·띠 부활 방지 회귀 검사 ── */
+test('오탐 제외 — 일반 노무 실무(취업규칙·근로계약·급여·체불·위임약정)·단순 송부·완료 통보·타 노무사 명의는 올리지 않는다', () => {
+  assert.equal(Q.detect({ s: '취업규칙 변경 동의서 검토 요청', an: ['취업규칙변경동의서.hwp'], p: '검토 부탁드립니다', d: NOW }), null);
+  assert.equal(Q.detect({ s: '근로계약서 양식 검토 요청', an: ['근로계약서.docx'], p: '확인 부탁드립니다', d: NOW }), null);
+  assert.equal(Q.detect({ s: '사업자등록증을 보내드립니다', an: ['사업자등록증.pdf'], p: '첨부 확인 바랍니다', d: NOW }), null);
+  assert.equal(Q.detect({ s: '보험계약서류 전자서명 완료 및 교부 안내', an: ['청약서사본.pdf'], p: '전자서명 완료', d: NOW }), null);
+  assert.equal(Q.detect({ s: '사건 위임약정서 제출', an: ['위임장.pdf'], p: '서명 후 회신 바랍니다', d: NOW }), null);
+  assert.equal(Q.detect({ s: '국선노무사 위촉 알림(홍길동 노무사)', an: ['서약서(홍길동 노무…'], p: '제출 바랍니다', d: NOW }), null);
+  const ok = Q.detect({ s: '직장 내 괴롭힘 판단 전문위원회 참석 요청', an: ['전문위원회 서약서(권형하 노무사).hwpx'], p: '작성 후 회신 바랍니다', d: NOW });
+  assert.ok(ok && ok.kinds.includes('consent'), '대표 본인 전문위원회 서약서는 그대로 잡는다');
+});
+test('폴더 고르기 — 자문·급여·컨설팅·체불·산재·구인이력서 폴더는 건너뛰고 공공기관·받은메일함만 훑는다', () => {
+  const boxes = Q.boxesOf({
+    'INBOX-111111': { kind: 'inbox', name: '받은메일함' },
+    '6_공공기관-222222': { kind: 'custom', name: '6.공공기관' },
+    '7_노무사회-333333': { kind: 'custom', name: '7.노무사회 사업, 노동부' },
+    '1_자문사답변-444444': { kind: 'custom', name: '1.자문사답변' },
+    '2_급여-555555': { kind: 'custom', name: '2.급여+사무대행' },
+    '4_체불-666666': { kind: 'custom', name: '4.체불 및 체당금메일' },
+    '이력서-777777': { kind: 'custom', name: '이력서' },
+  });
+  assert.deepEqual(boxes.sort(), ['6_공공기관-222222', '7_노무사회-333333', 'INBOX-111111']);
+});
+test('가짜 기한 방지 — 수신일보다 옛 실적 기준일 · 먼 계약기간 만료일 · 짧은 답장 아래 인용 발송시각은 기한으로 잡지 않는다', () => {
+  assert.equal(Q.deadlineOf('활동 실적 인정기간: 2025.07.01 이후 증빙 제출 바랍니다', NOW), null, '1년 전 기준일은 기한이 아니다');
+  assert.equal(Q.deadlineOf('계약기간: 2026년 11월 1일 ~ 2027년 10월 31일까지', NOW), null, '계약기간 만료일은 기한이 아니다');
+  const quoted = Q.bodyOf({ text: '네 확인했습니다.\n2026년 11월 8일 (일) 오후 5:32, 가나담당 <a@example.org>님이 작성:\n제출기한: 2026년 11월 15일까지' });
+  assert.doesNotMatch(quoted, /11월 15일/, '9글자 짧은 답장 아래 인용문도 정확히 잘라 낸다');
+  assert.equal(Q.deadlineOf(quoted, NOW), null);
+});
+test('중복 차단 및 기존 오탐 자동 정화 — 같은 보낸이·제목 중복은 한 건만 남기고, 2차 스캔에서도 살아남은 건을 죽이지 않으며, 사람이 고친 건은 건드리지 않는다', async () => {
+  const f = db({
+    kcareer: { U1: { mailreq: { items: {
+      '1_자문사답변-444444~90': { id: '1_자문사답변-444444~90', slug: '1_자문사답변-444444', uid: '90', st: 'new', s: '취업규칙 동의서', e: 'x@example.org', d: NOW - DAY },
+      [CU + '~91']: { id: CU + '~91', slug: CU, uid: '91', st: 'new', s: '전문가 재위촉 증빙 제출 안내', e: 'y@example.org', d: NOW - DAY, deadline: { date: '2025-07-01', time: '' } },
+      [CU + '~92']: { id: CU + '~92', slug: CU, uid: '92', st: 'new', s: '취업규칙 동의서', e: 'z@example.org', d: NOW - DAY, memo: '직접 챙길 건' },
+      [IN + '~99']: { id: IN + '~99', slug: IN, uid: '99', st: 'ignored', s: SUBJ, e: 'req@example.org', d: at(11, 9, 10) },
+    } } } },
+  });
+  await f.ref('mailbox/msgs/' + IN + '/108').set(row({ s: '[가나사회경제연구원]전문가(멘토) 인력풀 참여 사전동의서', d: at(11, 9, 13) + 60000 }));
+  await scan(f);
+  await scan(f);                                                     // 2차 스캔에서도 이미 ignored 인 99 때문에 살아남은 101 이 죽지 않아야 한다
+  const all = items(f);
+  assert.equal(all['1_자문사답변-444444~90'].st, 'ignored', '제외 폴더 오탐은 자동으로 요청 아님 처리');
+  assert.equal(all[CU + '~91'].st, 'new'); assert.ok(!all[CU + '~91'].deadline, '가짜 과거 기한은 지운다');
+  assert.equal(all[CU + '~92'].st, 'new', '메모를 적은 건은 건드리지 않는다');
+  assert.equal(all[IN + '~101'].st, 'new', '이미 ignored 인 예전 건 때문에 정상 건이 죽지 않는다');
+  assert.ok(!(IN + '~108' in all), '공백만 다른 같은 제목·보낸이 중복 메일은 또 만들지 않는다');
+});
+test('알림 띠 판정(shouldShowBanner) — 일부를 완료해 건수가 줄어도 다시 뜨지 않고, 새 건이나 긴급도 상승 때만 다시 뜬다', () => {
+  const a = it('a~1', 'new'), b = it('b~2', 'new');
+  const mute = { hide: 0, ids: Q.alarmStateMap([a, b], NOW) };
+  assert.equal(Q.shouldShowBanner([a, b], mute, NOW), false, '방금 닫은 상태');
+  assert.equal(Q.shouldShowBanner([a], mute, NOW), false, '한 건을 완료해 1건으로 줄어도 닫힘 유지');
+  const aSoon = it('a~1', 'new', { date: '2026-11-10' });
+  assert.equal(Q.shouldShowBanner([aSoon], mute, NOW), true, '기한이 임박으로 올라가면 다시 알린다');
+  assert.equal(Q.shouldShowBanner([a, it('c~3', 'new')], mute, NOW), true, '새 건이 오면 다시 알린다');
+  assert.equal(Q.shouldShowBanner([a, it('c~3', 'new')], { hide: 1, ids: {} }, NOW), false, '상단 띠 끄기를 켜 두면 뜨지 않는다');
+});
