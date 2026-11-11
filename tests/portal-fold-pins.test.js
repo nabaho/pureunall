@@ -213,10 +213,11 @@ test('⑩ 폰: 아래 막대는 화면 맨 아래 전체 폭 · 본문은 그만
 
 /* 대표 2026-10-24 「폰에서는 자주 쓰는 앱을 위 상단에 별표하는 건 필요 없을 것 같다. 차라리 자주 쓰는 앱은
    꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것 같다」 → 「맨 위 줄 없애기」. */
-test('⑪ 폰: 자주 쓰는 앱 줄은 없다 — 꾹 누르면 «그 자리 칩»에 ★·노란 테두리', () => {
+test('⑪ 폰: 별표 찍은 앱은 상단 «자주 쓰는 앱» 박스에 보이고, 그 자리 칩에도 ★·노란 테두리가 붙는다 (대표 2026-11-11)', () => {
   /* 폰 구간 안에서 자주 쓰는 앱 줄을 감추고, ★ 붙은 칩을 그 자리에서 보인다 */
-  const at = HEAD.indexOf('#pinRow{display:none;}');
-  assert.ok(at > 0, '★ 폰에 자주 쓰는 앱 줄이 그대로 있다');
+  const at = HEAD.indexOf('#pinRow.empty{display:none;}');
+  assert.ok(at > 0 && HEAD.indexOf('#pinRow{display:none;}') < 0, '★ 폰에서 별표 찍은 앱이 상단 자주 쓰는 앱 박스에 안 보인다');
+  assert.ok(rulesFor('#pinRow .tiles').some((b) => /display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)), '★ 폰 상단 자주 쓰는 앱 박스가 칩 격자로 안 그려진다');
   assert.match(HEAD.slice(HEAD.lastIndexOf('@media', at), at), /^@media \(max-width:\d+px\)\{/, '★ 자주 쓰는 앱 줄을 PC 에서까지 감췄다');
   assert.ok(rulesFor('.tilerow.fold .tile.is-pin::after').some((b) => /content:'★'/.test(b)), '★ 꾹 눌러도 칩에 ★ 가 안 보인다');
   assert.match(cutFn(E, 'function paintPins('), /classList\.toggle\('is-pin'/, '★ 별표 목록이 바뀌어도 칩의 ★ 가 안 따라간다');
