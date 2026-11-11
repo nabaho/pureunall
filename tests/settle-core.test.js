@@ -492,3 +492,40 @@ test('입금 자동 검토 — 임시저장 정산표들의 주관 몫만 한꺼
   /* 1% 안쪽은 «가까움» */
   assert.deepEqual(C.reviewMonth([mk('2026-10', 'draft')], lead, [{ id: 'y', amount: 2483000 }]).rows.map((x) => [x.kind, x.diff]), [['near', -442]]);
 });
+
+/* ── 개인입금 사업 자동 연결 — 이알피 «같은 잣대»(유형 스위치 · 컨설팅 한 건의 on/off · 옛 personalDeposit) ── */
+test('개인입금 사업 종류 — 유형 스위치가 켜진 종류는 늘, 컨설팅 한 건이 개인입금이면 그 종류도 올린다(biz 순서)', () => {
+  const biz = [{ code: 'T-A', personal: true }, { code: 'T-B', personal: false }, { code: 'T-C', personal: false }, { code: 'T-D', personal: false }];
+  const range = { from: '2026-01-01', to: '2026-12-31' };
+  const cons = [
+    { id: 1, typeCode: 'T-B', personalDepositMode: 'on', startDate: '2026-03-01', endDate: '2026-12-01' },      // 이 건만 개인입금
+    { id: 2, typeCode: 'T-C', personalDeposit: true, startDate: '2026-02-01', endDate: '2026-11-30' },          // 옛 손으로 켠 값
+    { id: 3, typeCode: 'T-D', startDate: '2026-02-01', endDate: '2026-11-30' },                                 // 유형을 따름(꺼짐)
+  ];
+  const r = C.personalTypes(biz, cons, range);
+  assert.deepEqual(r.map((x) => [x.code, x.why]), [['T-A', 'type'], ['T-B', 'consulting'], ['T-C', 'consulting']]);
+  assert.equal(r.find((x) => x.code === 'T-B').count, 1);
+  /* 읽기만 한다 — 넘긴 자료를 바꾸지 않는다 */
+  assert.equal(biz[1].personal, false);
+});
+
+test('개인입금 사업 종류 — 법인 예외(off)·지운 건·해에 안 걸친 건·모르는 종류·계약이 품은 종류', () => {
+  const biz = [{ code: 'T-A', personal: true }, { code: 'T-B', personal: false }];
+  const range = { from: '2026-01-01', to: '2026-12-31' };
+  /* 유형은 개인입금이어도 그 «건»이 법인 예외(off)면 그 건은 세지 않는다 — 그래도 유형 자체는 올린다(why type, count 0) */
+  const off = C.personalTypes(biz, [{ id: 1, typeCode: 'T-A', personalDepositMode: 'off', startDate: '2026-02-01', endDate: '2026-12-01' }], range);
+  assert.deepEqual(off.map((x) => [x.code, x.why, x.count]), [['T-A', 'type', 0]]);
+  /* 지운 건 · 다른 해 건 · biz 에 없는 종류(숨김·합친 유형)는 종류를 끌어오지 않는다 */
+  const none = C.personalTypes([{ code: 'T-B', personal: false }], [
+    { id: 2, typeCode: 'T-B', personalDepositMode: 'on', _deleted: true, startDate: '2026-02-01', endDate: '2026-12-01' },
+    { id: 3, typeCode: 'T-B', personalDepositMode: 'on', startDate: '2024-02-01', endDate: '2024-12-01' },
+    { id: 4, typeCode: 'T-ZZ', personalDepositMode: 'on', startDate: '2026-02-01', endDate: '2026-12-01' },
+  ], range);
+  assert.deepEqual(none, []);
+  /* 계약이 품은 종류(typeCodes.consulting)도 같은 길 · 끝나는 날이 없으면 «진행 중» */
+  const ct = C.personalTypes(biz, [{ id: 5, typeCodes: { consulting: 'T-B' }, personalDepositMode: 'on', startDate: '2025-06-01' }], range);
+  assert.deepEqual(ct.map((x) => x.code), ['T-A', 'T-B']);
+  /* 빈 자료 · range 없음 */
+  assert.deepEqual(C.personalTypes(null, null), []);
+  assert.deepEqual(C.personalTypes(biz, [{ id: 6, typeCode: 'T-B', personalDepositMode: 'on', startDate: '2001-01-01', endDate: '2001-02-01' }]).map((x) => x.code), ['T-A', 'T-B']);
+});

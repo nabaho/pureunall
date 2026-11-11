@@ -385,8 +385,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=11"></script>
-<script src="js/pu-settle-view.js?v=14"></script>
+<script src="js/pu-settle-core.js?v=12"></script>
+<script src="js/pu-settle-view.js?v=15"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -451,7 +451,7 @@ async function loadErp(){
   ERP.people=activeStaff(accts, dir);
   ERP.biz=unwrap(r[1].val()).filter(function(b){ return b && b.code && !b.hidden && !b.mergedInto; })
     .sort(function(a,b){ return (Number(a.sortOrder)||999)-(Number(b.sortOrder)||999); })
-    .map(function(b){ return { code:String(b.code), name:String(b.name||b.code)+(b.agency?' ('+b.agency+')':'') }; });
+    .map(function(b){ return { code:String(b.code), name:String(b.name||b.code)+(b.agency?' ('+b.agency+')':''), personal:!!b.personalDeposit }; });
   ERP.consultings=unwrap(r[2].val()).filter(function(c){ return c && c.id && !c._deleted; });
 }
 async function reload(){
@@ -904,10 +904,20 @@ function unlinkedOf(n){
 /* 요율표 사본 만들기 — 서버의 규칙(D.rules)을 사업 종류 칸 · 사람 줄로 편다. 사람 줄 = 어느 사업에든 요율이 있는 사람(이름순) */
 function buildWork(){
   var types=Object.keys(D.rules).filter(function(k){ return D.rules[k] && !D.rules[k]._deleted; });
+  /* 개인입금 사업 자동 연결 — 대표 지시 2026-11-11 「이알피 컨설팅에 개인입금이 있다 … 다른 정부사업 개인입금 사업은 자동으로 여기에 연결」.
+     이알피의 개인입금 사업 종류(유형 스위치 · 그 해에 든 개인입금 컨설팅)가 규칙이 아직 없으면 «빈 칸»으로 올린다.
+     ⚠ 칸만 올리고 서버에는 쓰지 않는다 — 규칙이 생기면 재무관리가 그 사업의 개인수익 성과급을 막으므로(PR ③) «저장»은 사람이 주관·요율을 넣고 누를 때만.
+     규칙이 지워진 사업(_deleted)은 사람이 푼 것이라 다시 올리지 않는다 — «+ 사업 종류»로 직접 더할 수 있다. */
+  var auto={};
+  C.personalTypes(ERP.biz, ERP.consultings, { from:yearFrom(), to:yearTo() }).forEach(function(p){
+    if(D.rules[p.code]) return;
+    auto[p.code]=p; types.push(p.code);
+  });
   var order={}; ERP.biz.forEach(function(b, i){ order[b.code]=i; });
   types.sort(function(a,b){ return (order[a]==null?999:order[a])-(order[b]==null?999:order[b]); });
   var rules={}, seen={}, people=[];
   types.forEach(function(k){
+    if(auto[k]){ rules[k]={ typeCode:k, title:'', tax:C.taxOf(''), leadSid:'', rates:{}, siteRates:{}, msgHead:'', msgFoot:'', active:true, auto:auto[k] }; return; }
     var r=D.rules[k], rates={};
     Object.keys(r.rates||{}).forEach(function(s){ rates[s]=String(r.rates[s]); if(!seen[s]){ seen[s]=1; people.push(s); } });
     rules[k]={ typeCode:k, title:r.title||'', tax:C.taxOf(r.tax), leadSid:r.leadSid||'', rates:rates, siteRates:JSON.parse(JSON.stringify(r.siteRates||{})), msgHead:r.msgHead||'', msgFoot:r.msgFoot||'', active:r.active!==false };
@@ -937,12 +947,21 @@ function drawRules(){
   drawBulks();
 }
 function markDirty(){ if(!WORK) return; WORK.dirty=true; var b=$('mx_save'); if(b) b.disabled=false; }
+/* 자동으로 올라온 개인입금 칸을 사람이 아직 안 건드렸나 — 주관·요율·문구·예외 요율·세금·켜짐이 처음 그대로면 true.
+   하나라도 건드렸으면 false → 보통 칸처럼 검사(주관이 없으면 «주관을 고르세요») */
+function autoUntouched(w){
+  if(!w) return true;
+  var any=function(o){ return Object.keys(o||{}).some(function(k){ return String(o[k]).trim()!==''; }); };
+  return !w.leadSid && !any(w.rates) && !w.title && !w.msgHead && !w.msgFoot && Object.keys(w.siteRates||{}).length===0 && C.taxOf(w.tax)==='3.3' && w.active!==false;
+}
 /* 요율표 «저장» — 바뀐 사업 종류만, 한 사업씩 관문으로. 주관이 없거나 요율이 0~100 숫자가 아니면 아무것도 저장하지 않는다 */
 async function saveRules(){
   if(!WORK || !WORK.dirty) return;
   var recs=[], bad='';
   WORK.types.forEach(function(k){
     var w=WORK.rules[k], rates={};
+    /* 자동으로 올라온 개인입금 칸은 주관·요율을 하나도 안 넣었으면 건너뛴다 — 다른 칸을 고쳐도 저장이 막히지 않고, 규칙(=성과급 막음)은 사람이 채운 칸만 생긴다 */
+    if(w.auto && autoUntouched(w)) return;
     if(!w.leadSid && !bad) bad=bizName(k)+' — 주관을 고르세요';
     Object.keys(w.rates).forEach(function(s){
       var t=String(w.rates[s]).replace(/[%\s]/g,''); if(t==='') return;

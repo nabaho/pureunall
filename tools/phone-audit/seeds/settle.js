@@ -67,8 +67,10 @@ module.exports = {
       user_dir: { v: 명부 },
       user_accounts: { v: 명부 },
       ledger_batches,
-      biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' }] },
-      consultings: { v: consultings },
+      /* 개인입금 자동 연결 점검용 — 유형 스위치가 켜진 «가짜 일자리전환»(규칙 없음 → 빈 칸으로 올라온다) + 유형은 법인인데 이 건만 개인입금인 현장클리닉 한 건 */
+      biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' },
+        { code: 'cons-jobs', short: '일자', name: '점검일자리전환', agency: '점검협회', personalDeposit: true }] },
+      consultings: { v: consultings.concat([{ id: 'CS-P1', typeCode: 'cons-clinic', personalDepositMode: 'on', companyName: '(주)점검개인입금', companyId: 'CO-P1', no: '클릭-2026-001', startDate: '2026-05-01', endDate: '2026-12-01' }]) },
     },
     settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts },
   },
