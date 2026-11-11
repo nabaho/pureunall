@@ -936,6 +936,18 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .cn-t tr.off td{color:#94a3b8}
 .cn-t tr.cn-find td{background:#f8fafc;height:40px}
 .cn-t tr.cn-find input{font-family:inherit;font-size:12.5px;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;width:200px}
+.cn-q{height:28px;border:1px solid #cbd5e1;border-radius:6px;padding:0 8px;font-family:inherit;font-size:12.5px;width:150px;color:#1e293b;background:#ffffff}
+.cn-chk{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer;white-space:nowrap}
+.cn-chk input{margin:0;accent-color:#2563eb}
+#pcMail .cn.uchk .cn-head{height:auto;min-height:calc(var(--cnTop) + 16px);padding-bottom:6px;flex-wrap:wrap;row-gap:6px}
+@media(max-width:1200px){#pcMail .cn.uchk .cn-t th{position:static}}
+.cn.uchk .cn-cards,.cn.uchk .cn-bulk{flex-wrap:wrap;white-space:normal}
+.cn.uchk .mn{padding:0}
+.cn.uchk .cn-t td.no,.cn.uchk .cn-t td.sg.none{color:#64748b}
+.cn.uchk .ck input,.mn-ck{width:18px;height:18px;cursor:pointer;accent-color:#2563eb}
+.cn.uchk .cn-bulk button,.cn.uchk .cn-t button,.cn.uchk .cn-card{min-height:26px;min-width:26px}
+.cn.uchk button:disabled,.mn button:disabled{opacity:.55;cursor:default}
+@media(max-width:760px){.cn-q,.cn-t tr.cn-find input{font-size:16px}.cn.uchk .mn-r,.cn.uchk .mn-bulk{flex-wrap:wrap;height:auto;padding:6px 8px}}
 .cn-none{color:#64748b;font-size:12.5px}
 /* 이메일 칸은 1360px 아래에서 접는다 (2026-10-06) — 옆줄 240px·여백을 빼면 1101~1260px 창에서
    «최근 메일»(날짜·제목) 칸이 0 에 가깝게 눌려 연도까지 넣은 날짜가 안 보였다. 이메일은 이름에 손을 올리면 뜬다. */
@@ -8719,6 +8731,8 @@ function renderMailPage(){
      'box' 는 다음메일함을 비추는 목록이다 — 2026-08-24 에 더했다. */
   el.innerHTML = (state.mailSent==='box' ? mbBoxHtml()
                 : state.mailSent==='who' ? whoPageHtml()
+                /* ☑ 미확정 체크 — 추천 연결 · 칸 임시배정 · 단서 없는 미확정 · 담당 변경 점검 */
+                : state.mailSent==='uchk' ? uchkHtml()
                 /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
                 : state.mailSent==='mnew' ? cntHtml()
                 /* 🔎 담당 점검 (대표 승인 목업 2026-10-03) */
@@ -8768,6 +8782,10 @@ function renderMailMobile(){
   const body=$('mmBody'); if(!body) return;
   body.innerHTML = (state.mailSent==='box' ? mbMobileHtml()
                  /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고친다 — 한쪽만 고치면 폰에서만 안 열린다 */
+                 : state.mailSent==='who' ? whoPageHtml()
+                 : state.mailSent==='uchk' ? uchkHtml()
+                 : state.mailSent==='mnew' ? cntHtml()
+                 : state.mailSent==='mgr' ? mgrHtml()
                  : state.mailSent==='set' ? mailSetHtml()
                  : state.mailSent==='inbox' ? inboxBoxHtml()
                  : state.mailSent==='co' ? coThreadHtml()
@@ -20863,7 +20881,7 @@ function mbWhoIndex(){
 }
 /* ⚠ 그리는 동안의 셈도 함께 버린다 — 오래 사는 것만 지우면 «이번 그리기»는 옛 표를
      그대로 쓴다(담당자를 바꿨는데 화면이 안 바뀐다). */
-function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
+function mbWhoBust(){ _mbWhoIdx = null; if(typeof uchkBust === 'function') uchkBust(); const m0 = mbMemoOf();
   delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor;
   /* 담당자·스팸 판정 셈도 버린다(2026-10-02) — 사람이 바꾼 것이 그 자리에서 보여야 한다 */
   delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy;
@@ -21018,10 +21036,13 @@ function mbNoWhoWhy(slug){
 function mbNoWhoLabel(slug){
   return mbNoWhoWhy(slug) === 'mixed' ? '여럿이 섞임' : '사람 안 붙임';
 }
-/* 이 줄이 「사람 안 붙임」인가 — 사람이 콕 집어 보낸 것은 빼고 본다 */
+/* 이 줄이 「사람 안 붙임」인가 — 사람이 콕 집어 보낸 것은 빼고 본다.
+   ⚠ why === 'mixed'(여러 사람 것이 섞여 칸 하나로는 못 정함)는 «칸 고정 담당»만 막고,
+     개별 메일의 주소·자문사·사건 담당 판정은 그대로 살린다(안 그러면 자문사답변·급여 칸 메일이 전부 증발한다). */
 function mbNoWhoOfRow(v){
   if(!v || !v._slug) return false;
   if(!mbNoWhoBox(v._slug)) return false;
+  if(mbNoWhoWhy(v._slug) === 'mixed') return false;
   const byMsg = (v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '';
   return !byMsg;
 }
@@ -21893,8 +21914,10 @@ function mbWhoWhyOf(em, idx0, none){
   if(d){
     const h2 = mbWhoLive(set[mbWhoKey('@' + d)]);
     if(h2) return { who:h2, why:'hand' };                 /* ③ 사람이 정한 도메인 */
-    const a2 = mbWhoLive(idx.byDom[d]);
-    if(a2) return { who:a2, why:'card' };                 /* ④ 기업정보함 도메인 */
+    if(typeof mbAutoOther !== 'function' || !mbAutoOther(em)){
+      const a2 = mbWhoLive(idx.byDom[d]);
+      if(a2) return { who:a2, why:'card' };               /* ④ 기업정보함 도메인 (자동발송·반송 제외) */
+    }
   }
   return none;                                            /* ⑤ 담당 모름 */
 }
@@ -23244,6 +23267,14 @@ function mbWhoScope(v){
   const b = mbBinOfRow(v);
   return !!(b && !mbHidden(b.id));
 }
+/* 받은메일함(INBOX) 제자리에 남아 있는 메일인가 — AI 분류가 보류한 자문사 메일이 여기 남는다.
+   ⚠ 담당자가 판정되는 것(또는 자문종료)만 개인 담당자/종료 칸에 비추고, 미확정 메일은
+     「담당 모름」·「그 밖」에 넣지 않는다(넣으면 받은메일함 광고로 담당 모름이 찬다). */
+function mbInboxPlain(v){
+  if(!v || !v._slug || mbBinOfRow(v)) return false;
+  const f = mbFolderBy(v._slug);
+  return !!(f && f.kind === 'inbox');
+}
 
 /* ── 담당자 목록 ── 자문사를 맡은 사람만. 빈 칸이 늘어서면 왼쪽만 길어진다. */
 /* ══════════════════════════════════════════════════════════════════════════
@@ -23272,13 +23303,16 @@ function mbWhoTally(){
     Object.keys(box).forEach(uid=>{
       const row = box[uid]; if(!row) return;
       v.e = row.e; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid; v._src = row;   /* 원본을 가리켜 판정 기억을 함께 쓴다 */
-      if(!mbWhoScope(v)) return;
+      const inScope = mbWhoScope(v);
+      const inInbox = !inScope && mbInboxPlain(v);
+      if(!inScope && !inInbox) return;
       const unread = !Number(row.r||0);
       if(mbEndedOfRow(v, idx)){ ended.n++; if(unread) ended.un++; return; }
       /* ⚠ 자문종료 «다음», 담당자 판정 «앞»이다. 칸이 「사람 안 붙임」이면 담당자 칸에도
            「담당 모름」에도 안 넣는다 — 한 통이 두 곳에 겹치면 몇 통인지 알 수 없다. */
-      if(mbNoWhoOfRow(v)){ off.n++; if(unread) off.un++; return; }
+      if(mbNoWhoOfRow(v)){ if(!inInbox){ off.n++; if(unread) off.un++; } return; }
       const w = mbWhoOfRow(v, idx);
+      if(inInbox && !w) return;
       /* ⚠ 「그 밖」은 «담당자가 없을 때만» 본다 — 담당이 잡히면 그 사람 칸이 먼저다.
            치워 둔 주소라도 사람이 담당자를 박아 두었으면 그 뜻이 더 세다. */
       if(!w && mbOtherOfRow(v)){ other.n++; if(unread) other.un++; return; }
@@ -23345,7 +23379,10 @@ function mbRowFits(v, id, idx0){
   if(String(id).charAt(0)===MB_RAW_P) return true;         /* 원본 — 쪽지를 안 본다 */
   /* 담당자 칸 — 자리를 옮기는 것이 아니라 «거르는» 것이다(대표 지시 2026-08-26) */
   if(String(id).charAt(0)===MB_WHO_P){
-    if(!mbWhoScope(v)) return false;
+    const inScope = mbWhoScope(v);
+    const inInbox = !inScope && mbInboxPlain(v);
+    if(!inScope && !inInbox) return false;
+    if(inInbox && (id === MB_WHO_NA || id === MB_WHO_OTH || id === MB_WHO_OFF)) return false;
     /* ⚠ 자문이 끝난 업체는 «종료 칸에만» 넣는다. 담당자 칸에도 「담당 모름」에도 넣지
          않는다 — 한 통이 두 곳에 겹치면 몇 통인지 알 수 없다. */
     const idx = idx0 || mbWhoIndex();
@@ -23418,6 +23455,9 @@ function mbNeedSlugs(id){
   if(s.charAt(0)===MB_WHO_P){
     const need = {};
     mbBins().forEach(b=>{ if(b.link && !mbHidden(b.id)) need[b.link] = 1; });
+    if(s !== MB_WHO_NA && s !== MB_WHO_OTH && s !== MB_WHO_OFF){
+      mbFolderOf('inbox').forEach(f=>{ if(f && f.slug) need[f.slug] = 1; });
+    }
     const put = _mbPut||{};
     Object.keys(put).forEach(k=>{
       const at = k.lastIndexOf(':'); if(at>0) need[k.slice(0,at)] = 1;
@@ -24137,6 +24177,13 @@ function mailSideHtml(){
         ${noW.un?`<span class="nu">${noW.un}</span>`:''}
         <span class="fmenu ghost">⋮</span></div>`;
     }
+    /* ── ☑ 미확정 체크 — 추천 연결 · 칸 임시배정 · 단서 없는 미확정 · 담당 변경 점검을 한 화면에서 체크해 확정 ── */
+    const ucN = (typeof uchkBadgeCount === 'function') ? uchkBadgeCount() : 0;
+    h += `<div class="dm-f sub ${state.mailSent==='uchk'?'on':''}" role="button" tabindex="0" onclick="openUchkPage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openUchkPage()}"
+      title="명확히 확정되지 않은 보낸이(추천 연결 · 칸 임시배정 · 단서 없는 미확정 · 담당 변경)를 체크(☐)해서 판단·확정합니다">
+      <span class="ic">☑</span><span class="grip ghost">⋮⋮</span><span class="nm">미확정 체크</span>
+      ${ucN ? `<span class="nu mgwarn">${ucN.toLocaleString()}</span>` : ''}
+      <span class="fmenu ghost">⋮</span></div>`;
     h += `<div class="dm-f sub" onclick="openWhoPage()"
       title="자문사 이메일을 이어 두면 담당자가 저절로 잡힙니다">
       <span class="ic">🔗</span><span class="grip ghost">⋮⋮</span>
@@ -25301,7 +25348,7 @@ function mbWhoSet(email, who, byDomain){
   _mbOwner = _mbOwner || {};
   const before = _mbOwner[key];
   if(nm) _mbOwner[key] = nm; else delete _mbOwner[key];
-  renderPCSide(); renderMailPage();
+  mbWhoBust(); renderPCSide(); renderMailPage();
   const what = byDomain ? ('🏢 ' + mbDomOf(em) + ' 전체') : ('👤 ' + em);
   const msg = nm ? `${what} → 「${nm}」 담당으로 이었습니다 — 다음부터 저절로 갑니다`
                  : `↩ ${what} 의 정한 것을 지웠습니다`;
@@ -26123,6 +26170,13 @@ function mbDrawerHtml(){
     });
     else h += `<div class="dmm-hint">${_mbFolders===null ? '읽고 있습니다…'
       : '아직 담당자를 아는 메일이 없습니다'}</div>`;
+    const mNa = mbWhoNoneCount(), mUc = (typeof uchkBadgeCount === 'function') ? uchkBadgeCount() : 0;
+    h += `<div class="dmm-f ${now===MB_WHO_NA?'on':''}" style="padding-left:18px" onclick="mbGo('${MB_WHO_NA}')">
+      <span class="ic">❓</span><span class="nm">담당 모름</span>
+      ${mNa.n?`<span class="n">${mNa.n.toLocaleString()}</span>`:''}</div>`;
+    h += `<div class="dmm-f ${state.mailSent==='uchk'?'on':''}" style="padding-left:18px" role="button" tabindex="0" onclick="openUchkPage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openUchkPage()}">
+      <span class="ic">☑</span><span class="nm">미확정 체크</span>
+      ${mUc?`<span class="n">${mUc.toLocaleString()}</span>`:''}</div>`;
   }
   if(openMine && dash === 'topic'){
     /* 층만큼 들여쓰고, 줄 끝에 ⋮ 를 둔다 — 폰에서도 이름 바꾸기·숨기기가 된다 */
@@ -26233,12 +26287,18 @@ function mbWhoTag(v){
   /* 담당자 칸 안에서는 업무 칸을 적어 준다 */
   if(id.charAt(0)===MB_WHO_P && id !== MB_WHO_NA){
     const b = mbBinOfRow(v);
-    return b ? `<span class="dm-from" title="이 메일은 「${esc(b.name)}」 칸에 그대로 있습니다">📂 ${esc(b.name)}</span>` : '';
+    if(b) return `<span class="dm-from" title="이 메일은 「${esc(b.name)}」 칸에 그대로 있습니다">📂 ${esc(b.name)}</span>`;
+    if(mbInboxPlain(v)) return `<span class="dm-from" title="이 메일은 받은메일함에 있습니다">📥 받은메일함</span>`;
+    return '';
   }
   if(!em) return '';
   const w = mbWhoOfRow(v);
-  if(w) return `<span class="dm-who" onclick="event.stopPropagation();mbWhoAsk('${esc(em)}',event)"
-      title="${esc(w)} 담당 — 눌러서 바꿀 수 있습니다">👤 ${esc(w)}</span>`;
+  if(w){
+    const boxOnly = mbRowIsBoxOnly(v);
+    return `<span class="dm-who${boxOnly?' guess':''}" data-em="${esc(em)}" onclick="event.stopPropagation();mbWhoAsk(this.dataset.em,event)"
+      title="${boxOnly ? esc(w)+' — 이 폴더의 칸 담당으로 임시 배정된 것입니다(주소 미확정). 눌러서 확정하거나 바꿀 수 있습니다'
+                       : esc(w)+' 담당 — 눌러서 바꿀 수 있습니다'}">👤 ${esc(w)}${boxOnly?' <i>칸</i>':''}</span>`;
+  }
   /* 모르는 것은 «업무 칸»과 「담당 모름」에서만 물어본다. 전체메일에까지 노란 딱지가
      줄줄이 붙으면 목록이 시끄럽다. */
   if(id.charAt(0)===MB_BIN_P || id === MB_WHO_NA){
@@ -26759,6 +26819,8 @@ function mbListHtml(){
         /* ⚠ «아직 안 받아 온 것»을 「없습니다」라고 하면 안 된다 — 새로고침을 눌러야만
              나오는 것처럼 보인다(대표 보고 2026-08-30). 받아 오는 중이면 그렇게 말한다. */
         : mbLoadingBox() ? '읽고 있습니다…'
+        : (String(mbNow()).charAt(0)===MB_WHO_P && Object.keys(_mbMsgs||{}).some(k=>Object.keys(_mbMsgs[k]||{}).length > 0))
+          ? '이 칸에 해당하는 메일이 없습니다.'
         : '아직 동기화된 메일이 없습니다.<br><b>새로고침 ↻</b> 를 눌러 다음메일에서 가져오세요.'}</div>`;
 
   const meta = _mbMeta && _mbMeta.at
@@ -26839,7 +26901,9 @@ function mbListHtml(){
            ⚠ 수를 안 적는다. 세려면 메일 전부를 훑어야 하는데, 그 셈을 그릴 때마다 하면
              목록이 그때마다 멈칫한다. 여기서는 문만 열어 두고, 훑기는 «누를 때» 한다.
            ⚠ 다른 칸에는 안 내놓는다 — 이 일은 담당 모름을 줄이는 일이다. */''}
-      ${mbNow() === MB_WHO_NA ? `<button class="mck-chip" onclick="mbGuessOpen()"
+      ${mbNow() === MB_WHO_NA ? `<button class="mck-chip" onclick="openUchkPage()"
+        title="추천 연결 · 칸 임시배정 · 미확정 보낸이를 체크(☐)해서 한 번에 확정합니다"
+        >☑ 미확정 체크</button><button class="mck-chip" onclick="mbGuessOpen()"
         title="메일 속(제목·본문 첫 줄)을 읽어 «이 주소는 어느 업체인가»를 모아 짚어 드립니다"
         >📄 한 번에 나누기</button>` : ''}
       ${/* 몇 통씩 볼까 (대표 지시 2026-08-25) — 다음메일도 이 값을 고르게 해 둔다.
@@ -28357,6 +28421,7 @@ function mgrKeepIt(key){
 }
 /* ── 화면 ── */
 function openMgrPage(){
+  state.mbDrawerOpen = false;
   state.view='mail'; state.mailSent='mgr'; state.mbOpen=null;
   render();
   try{ $('pcMain').scrollTop=0; }catch(_){}
@@ -28369,49 +28434,656 @@ function openMgrPage(){
   };
   if(_mbFolders===null) loadMailFolders(go); else go();
 }
-function mgrHtml(){
-  const r = mgrRows();
+function mgrPicked(){ return state.mgrPick || (state.mgrPick = {}); }
+function mgrPick(k){ const p = mgrPicked(); if(p[k]) delete p[k]; else p[k] = 1; renderMailPage(); }
+function mgrPickClear(){ state.mgrPick = {}; renderMailPage(); }
+function mgrPickAll(sec){
+  const r = mgrRows(), p = mgrPicked();
+  const keys = sec === 'chg' ? r.changes.map(x=>'c:' + x.co) : r.hand.map(x=>'h:' + x.key);
+  if(!keys.length) return;
+  const all = keys.every(k=>p[k]);
+  keys.forEach(k=>{ if(all) delete p[k]; else p[k] = 1; });
+  renderMailPage();
+}
+async function mgrAckBulk(){
+  if(_uchkSaving) return false;
+  const p = mgrPicked();
+  const cos = mgrRows().changes.filter(x=>p['c:' + x.co] && (_mgrChange||{})[x.co]).map(x=>x.co);
+  if(!cos.length){ toast('확인할 업체를 먼저 체크(☐)해 주세요'); return false; }
+  const now = Date.now(), by = String(myEmail||''), up = {};
+  cos.forEach(co=>{
+    up[DB_ROOT + '/config/mgrChange/' + co + '/ack'] = now;
+    up[DB_ROOT + '/config/mgrChange/' + co + '/ackBy'] = by;
+  });
+  return uchkCommit(up, ()=>{
+    cos.forEach(co=>{
+      const rec = (_mgrChange||{})[co];
+      if(rec){ rec.ack = now; rec.ackBy = by; }
+      delete p['c:' + co];
+    });
+  }, '✔ ' + cos.length + '곳의 담당 변경을 한꺼번에 확인했습니다');
+}
+async function mgrFollowBulk(){
+  if(_uchkSaving) return false;
+  const p = mgrPicked();
+  const list = mgrRows().hand.filter(x=>p['h:' + x.key]);
+  if(!list.length){ toast('이알피 담당을 따를 주소를 체크(☐)해 주세요'); return false; }
+  if(!confirm(list.length + '개 주소에 손으로 정해 둔 담당을 지우고 푸른이알피 담당을 따르게 할까요?')) return false;
+  const up = {};
+  list.forEach(x=>{ up[DB_ROOT + '/config/mailWho/' + x.key] = null; });
+  return uchkCommit(up, ()=>{
+    _mbOwner = _mbOwner || {};
+    list.forEach(x=>{ delete _mbOwner[x.key]; delete p['h:' + x.key]; });
+  }, '✔ ' + list.length + '개 주소가 이제 푸른이알피 담당을 따릅니다');
+}
+function mgrHtml(hideHead){
+  const r = mgrRows(), p = mgrPicked(), dis = _uchkSaving ? ' disabled' : '';
   const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
   const none = '<div class="mn-none">없습니다</div>';
-  let h = `<div class="mn-head"><b>🔎 담당 점검</b>
+  const chgSel = r.changes.filter(x=>p['c:' + x.co]).length;
+  const handSel = r.hand.filter(x=>p['h:' + x.key]).length;
+  const allChg = r.changes.length > 0 && chgSel === r.changes.length;
+  const allHand = r.hand.length > 0 && handSel === r.hand.length;
+  let h = hideHead ? '' : `<div class="mn-head"><b>🔎 담당 점검</b>
     <span>이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳 · 손으로 정한 담당이 이알피와 다른 곳 — 고치는 것은 이알피에서 합니다</span></div>`;
+  if(chgSel + handSel > 0){
+    h += `<div class="mn-bulk"><b>☑ ${chgSel + handSel}건 선택</b>`
+      + (chgSel ? ` <button type="button"${dis} onclick="mgrAckBulk()">✔ 변경 확인 ${chgSel}건</button>` : '')
+      + (handSel ? ` <button type="button"${dis} onclick="mgrFollowBulk()">이알피 따르기 ${handSel}건</button>` : '')
+      + ` <button type="button"${dis} onclick="mgrPickClear()">선택 풀기</button></div>`;
+  }
   if(_mgrSeen !== null && !Object.keys(_mgrSeen).length)
     h += `<div class="mn-none">처음 켜는 날입니다 — 서버가 지금 담당을 적어 두고(업무 시간 10분마다), 다음에 바뀌면 여기 잡힙니다</div>`;
-  h += `<div class="mn-sec">🔄 이알피에서 담당이 바뀐 업체 <small>지난번과 다릅니다 — 맞게 바뀐 것이면 「확인」, 아니면 이알피에서 고치십시오</small></div>`;
+  const chgAllCk = r.changes.length ? `<input type="checkbox" class="mn-ck" aria-label="담당 변경 업체 모두 고르기" ${allChg?'checked':''} onclick="mgrPickAll('chg')" title="모두 고르기">` : '';
+  h += `<div class="mn-sec">${chgAllCk}🔄 이알피에서 담당이 바뀐 업체 <small>지난번과 다릅니다 — 맞게 바뀐 것이면 체크 후 「확인」, 아니면 이알피에서 고치십시오</small></div>`;
   h += r.changes.length ? r.changes.map((x, i)=>{
     const n = (typeof ErpMatch!=='undefined' && ErpMatch.ready) ? (mgrMailCount()[ErpMatch._norm(x.coName)] || 0) : 0;
-    const to = mgrName(x.to);
-    return `<div class="mn-r"><span class="mn-no">${i+1}</span>
+    const to = mgrName(x.to), ckKey = 'c:' + x.co;
+    return `<div class="mn-r${p[ckKey]?' on':''}"><input type="checkbox" class="mn-ck" aria-label="${esc(x.coName + ' 선택')}" ${p[ckKey]?'checked':''} data-k="${esc(ckKey)}" onclick="mgrPick(this.dataset.k)"><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
       <span class="mg-old">${esc(mgrName(x.from) || '(비어 있음)')}</span><span class="mg-ar">→</span>
       <span class="mg-new${to ? '' : ' none'}">${esc(to || '(비어 있음)')}</span>
       <span class="mg-cnt">${day(x.at)} 알아챔${x.by ? ' · ' + esc(x.by) : ''}${n ? ' · 최근 30일 메일 ' + n + '통' : ''}</span><span class="sj"></span>
-      <button class="pri" onclick="mgrAck('${esc(x.co)}')">확인</button>
-      <button onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
+      <button type="button" class="pri"${dis} data-co="${esc(x.co)}" onclick="mgrAck(this.dataset.co)">확인</button>
+      <button type="button" onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
   h += `<div class="mn-sec">⏳ 승인 기다리는 담당 변경 <small>이알피 업체관리에서 직원이 요청한 것 — 관리자가 업체관리 맨 위 띠에서 승인합니다</small></div>`;
-  h += (r.pending || []).length ? r.pending.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+  h += (r.pending || []).length ? r.pending.map((x, i)=>`<div class="mn-r"><span class="mn-ck0"></span><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
       <span class="mg-old">${esc(mgrName(x.from) || '(없음)')}</span><span class="mg-ar">→</span>
       <span class="mg-new${x.to ? '' : ' none'}">${esc(mgrName(x.to) || '(비움)')}</span>
       <span class="mg-cnt">${esc(x.byName || x.by || '')} · ${day(x.at)}${x.reason ? ' · ' + esc(x.reason) : ''}</span><span class="sj"></span>
-      <button onclick="mgrErp()">이알피에서 보기</button></div>`).join('') : none;
+      <button type="button" onclick="mgrErp()">이알피에서 보기</button></div>`).join('') : none;
   h += `<div class="mn-sec">⚠ 담당이 퇴사자인 업체 <small>메일이 갈 사람이 없습니다 — 이어받을 사람을 정하면 한 번에 넘어갑니다</small></div>`;
-  h += r.retired.length ? r.retired.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+  h += r.retired.length ? r.retired.map((x, i)=>`<div class="mn-r"><span class="mn-ck0"></span><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span><span class="mg-ret">${esc(x.name)}</span>
       <span class="mg-cnt">${x.n ? '최근 30일 메일 ' + x.n + '통' : '최근 30일 메일 없음'}</span><span class="sj"></span>
-      <button class="pri" onclick="openWhoPage('succ')">이어받기 정하기</button></div>`).join('') : none;
+      <button type="button" class="pri" onclick="openWhoPage('succ')">이어받기 정하기</button></div>`).join('') : none;
   h += `<div class="mn-sec">⚠ 담당이 비어 있는데 메일이 오는 업체 <small>최근 30일 메일이 있는 곳만</small></div>`;
-  h += r.empty.length ? r.empty.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+  h += r.empty.length ? r.empty.map((x, i)=>`<div class="mn-r"><span class="mn-ck0"></span><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span>
       <span class="mg-cnt">최근 30일 메일 ${x.n}통 · 모두 「담당 모름」</span><span class="sj"></span>
-      <button class="pri" onclick="mgrErp()">이알피에서 담당 정하기</button></div>`).join('') : none;
-  h += `<div class="mn-sec">✋ 손으로 정한 담당이 이알피와 다릅니다 <small>주소에 «이 사람»이라고 박아 둔 것 — 업체 담당이 바뀌어도 메일은 옛사람에게 갑니다</small></div>`;
-  h += r.hand.length ? r.hand.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <button type="button" class="pri" onclick="mgrErp()">이알피에서 담당 정하기</button></div>`).join('') : none;
+  const handAllCk = r.hand.length ? `<input type="checkbox" class="mn-ck" aria-label="손으로 정한 담당 주소 모두 고르기" ${allHand?'checked':''} onclick="mgrPickAll('hand')" title="모두 고르기">` : '';
+  h += `<div class="mn-sec">${handAllCk}✋ 손으로 정한 담당이 이알피와 다릅니다 <small>주소에 «이 사람»이라고 박아 둔 것 — 업체 담당이 바뀌어도 메일은 옛사람에게 갑니다</small></div>`;
+  h += r.hand.length ? r.hand.map((x, i)=>{
+    const ckKey = 'h:' + x.key;
+    return `<div class="mn-r${p[ckKey]?' on':''}"><input type="checkbox" class="mn-ck" aria-label="${esc(x.em + ' 선택')}" ${p[ckKey]?'checked':''} data-k="${esc(ckKey)}" onclick="mgrPick(this.dataset.k)"><span class="mn-no">${i+1}</span>
       <span class="em" title="${esc(x.em)}">${esc(x.em)}</span>
       <span class="mg-cnt">손으로: <b>${esc(x.hand)}</b> · 이알피: <b>${esc(x.erp)}</b> (${esc(x.coName)})</span><span class="sj"></span>
-      <button class="pri" onclick="mgrFollowErp('${esc(x.key)}')">이알피 따르기</button>
-      <button onclick="mgrKeepIt('${esc(x.key)}')">그대로 두기</button></div>`).join('') : none;
+      <button type="button" class="pri"${dis} data-k="${esc(x.key)}" onclick="mgrFollowErp(this.dataset.k)">이알피 따르기</button>
+      <button type="button"${dis} data-k="${esc(x.key)}" onclick="mgrKeepIt(this.dataset.k)">그대로 두기</button></div>`; }).join('') : none;
   return `<div class="mn">${h}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ☑ 미확정 체크 — 푸른메일함 안에서 미확정 보낸이·칸 임시배정·담당 변경을 체크해 확정
+   ══════════════════════════════════════════════════════════════════════════
+   ① 💡 추천 연결(hint): 명함 상호 · 고유 도메인 · 메일 제목 속 자문사 이름으로 추천 업체가 짚이는 미확정 보낸이
+   ② 📂 칸 임시배정(box): 주소로는 확정 안 됐는데 폴더 담당(체불·산재·컨설팅·기금·청구서 등) 때문에 임시 배정된 보낸이
+   ③ ❓ 단서 없는 미확정(none): 추천 단서도 칸 담당도 없는 순수 미확정 보낸이
+   ④ 🔎 담당 변경·빈칸(mgr): 푸른이알피 담당 변경 미확인 · 승인 대기 · 퇴사자 · 빈칸 점검
+   ⚠ 온톨로지 규칙: 업체 연결은 반드시 고유 열쇠(co.id)로만 저장한다(이름으로 자동 덮어쓰지 않는다). */
+function mbRowIsBoxOnly(v, idx0){
+  if(!v) return false;
+  if(v._key && (_mbWhoMsg||{})[mbWhoKey(v._key)]) return false;
+  const em = String(v.e||'').trim().toLowerCase();
+  if(!em) return false;
+  if(mbWhoWhy(em, idx0).who) return false;
+  if(typeof mbWorkMgrOfRow === 'function' && mbWorkMgrOfRow(v)) return false;
+  const bw = mbBoxWhoOfRow(v);
+  return !!(bw && bw.length);
+}
+let _uchkCache = null;
+let _uchkLoading = false;
+let _uchkSaving = false;
+function uchkBust(){ _uchkCache = null; }
+function uchkSig(){
+  const msgSlugs = Object.keys(_mbMsgs||{});
+  let msgTotal = 0;
+  for(let i=0;i<msgSlugs.length;i++) msgTotal += Object.keys(_mbMsgs[msgSlugs[i]]||{}).length;
+  return [
+    typeof mbJudgeSig === 'function' ? mbJudgeSig() : '',
+    msgSlugs.length, msgTotal,
+    state.uchkInbox ? 1 : 0,
+    (typeof ErpMatch !== 'undefined' && ErpMatch.ready) ? (ErpMatch.companies||[]).length : 0
+  ].join('|');
+}
+function uchkErpMap(){
+  const ready = (typeof ErpMatch !== 'undefined' && ErpMatch.ready);
+  const cos = ready ? (ErpMatch.companies || []) : [];
+  const coById = {}, byNorm = {}, directAddr = {}, domCos = {};
+  const hqFn = (typeof mbHqRec === 'function') ? mbHqRec : (c => c);
+  cos.forEach(raw=>{
+    if(!raw || !raw.id || raw._deleted) return;
+    const c = hqFn(raw) || raw;
+    if(!c || !c.id) return;
+    const rec = ErpMatch.recOfCo ? ErpMatch.recOfCo(c) : null;
+    if(!coById[c.id]) coById[c.id] = { co:c, rec:rec, who:(rec && !rec.left) ? mbWhoLive(rec.main) : '', left:!!(rec && rec.left) };
+    if(rec && !rec.left && c.status !== 'suboffice'){
+      const nk = ErpMatch._norm(c.name || '');
+      if(nk){ (byNorm[nk] = byNorm[nk] || {})[c.id] = coById[c.id]; }
+    }
+    const pri = [raw.email, raw.primaryContactEmail]
+      .concat((raw.contacts || []).filter(x=>x && !x.left).map(x=>x.email));
+    const all = pri.concat([raw.ceoEmail, raw.taxInvoiceEmail, raw.taxEmail]);
+    all.forEach(e0=>{
+      const em = String(e0||'').trim().toLowerCase();
+      if(em.indexOf('@') < 1 || /@pureun\.kr$/.test(em)) return;
+      if(ErpMatch.nameByEmail && ErpMatch.nameByEmail[em]) return;
+      (directAddr[em] = directAddr[em] || {})[c.id] = coById[c.id];
+    });
+    pri.forEach(e0=>{
+      const em = String(e0||'').trim().toLowerCase();
+      if(em.indexOf('@') < 1 || /@pureun\.kr$/.test(em)) return;
+      const d = mbDomOf(em);
+      if(!d || (typeof MB_PUB_DOM !== 'undefined' && MB_PUB_DOM.indexOf(d) >= 0) || (typeof MB_PUB_DOM_TAIL !== 'undefined' && MB_PUB_DOM_TAIL.test(d))) return;
+      if(rec && !rec.left) (domCos[d] = domCos[d] || {})[c.id] = coById[c.id];
+    });
+  });
+  const singleDirect = {}, sharedDirect = {}, uniqDom = {};
+  Object.keys(directAddr).forEach(em=>{
+    const ids = Object.keys(directAddr[em]);
+    if(ids.length === 1) singleDirect[em] = directAddr[em][ids[0]];
+    else if(ids.length > 1){
+      const whos = {};
+      ids.forEach(id=>{ const w = directAddr[em][id].who; if(w) whos[w] = 1; });
+      if(Object.keys(whos).length <= 1) singleDirect[em] = directAddr[em][ids[0]];
+      else sharedDirect[em] = ids.map(id=>directAddr[em][id]);
+    }
+  });
+  Object.keys(domCos).forEach(d=>{
+    const ids = Object.keys(domCos[d]);
+    if(ids.length === 1) uniqDom[d] = domCos[d][ids[0]];
+  });
+  return { coById:coById, byNorm:byNorm, singleDirect:singleDirect, sharedDirect:sharedDirect, uniqDom:uniqDom };
+}
+function uchkData(){
+  const sig = uchkSig();
+  if(_uchkCache && _uchkCache.sig === sig) return _uchkCache;
+  const erp = uchkErpMap();
+  const idx = mbWhoIndex();
+  const own = _mbOwner || {}, coMap = _mbCo || {}, wkAddr = _mbWkAddr || {};
+  const groups = {};
+  const v = { e:'', r:0, _slug:'', _key:'', _reuse:1 };
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    if(slug === MB_OLD_ID) return;
+    const f = mbFolderBy(slug);
+    if(!mbGotFolder(f)) return;
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const row = box[uid]; if(!row) return;
+      const em = String(row.e||'').trim().toLowerCase();
+      if(em.indexOf('@') < 1 || em === '370-6@daum.net' || /@pureun\.kr$/.test(em)) return;
+      if(typeof ErpMatch !== 'undefined' && ErpMatch.nameByEmail && ErpMatch.nameByEmail[em]) return;
+      v.e = em; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid; v._src = row;
+      const inScope = mbWhoScope(v);
+      const inInbox = !inScope && mbInboxPlain(v);
+      if(!inScope && !inInbox) return;
+      if(typeof mbIsSpam === 'function' && mbIsSpam(row)) return;
+      if(mbEndedOfRow(v, idx) || mbNoWhoOfRow(v)) return;
+      if(mbNotCo(em) || mbAutoOther(em)) return;
+      const wk = mbWhoKey(em), d = mbDomOf(em), dk = d ? mbWhoKey('@' + d) : '';
+      /* 이미 사람·자문사·업무건·이알피 직접 단일주소로 확정된 보낸이는 제외 */
+      if(own[wk] || (dk && own[dk]) || coMap[wk] || (dk && coMap[dk]) || wkAddr[em]) return;
+      if(typeof mbWorkMgrOfAddr === 'function' && mbWorkMgrOfAddr(em)) return;
+      if(erp.singleDirect[em]) return;
+      let g = groups[em];
+      if(!g){
+        g = groups[em] = {
+          key:wk, em:em, dom:d, n:0, scopeN:0, inboxN:0,
+          name:'', subj:'', last:0, sampleSlug:'', sampleUid:'',
+          boxWho:'', boxName:'', msgs:[], hays:[]
+        };
+      }
+      g.n++;
+      if(inScope) g.scopeN++; else g.inboxN++;
+      const dt = Number(row.d || 0);
+      const b = mbBinOfRow(v);
+      const bw = inScope ? mbBoxWhoOfRow(v) : [];
+      if(bw && bw.length && !g.boxWho){
+        g.boxWho = bw[0];
+        g.boxName = b ? b.name : String((f && f.name) || slug);
+      }
+      const fromNm = String(row.n || row.f || '').trim();
+      if(dt >= g.last){
+        g.last = dt;
+        if(fromNm) g.name = fromNm;
+        g.subj = String(row.s || '').trim();
+        g.sampleSlug = slug; g.sampleUid = uid;
+      } else if(!g.name && fromNm){
+        g.name = fromNm;
+      }
+      if(g.hays.length < 15) g.hays.push(String(row.s||'') + '\n' + fromNm + '\n' + String(row.p||''));
+      if(g.msgs.length < 8) g.msgs.push({ slug:slug, uid:uid, d:dt, s:String(row.s||''), box:b ? b.name : '받은메일함' });
+    });
+  });
+  const hint = [], box = [], none = [];
+  Object.keys(groups).forEach(em=>{
+    const g = groups[em];
+    g.msgs.sort((a,b)=>b.d - a.d);
+    let sug = null;
+    /* 단서 1: 복수 사업장에 동시에 적힌 세무/회계 공용 이메일 */
+    if(erp.sharedDirect[em]){
+      const list = erp.sharedDirect[em];
+      const names = list.slice(0, 2).map(x=>x.co.name).join('·') + (list.length > 2 ? ' 외 ' + (list.length - 2) : '');
+      sug = { shared:true, why:'공용 주소 (' + names + ')', co:null, who:'' };
+    }
+    /* 단서 2: 기업정보함 명함 상호가 활성 자문사 1곳과 일치(아직 회사 ID 로는 미확정) */
+    if(!sug && idx.coAddr && idx.coAddr[em] && typeof ErpMatch !== 'undefined' && ErpMatch._norm){
+      const nk = ErpMatch._norm(idx.coAddr[em]);
+      const mp = erp.byNorm[nk];
+      const ids = mp ? Object.keys(mp) : [];
+      if(ids.length === 1 && mp[ids[0]].who){
+        sug = { co:mp[ids[0]].co, who:mp[ids[0]].who, why:'명함 상호 일치' };
+      }
+    }
+    /* 단서 3: 고유 회사 도메인 일치 */
+    if(!sug && g.dom && erp.uniqDom[g.dom] && erp.uniqDom[g.dom].who){
+      sug = { co:erp.uniqDom[g.dom].co, who:erp.uniqDom[g.dom].who, why:'도메인 @' + g.dom };
+    }
+    /* 단서 4: 메일 제목·보낸이 이름·본문 첫줄 속 자문사 이름 (단일 업체로만 모일 때 추천, 섞이면 주의 표시) */
+    if(!sug && typeof mbGuessIn === 'function'){
+      const tally = {};
+      g.hays.forEach(txt=>{
+        const rec = mbGuessIn(txt);
+        if(!rec || rec.left || !rec.id) return;
+        tally[rec.id] = (tally[rec.id] || 0) + 1;
+      });
+      const hitIds = Object.keys(tally);
+      if(hitIds.length === 1){
+        const entry = erp.coById[hitIds[0]];
+        if(entry && entry.co && entry.who){
+          sug = { co:entry.co, who:entry.who, why:'제목·본문 ' + tally[hitIds[0]] + '/' + g.hays.length + '통' };
+        }
+      } else if(hitIds.length > 1){
+        const names = hitIds.slice(0, 2).map(id=>(erp.coById[id]&&erp.coById[id].co.name)||id).join('·');
+        sug = { shared:true, why:'여러 자문사 언급 (' + names + ')', co:null, who:'' };
+      }
+    }
+    g.sug = sug;
+    if(sug && (sug.co || sug.shared)){
+      hint.push(g);
+    } else if(g.boxWho){
+      box.push(g);
+    } else if(g.scopeN > 0 || state.uchkInbox){
+      none.push(g);
+    }
+  });
+  const byCnt = (a,b)=> (b.n - a.n) || (b.last - a.last) || a.em.localeCompare(b.em);
+  hint.sort((a,b)=> ((b.sug&&b.sug.co?1:0) - (a.sug&&a.sug.co?1:0)) || byCnt(a,b));
+  box.sort(byCnt);
+  none.sort(byCnt);
+  const byKey = {};
+  hint.concat(box, none).forEach(g=>{ byKey[g.key] = g; });
+  return (_uchkCache = { sig:sig, hint:hint, box:box, none:none, byKey:byKey });
+}
+function uchkBadgeCount(){
+  const mg = mgrCount();
+  if(!_mbFolders || !Object.keys(_mbMsgs||{}).length) return mg;
+  const d = uchkData();
+  return d.hint.length + d.box.length + d.none.length + mg;
+}
+function openUchkPage(tab){
+  state.mbDrawerOpen = false;
+  state.view = 'mail'; state.mailSent = 'uchk'; state.mbOpen = null;
+  if(tab) state.uchkTab = tab;
+  if(!state.uchkTab) state.uchkTab = 'hint';
+  state.uchkSel = state.uchkSel || {};
+  const needInit = _mbFolders === null || mbFolders().some(f=>mbGotFolder(f) && !_mbMsgs[f.slug]);
+  _uchkLoading = !!needInit;
+  render();
+  try{ $('pcMain').scrollTop = 0; }catch(_){}
+  mgrLoad(()=>{ if(state.mailSent==='uchk') mbDrawSoon(); });
+  const go = ()=>{
+    const need = mbFolders().filter(f=>mbGotFolder(f) && !_mbMsgs[f.slug]).map(f=>f.slug);
+    if(!need.length){
+      _uchkLoading = false;
+      uchkBust();
+      if(state.mailSent==='uchk'){ renderPCSide(); renderMailPage(); }
+      return;
+    }
+    let left = need.length;
+    need.forEach(sl=>loadMailBox(sl, mbPageSize(), ()=>{
+      if(--left) return;
+      _uchkLoading = false;
+      uchkBust();
+      if(state.mailSent==='uchk'){ renderPCSide(); renderMailPage(); }
+    }));
+  };
+  if(_mbFolders===null) loadMailFolders(go); else go();
+}
+function uchkListOf(tab){
+  const d = uchkData();
+  const raw = tab === 'hint' ? d.hint : tab === 'box' ? d.box : tab === 'none' ? d.none : [];
+  const q = String(state.uchkQ || '').trim().toLowerCase();
+  if(!q) return raw;
+  return raw.filter(g =>
+    g.em.indexOf(q) >= 0 ||
+    String(g.name||'').toLowerCase().indexOf(q) >= 0 ||
+    String(g.subj||'').toLowerCase().indexOf(q) >= 0 ||
+    String(g.boxWho||'').toLowerCase().indexOf(q) >= 0 ||
+    String(g.boxName||'').toLowerCase().indexOf(q) >= 0 ||
+    (g.sug && g.sug.co && String(g.sug.co.name||'').toLowerCase().indexOf(q) >= 0) ||
+    (g.sug && String(g.sug.who||'').toLowerCase().indexOf(q) >= 0)
+  );
+}
+function uchkTabSet(t){ state.uchkTab = t; state.uchkSel = {}; renderMailPage(); }
+function uchkSetQ(q){
+  state.uchkQ = String(q||'');
+  renderMailPage();
+  const inp = $('uchkQInp');
+  if(inp){ try{ inp.focus(); const L = inp.value.length; inp.setSelectionRange(L, L); }catch(_){} }
+}
+function uchkToggleInbox(on){ state.uchkInbox = !!on; uchkBust(); state.uchkSel = {}; renderPCSide(); renderMailPage(); }
+function uchkSel(k, on){
+  const s = state.uchkSel || (state.uchkSel = {});
+  if(on) s[k] = 1; else delete s[k];
+  renderMailPage();
+}
+function uchkSelAll(on){
+  const list = uchkListOf(state.uchkTab || 'hint');
+  state.uchkSel = {};
+  if(on) list.forEach(g=>{ state.uchkSel[g.key] = 1; });
+  renderMailPage();
+}
+function uchkFindToggle(key){
+  const Q = state.uchkFindQ || (state.uchkFindQ = {});
+  if(Q[key] !== undefined) delete Q[key]; else Q[key] = '';
+  renderMailPage();
+}
+function uchkFindInput(key, val){
+  const Q = state.uchkFindQ || (state.uchkFindQ = {});
+  Q[key] = String(val||'');
+  const box = $('ucf-' + key);
+  if(box) box.innerHTML = uchkHitsHtml(key, Q[key]);
+}
+function uchkHitsHtml(key, q){
+  const hits = mbNewHits(q);
+  if(!hits.length) return String(q||'').trim().length >= 2 ? '<span class="cn-none">일치하는 자문사가 없습니다</span>' : '';
+  const dis = _uchkSaving ? ' disabled' : '';
+  return hits.map(c=>{
+    const rec = ErpMatch.recOfCo ? ErpMatch.recOfCo(c) : null;
+    const who = (rec && rec.main) ? mbWhoLive(rec.main) : '';
+    return `<button type="button"${dis} data-k="${esc(key)}" data-co="${esc(String(c.id))}" onclick="uchkLinkCoByKey(this.dataset.k,this.dataset.co)">🏢 ${esc(String(c.name||''))}${who ? ' ('+esc(who)+')' : ''}</button>`;
+  }).join(' ');
+}
+function uchkPeekToggle(key){
+  const P = state.uchkPeek || (state.uchkPeek = {});
+  if(P[key]) delete P[key]; else P[key] = 1;
+  renderMailPage();
+}
+function uchkOpenInBox(slug, uid, em){
+  if(slug && uid){
+    state.mailSent = 'box';
+    state.mbBox = '*all';
+    state.mbQ = String(em || '');
+    renderPCSide();
+    mbOpenMsg(slug, uid);
+    return;
+  }
+  state.mailSent = 'box';
+  state.mbQ = String(em || '');
+  openMailBox('*all');
+}
+/* 서버(RTDB) 원자 저장이 성공한 뒤에만 로컬 상태를 확정하고, 거절·오프라인 시 선택을 유지한 채 오류를 알린다 */
+async function uchkCommit(up, applyLocal, okMsg, erpJobs){
+  if(_uchkSaving) return false;
+  if(typeof Store!=='undefined' && Store.mode==='firebase' && up && Object.keys(up).length){
+    _uchkSaving = true;
+    renderMailPage();
+    try{
+      await firebase.database().ref().update(up);
+    }catch(e){
+      _uchkSaving = false;
+      renderMailPage();
+      toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000);
+      return false;
+    }
+    _uchkSaving = false;
+  }
+  if(applyLocal) applyLocal();
+  mbMemoClear(); mbWhoBust(); uchkBust(); renderPCSide(); renderMailPage();
+  if(okMsg) toast(okMsg, 6000);
+  if(erpJobs && erpJobs.length && mbErpFillOn() && typeof erpFillContact === 'function'){
+    const errs = [];
+    for(let i=0;i<erpJobs.length;i++){
+      try{ await erpFillContact(erpJobs[i]); }catch(e){ errs.push((e && e.message) || String(e)); }
+    }
+    if(errs.length) toast('메일함은 확정했으나 푸른이알피 연락처 반영에 일부 실패했습니다 — ' + errs[0], 7500);
+  }
+  return true;
+}
+/* 업체 고유 열쇠(coId)로 확정 연결 — 동명 업체가 있어도 엉뚱한 회사로 가지 않는다 */
+async function uchkLinkCo(em, coId, fromName){
+  if(_uchkSaving) return false;
+  const addr = String(em||'').trim().toLowerCase();
+  if(!addr || !coId) return false;
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  const co = cos.find(c => c && String(c.id) === String(coId));
+  if(!co){ toast('그 자문사를 찾지 못했습니다'); return false; }
+  const wk = mbWhoKey(addr);
+  const val = { n:String(co.name||''), id:String(co.id), at:Date.now(), by:String(myEmail||'') };
+  const up = {};
+  up[DB_ROOT + '/config/mailCo/' + wk] = val;
+  const rec = ErpMatch.recOfCo ? ErpMatch.recOfCo(co) : null;
+  const who = (rec && rec.main) ? mbWhoLive(rec.main) : '';
+  return uchkCommit(up, ()=>{
+    _mbCo = _mbCo || {};
+    _mbCo[wk] = val;
+    if(state.uchkSel) delete state.uchkSel[wk];
+    if(state.uchkFindQ) delete state.uchkFindQ[wk];
+  }, `✅ ${addr} → 「${co.name}」${who ? '(담당 '+who+')' : ''} 확정했습니다`, [
+    { coId:String(co.id), email:addr, name:String(fromName||'').trim(), from:'mail-uchk' }
+  ]);
+}
+function uchkLinkCoByKey(key, coId){
+  const g = uchkData().byKey[key];
+  if(!g) return Promise.resolve(false);
+  return uchkLinkCo(g.em, coId, g.name);
+}
+function uchkConfirmBox(key){
+  if(_uchkSaving) return Promise.resolve(false);
+  const g = uchkData().byKey[key];
+  if(!g || !g.boxWho) return Promise.resolve(false);
+  const up = {};
+  up[DB_ROOT + '/config/mailWho/' + g.key] = g.boxWho;
+  return uchkCommit(up, ()=>{
+    _mbOwner = _mbOwner || {};
+    _mbOwner[g.key] = g.boxWho;
+    if(state.uchkSel) delete state.uchkSel[key];
+  }, `✅ ${g.em} → 「${g.boxWho}」 담당으로 확정했습니다`);
+}
+function uchkNotCo(key){
+  if(_uchkSaving) return Promise.resolve(false);
+  const g = uchkData().byKey[key];
+  if(!g) return Promise.resolve(false);
+  const up = {};
+  up[DB_ROOT + '/config/mailNotCo/' + g.key] = 1;
+  return uchkCommit(up, ()=>{
+    _mbNotCo = _mbNotCo || {};
+    _mbNotCo[g.key] = 1;
+    if(state.uchkSel) delete state.uchkSel[key];
+  }, `🙈 ${g.em} 주소를 「그 밖」으로 치웠습니다`);
+}
+function uchkBulkWhoMenu(ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const m = $('folderMenu'); if(!m) return;
+  const names = mbWhoNames();
+  m.innerHTML = `<div class="fmhead">선택한 주소를 누구에게 맡길까요?</div><div class="fmlist" role="menu" onkeydown="if(event.key==='Escape')closeFolderMenu()">`
+    + names.map(n=>`<button type="button" role="menuitem" class="fmi" style="width:100%;text-align:left;border:0;background:none;font:inherit" data-nm="${esc(n)}" onclick="uchkBulk('who',this.dataset.nm)">👤 ${esc(n)}</button>`).join('')
+    + `</div>`;
+  if(typeof mbPlaceMenu === 'function') mbPlaceMenu(m, ev);
+  else { m.style.display = 'block'; m.classList.add('open'); }
+}
+async function uchkBulk(act, whoName){
+  closeFolderMenu();
+  if(_uchkSaving) return false;
+  const sel = state.uchkSel || {};
+  const visible = uchkListOf(state.uchkTab || 'hint');
+  const rows = visible.filter(r => sel[r.key]);
+  if(!rows.length){ toast('먼저 왼쪽 네모(☐)를 체크해 주세요'); return false; }
+  if(act === 'link'){
+    const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+    const byId = {}; cos.forEach(c=>{ if(c && c.id) byId[String(c.id)] = c; });
+    const targets = rows.filter(r => r.sug && r.sug.co && r.sug.co.id && byId[String(r.sug.co.id)]);
+    if(!targets.length){ toast('추천 업체가 있는 줄이 없습니다'); return false; }
+    if(!confirm(`선택한 ${targets.length}개 주소를 각각의 추천 자문사로 한꺼번에 확정할까요?`)) return false;
+    const now = Date.now(), by = String(myEmail||''), up = {}, vals = {}, erpJobs = [];
+    targets.forEach(r=>{
+      const co = byId[String(r.sug.co.id)];
+      const val = { n:String(co.name||''), id:String(co.id), at:now, by:by };
+      vals[r.key] = val;
+      up[DB_ROOT + '/config/mailCo/' + r.key] = val;
+      erpJobs.push({ coId:String(co.id), email:r.em, name:String(r.name||'').trim(), from:'mail-uchk' });
+    });
+    return uchkCommit(up, ()=>{
+      _mbCo = _mbCo || {};
+      targets.forEach(r=>{
+        _mbCo[r.key] = vals[r.key];
+        delete sel[r.key];
+        if(state.uchkFindQ) delete state.uchkFindQ[r.key];
+      });
+    }, `✅ ${targets.length}개 주소를 추천 자문사에 일괄 확정했습니다`, erpJobs);
+  }
+  if(act === 'boxwho'){
+    const targets = rows.filter(r => r.boxWho);
+    if(!targets.length){ toast('칸 담당자가 있는 줄을 골라 주세요'); return false; }
+    if(!confirm(`선택한 ${targets.length}개 주소를 현재 배정된 칸 담당자로 확정할까요?`)) return false;
+    const up = {};
+    targets.forEach(r=>{ up[DB_ROOT + '/config/mailWho/' + r.key] = r.boxWho; });
+    return uchkCommit(up, ()=>{
+      _mbOwner = _mbOwner || {};
+      targets.forEach(r=>{ _mbOwner[r.key] = r.boxWho; delete sel[r.key]; });
+    }, `✅ ${targets.length}개 주소를 칸 담당자로 일괄 확정했습니다`);
+  }
+  if(act === 'who'){
+    const nm = String(whoName||'').trim();
+    if(!nm) return false;
+    if(!confirm(`선택한 ${rows.length}개 주소를 「${nm}」 담당으로 일괄 확정할까요?`)) return false;
+    const up = {};
+    rows.forEach(r=>{ up[DB_ROOT + '/config/mailWho/' + r.key] = nm; });
+    return uchkCommit(up, ()=>{
+      _mbOwner = _mbOwner || {};
+      rows.forEach(r=>{ _mbOwner[r.key] = nm; delete sel[r.key]; });
+    }, `👤 ${rows.length}개 주소를 「${nm}」 담당으로 일괄 확정했습니다`);
+  }
+  if(act === 'notco'){
+    if(!confirm(`선택한 ${rows.length}개 주소를 「그 밖(자문사 아님)」으로 치울까요?\n(메일은 지워지지 않고 「그 밖」 칸에서 언제든 되돌릴 수 있습니다)`)) return false;
+    const up = {};
+    rows.forEach(r=>{ up[DB_ROOT + '/config/mailNotCo/' + r.key] = 1; });
+    return uchkCommit(up, ()=>{
+      _mbNotCo = _mbNotCo || {};
+      rows.forEach(r=>{ _mbNotCo[r.key] = 1; delete sel[r.key]; });
+    }, `🙈 ${rows.length}개 주소를 「그 밖」으로 치웠습니다`);
+  }
+  return false;
+}
+function uchkHtml(){
+  const tab = state.uchkTab || 'hint';
+  const sel = state.uchkSel || (state.uchkSel = {});
+  const busy = _mbFolders === null || _uchkLoading;
+  const dis = _uchkSaving ? ' disabled' : '';
+  const d = busy ? { hint:[], box:[], none:[], byKey:{} } : uchkData();
+  const mgN = mgrCount();
+  const card = (t, ic, lb, n, sub) => `<button type="button" role="tab" aria-selected="${tab===t?'true':'false'}" class="cn-card${tab===t?' on':''}" data-t="${t}" onclick="uchkTabSet(this.dataset.t)" title="${sub}">${ic} ${lb} <b>${busy && t!=='mgr' ? '…' : n.toLocaleString()}</b></button>`;
+  let h = `<div class="cn-head"><b>☑ 미확정 체크</b><span class="cn-i" title="푸른이알피에 직접 확정되지 않은 보낸이와 담당 변경 사항을 한곳에 모았습니다.&#10;① 추천 연결: 명함·도메인·제목 단서로 자문사가 짚이는 곳&#10;② 칸 임시배정: 주소는 미확정인데 폴더 담당(체불·산재·컨설팅·기금 등)으로 임시 배정된 곳&#10;③ 단서 없음: 아무 단서가 없는 담당 모름 보낸이&#10;④ 담당 점검: 이알피 담당 변경·퇴사자·빈칸 확인">ⓘ</span>`;
+  h += `<div class="cn-cards" role="tablist">${
+      card('hint','💡','추천 연결', d.hint.length, '명함·도메인·제목으로 자문사가 짚이는 미확정 보낸이')
+    }${card('box','📂','칸 임시배정', d.box.length, '주소 확정 없이 폴더 담당으로 임시 배정된 보낸이')
+    }${card('none','❓','단서 없음', d.none.length, '추천 단서도 칸 담당도 없는 미확정 보낸이')
+    }${card('mgr','🔎','담당 점검', mgN, '이알피 담당 변경 미확인 · 퇴사자 · 빈칸')}</div>`;
+  if(tab !== 'mgr'){
+    const list = uchkListOf(tab);
+    const keys = list.map(r=>r.key);
+    const selRows = list.filter(r=>sel[r.key]);
+    const nSel = selRows.length;
+    const nLinkable = selRows.filter(r=>r.sug && r.sug.co).length;
+    const nBoxable = selRows.filter(r=>r.boxWho).length;
+    if(nSel){
+      h += `<div class="cn-bulk">☑ ${nSel}개 선택 `
+        + (nLinkable ? `<button type="button"${dis} onclick="uchkBulk('link')">✅ 추천 업체 확정 ${nLinkable}</button>` : '')
+        + (tab === 'box' && nBoxable ? `<button type="button"${dis} onclick="uchkBulk('boxwho')">✅ 칸 담당 확정 ${nBoxable}</button>` : '')
+        + `<button type="button"${dis} onclick="uchkBulkWhoMenu(event)">👤 담당자 지정 ˅</button>`
+        + `<button type="button"${dis} onclick="uchkBulk('notco')">🙈 그 밖</button>`
+        + `<button type="button"${dis} onclick="uchkSelAll(false)">선택 풀기</button></div>`;
+    } else {
+      h += `<div class="cn-bulk">`
+        + `<input id="uchkQInp" class="cn-q" aria-label="미확정 보낸이 검색" placeholder="이름·주소·업체 검색" value="${esc(state.uchkQ||'')}" oninput="if(!event.isComposing)uchkSetQ(this.value)" oncompositionend="uchkSetQ(this.value)">`
+        + `<label class="cn-chk" title="자문사로 확정할 때 푸른이알피 업체 담당자 이메일 칸에도 함께 적습니다"><input type="checkbox" ${mbErpFillOn()?'checked':''} onchange="mbErpFillSet(this.checked)">이알피 함께 적기</label>`
+        + (tab === 'none' ? `<label class="cn-chk" title="받은메일함(INBOX)에 남아 있는 미확정 보낸이도 함께 봅니다"><input type="checkbox" ${state.uchkInbox?'checked':''} onchange="uchkToggleInbox(this.checked)">받은메일함 포함</label>` : '')
+        + `</div>`;
+    }
+    h += `</div>`;
+    const allOn = keys.length > 0 && nSel === keys.length;
+    const dayTxt = t => { const v = Number(t||0); return !v || isNaN(new Date(v)) ? '' : fmtDate(v); };
+    const day = t => { const s = dayTxt(t); return s ? `<span class="cn-d">${s}</span>` : ''; };
+    const Q = state.uchkFindQ || {}, P = state.uchkPeek || {};
+    let idxNo = 0;
+    const rowsHtml = list.map(r=>{
+      const k = esc(r.key), rowLabel = esc((r.name ? r.name + ' ' : '') + r.em);
+      const sgTxt = r.sug
+        ? (r.sug.shared ? ('⚠ ' + r.sug.why) : `${r.sug.why}: ${r.sug.co.name} (${r.sug.who})`)
+        : (r.boxWho ? `📂 ${r.boxName} → ${r.boxWho}` : (r.scopeN ? '단서 없음' : '받은메일함'));
+      const sgCls = (r.sug || r.boxWho) ? 'sg' : 'sg none';
+      let act = '';
+      if(r.sug && r.sug.co){
+        act += `<button type="button" class="pri"${dis} data-k="${k}" data-co="${esc(String(r.sug.co.id))}" onclick="uchkLinkCoByKey(this.dataset.k,this.dataset.co)" title="「${esc(r.sug.co.name)}」(담당 ${esc(r.sug.who)}) 자문사로 확정합니다">🏢 ${esc(r.sug.co.name)}</button>`;
+      } else if(tab === 'box' && r.boxWho){
+        act += `<button type="button" class="pri"${dis} data-k="${k}" onclick="uchkConfirmBox(this.dataset.k)" title="이 주소를 「${esc(r.boxWho)}」 담당으로 확정합니다">✅ ${esc(r.boxWho)} 확정</button>`;
+      }
+      act += `<button type="button" data-k="${k}" aria-label="${rowLabel} 자문사 검색" onclick="uchkFindToggle(this.dataset.k)" title="자문사 검색해서 잇기">🔍<span class="lb">${r.sug&&r.sug.co ? '' : ' 업체'}</span></button>`
+        + `<button type="button" data-em="${esc(r.em)}" aria-label="${rowLabel} 담당자 직접 지정" onclick="mbWhoAsk(this.dataset.em,event)" title="담당자를 직접 고릅니다">👤</button>`
+        + `<button type="button" data-k="${k}" aria-label="${rowLabel} 최근 메일 미리보기" onclick="uchkPeekToggle(this.dataset.k)" title="이 보낸이의 최근 메일 ${r.n}통 미리보기 / 열기">✉</button>`
+        + `<button type="button"${dis} data-k="${k}" aria-label="${rowLabel} 그 밖으로 치우기" onclick="uchkNotCo(this.dataset.k)" title="그 밖(자문사 아님)으로 치우기">🙈</button>`;
+      let out = `<tr><td class="ck"><input type="checkbox" aria-label="${rowLabel} 선택" ${sel[r.key]?'checked':''} data-k="${k}" onchange="uchkSel(this.dataset.k,this.checked)"></td>`
+        + `<td class="no">${++idxNo}</td>`
+        + `<td class="nm" title="${esc((r.name ? r.name + ' · ' : '') + r.em + ' (' + r.n + '통)')}">${esc(r.name || r.em.split('@')[0])}</td>`
+        + `<td class="em" title="${esc(r.em + ' · ' + r.n + '통')}">${esc(r.em)} (${r.n})</td>`
+        + `<td class="sj" title="${esc((dayTxt(r.last) ? dayTxt(r.last) + ' · ' : '') + (r.subj||''))}">${day(r.last)}${dayTxt(r.last) ? ' · ' : ''}${esc(r.subj || '(제목 없음)')}</td>`
+        + `<td class="${sgCls}" title="${esc(sgTxt)}">${esc(sgTxt)}</td>`
+        + `<td class="act"><div class="cn-act">${act}</div></td></tr>`;
+      if(Q[r.key] !== undefined){
+        out += `<tr class="cn-find"><td colspan="7"><input value="${esc(Q[r.key])}" aria-label="자문사 이름 검색" data-k="${k}" placeholder="자문사 이름 두 글자 이상 입력" oninput="uchkFindInput(this.dataset.k,this.value)"> <span id="ucf-${k}">${uchkHitsHtml(r.key, Q[r.key])}</span></td></tr>`;
+      }
+      if(P[r.key]){
+        const mlist = r.msgs.slice(0, 5).map(m =>
+          `<button type="button" data-slug="${esc(m.slug)}" data-uid="${esc(m.uid)}" data-em="${esc(r.em)}" onclick="uchkOpenInBox(this.dataset.slug,this.dataset.uid,this.dataset.em)" title="${esc(m.box + ' · ' + (m.s||'(제목 없음)'))}">✉ ${esc(dayTxt(m.d))} [${esc(m.box)}] ${esc((m.s||'(제목 없음)').slice(0, 42))}</button>`
+        ).join(' ');
+        out += `<tr class="cn-find"><td colspan="7">${mlist} <button type="button" data-em="${esc(r.em)}" onclick="uchkOpenInBox('','',this.dataset.em)">🔎 메일함에서 전체 ${r.n}통 보기 ↗</button></td></tr>`;
+      }
+      return out;
+    }).join('');
+    const sgColTitle = tab === 'hint' ? '추천 자문사 · 담당' : tab === 'box' ? '임시 배정된 칸 · 담당' : '상태';
+    h += `<table class="cn-t todo"><colgroup><col class="ck"><col class="no"><col class="nm"><col class="em"><col><col class="sg"><col class="act"></colgroup>`
+      + `<tr><th class="ck"><input type="checkbox" aria-label="보이는 줄 모두 선택" ${allOn?'checked':''} onchange="uchkSelAll(this.checked)" title="보이는 줄 모두 고르기"></th><th class="no">#</th><th>보낸이</th><th>이메일 (통수)</th><th>최근 메일</th><th>${sgColTitle}</th><th></th></tr>`
+      + (busy ? `<tr><td colspan="7" class="cn-none">메일을 읽어 오는 중입니다…</td></tr>`
+        : list.length ? rowsHtml
+        : `<tr><td colspan="7" class="cn-none">이 갈래에 확인이 필요한 미확정 항목이 없습니다 ✔</td></tr>`)
+      + `</table>`;
+    return `<div class="cn uchk">${h}</div>`;
+  }
+  h += `</div>`;
+  return `<div class="cn uchk">${h}${mgrHtml(true)}</div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
