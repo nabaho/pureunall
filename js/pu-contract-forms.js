@@ -73,6 +73,8 @@
     { code:'{{추가인원단위}}', desc:'급여 계약: 추가 보수를 셈하는 근로자 수 단위 (예: 5 → 5명당)' },
     { code:'{{추가금액}}',   desc:'급여 계약: 추가 단위당 추가 보수 (원)' },
     { code:'{{성공보수}}',   desc:'성공보수 (정액/정률)' },
+    { code:'{{과업내용}}',   desc:'과업·위탁·조사 업무 내용' },
+    { code:'{{대상인원}}',   desc:'조사·컨설팅·교육 대상 인원' },
     { code:'{{주담당}}',     desc:'노무사 주담당' },
     { code:'{{부담당}}',     desc:'노무사 부담당' },
     { code:'{{오늘날짜}}',   desc:'오늘 날짜 (YYYY-MM-DD)' },
@@ -125,7 +127,29 @@
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-cms', kind:'company', name:'CMS 자동이체 이용신청서 (푸른 표준)',
       body:'         계좌/신용카드 자동출금 이용신청서 (■신규 □변경 □해지)\n\n                                                     계약번호: {{계약번호}}\n\n※ 전자금융거래법 관련 규정(시행령 10조)에 의거, 자동이체 신청시에는 반드시\n   서면/공동인증서/녹취를 통한 예금주/카드주/휴대폰명의자 본인의 동의가\n   필요합니다.\n※ 신용카드 이용시 카드이용내역서상 카드사에 따라 결제대행기관인 나이스\n   또는 나이스(올더게이트)의 이름으로 청구될 수 있으며, 계좌출금 시에는\n   통장 내역에 수납기관이 지정한 통장기재내역으로 6자 이내 표시됩니다.\n\n◈ 수납기관 및 요금정보 (수납기관 기재란)\n   수납기관명    : 푸른노무법인\n   자동이체사유  : 월 자문료\n   금     액     : {{계약금액}}원\n   비     고     : 통장기재내역: 푸른노무법인\n\n◈ 납부자 정보 (수납기관 기재란)\n   납부자 번호 (고객번호): __________________\n   이체개시 년월         : {{계약시작일}}\n   지정 출금일           : 매월 ___일\n\n◈ 신청인 정보 입력\n   신청인 성명           : {{회사명}}\n   이 메 일             : {{대표이메일}}\n   주     소             : {{주소}}\n   연 락 처              : {{대표전화}}\n   휴대폰번호            : __________________\n\n   결제수단 선택         : ■ 계좌(CMS)  □ 신용카드\n                          *계좌이용시 휴대폰번호 등으로 개설된 평생계좌번호는\n                           이용 불가\n\n   은행명/카드사         : __________________\n   사업자번호            : {{사업자번호}}\n   예금주/카드주 본인명  : __________________\n   계좌/카드번호         : __________________\n   예금주/카드주 본인 주민번호 앞6자리: ______ - *******\n   카드유효기간          : ___/___ (월/년)  *카드 선택시\n\n※ 법인공용카드, 선불카드, 해외발행카드 등 일부 카드는 이용이 불가능할 수\n   있습니다.\n※ 연체, 잔액부족 등의 사유로 납부가 지연되는 경우가 발생하지 않도록 유의\n   하여 주십시오.\n\n[자동이체 서비스 이용 약관 / 개인정보 수집·이용동의 / 개인정보 취급위탁 /\n 문자(SMS) 발송 동의]\n   상기 자동이체 신청과 관련하여 계좌예금주/카드주로서 자동이체서비스\n   이용약관과 개인정보 수집 및 이용동의, 개인정보 취급 위탁에 동의,\n   문자(SMS) 발송에 동의하며, 자동출금이체서비스를 신청합니다.\n\n                              {{계약일}}\n\n   신청인               : {{대표자}}                  (인 또는 서명)\n   예금주/카드주 동의란 :                              (인 또는 서명)\n\n   * 신청인과 예금주/카드주가 상이한 경우에는 예금주/카드주의 동의가 필요\n     하며, 날인 또는 서명은 출금통장의 거래날인, 서명 사용\n',
-      attachments:[], enabled:true, createdAt:'2026-05-08' }
+      attachments:[], enabled:true, createdAt:'2026-05-08' },
+    // ── 특수 과업·변경·견적 표준 양식 (괴롭힘조사·산업안전·단체교섭·의견서·변경합의·표준견적) ──
+    { id:'fm-pr-harass', kind:'consulting', name:'직장 내 괴롭힘·성희롱 조사 위탁계약서 (푸른 표준)',
+      body:'        직장 내 괴롭힘·성희롱 사안 조사 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은\n   근로기준법 제76조의3 및 남녀고용평등법 제14조에 따른 객관적·공정한 사안 조사를\n   위하여 다음과 같이 조사 위탁계약을 체결한다.\n\n제1조 【위탁 과업의 범위】\n   ① 과업내용: {{과업내용}}\n   ② 조사 대상 인원(예정): {{대상인원}}\n   ③ 을은 관련 법령에 따라 신고인·피신고인·참고인 면담, 객관적 증거자료 검토,\n      사실관계 확정 및 법적 해당 여부 판단, 최종 조사보고서 작성을 수행한다.\n\n제2조 【독립성 및 공정성 보장】\n   갑은 을이 독립적이고 중립적인 지위에서 조사를 수행할 수 있도록 보장하며,\n   조사 대상자의 출석 협조 및 관련 자료 제출에 적극 협조한다.\n\n제3조 【비밀유지 및 2차 피해 방지】\n   갑과 을은 근로기준법 제76조의3 제7항에 따라 조사 과정에서 알게 된 비밀을\n   누설하지 아니하며, 피해근로자 및 조사 참여자에 대한 2차 피해가 발생하지 않도록 한다.\n\n제4조 【수행 기간】\n   조사 수행 기간은 {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})로 하되,\n   조사 대상 추가 등 부득이한 사유가 있는 경우 상호 협의하여 연장할 수 있다.\n\n제5조 【위탁 보수】\n   ① 기본 조사 보수: 금 {{계약금액}}원 ({{부가세처리}})\n   ② 조사 대상 인원이 약정 기준을 초과하거나 출장·추가 심층조사가 필요한 경우\n      상호 협의하여 추가 보수를 정한다.\n   ③ 지급계좌: 하나은행 680-910005-45904 [푸른노무법인]\n\n제6조 【담당 노무사】\n   책임 수행 노무사: {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자)  상    호: {{회사명}} (사업자번호: {{사업자번호}})\n               주    소: {{주소}}\n               대 표 자: {{대표자}}                          (인)\n\n   을(수탁자)  상    호: 푸른노무법인\n               주    소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n               대 표 자: 권 형 하                            (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-safety', kind:'consulting', name:'산업안전·중대재해 컨설팅 위탁계약서 (푸른 표준)',
+      body:'          산업안전보건·중대재해예방 컨설팅 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 산업안전보건법 및\n   중대재해처벌법에 따른 안전보건관리체계 구축·점검 컨설팅을 위하여 다음과 같이 계약한다.\n\n제1조 【컨설팅 과업】\n   {{과업내용}}\n\n제2조 【수행 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【용역 보수】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【수행 담당】\n   주담당 노무사: {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-opinion', kind:'consulting', name:'법률의견서·노무검토 약정서 (푸른 표준)',
+      body:'              노무 법률의견서 작성 위임약정서\n\n                                                     계약번호: {{계약번호}}\n\n   위임인 {{회사명}}(대표자 {{대표자}})은 수임인 푸른노무법인에게 아래 사안에 관한\n   노동관계법령 검토 및 법률의견서 작성을 위임한다.\n\n1. 검토 과업: {{과업내용}}\n2. 제출 기한: {{계약기간}}\n3. 위임 보수: 금 {{계약금액}}원 ({{부가세처리}})\n4. 담당 노무사: {{주담당}}\n\n   수임인은 위임인이 제공한 사실관계 및 자료에 기초하여 성실히 의견서를 작성하며,\n   위임인은 본 의견서를 약정 목적 범위 내에서 사용한다.\n\n                              {{계약일}}\n\n   위임인: {{회사명}}  대표자 {{대표자}} (인)\n   수임인: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-bargain', kind:'company', name:'임금·단체교섭 위임계약서 (푸른 표준)',
+      body:'              임금·단체교섭 지원 및 위임계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 노동조합과의 임금 및\n   단체교섭 관련 교섭 위임·자문 업무에 관하여 다음과 같이 계약을 체결한다.\n\n제1조 【위임 범위】\n   {{과업내용}}\n\n제2조 【계약 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【위임 보수】\n   금 {{계약금액}}원 ({{부가세처리}}) / 성공보수 약정: {{성공보수}}\n\n제4조 【담당 노무사】\n   {{주담당}}\n\n                              {{계약일}}\n\n   갑: {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-amend', kind:'company', name:'계약 변경·연장 합의서 (푸른 표준)',
+      body:'                  계 약 변 경 · 연 장 합 의 서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 양 당사자 간 기 체결한\n   원 계약의 조건을 다음과 같이 변경·연장하기로 상호 합의한다.\n\n제1조 【변경·연장 대상 과업】\n   {{과업내용}}\n\n제2조 【변경 후 계약기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【변경 후 계약금액(보수)】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【효력】\n   본 합의서에서 변경한 사항 외의 나머지 조항은 원 계약서의 내용을 그대로 적용한다.\n\n                              {{계약일}}\n\n   갑   상 호: {{회사명}} (사업자번호: {{사업자번호}})\n        주 소: {{주소}}\n        대표자: {{대표자}}                              (인)\n\n   을   상 호: 푸른노무법인\n        주 소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n        대표자: 권 형 하                                (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-harass-quote', kind:'consulting', groupName:'제안서·견적서', name:'직장 내 괴롭힘·성희롱 조사 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (직장 내 괴롭힘·성희롱 조사)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 건    명: {{과업내용}}\n2. 조사대상: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n[세부 수행 범위]\n  - 신고인·피신고인·참고인 심층 면담 조사 및 진술록 확인\n  - 객관적 증거자료 검토 및 법리 판단\n  - 최종 조사결과 보고서 제출 및 후속 인사조치 자문\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n※ 문의전화: 041-556-0034~6\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-consulting-quote', kind:'consulting', groupName:'제안서·견적서', name:'인사노무 컨설팅·진단·자문 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n                        견     적     서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (사업자번호: {{사업자번호}} / 담당: {{담당자}})\n■ 발 신: 푸른노무법인 (사업자번호: 312-81-52792 / 대표: 권형하)\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 대상인원: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 합계금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n5. 담당노무사: {{주담당}}\n\n※ 본 견적의 유효기간은 발행일로부터 30일입니다.\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' }
   ];
 
   // ── 체당금 사건 양식 시드 (4종) ──
@@ -338,6 +362,44 @@
   function todayYMD() {
     var d = new Date();
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  /* 외부(보낸 견적서 관리 · 확정 계약서 관리)에서 한글·문서 파일을 곧바로 새 계약서·견적서 양식으로 등록 */
+  function scrubFormBody(s) {
+    var t = String(s == null ? '' : s);
+    if (w.PuRrnMask && typeof w.PuRrnMask.maskRrnInText === 'function') return w.PuRrnMask.maskRrnInText(t).text;
+    return t.replace(/(^|[^0-9])(\d{6}[-–—]\s?\d{7})([^0-9]|$)/g, '$1******-*******$3')
+            .replace(/(^|[^0-9])(\d{13})([^0-9]|$)/g, '$1******-*******$3');
+  }
+  function registerForm(db, o) {
+    o = o || {};
+    var id = o.id || newId('fm-');
+    var kind = o.kind || 'company';
+    var fname = String(o.fileName || ((o.name || '양식') + '.hwp'));
+    var fsize = o.size || o.fileSize || 0;
+    var attId = o.fileId ? newId('att-') : '';
+    var atts = Array.isArray(o.attachments) ? o.attachments.slice()
+      : (o.fileId ? [{ id: attId, name: fname, size: fsize, type: o.mime || '', fileId: o.fileId }] : []);
+    var origs = Array.isArray(o.originals) ? o.originals.slice()
+      : (o.fileId ? [{ attId: attId, name: fname, fileId: o.fileId }] : []);
+    var grp = String(o.groupName || '').trim();
+    if (!grp && o.docRole === 'quote' && twoGroups(kind)) grp = PROPOSAL_GROUP;
+    var fm = {
+      id: id,
+      kind: kind,
+      groupName: grp,
+      name: String(o.name || '새 양식').trim().slice(0, 120),
+      body: scrubFormBody(o.body || ''),
+      enabled: o.enabled !== false,
+      createdAt: todayYMD(),
+      attachments: atts,
+      originals: origs
+    };
+    if (o.docRole === 'quote' || o.docRole === 'contract') fm.docRole = o.docRole;
+    if (o.side) fm.side = o.side;
+    return db.ref(PATH_RM).once('value').then(function (rmSnap) {
+      var rm = listOf(rmSnap && rmSnap.val() && rmSnap.val().v);
+      return changeForms(db, rm, function (list) { return list.concat([fm]); });
+    }).then(function () { return fm; });
   }
   function kindInfo(v) { return KINDS.filter(function (k) { return k.v === v; })[0] || KINDS[0]; }
 
@@ -1544,6 +1606,7 @@
     if (!CF || !host.cards) { toast('ERP 업체정보 연결을 불러오지 못했습니다'); return; }
     fms = (fms || []).filter(Boolean);
     if (!fms.length) return;
+    var opts = arguments[3] || {};
     ensureCss();
     var one = fms.length === 1;
     var items = fms.map(function (fm) {
@@ -1556,6 +1619,20 @@
     /* 근로자 사건은 모두 부가세 포함 (대표 2026-10-24) — 고른 양식이 모두 근로자측이면 「포함」에서 시작한다 */
     if (fms.every(function (fm) { return sideOf(fm) === 'worker'; })) st.wi.vat = 'incl';
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
+    /* 지난 견적서·확정 계약서에서 참고하여 불러온 초기값 반영 */
+    if (opts.initial && typeof opts.initial === 'object') {
+      Object.keys(opts.initial).forEach(function (k) {
+        var v = opts.initial[k];
+        if (v != null && String(v).trim() !== '') st.edits[k] = String(v).trim();
+      });
+      var initAmt = opts.initial['견적금액'] || opts.initial['계약금액'];
+      if (initAmt) st.pv.amount = String(initAmt);
+      var initVat = String(opts.initial['부가세처리'] || '');
+      if (initVat) {
+        var vatCode = /별도/.test(initVat) ? 'excl' : 'incl';
+        st.pv.vat = vatCode; st.wi.vat = vatCode;
+      }
+    }
     var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var caseBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
@@ -2180,11 +2257,16 @@
     /* 기업정보함 「📨 제안서 보내기」로 왔으면 그 회사를 골라 둔다 (설계 2026-09-29 §8).
        ⚠ «회사» 줄만 — 사람(명함·담당자) 줄도 같은 회사 이름을 가져 먼저 걸리면 회사 칸이 비뚤어진다. */
     var preKey = host.propose || host.make || (host.contractCtx && host.contractCtx.coKey) || '';
-    if (preKey) withRows(function (rows) {
+    var preBz = String(opts.bizNo || (opts.initial && opts.initial['사업자번호']) || '').replace(/\D/g, '');
+    var preCo = String(opts.coName || (opts.initial && opts.initial['회사명']) || '').trim();
+    if (preKey || preBz || preCo) withRows(function (rows) {
       if (st.co) return;
-      var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0];
+      var coRows = rows.filter(function (x) { return x.k === 'biz' || x.k === 'erp' || x.k === 'card-co'; });
+      var r = preKey ? coRows.filter(function (x) { return CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0] : null;
+      if (!r && preBz.length === 10) r = coRows.filter(function (x) { return String(x.bz || '').replace(/\D/g, '') === preBz; })[0];
+      if (!r && preCo) r = coRows.filter(function (x) { return CF.sameCo(x.c) === CF.sameCo(preCo); })[0];
       if (r) pickCo(r);
-      else note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
+      else if (preKey) note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
     });
     refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
@@ -3669,6 +3751,7 @@
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,
     hwpSources: hwpSources,
+    registerForm: registerForm,
     openFill: openFill,
     mount: mount
   };
