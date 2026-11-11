@@ -722,6 +722,7 @@ body.portal-mode #camFab{display:flex;}
 #chatFab:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(37,99,235,.52);}
 #chatFab:active{transform:translateY(0) scale(.97);}
 #chatFab[aria-expanded="true"]{outline:2px solid #bfdbfe;outline-offset:1px;}
+#chatFab:focus-visible{outline:2px solid #bfdbfe;outline-offset:2px;}
 @media(max-width:520px){
   #chatFab{min-height:30px;padding:5px 10px;font-size:.72rem;border-radius:999px;flex:0 0 auto;}
   .pbar #chatFab{order:4;}
@@ -1400,7 +1401,7 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
-      <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 노동법·지원금·기금 AI 길잡이">🤖 <span class="chat-lb">길잡이 챗봇</span></button>
+      <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
@@ -5802,6 +5803,7 @@ body.portal-mode #moreFab{display:flex;}
     SG.role = acct ? acct.role : 'member';
     $('sgFab').style.display = 'inline-flex';
     if($('chatFab')) $('chatFab').style.display = 'inline-flex';
+    chatImpStartWatch();  // 길잡이 채팅방 내 개선요청 실시간 상태·결과 답변·승인 동기화
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
     sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
@@ -6756,6 +6758,119 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ══ 💬 길잡이 채팅방 ↔ 건의·개선요청 폐루프 연동 다리 (portalChatImprove) ══
+     채팅 중 코딩·문제해결이 필요할 때 건의함(suggestions_private · suggestions_meta_private ·
+     suggestions_resolved_private/{uid})과 동일한 통로로 접수하고, 개선 결과 답변이 오면
+     채팅방 안에서 실시간으로 받아 채팅자가 「확인·승인(완성)」 또는 「보완 재요청」까지 마친다. */
+  var _chatImpWatchRef = null;
+  var _chatImpWatchFn = null;
+  var _chatImpMap = {};
+  var _chatImpSubs = [];
+  function _chatImpValidId(id){ return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id); }
+  function _chatImpEmit(){
+    var uid = SG.uid || '';
+    _chatImpSubs.slice().forEach(function(fn){ try { fn(_chatImpMap, uid); } catch(_){} });
+  }
+  function chatImpStopWatch(){
+    if(_chatImpWatchRef && _chatImpWatchFn){
+      try { _chatImpWatchRef.off('value', _chatImpWatchFn); } catch(_){}
+    }
+    _chatImpWatchRef = null;
+    _chatImpWatchFn = null;
+    _chatImpMap = {};
+    _chatImpEmit();
+  }
+  function chatImpStartWatch(){
+    chatImpStopWatch();
+    if(!SG.uid) return;
+    var ref = db.ref(sgResolvedUidPath(SG.uid));
+    var fn = function(snap){
+      _chatImpMap = (snap && snap.val()) || {};
+      _chatImpEmit();
+    };
+    _chatImpWatchRef = ref;
+    _chatImpWatchFn = fn;
+    ref.on('value', fn, function(){});
+  }
+  window.portalChatImprove = {
+    submit: function(opts){
+      if(!auth.currentUser || !SG.uid) return Promise.reject(new Error('로그인 후 이용할 수 있습니다.'));
+      var o = opts || {};
+      var cat = sgCatClass(o.cat || 'portal');
+      var title = String(o.title || '').trim().slice(0, 200) || '[챗봇] 시스템 개선 요청';
+      var content = String(o.content || '').trim().slice(0, 9500) || title;
+      var now = Date.now();
+      var rec = {
+        cat: cat, title: title, content: content,
+        images: [],
+        author: SG.name || '사용자', authorEmail: SG.email || '', authorUid: SG.uid,
+        status: 'new', reply: '', source: 'chatbot', createdAt: now
+      };
+      if(o.relatedId && _chatImpValidId(o.relatedId)) rec.relatedId = o.relatedId;
+      var ref = db.ref(SG_PRIVATE_PATH).push();
+      return ref.set(rec).then(function(){
+        var ownRec = { title: rec.title, cat: rec.cat, status: 'new', at: rec.createdAt, seen: true, source: 'chatbot' };
+        if(rec.relatedId) ownRec.relatedId = rec.relatedId;
+        return Promise.all([
+          db.ref(SG_META_PRIVATE_PATH+'/'+ref.key).set({
+            author: rec.author, authorEmail: rec.authorEmail, authorUid: rec.authorUid,
+            status: 'new', cat: rec.cat, title: rec.title, createdAt: rec.createdAt
+          }).catch(function(){}),
+          db.ref(sgResolvedUidPath(SG.uid)+'/'+ref.key).set(ownRec).catch(function(){})
+        ]).then(function(){
+          if(sgIsAdmin()) sgUpdateBadge();
+          return { id: ref.key, cat: cat, catName: sgCatName(cat), title: title, status: 'new', at: now };
+        });
+      });
+    },
+    approve: function(id){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var now = Date.now();
+      return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+        seen: true, resolvedOk: true, resolvedAt: now
+      }).then(function(){
+        sgUpdateBadge();
+        return { ok: true, id: id, resolvedAt: now };
+      });
+    },
+    reopen: function(id, feedbackText){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var txt = String(feedbackText || '').trim();
+      if(!txt) return Promise.reject(new Error('보완이 필요한 내용을 적어주세요.'));
+      var orig = (_chatImpMap && _chatImpMap[id]) || {};
+      var cat = sgCatClass(orig.cat || 'portal');
+      var reTitle = ('↩ 재요청: ' + (orig.title || '개선 요청')).slice(0, 200);
+      return window.portalChatImprove.submit({
+        cat: cat, title: reTitle, content: txt, relatedId: id
+      }).then(function(res){
+        return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+          seen: true, resolvedOk: false, feedback: txt.slice(0, 2000), feedbackAt: Date.now()
+        }).catch(function(){}).then(function(){
+          sgUpdateBadge();
+          return { ok: true, id: res.id, relatedId: id, title: reTitle, cat: cat };
+        });
+      });
+    },
+    subscribe: function(fn){
+      if(typeof fn !== 'function') return function(){};
+      if(_chatImpSubs.indexOf(fn) < 0) _chatImpSubs.push(fn);
+      if(SG.uid) { try { fn(_chatImpMap, SG.uid); } catch(_){} }
+      return function(){
+        var idx = _chatImpSubs.indexOf(fn);
+        if(idx >= 0) _chatImpSubs.splice(idx, 1);
+      };
+    },
+    stop: chatImpStopWatch,
+    isAdmin: sgIsAdmin,
+    catName: sgCatName,
+    openAdminDetail: function(id){
+      if(!sgIsAdmin() || !_chatImpValidId(id)) return false;
+      sgOpen();
+      sgViewDetail(id);
+      return true;
+    }
+  };
+
   /* ══ 🤖 AI 답변 도움 (대표 지시 2026-09-11) ══════════════════════════════
      건의가 올라오면 서버(suggestionAssist)가 요약·종류·짐작·답변 초안을 지어
      suggestions_private/{id}/assist 에 적어 둔다.
@@ -7385,7 +7500,7 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=2"></script>
-<script src="js/pu-chatbot.js?v=2"></script>
+<script src="js/pu-chatbot-kb.js?v=3"></script>
+<script src="js/pu-chatbot.js?v=3"></script>
 </body>
 </html>
