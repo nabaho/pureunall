@@ -42,11 +42,13 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=52"></script>
+<script src="js/pu-doc-read.js?v=53"></script>
 <script src="js/pu-photo-look.js?v=1"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
-<script src="js/pu-doc-file.js?v=38"></script>
+<script src="js/pu-quote-detect.js?v=2"></script>
+<script src="js/pu-doc-pick.js?v=2"></script>
+<script src="js/pu-doc-file.js?v=39"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -1991,7 +1993,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=42"></script>
-  <script src="js/pu-handoff.js?v=1"></script>
+  <script src="js/pu-handoff.js?v=2"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -3341,7 +3343,7 @@ function takeHandoff() {
       toast('📥 ' + 어디서 + (쓸것.length > 1 ? 쓸것.length + '건' : '「' + 쓸것[0].name + '」') + ' 을 담습니다'
         + (놓친수 ? ' (못 찾은 것 ' + 놓친수 + '건)' : ''));
       /* isDoc = true — 메일로 오는 것은 사업자등록증·명함·계약서가 많아 글씨를 읽어야 한다 */
-      addFiles(쓸것.map(function (g) { return g.file; }), true, { via: 'mail' });
+      addFiles(쓸것.map(function (g) { return g.file; }), true, { via: 'mail', noSplitAsk: true });
     }).catch(function (e) {
       clearHandoffKey();
       toast('건네받지 못했습니다 — ' + ((e && e.message) || e), 9000);
@@ -6698,7 +6700,7 @@ async function addFiles(fileList, isDoc, opts) {
       '\n\n글자는 그대로 담고 판독도 됩니다 — 없는 것은 원본 파일뿐입니다.\n' +
       '표 줄·도장이 필요한 서류라면 원본을 지우지 마시고 다시 시도해 주세요.');
   }
-  const asks = spread.filter(function (x) { return x.pdf && !x.hwp && x.pdf.pages.length > 1; })
+  const asks = spread.filter(function (x) { return x.pdf && !x.hwp && !(opts && opts.noSplitAsk) && x.pdf.pages.length > 1; })
     .map(function (x) {
       const nm = (x.raw.name || '스캔').replace(/\.(pdf|tiff?|hwpx?)$/i, '');
       return { name: nm, pages: x.pdf.pages.length, hint: pdfSplitHint(x.pdf.pages) };
@@ -6760,6 +6762,7 @@ async function addFiles(fileList, isDoc, opts) {
              바로 원본을 받을 수 있다. 첫 쪽에만 적으면 3쪽을 보다가 원본을 받으려고
              1쪽을 찾아 돌아가야 한다. */
           if (x.orig) file.__pdfDoc.orig = x.orig;
+          if (f.__mailMeta) file.__mailMeta = f.__mailMeta;
         }
         /* 문서에서 펼친 쪽이라는 표시. 아래 장수 상한이 이것을 보고 **세지 않는다** —
            「따로 담기」를 고르면 __pdfDoc 가 없으므로 그것으로는 가릴 수 없다. */
@@ -6874,6 +6877,7 @@ async function addFiles(fileList, isDoc, opts) {
       /* 여러 쪽짜리 스캔에서 왔으면 어느 문서 몇 쪽인지 남긴다(2026-08-10).
          이것이 없으면 올린 뒤에는 서로 남남인 사진 여러 장이 된다. */
       if (f.__pdfDoc) meta.doc = f.__pdfDoc;
+      if (f.__mailMeta) meta.mail = f.__mailMeta;
       /* 「한 문서로 모으는 중」이면 이 문서에 붙인다 — 붙는 순간부터 판독이 멈춘다.
          ⚠ PDF 에서 갈라진 쪽은 이미 제 묶음이 있다(위 줄). **덮지 않는다** —
            덮으면 그 스캔의 쪽 차례가 통째로 뒤엉킨다.
@@ -9394,6 +9398,7 @@ function startRead(job) {
              ⚠ auto:true — 겹치면 «묻지 않고» 표시만 남긴다. 뒤에서 도는 판독이
                창을 띄우면 스물여덟 장이 스물여덟 번 묻고, 아무도 못 본다. */
           .then(function () { if (canSendWorker(r)) return sendWorker(j.id, year, j, { auto: true }); })
+          .then(function () { if (r.kind === 'contract') return autoSendContractToErp(j.id, year, j); })
           .catch(function (e) { console.warn('[보내기]', e); });   // 한 서류가 터져도 다음 서류는 간다
       }, Promise.resolve());
     });
@@ -11102,6 +11107,7 @@ function loadGrid() {
     /* 내 사진 가운데 «옛 자리(실시간DB)»로 물러나 있던 것을 몇 장씩 창고로 옮긴다
        (2026-10-07 전수 점검 — 실측 73장). 없으면 아무것도 안 한다. */
     legacyHealSweep();
+    mailContractSweep();
   }).catch(function (e) {
     /* ⚠ 예전에는 콘솔에만 적고 **빈 화면**을 보여줬다. 그래서 사진이 안 보일 때
        "아직 올린 사진이 없습니다"라고 **거짓말**을 하고, 왜 안 보이는지 아무도
@@ -17005,6 +17011,65 @@ function sendContractRequest() {
   });
 }
 
+function autoSendContractToErp(id, yearHint, job) {
+  if (!window.PuDocFile || typeof PuDocFile.autoRequestContractFromPhoto !== 'function') return Promise.resolve();
+  const it = gridItems.find(function (x) { return x.id === id; });
+  const read = (it && it.meta && it.meta.read) || (job && job._read);
+  if (!read || read.error || read.kind !== 'contract') return Promise.resolve();
+  if (read.filedCtReq && read.filedCtReq.at) return Promise.resolve();
+  const f = readFields(read);
+  const mailMeta = (it && it.meta && it.meta.mail) || (job && job.meta && job.meta.mail) || null;
+  const year = yearHint || (it && it.meta && it.meta.__year) || gridYear;
+  const owner = photoOwner(id) || '';
+  return PuDocFile.autoRequestContractFromPhoto({
+    id: id,
+    year: year,
+    owner: owner,
+    by: PuPhotoStore.myName() || '',
+    fields: f,
+    mailMeta: mailMeta
+  }).then(function (res) {
+    if (!res || !res.ok) return;
+    const stamped = Object.assign({}, read, {
+      filedCtReq: { at: Date.now(), id: res.id, targetStatus: res.targetStatus || 'signed' }
+    });
+    if (it && it.meta) it.meta = Object.assign({}, it.meta, { read: stamped });
+    if (job) job._read = stamped;
+    return PuPhotoStore.saveRead(year, id, stamped, owner);
+  }).catch(function (e) {
+    console.warn('[계약관리 자동등록]', e);
+  });
+}
+
+let _mailContractSweptOnce = false;
+function mailContractSweep() {
+  if (_mailContractSweptOnce) return Promise.resolve();
+  if (typeof viewingOnlyOther === 'function' && viewingOnlyOther()) return Promise.resolve();
+  if (!window.PuDocFile || typeof PuDocFile.pullMailContracts !== 'function') return Promise.resolve();
+  _mailContractSweptOnce = true;
+  return PuDocFile.pullMailContracts({ maxPull: 3 }).then(function (res) {
+    const list = (res && res.pulled) || [];
+    if (list.length) {
+      toast('📥 메일함에서 계약서 ' + list.length + '건을 자동으로 가져와 판독합니다');
+      addFiles(list.map(function (x) { return x.file; }), true, { via: 'mail', noSplitAsk: true });
+    }
+    /* 이미 사진첩에 들어와 읽혔으나 아직 계약관리 요청이 안 나간 메일 계약서도 챙긴다 */
+    const unfiled = gridItems.filter(function (it) {
+      if (!mayTouch(it.id)) return false;
+      const d = it && it.meta && it.meta.doc;
+      if (d && d.page && d.page > 1) return false;
+      const r = it && it.meta && it.meta.read;
+      return !!(r && !r.error && r.kind === 'contract' && (!r.filedCtReq || !r.filedCtReq.at) && (it.meta.via === 'mail' || it.meta.mail));
+    }).slice(0, 5);
+    return unfiled.reduce(function (ch, it) {
+      return ch.then(function () { return autoSendContractToErp(it.id, photoYearOf(it.id), null); });
+    }, Promise.resolve());
+  }).catch(function (e) {
+    _mailContractSweptOnce = false;
+    console.warn('[메일 계약서 자동수집]', e);
+  });
+}
+
 /* 「업체 없음 · 그냥 보관」 — 개인 통장처럼 붙일 업체가 애초에 없는 것.
    ⚠ 사진도 판독값도 그대로 둔다. 치우는 것은 «할 일 표시» 하나뿐이다 —
      답했다고 값까지 없애면 잘못 눌렀을 때 잃는 것이 너무 크다(겹침 물음과 같은 태도).
@@ -18423,6 +18488,7 @@ function readPhoto(id, masked, opt) {
              「올릴 때는 되는데 다시 판독하면 안 된다」가 된다. */
           .then(function () { if (autoSendCoInfo(rr)) return sendCoInfo(pid, photoYearOf(pid), null); })
           .then(function () { if (canSendWorker(rr)) return sendWorker(pid, gridYear, null); })
+          .then(function () { if (rr.kind === 'contract') return autoSendContractToErp(pid, photoYearOf(pid), null); })
           .catch(function (e) { console.warn('[보내기]', e); });   // 한 서류가 터져도 다음 서류는 간다
       }, Promise.resolve());
     });
@@ -22368,7 +22434,7 @@ function runProbe() {
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=4"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

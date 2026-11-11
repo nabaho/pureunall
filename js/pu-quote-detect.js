@@ -18,8 +18,8 @@
 
   /* 남의 견적(우리가 «달라고» 하는 메일·견적 의뢰·물품 견적)은 우리 견적이 아니다 */
   var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신)|견적\s*(의뢰|요청)|상품\s*견적|루나랩/;
-  var CONTRACT = /(자문|위임|용역|컨설팅|교육|위탁|대행)\s*계약서/;
-  var NOT_CONTRACT = /근로계약서/;
+  var CONTRACT = /(자문|위임|용역|컨설팅|교육|위탁|대행|고문)\s*(계약서|약정서)|위임\s*약정|약정서\s*(및\s*위임장)?/;
+  var NOT_CONTRACT = /(근로|연봉|급여)\s*계약서/;
   /* 비교견적 — 제목에 «견적서 요청/작성»이 있으면 우리가 남에게 달라고 한 것, «회신/제출»이면 남이 낸 것 */
   var COMPARE = /비교\s*견적/;
   var COMPARE_ASK = /비교\s*견적서?\s*(요청|작성)/;
@@ -46,7 +46,7 @@
   /* 「자문·위임·용역·컨설팅·교육·위탁·대행 계약서」 — 근로계약서는 아니다 */
   function isOurContract(subject, attNames) {
     var subj = s(subject);
-    if (NOT_CONTRACT.test(subj)) return false;
+    if (NOT_CONTRACT.test(subj + ' ' + joined(attNames))) return false;
     return CONTRACT.test(subj + ' ' + joined(attNames));
   }
   /* 한 메일이 견적도 계약서도 말하면 계약서가 이긴다(메일 하나에 기록 하나) */

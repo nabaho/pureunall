@@ -95,6 +95,7 @@
             type: String(파일.type || 'application/octet-stream'),
             bytes: bytes,
             from: String(파일.from || ''),       /* 어디서 왔는지 — 받는 쪽이 안내에 쓴다 */
+            mailMeta: 파일.mailMeta || null,
           });
         }).then(function () { return 열쇠; });
       });
@@ -118,7 +119,8 @@
             파일 = new Blob([v.bytes], { type: v.type });
             try { 파일.name = v.name; } catch (_) { /* 읽기 전용이면 그대로 */ }
           }
-          return { file: 파일, name: v.name, type: v.type, from: v.from || '' };
+          if (v.mailMeta) { try { 파일.__mailMeta = v.mailMeta; } catch (_) {} }
+          return { file: 파일, name: v.name, type: v.type, from: v.from || '', mailMeta: v.mailMeta || null };
         });
       });
     });

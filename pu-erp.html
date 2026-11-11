@@ -116,7 +116,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
      JSZip 은 쓸 때만 vendor 에서 불러온다(서식을 안 쓰는 날에는 안 받는다). -->
 <!-- 폰 뒤로가기 — 창·메뉴를 한 걸음씩 물러선다 (대표 지시 2026-08-30) -->
-<script src="js/pu-back.js?v=4"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script src="js/pu-form-fill.js?v=2"></script>
 <script src="js/pu-form-auto.js?v=1"></script>
 <script src="js/pu-fin-phone.js?v=2"></script>
@@ -239,7 +239,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
-<script src="js/pu-doc-read.js?v=52"></script>
+<script src="js/pu-doc-read.js?v=53"></script>
 <!-- 옵시디언 업무요약 — 떠 있는 단추를 달지 않는다: 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 덮었다(2026-09-27).
      메뉴 바닥의 한 줄(환경설정 바로 위)에서 연다. -->
 <script>window.PU_OBSIDIAN_NO_FAB = true;</script>
@@ -20803,6 +20803,78 @@ function erpQuoteLanePlan(req, cos, cts, users){
   return { action:'create', form:form };
 }
 
+/* ══════ 사진첩·메일함 계약서(kind=contract) 자동 정리 및 계약확정 (대표 지시 2026-11-10) ══════ */
+function erpParseContractMoney(v){
+  var s = String(v == null ? '' : v).replace(/\([^)]*\)/g, '');
+  if(!s.trim()) return 0;
+  var man = s.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*만\s*원?/);
+  if(man){
+    var nMan = parseFloat(man[1].replace(/,/g, '')) || 0;
+    if(nMan > 0) return Math.round(nMan * 10000);
+  }
+  var won = s.match(/(\d{1,3}(?:,\d{3})+|\d{4,})/);
+  if(won) return parseInt(won[1].replace(/,/g, ''), 10) || 0;
+  return 0;
+}
+function erpParseSuccessFee(v){
+  var s = String(v == null ? '' : v).replace(/\([^)]*\)/g, '');
+  if(!s.trim()) return { type:'amount', fee:0 };
+  var pct = s.match(/(\d+(?:\.\d+)?)\s*%/);
+  if(pct){
+    var p = parseFloat(pct[1]) || 0;
+    if(p > 0) return { type:'percent', fee:p };
+  }
+  var amt = erpParseContractMoney(s);
+  return { type:'amount', fee:amt };
+}
+function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTypes){
+  var f = cf || {};
+  var docName = String(f.docName || '').trim();
+  var scope = String(f.scope || '').trim();
+  var text = [docName, scope].filter(Boolean).join(' ');
+  if(/부당해고|부당징계|부당전보|구제신청|노동위원회|\d{4}\s*부해|임금\s*체불|퇴직금|체당금|대지급금|산재|요양\s*신청|장해\s*급여|유족\s*급여|직장\s*내\s*(괴롭힘|성희롱)|행정심판|진정\s*사건|사건\s*처리|위임\s*약정|약정서\s*및\s*위임장/.test(text)
+    || (/위임\s*(계약|약정)/.test(docName) && !/급여|자문|기금|컨설팅/.test(text))){
+    var cList = caseTypes || [];
+    var pickCase = function(rx, fallback){
+      var hit = cList.find(function(t){ return t && (rx.test(t.name || '') || rx.test(t.short || '')); });
+      return (hit && hit.code) || fallback;
+    };
+    var cCode = '';
+    if(/부당해고|부당징계|부당전보|구제신청|노동위원회|부해/.test(text)) cCode = pickCase(/부당해고|노동위원회|부해/, 'case-dismiss');
+    else if(/대지급금|체당금/.test(text)) cCode = pickCase(/체당|대지급/, 'case-subsidy');
+    else if(/임금|퇴직금|체불|진정|고소/.test(text)) cCode = pickCase(/임금|퇴직금|체불/, 'case-wage');
+    else if(/산재|요양|장해|유족|근로복지공단/.test(text)) cCode = pickCase(/산재|요양/, 'case-injury');
+    else if(/괴롭힘|성희롱|조사/.test(text)) cCode = pickCase(/조사|괴롭힘/, 'case-investigate');
+    else if(/징계/.test(text)) cCode = pickCase(/징계/, 'case-discipline');
+    else if(/행정심판|행심/.test(text)) cCode = pickCase(/행심|행정심판/, 'case-admin');
+    else if(/노사|단체교섭|노동조합/.test(text)) cCode = pickCase(/노사/, 'case-relation');
+    else if(/산업안전|중대재해|산안/.test(text)) cCode = pickCase(/산안|안전/, 'case-safety');
+    else cCode = (cList[0] && cList[0].code) || 'case-dismiss';
+    return { kind:'case', typeCode:cCode };
+  }
+  if(/기금|근로복지/.test(text)){
+    var fList = fundTypes || [];
+    return { kind:'fund', typeCode:(fList[0] && fList[0].code) || '' };
+  }
+  if(/자문\s*계약|노무\s*자문|법률\s*자문|상시\s*자문|고문\s*계약|급여\s*(관리|대행|아웃소싱)/.test(text)){
+    var mList = compTypes || [];
+    var wantPayroll = /급여/.test(text);
+    var mHit = mList.find(function(t){ return t && (wantPayroll ? /급여/.test(t.name || t.code || '') : /자문/.test(t.name || t.code || '')); });
+    return { kind:'company', typeCode:(mHit && mHit.code) || (wantPayroll ? '급여' : '자문') };
+  }
+  var ty = erpConsTypeByDocName(docName || scope, consTypes || []);
+  if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
+  if(/컨설팅|용역|클리닉|일터혁신|기술보호/.test(text)){
+    var kList = consTypes || [];
+    return { kind:'consulting', typeCode:(kList[0] && kList[0].code) || '' };
+  }
+  if(/위임|약정/.test(text)){
+    var cList2 = caseTypes || [];
+    return { kind:'case', typeCode:(cList2[0] && cList2[0].code) || 'case-dismiss' };
+  }
+  return { kind:'company', typeCode:'자문' };
+}
+
 /* 직원이 «지우기»를 눌렀을 때 — 막고 끝내지 않고 «할 일»을 알려 준다 (건의 2026-10-01 박한별)
    「중복이라 하나 지우려는데 관리자가 아니면 삭제할 수 없다고 나온다」 — 이관된 계약은 종료관리에 있고,
    거기 지우기가 「관리자만 삭제 가능합니다」 한 줄로 끝났다. 직원은 무엇을 해야 할지 몰랐다.
@@ -26367,7 +26439,168 @@ function ContractManagement(props){
     return { lane:'quote', made:newOne };
   }
 
+  async function processPhotoContractRequest(key, req){
+    var ref = fbDb.ref('data/contract_requests/' + key);
+    var drop = function(){ return ref.remove().catch(function(){}); };
+    var stop = async function(why){
+      await ref.update({ state:'blocked', why:why, handledAt:Date.now() }).catch(function(){});
+      return { lane:'photo_contract', why:why };
+    };
+    var cos = dbGet('companies', []) || [];
+    var cts = dbGet('contracts', []) || [];
+    var all = cts.filter(function(c){ return c && !c._deleted; });
+    var srcPhoto = req && req.srcPhoto;
+    var srcKey = String((req && req.srcKey) || (req && req.mailMeta && req.mailMeta.srcKey) || '');
+    var targetStatus = (req && req.targetStatus === 'review') ? 'review' : 'signed';
+    if(srcPhoto && srcPhoto.id){
+      var already = all.find(function(c){
+        return c.srcPhoto && c.srcPhoto.id === srcPhoto.id && (c.status === 'signed' || c.status === 'transferred' || c.status === targetStatus);
+      });
+      if(already){ await drop(); return { lane:'photo_contract', noop:'이미 반영한 계약서입니다' }; }
+    }
+    var rCo = (req && req.company) || {};
+    var cname = String(rCo.name || (req && req.companyName) || '').trim();
+    if(!cname) return await stop('계약서에서 회사(의뢰인) 이름을 찾지 못했습니다');
+    var users = getActiveUsers();
+    var sid = String((req && req.managerMain) || '');
+    if(sid && !users.some(function(u){ return u && u.sid === sid; })) sid = '';
+    if(!sid && req && req.by){
+      var byU = users.find(function(u){ return u && u.name === String(req.by).trim(); });
+      if(byU) sid = byU.sid;
+    }
+    if(!sid && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid){
+      if(users.some(function(u){ return u && u.sid === CURRENT_USER.sid; })) sid = CURRENT_USER.sid;
+    }
+    if(!sid) return await stop('담당자를 정해 주세요');
+    var cf = (req && req.contractFields) || {};
+    var guessed = erpGuessContractFromFields(
+      cf,
+      getKindTypes('consulting'),
+      getKindTypes('case'),
+      getKindTypes('company'),
+      getKindTypes('fund')
+    );
+    var kv = guessed.kind;
+    var amt = erpParseContractMoney(cf.retainer || cf.deposit || cf.fee);
+    var succ = erpParseSuccessFee(cf.success);
+    var vatRaw = [cf.vat, cf.retainer, cf.deposit, cf.fee, cf.success].filter(Boolean).join(' ');
+    var vatFlag = erpVatTextToFlag(vatRaw);
+    var briefText = String(cf.scope || cf.docName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    var cms = erpCmsFromDoc(cf);
+    var probe = { company:{ name:cname, bizNo:String(rCo.bizNo || ''), address:String(rCo.address || ''), ceo:String(rCo.ceo || '') } };
+    var sameOpen = all.filter(function(c){
+      return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c);
+    });
+    sameOpen.sort(function(a, b){ return (a.status === 'review' ? 0 : 1) - (b.status === 'review' ? 0 : 1); });
+    if(sameOpen.length >= 1){
+      var cur = sameOpen[0];
+      var nextCo = Object.assign({}, cur.company || {});
+      Object.keys(rCo).forEach(function(k){
+        if(rCo[k] && !nextCo[k]) nextCo[k] = rCo[k];
+      });
+      var nextKinds = (cur.kinds || []).filter(function(k){ return k !== 'consult'; });
+      if(nextKinds.indexOf(kv) < 0) nextKinds.push(kv);
+      var nextTc = Object.assign({}, cur.typeCodes || {});
+      if(guessed.typeCode) nextTc[kv] = guessed.typeCode;
+      var nextAmts = Object.assign({}, cur.amounts || {});
+      if(amt > 0) nextAmts[kv] = amt;
+      var nextBriefs = Object.assign({}, cur.briefs || {});
+      if(briefText && nextBriefs.hasOwnProperty(kv)) nextBriefs[kv] = briefText;
+      var noteLine = '📄 계약서 자동 반영 (' + (cf.docName || '계약서') + ')'
+        + (briefText ? ' · ' + briefText : '')
+        + (targetStatus === 'signed' ? ' → 계약확정' : ' → 계약협의');
+      var upd = Object.assign({}, cur, {
+        company: nextCo,
+        companyName: cur.companyName || nextCo.name || cname,
+        bizNo: cur.bizNo || nextCo.bizNo || '',
+        kinds: nextKinds,
+        typeCodes: nextTc,
+        amounts: nextAmts,
+        briefs: nextBriefs,
+        managerMain: cur.managerMain || sid,
+        status: targetStatus,
+        orderTs: Date.now(),
+        note: (cur.note ? cur.note + '\n\n' : '') + noteLine
+      });
+      if(succ.fee > 0){ upd.successFee = succ.fee; upd.successFeeType = succ.type; }
+      if(vatFlag !== null){ upd.contractFeeVatIncluded = vatFlag; upd.vatType = vatFlag ? 'inclusive' : 'separate'; }
+      if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) upd.signDate = cf.signDate;
+      if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
+      if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.endDate || ''))) upd.endDate = cf.endDate;
+      if(srcPhoto) upd.srcPhoto = srcPhoto;
+      if(srcKey) upd.srcMails = (cur.srcMails || []).concat(cur.srcMails && cur.srcMails.indexOf(srcKey) >= 0 ? [] : [srcKey]);
+      if(!upd.companyId) upd = erpDeferCoLinkIfNew(upd) || upd;
+      if(!persistOne(upd)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
+      await drop();
+      return { lane:'photo_contract', made:upd, confirmed:true };
+    }
+    var form = erpBlankContractForm();
+    Object.keys(rCo).forEach(function(k){
+      var v = rCo[k];
+      if(v !== '' && v != null && form.company.hasOwnProperty(k)) form.company[k] = v;
+    });
+    if(rCo.corpRegNo) form.company.corpRegNo = rCo.corpRegNo;
+    var bizDigits = String(form.company.bizNo || '').replace(/\D/g, '');
+    if(bizDigits.length === 10){
+      var matchedCos = cos.filter(function(x){
+        return x && !x._deleted && String(x.bizNo || '').replace(/\D/g, '') === bizDigits;
+      });
+      if(matchedCos.length === 1 && erpCoNameKey(matchedCos[0].name) === erpCoNameKey(cname)){
+        form.companyId = String(matchedCos[0].id);
+        form.company.companyId = String(matchedCos[0].id);
+        form.company.name = matchedCos[0].name;
+      }
+    }
+    if(!form.companyId){
+      var byIdOrName = (req.companyId ? cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId); })[0] : null)
+        || (function(){ var nh = cos.filter(function(x){ return x && !x._deleted && erpCoNameKey(x.name) === erpCoNameKey(cname); }); return nh.length === 1 ? nh[0] : null; })();
+      if(byIdOrName && erpCoNameKey(byIdOrName.name) === erpCoNameKey(cname)){
+        form.companyId = String(byIdOrName.id);
+        form.company.companyId = String(byIdOrName.id);
+        form.company.name = byIdOrName.name;
+        if(byIdOrName.bizNo) form.company.bizNo = byIdOrName.bizNo;
+      }
+    }
+    form.companyName = form.company.name || cname;
+    form.bizNo = form.company.bizNo || '';
+    form.kinds = [kv];
+    if(guessed.typeCode) form.typeCodes[kv] = guessed.typeCode;
+    if(amt > 0) form.amounts[kv] = amt;
+    if(briefText && form.briefs.hasOwnProperty(kv)) form.briefs[kv] = briefText;
+    if(succ.fee > 0){ form.successFee = succ.fee; form.successFeeType = succ.type; }
+    if(vatFlag !== null){ form.contractFeeVatIncluded = vatFlag; form.vatType = vatFlag ? 'inclusive' : 'separate'; }
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) form.signDate = cf.signDate;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) form.startDate = cf.startDate;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.endDate || ''))) form.endDate = cf.endDate;
+    if(cms.isCMS) form.isCMS = true;
+    if(cms.payDay){ form.cmsPayDay = String(cms.payDay); form.taxInvoicePaymentDay = cms.payDay + '일'; }
+    form.managerMain = sid;
+    form.status = targetStatus;
+    form.orderTs = Date.now();
+    if(srcPhoto) form.srcPhoto = srcPhoto;
+    if(srcKey) form.srcMails = [srcKey];
+    form.note = '📄 사진첩·메일함에서 계약서 자동 정리 (' + (cf.docName || '계약서') + ')'
+      + (briefText ? '\n업무: ' + briefText : '')
+      + (req.by ? ' · 담당 ' + req.by : '');
+    form = erpDeferCoLinkIfNew(form) || form;
+    var clash = erpBiznoClash(form, cos);
+    if(clash) return await stop('같은 사업자번호가 다른 업체(' + (clash.name || '-') + ')에 이미 있습니다');
+    var ym = String(form.signDate || '').slice(0, 7);
+    if(ym && typeof isContractLocked === 'function' && isContractLocked(ym))
+      return await stop(ym + ' 이 잠겨 있어 계약을 만들 수 없습니다');
+    var newOne = Object.assign({}, form, {
+      id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      contractNo: genContractNo(),
+      transferredTo: null,
+      regAt: (new Date()).toISOString()
+    });
+    if(!persistOne(newOne)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
+    await drop();
+    return { lane:'photo_contract', made:newOne };
+  }
+
   async function processOneContractRequest(key, req){
+    if(req && req.source === 'photo_contract') return await processPhotoContractRequest(key, req);
     if(erpQuoteLaneReq(req)) return await processQuoteLaneRequest(key, req);   // 견적 길(계획 3) — 문턱이 따로다
     var form = ctReqHumanFill(ctReqForm(req), req);
     /* ★★ 업체관리에 없는 회사면 «연결 보류»로 둔다 — 사람에게 묻는 길이
@@ -26417,7 +26650,7 @@ function ContractManagement(props){
         var r = await processOneContractRequest(key, all[key]);
         if(r.lane === 'quote'){
           if(r.made) madeQ++; else if(r.attached || r.advanced || r.noop) doneQ++; else blockedQ++;
-        } else if(r.made) made.push(r.made); else blocked++;
+        } else if(r.made) made.push(r.made); else if(!r.noop) blocked++;
       }
     } catch(e){
       console.warn('[계약 등록 요청]', e && e.message);
@@ -26451,6 +26684,7 @@ function ContractManagement(props){
         .map(function(k){ return Object.assign({ _key:k }, all[k]); })
         .sort(function(a,b){ return (b.handledAt||0) - (a.handledAt||0); });
       setBlockedReqs(list);
+      if(Object.keys(all).some(function(k){ return all[k] && all[k].state === 'pending'; })) runContractRequests();
     });
     return function(){ try{ ref.off('value', cb); }catch(_){} };
   }, []);

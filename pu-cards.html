@@ -84,7 +84,7 @@
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
-<script src="js/pu-doc-file.js?v=38"></script>
+<script src="js/pu-doc-file.js?v=39"></script>
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
@@ -3915,8 +3915,8 @@ body.pc #pcDetail{display:flex}
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=42"></script>
-  <script src="js/pu-handoff.js?v=1"></script>
-  <script src="js/pu-doc-pick.js?v=1"></script>
+  <script src="js/pu-handoff.js?v=2"></script>
+  <script src="js/pu-doc-pick.js?v=2"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -29826,7 +29826,8 @@ async function mbDocsToPhotos(){
       if(at < 0){ 못한것.push(String(v.s||'').slice(0,20) + ' (서류 첨부를 못 찾음)'); continue; }
       const f = await mbAttFetch(o, at, atts[at]);
       const k = await PuHandoff.put({ name:f.name, type:f.mime, bytes:f.bytes,
-        from:'메일 · ' + String(v.f || v.e || '').slice(0,40) });
+        from:'메일 · ' + String(v.f || v.e || '').slice(0,40),
+        mailMeta: { dir: v._slug === 'sent' ? 'out' : 'in', slug: String(v._slug || ''), uid: String(v.u || ''), srcKey: 'mail_' + String(v._slug || '') + '_' + String(v.u || ''), subject: String(v.s || ''), from: String(v.f || v.e || ''), to: String(v.to || ''), date: String(v.d || '') } });
       열쇠들.push(k);
     } catch(e){
       못한것.push(String(v.s||'').slice(0,20) + ' (' + ((e&&e.message)||e) + ')');
@@ -29856,7 +29857,8 @@ function mbAttToPhoto(i){
   mbAttFetch(o, i, a)
     .then(f => PuHandoff.put({ name: f.name, type: f.mime, bytes: f.bytes,
       /* 어디서 온 것인지 — 사진첩이 「메일에서 온 서류」라고 알려 줄 수 있게 */
-      from: '메일 · ' + String(v.f || v.e || '').slice(0, 40) }))
+      from: '메일 · ' + String(v.f || v.e || '').slice(0, 40),
+      mailMeta: { dir: o.slug === 'sent' ? 'out' : 'in', slug: String(o.slug || ''), uid: String(o.uid || ''), srcKey: 'mail_' + String(o.slug || '') + '_' + String(o.uid || ''), subject: String(v.s || o.subject || ''), from: String(v.f || v.e || ''), to: String(v.to || ''), date: String(v.d || '') } }))
     .then(k => { goPhotos('take=' + encodeURIComponent(k)); })
     .catch(e => toast('사진첩으로 담지 못했습니다 — ' + ((e&&e.message)||e), 9000));
 }
@@ -42830,7 +42832,7 @@ function delMailBlock(email){
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=4"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){
   /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
      ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */

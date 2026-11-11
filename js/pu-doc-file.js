@@ -1709,6 +1709,390 @@
     return deps.db.ref(CT_REQ + '/' + key).set(rec).then(function () { return key; });
   }
 
+  /* ══════ 계약서 사진 판독 → 푸른이알피 계약관리 자동 등록·확정 요청 (2026-11-10) ══════
+     사진첩에서 읽힌 계약서(kind === 'contract')의 상호·사업자번호·위임내용·보수·착수금·성공보수·
+     계약일을 정리해 data/contract_requests/ctphoto-{year}_{id} 에 올린다.
+     · 거래처에서 받은 계약서이거나 서명본 계약서는 targetStatus: 'signed' (계약확정 자리로 직행)
+     · 보낸메일함에서 발송한 초안 계약서는 targetStatus: 'review' (계약협의 자리로 이동/생성) */
+  function extractCoFromSubj(s) {
+    var t = String(s || '').trim();
+    if (!t) return '';
+    var m1 = /^\s*\[([^\]]{2,35})\]/.exec(t);
+    if (m1 && !/푸른노무법인|안내|공지|필독|긴급/.test(m1[1])) return m1[1].trim();
+    var m2 = /\(푸른노무법인\)\s*([^\s(\[\]]{2,25})/.exec(t);
+    if (m2 && !/위임|자문|계약|견적|안내|송부/.test(m2[1])) return m2[1].trim();
+    return '';
+  }
+
+  function autoRequestContractFromPhoto(o) {
+    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
+    o = o || {};
+    var f = o.fields || {};
+    var mm = o.mailMeta || {};
+    var compName = String(f.company || '').trim();
+    if (!compName || /푸른노무법인/.test(compName)) {
+      compName = String(mm.companyName || '').trim() || extractCoFromSubj(mm.subject) || extractCoFromSubj(f.docName);
+    }
+    if (!compName || /푸른노무법인/.test(compName)) {
+      return Promise.resolve({ ok: false, reason: 'no_company' });
+    }
+    var safeId = String(o.id || Date.now()).replace(/[.#$/[\]]/g, '_');
+    var year = String(o.year || new Date().getFullYear());
+    var key = 'ctphoto-' + year + '_' + safeId;
+    var reqRef = deps.db.ref(CT_REQ + '/' + key);
+
+    return reqRef.once('value').then(function (sn) {
+      var cur = sn.val();
+      if (cur && cur.state === 'done' && !o.force) {
+        return { ok: true, id: key, already: true };
+      }
+      var pBiz = f.bizno ? findCompanyByBizNo(f.bizno).catch(function () { return null; }) : Promise.resolve(null);
+      var pName = findCompanyByName(compName).catch(function () { return null; });
+      var pStaff = erpStaff();
+      return Promise.all([pBiz, pName, pStaff]).then(function (res) {
+        var matchedCo = res[0] || res[1] || null;
+        var staffList = res[2] || [];
+        var mgrSid = String(mm.managerSid || '').trim();
+        if (!mgrSid && matchedCo && matchedCo.rec && matchedCo.rec.managerMain) {
+          mgrSid = String(matchedCo.rec.managerMain).trim();
+        }
+        if (!mgrSid && mm.managerName) {
+          var byMm = staffList.filter(function (u) { return u.name === String(mm.managerName).trim(); })[0];
+          if (byMm) mgrSid = byMm.sid;
+        }
+        if (!mgrSid && o.by) {
+          var byUp = staffList.filter(function (u) { return u.name === String(o.by).trim(); })[0];
+          if (byUp) mgrSid = byUp.sid;
+        }
+        if (!mgrSid && o.owner) {
+          var byUid = staffList.filter(function (u) { return u.uid === String(o.owner).trim(); })[0];
+          if (byUid) mgrSid = byUid.sid;
+        }
+        if (!mgrSid && staffList.length) {
+          var adm = staffList.filter(function (u) { return u.role === 'admin' || u.name === '권형하'; })[0] || staffList[0];
+          if (adm) mgrSid = adm.sid;
+        }
+        var targetStatus = (mm && mm.dir === 'sent') ? 'review' : 'signed';
+        var rec = {
+          id: key,
+          source: 'photo_contract',
+          state: 'pending',
+          at: Date.now(),
+          by: String(o.by || mm.managerName || ''),
+          targetStatus: targetStatus,
+          managerMain: String(mgrSid || ''),
+          companyId: matchedCo ? String(matchedCo.id || '') : '',
+          company: {
+            name: compName,
+            bizNo: String(((!res[0] || f.biznoOk === false) && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || f.bizno || (matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || '').trim(),
+            ceo: String(f.ceo || (matchedCo && matchedCo.rec && matchedCo.rec.ceo) || '').trim(),
+            corpRegNo: String(f.corpno || (matchedCo && matchedCo.rec && matchedCo.rec.corpRegNo) || '').trim(),
+            address: String(f.address || (matchedCo && matchedCo.rec && matchedCo.rec.address) || '').trim(),
+            phone: String(f.companyTel || (matchedCo && matchedCo.rec && matchedCo.rec.phone) || '').trim()
+          },
+          contractFields: {
+            docName: String(f.docName || '').trim(),
+            scope: String(f.scope || '').trim(),
+            signDate: String(f.signDate || (mm && mm.dateYmd) || '').trim(),
+            startDate: String(f.startDate || '').trim(),
+            endDate: String(f.endDate || '').trim(),
+            term: String(f.term || '').trim(),
+            fee: String(f.fee || '').trim(),
+            vat: String(f.vat || '').trim(),
+            retainer: String(f.retainer || '').trim(),
+            success: String(f.success || '').trim(),
+            deposit: String(f.deposit || '').trim(),
+            memo: String(f.memo || '').trim()
+          },
+          mailMeta: mm && (mm.srcKey || mm.subject) ? mm : null,
+          srcPhoto: {
+            id: String(o.id || ''),
+            year: year,
+            owner: String(o.owner || ''),
+            kind: 'contract',
+            name: String(f.docName || '계약서').trim()
+          }
+        };
+        var pCoInfo = (!res[0] && rec.company.bizNo) ? sendToCoInfo({ kind: 'contract', fields: Object.assign({}, f, { company: compName, bizno: rec.company.bizNo }), photo: { id: String(o.id || ''), year: year, owner: String(o.owner || '') }, byName: rec.by }).catch(function () {}) : Promise.resolve();
+        return Promise.all([reqRef.set(rec), pCoInfo]).then(function () {
+          return { ok: true, id: key, targetStatus: targetStatus };
+        });
+      });
+    });
+  }
+
+  /* ══════ 메일함에서 견적서·계약서 자동 감지 및 계약서 첨부 당겨오기 (2026-11-10) ══════ */
+  var MAIL_READ_MSG_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/readMailMessage';
+  var MAIL_READ_ATT_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/readMailAttachment';
+  var PUB_DOMAINS = { 'naver.com': 1, 'daum.net': 1, 'hanmail.net': 1, 'gmail.com': 1, 'kakao.com': 1, 'nate.com': 1, 'yahoo.com': 1, 'hotmail.com': 1, 'outlook.com': 1 };
+
+  function pullMailContracts(opts) {
+    opts = opts || {};
+    if (!deps.db) return Promise.resolve({ pulled: [], quoteReqsCreated: 0 });
+    var u = global.firebase && global.firebase.auth && global.firebase.auth().currentUser;
+    if (!u || typeof global.fetch !== 'function') return Promise.resolve({ pulled: [], quoteReqsCreated: 0 });
+    var maxPull = Number(opts.maxPull) || 3;
+    var sinceMs = Number(opts.sinceMs) || (Date.now() - 45 * 86400000);
+
+    return Promise.all([
+      deps.db.ref('mailbox/folders').once('value').then(function (s) { return s.val() || {}; }).catch(function () { return {}; }),
+      deps.db.ref(CT_REQ).once('value').then(function (s) { return s.val() || {}; }).catch(function () { return {}; }),
+      deps.db.ref(ERP_CO).once('value').then(function (s) { var w = s.val(); return (w && w.v !== undefined) ? w.v : (w || {}); }).catch(function () { return {}; }),
+      erpStaff(),
+      deps.db.ref(CARDS_ROOT + '/config/mailWhoMsg').once('value').then(function (s) { return s.val() || {}; }).catch(function () { return {}; }),
+      u.getIdToken().catch(function () { return ''; })
+    ]).then(function (initRes) {
+      var folders = initRes[0], reqs = initRes[1], rawCos = initRes[2], staffList = initRes[3], mailWhoMsg = initRes[4], token = initRes[5];
+      if (!token) return { pulled: [], quoteReqsCreated: 0 };
+
+      var coList = [];
+      eachCompany(rawCos, function (co, at) {
+        if (co && co.name) coList.push({ id: co.id || at, rec: co, nameKey: coNameKey(co.name) });
+      });
+
+      function matchCoFromMail(subj, fromName, emailStr) {
+        var em = String(emailStr || '').toLowerCase();
+        var mAddr = /([^\s<>"',;]+@[^\s<>"',;]+)/.exec(em);
+        var addr = mAddr ? mAddr[1].replace(/[)\].]+$/, '') : '';
+        var dom = addr.indexOf('@') > 0 ? addr.split('@')[1] : '';
+        if (addr) {
+          for (var i = 0; i < coList.length; i++) {
+            var c = coList[i].rec;
+            var cEmails = [c.primaryContactEmail, c.contactEmail, c.taxEmail, c.email].concat((c.contacts || []).map(function (ct) { return ct && ct.email; })).map(function (x) { return String(x || '').toLowerCase(); }).join(' ');
+            if (cEmails.indexOf(addr) >= 0) return coList[i];
+          }
+          if (dom && !PUB_DOMAINS[dom]) {
+            var domHits = coList.filter(function (x) {
+              var c = x.rec;
+              var cEmails = [c.primaryContactEmail, c.contactEmail, c.taxEmail, c.email].concat((c.contacts || []).map(function (ct) { return ct && ct.email; })).map(function (e) { return String(e || '').toLowerCase(); }).join(' ');
+              return cEmails.indexOf('@' + dom) >= 0;
+            });
+            if (domHits.length === 1) return domHits[0];
+          }
+        }
+        var candNames = [];
+        var cSubj = extractCoFromSubj(subj);
+        if (cSubj) candNames.push(cSubj);
+        var mParen = /\(([^)]{2,30})\)/.exec(String(fromName || ''));
+        if (mParen && !/푸른노무법인/.test(mParen[1])) candNames.push(mParen[1].trim());
+        if (fromName && !/푸른노무법인/.test(fromName)) candNames.push(String(fromName).replace(/\([^)]*\)/g, '').trim());
+        for (var j = 0; j < candNames.length; j++) {
+          var nk = coNameKey(candNames[j]);
+          if (!nk || nk.length < 2) continue;
+          var exact = coList.filter(function (x) { return x.nameKey === nk; });
+          if (exact.length === 1) return exact[0];
+        }
+        var subjTidy = coNameKey(subj);
+        if (subjTidy.length >= 4) {
+          var inSubj = coList.filter(function (x) { return x.nameKey.length >= 3 && subjTidy.indexOf(x.nameKey) >= 0; });
+          if (inSubj.length === 1) return inSubj[0];
+        }
+        return null;
+      }
+
+      function resolveStaff(slugUid, matchedCo, subj) {
+        var whoVal = mailWhoMsg[slugUid];
+        var whoName = typeof whoVal === 'string' ? whoVal : (whoVal && whoVal.who ? String(whoVal.who) : '');
+        if (whoName) {
+          var st = staffList.filter(function (s) { return s.name === whoName || s.sid === whoName; })[0];
+          if (st) return { sid: st.sid, name: st.name };
+        }
+        if (matchedCo && matchedCo.rec && matchedCo.rec.managerMain) {
+          var st2 = staffList.filter(function (s) { return s.sid === matchedCo.rec.managerMain || s.name === matchedCo.rec.managerMain; })[0];
+          if (st2) return { sid: st2.sid, name: st2.name };
+          return { sid: String(matchedCo.rec.managerMain), name: '' };
+        }
+        for (var i = 0; i < staffList.length; i++) {
+          if (staffList[i].name && String(subj || '').indexOf(staffList[i].name) >= 0) {
+            return { sid: staffList[i].sid, name: staffList[i].name };
+          }
+        }
+        var me = staffList.filter(function (s) { return s.uid === u.uid; })[0] ||
+                 staffList.filter(function (s) { return s.role === 'admin' || s.name === '권형하'; })[0] ||
+                 staffList[0];
+        return me ? { sid: me.sid, name: me.name } : { sid: '', name: '' };
+      }
+
+      var scanSlugs = Object.keys(folders).filter(function (slug) {
+        var k = (folders[slug] && folders[slug].kind) || '';
+        return k === 'inbox' || k === 'sent' || k === 'custom';
+      });
+
+      return Promise.all(scanSlugs.map(function (slug) {
+        return deps.db.ref('mailbox/msgs/' + slug).limitToLast(100).once('value')
+          .then(function (s) { return { slug: slug, kind: (folders[slug] && folders[slug].kind) || 'custom', msgs: s.val() || {} }; })
+          .catch(function () { return { slug: slug, kind: 'custom', msgs: {} }; });
+      })).then(function (folderData) {
+        var quoteWrites = {};
+        var quoteReqsCreated = 0;
+        var pullCandidates = [];
+        var QD = global.PuQuoteDetect;
+        var DP = global.PuDocPick;
+
+        folderData.forEach(function (fd) {
+          var slug = fd.slug, fKind = fd.kind, msgs = fd.msgs || {};
+          Object.keys(msgs).forEach(function (uidKey) {
+            var m = msgs[uidKey] || {};
+            var dMs = Number(m.d) || 0;
+            if (dMs < sinceMs) return;
+            var uid = String(m.u || uidKey);
+            var safeKey = (slug + '_' + uid).replace(/[.#$/[\]]/g, '_');
+            var srcKey = slug + '|' + uid;
+            var subj = String(m.s || '');
+            var an = QD ? QD.namesOf(m.an) : (Array.isArray(m.an) ? m.an : []);
+            var isSent = (fKind === 'sent');
+            var peerName = isSent ? String(m.tn || '') : String(m.f || '');
+            var peerEmail = isSent ? String(m.t || '') : String(m.e || '');
+            var matchedCo = matchCoFromMail(subj, peerName, peerEmail);
+            var coName = (matchedCo && matchedCo.rec && matchedCo.rec.name) ||
+                         extractCoFromSubj(subj) ||
+                         (/\(([^)]{2,30})\)/.exec(peerName) || [])[1] ||
+                         '';
+            var staff = resolveStaff(slug + '_' + uid, matchedCo, subj);
+
+            /* 1) 보낸메일함의 견적서·계약서 → 상담접수(quote) / 계약협의(advance) 요청 생성 */
+            if (isSent && QD) {
+              var docKind = QD.docOf(subj, an);
+              var mqKey = 'mq-' + safeKey;
+              if ((docKind === 'quote' || docKind === 'contract') && !reqs[mqKey] && coName && staff.sid) {
+                quoteWrites[CT_REQ + '/' + mqKey] = {
+                  id: mqKey,
+                  source: 'mail_quote_watch',
+                  kind: docKind === 'contract' ? 'advance' : 'quote',
+                  allowCreateReview: docKind === 'contract',
+                  state: 'pending',
+                  at: Date.now(),
+                  srcKey: srcKey,
+                  companyId: matchedCo ? String(matchedCo.id || '') : '',
+                  company: {
+                    name: coName,
+                    bizNo: (matchedCo && matchedCo.rec && matchedCo.rec.bizNo) ? String(matchedCo.rec.bizNo) : ''
+                  },
+                  managerMain: staff.sid,
+                  mail: {
+                    slug: slug,
+                    uid: uid,
+                    subject: subj,
+                    to: String(m.t || ''),
+                    toName: String(m.tn || ''),
+                    sentAt: dMs,
+                    attNames: an
+                  }
+                };
+                quoteReqsCreated++;
+              }
+            }
+
+            /* 2) 받은메일함·자문사답변 등(및 보낸메일함)의 계약서·위임약정서 첨부 → 사진첩 자동 당겨오기 후보 */
+            var isContractMail = (DP && DP.계약서인가 && DP.계약서인가(m)) ||
+                                 (QD && QD.isOurContract(subj, an) && Number(m.a) > 0);
+            var mpKey = 'mp-' + safeKey;
+            if (isContractMail && !reqs[mpKey]) {
+              var dt = new Date(dMs || Date.now());
+              var ymd = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+              pullCandidates.push({
+                slug: slug,
+                uid: uid,
+                safeKey: safeKey,
+                srcKey: srcKey,
+                mpKey: mpKey,
+                date: dMs,
+                isSent: isSent,
+                subject: subj,
+                mailMeta: {
+                  dir: isSent ? 'sent' : 'recv',
+                  slug: slug,
+                  uid: uid,
+                  srcKey: srcKey,
+                  subject: subj,
+                  from: String(m.f || m.e || ''),
+                  to: String(m.t || ''),
+                  date: dMs,
+                  dateYmd: ymd,
+                  companyName: coName,
+                  companyId: matchedCo ? String(matchedCo.id || '') : '',
+                  managerSid: staff.sid,
+                  managerName: staff.name
+                }
+              });
+            }
+          });
+        });
+
+        pullCandidates.sort(function (a, b) {
+          if (a.isSent !== b.isSent) return a.isSent ? 1 : -1;
+          return b.date - a.date;
+        });
+
+        var pQuoteWrite = Object.keys(quoteWrites).length
+          ? deps.db.ref().update(quoteWrites).catch(function () {})
+          : Promise.resolve();
+
+        var targets = pullCandidates.slice(0, maxPull);
+        var pulled = [];
+
+        function pullNext(idx) {
+          if (idx >= targets.length) return Promise.resolve(pulled);
+          var c = targets[idx];
+          return global.fetch(MAIL_READ_MSG_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ slug: c.slug, uid: String(c.uid), peek: 1 })
+          }).then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) {
+              if (!j || !j.ok) return pullNext(idx + 1);
+              var atts = j.atts || [];
+              var atIdx = -1;
+              for (var k = 0; k < atts.length; k++) {
+                var nm = String((atts[k] && atts[k].name) || '');
+                if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
+                if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) { atIdx = k; break; }
+                if (atIdx < 0) atIdx = k;
+              }
+              if (atIdx < 0) {
+                return deps.db.ref(CT_REQ + '/' + c.mpKey).set({
+                  id: c.mpKey, state: 'skipped_ext', srcKey: c.srcKey, at: Date.now()
+                }).catch(function () {}).then(function () { return pullNext(idx + 1); });
+              }
+              var att = atts[atIdx];
+              return global.fetch(MAIL_READ_ATT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ slug: c.slug, uid: String(c.uid), index: atIdx, part: String(att.part || '') })
+              }).then(function (r2) { return r2.json().catch(function () { return {}; }); })
+                .then(function (j2) {
+                  if (!j2 || !j2.ok || !j2.b64) return pullNext(idx + 1);
+                  var bin = global.atob(j2.b64);
+                  var buf = new Uint8Array(bin.length);
+                  for (var b = 0; b < bin.length; b++) buf[b] = bin.charCodeAt(b);
+                  var fName = String(j2.name || att.name || '계약서.pdf');
+                  var fMime = String(j2.mime || att.mime || (/\.pdf$/i.test(fName) ? 'application/pdf' : 'application/octet-stream'));
+                  var file;
+                  try {
+                    file = new File([buf], fName, { type: fMime });
+                  } catch (e) {
+                    file = new Blob([buf], { type: fMime });
+                    try { file.name = fName; } catch (_) {}
+                  }
+                  try { file.__mailMeta = c.mailMeta; } catch (_) {}
+                  return deps.db.ref(CT_REQ + '/' + c.mpKey).set({
+                    id: c.mpKey, state: 'pulled', srcKey: c.srcKey, at: Date.now(),
+                    fileName: fName, subject: c.subject
+                  }).catch(function () {}).then(function () {
+                    pulled.push({ file: file, mailMeta: c.mailMeta, mpKey: c.mpKey });
+                    return pullNext(idx + 1);
+                  });
+                });
+            }).catch(function () { return pullNext(idx + 1); });
+        }
+
+        return pQuoteWrite.then(function () { return pullNext(0); }).then(function () {
+          return { pulled: pulled, quoteReqsCreated: quoteReqsCreated };
+        });
+      });
+    });
+  }
+
   global.PuDocFile = {
     HAND: HAND,
     init: init,
@@ -1716,6 +2100,8 @@
     consTypes: consTypes,
     guessConsType: guessConsType,
     requestContract: requestContract,
+    autoRequestContractFromPhoto: autoRequestContractFromPhoto,
+    pullMailContracts: pullMailContracts,
     MAIL_MAX_BYTES: MAIL_MAX_BYTES,
     pickMailPeople: pickMailPeople,
     findMailPeople: findMailPeople,

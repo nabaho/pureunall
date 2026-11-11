@@ -2456,16 +2456,16 @@ body.portal-mode #moreFab{display:flex;}
         if(_handled && _portalUid && user.uid !== _portalUid){
           // 다른 사람이 들어온 경우 이전 사람의 타일을 다시 드러내지 않는다.
           _loginGuard.cover();
-          location.replace(location.pathname + '?v=' + Date.now());
-          return;
+          location.replace(location.pathname + '?v=' + Date.now()); return;
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
         }
         try { _loginGuard.userSeen(); } catch(_g){}
-        window._puAuthAt = Date.now();
+        window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
-        else if(_handled && _portalReady && _portalUid === user.uid) _rmBootSplash();
+        else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); enterPortal(user); }
       } else if(_handled){
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
@@ -2520,9 +2520,10 @@ body.portal-mode #moreFab{display:flex;}
       if(!cached || !cached.uid || !cached.email || !cached.acct) return;
       var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
       if(logoutAt && (!cached.at || logoutAt >= cached.at)) return;
-      window._puAuthAt = Date.now();
+      window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
       _handled = true;
-      enterPortal({ uid: cached.uid, email: cached.email }, { acct: cached.acct, all: cached.all || [] });
+      renderPortal(cached.acct, { email: cached.email, all: cached.all || [], via: 'auto' });
+      $('portalView').style.display = 'block'; _portalReady = true; _portalUid = cached.uid; _rmBootSplash();
     } catch(_ir){}
   })();
 
@@ -3263,13 +3264,13 @@ body.portal-mode #moreFab{display:flex;}
     var _via = _freshLogin ? 'login' : 'auto';
     _freshLogin = false;
     // 직원명부에서 이 사용자(이메일 매칭) 찾아 이름·역할 확정 → 그 후에 한 번에 표시
-    function _show(m){
+    function _show(m, fromCache){
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
       _portalReady = true;
       armKakaoPortalHistory();
       try {
-        if(m && m.acct){
+        if(m && m.acct && !fromCache){
           var _fastAcct = JSON.stringify({ uid:user.uid||'', email:String(user.email||'').toLowerCase(), acct:m.acct, all:m.all||[], at:Date.now() });
           sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
           localStorage.setItem('pu_portal_fast_acct', _fastAcct);
@@ -3325,8 +3326,8 @@ body.portal-mode #moreFab{display:flex;}
            && _fp.uid === (user.uid || '')
            && _fp.email === String(user.email || '').toLowerCase()
            && (Date.now() - Number(_fp.at || 0) < 12 * 3600 * 1000)){
-          _show({ acct: _fp.acct, all: _fp.all || [_fp.acct] });
-          return;
+          _show({ acct: _fp.acct, all: _fp.all || [_fp.acct] }, true);
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
         }
       }
     } catch(_fe){}

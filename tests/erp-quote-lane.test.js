@@ -288,3 +288,78 @@ test('⑳ 걸린 요청 창 — 견적 길 요청은 담당자 고르기·연결
   assert.deepEqual(out(patches[1]), ['q1', { deferLink: true }]);
   assert.match(t, /업체관리에 없으면 연결 보류로 등록/);
 });
+
+test('㉑ 사진첩·메일함 계약서(photo_contract) — 금액·성공보수·사건/자문 종류 판별', () => {
+  const FN = ['function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName('].map((d) => cutFn(SRC, d)).join('\n');
+  const ctx = { console, Date, Object, Array, String, Number, JSON, Math, parseInt, parseFloat };
+  vm.createContext(ctx);
+  vm.runInContext(FN + '\nthis.api={erpParseContractMoney,erpParseSuccessFee,erpGuessContractFromFields};', ctx);
+  const A = ctx.api;
+  assert.equal(A.erpParseContractMoney('금 2,200,000 원(부가세 포함)'), 2200000);
+  assert.equal(A.erpParseContractMoney('220만원'), 2200000);
+  assert.deepEqual(out(A.erpParseSuccessFee('금 3,300,000 원 (부가세 포함)')), { type: 'amount', fee: 3300000 });
+  assert.deepEqual(out(A.erpParseSuccessFee('경제적 이익의 15%')), { type: 'percent', fee: 15 });
+  const g1 = A.erpGuessContractFromFields(
+    { docName: '위임약정서', scope: '충남2026부해1332 부당해고 등 구제신청 사건 처리에 관한 일체의 사항' },
+    [], [{ code: 'case-dismiss', name: '부당해고등노동위원회대리(노사)', short: '부해' }], [], []
+  );
+  assert.deepEqual(out(g1), { kind: 'case', typeCode: 'case-dismiss' });
+  const g2 = A.erpGuessContractFromFields(
+    { docName: '자문계약서', scope: '인사노무 상시자문' },
+    [], [], [{ code: '자문', name: '자문' }], []
+  );
+  assert.deepEqual(out(g2), { kind: 'company', typeCode: '자문' });
+});
+
+test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내용을 채우고 계약확정(signed)으로 배치·이동한다', async () => {
+  const FN = [
+    'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(',
+    'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
+    'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
+    'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('
+  ].map((d) => cutFn(SRC, d)).join('\n');
+  const calls = { persist: [], remove: 0, update: [] };
+  const ctx = {
+    console, Date, Object, Array, String, Number, JSON, Math, Promise, parseInt, parseFloat,
+    ERP_CMS_WORDS: ['CMS', '자동이체'],
+    todayYMD: () => '2026-11-10',
+    fbDb: { ref: () => ({ remove: () => { calls.remove++; return Promise.resolve(); }, update: (v) => { calls.update.push(v); return Promise.resolve(); } }) },
+    dbGet: (k, d) => (k === 'companies' ? [CO] : k === 'contracts' ? [] : d),
+    getActiveUsers: () => USERS,
+    getKindTypes: (kv) => (kv === 'case' ? [{ code: 'case-dismiss', name: '부당해고등노동위원회대리(노사)', short: '부해' }] : []),
+    erpDeferCoLinkIfNew: (f) => (f.companyId ? f : Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' })),
+    isContractLocked: () => false,
+    genContractNo: () => '계약-2026-197',
+    persistOne: (o) => { calls.persist.push(o); return true; }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(FN + '\nthis.run=processPhotoContractRequest;', ctx);
+  const r = await ctx.run('k-ct1', {
+    source: 'photo_contract',
+    state: 'pending',
+    targetStatus: 'signed',
+    managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '123-45-67890', corpRegNo: '161471-0001381', address: '충남 가나시 다라로 1', phone: '041-000-0000' },
+    contractFields: {
+      docName: '위임약정서',
+      scope: '충남2026부해1332 부당해고 등 구제신청 사건 처리에 관한 일체의 사항',
+      retainer: '금 2,200,000 원(부가세 포함)',
+      success: '금 3,300,000 원 (부가세 포함)'
+    },
+    srcPhoto: { id: 'p-1', year: 2026, owner: 'u1', kind: 'contract', name: '위임약정서' }
+  });
+  assert.ok(r.made);
+  assert.equal(calls.persist.length, 1);
+  const saved = calls.persist[0];
+  assert.equal(saved.status, 'signed', '계약확정 상태로 등록');
+  assert.deepEqual(out(saved.kinds), ['case']);
+  assert.equal(saved.typeCodes.case, 'case-dismiss');
+  assert.equal(saved.amounts.case, 2200000);
+  assert.equal(saved.successFee, 3300000);
+  assert.equal(saved.successFeeType, 'amount');
+  assert.equal(saved.contractFeeVatIncluded, true);
+  assert.match(saved.briefs.case, /충남2026부해1332/);
+  assert.equal(calls.remove, 1);
+});
