@@ -532,6 +532,13 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
   });
   assert.equal(rSynthWithLib.made.status, 'review', 'confirmed:true 가 있어도 검산 실패 번호는 review 로 격리한다');
+  const rZeroWithLib = await ctx.run('k-synth-zero', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', confirmed: true, managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '000-00-00000' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  assert.equal(rZeroWithLib.made.bizNo, '', '0000000000 은 유효 사업자번호로 인정하지 않는다');
+  assert.equal(rZeroWithLib.made.status, 'review');
 
   delete ctx.PuDocRead;
   calls.persist.length = 0;
