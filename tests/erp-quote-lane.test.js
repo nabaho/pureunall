@@ -475,14 +475,25 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     }
   });
   await prodCtx.PuDocFile.autoRequestContractFromPhoto({
-    id: 'p-badbiz', year: 2026, owner: 'u1', by: '담당가', bizNoOk: false,
-    fields: { company: '가나기관', bizno: '123', docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+    id: 'p-badbiz', year: 2026, owner: 'u1', by: '담당가',
+    fields: { company: '가나기관', bizno: '1234567890', docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
   });
   const builtReq = prodWrites['data/contract_requests/ctphoto-2026_p-badbiz'];
   assert.ok(builtReq, '생산자가 요청을 만들었다');
-  assert.equal(builtReq.companyId, '', '잘못된 사업자번호일 때 이름 검색 업체 ID 로 치환하지 않는다');
-  assert.equal(builtReq.company.bizNo, '', '잘못된 사업자번호일 때 이름 검색 사업자번호로 치환하지 않는다');
-  assert.equal(builtReq.targetStatus, 'review', '사업자번호 미검증 요청은 review 로 격리한다');
+  assert.equal(builtReq.companyId, '', 'PuDocRead.bizNoOk 가 false 인 10자리 번호는 이름/번호 검색 업체 ID 로 연결하지 않는다');
+  assert.equal(builtReq.company.bizNo, '', '검산 실패한 10자리 사업자번호는 요청에 남기지 않는다');
+  assert.equal(builtReq.targetStatus, 'review', '사업자번호 검산 실패 요청은 review 로 격리한다');
+
+  await prodCtx.PuDocFile.autoRequestContractFromPhoto({
+    id: 'p-mailid', year: 2026, owner: 'u1', by: '담당가', bizNoOk: false,
+    mailMeta: { companyId: 'co1', dir: 'in', srcKey: 'INBOX|77' },
+    fields: { company: '가나기관', bizno: '', docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  const builtMailReq = prodWrites['data/contract_requests/ctphoto-2026_p-mailid'];
+  assert.ok(builtMailReq);
+  assert.equal(builtMailReq.companyId, '', '빈 사업자번호 + mailMeta.companyId 로 이름 추정 업체 ID 를 연결하지 않는다');
+  assert.equal(builtMailReq.company.bizNo, '', '빈 사업자번호 + mailMeta.companyId 로 업체 사업자번호를 치환하지 않는다');
+  assert.equal(builtMailReq.targetStatus, 'review', '빈 사업자번호 + mailMeta.companyId 요청도 review 로 격리한다');
 
   mockCts = [card({ id: 'ct-existing-prod', companyId: 'co1', status: 'review', kinds: ['case'] })];
   calls.persist.length = 0;
@@ -490,4 +501,9 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.ok(rFromProd.made);
   assert.notEqual(rFromProd.made.id, 'ct-existing-prod', '생산자 요청을 소비자에 넣어도 기존 카드를 덮어쓰지 않는다');
   assert.equal(rFromProd.made.status, 'review', '기존 카드나 새 카드가 signed 로 확정되지 않는다');
+  calls.persist.length = 0;
+  const rFromMailProd = await ctx.run(builtMailReq.id, builtMailReq);
+  assert.ok(rFromMailProd.made);
+  assert.notEqual(rFromMailProd.made.id, 'ct-existing-prod', 'mailMeta.companyId 경로도 기존 카드를 덮어쓰지 않는다');
+  assert.equal(rFromMailProd.made.status, 'review');
 });
