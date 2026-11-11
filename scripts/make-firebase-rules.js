@@ -2035,4 +2035,62 @@ rules.pu_sign = {
   } }
 };
 
+/* ══ 🛡️ 괴롭힘·성희롱 조사 (pu-harass.html, 2026-11-11) ═════════════════════════
+   근로기준법 제76조의3 제7항(직무상 비밀유지 의무)에 따라 저장 자리를 둘로 가른다:
+     ① harass_invest : 사건 목록·8단계 진행현황·수집 공문 머리글·푸른이알피 동기화 큐 — 읽기는 재직 직원(LOGIN) 공유, 물리 삭제 금지(newData.exists()).
+        ★ 권한 상승 방지: 사건(cases/$id) 수정과 동기화 큐(erp_sync/$id) 발행은 대표(ADMIN) 또는 «이미 배정된» 주·부담당 노무사만 허용하며,
+          부담당은 담당자 목록(managerMain·managerSubs)을 바꿀 수 없고, 신규 생성 시에도 기존재 비밀금고($id) 선점 우회를 차단한다.
+     ② harass_secret : 면담 진술 요약·쟁점별 사실인정 및 3요건 검토·조사결과보고서 본문 —
+        위(루트)에는 .read/.write 를 두지 않고 사건 칸($cid)마다 «그 사건의 주·부담당 노무사 또는 대표(ADMIN)»만 열람·저장한다. */
+const 조사건 = (keyVar) => `root.child('harass_invest').child('cases').child(${keyVar})`;
+const 조사담당식 = (recExpr) => `(${내사번} != null && (${recExpr}.child('managerMain').val() === ${내사번}`
+  + [0, 1, 2, 3, 4].map(function (i) { return ` || ${recExpr}.child('managerSubs').child('${i}').val() === ${내사번}`; }).join('')
+  + '))';
+const 기존조사담당 = 조사담당식('data');
+const 담당자불변 = "newData.child('managerMain').val() === data.child('managerMain').val()"
+  + [0, 1, 2, 3, 4].map(function (i) { return ` && newData.child('managerSubs').child('${i}').val() === data.child('managerSubs').child('${i}').val()`; }).join('');
+const HARASS_CASE_WRITE = `(${LOGIN}) && newData.exists() && (!data.exists()`
+  + ` ? (${ADMIN} || (!root.child('harass_secret').child($id).exists() && ${조사담당식('newData')}))`
+  + ` : (${ADMIN} || (${기존조사담당} && ((${내사번} != null && data.child('managerMain').val() === ${내사번}) || (${담당자불변})))))`;
+const HARASS_SYNC_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건('$id'))})`;
+const HARASS_SECRET_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건('$cid'))})`;
+
+rules.harass_invest = {
+  '.read': LOGIN,
+  cases: { $id: {
+    '.write': HARASS_CASE_WRITE,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+    managerMain: {
+      '.validate': "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+    },
+    managerSubs: {
+      $subIdx: {
+        '.validate': "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+      }
+    }
+  } },
+  erp_sync: { $id: {
+    '.write': `(${HARASS_SYNC_OWNER}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  erp_ack: { $id: {
+    '.write': `(${HARASS_SYNC_OWNER}) && newData.exists() && root.child('harass_invest').child('erp_sync').child($id).exists()`
+      + " && newData.child('syncedRevision').val() === root.child('harass_invest').child('erp_sync').child($id).child('revision').val()",
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  dismissed: { $id: {
+    '.write': `(${LOGIN}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  $other: { '.validate': false }
+};
+
+rules.harass_secret = {
+  $cid: {
+    '.read': HARASS_SECRET_OWNER,
+    '.write': `(${HARASS_SECRET_OWNER}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+  }
+};
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

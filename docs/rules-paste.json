@@ -2872,6 +2872,51 @@
           }
         }
       }
+    },
+    "harass_invest": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "cases": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists() && (!data.exists() ? (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (!root.child('harass_secret').child($id).exists() && (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (newData.child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))) : (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || ((root.child('uid_roles').child(auth.uid).child('sid').val() != null && (data.child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || data.child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || data.child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || data.child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || data.child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || data.child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())) && ((root.child('uid_roles').child(auth.uid).child('sid').val() != null && data.child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (newData.child('managerMain').val() === data.child('managerMain').val() && newData.child('managerSubs').child('0').val() === data.child('managerSubs').child('0').val() && newData.child('managerSubs').child('1').val() === data.child('managerSubs').child('1').val() && newData.child('managerSubs').child('2').val() === data.child('managerSubs').child('2').val() && newData.child('managerSubs').child('3').val() === data.child('managerSubs').child('3').val() && newData.child('managerSubs').child('4').val() === data.child('managerSubs').child('4').val())))))",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+          "managerMain": {
+            ".validate": "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+          },
+          "managerSubs": {
+            "$subIdx": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+            }
+          }
+        }
+      },
+      "erp_sync": {
+        "$id": {
+          ".write": "((auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('harass_invest').child('cases').child($id).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))) && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+        }
+      },
+      "erp_ack": {
+        "$id": {
+          ".write": "((auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('harass_invest').child('cases').child($id).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($id).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))) && newData.exists() && root.child('harass_invest').child('erp_sync').child($id).exists() && newData.child('syncedRevision').val() === root.child('harass_invest').child('erp_sync').child($id).child('revision').val()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+        }
+      },
+      "dismissed": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "harass_secret": {
+      "$cid": {
+        ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('harass_invest').child('cases').child($cid).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))",
+        ".write": "((auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('harass_invest').child('cases').child($cid).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('harass_invest').child('cases').child($cid).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))) && newData.exists()",
+        ".validate": "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+      }
     }
   }
 }

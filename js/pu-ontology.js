@@ -113,6 +113,7 @@
       /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
       primaryRoots:['data','improve_requests','ieum_public','worker_secret','staff_secret'],
+      sharedRoots:['harass_invest'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
@@ -341,7 +342,18 @@
          읽은 사람이 안심하고 틀린다. */
     news:{ name:'뉴스레터', file:'pu-news.html', primaryRoots:['newsletter','ilabor'],
       sharedRoots:['data/companies','homepage/newsBrief','pucards/scheduled','mailbox'],
-      entityTypes:['Organization','Person','Message','Document'] }
+      entityTypes:['Organization','Person','Message','Document'] },
+    /* 괴롭힘·성희롱 조사(pu-harass.html) — 의뢰인 업무 조사 사건 공문 메일 자동수집 · 8단계 진행관리 · 조사결과보고서 · 푸른이알피 자동연동(2026-11-11).
+       ★ 비밀유지 분리(근로기준법 제76조의3 제7항): harass_invest(목록·8단계 진행·공문 머리글·이알피 동기화)는 재직 직원 공유,
+         harass_secret(면담 진술·쟁점 사실인정·조사결과보고서 본문)은 사건 주·부담당 노무사 및 대표만 읽고 쓴다. */
+    harass:{ name:'괴롭힘·성희롱 조사', file:'pu-harass.html', primaryRoots:['harass_invest','harass_secret'],
+      sharedRoots:['uid_roles','data/companies','data/cases','data/biz_case_types','data/user_dir','mailbox'],
+      writeContracts:[{path:'harass_invest/cases/{id}',entityType:'Case'},
+                      {path:'harass_invest/erp_sync/{id}',entityType:'Task'},
+                      {path:'harass_invest/erp_ack/{id}',entityType:'Task'},
+                      {path:'harass_invest/dismissed/{id}',entityType:'Task'},
+                      {path:'harass_secret/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Case','Document','Task','Message'] }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -600,6 +612,9 @@
     /* 컨설팅정산 — 사람별 금액·요율·송금이 든 재무 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     settle_core:{program:'settle',strategy:'in_app',path:'settle',parser:'coverage',
       gives:'컨설팅정산 규칙·연결·안내 파일·정산표·이월 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 괴롭힘·성희롱 조사 — 사건 진행·공문 연결 및 비밀유지 금고(harass_secret)는 앱 안에서만 본다(통합 진단에 민감 진술·본문 미포함). */
+    harass_core:{program:'harass',strategy:'in_app',path:'harass_invest',parser:'coverage',
+      gives:'괴롭힘·성희롱 조사 사건·8단계 진행현황·공문 연결 (진술·보고서 본문은 harass_secret 비밀유지 분리 — 앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
