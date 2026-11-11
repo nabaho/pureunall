@@ -217,7 +217,7 @@ test('⑪ 폰: 별표 찍은 앱은 상단 «자주 쓰는 앱» 박스에 보�
   /* 폰 구간 안에서 자주 쓰는 앱 줄을 감추고, ★ 붙은 칩을 그 자리에서 보인다 */
   const at = HEAD.indexOf('#pinRow.empty{display:none;}');
   assert.ok(at > 0 && HEAD.indexOf('#pinRow{display:none;}') < 0, '★ 폰에서 별표 찍은 앱이 상단 자주 쓰는 앱 박스에 안 보인다');
-  assert.ok(rulesFor('#pinRow .tiles').some((b) => /display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)), '★ 폰 상단 자주 쓰는 앱 박스가 칩 격자로 안 그려진다');
+  assert.ok(rulesFor('#pinTiles').some((b) => /display:grid/.test(b) && /repeat\(auto-(fill|fit),\s*minmax\(/.test(b)), '★ 폰 상단 자주 쓰는 앱 박스가 칩 격자로 안 그려진다');
   assert.match(HEAD.slice(HEAD.lastIndexOf('@media', at), at), /^@media \(max-width:\d+px\)\{/, '★ 자주 쓰는 앱 줄을 PC 에서까지 감췄다');
   assert.ok(rulesFor('.tilerow.fold .tile.is-pin::after').some((b) => /content:'★'/.test(b)), '★ 꾹 눌러도 칩에 ★ 가 안 보인다');
   assert.match(cutFn(E, 'function paintPins('), /classList\.toggle\('is-pin'/, '★ 별표 목록이 바뀌어도 칩의 ★ 가 안 따라간다');
