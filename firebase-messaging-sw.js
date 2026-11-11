@@ -24,7 +24,13 @@ var PORTAL_URL = '/pureunall/enter.html?sg=1';
    외부 도메인·javascript:·다른 경로가 들어오면 기본 포털 주소로 되돌려 오픈 리다이렉트를 막는다. */
 function safePortalUrl(raw) {
   try {
-    var base = (self.location && self.location.origin) || 'https://nabaho.github.io';
+    var hasLoc = typeof URL === 'function' && typeof self !== 'undefined' && self && self.location && self.location.origin;
+    if (!hasLoc) {
+      var s = String(raw || PORTAL_URL);
+      if (/^\/pureunall\/(?!\/)/.test(s) && !/[\r\n\\]/.test(s)) return s;
+      return PORTAL_URL;
+    }
+    var base = self.location.origin;
     var u = new URL(String(raw || PORTAL_URL), base);
     if (u.origin !== base) return new URL(PORTAL_URL, base).href;
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return new URL(PORTAL_URL, base).href;
@@ -56,8 +62,16 @@ firebase.messaging().onBackgroundMessage(function (payload) {
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
   var url = safePortalUrl((e.notification.data && e.notification.data.url) || PORTAL_URL);
+  var hasLoc = typeof URL === 'function' && typeof self !== 'undefined' && self && self.location && self.location.origin;
   var targetUrl = null;
-  try { targetUrl = new URL(url, self.location.origin); } catch (_) {}
+  if (hasLoc) {
+    try { targetUrl = new URL(url, self.location.origin); } catch (_) {}
+  }
+  var getPath = function (v) {
+    var m = String(v || '').match(/^(?:https?:\/\/[^/?#]+)?(\/[^?#]*)/);
+    return m ? m[1] : '';
+  };
+  var targetPath = targetUrl ? targetUrl.pathname : getPath(url);
   /* ⚠ «그 알림이 가리키는 화면»이 열려 있을 때만 그 탭으로 간다 (2026-10-04).
        예전에는 포털 탭이 있으면 무엇이든 거기로 갔다 — 메일 신규 문의 알림을 눌러도
        포털 건의함이 떴다. 같은 출처 + 경로(pathname)로 정확히 견준다. */
@@ -65,11 +79,15 @@ self.addEventListener('notificationclick', function (e) {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
       /* 🚗 출장 알림(trip=)은 «그 일정»을 열어야 한다 — 이미 열린 달력 탭으로 가면 출장 카드가 안 뜬다.
            달력 탭은 이 워커가 다스리지 않아(scope /push/) 주소를 바꿔 줄 수도 없다 → 새로 연다 */
-      if (String(url).indexOf('trip=') < 0 && targetUrl) {
+      if (String(url).indexOf('trip=') < 0 && targetPath) {
         for (var i = 0; i < list.length; i++) {
           try {
-            var cu = new URL(list[i].url);
-            if (cu.origin === targetUrl.origin && cu.pathname === targetUrl.pathname && 'focus' in list[i]) {
+            if (hasLoc && targetUrl) {
+              var cu = new URL(list[i].url);
+              if (cu.origin === targetUrl.origin && cu.pathname === targetUrl.pathname && 'focus' in list[i]) {
+                return list[i].focus();
+              }
+            } else if (getPath(list[i].url) === targetPath && 'focus' in list[i]) {
               return list[i].focus();
             }
           } catch (_) {}

@@ -138,7 +138,7 @@ test('★★ 포털 로그아웃이 «같은 열쇠»에 시각을 적고 이알
   const key = SRC.match(/var LOGOUT_KEY = '([^']+)'/)[1];
   const i = PORTAL.indexOf('function broadcastLogout()');
   assert.ok(i > 0, '★★ 포털에 «지금 나갔다» 적는 자리가 없습니다 — auth.signOut() 하나면 잠든 탭은 모릅니다');
-  const fn = PORTAL.slice(i, i + 600);
+  const fn = cutFn(PORTAL, 'function broadcastLogout(');
   assert.ok(fn.indexOf("'" + key + "'") > 0, '★★ 포털과 authsync 의 열쇠 이름이 다릅니다 — 신호가 서로 안 닿습니다');
   assert.match(fn, /pureun_v6_autologin_sid/, '★★ 이알피 자동 로그인 열쇠를 안 지웁니다');
   assert.match(fn, /pu_auth_uid/, 'uid 를 안 지웁니다');

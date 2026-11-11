@@ -2080,9 +2080,11 @@ function erpStaffLabel(u, list){
            ⚠ 어느 건인지는 여기서 말하지 않는다. 그건 근로자명부 › 퇴사 후 현황이 할 일이고,
              거기서 건별로 정산까지 한다. 알림은 «가야 할 곳»만 가리킨다.
            ⚠ finance_income 을 사람 수만큼 다시 읽던 것도 한 번만 읽게 고쳤다. */
-        var retiredUsers = (dbGet('user_accounts', [])||[]).filter(function(u){return u.status==='retired';});
+            var retiredUsers = (dbGet('user_accounts', [])||[]).filter(function(u){return u.status==='retired';});
         if(retiredUsers.length){
-          var _incAll = dbGet('finance_income', []) || [];
+          var _incAll = (dbGet('finance_income', []) || []).filter(function(fi){
+            return !!fi && !fi._deleted && !(fi.undoneDate && !fi.perfSettled);
+          });
           retiredUsers.forEach(function(u){
             if(!u.retireDate) return;
             var n = 0, sum = 0;
@@ -3827,22 +3829,21 @@ window.erpBackupCheck = function(force){
 
 
 
-// ── 긴급 Firebase 강제 재동기화 (콘솔에서: erpSyncNow()) ──
+// ── 긴급 Firebase 안전 재동기화 (콘솔에서: erpSyncNow()) ──
+// ★ 전체 표를 날 배열({v:[...]})로 통째 덮어쓰지 않는다 — 지운 건(_deleted)·되돌린 건(undoneDate)이
+//   오래된 기기 사본 때문에 되살아나고 다른 기기 입력분이 사라지던 경로를 원천 차단.
 window.erpSyncNow = function(){
-  if(!fbDb){ console.log('❌ Firebase 미연결'); return; }
-  console.log('🔄 Firebase 강제 재동기화 시작...');
-  var SYNC_KEYS2 = ['finance_income','contracts','cases','consultings','funds',
-    'payroll_monthly','activity_log','consult_logs'];
-  var updates = {};
-  var ts = Date.now();
-  SYNC_KEYS2.forEach(function(k){
-    var raw = (typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k);
-    if(!raw) return;
-    try { updates['data/'+k] = { v: JSON.parse(raw), u: ts }; } catch(e){}
+  if(!fbDb){ console.log('❌ Firebase 미연결'); return false; }
+  console.log('🔄 Firebase 안전 재동기화 시작 (보류 변경 건별 전송 — 통째 덮어쓰기 금지)...');
+  var po = window._fbPendingOps || {};
+  var keys = Object.keys(po);
+  var sent = 0;
+  keys.forEach(function(k){
+    try { if(typeof _fbReplayOps === 'function' && _fbReplayOps(k)) sent++; }
+    catch(e){ window._erpErrLog && window._erpErrLog(e); }
   });
-  fbDb.ref().update(updates)
-    .then(function(){ console.log('✅ Firebase 재동기화 완료'); })
-    .catch(function(e){ console.log('❌ 실패:', e.message); });
+  console.log('✅ 보류 변경 ' + sent + '개 표 건별 전송 요청 완료 (통째 덮어쓰기 안 함)');
+  return sent;
 };
 
 // ── 데이터 상태 진단 (콘솔에서: erpDiag()) ──
@@ -5718,8 +5719,23 @@ function dbSet(k, v){
                   if(!Array.isArray(curArr)) return;                                   // 형태 불명 → 중단
                   if(!curArr.every(function(x){ return x && x.id; })) return;           // id 없는 서버 항목 보호 → 중단
                   var _m = {}, _order = [];
+                  var _restoreId = (typeof window !== 'undefined' && window._erpRestoreIntent && (Date.now() - Number(window._erpRestoreIntent.at || 0) < 30000))
+                    ? String(window._erpRestoreIntent.id || '') : '';
                   curArr.forEach(function(x){ if(!_m[x.id]) _order.push(x.id); _m[x.id] = x; });
-                  _diffM.upserts.forEach(function(x){ if(x && x.id){ if(!_m[x.id]) _order.push(x.id); _m[x.id] = x; } });
+                  _diffM.upserts.forEach(function(x){
+                    if(!x || !x.id) return;
+                    var _sv = _m[x.id];
+                    if(_sv){
+                      // ★ 되살아남 방지: 서버가 이미 휴지통(_deleted) 또는 확정 되돌림(undoneDate)으로 못 박은 줄은
+                      //   명시적 휴지통 복원(_restoredAt / _erpRestoreIntent)이 아니면 옛 탭이 덮어써 되살리지 못하게 막는다.
+                      var _okRestore = (_restoreId && _restoreId === String(x.id))
+                        || (x._restoredAt && (!_sv._deletedAt || String(x._restoredAt) >= String(_sv._deletedAt)));
+                      if(_sv._deleted && !x._deleted && !_okRestore) return;
+                      if(_sv.undoneDate && !x.undoneDate) return;
+                    }
+                    if(!_m[x.id]) _order.push(x.id);
+                    _m[x.id] = x;
+                  });
                   _diffM.removes.forEach(function(id){ if(_m[id]) delete _m[id]; });
                   var merged = _order.map(function(id){ return _m[id]; }).filter(Boolean);
                   if(merged.length === 0 && curArr.length > 0){ _guardMsg = '0건'; return; }
@@ -6183,13 +6199,27 @@ function _fbPendKeepRows(localArr, serverArr, ops){
 }
 /* 기준(prev)을 모르는 저장 — 무엇을 «지웠는지» 모르므로 서버 줄을 하나도 안 지운다.
    서버와 다른 줄·새 줄만 얹는다. 서버가 이름 열쇠 표(객체)일 때만 쓴다.
+   ★ 단, 서버에서 이미 지운 줄(_deleted)·확정 되돌린 줄(undoneDate)·종료/이관된 줄(closed/cancelled/transferred)을
+     기준 없는 옛 사본이 덮어써 되살리는 일은 원천 차단한다(명시적 휴지통 복원 _restoredAt 제외).
    돌려주는 것: 보낼 경로들, 또는 보낼 것이 없으면 null. */
 function _fbUnknownBaseUpserts(k, v, srvMap, ts){
   if(!Array.isArray(v) || !srvMap || typeof srvMap !== 'object' || Array.isArray(srvMap)) return null;
   var u = {}, n = 0;
+  var restoreId = (typeof window !== 'undefined' && window && window._erpRestoreIntent
+    && (Number(ts || 0) - Number(window._erpRestoreIntent.at || 0) < 30000))
+    ? String(window._erpRestoreIntent.id || '') : '';
   v.forEach(function(x){
     if(!x || x.id == null || x.id === '') return;
     var s = srvMap[x.id];
+    if(s){
+      var okRestore = (restoreId && restoreId === String(x.id))
+        || !!(x._restoredAt && (!s._deletedAt || String(x._restoredAt) >= String(s._deletedAt)));
+      if(s._deleted && !x._deleted && !okRestore) return;
+      if(s.undoneDate && !x.undoneDate) return;
+      var sTerm = (s.status === 'closed' || s.status === 'cancelled' || s.status === 'transferred' || !!s.closedAt || !!s.closedDate || !!s.closeDate || !!s.permanentArchived);
+      var xTerm = (x.status === 'closed' || x.status === 'cancelled' || x.status === 'transferred' || !!x.closedAt || !!x.closedDate || !!x.closeDate || !!x.permanentArchived);
+      if(sTerm && !xTerm && !(Number(x.updatedAt || 0) > Number(s.updatedAt || 0))) return;
+    }
     if(!s || JSON.stringify(s) !== JSON.stringify(x)){ u['data/' + k + '/v/' + x.id] = x; n++; }
   });
   if(!n) return null;
@@ -8345,7 +8375,7 @@ function _erpInvBuild(){
   // 이미 입금된 계산서를 하나도 못 알아봤다
   var incs = _dbAsList(dbGet('finance_income', []));
   incs.forEach(function(i){
-    if(!i) return;
+    if(!(typeof erpIncomeLive === 'function' ? erpIncomeLive(i) : (!!i && !i._deleted && !i.undoneDate))) return;
     var nm = erpNormName(i.companyName);
     if(!nm) return;
     var a = parseInt(i.amount, 10) || 0;
@@ -9089,6 +9119,24 @@ function erpIncomeLive(fi){
 /* 매출로 세는 입금인가 — 살아 있고, 성과급 조정 줄(perf-adjust: 직원 성과급 차액)이 아닌 것 */
 function erpIncomeIsRevenue(fi){
   return erpIncomeLive(fi) && fi.sourceKind !== 'perf-adjust';
+}
+/* 입금 출처(sourceKind) → 원본 저장소 키 매핑 (other → other_projects 누락 방지) */
+function erpIncomeSourceStore(kind){
+  var k = String(kind || '').trim();
+  if(k === 'company') return 'companies';
+  if(k === 'case') return 'cases';
+  if(k === 'consulting') return 'consultings';
+  if(k === 'fund') return 'funds';
+  if(k === 'other' || k === 'other_project' || k === 'other_projects') return 'other_projects';
+  return k ? (k + 's') : '';
+}
+/* 종료·취소·이관·영구보관 등 이미 끝난(불변) 레코드인가 */
+function erpIsTerminalRecord(rec){
+  if(!rec || typeof rec !== 'object') return false;
+  var st = String(rec.status || '').toLowerCase();
+  if(st === 'closed' || st === 'cancelled' || st === 'transferred' || st === 'done' || st === 'end') return true;
+  if(rec.closedAt || rec.closedDate || rec.closeDate || rec.permanentArchived) return true;
+  return false;
 }
 /* 몇 월분 자문료인가 — 받을 달(advisoryYm)이 있으면 그것, 없으면 입금일의 달.
    ⚠ pu-cms-auto.js 의 ymOf 와 같은 결과여야 한다(검사가 견준다). */
@@ -11000,15 +11048,16 @@ var TrashBin = {
     dbSet(storageKey, arr);
     return true;
   },
-  // 복원: _deleted 플래그 제거
+  // 복원: _deleted 플래그 제거 (명시적 복원 시각·의도 기록 — 동기화 되살아남 가드 통과용)
   restore: function(storageKey, itemId){
     var arr = dbGet(storageKey, []) || [];
     if(!Array.isArray(arr)) return false;
     var found = false;
+    var nowIso = new Date().toISOString();
     arr = arr.map(function(x){
       if(x && x.id === itemId && x._deleted){
         found = true;
-        var copy = Object.assign({}, x);
+        var copy = Object.assign({}, x, { _restoredAt: nowIso });
         delete copy._deleted;
         delete copy._deletedAt;
         delete copy._deletedBy;
@@ -11018,6 +11067,7 @@ var TrashBin = {
       return x;
     });
     if(!found) return false;
+    if(typeof window !== 'undefined') window._erpRestoreIntent = { id: String(itemId), at: Date.now() };
     dbSet(storageKey, arr);
     return true;
   },
@@ -14182,7 +14232,7 @@ function Sidebar(props){
       });
       // 3) 세금계산서 (발행·incomes 매칭 없음)
       var invs = dbGet('finance_invoice', []) || [];
-      var ins  = dbGet('finance_income', [])  || [];
+      var ins  = (dbGet('finance_income', []) || []).filter(erpIncomeLive);
       invs.forEach(function(iv){
         if(iv.status !== '발행') return;
         var matched = ins.some(function(i){
@@ -15599,7 +15649,7 @@ function GlobalSearch(props){
         results.push({type:'계약',icon:'📋',color:'#1e40af',title:c.companyName||'-',sub:_nz(_ctKinds(c), c.consultingType||c.caseType||c.fundType||c.programName, c.contractNo)||c.ceoName||'-',mgr:mgrs(c),goto:'biz/contract',closed:false});
       }
     });
-    (dbGet('finance_income', [])||[]).forEach(function(c){
+    (dbGet('finance_income', [])||[]).filter(erpIncomeLive).forEach(function(c){
       if(match(c, ['companyName','kind','note','payee'])){
         results.push({type:'입금',icon:'💵',color:'#16a34a',title:c.companyName||c.kind||'입금',sub:((c.amount?Number(c.amount).toLocaleString('ko-KR')+'원':'')+(c.date?' · '+c.date:''))||'-',mgr:c.managerName||'',goto:'fin/income',closed:false});
       }
@@ -21069,7 +21119,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
     var cons = same0.filter(function(c){ return c.status === 'consult'; });
     var open0 = same0.filter(function(c){ return c.status === 'consult' || c.status === 'review'; }); if(cons.length === 1 && open0.length > 1) return { action:'blocked', why:'같은 사업장에 진행 중 카드가 ' + open0.length + '건 있습니다 — 어느 카드인지 정해 주세요' }; if(cons.length === 1) return { action:'advance', target:cons[0] };
     if(cons.length > 1) return { action:'blocked', why:'같은 사업장에 상담접수 카드가 ' + cons.length + '건 있습니다 — 어느 카드인지 정해 주세요' };
-    if(same0.some(function(c){ return c.status === 'review' || c.status === 'signed' || c.status === 'transferred'; })) return { action:'noop', why:'이미 계약협의 이상으로 진행된 사업장입니다' };
+    if(same0.some(function(c){ return c.status === 'review' || c.status === 'signed' || c.status === 'transferred' || c.status === 'closed' || c.status === 'cancelled'; })) return { action:'noop', why:'이미 계약협의 이상으로 진행된 사업장입니다' };
     if(!r.allowCreateReview) return { action:'blocked', why:'옮길 상담접수 카드가 없습니다' };
   }
   /* kind === 'quote' */
@@ -21098,7 +21148,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
   form.status = kind === 'advance' ? 'review' : 'consult';
   form.managerMain = sid;
   form.srcMails = reqSrcMails;
-  var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; });
+  var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred' || c.status === 'closed'; });
   form.note = note + (renewal ? '\n재계약일 수 있음 — 이 사업장에 이미 계약확정된 계약이 있음.' : '');
   return { action:'create', form:form };
 }
@@ -26913,13 +26963,18 @@ function ContractManagement(props){
     if(srcKey && reqSrcMails.indexOf(srcKey) < 0) reqSrcMails.push(srcKey);
     var synthNote = String((req && req.synthesizedNote) || (req && req.mailMeta && req.mailMeta.lifecycle && req.mailMeta.lifecycle.synthesizedNote) || '').trim();
     var lcMeta = (req && req.mailMeta && req.mailMeta.lifecycle) || null; var isOutDir = !!(req && req.mailMeta && (req.mailMeta.dir === 'sent' || req.mailMeta.dir === 'out')); var hasMailMeta = !!(req && req.mailMeta && (req.mailMeta.dir || req.mailMeta.srcKey || req.mailMeta.subject || req.mailMeta.mpKey || req.mailMeta.companyId || req.mailMeta.lifecycle)); var mailRecvVerified = !hasMailMeta || isOutDir || (req && req.senderVerified === true && (!lcMeta || (lcMeta.senderVerified !== false && (!lcMeta.targetStage || lcMeta.targetStage === 'signed')))) || !!(lcMeta && lcMeta.senderVerified === true && lcMeta.targetStage === 'signed' && (!req || req.senderVerified !== false) && (!req.mailMeta || req.mailMeta.senderVerified !== false)); var reqUnverified = !!(req && ((!isOutDir && req.targetStatus === 'review') || !mailRecvVerified || req.senderVerified === false || (req.mailMeta && req.mailMeta.senderVerified === false) || (!isOutDir && lcMeta && (lcMeta.senderVerified === false || (lcMeta.targetStage && lcMeta.targetStage !== 'signed'))))); var targetStatus = (req && (req.targetStatus === 'review' || reqUnverified)) ? 'review' : 'signed';
+    var _isHandledCt = function(c){
+      return !!(c && (c.status === 'signed' || c.status === 'transferred' || c.status === 'closed' || c.status === 'cancelled' || c.closedAt || c.closedDate || c.permanentArchived));
+    };
     if(srcPhoto && srcPhoto.id){
       var already = all.find(function(c){
-        return c.srcPhoto && c.srcPhoto.id === srcPhoto.id && (c.status === 'signed' || c.status === 'transferred' || c.status === targetStatus);
+        return c.srcPhoto && c.srcPhoto.id === srcPhoto.id && (_isHandledCt(c) || c.status === targetStatus);
       });
       if(already){ await drop(); return { lane:'photo_contract', noop:'이미 반영한 계약서입니다' }; }
     }
-    if((req && req.isDuplicateInErp) || (srcKey && all.some(function(c){ return (c.status === 'signed' || c.status === 'transferred') && (c.srcMails || []).indexOf(srcKey) >= 0; }))){
+    if((req && req.isDuplicateInErp)
+      || (srcKey && all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(srcKey) >= 0; }))
+      || (reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(sk) >= 0; }); }))){
       await drop();
       return { lane:'photo_contract', noop:'이미 반영한 중복 계약서입니다' };
     }
@@ -28837,14 +28892,21 @@ function genNextNo(prefix, year, currentNo, items, selfId, noField){
 
 // 컨설팅 관리번호 계약일(startDate) 순 재정렬
 //   같은 prefix-year 그룹 내에서 startDate 순으로 번호 001~ 재부여
-//   소급 입력된 항목도 자연스럽게 정렬됨
+//   ★ 불변 원칙: 휴지통(_deleted) 건은 제외하고, 종료·취소·영구보관(closed/cancelled 등) 건의 관리번호는 절대 바꾸지 않는다.
 function reorderConsultingNos(){
   var arr = dbGet('consultings', []);
   if(!Array.isArray(arr) || arr.length === 0) return 0;
-  // prefix-year 그룹화
+  var isLocked = function(it){
+    if(!it) return false;
+    if(typeof erpIsTerminalRecord === 'function') return erpIsTerminalRecord(it);
+    var st = String(it.status || '').toLowerCase();
+    return st === 'closed' || st === 'cancelled' || st === 'transferred' || !!it.closedAt || !!it.closeDate || !!it.closedDate || !!it.permanentArchived;
+  };
+  // prefix-year 그룹화 (휴지통 건은 제외 — 죽은 건이 번호를 훔치거나 다시 매겨지지 않게)
   var groups = {};
   arr.forEach(function(item){
-    var m = (item.no||'').match(/^(.+?)-(\d{4})-\d+$/);
+    if(!item || item._deleted) return;
+    var m = (item.no||'').match(/^(.+?)-(\d{4})-(\d+)$/);
     if(!m) return;
     var key = m[1] + '-' + m[2];
     if(!groups[key]) groups[key] = [];
@@ -28854,15 +28916,30 @@ function reorderConsultingNos(){
   var changedItems = [], olds = [];
   Object.keys(groups).forEach(function(key){
     var items = groups[key];
-    // startDate 빠른 순으로 정렬 (없으면 contractDate→createdAt fallback)
-    items.sort(function(a,b){
+    var lockedNums = {};
+    var openItems = [];
+    items.forEach(function(item){
+      if(isLocked(item)){
+        var lm = (item.no||'').match(/^.+?-\d{4}-(\d+)$/);
+        var ln = lm ? (parseInt(lm[1], 10) || 0) : 0;
+        if(ln > 0) lockedNums[ln] = true;
+      } else {
+        openItems.push(item);
+      }
+    });
+    // 진행 중(열린) 건만 startDate 빠른 순으로 정렬 (없으면 contractDate→createdAt fallback)
+    openItems.sort(function(a,b){
       var da = a.startDate || a.contractDate || a.createdAt || '';
       var db = b.startDate || b.contractDate || b.createdAt || '';
-      if(da === db) return 0;
-      return da < db ? -1 : 1;
+      if(da !== db) return da < db ? -1 : 1;
+      return String(a.no || '').localeCompare(String(b.no || ''));
     });
-    items.forEach(function(item, idx){
-      var newNo = key + '-' + ('00'+(idx+1)).slice(-3);
+    var seq = 1;
+    openItems.forEach(function(item){
+      while(lockedNums[seq]) seq++;
+      var pad = seq < 1000 ? ('00' + seq).slice(-3) : String(seq);
+      var newNo = key + '-' + pad;
+      seq++;
       if(item.no !== newNo){ olds.push({ id:item.id, from:item.no, to:newNo }); item.no = newNo; changed++; changedItems.push(item); }
     });
   });
@@ -28873,36 +28950,70 @@ function reorderConsultingNos(){
 }
 
 // 계약-2026 관리번호 빈 번호 메우기 (현재 번호 오름차순 → 001부터 재부여)
-//   이관된 컨설팅·기금·기타·사건의 sourceContractNo 참조도 함께 갱신
+//   ★ 불변 원칙: 휴지통(_deleted) 건은 제외하고, 이관·종료·취소(transferred/closed/cancelled)된 계약의 번호는 고정한다.
 function renumberContracts2026(){
   var arr = dbGet('contracts', []);
   if(!Array.isArray(arr)) return { changed:0 };
   var prefix = '계약-2026-';
-  var grp = arr.filter(function(c){ return (c.contractNo||'').indexOf(prefix) === 0; }).slice()
-    .sort(function(a,b){
-      var na = parseInt((a.contractNo||'').slice(prefix.length),10) || 0;
-      var nb = parseInt((b.contractNo||'').slice(prefix.length),10) || 0;
-      return na - nb;
-    });
+  var isLocked = function(c){
+    if(!c) return false;
+    if(typeof erpIsTerminalRecord === 'function') return erpIsTerminalRecord(c);
+    var st = String(c.status || '').toLowerCase();
+    return st === 'transferred' || st === 'closed' || st === 'cancelled' || !!c.closedAt || !!c.closedDate || !!c.permanentArchived;
+  };
+  var liveGrp = arr.filter(function(c){ return c && !c._deleted && (c.contractNo||'').indexOf(prefix) === 0; });
+  var lockedNums = {};
+  var openGrp = [];
+  liveGrp.forEach(function(c){
+    var num = parseInt((c.contractNo||'').slice(prefix.length), 10) || 0;
+    if(isLocked(c)){
+      if(num > 0) lockedNums[num] = true;
+    } else {
+      openGrp.push(c);
+    }
+  });
+  openGrp.sort(function(a,b){
+    var na = parseInt((a.contractNo||'').slice(prefix.length),10) || 0;
+    var nb = parseInt((b.contractNo||'').slice(prefix.length),10) || 0;
+    return na - nb;
+  });
   var map = {};
-  grp.forEach(function(c, idx){
-    var newNo = prefix + ('00'+(idx+1)).slice(-3);
+  var seq = 1;
+  openGrp.forEach(function(c){
+    while(lockedNums[seq]) seq++;
+    var pad = seq < 1000 ? ('00' + seq).slice(-3) : String(seq);
+    var newNo = prefix + pad;
+    seq++;
     if(c.contractNo !== newNo) map[c.contractNo] = newNo;
   });
   if(Object.keys(map).length === 0) return { changed:0 };
+  var changedContracts = [];
   var newArr = arr.map(function(c){
-    return map[c.contractNo] ? Object.assign({}, c, { contractNo: map[c.contractNo] }) : c;
+    if(c && !c._deleted && map[c.contractNo]){
+      var nextC = Object.assign({}, c, { contractNo: map[c.contractNo] });
+      changedContracts.push(nextC);
+      return nextC;
+    }
+    return c;
   });
-  dbSet('contracts', newArr);
+  if(typeof dbUpsertMany === 'function') dbUpsertMany('contracts', changedContracts);
+  else dbSet('contracts', newArr);
   ['consultings','funds','other_projects','cases'].forEach(function(key){
     var list = dbGet(key, []);
     if(!Array.isArray(list) || list.length === 0) return;
-    var touched = false;
+    var touchedItems = [];
     var nl = list.map(function(x){
-      if(x && map[x.sourceContractNo]){ touched = true; return Object.assign({}, x, { sourceContractNo: map[x.sourceContractNo] }); }
+      if(x && !x._deleted && map[x.sourceContractNo]){
+        var nx = Object.assign({}, x, { sourceContractNo: map[x.sourceContractNo] });
+        touchedItems.push(nx);
+        return nx;
+      }
       return x;
     });
-    if(touched) dbSet(key, nl);
+    if(touchedItems.length){
+      if(typeof dbUpsertMany === 'function') dbUpsertMany(key, touchedItems);
+      else dbSet(key, nl);
+    }
   });
   return { changed:Object.keys(map).length };
 }
@@ -35785,7 +35896,7 @@ function CaseManagement(props){
   }
   async function del(id){
     var c = cases.find(function(x){return x.id===id;});
-    var _linkedInc = dbGet('finance_income', []).filter(function(fi){ return fi.sourceKind==='case' && fi.sourceId===id; });
+    var _linkedInc = dbGet('finance_income', []).filter(function(fi){ return erpIncomeLive(fi) && fi.sourceKind==='case' && fi.sourceId===id; });
     var _delMsg = '사건 ' + (c?c.caseNo:'') + ' 을 삭제하시겠습니까?\n\n→ 휴지통으로 이동 (관리자가 복원 가능)';
     if(_linkedInc.length > 0){
       var _sum = _linkedInc.reduce(function(a,b){return a+(b.amount||0);},0);
@@ -35983,7 +36094,7 @@ function CaseManagement(props){
     if(isIncomeLocked((paidDate||'').slice(0,7))){ showToast('🔒 ' + (paidDate||'').slice(0,7) + ' 입금 마감 — 복원 불가'); return; }
 
     var fi = dbGet('finance_income', []);
-    var already = fi.some(function(f){return f.sourceKind==='case' && f.sourceId===c.id && f.kind===kindLabel;});
+    var already = fi.some(function(f){return erpIncomeLive(f) && f.sourceKind==='case' && f.sourceId===c.id && f.kind===kindLabel;});
     if(already){ showToast('이미 입금 데이터가 있습니다'); return; }
 
     var users = dbGet('user_accounts', []);
@@ -36513,12 +36624,12 @@ function CaseManagement(props){
 
               var retainerPaid = !!(c.retainerPaidDate || (c.incomes||[]).some(function(i){return i.kind==='착수금' && i.confirmed;}));
               var successPaid = !!(c.successPaidDate || (c.incomes||[]).some(function(i){return i.kind==='성공보수' && i.confirmed;}));
-              // ★ 불일치 감지: PaidDate는 있는데 finance_income에 없는 경우
+              // ★ 불일치 감지: PaidDate는 있는데 살아 있는 finance_income에 없는 경우
               var _fi = dbGet('finance_income',[]);
               var retainerMissing = retainerPaid && (c.retainerFee||0)>0
-                && !_fi.some(function(fi){return fi.sourceKind==='case' && fi.sourceId===c.id && fi.kind==='착수금';});
+                && !_fi.some(function(fi){return erpIncomeLive(fi) && fi.sourceKind==='case' && fi.sourceId===c.id && fi.kind==='착수금';});
               var successMissing  = successPaid  && (c.successFee||0)>0
-                && !_fi.some(function(fi){return fi.sourceKind==='case' && fi.sourceId===c.id && fi.kind==='성공보수';});
+                && !_fi.some(function(fi){return erpIncomeLive(fi) && fi.sourceKind==='case' && fi.sourceId===c.id && fi.kind==='성공보수';});
 
               var _row = h('tr', { key:c.id, draggable:true,
                 onDragStart:function(ev){
@@ -37373,7 +37484,7 @@ function CaseDetailModal(props){
   var retainerPaid = (c.incomes||[]).some(function(i){return i.kind==='착수금' && i.confirmed;});
   var successPaid = (c.incomes||[]).some(function(i){return i.kind==='성공보수' && i.confirmed;});
   var finIncomes = dbGet('finance_income', []).filter(function(fi){
-    return fi.sourceKind === 'case' && fi.sourceId === c.id;
+    return erpIncomeLive(fi) && fi.sourceKind === 'case' && fi.sourceId === c.id;
   });
 
   var parentLabel = c.parentCaseNo || (c.parentCaseId ? ((dbGet('cases', []) || []).find(function(x){ return x && x.id === c.parentCaseId; }) || {}).caseNo : '') || '';
@@ -52577,7 +52688,7 @@ function erpInvoiceMatchAll(invs, incs, asOf){
   var _asList = (typeof _dbAsList === 'function') ? _dbAsList
     : function(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function(k){ return v[k]; }) : []); };
   _asList(incs).forEach(function(i){
-    if(!i) return;
+    if(!(typeof erpIncomeLive === 'function' ? erpIncomeLive(i) : (!!i && !i._deleted && !i.undoneDate))) return;
     var a = parseInt(i.amount, 10) || 0;
     if(a <= 0) return;
     _incs.push({ nm:erpNormName(i.companyName), amt:a, date:String(i.date || '').slice(0,10),
@@ -53112,7 +53223,9 @@ function erpUndoIncome(fi){
     }
     dbPatch('finance_income', fi.id, _patch);
     if(fi.sourceId && fi.sourceKind){
-      var store = (fi.sourceKind === 'company') ? 'companies' : (fi.sourceKind + 's');
+      var store = (typeof erpIncomeSourceStore === 'function')
+        ? erpIncomeSourceStore(fi.sourceKind)
+        : ((fi.sourceKind === 'company') ? 'companies' : ((fi.sourceKind === 'other' || fi.sourceKind === 'other_project') ? 'other_projects' : (fi.sourceKind + 's')));
       var rollback = {}, k = fi.kind || '';
       if(k === '사건(착수)' || k.indexOf('착수') >= 0){ rollback.retainerPaid=false; rollback.retainerPaidDate=null; rollback.retainerPaidAmount=0; }
       else if(k === '사건(성공보수)' || k.indexOf('성공') >= 0){ rollback.successPaid=false; rollback.successPaidDate=null; rollback.successPaidAmount=0; }
@@ -56618,9 +56731,9 @@ function FinanceLedger(props){
       h('div',{className:'ld-bar' + (ldTools ? ' on' : ''),style:{display:'flex',gap:'7px',marginBottom:'10px',flexWrap:'wrap',alignItems:'center',
         border:'1.5px solid #e2e8f0',borderRadius:'8px',padding:'5px 9px',background:'#fff'}},
       ldMonths.length>0 && (function(){
-        var _cfm={};                                   // 월별 확정 건수·금액 (finance_income 기준)
+        var _cfm={};                                   // 월별 확정 건수·금액 (살아 있는 finance_income 기준)
         try{(dbGet('finance_income',[])||[]).forEach(function(fi){
-          if(!fi||!fi.date) return;
+          if(!erpIncomeLive(fi)||!fi.date) return;
           var ym=String(fi.date).slice(0,7);
           if(!_cfm[ym]) _cfm[ym]={cnt:0,amt:0};
           _cfm[ym].cnt++; _cfm[ym].amt+=(parseInt(fi.amount,10)||0);
@@ -59225,7 +59338,9 @@ function FinanceLedger(props){
           (fi.companyName||'-') + ' ' + k + ' ' + (fi.amount||0).toLocaleString() + '원\n\n'
           + '들어온 돈은 그대로 두고, 원본 건의 «완납» 표시만 풉니다.\n'
           + '남은 금액이 다시 미입금으로 잡힙니다.'))) return;
-        var store = (fi.sourceKind === 'company') ? 'companies' : (fi.sourceKind + 's');
+        var store = (typeof erpIncomeSourceStore === 'function')
+          ? erpIncomeSourceStore(fi.sourceKind)
+          : ((fi.sourceKind === 'company') ? 'companies' : ((fi.sourceKind === 'other' || fi.sourceKind === 'other_project') ? 'other_projects' : (fi.sourceKind + 's')));
         var patch = {}; patch[flag[0]] = false; patch[flag[1]] = null;
         try{ dbPatch(store, fi.sourceId, patch); }
         catch(e){ if(window._erpErrLog) window._erpErrLog(e); showToast('❌ 바꾸지 못했습니다'); return; }
@@ -59765,7 +59880,7 @@ function IncomeUnmatchedTab(props){
   }
   function setThisYear(){ setMonthFilter(String((new Date()).getFullYear())); }
 
-  var allIncomes = dbGet('finance_income', []);
+  var allIncomes = (dbGet('finance_income', []) || []).filter(erpIncomeLive);
   var unmatched = allIncomes.filter(function(fi){
     if(fi.sourceKind === 'company') return false;  // 업체입금(자문료) 성과관리 제외
     if(!(((fi.perfShares||[]).length === 0) || fi.perfExclude === true || erpPerfPaidZero(fi))) return false;
@@ -61805,7 +61920,7 @@ function IncomePendingTab(props){
 // ── 입금 리스트 탭 (기존 통합 뷰) ──
 function IncomeListTab(){
   var _fill3 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 380px)
-  var existing = dbGet('finance_income', []);
+  var existing = (dbGet('finance_income', []) || []).filter(erpIncomeLive);
   var s = useState(existing); var incomes = s[0]; var setIncomes = s[1];
   /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
   useDbReread(['finance_income'], function(){ refreshIncomes(); });
@@ -61841,7 +61956,7 @@ function IncomeListTab(){
 
   var users = getActiveUsers();
   // ── Phase 2: 건별 저장 (과거회귀 방지) — 그 1건만 서버 반영, 화면 배열 재사용 금지 ──
-  function refreshIncomes(){ setIncomes(dbGet('finance_income', []).slice()); }
+  function refreshIncomes(){ setIncomes((dbGet('finance_income', []) || []).filter(erpIncomeLive)); }
   function incomeLockGuard(it){
     var ym = ((it && it.date) || '').slice(0,7);
     if(ym && isIncomeLocked(ym)){ showToast('🔒 ' + ym + ' 입금 마감 — 변경 불가'); return false; }
@@ -62020,7 +62135,7 @@ function IncomeListTab(){
                 monthFilter + ' 입금내역을 마감(잠금)할까요?\n→ 이후 입금확정·해제·복원 차단\n→ 같은 버튼으로 다시 해제 가능'))) return;
               showToast('🔒 ' + monthFilter + ' 입금 마감 완료');
             }
-            setIncomes(dbGet('finance_income', []));
+            setIncomes((dbGet('finance_income', []) || []).filter(erpIncomeLive));
           },
           title: locked ? monthFilter+' 잠김 — 클릭하여 해제' : monthFilter+' 마감 잠금',
           style:{ padding:'3px 8px', background:locked?'#dc2626':'#fff', color:locked?'#fff':'#475569', border:'1px solid '+(locked?'#dc2626':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:locked?700:600 } },
@@ -63755,6 +63870,7 @@ function IncomeKindTab(props){
       ? Object.keys(allIncomes).map(function(k){return allIncomes[k];}).filter(function(x){return x&&typeof x==='object';})
       : [];
   }
+  allIncomes = allIncomes.filter(erpIncomeLive);
 
   // 월 필터 (기본=이번 월)
   var mf = usePersistedState('income_kind_'+props.kind+'_month', todayYM()); var monthFilter = mf[0]; var setMonthFilter = mf[1];
@@ -64374,8 +64490,8 @@ function FinanceExpense(){
       _ym: r.ym
     };
   });
-  // 카드결제 수수료 (입금건 finance_income.cardFee 파생, finance_expense에는 저장 안 됨)
-  var cardFeeVirtuals = dbGet('finance_income', []).filter(function(i){ return (i.cardFee||0) > 0 && !i.isPersonalIncome; }).map(function(i){
+  // 카드결제 수수료 (입금건 finance_income.cardFee 파생, finance_expense에는 저장 안 됨 — 되돌린/삭제된 입금은 제외)
+  var cardFeeVirtuals = dbGet('finance_income', []).filter(function(i){ return erpIncomeLive(i) && (i.cardFee||0) > 0 && !i.isPersonalIncome; }).map(function(i){
     return {
       id: 'cardfee-'+i.id,
       date: i.date || '',
@@ -71729,7 +71845,7 @@ function FinanceReceivable(props){
   var funds = dbGetLive('funds');
   var others = dbGetLive('other_projects');
   var invoices = dbGet('finance_invoice', []);
-  var incomes = dbGet('finance_income', []);
+  var incomes = (dbGet('finance_income', []) || []).filter(erpIncomeLive);
 
   var today = new Date(); today.setHours(0,0,0,0);
   var todayStr = localYMD(today);
@@ -76181,6 +76297,7 @@ function StaffRosterDetail(props){
           // fiId·shareIdx 를 같이 들고 나가야 나중에 그 줄에 정확히 쓸 수 있다.
           var unsettled = [], settled = [];
           (dbGet('finance_income', [])||[]).forEach(function(fi){
+            if(!fi || fi._deleted || (fi.undoneDate && !fi.perfSettled)) return;
             if(!u.retireDate || (fi.date||'') < u.retireDate) return;
             (fi.perfShares||[]).forEach(function(ps, psIdx){
               var match = ps.sid === u.sid || ps.sid === u.name || (ps.name && ps.name === u.name);
@@ -77568,7 +77685,10 @@ function PerfManagement(props){
     return true;                                   // 재직·휴직 등 그 외 전부 포함
   }));
   var rates = getMgrRates();
-  var allIncomes = dbGet('finance_income', []);
+  // ★ 삭제(_deleted)·확정 되돌림(undoneDate, 마감월 기지급 perfSettled 제외) 입금은 성과관리에서 즉시 제외한다.
+  var allIncomes = (dbGet('finance_income', []) || []).filter(function(fi){
+    return !!fi && !fi._deleted && !(fi.undoneDate && !fi.perfSettled);
+  });
 
   // ── 인센티브(상여내역) 엑셀 가져오기 — 사건별 입금→담당자 성과급 보관 (사업장 연결 없음) ──
   function importIncentiveXlsx(e){
@@ -77718,50 +77838,36 @@ function PerfManagement(props){
 
   var rf = useState(0); var refreshTick = rf[0]; var setRefreshTick = rf[1];
 
-  // 입금확정 해제 (복원) - finance_income 삭제 + 원본 미입금 상태로 되돌림
+  // 입금확정 해제 (복원) - 물리 삭제(dbRemove) 금지 · 단일 관문 erpUndoIncome 으로 undoneDate 기록 + 마감월 차액 조정 + 원본 미입금 복원
   async function unconfirmPerfItem(it){
-    var _fiT = dbGet('finance_income', []).find(function(x){ return x.id === it.fiId; });
-    var _ymP = ((_fiT && _fiT.date) || '').slice(0,7);
-    if(_ymP && isIncomeLocked(_ymP)){ showToast('🔒 ' + _ymP + ' 입금 마감 — 해제 불가'); return; }
+    var target = (dbGet('finance_income', []) || []).find(function(x){ return x && x.id === it.fiId; });
+    if(!target){ showToast('finance_income 항목을 찾을 수 없음'); return; }
+    var _lockYm = erpIncomeLockYm(target);
+    if(_lockYm){ showToast('🔒 ' + _lockYm + ' 입금 마감 — 해제 불가'); return; }
     if(!(await popConfirm('이 입금확정을 해제하고 성과 항목을 복원하시겠습니까?\n\n'
       + '업체: ' + (it.companyName||'-') + '\n'
       + '항목: ' + (it.kind||'-') + '\n'
       + '금액: ' + (it.baseAmount||0).toLocaleString() + '원\n\n'
-      + '→ finance_income 삭제\n'
-      + '→ 원본(사건/컨설팅 등) 미입금 상태 복원'))) return;
-    var fi = dbGet('finance_income', []);
-    var target = fi.find(function(x){ return x.id === it.fiId; });
-    if(!target){ showToast('finance_income 항목을 찾을 수 없음'); return; }
-    // 1) finance_income에서 제거 (그 1건만)
-    dbRemove('finance_income', it.fiId);
-    // 2) 원본 데이터 복원
-    if(target.sourceKind === 'case'){
-      var cases = dbGet('cases', []);
-      var nc = cases.map(function(c){
-        if(c.id !== target.sourceId) return c;
-        var dateKey = target.sourceSubKind === 'retainer' ? 'retainerPaidDate' : 'successPaidDate';
-        var kindLabel = target.sourceSubKind === 'retainer' ? '착수금' : '성공보수';
-        var newIncomes = (c.incomes||[]).filter(function(inc){
-          return !(inc.date === target.date && inc.amount === target.amount && inc.kind === kindLabel);
+      + '→ 입금 확정 되돌림(undoneDate 기록)\n'
+      + '→ 원본(사건/컨설팅/기금/기타 등) 미입금 상태 복원'
+      + erpLockNoticeFor(target)))) return;
+    if(!erpUndoIncome(target)){
+      if(!erpIncomeLockYm(target)) showToast('❌ 입금확정을 해제하지 못했습니다');
+      return;
+    }
+    if(target.sourceKind === 'case' && target.sourceId){
+      var cases = dbGet('cases', []) || [];
+      var curCase = cases.find(function(c){ return c && c.id === target.sourceId; });
+      if(curCase && Array.isArray(curCase.incomes) && curCase.incomes.length){
+        var kindLabel2 = target.sourceSubKind === 'retainer' ? '착수금' : '성공보수';
+        var newIncomes = curCase.incomes.filter(function(inc){
+          return !(inc && inc.date === target.date && inc.amount === target.amount && inc.kind === kindLabel2);
         });
-        var patch = { incomes: newIncomes };
-        patch[dateKey] = '';
-        return Object.assign({}, c, patch);
-      });
-      var _ncT = nc.find(function(c){ return c.id === target.sourceId; });
-      if(_ncT) dbUpsert('cases', _ncT);
-    } else {
-      var storeKeyMap = { consulting:'consultings', fund:'funds', other:'other_projects', company:'companies' };
-      var sk = storeKeyMap[target.sourceKind];
-      if(sk){
-        var arr = dbGet(sk, []);
-        var paidKey = target.sourceSubKind === 'contract' ? 'contractPaid' : 'balancePaid';
-        var dateKey = target.sourceSubKind === 'contract' ? 'contractPaidDate' : 'balancePaidDate';
-        var patch = {}; patch[paidKey] = false; patch[dateKey] = '';
-        if(arr.some(function(x){ return x.id === target.sourceId; })) dbPatch(sk, target.sourceId, patch);
+        if(newIncomes.length !== curCase.incomes.length) dbPatch('cases', target.sourceId, { incomes: newIncomes });
       }
     }
-    showToast('✓ 입금확정 해제 - 성과 항목 복원됨');
+    if(typeof erpIncomeLog === 'function') erpIncomeLog(target, '성과관리에서 입금확정 해제(되돌림)', null, null, '');
+    showToast('✓ 입금확정 해제 — 되돌림 기록 및 원본 미입금 복원됨');
     setRefreshTick(Date.now());
   }
 
@@ -78465,7 +78571,7 @@ function PerfManagement(props){
         return false;
       }
       var personalAll = allIncomes.filter(function(fi){
-        return fi.personalRecipientSid || (fi.deductions && fi.deductions.personalRevenue);
+        return erpIncomeLive(fi) && (fi.personalRecipientSid || (fi.deductions && fi.deductions.personalRevenue));
       });
       // 권한·월 필터
       var monthPersonal = personalAll.filter(function(fi){
@@ -79624,7 +79730,7 @@ function erpPerfMonthOf(item){
    실적으로는 세야 맞고, 급여로는 붙으면 안 된다(그 달 급여는 이미 끝났다).
    ★ 그 하나를 빼면 거르개는 여전히 «한 함수» 다 — 갈라 두면 언젠가 조용히 어긋난다. */
 function erpPerfCounts(item, forPay){
-  if(!item) return false;
+  if(!item || item._deleted) return false;
   if(item.sourceKind === 'company') return false;   // 자문료는 정책상 성과 대상이 아니다
   if(item.isPersonalIncome) return false;           // 개인소득도 아니다
   // 되돌린 건은 안 센다. 다만 마감된 달로 «이미 나간» 몫은 그 달에 그대로 둔다.
@@ -80191,7 +80297,8 @@ function monthCloseIssues(key, ym){
       if(noMgr.length) push('담당자가 비어 있는 계약 '+noMgr.length+'건', noMgr.map(function(c){ return c.companyName || '?'; }));
     }
     if(key === 'income'){
-      var fis = (dbGet('finance_income', []) || []).filter(function(r){ return r && (r.date||'').slice(0,7) === ym; });
+      var _liveR = (typeof erpIncomeLive === 'function') ? erpIncomeLive : function(x){ return !!x && !x._deleted && !x.undoneDate; };
+      var fis = (dbGet('finance_income', []) || []).filter(function(r){ return _liveR(r) && (r.date||'').slice(0,7) === ym; });
       var noCo = fis.filter(function(r){ return !r.companyName; });
       if(noCo.length) out.push('업체가 비어 있는 입금 '+noCo.length+'건');
       if(fis.length === 0) out.push('이 달 입금 기록이 없다');

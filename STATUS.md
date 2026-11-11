@@ -1430,6 +1430,7 @@ Firebase 저장 방식 변경은 2초 우회 약속을 없애고 실제 완료�
    그 값으로 재면 넘친 화면도 «옆넘침 0» 이다 — 2026-10-18 급여데이터함 360px 폰에서 472px 로 잡혀 있었는데 0 으로 나왔다.
    잣대는 «폰 폭»(기기 폭) 하나다. 본문 상자(main{overflow:auto})가 페이지 노릇을 하는 앱은 그 상자 안의 넘침도 본다.
    그리고 **공용으로 떠 있는 단추를 앱마다 숨기지 말 것** — 숨기면 그 일을 할 길이 없어진다. 공용 앱바가 폰에서 정리한다.
+13. **종료·삭제·되돌린 건이 다시 살아나거나 번호가 바뀌기.** ① `finance_income` 을 읽는 새 탭·집계가 `erpIncomeLive`·`erpPerfCounts` 거르개를 빼먹어 되돌린 입금(`undoneDate`)이나 지운 입금(`_deleted`)이 입금 리스트·성과관리에 유령처럼 남고, ② 표 통째 덮어쓰기(`data/<표>`)나 무덤 표식(`_deleted: true` / `co_tombstones`) 없는 물리 삭제 때문에 다른 기기 옛 사본에서 죽은 건이 되살아나고, ③ 번호 재정렬(`reorderConsultingNos`·`renumberContracts2026`)이 휴지통·종결 건의 관리번호까지 뒤에서 밀어 바꾸던 사고가 반복됐다. 코딩·데이터 검토 모두 먼저 `docs/규칙/종료-삭제-되돌림-불변.md` 를 읽고 `node scripts/erp-integrity-audit.js` 와 `tests/anti-resurrection-guards.test.js` 로 지킨다.
 
 ---
 

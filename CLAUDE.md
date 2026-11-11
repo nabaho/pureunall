@@ -93,6 +93,12 @@
 - ★ 계약·사건 입력, 일괄 입력, 은행·카드 문자 수집, 재무 가져오기, 저장 관문·자료 이관, Cloud Functions 쓰기를 만질 때는 **먼저 `docs/규칙/온톨로지.md` 를 읽는다**(검증 함수·금액 자동 대입 금지 등 세부 규칙).
 - 지킴: `tests/ontology-contract.test.js` — 우회하지 않는다. 설계: `docs/푸른통합온톨로지-1단계.md`
 
+## 종료·삭제·되돌림 불변 — 끝난 건은 되살리거나 번호·상태를 바꾸지 않는다 (대표 지시 2026-11-11)
+
+- 코딩·데이터 검토 모두 종결·이관·취소(`closed`·`transferred`·`cancelled`)·마감월(`locked_*`)·휴지통(`_deleted`)·확정 되돌림(`undoneDate`) 건의 번호·상태를 자동 변경하거나 통째 덮어쓰기(`data/<표>`)·물리 삭제로 되살리지 않는다.
+- 입금·성과 조회는 `erpIncomeLive`·`erpPerfCounts` 거르개를 반드시 거치고, 데이터 정리 전후에는 `node scripts/erp-integrity-audit.js` 로 불변성을 검증한다.
+- 지킴: `tests/anti-resurrection-guards.test.js` · 자세히: `docs/규칙/종료-삭제-되돌림-불변.md`
+
 ## 어느 방이든 — 공용 상태 파일 `STATUS.md`
 
 - 여러 방이 동시에 고친다. 시작할 때 `STATUS.md` 를 읽고 `gh pr list --state open` 을 본다. 코드를 만지기 전에 「되풀이된 실수」 절을 읽는다.

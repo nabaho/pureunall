@@ -15,7 +15,7 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 
 ---
 
-## ★ 어기면 되돌려지는 것 여덟
+## ★ 어기면 되돌려지는 것 아홉
 
 ### ① 검사는 「지금 값」이 아니라 「규칙」을 박는다
 `maxHeight:'calc(100vh - 340px)'` 가 아니라 «높이 한도가 있는가»,
@@ -87,6 +87,13 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 → `tests/phone-screen-rules.test.js` · `tests/phone-input-zoom.test.js` · `tests/version-fab-phone-low.test.js`
 진짜 폰으로 볼 때는 `폰미러-켜기.bat`(`tools/phone-mirror.js` — scrcpy 미러 · `--shot` 갈무리 · `--measure` 폰 크롬의 푸른 화면만 measure.js 로 재기).
 **폰을 누르거나 치지 않는다**(사람이 미러 창에서 한다). 갈무리(`tools/phone-mirror/out/`)는 고객 화면이라 저장소·채팅에 올리지 않는다. → `tests/phone-mirror.test.js` · `docs/폰-미러.md`
+
+### ⑨ 종료·삭제·되돌림·마감된 자료는 되살리거나 번호·상태를 바꾸지 않는다 (대표 지시 2026-11-11)
+코드를 고치든 데이터를 검토·정리하든 이미 끝난 기록(`closed`·`transferred`·`cancelled`, `closedAt`/`closedDate`/`closeDate`, `permanentArchived`, 마감월 `locked_*`)의 관리번호(`no`·`contractNo`·`caseNo`)·상태·금액을 자동 재정렬이나 정리 스크립트로 바꾸지 않는다.
+삭제는 물리 제거 대신 무덤 표식(`_deleted: true` · `co_tombstones`)으로 남겨 다른 기기 옛 캐시에서 되살아나지 않게 하고, `DIFF_KEYS` 표 루트(`data/<표>`)를 배열·스냅샷으로 통째 덮어쓰지 않는다.
+`finance_income` 을 읽는 모든 목록·집계·검색은 `erpIncomeLive`, 성과·임금·퇴사자 정산은 `erpPerfCounts`(또는 `!fi._deleted && !(fi.undoneDate && !fi.perfSettled)`)를 거치고, 되돌림 원본 롤백은 `erpIncomeSourceStore` 로 맞춘다.
+데이터 검토·정리 전후에는 반드시 `docs/규칙/종료-삭제-되돌림-불변.md` 의 5단계 절차와 `scripts/erp-integrity-audit.js` 를 돌린다.
+→ `tests/anti-resurrection-guards.test.js` · `scripts/erp-integrity-audit.js`
 
 ---
 
