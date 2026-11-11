@@ -6587,23 +6587,30 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 읽기만 한다. 관리자만 읽을 수 있는 자리라 일반 직원 화면에서는 부르지 않는다. 실패해도 목록은 그대로다. */
   function sgLoadAckStates(){
     if(!sgIsAdmin()) return;
-    /* 나이로 자르지 않는다 — 90일째 답 없는 건이 «가장 알려야 할 건» 이다(외부 검토 지적). 대신 건수로 한도를 둔다: 최근 완료 60건까지. */
-    var todo = (SG._all||[]).filter(function(s){
-      return s.status==='done' && s.authorUid && SG.ack[s._id]===undefined;
-    }).sort(function(a,b){ return (b.repliedAt||b.createdAt||0)-(a.repliedAt||a.createdAt||0); }).slice(0, 60);
-    if(!todo.length) return;
-    var tries = 0;
+    /* 건의자(uid)마다 진행함을 «한 번씩» 읽어 그 사람의 완료 건을 모두 판정한다 — 건수·나이로 자르지 않는다.
+       (예전엔 건마다 두 번씩 읽으며 «최근 60건» 으로 잘라, 완료가 많아지면 가장 오래 답 없는 건이 다시 빠졌다 — 외부 검토 지적.)
+       읽는 양의 한도는 «사람 수»(40명)다. */
+    var byUid = {};
+    (SG._all||[]).forEach(function(s){
+      if(s.status==='done' && s.authorUid && SG.ack[s._id]===undefined){ (byUid[s.authorUid] = byUid[s.authorUid] || []).push(s); }
+    });
+    var uids = Object.keys(byUid).slice(0, 40);
+    if(!uids.length) return;
     function repaint(){
-      /* 검색창에 글자를 치는 중이면 끝날 때까지 미룬다 — 다시 그리면 입력 칸이 새로 만들어져 포커스·한글 조합이 끊긴다 */
-      var ae = (typeof document !== 'undefined') ? document.activeElement : null;
-      if(ae && ae.id==='sgListSearch' && tries++ < 8){ setTimeout(repaint, 1200); return; }
+      /* 목록 화면을 떠났으면 그만. 검색창에 글자를 치는 중이면 «포커스가 빠질 때까지» 미룬다 — 다시 그리면 입력 칸이 새로 만들어져 포커스·한글 조합이 끊긴다 */
+      var d = (typeof document !== 'undefined') ? document : null;
+      if(d && d.getElementById && !d.getElementById('sgListWrap')) return;
+      var ae = d ? d.activeElement : null;
+      if(ae && ae.id==='sgListSearch'){ setTimeout(repaint, 1200); return; }
       sgRenderList();
     }
-    return Promise.all(todo.map(function(s){
-      var base = sgResolvedUidPath(s.authorUid)+'/'+s._id;
-      return Promise.all([ db.ref(base+'/resolvedOk').once('value'), db.ref(base+'/seen').once('value') ]).then(function(r){
-        var ok = r[0].val(), seen = r[1].val();
-        SG.ack[s._id] = ok===true ? 'ok' : (ok===false ? 'no' : (seen===false ? 'wait' : 'old'));
+    return Promise.all(uids.map(function(uid){
+      return db.ref(sgResolvedUidPath(uid)).once('value').then(function(snap){
+        var recs = snap.val() || {};
+        byUid[uid].forEach(function(s){
+          var r = recs[s._id]; if(!r || typeof r!=='object') return;     // 진행함에 줄이 없으면 모른다 — «대기» 로 단정하지 않는다
+          SG.ack[s._id] = r.resolvedOk===true ? 'ok' : (r.resolvedOk===false ? 'no' : (r.seen===false ? 'wait' : 'old'));
+        });
       }).catch(function(){});
     })).then(repaint).catch(function(){});
   }
@@ -6778,7 +6785,7 @@ body.portal-mode #moreFab{display:flex;}
     box.innerHTML = '<div style="border:1px solid #fde68a;background:#fffbeb;border-radius:9px;padding:8px 10px;margin:8px 0">'
       + '<div style="font-size:.76rem;font-weight:800;color:#854d0e;margin-bottom:5px">💡 비슷한 지난 건의 '+scored.length+'건 — 이미 접수·처리된 내용인지 확인해보세요</div>'
       + scored.map(function(x){ var st=SG_STATUS[x.s.status]||SG_STATUS.new;
-          return '<div class="sgSimIt" data-id="'+x.s._id+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
+          return '<div class="sgSimIt" data-id="'+sgEsc(x.s._id)+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
         }).join('')
       + '</div>';
     Array.prototype.forEach.call(box.querySelectorAll('.sgSimIt'), function(el){

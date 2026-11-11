@@ -56,8 +56,10 @@ function pickPending(meta) {
   const m = meta || {};
   return Object.keys(m)
     .filter((id) => m[id] && m[id].status !== 'done')
-    .map((id) => ({ id, status: m[id].status || 'new', cat: m[id].cat || '', title: m[id].title || '',
-      author: m[id].author || '', authorUid: m[id].authorUid || '', createdAt: Number(m[id].createdAt || 0) }))
+    /* 번호·제목은 직원이 쓴 값이다 — 이상한 번호는 unsafe 로 표시(명령에 넣지 말 것), 제목은 제어문자를 걷고 줄인다 */
+    .map((id) => Object.assign({ id, status: m[id].status || 'new', cat: cleanText(m[id].cat, 20), title: cleanText(m[id].title),
+      author: cleanText(m[id].author, 40), authorUid: m[id].authorUid || '', createdAt: Number(m[id].createdAt || 0) },
+      isSafeKey(id) ? {} : { unsafe: true }))
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
@@ -216,8 +218,19 @@ function cmdShow(id) {
     fs.writeFileSync(f, Buffer.from(m[2], 'base64'));
     files.push(f);
   });
-  const card = { id, status: rec.status, cat: rec.cat, title: rec.title, author: rec.author, authorUid: rec.authorUid,
-    createdAt: rec.createdAt, relatedId: rec.relatedId || null, content: rec.content, reply: rec.reply || '',
+  /* 재요청이면 «원본의 건의자 확인 상태» 를 도구가 대신 읽어 준다. relatedId 는 직원이 쓴 값이라 AI 가 그대로 명령에 넣으면 안 된다
+     (외부 보안 검토 2026-11-11). 확인 기록(resolvedOk·resolvedAt)은 건의자 진행함에만 있다 — suggestions_private 에는 없다. */
+  let related = null;
+  if (rec.relatedId) {
+    if (!isSafeKey(rec.relatedId) || !isSafeKey(rec.authorUid)) related = { id: null, unsafe: true };
+    else {
+      const o = getJson('/' + P_RESOLVED + '/' + rec.authorUid + '/' + rec.relatedId) || {};
+      related = { id: rec.relatedId, status: o.status || null, resolvedOk: o.resolvedOk === undefined ? null : o.resolvedOk,
+        resolvedAt: o.resolvedAt || null, feedbackAt: o.feedbackAt || null };
+    }
+  }
+  const card = { id, status: rec.status, cat: cleanText(rec.cat, 20), title: cleanText(rec.title, 200), author: cleanText(rec.author, 40), authorUid: rec.authorUid,
+    createdAt: rec.createdAt, relatedId: (related && related.id) || null, related, content: rec.content, reply: rec.reply || '',
     images: files, imageUrls: imgs.filter((u) => !/^data:/.test(String(u || ''))), assist: rec.assist || null };
   console.log(JSON.stringify(card, null, 2));
 }
@@ -239,6 +252,7 @@ function cmdReply(id) {
   if (!id || !status || !file) throw new Error('사용: reply <건의 번호> --status ing|done --file 답변.txt [--seen true|false] [--again]');
   assertSafeKey(id);
   const rec = getJson('/' + P_PRIVATE + '/' + id);
+  if (rec) assertSafeKey(rec.authorUid, '건의자 uid');          /* 경로에 들어가는 값 — 레코드에서 읽은 것도 믿지 않는다 */
   const seenArg = argOf('--seen');
   const w = buildReplyWrites({ id, rec, status, reply: fs.readFileSync(file, 'utf8'),
     seen: seenArg === undefined ? undefined : seenArg === 'true', again: process.argv.indexOf('--again') >= 0 });
