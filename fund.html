@@ -35,7 +35,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=3"></script>
+<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=4"></script>
 <!-- 다음(Daum) 우편번호 서비스 — 무료, 가입 불필요. 푸른이알피(pu-erp.html)에서 이미 쓰는 것과 같다 -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
@@ -127,7 +127,7 @@
   .search{padding:8px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;min-width:220px}
   button{font-family:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;color:var(--ink)}
   button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}button.primary:hover{background:var(--acc2)}button:disabled{opacity:.45;cursor:not-allowed}
-  .stat{font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px;color:var(--sub)}
+  .stat{font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px;color:var(--ink)}
   .grp-h{font-size:13.5px;font-weight:800;margin:16px 0 6px;display:flex;align-items:center;gap:8px}
   .grp-h .cnt{font-size:11.5px;color:var(--sub);font-weight:600}
   table{width:100%;border-collapse:collapse}
@@ -325,7 +325,7 @@
   .hsel{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 6px;font-size:12px;color:var(--ink);max-width:38vw}
   .ibtn{padding:3px 8px;line-height:1.4}
   /* 도움말 ⓘ — 설명을 화면에 깔지 않고 눌러서 보게 한다 */
-  .hbtn{font-size:11px;line-height:1.5;padding:1px 6px;border:1px solid var(--line);background:#fff;border-radius:999px;color:var(--faint);cursor:pointer;flex:none;vertical-align:middle}
+  .hbtn{font-size:11px;line-height:1.5;padding:3px 7px;border:1px solid var(--line);background:#fff;border-radius:999px;color:var(--sub);cursor:pointer;flex:none;vertical-align:middle}
   .hbtn:hover{background:var(--acc-soft);color:var(--acc2);border-color:#bfdbfe}
   .helpbody{font-size:13px;line-height:1.8;color:var(--ink)}
   .helpbody p{margin:0 0 9px}.helpbody p:last-child{margin-bottom:0}
@@ -1762,6 +1762,7 @@ function openFundKbItem(id){
     +'<b>관련 법령·지침 근거:</b> '+esc(it.law||'')+(it.date?' ('+esc(it.date)+')':'')+'</div>'
     +'<div style="padding:9px 11px;border-left:3px solid var(--acc);background:var(--acc-soft);border-radius:6px;font-size:12.5px;font-weight:600;margin-bottom:10px">'
     +'❓ 질의·쟁점: '+esc(it.q||'')+'</div>'
+    +(it.easy?'<div style="padding:11px 13px;border:1.5px solid var(--acc);border-radius:8px;background:var(--acc-soft);font-size:13px;line-height:1.68;white-space:pre-line;margin-bottom:10px;color:var(--ink)">'+esc(it.easy)+'</div>':'')
     +'<div style="padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;line-height:1.7;white-space:pre-line;margin-bottom:10px">'
     +esc(it.a||'')+'</div>'
     +(pts?'<div style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;font-size:12px;margin-bottom:10px"><b style="color:var(--acc2)">📌 실무 핵심 체크포인트</b><ul style="margin:5px 0 0;padding-left:18px;line-height:1.6">'+pts+'</ul></div>':'')
@@ -13411,7 +13412,7 @@ function _deleteSetupFund(fid,goHome){
       // ③ 기금 하위 데이터 일괄 삭제
       var up={}; up['funds/'+fid]=null; up['sites/'+fid]=null; up['annual/'+fid]=null;
       up['subsidy_docs/'+fid]=null; up['doc_edits/'+fid]=null; up['welfare/'+fid]=null;
-      up['events/'+fid]=null; up['txns/'+fid]=null;
+      up['events/'+fid]=null; up['txns/'+fid]=null; up['stocks/'+fid]=null; up['stock_blobs/'+fid]=null;
       return fbDb.ref(NS).update(up);
     }).then(function(st){
       if(st==='abort') return 'abort';
@@ -19780,8 +19781,8 @@ var STOCK_RETIRE_KINDS=[
 ];
 function scrubStockPii(raw){
   var s=String(raw==null?'':raw);
-  // 주민등록번호·외국인등록번호 (하이픈 유무·공백 포함)
-  s=s.replace(/\b\d{6}\s*[-~–—]\s*[1-8]\d{6}\b/g,'[개인정보차단]');
+  // 주민등록번호·외국인등록번호 (하이픈·물결·마침표·공백·비구분 포함)
+  s=s.replace(/(^|[^\d])\d{6}\s*[-~–—.]\s*[1-8]\d{6}(?!\d)/g,'$1[개인정보차단]');
   s=s.replace(/(^|[^\d])\d{6}\s+[1-8]\d{6}(?!\d)/g,'$1[개인정보차단]');
   s=s.replace(/(^|[^\d])(?:\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))[1-8]\d{6}(?!\d)/g,'$1[개인정보차단]');
   // 운전면허번호
@@ -20153,6 +20154,7 @@ function stockSummaryPanel(f){
   var list=_stockListOf(), maskOn=(S._stockMask!==false);
   var remSh=0, remBook=0, cashInTot=0;
   list.forEach(function(b){
+    if(b&&b.filing_status==='withdrawn') return;
     var ts=_stockNum(b.total_shares), bk=_stockNum(b.book_amount);
     var rs=b.remain_shares!=null?_stockNum(b.remain_shares):ts;
     var rb=b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0);
@@ -20161,37 +20163,44 @@ function stockSummaryPanel(f){
     Object.keys(rets).forEach(function(rk){ cashInTot+=_stockNum((rets[rk]||{}).gross_cash); });
   });
   var rowsHtml=list.map(function(b,i){
+    var isWd=!!(b&&b.filing_status==='withdrawn');
     var ts=_stockNum(b.total_shares), bk=_stockNum(b.book_amount);
-    var rs=b.remain_shares!=null?_stockNum(b.remain_shares):ts;
-    var rb=b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0);
+    var rs=isWd?0:(b.remain_shares!=null?_stockNum(b.remain_shares):ts);
+    var rb=isWd?0:(b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0));
     var hCnt=(b.holders||[]).length;
     var firstH=hCnt?maskHolderName((b.holders[0]||{}).holder,maskOn)+(hCnt>1?' 외 '+(hCnt-1)+'인':''):'—';
     var due=b.due_date||(b.date?dsDue('d+21d',{d:b.date}):'');
+    var docCnt=Object.keys((b&&b.docs)||{}).length, mailCnt=Object.keys((b&&b.mails)||{}).length;
+    var stChip=isWd?'<span class="chip warn" title="출연 미이행·변경신고 반려 요청 등으로 장부 매도가능증권에는 산입하지 않고 과거 이력·서류·메일만 보존합니다">신고반려·미이행(이력보존)</span>'
+      :((rs===0?'<span class="chip">전량소각·처분</span>':'<span class="chip ok">보유중</span>')+(b.filing_status==='completed'?' <span class="chip">신고완료</span>':(due?' <span class="chip" title="출연 변경보고 기한(출연일+3주)">보고기한 '+esc(due)+'</span>':'')));
     return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td>'
       +'<td style="white-space:nowrap">'+esc(b.date||'—')+'</td>'
       +'<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(b.issuer||'')+'"><b>'+esc(b.issuer||'—')+'</b></td>'
       +'<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="주주 '+hCnt+'명">'+esc(firstH)+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'+rs.toLocaleString()+' / '+ts.toLocaleString()+'주</td>'
       +'<td style="text-align:right;white-space:nowrap"><b>'+rb.toLocaleString()+'원</b></td>'
-      +'<td style="white-space:nowrap">'+(rs===0?'<span class="chip">전량소각·처분</span>':'<span class="chip ok">보유중</span>')+(due?' <span class="chip" title="출연 변경보고 기한(출연일+3주)">보고기한 '+esc(due)+'</span>':'')+'</td>'
+      +'<td style="white-space:nowrap">'+stChip+'</td>'
       +'<td style="white-space:nowrap">'
-      +(rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')" style="padding:2px 7px;font-size:11px">🔥 소각·처분</button> ':'')
-      +'<button onclick="openStockForm10(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="별지 제10호 기본재산 총액 변경 내용 보고서 열기">📄 별지10호</button> '
-      +'<button onclick="openStockAssetListPrint(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="별지 제10호 첨부용 변경 재산목록 인쇄">📋 재산목록</button> '
-      +'<button onclick="openStockCertPrint(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="주주별 주식 기금출연확인서 A4 인쇄">🖨 확인서</button> '
-      +'<button onclick="delStockBatch(\''+b._id+'\')" title="주식출연 원장 삭제" aria-label="주식출연 원장 삭제" style="padding:3px 8px;font-size:11px;color:var(--danger)">×</button>'
+      +'<button onclick="openStockDocsModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="비식별 클린 증빙서류 열람·첨부">📎 자료'+(docCnt?' '+docCnt:'')+'</button> '
+      +'<button onclick="openStockMailsModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="푸른메일함 관련 메일 열람·연결">📨 메일'+(mailCnt?' '+mailCnt:'')+'</button> '
+      +(!isWd&&rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px">🔥 소각·처분</button> ':'')
+      +(!isWd?'<button onclick="openStockForm10(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="별지 제10호 기본재산 총액 변경 내용 보고서 열기">📄 별지10호</button> '
+        +'<button onclick="openStockAssetListPrint(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="별지 제10호 첨부용 변경 재산목록 인쇄">📋 재산목록</button> ':'')
+      +'<button onclick="openStockCertPrint(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="주주별 주식 기금출연확인서 A4 인쇄">🖨 확인서</button> '
+      +'<button onclick="delStockBatch(\''+b._id+'\')" title="주식출연 원장 삭제" aria-label="주식출연 원장 삭제" style="padding:4px 9px;font-size:12px;color:var(--danger)">×</button>'
       +'</td></tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px">'
-    +'<b style="font-size:14.5px">📈 보유주식 · 주주 주식출연·소각 원장</b>'+hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')
+    +'<b style="font-size:14.5px">📈 보유주식 · 주주 주식출연·소각 원장</b>'+hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')+hlp('stock.history')
     +(list.length?'<span class="stat">보유 '+remSh.toLocaleString()+'주</span><span class="stat">기본재산 장부가 '+remBook.toLocaleString()+'원</span>'+(cashInTot?'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">누적 소각·처분 유입 '+cashInTot.toLocaleString()+'원</span>':''):'')
     +'<span style="flex:1"></span>'
+    +'<button onclick="openFundChat(\'주주들이 기금에 주식을 출연했을 때 기본재산 계상 기준과 변경보고 절차는?\')" title="주식출연·소각 쉬운 설명 챗봇 열기">💬 쉬운 설명 질문</button>'
     +(S.tab!=='closing'?'<button onclick="S.tab=\'closing\';S.closeSub=\'stocks\';renderFund()" title="회계·결산의 주식출연·소각 전용 회계장부 탭으로 이동">📒 회계·결산 전용보기</button>':'')
     +'<button onclick="toggleStockMask()" title="화면에서 개인 주주 성명을 홍○동으로 가립니다">'+(maskOn?'🔒 주주 실명 가림 켜짐':'🔓 주주 실명 표시중')+'</button>'
     +(remSh>0?'<button onclick="openStockRetireModal()">🔥 주식 소각·처분 처리</button>':'')
     +'<button class="primary" onclick="openStockContribModal()">＋ 주주 주식출연 일괄 등록</button>'
     +'</div>'
-    +(list.length?'<div class="tblwrap" style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>출연일</th><th>발행회사</th><th>출연 주주</th><th style="text-align:right">잔여/출연주식수</th><th style="text-align:right">잔여 장부가액</th><th>상태·보고기한</th><th>처리·서식</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'
+    +(list.length?'<div class="tblwrap" style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>출연일</th><th>발행회사</th><th>출연 주주</th><th style="text-align:right">잔여/출연주식수</th><th style="text-align:right">잔여 장부가액</th><th>상태·보고기한</th><th>자료·메일·처리</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'
       :'<div class="row" style="margin-top:6px;gap:8px;flex-wrap:wrap"><span class="chip">등록된 보유주식이 없습니다 — 사내·공동기금 주주 주식출연 시 [＋ 주주 주식출연 일괄 등록]으로 한 번에 기본재산 변경보고까지 처리하세요</span></div>')
     +'</div>';
 }
@@ -20199,11 +20208,12 @@ function stockSummaryPanel(f){
 function stockAsOfYear(list,yr){
   var yrStr=yr?String(yr):'', yrBoy=yrStr?yrStr+'-01-01':'0000-01-01', yrEnd=yrStr?yrStr+'-12-31':'9999-12-31', yrPre=yrStr?yrStr+'-':'';
   var out={
-    asOfShares:0, asOfBook:0, boyBook:0, curShares:0, curBook:0, priorBatchCount:0,
+    asOfShares:0, asOfBook:0, boyBook:0, curShares:0, curBook:0, priorBatchCount:0, withdrawnCount:0,
     yrContribCount:0, yrContribShares:0, yrContribBook:0, yrContribHolders:0,
     yrRetCount:0, yrRetShares:0, yrRetGross:0, yrRetNet:0, yrRetPrin:0, yrRetGain:0, yrRetLoss:0
   };
   (list||[]).forEach(function(b){
+    if(b&&b.filing_status==='withdrawn'){ out.withdrawnCount++; return; }
     var ts=_stockNum(b.total_shares), bk=_stockNum(b.book_amount);
     var rs=b.remain_shares!=null?_stockNum(b.remain_shares):ts;
     var rb=b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0);
@@ -20293,6 +20303,35 @@ function stockJournalRows(arr){
   });
   return {rows:expanded, apprSum:apprSum, totSum:totSum, unapprCnt:unapprCnt, rawCount:picked.length};
 }
+function toggleStockGuide(){
+  S._hideStockGuide=!S._hideStockGuide;
+  if($('modalbg')&&S._stockModalOpen) _stockModalRender();
+  else renderFund();
+}
+function stockEasyGuideHTML(){
+  var hidden=!!S._hideStockGuide;
+  return '<div class="panel" style="background:var(--acc-soft);border:1px solid var(--line)">'
+    +'<div class="row" style="flex-wrap:wrap;gap:6px">'
+    +'<b style="font-size:13.5px;color:var(--acc2)">💡 주식출연 · 보유주식 소각 · 현금유입 · 세금 한눈에 쉬운 설명</b>'
+    +'<button onclick="openFundChat(\'주주들이 기금에 주식을 출연했을 때 기본재산 계상 기준과 변경보고 절차는?\')" style="font-size:11.5px;padding:3px 8px">💬 주주 주식출연 절차</button>'
+    +'<button onclick="openFundChat(\'출연받은 주식이 소각되어 현금으로 기금에 들어온 경우 회계처리와 기본재산 변경보고는?\')" style="font-size:11.5px;padding:3px 8px">💬 주식소각 현금입금 처리</button>'
+    +'<button onclick="openFundChat(\'주주 주식출연·보유주식 유상소각 때 증여세·양도세·원천징수 세금은 어떻게 되나요?\')" style="font-size:11.5px;padding:3px 8px">💬 증여세·원천세 15.4% 환급</button>'
+    +'<button onclick="openFundChat(\'출연받은 비상장주식 평가가액 기준과 팔기 전 50%·80% 사용 가능 여부, 미이행 신고반려는?\')" style="font-size:11.5px;padding:3px 8px">💬 평가액·미이행 신고반려</button>'
+    +'<span style="flex:1"></span>'
+    +'<button onclick="toggleStockGuide()" style="font-size:11.5px;padding:3px 8px">'+(hidden?'펼치기 ▾':'접기 ▴')+'</button>'
+    +'</div>'
+    +(hidden?'':'<div class="gridw" style="margin-top:9px;gap:8px">'
+      +'<div style="background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12px;line-height:1.58">'
+      +'<b style="color:var(--acc2)">① 주주 주식 무상출연 = 기본재산(원금)</b><div style="margin-top:4px;color:var(--ink)">회사 주주들이 보유 주식을 기금에 무상 출연하면 평가액만큼 기금 원금(<code>매도가능증권 / 기본재산</code>)이 늘어나며, <b>출연·명의개서일+3주(21일) 내 노동청 별지 제10호 보고 + 등기소 자산총액 변경등기</b>를 완료합니다.</div></div>'
+      +'<div style="background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12px;line-height:1.58">'
+      +'<b style="color:var(--acc2)">② 팔기 전 사용 한도 · 배당수익</b><div style="margin-top:4px;color:var(--ink)">현물 주식 상태 그대로는 당해연도 50%·80% 한도로 쪼개 지출할 수 없습니다. 보유 중 나오는 <b>배당금</b>이나 향후 <b>유상소각·매각 시 장부가 초과 차익</b>을 근로자 복지사업비로 사용합니다.</div></div>'
+      +'<div style="background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12px;line-height:1.58">'
+      +'<b style="color:var(--ok)">③ 주식 소각 현금 유입 (예: 7억 주식 → 10억 입금)</b><div style="margin-top:4px;color:var(--ink)">원래 장부가 <b>7억은 예금 원금으로 그대로 보전</b>(원금 총액 불변 시 별지10호 의무 아님)하고, 더 받은 <b>초과 차익 3억은 수익금(잡수익)으로 한도 없이 100% 복지사업에 사용</b>합니다(차익 원금전입·감자손실 시에만 3주 내 별지10호 보고).</div></div>'
+      +'<div style="background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12px;line-height:1.58">'
+      +'<b style="color:var(--warn)">④ 세금 비과세·환급 &amp; 미이행 반려</b><div style="margin-top:4px;color:var(--ink)">무상 출연은 주주 양도세·기금 증여세 부담이 없고, 소각차익에 원천징수된 <b>의제배당세(15.4%, 선납세금)</b>는 법인세법 제29조 준비금 100% 설정으로 환급 검토합니다. 출연 미이행 시 노동청에 <b>변경신고 반려 요청 공문</b>을 내고 이력만 보존합니다.</div></div>'
+      +'</div>')
+    +'</div>';
+}
 function stocksCloseView(arr){
   var _fid=S.fundId, yr=+S.year||new Date().getFullYear();
   if(_fid&&typeof fbDb!=='undefined'&&fbDb&&(S.stocksFor!==_fid||S.stocks===null)){
@@ -20303,18 +20342,24 @@ function stocksCloseView(arr){
   var sum=stockAsOfYear(list,yr), jr=stockJournalRows(arr);
   var fin=computeFin(arr,_fid,yr);
   var finSecu=Math.round(num(fin&&fin.secu)||0);
-  var openSecu=Math.round(num((_openingOf(_fid,yr)||{}).secu)||0);
+  var openObj=_openingOf(_fid,yr)||{};
+  var ydCur=(funds[_fid]&&funds[_fid].years&&funds[_fid].years[yr])||{};
+  var openUnset=!Object.keys(openObj).length&&!ydCur.opening_none;
+  var openSecu=Math.round(num(openObj.secu)||0);
   var legacySecu=Math.max(openSecu-sum.boyBook,0);
   var expectedSecu=sum.asOfBook+legacySecu;
   var reconDiff=finSecu-expectedSecu;
   var reconHtml=Math.abs(reconDiff)<1
     ? '<span class="chip ok" title="재무상태표 매도가능증권 잔액과 주식원장 기말 장부가액이 일치합니다">✅ 매도가능증권 장부·원장 대사 일치 ('+won(finSecu)+')</span>'
-    : '<span class="chip warn" title="원장 기말장부가('+won(expectedSecu)+')와 재무상태표 매도가능증권('+won(finSecu)+')에 차이가 있습니다 — 미승인 분개 또는 전기이월 유가증권을 확인하세요">⚠ 장부 매도가능증권 '+won(finSecu)+' ↔ 원장 '+won(expectedSecu)+' (차이 '+won(reconDiff)+')</span>';
+    : (openUnset&&sum.boyBook>0&&Math.abs((finSecu+sum.boyBook)-expectedSecu)<1
+      ? '<span class="chip" title="'+yr+'년 전기이월(기초잔액)이 아직 이월되지 않았습니다. 재무제표·결산에서 [전년 기말에서 가져오기]를 실행하면 장부 매도가능증권도 자동 일치합니다">ℹ️ '+yr+'년 전기이월 미반영 (원장 보유 '+won(expectedSecu)+')</span>'
+      : '<span class="chip warn" title="원장 기말장부가('+won(expectedSecu)+')와 재무상태표 매도가능증권('+won(finSecu)+')에 차이가 있습니다 — 미승인 분개 또는 전기이월 유가증권을 확인하세요">⚠ 장부 매도가능증권 '+won(finSecu)+' ↔ 원장 '+won(expectedSecu)+' (차이 '+won(reconDiff)+')</span>');
 
   var headPanel='<div class="panel">'
     +'<div class="row" style="flex-wrap:wrap;gap:8px">'
-    +'<h2 style="font-size:15px">📈 주식출연 · 보유주식 · 소각 전용 회계 ('+yr+'년)</h2>'+hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')
+    +'<h2 style="font-size:15px">📈 주식출연 · 보유주식 · 소각 전용 회계 ('+yr+'년)</h2>'+hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')+hlp('stock.history')
     +'<span style="flex:1"></span>'
+    +'<button onclick="openFundChat(\'출연받은 주식이 소각되어 현금으로 기금에 들어온 경우 회계처리와 기본재산 변경보고는?\')" title="주식출연·소각 쉬운 설명 챗봇 열기">💬 법령·세무 쉽게 묻기</button>'
     +'<button onclick="toggleStockMask()" title="화면에서 개인 주주 성명을 홍○동으로 가립니다">'+(maskOn?'🔒 주주 실명 가림 켜짐':'🔓 주주 실명 표시중')+'</button>'
     +(sum.curShares>0?'<button onclick="openStockRetireModal()">🔥 주식 소각·처분 마법사</button>':'')
     +'<button class="primary" onclick="openStockContribModal()">＋ 주주 주식출연 일괄 등록</button>'
@@ -20324,8 +20369,11 @@ function stocksCloseView(arr){
     +'<span class="stat">기말 주식 장부가 '+won(sum.asOfBook)+'</span>'
     +(sum.yrContribBook>0?'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">'+yr+'년 주식출연 +'+won(sum.yrContribBook)+' ('+sum.yrContribShares.toLocaleString()+'주 · 주주 '+sum.yrContribHolders+'명)</span>':'')
     +(sum.yrRetCount>0?'<span class="stat" style="background:var(--acc-soft);color:var(--acc2)">'+yr+'년 소각·처분 '+sum.yrRetShares.toLocaleString()+'주 · 입금 '+won(sum.yrRetGross)+(sum.yrRetGain?' · 수익금차익 +'+won(sum.yrRetGain):'')+(sum.yrRetLoss?' · 감자손실 △'+won(sum.yrRetLoss):'')+'</span>':'')
+    +(sum.withdrawnCount>0?'<span class="chip warn">신고반려·미이행 이력 '+sum.withdrawnCount+'건 (장부 제외)</span>':'')
     +reconHtml
     +'</div></div>';
+
+  var guidePanel=(typeof stockEasyGuideHTML==='function')?stockEasyGuideHTML():'';
 
   var jrRowsHtml=jr.rows.map(function(r,idx){
     return '<tr>'+_ckTd()+'<td class="no">'+(idx+1)+'</td>'
@@ -20350,7 +20398,7 @@ function stocksCloseView(arr){
     +'<button onclick="closeSub(\'txn\')" title="전체 통장 거래·분개입력 탭으로 이동">전체 거래·분개입력 →</button>'
     +'</div>'
     +(jr.rows.length
-      ? '<div class="ledgerwrap" style="margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>일자</th><th>주식 회계 구분</th><th>차변 계정</th><th style="text-align:right">차변 금액</th><th>대변 계정</th><th style="text-align:right">대변 금액</th><th>상태</th><th>적요</th></tr></thead><tbody>'
+      ? '<div class="tblwrap" style="overflow-x:auto;margin-top:8px"><table><thead><tr style="white-space:nowrap">'+_ckTh()+'<th class="no">#</th><th>일자</th><th>주식 회계 구분</th><th>차변 계정</th><th style="text-align:right">차변 금액</th><th>대변 계정</th><th style="text-align:right">대변 금액</th><th>상태</th><th>적요</th></tr></thead><tbody>'
         +jrRowsHtml
         +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td class="ckcol"></td><td colspan="4">합계 (승인 '+won(jr.apprSum)+')</td>'
         +'<td style="text-align:right;white-space:nowrap">'+_n(jr.totSum)+'원</td><td></td><td style="text-align:right;white-space:nowrap">'+_n(jr.totSum)+'원</td><td colspan="2"></td></tr>'
@@ -20359,12 +20407,16 @@ function stocksCloseView(arr){
     +'</div>';
 
   var batchRowsHtml=list.map(function(b,i){
+    var isWd=!!(b&&b.filing_status==='withdrawn');
     var ts=_stockNum(b.total_shares), bk=_stockNum(b.book_amount);
-    var rs=b.remain_shares!=null?_stockNum(b.remain_shares):ts;
-    var rb=b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0);
+    var rs=isWd?0:(b.remain_shares!=null?_stockNum(b.remain_shares):ts);
+    var rb=isWd?0:(b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0));
     var hCnt=(b.holders||[]).length;
     var firstH=hCnt?maskHolderName((b.holders[0]||{}).holder,maskOn)+(hCnt>1?' 외 '+(hCnt-1)+'인':''):'—';
     var due=b.due_date||(b.date?dsDue('d+21d',{d:b.date}):'');
+    var docCnt=Object.keys((b&&b.docs)||{}).length, mailCnt=Object.keys((b&&b.mails)||{}).length;
+    var stChip=isWd?'<span class="chip warn" title="출연 미이행·변경신고 반려 요청 등으로 장부 매도가능증권에는 산입하지 않고 과거 이력·서류·메일만 보존합니다">신고반려·미이행(이력보존)</span>'
+      :((rs===0?'<span class="chip">전량소각·처분</span>':'<span class="chip ok">보유중</span>')+(b.filing_status==='completed'?' <span class="chip">변경신고완료</span>':(due?' <span class="chip" title="출연 변경보고 기한(출연일+3주)">보고기한 '+esc(due)+'</span>':'')));
     return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td>'
       +'<td style="white-space:nowrap">'+esc(b.date||'—')+'</td>'
       +'<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(b.issuer||'')+'"><b>'+esc(b.issuer||'—')+'</b></td>'
@@ -20372,28 +20424,30 @@ function stocksCloseView(arr){
       +'<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="주주 '+hCnt+'명">'+esc(firstH)+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'+rs.toLocaleString()+' / '+ts.toLocaleString()+'주</td>'
       +'<td style="text-align:right;white-space:nowrap"><b>'+rb.toLocaleString()+'원</b></td>'
-      +'<td style="white-space:nowrap">'+(rs===0?'<span class="chip">전량소각·처분</span>':'<span class="chip ok">보유중</span>')+(due?' <span class="chip" title="출연 변경보고 기한(출연일+3주)">보고기한 '+esc(due)+'</span>':'')+'</td>'
+      +'<td style="white-space:nowrap">'+stChip+'</td>'
       +'<td style="white-space:nowrap">'
-      +(rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')" style="padding:2px 7px;font-size:11px">🔥 소각·처분</button> ':'')
-      +'<button onclick="openStockForm10(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="별지 제10호 기본재산 총액 변경 내용 보고서 열기">📄 별지10호</button> '
-      +'<button onclick="openStockAssetListPrint(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="별지 제10호 첨부용 변경 재산목록 인쇄">📋 재산목록</button> '
-      +'<button onclick="openStockCertPrint(\''+b._id+'\')" style="padding:2px 7px;font-size:11px" title="주주별 주식 기금출연확인서 A4 인쇄">🖨 확인서</button> '
-      +'<button onclick="delStockBatch(\''+b._id+'\')" title="주식출연 원장 삭제" aria-label="주식출연 원장 삭제" style="padding:3px 8px;font-size:11px;color:var(--danger)">×</button>'
+      +'<button onclick="openStockDocsModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="과거 클린 증빙서류(출연확인서·평가서·보고서 등) 열람·첨부">📎 자료'+(docCnt?' '+docCnt:'')+'</button> '
+      +'<button onclick="openStockMailsModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="푸른메일함 과거 메일 열람·연결">📨 메일'+(mailCnt?' '+mailCnt:'')+'</button> '
+      +(!isWd&&rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')" style="padding:4px 9px;font-size:12px">🔥 소각·처분</button> ':'')
+      +(!isWd?'<button onclick="openStockForm10(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="별지 제10호 기본재산 총액 변경 내용 보고서 열기">📄 별지10호</button> '
+        +'<button onclick="openStockAssetListPrint(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="별지 제10호 첨부용 변경 재산목록 인쇄">📋 재산목록</button> ':'')
+      +'<button onclick="openStockCertPrint(\''+b._id+'\')" style="padding:4px 9px;font-size:12px" title="주주별 주식 기금출연확인서 A4 인쇄">🖨 확인서</button> '
+      +'<button onclick="delStockBatch(\''+b._id+'\')" title="주식출연 원장 삭제" aria-label="주식출연 원장 삭제" style="padding:4px 9px;font-size:12px;color:var(--danger)">×</button>'
       +'</td></tr>';
   }).join('');
 
   var ledgerPanel='<div class="panel">'
     +'<div class="row" style="flex-wrap:wrap;gap:8px">'
-    +'<b style="font-size:14.5px">🗂 기금 보유주식 · 주주별 출연 명세 · 소각 이력 원장</b>'
+    +'<b style="font-size:14.5px">🗂 기금 보유주식 · 주주별 출연 명세 · 과거 자료·메일 · 소각 이력 원장</b>'
     +(list.length?'<span class="stat">출연 묶음 '+list.length+'건</span><span class="stat">현재 잔여 '+sum.curShares.toLocaleString()+'주 ('+won(sum.curBook)+')</span>':'')
     +'</div>'
     +(list.length
-      ? '<div class="tblwrap" style="overflow-x:auto;margin-top:8px;margin-bottom:12px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>출연일</th><th>발행회사</th><th>출연구분</th><th>출연 주주</th><th style="text-align:right">잔여/출연주식수</th><th style="text-align:right">잔여 장부가액</th><th>상태·보고기한</th><th>서식·처리</th></tr></thead><tbody>'+batchRowsHtml+'</tbody></table></div>'
+      ? '<div class="tblwrap" style="overflow-x:auto;margin-top:8px;margin-bottom:12px"><table><thead><tr style="white-space:nowrap">'+_ckTh()+'<th class="no">#</th><th>출연일</th><th>발행회사</th><th>출연구분</th><th>출연 주주</th><th style="text-align:right">잔여/출연주식수</th><th style="text-align:right">잔여 장부가액</th><th>상태·보고기한</th><th>과거자료·메일·서식</th></tr></thead><tbody>'+batchRowsHtml+'</tbody></table></div>'
         +_stockListModalHTML(true)
       : '<div class="muted" style="padding:12px 2px;font-size:12.5px">기금에 등록된 주식출연 원장이 없습니다. 기금출연확인서 PDF·사진 보안 판독 또는 표 붙여넣기로 여러 주주의 주식출연을 한 번에 등록하세요.</div>')
     +'</div>';
 
-  return headPanel+jrPanel+ledgerPanel;
+  return headPanel+guidePanel+jrPanel+ledgerPanel;
 }
 function _defaultIssuerOf(f){
   f=f||funds[S.fundId]||{};
@@ -20408,6 +20462,8 @@ function _initStockDraft(){
     date:ymd(),
     issuer:_defaultIssuerOf(f),
     bf_kind:'other',
+    filing_status:'completed',
+    note:'',
     basis:'eval',
     custom_amount:'',
     par_price:500,
@@ -20420,6 +20476,7 @@ function _initStockDraft(){
 }
 function _initStockRetDraft(batchId){
   var list=_stockListOf().filter(function(b){
+    if(b&&b.filing_status==='withdrawn') return false;
     var rs=b.remain_shares!=null?_stockNum(b.remain_shares):_stockNum(b.total_shares);
     return rs>0;
   });
@@ -20473,8 +20530,9 @@ function _stockModalRender(){
     +'<button role="tab" aria-selected="'+(tab==='list')+'" style="'+tSty('list')+'" onclick="stockTabGo(\'list\')">📊 보유주식·이력</button>'
     +'<button role="tab" aria-selected="'+(tab==='contrib')+'" style="'+tSty('contrib')+'" onclick="stockTabGo(\'contrib\')">＋ 주주 주식출연 일괄 등록</button>'
     +'<button role="tab" aria-selected="'+(tab==='retire')+'" style="'+tSty('retire')+'" onclick="stockTabGo(\'retire\')">🔥 주식 소각·처분 마법사</button>'
-    +hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')
+    +hlp('stock.main')+hlp('stock.sec')+hlp('stock.retire')+hlp('stock.history')
     +'<span style="flex:1"></span>'
+    +'<button onclick="openFundChat(\'주주들이 기금에 주식을 출연했을 때 기본재산 계상 기준과 변경보고 절차는?\')">💬 쉬운 설명 질문</button>'
     +'<button onclick="toggleStockMask()">'+(maskOn?'🔒 실명 가림 켜짐':'🔓 실명 표시중')+'</button>'
     +'<button onclick="closeM()">닫기</button></div>';
   var body='';
@@ -20511,9 +20569,11 @@ function _stockListModalHTML(inCloseTab){
     return '<div class="msg warn" style="margin-bottom:10px">등록된 주식출연 내역이 없습니다. 위 <b>[＋ 주주 주식출연 일괄 등록]</b> 탭에서 기금출연확인서 PDF 판독 또는 표 붙여넣기로 등록하세요.</div>';
   }
   return list.map(function(b,bi){
+    var isWd=!!(b&&b.filing_status==='withdrawn');
     var ts=_stockNum(b.total_shares), bk=_stockNum(b.book_amount);
-    var rs=b.remain_shares!=null?_stockNum(b.remain_shares):ts;
-    var rb=b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0);
+    var rs=isWd?0:(b.remain_shares!=null?_stockNum(b.remain_shares):ts);
+    var rb=isWd?0:(b.remain_book!=null?_stockNum(b.remain_book):(ts>0?Math.round(bk*rs/ts):0));
+    var docCnt=Object.keys((b&&b.docs)||{}).length, mailCnt=Object.keys((b&&b.mails)||{}).length;
     var hRows=(b.holders||[]).map(function(h,hi){
       return '<tr>'+_ckTd()+'<td class="no">'+(hi+1)+'</td>'
         +'<td style="white-space:nowrap"><b>'+esc(maskHolderName(h.holder,maskOn))+'</b></td>'
@@ -20538,24 +20598,31 @@ function _stockListModalHTML(inCloseTab){
           +'<td style="text-align:right;white-space:nowrap">'+esc(gl)+'</td>'
           +'<td style="white-space:nowrap">'+(r.report_required?'<span class="chip warn">별지10호 대상 (기한 '+esc(r.due_date||'')+')</span>':'<span class="chip ok">총액불변 (수익금 처리)</span>')+'</td></tr>';
       }).join('')+'</tbody></table></div></div>':'';
+    var noteHtml=b.note?'<div style="margin:0 0 8px;padding:7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:7px;font-size:12px">📝 <b>행정·이력 메모:</b> '+esc(b.note)+'</div>':'';
     return '<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px">'
       +'<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">'
       +'<b>#'+(bi+1)+' · '+esc(b.issuer||'발행회사')+' ('+esc(b.date||'')+' 출연 · 주주 '+(b.holders||[]).length+'명 명세)</b>'
       +'<span class="chip">'+(b.bf_kind==='employer'?'⑬ 사업주 출연':'⑮ 주주·제3자 출연')+'</span>'
-      +'<span class="chip ok">잔여 '+rs.toLocaleString()+' / '+ts.toLocaleString()+'주 · 장부가 '+rb.toLocaleString()+'원</span>'
-      +(inCloseTab?'':'<span style="flex:1"></span>'
-        +(rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')">🔥 소각·처분 처리</button>':'')
-        +'<button onclick="openStockForm10(\''+b._id+'\')">📄 별지 제10호 보고서</button>'
-        +'<button onclick="openStockAssetListPrint(\''+b._id+'\')">📋 변경 재산목록 인쇄</button>'
+      +(isWd
+        ? '<span class="chip warn">신고반려·미이행(이력보존 · 장부 제외 · 당초 '+ts.toLocaleString()+'주 / '+bk.toLocaleString()+'원)</span>'
+        : '<span class="chip ok">잔여 '+rs.toLocaleString()+' / '+ts.toLocaleString()+'주 · 장부가 '+rb.toLocaleString()+'원</span>'+(b.filing_status==='completed'?'<span class="chip">변경신고완료</span>':''))
+      +'<span style="flex:1"></span>'
+      +'<button onclick="openStockDocsModal(\''+b._id+'\')">📎 과거자료'+(docCnt?' '+docCnt+'건':'')+'</button>'
+      +'<button onclick="openStockMailsModal(\''+b._id+'\')">📨 푸른메일'+(mailCnt?' '+mailCnt+'통':'')+'</button>'
+      +(inCloseTab?'':
+        (!isWd&&rs>0?'<button onclick="openStockRetireModal(\''+b._id+'\')">🔥 소각·처분 처리</button>':'')
+        +(!isWd?'<button onclick="openStockForm10(\''+b._id+'\')">📄 별지 제10호 보고서</button>'
+          +'<button onclick="openStockAssetListPrint(\''+b._id+'\')">📋 변경 재산목록 인쇄</button>':'')
         +'<button onclick="openStockCertPrint(\''+b._id+'\')">🖨 주주별 출연확인서 인쇄</button>')
       +'</div>'
-      +'<div class="tblwrap" style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>출연 주주</th><th>주식종류</th><th style="text-align:right">출연주식수</th><th style="text-align:right">지분율</th><th style="text-align:right">1주당 액면가</th><th style="text-align:right">1주당 평가액</th><th style="text-align:right">출연주식의 금액</th></tr></thead><tbody>'+hRows+'</tbody></table></div>'
+      +noteHtml
+      +'<div class="tblwrap" style="overflow-x:auto"><table><thead><tr style="white-space:nowrap">'+_ckTh()+'<th class="no">#</th><th>출연 주주</th><th>주식종류</th><th style="text-align:right">출연주식수</th><th style="text-align:right">지분율</th><th style="text-align:right">1주당 액면가</th><th style="text-align:right">1주당 평가액</th><th style="text-align:right">출연주식의 금액</th></tr></thead><tbody>'+hRows+'</tbody></table></div>'
       +rHtml+'</div>';
   }).join('');
 }
 function _stockContribHTML(){
   var D=_stockDraft; if(!D){ _initStockDraft(); D=_stockDraft; }
-  var C=calcStockBatch(D.rows,D);
+  var C=calcStockBatch(D.rows,D), isWd=(D.filing_status==='withdrawn');
   var secBanner='<div class="msg ok" style="margin-bottom:10px">🔒 <b>보안 모드 작동중</b> — 파일은 이 PC 브라우저 안에서만 읽으며 외부 전송하지 않습니다. 인감증명서·주민등록번호·자택 상세주소는 감지 즉시 차단·폐기됩니다.'
     +(D.blocked&&D.blocked.length?' <span class="chip warn">인감증명서 등 개인정보 '+D.blocked.length+'쪽 자동 차단·폐기됨</span>':'')
     +(D.roster&&D.roster.total_shares?' <span class="chip">주주명부 확인: 발행총수 '+D.roster.total_shares.toLocaleString()+'주'+(D.roster.capital_total?' · 자본금 '+D.roster.capital_total.toLocaleString()+'원':'')+'</span>':'')
@@ -20589,11 +20656,16 @@ function _stockContribHTML(){
     +'<option value="par"'+(D.basis==='par'?' selected':'')+'>액면가액 합계 ('+C.par_total.toLocaleString()+'원)</option>'
     +'<option value="custom"'+(D.basis==='custom'?' selected':'')+'>직접 지정 금액 (자본금 비례액 등)</option></select></div>'
     +(D.basis==='custom'?'<div class="fld"><label>직접 지정 장부가액(원)</label><input data-fk="opt_custom" aria-label="직접 지정 장부가액(원)" value="'+esc(D.custom_amount||'')+'" inputmode="numeric" placeholder="장부 계상 총액(원)" onchange="stockOptChg(\'custom_amount\',this.value)"></div>':'')
+    +'<div class="fld"><label>행정처리 상태</label><select data-fk="opt_fstat" aria-label="행정처리 상태" onchange="stockOptChg(\'filing_status\',this.value)">'
+    +'<option value="completed"'+(D.filing_status!=='pending'&&D.filing_status!=='withdrawn'?' selected':'')+'>기본재산 편입 · 변경보고 완료(정상 보유)</option>'
+    +'<option value="pending"'+(D.filing_status==='pending'?' selected':'')+'>변경보고 진행중(3주 이내 제출 대상)</option>'
+    +'<option value="withdrawn"'+(D.filing_status==='withdrawn'?' selected':'')+'>신고반려·미이행 이력보존(장부 제외)</option></select></div>'
+    +'<div class="fld w2"><label>행정·이력 메모 (선택 · 신고번호·반려사유·평가기준일 등)</label><input data-fk="opt_note" aria-label="행정 이력 메모" value="'+esc(D.note||'')+'" placeholder="예: 상증세법 평가 기준 · 노동청 변경보고 수리 완료" onchange="stockOptChg(\'note\',this.value)"></div>'
     +'</div>'
     +'<div class="tblwrap" style="overflow-x:auto;max-height:40vh"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>출연 주주명</th><th>주식종류</th><th style="text-align:right">출연주식수(주)</th><th style="text-align:right">지분율(%)</th><th style="text-align:right">1주당 액면가</th><th style="text-align:right">1주당 평가액</th><th style="text-align:right">출연평가금액(원)</th><th></th></tr></thead><tbody>'+rowHtml+'</tbody></table></div>'
     +'<div id="stockPasteBox" style="display:none;margin-top:8px;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px">'
     +'<div class="row" style="margin-bottom:6px"><b>📋 주주별 명세 붙여넣기 (주주명 · 주식종류 · 주식수 · 지분율 · 액면가 · 평가단가 · 평가금액)</b><span style="flex:1"></span><button onclick="$(\'stockPasteBox\').style.display=\'none\'">접기</button></div>'
-    +'<textarea id="stockPasteTxt" rows="4" placeholder="홍길동\t보통주식\t1,000\t2.5\t500\t5,000\t5,000,000" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:inherit"></textarea>'
+    +'<textarea id="stockPasteTxt" aria-label="주주별 명세 붙여넣기 입력칸" rows="4" placeholder="홍길동\t보통주식\t1,000\t2.5\t500\t5,000\t5,000,000" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:inherit"></textarea>'
     +'<div class="row" style="justify-content:flex-end;margin-top:6px"><button class="primary" onclick="stockPasteApply()">표에 채우기</button></div></div>'
     +'<div style="margin-top:10px;padding:10px 12px;background:var(--acc-soft);border:1px solid var(--line);border-radius:9px">'
     +'<div class="row" style="flex-wrap:wrap;gap:10px">'
@@ -20601,16 +20673,18 @@ function _stockContribHTML(){
     +'<span>총 주식수 <b>'+C.total_shares.toLocaleString()+'주</b>'+(C.ratio_sum?' ('+C.ratio_sum+'%)':'')+'</span>'
     +'<span>액면 합계 <b>'+C.par_total.toLocaleString()+'원</b></span>'
     +'<span>평가가액 합계 <b>'+C.eval_total.toLocaleString()+'원</b></span>'
-    +'<span>→ 기본재산 편입 장부가액 <b style="color:var(--acc2)">'+C.book_amount.toLocaleString()+'원</b></span>'
-    +(C.due_date?'<span class="chip warn">고용노동부 별지 제10호 보고기한: '+esc(C.due_date)+' (출연일+3주)</span>':'')
+    +(isWd?'<span class="chip warn">신고반려·미이행 이력보존 — 재무상태표 매도가능증권에는 산입하지 않습니다</span>'
+      :'<span>→ 기본재산 편입 장부가액 <b style="color:var(--acc2)">'+C.book_amount.toLocaleString()+'원</b></span>'
+      +(C.due_date?'<span class="chip warn">고용노동부 별지 제10호 보고기한: '+esc(C.due_date)+' (출연일+3주)</span>':''))
     +'</div>'
-    +'<div class="row" style="margin-top:8px;gap:14px;flex-wrap:wrap">'
-    +'<label style="font-size:12.5px;display:flex;align-items:center;gap:5px"><input type="checkbox"'+(D.make_txn?' checked':'')+' onchange="stockOptChg(\'make_txn\',this.checked)"> 회계·결산에 현물출연 대체분개((차)매도가능증권 / (대)기본재산) 자동 승인 등록 → 별지 제10호·제15호 즉시 연동</label>'
-    +'<label style="font-size:12.5px;display:flex;align-items:center;gap:5px"><input type="checkbox"'+(D.make_ev?' checked':'')+' onchange="stockOptChg(\'make_ev\',this.checked)"> 변경 이벤트(3주 이내 기본재산 변경보고·자산총액 변경등기 체크리스트) 자동 생성</label>'
-    +'</div></div>'
+    +(isWd?'':'<div class="row" style="margin-top:8px;gap:14px;flex-wrap:wrap">'
+      +'<label style="font-size:12.5px;display:flex;align-items:center;gap:5px"><input type="checkbox"'+(D.make_txn?' checked':'')+' onchange="stockOptChg(\'make_txn\',this.checked)"> 회계·결산에 현물출연 대체분개((차)매도가능증권 / (대)기본재산) 자동 승인 등록 → 별지 제10호·제15호 즉시 연동</label>'
+      +'<label style="font-size:12.5px;display:flex;align-items:center;gap:5px"><input type="checkbox"'+(D.make_ev?' checked':'')+' onchange="stockOptChg(\'make_ev\',this.checked)"> 변경 이벤트(3주 이내 기본재산 변경보고·자산총액 변경등기 체크리스트) 자동 생성</label>'
+      +'</div>')
+    +'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px">'
     +'<button onclick="_initStockDraft();_stockModalRender()">초기화</button>'
-    +'<button class="primary" data-modal-save="1" onclick="saveStockBatch()"'+(C.holder_count&&C.total_shares>0&&C.book_amount>0&&!C.has_negative?'':' disabled')+'>💾 주주 '+C.holder_count+'명 주식출연 일괄 반영</button></div>';
+    +'<button class="primary" data-modal-save="1" onclick="saveStockBatch()"'+(C.holder_count&&C.total_shares>0&&C.book_amount>0&&!C.has_negative?'':' disabled')+'>💾 주주 '+C.holder_count+'명 주식출연 '+(isWd?'이력보존 저장':'일괄 반영')+'</button></div>';
 }
 function stockRowChg(idx,k,v){
   if(!_stockDraft||!_stockDraft.rows[idx]) return;
@@ -20624,7 +20698,8 @@ function stockRowChg(idx,k,v){
 }
 function stockOptChg(k,v){
   if(!_stockDraft) return;
-  _stockDraft[k]=v;
+  _stockDraft[k]=(k==='note')?scrubStockPii(v):v;
+  if(k==='filing_status'&&v==='withdrawn'){ _stockDraft.make_txn=false; _stockDraft.make_ev=false; }
   _stockModalRender();
 }
 function stockAddRow(){
@@ -20711,12 +20786,13 @@ function _checkLedgerOpen(fid,dateStr){
 function saveStockBatch(){
   var D=_stockDraft, fid=S.fundId;
   if(!D||!fid) return;
-  var C=calcStockBatch(D.rows,D);
+  var C=calcStockBatch(D.rows,D), isWd=(D.filing_status==='withdrawn');
+  var makeTxn=(!isWd&&!!D.make_txn), makeEv=(!isWd&&!!D.make_ev);
   if(!D.date||!/^\d{4}-\d{2}-\d{2}$/.test(D.date)){ toast('출연일자를 입력하세요','warn'); return; }
   if(!String(D.issuer||'').trim()){ toast('발행회사 상호를 입력하세요','warn'); return; }
   if(C.has_negative){ toast('주식수·지분율·금액에는 음수를 입력할 수 없습니다','warn'); return; }
   if(!C.holder_count||C.total_shares<=0||C.book_amount<=0){ toast('출연 주주·주식수·장부가액을 확인하세요','warn'); return; }
-  var checkP=D.make_txn?_checkLedgerOpen(fid,D.date):Promise.resolve({ok:true,yr:+D.date.slice(0,4)});
+  var checkP=makeTxn?_checkLedgerOpen(fid,D.date):Promise.resolve({ok:true,yr:+D.date.slice(0,4)});
   checkP.then(function(chk){
     if(!chk.ok){ toast(chk.msg,'warn'); return; }
     var yr=chk.yr, batchRef=fbDb.ref(NS+'/stocks/'+fid).push(), batchId=batchRef.key;
@@ -20741,11 +20817,13 @@ function saveStockBatch(){
       due_date:C.due_date,
       issuer:String(D.issuer).trim(),
       bf_kind:D.bf_kind==='employer'?'employer':'other',
+      filing_status:isWd?'withdrawn':(D.filing_status==='pending'?'pending':'completed'),
+      note:scrubStockPii(String(D.note||'').trim()),
       basis:C.basis,
       book_amount:C.book_amount,
-      remain_book:C.book_amount,
+      remain_book:isWd?0:C.book_amount,
       total_shares:C.total_shares,
-      remain_shares:C.total_shares,
+      remain_shares:isWd?0:C.total_shares,
       par_total:C.par_total,
       eval_total:C.eval_total,
       ratio_sum:C.ratio_sum,
@@ -20753,7 +20831,7 @@ function saveStockBatch(){
       created_at:ymd(),
       created_by:String(S.user||'')
     };
-    if(D.make_txn){
+    if(makeTxn){
       batchRec.txn_id=txnId; batchRec.txn_yr=yr;
       updates['txns/'+fid+'/'+yr+'/'+txnId]={
         date:D.date,
@@ -20772,7 +20850,7 @@ function saveStockBatch(){
       };
       updates['closing/'+fid+'/'+yr+'/report/bf/'+txnId]=batchRec.bf_kind;
     }
-    if(D.make_ev){
+    if(makeEv){
       evId=fbDb.ref(NS+'/events/'+fid).push().key;
       batchRec.ev_id=evId;
       var meta=EVENT_KINDS.stock_contrib;
@@ -20789,19 +20867,20 @@ function saveStockBatch(){
     }
     updates['stocks/'+fid+'/'+batchId]=batchRec;
     return fbDb.ref(NS).update(updates).then(function(){
-      _audit(fid,'주식출연 일괄 등록',String(D.issuer).trim()+' · 주주 '+cleanHolders.length+'명 · '+C.total_shares.toLocaleString()+'주 · 장부가 '+C.book_amount.toLocaleString()+'원');
+      _audit(fid,isWd?'주식출연 미이행·신고반려 이력 등록':'주식출연 일괄 등록',String(D.issuer).trim()+' · 주주 '+cleanHolders.length+'명 · '+C.total_shares.toLocaleString()+'주 · 장부가 '+C.book_amount.toLocaleString()+'원');
       S.stocksFor=null; S.txnsFor=null; S.evFor=null; S.f15For=null; S._docBf=null; S._docR=null;
       _initStockDraft();
       S.year=yr;
       if(S.tab==='closing') S.closeSub='stocks';
       S._stockModalOpen=false; closeM();
       renderFund();
-      toast('주식출연 '+cleanHolders.length+'명('+C.total_shares.toLocaleString()+'주) 등록 및 기본재산 반영 완료 — [📄 별지10호]에서 바로 출력하세요');
+      toast(isWd?'주식출연 신고반려·미이행 이력보존 저장 완료(장부 미산입)':'주식출연 '+cleanHolders.length+'명('+C.total_shares.toLocaleString()+'주) 등록 및 기본재산 반영 완료 — [📄 별지10호]에서 바로 출력하세요');
     });
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 function _stockRetireHTML(){
   var list=_stockListOf().filter(function(b){
+    if(b&&b.filing_status==='withdrawn') return false;
     var rs=b.remain_shares!=null?_stockNum(b.remain_shares):_stockNum(b.total_shares);
     return rs>0;
   });
@@ -20976,6 +21055,7 @@ function delStockBatch(batchId){
       if(blockedChk){ toast(blockedChk.msg,'warn'); return null; }
       var up={};
       up['stocks/'+fid+'/'+batchId]=null;
+      Object.keys((b&&b.docs)||{}).forEach(function(did){ up['stock_blobs/'+fid+'/'+did]=null; });
       if(b.txn_id&&yr){
         up['txns/'+fid+'/'+yr+'/'+b.txn_id]=null;
         up['closing/'+fid+'/'+yr+'/report/bf/'+b.txn_id]=null;
@@ -21061,6 +21141,7 @@ function openStockAssetListPrint(batchId){
     var arr=closeArr(r[0],fid,yr), rp=r[1];
     var R=buildF15(arr,fid,yr,rp,[],[]);
     var stList=_stockListOf().filter(function(x){
+      if(x&&x.filing_status==='withdrawn') return false;
       var rs=x.remain_shares!=null?_stockNum(x.remain_shares):_stockNum(x.total_shares);
       return rs>0;
     });
@@ -21095,6 +21176,647 @@ function openStockAssetListPrint(batchId){
       +'</div>';
     _openPrintWin((f.name||'기금')+' — 변경 기본재산 목록(별지 제10호 첨부)',html);
   });
+}
+/* ── 과거 주식출연 비식별 증빙서류 보관·열람 및 푸른메일 연결 ── */
+var STOCK_DOC_KINDS=[['cert','출연확인서'],['valuation','주식가치평가서'],['form10','별지10호·변경보고'],['roster','주주명부(비식별)'],['reject','반려요청·공문'],['etc','기타증빙']];
+var STOCK_DOC_MAX_PAGES=50;
+var _stockBlobUrl='';
+var _stockMailSearchHits=[];
+var _stockLiveMailAtts={};
+var _stockModalBusy=false;
+var _stockPrevFocus=null;
+var _stockModalKeyFn=null;
+function _revokeStockBlobUrl(){
+  if(_stockBlobUrl&&typeof URL!=='undefined'&&URL.revokeObjectURL){
+    try{ URL.revokeObjectURL(_stockBlobUrl); }catch(e){}
+  }
+  _stockBlobUrl='';
+}
+function _stockDocKindLabel(k){
+  for(var i=0;i<STOCK_DOC_KINDS.length;i++){ if(STOCK_DOC_KINDS[i][0]===k) return STOCK_DOC_KINDS[i][1]; }
+  return k||'기타증빙';
+}
+function hasStockRawRrn(raw){
+  var s=String(raw==null?'':raw);
+  if(/(?:^|[^\d])\d{6}\s*[-~–—.]\s*[1-8]\d{6}(?!\d)/.test(s)) return true;
+  if(/(?:^|[^\d])\d{6}\s+[1-8]\d{6}(?!\d)/.test(s)) return true;
+  if(/(?:^|[^\d])(?:\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))[1-8]\d{6}(?!\d)/.test(s)) return true;
+  if(/\b\d{2}-\d{2}-\d{6}-\d{2}\b/.test(s)) return true;
+  return false;
+}
+function checkStockCleanText(pages,fileName,expectedPages){
+  var fn=String(fileName||'');
+  if(/인감증명|본인서명사실|주민등록등본|주민등록초본|등초본|가족관계증명|신분증|운전면허증|여권사본/.test(fn)){
+    return {ok:false, blocked:[{page:0, reason:'신분증명·인감증명서 파일명 감지'}]};
+  }
+  if(expectedPages!=null){
+    var exp=Number(expectedPages)||0;
+    if(exp<=0||!Array.isArray(pages)||pages.length<exp){
+      return {ok:false, blocked:[{page:0, reason:'미판독 페이지 또는 빈 문서 감지(전 페이지 판독 필수)'}]};
+    }
+  }
+  var blocked=[];
+  (pages||[]).forEach(function(pg,idx){
+    var raw=String((pg&&pg.text)||'');
+    var pno=(pg&&pg.page)||(idx+1);
+    if(raw.replace(/\s+/g,'').length<2) blocked.push({page:pno, reason:'문자를 판독할 수 없는 빈 이미지·저해상도 스캔 감지(선명한 문서 첨부 필요)'});
+    else if(isStockSensitivePage(raw)) blocked.push({page:pno, reason:'인감증명서·주민등록등초본 등 신분증명 페이지 감지'});
+    else if(hasStockRawRrn(raw)) blocked.push({page:pno, reason:'마스킹되지 않은 주민등록번호·운전면허번호 감지'});
+  });
+  return {ok:blocked.length===0, blocked:blocked};
+}
+function stockMailHtmlToText(html){
+  var cleaned=String(html==null?'':html)
+    .replace(/<!--[\s\S]*?-->/g,' ')
+    .replace(/<head[\s\S]*?<\/head>/gi,' ')
+    .replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<script[\s\S]*?<\/script>/gi,' ');
+  if(typeof DOMParser!=='undefined'){
+    try{
+      var doc=new DOMParser().parseFromString(cleaned,'text/html');
+      return String((doc&&doc.body&&doc.body.textContent)||'').replace(/\u00a0/g,' ').trim();
+    }catch(e){}
+  }
+  return cleaned
+    .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6])\b[^>]*>/gi,'\n')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/&nbsp;/gi,' ')
+    .replace(/&amp;/gi,'&')
+    .replace(/&lt;/gi,'<')
+    .replace(/&gt;/gi,'>')
+    .replace(/&quot;/gi,'"')
+    .replace(/&#39;/gi,"'")
+    .replace(/[ \t]+\n/g,'\n')
+    .trim();
+}
+function _jpegPagesToPdfBytes(jpegPages){
+  if(!jpegPages||!jpegPages.length) throw new Error('빈 이미지 페이지로는 PDF를 생성할 수 없습니다');
+  var asciiBytes=function(str){
+    var a=new Uint8Array(str.length);
+    for(var i=0;i<str.length;i++) a[i]=str.charCodeAt(i)&0xff;
+    return a;
+  };
+  var chunks=[], size=0, offsets=[0];
+  var pushStr=function(s){ var b=asciiBytes(s); chunks.push(b); size+=b.length; };
+  var pushRaw=function(b){ chunks.push(b); size+=b.length; };
+  pushStr('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n');
+  var n=jpegPages.length, kids=[];
+  for(var k=0;k<n;k++) kids.push((3+k*3)+' 0 R');
+  offsets[1]=size; pushStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  offsets[2]=size; pushStr('2 0 obj\n<< /Type /Pages /Kids ['+kids.join(' ')+'] /Count '+n+' >>\nendobj\n');
+  for(var p=0;p<n;p++){
+    var pg=jpegPages[p], wPx=Math.max(1,Math.round(pg.width||595)), hPx=Math.max(1,Math.round(pg.height||842));
+    var wPt=Math.max(72,Math.round(wPx*72/216)), hPt=Math.max(72,Math.round(hPx*72/216));
+    var pageObj=3+p*3, cntObj=pageObj+1, imgObj=pageObj+2;
+    var cmd='q '+wPt+' 0 0 '+hPt+' 0 0 cm /Im0 Do Q\n';
+    offsets[pageObj]=size;
+    pushStr(pageObj+' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+wPt+' '+hPt+'] /Resources << /XObject << /Im0 '+imgObj+' 0 R >> >> /Contents '+cntObj+' 0 R >>\nendobj\n');
+    offsets[cntObj]=size;
+    pushStr(cntObj+' 0 obj\n<< /Length '+cmd.length+' >>\nstream\n'+cmd+'endstream\nendobj\n');
+    offsets[imgObj]=size;
+    pushStr(imgObj+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+wPx+' /Height '+hPx+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+pg.bytes.length+' >>\nstream\n');
+    pushRaw(pg.bytes);
+    pushStr('\nendstream\nendobj\n');
+  }
+  var totalObjs=2+n*3, xrefStart=size;
+  var pad10=function(v){ var s=String(v); while(s.length<10) s='0'+s; return s; };
+  pushStr('xref\n0 '+(totalObjs+1)+'\n0000000000 65535 f \n');
+  for(var oi=1;oi<=totalObjs;oi++) pushStr(pad10(offsets[oi])+' 00000 n \n');
+  pushStr('trailer\n<< /Size '+(totalObjs+1)+' /Root 1 0 R >>\nstartxref\n'+xrefStart+'\n%%EOF\n');
+  var out=new Uint8Array(size), pos=0;
+  for(var ci=0;ci<chunks.length;ci++){ out.set(chunks[ci],pos); pos+=chunks[ci].length; }
+  return out;
+}
+function _canvasToJpegBytes(cv,quality){
+  var dataUrl=cv.toDataURL('image/jpeg',quality||0.86);
+  var b64=String(dataUrl.split(',')[1]||'');
+  if(!b64) throw new Error('비식별 이미지 재인코딩에 실패했습니다');
+  return _b64ToBytes(b64);
+}
+function _scanAndRebuildStockCleanDoc(file,onStat){
+  var nm=String((file&&file.name)||'');
+  var tp=String((file&&file.type)||'').toLowerCase();
+  var isPdf=/\.pdf$/i.test(nm)||tp==='application/pdf';
+  var isImg=/\.(png|jpe?g)$/i.test(nm)||/^image\/(png|jpeg|jpg)$/.test(tp);
+  if(!isPdf&&!isImg){
+    return Promise.reject(new Error(nm+': PDF 또는 이미지(PNG·JPG) 파일만 보안 검증 후 첨부할 수 있습니다 (한글 HWP 등은 PDF로 변환해 주세요)'));
+  }
+  if(isImg){
+    return imgCanvas(file,true).then(function(cv){
+      onStat&&onStat(nm+' 개인정보 판독(OCR) 중…');
+      return ocrCanvases([cv],onStat).then(function(txt){
+        var bytes=_canvasToJpegBytes(cv,0.88);
+        var cleanName=nm.replace(/\.[^.]+$/,'')+'.jpg';
+        return {pages:[{page:1, label:nm, text:String(txt||''), ocr:true}], totalPages:1, bytes:bytes, mime:'image/jpeg', outName:cleanName};
+      });
+    });
+  }
+  return file.arrayBuffer().then(function(ab){
+    var buf=new Uint8Array(ab);
+    return _pdfPagesText(buf,STOCK_DOC_MAX_PAGES+1).then(function(r){
+      var total=Number(r&&r.total)||0;
+      if(total<1) throw new Error(nm+': 페이지가 없는 빈 PDF이거나 손상된 파일입니다');
+      if(total>STOCK_DOC_MAX_PAGES) throw new Error(nm+': 최대 '+STOCK_DOC_MAX_PAGES+'쪽 이하 PDF만 한 번에 보안 검증할 수 있습니다 (현재 '+total+'쪽 — 분할 후 첨부)');
+      return pdfPageCanvases(buf,total,true).then(function(cvs){
+        if(!cvs||cvs.length<total) throw new Error(nm+': 전체 페이지 렌더링에 실패하여 업로드를 차단했습니다');
+        return cvs.reduce(function(p,cv,i){
+          return p.then(function(acc){
+            var txtLayer=String((r.texts&&r.texts[i])||'');
+            if(txtLayer.replace(/\s/g,'').length>=80){
+              acc.push({page:i+1, label:nm+' '+(i+1)+'쪽', text:txtLayer, ocr:false});
+              return acc;
+            }
+            onStat&&onStat(nm+' ('+(i+1)+'/'+total+'쪽) 스캔 글자 보안 판독 중…');
+            return ocrCanvases([cv],onStat).then(function(ocrTxt){
+              acc.push({page:i+1, label:nm+' '+(i+1)+'쪽', text:(txtLayer+'\n'+String(ocrTxt||'')).trim(), ocr:true});
+              return acc;
+            });
+          });
+        }, Promise.resolve([])).then(function(pgs){
+          onStat&&onStat(nm+' 비식별 단일 이미지 PDF로 재합성 중…');
+          var jpegPages=cvs.map(function(cv){ return {bytes:_canvasToJpegBytes(cv,0.85), width:cv.width, height:cv.height}; });
+          var pdfBytes=_jpegPagesToPdfBytes(jpegPages);
+          var cleanPdfName=/\.pdf$/i.test(nm)?nm:(nm+'.pdf');
+          return {pages:pgs, totalPages:total, bytes:pdfBytes, mime:'application/pdf', outName:cleanPdfName};
+        });
+      });
+    });
+  });
+}
+function _detachStockModalA11y(){
+  if(_stockModalKeyFn&&typeof document!=='undefined'&&document.removeEventListener){
+    document.removeEventListener('keydown',_stockModalKeyFn,true);
+  }
+  _stockModalKeyFn=null;
+}
+function _attachStockModalA11y(m){
+  if(!m) return;
+  m.setAttribute('aria-labelledby','stModalTitle');
+  if(!_stockModalKeyFn){
+    _stockModalKeyFn=function(e){
+      var cur=$('modalbg'), curBox=$('modalbox');
+      if(!cur||!curBox){ _detachStockModalA11y(); return; }
+      if($('confirmbg')) return;
+      if(e.key==='Escape'){ e.preventDefault(); closeM(); return; }
+      if(e.key==='Tab'&&curBox.querySelectorAll){
+        var focusables=[].slice.call(curBox.querySelectorAll('button:not([disabled]),select:not([disabled]),input:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'));
+        if(!focusables.length) return;
+        var first=focusables[0], last=focusables[focusables.length-1];
+        var ae=typeof document!=='undefined'?document.activeElement:null;
+        var inside=ae&&curBox.contains?curBox.contains(ae):(focusables.indexOf(ae)>=0||ae===$('stModalTitle'));
+        if(!inside){ e.preventDefault(); (e.shiftKey?last:first).focus(); return; }
+        if(e.shiftKey&&(ae===first||ae===$('stModalTitle'))){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey&&ae===last){ e.preventDefault(); first.focus(); }
+      }
+    };
+    if(typeof document!=='undefined'&&document.addEventListener) document.addEventListener('keydown',_stockModalKeyFn,true);
+  }
+  var box=$('modalbox'), ae2=typeof document!=='undefined'?document.activeElement:null;
+  var stayInside=ae2&&box&&box.contains&&ae2!==document.body&&box.contains(ae2);
+  if(!stayInside){
+    var hd=$('stModalTitle');
+    if(hd&&typeof hd.focus==='function'){
+      try{ hd.focus(); }catch(e){}
+      setTimeout(function(){ try{ var h2=$('stModalTitle'); if(h2) h2.focus(); }catch(e){} },0);
+    }
+  }
+}
+function _openOrRefreshStockModal(html,opts){
+  opts=opts||{};
+  var existing=$('modalbg'), box=$('modalbox');
+  var userClose=opts.onclose||null;
+  var prevClose=existing&&existing._onclose&&!existing._stockA11yWrapped?existing._onclose:null;
+  var wrappedClose=function(){
+    _detachStockModalA11y();
+    if(userClose){ try{ userClose(); }catch(e){} }
+    if(prevClose){ try{ prevClose(); }catch(e){} }
+    var pf=_stockPrevFocus; _stockPrevFocus=null;
+    if(pf&&typeof pf.focus==='function'){ try{ pf.focus(); }catch(e){} }
+  };
+  if(existing&&box){
+    if(!_stockPrevFocus&&typeof document!=='undefined'&&document.activeElement&&document.activeElement!==document.body&&(!box.contains||!box.contains(document.activeElement))){
+      _stockPrevFocus=document.activeElement;
+    }
+    box.style.maxWidth=(opts.width||980)+'px';
+    box.innerHTML=html;
+    existing._onclose=wrappedClose;
+    existing._stockA11yWrapped=true;
+    _attachStockModalA11y(existing);
+    return;
+  }
+  if(typeof document!=='undefined'&&document.activeElement) _stockPrevFocus=document.activeElement;
+  showModal(html,{width:opts.width||980, onclose:wrappedClose});
+  var m=$('modalbg');
+  if(m){
+    m._stockA11yWrapped=true;
+    _detachStockModalA11y();
+    _attachStockModalA11y(m);
+  }
+}
+function openStockDocsModal(batchId){
+  var fid=S.fundId; if(!fid) return;
+  _loadStocks(fid).then(function(){
+    var b=(S.stocks||{})[batchId];
+    if(!b){ toast('해당 주식출연 묶음을 찾지 못했습니다','warn'); return; }
+    S._stockModalOpen=false;
+    _revokeStockBlobUrl();
+    _renderStockDocsModal(batchId);
+  }).catch(function(e){ toast('증빙서류 목록 조회 실패: '+((e&&e.message)||e),'err'); });
+}
+function _renderStockDocsModal(batchId){
+  var fid=S.fundId, f=funds[fid]||{}, b=(S.stocks||{})[batchId]||{};
+  var docsObj=b.docs||{};
+  var dis=_stockModalBusy?' disabled':'';
+  var keys=Object.keys(docsObj).sort(function(a,k2){
+    return String((docsObj[a]||{}).kind||'').localeCompare(String((docsObj[k2]||{}).kind||''))||a.localeCompare(k2);
+  });
+  var rows=keys.map(function(did,idx){
+    var d=docsObj[did]||{};
+    var kb=d.size?Math.max(1,Math.round(Number(d.size)/1024))+'KB':'—';
+    return '<tr>'+_ckTd()+'<td class="no">'+(idx+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip">'+esc(_stockDocKindLabel(d.kind))+'</span></td>'
+      +'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.title||d.name||'')+'"><b>'+esc(d.title||d.name||'증빙서류')+'</b>'+(d.pages?' <span class="muted">('+Number(d.pages)+'쪽)</span>':'')+'</td>'
+      +'<td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.note||'')+'">'+esc(d.note||'개인정보 비식별 검증 완료')+'</td>'
+      +'<td style="text-align:right;white-space:nowrap">'+esc(kb)+'</td>'
+      +'<td style="white-space:nowrap">'+esc(d.uploaded_at||'—')+'</td>'
+      +'<td style="white-space:nowrap">'
+      +'<button class="primary"'+dis+' onclick="openStockDocBlob(\''+batchId+'\',\''+did+'\',false)" style="padding:4px 10px;font-size:12px">👁 열람</button> '
+      +'<button'+dis+' onclick="openStockDocBlob(\''+batchId+'\',\''+did+'\',true)" style="padding:4px 10px;font-size:12px">⬇ 저장</button> '
+      +'<button'+dis+' onclick="delStockDoc(\''+batchId+'\',\''+did+'\')" title="첨부 서류 삭제" aria-label="첨부 서류 삭제" style="padding:4px 9px;font-size:12px;color:var(--danger)">×</button>'
+      +'</td></tr>';
+  }).join('');
+  var html='<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+    +'<h2 id="stModalTitle" tabindex="-1" style="margin:0;font-size:16px;outline:none">📎 비식별 클린 증빙서류 보관함 — '+esc(f.short_name||f.name||'')+' · '+esc(b.issuer||'')+' ('+esc(b.date||'')+')</h2>'
+    +hlp('stock.history')
+    +'<span style="flex:1"></span>'
+    +'<select id="stDocKindSel"'+dis+' aria-label="첨부 서류 구분" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px">'
+    +STOCK_DOC_KINDS.map(function(k){ return '<option value="'+k[0]+'">'+esc(k[1])+'</option>'; }).join('')+'</select>'
+    +'<button class="primary"'+dis+' onclick="pickStockCleanDoc(\''+batchId+'\')">＋ 클린 서류 추가(보안 검증)</button>'
+    +'<button'+dis+' onclick="openStockMailsModal(\''+batchId+'\')">📨 연결 메일 보기</button>'
+    +'<button onclick="_revokeStockBlobUrl();closeM()">닫기</button></div>'
+    +'<div class="msg ok" style="margin-bottom:10px">🔒 <b>개인정보 비식별 전용 보안 저장소(RTDB 내부 권한 보호):</b> 공개 URL을 만들지 않으며 재직 담당자만 열람할 수 있습니다. <b>전체 페이지를 판독하여 인감증명서·주민등록등초본·주민등록번호(하이픈 유무 불문) 감지 시 업로드를 원천 차단</b>하고, 통과한 문서만 비식별 단일 이미지로 재합성해 저장합니다.</div>'
+    +(keys.length
+      ? '<div class="tblwrap" style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>서류구분</th><th>문서명</th><th>비식별·검증 메모</th><th style="text-align:right">용량</th><th>등록일</th><th>열람·저장</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      : '<div class="msg warn">첨부된 클린 증빙서류가 없습니다. 인감증명서·주민등록번호를 제거한 출연확인서·가치평가서·별지 제10호 보고서(PDF·PNG·JPG)를 추가하세요.</div>')
+    +'<div id="stDocPreview" style="margin-top:12px"></div>';
+  _openOrRefreshStockModal(html,{width:980,onclose:function(){ _revokeStockBlobUrl(); }});
+}
+function pickStockCleanDoc(batchId){
+  if(_stockModalBusy) return;
+  var inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='.pdf,.png,.jpg,.jpeg';
+  inp.onchange=function(){ var files=[].slice.call(inp.files||[]); if(files.length) uploadStockCleanDocs(batchId,files); };
+  inp.click();
+}
+function uploadStockCleanDocs(batchId,files){
+  var fid=S.fundId; if(!fid||!batchId||!files||!files.length||_stockModalBusy) return;
+  var kindEl=$('stDocKindSel'), kind=kindEl?kindEl.value:'cert';
+  _stockModalBusy=true;
+  _renderStockDocsModal(batchId);
+  var stat=function(t){ var pv=$('stDocPreview'); if(pv) pv.innerHTML='<div class="panel">'+loadingHTML(t)+'</div>'; };
+  var added=0;
+  return files.reduce(function(p,file,fi){ return p.then(function(){
+    var rawName=String((file&&file.name)||('문서'+(fi+1)));
+    if(file.size>12*1024*1024){ toast(rawName+': 12MB 이하 클린 파일만 첨부할 수 있습니다','warn'); return; }
+    var nameChk=checkStockCleanText([],rawName);
+    if(!nameChk.ok){ toast('차단됨('+rawName+'): '+nameChk.blocked[0].reason,'err'); return; }
+    stat('보안 검증 중 ('+(fi+1)+'/'+files.length+') · '+rawName);
+    return _scanAndRebuildStockCleanDoc(file,stat).then(function(res){
+      var chk=checkStockCleanText(res.pages,rawName,res.totalPages);
+      if(!chk.ok){
+        toast('🔒 보안 차단('+rawName+' '+(chk.blocked[0].page?chk.blocked[0].page+'쪽':'전체')+'): '+chk.blocked[0].reason+' — 해당 페이지 제거·마스킹 후 올려 주세요','err');
+        return;
+      }
+      var docId=fbDb.ref(NS+'/stocks/'+fid+'/'+batchId+'/docs').push().key;
+      var saveName=res.outName||rawName;
+      var up={};
+      up['stock_blobs/'+fid+'/'+docId]={
+        name:saveName,
+        mime:res.mime,
+        size:res.bytes.length,
+        b64:_bytesToB64(res.bytes),
+        uploaded_at:ymd(),
+        uploaded_by:String(S.user||'')
+      };
+      up['stocks/'+fid+'/'+batchId+'/docs/'+docId]={
+        kind:kind,
+        title:rawName.replace(/\.[^.]+$/,''),
+        name:saveName,
+        mime:res.mime,
+        size:res.bytes.length,
+        pages:res.totalPages,
+        note:'전 페이지('+res.totalPages+'쪽) 보안 판독 통과 · 비식별 재합성 저장',
+        uploaded_at:ymd(),
+        uploaded_by:String(S.user||'')
+      };
+      return fbDb.ref(NS).update(up).then(function(){ added++; });
+    }, function(scanErr){
+      toast('🔒 보안 검증 중단('+rawName+'): '+((scanErr&&scanErr.message)||scanErr),'err');
+    });
+  }); }, Promise.resolve()).then(function(){
+    _stockModalBusy=false;
+    S.stocksFor=null;
+    return _loadStocks(fid).then(function(){
+      _renderStockDocsModal(batchId);
+      renderFund();
+      if(added) toast('클린 증빙서류 '+added+'건 첨부 완료');
+    });
+  }).catch(function(e){
+    _stockModalBusy=false;
+    _renderStockDocsModal(batchId);
+    toast('첨부 오류: '+((e&&e.message)||e),'err');
+  });
+}
+function openStockDocBlob(batchId,docId,dlOnly){
+  var fid=S.fundId; if(!fid||!docId) return;
+  var meta=(((S.stocks||{})[batchId]||{}).docs||{})[docId]||{};
+  var pv=$('stDocPreview');
+  if(!dlOnly&&pv) pv.innerHTML='<div class="panel">'+loadingHTML('보안 저장소에서 서류를 불러오는 중…')+'</div>';
+  fbDb.ref(NS+'/stock_blobs/'+fid+'/'+docId).once('value').then(function(sn){
+    var v=sn.val();
+    if(!v||!v.b64){ toast('저장된 파일 본문을 찾지 못했습니다','warn'); if(pv) pv.innerHTML=''; return; }
+    var bytes=_b64ToBytes(v.b64);
+    var fname=v.name||meta.name||(meta.title||'증빙서류')+'.pdf';
+    var mime=v.mime||meta.mime||(/\.pdf$/i.test(fname)?'application/pdf':'application/octet-stream');
+    _revokeStockBlobUrl();
+    var blob=new Blob([bytes],{type:mime});
+    _stockBlobUrl=URL.createObjectURL(blob);
+    if(dlOnly){
+      var a=document.createElement('a'); a.href=_stockBlobUrl; a.download=fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    if(!pv) return;
+    var bar='<div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+      +'<b>📄 '+esc(meta.title||fname)+'</b>'
+      +'<span class="chip ok">비식별 검증본</span>'
+      +'<span style="flex:1"></span>'
+      +'<a class="btn" href="'+_stockBlobUrl+'" target="_blank" rel="noopener" style="text-decoration:none;padding:5px 11px;border:1px solid var(--line);border-radius:6px;font-size:12px">↗ 새 탭에서 크게 열기</a>'
+      +'<a class="btn" href="'+_stockBlobUrl+'" download="'+esc(fname)+'" style="text-decoration:none;padding:5px 11px;border:1px solid var(--line);border-radius:6px;font-size:12px">⬇ 파일 저장</a>'
+      +'</div>';
+    if(mime==='application/pdf'||/\.pdf$/i.test(fname)){
+      pv.innerHTML='<div class="panel">'+bar+'<iframe src="'+_stockBlobUrl+'" title="'+esc(fname)+'" style="width:100%;height:66vh;border:1px solid var(--line);border-radius:8px;background:#fff"></iframe></div>';
+    } else if(/^image\//i.test(mime)||/\.(png|jpe?g)$/i.test(fname)){
+      pv.innerHTML='<div class="panel">'+bar+'<div style="text-align:center;max-height:66vh;overflow:auto"><img src="'+_stockBlobUrl+'" alt="'+esc(fname)+'" style="max-width:100%;border:1px solid var(--line);border-radius:8px"></div></div>';
+    } else {
+      pv.innerHTML='<div class="panel">'+bar+'<div class="muted">브라우저 직접 미리보기가 지원되지 않는 형식입니다. 위 [⬇ 파일 저장]을 눌러 확인하세요.</div></div>';
+    }
+  }).catch(function(e){ if(pv) pv.innerHTML=''; toast('열람 오류: '+((e&&e.message)||e),'err'); });
+}
+function delStockDoc(batchId,docId){
+  var fid=S.fundId, meta=((((S.stocks||{})[batchId]||{}).docs||{})[docId])||{};
+  if(!fid||!docId||_stockModalBusy) return;
+  confirmM('첨부 서류 「'+(meta.title||meta.name||docId)+'」를 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){
+    if(!ok) return;
+    _stockModalBusy=true; _renderStockDocsModal(batchId);
+    var up={};
+    up['stocks/'+fid+'/'+batchId+'/docs/'+docId]=null;
+    up['stock_blobs/'+fid+'/'+docId]=null;
+    return fbDb.ref(NS).update(up).then(function(){
+      _audit(fid,'주식출연 첨부서류 삭제',String(meta.title||meta.name||docId));
+      _stockModalBusy=false; S.stocksFor=null;
+      return _loadStocks(fid).then(function(){ _renderStockDocsModal(batchId); renderFund(); toast('삭제되었습니다'); });
+    });
+  }).catch(function(e){ _stockModalBusy=false; _renderStockDocsModal(batchId); toast('첨부 서류 삭제 실패: '+((e&&e.message)||e),'err'); });
+}
+function _fmtStockMailDate(m){
+  if(m&&m.date_str) return String(m.date_str);
+  var ms=Number((m&&(m.date_ms||m.d))||0);
+  if(!ms) return '—';
+  var d=new Date(ms);
+  if(isNaN(d.getTime())) return '—';
+  var pad=function(n){ return n<10?'0'+n:String(n); };
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function scoreStockMailCandidate(m,keys){
+  if(!m) return 0;
+  var txt=String(m.s||m.subject||'')+' '+String(m.p||m.summary||'')+' '+String(m.f||m.from||'')+' '+String(m.e||m.email||'');
+  var norm=txt.replace(/\(주\)|주식회사|\s+/g,'').toLowerCase();
+  var kwList=(keys||[]).map(function(k){ return String(k||'').replace(/\(주\)|주식회사|\s+/g,'').toLowerCase(); }).filter(function(k){ return k.length>=2; });
+  var matchedName=kwList.some(function(k){ return norm.indexOf(k)>=0; });
+  if(!matchedName) return 0;
+  var sc=3;
+  if(/주식|출연|주주|평가|상증|소각|감자|기본재산|반려|별지|유가증권/.test(txt)) sc+=4;
+  if(+m.a>0||(m.att_names&&m.att_names.length)) sc+=1;
+  return sc;
+}
+function openStockMailsModal(batchId){
+  var fid=S.fundId; if(!fid) return;
+  _loadStocks(fid).then(function(){
+    var b=(S.stocks||{})[batchId];
+    if(!b){ toast('해당 주식출연 묶음을 찾지 못했습니다','warn'); return; }
+    S._stockModalOpen=false;
+    _stockMailSearchHits=[];
+    _renderStockMailsModal(batchId);
+  }).catch(function(e){ toast('연결 메일 조회 실패: '+((e&&e.message)||e),'err'); });
+}
+function _renderStockMailsModal(batchId){
+  var fid=S.fundId, f=funds[fid]||{}, b=(S.stocks||{})[batchId]||{};
+  var mailsObj=b.mails||{};
+  var dis=_stockModalBusy?' disabled':'';
+  var keys=Object.keys(mailsObj).sort(function(a,k2){
+    return (Number((mailsObj[k2]||{}).date_ms)||0)-(Number((mailsObj[a]||{}).date_ms)||0);
+  });
+  var rows=keys.map(function(mid,idx){
+    var m=mailsObj[mid]||{};
+    var atts=(m.att_names||[]);
+    var srcLabel=m.source==='old'?'지난메일함':'푸른메일함';
+    return '<tr>'+_ckTd()+'<td class="no">'+(idx+1)+'</td>'
+      +'<td style="white-space:nowrap">'+esc(_fmtStockMailDate(m))+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip">'+esc(srcLabel)+'</span></td>'
+      +'<td style="max-width:290px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.subject||'')+'"><b>'+esc(m.subject||'(제목 없음)')+'</b></td>'
+      +'<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc((m.from||'')+' '+(m.email||''))+'">'+esc(m.from||m.email||'—')+'</td>'
+      +'<td style="white-space:nowrap">'+(atts.length?'<span class="chip ok" title="'+esc(atts.join(', '))+'">첨부 '+atts.length+'건</span>':'—')+'</td>'
+      +'<td style="white-space:nowrap">'
+      +'<button class="primary"'+dis+' onclick="viewStockMailDetail(\''+batchId+'\',\''+mid+'\')" style="padding:4px 10px;font-size:12px">📖 내용·원문</button> '
+      +'<button'+dis+' onclick="unlinkStockMail(\''+batchId+'\',\''+mid+'\')" title="메일 연결 해제" aria-label="메일 연결 해제" style="padding:4px 9px;font-size:12px;color:var(--danger)">×</button>'
+      +'</td></tr>';
+  }).join('');
+  var html='<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+    +'<h2 id="stModalTitle" tabindex="-1" style="margin:0;font-size:16px;outline:none">📨 푸른메일함 과거 메일 연결 — '+esc(f.short_name||f.name||'')+' · '+esc(b.issuer||'')+'</h2>'
+    +hlp('stock.history')
+    +'<span style="flex:1"></span>'
+    +'<button'+dis+' onclick="searchStockMailsFromBox(\''+batchId+'\')">🔍 푸른메일함(현재·과거)에서 메일 더 찾기</button>'
+    +'<button'+dis+' onclick="openStockDocsModal(\''+batchId+'\')">📎 클린 증빙서류 보기</button>'
+    +'<button onclick="closeM()">닫기</button></div>'
+    +(keys.length
+      ? '<div class="tblwrap" style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>수신·발신일</th><th>메일함</th><th>제목</th><th>보낸사람</th><th>첨부</th><th>열람</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      : '<div class="msg warn">연결된 푸른메일 이력이 없습니다. 위 <b>[🔍 푸른메일함(현재·과거)에서 메일 더 찾기]</b>를 눌러 관련 메일을 연결하세요.</div>')
+    +'<div id="stMailDetail" style="margin-top:12px"></div>';
+  _openOrRefreshStockModal(html,{width:980});
+}
+function viewStockMailDetail(batchId,mailId){
+  var b=(S.stocks||{})[batchId]||{}, m=(b.mails||{})[mailId]||{};
+  var box=$('stMailDetail'); if(!box) return;
+  var atts=m.att_names||[];
+  var canLive=(m.source==='old'&&m.old_key)||(m.source==='imap'&&m.slug&&m.uid);
+  box.innerHTML='<div class="panel">'
+    +'<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+    +'<b>📨 '+esc(m.subject||'(제목 없음)')+'</b>'
+    +'<span class="chip">'+esc(_fmtStockMailDate(m))+'</span>'
+    +(m.from||m.email?'<span class="muted" style="font-size:12px">보낸이: '+esc((m.from||'')+(m.email?' <'+m.email+'>':''))+'</span>':'')
+    +'<span style="flex:1"></span>'
+    +(canLive?'<button class="primary" onclick="fetchLiveStockMail(\''+batchId+'\',\''+mailId+'\')">🔄 푸른메일 서버에서 전체 원문·첨부 불러오기</button>':'')
+    +'</div>'
+    +(atts.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:12px">원본 메일 첨부 목록:</span>'+atts.map(function(n){
+      var sens=/인감증명|본인서명사실|주민등록|등초본|신분증|운전면허/.test(String(n));
+      return '<span class="chip'+(sens?' warn':'')+'">'+esc(n)+(sens?' (개인정보 차단대상)':'')+'</span>';
+    }).join('')+'</div>':'')
+    +'<div id="stMailBodyBox" style="white-space:pre-wrap;font-size:12.5px;line-height:1.65;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;max-height:46vh;overflow:auto">'
+    +esc(scrubStockPii(m.summary||'저장된 요약이 없습니다. 우측 상단 [🔄 푸른메일 서버에서 전체 원문·첨부 불러오기]를 눌러 확인하세요.'))+'</div>'
+    +'</div>';
+}
+function fetchLiveStockMail(batchId,mailId){
+  var b=(S.stocks||{})[batchId]||{}, m=(b.mails||{})[mailId]||{};
+  var bodyBox=$('stMailBodyBox');
+  if(bodyBox) bodyBox.innerHTML=loadingHTML('푸른메일 서버에서 원문을 읽는 중…');
+  var callP=(m.source==='old'&&m.old_key)
+    ? _mfCall('readOldMail',{key:String(m.old_key),full:1})
+    : _mfCall('readMailMessage',{slug:String(m.slug||''),uid:String(m.uid||''),peek:1});
+  callP.then(function(j){
+    var rawTxt=String(j.text||'').trim();
+    if(!rawTxt&&j.html) rawTxt=stockMailHtmlToText(j.html);
+    var cleanTxt=scrubStockPii(rawTxt||m.summary||'(본문 없음)');
+    var atts=j.atts||[];
+    _stockLiveMailAtts[mailId]=atts;
+    var attHtml=atts.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px"><b style="font-size:12px">첨부파일 내려받기:</b>'
+      +atts.map(function(a,ai){
+        var nm=String(a.name||('첨부'+(ai+1)));
+        var sens=/인감증명|본인서명사실|주민등록|등초본|신분증|운전면허/.test(nm);
+        return '<button onclick="downloadLiveStockMailAtt(\''+batchId+'\',\''+mailId+'\','+ai+')" style="font-size:12px;padding:4px 10px">'+(sens?'🔒 ':'⬇ ')+esc(nm)+'</button>';
+      }).join('')+'</div>':'';
+    if(bodyBox) bodyBox.innerHTML=attHtml+'<div style="white-space:pre-wrap">'+esc(cleanTxt)+'</div>';
+  }).catch(function(e){
+    if(bodyBox) bodyBox.innerHTML='<div class="msg warn">실시간 메일 서버 조회 실패('+esc((e&&e.message)||e)+') — 비식별 보관 요약을 표시합니다.</div><div style="white-space:pre-wrap;margin-top:8px">'+esc(scrubStockPii(m.summary||''))+'</div>';
+  });
+}
+function downloadLiveStockMailAtt(batchId,mailId,attIdx){
+  var b=(S.stocks||{})[batchId]||{}, m=(b.mails||{})[mailId]||{};
+  var atts=_stockLiveMailAtts[mailId]||[], a=atts[attIdx];
+  if(!a){ toast('첨부 정보를 찾지 못했습니다','warn'); return; }
+  var nm=String(a.name||'첨부파일');
+  if(/인감증명|본인서명사실|주민등록|등초본|신분증|운전면허/.test(nm)){
+    toast('🔒 개인 인감증명서·주민등록 서류는 보안 정책상 내려받기가 차단됩니다 — 기금 내 [📎 비식별 클린 증빙서류]를 이용하세요','err');
+    return;
+  }
+  toast('첨부파일을 내려받는 중…');
+  var p=(m.source==='old'&&m.old_key)
+    ? _mfCall('readOldMail',{key:String(m.old_key),index:a.i!=null?a.i:attIdx})
+    : _mfCall('readMailAttachment',{slug:String(m.slug||''),uid:String(m.uid||''),index:a.i!=null?a.i:attIdx,part:String(a.part||'')});
+  p.then(function(j){
+    var bytes=_b64ToBytes(j.b64||'');
+    var blob=new Blob([bytes],{type:j.mime||'application/octet-stream'});
+    var url=URL.createObjectURL(blob);
+    var el=document.createElement('a'); el.href=url; el.download=j.name||nm;
+    document.body.appendChild(el); el.click(); el.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+  }).catch(function(e){ toast('첨부 내려받기 실패: '+((e&&e.message)||e),'err'); });
+}
+function searchStockMailsFromBox(batchId){
+  if(_stockModalBusy) return;
+  var fid=S.fundId, f=funds[fid]||{}, b=(S.stocks||{})[batchId]||{};
+  var box=$('stMailDetail'); if(!box) return;
+  box.innerHTML='<div class="panel">'+loadingHTML('푸른메일함(현재 메일 + 지난 메일 보관함)에서 관련 메일을 검색하는 중…')+'</div>';
+  var kw=[
+    String(f.short_name||'').replace(/(사내|공동)?근로복지기금(법인)?/g,'').replace(/(사내|공동)$/,'').trim(),
+    String(f.name||'').replace(/(사내|공동)?근로복지기금(법인)?/g,'').trim(),
+    String(b.issuer||'').replace(/\(주\)|주식회사/g,'').trim()
+  ].filter(function(x){ return x&&x.length>=2; });
+  var errs=[];
+  var pFolders=fbDb.ref('mailbox/folders').once('value').then(function(sn){
+    var v=sn.val()||{};
+    return Object.keys(v).filter(function(k){ var o=v[k]||{}; return o.kind==='inbox'||/^INBOX/i.test(String(o.path||k))||/근로복지기금|기금/.test(String(o.name||k)); });
+  }).catch(function(e){ errs.push('현재메일함 폴더: '+((e&&e.message)||e)); return null; });
+  var pOld=fbDb.ref('mailbox/old/msgs').once('value').then(function(sn){
+    var v=sn.val()||{};
+    return Object.keys(v).map(function(ok){ var m=v[ok]||{}; return Object.assign({_src:'old', old_key:ok},m); });
+  }).catch(function(e){ errs.push('지난메일함: '+((e&&e.message)||e)); return null; });
+  return Promise.all([pFolders,pOld]).then(function(r){
+    if(r[0]===null&&r[1]===null){
+      var errMsg=errs.join(' · ')||'권한 또는 네트워크 오류';
+      box.innerHTML='<div class="msg err">푸른메일함 조회 실패: '+esc(errMsg)+' — 메일함 접근 권한 또는 네트워크 연결을 확인하세요.</div>';
+      toast('푸른메일함 조회 실패: '+errMsg,'err');
+      return;
+    }
+    return Promise.all((r[0]||[]).map(function(slug){
+      return fbDb.ref('mailbox/msgs/'+slug).once('value').then(function(sn){
+        var v=sn.val()||{};
+        return Object.keys(v).map(function(uid){ return Object.assign({_src:'imap', slug:slug, uid:uid},v[uid]); });
+      }).catch(function(e){ errs.push(slug+': '+((e&&e.message)||e)); return []; });
+    })).then(function(imapLists){
+      var all=[].concat.apply([],imapLists).concat(r[1]||[]);
+      var existing=b.mails||{}, seen={};
+      Object.keys(existing).forEach(function(mid){
+        var em=existing[mid]||{};
+        if(em.old_key) seen['old:'+em.old_key]=1;
+        if(em.slug&&em.uid) seen['imap:'+em.slug+'/'+em.uid]=1;
+      });
+      var hits=all.map(function(m){ return {m:m, sc:scoreStockMailCandidate(m,kw)}; })
+        .filter(function(x){
+          if(x.sc<=0) return false;
+          var uk=x.m._src==='old'?'old:'+x.m.old_key:'imap:'+x.m.slug+'/'+x.m.uid;
+          if(seen[uk]) return false;
+          seen[uk]=1; return true;
+        })
+        .sort(function(a,k2){ return k2.sc-a.sc||(Number(k2.m.d)||0)-(Number(a.m.d)||0); })
+        .slice(0,25);
+      _stockMailSearchHits=hits.map(function(x){ return x.m; });
+      var warnBanner=errs.length?'<div class="msg warn" style="margin-bottom:8px">일부 메일함 조회 제한: '+esc(errs.join(' · '))+'</div>':'';
+      if(!hits.length){
+        box.innerHTML=warnBanner+'<div class="msg">추가로 연결할 새 관련 메일이 없습니다 (검색어: '+esc(kw.join(', ')||'기금명')+').</div>';
+        return;
+      }
+      var hRows=hits.map(function(x,hi){
+        var m=x.m;
+        return '<tr>'+_ckTd()+'<td class="no">'+(hi+1)+'</td>'
+          +'<td style="white-space:nowrap">'+esc(_fmtStockMailDate(m))+'</td>'
+          +'<td style="white-space:nowrap"><span class="chip">'+(m._src==='old'?'지난메일함':'푸른메일함')+'</span></td>'
+          +'<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.s||'')+'"><b>'+esc(m.s||'(제목 없음)')+'</b></td>'
+          +'<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.f||m.e||'—')+'</td>'
+          +'<td style="white-space:nowrap"><button class="primary" onclick="linkStockMailToBatch(\''+batchId+'\','+hi+')" style="padding:4px 10px;font-size:12px">＋ 연결</button></td></tr>';
+      }).join('');
+      box.innerHTML=warnBanner+'<div class="panel"><div class="row" style="margin-bottom:8px"><b>🔍 검색된 푸른메일 ('+hits.length+'통)</b></div>'
+        +'<div class="tblwrap" style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>수신·발신일</th><th>구분</th><th>제목</th><th>보낸사람</th><th>연결</th></tr></thead><tbody>'+hRows+'</tbody></table></div></div>';
+    });
+  }).catch(function(e){
+    var msg=(e&&e.message)||String(e);
+    box.innerHTML='<div class="msg err">푸른메일함 검색 오류: '+esc(msg)+'</div>';
+    toast('푸른메일함 검색 오류: '+msg,'err');
+  });
+}
+function linkStockMailToBatch(batchId,idx){
+  var fid=S.fundId, m=_stockMailSearchHits[idx];
+  if(!fid||!batchId||!m||_stockModalBusy) return;
+  _stockModalBusy=true;
+  var mid=fbDb.ref(NS+'/stocks/'+fid+'/'+batchId+'/mails').push().key;
+  var rec={
+    source:m._src==='old'?'old':'imap',
+    slug:String(m.slug||''),
+    uid:String(m.uid||''),
+    old_key:String(m.old_key||''),
+    subject:scrubStockPii(String(m.s||'')),
+    from:scrubStockPii(String(m.f||'')),
+    email:String(m.e||''),
+    date_ms:Number(m.d)||0,
+    date_str:_fmtStockMailDate(m),
+    att_names:[],
+    summary:scrubStockPii(String(m.p||''))
+  };
+  return fbDb.ref(NS+'/stocks/'+fid+'/'+batchId+'/mails/'+mid).set(rec).then(function(){
+    _audit(fid,'주식출연 푸른메일 연결',rec.subject);
+    _stockModalBusy=false; S.stocksFor=null;
+    return _loadStocks(fid).then(function(){ _renderStockMailsModal(batchId); renderFund(); toast('메일을 연결했습니다'); });
+  }).catch(function(e){ _stockModalBusy=false; _renderStockMailsModal(batchId); toast('메일 연결 저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function unlinkStockMail(batchId,mailId){
+  var fid=S.fundId; if(!fid||!mailId||_stockModalBusy) return;
+  return confirmM('이 메일 연결을 해제할까요? (푸른메일함 원본 메일은 삭제되지 않습니다)',{ok:'연결 해제',danger:true}).then(function(ok){
+    if(!ok) return;
+    _stockModalBusy=true; _renderStockMailsModal(batchId);
+    return fbDb.ref(NS+'/stocks/'+fid+'/'+batchId+'/mails/'+mailId).remove().then(function(){
+      _stockModalBusy=false; S.stocksFor=null;
+      return _loadStocks(fid).then(function(){ _renderStockMailsModal(batchId); renderFund(); toast('연결을 해제했습니다'); });
+    });
+  }).catch(function(e){ _stockModalBusy=false; _renderStockMailsModal(batchId); toast('메일 연결 해제 실패: '+((e&&e.message)||e),'err'); });
 }
 /* ── 해산·탈퇴: 기한 셈 — 순수 함수(검사가 그대로 돌린다) ──
    규칙 «기준일+N일» 또는 «기준일+N개월». 개월은 말일을 넘지 않게(1/31+1개월 → 2/28). 기준일이 비면 '' — 지어내지 않는다. */
@@ -27688,6 +28410,10 @@ var HELP={
    +'<p><b>② 장부가액을 초과한 소각·처분 차익</b> — 원칙적으로 기본재산이 아니라 기금운용 <b>수익금(잡수익)</b>으로 처리하여 <b>50%·80% 한도 제한 없이 전액 근로자 목적사업(복지사업) 재원</b>으로 사용할 수 있습니다. 통장 입금 1줄을 원금(매도가능증권)과 차익(잡수익) 분할 분개로 자동 생성하므로 통장 잔액 대사와 결산 재무제표가 한 번에 맞습니다.</p>'
    +'<p><b>③ 기본재산 총액 변경보고(별지 제10호) 여부</b> — 원금을 현금 기본재산으로 유지하고 차익을 수익금으로 쓰면 <b>기본재산 총액 자체는 변동이 없어</b> 법정 총액 변경보고 의무 대상이 아닙니다(별지 제15호 연말 보고에 반영). 다만 <b>협의회 의결로 소각차익을 기본재산에 편입(총액 증가)</b>하거나 <b>감자손실·저가소각으로 원금이 줄어든 경우(총액 감소)</b>에는 변동일로부터 <b>3주 이내</b>에 별지 제10호 보고서와 변경 재산목록을 노동청에 제출해야 합니다.</p>'
    +'<p><b>④ 세무 체크(의제배당·원천세 환급)</b> — 주식 소각 시 취득가액 초과 금전은 법인세법 제16조 <b>의제배당</b>에 해당해 원천징수(법인세 14%+지방소득세 1.4%, 선납세금 처리)될 수 있으며, 법인세법 제29조제1항제1호 배당소득 100% 고유목적사업준비금 손금산입 신고로 환급받을 수 있는지 담당 세무사와 확인하세요.</p>'},
+ 'stock.history':{t:'과거 주식출연 비식별 서류 보관 및 푸른메일 연결 열람',h:'<p>사업장·주주가 과거에 출연한 주식의 <b>비식별 클린 증빙서류</b>(기금출연확인서·상증세법 주식가치평가서·별지 제10호 기본재산 변경보고서·비식별 주주명부·신고반려 공문 등)와 <b>푸른메일함 수발신 이력</b>을 주식출연 묶음마다 연결해 관리합니다.</p>'
+   +'<p><b>① 개인정보 원천 제거 및 비공개 저장</b> — 인감증명서·주민등록등초본 페이지와 주민등록번호·자택 상세주소가 포함된 원본은 그대로 올릴 수 없으며(감지 시 자동 차단), 개인정보가 제거된 클린 문서만 재직 담당자 전용 보안 노드(공개 URL 미생성)에 보관합니다.</p>'
+   +'<p><b>② 푸른메일함 실시간·과거 메일 연동</b> — 현재 푸른메일함과 지난 메일 보관함의 관련 메일을 연결해 수발신 경위와 비식별 요약·원문을 바로 열람할 수 있습니다.</p>'
+   +'<p><b>③ 신고반려·미이행 이력보존 분리</b> — 주식출연 변경신고 접수 후 명의개서 미이행 등으로 노동청에 <b>반려 요청</b>한 건은 <b>신고반려·미이행(이력보존)</b> 상태로 두어 재무상태표 매도가능증권 잔액에는 산입하지 않으면서 당시 서류와 메일 경위만 보존합니다.</p>'},
  'lib.chat':{t:'법령·유권해석·공단 지침 챗봇',h:'<p><b>근로복지기본법령</b>, <b>고용노동부 예규 제169호(사내·공동근로복지기금 업무처리지침)</b>, <b>근로복지공단 근로복지기금 지원사업 업무처리규정(제1375호)</b> 및 주요 <b>고용노동부 행정해석·국민신문고 회신</b>을 한곳에 모아 질의응답하는 도우미입니다.</p>'
    +'<p><b>💬 질문하기(즉시 판시)</b> — 입력한 질문과 가장 관련도가 높은 유권해석·지침·법령 조문을 즉시 찾아 핵심 결론과 원문 판시를 보여 줍니다.</p>'
    +'<p><b>🤖 AI 심층답변</b> — 검색된 공식 법령·유권해석 근거만을 바탕으로 Claude AI가 사내·공동기금 맞춤 검토의견을 종합해 작성합니다. 근거에 없는 문서번호나 조문은 지어내지 않으며, 인용 배지를 누르면 원문 전체를 확인할 수 있습니다.</p>'

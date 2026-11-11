@@ -196,7 +196,7 @@
       }
       try {
         var s = d.createElement('script');
-        s.src = 'fund_kb.js?v=1';
+        s.src = 'fund_kb.js?v=4';
         s.async = true;
         s.onload = function () { STATE.fundKbLoaded = true; done(w.FUND_KB || []); };
         s.onerror = function () { STATE.fundKbLoading = null; done([]); };
