@@ -526,7 +526,7 @@ t('id 없는 건은 건너뛴다',
 }
 
 /* ═══ 6. 화면 ═══ */
-function renderSweep(result, filter){
+function renderSweep(result, filter, extraProps){
   const nodes = [], texts = [];
   const rc = {
     console, Date, Math, Object, JSON, Array, String, Number, parseInt, isNaN, RegExp,
@@ -546,8 +546,8 @@ function renderSweep(result, filter){
   vm.runInContext(slice('// ── 지난 자료 중복 훑기 결과 ──', '\n//  - 사건유형 (case_types)'), rc);
   rc.dupSweepDateOf = (r) => String((r && (r.signDate || r.receiveDate || r.startDate)) || '');
   rc.dupSweepNoOf   = (r) => String((r && (r.contractNo || r.caseNo || r.itemNo)) || '');
-  rc.DupSweepModal({ result:result, filter:filter || 'all',
-    onFilter(){}, onClose(){}, onRescan(){}, onOpen(){} });
+  rc.DupSweepModal(Object.assign({ result:result, filter:filter || 'all',
+    onFilter(){}, onClose(){}, onRescan(){}, onOpen(){} }, extraProps || {}));
   return { nodes, texts, all:texts.join(' | ') };
 }
 {
@@ -657,6 +657,46 @@ function renderSweep(result, filter){
 {
   const v = renderSweep({ counts:{ dup:0, again:0, unknown:0, groups:0, scanned:12 }, groups:[] });
   t('★ 겹치는 게 없으면 깨끗하다고 말한다', v.all.indexOf('깨끗합니다') >= 0, true);
+}
+// 별건 구분됨 타일 · 별건 확인/해제 버튼 (복제본에는 별건 확인 버튼을 띄우지 않는다)
+{
+  const rDup = scan({ contracts:[
+    { id:'c1', companyName:'다라테크', signDate:'2026-01-10', contractNo:'계약-2026-001', kinds:['case'], typeCodes:{ case:'case-dismiss' } },
+    { id:'c2', companyName:'다라테크', signDate:'2026-04-10', contractNo:'계약-2026-002', kinds:['case'], typeCodes:{ case:'case-dismiss' } }
+  ]});
+  let marked = null;
+  const vMark = renderSweep(rDup, 'dup', { onMarkDistinct(g){ marked = g; } });
+  const markBtns = vMark.nodes.filter(n => n.tag === 'button' && n.kids[0] === '✓ 별건 확인');
+  t('★ 일반 중복 묶음에는 별건 확인 버튼이 보인다', markBtns.length, 1);
+  markBtns[0].props.onClick();
+  t('★ 별건 확인 버튼을 누르면 해당 묶음을 넘긴다', marked && marked.coName, '다라테크');
+
+  const rClone = scan({ contracts:[
+    { id:'c1', companyName:'다라테크', signDate:'2026-01-10', contractNo:'계약-2026-001', kinds:['case'], typeCodes:{ case:'case-dismiss' } },
+    { id:'c2', companyName:'다라테크', signDate:'2026-01-10', contractNo:'계약-2026-001', kinds:['case'], typeCodes:{ case:'case-dismiss' } }
+  ]});
+  const vClone = renderSweep(rClone, 'dup', { onMarkDistinct(){} });
+  t('★ 관리번호 복제본에는 별건 확인 버튼을 띄우지 않는다',
+    vClone.nodes.some(n => n.tag === 'button' && n.kids[0] === '✓ 별건 확인'), false);
+
+  const rDist = scan({ cases:[
+    { id:'k1', companyName:'마바운수', receiveDate:'2026-01-10', caseNo:'부해-2026-001', typeCode:'case-dismiss', distinctIds:['k2'] },
+    { id:'k2', companyName:'마바운수', receiveDate:'2026-05-10', caseNo:'부해-2026-002', typeCode:'case-dismiss', distinctIds:['k1'] }
+  ]});
+  let unmarked = null;
+  const vDist = renderSweep(rDist, 'distinct', { onUnmarkDistinct(g){ unmarked = g; } });
+  t('★ 별건 구분됨 갈래에서 사유가 보이고 명암비 위반 색이 없다',
+    vDist.all.indexOf('별건 확인됨') >= 0 &&
+    !vDist.nodes.some(n => n.props.style && (n.props.style.color === '#94a3b8' || n.props.style.color === '#16a34a')), true);
+  const unmarkBtns = vDist.nodes.filter(n => n.tag === 'button' && n.kids[0] === '별건 해제');
+  t('★ 수동 별건 묶음에는 별건 해제 버튼이 보인다', unmarkBtns.length, 1);
+  unmarkBtns[0].props.onClick();
+  t('★ 별건 해제 버튼을 누르면 해당 묶음을 넘긴다', unmarked && unmarked.coName, '마바운수');
+
+  const vErr = renderSweep(Object.assign({}, rDup, { errorNotice:'별건 표식 저장 중 오류가 발생했습니다.' }), 'dup');
+  t('★ 저장 오류 시 모달 안에 role=alert 고정 경고 배너가 표시된다',
+    vErr.nodes.some(n => n.props.role === 'alert' && n.props['aria-live'] === 'assertive') &&
+    vErr.all.indexOf('별건 표식 저장 중 오류가 발생했습니다.') >= 0, true);
 }
 
 /* ═══ 7. 배선 ═══ */
