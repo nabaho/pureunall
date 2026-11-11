@@ -217,7 +217,7 @@ details.dep textarea{min-height:64px}
   .t[data-name] thead tr{display:flex;align-items:center}
   .t[data-name] thead th{display:none}
   .t[data-name] thead th.c{display:block;width:36px;padding:6px 0;margin-left:4px}
-  .t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0}
+  .t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0;white-space:nowrap}
   .t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;position:relative;padding:7px 10px 7px 70px;min-height:44px;border-bottom:1px solid var(--line)}
   .t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
   .t[data-name] tbody td{border:0;padding:0;max-width:none}
@@ -293,6 +293,7 @@ details.dep textarea{min-height:64px}
   /* 월별 정산 — 폰은 달 줄을 여섯 칸 두 줄, 문구 카드는 한 줄에 하나 */
   .yearbar,.mleg,.mhead{padding-left:10px;padding-right:10px}
   .mstrip{grid-template-columns:repeat(6,minmax(0,1fr));padding:0 10px}
+  .mstrip button.mo{white-space:nowrap;padding:5px 2px;font-size:12px}
   .stephd,.mrun-h{padding:9px 10px}
   .mtr{padding:0 10px 8px}
   .mtr-r .co{max-width:100%}

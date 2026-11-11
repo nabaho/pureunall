@@ -188,11 +188,12 @@ table.mx td.dot.yes{background:var(--green-bg)}
      겉 여백 8 + 상자 안 여백 10~12px 가 쌓여 글이 화면 끝에서 17~19px 안쪽에서 시작했다 → 겉 5px, 상자 안 8px. 창은 양옆 6px.
    tests/govaid-phone.test.js 가 지킨다. */
 @media (max-width:760px){
-  .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
-  .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
+  .top{flex-wrap:nowrap;gap:5px;padding:6px 8px}
+  .top h1{font-size:13.5px;white-space:nowrap;flex-shrink:0}
   .top .sub{display:none}
-  #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-  .top button{flex-shrink:0}
+  #who{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+  .top .sp{flex:1 1 0;min-width:0}
+  .top button{flex-shrink:0;padding:4px 7px;font-size:11.5px;white-space:nowrap}
   .tabs{flex-wrap:nowrap;overflow-x:auto;gap:0;padding:0 6px;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex-shrink:0;padding:8px 9px}
@@ -202,7 +203,8 @@ table.mx td.dot.yes{background:var(--green-bg)}
   .li{padding:8px}
   .co-head{padding:6px 8px}
   .sec{padding:8px}
-  .prof{padding:8px}
+  .prof{padding:8px;max-width:100%;overflow:hidden}
+  .prof>*{min-width:0;max-width:100%;overflow-wrap:anywhere;white-space:normal}
   .modal{padding:10px 6px}
   .mhead,.mfoot{padding:10px}
   .ed{padding:8px}

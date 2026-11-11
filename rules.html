@@ -469,6 +469,7 @@ table.daejo thead th{position:sticky;top:-18px;z-index:3;
    — 머리줄에 있을 때(header .fld)가 원래 이 모습이었다. */
 #setup .fld{flex-direction:row;align-items:center;gap:6px}
 #setup .fld label{white-space:nowrap}
+@media (max-width:760px){#setup .fld{min-width:0;max-width:100%;flex:1 1 100%}#setup .fld select,#site{min-width:0;max-width:100%;flex:1 1 0;width:0}}
 /* 두 무리를 가르는 «금». 빈 여백으로 벌리지 않는다 —
    ⚠ flex 는 줄을 «먼저 나누고» 그다음에 줄인다. 그래서 넉넉한 여백을 끼우면
      flex-shrink 를 줘도 맨 끝 단추가 다음 줄로 접힌다(실제로 2px 모자라 접혔다).

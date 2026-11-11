@@ -1404,7 +1404,12 @@
   #app > .tlwrap .tlname{min-width:0}
   /* 빠른 기록 바 — 양옆 6px */
   #qwrap{left:6px;right:6px}
-  #qbar{padding-left:10px;padding-right:10px}
+  .wkgrp{max-width:100%;min-width:0;flex:0 1 auto;gap:3px}
+  .wkgrp .wkpill{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .wkgrp .wknav{padding:3px 5px;font-size:11.5px;flex:0 0 auto}
+  #qbar{padding-left:8px;padding-right:8px;gap:5px;max-width:100%;box-sizing:border-box}
+  #qbar input{width:0;min-width:0;flex:1 1 0}
+  #qbar .k{flex:0 0 auto;padding:0 5px}
   /* 업무 서랍 — 화면 전체. 칸(상자)은 옆 테두리를 걷어 서랍 폭 다 */
   #drawer{width:100%;max-width:100%;border-left:0}
   #drawer .dh,#feed{padding-left:12px;padding-right:12px}

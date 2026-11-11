@@ -56,7 +56,7 @@
     .nav.soon{display:none}
     .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}.nav-tree{display:none}
     .shell .main{margin:12px auto;padding:0 10px}
-    .top{padding:10px 12px;gap:8px;flex-wrap:wrap}.top h1{width:100%;font-size:14px}.top #whoami{margin-right:auto}
+    .top{padding:7px 10px;gap:6px;flex-wrap:nowrap}.top h1{width:auto;flex:0 0 auto;font-size:14px;white-space:nowrap}.top #whoami{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:auto}.top #saveState{font-size:0;gap:0;padding:5px}.top #saveState.failed{font-size:11px;gap:5px;padding:3px 8px}.top a{flex:0 0 auto;white-space:nowrap}
     .main{margin:12px auto;padding:0 10px}.card{padding:13px;overflow-x:auto}
     .card>div:first-child{min-width:0;gap:8px}.card>div:first-child b{min-width:0}
     table{min-width:640px}#viewDetail{overflow-x:auto}
@@ -108,7 +108,10 @@
     /* 흰 카드 안의 흰 상자(목록 틀·종이)는 보이지 않는 겹이다 — 바탕을 걷어 한 겹으로. 종이는 위아래 줄로만 가른다 */
     #paneForms .pcf-lp,#paneForms .pcf-list{background:none}
     #paneForms .pcf-sheetwrap{padding:0;background:none}
-    #paneForms .pcf-sheet{padding:16px 10px;background:none;box-shadow:none;border-bottom:1px solid #e2e8f0}
+    #paneForms .pcf-sheet{padding:16px 10px;background:none;box-shadow:none;border-bottom:1px solid #e2e8f0;max-width:100%;overflow-x:auto}
+    #paneForms .pcf-sheet table{min-width:0}
+    .pod-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+    .pod-tabs button{flex:0 0 auto;white-space:nowrap;padding:8px 10px}
   }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)

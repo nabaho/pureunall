@@ -232,7 +232,12 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
   nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
   nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px}
   #colist{width:100%;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
-  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis{grid-template-columns:1fr}
+  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis,.sev-3col{grid-template-columns:minmax(0,1fr)!important}
+  .sev-card{min-width:0;max-width:100%}
+  .sev-card .badge{white-space:nowrap;flex:0 0 auto}
+  .sev-card>div:first-child{gap:6px}
+  .sev-card>div:first-child>b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sev-card>div:first-child>span{white-space:nowrap;flex:0 0 auto}
 }
 /* ══════ 머리줄 회사 칸 (2026-10-05) — 회사 이름·담당·지표를 맨 위 파란 줄에 ══════ */
 /* ⚠ 넘치면 잘라 버리지 않고 둘째 줄로 내린다 — 맨 끝의 「확정」 단추가 잘려 안 보이면 안 된다 */

@@ -271,7 +271,41 @@
       '  .pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root input,.pau-root select,.pau-root textarea{font-size:16px!important;height:38px;}',
       '  .pau-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}',
       '  .pau-hdr{padding:10px 12px;}',
-      '  .pau-body{padding:10px 10px 24px;}',
+      '  .pau-wide,.pau-hdr-badges,.pau-who-slot{display:none!important;}',
+      '  .pau-hdr{padding:5px 6px;gap:4px;flex-wrap:nowrap;}',
+      '  .pau-hdr-ico{font-size:17px;}',
+      '  .pau-hdr-tit{font-size:14px;white-space:nowrap;flex:0 0 auto;margin-right:0;}',
+      '  .pau-hdr-r{gap:4px;flex-wrap:nowrap;min-width:0;}',
+      '  .pau-btn{padding:4px 6px;font-size:11px;}',
+      '  .pau-tabs{padding:4px 6px 0;gap:2px;scrollbar-width:none;}',
+      '  .pau-tab{padding:6px 8px;font-size:12px;}',
+      '  .pau-body{padding:6px 5px 24px;}',
+      '  .pau-flt{padding:6px 8px;gap:5px;margin-bottom:6px;}',
+      '  .pau-flt select{flex:1 1 30%;min-width:0!important;max-width:100%;padding:0 5px;height:36px;}',
+      '  .pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{flex:1 1 100%;min-width:0;max-width:none;height:36px;}',
+      '  .pau-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-bottom:6px;}',
+      '  .pau-kpi{padding:5px 7px;gap:4px;min-width:0;overflow:hidden;}',
+      '  .pau-kpi span{font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;}',
+      '  .pau-kpi b{font-size:13px;}',
+      '  .pau-tbl-wrap{max-height:none;border-left:0;border-right:0;border-radius:0;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl),.pau-body .pau-tbl:not(#pauMTbl) thead,.pau-body .pau-tbl:not(#pauMTbl) tbody{display:block;width:100%;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) thead tr{display:flex;align-items:center;padding:4px 8px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) thead th{display:none;position:static;border:0;padding:0;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) thead th.c-ck{display:flex;align-items:center;width:30px;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) thead th.c-no{display:block;width:auto;text-align:left;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;position:relative;padding:7px 8px 7px 64px;border-bottom:1px solid #e2e8f0;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody td{display:inline-flex;align-items:center;padding:0;border:0;width:auto!important;max-width:100%;min-width:0;font-size:12px;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) .pau-line{flex-wrap:wrap;white-space:normal;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) .pau-line > span{max-width:100%;min-width:0;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody td.c-ck{position:absolute;left:6px;top:7px;width:28px!important;justify-content:center;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody td.c-no{position:absolute;left:34px;top:9px;width:24px!important;justify-content:flex-end;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody td:nth-child(3){flex:1 1 100%;font-size:13.5px;font-weight:700;}',
+      '  .pau-body .pau-tbl:not(#pauMTbl) tbody td[colspan]{flex:1 1 100%;justify-content:center;padding:20px 8px;margin-left:-56px;white-space:normal;}',
+      '  .pau-tbl input[type=checkbox]{width:24px;height:24px;margin:0;}',
+      '  #pauMTbl,.pau-detail-body .pau-tbl{table-layout:auto;width:max-content;min-width:100%;}',
+      '  .pau-sec-card{overflow-x:auto;padding:10px;}',
+      '  .pau-detail-hdr{padding:8px 10px;}',
+      '  .pau-detail-body{padding:8px;}',
       '}'
     ].join('\n');
     document.head.appendChild(st);
@@ -667,7 +701,7 @@
     root.innerHTML = [
       '<div class="pau-hdr" id="head">',
       '  <div class="pau-hdr-ico">🤝</div>',
-      '  <div class="pau-hdr-tit">공공임단협 — 공공기관 노동조합·임금·단체협약 비교분석</div>',
+      '  <div class="pau-hdr-tit">공공임단협<span class="pau-wide"> — 공공기관 노동조합·임금·단체협약 비교분석</span></div>',
       '  <div class="pau-hdr-badges">',
       '    <span class="pau-badge ok" id="pauApiStatusBadge">🟢 5대 공공·법령 API 연결됨</span>',
       '    <span class="pau-badge">기관 ' + fmtNum(insts.length) + '곳</span>',
@@ -677,12 +711,12 @@
       '  </div>',
       '  <div class="pau-hdr-r">',
       '    <span id="who" class="pau-who-slot"></span>',
-      '    <button type="button" class="pau-btn pri" data-act="csv">📥 현재 표 엑셀(CSV) 받기</button>',
-      '    <button type="button" class="pau-btn" data-act="reload" title="데이터 및 API 상태 새로고침">🔄 새로고침</button>',
+      '    <button type="button" class="pau-btn pri" data-act="csv" title="현재 표 엑셀(CSV) 받기">📥<span class="pau-wide"> 현재 표 엑셀(CSV) 받기</span></button>',
+      '    <button type="button" class="pau-btn" data-act="reload" title="데이터 및 API 상태 새로고침">🔄<span class="pau-wide"> 새로고침</span></button>',
       (opts.isModal
-        ? '<button type="button" class="pau-btn" data-act="newwin" title="독립 창으로 크게 열기">↗ 새 창으로 크게 열기</button>' +
-          '<button type="button" class="pau-btn" data-act="close" title="닫기 (ESC)">✕ 닫기</button>'
-        : '<a href="enter.html" class="pau-btn">🏠 포털 홈</a>' +
+        ? '<button type="button" class="pau-btn" data-act="newwin" title="독립 창으로 크게 열기" aria-label="새 창으로 크게 열기">↗<span class="pau-wide"> 새 창으로 크게 열기</span></button>' +
+          '<button type="button" class="pau-btn" data-act="close" title="닫기 (ESC)" aria-label="닫기">✕<span class="pau-wide"> 닫기</span></button>'
+        : '<a href="enter.html" class="pau-btn" title="포털 홈">🏠<span class="pau-wide"> 포털 홈</span></a>' +
           '<button type="button" class="pau-btn" id="outBtn" style="display:none" onclick="try{firebase.auth().signOut()}catch(e){}">로그아웃</button>'),
       '  </div>',
       '</div>',
@@ -853,7 +887,7 @@
         '    <option value="노조없음"' + (state.uStruct === '노조없음' ? ' selected' : '') + '>노조없음</option>',
         '  </select>',
         '  <input type="search" id="pauUQuery" aria-label="기관명 및 노동조합 검색" placeholder="기관명·노동조합명·주무부처·연맹 검색…" value="' + esc(state.uQuery) + '">',
-        '  <span style="font-size:12px;color:#475569;">💡 기관명을 누르면 <b>기관별 노조·임단협·공시 종합 팝업창</b>이 열립니다</span>',
+        '  <span class="pau-wide" style="font-size:12px;color:#475569;">💡 기관명을 누르면 <b>기관별 노조·임단협·공시 종합 팝업창</b>이 열립니다</span>',
         '</div>',
         '<div class="pau-kpis" id="pauUKpis"></div>',
         '<div class="pau-bulk" id="pauUBulk"></div>',
@@ -1712,6 +1746,7 @@
 
   // ── 레이어 모달 팝업창 열기/닫기 ──
   var modalEl = null;
+  var modalPrevFocus = null;
 
   function closeModal() {
     if (!modalEl) return;
@@ -1720,26 +1755,58 @@
     if (global.PuBack && global.PuBack.close) {
       try { global.PuBack.close('pu-alio-modal'); } catch (e) {}
     }
+    if (modalPrevFocus && typeof modalPrevFocus.focus === 'function') {
+      try { modalPrevFocus.focus(); } catch (e) {}
+    }
+    modalPrevFocus = null;
   }
 
   function openModal() {
     injectStyles();
     if (modalEl) {
       modalEl.style.display = 'flex';
+      var existingClose = modalEl.querySelector('[data-act="close"]');
+      if (existingClose) { try { existingClose.focus(); } catch (e) {} }
       return;
     }
+    modalPrevFocus = document.activeElement || null;
     modalEl = document.createElement('div');
     modalEl.className = 'pau-modal-back';
     modalEl.id = 'puAlioModalBack';
-    modalEl.innerHTML = '<div class="pau-modal-box" id="puAlioModalBox" role="dialog" aria-modal="true" aria-label="공공임단협 비교분석"></div>';
+    modalEl.innerHTML = '<div class="pau-modal-box" id="puAlioModalBox" role="dialog" aria-modal="true" aria-label="공공임단협 비교분석" tabindex="-1"></div>';
     document.body.appendChild(modalEl);
 
     modalEl.addEventListener('click', function (ev) {
       if (ev.target === modalEl) closeModal();
     });
 
+    modalEl.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Tab' || !modalEl) return;
+      var boxEl = modalEl.querySelector('#puAlioModalBox');
+      if (!boxEl) return;
+      var focusables = Array.prototype.slice.call(
+        boxEl.querySelectorAll('a[href],button:not([disabled]),select:not([disabled]),input:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')
+      ).filter(function (el) { return el.offsetParent !== null; });
+      if (!focusables.length) { ev.preventDefault(); boxEl.focus(); return; }
+      var first = focusables[0];
+      var last = focusables[focusables.length - 1];
+      if (ev.shiftKey) {
+        if (document.activeElement === first || !boxEl.contains(document.activeElement)) {
+          ev.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !boxEl.contains(document.activeElement)) {
+          ev.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
     var box = modalEl.querySelector('#puAlioModalBox');
     mount(box, { isModal: true, onClose: closeModal });
+    var closeBtn = box.querySelector('[data-act="close"]') || box.querySelector('button');
+    try { (closeBtn || box).focus(); } catch (e) {}
 
     if (global.PuBack && global.PuBack.open) {
       try { global.PuBack.open('pu-alio-modal', closeModal); } catch (e) {}

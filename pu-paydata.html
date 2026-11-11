@@ -629,7 +629,8 @@ h1{font-size:18px;margin-bottom:4px}
     justify-content:flex-end}
   header .who::-webkit-scrollbar{display:none}
   header .who #whoami{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
-  header .who .out{flex:0 0 auto;white-space:nowrap;font-size:11.5px;padding:4px 8px}
+  header .who .out{flex:0 0 auto;white-space:nowrap;font-size:11px;padding:4px 6px}
+  header .who #whoami{min-width:3.2em}
   /* 곁다리 단추 둘은 그림쇠만 남긴다 — 글씨를 접으면 이름이 「권형…」으로 잘리지 않는다.
      (지우는 것이 아니다. 눌리는 자리는 그대로고, aria-label 로 이름도 남는다.) */
   header .who #btnStaff,header .who #btnDeputy{font-size:0;padding:4px 7px}
@@ -691,7 +692,11 @@ table.grid td.iffy{background:#fffbeb}
 .sl2,.dl2,.dl2b{display:contents}
 @media(max-width:760px){
   /* 머리줄 — 넘치면 접는다(옆으로 밀지 않는다). 단추 묶음은 제 줄에서 옆으로 민다. */
-  .dhead[data-h]{flex-wrap:wrap;row-gap:6px}
+  .dhead,.dhead[data-h]{flex-wrap:wrap;row-gap:6px}
+  .dhead .dacts{flex:0 1 auto;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .dhead .dacts::-webkit-scrollbar{display:none}
+  .dhead .dacts>*{flex:0 0 auto;white-space:nowrap}
+  .row>.btn{flex:0 0 auto;white-space:nowrap}
   .dhead[data-h] .dtitle{flex:1 1 0;min-width:60px}
   .dhead[data-h] .dkpi{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .dhead[data-h] .dacts{flex:0 1 auto;min-width:0;max-width:100%;overflow-x:auto;

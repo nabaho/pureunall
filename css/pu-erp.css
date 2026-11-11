@@ -776,7 +776,9 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   /* 왼쪽 단추는 «그림만» — 글자를 접으면 120px 이 돌아온다. 단추는 그대로 있다 */
   .hd-lbl { display: none !important; }
   /* 좁은 화면에서는 사이 간격도 아껴 제목에 준다 — 제목이 0px 이 되면 «여기가 어디인지»를 잃는다 */
-  .hd { padding: 0 6px; gap: 3px; }
+  .hd { padding: 0 5px; gap: 2px; }
+  .hd > button { padding-left: 7px !important; padding-right: 7px !important; min-width: 30px !important; }
+  .hd-title { font-size: 13.5px !important; }
   /* ⋯ — 오른쪽 묶음을 여는 손잡이 */
   .hd-more { display: inline-flex !important; align-items: center; justify-content: center;
              margin-left: 2px; padding: 0 10px; min-width: 34px; height: 34px; min-height: 34px;
@@ -798,7 +800,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
      ⚠ 안쪽 style= 로 자리를 잡는 것이라 여기서는 !important 가 필요하다.
        두 값뿐이라 이 자리에 두는 편이 낫다(판 쪽은 셈이 얽혀 있어 JS 안에 두었다). */
   #erp-alert-badge { right: 8px !important; }
-  body.has-alert-badge .hd { padding-right: 72px; }
+  body.has-alert-badge .hd { padding-right: 60px; }
   /* 표 셀 줄바꿈 방지 → 좁은 폰에서 글자가 세로로 쪼개지는 대신 표 전체가 가로 스크롤되도록 */
   .page table th, .page table td { white-space: nowrap; }
   /* 좌우 2단 레이아웃 → 1칸 (근태 폼+캘린더, 성과 안내+패널, 대시보드 본문+사이드) */
@@ -1721,7 +1723,14 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   /* 출금관리 도구줄 — 단추 여덟이 모양·폭이 제각각이라 줄마다 들쭉날쭉했다 → 같은 폭 셋씩 격자, 검색은 줄 폭 전체 */
   .fx-tools{ display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px !important; width:100%; flex:1 1 100% !important; }
   .fx-tools > .fx-sep{ display:none; }
-  .fx-tools > button, .fx-tools > div > button{ width:100%; min-height:38px; padding:4px 6px !important; font-size:13px !important; white-space:normal; line-height:1.2; }
+  .fx-tools > button, .fx-tools > div > button{ width:100%; min-height:38px; padding:4px 2px !important; font-size:11px !important; white-space:nowrap; line-height:1.2; }
+  .pl-chart{ max-width:100%; min-width:0; padding:12px !important; overflow:hidden; }
+  .pl-chart > div:first-child{ flex-wrap:wrap; gap:6px; }
+  .pl-chartbox{ max-width:100%; overflow-x:auto !important; }
+  .pl-bars > div > div:last-child{ white-space:nowrap; font-size:10.5px !important; }
+  .pl-chart > div:last-child{ grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:5px !important; }
+  .pl-chart > div:last-child > div{ padding:6px 4px !important; min-width:0; }
+  .pl-chart > div:last-child > div > div{ font-size:11.5px !important; }
   .fx-tools > div{ min-width:0; }
   .fx-tools > input{ grid-column:1 / -1; min-height:38px; }
   /* 접어 둔 요약 한 줄 — 잘리지 않고 두 줄까지 접는다(눌러 펼치는 것은 그대로) */

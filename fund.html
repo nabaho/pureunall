@@ -406,7 +406,7 @@
     th{font-size:9.5px}
     /* 표 안의 드롭다운이 줄 키를 정한다 — 여기가 낮아지면 스무 줄이 한꺼번에 낮아진다.
        ⚠ 줄마다 style= 로 박혀 있어 !important 가 없으면 안 듣는다. */
-    td select{padding:2px 5px!important;font-size:11px!important;max-width:86px!important}
+    td select{padding:2px 4px!important;font-size:16px!important;max-width:88px!important}
     /* ★ 2026-09-30 (대표 폰 캡쳐 「컴팩트하게 다시정리」) — 기금명이 또 «한 글자씩» 세로로 쌓였다.
          주담당 132px·계약관계 122px 이 폰에서도 그대로라 411px 화면에서 기금명 칸이 40px 남짓이었다.
          폰에서는 번호·주담당·계약관계 폭을 줄이고(이름은 안 접힌다), 기금명 아래 긴 정식 이름 줄은 접는다(.ph). */
@@ -442,10 +442,17 @@
           저장 알림은 점만(실패일 때는 글씨까지 — 놓치면 안 되는 알림이다), 이름 칸을 조금 줄이고, 로그아웃은 한 줄. */
     #saveState{font-size:0;gap:0;padding:5px}
     #saveState.failed{font-size:11px;gap:5px;padding:4px 8px}
-    #topuser{max-width:24vw}
-    #logoutbtn{white-space:nowrap}
+    #topbar{padding:6px 8px;gap:5px}
+    #menubtn{padding:4px 8px}
+    #topright{gap:4px;min-width:0}
+    #topright>button{padding:4px 7px!important}
+    #topuser{display:none}
+    #logoutbtn{white-space:nowrap;padding:4px 7px!important;font-size:11px;flex:none}
+    #kbchatbtn{font-size:0!important;padding:4px 7px!important;line-height:1;flex:none;white-space:nowrap}
+    #kbchatbtn::before{content:'💬';font-size:14px}
+    #kbChatWin{left:8px!important;right:8px!important;width:auto!important;max-width:calc(100vw - 16px)!important;bottom:10px!important;max-height:78vh!important}
     /* ①-2 «지금 어느 화면인지»(#crumb)가 19px 로 짓눌려 「기…」 만 남았다(2026-10-18 전수점검) — 이름 칸이 먼저 줄고 화면 이름은 네 글자를 지킨다 */
-    #crumb{flex:1 1 auto;min-width:4.5em}
+    #crumb{flex:1 1 0;min-width:4em}
     #topright{min-width:0}
     #topuser{min-width:0;flex:0 1 auto}
     /* ② 기금 머리 — 이름·딱지·상태·담당을 한 줄에 우겨 넣어 「공/동」 딱지가 세로로 쌓이고 「🔖 상태 👤 담당」이 화면 밖으로 잘렸다.

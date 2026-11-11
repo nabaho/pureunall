@@ -156,7 +156,8 @@ main{padding:12px 16px 40px}
   .t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
   .t[data-name] tbody td{border:0;padding:0;max-width:none}
   .t[data-name] tbody td[data-k="ti"],.t[data-name] tbody td.ti{order:3;flex:1 1 0;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
-  .t[data-name] tbody td[data-k="body"],.t[data-name] tbody td[data-k="memo"],.t[data-name] tbody td[data-k="per"]{order:7;flex:1 1 0;min-width:0;color:var(--ink2);overflow:hidden;text-overflow:ellipsis}
+  .t[data-name] tbody td[data-k="per"]{order:6;flex:1 1 100%;min-width:0;color:var(--ink2);white-space:normal;word-break:keep-all}
+  .t[data-name] tbody td[data-k="body"],.t[data-name] tbody td[data-k="memo"]{order:7;flex:1 1 0;min-width:0;color:var(--ink2);overflow:hidden;text-overflow:ellipsis}
   .t[data-name] tbody td[data-k="btn"],.t[data-name] tbody td[data-k="act"]{order:8}
   .t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
   /* 광고 */
@@ -198,6 +199,12 @@ main{padding:12px 16px 40px}
   .fv input[type=number]{width:84px}
   .fv .ck input{width:20px;height:20px}
   .pvwrap{padding:8px 12px 12px}
+  .card button,.cardp button{max-width:100%;white-space:normal;word-break:keep-all}
+  .mbox{max-width:100%;overflow-x:hidden}
+  .fv select,.fv input[type=file]{max-width:100%;min-width:0}
+  .trs input[type=time]{min-width:0;width:0;flex:1 1 0}
+  .kv>span{white-space:nowrap;flex:0 0 auto}
+  .kv>b{min-width:0;text-align:right;word-break:keep-all}
 }
 </style>
 </head>

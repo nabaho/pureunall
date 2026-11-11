@@ -291,6 +291,13 @@ button.td-biz.td-ok{border-left-color:var(--green)}
   .bizp section h2{padding:0 4px}
   .bizp .bz-card{padding:8px 7px}
   .bz-hint{display:none}
+  .bz-k{white-space:nowrap;flex-shrink:0}
+  #board:has(#today:not([style*="none"])) > .bizp{display:none}
+  .yrs{gap:4px;padding:3px;margin-bottom:8px}
+  .yrs button{padding:4px 10px;display:inline-flex;align-items:baseline;justify-content:center;gap:6px}
+  .yrs small{display:inline;font-size:12px}
+  .td-tabs{display:flex;flex-wrap:nowrap;gap:6px}
+  .td-tabs button{flex:1 1 0;min-width:0;white-space:nowrap;padding:7px 8px;font-size:13px}
   .bizp div.bz-g+div.bz-g{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .bizp div.bz-g+div.bz-g>.bz-sum{flex:0 0 auto;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:2px;margin:0;padding:0 2px;white-space:nowrap}
   .bizp div.bz-g+div.bz-g>.days{flex:1 0 100%}
@@ -314,7 +321,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
   #rows td.co{order:1;flex:1 1 0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #rows td:nth-child(6){order:2;flex:0 1 auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #rows td.ty{order:4;flex:0 1 auto;max-width:32%;font-size:12px;color:var(--mute)}
-  #rows td:nth-child(4){order:5;flex:1 1 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--mute)}
+  #rows td:nth-child(4){order:5;flex:1 1 84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--mute)}
   #rows td.num{order:6;font-size:12px}
   #rows td:nth-child(3),#rows td:nth-child(7),#rows td:nth-child(8){display:none}
   #rows td:nth-child(9){order:9;display:flex;gap:4px;flex-shrink:0;margin-left:auto}
