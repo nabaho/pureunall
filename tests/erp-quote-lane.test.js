@@ -362,4 +362,61 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.equal(saved.contractFeeVatIncluded, true);
   assert.match(saved.briefs.case, /충남2026부해1332/);
   assert.equal(calls.remove, 1);
+
+  /* ㉓ allowCreateReview 가 켜진 advance 요청은 상담접수 카드가 없어도 계약협의(review) 카드를 새로 만든다 */
+  const planRev = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', allowCreateReview: true }), [CO], [], USERS);
+  assert.equal(planRev.action, 'create');
+  assert.equal(planRev.form.status, 'review');
+
+  /* ㉔ 같은 사업장에 진행 중 카드가 2건 이상이면 종류가 달라도 blocked 로 막는다 */
+  let mockCts = [
+    card({ id: 'ct-a', status: 'review', kinds: ['consulting'] }),
+    card({ id: 'ct-b', status: 'consult', kinds: ['consult'] })
+  ];
+  ctx.dbGet = (k, d) => (k === 'companies' ? [CO] : k === 'contracts' ? mockCts : d);
+  calls.persist.length = 0; calls.update.length = 0;
+  const rDup = await ctx.run('k-ct2', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '123-45-67890' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청' }
+  });
+  assert.match(rDup.why, /진행 중 카드가 2건/);
+  assert.equal(calls.persist.length, 0);
+
+  /* 다른 종류(consulting) 진행 중 카드 1건만 있으면 덮어쓰지 않고 별도 case 카드로 만들고,
+     같은 종류(case) 진행 중 카드 1건에 이미 적힌 금액·성공보수는 덮어쓰지 않고 보존한다 */
+  mockCts = [card({ id: 'ct-cons', status: 'review', kinds: ['consulting'], amounts: { consulting: 5000000 } })];
+  calls.persist.length = 0;
+  const rDiffKind = await ctx.run('k-ct3', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '123-45-67890' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  assert.ok(rDiffKind.made);
+  assert.notEqual(rDiffKind.made.id, 'ct-cons', '기존 컨설팅 카드를 덮어쓰지 않고 새 카드로 생성');
+  assert.deepEqual(out(rDiffKind.made.kinds), ['case']);
+
+  mockCts = [card({ id: 'ct-case1', status: 'review', kinds: ['case'], amounts: { case: 1500000 }, successFee: 2000000, successFeeType: 'amount' })];
+  calls.persist.length = 0;
+  const rKeepAmt = await ctx.run('k-ct4', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '123-45-67890' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '990만원', success: '880만원' }
+  });
+  assert.equal(rKeepAmt.made.id, 'ct-case1');
+  assert.equal(rKeepAmt.made.amounts.case, 1500000, '기존에 적힌 착수금 보존');
+  assert.equal(rKeepAmt.made.successFee, 2000000, '기존에 적힌 성공보수 보존');
+
+  /* ㉕ 사업자번호도 companyId 도 없이 상호만 같은 미확인 요청은 companyId 를 잇지 않고 계약협의(review)로 둔다 */
+  mockCts = [];
+  calls.persist.length = 0;
+  const rUnverified = await ctx.run('k-ct5', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  assert.ok(rUnverified.made);
+  assert.equal(rUnverified.made.companyId, '', '이름만으로 업체 ID 를 잇지 않는다');
+  assert.equal(rUnverified.made.companyLinkStatus, 'pending');
+  assert.equal(rUnverified.made.status, 'review', '거래처 미확인 신규 요청은 계약협의(review)에 둔다');
 });

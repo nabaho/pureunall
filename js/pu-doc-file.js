@@ -2011,6 +2011,7 @@
                   slug: slug,
                   uid: uid,
                   srcKey: srcKey,
+                  mpKey: mpKey,
                   subject: subj,
                   from: String(m.f || m.e || ''),
                   to: String(m.t || ''),
@@ -2032,7 +2033,7 @@
         });
 
         var pQuoteWrite = Object.keys(quoteWrites).length
-          ? deps.db.ref().update(quoteWrites).catch(function () {})
+          ? deps.db.ref().update(quoteWrites).catch(function () { quoteReqsCreated = 0; })
           : Promise.resolve();
 
         var targets = pullCandidates.slice(0, maxPull);
@@ -2082,13 +2083,15 @@
                     try { file.name = fName; } catch (_) {}
                   }
                   try { file.__mailMeta = c.mailMeta; } catch (_) {}
-                  return deps.db.ref(CT_REQ + '/' + c.mpKey).set({
-                    id: c.mpKey, state: 'pulled', srcKey: c.srcKey, at: Date.now(),
-                    fileName: fName, subject: c.subject
-                  }).catch(function () {}).then(function () {
-                    pulled.push({ file: file, mailMeta: c.mailMeta, mpKey: c.mpKey });
-                    return pullNext(idx + 1);
-                  });
+                  var pulledItem = { file: file, mailMeta: c.mailMeta, mpKey: c.mpKey, srcKey: c.srcKey, fileName: fName, subject: c.subject };
+                  if (opts.deferMarkPulled) { pulled.push(pulledItem); return pullNext(idx + 1); }
+                  return markMailContractPulled(pulledItem).then(function (ok) { if (ok) pulled.push(pulledItem); return pullNext(idx + 1); }, function () { return pullNext(idx + 1); });
+
+
+
+
+
+
                 });
             }).catch(function () { return pullNext(idx + 1); });
         }
@@ -2100,6 +2103,14 @@
     });
   }
 
+  function markMailContractPulled(item) {
+    if (!deps.db || !item || !item.mpKey) return Promise.resolve(false);
+    return deps.db.ref(CT_REQ + '/' + item.mpKey).set({
+      id: item.mpKey, state: 'pulled', srcKey: String(item.srcKey || ''), at: Date.now(),
+      fileName: String(item.fileName || ''), subject: String(item.subject || '')
+    }).then(function () { return true; });
+  }
+
   global.PuDocFile = {
     HAND: HAND,
     init: init,
@@ -2109,6 +2120,7 @@
     requestContract: requestContract,
     autoRequestContractFromPhoto: autoRequestContractFromPhoto,
     pullMailContracts: pullMailContracts,
+    markMailContractPulled: markMailContractPulled,
     MAIL_MAX_BYTES: MAIL_MAX_BYTES,
     pickMailPeople: pickMailPeople,
     findMailPeople: findMailPeople,

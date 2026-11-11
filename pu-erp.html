@@ -20771,7 +20771,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
     if(cons.length === 1) return { action:'advance', target:cons[0] };
     if(cons.length > 1) return { action:'blocked', why:'같은 사업장에 상담접수 카드가 ' + cons.length + '건 있습니다 — 어느 카드인지 정해 주세요' };
     if(same0.some(function(c){ return c.status === 'review' || c.status === 'signed'; })) return { action:'noop', why:'이미 계약협의 이상으로 진행된 사업장입니다' };
-    return { action:'blocked', why:'옮길 상담접수 카드가 없습니다' };
+    if(!r.allowCreateReview) return { action:'blocked', why:'옮길 상담접수 카드가 없습니다' };
   }
   /* kind === 'quote' */
   if(!cname) return { action:'blocked', why:'사업장을 정해 주세요 — 업체를 이을 수 없었습니다' };
@@ -20795,7 +20795,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
   form.companyName = form.company.name;
   form.bizNo = form.company.bizNo || '';
   form.kinds = ['consult'];
-  form.status = 'consult';
+  form.status = kind === 'advance' ? 'review' : 'consult';
   form.managerMain = sid;
   form.srcMails = srcKey ? [srcKey] : [];
   var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; });
@@ -26488,7 +26488,9 @@ function ContractManagement(props){
     var briefText = String(cf.scope || cf.docName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     var cms = erpCmsFromDoc(cf);
     var probe = { company:{ name:cname, bizNo:String(rCo.bizNo || ''), address:String(rCo.address || ''), ceo:String(rCo.ceo || '') } };
-    var sameOpen = all.filter(function(c){
+    var allSameOpen = all.filter(function(c){ return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c); });
+    if(allSameOpen.length > 1) return await stop('같은 사업장에 진행 중 카드가 ' + allSameOpen.length + '건 있습니다 — 어느 카드인지 정해 주세요');
+    var sameOpen = allSameOpen.filter(function(c){
       return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c) && (!(c.kinds && c.kinds.length) || (c.kinds || []).indexOf('consult') >= 0 || (c.kinds || []).indexOf(kv) >= 0);
     });
     sameOpen.sort(function(a, b){ return (a.status === 'review' ? 0 : 1) - (b.status === 'review' ? 0 : 1); });
@@ -26504,7 +26506,7 @@ function ContractManagement(props){
       var nextTc = Object.assign({}, cur.typeCodes || {});
       if(guessed.typeCode) nextTc[kv] = guessed.typeCode;
       var nextAmts = Object.assign({}, cur.amounts || {});
-      if(amt > 0) nextAmts[kv] = amt;
+      if(amt > 0 && !(Number(nextAmts[kv]) > 0)) nextAmts[kv] = amt;
       var nextBriefs = Object.assign({}, cur.briefs || {});
       if(briefText && nextBriefs.hasOwnProperty(kv)) nextBriefs[kv] = briefText;
       var noteLine = '📄 계약서 자동 반영 (' + (cf.docName || '계약서') + ')'
@@ -26523,7 +26525,7 @@ function ContractManagement(props){
         orderTs: Date.now(),
         note: (cur.note ? cur.note + '\n\n' : '') + noteLine
       });
-      if(succ.fee > 0){ upd.successFee = succ.fee; upd.successFeeType = succ.type; }
+      if(succ.fee > 0 && !(Number(cur.successFee) > 0)){ upd.successFee = succ.fee; upd.successFeeType = succ.type; }
       if(vatFlag !== null){ upd.contractFeeVatIncluded = vatFlag; upd.vatType = vatFlag ? 'inclusive' : 'separate'; }
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) upd.signDate = cf.signDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
@@ -26576,7 +26578,8 @@ function ContractManagement(props){
     if(cms.isCMS) form.isCMS = true;
     if(cms.payDay){ form.cmsPayDay = String(cms.payDay); form.taxInvoicePaymentDay = cms.payDay + '일'; }
     form.managerMain = sid;
-    form.status = targetStatus;
+    var confirmedParty = !!(form.companyId || bizDigits.length === 10 || (req && req.confirmed));
+    form.status = (targetStatus === 'signed' && !confirmedParty) ? 'review' : targetStatus;
     form.orderTs = Date.now();
     if(srcPhoto) form.srcPhoto = srcPhoto;
     if(srcKey) form.srcMails = [srcKey];

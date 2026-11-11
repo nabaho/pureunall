@@ -48,7 +48,7 @@
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-quote-detect.js?v=2"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
-<script src="js/pu-doc-file.js?v=40"></script>
+<script src="js/pu-doc-file.js?v=41"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -6829,6 +6829,7 @@ async function addFiles(fileList, isDoc, opts) {
        없으면 같은 시각끼리 번호순으로 흩어져 찍은 차례가 뒤집힌다. */
   const batchUpAt = Date.now();
   let overCollect = 0;   // 한 문서 상한(COLLECT_MAX)을 넘어 문서에 못 붙인 장수
+  const okMailKeys = []; const failMailKeys = {};
   /* ⚠ 장마다 alert 를 띄우지 않는다 — 열 장이 막히면 「확인」을 열 번 눌러야 했다
      (대표 화면 2026-08-30). 모아 두었다가 끝에 한 번, 이름을 대고 말한다. */
   const failed = [];
@@ -6921,8 +6922,12 @@ async function addFiles(fileList, isDoc, opts) {
         text: f.__pdfText || '',
         meta: meta
       });
+      const mKey = f && f.__mailMeta && (f.__mailMeta.mpKey || f.__mailMeta.srcKey || f.__mailMeta.key);
+      if (mKey && okMailKeys.indexOf(mKey) < 0) okMailKeys.push(mKey);
     } catch (e) {
       console.warn('[사진 준비]', e);
+      const mKey = f && f.__mailMeta && (f.__mailMeta.mpKey || f.__mailMeta.srcKey || f.__mailMeta.key);
+      if (mKey) failMailKeys[mKey] = 1;
       failed.push({ name: (f && f.name) || '', why: ((e && e.message) || String(e)) });
     }
   }
@@ -6945,11 +6950,14 @@ async function addFiles(fileList, isDoc, opts) {
   }
   /* ⚠ 조용히 자르지 않는다 — 사진은 올라갔지만 **이 문서에는 안 들어갔다**는
      사실을 말해 줘야, 사람이 그 장을 따로 챙길 수 있다. */
+  const addOut = { enqueued: Object.keys(idAt).length, failed: failed.length, mailKeys: okMailKeys.filter(function (k) { return !failMailKeys[k]; }) };
+  if (!overCollect) return addOut;
   if (overCollect) {
     alert('한 문서에 ' + COLLECT_MAX + '장까지 모을 수 있습니다.\n' +
       '나머지 ' + overCollect + '장은 **이 문서에 안 들어갔습니다** — 따로 읽힙니다.\n' +
       '(사진은 모두 올라갔습니다)\n\n' +
       '「✓ 다 넣었습니다」로 이 문서를 끝낸 뒤 새로 시작해 주세요.');
+    return addOut;
   }
 }
 
@@ -17048,12 +17056,19 @@ function mailContractSweep() {
   if (typeof viewingOnlyOther === 'function' && viewingOnlyOther()) return Promise.resolve();
   if (!window.PuDocFile || typeof PuDocFile.pullMailContracts !== 'function') return Promise.resolve();
   _mailContractSweptOnce = true;
-  return PuDocFile.pullMailContracts({ maxPull: 3 }).then(function (res) {
+  return PuDocFile.pullMailContracts({ maxPull: 3, deferMarkPulled: true }).then(function (res) {
     const list = (res && res.pulled) || [];
     if (list.length) {
       toast('📥 메일함에서 계약서 ' + list.length + '건을 자동으로 가져와 판독합니다');
-      addFiles(list.map(function (x) { return x.file; }), true, { via: 'mail', noSplitAsk: true });
+      return Promise.resolve(addFiles(list.map(function (x) { return x.file; }), true, { via: 'mail', noSplitAsk: true })).then(function (addRes) {
+        const okKeys = (addRes && Array.isArray(addRes.mailKeys)) ? addRes.mailKeys : null;
+        return Promise.all(list.map(function (x) {
+          const xKey = x.mpKey || x.srcKey || x.key;
+          return (okKeys && okKeys.indexOf(xKey) >= 0 && PuDocFile.markMailContractPulled) ? PuDocFile.markMailContractPulled(x) : null;
+        }));
+      });
     }
+  }).then(function () {
     /* 이미 사진첩에 들어와 읽혔으나 아직 계약관리 요청이 안 나간 메일 계약서도 챙긴다 */
     const unfiled = gridItems.filter(function (it) {
       if (!mayTouch(it.id)) return false;
