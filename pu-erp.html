@@ -26523,7 +26523,8 @@ function ContractManagement(props){
     if(!reqMatchedCo && req && req.companyId) reqMatchedCo = cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] || null;
     var reqCoId = reqMatchedCo ? String(reqMatchedCo.id) : '';
     if(!reqBizDigits && reqMatchedCo && reqMatchedCo.bizNo) reqBizDigits = String(reqMatchedCo.bizNo).replace(/\D/g, '');
-    var reqConfirmed = !!(reqCoId || reqBizDigits.length === 10 || (req && req.confirmed));
+    var nameClashDiffBiz = reqBizDigits.length === 10 && !reqMatchedCo && cos.some(function(x){ return x && !x._deleted && erpCoNameKey(x.name) === erpCoNameKey(cname) && String(x.bizNo || '').replace(/\D/g, '') !== reqBizDigits; });
+    var reqConfirmed = !!(reqCoId || (reqBizDigits.length === 10 && !nameClashDiffBiz) || (req && req.confirmed));
     var allSameOpen = all.filter(function(c){ return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c); });
     if(allSameOpen.length > 1) return await stop('같은 사업장에 진행 중 카드가 ' + allSameOpen.length + '건 있습니다 — 어느 카드인지 정해 주세요');
     var sameOpen = allSameOpen.filter(function(c){
@@ -26620,7 +26621,7 @@ function ContractManagement(props){
     if(cms.isCMS) form.isCMS = true;
     if(cms.payDay){ form.cmsPayDay = String(cms.payDay); form.taxInvoicePaymentDay = cms.payDay + '일'; }
     form.managerMain = sid;
-    var confirmedParty = !!(form.companyId || bizDigits.length === 10 || (req && req.confirmed));
+    var confirmedParty = reqConfirmed;
     form.status = (targetStatus === 'signed' && !confirmedParty) ? 'review' : targetStatus;
     form.orderTs = Date.now();
     if(srcPhoto) form.srcPhoto = srcPhoto;

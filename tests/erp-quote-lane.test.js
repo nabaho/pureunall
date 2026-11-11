@@ -447,4 +447,47 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.ok(rUnvPend.made);
   assert.notEqual(rUnvPend.made.id, 'unverified-existing', '미확인 기존 카드도 이름만으로 signed 확정하지 않는다');
   assert.equal(rUnvPend.made.status, 'review');
+
+  /* ㉖ 생산자(PuDocFile.autoRequestContractFromPhoto) → 소비자(processPhotoContractRequest):
+     잘못된 사업자번호(123 또는 bizNoOk:false) + 같은 상호가 있을 때 이름 검색 결과로 companyId·사업자번호를 치환해 signed 확정하는 우회를 차단한다 */
+  const DOCFILE_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-file.js'), 'utf8');
+  const prodWrites = {};
+  const prodCtx = {
+    console, Date, Object, Array, String, Number, JSON, Math, Promise, RegExp, Error,
+    PuDocRead: { bizNoOk: () => false }
+  };
+  prodCtx.window = prodCtx; prodCtx.global = prodCtx;
+  vm.createContext(prodCtx);
+  vm.runInContext(DOCFILE_SRC, prodCtx);
+  prodCtx.PuDocFile.init({
+    db: {
+      ref: (p) => ({
+        once: () => Promise.resolve({
+          val: () => {
+            if (p.indexOf('companies') >= 0) return { v: { co1: { id: 'co1', name: '가나기관', bizNo: '1234567890', managerMain: 'P-005' } } };
+            if (p.indexOf('user_dir') >= 0) return { v: USERS };
+            return null;
+          }
+        }),
+        set: (v) => { prodWrites[p] = v; return Promise.resolve(); },
+        update: () => Promise.resolve()
+      })
+    }
+  });
+  await prodCtx.PuDocFile.autoRequestContractFromPhoto({
+    id: 'p-badbiz', year: 2026, owner: 'u1', by: '담당가', bizNoOk: false,
+    fields: { company: '가나기관', bizno: '123', docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  const builtReq = prodWrites['data/contract_requests/ctphoto-2026_p-badbiz'];
+  assert.ok(builtReq, '생산자가 요청을 만들었다');
+  assert.equal(builtReq.companyId, '', '잘못된 사업자번호일 때 이름 검색 업체 ID 로 치환하지 않는다');
+  assert.equal(builtReq.company.bizNo, '', '잘못된 사업자번호일 때 이름 검색 사업자번호로 치환하지 않는다');
+  assert.equal(builtReq.targetStatus, 'review', '사업자번호 미검증 요청은 review 로 격리한다');
+
+  mockCts = [card({ id: 'ct-existing-prod', companyId: 'co1', status: 'review', kinds: ['case'] })];
+  calls.persist.length = 0;
+  const rFromProd = await ctx.run(builtReq.id, builtReq);
+  assert.ok(rFromProd.made);
+  assert.notEqual(rFromProd.made.id, 'ct-existing-prod', '생산자 요청을 소비자에 넣어도 기존 카드를 덮어쓰지 않는다');
+  assert.equal(rFromProd.made.status, 'review', '기존 카드나 새 카드가 signed 로 확정되지 않는다');
 });

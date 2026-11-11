@@ -1746,11 +1746,15 @@
       if (cur && cur.state === 'done' && !o.force) {
         return { ok: true, id: key, already: true };
       }
-      var pBiz = f.bizno ? findCompanyByBizNo(f.bizno).catch(function () { return null; }) : Promise.resolve(null);
+      var bizOk = !(o.bizNoOk === false || f.biznoOk === false);
+      var validBizDigits = bizOk ? String(f.bizno || '').replace(/\D/g, '') : '';
+      if (validBizDigits.length !== 10) validBizDigits = '';
+      var pBiz = validBizDigits ? findCompanyByBizNo(validBizDigits).catch(function () { return null; }) : Promise.resolve(null);
       var pName = findCompanyByName(compName).catch(function () { return null; });
       var pStaff = erpStaff();
       return Promise.all([pBiz, pName, pStaff]).then(function (res) {
-        var matchedCo = res[0] || res[1] || null;
+        var bizMatchedCo = res[0] || null;
+        var matchedCo = bizMatchedCo || res[1] || null;
         var staffList = res[2] || [];
         var mgrSid = String(mm.managerSid || '').trim();
         if (!mgrSid && matchedCo && matchedCo.rec && matchedCo.rec.managerMain) {
@@ -1772,8 +1776,10 @@
           var adm = staffList.filter(function (u) { return u.role === 'admin' || u.name === '권형하'; })[0] || staffList[0];
           if (adm) mgrSid = adm.sid;
         }
-        var targetStatus = (mm && (mm.dir === 'sent' || mm.dir === 'out')) ? 'review' : 'signed';
-        var allowCoLink = !!(res[0] || mm.companyId || f.bizno);
+        var linkedCo = bizMatchedCo || (!f.bizno && mm.companyId && res[1] && String(res[1].id) === String(mm.companyId) ? res[1] : null);
+        var allowCoLink = !!(bizMatchedCo || (!f.bizno && mm.companyId));
+        var verifiedParty = !!(allowCoLink || (validBizDigits.length === 10 && !res[1]));
+        var targetStatus = (mm && (mm.dir === 'sent' || mm.dir === 'out')) || !verifiedParty ? 'review' : 'signed';
         var rec = {
           id: key,
           source: 'photo_contract',
@@ -1782,14 +1788,14 @@
           by: String(o.by || mm.managerName || ''),
           targetStatus: targetStatus,
           managerMain: String(mgrSid || ''),
-          companyId: allowCoLink && matchedCo ? String(matchedCo.id || mm.companyId || '') : String(mm.companyId || ''),
+          companyId: allowCoLink ? String((linkedCo && linkedCo.id) || mm.companyId || '') : '',
           company: {
             name: compName,
-            bizNo: String((allowCoLink && (!res[0] || o.bizNoOk === false || f.biznoOk === false) && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || (o.bizNoOk === false || f.biznoOk === false ? '' : f.bizno) || (allowCoLink && matchedCo && matchedCo.rec && matchedCo.rec.bizNo) || '').trim(),
-            ceo: String(f.ceo || (matchedCo && matchedCo.rec && matchedCo.rec.ceo) || '').trim(),
-            corpRegNo: String(f.corpno || (matchedCo && matchedCo.rec && matchedCo.rec.corpRegNo) || '').trim(),
-            address: String(f.address || (matchedCo && matchedCo.rec && matchedCo.rec.address) || '').trim(),
-            phone: String(f.companyTel || (matchedCo && matchedCo.rec && matchedCo.rec.phone) || '').trim()
+            bizNo: String((linkedCo && linkedCo.rec && linkedCo.rec.bizNo) || (validBizDigits ? f.bizno : '') || '').trim(),
+            ceo: String(f.ceo || (linkedCo && linkedCo.rec && linkedCo.rec.ceo) || '').trim(),
+            corpRegNo: String(f.corpno || (linkedCo && linkedCo.rec && linkedCo.rec.corpRegNo) || '').trim(),
+            address: String(f.address || (linkedCo && linkedCo.rec && linkedCo.rec.address) || '').trim(),
+            phone: String(f.companyTel || (linkedCo && linkedCo.rec && linkedCo.rec.phone) || '').trim()
           },
           contractFields: {
             docName: String(f.docName || '').trim(),
