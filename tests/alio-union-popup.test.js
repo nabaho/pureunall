@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..');
 const enterSrc = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
@@ -27,9 +28,10 @@ test('② 독립 프로그램 화면(pu-alio-union.html)은 푸른통합시스�
   assert.match(standaloneSrc, /<script src="js\/pu-whoami\.js\?v=\d+"><\/script>/);
   assert.match(standaloneSrc, /PuWhoami\.mount\('#who'\)/);
   assert.match(standaloneSrc, /window\.PuAlioUnion\.mount\(rootEl,\s*\{\s*isModal:\s*false\s*\}\)/);
+  assert.match(standaloneSrc, /window\.PuAlioUnion\.setAuthUser\(u \|\| null\)/);
 });
 
-test('③ 독립 프로그램(js/pu-alio-union.js)은 5대 핵심 탭·기관별 종합 상세 팝업(openOrganDetailModal)·☐ 고르기 칸·№ 일련번호·한 줄 말줄임(title)을 갖춘다', () => {
+test('③ 독립 프로그램(js/pu-alio-union.js)은 5대 핵심 탭·기관별 종합 상세 팝업(openOrganDetailModal)·배열/객체 지표 추출·첨부 URL 안전 검증을 갖춘다', () => {
   assert.match(uiSrc, /전 기관 노조·타임오프 현황/);
   assert.match(uiSrc, /13대 핵심 쟁점 기관간 비교·원문 대조/);
   assert.match(uiSrc, /단체협약 조문 통합 검색/);
@@ -38,6 +40,23 @@ test('③ 독립 프로그램(js/pu-alio-union.js)은 5대 핵심 탭·기관별
   assert.match(uiSrc, /function openOrganDetailModal\(aid\)/);
   assert.match(uiSrc, /class="c-ck"/);
   assert.match(uiSrc, /class="c-no"/);
+
+  const sandbox = {
+    window: {},
+    document: { addEventListener: () => {}, getElementById: () => null, head: { appendChild: () => {} } },
+    URL
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+
+  // 배열 형태 metrics에서도 C0005 등 기관별 쟁점 지표를 정확히 추출한다
+  const c0005Metrics = sandbox.PuAlioUnion.extractOrganMetrics(dataMod.metrics, 'C0005');
+  assert.ok(Object.keys(c0005Metrics).length >= 5, 'C0005 기관의 13대 핵심 쟁점 지표가 상세 팝업용으로 추출되어야 합니다');
+
+  // 첨부파일 URL 안전 검증(https://www.alio.go.kr 허용, javascript: 차단)
+  assert.equal(sandbox.PuAlioUnion.safeHttpUrl('https://www.alio.go.kr/download/file.json?f=1'), 'https://www.alio.go.kr/download/file.json?f=1');
+  assert.equal(sandbox.PuAlioUnion.safeHttpUrl('javascript:alert(1)'), '');
+  assert.equal(sandbox.PuAlioUnion.safeHttpUrl('https://evil.example.com/phish.pdf'), '');
 });
 
 test('④ 내장된 ALIO 공공임단협 데이터(pu-alio-data.js)에 전체 중앙공공기관·단위노조·수시공시/내부규정·13대 쟁점 지표·조문이 실려 있다', () => {

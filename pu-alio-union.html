@@ -45,7 +45,7 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#pauOrganDetailModal,#puAlioModalBack'); }); }catch(e){}</script>
 <script src="js/pu-alio-data.js?v=2"></script>
-<script src="js/pu-alio-union.js?v=3"></script>
+<script src="js/pu-alio-union.js?v=4"></script>
 <script>
 (function(){
   'use strict';
@@ -79,6 +79,9 @@ html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic
       firebase.auth().onAuthStateChanged(function(u){
         var outBtn = document.getElementById('outBtn');
         if(outBtn) outBtn.style.display = u ? '' : 'none';
+        if(window.PuAlioUnion && typeof window.PuAlioUnion.setAuthUser === 'function'){
+          window.PuAlioUnion.setAuthUser(u || null);
+        }
         if(!u){
           PuGate.show();
           return;

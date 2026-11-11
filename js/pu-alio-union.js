@@ -3,7 +3,7 @@
    파일: js/pu-alio-union.js
    - 포털(enter.html) 자료함 줄의 「🤝 공공임단협」 타일 또는 오른쪽 앱바(pu-appbar.js)에서
      별개의 독립 프로그램(pu-alio-union.html, 창 이름 pureun-aliounion)으로 열린다.
-   - 프로그램 안에서 기관명(또는 [📋 상세 팝업])을 누르면 기관별 노조·임단협·13대 쟁점·공시원문
+   - 프로그램 안에서 기관명(또는 📋 상세팝업)을 누르면 기관별 노조·임단협·13대 쟁점·공시원문
      종합 팝업창(openOrganDetailModal)이 열린다.
    - 5대 공공·법령·노사 API(알리오 OpenAPI, 알리오 9대 공시 원문 API, 현행 노동법령 실시간 API,
      한국천문연구원 공휴일·국민연금/고용보험 pubdata API, 지방공기업·전국노조 OpenAPI)를 모두 연결한다.
@@ -15,7 +15,7 @@
 
   var DATA_SCRIPT_URL = 'js/pu-alio-data.js?v=2';
   var STYLE_ID = 'pu-alio-union-css';
-  var LS_KEY_DATA = 'pu_alio_datagokr_key';
+  var LS_KEY_PREFIX = 'pu_alio_datagokr_key_';
 
   var METRIC_DEFS = [
     { key: 'union_shop', label: '조합원 자격 (유니온숍/가입범위)', lawKey: '노동조합및노동관계조정법', lawArt: '81', lawTitle: '노조법 제5조·제81조 제1항 제2호 단서(유니온숍)' },
@@ -64,6 +64,7 @@
 
   var lawCache = {};
   var latestAppHooks = null;
+  var currentAuthUid = '';
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -71,6 +72,22 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function safeHttpUrl(rawUrl) {
+    var s = String(rawUrl == null ? '' : rawUrl).trim();
+    if (!s) return '';
+    try {
+      var u = new URL(s, 'https://www.alio.go.kr');
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+      var host = (u.hostname || '').toLowerCase();
+      if (host === 'www.alio.go.kr' || host === 'alio.go.kr' || host.endsWith('.alio.go.kr') || host.endsWith('.go.kr')) {
+        return u.href;
+      }
+      return '';
+    } catch (e) {
+      return '';
+    }
   }
 
   function worth(v) {
@@ -81,6 +98,34 @@
   function fmtNum(n) {
     var v = Number(n || 0);
     return isFinite(v) ? v.toLocaleString('ko-KR') : '0';
+  }
+
+  function extractOrganMetrics(rawMetrics, aid) {
+    var out = {};
+    if (!rawMetrics || !aid) return out;
+    if (Array.isArray(rawMetrics)) {
+      rawMetrics.forEach(function (m) {
+        if (m && m.apba_id === aid && m.metric_key) {
+          out[m.metric_key] = m;
+        }
+      });
+    } else if (typeof rawMetrics === 'object' && rawMetrics[aid]) {
+      out = rawMetrics[aid] || {};
+    }
+    return out;
+  }
+
+  function getActiveUid() {
+    if (currentAuthUid) return currentAuthUid;
+    try {
+      var u = typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser;
+      if (u && u.uid) return String(u.uid);
+    } catch (e) {}
+    return '';
+  }
+
+  function userLsKey(uid) {
+    return uid ? (LS_KEY_PREFIX + uid) : '';
   }
 
   function parseLawMarkdown(md) {
@@ -172,7 +217,8 @@
       '.pau-badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#e2e8f0;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;}',
       '.pau-badge.ok{background:rgba(34,197,94,.22);border-color:rgba(74,222,128,.45);color:#dcfce7;}',
       '.pau-hdr-r{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
-      '.pau-who-slot{display:inline-flex;align-items:center;}',
+      '.pau-who-slot{display:inline-flex;align-items:center;background:#f8fafc;color:#0f172a;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #cbd5e1;}',
+      '.pau-who-slot:empty{display:none;}',
       '.pau-btn{cursor:pointer;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#ffffff;padding:6px 11px;border-radius:8px;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}',
       '.pau-btn:hover{background:rgba(255,255,255,.22);}',
       '.pau-btn.pri{background:#2563eb;border-color:#3b82f6;color:#ffffff;}',
@@ -183,14 +229,15 @@
       '.pau-tab.on{color:#1d4ed8;border-bottom-color:#2563eb;background:#eff6ff;}',
       '.pau-body{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 20px;}',
       '.pau-flt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;}',
-      '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text]{height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;background:#ffffff;color:#1e293b;font-size:12.5px;}',
-      '.pau-flt input[type=search],.pau-flt input[type=text]{min-width:210px;flex:1;max-width:340px;}',
+      '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;background:#ffffff;color:#1e293b;font-size:12.5px;}',
+      '.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{min-width:210px;flex:1;max-width:340px;}',
       '.pau-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;}',
       '.pau-kpi{background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;white-space:nowrap;}',
       '.pau-kpi span{font-size:12px;color:#64748b;}',
       '.pau-kpi b{font-size:16px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;}',
       '.pau-bulk{display:none;align-items:center;gap:8px;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:10px;color:#1e40af;font-size:12.5px;font-weight:600;flex-wrap:wrap;}',
       '.pau-bulk.on{display:flex;}',
+      '.pau-trunc-note{padding:6px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:8px;color:#92400e;font-size:12px;font-weight:600;}',
       '.pau-tbl-wrap{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:auto;max-height:calc(100vh - 285px);}',
       '.pau-tbl{width:100%;border-collapse:collapse;table-layout:fixed;}',
       '.pau-tbl th,.pau-tbl td{padding:7px 9px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12.5px;}',
@@ -209,7 +256,8 @@
       '.pau-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;}',
       '.pau-chip{padding:4px 10px;border-radius:999px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:12px;cursor:pointer;white-space:nowrap;}',
       '.pau-chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700;}',
-      '.pau-sbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px;margin-top:12px;}',
+      '.pau-sbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:10px;margin-top:12px;}',
+      '.pau-api-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;}',
       '.pau-card{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;}',
       '.pau-card.law{background:#f0fdf4;border-color:#86efac;}',
       '.pau-card-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:#0f172a;}',
@@ -220,7 +268,7 @@
       '@media (max-width:768px){',
       '  .pau-modal-back,.pau-detail-back{padding:0;}',
       '  .pau-modal-box,.pau-detail-box{width:100vw;height:100vh;max-height:100vh;border-radius:0;border:0;}',
-      '  .pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-root input,.pau-root select,.pau-root textarea{font-size:16px!important;height:38px;}',
+      '  .pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root input,.pau-root select,.pau-root textarea{font-size:16px!important;height:38px;}',
       '  .pau-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}',
       '  .pau-hdr{padding:10px 12px;}',
       '  .pau-body{padding:10px 10px 24px;}',
@@ -261,14 +309,19 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   }
 
-  // 포털에 저장된 공공데이터포털(data.go.kr) 인증키 및 공휴일 공공데이터(pubdata) 자동 탐색
+  // 포털에 저장된 공공데이터포털(data.go.kr) 인증키(로그인 사용자 UID별 분리) 및 공휴일 공공데이터(pubdata) 자동 탐색
   function discoverPortalApiKeys(cb) {
     var out = { dataKey: '', source: '', holidays: [] };
+    var uid = getActiveUid();
     try {
-      var saved = localStorage.getItem(LS_KEY_DATA);
-      if (saved && saved.trim()) {
-        out.dataKey = saved.trim();
-        out.source = '브라우저 저장 열쇠';
+      // 구버전 공용 키가 남아 있으면 즉시 삭제하여 계정 간 공유를 차단한다
+      localStorage.removeItem('pu_alio_datagokr_key');
+      if (uid) {
+        var saved = localStorage.getItem(userLsKey(uid));
+        if (saved && saved.trim()) {
+          out.dataKey = saved.trim();
+          out.source = '계정 전용 저장 열쇠';
+        }
       }
     } catch (e) {}
 
@@ -281,14 +334,13 @@
           if (v && Array.isArray(v.list)) out.holidays = v.list;
         }).catch(function () {});
 
-        var u = firebase.auth && firebase.auth().currentUser;
-        if (u && u.uid) {
-          db.ref('gov/' + u.uid + '/key_data').once('value').then(function (snap) {
+        if (uid) {
+          db.ref('gov/' + uid + '/key_data').once('value').then(function (snap) {
             var k = snap.val();
             if (k && String(k).trim()) {
               out.dataKey = String(k).trim();
-              out.source = '푸른포털 정부사업신청(gov/' + u.uid.slice(0, 6) + '…) 자동연동';
-              try { localStorage.setItem(LS_KEY_DATA, out.dataKey); } catch (e) {}
+              out.source = '푸른포털 정부사업신청(gov/' + uid.slice(0, 6) + '…) 자동연동';
+              try { localStorage.setItem(userLsKey(uid), out.dataKey); } catch (e) {}
             }
             cb(out);
           }).catch(function () { cb(out); });
@@ -301,6 +353,7 @@
 
   // ── 기관별 종합 상세 팝업창 (노조 현황 + 13대 핵심 쟁점 + 공시·규정 원문 내려받기) ──
   var detailModalEl = null;
+  var lastDetailTrigger = null;
 
   function closeOrganDetailModal() {
     if (!detailModalEl) return;
@@ -309,27 +362,50 @@
     if (global.PuBack && global.PuBack.close) {
       try { global.PuBack.close('pu-alio-organ-detail'); } catch (e) {}
     }
+    if (lastDetailTrigger && typeof lastDetailTrigger.focus === 'function') {
+      try { lastDetailTrigger.focus(); } catch (e) {}
+    }
+    lastDetailTrigger = null;
   }
 
   function openOrganDetailModal(aid) {
     injectStyles();
     ensureDataLoaded(function (data) {
       if (!data) return;
+      var prevTrigger = document.activeElement;
       closeOrganDetailModal();
+      lastDetailTrigger = prevTrigger;
 
       var insts = data.institutions || [];
       var unions = data.unions || [];
       var discs = data.disclosures || [];
-      var rawMetrics = data.metrics || {};
+      var rawMetrics = data.metrics || [];
 
-      var inst = insts.find(function (x) { return x.apba_id === aid; }) || { apba_id: aid, name: aid, inst_type: '', ministry: '', union_structure: '' };
+      var foundInst = insts.find(function (x) { return x.apba_id === aid; });
+      var inst = foundInst || { apba_id: aid, name: '미등록 기관 (' + aid + ')', inst_type: '', ministry: '', union_structure: '' };
       var orgUnions = unions.filter(function (u) { return u.apba_id === aid; });
       var orgDiscs = discs.filter(function (d) { return d.aid === aid; });
-      var orgMetrics = (!Array.isArray(rawMetrics) && rawMetrics[aid]) ? rawMetrics[aid] : {};
+      var orgMetrics = extractOrganMetrics(rawMetrics, aid);
 
       detailModalEl = document.createElement('div');
       detailModalEl.className = 'pau-detail-back';
       detailModalEl.id = 'pauOrganDetailModal';
+
+      if (!foundInst && !orgUnions.length && !orgDiscs.length && !Object.keys(orgMetrics).length) {
+        detailModalEl.innerHTML = [
+          '<div class="pau-detail-box" role="dialog" aria-modal="true" aria-label="기관 정보 없음">',
+          '  <div class="pau-detail-hdr"><b>⚠ 요청한 공공기관(' + esc(aid) + ') 정보를 찾을 수 없습니다</b><button type="button" class="pau-btn" data-dact="close">✕ 닫기 (ESC)</button></div>',
+          '  <div class="pau-detail-body"><div class="pau-sec-card" style="text-align:center;padding:32px;color:#64748b;">등록된 공공기관 코드가 아니거나 공시 데이터가 없습니다.</div></div>',
+          '</div>'
+        ].join('');
+        document.body.appendChild(detailModalEl);
+        var cBtn0 = detailModalEl.querySelector('button[data-dact="close"]');
+        if (cBtn0) cBtn0.focus();
+        detailModalEl.addEventListener('click', function (ev) {
+          if (ev.target === detailModalEl || ev.target.closest('button[data-dact="close"]')) closeOrganDetailModal();
+        });
+        return;
+      }
 
       var unionRowsHtml = orgUnions.map(function (u, idx) {
         var toParts = [];
@@ -383,7 +459,9 @@
           ? '<a href="https://www.alio.go.kr/item/itemReportRight.do?disclosureNo=' + esc(d.dno) + '" target="_blank" rel="noopener" class="pau-pill ok" style="text-decoration:none;margin-right:4px;">🔗 공시원문</a>'
           : '';
         var fileLinks = (d.files || []).map(function (f) {
-          return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" class="pau-pill fktu" style="text-decoration:none;margin-right:4px;">⬇ ' + esc(f.name) + '</a>';
+          var safeHref = safeHttpUrl(f.url);
+          if (!safeHref) return '';
+          return '<a href="' + esc(safeHref) + '" target="_blank" rel="noopener" class="pau-pill fktu" style="text-decoration:none;margin-right:4px;">⬇ ' + esc(f.name) + '</a>';
         }).join('');
         return [
           '<tr>',
@@ -449,6 +527,24 @@
 
       document.body.appendChild(detailModalEl);
 
+      var closeBtn = detailModalEl.querySelector('button[data-dact="close"]');
+      if (closeBtn) closeBtn.focus();
+
+      detailModalEl.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Tab') return;
+        var focusables = detailModalEl.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (!focusables.length) return;
+        var first = focusables[0];
+        var last = focusables[focusables.length - 1];
+        if (ev.shiftKey && document.activeElement === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && document.activeElement === last) {
+          ev.preventDefault();
+          first.focus();
+        }
+      });
+
       detailModalEl.addEventListener('click', function (ev) {
         if (ev.target === detailModalEl) {
           closeOrganDetailModal();
@@ -472,6 +568,15 @@
         try { global.PuBack.open('pu-alio-organ-detail', closeOrganDetailModal); } catch (e) {}
       }
     });
+  }
+
+  function setAuthUser(u) {
+    var nextUid = (u && u.uid) ? String(u.uid) : '';
+    var changed = currentAuthUid !== nextUid;
+    currentAuthUid = nextUid;
+    if (changed && latestAppHooks && typeof latestAppHooks.refreshAuthKey === 'function') {
+      latestAppHooks.refreshAuthKey();
+    }
   }
 
   function mount(container, opts) {
@@ -543,8 +648,10 @@
       // Tab 4 organ detail state
       dOrgan: 'ALL',
       dCat: 'ALL',
+      dSelected: {},
       // Tab 5 API hub state
       apiDataKey: '',
+      apiKeyMasked: true,
       apiKeySource: '확인 중…',
       apiHolidays: [],
       apiLawKey: '노동조합및노동관계조정법',
@@ -579,12 +686,12 @@
           '<button type="button" class="pau-btn" id="outBtn" style="display:none" onclick="try{firebase.auth().signOut()}catch(e){}">로그아웃</button>'),
       '  </div>',
       '</div>',
-      '<div class="pau-tabs" role="tablist">',
-      '  <button type="button" class="pau-tab on" data-tab="unions">📊 1. 전 기관 노조·타임오프 현황</button>',
-      '  <button type="button" class="pau-tab" data-tab="matrix">⚖️ 2. 13대 핵심 쟁점 기관간 비교·원문 대조</button>',
-      '  <button type="button" class="pau-tab" data-tab="articles">🔍 3. 단체협약 조문 통합 검색</button>',
-      '  <button type="button" class="pau-tab" data-tab="detail">📂 4. 기관별 공시·별도합의·내부규정 원문</button>',
-      '  <button type="button" class="pau-tab" data-tab="apihub">🔌 5. 공공·법령 API 실시간 연동 센터</button>',
+      '<div class="pau-tabs" role="tablist" aria-label="공공임단협 주요 기능 탭">',
+      '  <button type="button" role="tab" aria-selected="true" class="pau-tab on" data-tab="unions">📊 1. 전 기관 노조·타임오프 현황</button>',
+      '  <button type="button" role="tab" aria-selected="false" class="pau-tab" data-tab="matrix">⚖️ 2. 13대 핵심 쟁점 기관간 비교·원문 대조</button>',
+      '  <button type="button" role="tab" aria-selected="false" class="pau-tab" data-tab="articles">🔍 3. 단체협약 조문 통합 검색</button>',
+      '  <button type="button" role="tab" aria-selected="false" class="pau-tab" data-tab="detail">📂 4. 기관별 공시·별도합의·내부규정 원문</button>',
+      '  <button type="button" role="tab" aria-selected="false" class="pau-tab" data-tab="apihub">🔌 5. 공공·법령 API 실시간 연동 센터</button>',
       '</div>',
       '<div class="pau-body" id="pauBody"></div>'
     ].join('');
@@ -604,6 +711,15 @@
 
     var bodyEl = root.querySelector('#pauBody');
 
+    function syncAuthKeys() {
+      discoverPortalApiKeys(function (info) {
+        state.apiDataKey = info.dataKey || '';
+        state.apiKeySource = info.source || (state.apiDataKey ? '계정 저장 열쇠' : '미입력 (로그인 후 API 탭에서 입력 가능)');
+        state.apiHolidays = info.holidays || [];
+        if (state.tab === 'apihub') renderApiHubTab();
+      });
+    }
+
     latestAppHooks = {
       openOrganInTab4: function (aid) {
         state.dOrgan = aid;
@@ -614,15 +730,19 @@
           state.compOrgans.push(aid);
         }
         switchTab('matrix');
+      },
+      refreshAuthKey: function () {
+        if (!getActiveUid()) {
+          state.apiDataKey = '';
+          state.apiKeySource = '미로그인';
+          if (state.tab === 'apihub') renderApiHubTab();
+        } else {
+          syncAuthKeys();
+        }
       }
     };
 
-    discoverPortalApiKeys(function (info) {
-      state.apiDataKey = info.dataKey || '';
-      state.apiKeySource = info.source || (state.apiDataKey ? '수동 입력' : '미입력 (API 탭에서 입력 가능)');
-      state.apiHolidays = info.holidays || [];
-      if (state.tab === 'apihub') renderApiHubTab();
-    });
+    syncAuthKeys();
 
     root.querySelector('.pau-hdr').addEventListener('click', function (ev) {
       var btn = ev.target.closest('button[data-act]');
@@ -649,8 +769,11 @@
       state.uSelected = {};
       state.mSelected = {};
       state.aSelected = {};
+      state.dSelected = {};
       root.querySelectorAll('.pau-tab').forEach(function (b) {
-        b.classList.toggle('on', b.dataset.tab === t);
+        var active = b.dataset.tab === t;
+        b.classList.toggle('on', active);
+        b.setAttribute('aria-selected', active ? 'true' : 'false');
       });
       renderCurrentTab();
     }
@@ -689,7 +812,11 @@
         });
         downloadCsv('공공임단협_조문검색결과.csv', ['번호', '기관명', '쟁점분류', '장', '조문번호', '조문제목', '조문내용'], arows);
       } else {
-        var drows = discs.filter(function (d) { return state.dOrgan === 'ALL' || d.aid === state.dOrgan; }).map(function (d, idx) {
+        var drows = discs.filter(function (d) {
+          if (state.dOrgan !== 'ALL' && d.aid !== state.dOrgan) return false;
+          if (state.dCat !== 'ALL' && d.ccode !== state.dCat) return false;
+          return true;
+        }).map(function (d, idx) {
           return [idx + 1, d.iname, d.cname, d.title, d.edate || '', d.rdate || '', (d.files || []).map(function (f) { return f.name; }).join(' / ')];
         });
         downloadCsv('공공임단협_기관별_노사공시목록.csv', ['번호', '기관명', '공시항목', '제목', '체결/기준일', '등록일', '첨부파일'], drows);
@@ -717,15 +844,15 @@
 
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
-        '  <select id="pauUType">' + types.map(function (t) { return '<option value="' + esc(t) + '"' + (state.uType === t ? ' selected' : '') + '>' + (t === 'ALL' ? '기관유형 전체' : esc(t)) + '</option>'; }).join('') + '</select>',
-        '  <select id="pauUConfed">' + confeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.uConfed === c ? ' selected' : '') + '>' + (c === 'ALL' ? '상급단체 전체' : esc(c)) + '</option>'; }).join('') + '</select>',
-        '  <select id="pauUStruct">',
+        '  <select id="pauUType" aria-label="기관유형 필터">' + types.map(function (t) { return '<option value="' + esc(t) + '"' + (state.uType === t ? ' selected' : '') + '>' + (t === 'ALL' ? '기관유형 전체' : esc(t)) + '</option>'; }).join('') + '</select>',
+        '  <select id="pauUConfed" aria-label="상급단체 필터">' + confeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.uConfed === c ? ' selected' : '') + '>' + (c === 'ALL' ? '상급단체 전체' : esc(c)) + '</option>'; }).join('') + '</select>',
+        '  <select id="pauUStruct" aria-label="노조형태 필터">',
         '    <option value="ALL"' + (state.uStruct === 'ALL' ? ' selected' : '') + '>노조형태 전체</option>',
         '    <option value="단일노조"' + (state.uStruct === '단일노조' ? ' selected' : '') + '>단일노조</option>',
         '    <option value="복수노조"' + (state.uStruct === '복수노조' ? ' selected' : '') + '>복수노조</option>',
         '    <option value="노조없음"' + (state.uStruct === '노조없음' ? ' selected' : '') + '>노조없음</option>',
         '  </select>',
-        '  <input type="search" id="pauUQuery" placeholder="기관명·노동조합명·주무부처·연맹 검색…" value="' + esc(state.uQuery) + '">',
+        '  <input type="search" id="pauUQuery" aria-label="기관명 및 노동조합 검색" placeholder="기관명·노동조합명·주무부처·연맹 검색…" value="' + esc(state.uQuery) + '">',
         '  <span style="font-size:12px;color:#475569;">💡 기관명을 누르면 <b>기관별 노조·임단협·공시 종합 팝업창</b>이 열립니다</span>',
         '</div>',
         '<div class="pau-kpis" id="pauUKpis"></div>',
@@ -734,7 +861,7 @@
         '  <table class="pau-tbl">',
         '    <thead>',
         '      <tr>',
-        '        <th class="c-ck"><input type="checkbox" id="pauUAllCk" title="현재 목록 전체 선택"></th>',
+        '        <th class="c-ck"><input type="checkbox" id="pauUAllCk" aria-label="현재 목록 전체 선택" title="현재 목록 전체 선택"></th>',
         '        <th class="c-no">№</th>',
         '        <th style="width:175px">기관명 · 주무부처</th>',
         '        <th style="width:125px">기관유형 · 형태</th>',
@@ -785,6 +912,12 @@
         ].join('');
 
         var tbody = bodyEl.querySelector('#pauUTbody');
+        if (!state.uVisibleRows.length) {
+          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#64748b;">검색 조건에 맞는 공공기관·노동조합이 없습니다.</td></tr>';
+          paintBulkBar();
+          return;
+        }
+
         tbody.innerHTML = state.uVisibleRows.map(function (u, idx) {
           var rowKey = u.apba_id + '|' + u.union_name;
           var checked = !!state.uSelected[rowKey];
@@ -814,7 +947,7 @@
 
           return [
             '<tr data-rk="' + esc(rowKey) + '" data-aid="' + esc(u.apba_id) + '">',
-            '  <td class="c-ck"><input type="checkbox" class="pau-row-ck" data-rk="' + esc(rowKey) + '"' + (checked ? ' checked' : '') + '></td>',
+            '  <td class="c-ck"><input type="checkbox" class="pau-row-ck" aria-label="' + esc(u.inst_name + ' ' + u.union_name) + ' 선택" data-rk="' + esc(rowKey) + '"' + (checked ? ' checked' : '') + '></td>',
             '  <td class="c-no">' + (idx + 1) + '</td>',
             '  <td title="' + esc(u.inst_name + (worth(u.ministry) ? ' · ' + u.ministry : '') + ' (클릭 시 기관 종합 팝업)') + '"><div class="pau-line"><a href="#" class="pau-org-lnk" data-aid="' + esc(u.apba_id) + '" style="font-weight:700;color:#1e40af;text-decoration:none">' + esc(u.inst_name) + '</a>' + (worth(u.ministry) ? '<span style="color:#64748b;font-size:11.5px">' + esc(u.ministry) + '</span>' : '') + '</div></td>',
             '  <td title="' + esc(u.inst_type + ' · ' + u.union_structure) + '"><div class="pau-line">' + structPill + '<span>' + esc(u.inst_type) + '</span></div></td>',
@@ -927,7 +1060,7 @@
         '<div style="margin-top:14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">',
         '  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">',
         '    <b style="font-size:13.5px;color:#0f172a;">🔍 쟁점별 현행 노동법령 API 조문 vs 기관별 단체협약 원문 Side-by-Side 대조</b>',
-        '    <select id="pauMMetricSel" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-weight:700;color:#1e40af;">',
+        '    <select id="pauMMetricSel" aria-label="대조할 핵심 쟁점 선택" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-weight:700;color:#1e40af;">',
         METRIC_DEFS.map(function (m) {
           return '<option value="' + esc(m.key) + '"' + (state.compMetricKey === m.key ? ' selected' : '') + '>' + esc(m.label) + '</option>';
         }).join(''),
@@ -951,10 +1084,11 @@
 
         var tbl = bodyEl.querySelector('#pauMTbl');
         var selOrgans = metricOrganList.filter(function (o) { return state.compOrgans.indexOf(o.apba_id) >= 0; });
+        var allChecked = METRIC_DEFS.every(function (m) { return !!state.mSelected[m.key]; });
 
         var thead = [
           '<thead><tr>',
-          '  <th class="c-ck"><input type="checkbox" id="pauMAllCk"></th>',
+          '  <th class="c-ck"><input type="checkbox" id="pauMAllCk" aria-label="13대 쟁점 전체 선택"' + (allChecked ? ' checked' : '') + '></th>',
           '  <th class="c-no">№</th>',
           '  <th style="width:210px">13대 핵심 노무·단협 쟁점</th>',
           selOrgans.map(function (o) {
@@ -968,7 +1102,7 @@
           var ck = !!state.mSelected[mdef.key];
           return [
             '<tr data-mkey="' + esc(mdef.key) + '" style="cursor:pointer;' + (isFocused ? 'background:#eff6ff;' : '') + '">',
-            '  <td class="c-ck"><input type="checkbox" class="pau-m-ck" data-mkey="' + esc(mdef.key) + '"' + (ck ? ' checked' : '') + '></td>',
+            '  <td class="c-ck"><input type="checkbox" class="pau-m-ck" aria-label="' + esc(mdef.label) + ' 선택" data-mkey="' + esc(mdef.key) + '"' + (ck ? ' checked' : '') + '></td>',
             '  <td class="c-no">' + (idx + 1) + '</td>',
             '  <td title="' + esc(mdef.label + ' — ' + mdef.lawTitle) + '" style="font-weight:700;color:#1e40af">' + esc(mdef.label) + '</td>',
             selOrgans.map(function (o) {
@@ -1064,6 +1198,21 @@
         paintMatrix();
       });
 
+      bodyEl.querySelector('#pauMTbl').addEventListener('change', function (e) {
+        if (e.target.id === 'pauMAllCk') {
+          var on = e.target.checked;
+          METRIC_DEFS.forEach(function (m) {
+            if (on) state.mSelected[m.key] = true;
+            else delete state.mSelected[m.key];
+          });
+          paintMatrix();
+        } else if (e.target.classList.contains('pau-m-ck')) {
+          var mk = e.target.dataset.mkey;
+          if (e.target.checked) state.mSelected[mk] = true;
+          else delete state.mSelected[mk];
+        }
+      });
+
       bodyEl.querySelector('#pauMTbl').addEventListener('click', function (e) {
         var orgLnk = e.target.closest('.pau-org-lnk');
         if (orgLnk) {
@@ -1095,15 +1244,16 @@
     function renderArticlesTab() {
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
-        '  <select id="pauATax">' + TAXONOMY_LIST.map(function (t) { return '<option value="' + esc(t[0]) + '"' + (state.aTax === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>'; }).join('') + '</select>',
-        '  <select id="pauAOrgan"><option value="ALL">파싱 기관 전체</option>' + metricOrganList.map(function (o) { return '<option value="' + esc(o.apba_id) + '"' + (state.aOrgan === o.apba_id ? ' selected' : '') + '>' + esc(o.name) + '</option>'; }).join('') + '</select>',
-        '  <input type="search" id="pauAQuery" placeholder="조문 제목·본문 검색 (예: 징계위원회, 유급병가, 합의, 정년, 타임오프)…" value="' + esc(state.aQuery) + '">',
+        '  <select id="pauATax" aria-label="쟁점 분류 필터">' + TAXONOMY_LIST.map(function (t) { return '<option value="' + esc(t[0]) + '"' + (state.aTax === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>'; }).join('') + '</select>',
+        '  <select id="pauAOrgan" aria-label="기관 필터"><option value="ALL">파싱 기관 전체</option>' + metricOrganList.map(function (o) { return '<option value="' + esc(o.apba_id) + '"' + (state.aOrgan === o.apba_id ? ' selected' : '') + '>' + esc(o.name) + '</option>'; }).join('') + '</select>',
+        '  <input type="search" id="pauAQuery" aria-label="단체협약 조문 검색어" placeholder="조문 제목·본문 검색 (예: 징계위원회, 유급병가, 합의, 정년, 타임오프)…" value="' + esc(state.aQuery) + '">',
         '</div>',
+        '<div id="pauATruncNote"></div>',
         '<div class="pau-tbl-wrap">',
         '  <table class="pau-tbl">',
         '    <thead>',
         '      <tr>',
-        '        <th class="c-ck"><input type="checkbox" id="pauAAllCk"></th>',
+        '        <th class="c-ck"><input type="checkbox" id="pauAAllCk" aria-label="조문 목록 전체 선택"></th>',
         '        <th class="c-no">№</th>',
         '        <th style="width:150px">기관명</th>',
         '        <th style="width:175px">표준 쟁점 분류</th>',
@@ -1129,12 +1279,26 @@
           return true;
         });
 
+        var noteEl = bodyEl.querySelector('#pauATruncNote');
+        if (state.aVisibleRows.length > 300) {
+          noteEl.innerHTML = '<div class="pau-trunc-note">📌 검색된 조문 총 ' + fmtNum(state.aVisibleRows.length) + '건 중 화면 속도를 위해 상위 300건을 먼저 표시합니다. 상단 [📥 현재 표 엑셀(CSV) 받기]로 전체 ' + fmtNum(state.aVisibleRows.length) + '건을 모두 내려받을 수 있습니다.</div>';
+        } else {
+          noteEl.innerHTML = '';
+        }
+
         var tbody = bodyEl.querySelector('#pauATbody');
-        tbody.innerHTML = state.aVisibleRows.slice(0, 300).map(function (a, idx) {
+        if (!state.aVisibleRows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#64748b;">조회된 단체협약 조문이 없습니다. 검색어나 분류를 바꿔 보세요.</td></tr>';
+          return;
+        }
+
+        var shown = state.aVisibleRows.slice(0, 300);
+        tbody.innerHTML = shown.map(function (a, idx) {
           var oneLineText = String(a.text || '').replace(/\s+/g, ' ').trim();
+          var ck = !!state.aSelected[idx];
           return [
             '<tr>',
-            '  <td class="c-ck"><input type="checkbox" class="pau-a-ck" data-idx="' + idx + '"></td>',
+            '  <td class="c-ck"><input type="checkbox" class="pau-a-ck" aria-label="' + esc(a.inst_name + ' ' + a.article_no) + ' 선택" data-idx="' + idx + '"' + (ck ? ' checked' : '') + '></td>',
             '  <td class="c-no">' + (idx + 1) + '</td>',
             '  <td title="' + esc(a.inst_name) + '"><a href="#" class="pau-org-lnk" data-aid="' + esc(a.apba_id) + '" style="font-weight:700;color:#1e40af;text-decoration:none">' + esc(a.inst_name) + '</a></td>',
             '  <td title="' + esc(a.taxonomy_name) + '"><span class="pau-pill fktu">' + esc(a.taxonomy_name) + '</span></td>',
@@ -1149,6 +1313,21 @@
       bodyEl.querySelector('#pauATax').addEventListener('change', function (e) { state.aTax = e.target.value; filterArticles(); });
       bodyEl.querySelector('#pauAOrgan').addEventListener('change', function (e) { state.aOrgan = e.target.value; filterArticles(); });
       bodyEl.querySelector('#pauAQuery').addEventListener('input', function (e) { state.aQuery = e.target.value; filterArticles(); });
+      bodyEl.querySelector('#pauAAllCk').addEventListener('change', function (e) {
+        var on = e.target.checked;
+        var limit = Math.min(300, state.aVisibleRows.length);
+        for (var i = 0; i < limit; i++) {
+          if (on) state.aSelected[i] = true;
+          else delete state.aSelected[i];
+        }
+        filterArticles();
+      });
+      bodyEl.querySelector('#pauATbody').addEventListener('change', function (e) {
+        if (!e.target.classList.contains('pau-a-ck')) return;
+        var idx = e.target.dataset.idx;
+        if (e.target.checked) state.aSelected[idx] = true;
+        else delete state.aSelected[idx];
+      });
       bodyEl.querySelector('#pauATbody').addEventListener('click', function (e) {
         var lnk = e.target.closest('.pau-org-lnk');
         if (!lnk) return;
@@ -1165,29 +1344,30 @@
     function renderDetailTab() {
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
-        '  <select id="pauDOrgan" style="min-width:260px;font-weight:700;">',
+        '  <select id="pauDOrgan" aria-label="공시 조회 기관 선택" style="min-width:260px;font-weight:700;">',
         '    <option value="ALL"' + (state.dOrgan === 'ALL' ? ' selected' : '') + '>공시·규정 수집 기관 전체 보기 (' + fmtNum(discs.length) + '건)</option>',
         insts.map(function (i) {
           return '<option value="' + esc(i.apba_id) + '"' + (state.dOrgan === i.apba_id ? ' selected' : '') + '>' + esc(i.name + ' (' + i.inst_type + ' · ' + i.ministry + ')') + '</option>';
         }).join(''),
         '  </select>',
-        '  <select id="pauDCat">',
-        '    <option value="ALL">공시항목 전체 (단협·임협·별도합의·내부규정)</option>',
-        '    <option value="21026">단체협약 정보 (21026)</option>',
-        '    <option value="21027">임금협약 정보 (21027)</option>',
-        '    <option value="63787">제도운영 상황 / 타임오프 (63787)</option>',
-        '    <option value="63795">단체협약상 별도 합의사항 (63795)</option>',
-        '    <option value="63796">단체협약 외의 별도 합의사항 (63796)</option>',
-        '    <option value="21028">노사협의회 의결사항 (21028)</option>',
-        '    <option value="21025">복수노조 교섭창구 단일화 (21025)</option>',
-        '    <option value="21110">내부규정 - 취업·인사·보수 (21110)</option>',
+        '  <select id="pauDCat" aria-label="공시 항목 분류 선택">',
+        '    <option value="ALL"' + (state.dCat === 'ALL' ? ' selected' : '') + '>공시항목 전체 (단협·임협·별도합의·내부규정)</option>',
+        '    <option value="21026"' + (state.dCat === '21026' ? ' selected' : '') + '>단체협약 정보 (21026)</option>',
+        '    <option value="21027"' + (state.dCat === '21027' ? ' selected' : '') + '>임금협약 정보 (21027)</option>',
+        '    <option value="63787"' + (state.dCat === '63787' ? ' selected' : '') + '>제도운영 상황 / 타임오프 (63787)</option>',
+        '    <option value="63795"' + (state.dCat === '63795' ? ' selected' : '') + '>단체협약상 별도 합의사항 (63795)</option>',
+        '    <option value="63796"' + (state.dCat === '63796' ? ' selected' : '') + '>단체협약 외의 별도 합의사항 (63796)</option>',
+        '    <option value="21028"' + (state.dCat === '21028' ? ' selected' : '') + '>노사협의회 의결사항 (21028)</option>',
+        '    <option value="21025"' + (state.dCat === '21025' ? ' selected' : '') + '>복수노조 교섭창구 단일화 (21025)</option>',
+        '    <option value="21110"' + (state.dCat === '21110' ? ' selected' : '') + '>내부규정 - 취업·인사·보수 (21110)</option>',
         '  </select>',
         '</div>',
+        '<div id="pauDTruncNote"></div>',
         '<div class="pau-tbl-wrap">',
         '  <table class="pau-tbl">',
         '    <thead>',
         '      <tr>',
-        '        <th class="c-ck"><input type="checkbox" id="pauDAllCk"></th>',
+        '        <th class="c-ck"><input type="checkbox" id="pauDAllCk" aria-label="공시 목록 전체 선택"></th>',
         '        <th class="c-no">№</th>',
         '        <th style="width:150px">기관명</th>',
         '        <th style="width:175px">공시항목</th>',
@@ -1202,20 +1382,29 @@
         '</div>'
       ].join('');
 
+      var visibleDiscs = [];
+
       function paintDisclosures() {
-        var rows = discs.filter(function (d) {
+        visibleDiscs = discs.filter(function (d) {
           if (state.dOrgan !== 'ALL' && d.aid !== state.dOrgan) return false;
           if (state.dCat !== 'ALL' && d.ccode !== state.dCat) return false;
           return true;
         });
 
+        var noteEl = bodyEl.querySelector('#pauDTruncNote');
+        if (visibleDiscs.length > 350) {
+          noteEl.innerHTML = '<div class="pau-trunc-note">📌 조회된 공시·규정 총 ' + fmtNum(visibleDiscs.length) + '건 중 상위 350건을 먼저 표시합니다. 상단 [📥 현재 표 엑셀(CSV) 받기]로 전체 ' + fmtNum(visibleDiscs.length) + '건을 내려받을 수 있습니다.</div>';
+        } else {
+          noteEl.innerHTML = '';
+        }
+
         var tbody = bodyEl.querySelector('#pauDTbody');
-        if (!rows.length) {
+        if (!visibleDiscs.length) {
           tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#64748b;">조회된 수시공시·내부규정 내역이 없습니다. (전체 보기 또는 공기업·준정부기관을 선택해 보세요)</td></tr>';
           return;
         }
 
-        tbody.innerHTML = rows.slice(0, 350).map(function (d, idx) {
+        tbody.innerHTML = visibleDiscs.slice(0, 350).map(function (d, idx) {
           var kvParts = [];
           Object.keys(d.kv || {}).forEach(function (k) {
             if (k !== '기준일' && k !== '제출일' && worth(d.kv[k])) {
@@ -1229,12 +1418,16 @@
             : '';
 
           var fileLinks = (d.files || []).map(function (f) {
-            return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" class="pau-pill fktu" style="text-decoration:none;margin-right:4px;" title="' + esc(f.name) + ' 내려받기">⬇ ' + esc(f.name) + '</a>';
+            var safeHref = safeHttpUrl(f.url);
+            if (!safeHref) return '';
+            return '<a href="' + esc(safeHref) + '" target="_blank" rel="noopener" class="pau-pill fktu" style="text-decoration:none;margin-right:4px;" title="' + esc(f.name) + ' 내려받기">⬇ ' + esc(f.name) + '</a>';
           }).join('');
+
+          var ck = !!state.dSelected[idx];
 
           return [
             '<tr>',
-            '  <td class="c-ck"><input type="checkbox"></td>',
+            '  <td class="c-ck"><input type="checkbox" class="pau-d-ck" aria-label="' + esc(d.iname + ' ' + d.title) + ' 선택" data-idx="' + idx + '"' + (ck ? ' checked' : '') + '></td>',
             '  <td class="c-no">' + (idx + 1) + '</td>',
             '  <td title="' + esc(d.iname) + '"><a href="#" class="pau-org-lnk" data-aid="' + esc(d.aid) + '" style="font-weight:700;color:#1e40af;text-decoration:none">' + esc(d.iname) + '</a></td>',
             '  <td title="' + esc(d.cname) + '"><span class="pau-pill">' + esc(d.cname) + '</span></td>',
@@ -1249,6 +1442,21 @@
 
       bodyEl.querySelector('#pauDOrgan').addEventListener('change', function (e) { state.dOrgan = e.target.value; paintDisclosures(); });
       bodyEl.querySelector('#pauDCat').addEventListener('change', function (e) { state.dCat = e.target.value; paintDisclosures(); });
+      bodyEl.querySelector('#pauDAllCk').addEventListener('change', function (e) {
+        var on = e.target.checked;
+        var limit = Math.min(350, visibleDiscs.length);
+        for (var i = 0; i < limit; i++) {
+          if (on) state.dSelected[i] = true;
+          else delete state.dSelected[i];
+        }
+        paintDisclosures();
+      });
+      bodyEl.querySelector('#pauDTbody').addEventListener('change', function (e) {
+        if (!e.target.classList.contains('pau-d-ck')) return;
+        var idx = e.target.dataset.idx;
+        if (e.target.checked) state.dSelected[idx] = true;
+        else delete state.dSelected[idx];
+      });
       bodyEl.querySelector('#pauDTbody').addEventListener('click', function (e) {
         var lnk = e.target.closest('.pau-org-lnk');
         if (!lnk) return;
@@ -1314,15 +1522,16 @@
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
         '  <b style="color:#0f172a;">🔑 공공데이터포털(data.go.kr) 통합 인증키:</b>',
-        '  <input type="text" id="pauApiKeyInput" placeholder="공공데이터포털 일반 인증키(Decoding 또는 Encoding) 입력…" value="' + esc(state.apiDataKey) + '">',
+        '  <input type="' + (state.apiKeyMasked ? 'password' : 'text') + '" id="pauApiKeyInput" autocomplete="off" aria-label="공공데이터포털 인증키 입력" placeholder="공공데이터포털 일반 인증키(Decoding 또는 Encoding) 입력…" value="' + esc(state.apiDataKey) + '">',
+        '  <button type="button" class="pau-act-btn" id="pauApiKeyToggle">' + (state.apiKeyMasked ? '👁 표시' : '🙈 가리기') + '</button>',
         '  <button type="button" class="pau-act-btn pri" id="pauApiKeySave">💾 인증키 저장·연결</button>',
-        '  <span style="font-size:12px;color:#475569;">출처: <b>' + esc(state.apiKeySource) + '</b> (정부사업신청 앱의 인증키와 자동 연동됩니다)</span>',
+        '  <span style="font-size:12px;color:#475569;">출처: <b>' + esc(state.apiKeySource) + '</b> (로그인 계정별로 안전하게 분리 보관됩니다)</span>',
         '</div>',
         '<div class="pau-tbl-wrap" style="margin-bottom:14px;">',
         '  <table class="pau-tbl">',
         '    <thead>',
         '      <tr>',
-        '        <th class="c-ck"><input type="checkbox" checked disabled></th>',
+        '        <th class="c-ck"><input type="checkbox" checked disabled aria-label="API 연결됨"></th>',
         '        <th class="c-no">№</th>',
         '        <th style="width:290px">연결된 공공·법령·노사 API 명칭</th>',
         '        <th style="width:310px">API 엔드포인트 (Endpoint URL)</th>',
@@ -1335,7 +1544,7 @@
         apiRegistry.map(function (a, i) {
           return [
             '<tr>',
-            '  <td class="c-ck"><input type="checkbox" checked></td>',
+            '  <td class="c-ck"><input type="checkbox" checked aria-label="' + esc(a.name) + ' 선택"></td>',
             '  <td class="c-no">' + (i + 1) + '</td>',
             '  <td title="' + esc(a.name) + '" style="font-weight:700;color:#0f172a">' + esc(a.name) + '</td>',
             '  <td title="' + esc(a.endpoint) + '" style="color:#2563eb;font-family:monospace;font-size:11.5px">' + esc(a.endpoint) + '</td>',
@@ -1348,19 +1557,19 @@
         '    </tbody>',
         '  </table>',
         '</div>',
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;">',
+        '<div class="pau-api-grid">',
         '  <div class="pau-card">',
         '    <div class="pau-card-hd">',
         '      <span>⚖️ 실시간 노동관계법령 조문 API 조회기</span>',
         '      <span class="pau-pill ok">CORS 무인증 실시간</span>',
         '    </div>',
         '    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0;">',
-        '      <select id="pauLawSel" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;flex:1;">',
+        '      <select id="pauLawSel" aria-label="조회할 노동관계법령 선택" style="height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;flex:1;">',
         LAW_API_SOURCES.map(function (l) {
           return '<option value="' + esc(l.key) + '"' + (state.apiLawKey === l.key ? ' selected' : '') + '>' + esc(l.name) + '</option>';
         }).join(''),
         '      </select>',
-        '      <input type="text" id="pauLawArtInput" value="' + esc(state.apiLawArt) + '" placeholder="조 번호 (예: 24, 29의2, 55)" style="width:110px;height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;">',
+        '      <input type="text" id="pauLawArtInput" aria-label="조문 번호 입력" value="' + esc(state.apiLawArt) + '" placeholder="조 번호 (예: 24, 29의2, 55)" style="width:110px;height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;">',
         '      <button type="button" class="pau-act-btn pri" id="pauLawFetchBtn">조문 API 조회</button>',
         '    </div>',
         '    <pre class="pau-card-pre" id="pauLawResultPre" style="min-height:180px;">⏳ 법령과 조문 번호를 선택하면 현행 법령 API에서 실시간 조문 원문을 불러옵니다.</pre>',
@@ -1449,13 +1658,21 @@
           '1. 일요일(주휴일)\n2. 국경일(3·1절, 제헌절, 광복절, 개천절, 한글날)\n3. 1월 1일, 설날 전날·설날·설날 다음날(3일), 추석 전날·추석·추석 다음날(3일)\n4. 부처님오신날, 어린이날, 현충일, 기독탄신일\n5. 공직선거법상 임기만료 선거일 및 대체공휴일, 근로자의 날(5월 1일)';
       }
 
+      bodyEl.querySelector('#pauApiKeyToggle').addEventListener('click', function () {
+        state.apiKeyMasked = !state.apiKeyMasked;
+        renderApiHubTab();
+      });
+
       bodyEl.querySelector('#pauApiKeySave').addEventListener('click', function () {
         var val = (bodyEl.querySelector('#pauApiKeyInput').value || '').trim();
+        var uid = getActiveUid();
         state.apiDataKey = val;
-        state.apiKeySource = val ? '직접 입력 저장됨' : '미입력';
+        state.apiKeySource = val ? (uid ? '계정 전용 저장됨' : '현재 세션 임시 적용') : '미입력';
         try {
-          if (val) localStorage.setItem(LS_KEY_DATA, val);
-          else localStorage.removeItem(LS_KEY_DATA);
+          if (uid) {
+            if (val) localStorage.setItem(userLsKey(uid), val);
+            else localStorage.removeItem(userLsKey(uid));
+          }
         } catch (e) {}
         renderApiHubTab();
       });
@@ -1541,6 +1758,9 @@
     closeModal: closeModal,
     openOrganDetailModal: openOrganDetailModal,
     closeOrganDetailModal: closeOrganDetailModal,
+    extractOrganMetrics: extractOrganMetrics,
+    safeHttpUrl: safeHttpUrl,
+    setAuthUser: setAuthUser,
     mount: mount
   };
 })(typeof window !== 'undefined' ? window : this);
