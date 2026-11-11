@@ -832,6 +832,7 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ order 로 «늘» 끝에 둔다 — 백업·복구는 로그인 뒤 늦게 생겨 막대 맨 뒤에 붙는다. 차례에 기대면
        건의하기 «오른쪽»에 붙어 가운데 📷 와 겹쳤다(2026-10-24 대표 폰 캡처). */
   #fabBar > #sgFab{position:relative!important;margin-left:auto!important;order:9;}
+  #fabBar > #pu-health-admin-badge,#fabBar > #pu-resilience-badge{position:absolute!important;left:12px!important;bottom:calc(100% + 6px)!important;box-shadow:0 4px 12px rgba(185,28,28,.28)!important;}
   body.portal-mode #camFab{left:50%;right:auto;margin-left:-27px;width:54px;height:54px;z-index:62;
     bottom:calc(16px + env(safe-area-inset-bottom));}
   #moreDock{bottom:calc(68px + env(safe-area-inset-bottom));}
@@ -2075,7 +2076,6 @@ body.portal-mode #moreFab{display:flex;}
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
-,
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
@@ -2465,7 +2465,7 @@ body.portal-mode #moreFab{display:flex;}
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
-        else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); enterPortal(user); }
+        else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); if(window._fastRestored){ window._fastRestored = false; enterPortal(user); } }
       } else if(_handled){
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
@@ -2521,6 +2521,7 @@ body.portal-mode #moreFab{display:flex;}
       var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
       if(logoutAt && (!cached.at || logoutAt >= cached.at)) return;
       window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
+      window._fastRestored = true;
       _handled = true;
       renderPortal(cached.acct, { email: cached.email, all: cached.all || [], via: 'auto' });
       $('portalView').style.display = 'block'; _portalReady = true; _portalUid = cached.uid; _rmBootSplash();
@@ -3435,10 +3436,6 @@ body.portal-mode #moreFab{display:flex;}
     catch(e){ try { ref.location.href = url; } catch(_){} }
   }
   function openPortalApp(app, url){
-    if(app && app.key === 'aliounion' && typeof window !== 'undefined' && window.PuAlioUnion && typeof window.PuAlioUnion.openModal === 'function'){
-      window.PuAlioUnion.openModal();
-      return null;
-    }
     var winName = portalAppWindowName(app.key);
     var ref = portalAppWindows[app.key];
 
@@ -3951,20 +3948,6 @@ body.portal-mode #moreFab{display:flex;}
 
     hideEmptyRows();
     뉴스레터경고달기();
-    (function(){
-      var t = origTile('aliounion');
-      if(!t) return;
-      var nt = t.querySelector('.newtab');
-      if(nt) nt.textContent = '팝업 열기 ⊞';
-      if(isMobile()){
-        t.addEventListener('click', function(ev){
-          if(window.PuAlioUnion && typeof window.PuAlioUnion.openModal === 'function'){
-            ev.preventDefault();
-            window.PuAlioUnion.openModal();
-          }
-        });
-      }
-    })();
 
     // 앱 배치 — 관리자가 저장한 공용 배치를 따르고(관리자만 편집·📌 틀 고정), 즐겨찾기·접힘은 사람별 저장
     initTileOrder();
@@ -7369,6 +7352,5 @@ window.PU_TYPESAFE_MOUNT = function(){
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
-<script src="js/pu-alio-union.js?v=2"></script>
 </body>
 </html>
