@@ -1758,8 +1758,12 @@
   }
 
   function isTerminatedMailText(subj, body) {
-    var txt = String(subj || '') + ' ' + String(body || '');
-    return /자문\s*계약\s*(?:해지|종료)|계약\s*(?:해지|종료)\s*(?:통보|요청|안내|의\s*건)|해지\s*통보|거래\s*종료\s*(?:통보|요청)/.test(txt);
+    var s = String(subj || '');
+    if (/자문\s*계약\s*(?:해지|종료)|계약\s*(?:해지|종료)\s*(?:통보|요청|안내|의\s*건)|해지\s*통보|거래\s*종료\s*(?:통보|요청)/.test(s)) return true;
+    if (/견적서|계약서|위임약정서|위임장|서명본|날인본/.test(s)) return false;
+    var b = String(body || '').split(/-----Original Message-----|보낸사람\s*:|From\s*:/i)[0] || '';
+    b = b.replace(/^\s*>.*$/gm, '');
+    return /자문\s*계약\s*(?:해지|종료)\s*(?:통보|요청|안내|드립|합니)|계약\s*(?:해지|종료)\s*(?:통보|요청)\s*(?:드립|합니)|거래\s*종료\s*(?:통보|요청)\s*(?:안내|드립|합니)/.test(b);
   }
 
   function isDraftOrReviewRequest(subj, attNames, bodyTxt) {
@@ -1890,13 +1894,11 @@
         if (!cName || /푸른노무법인/.test(cName)) return;
         var ck = coNameKey(cName);
         if (!ck || ck.length < 2) return;
-        if (!sentPeersByCo[ck]) sentPeersByCo[ck] = { addrs: {}, doms: {}, hasEmail: false };
+        if (!sentPeersByCo[ck]) sentPeersByCo[ck] = { hasEmail: false };
         String(peerEmail || '').split(/[,;\s]+/).forEach(function (tok) {
           var p = parseOneEmailAddr(tok);
           if (p) {
-            sentPeersByCo[ck].addrs[p.addr] = true;
             sentPeersByCo[ck].hasEmail = true;
-            if (p.dom && !PUB_DOMAINS[p.dom]) sentPeersByCo[ck].doms[p.dom] = true;
           }
         });
       });
@@ -1960,18 +1962,20 @@
         if (!stage) return;
 
         var evKind = inferMailWorkKind(subj + ' ' + an.join(' '));
-        var partyKey = !senderVerified
+        var bucketVerified = senderVerified || stage === 'terminated';
+        var bucketCo = bucketVerified ? origMatchedCo : null;
+        var partyKey = !bucketVerified
           ? ('unverified:' + ck + '|' + srcKey)
-          : (matchedCo ? ('id:' + matchedCo.id) : ('name:' + ck));
+          : (bucketCo ? ('id:' + bucketCo.id) : ('name:' + ck));
 
         if (!rawBuckets[partyKey]) {
           rawBuckets[partyKey] = {
             coKey: ck,
             partyKey: partyKey,
             companyName: coName,
-            companyId: matchedCo ? String(matchedCo.id || '') : '',
-            matchedCo: matchedCo ? matchedCo.rec : null,
-            senderVerified: senderVerified,
+            companyId: bucketCo ? String(bucketCo.id || '') : '',
+            matchedCo: bucketCo ? bucketCo.rec : null,
+            senderVerified: bucketVerified,
             events: []
           };
         }
@@ -1990,20 +1994,23 @@
       });
     });
 
-    /* 같은 사업장 안에서도 사건(case)·컨설팅(consulting) 등 서로 다른 업무 갈래는 분리하고, 일반 견적(consult)은 해당 사업장의 주 업무 흐름에 합친다 */
+    /* 같은 사업장 안에서도 사건(case)·컨설팅(consulting) 등 서로 다른 업무 갈래는 분리하고, 단일 업무 흐름일 때만 일반 견적(consult)을 합친다 */
     var byStream = {};
     Object.keys(rawBuckets).forEach(function (pk) {
       var b = rawBuckets[pk];
       var specificKinds = [];
+      var hasConsultEv = false;
       b.events.forEach(function (e) {
-        if (e.stage !== 'terminated' && e.evKind && e.evKind !== 'consult' && specificKinds.indexOf(e.evKind) < 0) {
-          specificKinds.push(e.evKind);
-        }
+        if (e.stage === 'terminated' || !e.evKind) return;
+        if (e.evKind === 'consult') { hasConsultEv = true; return; }
+        if (specificKinds.indexOf(e.evKind) < 0) specificKinds.push(e.evKind);
       });
       if (specificKinds.length <= 1) {
         byStream[pk] = b;
       } else {
-        specificKinds.forEach(function (k) {
+        var streamKinds = specificKinds.slice();
+        if (hasConsultEv) streamKinds.push('consult');
+        streamKinds.forEach(function (k) {
           var skey = pk + '|kind:' + k;
           byStream[skey] = {
             coKey: b.coKey,
@@ -2013,7 +2020,7 @@
             companyId: b.companyId,
             matchedCo: b.matchedCo,
             senderVerified: b.senderVerified,
-            events: b.events.filter(function (e) { return e.stage === 'terminated' || e.evKind === 'consult' || e.evKind === k; })
+            events: b.events.filter(function (e) { return e.stage === 'terminated' || e.evKind === k; })
           };
         });
       }
@@ -2091,11 +2098,22 @@
       var allSrcAlreadyInErp = srcMails.length > 0 && srcMails.every(function (sk) {
         return activeCts.some(function (c) { return Array.isArray(c.srcMails) && c.srcMails.indexOf(sk) >= 0; });
       });
-      /* 기존 계약과 중복 판정: 기존 확정 계약에 이미 모든 메일이 반영되어 있거나, srcMails 없이 수기 등록된 동일 종류 확정 계약이 같은 시기(±30일)에 있을 때만 중복으로 본다. */
+      /* 기존 계약과 중복 판정: 기존 확정 계약에 이미 모든 메일이 반영되어 있거나, srcMails 없이 수기 등록된 동일 종류 확정 계약(체결일 전 180일~후 30일 이내) 메일이면 이미 체결·이관된 건으로 보아 제외한다. */
       var sameDealConfirmed = activeCts.some(function (c) {
         if (c.status !== 'signed' && c.status !== 'transferred') return false;
-        var ks = Array.isArray(c.kinds) ? c.kinds : [];
-        var kindMatch = (inferredKind === 'consult') || ks.indexOf(inferredKind) >= 0;
+        var ks = (Array.isArray(c.kinds) ? c.kinds : []).filter(function (k) { return k && k !== 'consult'; });
+        var kindMatch = false;
+        if (ks.length > 0) {
+          kindMatch = (inferredKind === 'consult') || ks.indexOf(inferredKind) >= 0;
+        } else {
+          var ctText = [c.note || ''].concat(c.briefs && typeof c.briefs === 'object' ? Object.keys(c.briefs).map(function (k) { return c.briefs[k]; }) : []).join(' ');
+          var ctKind = inferMailWorkKind(ctText);
+          if (ctKind !== 'consult') {
+            kindMatch = (inferredKind === 'consult') || (inferredKind === ctKind);
+          } else {
+            kindMatch = (inferredKind === 'consult') || (inferredKind === 'consulting');
+          }
+        }
         if (!kindMatch) return false;
         var cSrc = Array.isArray(c.srcMails) ? c.srcMails.filter(Boolean) : [];
         if (cSrc.length > 0) {
@@ -2103,7 +2121,7 @@
         }
         var ctMs = Date.parse(c.signDate || c.startDate || c.regAt || '') || 0;
         if (ctMs > 0 && activeMaxMs > 0) {
-          return Math.abs(activeMaxMs - ctMs) <= 30 * 86400000;
+          return activeMaxMs >= ctMs - 180 * 86400000 && activeMaxMs <= ctMs + 30 * 86400000;
         }
         return true;
       });
@@ -2131,6 +2149,38 @@
       g.events.forEach(function (ev) {
         if (!ev || !ev.srcKey) return;
         verifiedBySrcKey[ev.srcKey] = !!(ev.senderVerified === true && g.senderVerified !== false);
+        var evTerminated = ev.stage === 'terminated' || (maxTermMs > 0 && ev.dMs <= maxTermMs);
+        var evFinalized = !!finalizedSrcMap[ev.srcKey];
+        if (evTerminated) {
+          bySrcKey[ev.srcKey] = {
+            coKey: ck,
+            partyKey: g.partyKey,
+            companyName: g.companyName,
+            companyId: g.companyId,
+            senderVerified: g.senderVerified,
+            targetStage: 'review',
+            srcMails: [],
+            companyClosed: true,
+            isDuplicateInErp: false,
+            excluded: 'closed_company'
+          };
+          return;
+        }
+        if (evFinalized) {
+          bySrcKey[ev.srcKey] = {
+            coKey: ck,
+            partyKey: g.partyKey,
+            companyName: g.companyName,
+            companyId: g.companyId,
+            senderVerified: g.senderVerified,
+            targetStage: g.targetStage,
+            srcMails: [],
+            companyClosed: false,
+            isDuplicateInErp: true,
+            excluded: 'duplicate'
+          };
+          return;
+        }
         if (!bySrcKey[ev.srcKey] || g.senderVerified === false) {
           bySrcKey[ev.srcKey] = g;
         }
@@ -2447,6 +2497,7 @@
             var directStream = (synth.bySrcKey && synth.bySrcKey[srcKey]) || null;
             var lcGroup = directStream || (isSent && ck ? (synth.groups[ck + ':' + msgKind] || synth.groups[ck]) : null);
             if (lcGroup && (lcGroup.companyClosed || lcGroup.isDuplicateInErp)) return;
+            if (lcGroup && Array.isArray(lcGroup.srcMails) && lcGroup.srcMails.indexOf(srcKey) < 0) return;
             if (matchedCo && matchedCo.rec && isClosedCompanyRecord(matchedCo.rec, null)) return;
             var staff = resolveStaff(slug + '_' + uid, matchedCo, subj);
 
@@ -2470,6 +2521,7 @@
                   srcKey: srcKey,
                   srcMails: (lcGroup && Array.isArray(lcGroup.srcMails) && lcGroup.srcMails.length) ? lcGroup.srcMails : [srcKey],
                   synthesizedNote: (lcGroup && lcGroup.synthesizedNote) || '',
+                  useInferredKind: true,
                   inferredKind: (lcGroup && lcGroup.inferredKind) || msgKind,
                   companyId: matchedCo ? String(matchedCo.id || '') : '',
                   company: {

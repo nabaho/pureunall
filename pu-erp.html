@@ -21093,7 +21093,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
   }
   form.companyName = form.company.name;
   form.bizNo = form.company.bizNo || '';
-  var validInferred = (r.useInferredKind && r.inferredKind && ['case', 'consulting', 'company', 'fund', 'other', 'consult'].indexOf(r.inferredKind) >= 0) ? r.inferredKind : 'consult';
+  var validInferred = (r.useInferredKind !== false && r.inferredKind && ['case', 'consulting', 'company', 'fund', 'other', 'consult'].indexOf(r.inferredKind) >= 0) ? r.inferredKind : 'consult';
   form.kinds = [validInferred];
   form.status = kind === 'advance' ? 'review' : 'consult';
   form.managerMain = sid;
