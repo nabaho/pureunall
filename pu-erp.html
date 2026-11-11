@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=42">
+<link rel="stylesheet" href="css/pu-erp.css?v=43">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -26518,9 +26518,10 @@ function ContractManagement(props){
     var briefText = String(cf.scope || cf.docName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     var cms = erpCmsFromDoc(cf);
     var probe = { company:{ name:cname, bizNo:String(rCo.bizNo || ''), address:String(rCo.address || ''), ceo:String(rCo.ceo || '') } };
-    var reqBizDigits = String(rCo.bizNo || '').replace(/\D/g, '');
+    var erpBizOk = function(v){ if(typeof PuDocRead !== 'undefined' && PuDocRead && typeof PuDocRead.bizNoValid === 'function') return !!PuDocRead.bizNoValid(v); if(typeof PuDocRead !== 'undefined' && PuDocRead && typeof PuDocRead.bizNoOk === 'function') return !!PuDocRead.bizNoOk(v); var d = String(v == null ? '' : v).replace(/\D/g, ''); if(d.length !== 10) return false; var w = [1, 3, 7, 1, 3, 7, 1, 3, 5], s = 0; for(var i = 0; i < 9; i++) s += parseInt(d.charAt(i), 10) * w[i]; s += Math.floor(parseInt(d.charAt(8), 10) * 5 / 10); return (10 - (s % 10)) % 10 === parseInt(d.charAt(9), 10); };
+    var reqBizDigits = (req && req.bizNoOk !== false && erpBizOk(rCo.bizNo)) ? String(rCo.bizNo || '').replace(/\D/g, '') : '';
     var reqMatchedCo = reqBizDigits.length === 10 ? cos.filter(function(x){ return x && !x._deleted && String(x.bizNo || '').replace(/\D/g, '') === reqBizDigits && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] : null;
-    if(!reqMatchedCo && req && req.companyId) reqMatchedCo = cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] || null;
+    if(!reqMatchedCo && req && req.companyId && !rCo.bizNo && req.bizNoOk !== false) reqMatchedCo = cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpCoNameKey(x.name) === erpCoNameKey(cname) && erpBizOk(x.bizNo); })[0] || null;
     var reqCoId = reqMatchedCo ? String(reqMatchedCo.id) : '';
     if(!reqBizDigits && reqMatchedCo && reqMatchedCo.bizNo) reqBizDigits = String(reqMatchedCo.bizNo).replace(/\D/g, '');
     var nameClashDiffBiz = reqBizDigits.length === 10 && !reqMatchedCo && cos.some(function(x){ return x && !x._deleted && erpCoNameKey(x.name) === erpCoNameKey(cname) && String(x.bizNo || '').replace(/\D/g, '') !== reqBizDigits; });
@@ -26586,7 +26587,7 @@ function ContractManagement(props){
       if(v !== '' && v != null && form.company.hasOwnProperty(k)) form.company[k] = v;
     });
     if(rCo.corpRegNo) form.company.corpRegNo = rCo.corpRegNo;
-    var bizDigits = String(form.company.bizNo || '').replace(/\D/g, '');
+    var bizDigits = reqBizDigits; if(!bizDigits) form.company.bizNo = '';
     if(bizDigits.length === 10){
       var matchedCos = cos.filter(function(x){
         return x && !x._deleted && String(x.bizNo || '').replace(/\D/g, '') === bizDigits;
@@ -26598,7 +26599,7 @@ function ContractManagement(props){
       }
     }
     if(!form.companyId){
-      var byIdOrName = req.companyId ? cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId); })[0] : null;
+      var byIdOrName = (req.companyId && !rCo.bizNo && req.bizNoOk !== false) ? cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpBizOk(x.bizNo); })[0] : null;
 
       if(byIdOrName && erpCoNameKey(byIdOrName.name) === erpCoNameKey(cname)){
         form.companyId = String(byIdOrName.id);

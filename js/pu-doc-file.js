@@ -1746,7 +1746,17 @@
       if (cur && cur.state === 'done' && !o.force) {
         return { ok: true, id: key, already: true };
       }
-      var bizOk = !(o.bizNoOk === false || f.biznoOk === false) && (!global.PuDocRead || typeof global.PuDocRead.bizNoOk !== 'function' || !!global.PuDocRead.bizNoOk(f.bizno));
+      var checkBizNo = function (v) {
+        if (global.PuDocRead && typeof global.PuDocRead.bizNoValid === 'function') return !!global.PuDocRead.bizNoValid(v);
+        if (global.PuDocRead && typeof global.PuDocRead.bizNoOk === 'function') return !!global.PuDocRead.bizNoOk(v);
+        var d = digits(v);
+        if (d.length !== 10) return false;
+        var w = [1, 3, 7, 1, 3, 7, 1, 3, 5], s = 0;
+        for (var i = 0; i < 9; i++) s += parseInt(d.charAt(i), 10) * w[i];
+        s += Math.floor(parseInt(d.charAt(8), 10) * 5 / 10);
+        return (10 - (s % 10)) % 10 === parseInt(d.charAt(9), 10);
+      };
+      var bizOk = !(o.bizNoOk === false || f.biznoOk === false) && checkBizNo(f.bizno);
       var validBizDigits = bizOk ? String(f.bizno || '').replace(/\D/g, '') : '';
       if (validBizDigits.length !== 10) validBizDigits = '';
       var pBiz = validBizDigits ? findCompanyByBizNo(validBizDigits).catch(function () { return null; }) : Promise.resolve(null);
@@ -1820,7 +1830,7 @@
             name: String(f.docName || '계약서').trim()
           }
         };
-        var canCoInfo = !!(rec.company.bizNo && (!global.PuDocRead || !global.PuDocRead.bizNoOk || global.PuDocRead.bizNoOk(rec.company.bizNo)));
+        var canCoInfo = !!(rec.company.bizNo && checkBizNo(rec.company.bizNo));
         var pCoInfo = canCoInfo ? sendToCoInfo({ kind: 'contract', fields: Object.assign({}, f, { company: compName, bizno: rec.company.bizNo }), photo: { id: String(o.id || ''), year: year, owner: String(o.owner || '') }, byName: rec.by }).catch(function () {}) : Promise.resolve();
         return Promise.all([reqRef.set(rec), pCoInfo]).then(function () {
           return { ok: true, id: key, targetStatus: targetStatus };

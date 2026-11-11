@@ -320,13 +320,15 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
     'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('
   ].map((d) => cutFn(SRC, d)).join('\n');
+  const CO_V = Object.assign({}, CO, { bizNo: '1234567891' });
+  const cardV = (o) => card(Object.assign({ company: { name: '가나기관', bizNo: '1234567891' } }, o || {}));
   const calls = { persist: [], remove: 0, update: [] };
   const ctx = {
     console, Date, Object, Array, String, Number, JSON, Math, Promise, parseInt, parseFloat,
     ERP_CMS_WORDS: ['CMS', '자동이체'],
     todayYMD: () => '2026-11-10',
     fbDb: { ref: () => ({ remove: () => { calls.remove++; return Promise.resolve(); }, update: (v) => { calls.update.push(v); return Promise.resolve(); } }) },
-    dbGet: (k, d) => (k === 'companies' ? [CO] : k === 'contracts' ? [] : d),
+    dbGet: (k, d) => (k === 'companies' ? [CO_V] : k === 'contracts' ? [] : d),
     getActiveUsers: () => USERS,
     getKindTypes: (kv) => (kv === 'case' ? [{ code: 'case-dismiss', name: '부당해고등노동위원회대리(노사)', short: '부해' }] : []),
     erpDeferCoLinkIfNew: (f) => (f.companyId ? f : Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' })),
@@ -341,7 +343,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     state: 'pending',
     targetStatus: 'signed',
     managerMain: 'P-005',
-    company: { name: '가나기관', bizNo: '123-45-67890', corpRegNo: '161471-0001381', address: '충남 가나시 다라로 1', phone: '041-000-0000' },
+    company: { name: '가나기관', bizNo: '123-45-67891', corpRegNo: '161471-0001381', address: '충남 가나시 다라로 1', phone: '041-000-0000' },
     contractFields: {
       docName: '위임약정서',
       scope: '충남2026부해1332 부당해고 등 구제신청 사건 처리에 관한 일체의 사항',
@@ -372,14 +374,14 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
 
   /* ㉔ 같은 사업장에 진행 중 카드가 2건 이상이면 종류가 달라도 blocked 로 막는다 */
   let mockCts = [
-    card({ id: 'ct-a', status: 'review', kinds: ['consulting'] }),
-    card({ id: 'ct-b', status: 'consult', kinds: ['consult'] })
+    cardV({ id: 'ct-a', status: 'review', kinds: ['consulting'] }),
+    cardV({ id: 'ct-b', status: 'consult', kinds: ['consult'] })
   ];
-  ctx.dbGet = (k, d) => (k === 'companies' ? [CO] : k === 'contracts' ? mockCts : d);
+  ctx.dbGet = (k, d) => (k === 'companies' ? [CO_V] : k === 'contracts' ? mockCts : d);
   calls.persist.length = 0; calls.update.length = 0;
   const rDup = await ctx.run('k-ct2', {
     source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
-    company: { name: '가나기관', bizNo: '123-45-67890' },
+    company: { name: '가나기관', bizNo: '123-45-67891' },
     contractFields: { docName: '위임약정서', scope: '부당해고 구제신청' }
   });
   assert.match(rDup.why, /진행 중 카드가 2건/);
@@ -387,22 +389,22 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
 
   /* 다른 종류(consulting) 진행 중 카드 1건만 있으면 덮어쓰지 않고 별도 case 카드로 만들고,
      같은 종류(case) 진행 중 카드 1건에 이미 적힌 금액·성공보수는 덮어쓰지 않고 보존한다 */
-  mockCts = [card({ id: 'ct-cons', status: 'review', kinds: ['consulting'], amounts: { consulting: 5000000 } })];
+  mockCts = [cardV({ id: 'ct-cons', status: 'review', kinds: ['consulting'], amounts: { consulting: 5000000 } })];
   calls.persist.length = 0;
   const rDiffKind = await ctx.run('k-ct3', {
     source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
-    company: { name: '가나기관', bizNo: '123-45-67890' },
+    company: { name: '가나기관', bizNo: '123-45-67891' },
     contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
   });
   assert.ok(rDiffKind.made);
   assert.notEqual(rDiffKind.made.id, 'ct-cons', '기존 컨설팅 카드를 덮어쓰지 않고 새 카드로 생성');
   assert.deepEqual(out(rDiffKind.made.kinds), ['case']);
 
-  mockCts = [card({ id: 'ct-case1', status: 'review', kinds: ['case'], amounts: { case: 1500000 }, successFee: 2000000, successFeeType: 'amount', contractFeeVatIncluded: false, vatType: 'separate' })];
+  mockCts = [cardV({ id: 'ct-case1', status: 'review', kinds: ['case'], amounts: { case: 1500000 }, successFee: 2000000, successFeeType: 'amount', contractFeeVatIncluded: false, vatType: 'separate' })];
   calls.persist.length = 0;
   const rKeepAmt = await ctx.run('k-ct4', {
     source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
-    company: { name: '가나기관', bizNo: '123-45-67890' },
+    company: { name: '가나기관', bizNo: '123-45-67891' },
     contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '990만원(부가세 포함)', success: '880만원(부가세 포함)' }
   });
   assert.equal(rKeepAmt.made.id, 'ct-case1');
@@ -450,14 +452,15 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
 
   /* ㉖ 생산자(PuDocFile.autoRequestContractFromPhoto) → 소비자(processPhotoContractRequest):
      잘못된 사업자번호(123 또는 bizNoOk:false) + 같은 상호가 있을 때 이름 검색 결과로 companyId·사업자번호를 치환해 signed 확정하는 우회를 차단한다 */
+  const DOCREAD_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8');
   const DOCFILE_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-file.js'), 'utf8');
   const prodWrites = {};
   const prodCtx = {
-    console, Date, Object, Array, String, Number, JSON, Math, Promise, RegExp, Error,
-    PuDocRead: { bizNoOk: () => false }
+    console, Date, Object, Array, String, Number, JSON, Math, Promise, RegExp, Error, parseInt, parseFloat, setTimeout
   };
   prodCtx.window = prodCtx; prodCtx.global = prodCtx;
   vm.createContext(prodCtx);
+  vm.runInContext(DOCREAD_SRC, prodCtx);
   vm.runInContext(DOCFILE_SRC, prodCtx);
   prodCtx.PuDocFile.init({
     db: {
@@ -506,4 +509,28 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.ok(rFromMailProd.made);
   assert.notEqual(rFromMailProd.made.id, 'ct-existing-prod', 'mailMeta.companyId 경로도 기존 카드를 덮어쓰지 않는다');
   assert.equal(rFromMailProd.made.status, 'review');
+
+  /* 판독 라이브러리(PuDocRead) 미로딩 상태에서도 생산자·소비자 모두 검산 실패 10자리 번호(1234567890)를 fail-closed 로 차단한다 */
+  delete prodCtx.PuDocRead;
+  await prodCtx.PuDocFile.autoRequestContractFromPhoto({
+    id: 'p-nolib', year: 2026, owner: 'u1', by: '담당가',
+    fields: { company: '가나기관', bizno: '1234567890', docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  const builtNoLib = prodWrites['data/contract_requests/ctphoto-2026_p-nolib'];
+  assert.ok(builtNoLib);
+  assert.equal(builtNoLib.companyId, '', 'PuDocRead 미로딩 시에도 검산 실패 번호로 업체를 잇지 않는다');
+  assert.equal(builtNoLib.company.bizNo, '', 'PuDocRead 미로딩 시에도 검산 실패 번호를 남기지 않는다');
+  assert.equal(builtNoLib.targetStatus, 'review', 'PuDocRead 미로딩 시에도 검산 실패 번호는 review 로 격리한다');
+
+  calls.persist.length = 0;
+  const rSynthInvalid = await ctx.run('k-synth-badbiz', {
+    source: 'photo_contract', state: 'pending', targetStatus: 'signed', managerMain: 'P-005',
+    company: { name: '가나기관', bizNo: '1234567890' },
+    contractFields: { docName: '위임약정서', scope: '부당해고 구제신청', retainer: '220만원' }
+  });
+  assert.ok(rSynthInvalid.made);
+  assert.notEqual(rSynthInvalid.made.id, 'ct-existing-prod', '소비자에 직접 검산 실패 10자리 번호를 넣어도 기존 카드를 덮어쓰지 않는다');
+  assert.equal(rSynthInvalid.made.companyId, '');
+  assert.equal(rSynthInvalid.made.bizNo, '');
+  assert.equal(rSynthInvalid.made.status, 'review', '소비자도 독립 검산으로 검산 실패 번호를 review 로 격리한다');
 });
