@@ -58,18 +58,20 @@ test('★★★ 옛 모양(1)에서도 안 깨진다 — 먼저 적어 둔 칸�
   assert.equal(c.mbNoWhoWhy('AD'), '');
 });
 
-test('★★★ 하는 일은 같다 — 둘 다 칸이 담당을 안 내놓는다', () => {
+test('★★★ 하는 일 — 칸 담당은 둘 다 안 내놓되, 섞임 칸은 개별 메일의 주소·업체 담당 판정을 살린다', () => {
   const c = box({ AD: 1, GOV: { why: 'mixed' } });
   assert.equal(c.mbNoWhoBox('AD'), true);
-  assert.equal(c.mbNoWhoBox('GOV'), true, '★★ 섞임 칸인데 담당을 내놓는다 — 한 사람에게 쏠린다');
-  assert.equal(c.mbNoWhoOfRow({ _slug: 'GOV' }), true);
+  assert.equal(c.mbNoWhoBox('GOV'), true, '★★ 섞임 칸인데 칸 담당을 내놓는다 — 한 사람에게 쏠린다');
+  assert.equal(c.mbNoWhoOfRow({ _slug: 'AD' }), true, '★★ 사람 안 붙이는 칸(광고·반송)은 줄도 사람 안 붙임으로 간다');
+  assert.equal(c.mbNoWhoOfRow({ _slug: 'GOV' }), false, '★★★ 섞임 업무 칸(자문사답변·급여 등)의 자문사 메일까지 사람 안 붙임으로 증발하면 안 된다');
 });
 
-test('★★★ 한 통씩 박은 것은 「못 정함」보다 세다 — 칸 이야기지 메일 이야기가 아니다', () => {
-  const c = box({ GOV: { why: 'mixed' } }, { 'gov:7': '홍길동' });
-  assert.equal(c.mbNoWhoOfRow({ _slug: 'GOV', _key: 'GOV:7' }), false,
+test('★★★ 한 통씩 박은 것은 「사람 안 붙임」보다 세다 — 칸 이야기지 메일 이야기가 아니다', () => {
+  const c = box({ AD: 1, GOV: { why: 'mixed' } }, { 'ad:7': '홍길동', 'gov:7': '홍길동' });
+  assert.equal(c.mbNoWhoOfRow({ _slug: 'AD', _key: 'AD:7' }), false,
     '★★ 사람이 콕 집어 박았는데 칸 규칙이 덮었다');
-  assert.equal(c.mbNoWhoOfRow({ _slug: 'GOV', _key: 'GOV:9' }), true);
+  assert.equal(c.mbNoWhoOfRow({ _slug: 'AD', _key: 'AD:9' }), true);
+  assert.equal(c.mbNoWhoOfRow({ _slug: 'GOV', _key: 'GOV:7' }), false);
 });
 
 test('★★ 말이 다르다 — 그 말이 이 기능의 값이다', () => {

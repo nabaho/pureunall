@@ -99,5 +99,6 @@ module.exports = {
     { name: 'cothread', run: async (page) => { await page.evaluate(() => openCoThread()); }, wait: 2500 },
     { name: 'mat', run: async (page) => { await page.evaluate(() => { openMailBox(mbNow()); openMatPage(); }); }, wait: 2500 },
     { name: 'matset', run: async (page) => { await page.evaluate(() => setMatCat('set')); }, wait: 1500 },
+    { name: 'uchk', run: async (page) => { await page.evaluate(() => openUchkPage()); }, wait: 2000 },
   ],
 };
