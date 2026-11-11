@@ -28,6 +28,7 @@ const MAILCARD = require('./mail-card');            /* 📬 처음 보는 보낸
 const GONE = require('./gone-watch');            /* 🏚 반송 메일 → 없어진 듯한 곳 근거 */
 const MYMAIL = require('./mail-owner');             /* 📬 내 담당 메일 → 그 담당자 폰 알림 */
 const QUOTEWATCH = require('./mail-quote-watch');   /* 📨 보낸메일함의 우리 견적서·계약서 → 이알피 계약 요청(계획 3, 기본 꺼짐) */
+const CALOFFICIAL = require('./cal-official-sync'); /* 🏛 공공기관·회의·조사 참석 요청 공문 → 구글 공용 달력 자동 입력·보완(2026-11-11) */
 
 const ROOT = 'mailbox';
 
@@ -642,6 +643,21 @@ async function runSync(deps, opts) {
                 console.warn('mail-owner 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
             }
+            /* ── 🏛 공공기관·위원회·조사 참석 요청 공문 → 구글 공용 달력 자동 입력·보완 (대표 지시 2026-11-11) ──
+               ⚠ 받은메일함(inbox)뿐 아니라 「6.공공기관」 같은 사용자 폴더(custom)로 바로 들어오는 새 메일도 본다.
+               ⚠ 여기서는 가벼운 줄 세우기(queueFromNewMail)만 하고, 첨부 판독·달력 반영은 calOfficialSync 가 따로 한다.
+               ⚠ 실패해도 절대 던지지 않는다 — 공문 판독이 죽어도 동기화는 계속된다. */
+            if (r.dir === 'fresh' && held.length && CALOFFICIAL.isIncomingKind(MB.folderKind(p.box))) {
+              try {
+                const co = await CALOFFICIAL.queueFromNewMail(deps, {
+                  slug: p.slug, boxName: p.box.name || p.box.path || '',
+                  rows: held.map((g) => g.row), self: [String(user || '').toLowerCase()],
+                });
+                if (co.queued) console.log('cal-official-queue', JSON.stringify(co));
+              } catch (e) {
+                console.warn('cal-official-queue 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+            }
             /* ⚠★ 여기서 «이 칸의 기간»을 재던 자리다 — 걷어냈다 (대표 지적 2026-09-11).
                  held 는 «이번 회차에 받아온 줄»뿐이라, 새 메일 한 통만 온 칸은
                  「담긴 기간 1일」이 되었다. 게다가 바로 아래 nextSync 가 새 그릇을
@@ -856,6 +872,8 @@ async function runSync(deps, opts) {
     /* 📦 지난 메일 «열 수 있는 것이 얼마인가» — 부탁이 있을 때만(위 oldProbe 머리글). 못 해도 동기화는 멀쩡해야 한다 */
     if (!o.client) {
       try { await oldProbe(deps, db, deadline); } catch (e) { console.warn('oldProbe 실패:', String((e && e.message) || e).slice(0, 200)); }
+      try { await CALOFFICIAL.bootstrapRecent(deps, { self: [String(user || '').toLowerCase()] }); }
+      catch (e) { console.warn('cal-official bootstrap 실패:', String((e && e.message) || e).slice(0, 200)); }
     }
     await db.ref(ROOT + '/meta').update({
       at: nowMs(), ok: true, folders: out.folders, rows: out.rows,
