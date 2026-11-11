@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=41">
+<link rel="stylesheet" href="css/pu-erp.css?v=42">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -20768,7 +20768,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
     if(!cname) return { action:'blocked', why:'사업장을 정해 주세요' };
     var same0 = all.filter(function(c){ return erpSameCompany(probe, c); });
     var cons = same0.filter(function(c){ return c.status === 'consult'; });
-    if(cons.length === 1) return { action:'advance', target:cons[0] };
+    var open0 = same0.filter(function(c){ return c.status === 'consult' || c.status === 'review'; }); if(cons.length === 1 && open0.length > 1) return { action:'blocked', why:'같은 사업장에 진행 중 카드가 ' + open0.length + '건 있습니다 — 어느 카드인지 정해 주세요' }; if(cons.length === 1) return { action:'advance', target:cons[0] };
     if(cons.length > 1) return { action:'blocked', why:'같은 사업장에 상담접수 카드가 ' + cons.length + '건 있습니다 — 어느 카드인지 정해 주세요' };
     if(same0.some(function(c){ return c.status === 'review' || c.status === 'signed'; })) return { action:'noop', why:'이미 계약협의 이상으로 진행된 사업장입니다' };
     if(!r.allowCreateReview) return { action:'blocked', why:'옮길 상담접수 카드가 없습니다' };
@@ -26488,10 +26488,19 @@ function ContractManagement(props){
     var briefText = String(cf.scope || cf.docName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     var cms = erpCmsFromDoc(cf);
     var probe = { company:{ name:cname, bizNo:String(rCo.bizNo || ''), address:String(rCo.address || ''), ceo:String(rCo.ceo || '') } };
+    var reqBizDigits = String(rCo.bizNo || '').replace(/\D/g, '');
+    var reqMatchedCo = reqBizDigits.length === 10 ? cos.filter(function(x){ return x && !x._deleted && String(x.bizNo || '').replace(/\D/g, '') === reqBizDigits && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] : null;
+    if(!reqMatchedCo && req && req.companyId) reqMatchedCo = cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] || null;
+    var reqCoId = reqMatchedCo ? String(reqMatchedCo.id) : '';
+    if(!reqBizDigits && reqMatchedCo && reqMatchedCo.bizNo) reqBizDigits = String(reqMatchedCo.bizNo).replace(/\D/g, '');
+    var reqConfirmed = !!(reqCoId || reqBizDigits.length === 10 || (req && req.confirmed));
     var allSameOpen = all.filter(function(c){ return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c); });
     if(allSameOpen.length > 1) return await stop('같은 사업장에 진행 중 카드가 ' + allSameOpen.length + '건 있습니다 — 어느 카드인지 정해 주세요');
     var sameOpen = allSameOpen.filter(function(c){
-      return (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c) && (!(c.kinds && c.kinds.length) || (c.kinds || []).indexOf('consult') >= 0 || (c.kinds || []).indexOf(kv) >= 0);
+      var cBiz = String((c.company && c.company.bizNo) || c.bizNo || '').replace(/\D/g, '');
+      var cCoId = String(c.companyId || (c.company && c.company.companyId) || '');
+      var verifiedMatch = reqConfirmed && ((reqCoId && cCoId === reqCoId) || (reqBizDigits.length === 10 && cBiz === reqBizDigits));
+      return verifiedMatch && (c.status === 'consult' || c.status === 'review') && erpSameCompany(probe, c) && (!(c.kinds && c.kinds.length) || (c.kinds || []).indexOf('consult') >= 0 || (c.kinds || []).indexOf(kv) >= 0);
     });
     sameOpen.sort(function(a, b){ return (a.status === 'review' ? 0 : 1) - (b.status === 'review' ? 0 : 1); });
     if(sameOpen.length > 1) return await stop('같은 사업장에 진행 중 카드가 ' + sameOpen.length + '건 있습니다 — 어느 카드인지 정해 주세요');
@@ -26506,12 +26515,14 @@ function ContractManagement(props){
       var nextTc = Object.assign({}, cur.typeCodes || {});
       if(guessed.typeCode) nextTc[kv] = guessed.typeCode;
       var nextAmts = Object.assign({}, cur.amounts || {});
+      var hadExistingMoney = (Number(nextAmts[kv]) > 0) || (Number(cur.successFee) > 0);
       if(amt > 0 && !(Number(nextAmts[kv]) > 0)) nextAmts[kv] = amt;
       var nextBriefs = Object.assign({}, cur.briefs || {});
       if(briefText && nextBriefs.hasOwnProperty(kv)) nextBriefs[kv] = briefText;
+      var updStatus = (targetStatus === 'signed' && !reqConfirmed) ? 'review' : targetStatus;
       var noteLine = '📄 계약서 자동 반영 (' + (cf.docName || '계약서') + ')'
         + (briefText ? ' · ' + briefText : '')
-        + (targetStatus === 'signed' ? ' → 계약확정' : ' → 계약협의');
+        + (updStatus === 'signed' ? ' → 계약확정' : ' → 계약협의');
       var upd = Object.assign({}, cur, {
         company: nextCo,
         companyName: cur.companyName || nextCo.name || cname,
@@ -26521,12 +26532,13 @@ function ContractManagement(props){
         amounts: nextAmts,
         briefs: nextBriefs,
         managerMain: cur.managerMain || sid,
-        status: targetStatus,
+        status: updStatus,
         orderTs: Date.now(),
         note: (cur.note ? cur.note + '\n\n' : '') + noteLine
       });
+      if(reqCoId && !upd.companyId){ upd.companyId = reqCoId; upd.company.companyId = reqCoId; }
       if(succ.fee > 0 && !(Number(cur.successFee) > 0)){ upd.successFee = succ.fee; upd.successFeeType = succ.type; }
-      if(vatFlag !== null){ upd.contractFeeVatIncluded = vatFlag; upd.vatType = vatFlag ? 'inclusive' : 'separate'; }
+      if(vatFlag !== null && !hadExistingMoney){ upd.contractFeeVatIncluded = vatFlag; upd.vatType = vatFlag ? 'inclusive' : 'separate'; }
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) upd.signDate = cf.signDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.endDate || ''))) upd.endDate = cf.endDate;
