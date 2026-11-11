@@ -63,6 +63,8 @@ function takeCards(req) {
     try {
       var form = await req.formData();
       var files = form.getAll('images').filter(function (f) { return f && f.size; });
+      /* 앞선 공유에서 남은 shared-1..N 그림이 새 공유 뒤에 섞여 남지 않도록 먼저 비운다 */
+      await caches.delete('pucards-share');
       var cache = await caches.open('pucards-share');
       await cache.put('shared-files', new Response(JSON.stringify({ n: files.length })));
       for (var i = 0; i < files.length; i++) {

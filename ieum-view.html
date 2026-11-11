@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1e40af">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
 <title>이음센터 근무일정 — 푸른노무법인</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🕒</text></svg>">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -128,9 +130,9 @@ body{background:#f8fafc;color:#1e293b;-webkit-tap-highlight-color:transparent;
     var firstDow = first.getDay();
     var lastDate = new Date(viewY, viewM+1, 0).getDate();
     var cal = '<div class="card">'
-      + '<div class="calhd"><button id="prev">‹</button>'
+      + '<div class="calhd"><button id="prev" aria-label="이전 달">‹</button>'
       + '<span class="mo">'+viewY+'년 '+(viewM+1)+'월</span>'
-      + '<button id="next">›</button></div>'
+      + '<button id="next" aria-label="다음 달">›</button></div>'
       + '<div class="dow">'+DOW.map(function(d){return '<span>'+d+'</span>';}).join('')+'</div>'
       + '<div class="grid">';
     for(var p=0;p<firstDow;p++) cal += '<div class="d pad"></div>';

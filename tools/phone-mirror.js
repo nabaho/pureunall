@@ -204,7 +204,13 @@ async function 재기(dry) {
   const 기 = 준비(); if (!기) return;
   const f = 돌려(기.adb, ['-s', 기.serial, 'forward', 'tcp:' + PORT, 'localabstract:chrome_devtools_remote']);
   if (f.status !== 0) { console.log('✗ 폰 크롬에 길을 못 냈습니다 — 폰에서 «크롬»을 열어 두십시오'); return; }
-  return 탭재기(PORT);
+  /* ★ 재기가 끝나면(성공하든 실패하든) 열린 디버그 통로(tcp:9222)를 곧바로 닫는다 —
+     열어 둔 채로 끝내면 PC의 다른 프로세스가 폰 크롬 세션에 붙을 수 있다 (2026-11-11). */
+  try {
+    return await 탭재기(PORT);
+  } finally {
+    try { 돌려(기.adb, ['-s', 기.serial, 'forward', '--remove', 'tcp:' + PORT]); } catch (e) {}
+  }
 }
 
 /* 길(adb forward)이 난 뒤 — 푸른 탭 하나를 잰다. 길만 다르면 PC 크롬에도 그대로 쓴다(검사·시험용) */
@@ -214,7 +220,11 @@ async function 탭재기(port) {
   catch (e) { console.log('✗ 폰 크롬 탭을 못 읽었습니다 — 폰에서 크롬을 앞에 띄워 두십시오'); return; }
   const 고름 = 탭고르기(탭들);
   if (!고름.tab) { console.log('✗ 폰 크롬에 푸른 화면이 없습니다 — nabaho.github.io/pureunall 을 열어 두십시오 (다른 탭 ' + 고름.다른탭수 + '개는 안 봤습니다)'); return; }
-  const ws = 고름.tab.webSocketDebuggerUrl;
+  const ws = String(고름.tab.webSocketDebuggerUrl || '');
+  if (!/^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(ws)) {
+    console.log('✗ 폰 크롬 디버그 주소가 로컬이 아닙니다 — 중단합니다');
+    return;
+  }
   console.log('잴 화면: ' + 고름.tab.title + '  (' + 고름.tab.url + ')');
   const 자 = fs.readFileSync(MEASURE, 'utf8');
   const 식 = '(function(){' + 자 + '\n;return JSON.stringify(__paMeasure({ width: Math.min(screen.width, document.documentElement.clientWidth) }));})()';

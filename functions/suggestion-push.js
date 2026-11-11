@@ -35,20 +35,20 @@ function clip(s, n) {
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
 }
 
-/* 쓴 사람이 «믿을 수 있는가» — 관리 도구(ADMIN)거나 관리자 계정 */
+/* 쓴 사람이 «믿을 수 있는가» — 관리 도구(ADMIN)거나 재직 중인 관리자 계정 */
 async function writerIsTrusted(db, context) {
   if (!context) return false;
   if (context.authType === "ADMIN") return true;
   const uid = context.auth && context.auth.uid;
   if (!uid) return false;
   const v = (await db.ref("uid_roles/" + uid).once("value")).val() || {};
-  return v.isAdmin === true && v.status !== "resigned";
+  return v.isAdmin === true && (!v.status || v.status === "active") && v.status !== "resigned";
 }
 
 async function isAdminUid(db, uid) {
   if (!uid) return false;
   const v = (await db.ref("uid_roles/" + uid).once("value")).val() || {};
-  return v.isAdmin === true && v.status !== "resigned";
+  return v.isAdmin === true && (!v.status || v.status === "active") && v.status !== "resigned";
 }
 
 /* ① 감시 알림 — suggestions_private/{id}/watchNotice/{nid} onCreate.

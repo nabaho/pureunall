@@ -20,6 +20,21 @@ firebase.initializeApp({
 
 var PORTAL_URL = '/pureunall/enter.html?sg=1';
 
+/* ★ 알림 클릭 이동 주소는 «같은 출처(origin) + /pureunall/ 안쪽» 만 허용한다 (2026-11-11 폰 보안 점검).
+   외부 도메인·javascript:·다른 경로가 들어오면 기본 포털 주소로 되돌려 오픈 리다이렉트를 막는다. */
+function safePortalUrl(raw) {
+  try {
+    var base = (self.location && self.location.origin) || 'https://nabaho.github.io';
+    var u = new URL(String(raw || PORTAL_URL), base);
+    if (u.origin !== base) return new URL(PORTAL_URL, base).href;
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return new URL(PORTAL_URL, base).href;
+    if (!/^\/pureunall\//.test(u.pathname)) return new URL(PORTAL_URL, base).href;
+    return u.href;
+  } catch (err) {
+    return PORTAL_URL;
+  }
+}
+
 firebase.messaging().onBackgroundMessage(function (payload) {
   var d = (payload && payload.data) || {};
   self.registration.showNotification(d.title || '푸른노무법인', {
@@ -33,25 +48,31 @@ firebase.messaging().onBackgroundMessage(function (payload) {
     renotify: true,
     /* 🚗 출장 출발 알림은 누를 때까지 남긴다 — 운전 준비 중에 사라지면 못 찾는다(2026-10-09) */
     requireInteraction: /^pu-trip-/.test(d.tag || ''),
-    data: { url: d.url || PORTAL_URL }
+    data: { url: safePortalUrl(d.url || PORTAL_URL) }
   });
 });
 
 /* 알림을 누르면 이미 열려 있는 포털 탭으로 — 없으면 새로 연다 */
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
-  var url = (e.notification.data && e.notification.data.url) || PORTAL_URL;
+  var url = safePortalUrl((e.notification.data && e.notification.data.url) || PORTAL_URL);
+  var targetUrl = null;
+  try { targetUrl = new URL(url, self.location.origin); } catch (_) {}
   /* ⚠ «그 알림이 가리키는 화면»이 열려 있을 때만 그 탭으로 간다 (2026-10-04).
        예전에는 포털 탭이 있으면 무엇이든 거기로 갔다 — 메일 신규 문의 알림을 눌러도
-       포털 건의함이 떴다. 주소의 경로(? 앞)로 견준다. */
-  var path = String(url).split('?')[0];
+       포털 건의함이 떴다. 같은 출처 + 경로(pathname)로 정확히 견준다. */
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
       /* 🚗 출장 알림(trip=)은 «그 일정»을 열어야 한다 — 이미 열린 달력 탭으로 가면 출장 카드가 안 뜬다.
            달력 탭은 이 워커가 다스리지 않아(scope /push/) 주소를 바꿔 줄 수도 없다 → 새로 연다 */
-      if (String(url).indexOf('trip=') < 0) {
+      if (String(url).indexOf('trip=') < 0 && targetUrl) {
         for (var i = 0; i < list.length; i++) {
-          if (list[i].url.indexOf(path) >= 0 && 'focus' in list[i]) return list[i].focus();
+          try {
+            var cu = new URL(list[i].url);
+            if (cu.origin === targetUrl.origin && cu.pathname === targetUrl.pathname && 'focus' in list[i]) {
+              return list[i].focus();
+            }
+          } catch (_) {}
         }
       }
       return self.clients.openWindow(url);

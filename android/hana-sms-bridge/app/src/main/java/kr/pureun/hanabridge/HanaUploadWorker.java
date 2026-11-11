@@ -43,7 +43,7 @@ public final class HanaUploadWorker extends Worker {
             }
             return Result.success();
         } catch (UnauthorizedException unauthorized) {
-            SecureStore.clearConnection(context);
+            SecureStore.clearAll(context);
             SecureStore.setLastStatus(context, "연결이 해제되었습니다. ERP에서 다시 연결해 주세요.");
             return Result.failure();
         } catch (Exception retryable) {
@@ -94,5 +94,5 @@ public final class HanaUploadWorker extends Worker {
         return value.length() > limit ? value.substring(0, limit) : value;
     }
 
-    private static final class UnauthorizedException extends Exception {}
+    static final class UnauthorizedException extends Exception {}
 }

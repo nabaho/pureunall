@@ -6844,6 +6844,18 @@ async function hanaNoteSkip(linked, reason) {
   } catch (err) { /* 기록에 실패해도 문자 처리를 막지 않는다 */ }
 }
 
+/* ★ 연결된 휴대폰 주인(uid)이 «지금도 재직 중인 관리자·재무 담당자»인지 확인한다 (2026-11-11 폰 보안 점검).
+   연결 당시 권한이 있었더라도 퇴사·권한 회수 뒤에 기기 열쇠만으로 입금 내역 올리기·카톡 업무방 목록 받기·
+   방문 안내 문자(고객 번호) 가져가기가 계속 도는 것을 막는다. 403 을 돌려주면 폰 앱도 스스로 연결을 지운다. */
+async function hanaStaffRoleOk(db, uid) {
+  if (!uid) return false;
+  const role = (await db.ref(`uid_roles/${uid}`).once("value")).val() || {};
+  return role.status === "active" && (role.isAdmin === true || role.fin === true);
+}
+
+const HANA_PAIR_WINDOW_MS = 10 * 60 * 1000;
+const HANA_PAIR_MAX_FAILS = 5;
+
 async function requireHanaDevice(req, body) {
   const match = /^Device\s+(.+)$/i.exec(String(req.headers.authorization || ""));
   const uid = String(body.uid || "").trim();
@@ -6853,7 +6865,8 @@ async function requireHanaDevice(req, body) {
     error.status = 401;
     throw error;
   }
-  const ref = getDatabase().ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
+  const db = getDatabase();
+  const ref = db.ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
   const snap = await ref.once("value");
   const device = snap.val() || {};
   if (device.disabled === true || !device.tokenHash || !hanaSafeEqual(device.tokenHash, hanaHash(match[1]))) {
@@ -6862,7 +6875,7 @@ async function requireHanaDevice(req, body) {
        그래서 화면은 「연결 뒤 문자 0건」이라고만 했고, 대표는
        「앱이 지워졌나 · 알림이 꺼졌나 · 절전인가」를 셋 다 헤매야 했다.
        실은 «앱은 멀쩡히 살아 말을 걸고 있는데 연결만 끊긴» 것일 수 있다.
-     ⚠ «그 폰이 실제로 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
+     ⚠ «그 폰이 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
        아무 uid 나 적게 하면 모르는 사람이 남의 칸에 글을 쓸 수 있다. */
     if (device.tokenHash) {
       ref.child("lastReject").set({ at: Date.now(), reason: device.disabled === true ? "disabled" : "bad_token" })
@@ -6870,6 +6883,12 @@ async function requireHanaDevice(req, body) {
     }
     const error = new Error("휴대폰 연결이 만료되었거나 해제되었습니다.");
     error.status = 401;
+    throw error;
+  }
+  if (!(await hanaStaffRoleOk(db, uid))) {
+    ref.update({ disabled: true, lastReject: { at: Date.now(), reason: "role_revoked" } }).catch(() => {});
+    const error = new Error("재무·관리자 권한이 없거나 재직 중인 계정이 아닙니다.");
+    error.status = 403;
     throw error;
   }
   /* 잘 들어왔으면 「끊김」 자국을 지운다 — 지난 자국이 남아 계속 붉으면 못 믿는 표가 된다. */
@@ -6897,26 +6916,50 @@ exports.hanaMessageBridge = functions
         if (!/^\d{8}$/.test(code) || !deviceId || deviceId.length > 200) {
           hanaJson(res, 400, { ok: false, error: "8자리 연결번호와 휴대폰 정보가 필요합니다." }); return;
         }
+        /* 8자리 연결번호 무차별 대입 차단 — 기기·접속지별 실패 횟수를 세어 한도를 넘기면 잠근다 */
+        const callerIp = String((req.headers["x-forwarded-for"] || req.ip || "")).split(",")[0].trim();
+        const guardKey = hanaHash("pair:" + (callerIp || deviceId));
+        const guardRef = db.ref(`hanaSmsBridge/pairAttempts/${guardKey}`);
+        const guardVal = (await guardRef.once("value")).val() || {};
+        const nowAt = Date.now();
+        const recentFails = (nowAt - Number(guardVal.windowAt || 0) < HANA_PAIR_WINDOW_MS) ? Number(guardVal.count || 0) : 0;
+        if (recentFails >= HANA_PAIR_MAX_FAILS) {
+          hanaJson(res, 429, { ok: false, error: "연결 시도가 너무 많습니다. 10분 뒤 다시 시도해 주세요." }); return;
+        }
+        const notePairFail = () => guardRef.set({
+          count: recentFails + 1,
+          windowAt: recentFails > 0 ? Number(guardVal.windowAt || nowAt) : nowAt,
+          lastAt: nowAt,
+        }).catch(() => {});
+
         const pairRef = db.ref(`hanaSmsBridge/pairs/${hanaHash(code)}`);
         const pairSnap = await pairRef.once("value");
         const pair = pairSnap.val() || {};
-        if (!pair.uid || Number(pair.expiresAt || 0) < Date.now()) {
+        if (!pair.uid || Number(pair.expiresAt || 0) < nowAt) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "연결번호가 만료되었습니다. ERP에서 다시 발급해 주세요." }); return;
         }
         const currentPair = await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).once("value");
         if (String(currentPair.val() || "") !== hanaHash(code)) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "새 연결번호가 발급되었습니다. 가장 최근 번호를 입력해 주세요." }); return;
         }
+        if (!(await hanaStaffRoleOk(db, pair.uid))) {
+          await pairRef.remove().catch(() => {});
+          await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).remove().catch(() => {});
+          hanaJson(res, 403, { ok: false, error: "재무·관리자 권한이 있는 재직 계정만 휴대폰을 연결할 수 있습니다." }); return;
+        }
+        await guardRef.remove().catch(() => {});
         const token = crypto.randomBytes(32).toString("base64url");
         const deviceKey = hanaDeviceKey(deviceId);
         await db.ref(`hanaSmsBridge/devices/${pair.uid}`).set({
           [deviceKey]: {
             tokenHash: hanaHash(token),
             deviceName,
-            pairedAt: Date.now(),
-            lastSeenAt: Date.now(),
+            pairedAt: nowAt,
+            lastSeenAt: nowAt,
             disabled: false,
           },
         });

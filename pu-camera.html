@@ -57,11 +57,16 @@
   var params = new URLSearchParams(location.search || '');
   var mode = params.get('mode');
   if (mode !== 'card' && mode !== 'document') return;   // 사진 — 이 앱이 그대로 찍는다
+  var safeFrom = String(params.get('from') || '').replace(/[^\w-]/g, '').slice(0, 32);
   var request = { mode: mode, quick: params.get('quick') === '1',
-    from: params.get('from') || '', at: Date.now() };
+    from: safeFrom, at: Date.now() };
   /* 주소의 cam 값은 로그인·자동 업데이트 중 사라질 수 있어 여기에도 적어 둔다.
      사진첩은 실제 촬영 화면을 연 뒤에만 이 기록을 지운다. */
   try { sessionStorage.setItem('pu_open_camera', JSON.stringify(request)); } catch (_) { }
+  if (params.has('from')) {
+    if (safeFrom) params.set('from', safeFrom);
+    else params.delete('from');
+  }
   params.set('cam', '1');
   params.set('mode', mode);
   location.replace('pu-photos.html?' + params.toString());
@@ -139,7 +144,7 @@ button{font-family:inherit;cursor:pointer;color:inherit}
   border:1px solid #e2e8f0;display:block;background:#f1f5f9}
 #strip .row .t{position:absolute;left:0;right:0;bottom:0;font-size:9px;background:rgba(15,23,42,.62);
   color:#fff;text-align:center;border-radius:0 0 6px 6px;font-weight:700;pointer-events:none}
-#strip .row .x{position:absolute;top:-5px;right:-5px;width:19px;height:19px;border-radius:50%;
+#strip .row .x{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;
   border:none;background:#1e293b;color:#fff;font-size:11px;line-height:1;padding:0}
 #strip .row .one.up img{opacity:.45}
 #strip .row .one.bad img{border-color:#fecaca;box-shadow:0 0 0 2px #fef2f2}
@@ -537,7 +542,7 @@ function agoText(ts) {
 
 function renderStrip() {
   var box = $('strip');
-  if (!shots.length) { box.style.display = 'none'; $('cnt').textContent = ''; return; }
+  if (!shots.length) { box.style.display = 'none'; $('cnt').textContent = ''; $('stripRow').innerHTML = ''; return; }
   box.style.display = 'block';
   $('cnt').textContent = shots.length + '장';
   var 가는중 = 0, 실패 = 0;
@@ -577,18 +582,52 @@ try { storage = firebase.storage(); } catch (e) { storage = null; }
 /* ⚠ auth 를 넘긴다 — 저장 층이 「누구인지」를 알아야 제 자리에 담는다(사진첩과 같다) */
 PuPhotoStore.init({ db: db, storage: storage, auth: firebase.auth() });
 
+var lastAuthSeenAt = 0;
+
+/* 로그아웃·계정 전환 시 방금 찍은 미리보기 줄과 메모·이름을 즉시 비운다 — 앞사람 사진이 화면에 남지 않게 */
+function clearCameraSession() {
+  shots = [];
+  clearMemo();
+  if ($('who')) $('who').textContent = '';
+  renderStrip();
+}
+
+function syncCameraLogoutFromPortal() {
+  try {
+    if (typeof localStorage === 'undefined' || !localStorage) return false;
+    var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
+    var savedUid = String(localStorage.getItem('pu_auth_uid') || '');
+    var kickedByLogout = !!(logoutAt && lastAuthSeenAt && logoutAt > lastAuthSeenAt);
+    var kickedBySwitch = !!(me && savedUid && savedUid !== me.uid);
+    if (!kickedByLogout && !kickedBySwitch) return false;
+    me = null;
+    lastAuthSeenAt = 0;
+    stopCam();
+    clearCameraSession();
+    if ($('gate')) $('gate').style.display = 'flex';
+    try { firebase.auth().signOut(); } catch (e2) { }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 firebase.auth().onAuthStateChanged(function (u) {
   var signedIn = !!(u && u.email);
   $('gate').style.display = signedIn ? 'none' : 'flex';
-  if (!signedIn) { me = null; stopCam(); return; }
+  if (!signedIn) { me = null; lastAuthSeenAt = 0; stopCam(); clearCameraSession(); return; }
+  if (me && me.uid && me.uid !== u.uid) clearCameraSession();
   me = u;
+  lastAuthSeenAt = Date.now();
   /* 사진 자리가 사람별로 갈려 있어 **계정을 알기 전에는 담을 수 없다** —
      사진첩과 같은 차례다(로그인 확인 → 계정 등록 → 그다음). */
   PuPhotoStore.signIn(u.uid, u.email, u.displayName).then(function (who) {
+    if (!me || me.uid !== u.uid) return;
     /* 이름만 — 이름을 못 찾으면 이름 줄은 빼고 안내만(이메일·사번을 대신 적지 않는다, 2026-10-25) */
     $('who').textContent = [(who && who.name) || '', '푸른사진첩으로 자동 저장'].filter(Boolean).join(' · ');
     startCam();
   }).catch(function (e) {
+    if (!me || me.uid !== u.uid) return;
     console.warn('[로그인]', e);
     $('who').textContent = '푸른사진첩으로 자동 저장';
     startCam();
@@ -596,10 +635,16 @@ firebase.auth().onAuthStateChanged(function (u) {
 });
 
 /* 탭을 덮거나 앱을 내리면 카메라를 놓는다 — 안 놓으면 렌즈 불이 켜진 채 남고
-   배터리를 먹는다. 돌아오면 다시 연다. */
+   배터리를 먹는다. 돌아오면 다른 탭 로그아웃 여부를 먼저 보고 다시 연다. */
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) stopCam();
-  else if (me) startCam();
+  else if (!syncCameraLogoutFromPortal() && me) startCam();
+});
+window.addEventListener('pageshow', function () { syncCameraLogoutFromPortal(); });
+window.addEventListener('focus', function () { syncCameraLogoutFromPortal(); });
+window.addEventListener('storage', function (ev) {
+  if (!ev || (ev.key !== 'pu_auth_logout_at' && ev.key !== 'pu_auth_uid')) return;
+  syncCameraLogoutFromPortal();
 });
 window.addEventListener('pagehide', stopCam);
 </script>

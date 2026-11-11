@@ -145,6 +145,9 @@ public final class HanaSweepWorker extends Worker {
                         JSONObject response = HanaUploadWorker.post(body, token);
                         if (response.optBoolean("saved")) sent++;
                         else if (response.optBoolean("duplicate")) already++;
+                    } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+                        /* 권한이 회수됐으면 남은 수백 통을 더 두드리지 않고 곧바로 아래 안부(sweepPing)의 소거 갈래로 간다 */
+                        break;
                     } catch (Exception error) {
                         failed++;
                     }
@@ -187,6 +190,10 @@ public final class HanaSweepWorker extends Worker {
             /* 방문 안내 문자 일이 실려 오면 이 폰이 보낸다(2026-10-15) — 하나 거래 훑기와는 «따로»,
                여기서 터져도 위 훑기 결과에는 영향이 없다(handle 이 예외를 안 낸다). */
             VisitSmsSender.handle(context, pong, uid, token);
+        } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+            SecureStore.clearAll(context);
+            SecureStore.setLastStatus(context, "연결이 해제되었습니다. ERP에서 다시 연결해 주세요.");
+            return Result.failure();
         } catch (Exception error) {
             /* 알림 한 번 못 보낸 것으로 다시 시도하지는 않는다 — 15분 뒤에 또 온다. */
             return Result.success();

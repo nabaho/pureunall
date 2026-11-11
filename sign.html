@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1e40af">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
 <title>전자위임장 제출 — 푸른노무법인</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>✍️</text></svg>">
 <!-- 모바일 우선 근로자 제출 페이지: 카톡/문자 링크(sign.html?case=..&t=..)로 접속, 익명 인증 -->
@@ -18,7 +20,7 @@
   label{display:block;font-size:13px;font-weight:700;color:#1e293b;margin:14px 0 5px}
   label .req{color:#dc2626}
   input[type=text],input[type=tel],input[type=date]{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
-  input:focus{outline:none;border-color:#1e40af}
+  input:focus{outline:none;border-color:#1e40af;box-shadow:0 0 0 2px #bfdbfe}
   .hint{font-size:11.5px;color:#94a3b8;margin-top:3px}
   .err{color:#dc2626;font-size:12.5px;margin-top:4px;display:none}
   .btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;margin-top:22px}
@@ -66,21 +68,21 @@
       <input type="file" id="ocrFile" accept="image/*" capture="environment" style="display:none">
       <div id="ocrStatus" style="display:none;font-size:12.5px;color:#854d0e;margin-top:6px"></div>
     </div>
-    <label>성명 <span class="req">*</span></label>
+    <label for="fName">성명 <span class="req">*</span></label>
     <input type="text" id="fName" autocomplete="name">
-    <label>주민등록번호(외국인등록번호) <span class="req">*</span></label>
+    <label for="fIdNo">주민등록번호(외국인등록번호) <span class="req">*</span></label>
     <input type="tel" id="fIdNo" placeholder="000000-0000000" maxlength="14">
     <div class="err" id="errIdNo"></div>
     <div class="hint">위임장·진정서 작성에만 사용되며 암호화되어 전송됩니다</div>
-    <label>휴대전화 <span class="req">*</span></label>
+    <label for="fPhone">휴대전화 <span class="req">*</span></label>
     <input type="tel" id="fPhone" placeholder="010-0000-0000" autocomplete="tel">
-    <label>주소 <span class="req">*</span></label>
+    <label for="fAddr">주소 <span class="req">*</span></label>
     <input type="text" id="fAddr" autocomplete="street-address">
-    <label>입금 은행/계좌번호 <span class="req">*</span></label>
+    <label for="fBank">입금 은행/계좌번호 <span class="req">*</span></label>
     <input type="text" id="fBank" placeholder="예: 우리 1002-000-000000">
-    <label>입사일</label>
+    <label for="fJoin">입사일</label>
     <input type="date" id="fJoin">
-    <label>퇴사일 (재직 중이면 비워두세요)</label>
+    <label for="fLeave">퇴사일 (재직 중이면 비워두세요)</label>
     <input type="date" id="fLeave">
     <div class="consent">
       <b>개인정보 수집·이용 동의</b>
@@ -321,7 +323,12 @@ $('btnSubmit').onclick = async function () {
       reviewState: 'pending'
     });
     try { localStorage.setItem('esign_done_' + caseId, '1'); } catch (e) {}
-    window._myCopy = data;
+    myCopy = data;
+    /* 제출 직후 입력칸과 서명판의 평문 주민번호·계좌번호를 비워 화면·자동완성 잔류를 줄인다 */
+    ['fName', 'fIdNo', 'fPhone', 'fAddr', 'fBank', 'fJoin', 'fLeave'].forEach(function (id) {
+      var el = $(id); if (el) el.value = '';
+    });
+    try { if (sigPad && sigPad.clear) sigPad.clear(); } catch (e) {}
     showStep(4);
   } catch (e) {
     alert('전송에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.\n(' + (e && e.message || e) + ')');
@@ -420,10 +427,12 @@ $('ocrFile').addEventListener('change', async function () {
   }
 });
 
-// ── 본인 제출본 PDF 저장 (완료 화면 — 기기에만 저장, 전송 없음) ──
+// ── 본인 제출본 PDF 저장 (완료 화면 — 전역 window 에 노출하지 않고 닫을 때 메모리에서 비움) ──
+var myCopy = null;
+window.addEventListener('pagehide', function () { myCopy = null; });
 $('btnMyCopy').onclick = function () {
-  if (!window._myCopy) return;
-  EsignDocs.htmlPagesToPdf([EsignDocs.buildDelegationHtml(window._myCopy, caseMeta)], '전자위임장_' + window._myCopy.name + '.pdf')
+  if (!myCopy) return;
+  EsignDocs.htmlPagesToPdf([EsignDocs.buildDelegationHtml(myCopy, caseMeta)], '전자위임장_' + myCopy.name + '.pdf')
     .catch(function () { alert('PDF 생성에 실패했습니다.'); });
 };
 </script>

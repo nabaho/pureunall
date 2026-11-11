@@ -68,8 +68,9 @@ public final class KakaoUploadWorker extends Worker {
     public Result doWork() {
         Context context = getApplicationContext();
         String name = getInputData().getString(KEY_FILE);
-        File file = name == null ? null : new File(new File(context.getCacheDir(), DIR), name);
-        if (file == null || !file.exists()) return Result.failure();
+        if (name == null || !name.matches("^[A-Za-z0-9._-]{1,80}\\.json$")) return Result.failure();
+        File file = new File(new File(context.getCacheDir(), DIR), name);
+        if (!file.exists()) return Result.failure();
         String uid = SecureStore.uid(context);
         String token = SecureStore.token(context);
         if (uid.isEmpty() || token.isEmpty()) {
@@ -93,8 +94,22 @@ public final class KakaoUploadWorker extends Worker {
             KakaoRooms.absorb(context, response);
             file.delete();
             return Result.success();
+        } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+            file.delete();
+            SecureStore.clearAll(context);
+            SecureStore.setLastStatus(context, "연결이 해제되었습니다. ERP에서 다시 연결해 주세요.");
+            return Result.failure();
         } catch (Exception retryable) {
             return Result.retry();
+        }
+    }
+
+    static void clearPending(Context context) {
+        File dir = new File(context.getCacheDir(), DIR);
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            try { f.delete(); } catch (Exception ignored) {}
         }
     }
 }

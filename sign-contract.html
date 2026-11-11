@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1e40af">
 <meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
 <title>계약서 서명 — 푸른노무법인</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>✍️</text></svg>">
 <!-- ✍ 계약서 서명 요청 — 받는 사람 폰 화면 (대표 「1단계부터 진행해라」 2026-10-09)
@@ -21,7 +22,7 @@
   .step{display:none}.step.on{display:block}
   label{display:block;font-size:13px;font-weight:700;margin:14px 0 5px}
   input[type=text],input[type=tel]{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px}
-  input:focus{outline:none;border-color:#1e40af}
+  input:focus{outline:none;border-color:#1e40af;box-shadow:0 0 0 2px #bfdbfe}
   .btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;background:#1e40af;color:#fff;font-size:16px;font-weight:700;margin-top:18px;cursor:pointer}
   .btn:disabled{background:#94a3b8}.btn.sub{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1}
   .pages img{width:100%;display:block;border:1px solid #e2e8f0;margin-bottom:10px;background:#fff}
@@ -106,9 +107,23 @@ function show(n) {
   window.scrollTo(0, 0);
 }
 function fatal(msg) { $('fatalMsg').textContent = msg; $('docSub').textContent = '푸른노무법인'; show('err'); }
+function safePageSrc(u) {
+  var s = String(u || '').trim();
+  if (/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(s)) return s;
+  try {
+    var parsed = new URL(s, location.origin);
+    if (parsed.origin === location.origin && (parsed.protocol === 'https:' || parsed.protocol === 'http:')) return parsed.href;
+    if (parsed.protocol === 'https:' && parsed.hostname === 'firebasestorage.googleapis.com') return parsed.href;
+  } catch (e) {}
+  return '';
+}
 function drawPages(box) {
   box.innerHTML = '';
-  (O.pages || []).forEach(function (u, i) { var im = document.createElement('img'); im.src = u; im.alt = (i + 1) + '쪽'; im.loading = 'lazy'; box.appendChild(im); });
+  (O.pages || []).forEach(function (u, i) {
+    var safe = safePageSrc(u);
+    if (!safe) return;
+    var im = document.createElement('img'); im.src = safe; im.alt = (i + 1) + '쪽'; im.loading = 'lazy'; box.appendChild(im);
+  });
 }
 
 if (!/^[0-9a-f]{32}$/.test(t)) fatal('잘못된 링크입니다. 안내받은 링크로 다시 열어 주세요.');
