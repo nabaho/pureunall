@@ -401,3 +401,21 @@ test('개인입금 사업 자동 연결 — 이알피의 개인입금 종류를 
   ctx2.WORK.rules['T-NEW'].leadSid = 'L';
   assert.deepEqual(Object.keys(ctx2.f()).sort(), ['T-NEW|S1', 'T-OLD2|S1'], '주관을 고른(건드린) 자동 칸은 보통 칸처럼');
 });
+
+test('요율표 폭 — 사업 칸이 늘면 창 폭까지 자라고(잘리지 않는다), 자동 칸 설명 문구는 늘어놓지 않는다 (대표 2026-11-12)', () => {
+  /* 설정 칸 전체를 고정 폭으로 막지 않는다 — 막으면 개인입금 사업 칸이 늘 때 표가 잘려 옆으로 밀어야 한다 */
+  assert.doesNotMatch(NOC, /#sub-rules\s*\{[^}]*max-width:\s*\d+px/, '설정 칸 전체에 고정 폭 한도가 있다');
+  /* 요율표 상자는 «내용만큼 자라되 창 폭이 한도» — 칸이 적으면 예전 폭 */
+  const box = NOC.match(/#ruleBox\s*\{([^}]*)\}/);
+  assert.ok(box, '#ruleBox 규칙이 없다');
+  assert.match(box[1], /width:\s*max-content/);
+  assert.match(box[1], /max-width:\s*100%/, '창 폭이 한도');
+  /* 다른 카드는 읽기 좋은 폭에 둔다(대표 2026-10-31 「불필요하게 화면을 넓게」) */
+  assert.match(NOC, /#ruleDetBox,\s*#sub-rules>\.card\s*\{[^}]*max-width:\s*\d+px/);
+  /* 사업 이름은 자르지 않고 접는다 — 칸 머리가 «…» 로 잘리지 않는다 */
+  assert.match(NOC, /\.t\.mx th\.mxc\s*\{[^}]*white-space:\s*normal/);
+  /* 자동 칸의 설명 한 줄은 없앴다 — 칸 머리 «설정 필요» 표시만 */
+  const view = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-settle-view.js'), 'utf8');
+  assert.doesNotMatch(view, /mx_autoNote/);
+  assert.match(view, /설정 필요/);
+});
