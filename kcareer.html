@@ -8443,7 +8443,13 @@ async function hrCertLoad(){
   if(typeof fbDb==='undefined' || !fbDb){ done({ err:'클라우드 로그인 후 사용하세요 — 푸른인사관리 발급 이력은 로그인해야 읽을 수 있습니다' }); return; }
   /* ⚠ 늦게 도착한 «옛 읽기»가 새 읽기의 결과를 되돌리지 못하게 한다 — await 를 지날 때마다, 그리고 보관함에 쓰기 «직전»에 이 읽기가 아직 최신인지(tok)
        와 신원이 그대로인지 본다. 창을 닫았거나 다시 읽었으면 «아무것도 쓰지 않고» 버린다(취소 표시를 옛 응답이 지워 버리는 경합 — 2026-11-12 보안 검토). */
-  var 옛것=function(sid){ return tok!==_hcTok || (sid!==undefined && String(_me.sid||'').trim()!==sid); };
+  var uid0=hrCertUid();   /* 읽기 «시작할 때»의 로그인 계정 — await 를 지난 뒤 같은 계정·같은 직원·아직 대표 화면인지 본다(자동 보안 검토 3차) */
+  var 바뀜=function(sid){ return (sid!==undefined && String(_me.sid||'').trim()!==sid) || hrCertUid()!==uid0 || (typeof kcOwnerState==='function' && kcOwnerState()!=='owner'); };
+  var 옛것=function(sid){
+    if(tok!==_hcTok) return true;                  /* 닫았거나 더 새 읽기가 있다 — 그쪽이 화면을 맡는다 */
+    if(바뀜(sid)){ hrCertClose(); toast('로그인한 계정이 바뀌어 읽기를 멈췄습니다 — 다시 열어 주세요'); return true; }   /* 신원이 바뀌었다 — 읽은 것은 버리고 «읽는 중…»에 갇히지 않게 닫는다 */
+    return false;
+  };
   try{
     if(!_me.resolved) await resolveMe();
     if(옛것()) return;
@@ -8472,7 +8478,7 @@ async function hrCertLoad(){
       }
     }
     var sel={}; p.items.forEach(function(it){ if(it.pick) sel[it.certNo]=1; });
-    done({ items:p.items, sel:sel, stat:p.stat, sid:sid, uid:hrCertUid() });   /* 이 목록은 «이 신원»으로 읽은 것이다 — 넣을 때 같은 신원인지 다시 본다 */
+    done({ items:p.items, sel:sel, stat:p.stat, sid:sid, uid:uid0 });   /* 이 목록은 «이 신원»으로 읽은 것이다 — 넣을 때 같은 신원인지 다시 본다 */
   }catch(e){ console.warn('hrCertLoad', e); if(옛것()) return; done({ err:'발급 이력을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,80) }); }
 }
 function hrCertSummaryText(st){

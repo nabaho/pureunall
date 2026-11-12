@@ -359,7 +359,24 @@ test('경합 — 읽는 사이 로그인한 직원이 바뀌면(다른 sid) 그 
   const p = w.ctx.hrCertOpen(); await tick();
   vm.runInContext("_me.sid='S-OTHER-99'", w.ctx);
   w.pending[0].resolve(ROWS()); await p;
-  assert.equal(w.store.certdoc[0].hrCanceled, undefined); assert.equal(w.toasts.length, 0);
+  assert.equal(w.store.certdoc[0].hrCanceled, undefined);
+  assert.ok(w.toasts.length >= 1 && w.toasts.every((m) => /바뀌어/.test(m)), '«취소 표시» 알림이 아니라 «계정이 바뀌어 멈췄다» 알림만');
+  assert.equal(w.hc().busy, false, '«읽는 중…»에 갇히지 않는다');
+});
+test('경합(자동 보안 검토 3차) — 읽는 사이 로그인 계정(uid)이 바뀌거나 대표 화면이 아니게 되면: 취소 표시도 저장하지 않고, 목록을 새 신원에 묶지도 않고, «읽는 중…»에 갇히지도 않는다', async () => {
+  const have = [{ id: 'CD0001', docSrc: 'hr', hrCertNo: 'PU-2026-0005', hrCertLogId: 'cl-aaa4', kind: '재직증명서' }];   /* 응답대로라면 «취소됨» 고침 대상 */
+  const 바꾸기 = { 'uid 가 바뀜': (w) => { w.state.uid = 'U-OTHER'; }, '대표 화면이 아니게': (w) => { w.state.owner = 'locked'; } };
+  for (const [이름, 바꿈] of Object.entries(바꾸기)) {
+    const w = world({ certdoc: have, manual: true });
+    const p = w.ctx.hrCertOpen(); await tick();
+    바꿈(w);
+    w.pending[0].resolve(ROWS()); await p;
+    assert.equal(w.store.certdoc[0].hrCanceled, undefined, 이름 + ': 보관함을 고치지 않는다');
+    assert.equal(w.hc().items.length, 0, 이름 + ': 목록을 만들지 않는다');
+    assert.equal(w.hc().uid === undefined || w.hc().uid === '', true, 이름 + ': 새 신원에 묶지 않는다');
+    assert.equal(w.hc().busy, false, 이름 + ': «읽는 중…»에 갇히지 않는다');
+    assert.ok(w.toasts.some((m) => /바뀌어/.test(m)), 이름 + ': 이유를 알린다');
+  }
 });
 test('신원 묶기(자동 보안 검토 2차) — 목록을 읽은 뒤 직원 번호·로그인 계정·대표 여부가 바뀌면 넣지 않고 목록을 비운다 · 기록의 sid 는 «읽을 때 묶은 sid»', async () => {
   const 바꾸기 = {
