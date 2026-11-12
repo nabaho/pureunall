@@ -419,3 +419,21 @@ test('요율표 폭 — 사업 칸이 늘면 창 폭까지 자라고(잘리지 �
   assert.doesNotMatch(view, /mx_autoNote/);
   assert.match(view, /설정 필요/);
 });
+
+test('월별 한 화면 — 카톡 보내기는 사람 줄·카톡 방을 누를 때만 문구를 펼치고(하나만), 월 머리 줄은 정산표가 있으면 비운다 (대표 2026-11-12)', () => {
+  /* 누르면 그 줄만 펼치고 다시 누르면 접는다 — 펼친 줄은 다시 그릴 때도 이어진다(open) */
+  assert.match(NOC, /closest\('\[data-msg-open\]'\)[\s\S]{0,120}MSG_OPEN=\(MSG_OPEN===mo\)\?'':mo; drawSend\(/);
+  assert.match(fnBody('function drawSend('), /open:MSG_OPEN/);
+  /* 다른 달로 가면 접는다 */
+  assert.match(NOC, /closest\('\[data-month\]'\)\)\)\{[^}]*MSG_OPEN=''/);
+  /* 사람별 금액은 카톡 문구와 같은 사람·같은 순서일 때만 얹는다 */
+  const mi = fnBody('function monthItems(');
+  assert.match(mi, /C\.personTotals\(r, NAMES\)/);
+  assert.match(mi, /tots\[i\]\.sid===m\.sid/);
+  assert.doesNotMatch(mi, /gate\.save|patchRecord|save\(/, '화면 정리가 서버에 쓴다');
+  /* 정산표가 있으면 «2026년 10월 정산표 2개 · …» 머리 줄을 그리지 않는다 */
+  assert.match(fnBody('function drawMonth('), /\$\('monthHead'\)\.innerHTML=runs\.length \? ''/);
+  /* PC 카톡 연결은 한 줄짜리 딱지(긴 경고 줄은 설정 › 카톡 연결에서만) */
+  assert.match(fnBody('function drawSend('), /V\.agentPill\(/);
+  assert.match(fnBody('function drawRooms('), /V\.agentLine\(/);
+});

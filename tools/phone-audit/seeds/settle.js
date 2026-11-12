@@ -74,7 +74,8 @@ module.exports = {
         ...['통합점검보호지원단', '점검기술지원컨설팅충남', '점검기초컨설팅푸른법인', '점검인사노무컨설팅북부상의', '점검사회적기업컨설팅', '점검노동전환컨설팅'].map((n, i) => ({ code: 'cons-pj' + i, short: 'P' + i, name: n, agency: '가짜기관' + i, personalDeposit: true }))] },
       consultings: { v: consultings.concat([{ id: 'CS-P1', typeCode: 'cons-clinic', personalDepositMode: 'on', companyName: '(주)점검개인입금', companyId: 'CO-P1', no: '클릭-2026-001', startDate: '2026-05-01', endDate: '2026-12-01' }]) },
     },
-    settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts },
+    /* rooms — 한 사람만 카톡 방이 있다(사람 줄의 «💬 방» 칩과 «방 없음» 등록 칸을 둘 다 본다) */
+    settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts, rooms: { P002: { sid: 'P002', room: '점검노무 노무사(점검)' } } },
   },
   views: [
     { name: 'run', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step2 [data-run]'); } },
@@ -83,6 +84,7 @@ module.exports = {
     { name: 'inbox', run: async (p) => { await p.click('#inboxBtn'); } },
     { name: 'link', run: async (p) => { await p.click('#noticesBox [data-notice]'); } },
     { name: 'year', run: async (p) => { await p.click('#tabs button[data-tab=year]'); } },
+    { name: 'msg', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step3 .kchip'); } },
     { name: 'rules', run: async (p) => { await p.click('#tabs button[data-tab=setup]'); } },
     { name: 'kakao', run: async (p) => { await p.click('#subtabs button[data-sub=kakao]'); } },
   ],

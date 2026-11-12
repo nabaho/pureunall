@@ -672,6 +672,25 @@
       .map(function (code) { return { code: code, why: typeOn[code] ? 'type' : 'consulting', count: count[code] || 0 }; });
   }
 
+  /* 담당마다 한 줄 요약 — 카톡 보내기 목록(③)에서 «사람별 금액»을 먼저 보이게 한다(대표 지시 2026-11-12).
+     buildMessages 와 «같은 사람 · 같은 순서»다(같은 걸러내기 — 검사가 맞춘다). share = 몫 · used = 받은 금액 · settle = 차액(+ 추가 지급 · − 반환) · n = 사업장 수.
+     읽기만 한다 — 정산표를 바꾸지 않는다. */
+  function personTotals(run, names) {
+    names = names || {};
+    var order = [], by = {};
+    ((run && run.sites) || []).forEach(function (s) {
+      var lead = s.members.filter(function (x) { return x.role === 'lead'; })[0];
+      s.members.forEach(function (m) {
+        if (m.role !== 'staff' || !m.sid || m.settle == null) return;
+        if (!by[m.sid]) { by[m.sid] = { sid: m.sid, name: names[m.sid] || m.name || '', share: 0, used: 0, settle: 0, adjust: 0, n: 0, leadName: '' }; order.push(m.sid); }
+        var p = by[m.sid];
+        p.share += Number(m.share) || 0; p.used += Number(m.used) || 0; p.settle += Number(m.settle) || 0; p.adjust += Number(m.adjust) || 0; p.n++;
+        if (!p.leadName && lead) p.leadName = names[lead.sid] || lead.name || '';
+      });
+    });
+    return order.map(function (sid) { return by[sid]; });
+  }
+
   return {
     DEFAULT_HEAD: DEFAULT_HEAD, DEFAULT_FOOT: DEFAULT_FOOT,
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
@@ -682,6 +701,6 @@
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
     manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
     TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate,
-    monthState: monthState, reviewMonth: reviewMonth, personalTypes: personalTypes
+    monthState: monthState, reviewMonth: reviewMonth, personalTypes: personalTypes, personTotals: personTotals
   };
 });
