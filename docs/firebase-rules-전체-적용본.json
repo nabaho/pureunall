@@ -1607,13 +1607,15 @@
           ".validate": "newData.isString() && newData.val().length <= 20000"
         },
         "images": {
+          ".validate": "newData.hasChildren()",
           "$i": {
-            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+            ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
           }
         },
         "replyImages": {
+          ".validate": "newData.hasChildren()",
           "$i": {
-            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+            ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
           }
         },
         "relatedId": {
@@ -1662,9 +1664,9 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         ".write": "auth != null && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
-        ".validate": "!newData.exists() || $uid.matches(/^[A-Za-z0-9_-]{1,128}$/)",
+        ".validate": "!newData.exists() || ($uid.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.hasChildren())",
         "$id": {
-          ".validate": "!newData.exists() || $id.matches(/^[A-Za-z0-9_-]{1,64}$/)",
+          ".validate": "!newData.exists() || ($id.matches(/^[A-Za-z0-9_-]{1,64}$/) && newData.hasChildren())",
           "title": {
             ".validate": "newData.isString() && newData.val().length <= 200"
           },
@@ -1684,8 +1686,9 @@
             ".validate": "newData.isString() && newData.val().length <= 20000"
           },
           "replyImages": {
+            ".validate": "newData.hasChildren()",
             "$i": {
-              ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+              ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
             }
           },
           "resolvedOk": {

@@ -1133,7 +1133,7 @@ const sugWrite = `(${LOGIN}) && (${ADMIN} || (!data.exists() && newData.child('a
    ★ 지킨 것
      · 번호는 파이어베이스 push() 번호 모양(영문·숫자·-·_)만. 지금 운영의 번호 37개·진행함 uid 5개는 전부 이 모양이다.
      · «알려진 칸만» — 모르는 칸은 $other 로 거절. 알려진 칸은 화면(enter.html)이 실제로 쓰는 것만 적었다:
-         건의 원문 12칸 · 메타 7칸 · 진행함 13칸. 새 칸이 필요하면 여기와 화면을 «같이» 고친다.
+         건의 원문 14칸 · 메타 7칸 · 진행함 13칸. 새 칸이 필요하면 여기와 화면을 «같이» 고친다.
      · 그림은 줄여 담은 JPEG(가로 1400px·품질 0.7)라 글자 수가 최대 약 33만 자였다 → 한 장 100만 자, 최대 3장.
    ⚠ 서버(Cloud Functions · 대표 PC 의 감시 도구 = firebase CLI)는 관리자 권한이라 규칙을 «안 탄다». AI 접수 도우미 초안(assist)·감시 알림 칸 처럼
      «서버가 쓰는 칸» 은 일부러 여기 적지 않았다 — 브라우저에서 직원이 그 칸에 쓰지 못하게(예전엔 새 건의에 함께 담을 수 있었다).
@@ -1142,7 +1142,14 @@ const sugWrite = `(${LOGIN}) && (${ADMIN} || (!data.exists() && newData.child('a
 const SG_KEY_RE = '/^[A-Za-z0-9_-]{1,64}$/';
 const SG_CAT_RE = '/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/';
 const SG_STR = (n) => `newData.isString() && newData.val().length <= ${n}`;
-const SG_IMGS = { $i: { '.validate': "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000" } };
+/* ★ «객체가 아닌 값» 을 막는다 (외부 검토 2026-11-12 «중간» — 실제 엔진에서 재현됨):
+   RTDB 는 노드에 글자·숫자 같은 «통짜 값» 을 쓰면 자식 규칙($i·$id·칸별·$other)을 «평가하지 않는다». 그래서 images 에
+   200만 자짜리 «문자열» 을 직접 쓰면 통과했고, 진행함 $uid·$id 자리에 통짜 글자를 써도 통과했다 — 컨테이너 자리는
+   newData.hasChildren() 로 «객체일 때만» 받는다.
+   그림은 0번부터 «빈틈 없이» 이어져야 한다(1번은 0번이, 2번은 1번이 있을 때만) — 빈틈이 있으면 배열이 아닌 객체로 돌아와
+   대표 화면의 images.map 이 죽는다. */
+const SG_IMG_IDX = "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1')))";
+const SG_IMGS = { '.validate': 'newData.hasChildren()', $i: { '.validate': `${SG_IMG_IDX} && newData.isString() && newData.val().length <= 1000000` } };
 const SG_REL = { '.validate': `newData.isString() && newData.val().matches(${SG_KEY_RE})` };
 const SG_SRC = { '.validate': "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" };
 const SG_STATUS = { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" };
@@ -1188,9 +1195,9 @@ rules.suggestions_resolved_private = {
   $uid: {
     '.read':  `auth != null && (auth.uid === $uid || ${ADMIN})`,
     '.write': `auth != null && (auth.uid === $uid || ${ADMIN})`,
-    '.validate': `!newData.exists() || $uid.matches(/^[A-Za-z0-9_-]{1,128}$/)`,
+    '.validate': `!newData.exists() || ($uid.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.hasChildren())`,
     $id: {
-      '.validate': `!newData.exists() || $id.matches(${SG_KEY_RE})`,
+      '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren())`,
       title: { '.validate': SG_STR(200) },
       cat: { '.validate': SG_STR(20) },
       status: SG_STATUS,

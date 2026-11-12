@@ -165,6 +165,23 @@ await pair('진행함 reply 2만 자 초과', 'PUT', OWN, STAFF, own({ reply: 'x
 await pair('진행함 status 모양 밖', 'PUT', OWN, STAFF, own({ status: 'ing' }), (r) => Object.assign(r, { status: 'whatever' }));
 await pair('진행함 제목 200자 초과', 'PUT', OWN, STAFF, own({ title: 'x'.repeat(200) }), (r) => Object.assign(r, { title: 'x'.repeat(201) }));
 
+console.log('\n── ⑥-2 «객체가 아닌 값» · 그림 번호의 빈틈 (외부 검토 2026-11-12 — 통짜 값은 자식 규칙을 «평가하지 않는다») ──');
+await seed();
+const BIG = 'X'.repeat(2000000);
+await pair('images 에 통짜 글자(200만 자)', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { images: [IMG] }), (r) => Object.assign(r, { images: BIG }));
+await pair('replyImages 에 통짜 글자(200만 자)', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { replyImages: [IMG] }), (r) => Object.assign(r, { replyImages: BIG }));
+await pair('images 에 숫자 한 개', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { images: [IMG] }), (r) => Object.assign(r, { images: 12345 }));
+await pair('그림이 0번 없이 2번만(빈틈 → 화면 images.map 이 죽는다)', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { images: [IMG] }), (r) => Object.assign(r, { images: { 2: IMG } }));
+await pair('그림이 0번 없이 1번만', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { images: [IMG, IMG] }), (r) => Object.assign(r, { images: { 1: IMG } }));
+await pair('그림이 0·2번(1번 빠짐)', 'PUT', S('suggestions_private'), STAFF, rec('U_STAFF', { images: [IMG, IMG, IMG] }), (r) => Object.assign(r, { images: { 0: IMG, 2: IMG } }));
+await expect('★ 내 진행함 «칸 전체» 에 통짜 글자 200만 자', 'PUT', 'suggestions_resolved_private/U_STAFF', STAFF, BIG, '거부');
+await expect('★ 내 진행함 «한 건» 자리에 통짜 글자 200만 자', 'PUT', 'suggestions_resolved_private/U_STAFF/-Nraw00000001', STAFF, BIG, '거부');
+await expect('내 진행함 한 건 자리에 참/거짓 한 개', 'PUT', 'suggestions_resolved_private/U_STAFF/-Nraw00000002', STAFF, true, '거부');
+await expect('관리자도 진행함 한 건 자리에 통짜 글자는 못 쓴다', 'PUT', 'suggestions_resolved_private/U_STAFF/-Nraw00000003', ADMIN, BIG, '거부');
+await expect('건의 «한 건» 자리에 통짜 글자 200만 자', 'PUT', 'suggestions_private/-Nraw00000004', STAFF, BIG, '거부');
+await expect('메타 «한 건» 자리에 통짜 글자 200만 자', 'PUT', 'suggestions_meta_private/-Nraw00000005', STAFF, BIG, '거부');
+await expect('진행함 «칸 전체» 에 정상 객체(짝)', 'PUT', 'suggestions_resolved_private/U_STAFF', STAFF, { '-Nobj00000001': own() }, '허용');
+
 console.log('\n── ⑦ 예전부터 막혀 있던 것은 그대로 막혀 있다(회귀) ──');
 await seed();
 await call('PUT', 'suggestions_private/-Nexist000001', OWNER, rec('U_STAFF'));

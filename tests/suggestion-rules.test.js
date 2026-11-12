@@ -33,7 +33,9 @@ const generator = fs.readFileSync(path.join(root, 'scripts', 'make-firebase-rule
    · 규칙이 없는 칸은 통과(실제 엔진도 .validate 가 없으면 막지 않는다)
    · 부분 갱신(patch)은 «쓴 칸» 만 자식 규칙으로 보고, 그 위 자리(.validate)는 «합친 값» 으로 본다 */
 class Snap {
-  constructor(v) { this.v = v; }
+  constructor(v, parent) { this.v = v; this.p = parent; }
+  parent() { return this.p || new Snap(undefined); }
+  hasChild(k) { return this.child(k).exists(); }
   child(p) { let c = this.v; for (const k of String(p).split('/')) c = (c && typeof c === 'object') ? c[k] : undefined; return new Snap(c); }
   val() { return this.v === undefined ? null : this.v; }
   exists() { return this.v !== undefined && this.v !== null; }
@@ -44,21 +46,21 @@ class Snap {
 }
 const AUTH = { uid: 'U_STAFF' };
 const ROOT = new Snap({ uid_roles: { U_ADMIN: { isAdmin: true, status: 'active' }, U_STAFF: { isAdmin: false, status: 'active' } } });
-function evalExpr(expr, vars, newVal) {
+function evalExpr(expr, vars, newVal, parentVal) {
   /* 실제 엔진의 문자열에는 .matches() 가 있다 — 평가하는 동안만 붙인다 */
   const had = Object.prototype.hasOwnProperty.call(String.prototype, 'matches');
   if (!had) Object.defineProperty(String.prototype, 'matches', { value: function (re) { return re.test(String(this)); }, configurable: true });
   try {
     const names = Object.keys(vars).concat(['auth', 'root', 'newData', 'now']);
-    const vals = Object.keys(vars).map((k) => vars[k]).concat([AUTH, ROOT, new Snap(newVal), Date.now()]);
+    const vals = Object.keys(vars).map((k) => vars[k]).concat([AUTH, ROOT, new Snap(newVal, new Snap(parentVal)), Date.now()]);
     return Boolean(Function(...names, `"use strict"; return (${expr});`)(...vals));
   } finally { if (!had) delete String.prototype.matches; }
 }
 /* 변수 이름에 $ 가 들어 있어 Function 인자 이름으로 쓸 수 있다($id·$uid·$i·$other) */
-function validateValue(node, key, wildcardVars, value, errors, where) {
+function validateValue(node, key, wildcardVars, value, errors, where, parentVal) {
   if (value === null || value === undefined) return;
   if (node && typeof node['.validate'] === 'string') {
-    if (!evalExpr(node['.validate'], wildcardVars, value)) errors.push(where + ' (.validate)');
+    if (!evalExpr(node['.validate'], wildcardVars, value, parentVal)) errors.push(where + ' (.validate)');
   } else if (node && node['.validate'] === false) {
     errors.push(where + ' (.validate:false)');
   }
@@ -66,7 +68,7 @@ function validateValue(node, key, wildcardVars, value, errors, where) {
     Object.keys(value).forEach((k) => {
       const child = findChild(node, k);
       if (!child) return;
-      validateValue(child.rule, k, Object.assign({}, wildcardVars, child.wild ? { [child.wild]: k } : {}), value[k], errors, where + '/' + k);
+      validateValue(child.rule, k, Object.assign({}, wildcardVars, child.wild ? { [child.wild]: k } : {}), value[k], errors, where + '/' + k, value);
     });
   }
 }
@@ -103,13 +105,13 @@ function writeErrors(segs, value, opts) {
     Object.keys(value).forEach((k) => {
       const c = findChild(node, k);
       if (!c) return;
-      validateValue(c.rule, k, Object.assign({}, vars, c.wild ? { [c.wild]: k } : {}), value[k], errors, segs.join('/') + '/' + k);
+      validateValue(c.rule, k, Object.assign({}, vars, c.wild ? { [c.wild]: k } : {}), value[k], errors, segs.join('/') + '/' + k, value);
     });
   } else if (value && typeof value === 'object') {
     Object.keys(value).forEach((k) => {
       const c = findChild(node, k);
       if (!c) return;
-      validateValue(c.rule, k, Object.assign({}, vars, c.wild ? { [c.wild]: k } : {}), value[k], errors, segs.join('/') + '/' + k);
+      validateValue(c.rule, k, Object.assign({}, vars, c.wild ? { [c.wild]: k } : {}), value[k], errors, segs.join('/') + '/' + k, value);
     });
   }
   return errors;
@@ -210,7 +212,7 @@ test('③ 그림 한도는 «줄여 담은 그림이 실제로 들어가는 크�
   /* 화면은 가로 1400px·JPEG 품질 0.7 로 줄여 담는다(sgCompress). 운영 실측 한 장 최대 약 33만 자 — 한도는 그 몇 배여야 한다. */
   assert.match(enter, /maxW = 1400/, '그림 줄이기 기준(가로 1400px)이 바뀌었다 — 규칙의 그림 한도를 다시 본다');
   assert.match(enter, /toDataURL\('image\/jpeg', 0\.7\)/, '그림 품질이 바뀌었다 — 규칙의 그림 한도를 다시 본다');
-  const lim = Number((generator.match(/const SG_IMGS = [^\n]*?newData\.val\(\)\.length <= (\d+)"/) || [])[1]);
+  const lim = Number((generator.match(/const SG_IMGS = [^\n]*?newData\.val\(\)\.length <= (\d+)[`"]/) || [])[1]);
   assert.ok(lim >= 600000, '그림 한 장 한도가 너무 작다(정상 그림이 막힌다): ' + lim);
   assert.ok(lim <= 3000000, '그림 한 장 한도가 너무 크다(큰 글을 숨길 수 있다): ' + lim);
 });
@@ -234,4 +236,33 @@ test('에뮬레이터 검사가 곁에 있다 — 규칙의 «뜻» 은 진짜 �
   assert.match(emu, /pureun-erp-default-rtdb/, '네임스페이스가 틀리면 규칙 없는 DB 에 가짜 성공이 난다');
   assert.match(emu, /나쁜 것/, '«막히는 경우» 는 «통과하는 짝» 과 함께 본다');
   assert.doesNotMatch(path.basename('suggestion-rules.emulator.mjs'), /\.test\.js$/, '에뮬레이터 검사는 .test.js 로 두면 평소 전체 검사가 에뮬레이터 없이 죽는다');
+});
+
+test('★★ 「객체가 아닌 값」 — 통짜 글자·숫자는 자식 규칙을 «평가하지 않으므로» 컨테이너 자리가 객체일 때만 받는다 (외부 검토 2026-11-12)', () => {
+  const BIG = 'X'.repeat(2000000);
+  /* 짝(정상)이 먼저 통과해야 «다른 이유로 막힌 것» 이 아니다 */
+  assert.equal(ok([...P, ID], rec({ images: [IMG], replyImages: [IMG] })), true, '짝(정상)이 막힙니다');
+  assert.equal(ok([...P, ID], rec({ images: BIG })), false, '★ images 에 200만 자 «글자» 가 통과합니다');
+  assert.equal(ok([...P, ID], rec({ replyImages: BIG })), false, '★ replyImages 에 200만 자 «글자» 가 통과합니다');
+  assert.equal(ok([...P, ID], rec({ images: 12345 })), false, '★ images 에 숫자가 통과합니다');
+  assert.equal(ok([...R('U_STAFF'), ID], BIG), false, '★ 진행함 한 건 자리에 통짜 글자가 통과합니다');
+  assert.equal(ok([...R('U_STAFF'), ID], true), false, '진행함 한 건 자리에 참/거짓이 통과합니다');
+  assert.equal(ok(['suggestions_resolved_private', 'U_STAFF'], BIG), false, '★ 진행함 «칸 전체» 에 통짜 글자가 통과합니다');
+  assert.equal(ok(['suggestions_resolved_private', 'U_STAFF'], { [ID]: own() }), true, '진행함 칸 전체에 정상 객체(짝)가 막힙니다');
+  assert.equal(ok([...P, ID], BIG), false, '건의 한 건 자리에 통짜 글자가 통과합니다');
+  assert.equal(ok([...M, ID], BIG), false, '메타 한 건 자리에 통짜 글자가 통과합니다');
+  ['suggestions_private', 'suggestions_resolved_private'].forEach((n) => {
+    const node = n === 'suggestions_private' ? RULES[n].$id.images : RULES[n].$uid;
+    assert.match(String(node['.validate']), /hasChildren\(\)/, n + ' 의 컨테이너 자리에 객체 검사(hasChildren())가 없다');
+  });
+});
+
+test('★ 그림은 0번부터 «빈틈 없이» 이어진다 — 빈틈이 있으면 배열이 아닌 객체로 돌아와 대표 화면의 images.map 이 죽는다', () => {
+  assert.equal(ok([...P, ID], rec({ images: [IMG] })), true);
+  assert.equal(ok([...P, ID], rec({ images: [IMG, IMG, IMG] })), true);
+  assert.equal(ok([...P, ID], rec({ images: { 2: IMG } })), false, '★ 0번 없이 2번만 있는 그림이 통과합니다');
+  assert.equal(ok([...P, ID], rec({ images: { 1: IMG } })), false, '0번 없이 1번만 있는 그림이 통과합니다');
+  assert.equal(ok([...P, ID], rec({ images: { 0: IMG, 2: IMG } })), false, '1번이 빠진 그림이 통과합니다');
+  assert.equal(ok([...R('U_STAFF'), ID], own({ replyImages: { 1: IMG } })), false, '진행함 답변 그림의 빈틈이 통과합니다');
+  assert.equal(ok([...R('U_STAFF'), ID], own({ replyImages: [IMG, IMG] })), true);
 });
