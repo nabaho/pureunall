@@ -131,15 +131,12 @@ main{padding:12px 16px 40px}
 .yearbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;max-width:1200px}
 .yearbar #yearPick{font-size:16px;font-weight:700;border:none;background:none;padding:2px 4px}
 .mstrip{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
-.mo{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 2px;font-size:12.5px;border-radius:8px}
-.mo.on{border:2px solid var(--blue);font-weight:700;padding:6px 1px}
+.mo{display:flex;flex-direction:row;justify-content:center;align-items:center;gap:5px;padding:5px 2px;font-size:12.5px;border-radius:8px}
+.mo.on{border:2px solid var(--blue);font-weight:700;padding:4px 1px}
 .mo.mo-none{color:var(--mute)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line2)}
 .mo-todo .dot,.dot.dot-todo{background:var(--amber-m)}
 .mo-done .dot,.dot.dot-done{background:var(--green-m)}
-.mleg{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin:5px 2px 12px}
-.mleg .dot{margin-left:8px}
-.mleg .dot:first-child{margin-left:0}
 .mhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 2px 8px}
 .mhead b{font-size:16px}
 .stephd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px}
@@ -153,11 +150,30 @@ main{padding:12px 16px 40px}
 .mtr-r .amt{font-variant-numeric:tabular-nums}
 .mtr-r .co{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mdet{border-top:1px dashed var(--line2)}
-.kcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;padding:0 12px 12px}
-.kcard{border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
-.kh,.kst,.kroom{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-.kh .hint{max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.kroom input{flex:1 1 180px;min-width:0}
+/* ③ 카톡 보내기 — 사람마다 한 줄(이름·금액·카톡 방·상태·단추), 보낼 문구는 줄이나 카톡 방을 누를 때만 펼친다(대표 2026-11-12) */
+.kmsgs{padding:0 6px 4px}
+.kmr{border-top:1px solid var(--line)}
+.kmr.on{background:var(--blue-bg)}
+.kmr-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 6px}
+.kname{display:inline-flex;align-items:baseline;gap:6px;min-width:110px;max-width:280px;border:0;background:none;padding:2px 4px;text-align:left;overflow:hidden}
+.kname b,.kname .hint{overflow:hidden;text-overflow:ellipsis}
+.kamt{display:inline-flex;align-items:center;gap:6px}
+.kamt .amt{font-variant-numeric:tabular-nums}
+.kbd{white-space:nowrap}
+.kchip{max-width:260px;overflow:hidden;text-overflow:ellipsis;font-size:12px;padding:2px 9px;border-radius:10px;background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
+.kchip.on{border-color:var(--green)}
+.kroom{display:inline-flex;align-items:center;gap:6px}
+.kroom input{width:200px;min-width:0}
+.kdet{padding:2px 8px 10px 14px}
+/* 월별 정산 한 화면 — 설명 줄을 없앤 만큼 여백·줄 높이도 줄인다(대표 2026-11-12 「화면 아래까지 안 내려오게」) */
+#pane-month .card{margin-bottom:8px}
+#pane-month .stephd{padding:6px 12px}
+#pane-month .mrun-h{padding:5px 12px}
+#pane-month .mtr{padding:0 12px 4px}
+#pane-month .mtr-r{padding:2px 0}
+#pane-month .t th,#pane-month .t td{padding:4px 9px}
+#pane-month details.dep{margin:2px 10px}
+#pane-month details.dep>summary{padding:4px 8px}
 .msg{background:var(--bg);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.65;white-space:pre-wrap;word-break:break-all}
 details.why>summary{cursor:pointer;font-size:12px;color:var(--mute);padding:6px 2px}
 #inbox{display:none}
@@ -296,13 +312,14 @@ details.dep textarea{min-height:64px}
   .t[data-name=calcout] tbody td[data-k="share"]:not(:empty)::before{content:'몫 '}
   .t[data-name=calcout] tbody td[data-k="final"]::before{content:'최종 '}
   /* 월별 정산 — 폰은 달 줄을 여섯 칸 두 줄, 문구 카드는 한 줄에 하나 */
-  .yearbar,.mleg,.mhead{padding-left:10px;padding-right:10px}
+  .yearbar,.mhead{padding-left:10px;padding-right:10px}
   .mstrip{grid-template-columns:repeat(6,minmax(0,1fr));padding:0 10px}
   .mstrip button.mo{white-space:nowrap;padding:5px 2px;font-size:12px}
   .stephd,.mrun-h{padding:9px 10px}
   .mtr{padding:0 10px 8px}
   .mtr-r .co{max-width:100%}
-  .kcards{grid-template-columns:1fr;padding:0 10px 10px}
+  .kmsgs{padding:0 4px 4px}
+  .kroom input{width:100%;flex:1 1 140px}
   .subtabs{padding:0 10px}
   .t[data-name=auto] tbody td[data-k="pick"]{order:7;flex:0 0 100%}
   .t[data-name=auto] tbody td[data-k="exp"]::before{content:'예상 '}
@@ -390,8 +407,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=12"></script>
-<script src="js/pu-settle-view.js?v=16"></script>
+<script src="js/pu-settle-core.js?v=13"></script>
+<script src="js/pu-settle-view.js?v=17"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -400,7 +417,7 @@ var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:
 var ERP={ biz:[], consultings:[], people:[] };
 /* 사번 → 이름 — 기록은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
 var NAMES={};
-var TAB='month', CUR_RUN='', CUR_NOTICE='', CUR_MONTH='', SUB='rules';
+var TAB='month', CUR_RUN='', CUR_NOTICE='', CUR_MONTH='', SUB='rules', MSG_OPEN='';   /* MSG_OPEN = ③에서 보낼 문구를 펼친 줄('정산표|번호') — 하나만 */
 /* 자료 넣기 상자(안내 파일 올리기·직접 입력·안내 파일 목록) — 월별 정산 위에 접었다 편다 */
 var INBOX={ open:false };
 /* 입금 자동 검토(대표 지시 2026-11-07 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) — 재무관리 거래내역은 «읽기만» 한 번 읽어 두고(batches)
@@ -564,9 +581,8 @@ function drawMonth(){
   $('inbox').className='card'+(INBOX.open||MANUAL.open?' on':'');
   $('manualBox').innerHTML=MANUAL.open?V.manualBox(MANUAL, manualOpt()):'';
   drawNotices();
-  $('monthHead').innerHTML='<b>'+YEAR+'년 '+Number(CUR_MONTH.slice(5))+'월</b><span class="hint">'+(runs.length
-    ? '정산표 '+runs.length+'개 · '+V.esc(runs.map(function(r){ return biz[r.typeCode]||r.typeCode; }).join(' · '))
-    : '정산표가 없습니다 — 위 «📥 자료 넣기»로 비용지급 안내를 올리거나 직접 입력하세요')+'</span>';
+  /* 정산표가 있으면 달 띠가 «지금 달»을 이미 보여 준다 — 머리 줄을 늘어놓지 않는다(대표 2026-11-12 「불필요한 설명」). 없을 때만 안내 */
+  $('monthHead').innerHTML=runs.length ? '' : '<b>'+YEAR+'년 '+Number(CUR_MONTH.slice(5))+'월</b><span class="hint">정산표가 없습니다 — 위 «📥 자료 넣기»로 비용지급 안내를 올리거나 직접 입력하세요</span>';
   ['step1','step2','step3'].forEach(function(id){ $(id).style.display=runs.length?'':'none'; });
   if(runs.length){
     drawAuto(runs);
@@ -631,7 +647,8 @@ function msgsOf(run){ var rule=D.rules[run.typeCode]; return rule ? C.buildMessa
 function monthItems(runs){
   var out=[];
   runs.filter(function(r){ return r.status==='confirmed'; }).concat(runs.filter(function(r){ return r.status==='draft'; })).forEach(function(r){
-    msgsOf(r).forEach(function(m, i){ out.push({ rid:r.id, i:i, sid:m.sid, name:m.name, text:m.text, biz:bizName(r.typeCode), preview:r.status!=='confirmed' }); });
+    var tots=C.personTotals(r, NAMES);   /* buildMessages 와 같은 사람·같은 순서 — 사람이 맞을 때만 얹는다 */
+    msgsOf(r).forEach(function(m, i){ out.push({ rid:r.id, i:i, sid:m.sid, name:m.name, text:m.text, biz:bizName(r.typeCode), preview:r.status!=='confirmed', tot:(tots[i] && tots[i].sid===m.sid) ? tots[i] : null }); });
   });
   return out;
 }
@@ -646,7 +663,7 @@ function drawSend(runs){
   var last={}; runs.forEach(function(r){ last[r.id]=kqLast(r.id); });
   var ready=runs.filter(function(r){ return r.status==='draft' && confirmable(r.id); }).length, open=ME.isAdmin?openPicks(runs).length:0;
   var go=ready ? { label:ready+'개 정산표 확정'+(ME.isAdmin?'하고 카톡 보내기':'') } : open ? { label:'카톡 '+open+'통 보내기' } : null;
-  $('step3').innerHTML=V.monthMsgs(monthItems(runs), { rooms:roomMap(), last:last, isAdmin:!!ME.isAdmin, agent:V.agentLine(D.agent, Date.now()), go:go, multi:runs.length>1 });
+  $('step3').innerHTML=V.monthMsgs(monthItems(runs), { rooms:roomMap(), last:last, isAdmin:!!ME.isAdmin, agent:V.agentPill(D.agent, Date.now()), go:go, multi:runs.length>1, open:MSG_OPEN });
 }
 /* ═══ 한 해 합계 탭 — 담당별 반환·추가 지급 · 달마다 한 줄 · 카톡 보낸 기록 ═══ */
 function drawYear(){
@@ -1285,7 +1302,7 @@ document.addEventListener('click', async function(ev){
   if((b=t.closest('#tabs button'))){ setTab(b.getAttribute('data-tab')); return; }
   if((b=t.closest('#subtabs button'))){ SUB=b.getAttribute('data-sub'); lsSet('sub', SUB); drawTabs(); return; }
   /* 달 고르기(열두 달 줄·한 해 합계의 달) — 그 달로 가고 펼친 정산표는 닫는다 */
-  if((b=t.closest('[data-month]'))){ ev.preventDefault(); CUR_MONTH=b.getAttribute('data-month'); lsSet('month', CUR_MONTH); CUR_RUN=''; SEL.members={}; SEL.transfers={}; SEL.deposits={};
+  if((b=t.closest('[data-month]'))){ ev.preventDefault(); CUR_MONTH=b.getAttribute('data-month'); lsSet('month', CUR_MONTH); CUR_RUN=''; MSG_OPEN=''; SEL.members={}; SEL.transfers={}; SEL.deposits={};
     DEP={ sid:'', found:[], source:'', text:'', pick:{}, open:false }; if(TAB!=='month'){ TAB='month'; lsSet('tab', TAB); } draw(); return; }
   if(t.closest('#yPrev')){ setYear(String(Number(YEAR)-1)); return; }
   if(t.closest('#yNext')){ setYear(String(Number(YEAR)+1)); return; }
@@ -1371,6 +1388,7 @@ document.addEventListener('click', async function(ev){
     if(sr0[q[1]]){ delete sr0[q[1]][q[2]]; if(!Object.keys(sr0[q[1]]).length) delete sr0[q[1]]; } WORK.open=q[0]; markDirty(); drawRules(); return; }
   if(t.closest('#a_add')){ await addAdjust(); return; }
   if((b=t.closest('[data-adj-del]'))){ var aid=b.getAttribute('data-adj-del'); if(!window.confirm('이 이월·조정을 지울까요?')) return; try{ await softDelete('settle/adjusts/'+aid, 'SettleAdjust', D.adjusts[aid]); }catch(e){ toast('지우지 못했습니다: '+errMsg(e)); } await reload(); return; }
+  if((b=t.closest('[data-msg-open]'))){ var mo=b.getAttribute('data-msg-open'); MSG_OPEN=(MSG_OPEN===mo)?'':mo; drawSend(monthRunsOf(CUR_MONTH)); return; }
   if((b=t.closest('[data-copy]'))){ copyMsg(b.getAttribute('data-copy')); return; }
   if((b=t.closest('[data-kq]'))){ await kqSend([refPick(b.getAttribute('data-kq'))]); return; }
   /* 방 저장 — 누른 단추 옆 칸의 글(같은 사람 칸이 여러 곳에 있어도 그 칸) */
