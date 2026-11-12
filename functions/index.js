@@ -7702,6 +7702,15 @@ const GEUM = require("./gcal-eum")({ functions, getDatabase, ownerAccess: GPROXY
 exports.gcalEum = GEUM.gcalEum;
 exports.gcalEumBackfill = GEUM.gcalEumBackfill;
 
+/* 🏛 공공기관·회의·조사 참석 요청 공문 → 구글 공용 달력 자동 입력·보완 (대표 지시 2026-11-11, functions/cal-official-sync.js).
+   메일 동기화가 들어온 칸(inbox·custom)에서 줄 세운 후보(gcal_proxy/officialMail/q)를 받아
+   본문·첨부(.pdf·.hwpx·.hwp·.docx·그림)를 읽기 전용으로 판독해 구글 공용 달력에 넣거나 동일 시각 기존 일정을 고쳐 채운다. */
+const CALOFFICIAL = require("./cal-official-sync")({
+  functions, getDatabase, ownerAccess: GPROXY.ownerAccess, mailDeps: MAIL_DEPS, region: MAIL_REGION,
+});
+exports.calOfficialSync = CALOFFICIAL.calOfficialSync;
+exports.calOfficialSweep = CALOFFICIAL.calOfficialSweep;
+
 /* 🔗 구글 캘린더 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」) —
    서버가 사람마다 갱신 열쇠를 들고, 화면은 한 시간짜리 표만 받아 간다. 실제 코드는 gcal-link.js.
    ⚠ 여기 줄을 안 적으면 배포가 안 된다. 갱신 열쇠 자리(gcal_tokens)는 보안규칙에 «일부러» 없다. */
