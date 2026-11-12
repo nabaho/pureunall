@@ -807,7 +807,17 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .hc-help>summary::-webkit-details-marker{display:none}
 .hc-help>summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .hc-err{font-size:12.5px;line-height:1.7;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;word-break:keep-all}
-#hcBody .btn:disabled{opacity:.5;cursor:default}
+#hcBody .btn:disabled,#modalHrCert .modal-foot .btn:disabled{opacity:.5;cursor:default;filter:grayscale(.5)}   /* 끝 단추(고른 것 넣기·다시 읽기)도 — 비활성이 활성처럼 보이지 않게 */
+#hcBody .hc-use{max-width:340px;white-space:nowrap}
+#hcBody .hc-ell{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:900px){ #hcBody .hc-use{max-width:200px} }   /* 태블릿 폭에서도 여섯 칸이 창 안에 들어오게 */
+@media (min-width:761px){ #hcBody .dt{max-height:min(48vh,420px);overflow:auto} #hcBody .dt thead th{top:0} }   /* 줄이 많아도 제목·고르기 줄·끝 단추가 밀려 나가지 않게 — 목록만 스크롤 */
+html.dark #hcSel{background:var(--soft);border-color:var(--border);color:var(--text)}
+/* 어두운 판 — 공용 표(.dt)는 칸 글자(#1e293b)·머리글 바탕(#f8fafc)이 박혀 있어 폰 카드(바탕 var(--card)=어두움)에서 글자가 묻힌다(자동 검토 2026-11-12). 이 기능이 다루는 두 표만 따로 맞춘다 */
+html.dark #hcBody .dt table,html.dark #cdBody .dt table{background:var(--card)}
+html.dark #hcBody .dt tbody td,html.dark #cdBody .dt tbody td{color:var(--text)}
+html.dark #hcBody .dt thead th,html.dark #cdBody .dt thead th{background:#1e293b!important;color:var(--text)}
+html.dark #modalHrCert .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}   /* 기본 단추는 흰 바탕이라 어두운 판에서 밝은 글자가 묻힌다 */   /* 고르기 줄은 밝은 바탕이 박혀 있어 어두운 판에서 글자가 묻힌다 */
 /* 직원 «보기 전용» 화면(body.kc-staff)은 대표 기록을 고치는 손잡이를 다 감춘다(위 330~341줄) — 증명서를 보관함에 넣는 이 단추도 같다. hrCertOpen 도 대표가 아니면 열리지 않는다 */
 body.kc-staff #hcOpenBtn{display:none!important}
 #hcBody tr.hc-gone td{opacity:.75}
@@ -3163,11 +3173,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   </div>
 </div>
 <!-- 🏢 푸른인사관리에서 증명서 당겨오기 (대표 지시 2026-11-12) — 셈은 js/kcareer-hrcert.js, 화면은 hrCert* (읽기 전용 · 인사관리 자료는 바뀌지 않는다) -->
-<div class="modal-ov" id="modalHrCert">
+<div class="modal-ov" id="modalHrCert" role="dialog" aria-modal="true" aria-labelledby="hcTitle">
   <div class="modal" style="width:820px;max-width:96vw">
-    <div class="modal-h">🏢 푸른인사관리에서 증명서 당겨오기</div>
+    <div class="modal-h" id="hcTitle" tabindex="-1">🏢 푸른인사관리에서 증명서 당겨오기</div>
     <div class="modal-b" id="hcBody"></div>
-    <div class="modal-foot" style="flex-wrap:wrap"><button class="btn" type="button" style="margin-right:auto" onclick="hrCertOpenHr()" title="푸른인사관리 › 증명서 화면을 새 창으로 엽니다 — 증명서를 발급(인쇄/PDF)하는 일은 거기서 합니다">🏢<span class="hc-btx"> 인사관리 열기</span></button><button class="btn" type="button" onclick="hrCertLoad()" title="발급 이력을 다시 읽습니다">↻<span class="hc-btx"> 다시 읽기</span></button><button class="btn" type="button" onclick="hrCertClose()">닫기</button><button class="btn primary" type="button" id="hcGo" onclick="hrCertGo()">고른 것 넣기</button></div>
+    <div class="modal-foot" style="flex-wrap:wrap"><button class="btn" type="button" style="margin-right:auto" onclick="hrCertOpenHr()" title="푸른인사관리 › 증명서 화면을 새 창으로 엽니다 — 증명서를 발급(인쇄/PDF)하는 일은 거기서 합니다" aria-label="인사관리 열기">🏢<span class="hc-btx"> 인사관리 열기</span></button><button class="btn" type="button" id="hcReload" onclick="hrCertLoad()" title="발급 이력을 다시 읽습니다" aria-label="발급 이력 다시 읽기">↻<span class="hc-btx"> 다시 읽기</span></button><button class="btn" type="button" onclick="hrCertClose()">닫기</button><button class="btn primary" type="button" id="hcGo" onclick="hrCertGo()">고른 것 넣기</button></div>
   </div>
 </div>
 <!-- 🏢 사업 서랍 · 7번 폴더 고르기 · 서류 비교 (2026-10-05) -->
@@ -8335,7 +8345,10 @@ var _cdNoFileOnly = false;
 function toggleCdNoFile(){ _cdNoFileOnly = !_cdNoFileOnly; renderDocStore('certdoc'); }
 
 function _cdTable(rows, D){
-  return '<table><thead><tr>'
+  /* ★ 공용 표 옷(.dt)을 입힌다 — 폰에서는 칸 이름표가 붙은 카드로 접힌다(renderDocStore 가 stampCellLabels 를 부른다).
+     그냥 <table> 이면 폰에서 칸이 짓눌려 글자가 세로로 쌓이고, 인사관리에서 당겨온 줄(한 줄 칸·붙이기 단추)이 들어오면 페이지가 옆으로 밀린다(2026-11-12 검증).
+     ⚠ 예전에는 끝에 stampCellLabels(box) 가 있었으나 return 뒤라 한 번도 돌지 않았다(box 도 없다) — 지웠다. */
+  return '<div class="dt" style="overflow-x:auto"><table><thead><tr>'
     + ['종류','발급기관','발급일','증명기간','용도·제출처','원본','제출','관리'].map(function(h){ return '<th>'+h+'</th>'; }).join('')
     + '</tr></thead><tbody>'
     + rows.map(function(r){
@@ -8346,7 +8359,7 @@ function _cdTable(rows, D){
           + '<td>' + escapeHtml(org) + '</td>'
           + '<td style="white-space:nowrap">' + escapeHtml(formatDate(r.date)||r.year||'-') + '</td>'
           + '<td style="font-size:11px">' + escapeHtml(r.coverage||'-') + '</td>'
-          + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.usage||'-') + '</td>'
+          + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.usage||'') + '"><span style="display:block;min-width:0;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(r.usage||'-') + '</span></td>'
           + '<td>' + (hasOriginal(r)
               ? '<button class="btn sm" onclick=\'openOriginal(' + JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;") + ')\'>📄</button>'
               : (hr ? '<button class="btn sm" type="button" onclick="hrCertAttach(\'' + _jsAttr(r.id) + '\')" title="인사관리 › 증명서에서 «인쇄/PDF»로 저장한 이 증명서(제 ' + escapeHtml(r.hrCertNo||'') + ' 호)를 붙입니다 — 인사관리는 증명서 본문을 남기지 않아 파일은 사람이 붙여야 합니다">📎 붙이기</button>'
@@ -8358,8 +8371,7 @@ function _cdTable(rows, D){
             + '<button class="btn sm" onclick="delDoc(\'certdoc\',\'' + _jsAttr(r.id) + '\',this)" style="color:#dc2626">🗑</button>'
           + '</td></tr>';
       }).join('')
-    + '</tbody></table>';
-  stampCellLabels(box);
+    + '</tbody></table></div>';
 }
 
 /* ═══ 🏢 푸른인사관리에서 증명서 당겨오기 (대표 지시 2026-11-12 「경력관리에 재직증명서 당겨오는 기능」) ═══
@@ -8370,11 +8382,12 @@ function _cdTable(rows, D){
    ⚠ 인사관리는 증명서 «본문»을 남기지 않는다(메타데이터뿐). 그래서 넣는 것은 «기록 한 줄»이고 원본 파일은 없다 — 본문을 다시 그려 발급된 것처럼 만들지 않는다.
      인사관리에서 «인쇄/PDF»로 저장한 파일은 줄의 «📎 붙이기»로 사람이 붙인다(hrCertAttach).
    ⚠ 같은 발급번호는 두 번 넣지 않는다(보관함·휴지통 모두). 사람은 sid 로만 맞춘다 — 이름으로 «내 것»을 찾지 않는다. */
-var _hc={ items:[], sel:{}, busy:false, err:'', stat:null }, _hcTok=0;
+var _hc={ items:[], sel:{}, busy:false, err:'', stat:null }, _hcTok=0, _hcFrom=null;
 function _hcBadge(r){
   var no=String(r.hrCertNo||'');
   var tip='푸른인사관리에서 발급한 증명서 · 제 '+no+' 호'+(r.hrCanceled?'\n⚠ 인사관리에서 «취소» 표시된 증명서입니다 — 제출하지 마세요':'');
-  return ' <span class="hc-chip'+(r.hrCanceled?' red':'')+'" title="'+escapeHtml(tip)+'">'+(r.hrCanceled?'⚠ 취소됨 ':'🏢 ')+escapeHtml(no)+'</span>';
+  /* 취소된 줄은 «취소됨»만 — 폰 카드의 좁은 첫 칸에서 번호까지 쓰면 잘린다(번호는 위 풍선말·메모에 있다) */
+  return ' <span class="hc-chip'+(r.hrCanceled?' red':'')+'" title="'+escapeHtml(tip)+'">'+(r.hrCanceled?'⚠ 취소됨':'🏢 '+escapeHtml(no))+'</span>';
 }
 function hrCertOpen(){
   /* 이 앱은 대표 개인 기록이다 — 직원 «보기 전용»(kcareer_pub 사본)에서는 보관함에 넣는 일을 하지 않는다(증명서를 못 믿게 된다) */
@@ -8382,15 +8395,30 @@ function hrCertOpen(){
     var 상태=kcOwnerState();
     if(상태!=='owner'){ toast(상태==='checking'?'신원을 확인하는 중입니다 — 잠시 뒤 다시 눌러 주세요':'대표 경력관리에서만 쓸 수 있습니다 — 직원 보기는 보기 전용입니다'); return Promise.resolve(); }
   }
+  _hcFrom=document.activeElement||null;   /* 닫을 때 열었던 단추로 돌아간다(키보드로 쓰는 사람이 길을 잃지 않게) */
   _hc={ items:[], sel:{}, busy:true, err:'', stat:null };
   var m=$('modalHrCert'); if(m) m.classList.add('open');
   hrCertRender();
+  var t=$('hcTitle'); if(t && t.focus) t.focus();   /* 창 제목으로 초점 — 스크린리더가 창 이름부터 읽는다 */
+  if(document.addEventListener){ document.removeEventListener('keydown', hrCertKey); document.addEventListener('keydown', hrCertKey); }
   return hrCertLoad();
 }
 function hrCertClose(){
   _hcTok++;   /* 아직 오는 중인 읽기는 버린다 */
   _hc={ items:[], sel:{}, busy:false, err:'', stat:null };   /* 떠나면 읽은 것·고른 것을 비운다 */
   var m=$('modalHrCert'); if(m) m.classList.remove('open');
+  if(document.removeEventListener) document.removeEventListener('keydown', hrCertKey);
+  var back=_hcFrom; _hcFrom=null;
+  try{ if(back && back.focus && back.isConnected!==false) back.focus(); }catch(e){}
+}
+/* 창 안에서만 Tab 이 돈다 — aria-modal 이라 뒤 화면으로 초점이 빠지면 안 된다(Esc 는 전역 처리기가 «닫기» 단추를 눌러 닫는다) */
+function hrCertKey(e){
+  var ov=$('modalHrCert'); if(!ov || e.key!=='Tab' || !ov.classList.contains('open') || !ov.querySelectorAll) return;
+  var list=[].filter.call(ov.querySelectorAll('input,button,summary,[tabindex="0"]'), function(n){ return !n.disabled && n.offsetParent!==null; });
+  if(!list.length) return;
+  var first=list[0], last=list[list.length-1], cur=document.activeElement, inside=ov.contains?ov.contains(cur):true;
+  if(e.shiftKey && (cur===first || !inside || cur===$('hcTitle'))){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (cur===last || !inside)){ e.preventDefault(); first.focus(); }
 }
 function hrCertOpenHr(){ var u='pu-erp.html?app=hr'; if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(u, 'hr'); else window.open(u,'pu_hr'); }
 async function hrCertLoad(){
@@ -8399,18 +8427,24 @@ async function hrCertLoad(){
   var done=function(patch){ if(tok!==_hcTok) return; _hc=Object.assign({ items:[], sel:{}, stat:null }, patch, { busy:false }); hrCertRender(); };
   if(typeof KcareerHrCert==='undefined'){ done({ err:'당겨오기 도구를 불러오지 못했습니다 — 새로고침해 주세요' }); return; }
   if(typeof fbDb==='undefined' || !fbDb){ done({ err:'클라우드 로그인 후 사용하세요 — 푸른인사관리 발급 이력은 로그인해야 읽을 수 있습니다' }); return; }
+  /* ⚠ 늦게 도착한 «옛 읽기»가 새 읽기의 결과를 되돌리지 못하게 한다 — await 를 지날 때마다, 그리고 보관함에 쓰기 «직전»에 이 읽기가 아직 최신인지(tok)
+       와 신원이 그대로인지 본다. 창을 닫았거나 다시 읽었으면 «아무것도 쓰지 않고» 버린다(취소 표시를 옛 응답이 지워 버리는 경합 — 2026-11-12 보안 검토). */
+  var 옛것=function(sid){ return tok!==_hcTok || (sid!==undefined && String(_me.sid||'').trim()!==sid); };
   try{
     if(!_me.resolved) await resolveMe();
+    if(옛것()) return;
     var sid=String(_me.sid||'').trim();
     if(!sid){ done({ err:'로그인한 계정의 직원 번호(sid)를 확인하지 못했습니다 — 푸른이알피에 직원 계정으로 로그인한 뒤 다시 열어 주세요. 이름만 같은 줄은 가져오지 않습니다.' }); return; }
     var snap;
     try{ snap=await fbDb.ref('data/cert_log').once('value'); }
     catch(e){
+      if(옛것()) return;
       var 막힘=/permission|denied/i.test(String((e&&e.code)||'')+' '+String((e&&e.message)||''));
       done({ err:막힘 ? '푸른인사관리 발급 이력을 읽을 권한이 없습니다 — 이 이력은 인사 담당(재무 권한자·관리자·위임관리인)만 읽을 수 있습니다. 본인 증명서는 인사 담당에게 PDF로 받아 «+ 받은 증명서 추가»로 넣어 주세요.'
                   : '발급 이력을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,80) });
       return;
     }
+    if(옛것(sid)) return;   /* 읽는 사이 창을 닫았거나 다시 읽었거나 계정이 바뀌었다 — 쓰지 않고 버린다 */
     var Q=KcareerHrCert, rows=Q.rowsOf(_puUnwrap(snap.val()));
     var 지운=kcTrashList().filter(function(e){ return e && e.store==='certdoc' && e.rec; }).map(function(e){ return e.rec; });
     var p=Q.plan(rows, sid, { have:get('certdoc')||[], gone:지운 });
@@ -8425,7 +8459,7 @@ async function hrCertLoad(){
     }
     var sel={}; p.items.forEach(function(it){ if(it.pick) sel[it.certNo]=1; });
     done({ items:p.items, sel:sel, stat:p.stat });
-  }catch(e){ console.warn('hrCertLoad', e); done({ err:'발급 이력을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,80) }); }
+  }catch(e){ console.warn('hrCertLoad', e); if(옛것()) return; done({ err:'발급 이력을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,80) }); }
 }
 function hrCertSummaryText(st){
   var a=['내 발급 이력 '+st.mine+'건 중 새로 넣을 것 '+st.fresh+'건'];
@@ -8447,14 +8481,14 @@ function hrCertRowHtml(it, i){
     +'<td style="white-space:nowrap"><strong>'+escapeHtml(it.kindLabel)+'</strong></td>'
     +'<td style="white-space:nowrap;font-variant-numeric:tabular-nums">'+escapeHtml(it.certNo)+'</td>'
     +'<td style="white-space:nowrap" title="'+escapeHtml('인사관리 발급 기록 시각 '+it.issuedAt+' 기준 한국 날짜 — 종이에 찍힌 발급일을 따로 고른 경우와 다를 수 있습니다')+'">'+escapeHtml(it.date||'-')+'</td>'
-    +'<td style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(용도||'(용도 없음)')+'">'+escapeHtml(용도||'-')+'</td>'
+    +'<td class="hc-use" title="'+escapeHtml(용도||'(용도 없음)')+'"><span class="hc-ell">'+escapeHtml(용도||'-')+'</span></td>'
     +'<td style="white-space:nowrap">'+chip+'</td></tr>';
 }
 function hrCertRender(){
   var box=$('hcBody'); if(!box) return;
   var go=$('hcGo'), h='';
-  if(_hc.busy){ h='<div class="hc-note">⏳ 푸른인사관리 발급 이력을 읽는 중…</div>'; }
-  else if(_hc.err){ h='<div class="hc-err">⚠ '+escapeHtml(_hc.err)+'</div>'; }
+  if(_hc.busy){ h='<div class="hc-note" role="status">⏳ 푸른인사관리 발급 이력을 읽는 중…</div>'; }
+  else if(_hc.err){ h='<div class="hc-err" role="alert">⚠ '+escapeHtml(_hc.err)+'</div>'; }
   else if(_hc.stat){
     var st=_hc.stat;
     /* 긴 설명은 폰에서 접어 둔다(목록이 첫 화면에 보이게) — 넓은 화면에서는 펼쳐 둔다 */
@@ -8471,7 +8505,7 @@ function hrCertRender(){
         +'<button class="btn sm" type="button" onclick="hrCertPickAll(true)">전체 선택</button>'
         +'<button class="btn sm" type="button" onclick="hrCertPickAll(false)">선택 해제</button>'
         +'<span class="hc-hint" style="color:var(--text-mute);font-size:12px">고르고 아래 «넣기»를 누르면 건수를 한 번 더 묻습니다</span></div>'
-        +'<div class="dt" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="hcAll" onclick="hrCertPickAll(this.checked)" title="새로 넣을 수 있는 줄 전체 선택"> №</th>'
+        +'<div class="dt" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="hcAll" onclick="hrCertPickAll(this.checked)" title="새로 넣을 수 있는 줄 전체 선택" aria-label="새로 넣을 수 있는 줄 전체 선택"> №</th>'
         +'<th>종류</th><th>발급번호</th><th>발급일</th><th>용도·제출처</th><th>상태</th></tr></thead><tbody>'
         +_hc.items.map(hrCertRowHtml).join('')+'</tbody></table></div>';
     }
@@ -8480,6 +8514,7 @@ function hrCertRender(){
   try{ stampCellLabels(box); }catch(e){}
   hrCertSelSync();
   if(go) go.style.display=(_hc.busy||_hc.err||!_hc.items.length)?'none':'';
+  var rl=$('hcReload'); if(rl) rl.disabled=!!_hc.busy;   /* 읽는 중에 또 눌러 겹치지 않게 */
 }
 function hrCertPick(no, on){ if(on) _hc.sel[no]=1; else delete _hc.sel[no]; hrCertSelSync(); }
 function hrCertPickAll(on){
@@ -8805,7 +8840,7 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
     rows=rows.slice().sort(function(a,b){ return String((b.date||b.year||'')).localeCompare(String(a.date||a.year||'')); });
   }
   if(!rows.length){ body.innerHTML=cdBar+'<div class="empty"><div class="emp-ico">📭</div>보관된 '+D.label+'이(가) 없습니다</div>'; return; }
-  if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); return; }
+  if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); _safe(function(){ stampCellLabels(body); }); return; }   /* 폰에서 칸 이름표가 붙은 카드로 접힌다(.dt) */
   /* ★ № 넘버링 + ㅁ 고르기 (대표 지시 2026-09-28) — 번호는 해를 «통틀어» 이어 센다
      (해마다 1번이 있으면 가리킬 수 없다 — 작성 중 목록과 같은 까닭). 옷은 목록 화면과 같다. */
   let 번호=0;
