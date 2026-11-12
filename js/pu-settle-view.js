@@ -317,6 +317,11 @@
     if (cur && !list.some(function (p) { return p.sid === cur; })) list.unshift({ sid: cur, name: (names && names[cur]) || '(이름 없음)' });
     return '<option value="">' + esc(blank || '— 사람 —') + '</option>' + list.map(function (p) { return '<option value="' + esc(p.sid) + '"' + (p.sid === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('');
   }
+  /* 사업 이름 «이름 (기관)» → 두 줄로 나눈다. 끝의 괄호 한 덩이만 2줄로, 괄호가 없으면 1줄 */
+  function splitTitle(t) {
+    var m = String(t == null ? '' : t).match(/^(.*?)\s*(\([^()]*\))\s*$/);
+    return m && m[1] ? { name: m[1], sub: m[2] } : { name: String(t == null ? '' : t), sub: '' };
+  }
   function rateMatrix(work, opt) {
     opt = opt || {}; work = work || {};
     var types = work.types || [], rules = work.rules || {}, people = work.people || [], names = opt.names || {}, sel = opt.sel || {}, biz = opt.bizNames || {};
@@ -334,8 +339,10 @@
       + '<th class="c"><input type="checkbox" data-all="mxpeople"' + (allOn ? ' checked' : '') + '></th><th class="n">번호</th><th>이름</th>'
       + types.map(function (c) {
         var au = (rules[c] || {}).auto;
-        var why = au ? ' — 이알피 개인입금 사업(' + (au.why === 'type' ? '유형 설정' : '개인입금 컨설팅 ' + (au.count || 0) + '건') + ') · 주관·요율을 넣고 저장해야 컨설팅정산이 맡는다' : '';
-        return '<th class="mxc" title="' + esc(title(c) + why) + '">' + esc(title(c)) + (au ? ' <span class="hint" style="white-space:nowrap">👤 설정 필요</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>'
+        var why = au ? ' — 이알피 개인입금 사업(' + (au.why === 'type' ? '유형 설정' : '개인입금 컨설팅 ' + (au.count || 0) + '건') + ') · 설정 필요: 주관·요율을 넣고 저장해야 컨설팅정산이 맡는다' : '';
+        /* 칸 머리는 «두 줄» — 1줄 사업 이름 · 2줄 (기관). 한 줄로 이어 쓰면 칸이 넓어져 표가 창 밖으로 잘린다(대표 2026-11-12 「왜 자꾸 잘리나 … 두 줄로」) */
+        var n = splitTitle(title(c));
+        return '<th class="mxc" title="' + esc(title(c) + why) + '"><span class="mxn">' + (au ? '👤 ' : '') + esc(n.name) + '</span>' + (n.sub ? '<span class="mxs">' + esc(n.sub) + '</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>'
       + '<tr class="cfg"><td></td><td></td><td>주관</td>' + types.map(function (c) { return '<td class="mxc"><select data-lead="' + esc(c) + '">' + staffOpts(opt.staff, names, (rules[c] || {}).leadSid, '— 고르기 —') + '</select></td>'; }).join('') + '</tr>'
       + '<tr class="cfg"><td></td><td></td><td>켜짐</td>' + types.map(function (c) { return '<td class="mxc"><label class="ck" title="켜면 이 사업 종류는 컨설팅정산에서 개별정산한다(재무관리 성과급에서 뺀다)"><input type="checkbox" data-on="' + esc(c) + '"' + ((rules[c] || {}).active !== false ? ' checked' : '') + '></label></td>'; }).join('') + '</tr>';
     people.forEach(function (sid, i) {

@@ -412,8 +412,9 @@ test('요율표 폭 — 사업 칸이 늘면 창 폭까지 자라고(잘리지 �
   assert.match(box[1], /max-width:\s*100%/, '창 폭이 한도');
   /* 다른 카드는 읽기 좋은 폭에 둔다(대표 2026-10-31 「불필요하게 화면을 넓게」) */
   assert.match(NOC, /#ruleDetBox,\s*#sub-rules>\.card\s*\{[^}]*max-width:\s*\d+px/);
-  /* 사업 이름은 자르지 않고 접는다 — 칸 머리가 «…» 로 잘리지 않는다 */
-  assert.match(NOC, /\.t\.mx th\.mxc\s*\{[^}]*white-space:\s*normal/);
+  /* 사업 이름은 자르지 않고 «두 줄»로 나눈다(1줄 이름 · 2줄 기관) — 칸 머리가 «…» 로 잘리지도, 한 줄로 길게 이어지지도 않는다 */
+  assert.match(NOC, /\.t\.mx th\.mxc \.mxn\s*\{[^}]*display:\s*block/);
+  assert.match(NOC, /\.t\.mx th\.mxc \.mxs\s*\{[^}]*display:\s*block/);
   /* 자동 칸의 설명 한 줄은 없앴다 — 칸 머리 «설정 필요» 표시만 */
   const view = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-settle-view.js'), 'utf8');
   assert.doesNotMatch(view, /mx_autoNote/);
