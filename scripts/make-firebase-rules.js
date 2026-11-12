@@ -1125,32 +1125,87 @@ rules.paydata = {
 
 /* ══ 건의함 ════════════════════════════════════════════════════════════ */
 const sugWrite = `(${LOGIN}) && (${ADMIN} || (!data.exists() && newData.child('authorUid').val() === auth.uid && newData.child('status').val() === 'new'))`;
+/* ★ 번호(키)·칸의 «모양과 크기» (2026-11-11 외부 보안 검토 «높음» → 대표 요청 «건의함 보안규칙: 키 모양·크기 검사 추가»)
+   건의함 세 자리는 «직원이 쓸 수 있는 자리» 인데 규칙이 키 모양도 칸도 크기도 안 봤다. 그래서
+     · 번호(키)에 & | ^ % 따옴표 같은 셸 글자를 넣을 수 있었다 — 대표 PC 의 감시 도구가 윈도우에서 firebase 를 cmd.exe 로 부르므로
+       그 번호가 «명령» 으로 읽힐 수 있었다(도구는 2026-11-11 PR #3008 에서 막았다 — 이것은 «두 번째 겹» 이다)
+     · 아무 이름의 칸에 큰 글을 숨겨, 대표가 건의함 목록을 열 때마다 그것을 내려받게 할 수 있었다(진행함 전체를 읽는다)
+   ★ 지킨 것
+     · 번호는 파이어베이스 push() 번호 모양(영문·숫자·-·_)만. 지금 운영의 번호 37개·진행함 uid 5개는 전부 이 모양이다.
+     · «알려진 칸만» — 모르는 칸은 $other 로 거절. 알려진 칸은 화면(enter.html)이 실제로 쓰는 것만 적었다:
+         건의 원문 12칸 · 메타 7칸 · 진행함 13칸. 새 칸이 필요하면 여기와 화면을 «같이» 고친다.
+     · 그림은 줄여 담은 JPEG(가로 1400px·품질 0.7)라 글자 수가 최대 약 33만 자였다 → 한 장 100만 자, 최대 3장.
+   ⚠ 서버(Cloud Functions · 대표 PC 의 감시 도구 = firebase CLI)는 관리자 권한이라 규칙을 «안 탄다». AI 접수 도우미 초안(assist)·감시 알림 칸 처럼
+     «서버가 쓰는 칸» 은 일부러 여기 적지 않았다 — 브라우저에서 직원이 그 칸에 쓰지 못하게(예전엔 새 건의에 함께 담을 수 있었다).
+     (이 칸들을 위한 «새 규칙» 은 여전히 없다 — tests/suggestion-push.test.js 의 약속. «없는 것» 이 곧 거절이다.)
+   ⚠ .validate 는 «새로 쓰는 값» 만 본다 — 이미 있는 자료는 건드리지 않고, 지우는 것(삭제)은 언제나 된다. */
+const SG_KEY_RE = '/^[A-Za-z0-9_-]{1,64}$/';
+const SG_CAT_RE = '/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/';
+const SG_STR = (n) => `newData.isString() && newData.val().length <= ${n}`;
+const SG_IMGS = { $i: { '.validate': "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000" } };
+const SG_REL = { '.validate': `newData.isString() && newData.val().matches(${SG_KEY_RE})` };
+const SG_SRC = { '.validate': "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" };
+const SG_STATUS = { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" };
 rules.suggestions_private = {
   '.read': `(${LOGIN}) && ${ADMIN}`,
   '.indexOn': ['createdAt'],
   $id: {
     '.write': sugWrite,
-    '.validate': "!newData.exists() || newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt'])",
-    cat: { '.validate': "newData.isString() && newData.val().matches(/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/)" },
+    '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt']))`,
+    cat: { '.validate': `newData.isString() && newData.val().matches(${SG_CAT_RE})` },
     title:   { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 200' },
     content: { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 10000' },
     authorUid: { '.validate': `${ADMIN} || newData.val() === auth.uid` },
-    status: { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" }
+    status: SG_STATUS,
+    author: { '.validate': SG_STR(100) },
+    authorEmail: { '.validate': SG_STR(320) },
+    createdAt: { '.validate': 'newData.isNumber()' },
+    repliedAt: { '.validate': 'newData.isNumber()' },
+    reply: { '.validate': SG_STR(20000) },
+    images: SG_IMGS,
+    replyImages: SG_IMGS,
+    relatedId: SG_REL,
+    source: SG_SRC,
+    $other: { '.validate': false }
   }
 };
 rules.suggestions_meta_private = {
   '.read': `(${LOGIN}) && ${ADMIN}`,
   $id: {
     '.write': sugWrite,
-    '.validate': "!newData.exists() || newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt'])",
+    '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt']))`,
+    author: { '.validate': SG_STR(100) },
+    authorEmail: { '.validate': SG_STR(320) },
     authorUid: { '.validate': `${ADMIN} || newData.val() === auth.uid` },
-    status: { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" }
+    status: SG_STATUS,
+    cat: { '.validate': SG_STR(20) },
+    title: { '.validate': SG_STR(200) },
+    createdAt: { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
   }
 };
 rules.suggestions_resolved_private = {
   $uid: {
     '.read':  `auth != null && (auth.uid === $uid || ${ADMIN})`,
-    '.write': `auth != null && (auth.uid === $uid || ${ADMIN})`
+    '.write': `auth != null && (auth.uid === $uid || ${ADMIN})`,
+    '.validate': `!newData.exists() || $uid.matches(/^[A-Za-z0-9_-]{1,128}$/)`,
+    $id: {
+      '.validate': `!newData.exists() || $id.matches(${SG_KEY_RE})`,
+      title: { '.validate': SG_STR(200) },
+      cat: { '.validate': SG_STR(20) },
+      status: SG_STATUS,
+      at: { '.validate': 'newData.isNumber()' },
+      seen: { '.validate': 'newData.isBoolean()' },
+      reply: { '.validate': SG_STR(20000) },
+      replyImages: SG_IMGS,
+      resolvedOk: { '.validate': 'newData.isBoolean()' },
+      resolvedAt: { '.validate': 'newData.isNumber()' },
+      feedback: { '.validate': SG_STR(2000) },
+      feedbackAt: { '.validate': 'newData.isNumber()' },
+      relatedId: SG_REL,
+      source: SG_SRC,
+      $other: { '.validate': false }
+    }
   }
 };
 

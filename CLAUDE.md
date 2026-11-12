@@ -48,6 +48,7 @@
 
 - 코드를 고칠 건은 읽고·고치고·검사·PR 뒤 답변까지 넣는다. 설명만 필요한 건은 답 + `ing`, 돈·정책은 대표에게 묻고 `ing`. 안 고친 것을 `done` 으로 두지 않는다.
 - 읽기·답변은 `node scripts/suggestion-watch.js`(pending · show · reply · notify)로 — 답은 세 자리에 한 번에, 왜·어떻게·건의자가 할 일까지.
+- 건의함 세 자리(`suggestions_*_private`)의 보안규칙은 «번호는 push 번호 모양만 · 알려진 칸만 · 칸마다 길이 한도» — 이 자리에 **새 칸**을 쓰려면 `scripts/make-firebase-rules.js` 건의함 절과 화면을 «같이» 고친다(안 그러면 접수가 막힌다). 지킴: `tests/suggestion-rules.test.js` · 진짜 엔진 확인 `tests/suggestion-rules.emulator.mjs`(수동)
 - 고친 뒤 같은 화면의 다른 길을 한 번 더 본다. 직접 고쳐도 돈 자동 변경·보안규칙·살아 있는 자료 쓰기·외부 발송의 안전장치는 그대로다.
 - 자세히(읽는 법·답변 세 자리·자동 감시·알림): `docs/규칙/건의함.md`
 

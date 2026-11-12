@@ -102,6 +102,7 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 - 포털 💬 건의함(`suggestions_private`)의 건 중 코드를 고칠 일은 읽고·고치고·검사하고·PR 로 올린 뒤 답변까지 넣는다.
 - 답변은 세 자리에 함께: `suggestions_private/{id}` · `suggestions_meta_private/{id}` · `suggestions_resolved_private/{authorUid}/{id}`.
   담을 것은 «왜 그랬나 · 어떻게 고쳤나 · 건의자가 할 일». 「처리함」 같은 2~3글자 답은 쓰지 않는다.
+- 건의함 세 자리(`suggestions_*_private`)의 보안규칙은 «번호는 push 번호 모양만 · 알려진 칸만 · 칸마다 길이 한도» 다 — 새 칸을 쓰려면 `scripts/make-firebase-rules.js` 건의함 절과 화면을 같이 고친다(안 그러면 접수가 막힌다). 지킴: `tests/suggestion-rules.test.js`.
 - 고치지 않은 건을 `done` 으로 두지 않는다(`ing`). 돈을 자동으로 바꾸는 일·보안규칙·살아 있는 자료 쓰기는 CLAUDE.md 의 절차를 따른다.
 - 고친 뒤 같은 화면의 다른 길을 한 번 더 본다 — 고침이 다른 곳을 깨 직원이 먼저 발견한 일이 있었다(2026-10-01).
 - 도구: `scripts/suggestion-watch.js` (`pending` · `show` · `reply`) — 답변 세 자리를 한 번에 쓰고 다시 읽어 확인한다. 손으로 세 번 쓰지 않는다.
