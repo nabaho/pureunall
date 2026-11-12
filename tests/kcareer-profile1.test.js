@@ -273,3 +273,16 @@ test('⑬ 화면 배선 — 고른 것만 넣기를 모델에 넘기고·저장�
   assert.match(side, /' · 넣음 '/);
   assert.doesNotMatch(side, /perfByYear/);
 });
+
+test('⑭ 고르기 창 — 접근성(대화상자·스위치 눌림 표시)·빈 목록 안내 · 고른 것만 넣는 칸은 «몇 건» 상자를 막는다 (자동 검증 낮음 지적 반영)', () => {
+  assert.match(SRC, /<div class="modal" role="dialog" aria-modal="true" aria-labelledby="p1PickTitle"/, '고르기 창은 대화상자로 알린다');
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.match(draw, /data-m="auto" aria-pressed="false"/); assert.match(draw, /data-m="only" aria-pressed="false"/);
+  assert.match(draw, /aria-label="기관·직책·사업 찾기"/, '찾기칸에 이름');
+  assert.match(draw, /찾는 줄이 없습니다/, '검색·«고른 것만 보기» 결과가 0건이면 빈 표 대신 안내');
+  const mode = bare.slice(bare.indexOf('function _p1PickModeDraw('), bare.indexOf('function p1PickMode('));
+  assert.match(mode, /setAttribute\('aria-pressed'/, '방식을 바꾸면 눌림 표시도 바꾼다');
+  const panel = bare.slice(bare.indexOf('function p1Panel('), bare.indexOf('function p1Lim('));
+  assert.match(panel, /\(만\?' disabled':''\)/, '★ 고른 것만 넣는 칸은 건수를 안 보므로 «몇 건» 상자를 막는다');
+  assert.match(panel, /고른 것만 넣는 중 — 건수는 적용되지 않습니다/);
+});

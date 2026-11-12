@@ -3108,9 +3108,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalCasePast').classList.remove('open')">취소</button><button class="btn primary" id="casePastGo" onclick="casePastGo()">넣기</button></div>
   </div>
 </div>
-<!-- ⭐ 프로필 1장 — 중요 고르기 (대표 지시 2026-10-07 「한번 클릭해서 저장하면 변경요청 전까지 그대로」) -->
+<!-- ☑ 프로필 1장 — 고르기 (대표 지시 2026-10-07 「한번 클릭해서 저장하면 변경요청 전까지 그대로」 · 2026-11-12 «고른 것만 넣기») -->
 <div class="modal-ov" id="modalP1Pick">
-  <div class="modal" style="width:860px;max-width:96vw">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="p1PickTitle" style="width:860px;max-width:96vw">
     <div class="modal-h" id="p1PickTitle">☑ 고르기</div>
     <div class="modal-b" id="p1PickBody"></div>
     <div class="modal-foot"><span id="p1PickSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" onclick="p1PickClose()">취소</button><button class="btn primary" onclick="p1PickSave()">저장</button></div>
@@ -8035,9 +8035,11 @@ function p1Panel(k,o){
   var opts=['auto','3','5','8','10','13','20','all'].map(function(v){
     return '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+(v==='auto'?'자동(한 장에 맞춤)':v==='all'?'전체':v+'건')+'</option>'; }).join('');
   var inp='width:100%;min-width:0;font-size:16px';
+  /* «고른 것만 넣기»를 켠 칸은 건수를 안 본다(고른 줄이 전부 나온다) — 건수 상자는 막고 까닭을 적는다 */
+  var 만=!!(o.only||{})[k]&&KcareerProfile1.PIN_KEYS.indexOf(k)>=0;
   return '<div style="grid-column:1/-1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:0;background:#f8fafc;white-space:normal">'
-    +'<div style="font-size:12px;color:var(--text-mute);margin-bottom:3px">몇 건 넣을까 <span style="color:var(--text-mute)">(정하면 한 장에 맞추려 줄이지 않습니다)</span></div>'
-    +'<select class="tb-select" style="width:100%" data-k="'+k+'" onchange="p1Lim(this.dataset.k,this.value)">'+opts+'</select>'
+    +'<div style="font-size:12px;color:var(--text-mute);margin-bottom:3px">몇 건 넣을까 <span style="color:var(--text-mute)">('+(만?'✅ 고른 것만 넣는 중 — 건수는 적용되지 않습니다':'정하면 한 장에 맞추려 줄이지 않습니다')+')</span></div>'
+    +'<select class="tb-select" style="width:100%" data-k="'+k+'"'+(만?' disabled':'')+' aria-label="몇 건 넣을까" onchange="p1Lim(this.dataset.k,this.value)">'+opts+'</select>'
     +'<div style="font-size:12px;color:var(--text-mute);margin:6px 0 3px">제목 바꾸기</div>'
     +'<input class="tb-input" style="'+inp+'" data-k="'+k+'" placeholder="'+escapeHtml(S.title)+'" value="'+escapeHtml((o.titles||{})[k]||'')+'" onchange="p1Title(this.dataset.k,this.value)">'
     +'<div style="font-size:12px;color:var(--text-mute);margin:6px 0 3px">이 칸 끝에 한 줄 더</div>'
@@ -8088,25 +8090,27 @@ function p1PickDraw(){
     ? [String(r.issueDate||r.periodStart||r.year||'').slice(0,10), r.org||'', r.titleVal||r.type||'']
     : [String(r.year||r.date||''), r.type||'', [r.org,r.project].filter(Boolean).join(' · ')]; };
   var 보일=P.list.filter(function(r){ return !q || 칸(r).join(' ').toLowerCase().indexOf(q)>=0; });
+  var 줄들=보일.filter(function(r){ return !P.only || P.on[String(r.id)]; });
   /* 찾기칸은 «한 번만» 그린다 — 칠 때마다 통째로 다시 그리면 입력칸이 바뀌어 글자가 끊긴다. 표만 다시 그린다 */
   if(!document.getElementById('p1PickQ')){
     box.innerHTML='<div id="p1PickMode" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
-      +'<button class="btn sm" type="button" data-m="auto" onclick="p1PickMode(\'auto\')" title="고른 것은 늘 넣고, 남는 자리는 최근 것이 저절로 채웁니다">자동 — ⭐ 중요 + 최근 것</button>'
-      +'<button class="btn sm" type="button" data-m="only" onclick="p1PickMode(\'only\')" title="고른 것만 프로필에 들어갑니다">✅ 고른 것만 넣기</button></div>'
+      +'<button class="btn sm" type="button" data-m="auto" aria-pressed="false" onclick="p1PickMode(\'auto\')" title="고른 것은 늘 넣고, 남는 자리는 최근 것이 저절로 채웁니다">자동 — ⭐ 중요 + 최근 것</button>'
+      +'<button class="btn sm" type="button" data-m="only" aria-pressed="false" onclick="p1PickMode(\'only\')" title="고른 것만 프로필에 들어갑니다">✅ 고른 것만 넣기</button></div>'
       +'<div id="p1PickModeNote" style="font-size:12px;color:var(--text-mute);margin-bottom:8px;white-space:normal"></div>'
       +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-      +'<input id="p1PickQ" class="tb-input" style="flex:1;min-width:0;font-size:16px" placeholder="기관·직책·사업 찾기" oninput="_p1Pick.q=this.value;p1PickDraw()">'
+      +'<input id="p1PickQ" class="tb-input" style="flex:1;min-width:0;font-size:16px" placeholder="기관·직책·사업 찾기" aria-label="기관·직책·사업 찾기" oninput="_p1Pick.q=this.value;p1PickDraw()">'
       +'<button class="btn sm" type="button" id="p1PickOnlyBtn" onclick="p1PickOnly()">고른 것만 보기</button></div><div id="p1PickTbl"></div>';
   }
   var ob=document.getElementById('p1PickOnlyBtn'); if(ob) ob.textContent=P.only?'전체 보기':'고른 것만 보기';
   _p1PickModeDraw();
   document.getElementById('p1PickTbl').innerHTML='<div class="dt" style="max-height:56vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.mode==='only'?'✅':'⭐')+' №</th><th style="width:96px">'+(P.k==='wic'?'일자':'연도')+'</th><th>'+(P.k==='wic'?'기관':'유형')+'</th><th>'+(P.k==='wic'?'직책·내용':'고객사·사업')+'</th>'+(P.k==='perf'?'<th style="width:84px">금액</th>':'')+'</tr></thead><tbody>'
-    +보일.filter(function(r){ return !P.only || P.on[String(r.id)]; }).map(function(r,i){ var c=칸(r);
+    +줄들.map(function(r,i){ var c=칸(r);
       return '<tr><td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk"'+(P.on[String(r.id)]?' checked':'')+' onclick="p1PickToggle(\''+_jsAttr(String(r.id))+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
         +'<td style="white-space:nowrap">'+escapeHtml(c[0])+'</td>'
         +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[1])+'">'+escapeHtml(c[1])+'</td>'
         +'<td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[2])+'">'+escapeHtml(c[2])+'</td>'
         +(P.k==='perf'?'<td style="white-space:nowrap">'+딱지(r)+'</td>':'')+'</tr>'; }).join('')
+    +(줄들.length?'':'<tr><td colspan="'+(P.k==='perf'?5:4)+'" style="color:var(--text-mute);padding:12px 6px">찾는 줄이 없습니다</td></tr>')
     +'</tbody></table></div>';
   _p1PickSum();
 }
@@ -8120,7 +8124,7 @@ function _p1PickSum(){
 }
 function _p1PickModeDraw(){
   var P=_p1Pick, row=document.getElementById('p1PickMode'); if(!P||!row) return;
-  Array.prototype.forEach.call(row.querySelectorAll('button[data-m]'), function(b){ b.className='btn sm'+(b.dataset.m===P.mode?' primary':''); });
+  Array.prototype.forEach.call(row.querySelectorAll('button[data-m]'), function(b){ var 켜짐=(b.dataset.m===P.mode); b.className='btn sm'+(켜짐?' primary':''); b.setAttribute('aria-pressed',켜짐?'true':'false'); });
   var note=document.getElementById('p1PickModeNote');
   if(note) note.textContent=P.mode==='only'
     ? '고른 것만 프로필에 들어갑니다 — 자동으로 최근 것을 더 채우지 않고, 한 장을 넘어도 줄이지 않습니다.'
