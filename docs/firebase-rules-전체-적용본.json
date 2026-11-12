@@ -1607,15 +1607,15 @@
           ".validate": "newData.isString() && newData.val().length <= 20000"
         },
         "images": {
-          ".validate": "newData.hasChildren()",
+          ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
           "$i": {
-            ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
+            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
           }
         },
         "replyImages": {
-          ".validate": "newData.hasChildren()",
+          ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
           "$i": {
-            ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
+            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
           }
         },
         "relatedId": {
@@ -1686,9 +1686,9 @@
             ".validate": "newData.isString() && newData.val().length <= 20000"
           },
           "replyImages": {
-            ".validate": "newData.hasChildren()",
+            ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
             "$i": {
-              ".validate": "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1'))) && newData.isString() && newData.val().length <= 1000000"
+              ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
             }
           },
           "resolvedOk": {

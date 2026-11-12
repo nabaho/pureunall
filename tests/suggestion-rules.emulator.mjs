@@ -77,11 +77,10 @@ const meta = (uid, o) => Object.assign({ author: '홍길동', authorEmail: 'a@pu
 const own = (o) => Object.assign({ title: '제목', cat: 'erp', status: 'new', at: NOW, seen: true }, o || {});
 
 async function seed() {
-  await call('PUT', 'uid_roles', OWNER, {
-    U_ADMIN: { isAdmin: true, sid: 'admin', status: 'active' },
-    U_STAFF: { isAdmin: false, sid: 'staff', status: 'active' },
-    U_STAFF2: { isAdmin: false, sid: 'staff2', status: 'active' }
-  });
+  /* ⚠ 시험 계정 «세 자리만» 심는다 — uid_roles 전체를 덮어쓰면 같은 에뮬레이터를 쓰는 다른 시험의 역할이 지워진다(외부 재검증 지적) */
+  await call('PUT', 'uid_roles/U_ADMIN', OWNER, { isAdmin: true, sid: 'admin', status: 'active' });
+  await call('PUT', 'uid_roles/U_STAFF', OWNER, { isAdmin: false, sid: 'staff', status: 'active' });
+  await call('PUT', 'uid_roles/U_STAFF2', OWNER, { isAdmin: false, sid: 'staff2', status: 'active' });
   await call('DELETE', 'suggestions_private', OWNER);
   await call('DELETE', 'suggestions_meta_private', OWNER);
   await call('DELETE', 'suggestions_resolved_private', OWNER);
@@ -181,6 +180,22 @@ await expect('관리자도 진행함 한 건 자리에 통짜 글자는 못 쓴�
 await expect('건의 «한 건» 자리에 통짜 글자 200만 자', 'PUT', 'suggestions_private/-Nraw00000004', STAFF, BIG, '거부');
 await expect('메타 «한 건» 자리에 통짜 글자 200만 자', 'PUT', 'suggestions_meta_private/-Nraw00000005', STAFF, BIG, '거부');
 await expect('진행함 «칸 전체» 에 정상 객체(짝)', 'PUT', 'suggestions_resolved_private/U_STAFF', STAFF, { '-Nobj00000001': own() }, '허용');
+
+console.log('\n── ⑥-3 «부분 삭제» 로 빈틈 만들기 (외부 재검증 지적 — 지울 때는 자식 규칙이 평가되지 않는다) ──');
+/* 3장이 있는 정상 자료를 «서버 권한으로» 심고, 직원/관리자가 일부만 지우는 갱신(PATCH)을 시험한다 */
+const OWNIMG = (id) => `suggestions_resolved_private/U_STAFF/${id}`;
+await call('PUT', OWNIMG('-Ndel00000001'), OWNER, own({ replyImages: [IMG, IMG, IMG] }));
+await expect('★ 진행함 그림 3장 중 0·1번만 지워 2번만 남기기', 'PATCH', OWNIMG('-Ndel00000001'), STAFF, { 'replyImages/0': null, 'replyImages/1': null }, '거부');
+await expect('★ 진행함 그림 3장 중 0번만 지우기(1·2번만 남음)', 'PATCH', OWNIMG('-Ndel00000001'), STAFF, { 'replyImages/0': null }, '거부');
+await expect('★ 진행함 그림 3장 중 1번만 지우기(0·2번만 남음)', 'PATCH', OWNIMG('-Ndel00000001'), STAFF, { 'replyImages/1': null }, '거부');
+await expect('짝: 그림 3장 중 «마지막(2번)만» 지우기 → 0·1번 남음', 'PATCH', OWNIMG('-Ndel00000001'), STAFF, { 'replyImages/2': null }, '허용');
+await call('PUT', OWNIMG('-Ndel00000002'), OWNER, own({ replyImages: [IMG, IMG, IMG] }));
+await expect('짝: 그림 전체를 한 번에 지우기', 'PATCH', OWNIMG('-Ndel00000002'), STAFF, { replyImages: null }, '허용');
+await call('PUT', 'suggestions_private/-Ndel00000003', OWNER, rec('U_STAFF', { replyImages: [IMG, IMG, IMG] }));
+await expect('★ 건의 원문 답변 그림 0·1번만 지우기(관리자)', 'PATCH', 'suggestions_private/-Ndel00000003', ADMIN, { 'replyImages/0': null, 'replyImages/1': null }, '거부');
+await expect('짝: 건의 원문 답변 그림 «마지막만» 지우기(관리자)', 'PATCH', 'suggestions_private/-Ndel00000003', ADMIN, { 'replyImages/2': null }, '허용');
+await call('PUT', 'suggestions_private/-Ndel00000004', OWNER, rec('U_STAFF', { images: [IMG, IMG, IMG] }));
+await expect('★ 건의 원문 첨부 그림 0번만 지우기(관리자)', 'PATCH', 'suggestions_private/-Ndel00000004', ADMIN, { 'images/0': null }, '거부');
 
 console.log('\n── ⑦ 예전부터 막혀 있던 것은 그대로 막혀 있다(회귀) ──');
 await seed();

@@ -266,3 +266,17 @@ test('★ 그림은 0번부터 «빈틈 없이» 이어진다 — 빈틈이 있�
   assert.equal(ok([...R('U_STAFF'), ID], own({ replyImages: { 1: IMG } })), false, '진행함 답변 그림의 빈틈이 통과합니다');
   assert.equal(ok([...R('U_STAFF'), ID], own({ replyImages: [IMG, IMG] })), true);
 });
+
+test('★★ 그림의 «빈틈 없음» 은 컨테이너(images 자체)에서 본다 — 자식에서만 보면 «지울 때» 평가되지 않아 부분 삭제로 빈틈을 만든다 (외부 재검증)', () => {
+  /* 모의 평가기는 «삭제» 를 흉내 내지 못한다 — 그래서 규칙의 «모양» 을 직접 지킨다. 실제 엔진에서의 동작은
+     tests/suggestion-rules.emulator.mjs ⑥-3(3장 중 0·1번만 지우기 → 거부)이 기준이다. */
+  [['suggestions_private', RULES.suggestions_private.$id.images], ['suggestions_private', RULES.suggestions_private.$id.replyImages],
+   ['suggestions_resolved_private', RULES.suggestions_resolved_private.$uid.$id.replyImages]].forEach(([n, node]) => {
+    const v = String(node['.validate']);
+    assert.match(v, /hasChild\('2'\)/, n + ': 컨테이너에 «2번이 있으면 1번도» 검사가 없다');
+    assert.match(v, /hasChild\('1'\)/);
+    assert.match(v, /hasChild\('0'\)/, n + ': 컨테이너에 «1번이 있으면 0번도» 검사가 없다');
+    assert.match(v, /hasChildren\(\)/, n + ': 컨테이너에 객체 검사가 없다');
+    assert.doesNotMatch(String(node.$i['.validate']), /parent\(\)/, n + ': 자식에서 연속성을 보면 지울 때 평가되지 않는다 — 컨테이너로 옮겼다');
+  });
+});

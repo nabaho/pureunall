@@ -1146,10 +1146,12 @@ const SG_STR = (n) => `newData.isString() && newData.val().length <= ${n}`;
    RTDB 는 노드에 글자·숫자 같은 «통짜 값» 을 쓰면 자식 규칙($i·$id·칸별·$other)을 «평가하지 않는다». 그래서 images 에
    200만 자짜리 «문자열» 을 직접 쓰면 통과했고, 진행함 $uid·$id 자리에 통짜 글자를 써도 통과했다 — 컨테이너 자리는
    newData.hasChildren() 로 «객체일 때만» 받는다.
-   그림은 0번부터 «빈틈 없이» 이어져야 한다(1번은 0번이, 2번은 1번이 있을 때만) — 빈틈이 있으면 배열이 아닌 객체로 돌아와
+   그림은 0번부터 «빈틈 없이» 이어져야 한다(1번은 0번이, 2번은 1번이 있을 때만 — 아래 SG_IMG_SEQ) — 빈틈이 있으면 배열이 아닌 객체로 돌아와
    대표 화면의 images.map 이 죽는다. */
-const SG_IMG_IDX = "($i === '0' || ($i === '1' && newData.parent().hasChild('0')) || ($i === '2' && newData.parent().hasChild('1')))";
-const SG_IMGS = { '.validate': 'newData.hasChildren()', $i: { '.validate': `${SG_IMG_IDX} && newData.isString() && newData.val().length <= 1000000` } };
+/* ⚠ 연속성(빈틈 없음)은 «컨테이너(images 자체)» 에서 본다 — 자식($i)에서만 보면 «지울 때» 평가되지 않아, 3장을 쓴 뒤
+   0번·1번만 지우는 부분 삭제로 2번만 남길 수 있었다(외부 재검증 지적, 실제 엔진에서 재현). 컨테이너는 쓰는 값이 «합쳐진 결과» 로 평가된다. */
+const SG_IMG_SEQ = "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))";
+const SG_IMGS = { '.validate': SG_IMG_SEQ, $i: { '.validate': "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000" } };
 const SG_REL = { '.validate': `newData.isString() && newData.val().matches(${SG_KEY_RE})` };
 const SG_SRC = { '.validate': "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" };
 const SG_STATUS = { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" };
