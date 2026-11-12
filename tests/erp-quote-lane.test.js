@@ -561,7 +561,10 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     {
       slug: 'Sent', kind: 'sent',
       msgs: {
+        '99': { u: '99', d: Date.parse('2026-09-01T10:00:00+09:00'), s: '[푸른노무법인] 복귀기업 자문 견적서 송부', an: ['견적서_복귀기업.pdf'] },
         '100': { u: '100', d: Date.parse('2026-01-10T10:00:00+09:00'), s: '[푸른노무법인] 재계약기업 1차 컨설팅 견적서 송부', an: ['견적서_재계약기업_1차.pdf'] },
+        '110': { u: '110', d: Date.parse('2026-05-10T10:00:00+09:00'), s: '[푸른노무법인] 수기확정기업 컨설팅 견적서 송부', an: ['견적서_수기확정기업.pdf'] },
+        '111': { u: '111', d: Date.parse('2026-05-11T10:00:00+09:00'), s: '[푸른노무법인] 수기확정기업 컨설팅 위임계약서 송부', an: ['위임계약서_수기확정기업.pdf'] },
         '101': { u: '101', d: Date.parse('2026-10-20T10:00:00+09:00'), t: 'hr@basa.example', s: '[푸른노무법인] 바사테크 취업규칙 변경 컨설팅 견적서 송부', an: ['견적서_바사테크.pdf'] },
         '102': { u: '102', d: Date.parse('2026-10-22T10:00:00+09:00'), t: 'hr@basa.example', s: '[푸른노무법인] 바사테크 취업규칙 컨설팅 위임계약서 송부', an: ['위임계약서_바사테크.pdf'] },
         '103': { u: '103', d: Date.parse('2026-10-21T10:00:00+09:00'), s: '[푸른노무법인] 종료상사 자문 견적서 송부', an: ['견적서_종료상사.pdf'] },
@@ -598,19 +601,28 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
       coDup: { id: 'coDup', name: '중복기업', status: 'active', contacts: { c1: { email: 'extra@partner.example' } } },
       coRenew: { id: 'coRenew', name: '재계약기업', status: 'active' },
       coGana: { id: 'coGana', name: '가나기관', status: 'active', email: 'kim@gana.example' },
-      coNoEmail: { id: 'coNoEmail', name: '무이메일기업', status: 'active', email: '' }
+      coNoEmail: { id: 'coNoEmail', name: '무이메일기업', status: 'active', email: '' },
+      coManual: { id: 'coManual', name: '수기확정기업', status: 'active' }
     },
     contracts: [
       { id: 'ct-dup', companyId: 'coDup', companyName: '중복기업', status: 'transferred', kinds: ['consulting'], srcMails: ['Sent|104'] },
-      { id: 'ct-old', companyId: 'coRenew', companyName: '재계약기업', status: 'signed', kinds: ['consulting'], srcMails: ['Sent|100'], signDate: '2026-01-10' }
+      { id: 'ct-old', companyId: 'coRenew', companyName: '재계약기업', status: 'signed', kinds: ['consulting'], srcMails: ['Sent|100'], signDate: '2026-01-10' },
+      { id: 'ct-manual', companyId: 'coManual', companyName: '수기확정기업', status: 'signed', kinds: ['consult'], signDate: '2026-06-25' }
     ]
   });
   assert.equal(synthRes.groups['종료상사'].excluded, 'closed_company', '종료된 사업장은 자동 제외');
   assert.equal(synthRes.groups['해지테크'].excluded, 'closed_company', '계약 해지 통보 사업장은 자동 제외');
   assert.equal(synthRes.groups['중복기업'].excluded, 'duplicate', '이미 이관·반영된 중복 사업장은 자동 제외');
+  assert.equal(synthRes.groups['수기확정기업'].excluded, 'duplicate', 'srcMails 없는 수기 확정 계약(signDate 2026-06-25, kinds consult) 이전인 2026-05-10·11 견적·계약서 메일도 중복으로 자동 제외');
   assert.equal(synthRes.groups['재계약기업'].excluded, '', '과거 계약에 반영된 Sent|100 과 신규 Sent|105 가 함께 있어도 미반영 신규 메일(Sent|105)만 분리해 중복 제외하지 않는다');
   assert.deepEqual(out(synthRes.groups['재계약기업'].srcMails), ['Sent|105'], '이미 확정 계약에 들어간 과거 srcKey(Sent|100)는 제외하고 신규 srcKey 만 남긴다');
+  assert.equal(synthRes.bySrcKey['Sent|100'].isDuplicateInErp, true, '이미 확정 계약에 반영된 개별 과거 메일(Sent|100)은 bySrcKey 에서도 중복 제외');
   assert.equal(synthRes.groups['복귀기업'].excluded, '', '과거 해지 이후 새로 발송된 견적서는 제외하지 않는다');
+  assert.deepEqual(out(synthRes.groups['복귀기업'].srcMails), ['Sent|106'], '해지 이전 메일(Sent|99)은 제외하고 해지 이후 신규 메일(Sent|106)만 포함');
+  assert.equal(synthRes.bySrcKey['Sent|99'].companyClosed, true, '해지 통보(2026-10-01) 이전의 구 견적 메일(Sent|99, 2026-09-01)은 bySrcKey 에서 종료 건으로 격리되어 재수집되지 않는다');
+  assert.equal(prodCtx.PuDocFile.isTerminatedMailText('[바사테크] 자문계약서 송부', '제10조 해지 통보는 30일 전에 서면으로 한다.'), false, '계약서 본문의 일반 해지 조항 문구는 해지 통보 메일로 오인하지 않는다');
+  const planWithKind = P.erpQuoteLanePlan(req({ inferredKind: 'consulting' }), [CO], [], USERS);
+  assert.deepEqual(out(planWithKind.form.kinds), ['consulting'], 'inferredKind 가 전달되면 카드의 kinds 에 반영');
   assert.equal(synthRes.groups['초안기업'].hasSigned, false, '계약서 초안·검토요청 메일은 체결(contract_signed)로 판정하지 않는다');
   assert.equal(synthRes.groups['초안기업'].targetStage, 'review');
   assert.equal(synthRes.groups['안괄호기업'].hasSigned, false, '제목에 (안)이 포함된 메일은 review 로 분류');
