@@ -285,7 +285,11 @@ test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜�
   const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
   assert.match(ths[0], /data-all="mxpeople"/);
   assert.match(ths[1], /번호/);
-  assert.match(visible(ths[3]), /가나사업 \(가나재단\)/, '칸 머리는 사업 이름 전체(대표 지시 「사업 이름 정확하게」)');
+  assert.match(visible(ths[3]), /가나사업\s+\(가나재단\)/, '칸 머리는 사업 이름 전체(대표 지시 「사업 이름 정확하게」)');
+  /* 칸 머리는 «두 줄» — 1줄 이름 · 2줄 (기관). 괄호가 없으면 1줄. 한 줄로 이으면 칸이 넓어져 표가 잘린다(대표 2026-11-12) */
+  assert.match(ths[3], /<span class="mxn">가나사업<\/span><span class="mxs">\(가나재단\)<\/span>/);
+  assert.match(ths[4], /<span class="mxn">나다사업<\/span><\/th>/);
+  assert.doesNotMatch(ths[4], /mxs/);
   assert.match(h, /data-mx="cons-a\|T-A" value="25"/);
   assert.match(h, /data-mx="cons-b\|T-B" value=""/);
   assert.match(h, /<select data-lead="cons-a">[\s\S]*?value="T-LEAD" selected/);
@@ -296,6 +300,8 @@ test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜�
   assert.match(visible(h), /이퇴사/, '퇴사자라도 이미 든 요율은 이름으로 보인다');
   assert.doesNotMatch(visible(h), /T-[A-Z]/);
   assert.doesNotMatch(h, /<br/i);
+  /* 이름과 기관이 한 줄에 이어 붙지 않는다 — 두 줄 칸 머리는 줄을 «블록»으로 나눈다(CSS) */
+  assert.match(h, /<span class="mxn">/);
   assert.match(h, /id="mx_save"(?! disabled)/);
   assert.match(visible(h), /저장하지 않은 변경/);
 });
@@ -472,4 +478,18 @@ test('카톡 상태 딱지·심부름꾼 줄·카톡 방 표·보낸 기록 — 
   assert.match(k, /data-all="kq"/);
   assert.ok(visible(k).indexOf('이다라') < visible(k).indexOf('김가나'), '최근 것이 위가 아니다');
   [r, k].forEach((x) => assert.doesNotMatch(visible(x), /T-[A-Z]/));
+});
+
+test('요율표 칸 머리 두 줄 — 끝의 괄호 한 덩이만 2줄로, 자동 개인입금 칸은 «👤 이름» + (기관)·마우스를 올리면 설정 필요', () => {
+  const work = { types: ['cons-a', 'cons-b', 'cons-c'], people: [], dirty: false, rules: {
+    'cons-a': { title: '긴사업이름컨설팅 (중소기업기술보호울타리)', leadSid: 'T-LEAD', rates: {}, active: true },
+    'cons-b': { title: '괄호둘 (가나) (다라재단)', leadSid: 'T-LEAD', rates: {}, active: true },
+    'cons-c': { title: '점검일자리전환 (점검협회)', leadSid: '', rates: {}, active: true, auto: { why: 'type', count: 0 } } } };
+  const h = V.rateMatrix(work, { names: {}, staff: [] });
+  const th = (n) => [...h.matchAll(/<th class="mxc"[^>]*>[\s\S]*?<\/th>/g)].map((m) => m[0])[n];
+  assert.match(th(0), /<span class="mxn">긴사업이름컨설팅<\/span><span class="mxs">\(중소기업기술보호울타리\)<\/span>/);
+  assert.match(th(1), /<span class="mxn">괄호둘 \(가나\)<\/span><span class="mxs">\(다라재단\)<\/span>/, '끝의 괄호만 2줄로');
+  assert.match(th(2), /<span class="mxn">👤 점검일자리전환<\/span><span class="mxs">\(점검협회\)<\/span>/);
+  assert.match(th(2), /title="[^"]*설정 필요/, '설정 필요는 마우스를 올릴 때');
+  assert.doesNotMatch(visible(th(2)), /설정 필요/, '머리에 글자로 늘어놓지 않는다');
 });
