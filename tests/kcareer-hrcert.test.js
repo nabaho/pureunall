@@ -211,6 +211,7 @@ function world(o) {
   o = o || {};
   const store = { certdoc: (o.certdoc || []).slice() }, trash = (o.trash || []).slice();
   const reads = [], writes = [], toasts = [], confirms = [], els = {}, resolved = [], pending = [], focused = [], listeners = [];
+  const ctxState = { uid: 'U-TEST-1', owner: '' };
   const el = (id) => (els[id] = els[id] || { id, innerHTML: '', textContent: '', disabled: false, checked: false, indeterminate: false, style: {}, classList: { add() {}, remove() {} } });
   const fbDb = { ref: (p) => ({
     once: async () => {
@@ -230,7 +231,7 @@ function world(o) {
     get: (k) => (store[k] || []).slice(), set: (k, v) => { store[k] = v; },
     kcTrashList: () => trash,
     kcNextNo: (pre, w, st, extra) => { let m = 0; (store[st] || []).concat(extra || []).forEach((r) => { const x = /^CD(\d+)$/.exec(r.id || ''); if (x) m = Math.max(m, +x[1]); }); return pre + String(m + 1).padStart(w, '0'); },
-    firmInfo: () => ({ name: '푸른노무법인' }), kcOwnerState: () => (o.owner || 'owner'),
+    firmInfo: () => ({ name: '푸른노무법인' }), kcOwnerState: () => (ctxState.owner || o.owner || 'owner'), _kcUid: () => ctxState.uid,
     renderDocStore: () => {}, _safe: (f) => f(), stampCellLabels: () => {}, toast: (m) => toasts.push(String(m)),
     confirm: (m) => { confirms.push(String(m)); return o.confirmNo ? false : true; },
     document: { getElementById: el, querySelectorAll: () => [], activeElement: { focus: () => focused.push('열었던 단추') }, addEventListener: (ev, fn) => listeners.push(['add', ev]), removeEventListener: (ev) => listeners.push(['remove', ev]) }, window: {},
@@ -238,7 +239,7 @@ function world(o) {
   };
   ctx.window = ctx;
   vm.createContext(ctx); vm.runInContext(BLOCK, ctx);
-  return { ctx, store, trash, reads, writes, toasts, confirms, els, resolved, pending, focused, listeners, hc: () => vm.runInContext('_hc', ctx) };
+  return { ctx, store, trash, reads, writes, toasts, confirms, els, resolved, pending, focused, listeners, state: ctxState, hc: () => vm.runInContext('_hc', ctx) };
 }
 test('열기 → 읽기 → 내 줄만 목록에 · 인사관리에는 아무것도 쓰지 않는다', async () => {
   const w = world();
@@ -359,6 +360,47 @@ test('경합 — 읽는 사이 로그인한 직원이 바뀌면(다른 sid) 그 
   vm.runInContext("_me.sid='S-OTHER-99'", w.ctx);
   w.pending[0].resolve(ROWS()); await p;
   assert.equal(w.store.certdoc[0].hrCanceled, undefined); assert.equal(w.toasts.length, 0);
+});
+test('신원 묶기(자동 보안 검토 2차) — 목록을 읽은 뒤 직원 번호·로그인 계정·대표 여부가 바뀌면 넣지 않고 목록을 비운다 · 기록의 sid 는 «읽을 때 묶은 sid»', async () => {
+  const 바꾸기 = {
+    '직원 번호(sid)': (w) => vm.runInContext("_me.sid='S-OTHER-99'", w.ctx),
+    '로그인 계정(uid)': (w) => { w.state.uid = 'U-OTHER'; },
+    '대표 화면이 아니게': (w) => { w.state.owner = 'locked'; },
+  };
+  for (const [이름, 바꿈] of Object.entries(바꾸기)) {
+    const w = world();
+    await w.ctx.hrCertOpen();
+    assert.equal(w.hc().sid, ME, '목록은 읽을 때의 sid 에 묶인다'); assert.equal(w.hc().uid, 'U-TEST-1');
+    바꿈(w);
+    w.ctx.hrCertGo();
+    assert.equal(w.store.certdoc.length, 0, 이름 + ' 이 바뀌면 저장하지 않는다');
+    assert.equal(w.confirms.length, 0, '묻지도 않는다');
+    assert.equal(w.hc().items.length, 0, '목록을 비운다');
+    assert.ok(w.toasts.some((m) => /바뀌어|비웠습니다/.test(m)), '이유를 알린다');
+  }
+  /* 확인 창을 «누르는 사이» 바뀐 경우 — 저장 직전에 한 번 더 본다 */
+  const w2 = world();
+  await w2.ctx.hrCertOpen();
+  w2.ctx.confirm = (m) => { vm.runInContext("_me.sid='S-OTHER-99'", w2.ctx); return true; };
+  w2.ctx.hrCertGo();
+  assert.equal(w2.store.certdoc.length, 0, '확인한 뒤에도 신원을 다시 본다');
+  /* 그대로면 저장되고, 기록의 sid 는 묶어 둔 sid */
+  const w3 = world();
+  await w3.ctx.hrCertOpen(); w3.ctx.hrCertGo();
+  assert.ok(w3.store.certdoc.length === 2 && w3.store.certdoc.every((r) => r.sid === ME));
+  assert.match(html, /sid:_hc\.sid, issuer:issuer/, '저장은 지금 _me.sid 가 아니라 묶어 둔 값을 쓴다');
+});
+test('화면 보강(자동 검토 2차) — 직원 보기에서 증명서 보관함 첫 칸 유지 · 취소 줄은 opacity 가 아니라 글자색 · 발급기관·증명기간도 한 줄 · 폰에서 «넣기» 단추 고정', () => {
+  assert.match(html, /body\.kc-staff #cdBody \.dt th:first-child,body\.kc-staff #cdBody \.dt td:first-child\{display:table-cell!important\}/);
+  assert.match(html, /@media \(max-width:520px\)\{ body\.kc-staff #cdBody \.dt td:first-child\{display:flex!important\} \}/, '폰 카드 칸은 flex');
+  assert.match(html, /#cdBody tr\.hc-canceled td:not\(:first-child\):not\(:last-child\)\{color:var\(--text-mute\)\}/);
+  assert.ok(!/hc-canceled[^}]*opacity/.test(html), '취소 줄을 opacity 로 흐리면 명암비가 모자란다');
+  assert.match(html, /#cdBody \.dt thead th:last-child\{width:auto;min-width:0\}/, '끝 칸 200px 고정을 풀어 태블릿에서 발급기관 칸이 짓눌리지 않게');
+  assert.match(html, /#cdBody \.dt thead th\{white-space:nowrap\}/, '머리글도 한 줄');
+  const t = html.slice(html.indexOf('function _cdTable'), html.indexOf('/* ═══ 🏢 푸른인사관리에서 증명서 당겨오기'));
+  assert.match(t, /<td style="white-space:nowrap">' \+ escapeHtml\(org\)/); assert.match(t, /<td style="font-size:11px;white-space:nowrap">' \+ escapeHtml\(r\.coverage/);
+  /* 폰: 창에 «높이 한도»가 있고(숫자는 박지 않는다) 본문만 스크롤 — 끝 단추는 창 아래에 남는다 */
+  assert.match(html, /@media \(max-width:520px\)\{ #modalHrCert \.modal\{max-height:[^;}]+;display:flex;flex-direction:column\} #modalHrCert \.modal-b\{overflow:auto/);
 });
 test('읽는 중에는 «다시 읽기»를 못 누른다 · 창을 열면 제목으로 초점 · 닫으면 열었던 단추로 돌아가고 Tab 가두기를 푼다', async () => {
   const w = world({ manual: true });
