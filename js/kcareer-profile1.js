@@ -6,7 +6,9 @@
    ■ 지키는 것
      · 금액·주민번호·계좌·생년월일은 «아예 받지 않는다» — 들어올 길이 없어야 실수로도 안 나간다.
      · 한 장을 넘으면 «최근 N»을 저절로 줄인다(줄일 차례는 실적 → 위촉 → 강의 → 경력 …). 지어내지 않는다.
-     · 줄인 만큼은 «외 N건»으로 밝힌다 — 숨긴 줄 모르면 적게 한 것으로 읽힌다.
+     · 종이(미리보기·PDF·한글)에는 «제출한 내용만» 둔다 — 「(최근 N · 전체 M)」·「외 N건」·「연도별」 같은 건수 표시는
+       찍지 않는다(대표 지시 2026-11-12 「제출하면 제출된 내용만 있어야 된다」). 몇 건 중 몇 건인지는 화면 옆 «넣을 칸 고르기»가 말한다.
+     · 위촉·위원과 컨설팅 실적은 «고른 것만 넣기»(opts.only)를 켤 수 있다 — 고른 것(pins)만 나오고, 자동으로 최근 것을 더 채우지 않는다.
      · 자리가 남으면 «채운다»(fill) — 아래 4분의 1이 비고 「외 1건」이 붙어 있었다(대표 2026-10-07 인쇄 화면).
        얼마나 남는지는 글꼴·줄바꿈에 달려 셈으로는 못 맞힌다 → 화면이 «재어 보는 함수»를 건네고 한 줄씩 늘린다.
      · 숫자 칸(KPI)·컨설팅 실적은 기본으로 안 넣는다(대표 2026-10-07 「kpi 필요없다 · 컨설팅실적은 필요없고」).
@@ -87,7 +89,8 @@
 
   /* src = { fields:{name,org,title,phone,email,license}, edu, cert, work, wiccok, consult, advisory, lecture }
      opts = { use:'general'|…, on:{ edu:true,… }, roles:'2019~2021 ○○노무사회 회장\n…', now:Date,
-              amtOf:function(실적)→원|null, minAmt:5000000, pins:{ wic:[id…], perf:[id…] } } */
+              amtOf:function(실적)→원|null, minAmt:5000000, pins:{ wic:[id…], perf:[id…] },
+              only:{ wic:true, perf:true } ← «고른 것만 넣기»: 그 칸은 pins 로 고른 것만 나온다(자동 채움·금액 문턱·건수 없음) } */
   /* 사업별 수행 요약 — 실적 기록을 «사업 종류»로 묶어 건수·일수(적힌 건만)를 센다. 모르는 것을 지어내지 않는다. */
   function bizRows(recs) {
     var g = {};
@@ -115,17 +118,20 @@
     var on = opts.on || {}, f = src.fields || {};
     var 살 = function (k) { return isOn(k, on, use); };
     var 올해 = (opts.now instanceof Date ? opts.now : new Date()).getFullYear();
-    var pins = opts.pins || {}, 고정 = {};
+    var pins = opts.pins || {}, 고정 = {}, only = opts.only || {};
     PIN_KEYS.forEach(function (k) { 고정[k] = {}; (pins[k] || []).forEach(function (id) { 고정[k][String(id)] = 1; }); });
     var 꽂힘 = function (k, r) { return !!(r && r.id != null && 고정[k][String(r.id)]); };
+    /* «고른 것만 넣기» — 고를 수 있는 칸(PIN_KEYS)에서만. 고른 것이 없으면 그 칸은 비어서 종이에 안 나온다(지어서 채우지 않는다) */
+    var 만 = function (k) { return only[k] === true && PIN_KEYS.indexOf(k) >= 0; };
     var 실적전부 = (src.consult || []).filter(function (r) { return r && !r.excluded; });
     var 금액셈 = { big: 0, small: 0, unknown: 0 };
     var 실적 = 실적전부.filter(function (r) {
       var c = perfClass(r, opts.amtOf, opts.minAmt);
       if (c !== 'all') 금액셈[c]++;
+      if (만('perf')) return 꽂힘('perf', r);                  /* 고른 것만 — 금액 문턱도 건너뛴다(사람이 골랐다) */
       return 꽂힘('perf', r) || c === 'all' || c === 'big';
     });
-    var 위촉 = (src.wiccok || []).filter(function (r) { return r && !isAward(r); });
+    var 위촉 = (src.wiccok || []).filter(function (r) { return r && !isAward(r) && (!만('wic') || 꽂힘('wic', r)); });
     /* 고정한 것을 맨 앞으로(그 안에서도 최근 것부터) — 몇 개인지 세어 «줄이지 않는 바닥»으로 쓴다 */
     var 고정수 = {};
     function 고정먼저(k, arr) {
@@ -155,10 +161,7 @@
       biz: bizRows(실적전부),
       pub: pubRows(opts.pubs)
     };
-    /* 연도별 실적 수 — 줄인 뒤에도 «전체»를 한 줄로 보여 준다(실적 칸을 넣을 때만) */
-    var 해별 = {};
-    실적.forEach(function (r) { var y = s(r.year) || yearOf(r.date); if (y) 해별[y] = (해별[y] || 0) + 1; });
-    var 해줄 = !살('perf') ? '' : Object.keys(해별).sort().reverse().slice(0, 6).map(function (y) { return y + ' ' + 해별[y]; }).join(' · ');
+    /* ⚠ «연도별 실적 수» 줄은 없앴다(대표 2026-11-12) — 찍는 것은 고른 줄뿐이고, 몇 건 중 몇 건인지는 종이에 안 적는다 */
     var limit = { edu: 99, cert: 99, role: 99, work: L.work, lec: L.lec, wic: L.wic, perf: L.perf, award: L.award, biz: 8, pub: 99 };
     var model = {
       use: use, useLabel: USES[use].label,
@@ -168,7 +171,6 @@
         { label: '컨설팅 실적', n: 실적.length }, { label: '위촉·위원', n: 위촉.length },
         { label: '강의', n: (src.lecture || []).length }, { label: '자격', n: 자격.length }
       ].concat((src.advisory || []).length ? [{ label: '자문', n: (src.advisory || []).filter(function (r) { return r && !r.excluded; }).length }] : []),
-      perfByYear: 해줄,
       /* 실적 금액 셈 — 화면 옆에 «500만↑ N건만 · 모름 M건은 ⭐로»를 밝힌다(종이에는 안 찍는다) */
       perfAmt: typeof opts.amtOf === 'function' ? 금액셈 : null,
       sections: []
@@ -178,9 +180,11 @@
       var pin = 고정수[S.key] || 0;
       /* ★ 칸마다 사람이 정한 것(2026-10-11) — 건수(숫자 · 'all'=전체) · 제목 · 한 줄 더.
          건수를 정하면 «고정»이다 — 한 장 맞추기·남는 자리 채우기가 이 칸은 건드리지 않는다(넘치면 넘친다고 알린다). */
-      var 정함 = (opts.lim || {})[S.key], 고정건수 = (정함 === 'all' || (typeof 정함 === 'number' && 정함 > 0));
-      var 건수 = 정함 === 'all' ? all[S.key].length : (고정건수 ? 정함 : limit[S.key]);
-      model.sections.push({ key: S.key, title: s((opts.titles || {})[S.key]) || S.title, note: s((opts.notes || {})[S.key]), fixed: 고정건수,
+      var 정함 = (opts.lim || {})[S.key], 골랐다 = 만(S.key);
+      var 고정건수 = 골랐다 || (정함 === 'all' || (typeof 정함 === 'number' && 정함 > 0));
+      /* 고른 것만 — 고른 줄은 «전부» 보인다(건수·한 장 맞추기가 줄이지 않는다. 넘치면 넘친다고 알린다) */
+      var 건수 = (골랐다 || 정함 === 'all') ? all[S.key].length : (고정건수 ? 정함 : limit[S.key]);
+      model.sections.push({ key: S.key, title: s((opts.titles || {})[S.key]) || S.title, note: s((opts.notes || {})[S.key]), fixed: 고정건수, picked: 골랐다,
         all: all[S.key], n: all[S.key].length, pin: pin,
         show: Math.min(Math.max(건수, pin), all[S.key].length) });
     });
@@ -188,7 +192,7 @@
   }
 
   function lines(model) {
-    var n = 4 + (model.perfByYear ? 1 : 0);              /* 머리(이름·소속·연락·주 분야) — 숫자 칸은 뺐다 */
+    var n = 4;                                           /* 머리(이름·소속·연락·주 분야) — 숫자 칸은 뺐다 */
     model.sections.forEach(function (x) { n += 1.5 + x.show + (x.show < x.n ? 1 : 0); });
     return n;
   }
@@ -249,14 +253,13 @@
       return [y, t + ' (' + n + '건)', g[t].orgs.join(' · ')];
     });
   }
-  /* 「외 N건」 줄은 그리지 않는다(대표 지시 2026-10-12) — 몇 건 중 몇 건인지는 칸 제목 옆 «(최근 N · 전체 M)» 이 말한다 */
+  /* 종이에는 «고른 줄»만 — 「외 N건」(2026-10-12)에 이어 제목 옆 「(최근 N · 전체 M)」·「연도별」도 찍지 않는다(대표 지시 2026-11-12
+     「최근 전체 이런 표시 없애라 · 제출하면 제출된 내용만 있어야 된다」). 몇 건 중 몇 건인지는 화면 옆 «넣을 칸 고르기»에서만 본다. */
   function secHtml(model, x) {
-      var 머리말 = !x.more ? '' : (x.pin ? '(주요 ' + x.pin + (x.show > x.pin ? ' · 최근 ' + (x.show - x.pin) : '') + ' · 전체 ' + x.n + ')' : '(최근 ' + x.show + ' · 전체 ' + x.n + ')');
       var rows = x.key === 'perf' ? perfByBiz(x.rows) : x.rows;
-      return '<h4>' + esc(x.title) + (머리말 ? ' <small>' + 머리말 + '</small>' : '') + '</h4><table class="t-' + x.key + '">'
+      return '<h4>' + esc(x.title) + '</h4><table class="t-' + x.key + '">'
         + rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
         + (x.note ? '<tr><td class="y"></td><td colspan="2" class="more">' + esc(x.note) + '</td></tr>' : '')
-        + (x.key === 'perf' && model.perfByYear ? '<tr><td class="y"></td><td colspan="2" class="more">연도별: ' + esc(model.perfByYear) + '</td></tr>' : '')
         + '</table>';
     }
 
