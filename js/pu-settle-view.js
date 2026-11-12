@@ -324,10 +324,6 @@
       + (opt.addTypes || []).map(function (b) { return '<option value="' + esc(b.code) + '">' + (b.personal ? '👤 ' : '') + esc(b.name) + '</option>'; }).join('') + '</select>'
       + (Object.keys(opt.suggest || {}).length ? '<button class="sm" id="mx_fill" title="빈 칸에 그 사람이 다른 컨설팅에서 쓰는 요율을 넣는다 — «저장»을 눌러야 반영">빈 칸에 기존 % 넣기</button>' : '')
       + '<button class="sm pri" id="mx_save"' + (work.dirty ? '' : ' disabled') + '>저장</button></div>';
-    /* 이알피 개인입금 사업이 자동으로 올라온 칸(rules[c].auto) — 서버에는 아직 없다. 저장해야 컨설팅정산이 맡는다는 것을 한 줄로 알린다 */
-    var autos = types.filter(function (c) { return (rules[c] || {}).auto; });
-    if (autos.length) h += '<div class="hint" id="mx_autoNote" style="padding:6px 12px">👤 이알피에서 개인입금으로 잡힌 사업 ' + autos.length + '개를 칸으로 올렸습니다 — '
-      + esc(autos.map(title).join(' · ')) + '. 주관을 고르고 요율을 넣어 «저장»하면 컨설팅정산이 맡습니다(그 사업의 개인수익은 재무관리 성과급에서 빠집니다). 저장하기 전에는 아무것도 바뀌지 않습니다.</div>';
     if (!types.length) return h + '<div class="empty">아직 사업 종류가 없습니다 — 오른쪽 위 «+ 사업 종류»로 칸을 더하세요.</div></div>';
     var sug = opt.suggest || {};
     var allOn = people.length > 0 && people.every(function (s) { return sel[s]; });
