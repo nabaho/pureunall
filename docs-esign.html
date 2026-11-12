@@ -171,9 +171,9 @@
   <!-- 서식집 — 노무사 검토(Phase 1) 전이라 누를 수 없다. data-pane 이 없어 칸 오가기에 끼지 않는다.
        노무사가 승인한 서식(forms/index.json)이 하나라도 실리면 로그인 뒤 openLibraryNav() 가 단추로 바꾼다 -->
   <div class="nav sub soon" id="navLib" aria-disabled="true" title="노무사 검토가 끝나면 열립니다">📚 서식집<i>검토 후</i></div>
-  <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
+  <button type="button" class="nav sub" data-pane="quotes" id="navQuotes">💼 보낸 견적서 관리</button>
+  <button type="button" class="nav sub" data-pane="co">📑 확정 계약서 관리</button>
   <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
-  <button type="button" class="nav sub" data-pane="quotes" id="navQuotes">💼 지난 견적·계약</button>
   <button type="button" class="nav sub" data-pane="log" id="navLog" hidden>🧾 작업 기록</button>
 </nav>
 <div class="main">
@@ -206,7 +206,7 @@
 <!-- 기업별 계약서 · 원본 보관함 — js/pu-office-docs.js 가 그린다 (2026-09-27) -->
 <div id="paneCo" hidden>
   <div class="card">
-    <div class="crumb">사무관리서류 › <b>기업별 계약서</b></div>
+    <div class="crumb">사무관리서류 › <b>확정 계약서 관리</b></div>
     <div id="coRoot"></div>
   </div>
 </div>
@@ -223,10 +223,10 @@
     <div id="arcRoot"></div>
   </div>
 </div>
-<!-- 💼 지난 견적·계약 — 업무 종류별, 금액은 대표·총괄·재무·확정 담당자만 (js/pu-quotes-view.js) -->
+<!-- 💼 보낸 견적서 관리 — 업무 종류별, 금액은 대표·총괄·재무·확정 담당자만 (js/pu-quotes-view.js) -->
 <div id="paneQuotes" hidden>
   <div class="card">
-    <div class="crumb">사무관리서류 › <b>지난 견적·계약</b></div>
+    <div class="crumb">사무관리서류 › <b>보낸 견적서 관리</b></div>
     <div id="quotesRoot"></div>
   </div>
 </div>
@@ -268,7 +268,7 @@
 <script src="js/esign-hwp-tpl.js?v=8"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=22"></script>
-<script src="js/pu-contract-forms.js?v=69"></script>
+<script src="js/pu-contract-forms.js?v=71"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-worklog.js?v=1"></script>
@@ -276,13 +276,13 @@
 <!-- 보낸메일 가져오기(총괄관리자만): 한글·PDF 글자를 AI 에 맡긴다 — 주민번호 지우개(pu-rrn-mask)가 없으면 판독 층이 멈춘다 -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=53"></script>
-<script src="js/pu-quotes.js?v=1"></script>
-<script src="js/pu-quote-detect.js?v=2"></script>
-<script src="js/pu-quote-import.js?v=2"></script>
-<script src="js/pu-quotes-view.js?v=4"></script>
+<script src="js/pu-quotes.js?v=3"></script>
+<script src="js/pu-quote-detect.js?v=4"></script>
+<script src="js/pu-quote-import.js?v=3"></script>
+<script src="js/pu-quotes-view.js?v=6"></script>
 <script src="js/pu-doc-file.js?v=41"></script>
-<script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=22"></script>
+<script src="js/pu-co-roster.js?v=4"></script>
+<script src="js/pu-office-docs.js?v=23"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -473,7 +473,7 @@ function quoteSentSlug() {
     return keys[0];
   });
 }
-/* 아직 안 가져온 후보 — 이미 가져온 것은 srcKey 로 뺀다(다시 눌러도 안전) */
+/* 아직 안 가져온 후보 — 이미 가져온 것은 srcKey 로 뺀다(다시 눌러도 안전). 한 메일 안 복수 견적·계약 첨부도 빠짐없이 모은다 */
 function quotePendingList() {
   return quoteSentSlug().then(function (slug) {
     return Promise.all([
@@ -481,7 +481,7 @@ function quotePendingList() {
       PuQuotes.list()
     ]).then(function (r) {
       var have = {}; r[1].forEach(function (q) { if (q.srcKey) have[q.srcKey] = 1; });
-      quotePending = PuQuoteImport.candidates(r[0].val() || {}, slug).filter(function (c) { return !have[c.srcKey]; });
+      quotePending = PuQuoteImport.candidates(r[0].val() || {}, slug, { allAtts: true }).filter(function (c) { return !have[c.srcKey]; });
       return quotePending;
     });
   });
@@ -542,6 +542,12 @@ var quoteImporter = {
       quotePending = null;
       return PuQuoteImport.runImport(list, quoteImportHost(), onStep);
     });
+  },
+  runFast: function (onStep) {
+    return (quotePending ? Promise.resolve(quotePending) : quotePendingList()).then(function (list) {
+      quotePending = null;
+      return PuQuoteImport.runImport(list, quoteImportHost(), onStep, { skipAi: true });
+    });
   }
 };
 /* 📨 견적 자동 감지 스위치 — 서버 감지 훅(functions/mail-quote-watch.js)이 읽는 칸 pucards/config/quoteWatch/on.
@@ -589,6 +595,10 @@ function officeHost() {
     zip: formZip, hwpShow: formFileShow,   /* 원본 보관함 — 고른 것 묶어 받기·오른쪽 미리보기 (2026-10-07) */
     contractList: formContractList,        /* 📎 서명본 올리기 — 이알피 계약 연결(읽기만) (2026-10-07) */
     sign: formSignApi(),                   /* ✍ 서명 요청 진행·저장 (2026-10-09) */
+    confirmedImport: confirmedContractImporter(),
+    editCoHwp: officeEditCoHwp,
+    fillFromCo: officeFillFromCo,
+    registerForm: officeRegisterForm,
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -1172,7 +1182,10 @@ function showPane(name) {
     adminOk.then(function () {
       quotesUi = PuQuotesView.mount($('quotesRoot'), {
         list: PuQuotes.list, amounts: PuQuotes.amounts, confirmOwners: PuQuotes.confirmOwners,
-        openFile: quotesOpenFile, staff: quotesStaff, toast: showToast, importer: quoteImporter, watch: quoteWatchSwitch,
+        openFile: quotesOpenFile, previewFile: quotesPreviewFile, editQuoteHwp: quotesEditHwp,
+        fillFromQuote: quotesFillForm, toContract: quotesToContract, updateQuote: quotesUpdate,
+        createNew: quotesCreateNew, registerForm: quotesRegisterForm,
+        staff: quotesStaff, toast: showToast, importer: quoteImporter, watch: quoteWatchSwitch,
         role: { isAdmin: isAdmin, fin: isFin }, uid: curUser ? curUser.uid : ''
       });
     });
@@ -2217,6 +2230,876 @@ async function openArrears() {
     renderDetail();
     showToast('✅ 체불내역이 저장되었습니다');
   };
+}
+
+/* ══ 💼 보낸 견적서 관리 · 📑 확정 계약서 관리 — 참고·수정·변경·수집 연결 층 ══
+   원칙: ① 모든 원본은 보관함에 영구 보존하고 수정본은 새 사본으로 저장한다.
+         ② 메일은 사람이 받는 주소·제목·본문을 확인하고 직접 눌렀을 때만 보낸다.
+         ③ 사용자 값은 qEl(…, { text }) 로만 조립한다(innerHTML 조립 금지). */
+function qEl(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) {
+    var v = attrs[k];
+    if (v == null || v === false) return;
+    if (k === 'style') n.style.cssText = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? '' : v);
+  });
+  (kids || []).forEach(function (c) {
+    if (c == null || c === false) return;
+    n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return n;
+}
+function qModal(title, bodyKids, footFn, modalOpts) {
+  var prevFocus = (modalOpts && modalOpts.returnFocus) || document.activeElement;
+  var bg = qEl('div', { 'class': 'modal-bg', style: 'z-index:1300' }), md = null;
+  function close(skipFocus) {
+    document.removeEventListener('keydown', onKey);
+    bg.remove();
+    if (skipFocus !== true && prevFocus && typeof prevFocus.focus === 'function') { try { prevFocus.focus(); } catch (_) {} }
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Tab' && md && md.querySelectorAll) {
+      var fcs = Array.prototype.slice.call(md.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+      if (!fcs.length) return;
+      var firstEl = fcs[0], lastEl = fcs[fcs.length - 1];
+      if (e.shiftKey && (document.activeElement === firstEl || !md.contains(document.activeElement))) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+    }
+  }
+  document.addEventListener('keydown', onKey);
+  bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
+  md = qEl('div', { 'class': 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title, style: 'max-width:720px;width:100%' }, [
+    qEl('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:8px' }, [
+      qEl('b', { style: 'flex:1;font-size:15px;color:#1e293b', text: title }),
+      qEl('button', { type: 'button', 'class': 'btn btn-sub', 'aria-label': '닫기', text: '×', onclick: function () { close(); } })
+    ]),
+    qEl('div', { style: 'max-height:68vh;overflow-y:auto' }, bodyKids),
+    qEl('div', { style: 'display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0' }, footFn ? footFn(close) : [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '닫기', onclick: function () { close(); } })])
+  ]);
+  bg.appendChild(md);
+  document.body.appendChild(bg);
+  var f0 = md.querySelector('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])');
+  if (f0 && typeof f0.focus === 'function') { try { f0.focus(); } catch (_) {} }
+  return close;
+}
+function qTodayYmd() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function qSaveBytes(bytes, name, mime) {
+  PuOfficeStore.saveBlob(new Blob([bytes], { type: mime || 'application/octet-stream' }), name || '문서');
+}
+function qBytesToDataUrl(bytes, mime) {
+  var s = '';
+  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return 'data:' + (mime || 'application/octet-stream') + ';base64,' + btoa(s);
+}
+function fillFormHost() {
+  return {
+    cards: formCards(), ntsCheck: formNtsCheck, contractLoad: formContract, contractList: formContractList,
+    hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow,
+    zip: formZip, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
+    mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect },
+    sign: formSignApi(), me: function () { return window.PuWhoami && PuWhoami.get(); }
+  };
+}
+/* 확인 후 메일 보내기(자동 발송 금지) */
+function qSendMailDialog(coName, bz, docTitle, fileObj) {
+  var toSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' }, [
+    qEl('option', { value: '', text: '직접 적기…' })
+  ]);
+  var toIn = qEl('input', { type: 'email', placeholder: '받는 분 이메일 주소', style: 'width:100%;font-size:16px;margin-top:6px' });
+  var ccIn = qEl('input', { type: 'text', placeholder: '(선택) 참조 이메일', style: 'width:100%;font-size:16px' });
+  var m0 = PuOfficeDocs.resendMail(coName || '', '', [docTitle || fileObj.name || '서류']);
+  var subIn = qEl('input', { type: 'text', value: m0.subject, style: 'width:100%;font-size:16px' });
+  var bodyIn = qEl('textarea', { rows: '7', style: 'width:100%;font-size:14px;line-height:1.6' });
+  bodyIn.value = m0.body;
+  var note = qEl('div', { style: 'font-size:12px;color:#64748b;margin-top:6px', text: '첨부: ' + (fileObj.name || '서류') });
+  var targets = { to: [] }, mailMode = 'auto', busy = false;
+  toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; });
+  formCards().rows().then(function (rows) {
+    targets = PuOfficeDocs.mailTargets(rows, coName || '', bz || '');
+    targets.to.forEach(function (t) { toSel.appendChild(qEl('option', { value: t.v, text: t.label })); });
+    if (targets.to.length) { toSel.value = targets.to[0].v; toIn.hidden = true; }
+  }).catch(function () {});
+  formMailMode().then(function (md) {
+    mailMode = md;
+    if (md !== 'auto') note.textContent = '첨부: ' + (fileObj.name || '서류') + ' · 자동 발송이 꺼져 있어 파일을 받고 메일 창을 엽니다.';
+  }).catch(function () {});
+  qModal('✉ 메일로 보내기 — ' + (coName || docTitle || ''), [
+    qEl('label', { text: '받는 사람' }), toSel, toIn,
+    qEl('label', { text: '참조' }), ccIn,
+    qEl('label', { text: '제목' }), subIn,
+    qEl('label', { text: '본문' }), bodyIn,
+    note
+  ], function (close) {
+    var go = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '✉ 보내기', onclick: function () {
+      if (busy) return;
+      var to = String(toSel.value || toIn.value || '').trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note.textContent = '⚠ 받는 메일 주소를 확인해 주세요'; return; }
+      if (!subIn.value.trim() || !bodyIn.value.trim()) { note.textContent = '⚠ 제목과 본문을 적어 주세요'; return; }
+      busy = true; go.disabled = true; go.textContent = '보내는 중…';
+      var whoObj = (targets.to || []).filter(function (x) { return x.v === to; })[0];
+      var who = whoObj ? whoObj.who : '';
+      var isCt = /계약|약정|위임|합의/.test(docTitle || fileObj.name || '');
+      Promise.resolve().then(function () {
+        if (mailMode !== 'auto') {
+          qSaveBytes(fileObj.bytes, fileObj.name);
+          location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subIn.value) + '&body=' + encodeURIComponent(bodyIn.value);
+          return 'mailto';
+        }
+        return formMailSend({ to: to, cc: ccIn.value.trim(), subject: subIn.value.trim(), body: bodyIn.value, toName: who }, [fileObj]).then(function () { return 'sent'; });
+      }).then(function (st) {
+        if (coName) formMailRecord({ bz: bz || '' }, { 회사명: coName, 사업자번호: bz || '' }, { kind: isCt ? '계약서' : '제안서', names: [fileObj.name], who: who, await: isCt }).catch(function () {});
+        close();
+        showToast(st === 'sent' ? '✉ 메일을 보냈습니다' : '파일을 내려받고 메일 창을 열었습니다');
+      }, function (e) { busy = false; go.disabled = false; go.textContent = '✉ 보내기'; note.textContent = '❌ ' + ((e && e.message) || e); });
+    } });
+    return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '취소', onclick: close }), go];
+  });
+}
+
+/* 견적서 원본 바이트 읽기(🔒 비밀 원본은 서버가 총괄·재무·확정담당 여부를 검사해 내준다) */
+async function quotesFileBytes(rec) {
+  if (!rec || !rec.fileId) throw new Error('연결된 원본 파일이 없습니다');
+  var o = await PuOfficeStore.getOriginal(rec.fileId);
+  if (!o) throw new Error('보관함에 없는 파일입니다');
+  if (PuOfficeStore.isSecret(o)) {
+    var blob = await fetchSecretDoc(rec.fileId, rec.id);
+    return { name: o.name || '문서', type: o.type || blob.type || '', bytes: new Uint8Array(await blob.arrayBuffer()), orig: o };
+  }
+  var r = await fetch(await PuOfficeStore.fileUrl(o));
+  if (!r.ok) throw new Error('파일을 받지 못했습니다 (HTTP ' + r.status + ')');
+  return { name: o.name || '문서', type: o.type || '', bytes: new Uint8Array(await r.arrayBuffer()), orig: o };
+}
+function quotesPreviewFile(rec, box) {
+  return quotesFileBytes(rec).then(function (f) {
+    box.innerHTML = '';
+    var tp = PuOfficeDocs.fileType(f.name);
+    if (tp === 'pdf' || tp === 'img') {
+      var u = URL.createObjectURL(new Blob([f.bytes], { type: tp === 'pdf' ? 'application/pdf' : (f.type || 'image/jpeg') }));
+      box.appendChild(tp === 'pdf'
+        ? qEl('iframe', { src: u, title: f.name, style: 'width:100%;height:420px;border:none;background:#fff' })
+        : qEl('img', { src: u, alt: f.name, style: 'max-width:100%;max-height:420px' }));
+      return;
+    }
+    if (tp === 'hwp' || tp === 'xlsx') return formFileShow(box, f.bytes, f.name);
+    return quoteExtractText(f.bytes).then(function (txt) {
+      if (txt) {
+        box.appendChild(qEl('div', { style: 'white-space:pre-wrap;font-size:12.5px;line-height:1.7;background:#fff;padding:12px;border:1px solid #e2e8f0;border-radius:6px', text: txt }));
+      } else {
+        box.appendChild(qEl('div', { style: 'padding:20px;text-align:center;color:#64748b', text: f.name + ' — 미리보기가 없는 형식입니다. [📥 원본 내려받기]로 열어 보세요.' }));
+      }
+    });
+  });
+}
+
+/* 표준 양식 자동 추천 및 찾아서 채우기 열기(견적서 재작성 · 확정 계약서 전환 · 변경·갱신 계약서 작성 공통) */
+function isQuoteForm(f) {
+  return !!(f && (f.docRole === 'quote' || f.groupName === PuContractForms.PROPOSAL_GROUP || /견적|제안/.test(f.name || '')));
+}
+function pickRecommendedFormId(mode, codeOrKind) {
+  var k = String(codeOrKind || '');
+  if (mode === 'amend' || k === '변경·갱신') return 'fm-pr-amend';
+  if (mode === 'quote') {
+    if (k === 'investigation' || k === '괴롭힘·성희롱조사') return 'fm-pr-harass-quote';
+    if (k === 'bargaining' || k === '단체교섭') return 'fm-pq-06';
+    if (k === 'payroll' || k === '급여관리') return 'fm-pr-payroll-quote';
+    if (k === 'opinion' || k === '의견서') return 'fm-pq-05';
+    if (k === 'safety' || k === '산업안전') return 'fm-pq-03';
+    if (k === 'fund' || k === '기금') return 'fm-pq-07';
+    if (k === 'education' || k === '교육·강의') return 'fm-pq-04';
+    if (k === 'case' || k === '사건') return 'fm-pr-case-quote';
+    if (k === '노무진단·규정') return 'fm-pr-rules-quote';
+    if (k === 'advice' || k === '자문') return 'fm-pq-01';
+    return 'fm-pr-consulting-quote';
+  }
+  if (k === 'investigation' || k === '괴롭힘·성희롱조사') return 'fm-pr-harass';
+  if (k === 'bargaining' || k === '단체교섭') return 'fm-pr-bargain';
+  if (k === '노무진단·규정') return 'fm-pr-rules';
+  if (k === 'hr_consult' || k === '컨설팅') return 'fm-4';
+  if (k === 'safety' || k === '산업안전') return 'fm-pr-safety';
+  if (k === 'opinion' || k === '의견서') return 'fm-pr-opinion';
+  if (k === 'payroll' || k === '급여관리') return 'fm-pr-payroll';
+  if (k === 'fund' || k === '기금') return 'fm-5';
+  if (k === 'education' || k === '교육·강의') return 'fm-6';
+  if (k === 'case' || k === '사건') return 'fm-mv1nad0teyj-8hy';
+  if (k === 'CMS') return 'fm-pr-cms';
+  if (k === 'EDI') return 'fm-pr-employment';
+  return 'fm-pr-advisory';
+}
+function pickRecommendedSetId(mode, codeOrKind) {
+  var k = String(codeOrKind || '');
+  if (mode === 'amend' || k === '변경·갱신') return 'fs-amend';
+  if (k === 'investigation' || k === '괴롭힘·성희롱조사') return 'fs-harass';
+  if (k === 'bargaining' || k === '단체교섭') return 'fs-bargain';
+  if (k === '노무진단·규정') return 'fs-rules';
+  if (k === 'hr_consult' || k === '컨설팅') return 'fs-consulting-hr';
+  if (k === 'safety' || k === '산업안전') return 'fs-consulting-safety';
+  if (k === 'opinion' || k === '의견서') return 'fs-opinion';
+  if (k === 'payroll' || k === '급여관리') return 'fs-payroll';
+  if (k === 'EDI') return 'fs-office';
+  if (k === 'fund' || k === '기금') return 'fs-fund';
+  if (k === 'education' || k === '교육·강의') return 'fs-edu';
+  if (k === 'case' || k === '사건') return 'fs-case-dismiss';
+  return 'fs-advisory';
+}
+function openFormPickerAndFill(opts) {
+  opts = opts || {};
+  var originFocus = opts.returnFocus || document.activeElement;
+  Promise.all([
+    PuContractForms.loadForms(db),
+    db.ref('data/contract_form_sets').once('value').then(function (s) { return PuContractForms.setsOf(s.val()); }, function () { return PuContractForms.setsOf(null); })
+  ]).then(function (got) {
+    var all = got[0], allSets = got[1] || [];
+    var list = (all || []).filter(function (f) { return f && !PuContractForms.isClosed(f); });
+    if (!list.length) { showToast('등록된 표준 양식이 없습니다'); return; }
+    var byId = {}; list.forEach(function (f) { byId[f.id] = f; });
+    var recId = pickRecommendedFormId(opts.mode || 'contract', opts.kindKey || '');
+    var recSetId = pickRecommendedSetId(opts.mode || 'contract', opts.kindKey || '');
+    var recSet = allSets.filter(function (s) { return s && s.id === recSetId; })[0] || null;
+    var filtered = opts.mode === 'quote'
+      ? list.filter(isQuoteForm)
+      : list.filter(function (f) { return !isQuoteForm(f); });
+    if (!filtered.length) filtered = list;
+    var advQuote = (opts.mode === 'quote' && (opts.kindKey === 'advice' || opts.kindKey === '자문'))
+      ? list.filter(function (f) { return /노무\s*자문\s*견적/.test(f.name || ''); })[0]
+      : null;
+    var best = advQuote || list.filter(function (f) { return f.id === recId; })[0] || filtered[0] || list[0];
+    var ordered = [best].concat(filtered.filter(function (f) { return f.id !== best.id; }))
+      .concat(list.filter(function (f) { return f.id !== best.id && filtered.indexOf(f) < 0; }));
+    var sel = qEl('select', { 'aria-label': '사용할 공용 양식', style: 'width:100%;font-size:16px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px' },
+      ordered.map(function (f) {
+        return qEl('option', { value: f.id, text: (f.id === best.id ? '★ 추천 · ' : '') + (f.name || f.id) + (f.groupName ? ' (' + f.groupName + ')' : '') });
+      }));
+    sel.value = best.id;
+    var coIn = qEl('input', { type: 'text', 'aria-label': '의뢰처·회사명', value: opts.coName || '', placeholder: '회사·의뢰처 이름', style: 'width:100%;font-size:16px' });
+    var amtIn = qEl('input', { type: 'text', inputmode: 'numeric', 'aria-label': '금액(원)', value: opts.amount ? Number(opts.amount).toLocaleString('ko-KR') : '', placeholder: '예: 3,300,000', style: 'width:100%;font-size:16px' });
+    var termIn = qEl('input', { type: 'text', 'aria-label': '계약·수행 기간', value: opts.term || '', placeholder: '예: 2026.11.01 ~ 2027.10.31 (1년)', style: 'width:100%;font-size:16px' });
+    var scopeIn = qEl('input', { type: 'text', 'aria-label': '과업·주요 내용', value: opts.scope || '', placeholder: '과업·변경 조건 요약', style: 'width:100%;font-size:16px' });
+    function buildInit() {
+      var aNum = String(amtIn.value || '').replace(/\D/g, '');
+      var init = Object.assign({}, opts.initial || {});
+      if (coIn.value.trim()) init['회사명'] = coIn.value.trim();
+      if (opts.bizNo) init['사업자번호'] = opts.bizNo;
+      if (aNum) { init['계약금액'] = Number(aNum).toLocaleString('ko-KR'); init['견적금액'] = Number(aNum).toLocaleString('ko-KR'); }
+      if (termIn.value.trim()) init['계약기간'] = termIn.value.trim();
+      if (scopeIn.value.trim()) init['과업내용'] = scopeIn.value.trim();
+      if (!init['계약일']) init['계약일'] = qTodayYmd();
+      return init;
+    }
+    qModal(opts.modalTitle || '📝 표준 양식에 불러와 수정·작성', [
+      qEl('div', { style: 'background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px',
+        text: '업무 갈래에 맞는 표준 양식을 골랐습니다. 양식 1건만 열거나 [📦 동종 하위 세트 전체 채우기]로 견적서·계약서·위임장·부속서류를 한 번에 모두 채울 수 있습니다.' }),
+      qEl('label', { text: '사용할 공용 양식' }), sel,
+      qEl('label', { text: '의뢰처·회사명' }), coIn,
+      qEl('label', { text: '금액(원)' }), amtIn,
+      qEl('label', { text: '계약·수행 기간' }), termIn,
+      qEl('label', { text: '과업·주요 내용' }), scopeIn
+    ], function (close) {
+      var setForms = recSet ? (recSet.formIds || []).map(function (id) { return byId[id]; }).filter(Boolean) : [];
+      var setBtn = setForms.length > 1 ? qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📦 ' + recSet.name + ' (' + setForms.length + '종 한 번에)', onclick: function () {
+        var init = buildInit();
+        close(true);
+        PuContractForms.openFill(setForms, fillFormHost(), recSet.name, {
+          coName: coIn.value.trim() || opts.coName || '',
+          bizNo: opts.bizNo || '',
+          initial: init,
+          returnFocus: originFocus
+        });
+      } }) : null;
+      var go = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '📝 양식 채우기 열기', onclick: function () {
+        var fm = list.filter(function (f) { return f.id === sel.value; })[0] || best;
+        var init = buildInit();
+        close(true);
+        PuContractForms.openFill([fm], fillFormHost(), fm.name, {
+          coName: coIn.value.trim() || opts.coName || '',
+          bizNo: opts.bizNo || '',
+          initial: init,
+          returnFocus: originFocus
+        });
+      } });
+      return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '취소', onclick: function () { close(); } }), setBtn, go].filter(Boolean);
+    }, { returnFocus: originFocus });
+  }, function (e) { showToast('양식을 불러오지 못했습니다 — ' + ((e && e.message) || e)); });
+}
+
+function quotesInitialFrom(rec, amt) {
+  var money = amt && amt.amount != null ? amt.amount : (amt && amt.supply != null ? amt.supply : null);
+  var init = {
+    '회사명': (rec && rec.co) || '',
+    '계약기간': (rec && (rec.period || rec.term)) || '',
+    '과업내용': (rec && rec.scope) || '',
+    '대상인원': rec && typeof rec.staff === 'number' ? rec.staff + '명' : '',
+    '계약일': qTodayYmd()
+  };
+  if (money != null && money !== '') {
+    init['계약금액'] = Number(money).toLocaleString('ko-KR');
+    init['견적금액'] = Number(money).toLocaleString('ko-KR');
+  }
+  if (amt && amt.vat) init['부가세처리'] = (amt.vat === 'incl' || amt.vat === 'included') ? '부가가치세 포함' : '부가가치세 별도';
+  return init;
+}
+function quotesFillForm(rec, amt) {
+  var money = amt && amt.amount != null ? amt.amount : '';
+  openFormPickerAndFill({
+    mode: 'quote',
+    modalTitle: '📝 지난 견적서를 바탕으로 수정 견적서 작성',
+    kindKey: (rec && rec.type) || 'advice',
+    coName: (rec && rec.co) || '',
+    amount: money,
+    term: (rec && rec.period) || '',
+    scope: (rec && rec.scope) || '',
+    initial: quotesInitialFrom(rec, amt)
+  });
+}
+function quotesToContract(rec, amt) {
+  var money = amt && amt.amount != null ? amt.amount : '';
+  openFormPickerAndFill({
+    mode: 'contract',
+    modalTitle: '📑 견적 내용을 확정 계약서 양식으로 전환·작성',
+    kindKey: (rec && rec.type) || 'advice',
+    coName: (rec && rec.co) || '',
+    amount: money,
+    term: (rec && rec.period) || '',
+    scope: (rec && rec.scope) || '',
+    initial: quotesInitialFrom(rec, amt)
+  });
+}
+
+/* 견적서 한글(.hwp/.hwpx) 직접 편집 후 새 사본 저장·내려받기·PDF·메일 발송 */
+function quotesEditHwp(rec, amt, onSaved) {
+  quotesFileBytes(rec).then(function (f) {
+    if (!/\.(hwp|hwpx)$/i.test(f.name || '')) {
+      showToast('원본이 한글(.hwp/.hwpx) 파일이 아니어서 표준 양식 채우기로 엽니다');
+      quotesFillForm(rec, amt);
+      return null;
+    }
+    return formHwpEdit(f.bytes, f.name).then(function (edited) {
+      if (!edited) return;
+      var ext = /\.hwpx$/i.test(f.name) ? '.hwpx' : '.hwp';
+      var base = f.name.replace(/\.[^.]+$/, '');
+      var newName = PuOfficeStore.safeFileName(base + '_수정_' + qTodayYmd()) + ext;
+      var coIn = qEl('input', { type: 'text', value: rec.co || '', placeholder: '의뢰처·회사명', style: 'width:100%;font-size:16px' });
+      var tSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' },
+        PuQuotes.TYPES.map(function (t) { return qEl('option', { value: t.code, text: t.label }); }));
+      tSel.value = rec.type || 'other';
+      var scIn = qEl('input', { type: 'text', value: rec.scope || '', placeholder: '과업·수정 요약', style: 'width:100%;font-size:16px' });
+      var supIn = qEl('input', { type: 'text', inputmode: 'numeric', value: amt && amt.amount != null ? String(amt.amount) : '', placeholder: '수정 금액(원, 선택)', style: 'width:100%;font-size:16px' });
+      var vatSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' }, [
+        qEl('option', { value: 'excl', text: '부가세 별도' }),
+        qEl('option', { value: 'incl', text: '부가세 포함' })
+      ]);
+      if (amt && amt.vat === 'incl') vatSel.value = 'incl';
+      var stat = qEl('div', { style: 'font-size:12.5px;color:#166534;margin-top:8px', text: '✔ 한글 편집이 완료되었습니다 (' + newName + '). 원본은 보관함에 그대로 유지됩니다.' });
+      qModal('💾 수정한 견적서 저장 · 내보내기', [
+        stat,
+        qEl('label', { text: '의뢰처·회사명' }), coIn,
+        qEl('label', { text: '업무 종류' }), tSel,
+        qEl('label', { text: '과업·수정 메모' }), scIn,
+        qEl('label', { text: '수정 금액(원)' }), supIn,
+        qEl('label', { text: '부가세' }), vatSel,
+        qEl('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px' }, [
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📥 한글 파일 내려받기', onclick: function () { qSaveBytes(edited, newName); } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📕 PDF로 내려받기', onclick: function () {
+            stat.textContent = 'PDF 변환 중…';
+            formHwpPdf(edited, newName).then(function (pdf) {
+              qSaveBytes(pdf, newName.replace(/\.[^.]+$/, '.pdf'), 'application/pdf');
+              stat.textContent = '✔ PDF로 내려받았습니다.';
+            }, function (e) { stat.textContent = '❌ PDF 변환 실패: ' + ((e && e.message) || e); });
+          } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '✉ 메일로 보내기', onclick: function () {
+            qSendMailDialog(coIn.value.trim(), '', newName.replace(/\.[^.]+$/, ''), { name: newName, bytes: edited });
+          } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📄 공용 양식에 등록', onclick: function () {
+            registerDocBytesAsForm({ name: newName, bytes: edited, title: '표준 견적서 양식', coName: coIn.value.trim(), amount: supIn.value, isSecret: true, docRole: 'quote', quoteType: tSel.value });
+          } })
+        ])
+      ], function (close) {
+        var saveBtn = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '💾 새 수정 견적서로 저장', onclick: function () {
+          saveBtn.disabled = true; saveBtn.textContent = '저장 중…';
+          var co = coIn.value.trim();
+          var supDigits = String(supIn.value || '').replace(/\D/g, '');
+          var ownerUid = isAdmin ? ((amt && amt.owner) || (curUser ? curUser.uid : '')) : (curUser ? curUser.uid : '');
+          var newAmt = supDigits
+            ? { amount: Number(supDigits), vat: vatSel.value, owner: ownerUid }
+            : (ownerUid ? { vat: '', owner: ownerUid } : null);
+          trackedWrite(PuOfficeStore.putOriginal({ name: newName, size: edited.length, type: f.type || 'application/x-hwp', bytes: edited },
+            { kind: 'quote', coName: co }, { secret: true }))
+            .then(function (put) {
+              return trackedWrite(PuQuotes.save({
+                doc: rec.doc === 'contract' ? 'contract' : 'quote',
+                type: tSel.value, co: co, date: qTodayYmd(), scope: scIn.value.trim(),
+                period: rec.period || '', staff: rec.staff, fileId: put.fileId,
+                ownerGuess: rec.ownerGuess || meName(), review: supDigits ? 'ok' : 'check',
+                src: { how: 'upload' }
+              }, newAmt));
+            }).then(function () {
+              close(); showToast('✅ 새 수정 견적서로 저장했습니다 (원본 보존)');
+              if (onSaved) onSaved();
+            }, function (e) { saveBtn.disabled = false; saveBtn.textContent = '💾 새 수정 견적서로 저장'; stat.textContent = '❌ ' + ((e && e.message) || e); });
+        } });
+        return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '닫기', onclick: close }), saveBtn];
+      });
+    });
+  }).catch(function (e) { showToast('편집기를 열지 못했습니다 — ' + ((e && e.message) || e)); });
+}
+
+/* 견적 정보·금액 수정 또는 새 수정본 복제 */
+function quotesUpdate(qid, recPatch, amtPatch, asCopy) {
+  if (asCopy) {
+    return PuQuotes.list().then(function (all) {
+      var orig = (all || []).filter(function (x) { return x.id === qid; })[0] || {};
+      var canKeepFile = isAdmin || !!(curUser && orig.by && orig.by === curUser.uid);
+      var patchFile = recPatch && recPatch.fileId && recPatch.fileId !== orig.fileId ? recPatch.fileId : '';
+      var nextRec = Object.assign({
+        doc: orig.doc === 'contract' ? 'contract' : 'quote',
+        type: orig.type || 'other', co: orig.co || '',
+        date: qTodayYmd(), scope: orig.scope || '', period: orig.period || '',
+        staff: orig.staff, ownerGuess: orig.ownerGuess || meName(),
+        review: 'ok', src: { how: 'upload' }
+      }, recPatch || {});
+      nextRec.fileId = patchFile || (canKeepFile ? (orig.fileId || '') : '');
+      if (!nextRec.date) nextRec.date = qTodayYmd();
+      delete nextRec.srcKey;
+      var copyAmt = amtPatch ? Object.assign({ owner: curUser ? curUser.uid : '' }, amtPatch) : null;
+      return trackedWrite(PuQuotes.save(nextRec, copyAmt));
+    });
+  }
+  return trackedWrite(PuQuotes.update(qid, recPatch, amtPatch)).catch(function (e) {
+    if (amtPatch && !isAdmin && /permission/i.test(String((e && (e.code || e.message)) || e))) {
+      return trackedWrite(PuQuotes.update(qid, recPatch, null)).then(function () {
+        showToast('기본 정보는 저장했습니다 (기존 금액 수정은 총괄관리자 권한이 필요해 [📋 새 수정 견적 기록으로 복제 저장]을 이용해 주세요)');
+      });
+    }
+    throw e;
+  });
+}
+
+/* + 새 견적서 작성·올리기 */
+function quotesCreateNew(onDone) {
+  var closeModalFn = null;
+  var fileIn = qEl('input', { type: 'file', accept: '.hwp,.hwpx,.pdf,.xlsx,.xls,.doc,.docx' });
+  var coIn = qEl('input', { type: 'text', placeholder: '의뢰처·회사명 *', style: 'width:100%;font-size:16px' });
+  var tSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' },
+    PuQuotes.TYPES.map(function (t) { return qEl('option', { value: t.code, text: t.label }); }));
+  var scIn = qEl('input', { type: 'text', placeholder: '과업 요약 (예: 직장 내 괴롭힘 조사 · 상시 노무자문)', style: 'width:100%;font-size:16px' });
+  var tmIn = qEl('input', { type: 'text', placeholder: '기간 (예: 1년 · 조사 종결 시)', style: 'width:100%;font-size:16px' });
+  var supIn = qEl('input', { type: 'text', inputmode: 'numeric', placeholder: '금액(원)', style: 'width:100%;font-size:16px' });
+  var vatSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' }, [
+    qEl('option', { value: 'excl', text: '부가세 별도' }),
+    qEl('option', { value: 'incl', text: '부가세 포함' })
+  ]);
+  qModal('+ 새 견적서 작성 · 올리기', [
+    qEl('div', { style: 'background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap' }, [
+      qEl('span', { style: 'flex:1;font-size:12.5px', text: '표준 견적서 양식에 업체·금액을 채워 새 견적서를 바로 만드시겠습니까?' }),
+      qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '📝 표준 양식으로 작성하기', onclick: function () {
+        var supD = String(supIn.value || '').replace(/\D/g, '');
+        if (closeModalFn) closeModalFn();
+        openFormPickerAndFill({ mode: 'quote', modalTitle: '📝 표준 견적서 양식으로 작성', kindKey: tSel.value, coName: coIn.value.trim(), amount: supD ? Number(supD) : '', term: tmIn.value.trim(), scope: scIn.value.trim() });
+      } })
+    ]),
+    qEl('div', { style: 'font-size:12.5px;font-weight:700;color:#475569;margin:8px 0 4px', text: '내 PC의 견적서 파일 올리기 (보관함 🔒 원본 보관 + 목록 등록)' }),
+    qEl('label', { text: '파일 (.hwp · .hwpx · .pdf · .xlsx · .docx)' }), fileIn,
+    qEl('label', { text: '의뢰처·회사명 *' }), coIn,
+    qEl('label', { text: '업무 종류' }), tSel,
+    qEl('label', { text: '과업 요약' }), scIn,
+    qEl('label', { text: '수행·계약 기간' }), tmIn,
+    qEl('label', { text: '금액(원)' }), supIn,
+    qEl('label', { text: '부가세' }), vatSel
+  ], function (close) {
+    closeModalFn = close;
+    var upBtn = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '📎 파일 올려 등록', onclick: function () {
+      var f = fileIn.files && fileIn.files[0], co = coIn.value.trim();
+      if (!f) { showToast('올릴 견적서 파일을 골라 주세요'); return; }
+      if (!co) { showToast('의뢰처 이름을 적어 주세요'); coIn.focus(); return; }
+      var chk = PuOfficeStore.okDocFile(f.name, f.size);
+      if (!chk.ok) { showToast('❌ ' + chk.why); return; }
+      upBtn.disabled = true; upBtn.textContent = '올리는 중…';
+      var supD = String(supIn.value || '').replace(/\D/g, '');
+      f.arrayBuffer().then(function (ab) {
+        var bytes = new Uint8Array(ab);
+        return trackedWrite(PuOfficeStore.putOriginal({ name: f.name, size: f.size, type: f.type || '', bytes: bytes }, { kind: 'quote', coName: co }, { secret: true }));
+      }).then(function (put) {
+        var ownerUid = curUser ? curUser.uid : '';
+        return trackedWrite(PuQuotes.save({
+          doc: 'quote', type: tSel.value, co: co, date: qTodayYmd(),
+          scope: scIn.value.trim() || f.name.replace(/\.[^.]+$/, ''),
+          period: tmIn.value.trim(), fileId: put.fileId,
+          ownerGuess: meName(), review: supD ? 'ok' : 'check', src: { how: 'upload' }
+        }, supD ? { amount: Number(supD), vat: vatSel.value, owner: ownerUid } : (ownerUid ? { vat: '', owner: ownerUid } : null)));
+      }).then(function () {
+        close(); showToast('✅ 견적서를 등록했습니다');
+        if (onDone) onDone();
+      }, function (e) { upBtn.disabled = false; upBtn.textContent = '📎 파일 올려 등록'; showToast('❌ ' + ((e && e.message) || e)); });
+    } });
+    return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '취소', onclick: close }), upBtn];
+  });
+}
+
+/* 견적서·계약서 파일을 공용 양식함(data/contract_forms)에 등록 — 주민번호 가림 + 실명·금액 {{치환}} 검수 후 등록 */
+function formKindOfQuoteOrCo(quoteType, coKind) {
+  if (quoteType === 'case' || coKind === '사건') return 'case';
+  if (quoteType === 'hr_consult' || quoteType === 'safety'
+    || coKind === '컨설팅' || coKind === '산업안전') return 'consulting';
+  if (quoteType === 'fund' || coKind === '기금') return 'fund';
+  if (quoteType === 'education' || quoteType === 'other' || coKind === '교육·강의' || coKind === '기타') return 'other';
+  if (coKind === '제안서') return 'consult';
+  return 'company';
+}
+function sanitizeFormDraftText(txt, opts) {
+  opts = opts || {};
+  var out = String(txt == null ? '' : txt);
+  if (window.PuRrnMask && typeof PuRrnMask.maskRrnInText === 'function') out = PuRrnMask.maskRrnInText(out).text;
+  var co = String(opts.coName || '').trim();
+  if (co.length >= 2) out = out.split(co).join('{{회사명}}');
+  var bz = String(opts.bizNo || '').replace(/\D/g, '');
+  if (bz.length === 10) {
+    out = out.split(bz.slice(0, 3) + '-' + bz.slice(3, 5) + '-' + bz.slice(5)).join('{{사업자번호}}');
+    out = out.split(bz).join('{{사업자번호}}');
+  }
+  var amtNum = Number(String(opts.amount == null ? '' : opts.amount).replace(/\D/g, ''));
+  if (amtNum >= 1000 && isFinite(amtNum)) {
+    out = out.split(amtNum.toLocaleString('ko-KR')).join('{{계약금액}}');
+    out = out.split(String(amtNum)).join('{{계약금액}}');
+  }
+  return out;
+}
+function registerDocBytesAsForm(opts) {
+  opts = opts || {};
+  var rawTitle = String(opts.title || (opts.name || '새 양식').replace(/\.[^.]+$/, '')).trim();
+  if (opts.coName && opts.coName.length >= 2) rawTitle = rawTitle.split(opts.coName).join('표준').replace(/\s{2,}/g, ' ').trim();
+  var fallbackBody = (rawTitle || '표준 양식') + '\n\n의뢰처: {{회사명}}\n계약금액: 금 {{계약금액}}원 ({{부가세처리}})\n계약기간: {{계약기간}}\n계약일: {{계약일}}';
+  var nmIn = qEl('input', { type: 'text', value: rawTitle, placeholder: '양식 이름 *', style: 'width:100%;font-size:16px' });
+  var kSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' },
+    PuContractForms.KINDS.map(function (k) { return qEl('option', { value: k.v, text: k.icon + ' ' + k.label }); }));
+  kSel.value = formKindOfQuoteOrCo(opts.quoteType, opts.coKind);
+  var rSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' }, [
+    qEl('option', { value: 'contract', text: '계약서·약정서 양식' }),
+    qEl('option', { value: 'quote', text: '견적서·제안서 양식' })
+  ]);
+  rSel.value = opts.docRole === 'quote' ? 'quote' : 'contract';
+  var gIn = qEl('input', { type: 'text', value: opts.docRole === 'quote' ? '제안서·견적서' : (opts.coKind || ''), placeholder: '(선택) 세부 묶음 이름', style: 'width:100%;font-size:16px' });
+  var bodyArea = qEl('textarea', { rows: '7', placeholder: '양식 본문 ({{회사명}}, {{계약금액}}, {{계약기간}} 등)', style: 'width:100%;font-size:13px;line-height:1.5;padding:8px;border:1px solid #cbd5e1;border-radius:6px' });
+  bodyArea.value = opts.bytes && opts.bytes.length ? '문서 본문을 추출하고 개인정보·실명을 {{변수}}로 치환하는 중…' : fallbackBody;
+  var canAttachRaw = !!(opts.bytes && opts.bytes.length <= 750 * 1024 && /\.(hwp|hwpx|xlsx)$/i.test(opts.name || '') && (!opts.isSecret || isAdmin));
+  var keepAtt = qEl('input', { type: 'checkbox', checked: !!(canAttachRaw && !opts.isSecret) });
+  if (opts.bytes && opts.bytes.length) {
+    quoteExtractText(opts.bytes).then(function (txt) {
+      var scrubbed = sanitizeFormDraftText(txt, opts);
+      bodyArea.value = scrubbed.trim() ? scrubbed : fallbackBody;
+    }, function () { bodyArea.value = fallbackBody; });
+  }
+  qModal('📄 공용 양식함에 등록', [
+    qEl('div', { style: 'font-size:12.5px;color:#475569;margin-bottom:8px', text: '공용 양식은 재직 직원 모두가 열람할 수 있습니다. 주민번호는 자동 가림 처리되며, 아래 양식 본문에서 고객사 실명·금액이 {{회사명}}·{{계약금액}}으로 잘 바뀌었는지 확인 후 등록해 주세요.' }),
+    qEl('label', { text: '양식 이름 *' }), nmIn,
+    qEl('label', { text: '분류 갈래' }), kSel,
+    qEl('label', { text: '서식 구분' }), rSel,
+    qEl('label', { text: '세부 묶음 (선택)' }), gIn,
+    qEl('label', { text: '양식 본문 검수 ({{회사명}} · {{계약금액}} · {{계약기간}} 편집 가능)' }), bodyArea,
+    canAttachRaw
+      ? qEl('label', { style: 'display:flex;align-items:flex-start;gap:6px;margin-top:10px;font-weight:400;color:#854d0e;font-size:12px' }, [keepAtt, '원본 서식 파일(' + opts.name + ')도 공용 양식에 첨부 (⚠ 전 직원이 열람 가능 — 고객사 실명·비밀 금액이 없는 빈 서식일 때만 체크)'])
+      : qEl('div', { style: 'font-size:12px;color:#64748b;margin-top:8px', text: '🔒 고객사 비밀 원본 파일은 첨부하지 않고, 위 검수된 텍스트 양식만 안전하게 공용 양식함에 등록합니다.' })
+  ], function (close) {
+    var go = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '📄 양식 등록', onclick: function () {
+      var nm = nmIn.value.trim();
+      if (!nm) { showToast('양식 이름을 적어 주세요'); nmIn.focus(); return; }
+      go.disabled = true; go.textContent = '등록 중…';
+      var finalBody = sanitizeFormDraftText(bodyArea.value || '', opts).trim() || fallbackBody;
+      var atts = [];
+      if (canAttachRaw && keepAtt.checked && opts.bytes && opts.bytes.length <= 750 * 1024) {
+        atts.push({ id: 'att-' + Date.now().toString(36), name: (nm + ((opts.name || '').match(/\.[^.]+$/) || ['.hwp'])[0]), size: opts.bytes.length, data: qBytesToDataUrl(opts.bytes, 'application/octet-stream') });
+      }
+      trackedWrite(PuContractForms.registerForm(db, {
+        name: nm, kind: kSel.value, docRole: rSel.value, groupName: gIn.value.trim(),
+        body: finalBody,
+        attachments: atts
+      })).then(function () {
+        close(); showToast('✅ 공용 양식함에 「' + nm + '」 양식을 등록했습니다');
+      }, function (e) { go.disabled = false; go.textContent = '📄 양식 등록'; showToast('❌ ' + ((e && e.message) || e)); });
+    } });
+    return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '취소', onclick: close }), go];
+  });
+}
+function quotesRegisterForm(rec, amt) {
+  var amtVal = amt && amt.amount != null ? amt.amount : '';
+  if (!rec || !rec.fileId) {
+    registerDocBytesAsForm({ title: '표준 견적서 양식', coName: rec && rec.co, amount: amtVal, isSecret: true, docRole: 'quote', quoteType: rec && rec.type });
+    return;
+  }
+  quotesFileBytes(rec).then(function (f) {
+    registerDocBytesAsForm({ name: f.name, bytes: f.bytes, title: f.name.replace(/\.[^.]+$/, ''), coName: rec.co, amount: amtVal, isSecret: true, docRole: rec.doc === 'contract' ? 'contract' : 'quote', quoteType: rec.type });
+  }, function (e) { showToast('원본을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
+}
+function officeRegisterForm(doc, kindHint, co, rec) {
+  if (!doc || !doc.fileId) return;
+  formFileBytes(doc.fileId).then(function (f) {
+    registerDocBytesAsForm({
+      name: f.name, bytes: f.bytes, title: doc.title || f.name.replace(/\.[^.]+$/, ''),
+      coName: (co && co.name) || '', bizNo: (co && co.bz) || (rec && rec.bizNo) || '',
+      amount: rec && rec.amount != null ? rec.amount : '', isSecret: !!doc.secret,
+      docRole: 'contract', coKind: kindHint || doc.kind || ''
+    });
+  }, function (e) { showToast('파일을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
+}
+
+/* ══ 📑 확정 계약서 관리 — 푸른메일·이알피 확정 계약서 일괄 수집 & 한글/양식 변경 관리 ══ */
+function guessCoFromMail(msg, attName) {
+  var raw = String((msg && (msg.tn || msg.fn)) || '').replace(/<[^>]*>/g, '').replace(/["']/g, '').trim();
+  if (raw && !/@|노무법인\s*푸른|푸른\s*노무/.test(raw)) {
+    var cleaned = raw.replace(/\s*(대표|담당자?|인사팀|총무팀|노무사|변호사|과장|차장|부장|팀장|이사|상무|전무|선생)?\s*님?$/, '').trim();
+    if (cleaned.length >= 2 && cleaned.length <= 40) return cleaned;
+  }
+  var s = String(attName || '').replace(/\.[^.]+$/, '') + ' ' + String((msg && msg.s) || '');
+  var m = /[\[【(]([^\]】)]{2,24})[\]】)]/.exec(s);
+  if (m && !/푸른|계약|견적|서명|최종|회신|날인|초안|수정/.test(m[1])) return m[1].trim();
+  var parts = String(attName || '').replace(/\.[^.]+$/, '').split(/[_\-—]/).map(function (x) { return x.trim(); }).filter(Boolean);
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].length >= 2 && !/푸른|계약|약정|위임|합의|자문|컨설팅|조사|서명|날인|최종|\d{4}/.test(parts[i])) return parts[i];
+  }
+  return '';
+}
+function erpKindToCoKind(c) {
+  var ks = [].concat(c.kinds || (c.kind ? [c.kind] : [])).join(' ') + ' ' + String(c.typeCode || '') + ' ' + String(c.caseType || '') + ' ' + String(c.title || c.memo || '');
+  var g = window.PuCoRoster && PuCoRoster.guessKind ? PuCoRoster.guessKind(ks) : '';
+  if (g) return g;
+  if (/payroll|급여/i.test(ks)) return '급여관리';
+  if (/case|사건/i.test(ks)) return '사건';
+  if (/consult|컨설팅/i.test(ks)) return '컨설팅';
+  if (/fund|기금/i.test(ks)) return '기금';
+  return '자문';
+}
+function confirmedContractImporter() {
+  return {
+    scanMail: function () {
+      return Promise.all([
+        db.ref('mailbox/folders').once('value').then(function (s) { return s.val() || {}; }, function () { return {}; }),
+        PuOfficeStore.listOriginals().catch(function () { return []; })
+      ]).then(function (init) {
+        var folders = init[0], origs = init[1] || [];
+        var importedMsg = {};
+        origs.forEach(function (o) { if (o && o.from && o.from.msgKey) importedMsg[o.from.msgKey] = 1; });
+        var slugs = Object.keys(folders).filter(function (k) { return /^(INBOX-|Sent Messages-)/i.test(k); });
+        if (!slugs.length) throw new Error('푸른메일 폴더를 찾지 못했습니다 — 푸른 메일을 먼저 동기화해 주세요');
+        return Promise.all(slugs.map(function (slug) {
+          return db.ref('mailbox/msgs/' + slug).orderByChild('d').limitToLast(2500).once('value')
+            .then(function (sn) { return { slug: slug, msgs: sn.val() || {} }; }, function () { return { slug: slug, msgs: {} }; });
+        })).then(function (packs) {
+          var out = [];
+          packs.forEach(function (pk) {
+            var isSent = /^Sent Messages-/i.test(pk.slug);
+            var folderLabel = isSent ? '보낸메일' : '받은메일';
+            Object.keys(pk.msgs).forEach(function (msgId) {
+              var m = pk.msgs[msgId] || {};
+              var imapUid = /^\d+$/.test(String(m.u || '')) && Number(m.u) > 0 ? String(m.u) : (/^\d+$/.test(msgId) && Number(msgId) > 0 ? msgId : '');
+              if (!imapUid) return;
+              var anList = PuQuoteDetect.namesOf(m.an);
+              if (!anList.length) return;
+              anList.forEach(function (anRaw, idx) {
+                var an = PuQuoteImport.nfc(anRaw);
+                if (!PuOfficeStore.okDocFile(an, 1).ok) return;
+                if (!PuQuoteDetect.isOurContract(m.s || '', [an]) && !(window.PuCoRoster && PuCoRoster.guessKind(an))) return;
+                if (PuQuoteDetect.isOurQuote(m.s || '', [an]) && !PuQuoteDetect.isOurContract('', [an])) return;
+                var msgKey = pk.slug + '__' + msgId + '__' + idx;
+                var signed = PuQuoteDetect.isSignedContract ? PuQuoteDetect.isSignedContract(m.s || '', [an]) : (!isSent && /서명|날인|체결|완료|스캔/.test((m.s || '') + ' ' + an));
+                var guessed = (window.PuCoRoster && PuCoRoster.guessKind(an + ' ' + (m.s || ''))) || '자문';
+                var dt = m.d ? new Date(Number(m.d)) : null;
+                var ymd = dt && !isNaN(dt.getTime())
+                  ? dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2)
+                  : '';
+                out.push({
+                  msgKey: msgKey, slug: pk.slug, uid: imapUid, attIndex: idx, attCount: Number(m.a) || anList.length,
+                  attName: an, subject: String(m.s || ''), folderLabel: folderLabel,
+                  coName: guessCoFromMail(m, an), kind: guessed, date: ymd, ts: Number(m.d) || 0,
+                  signed: !!signed, imported: !!importedMsg[msgKey]
+                });
+              });
+            });
+          });
+          out.sort(function (a, b) {
+            if (a.imported !== b.imported) return a.imported ? 1 : -1;
+            if (a.signed !== b.signed) return a.signed ? -1 : 1;
+            return b.ts - a.ts;
+          });
+          return out;
+        });
+      });
+    },
+    importMail: function (rows, onStep) {
+      var list = rows || [], ok = 0, fail = 0;
+      return list.reduce(function (p, r, idx) {
+        return p.then(function () {
+          if (onStep) onStep(idx + 1, list.length, r.coName || r.attName);
+          return quoteFetchAtt(r).then(function (file) {
+            var co = String(r.coName || '').trim() || '미지정업체';
+            return trackedWrite(PuOfficeStore.putOriginal({ name: file.name, size: file.bytes.length, type: file.type || '', bytes: file.bytes },
+              { kind: 'co', coKey: PuOfficeStore.coKey(co), coName: co, via: 'mail', msgKey: String(r.msgKey).slice(0, 180) }, { secret: true }))
+              .then(function (put) {
+                var title = String(r.attName || r.subject || '계약서').replace(/\.[^.]+$/, '').slice(0, 110);
+                return trackedWrite(PuOfficeStore.addCoDoc({ coName: co, fileId: put.fileId, title: title, date: r.date || qTodayYmd(), src: 'upload', secret: put.secret !== false }));
+              }).then(function (added) {
+                return trackedWrite(PuOfficeStore.updateCoDoc(added.coKey, added.docId, { kind: r.kind || '자문' })).catch(function () {})
+                  .then(function () {
+                    return trackedWrite(PuOfficeStore.importCoRecs([{
+                      coName: co, date: r.date || qTodayYmd(), kind: r.kind || '자문',
+                      docId: added.docId, src: 'import', note: '푸른메일 확정 계약서 (' + (r.folderLabel || '메일') + ')'
+                    }]));
+                  });
+              });
+          }).then(function () { ok++; }, function () { fail++; });
+        });
+      }, Promise.resolve()).then(function () { return { ok: ok, fail: fail }; });
+    },
+    scanErp: function () {
+      return Promise.all([formContractData(true), PuOfficeStore.listAllCoData().catch(function () { return { recs: {}, docs: {} }; })]).then(function (got) {
+        var data = got[0], allRecs = (got[1] && got[1].recs) || {};
+        var usersBySid = {};
+        (data.users || []).forEach(function (u) { if (u && u.sid && u.name) usersBySid[String(u.sid).toUpperCase()] = u.name; });
+        var cosById = {};
+        (data.cos || []).forEach(function (co) { if (co && co.id) cosById[co.id] = co; });
+        var seenRec = {};
+        Object.keys(allRecs).forEach(function (ck) {
+          var m = allRecs[ck] || {};
+          Object.keys(m).forEach(function (rid) {
+            var x = m[rid] || {};
+            seenRec[ck + '|' + (x.date || '') + '|' + (x.kind || '')] = 1;
+            if (x.note) seenRec['note|' + x.note] = 1;
+          });
+        });
+        return (data.cs || []).filter(function (c) {
+          if (!c || !c.id) return false;
+          var st = String(c.status || '').toLowerCase();
+          return st !== 'cancelled' && st !== 'canceled' && st !== 'draft';
+        }).map(function (c) {
+          var coObj = (c.companyId && cosById[c.companyId]) || {};
+          var coName = String(c.companyName || (c.company && c.company.name) || coObj.name || '').trim();
+          var bizNo = String(c.bizNo || (c.company && c.company.bizNo) || coObj.bizNo || '').replace(/\D/g, '').slice(0, 10);
+          var date = String(c.signDate || c.contractDate || c.startDate || '').slice(0, 10);
+          var kind = erpKindToCoKind(c);
+          var amt = Number(c.monthlyFee || c.fee || c.amount || c.contractAmount || 0) || null;
+          var staff = String(c.managerName || usersBySid[String(c.managerSid || c.ownerSid || '').toUpperCase()] || '').slice(0, 30);
+          var note = '이알피 계약 ' + String(c.contractNo || c.id).slice(0, 40);
+          var ck = PuOfficeStore.coKey(coName);
+          var imported = !coName || !!seenRec[ck + '|' + date + '|' + kind] || !!seenRec['note|' + note];
+          return {
+            id: c.id, contractNo: c.contractNo || '', coName: coName || '(회사명 없음)', bizNo: bizNo,
+            date: date, kind: kind, amount: amt, payDay: String(c.payDay || '').slice(0, 12),
+            staff: staff, note: note, imported: imported
+          };
+        }).sort(function (a, b) {
+          if (a.imported !== b.imported) return a.imported ? 1 : -1;
+          return String(b.date).localeCompare(String(a.date));
+        });
+      });
+    }
+  };
+}
+
+/* 확정 계약서 → 표준 양식 또는 변경·연장 합의서로 수정·갱신 작성 */
+function officeFillFromCo(co, doc, rec, asAmend) {
+  var coName = (co && co.name) || '';
+  var bizNo = (co && co.bz) || (rec && rec.bizNo) || '';
+  var kind = asAmend ? '변경·갱신' : ((rec && rec.kind) || (doc && doc.kind) || (window.PuCoRoster && doc && PuCoRoster.guessKind(doc.title)) || '자문');
+  var amt = rec && rec.amount != null ? rec.amount : '';
+  var init = {
+    '회사명': coName,
+    '사업자번호': bizNo,
+    '계약일': qTodayYmd()
+  };
+  if (amt !== '') {
+    init['계약금액'] = Number(amt).toLocaleString('ko-KR');
+    init['견적금액'] = Number(amt).toLocaleString('ko-KR');
+  }
+  if (rec && rec.payDay) init['수수료지급일'] = String(rec.payDay).replace(/일$/, '') + '일';
+  if (asAmend && ((rec && rec.date) || (doc && doc.date))) {
+    init['과업내용'] = '원 계약(' + ((rec && rec.date) || (doc && doc.date)) + ' 체결 ' + ((rec && rec.kind) || (doc && doc.title) || '') + ')의 계약기간 연장 및 보수 조건 변경';
+  }
+  openFormPickerAndFill({
+    mode: asAmend ? 'amend' : 'contract',
+    modalTitle: asAmend ? '📑 계약 변경·연장 합의서 작성 — ' + coName : '📝 확정 계약 기반 변경·갱신 계약서 작성 — ' + coName,
+    kindKey: kind, coName: coName, bizNo: bizNo, amount: amt, scope: init['과업내용'] || '', initial: init
+  });
+}
+
+/* 확정 계약서 한글(.hwp/.hwpx) 직접 수정 → 새 변경·갱신 계약서 사본 저장(원본 보존) */
+function officeEditCoHwp(co, doc, rec, onSaved) {
+  if (!doc || !doc.fileId) return;
+  formFileBytes(doc.fileId).then(function (f) {
+    if (!/\.(hwp|hwpx)$/i.test(f.name || '')) {
+      showToast('스캔·PDF 파일이어서 표준 양식 변경·갱신 작성 창으로 엽니다');
+      officeFillFromCo(co, doc, rec, false);
+      return null;
+    }
+    return formHwpEdit(f.bytes, f.name).then(function (edited) {
+      if (!edited) return;
+      var ext = /\.hwpx$/i.test(f.name) ? '.hwpx' : '.hwp';
+      var coName = (co && co.name) || '';
+      var today = qTodayYmd();
+      var defTitle = ((doc.title || f.name.replace(/\.[^.]+$/, '')) + ' (변경·갱신 ' + today + ')').slice(0, 110);
+      var newName = PuOfficeStore.safeFileName(defTitle) + ext;
+      var tIn = qEl('input', { type: 'text', value: defTitle, style: 'width:100%;font-size:16px' });
+      var dIn = qEl('input', { type: 'date', value: today, style: 'width:100%;font-size:16px' });
+      var kinds = (window.PuCoRoster && PuCoRoster.KINDS) || ['자문', '변경·갱신', '기타'];
+      var kSel = qEl('select', { style: 'width:100%;font-size:16px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px' },
+        kinds.map(function (k) { return qEl('option', { value: k, text: k }); }));
+      kSel.value = (rec && rec.kind) || doc.kind || '변경·갱신';
+      var aIn = qEl('input', { type: 'text', inputmode: 'numeric', value: rec && rec.amount != null ? String(rec.amount) : '', placeholder: '변경 계약금액(원, 선택)', style: 'width:100%;font-size:16px' });
+      var stat = qEl('div', { style: 'font-size:12.5px;color:#166534;margin-bottom:8px', text: '✔ 한글 편집이 완료되었습니다. 기존 서명본·원본은 그대로 보존되고 새 변경·갱신 계약서로 추가됩니다.' });
+      qModal('🔒 변경·갱신 확정 계약서 저장 · 발송 — ' + coName, [
+        stat,
+        qEl('label', { text: '새 계약서 제목' }), tIn,
+        qEl('label', { text: '변경·갱신 계약일' }), dIn,
+        qEl('label', { text: '계약 종류' }), kSel,
+        qEl('label', { text: '계약 금액(원)' }), aIn,
+        qEl('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px' }, [
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📥 한글 내려받기', onclick: function () { qSaveBytes(edited, PuOfficeStore.safeFileName(tIn.value.trim() || defTitle) + ext); } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📕 PDF 내려받기', onclick: function () {
+            stat.textContent = 'PDF 변환 중…';
+            formHwpPdf(edited, newName).then(function (pdf) {
+              qSaveBytes(pdf, PuOfficeStore.safeFileName(tIn.value.trim() || defTitle) + '.pdf', 'application/pdf');
+              stat.textContent = '✔ PDF로 내려받았습니다.';
+            }, function (e) { stat.textContent = '❌ PDF 변환 실패: ' + ((e && e.message) || e); });
+          } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '✉ 메일 발송', onclick: function () {
+            var fn = PuOfficeStore.safeFileName(tIn.value.trim() || defTitle) + ext;
+            qSendMailDialog(coName, (co && co.bz) || '', tIn.value.trim() || defTitle, { name: fn, bytes: edited });
+          } }),
+          qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '📄 공용 양식 등록', onclick: function () {
+            registerDocBytesAsForm({ name: newName, bytes: edited, title: tIn.value.trim() || defTitle, coName: coName, bizNo: (co && co.bz) || '', amount: aIn.value, isSecret: true, docRole: 'contract', coKind: kSel.value });
+          } })
+        ])
+      ], function (close) {
+        var saveBtn = qEl('button', { type: 'button', 'class': 'btn btn-pri', text: '🔒 이 회사에 새 계약서로 저장', onclick: function () {
+          saveBtn.disabled = true; saveBtn.textContent = '저장 중…';
+          var title = tIn.value.trim() || defTitle;
+          var fn = PuOfficeStore.safeFileName(title) + ext;
+          var amtD = String(aIn.value || '').replace(/\D/g, '');
+          trackedWrite(PuOfficeStore.putOriginal({ name: fn, size: edited.length, type: 'application/x-hwp', bytes: edited },
+            { kind: 'co', coKey: PuOfficeStore.coKey(coName), coName: coName }, { secret: true }))
+            .then(function (put) {
+              return trackedWrite(PuOfficeStore.addCoDoc({ coName: coName, fileId: put.fileId, title: title, date: dIn.value || today, src: 'upload', secret: put.secret !== false }));
+            }).then(function (added) {
+              return trackedWrite(PuOfficeStore.updateCoDoc(added.coKey, added.docId, { kind: kSel.value })).catch(function () {})
+                .then(function () {
+                  return trackedWrite(PuOfficeStore.importCoRecs([{
+                    coName: coName, bizNo: (co && co.bz) || '', date: dIn.value || today, kind: kSel.value,
+                    amount: amtD ? Number(amtD) : null, payDay: (rec && rec.payDay) || '', staff: (rec && rec.staff) || meName(),
+                    docId: added.docId, note: '변경·갱신 계약 저장'
+                  }]));
+                });
+            }).then(function () {
+              close(); showToast('✅ 새 변경·갱신 계약서를 저장했습니다 (원본 보존)');
+              if (onSaved) onSaved();
+            }, function (e) { saveBtn.disabled = false; saveBtn.textContent = '🔒 이 회사에 새 계약서로 저장'; stat.textContent = '❌ ' + ((e && e.message) || e); });
+        } });
+        return [qEl('button', { type: 'button', 'class': 'btn btn-sub', text: '닫기', onclick: close }), saveBtn];
+      });
+    });
+  }).catch(function (e) { showToast('계약서 파일을 열지 못했습니다 — ' + ((e && e.message) || e)); });
 }
 </script>
 <!-- ── 폰 뒤로가기 — 창을 한 걸음씩 닫는다 (대표 지시 2026-08-30) ──
