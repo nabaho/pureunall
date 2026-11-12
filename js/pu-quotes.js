@@ -19,7 +19,7 @@
     { code: 'investigation', label: '괴롭힘·성희롱 조사' },
     { code: 'safety', label: '산업안전 컨설팅' },
     { code: 'hr_consult', label: '인사노무 컨설팅' },
-    { code: 'bargaining', label: '임금·단체교섭' },
+    { code: 'bargaining', label: '노사관계·단체교섭' },
     { code: 'fund', label: '근로복지기금' },
     { code: 'opinion', label: '의견서' },
     { code: 'advice', label: '노무자문' },
@@ -29,11 +29,11 @@
   /* 위 순서로 처음 맞는 것 — «기타» 는 낱말 없이 마지막 */
   var WORDS = [
     ['education', /교육|강의|특강/],
-    ['investigation', /괴롭힘|성희롱|진상\s*조사/],
+    ['investigation', /괴롭힘|성희롱|진상\s*조사|사안\s*조사/],
     ['safety', /산업\s*안전|중대\s*재해|안전\s*보건|위험성\s*평가/],
-    ['hr_consult', /직무\s*분석|규정|진단|인건비|원가|인사\s*노무\s*컨설팅|컨설팅/],
-    ['bargaining', /교섭|임금\s*협상|단체\s*협약/],
-    ['fund', /근로\s*복지\s*기금|복지\s*기금|기금\s*설립/],
+    ['hr_consult', /직무\s*분석|취업\s*규칙|인사\s*규정|규정|진단|실태\s*조사|불법\s*파견|하도급|인건비|원가|인사\s*노무\s*컨설팅|컨설팅/],
+    ['bargaining', /교섭|임금\s*협상|단체\s*협약|노사\s*관계|노사\s*협의회|노동\s*조합|노조/],
+    ['fund', /근로\s*복지\s*기금|복지\s*기금|기금\s*설립|사내\s*기금|공동\s*기금/],
     ['opinion', /의견서|법률\s*검토/],
     ['advice', /자문|급여\s*관리|급여\s*위임|아웃소싱|사무\s*위탁/],
     ['case', /위임|대리|사건|구제\s*신청|체당금|대지급금/]

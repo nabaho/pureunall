@@ -103,13 +103,13 @@
     return n;
   }
 
-  /* 금액 칸은 «4,000,000원 (부가세 별도)» 가 한 줄에 다 보이는 폭(176px) — 좁으면 부가세 말이 잘려 별도·포함이 안 보인다 */
-  var COLS = '28px 36px 88px minmax(110px,1.1fr) 44px minmax(120px,2fr) 88px 52px 176px 130px 56px auto';
+  /* 금액 칸은 «4,000,000원 (부가세 별도)» 가 한 줄에 다 보이는 폭(168px) — 1366px 본문 안에서도 가로 잘림 없이 전 열 노출 */
+  var COLS = '26px 32px 84px minmax(96px,1.1fr) 40px minmax(100px,1.8fr) 74px 46px 168px minmax(88px,1fr) 52px auto';
   var CSS = '.pqv{font-size:13px}.pqv button,.pqv select,.pqv input[type=search],.pqv input[type=text],.pqv input[type=date],.pqv textarea{font-family:inherit;font-size:13px}'
     + '.pqv-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}'
     + '.pqv-tchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}'
     + '.pqv-tools input[type=search]{border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;min-width:180px}'
-    + '.pqv-tools .chip,.pqv-tchips .chip,.pqv .btn{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:4px 10px;cursor:pointer}'
+    + '.pqv-tools .chip,.pqv-tchips .chip,.pqv .btn{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:4px 10px;min-height:28px;cursor:pointer}'
     + '.pqv .btn.pri{background:#1e40af;border-color:#1e40af;color:#fff;font-weight:700}'
     + '.pqv .btn.grn{background:#166534;border-color:#166534;color:#fff;font-weight:700}'
     + '.pqv .btn.sub{background:#eff6ff;border-color:#93c5fd;color:#1e40af;font-weight:600}'
@@ -119,16 +119,16 @@
     + '.pqv-imp{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc}'
     + '.pqv-sel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe}'
     + '.pqv-g{margin:12px 0 4px;font-weight:700;color:#1e293b}.pqv-g i{font-style:normal;font-weight:400;color:#64748b;margin-left:6px}'
-    + '.pqv-wrap{overflow-x:auto}.pqv-list{min-width:1040px}'
-    + '.pqv-row{display:grid;grid-template-columns:' + COLS + ';align-items:center;column-gap:6px;padding:5px 4px;border-bottom:1px solid #e2e8f0}'
+    + '.pqv-wrap{overflow-x:auto}.pqv-list{min-width:0}'
+    + '.pqv-row{display:grid;grid-template-columns:' + COLS + ';align-items:center;column-gap:5px;padding:5px 4px;border-bottom:1px solid #e2e8f0}'
     + '.pqv-row.clickable .c-co,.pqv-row.clickable .c-scope{cursor:pointer}.pqv-row.clickable:hover{background:#f8fafc}'
     + '.pqv-row>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pqv-head{font-weight:700;color:#475569;background:#f8fafc;border-bottom:1px solid #cbd5e1}'
     + '.pqv-no{font-variant-numeric:tabular-nums;color:#64748b;text-align:right}'
-    + '.pqv-row input[type=checkbox]{width:16px;height:16px;margin:0}'
-    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#94a3b8}.pqv-amt.chk{color:#b45309}'
+    + '.pqv-row input[type=checkbox]{width:24px;height:24px;margin:0}'
+    + '.pqv-amt{font-variant-numeric:tabular-nums}.pqv-amt.lock{color:#64748b}.pqv-amt.chk{color:#b45309}'
     + '.pqv-meta{display:none}'
-    + '.pqv .empty{padding:18px;color:#64748b;text-align:center}.pqv .msg{margin:6px 0;color:#334155}'
+    + '.pqv .empty{padding:18px;color:#475569;text-align:center}.pqv .msg{margin:6px 0;color:#334155}'
     + '.pqv-mbg{position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px}'
     + '.pqv-modal{background:#fff;border-radius:12px;width:1060px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);overflow:hidden}'
     + '.pqv-mh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid #e2e8f0;background:#f8fafc}'
@@ -141,6 +141,14 @@
     + '.pqv-fg{display:flex;flex-direction:column;gap:3px}.pqv-fg label{font-size:11.5px;font-weight:700;color:#475569}'
     + '.pqv-fg input,.pqv-fg select,.pqv-fg textarea{border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px}'
     + '.pqv-frow2{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+    + '@media(min-width:701px) and (max-width:1200px){'
+    + '.pqv-wrap{overflow-x:visible}.pqv-list{min-width:0}.pqv-head{display:none}'
+    + '.pqv-row{grid-template-columns:28px 32px minmax(0,1fr) auto auto auto;grid-template-areas:"chk no co amt open act" "chk no meta meta meta meta";row-gap:3px}'
+    + '.pqv-row .c-chk{grid-area:chk}.pqv-row .c-no{grid-area:no}.pqv-row .c-co{grid-area:co;font-weight:600}.pqv-row .c-amt{grid-area:amt;text-align:right}'
+    + '.pqv-row .c-open{grid-area:open}.pqv-row .c-act{grid-area:act}.pqv-row .c-meta{grid-area:meta;display:block;color:#475569}'
+    + '.pqv-row .c-date,.pqv-row .c-doc,.pqv-row .c-scope,.pqv-row .c-period,.pqv-row .c-staff,.pqv-row .c-who{display:none}'
+    + '.pqv-mb{grid-template-columns:1fr}'
+    + '}'
     + '@media(max-width:700px){'
     + '.pqv input[type=search],.pqv select{font-size:16px}'
     + '.pqv input[type=text],.pqv input[type=date],.pqv textarea{font-size:16px}'
@@ -324,7 +332,22 @@
       var canEditInPlace = role.isAdmin === true || !!(host.uid && r.by && r.by === host.uid);
       var canFile = canOpen(r, amt, role, host.uid);
       var T = typesOf(host.types);
-      function closeDetail() { unbindDetailEsc(); st.detailId = ''; draw(); }
+      function closeDetail(skipRestore) {
+        unbindDetailEsc();
+        var rid = st.restoreRowId, rt = st.restoreTarget;
+        st.detailId = ''; st.restoreRowId = ''; st.restoreTarget = '';
+        draw();
+        if (skipRestore !== true && rid && root.querySelectorAll) {
+          var rows = Array.prototype.slice.call(root.querySelectorAll('.pqv-row'));
+          for (var i = 0; i < rows.length; i++) {
+            if (rows[i].getAttribute && rows[i].getAttribute('data-qid') === rid) {
+              var tgt = rt === 'co' ? rows[i].querySelector('.c-co') : (rows[i].querySelector('.c-act') && rows[i].querySelector('.c-act').querySelector('button'));
+              if (tgt && typeof tgt.focus === 'function') { try { tgt.focus(); } catch (_) {} }
+              break;
+            }
+          }
+        }
+      }
 
       var barKids = [];
       if (canFile && typeof host.editQuoteHwp === 'function') {
@@ -460,19 +483,28 @@
         formBox.appendChild(el('div', { 'class': 'msg', text: '수행 기간: ' + (r.period || NONE) }));
       }
 
-      var mbg = el('div', { 'class': 'pqv-mbg', role: 'dialog', 'aria-modal': 'true', 'aria-label': '견적·계약 참고 및 수정' }, [
-        el('div', { 'class': 'pqv-modal' }, [
-          el('div', { 'class': 'pqv-mh' }, [
-            el('b', { text: (r.doc === 'contract' ? '📑 계약 상세 · ' : '💼 견적 상세 · ') + (r.co || '(의뢰처 미입력)') + ' (' + (r.date || '') + ')' }),
-            btn('닫기 ✕', closeDetail)
-          ]),
-          barKids.length ? el('div', { 'class': 'pqv-mbar' }, barKids) : null,
-          el('div', { 'class': 'pqv-mb' }, [prevBox, formBox])
-        ])
+      var modalEl = el('div', { 'class': 'pqv-modal' }, [
+        el('div', { 'class': 'pqv-mh' }, [
+          el('b', { text: (r.doc === 'contract' ? '📑 계약 상세 · ' : '💼 견적 상세 · ') + (r.co || '(의뢰처 미입력)') + ' (' + (r.date || '') + ')' }),
+          btn('닫기 ✕', function () { closeDetail(); })
+        ]),
+        barKids.length ? el('div', { 'class': 'pqv-mbar' }, barKids) : null,
+        el('div', { 'class': 'pqv-mb' }, [prevBox, formBox])
       ]);
+      var mbg = el('div', { 'class': 'pqv-mbg', role: 'dialog', 'aria-modal': 'true', 'aria-label': '견적·계약 참고 및 수정' }, [modalEl]);
       mbg.addEventListener('click', function (e) { if (e.target === mbg) closeDetail(); });
       if (w.document && w.document.addEventListener) {
-        var onKey = function (e) { if (e && e.key === 'Escape') closeDetail(); };
+        var onKey = function (e) {
+          if (!e) return;
+          if (e.key === 'Escape') { e.preventDefault(); closeDetail(); return; }
+          if (e.key === 'Tab' && modalEl.querySelectorAll) {
+            var fcs = Array.prototype.slice.call(modalEl.querySelectorAll('button,input,select,textarea')).filter(function (x) { return !x.disabled && x.getAttribute('disabled') === null; });
+            if (!fcs.length) return;
+            var firstEl = fcs[0], lastEl = fcs[fcs.length - 1], ae = w.document.activeElement;
+            if (e.shiftKey && (ae === firstEl || (modalEl.contains && !modalEl.contains(ae)))) { e.preventDefault(); lastEl.focus(); }
+            else if (!e.shiftKey && ae === lastEl) { e.preventDefault(); firstEl.focus(); }
+          }
+        };
         w.document.addEventListener('keydown', onKey);
         escCleanup = function () { w.document.removeEventListener('keydown', onKey); };
       }
@@ -503,19 +535,19 @@
       var scCell = cell('c-scope', scope);
       if (hasRich) {
         var allowed = canManage(r, amt, role, host.uid);
-        var openDetail = function () { st.detailId = r.id; draw(); };
-        var ab = btn(allowed ? '✏ 참고·수정' : '📝 양식 참고', openDetail, allowed ? 'sub' : '');
+        var openDetail = function (target) { st.restoreRowId = r.id; st.restoreTarget = target || 'act'; st.detailId = r.id; st.needModalFocus = true; draw(); };
+        var ab = btn(allowed ? '✏ 참고·수정' : '📝 양식 참고', function () { openDetail('act'); }, allowed ? 'sub' : '');
         ab.setAttribute('title', allowed ? '원본 미리보기·한글 수정·양식 채우기·정보 고치기' : '공개 정보로 표준 양식 채우기');
         act.appendChild(ab);
         coCell.setAttribute('role', 'button');
         coCell.setAttribute('tabindex', '0');
-        coCell.addEventListener('click', openDetail);
+        coCell.addEventListener('click', function () { openDetail('co'); });
         coCell.addEventListener('keydown', function (e) {
-          if (e && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail(); }
+          if (e && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail('co'); }
         });
-        scCell.addEventListener('click', openDetail);
+        scCell.addEventListener('click', function () { openDetail('act'); });
       }
-      var row = el('div', { 'class': 'pqv-row' + (hasRich ? ' clickable' : ''), role: 'row' }, [
+      var row = el('div', { 'class': 'pqv-row' + (hasRich ? ' clickable' : ''), role: 'row', 'data-qid': r.id }, [
         chk, el('span', { 'class': 'c-no pqv-no', text: String(no) }),
         cell('c-date', r.date || NONE), coCell, cell('c-doc', docTxt),
         scCell, cell('c-period', period), cell('c-staff', staff),
@@ -562,8 +594,20 @@
       if (st.rows === null) { box.appendChild(el('div', { 'class': 'empty', text: '불러오는 중…' })); root.appendChild(box); return; }
       if (!st.rows.length) {
         box.appendChild(el('div', { 'class': 'empty', text: '아직 모아 둔 견적·계약이 없습니다.' }));
+        var emptyBtns = [];
+        if (host.importer && role.isAdmin === true) {
+          var empImp = btn('⚡ 푸른메일 보낸 견적서·계약서 한 번에 가져오기', function () {
+            if (typeof host.importer.runFast === 'function') runImportMode(true);
+            else runImport();
+          }, 'pri');
+          if (st.impBusy) empImp.setAttribute('disabled', 'disabled');
+          emptyBtns.push(empImp);
+        }
         if (typeof host.createNew === 'function') {
-          box.appendChild(el('div', { 'class': 'pqv-tools', style: 'justify-content:center' }, [btn('+ 새 견적서 작성·올리기', function () { host.createNew(load); }, 'pri')]));
+          emptyBtns.push(btn('+ 새 견적서 작성·올리기', function () { host.createNew(load); }, emptyBtns.length ? 'grn' : 'pri'));
+        }
+        if (emptyBtns.length) {
+          box.appendChild(el('div', { 'class': 'pqv-tools', style: 'justify-content:center' }, emptyBtns));
         }
         root.appendChild(box); return;
       }
@@ -645,6 +689,14 @@
         if (curRow) box.appendChild(detailModal(curRow));
       }
       root.appendChild(box);
+      if (st.needModalFocus) {
+        st.needModalFocus = false;
+        var md = box.querySelector && box.querySelector('.pqv-modal');
+        if (md && md.querySelector) {
+          var f0 = md.querySelector('input') || md.querySelector('button');
+          if (f0 && typeof f0.focus === 'function') { try { f0.focus(); } catch (_) {} }
+        }
+      }
     }
     /* 글자를 치는 동안 입력칸을 다시 그리면 커서를 잃는다 — 그린 뒤 같은 칸에 돌려 놓는다 */
     function redrawKeepFocus() {

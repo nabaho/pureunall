@@ -70,10 +70,13 @@ function makeDom() {
     n.removeAttribute = (k) => { delete n.attrs[k]; };
     n.addEventListener = (ev, fn) => { (n.listeners[ev] = n.listeners[ev] || []).push(fn); };
     n.removeEventListener = (ev, fn) => { n.listeners[ev] = (n.listeners[ev] || []).filter((x) => x !== fn); };
-    n.focus = () => {};
+    n.focus = () => { document.activeElement = n; };
+    n.contains = (other) => allNodes(n).includes(other);
+    n.getBoundingClientRect = () => ({ top: 0, bottom: 100, left: 0, right: 100, width: 100, height: 100 });
     n.click = () => fire(n, 'click');
     n.querySelector = (sel) => queryAll(n, sel)[0] || null;
     n.querySelectorAll = (sel) => queryAll(n, sel);
+    Object.defineProperty(n, 'childNodes', { get() { return n.children; } });
     Object.defineProperty(n, 'firstChild', { get() { return n.children[0] || null; } });
     Object.defineProperty(n, 'lastChild', { get() { return n.children[n.children.length - 1] || null; } });
     Object.defineProperty(n, 'textContent', {
@@ -93,6 +96,14 @@ function makeDom() {
     return list;
   }
   function queryAll(root, sel) {
+    if (sel.indexOf(',') >= 0) {
+      const seen = new Set(), outList = [];
+      sel.split(',').forEach((part) => queryAll(root, part.trim().replace(/:not\([^)]*\)/g, '')).forEach((n) => {
+        if (!seen.has(n)) { seen.add(n); outList.push(n); }
+      }));
+      return outList;
+    }
+    sel = sel.replace(/:not\([^)]*\)/g, '');
     const nodes = allNodes(root).slice(1);
     if (sel.charAt(0) === '.') {
       const cls = sel.slice(1);
@@ -121,7 +132,11 @@ function makeDom() {
     querySelector: (sel) => body.querySelector(sel) || head.querySelector(sel),
     querySelectorAll: (sel) => body.querySelectorAll(sel),
     addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
-    removeEventListener: (ev, fn) => { docListeners[ev] = (docListeners[ev] || []).filter((x) => x !== fn); }
+    removeEventListener: (ev, fn) => { docListeners[ev] = (docListeners[ev] || []).filter((x) => x !== fn); },
+    dispatchKey: (key, extra) => {
+      const e = Object.assign({ key, preventDefault() {}, stopPropagation() {} }, extra || {});
+      (docListeners.keydown || []).slice().forEach((fn) => fn(e));
+    }
   };
   return { node, allNodes, fire, document, body, head };
 }
@@ -263,7 +278,7 @@ test('② PuCoRoster · PuOfficeDocs — 16종 계약 갈래(모두 20자 이하
   const Rst = box.PuCoRoster;
   const Docs = box.PuOfficeDocs;
 
-  assert.strictEqual(Rst.KINDS.length, 16);
+  assert.ok(Rst.KINDS.length >= 16, '최소 16종 이상의 계약 갈래 지원');
   Rst.KINDS.forEach((k) => {
     assert.ok(k.length > 0 && k.length <= 20, 'RTDB co_docs kind 20자 제한 준수: ' + k);
   });
@@ -351,7 +366,8 @@ test('③ PuContractForms — 신규 양식 7종 시드 · {{과업내용}}/{{�
       부가세처리: '별도',
       과업내용: '직장 내 괴롭힘 객관적 사실조사 및 보고서 작성',
       대상인원: '35명'
-    }
+    },
+    returnFocus: (() => { const b = dom.node('button'); b._text = '원래자리'; dom.body.appendChild(b); return b; })()
   });
   await settle();
   assert.strictEqual(dbTouched, false);
@@ -362,6 +378,8 @@ test('③ PuContractForms — 신규 양식 7종 시드 · {{과업내용}}/{{�
   assert.ok(scopeInput && scopeInput.value.includes('직장 내 괴롭힘'), '초기 과업내용이 채워져야 함');
   assert.strictEqual(staffInput && staffInput.value, '35명', '초기 대상인원이 채워져야 함');
   assert.strictEqual(coInput && coInput.value, '(주)가나상사', '자동 매칭된 업체명이 채워져야 함');
+  dom.document.dispatchKey('Escape');
+  assert.strictEqual(dom.document.activeElement && dom.document.activeElement.textContent, '원래자리', 'openFill 닫힘 시 returnFocus 대상으로 포커스 복원');
 
   // registerForm 트랜잭션 저장 검증 (fileId + 인라인 attachments + docRole:'quote' 자동 묶음 + 주민번호 자동 가림)
   const fakeDb = makeFakeDb({});
@@ -576,6 +594,7 @@ test('⑤ PuQuotesView — 갈래 칩·상세 수정 모달·원클릭 재작성
   const mbg = admin.root.querySelector('.pqv-mbg');
   assert.strictEqual(mbg.attrs['aria-modal'], 'true', '상세 모달에 aria-modal=true 부여');
   modal = admin.root.querySelector('.pqv-modal');
+  assert.ok(modal.contains(admin.dom.document.activeElement), '상세 모달 열림 시 모달 내부로 초기 포커스 이동');
   const coInput = admin.dom.allNodes(modal).find((n) => n.attrs && n.attrs['aria-label'] === '의뢰처');
   coInput.value = '(주)가나상사 충남공장';
   admin.dom.allNodes(modal).find((n) => n.tag === 'button' && n.textContent.indexOf('복제 저장') >= 0).click();
@@ -583,6 +602,10 @@ test('⑤ PuQuotesView — 갈래 칩·상세 수정 모달·원클릭 재작성
   assert.strictEqual(admin.calls.updateQuote.length, 1);
   assert.strictEqual(admin.calls.updateQuote[0].asCopy, true);
   assert.strictEqual(admin.calls.updateQuote[0].rp.co, '(주)가나상사 충남공장');
+  admin.dom.document.dispatchKey('Escape');
+  await settle();
+  assert.strictEqual(admin.root.querySelector('.pqv-modal'), null, 'Escape 로 상세 모달 닫힘');
+  assert.strictEqual(admin.dom.document.activeElement && admin.dom.document.activeElement.textContent, '✏ 참고·수정', '상세 모달 닫힘 후 원래 행 단추로 포커스 복원');
 
   // (C) 비작성자 재무(fin): 원본 직접 덮어쓰기(💾 수정사항 저장)는 숨기고 복제 저장만 노출(RTDB 보안규칙 일치)
   const finUser = runView({ fin: true }, 'u_fin', { q1: { amount: 3800000, vat: 'excl', owner: 'u7' } });
@@ -632,7 +655,7 @@ test('⑥ PuOfficeDocs · docs-esign.html — 확정 계약서 일괄 가져오�
       ]),
       importMail: (rows) => { calls.importMail.push(rows); return Promise.resolve({ done: rows.length, reused: 0, fail: 0 }); },
       scanErp: () => Promise.resolve([
-        { id: 'ct1', coName: '다라테크', bizNo: '222-33-44444', date: '2026-11-04', kind: '자문', amount: 550000, staff: '박노무', dup: false }
+        { id: 'ct1', coName: '다라테크', bizNo: '123-45-67890', date: '2026-11-04', kind: '자문', amount: 550000, staff: '박노무', dup: false }
       ])
     },
     editCoHwp: (co, doc, rec) => { calls.editHwp.push({ co, doc, rec }); },
@@ -677,4 +700,162 @@ test('⑥ PuOfficeDocs · docs-esign.html — 확정 계약서 일괄 가져오�
   assert.doesNotMatch(editQuoteFn, /originals[^\n]*\.(remove|set\(null)/, '기존 보관함 원본 삭제·덮어쓰기 금지');
   assert.match(editCoFn, /putOriginal\([\s\S]*?kind:\s*'co'[\s\S]*?\{\s*secret:\s*true\s*\}/, '수정한 계약서는 새 🔒 서명본 사본으로만 저장');
   assert.doesNotMatch(editCoFn, /originals[^\n]*\.(remove|set\(null)/, '기존 계약 원본 삭제·덮어쓰기 금지');
+});
+
+test('⑦ 계약서 양식·세트 통합 트리 & 직장 내 괴롭힘·노사관계·단체교섭·취업규칙·원가산정 전 분야 하위 세트 검증', async () => {
+  const dom = makeDom();
+  const storeMem = {};
+  const box = {
+    console, Date, Math, JSON, Promise, Object, Array, String, Number, Error, Uint8Array,
+    document: dom.document, setTimeout: fastTimeout, clearTimeout,
+    localStorage: {
+      getItem: (k) => (Object.prototype.hasOwnProperty.call(storeMem, k) ? storeMem[k] : null),
+      setItem: (k, v) => { storeMem[k] = String(v); },
+      removeItem: (k) => { delete storeMem[k]; }
+    },
+    innerWidth: 1280, innerHeight: 900, pageYOffset: 0,
+    location: { hash: '#forms' },
+    addEventListener: () => {}, removeEventListener: () => {},
+    prompt: () => '신규 테스트 세트', confirm: () => true
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-quote-detect.js'), box);
+  vm.runInContext(read('js/pu-quotes.js'), box);
+  vm.runInContext(read('js/pu-co-roster.js'), box);
+  vm.runInContext(read('js/pu-contract-forms.js'), box);
+
+  const P = box.PuContractForms;
+  const D = box.PuQuoteDetect;
+  const Q = box.PuQuotes;
+  const Rst = box.PuCoRoster;
+
+  // 1) 직장 내 괴롭힘 · 노사관계/단체교섭 · 취업규칙 · 입찰원가산정(fm-pq-02 복원) · 의견서 양식 & 동종 하위 세트 전수 검증
+  const byId = {};
+  P.mergeSeeds([], []).list.forEach((f) => { byId[f.id] = f; });
+  assert.ok(byId['fm-pq-02'] && byId['fm-pq-02'].originals && byId['fm-pq-02'].originals[0].fileId === '-P3_FSOYkSByHPy2xT-E',
+    '실제 보관함 원본(-P3_FSOYkSByHPy2xT-E)과 연결된 입찰·인건비 산정 견적서(fm-pq-02) 복원');
+  [
+    'fm-pr-harass', 'fm-pr-harass-quote', 'fm-pr-harass-nda',
+    'fm-pr-bargain', 'fm-pr-bargain-power', 'fm-pr-bargain-quote', 'fm-pq-06',
+    'fm-pr-rules', 'fm-pr-rules-quote',
+    'fm-pr-costing', 'fm-pq-02',
+    'fm-pr-opinion', 'fm-pq-05',
+    'fm-pr-safety', 'fm-pr-safety-quote', 'fm-pq-03',
+    'fm-pr-dispatch', 'fm-pr-case-quote', 'fm-pr-payroll-quote'
+  ].forEach((id) => assert.ok(byId[id], id + ' 양식이 SEED 에 있어야 함'));
+
+  const sets = out(P.setsOf(null));
+  const setById = {};
+  sets.forEach((s) => { setById[s.id] = s; });
+  // 업체계약 하위 세트에 직장내괴롭힘·노사관계단체교섭·취업규칙·원가산정·법률의견서·자문·급여 등 동종 견적서+계약서가 모두 한 묶음으로 포함
+  ['fs-advisory', 'fs-payroll', 'fs-office', 'fs-harass', 'fs-bargain', 'fs-union', 'fs-rules', 'fs-costing', 'fs-opinion', 'fs-amend'].forEach((sid) => {
+    assert.ok(setById[sid], sid + ' 하위 세트 존재');
+    assert.strictEqual(P.setKindOf(setById[sid], P.SEED), 'company', sid + ' 는 업체계약(company) 하위 세트로 배치');
+  });
+  // 업무 하위 세트 전원(전자위임장 근로자 전용 fs-chedang 제외)에 빈 DB에서도 실제 견적서(이름에 견적·제안 포함)와 실제 계약서·약정서·합의서·위탁서가 함께 묶여 있는지 전수 검증
+  const pairedSets = sets.filter((s) => s.id !== 'fs-chedang');
+  assert.ok(pairedSets.length >= 26, '최소 26종 이상의 동종 업무 하위 세트 구성');
+  pairedSets.forEach((st) => {
+    const fms = st.formIds.map((id) => byId[id]).filter(Boolean);
+    const hasQuote = fms.some((f) => f.groupName === P.PROPOSAL_GROUP && /(견적|제안)/.test(f.name));
+    const hasContract = fms.some((f) => f.groupName !== P.PROPOSAL_GROUP && /(계약서|약정서|합의서|위탁서)/.test(f.name));
+    assert.ok(hasQuote && hasContract, st.id + ' 세트 안에 빈 DB에서도 실제 동종 견적서와 계약서(약정·합의·위탁서)가 함께 묶여 있어야 함');
+  });
+  sets.forEach((st) => {
+    const activeCnt = st.formIds.filter((id) => !!byId[id]).length;
+    assert.ok(activeCnt >= 2, st.id + ' 하위 세트는 빈 DB에서도 최소 2종 이상의 유효 서류를 포함해야 함');
+  });
+
+  // 기존 저장된 contract_form_sets 나 깨진 formIds 도 안전하게 정규화·보강되는지 검증
+  const migrated = out(P.setsOf({
+    v: [
+      { id: 'fs-advisory', name: '자문 세트', formIds: { 0: 'fm-pr-advisory', 1: 'fm-pr-cms' } },
+      { id: 'fs-broken', name: '깨진 세트', formIds: 'not-an-array' }
+    ]
+  }));
+  const migAdv = migrated.find((s) => s.id === 'fs-advisory');
+  const migBroken = migrated.find((s) => s.id === 'fs-broken');
+  assert.strictEqual(migAdv.kind, 'company', '옛 저장본에 kind 가 없어도 시드 분류(company)로 자동 보완');
+  assert.deepStrictEqual(migAdv.formIds, ['fm-pr-advisory', 'fm-pr-cms']);
+  assert.deepStrictEqual(out(P.missingSeedFormIds(migAdv, Object.values(byId))), ['fm-pq-01'], '기존 저장 세트에서 새로 추가된 기본 견적서(fm-pq-01) 보강 대상 감지');
+  assert.deepStrictEqual(migBroken.formIds, [], '깨진 formIds 문자열도 빈 배열로 안전 정규화');
+
+  // 2) 왼쪽 사이드바(#formsTree) 렌더링 검증 — 별도 「📦 세트」 구역 없이 각 계약 분류 아래에 하위 세트가 펼쳐지고 클릭 시 한 번에 체크됨
+  const treeEl = dom.node('div');
+  const rootEl = dom.node('div');
+  rootEl.getBoundingClientRect = () => ({ top: 0 });
+  dom.body.appendChild(treeEl);
+  dom.body.appendChild(rootEl);
+  const db = makeFakeDb({});
+  const ui = P.mount(rootEl, { db, tree: treeEl, openEsign: () => {} });
+  await settle(20);
+
+  const treeButtons = dom.allNodes(treeEl).filter((n) => n.tag === 'button');
+  assert.ok(!treeButtons.some((b) => /📦\s*세트/.test(b.textContent)), '계약서 양식과 세트를 나누던 별도 「📦 세트」 머리글이 없어야 함');
+  const coIdx = treeButtons.findIndex((b) => /업체계약/.test(b.textContent));
+  const harassIdx = treeButtons.findIndex((b) => /직장 내 괴롭힘·성희롱 조사 세트/.test(b.textContent));
+  const bargainIdx = treeButtons.findIndex((b) => /노사관계·임금·단체교섭 세트/.test(b.textContent));
+  const caseIdx = treeButtons.findIndex((b) => /사건계약/.test(b.textContent));
+  assert.ok(coIdx >= 0 && harassIdx > coIdx && harassIdx < caseIdx, '직장 내 괴롭힘 조사 세트가 업체계약 바로 아래 하위 세트로 배치');
+  assert.ok(bargainIdx > coIdx && bargainIdx < caseIdx, '노사관계·임금·단체교섭 세트가 업체계약 바로 아래 하위 세트로 배치');
+
+  // 하위 세트 클릭 시 견적서+계약서+부속서류가 한 번에 모두 체크되어 묶음 관리 막대가 뜨는지 검증
+  treeButtons[harassIdx].click();
+  await settle(10);
+  const bbar = rootEl.querySelector('.pcf-bbar');
+  assert.ok(bbar && !bbar.hidden && /직장 내 괴롭힘·성희롱 조사 세트/.test(bbar.textContent), '하위 세트 선택 시 동종 서류 전체가 한 번에 체크됨');
+  assert.strictEqual(typeof ui.applySet, 'function');
+
+  // 3) openEditSetModal — 새 하위 세트 생성 · aria-modal · 동시 삭제 유실 방지(gone 가드) · Escape 닫기·포커스 복원 검증
+  const addSetBtn = dom.allNodes(treeEl).find((n) => n.tag === 'button' && /└ \+ 하위 세트 만들기/.test(n.textContent));
+  assert.ok(addSetBtn, '└ + 하위 세트 만들기 단추 존재');
+  addSetBtn.focus();
+  addSetBtn.click();
+  await settle(6);
+  let setModal = dom.body.querySelector('.pcf-m');
+  assert.ok(setModal && setModal.attrs['aria-modal'] === 'true', '세트 만들기 모달 aria-modal=true');
+  const nameIn = dom.allNodes(setModal).find((n) => n.attrs && n.attrs['aria-label'] === '하위 세트 이름');
+  nameIn.value = '맞춤 노사협상 세트';
+  dom.allNodes(setModal).find((n) => n.tag === 'button' && /하위 세트 만들기/.test(n.textContent)).click();
+  await settle(12);
+  assert.strictEqual(dom.body.querySelector('.pcf-m'), null, '새 하위 세트 저장 후 모달이 닫힘');
+  assert.ok(dom.body.contains(dom.document.activeElement) && /맞춤 노사협상 세트/.test(dom.document.activeElement.textContent),
+    '세트 저장 후 다시 그려진 DOM 안의 활성 하위 세트 단추로 포커스 연결 유지');
+
+  // 방금 만든 맞춤 세트가 선택된 상태에서 ✎ 세트 서류 편집 열기 → 다른 사용자가 DB에서 삭제한 뒤 저장 클릭 시 유실 방지 전환 확인
+  const editSetBtn = dom.allNodes(rootEl).find((n) => n.tag === 'button' && /✎ 세트 서류 편집/.test(n.textContent));
+  assert.ok(editSetBtn, '맞춤 하위 세트 선택 시 ✎ 세트 서류 편집 단추 노출');
+  editSetBtn.focus();
+  editSetBtn.click();
+  await settle(6);
+  setModal = dom.body.querySelector('.pcf-m');
+  assert.ok(setModal, '세트 서류 편집 모달 열림');
+  // 동시 삭제 시뮬레이션: DB의 contract_form_sets 에서 맞춤 세트 제거
+  db.data.data.contract_form_sets = { v: [], rm: [] };
+  const saveSetBtn = dom.allNodes(setModal).find((n) => n.tag === 'button' && /💾 세트 저장/.test(n.textContent));
+  saveSetBtn.click();
+  await settle(12);
+  assert.ok(dom.body.querySelector('.pcf-m'), '동시 삭제된 경우 편집값을 잃지 않도록 모달이 닫히지 않고 유지됨');
+  assert.match(saveSetBtn.textContent, /➕ 하위 세트 만들기/, '새 하위 세트 만들기 모드로 안전 전환');
+  dom.document.dispatchKey('Escape');
+  await settle(4);
+  assert.strictEqual(dom.body.querySelector('.pcf-m'), null, 'Escape 로 세트 모달 닫기');
+  assert.strictEqual(dom.document.activeElement, editSetBtn, '모달 닫힘 후 원래 트리거 단추로 포커스 복원');
+
+  // 4) 메일 견적서·계약서 탐지 확대 & 비노무 제안서·요청 메일 오탐 차단(제목·첨부 모두) 검증
+  assert.ok(D.isOurQuote('[노무법인 푸른] 인사노무 컨설팅 제안서 송부', ['인사노무컨설팅_제안서.pdf']));
+  assert.ok(D.isOurQuote('사내근로복지기금 설립 제안서 제출', ['복지기금_제안서.pdf']));
+  assert.strictEqual(D.isOurQuote('사무용품 구매 제안서 송부', ['사무용품_제안서.pdf']), false, '비노무 사무용품 제안서 오탐 차단');
+  assert.strictEqual(D.isOurQuote('웹사이트 제작 제안서 제출', ['홈페이지_제안서.pdf']), false, '비노무 웹사이트 제안서 오탐 차단');
+  assert.strictEqual(D.isOurQuote('자료 송부', ['홈페이지 제작 컨설팅 제안서.pdf']), false, '첨부 파일명의 비노무 제작 제안서도 오탐 차단');
+  assert.strictEqual(D.isOurQuote('견적서 요청', []), false, '견적서 요청 메일 오탐 차단');
+  assert.strictEqual(D.isOurQuote('교육 제안서 요청', []), false, '제안서 요청 메일 오탐 차단');
+  assert.ok(D.isOurContract('단체교섭 위임계약서 및 교섭권 위임장 송부', ['교섭권위임장.hwp']));
+  assert.ok(D.isOurContract('직장 내 괴롭힘 조사 비밀유지서약서', ['비밀유지서약서.hwpx']));
+  assert.ok(D.isOurContract('취업규칙 개정 용역계약서 검토본', ['취업규칙개정계약서.hwp']));
+  assert.strictEqual(Q.typeOf('노사협의회 운영 및 노동조합 단체교섭 지원'), 'bargaining');
+  assert.strictEqual(Q.typeOf('취업규칙 전면 개정 및 인사규정 정비'), 'hr_consult');
+  assert.strictEqual(Rst.guessKind('노동조합 임금교섭 위임계약서'), '단체교섭');
+  assert.strictEqual(Rst.guessKind('취업규칙 제·개정 위탁계약서'), '노무진단·규정');
 });
