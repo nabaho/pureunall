@@ -278,7 +278,7 @@
     var meta = validate(input, fileName, extra);
     var bytes = bytesOf(input);
     var ready = meta.format === 'hwpx' ? Promise.resolve({ bytes: bytes, name: meta.fileName })
-      : openDoc(bytes, meta.fileName).then(function (doc) {
+      : openDoc(bytes, meta.fileName, extra).then(function (doc) {
         try { return { bytes: new Uint8Array(doc.exportHwpx()), name: meta.fileName.replace(/\.hwp$/i, '') + '.hwpx' }; }
         finally { try { doc.free(); } catch (_) {} }
       });

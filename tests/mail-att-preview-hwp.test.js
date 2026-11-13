@@ -95,6 +95,7 @@ function makeBox(opts) {
         return {
           tagName: tag.toUpperCase(), className: '', style: {}, width: 0, height: 0, textContent: '',
           children,
+          getContext: () => ({}),
           setAttribute: (k, v) => { attrs[k] = String(v); },
           getAttribute: (k) => (k in attrs ? attrs[k] : null),
           appendChild: (c) => { children.push(c); return c; },
@@ -229,9 +230,16 @@ test('⑥ 창 닫기·다른 첨부 열기·늦게 도착한 응답·메일 나�
   assert.equal(nav.__calls.freed, 1, '메일을 나갈 때 미리보기 WASM 문서를 해제하지 않았습니다');
 });
 
-test('⑦ 키 큰 용지가 위쪽으로 잘리지 않게 .pvpdf 에 margin:auto 가 걸려 있다', () => {
+test('⑦ 키 큰 용지가 위쪽으로 잘리지 않게 .pvstage 가 세로 중앙 정렬을 쓰지 않고 min-height:0 과 상단 시작 흐름을 지킨다', () => {
+  const st = CSS.match(/\.pvstage\s*\{([^}]*)\}/);
+  assert.ok(st, '.pvstage 규칙이 없습니다');
+  assert.match(st[1], /align-items\s*:\s*flex-start/, '.pvstage 가 align-items:flex-start 가 아니면 긴 문서 윗부분이 잘립니다');
+  assert.doesNotMatch(st[1], /align-items\s*:\s*center/, '.pvstage 에 align-items:center 가 남아 있습니다');
+  assert.match(st[1], /min-height\s*:\s*0/, '.pvstage 에 min-height:0 이 없어 작은 창에서 아래 단추가 밀릴 수 있습니다');
   const m = CSS.match(/\.pvstage\s+\.pvpdf\s*\{([^}]*)\}/);
-  assert.ok(m && /margin\s*:\s*auto/.test(m[1]), '.pvpdf 에 margin:auto 가 없으면 세로로 긴 용지 윗부분이 잘립니다');
+  assert.ok(m && /margin\s*:\s*auto/.test(m[1]), '.pvpdf 에 margin:auto 가 없습니다');
+  const hwpCv = CSS.match(/\.pvstage\s+\.pvhwp\s+canvas\s*\{([^}]*)\}/);
+  assert.ok(hwpCv && /margin\s*:\s*0/.test(hwpCv[1]), '.pvhwp 안쪽 캔버스에 margin:0 이 없습니다');
 });
 
 test('⑧ openDoc 성공 뒤 pageCount·getPageInfo 예외나 둘째 쪽 캔버스 그리기 예외·PDF 그리기 예외가 나도 메모리를 해제하고 빈 종이를 남기지 않는다', async () => {
@@ -354,4 +362,63 @@ test('⑩ 미리보기 창에 대화상자 접근성 속성(role=dialog·aria-mo
   assert.match(HTML, /if\s*\(\s*e\.key\s*===\s*'Escape'\s*\)\s*\{\s*if\s*\(\s*state\.mbPv\s*\)\s*\{\s*e\.preventDefault\(\);\s*mbPvClose\(\);\s*return;\s*\}/);
   b.mbPvClose();
   assert.equal(refocused, 1, '창을 닫은 뒤 새로 그려진 미리보기 단추로 포커스가 돌아가지 않았습니다');
+});
+
+test('⑪ 여러 쪽 PDF(19쪽 등)도 한 쪽씩 끊기지 않고 #mbPvPdf 안에 전체 쪽을 한 번에 세로 연속 스크롤로 펼치며 스크롤·쪽 이동·정리가 된다', async () => {
+  const b = makeBox();
+  let pdfRendered = 0, pdfDestroyed = 0, scrollHandler = null;
+  const fakePdf = {
+    numPages: 19,
+    getPage: async (pgNo) => ({
+      pageNumber: pgNo,
+      getViewport: ({ scale }) => ({ width: 595 * scale, height: 842 * scale }),
+      render: () => { pdfRendered++; return { promise: Promise.resolve(), cancel: () => {} }; },
+    }),
+    destroy: () => { pdfDestroyed++; },
+  };
+  b.state.mbPv = {
+    i: 0, tok: 21, name: '중간보고서외.pdf', size: 1536 * 1024, kind: 'pdf',
+    loading: false, err: '', pdf: fakePdf, pdfBase: { w: 595, h: 842 }, page: 1, pages: 19,
+  };
+  const html = b.mbPvHtml();
+  assert.match(html, /id="mbPvPdf"/, 'PDF 연속 스크롤 무대(#mbPvPdf)를 그리지 않습니다');
+  assert.match(html, /canvas id="mbPvCanvas"/, '첫 쪽 캔버스(#mbPvCanvas)가 없습니다');
+  assert.match(html, /PDF 19쪽/, '머리줄에 PDF 전체 쪽수를 적지 않습니다');
+
+  const stage = {
+    clientWidth: 960, clientHeight: 720, scrollTop: 0,
+    addEventListener: (ev, fnCb) => { if (ev === 'scroll') scrollHandler = fnCb; },
+    removeEventListener: (ev) => { if (ev === 'scroll') scrollHandler = null; },
+    parentNode: null,
+  };
+  const host = b.document.createElement('div');
+  const firstCv = b.document.createElement('canvas');
+  firstCv.getContext = () => ({});
+  b.__els.mbPvPdf = host;
+  b.__els.mbPvCanvas = firstCv;
+  host.parentNode = stage;
+
+  b.mbPvPdfDraw();
+  assert.equal(host.children.length, 19, '19쪽 PDF 인데 19쪽이 한 번에 펼쳐지지 않았습니다');
+  host.children.forEach((pgEl, idx) => { pgEl.offsetTop = idx * 1260; });
+
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(pdfRendered, 19, '연속 스크롤 환경에서 PDF 각 쪽이 캔버스에 그려지지 않았습니다');
+
+  const prevRenders = b.__calls.renders;
+  b.mbPvPage(1);
+  assert.equal(b.state.mbPv.page, 2, '다음 쪽 단추로 2쪽으로 이동하지 않았습니다');
+  assert.equal(b.__calls.renders, prevRenders, '연속 스크롤 PDF 인데 쪽 이동 시 전체 창을 다시 그렸습니다');
+  assert.ok(stage.scrollTop > 1000, '2쪽 위치로 스크롤이 이동하지 않았습니다');
+
+  if (scrollHandler) {
+    stage.scrollTop = 5 * 1260;
+    scrollHandler();
+    assert.equal(b.state.mbPv.page, 6, '스크롤 위치에 따라 현재 쪽 번호가 갱신되지 않았습니다');
+  }
+
+  b.mbPvClose();
+  assert.equal(pdfDestroyed, 1, '창을 닫을 때 pdf.destroy() 가 호출되지 않았습니다');
+  assert.equal(scrollHandler, null, '창을 닫을 때 스크롤 감시기가 해제되지 않았습니다');
 });

@@ -23,9 +23,11 @@
     - 미리보기 창 닫기(`mbPvClose`), 다른 첨부 열기(`mbAttPeek`), 닫은 뒤 늦게 도착한 응답(`_mbPvSeq` 토큰 대조), `openDoc` 이후 `pageCount`·`getPageInfo` 예외, 어느 쪽이든 캔버스 그리기 예외(한글·PDF 공통), 다른 메일 열기(`openMailMsg`), 메일 목록으로 나가기(`mbBack`)에서 모두 `doc.free()` / `pdf.destroy()` 와 관찰기를 해제하고, 그리기 실패 시 빈 종이 대신 오류 안내를 띄운다.
     - 비정상적으로 큰 쪽 치수(예: `100000×100000`)가 들어와도 배율을 자동으로 낮춰 캔버스 픽셀 수가 `8M`(`8,388,608`) 상한을 절대 넘지 않게 방어했다(한글·PDF 공통).
     - 미리보기 대화상자에 `role="dialog" aria-modal="true"`, 쪽·닫기 `aria-label` 및 32×32 누름 영역, WCAG AA 명도 대비(`#475569` 대 `#e8edf3`), 포커스 이동·가두기·재렌더링 뒤 원래 `[미리보기]` 단추 복귀, `Escape` 닫기를 붙였다.
-- **PDF 미리보기도 함께 다듬었다** (`mbPvPdfDraw` · `.pvstage`):
-  - `mbPvPdfDraw` 에 `devicePixelRatio`(최대 2배·8M 픽셀 상한)를 반영해 고해상도 화면에서 PDF 글씨가 흐릿하지 않게 하고, 쪽을 넘기면 스크롤을 맨 위로 되돌린다.
-  - `.pvstage` 의 `align-items:center` 때문에 세로로 긴 A4 용지 윗부분이 잘리던 문제를 `align-items:flex-start` + `.pvpdf`/`.pvimg`/`.pvnone` 의 `margin:auto` 로 고쳤다.
+- **PDF 미리보기도 전체 쪽 연속 스크롤 + 상단 잘림 완전 제거로 맞췄다** (`mbPvDraw` · `mbPvPdfDraw` · `mbPvHtml` · `.pvstage`, 2026-11-13 추가 보강):
+  - 기존 PDF 미리보기(`mbPvPdfDraw`)는 한 번에 1쪽만 그려 `1 / 19` 문서에서 `▶`를 19번 눌러야 했고, `.pvstage` 의 `align-items:center` 때문에 세로로 긴 용지 윗부분이 잘려 스크롤을 맨 위로 올려도 제목·윗줄이 보이지 않았다.
+  - 한글과 똑같이 `#mbPvPdf.pvhwp` 안에 **전체 쪽(`1 ~ N`쪽)을 한 번에 세로로 이어 펼쳐** 스크롤만으로 처음부터 끝까지 끊김 없이 읽을 수 있게 바꿨고, `IntersectionObserver`(`rootMargin: '2400px 0px'`) + 현재·이웃 쪽 유지 보호(`|idx - cur| <= 1`)로 긴 문서에서도 폰·브라우저 메모리 한도(`8M` 픽셀 상한)를 넘지 않게 했다.
+  - `.pvstage` 에 팔레트 승인 배경(`#e2e8f0`), `align-items:flex-start`, `min-height:0` 을 적용하고 `.mck.pvbox` 높이를 `90vh`(`max-height:92vh`)로 확보해 어느 화면 크기에서도 1쪽 맨 윗줄부터 마지막 쪽 맨 아랫줄까지 잘림 없이 보이도록 고쳤다.
+  - `js/pu-hwp-engine.js?v=22` 캐시 번호를 이를 불러 쓰는 전체 10개 HTML 화면에 일괄 동기화했다.
 - 기존 메일 미리보기 하단 기능(`→ 급여데이터함`, `→ 기업별 계약서`, `📥 내려받기`, `닫기`)은 그대로 유지했다.
 
 ## 검사
