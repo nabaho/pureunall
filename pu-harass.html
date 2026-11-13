@@ -14,28 +14,41 @@
        2. 미등록 조사 메일은 의뢰 사업장별 후보 묶음(Bundle)으로 자동 분류해 검토 후 원클릭으로 사건 등록한다.
        3. 8단계 표준 조사 프로토콜 진행현황·일정·요약·공문 타임라인을 푸른이알피(pu-erp.html) 사건관리 및
           업무 메모(case_memos)에 자동으로 반영한다.
-       4. 당사자·참고인 면담 진술, 쟁점별 근로기준법 제76조의2 3요건 법리검토, 표준 조사결과보고서 초안 자동 조립 및
-          인쇄·문서(.doc) 내려받기를 지원한다.
+       4. 녹취록·진술서(.hwpx · .hwp · .docx · .txt · 음성/PDF) 자동 문답(Q&A)·요지·쟁점 정리,
+          종단간 암호화 비밀 전자서명(sign-harass.html · 현장 즉시 서명), 정식 한글(.hwpx) 진술확인서·조사결과보고서 입출력을 지원한다.
      ★ 비밀유지 분리(근로기준법 제76조의3 제7항):
        - harass_invest (사건 목록·8단계 진행현황·공문 머리글·이알피 동기화): 재직 직원(LOGIN) 공유
-       - harass_secret (면담 진술·쟁점 사실인정·조사결과보고서 본문): 사건 주·부담당 노무사 및 대표(ADMIN)만 열람·저장
+       - harass_secret (면담 진술·녹취 문답·쟁점 사실인정·조사결과보고서 본문): 사건 주·부담당 노무사 및 대표(ADMIN)만 열람·저장
+       - harass_sign   (당사자·참고인 비밀유지서약 및 진술확인 종단간 암호화 전자서명): 담당 노무사·대표 및 열쇠+뒷번호 4자리 보유 본인만 복호화
      ★ 모든 쓰기는 PuOntologyWrite 강제 관문(createGateway enforce)만 거치며 물리 삭제 대신 _deleted 표식을 남긴다.
      ══════════════════════════════════════════════════════════════════════ -->
 <style>
 :root{
-  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --ink:#1e293b; --ink2:#475569; --mute:#475569; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
   --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
   --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
   --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
   --red:#991b1b; --red-m:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+  --pri-bg:#1e40af; --ok-bg:#166534;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+    --blue:#60a5fa; --blue-d:#bfdbfe; --blue-bg:#1e293b; --blue-line:#2563eb;
+    --green:#4ade80; --green-m:#16a34a; --green-bg:#1e293b; --green-line:#16a34a;
+    --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+    --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+    --pri-bg:#2563eb; --ok-bg:#166534;
+  }
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
-button.pri{background:var(--blue-d);border-color:var(--blue-d);color:#ffffff;font-weight:600}
-button.ok{background:var(--green);border-color:var(--green);color:#ffffff;font-weight:600}
+button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:600}
+button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
 button.warn-btn{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber);font-weight:600}
 button.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
 button.sm{padding:5px 10px;min-height:32px;font-size:12px}
@@ -111,19 +124,72 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .att-list{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0}
 #lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
 #lock p{color:var(--mute);font-size:13px}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70;max-width:90vw}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70;max-width:90vw}
 #toast.on{opacity:1}
 .modal{position:fixed;inset:0;background:rgba(30,41,59,.42);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px;overflow:auto}
 .mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;width:100%;max-width:640px;overflow:hidden}
 .mbox.wide{max-width:860px}
+.mbox.xwide{max-width:1100px}
 .mhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-weight:700}
-.mbd{padding:12px 14px;max-height:74vh;overflow:auto}
+.mbd{padding:12px 14px;max-height:76vh;overflow:auto}
 .mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
+/* ── 사건 통합 작업실 (상단 8단계 스텝바 · 좌우 대조 2단 스플릿 · 녹취/전자서명 원스톱 카드) ── */
+.ws-steps{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;padding:8px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.ws-step{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);text-align:left;min-width:0;font-size:11.5px;white-space:normal}
+.ws-step b{font-size:12px;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-step span{font-size:11px;color:var(--mute);display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-step.done{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
+.ws-step.done span{color:var(--green)}
+.ws-step.cur{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
+.ws-step.cur span{color:var(--blue-d)}
+.ws-modes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);background:var(--card)}
+.ws-modes button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.ws-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
+.ws-split.focus-iv{grid-template-columns:1fr}
+.ws-split.focus-iv .ws-col-right{display:none}
+.ws-split.focus-doc{grid-template-columns:1fr}
+.ws-split.focus-doc .ws-col-left{display:none}
+.ws-col-left,.ws-col-right{min-width:0}
+.drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color .15s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--card)}
+.drop-zone b{display:block;font-size:13px;margin-bottom:3px}
+.drop-zone span{font-size:11.5px;color:var(--ink2)}
+.iv-list{display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.iv-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);display:flex;flex-direction:column;gap:7px}
+.iv-card.signed{border-color:var(--green-line)}
+.iv-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.iv-hd .iv-who{font-weight:700;font-size:13.5px}
+.iv-sum{font-size:12.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:84px;overflow:auto;padding:6px 8px;border-radius:7px;background:var(--bg);border:1px solid var(--line)}
+.amend-box{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:8px;padding:7px 10px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.iv-acts{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.studio-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:12px;align-items:start}
+.studio-pane{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0}
+.qa-list{display:flex;flex-direction:column;gap:7px;max-height:310px;overflow:auto;padding:2px 0}
+.qa-row{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);display:flex;flex-direction:column;gap:5px}
+.qa-row-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink2)}
+.cand-list{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.cand-item{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid var(--blue-line);border-radius:8px;background:var(--card);font-size:12px}
+.sig-pad-wrap{border:1.5px solid var(--line2);border-radius:10px;background:#ffffff;overflow:hidden;touch-action:none}
+.sig-pad{display:block;width:100%;height:170px;cursor:crosshair;touch-action:none}
+.evid-mini{max-height:240px;overflow:auto;padding:6px 12px}
+.evid-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+.evid-row:last-child{border-bottom:0}
+.evid-row .evid-ti{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #printArea{display:none}
 .phone-only{display:none}
+@media (max-width:1024px){
+  .ws-steps{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .ws-split,.studio-grid{grid-template-columns:1fr}
+}
 /* ── 폰 화면: 가로 밀기 없이 2줄 카드 (docs/규칙/폰화면.md · 고르기칸-번호.md) ── */
 @media (max-width:768px){
+  button.sm{min-height:36px;padding:6px 11px}
   input,select,textarea,.rpt-paper textarea{font-size:16px}
+  input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
+  .modal{padding:0}
+  .mbox,.mbox.wide,.mbox.xwide{max-width:100vw;border-left:0;border-right:0;border-radius:0}
+  .mbd{padding:10px;max-height:84vh}
+  .studio-pane{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:6px 0}
   .phone-only{display:inline}
   .wide-only{display:none}
   .top{padding:6px 8px;gap:5px;flex-wrap:nowrap}
@@ -137,6 +203,9 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .card{border-left:0;border-right:0;border-radius:0}
   .note,.warn,.secret-lock{margin:0 10px 10px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
+  .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 10px}
+  .ws-split,.studio-grid{grid-template-columns:1fr;gap:8px}
+  .iv-list{padding:8px 10px}
   .rpt-grid{grid-template-columns:1fr;padding:8px 10px}
   .fr{flex-direction:column;align-items:stretch;gap:4px;padding:6px 10px}
   .fr>label{width:auto}
@@ -169,7 +238,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <div id="head">
   <div class="top">
     <h1>🛡️ 괴롭힘·성희롱 조사</h1>
-    <span class="sub">사건별 공문·서류 메일 자동수집 · 조사결과보고서 · 푸른이알피 자동연동</span>
+    <span class="sub">공문 자동수집 · 녹취록 자동정리 · 비밀 전자서명 · 한글(.hwpx) 보고서 · 이알피 연동</span>
     <span id="who"></span>
     <span class="sp"></span>
     <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">메일 자동수집 · 이알피 동기화</span><span class="phone-only">자동수집</span></button>
@@ -179,8 +248,8 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <div class="tabs" id="tabs">
     <button data-tab="cases" class="on">📂 조사 사건 현황 <span class="chip c-blue" id="nCases">0</span></button>
     <button data-tab="inbox">📥 메일 자동수집 · 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
-    <button data-tab="detail">📋 사건 상세 · 8단계 &amp; 공문함</button>
-    <button data-tab="report">🔒 진술 · 3요건 검토 · 보고서</button>
+    <button data-tab="detail">📋 공문함 · 8단계 관리</button>
+    <button data-tab="report">🔒 녹취·전자서명 · 3요건·보고서(.hwpx)</button>
   </div>
 </div>
 
@@ -255,7 +324,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=94"></script>
+<script src="js/pu-ontology.js?v=95"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, harass 는 유예 목록에 없으므로 강제(enforce) 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -269,8 +338,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-harass-core.js?v=3"></script>
-<script src="js/pu-harass-view.js?v=5"></script>
+<script src="hangul/js/zip.js?v=1"></script>
+<script src="hangul/js/hwpx.js?v=1"></script>
+<script src="hangul/js/hwp.js?v=1"></script>
+<script src="vendor/pdf.min.js?v=1"></script>
+<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
+<script src="js/pu-kordoc-text.js?v=3"></script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-harass-core.js?v=6"></script>
+<script src="js/pu-harass-sign.js?v=3"></script>
+<script src="js/pu-harass-hwpx.js?v=3"></script>
+<script src="js/pu-harass-view.js?v=8"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};

@@ -2093,4 +2093,80 @@ rules.harass_secret = {
   }
 };
 
+/* 🛡️ 괴롭힘·성희롱 조사 전용 비밀 전자서명 (sign-harass.html, 2026-11-12)
+   - req/$cid/$r : 사건 주·부담당 노무사 및 대표(HARASS_SECRET_OWNER)만 열람·생성(일반 직원 열람 차단).
+   - open/$t     : 128비트 열쇠를 아는 사람만 단일 슬롯 읽기(목록 열람 차단). 내부에는 AES-256-GCM 암호문만 담기며 평문 진술·성명·사업장명·연락처 없음.
+                   생성·회수는 해당 cid 담당 노무사·대표만 허용하고 cid·reqId 재바인딩 우회를 막는다.
+   - open/$t/sub : 익명 서명자가 1회만 제출(!data.exists()), 기한 안·미취소·제출인증자(subAuth = SHA256(t|#k|code|docHash)) 일치·문서지문 일치 강제.
+                   연락처 끝자리(p4)나 보안코드를 평문 저장하지 않으며 #k 와 12자리 보안코드를 모두 모르면 슬롯 선점 불가능. */
+const HARASS_OPEN_CASE_OWNER = (cidExpr) => `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건(cidExpr))})`;
+const HARASS_OPEN_WRITE = "newData.exists() && (!data.exists()"
+  + ` ? (${HARASS_OPEN_CASE_OWNER("newData.child('cid').val()")})`
+  + ` : (newData.child('cid').val() === data.child('cid').val() && newData.child('reqId').val() === data.child('reqId').val() && (${HARASS_OPEN_CASE_OWNER("data.child('cid').val()")})))`;
+
+rules.harass_sign = {
+  req: {
+    $cid: {
+      '.read': HARASS_SECRET_OWNER,
+      $r: {
+        '.write': `(${HARASS_SECRET_OWNER}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $r && newData.child('cid').val() === $cid && newData.child('entityType').val() === 'Submission'"
+          + " && newData.hasChildren(['t','k','ivId','accessCode','subAuth','exp','docHash'])",
+        accessCode: { '.validate': "newData.isString() && newData.val().matches(/^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/)" },
+        subAuth:    { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        t:          { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)" },
+        k:          { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)" }
+      }
+    }
+  },
+  open: {
+    $t: {
+      '.read': 'auth != null',
+      '.write': HARASS_OPEN_WRITE,
+      '.validate': "$t.matches(/^[0-9a-f]{32}$/) && newData.child('id').val() === $t && newData.child('entityType').val() === 'Submission'"
+        + " && newData.hasChildren(['cid','reqId','exp','docHash'])"
+        + " && root.child('harass_sign').child('req').child(newData.child('cid').val()).child(newData.child('reqId').val()).child('t').val() === $t",
+      encPayload: {
+        '.validate': "newData.hasChildren(['ct','iv','salt'])",
+        ct:     { '.validate': 'newData.isString() && newData.val().length <= 2500000' },
+        iv:     { '.validate': 'newData.isString() && newData.val().length <= 64' },
+        salt:   { '.validate': 'newData.isString() && newData.val().length <= 64' },
+        $other: { '.validate': false }
+      },
+      seen: { '.write': 'auth != null && !data.exists()', '.validate': 'newData.val() === now || (data.exists() && newData.val() === data.val())' },
+      sub: {
+        '.write': "auth != null && !data.exists() && newData.exists()"
+          + " && data.parent().child('void').val() !== true && data.parent().child('_deleted').val() !== true"
+          + " && data.parent().child('exp').val() > now"
+          + " && newData.child('subAuth').val() === root.child('harass_sign').child('req').child(data.parent().child('cid').val()).child(data.parent().child('reqId').val()).child('subAuth').val()"
+          + " && newData.child('docHash').val() === data.parent().child('docHash').val()",
+        '.validate': "newData.hasChildren(['id','entityType','schemaVersion','contractVersion','createdAt','updatedAt','revision','subAuth','docHash','agree','pledgeAgree','at','encSub'])"
+          + " && newData.child('id').val() === $t && newData.child('entityType').val() === 'Submission'",
+        id:              { '.validate': 'newData.isString() && newData.val() === $t' },
+        entityType:      { '.validate': "newData.val() === 'Submission'" },
+        schemaVersion:   { '.validate': 'newData.isNumber()' },
+        contractVersion: { '.validate': 'newData.val() === 1' },
+        createdAt:       { '.validate': 'newData.isNumber()' },
+        updatedAt:       { '.validate': 'newData.isNumber()' },
+        revision:        { '.validate': 'newData.val() === 1' },
+        subAuth:         { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        docHash:         { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        agree:           { '.validate': 'newData.val() === true' },
+        pledgeAgree:     { '.validate': 'newData.val() === true' },
+        at:              { '.validate': 'newData.val() === now || (data.exists() && newData.val() === data.val())' },
+        ua:              { '.validate': 'newData.isString() && newData.val().length <= 300' },
+        encSub: {
+          '.validate': "newData.hasChildren(['ct','iv','salt'])",
+          ct:     { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length < 400000' },
+          iv:     { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length <= 64' },
+          salt:   { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length <= 64' },
+          $other: { '.validate': false }
+        },
+        $other: { '.validate': false }
+      }
+    }
+  },
+  $other: { '.validate': false }
+};
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

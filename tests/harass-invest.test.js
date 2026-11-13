@@ -716,3 +716,515 @@ test('⑦ 동시 단계·필드 수정 병합, 종결단계 취소 시 종결일
   assert.equal(savedAck['harass_invest/erp_ack/hc-m1'].syncedRevision, 2, '메모까지 모두 반영된 뒤에야 syncedRevision ACK 가 기록된다');
   assert.ok(erpStore.case_memos.length >= 1, '이알피 업무 메모도 누락 없이 저장되었다');
 });
+
+test('⑧ 녹취록 자동 문답(Q&A)·요지·3요건 쟁점 구조화 및 주민번호 가림 검증', () => {
+  const synthRrn = ['900303', '2345678'].join('-');
+  const rawTranscript = [
+    '조사자: 2026년 9월 주간회의 당시 어떤 일이 있었는지 말씀해 주세요.',
+    '신고인: 박팀장이 직원 10명이 있는 회의실에서 서류를 집어 던지며 폭언과 모욕적 발언을 반복했습니다. 제 번호는 ' + synthRrn + ' 입니다.',
+    '조사자: 그 이후 업무 배제나 불이익도 있었나요?',
+    '신고인: 다음 날부터 주요 프로젝트 메일 수신에서 제외되고 자리도 창고 옆으로 이동 지시를 받았습니다.',
+  ].join('\n');
+
+  const parsed = C.parseTranscriptFallback(rawTranscript, 'victim');
+  assert.equal(parsed.qaList.length, 2, '화자 구분 녹취록이 질문·답변 2쌍으로 정확히 분리된다');
+  assert.equal(C.hasUnmaskedRrn(JSON.stringify(parsed)), false, '정리된 문답·요지·쟁점 어디에도 마스킹 전 주민번호가 남지 않는다');
+  assert.ok(parsed.summary.includes('박팀장'), '핵심 진술 요지가 자동 생성된다');
+  assert.ok(parsed.candidateIssues.length >= 1, '폭언·업무배제 키워드가 포함된 답변에서 3요건 쟁점 후보가 자동 추출된다');
+
+  /* 한글(.hwpx) 표 추출 형태(질문 | 답변)도 문답으로 구조화된다 */
+  const tableStyleTxt = [
+    '구분 | 진술 내용',
+    '문: 성희롱 발언 시점과 장소는 언제입니까? | 답: 2026-08-14 부서 회식 자리에서 부적절한 신체 접촉과 성적 농담이 있었습니다.',
+  ].join('\n');
+  const parsedTbl = C.parseTranscriptFallback(tableStyleTxt, 'victim');
+  assert.ok(parsedTbl.qaList.some((q) => q.a.includes('부서 회식')), '표(칸 | 칸) 형태 진술서에서도 질문·답변이 정상 추출된다');
+
+  /* AI 프롬프트 조립 및 JSON 응답 정규화 검증 */
+  const prompt = C.buildTranscriptAiPrompt(rawTranscript, { role: 'victim', alias: '신고인 A' });
+  assert.equal(C.hasUnmaskedRrn(prompt), false, 'AI로 보내는 프롬프트 단계에서 이미 주민번호가 마스킹된다');
+
+  const aiJson = JSON.stringify({
+    summary: '회의실 폭언 및 업무 배제 진술 (' + synthRrn + ')',
+    qaList: [{ q: '폭언 경위', a: '회의 중 서류 투척 및 모욕 (' + synthRrn + ')' }],
+    candidateIssues: [{ title: '주간회의 폭언', whenWhere: '2026-09 회의실', claimVictim: '서류 투척 및 폭언' }],
+  });
+  const normAi = C.normalizeTranscriptAiResult(aiJson, rawTranscript, 'victim');
+  assert.equal(normAi.qaList.length, 1, 'AI JSON 응답의 문답 배열이 정규화된다');
+  assert.equal(C.hasUnmaskedRrn(JSON.stringify(normAi)), false, 'AI 응답 정규화 결과에서도 주민번호가 완전히 가려진다');
+});
+
+test('⑨ 정식 한글(.hwpx) 양방향 입출력 — 진술확인서(전자서명 이미지·정정의견 내장) 및 조사결과보고서 왕복 검증', async () => {
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const synthRrn = ['850505', '1234567'].join('-');
+  /* 1x1 투명 PNG base64 (전자서명 이미지 내장 검증용) */
+  const tinyPngDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  const caseRec = {
+    id: 'hc-hwpx-1',
+    companyName: '(주)푸른한글검증',
+    category: 'harass',
+    title: '직장 내 괴롭힘 조사',
+    erpCaseNo: '조사-2026-077',
+    receiveDate: '2026-10-01',
+    closeDate: '2026-10-25',
+    verdictSummary: 'recognized',
+    steps: {
+      intake: { done: true, date: '2026-10-01', note: '조사 수임' },
+      victim: { done: true, date: '2026-10-10', note: '피해자 면담 및 전자서명' },
+    },
+    mailLinks: [],
+  };
+
+  const ivRec = {
+    id: 'iv-hwpx-1',
+    role: 'victim',
+    alias: '신고인 김푸른',
+    dept: '경영지원팀',
+    date: '2026-10-10',
+    method: '대면면담',
+    pledgeSigned: true,
+    stmtSigned: true,
+    signMode: 'mobile',
+    signedAtText: '2026-10-10 15:30',
+    docHash: 'a'.repeat(64),
+    sigDataUrl: tinyPngDataUrl,
+    summary: '직속 상사의 반복적 폭언 진술 ' + synthRrn,
+    amendNote: '2번 답변의 일시를 10월 3일 오전 10시로 정정합니다.',
+    qaList: [
+      { q: '최초 폭언 일시는 언제입니까?', a: '2026년 10월 초 주간회의 시간입니다.' },
+      { q: '목격한 동료 근로자가 있습니까?', a: '같은 팀 이참고 대리가 동석했습니다.' },
+    ],
+  };
+
+  /* 1) 면담 진술확인서 .hwpx 생성 → ZIP 내부 구조(OWPML + 서명 PNG) 및 재추출 왕복 확인 */
+  const ivBytes = H.buildInterviewHwpx(caseRec, ivRec);
+  assert.ok(ivBytes instanceof Uint8Array && ivBytes.byteLength > 500, '진술확인서 .hwpx 바이트가 정상 생성된다');
+  assert.equal(ivBytes[0], 0x50, 'ZIP(PK) 시그니처로 시작하는 정식 OWPML 패키지다');
+
+  const zFiles = await globalThis.PureunZip.readZip(ivBytes);
+  assert.equal(new TextDecoder().decode(zFiles.mimetype), 'application/hwp+zip', '한컴 표준 mimetype(application/hwp+zip)을 갖춘다');
+  assert.ok(zFiles['Contents/section0.xml'], '본문 OWPML(Contents/section0.xml)이 존재한다');
+  const binKeys = Object.keys(zFiles).filter((k) => k.startsWith('BinData/'));
+  assert.equal(binKeys.length, 1, '전자서명 PNG 이미지가 BinData 폴더 안에 정식 첨부된다');
+
+  const extractedIv = await H.extractDocumentText(ivBytes, '면담진술확인서.hwpx');
+  assert.equal(extractedIv.ok, true, '생성된 진술확인서 .hwpx 파일을 다시 읽어 텍스트를 추출할 수 있다');
+  assert.equal(extractedIv.format, 'hwpx', '추출 포맷이 hwpx 로 식별된다');
+  assert.ok(extractedIv.text.includes('최초 폭언 일시는 언제입니까?'), '문답 표의 질문이 손실 없이 재추출된다');
+  assert.ok(extractedIv.text.includes('10월 3일 오전 10시로 정정'), '진술인 정정·보완 의견이 .hwpx 본문에 포함된다');
+  assert.equal(C.hasUnmaskedRrn(extractedIv.text), false, '.hwpx 출력물에도 마스킹 전 주민번호가 절대 노출되지 않는다');
+
+  /* 진술확인서 .hwpx 재반입(buildInterviewHwpx → extractDocumentText → parseTranscriptFallback) 왕복 무오염 검증 */
+  const roundtripParsed = C.parseTranscriptFallback(extractedIv.text);
+  assert.equal(roundtripParsed.qaList.length, 2, '진술확인서 .hwpx 를 다시 가져와도 표 머리글·서약문·서명란이 섞이지 않고 문답 2개만 정확히 복원된다');
+  assert.equal(roundtripParsed.qaList[0].q, '최초 폭언 일시는 언제입니까?', '1번 질문 원문이 정확히 복원된다');
+  assert.equal(roundtripParsed.qaList[1].a, '같은 팀 이참고 대리가 동석했습니다.', '2번 답변 원문이 서명란 텍스트 혼입 없이 복원된다');
+  assert.ok(roundtripParsed.amendNote.includes('10월 3일 오전 10시로 정정'), '진술인 정정·보완 의견도 별도 필드로 깨끗이 복원된다');
+
+  /* 파이프(|) 및 여러 줄(\n)이 포함된 문답·요지·정정의견 .hwpx 왕복 무손실 복원 검증 */
+  const complexIv = Object.assign({}, ivRec, {
+    summary: '요지 첫째 줄\n요지 둘째 줄',
+    amendNote: '정정의견 1항\n정정의견 2항',
+    qaList: [{ q: '표시 A | B 중 무엇입니까?', a: '첫째 답변\n둘째 답변' }],
+  });
+  const complexBytes = H.buildInterviewHwpx(caseRec, complexIv);
+  const complexExtracted = await H.extractDocumentText(complexBytes, '복합문답.hwpx');
+  const complexParsed = C.parseTranscriptFallback(complexExtracted.text);
+  assert.equal(complexParsed.qaList.length, 1, '파이프(|)가 포함된 질문도 열이 쪼개지지 않고 1문답으로 복원된다');
+  assert.equal(complexParsed.qaList[0].q, '표시 A | B 중 무엇입니까?', '질문 안의 파이프(|) 기호가 그대로 보존된다');
+  assert.equal(complexParsed.qaList[0].a, '첫째 답변\n둘째 답변', '답변 안의 줄바꿈(\\n)이 그대로 보존된다');
+  assert.equal(complexParsed.summary, '요지 첫째 줄\n요지 둘째 줄', '진술 요지의 여러 줄이 그대로 보존된다');
+  assert.equal(complexParsed.amendNote, '정정의견 1항\n정정의견 2항', '정정의견의 여러 줄이 그대로 보존된다');
+
+  /* PDF getTextContent 스팬 분절 주민번호(['900101-','123','4567']) 로컬 추출 및 가림 검증 */
+  const prevPdfLib = globalThis.pdfjsLib;
+  globalThis.pdfjsLib = {
+    getDocument() {
+      return {
+        promise: Promise.resolve({
+          numPages: 1,
+          async getPage() {
+            return {
+              async getTextContent() {
+                return {
+                  items: [
+                    { str: '진술인 주민번호 ' },
+                    { str: ['900101', '-'].join('') },
+                    { str: '123' },
+                    { str: '4567', hasEOL: true },
+                  ],
+                };
+              },
+            };
+          },
+        }),
+      };
+    },
+  };
+  try {
+    const fakePdfBytes = new TextEncoder().encode('%PDF-1.4 mock');
+    const pdfRes = await H.extractDocumentText(fakePdfBytes, '진술서.pdf');
+    assert.equal(pdfRes.ok, true, '로컬 PDF 텍스트 추출기가 동작한다');
+    assert.ok(pdfRes.text.includes('900101-1******'), '스팬이 쪼개진 PDF 주민번호도 추출 즉시 마스킹된다');
+    assert.equal(C.hasUnmaskedRrn(pdfRes.text), false, '추출된 PDF 텍스트에 미가림 주민번호가 남지 않는다');
+    const spacedRrn = ['900101', '- ', '123', ' ', '4567'].join('');
+    assert.equal(C.hasUnmaskedRrn(spacedRrn), true, '내부 공백이 섞인 주민번호도 미가림 탐지기가 잡아낸다');
+    assert.equal(C.maskRrnText(spacedRrn), '900101-1******', '내부 공백이 섞인 주민번호도 정확히 가린다');
+  } finally {
+    globalThis.pdfjsLib = prevPdfLib;
+  }
+
+  /* 장시간 면담(45문답) 무손실 파싱 검증 */
+  const longLines = [];
+  for (let n = 1; n <= 45; n++) {
+    longLines.push(`문${n}: ${n}번째 확인 질문입니다.`);
+    longLines.push(`답${n}: ${n}번째 진술 답변입니다.`);
+  }
+  const longParsed = C.parseTranscriptFallback(longLines.join('\n'));
+  assert.equal(longParsed.qaList.length, 45, '40개를 넘는 장시간 면담 녹취록(45문답)도 잘리지 않고 모두 구조화된다');
+  assert.equal(longParsed.truncatedQaCount, 0, '500문답 이하에서는 잘림 경고가 발생하지 않는다');
+
+  /* 2) 최종 조사결과보고서 .hwpx 생성 및 재추출·본문 복원 왕복 검증 */
+  const secRec = {
+    overview: '직속 상사의 폭언 및 부당 업무배제 신고 건',
+    conclusion: '근로기준법 제76조의2 직장 내 괴롭힘 해당',
+    recommendations: '피해근로자 보호 및 행위자 징계·분리배치 권고',
+    interviews: [ivRec],
+    issues: [{
+      id: 'iss-1',
+      title: '회의실 공개 폭언',
+      whenWhere: '2026-10 회의실',
+      factStatus: 'recognized',
+      elemSuperiority: 'yes',
+      elemBeyondScope: 'yes',
+      elemHarm: 'yes',
+      verdict: 'yes',
+    }],
+    reportBody: '',
+  };
+  secRec.reportBody = C.assembleReportDraft(caseRec, secRec);
+  assert.ok(secRec.reportBody.includes('정정·보완 의견'), '표준 보고서 초안 조립 시에도 진술인 정정·보완 의견과 서명 상태가 반영된다');
+
+  const rptBytes = H.buildReportHwpx(caseRec, secRec);
+  const extractedRpt = await H.extractDocumentText(rptBytes, '최종조사결과보고서.hwpx');
+  assert.equal(extractedRpt.ok, true, '최종 조사결과보고서 .hwpx 를 생성하고 다시 읽을 수 있다');
+  assert.ok(extractedRpt.text.includes('조사결과보고서') && extractedRpt.text.includes('회의실 공개 폭언'), '보고서 표제 및 3요건 판정 표가 .hwpx 에 수록된다');
+  assert.equal(C.hasUnmaskedRrn(extractedRpt.text), false, '최종 보고서 .hwpx 에도 주민번호 원문이 남지 않는다');
+  const restoredBody = H.extractReportBodyFromText(extractedRpt.text);
+  assert.ok(
+    restoredBody.startsWith('【 직장 내 괴롭힘 사안 외부전문가 조사결과보고서 】') &&
+      restoredBody.includes('1. 사건 개요') &&
+      !restoredBody.includes('3. 쟁점 행위별 근로기준법 3요건 검토 요약'),
+    '보고서 .hwpx 재반입 시 앞쪽 요약표 중복 없이 원본 보고서 본문(reportBody)만 정확히 복원된다',
+  );
+});
+
+test('⑩ 비밀 전자서명(PuHarassSign · sign-harass.html · harass_sign 규칙 · doc-read 서버 가드) 2채널 암호화 및 위변조 차단 검증', async () => {
+  const S = require(path.join(ROOT, 'js', 'pu-harass-sign.js'));
+  const cp = require('node:child_process');
+
+  const k = S.newHexKey();
+  const t = S.newHexKey();
+  const code = S.newPasscode();
+  assert.match(k, /^[0-9a-f]{32}$/, '128비트 16진 보안 열쇠가 생성된다');
+  assert.match(code, /^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/, '60비트 고엔트로피 12자리 보안코드(XXXX-XXXX-XXXX)가 생성된다');
+  assert.equal(S.cleanPasscode(code.toLowerCase()), code.replace(/-/g, ''), '소문자·하이픈 입력도 정규화 검증된다');
+
+  const synthRrn = ['910202', '1234567'].join('-');
+  const norm = S.normalizeSignPayload({
+    docKind: 'pledge_and_stmt',
+    role: 'victim',
+    alias: '신고인 박검증',
+    dept: '영업1팀',
+    date: '2026-10-12',
+    method: '대면면담',
+    summary: '진술 요지 ' + synthRrn,
+    qaList: [{ q: '확인 질문', a: '확인 답변 ' + synthRrn }],
+  });
+  assert.equal(C.hasUnmaskedRrn(S.canonicalString(norm)), false, '서명 페이로드 정규화 단계에서 주민번호가 자동 가려진다');
+
+  const docHash = await S.sha256Hex(S.canonicalString(norm));
+  assert.match(docHash, /^[0-9a-f]{64}$/, 'SHA-256 문서 무결성 지문(64자 hex)이 계산된다');
+
+  const subAuth = await S.computeSubAuth(t, k, code, docHash);
+  assert.match(subAuth, /^[0-9a-f]{64}$/, 't·#k·보안코드·docHash 결합 256비트 제출인증자(subAuth)가 생성된다');
+
+  const enc = await S.encryptWithCode({ payload: norm, docHash }, k, code);
+  assert.ok(!JSON.stringify(enc).includes('박검증') && !JSON.stringify(enc).includes('영업1팀'), '암호문 객체에는 당사자 이름·부서·진술 평문이 일절 남지 않는다');
+
+  const dec = await S.decryptWithCode(enc, k, code);
+  assert.equal(dec.docHash, docHash, '올바른 #k 열쇠와 12자리 보안코드로 복호화하면 원본 문서와 지문이 일치한다');
+
+  await assert.rejects(() => S.decryptWithCode(enc, k, S.newPasscode()), '12자리 보안코드가 다르면 복호화가 거부된다');
+  await assert.rejects(() => S.decryptWithCode(enc, S.newHexKey(), code), 'URL #k 열쇠 조각이 다르면 복호화가 거부된다');
+
+  const link = S.linkOf('https://nabaho.github.io/pureunall/pu-harass.html', t, k);
+  assert.equal(link, `https://nabaho.github.io/pureunall/sign-harass.html?t=${t}#k=${k}`, '열쇠 k 는 서버로 전송되지 않는 해시(#k) 조각에만 실린다');
+
+  const msg1 = S.shareLinkMessage({ alias: '신고인 박검증', docKind: 'pledge_and_stmt', link, exp: Date.now() + 86400000 });
+  const msg2 = S.shareCodeMessage({ accessCode: code });
+  assert.ok(msg1.includes(link) && !msg1.includes(code), '1채널 링크 안내문에는 2채널 보안코드가 절대 함께 적히지 않는다');
+  assert.ok(msg2.includes(code) && !msg2.includes(t) && !msg2.includes(k), '2채널 보안코드 안내문에는 링크나 #k 열쇠가 절대 함께 적히지 않는다');
+
+  /* sign-harass.html 및 harass_sign 실시간DB 보안규칙 불변식 점검 */
+  const signHtml = fs.readFileSync(path.join(ROOT, 'sign-harass.html'), 'utf8');
+  assert.ok(signHtml.includes('noindex,nofollow') && signHtml.includes('no-referrer'), '외부 서명 화면은 검색 차단 및 리퍼러 차단을 갖춘다');
+  assert.ok(signHtml.includes('PuOntologyWrite.prepareRecord'), '익명 서명 제출도 온톨로지 필수 메타데이터 계약을 준수한다');
+  assert.ok(!signHtml.includes('pu_sign'), '전 직원 공유 서명함(pu_sign)을 참조하지 않고 전용 비밀 경로만 사용한다');
+  assert.ok(signHtml.includes('applyTypedSigBtn'), '손서명이 어려운 사용자를 위한 키보드 성명 서명 대체 수단을 제공한다');
+
+  const built = JSON.parse(cp.execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8' }));
+  const hs = built.rules.harass_sign;
+  assert.ok(hs && hs.req && hs.open, '실시간DB 규칙에 harass_sign(req·open)이 정의되어 있다');
+  assert.equal(hs.req['.read'], undefined, 'harass_sign/req 상위 전체 목록 읽기가 닫혀 있다');
+  assert.equal(hs.open['.read'], undefined, 'harass_sign/open 상위 전체 목록 읽기가 닫혀 있어 슬롯 열거가 불가능하다');
+  assert.ok(hs.req.$cid['.read'].includes('managerMain'), '서명 요청 원장(req/$cid)은 해당 사건 주·부담당 노무사 및 대표만 읽을 수 있다');
+  assert.ok(hs.open.$t.sub['.write'].includes('!data.exists()'), '서명 제출(sub)은 1회 제출 잠금(!data.exists())이 강제된다');
+  assert.ok(hs.open.$t.sub['.write'].includes("child('subAuth').val()"), '서명 제출 시 256비트 제출인증자(subAuth) 일치를 서버 규칙이 강제하여 슬롯 선점을 차단한다');
+  assert.ok(!JSON.stringify(hs).includes("'p4'"), '공개·요청 규칙 어디에도 취약한 4자리 전화번호(p4) 평문 필드를 쓰지 않는다');
+  assert.ok(hs.open.$t.sub['.write'].includes("child('docHash').val()"), '서명 제출 시 원본 문서 해시(docHash) 일치를 서버 규칙이 검증한다');
+
+  /* 500문답 대용량 진술확인서 암호화 압축 및 RTDB 허용 크기(MAX_ENC_CT_CHARS) 이내 통과 검증 */
+  const qa500 = Array.from({ length: 500 }, (_, idx) => ({
+    q: `${idx + 1}번째 면담 확인 질문입니다. 당시 회의실 상황과 참석자 발언을 구체적으로 설명해 주시겠습니까?`,
+    a: `${idx + 1}번째 답변입니다. 당시 팀장이 업무 지시 범위를 넘어 반복적으로 서류를 던지고 인격 모독성 발언을 하였으며 동료들이 목격했습니다.`,
+  }));
+  const norm500 = S.normalizeSignPayload({
+    docKind: 'pledge_and_stmt',
+    role: 'victim',
+    alias: '신고인 대용량검증',
+    dept: '인사팀',
+    date: '2026-10-12',
+    method: '대면면담',
+    summary: '장시간 면담 500문답 요약',
+    qaList: qa500,
+  });
+  const hash500 = await S.sha256Hex(S.canonicalString(norm500));
+  const enc500 = await S.encryptWithCode({ payload: norm500, docHash: hash500 }, k, code);
+  assert.ok(enc500.ct.length <= S.MAX_ENC_CT_CHARS && enc500.ct.length <= 2500000, '500문답 암호문도 압축을 거쳐 실시간DB 허용 한도 이내로 생성된다');
+  const dec500 = await S.decryptWithCode(enc500, k, code);
+  assert.equal(dec500.payload.qaList.length, 500, '압축 암호화된 500문답이 손실 없이 복호화 복원된다');
+
+  /* doc-read 서버 가드: inline_data 뿐 아니라 inlineData·fileData 등 복합 바이너리 필드를 원천 차단하고 text 만 재구성 */
+  const DR = require(path.join(ROOT, 'functions', 'doc-read.js'));
+  const badInlineCamel = DR.validate({
+    app: 'harass',
+    parts: [{ text: '정상 글자', inlineData: { mimeType: 'application/pdf', data: 'JVBERi0=' } }],
+  });
+  assert.equal(badInlineCamel.ok, false, '서버(doc-read.js)가 harass 요청의 camelCase inlineData 바이너리 밀반입을 거부한다');
+  const badInlineSnake = DR.validate({
+    app: 'harass',
+    parts: [{ inline_data: { mime_type: 'image/png', data: 'iVBORw0KGgo=' } }],
+  });
+  assert.equal(badInlineSnake.ok, false, '서버(doc-read.js)가 harass 요청의 inline_data 바이너리를 거부한다');
+  const badFileData = DR.validate({
+    app: 'harass',
+    parts: [{ text: '정상 글자', fileData: { fileUri: 'gs://bucket/raw.pdf' } }],
+  });
+  assert.equal(badFileData.ok, false, '서버(doc-read.js)가 harass 요청의 fileData 등 기타 필드를 거부한다');
+  const goodHarass = DR.validate({
+    app: 'harass',
+    parts: [{ text: '면담 기록 ' + ['900101', '- ', '123', ' ', '4567'].join('') }],
+  });
+  assert.equal(goodHarass.ok, true, '순수 text 단일 필드만 담긴 harass 요청은 통과한다');
+  assert.deepEqual(goodHarass.parts, [{ text: '면담 기록 900101-1******' }], '서버(doc-read.js)에서도 분절 주민번호를 재가림한 새 객체만 전달한다');
+});
+
+test('⑪ 모바일 전자서명 수거(harvestCaseSignatures) — 복호화 검증 · 비밀금고 봉인 · 공개슬롯 암호문 폐기 · 8단계 동기화', async () => {
+  const vm = require('node:vm');
+  const S = require(path.join(ROOT, 'js', 'pu-harass-sign.js'));
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+
+  const cid = 'hc-sign-1';
+  const ivId = 'iv-sign-1';
+  const reqId = 'sr-test-1';
+  const t = S.newHexKey();
+  const k = S.newHexKey();
+  const accessCode = S.newPasscode();
+  const validSigUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  const baseIv = {
+    id: ivId,
+    role: 'victim',
+    alias: '신고인 최검증',
+    dept: '개발팀',
+    date: '2026-10-15',
+    method: '대면면담',
+    pledgeSigned: false,
+    stmtSigned: false,
+    summary: '팀장으로부터 공개석상 모욕 발언을 들음',
+    qaList: [{ q: '발언 내용이 무엇입니까?', a: '인격 모독성 폭언을 들었습니다.' }],
+  };
+
+  const normPayload = S.normalizeSignPayload({
+    docKind: 'pledge_and_stmt',
+    role: baseIv.role,
+    alias: baseIv.alias,
+    dept: baseIv.dept,
+    date: baseIv.date,
+    method: baseIv.method,
+    summary: baseIv.summary,
+    qaList: baseIv.qaList,
+  });
+  const docHash = await S.sha256Hex(S.canonicalString(normPayload));
+  const subAuth = await S.computeSubAuth(t, k, accessCode, docHash);
+  const encPayload = await S.encryptWithCode({ payload: normPayload, docHash }, k, accessCode);
+  const encSub = await S.encryptWithCode({
+    docHash,
+    sigDataUrl: validSigUrl,
+    amendNote: '문답 1번 일시는 오후 3시경입니다.',
+    pledgeAgree: true,
+    agree: true,
+  }, k, accessCode);
+
+  const dbStore = {
+    'uid_roles/uAtty': { sid: 'P001', name: '담당노무', status: 'active', isAdmin: false },
+    'data/user_dir': [{ sid: 'P001', name: '담당노무', status: 'active' }],
+    'harass_invest/cases': {
+      [cid]: {
+        id: cid, companyId: 'co-1', companyName: '(주)서명수거검증', title: '서명 수거 사건',
+        managerMain: 'P001', managerSubs: [], receiveDate: '2026-10-01', steps: {}, mailLinks: [],
+      },
+    },
+    [`harass_secret/${cid}`]: {
+      id: cid, companyId: 'co-1', overview: '', conclusion: '', recommendations: '',
+      interviews: [baseIv], issues: [], reportBody: '',
+    },
+    [`harass_sign/req/${cid}`]: {
+      [reqId]: {
+        id: reqId, cid, companyId: 'co-1', ivId, alias: baseIv.alias, docKind: 'pledge_and_stmt',
+        t, k, accessCode, subAuth, exp: Date.now() + 86400000, docHash, status: 'sent',
+      },
+    },
+    [`harass_sign/open/${t}`]: {
+      id: t, cid, reqId, companyId: 'co-1', exp: Date.now() + 86400000, docHash, encPayload,
+      sub: { id: t, entityType: 'Submission', subAuth, docHash, agree: true, pledgeAgree: true, at: 1760500000000, encSub },
+    },
+  };
+
+  function makeEl(id) {
+    const classes = new Set();
+    return {
+      id, value: '', textContent: '', innerHTML: '', style: {}, disabled: false,
+      classList: {
+        add(c) { classes.add(c); },
+        remove(c) { classes.delete(c); },
+        toggle(c, f) { const on = f === undefined ? !classes.has(c) : !!f; if (on) classes.add(c); else classes.delete(c); },
+        contains(c) { return classes.has(c); },
+      },
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      getAttribute() { return ''; },
+      closest() { return null; },
+      matches() { return false; },
+    };
+  }
+  const els = {};
+  const getEl = (id) => (els[id] = els[id] || makeEl(id));
+  const docListeners = {};
+
+  function makeRef(p) {
+    return {
+      path: p,
+      child(seg) { return makeRef(p ? p + '/' + seg : String(seg)); },
+      on() {},
+      off() {},
+      once() {
+        return Promise.resolve({ val: () => (dbStore[p] !== undefined ? dbStore[p] : null) });
+      },
+    };
+  }
+
+  const ctx = vm.createContext({
+    console, setTimeout, clearTimeout, Promise, URLSearchParams,
+    PuHarassCore: C,
+    PuHarassSign: S,
+    PuHarassHwpx: H,
+    PuOntologyWrite: {
+      createGateway() {
+        return {
+          async save(ref, fn) {
+            const prev = dbStore[ref.path] || null;
+            const next = typeof fn === 'function' ? fn(prev) : fn;
+            dbStore[ref.path] = next;
+            if (ref.path.startsWith('harass_invest/cases/')) {
+              const id = ref.path.split('/')[2];
+              dbStore['harass_invest/cases'][id] = next;
+            }
+            if (ref.path.startsWith(`harass_sign/req/${cid}/`)) {
+              const rid = ref.path.split('/')[3];
+              dbStore[`harass_sign/req/${cid}`][rid] = next;
+            }
+            return { committed: true, snapshot: { val: () => next } };
+          },
+        };
+      },
+    },
+    PuGate: { show() {}, hide() {} },
+    location: { search: '', hash: '', pathname: '/pu-harass.html', href: 'https://nabaho.github.io/pureunall/pu-harass.html' },
+    history: { replaceState() {} },
+    document: {
+      activeElement: null,
+      contains: () => false,
+      getElementById: (id) => getEl(id),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener(ev, fn) { (docListeners[ev] = docListeners[ev] || []).push(fn); },
+    },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+
+  let authCb = null;
+  const curUser = { uid: 'uAtty', getIdToken: async () => 'tok' };
+  ctx.PuHarassView.boot({
+    auth: Object.assign(() => ({
+      currentUser: curUser,
+      setPersistence() {},
+      onAuthStateChanged(fn) { authCb = fn; },
+    }), { Auth: { Persistence: { LOCAL: 'local' } } }),
+    database: () => ({ ref: (p) => makeRef(p || '') }),
+  });
+
+  await authCb(curUser);
+
+  /* 보고서 작업실 열기 → 자동 서명 수거(harvestCaseSignatures) 완료까지 결정론적 대기(병렬 실행 시 타이밍 흔들림 방지) */
+  const openReportBtn = {
+    disabled: false,
+    getAttribute: (n) => (n === 'data-act' ? 'openReport' : n === 'data-id' ? cid : ''),
+  };
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? openReportBtn : null) },
+    stopPropagation() {},
+  });
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const curSec = dbStore[`harass_secret/${cid}`];
+    const curCase = dbStore['harass_invest/cases'][cid];
+    if (curSec && curSec.interviews[0] && curSec.interviews[0].stmtSigned && curCase && curCase.steps && curCase.steps.victim && curCase.steps.victim.done) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 25));
+  }
+
+  const savedSecret = dbStore[`harass_secret/${cid}`];
+  const sealedIv = savedSecret.interviews[0];
+  assert.equal(sealedIv.stmtSigned, true, '외부 서명 제출본이 자동 복호화·검증되어 면담 진술서명 완료(stmtSigned)로 봉인된다');
+  assert.equal(sealedIv.pledgeSigned, true, '비밀유지서약 완료(pledgeSigned)도 함께 체크된다');
+  assert.equal(sealedIv.amendNote, '문답 1번 일시는 오후 3시경입니다.', '서명자가 제출한 정정·보완 의견이 진술 기록에 보존된다');
+  assert.equal(sealedIv.docHash, docHash, '원본 문서 SHA-256 지문이 진술 기록에 함께 봉인된다');
+
+  const scrubbedOpen = dbStore[`harass_sign/open/${t}`];
+  assert.equal(scrubbedOpen._deleted, true, '수거 완료된 공개 슬롯은 온톨로지 삭제 표식(_deleted:true)으로 봉인된다');
+  assert.equal(scrubbedOpen.void, true, '공개 슬롯이 무효화(void:true)된다');
+  assert.equal(scrubbedOpen.encPayload, undefined, '공개 슬롯에 남아 있던 문서 암호문(encPayload)이 깨끗이 제거된다');
+  assert.equal(scrubbedOpen.sub, undefined, '공개 슬롯에 남아 있던 제출 암호문(sub)도 깨끗이 제거된다');
+
+  const updatedCase = dbStore['harass_invest/cases'][cid];
+  assert.equal(updatedCase.steps.pledge.done, true, '서명 수거와 동시에 3단계(비밀서약 징구)가 자동 완료된다');
+  assert.equal(updatedCase.steps.victim.done, true, '서명 수거와 동시에 4단계(피해자 면담)가 자동 완료된다');
+  assert.ok(getEl('reportBox').innerHTML.includes('진술서명 완료'), '통합 작업실 왼쪽 카드에 진술서명 완료 배지가 즉시 표시된다');
+  assert.ok(getEl('reportBox').innerHTML.includes('오후 3시경입니다'), '통합 작업실 왼쪽 카드에 진술인의 정정·보완 의견이 강조 표시된다');
+});

@@ -53,6 +53,7 @@ const DONE = [
   ['pu-signboard.html', '전광판'],
   ['pu-settle.html', '컨설팅정산'],
   ['pu-harass.html', '괴롭힘성희롱조사'],
+  ['sign-harass.html', '진술비밀서약서명'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
@@ -109,6 +110,7 @@ const EXCEPT = {
   'pu-settle.html': new Set([]),
   /* 괴롭힘·성희롱 조사(2026-11-11) — 처음부터 팔레트만 쓴다. 예외를 채워 넣지 말 것 */
   'pu-harass.html': new Set([]),
+  'sign-harass.html': new Set([]),
   /* ⚠ DONE 에 든 파일은 EXCEPT 에도 칸이 있어야 한다 — 없으면 팔레트 밖 색이
      나왔을 때 «무엇이 잘못됐는지 말하는 대신» TypeError 로 터진다(2026-09-19 에 그랬다). */
   /* 대표 지시 2026-09-27 「캘린더 ui 와 화면을 구글캘린더 화면과 글자색·테두리·글자형태로

@@ -143,13 +143,18 @@
     return s;
   }
 
-  /* 주민등록번호 패턴 가림 — 하이픈·물결표 유무와 관계없이 13자리 주민등록번호 형식을 모두 가린다 */
-  var RRN_REPLACE_RE = /(^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))(?:\s*[-~]\s*)?([1-8])\d{6}(?!\d)/g;
-  var RRN_TEST_RE = /(?:^|[^\d])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:\s*[-~]\s*)?[1-8]\d{6}(?!\d)/;
+  /* 주민등록번호 패턴 가림 — 하이픈·물결표 유무 및 PDF 스팬 분절 공백('900101- 123 4567' 등)까지 모두 가린다 */
+  var RRN_REPLACE_RE = /(^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))(?:\s*[-~–—]\s*)?([1-8])\d{6}(?!\d)/g;
+  var RRN_SPACED_REPLACE_RE = /(^|[^\d])((?:\d\s*){2}(?:0\s*[1-9]|1\s*[0-2])(?:0\s*[1-9]|[12]\s*\d|3\s*[01]))\s*[-~–—]\s*([1-8])(?:\s*\d){6}(?!\s*\d)/g;
+  var RRN_TEST_RE = /(?:^|[^\d])(?:\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:\s*[-~–—]\s*)?[1-8]\d{6}(?!\d)|(?:\d\s*){2}(?:0\s*[1-9]|1\s*[0-2])(?:0\s*[1-9]|[12]\s*\d|3\s*[01])\s*[-~–—]\s*[1-8](?:\s*\d){6}(?!\s*\d))/;
 
   function maskRrnText(text) {
     var s = String(text == null ? '' : text);
-    return s.replace(RRN_REPLACE_RE, '$1$2-$3******');
+    return s
+      .replace(RRN_REPLACE_RE, '$1$2-$3******')
+      .replace(RRN_SPACED_REPLACE_RE, function (_, pre, front, gender) {
+        return pre + String(front).replace(/\s+/g, '') + '-' + gender + '******';
+      });
   }
 
   function hasUnmaskedRrn(text) {
@@ -904,11 +909,19 @@
     } else {
       interviews.forEach(function (iv, idx) {
         var roleKr = iv.role === 'accused' ? '피신고인(행위자)' : iv.role === 'witness' ? '참고인' : '신고인(피해자)';
+        var qaCnt = Array.isArray(iv.qaList) ? iv.qaList.filter(function (q) { return obj(q) && (str(q.q) || str(q.a)); }).length : 0;
+        var badges = [];
+        if (iv.pledgeSigned) badges.push('비밀유지서약 완료');
+        if (iv.stmtSigned) badges.push('진술확인 전자서명 완료' + (iv.docHash ? '·지문 ' + str(iv.docHash).slice(0, 8) : ''));
+        if (qaCnt > 0) badges.push('문답 ' + qaCnt + '항');
         lines.push('  (' + (idx + 1) + ') [' + roleKr + '] ' + (maskRrnText(str(iv.alias)) || '익명') +
           (iv.dept ? ' · ' + maskRrnText(str(iv.dept)) : '') +
           (iv.date ? ' (' + str(iv.date) + ', ' + (maskRrnText(str(iv.method)) || '면담') + ')' : '') +
-          (iv.pledgeSigned ? ' [비밀유지서약 징구 완료]' : ''));
+          (badges.length ? ' [' + badges.join(' · ') + ']' : ''));
         lines.push('      진술 요지: ' + (maskRrnText(str(iv.summary)) || '(요지 미입력)'));
+        if (str(iv.amendNote)) {
+          lines.push('      진술인 정정·보완 의견: ' + maskRrnText(str(iv.amendNote)));
+        }
       });
     }
     lines.push('');
@@ -964,6 +977,328 @@
     return maskRrnText(lines.join('\n'));
   }
 
+  /* ═══ 녹취록·진술서 원문 자동 정리 (규칙 기반 즉시 정리 + AI JSON 정규화) ═══ */
+  var MAX_QA_ITEMS = 500;
+  var TS_HEAD_RE = /^\s*(?:\[\d{1,2}:\d{2}(?::\d{2})?\]|\(\d{1,2}:\d{2}(?::\d{2})?\)|\d{1,2}:\d{2}(?::\d{2})?)\s*/;
+  var Q_LABEL_RE = /^(?:문|질문|Q|조사자|조사역|노무사|진행자|면담자|참석자\s*1|화자\s*1)(?:\s*[\dA-Za-z가-힣]{0,6})?\s*[:.)\]】>]\s*/i;
+  var A_LABEL_RE = /^(?:답|답변|A|진술인|신고인|피신고인|피해자|행위자|참고인|근로자|참석자\s*[2-9]|화자\s*[2-9])(?:\s*[\dA-Za-z가-힣]{0,8})?\s*[:.)\]】>]\s*/i;
+  var META_LABEL_RE = /^(?:의뢰\s*사업장|조사\s*구분|사건명|대상자\s*구분|성명[·\s]*호칭(?:\s*\/\s*소속)?|면담\s*일자|면담\s*방식|조사\s*수행\s*기관|작성기관|확인\s*진술인|문서\s*무결성\s*지문|서약\s*확인\s*상태|조사\s*착수일|보고[·\s]*종결일|종합\s*판단\s*요약|일시|장소|참석자|소속|직위|성명|연락처)$/;
+  var ISSUE_CLUE_RE = /(폭언|욕설|고성|모욕|비하|사직|퇴사|따돌림|배제|무시|사적\s*지시|심부름|회식|성희롱|신체\s*접촉|성적|외모|야근\s*강요|업무\s*과다|업무\s*배제|협박|서류\s*투척|던지|강요|괴롭)/;
+  var DATE_PLACE_RE = /((?:20\d{2}\s*[년./-]\s*)?\d{1,2}\s*[월./-]\s*\d{1,2}\s*일?(?:\s*(?:경|쯤|오전|오후|\d{1,2}시))?(?:\s*[가-힣A-Za-z0-9]{1,10}(?:회의실|사무실|식당|현장|단톡방|메신저|자리))?)/;
+
+  function cleanUtterance(s) {
+    return maskRrnText(str(s).replace(TS_HEAD_RE, '').replace(/\s+/g, ' ').trim());
+  }
+
+  function extractCandidateIssuesFromQa(qaList, roleHint) {
+    var candidateIssues = [];
+    var seenTitles = {};
+    (qaList || []).forEach(function (qa) {
+      if (candidateIssues.length >= 10) return;
+      var a = str(qa && qa.a);
+      var mClue = a.match(ISSUE_CLUE_RE);
+      if (!mClue) return;
+      var mWhen = a.match(DATE_PLACE_RE);
+      var whenWhere = mWhen ? str(mWhen[1]) : '';
+      var kw = mClue[1];
+      var title = (whenWhere ? whenWhere + ' ' : '') + kw + ' 관련 행위';
+      if (seenTitles[title]) return;
+      seenTitles[title] = 1;
+      var snippet = a.length > 160 ? (a.slice(0, 158) + '…') : a;
+      candidateIssues.push({
+        title: maskRrnText(title.slice(0, 80)),
+        whenWhere: maskRrnText(whenWhere.slice(0, 80)),
+        claimVictim: roleHint === 'accused' ? '' : maskRrnText(snippet),
+        claimAccused: roleHint === 'accused' ? maskRrnText(snippet) : '',
+        evidenceNote: roleHint === 'witness' ? ('참고인 진술: ' + maskRrnText(snippet)) : ''
+      });
+    });
+    return candidateIssues;
+  }
+
+  /* 자체 생성 「비밀유지서약 및 면담 진술확인서」(.hwpx) 추출 텍스트를 무손실 복원 */
+  function tryParseStructuredInterviewText(safeRaw, roleHint) {
+    var i3 = safeRaw.indexOf('3. 면담 문답(Q&A) 정리 내역');
+    var i4 = safeRaw.indexOf('4. 진술 핵심 요지');
+    if (i3 < 0 || i4 <= i3) return null;
+    var i5 = safeRaw.indexOf('5. 진술인 열람 후 정정·보완 의견', i4);
+    var i6 = safeRaw.indexOf('6. 진술 확인 및 서명', i5 > 0 ? i5 : i4);
+
+    var qaBlock = safeRaw.slice(i3 + '3. 면담 문답(Q&A) 정리 내역'.length, i4).trim();
+    var sumEnd = i5 > i4 ? i5 : (i6 > i4 ? i6 : safeRaw.length);
+    var sumBlock = safeRaw.slice(i4 + '4. 진술 핵심 요지'.length, sumEnd).trim();
+    var amendBlock = (i5 > i4)
+      ? safeRaw.slice(i5 + '5. 진술인 열람 후 정정·보완 의견'.length, i6 > i5 ? i6 : safeRaw.length).trim()
+      : '';
+
+    var qaList = [];
+    if (qaBlock.indexOf('【문') >= 0) {
+      var curItem = null;
+      var curField = '';
+      qaBlock.split(/\r?\n/).forEach(function (rawLn) {
+        var ln = String(rawLn == null ? '' : rawLn);
+        var mQ = ln.match(/^\s*【문\d+】\s?(.*)$/);
+        if (mQ) {
+          curItem = { qLines: [mQ[1]], aLines: [] };
+          qaList.push(curItem);
+          curField = 'q';
+          return;
+        }
+        var mA = ln.match(/^\s*【답\d+】\s?(.*)$/);
+        if (mA && curItem) {
+          curItem.aLines.push(mA[1]);
+          curField = 'a';
+          return;
+        }
+        if (!curItem) return;
+        if (curField === 'q') curItem.qLines.push(ln);
+        else if (curField === 'a') curItem.aLines.push(ln);
+      });
+      qaList = qaList.map(function (it) {
+        var qTxt = maskRrnText(it.qLines.join('\n').trim());
+        var aTxt = maskRrnText(it.aLines.join('\n').trim());
+        if (qTxt === '-') qTxt = '';
+        if (aTxt === '-') aTxt = '';
+        return (qTxt || aTxt) ? { q: qTxt || '진술 사항 확인', a: aTxt || '(답변 확인 필요)' } : null;
+      }).filter(Boolean);
+    } else {
+      qaBlock.split(/\r?\n/).forEach(function (line) {
+        var s = str(line);
+        if (!s || s.indexOf('개별 문답 항목 없이') >= 0) return;
+        if (s.indexOf('|') >= 0) {
+          var cols = s.split('|').map(function (c) { return str(c); });
+          if (cols.length >= 3 && /^순번$/.test(cols[0])) return;
+          if (cols.length >= 3 && /^\d+$/.test(cols[0])) {
+            var qTxt = cleanUtterance(cols[1] === '-' ? '' : cols[1]);
+            var aTxt = cleanUtterance(cols.slice(2).join(' | ') === '-' ? '' : cols.slice(2).join(' | '));
+            if (qTxt || aTxt) qaList.push({ q: qTxt || '진술 사항 확인', a: aTxt || '(답변 확인 필요)' });
+          }
+        }
+      });
+    }
+
+    var truncatedQaCount = 0;
+    if (qaList.length > MAX_QA_ITEMS) {
+      truncatedQaCount = qaList.length - MAX_QA_ITEMS;
+      qaList = qaList.slice(0, MAX_QA_ITEMS);
+    }
+    var summary = sumBlock === '(진술 요지 미입력)' ? '' : maskRrnText(sumBlock);
+    var amendNote = (!amendBlock || amendBlock.indexOf('별도 정정·보완 의견 없음') === 0) ? '' : maskRrnText(amendBlock);
+    return {
+      qaList: qaList,
+      summary: summary,
+      amendNote: amendNote,
+      candidateIssues: extractCandidateIssuesFromQa(qaList, roleHint),
+      truncatedQaCount: truncatedQaCount,
+      fromStructuredDoc: true
+    };
+  }
+
+  function parseTranscriptFallback(rawText, roleHint) {
+    var safeRaw = maskRrnText(String(rawText == null ? '' : rawText));
+    if (!str(safeRaw)) return { qaList: [], summary: '', candidateIssues: [], truncatedQaCount: 0 };
+
+    var structured = tryParseStructuredInterviewText(safeRaw, roleHint);
+    if (structured) return structured;
+
+    var rawLines = safeRaw.split(/\r?\n/);
+    var turns = [];
+    var inQaTable = false;
+    rawLines.forEach(function (line) {
+      var s = String(line || '').replace(TS_HEAD_RE, '').trim();
+      if (!s) return;
+      /* 한글(.hwpx) 표 추출 줄: 순번 | 질문 | 답변 또는 질문 | 답변 */
+      if (s.indexOf('|') >= 0) {
+        var cols = s.split('|').map(function (c) { return str(c); }).filter(Boolean);
+        if (cols.length >= 2) {
+          var headJoin = cols.join(' ');
+          if (/^(?:순번|연번|번호)?\s*(?:질문|문|조사자|조사역)/.test(headJoin) && cols[0].length <= 10 && cols[1].length <= 16) {
+            inQaTable = true;
+            return;
+          }
+          /* 4칸 개요표나 메타데이터 머리칸 표는 문답으로 오인하지 않고 건너뛴다 */
+          if (cols.length >= 4 && (META_LABEL_RE.test(cols[0]) || META_LABEL_RE.test(cols[2]))) return;
+          if (META_LABEL_RE.test(cols[0])) return;
+          var hasNumSeq = cols.length >= 3 && /^\d{1,4}$/.test(cols[0]);
+          if (inQaTable || hasNumSeq || cols.length === 2) {
+            var qCol = hasNumSeq ? cols[1] : cols[0];
+            var aCol = hasNumSeq ? cols.slice(2).join(' ') : cols.slice(1).join(' ');
+            if (qCol && aCol) {
+              turns.push({ kind: 'Q', text: cleanUtterance(qCol) });
+              turns.push({ kind: 'A', text: cleanUtterance(aCol) });
+              return;
+            }
+          }
+        }
+      } else {
+        inQaTable = false;
+      }
+      if (Q_LABEL_RE.test(s)) {
+        turns.push({ kind: 'Q', text: cleanUtterance(s.replace(Q_LABEL_RE, '')) });
+        return;
+      }
+      if (A_LABEL_RE.test(s)) {
+        turns.push({ kind: 'A', text: cleanUtterance(s.replace(A_LABEL_RE, '')) });
+        return;
+      }
+      /* 일반 이름: 말 모양 (예: 김노무: ... / 박주임: ...), 단 서지사항 메타 라벨은 제외 */
+      var spMatch = s.match(/^([가-힣A-Za-z0-9_·\s]{1,12})\s*[:：]\s*(.+)$/);
+      if (spMatch && spMatch[2]) {
+        var spk = str(spMatch[1]);
+        if (META_LABEL_RE.test(spk)) return;
+        var body = cleanUtterance(spMatch[2]);
+        var isQ = /노무|조사|위원|진행|질문|\?$/.test(spk) || (!turns.length && /\?\s*$/.test(body));
+        turns.push({ kind: isQ ? 'Q' : 'A', speaker: spk, text: body });
+        return;
+      }
+      if (turns.length) {
+        turns[turns.length - 1].text = cleanUtterance(turns[turns.length - 1].text + ' ' + s);
+      } else {
+        turns.push({ kind: /\?\s*$/.test(s) ? 'Q' : 'A', text: cleanUtterance(s) });
+      }
+    });
+
+    var qaList = [];
+    var curQ = '';
+    var curA = [];
+    function flushPair() {
+      var qTxt = str(curQ);
+      var aTxt = str(curA.join(' '));
+      if (qTxt || aTxt) {
+        qaList.push({
+          q: qTxt || '진술 사항 확인',
+          a: aTxt || '(답변 확인 필요)'
+        });
+      }
+      curQ = '';
+      curA = [];
+    }
+    turns.forEach(function (t) {
+      if (!str(t.text)) return;
+      if (t.kind === 'Q') {
+        if (curQ && curA.length) flushPair();
+        curQ = curQ ? (curQ + ' ' + t.text) : t.text;
+      } else {
+        curA.push(t.text);
+      }
+    });
+    flushPair();
+
+    /* 화자 구분 없이 통문단으로 작성된 진술서일 경우 문단 단위로 정돈 */
+    if (qaList.length <= 1 && !turns.some(function (t) { return t.kind === 'Q'; })) {
+      var paras = safeRaw.split(/\n\s*\n/).map(cleanUtterance).filter(function (p) { return p.length >= 8; });
+      if (paras.length >= 2) {
+        qaList = paras.map(function (p, i) {
+          return { q: '진술 항목 ' + (i + 1), a: p };
+        });
+      }
+    }
+    var truncatedQaCount = 0;
+    if (qaList.length > MAX_QA_ITEMS) {
+      truncatedQaCount = qaList.length - MAX_QA_ITEMS;
+      qaList = qaList.slice(0, MAX_QA_ITEMS);
+    }
+
+    /* 핵심 진술 요지 생성 (답변 중심 상위 핵심 문장 추출) */
+    var answerPool = qaList.map(function (x) { return str(x.a); }).filter(function (a) { return a && a !== '(답변 확인 필요)'; });
+    var summaryBullets = [];
+    answerPool.forEach(function (ans) {
+      if (summaryBullets.length >= 5) return;
+      var shortAns = ans.length > 140 ? (ans.slice(0, 138) + '…') : ans;
+      if (ISSUE_CLUE_RE.test(ans) || DATE_PLACE_RE.test(ans) || summaryBullets.length < 3) {
+        summaryBullets.push('• ' + shortAns);
+      }
+    });
+    if (!summaryBullets.length && str(safeRaw)) {
+      summaryBullets.push('• ' + cleanUtterance(safeRaw).slice(0, 200));
+    }
+
+    return {
+      qaList: qaList,
+      summary: maskRrnText(summaryBullets.join('\n')),
+      candidateIssues: extractCandidateIssuesFromQa(qaList, roleHint),
+      truncatedQaCount: truncatedQaCount
+    };
+  }
+
+  function buildTranscriptAiPrompt(maskedText, meta) {
+    var m = obj(meta) ? meta : {};
+    var roleKr = m.role === 'accused' ? '피신고인(행위자)' : m.role === 'witness' ? '참고인' : '신고인(피해근로자)';
+    var clipped = maskRrnText(String(maskedText == null ? '' : maskedText)).slice(0, 28000);
+    return [
+      '당신은 대한민국 공인노무사의 직장 내 괴롭힘·성희롱 사건 조사를 보조하는 전문 기록 정리기입니다.',
+      '아래 면담 녹취록(또는 진술서) 원문을 읽고 객관적·중립적 문체로 정리하여 **오직 JSON 객체 하나**만 출력하세요.',
+      '절대 추측하거나 원문에 없는 사실을 보태지 말고, 주민등록번호가 보이면 000000-******* 로 가리세요.',
+      '',
+      '[면담 정보]',
+      '- 대상자 구분: ' + roleKr,
+      '- 대상자 호칭: ' + (maskRrnText(str(m.alias)) || roleKr),
+      '- 면담 일자·방식: ' + (str(m.date) || '미기재') + ' / ' + (str(m.method) || '면담'),
+      '',
+      '[출력 JSON 형식]',
+      '{',
+      '  "qaList": [ { "q": "조사자 질문 요지", "a": "진술인 답변 내용(1인칭 또는 객관화 정돈)" } ],',
+      '  "summary": "• 핵심 진술 요지 1\\n• 핵심 진술 요지 2\\n• 핵심 진술 요지 3",',
+      '  "candidateIssues": [',
+      '    { "title": "쟁점 행위 제목(예: 10.14 주간회의 중 폭언 및 사직 강요)", "whenWhere": "일시·장소", "claimVictim": "신고인 측 진술 요지", "claimAccused": "피신고인 측 소명 요지", "evidenceNote": "관련 참고인 진술·언급 증거" }',
+      '  ]',
+      '}',
+      '',
+      '[원문 시작]',
+      clipped,
+      '[원문 끝]'
+    ].join('\n');
+  }
+
+  function normalizeTranscriptAiResult(rawInput, fallbackRawText, roleHint) {
+    var parsed = null;
+    if (obj(rawInput)) {
+      parsed = rawInput;
+    } else if (typeof rawInput === 'string') {
+      var txt = rawInput.replace(/```json|```/gi, '').trim();
+      var firstBrace = txt.indexOf('{');
+      var lastBrace = txt.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) txt = txt.slice(firstBrace, lastBrace + 1);
+      try { parsed = JSON.parse(txt); } catch (e) { parsed = null; }
+    }
+    var fb = parseTranscriptFallback(fallbackRawText, roleHint);
+    if (!obj(parsed)) return fb;
+
+    var rawQa = Array.isArray(parsed.qaList)
+      ? parsed.qaList.filter(obj).map(function (x) {
+        return { q: maskRrnText(str(x.q).slice(0, 500)), a: maskRrnText(str(x.a).slice(0, 2500)) };
+      }).filter(function (x) { return x.q || x.a; })
+      : [];
+    var truncatedQaCount = rawQa.length > MAX_QA_ITEMS ? (rawQa.length - MAX_QA_ITEMS) : 0;
+    var qaList = rawQa.slice(0, MAX_QA_ITEMS);
+    if (!qaList.length) {
+      qaList = fb.qaList;
+      truncatedQaCount = fb.truncatedQaCount || 0;
+    }
+
+    var summary = '';
+    if (Array.isArray(parsed.summary)) {
+      summary = parsed.summary.map(function (s) { return '• ' + str(s).replace(/^[•\-*]\s*/, ''); }).join('\n');
+    } else {
+      summary = str(parsed.summary);
+    }
+    summary = maskRrnText(summary.slice(0, 4000)) || fb.summary;
+
+    var candidateIssues = Array.isArray(parsed.candidateIssues)
+      ? parsed.candidateIssues.filter(obj).map(function (iss) {
+        return {
+          title: maskRrnText(str(iss.title).slice(0, 120)),
+          whenWhere: maskRrnText(str(iss.whenWhere).slice(0, 100)),
+          claimVictim: maskRrnText(str(iss.claimVictim).slice(0, 800)),
+          claimAccused: maskRrnText(str(iss.claimAccused).slice(0, 800)),
+          evidenceNote: maskRrnText(str(iss.evidenceNote).slice(0, 800))
+        };
+      }).filter(function (iss) { return !!iss.title; }).slice(0, 12)
+      : fb.candidateIssues;
+
+    return { qaList: qaList, summary: summary, candidateIssues: candidateIssues, truncatedQaCount: truncatedQaCount };
+  }
+
   return {
     STEPS: STEPS,
     CATEGORIES: CATEGORIES,
@@ -996,6 +1331,9 @@
     mergeErpNote: mergeErpNote,
     buildErpSyncPayload: buildErpSyncPayload,
     judgeIssue: judgeIssue,
-    assembleReportDraft: assembleReportDraft
+    assembleReportDraft: assembleReportDraft,
+    parseTranscriptFallback: parseTranscriptFallback,
+    buildTranscriptAiPrompt: buildTranscriptAiPrompt,
+    normalizeTranscriptAiResult: normalizeTranscriptAiResult
   };
 });

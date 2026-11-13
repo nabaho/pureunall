@@ -345,15 +345,17 @@
       entityTypes:['Organization','Person','Message','Document'] },
     /* 괴롭힘·성희롱 조사(pu-harass.html) — 의뢰인 업무 조사 사건 공문 메일 자동수집 · 8단계 진행관리 · 조사결과보고서 · 푸른이알피 자동연동(2026-11-11).
        ★ 비밀유지 분리(근로기준법 제76조의3 제7항): harass_invest(목록·8단계 진행·공문 머리글·이알피 동기화)는 재직 직원 공유,
-         harass_secret(면담 진술·쟁점 사실인정·조사결과보고서 본문)은 사건 주·부담당 노무사 및 대표만 읽고 쓴다. */
-    harass:{ name:'괴롭힘·성희롱 조사', file:'pu-harass.html', primaryRoots:['harass_invest','harass_secret'],
+         harass_secret(면담 진술·쟁점 사실인정·조사결과보고서 본문) 및 harass_sign(진술·비밀서약 종단간 암호화 전자서명)은 사건 주·부담당 노무사 및 대표만 읽고 쓴다. */
+    harass:{ name:'괴롭힘·성희롱 조사', file:'pu-harass.html', primaryRoots:['harass_invest','harass_secret','harass_sign'],
       sharedRoots:['uid_roles','data/companies','data/cases','data/biz_case_types','data/user_dir','mailbox'],
       writeContracts:[{path:'harass_invest/cases/{id}',entityType:'Case'},
                       {path:'harass_invest/erp_sync/{id}',entityType:'Task'},
                       {path:'harass_invest/erp_ack/{id}',entityType:'Task'},
                       {path:'harass_invest/dismissed/{id}',entityType:'Task'},
-                      {path:'harass_secret/{id}',entityType:'Document'}],
-      entityTypes:['Organization','Person','Case','Document','Task','Message'] }
+                      {path:'harass_secret/{id}',entityType:'Document'},
+                      {path:'harass_sign/req/{cid}/{id}',entityType:'Submission'},
+                      {path:'harass_sign/open/{id}',entityType:'Submission'}],
+      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -468,7 +470,10 @@
       note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' },
     /* ✍ 계약서 서명 요청 (2026-10-09) — 받는 사람이 폰으로 확인·서명하는 쪽. 쓰는 곳은 pu_sign/open/{열쇠}/seen·sub 뿐 */
     contract_sign:{ name:'계약서 서명', file:'sign-contract.html', program:'docs',
-      note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' }
+      note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' },
+    /* 🛡️ 괴롭힘·성희롱 조사 비밀유지서약·진술확인 서명 (2026-11-12) — 당사자·참고인이 폰으로 종단간 복호화 확인·정정의견·손서명 제출 */
+    harass_sign:{ name:'진술·비밀서약 서명', file:'sign-harass.html', program:'harass',
+      note:'면담 대상자가 폰으로 비밀유지서약·진술확인서에 서명 — 괴롭힘·성희롱 조사가 받아 사건 비밀금고(harass_secret)에 봉인' }
   };
   var EXCLUDED_SCREENS = {
     'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다',
