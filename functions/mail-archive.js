@@ -113,8 +113,80 @@ async function openImap(opt) {
   throw last || new Error('접속할 아이디가 없습니다');
 }
 
+/* 연결을 «조용히» 닫는다 — 이미 끊겼으면 그대로 둔다 */
+async function closeQuiet(client) {
+  if (!client) return;
+  try { await client.logout(); } catch (_) {
+    try { client.close(); } catch (__) { /* 이미 끊겼다 */ }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   미리 접속 — 배달(SMTP)과 «동시에» 다음메일 IMAP 에 붙어 둔다 (대표 지시 2026-11-14 「메일 보내는 속도가 너무 늦다」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 까닭 — 서버 로그(2026-11-09 6.1초 · 11-02 4.2초)에서 한 통 보내는 데 4~6초가 걸렸다. 서버는 «배달이 끝난 뒤에야»
+     다음메일 IMAP 에 새로 접속(TLS) → 로그인 → 폴더 목록 → 올리기 → 끊기를 차례로 했고, 그 모두가 응답 시간에 얹혔다.
+     접속·로그인·목록은 편지와 상관없는 일이라 배달과 «겹쳐서» 해 둘 수 있다. 배달이 끝나면 올리기만 하면 된다.
+   ⚠ 던지지 않는다 — done 은 «절대 거절되지 않는다»(실패는 값으로). 미리 접속이 안 되면 archiveSent 가 배달 뒤에 예전처럼 접속한다.
+   ⚠ 아이디는 «첫 후보 하나»만 쓴다 — 여러 아이디로 두드리면 자격이 틀렸을 때 틀린 로그인이 배로 는다(계정이 잠길 수 있다).
+   ⚠ 쓰지 않고 끝나면(배달 실패·사본 건너뜀) release 로 닫는다 — 안 닫으면 연결이 남는다. 쓴 것은 archiveSent 가 닫는다.
+   ⚠ 끄는 스위치(MAIL_ARCHIVE_OFF)를 그대로 따른다 — 켜져 있으면 접속하지 않는다. */
+/* 로그인이 «거절됐다»는 오류인가 — imapflow 는 authenticationFailed 를 단다. 말로도 한 번 더 본다. */
+function isAuthFailure(e) {
+  if (e && e.authenticationFailed === true) return true;
+  return /AUTHENTICATIONFAILED|authentication failed|invalid credentials|login failed|\bNO\b.*LOGIN/i.test(String((e && e.message) || e));
+}
+
+/* 쓸 일이 없어졌을 때 «얼마나 기다렸다 닫을까» — 접속이 아직 안 끝났어도 응답을 이 이상 늦추지 않는다.
+   그동안 접속이 안 끝나면 «취소 표시»(abandoned)만 해 두고 가며, 접속이 늦게 끝나는 순간 스스로 닫힌다. */
+const PREFETCH_RELEASE_WAIT_MS = 1500;
+
+function prefetchSent(opt) {
+  const o = opt || {};
+  const st = { client: null, box: '', why: '', used: false, abandoned: false, authFailed: false, failedId: '' };
+  /* ★ 연결을 «한 번만» 닫는다 — 소유권을 먼저 빼고(st.client = null) 닫는다. 닫는 길이 여럿(release · 목록 오류 · 취소)이고
+       닫는 데 시간이 걸려도 같은 연결을 두 번 닫지 않는다(2026-11-14 재검증이 «목록 대기 중 release 가 닫은 뒤 목록이 거절되면
+       오류 처리가 또 닫는다»를 재현했다). 이미 올리기가 쓴 연결(st.used)은 올리기 쪽이 닫으므로 여기서 건드리지 않는다. */
+  /* ⚠ «이미 누가 닫는 중»이면 그 끝을 기다린다(st.closing 을 나눠 쓴다) — 소유권만 빼고 곧장 돌아가면, 닫는 동안
+       release 의 기다림이 끝났을 때 두 번째 닫기가 «이미 비었다»며 바로 돌아가 연결이 실제로 닫히기 «전에» 실패 응답이
+       나갈 수 있다(2026-11-14 재검증 2회차: 느린 logout 가짜로 «release 는 돌아왔는데 logout 은 안 끝남» 재현). */
+  const take = async () => {
+    const c = st.client;
+    if (!c || st.used) { if (st.closing) await st.closing; return; }
+    st.client = null;
+    st.closing = closeQuiet(c);
+    await st.closing;
+  };
+  const done = (async () => {
+    try {
+      if (String(process.env.MAIL_ARCHIVE_OFF || '') === '1') { st.why = '스위치가 꺼져 있습니다'; return st; }
+      const ids = (Array.isArray(o.loginIds) && o.loginIds.length) ? [o.loginIds[0]] : [String(o.user || '')];
+      st.failedId = ids[0];                                       /* 로그인이 거절되면 이 아이디는 다시 두드리지 않는다 */
+      const client = await (o.openClient || openImap)(Object.assign({}, o, { loginIds: ids, user: ids[0] }));
+      if (st.abandoned) { await closeQuiet(client); st.why = '쓸 일이 없어져 닫았습니다'; return st; }   /* 배달이 실패한 사이 접속이 끝났다 */
+      st.client = client;
+      st.box = pickSentBox(await client.list());
+      if (!st.box) st.why = '보낸메일함을 찾지 못했습니다';
+    } catch (e) {
+      st.why = String((e && e.message) || e);
+      st.authFailed = isAuthFailure(e);
+      await take();                                               /* 접속은 됐는데 목록에서 막혔으면 닫는다(이미 닫혔으면 그대로) */
+    }
+    return st;
+  })();
+  /* 쓰지 않고 끝났다 — 닫는다. 접속이 아직 안 끝났으면 waitMs 까지만 기다리고(그 뒤는 abandoned 가 닫는다) 돌아간다. */
+  const release = async (waitMs) => {
+    st.abandoned = true;
+    const wait = Number.isFinite(Number(waitMs)) ? Number(waitMs) : PREFETCH_RELEASE_WAIT_MS;
+    await Promise.race([done, new Promise((r) => { const t = setTimeout(r, wait); if (t && t.unref) t.unref(); })]);
+    await take();
+  };
+  return { done, release, state: st };
+}
+
 /* 사본 넣기. **절대 던지지 않는다** — 무슨 일이 나도 값으로 알려 준다.
-   돌려주는 것: { ok, put, dropped, box, why } */
+   돌려주는 것: { ok, put, dropped, box, why, viaPrefetch }
+   opt.prefetch — prefetchSent 가 돌려준 것. 미리 붙어 둔 연결이 «쓸 만하면» 그것으로 올리고, 아니면 예전처럼 새로 붙는다. */
 async function archiveSent(o) {
   const opt = o || {};
   const all = (Array.isArray(opt.raws) ? opt.raws : []).filter(Boolean);
@@ -133,11 +205,32 @@ async function archiveSent(o) {
       why: '첨부가 커서(' + Math.round(bytes / 1024 / 1024) + 'MB) 사본은 건너뛰었습니다' };
   }
 
-  let client = null, put = 0, box = '', why = '';
+  let client = null, put = 0, box = '', why = '', viaPrefetch = false;
   try {
-    client = await (opt.openClient || openImap)(opt);
-    box = pickSentBox(await client.list());
-    if (!box) {
+    /* 미리 붙어 둔 연결이 있고 «보낸함 자리까지 찾아 둔» 것이면 그것을 쓴다 — 접속·로그인·목록은 이미 끝났다.
+       못 쓰면(접속 실패·이미 씀) 예전 길 그대로: 새로 붙는다. */
+    const pre = opt.prefetch ? await opt.prefetch.done : null;
+    if (pre && pre.client && !pre.used) {
+      pre.used = true; viaPrefetch = true;
+      client = pre.client; box = pre.box;
+    } else {
+      /* 미리 접속에서 «로그인이 거절된» 아이디는 다시 두드리지 않는다 — 같은 틀린 로그인을 두 번 하면
+         계정이 잠길 수 있다(2026-11-14 보안 검토). 남은 후보가 없으면 «다시 시도하지 않고» 사본만 건너뛴다. */
+      let openOpt = opt;
+      if (pre && pre.authFailed && pre.failedId) {
+        const base = (Array.isArray(opt.loginIds) && opt.loginIds.length) ? opt.loginIds : [String(opt.user || '')];
+        const rest = base.filter((id) => id && id !== pre.failedId);
+        openOpt = Object.assign({}, opt, { loginIds: rest, user: rest[0] || '' });
+        if (!rest.length) why = '미리 접속에서 로그인이 거절되어 다시 시도하지 않았습니다';
+      }
+      if (!why) {
+        client = await (opt.openClient || openImap)(openOpt);
+        box = pickSentBox(await client.list());
+      }
+    }
+    if (why) {
+      /* 위에서 이미 «건너뛴다»고 정했다 */
+    } else if (!box) {
       why = '보낸메일함을 찾지 못했습니다';
     } else {
       /* 「읽음」으로 넣는다 — 내가 보낸 것이 안 읽음으로 뜨면 숫자가 거짓이 된다 */
@@ -150,16 +243,12 @@ async function archiveSent(o) {
     why = String((e && e.message) || e);
   } finally {
     /* 연결을 안 닫으면 함수가 안 끝나고 그동안 요금이 샌다 */
-    if (client) {
-      try { await client.logout(); } catch (_) {
-        try { client.close(); } catch (__) { /* 이미 끊겼다 */ }
-      }
-    }
+    await closeQuiet(client);
   }
-  return { ok: !!put && !why, put: put, dropped: dropped, box: box, why: why };
+  return { ok: !!put && !why, put: put, dropped: dropped, box: box, why: why, viaPrefetch: viaPrefetch };
 }
 
 module.exports = {
-  archiveSent, buildRaw, pickSentBox, looksSent, boxName,
+  archiveSent, prefetchSent, isAuthFailure, PREFETCH_RELEASE_WAIT_MS, buildRaw, pickSentBox, looksSent, boxName,
   ARCHIVE_MAX, ARCHIVE_MAX_BYTES, ARCHIVE_TIMEOUT_MS, IMAP_HOST,
 };
