@@ -183,3 +183,37 @@ test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인
   assert.match(본문, /Promise\.resolve\(\)\.then\(function\(\)\{ return PureunHwp\.renderPreview\(/);
   assert.doesNotMatch(본문, /'<td data-l="발급">'/);
 });
+
+/* 2026-11-15 직접 등기 — ④ 단계 순서·비용표, 신청 방법 칸 */
+test('직접 등기 — ④ 단계에 위택스·영수필·법인 인감 순서와 💰 예상 비용, 신청 방법을 바꾸면 화면을 다시', () => {
+  assert.match(본문, /function drawCost\(a\)\{/);
+  assert.match(본문, /C\.costPlan\(a\)/);
+  assert.match(본문, /wetax\.go\.kr/);
+  assert.match(본문, /data-k="filing"/);
+  assert.match(본문, /if\(el\.dataset\.k==='filing'\)\{ c\.filing=v==='agent'\?'agent':'self';/);
+  assert.match(본문, /\[4,'등기','직접 신청하고 끝내기'\]/);
+});
+
+test('직접 등기 검토 반영 — 안내 문구가 신청 방법·화면 모양을 따르고, 등기할 것이 없으면 그렇게 말한다, 머리줄 가림·폰 체크칸', () => {
+  assert.match(본문, /where=MODE==='easy'\?'④ 등기 단계':'⑦ 예상 비용'/);
+  assert.match(본문, /a\.c\.filing==='agent'\?'⚠ «변경등기 신청서»는 법무사 확인용 초안/);
+  assert.match(본문, /k===4&&a\.c\.filing==='agent'\?'법무사에게 맡기고 끝내기'/);
+  assert.match(본문, /if\(p\.none\)\{/);
+  assert.match(html, /#editor\{scroll-margin-top:\d+px\}/);
+  assert.match(html, /\.t tbody td\.c\{padding:8px\}/);
+});
+
+test('등기할 사항이 없는 건 — 반영 조건 한 곳(canApplyCase), 기한·끝내기 안내', () => {
+  assert.match(본문, /function canApplyCase\(a, c\)\{/);
+  assert.match(본문, /C\.needsReg\(a\) \? !!a\.c\.dates\.done : \(!a\.charterChanged \|\| !!a\.c\.dates\.approvalGet\)/);
+  assert.ok((본문.match(/canApplyCase\(a, /g) || []).length >= 3, '단계·예전 화면·칸 고칠 때 모두 같은 조건');
+  assert.match(본문, /if\(dl && dl\.none\)/);
+  assert.match(본문, /esc\(C\.purpose\(a\)\|\|'등기할 사항 없음'\)/);
+});
+
+test('넣다 만 변경은 반영 단추·다음 단추를 막고, 자세히 화면도 같은 설명(applyWhy)', () => {
+  assert.match(본문, /if\(!c \|\| c\.applied \|\| a\.errors\.length \|\| !a\.c\.changes\.length \|\| !C\.hasEffect\(a\)\) return false;/);
+  assert.match(본문, /if\(!C\.hasEffect\(a\)\) return toast\(/);
+  assert.match(본문, /n\.meeting\.date && C\.hasEffect\(a\)\)/);
+  assert.doesNotMatch(본문, /«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다/);
+});

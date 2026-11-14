@@ -47,8 +47,101 @@
     members: '공인노무사법 제7조의3제1항 — 사원은 2명 이상의 개업노무사(부족해진 날부터 3개월 안에 보충하지 않으면 인가 취소, 제7조의6제1호)',
     office: '공인노무사법 제7조의7제3항 — 주사무소·분사무소마다 공인노무사인 사원 1명 이상 상근',
     notary: '공증인법 제66조의2 — 법인 등기에 붙이는 총회 의사록은 공증인 인증(정관변경이 따르는 분사무소 변경은 경미사항 예외가 아님)',
-    fees: '등록면허세: 그 밖의 등기·분사무소 설치 건당 40,200원(지방세법 제28조제1항제6호, 대도시 분사무소 설치는 중과) + 지방교육세 20% · 등기신청수수료: 등기 목적마다 7,000원(전자신청 2,000원) — 건수·합계는 법무사 청구서로 확인'
+    fees: '등록면허세: 변경사항(등기 목적)마다 40,200원·분사무소 설치는 분사무소마다 40,200원(지방세법 제28조제1항제6호 마·바목, 등기예규 제1790호) + 지방교육세 20%(같은 법 제151조) · 등기신청수수료: 등기 목적마다 방문 7,000원·전자표준양식 5,000원·전자신청 2,000원(등기사항증명서 등 수수료규칙 제5조의3, 2025. 8. 1.부터) — 건수는 등기소·지자체 확인'
   };
+
+  /* ══ 직접 등기 비용 (대표 2026-11-15 «등기비용 등 필요 비용도 표시 — 법무사 없이 직접하는 것이다») ══
+     2026-11-15 공식 원문 확인(국가법령정보센터): 지방세법(2026. 7. 1. 시행) 제28조제1항제6호·제151조, 등기예규 제1790호(등록면허세 산정기준),
+     등기사항증명서 등 수수료규칙(2025. 8. 1. 시행) 제2조·제5조·제5조의3·제5조의5, 등기예규 제1861호(수수료 징수), 공증인 수수료 규칙 제21조제2항,
+     인감증명법 시행령 제19조, 주민등록법 시행규칙 제17조제4항. 공인노무사법령에는 정관변경 인가 수수료가 없다.
+     ⚠ 확정 못 한 것(«확인 필요»로 보인다): 현금·현물 출자 입사를 «출자증가»(1천분의 4, 최저 112,500원)로 보는지 · 변경사항을 몇 건으로 묶는지
+       · 총사원 동의서도 공증 대상인지 · 노무법인 전자신청 가능 여부 — 천안시 세무과·등기소에 미리 확인. 금액이 바뀌면 이 표만 고친다. */
+  var FEES = {
+    asOf: '2026-11-15',
+    regTax: 40200, incrRate: 0.004, incrMin: 112500, eduRate: 0.2,
+    filing: { visit: 7000, form: 5000, efile: 2000 },
+    notary: 30000,
+    cert: { seal: 600, corpSeal: 1000, reg: 1000, resident: 400 }
+  };
+  /* 지자체 이름 — 등록면허세 납세지(본점·분사무소 소재지). «충청남도 천안시 서북구 …» → 천안시, «대전광역시 서구 …» → 대전광역시 서구 */
+  function placeOf(addr) {
+    var t = String(addr || '').replace(/\s+/g, ' ').trim().split(' ');
+    if (!t[0]) return '';
+    if (/특별자치시$/.test(t[0])) return t[0];
+    if (/(광역시|특별시)$/.test(t[0])) return t[0] + (t[1] && /구$/.test(t[1]) ? ' ' + t[1] : '');
+    for (var i = 0; i < Math.min(t.length, 3); i++) if (/(시|군)$/.test(t[i]) && !/(도|특별자치도)$/.test(t[i])) return t[i];
+    return t[0];
+  }
+  function cashTotal(list) { return (list || []).reduce(function (s, m) { return s + normInvest(m.invest).cash; }, 0); }
+  function costPlan(after) {
+    var c = after.c, b = after.base || {}, firm = b.firm || {}, hq = placeOf(firm.hq) || '본점 소재지';
+    var has = {}; (after.events || []).forEach(function (e) { has[e.type] = true; });
+    var repAddr = (after.events || []).some(function (e) { return (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; })); });
+    /* 등기 목적 — 사원(임원)의 입사·퇴사·대표사원 취임·사임·주소변경은 «같은 등기목적»으로 1건(등기예규 제1861호 «2인 이상 임원의 취임·퇴임·주소변경»,
+       예규의 임원에 사원 포함). 등기소·지자체가 종류마다 따로 세면 더 나온다 — perType 으로 함께 보여 준다 */
+    var kinds = [];
+    if (has.join) kinds.push('입사');
+    if (has.leave) kinds.push('퇴사');
+    if (has.repIn || has.repOut) kinds.push('대표사원 ' + (has.repIn && has.repOut ? '취임·사임' : has.repIn ? '취임' : '사임'));
+    if (repAddr) kinds.push('대표사원 주소변경');
+    var purposes = [];
+    if (kinds.length) purposes.push({ key: 'officer', label: '사원 변경(' + kinds.join('·') + ')' });
+    if (has.share) purposes.push({ key: 'share', label: '사원 출자 변경' });
+    var rows = [], brAdds = 0;
+    purposes.forEach(function (p) { rows.push({ kind: 'tax', label: '등록면허세 — ' + p.label, calc: '건당 ' + won(FEES.regTax) + '원', amount: FEES.regTax, payTo: hq + '(본점)', basis: '지방세법 제28조제1항제6호 바목' }); });
+    (after.events || []).forEach(function (e) {
+      var br = (after.brById || {})[e.branch] || {};
+      if (e.type === 'brAdd') { brAdds++; rows.push({ kind: 'tax', label: '등록면허세 — 분사무소 설치(' + (br.name || '분사무소') + ')', calc: '분사무소마다 ' + won(FEES.regTax) + '원', amount: FEES.regTax, payTo: placeOf(br.addr) || '분사무소 소재지', basis: '지방세법 제28조제1항제6호 마목 · 등기예규 제1790호 제5조' }); }
+      if (e.type === 'brMove') rows.push({ kind: 'tax', label: '등록면허세 — 분사무소 이전(' + (br.name || '분사무소') + ')', calc: '건당 ' + won(FEES.regTax) + '원', amount: FEES.regTax, payTo: (placeOf(br.addr) || '새 소재지') + '(새 소재지)', basis: '지방세법 제28조제1항제6호 바목 · 등기예규 제1790호 제6조' });
+      if (e.type === 'brClose') rows.push({ kind: 'tax', label: '등록면허세 — 분사무소 폐지(' + (br.name || '분사무소') + ')', calc: '건당 ' + won(FEES.regTax) + '원', amount: FEES.regTax, payTo: placeOf(br.addr) || '분사무소 소재지', basis: '지방세법 제28조제1항제6호 바목 · 등기예규 제1790호 제7조' });
+    });
+    var tax = rows.reduce(function (s, r) { return s + r.amount; }, 0);
+    var edu = Math.floor(tax * FEES.eduRate / 10) * 10;
+    if (tax) rows.push({ kind: 'edu', label: '지방교육세', calc: '등록면허세의 20%', amount: edu, payTo: '등록면허세와 함께', basis: '지방세법 제151조제1항제2호' });
+    /* 수수료 «건» — 등기 목적마다, 분사무소 설치는 한 신청서에 여러 곳이어도 1건(등기예규 제1861호) */
+    var nFee = purposes.length + (brAdds ? 1 : 0) + (has.brMove ? 1 : 0) + (has.brClose ? 1 : 0);
+    var notes = [];
+    if (!hasEffect(after)) {
+      notes.push('넣은 변경이 아직 비었거나 지금과 같습니다 — 사람·분사무소·새 주소를 고르면 계산합니다');
+      return { rows: [], nFee: 0, tax: 0, edu: 0, visit: 0, efile: 0, perType: 0, alt: null, notes: notes, hq: hq, asOf: FEES.asOf, incomplete: true, resOther: 0 };
+    }
+    /* 등기할 것이 없으면(예: 대표사원이 아닌 사원의 주소만 바뀜 — 정관 제5조만 바뀌고 등기부엔 없다) 등기 비용은 없다 — 검토 2026-11-15 */
+    if (!nFee) {
+      if (after.charterChanged) rows.push({ kind: 'approval', label: '노동부 정관변경 인가', calc: '수수료 없음', amount: 0, payTo: (firm.authority || '관할 지방고용노동관서'), basis: '공인노무사법령에 수수료 규정 없음' });
+      notes.push('이번 변경은 등기할 사항이 없어 등기 비용(등록면허세·수수료·공증)이 들지 않습니다' + (after.charterChanged ? ' — 정관변경 인가만 받으면 됩니다' : ''));
+      return { rows: rows, nFee: 0, tax: 0, edu: 0, visit: 0, efile: 0, perType: 0, alt: null, notes: notes, hq: hq, asOf: FEES.asOf, none: true };
+    }
+    rows.push({ kind: 'fee', label: '등기신청수수료', calc: '등기 목적 ' + nFee + '건 × ' + won(FEES.filing.visit) + '원(방문)', amount: nFee * FEES.filing.visit, efile: nFee * FEES.filing.efile, payTo: '대법원(인터넷등기소·등기소)', basis: '등기사항증명서 등 수수료규칙 제5조의3·제5조의5' });
+    rows.push({ kind: 'notary', label: '의사록 공증(인증)', calc: '1건', amount: FEES.notary, payTo: '공증사무소', basis: '공증인법 제66조의2 · 공증인 수수료 규칙 제21조제2항', check: '총사원 동의서만 낼 때도 공증이 필요한지 등기소 확인' });
+    /* 증명서 — 필요서류 확인표와 같은 수: 남는 사원은 1통, 퇴사·입사·사임 사원은 2통(공증용·법원제출용), 지금 사원이 대표사원이 되면 +1(취임승낙서용).
+       ⚠ «변경 전» 사원은 등기 현황(after.base) 그대로 — 변경 뒤 출자액으로 다시 만들면 양도된 지분이 두 번 셈해진다(보안 검토 2026-11-15) */
+    var before = ((after.base && after.base.members) || []);
+    var twice = {}; (after.events || []).forEach(function (e) { if (e.type === 'leave' || (e.type === 'repOut' && !e.byLeave)) twice[e.member] = true; });
+    var nSeal = before.filter(function (m) { return !twice[m.id]; }).length + Object.keys(twice).length * 2, nRes = 0, resOther = 0, resSeen = {};
+    (after.events || []).forEach(function (e) {
+      if (e.type === 'join') { nSeal += 2; nRes += 1; }
+      if ((e.type === 'repIn' && !(after.byId[e.member] || {}).isNew) || (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; }))) { if (!resSeen[e.member]) { resSeen[e.member] = 1; nRes += 1; resOther += 1; } }
+      if (e.type === 'repIn' && !(after.byId[e.member] || {}).isNew && !twice[e.member]) nSeal += 1;
+    });
+    rows.push({ kind: 'cert', label: '개인 인감증명서 ' + nSeal + '통', calc: '통당 ' + won(FEES.cert.seal) + '원(정부24 전자발급·등기 제출용은 면제)', amount: nSeal * FEES.cert.seal, payTo: '주민센터', basis: '인감증명법 시행령 제19조' });
+    rows.push({ kind: 'cert', label: '법인인감증명서 2통', calc: '통당 ' + won(FEES.cert.corpSeal) + '원(무인발급기)', amount: 2 * FEES.cert.corpSeal, payTo: '등기소', basis: '등기사항증명서 등 수수료규칙 제5조' });
+    rows.push({ kind: 'cert', label: '등기사항증명서 2통(변경 전·후)', calc: '통당 ' + won(FEES.cert.reg) + '원(무인발급기·인터넷)', amount: 2 * FEES.cert.reg, payTo: '등기소·인터넷등기소', basis: '등기사항증명서 등 수수료규칙 제2조' });
+    if (nRes) rows.push({ kind: 'cert', label: '주민등록표 초본 ' + nRes + '통', calc: '통당 ' + won(FEES.cert.resident) + '원(정부24 무료)', amount: nRes * FEES.cert.resident, payTo: '주민센터', basis: '주민등록법 시행규칙 제17조제4항' });
+    if (after.charterChanged) rows.push({ kind: 'approval', label: '노동부 정관변경 인가', calc: '수수료 없음', amount: 0, payTo: (firm.authority || '관할 지방고용노동관서'), basis: '공인노무사법령에 수수료 규정 없음' });
+    var sum = function (k) { return rows.reduce(function (s, r) { return s + (k === 'efile' && r.kind === 'fee' ? r.efile : r.amount); }, 0); };
+    /* 종류마다 따로 세면 */
+    var extra = Math.max(0, kinds.length - 1);
+    var perType = extra ? sum('visit') + extra * (FEES.regTax + Math.floor(FEES.regTax * FEES.eduRate / 10) * 10 + FEES.filing.visit) : 0;
+    if (extra) notes.push('사원 변경을 종류(' + kinds.join('·') + ')마다 따로 세면 ' + extra + '건이 늘어 방문 기준 약 ' + won(perType) + '원 — 건수는 ' + (firm.court || '관할 등기소') + '·' + hq + ' 세무과에 확인');
+    /* 출자증가로 볼 때 — 현금·현물 출자로 총출자액이 늘면 가목(증가액×0.4%, 최저 112,500원)이 더 붙을 수 있다 */
+    var incr = cashTotal(after.members) - cashTotal(before), alt = null;
+    if (incr > 0) {
+      var t2 = Math.max(Math.round(incr * FEES.incrRate), FEES.incrMin), add = t2 + Math.floor(t2 * FEES.eduRate / 10) * 10;
+      alt = { incr: incr, tax: t2, visit: sum('visit') + add };
+      notes.push('현금·현물 출자로 총출자액이 ' + won(incr) + '원 늘어 «출자증가»(지방세법 제28조제1항제6호 가목, 증가액×0.4%·최저 112,500원)로 보면 등록면허세 ' + won(t2) + '원(+지방교육세)이 더해져 방문 기준 약 ' + won(alt.visit) + '원 — 노무법인에 적용하는지 ' + hq + ' 세무과에 확인');
+    }
+    return { rows: rows, nFee: nFee, tax: tax, edu: edu, visit: sum('visit'), efile: sum('efile'), perType: perType, alt: alt, notes: notes, hq: hq, asOf: FEES.asOf, resOther: resOther };
+  }
 
   /* ── 작은 도구 ── */
   /* ★ 주민등록번호 뒷자리 지우개 — 저장되는 «모든 글 칸»이 str·text 를 거치므로 여기 한 곳에서 지운다
@@ -233,6 +326,8 @@
       changes: arr(c.changes).map(normChange).filter(function (x) { return x.type; }),
       agent: { name: str(ag.name), office: str(ag.office), phone: str(ag.phone), addr: str(ag.addr) },
       notary: str(c.notary), dates: dates, checks: checks, docsOff: docsOff,
+      /* 등기 신청 — 'self' 직접(대표 2026-11-15 «법무사 없이 직접하는 것이다») · 'agent' 법무사에게 맡김 */
+      filing: c.filing === 'agent' ? 'agent' : 'self',
       cost: num(c.cost), memo: text(c.memo).slice(0, 4000), applied: c.applied === true,
       baseSnap: c.applied === true && c.baseSnap ? normBase(c.baseSnap) : null,
       _deleted: c._deleted === true
@@ -369,7 +464,8 @@
       });
     });
     /* 날짜를 하나도 정하지 않아 총회일로 적은 줄이 있으면 알린다 — 등기부에는 효력이 생긴 날이 올라간다 */
-    if (guessed && events.length) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «③ 노동부 인가»(자세히 화면은 «진행 일정»)의 «인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
+    /* 등기할 변경(대표사원 아닌 사원 주소변경 말고)이 있을 때만 — 등기부에 올라가는 날짜 이야기다 */
+    if (guessed && events.some(function (e) { return e.type !== 'addr' || (byId[e.member] || {}).rep; })) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «③ 노동부 인가»(자세히 화면은 «진행 일정»)의 «인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
     /* 정관 제5·6조의 차례 — 같은 건에서 들어오는 사원은 나가는 사원의 자리에 넣는다(남는 입사자는 끝에).
        이 법인 2026. 7. 22. 개정 정관도 퇴사 사원의 호(3.)에 입사 사원을 적었다. */
     var joiners = members.filter(function (m) { return m.isNew; }), ji = 0, cur = [];
@@ -437,7 +533,7 @@
     if (t.share) out.push('사원 출자 변경');
     if (t.repIn) out.push('대표사원 취임');
     if (t.repOut) out.push('대표사원 ' + (after.events.some(function (e) { return e.type === 'repOut' && !e.byLeave; }) ? '사임' : '퇴임'));
-    if (t.addr && after.events.some(function (e) { return e.type === 'addr' && (after.byId[e.member] || {}).rep; })) out.push('대표사원 주소 변경');
+    if (t.addr && after.events.some(function (e) { return (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; })); })) out.push('대표사원 주소 변경');
     if (t.brAdd) out.push('분사무소 설치');
     if (t.brMove) out.push('분사무소 이전');
     if (t.brClose) out.push('분사무소 폐지');
@@ -630,9 +726,9 @@
     { key: 'resign',    title: '대표사원 사임서',                when: 'repOut' },
     { key: 'leaveNote', title: '퇴사원(사원 퇴사 신청서)',       when: 'leave' },
     { key: 'transfer',  title: '지분 양도·양수 계약서',          when: 'transfer' },
-    { key: 'poa',       title: '위임장(등기신청 대리)',          when: 'always' },
+    { key: 'poa',       title: '위임장(등기신청 대리)',          when: 'agent' },
     { key: 'notaryPoa', title: '위임장(의사록 공증 촉탁)',       when: 'always' },
-    { key: 'request',   title: '변경등기 신청서(법무사 확인용 초안)', when: 'always' },
+    { key: 'request',   title: '변경등기 신청서',                when: 'always' },
     { key: 'delay',     title: '변경등기 지연 사유서',           when: 'late' },
     { key: 'checklist', title: '필요서류 확인표',                when: 'always' }
   ];
@@ -642,10 +738,14 @@
     var transfer = after.left.some(function (m) { return m.leaveShare && m.leaveShare.mode === 'transfer' && m.leaveShare.to.length; });
     var dl = deadline(after, opts.today);
     var late = !!(dl && dl.overdue);
+    /* 등기할 사항이 없으면(대표사원이 아닌 사원의 주소만 바뀜 등) 등기 신청 서류는 만들지 않는다 — 정관변경 인가 서류만(검토 2026-11-15) */
+    var hasReg = !after.c.changes.length || regItems(after).length > 0;
+    var REG_ONLY = { request: 1, poa: 1, notaryPoa: 1, delay: 1 };
     return DOCS.map(function (d) {
-      var need = d.when === 'always' || (d.when === 'charter' && after.charterChanged) ||
+      var need = d.when === 'always' || (d.when === 'charter' && after.charterChanged) || (d.when === 'agent' && after.c.filing === 'agent') ||
         (d.when === 'repIn' && ev.repIn) || (d.when === 'repOut' && after.events.some(function (e) { return e.type === 'repOut' && !e.byLeave; })) ||
         (d.when === 'leave' && ev.leave) || (d.when === 'transfer' && transfer) || (d.when === 'late' && late);
+      if (REG_ONLY[d.key] && !hasReg) need = false;
       var count = d.key === 'accept' ? (ev.repIn || 0) : d.key === 'leaveNote' ? (ev.leave || 0) :
         d.key === 'resign' ? after.events.filter(function (e) { return e.type === 'repOut' && !e.byLeave; }).length :
         d.key === 'transfer' ? after.left.filter(function (m) { return m.leaveShare && m.leaveShare.mode === 'transfer' && m.leaveShare.to.length; }).length : 1;
@@ -654,8 +754,14 @@
   }
 
   /* ── 기한 ── */
+  /* 등기할 사항이 있는가 — 대표사원이 아닌 사원의 주소만 바뀌면 정관(제5조)만 바뀌고 등기부엔 없다(검토 2026-11-15).
+     없으면 등기 신청·공증·세금·등기 기한·등기 완료일이 모두 필요 없다 — 정관변경 인가로 끝 */
+  function needsReg(after) { return !after.c.changes.length || !(after.events || []).length || regItems(after).length > 0; }
+  /* 넣은 변경이 실제로 무엇을 바꾸는가 — 대상 미선택·지금과 같은 값이면 events 가 비어 있다(2차 재검증 2026-11-15) */
+  function hasEffect(after) { return (after.events || []).length > 0; }
   function deadline(after, today) {
     var c = after.c, t = today || todayIso();
+    if (!needsReg(after)) return { from: '', due: '', basis: '등기할 사항 없음', left: null, overdue: false, filed: false, none: true, note: '등기할 사항이 없어 등기 기한이 없습니다' };
     var basis, from;
     if (after.charterChanged) { from = c.dates.approvalGet; basis = '정관변경 인가증 수령일'; }
     else { from = c.effDate || c.meeting.date; basis = '변경 연월일(총회일)'; }
@@ -676,6 +782,18 @@
     var c = after.c, b = after.base, out = [];
     function add(group, key, label, detail, src, months) { out.push({ group: group, key: key, label: label, detail: detail || '', src: src, months: months || 0 }); }
     var attendees = b.members;
+    /* 등기할 사항이 없으면 — 정관변경 인가 서류 날인·신청만(공증·증명서·세금·등기 신청 없음, 검토 2026-11-15) */
+    if (!needsReg(after)) {
+      add('법인', 'corpSeal', '법인인감도장', '정관변경 인가 신청서·변경 정관 날인', '서류');
+      add('사원 전원', 'memberSeals', '사원 도장 — ' + attendees.map(function (m) { return m.name; }).join(', '), '임시사원총회 의사록·총사원 동의서 날인', '서류');
+      if (after.charterChanged) {
+        add('정관변경 인가', 'applyDocs', '정관변경 인가 신청', '신청서(시행규칙 별지 제26호서식) · 정관 변경 이유서 · 정관 변경안(신·구조문 대비표·변경 정관) · 사원총회 회의록 사본 → ' + (b.firm.authority || '관할 지방고용노동관서') + ' (공인노무사법 시행령 제19조의3제1항) · 수수료 없음', '법령');
+        add('정관변경 인가', 'approvalGet', '정관변경 인가증 받음', '받은 날을 넣고 «등기 현황에 반영»하면 끝', '서류');
+      }
+      add('등기', 'noReg', '등기 신청 필요 없음', '대표사원이 아닌 사원의 주소 등은 등기부에 없습니다 — 등록면허세·수수료·공증·인감증명서가 들지 않습니다', '법령');
+      add('그 뒤', 'notify', '공인노무사회·은행·거래처 등 변경 안내', '필요한 곳만 — 담당자 확인', '확인 필요');
+      return out;
+    }
     add('법인', 'corpSeal', '법인인감도장', '등기신청서·위임장·의사록 날인', '법무사');
     add('법인', 'corpCert', '법인인감증명서 2통', '발급일로부터 3개월 이내 · 발급받을 때 법인인감카드 준비', '법무사', 3);
     add('법인', 'charterCopy', '정관 사본(원본대조필) 1통', after.charterChanged ? '변경 정관(인가받은 것)' : '현행 정관', '법무사');
@@ -701,23 +819,40 @@
         add('신입 사원', 'newLicense:' + m.id, m.name + ' 공인노무사 자격·직무개시 등록 확인', '정관 제19조(개업자격을 지닌 노무사)', '확인 필요');
       } else if (e.type === 'repIn') {
         add('대표사원 취임', 'accept:' + m.id, m.name + ' 취임승낙서', '이 앱 서류 — 인감 날인', '서류');
+        if (!m.isNew) add('대표사원 취임', 'repRes:' + m.id, m.name + ' 주민등록표 초본 1통', '새 대표사원 주소 증명 · 발급 3개월 이내(상업등기규칙 제52조제1항제3호·제4항)', '법령', 3);
         if (!m.isNew) add('대표사원 취임', 'repCert:' + m.id, m.name + ' 인감증명서', '취임승낙서 인감 확인용 · 발급 3개월 이내', '확인 필요', 3);
+        add('대표사원 취임', 'sealReport:' + m.id, m.name + ' 인감신고서(등기소 양식)', '새 대표사원 개인 인감 날인 · 3개월 이내 인감증명서 첨부(상업등기법 제25조, 상업등기규칙 제35조)', '법령');
+      } else if (e.type === 'addr' && m.rep && !after.events.some(function (x) { return x.type === 'repIn' && x.member === e.member; })) {
+        add('대표사원 주소변경', 'addrRes:' + m.id, m.name + ' 주민등록표 초본 1통', '주소변경 증명 · 발급 3개월 이내(상업등기규칙 제52조제1항제4호·제4항)', '법령', 3);
       } else if (e.type === 'brAdd' || e.type === 'brMove') {
         var br = after.brById[e.branch] || {};
         add('분사무소', 'lease:' + (br.id || e.change), (br.name || '분사무소') + ' 임대차계약서 사본', '2019년 서산 분사무소 설치 때 준비한 것', '지난 서류');
       }
     });
+    var self = c.filing !== 'agent', court = b.firm.court || '관할 등기소', hqPlace = placeOf(b.firm.hq) || '본점 소재지';
     if (after.events.some(function (e) { return e.type === 'repIn' || (e.type === 'repOut'); })) {
-      add('대표사원 취임', 'corpSealWho', '법인인감 신고 명의(대표사원) 바꿀지', '대표사원이 바뀌면 법인인감을 다시 신고할지 법무사와 확인', '확인 필요');
+      add('대표사원 취임', 'corpSealWho', '법인인감 신고 명의(대표사원) 바꿀지', '대표사원이 바뀌면 법인인감을 다시 신고할지 ' + (self ? court : '법무사') + '와 확인', '확인 필요');
     }
-    add('공증', 'notary', '의사록(총사원 동의서) 인증 — 공증사무소', '공증용 위임장 · 사원 인감증명서 · 법인인감증명서 지참 · ' + LAW.notary, '법무사');
+    if (cashTotal(after.members) > cashTotal(b.members)) {
+      add('신입 사원', 'investProof', '재산출자 이행 증명(현금·현물 출자 입사)', '입금 확인서·현물 인도 확인 등(민법법인 및 특수법인 등기규칙 제5조제3항, 공인노무사법 시행령 제19조의5제3항제3호)', '법령');
+    }
+    add('공증', 'notary', '의사록(총사원 동의서) 인증 — 공증사무소', '공증용 위임장 · 사원 인감증명서 · 법인인감증명서 지참 · 수수료 ' + won(FEES.notary) + '원(공증인 수수료 규칙 제21조제2항) · ' + LAW.notary, '법무사');
     if (after.charterChanged) {
       add('정관변경 인가', 'applyDocs', '정관변경 인가 신청', '신청서(시행규칙 별지 제26호서식) · 정관 변경 이유서 · 정관 변경안(신·구조문 대비표·변경 정관) · 사원총회 회의록 사본 → ' + (b.firm.authority || '관할 지방고용노동관서') + ' (공인노무사법 시행령 제19조의3제1항)', '서류');
       add('정관변경 인가', 'approvalGet', '정관변경 인가증 받음', '받은 날을 «진행 일정»에 적으면 등기 기한(받은 날부터 2주일)이 계산됩니다 · 등기신청서에 인가증을 붙인다(시행령 제19조의6제2항)', '서류');
     }
-    add('등기 신청', 'filing', '변경등기 신청 — ' + (b.firm.court || '관할 등기소'), DEADLINE_NOTE, '확인 필요');
-    add('등기 신청', 'jointFiling', '신청인(대표사원·사원 전원) 확인', '공인노무사법 시행령 제19조의5제3항 «노무법인의 등기는 사원 전원이 공동으로 신청» — 변경등기에도 그대로인지 법무사 확인', '확인 필요');
-    add('등기 신청', 'fees', '등록면허세·지방교육세·등기신청수수료 납부', LAW.fees, '확인 필요');
+    if (self) {
+      add('등기 신청', 'askCourt', '등기소에 미리 확인(전화)', court + ' — 총사원 동의서도 공증이 필요한지 · 사원 전원 공동신청인지 · 변경 정관을 붙이는지 · 노무법인 전자신청이 되는지 · 등록면허세 건수', '확인 필요');
+      var cp = costPlan(after);
+      add('등기 신청', 'taxPaid', '등록면허세·지방교육세 신고·납부 → 영수필 통지서·확인서 출력', '위택스(wetax.go.kr) «신고 > 등록면허세 > 등록면허세(등록분)» · 본점분 ' + hqPlace + ', 분사무소 설치·이전·폐지분은 그 분사무소 소재지 · 등기 신청하는 날까지(지방세법 시행령 제48조·제49조) · 예상 ' + won(cp.tax + cp.edu) + '원', '법령');
+      add('등기 신청', 'feePaid', '등기신청수수료 납부 → 영수필확인서', '인터넷등기소 전자납부 또는 등기소 무인발급기·수납은행 · 방문 신청 등기 목적 ' + cp.nFee + '건 × ' + won(FEES.filing.visit) + '원(등기사항증명서 등 수수료규칙 제5조의3)', '법령');
+      add('등기 신청', 'filing', '변경등기 직접 신청 — ' + court + ' 방문', '이 앱 «변경등기 신청서»(법인인감 날인) + 첨부서면 · 전자신청은 법인 전자증명서·보안매체가 필요(상업등기규칙 제67조) · ' + DEADLINE_NOTE, '법령');
+      add('등기 신청', 'jointFiling', '신청인(대표사원·사원 전원) 확인', '공인노무사법 시행령 제19조의5제3항 «노무법인의 등기는 사원 전원이 공동으로 신청» — 변경등기에도 그대로인지 등기소 확인', '확인 필요');
+    } else {
+      add('등기 신청', 'filing', '변경등기 신청 — ' + court, DEADLINE_NOTE, '확인 필요');
+      add('등기 신청', 'jointFiling', '신청인(대표사원·사원 전원) 확인', '공인노무사법 시행령 제19조의5제3항 «노무법인의 등기는 사원 전원이 공동으로 신청» — 변경등기에도 그대로인지 법무사 확인', '확인 필요');
+      add('등기 신청', 'fees', '등록면허세·지방교육세·등기신청수수료 납부', LAW.fees, '확인 필요');
+    }
     add('등기 후', 'regCheck', '바뀐 등기사항전부증명서 발급·대조', '등기할 사항이 그대로 올랐는지', '확인 필요');
     if (after.repChanged) add('등기 후', 'bizReg', '사업자등록 정정(대표자·주소 변경 시)', '관할 세무서 — 2017년 대표사원 변경 때 정정신청서를 냈다', '지난 서류');
     add('등기 후', 'notify', '공인노무사회·은행·거래처 등 변경 안내', '필요한 곳만 — 담당자 확인', '확인 필요');
@@ -758,7 +893,7 @@
     var branches = after.branches.map(function (x) {
       return { id: x.isNew ? fresh('b') : x.id, name: x.name, alias: x.alias, addr: x.addr, charterAddr: x.charterAddr || '', since: x.since || '', no: x.no };
     });
-    var done = c.dates.done || opts.today || todayIso();
+    var done = c.dates.done || (!needsReg(after) ? (c.dates.approvalGet || c.dates.approval) : '') || opts.today || todayIso();
     var hist = (b.history || []).concat([{ at: done, caseId: c.id, title: c.title, summary: summary(after) }]).slice(-30);
     /* 개정 연혁 한 줄은 총회일 — 이 법인 정관의 «(○. ○. ○. 개정)»은 사원총회 날짜다(인가일이 아니다) */
     var charter = b.charter ? charterFull(b.charter, Object.assign({}, after, { members: after.members }), null, meetingDate(c)).text : '';
@@ -773,6 +908,11 @@
     if (after.errors.length) return '입력 확인 — 빨간 글을 먼저 고치십시오';
     if (!c.changes.length) return '변경 내용 넣기';
     if (!c.meeting.date) return '총회일 정하기';
+    if (!needsReg(after)) {
+      if (after.charterChanged && !d.approvalApply) return '서류 날인 → 정관변경 인가 신청';
+      if (after.charterChanged && !d.approvalGet) return '정관변경 인가증 기다리기';
+      return c.applied ? '끝' : '등기 현황에 반영(등기할 사항 없음)';
+    }
     if (!d.notarize) return '서류 받기 → 사원 날인 → 의사록 공증';
     if (after.charterChanged && !d.approvalApply) return '정관변경 인가 신청';
     if (after.charterChanged && !d.approvalGet) return '정관변경 인가증 기다리기';
@@ -799,7 +939,9 @@
     transfer:  { who: 'parties', how: '지분을 넘기는 사원·받는 사원 개인 인감 날인' },
     poa:       { who: 'corp', how: '법인 인감 날인 — 법무사에게 등기 신청을 맡김' },
     notaryPoa: { who: 'corp', how: '법인 인감 날인 — 공증사무소에 의사록 인증을 맡김' },
-    delay:     { who: 'corp', how: '법인 인감 날인' }
+    delay:     { who: 'corp', how: '법인 인감 날인' },
+    /* 직접 신청일 때만 — 등기소에 신고한 법인 인감으로(상업등기법 제24조제4항) */
+    request:   { who: 'corp', how: '등기소에 신고한 법인 인감 날인 — 직접 제출', self: true }
   };
   function sealPlan(after, keys) {
     var titles = {}; DOCS.forEach(function (d) { titles[d.key] = d.title; });
@@ -809,7 +951,7 @@
     var ev = function (t) { return (after.events || []).filter(function (e) { return e.type === t && !(t === 'repOut' && e.byLeave); }).map(function (e) { return after.byId[e.member]; }); };
     var parties = [];
     (after.left || []).forEach(function (m) { if (m.leaveShare && m.leaveShare.mode === 'transfer' && m.leaveShare.to.length) { parties.push(m); m.leaveShare.to.forEach(function (t) { parties.push(after.byId[t.member]); }); } });
-    return (keys || []).filter(function (k) { return SEAL[k]; }).map(function (k) {
+    return (keys || []).filter(function (k) { return SEAL[k] && !(SEAL[k].self && after.c.filing === 'agent'); }).map(function (k) {
       var s = SEAL[k], who = '';
       if (s.who === 'meeting') who = '사원 ' + names(before);
       else if (s.who === 'everyone') who = '사원 ' + names(before.concat((after.members || []).filter(function (m) { return m.isNew; })));
@@ -819,13 +961,15 @@
       else if (s.who === 'outRep') who = names(ev('repOut'));
       else if (s.who === 'leavers') who = names(after.left || []);
       else if (s.who === 'parties') who = names(parties);
-      return { key: k, title: titles[k] || k, who: who, how: s.how };
+      /* 등기할 사항이 없으면 의사록 공증도 없다(공증인법 제66조의2는 «등기 신청서류에 첨부되는» 의사록) */
+      var how = (k === 'minutes' && !needsReg(after)) ? '의장과 출석한 사원 모두 날인(등기하지 않으므로 공증은 필요 없음)' : s.how;
+      return { key: k, title: titles[k] || k, who: who, how: how };
     });
   }
   /* 지금 있어야 할 단계 — 1 바뀌는 것 · 2 서류·도장 · 3 노동부 인가 · 4 등기 */
   function easyStep(after, sealKeys) {
     var c = after.c;
-    if (!c.changes.length || after.errors.length || !c.meeting.date) return 1;
+    if (!c.changes.length || after.errors.length || !c.meeting.date || !hasEffect(after)) return 1;
     var sealed = (sealKeys || []).every(function (k) { return c.checks['seal_' + k] && c.checks['seal_' + k].ok; });
     if (!sealed) return 2;
     if (after.charterChanged && !c.dates.approvalGet) return 3;
@@ -917,6 +1061,7 @@
 
   return {
     SEAL: SEAL, sealPlan: sealPlan, easyStep: easyStep,
+    FEES: FEES, costPlan: costPlan, placeOf: placeOf, needsReg: needsReg, hasEffect: hasEffect,
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
     normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,
