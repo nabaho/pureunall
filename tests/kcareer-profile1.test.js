@@ -367,6 +367,9 @@ test('★★ ⑰ 폰 폭(≤520px) — 고르기 창 표의 끝 칸은 «관리 
   assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#modalP1Pick \.modal\{max-height:calc\(100vh[^)]*\);display:flex;flex-direction:column\}[^@]*#modalP1Pick \.modal-b\{overflow:auto;min-height:0;flex:1 1 auto\}/, '★ 폰: 줄이 수십 건이어도 «저장» 단추가 창 아래에 남고 본문만 스크롤');
   assert.match(SRC, /#p1PickTbl \.dt td\[colspan\]::before\{content:none\}/, '안내 행에 빈 이름표 칸이 없다');
   assert.match(SRC, /html\.dark #p1PickTbl \.dt td\{color:var\(--text\)\}/, '★ 어두운 테마: 카드 글자가 어두운 바탕에 묻히지 않는다');
+  /* 어두운 테마는 «바탕·글자·머리줄» 세 벌이 한 짝 — 글자만 밝히면 520px 넘는 폭(태블릿·PC)에서 흰 바탕에 밝은 글자가 된다(재검증 2회차) */
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt table\{background:var\(--card\)\}/, '★ 어두운 테마: 표 바탕도 함께(글자만 바꾸면 흰 바탕에 밝은 글자)');
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt thead th\{[^}]*color:var\(--text\)/, '표 머리줄');
   assert.match(SRC, /html\.dark #modalP1Pick \.btn:not\(\.primary\)\{[^}]*color:var\(--text\)/, '어두운 테마의 기본 단추');
   assert.doesNotThrow(() => [{ title: '공인노무사', date: '2006' }, null, { title: '' }].sort(P1.certCmp), '빈 기록이 섞여도 자격을 줄 세운다');
   /* 칸마다 이름표(data-label) — 카드에서 값이 무엇인지 말한다 */

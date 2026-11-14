@@ -845,6 +845,7 @@ body.kc-staff #cdBody .dt th:first-child,body.kc-staff #cdBody .dt td:first-chil
 /* 검색줄 — 공용 .tb-input{min-width:100%!important}(≤820px)가 인라인 min-width:0 을 이겨 옆 «고른 것만 보기» 단추가 창 밖으로 밀린다(검증 2026-11-14) */
 #p1PickQ{min-width:0!important}
 /* 어두운 테마 — 폰 카드 바탕은 어두운데 글자색이 어둡게 박혀 안 보이고, 기본 단추·표 머리는 밝은 바탕이라 글자가 묻힌다(검증 2026-11-14) */
+html.dark #p1PickTbl .dt table{background:var(--card)}   /* 글자만 밝히면 520px 넘는 폭에서 흰 표 바탕에 밝은 글자가 된다(재검증 2회차 2026-11-14) — 증명서 창(#hcBody)과 같은 세 벌 */
 html.dark #p1PickTbl .dt td{color:var(--text)}
 html.dark #p1PickTbl .dt thead th{background:#1e293b!important;color:var(--text)}
 html.dark #modalP1Pick .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
