@@ -93,3 +93,21 @@ test('지우기 대신 «취소» 상태 — 자료 자리(ref)를 remove·set(n
   assert.doesNotMatch(본문, /\.set\(null\)/);
   assert.doesNotMatch(본문, /gate\.remove\(/);
 });
+
+/* 2026-11-14 기능 검증 2차 */
+test('글칸을 떠날 때 변경 카드를 통째 다시 그리지 않는다 — Tab 포커스·첫 클릭이 사라졌다', () => {
+  const line = (본문.match(/if\(ev\.type==='change' && isText[^\n]*/) || [''])[0];
+  assert.ok(line, '글칸 change 처리 줄을 못 찾았다');
+  assert.doesNotMatch(line, /drawChanges\(\)/);
+  assert.match(본문, /function joinOptLabel\(/);
+});
+test('좁은 화면 — 칸 묶음이 긴 고르기 칸에 밀려 옆으로 넘치지 않는다', () => {
+  assert.match(html, /\.grid\{grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.match(html, /\.fl\{[^}]*min-width:0/);
+});
+test('등기 현황 사원 표 — 빈 줄 칸 수가 머리줄과 같다', () => {
+  const head = (본문.match(/<thead><tr><th class="c"><input type="checkbox" data-selall="mem"[\s\S]*?<\/tr><\/thead>/) || [''])[0];
+  const n = (head.match(/<th[ >]/g) || []).length;
+  assert.ok(n >= 10, '사원 표 머리줄을 못 찾았다');
+  assert.match(본문, new RegExp('<td colspan="' + n + '" class="empty">사원이 없습니다'));
+});

@@ -775,3 +775,15 @@ test('배선·위치·팔레트·모바일 규칙: 우측하단 단추와 겹치
   const fundRefInUi = /fund_kb\.js\?[^"']+/.exec(uiSrc);
   assert.ok(fundRefInHtml && fundRefInUi && fundRefInHtml[0] === fundRefInUi[0], 'fund.html 과 js/pu-chatbot.js 지연 로더의 fund_kb.js 참조 문자열이 일치해야 합니다');
 });
+
+/* 2026-11-14 기능 검증 2차: 푸른등기를 길잡이에 넣고도 검색·연결이 빠져 «수임 순서» 글이 뽑혔다 */
+test('푸른등기 질문은 푸른등기 길잡이로 — 내부관리 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'inside').apps.find((a) => a.key === 'deungi').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-deungi-01');
+  assert.equal(PuChatbot.pick('푸른등기 사용법')[0].id, 'SYS-deungi-01');
+  const inside = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-inside');
+  assert.ok(inside.apps.indexOf('deungi') >= 0 && inside.tags.indexOf('푸른등기') >= 0 && /푸른등기/.test(inside.law));
+  assert.match(kbSrc, /deungi: 'erp'/);
+  assert.match(kbSrc, /deungi:푸른등기/);
+});
+function C0(k) { return PuChatbot[k]; }

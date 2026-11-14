@@ -142,7 +142,7 @@
     if (joins.length) secs.push(['본 회사의 사원을 다음과 같이 입사시킨다.', joins.map(function (e, i) {
       var m = a.byId[e.member];
       var acq = m.acq.length ? ' (사원 ' + m.acq.map(function (q) { return q.fromName + '의 지분 금 ' + C.won(q.amount) + '원 양수'; }).join(', ') + ')' : '';
-      var kind = C.inKindLines(m.invest);
+      var kind = C.normInvest(m.invest).cash > 0 ? C.inKindLines(m.invest) : [];
       return [(i + 1) + ') 사원 ' + m.name + ' (' + R(x, m) + ')', '    출자 : ' + C.investText(m.invest, 'charter') + acq + ', 전부이행']
         .concat(kind.length ? ['    현물재산 : ' + kind.join(', ')] : [])
         .concat(['    주소 : ' + m.addr, '    입사 연월일 : ' + onDate(x, e)]);

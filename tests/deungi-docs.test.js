@@ -122,3 +122,12 @@ test('파일 이름에 경로·금지 글자가 들어가지 않는다', () => {
   assert.doesNotMatch(n, /[\\/:*?"<>|]/);
   assert.match(n, /\.hwpx$/);
 });
+
+test('총사원 동의서 — 현물 금액이 0원이면 «현물재산» 줄을 넣지 않는다(정관 제6조와 맞춘다)', () => {
+  const 건0 = { id: 'DG-T5', meeting: { date: '2026-11-20' }, changes: [{ id: 'j', type: 'join', name: '새현물', birth: '950101', addr: '점검시 라로 4', invest: { cash: 0, labor: true, inKind: '차종 : 점검차' } }] };
+  const con = 글(unzipAll(DD.fileOne(DD.make('consent', DD.context(법인, 건0, {}, '2026-11-21'))))['Contents/section0.xml']);
+  assert.doesNotMatch(con, /현물재산/);
+  const 건1 = { id: 'DG-T6', meeting: { date: '2026-11-20' }, changes: [{ id: 'j', type: 'join', name: '새현물', birth: '950101', addr: '점검시 라로 4', invest: { cash: 5000000, inKind: '차종 : 점검차' } }] };
+  const con1 = 글(unzipAll(DD.fileOne(DD.make('consent', DD.context(법인, 건1, {}, '2026-11-21'))))['Contents/section0.xml']);
+  assert.match(con1, /현물재산 : 차종 : 점검차/);
+});

@@ -293,3 +293,10 @@ test('날짜 도구 — 달 끝·윤년을 넘겨도 3개월이 맞다', () => {
   assert.equal(C.addDays('2026-12-25', 14), '2027-01-08');
   assert.equal(C.isDate('2026-02-30'), false);
 });
+
+test('현물 재산만 적고 금액이 0원이면 경고 · 등기의 사유는 정관변경 인가일을 먼저 쓴다', () => {
+  const a = C.applyChanges(법인(), 건([{ id: 'j', type: 'join', name: '새현물', birth: '950101', addr: '점검시 라로 4', invest: { cash: 0, labor: true, inKind: '차종 : 점검차' } }]));
+  assert.ok(a.warnings.some((w) => /현물 가격\)이 0원/.test(w)), a.warnings.join('\n'));
+  const b = C.applyChanges(법인(), 건([{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }], { dates: { approval: '2026-12-05', approvalGet: '2026-12-08' } }));
+  assert.match(C.reason(b), /2026년 12월 5일 고용노동부 정관변경 인가를 받음/);
+});

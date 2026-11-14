@@ -380,6 +380,7 @@
     /* 출자 없는 신입 — 퇴사 사원 지분을 양수했으면 위에서 현금이 붙었다. 그래도 비면 묻는다 */
     cur.forEach(function (m) {
       var iv = normInvest(m.invest);
+      if (iv.inKind && !iv.cash) warnings.push('사원 ' + (m.name || '이름 없음') + ' — 현물 재산(' + iv.inKind + ')을 적었는데 출자 금액(현물 가격)이 0원입니다. 금액을 넣지 않으면 정관 제6조에 현물출자가 나오지 않습니다.');
       if (m.isNew && !iv.cash && !iv.labor) warnings.push('사원 입사(' + (m.name || '이름 없음') + ') — 출자(현금 또는 노무출자)가 정해지지 않았습니다. 다른 사원 지분을 양수하면 퇴사 쪽에서 양수인으로 고르십시오.');
     });
     if (c.changes.length && !cur.some(function (m) { return m.rep; })) errors.push('변경 뒤 대표사원이 한 명도 남지 않습니다 — 대표사원 취임을 함께 넣으십시오.');
@@ -462,7 +463,8 @@
   function reason(after) {
     var c = after.c, d = meetingDate(c);
     var s = (d ? koDate(d) + ' ' : '') + '임시사원총회(총사원 동의)의 결의로 ' + summary(after) + '하기로 함';
-    if (after.charterChanged) s += c.dates.approvalGet ? ('. ' + koDate(c.dates.approvalGet) + ' 고용노동부 정관변경 인가를 받음') : '. 정관변경 인가(고용노동부)를 받음';
+    var apOn = c.dates.approval || c.dates.approvalGet;
+    if (after.charterChanged) s += apOn ? ('. ' + koDate(apOn) + ' 고용노동부 정관변경 인가를 받음') : '. 정관변경 인가(고용노동부)를 받음';
     return s + '.';
   }
   /* 등기할 사항 — 등기부 «임원에 관한 사항»·«분사무소에 관한 사항» 말투 그대로.

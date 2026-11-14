@@ -75,7 +75,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 .t tr.click{cursor:pointer}
 .t input:not([type=checkbox]),.t select{width:100%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 12px}
-.fl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2)}
+.fl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2);min-width:0}
+.fl select,.fl input,.fl textarea{max-width:100%;min-width:0}
 .fl.wide{grid-column:1/-1}
 .fl input,.fl select,.fl textarea{font-size:13px;color:var(--ink)}
 .ck{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink);white-space:nowrap}
@@ -128,7 +129,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   .wide-only{display:none}
   input,select,textarea,.fl input,.fl select,.fl textarea,.step input,.t input:not([type=checkbox]),.t select{font-size:16px}
   .two{grid-template-columns:1fr}
-  .grid{grid-template-columns:1fr}
+  .grid{grid-template-columns:minmax(0,1fr)}
   /* 넓은 표 → 줄마다 카드(☐·№ 는 왼쪽 끝) */
   .t thead{display:none}
   .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
@@ -475,7 +476,7 @@ function drawChecklist(a){
       '<td class="inp"><input aria-label="'+esc(it.label)+' 메모" data-note="'+esc(it.key)+'" value="'+esc(ck.note||'')+'" placeholder="메모"></td></tr>';
     last=it.group;
   });
-  $('edList').innerHTML=h+'</tbody></table></div><div class="cb hint">근거 — 법무사: 법무사 «임원변경 등기신청 시 필요서류» 안내(2025. 2. 14. 메일) · 지난 서류: 지난 변경등기 때 낸 첨부서면 · 확인 필요: 담당 법무사·노무사와 확인. 등본·인감은 발급일부터 3개월 이내(신청일 기준).</div>';
+  $('edList').innerHTML=h+'</tbody></table></div><div class="cb hint">근거 — 법무사: 법무사 «사원 변경 등기신청 시 필요서류» 안내(2025. 2.·2026. 6. 메일 — 다르면 새것) · 지난 서류: 지난 변경등기 때 낸 첨부서면 · 확인 필요: 담당 법무사·노무사와 확인. 등본·인감은 발급일부터 3개월 이내(신청일 기준).</div>';
 }
 function drawSched(a){
   var c=a.c, d=c.dates, dl=C.deadline(a, today());
@@ -530,7 +531,7 @@ function drawBase(){
       '<td class="inp" data-l="입사일"><input type="date" data-bm="'+i+'" data-k="joinDate" value="'+esc(m.joinDate)+'"></td>'+
       '<td class="inp" data-l="노무사 등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="등록번호"></td></tr>';
   });
-  if(!b.members.length) h+='<tr><td colspan="10" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
+  if(!b.members.length) h+='<tr><td colspan="11" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
   h+='</tbody></table></div></div>';
   /* 분사무소 */
   var allB=b.branches.length && b.branches.every(function(x){ return SEL.br[x.id]; });
@@ -786,11 +787,13 @@ document.addEventListener('click', function(ev){
   if(t.id==='modal') closeModal();
 });
 $('jsonFile').addEventListener('change', function(){ var f=this.files&&this.files[0]; this.value=''; if(f) jsonIn(f); });
+/* 입사 사원 이름이 바뀌면 양수인·대표사원 고르기 칸의 그 사람 글자만 고친다 — 카드를 다시 그리지 않는다(포커스 지킴) */
+function joinOptLabel(ch){ var v='new:'+ch.id, lab=(ch.name||'(새 사원)')+' · 입사'; Array.prototype.forEach.call(document.querySelectorAll('#edChanges option'), function(o){ if(o.value===v) o.textContent=lab; }); }
 function onField(ev){
   var el=ev.target; if(!el||!el.matches('input,select,textarea')) return;
   var isText=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|)$/.test(el.type||'')));
   if(ev.type==='input' && !isText) return;
-  if(ev.type==='change' && isText && !el.closest('#pane-base')){ if(el.closest('[data-ch]') && cur()) drawChanges(); return; }
+  if(ev.type==='change' && isText && !el.closest('#pane-base')){ var bx=el.closest('[data-ch]'); if(bx && cur() && el.dataset.k==='name'){ var cj=chgById(bx.dataset.ch); if(cj && cj.type==='join') joinOptLabel(cj); } return; }
   var v=el.type==='checkbox'?el.checked:el.value;
   /* 고르기 칸 */
   if(el.dataset.selall){ var key=el.dataset.selall, on=el.checked;
