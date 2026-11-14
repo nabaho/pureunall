@@ -135,6 +135,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
   .t tbody td{border:none;padding:0;max-width:100%;white-space:normal}
   .t tbody td.c,.t tbody td.n{width:auto;flex:0 0 auto}
+  .t tbody td.tk{cursor:pointer}
   .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
   .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
   .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
@@ -158,10 +159,10 @@ main{padding:12px 16px 40px;max-width:1280px}
     <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
-  <div class="tabs" id="tabs">
-    <button data-tab="case">📝 등기 건</button>
-    <button data-tab="base">🏛 등기 현황</button>
-    <button data-tab="hist">📚 지난 기록</button>
+  <div class="tabs" id="tabs" role="tablist" aria-label="푸른등기 화면">
+    <button role="tab" data-tab="case">📝 등기 건</button>
+    <button role="tab" data-tab="base">🏛 등기 현황</button>
+    <button role="tab" data-tab="hist">📚 지난 기록</button>
   </div>
 </div>
 <div id="lock"><h2>🖋 푸른등기</h2><div id="lockWhy"></div><p>대표·위임관리인만 열 수 있습니다.</p></div>
@@ -285,7 +286,7 @@ function reload(){
 /* ═══ 그리기 ═══ */
 function setTab(t){ TAB=t; lsSet('tab', t); draw(); }
 function draw(){
-  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.classList.toggle('on', b.dataset.tab===TAB); });
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.classList.toggle('on', b.dataset.tab===TAB); b.setAttribute('aria-selected', b.dataset.tab===TAB ? 'true' : 'false'); });
   ['case','base','hist'].forEach(function(k){ $('pane-'+k).classList.toggle('on', TAB===k); });
   if(TAB==='case'){ drawBaseWarn(); drawCaseList(); drawEditor(); }
   else if(TAB==='base') drawBase();
@@ -517,7 +518,7 @@ function drawBase(){
   /* 사원 */
   var allM=b.members.length && b.members.every(function(m){ return SEL.mem[m.id]; });
   h+='<div class="card"><h3>사원 '+b.members.length+'명 <span class="hint">주민번호는 앞 6자리(생년월일)만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금·현물 출자(원)</th><th>현물 재산</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
+    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="사원 모두 고르기" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금·현물 출자(원)</th><th>현물 재산</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
   b.members.forEach(function(m, i){
     var iv=C.normInvest(m.invest);
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(m.name||'사원')+' 고르기" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
@@ -526,8 +527,8 @@ function drawBase(){
       '<td class="inp" data-l="주소" style="min-width:260px"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소"></td>'+
       '<td class="inp" data-l="현금·현물 출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="출자 금액"></td>'+
       '<td class="inp" data-l="현물 재산" style="min-width:180px"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / 연식 : ○○"></td>'+
-      '<td data-l="노무출자"><input type="checkbox" data-bm="'+i+'" data-k="invest.labor"'+(iv.labor?' checked':'')+'></td>'+
-      '<td data-l="대표사원"><input type="checkbox" data-bm="'+i+'" data-k="rep"'+(m.rep?' checked':'')+'></td>'+
+      '<td class="tk" data-l="노무출자"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 노무출자')+'" data-bm="'+i+'" data-k="invest.labor"'+(iv.labor?' checked':'')+'></td>'+
+      '<td class="tk" data-l="대표사원"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 대표사원')+'" data-bm="'+i+'" data-k="rep"'+(m.rep?' checked':'')+'></td>'+
       '<td class="inp" data-l="입사일"><input type="date" data-bm="'+i+'" data-k="joinDate" value="'+esc(m.joinDate)+'"></td>'+
       '<td class="inp" data-l="노무사 등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="등록번호"></td></tr>';
   });
@@ -536,7 +537,7 @@ function drawBase(){
   /* 분사무소 */
   var allB=b.branches.length && b.branches.every(function(x){ return SEL.br[x.id]; });
   h+='<div class="card"><h3>분사무소 '+b.branches.length+'곳 <span class="hint">«정관 호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th>정관 호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
+    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="분사무소 모두 고르기" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th>정관 호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
   b.branches.forEach(function(x, i){
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(x.name||'분사무소')+' 고르기" data-sel="br" data-id="'+esc(x.id)+'"'+(SEL.br[x.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="정관 호" style="width:70px"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
@@ -782,7 +783,7 @@ document.addEventListener('click', function(ev){
     return;
   }
   /* ☐ 칸 둘레를 누르면 «고르기»다 — 건이 열리면 안 된다(폰에서 체크칸이 작다 · 기능 검증 2026-11-14) */
-  if((el=t.closest('td.c')) && el.querySelector('input[type=checkbox]')){ el.querySelector('input[type=checkbox]').click(); return; }
+  if((el=t.closest('td.c, td.tk')) && el.querySelector('input[type=checkbox]')){ el.querySelector('input[type=checkbox]').click(); return; }
   if((el=t.closest('tr[data-open]'))){ openCase(el.dataset.open); return; }
   if(t.id==='modal') closeModal();
 });
@@ -839,7 +840,7 @@ function onField(ev){
     else if(k2==='birth') ch.birth=String(v).replace(/[^0-9]/g,'').slice(0,6);
     else setPath(ch, k2, v);
     if(k2==='member'&&ch.type==='leave'&&el.dataset.to==null){ ch.share={ mode:'transfer', to:[] }; }
-    if(!isText) drawChanges(); else { var hdx=box.querySelector('.hd .hint'); if(hdx) hdx.textContent=C.describe(C.normChange(ch), baseOf(c), C.applyChanges(baseOf(c), c));
+    if(!isText) drawChanges(); else { var aa=C.applyChanges(baseOf(c), c); Array.prototype.forEach.call(document.querySelectorAll('#edChanges [data-ch]'), function(bx3){ var cx=chgById(bx3.dataset.ch), hx=bx3.querySelector('.hd .hint'); if(cx&&hx) hx.textContent=C.describe(C.normChange(cx), baseOf(c), aa); });
       if(el.dataset.to!=null){ var tip=el.nextElementSibling; if(tip) tip.textContent=C.num(v)?C.won(v)+'원':'';
         var lmv=baseOf(c).members.filter(function(m){ return m.id===ch.member; })[0], tot=lmv?C.normInvest(lmv.invest).cash:0, sm=ch.share.to.reduce(function(a,x){ return a+C.num(x.amount); },0), chip=box.querySelector('.tos .chip');
         if(chip){ chip.className='chip '+(sm===tot?'g':'a'); chip.textContent='합계 '+C.won(sm)+' / '+C.won(tot)+'원'; } } }

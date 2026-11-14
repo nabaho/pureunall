@@ -106,8 +106,15 @@ test('좁은 화면 — 칸 묶음이 긴 고르기 칸에 밀려 옆으로 넘�
   assert.match(html, /\.fl\{[^}]*min-width:0/);
 });
 test('등기 현황 사원 표 — 빈 줄 칸 수가 머리줄과 같다', () => {
-  const head = (본문.match(/<thead><tr><th class="c"><input type="checkbox" data-selall="mem"[\s\S]*?<\/tr><\/thead>/) || [''])[0];
+  const head = (본문.match(/<thead><tr><th class="c"><input type="checkbox"[^>]*data-selall="mem"[\s\S]*?<\/tr><\/thead>/) || [''])[0];
   const n = (head.match(/<th[ >]/g) || []).length;
   assert.ok(n >= 10, '사원 표 머리줄을 못 찾았다');
   assert.match(본문, new RegExp('<td colspan="' + n + '" class="empty">사원이 없습니다'));
+});
+test('접근성 — 탭은 tablist·aria-selected, 전체 고르기·현황 표 체크칸에 이름, 체크칸 둘레를 눌러도 켜진다', () => {
+  assert.match(html, /id="tabs" role="tablist"/);
+  assert.match(본문, /setAttribute\('aria-selected'/);
+  assert.match(본문, /aria-label="사원 모두 고르기"/);
+  assert.match(본문, /aria-label="분사무소 모두 고르기"/);
+  assert.match(본문, /closest\('td\.c, td\.tk'\)/);
 });
