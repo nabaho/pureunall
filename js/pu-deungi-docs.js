@@ -371,9 +371,9 @@
     return { key: 'notaryPoa', label: '위임장(공증용)', body: body, margin: doc.margin };
   }
 
-  /* ── 14. 변경등기 신청서(초안) ── */
+  /* ── 14. 변경등기 신청서 — 직접 신청(기본)이면 제출용, 법무사에게 맡기면 법무사 확인용 초안 (대표 2026-11-15 «법무사 없이 직접») ── */
   function attachList(x) {
-    var a = x.after, ev = {}, out = [];
+    var a = x.after, ev = {}, out = [], self = x.c.filing !== 'agent';
     a.events.forEach(function (e) { ev[e.type] = (ev[e.type] || 0) + 1; });
     out.push('1. 총사원 동의서(임시사원총회 의사록) — 공증인 인증 1통');
     if (a.charterChanged) { out.push('1. 정관변경 인가증 사본 1통'); out.push('1. 정관(변경 후) 1통'); }
@@ -382,31 +382,41 @@
     if (ev.leave) out.push('1. 퇴사원 ' + ev.leave + '통, 퇴사 사원 인감증명서');
     var tr = a.left.filter(function (m) { return m.leaveShare && m.leaveShare.mode === 'transfer' && m.leaveShare.to.length; }).length;
     if (tr) out.push('1. 지분 양도·양수 계약서 ' + tr + '통');
-    if (ev.repIn) out.push('1. 취임승낙서 ' + ev.repIn + '통, 취임 대표사원 인감증명서');
+    if (ev.repIn) { out.push('1. 취임승낙서 ' + ev.repIn + '통, 취임 대표사원 인감증명서'); out.push('1. 인감신고서(새 대표사원) ' + ev.repIn + '통'); }
     var rs = a.events.filter(function (e) { return e.type === 'repOut' && !e.byLeave; }).length;
     if (rs) out.push('1. 대표사원 사임서 ' + rs + '통, 사임 대표사원 인감증명서');
-    out.push('1. 등록면허세 영수필확인서 1통');
+    var cp = C.costPlan(a);
+    if (cp.alt) out.push('1. 재산출자 이행 증명서 1통');
+    if (ev.addr && a.events.some(function (e) { return e.type === 'addr' && (a.byId[e.member] || {}).rep; })) out.push('1. 주소변경 대표사원 주민등록표 초본 1통');
+    out.push('1. 등록면허세 영수필 통지서(등기소 통보용)·영수필확인서 각 1통');
     out.push('1. 등기신청수수료 영수필확인서 1통');
-    out.push('1. 위임장(대리인이 신청할 경우) 1통');
+    if (!self) out.push('1. 위임장 1통');
     return out;
   }
   function request(x) {
-    var doc = D.begin('plain'), a = x.after, f = x.base.firm, ag = x.c.agent;
-    var reg = C.regItems(a, x.rrn);
+    var doc = D.begin('plain'), a = x.after, f = x.base.firm, ag = x.c.agent, self = x.c.filing !== 'agent';
+    var reg = C.regItems(a, x.rrn), cp = C.costPlan(a);
     var rows = [[hd('구 분'), hd('등기할 사항')]];
     reg.forEach(function (r) { rows.push([{ t: r.group, align: 'center', valign: 'center' }, r.lines.join('\n')]); });
     if (reg.length === 0) rows.push(['', '']);
-    var body = D.title('노무법인 변경등기 신청서', '특수법인 변경등기 · 법무사 확인용 초안') +
-      NOTE('※ 이 신청서는 법무사가 확인할 초안입니다. 실제 신청은 법무사가 등기소 양식(전자신청 포함)으로 합니다.') + SP() +
+    /* 세액·수수료 — 실제 납부한 영수필확인서 금액으로 고쳐 적는다(이 앱 값은 예상) */
+    var taxRows = [[hd('구 분'), hd('금 액'), hd('비 고')]];
+    cp.rows.filter(function (r) { return r.kind === 'tax'; }).forEach(function (r) { taxRows.push([r.label.replace(/^등록면허세 — /, '등록면허세 · '), { t: C.won(r.amount) + '원', align: 'right' }, r.payTo]); });
+    taxRows.push(['지방교육세', { t: C.won(cp.edu) + '원', align: 'right' }, '등록면허세의 20%']);
+    taxRows.push(['등기신청수수료', { t: C.won(cp.nFee * C.FEES.filing.visit) + '원', align: 'right' }, '등기 목적 ' + cp.nFee + '건(방문 신청)']);
+    var body = D.title('노무법인 변경등기 신청서', self ? '특수법인 변경등기' : '특수법인 변경등기 · 법무사 확인용 초안') +
+      (self ? NOTE('※ 세액·수수료는 예상 금액입니다. 실제 납부한 영수필확인서 금액과 다르면 고쳐 적으십시오.')
+        : NOTE('※ 이 신청서는 법무사가 확인할 초안입니다. 실제 신청은 법무사가 등기소 양식(전자신청 포함)으로 합니다.')) + SP() +
       D.infoTable([['명    칭', f.name, '등기번호', f.regNo], ['주사무소', f.hq], ['등기의 목적', C.purpose(a)], ['등기의 사유', C.reason(a)]], doc,
         { rowH: [3120, 3120, 3120, 5200] }) + SP() +
       D.bandTitle('등 기 할 사 항', doc) + T(rows, [0.16, 0.84], doc) + SP() +
+      D.bandTitle('세 액 · 수 수 료', doc) + T(taxRows, [0.42, 0.2, 0.38], doc) + SP() +
       D.bandTitle('첨 부 서 면', doc) + list(attachList(x)) + SP() +
       D.dateLine(x.c.dates.file || '') +
-      RT('신청인  명    칭 : ' + f.name) + RT('주사무소 : ' + f.hq) + RT('대표사원 : ' + repNames(x) + '    (인)') +
-      RT('대리인 : ' + (ag.name || '          ') + (ag.office ? ' (' + ag.office + ')' : '') + '    (인)') + SP() +
+      RT('신청인  명    칭 : ' + f.name) + RT('주사무소 : ' + f.hq) + RT('대표사원 : ' + repNames(x) + '    (법인인감)') +
+      (self ? '' : RT('대리인 : ' + (ag.name || '          ') + (ag.office ? ' (' + ag.office + ')' : '') + '    (인)')) + SP() +
       PB((f.court || '          등기소') + ' 귀중');
-    return { key: 'request', label: '변경등기 신청서(초안)', body: body, margin: doc.margin };
+    return { key: 'request', label: self ? '변경등기 신청서' : '변경등기 신청서(초안)', body: body, margin: doc.margin };
   }
 
   /* ── 15. 변경등기 지연 사유서 ── */
@@ -425,7 +435,7 @@
   }
 
   /* ── 16. 필요서류 확인표 ── */
-  var SRC_KO = { '법무사': '법무사 안내', '서류': '이 앱 서류', '지난 서류': '지난 등기', '확인 필요': '확인 필요' };
+  var SRC_KO = { '법무사': '법무사 안내', '서류': '이 앱 서류', '지난 서류': '지난 등기', '법령': '법령', '확인 필요': '확인 필요' };
   function checklistDoc(x) {
     var doc = D.begin('plain'), a = x.after, c = x.c;
     var rows = [[hd('확인'), hd('구 분'), hd('서 류'), hd('내용·기한'), hd('근 거')]];

@@ -183,3 +183,13 @@ test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인
   assert.match(본문, /Promise\.resolve\(\)\.then\(function\(\)\{ return PureunHwp\.renderPreview\(/);
   assert.doesNotMatch(본문, /'<td data-l="발급">'/);
 });
+
+/* 2026-11-15 직접 등기 — ④ 단계 순서·비용표, 신청 방법 칸 */
+test('직접 등기 — ④ 단계에 위택스·영수필·법인 인감 순서와 💰 예상 비용, 신청 방법을 바꾸면 화면을 다시', () => {
+  assert.match(본문, /function drawCost\(a\)\{/);
+  assert.match(본문, /C\.costPlan\(a\)/);
+  assert.match(본문, /wetax\.go\.kr/);
+  assert.match(본문, /data-k="filing"/);
+  assert.match(본문, /if\(el\.dataset\.k==='filing'\)\{ c\.filing=v==='agent'\?'agent':'self';/);
+  assert.match(본문, /\[4,'등기','직접 신청하고 끝내기'\]/);
+});

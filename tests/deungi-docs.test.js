@@ -131,3 +131,16 @@ test('총사원 동의서 — 현물 금액이 0원이면 «현물재산» 줄�
   const con1 = 글(unzipAll(DD.fileOne(DD.make('consent', DD.context(법인, 건1, {}, '2026-11-21'))))['Contents/section0.xml']);
   assert.match(con1, /현물재산 : 차종 : 점검차/);
 });
+
+/* 2026-11-15 직접 신청(기본) — 신청서는 제출용(세액·수수료 칸, 대리인 없음), 등기신청 위임장은 법무사에게 맡길 때만 */
+test('직접 신청이면 신청서에 세액·수수료 칸이 있고 대리인·초안 표시가 없다 · 위임장(등기신청 대리)은 법무사에게 맡길 때만', () => {
+  const x = DD.context(법인, 건, {}, '2026-11-14');
+  const t = 글(unzipAll(DD.fileOne(DD.make('request', x)))['Contents/section0.xml']);
+  assert.match(t, /세 액 · 수 수 료/); assert.match(t, /등록면허세/); assert.match(t, /지방교육세/);
+  assert.doesNotMatch(t, /대리인/); assert.doesNotMatch(t, /초안/);
+  assert.ok(C.docPlan(x.after, {}).every((d) => d.key !== 'poa' || !d.need), '직접 신청이면 등기신청 위임장은 필요 없다');
+  const y = DD.context(법인, Object.assign({}, 건, { filing: 'agent' }), {}, '2026-11-14');
+  const u = 글(unzipAll(DD.fileOne(DD.make('request', y)))['Contents/section0.xml']);
+  assert.match(u, /대리인/); assert.match(u, /초안/);
+  assert.ok(C.docPlan(y.after, {}).some((d) => d.key === 'poa' && d.need));
+});

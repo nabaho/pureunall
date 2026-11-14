@@ -394,7 +394,10 @@ test('쉬운 진행 — 도장 안내는 서류마다 누가·어떻게, 단계�
   assert.match(by.consent.who, /새노무/); assert.match(by.consent.who, /점검노무/);   /* 들어오는·나가는 사원 모두 */
   assert.match(by.leaveNote.who, /점검노무/);
   assert.match(by.transfer.who, /점검노무/); assert.match(by.transfer.who, /점검대표/);
-  assert.ok(!by.request && !by.checklist, '법무사가 쓰는 신청서·확인표는 도장 안내에 없다');
+  assert.ok(!by.checklist, '확인표는 도장 안내에 없다');
+  assert.ok(by.request && /법인 인감/.test(by.request.how), '직접 신청(기본)이면 신청서에 법인 인감');
+  const ag = C.applyChanges(법인(), 건({ filing: 'agent' }));
+  assert.ok(!C.sealPlan(ag, C.docPlan(ag, {}).filter((d) => d.on).map((d) => d.key)).some((r) => r.key === 'request'), '법무사에게 맡기면 신청서는 법무사가');
   const sk = rows.map((r) => r.key);
   assert.equal(C.easyStep(C.applyChanges(법인(), 건({ changes: [] })), []), 1, '바뀌는 것이 없으면 ①');
   assert.equal(C.easyStep(C.applyChanges(법인(), 건({ meeting: { date: '' } })), sk), 1, '총회 날짜가 없으면 ①');
@@ -404,4 +407,34 @@ test('쉬운 진행 — 도장 안내는 서류마다 누가·어떻게, 단계�
   assert.ok(b.charterChanged);
   assert.equal(C.easyStep(b, sk), 3, '정관이 바뀌면 인가증 받기 전엔 ③');
   assert.equal(C.easyStep(C.applyChanges(법인(), 건({ checks, dates: { approvalGet: '2026-12-01' } })), sk), 4, '인가증을 받으면 ④');
+});
+
+/* 2026-11-15 직접 등기 비용 — 대표 「등기비용 등 필요 비용도 표시해달라 법무사 없이 직접하는 것이다」 (2026-11-15 법령 확인 금액) */
+test('★ 예상 비용 — 등록면허세(사원 변경 1건·분사무소 설치는 곳마다)·지방교육세 20%·수수료 목적별·공증·증명서', () => {
+  assert.equal(C.FEES.regTax, 40200); assert.equal(C.FEES.filing.visit, 7000); assert.equal(C.FEES.filing.efile, 2000); assert.equal(C.FEES.notary, 30000);
+  const b = 법인(); b.firm.hq = '충청남도 천안시 서북구 점검로 1'; b.firm.court = '점검지원 등기과';
+  const 건 = (changes) => ({ id: 'DG-C', meeting: { date: '2026-11-20' }, changes });
+  /* 입사(노무출자)+대표사원 취임+대표사원 주소변경 → 사원 변경 1건 */
+  let p = C.costPlan(C.applyChanges(C.normBase(b), 건([
+    { id: 'j', type: 'join', name: '새노무', birth: '950101', addr: '점검시 라로 4', invest: { labor: true }, rep: true },
+    { id: 'a', type: 'addr', member: 'm1', addr: '점검시 새로 9' }])));
+  const tax = p.rows.filter((r) => r.kind === 'tax');
+  assert.equal(tax.length, 1); assert.equal(tax[0].amount, 40200); assert.match(tax[0].payTo, /천안시/);
+  assert.equal(p.edu, 8040); assert.equal(p.nFee, 1);
+  assert.equal(p.rows.find((r) => r.kind === 'fee').amount, 7000);
+  assert.ok(p.notes.some((t) => /따로 세면/.test(t)), '종류마다 따로 셀 때 금액도 알린다');
+  assert.ok(p.efile < p.visit);
+  assert.equal(p.alt, null, '노무출자는 출자증가 아님');
+  /* 분사무소 두 곳 설치 — 등록면허세는 곳마다(소재지 지자체), 수수료는 1건 */
+  p = C.costPlan(C.applyChanges(C.normBase(b), 건([
+    { id: 'b1', type: 'brAdd', name: '갑분사무소', addr: '세종특별자치시 점검로 1' },
+    { id: 'b2', type: 'brAdd', name: '을분사무소', addr: '대전광역시 서구 점검로 2' }])));
+  const bt = p.rows.filter((r) => r.kind === 'tax');
+  assert.deepEqual(bt.map((r) => r.payTo), ['세종특별자치시', '대전광역시 서구']);
+  assert.equal(p.nFee, 1);
+  /* 현금 출자 입사 — 출자증가로 볼 때(최저 112,500원)를 함께 보여 준다 */
+  p = C.costPlan(C.applyChanges(C.normBase(b), 건([{ id: 'j', type: 'join', name: '새현금', birth: '950101', addr: '점검시 라로 4', invest: { cash: 10000000 } }])));
+  assert.ok(p.alt && p.alt.tax === 112500 && p.alt.visit > p.visit);
+  assert.ok(p.notes.some((t) => /출자증가/.test(t) && /세무과/.test(t)));
+  assert.equal(C.placeOf('충남 서산시 쌍연남1로 37'), '서산시');
 });

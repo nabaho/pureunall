@@ -23,6 +23,8 @@
      ★ 쉬운 진행(2026-11-14 대표 「기본정보만 넣으면 전체서류가 생성되어서 도장찍고 노동부 인가 후 등기만 할 수 있게 … 아주 쉽게 … 한글 hwpx 화면」):
        등기 건을 열면 ① 바뀌는 것 → ② 서류 확인·도장(만든 한글 서류를 쪽 그대로 화면에) → ③ 노동부 인가 → ④ 등기 네 단계만 보인다.
        «자세히(모든 칸)»를 누르면 예전 전체 편집 화면.
+     ★ 직접 등기·비용(2026-11-15 대표 「등기비용 등 필요 비용도 표시해달라 — 법무사 없이 직접하는 것이다」): 신청 방법 기본 «직접» —
+       등기신청 위임장을 빼고 신청서를 제출용으로, ④ 단계에 직접 등기 순서와 💰 예상 비용(core costPlan — 2026-11-15 법령 확인 금액·근거).
      ⚠ 법령 근거(2026-11-14 현행 원문 확인)·기한은 js/pu-deungi-core.js 머리글. 서식·기한·비용은 담당 법무사가 최종 확인한다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -103,6 +105,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;padding:10px 12px}
 .tile{padding:12px;font-size:14px;text-align:left;white-space:normal;border-radius:10px;line-height:1.35}
 .tile small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.howto{margin:6px 0 0;padding-left:20px}
+.howto li{margin:5px 0;line-height:1.5}
 .nextbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
 .nextbar .pri{padding:9px 16px;font-size:14px}
 .doctoc{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
@@ -251,8 +255,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-office-store.js?v=11"></script>
-<script src="js/pu-deungi-core.js?v=4"></script>
-<script src="js/pu-deungi-docs.js?v=2"></script>
+<script src="js/pu-deungi-core.js?v=5"></script>
+<script src="js/pu-deungi-docs.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:'', isAdmin:false};
@@ -379,7 +383,8 @@ function drawEditor(){
     '<div class="card"><h3>③ 등기부가 이렇게 바뀝니다</h3><div class="cb" id="edPreview"></div></div>'+
     '<div class="card"><h3>④ 서류 만들기 (한글) <span class="sp"></span><button class="sm" data-act="rrn">🔐 주민번호 넣기</button></h3><div id="edDocs"></div></div>'+
     '<div class="card"><h3>⑤ 필요서류 확인 <span id="ckProg"></span></h3><div id="edList"></div></div>'+
-    '<div class="card"><h3>⑥ 진행 일정·기한</h3><div id="edSched"></div></div>';
+    '<div class="card"><h3>⑥ 진행 일정·기한</h3><div id="edSched"></div></div>'+
+    '<div class="card"><h3>⑦ 💰 예상 비용 <span class="hint">'+esc(C.FEES.asOf)+' 법령 기준 — 실제 고지·영수 금액이 기준</span></h3><div id="edCost"></div></div>';
   drawBasic(); drawChanges(); drawDerived(); drawSaveState();
 }
 function fld(label, key, val, opt){
@@ -405,6 +410,7 @@ function drawBasic(){
     fld('법무사 사무소', 'agent.office', n.agent.office)+
     fld('법무사 연락처', 'agent.phone', n.agent.phone)+
     fld('법무사 사무소 주소(위임장)', 'agent.addr', n.agent.addr)+
+    fld('등기 신청', 'filing', n.filing, { type:'select', options:[['self','직접 신청(법무사 없이)'],['agent','법무사에게 맡김']] })+
     fld('공증사무소(공증용 위임장)', 'notary', n.notary, { ph:'예: 법무법인 ○○' })+
     fld('메모', 'memo', n.memo, { type:'textarea', wide:true, rows:2, ph:'법무사와 나눈 말·청구 금액 등' })+
   '</div>';
@@ -469,6 +475,7 @@ function checkMsgs(a, B0){
   C.baseProblems(B0).forEach(function(e){ m+='<div class="msg w">⚠ 등기 현황: '+esc(e)+'</div>'; });
   if(!n.changes.length) m+='<div class="msg i">바뀌는 것을 넣으면 여기서 확인합니다.</div>';
   else if(!a.errors.length) m+='<div class="msg ok">✔ 서류를 만들 수 있습니다 — '+esc(C.purpose(a))+(a.charterChanged?' · 정관 '+a.arts.map(function(k){ return '제'+k+'조'; }).join('·')+' 변경 → 고용노동부 정관변경 인가가 필요합니다':' · 정관은 바뀌지 않습니다(인가 불필요)')+'</div>';
+  if(n.changes.length && !a.errors.length){ var cp=C.costPlan(a); m+='<div class="msg i">💰 예상 비용 약 <b>'+C.won(cp.visit)+'원</b>(직접 방문 신청 · 세금·수수료·공증·증명서) — 자세한 표는 ④ 등기 단계'+(cp.notes.length?' · 늘어날 수 있음':'')+'</div>'; }
   return '<div class="msgs">'+m+'</div>';
 }
 function drawDerived(){
@@ -484,7 +491,7 @@ function drawDerived(){
   var aft='<div class="reg"><h4>바뀐 뒤</h4>'+regLines(a.members, a.branches, a, false)+'</div>';
   $('edPreview').innerHTML='<div class="two">'+bef+aft+'</div>'+
     '<div class="reg" style="margin-top:10px"><h4>등기할 사항 '+(reg.length?'('+reg.length+')':'')+'</h4>'+(reg.length?reg.map(function(r){ return '<div class="ln"><span class="chip m">'+esc(r.group)+'</span> '+esc(r.lines.join(' / '))+'</div>'; }).join(''):'<div class="hint">없음</div>')+'</div>';
-  drawDocs(a); drawChecklist(a); drawSched(a); drawSaveState();
+  drawDocs(a); drawChecklist(a); drawSched(a); drawCost(a); drawSaveState();
 }
 function regLines(members, branches, a, before){
   var h='';
@@ -514,7 +521,7 @@ function drawDocs(a){
   });
   $('edDocs').innerHTML=h+'</tbody></table></div><div class="cb hint">⚠ «변경등기 신청서»는 법무사 확인용 초안입니다. 서식·기한·비용은 담당 법무사가 최종 확인합니다. 지분 양도·양수 계약서의 대금은 당사자 합의로 채웁니다.</div>';
 }
-var SRC_CLS={ '법무사':'g', '서류':'', '지난 서류':'m', '확인 필요':'a' };
+var SRC_CLS={ '법무사':'g', '법령':'g', '서류':'', '지난 서류':'m', '확인 필요':'a' };
 function drawChecklist(a){
   var items=C.checklist(a), c=a.c, pr=C.checkProgress(a, today());
   $('ckProg').innerHTML='<span class="chip '+(pr.stale?'r':pr.done===pr.total?'g':'m')+'">'+pr.done+'/'+pr.total+(pr.stale?' · 3개월 지남 '+pr.stale:'')+'</span><span class="prog"><i style="width:'+(pr.total?Math.round(pr.done*100/pr.total):0)+'%"></i></span>';
@@ -553,7 +560,7 @@ function drawSched(a){
 
 /* ═══ 쉬운 진행 ═══
    ① 바뀌는 것 → ② 서류 확인·도장(한글 쪽 화면) → ③ 노동부 인가(정관이 바뀔 때만) → ④ 등기. 입력 칸은 예전 편집 화면과 같은 data-k 를 쓴다(저장 길 하나). */
-var EASY_STEPS=[[1,'바뀌는 것 넣기','입사·퇴사·대표·주소·분사무소'],[2,'서류 확인·도장','한글 화면으로 보고 날인'],[3,'노동부 인가','정관이 바뀔 때만'],[4,'등기','법무사에게 맡기고 끝내기']];
+var EASY_STEPS=[[1,'바뀌는 것 넣기','입사·퇴사·대표·주소·분사무소'],[2,'서류 확인·도장','한글 화면으로 보고 날인'],[3,'노동부 인가','정관이 바뀔 때만'],[4,'등기','직접 신청하고 끝내기']];
 var EASY_TILES=[['join','➕ 노무사가 들어와요','사원 입사(출자·대표사원도)'],['leave','➖ 노무사가 나가요','사원 퇴사·지분 넘기기'],['repIn','⭐ 대표사원이 돼요','지금 사원 중에서'],['repOut','☆ 대표사원을 그만둬요','사원으로는 남음'],['addr','🏠 주소가 바뀌었어요','사원 주소 변경'],['brAdd','🏢 분사무소를 새로 내요','분사무소 설치'],['brMove','🚚 분사무소를 옮겨요','분사무소 이전'],['brClose','✖ 분사무소를 닫아요','분사무소 폐지']];
 function sealKeysOf(a){ return C.sealPlan(a, chosenKeys(a)).map(function(r){ return r.key; }); }
 function easyAuto(a){ return C.easyStep(a, sealKeysOf(a)); }
@@ -620,14 +627,36 @@ function drawWizBody(st, a){
     }
     $('wizBody').innerHTML=h; return;
   }
-  /* ④ 등기 */
-  var canApply=n.dates.done && !a.errors.length && n.changes.length && !c.applied;
-  h='<div class="card"><h3>④ 등기 — 법무사에게 맡기기</h3><div class="msgs" id="easyDl">'+deadlineHtml(a)+'</div>'+
-    '<div class="cb hint">도장 찍은 서류와 아래 필요서류를 담당 법무사에게 보내면 법무사가 등기를 신청합니다.</div></div>'+
+  /* ④ 등기 — 직접 신청(기본, 대표 2026-11-15 «법무사 없이 직접하는 것이다») 또는 법무사 */
+  var canApply=n.dates.done && !a.errors.length && n.changes.length && !c.applied, self=n.filing!=='agent', ct=(B0.firm&&B0.firm.court)||'관할 등기소';
+  h='<div class="card"><h3>④ 등기 — '+(self?'직접 신청':'법무사에게 맡기기')+'<span class="sp"></span><label class="fl" style="flex-direction:row;align-items:center;gap:6px;font-weight:400">신청 <select data-k="filing" aria-label="등기 신청 방법"><option value="self"'+(self?' selected':'')+'>직접</option><option value="agent"'+(self?'':' selected')+'>법무사</option></select></label></h3><div class="msgs" id="easyDl">'+deadlineHtml(a)+'</div>'+
+    (self?'<div class="cb"><b>직접 등기 순서</b><ol class="howto">'+
+      '<li><b>등기소에 미리 전화</b> — '+esc(ct)+': 총사원 동의서도 공증이 필요한지 · 사원 전원 공동신청인지 · 변경 정관을 붙이는지 · 등록면허세 건수</li>'+
+      '<li><b>등록면허세 내기</b> — 위택스(wetax.go.kr) «신고 › 등록면허세 › 등록면허세(등록분)». 본점분은 '+esc(C.placeOf(B0.firm&&B0.firm.hq)||'본점 소재지')+', 분사무소 설치·이전·폐지분은 그 분사무소 소재지. 등기 신청하는 날까지 → 영수필 통지서·확인서 출력</li>'+
+      '<li><b>등기신청수수료 내기</b> — 인터넷등기소 전자납부 또는 등기소 무인발급기·수납은행 → 영수필확인서</li>'+
+      '<li><b>신청서 내기</b> — ② 단계 «변경등기 신청서»에 등기소에 신고한 법인 인감을 찍고, 아래 필요서류를 붙여 '+esc(ct)+'에 방문 제출(전자신청은 법인 전자증명서·보안매체 필요 — 노무법인 가능 여부는 등기소 확인)</li>'+
+      '<li><b>끝난 뒤</b> — 등기사항증명서를 떼어 바뀐 내용 대조 → 아래 «등기 완료된 날» → «등기 현황에 반영»</li></ol></div>'
+      :'<div class="cb hint">도장 찍은 서류와 아래 필요서류를 담당 법무사에게 보내면 법무사가 등기를 신청합니다.</div>')+'</div>'+
+    '<div class="card"><h3>💰 예상 비용 <span class="hint">'+esc(C.FEES.asOf)+' 법령 기준 — 실제 고지·영수 금액이 기준</span></h3><div id="edCost"></div></div>'+
     '<div class="card"><h3>필요서류 확인 <span id="ckProg"></span></h3><div id="edList"></div></div>'+
     '<div class="card"><h3>등기 끝내기</h3><div class="cb"><div class="grid">'+fld('등기 신청한 날', 'dates.file', n.dates.file, { type:'date' })+fld('등기 완료된 날', 'dates.done', n.dates.done, { type:'date' })+'</div></div>'+
     '<div class="nextbar"><button class="sm" data-act="wizGo" data-s="3">← 앞 단계</button><span class="sp"></span>'+(c.applied?'<span class="chip g">✔ 등기 현황에 반영함 — 끝</span>':'<button class="pri" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료된 날»을 넣으면 누를 수 있습니다"')+'>🏛 등기 현황에 반영하고 끝내기</button>')+'</div></div>';
-  $('wizBody').innerHTML=h; drawChecklist(a);
+  $('wizBody').innerHTML=h; drawChecklist(a); drawCost(a);
+}
+/* 💰 예상 비용 — core costPlan(2026-11-15 법령 확인 금액). 보기 전용 표 */
+function drawCost(a){
+  var el=$('edCost'); if(!el) return;
+  if(!a.c.changes.length){ el.innerHTML='<div class="empty">바뀌는 것을 넣으면 계산합니다.</div>'; return; }
+  var p=C.costPlan(a), self=a.c.filing!=='agent';
+  var h='<div class="scroll"><table class="t"><thead><tr><th class="n">№</th><th>항목</th><th>계산</th><th>금액</th><th>내는 곳</th><th>근거</th></tr></thead><tbody>'+
+    p.rows.map(function(r, i){
+      return '<tr><td class="n">'+(i+1)+'</td><td class="ti" title="'+esc(r.label)+'">'+esc(r.label)+(r.check?' <span class="chip a" title="'+esc(r.check)+'">확인 필요</span>':'')+'</td><td data-l="계산">'+esc(r.calc)+'</td>'+
+        '<td data-l="금액" style="text-align:right"><b>'+C.won(r.amount)+'원</b></td><td data-l="내는 곳">'+esc(r.payTo)+'</td><td class="nw full hint" title="'+esc(r.basis)+'">'+esc(r.basis)+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  h+='<div class="msgs"><div class="msg ok">합계(직접 방문 신청) <b>'+C.won(p.visit)+'원</b>'+(self?' · 법무사 보수 없음':'')+' · 전자신청이면 등기신청수수료가 '+C.won(p.nFee*C.FEES.filing.efile)+'원이라 '+C.won(p.efile)+'원</div>'+
+    p.notes.map(function(t){ return '<div class="msg w">⚠ '+esc(t)+'</div>'; }).join('')+
+    '<div class="msg i">공증 '+C.won(C.FEES.notary)+'원은 공증사무소에서 의사록 인증 1건(출장하면 일당·여비 따로) · 인감증명서는 정부24 전자발급(등기 제출용)이면 무료 · 노동부 정관변경 인가는 수수료 없음 · 등록면허세는 분사무소 소재지마다 따로 냅니다</div></div>';
+  el.innerHTML=h;
 }
 /* 칸을 고칠 때 — 단계 막대·확인 글·기한·다음 단추만 고친다(글칸을 다시 그리면 커서가 빠진다) */
 function drawEasyDerived(){
@@ -638,6 +667,7 @@ function drawEasyDerived(){
   if($('edCheck')) $('edCheck').innerHTML=checkMsgs(a, baseOf(c));
   if($('easyDl')) $('easyDl').innerHTML=deadlineHtml(a);
   if($('edList')) drawChecklist(a);
+  if($('edCost')) drawCost(a);
   var nx=$('wizNext'), st=SHOWN||STEP||auto;
   if(nx){
     var ok=st===1 ? !!(n.changes.length && !a.errors.length && n.meeting.date) : st===2 ? sealKeysOf(a).every(function(k){ return (n.checks['seal_'+k]||{}).ok; }) : st===3 ? (!a.charterChanged || !!n.dates.approvalGet) : true;
@@ -1188,6 +1218,7 @@ function onField(ev){
     drawDerived(); scheduleSave(); return;
   }
   /* 건 정보 */
+  if(el.dataset.k==='filing'){ c.filing=v==='agent'?'agent':'self'; scheduleSave(); drawCaseList(); if(MODE==='easy') drawEasy(); else drawEditor(); return; }
   if(el.dataset.k){ setPath(c, el.dataset.k, v); if(el.dataset.k==='status') drawEditor(); else drawDerived(); scheduleSave(); drawCaseList(); }
 }
 document.addEventListener('input', onField);
