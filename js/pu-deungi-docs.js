@@ -38,7 +38,10 @@
   }
   function firmName(x) { return x.base.firm.name || '푸른 노무법인'; }
   function md(x) { return C.meetingDate(x.c); }
-  function effDate(x) { return x.c.dates.approvalGet || md(x) || x.today; }
+  function effDate(x) { return x.c.effDate || x.c.dates.approval || x.c.dates.approvalGet || md(x) || x.today; }
+  /* 변경 연월일 글 — 날짜를 정하지 않아 총회일로 채운 것은 의사록·동의서에 «정관변경 인가일»로 적는다
+     (이 법인 2026 의사록도 입사 날짜를 적지 않았고, 등기는 총회 뒤 날짜로 올라갔다) */
+  function onDate(x, e) { return e.dateSrc === 'meeting' && x.after.charterChanged ? '정관변경 인가일' : C.dotDate(e.date); }
   function attendees(x) { return x.base.members; }
   function repsAfter(x) { return x.after.members.filter(function (m) { return m.rep; }); }
   function repNames(x) { var r = repsAfter(x); return r.length ? r.map(function (m) { return m.name; }).join(', ') : '          '; }
@@ -70,12 +73,12 @@
     eventsOf(x, 'join').forEach(function (e) {
       var m = a.byId[e.member];
       agendas.push({ title: '사원 입사 승인의 건(' + m.name + ')', skip: '',
-        text: '공인노무사 ' + C.particle(m.name, '을', '를') + ' ' + C.investText(m.invest, 'charter') + ' 출자 사원으로 ' + C.dotDate(e.date) + '자로 입사시키는 것(정관 제19조 — 사원총회 2/3 이상의 의결)' });
+        text: '공인노무사 ' + C.particle(m.name, '을', '를') + ' ' + C.investText(m.invest, 'charter') + ' 출자 사원으로 ' + onDate(x, e) + '자로 입사시키는 것(정관 제19조 — 사원총회 2/3 이상의 의결)' });
     });
     eventsOf(x, 'leave').forEach(function (e) {
       var m = a.byId[e.member];
       agendas.push({ title: '사원 퇴사 승인 및 지분 처리의 건(' + m.name + ')', skip: m.id,
-        text: '사원 ' + C.particle(m.name, '이', '가') + ' ' + C.dotDate(e.date) + '자로 퇴사함에 따라 그 퇴사를 승인하고, ' + shareText(x, m) + '하는 것' });
+        text: '사원 ' + C.particle(m.name, '이', '가') + ' ' + onDate(x, e) + '자로 퇴사함에 따라 그 퇴사를 승인하고, ' + shareText(x, m) + '하는 것' });
     });
     var ins = eventsOf(x, 'repIn'), outs = eventsOf(x, 'repOut').filter(function (e) { return !e.byLeave; });
     if (ins.length || outs.length) {
@@ -139,35 +142,38 @@
     if (joins.length) secs.push(['본 회사의 사원을 다음과 같이 입사시킨다.', joins.map(function (e, i) {
       var m = a.byId[e.member];
       var acq = m.acq.length ? ' (사원 ' + m.acq.map(function (q) { return q.fromName + '의 지분 금 ' + C.won(q.amount) + '원 양수'; }).join(', ') + ')' : '';
-      return [(i + 1) + ') 사원 ' + m.name + ' (' + R(x, m) + ')', '    출자 : ' + C.investText(m.invest, 'charter') + acq + ', 전부이행', '    주소 : ' + m.addr, '    입사 연월일 : ' + C.dotDate(e.date)];
+      var kind = C.inKindLines(m.invest);
+      return [(i + 1) + ') 사원 ' + m.name + ' (' + R(x, m) + ')', '    출자 : ' + C.investText(m.invest, 'charter') + acq + ', 전부이행']
+        .concat(kind.length ? ['    현물재산 : ' + kind.join(', ')] : [])
+        .concat(['    주소 : ' + m.addr, '    입사 연월일 : ' + onDate(x, e)]);
     })]);
     var leaves = eventsOf(x, 'leave');
     if (leaves.length) secs.push(['본 회사 사원의 퇴사 및 지분에 관한 사항을 다음과 같이 정한다.', leaves.map(function (e, i) {
-      var m = a.byId[e.member], out = [(i + 1) + ') 사원 ' + m.name + ' (' + R(x, m) + ')', '    ' + shareText(x, m) + '하여 퇴사', '    퇴사 연월일 : ' + C.dotDate(e.date)];
+      var m = a.byId[e.member], out = [(i + 1) + ') 사원 ' + m.name + ' (' + R(x, m) + ')', '    ' + shareText(x, m) + '하여 퇴사', '    퇴사 연월일 : ' + onDate(x, e)];
       (m.leaveShare.to || []).forEach(function (t) {
         var r = a.byId[t.member];
-        if (r && !r.isNew) out.push('    사원 ' + r.name + ' (' + R(x, r) + ') — 사원 ' + m.name + '의 지분 금 ' + C.won(t.amount) + '원을 양수하여 출자금 총액을 금 ' + C.won(C.normInvest(r.invest).cash) + '원으로 변경, 전부이행 (변경 연월일 : ' + C.dotDate(e.date) + ')');
+        if (r && !r.isNew) out.push('    사원 ' + r.name + ' (' + R(x, r) + ') — 사원 ' + m.name + '의 지분 금 ' + C.won(t.amount) + '원을 양수하여 출자금 총액을 금 ' + C.won(C.normInvest(r.invest).cash) + '원으로 변경, 전부이행 (변경 연월일 : ' + onDate(x, e) + ')');
       });
       return out;
     })]);
     var ins = eventsOf(x, 'repIn'), outs = eventsOf(x, 'repOut');
     if (ins.length || outs.length) {
       var rows = [], k = 0;
-      outs.forEach(function (e) { var m = a.byId[e.member]; rows.push([(++k) + ') 대표사원직 ' + (e.byLeave ? '퇴임' : '사임') + ' — ' + m.name + ' (' + R(x, m) + ')', '    ' + (e.byLeave ? '퇴임' : '사임') + ' 연월일 : ' + C.dotDate(e.date)]); });
-      ins.forEach(function (e) { var m = a.byId[e.member]; rows.push([(++k) + ') 취임한 대표사원 — ' + m.name + ' (' + R(x, m) + ')', '    주소 : ' + m.addr, '    취임 연월일 : ' + C.dotDate(e.date)]); });
+      outs.forEach(function (e) { var m = a.byId[e.member]; rows.push([(++k) + ') 대표사원직 ' + (e.byLeave ? '퇴임' : '사임') + ' — ' + m.name + ' (' + R(x, m) + ')', '    ' + (e.byLeave ? '퇴임' : '사임') + ' 연월일 : ' + onDate(x, e)]); });
+      ins.forEach(function (e) { var m = a.byId[e.member]; rows.push([(++k) + ') 취임한 대표사원 — ' + m.name + ' (' + R(x, m) + ')', '    주소 : ' + m.addr, '    취임 연월일 : ' + onDate(x, e)]); });
       secs.push(['본 회사 정관 제13조 및 총사원의 동의로 대표사원을 다음과 같이 변경한다.', rows]);
     }
     var addrs = eventsOf(x, 'addr');
     if (addrs.length) secs.push(['사원의 주소를 다음과 같이 변경한다.', addrs.map(function (e, i) {
       var m = a.byId[e.member];
-      return [(i + 1) + ') 사원 ' + m.name + (m.rep ? '(대표사원)' : ''), '    종전 주소 : ' + m.before.addr, '    변경 주소 : ' + m.addr, '    변경 연월일 : ' + C.dotDate(e.date)];
+      return [(i + 1) + ') 사원 ' + m.name + (m.rep ? '(대표사원)' : ''), '    종전 주소 : ' + m.before.addr, '    변경 주소 : ' + m.addr, '    변경 연월일 : ' + onDate(x, e)];
     })]);
     var brs = a.events.filter(function (e) { return /^br/.test(e.type); });
     if (brs.length) secs.push(['분사무소를 다음과 같이 정한다.', brs.map(function (e, i) {
       var b = a.brById[e.branch];
-      if (e.type === 'brAdd') return [(i + 1) + ') 분사무소 설치 — ' + b.name, '    소재지 : ' + b.addr, '    설치 연월일 : ' + C.dotDate(e.date)];
-      if (e.type === 'brMove') return [(i + 1) + ') 분사무소 이전 — ' + b.name, '    종전 소재지 : ' + b.before.addr, '    변경된 소재지 : ' + b.addr, '    이전 연월일 : ' + C.dotDate(e.date)];
-      return [(i + 1) + ') 분사무소 폐지 — ' + b.name, '    소재지 : ' + b.addr, '    폐지 연월일 : ' + C.dotDate(e.date)];
+      if (e.type === 'brAdd') return [(i + 1) + ') 분사무소 설치 — ' + b.name, '    소재지 : ' + b.addr, '    설치 연월일 : ' + onDate(x, e)];
+      if (e.type === 'brMove') return [(i + 1) + ') 분사무소 이전 — ' + b.name, '    종전 소재지 : ' + b.before.addr, '    변경된 소재지 : ' + b.addr, '    이전 연월일 : ' + onDate(x, e)];
+      return [(i + 1) + ') 분사무소 폐지 — ' + b.name, '    소재지 : ' + b.addr, '    폐지 연월일 : ' + onDate(x, e)];
     })]);
     if (a.charterChanged) {
       var arts = C.articles(a, x.rrn);
@@ -200,7 +206,7 @@
   /* ── 4. 정관변경 이유서 ── */
   function reason(x) {
     var doc = D.begin('plain'), a = x.after, fn = firmName(x);
-    var what = { 3: '주사무소와 분사무소의 소재지', 5: '사원의 성명과 주소', 6: '사원의 출자에 관한 사항' };
+    var what = { 3: '주사무소와 분사무소의 소재지', 5: '사원의 성명과 주소', 6: '사원의 출자에 관한 사항', 13: '회사의 대표사원' };
     var items = a.arts.map(function (n) { return what[n]; });
     var body = D.title('정관변경 이유서') + SP() + SP() +
       P(C.particle(fn, '은', '는') + ' ' + C.koDate(md(x)) + ' 임시사원총회(총사원 동의)의 결의로 ' + C.summary(a) + '하기로 함에 따라, ' + C.LAW.charter + '에 규정된 정관의 기재사항 중 ' +
@@ -235,7 +241,8 @@
   /* ── 6. 변경 정관 ── 정관 본문이 있으면 전문, 없으면 바뀐 조문만 */
   function charter(x) {
     var doc = D.begin('rule'), a = x.after;
-    var full = x.base.charter ? C.charterFull(x.base.charter, a, x.rrn, x.c.dates.approvalGet || md(x)) : null;
+    /* 개정 연혁은 총회일 — 이 법인 정관의 «(○. ○. ○. 개정)»은 사원총회 날짜다 */
+    var full = x.base.charter ? C.charterFull(x.base.charter, a, x.rrn, md(x)) : null;
     var body;
     if (full && full.text) {
       body = D.fromText(full.text, doc);
@@ -257,7 +264,7 @@
     a.members.forEach(function (m) {
       var iv = C.normInvest(m.invest);
       rows.push([{ t: m.name, align: 'center' }, { t: R(x, m), align: 'center' }, m.addr,
-        { t: iv.cash ? C.won(iv.cash) + '원' + (iv.labor ? '\n노무출자' : '') : (iv.labor ? '노무출자' : '-'), align: 'right' },
+        { t: iv.cash ? C.won(iv.cash) + '원' + (iv.inKind ? '\n(현물)' : '') + (iv.labor ? '\n노무출자' : '') : (iv.labor ? '노무출자' : '-'), align: 'right' },
         { t: iv.cash && total ? (Math.round(iv.cash * 10000 / total) / 100).toFixed(2) + '%' : '-', align: 'center' },
         { t: m.rep ? '대표사원' : '사원', align: 'center' }, '']);
     });

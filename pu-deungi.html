@@ -207,8 +207,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="js/pu-deungi-core.js?v=1"></script>
-<script src="js/pu-deungi-docs.js?v=1"></script>
+<script src="js/pu-deungi-core.js?v=2"></script>
+<script src="js/pu-deungi-docs.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:'', isAdmin:false};
@@ -349,7 +349,7 @@ function drawBasic(){
     fld('폐회 시각(선택)', 'meeting.endTime', n.meeting.endTime, { type:'time' })+
     fld('개최 장소', 'meeting.place', n.meeting.place)+
     fld('의장(사회자)', 'meeting.chair', n.meeting.chair, { type:'select', options:memberOpts(B0.members, '— 대표사원 중 첫 사람 —') })+
-    fld('변경 연월일(총회일과 다를 때만)', 'effDate', n.effDate, { type:'date' })+
+    fld('변경 연월일(정해졌을 때만 — 비우면 정관변경 인가일, 그것도 없으면 총회일)', 'effDate', n.effDate, { type:'date' })+
     fld('담당 법무사 성명', 'agent.name', n.agent.name)+
     fld('법무사 사무소', 'agent.office', n.agent.office)+
     fld('법무사 연락처', 'agent.phone', n.agent.phone)+
@@ -370,14 +370,15 @@ function drawChanges(){
     var T=C.TYPES[ch.type], b='';
     if(ch.type==='join'){
       b='<div class="grid">'+fld('이름', 'name', ch.name)+fld('생년월일(주민번호 앞 6자리)', 'birth', ch.birth, { im:'numeric', max:6, ph:'예: 900101' })+
-        fld('주소', 'addr', ch.addr, { wide:true })+fld('현금 출자(원)', 'invest.cash', ch.invest.cash||'', { im:'numeric', ph:'없으면 비움 · 지분 양수는 퇴사 쪽에서' })+
+        fld('주소', 'addr', ch.addr, { wide:true })+fld('현금·현물 출자(원)', 'invest.cash', ch.invest.cash||'', { im:'numeric', ph:'없으면 비움 · 지분 양수는 퇴사 쪽에서' })+
+        fld('현물이면 그 재산(현금이면 비움)', 'invest.inKind', (ch.invest&&ch.invest.inKind)||'', { wide:true, ph:'예: 차종 : ○○ / 연식 : ○○ / 차대번호 : ○○ — « / »로 줄을 나눕니다' })+
         '<label class="fl">노무출자<span class="ck"><input type="checkbox" data-k="invest.labor"'+(ch.invest.labor?' checked':'')+'> 노무출자로 입사</span></label>'+
         '<label class="fl">대표사원<span class="ck"><input type="checkbox" data-k="rep"'+(ch.rep?' checked':'')+'> 대표사원으로 취임</span></label>'+
-        fld('공인노무사 등록번호(선택)', 'license', ch.license)+fld('입사 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+'</div>';
+        fld('공인노무사 등록번호(선택)', 'license', ch.license)+fld('입사 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+'</div>';
     } else if(ch.type==='leave'){
       var lm=B0.members.filter(function(m){ return m.id===ch.member; })[0], iv=lm?C.normInvest(lm.invest):{ cash:0, labor:false };
       b='<div class="grid">'+fld('퇴사하는 사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members) })+fld('퇴사 사유', 'reason', ch.reason)+
-        fld('퇴사 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+
+        fld('퇴사 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+
         (iv.cash ? fld('지분(금 '+C.won(iv.cash)+'원) 처리', 'share.mode', ch.share.mode, { type:'select', options:[['transfer','다른 사원에게 양도(양수)'],['refund','환급'],['none','아직 안 정함']] }) : '<label class="fl">지분<span class="hint">'+(lm?(iv.labor?'노무출자 — 넘길 현금 지분 없음':'출자 없음'):'사원을 고르면 지분이 보입니다')+'</span></label>')+'</div>';
       if(iv.cash && ch.share.mode==='transfer'){
         var leavingNow={}; n.changes.forEach(function(x){ if(x.type==='leave'&&x.member) leavingNow[x.member]=1; });
@@ -391,20 +392,20 @@ function drawChanges(){
         b+='<div class="tor"><button class="sm" data-act="toAdd">＋ 양수인</button><span class="chip '+(sum===iv.cash?'g':'a')+'">합계 '+C.won(sum)+' / '+C.won(iv.cash)+'원</span></div></div>';
       }
     } else if(ch.type==='repIn'){
-      b='<div class="grid">'+fld('대표사원이 될 사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members.filter(function(m){ return !m.rep; })) })+fld('취임 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+'</div><div class="hint">새로 들어오는 사원이 대표사원이 되면 «사원 입사»의 «대표사원으로 취임»을 켜십시오.</div>';
+      b='<div class="grid">'+fld('대표사원이 될 사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members.filter(function(m){ return !m.rep; })) })+fld('취임 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+'</div><div class="hint">새로 들어오는 사원이 대표사원이 되면 «사원 입사»의 «대표사원으로 취임»을 켜십시오.</div>';
     } else if(ch.type==='repOut'){
-      b='<div class="grid">'+fld('사임하는 대표사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members.filter(function(m){ return m.rep; })) })+fld('사임 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+'</div><div class="hint">사원 자격은 남고 대표사원만 그만둘 때입니다. 퇴사하면 «사원 퇴사»만 넣으십시오(대표사원 퇴임은 저절로 들어갑니다).</div>';
+      b='<div class="grid">'+fld('사임하는 대표사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members.filter(function(m){ return m.rep; })) })+fld('사임 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+'</div><div class="hint">사원 자격은 남고 대표사원만 그만둘 때입니다. 퇴사하면 «사원 퇴사»만 넣으십시오(대표사원 퇴임은 저절로 들어갑니다).</div>';
     } else if(ch.type==='addr'){
       var am=B0.members.filter(function(m){ return m.id===ch.member; })[0];
       b='<div class="grid">'+fld('주소가 바뀐 사원', 'member', ch.member, { type:'select', options:memberOpts(B0.members) })+fld('새 주소', 'addr', ch.addr, { wide:true })+fld('주소 변경일(전입일)', 'date', ch.date, { type:'date' })+'</div>'+(am?'<div class="hint">지금 주소: '+esc(am.addr)+(am.rep?' · 대표사원이라 등기부 주소도 바뀝니다':' · 대표사원이 아니라 등기부엔 없고 정관 제5조만 바뀝니다')+'</div>':'');
     } else if(ch.type==='brAdd'){
       b='<div class="grid">'+fld('명칭(등기부)', 'name', ch.name, { ph:'예: 세종분사무소' })+fld('정관에 쓰는 명칭', 'alias', ch.alias, { ph:'비우면 «○○지사»' })+
-        fld('소재지(등기부)', 'addr', ch.addr, { wide:true })+fld('정관에 쓰는 소재지(다를 때만)', 'charterAddr', ch.charterAddr, { wide:true })+fld('설치 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+'</div>';
+        fld('소재지(등기부)', 'addr', ch.addr, { wide:true })+fld('정관에 쓰는 소재지(다를 때만)', 'charterAddr', ch.charterAddr, { wide:true })+fld('설치 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+'</div>';
     } else if(ch.type==='brMove'||ch.type==='brClose'){
       var bOpts=[['','— 고르기 —']].concat(B0.branches.map(function(x){ return [x.id, x.name+' · '+x.addr]; }));
       b='<div class="grid">'+fld('분사무소', 'branch', ch.branch, { type:'select', options:bOpts })+
         (ch.type==='brMove' ? fld('새 소재지(등기부)', 'addr', ch.addr, { wide:true })+fld('정관에 쓰는 소재지(다를 때만)', 'charterAddr', ch.charterAddr, { wide:true }) : '')+
-        fld((ch.type==='brMove'?'이전':'폐지')+' 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+'</div>';
+        fld((ch.type==='brMove'?'이전':'폐지')+' 연월일(정해졌을 때만)', 'date', ch.date, { type:'date' })+'</div>';
     }
     h+='<div class="chg" data-ch="'+esc(ch.id)+'"><div class="hd">'+T.icon+' <b>'+(i+1)+'. '+esc(T.label)+'</b><span class="hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+esc(C.describe(ch, B0, a))+'</span><button class="sm" data-act="chgDel" title="이 변경 빼기">빼기</button></div><div class="bd">'+b+'</div></div>';
   });
@@ -478,8 +479,8 @@ function drawChecklist(a){
 }
 function drawSched(a){
   var c=a.c, d=c.dates, dl=C.deadline(a, today());
-  var steps=[['notice','소집통지일'],['notarize','의사록 공증'],['approvalApply','정관변경 인가 신청'],['approvalGet','정관변경 인가증 받음'],['file','등기 신청'],['done','등기 완료']]
-    .filter(function(s){ return a.charterChanged || (s[0]!=='approvalApply' && s[0]!=='approvalGet'); });
+  var steps=[['notice','소집통지일'],['notarize','의사록 공증'],['approvalApply','정관변경 인가 신청'],['approval','정관변경 인가일'],['approvalGet','정관변경 인가증 받음'],['file','등기 신청'],['done','등기 완료']]
+    .filter(function(s){ return a.charterChanged || (s[0]!=='approvalApply' && s[0]!=='approval' && s[0]!=='approvalGet'); });
   var h='<div class="steps">'+steps.map(function(s){ return '<label class="step'+(d[s[0]]?' done':'')+'">'+esc(s[1])+'<input type="date" data-k="dates.'+s[0]+'" value="'+esc(d[s[0]]||'')+'"></label>'; }).join('')+'</div>';
   var dm='';
   if(dl && dl.due){
@@ -515,14 +516,15 @@ function drawBase(){
   /* 사원 */
   var allM=b.members.length && b.members.every(function(m){ return SEL.mem[m.id]; });
   h+='<div class="card"><h3>사원 '+b.members.length+'명 <span class="hint">주민번호는 앞 6자리(생년월일)만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금 출자(원)</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
+    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금·현물 출자(원)</th><th>현물 재산</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
   b.members.forEach(function(m, i){
     var iv=C.normInvest(m.invest);
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(m.name||'사원')+' 고르기" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="이름"><input data-bm="'+i+'" data-k="name" value="'+esc(m.name)+'" placeholder="이름"></td>'+
       '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리"></td>'+
       '<td class="inp" data-l="주소" style="min-width:260px"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소"></td>'+
-      '<td class="inp" data-l="현금 출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="현금 출자"></td>'+
+      '<td class="inp" data-l="현금·현물 출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="출자 금액"></td>'+
+      '<td class="inp" data-l="현물 재산" style="min-width:180px"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / 연식 : ○○"></td>'+
       '<td data-l="노무출자"><input type="checkbox" data-bm="'+i+'" data-k="invest.labor"'+(iv.labor?' checked':'')+'></td>'+
       '<td data-l="대표사원"><input type="checkbox" data-bm="'+i+'" data-k="rep"'+(m.rep?' checked':'')+'></td>'+
       '<td class="inp" data-l="입사일"><input type="date" data-bm="'+i+'" data-k="joinDate" value="'+esc(m.joinDate)+'"></td>'+
@@ -545,7 +547,7 @@ function drawBase(){
   });
   if(!b.branches.length) h+='<tr><td colspan="8" class="empty">분사무소가 없습니다.</td></tr>';
   h+='</tbody></table></div></div>';
-  h+='<div class="card"><h3>정관 본문(선택) <span class="hint">넣어 두면 «변경 정관»이 제3·5·6조를 갈아 끼운 전문으로 나옵니다. 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸으로 바뀝니다</span></h3>'+
+  h+='<div class="card"><h3>정관 본문(선택) <span class="hint">넣어 두면 «변경 정관»이 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼운 전문으로 나옵니다. 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸으로 바뀝니다</span></h3>'+
     '<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div></div>';
   $('baseBox').innerHTML=h;
   /* 표 안 입력칸 이름표(스크린리더) — 폰 카드 이름표(data-l)와 같은 말 */
@@ -695,7 +697,7 @@ function applyToBase(){
   /* 반영 전 현황을 건에 남긴다 — 나중에 이 건을 열어도 같은 서류가 나오게(정관 본문·기록은 빼고) */
   var snap=C.normBase(BASE); snap.charter=''; snap.history=[];
   var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+
-    (BASE.charter?'\n· 정관 본문의 제3·5·6조도 바꿉니다':'')+'\n\n바꾼 뒤에는 이 건을 «지난 기록»으로 옮깁니다. 진행할까요?';
+    (BASE.charter?'\n· 정관 본문의 제3·5·6조'+(a.arts.indexOf(13)>=0?'·제13조':'')+'도 바꿉니다':'')+'\n\n바꾼 뒤에는 이 건을 «지난 기록»으로 옮깁니다. 진행할까요?';
   if(!confirm(msg)) return;
   var g=GEN;
   save('deungi/base', 'DeungiBase', function(prev){ var o=Object.assign({}, nb); if(prev&&prev.createdAt) o.createdAt=prev.createdAt; return o; })
@@ -802,6 +804,7 @@ function onField(ev){
     if(el.dataset.bm!=null){ var m=b.members[Number(el.dataset.bm)]; if(!m) return; var k=el.dataset.k;
       if(k==='invest.cash'){ m.invest=C.normInvest(m.invest); m.invest.cash=C.num(v); }
       else if(k==='invest.labor'){ m.invest=C.normInvest(m.invest); m.invest.labor=!!v; }
+      else if(k==='invest.inKind'){ m.invest=C.normInvest(m.invest); m.invest.inKind=C.str(v).slice(0,300); }
       else if(k==='birth') m.birth=String(v).replace(/[^0-9]/g,'').slice(0,6);
       else m[k]=v; }
     else if(el.dataset.bb!=null){ var x=b.branches[Number(el.dataset.bb)]; if(!x) return; x[el.dataset.k]=el.dataset.k==='no'?C.num(v):v; }
@@ -829,6 +832,7 @@ function onField(ev){
     if(el.dataset.to!=null){ var t=ch.share.to[Number(el.dataset.to)]; if(!t) return; t[k2]=k2==='amount'?C.num(v):v; }
     else if(k2==='invest.cash'){ ch.invest=C.normInvest(ch.invest); ch.invest.cash=C.num(v); }
     else if(k2==='invest.labor'){ ch.invest=C.normInvest(ch.invest); ch.invest.labor=!!v; }
+    else if(k2==='invest.inKind'){ ch.invest=C.normInvest(ch.invest); ch.invest.inKind=C.str(v).slice(0,300); }
     else if(k2==='birth') ch.birth=String(v).replace(/[^0-9]/g,'').slice(0,6);
     else setPath(ch, k2, v);
     if(k2==='member'&&ch.type==='leave'&&el.dataset.to==null){ ch.share={ mode:'transfer', to:[] }; }

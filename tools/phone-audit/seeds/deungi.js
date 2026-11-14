@@ -12,7 +12,7 @@ const base = Object.assign(meta('base', 'DeungiBase'), {
     { id: 'm1', name: '점검대표', birth: '700101', addr: '점검도 점검시 점검구 가나다라로 20, 103동 1303호(점검동, 가나다라마바사아파트)', invest: { cash: 15000000, labor: false }, rep: true, joinDate: '2017-11-20' },
     { id: 'm2', name: '점검노무', birth: '800101', addr: '점검도 점검시 마바로 31, 105동 1201호', invest: { cash: 15000000, labor: false }, rep: true, joinDate: '2017-11-20' },
     { id: 'm3', name: '점검사원', birth: '900101', addr: '점검도 점검시 사아로 3', invest: { cash: 0, labor: true }, rep: false, joinDate: '2024-02-28' },
-    { id: 'm4', name: '점검사무장', birth: '850101', addr: '점검도 점검시 자차로 4', invest: { cash: 10000000, labor: false }, rep: false, joinDate: '2025-01-01' },
+    { id: 'm4', name: '점검사무장', birth: '850101', addr: '점검도 점검시 자차로 4', invest: { cash: 10000000, labor: false, inKind: '차종 : 점검차 / 연식 : 2000 / 차대번호 : TEST0000' }, rep: false, joinDate: '2025-01-01' },
   ],
   branches: [
     { id: 'b1', name: '가지분사무소', alias: '가지지사', addr: '점검광역시 서구 점검서로 79, 2층(점검동, 점검빌딩)', no: 1, since: '2002-03-11' },

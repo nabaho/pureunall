@@ -94,11 +94,26 @@ test('정관변경 인가 신청서는 시행규칙 별지 제26호서식 머리
   assert.ok(t.indexOf(x.base.firm.authority) >= 0, '수신 관청이 없다');
 });
 
-test('정관이 안 바뀌는 건(대표사원만)은 인가 서류를 만들지 않는다', () => {
+/* 2026-11-14 고침: 이 법인 정관은 제5·6·13조에 대표사원을 적으므로 대표사원만 바뀌어도 인가 서류가 필요하다 */
+test('대표사원만 바뀌어도 정관 제5·6·13조가 바뀌어 인가 서류를 만든다 — 변경 정관 조문에 새 대표사원이 들어간다', () => {
   const x = DD.context(법인, { id: 'DG-T3', meeting: { date: '2026-11-20' }, changes: [{ id: 'r', type: 'repIn', member: 'm3' }] }, {}, '2026-11-21');
   const keys = DD.build(x).map((d) => d.key);
-  ['compare', 'reason', 'apply', 'charter'].forEach((k) => assert.ok(keys.indexOf(k) < 0, k + ' 가 나왔다'));
-  assert.ok(keys.indexOf('accept') >= 0);
+  ['compare', 'reason', 'apply', 'charter', 'accept'].forEach((k) => assert.ok(keys.indexOf(k) >= 0, k + ' 가 빠졌다'));
+  const ch = 글(unzipAll(DD.fileOne(DD.make('charter', x)))['Contents/section0.xml']);
+  assert.match(ch, /제13조\s*【회사의 대표】/);
+  assert.match(ch, /점검대표, 점검노무, 점검사원으로 한다/);
+  assert.match(ch, /3\. 대표사원 : 점검사원/);
+});
+
+test('의사록·동의서 — 날짜를 정하지 않은 입사는 «정관변경 인가일», 인가일을 넣으면 그 날짜', () => {
+  const 입사 = { id: 'DG-T4', meeting: { date: '2026-11-20' }, changes: [{ id: 'j', type: 'join', name: '새노무', birth: '950101', addr: '점검시 라로 4', invest: { labor: true } }] };
+  const x = DD.context(법인, 입사, {}, '2026-11-21');
+  const min = 글(unzipAll(DD.fileOne(DD.make('minutes', x)))['Contents/section0.xml']);
+  assert.match(min, /정관변경 인가일자로 입사/);
+  const con = 글(unzipAll(DD.fileOne(DD.make('consent', x)))['Contents/section0.xml']);
+  assert.match(con, /입사 연월일 : 정관변경 인가일/);
+  const y = DD.context(법인, Object.assign({}, 입사, { dates: { approval: '2026-12-05' } }), {}, '2026-12-06');
+  assert.match(글(unzipAll(DD.fileOne(DD.make('minutes', y)))['Contents/section0.xml']), /2026\. 12\. 05\.자로 입사/);
 });
 
 test('파일 이름에 경로·금지 글자가 들어가지 않는다', () => {

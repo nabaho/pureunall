@@ -4,7 +4,7 @@
  *    (tests/portal-chatbot.test.js)
  *
  * 검증 범위:
- *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 24개 앱) 및 RAG 정확도
+ *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 25개 앱) 및 RAG 정확도
  *   2. 개인·기업 식별정보 자동 마스킹(현재 질문 + 멀티턴 대화 맥락 + 자동 개선요청 티켓 본문·제목)
  *   3. 코딩·문제해결 필요 의도 자동 판별(detectImproveIntent — 단순 질문 오탐 차단 + 오류/개선 감지)
  *   4. 간소화 UI(PuChatbotUI) — 비사전 모드 범주줄 숨김, 우측하단 단추 비간섭 배치, 압축 연결도 칩
@@ -41,7 +41,7 @@ function loadWithFundKb() {
 }
 
 /* ── 1. 통합 지식베이스 · 연결도 지도 · RAG 검색 정확도 ── */
-test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 24개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
+test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 25개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
   const ctx = loadWithFundKb();
   const C = ctx.PuChatbot;
   assert.ok(C, 'PuChatbot 전역 객체가 생성되어야 합니다');
@@ -65,7 +65,8 @@ test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결
 
   assert.deepEqual(Array.from(C.PORTAL_ROWS_GUIDE.map((r) => r.id)), ['client', 'store', 'sales', 'inside']);
   const totalRowApps = C.PORTAL_ROWS_GUIDE.reduce((sum, r) => sum + r.apps.length, 0);
-  assert.equal(totalRowApps, 24, '포털 4대 영역 24개 앱 전체가 수록되어야 합니다');
+  /* 2026-11-14 푸른등기(내부관리) 더해 25개 */
+  assert.equal(totalRowApps, 25, '포털 4대 영역 25개 앱 전체가 수록되어야 합니다');
   for (const r of C.PORTAL_ROWS_GUIDE) {
     for (const ap of r.apps) {
       assert.ok(ap.key && ap.name && ap.when && ap.from && ap.to && ap.ask, ap.key + ' 입출력 설명이 모두 있어야 합니다');

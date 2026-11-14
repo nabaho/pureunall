@@ -124,16 +124,19 @@
     return s + (((c - 0xAC00) % 28) ? a : b);
   }
 
-  /* ── 출자 ── invest = { cash: 원, labor: 노무출자 여부 } */
+  /* ── 출자 ── invest = { cash: 원, labor: 노무출자 여부, inKind: 현물이면 그 재산(«차종 : ○○ / 연식 : ○○» 처럼 « / » 로 줄 나눔) }
+     현물출자는 cash 가 그 재산의 가격이다. 정관 제6조는 «현물 ○원»과 «② 현물재산의 종류»로 적고,
+     등기부는 현금과 같이 «금 ○원 전부이행»으로 올라간다(이 법인 등기사항증명서 2026-09 발급본에서 확인). */
   function normInvest(v) {
     v = v || {};
-    if (v.kind) return { cash: v.kind === 'cash' ? num(v.amount) : 0, labor: v.kind === 'labor' };
-    return { cash: Math.max(0, num(v.cash)), labor: v.labor === true };
+    if (v.kind) return { cash: v.kind === 'cash' ? num(v.amount) : 0, labor: v.kind === 'labor', inKind: '' };
+    return { cash: Math.max(0, num(v.cash)), labor: v.labor === true, inKind: str(v.inKind).slice(0, 300) };
   }
+  function inKindLines(iv) { return String(normInvest(iv).inKind || '').split(/\s+\/\s+/).map(function (s) { return s.trim(); }).filter(Boolean); }
   function investText(iv, style) { /* style 'reg' = 등기부 말투, 'charter' = 정관 말투 */
     iv = normInvest(iv);
     var parts = [];
-    if (iv.cash > 0) parts.push(style === 'reg' ? '금 ' + won(iv.cash) + '원 전부이행' : '현금 ' + won(iv.cash) + '원');
+    if (iv.cash > 0) parts.push(style === 'reg' ? '금 ' + won(iv.cash) + '원 전부이행' : (iv.inKind ? '현물 ' : '현금 ') + won(iv.cash) + '원');
     if (iv.labor) parts.push('노무출자');
     return parts.join(style === 'reg' ? ', ' : ' 및 ') || (style === 'reg' ? '출자 없음' : '출자 없음');
   }
@@ -210,7 +213,7 @@
     var c = raw || {};
     var m = c.meeting || {}, d = c.dates || {}, ag = c.agent || {};
     var dates = {};
-    ['notice', 'notarize', 'approvalApply', 'approvalGet', 'file', 'done'].forEach(function (k) { dates[k] = isDate(d[k]) ? d[k] : ''; });
+    ['notice', 'notarize', 'approvalApply', 'approval', 'approvalGet', 'file', 'done'].forEach(function (k) { dates[k] = isDate(d[k]) ? d[k] : ''; });
     var checks = {};
     Object.keys(c.checks || {}).forEach(function (k) {
       var x = c.checks[k] || {};
@@ -234,7 +237,16 @@
     };
   }
   function meetingDate(c) { return c.meeting.date || c.effDate || ''; }
-  function changeDate(c, ch) { return ch.date || c.effDate || c.meeting.date || ''; }
+  /* 변경 연월일 — 그 줄에 적은 날 → 건의 «변경 연월일» → 정관변경 인가일 → 총회일.
+     이 법인의 변경은 모두 정관을 바꾸고(제3·5·6·13조), 정관은 인가를 받은 날부터 시행한다(정관 부칙).
+     지난 등기(2026)도 입사·분사무소 이전을 총회일이 아니라 그 뒤 날짜로 올렸다(인가일로 보인다 — 법무사 확인). */
+  function changeDateSrc(c, ch) {
+    if (ch.date) return { date: ch.date, src: 'set' };
+    if (c.effDate) return { date: c.effDate, src: 'set' };
+    if (c.dates && c.dates.approval) return { date: c.dates.approval, src: 'approval' };
+    return { date: c.meeting.date || '', src: c.meeting.date ? 'meeting' : '' };
+  }
+  function changeDate(c, ch) { return changeDateSrc(c, ch).date; }
 
   /* ── 변경 반영 — 기준 + 등기 건 → 변경 뒤 모습 ──
      돌려주는 것: members(남는 사원) · left(퇴사) · branches(남는 분사무소) · closed · events(등기할 사항의 재료)
@@ -257,10 +269,13 @@
       if (m.gone) { errors.push(what + ' — ' + m.name + '은(는) 이미 이 건에서 퇴사합니다.'); return null; }
       return m;
     }
+    var guessed = false;
     ORDER.forEach(function (type) {
       c.changes.filter(function (ch) { return ch.type === type; }).forEach(function (ch) {
-        var d = changeDate(c, ch), lab = TYPES[type].label;
+        var ds = changeDateSrc(c, ch), d = ds.date, lab = TYPES[type].label;
         if (!d) warnings.push(lab + ' — 변경 연월일이 비어 있어 총회일로도 정할 수 없습니다.');
+        if (ds.src === 'meeting') guessed = true;
+        var nEv = events.length;
         if (type === 'join') {
           if (!ch.name) errors.push('사원 입사 — 이름을 넣으십시오.');
           if (!birthOk(ch.birth)) errors.push('사원 입사' + (ch.name ? '(' + ch.name + ')' : '') + ' — 생년월일 6자리를 넣으십시오.');
@@ -271,7 +286,7 @@
           members.push(nm); byId[nm.id] = nm;
           events.push({ type: 'join', member: nm.id, date: d, change: ch.id });
           arts[5] = arts[6] = true;
-          if (ch.rep) { nm.rep = true; nm.repDate = d; events.push({ type: 'repIn', member: nm.id, date: d, change: ch.id, auto: true }); }
+          if (ch.rep) { nm.rep = true; nm.repDate = d; events.push({ type: 'repIn', member: nm.id, date: d, change: ch.id, auto: true }); arts[13] = true; }
         } else if (type === 'leave') {
           var lm = live(ch.member, '사원 퇴사'); if (!lm) return;
           if (seen['leave:' + lm.id]) { errors.push('사원 퇴사 — ' + lm.name + '이(가) 두 번 들어 있습니다.'); return; }
@@ -291,7 +306,9 @@
               took[r.id] = true;
               if (t.amount <= 0) { errors.push('사원 퇴사(' + lm.name + ') — ' + r.name + '에게 넘길 금액을 넣으십시오.'); return; }
               sum += t.amount;
-              r.invest = normInvest(r.invest); r.invest.cash += t.amount;
+              r.invest = normInvest(r.invest);
+              if (r.invest.inKind) warnings.push('사원 퇴사(' + lm.name + ') — 양수인 ' + r.name + '은(는) 현물출자 사원입니다. 정관 제6조의 «현물 ○원»에 양수한 현금 지분이 합쳐져 적히므로 문구를 손으로 확인하십시오.');
+              r.invest.cash += t.amount;
               r.acq.push({ from: lm.id, fromName: lm.name, amount: t.amount, date: d });
               tos.push({ member: r.id, name: r.name, amount: t.amount });
             });
@@ -301,18 +318,21 @@
           }
           lm.leaveShare = { mode: iv.cash > 0 ? ch.share.mode : 'none', to: tos, cash: iv.cash, labor: iv.labor };
           events.push({ type: 'leave', member: lm.id, date: d, change: ch.id });
-          if (lm.rep) { lm.rep = false; events.push({ type: 'repOut', member: lm.id, date: d, change: ch.id, auto: true, byLeave: true }); }
+          if (lm.rep) { lm.rep = false; events.push({ type: 'repOut', member: lm.id, date: d, change: ch.id, auto: true, byLeave: true }); arts[13] = true; }
           arts[5] = arts[6] = true;
         } else if (type === 'repIn') {
           var rm = live(ch.member, '대표사원 취임'); if (!rm) return;
           if (rm.rep) { warnings.push('대표사원 취임 — ' + rm.name + '은(는) 이미 대표사원입니다.'); return; }
           rm.rep = true; rm.repDate = d;
           events.push({ type: 'repIn', member: rm.id, date: d, change: ch.id });
+          /* 이 법인 정관은 제5·6조에 «대표사원 : 이름», 제13조에 대표사원 이름을 적는다 — 대표사원이 바뀌면 정관도 바뀐다(인가 필요) */
+          arts[5] = arts[6] = arts[13] = true;
         } else if (type === 'repOut') {
           var om = live(ch.member, '대표사원 사임'); if (!om) return;
           if (!om.rep) { warnings.push('대표사원 사임 — ' + om.name + '은(는) 대표사원이 아닙니다.'); return; }
           om.rep = false;
           events.push({ type: 'repOut', member: om.id, date: d, change: ch.id });
+          arts[5] = arts[6] = arts[13] = true;
         } else if (type === 'addr') {
           var am = live(ch.member, '사원 주소 변경'); if (!am) return;
           if (!ch.addr) { errors.push('사원 주소 변경(' + am.name + ') — 새 주소를 넣으십시오.'); return; }
@@ -323,9 +343,12 @@
         } else if (type === 'brAdd') {
           if (!ch.name) errors.push('분사무소 설치 — 명칭(예: 세종분사무소)을 넣으십시오.');
           if (!ch.addr) errors.push('분사무소 설치' + (ch.name ? '(' + ch.name + ')' : '') + ' — 소재지를 넣으십시오.');
-          var maxNo = branches.reduce(function (a, x) { return Math.max(a, x.no || 0); }, 0);
+          /* 정관 제3조의 호 — 비어 있는 호(«삭제»)부터 채운다. 이 법인은 없어진 분사무소의 호에 새 분사무소를 넣어 왔다
+             (지난 정관들의 제3조② 대조). 빈 호가 없으면 끝에 붙인다. */
+          var usedNo = {}; branches.forEach(function (x) { if (!x.gone) usedNo[x.no] = 1; });
+          var slot = 1; while (usedNo[slot]) slot++;
           var nb = { id: 'new:' + ch.id, name: ch.name, alias: ch.alias || ch.name.replace(/분사무소$/, '지사'), addr: ch.addr,
-            charterAddr: ch.charterAddr, since: d, no: maxNo + 1, isNew: true, before: null };
+            charterAddr: ch.charterAddr, since: d, no: slot, isNew: true, before: null };
           branches.push(nb); brById[nb.id] = nb;
           events.push({ type: 'brAdd', branch: nb.id, date: d, change: ch.id });
           arts[3] = true;
@@ -340,9 +363,20 @@
           events.push({ type: type, branch: br.id, date: d, change: ch.id });
           arts[3] = true;
         }
+        for (var q = nEv; q < events.length; q++) events[q].dateSrc = ds.src;
       });
     });
-    var cur = members.filter(function (m) { return !m.gone; });
+    /* 날짜를 하나도 정하지 않아 총회일로 적은 줄이 있으면 알린다 — 등기부에는 효력이 생긴 날이 올라간다 */
+    if (guessed && events.length) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «진행 일정»의 «정관변경 인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
+    /* 정관 제5·6조의 차례 — 같은 건에서 들어오는 사원은 나가는 사원의 자리에 넣는다(남는 입사자는 끝에).
+       이 법인 2026. 7. 22. 개정 정관도 퇴사 사원의 호(3.)에 입사 사원을 적었다. */
+    var joiners = members.filter(function (m) { return m.isNew; }), ji = 0, cur = [];
+    members.forEach(function (m) {
+      if (m.isNew) return;
+      if (m.gone) { if (ji < joiners.length) cur.push(joiners[ji++]); return; }
+      cur.push(m);
+    });
+    while (ji < joiners.length) cur.push(joiners[ji++]);
     /* 출자 없는 신입 — 퇴사 사원 지분을 양수했으면 위에서 현금이 붙었다. 그래도 비면 묻는다 */
     cur.forEach(function (m) {
       var iv = normInvest(m.invest);
@@ -472,13 +506,26 @@
       .map(function (p) { return p.x; });
   }
 
-  /* ── 정관 조문(제3조·제5조·제6조) ── */
-  var ART_TITLE = { 3: '제3조【사무소의 소재지】', 5: '제5조【사원의 성명과 주소】', 6: '제6조【출자의 목적, 가격 및 이행】' };
+  /* ── 정관 조문(제3조·제5조·제6조·제13조) ──
+     글꼴은 이 법인 정관(2026. 7. 22. 개정본)을 따른다: 제5·6조는 «대표사원 : 이름»/«사원 : 이름»,
+     제6조 머리는 정관 글 그대로 «제2조에 제기한», 현물출자가 있으면 «① … ② 제1항 제○호의 현물재산의 종류는 다음과 같다.»,
+     제13조는 «본 회사의 대표사원은 제5조에서 정한 바와 같이 ○○, ○○으로 한다.» */
+  var ART_NOS = [3, 5, 6, 13];
+  var ART_TITLE = { 3: '제3조【사무소의 소재지】', 5: '제5조【사원의 성명과 주소】', 6: '제6조【출자의 목적, 가격 및 이행】', 13: '제13조【회사의 대표】' };
   var ART_NOTE = {
     3: '분사무소 설치·이전·폐지에 따라 분사무소의 명칭 및 소재지를 변경함',
-    5: '사원 입사·퇴사·주소변경에 따라 사원의 성명과 주소를 변경함',
-    6: '사원 변경(입사·퇴사·지분 양수)에 따라 출자의 목적, 가격 및 이행을 변경함'
+    5: '사원 입사·퇴사·주소변경·대표사원 변경에 따라 사원의 성명과 주소를 변경함',
+    6: '사원 변경(입사·퇴사·지분 양수·대표사원 변경)에 따라 출자의 목적, 가격 및 이행을 변경함',
+    13: '대표사원 취임·사임(퇴임)에 따라 회사의 대표사원을 변경함'
   };
+  var CIRCLED = ['', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+  function roleOf(m) { return m.rep ? '대표사원' : '사원'; }
+  function particleRo(word) { /* 받침 없거나 ㄹ 받침이면 «로», 아니면 «으로» */
+    var s = String(word || ''); var c = s.charCodeAt(s.length - 1);
+    if (c < 0xAC00 || c > 0xD7A3) return s + '(으)로';
+    var j = (c - 0xAC00) % 28;
+    return s + (j === 0 || j === 8 ? '로' : '으로');
+  }
   function art3(firm, branches) {
     var lines = [ART_TITLE[3], '① 회사의 주사무소는 ' + (firm.hqCharter || firm.hq || '          ') + '에 둔다.', '② 분사무소의 명칭 및 소재지는 아래와 같다.'];
     var byNo = {}, max = 0;
@@ -494,17 +541,27 @@
   function art5(members, rrnMap) {
     var lines = [ART_TITLE[5], '회사 사원의 성명과 주소는 다음과 같다.'];
     members.forEach(function (m, i) {
-      lines.push((i + 1) + '. 사원 : ' + m.name + '(' + rrn(m, rrnMap) + ')');
+      lines.push((i + 1) + '. ' + roleOf(m) + ' : ' + m.name + '(' + rrn(m, rrnMap) + ')');
       lines.push('   주소 : ' + m.addr);
     });
     return lines;
   }
   function art6(members, rrnMap) {
-    var lines = [ART_TITLE[6], '제2조에 게기한 목적사업을 위한 각 사원의 출자액과 이행할 내역은 다음과 같다.'];
+    var kinds = [];
+    members.forEach(function (m, i) { var iv = normInvest(m.invest); if (iv.inKind && iv.cash > 0) kinds.push({ no: i + 1, lines: inKindLines(iv) }); });
+    var lines = [ART_TITLE[6], (kinds.length ? '① ' : '') + '제2조에 제기한 목적사업을 위한 각 사원의 출자액과 이행할 내역은 다음과 같다.'];
     members.forEach(function (m, i) {
-      lines.push((i + 1) + '. 사원 : ' + m.name + '(' + rrn(m, rrnMap) + ') ' + investText(m.invest, 'charter'));
+      lines.push((i + 1) + '. ' + roleOf(m) + ' : ' + m.name + '(' + rrn(m, rrnMap) + ') ' + investText(m.invest, 'charter'));
+    });
+    kinds.forEach(function (k, j) {
+      lines.push((CIRCLED[j + 2] || '(' + (j + 2) + ')') + ' 제1항 제' + k.no + '호의 현물재산의 종류는 다음과 같다.');
+      k.lines.forEach(function (l) { lines.push('   ' + l); });
     });
     return lines;
+  }
+  function art13(members) {
+    var reps = members.filter(function (m) { return m.rep; }).map(function (m) { return m.name; });
+    return [ART_TITLE[13], '본 회사의 대표사원은 제5조에서 정한 바와 같이 ' + (reps.length ? particleRo(reps.join(', ')) : '          (으)로') + ' 한다.'];
   }
   function articles(after, rrnMap) {
     var b = after.base;
@@ -513,25 +570,28 @@
     return {
       3: { old: art3(b.firm, oldBr), neu: art3(b.firm, newBr) },
       5: { old: art5(oldM, rrnMap), neu: art5(newM, rrnMap) },
-      6: { old: art6(oldM, rrnMap), neu: art6(newM, rrnMap) }
+      6: { old: art6(oldM, rrnMap), neu: art6(newM, rrnMap) },
+      13: { old: art13(oldM), neu: art13(newM) }
     };
   }
   /* 신·구조문 대비 — 실제로 글이 달라진 조문만 */
   function compareRows(after, rrnMap) {
     var a = articles(after, rrnMap), out = [];
-    [3, 5, 6].forEach(function (n) {
+    ART_NOS.forEach(function (n) {
       if (a[n].old.join('\n') === a[n].neu.join('\n')) return;
       out.push({ no: n, title: ART_TITLE[n], old: a[n].old.slice(1), neu: a[n].neu.slice(1), note: ART_NOTE[n] });
     });
     return out;
   }
-  /* 정관 전문 — 기준에 넣어 둔 정관 본문에서 제3·5·6조만 갈아 끼우고 개정 연혁 한 줄을 더한다 */
+  /* 정관 전문 — 기준에 넣어 둔 정관 본문에서 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼우고 개정 연혁 한 줄을 더한다.
+     제13조는 대표사원이 바뀐 건에서만 바꾼다 — 다른 꼴로 적힌 옛 정관의 제13조를 함부로 덮지 않게. */
   var HEAD_RE = /^\s*(제\s*\d+\s*조|제\s*\d+\s*장|부\s*칙|보\s*칙)/;
   function charterFull(charterText, after, rrnMap, revDate) {
+    var nos = [3, 5, 6].concat((after.arts || []).indexOf(13) >= 0 ? [13] : []);
     var src = text(charterText);
-    if (!src.trim()) return { text: '', replaced: [], missing: [3, 5, 6] };
+    if (!src.trim()) return { text: '', replaced: [], missing: nos };
     var lines = src.split('\n'), a = articles(after, rrnMap), replaced = [], missing = [];
-    [3, 5, 6].forEach(function (n) {
+    nos.forEach(function (n) {
       var re = new RegExp('^\\s*제\\s*' + n + '\\s*조(?!의)');
       var s = -1;
       for (var i = 0; i < lines.length; i++) { if (re.test(lines[i])) { s = i; break; } }
@@ -604,7 +664,7 @@
   }
 
   /* ── 필요서류 확인표 ──
-     src: '법무사' — 법무사 «임원변경 등기신청 시 필요서류»(2025-02-14 메일) 그대로
+     src: '법무사' — 법무사 «사원 변경 등기신청 시 필요서류»(2025-02-14·2026-06-29 메일 그림 — 둘이 다르면 새것) 그대로
           '서류'   — 이 앱이 만드는 서류(날인 필요)
           '지난 서류' — 지난 변경등기 때 실제로 낸 것(2011·2019 신청서 첨부서면)
           '확인 필요' — 실무상 점검 — 담당 법무사·노무사와 확인 */
@@ -612,16 +672,14 @@
     var c = after.c, b = after.base, out = [];
     function add(group, key, label, detail, src, months) { out.push({ group: group, key: key, label: label, detail: detail || '', src: src, months: months || 0 }); }
     var attendees = b.members;
-    var nAll = attendees.length;
-    var needN = Math.ceil(nAll / (after.charterChanged ? 3 : 4));
     add('법인', 'corpSeal', '법인인감도장', '등기신청서·위임장·의사록 날인', '법무사');
-    add('법인', 'corpCert', '법인인감증명서 2통', '발급일로부터 3개월 이내', '법무사', 3);
+    add('법인', 'corpCert', '법인인감증명서 2통', '발급일로부터 3개월 이내 · 발급받을 때 법인인감카드 준비', '법무사', 3);
     add('법인', 'charterCopy', '정관 사본(원본대조필) 1통', after.charterChanged ? '변경 정관(인가받은 것)' : '현행 정관', '법무사');
     add('법인', 'roster', '사원명부 1통', '이 앱 «사원(출자자) 명부» — 대표사원 날인', '법무사');
     if (after.charterChanged) add('법인', 'approvalCert', '인허가 증명서 — 정관변경 인가증 사본', '고용노동부(' + (b.firm.authority || '관할 지방고용노동관서') + ') 발급', '법무사');
     add('법인', 'regCert', '등기사항전부증명서(변경 전)', '지금 등기 내용 대조용', '확인 필요', 3);
     add('사원 전원', 'memberSeals', '사원 인감도장 — ' + attendees.map(function (m) { return m.name; }).join(', '), '의사록·총사원 동의서·공증용 위임장 날인', '법무사');
-    add('사원 전원', 'memberCerts', '사원 인감증명서 각 2통(공증용·법원제출용)', '법무사 안내: 사원 1/4 이상(정관변경이 수반되면 1/3 이상) — 지금 ' + nAll + '명 중 최소 ' + needN + '명 · 발급 3개월 이내', '법무사', 3);
+    add('사원 전원', 'memberCerts', '사원 전원 인감증명서 각 1통', '법무사 안내(2026. 6.) · 발급 3개월 이내 — 퇴사·입사 사원은 아래에 따로 2통(공증용·법원제출용)', '법무사', 3);
     after.events.forEach(function (e) {
       var m = after.byId[e.member] || {};
       if (e.type === 'leave') {
@@ -633,9 +691,9 @@
         add('퇴사·사임 사원', 'resignCert:' + m.id, m.name + ' 인감증명서 2통(공증용·법원제출용)', '법무사 안내(사임 임원) · 발급 3개월 이내', '법무사', 3);
         add('퇴사·사임 사원', 'resign:' + m.id, m.name + ' 대표사원 사임서', '이 앱 서류 — 인감 날인', '서류');
       } else if (e.type === 'join') {
-        add('신입 사원', 'newCert:' + m.id, m.name + ' 인감증명서 2통(공증용·법원제출용)', '발급 3개월 이내 — 통수는 법무사와 확인', '지난 서류', 3);
-        add('신입 사원', 'newSeal:' + m.id, m.name + ' 인감도장', '총사원 동의서 날인', '지난 서류');
-        add('신입 사원', 'newResident:' + m.id, m.name + ' 주민등록표 초본(또는 등본) 1통', '2011년 사원 추가 변경등기 첨부서면 기준', '지난 서류', 3);
+        add('신입 사원', 'newCert:' + m.id, m.name + ' 인감증명서 2통(공증용·법원제출용)', '법무사 안내(취임 사원) · 발급 3개월 이내', '법무사', 3);
+        add('신입 사원', 'newSeal:' + m.id, m.name + ' 인감도장', '총사원 동의서·취임 서류 날인', '법무사');
+        add('신입 사원', 'newResident:' + m.id, m.name + ' 주민등록표 초본 1통', '법무사 안내(취임 사원) · 발급 3개월 이내', '법무사', 3);
         add('신입 사원', 'newLicense:' + m.id, m.name + ' 공인노무사 자격·직무개시 등록 확인', '정관 제19조(개업자격을 지닌 노무사)', '확인 필요');
       } else if (e.type === 'repIn') {
         add('대표사원 취임', 'accept:' + m.id, m.name + ' 취임승낙서', '이 앱 서류 — 인감 날인', '서류');
@@ -698,7 +756,8 @@
     });
     var done = c.dates.done || opts.today || todayIso();
     var hist = (b.history || []).concat([{ at: done, caseId: c.id, title: c.title, summary: summary(after) }]).slice(-30);
-    var charter = b.charter ? charterFull(b.charter, Object.assign({}, after, { members: after.members }), null, c.dates.approvalGet || meetingDate(c)).text : '';
+    /* 개정 연혁 한 줄은 총회일 — 이 법인 정관의 «(○. ○. ○. 개정)»은 사원총회 날짜다(인가일이 아니다) */
+    var charter = b.charter ? charterFull(b.charter, Object.assign({}, after, { members: after.members }), null, meetingDate(c)).text : '';
     /* ⚠ 정관 본문에 주민번호 뒷자리를 넣지 않는다 — rrnMap 없이 만들면 «앞자리-_______» 로 남는다 */
     return { id: 'base', entityType: 'DeungiBase', asOf: done, source: '등기 완료 반영 — ' + c.title,
       firm: Object.assign({}, b.firm), members: members, branches: branches, charter: charter, history: hist };
@@ -720,12 +779,12 @@
   }
 
   return {
-    TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE,
+    TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,
     DEADLINE_DAYS: DEADLINE_DAYS, DEADLINE_NOTE: DEADLINE_NOTE, LAW: LAW,
     str: str, num: num, won: won, isDate: isDate, addDays: addDays, addMonths: addMonths, diffDays: diffDays, todayIso: todayIso,
     koDate: koDate, dotDate: dotDate, regDate: regDate, timeKo: timeKo, birthOk: birthOk, backOk: backOk, rrn: rrn, newId: newId, particle: particle,
-    normInvest: normInvest, investText: investText, emptyBase: emptyBase, normBase: normBase, baseProblems: baseProblems,
-    normChange: normChange, normCase: normCase, meetingDate: meetingDate, changeDate: changeDate,
+    normInvest: normInvest, investText: investText, inKindLines: inKindLines, particleRo: particleRo, emptyBase: emptyBase, normBase: normBase, baseProblems: baseProblems,
+    normChange: normChange, normCase: normCase, meetingDate: meetingDate, changeDate: changeDate, changeDateSrc: changeDateSrc,
     applyChanges: applyChanges, describe: describe, purpose: purpose, summary: summary, reason: reason, regItems: regItems,
     articles: articles, compareRows: compareRows, charterFull: charterFull,
     docPlan: docPlan, deadline: deadline, checklist: checklist, staleCheck: staleCheck, checkProgress: checkProgress,
