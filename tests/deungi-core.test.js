@@ -380,3 +380,28 @@ test('★ 파일 이름 지우개(safeName) — 밑줄 여러 개·전각 하이
   assert.doesNotMatch(C.arcFileEntry('push_key_000004', '시험_900101(1234567).pdf').name, /1234567/);
   assert.doesNotMatch(C.normArchive({ id: 'ARx0001', files: { push_key_000005: { fileId: 'push_key_000005', name: 'a_900101____1234567.pdf' } } }).files.push_key_000005.name, /1234567/);
 });
+
+/* 2026-11-14 쉬운 진행 — 대표 「기본정보만 넣으면 전체서류가 생성되어서 도장찍고 노동부 인가 후 등기만 할 수 있게」 */
+test('쉬운 진행 — 도장 안내는 서류마다 누가·어떻게, 단계는 바뀌는 것 → 도장 → 인가(정관이 바뀔 때만) → 등기', () => {
+  const 건 = (o) => Object.assign({ id: 'DG-E', meeting: { date: '2026-11-20' }, changes: [
+    { id: 'j', type: 'join', name: '새노무', birth: '950101', addr: '점검시 라로 4', invest: { labor: true } },
+    { id: 'l', type: 'leave', member: 'm2', share: { mode: 'transfer', to: [{ member: 'm1', amount: 15000000 }] } }] }, o || {});
+  const a = C.applyChanges(법인(), 건());
+  const keys = C.docPlan(a, {}).filter((d) => d.on).map((d) => d.key);
+  const rows = C.sealPlan(a, keys);
+  const by = {}; rows.forEach((r) => { by[r.key] = r; });
+  assert.ok(by.minutes && /공증/.test(by.minutes.how), '의사록은 공증까지');
+  assert.match(by.consent.who, /새노무/); assert.match(by.consent.who, /점검노무/);   /* 들어오는·나가는 사원 모두 */
+  assert.match(by.leaveNote.who, /점검노무/);
+  assert.match(by.transfer.who, /점검노무/); assert.match(by.transfer.who, /점검대표/);
+  assert.ok(!by.request && !by.checklist, '법무사가 쓰는 신청서·확인표는 도장 안내에 없다');
+  const sk = rows.map((r) => r.key);
+  assert.equal(C.easyStep(C.applyChanges(법인(), 건({ changes: [] })), []), 1, '바뀌는 것이 없으면 ①');
+  assert.equal(C.easyStep(C.applyChanges(법인(), 건({ meeting: { date: '' } })), sk), 1, '총회 날짜가 없으면 ①');
+  assert.equal(C.easyStep(a, sk), 2, '도장 전이면 ②');
+  const checks = {}; sk.forEach((k) => { checks['seal_' + k] = { ok: true }; });
+  const b = C.applyChanges(법인(), 건({ checks }));
+  assert.ok(b.charterChanged);
+  assert.equal(C.easyStep(b, sk), 3, '정관이 바뀌면 인가증 받기 전엔 ③');
+  assert.equal(C.easyStep(C.applyChanges(법인(), 건({ checks, dates: { approvalGet: '2026-12-01' } })), sk), 4, '인가증을 받으면 ④');
+});

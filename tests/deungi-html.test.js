@@ -48,7 +48,7 @@ test('온톨로지 — 프로그램·개체·읽기 어댑터(앱 안에서만)�
 test('★ 주민번호 뒷자리(RRN)는 저장하지 않는다 — 파이어베이스·localStorage 로 가는 길에 안 실린다', () => {
   assert.ok(본문.length > 1000, '앱 본문 스크립트를 못 찾았다');
   /* lsSet 은 탭·연 건 열쇠만 */
-  (본문.match(/lsSet\('([^']+)'/g) || []).forEach((s) => assert.match(s, /lsSet\('(tab|cur)'/, '저장하는 열쇠: ' + s));
+  (본문.match(/lsSet\('([^']+)'/g) || []).forEach((s) => assert.match(s, /lsSet\('(tab|cur|mode)'/, '저장하는 열쇠: ' + s));
   assert.doesNotMatch(본문, /(localStorage|sessionStorage)\.setItem\([^)]*RRN/);
   /* 저장 레코드를 만드는 곳(caseRecord)은 정리 함수(normCase)를 거친다 — 모르는 칸(RRN 포함)이 떨어진다 */
   assert.match(본문, /function caseRecord\(raw\)\{\s*var n=C\.normCase\(raw\)/);
@@ -156,4 +156,30 @@ test('★ 보안규칙 — 묶음은 관리자·위임관리인, 파일 줄은 �
   global.window = global.window || {};
   const O = require('../js/pu-ontology.js'); const Ont = O.PuOntology || O || global.window.PuOntology;
   assert.ok(Ont.PROGRAMS.deungi.writeContracts.some((w) => w.path === 'deungi/archive/{id}' && w.entityType === 'DeungiArchive'));
+});
+
+/* 2026-11-14 쉬운 진행 — 기본은 네 단계 화면, «자세히»는 예전 화면. 만든 한글 서류를 쪽 그대로 보여 준다 */
+test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인쇄', () => {
+  assert.match(본문, /var MODE='easy'/, '기본은 쉬운 진행');
+  assert.match(본문, /if\(MODE==='easy'\)\{ drawEasy\(\); return; \}/);
+  ['바뀌는 것 넣기', '서류 확인·도장', '노동부 인가', '등기'].forEach((k) => assert.ok(본문.indexOf("'" + k + "'") >= 0, k));
+  /* 한글 쪽 화면 — 서류마다 PureunHwp.renderPreview, 다시 그리면 앞 그리기는 버린다 */
+  const r = 본문.slice(본문.indexOf('function renderAllDocs('), 본문.indexOf('function renderAllDocs(') + 1800);
+  assert.match(r, /PureunHwp\.renderPreview\(/);
+  assert.match(r, /g!==GEN \|\| vg!==VIEW_GEN/);
+  /* 도장 체크는 건의 checks(seal_서류)에 저장 — 주민번호와 상관없는 칸 */
+  assert.match(본문, /c\.checks\['seal_'\+el\.dataset\.seal\]/);
+  /* 인쇄 — 한글 화면만 */
+  assert.match(html, /@media print\{[\s\S]*#hwpView/);
+  /* 칸을 고쳐도 지금 보이는 단계를 기준으로 «다음» 단추를 켠다 */
+  assert.match(본문, /st=SHOWN\|\|STEP\|\|auto/);
+  /* 로그아웃 때 단계·그리기도 비운다 */
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
+  assert.ok(wipe.indexOf('VIEW_GEN++') >= 0 && wipe.indexOf('STEP=0') >= 0);
+  /* (검토 2026-11-14) ④ 완료일을 넣으면 반영 단추가 바로 켜진다 · 주민번호를 넣어도 단계 그대로 · 서류 하나가 실패해도 다음 서류 */
+  const d = 본문.slice(본문.indexOf('function drawEasyDerived('), 본문.indexOf('function drawEasyDerived(') + 2200);
+  assert.match(d, /\[data-act="applyBase"\][\s\S]*ab\.disabled=!canA/);
+  assert.match(본문, /STEP=SHOWN\|\|STEP; drawEasy\(\)/);
+  assert.match(본문, /Promise\.resolve\(\)\.then\(function\(\)\{ return PureunHwp\.renderPreview\(/);
+  assert.doesNotMatch(본문, /'<td data-l="발급">'/);
 });

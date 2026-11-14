@@ -48,7 +48,10 @@ module.exports = {
   data: { deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } } },
   localStorage: { pu_deungi_tab: 'case', pu_deungi_cur: c1.id },
   views: [
-    { name: 'docs', run: async (p) => { await p.click('#edDocs input[data-doc]'); } },
+    { name: 'easy1', run: async (p) => { await p.click('#wizSteps [data-s="1"]'); } },
+    { name: 'easy3', run: async (p) => { await p.click('#wizSteps [data-s="3"]'); } },
+    { name: 'easy4', run: async (p) => { await p.click('#wizSteps [data-s="4"]'); } },
+    { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
     { name: 'base', run: async (p) => { await p.click('#tabs button[data-tab=base]'); } },
     { name: 'hist', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); } },
   ],

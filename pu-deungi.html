@@ -20,6 +20,9 @@
      ⚠ 주민등록번호 «뒷자리»는 저장하지 않는다 — 생년월일만 저장하고, 뒷자리는 서류를 만들 때 «🔐 주민번호 넣기»로 이 창에만 받는다
        (새로고침·창 닫기에 지워진다). 정관 본문에 붙여 넣은 주민번호 뒷자리도 저장할 때 빈칸으로 바꾼다.
      ⚠ 대표·위임관리인만 연다(규칙 deungi = 같은 사람) — 사원 주소·생년월일이 든 자리다. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
+     ★ 쉬운 진행(2026-11-14 대표 「기본정보만 넣으면 전체서류가 생성되어서 도장찍고 노동부 인가 후 등기만 할 수 있게 … 아주 쉽게 … 한글 hwpx 화면」):
+       등기 건을 열면 ① 바뀌는 것 → ② 서류 확인·도장(만든 한글 서류를 쪽 그대로 화면에) → ③ 노동부 인가 → ④ 등기 네 단계만 보인다.
+       «자세히(모든 칸)»를 누르면 예전 전체 편집 화면.
      ⚠ 법령 근거(2026-11-14 현행 원문 확인)·기한은 js/pu-deungi-core.js 머리글. 서식·기한·비용은 담당 법무사가 최종 확인한다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -87,6 +90,34 @@ main{padding:12px 16px 40px;max-width:1280px}
 .chg>.hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:9px 9px 0 0}
 .chg>.hd b{font-size:13px}
 .arcg{border-top:1px solid var(--line)}
+/* 쉬운 진행 — 단계 막대 · 큰 단추 · 한글 쪽 화면 */
+.wiz{display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap}
+.wiz button{flex:1 1 150px;display:flex;align-items:center;gap:8px;text-align:left;padding:8px 10px;border-radius:10px;white-space:normal}
+.wiz button .no{flex:0 0 26px;height:26px;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;background:var(--line);color:var(--ink2);font-weight:700}
+.wiz button .tx{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wiz button .tx small{color:var(--mute);font-size:11.5px}
+.wiz button.on{border-color:var(--blue);background:var(--blue-bg)}
+.wiz button.on .no{background:var(--blue);color:#ffffff}
+.wiz button.done .no{background:var(--green-m);color:#ffffff}
+.easy .adds{display:none}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;padding:10px 12px}
+.tile{padding:12px;font-size:14px;text-align:left;white-space:normal;border-radius:10px;line-height:1.35}
+.tile small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.nextbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
+.nextbar .pri{padding:9px 16px;font-size:14px}
+.doctoc{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
+.hwpv{background:var(--line);max-height:78vh;overflow:auto}
+.docblk{border-bottom:1px solid var(--line2)}
+.dochd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);font-weight:700;position:sticky;top:0;z-index:2}
+.dochd .sp{flex:1}
+@media print{
+  body *{visibility:hidden !important}
+  #hwpView, #hwpView *{visibility:visible !important}
+  #hwpView{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;background:#ffffff}
+  #hwpView .dochd, #hwpView .doctoc{display:none}
+  #hwpView [id^=hvp]{padding:0 !important;background:#ffffff !important}
+  #hwpView canvas{box-shadow:none !important;margin:0 auto !important;break-after:page;page-break-after:always;max-width:100% !important}
+}
 .arcg>.hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 12px;background:var(--bg)}
 .arcg>.hd b{white-space:nowrap;font-size:13px}
 .chg>.bd{padding:9px 10px}
@@ -150,6 +181,9 @@ main{padding:12px 16px 40px;max-width:1280px}
   .chg{margin:8px 6px}
   .tor input,.tor select{width:100%}
   .step{flex:1 1 100%}
+  .tiles{grid-template-columns:1fr 1fr}
+  .wiz button{flex:1 1 calc(50% - 6px)}
+  .hwpv{max-height:70vh}
   .mbox{border-radius:10px}
 }
 </style>
@@ -217,7 +251,7 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-office-store.js?v=11"></script>
-<script src="js/pu-deungi-core.js?v=3"></script>
+<script src="js/pu-deungi-core.js?v=4"></script>
 <script src="js/pu-deungi-docs.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -225,6 +259,8 @@ var fbDb=null, gate=null, ME={sid:'', isAdmin:false};
 var C=DeungiCore, DD=DeungiDocs;
 var BASE=C.emptyBase(), BASE_DRAFT=null, BASE_SAVED_AT=0;
 var CASES={}, CUR='', TAB='case';
+/* 쉬운 진행 — 화면 모양(easy·full) · 고른 단계(0 이면 저절로) · 한글 쪽 화면 차례 번호 */
+var MODE='easy', STEP=0, SHOWN=0, VIEW_GEN=0;
 /* 주민등록번호 뒷자리 — 이 창의 기억에만 둔다(저장·localStorage 없음). 새로고침하면 사라진다 */
 var RRN={};
 var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
@@ -333,9 +369,10 @@ function drawCaseList(){
 function drawEditor(){
   var c=cur();
   if(!c){ $('editor').innerHTML=''; return; }
+  if(MODE==='easy'){ drawEasy(); return; }
   var n=C.normCase(c);
   $('editor').innerHTML=
-    '<div class="card"><h3>📝 <span id="edTitle">'+esc(n.title)+'</span> '+stChip(n.status)+' <span id="saveState" class="chip g">저장됨</span><span class="sp"></span><button class="sm" data-act="closeCase">닫기</button></h3>'+
+    '<div class="card"><h3>📝 <span id="edTitle">'+esc(n.title)+'</span> '+stChip(n.status)+' <span id="saveState" class="chip g">저장됨</span><span class="sp"></span><button class="sm pri" data-act="mode" data-m="easy">쉬운 진행</button><button class="sm" data-act="closeCase">닫기</button></h3>'+
     '<div class="cb" id="edBasic"></div></div>'+
     '<div class="card"><h3>① 바뀌는 것 <span class="hint">바뀌는 사람·분사무소만 넣으십시오 — 나머지는 등기 현황에서 가져옵니다</span></h3><div id="edChanges"></div></div>'+
     '<div class="card"><h3>② 확인 <span class="hint">빨간 글이 있으면 서류를 만들지 않습니다</span></h3><div id="edCheck"></div></div>'+
@@ -425,18 +462,22 @@ function drawChanges(){
   });
   $('edChanges').innerHTML=h;
 }
-function drawDerived(){
-  var c=cur(); if(!c) return; var B0=baseOf(c);
-  var a=C.applyChanges(baseOf(c), c), n=a.c;
-  $('edTitle').textContent=n.title;
-  /* ② 확인 */
-  var m='';
+function checkMsgs(a, B0){
+  var m='', n=a.c;
   a.errors.forEach(function(e){ m+='<div class="msg e">✖ '+esc(e)+'</div>'; });
   a.warnings.forEach(function(e){ m+='<div class="msg w">⚠ '+esc(e)+'</div>'; });
   C.baseProblems(B0).forEach(function(e){ m+='<div class="msg w">⚠ 등기 현황: '+esc(e)+'</div>'; });
   if(!n.changes.length) m+='<div class="msg i">바뀌는 것을 넣으면 여기서 확인합니다.</div>';
   else if(!a.errors.length) m+='<div class="msg ok">✔ 서류를 만들 수 있습니다 — '+esc(C.purpose(a))+(a.charterChanged?' · 정관 '+a.arts.map(function(k){ return '제'+k+'조'; }).join('·')+' 변경 → 고용노동부 정관변경 인가가 필요합니다':' · 정관은 바뀌지 않습니다(인가 불필요)')+'</div>';
-  $('edCheck').innerHTML='<div class="msgs">'+m+'</div>';
+  return '<div class="msgs">'+m+'</div>';
+}
+function drawDerived(){
+  var c=cur(); if(!c) return; var B0=baseOf(c);
+  if(MODE==='easy'){ drawEasyDerived(); return; }
+  var a=C.applyChanges(baseOf(c), c), n=a.c;
+  $('edTitle').textContent=n.title;
+  /* ② 확인 */
+  $('edCheck').innerHTML=checkMsgs(a, B0);
   /* ③ 등기부 미리보기 */
   var reg=C.regItems(a);
   var bef='<div class="reg"><h4>지금(등기 현황 '+esc(B0.asOf||'날짜 없음')+')</h4>'+regLines(B0.members, B0.branches, a, true)+'</div>';
@@ -484,7 +525,7 @@ function drawChecklist(a){
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(it.label)+' 확인" data-ck="'+esc(it.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td>'+(it.group!==last?'<b>'+esc(it.group)+'</b>':'<span class="hint">'+esc(it.group)+'</span>')+'</td>'+
       '<td class="nw full" title="'+esc(it.label+' — '+it.detail)+'">'+esc(it.label)+' <span class="hint">'+esc(it.detail)+'</span></td>'+
-      '<td data-l="발급">'+(it.months?'<input type="date" aria-label="'+esc(it.label)+' 발급일" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
+      '<td'+(it.months?' data-l="발급"':'')+'>'+(it.months?'<input type="date" aria-label="'+esc(it.label)+' 발급일" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
       '<td><span class="chip '+(SRC_CLS[it.src]||'m')+'">'+esc(it.src)+'</span></td>'+
       '<td class="inp"><input aria-label="'+esc(it.label)+' 메모" data-note="'+esc(it.key)+'" value="'+esc(ck.note||'')+'" placeholder="메모"></td></tr>';
     last=it.group;
@@ -508,6 +549,118 @@ function drawSched(a){
     '<span class="hint">다음: '+esc(C.nextStep(a, today()))+'</span><span class="sp"></span>'+
     (c.applied?'<span class="chip g">✔ 등기 현황에 반영함</span>':'<button class="sm '+(canApply?'pri':'')+'" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다"')+'>🏛 등기 현황에 반영</button>')+'</div></div>';
   $('edSched').innerHTML=h;
+}
+
+/* ═══ 쉬운 진행 ═══
+   ① 바뀌는 것 → ② 서류 확인·도장(한글 쪽 화면) → ③ 노동부 인가(정관이 바뀔 때만) → ④ 등기. 입력 칸은 예전 편집 화면과 같은 data-k 를 쓴다(저장 길 하나). */
+var EASY_STEPS=[[1,'바뀌는 것 넣기','입사·퇴사·대표·주소·분사무소'],[2,'서류 확인·도장','한글 화면으로 보고 날인'],[3,'노동부 인가','정관이 바뀔 때만'],[4,'등기','법무사에게 맡기고 끝내기']];
+var EASY_TILES=[['join','➕ 노무사가 들어와요','사원 입사(출자·대표사원도)'],['leave','➖ 노무사가 나가요','사원 퇴사·지분 넘기기'],['repIn','⭐ 대표사원이 돼요','지금 사원 중에서'],['repOut','☆ 대표사원을 그만둬요','사원으로는 남음'],['addr','🏠 주소가 바뀌었어요','사원 주소 변경'],['brAdd','🏢 분사무소를 새로 내요','분사무소 설치'],['brMove','🚚 분사무소를 옮겨요','분사무소 이전'],['brClose','✖ 분사무소를 닫아요','분사무소 폐지']];
+function sealKeysOf(a){ return C.sealPlan(a, chosenKeys(a)).map(function(r){ return r.key; }); }
+function easyAuto(a){ return C.easyStep(a, sealKeysOf(a)); }
+function drawEasy(){
+  var c=cur(); if(!c) return; var n=C.normCase(c), a=C.applyChanges(baseOf(c), c), auto=easyAuto(a), st=STEP||auto;
+  $('editor').innerHTML=
+    '<div class="card"><h3>📝 <span id="edTitle">'+esc(n.title)+'</span> '+stChip(n.status)+' <span id="saveState" class="chip g">저장됨</span><span class="sp"></span><button class="sm" data-act="mode" data-m="full" title="예전 화면 — 모든 칸·서류 고르기·등기부 미리보기">자세히(모든 칸)</button><button class="sm" data-act="closeCase">닫기</button></h3>'+
+    '<div class="wiz" id="wizSteps" role="tablist" aria-label="등기 진행 단계"></div></div><div id="wizBody"></div>';
+  drawWizSteps(a, st, auto); drawWizBody(st, a); drawSaveState();
+}
+function drawWizSteps(a, st, auto){
+  var el=$('wizSteps'); if(!el) return;
+  el.innerHTML=EASY_STEPS.map(function(x){
+    var k=x[0], done=k<auto, skip=k===3&&!a.charterChanged&&a.c.changes.length;
+    return '<button role="tab" aria-selected="'+(k===st?'true':'false')+'" class="'+(k===st?'on ':'')+(done?'done':'')+'" data-act="wizGo" data-s="'+k+'"><span class="no">'+(done?'✓':k)+'</span><span class="tx"><b>'+esc(x[1])+'</b><small>'+esc(skip?'이번엔 필요 없음':x[2])+'</small></span></button>';
+  }).join('');
+}
+function nextBar(k, ok, why){
+  return '<div class="nextbar">'+(k>1?'<button class="sm" data-act="wizGo" data-s="'+(k-1)+'">← 앞 단계</button>':'')+'<span class="sp"></span>'+(why&&!ok?'<span class="hint">'+esc(why)+'</span>':'')+
+    (k<4?'<button class="pri" id="wizNext" data-act="wizGo" data-s="'+(k+1)+'"'+(ok?'':' disabled')+'>다음: '+esc(EASY_STEPS[k][1])+' →</button>':'')+'</div>';
+}
+function deadlineHtml(a){
+  var d=a.c.dates, dl=C.deadline(a, today());
+  if(dl && dl.due) return dl.filed ? '<div class="msg '+(dl.left<0?'w':'ok')+'">등기 신청 '+esc(d.file)+' — 기한 '+esc(dl.due)+(dl.left<0?'을 '+(-dl.left)+'일 넘겼습니다(«변경등기 지연 사유서»가 서류에 들어갑니다)':' 안에 신청했습니다')+'</div>'
+    : '<div class="msg '+(dl.overdue?'e':dl.left<=5?'w':'i')+'">등기 기한 <b>'+esc(dl.due)+'</b> ('+esc(dl.basis)+' '+esc(dl.from)+' + 2주일) — '+(dl.overdue?(-dl.left)+'일 지났습니다':dl.left+'일 남음')+'</div>';
+  return '<div class="msg i">'+(a.charterChanged?'«인가증 받은 날»을 넣으면 등기 기한(받은 날부터 2주일)이 나옵니다.':'총회 날짜를 넣으면 등기 기한(2주일)이 나옵니다.')+'</div>';
+}
+function drawWizBody(st, a){
+  var c=cur(); if(!c) return; a=a||C.applyChanges(baseOf(c), c); var n=a.c, B0=baseOf(c), h='';
+  VIEW_GEN++; SHOWN=st;
+  if(st===1){
+    h='<div class="card easy"><h3>① 무엇이 바뀌나요? <span class="hint">아래 단추를 눌러 넣고, 나오는 칸만 채우면 됩니다 — 나머지는 등기 현황에서 가져옵니다</span></h3>'+
+      '<div class="cb"><div class="grid">'+fld('사원총회 날짜(서류에 들어가는 날짜)', 'meeting.date', n.meeting.date, { type:'date' })+fld('시각', 'meeting.time', n.meeting.time, { type:'time' })+fld('장소', 'meeting.place', n.meeting.place)+'</div></div>'+
+      '<div class="tiles">'+EASY_TILES.map(function(t){ return '<button class="tile" data-add="'+t[0]+'">'+esc(t[1])+'<small>'+esc(t[2])+'</small></button>'; }).join('')+'</div>'+
+      '<div id="edChanges"></div><div id="edCheck"></div>'+nextBar(1, !!(n.changes.length && !a.errors.length && n.meeting.date), !n.changes.length?'바뀌는 것을 하나 이상 넣으십시오':!n.meeting.date?'사원총회 날짜를 넣으십시오':a.errors.length?'빨간 글을 먼저 고치십시오':'')+'</div>';
+    $('wizBody').innerHTML=h; drawChanges(); $('edCheck').innerHTML=checkMsgs(a, B0); return;
+  }
+  if(st===2){
+    var rows=C.sealPlan(a, chosenKeys(a)), nR=Object.keys(RRN).length, blocked=!!(a.errors.length||!n.changes.length);
+    h='<div class="card"><h3>② 서류 확인·도장 <span class="hint">만든 한글 서류가 아래에 쪽 그대로 나옵니다 — 받아서 출력하고 도장을 찍으십시오</span></h3>'+
+      '<div class="bar"><button class="pri" data-act="dlPack"'+(blocked?' disabled':'')+'>⬇ 한글 파일로 모두 받기</button><button class="sm" data-act="printView"'+(blocked?' disabled':'')+'>🖨 화면 그대로 인쇄</button><button class="sm" data-act="rrn">🔐 주민번호 넣기</button>'+
+      '<span class="hint">주민번호 뒷자리: '+(nR?'<b>'+nR+'명 넣음</b>(저장 안 함)':'안 넣음 — «앞자리-_______» 빈칸으로 나옵니다')+'</span></div>'+
+      (blocked?'<div class="msgs"><div class="msg w">① 단계를 먼저 마치십시오(바뀌는 것·빨간 글).</div></div>':
+      '<div class="cb"><b>도장 찍을 곳</b> <span class="hint">찍으면 ☑ — 실제 날인·간인·공증 방식은 담당 법무사·공증사무소와 확인</span></div>'+
+      '<div class="scroll"><table class="t"><thead><tr><th class="c">✓</th><th class="n">№</th><th>서류</th><th>누가</th><th>어떻게</th></tr></thead><tbody>'+rows.map(function(r, i){
+        var ck=n.checks['seal_'+r.key]||{};
+        return '<tr><td class="c tk"><input type="checkbox" aria-label="'+esc(r.title)+' 도장 찍음" data-seal="'+esc(r.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti" title="'+esc(r.title)+'">'+esc(r.title)+'</td><td data-l="누가">'+esc(r.who)+'</td><td class="nw full" title="'+esc(r.how)+'">'+esc(r.how)+'</td></tr>';
+      }).join('')+'</tbody></table></div>')+
+      nextBar(2, !blocked && rows.every(function(r){ return (n.checks['seal_'+r.key]||{}).ok; }), '도장 찍을 곳을 모두 ☑ 하면 다음으로 갑니다')+'</div>'+
+      (blocked?'':'<div class="card"><h3>📖 한글 화면 <span class="hint">«⬇ 한글 파일로 모두 받기»와 같은 서류</span><span class="sp"></span><button class="sm" data-act="viewAll">다시 그리기</button></h3><div class="hwpv" id="hwpView"></div></div>');
+    $('wizBody').innerHTML=h; if(!blocked) renderAllDocs(); return;
+  }
+  if(st===3){
+    if(!a.charterChanged){
+      h='<div class="card"><h3>③ 노동부 인가</h3><div class="msgs"><div class="msg ok">✔ 이번 등기는 정관이 바뀌지 않아 고용노동부 정관변경 인가가 필요 없습니다. 바로 ④ 등기로 가십시오.</div></div>'+nextBar(3, true)+'</div>';
+    } else {
+      var ak=['apply','reason','compare','charter','minutes','consent'].filter(function(k){ return chosenKeys(a).indexOf(k)>=0; });
+      var tt={}; C.DOCS.forEach(function(d){ tt[d.key]=d.title; });
+      h='<div class="card"><h3>③ 고용노동부 정관변경 인가 <span class="hint">바뀌는 정관: '+esc(a.arts.map(function(k){ return '제'+k+'조'; }).join('·'))+'</span></h3>'+
+        '<div class="cb">'+esc((B0.firm&&B0.firm.authority)||'관할 지방고용노동관서')+'에 아래 서류를 내고 인가증을 받습니다(공인노무사법 시행령 제19조의3).'+
+        '<div class="items" style="margin-top:6px">'+ak.map(function(k){ return '<div class="it">📄 '+esc(tt[k]||k)+(k==='minutes'?' <span class="hint">(공증받은 것)</span>':'')+' <button class="sm" data-act="dl1" data-key="'+k+'" aria-label="'+esc(tt[k]||k)+' 받기">⬇</button></div>'; }).join('')+'</div></div>'+
+        '<div class="cb"><div class="grid">'+fld('인가 신청한 날', 'dates.approvalApply', n.dates.approvalApply, { type:'date' })+fld('인가일(인가증에 적힌 날)', 'dates.approval', n.dates.approval, { type:'date' })+fld('인가증 받은 날', 'dates.approvalGet', n.dates.approvalGet, { type:'date' })+'</div></div>'+
+        '<div class="msgs" id="easyDl">'+deadlineHtml(a)+'</div>'+nextBar(3, !!n.dates.approvalGet, '«인가증 받은 날»을 넣으면 다음으로 갑니다')+'</div>';
+    }
+    $('wizBody').innerHTML=h; return;
+  }
+  /* ④ 등기 */
+  var canApply=n.dates.done && !a.errors.length && n.changes.length && !c.applied;
+  h='<div class="card"><h3>④ 등기 — 법무사에게 맡기기</h3><div class="msgs" id="easyDl">'+deadlineHtml(a)+'</div>'+
+    '<div class="cb hint">도장 찍은 서류와 아래 필요서류를 담당 법무사에게 보내면 법무사가 등기를 신청합니다.</div></div>'+
+    '<div class="card"><h3>필요서류 확인 <span id="ckProg"></span></h3><div id="edList"></div></div>'+
+    '<div class="card"><h3>등기 끝내기</h3><div class="cb"><div class="grid">'+fld('등기 신청한 날', 'dates.file', n.dates.file, { type:'date' })+fld('등기 완료된 날', 'dates.done', n.dates.done, { type:'date' })+'</div></div>'+
+    '<div class="nextbar"><button class="sm" data-act="wizGo" data-s="3">← 앞 단계</button><span class="sp"></span>'+(c.applied?'<span class="chip g">✔ 등기 현황에 반영함 — 끝</span>':'<button class="pri" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료된 날»을 넣으면 누를 수 있습니다"')+'>🏛 등기 현황에 반영하고 끝내기</button>')+'</div></div>';
+  $('wizBody').innerHTML=h; drawChecklist(a);
+}
+/* 칸을 고칠 때 — 단계 막대·확인 글·기한·다음 단추만 고친다(글칸을 다시 그리면 커서가 빠진다) */
+function drawEasyDerived(){
+  var c=cur(); if(!c) return; var a=C.applyChanges(baseOf(c), c), n=a.c, auto=easyAuto(a);
+  if(/^\d{4} 변경등기$/.test(String(c.title||'')) && n.changes.length && !a.errors.length && C.purpose(a)){ c.title=String(n.meeting.date||today()).slice(0,4)+' '+C.purpose(a).replace(/ 등기$/, '')+' 변경등기'; c.title=c.title.slice(0,80); n.title=c.title; scheduleSave(); drawCaseList(); }
+  var t=$('edTitle'); if(t) t.textContent=n.title;
+  drawWizSteps(a, SHOWN||STEP||auto, auto);
+  if($('edCheck')) $('edCheck').innerHTML=checkMsgs(a, baseOf(c));
+  if($('easyDl')) $('easyDl').innerHTML=deadlineHtml(a);
+  if($('edList')) drawChecklist(a);
+  var nx=$('wizNext'), st=SHOWN||STEP||auto;
+  if(nx){
+    var ok=st===1 ? !!(n.changes.length && !a.errors.length && n.meeting.date) : st===2 ? sealKeysOf(a).every(function(k){ return (n.checks['seal_'+k]||{}).ok; }) : st===3 ? (!a.charterChanged || !!n.dates.approvalGet) : true;
+    nx.disabled=!ok;
+  }
+  var ab=document.querySelector('#wizBody [data-act="applyBase"]');
+  if(ab){ var canA=!!(n.dates.done && !a.errors.length && n.changes.length && !c.applied); ab.disabled=!canA; ab.title=canA?'':'«등기 완료된 날»을 넣으면 누를 수 있습니다'; }
+  drawSaveState();
+}
+/* 한글 쪽 화면 — 서류마다 따로 그려 차례(목차)를 붙인다. 다른 단계로 가거나 다시 그리면 앞 그리기는 버린다 */
+function renderAllDocs(){
+  var box=$('hwpView'); if(!box) return;
+  if(!ready()){ box.innerHTML='<div class="msg w">한글 문서 기능을 불러오지 못했습니다 — 새로고침 하십시오</div>'; return; }
+  var x=docCtx(); if(x.after.errors.length){ box.innerHTML='<div class="msg w">① 단계의 빨간 글을 먼저 고치십시오</div>'; return; }
+  var docs; try{ docs=DD.build(x, chosenKeys(x.after)); }catch(e){ box.innerHTML='<div class="msg w">서류를 만들지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; return; }
+  var g=GEN, vg=++VIEW_GEN;
+  box.innerHTML='<div class="doctoc">'+docs.map(function(d, i){ return '<button class="sm" data-act="hvgo" data-i="'+i+'">'+(i+1)+'. '+esc(d.label)+'</button>'; }).join('')+'</div>'+
+    docs.map(function(d, i){ return '<div class="docblk" id="hv'+i+'"><div class="dochd">📄 '+(i+1)+'. '+esc(d.label)+'<span class="sp"></span><button class="sm" data-act="dl1" data-key="'+esc(d.key)+'" aria-label="'+esc(d.label)+' 받기">⬇ 받기</button></div><div id="hvp'+i+'"><div class="empty">그리는 중…</div></div></div>'; }).join('');
+  docs.reduce(function(p, d, i){ return p.then(function(){
+    if(g!==GEN || vg!==VIEW_GEN) return;
+    var el=$('hvp'+i); if(!el) return;
+    return Promise.resolve().then(function(){ return PureunHwp.renderPreview(el, DD.fileOne(d), DD.fileName(x, d)); }).catch(function(e){ if(vg===VIEW_GEN && $('hvp'+i)) $('hvp'+i).innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
+  }); }, Promise.resolve());
 }
 
 /* ═══ 등기 현황 ═══ */
@@ -837,13 +990,13 @@ function newCase(){
   CASES[id]={ id:id, entityType:'DeungiCase', title:y+' 변경등기', status:'draft',
     meeting:{ date:'', time:'10:00', place:'푸른노무법인 본 사무소', chair:rep?rep.id:'' },
     changes:[], agent:prev&&prev.agent?JSON.parse(JSON.stringify(prev.agent)):{}, notary:(prev&&prev.notary)||'', dates:{}, checks:{}, docsOff:{} };
-  CUR=id; lsSet('cur', id); RRN={}; draw(); scheduleSave();
-  setTimeout(function(){ var el=document.querySelector('#edBasic [data-k="title"]'); if(el){ el.focus(); el.select(); } }, 30);
+  CUR=id; lsSet('cur', id); RRN={}; STEP=0; SHOWN=0; draw(); scheduleSave();
+  setTimeout(function(){ var el=document.querySelector(MODE==='easy'?'#wizBody [data-k="meeting.date"]':'#edBasic [data-k="title"]'); if(el){ el.focus(); if(el.select) el.select(); } }, 30);
 }
 function openCase(id){
   if(CUR===id) return;
   if(SAVE.dirty) saveCase();
-  CUR=id; lsSet('cur', id); RRN={}; SEL.docs={};
+  CUR=id; lsSet('cur', id); RRN={}; SEL.docs={}; STEP=0; SHOWN=0;
   if(TAB!=='case') setTab('case'); else draw();
   var e=$('editor'); if(e) e.scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -855,6 +1008,7 @@ function addChange(type){
   if(type==='leave') ch.share={ mode:'transfer', to:[] };
   c.changes.push(ch);
   drawChanges(); drawDerived(); scheduleSave();
+  if(MODE==='easy'){ var bx=document.querySelector('#edChanges [data-ch="'+ch.id+'"]'); if(bx){ bx.scrollIntoView({ behavior:'smooth', block:'center' }); var fi=bx.querySelector('input,select'); if(fi) setTimeout(function(){ try{ fi.focus({ preventScroll:true }); }catch(e){} }, 300); } }
 }
 function chgById(id){ var c=cur(); return (c.changes||[]).filter(function(x){ return x.id===id; })[0]; }
 function applyToBase(){
@@ -919,7 +1073,12 @@ document.addEventListener('click', function(ev){
   if((el=t.closest('[data-act]'))){
     var act=el.dataset.act, c=cur();
     if(act==='goBase') setTab('base');
-    else if(act==='closeCase'){ if(SAVE.dirty) saveCase(); CUR=''; lsSet('cur',''); draw(); }
+    else if(act==='closeCase'){ if(SAVE.dirty) saveCase(); CUR=''; STEP=0; SHOWN=0; lsSet('cur',''); draw(); }
+    else if(act==='mode'){ MODE=el.dataset.m==='full'?'full':'easy'; lsSet('mode', MODE); STEP=0; drawEditor(); }
+    else if(act==='wizGo'){ var s2=Number(el.dataset.s)||1; if(s2>=1&&s2<=4){ STEP=s2; drawEasy(); var ed=$('editor'); if(ed) ed.scrollIntoView({ block:'start' }); } }
+    else if(act==='viewAll') renderAllDocs();
+    else if(act==='hvgo'){ var hb=$('hv'+el.dataset.i); if(hb) hb.scrollIntoView({ behavior:'smooth', block:'start' }); }
+    else if(act==='printView'){ if(!$('hwpView')) return; window.print(); }
     else if(act==='chgDel'){ var box=el.closest('[data-ch]'); if(c&&box&&confirm('이 변경을 뺄까요?')){ c.changes=c.changes.filter(function(x){ return x.id!==box.dataset.ch; }); drawChanges(); drawDerived(); scheduleSave(); } }
     else if(act==='toAdd'){ var bx=el.closest('[data-ch]'), ch=bx&&chgById(bx.dataset.ch); if(ch){ ch.share=ch.share||{ mode:'transfer', to:[] }; ch.share.to=(ch.share.to||[]).concat([{ member:'', amount:0 }]); drawChanges(); drawDerived(); scheduleSave(); } }
     else if(act==='toDel'){ var bx2=el.closest('[data-ch]'), ch2=bx2&&chgById(bx2.dataset.ch); if(ch2){ ch2.share.to.splice(Number(el.dataset.j),1); drawChanges(); drawDerived(); scheduleSave(); } }
@@ -934,7 +1093,7 @@ document.addEventListener('click', function(ev){
       var bad=[], nx={};
       Array.prototype.forEach.call(document.querySelectorAll('[data-rrn]'), function(i){ var v=i.value.replace(/[^0-9]/g,''); if(!v) return; if(C.backOk(v)) nx[i.dataset.rrn]=v; else bad.push(i); });
       if(bad.length){ toast('뒷자리는 숫자 7자리입니다'); bad[0].focus(); return; }
-      RRN=nx; closeModal(); drawDerived(); toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
+      RRN=nx; closeModal(); drawDerived(); if(MODE==='easy' && $('hwpView')){ STEP=SHOWN||STEP; drawEasy(); } toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
     }
     else if(act==='applyBase') applyToBase();
     else if(act==='cancelSel') cancelSelected();
@@ -998,6 +1157,8 @@ function onField(ev){
     return;
   }
   var c=cur(); if(!c) return;
+  /* 쉬운 진행 ② 도장 찍음 */
+  if(el.dataset.seal){ c.checks=c.checks||{}; c.checks['seal_'+el.dataset.seal]=Object.assign({}, c.checks['seal_'+el.dataset.seal]||{}, { ok:el.checked }); drawEasyDerived(); scheduleSave(); return; }
   /* 서류 고르기 */
   if(el.hasAttribute('data-docall')){ var plan=C.docPlan(C.applyChanges(baseOf(c), c), { today:today() }).filter(function(d){ return d.need; }); c.docsOff={}; if(!el.checked) plan.forEach(function(d){ c.docsOff[d.key]=true; }); drawDerived(); scheduleSave(); return; }
   if(el.dataset.doc){ c.docsOff=c.docsOff||{}; if(el.checked) delete c.docsOff[el.dataset.doc]; else c.docsOff[el.dataset.doc]=true; drawDerived(); scheduleSave(); return; }
@@ -1036,13 +1197,14 @@ document.addEventListener('change', onField);
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
 function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} }; DL_EACH=false; gate=null;
-  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
+  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); STEP=0; SHOWN=0; VIEW_GEN++; clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }
 async function staffRole(u){ try{ return (await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||null; }catch(e){ return null; } }
 function boot(){
   var t=lsGet('tab'); if(['case','base','hist'].indexOf(t)>=0) TAB=t;
+  if(lsGet('mode')==='full') MODE='full';
   var cu=lsGet('cur'); if(cu) CUR=cu;
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여십시오'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
