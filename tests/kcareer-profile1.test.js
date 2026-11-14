@@ -340,11 +340,30 @@ test('★★ ⑯ 고르기 창은 «고를 수 있는 칸 전부»를 한 표(P1
   assert.match(work, /_p1WorkRows\(\)/); assert.doesNotMatch(work, /date:function/, '경력은 날짜 정렬 함수를 두지 않는다');
   assert.match(bare, /work:_p1WorkRows\(\)/, '종이를 짓는 재료(_p1Src)도 같은 함수');
   const open = bare.slice(bare.indexOf('function p1PickOpen('), bare.indexOf('function p1PickDraw('));
-  assert.match(open, /if\(def\.date\) 목록\.sort/, '날짜가 있는 칸만 최근 것 먼저로 줄 세운다');
+  assert.match(open, /if\(def\.order\) 목록\.sort\(def\.order\);\s*else if\(def\.date\) 목록\.sort/, '차례 함수가 있으면 그것(자격), 없으면 날짜가 있는 칸만 최근 것 먼저');
+  assert.match(tbl.slice(tbl.indexOf('  cert:{')), /order:function\(a,b\)\{ return KcareerProfile1\.certCmp\(a,b\); \}/, '★ 자격은 종이와 «같은 비교 함수»로 줄 세운다(창만 날짜순이면 번호가 어긋난다)');
   assert.match(open, /id!=null|list\(\)/, '번호(id) 없는 기록은 고를 수 없다');
   /* 열 머리·칸 글은 표에서 읽는다 — 위촉·실적 둘만 가정한 분기(P.k==='wic')가 남아 있으면 안 된다 */
   const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
   assert.doesNotMatch(draw, /P\.k===\x27wic\x27/, '★ 위촉 하나만 가정한 분기가 남았다');
   assert.match(draw, /def\.heads\[0\]/); assert.match(draw, /def\.amt/, '금액 딱지는 실적만(표의 amt)');
   assert.match(bare.slice(bare.indexOf('function p1PickSave('), bare.indexOf('function _p1Name(')), /P1_PICK\[P\.k\]\.title/);
+});
+
+test('★★ ⑰ 폰 폭(≤520px) — 고르기 창 표의 끝 칸은 «관리 단추 열»이 아니다 · 칸마다 이름표 · 자격 차례는 종이와 같다 (자동 검증 2026-11-14 지적)', () => {
+  /* 자격 차례 — 국가자격 먼저, 그 안에서 최근 것 먼저. 종이(build)와 창(certCmp)이 같은 비교를 쓴다 */
+  const 줄 = [{ id: 'a', title: '직업상담사 2급', date: '2015.1.1' }, { id: 'b', title: '공인노무사', date: '2006.11.20' },
+    { id: 'c', title: '정보처리기사', date: '2007.5.1' }, { id: 'd', title: '컴퓨터활용능력', date: '2020.3.1' }];
+  const 창 = 줄.slice().sort(P1.certCmp).map((r) => r.title);
+  const 종이 = P1.build({ cert: 줄.map((r) => ({ ...r, org: '기관' })) }, { use: 'general' }).sections.find((x) => x.key === 'cert').all.map((r) => r[1]);
+  assert.deepEqual(창, 종이, '★ 고르기 창의 자격 차례 = 종이의 차례');
+  assert.deepEqual(창.slice(0, 2), ['정보처리기사', '공인노무사'], '국가자격이 먼저, 그 안에서 최근 것 먼저');
+  /* 폰 카드(공용 .dt)는 끝 칸을 «관리 단추 열»(오른쪽 72px)로 세운다 — 이 표는 끝 칸이 값이라 같은 칸 줄에 놓는다 */
+  assert.match(SRC, /@media \(max-width:520px\)\{\s*#p1PickTbl \.dt td:last-child\{[^}]*grid-column:1 \/ 3[^}]*border-left:none!important/, '★ 고르기 창 표만 끝 칸을 일반 칸처럼(폰 폭에서만)');
+  assert.match(SRC, /#p1PickTbl \.dt td:last-child::before\{content:attr\(data-label\)\}/, '끝 칸에도 이름표');
+  assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#p1PickTbl \.dt tr\{grid-template-columns:66px minmax\(0,1fr\)\}/, '★ 관리 단추 열이 없으니 두 칸(이름표 + 값) — 안 그러면 값이 절반 폭에서 잘린다');
+  /* 칸마다 이름표(data-label) — 카드에서 값이 무엇인지 말한다 */
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.ok((draw.match(/<td data-label="/g) || []).length >= 4, '일자·이름·내용·금액 칸에 이름표');
+  assert.match(draw, /data-label="\x27\+escapeHtml\(def\.heads\[0\]\)/, '이름표는 표의 열 머리에서 읽는다');
 });
