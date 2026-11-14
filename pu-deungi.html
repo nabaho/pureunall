@@ -14,6 +14,8 @@
        ·사원명부·취임승낙서·퇴사원·지분 양도양수 계약서·위임장 둘·변경등기 신청서(초안)·필요서류 확인표를 한글(hwpx)로 한 번에 만든다.
        필요서류는 법무사 안내(2025-02-14 메일)와 지난 등기 첨부서면으로 확인표를 만들고, 발급 3개월을 넘긴 서류를 알려 준다.
      ★ 쓰는 자리(관문 강제 모드, PROGRAMS.deungi.writeContracts): deungi/base(DeungiBase) · deungi/cases/{id}(DeungiCase)
+       · deungi/archive/{id}(DeungiArchive — 지난 등기 원본 서류 묶음, 2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」)
+     ★ 파일 바이트는 원본 보관함 🔒 자리(pu_docs/secret · 기록 pu_docs/originals, from.kind 'deungi') — 여는 길은 서버 함수 puDocSecret(총괄관리자만)
      ★ 읽기만: uid_roles(권한)
      ⚠ 주민등록번호 «뒷자리»는 저장하지 않는다 — 생년월일만 저장하고, 뒷자리는 서류를 만들 때 «🔐 주민번호 넣기»로 이 창에만 받는다
        (새로고침·창 닫기에 지워진다). 정관 본문에 붙여 넣은 주민번호 뒷자리도 저장할 때 빈칸으로 바꾼다.
@@ -84,6 +86,9 @@ main{padding:12px 16px 40px;max-width:1280px}
 .chg{border:1px solid var(--line);border-radius:9px;margin:10px 12px;background:var(--card)}
 .chg>.hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:9px 9px 0 0}
 .chg>.hd b{font-size:13px}
+.arcg{border-top:1px solid var(--line)}
+.arcg>.hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 12px;background:var(--bg)}
+.arcg>.hd b{white-space:nowrap;font-size:13px}
 .chg>.bd{padding:9px 10px}
 .tos{margin-top:8px;border-top:1px dashed var(--line2);padding-top:8px}
 .tor{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -135,7 +140,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
   .t tbody td{border:none;padding:0;max-width:100%;white-space:normal}
   .t tbody td.c,.t tbody td.n{width:auto;flex:0 0 auto}
-  .t tbody td.tk{cursor:pointer}
+  .t tbody td.tk{cursor:pointer;padding:8px}
   .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
   .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
   .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
@@ -186,12 +191,14 @@ main{padding:12px 16px 40px;max-width:1280px}
 <div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="창"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
+<input type="file" id="arcFile" multiple accept=".hwp,.hwpx,.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="display:none">
 
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=96"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="js/pu-ontology.js?v=97"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -209,7 +216,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="js/pu-deungi-core.js?v=2"></script>
+<script src="js/pu-office-store.js?v=11"></script>
+<script src="js/pu-deungi-core.js?v=3"></script>
 <script src="js/pu-deungi-docs.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -219,7 +227,9 @@ var BASE=C.emptyBase(), BASE_DRAFT=null, BASE_SAVED_AT=0;
 var CASES={}, CUR='', TAB='case';
 /* 주민등록번호 뒷자리 — 이 창의 기억에만 둔다(저장·localStorage 없음). 새로고침하면 사라진다 */
 var RRN={};
-var SEL={ cases:{}, docs:{}, mem:{}, br:{} };
+var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
+/* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 */
+var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
 var SAVE={ t:null, busy:false, dirty:false, err:'', at:0 };
 
 function $(id){ return document.getElementById(id); }
@@ -266,7 +276,7 @@ function drawSaveState(){
   el.textContent=SAVE.err?'저장 안 됨':SAVE.busy?'저장 중…':SAVE.dirty?'고침':'저장됨';
   el.title=SAVE.err||'';
 }
-window.addEventListener('beforeunload', function(e){ if(SAVE.dirty||SAVE.busy||BASE_DRAFT){ e.preventDefault(); e.returnValue=''; } });
+window.addEventListener('beforeunload', function(e){ if(SAVE.dirty||SAVE.busy||BASE_DRAFT||ARC_BUSY){ e.preventDefault(); e.returnValue=''; } });
 
 /* ═══ 읽기 ═══ */
 function reload(){
@@ -278,6 +288,8 @@ function reload(){
     BASE=v.base ? C.normBase(v.base) : C.emptyBase();
     CASES={};
     Object.keys(v.cases||{}).forEach(function(k){ var x=v.cases[k]; if(x&&x.id===k) CASES[k]=x; });
+    ARCH={};
+    Object.keys(v.archive||{}).forEach(function(k){ var x=v.archive[k]; if(x&&x.id===k) ARCH[k]=x; });
     if(CUR && !CASES[CUR]) CUR='';
     draw();
   }).catch(function(e){ lock('등기 자료를 읽을 권한이 없습니다 — '+((e&&e.message)||'')); });
@@ -570,6 +582,161 @@ function saveBase(){
 }
 
 /* ═══ 지난 기록 ═══ */
+/* ── 지난 등기 원본 서류 (2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」) ──
+   묶음(지난 등기 하나) → 파일들. 파일은 원본 보관함 🔒 자리에 올리고, 묶음에는 파일 번호·종류만 적는다.
+   ⚠ 여는 것(보기·받기)은 서버 함수 puDocSecret 이 총괄관리자에게만 내준다 — 위임관리인은 목록만 본다.
+   ⚠ 지우기 없음 — «묶음에서 빼기»는 연결만 끊고 파일은 보관함에 남는다(보관함 규칙이 «새로 쓰기만»). */
+function arcRows(){ return C.archiveList(ARCH); }
+function arcById(id){ return arcRows().filter(function(a){ return a.id===id; })[0]||null; }
+function extOf(nm){ var m=/\.([A-Za-z0-9]+)$/.exec(String(nm||'')); return m?m[1].toLowerCase():''; }
+function arcLockAttr(){ return ME.isAdmin?'':' disabled title="🔒 총괄관리자만 엽니다"'; }
+function drawArchive(){
+  var rows=arcRows(), nsel=Object.keys(SEL.arc).filter(function(k){ return SEL.arc[k]; }).length;
+  var h='<div class="card" id="arcCard"><h3>📁 지난 등기 원본 서류 <span class="chip m">'+rows.length+'묶음</span><span class="hint wide-only">파일은 원본 보관함 🔒 자리 — 보기·받기는 총괄관리자만</span><span class="sp"></span><button class="sm pri" data-act="arcNew">＋ 묶음 만들기</button></h3>';
+  if(nsel) h+='<div class="bar"><b>'+nsel+'개 선택</b><button class="sm" data-act="arcSelDl"'+arcLockAttr()+'>⬇ 받기</button><button class="sm warn" data-act="arcSelOut">묶음에서 빼기</button><button class="sm" data-act="arcSelClear">고르기 풀기</button><span class="hint">빼도 파일은 보관함에 남습니다</span></div>';
+  if(ARC_BUSY) h+='<div class="msgs"><div class="msg i">파일을 올리는 중입니다 — 창을 닫지 마십시오.</div></div>';
+  if(!rows.length) h+='<div class="empty">아직 없습니다. «＋ 묶음 만들기»로 지난 등기(예: 2019-07 서산분사무소 설치)를 만들고 원본 파일을 올리십시오.</div>';
+  rows.forEach(function(a){
+    var fl=C.arcFiles(a), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; });
+    h+='<div class="arcg" data-arc="'+esc(a.id)+'"><div class="hd"><b>'+esc(a.at||'날짜 없음')+'</b> '+esc(a.title||'(이름 없음)')+' <span class="chip m">'+fl.length+'개</span><span class="sp"></span><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp"'+(ARC_BUSY?' disabled':'')+'>＋ 파일 올리기</button></div>';
+    if(a.summary) h+='<div class="cb hint">'+esc(a.summary)+'</div>';
+    if(!fl.length) h+='<div class="empty">파일이 없습니다.</div>';
+    else {
+      h+='<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="이 묶음 모두 고르기" data-selall="arc:'+esc(a.id)+'"'+(all?' checked':'')+'></th><th class="n">№</th><th>종류</th><th>파일 이름</th><th>날짜</th><th>표시</th><th></th></tr></thead><tbody>';
+      fl.forEach(function(x, i){
+        var k=a.id+'|'+x.fileId;
+        h+='<tr data-arcf="'+esc(x.fileId)+'"><td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+          '<td data-l="종류"><select data-arckind aria-label="'+esc(x.name)+' 종류">'+C.ARC_KINDS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===x.kind?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></td>'+
+          '<td class="ti" title="'+esc(x.name)+'">'+esc(x.name)+'</td><td data-l="날짜">'+esc(x.date||'—')+'</td>'+
+          '<td>🔒'+(x.masked?' <span class="chip g">주민번호 가림</span>':'')+'</td>'+
+          '<td><button class="sm" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>👁 보기</button> <button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기"'+arcLockAttr()+'>⬇ 받기</button></td></tr>';
+      });
+      h+='</tbody></table></div>';
+    }
+    h+='</div>';
+  });
+  return h+'<div style="height:4px"></div></div>';
+}
+/* 묶음 하나 고치기 — 관문으로. 찬 자리에서 previous 가 null 로 먼저 오면 화면 기억(ARCH)으로 만든다 */
+function arcWrite(id, fn){
+  var g=GEN;
+  return save('deungi/archive/'+id, 'DeungiArchive', function(prev){
+    var a=C.normArchive(prev||ARCH[id]||{ id:id }); a.id=id; a=fn(a)||a;
+    var rec=C.normArchive(a); rec.id=id; rec.entityType='DeungiArchive';
+    if(prev&&prev.createdAt) rec.createdAt=prev.createdAt;
+    return rec;
+  }).then(function(r){ if(g!==GEN) return; var v=r&&r.snapshot&&r.snapshot.val(); if(v&&v.id===id) ARCH[id]=v; return v; });
+}
+function arcModal(id){
+  var a=id?arcById(id):null;
+  openModal('<h3>📁 '+(a?'묶음 고치기':'새 묶음')+'<span class="sp"></span><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div class="grid">'+
+    '<label class="fl">날짜(등기일·총회일)<input type="date" data-af="at" value="'+esc(a?a.at:'')+'"></label>'+
+    '<label class="fl wide">이름<input type="text" data-af="title" maxlength="120" value="'+esc(a?a.title:'')+'" placeholder="예: 2019-07 서산분사무소 설치·정관변경"></label>'+
+    '<label class="fl wide">요약(선택)<textarea data-af="summary" rows="3" maxlength="600">'+esc(a?a.summary:'')+'</textarea></label></div>'+
+    '<div class="msg i">주민번호 뒷자리는 저장할 때 지워집니다. 파일은 묶음을 만든 뒤 «＋ 파일 올리기»로 넣습니다.</div></div>'+
+    '<div class="mf"><button class="sm" data-act="closeModal">취소</button><button class="sm pri" data-act="arcSave" data-id="'+esc(id||'')+'">저장</button></div>');
+}
+function arcSaveMeta(id){
+  var m=$('modal'), get=function(k){ var e=m.querySelector('[data-af="'+k+'"]'); return e?e.value:''; };
+  var title=C.str(get('title')), at=get('at'), summary=C.str(get('summary'));
+  if(!title){ toast('이름을 넣으십시오'); return; }
+  if(at && !C.isDate(at)){ toast('날짜가 올바르지 않습니다'); return; }
+  var nid=id||C.newId('AR'), g=GEN;
+  closeModal();
+  arcWrite(nid, function(a){ a.title=title; a.at=at; a.summary=summary; return a; })
+    .then(function(){ if(g!==GEN) return; toast(id?'고쳤습니다':'묶음을 만들었습니다'); drawHist(); })
+    .catch(function(e){ if(g!==GEN) return; toast('저장하지 못했습니다 — '+((e&&e.message)||''), 5000); });
+}
+/* 파일 올리기 — 한 개씩: 보관함 🔒 자리 → 묶음에 한 줄. 중간에 끊겨도 올린 것까지는 묶음에 남는다 */
+function arcUpload(evId, files){
+  var list=Array.prototype.slice.call(files||[]); if(!list.length) return;
+  var a=arcById(evId); if(!a){ toast('묶음을 찾지 못했습니다'); return; }
+  if(!window.PuOfficeStore){ toast('원본 보관함 기능을 불러오지 못했습니다 — 새로고침 하십시오', 4000); return; }
+  for(var i=0;i<list.length;i++){ var ck=PuOfficeStore.okDocFile(list[i].name, list[i].size); if(!ck.ok){ toast(list[i].name+' — '+ck.why, 5000); return; } }
+  if(!confirm('«'+(a.title||'묶음')+'»에 '+list.length+'개 파일을 올릴까요?\n\n· 원본 보관함 🔒 자리에 둡니다 — 보기·받기는 총괄관리자만.\n· 주민번호 뒷자리가 보이는 서류는 가린 사본을 올리십시오.\n· 올린 파일은 지울 수 없습니다(묶음에서 빼기만).')) return;
+  ARC_BUSY=true; drawHist();
+  var g=GEN, ok=0, fail=[], other=0;
+  list.reduce(function(p, fl, idx){ return p.then(function(){
+    if(g!==GEN) return;
+    /* ★ 이름의 주민번호 뒷자리는 «올리기 전»에 지운다 — 원본 보관함 색인(pu_docs/originals)은 직원 모두가 읽고, 창고 경로에도 이름이 들어간다(보안 검토 2026-11-14) */
+    var nm=C.safeName(fl.name)||'파일';
+    toast('올리는 중… '+(idx+1)+'/'+list.length+' '+nm, 60000);
+    return fl.arrayBuffer().then(function(buf){
+      if(g!==GEN) return null;
+      return PuOfficeStore.putOriginal({ name:nm, size:fl.size, type:fl.type||'', bytes:new Uint8Array(buf) }, { kind:'deungi', ev:evId }, { secret:true, alive:function(){ return g===GEN; } });
+    }).then(function(r){
+      if(g!==GEN||!r) return;
+      /* 같은 파일이 이미 보관함에 있으면 그 기록을 다시 쓴다 — 🔒 푸른등기 파일이 아니면(직원이 여는 보통 자리·다른 업무) 잇지 않는다. 규칙도 같은 것을 막는다 */
+      return (r.reused ? PuOfficeStore.getOriginal(r.fileId) : Promise.resolve({ secret:true, from:{ kind:'deungi' } })).then(function(rec){
+        if(g!==GEN) return;
+        if(!rec || rec.secret!==true || !rec.from || rec.from.kind!=='deungi'){ other++; return; }
+        var e=C.arcFileEntry(r.fileId, nm); if(!e) throw new Error('파일 번호가 올바르지 않습니다');
+        return arcWrite(evId, function(x){ var had=x.files[e.fileId]; x.files[e.fileId]=had?Object.assign({}, e, { kind:had.kind, date:had.date||e.date, addedAt:had.addedAt||e.addedAt }):e; return x; }).then(function(){ ok++; });
+      });
+    }).catch(function(err){ if(g!==GEN) return; fail.push(C.safeName(fl.name)+' — '+((err&&err.message)||err)); });
+  }); }, Promise.resolve()).then(function(){
+    if(g!==GEN) return;
+    ARC_BUSY=false; drawHist();
+    toast(ok+'개 올렸습니다'+(other?' · 같은 파일이 이미 원본 보관함에 다른 업무 파일로 있어 잇지 않음 '+other+'개':'')+(fail.length?' · 못 올림 '+fail.length+'개: '+fail[0]:''), fail.length||other?9000:3000);
+  });
+}
+function arcSetKind(evId, fid, kind){
+  var g=GEN;
+  arcWrite(evId, function(a){ if(a.files[fid]) a.files[fid].kind=kind; return a; })
+    .then(function(){ if(g!==GEN) return; toast('종류를 바꿨습니다'); drawHist(); })
+    .catch(function(e){ if(g!==GEN) return; toast('저장하지 못했습니다 — '+((e&&e.message)||''), 5000); drawHist(); });
+}
+function arcSelected(){ return Object.keys(SEL.arc).filter(function(k){ return SEL.arc[k]; }).map(function(k){ var p=k.split('|'); return { ev:p[0], fid:p[1] }; }); }
+function arcSelOut(){
+  var sel=arcSelected(); if(!sel.length) return;
+  if(!confirm(sel.length+'개 파일을 묶음에서 뺄까요?\n(파일은 원본 보관함에 그대로 남습니다)')) return;
+  var by={}; sel.forEach(function(x){ (by[x.ev]=by[x.ev]||[]).push(x.fid); });
+  var g=GEN;
+  Object.keys(by).reduce(function(p, ev){ return p.then(function(){ if(g!==GEN) return; return arcWrite(ev, function(a){ by[ev].forEach(function(fid){ delete a.files[fid]; }); return a; }); }); }, Promise.resolve())
+    .then(function(){ if(g!==GEN) return; SEL.arc={}; toast(sel.length+'개를 뺐습니다'); drawHist(); })
+    .catch(function(e){ if(g!==GEN) return; toast('저장하지 못했습니다 — '+((e&&e.message)||''), 5000); drawHist(); });
+}
+var ARC_DL=false;
+function arcDownload(list){
+  if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
+  if(ARC_DL) return toast('받는 중입니다 — 잠시 기다리십시오');
+  if(!window.PuOfficeStore) return toast('원본 보관함 기능을 불러오지 못했습니다', 4000);
+  var g=GEN, i=0, ok=0; ARC_DL=true;
+  (function next(){
+    if(g!==GEN){ ARC_DL=false; return; }
+    if(i>=list.length){ ARC_DL=false; toast(ok+'개를 받았습니다'); return; }
+    var x=list[i++], a=arcById(x.ev), f=a&&a.files[x.fid];
+    if(!f){ next(); return; }
+    PuOfficeStore.secretBlob(f.fileId).then(function(b){ if(g!==GEN) return; PuOfficeStore.saveBlob(b, f.name); ok++; }, function(e){ if(g!==GEN) return; toast(f.name+' — '+((e&&e.message)||e), 5000); })
+      .then(function(){ if(g!==GEN){ ARC_DL=false; return; } setTimeout(next, 500); });
+  })();
+}
+function arcRevoke(){ PV_SEQ++; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
+function arcView(evId, fid){
+  if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
+  var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
+  openModal('<h3>👁 '+esc(f.name)+'<span class="sp"></span><button class="sm" data-act="arcDlOne" data-ev="'+esc(evId)+'" data-fid="'+esc(fid)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">불러오는 중…</div></div></div>');
+  var g=GEN, ext=extOf(f.name), seq=++PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && !!$('pv'); };
+  PuOfficeStore.secretBlob(fid).then(function(blob){
+    if(!live()) return;
+    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; return PureunHwp.renderPreview($('pv'), new Uint8Array(b), f.name); });
+    if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; }
+    if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); $('pv').innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'" style="width:100%;height:75vh;border:0"></iframe>'; }
+    else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(blob); $('pv').innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'" style="max-width:100%">'; }
+    else $('pv').innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
+  }).catch(function(e){ if(!live()) return; $('pv').innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
+}
+/* 🔒 파일 받기 — 서버 함수 puDocSecret(총괄관리자만, 열람 기록을 남긴다). 문서관리(docs-esign)와 같은 길 */
+function fetchSecret(fileId){
+  var u=firebase.auth().currentUser;
+  if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  return u.getIdToken().then(function(tok){
+    return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecret', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify({ fileId:fileId }) });
+  }).then(function(r){
+    if(r.ok) return r.blob();
+    return r.json().catch(function(){ return {}; }).then(function(j){ throw new Error(j.error||('열지 못했습니다 ('+r.status+')')); });
+  });
+}
 function drawHist(){
   var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); });
   var h='<div class="card"><h3>끝난·취소한 등기 건 '+done.length+'</h3>';
@@ -585,7 +752,7 @@ function drawHist(){
   h+='</div>';
   var hi=(BASE.history||[]).slice().reverse();
   h+='<div class="card"><h3>등기 현황 바뀐 기록 '+hi.length+'</h3>'+(hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>')+'</div>';
-  $('histBox').innerHTML=h;
+  $('histBox').innerHTML=drawArchive()+h;
 }
 
 /* ═══ 서류 ═══ */
@@ -634,7 +801,7 @@ var MODAL_BACK=null;
 function openModal(html){ var m=$('modal'); MODAL_BACK=document.activeElement; m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex';
   var h=m.querySelector('h3'); m.setAttribute('aria-label', h?h.textContent.replace(/\s+/g,' ').trim().slice(0,40):'창');
   setTimeout(function(){ var f=m.querySelector('input,button:not([disabled])'); if(f) f.focus(); }, 0); }
-function closeModal(){ var m=$('modal'); m.style.display='none'; m.innerHTML=''; if(MODAL_BACK&&MODAL_BACK.focus){ try{ MODAL_BACK.focus(); }catch(e){} } MODAL_BACK=null; }
+function closeModal(){ arcRevoke(); var m=$('modal'); m.style.display='none'; m.innerHTML=''; if(MODAL_BACK&&MODAL_BACK.focus){ try{ MODAL_BACK.focus(); }catch(e){} } MODAL_BACK=null; }
 /* Esc 로 닫기 · Tab 은 창 안에서만 돈다 · 목록 줄은 Enter/Space 로 연다(키보드 — 기능 검증 2026-11-14) */
 document.addEventListener('keydown', function(ev){
   var m=$('modal');
@@ -780,6 +947,15 @@ document.addEventListener('click', function(ev){
     else if(act==='brDel'){ var ids2=Object.keys(SEL.br).filter(function(k){ return SEL.br[k]; }); if(ids2.length&&confirm(ids2.length+'곳을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b4=touchBase(); b4.branches=b4.branches.filter(function(x){ return !SEL.br[x.id]; }); SEL.br={}; drawBase(); } }
     else if(act==='jsonOut') jsonOut();
     else if(act==='jsonIn') $('jsonFile').click();
+    else if(act==='arcNew') arcModal('');
+    else if(act==='arcEdit'){ var ab=el.closest('[data-arc]'); if(ab) arcModal(ab.dataset.arc); }
+    else if(act==='arcSave') arcSaveMeta(el.dataset.id||'');
+    else if(act==='arcUp'){ var au=el.closest('[data-arc]'); if(au&&!ARC_BUSY){ ARC_EV=au.dataset.arc; $('arcFile').click(); } }
+    else if(act==='arcView'||act==='arcDl'){ var av=el.closest('[data-arc]'), af=el.closest('[data-arcf]'); if(av&&af){ if(act==='arcView') arcView(av.dataset.arc, af.dataset.arcf); else arcDownload([{ ev:av.dataset.arc, fid:af.dataset.arcf }]); } }
+    else if(act==='arcDlOne') arcDownload([{ ev:el.dataset.ev, fid:el.dataset.fid }]);
+    else if(act==='arcSelDl') arcDownload(arcSelected());
+    else if(act==='arcSelOut') arcSelOut();
+    else if(act==='arcSelClear'){ SEL.arc={}; drawHist(); }
     return;
   }
   /* ☐ 칸 둘레를 누르면 «고르기»다 — 건이 열리면 안 된다(폰에서 체크칸이 작다 · 기능 검증 2026-11-14) */
@@ -788,20 +964,24 @@ document.addEventListener('click', function(ev){
   if(t.id==='modal') closeModal();
 });
 $('jsonFile').addEventListener('change', function(){ var f=this.files&&this.files[0]; this.value=''; if(f) jsonIn(f); });
+$('arcFile').addEventListener('change', function(){ var fl=Array.prototype.slice.call(this.files||[]), ev=ARC_EV; this.value=''; ARC_EV=''; if(ev&&fl.length) arcUpload(ev, fl); });
 /* 입사 사원 이름이 바뀌면 양수인·대표사원 고르기 칸의 그 사람 글자만 고친다 — 카드를 다시 그리지 않는다(포커스 지킴) */
 function joinOptLabel(ch){ var v='new:'+ch.id, lab=(ch.name||'(새 사원)')+' · 입사'; Array.prototype.forEach.call(document.querySelectorAll('#edChanges option'), function(o){ if(o.value===v) o.textContent=lab; }); }
 function onField(ev){
   var el=ev.target; if(!el||!el.matches('input,select,textarea')) return;
+  if(el.dataset.af!=null) return; /* 묶음 창의 글칸 — «저장» 단추로만 */
+  if(el.hasAttribute('data-arckind')){ if(ev.type==='change'){ var ab2=el.closest('[data-arc]'), af2=el.closest('[data-arcf]'); if(ab2&&af2) arcSetKind(ab2.dataset.arc, af2.dataset.arcf, el.value); } return; }
   var isText=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|)$/.test(el.type||'')));
   if(ev.type==='input' && !isText) return;
   if(ev.type==='change' && isText && !el.closest('#pane-base')){ var bx=el.closest('[data-ch]'); if(bx && cur() && el.dataset.k==='name'){ var cj=chgById(bx.dataset.ch); if(cj && cj.type==='join') joinOptLabel(cj); } return; }
   var v=el.type==='checkbox'?el.checked:el.value;
   /* 고르기 칸 */
+  if(el.dataset.selall && el.dataset.selall.indexOf('arc:')===0){ var ak=el.dataset.selall.slice(4), aa2=arcById(ak); if(aa2) C.arcFiles(aa2).forEach(function(x){ SEL.arc[ak+'|'+x.fileId]=el.checked; }); drawHist(); return; }
   if(el.dataset.selall){ var key=el.dataset.selall, on=el.checked;
     var ids=key==='cases'?caseRows().filter(function(c){ return c.status!=='cancelled' && !(c.status==='done'&&c.applied); }).map(function(c){ return c.id; }):key==='mem'?bd().members.map(function(m){ return m.id; }):bd().branches.map(function(x){ return x.id; });
     SEL[key]={}; if(on) ids.forEach(function(id){ SEL[key][id]=true; });
     if(key==='cases') drawCaseList(); else drawBase(); return; }
-  if(el.dataset.sel){ SEL[el.dataset.sel][el.dataset.id]=el.checked; if(el.dataset.sel==='cases') drawCaseList(); else drawBase(); return; }
+  if(el.dataset.sel){ SEL[el.dataset.sel][el.dataset.id]=el.checked; if(el.dataset.sel==='cases') drawCaseList(); else if(el.dataset.sel==='arc') drawHist(); else drawBase(); return; }
   /* 등기 현황 */
   if(el.closest('#pane-base')){
     var b=touchBase();
@@ -855,7 +1035,8 @@ document.addEventListener('change', onField);
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
-function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
+function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} }; DL_EACH=false; gate=null;
+  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }
@@ -879,6 +1060,7 @@ function boot(){
     if(gen!==GEN || !now || now.uid!==u.uid) return;
     if(!canOpen(role)){ lock(role&&role.status==='active'?'대표·위임관리인 권한이 없는 계정입니다':'재직 중인 직원 계정이 아닙니다'); return; }
     ME.sid=String(role.sid); ME.isAdmin=role.isAdmin===true; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:ME.sid });
+    try{ PuOfficeStore.init({ db:fbDb, storage:firebase.app().storage('gs://pureun-erp-hrphotos'), uid:u.uid, name:String(role.name||'').slice(0,60), secretFetch:fetchSecret }); }catch(e){}
     $('lock').style.display='none'; $('app').style.display='';
     await reload();
   });

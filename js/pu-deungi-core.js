@@ -55,7 +55,9 @@
      (보안 검토 2026-11-14: 메모·필요서류 메모·정관 본문에 붙여 넣은 번호가 그대로 남을 수 있었다).
      앞 6자리 + (하이픈·대시·공백 있거나 없이) 성별 자리 1~8 + 6자리 → «앞자리-_______».
      법인등록번호(161571-0000304)처럼 뒷자리가 0 으로 시작하는 것은 건드리지 않는다. */
-  var RRN_RE = /(^|[^0-9])(\d{6})\s*[-–]?\s*[1-8]\d{6}(?![0-9])/g;
+  /* 구분자 — 하이픈·대시·공백 말고 파일 이름에 흔한 밑줄·점·물결도(보안 재검토 2026-11-14: «900101_1234567.pdf» 가 그대로 남았다).
+     6+7 자리라 날짜(2019.07.15)·전화(041-556-0035)·사업자번호(312-81-52792)와는 겹치지 않는다. */
+  var RRN_RE = /(^|[^0-9])(\d{6})[\s\-–—_.~·]{0,3}[1-8]\d{6}(?![0-9])/g;
   function scrubRrn(s) { return String(s).replace(RRN_RE, '$1$2-_______'); }
   function str(v) { return v == null ? '' : scrubRrn(String(v).replace(/\s+/g, ' ').trim()); }
   function text(v) { return v == null ? '' : scrubRrn(String(v).replace(/\r\n?/g, '\n')); }
@@ -780,7 +782,92 @@
     return '끝';
   }
 
+  /* ══ 지난 등기 원본 서류 묶음 (대표 지시 2026-11-14 「지난기록 서식 원본과 자료들 모두 넣어달라」) ══
+     파일 «바이트»는 원본 보관함 🔒 자리(pu_docs/secret — 아무도 직접 못 읽고, 서버 함수가 총괄관리자에게만 내준다)에 두고,
+     여기(deungi/archive/{id})에는 묶음 이름·날짜·요약과 «파일 번호·종류»만 적는다.
+     ⚠ 주민번호 뒷자리는 가린 사본을 올린다(대표 2026-11-14 «뒷자리 가린 사본»). 글 칸은 str 이 한 번 더 지운다. */
+  var ARC_KINDS = [
+    ['charter', '정관'], ['compare', '신·구조문 대비표'], ['reason', '정관변경 이유서'], ['apply', '정관변경 인가신청서'],
+    ['approval', '인가증'], ['minutes', '사원총회 의사록'], ['consent', '총사원 동의서'], ['roster', '사원명부'],
+    ['poa', '위임장'], ['request', '등기신청서'], ['registry', '등기사항증명서'], ['guide', '법무사 안내'],
+    ['fee', '납부·영수'], ['etc', '기타']
+  ];
+  var ARC_KIND_KEYS = ARC_KINDS.map(function (k) { return k[0]; });
+  /* 파일 이름으로 종류 짐작 — 앞줄이 먼저 이긴다(«정관변경 인가신청서»가 «정관»으로 가지 않게) */
+  var ARC_GUESS = [
+    ['approval', /인가증/], ['apply', /인가\s*신청|변경\s*인가|변경\s*신청서/], ['reason', /이유서/],
+    ['minutes', /의사록|회의록/], ['consent', /동의서/], ['compare', /대비|신\s*[·.]?\s*구|변경\s*사항/],
+    ['roster', /사원\s*명부|주주\s*명부|지분/], ['poa', /위임장/], ['registry', /등기부|등기사항|등본|증명서/],
+    ['request', /등기\s*신청|신청서|변경등기|설립등기/], ['guide', /필요\s*서류|안내/], ['fee', /납부|영수|수수료|면허세/],
+    ['charter', /정\s*관/]
+  ];
+  var ARC_FILE_ID = /^[-_A-Za-z0-9]{10,40}$/;
+  var ARC_ID = /^[A-Za-z0-9_-]{4,60}$/;
+  function arcKindLabel(k) { for (var i = 0; i < ARC_KINDS.length; i++) if (ARC_KINDS[i][0] === k) return ARC_KINDS[i][1]; return '기타'; }
+  function guessArcKind(name) {
+    var s = String(name || '').normalize ? String(name || '').normalize('NFC') : String(name || '');
+    s = s.replace(/\.[A-Za-z0-9]{1,5}$/, '');
+    for (var i = 0; i < ARC_GUESS.length; i++) if (ARC_GUESS[i][1].test(s)) return ARC_GUESS[i][0];
+    return 'etc';
+  }
+  /* 파일 이름 속 날짜 — 2019-07-30 · 2019.7.30 · 20190730 · 2019_07_30 만 읽는다.
+     ⚠ 여섯 자리(240416)는 읽지 않는다 — 주민번호 앞자리와 모양이 같다. */
+  function arcDateFromName(name) {
+    var s = String(name || '');
+    var m = /(?:^|[^0-9])(20\d{2})[.\-_ ](\d{1,2})[.\-_ ](\d{1,2})(?![0-9])/.exec(s) || /(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?![0-9])/.exec(s);
+    if (!m) return '';
+    var iso = m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+    return isDate(iso) ? iso : '';
+  }
+  /* ★ 파일 이름 전용 지우개 — 이름은 원본 보관함 색인(직원 모두 읽음)·창고 경로에도 들어간다(보안 재검토 2026-11-14 두 번).
+     전각(－ ０)을 반각으로 편 뒤, 앞 6자리와 뒤 7자리 사이에 «숫자 아닌 글자 0~6개»(밑줄 여러 개·괄호·점…)가 끼어도 뒤 7자리를 지운다.
+     법인등록번호(뒤가 0)·날짜(2019-07-15)·전화(041-556-0035)는 건드리지 않는다. */
+  function safeName(name) {
+    var t = String(name == null ? '' : name);
+    try { t = t.normalize('NFKC'); } catch (e) { /* 옛 브라우저 */ }
+    t = t.replace(/(^|[^0-9])([0-9]{6})([^0-9]{0,6}?)[1-8][0-9]{6}(?![0-9])/g, '$1$2$3_______');
+    return str(t).slice(0, 200);
+  }
+  function normArcFile(f, key) {
+    f = f || {};
+    var fid = String(f.fileId || '');
+    if (!ARC_FILE_ID.test(fid) || (key != null && key !== fid)) return null;
+    return { fileId: fid, name: safeName(f.name) || '파일', kind: ARC_KIND_KEYS.indexOf(f.kind) >= 0 ? f.kind : 'etc',
+      date: isDate(f.date) ? f.date : '', note: str(f.note).slice(0, 200), masked: f.masked === true, addedAt: num(f.addedAt) > 0 ? num(f.addedAt) : 0 };
+  }
+  function normArchive(raw) {
+    raw = raw || {};
+    var files = {}, n = 0;
+    Object.keys(raw.files || {}).forEach(function (k) {
+      if (n >= 200) return;
+      var f = normArcFile(raw.files[k], k); if (!f) return;
+      files[f.fileId] = f; n++;
+    });
+    return { id: ARC_ID.test(String(raw.id || '')) ? String(raw.id) : '', entityType: 'DeungiArchive',
+      title: str(raw.title).slice(0, 120), at: isDate(raw.at) ? raw.at : '', summary: str(raw.summary).slice(0, 600), files: files };
+  }
+  /* 묶음 차례 — 날짜 늦은 것이 위, 날짜 없는 묶음은 맨 아래 */
+  function archiveList(map) {
+    return Object.keys(map || {}).map(function (k) { var a = normArchive(map[k]); a.id = a.id || k; return a; })
+      .filter(function (a) { return a.id && ARC_ID.test(a.id); })
+      .sort(function (a, b) { return (b.at ? 1 : 0) - (a.at ? 1 : 0) || String(b.at).localeCompare(String(a.at)) || String(a.title).localeCompare(String(b.title)) || String(a.id).localeCompare(String(b.id)); });
+  }
+  /* 묶음 안 파일 차례 — 서류 종류 차례(정관 → … → 기타), 같은 종류는 날짜·이름 */
+  function arcFiles(a) {
+    var fs = a && a.files || {};
+    return Object.keys(fs).map(function (k) { return fs[k]; }).sort(function (x, y) {
+      return ARC_KIND_KEYS.indexOf(x.kind) - ARC_KIND_KEYS.indexOf(y.kind) || String(x.date).localeCompare(String(y.date)) || String(x.name).localeCompare(String(y.name));
+    });
+  }
+  /* 새로 올린 파일 한 줄 — 종류·날짜는 이름으로 짐작, «가림» 이 이름에 있으면 가린 사본으로 표시 */
+  function arcFileEntry(fileId, name, now) {
+    return normArcFile({ fileId: fileId, name: name, kind: guessArcKind(name), date: arcDateFromName(name),
+      masked: /가림|가린|마스킹|주민번호\s*삭제/.test(String(name || '')), addedAt: now || Date.now() });
+  }
+
   return {
+    ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
+    normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,
     DEADLINE_DAYS: DEADLINE_DAYS, DEADLINE_NOTE: DEADLINE_NOTE, LAW: LAW,
     str: str, num: num, won: won, isDate: isDate, addDays: addDays, addMonths: addMonths, diffDays: diffDays, todayIso: todayIso,

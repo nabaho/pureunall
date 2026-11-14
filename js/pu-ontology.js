@@ -29,7 +29,7 @@
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
-      DeungiBase:'노무법인 등기 현황', DeungiCase:'노무법인 변경등기 건',
+      DeungiBase:'노무법인 등기 현황', DeungiCase:'노무법인 변경등기 건', DeungiArchive:'노무법인 지난 등기 원본 서류 묶음',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -280,13 +280,15 @@
                       {path:'settle/kakaoQueue/{id}',entityType:'SettleKakao'}],
       entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
     /* 푸른등기 — 노무법인 변경등기(사원 입사·퇴사·지분 양도, 대표사원 취임·사임, 주소변경, 분사무소 설치·이전·폐지) 서류를 한글로 만든다(대표 지시 2026-11-14).
-       ★ 쓰는 것: base(DeungiBase — 지금 등기부 현황 하나) · cases(DeungiCase — 등기 건).
+       ★ 쓰는 것: base(DeungiBase — 지금 등기부 현황 하나) · cases(DeungiCase — 등기 건) · archive(DeungiArchive — 지난 등기 원본 서류 묶음, 2026-11-14).
+       ★ 원본 파일은 원본 보관함(pu_docs, 공용 층 js/pu-office-store.js)의 🔒 자리에 올린다(from.kind 'deungi') — 묶음에는 파일 번호만.
        ★ 사람은 «등기 현황 안의 사원 줄»(id m1…)로만 가리킨다 — 직원 명부(sid)와 이름으로 잇지 않는다(사원이 퇴사·입사해도 명부와 따로 간다).
        ⚠ 주민등록번호 뒷자리는 저장하지 않는다(생년월일만). 대표·위임관리인만(규칙 deungi). */
-    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles'],
+    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs'],
       writeContracts:[{path:'deungi/base',entityType:'DeungiBase'},
-                      {path:'deungi/cases/{id}',entityType:'DeungiCase'}],
-      entityTypes:['DeungiBase','DeungiCase'] },
+                      {path:'deungi/cases/{id}',entityType:'DeungiCase'},
+                      {path:'deungi/archive/{id}',entityType:'DeungiArchive'}],
+      entityTypes:['DeungiBase','DeungiCase','DeungiArchive'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -632,7 +634,7 @@
       gives:'괴롭힘·성희롱 조사 사건·8단계 진행현황·공문 연결 (진술·보고서 본문은 harass_secret 비밀유지 분리 — 앱 안에서만 본다)'},
     /* 푸른등기 — 사원 주소·생년월일이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     deungi_core:{program:'deungi',strategy:'in_app',path:'deungi',parser:'coverage',
-      gives:'등기 현황·변경등기 건 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+      gives:'등기 현황·변경등기 건·지난 등기 원본 서류 묶음 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
