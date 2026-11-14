@@ -83,6 +83,9 @@ test('★ 로그아웃·계정이 바뀌면 화면 기억을 비우고, 늦게 �
   const saves = (본문.match(/save\('deungi\//g) || []).length;
   const guards = (본문.match(/if\(g!==GEN\)/g) || []).length;
   assert.ok(guards >= saves, '세대 검사(' + guards + ')가 저장(' + saves + ')보다 적다');
+  /* 파일 불러오기도 같다 — 늦게 끝난 읽기가 앞 사람 초안을 되살리면 안 된다 */
+  assert.match(본문, /r\.onload=function\(\)\{[\s\S]{0,80}if\(g!==GEN\) return;/, '파일 불러오기 onload 가 세대를 보지 않는다');
+  assert.ok(wipe[0].indexOf('JSON_READER.abort()') >= 0, 'wipe 가 진행 중인 파일 읽기를 끊지 않는다');
 });
 
 test('지우기 대신 «취소» 상태 — 자료 자리(ref)를 remove·set(null) 하지 않는다', () => {

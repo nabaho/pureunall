@@ -718,9 +718,14 @@ function jsonOut(){
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='푸른등기_등기현황_'+(b.asOf||today())+'.json'; document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
+/* 파일 읽기도 세대를 본다 — 읽는 사이 로그아웃·계정이 바뀌면 버리고, wipe 가 읽기를 끊는다(보안 재검증 2026-11-14) */
+var JSON_READER=null;
 function jsonIn(file){
-  var r=new FileReader();
+  var r=new FileReader(), g=GEN; JSON_READER=r;
+  r.onerror=function(){ if(JSON_READER===r) JSON_READER=null; if(g!==GEN) return; toast('파일을 읽지 못했습니다', 4000); };
   r.onload=function(){
+    if(JSON_READER===r) JSON_READER=null;
+    if(g!==GEN) return;
     try{
       var j=JSON.parse(String(r.result||'')), raw=j && j.kind==='pureun-deungi-base' ? j.base : j;
       var b=C.normBase(raw);
@@ -842,7 +847,7 @@ document.addEventListener('change', onField);
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
-function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
+function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }
