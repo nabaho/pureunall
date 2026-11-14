@@ -1575,7 +1575,7 @@
       ],
       "$id": {
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (!data.exists() && newData.child('authorUid').val() === auth.uid && newData.child('status').val() === 'new'))",
-        ".validate": "!newData.exists() || newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt'])",
+        ".validate": "!newData.exists() || ($id.matches(/^[A-Za-z0-9_-]{1,64}$/) && newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt']))",
         "cat": {
           ".validate": "newData.isString() && newData.val().matches(/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/)"
         },
@@ -1590,6 +1590,42 @@
         },
         "status": {
           ".validate": "newData.isString() && newData.val().matches(/^(new|ing|done)$/)"
+        },
+        "author": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "authorEmail": {
+          ".validate": "newData.isString() && newData.val().length <= 320"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "repliedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "reply": {
+          ".validate": "newData.isString() && newData.val().length <= 20000"
+        },
+        "images": {
+          ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
+          "$i": {
+            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+          }
+        },
+        "replyImages": {
+          ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
+          "$i": {
+            ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+          }
+        },
+        "relatedId": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,64}$/)"
+        },
+        "source": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)"
+        },
+        "$other": {
+          ".validate": false
         }
       }
     },
@@ -1597,19 +1633,86 @@
       ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "$id": {
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (!data.exists() && newData.child('authorUid').val() === auth.uid && newData.child('status').val() === 'new'))",
-        ".validate": "!newData.exists() || newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt'])",
+        ".validate": "!newData.exists() || ($id.matches(/^[A-Za-z0-9_-]{1,64}$/) && newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt']))",
+        "author": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "authorEmail": {
+          ".validate": "newData.isString() && newData.val().length <= 320"
+        },
         "authorUid": {
           ".validate": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || newData.val() === auth.uid"
         },
         "status": {
           ".validate": "newData.isString() && newData.val().matches(/^(new|ing|done)$/)"
+        },
+        "cat": {
+          ".validate": "newData.isString() && newData.val().length <= 20"
+        },
+        "title": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
         }
       }
     },
     "suggestions_resolved_private": {
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
-        ".write": "auth != null && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)"
+        ".write": "auth != null && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".validate": "!newData.exists() || ($uid.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.hasChildren())",
+        "$id": {
+          ".validate": "!newData.exists() || ($id.matches(/^[A-Za-z0-9_-]{1,64}$/) && newData.hasChildren())",
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "cat": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "status": {
+            ".validate": "newData.isString() && newData.val().matches(/^(new|ing|done)$/)"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "seen": {
+            ".validate": "newData.isBoolean()"
+          },
+          "reply": {
+            ".validate": "newData.isString() && newData.val().length <= 20000"
+          },
+          "replyImages": {
+            ".validate": "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))",
+            "$i": {
+              ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000"
+            }
+          },
+          "resolvedOk": {
+            ".validate": "newData.isBoolean()"
+          },
+          "resolvedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "feedback": {
+            ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "feedbackAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "relatedId": {
+            ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,64}$/)"
+          },
+          "source": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
       }
     },
     "systemAlerts": {
