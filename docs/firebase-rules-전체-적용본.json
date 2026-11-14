@@ -1879,7 +1879,7 @@
           ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiArchive'",
           "files": {
             "$f": {
-              ".validate": "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).exists()"
+              ".validate": "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).child('secret').val() === true && root.child('pu_docs/originals').child($f).child('from').child('kind').val() === 'deungi'"
             }
           }
         }

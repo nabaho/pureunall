@@ -86,6 +86,9 @@ main{padding:12px 16px 40px;max-width:1280px}
 .chg{border:1px solid var(--line);border-radius:9px;margin:10px 12px;background:var(--card)}
 .chg>.hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:9px 9px 0 0}
 .chg>.hd b{font-size:13px}
+.arcg{border-top:1px solid var(--line)}
+.arcg>.hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 12px;background:var(--bg)}
+.arcg>.hd b{white-space:nowrap;font-size:13px}
 .chg>.bd{padding:9px 10px}
 .tos{margin-top:8px;border-top:1px dashed var(--line2);padding-top:8px}
 .tor{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -137,7 +140,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
   .t tbody td{border:none;padding:0;max-width:100%;white-space:normal}
   .t tbody td.c,.t tbody td.n{width:auto;flex:0 0 auto}
-  .t tbody td.tk{cursor:pointer}
+  .t tbody td.tk{cursor:pointer;padding:8px}
   .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
   .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
   .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
@@ -213,7 +216,7 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="js/pu-office-store.js?v=10"></script>
+<script src="js/pu-office-store.js?v=11"></script>
 <script src="js/pu-deungi-core.js?v=3"></script>
 <script src="js/pu-deungi-docs.js?v=2"></script>
 <script>
@@ -226,7 +229,7 @@ var CASES={}, CUR='', TAB='case';
 var RRN={};
 var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
 /* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 */
-var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='';
+var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
 var SAVE={ t:null, busy:false, dirty:false, err:'', at:0 };
 
 function $(id){ return document.getElementById(id); }
@@ -273,7 +276,7 @@ function drawSaveState(){
   el.textContent=SAVE.err?'저장 안 됨':SAVE.busy?'저장 중…':SAVE.dirty?'고침':'저장됨';
   el.title=SAVE.err||'';
 }
-window.addEventListener('beforeunload', function(e){ if(SAVE.dirty||SAVE.busy||BASE_DRAFT){ e.preventDefault(); e.returnValue=''; } });
+window.addEventListener('beforeunload', function(e){ if(SAVE.dirty||SAVE.busy||BASE_DRAFT||ARC_BUSY){ e.preventDefault(); e.returnValue=''; } });
 
 /* ═══ 읽기 ═══ */
 function reload(){
@@ -595,7 +598,7 @@ function drawArchive(){
   if(!rows.length) h+='<div class="empty">아직 없습니다. «＋ 묶음 만들기»로 지난 등기(예: 2019-07 서산분사무소 설치)를 만들고 원본 파일을 올리십시오.</div>';
   rows.forEach(function(a){
     var fl=C.arcFiles(a), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; });
-    h+='<div class="chg" data-arc="'+esc(a.id)+'"><div class="hd"><b>'+esc(a.at||'날짜 없음')+'</b> '+esc(a.title||'(이름 없음)')+' <span class="chip m">'+fl.length+'개</span><span class="sp"></span><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp"'+(ARC_BUSY?' disabled':'')+'>＋ 파일 올리기</button></div>';
+    h+='<div class="arcg" data-arc="'+esc(a.id)+'"><div class="hd"><b>'+esc(a.at||'날짜 없음')+'</b> '+esc(a.title||'(이름 없음)')+' <span class="chip m">'+fl.length+'개</span><span class="sp"></span><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp"'+(ARC_BUSY?' disabled':'')+'>＋ 파일 올리기</button></div>';
     if(a.summary) h+='<div class="cb hint">'+esc(a.summary)+'</div>';
     if(!fl.length) h+='<div class="empty">파일이 없습니다.</div>';
     else {
@@ -606,7 +609,7 @@ function drawArchive(){
           '<td data-l="종류"><select data-arckind aria-label="'+esc(x.name)+' 종류">'+C.ARC_KINDS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===x.kind?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></td>'+
           '<td class="ti" title="'+esc(x.name)+'">'+esc(x.name)+'</td><td data-l="날짜">'+esc(x.date||'—')+'</td>'+
           '<td>🔒'+(x.masked?' <span class="chip g">주민번호 가림</span>':'')+'</td>'+
-          '<td><button class="sm" data-act="arcView"'+arcLockAttr()+'>👁 보기</button> <button class="sm" data-act="arcDl"'+arcLockAttr()+'>⬇ 받기</button></td></tr>';
+          '<td><button class="sm" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>👁 보기</button> <button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기"'+arcLockAttr()+'>⬇ 받기</button></td></tr>';
       });
       h+='</tbody></table></div>';
     }
@@ -652,23 +655,29 @@ function arcUpload(evId, files){
   for(var i=0;i<list.length;i++){ var ck=PuOfficeStore.okDocFile(list[i].name, list[i].size); if(!ck.ok){ toast(list[i].name+' — '+ck.why, 5000); return; } }
   if(!confirm('«'+(a.title||'묶음')+'»에 '+list.length+'개 파일을 올릴까요?\n\n· 원본 보관함 🔒 자리에 둡니다 — 보기·받기는 총괄관리자만.\n· 주민번호 뒷자리가 보이는 서류는 가린 사본을 올리십시오.\n· 올린 파일은 지울 수 없습니다(묶음에서 빼기만).')) return;
   ARC_BUSY=true; drawHist();
-  var g=GEN, ok=0, fail=[], open=0;
+  var g=GEN, ok=0, fail=[], other=0;
   list.reduce(function(p, fl, idx){ return p.then(function(){
     if(g!==GEN) return;
-    toast('올리는 중… '+(idx+1)+'/'+list.length+' '+fl.name, 60000);
+    /* ★ 이름의 주민번호 뒷자리는 «올리기 전»에 지운다 — 원본 보관함 색인(pu_docs/originals)은 직원 모두가 읽고, 창고 경로에도 이름이 들어간다(보안 검토 2026-11-14) */
+    var nm=C.str(fl.name).slice(0,200)||'파일';
+    toast('올리는 중… '+(idx+1)+'/'+list.length+' '+nm, 60000);
     return fl.arrayBuffer().then(function(buf){
       if(g!==GEN) return null;
-      return PuOfficeStore.putOriginal({ name:fl.name, size:fl.size, type:fl.type||'', bytes:new Uint8Array(buf) }, { kind:'deungi', ev:evId }, { secret:true });
+      return PuOfficeStore.putOriginal({ name:nm, size:fl.size, type:fl.type||'', bytes:new Uint8Array(buf) }, { kind:'deungi', ev:evId }, { secret:true, alive:function(){ return g===GEN; } });
     }).then(function(r){
       if(g!==GEN||!r) return;
-      if(r.reused && r.secret===false) open++;
-      var e=C.arcFileEntry(r.fileId, fl.name); if(!e) throw new Error('파일 번호가 올바르지 않습니다');
-      return arcWrite(evId, function(x){ var had=x.files[e.fileId]; x.files[e.fileId]=had?Object.assign({}, e, { kind:had.kind, date:had.date||e.date, addedAt:had.addedAt||e.addedAt }):e; return x; }).then(function(){ ok++; });
-    }).catch(function(err){ fail.push(fl.name+' — '+((err&&err.message)||err)); });
+      /* 같은 파일이 이미 보관함에 있으면 그 기록을 다시 쓴다 — 🔒 푸른등기 파일이 아니면(직원이 여는 보통 자리·다른 업무) 잇지 않는다. 규칙도 같은 것을 막는다 */
+      return (r.reused ? PuOfficeStore.getOriginal(r.fileId) : Promise.resolve({ secret:true, from:{ kind:'deungi' } })).then(function(rec){
+        if(g!==GEN) return;
+        if(!rec || rec.secret!==true || !rec.from || rec.from.kind!=='deungi'){ other++; return; }
+        var e=C.arcFileEntry(r.fileId, nm); if(!e) throw new Error('파일 번호가 올바르지 않습니다');
+        return arcWrite(evId, function(x){ var had=x.files[e.fileId]; x.files[e.fileId]=had?Object.assign({}, e, { kind:had.kind, date:had.date||e.date, addedAt:had.addedAt||e.addedAt }):e; return x; }).then(function(){ ok++; });
+      });
+    }).catch(function(err){ if(g!==GEN) return; fail.push(C.str(fl.name)+' — '+((err&&err.message)||err)); });
   }); }, Promise.resolve()).then(function(){
     if(g!==GEN) return;
     ARC_BUSY=false; drawHist();
-    toast(ok+'개 올렸습니다'+(open?' · 이미 보관함 보통 자리에 있던 같은 파일 '+open+'개(직원 열람 가능)':'')+(fail.length?' · 못 올림 '+fail.length+'개: '+fail[0]:''), fail.length||open?9000:3000);
+    toast(ok+'개 올렸습니다'+(other?' · 같은 파일이 이미 원본 보관함에 다른 업무 파일로 있어 잇지 않음 '+other+'개':'')+(fail.length?' · 못 올림 '+fail.length+'개: '+fail[0]:''), fail.length||other?9000:3000);
   });
 }
 function arcSetKind(evId, fid, kind){
@@ -698,24 +707,24 @@ function arcDownload(list){
     if(i>=list.length){ ARC_DL=false; toast(ok+'개를 받았습니다'); return; }
     var x=list[i++], a=arcById(x.ev), f=a&&a.files[x.fid];
     if(!f){ next(); return; }
-    PuOfficeStore.download(f.fileId, f.name).then(function(){ ok++; }, function(e){ toast(f.name+' — '+((e&&e.message)||e), 5000); })
-      .then(function(){ setTimeout(next, 500); });
+    PuOfficeStore.secretBlob(f.fileId).then(function(b){ if(g!==GEN) return; PuOfficeStore.saveBlob(b, f.name); ok++; }, function(e){ if(g!==GEN) return; toast(f.name+' — '+((e&&e.message)||e), 5000); })
+      .then(function(){ if(g!==GEN){ ARC_DL=false; return; } setTimeout(next, 500); });
   })();
 }
-function arcRevoke(){ if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
+function arcRevoke(){ PV_SEQ++; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
 function arcView(evId, fid){
   if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
   var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
   openModal('<h3>👁 '+esc(f.name)+'<span class="sp"></span><button class="sm" data-act="arcDlOne" data-ev="'+esc(evId)+'" data-fid="'+esc(fid)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">불러오는 중…</div></div></div>');
-  var g=GEN, ext=extOf(f.name);
+  var g=GEN, ext=extOf(f.name), seq=++PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && !!$('pv'); };
   PuOfficeStore.secretBlob(fid).then(function(blob){
-    if(g!==GEN||!$('pv')) return;
-    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(g!==GEN||!$('pv')) return; return PureunHwp.renderPreview($('pv'), new Uint8Array(b), f.name); });
-    arcRevoke();
+    if(!live()) return;
+    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; return PureunHwp.renderPreview($('pv'), new Uint8Array(b), f.name); });
+    if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; }
     if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); $('pv').innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'" style="width:100%;height:75vh;border:0"></iframe>'; }
     else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(blob); $('pv').innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'" style="max-width:100%">'; }
     else $('pv').innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
-  }).catch(function(e){ if(g!==GEN||!$('pv')) return; $('pv').innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
+  }).catch(function(e){ if(!live()) return; $('pv').innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
 }
 /* 🔒 파일 받기 — 서버 함수 puDocSecret(총괄관리자만, 열람 기록을 남긴다). 문서관리(docs-esign)와 같은 길 */
 function fetchSecret(fileId){
@@ -1027,7 +1036,7 @@ document.addEventListener('change', onField);
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
 function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} }; DL_EACH=false; gate=null;
-  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
+  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }

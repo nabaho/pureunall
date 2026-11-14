@@ -97,38 +97,47 @@
   /* opts.secret — 🔒 서명본: 창고 pu_docs/secret/… (창고 규칙이 «아무도 직접 못 읽음»), 기록에 secret:true.
      여는 길은 서버 함수뿐이다(secretBlob). ⚠ 같은 파일이 이미 보통 자리에 있으면 그것을 다시 쓴다(해시) —
      이미 직원에게 열려 있던 파일이라 새로 막을 것이 없다. */
+  /* opts.alive — 단계마다 «아직 그 사람·그 화면인가»를 묻는 함수(선택). false 면 거기서 멈춘다(보안 검토 2026-11-14:
+     해시·전송 도중 로그아웃·계정이 바뀌면 남의 이름으로 색인을 쓰지 않게). ⚠ 연결(db·창고·uid)은 «부른 순간» 것을 붙잡아 쓴다 —
+     도중에 init 이 다른 사람으로 바뀌어도 이 올리기는 처음 사람 것으로만 쓴다(규칙 by === auth.uid 가 남의 세션에서는 거절한다). */
   function putOriginal(file, from, opts) {
     var secret = !!(opts && opts.secret);
+    var alive = opts && typeof opts.alive === 'function' ? opts.alive : function () { return true; };
+    var d = { db: deps.db, storage: deps.storage, uid: deps.uid, name: deps.name };
+    function stillOk() { if (!alive()) throw new Error('올리기를 멈췄습니다(로그아웃·계정 바뀜)'); }
     var chk = okDocFile(file && file.name, file && file.size);
     if (!chk.ok) return Promise.reject(new Error(chk.why));
-    if (!deps.storage) return Promise.reject(new Error('파일 창고가 연결되지 않았습니다'));
-    if (!deps.uid) return Promise.reject(new Error('로그인한 계정을 알 수 없습니다'));
-    needDb();
+    if (!d.storage) return Promise.reject(new Error('파일 창고가 연결되지 않았습니다'));
+    if (!d.uid) return Promise.reject(new Error('로그인한 계정을 알 수 없습니다'));
+    if (!d.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
     return sha256Hex(file.bytes).then(function (h) {
-      return deps.db.ref(ROOT + '/hash/' + h).once('value').then(function (s) {
+      stillOk();
+      return d.db.ref(ROOT + '/hash/' + h).once('value').then(function (s) {
+        stillOk();
         var have = s.val();
         /* 🔒 로 올리려는데 같은 파일이 이미 있으면 그 자리가 🔒 인지 알려 준다 — 부르는 쪽이 🔒 표시를 함부로 붙이지 않게(검토 2026-10-09) */
-        if (have && secret) return deps.db.ref(ROOT + '/originals/' + have + '/secret').once('value').then(function (x) {
+        if (have && secret) return d.db.ref(ROOT + '/originals/' + have + '/secret').once('value').then(function (x) {
           return { fileId: have, sha256: h, reused: true, secret: x.val() === true };
         }, function () { return { fileId: have, sha256: h, reused: true, secret: false }; });
         if (have) return { fileId: have, sha256: h, reused: true };
-        var fileId = deps.db.ref(ROOT + '/originals').push().key;
+        var fileId = d.db.ref(ROOT + '/originals').push().key;
         var p = ROOT + (secret ? '/secret/' : '/originals/') + fileId + '/' + safeFileName(file.name);
-        return deps.storage.ref(p).put(file.bytes, { contentType: file.type || 'application/octet-stream' })
+        return d.storage.ref(p).put(file.bytes, { contentType: file.type || 'application/octet-stream' })
           .then(function () {
-            return deps.db.ref(ROOT + '/originals/' + fileId).set(originalRecord({
+            stillOk();
+            return d.db.ref(ROOT + '/originals/' + fileId).set(originalRecord({
               name: String(file.name).slice(0, 200), size: file.size, type: String(file.type || '').slice(0, 120),
-              sha256: h, path: p, at: Date.now(), by: deps.uid, byName: deps.name, from: from, secret: secret }));
+              sha256: h, path: p, at: Date.now(), by: d.uid, byName: d.name, from: from, secret: secret }));
           })
           .then(function () {
-            return deps.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
+            return d.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
               return { fileId: fileId, sha256: h, reused: false, secret: secret };
             }, function (setErr) {
               /* ⚠ 겹쳐 쓰기 — 다른 탭·사람이 같은 순간 같은 해시로 먼저 hash/{h} 를
                  심었으면(규칙이 «새로 쓰기만» 이라 우리 것은 거절된다) 진 게 아니다.
                  다시 읽어 그 fileId 를 쓰면 된다 — 우리가 창고에 올린 것은 고아로
                  남지만(정직하게 감수), 화면은 먼저 심긴 쪽을 그대로 쓰면 된다. */
-              return deps.db.ref(ROOT + '/hash/' + h).once('value').then(function (s2) {
+              return d.db.ref(ROOT + '/hash/' + h).once('value').then(function (s2) {
                 var have2 = s2.val();
                 if (have2) return { fileId: have2, sha256: h, reused: true };
                 throw setErr;

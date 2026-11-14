@@ -1385,14 +1385,15 @@ rules.settle = { '.read': SETTLE_R,
      ⚠ 주민등록번호 뒷자리는 화면이 저장하지 않는다(생년월일만) — 그래도 주소가 들어 있어 재무권한자에게도 열지 않는다.
    ⚠ 지우기(빈 값 쓰기)는 막는다 — 등기 건은 «취소» 상태로만 거둔다. 열쇠와 레코드 id 가 어긋나면 막는다.
    ★ archive(2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」) — 지난 등기 원본 서류 묶음. 파일 바이트는 원본 보관함 🔒 자리,
-     여기엔 파일 번호·종류만. 파일 줄의 열쇠 = 파일 번호이고, 원본 보관함에 «있는» 번호만 받는다(남의 자리를 가리키는 헛 번호 막기). */
+     여기엔 파일 번호·종류만. 파일 줄의 열쇠 = 파일 번호이고, 원본 보관함에서 «🔒(secret) 이고 푸른등기가 올린(from.kind deungi)» 번호만 받는다
+     — 다른 업무의 보통 원본(직원 누구나 여는 자리)을 이어 «총괄관리자만 연다»는 약속이 깨지지 않게(보안 검토 2026-11-14). */
 const DEUNGI_R = `(${LOGIN}) && (${ADMIN} || ${SUB})`;
 const DEUNGI_W = `${DEUNGI_R} && newData.exists()`;
 rules.deungi = { '.read': DEUNGI_R,
   base:  { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === 'base' && newData.child('entityType').val() === 'DeungiBase'" },
   cases: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'" } },
   archive: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiArchive'",
-    files: { $f: { '.validate': "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).exists()" } } } } };
+    files: { $f: { '.validate': "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).child('secret').val() === true && root.child('pu_docs/originals').child($f).child('from').child('kind').val() === 'deungi'" } } } } };
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).

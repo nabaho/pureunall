@@ -121,8 +121,16 @@ test('접근성 — 탭은 tablist·aria-selected, 전체 고르기·현황 표 
 
 /* 2026-11-14 지난 등기 원본 서류 — 원본 보관함 🔒 자리 · 총괄관리자만 연다 · 지우지 않는다 */
 test('★ 원본 파일은 원본 보관함 🔒 자리에(from.kind deungi) 올리고, 보기·받기는 총괄관리자만', () => {
-  assert.match(본문, /PuOfficeStore\.putOriginal\([^;]*\{ kind:'deungi', ev:evId \}, \{ secret:true \}\)/);
+  assert.match(본문, /PuOfficeStore\.putOriginal\(\{ name:nm,[^;]*\{ kind:'deungi', ev:evId \}, \{ secret:true, alive:function\(\)\{ return g===GEN; \} \}\)/);
   assert.doesNotMatch(본문, /secret:false/);
+  /* ★ 이름의 주민번호 뒷자리는 올리기 «전»에 지운다 — 원본 보관함 색인은 직원 모두가 읽는다(보안 검토 2026-11-14) */
+  assert.match(본문, /var nm=C\.str\(fl\.name\)/);
+  /* ★ 같은 파일이 이미 보관함에 있으면 🔒 이고 푸른등기가 올린 것만 잇는다 */
+  assert.match(본문, /rec\.secret!==true \|\| !rec\.from \|\| rec\.from\.kind!=='deungi'/);
+  /* ★ 받기·보기 — 늦게 온 응답은 세대·차례를 보고 버린다(로그아웃 뒤 자동 내려받기·남의 미리보기 덮기 막기) */
+  assert.match(본문, /secretBlob\(f\.fileId\)\.then\(function\(b\)\{ if\(g!==GEN\) return; PuOfficeStore\.saveBlob/);
+  assert.doesNotMatch(본문, /PuOfficeStore\.download\(/);
+  assert.match(본문, /seq===PV_SEQ/);
   ['function arcView(', 'function arcDownload('].forEach((k) => {
     const i = 본문.indexOf(k); assert.ok(i >= 0, k);
     assert.match(본문.slice(i, i + 200), /if\(!ME\.isAdmin\) return toast\('🔒 총괄관리자만 엽니다'\)/, k + ' 에 총괄관리자 문이 없다');
@@ -141,7 +149,9 @@ test('★ 보안규칙 — 묶음은 관리자·위임관리인, 파일 줄은 �
   const a = r.deungi.archive.$id;
   assert.match(a['.write'], /isAdmin/); assert.match(a['.write'], /isSubAdmin/); assert.match(a['.write'], /newData\.exists\(\)/);
   assert.match(a['.validate'], /=== \$id/); assert.match(a['.validate'], /'DeungiArchive'/);
-  assert.match(a.files.$f['.validate'], /root\.child\('pu_docs\/originals'\)\.child\(\$f\)\.exists\(\)/);
+  /* 파일 줄은 «🔒 이고 푸른등기가 올린» 원본만 — 다른 업무의 보통 원본을 이어 열람 약속을 깨지 않게(보안 검토 2026-11-14) */
+  assert.match(a.files.$f['.validate'], /child\(\$f\)\.child\('secret'\)\.val\(\) === true/);
+  assert.match(a.files.$f['.validate'], /child\('from'\)\.child\('kind'\)\.val\(\) === 'deungi'/);
   assert.match(r.pu_docs.originals.$id.from.kind['.validate'], /'deungi'/);
   global.window = global.window || {};
   const O = require('../js/pu-ontology.js'); const Ont = O.PuOntology || O || global.window.PuOntology;
