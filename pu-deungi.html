@@ -248,13 +248,15 @@ function saveCase(){
   clearTimeout(SAVE.t);
   var id=c.id, rec=caseRecord(c);
   SAVE.busy=true; SAVE.err=''; drawSaveState();
+  var g=GEN;
   return save('deungi/cases/'+id, 'DeungiCase', function(prev){ return Object.assign({}, rec, prev&&prev.createdAt?{ createdAt:prev.createdAt }:{}); })
     .then(function(r){
+      if(g!==GEN) return;
       var v=r&&r.snapshot&&r.snapshot.val();
       if(v && CASES[id]){ CASES[id].revision=v.revision; CASES[id].createdAt=v.createdAt; CASES[id].updatedAt=v.updatedAt; }
       SAVE.busy=false; SAVE.dirty=false; SAVE.at=Date.now(); drawSaveState(); drawCaseList();
     })
-    .catch(function(e){ SAVE.busy=false; SAVE.err=(e&&e.message)||'저장 실패'; drawSaveState(); toast('저장하지 못했습니다 — '+SAVE.err, 5000); });
+    .catch(function(e){ if(g!==GEN) return; SAVE.busy=false; SAVE.err=(e&&e.message)||'저장 실패'; drawSaveState(); toast('저장하지 못했습니다 — '+SAVE.err, 5000); });
 }
 function drawSaveState(){
   var el=$('saveState'); if(!el) return;
@@ -383,8 +385,8 @@ function drawChanges(){
         var sum=ch.share.to.reduce(function(s,t){ return s+C.num(t.amount); }, 0);
         b+='<div class="tos"><div class="hint">양수인 — 넘겨받는 사원과 금액(합계가 금 '+C.won(iv.cash)+'원이 되게)</div>';
         ch.share.to.forEach(function(t, j){
-          b+='<div class="tor"><select data-to="'+j+'" data-k="member">'+memberOpts(others).map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===t.member?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+
-            '<input data-to="'+j+'" data-k="amount" inputmode="numeric" value="'+esc(t.amount||'')+'" placeholder="금액(원)"><span class="hint">'+(t.amount?C.won(t.amount)+'원':'')+'</span><button class="sm" data-act="toDel" data-j="'+j+'">빼기</button></div>';
+          b+='<div class="tor"><select aria-label="양수인" data-to="'+j+'" data-k="member">'+memberOpts(others).map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===t.member?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+
+            '<input aria-label="양수 금액(원)" data-to="'+j+'" data-k="amount" inputmode="numeric" value="'+esc(t.amount||'')+'" placeholder="금액(원)"><span class="hint">'+(t.amount?C.won(t.amount)+'원':'')+'</span><button class="sm" data-act="toDel" data-j="'+j+'">빼기</button></div>';
         });
         b+='<div class="tor"><button class="sm" data-act="toAdd">＋ 양수인</button><span class="chip '+(sum===iv.cash?'g':'a')+'">합계 '+C.won(sum)+' / '+C.won(iv.cash)+'원</span></div></div>';
       }
@@ -546,6 +548,8 @@ function drawBase(){
   h+='<div class="card"><h3>정관 본문(선택) <span class="hint">넣어 두면 «변경 정관»이 제3·5·6조를 갈아 끼운 전문으로 나옵니다. 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸으로 바뀝니다</span></h3>'+
     '<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div></div>';
   $('baseBox').innerHTML=h;
+  /* 표 안 입력칸 이름표(스크린리더) — 폰 카드 이름표(data-l)와 같은 말 */
+  Array.prototype.forEach.call($('baseBox').querySelectorAll('td[data-l] input:not([aria-label])'), function(i){ i.setAttribute('aria-label', i.closest('td').getAttribute('data-l')); });
 }
 function baseHeadHtml(){ return BASE_DRAFT?'<span class="chip a">저장 안 한 고침</span> <button class="sm" data-act="baseUndo">되돌리기</button> <button class="sm pri" data-act="baseSave">저장</button>':'<span class="chip g">저장됨</span>'; }
 function touchBase(){ if(!BASE_DRAFT){ BASE_DRAFT=JSON.parse(JSON.stringify(BASE)); var hb=$('baseHead'); if(hb) hb.innerHTML=baseHeadHtml(); } return BASE_DRAFT; }
@@ -555,9 +559,10 @@ function saveBase(){
   var b=C.normBase(BASE_DRAFT); b.charter=maskRrnText(b.charter);
   var p=C.baseProblems(b);
   if(p.length && !confirm('확인할 것이 있습니다:\n· '+p.join('\n· ')+'\n\n그래도 저장할까요?')) return;
+  var g=GEN;
   save('deungi/base', 'DeungiBase', function(prev){ var o=Object.assign({}, b); if(prev&&prev.createdAt) o.createdAt=prev.createdAt; return o; })
-    .then(function(){ BASE=b; BASE_DRAFT=null; toast('등기 현황을 저장했습니다'); draw(); })
-    .catch(function(e){ toast('저장하지 못했습니다 — '+((e&&e.message)||''), 5000); });
+    .then(function(){ if(g!==GEN) return; BASE=b; BASE_DRAFT=null; toast('등기 현황을 저장했습니다'); draw(); })
+    .catch(function(e){ if(g!==GEN) return; toast('저장하지 못했습니다 — '+((e&&e.message)||''), 5000); });
 }
 
 /* ═══ 지난 기록 ═══ */
@@ -596,16 +601,16 @@ function dlPack(){
     toast(docs.length+'가지 서류를 한 파일로 받았습니다');
   }catch(e){ toast('만들지 못했습니다 — '+((e&&e.message)||e), 5000); }
 }
-var DL_EACH=false;
+var DL_EACH=false, DL_T=null;
 function dlEach(){
   if(DL_EACH) return toast('받는 중입니다 — 잠시 기다리십시오');
   if(!ready()) return; var x=docCtx();
   if(x.after.errors.length) return toast('빨간 글을 먼저 고치십시오');
-  var docs=DD.build(x, chosenKeys(x.after)), i=0; DL_EACH=true;
-  (function next(){ if(i>=docs.length){ DL_EACH=false; toast(docs.length+'개 파일을 받았습니다'); return; }
+  var docs=DD.build(x, chosenKeys(x.after)), i=0, g=GEN; DL_EACH=true;
+  (function next(){ DL_T=null; if(g!==GEN){ docs=null; return; } if(i>=docs.length){ DL_EACH=false; toast(docs.length+'개 파일을 받았습니다'); docs=null; return; }
     var d=docs[i++], u8=DD.fileOne(d), name=DD.fileName(x, d);
     try{ PureunHwp.validate(u8, name); PureunHwp.download(u8, name, 'hwpx'); }catch(e){ toast(d.label+' — '+((e&&e.message)||e), 4000); }
-    setTimeout(next, 450); })();
+    DL_T=setTimeout(next, 450); })();
 }
 function dlOne(key){
   if(!ready()) return; var x=docCtx(), d=DD.make(key, x);
@@ -618,7 +623,8 @@ function preview(key){
   if(!d||!d.body) return toast('이 건에는 만들 내용이 없습니다');
   var u8=DD.fileOne(d), name=DD.fileName(x, d);
   openModal('<h3>👁 '+esc(d.label)+'<span class="sp"></span><button class="sm" data-act="dl1" data-key="'+esc(key)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">그리는 중…</div></div></div>');
-  PureunHwp.renderPreview($('pv'), u8, name).catch(function(e){ $('pv').innerHTML='<div class="msg w">미리보기를 그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오.</div>'; });
+  var g=GEN;
+  PureunHwp.renderPreview($('pv'), u8, name).catch(function(e){ if(g!==GEN||!$('pv')) return; $('pv').innerHTML='<div class="msg w">미리보기를 그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오.</div>'; });
 }
 var MODAL_BACK=null;
 function openModal(html){ var m=$('modal'); MODAL_BACK=document.activeElement; m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex';
@@ -691,18 +697,20 @@ function applyToBase(){
   var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+
     (BASE.charter?'\n· 정관 본문의 제3·5·6조도 바꿉니다':'')+'\n\n바꾼 뒤에는 이 건을 «지난 기록»으로 옮깁니다. 진행할까요?';
   if(!confirm(msg)) return;
+  var g=GEN;
   save('deungi/base', 'DeungiBase', function(prev){ var o=Object.assign({}, nb); if(prev&&prev.createdAt) o.createdAt=prev.createdAt; return o; })
-    .then(function(){ BASE=C.normBase(nb); c.baseSnap=snap; c.applied=true; c.status='done'; return saveCase(); })
-    .then(function(){ toast('등기 현황에 반영했습니다'); CUR=''; draw(); })
-    .catch(function(e){ toast('반영하지 못했습니다 — '+((e&&e.message)||''), 5000); });
+    .then(function(){ if(g!==GEN) return; BASE=C.normBase(nb); c.baseSnap=snap; c.applied=true; c.status='done'; return saveCase(); })
+    .then(function(){ if(g!==GEN) return; toast('등기 현황에 반영했습니다'); CUR=''; draw(); })
+    .catch(function(e){ if(g!==GEN) return; toast('반영하지 못했습니다 — '+((e&&e.message)||''), 5000); });
 }
 function cancelSelected(){
   var ids=Object.keys(SEL.cases).filter(function(k){ return SEL.cases[k] && CASES[k]; });
   if(!ids.length) return;
   if(!confirm(ids.length+'건을 «취소»로 표시합니다(지우지 않고 지난 기록에 남깁니다). 진행할까요?')) return;
-  Promise.all(ids.map(function(id){ var rec=caseRecord(Object.assign({}, CASES[id], { status:'cancelled' })); return save('deungi/cases/'+id, 'DeungiCase', function(prev){ return Object.assign({}, rec, prev&&prev.createdAt?{ createdAt:prev.createdAt }:{}); }).then(function(){ CASES[id].status='cancelled'; }); }))
-    .then(function(){ SEL.cases={}; if(ids.indexOf(CUR)>=0) CUR=''; toast(ids.length+'건을 취소로 표시했습니다'); draw(); })
-    .catch(function(e){ toast('바꾸지 못했습니다 — '+((e&&e.message)||''), 5000); });
+  var g=GEN;
+  Promise.all(ids.map(function(id){ var rec=caseRecord(Object.assign({}, CASES[id], { status:'cancelled' })); return save('deungi/cases/'+id, 'DeungiCase', function(prev){ return Object.assign({}, rec, prev&&prev.createdAt?{ createdAt:prev.createdAt }:{}); }).then(function(){ if(g===GEN && CASES[id]) CASES[id].status='cancelled'; }); }))
+    .then(function(){ if(g!==GEN) return; SEL.cases={}; if(ids.indexOf(CUR)>=0) CUR=''; toast(ids.length+'건을 취소로 표시했습니다'); draw(); })
+    .catch(function(e){ if(g!==GEN) return; toast('바꾸지 못했습니다 — '+((e&&e.message)||''), 5000); });
 }
 function jsonOut(){
   var b=C.normBase(bd()); b.charter=maskRrnText(b.charter);
@@ -834,7 +842,7 @@ document.addEventListener('change', onField);
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
-function wipe(){ GEN++; clearTimeout(SAVE.t); SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
+function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }
@@ -854,6 +862,8 @@ function boot(){
     WHO=u.uid; var gen=GEN;
     PuGate.hide();
     var role=await staffRole(u);
+    var now=firebase.auth().currentUser;
+    if(gen!==GEN || !now || now.uid!==u.uid) return;
     if(!canOpen(role)){ lock(role&&role.status==='active'?'대표·위임관리인 권한이 없는 계정입니다':'재직 중인 직원 계정이 아닙니다'); return; }
     ME.sid=String(role.sid); ME.isAdmin=role.isAdmin===true; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:ME.sid });
     $('lock').style.display='none'; $('app').style.display='';

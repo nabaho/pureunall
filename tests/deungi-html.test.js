@@ -73,6 +73,18 @@ test('★ 문은 관리자·위임관리인만 — 재직 아님·권한 없음�
   assert.doesNotMatch(m[0], /\.fin/);
 });
 
+test('★ 로그아웃·계정이 바뀌면 화면 기억을 비우고, 늦게 온 저장·권한 응답은 버린다(보안 검토 2026-11-14)', () => {
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/);
+  assert.ok(wipe, 'wipe() 가 없다');
+  ['RRN={}', 'BASE_DRAFT=null', 'CASES={}', 'clearTimeout(SAVE.t)', 'clearTimeout(DL_T)', 'GEN++'].forEach((k) => assert.ok(wipe[0].indexOf(k) >= 0, 'wipe 가 비우지 않는 것: ' + k));
+  assert.match(본문, /if\(!u\)\{[^}]*wipe\(\)/, '로그아웃 때 wipe 를 부르지 않는다');
+  assert.match(본문, /var role=await staffRole\(u\);\s*var now=firebase\.auth\(\)\.currentUser;\s*if\(gen!==GEN/, '권한 응답 뒤 세대·사용자를 다시 보지 않는다');
+  /* 저장 콜백마다 세대를 본다 — then 이 있는 save( 의 수만큼 g!==GEN 이 있어야 한다 */
+  const saves = (본문.match(/save\('deungi\//g) || []).length;
+  const guards = (본문.match(/if\(g!==GEN\)/g) || []).length;
+  assert.ok(guards >= saves, '세대 검사(' + guards + ')가 저장(' + saves + ')보다 적다');
+});
+
 test('지우기 대신 «취소» 상태 — 자료 자리(ref)를 remove·set(null) 하지 않는다', () => {
   assert.doesNotMatch(본문, /ref\([^)]*\)\s*\.remove\(/);
   assert.doesNotMatch(본문, /\.set\(null\)/);
