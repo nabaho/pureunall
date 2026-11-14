@@ -461,3 +461,26 @@ test('★ 예상 비용 검토 반영 — 비대표 사원 주소만이면 등�
   assert.ok(p.alt && p.alt.incr === 10000000, '양도된 지분을 두 번 세면 출자증가를 놓친다');
   assert.ok(C.checklist(a).some((i) => i.key === 'investProof'));
 });
+
+/* 2026-11-15 재검증 반영 — 등기할 사항이 없는 건은 정관변경 인가로 끝, 대표사원 주소변경엔 초본 */
+test('★ 등기할 사항이 없는 건 — 필요서류·다음 할 일·기한·도장 안내가 인가만, 현황 반영은 인가증 받은 날', () => {
+  const b = 법인(); b.firm.hq = '충청남도 천안시 서북구 점검로 1';
+  const 건 = (o) => Object.assign({ id: 'DG-N', meeting: { date: '2026-11-20' }, changes: [{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }] }, o || {});
+  let a = C.applyChanges(C.normBase(b), 건());
+  assert.equal(C.needsReg(a), false); assert.equal(a.charterChanged, true);
+  const keys = C.checklist(a).map((i) => i.key);
+  assert.ok(keys.includes('noReg') && keys.includes('applyDocs'));
+  ['notary', 'memberCerts', 'taxPaid', 'feePaid', 'filing', 'corpCert'].forEach((k) => assert.ok(!keys.includes(k), k + ' 는 등기할 것이 없으면 필요 없다'));
+  assert.equal(C.deadline(a, '2026-12-30').none, true);
+  assert.match(C.nextStep(a, '2026-11-21'), /정관변경 인가 신청/);
+  assert.doesNotMatch(C.nextStep(a, '2026-11-21'), /공증/);
+  assert.match(C.sealPlan(a, ['minutes'])[0].how, /공증은 필요 없음/);
+  a = C.applyChanges(C.normBase(b), 건({ dates: { approvalApply: '2026-11-22', approvalGet: '2026-12-01' } }));
+  assert.match(C.nextStep(a, '2026-12-02'), /등기 현황에 반영/);
+  assert.equal(C.nextBase(a, { today: '2026-12-05' }).history.slice(-1)[0].at, '2026-12-01', '등기 완료일 대신 인가증 받은 날');
+  /* 대표사원 주소변경 — 주민등록표 초본(비용·필요서류) */
+  a = C.applyChanges(C.normBase(b), 건({ changes: [{ id: 'a', type: 'addr', member: 'm1', addr: '점검시 새로 9' }] }));
+  assert.equal(C.needsReg(a), true);
+  assert.ok(C.costPlan(a).rows.some((r) => /주민등록표 초본 1통/.test(r.label)));
+  assert.ok(C.checklist(a).some((i) => /^addrRes:/.test(i.key)));
+});

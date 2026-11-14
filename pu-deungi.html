@@ -476,7 +476,7 @@ function checkMsgs(a, B0){
   a.warnings.forEach(function(e){ m+='<div class="msg w">⚠ '+esc(e)+'</div>'; });
   C.baseProblems(B0).forEach(function(e){ m+='<div class="msg w">⚠ 등기 현황: '+esc(e)+'</div>'; });
   if(!n.changes.length) m+='<div class="msg i">바뀌는 것을 넣으면 여기서 확인합니다.</div>';
-  else if(!a.errors.length) m+='<div class="msg ok">✔ 서류를 만들 수 있습니다 — '+esc(C.purpose(a))+(a.charterChanged?' · 정관 '+a.arts.map(function(k){ return '제'+k+'조'; }).join('·')+' 변경 → 고용노동부 정관변경 인가가 필요합니다':' · 정관은 바뀌지 않습니다(인가 불필요)')+'</div>';
+  else if(!a.errors.length) m+='<div class="msg ok">✔ 서류를 만들 수 있습니다 — '+esc(C.purpose(a)||'등기할 사항 없음')+(a.charterChanged?' · 정관 '+a.arts.map(function(k){ return '제'+k+'조'; }).join('·')+' 변경 → 고용노동부 정관변경 인가가 필요합니다':' · 정관은 바뀌지 않습니다(인가 불필요)')+'</div>';
   if(n.changes.length && !a.errors.length){ var cp=C.costPlan(a), where=MODE==='easy'?'④ 등기 단계':'⑦ 예상 비용';
     m+='<div class="msg i">💰 '+(cp.none?'등기할 사항이 없어 등기 비용이 들지 않습니다'+(a.charterChanged?'(정관변경 인가만)':''):'예상 비용 약 <b>'+C.won(cp.visit)+'원</b>('+(n.filing==='agent'?'세금·수수료·공증·증명서 — 법무사 보수 별도':'직접 방문 신청 · 세금·수수료·공증·증명서')+') — 자세한 표는 '+where+(cp.alt||cp.perType?' · 늘어날 수 있음':''))+'</div>'; }
   return '<div class="msgs">'+m+'</div>';
@@ -548,13 +548,14 @@ function drawSched(a){
     .filter(function(s){ return a.charterChanged || (s[0]!=='approvalApply' && s[0]!=='approval' && s[0]!=='approvalGet'); });
   var h='<div class="steps">'+steps.map(function(s){ return '<label class="step'+(d[s[0]]?' done':'')+'">'+esc(s[1])+'<input type="date" data-k="dates.'+s[0]+'" value="'+esc(d[s[0]]||'')+'"></label>'; }).join('')+'</div>';
   var dm='';
-  if(dl && dl.due){
+  if(dl && dl.none) dm='<div class="msg ok">✔ 등기할 사항이 없어 등기 기한이 없습니다'+(a.charterChanged?' — 정관변경 인가만 받으면 됩니다':'')+'</div>';
+  else if(dl && dl.due){
     dm=dl.filed ? '<div class="msg '+(dl.left<0?'w':'ok')+'">등기 신청 '+esc(d.file)+' — 기한 '+esc(dl.due)+(dl.left<0?' 을 '+(-dl.left)+'일 넘겨 신청했습니다(«변경등기 지연 사유서»가 서류에 들어갑니다)':' 안에 신청했습니다')+'</div>'
       : '<div class="msg '+(dl.overdue?'e':dl.left<=5?'w':'i')+'">등기 기한 <b>'+esc(dl.due)+'</b> ('+esc(dl.basis)+' '+esc(dl.from)+' + 2주일) — '+(dl.overdue?(-dl.left)+'일 지났습니다. «변경등기 지연 사유서»가 서류에 들어갑니다':dl.left+'일 남음')+'</div>';
   } else dm='<div class="msg i">'+(a.charterChanged?'«정관변경 인가증 받음» 날짜를 넣으면 등기 기한(받은 날부터 2주일)이 나옵니다.':'총회일을 넣으면 등기 기한(2주일)이 나옵니다.')+'</div>';
   dm+='<div class="hint" style="padding:0 2px">'+esc(C.DEADLINE_NOTE)+'</div>';
   var stOpts=C.STATUS_ORDER.map(function(k){ return [k, C.STATUS[k]]; });
-  var canApply=c.dates.done && !a.errors.length && c.changes.length && !c.applied;
+  var canApply=canApplyCase(a, cur());
   h+='<div class="cb">'+dm+'<div class="bar" style="padding:8px 0 0"><label class="fl" style="flex-direction:row;align-items:center;gap:6px">단계 <select data-k="status">'+stOpts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===c.status?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></label>'+
     '<span class="hint">다음: '+esc(C.nextStep(a, today()))+'</span><span class="sp"></span>'+
     (c.applied?'<span class="chip g">✔ 등기 현황에 반영함</span>':'<button class="sm '+(canApply?'pri':'')+'" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다"')+'>🏛 등기 현황에 반영</button>')+'</div></div>';
@@ -587,6 +588,7 @@ function nextBar(k, ok, why){
 }
 function deadlineHtml(a){
   var d=a.c.dates, dl=C.deadline(a, today());
+  if(dl && dl.none) return '<div class="msg ok">✔ 등기할 사항이 없어 등기 기한이 없습니다'+(a.charterChanged?' — 정관변경 인가만 받으면 됩니다':'')+'</div>';
   if(dl && dl.due) return dl.filed ? '<div class="msg '+(dl.left<0?'w':'ok')+'">등기 신청 '+esc(d.file)+' — 기한 '+esc(dl.due)+(dl.left<0?'을 '+(-dl.left)+'일 넘겼습니다(«변경등기 지연 사유서»가 서류에 들어갑니다)':' 안에 신청했습니다')+'</div>'
     : '<div class="msg '+(dl.overdue?'e':dl.left<=5?'w':'i')+'">등기 기한 <b>'+esc(dl.due)+'</b> ('+esc(dl.basis)+' '+esc(dl.from)+' + 2주일) — '+(dl.overdue?(-dl.left)+'일 지났습니다':dl.left+'일 남음')+'</div>';
   return '<div class="msg i">'+(a.charterChanged?'«인가증 받은 날»을 넣으면 등기 기한(받은 날부터 2주일)이 나옵니다.':'총회 날짜를 넣으면 등기 기한(2주일)이 나옵니다.')+'</div>';
@@ -631,7 +633,7 @@ function drawWizBody(st, a){
     $('wizBody').innerHTML=h; return;
   }
   /* ④ 등기 — 직접 신청(기본, 대표 2026-11-15 «법무사 없이 직접하는 것이다») 또는 법무사 */
-  var canApply=n.dates.done && !a.errors.length && n.changes.length && !c.applied, self=n.filing!=='agent', ct=(B0.firm&&B0.firm.court)||'관할 등기소';
+  var canApply=canApplyCase(a, c), self=n.filing!=='agent', ct=(B0.firm&&B0.firm.court)||'관할 등기소';
   h='<div class="card"><h3>④ 등기 — '+(self?'직접 신청':'법무사에게 맡기기')+'<span class="sp"></span><label class="fl" style="flex-direction:row;align-items:center;gap:6px;font-weight:400">신청 <select data-k="filing" aria-label="등기 신청 방법"><option value="self"'+(self?' selected':'')+'>직접</option><option value="agent"'+(self?'':' selected')+'>법무사</option></select></label></h3><div class="msgs" id="easyDl">'+deadlineHtml(a)+'</div>'+
     (C.costPlan(a).none?'<div class="msgs"><div class="msg ok">✔ 이번 변경은 등기할 사항이 없습니다'+(a.charterChanged?' — ③ 정관변경 인가만 받으면 끝입니다':'')+'.</div></div>':self?'<div class="cb"><b>직접 등기 순서</b><ol class="howto">'+
       '<li><b>등기소에 미리 전화</b> — '+esc(ct)+': 총사원 동의서도 공증이 필요한지 · 사원 전원 공동신청인지 · 변경 정관을 붙이는지 · 등록면허세 건수</li>'+
@@ -642,10 +644,16 @@ function drawWizBody(st, a){
       :'<div class="cb hint">도장 찍은 서류와 아래 필요서류를 담당 법무사에게 보내면 법무사가 등기를 신청합니다.</div>')+'</div>'+
     '<div class="card"><h3>💰 예상 비용 <span class="hint">'+esc(C.FEES.asOf)+' 법령 기준 — 실제 고지·영수 금액이 기준</span></h3><div id="edCost"></div></div>'+
     '<div class="card"><h3>필요서류 확인 <span id="ckProg"></span></h3><div id="edList"></div></div>'+
-    '<div class="card"><h3>등기 끝내기</h3><div class="cb"><div class="grid">'+fld('등기 신청한 날', 'dates.file', n.dates.file, { type:'date' })+fld('등기 완료된 날', 'dates.done', n.dates.done, { type:'date' })+'</div></div>'+
-    '<div class="nextbar"><button class="sm" data-act="wizGo" data-s="3">← 앞 단계</button><span class="sp"></span>'+(c.applied?'<span class="chip g">✔ 등기 현황에 반영함 — 끝</span>':'<button class="pri" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료된 날»을 넣으면 누를 수 있습니다"')+'>🏛 등기 현황에 반영하고 끝내기</button>')+'</div></div>';
+    '<div class="card"><h3>'+(C.needsReg(a)?'등기 끝내기':'끝내기')+'</h3>'+(C.needsReg(a)?'':'<div class="cb hint">등기할 사항이 없어 등기 날짜는 필요 없습니다 — '+(a.charterChanged?'인가증을 받았으면':'바로')+' «등기 현황에 반영하고 끝내기»를 누르십시오.</div>')+'<div class="cb"'+(C.needsReg(a)?'':' style="display:none"')+'><div class="grid">'+fld('등기 신청한 날', 'dates.file', n.dates.file, { type:'date' })+fld('등기 완료된 날', 'dates.done', n.dates.done, { type:'date' })+'</div></div>'+
+    '<div class="nextbar"><button class="sm" data-act="wizGo" data-s="3">← 앞 단계</button><span class="sp"></span>'+(c.applied?'<span class="chip g">✔ 등기 현황에 반영함 — 끝</span>':'<button class="pri" data-act="applyBase"'+(canApply?'':' disabled title="'+esc(applyWhy(a))+'"')+'>🏛 등기 현황에 반영하고 끝내기</button>')+'</div></div>';
   $('wizBody').innerHTML=h; drawChecklist(a); drawCost(a);
 }
+/* 등기 현황에 반영할 수 있나 — 등기할 사항이 있으면 «등기 완료된 날», 없으면 정관이 바뀔 때 «인가증 받은 날»(검토 2026-11-15) */
+function canApplyCase(a, c){
+  if(!c || c.applied || a.errors.length || !a.c.changes.length) return false;
+  return C.needsReg(a) ? !!a.c.dates.done : (!a.charterChanged || !!a.c.dates.approvalGet);
+}
+function applyWhy(a){ return C.needsReg(a) ? '«등기 완료된 날»을 넣으면 누를 수 있습니다' : '«인가증 받은 날»을 넣으면 누를 수 있습니다(등기할 사항 없음)'; }
 /* 💰 예상 비용 — core costPlan(2026-11-15 법령 확인 금액). 보기 전용 표 */
 function drawCost(a){
   var el=$('edCost'); if(!el) return;
@@ -678,7 +686,7 @@ function drawEasyDerived(){
     nx.disabled=!ok;
   }
   var ab=document.querySelector('#wizBody [data-act="applyBase"]');
-  if(ab){ var canA=!!(n.dates.done && !a.errors.length && n.changes.length && !c.applied); ab.disabled=!canA; ab.title=canA?'':'«등기 완료된 날»을 넣으면 누를 수 있습니다'; }
+  if(ab){ var canA=canApplyCase(a, c); ab.disabled=!canA; ab.title=canA?'':applyWhy(a); }
   drawSaveState();
 }
 /* 한글 쪽 화면 — 서류마다 따로 그려 차례(목차)를 붙인다. 다른 단계로 가거나 다시 그리면 앞 그리기는 버린다 */
@@ -1048,7 +1056,8 @@ function chgById(id){ var c=cur(); return (c.changes||[]).filter(function(x){ re
 function applyToBase(){
   var c=cur(); if(!c) return; var a=C.applyChanges(baseOf(c), c);
   if(a.errors.length) return toast('빨간 글을 먼저 고치십시오');
-  if(!a.c.dates.done) return toast('«등기 완료» 날짜를 넣으십시오');
+  if(C.needsReg(a) && !a.c.dates.done) return toast('«등기 완료» 날짜를 넣으십시오');
+  if(!C.needsReg(a) && a.charterChanged && !a.c.dates.approvalGet) return toast('«인가증 받은 날»을 넣으십시오');
   if(BASE_DRAFT) return toast('«등기 현황»에 저장 안 한 고침이 있습니다 — 먼저 저장하거나 되돌리십시오', 4000);
   var nb=C.nextBase(a, { today:today() });
   /* 반영 전 현황을 건에 남긴다 — 나중에 이 건을 열어도 같은 서류가 나오게(정관 본문·기록은 빼고) */

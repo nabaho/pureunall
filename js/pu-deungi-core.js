@@ -116,6 +116,7 @@
     var nSeal = before.filter(function (m) { return !twice[m.id]; }).length + Object.keys(twice).length * 2, nRes = 0;
     (after.events || []).forEach(function (e) {
       if (e.type === 'join') { nSeal += 2; nRes += 1; }
+      if (e.type === 'addr' && (after.byId[e.member] || {}).rep) nRes += 1;   /* 대표사원 주소변경 증명 */
       if (e.type === 'repIn' && !(after.byId[e.member] || {}).isNew && !twice[e.member]) nSeal += 1;
     });
     rows.push({ kind: 'cert', label: '개인 인감증명서 ' + nSeal + '통', calc: '통당 ' + won(FEES.cert.seal) + '원(정부24 전자발급·등기 제출용은 면제)', amount: nSeal * FEES.cert.seal, payTo: '주민센터', basis: '인감증명법 시행령 제19조' });
@@ -459,7 +460,8 @@
       });
     });
     /* 날짜를 하나도 정하지 않아 총회일로 적은 줄이 있으면 알린다 — 등기부에는 효력이 생긴 날이 올라간다 */
-    if (guessed && events.length) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «③ 노동부 인가»(자세히 화면은 «진행 일정»)의 «인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
+    /* 등기할 변경(대표사원 아닌 사원 주소변경 말고)이 있을 때만 — 등기부에 올라가는 날짜 이야기다 */
+    if (guessed && events.some(function (e) { return e.type !== 'addr' || (byId[e.member] || {}).rep; })) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «③ 노동부 인가»(자세히 화면은 «진행 일정»)의 «인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
     /* 정관 제5·6조의 차례 — 같은 건에서 들어오는 사원은 나가는 사원의 자리에 넣는다(남는 입사자는 끝에).
        이 법인 2026. 7. 22. 개정 정관도 퇴사 사원의 호(3.)에 입사 사원을 적었다. */
     var joiners = members.filter(function (m) { return m.isNew; }), ji = 0, cur = [];
@@ -748,8 +750,12 @@
   }
 
   /* ── 기한 ── */
+  /* 등기할 사항이 있는가 — 대표사원이 아닌 사원의 주소만 바뀌면 정관(제5조)만 바뀌고 등기부엔 없다(검토 2026-11-15).
+     없으면 등기 신청·공증·세금·등기 기한·등기 완료일이 모두 필요 없다 — 정관변경 인가로 끝 */
+  function needsReg(after) { return !after.c.changes.length || regItems(after).length > 0; }
   function deadline(after, today) {
     var c = after.c, t = today || todayIso();
+    if (!needsReg(after)) return { from: '', due: '', basis: '등기할 사항 없음', left: null, overdue: false, filed: false, none: true, note: '등기할 사항이 없어 등기 기한이 없습니다' };
     var basis, from;
     if (after.charterChanged) { from = c.dates.approvalGet; basis = '정관변경 인가증 수령일'; }
     else { from = c.effDate || c.meeting.date; basis = '변경 연월일(총회일)'; }
@@ -770,6 +776,18 @@
     var c = after.c, b = after.base, out = [];
     function add(group, key, label, detail, src, months) { out.push({ group: group, key: key, label: label, detail: detail || '', src: src, months: months || 0 }); }
     var attendees = b.members;
+    /* 등기할 사항이 없으면 — 정관변경 인가 서류 날인·신청만(공증·증명서·세금·등기 신청 없음, 검토 2026-11-15) */
+    if (!needsReg(after)) {
+      add('법인', 'corpSeal', '법인인감도장', '정관변경 인가 신청서·변경 정관 날인', '서류');
+      add('사원 전원', 'memberSeals', '사원 도장 — ' + attendees.map(function (m) { return m.name; }).join(', '), '임시사원총회 의사록·총사원 동의서 날인', '서류');
+      if (after.charterChanged) {
+        add('정관변경 인가', 'applyDocs', '정관변경 인가 신청', '신청서(시행규칙 별지 제26호서식) · 정관 변경 이유서 · 정관 변경안(신·구조문 대비표·변경 정관) · 사원총회 회의록 사본 → ' + (b.firm.authority || '관할 지방고용노동관서') + ' (공인노무사법 시행령 제19조의3제1항) · 수수료 없음', '법령');
+        add('정관변경 인가', 'approvalGet', '정관변경 인가증 받음', '받은 날을 넣고 «등기 현황에 반영»하면 끝', '서류');
+      }
+      add('등기', 'noReg', '등기 신청 필요 없음', '대표사원이 아닌 사원의 주소 등은 등기부에 없습니다 — 등록면허세·수수료·공증·인감증명서가 들지 않습니다', '법령');
+      add('그 뒤', 'notify', '공인노무사회·은행·거래처 등 변경 안내', '필요한 곳만 — 담당자 확인', '확인 필요');
+      return out;
+    }
     add('법인', 'corpSeal', '법인인감도장', '등기신청서·위임장·의사록 날인', '법무사');
     add('법인', 'corpCert', '법인인감증명서 2통', '발급일로부터 3개월 이내 · 발급받을 때 법인인감카드 준비', '법무사', 3);
     add('법인', 'charterCopy', '정관 사본(원본대조필) 1통', after.charterChanged ? '변경 정관(인가받은 것)' : '현행 정관', '법무사');
@@ -797,6 +815,8 @@
         add('대표사원 취임', 'accept:' + m.id, m.name + ' 취임승낙서', '이 앱 서류 — 인감 날인', '서류');
         if (!m.isNew) add('대표사원 취임', 'repCert:' + m.id, m.name + ' 인감증명서', '취임승낙서 인감 확인용 · 발급 3개월 이내', '확인 필요', 3);
         add('대표사원 취임', 'sealReport:' + m.id, m.name + ' 인감신고서(등기소 양식)', '새 대표사원 개인 인감 날인 · 3개월 이내 인감증명서 첨부(상업등기법 제25조, 상업등기규칙 제35조)', '법령');
+      } else if (e.type === 'addr' && m.rep) {
+        add('대표사원 주소변경', 'addrRes:' + m.id, m.name + ' 주민등록표 초본 1통', '주소변경 증명 · 발급 3개월 이내(상업등기규칙 제52조제1항제4호·제4항)', '법령', 3);
       } else if (e.type === 'brAdd' || e.type === 'brMove') {
         var br = after.brById[e.branch] || {};
         add('분사무소', 'lease:' + (br.id || e.change), (br.name || '분사무소') + ' 임대차계약서 사본', '2019년 서산 분사무소 설치 때 준비한 것', '지난 서류');
@@ -866,7 +886,7 @@
     var branches = after.branches.map(function (x) {
       return { id: x.isNew ? fresh('b') : x.id, name: x.name, alias: x.alias, addr: x.addr, charterAddr: x.charterAddr || '', since: x.since || '', no: x.no };
     });
-    var done = c.dates.done || opts.today || todayIso();
+    var done = c.dates.done || (!needsReg(after) ? (c.dates.approvalGet || c.dates.approval) : '') || opts.today || todayIso();
     var hist = (b.history || []).concat([{ at: done, caseId: c.id, title: c.title, summary: summary(after) }]).slice(-30);
     /* 개정 연혁 한 줄은 총회일 — 이 법인 정관의 «(○. ○. ○. 개정)»은 사원총회 날짜다(인가일이 아니다) */
     var charter = b.charter ? charterFull(b.charter, Object.assign({}, after, { members: after.members }), null, meetingDate(c)).text : '';
@@ -881,6 +901,11 @@
     if (after.errors.length) return '입력 확인 — 빨간 글을 먼저 고치십시오';
     if (!c.changes.length) return '변경 내용 넣기';
     if (!c.meeting.date) return '총회일 정하기';
+    if (!needsReg(after)) {
+      if (after.charterChanged && !d.approvalApply) return '서류 날인 → 정관변경 인가 신청';
+      if (after.charterChanged && !d.approvalGet) return '정관변경 인가증 기다리기';
+      return c.applied ? '끝' : '등기 현황에 반영(등기할 사항 없음)';
+    }
     if (!d.notarize) return '서류 받기 → 사원 날인 → 의사록 공증';
     if (after.charterChanged && !d.approvalApply) return '정관변경 인가 신청';
     if (after.charterChanged && !d.approvalGet) return '정관변경 인가증 기다리기';
@@ -929,7 +954,9 @@
       else if (s.who === 'outRep') who = names(ev('repOut'));
       else if (s.who === 'leavers') who = names(after.left || []);
       else if (s.who === 'parties') who = names(parties);
-      return { key: k, title: titles[k] || k, who: who, how: s.how };
+      /* 등기할 사항이 없으면 의사록 공증도 없다(공증인법 제66조의2는 «등기 신청서류에 첨부되는» 의사록) */
+      var how = (k === 'minutes' && !needsReg(after)) ? '의장과 출석한 사원 모두 날인(등기하지 않으므로 공증은 필요 없음)' : s.how;
+      return { key: k, title: titles[k] || k, who: who, how: how };
     });
   }
   /* 지금 있어야 할 단계 — 1 바뀌는 것 · 2 서류·도장 · 3 노동부 인가 · 4 등기 */
@@ -1027,7 +1054,7 @@
 
   return {
     SEAL: SEAL, sealPlan: sealPlan, easyStep: easyStep,
-    FEES: FEES, costPlan: costPlan, placeOf: placeOf,
+    FEES: FEES, costPlan: costPlan, placeOf: placeOf, needsReg: needsReg,
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
     normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,

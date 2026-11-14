@@ -202,3 +202,11 @@ test('직접 등기 검토 반영 — 안내 문구가 신청 방법·화면 모
   assert.match(html, /#editor\{scroll-margin-top:\d+px\}/);
   assert.match(html, /\.t tbody td\.c\{padding:8px\}/);
 });
+
+test('등기할 사항이 없는 건 — 반영 조건 한 곳(canApplyCase), 기한·끝내기 안내', () => {
+  assert.match(본문, /function canApplyCase\(a, c\)\{/);
+  assert.match(본문, /C\.needsReg\(a\) \? !!a\.c\.dates\.done : \(!a\.charterChanged \|\| !!a\.c\.dates\.approvalGet\)/);
+  assert.ok((본문.match(/canApplyCase\(a, /g) || []).length >= 3, '단계·예전 화면·칸 고칠 때 모두 같은 조건');
+  assert.match(본문, /if\(dl && dl\.none\)/);
+  assert.match(본문, /esc\(C\.purpose\(a\)\|\|'등기할 사항 없음'\)/);
+});
