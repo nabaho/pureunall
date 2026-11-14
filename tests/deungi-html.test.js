@@ -193,3 +193,12 @@ test('직접 등기 — ④ 단계에 위택스·영수필·법인 인감 순서
   assert.match(본문, /if\(el\.dataset\.k==='filing'\)\{ c\.filing=v==='agent'\?'agent':'self';/);
   assert.match(본문, /\[4,'등기','직접 신청하고 끝내기'\]/);
 });
+
+test('직접 등기 검토 반영 — 안내 문구가 신청 방법·화면 모양을 따르고, 등기할 것이 없으면 그렇게 말한다, 머리줄 가림·폰 체크칸', () => {
+  assert.match(본문, /where=MODE==='easy'\?'④ 등기 단계':'⑦ 예상 비용'/);
+  assert.match(본문, /a\.c\.filing==='agent'\?'⚠ «변경등기 신청서»는 법무사 확인용 초안/);
+  assert.match(본문, /k===4&&a\.c\.filing==='agent'\?'법무사에게 맡기고 끝내기'/);
+  assert.match(본문, /if\(p\.none\)\{/);
+  assert.match(html, /#editor\{scroll-margin-top:\d+px\}/);
+  assert.match(html, /\.t tbody td\.c\{padding:8px\}/);
+});

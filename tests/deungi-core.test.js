@@ -167,7 +167,9 @@ test('필요서류 확인표 — 법무사 안내(2026. 6.)대로: 사원 전원
 });
 
 test('★ 정관이 바뀌면 기한은 «인가증 받은 날 + 2주일» — 지나면 지연 사유서가 서류에 들어간다', () => {
-  const ch = [{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }];
+  /* 대표사원 주소변경 — 정관 제5조도 바뀌고 등기부(대표사원 주소)도 바뀐다.
+     (대표사원이 아닌 사원의 주소만 바뀌면 등기할 것이 없어 지연 사유서도 없다 — 2026-11-15 검토 반영) */
+  const ch = [{ id: 'a', type: 'addr', member: 'm1', addr: '점검시 새로 9' }];
   const a1 = C.applyChanges(법인(), 건(ch));
   assert.equal(a1.charterChanged, true);
   assert.equal(C.deadline(a1, '2026-11-21').due, '', '인가증 날짜가 없으면 기한을 지어내지 않는다');
@@ -437,4 +439,25 @@ test('★ 예상 비용 — 등록면허세(사원 변경 1건·분사무소 설
   assert.ok(p.alt && p.alt.tax === 112500 && p.alt.visit > p.visit);
   assert.ok(p.notes.some((t) => /출자증가/.test(t) && /세무과/.test(t)));
   assert.equal(C.placeOf('충남 서산시 쌍연남1로 37'), '서산시');
+});
+
+/* 2026-11-15 외부 검토 반영 — 등기할 것이 없는 건 · 인감증명서 통수 · 지분 양도와 현금 출자 입사가 함께일 때 */
+test('★ 예상 비용 검토 반영 — 비대표 사원 주소만이면 등기 비용 0·신청서 없음, 퇴사 사원 인감증명서 2통, 양도+현금 입사도 출자증가', () => {
+  const b = 법인(); b.firm.hq = '충청남도 천안시 서북구 점검로 1';
+  const 건 = (changes) => ({ id: 'DG-R', meeting: { date: '2026-11-20' }, changes });
+  let a = C.applyChanges(C.normBase(b), 건([{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }]));
+  let p = C.costPlan(a);
+  assert.equal(p.none, true); assert.equal(p.visit, 0); assert.equal(p.nFee, 0);
+  assert.ok(!p.rows.some((r) => r.kind === 'fee' || r.kind === 'notary' || r.kind === 'cert'));
+  assert.ok(!C.docPlan(a, {}).some((d) => ['request', 'poa', 'notaryPoa'].includes(d.key) && d.need), '등기할 것이 없으면 등기 신청 서류도 없다');
+  /* 사원 3명 중 1명 퇴사 — 남는 2명 1통씩 + 퇴사 1명 2통 = 4통 */
+  a = C.applyChanges(C.normBase(b), 건([{ id: 'l', type: 'leave', member: 'm2', share: { mode: 'transfer', to: [{ member: 'm1', amount: 15000000 }] } }]));
+  assert.match(C.costPlan(a).rows.find((r) => r.kind === 'cert' && /인감증명서/.test(r.label) && !/법인/.test(r.label)).label, /4통/);
+  /* 총출자 3천만 → 퇴사자 지분을 기존 사원에게 양도 + 새 사원 현금 1천만 = 4천만: 출자증가 1천만 */
+  a = C.applyChanges(C.normBase(b), 건([
+    { id: 'j', type: 'join', name: '새현금', birth: '950101', addr: '점검시 라로 4', invest: { cash: 10000000 } },
+    { id: 'l', type: 'leave', member: 'm2', share: { mode: 'transfer', to: [{ member: 'm1', amount: 15000000 }] } }]));
+  p = C.costPlan(a);
+  assert.ok(p.alt && p.alt.incr === 10000000, '양도된 지분을 두 번 세면 출자증가를 놓친다');
+  assert.ok(C.checklist(a).some((i) => i.key === 'investProof'));
 });
