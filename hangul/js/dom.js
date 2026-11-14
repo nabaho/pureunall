@@ -28,6 +28,7 @@
   const FONT_ALT = { 'HY그래픽M': 'HYGraphic', 'HY그래픽': 'HYGraphic', 'HY신명조': 'HYSinMyeongJo', 'HY중고딕': 'HYGothic', 'HY헤드라인M': 'HYHeadLine', 'HY궁서B': 'HYGungSo', 'HY목각파임B': 'HYPMokGak', 'HY얕은샘물M': 'HYShortSamul', 'HY엽서L': 'HYPost', 'HY엽서M': 'HYPost' };
   // 한글은 없는 글꼴을 한컴바탕으로 바꿔 계산 (한글 시험: 없는 이름·한양신명조·신명 신명조의 가·i·M·a·1·( 폭이 한컴바탕과 같음)
   const MISSING_FONT = '한컴바탕';
+  const DEFAULT_STACK = `'${DEFAULT_FONT}','HCR Batang','바탕','Batang',serif`; // app.css 의 .doc 글꼴 목록과 같게
   const availCache = new Map();
   function fontAvail(font) {
     if (typeof document === 'undefined') return true;
@@ -61,6 +62,10 @@
   // 글꼴 하나의 CSS 이름 목록: 한글 전용 글꼴이면 대체 TTF, 브라우저에 없으면 대체 이름, 그다음 한컴바탕
   //  글꼴에 없는 글자도 한글은 한컴바탕 폭으로 계산 (한글 시험: HyhwpEQ·Times New Roman·Arial·Verdana·HancomEQN 의 '가'·'한'·'①' 이 1em — 함초롬바탕은 0.97em)
   function fontList(font) {
+    // 기본 글꼴(함초롬바탕)은 글자 조각에 font-family 를 따로 주지 않아 CSS 기본 목록(app.css .doc)으로 그려진다.
+    //  재는 쪽도 «같은 목록»이어야 한다 — 함초롬바탕이 PC 에 없으면 그리기는 '바탕'으로, 재기는 브라우저 기본 글꼴로 갈려
+    //  빈칸 폭 보정(word-spacing)이 어긋나 글이 4~5% 넓게 그려지고 줄이 더 접혔다(2026-11-08, 이 PC 에서 확인).
+    if (font === DEFAULT_FONT) return DEFAULT_STACK;
     const fs = [font];
     if (hftSubst.has(font)) fs.push(hftSubst.get(font));
     if (!fontAvail(font) && FONT_ALT[font]) fs.push(FONT_ALT[font]);
@@ -106,16 +111,31 @@
   // 워드 호환 문서에서 문단 끝에 오면 여백에 걸치는 글자 (한글 시험으로 확인한 것만)
   const HANG_END = new Set([':', ']', '.', ',', ')', ';', '!', '?', '\u201d', '\u2019', '}', '>', '%', '\u00b7', '\u3002', '\u300d']);
   const charCache = new Map();
+  let measCtx = null, measHost = null, measSpan = null;
+  const getMeasHost = () => {
+    if (measHost && measHost.isConnected) return measHost;
+    if (typeof document === 'undefined' || !document.body) return null;
+    measHost = document.createElement('div');
+    measHost.setAttribute('aria-hidden', 'true');
+    measHost.style.cssText = 'contain:strict;position:fixed;left:-9999px;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
+    document.body.append(measHost);
+    return measHost;
+  };
+  const normCh = ch => (/^[\uac00-\ud7a3]$/.test(ch) ? '가' : /^[\u4e00-\u9fff\uf900-\ufaff]$/.test(ch) ? '漢' : ch);
   // 한글이 쓰는 글자 폭 (em) — 굵게여도 보통 굵기 폭 (한글 시험: 한컴돋움·한컴바탕·함초롬·맑은 고딕·굴림·바탕·HY견고딕 10·13pt 굵게/보통 줄 글자 수 같음)
   //  화면의 굵은 글자 폭과의 차이는 advFix 가 자간으로 채움
   function charEm(ch, font, bold) {
     bold = false;
     const hs = hftSymEm(ch, font);
     if (hs) return hs;
+    ch = normCh(ch);
+    // 함초롬바탕이 PC 에 없으면 대체 글꼴(바탕)의 폭(1em)이 아니라 한글의 값: 한글 글자 0.968em (한컴 줄 정보와 rhwp 로 확인: 0.967~0.979)
+    //  → advFix 가 그만큼 자간을 줄여 줄 길이가 한글과 같아진다. 글꼴이 있으면 재서 나오는 값과 같으므로 그대로 둔다.
+    if (ch === '가' && font === DEFAULT_FONT && !fontAvail(font)) return 0.968;
     const key = ch + '|' + fontList(font) + (bold ? '|b' : '');
     if (charCache.has(key)) return charCache.get(key);
     let v = 0.3;
-    try { const cx = document.createElement('canvas').getContext('2d'); cx.font = `${bold ? 'bold ' : ''}100px ${fontList(font)}, '${DEFAULT_FONT}'`; v = cx.measureText(ch).width / 100; } catch (e) {}
+    try { const cx = measCtx || (measCtx = document.createElement('canvas').getContext('2d')); cx.font = `${bold ? 'bold ' : ''}100px ${fontList(font)}, '${DEFAULT_FONT}'`; v = cx.measureText(ch).width / 100; } catch (e) {}
     charCache.set(key, v);
     return v;
   }
@@ -123,17 +143,18 @@
   //  작은 크기 비트맵이 든 글꼴(바탕·굴림·돋움·한컴바탕 11pt 등)은 브라우저가 폭을 화소로 반올림해 그림 — 한글은 본래 폭으로 줄을 나눔
   const advCache = new Map();
   function advFix(font, pt, bold, ch) {
-    if (typeof document === 'undefined' || !document.body) return 0;
+    const host = getMeasHost();
+    if (!host) return 0;
+    ch = normCh(ch);
     const key = fontList(font) + '|' + pt + '|' + (bold ? 1 : 0) + '|' + ch;
     if (advCache.has(key)) return advCache.get(key);
     let v = 0;
     try {
-      const s = document.createElement('span');
-      s.style.cssText = `position:absolute;left:-9999px;top:0;white-space:pre;letter-spacing:0;word-spacing:0;font-family:${fontList(font)},'${DEFAULT_FONT}';font-size:${pt}pt;font-weight:${bold ? 'bold' : 'normal'}`;
+      const s = measSpan || (measSpan = document.createElement('span'));
+      s.style.cssText = `position:absolute;left:0;top:0;white-space:pre;letter-spacing:0;word-spacing:0;font-family:${fontList(font)},'${DEFAULT_FONT}';font-size:${pt}pt;font-weight:${bold ? 'bold' : 'normal'}`;
       s.textContent = ch.repeat(20);
-      document.body.append(s);
+      if (s.parentNode !== host) host.append(s);
       const got = s.getBoundingClientRect().width / 20 / (pt * 96 / 72);
-      s.remove();
       if (got > 0) v = Math.round((charEm(ch, font, bold) - got) * 100000) / 100000;
       if (Math.abs(v) < 0.00005) v = 0;
     } catch (e) { v = 0; }
@@ -172,21 +193,44 @@
   const LINE_CSS = { NONE: 'none', SOLID: 'solid', DASH: 'dashed', LONG_DASH: 'dashed', DASH_DOT: 'dashed', DASH_DOT_DOT: 'dashed', DOT: 'dotted', CIRCLE: 'dotted',
     DOUBLE_SLIM: 'double', SLIM_THICK: 'double', THICK_SLIM: 'double', SLIM_THICK_SLIM: 'double', WAVE: 'solid', DOUBLEWAVE: 'double', THICK_3D: 'ridge', THICK_3D_REVERS: 'groove', '3D': 'ridge', '3D_REVERS': 'groove' };
   const SIDES = [['l', 'Left'], ['r', 'Right'], ['t', 'Top'], ['b', 'Bottom']];
-  const encodeBorders = b => SIDES.map(([k]) => { const s = b[k] || g.PureunHwpx.DEFAULT_SIDE; return `${s.type},${s.width},${s.color}`; }).join(';');
+  const encodeBorders = b => {
+    const base = SIDES.map(([k]) => { const s = b[k] || g.PureunHwpx.DEFAULT_SIDE; return `${s.type},${s.width},${s.color}`; });
+    if (b.slash && b.slash.type && b.slash.type !== 'NONE') base.push(`slash=${b.slash.type},${b.slash.width || 0.12},${b.slash.color || '#000000'}`);
+    if (b.backSlash && b.backSlash.type && b.backSlash.type !== 'NONE') base.push(`backSlash=${b.backSlash.type},${b.backSlash.width || 0.12},${b.backSlash.color || '#000000'}`);
+    return base.join(';');
+  };
   function decodeBorders(str) {
     const parts = (str || '').split(';');
-    if (parts.length !== 4) return null;
+    if (parts.length < 4) return null;
     const out = {};
     SIDES.forEach(([k], i) => { const [type, w, color] = parts[i].split(','); out[k] = { type, width: parseFloat(w) || 0.12, color: color || '#000000' }; });
+    for (let i = 4; i < parts.length; i++) {
+      const [key, val] = parts[i].split('=');
+      if ((key === 'slash' || key === 'backSlash') && val) {
+        const [type, w, color] = val.split(',');
+        if (type && type !== 'NONE') out[key] = { type, width: parseFloat(w) || 0.12, color: color || '#000000' };
+      }
+    }
     return out;
   }
+  function diagBgCss(b) {
+    const sl = b && b.slash && b.slash.type && b.slash.type !== 'NONE' ? b.slash : null;
+    const bsl = b && b.backSlash && b.backSlash.type && b.backSlash.type !== 'NONE' ? b.backSlash : null;
+    if (!sl && !bsl) return '';
+    const lines = [];
+    if (sl) lines.push(`<line x1='100%' y1='0%' x2='0%' y2='100%' stroke='${encodeURIComponent(sl.color || '#000000')}' stroke-width='${Math.max(1, (sl.width || 0.12) * 3.78).toFixed(1)}'/>`);
+    if (bsl) lines.push(`<line x1='0%' y1='0%' x2='100%' y2='100%' stroke='${encodeURIComponent(bsl.color || '#000000')}' stroke-width='${Math.max(1, (bsl.width || 0.12) * 3.78).toFixed(1)}'/>`);
+    return `background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none' width='100%' height='100%'>${lines.join('')}</svg>");background-size:100% 100%;background-repeat:no-repeat`;
+  }
   function borderCss(b) {
-    return SIDES.map(([k, side]) => {
+    const base = SIDES.map(([k, side]) => {
       const s = b[k] || g.PureunHwpx.DEFAULT_SIDE, css = LINE_CSS[s.type] || 'solid';
       if (css === 'none') return `border-${side.toLowerCase()}:none`;
       const w = css === 'double' ? Math.max(s.width, 0.8) : s.width;
       return `border-${side.toLowerCase()}:${w}mm ${css} ${s.color}`;
     }).join(';');
+    const dg = diagBgCss(b);
+    return dg ? base + ';' + dg : base;
   }
   // 겹친 테두리에서 칸 하나가 차지하는 테두리 반쪽 (mm): 브라우저는 1 장치 픽셀보다 가는 선을 1 장치 픽셀로, 그보다 굵으면 내려서 그림
   function halfBorderMm(s) {
@@ -217,6 +261,7 @@
   // 셀 요소에 테두리 적용 (편집 기능에서 사용)
   function setCellBorders(td, b) {
     for (const [, side] of SIDES) td.style['border' + side] = '';
+    td.style.backgroundImage = '';
     if (!b) { delete td.dataset.border; return; }
     td.dataset.border = encodeBorders(b);
     td.style.cssText += ';' + borderCss(b);
@@ -326,7 +371,7 @@
     if (r.compose) return composeHtml(r).replace(/^<span/, `<span${csAttr(r.style)}`);
     if (r.table) return blockHtml(r.table).replace(/<table/, `<table${csAttr(r.style)}`);
     if (r.image) {
-      if (!r.image.src && !nativeImg(r.image.mime)) {
+      if (!r.image.src && r.image.data) {
         const id = 'i' + (++imgSeq);
         imgStore.set(id, r.image);
         return `<img src="${imgUrl(r.image) || ''}" data-img="${id}"${csAttr(r.style)} style="width:${r.image.w}mm;height:${r.image.h}mm" alt="">`;
@@ -474,10 +519,11 @@
     if (factorCache.has(fk)) return factorCache.get(fk);
     let v = 1.15;
     try {
+      const host = getMeasHost() || document.body;
       const d = document.createElement('div');
       d.style.cssText = `position:absolute;visibility:hidden;font-family:${fontList(font)};font-size:100px;line-height:normal;white-space:nowrap`;
       d.textContent = 'Hg';
-      document.body.append(d); v = d.offsetHeight / 100 || v; d.remove();
+      host.append(d); v = d.offsetHeight / 100 || v; d.remove();
     } catch (e) {}
     factorCache.set(fk, v);
     return v;
@@ -486,7 +532,7 @@
   const DESC_FACTOR = { Arial: 0.212, 'Times New Roman': 0.217, Verdana: 0.210, '한컴바탕': 0.292, 'Haansoft Batang': 0.292 };
   function descFactor(font) {
     if (DESC_FACTOR[font] !== undefined) return DESC_FACTOR[font];
-    try { const c = document.createElement('canvas').getContext('2d'); c.font = `100px ${fontList(font)}`; return c.measureText('Hg').fontBoundingBoxDescent / 100 || 0.2; } catch (e) { return 0.2; }
+    try { const c = measCtx || (measCtx = document.createElement('canvas').getContext('2d')); c.font = `100px ${fontList(font)}`; return c.measureText('Hg').fontBoundingBoxDescent / 100 || 0.2; } catch (e) { return 0.2; }
   }
   function runDesc(r) {
     const size = r.size || 10, font = r.font || DEFAULT_FONT, t = r.text || '';
@@ -512,6 +558,41 @@
     return size * Math.max(...hs, 1);
   }
 
+  /* 글꼴에 어울리는 줄 높이 (2026-11-08 «줄칸 높이가 달라요») — 한컴이 .hwp 에 저장한 줄 정보(LINE_SEG)로 확인
+     (바탕화면 .hwp 220개·문단 4.6만 개): 이 옵션이 «꺼져 있으면» 줄 높이는 모든 글꼴에서 글자 크기와 같고(배율 1.000),
+     «켜져 있으면» 글꼴 고유 배율이 곱해진다 — 함초롬바탕 1.300 · 맑은 고딕 1.331 · 휴먼명조 1.055 ·
+     나눔고딕 Light 1.151 이고 바탕·굴림·돋움·한양 계열 같은 옛 글꼴은 1.000. 줄 간격 %는 이 높이에 곱한다(130% → 줄 간격 = 높이 × 1.3).
+     편집기는 이 옵션을 무시해 함초롬바탕 12pt·130% 문단이 줄 간격 20.8px(한컴 27.0px)로 23% 좁게 그려졌다.
+     ⚠ 브라우저로 재면 안 된다 — 크롬은 굴림·바탕·돋움을 1.15 로 재지만 한컴은 1.0 이고, 한컴 글꼴은 없어서 1.15 로 폴백한다.
+     ⚠ 글이 없는 문단(문단 끝 표시만)은 옵션이 켜져 있어도 글자 크기 그대로다(같은 문서에서 확인). */
+  // 표본: 1,400개 문서·27만 줄(배율이 문서마다 똑같이 나옴) — 함초롬바탕 1.300(1,918) · 함초롬돋움 1.300(492) · 맑은 고딕 1.331(1,201) · 휴먼명조 1.055(1,968) · 신협나눔 보통 1.322(45) · 나눔고딕 Light 1.151(38) ·
+  // 나눔고딕 ExtraBold 1.150 · -윤명조120 1.085. 한컴바탕·바탕·굴림·돋움·한양·HY 는 1.000 (표에 없으면 1)
+  const NATURAL_FACTOR = { '함초롬바탕': 1.300, '함초롬돋움': 1.300, '맑은 고딕': 1.331, '휴먼명조': 1.055, '신협나눔 보통': 1.322, '나눔고딕 Light': 1.151, '나눔고딕 ExtraBold': 1.150, '-윤명조120': 1.085 };
+  const naturalFactor = font => NATURAL_FACTOR[font] || 1;
+  // 글자 조각 높이(pt): 영문 글자는 영문 글꼴, 한글 글자는 한글 글꼴의 배율 (큰 쪽)
+  function naturalRunHeight(r) {
+    const size = r.size || 10, font = r.font || DEFAULT_FONT, t = r.text || '';
+    const f = r.langs && g.PureunHwpx.parseLangs(r.langs).f;
+    const latin = f && f[0] === font ? f[1] : font;
+    const hs = [];
+    if (!t || LATIN_CH.test(t)) hs.push(naturalFactor(latin));
+    if (NON_LATIN_CH.test(t)) hs.push(naturalFactor(font));
+    return size * Math.max(...hs, 1);
+  }
+  // 문단 요소의 글 조각들 — 글자 크기·글꼴은 그 글이 놓인 요소의 계산 값(문단 모양 대화상자가 줄 높이를 다시 셀 때). 문단 번호(.phead)는 글이 아니다.
+  function paraTextRuns(el) {
+    const runs = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const host = n.parentElement || el;
+      if (!n.nodeValue || host.closest('.phead')) continue;
+      const c = getComputedStyle(host);
+      runs.push({ text: n.nodeValue, size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') });
+    }
+    return runs;
+  }
+  const FLH_ON = /"fontLineHeight":\s*1\b/;
+  const fontLineHeightOn = b => (!b.lineType || b.lineType === 'PERCENT') && typeof b.pp === 'string' && FLH_ON.test(b.pp) && (b.runs || []).some(r => r.text);
+
   // 한글의 '내어쓰기'는 첫 줄이 왼쪽 여백에 있고 둘째 줄부터 들어감 → CSS 는 margin 을 더 주고 text-indent 를 음수로
   // 줄 간격 종류: 고정 값 / 최소 / 여백만 은 pt 로 (정확한 값은 data-lt·data-lv 에 보관)
   function lineCss(b) {
@@ -519,6 +600,13 @@
     // 문단 끝 글자 모양(endMark)의 크기도 줄 높이에 들어감 (한글 시험 문서로 확인)
     const sizes = (b.runs || []).filter(r => r.text).map(r => r.size || 10).concat(b.endMark ? [b.endMark.size || 10] : []);
     const maxSize = sizes.length ? Math.max(...sizes) : (b.mark && b.mark.size) || 10;
+    // 글꼴에 어울리는 줄 높이(문단 모양 pp.fontLineHeight=1)가 켜진 «글이 있는» 문단(비율 줄 간격): 줄 높이 = 글자 크기 × 글꼴 고유 배율, 줄 간격 %는 그 높이에 곱함
+    if (!wordMode && fontLineHeightOn(b)) {
+      const texts = (b.runs || []).filter(r => r.text);
+      let hMax = Math.max(...texts.map(naturalRunHeight));
+      if (b.endMark) hMax = Math.max(hMax, naturalRunHeight({ size: b.endMark.size, font: b.endMark.font, text: '가' }));
+      return `line-height:${Math.round(hMax * (b.lineSpacing || 160)) / 100}pt`;
+    }
     if (wordMode) {
       // MS 워드 호환 문서: 글자 높이 = 크기 × 글꼴 고유 줄 높이 배율 (문단에서 가장 큰 것). 비율 줄 간격도 그 높이에 곱함 (한글로 확인)
       // 문단 끝 글자 모양이 글자보다 높으면: 그 높이 + 글자의 기준선 아래 길이 (16가지 글꼴 조합으로 확인)
@@ -537,7 +625,7 @@
     if (b.lineType === 'BETWEEN_LINES') return `line-height:${maxSize + b.lineValue}pt`;
     return b.lineSpacing && b.lineSpacing !== 160 ? `line-height:${b.lineSpacing / 100}` : '';
   }
-  // 문단 모양의 나머지 항목(pp) 중 화면에 보이는 것: 줄 나눔 기준 · 공백 최소값
+  // 문단 모양의 나머지 항목(pp) 중 화면에 보이는 것: 줄 나눔 기준 · 공백 최소값 · 문단 테두리/배경
   function ppCss(pp) {
     if (!pp) return '';
     const x = g.PureunHwpx.parsePP(pp), css = [];
@@ -547,6 +635,10 @@
     else if (x.breakLatinWord === 'BREAK_WORD') css.push('word-break:break-all');
     // 공백 최소값(%): 줄에 더 넣으려고 빈칸을 그만큼 줄일 수 있음 → 빈칸(약 0.3em)을 미리 줄여 둠. 양쪽 정렬이면 남는 폭은 다시 벌어짐
     if (x.condense) css.push(`word-spacing:${-Math.round(x.condense * 3) / 1000}em`);
+    if (x.border) {
+      if (x.border.bg) css.push(`background-color:${x.border.bg}`);
+      if (x.border.sides) css.push(borderCss(x.border.sides));
+    }
     return css.join(';');
   }
   function paraCss(b) {
@@ -568,7 +660,7 @@
   }
 
   function blockHtml(b) {
-    const pb = b.pageBreak ? ' data-pb="1"' : '';
+    const pb = (b.pageBreak ? ' data-pb="1"' : '') + (b.columnBreak ? ' data-cb="1"' : '');
     if (b.type === 'table') {
       // 칸 너비·표 너비는 % 소수 넷째 자리까지 (0.1% 로 반올림하면 좁은 칸에서 0.5px 남짓 모자라 한글보다 일찍 줄이 바뀜)
       //  원래 비율은 data-w 에 그대로 두어, 칸 너비를 바꾸지 않았으면 저장할 때 원래 HWPUNIT 너비가 그대로 나오게 함
@@ -696,11 +788,12 @@
 
   // 각주 내용(HTML) → 블록: 계산된 스타일이 필요하므로 화면 밖 임시 상자에 넣어 변환
   function noteBlocks(html) {
+    const host = getMeasHost() || document.body;
     const box = document.createElement('div');
     box.className = 'doc';
-    box.style.cssText = 'position:absolute;left:-10000px;top:0;width:150mm;visibility:hidden';
+    box.style.cssText = 'position:absolute;left:0;top:0;width:150mm;visibility:hidden';
     box.innerHTML = html || '<p><br></p>';
-    document.body.append(box);
+    host.append(box);
     try { return htmlToBlocks(box); } finally { box.remove(); }
   }
 
@@ -742,6 +835,12 @@
     else { delete el.dataset.lt; delete el.dataset.lv; }
     // 워드 호환 문서: 문단의 실제 글자(크기·글꼴)로 줄 높이를 셈
     let lv = v;
+    const ppStr = v.pp || el.dataset.pp;
+    if (!wordMode && ppStr && FLH_ON.test(ppStr) && (!v.lineType || v.lineType === 'PERCENT')) {
+      // 글꼴에 어울리는 줄 높이: 문단의 실제 글 조각(크기·글꼴)으로 줄 높이를 셈 (글이 없거나 문단 번호뿐이면 건드리지 않음)
+      const runs = paraTextRuns(el);
+      if (runs.length) lv = Object.assign({}, v, { pp: ppStr, runs });
+    }
     if (wordMode) {
       const c = getComputedStyle(el);
       lv = Object.assign({}, v, { runs: [{ text: el.textContent || ' ', size: parseFloat(c.fontSize) * 0.75, font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '') }] });
@@ -764,6 +863,18 @@
     delete el.dataset.lsd; // 줄 끝 자간 몫은 편집기가 다시 셈
     s.marginTop = v.before ? v.before + 'pt' : '';
     s.marginBottom = v.after ? v.after + 'pt' : '';
+    if ('pp' in v) {
+      if (v.pp) el.dataset.pp = v.pp; else delete el.dataset.pp;
+      const x = v.pp ? g.PureunHwpx.parsePP(v.pp) : {};
+      s.wordBreak = x.breakNonLatinWord === 'BREAK_WORD' ? 'keep-all' : x.breakLatinWord === 'BREAK_WORD' ? 'break-all' : '';
+      s.wordSpacing = x.condense ? `${-Math.round(x.condense * 3) / 1000}em` : '';
+      for (const [, side] of SIDES) s['border' + side] = '';
+      s.backgroundColor = '';
+      if (x.border) {
+        if (x.border.bg) s.backgroundColor = x.border.bg;
+        if (x.border.sides) el.style.cssText += ';' + borderCss(x.border.sides);
+      }
+    }
     if (!el.getAttribute('style')) el.removeAttribute('style');
   }
 
@@ -907,6 +1018,7 @@
           flush();
           const t = tableModel(node);
           if (node.dataset.pb) t.pageBreak = true;
+          if (node.dataset.cb) t.columnBreak = true;
           out.push(mark(t));
           continue;
         }
@@ -914,6 +1026,8 @@
           // 글자처럼 취급한 표가 든 문단 → 표를 글자처럼 품은 문단 하나
           flush();
           const p = mark(Object.assign({ type: 'p', runs: [] }, paraProps(node)));
+          if (node.dataset.pb) p.pageBreak = true;
+          if (node.dataset.cb) p.columnBreak = true;
           for (const c of node.childNodes) inlineRuns(c, p.runs);
           out.push(finish(p, node));
           continue;
@@ -924,6 +1038,7 @@
           const inner = collectBlocks(node);
           const blocks = inner.length ? inner : [Object.assign({ type: 'p', runs: [], mark: markOf(styleOf(node)) }, paraProps(node))];
           if (node.dataset.pb && blocks[0]) blocks[0].pageBreak = true;
+          if (node.dataset.cb && blocks[0]) blocks[0].columnBreak = true;
           if (blocks[0]) mark(blocks[0]);
           out.push(...blocks);
           continue;
@@ -997,5 +1112,6 @@
     return collectBlocks(root);
   }
 
-  g.PureunDom = { setCompat, setFontInfo, headCss, cellMargin, setCellMargin, borderCss, blocksToHtml, htmlToBlocks, noteBlocks, shapeOf, shapeSvg, shapeHtml, putShape, readParaProps, writeParaProps, bytesToDataUrl, dataUrlToBytes, paraCss, setCellBorders, decodeBorders };
+  function invalidateShape(sid) { svgCache.delete(sid); return shapeSvg(sid); }
+  g.PureunDom = { setCompat, setFontInfo, headCss, cellMargin, setCellMargin, borderCss, blocksToHtml, htmlToBlocks, noteBlocks, shapeOf, shapeSvg, shapeHtml, putShape, invalidateShape, readParaProps, writeParaProps, bytesToDataUrl, dataUrlToBytes, paraCss, setCellBorders, decodeBorders, encodeBorders };
 })(window);

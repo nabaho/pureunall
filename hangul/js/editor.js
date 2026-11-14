@@ -6,9 +6,9 @@
   const LEAF = 'p,h1,h2,h3,h4,h5,h6,li';
   const E = { onChange: null, onSelection: null };
   let doc, stack, sheets, desk, hruler, vruler, probe, underlay, overlay;
-  let savedRange = null, painter = null, layoutQueued = false, pageCount = 1;
+  let savedRange = null, painter = null, layoutQueued = false, pageCount = 1, cachedChars = -1, lastPaginateMs = 0, layoutTimer = 0;
 
-  E.state = { page: H.defaultPage(), header: null, footer: null, pageNum: null, zoom: 1, pageView: true, marks: false, overwrite: false };
+  E.state = { page: H.defaultPage(), header: null, footer: null, pageNum: null, zoom: 1, pageView: true, marks: false, ctrlMarks: false, overwrite: false };
   // 화면 배율 (stack 의 CSS zoom) — getBoundingClientRect 값 ÷ 이 값 = CSS px. offsetWidth 는 정수라 배율을 재면 0.1% 가까이 틀림(쪽 너비 567px)
   const zf = () => E.state.zoom || 1;
 
@@ -27,7 +27,7 @@
     doc.addEventListener('input', onInput);
     doc.addEventListener('keydown', onKeyDown);
     doc.addEventListener('beforeinput', onBeforeInput);
-    doc.addEventListener('load', e => { if (e.target.tagName === 'IMG') queueLayout(); }, true);
+    doc.addEventListener('load', e => { if (e.target.tagName === 'IMG' && (!e.target.style.width || !e.target.style.height)) queueLayout(); }, true);
     document.addEventListener('selectionchange', () => {
       const s = getSelection();
       if (s.rangeCount && doc.contains(s.anchorNode)) {
@@ -47,6 +47,36 @@
     addEventListener('resize', drawRulers);
     initColumnResize();
     initRulerDrag();
+    doc.addEventListener('click', e => {
+      const gso = e.target.closest && e.target.closest('.gso[data-sid]');
+      if (!gso) return;
+      const sid = gso.dataset.sid, node = Dm.shapeOf(sid), S = g.PureunShape;
+      if (!node || !S) return;
+      const t = S.local(node.tag);
+      if (t === 'checkBtn') {
+        E.checkpoint();
+        node.attrs = node.attrs || {};
+        node.attrs.value = node.attrs.value === 'CHECKED' ? 'UNCHECKED' : 'CHECKED';
+        gso.innerHTML = Dm.invalidateShape(sid);
+        afterEdit();
+      } else if (t === 'radioBtn') {
+        E.checkpoint();
+        node.attrs = node.attrs || {};
+        const grp = node.attrs.radioGroupName || '';
+        if (grp) {
+          doc.querySelectorAll('.gso[data-sid]').forEach(other => {
+            const on = Dm.shapeOf(other.dataset.sid);
+            if (on && S.local(on.tag) === 'radioBtn' && (on.attrs && on.attrs.radioGroupName || '') === grp) {
+              on.attrs.value = 'UNCHECKED';
+              other.innerHTML = Dm.invalidateShape(other.dataset.sid);
+            }
+          });
+        }
+        node.attrs.value = 'CHECKED';
+        gso.innerHTML = Dm.invalidateShape(sid);
+        afterEdit();
+      }
+    });
   };
 
   // 표 칸 경계를 마우스로 끌어 너비 조절 (안쪽 경계만)
@@ -104,7 +134,7 @@
     afterEdit();
   };
 
-  const changed = () => { E.onChange && E.onChange(); };
+  const changed = () => { cachedChars = -1; E.onChange && E.onChange(); };
   function onInput() { lastEdit = Date.now(); normalizeRoot(); queueLayout(); changed(); }
 
   // ---------- 선택 영역 ----------
@@ -189,12 +219,16 @@
     st.styles = d.styles || null; // 문서의 스타일 표 (그대로 저장)
     st.fontInfo = d.fontInfo || null; // 글꼴 정보(종류·대체 글꼴·분류, 그대로 저장)
     savedRange = null;
+    cachedChars = -1;
     doc.innerHTML = d.html !== undefined ? d.html : Dm.blocksToHtml(d.blocks);
     normalizeRoot();
     E.layout();
     E.resetHistory();
   };
   E.getHtml = () => {
+    if (!doc.querySelector('.endnotes')) {
+      return doc.innerHTML.replace(/<(div|span) class="pg-gap(?:\s+pg-gap-in)?"[^>]*><\/\1>/g, '');
+    }
     const c = doc.cloneNode(true);
     c.querySelectorAll('.pg-gap').forEach(x => x.remove());
     return c.innerHTML;
@@ -309,7 +343,15 @@
     setTimeout(run, 60);
   }
   E.nextFrame = nextFrame;
+  /* 쪽 나눔이 오래 걸리는 큰 문서는(마지막에 0.25초 넘게 걸림) 글자를 칠 때마다 돌리면 화면이 멈춘 것처럼 되므로
+     입력이 잠깐 멈춘 뒤 한 번만 돌린다(걸린 시간의 절반, 최대 1.2초). 작은 문서는 전처럼 다음 화면 그리기 때 바로. */
   function queueLayout() {
+    if (lastPaginateMs > 250) {
+      clearTimeout(layoutTimer);
+      layoutQueued = true;
+      layoutTimer = setTimeout(() => { layoutQueued = false; paginate(); keepCaretVisible(); }, Math.min(1200, Math.round(lastPaginateMs / 2)));
+      return;
+    }
     if (layoutQueued) return;
     layoutQueued = true;
     nextFrame(() => { layoutQueued = false; paginate(); keepCaretVisible(); });
@@ -364,7 +406,7 @@
   // 문단 줄 나눔 계획: 원래 배치에서 잰 값 + 앞에서 밀린 거리(shift)로 계산 (DOM 은 나중에 한꺼번에 바꿈)
   // bodyEnd(쪽) = 그 쪽 본문이 끝나는 위치 (각주 자리만큼 줄어듦)
   // 반환 { whole: 첫 줄부터 넘침, splits: [{ node, offset, height }], added: 늘어난 높이 }
-  function planSplits(el, shift, page, geo, docY, bodyEnd) {
+  function planSplits(el, shift, page, geo, docY, bodyEnd, isTail) {
     const { pitch } = geo;
     const out = { whole: false, splits: [], added: 0 };
     const nodes = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -388,15 +430,13 @@
     if (!nodes.length) {
       // 문서 끝의 빈 문단들(뒤에 내용 없음)은 넘쳐도 새 쪽을 만들지 않음 — 한글 시험(HOME01: 끝 빈 문단 1·2개는 1쪽, 끝 문단에 글자를 넣으면 2쪽)
       const isEmpty = e => e.tagName === 'P' && !e.textContent.replace(/[\s​]/g, '') && !e.querySelector('img, .gso, table, .hctl');
-      let tail = true;
-      for (let s2 = el.nextElementSibling; s2; s2 = s2.nextElementSibling) { if (s2.classList.contains('pg-gap')) continue; if (!isEmpty(s2)) { tail = false; break; } }
-      if (tail && isEmpty(el)) return out;
+      if (isTail !== undefined ? isTail && isEmpty(el) : (() => { let tail = true; for (let s2 = el.nextElementSibling; s2; s2 = s2.nextElementSibling) { if (s2.classList.contains('pg-gap')) continue; if (!isEmpty(s2)) { tail = false; break; } } return tail && isEmpty(el); })()) return out;
       const obj = el.querySelector('img, .gso.inl, table');
       const L1 = !obj && L > 0 ? L : docY(el.getBoundingClientRect().bottom) - pTop;
       if (pTop + (!obj && !isWord() && fsP > 0 ? Math.min(fsP, L1) : L1) + shift > bodyEnd(page) + 0.5) out.whole = true;
       return out;
     }
-    let k = 0, from = 0, first = true;
+    let k = 0, from = 0, first = true, prevK = -1, prevSt = -1;
     for (let guard = 0; guard < 500; guard++) {
       const end = bodyEnd(page), off = shift + out.added;
       let hit = null;
@@ -413,6 +453,8 @@
         break;
       }
       if (!hit) break;
+      if (!first && hit.k === prevK && hit.st === prevSt) break;
+      prevK = hit.k; prevSt = hit.st;
       if (hit.k === 0 && hit.st === 0) {
         // 문단 첫 줄이 넘침(앞에 그림도 없음) → 문단째 다음 쪽으로
         const before = document.createRange();
@@ -539,28 +581,46 @@
     const best = new Map(), seen = new Set();
     const isRun = sp => !('ls0' in sp.dataset); // 영문 낱말·마지막 글자 보기용 조각은 run 이 아님
     for (const sp0 of doc.querySelectorAll('p span[data-lse], p span[style*="letter-spacing"]:not([data-spl]):not([data-ls0])')) {
-      const p = sp0.closest('p');
-      if (seen.has(p)) continue;
+      const p = sp0.parentElement && sp0.parentElement.tagName === 'P' ? sp0.parentElement : sp0.closest('p');
+      if (!p || seen.has(p)) continue;
       seen.add(p);
-      // 글자가 든 run 만 (자간만 준 빈 입력 자리 span 은 빼고)
-      const runs = Array.from(p.querySelectorAll('span[data-spl], span[style*="letter-spacing"]')).filter(s => isRun(s) && s.closest('p') === p && /[^\s​⁠﻿]/.test(s.textContent));
-      const sp = runs[runs.length - 1];
-      if (!sp) continue;
-      // 그 run 뒤에 글자가 더 있으면(자간 없는 run) 자간 몫 없음
-      const after = document.createRange(); after.setStartAfter(sp); after.setEnd(p, p.childNodes.length);
-      if (/[^\s ﻿​]/.test(after.toString())) continue;
+      // 글자가 든 마지막 run 찾기 (Range 생성 없이 역방향 순회)
+      let sp = null, hasAfter = false;
+      for (let ch = p.lastChild; ch; ch = ch.previousSibling) {
+        if (ch.nodeType === 1 && ch.classList && ch.classList.contains('pg-gap')) continue;
+        const txt = ch.textContent || '';
+        if (!/[^\s\u00a0\ufeff\u200b\u2060]/.test(txt)) continue;
+        if (ch.nodeType === 1 && (ch.dataset.spl !== undefined || ch.style.letterSpacing) && isRun(ch)) { sp = ch; break; }
+        const inner = ch.nodeType === 1 && ch.querySelectorAll ? Array.from(ch.querySelectorAll('span[data-spl], span[style*="letter-spacing"]')).filter(s => isRun(s) && /[^\s\u200b\u2060\ufeff]/.test(s.textContent)) : [];
+        if (inner.length) {
+          const lastIn = inner[inner.length - 1];
+          const after = document.createRange(); after.setStartAfter(lastIn); after.setEnd(p, p.childNodes.length);
+          if (!/[^\s\u00a0\ufeff\u200b]/.test(after.toString())) sp = lastIn;
+          break;
+        }
+        hasAfter = true;
+        break;
+      }
+      if (!sp || hasAfter) continue;
       const own = sp.style.letterSpacing || '0em';
       const em = sp.dataset.spl !== undefined && own === sp.dataset.spl ? +sp.dataset.lse || 0 : /em$/.test(own) ? parseFloat(own) || 0 : 0;
       if (em) best.set(p, { em, sp });
     }
     for (const p of doc.querySelectorAll('p[data-lsd]')) if (!best.has(p)) best.set(p, { em: 0 });
+    const writes = [];
     for (const [p, b] of best) {
       const old = +p.dataset.lsd || 0;
-      const pt = b.em ? Math.round(b.em * parseFloat(getComputedStyle(b.sp).fontSize) * 0.75 * 100) / 100 : 0;
+      const fsPt = b.em ? (/pt$/.test(b.sp.style.fontSize) ? parseFloat(b.sp.style.fontSize) : parseFloat(getComputedStyle(b.sp).fontSize) * 0.75) : 0;
+      const pt = b.em ? Math.round(b.em * fsPt * 100) / 100 : 0;
       if (Math.abs(pt - old) < 0.005) continue;
-      const base = Math.round((parseFloat(getComputedStyle(p).marginRight) * 0.75 + old) * 100) / 100;
+      const mrRaw = p.style.marginRight;
+      const mrPt = !mrRaw ? 0 : /pt$/.test(mrRaw) ? parseFloat(mrRaw) : parseFloat(getComputedStyle(p).marginRight) * 0.75;
+      const base = Math.round((mrPt + old) * 100) / 100;
       const mr = Math.round((base - pt) * 100) / 100;
-      p.style.marginRight = mr ? mr + 'pt' : '';
+      writes.push([p, mr ? mr + 'pt' : '', pt]);
+    }
+    for (const [p, mr, pt] of writes) {
+      p.style.marginRight = mr;
       if (pt) p.dataset.lsd = pt; else delete p.dataset.lsd;
     }
   }
@@ -650,11 +710,16 @@
   //  → 칸 경계가 1/64px 격자에 반올림한 자리가 되게 % 를 다시 줌 (더한 몫은 col 의 data-e, 읽을 때 뺌. 마지막 칸은 나머지)
   function tableColumns() {
     const lu = v => Math.round(v * 64) / 64;
-    for (const t of doc.querySelectorAll('table')) {
+    const z = E.state.zoom || 1;
+    const all = doc.querySelectorAll('table');
+    const many = all.length > 60;
+    const writes = [];
+    for (const t of all) {
+      if (many && t._tcolZ === z) continue;
       const cols = t.querySelectorAll(':scope > colgroup > col');
-      if (cols.length < 2) continue;
+      if (cols.length < 2) { t._tcolZ = z; continue; }
       // 화면(확대 반영) 좌표에서 셈 — 크롬의 1/64px 격자도 확대된 좌표 기준. offsetWidth 는 정수라 배율을 재는 데 쓰지 않음
-      const z = E.state.zoom || 1, tr = t.getBoundingClientRect();
+      const tr = t.getBoundingClientRect();
       const base = tr.width - ((parseFloat(t.style.getPropertyValue('--tbl')) || 0) + (parseFloat(t.style.getPropertyValue('--tbr')) || 0)) * z;
       if (!(base > 1)) continue;
       const want = Array.from(cols, c => {
@@ -662,15 +727,17 @@
         return w0 && Math.abs(pct - w0 * 100) < 0.0006 ? w0 * 100 : pct;
       });
       if (want.some(v => !(v >= 0))) continue;
+      t._tcolZ = z;
       let cum = 0, used = 0;
       want.forEach((p, i) => {
         const w = lu((cum + p) / 100 * base) - lu(cum / 100 * base);
         cum += p;
         const np = i === want.length - 1 ? Math.max(0, 100 - used - 1e-6) : (w + 0.25 / 64) / base * 100;
         used += np;
-        if (Math.abs((parseFloat(cols[i].style.width) || 0) - np) > 1e-6) { cols[i].style.width = np.toFixed(6) + '%'; cols[i].dataset.e = (np - p).toFixed(6); }
+        if (Math.abs((parseFloat(cols[i].style.width) || 0) - np) > 1e-6) writes.push([cols[i], np.toFixed(6) + '%', (np - p).toFixed(6)]);
       });
     }
+    for (const [col, w, e] of writes) { col.style.width = w; col.dataset.e = e; }
   }
   // 겹친 테두리 표가 맨 위·아래 칸 테두리 반쪽만큼 커진 크기 (CSS px) — 한글은 테두리가 자리를 차지하지 않음
   function outerHalf(t) {
@@ -690,8 +757,8 @@
     const key = doc.style.width + '|' + JSON.stringify(para);
     if (lineCache.has(key)) return lineCache.get(key);
     if (!lineMeas) { lineMeas = document.createElement('div'); lineMeas.className = 'doc'; lineMeas.setAttribute('aria-hidden', 'true'); }
-    lineMeas.style.cssText = `position:absolute;visibility:hidden;left:-10000px;top:0;width:${doc.style.width}`;
-    if (!lineMeas.isConnected) doc.parentElement.append(lineMeas);
+    lineMeas.style.cssText = `position:fixed;visibility:hidden;left:-10000px;top:0;width:${doc.style.width};contain:layout style`;
+    if (!lineMeas.isConnected) document.body.append(lineMeas);
     const b = Object.assign({}, para, { type: 'p', runs: [], before: 0, after: 0, mark: para.mark || { size: para.charSize || 10 } });
     delete b.charSize; delete b.head;
     lineMeas.innerHTML = Dm.blocksToHtml([b]);
@@ -702,6 +769,7 @@
   function floatTableSpacing() {
     const px = v => (v || 0) / (7200 / 25.4) * (96 / 25.4), ptPx = v => (v || 0) * 96 / 72;
     const sib = (el, next) => { let s = next ? el.nextElementSibling : el.previousElementSibling; while (s && s.classList.contains('pg-gap')) s = next ? s.nextElementSibling : s.previousElementSibling; return s; };
+    const writes = [];
     for (const t of doc.querySelectorAll(':scope > table[data-place]')) {
       let info;
       try { info = JSON.parse(t.dataset.place); } catch (e) { continue; }
@@ -717,6 +785,9 @@
       const { t: bt, b: bb } = outerHalf(t);
       // 표가 문단의 끝 조각이면 그 문단의 (빈) 줄이 표 아래에 옴 (Interview Rating Guide: 표 뒤 4.3mm 줄)
       const top = v(Math.max(0, (first ? ptPx(para.before) : 0) + px(out.t) + px(vo)) - bt), bottom = v(Math.max(0, px(out.b) + (last ? emptyLineH(para) + ptPx(para.after) : 0)) - bb);
+      writes.push([t, top, bottom]);
+    }
+    for (const [t, top, bottom] of writes) {
       if (t.style.marginTop !== top) t.style.marginTop = top;
       if (t.style.marginBottom !== bottom) t.style.marginBottom = bottom;
     }
@@ -725,43 +796,62 @@
   // 글자처럼 취급한 개체(양식·그림·도형)가 글자보다 크면 한글은 그 줄 높이를 '개체 높이 + 줄 간격 여분'으로 잡음
   //  (sample09: 13pt 160% 문단의 5.0mm 입력 상자 줄 = 5.0 + 2.8mm). 브라우저는 개체가 줄 간격 안에 들어가 높이가 그대로라 모자란 만큼 위 안 여백(--obj)으로 채움 (한 줄 문단만)
   function inlineObjectLines() {
-    const hwp = !isWord(); // 워드 호환 문서의 줄 높이 규칙은 따로 (확인 전이라 적용하지 않음)
-    for (const p of doc.querySelectorAll('p')) {
-      if (!hwp) { if (p.style.getPropertyValue('--obj')) p.style.removeProperty('--obj'); continue; }
-      const objs = Array.from(p.querySelectorAll(':scope > .gso.inl, :scope > span > .gso.inl, :scope > img, :scope > span > img')).filter(o => !o.closest('.gso-float'));
-      let v = '';
-      if (objs.length) {
-        p.style.removeProperty('--obj');
-        const c = getComputedStyle(p), fs = parseFloat(c.fontSize) || 0, lh = parseFloat(c.lineHeight) || 0;
-        // 개체 높이에는 바깥 여백(위·아래)도 들어감 (글자처럼 취급한 표와 같음)
-        const oh = Math.max(...objs.map(o => { const oc = getComputedStyle(o); return o.getBoundingClientRect().height / zf() + (parseFloat(oc.marginTop) || 0) + (parseFloat(oc.marginBottom) || 0); }));
-        const h = p.getBoundingClientRect().height / zf() - (parseFloat(c.paddingTop) || 0) - (parseFloat(c.paddingBottom) || 0);
-        // 한 줄 문단만: 높이가 (개체·줄 높이 중 큰 것) + 반 줄보다 작으면 한 줄 (개체만 든 줄은 이미 개체만큼 높음 — Business12 그림 줄)
-        //  모자람이 작아도 채움 (sample13: 11pt 250% 줄의 4.0mm 입력 상자 → 0.44px, 문단마다 쌓여 0.7mm 어긋나던 것)
-        if (oh > fs && lh > 0 && h < Math.max(oh, lh) + lh * 0.5) { const want = oh + (lh - fs); if (want - h > 0.05) v = (want - h).toFixed(2) + 'px'; }
-      }
-      if ((p.style.getPropertyValue('--obj') || '') !== v) { if (v) p.style.setProperty('--obj', v); else p.style.removeProperty('--obj'); }
+    for (const p of doc.querySelectorAll('p[style*="--obj"]')) p.style.removeProperty('--obj');
+    if (isWord()) return; // 워드 호환 문서의 줄 높이 규칙은 따로 (확인 전이라 적용하지 않음)
+    const cand = new Set();
+    for (const o of doc.querySelectorAll('p > .gso.inl, p > span > .gso.inl, p > img, p > span > img')) {
+      if (!o.closest('.gso-float')) { const p = o.closest('p'); if (p) cand.add(p); }
     }
+    if (!cand.size) return;
+    const sc = zf(), writes = [];
+    for (const p of cand) {
+      const objs = Array.from(p.querySelectorAll(':scope > .gso.inl, :scope > span > .gso.inl, :scope > img, :scope > span > img')).filter(o => !o.closest('.gso-float'));
+      if (!objs.length) continue;
+      const c = getComputedStyle(p), fs = parseFloat(c.fontSize) || 0, lh = parseFloat(c.lineHeight) || 0;
+      const oh = Math.max(...objs.map(o => { const oc = getComputedStyle(o); return o.getBoundingClientRect().height / sc + (parseFloat(oc.marginTop) || 0) + (parseFloat(oc.marginBottom) || 0); }));
+      const h = p.getBoundingClientRect().height / sc - (parseFloat(c.paddingTop) || 0) - (parseFloat(c.paddingBottom) || 0);
+      if (oh > fs && lh > 0 && h < Math.max(oh, lh) + lh * 0.5) {
+        const want = oh + (lh - fs);
+        if (want - h > 0.05) writes.push([p, (want - h).toFixed(2) + 'px']);
+      }
+    }
+    for (const [p, v] of writes) p.style.setProperty('--obj', v);
   }
 
   // 셀 안 문단 간격: 한글은 앞 문단 아래 간격 + 이 문단 위 간격을 더하지만 브라우저는 겹쳐(큰 쪽만) 씀 →
   // 겹쳐 없어진 만큼(작은 쪽)을 이 문단 위 안 여백(--sib)으로 채움 (Employee Accident Report 의 2문단 칸: 한글 17.3mm)
   function cellSpacing() {
+    const toPx = (el, val, prop) => !val ? 0 : /pt$/.test(val) ? parseFloat(val) * 96 / 72 : /px$/.test(val) ? parseFloat(val) : parseFloat(getComputedStyle(el)[prop]) || 0;
+    const sibWrites = [];
     for (const p of doc.querySelectorAll('td > p + p')) {
-      const a = parseFloat(getComputedStyle(p.previousElementSibling).marginBottom) || 0, b = parseFloat(getComputedStyle(p).marginTop) || 0;
+      const prev = p.previousElementSibling;
+      const a = prev && prev.style.marginBottom ? toPx(prev, prev.style.marginBottom, 'marginBottom') : 0;
+      const b = p.style.marginTop ? toPx(p, p.style.marginTop, 'marginTop') : 0;
       const v = a > 0 && b > 0 ? Math.min(a, b) + 'px' : '';
-      if ((p.style.getPropertyValue('--sib') || '') !== v) { if (v) p.style.setProperty('--sib', v); else p.style.removeProperty('--sib'); }
+      if ((p.style.getPropertyValue('--sib') || '') !== v) sibWrites.push([p, v]);
     }
+    for (const [p, v] of sibWrites) { if (v) p.style.setProperty('--sib', v); else p.style.removeProperty('--sib'); }
     // 한글 문서: 칸 마지막 문단의 줄 간격(줄 높이 − 글자 크기)을 칸 높이에서 뺌 (PUBL110 첫 줄: 15pt 90% + 10pt 160% 문단 칸 = 한글 14.56mm)
     const hwp = !isWord();
     doc.classList.toggle('hwpmode', hwp);
     stack.classList.toggle('wordmode', !hwp); // 워드 호환: 글상자 글이 넘쳐도 보임 (상자가 커짐)
+    const leadCache = new Map(), tdWrites = [];
     for (const td of doc.querySelectorAll('td')) {
       const last = td.lastElementChild;
       let v = '';
-      if (hwp && last && last.tagName === 'P') { const c = getComputedStyle(last); const lead = (parseFloat(c.lineHeight) || 0) - (parseFloat(c.fontSize) || 0); if (Math.abs(lead) > 0.01) v = lead.toFixed(2) + 'px'; }
-      if ((td.style.getPropertyValue('--lead') || '') !== v) { if (v) td.style.setProperty('--lead', v); else td.style.removeProperty('--lead'); }
+      if (hwp && last && last.tagName === 'P') {
+        const k = (last.getAttribute('style') || '') + '|' + (last.dataset.st || '');
+        if (leadCache.has(k)) v = leadCache.get(k);
+        else {
+          const c = getComputedStyle(last);
+          const lead = (parseFloat(c.lineHeight) || 0) - (parseFloat(c.fontSize) || 0);
+          if (Math.abs(lead) > 0.01) v = lead.toFixed(2) + 'px';
+          leadCache.set(k, v);
+        }
+      }
+      if ((td.style.getPropertyValue('--lead') || '') !== v) tdWrites.push([td, v]);
     }
+    for (const [td, v] of tdWrites) { if (v) td.style.setProperty('--lead', v); else td.style.removeProperty('--lead'); }
   }
 
   // 한 문단의 자리 차지 개체들은 겹쳐 놓이므로 빈 자리는 가장 큰 것 하나만큼 (첫 개체에 몰아 줌)
@@ -826,7 +916,14 @@
     }
   }
 
+  // 쪽 나눔 한 번에 걸린 시간 — 큰 문서(편람 450쪽 ≈ 5초)에서 글자를 칠 때마다 돌리지 않으려고 queueLayout 이 본다
   function paginate() {
+    // 지금 바로 나누므로 미뤄 둔 예약(큰 문서의 입력 대기 타이머)은 필요 없다 — 남겨 두면 탭을 바꾼 뒤에도 뒤늦게 한 번 더 돌고 다음 예약을 막는다(자동 검토 «낮음»)
+    clearTimeout(layoutTimer); layoutTimer = 0; layoutQueued = false;
+    const t0 = performance.now();
+    try { paginateNow(); } finally { lastPaginateMs = performance.now() - t0; }
+  }
+  function paginateNow() {
     shapeReserves();
     updateHeads();
     numberNotes();
@@ -1009,8 +1106,9 @@
     ms.forEach((it, i) => {
       const top = it.top + shift, k = Math.floor((top + 0.5) / sliceH), inS = top - k * sliceH;
       let target = null;
-      // 쪽 나누기는 다음 쪽 첫 단으로, 단에 다 안 들어가는 문단·표는 다음 단으로
+      // 쪽 나누기는 다음 쪽 첫 단으로, 단 나누기·단에 다 안 들어가는 문단·표는 다음 단으로
       if (it.el.dataset.pb && i > 0) target = (Math.floor(k / n) + 1) * n * sliceH;
+      else if (it.el.dataset.cb && i > 0) target = (k + 1) * sliceH;
       else if (inS > 0.5 && inS + it.h > sliceH + 0.5) target = (k + 1) * sliceH;
       if (target !== null && target > top) { gaps.push({ el: it.el, h: target - top }); shift += target - top; }
     });
@@ -1036,9 +1134,12 @@
     const scale = zf();
     const docY = vy => (vy - dr.top) / scale;
     const ms = Array.from(doc.children).map(el => {
-      const c = getComputedStyle(el);
-      return { el, top: el.offsetTop, h: el.offsetHeight, mt: Math.max(0, parseFloat(c.marginTop) || 0), mb: Math.max(0, parseFloat(c.marginBottom) || 0) };
+      const c = el.style.marginTop || el.style.marginBottom || el.classList.contains('endnotes') ? getComputedStyle(el) : null;
+      return { el, top: el.offsetTop, h: el.offsetHeight, mt: c ? Math.max(0, parseFloat(c.marginTop) || 0) : 0, mb: c ? Math.max(0, parseFloat(c.marginBottom) || 0) : 0 };
     });
+    const isEmptyBlk = e => e.tagName === 'P' && !e.textContent.replace(/[\s​]/g, '') && !e.querySelector('img, .gso, table, .hctl');
+    let lastNonEmpty = ms.length - 1;
+    while (lastNonEmpty >= 0 && (ms[lastNonEmpty].el.classList.contains('pg-gap') || isEmptyBlk(ms[lastNonEmpty].el))) lastNonEmpty--;
     // 위아래로 자리를 차지하는(TOP_AND_BOTTOM) 종이·쪽 기준 개체: 그 쪽에서 개체가 차지하는 띠(바깥 여백 포함) 안에서
     // 시작하는 문단은 띠 아래로 (기준 문단 자신도). 한글은 띠 아래에 문단 위 간격을 두지 않고, 워드 호환 문서는 둠 (한글로 확인)
     const Sh = g.PureunShape, bands = [], anchorsAt = new Map();
@@ -1092,7 +1193,7 @@
       else if (inPage + m.h > bodyHp(cp) + 0.5) {
         if (el.matches(LEAF)) {
           // 문단은 한글처럼 줄 단위로 나눔 (여러 쪽에 걸치면 반복)
-          const plan = planSplits(el, shift, cp, geo, docY, bodyEnd);
+          const plan = planSplits(el, shift, cp, geo, docY, bodyEnd, i > lastNonEmpty);
           if (plan.whole) { if (inPage - m.mt > 0.5) target = (cp + 1) * pitch; }
           else { lineGaps.push(...plan.splits); shift += plan.added; }
         } else if (m.h <= bodyHp(cp + 1) && inPage - m.mt > 0.5) {
@@ -1106,7 +1207,7 @@
         blockGaps.push({ el, height: Math.max(0, target - top - collapse) });
         shift += target - top;
         if (el.matches(LEAF) && m.h > bodyHp(cp + 1) + 0.5) {
-          const plan = planSplits(el, shift, cp + 1, geo, docY, bodyEnd);
+          const plan = planSplits(el, shift, cp + 1, geo, docY, bodyEnd, i > lastNonEmpty);
           lineGaps.push(...plan.splits);
           shift += plan.added;
         }
@@ -1143,10 +1244,13 @@
       const top = pb.headerInside ? m.top : bodyTop(), bot = pb.footerInside ? Hh - m.bottom : Hh - bodyBottom();
       box = { l: m.left - mm(off.l), t: top - mm(off.t), r: W - m.right + mm(off.r), b: bot + mm(off.b) };
     }
+    const vis = (E.state.sec && E.state.sec.visibility) || {};
+    const showBg = !(vis.fill === 'HIDE_FIRST' && i === 0) && !(vis.fill === 'SHOW_FIRST' && i > 0);
+    const showBd = !(vis.border === 'HIDE_FIRST' && i === 0) && !(vis.border === 'SHOW_FIRST' && i > 0);
     const out = [];
     const area = pb.fillArea === 'PAGE' ? { l: m.left, t: bodyTop(), r: W - m.right, b: Hh - bodyBottom() } : pb.fillArea === 'BORDER' ? box : { l: 0, t: 0, r: W, b: Hh };
     const rect = r => ({ left: r.l + 'mm', top: r.t + 'mm', width: Math.max(0, r.r - r.l) + 'mm', height: Math.max(0, r.b - r.t) + 'mm' });
-    if (pb.img || pb.bg) {
+    if (showBg && (pb.img || pb.bg)) {
       const st = Object.assign({ position: 'absolute' }, rect(area));
       if (pb.bg) st.backgroundColor = pb.bg;
       if (pb.img) {
@@ -1157,7 +1261,7 @@
       out.push(UI.h('div', { class: 'pg-bg', style: st }));
     }
     const sides = pb.sides || {};
-    if (['l', 'r', 't', 'b'].some(k => sides[k] && sides[k].type !== 'NONE')) out.push(UI.h('div', { class: 'pg-border', style: Object.assign({ position: 'absolute', boxSizing: 'border-box' }, rect(box)), html: '' }));
+    if (showBd && ['l', 'r', 't', 'b'].some(k => sides[k] && sides[k].type !== 'NONE')) out.push(UI.h('div', { class: 'pg-border', style: Object.assign({ position: 'absolute', boxSizing: 'border-box' }, rect(box)), html: '' }));
     const bd = out[out.length - 1];
     if (bd && bd.classList.contains('pg-border')) bd.style.cssText += ';' + Dm.borderCss(sides);
     return out;
@@ -1176,14 +1280,17 @@
     const htmlCache = new Map(), htmlOf = blocks => { if (!blocks) return ''; if (!htmlCache.has(blocks)) htmlCache.set(blocks, Dm.blocksToHtml(blocks)); return htmlCache.get(blocks); };
     const hfAt = (i, kind) => { let b = st[kind]; for (const c of hfChanges) if (c.page <= i && c.hf.kind === kind) b = c.hf.blocks; return b; };
     const pos = st.pageNum && st.pageNum.pos;
+    const vis = (st.sec && st.sec.visibility) || {};
+    const lns = st.sec && st.sec.lineNumberShape;
     const frag = document.createDocumentFragment();
+    let globalLineNo = lns ? Math.max(1, +(lns.startNumber || 1)) : 1;
     for (let i = 0; i < pageCount; i++) {
       const s = UI.h('div', { class: 'sheet', style: { top: (i * geo.pitch) + 'px', height: effH() + 'mm' } });
       const box = { left: m.left + 'mm', right: m.right + 'mm' };
       pageBorderEls(i).forEach(el => s.append(el));
       // 바탕쪽: 본문 영역에 본문 뒤로 (홀수·짝수 쪽 따로 있으면 그것을)
       const mps = st.masterPages;
-      if (mps && mps.length) {
+      if (mps && mps.length && !(i === 0 && vis.hideFirstMasterPage === '1')) {
         const mp = mps.find(x => x.type === ((i + 1) % 2 ? 'ODD' : 'EVEN')) || mps.find(x => x.type === 'BOTH');
         if (mp) s.append(UI.h('div', { class: 'sh-master doc', html: Dm.blocksToHtml(mp.blocks), style: { left: m.left + 'mm', top: bodyTop() + 'mm', width: (effW() - m.left - m.right) + 'mm' } }));
       }
@@ -1192,7 +1299,8 @@
         s.append(UI.h('i', { class: `crop ${v} ${hz}`, style: { [v]: (v === 'top' ? bodyTop() : bodyBottom()) + 'mm', [hz]: (hz === 'left' ? m.left : m.right) + 'mm' } }));
       }
       // 머리말은 위쪽 여백에서, 꼬리말은 꼬리말 영역 맨 위에서 시작 (한글과 같음)
-      const headHtml = htmlOf(hfAt(i, 'header')), footHtml = htmlOf(hfAt(i, 'footer'));
+      const headHtml = (i === 0 && vis.hideFirstHeader === '1') ? '' : htmlOf(hfAt(i, 'header'));
+      const footHtml = (i === 0 && vis.hideFirstFooter === '1') ? '' : htmlOf(hfAt(i, 'footer'));
       if (headHtml) s.append(UI.h('div', { class: 'sh-head', html: headHtml, style: Object.assign({ top: m.top + 'mm' }, box) }));
       if (footHtml) s.append(UI.h('div', { class: 'sh-foot', html: footHtml, style: Object.assign({ top: (effH() - bodyBottom()) + 'mm' }, box) }));
       // 각주: 본문 아래쪽, 각주 자리만큼 줄인 본문 바로 밑에
@@ -1200,11 +1308,24 @@
         const top = bodyTop() * geo.pm + geo.bodyH - (reserve[i] || 0);
         s.append(UI.h('div', { class: 'sh-notes', html: '<div class="fn-sep"></div>' + notesByPage[i].join(''), style: Object.assign({ top: top + 'px' }, box) }));
       }
-      if (pos) {
+      if (pos && !(i === 0 && vis.hideFirstPageNum === '1')) {
         const [vert, horz] = pos.split('_');
         const al = { LEFT: 'left', CENTER: 'center', RIGHT: 'right' }[horz] || 'center';
         const style = Object.assign({ textAlign: al }, box, vert === 'TOP' ? { top: m.top + 'mm' } : { bottom: m.bottom + 'mm' }); // 쪽 번호: 머리말 영역 위 / 꼬리말 영역 아래에 맞춤
         s.append(UI.h('div', { class: 'sh-pnum', style }, pageNumText(i + 1)));
+      }
+      if (vis.showLineNumber === '1') {
+        const step = Math.max(1, +(lns && lns.countBy) || 5);
+        const distMm = (+(lns && lns.distance) || 850) / (7200 / 25.4);
+        if (lns && lns.restartType === '1' && i > 0) globalLineNo = Math.max(1, +(lns.startNumber || 1));
+        const lhPx = (10 * 1.6) * (96 / 72);
+        const maxLines = Math.max(1, Math.floor((geo.bodyH - (reserve[i] || 0)) / lhPx));
+        const lnBox = UI.h('div', { class: 'sh-linenums', style: { position: 'absolute', left: Math.max(2, m.left - distMm - 8) + 'mm', width: '7mm', top: bodyTop() + 'mm', textAlign: 'right', fontSize: '8pt', color: '#6b7280', pointerEvents: 'none', lineHeight: lhPx + 'px' } });
+        for (let ln = 0; ln < maxLines; ln++) {
+          const curNo = globalLineNo++;
+          lnBox.append(UI.h('div', { style: { height: lhPx + 'px' } }, curNo % step === 0 || curNo === 1 ? String(curNo) : ''));
+        }
+        s.append(lnBox);
       }
       frag.append(s);
     }
@@ -1443,6 +1564,7 @@
   };
   E.setPageView = on => { E.state.pageView = on; E.layout(); };
   E.setMarks = on => { E.state.marks = on; doc.classList.toggle('show-marks', on); };
+  E.setCtrlMarks = on => { E.state.ctrlMarks = on; doc.classList.toggle('show-ctrl-marks', on); };
 
   // ---------- 글자 모양 ----------
   E.exec = (cmd, val) => {
@@ -1457,16 +1579,24 @@
   function afterEdit() { lastEdit = Date.now(); normalizeRoot(); queueLayout(); changed(); }
   E.afterEdit = afterEdit;
 
-  // 선택 영역에 CSS 적용 (선택이 없으면 이후 입력에 적용)
-  E.styleSelection = props => {
+  // 선택 영역에 CSS 및 data 속성 적용 (선택이 없으면 이후 입력에 적용)
+  E.styleSelection = (props, dataAttrs) => {
     E.restoreSel();
     E.checkpoint();
+    const applyAttrs = el => {
+      if (!dataAttrs) return;
+      for (const [k, v] of Object.entries(dataAttrs)) {
+        if (v === null || v === undefined || v === '') delete el.dataset[k];
+        else el.dataset[k] = String(v);
+      }
+    };
     const sel = getSelection();
     if (!sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) {
       const span = document.createElement('span');
       Object.assign(span.style, props);
+      applyAttrs(span);
       span.textContent = '​';
       range.insertNode(span);
       const r = document.createRange();
@@ -1490,6 +1620,7 @@
       }
       el.style.fontFamily = el.dataset.ff || '';
       Object.assign(el.style, props);
+      applyAttrs(el);
       el.querySelectorAll('[style]').forEach(d => { for (const k of Object.keys(props)) d.style[k] = ''; });
     });
     doc.querySelectorAll('[data-ff]').forEach(el => delete el.dataset.ff);
@@ -1498,7 +1629,16 @@
 
   E.setFont = name => E.exec('fontName', name);
   E.setSize = pt => E.styleSelection({ fontSize: pt + 'pt' });
-  E.setSpacing = pct => E.styleSelection({ letterSpacing: pct ? pct / 100 + 'em' : '' });
+  E.setSpacing = pct => E.styleSelection({ letterSpacing: pct ? pct / 100 + 'em' : '' }, { sp: pct || '', spl: '' });
+  E.setRatio = ratio => {
+    const r = Math.max(50, Math.min(200, Math.round(ratio || 100)));
+    const adj = r !== 100 ? ((r - 100) / 100) * 0.9 : 0;
+    const curSp = E.charState().spacing || 0;
+    const em = Math.round((curSp / 100 + adj) * 1000) / 1000;
+    E.styleSelection({ letterSpacing: em ? em + 'em' : '' }, { ratio: r !== 100 ? r : '', sp: curSp || '', spl: '' });
+  };
+  E.stepSpacing = d => { const cur = E.charState().spacing || 0; E.setSpacing(Math.max(-50, Math.min(50, cur + d))); };
+  E.stepRatio = d => { const cur = E.charState().ratio || 100; E.setRatio(Math.max(50, Math.min(200, cur + d))); };
   E.setColor = c => E.exec('foreColor', c || '#000000');
   E.setShade = c => E.exec('hiliteColor', c || 'transparent');
   E.stepSize = d => {
@@ -1512,6 +1652,12 @@
     if (seg && seg.parentElement) el = seg.parentElement;
     const c = getComputedStyle(el);
     const q = k => { try { return document.queryCommandState(k); } catch (e) { return false; } };
+    const ratioEl = el.closest && el.closest('[data-ratio]');
+    const fxEl = el.closest && el.closest('[data-fx]');
+    const langEl = el.closest && el.closest('[data-lang]');
+    const ratio = (ratioEl && doc.contains(ratioEl) && +ratioEl.dataset.ratio) || 100;
+    const ratioAdjEm = ratio !== 100 ? ((ratio - 100) / 100) * 0.9 : 0;
+    const rawLsEm = parseFloat(c.letterSpacing) ? parseFloat(c.letterSpacing) / parseFloat(c.fontSize) : 0;
     return {
       font: c.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, ''),
       size: Math.round(parseFloat(c.fontSize) * 0.75 * 2) / 2,
@@ -1519,8 +1665,12 @@
       sup: q('superscript'), sub: q('subscript'),
       // 글자 폭에 맞춰 바꿔 그린 자간이면 원래 값(data-sp)
       spacing: (sp => (sp && (sp.style.letterSpacing || '0em') === sp.dataset.spl ? +sp.dataset.sp || 0 : null))(el.closest && el.closest('[data-sp]'))
-        ?? (parseFloat(c.letterSpacing) ? Math.round(parseFloat(c.letterSpacing) / parseFloat(c.fontSize) * 100) : 0),
+        ?? Math.round((rawLsEm - ratioAdjEm) * 100),
+      ratio,
+      fx: (fxEl && doc.contains(fxEl) && fxEl.dataset.fx) || '',
+      langs: (langEl && doc.contains(langEl) && langEl.dataset.lang) || '',
       color: c.color,
+      shade: c.backgroundColor,
     };
   };
 
@@ -1686,6 +1836,15 @@
     document.execCommand('insertParagraph');
     const b = E.currentBlock();
     if (b) b.dataset.pb = '1';
+    afterEdit();
+  };
+  E.insertColumnBreak = () => {
+    E.restoreSel();
+    E.checkpoint();
+    document.execCommand('insertParagraph');
+    const b = E.currentBlock();
+    if (b) b.dataset.cb = '1';
+    if (!E.state.columns || E.state.columns.count < 2) E.state.columns = { count: 2, gap: 8 };
     afterEdit();
   };
 
@@ -1855,12 +2014,75 @@
       const cells = (given || E.table.targetCells()).filter(c => doc.contains(c));
       if (!cells.length) return UI.toast('표 안에서만 쓰는 기능입니다 — 표 칸을 눌러 커서를 둔 뒤 다시 해 주세요.', true);
       E.checkpoint();
-      if (p.tableWidth) cells[0].closest('table').style.setProperty('--w', Math.max(10, Math.min(100, p.tableWidth)) + '%'); // 너비는 --w (그릴 때 바깥 테두리 반쪽을 더함)
+      const tbl = cells[0].closest('table');
+      if (p.tableWidth) tbl.style.setProperty('--w', Math.max(10, Math.min(100, p.tableWidth)) + '%'); // 너비는 --w (그릴 때 바깥 테두리 반쪽을 더함)
+      if (p.repeatHeader !== undefined || p.pageBreak !== undefined) {
+        let saved = {};
+        try { saved = JSON.parse(tbl.dataset.place || '{}') || {}; } catch (e) { saved = {}; }
+        saved.place = Object.assign({ inline: true }, saved.place, p.repeatHeader !== undefined ? { repeatHeader: !!p.repeatHeader } : null, p.pageBreak !== undefined ? { pageBreak: p.pageBreak } : null);
+        tbl.dataset.place = JSON.stringify(saved);
+      }
       for (const c of cells) {
-        if (p.height !== undefined) c.style.height = p.height > 0 ? p.height + 'mm' : '';
+        if (p.height !== undefined) { c.style.height = p.height > 0 ? p.height + 'mm' : ''; delete c.dataset.hh; }
+        if (p.valign) c.style.verticalAlign = p.valign === 'middle' ? '' : p.valign;
+        if (p.dir !== undefined) {
+          if (p.dir && p.dir !== 'HORIZONTAL') { c.dataset.dir = p.dir; c.style.writingMode = 'vertical-rl'; }
+          else { delete c.dataset.dir; c.style.writingMode = ''; }
+        }
+        if (p.wrap !== undefined) {
+          if (p.wrap && p.wrap !== 'BREAK') c.dataset.wrap = p.wrap;
+          else delete c.dataset.wrap;
+        }
         if (p.margin) {
           const m = p.margin, def = H.compactMargin(m) === null;
           Dm.setCellMargin(c, def ? null : m);
+        }
+        if (p.customBorder) {
+          const cb = p.customBorder;
+          const curB = Dm.decodeBorders(c.dataset.border) || { l: Object.assign({}, H.DEFAULT_SIDE), r: Object.assign({}, H.DEFAULT_SIDE), t: Object.assign({}, H.DEFAULT_SIDE), b: Object.assign({}, H.DEFAULT_SIDE) };
+          const sd = { type: cb.type || 'SOLID', width: cb.width || 0.12, color: cb.color || '#000000' };
+          const apply = cb.apply || 'all';
+          if (apply === 'all') { curB.l = Object.assign({}, sd); curB.r = Object.assign({}, sd); curB.t = Object.assign({}, sd); curB.b = Object.assign({}, sd); }
+          else if (apply === 'none') { const nn = { type: 'NONE', width: 0.1, color: '#000000' }; curB.l = Object.assign({}, nn); curB.r = Object.assign({}, nn); curB.t = Object.assign({}, nn); curB.b = Object.assign({}, nn); }
+          else if (['l', 'r', 't', 'b'].includes(apply)) curB[apply] = Object.assign({}, sd);
+          else if (apply === 'tb') { curB.t = Object.assign({}, sd); curB.b = Object.assign({}, sd); }
+          else if (apply === 'lr') { curB.l = Object.assign({}, sd); curB.r = Object.assign({}, sd); }
+          if (cb.diag !== undefined) {
+            delete curB.slash; delete curB.backSlash;
+            const dSpec = { type: cb.type && cb.type !== 'NONE' ? cb.type : 'SOLID', width: cb.width || 0.12, color: cb.color || '#000000' };
+            if (cb.diag === 'slash' || cb.diag === 'cross') curB.slash = Object.assign({}, dSpec);
+            if (cb.diag === 'backSlash' || cb.diag === 'cross') curB.backSlash = Object.assign({}, dSpec);
+          }
+          Dm.setCellBorders(c, H.compactBorders(curB));
+        }
+      }
+      afterEdit();
+    },
+    resizeCells(dxPct, dyMm, given) {
+      const cells = (given || E.table.targetCells()).filter(c => doc.contains(c));
+      if (!cells.length) return;
+      E.checkpoint();
+      const tbl = cells[0].closest('table');
+      grid(tbl);
+      if (dxPct) {
+        const cl = cols(tbl);
+        const colSet = new Set(cells.map(c => c._c + c.colSpan - 1));
+        for (const ci of colSet) {
+          if (ci < cl.length - 1) {
+            const a = Math.max(2, (parseFloat(cl[ci].style.width) - (+cl[ci].dataset.e || 0) || 100 / cl.length) + dxPct);
+            const b = Math.max(2, (parseFloat(cl[ci + 1].style.width) - (+cl[ci + 1].dataset.e || 0) || 100 / cl.length) - dxPct);
+            cl[ci].style.width = a.toFixed(2) + '%';
+            cl[ci + 1].style.width = b.toFixed(2) + '%';
+            delete cl[ci].dataset.e; delete cl[ci + 1].dataset.e;
+          }
+        }
+      }
+      if (dyMm) {
+        const pm = pxPerMm();
+        for (const c of cells) {
+          const curH = /mm$/.test(c.style.height) ? parseFloat(c.style.height) : c.offsetHeight / pm;
+          c.style.height = Math.max(3, Math.round((curH + dyMm) * 10) / 10) + 'mm';
+          delete c.dataset.hh;
         }
       }
       afterEdit();
@@ -2014,18 +2236,28 @@
     savedRange = r.cloneRange();
     (block).scrollIntoView({ block: 'center' });
   };
-  E.leafBlocks = () => Array.from(doc.querySelectorAll(LEAF)).filter(b => !b.querySelector(LEAF));
+  E.leafBlocks = () => Array.from(doc.querySelectorAll(LEAF)).filter(b => b.tagName !== 'LI' || !b.querySelector(LEAF));
   E.textOfBlock = b => blockTextMap(b).text;
+
+  // 상태 표시줄용 경량 글자 수 (커서 이동 때마다 수만 개 TreeWalker 를 만들지 않도록 캐시)
+  E.charCount = () => {
+    if (cachedChars >= 0) return cachedChars;
+    let raw = doc.textContent || '';
+    for (const g2 of doc.querySelectorAll('.pg-gap')) if (g2.textContent) raw = raw.replace(g2.textContent, '');
+    cachedChars = raw.replace(/[\u200b\u2060\r\n]/g, '').length;
+    return cachedChars;
+  };
 
   // ---------- 통계 ----------
   E.stats = () => {
-    const text = E.leafBlocks().map(b => E.textOfBlock(b).replace(/[​\u2060]/g, '')).join('\n');
+    const leaves = E.leafBlocks();
+    const text = leaves.map(b => E.textOfBlock(b).replace(/[​\u2060]/g, '')).join('\n');
     return {
       pages: pageCount,
       chars: text.replace(/\n/g, '').length,
       charsNoSpace: text.replace(/\s/g, '').length,
       words: (text.match(/\S+/g) || []).length,
-      paras: E.leafBlocks().length,
+      paras: leaves.length,
       tables: doc.querySelectorAll('table').length,
       images: doc.querySelectorAll('img').length,
     };

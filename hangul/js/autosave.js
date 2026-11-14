@@ -7,7 +7,7 @@
   const DB = 'pureun-hangul', STORE = 'autosave', MAX_KEEP = 20, MAX_DAYS = 14, IDLE_MS = 2500;
   const { h, toast } = PureunUI;
   const A = () => window.PureunApp;
-  let dbp = null, timer = null, saving = false, again = false;
+  let dbp = null, timer = null, saving = false, again = false, rev = 0;
 
   const idb = () => dbp || (dbp = new Promise((res, rej) => {
     try {
@@ -35,17 +35,19 @@
     for (const r of list.filter((r, i) => i >= MAX_KEEP || r.savedAt < cut)) await del(r.id);
   }
 
-  // 지금 편집기에 올라 있는 문서를 저장 (다른 문서는 탭을 바꿀 때 저장됨)
+  // 지금 편집기에 올라 있는 문서를 저장 (수정된 문서만 저장하여 대용량 문서를 열자마자 멈추는 현상 방지)
   async function saveCurrent() {
     const app = A(), d = app && app.current();
-    if (!d || d.readOnly || (d.pristine && !d.dirty)) return;
+    if (!d || d.readOnly || !d.dirty || d._savedRev === rev) return;
     if (saving) { again = true; return; }
     saving = true;
+    const curRev = rev;
     try {
       const bytes = app.buildBytes();
       if (!d.autoId) d.autoId = uid();
       const buf = bytes.buffer && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
       await put({ id: d.autoId, name: d.name, savedAt: Date.now(), dirty: !!d.dirty, bytes: buf });
+      d._savedRev = curRev;
       msg('자동 저장됨 ' + hhmmss(Date.now()));
       prune().catch(() => {});
     } catch (e) { msg('자동 저장 실패'); } finally {
@@ -53,11 +55,19 @@
       if (again) { again = false; schedule(); }
     }
   }
-  function schedule() { clearTimeout(timer); timer = setTimeout(saveCurrent, IDLE_MS); }
+  function schedule() {
+    clearTimeout(timer);
+    const pages = window.PureunEditor && PureunEditor.pageCount ? PureunEditor.pageCount() : 1;
+    const wait = pages > 30 ? 12000 : IDLE_MS;
+    timer = setTimeout(() => {
+      if (typeof requestIdleCallback === 'function' && pages > 15) requestIdleCallback(() => saveCurrent(), { timeout: 5000 });
+      else saveCurrent();
+    }, wait);
+  }
   function flush() { clearTimeout(timer); return saveCurrent(); }
 
-  document.addEventListener('pu:dirty', schedule);
-  document.addEventListener('pu:doc', schedule);
+  document.addEventListener('pu:dirty', () => { rev++; schedule(); });
+  document.addEventListener('pu:doc', () => { const app = A(), d = app && app.current(); if (d && d.dirty) schedule(); });
   document.addEventListener('pu:leave', flush);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   addEventListener('pagehide', flush);

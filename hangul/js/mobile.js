@@ -215,7 +215,7 @@
     mFill.hidden = !document.querySelector('#fieldList input'); // {{항목}}이 있는 서식이면 채우기 단추
     mZoomLbl.textContent = Math.round(E.state.zoom * 100) + '%';
     // 처음 열린 빈 문서면 시작 화면
-    const empty = cur.pristine && !cur.dirty && A.docs().length === 1 && E.stats().chars === 0;
+    const empty = cur.pristine && !cur.dirty && A.docs().length === 1 && E.charCount() === 0;
     mStart.hidden = !(empty && !startDismissed && !editing && closed('taskpane'));
     mTable.hidden = !(editing && E.currentCell());
     if (editing && E.anchorEl()) {
