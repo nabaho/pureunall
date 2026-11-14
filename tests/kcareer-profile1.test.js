@@ -252,9 +252,48 @@ test('★★ ⑫ 고른 것만 넣기 — 고른 줄만 나오고, 자동 채움
   /* only 를 안 켜면 예전 그대로 — 고른 것 + 자동 */
   const 예전 = P1.build(src, { use: 'general', pins: { wic: 고른위촉 } }).sections.find((x) => x.key === 'wic');
   assert.ok(예전.n > 3, '켜지 않으면 자동 채움이 그대로다');
-  /* 고를 수 없는 칸(강의 등)에 only 를 줘도 무시한다 — 지금은 위촉·실적만 고를 수 있다 */
-  const 강의 = P1.build(src, { use: 'general', only: { lec: true } }).sections.find((x) => x.key === 'lec');
-  assert.ok(강의 && 강의.n === 9, '고르기 칸이 아닌 곳은 only 가 걸리지 않는다');
+  /* 고를 수 없는 칸(학력·주요 직책·연구기고)에 only 를 줘도 무시한다 */
+  const 학력 = P1.build(src, { use: 'general', only: { edu: true } }).sections.find((x) => x.key === 'edu');
+  assert.ok(학력 && 학력.n === 1, '고르기 칸이 아닌 곳은 only 가 걸리지 않는다');
+});
+
+test('★★ ⑮ 경력·강의·자격·수상도 고른다 — 고른 것은 앞으로(자동) · 고른 것만(only) · 앱이 정한 차례와 거름은 그대로 (대표 2026-11-12)', () => {
+  assert.deepEqual([...P1.PIN_KEYS].sort(), ['award', 'cert', 'lec', 'perf', 'wic', 'work'], '고를 수 있는 칸 여섯');
+  const src = 재료();
+  src.work.forEach((r, i) => { r.id = 'W' + i; });                      /* 앱이 정한 차례 = 배열 차례(들어간 날 최근 것 먼저) */
+  src.lecture.forEach((r, i) => { r.id = 'L' + i; });
+  src.cert = [{ id: 'T1', title: '공인노무사', date: '2006.11.20', org: '고용노동부' }, { id: 'T2', title: '정보처리기사', date: '2007.5.1', org: '산업인력공단' },
+    { id: 'T3', title: '노무관리 과정 수료', date: '2020.1.1', org: '협회' }, { id: 'T4', title: '직업상담사 2급', date: '2011.8.1', org: '산업인력공단' }];
+  src.wiccok.forEach((r, i) => { r.id = 'K' + i; });                    /* 40번째(K40)는 표창 */
+  const by = (m, k) => m.sections.find((x) => x.key === k);
+
+  /* ── 자동(기본): 고른 것은 오래된 것이어도 맨 앞으로, 나머지는 예전 차례 ── */
+  const 자동 = P1.build(src, { use: 'general', pins: { work: ['W5'], lec: ['L0'], cert: ['T4'], award: ['K40'] } });
+  assert.equal(by(자동, 'work').rows[0][1].indexOf('가나5') >= 0, true, '★ 고른 경력이 맨 앞');
+  assert.equal(by(자동, 'work').pin, 1);
+  assert.equal(by(자동, 'cert').rows[0][1], '직업상담사 2급', '★ 고른 자격이 맨 앞(국가자격 먼저 차례보다 앞)');
+  assert.equal(by(자동, 'award').pin, 1);
+  /* 고른 것은 한 장 맞추기에서도 안 빠진다 */
+  const 작게 = P1.fit(P1.build(src, { use: 'general', pins: { work: ['W5'], lec: ['L8'] } }), 5);
+  assert.ok(by(작게, 'work').rows.some((r) => r[1].indexOf('가나5') >= 0), '★ 줄이느라 고른 경력을 빼면 안 된다');
+  assert.ok(by(작게, 'lec').rows.some((r) => r[1].indexOf('교육8') >= 0), '★ 줄이느라 고른 강의를 빼면 안 된다');
+
+  /* ── 고른 것만: 고른 줄만, 거름(수료는 자격이 아니다·표창은 위촉이 아니다)과 차례는 그대로 ── */
+  const 만 = P1.build(src, { use: 'general', pins: { work: ['W3', 'W1'], lec: ['L2', 'L7'], cert: ['T2', 'T1', 'T3'], award: ['K40'] }, only: { work: true, lec: true, cert: true, award: true } });
+  assert.equal(by(만, 'work').n, 2, '고른 경력 2건만');
+  assert.ok(by(만, 'work').rows[0][1].indexOf('가나1') >= 0 && by(만, 'work').rows[1][1].indexOf('가나3') >= 0, '★ 경력은 앱이 정한 차례 그대로(고른 순서가 아니라)');
+  assert.equal(by(만, 'lec').n, 2, '고른 강의 2건만');
+  assert.equal(by(만, 'cert').n, 2, '★ 고른 T3 는 «수료»라 자격이 아니므로 안 나온다(거름 그대로)');
+  assert.equal(by(만, 'award').n, 1, '고른 표창 1건');
+  [by(만, 'work'), by(만, 'lec'), by(만, 'cert'), by(만, 'award')].forEach((x) => { assert.equal(x.fixed, true); assert.equal(x.more, 0); });
+  /* 한 장 맞추기·채우기가 고른 칸을 건드리지 않는다 */
+  const 채움 = P1.fill(P1.build(src, { use: 'lecturer', pins: { lec: ['L2'] }, only: { lec: true } }), () => true);
+  assert.equal(by(채움, 'lec').rows.length, 1, '★ 강의 위주 용도라도 고른 것만 — 남는 자리를 최근 강의로 채우지 않는다');
+  /* 고른 것이 없으면 그 칸은 빠진다(지어서 채우지 않는다) */
+  const 빈 = P1.build(src, { use: 'general', pins: {}, only: { work: true, lec: true, cert: true, award: true } });
+  ['work', 'lec', 'cert', 'award'].forEach((k) => assert.ok(!by(빈, k), k + ' 칸이 빠져야 한다'));
+  /* 종이에는 건수 표시가 없다 */
+  assert.doesNotMatch(P1.toHtml(만, ''), /전체\s*\d+|최근\s*\d+|주요\s*\d+|연도별/);
 });
 
 test('⑬ 화면 배선 — 고른 것만 넣기를 모델에 넘기고·저장하고 · 건수 표시는 한글 내보내기에도 없다', () => {
@@ -278,11 +317,34 @@ test('⑭ 고르기 창 — 접근성(대화상자·스위치 눌림 표시)·�
   assert.match(SRC, /<div class="modal" role="dialog" aria-modal="true" aria-labelledby="p1PickTitle"/, '고르기 창은 대화상자로 알린다');
   const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
   assert.match(draw, /data-m="auto" aria-pressed="false"/); assert.match(draw, /data-m="only" aria-pressed="false"/);
-  assert.match(draw, /aria-label="기관·직책·사업 찾기"/, '찾기칸에 이름');
+  assert.match(draw, /id="p1PickQ"[^>]*aria-label="[^"]+"/, '찾기칸에 이름');
   assert.match(draw, /찾는 줄이 없습니다/, '검색·«고른 것만 보기» 결과가 0건이면 빈 표 대신 안내');
   const mode = bare.slice(bare.indexOf('function _p1PickModeDraw('), bare.indexOf('function p1PickMode('));
   assert.match(mode, /setAttribute\('aria-pressed'/, '방식을 바꾸면 눌림 표시도 바꾼다');
   const panel = bare.slice(bare.indexOf('function p1Panel('), bare.indexOf('function p1Lim('));
   assert.match(panel, /\(만\?' disabled':''\)/, '★ 고른 것만 넣는 칸은 건수를 안 보므로 «몇 건» 상자를 막는다');
   assert.match(panel, /고른 것만 넣는 중 — 건수는 적용되지 않습니다/);
+});
+
+test('★★ ⑯ 고르기 창은 «고를 수 있는 칸 전부»를 한 표(P1_PICK)로 안다 — 종이를 짓는 길과 같은 거름·같은 차례·같은 번호 (대표 2026-11-12)', () => {
+  /* 표의 열쇠 = 계산이 «고를 수 있다»고 하는 칸 — 어긋나면 단추는 있는데 창이 안 열리거나, 창은 있는데 종이가 안 따른다 */
+  const tbl = bare.slice(bare.indexOf('var P1_PICK={'), bare.indexOf('function p1PickOpen('));
+  const keys = [...tbl.matchAll(/^  (\w+):\{ title:/gm)].map((m) => m[1]).sort();
+  assert.deepEqual(keys, [...P1.PIN_KEYS].sort(), '★ 고르기 창이 아는 칸 = 계산이 고를 수 있다는 칸');
+  [...P1.PIN_KEYS].forEach((k) => assert.match(tbl, new RegExp('  ' + k + ':\\{ title:\\x27[^\\x27]+\\x27, heads:\\[\\x27[^\\x27]+\\x27,\\x27[^\\x27]+\\x27,\\x27[^\\x27]+\\x27\\]'), k + ' 칸에 이름과 열 머리'));
+  /* 같은 거름 — 수상/수료 판정은 계산의 것을 그대로 쓴다(따로 정규식을 두면 어긋난다) */
+  assert.match(tbl, /KcareerProfile1\.isAward/); assert.match(tbl, /KcareerProfile1\.isCourse/);
+  assert.doesNotMatch(tbl, /표창\|상장|수료\|이수/, '★ 수상·수료 판정을 창이 따로 갖지 않는다');
+  /* 경력 — 앱이 정한 차례를 «날짜로 다시 줄 세우지 않는다»·종이와 같은 함수(_p1WorkRows) */
+  const work = tbl.slice(tbl.indexOf('  work:{'), tbl.indexOf('  lec:{'));
+  assert.match(work, /_p1WorkRows\(\)/); assert.doesNotMatch(work, /date:function/, '경력은 날짜 정렬 함수를 두지 않는다');
+  assert.match(bare, /work:_p1WorkRows\(\)/, '종이를 짓는 재료(_p1Src)도 같은 함수');
+  const open = bare.slice(bare.indexOf('function p1PickOpen('), bare.indexOf('function p1PickDraw('));
+  assert.match(open, /if\(def\.date\) 목록\.sort/, '날짜가 있는 칸만 최근 것 먼저로 줄 세운다');
+  assert.match(open, /id!=null|list\(\)/, '번호(id) 없는 기록은 고를 수 없다');
+  /* 열 머리·칸 글은 표에서 읽는다 — 위촉·실적 둘만 가정한 분기(P.k==='wic')가 남아 있으면 안 된다 */
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.doesNotMatch(draw, /P\.k===\x27wic\x27/, '★ 위촉 하나만 가정한 분기가 남았다');
+  assert.match(draw, /def\.heads\[0\]/); assert.match(draw, /def\.amt/, '금액 딱지는 실적만(표의 amt)');
+  assert.match(bare.slice(bare.indexOf('function p1PickSave('), bare.indexOf('function _p1Name(')), /P1_PICK\[P\.k\]\.title/);
 });

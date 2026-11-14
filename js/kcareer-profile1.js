@@ -79,7 +79,9 @@
   var MIN_AMT = 5000000;
   /* 「⭐ 중요」로 고정한 것(pins) — 날짜와 상관없이 맨 앞, 한 장에 맞출 때도 안 줄인다(대표 지시 2026-10-07 「한번 클릭해서 저장하면
      변경요청 전까지 그대로」). 위촉·위원과 컨설팅 실적에 쓴다. */
-  var PIN_KEYS = ['wic', 'perf'];
+  /* «고를 수 있는 칸» — 사람이 ☑ 로 넣을 것을 직접 고른다(고르기 창·고른 것만 넣기 · 대표 지시 2026-11-12 「경력·강의·자격·수상도」).
+     위촉·실적(2026-10-07)에 경력·강의·자격·수상을 더했다. 학력(2~3줄)·주요 직책·연구기고는 사람이 적거나 줄이 적어 뺀다. */
+  var PIN_KEYS = ['wic', 'perf', 'work', 'lec', 'cert', 'award'];
   function perfClass(r, amtOf, min) {
     if (typeof amtOf !== 'function') return 'all';
     var v = amtOf(r);
@@ -139,21 +141,25 @@
       고정수[k] = 앞.length;
       return 앞.concat(뒤);
     }
-    var 수상 = (src.wiccok || []).filter(isAward);
-    var 자격 = (src.cert || []).filter(function (r) { return r && !isCourse(r); })
+    /* 고른 것만 — 그 칸의 «고른 줄»만 남긴다(고를 수 있는 칸에서만). 아니면 그대로 */
+    var 고름 = function (k, arr) { return 만(k) ? arr.filter(function (r) { return 꽂힘(k, r); }) : arr; };
+    var 수상 = 고름('award', (src.wiccok || []).filter(isAward));
+    var 자격 = 고름('cert', (src.cert || []).filter(function (r) { return r && !isCourse(r); }))
       .sort(function (a, b) { return (국가.test(s(b.title)) ? 1 : 0) - (국가.test(s(a.title)) ? 1 : 0) || dkey(b.date).localeCompare(dkey(a.date)); });
     var all = {
       edu: newest(src.edu || [], function (r) { return r.period || r.year; })
         .map(function (r) { return [yearOf(String(r.period || r.year || '').split(/[~～]/).pop()) || '', s([r.school, r.major, r.degree].filter(Boolean).join(' '))]; }),
-      cert: 자격.map(function (r) { return [yearOf(r.date), s(r.title), s(r.org)]; }),
-      work: (src.work || []).slice().map(function (r) { return [s(r.periodLabel || r.period || ''), s([r.org, r.dept, r.title].filter(Boolean).join(' '))]; }),
-      lec: newest(src.lecture || [], function (r) { return r.date || r.year; })
+      cert: 고정먼저('cert', 자격).map(function (r) { return [yearOf(r.date), s(r.title), s(r.org)]; }),
+      /* 경력은 앱이 정한 차례(들어간 날 최근 것 먼저)를 그대로 — 고른 것은 그 안에서 앞으로 */
+      work: 고정먼저('work', 고름('work', (src.work || []).filter(Boolean)))
+        .map(function (r) { return [s(r.periodLabel || r.period || ''), s([r.org, r.dept, r.title].filter(Boolean).join(' '))]; }),
+      lec: 고정먼저('lec', newest(고름('lec', (src.lecture || []).filter(Boolean)), function (r) { return r.date || r.year; }))
         .map(function (r) { return [yearOf(r.date || r.year), s(r.topic || r.title), s(r.org)]; }),
       wic: 고정먼저('wic', newest(위촉, function (r) { return r.issueDate || r.periodStart || r.year; }))
         .map(function (r) { return [yearOf(r.issueDate || r.periodStart || r.year), s(r.org), s(r.titleVal || '')]; }),
       perf: 고정먼저('perf', newest(실적, function (r) { return r.date || r.year; }))
         .map(function (r) { return [s(r.year) || yearOf(r.date), s(r.type), s([r.org, r.project].filter(Boolean).join(' · '))]; }),
-      award: newest(수상, function (r) { return r.issueDate || r.year; })
+      award: 고정먼저('award', newest(수상, function (r) { return r.issueDate || r.year; }))
         .map(function (r) { return [yearOf(r.issueDate || r.year), s(r.titleVal || r.type), s(r.org)]; }),
       /* 사람이 적은 차례 그대로 — 무엇을 앞세울지는 사람이 고른다 */
       role: (Array.isArray(opts.roles) ? opts.roles : String(opts.roles || '').split(/\r?\n/))
@@ -316,7 +322,7 @@
     + '.p1 .t-work td.y,.p1 .t-role td.y{width:112px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
-  var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,
+  var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass, isAward: isAward, isCourse: isCourse,
     build: build, perfByBiz: perfByBiz, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerProfile1 = api;

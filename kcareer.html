@@ -1561,7 +1561,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=13"></script>
+<script src="js/kcareer-profile1.js?v=14"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <!-- 🏢 푸른인사관리 증명서 당겨오기(재직·경력증명서 발급 이력 → 서류 보관함) 셈 — 2026-11-12 -->
 <script src="js/kcareer-hrcert.js?v=1"></script>
@@ -7847,11 +7847,16 @@ function _p1Load(){
   return _p1Opt;
 }
 function _p1Keep(){ try{ LS.set(NS+'p1_opts', JSON.stringify(_p1Opt)); }catch(e){} }
+/* 프로필의 «주요 경력» 재료 — 앱이 정한 차례(들어간 날 최근 것 먼저)에 기간 글을 붙인다. 번호(id)는 그대로라 «고르기»가 같은 줄을 가리킨다.
+   종이를 짓는 길(_p1Src)과 고르기 창(P1_PICK.work)이 «같은 함수»를 쓴다 — 따로 모으면 차례가 어긋난다 */
+function _p1WorkRows(){
+  return ((typeof _cvWorkSorted==='function')?_cvWorkSorted():(get('work')||[])).map(function(r){ return Object.assign({}, r, { periodLabel:(typeof workPeriod==='function'?workPeriod(r):r.period) }); });
+}
 function _p1Src(){
   var d=_cvFillData(), f=d.fields||{};
   return { fields:{ name:f.name, license:f.license, org:f.org, title:f.title, phone:f.phone, email:f.email },
     edu:get('edu')||[], cert:get('cert')||[],
-    work:((typeof _cvWorkSorted==='function')?_cvWorkSorted():(get('work')||[])).map(function(r){ return Object.assign({}, r, { periodLabel:(typeof workPeriod==='function'?workPeriod(r):r.period) }); }),
+    work:_p1WorkRows(),
     wiccok:get('wiccok')||[], consult:get('consult')||[], advisory:get('advisory')||[], lecture:get('lecture')||[] };
 }
 /* ★ 한 장에 «드나»를 실제로 그려 잰다 — 셈(줄 수)으로는 글꼴·두 단 짝 때문에 4분의 1이 남았다(대표 2026-10-07 인쇄 화면).
@@ -8106,23 +8111,49 @@ function p1Pubs(v){ _p1Load().pubs=String(v||'').replace(/\r/g,'').split('\n').m
 function p1Field(v){ _p1Load().field=String(v||'').trim(); _p1Keep(); renderProfile1(); }
 function p1Photo(v){ _p1Load().photo=!!v; _p1Keep(); if(v&&!_p1PhotoUrl) _p1PhotoTried=false; renderProfile1(); }
 function p1Roles(v){ _p1Load().roles=String(v||'').replace(/\r/g,'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).join('\n'); _p1Keep(); renderProfile1(); }
-/* ── ☑ 고르기 — 위촉·위원 / 컨설팅 실적 전체에서 «넣을 것»을 클릭해 고른다 (2026-11-12 «선택» 기능으로 넓힘) ──
+/* ── ☑ 고르기 — 위촉·위원 / 컨설팅 실적 / 주요 경력 / 강의 / 자격 / 수상·표창 전체에서 «넣을 것»을 클릭해 고른다 (2026-11-12 «선택» 기능으로 넓힘) ──
+   칸마다 «어떤 기록을 어떤 열로 보이나»는 P1_PICK 한 표 — 계산(KcareerProfile1)이 쓰는 것과 «같은 거름·같은 번호(id)»다
+   (수상은 위촉장 기록 중 표창류, 자격은 수료·이수 과정을 뺀 것). 경력은 앱이 정한 차례(들어간 날 최근 것 먼저) 그대로 보인다.
    넣는 방식 둘: ① 자동 — 고른 것(⭐)은 오래된 것이어도 늘 넣고, 남는 자리는 최근 것이 저절로 채운다(예전 방식)
                  ② 고른 것만 — 고른 것만 종이에 나온다(p1_opts.only[k]=true). 자동 채움·금액 문턱·건수가 없다.
    저장한 것은 p1_opts.pins / p1_opts.only 에 담겨(클라우드로 함께 간다) 사람이 바꾸기 전까지 그대로다.
    ⚠ 고른 «번호(id)»를 담는다 — 이름·차례로 담으면 기록이 늘거나 고쳐질 때 엉뚱한 줄을 가리킨다.
    ⚠ 실적 금액은 «500만↑ / 미만 / 모름» 딱지로만 보인다 — 숫자는 안 보인다. */
 var _p1Pick=null;
+var P1_PICK={
+  wic:{ title:'위촉·위원', heads:['일자','기관','직책·내용'],
+    list:function(){ return (get('wiccok')||[]).filter(function(r){ return r&&r.id!=null&&!KcareerProfile1.isAward(r); }); },
+    date:function(r){ return r.issueDate||r.periodStart||r.year; },
+    cols:function(r){ return [String(r.issueDate||r.periodStart||r.year||'').slice(0,10), r.org||'', r.titleVal||r.type||'']; } },
+  award:{ title:'수상·표창', heads:['일자','기관','수상·표창'],
+    list:function(){ return (get('wiccok')||[]).filter(function(r){ return r&&r.id!=null&&KcareerProfile1.isAward(r); }); },
+    date:function(r){ return r.issueDate||r.year; },
+    cols:function(r){ return [String(r.issueDate||r.year||'').slice(0,10), r.org||'', r.titleVal||r.type||'']; } },
+  perf:{ title:'컨설팅 실적', heads:['연도','유형','고객사·사업'], amt:true,
+    list:function(){ return (get('consult')||[]).filter(function(r){ return r&&r.id!=null&&!r.excluded; }); },
+    date:function(r){ return r.date||r.year; },
+    cols:function(r){ return [String(r.year||r.date||''), r.type||'', [r.org,r.project].filter(Boolean).join(' · ')]; } },
+  /* 경력은 날짜로 다시 줄 세우지 않는다 — 앱이 정한 차례(들어간 날 최근 것 먼저)가 곧 종이의 차례다 */
+  work:{ title:'주요 경력', heads:['기간','기관','부서·직위'],
+    list:function(){ return _p1WorkRows().filter(function(r){ return r&&r.id!=null; }); },
+    cols:function(r){ return [String(r.periodLabel||r.period||''), r.org||'', [r.dept,r.title].filter(Boolean).join(' ')]; } },
+  lec:{ title:'강의', heads:['일자','주제','기관'],
+    list:function(){ return (get('lecture')||[]).filter(function(r){ return r&&r.id!=null; }); },
+    date:function(r){ return r.date||r.year; },
+    cols:function(r){ return [String(r.date||r.year||'').slice(0,10), r.topic||r.title||'', r.org||'']; } },
+  cert:{ title:'자격', heads:['일자','자격명','기관'],
+    list:function(){ return (get('cert')||[]).filter(function(r){ return r&&r.id!=null&&!KcareerProfile1.isCourse(r); }); },
+    date:function(r){ return r.date; },
+    cols:function(r){ return [String(r.date||'').slice(0,10), r.title||'', r.org||'']; } }
+};
 function p1PickOpen(k){
+  var def=P1_PICK[k]; if(!def) return;
   var o=_p1Load(), 꽂음={}; ((o.pins||{})[k]||[]).forEach(function(id){ 꽂음[String(id)]=1; });
-  var isAw=function(r){ return /표창|상장|감사|공로|포상|수상/.test(String((r&&r.type)||'')); };
-  var 키=function(r){ return KcareerProfile1.dkey(k==='wic'?(r.issueDate||r.periodStart||r.year):(r.date||r.year)); };
-  var 목록=(k==='wic'?(get('wiccok')||[]).filter(function(r){ return r&&r.id!=null&&!isAw(r); })
-                     :(get('consult')||[]).filter(function(r){ return r&&r.id!=null&&!r.excluded; }))
-    .slice().sort(function(a,b){ return 키(b).localeCompare(키(a)); });
+  var 목록=def.list().slice();
+  if(def.date) 목록.sort(function(a,b){ return KcareerProfile1.dkey(def.date(b)).localeCompare(KcareerProfile1.dkey(def.date(a))); });
   _p1Pick={ k:k, list:목록, on:꽂음, q:'', mode:((o.only||{})[k]?'only':'auto') };
   var 몸=document.getElementById('p1PickBody'); if(몸) 몸.innerHTML='';   /* 앞에 연 창의 찾기칸을 비운다 */
-  document.getElementById('p1PickTitle').textContent='☑ 고르기 — '+(k==='wic'?'위촉·위원':'컨설팅 실적');
+  document.getElementById('p1PickTitle').textContent='☑ 고르기 — '+def.title;
   p1PickDraw();
   document.getElementById('modalP1Pick').classList.add('open');
 }
@@ -8131,9 +8162,7 @@ function p1PickDraw(){
   var q=String(P.q||'').toLowerCase();
   var 딱지=function(r){ if(P.k!=='perf') return ''; var c=KcareerProfile1.perfClass(r, _p1Amt?_p1AmtOf:undefined, KcareerProfile1.MIN_AMT);
     return c==='big'?'<span class="tag teal">500만↑</span>':c==='small'?'<span class="tag" style="color:var(--text-mute)">미만</span>':c==='unknown'?'<span class="tag" style="color:var(--text-mute)">금액 모름</span>':''; };
-  var 칸=function(r){ return P.k==='wic'
-    ? [String(r.issueDate||r.periodStart||r.year||'').slice(0,10), r.org||'', r.titleVal||r.type||'']
-    : [String(r.year||r.date||''), r.type||'', [r.org,r.project].filter(Boolean).join(' · ')]; };
+  var def=P1_PICK[P.k], 칸=def.cols;
   var 보일=P.list.filter(function(r){ return !q || 칸(r).join(' ').toLowerCase().indexOf(q)>=0; });
   var 줄들=보일.filter(function(r){ return !P.only || P.on[String(r.id)]; });
   /* 찾기칸은 «한 번만» 그린다 — 칠 때마다 통째로 다시 그리면 입력칸이 바뀌어 글자가 끊긴다. 표만 다시 그린다 */
@@ -8143,19 +8172,19 @@ function p1PickDraw(){
       +'<button class="btn sm" type="button" data-m="only" aria-pressed="false" onclick="p1PickMode(\'only\')" title="고른 것만 프로필에 들어갑니다">✅ 고른 것만 넣기</button></div>'
       +'<div id="p1PickModeNote" style="font-size:12px;color:var(--text-mute);margin-bottom:8px;white-space:normal"></div>'
       +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-      +'<input id="p1PickQ" class="tb-input" style="flex:1;min-width:0;font-size:16px" placeholder="기관·직책·사업 찾기" aria-label="기관·직책·사업 찾기" oninput="_p1Pick.q=this.value;p1PickDraw()">'
+      +'<input id="p1PickQ" class="tb-input" style="flex:1;min-width:0;font-size:16px" placeholder="기관·이름·내용 찾기" aria-label="기관·이름·내용 찾기" oninput="_p1Pick.q=this.value;p1PickDraw()">'
       +'<button class="btn sm" type="button" id="p1PickOnlyBtn" onclick="p1PickOnly()">고른 것만 보기</button></div><div id="p1PickTbl"></div>';
   }
   var ob=document.getElementById('p1PickOnlyBtn'); if(ob) ob.textContent=P.only?'전체 보기':'고른 것만 보기';
   _p1PickModeDraw();
-  document.getElementById('p1PickTbl').innerHTML='<div class="dt" style="max-height:56vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.mode==='only'?'✅':'⭐')+' №</th><th style="width:96px">'+(P.k==='wic'?'일자':'연도')+'</th><th>'+(P.k==='wic'?'기관':'유형')+'</th><th>'+(P.k==='wic'?'직책·내용':'고객사·사업')+'</th>'+(P.k==='perf'?'<th style="width:84px">금액</th>':'')+'</tr></thead><tbody>'
+  document.getElementById('p1PickTbl').innerHTML='<div class="dt" style="max-height:56vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.mode==='only'?'✅':'⭐')+' №</th><th style="width:96px">'+escapeHtml(def.heads[0])+'</th><th>'+escapeHtml(def.heads[1])+'</th><th>'+escapeHtml(def.heads[2])+'</th>'+(def.amt?'<th style="width:84px">금액</th>':'')+'</tr></thead><tbody>'
     +줄들.map(function(r,i){ var c=칸(r);
       return '<tr><td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk"'+(P.on[String(r.id)]?' checked':'')+' onclick="p1PickToggle(\''+_jsAttr(String(r.id))+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
         +'<td style="white-space:nowrap">'+escapeHtml(c[0])+'</td>'
         +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[1])+'">'+escapeHtml(c[1])+'</td>'
         +'<td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[2])+'">'+escapeHtml(c[2])+'</td>'
-        +(P.k==='perf'?'<td style="white-space:nowrap">'+딱지(r)+'</td>':'')+'</tr>'; }).join('')
-    +(줄들.length?'':'<tr><td colspan="'+(P.k==='perf'?5:4)+'" style="color:var(--text-mute);padding:12px 6px">찾는 줄이 없습니다</td></tr>')
+        +(def.amt?'<td style="white-space:nowrap">'+딱지(r)+'</td>':'')+'</tr>'; }).join('')
+    +(줄들.length?'':'<tr><td colspan="'+(def.amt?5:4)+'" style="color:var(--text-mute);padding:12px 6px">찾는 줄이 없습니다</td></tr>')
     +'</tbody></table></div>';
   _p1PickSum();
 }
@@ -8186,7 +8215,7 @@ function p1PickSave(){
   o.pins[P.k]=P.list.filter(function(r){ return P.on[String(r.id)]; }).map(function(r){ return String(r.id); });
   o.only=Object.assign({}, o.only||{}); if(P.mode==='only') o.only[P.k]=true; else delete o.only[P.k];
   _p1Keep();
-  var 이름=(P.k==='wic'?'위촉·위원':'컨설팅 실적'), 몇=o.pins[P.k].length;
+  var 이름=P1_PICK[P.k].title, 몇=o.pins[P.k].length;
   toast(P.mode==='only'
     ? '✅ '+이름+' — 고른 '+몇+'건만 프로필에 넣습니다'+(몇?' — 바꾸기 전까지 그대로':' (고른 것이 없어 이 칸은 빠집니다)')
     : '⭐ '+이름+' 중요 '+몇+'건을 저장했습니다 — 바꾸기 전까지 프로필에 늘 들어갑니다', 5000);
