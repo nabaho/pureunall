@@ -836,7 +836,18 @@ body.kc-staff #cdBody .dt th:first-child,body.kc-staff #cdBody .dt td:first-chil
   #p1PickTbl .dt td:last-child > span{display:inline!important;flex-direction:row;width:auto}
   /* 관리 단추 열이 없으니 카드를 «이름표 + 값» 두 칸으로 — 안 그러면 오른쪽 72px 이상이 비어 값이 절반 폭에서 … 로 잘린다 */
   #p1PickTbl .dt tr{grid-template-columns:66px minmax(0,1fr)}
+  /* 안내 행(«찾는 줄이 없습니다»)에는 이름표가 없다 — 공용 카드가 66px 빈 이름표 칸을 그리지 않게 */
+  #p1PickTbl .dt td[colspan]::before{content:none}
+  /* 줄이 수십 건이어도 «저장» 단추는 창 아래에 그대로 — 본문만 스크롤(증명서 창 #modalHrCert 와 같은 방식) */
+  #modalP1Pick .modal{max-height:calc(100vh - 48px);display:flex;flex-direction:column}
+  #modalP1Pick .modal-b{overflow:auto;min-height:0;flex:1 1 auto}
 }
+/* 검색줄 — 공용 .tb-input{min-width:100%!important}(≤820px)가 인라인 min-width:0 을 이겨 옆 «고른 것만 보기» 단추가 창 밖으로 밀린다(검증 2026-11-14) */
+#p1PickQ{min-width:0!important}
+/* 어두운 테마 — 폰 카드 바탕은 어두운데 글자색이 어둡게 박혀 안 보이고, 기본 단추·표 머리는 밝은 바탕이라 글자가 묻힌다(검증 2026-11-14) */
+html.dark #p1PickTbl .dt td{color:var(--text)}
+html.dark #p1PickTbl .dt thead th{background:#1e293b!important;color:var(--text)}
+html.dark #modalP1Pick .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
 #hcBody .dt thead th:last-child{width:auto;min-width:96px}   /* 공용 표는 맨 끝 칸(관리)을 200px 로 잡는다 — 여기 끝 칸은 짧은 «상태» 칩이라 좁게 */
 #cdBody tr.hc-canceled td:not(:first-child):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
 @media (max-width:760px){ .hc-btx{display:none} .hc-hint{display:none} }
@@ -1571,7 +1582,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=15"></script>
+<script src="js/kcareer-profile1.js?v=16"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <!-- 🏢 푸른인사관리 증명서 당겨오기(재직·경력증명서 발급 이력 → 서류 보관함) 셈 — 2026-11-12 -->
 <script src="js/kcareer-hrcert.js?v=1"></script>

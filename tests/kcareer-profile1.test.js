@@ -362,6 +362,13 @@ test('★★ ⑰ 폰 폭(≤520px) — 고르기 창 표의 끝 칸은 «관리 
   assert.match(SRC, /@media \(max-width:520px\)\{\s*#p1PickTbl \.dt td:last-child\{[^}]*grid-column:1 \/ 3[^}]*border-left:none!important/, '★ 고르기 창 표만 끝 칸을 일반 칸처럼(폰 폭에서만)');
   assert.match(SRC, /#p1PickTbl \.dt td:last-child::before\{content:attr\(data-label\)\}/, '끝 칸에도 이름표');
   assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#p1PickTbl \.dt tr\{grid-template-columns:66px minmax\(0,1fr\)\}/, '★ 관리 단추 열이 없으니 두 칸(이름표 + 값) — 안 그러면 값이 절반 폭에서 잘린다');
+  /* 자동 검증 재지적(2026-11-14): 검색줄 넘침·폰에서 저장 단추 밀림·안내 행 빈 이름표·어두운 테마 글자 — 모두 고르기 창(#modalP1Pick·#p1PickTbl·#p1PickQ)에만 */
+  assert.match(SRC, /#p1PickQ\{min-width:0!important\}/, '★ 검색줄: 공용 .tb-input 의 min-width:100%!important 를 이겨야 옆 단추가 안 밀려난다');
+  assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#modalP1Pick \.modal\{max-height:calc\(100vh[^)]*\);display:flex;flex-direction:column\}[^@]*#modalP1Pick \.modal-b\{overflow:auto;min-height:0;flex:1 1 auto\}/, '★ 폰: 줄이 수십 건이어도 «저장» 단추가 창 아래에 남고 본문만 스크롤');
+  assert.match(SRC, /#p1PickTbl \.dt td\[colspan\]::before\{content:none\}/, '안내 행에 빈 이름표 칸이 없다');
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt td\{color:var\(--text\)\}/, '★ 어두운 테마: 카드 글자가 어두운 바탕에 묻히지 않는다');
+  assert.match(SRC, /html\.dark #modalP1Pick \.btn:not\(\.primary\)\{[^}]*color:var\(--text\)/, '어두운 테마의 기본 단추');
+  assert.doesNotThrow(() => [{ title: '공인노무사', date: '2006' }, null, { title: '' }].sort(P1.certCmp), '빈 기록이 섞여도 자격을 줄 세운다');
   /* 칸마다 이름표(data-label) — 카드에서 값이 무엇인지 말한다 */
   const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
   assert.ok((draw.match(/<td data-label="/g) || []).length >= 4, '일자·이름·내용·금액 칸에 이름표');
