@@ -819,11 +819,20 @@
     var iso = m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
     return isDate(iso) ? iso : '';
   }
+  /* ★ 파일 이름 전용 지우개 — 이름은 원본 보관함 색인(직원 모두 읽음)·창고 경로에도 들어간다(보안 재검토 2026-11-14 두 번).
+     전각(－ ０)을 반각으로 편 뒤, 앞 6자리와 뒤 7자리 사이에 «숫자 아닌 글자 0~6개»(밑줄 여러 개·괄호·점…)가 끼어도 뒤 7자리를 지운다.
+     법인등록번호(뒤가 0)·날짜(2019-07-15)·전화(041-556-0035)는 건드리지 않는다. */
+  function safeName(name) {
+    var t = String(name == null ? '' : name);
+    try { t = t.normalize('NFKC'); } catch (e) { /* 옛 브라우저 */ }
+    t = t.replace(/(^|[^0-9])([0-9]{6})([^0-9]{0,6}?)[1-8][0-9]{6}(?![0-9])/g, '$1$2$3_______');
+    return str(t).slice(0, 200);
+  }
   function normArcFile(f, key) {
     f = f || {};
     var fid = String(f.fileId || '');
     if (!ARC_FILE_ID.test(fid) || (key != null && key !== fid)) return null;
-    return { fileId: fid, name: str(f.name).slice(0, 200) || '파일', kind: ARC_KIND_KEYS.indexOf(f.kind) >= 0 ? f.kind : 'etc',
+    return { fileId: fid, name: safeName(f.name) || '파일', kind: ARC_KIND_KEYS.indexOf(f.kind) >= 0 ? f.kind : 'etc',
       date: isDate(f.date) ? f.date : '', note: str(f.note).slice(0, 200), masked: f.masked === true, addedAt: num(f.addedAt) > 0 ? num(f.addedAt) : 0 };
   }
   function normArchive(raw) {
@@ -858,7 +867,7 @@
 
   return {
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
-    normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry,
+    normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,
     DEADLINE_DAYS: DEADLINE_DAYS, DEADLINE_NOTE: DEADLINE_NOTE, LAW: LAW,
     str: str, num: num, won: won, isDate: isDate, addDays: addDays, addMonths: addMonths, diffDays: diffDays, todayIso: todayIso,

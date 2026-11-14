@@ -659,7 +659,7 @@ function arcUpload(evId, files){
   list.reduce(function(p, fl, idx){ return p.then(function(){
     if(g!==GEN) return;
     /* ★ 이름의 주민번호 뒷자리는 «올리기 전»에 지운다 — 원본 보관함 색인(pu_docs/originals)은 직원 모두가 읽고, 창고 경로에도 이름이 들어간다(보안 검토 2026-11-14) */
-    var nm=C.str(fl.name).slice(0,200)||'파일';
+    var nm=C.safeName(fl.name)||'파일';
     toast('올리는 중… '+(idx+1)+'/'+list.length+' '+nm, 60000);
     return fl.arrayBuffer().then(function(buf){
       if(g!==GEN) return null;
@@ -673,7 +673,7 @@ function arcUpload(evId, files){
         var e=C.arcFileEntry(r.fileId, nm); if(!e) throw new Error('파일 번호가 올바르지 않습니다');
         return arcWrite(evId, function(x){ var had=x.files[e.fileId]; x.files[e.fileId]=had?Object.assign({}, e, { kind:had.kind, date:had.date||e.date, addedAt:had.addedAt||e.addedAt }):e; return x; }).then(function(){ ok++; });
       });
-    }).catch(function(err){ if(g!==GEN) return; fail.push(C.str(fl.name)+' — '+((err&&err.message)||err)); });
+    }).catch(function(err){ if(g!==GEN) return; fail.push(C.safeName(fl.name)+' — '+((err&&err.message)||err)); });
   }); }, Promise.resolve()).then(function(){
     if(g!==GEN) return;
     ARC_BUSY=false; drawHist();

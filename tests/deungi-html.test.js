@@ -124,7 +124,7 @@ test('★ 원본 파일은 원본 보관함 🔒 자리에(from.kind deungi) 올
   assert.match(본문, /PuOfficeStore\.putOriginal\(\{ name:nm,[^;]*\{ kind:'deungi', ev:evId \}, \{ secret:true, alive:function\(\)\{ return g===GEN; \} \}\)/);
   assert.doesNotMatch(본문, /secret:false/);
   /* ★ 이름의 주민번호 뒷자리는 올리기 «전»에 지운다 — 원본 보관함 색인은 직원 모두가 읽는다(보안 검토 2026-11-14) */
-  assert.match(본문, /var nm=C\.str\(fl\.name\)/);
+  assert.match(본문, /var nm=C\.safeName\(fl\.name\)/);
   /* ★ 같은 파일이 이미 보관함에 있으면 🔒 이고 푸른등기가 올린 것만 잇는다 */
   assert.match(본문, /rec\.secret!==true \|\| !rec\.from \|\| rec\.from\.kind!=='deungi'/);
   /* ★ 받기·보기 — 늦게 온 응답은 세대·차례를 보고 버린다(로그아웃 뒤 자동 내려받기·남의 미리보기 덮기 막기) */

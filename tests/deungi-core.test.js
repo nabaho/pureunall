@@ -370,3 +370,13 @@ test('★ 주민번호 지우개 — 파일 이름에 흔한 밑줄·점·물결
   const e = C.arcFileEntry('push_key_000003', '동의서_900101_1234567.hwp');
   assert.doesNotMatch(e.name, /1234567/);
 });
+
+test('★ 파일 이름 지우개(safeName) — 밑줄 여러 개·전각 하이픈·괄호로 감싸도 뒷자리를 지운다(보안 재검토 2026-11-14 두 번째)', () => {
+  ['시험_900101____1234567.pdf', '시험_900101－1234567.pdf', '시험_900101(1234567).pdf', '시험 900101 _ 1234567.hwp', '９００１０１－２２３４５６７.hwp', '동의서_900101_1234567.hwp'].forEach((s) => {
+    assert.doesNotMatch(C.safeName(s), /1234567|2234567/, s);
+  });
+  ['2019-07-15_정관.hwp', '161571-0000304 등기부.pdf', '041-556-0035.pdf', 'SCAN_20180828_172128591 (2).pdf'].forEach((s) => assert.equal(C.safeName(s), s, s));
+  /* 묶음 정리·새 줄도 같은 지우개를 거친다 */
+  assert.doesNotMatch(C.arcFileEntry('push_key_000004', '시험_900101(1234567).pdf').name, /1234567/);
+  assert.doesNotMatch(C.normArchive({ id: 'ARx0001', files: { push_key_000005: { fileId: 'push_key_000005', name: 'a_900101____1234567.pdf' } } }).files.push_key_000005.name, /1234567/);
+});
