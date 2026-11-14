@@ -229,7 +229,7 @@
     var isPdf = /\.pdf$/i.test(lower) || (u8.length >= 5 && u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46);
     if (isPdf && root.pdfjsLib && typeof root.pdfjsLib.getDocument === 'function') {
       try {
-        var pdfDoc = await root.pdfjsLib.getDocument({ data: u8.slice(0) }).promise;
+        var pdfDoc = await root.pdfjsLib.getDocument({ data: u8.slice(0), isEvalSupported: false }).promise;
         var maxPages = Math.min(Number(pdfDoc.numPages) || 0, 150);
         var pageTexts = [];
         for (var pIdx = 1; pIdx <= maxPages; pIdx++) {

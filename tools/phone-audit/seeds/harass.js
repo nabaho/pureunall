@@ -8,15 +8,15 @@
 const NOW = Date.UTC(2026, 10, 11, 1, 0, 0);
 
 const companies = [
-  { id: 'hco-1', name: '(주)가나점검테크놀로지솔루션', bizNo: '000-00-20001', email: 'hr@gana-audit.example', status: 'active' },
-  { id: 'hco-2', name: '(주)다라점검바이오헬스케어시스템즈', bizNo: '000-00-20002', email: 'audit@dara-check.example', status: 'active' },
-  { id: 'hco-3', name: '점검물류센터(주) 중부사업장', bizNo: '000-00-20003', email: 'team@logis-audit.example', status: 'active' },
+  { id: 'hco-1', name: '(주)가나점검테크놀로지솔루션', bizNo: '123-81-20012', email: 'hr@gana-audit.example', status: 'active' },
+  { id: 'hco-2', name: '(주)다라점검바이오헬스케어시스템즈', bizNo: '123-81-20026', email: 'audit@dara-check.example', status: 'active' },
+  { id: 'hco-3', name: '점검물류센터(주) 중부사업장', bizNo: '123-81-20031', email: 'team@logis-audit.example', status: 'active' },
 ];
 
 const erpCases = [
   {
     id: 'ec-hi-1', caseNo: '조사-2026-001', typeCode: 'case-investigate',
-    companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '000-00-20001',
+    companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '123-81-20012',
     managerMain: 'P001', managerSubs: ['P002'], receiveDate: '2026-10-05', dueDate: '2026-11-20',
     status: 'progress', brief: '직장 내 괴롭힘 조사 (5/8단계 · 63%)',
   },
@@ -27,7 +27,7 @@ const harassCases = {
     id: 'hc-1', entityType: 'Case', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 10, updatedAt: NOW - 3600e3, revision: 3,
     erpCaseId: 'ec-hi-1', erpCaseNo: '조사-2026-001', sourceKind: 'case', sourceId: 'ec-hi-1',
-    companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '000-00-20001',
+    companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '123-81-20012',
     category: 'harass', title: '생산품질본부 직장 내 괴롭힘 신고 외부전문가 조사 건',
     managerMain: 'P001', managerSubs: ['P002'],
     receiveDate: '2026-10-05', dueDate: '2026-11-20', closeDate: '',
@@ -51,7 +51,7 @@ const harassCases = {
   'hc-2': {
     id: 'hc-2', entityType: 'Case', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 4, updatedAt: NOW - 7200e3, revision: 1,
-    companyId: 'hco-2', companyName: '(주)다라점검바이오헬스케어시스템즈', bizNo: '000-00-20002',
+    companyId: 'hco-2', companyName: '(주)다라점검바이오헬스케어시스템즈', bizNo: '123-81-20026',
     category: 'both', title: '연구소 직장 내 괴롭힘 및 성희롱 복합 조사 건',
     managerMain: 'P002', managerSubs: [],
     receiveDate: '2026-11-01', dueDate: '2026-12-10', closeDate: '',
@@ -118,6 +118,6 @@ module.exports = {
   views: [
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
-    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="report"]'); } },
+    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('#modeGroup button[data-mode="doc"]'); } },
   ],
 };

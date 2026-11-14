@@ -39,8 +39,8 @@ test('① 8단계 프로토콜 및 공문·서류 역할 분류기·기관명 �
 
 test('② 사건별 메일 자동 수집 및 8단계 자동 복원 — 수동 편집(manual:true) 단계는 덮어쓰지 않는다', () => {
   const companies = [
-    { id: 'co-a', name: '(주)가나점검테크', bizNo: '000-00-20001', email: 'hr@gana-check.example' },
-    { id: 'co-b', name: '(주)타사점검산업', bizNo: '000-00-20099', email: 'info@other-check.example' },
+    { id: 'co-a', name: '(주)가나점검테크', bizNo: '123-81-20012', email: 'hr@gana-check.example' },
+    { id: 'co-b', name: '(주)타사점검산업', bizNo: '123-81-20098', email: 'info@other-check.example' },
   ];
   const coDir = C.buildCompanyDirectory(companies);
   const folders = {
@@ -78,7 +78,7 @@ test('② 사건별 메일 자동 수집 및 8단계 자동 복원 — 수동 �
 });
 
 test('③ 미등록 후보 묶음(Bundle) 발굴 및 동일 사업장 동시 사건 공문 분리', () => {
-  const companies = [{ id: 'co-1', name: '(주)가나점검테크', bizNo: '000-00-20001', email: 'hr@gana-check.example' }];
+  const companies = [{ id: 'co-1', name: '(주)가나점검테크', bizNo: '123-81-20012', email: 'hr@gana-check.example' }];
   const coDir = C.buildCompanyDirectory(companies);
   const folders = { inbox: { kind: 'inbox', name: '받은편지함' } };
   const msgs = {

@@ -178,7 +178,10 @@ const allowTop = ['harass_invest' /* 괴롭힘·성희롱 조사 목록·8단계
   /* 2026-09-27 카카오 로그인 — 「연결됨」 표시(functions/kakao.js). 본인·관리자만 읽고,
      쓰기는 없다(서버 관리자 SDK 전용). 카카오 회원번호 자체(kakao_links)는 지문의
      passkeys 와 같이 규칙 없는 서버 전용 자리라 여기 안 나온다. */
-  'uid_kakao'];
+  'uid_kakao',
+  /* 2026-11-12 괴롭힘·성희롱 조사 비밀 전자서명(sign-harass.html).
+     사건 기밀(harass_secret)과 격리된 종단간 암호화 단건 서명 슬롯이다. */
+  'harass_sign'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });
