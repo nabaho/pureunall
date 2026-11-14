@@ -1378,6 +1378,18 @@ rules.settle = { '.read': SETTLE_R,
     '.validate': "newData.child('id').val() === $id && newData.child('status').val() === 'pending' && newData.child('text').isString() && newData.child('text').val().length <= 4000" } },
   agent:   { '.write': false } };
 
+/* ══ 🏛 푸른등기(pu-deungi.html) — 노무법인 변경등기 서류·필요서류 (2026-11-14) ══
+   대표 지시 2026-11-14 「노무사 변경될 때마다 등기 … 서류가 자동으로 한글파일로 … 내부관리에 넣어라」.
+   ★ 읽기·쓰기 = 재직 + (관리자 · 위임관리인) — 포털 타일(perm 'deungi' — 아무에게도 안 준 깃발)과 «같은 사람».
+     담기는 것: 지금 등기부 현황(사원 이름·생년월일·주소·출자, 대표사원, 분사무소) · 등기 건(바뀌는 사람·서류 고르기·필요서류 확인·일정).
+     ⚠ 주민등록번호 뒷자리는 화면이 저장하지 않는다(생년월일만) — 그래도 주소가 들어 있어 재무권한자에게도 열지 않는다.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 등기 건은 «취소» 상태로만 거둔다. 열쇠와 레코드 id 가 어긋나면 막는다. */
+const DEUNGI_R = `(${LOGIN}) && (${ADMIN} || ${SUB})`;
+const DEUNGI_W = `${DEUNGI_R} && newData.exists()`;
+rules.deungi = { '.read': DEUNGI_R,
+  base:  { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === 'base' && newData.child('entityType').val() === 'DeungiBase'" },
+  cases: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'" } } };
+
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
    ★ 읽기 = 재직 직원(LOGIN) — 대표 지시 2026-10-30 「영업관리 자료함 의뢰인업무는 모든 직원들에게 공개한다」(완전 공개 · 직원도 사용).

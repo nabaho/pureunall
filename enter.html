@@ -2069,6 +2069,9 @@ body.portal-mode #moreFab{display:flex;}
     { key:'fin',     name:'재무관리',      desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inside' },
     /* 컨설팅정산(2026-10-31 대표 지시) — 개인입금 사업 정산. 재무관리와 같은 사람만(perm 'fin' — 새 권한 깃발을 만들지 않는다) */
     { key:'settle',  name:'컨설팅정산',    desc:'개인입금 사업 정산', icon:'🧾', url:'pu-settle.html',      roles:null, perm:'fin', row:'inside' },
+    /* 푸른등기(2026-11-14 대표 지시 「내부관리에 프로그램을 넣어라」) — 노무법인 변경등기 서류·필요서류. 사원 주소·생년월일이 든 자리라
+       대표·위임관리인만 — perm 'deungi' 는 아무에게도 주지 않은 깃발이라 관리자·위임관리인에게만 보인다(규칙 deungi 와 같은 사람). */
+    { key:'deungi',  name:'푸른등기',     desc:'변경등기 서류·체크', icon:'🖋', url:'pu-deungi.html',      roles:null, perm:'deungi', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
