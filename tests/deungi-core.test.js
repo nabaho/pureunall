@@ -155,6 +155,28 @@ test('등기 완료 반영 — 새 사원·분사무소는 영구 id 를 받고,
   assert.equal(nb.asOf, '2026-12-15');
 });
 
+test('★ 같은 건에서 함께 퇴사하는 사원·같은 양수인 두 줄은 양수인으로 받지 않는다 — 출자금이 사라지거나 부풀지 않게', () => {
+  const a = C.applyChanges(법인(), 건([
+    { id: 'l1', type: 'leave', member: 'm1', share: { mode: 'transfer', to: [{ member: 'm2', amount: 15000000 }] } },
+    { id: 'l2', type: 'leave', member: 'm2', share: { mode: 'transfer', to: [{ member: 'm1', amount: 15000000 }] } },
+  ]));
+  assert.ok(a.errors.some((e) => /함께 퇴사/.test(e)), '함께 퇴사하는 양수인을 막지 않았다');
+  const b = C.applyChanges(법인(), 건([
+    { id: 'l', type: 'leave', member: 'm2', share: { mode: 'transfer', to: [{ member: 'm1', amount: 5000000 }, { member: 'm1', amount: 10000000 }] } },
+  ]));
+  assert.ok(b.errors.some((e) => /두 줄/.test(e)), '같은 양수인 두 줄을 막지 않았다');
+});
+
+test('★ 저장되는 모든 글 칸에서 주민번호 뒷자리를 지운다 — 하이픈 없이 붙여 넣어도, 법인등록번호·전화는 그대로', () => {
+  const c = C.normCase({ id: 'DG-9', memo: '번호 7001011234567 와 800101-2234567', checks: { x: { note: '900101 - 1234567' } } });
+  assert.doesNotMatch(JSON.stringify(c), /1234567|2234567/);
+  const b = C.normBase({ firm: { name: '가나', corpNo: '000000-0000000', phone: '041-000-0000', 모르는칸: '700101-1234567' }, charter: '1. 사원 : 점검(7001011234567)' });
+  assert.equal(b.firm.corpNo, '000000-0000000');
+  assert.equal(b.firm.phone, '041-000-0000');
+  assert.ok(!('모르는칸' in b.firm), '정해 두지 않은 법인 칸이 남았다');
+  assert.match(b.charter, /700101-_______/);
+});
+
 test('같은 사원을 두 번 퇴사시키거나 이미 나간 사원을 고르면 막는다', () => {
   const a = C.applyChanges(법인(), 건([
     { id: 'l1', type: 'leave', member: 'm3' }, { id: 'l2', type: 'leave', member: 'm3' }, { id: 'ad', type: 'addr', member: 'm3', addr: 'y' },

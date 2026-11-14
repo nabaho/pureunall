@@ -51,8 +51,14 @@
   };
 
   /* ── 작은 도구 ── */
-  function str(v) { return v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); }
-  function text(v) { return v == null ? '' : String(v).replace(/\r\n?/g, '\n'); }
+  /* ★ 주민등록번호 뒷자리 지우개 — 저장되는 «모든 글 칸»이 str·text 를 거치므로 여기 한 곳에서 지운다
+     (보안 검토 2026-11-14: 메모·필요서류 메모·정관 본문에 붙여 넣은 번호가 그대로 남을 수 있었다).
+     앞 6자리 + (하이픈·대시·공백 있거나 없이) 성별 자리 1~8 + 6자리 → «앞자리-_______».
+     법인등록번호(161571-0000304)처럼 뒷자리가 0 으로 시작하는 것은 건드리지 않는다. */
+  var RRN_RE = /(^|[^0-9])(\d{6})\s*[-–]?\s*[1-8]\d{6}(?![0-9])/g;
+  function scrubRrn(s) { return String(s).replace(RRN_RE, '$1$2-_______'); }
+  function str(v) { return v == null ? '' : scrubRrn(String(v).replace(/\s+/g, ' ').trim()); }
+  function text(v) { return v == null ? '' : scrubRrn(String(v).replace(/\r\n?/g, '\n')); }
   function num(v) {
     if (typeof v === 'number') return isFinite(v) ? Math.round(v) : 0;
     var s = String(v == null ? '' : v).replace(/[^0-9-]/g, '');
@@ -152,13 +158,14 @@
       no: Math.max(1, num(b.no) || (i + 1)) };
   }
   function normBase(raw) {
-    var e = emptyBase(), b = raw || {};
-    var firm = Object.assign({}, e.firm, b.firm || {});
-    Object.keys(firm).forEach(function (k) { firm[k] = str(firm[k]); });
+    var e = emptyBase(), b = raw || {}, bf = b.firm || {};
+    /* 법인 칸은 «정해 둔 칸만» 받는다 — 불러온 파일의 모르는 칸이 그대로 저장되지 않게(보안 검토 2026-11-14) */
+    var firm = {};
+    Object.keys(e.firm).forEach(function (k) { firm[k] = str(bf[k]).slice(0, 200); });
     if (!firm.name) firm.name = e.firm.name;
-    return { id: 'base', entityType: 'DeungiBase', asOf: isDate(b.asOf) ? b.asOf : '', source: str(b.source), firm: firm,
-      members: arr(b.members).map(normMember), branches: arr(b.branches).map(normBranch), charter: text(b.charter),
-      history: arr(b.history).slice(-30) };
+    return { id: 'base', entityType: 'DeungiBase', asOf: isDate(b.asOf) ? b.asOf : '', source: str(b.source).slice(0, 300), firm: firm,
+      members: arr(b.members).slice(0, 100).map(normMember), branches: arr(b.branches).slice(0, 50).map(normBranch), charter: text(b.charter).slice(0, 60000),
+      history: arr(b.history).slice(-30).map(function (h) { h = h || {}; return { at: isDate(h.at) ? h.at : '', caseId: str(h.caseId).slice(0, 60), title: str(h.title).slice(0, 120), summary: str(h.summary).slice(0, 400) }; }) };
   }
   function baseProblems(base) {
     var b = normBase(base), out = [];
@@ -241,7 +248,9 @@
     var brById = {}; branches.forEach(function (x) { brById[x.id] = x; });
     var arts = {};
     var seen = {};
-    function who(id) { var m = byId[id]; return m ? m.name : '(고르지 않은 사원)'; }
+    /* 이 건에서 퇴사하는 사원 — 그 사람을 다른 퇴사자의 양수인으로 고르면 출자금이 사라지거나 부푼다(기능 검증 2026-11-14) */
+    var leaving = {};
+    c.changes.forEach(function (ch) { if (ch.type === 'leave' && ch.member) leaving[ch.member] = true; });
     function live(id, what) {
       var m = byId[id];
       if (!m) { errors.push(what + ' — 사원을 고르십시오.'); return null; }
@@ -272,11 +281,14 @@
           var tos = [];
           if (iv.cash > 0 && ch.share.mode === 'transfer') {
             if (!ch.share.to.length) errors.push('사원 퇴사(' + lm.name + ') — 지분 금 ' + won(iv.cash) + '원을 넘겨받을 사원(양수인)을 고르십시오.');
-            var sum = 0;
+            var sum = 0, took = {};
             ch.share.to.forEach(function (t) {
               var r = byId[t.member];
               if (!r) { errors.push('사원 퇴사(' + lm.name + ') — 양수인을 찾을 수 없습니다.'); return; }
               if (r.id === lm.id) { errors.push('사원 퇴사(' + lm.name + ') — 자기 자신에게 양도할 수 없습니다.'); return; }
+              if (leaving[r.id]) { errors.push('사원 퇴사(' + lm.name + ') — ' + r.name + '은(는) 이 건에서 함께 퇴사하므로 양수인이 될 수 없습니다.'); return; }
+              if (took[r.id]) { errors.push('사원 퇴사(' + lm.name + ') — 양수인 ' + r.name + '이(가) 두 줄 들어 있습니다. 금액을 한 줄로 합치십시오.'); return; }
+              took[r.id] = true;
               if (t.amount <= 0) { errors.push('사원 퇴사(' + lm.name + ') — ' + r.name + '에게 넘길 금액을 넣으십시오.'); return; }
               sum += t.amount;
               r.invest = normInvest(r.invest); r.invest.cash += t.amount;

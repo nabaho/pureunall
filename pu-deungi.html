@@ -29,7 +29,7 @@
   --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
+body{word-break:keep-all;overflow-wrap:anywhere;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
 button:disabled{opacity:.45;cursor:default}
@@ -136,7 +136,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   .t tbody td.c,.t tbody td.n{width:auto;flex:0 0 auto}
   .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
   .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
-  .t tbody td.full{flex:1 1 100%}
+  .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
   .t tbody td[data-l]::before{content:attr(data-l) ' ';color:var(--mute);font-size:12px}
   .t tbody td input:not([type=checkbox]),.t tbody td select{width:100%}
   .t tbody td.inp{flex:1 1 100%}
@@ -181,8 +181,8 @@ main{padding:12px 16px 40px;max-width:1280px}
     <div id="histBox"></div>
   </section>
 </main>
-<div class="modal" id="modal" style="display:none"></div>
-<div id="toast"></div>
+<div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="창"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
 
 <script src="js/pu-sid-guard.js?v=1"></script>
@@ -267,7 +267,9 @@ window.addEventListener('beforeunload', function(e){ if(SAVE.dirty||SAVE.busy||B
 /* ═══ 읽기 ═══ */
 function reload(){
   if(!fbDb) return Promise.resolve();
+  var gen=GEN;
   return fbDb.ref('deungi').once('value').then(function(s){
+    if(gen!==GEN) return;
     var v=s.val()||{};
     BASE=v.base ? C.normBase(v.base) : C.emptyBase();
     CASES={};
@@ -304,7 +306,7 @@ function drawCaseList(){
   var h='<table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="cases"'+(all?' checked':'')+' title="보이는 줄 모두 고르기"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>다음 할 일</th><th>필요서류</th></tr></thead><tbody>';
   rows.forEach(function(c, i){
     var a=C.applyChanges(baseOf(c), c), pr=C.checkProgress(a, today());
-    h+='<tr class="click'+(c.id===CUR?' cur':'')+'" data-open="'+esc(c.id)+'"><td class="c"><input type="checkbox" data-sel="cases" data-id="'+esc(c.id)+'"'+(SEL.cases[c.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+    h+='<tr class="click'+(c.id===CUR?' cur':'')+'" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c"><input type="checkbox" aria-label="'+esc(c.title)+' 고르기" data-sel="cases" data-id="'+esc(c.id)+'"'+(SEL.cases[c.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="ti" title="'+esc(c.title)+'">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td>'+
       '<td class="nw" title="'+esc(C.nextStep(a, today()))+'">'+esc(C.nextStep(a, today()))+'</td><td data-l="서류"><span class="chip '+(pr.stale?'r':pr.done===pr.total?'g':'m')+'">'+pr.done+'/'+pr.total+(pr.stale?' · 기한 지남 '+pr.stale:'')+'</span></td></tr>';
   });
@@ -376,7 +378,8 @@ function drawChanges(){
         fld('퇴사 연월일(총회일과 다를 때만)', 'date', ch.date, { type:'date' })+
         (iv.cash ? fld('지분(금 '+C.won(iv.cash)+'원) 처리', 'share.mode', ch.share.mode, { type:'select', options:[['transfer','다른 사원에게 양도(양수)'],['refund','환급'],['none','아직 안 정함']] }) : '<label class="fl">지분<span class="hint">'+(lm?(iv.labor?'노무출자 — 넘길 현금 지분 없음':'출자 없음'):'사원을 고르면 지분이 보입니다')+'</span></label>')+'</div>';
       if(iv.cash && ch.share.mode==='transfer'){
-        var others=people.filter(function(m){ return m.id!==ch.member; });
+        var leavingNow={}; n.changes.forEach(function(x){ if(x.type==='leave'&&x.member) leavingNow[x.member]=1; });
+        var others=people.filter(function(m){ return m.id!==ch.member && !leavingNow[m.id]; });
         var sum=ch.share.to.reduce(function(s,t){ return s+C.num(t.amount); }, 0);
         b+='<div class="tos"><div class="hint">양수인 — 넘겨받는 사원과 금액(합계가 금 '+C.won(iv.cash)+'원이 되게)</div>';
         ch.share.to.forEach(function(t, j){
@@ -448,8 +451,8 @@ function drawDocs(a){
   var all=plan.every(function(d){ return d.on; });
   h+='<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-docall'+(all?' checked':'')+' title="모두 고르기"></th><th class="n">№</th><th>서류</th><th>쪽</th><th></th></tr></thead><tbody>';
   plan.forEach(function(d, i){
-    h+='<tr><td class="c"><input type="checkbox" data-doc="'+d.key+'"'+(d.on?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(d.title)+'</td><td'+(d.count>1?' data-l="쪽">'+d.count+'명':'>')+'</td>'+
-      '<td><button class="sm" data-act="pv" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>👁 미리보기</button> <button class="sm" data-act="dl1" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>⬇</button></td></tr>';
+    h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(d.title)+' 고르기" data-doc="'+d.key+'"'+(d.on?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(d.title)+'</td><td'+(d.count>1?' data-l="쪽">'+d.count+'명':'>')+'</td>'+
+      '<td><button class="sm" data-act="pv" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>👁 미리보기</button> <button class="sm" aria-label="'+esc(d.title)+' 받기" title="'+esc(d.title)+' 받기" data-act="dl1" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>⬇</button></td></tr>';
   });
   $('edDocs').innerHTML=h+'</tbody></table></div><div class="cb hint">⚠ «변경등기 신청서»는 법무사 확인용 초안입니다. 서식·기한·비용은 담당 법무사가 최종 확인합니다. 지분 양도·양수 계약서의 대금은 당사자 합의로 채웁니다.</div>';
 }
@@ -461,12 +464,12 @@ function drawChecklist(a){
   var last='';
   items.forEach(function(it, i){
     var ck=c.checks[it.key]||{}, st=C.staleCheck(it, ck, a, today());
-    h+='<tr><td class="c"><input type="checkbox" data-ck="'+esc(it.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
-      '<td data-l="">'+(it.group!==last?'<b>'+esc(it.group)+'</b>':'<span class="hint">'+esc(it.group)+'</span>')+'</td>'+
+    h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(it.label)+' 확인" data-ck="'+esc(it.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+      '<td>'+(it.group!==last?'<b>'+esc(it.group)+'</b>':'<span class="hint">'+esc(it.group)+'</span>')+'</td>'+
       '<td class="nw full" title="'+esc(it.label+' — '+it.detail)+'">'+esc(it.label)+' <span class="hint">'+esc(it.detail)+'</span></td>'+
-      '<td data-l="발급">'+(it.months?'<input type="date" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red-m)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
+      '<td data-l="발급">'+(it.months?'<input type="date" aria-label="'+esc(it.label)+' 발급일" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
       '<td><span class="chip '+(SRC_CLS[it.src]||'m')+'">'+esc(it.src)+'</span></td>'+
-      '<td class="inp"><input data-note="'+esc(it.key)+'" value="'+esc(ck.note||'')+'" placeholder="메모"></td></tr>';
+      '<td class="inp"><input aria-label="'+esc(it.label)+' 메모" data-note="'+esc(it.key)+'" value="'+esc(ck.note||'')+'" placeholder="메모"></td></tr>';
     last=it.group;
   });
   $('edList').innerHTML=h+'</tbody></table></div><div class="cb hint">근거 — 법무사: 법무사 «임원변경 등기신청 시 필요서류» 안내(2025. 2. 14. 메일) · 지난 서류: 지난 변경등기 때 낸 첨부서면 · 확인 필요: 담당 법무사·노무사와 확인. 등본·인감은 발급일부터 3개월 이내(신청일 기준).</div>';
@@ -513,7 +516,7 @@ function drawBase(){
     '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금 출자(원)</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
   b.members.forEach(function(m, i){
     var iv=C.normInvest(m.invest);
-    h+='<tr><td class="c"><input type="checkbox" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+    h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(m.name||'사원')+' 고르기" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="이름"><input data-bm="'+i+'" data-k="name" value="'+esc(m.name)+'" placeholder="이름"></td>'+
       '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리"></td>'+
       '<td class="inp" data-l="주소" style="min-width:260px"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소"></td>'+
@@ -530,7 +533,7 @@ function drawBase(){
   h+='<div class="card"><h3>분사무소 '+b.branches.length+'곳 <span class="hint">«정관 호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
     '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th>정관 호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
   b.branches.forEach(function(x, i){
-    h+='<tr><td class="c"><input type="checkbox" data-sel="br" data-id="'+esc(x.id)+'"'+(SEL.br[x.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+    h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(x.name||'분사무소')+' 고르기" data-sel="br" data-id="'+esc(x.id)+'"'+(SEL.br[x.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="정관 호" style="width:70px"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
       '<td class="inp" data-l="명칭(등기부)"><input data-bb="'+i+'" data-k="name" value="'+esc(x.name)+'" placeholder="예: 대전분사무소"></td>'+
       '<td class="inp" data-l="정관 명칭"><input data-bb="'+i+'" data-k="alias" value="'+esc(x.alias)+'" placeholder="예: 대전지사"></td>'+
@@ -566,7 +569,7 @@ function drawHist(){
     h+='<div class="scroll"><table class="t"><thead><tr><th class="c"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>등기 완료</th><th>바뀐 것</th></tr></thead><tbody>';
     done.forEach(function(c, i){
       var a=C.applyChanges(baseOf(c), c);
-      h+='<tr class="click" data-open="'+esc(c.id)+'"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
+      h+='<tr class="click" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
     });
     h+='</tbody></table></div>';
   }
@@ -593,11 +596,13 @@ function dlPack(){
     toast(docs.length+'가지 서류를 한 파일로 받았습니다');
   }catch(e){ toast('만들지 못했습니다 — '+((e&&e.message)||e), 5000); }
 }
+var DL_EACH=false;
 function dlEach(){
+  if(DL_EACH) return toast('받는 중입니다 — 잠시 기다리십시오');
   if(!ready()) return; var x=docCtx();
   if(x.after.errors.length) return toast('빨간 글을 먼저 고치십시오');
-  var docs=DD.build(x, chosenKeys(x.after)), i=0;
-  (function next(){ if(i>=docs.length){ toast(docs.length+'개 파일을 받았습니다'); return; }
+  var docs=DD.build(x, chosenKeys(x.after)), i=0; DL_EACH=true;
+  (function next(){ if(i>=docs.length){ DL_EACH=false; toast(docs.length+'개 파일을 받았습니다'); return; }
     var d=docs[i++], u8=DD.fileOne(d), name=DD.fileName(x, d);
     try{ PureunHwp.validate(u8, name); PureunHwp.download(u8, name, 'hwpx'); }catch(e){ toast(d.label+' — '+((e&&e.message)||e), 4000); }
     setTimeout(next, 450); })();
@@ -615,8 +620,23 @@ function preview(key){
   openModal('<h3>👁 '+esc(d.label)+'<span class="sp"></span><button class="sm" data-act="dl1" data-key="'+esc(key)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">그리는 중…</div></div></div>');
   PureunHwp.renderPreview($('pv'), u8, name).catch(function(e){ $('pv').innerHTML='<div class="msg w">미리보기를 그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오.</div>'; });
 }
-function openModal(html){ var m=$('modal'); m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex'; }
-function closeModal(){ var m=$('modal'); m.style.display='none'; m.innerHTML=''; }
+var MODAL_BACK=null;
+function openModal(html){ var m=$('modal'); MODAL_BACK=document.activeElement; m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex';
+  var h=m.querySelector('h3'); m.setAttribute('aria-label', h?h.textContent.replace(/\s+/g,' ').trim().slice(0,40):'창');
+  setTimeout(function(){ var f=m.querySelector('input,button:not([disabled])'); if(f) f.focus(); }, 0); }
+function closeModal(){ var m=$('modal'); m.style.display='none'; m.innerHTML=''; if(MODAL_BACK&&MODAL_BACK.focus){ try{ MODAL_BACK.focus(); }catch(e){} } MODAL_BACK=null; }
+/* Esc 로 닫기 · Tab 은 창 안에서만 돈다 · 목록 줄은 Enter/Space 로 연다(키보드 — 기능 검증 2026-11-14) */
+document.addEventListener('keydown', function(ev){
+  var m=$('modal');
+  if(m.style.display!=='none'){
+    if(ev.key==='Escape'){ ev.preventDefault(); closeModal(); return; }
+    if(ev.key==='Tab'){ var fs=Array.prototype.filter.call(m.querySelectorAll('button,input,select,textarea,[tabindex]'), function(x){ return !x.disabled && x.offsetParent!==null; });
+      if(fs.length){ var i=fs.indexOf(document.activeElement); if(ev.shiftKey && i<=0){ ev.preventDefault(); fs[fs.length-1].focus(); } else if(!ev.shiftKey && i===fs.length-1){ ev.preventDefault(); fs[0].focus(); } } }
+    return;
+  }
+  var tr=ev.target && ev.target.closest && ev.target.closest('tr[data-open]');
+  if(tr && ev.target===tr && (ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); openCase(tr.dataset.open); }
+});
 /* 주민번호 뒷자리 — 저장하지 않는다 */
 function rrnModal(){
   var c=cur(); if(!c) return; var B0=baseOf(c);
@@ -626,7 +646,7 @@ function rrnModal(){
   var h='<h3>🔐 주민등록번호 뒷자리 <span class="sp"></span><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb">'+
     '<div class="msg i">여기 넣은 뒷자리는 <b>저장하지 않습니다</b>. 이 창에서 서류를 만들 때만 쓰고, 새로고침하거나 창을 닫으면 지워집니다. 넣지 않으면 서류에 빈칸(_______)으로 나와 손으로 적습니다.</div>'+
     '<div class="scroll"><table class="t"><thead><tr><th class="n">№</th><th>이름</th><th>앞자리</th><th>뒷자리 7자리</th></tr></thead><tbody>'+
-    people.map(function(p, i){ return '<tr><td class="n">'+(i+1)+'</td><td class="ti">'+esc(p.name)+'</td><td data-l="앞">'+esc(p.birth||'—')+'</td><td class="inp"><input type="password" autocomplete="off" inputmode="numeric" maxlength="7" data-rrn="'+esc(p.id)+'" value="'+esc(RRN[p.id]||'')+'"></td></tr>'; }).join('')+
+    people.map(function(p, i){ return '<tr><td class="n">'+(i+1)+'</td><td class="ti">'+esc(p.name)+'</td><td data-l="앞">'+esc(p.birth||'—')+'</td><td class="inp"><input type="password" aria-label="'+esc(p.name)+' 주민등록번호 뒷자리" autocomplete="off" inputmode="numeric" maxlength="7" data-rrn="'+esc(p.id)+'" value="'+esc(RRN[p.id]||'')+'"></td></tr>'; }).join('')+
     '</tbody></table></div></div><div class="mf"><button class="sm" data-act="rrnClear">모두 지우기</button><button class="pri" data-act="rrnOk">적용</button></div>';
   openModal(h);
 }
@@ -708,7 +728,7 @@ function jsonIn(file){
 document.addEventListener('click', function(ev){
   var t=ev.target, el;
   if((el=t.closest('#tabs button'))){ setTab(el.dataset.tab); return; }
-  if(t.id==='reloadBtn'||t.closest('#reloadBtn')){ if(SAVE.dirty) saveCase(); reload(); return; }
+  if(t.id==='reloadBtn'||t.closest('#reloadBtn')){ if(BASE_DRAFT){ if(!confirm('«등기 현황»에 저장 안 한 고침이 있습니다. 버리고 새로 읽을까요?')) return; BASE_DRAFT=null; } if(SAVE.dirty) saveCase(); reload(); return; }
   if(t.id==='newCaseBtn'){ newCase(); return; }
   if((el=t.closest('[data-add]'))){ addChange(el.dataset.add); return; }
   if(t.matches('input,select,textarea,label')||t.closest('label')) { return; }
@@ -745,6 +765,8 @@ document.addEventListener('click', function(ev){
     else if(act==='jsonIn') $('jsonFile').click();
     return;
   }
+  /* ☐ 칸 둘레를 누르면 «고르기»다 — 건이 열리면 안 된다(폰에서 체크칸이 작다 · 기능 검증 2026-11-14) */
+  if((el=t.closest('td.c')) && el.querySelector('input[type=checkbox]')){ el.querySelector('input[type=checkbox]').click(); return; }
   if((el=t.closest('tr[data-open]'))){ openCase(el.dataset.open); return; }
   if(t.id==='modal') closeModal();
 });
@@ -753,7 +775,7 @@ function onField(ev){
   var el=ev.target; if(!el||!el.matches('input,select,textarea')) return;
   var isText=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|)$/.test(el.type||'')));
   if(ev.type==='input' && !isText) return;
-  if(ev.type==='change' && isText && !el.closest('#pane-base')) return;
+  if(ev.type==='change' && isText && !el.closest('#pane-base')){ if(el.closest('[data-ch]') && cur()) drawChanges(); return; }
   var v=el.type==='checkbox'?el.checked:el.value;
   /* 고르기 칸 */
   if(el.dataset.selall){ var key=el.dataset.selall, on=el.checked;
@@ -797,7 +819,10 @@ function onField(ev){
     else if(k2==='birth') ch.birth=String(v).replace(/[^0-9]/g,'').slice(0,6);
     else setPath(ch, k2, v);
     if(k2==='member'&&ch.type==='leave'&&el.dataset.to==null){ ch.share={ mode:'transfer', to:[] }; }
-    if(!isText) drawChanges(); else { var hdx=box.querySelector('.hd .hint'); if(hdx) hdx.textContent=C.describe(C.normChange(ch), baseOf(c), C.applyChanges(baseOf(c), c)); }
+    if(!isText) drawChanges(); else { var hdx=box.querySelector('.hd .hint'); if(hdx) hdx.textContent=C.describe(C.normChange(ch), baseOf(c), C.applyChanges(baseOf(c), c));
+      if(el.dataset.to!=null){ var tip=el.nextElementSibling; if(tip) tip.textContent=C.num(v)?C.won(v)+'원':'';
+        var lmv=baseOf(c).members.filter(function(m){ return m.id===ch.member; })[0], tot=lmv?C.normInvest(lmv.invest).cash:0, sm=ch.share.to.reduce(function(a,x){ return a+C.num(x.amount); },0), chip=box.querySelector('.tos .chip');
+        if(chip){ chip.className='chip '+(sm===tot?'g':'a'); chip.textContent='합계 '+C.won(sm)+' / '+C.won(tot)+'원'; } } }
     drawDerived(); scheduleSave(); return;
   }
   /* 건 정보 */
@@ -808,7 +833,10 @@ document.addEventListener('change', onField);
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
-function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+var GEN=0, WHO='';
+function wipe(){ GEN++; clearTimeout(SAVE.t); SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{} }; DL_EACH=false; gate=null;
+  var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
+function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }
 async function staffRole(u){ try{ return (await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||null; }catch(e){ return null; } }
 function boot(){
@@ -821,7 +849,9 @@ function boot(){
   try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
   firebase.auth().onAuthStateChanged(async function(u){
     $('outBtn').style.display=u?'':'none';
-    if(!u){ PuGate.show(); return; }
+    if(!u){ WHO=''; wipe(); $('app').style.display='none'; PuGate.show(); return; }
+    if(WHO && WHO!==u.uid) wipe();
+    WHO=u.uid; var gen=GEN;
     PuGate.hide();
     var role=await staffRole(u);
     if(!canOpen(role)){ lock(role&&role.status==='active'?'대표·위임관리인 권한이 없는 계정입니다':'재직 중인 직원 계정이 아닙니다'); return; }
