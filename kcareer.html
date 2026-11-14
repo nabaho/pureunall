@@ -816,6 +816,9 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 /* 고르기 줄·고른 줄 — 어두운 판에서 «밝은 바탕에 밝은 글자»가 되어 N건 선택·고른 줄 글자가 묻힌다(2026-11-14 증명서 표 점검에서 발견: 대비 1.18:1). 모든 목록의 같은 옷이라 한 곳에서 맞춘다 */
 html.dark .sel-bar{background:var(--soft);border-color:var(--border);color:var(--text)}
 html.dark .dt tbody tr.sel-on{background:var(--hover)!important;box-shadow:inset 3px 0 0 var(--blue)}
+/* 고르기 줄·증명서 표 안의 기본 단추(.btn)는 흰 바탕이라 어두운 판에서 밝은 글자가 묻힌다(대비 1.23:1 — 2026-11-14 검토). 빨간 «삭제» 글자는 줄 안 style 이 그대로 이긴다 */
+html.dark .sel-bar .btn,html.dark #cdBody .btn{background:var(--soft);color:var(--text);border-color:#475569}
+html.dark .sel-bar .btn[style*="color:var(--red)"]{color:#f87171!important}   /* 어두운 바탕 위의 빨강 «삭제» 글자 — 기본 빨강은 3:1 이라 한 단계 밝게 */
 html.dark #hcSel{background:var(--soft);border-color:var(--border);color:var(--text)}
 /* 어두운 판 — 공용 표(.dt)는 칸 글자(#1e293b)·머리글 바탕(#f8fafc)이 박혀 있어 폰 카드(바탕 var(--card)=어두움)에서 글자가 묻힌다(자동 검토 2026-11-12). 이 기능이 다루는 두 표만 따로 맞춘다 */
 html.dark #hcBody .dt table,html.dark #cdBody .dt table{background:var(--card)}
@@ -8400,7 +8403,7 @@ function _cdTable(rows, D){
         var org = r.issuer || r.org || '-';
         var hr = _cdSrc(r) === 'hr';          /* 🏢 푸른인사관리에서 당겨온 줄 (hrCert*) */
         return '<tr' + (hr && r.hrCanceled ? ' class="hc-canceled"' : '') + '>'
-          + '<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" value="' + _jsAttr(r.id) + '" aria-label="' + escapeHtml((r.kind||'증명서') + ' ' + (formatDate(r.date)||r.year||'') + ' 고르기') + '" onchange="docSelSync(\'certdoc\')"><span>' + (i + 1) + '</span></label></td>'
+          + '<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" value="' + escapeHtml(r.id) + '" aria-label="' + escapeHtml((r.kind||'증명서') + ' ' + (formatDate(r.date)||r.year||'') + ' 고르기') + '" onchange="docSelSync(\'certdoc\')"><span>' + (i + 1) + '</span></label></td>'
           + '<td' + (hr ? ' style="white-space:nowrap"' : '') + '><strong>' + escapeHtml(r.kind||'-') + '</strong>' + (hr ? _hcBadge(r) : '') + '</td>'
           + '<td style="white-space:nowrap">' + escapeHtml(org) + '</td>'
           + '<td style="white-space:nowrap">' + escapeHtml(formatDate(r.date)||r.year||'-') + '</td>'
@@ -9282,10 +9285,18 @@ function _docTrashIds(domain, ids, btn, 제목, 덧말){
         +(줄들.length>4?'<br>… 외 '+(줄들.length-4)+'건':'')
         +'<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다</b>(환경설정 › 🗑 휴지통).' },
     function(){
-      var e=null;
-      줄들.forEach(function(r){ e=kcTrashPut(D.store, '', r, D.label||'서류'); });
+      var es=[];
+      줄들.forEach(function(r){ var e=kcTrashPut(D.store, '', r, D.label||'서류'); if(e) es.push(e); });
       set(D.store, get(D.store).filter(function(x){ return ids.indexOf(x.id)<0; }));
-      renderDocStore(domain); kcTrashDone(e, '🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다');
+      renderDocStore(domain);
+      var 알림='🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다';
+      if(es.length<=1){ kcTrashDone(es[0], 알림); return; }
+      /* ★ 여러 건이면 «되돌리기»가 «전부» 되살린다 — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
+         옛 순서로 놓이도록 거꾸로 되살린다(되살린 줄은 맨 앞에 놓인다) */
+      kcUndoBar(알림+' · '+TRASH_DAYS+'일 보관', null, async function(){
+        for(var i=es.length-1;i>=0;i--) await kcTrashRestore(es[i].tid, true);
+        toast('↩ '+es.length+'건을 되살렸습니다');
+      });
     });
 }
 function initDocStore(domain){ const D=DOMAINS[domain]; const s=document.getElementById(D.search); if(!s) return;
@@ -11732,6 +11743,9 @@ var TRASH_STORE='trash', TRASH_DAYS=30;
 function kcTrashLabel(rec){
   var r=rec||{};
   var head=[r.titleVal,r.title,r.name,r.subject,r.content,r.label,r.kindName,r.bank].filter(Boolean)[0]||'';
+  /* 제목 칸이 없는 줄(증명서 — 종류만 있다)은 «종류 + 번호·날짜»로 — 기관 이름만 나오면 줄마다 같은 글자라 어느 것을 지우는지 알 수 없다(2026-11-14 검토).
+     ⚠ 위 칸이 하나라도 있으면 그대로다 — 다른 보관함의 이름표는 안 바뀐다 */
+  if(!head && r.kind) head=[r.kind, r.hrCertNo||r.date||r.year].filter(Boolean).join(' ');
   var org=[r.org,r.agency,r.issuer,r.company,r.holder].filter(Boolean)[0]||'';
   var t=[head,org].filter(Boolean).join(' · ');
   return t || (r.id||'(내용 없음)');

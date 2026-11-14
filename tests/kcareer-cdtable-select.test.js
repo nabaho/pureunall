@@ -10,19 +10,26 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
-const slice = (from, to) => {
-  const a = html.indexOf(from), b = html.indexOf(to, a + 1);
-  assert.ok(a > 0 && b > a, '코드 덩어리를 못 찾았다: ' + from.slice(0, 40));
-  return html.slice(a, b);
+/* 함수 하나를 «이름으로 통째» 꺼낸다 — 주석 문구에 기대지 않는다(주석을 고쳐도 안 깨진다).
+   한 줄짜리는 그 줄, 여러 줄이면 맨 왼쪽 `}` 까지가 함수 끝이다(이 파일의 함수는 모두 그렇게 닫힌다). */
+const fn = (name) => {
+  const m = new RegExp('(?:async )?function ' + name + '\\(').exec(html);
+  assert.ok(m, '함수를 못 찾았다: ' + name);
+  const rest = html.slice(m.index), firstLine = rest.slice(0, rest.search(/\r?\n/));
+  const open = (firstLine.match(/\{/g) || []).length, close = (firstLine.match(/\}/g) || []).length;
+  if (open > 0 && open === close) return firstLine;
+  const end = /\r?\n\}/.exec(rest);
+  assert.ok(end, '함수 끝을 못 찾았다: ' + name);
+  return rest.slice(0, end.index + end[0].length);
 };
-const line1 = (re) => { const m = html.match(re); assert.ok(m, '함수를 못 찾았다: ' + re); return m[0]; };
+const fns = (...names) => names.map(fn).join('\n');
 
-const TABLE = slice('function _cdTable', '/* ═══ 🏢 푸른인사관리에서 증명서 당겨오기');
-const SELECT = slice('/* 고른 뒤에 뜨는 줄', 'async function docSelDl(');          /* _dsSelBarHtml · _docSelBox · docSelIds · docSelSync · docSelAll */
-const TRASH = slice('function docSelDel(', 'function initDocStore(');                 /* docSelDel · _docTrashIds */
-const SRC = slice('function _cdSrc(r){', '/* 스캔이 남긴 어긋난 필드');
-const BADGE = slice('function _hcBadge(r){', 'function hrCertOpen(){');
-const HELPERS = line1(/^function escapeHtml\(s\)\{.*\}$/m) + '\n' + line1(/^function _jsAttr\(s\)\{.*\}$/m);
+const TABLE = fn('_cdTable');
+const SELECT = fns('_dsSelBarHtml', '_docSelBox', 'docSelIds', 'docSelSync', 'docSelAll');
+const TRASH = fns('docSelDel', '_docTrashIds');
+const SRC = fn('_cdSrc');
+const BADGE = fn('_hcBadge');
+const HELPERS = fns('escapeHtml', '_jsAttr');
 
 /* ── 합성 증명서 줄 ── */
 const R = (o) => Object.assign({ id: 'CD0001', kind: '재직증명서', issuer: '푸른노무법인', org: '푸른노무법인', date: '2026-11-12', year: '2026', usage: '용도 가', coverage: '', submits: [], savedAt: '2026-11-12T01:00:00.000Z' }, o);
@@ -90,7 +97,9 @@ test('고르기 줄은 한 곳 — 카드 보관함과 증명서 표가 같은 �
   assert.match(bar, /docSelDl\('certdoc'\)/); assert.match(bar, /docSelDel\('certdoc',this\)/);
 });
 test('끌어서 여러 줄 고르기 · 다시 그리면 고른 것을 비운다(화면을 떠났다 돌아와도) — 표 길도 같다', () => {
-  const t = html.slice(html.indexOf('if(D.tableView){\n') >= 0 ? html.indexOf('if(D.tableView){\n') : html.indexOf('if(D.tableView){\r\n'), html.indexOf('/* ★ № 넘버링 + ㅁ 고르기'));
+  const rds = fn('renderDocStore'), at = rds.search(/if\(D\.tableView\)\{\r?\n\s+body\.innerHTML=/);
+  assert.ok(at > 0, '표 길을 못 찾았다');
+  const t = rds.slice(at, rds.indexOf('return; }', at) + 9);   /* 표 길은 `return; }` 로 끝난다 */
   assert.match(t, /bindDragSel\(body, function\(\)\{ docSelSync\(domain\); \}\)/, '끌어 고르기');
   assert.match(t, /body\.innerHTML=cdBar\+_dsSelBarHtml/, '통째로 다시 그린다 → 고른 것이 비워진다');
   assert.ok(!/_dsPicked|sessionStorage|localStorage|\.set\(/.test(t), '고른 것을 어디에도 저장하지 않는다');
@@ -104,7 +113,9 @@ test('직원 «보기 전용»(body.kc-staff)에서는 ☐·첫 칸·고르기 �
 test('어두운 판 — 고르기 줄과 «고른 줄»이 밝은 바탕에 밝은 글자가 되지 않는다(전에는 N건 선택·고른 줄 글자 대비 1.18:1)', () => {
   assert.match(html, /html\.dark \.sel-bar\{background:var\(--soft\);border-color:var\(--border\);color:var\(--text\)\}/, '고르기 줄');
   assert.match(html, /html\.dark \.dt tbody tr\.sel-on\{background:var\(--hover\)!important/, '고른 줄 바탕은 어두운 판의 바탕(밝은 #f8fafc 를 덮는다)');
-  assert.match(html, /\.dt tbody tr\.sel-on\{background:#f8fafc!important\}/, '밝은 판의 고른 줄 바탕은 그대로(PC 모습이 안 바뀐다)');
+  assert.match(html, /html\.dark \.sel-bar \.btn,html\.dark #cdBody \.btn\{background:var\(--soft\);color:var\(--text\)/, '고르기 줄·표 안 기본 단추(.btn)도 어두운 판 글자가 읽힌다');
+  assert.match(html, /html\.dark \.sel-bar \.btn\[style\*="color:var\(--red\)"\]\{color:#[0-9a-f]{6}!important\}/, '빨간 «선택 삭제» 글자는 어두운 바탕 위에서 한 단계 밝게(줄 안 style 을 !important 로 덮는다)');
+  assert.match(SELECT, /style="color:var\(--red\)"/,'덮는 대상(삭제 단추의 인라인 색)이 실제로 그 모양이다');
 });
 
 /* ── 고르기 줄 동작(실제 docSelSync·docSelAll·docSelIds) ── */
@@ -137,19 +148,20 @@ test('고르면 «N건 선택»과 줄 바탕이 나오고, 머리 ☐ 는 일�
 
 /* ── 일괄 삭제: 건수를 묻고 · 한 번에 저장 · 휴지통으로(되살릴 수 있게) ── */
 function trashWorld(picked, ask) {
-  const store = { certdoc: ROWS() }, sets = [], trash = [], asks = [], toasts = [];
+  const store = { certdoc: ROWS() }, sets = [], trash = [], asks = [], toasts = [], undo = [], restored = [], done = [];
   const sel = selWorld(3);
   sel.boxes.forEach((b, i) => { b.checked = picked.includes(i); });
   const ctx = sel.ctx;
   Object.assign(ctx, {
     TRASH_DAYS: 30, escapeHtml: (s) => String(s), kcTrashLabel: (r) => r.kind + ' · ' + r.id,
     get: (k) => store[k].slice(), set: (k, v) => { sets.push(k); store[k] = v; },
-    kcTrashPut: (st, page, rec, what) => { trash.push({ st, rec }); return { tid: 'T' + trash.length }; }, kcTrashDone: (e, m) => toasts.push(m),
+    kcTrashPut: (st, page, rec, what) => { trash.push({ st, rec }); return { tid: 'T' + trash.length }; }, kcTrashDone: (e, m) => { done.push(e && e.tid); toasts.push(m); },
+    kcUndoBar: (msg, tid, f) => undo.push({ msg, tid, fn: f }), kcTrashRestore: async (tid) => { restored.push(tid); },
     kcAskDelete: (btn, opt, onYes) => { asks.push(opt); if (ask) onYes(); }, renderDocStore: () => {}, toast: (m) => toasts.push(m),
   });
   ctx.DOMAINS.certdoc.store = 'certdoc'; ctx.DOMAINS.certdoc.label = '경력증명서';
   vm.runInContext(TRASH, ctx);
-  return { ctx, store, sets, trash, asks, toasts };
+  return { ctx, store, sets, trash, asks, toasts, undo, restored, done };
 }
 test('선택 삭제 — 건수를 묻고(예 → 한 번에 저장), 지운 줄은 휴지통에 통째로 담긴다(되살릴 수 있다)', () => {
   const w = trashWorld([0, 2], true);
@@ -158,6 +170,40 @@ test('선택 삭제 — 건수를 묻고(예 → 한 번에 저장), 지운 줄�
   assert.equal(w.sets.length, 1, '저장은 한 번');
   assert.deepEqual(w.store.certdoc.map((r) => r.id), ['CD0002'], '고르지 않은 줄은 그대로');
   assert.deepEqual(w.trash.map((t) => t.rec.id).sort(), ['CD0001', 'CD0003'], '물리 삭제가 아니라 휴지통');
+});
+test('선택 삭제 — 여러 건이면 «되돌리기»가 전부 되살린다(마지막 한 건만이 아니다) · 한 건이면 그 건의 번호로', async () => {
+  const w = trashWorld([0, 1, 2], true);
+  w.ctx.docSelDel('certdoc', {});
+  assert.equal(w.undo.length, 1, '되돌리기 줄이 하나 뜬다');
+  assert.equal(w.undo[0].tid, null, '한 건의 번호(tid)를 쥐지 않는다 — 전부 되돌리는 함수를 준다');
+  assert.equal(typeof w.undo[0].fn, 'function');
+  assert.match(w.undo[0].msg, /3건/);
+  await w.undo[0].fn();
+  assert.deepEqual(w.restored, ['T3', 'T2', 'T1'], '지운 세 건 모두 거꾸로 되살린다(옛 순서가 돌아오게)');
+  const one = trashWorld([1], true);
+  one.ctx.docSelDel('certdoc', {});
+  assert.equal(one.undo.length, 0, '한 건은 기존 길(kcTrashDone)');
+  assert.deepEqual(one.done, ['T1'], '그 건의 번호로 되살린다');
+});
+test('휴지통·확인창 이름표 — 종류만 있는 줄(증명서)은 «종류 + 발급번호·날짜»로 서로 구분된다 · 제목이 있는 줄의 이름표는 그대로', () => {
+  const ctx = vm.createContext({});
+  vm.runInContext(fn('kcTrashLabel'), ctx);
+  const label = (r) => vm.runInContext('kcTrashLabel', ctx)(r);
+  const a = label(R({ id: 'CD0001', docSrc: 'hr', hrCertNo: 'PU-2026-0001' })), b = label(R({ id: 'CD0002', docSrc: 'hr', hrCertNo: 'PU-2026-0002' })), c = label(R({ id: 'CD0003', date: '2026-10-20' }));
+  assert.ok(a !== b && a !== c && b !== c, '줄마다 달라야 어느 것을 지우는지 안다: ' + [a, b, c].join(' | '));
+  assert.ok(/재직증명서/.test(a) && /PU-2026-0001/.test(a) && /푸른노무법인/.test(a));
+  assert.match(c, /2026-10-20/, '번호가 없으면 날짜');
+  assert.equal(label({ id: 'X1', title: '위촉장 제목', org: '기관' }), '위촉장 제목 · 기관', '제목 칸이 있는 줄은 예전과 같다');
+  assert.equal(label({ id: 'X2' }), 'X2', '아무 칸도 없으면 번호');
+});
+test('☐ 의 value 는 HTML 속성 이스케이프(escapeHtml) — JS 이스케이프(_jsAttr)로 \' 와 \\ 가 달라지면 줄을 못 찾는다', () => {
+  const id = "CD'9\\z&<";
+  const h = render([R({ id })]);
+  const v = (h.match(/class="row-chk" value="([^"]*)"/) || [])[1];
+  assert.ok(v !== undefined, 'value 를 못 찾았다');
+  assert.ok(!/\\'/.test(v) && !/\\\\/.test(v), 'JS 식 이스케이프(\\\' · 겹역슬래시)가 끼지 않는다: ' + v);
+  const decoded = v.replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  assert.equal(decoded, id, '브라우저가 속성을 풀면 원래 id 가 나온다');
 });
 test('선택 삭제 — «아니요»면 아무것도 안 바뀐다 · 아무것도 안 골랐으면 묻지도 않는다', () => {
   const w = trashWorld([0, 1], false);

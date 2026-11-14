@@ -65,7 +65,9 @@ function 세상(o) {
     escapeHtml: (s) => String(s == null ? '' : s).replace(/</g, '&lt;'), _jsAttr: (s) => String(s),
     _cdSrc: () => 'made', hasOriginal: () => true, bindDragSel: () => {},
     kcAskDelete: (btn, opt, ok) => { ctx._물음 = opt; if (!o.noConfirm) ok(); },
-    kcTrashPut: (st, pg, r) => { 휴지통.push(r.id); return 1; }, kcTrashDone: (e, m) => { 알림.push(m || '지움'); },
+    kcTrashPut: (st, pg, r) => { 휴지통.push(r.id); return { tid: 'T' + 휴지통.length }; }, kcTrashDone: (e, m) => { 알림.push(m || '지움'); },
+    /* 여러 건을 지우면 «되돌리기»가 지운 건 «전부»를 되살리는 함수를 받는다(2026-11-14 — 전에는 마지막 한 건의 번호만 쥐었다) */
+    kcUndoBar: (m, t, f) => { ctx._되돌림 = { m, t, f }; }, kcTrashRestore: async () => {},
     kcTrashLabel: (r) => r.kind + ' ' + r.org, TRASH_DAYS: 30,
     hideThumb: () => {}, fileExt: (id) => (파일[id] && 파일[id].ext) || '', fileURL: () => 'u',
     openHwpViewer: (b, n) => { 뷰어.push(n); }, showPDFInline: () => {}, _furl: {}
@@ -149,6 +151,7 @@ test('★★ 골라 내려받기·골라 삭제 — 한 번 묻고, 휴지통으
   assert.match(w.ctx._물음.title, /2건/, '★ 몇 건인지 묻지 않습니다');
   assert.equal(w.통.resume.length, 1, '★★ 골라 지우기가 안 됩니다');
   assert.equal(w.휴지통.length, 2, '★★★ 휴지통을 안 거치고 지웁니다 — 되살릴 수 없습니다');
+  assert.ok(w.ctx._되돌림 && typeof w.ctx._되돌림.f === 'function' && w.ctx._되돌림.t === null, '★★ 여러 건 «되돌리기»가 마지막 한 건만 되살립니다');
   const w2 = 세상({ rows: [줄('1', '2026')], noConfirm: true });
   w2.돌려("renderDocStore('resume')"); w2.몸._chk[0].checked = true; w2.돌려("docSelDel('resume',null)");
   assert.equal(w2.통.resume.length, 1, '★★★ 묻지도 않고 지웁니다');
