@@ -176,4 +176,10 @@ test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인
   /* 로그아웃 때 단계·그리기도 비운다 */
   const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
   assert.ok(wipe.indexOf('VIEW_GEN++') >= 0 && wipe.indexOf('STEP=0') >= 0);
+  /* (검토 2026-11-14) ④ 완료일을 넣으면 반영 단추가 바로 켜진다 · 주민번호를 넣어도 단계 그대로 · 서류 하나가 실패해도 다음 서류 */
+  const d = 본문.slice(본문.indexOf('function drawEasyDerived('), 본문.indexOf('function drawEasyDerived(') + 2200);
+  assert.match(d, /\[data-act="applyBase"\][\s\S]*ab\.disabled=!canA/);
+  assert.match(본문, /STEP=SHOWN\|\|STEP; drawEasy\(\)/);
+  assert.match(본문, /Promise\.resolve\(\)\.then\(function\(\)\{ return PureunHwp\.renderPreview\(/);
+  assert.doesNotMatch(본문, /'<td data-l="발급">'/);
 });

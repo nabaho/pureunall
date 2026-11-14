@@ -525,7 +525,7 @@ function drawChecklist(a){
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(it.label)+' 확인" data-ck="'+esc(it.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td>'+(it.group!==last?'<b>'+esc(it.group)+'</b>':'<span class="hint">'+esc(it.group)+'</span>')+'</td>'+
       '<td class="nw full" title="'+esc(it.label+' — '+it.detail)+'">'+esc(it.label)+' <span class="hint">'+esc(it.detail)+'</span></td>'+
-      '<td data-l="발급">'+(it.months?'<input type="date" aria-label="'+esc(it.label)+' 발급일" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
+      '<td'+(it.months?' data-l="발급"':'')+'>'+(it.months?'<input type="date" aria-label="'+esc(it.label)+' 발급일" data-iss="'+esc(it.key)+'" value="'+esc(ck.issued||'')+'"'+(st&&st.stale?' style="border-color:var(--red)" title="3개월 지남 — 다시 발급"':'')+'>'+(st?'<span class="chip '+(st.stale?'r':'g')+'">'+(st.stale?'지남':'~'+st.limit)+'</span>':''):'')+'</td>'+
       '<td><span class="chip '+(SRC_CLS[it.src]||'m')+'">'+esc(it.src)+'</span></td>'+
       '<td class="inp"><input aria-label="'+esc(it.label)+' 메모" data-note="'+esc(it.key)+'" value="'+esc(ck.note||'')+'" placeholder="메모"></td></tr>';
     last=it.group;
@@ -643,6 +643,8 @@ function drawEasyDerived(){
     var ok=st===1 ? !!(n.changes.length && !a.errors.length && n.meeting.date) : st===2 ? sealKeysOf(a).every(function(k){ return (n.checks['seal_'+k]||{}).ok; }) : st===3 ? (!a.charterChanged || !!n.dates.approvalGet) : true;
     nx.disabled=!ok;
   }
+  var ab=document.querySelector('#wizBody [data-act="applyBase"]');
+  if(ab){ var canA=!!(n.dates.done && !a.errors.length && n.changes.length && !c.applied); ab.disabled=!canA; ab.title=canA?'':'«등기 완료된 날»을 넣으면 누를 수 있습니다'; }
   drawSaveState();
 }
 /* 한글 쪽 화면 — 서류마다 따로 그려 차례(목차)를 붙인다. 다른 단계로 가거나 다시 그리면 앞 그리기는 버린다 */
@@ -657,7 +659,7 @@ function renderAllDocs(){
   docs.reduce(function(p, d, i){ return p.then(function(){
     if(g!==GEN || vg!==VIEW_GEN) return;
     var el=$('hvp'+i); if(!el) return;
-    return PureunHwp.renderPreview(el, DD.fileOne(d), DD.fileName(x, d)).catch(function(e){ if(vg===VIEW_GEN && $('hvp'+i)) $('hvp'+i).innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
+    return Promise.resolve().then(function(){ return PureunHwp.renderPreview(el, DD.fileOne(d), DD.fileName(x, d)); }).catch(function(e){ if(vg===VIEW_GEN && $('hvp'+i)) $('hvp'+i).innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
   }); }, Promise.resolve());
 }
 
@@ -988,13 +990,13 @@ function newCase(){
   CASES[id]={ id:id, entityType:'DeungiCase', title:y+' 변경등기', status:'draft',
     meeting:{ date:'', time:'10:00', place:'푸른노무법인 본 사무소', chair:rep?rep.id:'' },
     changes:[], agent:prev&&prev.agent?JSON.parse(JSON.stringify(prev.agent)):{}, notary:(prev&&prev.notary)||'', dates:{}, checks:{}, docsOff:{} };
-  CUR=id; lsSet('cur', id); RRN={}; STEP=0; draw(); scheduleSave();
+  CUR=id; lsSet('cur', id); RRN={}; STEP=0; SHOWN=0; draw(); scheduleSave();
   setTimeout(function(){ var el=document.querySelector(MODE==='easy'?'#wizBody [data-k="meeting.date"]':'#edBasic [data-k="title"]'); if(el){ el.focus(); if(el.select) el.select(); } }, 30);
 }
 function openCase(id){
   if(CUR===id) return;
   if(SAVE.dirty) saveCase();
-  CUR=id; lsSet('cur', id); RRN={}; SEL.docs={}; STEP=0;
+  CUR=id; lsSet('cur', id); RRN={}; SEL.docs={}; STEP=0; SHOWN=0;
   if(TAB!=='case') setTab('case'); else draw();
   var e=$('editor'); if(e) e.scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -1071,7 +1073,7 @@ document.addEventListener('click', function(ev){
   if((el=t.closest('[data-act]'))){
     var act=el.dataset.act, c=cur();
     if(act==='goBase') setTab('base');
-    else if(act==='closeCase'){ if(SAVE.dirty) saveCase(); CUR=''; STEP=0; lsSet('cur',''); draw(); }
+    else if(act==='closeCase'){ if(SAVE.dirty) saveCase(); CUR=''; STEP=0; SHOWN=0; lsSet('cur',''); draw(); }
     else if(act==='mode'){ MODE=el.dataset.m==='full'?'full':'easy'; lsSet('mode', MODE); STEP=0; drawEditor(); }
     else if(act==='wizGo'){ var s2=Number(el.dataset.s)||1; if(s2>=1&&s2<=4){ STEP=s2; drawEasy(); var ed=$('editor'); if(ed) ed.scrollIntoView({ block:'start' }); } }
     else if(act==='viewAll') renderAllDocs();
@@ -1091,7 +1093,7 @@ document.addEventListener('click', function(ev){
       var bad=[], nx={};
       Array.prototype.forEach.call(document.querySelectorAll('[data-rrn]'), function(i){ var v=i.value.replace(/[^0-9]/g,''); if(!v) return; if(C.backOk(v)) nx[i.dataset.rrn]=v; else bad.push(i); });
       if(bad.length){ toast('뒷자리는 숫자 7자리입니다'); bad[0].focus(); return; }
-      RRN=nx; closeModal(); drawDerived(); if(MODE==='easy' && $('hwpView')) drawEasy(); toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
+      RRN=nx; closeModal(); drawDerived(); if(MODE==='easy' && $('hwpView')){ STEP=SHOWN||STEP; drawEasy(); } toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
     }
     else if(act==='applyBase') applyToBase();
     else if(act==='cancelSel') cancelSelected();
