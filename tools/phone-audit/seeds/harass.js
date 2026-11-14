@@ -118,6 +118,6 @@ module.exports = {
   views: [
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
-    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('#modeGroup button[data-mode="doc"]'); } },
+    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('button[data-act="wsMode"][data-id="doc"]'); } },
   ],
 };

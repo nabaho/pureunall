@@ -103,7 +103,8 @@ table.t td{overflow:hidden;text-overflow:ellipsis;max-width:340px}
 table.t td.ti{font-weight:600;max-width:300px}
 table.t td.wide{max-width:420px}
 table.t th.c,table.t td.c{width:40px;text-align:center}
-table.t input[type=checkbox]{width:18px;height:18px;margin:0;cursor:pointer;vertical-align:middle}
+input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
+table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t th.n,table.t td.n{width:42px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
@@ -348,8 +349,8 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-harass-core.js?v=6"></script>
 <script src="js/pu-harass-sign.js?v=3"></script>
-<script src="js/pu-harass-hwpx.js?v=4"></script>
-<script src="js/pu-harass-view.js?v=8"></script>
+<script src="js/pu-harass-hwpx.js?v=5"></script>
+<script src="js/pu-harass-view.js?v=9"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
