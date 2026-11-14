@@ -343,9 +343,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 새 자리뿐이다(읽기·쓰기 재직 + 관리자·위임관리인, 지우기 금지, 열쇠=id).
      ⚠ 이 방(자동 모드)에서는 rules-deploy.js 실행이 막혔다 — 대표 PC 에서 rules-deploy.js --deploy(또는 GitHub «Firebase 배포» rules=true)로 게시한 뒤
      콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에는 푸른등기 화면이 «읽을 권한이 없습니다»로 잠긴다(다른 앱은 그대로). */
-  const PENDING = [
-    '/deungi',
-  ];
+  /* ★ 2026-11-14 — 푸른등기 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「다시해라」): 새로 1(/deungi) · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-14.json — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
