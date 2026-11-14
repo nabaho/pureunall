@@ -72,7 +72,22 @@ function validate(body) {
       ? "사진이 너무 큽니다 — 장수를 나눠 판독해 주세요"
       : "글자가 너무 많습니다 — 나눠서 판독해 주세요" };
   }
-  return { ok: true, parts: parts, cfg: body.generationConfig, app: appOf(body.app) };
+  const resolvedApp = appOf(body.app);
+  if (resolvedApp === "pbox") {
+    const cleanPboxParts = [];
+    for (const p of parts) {
+      const pKeys = Object.keys(p);
+      if (pKeys.length !== 1 || pKeys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: "P박스 AI 질의는 비식별 텍스트(text 단일 속성)만 허용되며 이미지·첨부 데이터 전송은 차단됩니다." };
+      }
+      if (/(?:^|[^\d])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:\s*[-~]\s*[1-8]\d{6}|[1-8]\d{6})(?![\d])/.test(p.text)) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      cleanPboxParts.push({ text: p.text });
+    }
+    return { ok: true, parts: cleanPboxParts, cfg: body.generationConfig, app: resolvedApp };
+  }
+  return { ok: true, parts: parts, cfg: body.generationConfig, app: resolvedApp };
 }
 
 /* ══ ⑤ 어느 앱이 몫을 썼나 (대표 물음 2026-09-08 「판독 한도 어떻게 해결할까」) ══
@@ -85,7 +100,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "pbox"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";

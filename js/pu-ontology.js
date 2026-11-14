@@ -206,6 +206,8 @@
       note:'한글 문서를 이 PC 안에서 열고 고치는 도구 — 파이어베이스에 쓰지 않는다' },
     aliounion:{ name:'공공임단협', file:'pu-alio-union.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
       note:'알리오 공공기관 노동조합·단체협약 비교분석 도구 — 파이어베이스에 쓰지 않는다' },
+    pbox:{ name:'P박스', file:'pu-pbox.html', primaryRoots:[], entityTypes:['Document','Project'], localOnly:true,
+      note:'대한민국 전 법령·판례·유권해석·AI 서면 도구 — 브라우저 로컬 및 무료 외부 색인 기반으로 파이어베이스에 쓰지 않는다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],

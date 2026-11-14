@@ -3783,6 +3783,21 @@ exports.readDoc = functions
       const 줄인것 = await freeFirstSlim(v.parts, v.app);
       if (줄인것) parts = 줄인것;
     }
+    if (v.app === "pbox") {
+      if (parts.some((p) => !p || typeof p !== "object" || Object.keys(p).length !== 1 || typeof p.text !== "string")) {
+        res.status(400).json({ ok: false, error: "P박스 AI 질의는 비식별 텍스트만 허용됩니다.", status: 400 });
+        return;
+      }
+      const PBoxSync = require("./pbox-sync");
+      parts = parts.map(function (p) {
+        const names = PBoxSync.extractPartyNamesServer(p.text, "");
+        return { text: PBoxSync.scrubServerPii(p.text, names) };
+      });
+      if (PBoxSync.hasResidualHardPii(parts)) {
+        res.status(400).json({ ok: false, error: "민감 개인정보가 감지되어 외부 AI 호출을 차단했습니다.", status: 400 });
+        return;
+      }
+    }
 
     // cfg = 부르는 쪽이 정한 값(온도·최대 길이). 걸러진 것만 넘어온다.
     const r = await DR.callGemini(fetch, key, parts, null, v.cfg);
@@ -8162,5 +8177,75 @@ exports.visitSmsSend = functions
     } catch (e) {
       if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
       res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
+    }
+  });
+
+/* ── P박스(pu-pbox.html) 법령·판례·행정해석·산재하급심 자동 동기화 (2026-11-14) ──
+   선언되지 않은 비밀키로 배포가 막히지 않게 secrets 배열을 두지 않고 process.env 에서 선택적으로 읽는다.
+   파이어베이스 실시간DB에는 아무것도 쓰지 않아 RTDB 저장·대역폭 비용이 0원이다. */
+exports.pboxDailySync = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 180, memory: "256MB" })
+  .pubsub.schedule("every day 03:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const PBoxSync = require("./pbox-sync");
+    const r = await PBoxSync.runSync({ env: process.env });
+    console.log("[P박스 일일 동기화]", JSON.stringify({
+      krTreeSha: r.krTreeSha,
+      dedupedCount: r.dedupedCount,
+      supabasePushed: r.supabasePushed
+    }));
+    return null;
+  });
+
+exports.pboxApi = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireStaff(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const PBoxSync = require("./pbox-sync");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const action = String(body.action || "sync");
+    try {
+      if (action === "pull") {
+        const pulled = await PBoxSync.pullFromSupabaseServer(
+          process.env,
+          fetch,
+          body.limit,
+          body.sinceDeletedAt || "",
+          body.afterDeletedKey || ""
+        );
+        res.status(pulled.ok === false ? 502 : 200).json(pulled);
+        return;
+      }
+      if (action === "push") {
+        const docs = Array.isArray(body.docs) ? body.docs.slice(0, 50) : [];
+        const pushed = await PBoxSync.upsertToSupabase(docs, process.env, fetch, me.uid, {});
+        const status = pushed.ok === false ? (pushed.status || 403) : 200;
+        res.status(status).json(Object.assign({ ok: pushed.ok !== false }, pushed));
+        return;
+      }
+      if (action === "delete") {
+        const keys = Array.isArray(body.canonicalKeys) ? body.canonicalKeys.slice(0, 50) : [];
+        const del = await PBoxSync.deleteFromSupabaseServer(keys, process.env, fetch, me.uid);
+        const delStatus = del.ok === false ? (del.status || 502) : 200;
+        res.status(delStatus).json(Object.assign({ ok: del.ok !== false }, del));
+        return;
+      }
+      const out = await PBoxSync.runSync({
+        env: process.env,
+        lawOc: body.lawOc || "",
+        sinceDate: body.sinceDate || "",
+        maxPages: body.maxPages
+      });
+      res.status(200).json(out);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 240) });
     }
   });
