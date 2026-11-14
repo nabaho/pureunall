@@ -831,6 +831,28 @@ body.kc-staff #hcOpenBtn{display:none!important}
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
 #hcBody tr.hc-gone td{opacity:.75}
+/* ☑ 고르기 창(#p1PickTbl)의 표는 «끝 칸이 관리 단추»가 아니다. 폰 카드(공용 .dt)가 끝 칸을 오른쪽 단추 열로 세우면 긴 기관명 줄에서 일자 칸이 0px 로 눌려 가려진다
+   (자동 검증 2026-11-14, 375px · 자격·강의 고르기). 끝 칸도 다른 칸처럼 «이름표 + 값 한 줄»로 — 폰 폭에서만 */
+@media (max-width:520px){
+  #p1PickTbl .dt td:last-child{grid-column:1 / 3;grid-row:auto;align-self:start;flex-direction:row;justify-content:flex-start;gap:8px;
+    border-left:none!important;margin:0!important;padding:2px 0!important}
+  #p1PickTbl .dt td:last-child::before{content:attr(data-label)}
+  #p1PickTbl .dt td:last-child > span{display:inline!important;flex-direction:row;width:auto}
+  /* 관리 단추 열이 없으니 카드를 «이름표 + 값» 두 칸으로 — 안 그러면 오른쪽 72px 이상이 비어 값이 절반 폭에서 … 로 잘린다 */
+  #p1PickTbl .dt tr{grid-template-columns:66px minmax(0,1fr)}
+  /* 안내 행(«찾는 줄이 없습니다»)에는 이름표가 없다 — 공용 카드가 66px 빈 이름표 칸을 그리지 않게 */
+  #p1PickTbl .dt td[colspan]::before{content:none}
+  /* 줄이 수십 건이어도 «저장» 단추는 창 아래에 그대로 — 본문만 스크롤(증명서 창 #modalHrCert 와 같은 방식) */
+  #modalP1Pick .modal{max-height:calc(100vh - 48px);display:flex;flex-direction:column}
+  #modalP1Pick .modal-b{overflow:auto;min-height:0;flex:1 1 auto}
+}
+/* 검색줄 — 공용 .tb-input{min-width:100%!important}(≤820px)가 인라인 min-width:0 을 이겨 옆 «고른 것만 보기» 단추가 창 밖으로 밀린다(검증 2026-11-14) */
+#p1PickQ{min-width:0!important}
+/* 어두운 테마 — 폰 카드 바탕은 어두운데 글자색이 어둡게 박혀 안 보이고, 기본 단추·표 머리는 밝은 바탕이라 글자가 묻힌다(검증 2026-11-14) */
+html.dark #p1PickTbl .dt table{background:var(--card)}   /* 글자만 밝히면 520px 넘는 폭에서 흰 표 바탕에 밝은 글자가 된다(재검증 2회차 2026-11-14) — 증명서 창(#hcBody)과 같은 세 벌 */
+html.dark #p1PickTbl .dt td{color:var(--text)}
+html.dark #p1PickTbl .dt thead th{background:#1e293b!important;color:var(--text)}
+html.dark #modalP1Pick .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
 #hcBody .dt thead th:last-child{width:auto;min-width:96px}   /* 공용 표는 맨 끝 칸(관리)을 200px 로 잡는다 — 여기 끝 칸은 짧은 «상태» 칩이라 좁게 */
 #cdBody tr.hc-canceled td:nth-child(n+3):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
 @media (max-width:760px){ .hc-btx{display:none} .hc-hint{display:none} }
@@ -1565,7 +1587,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=14"></script>
+<script src="js/kcareer-profile1.js?v=16"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <!-- 🏢 푸른인사관리 증명서 당겨오기(재직·경력증명서 발급 이력 → 서류 보관함) 셈 — 2026-11-12 -->
 <script src="js/kcareer-hrcert.js?v=1"></script>
@@ -8147,14 +8169,15 @@ var P1_PICK={
     cols:function(r){ return [String(r.date||r.year||'').slice(0,10), r.topic||r.title||'', r.org||'']; } },
   cert:{ title:'자격', heads:['일자','자격명','기관'],
     list:function(){ return (get('cert')||[]).filter(function(r){ return r&&r.id!=null&&!KcareerProfile1.isCourse(r); }); },
-    date:function(r){ return r.date; },
+    order:function(a,b){ return KcareerProfile1.certCmp(a,b); },   /* 종이와 같은 차례(국가자격 먼저·최근 것 먼저) */
     cols:function(r){ return [String(r.date||'').slice(0,10), r.title||'', r.org||'']; } }
 };
 function p1PickOpen(k){
   var def=P1_PICK[k]; if(!def) return;
   var o=_p1Load(), 꽂음={}; ((o.pins||{})[k]||[]).forEach(function(id){ 꽂음[String(id)]=1; });
   var 목록=def.list().slice();
-  if(def.date) 목록.sort(function(a,b){ return KcareerProfile1.dkey(def.date(b)).localeCompare(KcareerProfile1.dkey(def.date(a))); });
+  if(def.order) 목록.sort(def.order);
+  else if(def.date) 목록.sort(function(a,b){ return KcareerProfile1.dkey(def.date(b)).localeCompare(KcareerProfile1.dkey(def.date(a))); });
   _p1Pick={ k:k, list:목록, on:꽂음, q:'', mode:((o.only||{})[k]?'only':'auto') };
   var 몸=document.getElementById('p1PickBody'); if(몸) 몸.innerHTML='';   /* 앞에 연 창의 찾기칸을 비운다 */
   document.getElementById('p1PickTitle').textContent='☑ 고르기 — '+def.title;
@@ -8184,10 +8207,10 @@ function p1PickDraw(){
   document.getElementById('p1PickTbl').innerHTML='<div class="dt" style="max-height:56vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.mode==='only'?'✅':'⭐')+' №</th><th style="width:96px">'+escapeHtml(def.heads[0])+'</th><th>'+escapeHtml(def.heads[1])+'</th><th>'+escapeHtml(def.heads[2])+'</th>'+(def.amt?'<th style="width:84px">금액</th>':'')+'</tr></thead><tbody>'
     +줄들.map(function(r,i){ var c=칸(r);
       return '<tr><td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk"'+(P.on[String(r.id)]?' checked':'')+' onclick="p1PickToggle(\''+_jsAttr(String(r.id))+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
-        +'<td style="white-space:nowrap">'+escapeHtml(c[0])+'</td>'
-        +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[1])+'">'+escapeHtml(c[1])+'</td>'
-        +'<td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[2])+'">'+escapeHtml(c[2])+'</td>'
-        +(def.amt?'<td style="white-space:nowrap">'+딱지(r)+'</td>':'')+'</tr>'; }).join('')
+        +'<td data-label="'+escapeHtml(def.heads[0])+'" style="white-space:nowrap">'+escapeHtml(c[0])+'</td>'
+        +'<td data-label="'+escapeHtml(def.heads[1])+'" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[1])+'">'+escapeHtml(c[1])+'</td>'
+        +'<td data-label="'+escapeHtml(def.heads[2])+'" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(c[2])+'">'+escapeHtml(c[2])+'</td>'
+        +(def.amt?'<td data-label="금액" style="white-space:nowrap">'+딱지(r)+'</td>':'')+'</tr>'; }).join('')
     +(줄들.length?'':'<tr><td colspan="'+(def.amt?5:4)+'" style="color:var(--text-mute);padding:12px 6px">찾는 줄이 없습니다</td></tr>')
     +'</tbody></table></div>';
   _p1PickSum();
