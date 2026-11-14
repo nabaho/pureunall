@@ -140,7 +140,17 @@
     return out.join('\n');
   }
 
+  function hasDisallowedControlChars(txt) {
+    return /[\x00-\x08\x0B\x0E-\x1F\x7F]/.test(String(txt == null ? '' : txt));
+  }
+
   function decodePlainTextBytes(u8) {
+    if (u8.length >= 2 && u8[0] === 0xff && u8[1] === 0xfe) {
+      return new TextDecoder('utf-16le', { fatal: false }).decode(u8);
+    }
+    if (u8.length >= 2 && u8[0] === 0xfe && u8[1] === 0xff) {
+      return new TextDecoder('utf-16be', { fatal: false }).decode(u8);
+    }
     var utf8 = new TextDecoder('utf-8', { fatal: false }).decode(u8);
     if (utf8.indexOf('\uFFFD') >= 0) {
       try {
@@ -230,7 +240,8 @@
     if (isPdf && root.pdfjsLib && typeof root.pdfjsLib.getDocument === 'function') {
       try {
         var pdfDoc = await root.pdfjsLib.getDocument({ data: u8.slice(0), isEvalSupported: false }).promise;
-        var maxPages = Math.min(Number(pdfDoc.numPages) || 0, 150);
+        var totalPages = Number(pdfDoc.numPages) || 0;
+        var maxPages = Math.min(totalPages, 150);
         var pageTexts = [];
         for (var pIdx = 1; pIdx <= maxPages; pIdx++) {
           var page = await pdfDoc.getPage(pIdx);
@@ -271,20 +282,31 @@
           if (pageLines.length) pageTexts.push(pageLines.join('\n'));
         }
         var fullPdfTxt = pageTexts.join('\n\n').trim();
-        if (str(fullPdfTxt)) return { ok: true, format: 'pdf', text: mask(fullPdfTxt) };
+        if (str(fullPdfTxt)) {
+          var isTruncated = totalPages > maxPages;
+          if (isTruncated) {
+            fullPdfTxt += '\n\n[안내: 전체 ' + totalPages + '쪽 중 앞 ' + maxPages + '쪽까지만 추출되었습니다. 이후 쪽은 분할 파일로 불러와 주세요.]';
+          }
+          return { ok: true, format: 'pdf', text: mask(fullPdfTxt), truncated: isTruncated, totalPages: totalPages, readPages: maxPages };
+        }
         return { ok: false, format: 'pdf_image', text: '' };
       } catch (e) {
         return { ok: false, format: 'pdf', text: '' };
       }
     }
 
-    /* 6) 일반 텍스트 (.txt · .srt · .vtt · .md · .csv) */
-    if (/\.(txt|srt|vtt|md|csv|log)$/i.test(lower) || (!isZip && !isOle && !isPdf && !/\.(mp3|m4a|wav|ogg|webm|png|jpg|jpeg)$/i.test(lower))) {
+    /* 6) 일반 텍스트 (.txt · .srt · .vtt · .md · .csv) — 손상된 바이너리 컨테이너 문서 및 제어문자 포함 데이터 차단 */
+    var isBinContainerExt = /\.(hwpx|hwp|hwt|docx|doc|pdf|xlsx|xls|xlsm|pptx|ppt|zip)$/i.test(lower);
+    var isMediaExt = /\.(mp3|m4a|wav|ogg|webm|png|jpg|jpeg|gif|webp)$/i.test(lower);
+    if (!isBinContainerExt && !isMediaExt && !isZip && !isOle && !isPdf && u8.length > 0) {
       var plain = decodePlainTextBytes(u8);
-      if (str(plain)) return { ok: true, format: 'txt', text: mask(plain) };
+      if (!hasDisallowedControlChars(plain) && str(plain)) {
+        return { ok: true, format: 'txt', text: mask(plain) };
+      }
+      return { ok: false, format: 'corrupt', text: '' };
     }
 
-    return { ok: false, format: isPdf ? 'pdf_image' : (lower.split('.').pop() || 'unknown'), text: '' };
+    return { ok: false, format: isPdf ? 'pdf_image' : (isBinContainerExt ? 'corrupt' : (lower.split('.').pop() || 'unknown')), text: '' };
   }
 
   /* 보고서 .hwpx/.docx/.txt 불러오기 시 본문 영역만 깔끔히 추출 (자체 생성 .hwpx 왕복 지원) */

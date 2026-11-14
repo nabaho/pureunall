@@ -837,22 +837,27 @@ test('⑨ 정식 한글(.hwpx) 양방향 입출력 — 진술확인서(전자서
   assert.equal(complexParsed.summary, '요지 첫째 줄\n요지 둘째 줄', '진술 요지의 여러 줄이 그대로 보존된다');
   assert.equal(complexParsed.amendNote, '정정의견 1항\n정정의견 2항', '정정의견의 여러 줄이 그대로 보존된다');
 
-  /* PDF getTextContent 스팬 분절 주민번호(['900101-','123','4567']) 로컬 추출 및 가림 검증 */
+  /* PDF getTextContent 스팬 분절 주민번호(['900101-','123','4567']) 로컬 추출·isEvalSupported:false·150쪽 상한 안내·손상 파일 거부 검증 */
   const prevPdfLib = globalThis.pdfjsLib;
+  let capturedPdfOpts = null;
+  let mockPdfPages = 1;
   globalThis.pdfjsLib = {
-    getDocument() {
+    getDocument(opts) {
+      capturedPdfOpts = opts;
       return {
         promise: Promise.resolve({
-          numPages: 1,
-          async getPage() {
+          numPages: mockPdfPages,
+          async getPage(pNo) {
             return {
               async getTextContent() {
                 return {
-                  items: [
+                  items: pNo === 1 ? [
                     { str: '진술인 주민번호 ' },
                     { str: ['900101', '-'].join('') },
                     { str: '123' },
                     { str: '4567', hasEOL: true },
+                  ] : [
+                    { str: pNo + '쪽 본문', hasEOL: true },
                   ],
                 };
               },
@@ -866,8 +871,34 @@ test('⑨ 정식 한글(.hwpx) 양방향 입출력 — 진술확인서(전자서
     const fakePdfBytes = new TextEncoder().encode('%PDF-1.4 mock');
     const pdfRes = await H.extractDocumentText(fakePdfBytes, '진술서.pdf');
     assert.equal(pdfRes.ok, true, '로컬 PDF 텍스트 추출기가 동작한다');
+    assert.equal(capturedPdfOpts && capturedPdfOpts.isEvalSupported, false, 'PDF.js 호출 시 CVE-2024-4367 방어용 isEvalSupported:false 를 반드시 넘긴다');
+    assert.equal(pdfRes.truncated, false, '150쪽 이하 PDF는 잘림 표시가 없다');
     assert.ok(pdfRes.text.includes('900101-1******'), '스팬이 쪼개진 PDF 주민번호도 추출 즉시 마스킹된다');
     assert.equal(C.hasUnmaskedRrn(pdfRes.text), false, '추출된 PDF 텍스트에 미가림 주민번호가 남지 않는다');
+
+    mockPdfPages = 151;
+    const longPdfRes = await H.extractDocumentText(fakePdfBytes, '장문진술서.pdf');
+    assert.equal(longPdfRes.ok, true, '151쪽 PDF도 앞 150쪽 본문을 안전하게 추출한다');
+    assert.equal(longPdfRes.truncated, true, '150쪽 초과 PDF는 truncated:true 를 반환한다');
+    assert.equal(longPdfRes.totalPages, 151, '전체 쪽수(151)를 반환한다');
+    assert.equal(longPdfRes.readPages, 150, '읽은 쪽수(150)를 반환한다');
+    assert.ok(longPdfRes.text.includes('전체 151쪽 중 앞 150쪽까지만 추출'), '본문 말미에 쪽수 상한 안내가 명시된다');
+
+    const corruptHwpx = await H.extractDocumentText(new Uint8Array([1, 2]), 'bad.hwpx');
+    assert.equal(corruptHwpx.ok, false, '손상된 .hwpx 바이트가 일반 텍스트 폴백으로 잘못 성공 처리되지 않는다');
+    const corruptBin = await H.extractDocumentText(new Uint8Array([0, 1, 2, 3, 4]), 'unknown.dat');
+    assert.equal(corruptBin.ok, false, 'NUL·제어문자가 섞인 임의 바이너리도 텍스트로 오인하지 않는다');
+    const bomBypass = await H.extractDocumentText(new Uint8Array([0xff, 0xfe, 0x00, 0x00, 0x01, 0x00, 0x41, 0x00]), 'bom.dat');
+    assert.equal(bomBypass.ok, false, 'UTF-16 BOM 뒤에 NUL·제어문자가 섞인 바이너리도 거부한다');
+    const tailBypassBuf = new Uint8Array(4100);
+    tailBypassBuf.fill(0x61);
+    tailBypassBuf[4099] = 0x00;
+    const tailBypass = await H.extractDocumentText(tailBypassBuf, 'tail.dat');
+    assert.equal(tailBypass.ok, false, '4096바이트 이후 끝에 NUL·제어문자가 숨은 파일도 전체 길이 검사로 거부한다');
+    const ratioBypassBuf = new TextEncoder().encode('정상 진술 본문 줄입니다.\n'.repeat(30) + '\x01');
+    const ratioBypass = await H.extractDocumentText(ratioBypassBuf, 'ratio.txt');
+    assert.equal(ratioBypass.ok, false, '소량의 비인쇄 제어문자(0x01)가 섞인 파일도 거부한다');
+
     const spacedRrn = ['900101', '- ', '123', ' ', '4567'].join('');
     assert.equal(C.hasUnmaskedRrn(spacedRrn), true, '내부 공백이 섞인 주민번호도 미가림 탐지기가 잡아낸다');
     assert.equal(C.maskRrnText(spacedRrn), '900101-1******', '내부 공백이 섞인 주민번호도 정확히 가린다');

@@ -2117,7 +2117,9 @@
       $('rBody').value = bodyTxt;
       DIRTY_RPT._cid = cid;
       DIRTY_RPT.reportBody = 1;
-      toast('📄 ' + fname + ' (' + ex.format.toUpperCase() + ') 내용을 조사결과보고서 본문으로 불러왔습니다. 확인 후 [💾 보고서 저장]을 눌러 주세요.');
+      toast('📄 ' + fname + ' (' + ex.format.toUpperCase() + ') 내용을 조사결과보고서 본문으로 불러왔습니다.'
+        + (ex.truncated ? (' (전체 ' + ex.totalPages + '쪽 중 앞 ' + ex.readPages + '쪽까지만 반영됨)') : '')
+        + ' 확인 후 [💾 보고서 저장]을 눌러 주세요.');
     }
   }
 
@@ -2467,7 +2469,7 @@
       if ($('ivRaw')) $('ivRaw').value = cleanTxt;
       var roleHint = $('ivRole') ? C.str($('ivRole').value) : 'victim';
       var quick = C.parseTranscriptFallback(cleanTxt, roleHint);
-      applyOrganizedResult(quick, fname + ' (' + ex.format.toUpperCase() + ') 추출·자동정리');
+      applyOrganizedResult(quick, fname + ' (' + ex.format.toUpperCase() + (ex.truncated ? ' · 앞 ' + ex.readPages + '/' + ex.totalPages + '쪽' : '') + ') 추출·자동정리');
     }
 
     renderQaRows();
