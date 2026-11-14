@@ -369,7 +369,7 @@
       });
     });
     /* 날짜를 하나도 정하지 않아 총회일로 적은 줄이 있으면 알린다 — 등기부에는 효력이 생긴 날이 올라간다 */
-    if (guessed && events.length) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «진행 일정»의 «정관변경 인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
+    if (guessed && events.length) warnings.push('변경 연월일 — 날짜를 따로 정하지 않은 변경은 총회일로 적었습니다. 정관은 인가를 받은 날부터 시행하므로(정관 부칙) 입사·분사무소 이전 등은 보통 인가일로 등기합니다 — 인가일이 정해지면 «③ 노동부 인가»(자세히 화면은 «진행 일정»)의 «인가일»에 넣고, 날짜는 법무사와 확인하십시오.');
     /* 정관 제5·6조의 차례 — 같은 건에서 들어오는 사원은 나가는 사원의 자리에 넣는다(남는 입사자는 끝에).
        이 법인 2026. 7. 22. 개정 정관도 퇴사 사원의 호(3.)에 입사 사원을 적었다. */
     var joiners = members.filter(function (m) { return m.isNew; }), ji = 0, cur = [];
@@ -782,6 +782,56 @@
     return '끝';
   }
 
+  /* ══ 쉬운 진행 (대표 지시 2026-11-14 「기본정보만 넣으면 전체서류가 생성되어서 도장찍고 노동부 인가 후 등기만 할 수 있게 … 아주 쉽게」) ══
+     ① 바뀌는 것 → ② 서류 확인·도장 → ③ 노동부 인가(정관이 바뀔 때만) → ④ 등기.
+     서류마다 «누가 어떤 도장을» — 실무 안내다(실제 날인·간인·공증 방식은 담당 법무사·공증사무소 확인). */
+  var SEAL = {
+    minutes:   { who: 'meeting', how: '의장과 출석한 사원 모두 개인 인감 날인 → 공증사무소에서 의사록 인증(공증)' },
+    consent:   { who: 'everyone', how: '사원 모두(나가는·들어오는 사원 포함) 개인 인감 날인' },
+    compare:   { who: 'rep', how: '대표사원 날인' },
+    reason:    { who: 'rep', how: '대표사원 날인' },
+    apply:     { who: 'corp', how: '법인 인감 날인' },
+    charter:   { who: 'rep', how: '대표사원 날인(쪽 사이 간인)' },
+    roster:    { who: 'corp', how: '법인 인감 날인' },
+    accept:    { who: 'newRep', how: '새 대표사원 개인 인감 날인' },
+    resign:    { who: 'outRep', how: '사임하는 대표사원 개인 인감 날인' },
+    leaveNote: { who: 'leavers', how: '나가는 사원 개인 인감 날인' },
+    transfer:  { who: 'parties', how: '지분을 넘기는 사원·받는 사원 개인 인감 날인' },
+    poa:       { who: 'corp', how: '법인 인감 날인 — 법무사에게 등기 신청을 맡김' },
+    notaryPoa: { who: 'corp', how: '법인 인감 날인 — 공증사무소에 의사록 인증을 맡김' },
+    delay:     { who: 'corp', how: '법인 인감 날인' }
+  };
+  function sealPlan(after, keys) {
+    var titles = {}; DOCS.forEach(function (d) { titles[d.key] = d.title; });
+    var names = function (list) { return list.filter(Boolean).map(function (m) { return m.name || '(이름 없음)'; }).filter(function (x, i, a) { return a.indexOf(x) === i; }).join(', '); };
+    var before = (after.members || []).filter(function (m) { return !m.isNew; }).concat(after.left || []);
+    var reps = (after.members || []).filter(function (m) { return m.rep; });
+    var ev = function (t) { return (after.events || []).filter(function (e) { return e.type === t && !(t === 'repOut' && e.byLeave); }).map(function (e) { return after.byId[e.member]; }); };
+    var parties = [];
+    (after.left || []).forEach(function (m) { if (m.leaveShare && m.leaveShare.mode === 'transfer' && m.leaveShare.to.length) { parties.push(m); m.leaveShare.to.forEach(function (t) { parties.push(after.byId[t.member]); }); } });
+    return (keys || []).filter(function (k) { return SEAL[k]; }).map(function (k) {
+      var s = SEAL[k], who = '';
+      if (s.who === 'meeting') who = '사원 ' + names(before);
+      else if (s.who === 'everyone') who = '사원 ' + names(before.concat((after.members || []).filter(function (m) { return m.isNew; })));
+      else if (s.who === 'rep') who = '대표사원 ' + names(reps);
+      else if (s.who === 'corp') who = '법인(대표사원 ' + names(reps) + ')';
+      else if (s.who === 'newRep') who = names(ev('repIn'));
+      else if (s.who === 'outRep') who = names(ev('repOut'));
+      else if (s.who === 'leavers') who = names(after.left || []);
+      else if (s.who === 'parties') who = names(parties);
+      return { key: k, title: titles[k] || k, who: who, how: s.how };
+    });
+  }
+  /* 지금 있어야 할 단계 — 1 바뀌는 것 · 2 서류·도장 · 3 노동부 인가 · 4 등기 */
+  function easyStep(after, sealKeys) {
+    var c = after.c;
+    if (!c.changes.length || after.errors.length || !c.meeting.date) return 1;
+    var sealed = (sealKeys || []).every(function (k) { return c.checks['seal_' + k] && c.checks['seal_' + k].ok; });
+    if (!sealed) return 2;
+    if (after.charterChanged && !c.dates.approvalGet) return 3;
+    return 4;
+  }
+
   /* ══ 지난 등기 원본 서류 묶음 (대표 지시 2026-11-14 「지난기록 서식 원본과 자료들 모두 넣어달라」) ══
      파일 «바이트»는 원본 보관함 🔒 자리(pu_docs/secret — 아무도 직접 못 읽고, 서버 함수가 총괄관리자에게만 내준다)에 두고,
      여기(deungi/archive/{id})에는 묶음 이름·날짜·요약과 «파일 번호·종류»만 적는다.
@@ -866,6 +916,7 @@
   }
 
   return {
+    SEAL: SEAL, sealPlan: sealPlan, easyStep: easyStep,
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
     normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,
