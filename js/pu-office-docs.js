@@ -195,7 +195,22 @@
     return { wait: wait, done: done };
   }
   /* 보낸 서류 이름 → 계약 기록 종류(KINDS) 짐작. 묶음은 «가장 앞선» 계약서 이름으로 — 사람이 고친다 */
-  var AWAIT_KIND_RE = [[/급여/, '급여관리'], [/기금/, '기금'], [/컨설팅/, '컨설팅'], [/위임|사건/, '사건'], [/자문|노동조합|노조/, '자문'], [/사무\s*(대행|위탁)|EDI/i, 'EDI'], [/CMS|자동\s*출금|자동\s*이체/i, 'CMS']];
+  var AWAIT_KIND_RE = [
+    [/괴롭힘|성희롱|진상\s*조사/, '괴롭힘·성희롱조사'],
+    [/산업\s*안전|중대\s*재해|안전\s*보건|위험성\s*평가/, '산업안전'],
+    [/노무\s*진단|조직\s*진단|인사\s*진단|취업\s*규칙|규정\s*정비/, '노무진단·규정'],
+    [/단체\s*교섭|임금\s*교섭|단협/, '단체교섭'],
+    [/법률\s*의견|검토\s*의견|의견서/, '의견서'],
+    [/변경|갱신|연장/, '변경·갱신'],
+    [/교육|강의|특강/, '교육·강의'],
+    [/급여|아웃소싱|임금\s*대장/, '급여관리'],
+    [/기금/, '기금'],
+    [/컨설팅/, '컨설팅'],
+    [/위임|사건/, '사건'],
+    [/자문|노동조합|노조/, '자문'],
+    [/사무\s*(대행|위탁)|EDI/i, 'EDI'],
+    [/CMS|자동\s*출금|자동\s*이체/i, 'CMS']
+  ];
   function awaitKindOf(names) {
     var list = names || [];
     for (var i = 0; i < AWAIT_KIND_RE.length; i++) {
@@ -236,6 +251,7 @@
     + '.pod-arc-r{width:46%;flex:none;position:sticky;top:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;display:flex;flex-direction:column;max-height:calc(100vh - 180px)}'
     + '.pod-arc-rh{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #e5e7eb}'
     + '.pod-arc-rh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}'
+    + '.pod-arc-acts{display:flex;gap:6px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid #f1f5f9;background:#f8fafc}'
     + '.pod-arc-rb{flex:1;overflow:auto;padding:10px;background:#f8fafc;min-height:300px}'
     + '.pod-arc-rb img{max-width:100%}.pod-arc-rb iframe{width:100%;height:calc(100vh - 260px);border:none;background:#fff}'
     /* 기업별 계약서 — 위 단추 줄·회사 이름은 그대로, 회사 목록·내용은 그 안에서 스크롤(표 머리줄 고정) (2026-10-07) */
@@ -359,7 +375,8 @@
         link = f ? f.name : (fr.formName || '양식');
         gone = !f;
         if (gone) link += ' — 양식 삭제됨 · 사본만 남음';
-      } else if (fr.kind === 'co') link = '기업 · ' + (fr.coName || '');
+      } else if (fr.kind === 'co') link = '기업 · ' + (fr.coName || '') + (fr.via === 'mail' ? ' (푸른메일)' : '');
+      else if (fr.kind === 'quote') link = '보낸 견적·계약' + (fr.coName ? ' · ' + fr.coName : '');
       else if (fr.kind === 'photo') link = '기업 · ' + (fr.coName || '') + ' (사진첩)';
       else if (fr.kind === 'folder') link = '기업 · ' + (fr.coName || '') + ' (PC 폴더)';
       return { id: r.id, name: r.name, size: r.size, at: r.at, byName: r.byName || '', link: link, gone: gone, rec: r,
@@ -376,7 +393,7 @@
     if (/\.(docx?|pptx?)$/.test(n)) return 'doc';
     return 'etc';
   }
-  var ARC_KINDS = [['form', '계약서 양식'], ['co', '기업별 계약서'], ['photo', '사진첩'], ['folder', 'PC 폴더']];
+  var ARC_KINDS = [['form', '계약서 양식'], ['co', '기업별 계약서'], ['quote', '보낸 견적·계약'], ['photo', '사진첩'], ['folder', 'PC 폴더']];
   var ARC_TYPES = [['pdf', 'PDF'], ['hwp', '한글'], ['xlsx', '엑셀'], ['img', '그림'], ['doc', '워드·PPT'], ['etc', '그 밖']];
   /* 원본 보관함 걸러 보기 — f: { q, kind, type, by } (빈 값 = 전체) */
   function filterArchive(rows, f) {
@@ -396,12 +413,12 @@
      파일 종류: 이어진 계약 기록 > 파일에 정해 둔 종류(kind) > 제목 짐작(PuCoRoster.guessKind) > 미분류.
      상태: ok(기록+파일) · missing(기록만 — 서명본 회수 필요) · norec(파일만 — 기록 만들기) */
   var KIND_GROUPS = [
-    { v: 'company', label: '업체계약', icon: '🏢', kinds: ['자문', '급여관리', 'CMS', 'EDI'] },
-    { v: 'case', label: '사건계약', icon: '⚖️', kinds: ['사건'] },
-    { v: 'consulting', label: '컨설팅계약', icon: '📊', kinds: ['컨설팅'] },
+    { v: 'company', label: '업체계약', icon: '🏢', kinds: ['자문', '급여관리', '단체교섭', '변경·갱신', 'CMS', 'EDI'] },
+    { v: 'case', label: '사건계약', icon: '⚖️', kinds: ['사건', '괴롭힘·성희롱조사'] },
+    { v: 'consulting', label: '컨설팅계약', icon: '📊', kinds: ['컨설팅', '산업안전', '노무진단·규정', '의견서'] },
     { v: 'fund', label: '기금관리', icon: '🏦', kinds: ['기금'] },
     { v: 'consult', label: '상담·제안', icon: '📞', kinds: ['제안서'] },
-    { v: 'other', label: '기타사업', icon: '📋', kinds: ['기타'] }];
+    { v: 'other', label: '기타사업', icon: '📋', kinds: ['교육·강의', '기타'] }];
   function groupOfKind(k) {
     for (var i = 0; i < KIND_GROUPS.length; i++) if (KIND_GROUPS[i].kinds.indexOf(k) >= 0) return KIND_GROUPS[i].v;
     return '';
@@ -1086,6 +1103,8 @@
     function won(n) { return n == null || n === '' ? '' : String(Math.round(+n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     function openRec(r, pre) {
       var key = S.sel, isNew = !r; r = r || Object.assign({ kind: '자문', date: ymd(Date.now()) }, pre || {});
+      var selCoObj = S.cos.filter(function (c) { return c.key === key; })[0] || { key: key, name: coName(key), bz: '' };
+      var linkedDoc = r.docId ? (S.docs.filter(function (x) { return x.id === r.docId; })[0] || null) : null;
       var dIn = el('input', { type: 'date', value: r.date || '' });
       var kSel = el('select', null, KINDS.map(function (k) { return el('option', { value: k, text: k }); })); kSel.value = r.kind || '기타';
       var aIn = el('input', { type: 'text', inputmode: 'numeric', placeholder: '예: 220,000', value: won(r.amount) });
@@ -1093,16 +1112,33 @@
       var eIn = el('input', { type: 'text', placeholder: '○ 또는 빈칸', value: r.edi || '' });
       var sIn = el('input', { type: 'text', placeholder: '우리 담당', value: r.staff || '' });
       var nIn = el('input', { type: 'text', placeholder: '메모(200자)', value: r.note || '' });
-      modalShell((coName(key) || '') + ' · 계약 기록' + (isNew ? ' 더하기' : ''), [
+      var patch = function () {
+        var a = String(aIn.value).replace(/\D/g, '');
+        return { date: dIn.value, kind: kSel.value, amount: a === '' ? null : +a,
+          payDay: pIn.value.trim(), edi: eIn.value.trim(), staff: sIn.value.trim(), note: nIn.value.trim() };
+      };
+      var closeModal = null;
+      var quickBar = (!isNew && (host.fillFromCo || (linkedDoc && host.editCoHwp))) ? el('div', { 'class': 'pod-note', style: 'margin-bottom:8px' }, [
+        el('span', { style: 'flex:1;min-width:160px', text: '이 확정 계약을 바탕으로 조건·금액·기간을 손쉽게 변경·갱신할 수 있습니다.' }),
+        linkedDoc && host.editCoHwp && /\.(hwp|hwpx)$/i.test(linkedDoc.title || '') ? el('button', { type: 'button', 'class': 'pod-b p', text: '✏ 한글 파일 바로 수정', onclick: function () {
+          if (closeModal) closeModal();
+          host.editCoHwp(selCoObj, linkedDoc, Object.assign({}, r, patch()), function () { load(true); loadIndex(); });
+        } }) : null,
+        host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b g', text: '📝 표준 양식으로 변경·갱신', onclick: function () {
+          if (closeModal) closeModal();
+          host.fillFromCo(selCoObj, linkedDoc, Object.assign({}, r, patch()), false);
+        } }) : null,
+        host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b', text: '📑 변경·연장 합의서 작성', onclick: function () {
+          if (closeModal) closeModal();
+          host.fillFromCo(selCoObj, linkedDoc, Object.assign({}, r, patch()), true);
+        } }) : null
+      ]) : null;
+      closeModal = modalShell((coName(key) || '') + ' · 계약 기록' + (isNew ? ' 더하기' : ''), [
+        quickBar,
         el('label', { text: '계약일' }), dIn, el('label', { text: '종류' }), kSel, el('label', { text: '금액(원)' }), aIn,
         el('label', { text: '지급일' }), pIn, el('label', { text: 'EDI' }), eIn, el('label', { text: '담당' }), sIn, el('label', { text: '메모' }), nIn,
-        r.src === 'import' ? el('div', { style: 'font-size:12px;color:#64748b;margin-top:8px', text: '엑셀 명단에서 가져온 기록입니다' + (r.byName ? ' · ' + r.byName : '') }) : null
+        r.src === 'import' ? el('div', { style: 'font-size:12px;color:#64748b;margin-top:8px', text: '가져온 기록입니다' + (r.byName ? ' · ' + r.byName : '') }) : null
       ], function (close) {
-        var patch = function () {
-          var a = String(aIn.value).replace(/\D/g, '');
-          return { date: dIn.value, kind: kSel.value, amount: a === '' ? null : +a,
-            payDay: pIn.value.trim(), edi: eIn.value.trim(), staff: sIn.value.trim(), note: nIn.value.trim() };
-        };
         return [
           isNew ? null : el('button', { type: 'button', 'class': 'pod-b', text: '이 기록 지우기', title: '기록만 지웁니다 — 파일은 그대로', onclick: function () {
             if (!w.confirm('이 계약 기록을 지울까요?\n(계약서 파일은 그대로 남습니다)')) return;
@@ -1558,9 +1594,194 @@
         });
     }
 
+    /* ── 📨 푸른메일·이알피 확정 계약서 일괄 가져오기 ── */
+    function openConfirmedImport() {
+      var CI = host.confirmedImport;
+      if (!CI) { toast('확정 계약서 가져오기 도구가 연결되지 않았습니다'); return; }
+      var st = { mode: 'mail', mailRows: null, erpRows: null, mOn: {}, eOn: {}, busy: false };
+      var tabMail = el('button', { type: 'button', 'class': 'pod-b on', text: '✉ 푸른메일 체결·확정 계약서' });
+      var tabErp = el('button', { type: 'button', 'class': 'pod-b', text: '🏢 푸른이알피 확정 계약 기록' });
+      var info = el('div', { style: 'font-size:12.5px;color:#475569;margin:8px 0', text: '푸른메일(받은메일함·보낸메일함)에서 계약서 첨부를 찾는 중…' });
+      var box = el('div', { 'class': 'pod-imp' });
+      var go = null;
+
+      function curList() { return st.mode === 'mail' ? (st.mailRows || []) : (st.erpRows || []); }
+      function curOn() { return st.mode === 'mail' ? st.mOn : st.eOn; }
+      function pickedCount() {
+        var ls = curList(), on = curOn();
+        return ls.filter(function (_, i) { return !!on[i]; }).length;
+      }
+      function syncGo() {
+        if (!go) return;
+        var n = pickedCount();
+        go.disabled = st.busy || !n;
+        if (st.busy) return;
+        go.textContent = st.mode === 'mail'
+          ? (n ? '🔒 선택 ' + n + '건 확정 계약서로 가져오기' : '가져올 메일 계약서를 고르세요')
+          : (n ? '✅ 선택 ' + n + '건 확정 계약 기록 가져오기' : '가져올 이알피 계약을 고르세요');
+      }
+      function drawBody() {
+        tabMail.className = 'pod-b' + (st.mode === 'mail' ? ' on' : '');
+        tabErp.className = 'pod-b' + (st.mode === 'erp' ? ' on' : '');
+        box.innerHTML = '';
+        if (st.mode === 'mail') {
+          if (!st.mailRows) {
+            info.textContent = '푸른메일(받은메일함·보낸메일함)에서 체결·확정 계약서를 찾는 중…';
+            syncGo(); return;
+          }
+          if (!st.mailRows.length) {
+            info.textContent = '푸른메일에서 새로 가져올 계약서 후보가 없습니다.';
+            box.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:20px', text: '메일함에 계약서 첨부가 없거나 모두 가져왔습니다.' }));
+            syncGo(); return;
+          }
+          var freshCnt = st.mailRows.filter(function (r) { return !r.imported; }).length;
+          info.textContent = '계약서 첨부 ' + st.mailRows.length + '건 발견 (새 후보 ' + freshCnt + '건) — 회사 이름·종류를 확인하고 🔒 서명본 + 계약 기록으로 한 번에 가져오세요.';
+          var all = el('input', { type: 'checkbox', 'aria-label': '새 메일 계약서 모두 고르기',
+            checked: st.mailRows.some(function (r, i) { return !r.imported && st.mOn[i]; }) && st.mailRows.every(function (r, i) { return r.imported || st.mOn[i]; }) });
+          all.addEventListener('change', function () {
+            st.mailRows.forEach(function (r, i) { if (!r.imported) st.mOn[i] = all.checked; });
+            drawBody(); syncGo();
+          });
+          var tb = el('tbody');
+          st.mailRows.forEach(function (r, i) {
+            var cb = el('input', { type: 'checkbox', 'aria-label': (r.attName || r.subject || '계약서') + ' 고르기', checked: !!st.mOn[i], disabled: !!r.imported });
+            cb.addEventListener('change', function () { st.mOn[i] = cb.checked; syncGo(); });
+            var coIn = el('input', { type: 'text', list: 'pod-cos', value: r.coName || '', placeholder: '회사 이름', style: 'width:130px;padding:4px 6px;font-size:12px' });
+            coIn.addEventListener('input', function () { r.coName = coIn.value.trim(); });
+            var kSel = el('select', { style: 'padding:4px 6px;font-size:12px' }, KINDS.map(function (k) { return el('option', { value: k, text: k }); }));
+            kSel.value = KINDS.indexOf(r.kind) >= 0 ? r.kind : '자문';
+            r.kind = kSel.value;
+            kSel.addEventListener('change', function () { r.kind = kSel.value; });
+            tb.appendChild(el('tr', null, [
+              el('td', null, [cb]),
+              el('td', { text: String(i + 1) }),
+              el('td', null, [coIn]),
+              el('td', null, [kSel]),
+              el('td', { text: r.date || '' }),
+              el('td', { title: (r.subject || '') + '\n' + (r.attName || ''), style: 'max-width:240px;overflow:hidden;text-overflow:ellipsis' }, [
+                el('b', { text: r.attName || '(첨부)' }),
+                el('div', { style: 'font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis', text: (r.folderLabel ? '[' + r.folderLabel + '] ' : '') + (r.subject || '') })
+              ]),
+              el('td', { 'class': r.imported ? 'dup' : (r.signed ? 'ok' : 'new'),
+                text: r.imported ? '이미 가져옴' : (r.signed ? '✓ 체결·서명 단서' : '계약서 첨부') })
+            ]));
+          });
+          box.appendChild(el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [
+            el('th', { style: 'width:32px' }, [all]), el('th', { style: 'width:34px', text: '#' }),
+            el('th', { text: '회사 이름' }), el('th', { text: '종류' }), el('th', { text: '날짜' }),
+            el('th', { text: '첨부 파일 · 메일 제목' }), el('th', { text: '구분' })
+          ])]), tb]));
+          syncGo();
+          return;
+        }
+        if (!st.erpRows) {
+          info.textContent = '푸른이알피 확정 계약을 불러오는 중…';
+          syncGo(); return;
+        }
+        if (!st.erpRows.length) {
+          info.textContent = '푸른이알피에 확정 등록된 계약이 없습니다.';
+          box.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:20px', text: '확정된 이알피 계약이 없습니다.' }));
+          syncGo(); return;
+        }
+        var erpFresh = st.erpRows.filter(function (r) { return !r.imported; }).length;
+        info.textContent = '푸른이알피 확정 계약 ' + st.erpRows.length + '건 (미동기화 ' + erpFresh + '건) — 선택 건을 확정 계약서 관리의 계약 기록으로 가져옵니다.';
+        var eAll = el('input', { type: 'checkbox', 'aria-label': '이알피 계약 모두 고르기',
+          checked: st.erpRows.some(function (r, i) { return !r.imported && st.eOn[i]; }) && st.erpRows.every(function (r, i) { return r.imported || st.eOn[i]; }) });
+        eAll.addEventListener('change', function () {
+          st.erpRows.forEach(function (r, i) { if (!r.imported) st.eOn[i] = eAll.checked; });
+          drawBody(); syncGo();
+        });
+        var etb = el('tbody');
+        st.erpRows.forEach(function (r, i) {
+          var cb = el('input', { type: 'checkbox', 'aria-label': (r.coName || '') + ' 고르기', checked: !!st.eOn[i], disabled: !!r.imported });
+          cb.addEventListener('change', function () { st.eOn[i] = cb.checked; syncGo(); });
+          etb.appendChild(el('tr', null, [
+            el('td', null, [cb]),
+            el('td', { text: String(i + 1) }),
+            el('td', null, [el('b', { text: r.coName || '' }), r.bizNo ? el('div', { style: 'font-size:11px;color:#94a3b8', text: fmtBz(r.bizNo) }) : null]),
+            el('td', null, [el('span', { 'class': 'pod-kd', text: r.kind || '자문' })]),
+            el('td', { text: r.date || '' }),
+            el('td', { 'class': 'amt', text: won(r.amount) || '—' }),
+            el('td', { text: r.staff || '' }),
+            el('td', { 'class': r.imported ? 'dup' : 'ok', text: r.imported ? '이미 있음' : '새 확정 계약' })
+          ]));
+        });
+        box.appendChild(el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [
+          el('th', { style: 'width:32px' }, [eAll]), el('th', { style: 'width:34px', text: '#' }),
+          el('th', { text: '회사' }), el('th', { text: '종류' }), el('th', { text: '계약일' }),
+          el('th', { text: '금액' }), el('th', { text: '담당' }), el('th', { text: '상태' })
+        ])]), etb]));
+        syncGo();
+      }
+
+      function loadMailTab() {
+        if (st.mailRows || !CI.scanMail) { drawBody(); return; }
+        CI.scanMail().then(function (rows) {
+          st.mailRows = rows || [];
+          st.mOn = {};
+          var anySigned = st.mailRows.some(function (r) { return !r.imported && r.signed; });
+          st.mailRows.forEach(function (r, i) {
+            if (!r.imported) st.mOn[i] = anySigned ? !!r.signed : true;
+          });
+          drawBody();
+        }, function (e) { st.mailRows = []; info.textContent = '❌ 푸른메일을 읽지 못했습니다 — ' + msg(e); syncGo(); });
+      }
+      function loadErpTab() {
+        if (st.erpRows || !CI.scanErp) { drawBody(); return; }
+        CI.scanErp().then(function (rows) {
+          st.erpRows = rows || [];
+          st.eOn = {};
+          st.erpRows.forEach(function (r, i) { if (!r.imported) st.eOn[i] = true; });
+          drawBody();
+        }, function (e) { st.erpRows = []; info.textContent = '❌ 이알피 계약을 읽지 못했습니다 — ' + msg(e); syncGo(); });
+      }
+
+      tabMail.addEventListener('click', function () { if (st.busy) return; st.mode = 'mail'; loadMailTab(); });
+      tabErp.addEventListener('click', function () { if (st.busy) return; st.mode = 'erp'; loadErpTab(); });
+
+      modalShell('📨 확정 계약서 모두 가져오기 (푸른메일 · 푸른이알피)', [
+        el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, [tabMail, CI.scanErp ? tabErp : null]),
+        info, box, coList()
+      ], function (close) {
+        go = el('button', { type: 'button', 'class': 'pod-b p', text: '불러오는 중…', disabled: true, onclick: function () {
+          if (st.busy) return;
+          if (st.mode === 'mail') {
+            var mPick = (st.mailRows || []).filter(function (_, i) { return st.mOn[i]; });
+            if (!mPick.length) return;
+            var missingCo = mPick.filter(function (r) { return !String(r.coName || '').trim(); });
+            if (missingCo.length) { toast('회사 이름이 비어 있는 줄이 ' + missingCo.length + '건 있습니다 — 회사 이름을 적어 주세요'); return; }
+            st.busy = true; syncGo();
+            CI.importMail(mPick, function (done, tot, label) {
+              go.textContent = '가져오는 중… (' + done + '/' + tot + ') ' + (label || '');
+            }).then(function (res) {
+              st.busy = false; close();
+              toast('✅ 푸른메일 확정 계약서 ' + (res.ok || 0) + '건을 가져왔습니다' + (res.fail ? ' · 실패 ' + res.fail + '건' : ''));
+              load(true); loadIndex();
+            }, function (e) { st.busy = false; syncGo(); toast('❌ 가져오지 못했습니다 — ' + msg(e)); });
+            return;
+          }
+          var ePick = (st.erpRows || []).filter(function (_, i) { return st.eOn[i]; }).map(function (r) {
+            return { coName: r.coName, bizNo: r.bizNo || '', date: r.date || '', kind: r.kind || '자문',
+              amount: r.amount, payDay: r.payDay || '', staff: r.staff || '', note: r.note || '', src: 'import' };
+          });
+          if (!ePick.length) return;
+          st.busy = true; syncGo();
+          store.importCoRecs(ePick, function (i, n) { go.textContent = '동기화 중… ' + i + '/' + n; }).then(function (x) {
+            st.busy = false; close();
+            toast('✅ 확정 계약 ' + x.added + '건을 가져왔습니다' + (x.skipped ? ' (이미 있던 ' + x.skipped + '건 건너뜀)' : ''));
+            load(true); loadIndex();
+          }, function (e) { st.busy = false; syncGo(); toast('❌ 가져오지 못했습니다 — ' + msg(e)); });
+        } });
+        return [el('button', { type: 'button', 'class': 'pod-b', text: '닫기', onclick: function () { if (!st.busy) close(); } }), go];
+      });
+      loadMailTab();
+    }
+
     /* ── 큰 보기 ── */
     function openDoc(d) {
       var key = S.sel;
+      var selCoObj = S.cos.filter(function (c) { return c.key === key; })[0] || { key: key, name: coName(key), bz: '' };
+      var linkedRec = S.recs.filter(function (x) { return x.docId === d.id; })[0] || S.recs[0] || null;
       var view = el('div', { style: 'min-height:320px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:8px', text: '불러오는 중…' });
       var tIn = el('input', { type: 'text', value: d.title || '' });
       var dIn = el('input', { type: 'date', value: d.date || '' });
@@ -1568,8 +1789,24 @@
       var kSel = el('select', { 'aria-label': '계약 종류' }, [el('option', { value: '', text: g0 ? '(제목으로 짐작: ' + g0 + ')' : '(정하지 않음 — 미분류)' })]
         .concat(KINDS.map(function (k) { return el('option', { value: k, text: k }); })));
       kSel.value = d.kind || '';
-      var rec = null;
-      modalShell((coName(key) || '') + ' · ' + (d.title || '계약서'), [view,
+      var rec = null, closeModal = null;
+      var curRecInfo = function () {
+        return Object.assign({}, linkedRec || {}, { kind: kSel.value || (linkedRec && linkedRec.kind) || g0 || '자문', date: dIn.value || d.date || '' });
+      };
+      var editActs = (host.editCoHwp || host.fillFromCo || host.registerForm) ? el('div', { 'class': 'pod-arc-acts', style: 'border-radius:8px;margin-top:8px;border:1px solid #e2e8f0' }, [
+        host.editCoHwp ? el('button', { type: 'button', 'class': 'pod-b p', text: '✏ 한글 편집기로 고쳐 변경·갱신 사본 저장',
+          title: '원본은 그대로 보관하고, 수정한 내용을 새 변경·갱신 계약서로 저장·발송합니다',
+          onclick: function () { if (closeModal) closeModal(); host.editCoHwp(selCoObj, d, curRecInfo(), function () { load(true); loadIndex(); }); } }) : null,
+        host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b g', text: '📝 표준 양식으로 변경·갱신 작성',
+          title: '이 회사의 정보·종류·금액을 표준 계약서 양식에 자동 채워 엽니다',
+          onclick: function () { if (closeModal) closeModal(); host.fillFromCo(selCoObj, d, curRecInfo(), false); } }) : null,
+        host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b', text: '📑 변경·연장 합의서 작성',
+          onclick: function () { if (closeModal) closeModal(); host.fillFromCo(selCoObj, d, curRecInfo(), true); } }) : null,
+        host.registerForm ? el('button', { type: 'button', 'class': 'pod-b', text: '📄 공용 양식에 등록',
+          title: '이 계약서를 계약서 양식함에 공용 양식으로 등록합니다',
+          onclick: function () { host.registerForm(d, kSel.value || g0 || '', selCoObj, curRecInfo()); } }) : null
+      ]) : null;
+      closeModal = modalShell((coName(key) || '') + ' · ' + (d.title || '계약서'), [view, editActs,
         el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn,
         el('label', { text: '종류 (갈래별 정리에 쓰입니다)' }), kSel
       ], function (close) {
@@ -1590,6 +1827,24 @@
         view.textContent = '';
         var openBtn = el('button', { type: 'button', 'class': 'pod-b p', text: '🔒 서명본 열기 (대표·관리자)', onclick: function () {
           openBtn.disabled = true; openBtn.textContent = '여는 중…';
+          if (host.fileBytes && host.hwpShow) {
+            host.fileBytes(d.fileId).then(function (f) {
+              view.textContent = '';
+              var tp = fileType(f.name || d.title);
+              if (tp === 'img' || tp === 'pdf') {
+                var u0 = w.URL.createObjectURL(new Blob([f.bytes], { type: tp === 'pdf' ? 'application/pdf' : 'image/jpeg' }));
+                view.appendChild(tp === 'pdf' ? el('iframe', { src: u0, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' })
+                  : el('img', { src: u0, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
+              } else if (tp === 'hwp' || tp === 'xlsx') {
+                var hb = el('div', { style: 'width:100%;max-height:60vh;overflow:auto;background:#fff;padding:10px' });
+                view.appendChild(hb);
+                host.hwpShow(hb, f.bytes, f.name || d.title);
+              } else {
+                view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: '미리보기가 없는 종류입니다 — [📥 내려받기]로 여세요' })]));
+              }
+            }, function (e) { view.textContent = msg(e); });
+            return;
+          }
           store.secretBlob(d.fileId).then(function (blob) {
             var url = w.URL.createObjectURL(blob); view.textContent = '';
             if (/^image\//.test(blob.type)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
@@ -1608,7 +1863,11 @@
         view.textContent = '';
         if (isImg(r.name)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
         else if (/\.pdf$/i.test(r.name)) view.appendChild(el('iframe', { src: url, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' }));
-        else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: r.name }), el('div', { style: 'font-size:12px;color:#94a3b8', text: '미리보기가 없는 종류입니다 — 내려받아 여세요' })]));
+        else if ((fileType(r.name) === 'hwp' || fileType(r.name) === 'xlsx') && host.fileBytes && host.hwpShow) {
+          var hb2 = el('div', { style: 'width:100%;max-height:60vh;overflow:auto;background:#fff;padding:10px' });
+          view.appendChild(hb2);
+          host.fileBytes(d.fileId).then(function (f) { host.hwpShow(hb2, f.bytes, f.name || r.name); }, function (e) { hb2.textContent = msg(e); });
+        } else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: r.name }), el('div', { style: 'font-size:12px;color:#94a3b8', text: '미리보기가 없는 종류입니다 — 내려받아 여세요' })]));
       }).catch(function (e) { view.textContent = '불러오지 못했습니다 — ' + msg(e); });
     }
 
@@ -1678,14 +1937,17 @@
     function draw() {
       root.innerHTML = '';
       var wrap = el('div', { 'class': 'pod' });
-      /* 위 줄은 «📎 업로드» 하나와 「가져오기·정리 ▾」 하나 — 드물게 쓰는 다섯 가지를 메뉴 안으로 (대표 지시 2026-10-10 「서류관리 화면 깔끔하게, 다른 형태도 같이」) */
+      /* 위 줄은 «📎 업로드»·«📨 확정 계약서 가져오기»와 「가져오기·정리 ▾」 메뉴 */
       var menuItems = [
+        host.confirmedImport ? ['📨 푸른메일·이알피 확정 계약서 가져오기', '푸른메일의 체결·서명 계약서와 푸른이알피 확정 계약을 한 번에 모아 가져옵니다', openConfirmedImport] : null,
         ['📥 엑셀 명단 가져오기', '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', openRosterImport],
         ['📂 PC 폴더 가져오기', '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', openFolderImport],
         ['🖼 사진첩에서 가져오기', '내 사진첩의 계약서를 가져옵니다', openPhotoImport],
         host.coLink ? ['🔗 이알피 업체와 맞추기', '사업자번호를 넣고, 같은 회사가 다른 이름으로 들어온 것을 합칩니다', openLink] : null,
         host.secretMove ? ['🔒 서명본으로 옮기기', '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', openSecretMove] : null].filter(Boolean);
-      wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { 'class': 'pod-ttl', text: '🏢 기업별 계약서' }),
+      wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { 'class': 'pod-ttl', text: '📑 확정 계약서 관리 · 기업별' }),
+        host.confirmedImport ? el('button', { type: 'button', 'class': 'pod-b g', title: '푸른메일·이알피의 확정 계약서를 한 번에 찾아 가져옵니다',
+          text: '📨 확정 계약서 가져오기', onclick: openConfirmedImport }) : null,
         el('button', { type: 'button', 'class': 'pod-b' + (S.menuOpen ? ' on' : ''), 'aria-haspopup': 'menu', 'aria-expanded': S.menuOpen ? 'true' : 'false',
           text: '📥 가져오기·정리 ' + (S.menuOpen ? '▴' : '▾'), onclick: function () { S.menuOpen = !S.menuOpen; draw(); } }),
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
@@ -1772,6 +2034,8 @@
         /* 📱 폰에서만 — 회사 목록을 접고 펼친다(넓은 화면은 목록이 늘 왼쪽에 있다) */
         el('button', { type: 'button', 'class': 'pod-b pod-pickbtn', 'aria-expanded': S.pickOpen ? 'true' : 'false', text: S.pickOpen ? '▴ 목록 닫기' : '▾ 회사 바꾸기', title: '회사 ' + S.cos.length + '곳 — 찾아서 고릅니다',
           onclick: function () { S.pickOpen = !S.pickOpen; draw(); } }),
+        host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b g', title: '이 회사의 신규·변경·갱신 계약서를 표준 양식으로 바로 작성합니다', 'aria-label': '이 회사 변경·갱신 계약서 작성',
+          onclick: function () { host.fillFromCo(selCo, null, S.recs[0] || null, false); } }, ['📝', el('span', { 'class': 'pod-lg', text: ' 변경·갱신 계약 작성' })]) : null,
         host.coMerge ? el('button', { type: 'button', 'class': 'pod-b', title: '다른 회사를 여기로 합치기', 'aria-label': '다른 회사를 여기로 합치기', onclick: openMerge }, ['🔗', el('span', { 'class': 'pod-lg', text: ' 다른 회사를 여기로 합치기' })]) : null]);
       wrap.appendChild(cohd);
       /* 계약 기록 표 — ☐·# 맨 앞, 선택 지우기 (목록 관례) */
@@ -1846,6 +2110,20 @@
         el('button', { type: 'button', 'class': 'pod-b', text: '📥', title: '내려받기', onclick: function () { host.download(d.fileId, d.title); } }),
         el('button', { type: 'button', 'class': 'pod-b', 'aria-label': '미리보기 닫기', text: '×', onclick: function () { S.dsel = null; draw(); } })]));
       box.appendChild(el('div', { style: 'padding:4px 10px 6px;font-size:11.5px;color:#64748b;border-bottom:1px solid #f1f5f9', text: (d.date || '날짜 없음') + ' · ' + (d.src === 'photo' ? '사진첩' : d.src === 'folder' ? 'PC 폴더' : '업로드') }));
+      var selCoObj = S.cos.filter(function (c) { return c.key === S.sel; })[0] || { key: S.sel, name: coName(S.sel), bz: '' };
+      var linkedRec = S.recs.filter(function (x) { return x.docId === d.id; })[0] || S.recs[0] || null;
+      if (host.editCoHwp || host.fillFromCo || host.registerForm) {
+        box.appendChild(el('div', { 'class': 'pod-arc-acts' }, [
+          host.editCoHwp ? el('button', { type: 'button', 'class': 'pod-b p', text: '✏ 한글로 수정·변경', title: '내장 한글 편집기로 열어 고친 뒤 새 변경·갱신 계약서로 저장·발송합니다(원본 보존)',
+            onclick: function () { host.editCoHwp(selCoObj, d, linkedRec, function () { load(true); loadIndex(); }); } }) : null,
+          host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b g', text: '📝 양식으로 변경·갱신', title: '이 계약의 업체·금액·종류를 표준 계약서 양식에 자동 채워 엽니다',
+            onclick: function () { host.fillFromCo(selCoObj, d, linkedRec, false); } }) : null,
+          host.fillFromCo ? el('button', { type: 'button', 'class': 'pod-b', text: '📑 변경합의서', title: '계약 변경·연장 합의서 양식에 자동 채워 엽니다',
+            onclick: function () { host.fillFromCo(selCoObj, d, linkedRec, true); } }) : null,
+          host.registerForm ? el('button', { type: 'button', 'class': 'pod-b', text: '📄 양식 등록', title: '이 계약서를 공용 양식에 등록합니다',
+            onclick: function () { host.registerForm(d, d.kind || guessDocKind(d.title), selCoObj, linkedRec); } }) : null
+        ]));
+      }
       box.appendChild(body);
       if (!host.fileBytes) { body.textContent = '미리보기 길이 연결되지 않았습니다'; return; }
       var want = d;

@@ -637,6 +637,60 @@
     return { rows: rows, counts: counts };
   }
 
+  /* 개인입금 사업 종류 — 대표 지시 2026-11-11 「이알피 컨설팅에 개인입금이 있다 … 다른 정부사업 개인입금 사업은 자동으로 여기에 연결」
+     이알피(pu-erp.html erpPersonalDepositInfo)와 «같은 잣대»로 본다 — 두 군데가 다르면 이알피에서 개인입금인데 정산에는 안 올라온다.
+       · 유형 스위치(biz_cons_types.personalDeposit) 가 켜진 사업 종류 → 그 유형은 늘 올린다(why 'type')
+       · 컨설팅 한 건: personalDepositMode 'off' = 법인(예외) · 'on' = 개인입금 · 옛 personalDeposit:true = 개인입금 · 아니면 유형을 따른다
+         → 개인입금인 컨설팅이 range(그 해)에 걸쳐 있으면 그 컨설팅의 사업 종류도 올린다(why 'consulting')
+     biz = [{code, personal}] — 숨김·합친 유형은 부르는 쪽에서 이미 뺀다. 모르는 코드(biz 에 없는 종류)는 이름을 못 붙이므로 올리지 않는다.
+     종류 코드는 이알피 erpConsTypeCodeOf 와 같다 — typeCode, 없으면 typeCodes.consulting(그 건이 consulting 을 품을 때만).
+     ⚠ 컨설팅정산은 data/consultings(컨설팅)만 읽는다 — 이알피가 개인입금으로 보는 «계약»은 여기서 보지 않는다.
+     돌려주는 것 = [{code, why, count}] (biz 순서). count = range 에 걸친 개인입금 컨설팅 수. 읽기만 한다 — 아무것도 저장하지 않는다. */
+  function personalTypes(biz, consultings, range) {
+    var typeOn = {}, order = [], from = range && range.from, to = range && range.to;
+    (biz || []).forEach(function (b) {
+      if (!b || !b.code) return;
+      var code = String(b.code);
+      if (!own(typeOn, code)) order.push(code);
+      typeOn[code] = !!b.personal;
+    });
+    var count = {}, viaConsulting = {};
+    (consultings || []).forEach(function (c) {
+      if (!c || c._deleted) return;
+      var ks = c.kinds || (c.kind ? [c.kind] : []);
+      var code = String(c.typeCode || (c.typeCodes && ks.indexOf('consulting') >= 0 ? c.typeCodes.consulting : '') || '');
+      if (!code || !own(typeOn, code)) return;
+      var mode = c.personalDepositMode || '';
+      var on = mode === 'on' ? true : mode === 'off' ? false : c.personalDeposit ? true : typeOn[code];
+      if (!on) return;
+      if (from && String(c.endDate || '9999-12-31') < from) return;
+      if (to && String(c.startDate || '') > to) return;
+      count[code] = (count[code] || 0) + 1;
+      if (!typeOn[code]) viaConsulting[code] = true;
+    });
+    return order.filter(function (code) { return typeOn[code] || viaConsulting[code]; })
+      .map(function (code) { return { code: code, why: typeOn[code] ? 'type' : 'consulting', count: count[code] || 0 }; });
+  }
+
+  /* 담당마다 한 줄 요약 — 카톡 보내기 목록(③)에서 «사람별 금액»을 먼저 보이게 한다(대표 지시 2026-11-12).
+     buildMessages 와 «같은 사람 · 같은 순서»다(같은 걸러내기 — 검사가 맞춘다). share = 몫 · used = 받은 금액 · settle = 차액(+ 추가 지급 · − 반환) · n = 사업장 수.
+     읽기만 한다 — 정산표를 바꾸지 않는다. */
+  function personTotals(run, names) {
+    names = names || {};
+    var order = [], by = {};
+    ((run && run.sites) || []).forEach(function (s) {
+      var lead = s.members.filter(function (x) { return x.role === 'lead'; })[0];
+      s.members.forEach(function (m) {
+        if (m.role !== 'staff' || !m.sid || m.settle == null) return;
+        if (!by[m.sid]) { by[m.sid] = { sid: m.sid, name: names[m.sid] || m.name || '', share: 0, used: 0, settle: 0, adjust: 0, n: 0, leadName: '' }; order.push(m.sid); }
+        var p = by[m.sid];
+        p.share += Number(m.share) || 0; p.used += Number(m.used) || 0; p.settle += Number(m.settle) || 0; p.adjust += Number(m.adjust) || 0; p.n++;
+        if (!p.leadName && lead) p.leadName = names[lead.sid] || lead.name || '';
+      });
+    });
+    return order.map(function (sid) { return by[sid]; });
+  }
+
   return {
     DEFAULT_HEAD: DEFAULT_HEAD, DEFAULT_FOOT: DEFAULT_FOOT,
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
@@ -647,6 +701,6 @@
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
     manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
     TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate,
-    monthState: monthState, reviewMonth: reviewMonth
+    monthState: monthState, reviewMonth: reviewMonth, personalTypes: personalTypes, personTotals: personTotals
   };
 });

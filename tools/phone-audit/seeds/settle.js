@@ -67,10 +67,15 @@ module.exports = {
       user_dir: { v: 명부 },
       user_accounts: { v: 명부 },
       ledger_batches,
-      biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' }] },
-      consultings: { v: consultings },
+      /* 개인입금 자동 연결 점검용 — 유형 스위치가 켜진 «가짜 일자리전환»(규칙 없음 → 빈 칸으로 올라온다) + 유형은 법인인데 이 건만 개인입금인 현장클리닉 한 건 */
+      biz_cons_types: { v: [{ code: TYPE, short: '일혁', name: '일터상생혁신', agency: '노사발전재단' }, { code: 'cons-clinic', short: '클릭', name: '현장클리닉', agency: '' },
+        { code: 'cons-jobs', short: '일자', name: '점검일자리전환', agency: '점검협회', personalDeposit: true },
+        /* 개인입금 사업이 많을 때(실제 7개) 요율표가 창 폭 안에서 잘리지 않는지 보는 가짜 유형 — 이름은 길게 */
+        ...['통합점검보호지원단', '점검기술지원컨설팅충남', '점검기초컨설팅푸른법인', '점검인사노무컨설팅북부상의', '점검사회적기업컨설팅', '점검노동전환컨설팅'].map((n, i) => ({ code: 'cons-pj' + i, short: 'P' + i, name: n, agency: '가짜기관' + i, personalDeposit: true }))] },
+      consultings: { v: consultings.concat([{ id: 'CS-P1', typeCode: 'cons-clinic', personalDepositMode: 'on', companyName: '(주)점검개인입금', companyId: 'CO-P1', no: '클릭-2026-001', startDate: '2026-05-01', endDate: '2026-12-01' }]) },
     },
-    settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts },
+    /* rooms — 한 사람만 카톡 방이 있다(사람 줄의 «💬 방» 칩과 «방 없음» 등록 칸을 둘 다 본다) */
+    settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts, rooms: { P002: { sid: 'P002', room: '점검노무 노무사(점검)' } } },
   },
   views: [
     { name: 'run', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step2 [data-run]'); } },
@@ -79,6 +84,7 @@ module.exports = {
     { name: 'inbox', run: async (p) => { await p.click('#inboxBtn'); } },
     { name: 'link', run: async (p) => { await p.click('#noticesBox [data-notice]'); } },
     { name: 'year', run: async (p) => { await p.click('#tabs button[data-tab=year]'); } },
+    { name: 'msg', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step3 .kchip'); } },
     { name: 'rules', run: async (p) => { await p.click('#tabs button[data-tab=setup]'); } },
     { name: 'kakao', run: async (p) => { await p.click('#subtabs button[data-sub=kakao]'); } },
   ],

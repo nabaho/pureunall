@@ -39,13 +39,21 @@ test('ⓑ 기본 세트 — 체당금 접수 세트가 들어오고, 지우면 �
   assert.deepEqual(ch.formIds, ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04']);
   assert.equal(ch.side, 'worker'); assert.equal(ch.groupName, '체당금');
   assert.ok(!out(P.setsOf({ v: [], rm: ['fs-chedang'] })).some((x) => x.id === 'fs-chedang'), '★ 지운 기본 세트가 되살아났습니다');
-  /* 2026-10-07 업무별 기본 세트 — 자문·급여는 이알피 계약서 출력(CONTRACT_SETS)과 같은 양식 */
-  assert.deepEqual(a.map((s) => s.id), ['fs-advisory', 'fs-payroll', 'fs-fund', 'fs-fund-company', 'fs-fund-joint', 'fs-fund-project', 'fs-union', 'fs-office', 'fs-chedang']);
-  assert.deepEqual(a.filter((s) => s.id === 'fs-advisory')[0].formIds, out(P.CONTRACT_SETS.advisory));
-  assert.deepEqual(a.filter((s) => s.id === 'fs-payroll')[0].formIds, out(P.CONTRACT_SETS.payroll));
+  /* 2026-10-07 업무별 기본 세트 + 2026-11-12 분류별 하위 세트 통합 — 자문·급여는 계약서 출력(contractPick) 때 CONTRACT_SETS 와 같고, 세트 보기에서는 동종 견적서까지 함께 묶인다 */
+  ['fs-advisory', 'fs-payroll', 'fs-fund', 'fs-fund-company', 'fs-fund-joint', 'fs-fund-project', 'fs-union', 'fs-office', 'fs-chedang'].forEach((id) => {
+    assert.ok(a.some((s) => s.id === id), id + ' 기본 세트가 없습니다');
+  });
+  const advIds = a.filter((s) => s.id === 'fs-advisory')[0].formIds;
+  const payIds = a.filter((s) => s.id === 'fs-payroll')[0].formIds;
+  out(P.CONTRACT_SETS.advisory).forEach((id) => assert.ok(advIds.indexOf(id) >= 0, '자문 세트에 ' + id + ' 빠짐'));
+  out(P.CONTRACT_SETS.payroll).forEach((id) => assert.ok(payIds.indexOf(id) >= 0, '급여 세트에 ' + id + ' 빠짐'));
+  assert.deepEqual(out(P.contractPick(P.SEED, { kinds: ['company'], typeCode: '자문', sets: a })), out(P.CONTRACT_SETS.advisory), '이알피 계약서 출력은 견적서를 빼고 계약서만 자동 체크');
+  assert.deepEqual(out(P.contractPick(P.SEED, { kinds: ['company'], typeCode: '급여', sets: a })), out(P.CONTRACT_SETS.payroll), '이알피 급여 계약서 출력은 견적서를 빼고 계약서만 자동 체크');
+  P.KINDS.forEach((k) => assert.ok(P.setsForKind(a, P.SEED, k.v).length >= 1, k.label + ' 하위 세트가 없습니다'));
+  const defaultIds = a.map((s) => s.id);
   const mine = { id: 'fs-1', name: '부해 세트', formIds: ['x'] };
-  assert.deepEqual(out(P.setsOf({ v: [mine], rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-fund-company', 'fs-fund-joint', 'fs-fund-project', 'fs-union', 'fs-office', 'fs-chedang']);
-  assert.deepEqual(out(P.setsOf({ v: { 0: mine }, rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-fund-company', 'fs-fund-joint', 'fs-fund-project', 'fs-union', 'fs-office', 'fs-chedang'], '열쇠 지도 꼴도 읽는다');
+  assert.deepEqual(out(P.setsOf({ v: [mine], rm: [] })).map((s) => s.id), ['fs-1'].concat(defaultIds));
+  assert.deepEqual(out(P.setsOf({ v: { 0: mine }, rm: [] })).map((s) => s.id), ['fs-1'].concat(defaultIds), '열쇠 지도 꼴도 읽는다');
 });
 
 test('ⓐ ★★ changeSets — 서버 최신본 위에 한 건만, u 를 올린다', async () => {
