@@ -813,6 +813,9 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 @media (max-width:900px){ #hcBody .hc-use{max-width:200px} }   /* 태블릿 폭에서도 여섯 칸이 창 안에 들어오게 */
 @media (min-width:761px){ #hcBody .dt{max-height:min(48vh,420px);overflow:auto} #hcBody .dt thead th{top:0} }
 @media (max-width:520px){ #modalHrCert .modal{max-height:calc(100vh - 48px);display:flex;flex-direction:column} #modalHrCert .modal-b{overflow:auto;min-height:0;flex:1 1 auto} }   /* 폰: 줄이 수십 건이어도 «넣기» 단추는 창 아래에 그대로 — 본문만 스크롤 */   /* 줄이 많아도 제목·고르기 줄·끝 단추가 밀려 나가지 않게 — 목록만 스크롤 */
+/* 고르기 줄·고른 줄 — 어두운 판에서 «밝은 바탕에 밝은 글자»가 되어 N건 선택·고른 줄 글자가 묻힌다(2026-11-14 증명서 표 점검에서 발견: 대비 1.18:1). 모든 목록의 같은 옷이라 한 곳에서 맞춘다 */
+html.dark .sel-bar{background:var(--soft);border-color:var(--border);color:var(--text)}
+html.dark .dt tbody tr.sel-on{background:var(--hover)!important;box-shadow:inset 3px 0 0 var(--blue)}
 html.dark #hcSel{background:var(--soft);border-color:var(--border);color:var(--text)}
 /* 어두운 판 — 공용 표(.dt)는 칸 글자(#1e293b)·머리글 바탕(#f8fafc)이 박혀 있어 폰 카드(바탕 var(--card)=어두움)에서 글자가 묻힌다(자동 검토 2026-11-12). 이 기능이 다루는 두 표만 따로 맞춘다 */
 html.dark #hcBody .dt table,html.dark #cdBody .dt table{background:var(--card)}
@@ -821,14 +824,12 @@ html.dark #hcBody .dt thead th,html.dark #cdBody .dt thead th{background:#1e293b
 html.dark #modalHrCert .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}   /* 기본 단추는 흰 바탕이라 어두운 판에서 밝은 글자가 묻힌다 */   /* 고르기 줄은 밝은 바탕이 박혀 있어 어두운 판에서 글자가 묻힌다 */
 /* 직원 «보기 전용» 화면(body.kc-staff)은 대표 기록을 고치는 손잡이를 다 감춘다(위 330~341줄) — 증명서를 보관함에 넣는 이 단추도 같다. hrCertOpen 도 대표가 아니면 열리지 않는다 */
 body.kc-staff #hcOpenBtn{display:none!important}
-/* 증명서 보관함 표(#cdBody)는 번호 칸이 없어 «첫 칸»이 종류다 — 직원 보기가 공용 표의 첫 칸을 감추면(위 337~338줄) 종류·발급번호가 통째로 사라진다 */
-body.kc-staff #cdBody .dt th:first-child,body.kc-staff #cdBody .dt td:first-child{display:table-cell!important}
-@media (max-width:520px){ body.kc-staff #cdBody .dt td:first-child{display:flex!important} }   /* 폰 카드의 칸은 flex(이름표 + 값) */
+/* 증명서 보관함 표(#cdBody)의 첫 칸은 이제 ☐ + № 칸이다 — 직원 «보기 전용»에서는 다른 표처럼 감춘다(위 337~338줄). 종류·발급번호는 둘째 칸이라 남는다 */
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
 #hcBody tr.hc-gone td{opacity:.75}
 #hcBody .dt thead th:last-child{width:auto;min-width:96px}   /* 공용 표는 맨 끝 칸(관리)을 200px 로 잡는다 — 여기 끝 칸은 짧은 «상태» 칩이라 좁게 */
-#cdBody tr.hc-canceled td:not(:first-child):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
+#cdBody tr.hc-canceled td:nth-child(n+3):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
 @media (max-width:760px){ .hc-btx{display:none} .hc-hint{display:none} }
 #mrBody .btn:disabled{opacity:.5;cursor:default}
 #mrBody tr.mr-over td:first-child{box-shadow:inset 3px 0 0 var(--red)}
@@ -8389,13 +8390,17 @@ function _cdTable(rows, D){
   /* ★ 공용 표 옷(.dt)을 입힌다 — 폰에서는 칸 이름표가 붙은 카드로 접힌다(renderDocStore 가 stampCellLabels 를 부른다).
      그냥 <table> 이면 폰에서 칸이 짓눌려 글자가 세로로 쌓이고, 인사관리에서 당겨온 줄(한 줄 칸·붙이기 단추)이 들어오면 페이지가 옆으로 밀린다(2026-11-12 검증).
      ⚠ 예전에는 끝에 stampCellLabels(box) 가 있었으나 return 뒤라 한 번도 돌지 않았다(box 도 없다) — 지웠다. */
+  /* ★ 맨 왼쪽은 ☐ 고르기 칸 + 번호(대표 지시 2026-10-05 · docs/규칙/고르기칸-번호.md) — 번호는 «지금 보이는 순서»(거르면 다시 매기고, 저장하거나 열쇠로 쓰지 않는다).
+     머리줄 ☐ 는 지금 보이는 줄 전체. 고르기 줄(N건 선택)·끌어 고르기·삭제(휴지통)는 카드 보관함과 같은 길(docSelSync·docSelAll·docSelDel)이다 */
   return '<div class="dt" style="overflow-x:auto"><table><thead><tr>'
+    + '<th class="rownum-h"><input type="checkbox" class="ds-all" onchange="docSelAll(\'certdoc\',this.checked)" title="지금 보이는 줄 전체 선택" aria-label="지금 보이는 증명서 전체 선택"> №</th>'
     + ['종류','발급기관','발급일','증명기간','용도·제출처','원본','제출','관리'].map(function(h){ return '<th>'+h+'</th>'; }).join('')
     + '</tr></thead><tbody>'
-    + rows.map(function(r){
+    + rows.map(function(r, i){
         var org = r.issuer || r.org || '-';
         var hr = _cdSrc(r) === 'hr';          /* 🏢 푸른인사관리에서 당겨온 줄 (hrCert*) */
         return '<tr' + (hr && r.hrCanceled ? ' class="hc-canceled"' : '') + '>'
+          + '<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" value="' + _jsAttr(r.id) + '" aria-label="' + escapeHtml((r.kind||'증명서') + ' ' + (formatDate(r.date)||r.year||'') + ' 고르기') + '" onchange="docSelSync(\'certdoc\')"><span>' + (i + 1) + '</span></label></td>'
           + '<td' + (hr ? ' style="white-space:nowrap"' : '') + '><strong>' + escapeHtml(r.kind||'-') + '</strong>' + (hr ? _hcBadge(r) : '') + '</td>'
           + '<td style="white-space:nowrap">' + escapeHtml(org) + '</td>'
           + '<td style="white-space:nowrap">' + escapeHtml(formatDate(r.date)||r.year||'-') + '</td>'
@@ -8897,17 +8902,16 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
     rows=rows.slice().sort(function(a,b){ return String((b.date||b.year||'')).localeCompare(String(a.date||a.year||'')); });
   }
   if(!rows.length){ body.innerHTML=cdBar+'<div class="empty"><div class="emp-ico">📭</div>보관된 '+D.label+'이(가) 없습니다</div>'; return; }
-  if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); _safe(function(){ stampCellLabels(body); }); return; }   /* 폰에서 칸 이름표가 붙은 카드로 접힌다(.dt) */
+  if(D.tableView){
+    body.innerHTML=cdBar+_dsSelBarHtml(domain)+_cdTable(rows,D);   /* 다시 그리면 고른 것은 비워진다 — 화면을 떠났다 돌아와도, 검색·거르기를 바꿔도 */
+    _safe(function(){ stampCellLabels(body); });                     /* 폰에서 칸 이름표가 붙은 카드로 접힌다(.dt) */
+    _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });   /* 끌어서 여러 줄 고르기 */
+    _safe(function(){ docSelSync(domain); });
+    return; }
   /* ★ № 넘버링 + ㅁ 고르기 (대표 지시 2026-09-28) — 번호는 해를 «통틀어» 이어 센다
      (해마다 1번이 있으면 가리킬 수 없다 — 작성 중 목록과 같은 까닭). 옷은 목록 화면과 같다. */
   let 번호=0;
-  const dsBar='<div class="sel-bar" id="dsSel-'+domain+'" style="display:none;position:static;margin:4px 0 8px">'
-    +'<b id="dsSelCnt-'+domain+'">0건 선택</b>'
-    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',true)">전체 선택</button>'
-    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',false)">선택 해제</button>'
-    +'<span style="flex:1"></span>'
-    +'<button class="btn sm" type="button" onclick="docSelDl(\''+domain+'\')">⬇ 선택 내려받기</button>'
-    +'<button class="btn sm" type="button" style="color:var(--red)" onclick="docSelDel(\''+domain+'\',this)">🗑 선택 삭제</button></div>';
+  const dsBar=_dsSelBarHtml(domain);
   const allChk='<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mute);cursor:pointer;margin-top:6px">'
     +'<input type="checkbox" class="ds-all" onchange="docSelAll(\''+domain+'\',this.checked)"> 전체 선택</label>';
   /* ★ 기관별 묶음 + 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C)
@@ -9225,6 +9229,17 @@ function openDocDlLog(domain,id){
   document.body.appendChild(p);
 }
 /* ── ㅁ 고른 것 — 목록 화면·작성 중 목록과 같은 얼개 ── */
+/* 고른 뒤에 뜨는 줄 — 「N건 선택」과 할 일. 고르기만으로는 아무것도 안 바뀐다(규칙: docs/규칙/고르기칸-번호.md).
+   카드 보관함(이력서·프로필·비용 서류)과 증명서 표(_cdTable)가 «같은 줄»을 쓴다 — docSelSync 가 이 id(dsSel-·dsSelCnt-)를 본다 */
+function _dsSelBarHtml(domain){
+  return '<div class="sel-bar" id="dsSel-'+domain+'" style="display:none;position:static;margin:4px 0 8px">'
+    +'<b id="dsSelCnt-'+domain+'">0건 선택</b>'
+    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',true)">전체 선택</button>'
+    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',false)">선택 해제</button>'
+    +'<span style="flex:1"></span>'
+    +'<button class="btn sm" type="button" onclick="docSelDl(\''+domain+'\')">⬇ 선택 내려받기</button>'
+    +'<button class="btn sm" type="button" style="color:var(--red)" onclick="docSelDel(\''+domain+'\',this)">🗑 선택 삭제</button></div>';
+}
 function _docSelBox(domain){ var D=DOMAINS[domain]; return D?document.getElementById(D.body):null; }
 function docSelIds(domain){
   var b=_docSelBox(domain); if(!b) return [];
@@ -9233,7 +9248,7 @@ function docSelIds(domain){
 function docSelSync(domain){
   var b=_docSelBox(domain); if(!b) return;
   var 전부=b.querySelectorAll('.row-chk'), 고른=docSelIds(domain);
-  [].forEach.call(전부, function(c){ var card=c.closest('.ds-card'); if(card) card.classList.toggle('sel-on', c.checked); });
+  [].forEach.call(전부, function(c){ var card=c.closest('.ds-card')||c.closest('tr'); if(card) card.classList.toggle('sel-on', c.checked); });   /* 카드는 .ds-card, 증명서 표는 tr */
   var bar=document.getElementById('dsSel-'+domain); if(bar) bar.style.display=고른.length?'':'none';
   var cnt=document.getElementById('dsSelCnt-'+domain); if(cnt) cnt.textContent=고른.length+'건 선택';
   var all=b.querySelector('.ds-all'); if(all){ all.checked=!!전부.length && 고른.length===전부.length; all.indeterminate=고른.length>0 && 고른.length<전부.length; }

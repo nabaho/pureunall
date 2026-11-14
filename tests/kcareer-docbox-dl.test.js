@@ -73,7 +73,7 @@ function 세상(o) {
   vm.createContext(ctx);
   vm.runInContext([SRC.match(/var DOC_DL_MAX=\d+;/)[0], SRC.match(/var _dsFold=[^\n]*\n/)[0], SRC.match(/var DS_PV_DEF=[^\n]*\n/)[0], SRC.match(/var _dsVer=[^\n]*\n/)[0],
     ...['function renderDocStore(', 'function _dsHeadPark(', 'function _dsHeadDock(', 'function _docDlTag(', 'async function docDl(', 'function openDocDlLog(',
-      'function _docSelBox(', 'function docSelIds(', 'function docSelSync(', 'function docSelAll(', 'async function docSelDl(',
+      'function _dsSelBarHtml(', 'function _docSelBox(', 'function docSelIds(', 'function docSelSync(', 'function docSelAll(', 'async function docSelDl(',
       'function docSelDel(', 'function showBig(',
       /* 2026-09-29 기관별 묶음·미리보기 도우미 */
       'function _docDlInline(', 'function _dsDay(', 'function _dsShort(', 'function dsTitleOf(', 'function dsPrevDraw(', 'function dbToolsMount(', 'function dsPvWidth(', 'function dsDupKey(', 'function dsDupClusters(', 'function dsDupSummary(', 'function dsSameCheck(', 'function _docTrashIds('].map(떼기)].join('\n').replace(/^(\s*)const /gm, '$1var '), ctx);
