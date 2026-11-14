@@ -181,7 +181,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=42"></script>
+  <script src="js/pu-appbar.js?v=43"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -218,7 +218,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=95"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -237,6 +237,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <script src="js/pu-sanjae-cases.js?v=2"></script>
+<script src="js/pu-harass-core.js?v=6"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
@@ -37498,7 +37499,12 @@ function CaseDetailModal(props){
          그 자리에서 찾는다(js/pu-sanjae-cases.js). 고른 사례는 이 사건의 업무 메모(case_memos)에 출처와 함께 붙는다. */
       erpIsInjuryCase(c, t) && window.PuSanjae ? ['산재 사례', h('button', { onClick:function(){ window.PuSanjae.open({ kind:'jil', q:window.PuSanjae.guessQuery(c),
           onAttach:function(txt){ erpCaseMemoAdd(c.id, '⚖ 참고 사례 — ' + txt); } }); },
-        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null,
+      /* 🛡️ 괴롭힘·성희롱 조사 전용 연동 — 조사 사건일 때 조사실·보고서 바로가기 단추 노출 */
+      (window.PuHarassCore && window.PuHarassCore.isErpInvestigateCase(c, caseTypes)) ? ['조사실·보고서', h('a', {
+        href:'pu-harass.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🛡️ 조사실·보고서 열기 ›')] : null
     ].filter(function(x){ return x; })
   };
 
@@ -37530,11 +37536,33 @@ function CaseDetailModal(props){
     ]
   } : null;
 
+  var harassSection = (c.harassSummary && Array.isArray(c.harassSummary.steps)) ? {
+    icon:'🛡️',
+    title:'괴롭힘·성희롱 조사 진행과정 (' + Number(c.harassSummary.doneCount || 0) + '/' + Number(c.harassSummary.totalCount || 8) + '단계 · ' + Number(c.harassSummary.progressPct || 0) + '%)',
+    bg:'#eff6ff', border:'#bfdbfe', headColor:'#1e40af', headBorder:'#2563eb',
+    rows:[
+      ['현재 단계', h('span', { style:{ fontWeight:700, color:'#1e40af' } }, (c.harassSummary.currentStepName || '진행 중') + ' · 수집 공문 ' + Number(c.harassSummary.mailCount || 0) + '건')],
+      c.harassSummary.verdictSummary ? ['종합 판단', h('span', { style:{ background:'#fff', color:'#1e293b', border:'1px solid #cbd5e1', borderRadius:'4px', padding:'2px 8px', fontSize:'11px', fontWeight:700 } },
+        (window.PuHarassCore && window.PuHarassCore.VERDICTS && window.PuHarassCore.VERDICTS[c.harassSummary.verdictSummary] ? window.PuHarassCore.VERDICTS[c.harassSummary.verdictSummary].label : c.harassSummary.verdictSummary))] : null,
+      ['8단계 현황', h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px' } },
+        c.harassSummary.steps.map(function(st){
+          var done = !!st.done;
+          return h('span', { key:st.code || String(st.no), style:{
+            background: done ? '#f0fdf4' : '#f8fafc',
+            color: done ? '#166534' : '#64748b',
+            border: '1px solid ' + (done ? '#bbf7d0' : '#e2e8f0'),
+            borderRadius:'4px', padding:'2px 7px', fontSize:'11px', fontWeight: done ? 700 : 500
+          } }, (done ? '✓ ' : '○ ') + st.no + '.' + st.short + (st.date ? ' (' + st.date.slice(5) + ')' : ''));
+        })
+      )]
+    ].filter(function(x){ return x; })
+  } : null;
+
   return h(UnifiedDetailModal, {
     cur: c,
     headerIcon: '⚖️',
     headerTitle: c.caseNo + ' - ' + c.companyName,
-    extraSections: [moduleSection, feeSection].concat(jurSection ? [jurSection] : []),
+    extraSections: [moduleSection].concat(harassSection ? [harassSection] : []).concat([feeSection]).concat(jurSection ? [jurSection] : []),
     finIncomes: finIncomes,
     extraFooter: h('button', {
       type:'button',
@@ -37847,6 +37875,224 @@ function erpCaseMemoMigrate(){
 }
 window.erpCaseMemoMigrate = erpCaseMemoMigrate;
 try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ try { erpCaseMemoMigrate(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, 5000); }); } catch(e){}
+
+/* 🛡️ 괴롭힘·성희롱 조사(pu-harass.html) → 푸른이알피 자동 동기화 (2026-11-11)
+   harass_invest/erp_sync/{hid} 에 올라온 8단계 진행현황·일정·요약·공문 타임라인 메모를
+   이알피 사건(data/cases)과 업무 메모(case_memos)에 반영하고 erp_ack/{hid} 에 수신 확인을 남긴다.
+   ⚠ 주의: 함수 본문 중괄호 절단 검사 보호를 위해 정규식 수량자 중괄호를 쓰지 않는다. */
+var _erpHarassSyncBusy = Object.create(null);
+var _erpHarassWatchAttached = false;
+async function erpApplyHarassSyncOne(hid, sync, ackMap, caseMap){
+  if(!hid || !sync || typeof sync !== 'object' || sync._deleted) return false;
+  if(!fbDb || !window.PuHarassCore || (typeof _fbSynced !== 'undefined' && !_fbSynced)) return false;
+  if(typeof PU_APP !== 'undefined' && PU_APP !== 'erp') return false;
+  if(_erpHarassSyncBusy[hid]) return false;
+  var caseRec = caseMap && caseMap[hid];
+  if(!caseRec || typeof caseRec !== 'object' || caseRec._deleted) return false;
+  var C = window.PuHarassCore;
+  var curMe = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? {
+    sid: String(CURRENT_USER.sid || ''),
+    isAdmin: !!(CURRENT_USER.isAdmin || CURRENT_USER.isOwner || CURRENT_USER.role === 'admin')
+  } : null;
+  if(!C.canAccessSecret(caseRec, curMe)) return false;
+  var canonical = C.buildErpSyncPayload(caseRec);
+  if(!canonical) return false;
+  var ack = ackMap && ackMap[hid];
+  var syncRev = Number(sync.revision || 0);
+  if(syncRev <= 0) return false;
+  var ackRev = ack ? Number(ack.syncedRevision || 0) : 0;
+  var detId = 'c-hi-' + C.safeKey(hid);
+  var allCases = dbGet('cases', []) || [];
+  /* ★ ACK 의 erpCaseId 는 연결 대상 탐색에 절대 신뢰하지 않고 사건 원장(caseRec.erpCaseId) 또는 결정적 ID·연결표식만 사용한다 */
+  var wantErpId = String(caseRec.erpCaseId || '');
+  var anyMatch = allCases.find(function(x){
+    if(!x) return false;
+    if(wantErpId && x.id === wantErpId) return true;
+    return x.id === detId || x.harassCaseId === hid;
+  });
+  if(anyMatch && anyMatch._deleted) return false; // 휴지통에 버려진 사건은 되살리지 않는다
+  if(anyMatch){
+    /* 타 업무 사건이나 다른 회사 사건을 잘못 덮어쓰는 우회를 차단한다 */
+    var caseTypes = typeof getCaseTypes === 'function' ? getCaseTypes() : [];
+    if(!C.isErpInvestigateCase(anyMatch, caseTypes)) return false;
+    if(anyMatch.harassCaseId && anyMatch.harassCaseId !== hid) return false;
+    if(anyMatch.companyId && canonical.companyId && anyMatch.companyId !== canonical.companyId) return false;
+  }
+  if(anyMatch && ack && ackRev === syncRev && ack.erpCaseId === anyMatch.id && anyMatch.harassSummary) return false;
+
+  _erpHarassSyncBusy[hid] = true;
+  try {
+    var nowIso = (new Date()).toISOString();
+    var targetCase = null;
+    if(!anyMatch){
+      var newCase = {
+        id: detId,
+        caseNo: genCaseNo('case-investigate'),
+        typeCode: 'case-investigate',
+        companyId: String(canonical.companyId || ''),
+        companyName: String(canonical.companyName || '(미지정 사업장)'),
+        bizNo: String(canonical.bizNo || ''),
+        managerMain: String(canonical.managerMain || ''),
+        managerSubs: Array.isArray(canonical.managerSubs) ? canonical.managerSubs.slice(0, 5) : [],
+        entityType: 'Case',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        receiveDate: String(canonical.receiveDate || nowIso.slice(0, 10)),
+        dueDate: String(canonical.dueDate || ''),
+        closeDate: String(canonical.closeDate || ''),
+        status: String(canonical.erpStatus || 'pending'),
+        brief: String(canonical.erpBrief || ''),
+        note: C.mergeErpNote('', canonical.erpNoteBlock || ''),
+        harassCaseId: hid,
+        harassSummary: canonical.harassSummary || null
+      };
+      if(typeof CompanyRef !== 'undefined' && CompanyRef && typeof CompanyRef.attachId === 'function' && !newCase.companyId){
+        try { CompanyRef.attachId(newCase); } catch(_){}
+      }
+      if(!dbUpsert('cases', newCase)) return false;
+      targetCase = newCase;
+    } else {
+      var patch = {
+        updatedAt: nowIso,
+        harassCaseId: hid,
+        harassSummary: canonical.harassSummary || null,
+        brief: String(canonical.erpBrief || anyMatch.brief || ''),
+        note: C.mergeErpNote(anyMatch.note || '', canonical.erpNoteBlock || ''),
+        dueDate: String(canonical.dueDate || ''),
+        closeDate: String(canonical.closeDate || '')
+      };
+      if(canonical.erpStatus) patch.status = String(canonical.erpStatus);
+      if(!anyMatch.receiveDate && canonical.receiveDate) patch.receiveDate = String(canonical.receiveDate);
+      if(!anyMatch.managerMain && canonical.managerMain) patch.managerMain = String(canonical.managerMain);
+      if(!dbPatch('cases', anyMatch.id, patch)) return false;
+      targetCase = Object.assign({}, anyMatch, patch);
+    }
+
+    var syncMemos = Array.isArray(canonical.memos) ? canonical.memos : [];
+    if(syncMemos.length){
+      var curMemos = (dbGet(CASE_MEMO_KEY, []) || []).slice();
+      var idxById = Object.create(null);
+      curMemos.forEach(function(m, idx){ if(m && m.id) idxById[String(m.id)] = idx; });
+      var addedMemos = [];
+      var memoDirty = false;
+      syncMemos.forEach(function(mm){
+        if(!mm) return;
+        var mid = String(mm.memoKey || '');
+        if(!mid || /[.#$\[\]\/]/.test(mid)) return;
+        var txt = String(mm.text || '').trim();
+        if(!txt) return;
+        var atIso = mm.date ? (String(mm.date).slice(0, 10) + 'T09:00:00.000Z') : nowIso;
+        var hitIdx = idxById[mid];
+        if(hitIdx === undefined){
+          addedMemos.push({
+            id: mid, entityType: 'case_memo', caseId: targetCase.id, text: txt,
+            author: '조사자동연동', authorSid: String(canonical.managerMain || ''),
+            at: atIso, createdAt: atIso, updatedAt: nowIso, harassSync: true
+          });
+          memoDirty = true;
+        } else {
+          var prevMemo = curMemos[hitIdx];
+          if(prevMemo && !prevMemo._deleted && (prevMemo.text !== txt || prevMemo.caseId !== targetCase.id)){
+            curMemos[hitIdx] = Object.assign({}, prevMemo, { caseId: targetCase.id, text: txt, updatedAt: nowIso });
+            memoDirty = true;
+          }
+        }
+      });
+      if(memoDirty){
+        if(!dbSet(CASE_MEMO_KEY, addedMemos.concat(curMemos))){
+          try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: 'cases' })); } catch(_){}
+          return false;
+        }
+        try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: CASE_MEMO_KEY })); } catch(_){}
+      }
+    }
+
+    try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: 'cases' })); } catch(_){}
+
+    if(!window.PuOntologyWrite || typeof window.PuOntologyWrite.createGateway !== 'function') return false;
+    var actorSid = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) ? CURRENT_USER.sid : 'erp';
+    var gw = window.PuOntologyWrite.createGateway({ mode: 'enforce', actor: actorSid });
+
+    if(caseRec.erpCaseId !== targetCase.id || caseRec.erpCaseNo !== targetCase.caseNo){
+      try {
+        await gw.save(fbDb.ref('harass_invest/cases/' + hid), function(prev){
+          var baseObj = (prev && typeof prev === 'object') ? prev : caseRec;
+          return Object.assign({}, baseObj, {
+            erpCaseId: targetCase.id,
+            erpCaseNo: String(targetCase.caseNo || ''),
+            sourceKind: 'case',
+            sourceId: targetCase.id
+          });
+        }, { entityType: 'Case', allowPendingCompany: true });
+      } catch(_){}
+    }
+
+    var ackRes = await gw.save(fbDb.ref('harass_invest/erp_ack/' + hid), function(prev){
+      return Object.assign({}, prev || {}, {
+        id: hid,
+        harassCaseId: hid,
+        erpCaseId: targetCase.id,
+        erpCaseNo: String(targetCase.caseNo || ''),
+        syncedRevision: syncRev,
+        syncedAt: Date.now(),
+        sourceKind: 'case',
+        sourceId: targetCase.id
+      });
+    }, { entityType: 'Task', allowPendingCompany: true });
+    if(!ackRes || ackRes.committed === false) return false;
+    return true;
+  } catch(err){
+    if(window._erpErrLog) window._erpErrLog(err);
+    return false;
+  } finally {
+    delete _erpHarassSyncBusy[hid];
+  }
+}
+
+async function erpHarassInvestSync(){
+  if(!fbDb || !window.PuHarassCore || (typeof _fbSynced !== 'undefined' && !_fbSynced)) return 0;
+  if(typeof PU_APP !== 'undefined' && PU_APP !== 'erp') return 0;
+  try {
+    var snaps = await Promise.all([
+      fbDb.ref('harass_invest/erp_sync').once('value'),
+      fbDb.ref('harass_invest/erp_ack').once('value'),
+      fbDb.ref('harass_invest/cases').once('value')
+    ]);
+    var syncMap = (snaps[0] && snaps[0].val()) || {};
+    var ackMap = (snaps[1] && snaps[1].val()) || {};
+    var caseMap = (snaps[2] && snaps[2].val()) || {};
+    var keys = Object.keys(syncMap);
+    var count = 0;
+    for(var i = 0; i < keys.length; i++){
+      var k = keys[i];
+      if(await erpApplyHarassSyncOne(k, syncMap[k], ackMap, caseMap)) count++;
+    }
+    if(!_erpHarassWatchAttached){
+      _erpHarassWatchAttached = true;
+      var onLive = function(snap){
+        if(!snap) return;
+        var k = snap.key, v = snap.val();
+        if(!k || !v) return;
+        Promise.all([
+          fbDb.ref('harass_invest/erp_ack/' + k).once('value'),
+          fbDb.ref('harass_invest/cases/' + k).once('value')
+        ]).then(function(pair){
+          var am = {}; am[k] = pair[0] ? pair[0].val() : null;
+          var cm = {}; cm[k] = pair[1] ? pair[1].val() : null;
+          erpApplyHarassSyncOne(k, v, am, cm);
+        }).catch(function(){});
+      };
+      fbDb.ref('harass_invest/erp_sync').on('child_added', onLive);
+      fbDb.ref('harass_invest/erp_sync').on('child_changed', onLive);
+    }
+    return count;
+  } catch(e){
+    if(window._erpErrLog) window._erpErrLog(e);
+    return 0;
+  }
+}
+window.erpHarassInvestSync = erpHarassInvestSync;
+try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ try { erpHarassInvestSync(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, 3500); }); } catch(e){}
 /* 산재 사건인가 — 유형 코드 case-injury(산재등) 또는 약어 「산재」 */
 function erpIsInjuryCase(c, t){
   return !!c && (c.typeCode === 'case-injury' || !!(t && /산재/.test(String(t.short || t.name || ''))));

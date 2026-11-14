@@ -45,7 +45,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=95"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -3925,7 +3925,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=42"></script>
+  <script src="js/pu-appbar.js?v=43"></script>
   <script src="js/pu-handoff.js?v=2"></script>
   <script src="js/pu-doc-pick.js?v=2"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -8701,6 +8701,51 @@ function closeMailPage(){
   }
   state.view='list'; render();
 }
+/* ══════ 글자를 치는 중인 검색칸은 «그대로 둔 채» 나머지만 갈아 끼운다 ══════
+   (대표 지시 2026-11-14 「검색기능이 이상하다 제대로 작동 잘 안한다」)
+   ★ 까닭 — 검색칸에 한 글자 칠 때마다 메일 화면 «전체»를 다시 그렸다(el.innerHTML = …). 검색칸 자신도 새로
+     만들어져 커서가 풀렸다 — 「s」 한 글자만 들어가고 다음 글자는 어디에도 안 들어갔다
+     (2026-11-14 재현: 한 글자 친 뒤 활성 요소가 BODY). 한글은 더 나쁘다 — 글자를 «조합하는 중»에 칸이
+     바뀌면 입력기가 깨진다. 수신기록·사업장별·보낸 메일·폰 검색칸도 같은 모양이었다.
+   ★ 그래서 data-keep 표가 붙은 칸에 «지금 커서가 있으면» 그 칸과 그 조상 줄기는 그대로 두고, 줄기의
+     «옆 가지»(목록·단추·쪽수…)만 새 그림으로 갈아 끼운다. 칸이 그대로라 커서·글자 조합·되돌리기(Ctrl+Z)가 산다.
+   ⚠ 새 그림에서 같은 표의 칸을 못 찾거나 줄기 모양(깊이·꼬리표)이 다르면 «예전처럼 통째로» 그린다 —
+     안 맞는 줄기를 억지로 맞추지 않는다. 커서가 그 칸에 없을 때(다른 곳을 눌렀을 때)도 예전 그대로다.
+   ⚠ 칸의 글자(value)는 건드리지 않는다. 다만 코드가 값을 바꿨으면(칸에 든 글과 새 그림의 글이 다르면) 새 값을 따른다. */
+function mailPaintAttrs(o, n){
+  Array.from(o.attributes || []).forEach(a=>{ if(!n.hasAttribute(a.name)) o.removeAttribute(a.name); });
+  Array.from(n.attributes || []).forEach(a=>{ if(o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value); });
+}
+function mailPaint(el, html){
+  const ae = (typeof document !== 'undefined') ? document.activeElement : null;
+  const mark = (ae && ae.getAttribute && el.contains && el.contains(ae)) ? ae.getAttribute('data-keep') : '';
+  if(!mark){ el.innerHTML = html; return false; }
+  const tmp = document.createElement('div'); tmp.innerHTML = html;
+  const withMark = (root)=>Array.from(root.querySelectorAll('[data-keep]')).filter(x=>x.getAttribute('data-keep') === mark);
+  const news = withMark(tmp), olds = withMark(el);
+  /* ⚠ 같은 표의 칸이 한 화면에 «둘 이상»이면 어느 칸이 어느 칸인지 못 정한다(커서가 다른 칸 자리로 옮겨 간다) → 통째로 */
+  const nw = (news.length === 1 && olds.length === 1) ? news[0] : null;
+  const prevQ = ae.getAttribute('value') || '';      /* 직전에 그려 둔 검색어 — 줄기 속성을 맞추기 «전에» 읽는다 */
+  const chain = (n, top)=>{ const a = []; for(; n && n !== top; n = n.parentNode) a.push(n); return a; };
+  const oc = nw ? chain(ae, el) : [], nc = nw ? chain(nw, tmp) : [];
+  if(!nw || oc.length !== nc.length || oc.some((n,i)=>n.tagName !== nc[i].tagName)){ el.innerHTML = html; return false; }
+  for(let i = 0; i < oc.length; i++){
+    const o = oc[i], n = nc[i], parent = o.parentNode, nparent = n.parentNode;
+    while(parent.firstChild !== o) parent.removeChild(parent.firstChild);        /* 옛 앞 가지 */
+    while(o.nextSibling) parent.removeChild(o.nextSibling);                      /* 옛 뒤 가지 */
+    while(nparent.firstChild !== n) parent.insertBefore(nparent.firstChild, o);  /* 새 앞 가지 */
+    while(n.nextSibling) parent.appendChild(n.nextSibling);                      /* 새 뒤 가지 */
+    mailPaintAttrs(o, n);                                                        /* 줄기의 클래스·글귀도 새 것을 따른다 */
+  }
+  if(ae.value !== nw.value){                                                     /* 코드가 값을 바꾼 경우만 */
+    ae.value = nw.value;
+    try{ ae.setSelectionRange(ae.value.length, ae.value.length); }catch(_){}
+  }
+  /* 검색어가 «바뀌었으면» 결과는 맨 위부터 — 예전(통째로 다시 그림)과 같다. 줄기의 스크롤 칸(나눠 보기 목록)은
+     이제 지워지지 않아 내려 둔 자리가 남는다. 검색어가 같은 다시 그리기(새 메일 도착 등)는 스크롤을 건드리지 않는다. */
+  if(prevQ !== String(nw.value)) oc.forEach(o=>{ if(o.scrollTop) o.scrollTop = 0; });
+  return true;
+}
 function renderMailPage(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */
@@ -8723,7 +8768,7 @@ function renderMailPage(){
      갈래가 늘 때 **두 곳을 함께** 고쳐야 한다(폰은 renderMailMobile). */
   /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고쳐야 한다(폰은 renderMailMobile).
      'box' 는 다음메일함을 비추는 목록이다 — 2026-08-24 에 더했다. */
-  el.innerHTML = (state.mailSent==='box' ? mbBoxHtml()
+  const html = (state.mailSent==='box' ? mbBoxHtml()
                 : state.mailSent==='who' ? whoPageHtml()
                 /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
                 : state.mailSent==='mnew' ? cntHtml()
@@ -8737,6 +8782,8 @@ function renderMailPage(){
                 : state.mailSent ? sentBoxHtml() : mailWriteHtml())
                 /* 세무사무실 저장 창 — 열려 있을 때만 뒤에 붙는다 (2026-08-28) */
                 + taxSaveHtml();
+  /* 글자를 치는 중인 검색칸은 그대로 둔다(mailPaint). ⚠ 검사가 이 함수만 잘라 돌릴 때 mailPaint 가 없을 수 있다 */
+  if(typeof mailPaint === 'function') mailPaint(el, html); else el.innerHTML = html;
   if(!state.mailSent) wireMailWrite();
   mbPvAfter();     /* 첨부 미리보기의 PDF 는 화면이 그려진 «뒤»에 그린다 */
 }
@@ -8749,30 +8796,21 @@ function renderMailMobile(){
   if(state.view !== 'mail') return;   /* 명함 목록(#list)을 메일로 덮지 않는다 — renderMailPage 머리 참고 */
   const el=$('list'); if(!el) return;
   const tab=(fn,lb,on)=>`<button class="mmtab${on?' on':''}" onclick="${fn}">${lb}</button>`;
+  /* 글자를 치는 중인 검색칸은 그대로 둔 채 갈아 끼운다(mailPaint). ⚠ 검사가 이 함수만 잘라 돌릴 때 mailPaint 가 없을 수 있다 */
+  const paint = (html)=>{ if(typeof mailPaint === 'function') mailPaint(el, html); else el.innerHTML = html; };
   /* ★ 메일함은 폰에서 «앱과 같은 차림»으로 화면을 통째로 쓴다(대표 화면 2026-08-24).
      그래서 갈래줄을 안 그린다 — 그리면 앱에 없는 줄이 화면 뒤에 남는다.
      그 화면에서 다른 곳으로 가는 길은 왼쪽 서랍 맨 아래에 있다(mbDrawerHtml).
      ⚠ 나머지 화면(쓰기·보낸·예약·수신기록)은 예전 그대로 PC 것을 쓴다 — 두 벌로
        만들지 않는다는 약속은 그 화면들에 그대로 살아 있다. */
   if(state.mailSent==='box'){
-    el.innerHTML = `<div id="mmBody">${mbMobileHtml()}</div>`;
+    paint(`<div id="mmBody">${mbMobileHtml()}</div>`);
     mbPvAfter();   /* PC 와 «같이» 고친다 — 안 부르면 폰에서 PDF 가 빈 칸으로 남는다 */
     return;
   }
-  el.innerHTML = `<div class="mmbar">
-      <button class="mmback" onclick="mailBack()" title="${urlWantsMail()?'메일함으로':'명함 목록으로'}">‹ 목록</button>
-      ${tab("openMailBox(mbNow())",'📥 메일함', state.mailSent==='box')}
-      ${tab('openInbox()','🧾 수신기록', state.mailSent==='inbox')}
-      ${tab('openCoThread()','🏢 사업장별', state.mailSent==='co')}
-      ${tab('openMailPage()','✏️ 쓰기', !state.mailSent)}
-      ${tab('openSentBox()','📤 보낸', state.mailSent===true)}
-      ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
-      <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
-    </div><div id="mmBody"></div>`;
-  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
-  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
-  const body=$('mmBody'); if(!body) return;
-  body.innerHTML = (state.mailSent==='box' ? mbMobileHtml()
+  /* ⚠ 띠와 몸통을 «한 번에» 그린다(예전에는 띠를 먼저 그리고 몸통을 따로 채웠다) — 그래야 글자를 치는 중인
+       검색칸이 몸통 안에 있어도 그 칸을 그대로 둔 채 갈아 끼울 수 있다(mailPaint). */
+  const bodyHtml = (state.mailSent==='box' ? mbMobileHtml()
                  /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고친다 — 한쪽만 고치면 폰에서만 안 열린다 */
                  : state.mailSent==='set' ? mailSetHtml()
                  : state.mailSent==='inbox' ? inboxBoxHtml()
@@ -8781,6 +8819,19 @@ function renderMailMobile(){
                  : state.mailSent ? sentBoxHtml() : mailWriteHtml())
                  /* 폰에서도 같은 저장 창을 쓴다 — 한쪽만 달면 기기에 따라 안 뜬다 */
                  + taxSaveHtml();
+  paint(`<div class="mmbar">
+      <button class="mmback" onclick="mailBack()" title="${urlWantsMail()?'메일함으로':'명함 목록으로'}">‹ 목록</button>
+      ${tab("openMailBox(mbNow())",'📥 메일함', state.mailSent==='box')}
+      ${tab('openInbox()','🧾 수신기록', state.mailSent==='inbox')}
+      ${tab('openCoThread()','🏢 사업장별', state.mailSent==='co')}
+      ${tab('openMailPage()','✏️ 쓰기', !state.mailSent)}
+      ${tab('openSentBox()','📤 보낸', state.mailSent===true)}
+      ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
+      <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
+    </div><div id="mmBody">${bodyHtml}</div>`);
+  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
+  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
+  if(!$('mmBody')) return;
   if(!state.mailSent) wireMailWrite();
 }
 /* ── 쓰기 화면 ── */
@@ -9970,7 +10021,7 @@ function inboxBoxHtml(){
         : (state.inboxQ||(state.inboxFilter&&state.inboxFilter!=='all') ? '찾은 메일이 없습니다.' : '아직 서버가 본 메일이 없습니다.')}</td></tr>`;
   return `
     <div class="ibtools">
-      <input id="ibQ" placeholder="보낸이·제목으로 찾기" value="${esc(state.inboxQ||'')}"
+      <input id="ibQ" data-keep="ibQ" placeholder="보낸이·제목으로 찾기" value="${esc(state.inboxQ||'')}"
         oninput="state.inboxQ=this.value;if(!event.isComposing)renderMailPage()" oncompositionend="state.inboxQ=this.value;renderMailPage()">
       ${chip('all','전체',c.all)}${chip('took','자료 담김',c.took)}
       ${chip('none','안 담김',c.none)}${chip('lost','임자 못 찾음',c.lost)}
@@ -10126,7 +10177,7 @@ function coThreadHtml(){
   if(co) coMailWrite(co, rows);
 
   let h = '<div class="ibtools">'
-    + '<input id="ctQ" placeholder="사업장 이름으로 찾기" value="'+esc(state.coThreadQ||'')+'"'
+    + '<input id="ctQ" data-keep="ctQ" placeholder="사업장 이름으로 찾기" value="'+esc(state.coThreadQ||'')+'"'
     + ' oninput="state.coThreadQ=this.value;if(!event.isComposing)renderMailPage()"'
     + ' oncompositionend="state.coThreadQ=this.value;renderMailPage()">'
     + '<span class="ibnote" style="margin:0">오간 것이 있는 사업장 '+list.length+'곳</span>'
@@ -10446,7 +10497,7 @@ function sentBoxHtml(){
         state.sentCat?` · ${esc(state.sentCat==='__none'?'자료 없이':state.sentCat)}`:''}${
         state.sentBy?` · ${esc(staffName(state.sentBy))}`:''}</span>
       ${(state.sentCat||state.sentBy)?`<button class="mattab" onclick="state.sentCat='';state.sentBy='';openSentBox()">전체 보기</button>`:''}
-      <div class="matsearch"><input value="${esc(state.sentQ||'')}"
+      <div class="matsearch"><input data-keep="sentQ" value="${esc(state.sentQ||'')}"
         placeholder="🔍 받는사람·제목·자료 이름으로 찾기"
         oninput="state.sentQ=this.value;if(!event.isComposing)renderMailPage()" oncompositionend="state.sentQ=this.value;renderMailPage()"></div>
       <button class="mattab ${mine?'on':''}" onclick="state.sentMine=!state.sentMine;renderMailPage()">내가 보낸 것</button>
@@ -26017,7 +26068,7 @@ function mbMobileHtml(){
         <button class="dmm-ic ${state.mbFind?'on':''}" onclick="mbFindToggle()" title="찾기">🔍</button>`}
     </div>
     ${state.mbFind ? `<div class="dmm-find">
-      <input id="dmmQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
+      <input id="dmmQ" data-keep="dmmQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
         oninput="state.mbQ=this.value;if(!event.isComposing)renderMailPage()"
         oncompositionend="state.mbQ=this.value;renderMailPage()"></div>` : ''}
     <div class="dmm-list">${body}
@@ -26819,7 +26870,7 @@ function mbListHtml(){
         title="${mbCardOn() ? '줄에 마우스를 올리면 내용 카드가 뜹니다 — 읽음 표시는 안 됩니다. 누르면 끕니다' : '눌러서 올려보기를 켭니다'}">👁 올려보기</button>
       <span class="sp"></span>
       <span class="dm-search"><i>🔍</i>
-        <input id="mbQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
+        <input id="mbQ" data-keep="mbQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
           oninput="state.mbQ=this.value;if(!event.isComposing)renderMailPage()"
           oncompositionend="state.mbQ=this.value;renderMailPage()"></span>
       ${/* ── 본문까지 찾기 (대표 결정 2026-08-30) ──
