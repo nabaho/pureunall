@@ -360,3 +360,13 @@ test('새로 올린 파일 한 줄 — 종류·날짜를 이름으로 짐작하�
   assert.equal(C.arcFileEntry('x', '정관.hwp'), null, '파일 번호 꼴이 아니면 만들지 않는다');
   assert.equal(C.arcFileEntry('push_key_000002', '정관.hwp').masked, false);
 });
+
+test('★ 주민번호 지우개 — 파일 이름에 흔한 밑줄·점·물결로 이어도 지운다(보안 재검토 2026-11-14)', () => {
+  ['시험_900101_1234567.pdf', '시험 900101.1234567.hwp', '900101~2234567', '900101 - 1234567', '9001011234567'].forEach((s) => {
+    assert.doesNotMatch(C.str(s), /1234567|2234567/, s);
+  });
+  /* 날짜·전화·사업자번호·법인등록번호는 그대로 */
+  ['2019.07.15', '041-556-0035', '312-81-52792', '161571-0000304'].forEach((s) => assert.equal(C.str(s), s));
+  const e = C.arcFileEntry('push_key_000003', '동의서_900101_1234567.hwp');
+  assert.doesNotMatch(e.name, /1234567/);
+});

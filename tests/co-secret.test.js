@@ -121,3 +121,13 @@ test('putOriginal — alive 가 false 가 되면 창고·색인을 쓰지 않고
   assert.equal(db.store['pu_docs/originals/' + r.fileId].by, 'uA');
   assert.equal(Object.keys(db2.store).length, 0, '바뀐 사람의 DB 에 쓰면 안 된다');
 });
+
+test('putOriginal — 색인을 쓴 뒤 멈추면 해시(같은 파일 찾기)는 쓰지 않는다(보안 재검토 2026-11-14)', async () => {
+  const S = loadStore(), st = fakeStorage();
+  const db = fakeDb(); let ok = true;
+  const orig = db.ref.bind(db);
+  db.ref = (p) => { const r = orig(p); if (/^pu_docs\/originals\/f/.test(p)) { const set = r.set; r.set = (v) => set(v).then(() => { ok = false; }); } return r; };
+  S.init({ db, storage: st, uid: 'uA', name: '가' });
+  await assert.rejects(S.putOriginal({ name: 'z.pdf', size: 3, type: 'application/pdf', bytes: new Uint8Array([9, 9, 9]) }, { kind: 'deungi' }, { secret: true, alive: () => ok }), /멈췄습니다/);
+  assert.equal(Object.keys(db.store).filter((k) => /^pu_docs\/hash\//.test(k)).length, 0, '멈춘 뒤 해시를 쓰면 안 된다');
+});

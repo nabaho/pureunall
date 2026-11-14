@@ -130,6 +130,7 @@
               sha256: h, path: p, at: Date.now(), by: d.uid, byName: d.name, from: from, secret: secret }));
           })
           .then(function () {
+            stillOk();
             return d.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
               return { fileId: fileId, sha256: h, reused: false, secret: secret };
             }, function (setErr) {
