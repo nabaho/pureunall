@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e40af">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>비밀유지서약 · 진술확인 서명 — 푸른노무법인</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🛡️</text></svg>">
+<!-- 🛡️ 직장 내 괴롭힘·성희롱 조사 전용 비밀 전자서명 화면 (sign-harass.html)
+     링크 형식: sign-harass.html?t={32자열쇠}#k={32자복호화열쇠}
+     ★ 근로기준법 제76조의3 제7항 비밀엄수 설계:
+       - 주소 조각(#k)은 서버나 리퍼러로 전송되지 않으며 DB 공개 슬롯에도 저장되지 않는다.
+       - 별도 채널로 전달받은 12자리 보안코드(60비트 엔트로피)와 #k 를 합쳐야만 브라우저 안에서 진술문(AES-256-GCM)이 복호화된다.
+       - 진술인은 본인 진술 문답을 확인하고 필요 시 「정정·보완 의견」을 직접 남긴 뒤 손글씨 또는 키보드 성명 서명으로 1회 제출한다.
+       - 제출 슬롯에는 연락처·보안코드 평문 대신 256비트 인증자(subAuth)만 기록되며 사건 담당 노무사·대표만 복호화 후 비밀금고에 봉인한다. -->
+<style>
+  :root{
+    --ink:#1e293b; --ink2:#475569; --mute:#475569; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+    --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+    --green:#166534; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+    --amber:#854d0e; --amber-bg:#fffbeb; --amber-line:#fde68a;
+    --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
+    --btn-bg:#1e40af; --btn-fg:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+      --blue:#60a5fa; --blue-d:#bfdbfe; --blue-bg:#1e293b; --blue-line:#2563eb;
+      --green:#4ade80; --green-bg:#1e293b; --green-line:#16a34a;
+      --amber:#fde68a; --amber-bg:#1e293b; --amber-line:#d97706;
+      --red:#fecaca; --red-bg:#1e293b; --red-line:#dc2626;
+      --btn-bg:#2563eb; --btn-fg:#ffffff;
+    }
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}
+  .wrap{max-width:600px;margin:0 auto;min-height:100vh;background:var(--card);padding:18px 16px 48px}
+  .head{padding:8px 0 14px;border-bottom:2px solid var(--blue-d);margin-bottom:14px}
+  .head h1{font-size:18px;color:var(--blue-d)}
+  .head .sub{font-size:12.5px;color:var(--mute);margin-top:3px}
+  .steps{display:flex;gap:6px;font-size:12.5px;color:var(--mute);margin-bottom:14px;flex-wrap:wrap}
+  .steps b{color:var(--blue-d)}
+  .step{display:none}.step.on{display:block}
+  .step-hd{font-size:15px;font-weight:700;color:var(--ink);margin:8px 0 6px}
+  .step-hd:focus{outline:2px solid var(--blue-d);outline-offset:3px;border-radius:4px}
+  label.lbl{display:block;font-size:13.5px;font-weight:700;margin:14px 0 6px;color:var(--ink)}
+  input[type=tel],input[type=text],textarea{width:100%;padding:12px;border:1px solid var(--line2);border-radius:8px;font-size:16px;font-family:inherit;color:var(--ink);background:var(--card)}
+  textarea{resize:vertical;line-height:1.55}
+  input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--blue-d);outline-offset:2px}
+  .btn{display:block;width:100%;min-height:46px;padding:13px 14px;border:none;border-radius:10px;background:var(--btn-bg);color:var(--btn-fg);font-size:16px;font-weight:700;margin-top:16px;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.sub{background:var(--bg);color:var(--ink2);border:1px solid var(--line2);margin-top:10px;font-weight:600}
+  .sig-tabs{display:flex;gap:8px;margin:8px 0 10px;flex-wrap:wrap}
+  .sig-tab{flex:1;min-height:40px;padding:8px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--ink2);font-size:13.5px;font-weight:700;cursor:pointer}
+  .sig-tab[aria-pressed="true"]{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg)}
+  .sig-kbd-box{display:none;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:8px}
+  .sig-kbd-box.on{display:block}
+  .note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:8px;padding:11px 12px;font-size:13.5px;margin:10px 0}
+  .pledge-box{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--ink);border-radius:10px;padding:12px;margin:12px 0;font-size:13.5px;white-space:pre-line}
+  .stmt-box{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:12px;margin:12px 0}
+  .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;font-size:13px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+  .qa-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:14px}
+  .qa-q{font-weight:700;color:var(--blue-d);margin-bottom:4px}
+  .qa-a{color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .sum-box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+  .agree{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin-top:12px;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
+  .agree input{width:24px;height:24px;min-width:24px;min-height:24px;flex:none;margin-top:2px}
+  .err{color:var(--red);font-size:13.5px;margin-top:8px;min-height:20px;font-weight:700}
+  .done-box{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green);border-radius:10px;padding:14px;font-size:14px;margin:12px 0}
+  .hash-box{margin-top:10px;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);font-size:12px;color:var(--ink2);word-break:break-all}
+  .fatal{text-align:center;padding:42px 12px;color:var(--ink2)}
+  @media (max-width:480px){ .meta-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="head">
+    <h1 id="docTitle">비밀유지서약 · 진술확인 서명</h1>
+    <div class="sub" id="docSub">푸른노무법인 · 보안 링크 확인 중…</div>
+  </div>
+  <nav class="steps" id="steps" aria-label="서명 진행 단계">
+    <span id="s1"><b>1 본인 확인</b></span>›<span id="s2">2 서약·진술 확인</span>›<span id="s3">3 전자서명 제출</span>
+  </nav>
+
+  <!-- 1단계: 별도 전달 12자리 보안코드 복호화 인증 -->
+  <section class="step on" id="step1" aria-labelledby="hd1">
+    <h2 class="step-hd" id="hd1" tabindex="-1">1단계. 본인 확인 및 암호 복호화</h2>
+    <div class="note">
+      근로기준법 제76조의3 제7항(비밀유지 의무)에 따라 문서는 종단간 암호화되어 있습니다.<br>
+      담당 공인노무사로부터 별도 안내받으신 <b>12자리 본인확인 보안코드</b>를 입력해 주세요.
+    </div>
+    <label class="lbl" for="passcode">본인확인 보안코드 (12자리)</label>
+    <input type="text" id="passcode" maxlength="16" placeholder="예: K7M9-P4X2-R8W3" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="e1">
+    <div class="err" id="e1" role="alert" aria-live="assertive"></div>
+    <button type="button" class="btn" id="go1">본인 확인 후 내용 열기</button>
+  </section>
+
+  <!-- 2단계: 비밀유지서약 동의 + 정리된 진술 확인 + 정정·보완 의견 -->
+  <section class="step" id="step2" aria-labelledby="hd2">
+    <h2 class="step-hd" id="hd2" tabindex="-1">2단계. 비밀유지서약 및 진술 내용 확인</h2>
+    <div class="lbl">① 조사 참여자 비밀유지 서약</div>
+    <div class="pledge-box" id="pledgeBody"></div>
+    <label class="agree" for="pledgeChk">
+      <input type="checkbox" id="pledgeChk" aria-describedby="e2">
+      <span><b>[필수]</b> 위 비밀유지 의무 안내를 읽었으며, 조사 과정에서 알게 된 비밀을 누설하지 않을 것을 서약합니다.</span>
+    </label>
+
+    <div id="stmtSection">
+      <div class="lbl">② 정리된 본인 면담 진술 내역 확인</div>
+      <div class="stmt-box">
+        <div class="meta-grid" id="stmtMeta"></div>
+        <div id="qaContainer"></div>
+        <div id="sumContainer"></div>
+      </div>
+
+      <label class="lbl" for="amendNote">③ 정정 · 보완 의견 (선택 사항)</label>
+      <textarea id="amendNote" rows="3" maxlength="1000" placeholder="위 문답이나 요지 중 본인의 진술 취지와 다르게 적힌 부분이나 덧붙일 내용이 있으면 자유롭게 적어 주세요. 비워 두시면 위 내용 그대로 확인됩니다."></textarea>
+    </div>
+
+    <div class="err" id="e2" role="alert" aria-live="assertive"></div>
+    <button type="button" class="btn" id="go2">다음 — 전자서명 하기</button>
+  </section>
+
+  <!-- 3단계: 손가락·마우스 서명 또는 키보드 성명 서명 및 최종 제출 -->
+  <section class="step" id="step3" aria-labelledby="hd3">
+    <h2 class="step-hd" id="hd3" tabindex="-1">3단계. 전자서명 및 최종 제출</h2>
+    <div class="note">손가락(마우스)으로 직접 서명하시거나, 마우스 사용이 어려운 경우 <b>키보드 성명 서명</b> 탭을 선택해 서명하실 수 있습니다. 제출 후에는 수정할 수 없습니다.</div>
+    <div class="sig-tabs" role="group" aria-label="서명 입력 방식 선택">
+      <button type="button" class="sig-tab" id="tabDraw" aria-pressed="true">✍️ 손글씨·마우스 서명</button>
+      <button type="button" class="sig-tab" id="tabType" aria-pressed="false">⌨️ 키보드 성명 서명</button>
+    </div>
+    <div id="sigWrap"></div>
+    <div class="sig-kbd-box" id="sigKbdBox">
+      <label class="lbl" for="sigTypedName" style="margin-top:0">서명자 성명 입력 (키보드 서명)</label>
+      <input type="text" id="sigTypedName" maxlength="30" placeholder="본인 성명을 입력해 주세요 (예: 홍길동)" aria-describedby="e3">
+      <button type="button" class="btn sub" id="applyTypedSigBtn">서명판에 성명 서명 적용</button>
+    </div>
+    <label class="agree" for="finalChk">
+      <input type="checkbox" id="finalChk" aria-describedby="e3">
+      <span id="finalChkTxt">위 비밀유지서약 및 본인 진술 내용(정정·보완 의견 포함)을 모두 확인하였으며 이에 직접 서명합니다.</span>
+    </label>
+    <div class="err" id="e3" role="alert" aria-live="assertive"></div>
+    <button type="button" class="btn" id="go3">확인 · 전자서명 제출</button>
+    <button type="button" class="btn sub" id="back3">← 앞 단계 내용 다시 보기</button>
+  </section>
+
+  <!-- 4단계: 제출 완료 -->
+  <section class="step" id="step4" aria-labelledby="hd4">
+    <h2 class="step-hd" id="hd4" tabindex="-1">전자서명 제출 완료</h2>
+    <div class="done-box" id="doneMsg" role="status" aria-live="polite">전자서명 제출이 완료되었습니다. 감사합니다.</div>
+    <div style="font-size:13.5px;color:var(--ink2)">
+      제출하신 서명본은 암호화되어 담당 공인노무사에게 전달되었습니다. 추가 문의나 사본 요청은 담당 노무사에게 연락해 주세요.
+    </div>
+    <div class="hash-box" id="doneHash"></div>
+  </section>
+
+  <section class="step" id="stepErr" aria-label="링크 안내"><div class="fatal" id="fatalMsg" role="alert" aria-live="assertive" tabindex="-1"></div></section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=96"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-harass-core.js?v=6"></script>
+<script src="js/pu-harass-sign.js?v=3"></script>
+<script>
+'use strict';
+(function () {
+  var FB_CONFIG = {
+    apiKey: 'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',
+    databaseURL: 'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'pureun-erp',
+    appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7',
+    messagingSenderId: '936817166182'
+  };
+  if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  var db = firebase.database();
+  var C = window.PuHarassCore;
+  var S = window.PuHarassSign;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var params = new URLSearchParams(location.search);
+  var t = (params.get('t') || '').trim().toLowerCase();
+  var hashParams = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  var kHex = (hashParams.get('k') || '').trim().toLowerCase();
+
+  var O = null;
+  var P = null;
+  var verifiedCode = '';
+
+  function show(n) {
+    ['step1', 'step2', 'step3', 'step4', 'stepErr'].forEach(function (id) { $(id).classList.remove('on'); });
+    var targetId = n === 'err' ? 'stepErr' : 'step' + n;
+    $(targetId).classList.add('on');
+    var labels = ['본인 확인', '서약·진술 확인', '전자서명 제출'];
+    ['s1', 's2', 's3'].forEach(function (id, idx) {
+      var el = $(id);
+      el.innerHTML = '';
+      var tag = document.createElement(idx + 1 === n ? 'b' : 'span');
+      tag.textContent = (idx + 1) + ' ' + labels[idx];
+      el.appendChild(tag);
+    });
+    $('steps').style.display = (n === 4 || n === 'err') ? 'none' : '';
+    window.scrollTo(0, 0);
+    var focusTarget = n === 'err' ? $('fatalMsg') : $('hd' + n);
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      try { focusTarget.focus(); } catch (e) {}
+    }
+  }
+
+  function fatal(msg) {
+    $('fatalMsg').textContent = msg;
+    $('docSub').textContent = '푸른노무법인';
+    show('err');
+  }
+
+  function addMetaItem(parent, label, val) {
+    var d = document.createElement('div');
+    var b = document.createElement('b');
+    b.textContent = label + ': ';
+    d.appendChild(b);
+    d.appendChild(document.createTextNode(val || '-'));
+    parent.appendChild(d);
+  }
+
+  function renderDecryptedPayload(doc) {
+    $('docTitle').textContent = doc.title || '비밀유지서약 · 진술확인 서명';
+    $('pledgeBody').textContent = doc.pledgeText || S.PLEDGE_TEXT;
+    if (doc.docKind === 'pledge_only') {
+      $('stmtSection').style.display = 'none';
+      $('finalChkTxt').textContent = '위 조사 참여자 비밀유지서약 내용을 모두 확인하였으며 이에 직접 서명합니다.';
+      return;
+    }
+    $('stmtSection').style.display = '';
+    var meta = $('stmtMeta');
+    meta.innerHTML = '';
+    addMetaItem(meta, '대상 구분', doc.roleLabel);
+    addMetaItem(meta, '성명·호칭', doc.alias + (doc.dept ? ' (' + doc.dept + ')' : ''));
+    addMetaItem(meta, '면담 일자', doc.date || '-');
+    addMetaItem(meta, '면담 방식', doc.method || '-');
+
+    var qaBox = $('qaContainer');
+    qaBox.innerHTML = '';
+    var qaList = Array.isArray(doc.qaList) ? doc.qaList : [];
+    if (qaList.length) {
+      qaList.forEach(function (qa, idx) {
+        var card = document.createElement('div');
+        card.className = 'qa-card';
+        var qEl = document.createElement('div');
+        qEl.className = 'qa-q';
+        qEl.textContent = '문 ' + (idx + 1) + '. ' + (qa.q || '');
+        var aEl = document.createElement('div');
+        aEl.className = 'qa-a';
+        aEl.textContent = '답: ' + (qa.a || '');
+        card.appendChild(qEl);
+        card.appendChild(aEl);
+        qaBox.appendChild(card);
+      });
+    }
+
+    var sumWrap = $('sumContainer');
+    sumWrap.innerHTML = '';
+    if (doc.summary) {
+      var lbl = document.createElement('div');
+      lbl.style.cssText = 'font-size:13px;font-weight:700;margin:8px 0 4px;color:var(--ink2)';
+      lbl.textContent = '진술 핵심 요지';
+      var sb = document.createElement('div');
+      sb.className = 'sum-box';
+      sb.textContent = doc.summary;
+      sumWrap.appendChild(lbl);
+      sumWrap.appendChild(sb);
+    }
+  }
+
+  if (!/^[0-9a-f]{32}$/.test(t) || !/^[0-9a-f]{32}$/.test(kHex)) {
+    fatal('유효하지 않은 보안 링크입니다. 안내받은 전체 링크 주소(#k 포함)를 그대로 다시 열어 주세요.');
+    return;
+  }
+
+  firebase.auth().signInAnonymously().then(function () {
+    return db.ref('harass_sign/open/' + t).once('value');
+  }).then(function (snap) {
+    O = snap.val();
+    if (!O || O._deleted || O.void) {
+      fatal('이미 서명이 완료되어 회수되었거나 취소된 링크입니다. 사본이나 재발송이 필요하면 담당 노무사에게 문의해 주세요.');
+      return;
+    }
+    if (O.sub) {
+      $('doneMsg').textContent = '이미 전자서명이 제출된 문서입니다.';
+      $('doneHash').textContent = '문서 무결성 지문(SHA-256): ' + String(O.docHash || '');
+      show(4);
+      return;
+    }
+    if (Number(O.exp || 0) < Date.now()) {
+      fatal('서명 유효 기한(' + S.ymd(O.exp) + ')이 지났습니다. 담당 노무사에게 새 링크를 요청해 주세요.');
+      return;
+    }
+    $('docSub').textContent = '푸른노무법인 · 유효기한 ' + S.ymd(O.exp) + ' 까지';
+    show(1);
+    db.ref('harass_sign/open/' + t + '/seen').set(firebase.database.ServerValue.TIMESTAMP).catch(function () {});
+  }).catch(function () {
+    fatal('보안 서명 서버에 연결하지 못했습니다. 네트워크 상태를 확인한 뒤 다시 열어 주세요.');
+  });
+
+  $('go1').onclick = async function () {
+    var cleanC = S.cleanPasscode($('passcode').value);
+    if (!cleanC) {
+      $('e1').textContent = '별도 안내받은 12자리 본인확인 보안코드(영문·숫자)를 입력해 주세요.';
+      $('passcode').focus();
+      return;
+    }
+    $('go1').disabled = true;
+    $('go1').textContent = '복호화 확인 중…';
+    $('e1').textContent = '';
+    try {
+      var rawDec = await S.decryptWithCode(O.encPayload, kHex, cleanC);
+      var doc = (rawDec && typeof rawDec === 'object' && rawDec.payload) ? rawDec.payload : rawDec;
+      var calcHash = await S.sha256Hex(S.canonicalString(doc));
+      if (calcHash !== O.docHash) {
+        throw new Error('문서 무결성 지문이 일치하지 않습니다.');
+      }
+      P = doc;
+      verifiedCode = cleanC;
+      renderDecryptedPayload(doc);
+      show(2);
+    } catch (err) {
+      $('e1').textContent = (err && err.message) || '본인확인 보안코드가 일치하지 않습니다.';
+    } finally {
+      $('go1').disabled = false;
+      $('go1').textContent = '본인 확인 후 내용 열기';
+    }
+  };
+
+  $('go2').onclick = function () {
+    if (!$('pledgeChk').checked) {
+      $('e2').textContent = '비밀유지 서약 동의에 체크해 주세요.';
+      $('pledgeChk').focus();
+      return;
+    }
+    $('e2').textContent = '';
+    show(3);
+    if (sigPad) sigPad.resize();
+  };
+
+  $('back3').onclick = function () { show(2); };
+
+  var sigPad = (function () {
+    var wrap = $('sigWrap');
+    wrap.innerHTML = '<canvas id="sigCanvas" role="img" aria-label="전자서명 서명판" tabindex="0" style="width:100%;height:190px;border:2px dashed var(--line2);border-radius:10px;background:#ffffff;touch-action:none;display:block"></canvas>' +
+      '<button type="button" id="sigClear" style="margin-top:8px;min-height:38px;padding:8px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--ink2);font-size:13px;cursor:pointer">서명 지우기</button>';
+    var cv = $('sigCanvas'), ctx = null, drawing = false, strokes = 0, typedStamped = false, lastPos = null;
+    function ensureCtx() {
+      var r = cv.getBoundingClientRect();
+      var w = r.width || 320;
+      var h = r.height || 190;
+      var dpr = window.devicePixelRatio || 1;
+      if (!ctx || !cv.width) {
+        cv.width = Math.round(w * dpr);
+        cv.height = Math.round(h * dpr);
+        ctx = cv.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#1e293b';
+      }
+      return { w: w, h: h };
+    }
+    function resize() {
+      var r = cv.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var dpr = window.devicePixelRatio || 1;
+      var snap = (strokes > 0 || typedStamped) ? cv.toDataURL('image/png') : null;
+      cv.width = Math.round(r.width * dpr);
+      cv.height = Math.round(r.height * dpr);
+      ctx = cv.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, r.width, r.height);
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1e293b';
+      if (snap) {
+        var im = new Image();
+        im.onload = function () { ctx.drawImage(im, 0, 0, r.width, r.height); };
+        im.src = snap;
+      } else {
+        strokes = 0;
+        typedStamped = false;
+      }
+    }
+    window.addEventListener('resize', resize);
+    function pos(e) {
+      var r = cv.getBoundingClientRect();
+      var p = (e.touches && e.touches[0]) || e;
+      return { x: p.clientX - r.left, y: p.clientY - r.top };
+    }
+    function start(e) { ensureCtx(); e.preventDefault(); drawing = true; lastPos = pos(e); ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); }
+    function move(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      var p = pos(e);
+      if (!lastPos || Math.hypot(p.x - lastPos.x, p.y - lastPos.y) >= 2) {
+        strokes++;
+        lastPos = p;
+      }
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    function end() { drawing = false; }
+    function clearPad() {
+      var dim = ensureCtx();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, dim.w, dim.h);
+      ctx.strokeStyle = '#1e293b';
+      strokes = 0;
+      typedStamped = false;
+      lastPos = null;
+    }
+    cv.addEventListener('touchstart', start, { passive: false });
+    cv.addEventListener('touchmove', move, { passive: false });
+    cv.addEventListener('touchend', end);
+    cv.addEventListener('mousedown', start);
+    cv.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    $('sigClear').onclick = clearPad;
+    return {
+      isEmpty: function () { return strokes < 5 && !typedStamped; },
+      clear: clearPad,
+      stampText: function (nameText) {
+        var cleanName = String(nameText || '').trim().slice(0, 24);
+        if (!cleanName) return false;
+        var dim = ensureCtx();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, dim.w, dim.h);
+        ctx.strokeStyle = '#1e40af';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(16, 24, dim.w - 32, dim.h - 48);
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 28px "Malgun Gothic","맑은 고딕",sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(cleanName + ' (서명)', dim.w / 2, dim.h / 2 - 8);
+        ctx.fillStyle = '#475569';
+        ctx.font = '12px "Malgun Gothic","맑은 고딕",sans-serif';
+        ctx.fillText('키보드 전자서명 확인 · ' + S.ymdhm(Date.now()), dim.w / 2, dim.h / 2 + 28);
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2.5;
+        typedStamped = true;
+        return true;
+      },
+      toDataURL: function () { ensureCtx(); return cv.toDataURL('image/png'); },
+      resize: resize
+    };
+  })();
+
+  $('tabDraw').onclick = function () {
+    $('tabDraw').setAttribute('aria-pressed', 'true');
+    $('tabType').setAttribute('aria-pressed', 'false');
+    $('sigKbdBox').classList.remove('on');
+  };
+  $('tabType').onclick = function () {
+    $('tabType').setAttribute('aria-pressed', 'true');
+    $('tabDraw').setAttribute('aria-pressed', 'false');
+    $('sigKbdBox').classList.add('on');
+    $('sigTypedName').focus();
+  };
+  $('applyTypedSigBtn').onclick = function () {
+    var nm = ($('sigTypedName').value || '').trim();
+    if (nm.length < 2) {
+      $('e3').textContent = '서명자 성명을 2자 이상 입력해 주세요.';
+      $('sigTypedName').focus();
+      return;
+    }
+    sigPad.stampText(C ? C.maskRrnText(nm) : nm);
+    $('e3').textContent = '';
+  };
+
+  if ($('amendNote')) {
+    $('amendNote').addEventListener('input', function () {
+      if (!sigPad.isEmpty() || ($('finalChk') && $('finalChk').checked)) {
+        sigPad.clear();
+        if ($('finalChk')) $('finalChk').checked = false;
+        $('e3').textContent = '정정·보완 의견이 수정되어 기존 서명과 동의가 초기화되었습니다. 수정 내용을 확인한 뒤 다시 서명해 주세요.';
+      }
+    });
+  }
+
+  var sending = false;
+  $('go3').onclick = async function () {
+    if (sending || !O || !P) return;
+    if (sigPad.isEmpty()) {
+      $('e3').textContent = '서명판에 직접 서명하거나 [키보드 성명 서명] 탭에서 성명 서명을 적용해 주세요.';
+      return;
+    }
+    if (!$('finalChk').checked) {
+      $('e3').textContent = '내용 확인 및 서명 동의에 체크해 주세요.';
+      $('finalChk').focus();
+      return;
+    }
+    sending = true;
+    $('go3').disabled = true;
+    $('go3').textContent = '암호화 봉인 및 제출 중…';
+    $('e3').textContent = '';
+    try {
+      var amendRaw = ($('amendNote') ? $('amendNote').value : '').trim().slice(0, 1000);
+      var amendClean = C ? C.maskRrnText(amendRaw) : amendRaw;
+      var sigUrl = sigPad.toDataURL();
+      var secretSubPayload = {
+        docHash: O.docHash,
+        sigDataUrl: sigUrl,
+        sig: sigUrl,
+        amendNote: amendClean,
+        pledgeAgree: true,
+        agree: true,
+        stmtAgree: P.docKind !== 'pledge_only',
+        signedAlias: P.alias || ''
+      };
+      var encSub = await S.encryptWithCode(secretSubPayload, kHex, verifiedCode);
+      var subAuth = await S.computeSubAuth(t, kHex, verifiedCode, O.docHash);
+      var baseRec = {
+        id: t,
+        subAuth: subAuth,
+        docHash: O.docHash,
+        agree: true,
+        pledgeAgree: true,
+        encSub: encSub,
+        ua: String(navigator.userAgent || '').slice(0, 300)
+      };
+      var prep = window.PuOntologyWrite.prepareRecord(baseRec, { entityType: 'Submission', allowPendingCompany: true, now: Date.now() });
+      if (!prep || !prep.ok) throw new Error('제출 레코드 검증에 실패했습니다.');
+      var subData = Object.assign({}, prep.value, { at: firebase.database.ServerValue.TIMESTAMP });
+      var doneHashVal = O.docHash;
+      await db.ref('harass_sign/open/' + t + '/sub').set(subData);
+      P = null;
+      verifiedCode = '';
+      if ($('passcode')) $('passcode').value = '';
+      $('doneMsg').textContent = '전자서명 제출이 완료되었습니다. 감사합니다. (' + S.ymdhm(Date.now()) + ')';
+      $('doneHash').textContent = '문서 무결성 지문(SHA-256): ' + doneHashVal;
+      show(4);
+    } catch (err) {
+      sending = false;
+      $('go3').disabled = false;
+      $('go3').textContent = '확인 · 전자서명 제출';
+      $('e3').textContent = '제출하지 못했습니다. 이미 제출되었거나 기한이 만료되었을 수 있으니 담당 노무사에게 문의해 주세요.';
+    }
+  };
+})();
+</script>
+</body>
+</html>

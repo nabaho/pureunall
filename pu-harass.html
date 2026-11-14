@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 괴롭힘·성희롱 조사</title>
+<!-- ══════════════════════════════════════════════════════════════════════
+     푸른노무법인 괴롭힘·성희롱 조사 (pu-harass.html) — 2026-11-11
+     의뢰인 업무 › 직장 내 괴롭힘·성희롱 사건 조사 · 메일 공문 자동수집 · 조사결과보고서 · 푸른이알피 자동연동
+
+     ★ 하는 일:
+       1. 푸른 메일함(mailbox/folders · mailbox/msgs · searchMailbox)에서 직장 내 괴롭힘·성희롱 조사 관련
+          견적서·위임계약·착수공문·비밀유지서약·면담진술·증거·조사결과보고서를 사건별로 자동 수집·정리한다.
+       2. 미등록 조사 메일은 의뢰 사업장별 후보 묶음(Bundle)으로 자동 분류해 검토 후 원클릭으로 사건 등록한다.
+       3. 8단계 표준 조사 프로토콜 진행현황·일정·요약·공문 타임라인을 푸른이알피(pu-erp.html) 사건관리 및
+          업무 메모(case_memos)에 자동으로 반영한다.
+       4. 녹취록·진술서(.hwpx · .hwp · .docx · .txt · 음성/PDF) 자동 문답(Q&A)·요지·쟁점 정리,
+          종단간 암호화 비밀 전자서명(sign-harass.html · 현장 즉시 서명), 정식 한글(.hwpx) 진술확인서·조사결과보고서 입출력을 지원한다.
+     ★ 비밀유지 분리(근로기준법 제76조의3 제7항):
+       - harass_invest (사건 목록·8단계 진행현황·공문 머리글·이알피 동기화): 재직 직원(LOGIN) 공유
+       - harass_secret (면담 진술·녹취 문답·쟁점 사실인정·조사결과보고서 본문): 사건 주·부담당 노무사 및 대표(ADMIN)만 열람·저장
+       - harass_sign   (당사자·참고인 비밀유지서약 및 진술확인 종단간 암호화 전자서명): 담당 노무사·대표 및 열쇠+뒷번호 4자리 보유 본인만 복호화
+     ★ 모든 쓰기는 PuOntologyWrite 강제 관문(createGateway enforce)만 거치며 물리 삭제 대신 _deleted 표식을 남긴다.
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#475569; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-m:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+  --pri-bg:#1e40af; --ok-bg:#166534;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+    --blue:#60a5fa; --blue-d:#bfdbfe; --blue-bg:#1e293b; --blue-line:#2563eb;
+    --green:#4ade80; --green-m:#16a34a; --green-bg:#1e293b; --green-line:#16a34a;
+    --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+    --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+    --pri-bg:#2563eb; --ok-bg:#166534;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--mute)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:600}
+button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
+button.warn-btn{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber);font-weight:600}
+button.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
+button.sm{padding:5px 10px;min-height:32px;font-size:12px}
+input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55}
+a{color:var(--blue-d);text-decoration:none}
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0}
+.top .sub{font-size:12px;color:var(--mute)}
+.sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap;align-items:center}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
+.chip{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink2)}
+.c-blue{background:var(--blue-bg);color:var(--blue-d);border-color:var(--blue-line)}
+.c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+.c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+.c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
+.pane{display:none}
+.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+.bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 12px}
+.sec{padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card>.sec:first-child{border-top:0;border-radius:10px 10px 0 0}
+.note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px}
+.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
+.secret-lock{background:var(--red-bg);border:1px solid var(--red-line);color:var(--red);border-radius:10px;padding:18px 16px;font-size:13px;line-height:1.6}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;flex-direction:column;gap:3px;min-width:0}
+.kpi span{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi b{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.k-blue b{color:var(--blue-d)}
+.kpi.k-green b{color:var(--green)}
+.kpi.k-amber b{color:var(--amber)}
+.prof{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 12px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.prof span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prof b{color:var(--mute);font-weight:500;margin-right:4px}
+.pbar{display:inline-flex;gap:2px;align-items:center;vertical-align:middle;margin-right:5px}
+.pdot{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line2)}
+.pdot.done{background:var(--green-m)}
+.pdot.cur{background:var(--blue)}
+.bulk{display:none;gap:6px;align-items:center;padding:6px 12px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);font-size:12.5px;flex-wrap:wrap}
+.bulk.on{display:flex}
+.scroll{overflow:auto}
+table.t{width:100%;border-collapse:collapse}
+table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
+table.t td{overflow:hidden;text-overflow:ellipsis;max-width:340px}
+table.t td.ti{font-weight:600;max-width:300px}
+table.t td.wide{max-width:420px}
+table.t th.c,table.t td.c{width:40px;text-align:center}
+input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
+table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
+table.t th.n,table.t td.n{width:42px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.t tr[data-row]{cursor:pointer}
+table.t tr[data-row]:hover>td{background:var(--bg)}
+table.t tr.cur>td{background:var(--blue-bg)}
+table.t tr.cur>td.n{color:var(--ink2)}
+.empty{padding:28px 12px;text-align:center;color:var(--mute)}
+.hint{font-size:12px;color:var(--mute)}
+.fr{display:flex;gap:10px;padding:7px 14px;align-items:center}
+.fr>label{width:110px;flex:none;color:var(--ink2);font-size:12.5px;font-weight:600;white-space:nowrap}
+.fv{flex:1;min-width:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fv input[type=text],.fv input[type=email],.fv select{flex:1;min-width:140px}
+.rpt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:10px 12px}
+.rpt-grid .full{grid-column:1 / -1}
+.rpt-lbl{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.rpt-paper{padding:14px;background:var(--bg);border-top:1px solid var(--line)}
+.rpt-paper textarea{min-height:360px;font-size:13px;line-height:1.65;background:var(--card)}
+.mail-body{max-height:52vh;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55}
+.att-list{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#lock p{color:var(--mute);font-size:13px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70;max-width:90vw}
+#toast.on{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(30,41,59,.42);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px;overflow:auto}
+.mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;width:100%;max-width:640px;overflow:hidden}
+.mbox.wide{max-width:860px}
+.mbox.xwide{max-width:1100px}
+.mhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-weight:700}
+.mbd{padding:12px 14px;max-height:76vh;overflow:auto}
+.mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
+/* ── 사건 통합 작업실 (상단 8단계 스텝바 · 좌우 대조 2단 스플릿 · 녹취/전자서명 원스톱 카드) ── */
+.ws-steps{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;padding:8px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.ws-step{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);text-align:left;min-width:0;font-size:11.5px;white-space:normal}
+.ws-step b{font-size:12px;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-step span{font-size:11px;color:var(--mute);display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-step.done{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
+.ws-step.done span{color:var(--green)}
+.ws-step.cur{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
+.ws-step.cur span{color:var(--blue-d)}
+.ws-modes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);background:var(--card)}
+.ws-modes button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.ws-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
+.ws-split.focus-iv{grid-template-columns:1fr}
+.ws-split.focus-iv .ws-col-right{display:none}
+.ws-split.focus-doc{grid-template-columns:1fr}
+.ws-split.focus-doc .ws-col-left{display:none}
+.ws-col-left,.ws-col-right{min-width:0}
+.drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color .15s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--card)}
+.drop-zone b{display:block;font-size:13px;margin-bottom:3px}
+.drop-zone span{font-size:11.5px;color:var(--ink2)}
+.iv-list{display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.iv-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);display:flex;flex-direction:column;gap:7px}
+.iv-card.signed{border-color:var(--green-line)}
+.iv-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.iv-hd .iv-who{font-weight:700;font-size:13.5px}
+.iv-sum{font-size:12.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:84px;overflow:auto;padding:6px 8px;border-radius:7px;background:var(--bg);border:1px solid var(--line)}
+.amend-box{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:8px;padding:7px 10px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.iv-acts{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.studio-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:12px;align-items:start}
+.studio-pane{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);min-width:0}
+.qa-list{display:flex;flex-direction:column;gap:7px;max-height:310px;overflow:auto;padding:2px 0}
+.qa-row{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);display:flex;flex-direction:column;gap:5px}
+.qa-row-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink2)}
+.cand-list{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.cand-item{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid var(--blue-line);border-radius:8px;background:var(--card);font-size:12px}
+.sig-pad-wrap{border:1.5px solid var(--line2);border-radius:10px;background:#ffffff;overflow:hidden;touch-action:none}
+.sig-pad{display:block;width:100%;height:170px;cursor:crosshair;touch-action:none}
+.evid-mini{max-height:240px;overflow:auto;padding:6px 12px}
+.evid-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+.evid-row:last-child{border-bottom:0}
+.evid-row .evid-ti{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#printArea{display:none}
+.phone-only{display:none}
+@media (max-width:1024px){
+  .ws-steps{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .ws-split,.studio-grid{grid-template-columns:1fr}
+}
+/* ── 폰 화면: 가로 밀기 없이 2줄 카드 (docs/규칙/폰화면.md · 고르기칸-번호.md) ── */
+@media (max-width:768px){
+  button.sm{min-height:36px;padding:6px 11px}
+  input,select,textarea,.rpt-paper textarea{font-size:16px}
+  input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
+  .modal{padding:0}
+  .mbox,.mbox.wide,.mbox.xwide{max-width:100vw;border-left:0;border-right:0;border-radius:0}
+  .mbd{padding:10px;max-height:84vh}
+  .studio-pane{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:6px 0}
+  .phone-only{display:inline}
+  .wide-only{display:none}
+  .top{padding:6px 8px;gap:5px;flex-wrap:nowrap}
+  .top h1{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+  .top .sub{display:none}
+  #who{flex:0 1 auto;min-width:0;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
+  main{padding:8px 0 64px}
+  .card{border-left:0;border-right:0;border-radius:0}
+  .note,.warn,.secret-lock{margin:0 10px 10px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
+  .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 10px}
+  .ws-split,.studio-grid{grid-template-columns:1fr;gap:8px}
+  .iv-list{padding:8px 10px}
+  .rpt-grid{grid-template-columns:1fr;padding:8px 10px}
+  .fr{flex-direction:column;align-items:stretch;gap:4px;padding:6px 10px}
+  .fr>label{width:auto}
+  select{max-width:100%}
+  table.t[data-name],table.t[data-name] thead,table.t[data-name] tbody{display:block;width:100%}
+  table.t[data-name] thead tr{display:flex;align-items:center}
+  table.t[data-name] thead th{display:none}
+  table.t[data-name] thead th.c{display:block;width:40px;padding:6px 0;margin-left:4px}
+  table.t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0;white-space:nowrap}
+  table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 74px;min-height:46px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
+  table.t[data-name] tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;order:6;color:var(--ink2);font-size:12.5px}
+  table.t[data-name] tbody td:empty{display:none}
+  table.t[data-name] tbody td.c{position:absolute;left:4px;top:8px;width:40px;text-align:center;order:0}
+  table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:24px;text-align:right;order:0}
+  table.t[data-name] tbody td.ti{order:1;flex:1 1 0;font-size:13.5px;font-weight:600;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
+  table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
+}
+@media (max-width:520px){#who{display:none}}
+@media print{
+  #head,main,#modal,#toast,#pu-appbar,#pu-appbar-fab{display:none !important}
+  body{background:#ffffff;color:#000000}
+  #printArea{display:block !important;padding:12mm 14mm;white-space:pre-wrap;font-size:11.5pt;line-height:1.75;color:#000000}
+}
+</style>
+</head>
+<body>
+<div id="head">
+  <div class="top">
+    <h1>🛡️ 괴롭힘·성희롱 조사</h1>
+    <span class="sub">공문 자동수집 · 녹취록 자동정리 · 비밀 전자서명 · 한글(.hwpx) 보고서 · 이알피 연동</span>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">메일 자동수집 · 이알피 동기화</span><span class="phone-only">자동수집</span></button>
+    <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
+    <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="cases" class="on">📂 조사 사건 현황 <span class="chip c-blue" id="nCases">0</span></button>
+    <button data-tab="inbox">📥 메일 자동수집 · 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
+    <button data-tab="detail">📋 공문함 · 8단계 관리</button>
+    <button data-tab="report">🔒 녹취·전자서명 · 3요건·보고서(.hwpx)</button>
+  </div>
+</div>
+
+<div id="lock">
+  <h2>🛡️ 괴롭힘·성희롱 조사</h2>
+  <p id="lockWhy"></p>
+  <p>재직 중인 직원 계정으로 열 수 있습니다.</p>
+</div>
+
+<main id="app" style="display:none">
+  <div class="warn" id="loadNote" style="display:none"></div>
+
+  <!-- 탭 1: 조사 사건 현황 -->
+  <section class="pane on" id="p-cases">
+    <div class="kpis" id="kpiBox"></div>
+    <div class="card">
+      <div class="bar">
+        <input id="caseQ" type="search" aria-label="사건 검색" placeholder="사업장·사건명·사건번호 찾기" style="flex:1;min-width:160px;max-width:300px">
+        <select id="caseCat" aria-label="조사 구분 필터">
+          <option value="">조사 구분 전체</option>
+          <option value="harass">직장 내 괴롭힘</option>
+          <option value="sexual">직장 내 성희롱</option>
+          <option value="both">괴롭힘·성희롱 복합</option>
+        </select>
+        <select id="caseSt" aria-label="진행상태 필터">
+          <option value="">진행상태 전체</option>
+          <option value="open">진행·검토 중</option>
+          <option value="closed">종결 완료</option>
+        </select>
+        <select id="caseMgr" aria-label="담당 노무사 필터"><option value="">담당 노무사 전체</option></select>
+        <span class="sp"></span>
+        <button class="sm" id="imapScanBtn" title="다음메일 서버 전체 폴더에서 지난 괴롭힘·성희롱 공문까지 심층 검색합니다">🔍 과거 메일 심층검색</button>
+        <button class="sm pri" id="newCaseBtn">+ 새 조사 사건</button>
+      </div>
+      <div id="casesBox"></div>
+    </div>
+  </section>
+
+  <!-- 탭 2: 메일 자동수집 · 미등록 후보 -->
+  <section class="pane" id="p-inbox">
+    <div class="note">
+      푸른 메일함에서 <b>직장 내 괴롭힘·성희롱 조사 관련 견적·계약·공문·진술서·보고서</b>를 자동 감지해 의뢰처별로 묶었습니다.
+      맞는 묶음을 골라 <b>➕ 사건 등록 + 이알피 반영</b>을 누르면 조사 사건 생성과 함께 푸른이알피에 진행 과정 전체가 자동 등록됩니다.
+    </div>
+    <div class="card">
+      <div class="bar">
+        <input id="inQ" type="search" aria-label="미등록 후보 검색" placeholder="의뢰처·메일 제목·첨부파일 찾기" style="flex:1;min-width:160px;max-width:320px">
+        <button class="sm" id="imapInboxBtn">🔍 키워드 지정 메일함 심층검색</button>
+        <span class="sp"></span>
+        <span class="hint" id="mailStat"></span>
+      </div>
+      <div id="inboxBox"></div>
+    </div>
+  </section>
+
+  <!-- 탭 3: 사건 상세 · 8단계 진행 & 공문함 -->
+  <section class="pane" id="p-detail">
+    <div id="detailBox"></div>
+  </section>
+
+  <!-- 탭 4: 진술 · 3요건 검토 · 조사결과보고서 (비밀유지 잠금) -->
+  <section class="pane" id="p-report">
+    <div id="reportBox"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox" role="dialog" aria-modal="true" aria-labelledby="mhdTitle" tabindex="-1"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="printArea"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=96"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, harass 는 유예 목록에 없으므로 강제(enforce) 모드로 동작합니다 -->
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=44"></script>
+<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script src="hangul/js/zip.js?v=1"></script>
+<script src="hangul/js/hwpx.js?v=1"></script>
+<script src="hangul/js/hwp.js?v=1"></script>
+<script src="vendor/pdf.min.js?v=1"></script>
+<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
+<script src="js/pu-kordoc-text.js?v=3"></script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-harass-core.js?v=6"></script>
+<script src="js/pu-harass-sign.js?v=3"></script>
+<script src="js/pu-harass-hwpx.js?v=5"></script>
+<script src="js/pu-harass-view.js?v=9"></script>
+<script>
+window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+if(location.protocol==='file:'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요';
+} else if(typeof firebase==='undefined'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='인터넷 연결이 필요합니다';
+} else {
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  PuHarassView.boot(firebase);
+}
+</script>
+</body>
+</html>
