@@ -5810,7 +5810,7 @@ body.portal-mode #moreFab{display:flex;}
     { g:'misc',   label:'기타 건의' }
   ];
   var SG_STATUS = { new:{t:'접수',c:'sg-st-new'}, ing:{t:'검토중',c:'sg-st-ing'}, done:{t:'완료',c:'sg-st-done'} };
-  var SG = { uid:'', name:'', email:'', role:'member', draftCat:'erp', draftImgs:[], _all:[], listStatus:'open', listQ:'', replyDraftImgs:[] };
+  var SG = { uid:'', name:'', email:'', role:'member', draftCat:'erp', draftImgs:[], _all:[], listStatus:'open', listQ:'', replyDraftImgs:[], ack:{} };
 
   window.sgSetUser = function(acct){
     SG.uid = (auth.currentUser && auth.currentUser.uid) || '';
@@ -6555,7 +6555,9 @@ body.portal-mode #moreFab{display:flex;}
       arr.reverse();
       SG._all = arr;
       SG.listShown = 30; SG.listPeriod = 'all';
+      SG.ack = {};
       sgRenderList();
+      sgLoadAckStates();     // 완료한 건 중 «건의자가 최종 확인했는지» 를 뒤따라 채운다 (관리자만)
       // 예전 건의(sg_meta 없던 시절) 백필 — 관리자가 목록을 열 때 조용히 보충
       if(sgIsAdmin()){
         db.ref(SG_META_PRIVATE_PATH).once('value').then(function(ms){
@@ -6575,6 +6577,46 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ── 최종 확정 표시 (대표 지시 2026-11-11 「담당자에게 최종확정되었는지 확인 답변까지 받게」) ──
+     «완료» 는 우리가 고쳤다는 말이고, «확정» 은 건의한 담당자가 「해결됐어요」 로 답한 것(resolvedOk:true)이다.
+     그 답은 건의자 진행함(suggestions_resolved_private/{uid}/{id})에 있어 목록(suggestions_private)만 봐서는 안 보였다 —
+     그래서 완료한 건이 «확인을 받았는지» 를 상세를 열어 보기 전엔 몰랐다.
+       ok   = 건의자가 해결을 확인함     no   = 아직 안 됐다고 회신함(재요청이 따로 접수됨)
+       wait = 확인 대기 — 답이 없고 확인 팝업이 아직 «안 본» 상태(seen:false)
+       그 밖 = 확인 칸이 없던 때 마감된 예전 건 — 아무 표시도 하지 않는다
+     ⚠ 읽기만 한다. 관리자만 읽을 수 있는 자리라 일반 직원 화면에서는 부르지 않는다. 실패해도 목록은 그대로다. */
+  function sgLoadAckStates(){
+    if(!sgIsAdmin()) return;
+    /* 건의자(uid)마다 진행함을 «한 번씩» 읽어 그 사람의 완료 건을 모두 판정한다 — 건수·나이로 자르지 않는다.
+       (예전엔 건마다 두 번씩 읽으며 «최근 60건» 으로 잘라, 완료가 많아지면 가장 오래 답 없는 건이 다시 빠졌다 — 외부 검토 지적.)
+       읽는 양의 한도는 «사람 수»(100명, 오래된 건을 가진 사람부터)다. */
+    var byUid = {};
+    (SG._all||[]).forEach(function(s){
+      if(s.status==='done' && s.authorUid && SG.ack[s._id]===undefined){ (byUid[s.authorUid] = byUid[s.authorUid] || []).push(s); }
+    });
+    /* 가장 오래된 완료 건을 가진 사람부터 읽는다 — 한도에 걸려도 «가장 오래 답 없는 건» 쪽이 먼저 보이게 */
+    function oldest(list){ return list.reduce(function(m,s){ return Math.min(m, s.repliedAt||s.createdAt||0); }, Infinity); }
+    var uids = Object.keys(byUid).sort(function(a,b){ return oldest(byUid[a]) - oldest(byUid[b]); }).slice(0, 100);
+    if(!uids.length) return;
+    function repaint(){
+      /* 목록 화면을 떠났으면 그만. 검색창에 글자를 치는 중이면 «포커스가 빠질 때까지» 미룬다 — 다시 그리면 입력 칸이 새로 만들어져 포커스·한글 조합이 끊긴다 */
+      var d = (typeof document !== 'undefined') ? document : null;
+      if(d && d.getElementById && !d.getElementById('sgListWrap')) return;
+      var ae = d ? d.activeElement : null;
+      if(ae && ae.id==='sgListSearch'){ setTimeout(repaint, 1200); return; }
+      sgRenderList();
+    }
+    return Promise.all(uids.map(function(uid){
+      return db.ref(sgResolvedUidPath(uid)).once('value').then(function(snap){
+        var recs = snap.val() || {};
+        byUid[uid].forEach(function(s){
+          var r = recs[s._id]; if(!r || typeof r!=='object') return;     // 진행함에 줄이 없으면 모른다 — «대기» 로 단정하지 않는다
+          SG.ack[s._id] = r.resolvedOk===true ? 'ok' : (r.resolvedOk===false ? 'no' : (r.seen===false ? 'wait' : 'old'));
+        });
+      }).catch(function(){});
+    })).then(repaint).catch(function(){});
+  }
+
   // 목록 렌더 (상태 필터 + 검색) — SG._all 기준, 재조회 없음
   function sgRenderList(){
     var wrap = $('sgListWrap'); if(!wrap) return;
@@ -6590,10 +6632,14 @@ body.portal-mode #moreFab{display:flex;}
        두 숫자를 한 곳에서 낸다. 이러면 어긋날 수가 없다.
        ⚠ 관리자만이다 — 일반 직원 배지는 「내 건의가 해결됐다」를 세는 다른 수다. */
     if(sgIsAdmin()) sgSetBadge(totalOpen);
-    var FILTERS = [['open','미처리 '+totalOpen],['done','완료 '+totalDone],['all','전체 '+arr.length]];
+    var nWait = sgIsAdmin() ? arr.filter(function(s){ return s.status==='done' && SG.ack[s._id]==='wait'; }).length : 0;
+    if(!nWait && SG.listStatus==='ack') SG.listStatus = 'done';     // 대기가 다 풀렸는데 그 칩에 머물지 않게
+    var FILTERS = [['open','미처리 '+totalOpen],['done','완료 '+totalDone]];
+    if(nWait) FILTERS.push(['ack','⏳ 대기 '+nWait,'건의자 확인 대기']);     // 좁은 폰(375px)에서도 탭이 한 줄이도록 짧게
+    FILTERS.push(['all','전체 '+arr.length]);
     var chips = '<div class="sg-list-tabs" role="tablist" aria-label="건의 상태">' + FILTERS.map(function(f){
       var on = SG.listStatus === f[0];
-      return '<button data-f="'+f[0]+'" class="sg-flt'+(on?' on':'')+'" role="tab" aria-selected="'+(on?'true':'false')+'">'+f[1]+'</button>';
+      return '<button data-f="'+f[0]+'" class="sg-flt'+(on?' on':'')+'" role="tab" aria-selected="'+(on?'true':'false')+'"'+(f[2]?' title="'+f[2]+'"':'')+'>'+f[1]+'</button>';
     }).join('') + '</div>';
     if(!SG.listPeriod) SG.listPeriod='all';
     var periodSelect = '<select id="sgPeriodSelect" aria-label="조회 기간">'
@@ -6617,12 +6663,14 @@ body.portal-mode #moreFab{display:flex;}
     var list = arr.filter(function(s){
       if(SG.listStatus==='open' && s.status==='done') return false;
       if(SG.listStatus==='done' && s.status!=='done') return false;
+      if(SG.listStatus==='ack' && !(s.status==='done' && SG.ack[s._id]==='wait')) return false;
       if(!_inPeriod(s)) return false;
       if(q){ var hay = ((s.title||'')+' '+(s.content||'')+' '+(s.author||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
       return true;
     });
     // 완료 탭은 완료(답변)일 최신순, 그 외는 등록일 최신순(arr 기본 순서 유지)
-    if(SG.listStatus==='done'){ list.sort(function(a,b){ return (b.repliedAt||b.createdAt||0)-(a.repliedAt||a.createdAt||0); }); }
+    var _byDone = SG.listStatus==='done' || SG.listStatus==='ack';
+    if(_byDone){ list.sort(function(a,b){ return (b.repliedAt||b.createdAt||0)-(a.repliedAt||a.createdAt||0); }); }
     // 더 보기(30개씩) — 완료가 아무리 많아도 가볍게
     var PAGE = 30;
     var shown = SG.listShown || PAGE;
@@ -6631,12 +6679,17 @@ body.portal-mode #moreFab{display:flex;}
       var st = SG_STATUS[s.status] || SG_STATUS.new;
       var shots = (s.images && s.images.length) ? ' · 📎 '+s.images.length : '';
       var rep = s.reply ? ' · 답변 ✔' : '';
-      var when = (SG.listStatus==='done' && s.repliedAt) ? ('완료 '+sgFmt(s.repliedAt)) : sgFmt(s.createdAt);
+      var when = (_byDone && s.repliedAt) ? ('완료 '+sgFmt(s.repliedAt)) : sgFmt(s.createdAt);
+      // 완료한 건이 «건의자 최종 확인» 을 받았는지 — 확정 ✅ · 미해결 회신 🙅 · 확인 대기 ⏳ (예전 건은 표시 없음)
+      var _ak = s.status==='done' ? SG.ack[s._id] : '';
+      var ackT = _ak==='ok' ? ' · <span style="color:#166534;font-weight:700">✅ 건의자 확인</span>'
+        : _ak==='no' ? ' · <span style="color:#991b1b;font-weight:700">🙅 미해결 회신</span>'
+        : _ak==='wait' ? ' · <span style="color:#854d0e;font-weight:700">⏳ 확인 대기</span>' : '';
       // 재요청(미해결 회신)은 목록에서도 바로 보이게 — 새 건의로 오해하지 않게
       var reReq = s.relatedId ? '<span style="color:#991b1b;font-weight:700"> · ↩ 재요청</span>' : '';
-      return '<div class="sg-item" data-id="'+s._id+'">'
+      return '<div class="sg-item" data-id="'+sgEsc(s._id)+'">'
         + '<div class="sg-itl">'+sgEsc(s.title)+'</div>'
-        + '<div class="sg-meta"><span class="sg-badge sg-b-'+sgCatClass(s.cat)+'">'+sgEsc(sgCatName(s.cat))+'</span> · '+sgEsc(sgWho(s.author))+' · '+when+shots+rep+reReq+'</div></div>';
+        + '<div class="sg-meta"><span class="sg-badge sg-b-'+sgCatClass(s.cat)+'">'+sgEsc(sgCatName(s.cat))+'</span>'+ackT+' · '+sgEsc(sgWho(s.author))+' · '+when+shots+rep+reReq+'</div></div>';
     }).join('') : '<div class="sg-empty">'+(arr.length? '조건에 맞는 건의가 없습니다.' : '아직 등록된 건의가 없습니다.<br>불편한 점을 자유롭게 남겨주세요.')+'</div>';
     var moreBtn = (list.length > shown)
       ? '<button id="sgMore" class="sg-btn ghost" style="margin-top:8px">더 보기 ('+(list.length-shown)+'건 남음)</button>' : '';
@@ -6734,7 +6787,7 @@ body.portal-mode #moreFab{display:flex;}
     box.innerHTML = '<div style="border:1px solid #fde68a;background:#fffbeb;border-radius:9px;padding:8px 10px;margin:8px 0">'
       + '<div style="font-size:.76rem;font-weight:800;color:#854d0e;margin-bottom:5px">💡 비슷한 지난 건의 '+scored.length+'건 — 이미 접수·처리된 내용인지 확인해보세요</div>'
       + scored.map(function(x){ var st=SG_STATUS[x.s.status]||SG_STATUS.new;
-          return '<div class="sgSimIt" data-id="'+x.s._id+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
+          return '<div class="sgSimIt" data-id="'+sgEsc(x.s._id)+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
         }).join('')
       + '</div>';
     Array.prototype.forEach.call(box.querySelectorAll('.sgSimIt'), function(el){
@@ -7090,6 +7143,8 @@ body.portal-mode #moreFab{display:flex;}
           else if(rv.resolvedOk === false)
             el.innerHTML = '<div style="background:#f8fafc;border:1px solid #fecaca;border-radius:8px;padding:7px 10px;margin:8px 0;font-size:.72rem;color:#991b1b"><b>🙅 건의자가 미해결로 회신했습니다</b>'+(rv.feedbackAt?' · '+sgFmt(rv.feedbackAt):'')
               +(rv.feedback?'<div style="margin-top:4px;color:#991b1b">'+sgEsc(rv.feedback)+'</div>':'')+'</div>';
+          else if(s.status==='done' && rv.seen===false)
+            el.innerHTML = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;margin:8px 0;font-size:.72rem;color:#854d0e"><b>⏳ 건의자 확인을 기다리는 중입니다</b> · 건의자가 포털에 로그인하면 「해결됐어요 / 아직 안 됐어요」 확인 창이 뜹니다</div>';
         }).catch(function(){});
       }
       if(sgIsAdmin()){
