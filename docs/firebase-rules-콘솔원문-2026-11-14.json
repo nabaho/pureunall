@@ -1872,6 +1872,17 @@
           ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true) && newData.exists()",
           ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'"
         }
+      },
+      "archive": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true) && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiArchive'",
+          "files": {
+            "$f": {
+              ".validate": "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).child('secret').val() === true && root.child('pu_docs/originals').child($f).child('from').child('kind').val() === 'deungi'"
+            }
+          }
+        }
       }
     },
     "rehab_ad": {
@@ -2471,7 +2482,7 @@
           "from": {
             ".validate": "newData.hasChild('kind')",
             "kind": {
-              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote'"
+              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote' || newData.val() === 'deungi'"
             },
             "$f": {
               ".validate": "newData.isString() && newData.val().length <= 200"

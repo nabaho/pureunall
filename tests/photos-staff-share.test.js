@@ -349,10 +349,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      새로 1(/deungi/archive — 재직+관리자·위임관리인, 지우기 금지, 파일 줄은 원본 보관함에 있는 번호만) ·
      바뀜 1(원본 보관함 from.kind 에 'deungi' 한 값 — 쓰기 조건은 그대로, 받는 값만 하나 늚) · 사라짐 0 · 넓어짐 0.
      게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 줄을 뺄 것. */
-  const PENDING = [
-    '/deungi/archive',
-    '/pu_docs/originals/$id/from/kind/.validate',
-  ];
+  /* ★ 2026-11-14 — 푸른등기 원본 서류 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「설정에서 허용하고 다시해라」): 새로 1 · 바뀜 1 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-14.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
