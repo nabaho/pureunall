@@ -1383,12 +1383,16 @@ rules.settle = { '.read': SETTLE_R,
    ★ 읽기·쓰기 = 재직 + (관리자 · 위임관리인) — 포털 타일(perm 'deungi' — 아무에게도 안 준 깃발)과 «같은 사람».
      담기는 것: 지금 등기부 현황(사원 이름·생년월일·주소·출자, 대표사원, 분사무소) · 등기 건(바뀌는 사람·서류 고르기·필요서류 확인·일정).
      ⚠ 주민등록번호 뒷자리는 화면이 저장하지 않는다(생년월일만) — 그래도 주소가 들어 있어 재무권한자에게도 열지 않는다.
-   ⚠ 지우기(빈 값 쓰기)는 막는다 — 등기 건은 «취소» 상태로만 거둔다. 열쇠와 레코드 id 가 어긋나면 막는다. */
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 등기 건은 «취소» 상태로만 거둔다. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ★ archive(2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」) — 지난 등기 원본 서류 묶음. 파일 바이트는 원본 보관함 🔒 자리,
+     여기엔 파일 번호·종류만. 파일 줄의 열쇠 = 파일 번호이고, 원본 보관함에 «있는» 번호만 받는다(남의 자리를 가리키는 헛 번호 막기). */
 const DEUNGI_R = `(${LOGIN}) && (${ADMIN} || ${SUB})`;
 const DEUNGI_W = `${DEUNGI_R} && newData.exists()`;
 rules.deungi = { '.read': DEUNGI_R,
   base:  { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === 'base' && newData.child('entityType').val() === 'DeungiBase'" },
-  cases: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'" } } };
+  cases: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'" } },
+  archive: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiArchive'",
+    files: { $f: { '.validate': "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).exists()" } } } } };
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
@@ -1818,8 +1822,9 @@ rules.pu_docs = {
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     from:   {
       '.validate': "newData.hasChild('kind')",
-      /* 'quote' — 보낸메일에서 가져온 견적·계약 원본(🔒, 견적·계약 자동화 계획 1). puDocSecret 이 «견적 길» 파일인지 이 값으로 가린다 */
-      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote'" },
+      /* 'quote' — 보낸메일에서 가져온 견적·계약 원본(🔒, 견적·계약 자동화 계획 1). puDocSecret 이 «견적 길» 파일인지 이 값으로 가린다
+         'deungi' — 푸른등기 «지난 등기 원본 서류»(🔒, 2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」). 여는 길은 puDocSecret 총괄관리자 길 그대로 */
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote' || newData.val() === 'deungi'" },
       $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
     },
     $other: { '.validate': false }

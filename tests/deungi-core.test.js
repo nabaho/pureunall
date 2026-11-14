@@ -300,3 +300,63 @@ test('현물 재산만 적고 금액이 0원이면 경고 · 등기의 사유는
   const b = C.applyChanges(법인(), 건([{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }], { dates: { approval: '2026-12-05', approvalGet: '2026-12-08' } }));
   assert.match(C.reason(b), /2026년 12월 5일 고용노동부 정관변경 인가를 받음/);
 });
+
+/* 2026-11-14 지난 등기 원본 서류 묶음(deungi/archive) — 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」 */
+test('원본 서류 종류 짐작 — «정관변경 인가신청서»가 «정관»으로 가지 않는다', () => {
+  const 보기 = {
+    '1. 노무법인 정관 변경인가 신청서.hwp': 'apply', '정관변경인가증.pdf': 'approval', '서산지사노동부인가증.pdf': 'approval',
+    '정관변경이유서.hwp': 'reason', '사원총회 의사록.hwp': 'minutes', '임시사원총회 회의록_240416.pdf': 'minutes',
+    '4. 총사원 동의서 (푸른노무법인) (.hwp': 'consent', '2. 정관변경사항 및 정관변경-검토수정안.hwp': 'compare',
+    '사원명부.pdf': 'roster', '주주명부_250102.pdf': 'roster', '7. 위임장.hwp': 'poa', '공증용위임장.hwp': 'poa',
+    '28(19).합명회사변경등기(상호·목적변경)-지사설립등기.hwp': 'request', '등기부등본.pdf': 'registry', '등기사항증명서_2026-09-10.pdf': 'registry',
+    '필요서류 안내.jpg': 'guide', '납부서외.pdf': 'fee', '3. 정 관-2019.7.(지사)-검토수정안.hwp': 'charter', '개정 정관.hwp': 'charter', '사진.jpg': 'etc',
+  };
+  Object.keys(보기).forEach((n) => assert.equal(C.guessArcKind(n), 보기[n], n));
+  assert.equal(C.arcKindLabel('apply'), '정관변경 인가신청서');
+  assert.equal(C.arcKindLabel('없는것'), '기타');
+});
+
+test('파일 이름 속 날짜 — 여덟 자리·구분 있는 날짜만, 여섯 자리(주민번호 앞자리 꼴)는 읽지 않는다', () => {
+  assert.equal(C.arcDateFromName('SCAN_20180828_172128591.pdf'), '2018-08-28');
+  assert.equal(C.arcDateFromName('정관변경2012.10.16'), '2012-10-16');
+  assert.equal(C.arcDateFromName('등기사항증명서_2026-09-10.pdf'), '2026-09-10');
+  assert.equal(C.arcDateFromName('회의록_240416.pdf'), '');
+  assert.equal(C.arcDateFromName('정 관 2019.7.(지사).hwp'), '');
+  assert.equal(C.arcDateFromName('20191399.pdf'), '');
+});
+
+test('★ 묶음 정리 — 파일 줄 열쇠는 파일 번호와 같아야 하고, 글 칸의 주민번호 뒷자리는 지운다', () => {
+  const a = C.normArchive({ id: 'ARtest01', title: '점검 등기 700101-1234567', at: '2019-07-30', summary: '사원 1명 입사 800101 2234567',
+    files: {
+      ok_file_id_0001: { fileId: 'ok_file_id_0001', name: '동의서 700101-1234567.hwp', kind: 'consent', date: '2019-07-30', masked: true, addedAt: 5 },
+      bad: { fileId: 'bad', name: '짧은 번호', kind: 'etc' },
+      mismatch_key_0001: { fileId: 'other_file_id_01', name: '열쇠가 다름', kind: 'etc' },
+      weird_kind_00001: { fileId: 'weird_kind_00001', name: '모르는 종류', kind: 'nope', date: '2019-02-30' },
+    } });
+  assert.equal(a.entityType, 'DeungiArchive');
+  assert.deepEqual(Object.keys(a.files).sort(), ['ok_file_id_0001', 'weird_kind_00001']);
+  assert.doesNotMatch(JSON.stringify(a), /1234567|2234567/);
+  assert.equal(a.files.weird_kind_00001.kind, 'etc');
+  assert.equal(a.files.weird_kind_00001.date, '');
+  assert.equal(a.files.ok_file_id_0001.masked, true);
+  assert.equal(C.normArchive({ id: 'a/b' }).id, '', '열쇠에 쓸 수 없는 글자');
+});
+
+test('묶음 차례는 날짜 늦은 것부터(날짜 없는 것은 끝), 파일은 서류 종류 차례', () => {
+  const rows = C.archiveList({
+    ARold00001: { id: 'ARold00001', title: '옛 등기', at: '2017-12-06' },
+    ARnone0001: { id: 'ARnone0001', title: '날짜 모름' },
+    ARnew00001: { id: 'ARnew00001', title: '새 등기', at: '2026-09-03', files: {
+      file_b_00001: { fileId: 'file_b_00001', name: '위임장.hwp', kind: 'poa' },
+      file_a_00001: { fileId: 'file_a_00001', name: '정관.hwp', kind: 'charter' } } },
+  });
+  assert.deepEqual(rows.map((r) => r.id), ['ARnew00001', 'ARold00001', 'ARnone0001']);
+  assert.deepEqual(C.arcFiles(rows[0]).map((f) => f.kind), ['charter', 'poa']);
+});
+
+test('새로 올린 파일 한 줄 — 종류·날짜를 이름으로 짐작하고, 이름에 «가림»이 있으면 가린 사본 표시', () => {
+  const e = C.arcFileEntry('push_key_000001', '2019-07-30_총사원 동의서_주민번호가림.hwp', 9);
+  assert.deepEqual(e, { fileId: 'push_key_000001', name: '2019-07-30_총사원 동의서_주민번호가림.hwp', kind: 'consent', date: '2019-07-30', note: '', masked: true, addedAt: 9 });
+  assert.equal(C.arcFileEntry('x', '정관.hwp'), null, '파일 번호 꼴이 아니면 만들지 않는다');
+  assert.equal(C.arcFileEntry('push_key_000002', '정관.hwp').masked, false);
+});

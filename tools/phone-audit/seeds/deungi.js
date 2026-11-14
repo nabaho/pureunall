@@ -33,8 +33,19 @@ const c1 = Object.assign(meta('DG20261114-test', 'DeungiCase'), {
   dates: { notice: '2026-11-13' }, checks: { corpSeal: { ok: true }, corpCert: { ok: true, issued: '2026-07-01' } }, docsOff: {},
 });
 
+/* 지난 등기 원본 서류 묶음(2026-11-14) — 긴 파일 이름·여러 종류를 섞어 폰 카드가 깨지는지 본다. 파일 번호는 지어낸 것 */
+const ar1 = Object.assign(meta('ARtest2019a', 'DeungiArchive'), {
+  title: '2019-07 나무분사무소 설치·정관변경(점검)', at: '2019-07-30', summary: '분사무소 1곳 설치 — 정관 제3조 변경, 인가 뒤 등기',
+  files: {
+    fake_file_id_0001: { fileId: 'fake_file_id_0001', name: '1. 노무법인 정관 변경인가 신청서(점검용 아주 긴 파일 이름 가나다라마바사아자차카타파하).hwp', kind: 'apply', date: '2019-07-17', note: '', masked: false, addedAt: T0 },
+    fake_file_id_0002: { fileId: 'fake_file_id_0002', name: '4. 총사원 동의서_주민번호가림.hwp', kind: 'consent', date: '2019-07-30', note: '', masked: true, addedAt: T0 },
+    fake_file_id_0003: { fileId: 'fake_file_id_0003', name: '정관변경인가증.pdf', kind: 'approval', date: '2019-07-31', note: '', masked: false, addedAt: T0 },
+  },
+});
+const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-12 정관변경(점검)', at: '2017-12-06', summary: '', files: {} });
+
 module.exports = {
-  data: { deungi: { base, cases: { [c1.id]: c1 } } },
+  data: { deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } } },
   localStorage: { pu_deungi_tab: 'case', pu_deungi_cur: c1.id },
   views: [
     { name: 'docs', run: async (p) => { await p.click('#edDocs input[data-doc]'); } },
