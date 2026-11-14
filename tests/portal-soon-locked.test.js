@@ -60,6 +60,8 @@ function 그려보기(role, offLifted) {
     isMobile: () => false,
     appRowOf: (a) => a.row,
     portalAppWindowName: (k) => 'pu_' + k,
+    /* head 앱(푸른 캘린더)은 줄 타일이 아니라 머리줄 단추로 간다 — 이 검사는 «타일»만 본다(단추는 tests/portal-cal-head-button.test.js) */
+    portalHeadAppPaint: () => {},
     tileCont: () => ({ appendChild: (a) => 그린것.push(a) })
   };
   vm.createContext(ctx);
