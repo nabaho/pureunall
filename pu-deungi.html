@@ -476,8 +476,9 @@ function checkMsgs(a, B0){
   a.warnings.forEach(function(e){ m+='<div class="msg w">⚠ '+esc(e)+'</div>'; });
   C.baseProblems(B0).forEach(function(e){ m+='<div class="msg w">⚠ 등기 현황: '+esc(e)+'</div>'; });
   if(!n.changes.length) m+='<div class="msg i">바뀌는 것을 넣으면 여기서 확인합니다.</div>';
+  else if(!a.errors.length && !C.hasEffect(a)) m+='<div class="msg w">⚠ 넣은 변경이 아직 비었거나 지금과 같습니다 — 사람·분사무소를 고르고 새 값을 넣으십시오.</div>';
   else if(!a.errors.length) m+='<div class="msg ok">✔ 서류를 만들 수 있습니다 — '+esc(C.purpose(a)||'등기할 사항 없음')+(a.charterChanged?' · 정관 '+a.arts.map(function(k){ return '제'+k+'조'; }).join('·')+' 변경 → 고용노동부 정관변경 인가가 필요합니다':' · 정관은 바뀌지 않습니다(인가 불필요)')+'</div>';
-  if(n.changes.length && !a.errors.length){ var cp=C.costPlan(a), where=MODE==='easy'?'④ 등기 단계':'⑦ 예상 비용';
+  if(n.changes.length && !a.errors.length && C.hasEffect(a)){ var cp=C.costPlan(a), where=MODE==='easy'?'④ 등기 단계':'⑦ 예상 비용';
     m+='<div class="msg i">💰 '+(cp.none?'등기할 사항이 없어 등기 비용이 들지 않습니다'+(a.charterChanged?'(정관변경 인가만)':''):'예상 비용 약 <b>'+C.won(cp.visit)+'원</b>('+(n.filing==='agent'?'세금·수수료·공증·증명서 — 법무사 보수 별도':'직접 방문 신청 · 세금·수수료·공증·증명서')+') — 자세한 표는 '+where+(cp.alt||cp.perType?' · 늘어날 수 있음':''))+'</div>'; }
   return '<div class="msgs">'+m+'</div>';
 }
@@ -545,7 +546,8 @@ function drawChecklist(a){
 function drawSched(a){
   var c=a.c, d=c.dates, dl=C.deadline(a, today());
   var steps=[['notice','소집통지일'],['notarize','의사록 공증'],['approvalApply','정관변경 인가 신청'],['approval','정관변경 인가일'],['approvalGet','정관변경 인가증 받음'],['file','등기 신청'],['done','등기 완료']]
-    .filter(function(s){ return a.charterChanged || (s[0]!=='approvalApply' && s[0]!=='approval' && s[0]!=='approvalGet'); });
+    .filter(function(s){ return a.charterChanged || (s[0]!=='approvalApply' && s[0]!=='approval' && s[0]!=='approvalGet'); })
+    .filter(function(s){ return C.needsReg(a) || ['notarize','file','done'].indexOf(s[0])<0; });   /* 등기할 사항이 없으면 공증·등기 날짜 칸이 없다 */
   var h='<div class="steps">'+steps.map(function(s){ return '<label class="step'+(d[s[0]]?' done':'')+'">'+esc(s[1])+'<input type="date" data-k="dates.'+s[0]+'" value="'+esc(d[s[0]]||'')+'"></label>'; }).join('')+'</div>';
   var dm='';
   if(dl && dl.none) dm='<div class="msg ok">✔ 등기할 사항이 없어 등기 기한이 없습니다'+(a.charterChanged?' — 정관변경 인가만 받으면 됩니다':'')+'</div>';
@@ -558,7 +560,7 @@ function drawSched(a){
   var canApply=canApplyCase(a, cur());
   h+='<div class="cb">'+dm+'<div class="bar" style="padding:8px 0 0"><label class="fl" style="flex-direction:row;align-items:center;gap:6px">단계 <select data-k="status">'+stOpts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===c.status?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></label>'+
     '<span class="hint">다음: '+esc(C.nextStep(a, today()))+'</span><span class="sp"></span>'+
-    (c.applied?'<span class="chip g">✔ 등기 현황에 반영함</span>':'<button class="sm '+(canApply?'pri':'')+'" data-act="applyBase"'+(canApply?'':' disabled title="«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다"')+'>🏛 등기 현황에 반영</button>')+'</div></div>';
+    (c.applied?'<span class="chip g">✔ 등기 현황에 반영함</span>':'<button class="sm '+(canApply?'pri':'')+'" data-act="applyBase"'+(canApply?'':' disabled title="'+esc(applyWhy(a))+'"')+'>🏛 등기 현황에 반영</button>')+'</div></div>';
   $('edSched').innerHTML=h;
 }
 
@@ -600,7 +602,7 @@ function drawWizBody(st, a){
     h='<div class="card easy"><h3>① 무엇이 바뀌나요? <span class="hint">아래 단추를 눌러 넣고, 나오는 칸만 채우면 됩니다 — 나머지는 등기 현황에서 가져옵니다</span></h3>'+
       '<div class="cb"><div class="grid">'+fld('사원총회 날짜(서류에 들어가는 날짜)', 'meeting.date', n.meeting.date, { type:'date' })+fld('시각', 'meeting.time', n.meeting.time, { type:'time' })+fld('장소', 'meeting.place', n.meeting.place)+'</div></div>'+
       '<div class="tiles">'+EASY_TILES.map(function(t){ return '<button class="tile" data-add="'+t[0]+'">'+esc(t[1])+'<small>'+esc(t[2])+'</small></button>'; }).join('')+'</div>'+
-      '<div id="edChanges"></div><div id="edCheck"></div>'+nextBar(1, !!(n.changes.length && !a.errors.length && n.meeting.date), !n.changes.length?'바뀌는 것을 하나 이상 넣으십시오':!n.meeting.date?'사원총회 날짜를 넣으십시오':a.errors.length?'빨간 글을 먼저 고치십시오':'')+'</div>';
+      '<div id="edChanges"></div><div id="edCheck"></div>'+nextBar(1, !!(n.changes.length && !a.errors.length && n.meeting.date && C.hasEffect(a)), !n.changes.length?'바뀌는 것을 하나 이상 넣으십시오':!C.hasEffect(a)?'사람·분사무소를 고르고 새 값을 넣으십시오':!n.meeting.date?'사원총회 날짜를 넣으십시오':a.errors.length?'빨간 글을 먼저 고치십시오':'')+'</div>';
     $('wizBody').innerHTML=h; drawChanges(); $('edCheck').innerHTML=checkMsgs(a, B0); return;
   }
   if(st===2){
@@ -650,7 +652,7 @@ function drawWizBody(st, a){
 }
 /* 등기 현황에 반영할 수 있나 — 등기할 사항이 있으면 «등기 완료된 날», 없으면 정관이 바뀔 때 «인가증 받은 날»(검토 2026-11-15) */
 function canApplyCase(a, c){
-  if(!c || c.applied || a.errors.length || !a.c.changes.length) return false;
+  if(!c || c.applied || a.errors.length || !a.c.changes.length || !C.hasEffect(a)) return false;
   return C.needsReg(a) ? !!a.c.dates.done : (!a.charterChanged || !!a.c.dates.approvalGet);
 }
 function applyWhy(a){ return C.needsReg(a) ? '«등기 완료된 날»을 넣으면 누를 수 있습니다' : '«인가증 받은 날»을 넣으면 누를 수 있습니다(등기할 사항 없음)'; }
@@ -659,6 +661,7 @@ function drawCost(a){
   var el=$('edCost'); if(!el) return;
   if(!a.c.changes.length){ el.innerHTML='<div class="empty">바뀌는 것을 넣으면 계산합니다.</div>'; return; }
   var p=C.costPlan(a), self=a.c.filing!=='agent';
+  if(p.incomplete){ el.innerHTML='<div class="empty">'+esc(p.notes[0])+'</div>'; return; }
   if(p.none){ el.innerHTML='<div class="msgs">'+p.notes.map(function(t){ return '<div class="msg ok">✔ '+esc(t)+'</div>'; }).join('')+'</div>'; return; }
   var h='<div class="scroll"><table class="t"><thead><tr><th class="n">№</th><th>항목</th><th>계산</th><th>금액</th><th>내는 곳</th><th>근거</th></tr></thead><tbody>'+
     p.rows.map(function(r, i){
@@ -682,7 +685,7 @@ function drawEasyDerived(){
   if($('edCost')) drawCost(a);
   var nx=$('wizNext'), st=SHOWN||STEP||auto;
   if(nx){
-    var ok=st===1 ? !!(n.changes.length && !a.errors.length && n.meeting.date) : st===2 ? sealKeysOf(a).every(function(k){ return (n.checks['seal_'+k]||{}).ok; }) : st===3 ? (!a.charterChanged || !!n.dates.approvalGet) : true;
+    var ok=st===1 ? !!(n.changes.length && !a.errors.length && n.meeting.date && C.hasEffect(a)) : st===2 ? sealKeysOf(a).every(function(k){ return (n.checks['seal_'+k]||{}).ok; }) : st===3 ? (!a.charterChanged || !!n.dates.approvalGet) : true;
     nx.disabled=!ok;
   }
   var ab=document.querySelector('#wizBody [data-act="applyBase"]');
@@ -1056,6 +1059,7 @@ function chgById(id){ var c=cur(); return (c.changes||[]).filter(function(x){ re
 function applyToBase(){
   var c=cur(); if(!c) return; var a=C.applyChanges(baseOf(c), c);
   if(a.errors.length) return toast('빨간 글을 먼저 고치십시오');
+  if(!C.hasEffect(a)) return toast('넣은 변경이 비었거나 지금과 같습니다 — 반영할 것이 없습니다', 4000);
   if(C.needsReg(a) && !a.c.dates.done) return toast('«등기 완료» 날짜를 넣으십시오');
   if(!C.needsReg(a) && a.charterChanged && !a.c.dates.approvalGet) return toast('«인가증 받은 날»을 넣으십시오');
   if(BASE_DRAFT) return toast('«등기 현황»에 저장 안 한 고침이 있습니다 — 먼저 저장하거나 되돌리십시오', 4000);

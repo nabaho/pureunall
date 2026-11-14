@@ -210,3 +210,10 @@ test('등기할 사항이 없는 건 — 반영 조건 한 곳(canApplyCase), �
   assert.match(본문, /if\(dl && dl\.none\)/);
   assert.match(본문, /esc\(C\.purpose\(a\)\|\|'등기할 사항 없음'\)/);
 });
+
+test('넣다 만 변경은 반영 단추·다음 단추를 막고, 자세히 화면도 같은 설명(applyWhy)', () => {
+  assert.match(본문, /if\(!c \|\| c\.applied \|\| a\.errors\.length \|\| !a\.c\.changes\.length \|\| !C\.hasEffect\(a\)\) return false;/);
+  assert.match(본문, /if\(!C\.hasEffect\(a\)\) return toast\(/);
+  assert.match(본문, /n\.meeting\.date && C\.hasEffect\(a\)\)/);
+  assert.doesNotMatch(본문, /«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다/);
+});

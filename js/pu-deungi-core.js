@@ -76,7 +76,7 @@
   function costPlan(after) {
     var c = after.c, b = after.base || {}, firm = b.firm || {}, hq = placeOf(firm.hq) || '본점 소재지';
     var has = {}; (after.events || []).forEach(function (e) { has[e.type] = true; });
-    var repAddr = (after.events || []).some(function (e) { return e.type === 'addr' && (after.byId[e.member] || {}).rep; });
+    var repAddr = (after.events || []).some(function (e) { return (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; })); });
     /* 등기 목적 — 사원(임원)의 입사·퇴사·대표사원 취임·사임·주소변경은 «같은 등기목적»으로 1건(등기예규 제1861호 «2인 이상 임원의 취임·퇴임·주소변경»,
        예규의 임원에 사원 포함). 등기소·지자체가 종류마다 따로 세면 더 나온다 — perType 으로 함께 보여 준다 */
     var kinds = [];
@@ -101,6 +101,10 @@
     /* 수수료 «건» — 등기 목적마다, 분사무소 설치는 한 신청서에 여러 곳이어도 1건(등기예규 제1861호) */
     var nFee = purposes.length + (brAdds ? 1 : 0) + (has.brMove ? 1 : 0) + (has.brClose ? 1 : 0);
     var notes = [];
+    if (!hasEffect(after)) {
+      notes.push('넣은 변경이 아직 비었거나 지금과 같습니다 — 사람·분사무소·새 주소를 고르면 계산합니다');
+      return { rows: [], nFee: 0, tax: 0, edu: 0, visit: 0, efile: 0, perType: 0, alt: null, notes: notes, hq: hq, asOf: FEES.asOf, incomplete: true, resOther: 0 };
+    }
     /* 등기할 것이 없으면(예: 대표사원이 아닌 사원의 주소만 바뀜 — 정관 제5조만 바뀌고 등기부엔 없다) 등기 비용은 없다 — 검토 2026-11-15 */
     if (!nFee) {
       if (after.charterChanged) rows.push({ kind: 'approval', label: '노동부 정관변경 인가', calc: '수수료 없음', amount: 0, payTo: (firm.authority || '관할 지방고용노동관서'), basis: '공인노무사법령에 수수료 규정 없음' });
@@ -113,10 +117,10 @@
        ⚠ «변경 전» 사원은 등기 현황(after.base) 그대로 — 변경 뒤 출자액으로 다시 만들면 양도된 지분이 두 번 셈해진다(보안 검토 2026-11-15) */
     var before = ((after.base && after.base.members) || []);
     var twice = {}; (after.events || []).forEach(function (e) { if (e.type === 'leave' || (e.type === 'repOut' && !e.byLeave)) twice[e.member] = true; });
-    var nSeal = before.filter(function (m) { return !twice[m.id]; }).length + Object.keys(twice).length * 2, nRes = 0;
+    var nSeal = before.filter(function (m) { return !twice[m.id]; }).length + Object.keys(twice).length * 2, nRes = 0, resOther = 0, resSeen = {};
     (after.events || []).forEach(function (e) {
       if (e.type === 'join') { nSeal += 2; nRes += 1; }
-      if (e.type === 'addr' && (after.byId[e.member] || {}).rep) nRes += 1;   /* 대표사원 주소변경 증명 */
+      if ((e.type === 'repIn' && !(after.byId[e.member] || {}).isNew) || (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; }))) { if (!resSeen[e.member]) { resSeen[e.member] = 1; nRes += 1; resOther += 1; } }
       if (e.type === 'repIn' && !(after.byId[e.member] || {}).isNew && !twice[e.member]) nSeal += 1;
     });
     rows.push({ kind: 'cert', label: '개인 인감증명서 ' + nSeal + '통', calc: '통당 ' + won(FEES.cert.seal) + '원(정부24 전자발급·등기 제출용은 면제)', amount: nSeal * FEES.cert.seal, payTo: '주민센터', basis: '인감증명법 시행령 제19조' });
@@ -136,7 +140,7 @@
       alt = { incr: incr, tax: t2, visit: sum('visit') + add };
       notes.push('현금·현물 출자로 총출자액이 ' + won(incr) + '원 늘어 «출자증가»(지방세법 제28조제1항제6호 가목, 증가액×0.4%·최저 112,500원)로 보면 등록면허세 ' + won(t2) + '원(+지방교육세)이 더해져 방문 기준 약 ' + won(alt.visit) + '원 — 노무법인에 적용하는지 ' + hq + ' 세무과에 확인');
     }
-    return { rows: rows, nFee: nFee, tax: tax, edu: edu, visit: sum('visit'), efile: sum('efile'), perType: perType, alt: alt, notes: notes, hq: hq, asOf: FEES.asOf };
+    return { rows: rows, nFee: nFee, tax: tax, edu: edu, visit: sum('visit'), efile: sum('efile'), perType: perType, alt: alt, notes: notes, hq: hq, asOf: FEES.asOf, resOther: resOther };
   }
 
   /* ── 작은 도구 ── */
@@ -529,7 +533,7 @@
     if (t.share) out.push('사원 출자 변경');
     if (t.repIn) out.push('대표사원 취임');
     if (t.repOut) out.push('대표사원 ' + (after.events.some(function (e) { return e.type === 'repOut' && !e.byLeave; }) ? '사임' : '퇴임'));
-    if (t.addr && after.events.some(function (e) { return e.type === 'addr' && (after.byId[e.member] || {}).rep; })) out.push('대표사원 주소 변경');
+    if (t.addr && after.events.some(function (e) { return (e.type === 'addr' && (after.byId[e.member] || {}).rep && !(after.events || []).some(function (x) { return x.type === 'repIn' && x.member === e.member; })); })) out.push('대표사원 주소 변경');
     if (t.brAdd) out.push('분사무소 설치');
     if (t.brMove) out.push('분사무소 이전');
     if (t.brClose) out.push('분사무소 폐지');
@@ -752,7 +756,9 @@
   /* ── 기한 ── */
   /* 등기할 사항이 있는가 — 대표사원이 아닌 사원의 주소만 바뀌면 정관(제5조)만 바뀌고 등기부엔 없다(검토 2026-11-15).
      없으면 등기 신청·공증·세금·등기 기한·등기 완료일이 모두 필요 없다 — 정관변경 인가로 끝 */
-  function needsReg(after) { return !after.c.changes.length || regItems(after).length > 0; }
+  function needsReg(after) { return !after.c.changes.length || !(after.events || []).length || regItems(after).length > 0; }
+  /* 넣은 변경이 실제로 무엇을 바꾸는가 — 대상 미선택·지금과 같은 값이면 events 가 비어 있다(2차 재검증 2026-11-15) */
+  function hasEffect(after) { return (after.events || []).length > 0; }
   function deadline(after, today) {
     var c = after.c, t = today || todayIso();
     if (!needsReg(after)) return { from: '', due: '', basis: '등기할 사항 없음', left: null, overdue: false, filed: false, none: true, note: '등기할 사항이 없어 등기 기한이 없습니다' };
@@ -813,9 +819,10 @@
         add('신입 사원', 'newLicense:' + m.id, m.name + ' 공인노무사 자격·직무개시 등록 확인', '정관 제19조(개업자격을 지닌 노무사)', '확인 필요');
       } else if (e.type === 'repIn') {
         add('대표사원 취임', 'accept:' + m.id, m.name + ' 취임승낙서', '이 앱 서류 — 인감 날인', '서류');
+        if (!m.isNew) add('대표사원 취임', 'repRes:' + m.id, m.name + ' 주민등록표 초본 1통', '새 대표사원 주소 증명 · 발급 3개월 이내(상업등기규칙 제52조제1항제3호·제4항)', '법령', 3);
         if (!m.isNew) add('대표사원 취임', 'repCert:' + m.id, m.name + ' 인감증명서', '취임승낙서 인감 확인용 · 발급 3개월 이내', '확인 필요', 3);
         add('대표사원 취임', 'sealReport:' + m.id, m.name + ' 인감신고서(등기소 양식)', '새 대표사원 개인 인감 날인 · 3개월 이내 인감증명서 첨부(상업등기법 제25조, 상업등기규칙 제35조)', '법령');
-      } else if (e.type === 'addr' && m.rep) {
+      } else if (e.type === 'addr' && m.rep && !after.events.some(function (x) { return x.type === 'repIn' && x.member === e.member; })) {
         add('대표사원 주소변경', 'addrRes:' + m.id, m.name + ' 주민등록표 초본 1통', '주소변경 증명 · 발급 3개월 이내(상업등기규칙 제52조제1항제4호·제4항)', '법령', 3);
       } else if (e.type === 'brAdd' || e.type === 'brMove') {
         var br = after.brById[e.branch] || {};
@@ -962,7 +969,7 @@
   /* 지금 있어야 할 단계 — 1 바뀌는 것 · 2 서류·도장 · 3 노동부 인가 · 4 등기 */
   function easyStep(after, sealKeys) {
     var c = after.c;
-    if (!c.changes.length || after.errors.length || !c.meeting.date) return 1;
+    if (!c.changes.length || after.errors.length || !c.meeting.date || !hasEffect(after)) return 1;
     var sealed = (sealKeys || []).every(function (k) { return c.checks['seal_' + k] && c.checks['seal_' + k].ok; });
     if (!sealed) return 2;
     if (after.charterChanged && !c.dates.approvalGet) return 3;
@@ -1054,7 +1061,7 @@
 
   return {
     SEAL: SEAL, sealPlan: sealPlan, easyStep: easyStep,
-    FEES: FEES, costPlan: costPlan, placeOf: placeOf, needsReg: needsReg,
+    FEES: FEES, costPlan: costPlan, placeOf: placeOf, needsReg: needsReg, hasEffect: hasEffect,
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,
     normArchive: normArchive, archiveList: archiveList, arcFiles: arcFiles, arcFileEntry: arcFileEntry, safeName: safeName,
     TYPES: TYPES, ORDER: ORDER, STATUS: STATUS, STATUS_ORDER: STATUS_ORDER, DOCS: DOCS, ART_TITLE: ART_TITLE, ART_NOS: ART_NOS,

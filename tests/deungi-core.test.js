@@ -484,3 +484,21 @@ test('★ 등기할 사항이 없는 건 — 필요서류·다음 할 일·기�
   assert.ok(C.costPlan(a).rows.some((r) => /주민등록표 초본 1통/.test(r.label)));
   assert.ok(C.checklist(a).some((i) => /^addrRes:/.test(i.key)));
 });
+
+/* 2026-11-15 2차 재검증 반영 — 넣다 만 변경·지금과 같은 변경은 «등기할 것 없음»이 아니다, 취임+주소변경은 한 번 */
+test('넣다 만·효력 없는 변경 — 등기 없음으로 보지 않고 계산·다음 단계도 막는다 · 같은 사원 취임+주소변경은 취임 등기 하나', () => {
+  const b = 법인(); b.firm.hq = '충청남도 천안시 서북구 점검로 1';
+  const A = (changes) => C.applyChanges(C.normBase(b), { id: 'DG-E', meeting: { date: '2026-11-20' }, changes });
+  let a = A([{ id: 'l', type: 'leave' }]);
+  assert.equal(C.hasEffect(a), false); assert.equal(C.needsReg(a), true);
+  assert.equal(C.costPlan(a).incomplete, true); assert.equal(C.costPlan(a).none, undefined);
+  assert.equal(C.easyStep(a, []), 1);
+  a = A([{ id: 'a', type: 'addr', member: 'm3', addr: '점검시 다로 3' }]);   /* 지금 주소와 같음 */
+  assert.equal(C.hasEffect(a), false);
+  a = A([{ id: 'r', type: 'repIn', member: 'm3' }, { id: 'a', type: 'addr', member: 'm3', addr: '점검시 새로 9' }]);
+  assert.doesNotMatch(C.purpose(a), /주소 변경/);
+  assert.equal(C.costPlan(a).rows.filter((r) => r.kind === 'tax').length, 1);
+  assert.equal(C.costPlan(a).resOther, 1, '초본은 사람마다 1통');
+  const ck = C.checklist(a).map((i) => i.key);
+  assert.ok(ck.includes('repRes:m3') && !ck.some((k) => /^addrRes:/.test(k)));
+});

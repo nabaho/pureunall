@@ -387,7 +387,7 @@
     if (rs) out.push('1. 대표사원 사임서 ' + rs + '통, 사임 대표사원 인감증명서');
     var cp = C.costPlan(a);
     if (cp.alt) out.push('1. 재산출자 이행 증명서 1통');
-    if (ev.addr && a.events.some(function (e) { return e.type === 'addr' && (a.byId[e.member] || {}).rep; })) out.push('1. 주소변경 대표사원 주민등록표 초본 1통');
+    if (cp.resOther) out.push('1. 주민등록표 초본(대표사원 취임·주소변경 사원) ' + cp.resOther + '통');
     out.push('1. 등록면허세 영수필 통지서(등기소 통보용)·영수필확인서 각 1통');
     out.push('1. 등기신청수수료 영수필확인서 1통');
     if (!self) out.push('1. 위임장 1통');
@@ -447,7 +447,7 @@
     });
     var dl = C.deadline(a, x.today);
     var body = D.title('필요서류 확인표', c.title + ' · ' + C.koDate(x.today) + ' 기준') + SP() +
-      (dl && dl.due ? P('등기 기한 : ' + C.koDate(dl.due) + ' (' + dl.basis + ' ' + dl.from + ' + 2주일)') : P('등기 기한 : ' + (a.charterChanged ? '정관변경 인가증을 받은 날부터 2주일' : '변경 연월일부터 2주일'))) +
+      (dl && dl.none ? P('등기 기한 : 없음 — 등기할 사항이 없습니다' + (a.charterChanged ? '(정관변경 인가만)' : '')) : dl && dl.due ? P('등기 기한 : ' + C.koDate(dl.due) + ' (' + dl.basis + ' ' + dl.from + ' + 2주일)') : P('등기 기한 : ' + (a.charterChanged ? '정관변경 인가증을 받은 날부터 2주일' : '변경 연월일부터 2주일'))) +
       NOTE('※ ' + C.DEADLINE_NOTE) + SP() +
       T(rows, [0.06, 0.13, 0.31, 0.38, 0.12], doc, { sz: SZ.p9, cp: CP.f9 }) + SP() +
       NOTE('근거 — 법무사 안내: 법무사 «임원변경 등기신청 시 필요서류»(2025. 2. 14.) · 지난 등기: 지난 변경등기 첨부서면 · 확인 필요: 담당 법무사·노무사 확인 · 등본·인감은 발급일부터 3개월 이내');
