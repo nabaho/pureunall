@@ -123,11 +123,21 @@
      ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름 — 둘 다 있으면 정확한 쪽이 이긴다.
      ⚠ 기록에 적는 경로·건 키는 늘 «번호 있는 이름»(CASE_ROOT) 기준이다 — 번호 없는 PC 와 있는 PC 가 같은 기록을 쓴다. */
   var NUM_PREFIX = /^\s*\d+\s*\.\s*/;
+  var CASE_ROOT_BARE = CASE_ROOT.replace(NUM_PREFIX, '');
   function dirNameChoices(name) {
     var n = String(name == null ? '' : name), bare = n.replace(NUM_PREFIX, '');
-    return bare && bare !== n ? [n, bare] : [n];
+    if (bare && bare !== n) return [n, bare];
+    /* 반대 방향 — 번호 «없는» 7번 폴더 이름으로 적힌 옛 기록(번호 없는 PC 에서 전체 스캔으로 만든 것)을 번호 «있는» PC 에서도 열려면
+       번호 있는 이름도 후보로 둔다(재검증 2026-11-15). 다른 폴더는 번호를 짐작하지 않는다. */
+    if (n === CASE_ROOT_BARE) return [n, CASE_ROOT];
+    return [n];
   }
-  function isCaseRootName(seg) { return dirNameChoices(CASE_ROOT).indexOf(String(seg == null ? '' : seg)) >= 0; }
+  function isCaseRootName(seg) { seg = String(seg == null ? '' : seg); return seg === CASE_ROOT || seg === CASE_ROOT_BARE; }
+  /* 기록에 적는 경로는 늘 «번호 있는 이름» — 첫 칸이 번호 없는 7번 폴더 이름이면 바꾼다(전체 스캔·건 등록 어느 길이든 같은 경로) */
+  function canonRelPath(relPath) {
+    var p = String(relPath == null ? '' : relPath), i = p.indexOf('/');
+    return i > 0 && isCaseRootName(p.slice(0, i)) ? CASE_ROOT + p.slice(i) : p;
+  }
 
   function pickYear(name, relPath, mtimeISO) {
     var m = String(name == null ? '' : name).match(/(20\d{2})/);
@@ -164,6 +174,10 @@
     var copySeen = {};       // name|size → 최초 relPath
     var caseMap = {};        // caseKey → 건 레코드
     var caseOrder = [];
+
+    /* 입력이 번호 없는 7번 폴더 경로여도 기록은 «번호 있는 이름»으로 — 건 키(caseDir)와 파일 경로(relPath)가 어긋나면
+       다른 PC 에서 원본이 안 열리고, 같은 파일이 두 번 등록된다(재검증 2026-11-15) */
+    files = (files || []).map(function (f) { return f && f.relPath ? Object.assign({}, f, { relPath: canonRelPath(f.relPath) }) : f; });
 
     (files || []).forEach(function (f) {
       if (isIgnoredFile(f.name)) { out.ignored++; return; }
@@ -228,6 +242,7 @@
     CASE_ROOT: CASE_ROOT,
     dirNameChoices: dirNameChoices,
     isCaseRootName: isCaseRootName,
+    canonRelPath: canonRelPath,
     buildRecords: buildRecords,
     extOf: extOf,
     isIgnoredFile: isIgnoredFile,

@@ -40,9 +40,12 @@
   var APPLY = /지원서|응모|이력서|프로필|지원\s*서류|입사\s*지원/;
   /* ★ 「…신청서 제출(이름, 분야)」 — 공고가 «메일 제목을 이렇게 쓰라»고 정한 꼴(2027 충남 비즈니스지원단 상담위원, 2026-11-11)이라 제목을 바꿀 수 없다.
      그런데 위 APPLY 는 «신청서»를 안 봐서 이 메일을 지원으로 못 알아봤다(실측 2026-11-15) → 보낸 뒤에도 «지원함»이 저절로 안 적혔다.
-     ⚠ 「신청서 제출」만으로는 안 된다 — 고객 업무(산재·근로자·기업 신청서 제출)에도 흔하다. «모집 대상 낱말(WHO: 지원단·상담위원·컨설턴트·위원…)»이 함께 있을 때만,
-       그리고 아래 CLIENT 로 걸러지지 않을 때만 지원으로 본다. */
-  var APPLY_FORM = /신청서\s*제출/;
+     ⚠ 「신청서 제출」만으로는 안 된다 — 고객 업무(산재·근로자·기업 신청서 제출)에도 흔하다. 세 겹으로 좁혔다(재검증 2026-11-15, 고객 대행 메일 오인 4건 실측):
+       ① 공고가 정한 꼴 그대로 «신청서 제출(이름, 분야)» — 괄호 안이 «사람 이름 + 쉼표 + 분야»여야 한다(「(㈜가나)」·「(가나산업)」 같은 기업 괄호는 아니다)
+       ② «모집 대상 낱말(WHO: 지원단·상담위원·컨설턴트·위원…)»이 함께 있어야 한다
+       ③ 고객 업무 낱말(아래 CLIENT)과 «기업·상담 신청» 표지(CLIENT_FORM)에 걸리지 않아야 한다. */
+  var APPLY_FORM = /신청서\s*제출\s*\(\s*[^(),]{2,6}\s*,\s*[^()]{1,16}\)/;
+  var CLIENT_FORM = /상담\s*신청서|선임|㈜|\(주\)|주식회사/;
   /* 고객 업무 메일 — 「산업일자리전환 컨설팅 신청서 송부」는 고객 기업의 신청서다(실측) */
   var CLIENT = /자동이체|급여|퇴직금|건강보험|국민연금|산재|육아휴직|일용|대체인력|해지|참여\s*신청|기업\s*리스트|기업\s*참여|근로자|사업장\s*신청|컨설팅\s*신청서|신청서\s*송부/;
   /* ── 결과 메일 ── */
@@ -84,7 +87,7 @@
     var orgs = (o.matches ? o.matches(subj) : []) || [];
     base.org = orgs[0] || '';
     /* 내가 보낸 지원 — 또는 받은편지함의 «내 지원 메일에 단 답장»(Re: 응모서류 제출의 건) */
-    if ((sent || reply) && (APPLY.test(subj) || (APPLY_FORM.test(subj) && WHO.test(subj))) && !CLIENT.test(subj)) { base.kind = 'submit'; base.viaReply = !sent; return base; }
+    if ((sent || reply) && (APPLY.test(subj) || (APPLY_FORM.test(subj) && WHO.test(subj) && !CLIENT_FORM.test(subj))) && !CLIENT.test(subj)) { base.kind = 'submit'; base.viaReply = !sent; return base; }
     if (!sent && !reply && RESULT.test(subj) && RESULT_WHO.test(subj) && !NOT_RESULT.test(subj)) {
       base.kind = 'result'; base.guess = outcome(subj); return base;
     }

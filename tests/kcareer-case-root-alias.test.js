@@ -45,7 +45,8 @@ class 폴더 {
 /* ───────── ① 공용 규칙(kcareer-scan.js) ───────── */
 test('① 번호 있는 이름과 없는 이름을 같은 폴더로 본다 — 정확한 이름이 먼저', () => {
   assert.deepEqual(Scan.dirNameChoices('7. 컨설턴트,위원신청등'), ['7. 컨설턴트,위원신청등', '컨설턴트,위원신청등']);
-  assert.deepEqual(Scan.dirNameChoices('컨설턴트,위원신청등'), ['컨설턴트,위원신청등'], '번호가 없으면 후보가 하나');
+  assert.deepEqual(Scan.dirNameChoices('컨설턴트,위원신청등'), ['컨설턴트,위원신청등', '7. 컨설턴트,위원신청등'], '반대 방향: 번호 없는 7번 폴더 이름으로 적힌 옛 기록을 번호 있는 PC 에서도 연다');
+  assert.deepEqual(Scan.dirNameChoices('임금체불'), ['임금체불'], '다른 폴더는 번호를 짐작하지 않는다');
   assert.deepEqual(Scan.dirNameChoices('2.충남노사민정 업무'), ['2.충남노사민정 업무', '충남노사민정 업무'], '점 뒤 띄어쓰기가 없어도');
   assert.deepEqual(Scan.dirNameChoices(''), ['']); assert.deepEqual(Scan.dirNameChoices(null), ['']);
   assert.ok(Scan.isCaseRootName('7. 컨설턴트,위원신청등') && Scan.isCaseRootName('컨설턴트,위원신청등'));
@@ -109,7 +110,7 @@ test('③ kcareer.html 에서 폴더를 이름으로 찾는 곳은 _fsDir 하나
   const 코드 = strip(KC);
   const 날것 = 코드.match(/getDirectoryHandle\([^)]*\)/g) || [];
   /* 허락: _fsDir 안의 한 줄(후보[i]) + 새 건 폴더를 «만드는» create:true 호출(연도·건·접수서류) */
-  const 허락 = 날것.filter((x) => /후보\[i\]/.test(x) || /create\s*:\s*true/.test(x));
+  const 허락 = 날것.filter((x) => /후보\[(i|0)\]/.test(x) || /create\s*:\s*true/.test(x));   /* _fsDir 안: 있는지 보는 줄(후보[i]) + 어느 쪽도 없을 때 정확한 이름으로 만드는 줄(후보[0]) */
   assert.deepEqual(날것.filter((x) => !허락.includes(x)), [], '⚠ 폴더를 «번호 있는 이름으로만» 찾는 곳이 남았습니다 — _fsDir 로 찾으세요(이름 접두어 규칙을 한 곳에 둔다)');
   assert.match(떼기(KC, 'async function _fsDir('), /KcareerScan\.dirNameChoices\(/);
   assert.match(KC, /<script src="js\/kcareer-scan\.js\?v=\d+"><\/script>/, '공용 규칙 파일에 캐시 번호가 붙어 있어야 고친 규칙이 받아진다');
@@ -141,15 +142,24 @@ test('④ gov-submit.js 캐시 번호가 붙어 있다(고친 규칙이 받아�
 /* ───────── ⑤ 공고가 정한 메일 제목을 «지원»으로 알아본다 ───────── */
 const 분류 = (제목, 보냄) => Gov.classify({ s: 제목, u: '1', d: '2026-11-16', a: 3 }, { sent: 보냄, folder: '보낸편지함', matches: () => [] });
 test('⑤ 「…신청서 제출(이름, 분야)」 — 보낸 메일도, 거기에 온 답장도 지원으로 알아본다', () => {
-  const 제목 = '2027년 충남 비즈니스지원단 신청서 제출(권형하, 인사노무)';
+  const 제목 = '2027년 충남 비즈니스지원단 신청서 제출(홍길동, 인사노무)';   /* 가짜 이름 — 시험 자료에 진짜 이름을 넣지 않는다 */
   const 보냄 = 분류(제목, true); assert.ok(보냄 && 보냄.kind === 'submit', '⚠ 공고가 정한 제목을 지원으로 못 알아봅니다 — 보낸 뒤 «지원함»이 저절로 안 적힙니다');
   const 답장 = 분류('Re: ' + 제목, false); assert.ok(답장 && 답장.kind === 'submit' && 답장.viaReply === true);
 });
 test('⑤ 「신청서 제출」만으로는 지원이 아니다 — 모집 대상 낱말(WHO)이 있어야 하고, 고객 업무 낱말(CLIENT)이 있으면 지원이 아니다', () => {
-  for (const 제목 of ['(주)가나다 산재 신청서 제출', '○○공단 신청서 제출', '상담위원 기업 참여신청서 제출', '근로자 상담위원 신청서 제출', '급여 컨설턴트 신청서 제출']) {
+  for (const 제목 of ['(주)가나다 산재 신청서 제출', '○○공단 신청서 제출(홍길동, 금융)', '상담위원 기업 참여신청서 제출(홍길동, 금융)', '근로자 상담위원 신청서 제출(홍길동, 금융)', '급여 컨설턴트 신청서 제출(홍길동, 금융)', '상담위원 신청서 제출']) {
     assert.equal(분류(제목, true), null, '⚠ 지원이 아닌 메일을 지원으로 적습니다: ' + 제목);
   }
   assert.equal(분류('2027년 충남 비즈니스지원단 신청서 제출 안내', false), null, '받은 안내 메일(답장 아님)은 지원이 아니다');
+});
+test('⑤ 고객 대행 메일 — 기업 괄호·상담 신청서·선임은 지원이 아니다(재검증 2026-11-15 실측 4건) · 공고 꼴은 «(사람 이름, 분야)»일 때만', () => {
+  for (const 제목 of ['충남 비즈니스지원단 상담 신청서 제출(㈜가나)', '노무사 선임 신청서 제출', '전문가 컨설팅 지원 신청서 제출(가나㈜)', '코칭 프로그램 신청서 제출(가나산업)',
+    '충남 비즈니스지원단 신청서 제출(주식회사 가나, 컨설팅)', '컨설턴트 상담 신청서 제출(홍길동, 금융)']) {
+    assert.equal(분류(제목, true), null, '⚠ 고객 대행 메일을 지원으로 적습니다: ' + 제목);
+  }
+  for (const 제목 of ['2027년 충남 비즈니스지원단 신청서 제출(홍길동,금융)', '2027년 충남 비즈니스지원단 신청서 제출( 홍길동 , 인사노무 )']) {
+    assert.ok(분류(제목, true), '공고 꼴인데 지원으로 못 알아봅니다: ' + 제목);
+  }
 });
 test('⑤ 기존에 알아보던 제목은 그대로다(지원서·응모·이력서·프로필)', () => {
   for (const 제목 of ['한국기계연구원 고문노무사 지원서 제출', '평가위원 응모 서류', '컨설턴트 이력서 송부', '전문가 프로필 제출']) {
@@ -159,6 +169,52 @@ test('⑤ 기존에 알아보던 제목은 그대로다(지원서·응모·이�
 test('⑤ 규칙은 한 곳(APPLY_FORM)이고 모집 대상 낱말·고객 낱말 거름은 그대로 걸려 있다', () => {
   const 코드 = strip(fs.readFileSync(path.join(__dirname, '..', 'js', 'gov-submit.js'), 'utf8'));
   assert.match(코드, /var APPLY_FORM\s*=\s*\/[^/]*신청서[^/]*제출[^/]*\//);
+  assert.match(코드, /var CLIENT_FORM\s*=\s*\/[^/]*상담[^/]*신청서[^/]*\//);
   const 줄 = 코드.match(/if \(\(sent \|\| reply\)[^\n]*\{/)[0];
-  assert.match(줄, /APPLY_FORM\.test\(subj\)\s*&&\s*WHO\.test\(subj\)/); assert.match(줄, /!CLIENT\.test\(subj\)/);
+  assert.match(줄, /APPLY_FORM\.test\(subj\)\s*&&\s*WHO\.test\(subj\)\s*&&\s*!CLIENT_FORM\.test\(subj\)/); assert.match(줄, /!CLIENT\.test\(subj\)/);
+});
+
+/* ───────── ⑥ 재검증(2026-11-15) 지적 — 기록의 경로는 어느 길로 들어와도 «번호 있는 이름» ───────── */
+test('⑥ 기록의 경로(relPath)도 «번호 있는 이름»으로 통일된다 — 건 키(caseDir)만 바뀌고 경로가 그대로면 두 PC 가 어긋나고 같은 파일이 두 번 등록된다', () => {
+  assert.equal(Scan.canonRelPath('컨설턴트,위원신청등/2026년/2026 ○○/접수서류/a.pdf'), '7. 컨설턴트,위원신청등/2026년/2026 ○○/접수서류/a.pdf');
+  assert.equal(Scan.canonRelPath('7. 컨설턴트,위원신청등/2026년/x/a.pdf'), '7. 컨설턴트,위원신청등/2026년/x/a.pdf', '이미 번호가 있으면 그대로');
+  assert.equal(Scan.canonRelPath('8. 공동기금/x.pdf'), '8. 공동기금/x.pdf', '다른 폴더는 건드리지 않는다');
+  assert.equal(Scan.canonRelPath('컨설턴트,위원신청등'), '컨설턴트,위원신청등', '경로 한 칸뿐이면 그대로');
+  const 입력 = [{ name: '2026 위촉장.pdf', relPath: '컨설턴트,위원신청등/2026년/2026 충남청/접수서류/2026 위촉장.pdf', size: 100, mtime: '2026-11-15T00:00:00.000Z' }];
+  const 결과 = Scan.buildRecords(입력, { scanId: 'T1' });
+  assert.equal(결과.submissions.length, 1);
+  const 건 = 결과.submissions[0];
+  assert.equal(건.caseDir, '7. 컨설턴트,위원신청등/2026년/2026 충남청');
+  assert.ok(건.files.every((f) => f.relPath.startsWith(Scan.CASE_ROOT + '/')), '⚠ 건 파일 경로가 번호 없는 이름으로 남았습니다');
+  assert.ok(결과.promotions.concat(결과.maybes).every((p) => !p.relPath || p.relPath.startsWith(Scan.CASE_ROOT + '/')), '⚠ 승격 후보 경로가 번호 없는 이름으로 남았습니다');
+  assert.equal(입력[0].relPath.startsWith('컨설턴트'), true, '입력 자료는 바꾸지 않는다(복사본만)');
+});
+test('⑥ 전체 스캔(fsScanAll) — 서류 폴더 바로 아래의 번호 없는 7번 폴더는 경로가 «번호 있는 이름»으로 적힌다 · 다른 폴더는 그대로', async () => {
+  const 파일 = (n) => ({ kind: 'file', name: n, getFile: async () => ({ size: 5, lastModified: 0 }) });
+  const 건 = new 폴더('접수서류'); 건.kids = { '신청서.pdf': 파일('신청서.pdf') };
+  const 칸 = new 폴더('컨설턴트,위원신청등', { '2026년': new 폴더('2026년', { '2026 ○○': new 폴더('2026 ○○', { '접수서류': 건 }) }) });
+  const 이름 = new 폴더('1. 컨설팅자료', { '메모.txt': 파일('메모.txt') });
+  const 루트 = new 폴더('서류', { '컨설턴트,위원신청등': 칸, '1. 컨설팅자료': 이름 });
+  const ctx = { Promise, Date, String, console, KcareerScan: Scan, KcareerCases: Cases, toast: () => {}, fsRoot: async () => 루트 };
+  vm.createContext(ctx); vm.runInContext(떼기(KC, 'async function fsScanAll('), ctx);
+  const 목록 = [...(await ctx.fsScanAll())].map((f) => f.relPath).sort();
+  assert.deepEqual(목록, ['1. 컨설팅자료/메모.txt', '7. 컨설턴트,위원신청등/2026년/2026 ○○/접수서류/신청서.pdf'], '⚠ 번호 없는 7번 폴더 경로가 그대로 적혔습니다 — 건 등록 경로와 달라 같은 파일이 두 번 올라갑니다');
+});
+test('⑥ 번호 있는 PC 에서 «번호 없는 경로»로 적힌 옛 기록도 열린다 — _fsDir 가 번호 있는 이름을 후보로 둔다', async () => {
+  const c = 도구(), 있는 = new 폴더('서류', { '7. 컨설턴트,위원신청등': new 폴더('7. 컨설턴트,위원신청등') });
+  assert.equal((await c._fsDir(있는, '컨설턴트,위원신청등')).name, '7. 컨설턴트,위원신청등');
+});
+test('⑥ _fsDir — create 를 줘도 «이미 있는 폴더»가 있으면 새로 만들지 않는다 · 어느 쪽도 없을 때만 정확한 이름으로 만든다', async () => {
+  const c = 도구();
+  const 번호없음만 = new 폴더('서류', { '컨설턴트,위원신청등': new 폴더('컨설턴트,위원신청등') });
+  const 찾음 = await c._fsDir(번호없음만, '7. 컨설턴트,위원신청등', { create: true });
+  assert.equal(찾음.name, '컨설턴트,위원신청등'); assert.deepEqual(번호없음만.만든것, [], '⚠ 번호 없는 폴더가 이미 있는데 번호 있는 폴더를 새로 만들었습니다');
+  const 빈 = new 폴더('서류', {});
+  const 만듦 = await c._fsDir(빈, '7. 컨설턴트,위원신청등', { create: true });
+  assert.equal(만듦.name, '7. 컨설턴트,위원신청등'); assert.deepEqual(빈.만든것, ['7. 컨설턴트,위원신청등'], '어느 쪽도 없으면 정확한 이름으로 한 번 만든다');
+});
+test('⑥ 전체 스캔이 올린 파일은 건 등록(fsCaseFiles) 경로와 같은 키 — 이미 등록한 것을 «새 파일»로 또 올리지 않는다', () => {
+  const 건등록경로 = Cases.caseDirOf('2026년', '2026 ○○') + '/접수서류/신청서.pdf';
+  const 스캔경로 = Scan.canonRelPath('컨설턴트,위원신청등/2026년/2026 ○○/접수서류/신청서.pdf');
+  assert.equal(스캔경로, 건등록경로, '⚠ 두 길의 경로가 다르면 fsKnownKeys(경로|크기|수정일)가 어긋나 같은 파일이 두 번 등록됩니다');
 });

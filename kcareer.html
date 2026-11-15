@@ -4606,11 +4606,16 @@ async function fsSaveToFolder(fileRec, store, type, rec){
 var _fsRepick=false;
 /* ★ 폴더를 «이름으로» 찾는 곳은 여기 한 곳이다 — 번호 접두어(«7. »)가 있는 이름과 없는 이름을 같은 폴더로 본다(대표 지시 2026-11-15).
    이 PC 의 서류 폴더는 «컨설턴트,위원신청등»(번호 없음)이라 «7. 컨설턴트,위원신청등» 만 찾던 제출서류·새 지원 건 찾기가 「폴더가 없습니다」라고 했다.
-   ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름이다. 폴더를 새로 만들거나 이름을 바꾸지 않는다(opt 로 create 를 준 곳만 만든다).
+   ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름이다(7번 폴더는 반대로 번호 없는 이름으로 적힌 옛 기록도 번호 있는 이름으로 연다). 폴더를 새로 만들거나 이름을 바꾸지 않는다
+     (opt 로 create 를 준 곳만 만들되, 어느 쪽 이름도 없을 때만 «정확한 이름»으로 만든다).
+   ⚠ 범위: 7번만이 아니라 «번호 접두어가 붙은 모든 폴더 이름»(경로의 각 칸·1~6번 저장 폴더)에 같은 규칙이다 — 번호가 빠진 PC 에서 같은 폴더를 찾게 하려는 뜻이고,
+     정확한 이름이 있는 PC 는 그대로다. 이름이 같은 «다른» 폴더를 오인하지 않게 번호만 뗀 이름의 완전 일치만 본다.
    ⚠ 기록에 적는 경로(relPath·caseDir)는 늘 «번호 있는 이름» 기준이다 — 파일을 열 때 여기서 실제 이름으로 바뀐다. */
 async function _fsDir(parent, name, opt){
-  var 후보=KcareerScan.dirNameChoices(name), last=null;
-  for(var i=0;i<후보.length;i++){ try{ return await parent.getDirectoryHandle(후보[i], opt); }catch(e){ last=e; } }
+  var 후보=KcareerScan.dirNameChoices(name), last=null, 읽기=(opt && opt.create) ? Object.assign({}, opt, { create:false }) : opt;
+  /* ⚠ 먼저 «있는지»만 본다 — create 를 첫 후보에 그대로 주면 번호 없는 폴더가 이미 있어도 번호 있는 폴더를 새로 만들어 버린다(재검증 2026-11-15) */
+  for(var i=0;i<후보.length;i++){ try{ return await parent.getDirectoryHandle(후보[i], 읽기); }catch(e){ last=e; } }
+  if(opt && opt.create) return await parent.getDirectoryHandle(후보[0], opt);   /* 어느 쪽도 없을 때만 «정확한 이름»으로 만든다 */
   throw last || new Error('폴더 없음: '+name);
 }
 async function _fsHas(root, name){ try{ await _fsDir(root, name); return true; }catch(e){ return false; } }
@@ -4663,7 +4668,10 @@ async function fsScanAll(onProgress){
   async function walk(dir, prefix){
     for await (var ent of dir.entries()){
       var name = ent[0], h = ent[1];
-      if(h.kind === 'directory'){ await walk(h, prefix ? prefix + '/' + name : name); continue; }
+      if(h.kind === 'directory'){
+        /* 서류 폴더 바로 아래의 «번호 없는» 7번 폴더는 기록에 «번호 있는 이름»으로 적는다 — 건 등록(fsCaseFiles)과 같은 경로여야
+           두 PC 가 같은 기록을 쓰고, 이미 등록한 파일을 «새 파일»로 또 올리지 않는다(재검증 2026-11-15). 열 때는 _fsDir 가 실제 이름으로 바꾼다. */
+        await walk(h, prefix ? prefix + '/' + name : (KcareerScan.isCaseRootName(name) ? KcareerCases.CASE_ROOT : name)); continue; }
       try{
         var f = await h.getFile();     /* 메타데이터만 사용 — 내용은 읽지 않는다 */
         files.push({ name:name, relPath:(prefix ? prefix + '/' : '') + name,
