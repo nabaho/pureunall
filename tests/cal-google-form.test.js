@@ -184,8 +184,7 @@ test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 
   vm.runInContext(함수몸('function 반복글(ymd){'), b);
   const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
   assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
-  /* 큰 창(옵션 더보기·폰)은 반복·알림 줄, 빠른 창(PC)은 시간 줄 안의 「반복 안함」 선택 — 둘 다 «새 일정에만» */
-  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? \(간략 \? '' : 반복알림줄\(m\)\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
+  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
   assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');
   assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
   assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
@@ -220,7 +219,7 @@ test('참석자·Meet — 서버 대신 넣기: 우리 표의 값을 넘기고, 
 });
 
 test('참석자·Meet — 화면: 줄은 새 일정에만 · 메일 검사 · 초대 메일 안 보냄을 말한다 · 클라이언트 Meet 실패 대비', () => {
-  assert.match(함수몸('function modalHtml(){'), /\(간략 \? '' : 반복알림줄\(m\)\) \+ 참석자줄\(m\)/);
+  assert.match(함수몸('function modalHtml(){'), /반복알림줄\(m\) \+ 참석자줄\(m\)/);
   assert.match(함수몸('function 참석자줄(m){'), /초대 메일은 보내지 않습니다/, '초대 메일이 안 간다는 말이 없습니다');
   assert.match(함수몸('function doSave(){'), /참석자 메일이 올바르지 않습니다/, '틀린 메일을 막지 않습니다');
   assert.match(함수몸('function 구글에넣기(m){'), /attendees: 참석자목록\(m\.guests\)\.메일, meet: !!m\.meet, meetId:/);
@@ -378,11 +377,11 @@ test('폰 일정 보기 카드 — 장소가 있으면 「장소, 시각」', ()
   assert.match(캘, /if\(e\.place\) 언제 = String\(e\.place\)\.trim\(\) \+ \(언제 \? ", " \+ 언제 : ""\);/);
 });
 
-test('「구글 앱 색」 — 기본 «켜짐»: 구글 색 번호 없는 칩은 전부 구글 캘린더 초록, 번호 있는 구글 일정은 그 색, 끄면 사람별 색 (대표 결정 2026-11-15)', () => {
+test('「구글 앱 색」 — 기본 «꺼짐»(사람별 색이 기본): 켜면 구글 색 번호 없는 칩이 전부 구글 캘린더 초록, 번호 있는 구글 일정은 그 색 (대표 지시 2026-11-15 「사람들 색 기존으로 돌려라」)', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /data-dmono="1">/);
   assert.match(캘, /localStorage\.setItem\("pucal_gmono", _모노\(\) \? "0" : "1"\)/);
-  /* 돌려서 본다 — 저장값 없음=켜짐 · "0"=꺼짐 · 읽기 실패=켜짐(모를 때는 구글처럼) */
+  /* 돌려서 본다 — 저장값 없음=꺼짐(기본) · "1"=켜짐 · 읽기 실패=꺼짐(모를 때는 사람별 색 그대로) */
   let 저장 = null, 던짐 = false;
   const b = { String, Object, Array, JSON, Math, Date, Number, RegExp, 구글캘린더색: '#GREEN',
     localStorage: { getItem: () => { if (던짐) throw new Error('막힘'); return 저장; } } };
@@ -395,13 +394,16 @@ test('「구글 앱 색」 — 기본 «켜짐»: 구글 색 번호 없는 칩�
     { kind: 'hol', id: 'h', color: '#공휴' }, { kind: 'gone', id: 'x', color: '#지움' }, { kind: 'due', id: 'd', color: '#기한' }];
   const 색들 = (r) => r.map((e) => e.color).join(' ');
   저장 = null;
-  assert.strictEqual(색들(b.칩색정리(목록)), '#GREEN #구글색번호 #GREEN #GREEN #GREEN #GREEN #공휴 #지움 #기한',
-    '★ 저장값이 없을 때(기본) 구글 색 번호 없는 칩이 캘린더 초록이 아니다 / 번호 있는 구글 일정·공휴일·기한 색은 그대로여야 한다');
-  assert.strictEqual(목록[0].color, '#사람', '★ 원본 칩을 고쳤다 — 끄면 사람별 색이 돌아와야 한다(복사본만 바꾼다)');
+  assert.strictEqual(색들(b.칩색정리(목록)), '#사람 #구글색번호 #사람 #사람 #사람 #사람 #공휴 #지움 #기한',
+    '★ 저장값이 없을 때(기본) 사람별 색이 그대로여야 한다 — 대표 지시 「사람들 색 기존으로 모두 돌려라」');
   저장 = '0';
   assert.strictEqual(색들(b.칩색정리(목록)), '#사람 #구글색번호 #사람 #사람 #사람 #사람 #공휴 #지움 #기한', '★ 끄면(0) 사람별 색이 그대로여야 한다');
+  저장 = '1';
+  assert.strictEqual(색들(b.칩색정리(목록)), '#GREEN #구글색번호 #GREEN #GREEN #GREEN #GREEN #공휴 #지움 #기한',
+    '★ 켜면(1) 구글 색 번호 없는 칩이 캘린더 초록이어야 한다 / 번호 있는 구글 일정·공휴일·기한 색은 그대로');
+  assert.strictEqual(목록[0].color, '#사람', '★ 원본 칩을 고쳤다 — 끄면 사람별 색이 돌아와야 한다(복사본만 바꾼다)');
   저장 = '1'; 던짐 = true;
-  assert.strictEqual(b._모노(), true, '★ 저장소를 못 읽을 때는 켜짐(구글처럼)이어야 한다');
+  assert.strictEqual(b._모노(), false, '★ 저장소를 못 읽을 때는 꺼짐(사람별 색 그대로)이어야 한다');
   /* 구글 캘린더 색 — 구글 앱에서 잰 값(2026-11-15 #7cb342). 예전 #87ac5c 는 캡처에서 눈으로 뽑은 값이라 앱과 달랐다 */
   assert.match(캘, /var 구글캘린더색 = "#7cb342";/);
   assert.match(캘, /return typeof 칩색정리 === "function" \? 칩색정리\(out\) : out;/, '그리는 쪽 입구(eventsOn 끝)에서 한 번에 거르지 않는다');
