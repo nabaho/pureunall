@@ -164,14 +164,15 @@ test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인
   assert.match(본문, /var MODE='easy'/, '기본은 쉬운 진행');
   assert.match(본문, /if\(MODE==='easy'\)\{ drawEasy\(\); return; \}/);
   ['바뀌는 것 넣기', '서류 확인·도장', '노동부 인가', '등기'].forEach((k) => assert.ok(본문.indexOf("'" + k + "'") >= 0, k));
-  /* 한글 쪽 화면 — 서류마다 PureunHwp.renderPreview, 다시 그리면 앞 그리기는 버린다 */
-  const r = 본문.slice(본문.indexOf('function renderAllDocs('), 본문.indexOf('function renderAllDocs(') + 1800);
-  assert.match(r, /PureunHwp\.renderPreview\(/);
-  assert.match(r, /g!==GEN \|\| vg!==VIEW_GEN/);
+  /* 한글 쪽 화면 — 오른쪽 칸에 서류마다 PureunHwp.renderPreview, 늦게 온 그림은 버린다(긴 한글 화면 renderAllDocs 는 없앴다) */
+  const r = 본문.slice(본문.indexOf('function docView('), 본문.indexOf('function docView(') + 1600);
+  assert.match(r, /PureunHwp\.renderPreview\(box, b\.u8, b\.name\)/);
+  assert.match(r, /if\(live\(\)\)/);
+  assert.doesNotMatch(본문, /renderAllDocs|hwpView|printView|function preview\(/);
   /* 도장 체크는 건의 checks(seal_서류)에 저장 — 주민번호와 상관없는 칸 */
   assert.match(본문, /c\.checks\['seal_'\+el\.dataset\.seal\]/);
-  /* 인쇄 — 한글 화면만 */
-  assert.match(html, /@media print\{[\s\S]*#hwpView/);
+  /* 인쇄 — 보기 칸 안의 서류만 */
+  assert.match(html, /@media print\{[\s\S]*body\.withSide>\*:not\(#side\)\{display:none !important\}[\s\S]*#spv canvas/);
   /* 칸을 고쳐도 지금 보이는 단계를 기준으로 «다음» 단추를 켠다 */
   assert.match(본문, /st=SHOWN\|\|STEP\|\|auto/);
   /* 로그아웃 때 단계·그리기도 비운다 */
@@ -180,7 +181,10 @@ test('쉬운 진행 — 네 단계·한글 쪽 화면·도장 체크 저장·인
   /* (검토 2026-11-14) ④ 완료일을 넣으면 반영 단추가 바로 켜진다 · 주민번호를 넣어도 단계 그대로 · 서류 하나가 실패해도 다음 서류 */
   const d = 본문.slice(본문.indexOf('function drawEasyDerived('), 본문.indexOf('function drawEasyDerived(') + 2200);
   assert.match(d, /\[data-act="applyBase"\][\s\S]*ab\.disabled=!canA/);
-  assert.match(본문, /STEP=SHOWN\|\|STEP; drawEasy\(\)/);
+  assert.match(본문, /RRN=nx; closeModal\(\); rrnChanged\(\); toast\(/);
+  /* 주민번호를 넣거나 «모두 지우기»를 하면 칸의 서류를 바로 다시 만든다 — 지운 뒤 옛 번호가 화면·인쇄에 남지 않게(보안 검토 2026-11-15) */
+  assert.match(본문, /function rrnChanged\(\)\{ drawDerived\(\); if\(MODE==='easy' && SHOWN===2\)\{ STEP=SHOWN; drawEasy\(\); \} sideDocRefresh\(0\); \}/);
+  assert.match(본문, /act==='rrnClear'\)\{ RRN=\{\};[^\n]*rrnChanged\(\); \}/);
   assert.match(본문, /Promise\.resolve\(\)\.then\(function\(\)\{ return PureunHwp\.renderPreview\(/);
   assert.doesNotMatch(본문, /'<td data-l="발급">'/);
 });
@@ -221,17 +225,18 @@ test('넣다 만 변경은 반영 단추·다음 단추를 막고, 자세히 화
 
 /* 2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」 */
 test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음으로 하나씩, 늦은 응답은 버린다', () => {
-  assert.match(html, /<aside id="side" role="complementary" aria-label="원본 서류 보기"><\/aside>/);
+  assert.match(html, /<aside id="side" role="complementary" aria-label="서류 보기"><\/aside>/);
   /* 넓은 화면은 본문이 왼쪽으로 좁아지고, 좁은 화면(1080px 미만)은 전체를 덮는다 */
   assert.match(html, /body\.withSide main\{margin-right:var\(--sideW,46vw\)\}/);
   assert.match(html, /@media \(max-width:1079px\)\{\n  #side\.on\{top:0;left:0;width:auto;z-index:45/);
   assert.match(본문, /function sideOverlay\(\)\{ try\{ return window\.matchMedia\('\(max-width:1079px\)'\)\.matches;/);
   /* 보기는 덮는 창(openModal)을 쓰지 않는다 */
-  const v = 본문.slice(본문.indexOf('function arcView('), 본문.indexOf('function sideNav('));
+  const v = 본문.slice(본문.indexOf('function arcView('), 본문.indexOf('function docBuild('));
   assert.doesNotMatch(v, /openModal\(/);
-  assert.match(v, /SIDE=\{ ev:evId, fid:fid \}/);
+  assert.match(v, /sideShow\(\{ kind:'arc', ev:evId, fid:fid \}/);
   /* 파일마다 새 그릴 자리 + 세대·차례·자리 검사 */
-  assert.match(v, /live=function\(\)\{ return g===GEN && seq===PV_SEQ && box\.isConnected; \}/);
+  const sh = 본문.slice(본문.indexOf('function sideShow('), 본문.indexOf('function arcView('));
+  assert.match(sh, /live=function\(\)\{ return g===GEN && seq===PV_SEQ && box\.isConnected; \}/);
   assert.match(v, /PureunHwp\.renderPreview\(box, PV_BYTES\.u8, f\.name\)/);
   /* 이전·다음 — 모든 묶음 파일을 목록 차례대로, 지금 줄을 칠한다 */
   assert.match(본문, /data-act="sideNav" data-d="-1">◀ 이전<\/button>/);
@@ -239,8 +244,9 @@ test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음
   assert.match(본문, /function arcFlat\(\)\{ var out=\[\]; arcRows\(\)\.forEach/);
   assert.match(본문, /r\.classList\.toggle\('cur', yes\)/);
   /* 칸 받기·닫기·Esc */
-  assert.match(본문, /act==='sideDl'\)\{ if\(SIDE\) arcDownload\(\[\{ ev:SIDE\.ev, fid:SIDE\.fid \}\]\); \}/);
-  assert.match(본문, /if\(SIDE && sd\)\{\n    var ov=sideOverlay\(\);\n    if\(ev\.key==='Escape'\)\{ ev\.preventDefault\(\); sideClose\(\); return; \}/);
+  assert.match(본문, /act==='sideDl'\) sideDl\(\);/);
+  assert.match(본문, /function sideDl\(\)\{ if\(!SIDE\) return; if\(SIDE\.kind==='doc'\) dlOne\(SIDE\.key\); else arcDownload\(\[\{ ev:SIDE\.ev, fid:SIDE\.fid \}\]\); \}/);
+  assert.match(본문, /if\(SIDE && sd\)\{\n    var ov=sideOverlay\(\);\n[^\n]*\n    var tg=ev\.target, fld=!!\(tg && tg\.matches && tg\.matches\('input:not\(\[type=checkbox\]\):not\(\[type=radio\]\),textarea,select'\)\);\n    if\(ev\.key==='Escape' && !\(fld && \(tg\.tagName==='SELECT' \|\| !sd\.contains\(tg\)\)\)\)\{ ev\.preventDefault\(\); sideCloseUser\(\); return; \}/);
   /* 외부 검토 2026-11-15 — 좁아진 본문은 카드 표 · 덮는 모양은 뒤를 inert · 빠진 파일은 칸 닫기 · 너비가 바뀔 때만 새 자리에 다시 그림 · 뒤로가기 */
   assert.match(html, /body\.slim \.t thead\{display:none\}/);
   assert.match(본문, /document\.body\.classList\.toggle\('slim', !!SIDE && !ov && document\.documentElement\.clientWidth-w < 820\)/);
@@ -260,4 +266,70 @@ test('★ 보기 칸 — 그림은 확장자 형식으로 고정하고, 칸이 �
   assert.match(본문, /PV_URL=URL\.createObjectURL\(new Blob\(\[blob\], \{ type:ext==='png'\?'image\/png':'image\/jpeg' \}\)\)/);
   assert.doesNotMatch(본문, /PV_URL=URL\.createObjectURL\(blob\)/);
   assert.match(본문, /sideFit\(\); sideHead\(\); sideMark\(\);\n  if\(!SIDE \|\| !\$\('spv'\)\) return;/);
+});
+
+/* 2026-11-15 대표 「새로 만든 서류도 오른쪽으로 — 화면이 너무 정신없다, 간략하게」 */
+test('★ 새로 만든 서류도 같은 오른쪽 칸 — ② 목록은 한 줄씩, 누르면 칸에 한글 쪽 그대로, ①에서 고치면 다시 그린다', () => {
+  /* 칸은 지난 원본(arc)·새 서류(doc) 둘을 맞바꿔 보여 준다 */
+  assert.match(본문, /var SIDE=null, SIDE_LAST=\{ arc:null, doc:null \}/);
+  assert.match(본문, /data-act="sideSrc" data-k="doc">새 서류<\/button><button class="sm" id="sdSrcArc" data-act="sideSrc" data-k="arc">지난 원본<\/button>/);
+  assert.match(본문, /function docList\(\)\{/);
+  assert.match(본문, /d\.need && \(MODE!=='easy' \|\| d\.on\)/);
+  assert.match(본문, /function sideList\(\)\{ return !SIDE \? \[\] : SIDE\.kind==='doc' \? docList\(\) : arcFlat\(\); \}/);
+  /* 서류 만들기는 서버를 거치지 않는다 — 지금 건의 값으로 이 브라우저에서 */
+  const b = 본문.slice(본문.indexOf('function docBuild('), 본문.indexOf('function sameBytes('));
+  assert.match(b, /DD\.make\(key, x\)/); assert.match(b, /DD\.fileOne\(d\)/); assert.doesNotMatch(b, /fetch\(|secretBlob/);
+  /* 서류 칸 열기 — 건 번호를 기억해 다른 건·닫힌 건이면 칸도 닫는다 */
+  assert.match(본문, /sideShow\(\{ kind:'doc', key:key, cid:CUR \}/);
+  assert.match(본문, /if\(!cur\(\) \|\| CUR!==SIDE\.cid\)\{ sideClose\(\); return; \}/);
+  /* ② 단계 — 목록은 도장 ☑ + 서류 이름만(누가·어떻게는 칸 위쪽·줄 설명에), 긴 한글 화면 카드는 없다 */
+  const w = 본문.slice(본문.indexOf('if(st===2){\n    var docs='), 본문.indexOf('if(st===3){'));
+  assert.match(w, /<th class="c">✓<\/th><th class="n">№<\/th><th>서류<\/th>/);
+  assert.match(w, /data-dockey=/); assert.match(w, /data-act="docView" data-key=/);
+  assert.doesNotMatch(w, /<th>누가<\/th>|<th>어떻게<\/th>|한글 화면<\/h3>/);
+  assert.match(본문, /function drawWizBody\(st, a\)\{\n  drawWizBody0\(st, a\); sideMark\(\);\n  if\(st===2\) sideDocsEnter\(\); else sideHead\(\);/);
+  /* 저절로 열기 — 좁은 화면은 덮으니 열지 않고, 원본을 보는 중이거나 사용자가 닫은 건은 그대로 */
+  assert.match(본문, /if\(SIDE \|\| sideOverlay\(\) \|\| DOC_NO_AUTO===CUR \|\|/);
+  assert.match(본문, /function sideCloseUser\(\)\{ if\(SIDE && SIDE\.kind==='doc'\) DOC_NO_AUTO=CUR; sideClose\(\); \}/);
+  assert.match(본문, /act==='sideClose'\) sideCloseUser\(\)/);
+  /* 값이 바뀌면 잠시 뒤 다시 만든다 — 같은 서류(같은 바이트)면 다시 그리지 않는다 */
+  assert.match(본문, /drawSaveState\(\); sideDocRefresh\(\);\n\}/);
+  assert.match(본문, /drawCost\(a\); drawSaveState\(\); sideDocRefresh\(\);/);
+  assert.match(본문, /else drawHist\(\);\n  sideHead\(\); sideDocRefresh\(\);/);
+  assert.match(본문, /sameBytes\(PV_BYTES\.u8, b\.u8\)/);
+  /* 자세히 화면의 «미리보기»도 덮는 창이 아니라 같은 칸 */
+  assert.match(본문, /data-act="docView" data-key="'\+d\.key\+'"/);
+  assert.match(본문, /act==='docView'\) docView\(el\.dataset\.key, true\)/);
+  /* 줄의 아무 곳이나 눌러도 칸에 열린다 */
+  assert.match(본문, /closest\('tr\[data-dockey\]'\)/); assert.match(본문, /closest\('tr\[data-arcf\]'\)/);
+  /* 칸 단추 — 새 서류는 🖨 인쇄, 지난 원본은 종류 칸 */
+  assert.match(본문, /\$\('sdPrint'\)\.hidden=!isDoc/); assert.match(본문, /function sidePrint\(\)/);
+  /* 로그아웃 때 마지막으로 본 것도 비운다 */
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
+  assert.ok(wipe.indexOf('SIDE_LAST={ arc:null, doc:null }') >= 0, 'wipe 가 마지막으로 본 것을 비우지 않는다');
+  /* 다른 건으로 옮기면 옛 건의 서류 칸을 먼저 닫아 새 건의 ② 에서 다시 열린다 */
+  assert.match(본문, /function sideDropDoc\(\)\{ if\(SIDE && SIDE\.kind==='doc'\) sideClose\(\); \}/);
+  assert.match(본문, /sideDropDoc\(\); CUR=id; lsSet\('cur', id\); RRN=\{\}; STEP=0;/);
+  assert.match(본문, /sideDropDoc\(\); CUR=id; lsSet\('cur', id\); RRN=\{\}; SEL\.docs=\{\};/);
+  /* ② 에서 이미 칸이 새 서류면 비어 있는 목록이어도 다시 그린다(안내 글로 바꾼다) */
+  assert.match(본문, /function sideDocsEnter\(\)\{\n  var list=docList\(\);\n  if\(SIDE && SIDE\.kind==='doc'\)\{ sideDocRefresh\(0\); sideMark\(\); return; \}\n  if\(!list\.length\)/);
+  /* 폰 — 칸 위쪽 종류 칸도 16px(확대 막기), 받기 단추가 혼자 둘째 줄로 떨어지지 않게 */
+  assert.match(html, /  \.arct tbody td\.ti\{flex:1 1 0;min-width:140px\}\n  #side select\{font-size:16px\}/);
+  assert.match(html, /@media \(max-width:440px\)\{\n  \.arct tbody td\.ac\{order:2;margin-left:0\}/);
+  assert.doesNotMatch(html, /\.hwpv|\.doctoc|\.docblk|#pv\{/);
+});
+
+test('★ 간략한 화면 — 지난 기록 목록은 한 줄(이름·종류·날짜·받기), 단계 줄은 지금 단계만 설명, 종류 바꾸기는 칸 위쪽', () => {
+  const a = 본문.slice(본문.indexOf("h+='<tr class=\"click\" data-arcf="), 본문.indexOf("h+='</tbody></table></div>';\n    }\n    h+='</div>';"));
+  assert.match(a, /<td class="kd">/); assert.match(a, /<td class="dt">/); assert.match(a, /<td class="ac">/);
+  assert.doesNotMatch(a, /<select|data-arckind|주민번호 가림|🔒<\/td>/);
+  assert.match(본문, /<th>파일<\/th><th>종류<\/th><th>날짜<\/th><th><\/th>/);
+  /* 종류는 칸 위쪽 select(#sdKind)에서 바꾼다 */
+  assert.match(본문, /<select id="sdKind" aria-label="이 파일의 종류" hidden>/);
+  assert.match(본문, /if\(el\.id==='sdKind'\)\{ if\(ev\.type==='change' && SIDE && SIDE\.kind==='arc'\) arcSetKind\(SIDE\.ev, SIDE\.fid, el\.value\); return; \}/);
+  assert.match(본문, /f\.masked\?'주민번호 가림':''/);
+  assert.match(html, /\.wiz button:not\(\.on\):not\(\.skip\) \.tx small\{display:none\}/);
+  assert.match(본문, /\(skip\?' skip':''\)/);
+  /* 좁은 본문에서도 받기 단추가 이름 줄에 붙는다 */
+  assert.match(html, /body\.slim \.arct tbody td\.ti\{flex:1 1 0;min-width:140px\}/);
 });
