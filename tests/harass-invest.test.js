@@ -1259,3 +1259,295 @@ test('⑪ 모바일 전자서명 수거(harvestCaseSignatures) — 복호화 검
   assert.ok(getEl('reportBox').innerHTML.includes('진술서명 완료'), '통합 작업실 왼쪽 카드에 진술서명 완료 배지가 즉시 표시된다');
   assert.ok(getEl('reportBox').innerHTML.includes('오후 3시경입니다'), '통합 작업실 왼쪽 카드에 진술인의 정정·보완 의견이 강조 표시된다');
 });
+
+test('⑫ 지난메일(POP3 mailbox/old/msgs) 통합·사업장 약칭 2차 확장·예방교육 분리·다년도 에피소드 분할 및 연도별 전체 자료함 검증', async () => {
+  const vm = require('node:vm');
+  /* 1) coCoreNorm 약칭 정규화 및 ymdOf 극단값 방어 검증 */
+  assert.equal(C.coCoreNorm('(주) 가나점검장항공장'), '가나점검', '사업장 끝 공장·지점 접미어를 덜어내 핵심 상호를 추출한다');
+  assert.equal(C.coCoreNorm('국공립푸른점검어린이집'), '푸른점검어린이집', '국공립·공립 접두어를 덜어내 핵심 기관명을 추출한다');
+  assert.equal(C.ymdOf(Number.MAX_VALUE), '', 'ymdOf 는 범위 밖 숫자(Number.MAX_VALUE)에도 예외 없이 빈 문자열을 돌려준다');
+
+  /* 2) flattenMailbox — IMAP↔POP3 정밀 중복제거, POP3 간 오병합 방지 및 370-6@daum.net 발신 판별 */
+  const t2026 = Date.UTC(2026, 1, 10, 3, 0, 0);
+  const t2026b = Date.UTC(2026, 1, 18, 3, 0, 0);
+  const t2025 = Date.UTC(2025, 5, 12, 3, 0, 0);
+  const t2023 = Date.UTC(2023, 3, 20, 3, 0, 0);
+  const t2021 = Date.UTC(2021, 8, 5, 3, 0, 0);
+
+  const folders = {
+    inbox: { kind: 'inbox', name: '받은편지함' },
+    tome: { kind: 'tome', name: '내게쓴편지함' },
+  };
+  const imapMsgs = {
+    inbox: {
+      '501': { u: '501', s: '[가나점검] 직장 내 괴롭힘 조사 착수공문 송부', f: '인사담당', e: 'hr@gana-branch.example', t: '370-6@daum.net', d: t2026, a: 1, an: ['착수공문.hwp'], p: '조사 착수 요청' },
+      '502': { u: '502', s: '피신고인 문답서 및 추가 소명서 제출의 건', f: '인사담당', e: 'hr@gana-branch.example', t: '370-6@daum.net', d: t2026b, a: 1, an: ['문답서.hwpx'], p: '소명서 첨부' },
+      '503': { u: '503', s: '2026년 직장 내 성희롱 예방교육 일지 및 수료증 송부', f: '총무팀', e: 'edu@edu-sample.example', t: '370-6@daum.net', d: t2026, a: 1, an: ['성희롱예방교육일지.pdf'], p: '법정의무교육 자료' },
+    },
+    tome: {
+      '601': { u: '601', s: '푸른점검어린이집 직장 내 괴롭힘 조사결과보고서 초안', f: '점검노무사', e: '370-6@daum.net', t: 'care@child-sample.example', d: t2026, a: 1, an: ['조사결과보고서.hwpx'], p: '보고서 송부' },
+    },
+  };
+  const oldPopMsgs = {
+    /* 501 과 동일 시각·발신자·수신자·제목·첨부 → IMAP↔POP3 중복 제거 대상 */
+    'p_dup': { u: 'p_dup', s: '[가나점검] 직장 내 괴롭힘 조사 착수공문 송부', f: '인사담당', e: 'hr@gana-branch.example', t: '370-6@daum.net', d: t2026 + 500, a: 1, an: ['착수공문.hwp'] },
+    /* 동일 제목으로 5초 간격에 서로 다른 수신처(a·b)로 발송된 별개 POP3 메일 2통 → 둘 다 보존되어야 함 */
+    'p_same_a': { u: 'p_same_a', s: '조사 협조 공문 안내', f: '푸른점검', e: '370-6@daum.net', t: 'a@client-one.example', d: t2023 + 1000, a: 0, an: [] },
+    'p_same_b': { u: 'p_same_b', s: '조사 협조 공문 안내', f: '푸른점검', e: '370-6@daum.net', t: 'b@client-two.example', d: t2023 + 6000, a: 0, an: [] },
+    /* outOfWindow 폴백 점검용 과거 메일 (메모리상의 mailbox/old/msgs 에는 p 가 존재) */
+    'pop_oow': { u: 'pop_oow', s: '2021년 착수공문', f: '담당자', e: 'old@past-sample.example', t: '370-6@daum.net', d: Date.UTC(2021, 2, 1), a: 1, an: ['착수공문.hwp'], p: '보관된 착수공문 요약글 900101-1234567' },
+    /* 동일 사업장(co-gana)의 2023년 과거 별개 사건 */
+    'p_2023': { u: 'p_2023', s: '[(주)가나점검장항공장] 직장 내 성희롱 조사결과보고서 최종본', f: '푸른점검', e: '370-6@daum.net', t: 'hr@gana-branch.example', d: t2023, a: 1, an: ['성희롱조사보고서_2023.hwpx'], p: '2023년 사건 종결 보고' },
+    /* 반복 의뢰사(나라마바점검)의 2025년 사건 & 2021년 사건 → 2개 에피소드로 분리되어야 함 */
+    'p_2025': { u: 'p_2025', s: '[(주)나라마바점검] 직장 내 괴롭힘 외부전문가 조사 위임계약서', f: '법무팀', e: 'legal@naramaba.example', t: '370-6@daum.net', d: t2025, a: 1, an: ['위임계약서_2025.pdf'], p: '2025년 조사 위임' },
+    'p_2021': { u: 'p_2021', s: '[(주)나라마바점검] 직장 내 괴롭힘 신고 진상조사 보고서 송부', f: '푸른점검', e: '370-6@daum.net', t: 'legal@naramaba.example', d: t2021, a: 1, an: ['진상조사보고서_2021.hwp'], p: '2021년 조사 보고' },
+  };
+
+  const flat = C.flattenMailbox(folders, imapMsgs, oldPopMsgs);
+  assert.equal(flat.some((r) => r.key === 'p:p_dup'), false, 'IMAP에 이미 있는 동일 메일은 POP3 병합 시 자동 중복 제거된다');
+  assert.equal(flat.some((r) => r.key === 'p:p_same_a') && flat.some((r) => r.key === 'p:p_same_b'), true, '5초 간격·동일 제목이라도 수신자가 다른 별개 POP3 메일 2통은 절대 하나로 합쳐지지 않는다');
+  const p2023Row = flat.find((r) => r.key === 'p:p_2023');
+  assert.ok(p2023Row && p2023Row.dir === 'out' && p2023Row.old === true, '370-6@daum.net 발신 지난메일은 발신(out)·old:true 로 분류된다');
+
+  /* 3) 단순 법정의무 예방교육 메일 제외 + 공유 사건 원장용 mailLink 에 본문 preview 미포함 검증 */
+  const eduRow = flat.find((r) => r.key === 'i:inbox:503');
+  assert.equal(C.inspectMailForHarass(eduRow, true), null, '단순 성희롱 예방교육 일지 메일은 조사 사건 자동발굴에서 제외된다');
+  const inspected2023 = C.inspectMailForHarass(p2023Row, true);
+  assert.equal(inspected2023.preview, undefined, '공유 원장(harass_invest/cases)에 저장될 mailLink 객체는 본문 미리보기(preview)를 담지 않는다');
+
+  /* 4) 업체 이메일 미등록 ERP 사건도 coCoreNorm + 2차 상대방 주소 확장으로 후속 문답서(502)까지 수집하되 2023년 메일은 섞지 않는다 */
+  const coDir = C.buildCompanyDirectory([
+    { id: 'co-gana', name: '(주) 가나점검장항공장', bizNo: '123-81-55555', email: 'hr@gana-branch.example' },
+  ]);
+  const erpCaseNoEmail = {
+    id: 'hc-gana-2026',
+    companyId: '',
+    companyName: '(주) 가나점검장항공장',
+    receiveDate: '2026-02-01',
+    mailLinks: [],
+  };
+  const ganaMails = C.collectMailsForCase(erpCaseNoEmail, flat, null, []);
+  assert.equal(ganaMails.length, 2, '약칭([가나점검]) 1차 매칭 후 동일 기간 후속 문답서(502)까지 2건 모두 수집하고 2023년 메일은 섞지 않는다');
+
+  /* 5) 다년도 사건 발굴 및 연도 단위 제외(dismissed) 키 격리 검증 */
+  const regCase2026 = {
+    id: 'hc-gana-reg',
+    companyId: 'co-gana',
+    companyName: '(주) 가나점검장항공장',
+    receiveDate: '2026-02-01',
+    mailLinks: ganaMails,
+  };
+  const bundles = C.discoverUnregisteredBundles(flat, [regCase2026], coDir, {});
+  const gana2023Bundle = bundles.find((b) => b.companyId === 'co-gana' && C.bundleYearOf(b) === '2023');
+  assert.ok(gana2023Bundle, '2026년 등록사건이 있는 사업장의 2023년 과거 별개 사건이 누락되지 않고 발굴된다');
+  assert.ok(/_2023\d{4}$/.test(gana2023Bundle.bundleKey), '묶음 열쇠에 에피소드 고유 시작일(_2023MMDD)이 고정되어 다른 사건과 격리된다');
+  const naraBundles = bundles.filter((b) => b.companyName.includes('나라마바점검'));
+  assert.equal(naraBundles.length, 2, '동일 의뢰처의 2025년·2021년 사건이 연도별 별개 묶음 2건으로 분리된다');
+
+  /* 동일 업체 같은 해(2023-01-05 · 2023-08-10) 두 사건에서 앞 사건을 등록해도 뒤 사건의 bundleKey 가 흔들리지 않아 제외(dismissed) 상태가 유지된다 */
+  const sameYearRows = C.flattenMailbox({}, {}, {
+    'sy_1': { u: 'sy_1', s: '[동일연도점검] 직장 내 괴롭힘 조사 의뢰', f: '인사팀', e: 'hr@sameyear.example', t: '370-6@daum.net', d: Date.UTC(2023, 0, 5, 3, 0, 0), a: 0, an: [] },
+    'sy_2': { u: 'sy_2', s: '[동일연도점검] 직장 내 성희롱 조사 의뢰', f: '인사팀', e: 'hr@sameyear.example', t: '370-6@daum.net', d: Date.UTC(2023, 7, 10, 3, 0, 0), a: 0, an: [] },
+  });
+  const syInitial = C.discoverUnregisteredBundles(sameYearRows, [], coDir, {});
+  assert.equal(syInitial.length, 2, '같은 해라도 120일 초과 공백이 있으면 별개 에피소드 2건으로 나뉜다');
+  const sySecond = syInitial.find((b) => b.firstDate === '2023-08-10');
+  assert.ok(sySecond, '8월 두 번째 에피소드가 존재한다');
+  const syAfterRegFirst = C.discoverUnregisteredBundles(
+    sameYearRows,
+    [{ id: 'hc-sy-1', companyName: '동일연도점검', receiveDate: '2023-01-05', mailLinks: [{ key: 'p:sy_1' }] }],
+    coDir,
+    { [sySecond.bundleKey]: { id: sySecond.bundleKey } }
+  );
+  assert.equal(syAfterRegFirst.length, 0, '앞 에피소드가 기등록 처리되더라도 제외해 둔 뒤 에피소드의 bundleKey 가 변하지 않아 되살아나지 않는다');
+
+  /* 2023년 묶음을 제외 처리하더라도 동일 의뢰처의 향후 2026년 신규 묶음은 정상 노출된다 */
+  const dismissed2023 = { [gana2023Bundle.bundleKey]: { id: gana2023Bundle.bundleKey } };
+  const futureBundles = C.discoverUnregisteredBundles(flat, [], coDir, dismissed2023);
+  assert.equal(futureBundles.some((b) => b.companyId === 'co-gana' && C.bundleYearOf(b) === '2023'), false, '제외 처리한 2023년 묶음은 숨겨진다');
+  assert.equal(futureBundles.some((b) => b.companyId === 'co-gana' && C.bundleYearOf(b) === '2026'), true, '과거 연도 묶음을 제외해도 같은 사업장의 2026년 신규 묶음은 가려지지 않는다');
+
+  const archive = C.buildYearlyArchive([regCase2026], bundles);
+  assert.deepEqual(archive.years, ['2026', '2025', '2023', '2021'], '연도별 전체 자료함이 최신 연도순(2026→2025→2023→2021)으로 집계된다');
+  assert.equal(archive.totalCases, 1, '등록 사건 수가 정확히 집계된다');
+  assert.equal(archive.totalBundles, 4, '미등록 묶음 수(2026 어린이집 + 2025 나라마바 + 2023 가나 + 2021 나라마바)가 정확히 집계된다');
+
+  /* 6) PuHarassView — preview 무저장 정화, readOldMail / outOfWindow RRN 가림 폴백, CSV·유형칩 필터 일치 및 일괄 제외 1회 저장 검증 */
+  const els = {};
+  const savedSnapshots = {};
+  const updateCalls = [];
+  const confirmMsgs = [];
+  const capturedCsvTexts = [];
+  const makeEl = (id) => ({
+    id, value: '', textContent: '', innerHTML: '', checked: false, disabled: false,
+    style: { display: '' },
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+    addEventListener(ev, fn) { (this._ev = this._ev || {})[ev] = fn; },
+    querySelector: () => null, querySelectorAll: () => [], focus() {},
+  });
+  const getEl = (id) => (els[id] = els[id] || makeEl(id));
+  const calledFns = [];
+  const docListeners = {};
+  const mockDb = {
+    'uid_roles/u1': { sid: 'P001', name: '점검노무', status: 'active', isAdmin: true },
+    'data/user_dir': [{ sid: 'P001', name: '점검노무', status: 'active' }],
+    'harass_invest/cases': {
+      'hc-old-1': {
+        id: 'hc-old-1', companyName: '(주)과거메일점검', title: '2022년 조사 건', category: 'harass', managerMain: 'P001', receiveDate: '2022-05-10',
+        mailLinks: [
+          { key: 'p:pop_ok', slug: '*old', uid: 'pop_ok', old: true, date: '2022-05-12', subject: '2022년 진술서', preview: '과거 잔존 미리보기', attNames: ['진술서.hwpx'] },
+          { key: 'p:pop_oow', slug: '*old', uid: 'pop_oow', old: true, date: '2021-03-01', subject: '2021년 착수공문', attNames: ['착수공문.hwp'] },
+        ],
+      },
+      'hc-2023-h': {
+        id: 'hc-2023-h', companyName: '(주)둘공이삼괴롭힘', title: '2023년 괴롭힘 건', category: 'harass', managerMain: 'P001', receiveDate: '2023-02-10',
+        mailLinks: [],
+      },
+    },
+    'mailbox/old/msgs': oldPopMsgs,
+  };
+  function makeRef(p) {
+    return {
+      path: p,
+      child(s) { return makeRef(p ? p + '/' + s : String(s)); },
+      on() {}, off() {},
+      once: () => Promise.resolve({ val: () => (mockDb[p] !== undefined ? mockDb[p] : null) }),
+      async update(patch) {
+        updateCalls.push({ path: p, patch });
+        return true;
+      },
+    };
+  }
+  class MockBlob {
+    constructor(parts, opts) {
+      this.parts = parts;
+      this.type = opts && opts.type;
+      capturedCsvTexts.push(parts.join(''));
+    }
+  }
+  const ctx = vm.createContext({
+    console, setTimeout, clearTimeout, Promise, URLSearchParams, Blob: MockBlob,
+    confirm(msg) { confirmMsgs.push(msg); return true; },
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    PuHarassCore: C,
+    PuGate: { show() {}, hide() {} },
+    PuOntologyWrite: {
+      createGateway: () => ({
+        prepare(rec, cOpts) {
+          return {
+            ok: true,
+            value: Object.assign({}, rec, {
+              entityType: (cOpts && cOpts.entityType) || 'Task',
+              createdAt: 1,
+              updatedAt: 2,
+              revision: 1,
+            }),
+            issues: [],
+          };
+        },
+        async save(r, fn) {
+          const prev = mockDb[r.path] || null;
+          const v = typeof fn === 'function' ? fn(prev) : fn;
+          savedSnapshots[r.path] = v;
+          return { committed: true, snapshot: { val: () => v } };
+        },
+      }),
+    },
+    fetch(url, opts) {
+      const fnName = String(url).split('/').pop();
+      const body = JSON.parse((opts && opts.body) || '{}');
+      calledFns.push({ fnName, body });
+      if (fnName === 'readOldMail' && body.key === 'pop_oow') {
+        return Promise.resolve({ json: async () => ({ ok: false, outOfWindow: true, error: 'POP3 창 밖' }) });
+      }
+      return Promise.resolve({ json: async () => ({ ok: true, text: 'POP3_OLD_MAIL_BODY_OK', atts: [] }) });
+    },
+    location: { search: '?tab=yearly', hash: '', pathname: '/pu-harass.html' },
+    history: { replaceState() {} },
+    document: {
+      activeElement: null, contains: () => false,
+      createElement: () => ({ click() {}, remove() {}, style: {} }),
+      body: { appendChild() {} },
+      getElementById: (id) => getEl(id),
+      querySelector: () => null, querySelectorAll: () => [],
+      addEventListener(ev, fn) { (docListeners[ev] = docListeners[ev] || []).push(fn); },
+    },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+
+  let authCb = null;
+  const curUser = { uid: 'u1', getIdToken: async () => 'tok-1' };
+  ctx.PuHarassView.boot({
+    auth: Object.assign(() => ({ currentUser: curUser, setPersistence() {}, onAuthStateChanged(fn) { authCb = fn; } }), { Auth: { Persistence: { LOCAL: 'local' } } }),
+    database: () => ({ ref: (p) => makeRef(p || '') }),
+  });
+  await authCb(curUser);
+
+  assert.equal(getEl('p-yearly').classList.contains('on'), true, '?tab=yearly 딥링크로 연도별 전체 자료함 탭이 즉시 열린다');
+  assert.ok(getEl('yrPillsBar').innerHTML.includes('aria-pressed="true"'), '연도 알약 필터 버튼에 aria-pressed 접근성 상태가 표시된다');
+  assert.ok(getEl('yearlyBox').innerHTML.includes('2022년'), '연도별 전체 자료함에 2022년 사건 카드가 렌더링된다');
+  assert.ok(getEl('yearlyBox').innerHTML.includes('2021년'), '연도별 전체 자료함에 POP3 2021년 메일 묶음 카드가 렌더링된다');
+
+  /* 화면 필터(#yrCat='sexual') 적용 시 카드 머리글 유형 칩과 CSV 내보내기가 모두 필터 결과와 일치하는지 검증 */
+  getEl('yrCat').value = 'sexual';
+  getEl('yrCat')._ev.change();
+  assert.ok(getEl('yearlyBox').innerHTML.includes('괴롭힘 0') && getEl('yearlyBox').innerHTML.includes('성희롱 1'), '유형 필터 적용 시 연도 카드 상단 집계 칩도 거른 행 기준 건수(괴롭힘 0 · 성희롱 1)를 표시한다');
+  getEl('yrCsvBtn')._ev.click();
+  assert.equal(capturedCsvTexts.length, 1, '연도별 목록 CSV 내보내기 Blob 이 생성된다');
+  assert.ok(capturedCsvTexts[0].includes('가나점검장항공장'), '성희롱 필터 적용 시 2023년 성희롱 묶음이 CSV에 포함된다');
+  assert.equal(capturedCsvTexts[0].includes('과거메일점검'), false, '성희롱 필터 적용 시 괴롭힘 사건은 CSV에서 제외된다');
+  getEl('yrCat').value = '';
+  getEl('yrCat')._ev.change();
+
+  /* 후보 묶음 다중 선택 제외 시 건수 확인(confirm) 및 단일 update 저장 검증 */
+  const nara2025Key = naraBundles.find((b) => C.bundleYearOf(b) === '2025').bundleKey;
+  const nara2021Key = naraBundles.find((b) => C.bundleYearOf(b) === '2021').bundleKey;
+  docListeners.change = docListeners.change || [];
+  /* 체크박스 선택 이벤트를 태워 2건을 고른 뒤 일괄 제외 실행 */
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === 'button[data-tab]' ? null : null) },
+    stopPropagation() {},
+  });
+  /* change 리스너로 bundles 체크박스 2건 선택 */
+  const changeFn = docListeners.change && docListeners.change[0];
+  assert.ok(changeFn, '체크박스 change 이벤트 리스너가 등록되어 있다');
+  await changeFn({ target: { checked: true, matches: (sel) => sel === '[data-ck]', getAttribute: (n) => (n === 'data-ck' ? 'bundles|' + nara2025Key : null) } });
+  await changeFn({ target: { checked: true, matches: (sel) => sel === '[data-ck]', getAttribute: (n) => (n === 'data-ck' ? 'bundles|' + nara2021Key : null) } });
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-bulkact]' ? { disabled: false, getAttribute: () => 'bundles:hide' } : null) },
+    stopPropagation() {},
+  });
+  assert.ok(confirmMsgs.some((m) => m.includes('2건')), '다중 후보 제외 시 선택한 건수(2건)를 먼저 확인한다');
+  assert.equal(updateCalls.length, 1, '다중 후보 제외 시 개별 루프 저장 대신 단일 원자적 update 1회로 저장한다');
+  assert.deepEqual(Object.keys(updateCalls[0].patch).sort(), [nara2021Key, nara2025Key].sort(), '선택한 두 후보 묶음 키가 한 번의 update 패치에 함께 담긴다');
+
+  /* 등록 사건(hc-old-1) 상세 열기 → 단계 토글 저장 시 기존 mailLinks 의 preview 가 깨끗이 제거되는지 검증 */
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'openDetail' : 'hc-old-1') } : null) },
+    stopPropagation() {},
+  });
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'toggleStep' : 'intake') } : null) },
+    stopPropagation() {},
+  });
+  const savedCase = savedSnapshots['harass_invest/cases/hc-old-1'];
+  assert.ok(savedCase && Array.isArray(savedCase.mailLinks), '사건 저장 스냅샷이 생성된다');
+  assert.equal(savedCase.mailLinks.some((m) => m.preview !== undefined), false, '저장된 harass_invest/cases/*/mailLinks 에는 preview 본문 조각이 절대 남지 않는다');
+
+  /* POP3 지난메일(pop_ok) 열람 시 readOldMail 엔드포인트가 호출된다 */
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'viewMail' : 'p:pop_ok') } : null) },
+    stopPropagation() {},
+  });
+  assert.ok(calledFns.some((c) => c.fnName === 'readOldMail' && c.body.key === 'pop_ok'), 'slug:*old 지난메일 열람 시 readOldMail API를 호출한다');
+  assert.equal(getEl('mMailBody').textContent, 'POP3_OLD_MAIL_BODY_OK', 'POP3 지난메일 본문이 모달에 안전하게 표시된다');
+
+  /* POP3 3만 통 창 밖(outOfWindow) 지난메일은 mailLinks 에 preview 가 없어도 메모리상 mailbox/old/msgs 요약(주민번호 마스킹 적용)을 안내한다 */
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'viewMail' : 'p:pop_oow') } : null) },
+    stopPropagation() {},
+  });
+  assert.ok(getEl('mMailBody').textContent.includes('보관된 착수공문 요약글 900101-1******'), 'outOfWindow 과거 메일은 메모리 보관함의 요약을 주민번호 가림 처리하여 표시한다');
+});

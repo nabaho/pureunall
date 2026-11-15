@@ -94,6 +94,11 @@ const mailboxMsgs = {
   },
 };
 
+const mailboxOldMsgs = {
+  '9001': { u: '9001', s: '[(주)사아점검메디컬] 직장 내 성희롱 조사결과보고서 최종 송부의 건', f: '푸른점검', e: '370-6@daum.net', t: 'hr@saa-check.example', d: Date.UTC(2025, 4, 15, 2, 0, 0), a: 1, an: ['조사결과보고서_점검용.hwpx'], p: '최종 조사결과보고서를 송부드립니다.' },
+  '8001': { u: '8001', s: '[(주)자차점검정밀] 직장 내 괴롭힘 고충조사 위임계약 및 착수공문', f: '인사팀', e: 'people@jacha-check.example', t: '370-6@daum.net', d: Date.UTC(2024, 7, 20, 2, 0, 0), a: 2, an: ['위임계약서.pdf', '착수공문.hwp'], p: '고충조사 착수 서류 전달 건' },
+};
+
 module.exports = {
   data: {
     harass_invest: {
@@ -113,10 +118,12 @@ module.exports = {
     mailbox: {
       folders: mailboxFolders,
       msgs: mailboxMsgs,
+      old: { msgs: mailboxOldMsgs },
     },
   },
   views: [
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
+    { name: 'yearly', run: async (p) => { await p.click('#tabs button[data-tab="yearly"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
     { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('button[data-act="wsMode"][data-id="doc"]'); } },
   ],
