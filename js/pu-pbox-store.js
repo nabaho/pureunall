@@ -1410,7 +1410,7 @@
     });
   }
 
-  function validateClientOfficialSearchQuery(rawVal, maxLen, allowEmpty) {
+  function validateClientOfficialSearchQuery(rawVal, maxLen, allowEmpty, autoOnly) {
     if (rawVal != null && typeof rawVal !== 'string') {
       return { ok: false, query: '', error: '검색어 형식이 올바르지 않습니다.' };
     }
@@ -1452,6 +1452,18 @@
     if (full.length > maxLen) {
       return { ok: false, query: '', error: '검색어는 ' + maxLen + '자 이하로 입력해 주세요.' };
     }
+    if (autoOnly) {
+      var idxList = global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function'
+        ? global.PuPBoxLawIndex.list()
+        : [];
+      var allowQ = (E && typeof E.extractSafeLegalOfficialQuery === 'function')
+        ? E.extractSafeLegalOfficialQuery(full, idxList)
+        : '';
+      if (!allowQ || allowQ.length < 2) {
+        return { ok: false, query: '', error: '자동 외부 조회는 허용된 법령명·조문·법리 키워드가 확인될 때만 실행됩니다.' };
+      }
+      return { ok: true, query: allowQ };
+    }
     var qPartyNames = (E && typeof E.extractPartyNames === 'function') ? E.extractPartyNames(full, '') : [];
     var safeQ = (E && typeof E.anonymizeLegalText === 'function')
       ? E.anonymizeLegalText(full, qPartyNames).text
@@ -1473,7 +1485,7 @@
       return Promise.reject(makeStaleSessionError());
     }
 
-    var liveQCheck = validateClientOfficialSearchQuery(opts.query, 50, false);
+    var liveQCheck = validateClientOfficialSearchQuery(opts.query, 50, false, opts.autoOnly === true);
     if (!liveQCheck.ok) {
       return Promise.reject(new Error(liveQCheck.error));
     }
@@ -1967,19 +1979,24 @@
     }
 
     var searchSeed = safeSourceText ? (query + ' ' + safeSourceText.slice(0, 600)) : query;
-    var searchRes = E.searchCorpus(searchSeed, {
+    var searchFn = (E && typeof E.searchUnifiedAllInOne === 'function') ? E.searchUnifiedAllInOne : E.searchCorpus;
+    var searchRes = searchFn(searchSeed, {
       docs: snapshotDocs,
       loadedLaws: loadedLaws,
       lawIndex: idxList,
-      limit: 8
+      limit: 80,
+      ragLimit: 8
     });
+    var ragDocs = (searchRes && Array.isArray(searchRes.balancedDocs) && searchRes.balancedDocs.length)
+      ? searchRes.balancedDocs
+      : searchRes.docs;
 
     var prompt = scrubText(E.buildRagPrompt({
       query: query,
       mode: params.mode || 'auto',
       workflow: wfObj,
       attached: attached,
-      retrievedDocs: searchRes.docs,
+      retrievedDocs: ragDocs,
       retrievedArticles: searchRes.articles
     }));
 
@@ -2036,7 +2053,7 @@
           engineLabel: engineLabel,
           verification: verification,
           attachedTitles: attached.map(function (a) { return a.title || a.caseNo; }),
-          retrievedDocIds: searchRes.docs.slice(0, 5).map(function (d) { return d.id; }),
+          retrievedDocIds: ragDocs.slice(0, 8).map(function (d) { return d.id; }),
           history: prevHistory
         };
         if (safeSourceText) threadPayload.sourceText = safeSourceText;
@@ -2059,7 +2076,7 @@
         mode: params.mode || 'auto',
         workflow: wfObj,
         attached: attached,
-        retrievedDocs: searchRes.docs,
+        retrievedDocs: ragDocs,
         retrievedArticles: searchRes.articles,
         retrievedLawFamilies: searchRes.lawFamilies
       });
@@ -2084,7 +2101,7 @@
         mode: params.mode || 'auto',
         workflow: wfObj,
         attached: attached,
-        retrievedDocs: searchRes.docs,
+        retrievedDocs: ragDocs,
         retrievedArticles: searchRes.articles,
         retrievedLawFamilies: searchRes.lawFamilies
       });

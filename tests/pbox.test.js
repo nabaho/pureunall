@@ -2588,3 +2588,337 @@ test('⑪ 스마트 약칭·초성·불리언 판례검색 · 전국 35개 법�
   dispatchClick({ 'data-act': 'open-ext-site', 'data-site-id': 'lbox', 'data-q-src': 'site' });
   assert.equal(openedUrls.length, openedBeforeMixed, '혼합 구분자 계좌번호가 포함된 검색어는 외부 사이트 열기도 차단되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ⑫ 화면 전체(100%) 레이아웃 · 홈 Enter 즉시 검색/검토 · 4대 근거(법령·판례·결정례·행정해석) 한화면 통합 · 타이핑/음성 자동 법리검토 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · 법령·판례·결정례·행정해석 한화면 통합 · 타이핑/마이크 음성 자동검토 검증', async () => {
+  const htmlSrc = fs.readFileSync(path.join(ROOT, 'pu-pbox.html'), 'utf8');
+
+  /* 1) 화면 전체(width:100%; max-width:none) 레이아웃 규칙 확인 */
+  for (const cls of ['.pbox-home-wrap', '.pbox-page-wrap', '.pbox-ws-wrap']) {
+    const mRule = new RegExp(cls.replace('.', '\\.') + '\\{([^}]+)\\}').exec(htmlSrc);
+    assert.ok(mRule, `${cls} 스타일 규칙이 존재해야 합니다`);
+    assert.ok(mRule[1].includes('width:100%') && mRule[1].includes('max-width:none'), `${cls} 는 화면 전체(width:100%; max-width:none)를 사용해야 합니다`);
+  }
+
+  const lawIndex = loadLawIndex().list();
+
+  /* 2) 법령·판례·결정례·행정해석(유권해석) 4대 근거 한번에 통합검색 및 오프라인 검토 합성 검증 */
+  const uniCommute = Engine.searchUnifiedAllInOne(
+    '출근길 어린이집에 아이를 등원시키고 회사로 가던 중 교통사고가 났는데 출퇴근 산재가 인정되나요?',
+    { docs: Corpus.SEED_DOCS, loadedLaws: [], lawIndex }
+  );
+  assert.ok(uniCommute.unified.counts.laws >= 1, '출퇴근 산재 질의 시 관련 국가법령이 함께 검색되어야 합니다');
+  assert.ok(uniCommute.unified.counts.precedents >= 1, '출퇴근 산재 질의 시 관련 판례(헌재·법원)가 함께 검색되어야 합니다');
+  assert.ok(uniCommute.unified.counts.decisions >= 1, '출퇴근 산재 질의 시 산재 재심사/노동위 결정례가 함께 검색되어야 합니다');
+  assert.ok(uniCommute.unified.counts.interpretations >= 1, '출퇴근 산재 질의 시 고용노동부·법제처 행정해석(유권해석)이 함께 검색되어야 합니다');
+
+  const uniKakao = Engine.searchUnifiedAllInOne(
+    '카카오톡 메시지로 해고 통보를 받았는데 부당해고 서면통지 위반인가요?',
+    { docs: Corpus.SEED_DOCS, loadedLaws: [], lawIndex }
+  );
+  assert.ok(
+    uniKakao.unified.counts.laws >= 1 &&
+    uniKakao.unified.counts.precedents >= 1 &&
+    uniKakao.unified.counts.decisions >= 1 &&
+    uniKakao.unified.counts.interpretations >= 1,
+    '카톡 해고 질의 시에도 법령·판례·결정례·행정해석 4대 근거가 한 번에 모두 조회되어야 합니다'
+  );
+
+  const synthReview = Engine.synthesizeOfflineAnswer({
+    query: '출근길 어린이집에 아이를 등원시키고 회사로 가던 중 교통사고가 났는데 출퇴근 산재가 인정되나요?',
+    mode: 'review',
+    retrievedDocs: uniCommute.balancedDocs,
+    retrievedArticles: uniCommute.articles
+  });
+  assert.ok(synthReview.includes('대법원·헌법재판소·하급심 판례 법리'), '검토 답변에 판례 법리 섹션이 명시되어야 합니다');
+  assert.ok(synthReview.includes('고용노동부·법제처 행정해석·유권해석 및 노동위·산재 결정례'), '검토 답변에 행정해석·유권해석·결정례 섹션이 함께 명시되어야 합니다');
+
+  const vfInterp = Engine.verifyCitations(
+    '고용노동부 산재보상정책과-출퇴근재해지침, 근로기준정책과-서면통지해석, 임금근로시간과-2271 회시 및 산재재심사-출퇴근경로복귀 재결에 따릅니다.',
+    { docs: Corpus.SEED_DOCS, loadedLaws: [], lawIndex }
+  );
+  assert.ok(vfInterp.verifiedCount >= 4 && vfInterp.unverifiedCount === 0, '행정해석 회시번호 및 산재 재심사 결정번호도 원문 인용 검증기에서 확인되어야 합니다');
+  const vfFakeInterp = Engine.verifyCitations(
+    '고용노동부 가짜정책과-9999 회시에 따릅니다.',
+    { docs: Corpus.SEED_DOCS, loadedLaws: [], lawIndex }
+  );
+  assert.equal(vfFakeInterp.unverifiedCount, 1, '코퍼스에 없는 가공 행정해석 회시번호는 미확인으로 검출되어야 합니다');
+
+  /* 3) UI 통합 검증: 타이핑 즉시 자동검토 · Enter 즉시 실행(Shift+Enter/IME 보호) · 🎤 마이크 음성설명 자동검토 · 예산 manual 게이트 */
+  const elementsById = {};
+  const docListeners = {};
+  let speechInstances = [];
+  let aiCallOptsLog = [];
+
+  function makeEl(id) {
+    return {
+      id: id || '',
+      tagName: id === 'pboxPromptInput' ? 'TEXTAREA' : 'DIV',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) delete elementsById[oldId];
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const idMatch = /\bid="([^"]+)"/i.exec(m[2] || '');
+          if (!idMatch) continue;
+          const child = makeEl(idMatch[1]);
+          child.tagName = (m[1] || 'DIV').toUpperCase();
+          const valMatch = /\bvalue="([^"]*)"/i.exec(m[2] || '');
+          if (valMatch) child.value = valMatch[1];
+          elementsById[idMatch[1]] = child;
+          this._ownedIds.add(idMatch[1]);
+        }
+      },
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      focus() {}
+    };
+  }
+
+  let mockLocalSpeechAvail = 'unavailable';
+  let mockInstallCalls = 0;
+  class MockSpeechRecognition {
+    static async available(opts) {
+      if (!opts || opts.processLocally !== true || !Array.isArray(opts.langs) || !opts.langs.includes('ko-KR')) {
+        return 'unavailable';
+      }
+      return mockLocalSpeechAvail;
+    }
+    static async install(opts) {
+      if (!opts || opts.processLocally !== true || !Array.isArray(opts.langs) || !opts.langs.includes('ko-KR')) {
+        return false;
+      }
+      mockInstallCalls++;
+      mockLocalSpeechAvail = 'available';
+      return true;
+    }
+    constructor() {
+      this.lang = '';
+      this.continuous = false;
+      this.interimResults = false;
+      this.processLocally = false;
+      this.started = false;
+      this.stopped = false;
+      this.onresult = null;
+      this.onend = null;
+      this.onerror = null;
+      speechInstances.push(this);
+    }
+    start() { this.started = true; }
+    stop() { this.stopped = true; }
+    abort() { this.stopped = true; }
+  }
+
+  const rootContainer = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootContainer;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => elementsById[id] || (elementsById[id] = makeEl(id)),
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+  };
+
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    Blob: class {},
+    URL: { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, docs: [] }), text: async () => '' }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1920,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    webkitSpeechRecognition: MockSpeechRecognition,
+    PuAiCall: {
+      ask: async (_parts, opts) => {
+        aiCallOptsLog.push(opts || {});
+        const err = new Error('over_budget_fallback');
+        err.overBudget = true;
+        throw err;
+      },
+      textOf: (r) => String(r || '')
+    },
+    firebase: { auth: () => ({ currentUser: { uid: 'user-full-12', getIdToken: async () => 'mock-id-token' } }) },
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    open: () => ({ opener: null }),
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('user-full-12');
+  App.mount(rootContainer);
+  App.setAuthUser({ uid: 'user-full-12', displayName: '권형하 대표노무사', getIdToken: async () => 'mock-id-token' });
+  await new Promise((r) => setImmediate(r));
+
+  function dispatchClick(attrs, extraProps) {
+    const btn = Object.assign({
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    }, extraProps || {});
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* A) 홈 화면에 3열 전체폭 대시보드 · 마이크 음성설명 버튼 · 실시간 자동검토 슬롯 확인 */
+  App.switchView('home');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pbox-home-dash-grid'), '홈 하단이 화면 전체 3열 대시보드 그리드로 구성되어야 합니다');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="toggle-voice-input"'), '홈 컴포저에 마이크 음성설명 단추가 표시되어야 합니다');
+
+  /* B) 사실관계 타이핑 시 입력창 포커스/값 손실 없이 실시간 자동 법리검토 + 4대 근거 보드 렌더링 및 하드 PII 차단 확인 */
+  const synthRrn = '890214' + '-' + '1' + '234567';
+  const typedNarrative = `근로자 홍길동(${synthRrn}, 010-0000-4321)이 출근길 어린이집에 아이를 등원시키고 가다가 교통사고가 났는데 산재가 되나요?`;
+  elementsById.pboxPromptInput.value = typedNarrative;
+  (docListeners.input || []).forEach((fn) => fn({ target: elementsById.pboxPromptInput }));
+
+  assert.equal(elementsById.pboxPromptInput.value, typedNarrative, '실시간 자동검토 갱신 중에도 타이핑 중인 입력창 값은 그대로 유지되어야 합니다');
+  const liveHtml = elementsById.pboxLiveFactReview.innerHTML;
+  assert.ok(liveHtml.includes('자동 쟁점 포섭') && liveHtml.includes('출퇴근 재해'), '사실관계 타이핑 즉시 출퇴근 재해 법리가 자동 포섭되어야 합니다');
+  assert.ok(liveHtml.includes('개인정보 자동 비식별'), '타이핑된 주민번호·연락처 비식별 건수 배지가 즉시 표시되어야 합니다');
+  assert.ok(
+    liveHtml.includes('현행 법령 · 조문') &&
+    liveHtml.includes('대법원 · 헌재 · 하급심 판례') &&
+    liveHtml.includes('노동위 · 산재 · 행심 결정례') &&
+    liveHtml.includes('노동부 · 법제처 행정·유권해석'),
+    '실시간 자동검토 패널에 법령·판례·결정례·행정해석 4대 기둥이 모두 한 번에 나와야 합니다'
+  );
+  const piiIntent = Engine.classifyPromptIntent(typedNarrative, lawIndex);
+  assert.equal(piiIntent.safeOfficialQuery, '', '주민번호·연락처가 섞인 문장은 외부 공공 API 검색어로 절대 전송되면 안 됩니다');
+
+  /* 역할어 없는 실명·업체명이 섞인 짧은 질의에서도 고유명사는 safeOfficialQuery 에 절대 남지 않고 표준 쟁점 쿼리 또는 허용 법률용어만 추출되어야 함 */
+  const unprefixedNameIntent = Engine.classifyPromptIntent('김가람 해고', lawIndex);
+  assert.ok(!unprefixedNameIntent.safeOfficialQuery.includes('김가람') && unprefixedNameIntent.safeOfficialQuery.includes('해고'), '역할어 없는 실명(김가람)은 제거되고 표준 해고 법리 검색어만 남아야 합니다');
+  const tokenAllowlistIntent = Engine.classifyPromptIntent('김가람 정직 감봉', lawIndex);
+  assert.equal(tokenAllowlistIntent.safeOfficialQuery, '정직 감봉', '규칙 미매칭 짧은 질의에서도 실명은 제거되고 허용 법률용어 사전 토큰만 남아야 합니다');
+  const corpIntent = Engine.classifyPromptIntent('주식회사 가상기업 부당해고', lawIndex);
+  assert.ok(!corpIntent.safeOfficialQuery.includes('주식회사') && !corpIntent.safeOfficialQuery.includes('가상기업') && corpIntent.safeOfficialQuery.includes('부당해고'), '업체명(주식회사 가상기업)은 제거되고 허용 법률용어만 남아야 합니다');
+  const onlyProperNounIntent = Engine.classifyPromptIntent('주식회사 가상기업 김가람', lawIndex);
+  assert.equal(onlyProperNounIntent.safeOfficialQuery, '', '법리 키워드 없이 업체명·실명만 있는 입력은 자동 외부 조회를 완전 차단해야 합니다');
+  await assert.rejects(
+    () => Store.liveSearchAndCollect({
+      query: '주식회사 가상기업 김가람',
+      autoOnly: true,
+      auth: { currentUser: { uid: 'user-full-12', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /법리 키워드/
+  );
+
+  /* C) Shift+Enter 및 한글 조합 중(isComposing / keyCode 229) Enter 는 제출하지 않고, 일반 Enter 만 즉시 자동 검색·검토 실행 */
+  const threadsBeforeEnter = Store.getThreads().length;
+  let preventedShift = false;
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    shiftKey: true,
+    isComposing: false,
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => { preventedShift = true; }
+  }));
+  assert.equal(preventedShift, false, 'Shift+Enter 는 줄바꿈을 위해 기본 동작을 막지 않아야 합니다');
+
+  let preventedIme = false;
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    shiftKey: false,
+    isComposing: true,
+    keyCode: 229,
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => { preventedIme = true; }
+  }));
+  assert.equal(preventedIme, false, '한글 입력기 조합 중(isComposing) Enter 는 조기 제출되면 안 됩니다');
+  assert.equal(Store.getThreads().length, threadsBeforeEnter, 'Shift+Enter / IME 조합 중에는 작업이 생성되면 안 됩니다');
+
+  /* 검색 모드에서 홈 Enter 입력 시 즉시 통합검색(cases) 화면으로 전환되고 4대 근거 보드가 표시되어야 함 */
+  dispatchClick({ 'data-act': 'set-mode', 'data-mode': 'search' });
+  elementsById.pboxPromptInput.value = '출퇴근 산재';
+  let preventedPlainEnter = false;
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    shiftKey: false,
+    isComposing: false,
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => { preventedPlainEnter = true; }
+  }));
+  assert.equal(preventedPlainEnter, true, '홈 입력창에서 일반 Enter 입력 시 즉시 실행되어야 합니다');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxCaseSearchInput') && elementsById.pboxMainArea.innerHTML.includes('pbox-unified-board'), '홈 검색 모드에서 Enter 입력 시 즉시 통합검색 화면과 4대 근거 보드가 열려야 합니다');
+
+  /* D) 온디바이스 로컬 음성인식(processLocally) 보안 강제 검증:
+   * - 로컬 한국어 모델이 unavailable 인 경우 외부 음성서버 폴백 없이 rec.start()를 완전 차단해야 함
+   * - downloadable 상태에서는 install({ langs: ['ko-KR'], processLocally: true }) 후 rec.processLocally === true 로만 시작해야 함 */
+  App.switchView('home');
+  dispatchClick({ 'data-act': 'set-mode', 'data-mode': 'auto' });
+  mockLocalSpeechAvail = 'unavailable';
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(speechInstances.some((inst) => inst.started), false, '온디바이스 로컬 모델 미지원(unavailable) 시 외부 서버 전송 차단을 위해 rec.start()가 절대 호출되면 안 됩니다');
+
+  speechInstances.length = 0;
+  mockLocalSpeechAvail = 'downloadable';
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(mockInstallCalls, 1, '온디바이스 한국어 모델이 downloadable 상태면 install({ langs: [ko-KR], processLocally: true })이 호출되어야 합니다');
+  const rec = speechInstances.find((inst) => inst.started);
+  assert.ok(rec, '온디바이스 한국어 모델 준비 완료 후 로컬 음성인식 인스턴스가 시작되어야 합니다');
+  assert.equal(rec.lang, 'ko-KR');
+  assert.equal(rec.processLocally, true, 'rec.processLocally === true 가 강제되어야 외부 음성 서버로 원음이 전송되지 않습니다');
+
+  rec.onresult({
+    results: [
+      Object.assign([{ transcript: `상시 12인 회사에서 재해자 박민수(${synthRrn})가 카카오톡으로 해고 통보를 받았습니다` }], { isFinal: true })
+    ]
+  });
+  assert.ok(!elementsById.pboxPromptInput.value.includes(synthRrn), '음성 인식 결과에 포함된 주민등록번호는 입력창 반영 즉시 마스킹되어야 합니다');
+  assert.ok(elementsById.pboxLiveFactReview.innerHTML.includes('서면통지'), '음성 설명 중에도 실시간 법리 포섭 패널이 즉시 작동해야 합니다');
+
+  /* 음성 입력 종료(onend) 시 자동으로 내용검토(review) 워크스페이스가 열리고 2단 분할 4대 근거가 표시되어야 함 */
+  rec.onend();
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+
+  const latestThread = Store.getThreads()[0];
+  assert.ok(latestThread && latestThread.mode === 'review', '음성 사실관계 설명 완료 시 자동으로 내용검토(review) 모드로 검토서가 생성되어야 합니다');
+  assert.ok(latestThread.answer.includes('판례') && latestThread.answer.includes('행정해석'), '자동 생성된 검토 의견서에 판례와 행정해석이 모두 포함되어야 합니다');
+  assert.ok(aiCallOptsLog.length >= 1 && aiCallOptsLog[0].manual === false, '자동/기본 프롬프트 제출은 월 AI 예산 게이트(manual: false)를 준수해야 합니다');
+
+  const wsHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(wsHtml.includes('id="pboxWsGrid"') && wsHtml.includes('관련 법령 · 판례 · 결정례 · 행정해석 한번에 보기'), '워크스페이스 화면이 전체폭 2단 그리드로 좌측 검토서와 우측 4대 근거 보드를 동시에 표시해야 합니다');
+
+  /* 원문 리더 열기/닫기 시 #pboxWsGrid 의 reader-open 클래스 자동 동기화 확인 */
+  dispatchClick({ 'data-act': 'open-doc', 'data-id': 'interp-moel-written-dismissal-sns' });
+  assert.equal(elementsById.pboxWsGrid.classList.contains('reader-open'), true, '우측 원문 리더가 열리면 워크스페이스 그리드가 reader-open 상태로 전환되어야 합니다');
+  dispatchClick({ 'data-act': 'close-reader' });
+  assert.equal(elementsById.pboxWsGrid.classList.contains('reader-open'), false, '원문 리더를 닫으면 워크스페이스 2단 분할 그리드가 복원되어야 합니다');
+});

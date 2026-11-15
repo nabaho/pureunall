@@ -4,6 +4,19 @@ module.exports = {
   data: {},
   views: [
     {
+      name: 'home_live_review',
+      run: async (page) => {
+        await page.evaluate(() => {
+          if (window.PuPBoxApp) window.PuPBoxApp.switchView('home');
+          var ta = document.getElementById('pboxPromptInput');
+          if (ta) {
+            ta.value = '출근길 어린이집에 아이를 등원시키고 회사로 가던 중 교통사고가 났는데 출퇴근 산재가 인정되나요?';
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+      }
+    },
+    {
       name: 'workspace',
       run: async (page) => {
         await page.evaluate(() => {
