@@ -115,8 +115,9 @@
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
       /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
+      /* site_secret — 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번. 그 건의 담당자와 대표만(2026-11-15) */
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
-      primaryRoots:['data','improve_requests','ieum_public','worker_secret','staff_secret'],
+      primaryRoots:['data','improve_requests','ieum_public','worker_secret','site_secret','staff_secret'],
       sharedRoots:['harass_invest'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document','SanjaeKit'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
