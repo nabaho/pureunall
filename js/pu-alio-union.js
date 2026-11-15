@@ -297,9 +297,18 @@
     var provShort = pDef ? pDef.short : '';
     var provPrefix = pk.slice(0, 2);
     var nm = String((inst && inst.name) || '');
-    // 도립 의료원(천안의료원·공주의료원·수원의료원·서귀포의료원 등, 단 성남시의료원·목포시의료원·진안군의료원 등 시/군립 제외)은 광역 본청 산하
+    // 도립 의료원(천안의료원·공주의료원·수원의료원·서귀포의료원·전라남도순천의료원 등, 단 성남시의료원·목포시의료원·진안군의료원 등 시/군립 제외)은 광역 본청 산하
     var isProvMed = nm.slice(-3) === '의료원' && nm.indexOf('시의료원') === -1 && nm.indexOf('군의료원') === -1;
-    if (isProvMed) return hqLabel;
+    if (isProvMed) {
+      if (pk === '전남광주통합특별시') {
+        return nm.indexOf('광주') >= 0 ? '광주 본청' : '전남 본청';
+      }
+      return hqLabel;
+    }
+    // 경기도 도립 공기업·출연기관 중 기초지자체 지명이 포함된 기관 예외 보정
+    if (pk === '경기도' && (nm.indexOf('경기평택항만공사') >= 0 || nm.indexOf('경기도수원월드컵경기장') >= 0)) {
+      return hqLabel;
+    }
 
     var list = MUNI_MAP[pk] || [];
     for (var i = 0; i < list.length; i++) {
@@ -323,8 +332,19 @@
       if (nm.indexOf('대산') >= 0) return '서산시';
       if (nm.indexOf('신창') >= 0 || nm.indexOf('선장') >= 0) return '아산시';
     }
-    if (pk === '전남광주통합특별시' && nm.indexOf('1004섬') >= 0) {
-      return '신안군';
+    if (pk === '전남광주통합특별시') {
+      if (nm.indexOf('1004섬') >= 0) return '신안군';
+      if (nm.indexOf('장보고장학회') >= 0) return '완도군';
+      if (nm.indexOf('백운장학회') >= 0) return '광양시';
+      if (nm.indexOf('광주') >= 0) return '광주 본청';
+      if (
+        nm.indexOf('전남') >= 0 || nm.indexOf('전라남도') >= 0 ||
+        nm.indexOf('명량대첩') >= 0 || nm.indexOf('녹색에너지연구원') >= 0 ||
+        nm.indexOf('포뮬러원') >= 0 || nm.indexOf('김대중노벨') >= 0 ||
+        nm.indexOf('남도음식') >= 0 || nm.indexOf('남도장터') >= 0
+      ) {
+        return '전남 본청';
+      }
     }
     return hqLabel;
   }
@@ -2216,15 +2236,33 @@
     cb(out);
   }
 
-  function getInitialOrganFromUrl() {
+  function getInitialUrlParams() {
+    var res = { organ: '', region: '', muni: '', compare: [], tab: '', mode: '', doc: '' };
     try {
       if (typeof location !== 'undefined' && location.search) {
         var sp = new URLSearchParams(location.search);
-        var org = sp.get('organ') || sp.get('aid') || '';
-        return org.trim();
+        res.organ = (sp.get('organ') || sp.get('aid') || '').trim();
+        res.region = (sp.get('region') || '').trim();
+        res.muni = (sp.get('muni') || '').trim();
+        res.tab = (sp.get('tab') || '').trim();
+        res.mode = (sp.get('mode') || '').trim();
+        res.doc = (sp.get('doc') || '').trim();
+        var cmpRaw = (sp.get('compare') || '').trim();
+        if (cmpRaw) {
+          var seenCmp = Object.create(null);
+          res.compare = cmpRaw.split(',').map(function (s) { return s.trim(); }).filter(function (s) {
+            if (!s || seenCmp[s]) return false;
+            seenCmp[s] = true;
+            return true;
+          }).slice(0, 6);
+        }
       }
     } catch (e) {}
-    return '';
+    return res;
+  }
+
+  function getInitialOrganFromUrl() {
+    return getInitialUrlParams().organ;
   }
 
   function openOrganWindow(aid, forceSameWin) {
@@ -2395,8 +2433,9 @@
       });
       var keys = Object.keys(counts);
       keys.sort(function (a, b) {
-        if (a === hqLabel) return -1;
-        if (b === hqLabel) return 1;
+        var aHq = (a === hqLabel || a.indexOf('본청') >= 0);
+        var bHq = (b === hqLabel || b.indexOf('본청') >= 0);
+        if (aHq !== bHq) return aHq ? -1 : 1;
         if (counts[b] !== counts[a]) return counts[b] - counts[a];
         return a.localeCompare(b, 'ko');
       });
@@ -2410,7 +2449,23 @@
     });
     allConfeds.sort();
 
-    var urlOrgan = getInitialOrganFromUrl();
+    var urlInit = getInitialUrlParams();
+    var urlOrgan = urlInit.organ;
+    var urlRegionResolved = '';
+    if (urlInit.region) {
+      if (urlInit.region === 'ALL') urlRegionResolved = 'ALL';
+      else if (PROVINCE_BY_KEY[urlInit.region]) urlRegionResolved = urlInit.region;
+      else urlRegionResolved = inferProvinceFromQuery(urlInit.region);
+    }
+    var urlCompareValid = [];
+    (urlInit.compare || []).forEach(function (cid) {
+      if (organById[cid] && urlCompareValid.indexOf(cid) === -1 && urlCompareValid.length < 6) {
+        urlCompareValid.push(cid);
+      }
+    });
+    var validUrlMode = /^(STUDIO|REGION|ALL_LIST)$/.test(urlInit.mode) ? urlInit.mode : '';
+    var validUrlDoc = urlInit.doc === 'DISC' ? 'DISC' : '';
+    var validUrlTab = /^(unions|organ|matrix|articles|apihub)$/.test(urlInit.tab) ? urlInit.tab : (validUrlDoc ? 'articles' : '');
     var defaultOrganAid = (urlOrgan && instMap[urlOrgan]) ? urlOrgan : '';
     if (!defaultOrganAid && safeInsts.length) {
       var preferred = safeInsts.find(function (x) {
@@ -2419,8 +2474,24 @@
       defaultOrganAid = preferred ? preferred.apba_id : safeInsts[0].apba_id;
     }
 
+    var initialTab = (urlOrgan && instMap[urlOrgan])
+      ? 'organ'
+      : ((urlRegionResolved || urlCompareValid.length || validUrlMode) ? 'matrix' : (validUrlTab || 'unions'));
+    var initialMSubMode = urlRegionResolved
+      ? 'REGION'
+      : (urlCompareValid.length ? 'STUDIO' : (validUrlMode || 'STUDIO'));
+    var initialRProv = urlRegionResolved
+      || ((organById[defaultOrganAid] && organById[defaultOrganAid].provinceKey) ? organById[defaultOrganAid].provinceKey : '충청남도');
+    var initialRMuni = '';
+    if (urlRegionResolved && urlRegionResolved !== 'ALL' && urlInit.muni) {
+      var allowedMunis = getMunicipalitiesForProvince(urlRegionResolved);
+      if (allowedMunis.some(function (m) { return m.name === urlInit.muni; })) {
+        initialRMuni = urlInit.muni;
+      }
+    }
+
     var state = {
-      tab: (urlOrgan && instMap[urlOrgan]) ? 'organ' : 'unions',
+      tab: initialTab,
       // 탭 1: 기관별 분류 · 내부영역 통합 (전 기관 노조·타임오프 현황 포함)
       uViewMode: 'ORGAN', // 'ORGAN' (1기관 1통합행 기본) | 'FLAT_UNION' (단위노조별 나열)
       uShowMacroChart: false,
@@ -2437,7 +2508,7 @@
       uPage: 0,
       uExpanded: {},
       // 비교 바구니 (최대 6개 기관)
-      compareIds: [],
+      compareIds: urlCompareValid,
       cmpAddQuery: '',
       // 탭 2: 기관별 연혁·과거임단협·유사기관 비교 & 내부 6대 영역 종합
       hScope: 'ALL',
@@ -2449,9 +2520,9 @@
       hVerB: 0,
       hSimMode: 'ALL',
       // 탭 3: 그래프·히트맵 비교분석 스튜디오 & 지역·지자체 산하 비교 & 13대 핵심 쟁점 원문 대조
-      mSubMode: 'STUDIO', // 'STUDIO' (다중기관 비교) | 'REGION' (지역·지자체 산하기관 전수 비교) | 'ALL_LIST' (단일쟁점 목록)
-      rProvince: (organById[defaultOrganAid] && organById[defaultOrganAid].provinceKey) ? organById[defaultOrganAid].provinceKey : '충청남도',
-      rMuni: '',
+      mSubMode: initialMSubMode, // 'STUDIO' (다중기관 비교) | 'REGION' (지역·지자체 산하기관 전수 비교) | 'ALL_LIST' (단일쟁점 목록)
+      rProvince: initialRProv,
+      rMuni: initialRMuni,
       rTypeGroup: '', // '' | 'LOCAL_CORP' | 'LOCAL_AFFIL' | 'LOCAL_DIRECT'
       rUnionFilter: '', // ''(노조우선 전체) | 'has_union' | 'multi' | 'no_union'
       rQuery: '',
@@ -2463,7 +2534,7 @@
       mQuery: '',
       mChecked: {},
       // 탭 4: 조문·원문 통합 (단체협약 조문 통합 검색 + 기관별 공시·별도합의·내부규정 원문)
-      docMode: 'ARTICLES', // 'ARTICLES' | 'DISC'
+      docMode: validUrlDoc || 'ARTICLES', // 'ARTICLES' | 'DISC'
       aScope: 'ALL',
       aCat: 'ALL',
       aQuery: '',
@@ -3656,8 +3727,9 @@
           });
         });
       }
-      bindFilterInputs(renderTabOrganHistory, { hSearch: updateHistorySearch }, '.pau-flt input[data-f]');
+      bindFilterInputs(renderTabOrganHistory, { hSearch: function () { updateHistorySearch(); syncUrlState(); } }, '.pau-flt input[data-f]');
       bindHistoryDynEvents();
+      syncUrlState();
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -3809,8 +3881,9 @@
             });
             breakdownItems = Object.keys(muniStatMap).map(function (k) { return muniStatMap[k]; });
             breakdownItems.sort(function (a, b) {
-              if (a.key === hqName) return -1;
-              if (b.key === hqName) return 1;
+              var aHq = (a.key === hqName || a.key.indexOf('본청') >= 0);
+              var bHq = (b.key === hqName || b.key.indexOf('본청') >= 0);
+              if (aHq !== bHq) return aHq ? -1 : 1;
               if (b.total !== a.total) return b.total - a.total;
               return a.label.localeCompare(b.label, 'ko');
             });
@@ -4134,6 +4207,7 @@
         });
         bindFilterInputs(renderTabMatrix, { rQuery: updateRegionDyn });
         bindRegionDynEvents();
+        syncUrlState();
         return;
       }
 
@@ -4284,6 +4358,7 @@
         bindMatrixSubModeButtons();
         bindFilterInputs(renderTabMatrix, { mQuery: updateMatrixListDyn });
         bindMatrixListDynEvents();
+        syncUrlState();
         return;
       }
 
@@ -4291,6 +4366,7 @@
       var cmpRecs = getActiveCompareRecords();
       if (!cmpRecs.length) {
         bodyEl.innerHTML = '<div class="pau-sec-card" style="padding:32px;text-align:center;color:var(--pau-muted);">비교 분석할 공공기관 데이터가 없습니다.</div>';
+        syncUrlState();
         return;
       }
       var baseRec = cmpRecs[0];
@@ -4592,6 +4668,7 @@
       });
 
       var lawBox = bodyEl.querySelector('[data-law-live-box]');
+      syncUrlState();
       fetchLawLive(def.lawKey, function (err, law) {
         if (!lawBox) return;
         if (err || !law) {
@@ -5251,6 +5328,45 @@
       }
     }
 
+    function syncUrlState() {
+      if (opts.isModal) return;
+      try {
+        if (typeof location === 'undefined' || typeof history === 'undefined' || typeof history.replaceState !== 'function') return;
+        if (location.protocol === 'file:') return;
+        var sp = new URLSearchParams(location.search || '');
+        sp.delete('organ');
+        sp.delete('aid');
+        sp.delete('region');
+        sp.delete('muni');
+        sp.delete('compare');
+        sp.delete('tab');
+        sp.delete('mode');
+        sp.delete('doc');
+        if (state.tab === 'organ' && state.hOrgan) {
+          sp.set('organ', state.hOrgan);
+        } else if (state.tab === 'matrix' && state.mSubMode === 'REGION') {
+          sp.set('region', state.rProvince || '충청남도');
+          if (state.rProvince !== 'ALL' && state.rMuni) sp.set('muni', state.rMuni);
+        } else if (state.tab === 'matrix' && state.mSubMode === 'ALL_LIST') {
+          sp.set('tab', 'matrix');
+          sp.set('mode', 'ALL_LIST');
+        } else if (state.tab === 'matrix' && state.mSubMode === 'STUDIO') {
+          if (state.compareIds.length) sp.set('compare', state.compareIds.slice(0, 6).join(','));
+          else sp.set('tab', 'matrix');
+        } else if (state.tab === 'articles') {
+          sp.set('tab', 'articles');
+          if (state.docMode === 'DISC') sp.set('doc', 'DISC');
+        } else if (state.tab !== 'unions') {
+          sp.set('tab', state.tab);
+        }
+        var qs = sp.toString();
+        var nextUrl = (location.pathname || 'pu-alio-union.html') + (qs ? ('?' + qs) : '') + (location.hash || '');
+        if (nextUrl !== ((location.pathname || '') + (location.search || '') + (location.hash || ''))) {
+          history.replaceState(null, '', nextUrl);
+        }
+      } catch (e) {}
+    }
+
     function renderCurrentTab() {
       if (state.tab === 'unions') renderTabUnions();
       else if (state.tab === 'organ') renderTabOrganHistory();
@@ -5260,6 +5376,7 @@
         else renderTabArticles();
       } else if (state.tab === 'detail') renderTabDetail();
       else renderTabApiHub();
+      syncUrlState();
     }
 
     renderCompareTray();

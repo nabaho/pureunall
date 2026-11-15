@@ -540,21 +540,42 @@ test('⑨ 지자체 약칭·다중어 스마트 검색(충남→천안도시공�
   assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 공사'), true, '공백 다중 키워드("충남 공사") AND 검색이 일치해야 합니다');
   assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 수원'), false, '불일치 키워드가 포함되면 제외되어야 합니다');
 
-  // 도립 의료원(천안의료원·공주의료원) 및 제주·전남광주 본청/자치구 산하 분류 정밀 검증
-  const cheonanMed = chungnamAll.find((r) => r.name === '천안의료원' || r.name.includes('천안의료원'));
-  if (cheonanMed) {
-    assert.equal(cheonanMed.muniName, '충남 본청', '도립 천안의료원은 충남 본청 산하로 분류되어야 합니다');
-  }
+  // 도립 의료원(천안의료원·전라남도순천의료원) 및 경기·제주·전남·광주 본청/자치구 산하 분류 정밀 검증
+  const cheonanMed = chungnamAll.find((r) => r.name.includes('천안의료원'));
+  assert.ok(cheonanMed, '천안의료원이 존재해야 합니다');
+  assert.equal(cheonanMed.muniName, '충남 본청', '도립 천안의료원은 충남 본청 산하로 분류되어야 합니다');
+
+  const suncheonMed = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전라남도순천의료원'));
+  assert.ok(suncheonMed, '전라남도순천의료원이 존재해야 합니다');
+  assert.equal(suncheonMed.muniName, '전남 본청', '도립 전라남도순천의료원은 전남 본청 산하로 분류되어야 합니다');
+
+  const gangjinMed = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전라남도강진의료원'));
+  assert.ok(gangjinMed, '전라남도강진의료원이 존재해야 합니다');
+  assert.equal(gangjinMed.muniName, '전남 본청', '도립 전라남도강진의료원은 전남 본청 산하로 분류되어야 합니다');
+
   const jejuDev = master.records.find((r) => r.provinceKey === '제주특별자치도' && r.name.includes('제주특별자치도개발공사'));
   assert.ok(jejuDev, '제주특별자치도개발공사가 존재해야 합니다');
   assert.equal(jejuDev.muniName, '제주 본청', '제주특별자치도개발공사는 제주 본청으로 분류되어야 합니다');
+
   const gwangjuTraffic = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('광주교통공사'));
   assert.ok(gwangjuTraffic, '광주교통공사가 존재해야 합니다');
-  assert.equal(gwangjuTraffic.muniName, '전남·광주 본청', '광주교통공사는 전남·광주 본청으로 일원화 분류되어야 합니다');
+  assert.equal(gwangjuTraffic.muniName, '광주 본청', '광주교통공사는 광주 본청으로 분류되어야 합니다');
+
+  const jeonnamDev = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전남개발공사'));
+  assert.ok(jeonnamDev, '전남개발공사가 존재해야 합니다');
+  assert.equal(jeonnamDev.muniName, '전남 본청', '전남개발공사는 전남 본청으로 분류되어야 합니다');
+
+  const gyeonggiPort = master.records.find((r) => r.provinceKey === '경기도' && r.name.includes('경기평택항만공사'));
+  assert.ok(gyeonggiPort, '경기평택항만공사가 존재해야 합니다');
+  assert.equal(gyeonggiPort.muniName, '경기 본청', '도립 경기평택항만공사는 경기 본청으로 분류되어야 합니다');
+
+  const suwonWorldcup = master.records.find((r) => r.provinceKey === '경기도' && r.name.includes('경기도수원월드컵경기장'));
+  assert.ok(suwonWorldcup, '경기도수원월드컵경기장관리재단이 존재해야 합니다');
+  assert.equal(suwonWorldcup.muniName, '경기 본청', '도립 경기도수원월드컵경기장관리재단은 경기 본청으로 분류되어야 합니다');
+
   const gwangjuDonggu = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('동구'));
-  if (gwangjuDonggu) {
-    assert.equal(gwangjuDonggu.muniName, '광주 동구', '광주광역시 동구 산하기관은 광주 동구로 분류되어야 합니다');
-  }
+  assert.ok(gwangjuDonggu, '광주 동구 산하기관이 존재해야 합니다');
+  assert.equal(gwangjuDonggu.muniName, '광주 동구', '광주광역시 동구 산하기관은 광주 동구로 분류되어야 합니다');
 
   // 지역별 벤치마크, 보안 URL 제한(https 전용) 및 REGION 모드 UI 구성요소 존재 검증
   assert.ok(master.benchmarks.LOCAL_ALL && master.benchmarks.LOCAL_ALL.totalOrgans >= 1300 && master.benchmarks.LOCAL_ALL.count > 300);
@@ -575,6 +596,109 @@ test('⑨ 지자체 약칭·다중어 스마트 검색(충남→천안도시공�
     assert.ok(sampleScores[k] && typeof sampleScores[k].tag === 'string', `issueScores.${k} 키가 실제 METRIC_DEFS 산출물에 존재해야 합니다`);
   }
 });
+
+test('⑩ URL 딥링크(?region=충남&muni=천안시, ?compare=중복제거, ?tab=articles&doc=DISC) 및 서브모드 전환 시 history.replaceState 상태 동기화가 정확히 동작한다', () => {
+  function runWithUrl(initialSearch) {
+    const replacedUrls = [];
+    const loc = {
+      protocol: 'https:',
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch,
+      hash: ''
+    };
+
+    function makeNode(tag) {
+      const attrs = {};
+      const listeners = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const cmpTrayEl = makeNode('DIV');
+    const subModeAllListBtn = makeNode('BUTTON');
+    subModeAllListBtn.setAttribute('data-m-submode', 'ALL_LIST');
+    bodyEl.querySelectorAll = (sel) => {
+      if (sel === '[data-m-submode]') return [subModeAllListBtn];
+      return [];
+    };
+
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          replacedUrls.push(url);
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+    return { root, bodyEl, subModeAllListBtn, loc, replacedUrls };
+  }
+
+  // 1) ?sso=1&region=충남&muni=천안시 진입 시 REGION 모드(충청남도·천안시)로 열리고, ALL_LIST로 전환하면 region/muni가 정리되며 sso=1은 보존됨
+  const r1 = runWithUrl('?sso=1&region=%EC%B6%A9%EB%82%A8&muni=%EC%B2%9C%EC%95%88%EC%8B%9C');
+  assert.match(r1.bodyEl.innerHTML, /천안도시공사/, '천안시 산하기관이 초기 렌더링되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /sso=1/, '포털 기존 쿼리(sso=1)는 유지되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /region=충청남도/, '약칭 충남이 정규 광역키 충청남도로 URL 동기화되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /muni=천안시/, '유효 기초지자체 천안시가 URL에 유지되어야 합니다');
+
+  r1.subModeAllListBtn.trigger('click');
+  const afterAllList = decodeURIComponent(r1.loc.search);
+  assert.doesNotMatch(afterAllList, /region=/, 'ALL_LIST 전환 후 이전 region 파라미터가 남아있으면 안 됩니다');
+  assert.doesNotMatch(afterAllList, /muni=/, 'ALL_LIST 전환 후 이전 muni 파라미터가 남아있으면 안 됩니다');
+  assert.match(afterAllList, /sso=1/, 'ALL_LIST 전환 후에도 sso=1은 보존되어야 합니다');
+  assert.match(afterAllList, /mode=ALL_LIST/, 'ALL_LIST 상태가 URL에 기록되어야 합니다');
+
+  // 2) ?compare=C0005,C0005,L_ERC 진입 시 중복 기관코드(C0005)가 자동 제거되어 고유 2개만 반영됨
+  const r2 = runWithUrl('?compare=C0005,C0005,L_ERC');
+  assert.equal(decodeURIComponent(r2.loc.search), '?compare=C0005,L_ERC', '중복 compare 기관코드가 제거되어야 합니다');
+
+  // 3) ?tab=articles&doc=DISC 진입 시 공시·사규 원문 모드로 직결되고 새로고침 URL도 유지됨
+  const r3 = runWithUrl('?tab=articles&doc=DISC');
+  assert.match(r3.bodyEl.innerHTML, /공시항목 분류/, 'doc=DISC 진입 시 공시·사규 원문 화면이 렌더링되어야 합니다');
+  assert.equal(decodeURIComponent(r3.loc.search), '?tab=articles&doc=DISC');
+});
+
 
 
 
