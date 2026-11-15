@@ -642,10 +642,222 @@
     return Hx.buildHwpx({ page: Hx.defaultPage(), pageNum: { pos: 'BOTTOM_CENTER', dash: true }, blocks: blocks });
   }
 
+  var OFFICIAL_DOC_TYPES = {
+    plan_req: {
+      code: 'plan_req',
+      label: '조사계획서 및 기초자료 제출·협조 요청 공문',
+      short: '조사계획·자료요청 공문',
+      stepCode: 'plan',
+      docRole: 'official_plan'
+    },
+    attend_notice: {
+      code: 'attend_notice',
+      label: '당사자·참고인 조사 출석 및 면담 안내문',
+      short: '출석·면담 안내문',
+      stepCode: 'victim',
+      docRole: 'victim_stmt'
+    },
+    pledge_form: {
+      code: 'pledge_form',
+      label: '조사 참여자 비밀유지서약서 (현장 출력·자필서명용)',
+      short: '비밀유지서약서 양식',
+      stepCode: 'pledge',
+      docRole: 'pledge_protect'
+    },
+    measure_rec: {
+      code: 'measure_rec',
+      label: '피해근로자 보호조치 및 사후 조치 권고 공문',
+      short: '보호·후속조치 권고공문',
+      stepCode: 'report',
+      docRole: 'final_report'
+    }
+  };
+
+  /* ③ 조사 단계별 실무 필수 공문·서식 4종 정식 .hwpx 생성 */
+  function buildOfficialDocHwpx(docType, caseRec, opts) {
+    var Hx = ensureHwpxBuilder();
+    var c = caseRec || {};
+    var o = opts || {};
+    var kind = OFFICIAL_DOC_TYPES[docType] ? docType : 'plan_req';
+    var cat = (C && C.CATEGORIES && C.CATEGORIES[c.category]) || { label: '직장 내 괴롭힘' };
+    var lawBasis = c.category === 'sexual'
+      ? '남녀고용평등과 일·가정 양립 지원에 관한 법률 제14조'
+      : c.category === 'both'
+        ? '근로기준법 제76조의2·제76조의3 및 남녀고용평등법 제14조'
+        : '근로기준법 제76조의2 및 제76조의3';
+    var coName = str(o.companyName || c.companyName) || '(의뢰 사업장)';
+    var caseTitle = str(o.caseTitle || c.title) || (cat.label + ' 사안 외부전문가 조사');
+    var issueDate = str(o.issueDate) || (C && C.ymdOf ? C.ymdOf(Date.now()) : '');
+    var mgrLabel = str(o.managerText) || '담당 공인노무사';
+    var customNote = str(o.customBody);
+    var blocks = [];
+
+    if (kind === 'plan_req') {
+      blocks.push(pBlock(cat.label + ' 사안 조사계획 및 기초자료 협조 요청', { align: 'center', size: 16, bold: true, after: 6 }));
+      blocks.push(pBlock('수행기관: 푸른노무법인 · 대외비 (' + lawBasis + ' 비밀엄수)', { align: 'center', size: 9.5, color: '#991B1B', bold: true, after: 10 }));
+
+      blocks.push(pBlock('1. 공문 및 조사 개요', { size: 11.5, bold: true, before: 4, after: 4 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('수신 (의뢰 사업장)', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(coName + ' 인사·노무 담당 부서장'), tCell('발신 일자', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(issueDate)],
+          [tCell('발신 기관', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('푸른노무법인'), tCell('담당 조사위원', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mgrLabel)],
+          [tCell('조사 건명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(caseTitle, { colSpan: 3 })],
+          [tCell('적용 법령', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(lawBasis + ' (직무상 비밀누설 금지 준수)', { colSpan: 3, color: '#1E40AF' })]
+        ]
+      });
+
+      blocks.push(pBlock('2. 표준 조사 추진 절차 및 일정(안)', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [18, 34, 48],
+        rows: [
+          [tCell('단계', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('주요 수행 내용', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('세부 기준 및 유의사항', { bg: '#EFF6FF', bold: true, align: 'center' })],
+          [tCell('1~2단계', { align: 'center', bold: true }), tCell('신고 요지 검토 및 기초자료 확보'), tCell('관련 사규·조직도·입증자료 검토 및 조사 범위·대상자 확정')],
+          [tCell('3단계', { align: 'center', bold: true }), tCell('비밀유지서약 및 임시 보호조치 점검'), tCell('조사 참여자 전원 비밀유지서약 징구, 피해근로자 분리배치·유급휴가 등 검토')],
+          [tCell('4~6단계', { align: 'center', bold: true }), tCell('신고인 · 참고인 · 피신고인 면담조사'), tCell('문답 조서 작성 및 본인 열람·정정 기회 부여 후 전자/자필 서명 확인')],
+          [tCell('7~8단계', { align: 'center', bold: true }), tCell('사실인정 · 법리검토 · 최종 결과보고'), tCell('객관적 증거 교차검증 및 법정 요건 검토 후 조사결과보고서 제출')]
+        ]
+      });
+
+      blocks.push(pBlock('3. 제출 및 협조 요청 기초자료', { size: 11.5, bold: true, before: 10, after: 4 }));
+      var reqItems = customNote || [
+        '① 취업규칙, 인사·징계규정, 직장 내 괴롭힘·성희롱 예방 및 처리 지침 사본',
+        '② 관련 부서 조직도 및 당사자(신고인·피신고인) 직위·담당업무·근무기간 현황',
+        '③ 최초 신고서 사본 및 기 제출된 녹취·메신저·이메일·진술서 등 관련 자료 일체',
+        '④ 면담 대상자(당사자 및 참고인) 일정 조율 담당자 지정 및 비밀보장 독립 면담장소 협조',
+        '※ 조사 개시 사실 및 관련 자료는 관계자 외 열람·유출되지 않도록 대외비로 관리하여 주시기 바랍니다.'
+      ].join('\n');
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [100], rows: [[tCell(reqItems, { valign: 'top' })]] });
+
+    } else if (kind === 'attend_notice') {
+      var role = str(o.targetRole) || 'victim';
+      var roleKr = role === 'accused' ? '피신고인(소명 대상자)' : role === 'witness' ? '참고인' : '신고인(피해 주장 근로자)';
+      var targetName = str(o.targetName) || '(대상자 성명·소속)';
+      var meetWhen = str(o.meetWhen) || '(추후 개별 조율 일시)';
+      var meetWhere = str(o.meetWhere) || '독립 비밀보장 면담실 (또는 비대면 화상·유선)';
+
+      blocks.push(pBlock(cat.label + ' 사안 면담조사 출석 및 절차 안내문', { align: 'center', size: 16, bold: true, after: 6 }));
+      blocks.push(pBlock('[친전 · 비밀엄수] 수신인 본인 외 개봉·공유 금지 (' + lawBasis + ')', { align: 'center', size: 9.5, color: '#991B1B', bold: true, after: 10 }));
+
+      blocks.push(pBlock('1. 면담조사 일정 및 대상 안내', { size: 11.5, bold: true, before: 4, after: 4 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('사업장명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(coName), tCell('안내 일자', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(issueDate)],
+          [tCell('조사 건명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(caseTitle, { colSpan: 3 })],
+          [tCell('면담 구분', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(roleKr, { bold: true }), tCell('성명 · 소속', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetName)],
+          [tCell('면담 일시', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(meetWhen, { bold: true, color: '#1E40AF' }), tCell('면담 장소·방식', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(meetWhere)],
+          [tCell('외부 조사기관', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('푸른노무법인 (' + mgrLabel + ')', { colSpan: 3 })]
+        ]
+      });
+
+      blocks.push(pBlock('2. 진술 권리 보장 및 비밀엄수 유의사항', { size: 11.5, bold: true, before: 10, after: 4 }));
+      var roleGuide = role === 'accused'
+        ? [
+          '① 공정성 및 소명권 보장: 본 조사는 객관적 사실관계 확인을 위해 독립된 외부 공인노무사가 중립적으로 수행하며, 귀하께서는 조사 쟁점에 대하여 충분한 소명 의견과 반박 자료를 제출하실 수 있습니다.',
+          '② 진술 확인 절차: 면담 내용은 문답 조서로 정리되며, 귀하께서 직접 내용을 열람·정정한 뒤 전자서명 또는 자필 서명으로 확인합니다.',
+          '③ 비밀유지 및 2차 피해 방지 의무: 조사 과정에서 알게 된 신고 내용·면담 질문·참고인 정보 등을 타인에게 누설하거나 신고인·참고인에게 연락·회유·불이익 언동을 하는 행위는 엄격히 금지됩니다.'
+        ]
+        : role === 'witness'
+          ? [
+            '① 참고인 보호 및 비밀보장: 귀하의 면담 참여 사실과 진술 내용은 ' + lawBasis + '에 따라 철저히 비밀이 보장되며, 조사 참여를 이유로 어떠한 인사상·업무상 불이익도 받지 않습니다.',
+            '② 객관적 진술 협조: 직접 경험하거나 목격하신 사실과 관련 자료(메신저·이메일 등)를 있는 그대로 말씀해 주시기 바랍니다.',
+            '③ 직무상 비밀유지 의무: 면담 과정에서 인지한 사건 내용 및 질문 사항을 사내외 타인에게 공유하거나 발설하지 않도록 유의하여 주시기 바랍니다.'
+          ]
+          : [
+            '① 피해근로자 보호 및 불이익 금지: ' + lawBasis + '에 따라 신고 및 조사 참여를 이유로 한 불리한 처우는 법적으로 금지되며, 조사 기간 중 근무장소 변경·유급휴가 등 희망하시는 보호조치 의견을 말씀하실 수 있습니다.',
+            '② 입증자료 지참 안내: 쟁점 행위 일시·장소·경위를 확인할 수 있는 녹취, 메신저 대화, 이메일, 업무일지, 진료기록 등 관련 자료가 있으면 면담 시 제출해 주시기 바랍니다.',
+            '③ 진술 확인 및 비밀유지: 면담 종료 후 정리된 진술확인서를 직접 열람·보완하신 뒤 서명하며, 공정한 조사를 위해 조사 진행 내용은 외부에 누설하지 않도록 협조 바랍니다.'
+          ];
+      var guideText = customNote ? (roleGuide.join('\n\n') + '\n\n[추가 안내사항]\n' + customNote) : roleGuide.join('\n\n');
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [100], rows: [[tCell(guideText, { valign: 'top' })]] });
+
+    } else if (kind === 'pledge_form') {
+      blocks.push(pBlock('직장 내 괴롭힘 · 성희롱 조사 참여자 비밀유지서약서', { align: 'center', size: 16, bold: true, after: 8 }));
+      blocks.push(pBlock('조사 수행 기관: 푸른노무법인 · 법정 비밀유지 서약 문서 (' + lawBasis + ')', { align: 'center', size: 9.5, color: '#475569', after: 10 }));
+
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('사업장명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(coName), tCell('참여 구분', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(str(o.targetRole) === 'accused' ? '피신고인' : str(o.targetRole) === 'witness' ? '참고인' : str(o.targetRole) === 'victim' ? '신고인' : '조사 참여자 (신고인/피신고인/참고인/관계자)')],
+          [tCell('조사 건명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(caseTitle, { colSpan: 3 })]
+        ]
+      });
+
+      blocks.push(pBlock('비밀유지 및 2차 피해 방지 서약 사항', { size: 11.5, bold: true, before: 10, after: 4 }));
+      var pledgeClauses = customNote || [
+        '1. 본인은 위 사안의 조사 참여자로서, 조사 과정에서 알게 된 신고 사실·당사자 및 참고인 인적사항·면담 질문 및 진술 내용·제출 증거 등 일체의 비밀을 피해근로자의 의사에 반하여 타인에게 누설하지 않겠습니다.',
+        '2. 본인은 면담 내용을 무단으로 녹음·유포하거나 사내외 메신저·게시판 등에 언급하여 2차 피해를 유발하는 행위를 일체 하지 않겠습니다.',
+        '3. 본인은 관련 법령(' + lawBasis + ')에 따른 비밀누설 금지 의무 및 불이익 처우·보복 행위 금지 규정을 안내받았으며, 이를 위반할 경우 관계 법령 및 사규에 따른 책임을 질 것을 확인합니다.',
+        '4. 위 서약 사항을 충분히 이해하고 본인의 자유로운 의사로 서명합니다.'
+      ].join('\n\n');
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [100], rows: [[tCell(pledgeClauses, { bg: '#F8FAFC', valign: 'top' })]] });
+
+      blocks.push(pBlock('서약 일자:  ' + issueDate, { align: 'center', size: 11, bold: true, before: 14, after: 8 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('소속 부서 / 직위', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(str(o.targetDept) || ''), tCell('성명 (자필서명)', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell((str(o.targetName) || '                ') + '   (서명 또는 인)', { align: 'right' })],
+          [tCell('조사 수행 기관', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('푸른노무법인 (' + mgrLabel + ') 귀중', { colSpan: 3 })]
+        ]
+      });
+
+    } else {
+      /* measure_rec: 피해근로자 보호조치 및 사후 조치 권고 공문 */
+      var vObj = (C && C.VERDICTS && C.VERDICTS[str(c.verdictSummary)]) || { label: '조사·검토 결과에 따른 조치 안내' };
+      blocks.push(pBlock(cat.label + ' 사안 사업주 법정의무 및 후속조치 권고 공문', { align: 'center', size: 16, bold: true, after: 6 }));
+      blocks.push(pBlock('발신: 푸른노무법인 (' + mgrLabel + ') · 대외비 인사권자 전용', { align: 'center', size: 9.5, color: '#991B1B', bold: true, after: 10 }));
+
+      blocks.push(pBlock('1. 대상 사건 및 판단 요약', { size: 11.5, bold: true, before: 4, after: 4 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('수신 사업장', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(coName + ' 대표이사 귀하'), tCell('발신 일자', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(issueDate)],
+          [tCell('사건명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(caseTitle, { colSpan: 3 })],
+          [tCell('종합 판단 요약', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(vObj.label, { colSpan: 3, bold: true, color: '#1E40AF' })]
+        ]
+      });
+
+      blocks.push(pBlock('2. 관계 법령상 사업주 필수 이행 사항 (' + lawBasis + ')', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table',
+        widthRatio: 1,
+        colWidths: [26, 74],
+        rows: [
+          [tCell('법정 조치 구분', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('이행 기준 및 실무 유의사항', { bg: '#EFF6FF', bold: true, align: 'center' })],
+          [tCell('피해근로자 보호조치', { bold: true, align: 'center' }), tCell('근무장소 변경, 배치전환, 유급휴가 명령 등 적절한 보호조치 시행 (피해근로자의 의사에 반하는 불리한 배치전환 금지)')],
+          [tCell('행위자 인사·징계 조치', { bold: true, align: 'center' }), tCell('괴롭힘·성희롱 사실 인정 시 지체 없이 행위자에 대해 징계, 근무장소 변경 등 필요한 조치 이행 (조치 전 반드시 피해근로자 의견 사전 청취 필수)')],
+          [tCell('불이익 처우·2차 가해 금지', { bold: true, align: 'center' }), tCell('신고인 및 참고인에 대한 해고·징계·집단 따돌림 등 불리한 처우 엄금 (위반 시 형사처벌 대상) 및 비밀유지 모니터링')],
+          [tCell('재발방지 및 조직문화 개선', { bold: true, align: 'center' }), tCell('관리자·전 직원 대상 예방 특별교육 실시, 사내 고충처리 절차 점검 및 후속 모니터링 실시')]
+        ]
+      });
+
+      blocks.push(pBlock('3. 본 건 맞춤 권고 의견', { size: 11.5, bold: true, before: 10, after: 4 }));
+      var recBody = customNote || str(o.recommendations) || '• 조사결과보고서상 인정된 사실관계 및 법리 판단을 토대로 피해근로자 보호의견을 우선 청취한 뒤 사규(인사·징계규정)에 따른 적정 후속조치 및 재발방지 교육을 시행하시기 바랍니다.';
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [100], rows: [[tCell(recBody, { valign: 'top' })]] });
+    }
+
+    return Hx.buildHwpx({ page: Hx.defaultPage(), pageNum: { pos: 'BOTTOM_CENTER', dash: true }, blocks: blocks });
+  }
+
   return {
+    OFFICIAL_DOC_TYPES: OFFICIAL_DOC_TYPES,
     extractDocumentText: extractDocumentText,
     extractReportBodyFromText: extractReportBodyFromText,
     buildInterviewHwpx: buildInterviewHwpx,
-    buildReportHwpx: buildReportHwpx
+    buildReportHwpx: buildReportHwpx,
+    buildOfficialDocHwpx: buildOfficialDocHwpx
   };
 });
