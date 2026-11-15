@@ -39,7 +39,7 @@
 <script src="js/pu-cal-write.js?v=10"></script>
 <script src="js/pu-cal-map.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-cal-capture.js?v=3"></script>
+<script src="js/pu-cal-capture.js?v=4"></script>
 <script src="js/pu-cal-card.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -69,7 +69,7 @@
        ③ 앞으로의 칩이 원색 그대로라 부셨다 → 칩은 chipHtml 이 15% 눅인다(어두운판에서만)
      ⚠ 푸른 기 없는 회색이다 — 남색(#1e293b)으로 되돌리면 ①이 되살아난다. */
   :root[data-theme="dark"]{--ink:#e3e3e3;--sub:#9aa0a6;--faint:#80868b;--line:#3c4043;
-    --panel:#1b1b1d;--bg:#131314;--acc-soft:rgba(138,180,248,.16);--ok:#4ade80;
+    --panel:#1b1b1d;--bg:#131314;--acc2:#8ab4f8;--acc-soft:rgba(138,180,248,.16);--ok:#4ade80;
     --warn:#fbbf24;--warn-bg:#1b1b1d;
     --gtext:#e3e3e3;--gsub:#9aa0a6;--gline:#3c4043;--gtoday:#8ab4f8;--gdate:#e3e3e3;--gfaint:#9aa0a6}
   *{box-sizing:border-box}
@@ -653,7 +653,7 @@
   .cinbox .cbh{display:flex;align-items:center;gap:6px;padding:14px 16px 6px}
   .cinbox .cbt{font-size:17px;font-weight:700;color:var(--gtext)}
   .cinbox .sp{flex:1}
-  .cinbox .cbx{border:none;background:transparent;font-size:18px;color:var(--gsub);padding:6px 10px;cursor:pointer;font-family:inherit}
+  .cinbox .cbx{border:none;background:transparent;font-size:18px;color:var(--gsub);padding:6px 10px;min-width:36px;min-height:36px;cursor:pointer;font-family:inherit}
   .cinbox .cbsub{padding:0 16px 10px;font-size:12px;color:var(--gsub);line-height:1.5}
   .cinbox .cblist{flex:1;overflow:auto;padding:0 12px 16px;background:var(--bg)}
   .cinbox .cmail{background:var(--panel);border:1px solid var(--gline);border-radius:12px;margin:8px 0;overflow:hidden}
@@ -5335,13 +5335,13 @@ function 후보창Html(){
   if(!후보.open) return "";
   var 묶음 = 후보묶기(), n = 후보새것().length, st = 후보.state || {};
   var 지난 = (후보.list || []).filter(function(c){ return c && c.status && c.status !== "new"; });
-  var 안내 = "받은 메일에서 AI 가 찾은 일정입니다 · 저절로 넣지 않습니다"
+  var 안내 = "회의·강의·조사 등 날짜 일정은 달력에 자동 등록·보강되며, 마감·확인 필요 건은 여기에 남습니다"
     + (st.at ? " · 마지막 확인 " + 후보메일날글(st.at) : "");
   var 멈춤 = st.paused === "budget" ? "⏸ 이번 달 AI 한도를 넘어 후보 뽑기를 멈췄습니다"
     : st.paused === "day" ? "⏸ 오늘 쓸 몫을 다 써서 멈췄습니다 — 내일 다시 뽑습니다" : "";
-  return '<div class="veil" data-cand="close"></div><div class="modal cinbox">'
+  return '<div class="veil" data-cand="close"></div><div class="modal cinbox" role="dialog" aria-modal="true" aria-label="일정 후보">'
     + '<div class="cbh"><span class="cbt">📥 일정 후보 ' + n + '건</span><span class="sp"></span>'
-    +   '<button class="cbx" data-cand="reload" title="새로 받기">↻</button><button class="cbx" data-cand="close" title="닫기">✕</button></div>'
+    +   '<button class="cbx" data-cand="reload" title="새로 받기" aria-label="새로 받기">↻</button><button class="cbx" data-cand="close" title="닫기" aria-label="닫기">✕</button></div>'
     + '<div class="cbsub">' + esc(안내) + (멈춤 ? '<div class="cwarn">' + esc(멈춤) + '</div>' : '')
     +   (후보.err ? '<div class="cwarn">후보를 못 받았습니다 — ' + esc(후보.err) + '</div>' : '') + '</div>'
     + '<div class="cblist">'
@@ -6654,6 +6654,7 @@ document.addEventListener('keydown', function(e){
   if(S.note){ e.preventDefault(); closeNote(); return; }
   if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
   if(S.modal){ e.preventDefault(); closeModal(); return; }
+  if(후보.open){ e.preventDefault(); 후보.open = false; render(); return; }
   if(S.sheet){ e.preventDefault(); S.sheet = false; render(); }
 });
 

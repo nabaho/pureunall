@@ -900,6 +900,16 @@ rules.pucards = {
   /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
      쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
   idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
+  /* ⚙️ 기업정보함·메일 공용 설정 — 일반 칸($k2: 분류·자문사 연결·알림 시험 등)은 예전($k.$k2) 그대로 재직 직원(LOGIN) 쓰기를 유지하고,
+     대표 전용 스위치(calInbox: 메일 일정 자동등록·한도, mailAiClassify: Jev 자동분류, mailPushMaster: 폰 알림 총스위치)만 총괄관리자(ADMIN) 쓰기로 잠근다 (2026-11-15 보안).
+     ⚠ RTDB 규칙은 위에서 허락한 쓰기를 아래에서 못 거두므로 config 자체의 .write 는 ADMIN 만 두고 갈래($k2)에서 연다. */
+  config: {
+    '.write': ADMIN,
+    calInbox:       { '.write': `auth != null && ${ADMIN}` },
+    mailAiClassify: { '.write': `auth != null && ${ADMIN}` },
+    mailPushMaster: { '.write': `auth != null && ${ADMIN}` },
+    $k2: { '.write': LOGIN }
+  },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
