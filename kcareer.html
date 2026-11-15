@@ -1721,7 +1721,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=2"></script>
+<script src="js/kcareer-mailreq.js?v=3"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -16040,14 +16040,44 @@ async function mrScan(quiet){
   _mr.busy=true; mrRender();
   try{
     var r=await KcareerMailReq.scan({ db:fbDb, uid:fbUid, readBody:KcareerMailReq.makeReadBody(_bizMbCall) });
-    _mr.last=Date.now(); _mr.lastRes={ folders:r.folders, scanned:r.scanned, found:r.found, errors:r.errors.length };
+    _mr.last=Date.now(); _mr.lastRes={ folders:r.folders, scanned:r.scanned, found:r.found, errors:r.errors.length, autoIgnored:(r.autoIgnored||0) };
     if(r.errors.length) console.warn('[요청 메일] 훑기', r.errors);
+    await mrJevRun();     /* 규칙이 못 가른 «애매한 건»만 Jev 에게 — 실패해도 훑기는 끝난 것이다(안에서 삼킨다) */
     /* 찾았으면 «새 요청» 알림(mrAnnounce)이 이미 말했다 — 같은 자리 알림이라 덮어쓰지 않는다 */
     if(!quiet && (r.errors.length || !r.created.length)) toast(r.errors.length ? ('⚠ 일부 폴더를 읽지 못했습니다 ('+r.errors.length+'곳)') : '새 요청 메일이 없습니다', 5000);
   }catch(e){ console.warn('[요청 메일] 훑기 실패', e); _mr.err='메일함을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,60); if(!quiet) toast('⚠ '+_mr.err, 6000); }
   finally{ _mr.busy=false; mrRender(); }
 }
 function mrScanNow(){ mrScan(false); }
+/* ── 🤖 Jev 범위 분류 — «이력서·경력·회의·비용»만 남기고 «업무»는 뺀다 (대표 지시 2026-11-15) ──
+   1차는 모듈의 말 목록(scopeOf — 밖으로 안 나간다). 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 서버 함수 mailReqScope 가
+   이름을 가려 Jev 에게 묻는다(본문·보낸이는 안 보낸다 · 관리자만 · 하루 한도). 켜짐이 기본 — 이 기기에서 끌 수 있다(mrLocal 'jev').
+   ⚠ 못 물으면(열쇠·한도·서버 함수 미배포·업체 오류) 던지지 않는다 — 30분 쉬고 «규칙 결과 그대로»다. 자동 제외는 «새 요청»만(모듈 scopeAsk). */
+function mrJevOn(){ return mrLocal('jev')!=='0'; }
+function mrJevPaused(){ var t=Number(mrLocal('jevPause'))||0; return t>Date.now() ? t : 0; }
+async function mrJevCall(items){
+  var u=firebase.auth().currentUser; if(!u) throw new Error('로그인이 필요합니다');
+  var tok=await u.getIdToken(), r;
+  try{ r=await kcFetch(BIZ_MB_FN+'mailReqScope', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify({ items:items }) }, 60000); }
+  catch(e){ throw new Error('Jev 분류 서버에 닿지 못했습니다 — 서버 함수가 아직 배포 전일 수 있습니다'); }
+  var j=await r.json().catch(function(){ return {}; });
+  if(!j.ok) throw new Error(j.error||('Jev 분류를 받지 못했습니다 ('+r.status+')'));
+  return j;
+}
+async function mrJevRun(){
+  if(!mrJevOn() || mrJevPaused() || !fbDb || !fbUid) return null;
+  try{
+    var r=await KcareerMailReq.scopeAsk({ db:fbDb, uid:fbUid, ask:mrJevCall });
+    if(r.errors.length){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=r.errors[0]; console.warn('[요청 메일] Jev 분류', r.errors); }
+    else{ _mr.jevMsg=''; if(r.work) toast('🤖 Jev 가 업무 관련 메일 '+r.work+'건을 «요청 아님»으로 치웠습니다 — «요청 아님» 탭에서 되돌릴 수 있습니다', 7000); }
+    return r;
+  }catch(e){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=String((e&&e.message)||e).slice(0,80); return null; }
+}
+function mrJevToggle(){
+  var on=!mrJevOn(); mrLocal('jev', on?'1':'0'); if(on) mrLocal('jevPause', null);
+  toast(on?'🤖 Jev 분류를 켰습니다 — 규칙이 못 가른 메일의 제목·첨부 이름만(이름 가림) 물어봅니다':'🤖 Jev 분류를 껐습니다 — 규칙으로만 가릅니다', 5000);
+  mrRender();
+}
 /* 푸른메일함 열기 — 앱끼리 여는 공용 길(같은 창을 다시 쓴다). «이름 없는 새 탭»은 누를 때마다 탭이 쌓인다(tests/one-window-per-app) */
 function mrOpenMail(){ var u='pu-cards.html?sso=1&view=mail'; if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(u); else window.open(u,'pu_pu_cards'); }
 
@@ -16096,7 +16126,15 @@ function mrStatusLine(){
   if(!_mr.ready) return '불러오는 중…';
   var r=_mr.lastRes, 때=_mr.last?mrWhen(_mr.last):'';
   return (때?'마지막 확인 '+때:'아직 메일함을 확인하지 않았습니다')+(r?(' · 폴더 '+r.folders+'곳'+(r.scanned?' · 새로 읽은 메일 '+r.scanned+'통':'')+(r.errors?' · <span style="color:var(--red)">못 읽은 폴더 '+r.errors+'곳</span>':'')):'')
-    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다';
+    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다'+mrJevLine();
+}
+/* 상태줄 끝 — 자동으로 치운 건수 · Jev 분류가 켜져 있는지/쉬는지(쉬는 까닭은 마우스를 올리면) */
+function mrJevLine(){
+  var n=KcareerMailReq.toList(_mr.items).filter(function(x){ return x.autoIgnored; }).length;
+  var 말=(n?' · 🤖 업무 관련 '+n+'건 자동 제외(«요청 아님» 탭)':'');
+  if(!mrJevOn()) return 말+' · Jev 분류 꺼짐(규칙으로만 가름)';
+  var p=mrJevPaused();
+  return 말+(p?' · <span title="'+escapeHtml(_mr.jevMsg||'')+'">Jev 분류 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로</span>':' · Jev 분류 켜짐');
 }
 function mrRowHtml(x, i, now){
   var Q=KcareerMailReq, u=Q.urgency(x, now), dd=Q.ddayOf(x.deadline, now), 종류=(x.kinds||[]).map(Q.kindMeta).filter(Boolean), st=Q.STATES[x.st]?x.st:'new';   /* 아는 상태만 — 클래스에 DB 값이 그대로 들어가지 않게 */
@@ -16117,7 +16155,8 @@ function mrRowHtml(x, i, now){
     +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
     +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
     +'<td style="white-space:nowrap">'+기한+'</td>'
-    +'<td style="white-space:nowrap"><span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span></td>'
+    +'<td style="white-space:nowrap"><span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span>'
+      +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? ' <span class="mr-chip ignored" title="'+escapeHtml(sm.title)+'">'+escapeHtml(sm.text)+'</span>' : ''; })()+'</td>'
     +'<td onclick="event.stopPropagation()" style="white-space:nowrap"><span style="display:inline-flex;gap:4px;flex-wrap:nowrap">'+관리+'</span></td></tr>';
 }
 /* 지금 탭에서 «보이는» 줄 — 그리기와 「전체 선택」이 같은 목록을 본다. 줄이 한없이 쌓이지 않게 한도를 둔다(오래 쓰면 완료 탭이 길어진다) */
@@ -16132,6 +16171,7 @@ function mrRender(){
   var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')">'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
     +'<div class="tb-spacer"></div>'
     +'<button class="btn" type="button" onclick="mrScanNow()"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
+    +'<button class="btn" type="button" onclick="mrJevToggle()" aria-pressed="'+mrJevOn()+'" title="규칙이 못 가른 애매한 메일의 제목·첨부 이름만(이름 가림, 본문·보낸이는 안 보냄) Jev 에게 물어 업무 관련인지 가립니다 — 끄면 규칙으로만 가릅니다">'+(mrJevOn()?'🤖<span class="mr-btx"> Jev 분류 켜짐</span>':'🤖<span class="mr-btx"> Jev 분류 꺼짐</span>')+'</button>'
     +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
     +'<button class="btn" type="button" onclick="mrOpenMail()" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
     +'<div class="mr-st">'+mrStatusLine()+'</div>';
@@ -16151,7 +16191,7 @@ function mrRender(){
       +list.map(function(x,i){ return mrRowHtml(x, i, now); }).join('')+'</tbody></table></div>'
       +(ml.all>list.length?'<div class="mr-st">앞의 '+list.length+'건만 보입니다 — 전체 '+ml.all+'건</div>':'');
   }
-  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.</div>';
+  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.<br>이 화면은 <b>이력서·경력·회의·비용</b> 서류만 다룹니다 — 고객 업무(노동청 사건·컨설팅 수행·급여·근로계약서 등)로 보이는 메일은 자동으로 «🚫 요청 아님»으로 치우고(🤖 표시), 애매한 것만 Jev 에게 제목·첨부 이름(이름 가림)을 물어봅니다. 잘못 치웠으면 «요청 아님» 탭에서 ↩ 되돌려 주세요.</div>';
   box.innerHTML=h;
   try{ stampCellLabels(box); }catch(e){}
   mrSelSync();

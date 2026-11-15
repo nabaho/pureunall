@@ -216,6 +216,40 @@
   function kindMeta(key) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i].key === key) return KINDS[i]; return null; }
   function kindsLabel(kinds) { return (kinds || []).map(function (k) { var m = kindMeta(k); return m ? m.icon + ' ' + m.label : ''; }).filter(Boolean).join(' · '); }
 
+  /* ── 범위(scope) — «이력서·경력·회의·비용»은 남기고 «업무»는 뺀다 (대표 지시 2026-11-15
+        「이력서 경력 회의 비용 등에 대한 부분이다 — 업무와 관련된 건 빼라, jev 활용해서 자동 분류」) ──
+     ★ 요청 메일은 «내 이력·위원 활동·비용» 서류를 챙기는 자리다. 고객 업무(컨설팅 수행·노동청 사건·급여 …)는 다른 곳에서 챙긴다.
+     ★ 제목·첨부 이름만 본다(본문은 안 본다). 1차는 이 말 목록(밖으로 안 나간다) — «확실한 것만» 가른다:
+         개인(personal) 말만 있다 → 남긴다 · 업무(work) 말만 있다 → «요청 아님»으로 자동 제외 · 둘 다 있거나 둘 다 없다 → 애매(unsure).
+       2차 — 애매한 것만 Jev 에게 묻는다(scopeAsk: 제목·첨부 이름만, 이름 가림, 관리자만, 하루 한도 — 서버 mail-req-scope.js).
+     ⚠ 자동 제외는 «새 요청»(st:'new')에만 한다 — 사람이 «확인함»·«처리 완료»로 만진 건은 건드리지 않는다. 틀리면 «요청 아님» 탭에서 되돌린다.
+     ⚠ 말 목록은 «손으로 정한 것»이다 — 놓치면 애매로 남아 Jev 가 보고, 그래도 못 가르면 사람이 본다(조용히 지우지 않는다). */
+  var SCOPES = ['work', 'personal', 'unsure'];
+  var SCOPE_PERSONAL = /이력\s*서|이력\s*사항|프로필|약력|경력\s*(?:증명|확인|사항|서|자료|조회|기술)|재직\s*증명|자격증\s*사본|강사\s*(?:이력|등록|프로필)|실적\s*(?:증명|확인)|위촉|위원회|심의|(?:평가|자문|심사|전문)\s*위원|위원\s*(?:명단|등록|활동|수당)|인력\s*풀|제척|기피|회피|서약서|활동\s*(?:증빙|확인|내역|실적)|지급\s*확인서|수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|통장\s*사본/;
+  var SCOPE_WORK = /업무\s*협조|보고서|이행\s*관리|인터뷰|수행\s*일지|산출물|신고\s*사건|진정\s*(?:사건|서|건)|노동청|고용노동\s*지청|근로\s*감독|근로자|사업장|취업\s*규칙|급여|임금|퇴직금|4대\s*보험|산재|고용\s*보험|세금\s*계산서|견적|협력\s*업체|(?:컨설팅|자문)\s*(?:진행|결과|일정|자료)|근로\s*계약|용역\s*계약|계약서\s*(?:양식|검토)|양식\s*검토|퇴사자|입\s*퇴사|입사\s*(?:자|서류)|신규\s*(?:직원|입사)|취득\s*신고|상실\s*신고|부양\s*가족|가족\s*관계|근태|노무\s*진단|제도\s*설계|\[푸른노무법인\]/;
+  function scopeHit(re, subj, names) {
+    var m = re.exec(subj); if (m) return '제목 «' + cut(m[0], 12) + '»';
+    for (var i = 0; i < names.length; i++) { m = re.exec(names[i]); if (m) return '첨부 «' + cut(m[0], 12) + '»'; }
+    return '';
+  }
+  /* row = { s 제목, an 첨부 이름들 } → { scope:'work'|'personal'|'unsure', why:[…] } */
+  function scopeOf(row) {
+    row = row || {};
+    var subj = oneLine(row.s), names = (Array.isArray(row.an) ? row.an : []).map(str).filter(Boolean);
+    var p = scopeHit(SCOPE_PERSONAL, subj, names), w = scopeHit(SCOPE_WORK, subj, names);
+    if (p && !w) return { scope: 'personal', why: ['이력·회의·비용 말 ' + p] };
+    if (w && !p) return { scope: 'work', why: ['업무 말 ' + w] };
+    if (p && w) return { scope: 'unsure', why: ['개인 말 ' + p + ' · 업무 말 ' + w + ' — 둘 다 있다'] };
+    return { scope: 'unsure', why: ['어느 쪽 말도 없다'] };
+  }
+  var SCOPE_LABELS = { work: '업무', personal: '이력·회의·비용', unsure: '애매' };
+  /* 목록에 붙일 딱지 — 자동으로 «요청 아님»이 된 건만. 어떻게 알았는지(규칙 · Jev)를 «같은 값처럼» 적지 않는다 */
+  function scopeMark(it) {
+    if (!it || !it.autoIgnored) return null;
+    var by = it.scopeBy === 'jev' ? 'Jev' : '규칙';
+    return { text: '🤖 업무 관련 · 자동 제외', title: by + '가 업무 관련 메일로 보고 «요청 아님»으로 치웠습니다' + (it.scopeWhy ? ' — ' + it.scopeWhy : '') + ' · «요청 아님» 탭에서 ↩ 되돌릴 수 있습니다' };
+  }
+
   /* ── 한 건의 기록 — 클라우드(kcareer/{uid}/mailreq/items/<id>)에 그대로 간다 ──
      ⚠ 본문은 «담지 않는다»(제목·보낸이·첨부 이름·기한·근거 짧게뿐). 메일 원본은 메일함에 있다. */
   function idOf(slug, uid) { return (okSlug(slug) && /^[0-9]{1,12}$/.test(str(uid))) ? slug + '~' + str(uid) : ''; }
@@ -230,6 +264,10 @@
     };
     if (hit.deadline) rec.deadline = hit.deadline;
     if (hit.replyTo) rec.replyTo = hit.replyTo;
+    /* 범위 — 업무 말만 있으면 처음부터 «요청 아님»(자동 제외)으로 만든다. 알림·진행 중 목록에 올리지 않는다. 애매하면 그대로 두고 Jev 가 본다 */
+    var sc = scopeOf(row);
+    rec.scope = sc.scope; rec.scopeBy = 'rule'; rec.scopeWhy = cut(sc.why.join(' · '), 60);
+    if (sc.scope === 'work') { rec.st = 'ignored'; rec.autoIgnored = now; }
     return rec;
   }
 
@@ -410,7 +448,66 @@
       } catch (e) { res.errors.push(item.id + ': ' + cut(e && e.message || e, 60)); delete newCur[x.slug]; }
     }
     if (Object.keys(newCur).length) { try { await db.ref(base + '/cur').update(newCur); } catch (e) { res.errors.push('cur: ' + cut(e && e.message || e, 60)); } }
+    try { await backfillScope(db, base, now, res); } catch (e) { res.errors.push('scope: ' + cut(e && e.message || e, 60)); }     // 범위를 아직 안 가른 옛 건 — 규칙으로 한 번 가른다
     if (typeof env.readBody === 'function') await enrich(env, db, base, now, since, res);
+    return res;
+  }
+  /* 범위를 아직 안 가른 건(이 기능 전에 만든 것)을 규칙으로 한 번 가른다 — 한 번에 SCOPE_BACKFILL_MAX 건.
+     ⚠ 자동 제외는 «새 요청»(st:'new')만 — 사람이 «확인함»·«처리 완료»·«요청 아님»으로 만진 건은 상태를 그대로 둔다(범위 딱지만 붙인다).
+     ⚠ 건마다 transaction — 읽은 뒤 사람이 상태를 바꿨으면 그 최신 값을 보고 정한다. */
+  var SCOPE_BACKFILL_MAX = 60;
+  function validId(id) { return typeof id === 'string' && /^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id); }
+  async function backfillScope(db, base, now, res) {
+    var all = toList((await db.ref(base + '/items').once('value')).val());
+    var todo = all.filter(function (x) { return !x.scope && validId(x.id); }).slice(0, SCOPE_BACKFILL_MAX);
+    for (var i = 0; i < todo.length; i++) {
+      var x = todo[i], sc = scopeOf({ s: x.s, an: x.an });
+      var tr = await db.ref(base + '/items/' + x.id).transaction(function (c) {
+        if (c === null) return c;
+        if (!obj(c) || c.scope) return;                                  // 그새 정해졌거나 이상한 값 — 건드리지 않는다
+        c.scope = sc.scope; c.scopeBy = 'rule'; c.scopeWhy = cut(sc.why.join(' · '), 60);
+        if (sc.scope === 'work' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        return c;
+      });
+      if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) {
+        res.scoped = (res.scoped || 0) + 1;
+        if (sc.scope === 'work' && tr.snapshot.val().autoIgnored === now) res.autoIgnored = (res.autoIgnored || 0) + 1;
+      }
+    }
+  }
+  /* ── 2차 — 규칙이 못 가른 «애매한 건»만 Jev 에게 묻는다 ──
+     env = { db, uid, now?, ask(items) → { results: { <id>: { scope } } } }  (ask 는 화면이 준다 — 로그인 토큰을 붙여 서버 함수 mailReqScope 를 부른다)
+     ⚠ 묻는 것은 제목·첨부 이름뿐이다(본문·보낸이 주소는 안 보낸다). 이름 가림·관리자 확인·하루 한도는 서버가 한다.
+     ⚠ 이미 «사람이 만진»(확인함) 건도 범위 딱지는 붙이되 상태는 안 바꾼다. 못 물으면(열쇠·한도·업체 오류) 던지지 않고 res.errors 에 적는다 — 화면이 한동안 쉰다.
+     ⚠ 한 번 물은 건은 다시 안 묻는다(scopeAsked). 답이 «애매»여도 마찬가지 — 사람이 본다. */
+  var JEV_MAX = 10, JEV_TRY = 2;
+  async function scopeAsk(env) {
+    var db = env.db, uid = str(env.uid), now = env.now > 0 ? env.now : Date.now();
+    var res = { asked: 0, work: 0, personal: 0, unsure: 0, errors: [] };
+    if (!db || !uid || typeof env.ask !== 'function') return res;
+    var base = ROOT_PATH + '/' + uid + '/mailreq', since = now - WINDOW_DAYS * 864e5;
+    var all = toList((await db.ref(base + '/items').once('value')).val());
+    var todo = all.filter(function (x) {
+      return (x.st === 'new' || x.st === 'doing') && x.scope === 'unsure' && x.scopeBy === 'rule' && !x.scopeAsked
+        && (Number(x.scopeTry) || 0) < JEV_TRY && Number(x.d) >= since && validId(x.id);
+    }).sort(function (a, b) { return (Number(b.d) || 0) - (Number(a.d) || 0); }).slice(0, JEV_MAX);
+    if (!todo.length) return res;
+    var ans;
+    try { ans = await env.ask(todo.map(function (x) { return { id: x.id, s: x.s, an: x.an }; })); }
+    catch (e) { res.errors.push(cut(e && e.message || e, 80)); return res; }
+    var got = obj(ans && ans.results) ? ans.results : {};
+    for (var i = 0; i < todo.length; i++) {
+      var x = todo[i], r = got[x.id], sc = obj(r) && SCOPES.indexOf(r.scope) >= 0 ? r.scope : '';
+      if (!sc) { try { await db.ref(base + '/items/' + x.id).update({ scopeTry: (Number(x.scopeTry) || 0) + 1 }); } catch (e2) { /* 다음에 다시 */ } continue; }
+      var tr = await db.ref(base + '/items/' + x.id).transaction(function (c) {
+        if (c === null) return c;
+        if (!obj(c) || c.scopeAsked || c.scope !== 'unsure') return;      // 그새 답이 왔거나 범위가 바뀌었다
+        c.scope = sc; c.scopeBy = 'jev'; c.scopeAsked = now; c.scopeWhy = 'Jev 가 «' + SCOPE_LABELS[sc] + '»으로 봤다';
+        if (sc === 'work' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        return c;
+      });
+      if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) { res.asked++; res[sc]++; }
+    }
     return res;
   }
   /* 본문을 열어 기한·회신 주소를 채운다 — 아직 안 연 «진행 중» 건만, 한 번에 BODY_MAX 건씩.
@@ -463,6 +560,8 @@
     kindMeta: kindMeta, kindsLabel: kindsLabel, idOf: idOf, makeItem: makeItem,
     urgency: urgency, alarmItems: alarmItems, summary: summary, summaryText: summaryText, sortItems: sortItems, filterItems: filterItems, stateUpdate: stateUpdate,
     editUpdate: editUpdate, MEMO_MAX: MEMO_MAX,
+    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK, JEV_MAX: JEV_MAX,
+    scopeOf: scopeOf, scopeMark: scopeMark, scopeAsk: scopeAsk,
     boxesOf: boxesOf, scan: scan, makeReadBody: makeReadBody, toList: toList
   };
   if (isNode) module.exports = api; else root.KcareerMailReq = api;
