@@ -468,12 +468,20 @@
         }
       }
 
-      /* 과거 버전에 corpus DB로 잘못 들어간 로컬 개인 수집문서(userIngested)는 공통 코퍼스에서 제외 */
+      /* 과거 버전에 corpus DB로 잘못 들어간 로컬 개인 수집문서(userIngested) 및 구버전 가공·요약 시드 캐시는 공통 코퍼스·IndexedDB에서 즉시 영구 정화 */
+      var cDb = getCorpusDb();
       var cleanSavedPublic = savedPublicDocs.filter(function (d) {
-        return d && !d.userIngested && !isDocTombstoned(d);
+        if (!d || d.userIngested || isDocTombstoned(d)) return false;
+        if (E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) {
+          if (d.id) idbDelete(cDb, 'docs', d.id);
+          return false;
+        }
+        return true;
       });
       var basePublic = !hasIdb && mem.publicDocs.length
-        ? mem.publicDocs.filter(function (d) { return !d.userIngested && !isDocTombstoned(d); })
+        ? mem.publicDocs.filter(function (d) {
+            return !d.userIngested && !isDocTombstoned(d) && !(E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d));
+          })
         : cleanSavedPublic;
 
       mem.publicDocs = E.deduplicateDocs(seedDocs, basePublic).docs;
@@ -497,10 +505,33 @@
       } else {
         mem.threads = [];
       }
-      mem.recents = cleanUid
-        ? savedRecents.sort(function (a, b) { return (b.viewedAt || 0) - (a.viewedAt || 0); }).slice(0, 30)
-        : [];
+      if (cleanUid) {
+        var recentWsDb = getWorkspaceDb();
+        var filteredRecents = savedRecents.filter(function (r) {
+          if (!r) return false;
+          if (r.kind === 'doc' && E.isDeprecatedSyntheticDoc) {
+            var rawDocId = String(r.id || '').replace(/^doc:/, '');
+            var subParts = String(r.sub || '').split('·');
+            var subCaseNo = subParts[subParts.length - 1].trim();
+            if (E.isDeprecatedSyntheticDoc({ id: rawDocId, caseNo: subCaseNo }) || !getDocById(rawDocId)) {
+              if (r.id) idbDelete(recentWsDb, 'recents', r.id);
+              return false;
+            }
+          }
+          return true;
+        });
+        mem.recents = filteredRecents.sort(function (a, b) { return (b.viewedAt || 0) - (a.viewedAt || 0); }).slice(0, 30);
+      } else {
+        mem.recents = [];
+      }
 
+      var freshAlert2 = {
+        id: 'init-alert-2',
+        date: E.todayKstYmd(),
+        kind: 'prec',
+        title: '법제처(law.go.kr) 실존 판례·행정해석·자치법규 조례·조례 유권해석 108선 원문 검증 수록 및 무인증 실시간 수집 연동',
+        detail: '대법원·헌재·하급심 판례, 고용노동부 질의회시·고시·예규, 법제처 법령해석·자치법규 의견제시, 전국 지자체 조례, 중앙노동위·산재재심사위·행심위·개보위·인권위 결정례가 100% 법제처 공식 원문 그대로 수록·연동되었습니다.'
+      };
       if (!mem.alerts.length) {
         mem.alerts = [
           {
@@ -510,14 +541,13 @@
             title: '국가법령 5,773편 무료 미러 연결 완료 (law.go.kr 점검 중에도 즉시 열람)',
             detail: '법제처 국가법령정보센터 시스템 점검과 무관하게 법률·시행령·시행규칙 전문 열람 및 @AI 첨부가 작동합니다.'
           },
-          {
-            id: 'init-alert-2',
-            date: '2024-12-19',
-            kind: 'prec',
-            title: '대법원 전원합의체 2020다247190·2023다302838 통상임금 고정성 폐기 법리 수록',
-            detail: '재직조건부·소정근로일수 이내 근무일수 조건부 정기상여금의 통상임금 산입 판례 및 2025 고용노동부 지침이 기본 코퍼스에 반영되어 있습니다.'
-          }
+          freshAlert2
         ];
+      } else {
+        mem.alerts = mem.alerts.map(function (al) {
+          if (al && al.id === 'init-alert-2') return freshAlert2;
+          return al;
+        });
       }
 
       return getStateSummary();
@@ -810,6 +840,7 @@
     var cleanIncoming = (Array.isArray(incomingList) ? incomingList : []).filter(function (d) {
       if (!d || typeof d !== 'object') return false;
       if (String(d.body || '').trim().length < 20) return false;
+      if (isPublicScope && E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) return false;
       if (opts.overrideDeleted) {
         if (d.id) mem.deletedDocKeys.delete(String(d.id));
         var ck = E.canonicalKeyOf(d);
@@ -1021,9 +1052,10 @@
     var combined = [
       d.body, d.title, d.summary, d.fileName, d.court, d.agency, d.caseNo || d.case_no
     ].concat(rawTags, rawRefLaws, rawRefCases, rawSources).filter(Boolean).join('\n');
-    var names = E.extractPartyNames ? E.extractPartyNames(combined, d.fileName || d.title || '') : [];
+    var names = E.extractPartyNames ? E.extractPartyNames(combined, d.fileName || '') : [];
     var sc = function (v) { return E.anonymizeLegalText(String(v || ''), names).text; };
-    return {
+    var cleanOfficialUrl = (E.sanitizeOfficialLawUrlClient && E.sanitizeOfficialLawUrlClient(d.officialUrl || d.official_url || '')) || '';
+    var scrubbedOut = {
       id: d.id,
       canonicalKey: d.canonicalKey || d.canonical_key || '',
       docType: d.docType || d.doc_type || 'prec_lower',
@@ -1039,14 +1071,16 @@
       refCases: rawRefCases.map(sc),
       sources: rawSources.map(sc)
     };
+    if (cleanOfficialUrl) scrubbedOut.officialUrl = cleanOfficialUrl;
+    return scrubbedOut;
   }
 
   function mapExternalSharedRow(row) {
     var clean = scrubFullDocClient(row);
-    var isOfficial = Array.isArray(clean.sources) && clean.sources.some(function (s) {
-      return /국가법령정보|근로복지공단|대법원|중앙노동위원회|고용노동부|법제처/.test(String(s));
-    });
-    return {
+    var isOfficial = Boolean(clean.officialUrl) || (Array.isArray(clean.sources) && clean.sources.some(function (s) {
+      return /국가법령정보|근로복지공단|대법원|중앙노동위원회|고용노동부|법제처|조례|자치법규/.test(String(s));
+    }));
+    var mappedOut = {
       id: clean.id || ('supa-' + clean.canonicalKey),
       canonicalKey: clean.canonicalKey,
       serverCanonicalKey: clean.canonicalKey,
@@ -1065,6 +1099,8 @@
       ingestedBy: row.ingested_by || row.ingestedBy || '',
       verified: isOfficial && clean.body.length >= 20
     };
+    if (clean.officialUrl) mappedOut.officialUrl = clean.officialUrl;
+    return mappedOut;
   }
 
   function pullFromSupabase() {
@@ -1520,6 +1556,18 @@
       saveConfig({ lawOc: lawOc });
     }
 
+    var docTypeTargetMap = {
+      prec_sc: ['prec_sc', 'detc'],
+      prec_lower: ['prec_lower'],
+      dec_nlrc: ['nlrc', 'decc'],
+      interp_moel: ['cgmExpc', 'admrul'],
+      interp_gov: ['expc', 'ordc'],
+      ordinance: ['ordin', 'ordc', 'expc']
+    };
+    var resolvedTargets = (Array.isArray(opts.targets) && opts.targets.length)
+      ? opts.targets.slice(0, 12)
+      : (docTypeTargetMap[String(opts.docType || '')] || []);
+
     var safeQuery = liveQCheck.query;
     return u.getIdToken().then(function (tok) {
       if (startGen !== sessionGen || startUid !== mem.uid) {
@@ -1532,7 +1580,7 @@
           action: 'live_search',
           lawOc: lawOc,
           query: safeQuery,
-          targets: Array.isArray(opts.targets) ? opts.targets.slice(0, 10) : [],
+          targets: resolvedTargets,
           maxPerTarget: Math.min(Math.max(3, Number(opts.maxPerTarget) || 10), 20),
           includeComwel: opts.includeComwel !== false
         })
