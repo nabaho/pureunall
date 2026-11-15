@@ -1007,6 +1007,241 @@ test('⑫ 기관 상세(탭 2) 통합 프로필 히어로·서브탭 분리·신
   assert.ok(master.byId.C0005.domains.articles.every((a) => !/^[:：]/.test(a.text)), '강원랜드(C0005) 모든 조문 본문 앞의 불필요한 콜론(:)이 제거되어야 합니다');
 });
 
+test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기관 즉석 매트릭스·비교함) 및 조문·원문 3모드(쟁점별 병렬비교·기관별 묶음·문서 묶음) 검증', () => {
+  const vm = require('node:vm');
+  const dataMod = require(path.join(ROOT, 'js', 'pu-alio-data.js'));
+
+  function mountInteractive(initialSearch) {
+    const loc = {
+      href: 'https://example.com/pureunall/pu-alio-union.html' + initialSearch,
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch,
+      protocol: 'https:'
+    };
+
+    function makeNode(tag) {
+      const listeners = {};
+      const attrs = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        checked: false,
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => (k in attrs ? attrs[k] : ''),
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg || {}); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    let dynNodes = {};
+    let parsedMap = {};
+
+    const bodyEl = makeNode('DIV');
+    let rawBodyHtml = '';
+
+    function rebuildParsed() {
+      parsedMap = {};
+      const allHtml = getCombinedHtml();
+      const tagRe = /<(button|tr|select|input|div|span)\b([^>]*)>/gi;
+      let m;
+      while ((m = tagRe.exec(allHtml)) !== null) {
+        const tag = m[1].toUpperCase();
+        const attrStr = m[2];
+        const node = makeNode(tag);
+        const attrRe = /([a-zA-Z0-9_-]+)(?:="([^"]*)")?/g;
+        let am;
+        while ((am = attrRe.exec(attrStr)) !== null) {
+          node.setAttribute(am[1], am[2] !== undefined ? am[2] : '');
+        }
+        const keys = Object.keys(parsedMap);
+        void keys;
+        const dataAttrs = [...attrStr.matchAll(/\b(data-[a-z0-9-]+)(?:="([^"]*)")?/g)];
+        for (const da of dataAttrs) {
+          const k = da[1];
+          const v = da[2];
+          const selBare = `[${k}]`;
+          if (!parsedMap[selBare]) parsedMap[selBare] = [];
+          parsedMap[selBare].push(node);
+          if (k === 'data-f' && v !== 'aCmpAddQ') {
+            const notSel = '[data-f]:not([data-f="aCmpAddQ"])';
+            if (!parsedMap[notSel]) parsedMap[notSel] = [];
+            parsedMap[notSel].push(node);
+          }
+          if (v !== undefined) {
+            const selVal = `[${k}="${v}"]`;
+            if (!parsedMap[selVal]) parsedMap[selVal] = [];
+            parsedMap[selVal].push(node);
+            if (attrStr.includes('pau-topic-chip')) {
+              const chipSel = `.pau-topic-chip[${k}="${v}"]`;
+              if (!parsedMap[chipSel]) parsedMap[chipSel] = [];
+              parsedMap[chipSel].push(node);
+            }
+          }
+        }
+      }
+    }
+
+    function getCombinedHtml() {
+      let out = rawBodyHtml;
+      for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+        if (dynNodes[k]) {
+          out = out.replace(new RegExp(`<div ${k}>[\\s\\S]*$`), `<div ${k}>${dynNodes[k].innerHTML}</div>`);
+        }
+      }
+      return out;
+    }
+
+    Object.defineProperty(bodyEl, 'innerHTML', {
+      get: () => getCombinedHtml(),
+      set: (v) => {
+        rawBodyHtml = String(v || '');
+        dynNodes = {};
+        for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+          const dm = rawBodyHtml.match(new RegExp(`<div ${k}>([\\s\\S]*)<\\/div>$`));
+          if (dm) {
+            const dn = makeNode('DIV');
+            let dHtml = dm[1];
+            Object.defineProperty(dn, 'innerHTML', {
+              get: () => dHtml,
+              set: (nv) => {
+                dHtml = String(nv || '');
+                rebuildParsed();
+              }
+            });
+            dn.querySelector = (sel) => (parsedMap[sel] && parsedMap[sel][0]) || null;
+            dn.querySelectorAll = (sel) => parsedMap[sel] || [];
+            dynNodes[k] = dn;
+          }
+        }
+        rebuildParsed();
+      }
+    });
+
+    bodyEl.querySelector = (sel) => {
+      if (sel === '[data-m-reg-dyn]' && dynNodes['data-m-reg-dyn']) return dynNodes['data-m-reg-dyn'];
+      if (sel === '[data-a-dyn]' && dynNodes['data-a-dyn']) return dynNodes['data-a-dyn'];
+      if (sel === '[data-d-dyn]' && dynNodes['data-d-dyn']) return dynNodes['data-d-dyn'];
+      return (parsedMap[sel] && parsedMap[sel][0]) || null;
+    };
+    bodyEl.querySelectorAll = (sel) => parsedMap[sel] || [];
+
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    return { bodyEl, cmpTrayEl, loc };
+  }
+
+  // 0) 정의되지 않은 CSS 변수(--pau-text, --pau-surface-alt, --pau-border) 미사용 및 .pau-hm-tag 스타일 정의 검증
+  assert.doesNotMatch(uiSrc, /var\(--pau-(?:text|surface-alt|border)\)/, '정의되지 않은 CSS 변수가 남아 있으면 안 됩니다');
+  assert.match(uiSrc, /\.pau-hm-tag\{/, '.pau-hm-tag 배지 스타일이 명시적으로 정의되어야 합니다');
+
+  // 1) 지역산하비교 다중 시·도 URL(?region=충남,대전) 및 다중 시·군·구 URL(?region=충남&muni=천안시,아산시) 진입 검증
+  const regMulti = mountInteractive('?region=%EC%B6%A9%EB%82%A8,%EB%8C%80%EC%A0%84');
+  assert.match(decodeURIComponent(regMulti.loc.search), /region=충청남도,대전광역시/, '복수 지역 약칭(충남,대전)이 정규 시·도 목록으로 URL 동기화되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /data-r-multigov-card/, '선택 광역 시·도 산하기관 총괄 다중비교 카드가 렌더링되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /충청남도/, '총괄 다중비교 표에 충청남도가 포함되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /대전광역시/, '총괄 다중비교 표에 대전광역시가 포함되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /data-toggle-cmp="/, '지역산하비교 각 행에도 비교함 담기(+비교) 버튼이 제공되어야 합니다');
+
+  const quickTop4Btn = regMulti.bodyEl.querySelector('[data-r-quick-top4]');
+  assert.ok(quickTop4Btn, '상위 4곳 즉석 다중비교 버튼이 노출되어야 합니다');
+  quickTop4Btn.trigger('click');
+  assert.match(regMulti.bodyEl.innerHTML, /data-r-inline-cmp/, '상위 4곳 즉석 다중비교 클릭 시 화면 내 산하기관 병렬 비교 매트릭스가 즉시 표시되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /선택 산하기관\(4곳\) 즉석 다중비교 매트릭스/, '선택 산하기관 4곳 비교 매트릭스 제목이 정확히 표시되어야 합니다');
+
+  const regMuniMulti = mountInteractive('?region=%EC%B6%A9%EB%82%A8&muni=%EC%B2%9C%EC%95%88%EC%8B%9C,%EC%95%84%EC%82%B0%EC%8B%9C');
+  assert.match(decodeURIComponent(regMuniMulti.loc.search), /region=충청남도/, '복수 기초지자체 진입 시 광역 시·도가 유지되어야 합니다');
+  assert.match(decodeURIComponent(regMuniMulti.loc.search), /muni=천안시,아산시/, '복수 기초지자체 URL 파라미터(muni=천안시,아산시)가 보존·동기화되어야 합니다');
+  assert.match(regMuniMulti.bodyEl.innerHTML, /기초지자체\(2곳\) 산하기관 총괄 다중비교/, '선택 기초지자체 2곳 총괄 다중비교 카드가 즉시 활성화되어야 합니다');
+
+  // 2) 단협 조문(?tab=articles&compare=C0006) 진입 시: 평면 나열 대신 쟁점별 다중비교(COMPARE) 기본 진입 + 동종 업종(보건·의료) 유사기관 자동 매칭 + 프리셋 + 쟁점 칩 전환 검증
+  const artCmp = mountInteractive('?tab=articles&compare=C0006');
+  assert.match(artCmp.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-a-view="COMPARE"/, '단협 조문 기본 보기 모드는 쟁점별 다중비교(COMPARE)여야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /건강보험심사평가원/, '비교함에 담긴 기준기관(건강보험심사평가원)이 조문 비교 대상에 즉시 반영되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /국민건강보험공단|한국보훈복지의료공단/, '기준기관 1곳 진입 시 동종 업종 유사기관이 자동 매칭되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /13대 핵심 단협 쟁점 한눈 비교표/, '전체 쟁점 상태에서는 13대 핵심 쟁점 한눈 비교표가 먼저 제시되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /class="pau-clause-cmp-grid"/, '비교 기관별 주요 수록 조문 카드 대조 그리드가 렌더링되어야 합니다');
+
+  const persChip = artCmp.bodyEl.querySelector('.pau-topic-chip[data-a-topic="PERSONNEL"]');
+  assert.ok(persChip, '인사·승진·전보 쟁점 빠른 선택 칩이 존재해야 합니다');
+  persChip.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /data-a-law-out/, '특정 쟁점 선택 시 대한민국 현행 노동관계법령 기준 스트립이 표시되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /기관별 조문 전문 병렬 대조/, '특정 쟁점 선택 시 기관별 조문 전문 병렬 대조 그리드로 전환되어야 합니다');
+
+  const medPresetBtn = artCmp.bodyEl.querySelector('[data-a-preset="LOCAL_MEDICAL"]');
+  assert.ok(medPresetBtn, '지방의료원 빠른 비교 프리셋 버튼이 존재해야 합니다');
+  medPresetBtn.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /의료원/, '지방의료원 프리셋 클릭 시 실제 지방의료원 기관들이 비교 대상에 채워져야 합니다');
+
+  // 2-1) 추출 조문이 없고 신·구대비표(diffs)가 있는 기관(C0352 우체국금융개발원) 진입 시 신·구대비 미리보기 정상 표시 + 악성 검색어(XSS) 이스케이프 검증
+  const artRev = mountInteractive('?tab=articles&compare=C0352');
+  assert.match(artRev.bodyEl.innerHTML, /\[신·구대비\]\s*제30조/, '추출 조문이 없는 기관 카드에는 신·구대비표 조항(diffs.art) 미리보기가 표시되어야 합니다');
+  const aQueryIn = artRev.bodyEl.querySelector('[data-f="aQuery"]');
+  assert.ok(aQueryIn, '조문 검색 입력창이 존재해야 합니다');
+  aQueryIn.value = '<img src=x onerror=alert(1)>';
+  aQueryIn.trigger('input');
+  assert.doesNotMatch(artRev.bodyEl.innerHTML, /<img\b/i, '조문 검색어에 HTML 태그 입력 시 원시 태그가 삽입(DOM XSS)되면 안 됩니다');
+  assert.match(artRev.bodyEl.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/, '조문 검색어가 안전하게 HTML 이스케이프 처리되어야 합니다');
+
+  // 3) 기관별 묶음(BY_ORGAN) 전환 시: 동일 기관 조문이 수십 행으로 쪼개지지 않고 1기관=1카드로 통합되어 +비교담기 버튼 중복이 없어야 함
+  const byOrgBtn = artCmp.bodyEl.querySelector('[data-a-view="BY_ORGAN"]');
+  assert.ok(byOrgBtn, '기관별 묶음 보기 전환 버튼이 존재해야 합니다');
+  byOrgBtn.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /class="pau-org-art-list"/, '기관별 묶음 전환 시 기관별 조문 카드 리스트가 렌더링되어야 합니다');
+  const toggleIdsInByOrgan = [...artCmp.bodyEl.innerHTML.matchAll(/data-toggle-cmp="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(toggleIdsInByOrgan.length >= 10, '기관별 묶음 카드마다 비교담기 버튼이 제공되어야 합니다');
+  assert.equal(new Set(toggleIdsInByOrgan).size, toggleIdsInByOrgan.length, '기관별 묶음 화면에서는 한 기관당 +비교담기 버튼이 중복 없이 단 1개만 노출되어야 합니다');
+
+  // 4) 공시·사규 원문(?tab=articles&doc=DISC) 기본 진입 시: 기관별 원문 묶음(BY_ORGAN)으로 중복 기관 나열 없이 정리되고 펼침 동작 검증
+  const discGrp = mountInteractive('?tab=articles&doc=DISC');
+  assert.match(discGrp.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-d-view="BY_ORGAN"/, '공시·사규 원문 기본 보기 모드는 기관별 원문 묶음(BY_ORGAN)이어야 합니다');
+  const discOrgExpBtns = discGrp.bodyEl.querySelectorAll('[data-d-org-exp]');
+  assert.ok(discOrgExpBtns.length >= 20, '기관별 원문 묶음 행마다 문서 펼침 버튼이 렌더링되어야 합니다');
+  discOrgExpBtns[0].trigger('click');
+  assert.match(discGrp.bodyEl.innerHTML, /class="pau-exp-row"/, '문서 펼침 클릭 시 해당 기관의 공시 문서 목록이 인라인으로 펼쳐져야 합니다');
+});
+
 
 
 

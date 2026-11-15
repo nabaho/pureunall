@@ -71,6 +71,45 @@
     ['ETC', '기타/일반조항']
   ];
 
+  var TAXONOMY_TO_METRIC = {
+    UNION_SHOP: 'union_shop',
+    TIMEOFF: 'timeoff_activity',
+    CHECKOFF: 'check_off',
+    PERSONNEL: 'personnel_participation',
+    DISCIPLINE: 'discipline_committee',
+    WORK_HOURS: 'work_hours_overtime',
+    LEAVE: 'paid_holidays_leave',
+    SICK_SAFETY: 'sick_leave_accident',
+    MATERNITY: 'maternity_childcare',
+    WAGE: 'wage_bonus_allowance',
+    WELFARE: 'welfare_education_housing',
+    RETIREMENT: 'retirement_age_peak',
+    BARGAINING: 'validity_auto_extension'
+  };
+
+  var METRIC_TO_TAXONOMY = Object.create(null);
+  Object.keys(TAXONOMY_TO_METRIC).forEach(function (tk) {
+    METRIC_TO_TAXONOMY[TAXONOMY_TO_METRIC[tk]] = tk;
+  });
+
+  var TOPIC_CHIP_ORDER = [
+    ['ALL', '전체 13대쟁점 한눈대조'],
+    ['PERSONNEL', '인사·승진·전보'],
+    ['DISCIPLINE', '징계·해고·재심'],
+    ['WAGE', '임금·수당·퇴직금'],
+    ['TIMEOFF', '타임오프·노조활동'],
+    ['LEAVE', '휴일·연차·경조휴가'],
+    ['WORK_HOURS', '근로시간·유연근무'],
+    ['SICK_SAFETY', '병가·산재·안전'],
+    ['MATERNITY', '모성보호·육아휴직'],
+    ['RETIREMENT', '정년·임금피크·고용'],
+    ['UNION_SHOP', '조합원자격·유니온숍'],
+    ['CHECKOFF', '조합비공제·편의제공'],
+    ['WELFARE', '복리후생·학자금'],
+    ['BARGAINING', '단체교섭·유효기간'],
+    ['ETC', '기타 조항']
+  ];
+
   var LAW_API_SOURCES = [
     { key: '노동조합및노동관계조정법', name: '노동조합 및 노동관계조정법', file: '법률(법률).md', mainArts: ['5', '24', '29', '29의2', '31', '32', '33', '81'] },
     { key: '근로기준법', name: '근로기준법', file: '법률(법률).md', mainArts: ['23', '27', '43', '50', '53', '55', '56', '60', '74', '93', '94'] },
@@ -2264,6 +2303,7 @@
       '.pau-body{flex:1;min-height:0;overflow-y:auto;padding:8px 10px 18px;}',
       '.pau-flt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:9px;margin-bottom:6px;}',
       '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root select,.pau-root input[type=search],.pau-root input[type=text],.pau-root input[type=password]{height:33px;min-height:33px;max-width:100%;border:1px solid var(--pau-bd);border-radius:7px;padding:0 8px;background:var(--pau-card);color:var(--pau-txt);font-size:16px;}',
+      '.pau-flt select:focus-visible,.pau-flt input:focus-visible,.pau-root select:focus-visible,.pau-root input:focus-visible,.pau-chip:focus-visible{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb;}',
       '.pau-root input::placeholder{font-size:13px;color:var(--pau-muted);}',
       '.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{min-width:180px;flex:1;max-width:340px;}',
       '.pau-subbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 6px;font-size:12px;color:var(--pau-sub);flex-wrap:wrap;}',
@@ -2392,20 +2432,37 @@
       '.pau-ab-sel{width:100%;max-width:100%;height:32px;min-height:32px;padding:0 8px;border:1px solid var(--pau-bd);border-radius:7px;background:var(--pau-card);color:var(--pau-txt);font-size:12.5px;font-weight:700;}',
       '.pau-issue-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}',
       '.pau-issue-card{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px;min-width:0;}',
+      '.pau-clause-cmp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:10px;}',
+      '.pau-clause-card{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:8px;min-width:0;}',
+      '.pau-clause-item{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-left:3px solid #2563eb;border-radius:7px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;min-width:0;}',
+      '.pau-clause-item-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px;font-weight:800;color:var(--pau-txt);}',
+      '.pau-clause-item-txt{font-size:12.5px;line-height:1.6;color:var(--pau-sub);white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere;}',
+      '.pau-org-art-list{display:flex;flex-direction:column;gap:8px;}',
+      '.pau-org-art-card{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;}',
+      '.pau-org-art-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}',
+      '.pau-art-subgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-top:8px;border-top:1px dashed var(--pau-bd-lt);}',
+      '.pau-law-strip{background:#f0fdf4;border:1px solid #86efac;border-radius:9px;padding:9px 12px;margin-bottom:10px;color:#0f172a;display:flex;flex-direction:column;gap:5px;}',
+      '.pau-root[data-theme="dark"] .pau-law-strip,body.dark .pau-root .pau-law-strip{background:#052e16;border-color:#4ade80;color:#f0fdf4;}',
+      '.pau-topic-bar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:7px 10px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:9px;margin-bottom:8px;}',
+      '.pau-topic-chip{cursor:pointer;border:1px solid var(--pau-bd);background:var(--pau-bg);color:var(--pau-sub);padding:4px 9px;min-height:28px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}',
+      '.pau-topic-chip:hover,.pau-topic-chip:focus-visible{background:var(--pau-th);color:var(--pau-txt);outline:2px solid #2563eb;outline-offset:1px;}',
+      '.pau-topic-chip.on{background:#1d4ed8;border-color:#1d4ed8;color:#ffffff;}',
+      '.pau-root[data-theme="dark"] .pau-topic-chip.on,body.dark .pau-root .pau-topic-chip.on{background:#2563eb;border-color:#60a5fa;color:#ffffff;}',
       '.pau-issue-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;}',
       '.pau-issue-mini{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:5px 8px;border-radius:6px;font-size:11.5px;border:1px solid var(--pau-bd-lt);background:var(--pau-bg);overflow:hidden;}',
       '.pau-issue-mini span{color:var(--pau-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.pau-issue-mini b{white-space:nowrap;font-weight:700;}',
-      '.pau-issue-mini.lv5,.pau-hm-cell.lv5{background:#dbeafe;border-color:#93c5fd;color:#1e3a8a;}',
-      '.pau-issue-mini.lv4,.pau-hm-cell.lv4{background:#dcfce7;border-color:#86efac;color:#14532d;}',
-      '.pau-issue-mini.lv3,.pau-hm-cell.lv3{background:#f8fafc;border-color:#cbd5e1;color:#1e293b;}',
-      '.pau-issue-mini.lv2,.pau-hm-cell.lv2{background:#fef9c3;border-color:#fde047;color:#713f12;}',
-      '.pau-issue-mini.lv1,.pau-hm-cell.lv1{background:#f1f5f9;border-color:#cbd5e1;color:#475569;}',
-      '.pau-root[data-theme="dark"] .pau-issue-mini.lv5,body.dark .pau-root .pau-issue-mini.lv5,.pau-root[data-theme="dark"] .pau-hm-cell.lv5,body.dark .pau-root .pau-hm-cell.lv5{background:#1e3a8a;border-color:#60a5fa;color:#eff6ff;}',
-      '.pau-root[data-theme="dark"] .pau-issue-mini.lv4,body.dark .pau-root .pau-issue-mini.lv4,.pau-root[data-theme="dark"] .pau-hm-cell.lv4,body.dark .pau-root .pau-hm-cell.lv4{background:#14532d;border-color:#4ade80;color:#f0fdf4;}',
-      '.pau-root[data-theme="dark"] .pau-issue-mini.lv3,body.dark .pau-root .pau-issue-mini.lv3,.pau-root[data-theme="dark"] .pau-hm-cell.lv3,body.dark .pau-root .pau-hm-cell.lv3{background:#1e293b;border-color:#475569;color:#e2e8f0;}',
-      '.pau-root[data-theme="dark"] .pau-issue-mini.lv2,body.dark .pau-root .pau-issue-mini.lv2,.pau-root[data-theme="dark"] .pau-hm-cell.lv2,body.dark .pau-root .pau-hm-cell.lv2{background:#713f12;border-color:#facc15;color:#fef9c3;}',
-      '.pau-root[data-theme="dark"] .pau-issue-mini.lv1,body.dark .pau-root .pau-issue-mini.lv1,.pau-root[data-theme="dark"] .pau-hm-cell.lv1,body.dark .pau-root .pau-hm-cell.lv1{background:#0f172a;border-color:#334155;color:#cbd5e1;}',
+      '.pau-hm-tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid var(--pau-bd);white-space:nowrap;line-height:1.3;}',
+      '.pau-issue-mini.lv5,.pau-hm-cell.lv5,.pau-hm-tag.lv5{background:#dbeafe;border-color:#93c5fd;color:#1e3a8a;}',
+      '.pau-issue-mini.lv4,.pau-hm-cell.lv4,.pau-hm-tag.lv4{background:#dcfce7;border-color:#86efac;color:#14532d;}',
+      '.pau-issue-mini.lv3,.pau-hm-cell.lv3,.pau-hm-tag.lv3{background:#f8fafc;border-color:#cbd5e1;color:#1e293b;}',
+      '.pau-issue-mini.lv2,.pau-hm-cell.lv2,.pau-hm-tag.lv2{background:#fef9c3;border-color:#fde047;color:#713f12;}',
+      '.pau-issue-mini.lv1,.pau-hm-cell.lv1,.pau-hm-tag.lv1{background:#f1f5f9;border-color:#cbd5e1;color:#475569;}',
+      '.pau-root[data-theme="dark"] .pau-issue-mini.lv5,body.dark .pau-root .pau-issue-mini.lv5,.pau-root[data-theme="dark"] .pau-hm-cell.lv5,body.dark .pau-root .pau-hm-cell.lv5,.pau-root[data-theme="dark"] .pau-hm-tag.lv5,body.dark .pau-root .pau-hm-tag.lv5{background:#1e3a8a;border-color:#60a5fa;color:#eff6ff;}',
+      '.pau-root[data-theme="dark"] .pau-issue-mini.lv4,body.dark .pau-root .pau-issue-mini.lv4,.pau-root[data-theme="dark"] .pau-hm-cell.lv4,body.dark .pau-root .pau-hm-cell.lv4,.pau-root[data-theme="dark"] .pau-hm-tag.lv4,body.dark .pau-root .pau-hm-tag.lv4{background:#14532d;border-color:#4ade80;color:#f0fdf4;}',
+      '.pau-root[data-theme="dark"] .pau-issue-mini.lv3,body.dark .pau-root .pau-issue-mini.lv3,.pau-root[data-theme="dark"] .pau-hm-cell.lv3,body.dark .pau-root .pau-hm-cell.lv3,.pau-root[data-theme="dark"] .pau-hm-tag.lv3,body.dark .pau-root .pau-hm-tag.lv3{background:#1e293b;border-color:#475569;color:#e2e8f0;}',
+      '.pau-root[data-theme="dark"] .pau-issue-mini.lv2,body.dark .pau-root .pau-issue-mini.lv2,.pau-root[data-theme="dark"] .pau-hm-cell.lv2,body.dark .pau-root .pau-hm-cell.lv2,.pau-root[data-theme="dark"] .pau-hm-tag.lv2,body.dark .pau-root .pau-hm-tag.lv2{background:#713f12;border-color:#facc15;color:#fef9c3;}',
+      '.pau-root[data-theme="dark"] .pau-issue-mini.lv1,body.dark .pau-root .pau-issue-mini.lv1,.pau-root[data-theme="dark"] .pau-hm-cell.lv1,body.dark .pau-root .pau-hm-cell.lv1,.pau-root[data-theme="dark"] .pau-hm-tag.lv1,body.dark .pau-root .pau-hm-tag.lv1{background:#0f172a;border-color:#334155;color:#cbd5e1;}',
       '.pau-mini-meter{width:54px;height:6px;background:var(--pau-bd-lt);border-radius:999px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:4px;}',
       '.pau-mini-meter > i{display:block;height:100%;border-radius:999px;background:#2563eb;}',
       '.pau-stack-bar{display:flex;width:100%;height:14px;border-radius:999px;overflow:hidden;background:var(--pau-bd-lt);}',
@@ -2447,7 +2504,7 @@
       '  .pau-hero-tit{font-size:15.5px;}',
       '  .pau-hero-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}',
       '  .pau-hero-tab{padding:5px 9px;font-size:11.5px;min-height:30px;}',
-      '  .pau-dom-grid,.pau-issue-mini-grid,.pau-ab-grid,.pau-issue-detail-grid{grid-template-columns:1fr;}',
+      '  .pau-dom-grid,.pau-issue-mini-grid,.pau-ab-grid,.pau-issue-detail-grid,.pau-clause-cmp-grid,.pau-art-subgrid{grid-template-columns:1fr;}',
       '  .pau-doc-row{flex-wrap:wrap;gap:4px 6px;}',
       '  .pau-doc-tit{flex:1 1 100%;order:3;white-space:normal;}',
       '  .pau-doc-meta{margin-left:auto;}',
@@ -2460,7 +2517,8 @@
       '  .pau-tbl thead{display:none;}',
       '  .pau-tbl tbody{display:block;width:100%;}',
       '  .pau-tbl tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:8px 10px;margin-bottom:6px;}',
-      '  .pau-tbl td{display:inline-flex;align-items:center;gap:4px;border:none;padding:2px 0;white-space:normal;overflow:visible;text-overflow:clip;max-width:100%;font-size:12.5px;}',
+      '  .pau-tbl td{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;border:none;padding:2px 0;white-space:normal;overflow:visible;text-overflow:clip;max-width:100%;font-size:12.5px;}',
+      '  .pau-tbl td a[data-jump-organ]{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}',
       '  .pau-tbl td.pau-hm-cell{display:block;width:100%;padding:5px 8px;border-radius:6px;margin-top:2px;}',
       '  .pau-tbl td.c-ck,.pau-tbl td.c-no{width:auto;padding:0 2px;}',
       '}'
@@ -2784,10 +2842,25 @@
     var urlInit = getInitialUrlParams();
     var urlOrgan = urlInit.organ;
     var urlRegionResolved = '';
+    var urlMultiProvs = [];
     if (urlInit.region) {
-      if (urlInit.region === 'ALL') urlRegionResolved = 'ALL';
-      else if (PROVINCE_BY_KEY[urlInit.region]) urlRegionResolved = urlInit.region;
-      else urlRegionResolved = inferProvinceFromQuery(urlInit.region);
+      if (urlInit.region.indexOf(',') >= 0) {
+        urlInit.region.split(',').forEach(function (part) {
+          var t = part.trim();
+          if (!t) return;
+          var pk = PROVINCE_BY_KEY[t] ? t : inferProvinceFromQuery(t);
+          if (pk && PROVINCE_BY_KEY[pk] && urlMultiProvs.indexOf(pk) === -1 && urlMultiProvs.length < 8) {
+            urlMultiProvs.push(pk);
+          }
+        });
+        if (urlMultiProvs.length) urlRegionResolved = urlMultiProvs[0];
+      } else if (urlInit.region === 'ALL') {
+        urlRegionResolved = 'ALL';
+      } else if (PROVINCE_BY_KEY[urlInit.region]) {
+        urlRegionResolved = urlInit.region;
+      } else {
+        urlRegionResolved = inferProvinceFromQuery(urlInit.region);
+      }
     }
     var urlCompareValid = [];
     (urlInit.compare || []).forEach(function (cid) {
@@ -2808,16 +2881,27 @@
 
     var initialTab = (urlOrgan && instMap[urlOrgan])
       ? 'organ'
-      : ((urlRegionResolved || urlCompareValid.length || validUrlMode) ? 'matrix' : (validUrlTab || 'unions'));
+      : ((urlRegionResolved || (urlCompareValid.length && !validUrlTab) || validUrlMode) ? 'matrix' : (validUrlTab || 'unions'));
     var initialMSubMode = urlRegionResolved
       ? 'REGION'
       : (urlCompareValid.length ? 'STUDIO' : (validUrlMode || 'STUDIO'));
     var initialRProv = urlRegionResolved
       || ((organById[defaultOrganAid] && organById[defaultOrganAid].provinceKey) ? organById[defaultOrganAid].provinceKey : '충청남도');
     var initialRMuni = '';
-    if (urlRegionResolved && urlRegionResolved !== 'ALL' && urlInit.muni) {
+    var urlMultiMunis = [];
+    if (urlRegionResolved && urlRegionResolved !== 'ALL' && urlMultiProvs.length < 2 && urlInit.muni) {
       var allowedMunis = getMunicipalitiesForProvince(urlRegionResolved);
-      if (allowedMunis.some(function (m) { return m.name === urlInit.muni; })) {
+      var hqMuniLbl = PROVINCE_BY_KEY[urlRegionResolved] ? (PROVINCE_BY_KEY[urlRegionResolved].short + ' 본청') : '';
+      if (urlInit.muni.indexOf(',') >= 0) {
+        urlInit.muni.split(',').forEach(function (mp) {
+          var mt = mp.trim();
+          if (!mt) return;
+          if ((mt === hqMuniLbl || allowedMunis.some(function (m) { return m.name === mt; })) && urlMultiMunis.indexOf(mt) === -1 && urlMultiMunis.length < 8) {
+            urlMultiMunis.push(mt);
+          }
+        });
+        if (urlMultiMunis.length === 1) initialRMuni = urlMultiMunis[0];
+      } else if (urlInit.muni === hqMuniLbl || allowedMunis.some(function (m) { return m.name === urlInit.muni; })) {
         initialRMuni = urlInit.muni;
       }
     }
@@ -2855,6 +2939,9 @@
       mSubMode: initialMSubMode, // 'STUDIO' (다중기관 비교) | 'REGION' (지역·지자체 산하기관 전수 비교) | 'ALL_LIST' (단일쟁점 목록)
       rProvince: initialRProv,
       rMuni: initialRMuni,
+      rMultiMode: urlMultiProvs.length >= 2 || urlMultiMunis.length >= 2,
+      rMultiProvs: urlMultiProvs.slice(),
+      rMultiMunis: urlMultiMunis.length >= 2 ? urlMultiMunis.slice() : [],
       rTypeGroup: '', // '' | 'LOCAL_CORP' | 'LOCAL_AFFIL' | 'LOCAL_DIRECT'
       rUnionFilter: '', // ''(노조우선 전체) | 'has_union' | 'multi' | 'no_union'
       rSort: 'members_desc',
@@ -2867,19 +2954,26 @@
       mSort: 'members_desc',
       mQuery: '',
       mChecked: {},
-      // 탭 4: 조문·원문 통합 (단체협약 조문 통합 검색 + 기관별 공시·별도합의·내부규정 원문)
+      // 탭 4: 조문·원문 통합 (단체협약 조문 쟁점별 다중비교·기관별 묶음·검색표 + 공시·사규 원문)
       docMode: validUrlDoc || 'ARTICLES', // 'ARTICLES' | 'DISC'
+      aViewMode: 'COMPARE', // 'COMPARE' (쟁점별 다중비교 기본) | 'BY_ORGAN' (기관별 조문 묶음) | 'TABLE' (전체 조문 검색표)
       aScope: 'ALL',
       aCat: 'ALL',
       aSort: '',
       aQuery: '',
+      aCmpAddQ: '',
+      aPage: 0,
+      aOrgExpanded: {},
+      aRowExpanded: {},
+      dViewMode: 'BY_ORGAN', // 'BY_ORGAN' (기관별 원문 묶음 기본) | 'TABLE' (전체 공시문서 표)
       dScope: 'ALL',
       dOrganSearch: '',
-      dOrgan: defaultOrganAid,
+      dOrgan: (urlOrgan && instMap[urlOrgan]) ? urlOrgan : '',
       dTax: 'ALL',
       dSort: '',
       dQuery: '',
       dPage: 0,
+      dOrgExpanded: {},
       // 탭 5(유틸): 공공·법령 API 실시간 연동 센터
       apiLawKey: LAW_API_SOURCES[0].key,
       apiLawArt: '24',
@@ -2962,7 +3056,9 @@
 
     function renderCompareTray() {
       if (!cmpTrayEl) return;
-      if (!state.compareIds.length || state.tab === 'matrix') {
+      var inStudio = (state.tab === 'matrix' && state.mSubMode === 'STUDIO');
+      var inClauseCmp = (state.tab === 'articles' && state.docMode !== 'DISC' && state.aViewMode === 'COMPARE');
+      if (!state.compareIds.length || inStudio) {
         if (cmpTrayEl.classList && cmpTrayEl.classList.toggle) cmpTrayEl.classList.toggle('on', false);
         cmpTrayEl.innerHTML = '';
         return;
@@ -2981,6 +3077,7 @@
         '</div>',
         '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
         '  <button type="button" class="pau-act-btn pri" data-tray-go>📊 비교분석 보기</button>',
+        (!inClauseCmp ? '  <button type="button" class="pau-act-btn" data-tray-clauses>⚖️ 조문 병렬비교</button>' : ''),
         '  <button type="button" class="pau-act-btn" data-tray-clear>비우기</button>',
         '</div>'
       ].join('');
@@ -2996,6 +3093,14 @@
         goBtn.addEventListener('click', function () {
           state.mSubMode = 'STUDIO';
           switchTab('matrix');
+        });
+      }
+      var clBtn = cmpTrayEl.querySelector('[data-tray-clauses]');
+      if (clBtn) {
+        clBtn.addEventListener('click', function () {
+          state.docMode = 'ARTICLES';
+          state.aViewMode = 'COMPARE';
+          switchTab('articles');
         });
       }
       var clrBtn = cmpTrayEl.querySelector('[data-tray-clear]');
@@ -3015,6 +3120,9 @@
         state.rProvince = '충청남도';
       }
       state.rMuni = (typeof muniKey === 'string') ? muniKey : '';
+      state.rMultiMode = false;
+      state.rMultiProvs = [];
+      state.rMultiMunis = [];
       state.rChecked = {};
       state.mSubMode = 'REGION';
       switchTab('matrix');
@@ -3121,6 +3229,7 @@
           e.preventDefault();
           var nextDocMode = docModeBtn.getAttribute('data-doc-mode') || 'ARTICLES';
           state.docMode = nextDocMode;
+          renderCompareTray();
           renderCurrentTab();
           if (bodyEl) {
             var focusDocBtn = bodyEl.querySelector('[data-doc-mode="' + nextDocMode + '"]');
@@ -3214,14 +3323,27 @@
         return;
       }
       if (colId.indexOf('a_') === 0) {
+        state.aViewMode = 'TABLE';
+        state.aPage = 0;
         if (colId === 'a_name') state.aSort = state.aSort === 'name_asc' ? 'name_desc' : 'name_asc';
         else if (colId === 'a_cat') state.aSort = state.aSort === 'cat_asc' ? 'cat_desc' : 'cat_asc';
         else if (colId === 'a_no') state.aSort = state.aSort === 'no_asc' ? 'no_desc' : 'no_asc';
         else if (colId === 'a_tit') state.aSort = state.aSort === 'tit_asc' ? 'tit_desc' : 'tit_asc';
+        renderCompareTray();
         renderTabArticles();
         return;
       }
+      if (colId.indexOf('d_org_') === 0) {
+        state.dViewMode = 'BY_ORGAN';
+        if (colId === 'd_org_name') state.dSort = state.dSort === 'name_asc' ? 'name_desc' : 'name_asc';
+        else if (colId === 'd_org_cnt') state.dSort = (state.dSort || 'cnt_desc') === 'cnt_desc' ? 'cnt_asc' : 'cnt_desc';
+        else if (colId === 'd_org_date') state.dSort = state.dSort === 'date_desc' ? 'date_asc' : 'date_desc';
+        state.dPage = 0;
+        renderTabDetail();
+        return;
+      }
       if (colId.indexOf('d_') === 0) {
+        state.dViewMode = 'TABLE';
         if (colId === 'd_name') state.dSort = state.dSort === 'name_asc' ? 'name_desc' : 'name_asc';
         else if (colId === 'd_cat') state.dSort = state.dSort === 'cat_asc' ? 'cat_desc' : 'cat_asc';
         else if (colId === 'd_date') state.dSort = state.dSort === 'date_desc' ? 'date_asc' : 'date_desc';
@@ -4576,6 +4698,7 @@
         b.addEventListener('click', function () {
           var nextMode = b.getAttribute('data-m-submode') || 'STUDIO';
           state.mSubMode = nextMode;
+          renderCompareTray();
           renderTabMatrix();
           var nextBtn = bodyEl.querySelector('[data-m-submode="' + nextMode + '"]');
           if (nextBtn && typeof nextBtn.focus === 'function') nextBtn.focus();
@@ -4585,10 +4708,22 @@
 
     function filterRegionalOrgans() {
       var curProv = state.rProvince || '충청남도';
+      var hasMultiProvs = state.rMultiMode && state.rMultiProvs.length >= 2;
+      var hasMultiMunis = state.rMultiMode && !hasMultiProvs && curProv !== 'ALL' && state.rMultiMunis.length >= 2;
+      var curHqLabel = (!hasMultiProvs && curProv !== 'ALL' && PROVINCE_BY_KEY[curProv]) ? (PROVINCE_BY_KEY[curProv].short + ' 본청') : '';
       var list = organRecords.filter(function (r) {
         if (!r.provinceKey) return false;
-        if (curProv !== 'ALL' && r.provinceKey !== curProv) return false;
-        if (curProv !== 'ALL' && state.rMuni && r.muniName !== state.rMuni) return false;
+        if (hasMultiProvs) {
+          if (state.rMultiProvs.indexOf(r.provinceKey) === -1) return false;
+        } else {
+          if (curProv !== 'ALL' && r.provinceKey !== curProv) return false;
+          if (hasMultiMunis) {
+            var mk = r.muniName || curHqLabel;
+            if (state.rMultiMunis.indexOf(mk) === -1) return false;
+          } else if (curProv !== 'ALL' && state.rMuni && r.muniName !== state.rMuni) {
+            return false;
+          }
+        }
         if (state.rTypeGroup && !matchOrganScope(r.inst, state.rTypeGroup)) return false;
         if (state.rUnionFilter === 'has_union' && !r.hasUnion) return false;
         if (state.rUnionFilter === 'multi' && (!r.hasUnion || !r.isMulti)) return false;
@@ -4748,12 +4883,201 @@
     function renderTabMatrix() {
       var def = METRIC_DEFS.find(function (d) { return d.key === state.mIssue; }) || METRIC_DEFS[0];
 
-      // ── 1) REGION 모드: 지역별 · 기초지자체(본청/시군구)별 산하기관 전수 한눈 비교 ──
+      // ── 1) REGION 모드: 지역별 · 기초지자체(본청/시군구)별 산하기관 전수 & 다중비교 ──
       if (state.mSubMode === 'REGION') {
         var curProv = state.rProvince || '충청남도';
-        var isAllProv = (curProv === 'ALL');
-        var provMeta = !isAllProv ? PROVINCE_BY_KEY[curProv] : null;
-        var muniOptions = !isAllProv ? getMunicipalitiesForProvince(curProv) : [];
+        var hasMultiProvs = state.rMultiMode && state.rMultiProvs.length >= 2;
+        var hasMultiMunis = state.rMultiMode && !hasMultiProvs && curProv !== 'ALL' && state.rMultiMunis.length >= 2;
+        var isAllProv = !hasMultiProvs && (curProv === 'ALL');
+        var provMeta = (!hasMultiProvs && !isAllProv) ? PROVINCE_BY_KEY[curProv] : null;
+        var muniOptions = (!hasMultiProvs && !isAllProv) ? getMunicipalitiesForProvince(curProv) : [];
+
+        function computeGovGroupStats(label, subsetRows, keyId) {
+          var uRows = subsetRows.filter(function (r) { return r.hasUnion; });
+          var cCnt = 0, aCnt = 0, dCnt = 0, memSum = 0, orgSum = 0, toSum = 0, toCnt = 0, scSum = 0;
+          var persSum = 0, leaveSum = 0;
+          subsetRows.forEach(function (r) {
+            if (matchOrganScope(r.inst, 'LOCAL_CORP')) cCnt += 1;
+            else if (matchOrganScope(r.inst, 'LOCAL_DIRECT')) dCnt += 1;
+            else aCnt += 1;
+            memSum += r.memberTotal;
+            if (r.hasUnion) {
+              orgSum += r.orgRate;
+              scSum += r.totalScore;
+              persSum += (((r.issueScores.personnel_participation && r.issueScores.personnel_participation.score) || 0) + ((r.issueScores.discipline_committee && r.issueScores.discipline_committee.score) || 0)) / 2;
+              leaveSum += (((r.issueScores.paid_holidays_leave && r.issueScores.paid_holidays_leave.score) || 0) + ((r.issueScores.work_hours_overtime && r.issueScores.work_hours_overtime.score) || 0)) / 2;
+            }
+            if (r.timeoffHours > 0) { toSum += r.timeoffHours; toCnt += 1; }
+          });
+          var topUnionRec = uRows.slice().sort(function (a, b) { return b.memberTotal - a.memberTotal; })[0] || subsetRows[0] || null;
+          return {
+            key: keyId,
+            label: label,
+            total: subsetRows.length,
+            corpCnt: cCnt,
+            affilCnt: aCnt,
+            directCnt: dCnt,
+            unionCnt: uRows.length,
+            unionPct: subsetRows.length ? Math.round((uRows.length / subsetRows.length) * 1000) / 10 : 0,
+            members: memSum,
+            avgOrgRate: uRows.length ? Math.round((orgSum / uRows.length) * 10) / 10 : 0,
+            avgTimeoff: toCnt ? Math.round(toSum / toCnt) : 0,
+            avgScore: uRows.length ? Math.round(scSum / uRows.length) : 0,
+            avgPers: uRows.length ? Math.round(persSum / uRows.length) : 0,
+            avgLeave: uRows.length ? Math.round(leaveSum / uRows.length) : 0,
+            topOrgan: topUnionRec
+          };
+        }
+
+        function renderMultiGovCompareHtml(regRows) {
+          if (!hasMultiProvs && !hasMultiMunis) return '';
+          var groups = [];
+          if (hasMultiProvs) {
+            state.rMultiProvs.forEach(function (pk) {
+              var pDef = PROVINCE_BY_KEY[pk];
+              var pRows = regRows.filter(function (r) { return r.provinceKey === pk; });
+              groups.push(computeGovGroupStats(pDef ? (pDef.short + ' (' + pk + ')') : pk, pRows, pk));
+            });
+          } else if (hasMultiMunis && provMeta) {
+            var hqNm = provMeta.short + ' 본청';
+            state.rMultiMunis.forEach(function (mk) {
+              var mRows = regRows.filter(function (r) { return (r.muniName || hqNm) === mk; });
+              groups.push(computeGovGroupStats(mk, mRows, mk));
+            });
+          }
+          if (groups.length < 2) return '';
+          var maxMemG = Math.max.apply(null, groups.map(function (g) { return g.members; }).concat([0]));
+          var maxOrgG = Math.max.apply(null, groups.map(function (g) { return g.avgOrgRate; }).concat([0]));
+          var maxToG = Math.max.apply(null, groups.map(function (g) { return g.avgTimeoff; }).concat([0]));
+          var maxScG = Math.max.apply(null, groups.map(function (g) { return g.avgScore; }).concat([0]));
+
+          return [
+            '<div class="pau-sec-card" data-r-multigov-card style="border-color:#93c5fd;">',
+            '  <div class="pau-sec-tit">',
+            '    <span>⚖️ ' + (hasMultiProvs ? ('선택 광역 시·도(' + groups.length + '곳)') : (esc(curProv) + ' 내 선택 기초지자체(' + groups.length + '곳)')) + ' 산하기관 총괄 다중비교</span>',
+            '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+            '      <button type="button" class="pau-act-btn pri" data-r-multi-rep-cmp>📊 지자체별 대표 산하기관 레이더·조문 심층대조 ↗</button>',
+            '      <button type="button" class="pau-act-btn" data-r-multi-reset>다중지자체 초기화</button>',
+            '    </div>',
+            '  </div>',
+            '  <div class="pau-tbl-wrap" style="max-height:340px;">',
+            '    <table class="pau-tbl">',
+            '      <thead>',
+            '        <tr>',
+            '          <th class="c-no">№</th>',
+            '          <th style="width:16%;">비교 지자체</th>',
+            '          <th style="width:15%;">산하기관 구성</th>',
+            '          <th style="width:12%;">노조보유 (설립률)</th>',
+            '          <th style="width:12%;">합산 조합원</th>',
+            '          <th style="width:10%;">평균 조직률</th>',
+            '          <th style="width:10%;">평균 타임오프</th>',
+            '          <th style="width:11%;">인사·휴가 수준</th>',
+            '          <th style="width:14%;">종합점수 · 대표기관</th>',
+            '        </tr>',
+            '      </thead>',
+            '      <tbody>',
+            groups.map(function (g, idx) {
+              var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+              var isTopMem = maxMemG > 0 && g.members === maxMemG;
+              var isTopOrg = maxOrgG > 0 && g.avgOrgRate === maxOrgG;
+              var isTopTo = maxToG > 0 && g.avgTimeoff === maxToG;
+              var isTopSc = maxScG > 0 && g.avgScore === maxScG;
+              return [
+                '<tr>',
+                '  <td class="c-no">' + (idx + 1) + '</td>',
+                '  <td style="font-weight:800;border-left:3px solid ' + pal.stroke + ';">' + esc(g.label) + '</td>',
+                '  <td>총 <b>' + fmtNum(g.total) + '곳</b> <span style="font-size:11px;color:var(--pau-muted);">(공단' + g.corpCnt + '·출연' + g.affilCnt + (g.directCnt ? '·직영' + g.directCnt : '') + ')</span></td>',
+                '  <td class="c-num"><span class="pau-show-sm">노조보유: </span><b>' + fmtNum(g.unionCnt) + '곳</b> (' + g.unionPct + '%)</td>',
+                '  <td class="c-num"' + (isTopMem ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm">조합원: </span>' + (isTopMem ? '🏆 ' : '') + '<b>' + fmtNum(g.members) + '명</b></td>',
+                '  <td class="c-num"' + (isTopOrg ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm">평균조직률: </span>' + (isTopOrg ? '🏆 ' : '') + fmtPct(g.avgOrgRate) + '</td>',
+                '  <td class="c-num"' + (isTopTo ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm">타임오프: </span>' + (isTopTo ? '🏆 ' : '') + (g.avgTimeoff ? (fmtNum(g.avgTimeoff) + 'h') : '—') + '</td>',
+                '  <td class="c-num">인사 ' + g.avgPers + ' · 휴가 ' + g.avgLeave + '점</td>',
+                '  <td' + (isTopSc ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm">종합점수: </span>' + (isTopSc ? '🏆 ' : '') + '<b>' + g.avgScore + '점</b>' + (g.topOrgan ? (' · <a href="pu-alio-union.html?organ=' + encodeURIComponent(g.topOrgan.aid) + '" data-jump-organ="' + esc(g.topOrgan.aid) + '" style="color:var(--pau-pri);text-decoration:none;font-weight:700;">↗ ' + esc(g.topOrgan.name) + '</a>') : '') + '</td>',
+                '</tr>'
+              ].join('');
+            }).join(''),
+            '      </tbody>',
+            '    </table>',
+            '  </div>',
+            '</div>'
+          ].join('');
+        }
+
+        function renderInlineRegInstCompareHtml(checkedIds) {
+          var selRecs = checkedIds.map(function (id) { return organById[id]; }).filter(Boolean).slice(0, 6);
+          if (selRecs.length < 2) return '';
+          var maxMemS = Math.max.apply(null, selRecs.map(function (r) { return r.memberTotal; }).concat([0]));
+          var maxOrgS = Math.max.apply(null, selRecs.map(function (r) { return r.orgRate; }).concat([0]));
+          var maxToS = Math.max.apply(null, selRecs.map(function (r) { return r.timeoffHours; }).concat([0]));
+          var maxScS = Math.max.apply(null, selRecs.map(function (r) { return r.totalScore; }).concat([0]));
+          var cmpIssueRows = [
+            { key: 'personnel_participation', label: '인사원칙 노조 관여' },
+            { key: 'discipline_committee', label: '징계위원회 구성·재심' },
+            { key: 'work_hours_overtime', label: '근로시간·유연근무' },
+            { key: 'paid_holidays_leave', label: '유급휴일·경조휴가' },
+            { key: 'maternity_childcare', label: '모성보호·육아휴직' },
+            { key: 'retirement_age_peak', label: '정년·임금피크·고용' }
+          ];
+          return [
+            '<div class="pau-sec-card" data-r-inline-cmp style="border-color:#2563eb;box-shadow:0 2px 8px rgba(37,99,235,.08);">',
+            '  <div class="pau-sec-tit">',
+            '    <span>⚖️ 선택 산하기관(' + selRecs.length + '곳) 즉석 다중비교 매트릭스</span>',
+            '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+            '      <button type="button" class="pau-act-btn pri" data-r-go-studio>📊 레이더·산점도 심층비교 ↗</button>',
+            '      <button type="button" class="pau-act-btn" data-r-go-clauses>📚 선택 기관 조문 병렬비교 →</button>',
+            '      <button type="button" class="pau-act-btn" data-r-sync-tray>📥 비교함 담기</button>',
+            '      <button type="button" class="pau-act-btn" data-r-clr-ck>✕ 선택 해제</button>',
+            '    </div>',
+            '  </div>',
+            '  <div class="pau-tbl-wrap" style="max-height:420px;">',
+            '    <table class="pau-tbl">',
+            '      <thead>',
+            '        <tr>',
+            '          <th style="width:16%;">비교 항목</th>',
+            selRecs.map(function (r, idx) {
+              var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+              return '<th style="border-bottom:3px solid ' + pal.stroke + ';"><a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="color:var(--pau-pri);text-decoration:none;font-weight:800;">↗ ' + esc(r.name) + '</a></th>';
+            }).join(''),
+            '        </tr>',
+            '      </thead>',
+            '      <tbody>',
+            '        <tr><td style="font-weight:700;">소속 지자체 · 유형</td>' + selRecs.map(function (r) {
+              var jt = (r.provinceShort || '') + (r.muniName ? ' · ' + r.muniName : '');
+              return '<td title="' + esc(jt + ' (' + r.inst_type + ')') + '"><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span><span class="pau-pill loc">' + esc(jt || r.ministry) + '</span> ' + esc(r.inst_type) + '</td>';
+            }).join('') + '</tr>',
+            '        <tr><td style="font-weight:700;">노조체계 · 대표노조</td>' + selRecs.map(function (r) {
+              var ut = r.hasUnion ? ('[' + (r.isMulti ? ('복수' + r.unionCount) : r.repConfed) + '] ' + (r.repUnion ? r.repUnion.union_name : '노동조합')) : '미설립·사규운영';
+              return '<td title="' + esc(ut) + '"><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span>' + esc(ut) + '</td>';
+            }).join('') + '</tr>',
+            '        <tr><td style="font-weight:700;">합산 조합원 · 조직률</td>' + selRecs.map(function (r) {
+              var isTop = maxMemS > 0 && r.memberTotal === maxMemS;
+              var isTopO = maxOrgS > 0 && r.orgRate === maxOrgS;
+              var mt = r.hasUnion ? (fmtNum(r.memberTotal) + '명 (' + fmtPct(r.orgRate) + ')') : '—';
+              return '<td' + (isTop || isTopO ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span>' + (isTop ? '🏆 ' : '') + esc(mt) + '</td>';
+            }).join('') + '</tr>',
+            '        <tr><td style="font-weight:700;">연간 타임오프 (한도%)</td>' + selRecs.map(function (r) {
+              var isTop = maxToS > 0 && r.timeoffHours === maxToS;
+              var tt = r.timeoffHours > 0 ? (fmtNum(r.timeoffHours) + 'h (' + fmtPct(r.timeoffLimitPct) + ')') : (r.hasUnion ? '비전임' : '—');
+              return '<td' + (isTop ? ' style="font-weight:800;color:var(--pau-pri);background:var(--pau-pri-bg);"' : '') + '><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span>' + (isTop ? '🏆 ' : '') + esc(tt) + '</td>';
+            }).join('') + '</tr>',
+            cmpIssueRows.map(function (ir) {
+              return '<tr><td style="font-weight:700;">' + esc(ir.label) + '</td>' + selRecs.map(function (r) {
+                var sc = r.issueScores[ir.key] || { tag: '기본', val: '—', level: 2 };
+                return '<td class="pau-hm-cell lv' + sc.level + '" title="' + esc('[' + sc.tag + '] ' + sc.val) + '"><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span><b>[' + esc(sc.tag) + ']</b> ' + esc(sc.val) + '</td>';
+              }).join('') + '</tr>';
+            }).join(''),
+            '        <tr><td style="font-weight:700;">6대영역 종합 · 바로가기</td>' + selRecs.map(function (r) {
+              var isTop = maxScS > 0 && r.totalScore === maxScS;
+              var sUrl = safeHttpUrl(buildOrganUrl(r.inst));
+              var pAttr = (!isErcMoisOrgan(r.inst)) ? (' data-cleaneye-post="' + esc(r.aid) + '" data-cleaneye-type="union_info"') : '';
+              return '<td style="white-space:normal;' + (isTop ? 'background:var(--pau-pri-bg);' : '') + '"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span><b style="color:var(--pau-pri);">' + (isTop ? '🏆 ' : '') + r.totalScore + '점</b> <button type="button" class="pau-act-btn" data-open-organ-here="' + esc(r.aid) + '">🔎 상세</button>' + (sUrl ? (' <a class="pau-pill ok" href="' + esc(sUrl) + '"' + pAttr + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">원문</a>') : '') + '</div></td>';
+            }).join('') + '</tr>',
+            '      </tbody>',
+            '    </table>',
+            '  </div>',
+            '</div>'
+          ].join('');
+        }
 
         function renderRegionDynHtml() {
           var regRows = filterRegionalOrgans();
@@ -4790,10 +5114,10 @@
           var maxChartMem = 50;
           chartRows.forEach(function (r) { if (r.memberTotal > maxChartMem) maxChartMem = r.memberTotal; });
 
-          // 우측 지자체 분포 집계 (시·도 선택 시 본청 vs 시·군·구, 전국 선택 시 16개 시·도)
+          // 우측 지자체 분포 집계 (다중 시·도 선택 시 선택된 시·도 비교, 단일 시·도 선택 시 본청 vs 시·군·구, 전국 선택 시 16개 시·도)
           var breakdownItems = [];
           var maxBreakCnt = 1;
-          if (!isAllProv && provMeta) {
+          if (!hasMultiProvs && !isAllProv && provMeta) {
             var hqName = provMeta.short + ' 본청';
             var muniStatMap = Object.create(null);
             organRecords.forEach(function (r) {
@@ -4819,6 +5143,7 @@
             });
           } else {
             PROVINCE_DEFS.forEach(function (p) {
+              if (hasMultiProvs && state.rMultiProvs.indexOf(p.key) === -1) return;
               var tot = 0;
               var uCnt = 0;
               var mem = 0;
@@ -4842,13 +5167,16 @@
           var checkedRegIds = Object.keys(state.rChecked).filter(function (k) { return !!state.rChecked[k] && !!organById[k]; });
           var tableLimit = 350;
           var shownRegRows = regRows.slice(0, tableLimit);
-          var regionTitleLabel = isAllProv
-            ? '전국 16개 시·도 지방산하기관'
-            : (curProv + (state.rMuni ? (' · ' + state.rMuni) : ' 전체'));
+          var regionTitleLabel = hasMultiProvs
+            ? (state.rMultiProvs.map(function (pk) { return PROVINCE_BY_KEY[pk] ? PROVINCE_BY_KEY[pk].short : pk; }).join(' · ') + ' (' + state.rMultiProvs.length + '개 시·도 다중비교)')
+            : (isAllProv
+              ? '전국 16개 시·도 지방산하기관'
+              : (curProv + (hasMultiMunis ? (' · ' + state.rMultiMunis.join('·')) : (state.rMuni ? (' · ' + state.rMuni) : ' 전체'))));
 
           return {
             rows: regRows,
             html: [
+              renderMultiGovCompareHtml(regRows),
               // ① 상단 지역 산하기관 한눈 그래프 비교 카드
               '<div class="pau-sec-card">',
               '  <div class="pau-sec-tit">',
@@ -4862,7 +5190,7 @@
               (chartRows.length ? chartRows.map(function (r) {
                 var memW = r.hasUnion ? Math.max(5, Math.round((r.memberTotal / maxChartMem) * 100)) : 0;
                 var scW = Math.max(8, Math.min(100, r.totalScore));
-                var jurTag = !isAllProv ? (r.muniName || r.provinceShort) : (r.provinceShort + (r.muniName && r.muniName.indexOf('본청') === -1 ? '·' + r.muniName : ''));
+                var jurTag = (!hasMultiProvs && !isAllProv) ? (r.muniName || r.provinceShort) : (r.provinceShort + (r.muniName && r.muniName.indexOf('본청') === -1 ? '·' + r.muniName : ''));
                 return [
                   '<div style="background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:7px;padding:5px 8px;display:flex;flex-direction:column;gap:4px;">',
                   '  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px;">',
@@ -4892,15 +5220,15 @@
               '    </div>',
 
               '    <div class="pau-card">',
-              '      <div class="pau-card-hd"><span>' + (!isAllProv ? ('🏛️ ' + esc(provMeta.short) + ' 본청 · 시·군·구별 산하기관 분포 (클릭→지자체 필터)') : '🗺️ 16개 시·도별 지방산하기관 · 노조 분포 (클릭→시·도 선택)') + '</span>' + (state.rMuni ? '<button type="button" class="pau-act-btn" data-r-muni-clear>시·군·구 해제</button>' : '') + '</div>',
+              '      <div class="pau-card-hd"><span>' + ((!hasMultiProvs && !isAllProv) ? ('🏛️ ' + esc(provMeta.short) + ' 본청 · 시·군·구별 분포 (' + (state.rMultiMode ? '클릭→시·군·구 다중비교 추가' : '클릭→지자체 필터') + ')') : '🗺️ 시·도별 지방산하기관 · 노조 분포 (클릭→시·도 선택)') + '</span>' + ((state.rMuni || hasMultiMunis) ? '<button type="button" class="pau-act-btn" data-r-muni-clear>시·군·구 해제</button>' : '') + '</div>',
               '      <div style="max-height:285px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding-right:3px;">',
               (breakdownItems.length ? breakdownItems.map(function (it) {
-                var isAct = !it.isProv && state.rMuni === it.key;
+                var isAct = !it.isProv && (hasMultiMunis ? (state.rMultiMunis.indexOf(it.key) >= 0) : (state.rMuni === it.key));
                 var totW = Math.max(6, Math.round((it.total / maxBreakCnt) * 100));
                 var uRatio = it.total ? Math.round((it.unionCnt / it.total) * totW) : 0;
                 return [
-                  '<button type="button" class="pau-sec-bar-btn" ' + (it.isProv ? ('data-r-prov="' + esc(it.key) + '"') : ('data-r-muni-pick="' + esc(it.key) + '"')) + ' style="' + (isAct ? 'background:var(--pau-pri-bg);outline:1px solid #2563eb;' : '') + '">',
-                  '  <span class="pau-sec-bar-nm">' + (isAct ? '▶ ' : '') + esc(it.label) + '</span>',
+                  '<button type="button" class="pau-sec-bar-btn" ' + (it.isProv ? ('data-r-prov="' + esc(it.key) + '"') : ('data-r-muni-pick="' + esc(it.key) + '"')) + ' aria-pressed="' + (isAct ? 'true' : 'false') + '" style="' + (isAct ? 'background:var(--pau-pri-bg);outline:1px solid #2563eb;' : '') + '">',
+                  '  <span class="pau-sec-bar-nm">' + (isAct ? '✓ ' : '') + esc(it.label) + '</span>',
                   '  <span style="flex:1;height:10px;background:var(--pau-bd-lt);border-radius:999px;overflow:hidden;display:flex;">',
                   '    <i style="width:' + uRatio + '%;background:#2563eb;height:100%;" title="노조보유 ' + it.unionCnt + '곳"></i>',
                   '    <i style="width:' + Math.max(0, totW - uRatio) + '%;background:#93c5fd;height:100%;" title="미설립 ' + (it.total - it.unionCnt) + '곳"></i>',
@@ -4917,6 +5245,9 @@
               '    </div>',
               '  </div>',
               '</div>',
+
+              // ①-B 선택 산하기관 즉석 다중비교 보드 (2곳 이상 체크 시 바로 노출)
+              renderInlineRegInstCompareHtml(checkedRegIds),
 
               // ② 지역 산하기관 전체 현황 · 핵심 근로조건 한눈 비교 매트릭스 표
               '<div class="pau-sec-card">',
@@ -4948,6 +5279,8 @@
                 return '<option value="' + esc(it[0]) + '"' + (curRSort === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
               }).join(''),
               '      </select>',
+              '      <span class="pau-hide-sm" style="font-size:11.5px;color:var(--pau-muted);">☑ 최대 6곳 선택 비교</span>',
+              (checkedRegIds.length < 2 && shownRegRows.length >= 2 ? '      <button type="button" class="pau-act-btn" data-r-quick-top4>⚡ 상위 4곳 즉석 다중비교</button>' : ''),
               (checkedRegIds.length ? '      <button type="button" class="pau-act-btn" data-r-clr-ck>선택 해제 (' + checkedRegIds.length + ')</button>' : ''),
               '      <button type="button" class="pau-act-btn pri" data-r-go-studio>📊 ' + (checkedRegIds.length ? ('선택 ' + checkedRegIds.length + '곳') : '대표 산하기관(최대 6곳)') + ' 레이더·조문 심층대조 ↗</button>',
               '    </div>',
@@ -4956,24 +5289,24 @@
               '    <table class="pau-tbl">',
               '      <thead>',
               '        <tr>',
-              '          <th class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-r-ck-all aria-label="상위 6개 산하기관 전체 선택"' + (shownRegRows.length && shownRegRows.slice(0, 6).every(function (r) { return !!state.rChecked[r.aid]; }) ? ' checked' : '') + '></label></th>',
+              '          <th class="c-ck" title="다중비교 최대 한도(상위 6곳) 일괄 선택·해제"><label class="pau-ck-lbl" title="다중비교 최대 한도(상위 6곳) 일괄 선택·해제"><input type="checkbox" data-r-ck-all aria-label="상위 6개 산하기관 전체 선택"' + (shownRegRows.length && shownRegRows.slice(0, 6).every(function (r) { return !!state.rChecked[r.aid]; }) ? ' checked' : '') + '></label></th>',
               '          <th class="c-no">№</th>',
               '          ' + renderSortTh('9%', '소속 지자체', 'r_muni', state.rSort || 'members_desc', ['muni_asc', 'muni_desc']),
-              '          ' + renderSortTh('17%', '산하기관명 · 유형 (클릭→별개 창)', 'r_name', state.rSort || 'members_desc', ['name_asc', 'name_desc']),
-              '          ' + renderSortTh('14%', '노조체계 · 대표노조', 'r_union', state.rSort || 'members_desc', ['union_desc', 'union_asc']),
+              '          ' + renderSortTh('16%', '산하기관명 · 유형 (클릭→별개 창)', 'r_name', state.rSort || 'members_desc', ['name_asc', 'name_desc']),
+              '          ' + renderSortTh('13%', '노조체계 · 대표노조', 'r_union', state.rSort || 'members_desc', ['union_desc', 'union_asc']),
               '          ' + renderSortTh('10%', '조합원 · 조직률', 'r_members', state.rSort || 'members_desc', ['members_desc', 'members_asc', 'orgrate_desc', 'orgrate_asc']),
               '          ' + renderSortTh('9%', '타임오프(한도%)', 'r_timeoff', state.rSort || 'members_desc', ['timeoff_desc', 'timeoff_asc']),
-              '          ' + renderSortTh('12%', '인사 · 징계 관여', 'r_pers', state.rSort || 'members_desc', ['pers_desc', 'pers_asc']),
+              '          ' + renderSortTh('11%', '인사 · 징계 관여', 'r_pers', state.rSort || 'members_desc', ['pers_desc', 'pers_asc']),
               '          ' + renderSortTh('11%', '휴가 · 근로시간', 'r_leave', state.rSort || 'members_desc', ['leave_desc', 'leave_asc']),
               '          ' + renderSortTh('10%', '임금 · 정년 · 점수', 'r_score', state.rSort || 'members_desc', ['score_desc', 'score_asc']),
-              '          <th style="width:8%;">원문 · 상세</th>',
+              '          <th style="width:11%;">비교 · 상세 · 원문</th>',
               '        </tr>',
               '      </thead>',
               '      <tbody>',
               (shownRegRows.length ? shownRegRows.map(function (r, idx) {
                 var isCk = !!state.rChecked[r.aid];
                 var inCmp = state.compareIds.indexOf(r.aid) >= 0;
-                var jurText = isAllProv ? (r.provinceShort + (r.muniName ? '·' + r.muniName : '')) : (r.muniName || (provMeta ? provMeta.short + ' 본청' : r.ministry));
+                var jurText = (hasMultiProvs || isAllProv) ? (r.provinceShort + (r.muniName ? '·' + r.muniName : '')) : (r.muniName || (provMeta ? provMeta.short + ' 본청' : r.ministry));
                 var typeShort = matchOrganScope(r.inst, 'LOCAL_CORP') ? '공사·공단' : (matchOrganScope(r.inst, 'LOCAL_DIRECT') ? '직영기업' : '출자·출연');
                 var scPers = r.issueScores.personnel_participation || { tag: '기본', val: '—', level: 2 };
                 var scDisc = r.issueScores.discipline_committee || { tag: '기본', val: '—', level: 2 };
@@ -4988,7 +5321,7 @@
                 var postAttr = (!isErcMoisOrgan(r.inst)) ? (' data-cleaneye-post="' + esc(r.aid) + '" data-cleaneye-type="union_info"') : '';
                 return [
                   '<tr' + (isCk || inCmp ? ' style="background:var(--pau-pri-bg);"' : '') + '>',
-                  '  <td class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-r-ck="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 선택') + '"' + (isCk ? ' checked' : '') + '></label></td>',
+                  '  <td class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-r-ck="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 다중비교 선택') + '"' + (isCk ? ' checked' : '') + '></label></td>',
                   '  <td class="c-no">' + (idx + 1) + '</td>',
                   '  <td title="' + esc(r.ministry + ' · ' + jurText) + '"><span class="pau-pill ' + (jurText.indexOf('본청') >= 0 ? 'loc' : '') + '">' + esc(jurText) + '</span></td>',
                   '  <td title="' + esc(r.name + ' (' + r.inst_type + ')') + '"><a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="color:var(--pau-pri);font-weight:800;text-decoration:none;">↗ ' + esc(r.name) + '</a> <span style="font-size:11px;color:var(--pau-muted);">(' + esc(typeShort) + ')</span></td>',
@@ -5003,6 +5336,7 @@
                   '  <td class="pau-hm-cell lv' + Math.max(scLeave.level, scWork.level) + '" title="' + esc('휴가: ' + scLeave.val + ' / 근로시간: ' + scWork.val) + '">' + esc(workTxt) + '</td>',
                   '  <td class="pau-hm-cell lv' + Math.max(scPeak.level, scWage.level) + '" title="' + esc('임금: ' + scWage.val + ' / 정년: ' + scPeak.val + ' / 6대영역 종합 ' + r.totalScore + '점') + '"><b>' + esc(wageTxt) + '</b></td>',
                   '  <td style="white-space:normal;"><div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;">' +
+                    '<button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(r.aid) + '" title="비교함에 담기 (타 지역·중앙기관과 교차비교)">' + (inCmp ? '✓비교' : '+비교') + '</button>' +
                     '<button type="button" class="pau-act-btn" data-open-organ-here="' + esc(r.aid) + '" title="6대영역 상세 열기" aria-label="' + esc(r.name + ' 상세 열기') + '">🔎</button>' +
                     (safeUrl ? '<a class="pau-pill ok" href="' + esc(safeUrl) + '"' + postAttr + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;" title="클린아이 공시원문 열기">원문</a>' : '') +
                   '</div></td>',
@@ -5026,10 +5360,10 @@
           '    <select data-f="rProvince" aria-label="광역 시·도 지자체 선택" style="font-weight:800;max-width:235px;">',
           '      <option value="ALL"' + (isAllProv ? ' selected' : '') + '>🗺️ 전국 16개 시·도 산하 전체 (' + fmtNum(allLocalAffilCount) + '곳)</option>',
           PROVINCE_DEFS.map(function (p) {
-            return '<option value="' + esc(p.key) + '"' + (curProv === p.key ? ' selected' : '') + '>' + esc(p.key + ' (' + p.short + ' · 산하 ' + fmtNum(provinceCounts[p.key] || 0) + '곳 · 노조 ' + fmtNum(provinceUnionCounts[p.key] || 0) + '곳)') + '</option>';
+            return '<option value="' + esc(p.key) + '"' + (!isAllProv && curProv === p.key ? ' selected' : '') + '>' + esc(p.key + ' (' + p.short + ' · 산하 ' + fmtNum(provinceCounts[p.key] || 0) + '곳 · 노조 ' + fmtNum(provinceUnionCounts[p.key] || 0) + '곳)') + '</option>';
           }).join(''),
           '    </select>',
-          (!isAllProv ? [
+          (!hasMultiProvs && !isAllProv ? [
             '    <select data-f="rMuni" aria-label="본청·기초지자체 시·군·구 선택" style="max-width:175px;">',
             '      <option value="">본청 · 시/군/구 전체 (' + fmtNum(provinceCounts[curProv] || 0) + '곳)</option>',
             muniOptions.map(function (m) {
@@ -5052,17 +5386,38 @@
           '    <input type="search" data-f="rQuery" aria-label="산하기관명·시군구 검색" placeholder="산하기관·시군구 검색" value="' + esc(state.rQuery) + '" style="min-width:148px;max-width:195px;flex:1 1 148px;">',
           '  </div>',
           '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed var(--pau-bd-lt);">',
-          '    <button type="button" class="pau-act-btn' + (isAllProv ? ' pri' : '') + '" aria-pressed="' + (isAllProv ? 'true' : 'false') + '" data-r-prov="ALL">전국(' + fmtNum(allLocalAffilCount) + ')</button>',
+          '    <button type="button" class="pau-act-btn' + (state.rMultiMode ? ' pri' : '') + '" aria-pressed="' + (state.rMultiMode ? 'true' : 'false') + '" data-r-multi-toggle title="여러 시·도 또는 여러 시·군·구를 동시에 선택하여 총괄 비교합니다">⚖️ 지자체 다중비교' + (state.rMultiMode ? ' ON' : '') + '</button>',
+          '    <button type="button" class="pau-act-btn' + (!state.rMultiMode && isAllProv ? ' pri' : '') + '" aria-pressed="' + (!state.rMultiMode && isAllProv ? 'true' : 'false') + '" data-r-prov="ALL">전국(' + fmtNum(allLocalAffilCount) + ')</button>',
           PROVINCE_DEFS.map(function (p) {
-            var isCurP = curProv === p.key;
-            return '<button type="button" class="pau-act-btn' + (isCurP ? ' pri' : '') + '" aria-pressed="' + (isCurP ? 'true' : 'false') + '" data-r-prov="' + esc(p.key) + '">' + esc(p.short) + '(' + (provinceCounts[p.key] || 0) + ')</button>';
+            var isCurP = state.rMultiMode ? (state.rMultiProvs.indexOf(p.key) >= 0) : (curProv === p.key);
+            return '<button type="button" class="pau-act-btn' + (isCurP ? ' pri' : '') + '" aria-pressed="' + (isCurP ? 'true' : 'false') + '" data-r-prov="' + esc(p.key) + '">' + (state.rMultiMode && isCurP ? '✓ ' : '') + esc(p.short) + '(' + (provinceCounts[p.key] || 0) + ')</button>';
           }).join(''),
           '  </div>',
+          (state.rMultiMode ? [
+            '  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:6px;padding:5px 8px;background:var(--pau-pri-bg);border-radius:7px;font-size:12px;">',
+            '    <b style="color:var(--pau-pri);">💡 다중비교 선택:</b>',
+            '    <span style="color:var(--pau-sub);">위 시·도 버튼(또는 우측 시·군·구 막대)을 여러 개 클릭하세요.</span>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="CHUNGCHEONG">충청권 4곳(충남·대전·세종·충북)</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="CAPITAL">수도권 3곳(서울·경기·인천)</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="YEONGNAM">동남권 3곳(부산·울산·경남)</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="DAEGYEONG">대경권 2곳(대구·경북)</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="HONAM">호남권 2곳(전북·전남광주)</button>',
+            '    <button type="button" class="pau-act-btn" data-r-multi-reset>다중비교 해제</button>',
+            '  </div>'
+          ].join('') : ''),
           '</div>',
           '<div data-m-reg-dyn>' + initRegDyn.html + '</div>'
         ].join('');
 
         var curRegRowsRef = initRegDyn.rows;
+
+        function getPickedOrTopRegIds() {
+          var picked = Object.keys(state.rChecked).filter(function (k) { return state.rChecked[k] && organById[k]; }).slice(0, 6);
+          if (!picked.length) {
+            picked = curRegRowsRef.slice(0, 6).map(function (r) { return r.aid; });
+          }
+          return picked;
+        }
 
         function bindRegionDynEvents() {
           var dynEl = bodyEl.querySelector('[data-m-reg-dyn]');
@@ -5070,7 +5425,14 @@
           Array.prototype.forEach.call(dynEl.querySelectorAll('[data-r-muni-pick]'), function (b) {
             b.addEventListener('click', function () {
               var mk = b.getAttribute('data-r-muni-pick') || '';
-              state.rMuni = (state.rMuni === mk) ? '' : mk;
+              if (state.rMultiMode && !hasMultiProvs) {
+                var idxM = state.rMultiMunis.indexOf(mk);
+                if (idxM >= 0) state.rMultiMunis.splice(idxM, 1);
+                else if (state.rMultiMunis.length < 8) state.rMultiMunis.push(mk);
+                state.rMuni = state.rMultiMunis.length === 1 ? state.rMultiMunis[0] : '';
+              } else {
+                state.rMuni = (state.rMuni === mk) ? '' : mk;
+              }
               renderTabMatrix();
             });
           });
@@ -5078,17 +5440,62 @@
           if (clrMuni) {
             clrMuni.addEventListener('click', function () {
               state.rMuni = '';
+              state.rMultiMunis = [];
               renderTabMatrix();
             });
           }
           Array.prototype.forEach.call(dynEl.querySelectorAll('[data-r-prov]'), function (b) {
             b.addEventListener('click', function () {
-              state.rProvince = b.getAttribute('data-r-prov') || 'ALL';
+              var pk = b.getAttribute('data-r-prov') || 'ALL';
+              state.rProvince = pk;
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
               state.rMuni = '';
               state.rChecked = {};
               renderTabMatrix();
             });
           });
+          var repCmpBtn = dynEl.querySelector('[data-r-multi-rep-cmp]');
+          if (repCmpBtn) {
+            repCmpBtn.addEventListener('click', function () {
+              var repIds = [];
+              if (hasMultiProvs) {
+                state.rMultiProvs.forEach(function (pk) {
+                  var best = curRegRowsRef.find(function (r) { return r.provinceKey === pk && r.hasUnion; }) || curRegRowsRef.find(function (r) { return r.provinceKey === pk; });
+                  if (best && repIds.indexOf(best.aid) === -1 && repIds.length < 6) repIds.push(best.aid);
+                });
+              } else if (hasMultiMunis && provMeta) {
+                var hqNm2 = provMeta.short + ' 본청';
+                state.rMultiMunis.forEach(function (mk) {
+                  var bestM = curRegRowsRef.find(function (r) { return (r.muniName || hqNm2) === mk && r.hasUnion; }) || curRegRowsRef.find(function (r) { return (r.muniName || hqNm2) === mk; });
+                  if (bestM && repIds.indexOf(bestM.aid) === -1 && repIds.length < 6) repIds.push(bestM.aid);
+                });
+              }
+              if (repIds.length) {
+                state.compareIds = repIds;
+                state.mSubMode = 'STUDIO';
+                renderCompareTray();
+                renderTabMatrix();
+              }
+            });
+          }
+          Array.prototype.forEach.call(dynEl.querySelectorAll('[data-r-multi-reset]'), function (b) {
+            b.addEventListener('click', function () {
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+              renderTabMatrix();
+            });
+          });
+          var quickTop4Btn = dynEl.querySelector('[data-r-quick-top4]');
+          if (quickTop4Btn) {
+            quickTop4Btn.addEventListener('click', function () {
+              state.rChecked = {};
+              curRegRowsRef.slice(0, 4).forEach(function (r) { state.rChecked[r.aid] = true; });
+              updateRegionDyn();
+            });
+          }
           var ckAll = dynEl.querySelector('[data-r-ck-all]');
           if (ckAll) {
             ckAll.addEventListener('change', function () {
@@ -5115,11 +5522,37 @@
               updateRegionDyn();
             });
           });
-          var clrCkBtn = dynEl.querySelector('[data-r-clr-ck]');
-          if (clrCkBtn) {
+          Array.prototype.forEach.call(dynEl.querySelectorAll('[data-r-clr-ck]'), function (clrCkBtn) {
             clrCkBtn.addEventListener('click', function () {
               state.rChecked = {};
               updateRegionDyn();
+            });
+          });
+          var syncTrayBtn = dynEl.querySelector('[data-r-sync-tray]');
+          if (syncTrayBtn) {
+            syncTrayBtn.addEventListener('click', function () {
+              var picked = getPickedOrTopRegIds();
+              picked.forEach(function (id) {
+                if (state.compareIds.indexOf(id) === -1) {
+                  if (state.compareIds.length >= 6) state.compareIds.shift();
+                  state.compareIds.push(id);
+                }
+              });
+              renderCompareTray();
+              updateRegionDyn();
+            });
+          }
+          var goClausesBtn = dynEl.querySelector('[data-r-go-clauses]');
+          if (goClausesBtn) {
+            goClausesBtn.addEventListener('click', function () {
+              var picked = getPickedOrTopRegIds();
+              if (picked.length) {
+                state.compareIds = picked;
+                state.docMode = 'ARTICLES';
+                state.aViewMode = 'COMPARE';
+                renderCompareTray();
+                switchTab('articles');
+              }
             });
           }
           var rSortSel = dynEl.querySelector('[data-r-sort]');
@@ -5131,13 +5564,9 @@
               if (nextRSel && typeof nextRSel.focus === 'function') nextRSel.focus();
             });
           }
-          var goStudioBtn = dynEl.querySelector('[data-r-go-studio]');
-          if (goStudioBtn) {
+          Array.prototype.forEach.call(dynEl.querySelectorAll('[data-r-go-studio]'), function (goStudioBtn) {
             goStudioBtn.addEventListener('click', function () {
-              var picked = Object.keys(state.rChecked).filter(function (k) { return state.rChecked[k] && organById[k]; }).slice(0, 6);
-              if (!picked.length) {
-                picked = curRegRowsRef.slice(0, 6).map(function (r) { return r.aid; });
-              }
+              var picked = getPickedOrTopRegIds();
               if (picked.length) {
                 state.compareIds = picked;
                 state.mSubMode = 'STUDIO';
@@ -5145,7 +5574,7 @@
                 renderTabMatrix();
               }
             });
-          }
+          });
         }
 
         function updateRegionDyn() {
@@ -5158,12 +5587,77 @@
         }
 
         bindMatrixSubModeButtons();
+        var multiToggleBtn = bodyEl.querySelector('[data-r-multi-toggle]');
+        if (multiToggleBtn) {
+          multiToggleBtn.addEventListener('click', function () {
+            state.rMultiMode = !state.rMultiMode;
+            if (state.rMultiMode) {
+              if (!state.rMultiProvs.length && curProv !== 'ALL') {
+                state.rMultiProvs = [curProv];
+              }
+              if (state.rMuni && !state.rMultiMunis.length) {
+                state.rMultiMunis = [state.rMuni];
+              }
+            } else {
+              if (state.rMultiProvs.length) state.rProvince = state.rMultiProvs[0];
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+            }
+            renderTabMatrix();
+            var nextToggle = bodyEl.querySelector('[data-r-multi-toggle]');
+            if (nextToggle && typeof nextToggle.focus === 'function') nextToggle.focus();
+          });
+        }
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-r-bloc]'), function (bb) {
+          bb.addEventListener('click', function () {
+            var bloc = bb.getAttribute('data-r-bloc') || '';
+            var blocMap = {
+              CHUNGCHEONG: ['충청남도', '대전광역시', '세종특별자치시', '충청북도'],
+              CAPITAL: ['서울특별시', '경기도', '인천광역시'],
+              YEONGNAM: ['부산광역시', '울산광역시', '경상남도'],
+              DAEGYEONG: ['대구광역시', '경상북도'],
+              HONAM: ['전북특별자치도', '전남광주통합특별시']
+            };
+            if (blocMap[bloc]) {
+              state.rMultiMode = true;
+              state.rMultiProvs = blocMap[bloc].slice();
+              state.rProvince = state.rMultiProvs[0];
+              state.rMultiMunis = [];
+              state.rMuni = '';
+              state.rChecked = {};
+              renderTabMatrix();
+            }
+          });
+        });
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-sec-card [data-r-multi-reset]'), function (rb) {
+          rb.addEventListener('click', function () {
+            state.rMultiMode = false;
+            state.rMultiProvs = [];
+            state.rMultiMunis = [];
+            renderTabMatrix();
+          });
+        });
         Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-sec-card > div [data-r-prov]'), function (b) {
           b.addEventListener('click', function () {
             var nextProv = b.getAttribute('data-r-prov') || 'ALL';
-            state.rProvince = nextProv;
-            state.rMuni = '';
-            state.rChecked = {};
+            if (state.rMultiMode && nextProv !== 'ALL') {
+              var pIdx = state.rMultiProvs.indexOf(nextProv);
+              if (pIdx >= 0) {
+                if (state.rMultiProvs.length > 1) state.rMultiProvs.splice(pIdx, 1);
+              } else if (state.rMultiProvs.length < 8) {
+                state.rMultiProvs.push(nextProv);
+              }
+              state.rProvince = state.rMultiProvs[0] || nextProv;
+              state.rMultiMunis = [];
+              state.rMuni = '';
+            } else {
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+              state.rProvince = nextProv;
+              state.rMuni = '';
+              state.rChecked = {};
+            }
             renderTabMatrix();
             var nextProvBtn = bodyEl.querySelector('.pau-sec-card > div [data-r-prov="' + nextProv + '"]');
             if (nextProvBtn && typeof nextProvBtn.focus === 'function') nextProvBtn.focus();
@@ -5715,9 +6209,443 @@
       return list;
     }
 
+    function formatArticleNoLabel(rawNo) {
+      var artNo = String(rawNo || '').trim();
+      if (artNo && artNo.indexOf('제') !== 0 && /^\d+$/.test(artNo)) artNo = '제' + artNo + '조';
+      return artNo;
+    }
+
+    function getClauseCompareRecords() {
+      var valid = state.compareIds.map(function (id) { return organById[id]; }).filter(Boolean);
+      var hasQ = !!String(state.aQuery || '').trim();
+
+      function pickPool(excludeMap) {
+        var pool = organRecords.filter(function (r) {
+          if (excludeMap[r.aid]) return false;
+          if (!matchOrganScope(r.inst, state.aScope)) return false;
+          if (hasQ) {
+            var extraTxt = r.domains.articles.map(function (a) { return (a.article_title || '') + ' ' + (a.text || ''); }).join(' ');
+            if (!matchSmartQuery(r.searchHaystack + ' ' + extraTxt, state.aQuery)) return false;
+          }
+          return true;
+        });
+        var withArts = pool.filter(function (r) { return r.domains.articles.length > 0; });
+        var target = withArts.length >= 2 ? withArts : pool.filter(function (r) { return r.hasUnion; });
+        if (!target.length) target = pool;
+        target.sort(function (a, b) {
+          var ac = (state.aCat && state.aCat !== 'ALL')
+            ? a.domains.articles.filter(function (x) { return x.taxonomy_code === state.aCat; }).length
+            : a.domains.articles.length;
+          var bc = (state.aCat && state.aCat !== 'ALL')
+            ? b.domains.articles.filter(function (x) { return x.taxonomy_code === state.aCat; }).length
+            : b.domains.articles.length;
+          if ((ac > 0) !== (bc > 0)) return bc > 0 ? 1 : -1;
+          if (bc !== ac) return bc - ac;
+          return b.memberTotal - a.memberTotal;
+        });
+        return target;
+      }
+
+      if (valid.length >= 2) return valid.slice(0, 6);
+      if (valid.length === 1) {
+        var base = valid[0];
+        var used = {};
+        used[base.aid] = true;
+        var peers = findSimilarOrgans(data, base.aid, 'ALL')
+          .map(function (s) { return organById[s.apba_id]; })
+          .filter(function (p) {
+            return p && !used[p.aid] && matchOrganScope(p.inst, state.aScope);
+          });
+        var peerWithArts = peers.filter(function (p) { return p.domains.articles.length > 0; });
+        var chosen = (peerWithArts.length >= 2 ? peerWithArts : peers).slice(0, 3);
+        chosen.forEach(function (c) { used[c.aid] = true; });
+        if (chosen.length < 3) {
+          pickPool(used).slice(0, 3 - chosen.length).forEach(function (c) { chosen.push(c); });
+        }
+        return [base].concat(chosen).slice(0, 6);
+      }
+      var picked = pickPool({}).slice(0, 4);
+      if (picked.length < 2) {
+        picked = organRecords.filter(function (r) { return r.domains.articles.length > 0; }).slice(0, 4);
+      }
+      return picked;
+    }
+
+    function renderOrganCaSourceLinkHtml(rec) {
+      var caDisc = (rec.domains.caDiscs && rec.domains.caDiscs[0]) || (rec.domains.statusDiscs && rec.domains.statusDiscs[0]) || null;
+      var caFile = (caDisc && caDisc.files && caDisc.files[0]) ? caDisc.files[0] : null;
+      var caFileUrl = caFile ? safeHttpUrl(caFile.url) : '';
+      var portalUrl = safeHttpUrl(buildOrganUrl(rec.inst, caDisc ? caDisc.dno : null, 'union_info'));
+      var parts = [];
+      if (caFileUrl) {
+        parts.push('<a class="pau-act-btn" href="' + esc(caFileUrl) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">📎 단협원문</a>');
+      } else if (portalUrl) {
+        parts.push('<a class="pau-act-btn" href="' + esc(portalUrl) + '"' + ((rec.isLocal && !rec.isMois) ? (' data-cleaneye-post="' + esc(rec.aid) + '" data-cleaneye-type="union_info"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>');
+      }
+      return parts.join('');
+    }
+
     function renderTabArticles() {
-      function renderArticlesDynHtml(rows) {
+      var curView = state.aViewMode || 'COMPARE';
+
+      function computeClauseAddCandidates(cmpRecs) {
+        var used = {};
+        cmpRecs.forEach(function (r) { used[r.aid] = true; });
+        var q = String(state.aCmpAddQ || '').trim();
+        var list = organRecords.filter(function (r) {
+          if (used[r.aid]) return false;
+          if (!matchOrganScope(r.inst, state.aScope)) return false;
+          if (!q) return true;
+          return matchSmartQuery(r.searchHaystack, q);
+        });
+        if (q) {
+          var instRank = {};
+          sortInstsByQueryRelevance(list.map(function (r) { return r.inst; }), q).forEach(function (inst, idx) {
+            instRank[inst.apba_id] = idx;
+          });
+          list.sort(function (a, b) { return (instRank[a.aid] || 0) - (instRank[b.aid] || 0); });
+        } else {
+          list.sort(function (a, b) {
+            var ac = a.domains.articles.length;
+            var bc = b.domains.articles.length;
+            if ((ac > 0) !== (bc > 0)) return bc > 0 ? 1 : -1;
+            if (bc !== ac) return bc - ac;
+            return b.memberTotal - a.memberTotal;
+          });
+        }
+        return list.slice(0, 120);
+      }
+
+      function renderClauseAddOptionsHtml(cands) {
+        if (!cands.length) return '<option value="">추가 가능한 기관 없음 (0곳)</option>';
+        return '<option value="">+ 비교기관 추가 선택 (' + fmtNum(cands.length) + '곳)</option>' +
+          cands.map(function (r) {
+            var artTag = r.domains.articles.length ? (' · 조문 ' + r.domains.articles.length + '건') : (' · ' + (r.hasUnion ? fmtNum(r.memberTotal) + '명' : '미설립'));
+            return '<option value="' + esc(r.aid) + '">' + esc('[' + r.scopeLabel + '] ' + r.name + artTag) + '</option>';
+          }).join('');
+      }
+
+      function renderClauseCompareModeHtml(filteredRows) {
+        var cmpRecs = getClauseCompareRecords();
+        var addCands = computeClauseAddCandidates(cmpRecs);
+        var autoPairedNotice = state.compareIds.length === 1
+          ? '기준기관 1곳에 유사·조문수록 기관을 자동 매칭했습니다'
+          : (state.compareIds.length === 0 ? '조문 수록 주요기관을 기본 대조 중입니다 (기관 추가·변경 가능)' : '비교함에 담긴 기관들을 조문·쟁점 단위로 직접 대조합니다');
+
+        var topicCounts = Object.create(null);
+        var allCmpArts = 0;
+        cmpRecs.forEach(function (r) {
+          r.domains.articles.forEach(function (a) {
+            if (state.aQuery && !matchSmartQuery(getOrganSearchHaystack(r.aid, (a.article_title || '') + ' ' + (a.text || '') + ' ' + (a.taxonomy_name || '')), state.aQuery)) return;
+            allCmpArts += 1;
+            var tc = a.taxonomy_code || 'ETC';
+            topicCounts[tc] = (topicCounts[tc] || 0) + 1;
+          });
+        });
+
+        var mappedMetricKey = (state.aCat && state.aCat !== 'ALL') ? (TAXONOMY_TO_METRIC[state.aCat] || '') : '';
+        var activeDef = mappedMetricKey ? METRIC_DEFS.find(function (d) { return d.key === mappedMetricKey; }) : null;
+        var hasQueryFilter = !!String(state.aQuery || '').trim();
+        var showOverviewMatrix = (state.aCat === 'ALL' && !hasQueryFilter);
+
+        var colPct = Math.max(12, Math.floor(80 / Math.max(1, cmpRecs.length)));
+
         return [
+          '<div class="pau-card" style="padding:10px 12px;">',
+          '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '      <span style="font-size:12.5px;font-weight:900;color:var(--pau-pri);">🎯 조문 병렬비교 대상 (' + cmpRecs.length + '/6곳):</span>',
+          cmpRecs.map(function (r, idx) {
+            var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+            return '<span class="pau-pill" style="background:' + pal.fill + ';border:1px solid ' + pal.stroke + ';color:var(--pau-txt);padding:3px 8px;gap:5px;">' +
+              '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pal.stroke + ';"></span>' +
+              '<a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="font-weight:800;color:inherit;text-decoration:none;">' + (idx === 0 ? '⭐ ' : '') + esc(r.name) + '</a>' +
+              '<span style="font-size:10.5px;color:var(--pau-muted);">조문 ' + r.domains.articles.length + '</span>' +
+              (cmpRecs.length > 2 ? '<button type="button" data-a-cmp-rm="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 비교 제외') + '" style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;min-height:24px;border:0;border-radius:999px;background:rgba(15,23,42,.08);color:var(--pau-txt);cursor:pointer;padding:0 5px;font-size:11px;font-weight:800;line-height:1;">✕</button>' : '') +
+            '</span>';
+          }).join(''),
+          '    </div>',
+          '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+          '      <input type="search" data-f="aCmpAddQ" aria-label="조문 비교기관 검색" placeholder="비교기관 추가 검색" value="' + esc(state.aCmpAddQ) + '" style="width:140px;min-width:120px;">',
+          '      <select data-a-cmp-add aria-label="조문 비교기관 추가 선택" style="max-width:225px;">' + renderClauseAddOptionsHtml(addCands) + '</select>',
+          '      <button type="button" class="pau-act-btn" data-a-preset="CENTRAL_CLAUSE">🏛️ 주요공기업</button>',
+          '      <button type="button" class="pau-act-btn" data-a-preset="LOCAL_METRO">🚇 도시철도·교통</button>',
+          '      <button type="button" class="pau-act-btn" data-a-preset="LOCAL_MEDICAL">🏥 지방의료원</button>',
+          '      <button type="button" class="pau-act-btn" data-a-go-studio>📊 레이더·수치 비교</button>',
+          '    </div>',
+          '  </div>',
+          '  <div style="font-size:11.5px;color:var(--pau-muted);margin-top:4px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
+          '    <span>💡 ' + esc(autoPairedNotice) + ' — 아래 쟁점 칩이나 표 행을 클릭하면 해당 쟁점 조문만 나란히 모아 비교합니다.</span>',
+          '    <span>전체 조건 일치 조문 <b>' + fmtNum(filteredRows.length) + '</b>건</span>',
+          '  </div>',
+          '  <div class="pau-topic-bar" role="group" aria-label="단협 쟁점 빠른 선택" style="margin-top:6px;">',
+          TOPIC_CHIP_ORDER.map(function (tp) {
+            var code = tp[0];
+            var label = tp[1];
+            var on = state.aCat === code;
+            var cnt = code === 'ALL' ? allCmpArts : (topicCounts[code] || 0);
+            return '<button type="button" class="pau-topic-chip' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-a-topic="' + esc(code) + '">' +
+              esc(label) + (cnt > 0 ? (' <b>(' + cnt + ')</b>') : '') + '</button>';
+          }).join(''),
+          '  </div>',
+          '</div>',
+
+          (activeDef ? [
+            '<div class="pau-law-strip">',
+            '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
+            '    <span>⚖️ <b>' + esc(activeDef.label) + '</b> — 대한민국 현행 법정 기준: <b>' + esc(activeDef.lawTitle) + '</b></span>',
+            '    <button type="button" class="pau-act-btn" data-a-topic="ALL">↩ 전체 13대쟁점 요약표로 복귀</button>',
+            '  </div>',
+            '  <div data-a-law-out data-law-key="' + esc(activeDef.lawKey) + '" data-law-art="' + esc(activeDef.lawArt) + '" data-law-title="' + esc(activeDef.lawTitle) + '" style="font-size:11.5px;color:inherit;white-space:pre-line;line-height:1.45;">법령 기준 조회 중...</div>',
+            '</div>'
+          ].join('') : ''),
+
+          (showOverviewMatrix ? [
+            '<div class="pau-card">',
+            '  <div class="pau-card-hd">',
+            '    <span>📊 ① 비교 대상 기관(' + cmpRecs.length + '곳) 13대 핵심 단협 쟁점 한눈 비교표 (행 클릭 → 해당 쟁점 조문 전문 병렬대조)</span>',
+            '    <span class="pau-pill">기준진단 + 수록조문 건수 통합</span>',
+            '  </div>',
+            '  <div class="pau-tbl-wrap" style="max-height:none;overflow:visible;">',
+            '    <table class="pau-tbl pau-hm-tbl">',
+            '      <thead><tr>',
+            '        <th style="width:20%;">13대 단협 핵심 쟁점 (클릭→조문 대조)</th>',
+            cmpRecs.map(function (r, idx) {
+              var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+              return '<th style="width:' + colPct + '%;border-bottom:2px solid ' + pal.stroke + ';" title="' + esc(r.name) + '">' +
+                '<a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="color:var(--pau-pri);text-decoration:none;font-weight:800;">↗ ' + esc(r.name) + '</a></th>';
+            }).join(''),
+            '      </tr></thead>',
+            '      <tbody>',
+            METRIC_DEFS.map(function (d) {
+              var taxCode = METRIC_TO_TAXONOMY[d.key] || 'ALL';
+              return '<tr data-a-topic="' + esc(taxCode) + '" tabindex="0" role="button" aria-label="' + esc(d.label + ' 조문 병렬 대조 열기') + '" style="cursor:pointer;">' +
+                '<td title="' + esc(d.label + ' · ' + d.lawTitle) + '"><span style="font-weight:800;color:var(--pau-pri);">▸ ' + esc(d.label) + '</span></td>' +
+                cmpRecs.map(function (r) {
+                  var sc = r.issueScores[d.key];
+                  var lvCls = 'lv' + Math.max(1, Math.min(5, sc.level));
+                  var artCnt = r.domains.articles.filter(function (a) { return a.taxonomy_code === taxCode; }).length;
+                  return '<td class="pau-hm-cell ' + lvCls + '" title="' + esc(sc.val + (sc.snip ? ' · ' + sc.snip : '')) + '">' +
+                    '<span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span>' +
+                    '<span class="pau-hm-tag ' + lvCls + '">' + esc(sc.tag) + '</span> ' +
+                    '<span>' + esc(sc.val) + '</span>' +
+                    (artCnt > 0 ? ' <span class="pau-pill ok">조문 ' + artCnt + '</span>' : '') +
+                  '</td>';
+                }).join('') +
+              '</tr>';
+            }).join(''),
+            '      </tbody>',
+            '    </table>',
+            '  </div>',
+            '</div>',
+
+            '<div class="pau-card">',
+            '  <div class="pau-card-hd">',
+            '    <span>📖 ② 비교 기관별 주요 수록 조문 카드 대조 (한 기관당 핵심 조문 묶음 요약)</span>',
+            '    <span style="font-size:11.5px;color:var(--pau-muted);">상단 쟁점 칩을 선택하면 해당 분야 전 조문을 나란히 대조합니다</span>',
+            '  </div>',
+            '  <div class="pau-clause-cmp-grid">',
+            cmpRecs.map(function (r, idx) {
+              var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+              var sampleArts = r.domains.articles.slice(0, 4);
+              var revPreview = (!sampleArts.length && r.domains.revisions && r.domains.revisions[0] && r.domains.revisions[0].diffs) ? r.domains.revisions[0].diffs.slice(0, 3) : [];
+              return [
+                '<div class="pau-clause-card" style="border-top:3px solid ' + pal.stroke + ';">',
+                '  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;flex-wrap:wrap;">',
+                '    <div>',
+                '      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+                '        <span class="pau-pill ' + (r.isLocal ? 'loc' : '') + '">' + esc(r.scopeLabel) + '</span>',
+                '        <a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="font-size:13.5px;font-weight:900;color:var(--pau-pri);text-decoration:none;">↗ ' + esc(r.name) + '</a>',
+                '      </div>',
+                '      <div style="font-size:11px;color:var(--pau-muted);margin-top:2px;">' + esc(r.ministry + ' · ' + (r.hasUnion ? (r.unionStructLabel + ' ' + fmtNum(r.memberTotal) + '명') : '노조 미설립')) + '</div>',
+                '    </div>',
+                '    <span class="pau-pill ' + (r.domains.articles.length ? 'ok' : '') + '">수록조문 ' + r.domains.articles.length + '건</span>',
+                '  </div>',
+                (sampleArts.length ? sampleArts.map(function (a) {
+                  var noLbl = formatArticleNoLabel(a.article_no);
+                  return '<div class="pau-clause-item">' +
+                    '<div class="pau-clause-item-hd">' +
+                      '<span style="font-weight:800;color:var(--pau-pri);">' + esc((noLbl ? noLbl + ' ' : '') + (a.article_title || '조문')) + '</span>' +
+                      '<button type="button" class="pau-pill" data-a-topic="' + esc(a.taxonomy_code || 'ETC') + '" style="border:0;cursor:pointer;">' + esc(a.taxonomy_name || '기타') + ' ▸</button>' +
+                    '</div>' +
+                    '<div class="pau-clause-item-txt">' + esc(String(a.text || '').trim()) + '</div>' +
+                  '</div>';
+                }).join('') : (revPreview.length ? revPreview.map(function (rv) {
+                  return '<div class="pau-clause-item">' +
+                    '<div class="pau-clause-item-hd"><span style="font-weight:800;color:var(--pau-pri);">[신·구대비] ' + esc(rv.art || '개정사항') + '</span></div>' +
+                    '<div class="pau-clause-item-txt">' + esc(String(rv.after || rv.note || rv.before || '').trim()) + '</div>' +
+                  '</div>';
+                }).join('') : '<div class="pau-clause-item" style="color:var(--pau-muted);font-size:12px;">텍스트 추출 조문 대신 첨부 단체협약서(PDF/HWP) 원문 및 13대 핵심기준 진단이 제공됩니다.</div>')),
+                '  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:auto;padding-top:4px;">',
+                (r.domains.articles.length > 4 ? '<button type="button" class="pau-act-btn pri" data-a-jump-org="' + esc(r.aid) + '">📖 이 기관 전체 조문(' + r.domains.articles.length + '건) 보기</button>' : ''),
+                '    <button type="button" class="pau-act-btn" data-open-organ-here="' + esc(r.aid) + '" data-open-sub="ISSUES">🔎 기관 상세</button>',
+                '    ' + renderOrganCaSourceLinkHtml(r),
+                '  </div>',
+                '</div>'
+              ].join('');
+            }).join(''),
+            '  </div>',
+            '</div>'
+          ].join('') : [
+            '<div class="pau-card">',
+            '  <div class="pau-card-hd">',
+            '    <span>⚖️ ' + esc((TAXONOMY_LIST.find(function (t) { return t[0] === state.aCat; }) || ['', '전체 쟁점'])[1]) + (hasQueryFilter ? (' · 검색어 "' + esc(state.aQuery.trim()) + '"') : '') + ' — 기관별 조문 전문 병렬 대조 (' + cmpRecs.length + '곳)</span>',
+            '    <button type="button" class="pau-act-btn" data-a-view="BY_ORGAN">🏛️ 전체 기관 묶음에서 더 찾기</button>',
+            '  </div>',
+            '  <div class="pau-clause-cmp-grid">',
+            cmpRecs.map(function (r, idx) {
+              var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+              var sc = mappedMetricKey ? r.issueScores[mappedMetricKey] : null;
+              var lvCls = sc ? ('lv' + Math.max(1, Math.min(5, sc.level))) : '';
+              var matchingArts = r.domains.articles.filter(function (a) {
+                if (state.aCat && state.aCat !== 'ALL' && a.taxonomy_code !== state.aCat) return false;
+                if (hasQueryFilter && !matchSmartQuery(getOrganSearchHaystack(r.aid, (a.article_title || '') + ' ' + (a.text || '') + ' ' + (a.taxonomy_name || '')), state.aQuery)) return false;
+                return true;
+              });
+              return [
+                '<div class="pau-clause-card" style="border-top:3px solid ' + pal.stroke + ';">',
+                '  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;flex-wrap:wrap;">',
+                '    <div>',
+                '      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+                '        <span class="pau-pill ' + (r.isLocal ? 'loc' : '') + '">' + esc(r.scopeLabel) + '</span>',
+                '        <a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="font-size:13.5px;font-weight:900;color:var(--pau-pri);text-decoration:none;">↗ ' + esc(r.name) + '</a>',
+                '      </div>',
+                '      <div style="font-size:11px;color:var(--pau-muted);margin-top:2px;">' + esc(r.ministry + ' · ' + (r.repUnion ? r.repUnion.union_name : r.unionStructLabel)) + '</div>',
+                '    </div>',
+                (sc ? '<span class="pau-hm-tag ' + lvCls + '">' + esc(sc.tag + ' · ' + sc.score + '점') + '</span>' : '<span class="pau-pill">조문 ' + matchingArts.length + '건</span>'),
+                '  </div>',
+                (sc ? '<div style="background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:7px;padding:6px 9px;font-size:11.5px;line-height:1.45;">' +
+                  '<div><b style="color:var(--pau-pri);">핵심 기준:</b> <b>' + esc(sc.val) + '</b>' + (sc.art ? (' <span style="color:var(--pau-muted);">(' + esc(sc.art) + ')</span>') : '') + '</div>' +
+                  (sc.snip ? '<div style="color:var(--pau-muted);margin-top:2px;">' + esc(sc.snip) + '</div>' : '') +
+                '</div>' : ''),
+                (matchingArts.length ? matchingArts.map(function (a) {
+                  var noLbl = formatArticleNoLabel(a.article_no);
+                  return '<div class="pau-clause-item">' +
+                    '<div class="pau-clause-item-hd">' +
+                      '<span style="font-weight:800;color:var(--pau-pri);">' + esc((noLbl ? noLbl + ' ' : '') + (a.article_title || '조문')) + '</span>' +
+                      '<span class="pau-pill">' + esc(a.taxonomy_name || '기타') + '</span>' +
+                    '</div>' +
+                    '<div class="pau-clause-item-txt">' + esc(String(a.text || '').trim()) + '</div>' +
+                  '</div>';
+                }).join('') : '<div class="pau-clause-item" style="color:var(--pau-muted);font-size:12px;">해당 분류로 추출된 텍스트 조문이 없습니다. 위 핵심 기준 요약 또는 아래 단체협약 첨부 원문으로 전문을 확인할 수 있습니다.</div>'),
+                '  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:auto;padding-top:4px;">',
+                '    <button type="button" class="pau-act-btn" data-open-organ-here="' + esc(r.aid) + '" data-open-sub="ISSUES">🔎 기관 상세</button>',
+                '    ' + renderOrganCaSourceLinkHtml(r),
+                '  </div>',
+                '</div>'
+              ].join('');
+            }).join(''),
+            '  </div>',
+            '</div>'
+          ].join(''))
+        ].join('');
+      }
+
+      function renderArticlesByOrganHtml(rows) {
+        var groupMap = Object.create(null);
+        var groups = [];
+        rows.forEach(function (a) {
+          var g = groupMap[a.apba_id];
+          if (!g) {
+            g = {
+              aid: a.apba_id,
+              rec: organById[a.apba_id] || null,
+              instName: a.inst_name || (instMap[a.apba_id] ? instMap[a.apba_id].name : a.apba_id),
+              items: [],
+              catCounts: Object.create(null)
+            };
+            groupMap[a.apba_id] = g;
+            groups.push(g);
+          }
+          g.items.push(a);
+          var cName = a.taxonomy_name || '기타';
+          g.catCounts[cName] = (g.catCounts[cName] || 0) + 1;
+        });
+
+        groups.sort(function (a, b) {
+          if (state.aSort === 'name_asc') return a.instName.localeCompare(b.instName, 'ko');
+          if (state.aSort === 'name_desc') return b.instName.localeCompare(a.instName, 'ko');
+          if (b.items.length !== a.items.length) return b.items.length - a.items.length;
+          return a.instName.localeCompare(b.instName, 'ko');
+        });
+
+        var pageSize = 25;
+        var totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+        if (state.aPage >= totalPages) state.aPage = totalPages - 1;
+        if (state.aPage < 0) state.aPage = 0;
+        var startIdx = state.aPage * pageSize;
+        var visGroups = groups.slice(startIdx, startIdx + pageSize);
+
+        return [
+          '<div class="pau-subbar">',
+          '  <span>조문 수록 기관 <b>' + fmtNum(groups.length) + '</b>곳 · 일치 조문 <b>' + fmtNum(rows.length) + '</b>건 (기관별 중복 없이 1카드 통합 정리)</span>',
+          '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">',
+          (groups.length > pageSize ? [
+            '    <span>' + (state.aPage + 1) + ' / ' + totalPages + ' 페이지</span>',
+            '    <button type="button" class="pau-act-btn" data-a-prev' + (state.aPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
+            '    <button type="button" class="pau-act-btn" data-a-next' + (state.aPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>'
+          ].join('') : ''),
+          '  </div>',
+          '</div>',
+          (visGroups.length ? '<div class="pau-org-art-list">' + visGroups.map(function (g, idx) {
+            var rec = g.rec;
+            var inCmp = state.compareIds.indexOf(g.aid) >= 0;
+            var expVal = state.aOrgExpanded[g.aid];
+            var isExp = expVal === true || (expVal === undefined && ((state.aPage === 0 && idx < 2) || groups.length <= 3));
+            var catEntries = Object.keys(g.catCounts).map(function (k) { return [k, g.catCounts[k]]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 6);
+            return [
+              '<div class="pau-org-art-card">',
+              '  <div class="pau-org-art-hd">',
+              '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+              (rec ? '<span class="pau-pill ' + (rec.isLocal ? 'loc' : '') + '">' + esc(rec.scopeLabel) + '</span>' : ''),
+              '      <a href="pu-alio-union.html?organ=' + encodeURIComponent(g.aid) + '" data-jump-organ="' + esc(g.aid) + '" style="font-size:13.5px;font-weight:900;color:var(--pau-pri);text-decoration:none;">↗ ' + esc(g.instName) + '</a>',
+              (rec ? '<span style="font-size:11.5px;color:var(--pau-muted);">(' + esc(rec.ministry + (rec.hasUnion ? ' · ' + fmtNum(rec.memberTotal) + '명' : '')) + ')</span>' : ''),
+              '      <span class="pau-pill ok">수록조문 ' + g.items.length + '건</span>',
+              catEntries.map(function (ce) {
+                return '<span class="pau-pill">' + esc(ce[0].split('·')[0] + ' ' + ce[1]) + '</span>';
+              }).join(''),
+              '    </div>',
+              '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+              '      <button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(g.aid) + '">' + (inCmp ? '✓비교담김' : '+비교담기') + '</button>',
+              (rec ? renderOrganCaSourceLinkHtml(rec) : ''),
+              '      <button type="button" class="pau-act-btn' + (isExp ? ' pri' : '') + '" data-a-org-exp="' + esc(g.aid) + '" aria-expanded="' + (isExp ? 'true' : 'false') + '">' + (isExp ? '▲ 조문 접기' : ('📖 조문 ' + g.items.length + '건 펼치기')) + '</button>',
+              '    </div>',
+              '  </div>',
+              (isExp ? '<div class="pau-art-subgrid">' + g.items.map(function (a) {
+                var noLbl = formatArticleNoLabel(a.article_no);
+                return '<div class="pau-clause-item">' +
+                  '<div class="pau-clause-item-hd">' +
+                    '<span style="font-weight:800;color:var(--pau-pri);">' + esc((noLbl ? noLbl + ' ' : '') + (a.article_title || '조문')) + '</span>' +
+                    '<span class="pau-pill">' + esc(a.taxonomy_name || '기타') + '</span>' +
+                  '</div>' +
+                  '<div class="pau-clause-item-txt">' + esc(String(a.text || '').trim()) + '</div>' +
+                '</div>';
+              }).join('') + '</div>' : ''),
+              '</div>'
+            ].join('');
+          }).join('') + '</div>' : '<div class="pau-card" style="text-align:center;padding:24px;color:var(--pau-muted);">검색 조건에 해당하는 단체협약 조문이 없습니다.</div>')
+        ].join('');
+      }
+
+      function renderArticlesTableHtml(rows) {
+        var pageSize = 200;
+        var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        if (state.aPage >= totalPages) state.aPage = totalPages - 1;
+        if (state.aPage < 0) state.aPage = 0;
+        var startIdx = state.aPage * pageSize;
+        var visRows = rows.slice(startIdx, startIdx + pageSize);
+
+        return [
+          '<div class="pau-subbar">',
+          '  <span>전체 조문 검색표 <b>' + fmtNum(rows.length) + '</b>건' + (rows.length > pageSize ? (' (' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visRows.length) + '번째 표시)') : '') + ' — 행의 [전문]을 누르면 잘림 없이 전문이 펼쳐집니다</span>',
+          '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">',
+          (rows.length > pageSize ? [
+            '    <span>' + (state.aPage + 1) + ' / ' + totalPages + ' 페이지</span>',
+            '    <button type="button" class="pau-act-btn" data-a-prev' + (state.aPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
+            '    <button type="button" class="pau-act-btn" data-a-next' + (state.aPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>'
+          ].join('') : ''),
+          '  </div>',
+          '</div>',
           '<div class="pau-tbl-wrap">',
           '  <table class="pau-tbl">',
           '    <thead>',
@@ -5727,26 +6655,35 @@
           '        ' + renderSortTh('14%', '쟁점 분류', 'a_cat', state.aSort, ['cat_asc', 'cat_desc']),
           '        ' + renderSortTh('8%', '조문번호', 'a_no', state.aSort, ['no_asc', 'no_desc']),
           '        ' + renderSortTh('16%', '조문제목', 'a_tit', state.aSort, ['tit_asc', 'tit_desc']),
-          '        <th style="width:35%;">조문 본문</th>',
-          '        <th style="width:9%;">비교담기</th>',
+          '        <th style="width:31%;">조문 본문 요약</th>',
+          '        <th style="width:13%;">전문 · 비교</th>',
           '      </tr>',
           '    </thead>',
           '    <tbody>',
-          (rows.length ? rows.map(function (a, idx) {
+          (visRows.length ? visRows.map(function (a, idx) {
+            var absIdx = startIdx + idx;
             var bodyTxt = String(a.text || '').replace(/\s+/g, ' ').trim();
-            var artNo = String(a.article_no || '');
-            if (artNo && artNo.indexOf('제') !== 0 && /^\d+$/.test(artNo)) artNo = '제' + artNo + '조';
+            var artNo = formatArticleNoLabel(a.article_no);
             var inCmp = state.compareIds.indexOf(a.apba_id) >= 0;
+            var rowKey = (a.apba_id || '') + '_' + absIdx;
+            var isRowExp = !!state.aRowExpanded[rowKey];
             return [
               '<tr>',
-              '  <td class="c-no">' + (idx + 1) + '</td>',
+              '  <td class="c-no">' + (absIdx + 1) + '</td>',
               '  <td title="' + esc(a.inst_name) + '"><a href="pu-alio-union.html?organ=' + encodeURIComponent(a.apba_id) + '" data-jump-organ="' + esc(a.apba_id) + '" style="font-weight:700;color:var(--pau-pri);text-decoration:none;">↗ ' + esc(a.inst_name) + '</a></td>',
               '  <td><span class="pau-pill">' + esc(a.taxonomy_name || '기타') + '</span></td>',
               '  <td style="font-weight:700;">' + esc(artNo) + '</td>',
               '  <td title="' + esc(a.article_title || '') + '" style="font-weight:700;color:var(--pau-pri);">' + esc(a.article_title || '—') + '</td>',
               '  <td title="' + esc(bodyTxt) + '">' + esc(bodyTxt) + '</td>',
-              '  <td style="white-space:normal;"><button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(a.apba_id) + '">' + (inCmp ? '✓비교' : '+비교') + '</button></td>',
-              '</tr>'
+              '  <td style="white-space:normal;"><div style="display:flex;gap:4px;flex-wrap:wrap;">' +
+                '<button type="button" class="pau-act-btn' + (isRowExp ? ' pri' : '') + '" data-a-row-exp="' + esc(rowKey) + '" aria-expanded="' + (isRowExp ? 'true' : 'false') + '">' + (isRowExp ? '접기' : '전문') + '</button>' +
+                '<button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(a.apba_id) + '">' + (inCmp ? '✓비교' : '+비교') + '</button>' +
+              '</div></td>',
+              '</tr>',
+              (isRowExp ? '<tr class="pau-exp-row"><td colspan="7"><div style="padding:4px 6px;">' +
+                '<div style="font-weight:800;color:var(--pau-pri);margin-bottom:4px;">' + esc(a.inst_name + ' — ' + (artNo ? artNo + ' ' : '') + (a.article_title || '')) + '</div>' +
+                '<div style="font-size:12.5px;line-height:1.6;white-space:pre-line;color:var(--pau-txt);">' + esc(String(a.text || '').trim()) + '</div>' +
+              '</div></td></tr>' : '')
             ].join('');
           }).join('') : '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--pau-muted);">검색 조건에 해당하는 단체협약 조문이 없습니다.</td></tr>'),
           '    </tbody>',
@@ -5755,11 +6692,203 @@
         ].join('');
       }
 
+      function renderArticlesDynHtml(rows) {
+        if (state.aViewMode === 'BY_ORGAN') return renderArticlesByOrganHtml(rows);
+        if (state.aViewMode === 'TABLE') return renderArticlesTableHtml(rows);
+        return renderClauseCompareModeHtml(rows);
+      }
+
+      function populateClauseLawStrip() {
+        var lawOut = bodyEl.querySelector('[data-a-law-out]');
+        if (!lawOut) return;
+        var lKey = lawOut.getAttribute('data-law-key') || '';
+        var lArt = lawOut.getAttribute('data-law-art') || '';
+        var lTit = lawOut.getAttribute('data-law-title') || '';
+        if (!lKey) return;
+        fetchLawLive(lKey, function (err, law) {
+          if (!lawOut) return;
+          if (err || !law) {
+            lawOut.textContent = lTit + ' — 법령 원문 연동 대기 중 (🔌 API 탭에서 전체 법령 조문 조회 가능)';
+            return;
+          }
+          var artObj = law.arts[lArt];
+          lawOut.textContent = artObj
+            ? '(' + law.title + ' ' + artObj.no + ' ' + artObj.title + ' · 시행 ' + law.effective + ') ' + artObj.text
+            : '(' + law.title + ') 공포 ' + law.promulgated + ' (제' + lArt + '조)';
+        });
+      }
+
+      function bindArticlesDynEvents() {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-view]'), function (b) {
+          b.addEventListener('click', function () {
+            var nextView = b.getAttribute('data-a-view') || 'COMPARE';
+            state.aViewMode = nextView;
+            state.aPage = 0;
+            renderCompareTray();
+            renderTabArticles();
+            var focusBtn = bodyEl.querySelector('[data-a-view="' + nextView + '"]');
+            if (focusBtn && typeof focusBtn.focus === 'function') focusBtn.focus();
+          });
+        });
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-topic]'), function (el) {
+          function applyTopic(keepFocus) {
+            var nextTopic = el.getAttribute('data-a-topic') || 'ALL';
+            state.aCat = nextTopic;
+            state.aPage = 0;
+            renderTabArticles();
+            if (keepFocus) {
+              var nextEl = bodyEl.querySelector('.pau-topic-chip[data-a-topic="' + nextTopic + '"]');
+              if (nextEl && typeof nextEl.focus === 'function') nextEl.focus();
+            }
+          }
+          el.addEventListener('click', function (e) {
+            if (e.target && e.target.closest && e.target.closest('a[data-jump-organ]')) return;
+            applyTopic(false);
+          });
+          if (el.tagName === 'TR') {
+            el.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                applyTopic(true);
+              }
+            });
+          }
+        });
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-cmp-rm]'), function (b) {
+          b.addEventListener('click', function () {
+            var rmAid = b.getAttribute('data-a-cmp-rm') || '';
+            if (state.compareIds.length < 2) {
+              state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
+            }
+            state.compareIds = state.compareIds.filter(function (x) { return x !== rmAid; });
+            renderCompareTray();
+            renderTabArticles();
+            syncUrlState();
+          });
+        });
+
+        var addSel = bodyEl.querySelector('[data-a-cmp-add]');
+        function addClauseOrgan(aidToAdd) {
+          if (!aidToAdd || !organById[aidToAdd]) return;
+          if (!state.compareIds.length) {
+            state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
+          }
+          if (state.compareIds.indexOf(aidToAdd) === -1) {
+            if (state.compareIds.length >= 6) state.compareIds.pop();
+            state.compareIds.push(aidToAdd);
+          }
+          state.aCmpAddQ = '';
+          renderCompareTray();
+          renderTabArticles();
+          syncUrlState();
+        }
+        if (addSel) {
+          addSel.addEventListener('change', function () {
+            addClauseOrgan(addSel.value);
+          });
+        }
+
+        var addQIn = bodyEl.querySelector('input[data-f="aCmpAddQ"]');
+        if (addQIn) {
+          var applyAddSearch = function () {
+            state.aCmpAddQ = addQIn.value;
+            if (!addSel) return;
+            addSel.innerHTML = renderClauseAddOptionsHtml(computeClauseAddCandidates(getClauseCompareRecords()));
+          };
+          addQIn.addEventListener('input', applyAddSearch);
+          addQIn.addEventListener('compositionend', applyAddSearch);
+          addQIn.addEventListener('search', applyAddSearch);
+          addQIn.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.isComposing) {
+              e.preventDefault();
+              var cands = computeClauseAddCandidates(getClauseCompareRecords());
+              if (cands[0]) addClauseOrgan(cands[0].aid);
+            }
+          });
+        }
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-preset]'), function (b) {
+          b.addEventListener('click', function () {
+            var p = b.getAttribute('data-a-preset') || '';
+            var picks = [];
+            if (p === 'LOCAL_METRO') {
+              picks = organRecords.filter(function (r) { return r.isLocal && r.sectorCode === 'RAIL_TRANSIT' && r.hasUnion; });
+            } else if (p === 'LOCAL_MEDICAL') {
+              picks = organRecords.filter(function (r) { return r.isLocal && r.sectorCode === 'MEDICAL_HEALTH' && r.hasUnion; });
+            } else {
+              picks = organRecords.filter(function (r) { return !r.isLocal && r.domains.articles.length >= 8 && r.hasUnion; });
+            }
+            picks.sort(function (a, c) { return (c.domains.articles.length - a.domains.articles.length) || (c.memberTotal - a.memberTotal); });
+            if (picks.length) {
+              state.compareIds = picks.slice(0, 4).map(function (r) { return r.aid; });
+            }
+            renderCompareTray();
+            renderTabArticles();
+            syncUrlState();
+          });
+        });
+
+        var goStudioBtn = bodyEl.querySelector('[data-a-go-studio]');
+        if (goStudioBtn) {
+          goStudioBtn.addEventListener('click', function () {
+            if (!state.compareIds.length) {
+              state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
+            }
+            state.mSubMode = 'STUDIO';
+            switchTab('matrix');
+          });
+        }
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-jump-org]'), function (b) {
+          b.addEventListener('click', function () {
+            var aid = b.getAttribute('data-a-jump-org') || '';
+            var rec = organById[aid];
+            state.aViewMode = 'BY_ORGAN';
+            state.aPage = 0;
+            if (rec) state.aQuery = rec.name;
+            state.aOrgExpanded[aid] = true;
+            renderCompareTray();
+            renderTabArticles();
+          });
+        });
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-org-exp]'), function (b) {
+          b.addEventListener('click', function () {
+            var aid = b.getAttribute('data-a-org-exp') || '';
+            var curExp = b.getAttribute('aria-expanded') === 'true';
+            state.aOrgExpanded[aid] = !curExp;
+            updateArticlesDyn();
+          });
+        });
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-row-exp]'), function (b) {
+          b.addEventListener('click', function () {
+            var rk = b.getAttribute('data-a-row-exp') || '';
+            state.aRowExpanded[rk] = !state.aRowExpanded[rk];
+            updateArticlesDyn();
+          });
+        });
+
+        var prevBtn = bodyEl.querySelector('[data-a-prev]');
+        if (prevBtn) prevBtn.addEventListener('click', function () { if (state.aPage > 0) { state.aPage -= 1; updateArticlesDyn(); } });
+        var nextBtn = bodyEl.querySelector('[data-a-next]');
+        if (nextBtn) nextBtn.addEventListener('click', function () { state.aPage += 1; updateArticlesDyn(); });
+
+        populateClauseLawStrip();
+      }
+
       var initRows = filterArticles();
 
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
         '  ' + renderDocModeToggleHtml(),
+        '  <div class="pau-seg" role="group" aria-label="단협 조문 보기 방식">',
+        '    <button type="button" class="pau-seg-btn' + (curView === 'COMPARE' ? ' on' : '') + '" aria-pressed="' + (curView === 'COMPARE' ? 'true' : 'false') + '" data-a-view="COMPARE">⚖️ 쟁점별 다중비교</button>',
+        '    <button type="button" class="pau-seg-btn' + (curView === 'BY_ORGAN' ? ' on' : '') + '" aria-pressed="' + (curView === 'BY_ORGAN' ? 'true' : 'false') + '" data-a-view="BY_ORGAN">🏛️ 기관별 묶음</button>',
+        '    <button type="button" class="pau-seg-btn' + (curView === 'TABLE' ? ' on' : '') + '" aria-pressed="' + (curView === 'TABLE' ? 'true' : 'false') + '" data-a-view="TABLE">📑 전체 조문표</button>',
+        '  </div>',
         '  <select data-f="aScope" aria-label="기관 권역 선택">',
         '    <option value="ALL"' + (state.aScope === 'ALL' ? ' selected' : '') + '>구분 전체 (중앙+지방)</option>',
         '    <option value="CENTRAL"' + (state.aScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
@@ -5771,22 +6900,24 @@
           return '<option value="' + esc(t[0]) + '"' + (state.aCat === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>';
         }).join(''),
         '  </select>',
-        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문·지역 검색 (예: 충남, 징계)" value="' + esc(state.aQuery) + '" style="min-width:210px;">',
-        '  <select class="pau-sub-sort" data-f="aSort" aria-label="단협 조문 정렬 기준">',
-        [
-          ['', '정렬: 기본순'],
-          ['name_asc', '정렬: 기관명 가나다 ▲'],
-          ['name_desc', '정렬: 기관명 역순 ▼'],
-          ['cat_asc', '정렬: 쟁점분류 가나다 ▲'],
-          ['cat_desc', '정렬: 쟁점분류 역순 ▼'],
-          ['no_asc', '정렬: 조문번호 오름차순 ▲'],
-          ['no_desc', '정렬: 조문번호 내림차순 ▼'],
-          ['tit_asc', '정렬: 조문제목 가나다 ▲'],
-          ['tit_desc', '정렬: 조문제목 역순 ▼']
-        ].map(function (it) {
-          return '<option value="' + esc(it[0]) + '"' + ((state.aSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
-        }).join(''),
-        '  </select>',
+        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문·기관·지역 검색 (예: 충남, 징계)" value="' + esc(state.aQuery) + '" style="min-width:190px;">',
+        (curView !== 'COMPARE' ? [
+          '  <select class="pau-sub-sort" data-f="aSort" aria-label="단협 조문 정렬 기준">',
+          [
+            ['', curView === 'BY_ORGAN' ? '정렬: 수록조문 많은순' : '정렬: 기본순'],
+            ['name_asc', '정렬: 기관명 가나다 ▲'],
+            ['name_desc', '정렬: 기관명 역순 ▼'],
+            ['cat_asc', '정렬: 쟁점분류 가나다 ▲'],
+            ['cat_desc', '정렬: 쟁점분류 역순 ▼'],
+            ['no_asc', '정렬: 조문번호 오름차순 ▲'],
+            ['no_desc', '정렬: 조문번호 내림차순 ▼'],
+            ['tit_asc', '정렬: 조문제목 가나다 ▲'],
+            ['tit_desc', '정렬: 조문제목 역순 ▼']
+          ].map(function (it) {
+            return '<option value="' + esc(it[0]) + '"' + ((state.aSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+          }).join(''),
+          '  </select>'
+        ].join('') : ''),
         '  <span data-a-cnt style="font-size:12px;margin-left:auto;">조회 <b>' + fmtNum(initRows.length) + '</b>건</span>',
         '</div>',
         '<div data-a-dyn>' + renderArticlesDynHtml(initRows) + '</div>'
@@ -5797,10 +6928,14 @@
         var cntEl = bodyEl.querySelector('[data-a-cnt]');
         if (cntEl) cntEl.innerHTML = '조회 <b>' + fmtNum(rowsNow.length) + '</b>건';
         var dynEl = bodyEl.querySelector('[data-a-dyn]');
-        if (dynEl) dynEl.innerHTML = renderArticlesDynHtml(rowsNow);
+        if (dynEl) {
+          dynEl.innerHTML = renderArticlesDynHtml(rowsNow);
+          bindArticlesDynEvents();
+        }
       }
 
-      bindFilterInputs(renderTabArticles, { aQuery: updateArticlesDyn });
+      bindFilterInputs(renderTabArticles, { aQuery: updateArticlesDyn }, '[data-f]:not([data-f="aCmpAddQ"])');
+      bindArticlesDynEvents();
     }
 
     function filterDisclosures() {
@@ -5879,6 +7014,159 @@
 
       function renderDetailDynHtml() {
         var rows = filterDisclosures();
+        var curDView = state.dOrgan ? 'TABLE' : (state.dViewMode || 'BY_ORGAN');
+
+        if (curDView === 'BY_ORGAN') {
+          var orgMap = Object.create(null);
+          var orgGroups = [];
+          rows.forEach(function (d) {
+            var g = orgMap[d.aid];
+            if (!g) {
+              g = {
+                aid: d.aid,
+                iname: d.iname || (instMap[d.aid] ? instMap[d.aid].name : d.aid),
+                rec: organById[d.aid] || null,
+                items: [],
+                cats: Object.create(null),
+                latestDate: '',
+                latestDoc: null,
+                repFiles: []
+              };
+              orgMap[d.aid] = g;
+              orgGroups.push(g);
+            }
+            g.items.push(d);
+            var cn = d.cname || d.ccode || '기타';
+            g.cats[cn] = (g.cats[cn] || 0) + 1;
+            var nd = normalizeTimelineDate(d.edate || d.rdate || '');
+            if (!g.latestDoc || (nd && (!g.latestDate || nd > g.latestDate))) {
+              if (nd) g.latestDate = nd;
+              g.latestDoc = d;
+            }
+            if (g.repFiles.length < 2 && d.files && d.files.length) {
+              d.files.forEach(function (f) {
+                if (g.repFiles.length < 2) g.repFiles.push(f);
+              });
+            }
+          });
+
+          var ds = state.dSort || 'cnt_desc';
+          orgGroups.sort(function (a, b) {
+            if (ds === 'name_asc') return a.iname.localeCompare(b.iname, 'ko');
+            if (ds === 'name_desc') return b.iname.localeCompare(a.iname, 'ko');
+            if (ds === 'date_desc' || ds === 'date_asc') {
+              if ((!!a.latestDate) !== (!!b.latestDate)) return b.latestDate ? 1 : -1;
+              var dc = a.latestDate.localeCompare(b.latestDate);
+              if (dc !== 0) return ds === 'date_asc' ? dc : -dc;
+            }
+            if (ds === 'cnt_asc') return (a.items.length - b.items.length) || a.iname.localeCompare(b.iname, 'ko');
+            return (b.items.length - a.items.length) || a.iname.localeCompare(b.iname, 'ko');
+          });
+
+          var gPageSize = 60;
+          var gTotalPages = Math.max(1, Math.ceil(orgGroups.length / gPageSize));
+          if (state.dPage >= gTotalPages) state.dPage = gTotalPages - 1;
+          if (state.dPage < 0) state.dPage = 0;
+          var gStart = state.dPage * gPageSize;
+          var visGroups = orgGroups.slice(gStart, gStart + gPageSize);
+
+          return {
+            totalPages: gTotalPages,
+            html: [
+              '<div class="pau-subbar">',
+              '  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">',
+              '    <div class="pau-seg" role="group" aria-label="공시·사규 보기 방식">',
+              '      <button type="button" class="pau-seg-btn on" aria-pressed="true" data-d-view="BY_ORGAN">🏛️ 기관별 원문 묶음 (' + fmtNum(orgGroups.length) + '곳)</button>',
+              '      <button type="button" class="pau-seg-btn" aria-pressed="false" data-d-view="TABLE">📑 문서별 전체 표 (' + fmtNum(rows.length) + '건)</button>',
+              '    </div>',
+              '    <span>공시 보유 기관 <b>' + fmtNum(orgGroups.length) + '</b>곳 · 문서 합계 <b>' + fmtNum(rows.length) + '</b>건</span>',
+              '  </div>',
+              '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">',
+              '    <select class="pau-sub-sort" data-d-sort aria-label="공시문서 정렬 기준">',
+              [
+                ['', '정렬: 수록문서 많은순 ▼'],
+                ['cnt_asc', '정렬: 수록문서 적은순 ▲'],
+                ['date_desc', '정렬: 최근 공시일 최신순 ▼'],
+                ['date_asc', '정렬: 최근 공시일 오래된순 ▲'],
+                ['name_asc', '정렬: 기관명 가나다 ▲'],
+                ['name_desc', '정렬: 기관명 역순 ▼'],
+                ['cat_asc', '정렬: 공시분류별 전체표 ▲']
+              ].map(function (it) {
+                return '<option value="' + esc(it[0]) + '"' + ((state.dSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+              }).join(''),
+              '    </select>',
+              (orgGroups.length > gPageSize ? [
+                '    <span>' + (state.dPage + 1) + ' / ' + gTotalPages + ' 페이지</span>',
+                '    <button type="button" class="pau-act-btn" data-d-prev' + (state.dPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
+                '    <button type="button" class="pau-act-btn" data-d-next' + (state.dPage + 1 >= gTotalPages ? ' disabled' : '') + '>다음 ▶</button>'
+              ].join('') : ''),
+              '  </div>',
+              '</div>',
+              '<div class="pau-tbl-wrap">',
+              '  <table class="pau-tbl">',
+              '    <thead><tr>',
+              '      <th class="c-no">№</th>',
+              '      ' + renderSortTh('20%', '기관명 · 소관 (클릭→별개 창)', 'd_org_name', ds, ['name_asc', 'name_desc']),
+              '      ' + renderSortTh('25%', '공시항목 분류 · 수록현황', 'd_org_cnt', ds, ['cnt_desc', 'cnt_asc']),
+              '      ' + renderSortTh('22%', '최근 공시문서 · 기준연혁일', 'd_org_date', ds, ['date_desc', 'date_asc']),
+              '      <th style="width:18%;">대표 첨부파일 · 뷰어</th>',
+              '      <th style="width:15%;">비교 · 문서펼침</th>',
+              '    </tr></thead>',
+              '    <tbody>',
+              (visGroups.length ? visGroups.map(function (g, idx) {
+                var absIdx = gStart + idx;
+                var catPills = Object.keys(g.cats).slice(0, 4).map(function (ck) {
+                  var shortCk = ck.replace('노동조합 관련 현황', '노조현황').replace('단체협약 정보', '단협').replace('임금협약 정보', '임협').replace('단체협약 외의 별도 합의사항', '별도합의').replace('내부규정', '사규').replace('노사협의회 의결사항', '노사협의');
+                  return '<span class="pau-pill">' + esc(shortCk + ' ' + g.cats[ck]) + '</span>';
+                }).join(' ');
+                var latestTitle = g.latestDoc ? (getReadableDocTitle(g.latestDoc) + (g.latestDate ? ' (' + g.latestDate + ')' : '')) : '—';
+                var safeViewerUrl = g.latestDoc ? safeHttpUrl(buildOrganUrl(instMap[g.aid] || g.aid, g.latestDoc.dno, resolveTargetTypeFromDisc(g.latestDoc))) : '';
+                var inCmp = state.compareIds.indexOf(g.aid) >= 0;
+                var dExpVal = state.dOrgExpanded[g.aid];
+                var isExp = dExpVal === true || (dExpVal === undefined && orgGroups.length === 1);
+                return [
+                  '<tr>',
+                  '  <td class="c-no">' + (absIdx + 1) + '</td>',
+                  '  <td title="' + esc(g.iname + (g.rec ? ' · ' + g.rec.ministry : '')) + '">' +
+                    '<a href="pu-alio-union.html?organ=' + encodeURIComponent(g.aid) + '" data-jump-organ="' + esc(g.aid) + '" style="font-weight:700;color:var(--pau-pri);text-decoration:none;">↗ ' + esc(g.iname) + '</a>' +
+                    (g.rec ? ' <span style="font-size:11px;color:var(--pau-muted);">(' + esc(g.rec.ministry) + ')</span>' : '') +
+                  '</td>',
+                  '  <td style="white-space:normal;"><div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center;"><span class="pau-pill ok">총 ' + g.items.length + '건</span>' + catPills + '</div></td>',
+                  '  <td title="' + esc(latestTitle) + '" style="font-weight:600;">' + esc(latestTitle) + '</td>',
+                  '  <td style="white-space:normal;"><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' +
+                    renderFilePills(g.repFiles, '원문다운') +
+                    (safeViewerUrl ? '<a class="pau-pill ok" href="' + esc(safeViewerUrl) + '"' + ((isLocalOrgan(g.aid) && !isErcMoisOrgan(g.aid)) ? (' data-cleaneye-post="' + esc(g.aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(g.latestDoc)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 뷰어</a>' : '') +
+                  '</div></td>',
+                  '  <td style="white-space:normal;"><div style="display:flex;gap:4px;flex-wrap:wrap;">' +
+                    '<button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(g.aid) + '">' + (inCmp ? '✓비교' : '+비교') + '</button>' +
+                    '<button type="button" class="pau-act-btn' + (isExp ? ' pri' : '') + '" data-d-org-exp="' + esc(g.aid) + '" aria-expanded="' + (isExp ? 'true' : 'false') + '">' + (isExp ? '▲ 접기' : ('📂 펼침(' + g.items.length + ')')) + '</button>' +
+                  '</div></td>',
+                  '</tr>',
+                  (isExp ? '<tr class="pau-exp-row"><td colspan="6"><div class="pau-doc-list" style="padding:4px 0;">' +
+                    g.items.slice(0, 25).map(function (d) {
+                      var nd = normalizeTimelineDate(d.edate || d.rdate || '') || (d.edate || d.rdate || '');
+                      var dTarget = resolveTargetTypeFromDisc(d);
+                      var vUrl = safeHttpUrl(buildOrganUrl(instMap[d.aid] || d.aid, d.dno, dTarget));
+                      return '<div class="pau-doc-row">' +
+                        '<span class="pau-pill">' + esc(d.cname || d.ccode) + '</span>' +
+                        (nd ? '<span class="pau-doc-dt">' + esc(nd) + '</span>' : '') +
+                        '<span class="pau-doc-tit">' + esc(getReadableDocTitle(d)) + '</span>' +
+                        '<div class="pau-doc-acts">' +
+                          renderFilePills(d.files || [], '다운로드') +
+                          (vUrl ? '<a class="pau-pill ok" href="' + esc(vUrl) + '"' + ((isLocalOrgan(d.aid) && !isErcMoisOrgan(d.aid)) ? (' data-cleaneye-post="' + esc(d.aid) + '" data-cleaneye-type="' + esc(dTarget) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시뷰어</a>' : '') +
+                        '</div>' +
+                      '</div>';
+                    }).join('') +
+                  '</div></td></tr>' : '')
+                ].join('');
+              }).join('') : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--pau-muted);">선택한 조건에 해당하는 공시·내부규정 문서가 없습니다.</td></tr>'),
+              '    </tbody>',
+              '  </table>',
+              '</div>'
+            ].join('')
+          };
+        }
+
         var pageSize = 300;
         var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
         if (state.dPage >= totalPages) state.dPage = totalPages - 1;
@@ -5890,7 +7178,15 @@
           totalPages: totalPages,
           html: [
             '<div class="pau-subbar">',
-            '  <span>조회 공시·사규 문서 <b>' + fmtNum(rows.length) + '</b>건' + (rows.length > pageSize ? ' (' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '번째 표시)' : '') + '</span>',
+            '  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">',
+            (!state.dOrgan ? [
+              '    <div class="pau-seg" role="group" aria-label="공시·사규 보기 방식">',
+              '      <button type="button" class="pau-seg-btn" aria-pressed="false" data-d-view="BY_ORGAN">🏛️ 기관별 원문 묶음</button>',
+              '      <button type="button" class="pau-seg-btn on" aria-pressed="true" data-d-view="TABLE">📑 문서별 전체 표 (' + fmtNum(rows.length) + '건)</button>',
+              '    </div>'
+            ].join('') : ''),
+            '    <span>조회 공시·사규 문서 <b>' + fmtNum(rows.length) + '</b>건' + (rows.length > pageSize ? ' (' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '번째 표시)' : '') + '</span>',
+            '  </div>',
             '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">',
             '    <select class="pau-sub-sort" data-d-sort aria-label="공시문서 정렬 기준">',
             [
@@ -5932,8 +7228,10 @@
                 kvParts.push('첨부원문: ' + stripFileExt(firstFile.name) + (files.length > 1 ? (' 외 ' + (files.length - 1) + '건') : ''));
               }
               var prev = ((d.highlights || []).join(' ') || kvParts.join(' · ')).replace(/\s+/g, ' ').trim();
-              var dt = d.edate || d.rdate || '';
-              var titFull = getReadableDocTitle(d) + (dt ? ' (' + dt + ')' : '');
+              var normDt = normalizeTimelineDate(d.edate || d.rdate || '');
+              var rawDt = String(d.edate || d.rdate || '').trim();
+              var cleanTitle = String(getReadableDocTitle(d) || '').replace(/\((20\d{2}[^()]{3,18})\)\s*$/, '[$1]');
+              var titFull = cleanTitle + (normDt ? ' (' + normDt + ')' : (rawDt ? ' [' + rawDt + ']' : ''));
               return [
                 '<tr>',
                 '  <td class="c-no">' + (absIdx + 1) + '</td>',
@@ -5944,7 +7242,7 @@
                   filePillsHtml +
                   (safeViewerUrl ? '<a class="pau-pill ok" href="' + esc(safeViewerUrl) + '"' + ((isLocalOrgan(d.aid) && !isErcMoisOrgan(d.aid)) ? (' data-cleaneye-post="' + esc(d.aid) + '" data-cleaneye-type="' + esc(dTargetType) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시뷰어</a>' : '') +
                   '</div></td>',
-                '  <td title="' + esc(prev) + '">' + esc(prev || '—') + '</td>',
+                '  <td title="' + esc(prev) + '"><span>' + esc(prev || '—') + '</span></td>',
                 '</tr>'
               ].join('');
             }).join('') : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--pau-muted);">선택한 조건에 해당하는 공시·내부규정 문서가 없습니다.</td></tr>'),
@@ -5983,10 +7281,31 @@
       ].join('');
 
       function bindDetailPager(totalPagesNow) {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-d-view]'), function (b) {
+          b.addEventListener('click', function () {
+            var nextDV = b.getAttribute('data-d-view') || 'BY_ORGAN';
+            state.dViewMode = nextDV;
+            state.dPage = 0;
+            updateDetailDyn();
+            var focusBtn = bodyEl.querySelector('[data-d-view="' + nextDV + '"]');
+            if (focusBtn && typeof focusBtn.focus === 'function') focusBtn.focus();
+          });
+        });
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-d-org-exp]'), function (b) {
+          b.addEventListener('click', function () {
+            var aid = b.getAttribute('data-d-org-exp') || '';
+            var curExp = b.getAttribute('aria-expanded') === 'true';
+            state.dOrgExpanded[aid] = !curExp;
+            updateDetailDyn();
+          });
+        });
         var dSortSel = bodyEl.querySelector('[data-d-sort]');
         if (dSortSel) {
           dSortSel.addEventListener('change', function () {
             state.dSort = dSortSel.value || '';
+            if (state.dSort === 'cat_asc' || state.dSort === 'cat_desc') {
+              state.dViewMode = 'TABLE';
+            }
             state.dPage = 0;
             updateDetailDyn();
             var nextDSel = bodyEl.querySelector('[data-d-sort]');
@@ -6251,10 +7570,23 @@
             }
             if (key === 'rProvince') {
               state.rMuni = '';
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+              state.rChecked = {};
+            }
+            if (key === 'rMuni') {
+              state.rMultiMunis = [];
               state.rChecked = {};
             }
             if (key === 'uScope' || key === 'uSector' || key === 'uType' || key === 'uMinistry' || key === 'uMuni' || key === 'uConfed' || key === 'uStruct' || key === 'uSort') {
               state.uPage = 0;
+            }
+            if (key === 'aScope' || key === 'aCat' || key === 'aSort') {
+              state.aPage = 0;
+              if (key === 'aSort' && (el.value.indexOf('no_') === 0 || el.value.indexOf('tit_') === 0 || el.value.indexOf('cat_') === 0)) {
+                state.aViewMode = 'TABLE';
+              }
             }
             if (key === 'dScope' || key === 'dOrgan' || key === 'dTax') {
               state.dPage = 0;
@@ -6279,6 +7611,7 @@
           if (!forceRun && nextVal === lastAppliedVal) return;
           lastAppliedVal = nextVal;
           if (key === 'uQuery') state.uPage = 0;
+          if (key === 'aQuery') state.aPage = 0;
           if (key === 'dOrganSearch' || key === 'dQuery') state.dPage = 0;
           if (typeof handlers[key] === 'function') {
             handlers[key](nextVal, el);
@@ -6334,7 +7667,9 @@
         );
       } else if (state.tab === 'matrix' && state.mSubMode === 'REGION') {
         var regRowsCsv = filterRegionalOrgans();
-        var regLabel = (state.rProvince === 'ALL' ? '전국지방' : (state.rProvince || '충청남도')) + (state.rMuni ? ('_' + state.rMuni) : '');
+        var regLabel = (state.rMultiMode && state.rMultiProvs.length >= 2)
+          ? state.rMultiProvs.join('_')
+          : ((state.rProvince === 'ALL' ? '전국지방' : (state.rProvince || '충청남도')) + ((state.rMultiMode && state.rMultiMunis.length >= 2) ? ('_' + state.rMultiMunis.slice(0, 4).join('_')) : (state.rMuni ? ('_' + state.rMuni) : '')));
         downloadCsv(
           '공공임단협_지역산하기관비교_' + regLabel + '.csv',
           ['기관코드', '광역지자체', '소속_기초지자체', '산하기관명', '기관유형', '업종분류', '노조체계', '대표노조', '상급단체', '합산조합원', '조직률(%)', '타임오프(h)', '법정상한비율(%)', '인사관여', '징계위구성', '유급휴가', '근로시간_유연근무', '임금피크_정년', '공시문서수', '6대영역종합점수'],
@@ -6382,14 +7717,30 @@
           })
         );
       } else if (state.tab === 'articles' && state.docMode !== 'DISC') {
-        var arts = filterArticles();
-        downloadCsv(
-          '공공임단협_단협조문검색.csv',
-          ['기관코드', '기관명', '분류', '조문번호', '조문제목', '조문본문'],
-          arts.map(function (a) {
-            return [a.apba_id, a.inst_name, a.taxonomy_name, a.article_no, a.article_title, a.text];
-          })
-        );
+        if (state.aViewMode === 'COMPARE') {
+          var cRecs = getClauseCompareRecords();
+          var cHeaders = ['쟁점_분류', '항목'].concat(cRecs.map(function (r) { return r.name; }));
+          var cRows = METRIC_DEFS.map(function (d) {
+            var tc = METRIC_TO_TAXONOMY[d.key] || '';
+            return [d.label, '기준진단·수록조문'].concat(cRecs.map(function (r) {
+              var sc = r.issueScores[d.key];
+              var mArts = r.domains.articles.filter(function (a) { return a.taxonomy_code === tc; }).map(function (a) {
+                return (formatArticleNoLabel(a.article_no) ? formatArticleNoLabel(a.article_no) + ' ' : '') + (a.article_title || '') + ': ' + String(a.text || '').replace(/\s+/g, ' ').trim();
+              }).join(' / ');
+              return '[' + sc.tag + '] ' + sc.val + (mArts ? ' | ' + mArts : '');
+            }));
+          });
+          downloadCsv('공공임단협_단협조문다중비교.csv', cHeaders, cRows);
+        } else {
+          var arts = filterArticles();
+          downloadCsv(
+            '공공임단협_단협조문검색.csv',
+            ['기관코드', '기관명', '분류', '조문번호', '조문제목', '조문본문'],
+            arts.map(function (a) {
+              return [a.apba_id, a.inst_name, a.taxonomy_name, a.article_no, a.article_title, a.text];
+            })
+          );
+        }
       } else {
         var discs = filterDisclosures();
         downloadCsv(
@@ -6419,8 +7770,18 @@
         if (state.tab === 'organ' && state.hOrgan) {
           sp.set('organ', state.hOrgan);
         } else if (state.tab === 'matrix' && state.mSubMode === 'REGION') {
-          sp.set('region', state.rProvince || '충청남도');
-          if (state.rProvince !== 'ALL' && state.rMuni) sp.set('muni', state.rMuni);
+          if (state.rMultiMode && state.rMultiProvs.length >= 2) {
+            sp.set('region', state.rMultiProvs.join(','));
+          } else {
+            sp.set('region', state.rProvince || '충청남도');
+            if (state.rProvince !== 'ALL') {
+              if (state.rMultiMode && state.rMultiMunis.length >= 2) {
+                sp.set('muni', state.rMultiMunis.join(','));
+              } else if (state.rMuni) {
+                sp.set('muni', state.rMuni);
+              }
+            }
+          }
         } else if (state.tab === 'matrix' && state.mSubMode === 'ALL_LIST') {
           sp.set('tab', 'matrix');
           sp.set('mode', 'ALL_LIST');
@@ -6430,6 +7791,7 @@
         } else if (state.tab === 'articles') {
           sp.set('tab', 'articles');
           if (state.docMode === 'DISC') sp.set('doc', 'DISC');
+          else if (state.aViewMode === 'COMPARE' && state.compareIds.length) sp.set('compare', state.compareIds.slice(0, 6).join(','));
         } else if (state.tab !== 'unions') {
           sp.set('tab', state.tab);
         }
