@@ -486,6 +486,48 @@ test('⑥ 서버 동기화 모듈(functions/pbox-sync.js) 및 Supabase 스키마
   const rawRrnForGate = '900101' + '-' + '1' + '234567';
   const blockedGate = DocRead.validate({ app: 'pbox', parts: [{ text: '질문 ' + rawRrnForGate }] });
   assert.equal(blockedGate.ok, false, 'doc-read.js 관문에서 미비식별 주민번호가 포함된 pbox 요청을 거부해야 합니다');
+  for (const rrnVariant of [
+    '900101' + ' ' + '1' + '234567',
+    '900101' + '.' + '1' + '234567',
+    '900101' + '..' + '1' + '234567',
+    '900101' + '_' + '1' + '234567',
+    '900101' + ':' + '1' + '234567',
+    '900101' + '+' + '1' + '234567',
+    '900101' + '|' + '1' + '234567',
+    '900101' + '*' + '1' + '234567',
+    '900101' + '\u2010' + '1' + '234567',
+    '900101' + '\u2011' + '1' + '234567',
+    '900101' + '\u2212' + '1' + '234567',
+    '900\u200E101' + '\u200B-\u034F' + '123\u202A4567',
+    '900101' + '\u00AD' + '1' + '234567',
+    '900101' + '\u30FB' + '1' + '234567',
+    '900101' + '/' + '1' + '234567',
+    '900101' + ',' + '1' + '234567',
+    '9 0 0 1 0 1' + ' - ' + '1 2 3 4 5 6 7',
+    '9 0 0 1 0 1' + ' ' + '1 2 3 4 5 6 7',
+    '900101' + '-\n' + '1234567',
+    '900101' + '\n-' + '1234567',
+    '900101' + ' -\r\n' + '1234567',
+    '900101' + '\n' + '1234567',
+    '900101' + '\r\n' + '1234567',
+    '900101' + ' \n ' + '1234567',
+    '90\u20030101' + '-' + '1234567',
+    '90.01.01' + '-' + '1234567',
+    '９００１０１' + '-' + '１' + '２３４５６７',
+    '𝟗𝟎𝟎𝟏𝟎𝟏' + '\uFE63' + '𝟏' + '𝟐𝟑𝟒𝟓𝟔𝟕',
+    '٩٠٠١٠١' + '-' + '١' + '٢٣٤٥٦٧'
+  ]) {
+    const blockedVar = DocRead.validate({ app: 'pbox', parts: [{ text: '변칙 구분자 ' + rrnVariant }] });
+    assert.equal(blockedVar.ok, false, '모든 변칙 주민번호가 doc-read.js(pbox) 에서 차단되어야 합니다: ' + rrnVariant);
+    const harassVar = DocRead.validate({ app: 'harass', parts: [{ text: '면담 ' + rrnVariant }] });
+    assert.equal(harassVar.ok, true);
+    assert.deepEqual(harassVar.parts, [{ text: '면담 900101-1******' }], 'doc-read.js(harass) 도 동일 변칙 주민번호를 가려야 합니다: ' + rrnVariant);
+    assert.equal(PBoxSync.hasResidualHardPii({ body: rrnVariant }), true, 'hasResidualHardPii 도 변칙 주민번호를 탐지해야 합니다: ' + rrnVariant);
+    const sPreserved = PBoxSync.scrubServerPii('제23조 ①② ㈜푸른테크 33㎡ ' + rrnVariant, []);
+    assert.equal(sPreserved, '제23조 ①② ㈜푸른테크 33㎡ ******-*******', '원문 기호(①②·㈜·㎡)는 보존하고 주민번호만 가려야 합니다');
+    const cPreserved = Engine.anonymizeText('제23조 ①② ㈜푸른테크 33㎡ ' + rrnVariant, '').text;
+    assert.equal(cPreserved, '제23조 ①② ㈜푸른테크 33㎡ ******-*******', '클라이언트 비식별화도 원문 기호를 보존해야 합니다');
+  }
 
   const blockedInlineImg = DocRead.validate({
     app: 'pbox',
@@ -649,7 +691,10 @@ test('⑦ 포털 연결 · 연속 질의 스레드 ID 보존 · 사용자별 작
   assert.match(html, /pu-authsync\.js\?v=\d+/, '전체 로그아웃 동기화 스크립트가 실려야 합니다');
   assert.match(html, /pu-ontology\.js\?v=\d+/, '온톨로지 계약 스크립트가 실려야 합니다');
   assert.ok(enter.includes("url:'pu-pbox.html'"), '포털 타일에 pu-pbox.html 이 연결되어야 합니다');
+  assert.match(enter, /key:'pbox'[^\n]*row:'store'/, '포털 타일에서 P박스는 자료함(store) 줄에 놓여야 합니다');
+  assert.match(enter, /ROW_MOVED_FROM\s*=\s*\{[^}]*pbox:\s*'client'/, '옛 줄(client)이 저장된 사람도 자료함(store)으로 옮겨지도록 ROW_MOVED_FROM 에 pbox 가 있어야 합니다');
   assert.ok(appbar.includes("url: 'pu-pbox.html'"), '공용 앱바에 pu-pbox.html 이 연결되어야 합니다');
+  assert.match(appbar, /key:\s*'pbox',\s*row:\s*'store'/, '공용 앱바에서도 P박스는 자료함(store) 줄이어야 합니다');
   assert.match(onto, /pbox:\s*\{[^}]*localOnly:\s*true/, '온톨로지에 localOnly 앱으로 등록되어야 합니다');
 
   const listeners = {};

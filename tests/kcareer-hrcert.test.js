@@ -174,7 +174,7 @@ test('목록 규칙 — 맨 왼쪽 ☐ + №(rownum) · 한 칸은 한 줄(nowra
   assert.match(BLOCK, /건 선택/, '고르기만으로는 안 바뀐다 — 건수와 할 일을 띄운다');
 });
 test('서류 보관함 표 — 당겨온 줄은 발급번호 칩 · 원본 없으면 «붙이기» · 기관 실적 보기(🏛)는 없다', () => {
-  const t = html.slice(html.indexOf('function _cdTable'), html.indexOf('function _cdTable') + 3000);
+  const t = html.slice(html.indexOf('function _cdTable'), html.indexOf('/* ═══ 🏢 푸른인사관리에서 증명서 당겨오기'));   /* 길이를 박지 않고 «이 함수의 끝»까지 */
   assert.match(t, /_cdSrc\(r\) === 'hr'/); assert.match(t, /_hcBadge\(r\)/); assert.match(t, /hrCertAttach\(/);
   assert.match(t, /hr \? '' : '<button class="btn sm" onclick="cdOpenAgency/);
   assert.match(t, /hc-canceled/);
@@ -203,7 +203,8 @@ test('증명서 보관함 표 — 공용 표 옷(.dt)과 칸 이름표(stampCell
   assert.match(t, /return '<div class="dt" style="overflow-x:auto"><table>/);
   assert.match(t, /<\/tbody><\/table><\/div>'/);
   assert.ok(!/\n\s*stampCellLabels\(box\);/.test(t), 'return 뒤에 박혀 한 번도 안 돌던 호출(주석 속 언급은 괜찮다)');
-  assert.match(html, /body\.innerHTML=cdBar\+_cdTable\(rows,D\); _safe\(function\(\)\{ stampCellLabels\(body\); \}\)/);
+  assert.match(html, /body\.innerHTML=cdBar\+_dsSelBarHtml\(domain\)\+_cdTable\(rows,D\);/);
+  assert.match(html, /_safe\(function\(\)\{ stampCellLabels\(body\); \}\);/);
 });
 
 /* ── 화면: 코드를 그대로 돌린다 ── */
@@ -407,10 +408,9 @@ test('신원 묶기(자동 보안 검토 2차) — 목록을 읽은 뒤 직원 �
   assert.ok(w3.store.certdoc.length === 2 && w3.store.certdoc.every((r) => r.sid === ME));
   assert.match(html, /sid:_hc\.sid, issuer:issuer/, '저장은 지금 _me.sid 가 아니라 묶어 둔 값을 쓴다');
 });
-test('화면 보강(자동 검토 2차) — 직원 보기에서 증명서 보관함 첫 칸 유지 · 취소 줄은 opacity 가 아니라 글자색 · 발급기관·증명기간도 한 줄 · 폰에서 «넣기» 단추 고정', () => {
-  assert.match(html, /body\.kc-staff #cdBody \.dt th:first-child,body\.kc-staff #cdBody \.dt td:first-child\{display:table-cell!important\}/);
-  assert.match(html, /@media \(max-width:520px\)\{ body\.kc-staff #cdBody \.dt td:first-child\{display:flex!important\} \}/, '폰 카드 칸은 flex');
-  assert.match(html, /#cdBody tr\.hc-canceled td:not\(:first-child\):not\(:last-child\)\{color:var\(--text-mute\)\}/);
+test('화면 보강(자동 검토 2차) — 직원 보기에서 종류 칸 유지(첫 칸은 ☐ + № 칸이라 다른 표처럼 감춘다) · 취소 줄은 opacity 가 아니라 글자색 · 발급기관·증명기간도 한 줄 · 폰에서 «넣기» 단추 고정', () => {
+  assert.ok(!/body\.kc-staff #cdBody \.dt (th|td):first-child/.test(html), '첫 칸이 ☐ + № 칸이 되어 «첫 칸 유지» 예외는 필요 없다(종류는 둘째 칸 — 직원 보기에서도 남는다)');
+  assert.match(html, /#cdBody tr\.hc-canceled td:nth-child\(n\+3\):not\(:last-child\)\{color:var\(--text-mute\)\}/, '번호·종류 칸(빨간 «취소됨» 칩)은 또렷하게, 나머지만 옅은 글자색');
   assert.ok(!/hc-canceled[^}]*opacity/.test(html), '취소 줄을 opacity 로 흐리면 명암비가 모자란다');
   assert.match(html, /#cdBody \.dt thead th:last-child\{width:auto;min-width:0\}/, '끝 칸 200px 고정을 풀어 태블릿에서 발급기관 칸이 짓눌리지 않게');
   assert.match(html, /#cdBody \.dt thead th\{white-space:nowrap\}/, '머리글도 한 줄');

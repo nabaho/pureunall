@@ -72,6 +72,11 @@
   function isAward(r) { return /표창|상장|감사|공로|포상|수상/.test(s(r && r.type)); }
   function isCourse(r) { return /수료|이수|과정|양성|교육/.test(s(r && r.title)); }
   var 국가 = /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|지도사/;
+  /* 자격의 차례 — 국가자격 먼저, 그 안에서 최근 것 먼저. 종이와 «☑ 고르기» 창이 같은 비교를 쓴다(창만 날짜순이면 번호가 종이와 어긋난다) */
+  function certCmp(a, b) {
+    a = a || {}; b = b || {};                              /* 빈 기록이 섞여도 줄 세우다 멈추지 않는다 */
+    return (국가.test(s(b.title)) ? 1 : 0) - (국가.test(s(a.title)) ? 1 : 0) || dkey(b.date).localeCompare(dkey(a.date));
+  }
 
   /* ★ 컨설팅 실적 «금액 문턱» (대표 지시 2026-10-07 「500만원 이상것만 넣어라」).
      금액은 «고르는 데만» 쓴다 — 종이에는 찍지 않는다(금액은 관리자만). amtOf(r) 가 null 이면 «금액 모름».
@@ -145,7 +150,7 @@
     var 고름 = function (k, arr) { return 만(k) ? arr.filter(function (r) { return 꽂힘(k, r); }) : arr; };
     var 수상 = 고름('award', (src.wiccok || []).filter(isAward));
     var 자격 = 고름('cert', (src.cert || []).filter(function (r) { return r && !isCourse(r); }))
-      .sort(function (a, b) { return (국가.test(s(b.title)) ? 1 : 0) - (국가.test(s(a.title)) ? 1 : 0) || dkey(b.date).localeCompare(dkey(a.date)); });
+      .sort(certCmp);
     var all = {
       edu: newest(src.edu || [], function (r) { return r.period || r.year; })
         .map(function (r) { return [yearOf(String(r.period || r.year || '').split(/[~～]/).pop()) || '', s([r.school, r.major, r.degree].filter(Boolean).join(' '))]; }),
@@ -322,7 +327,7 @@
     + '.p1 .t-work td.y,.p1 .t-role td.y{width:112px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
-  var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass, isAward: isAward, isCourse: isCourse,
+  var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass, isAward: isAward, isCourse: isCourse, certCmp: certCmp,
     build: build, perfByBiz: perfByBiz, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerProfile1 = api;

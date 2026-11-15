@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=94"></script>
+<script src="js/pu-ontology.js?v=98"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -341,7 +341,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=43"></script>
+<script src="js/pu-appbar.js?v=45"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
@@ -2648,8 +2648,8 @@ function kakaoOcrPanelHtml(site, month){
     preview='<div style="margin-top:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#f8fafc">' +
       '<tr style="background:#eff6ff"><th style="padding:5px 8px;text-align:left">성명</th><th style="padding:5px 8px;text-align:left">날짜</th><th style="padding:5px 8px;text-align:left">유형</th><th style="padding:5px 8px;text-align:left">출퇴근·휴게</th><th style="padding:5px 8px;text-align:left">원문 증빙</th></tr>' +
       kakaoOcrDraft.map(function(r){
-        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name||'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
-          '<td style="padding:5px 8px">'+r.date+'</td><td style="padding:5px 8px">'+r.type+'</td>' +
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name?esc(r.name):'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
+          '<td style="padding:5px 8px">'+esc(r.date)+'</td><td style="padding:5px 8px">'+esc(r.type)+'</td>' +
           '<td style="padding:5px 8px">'+(r.type==='work'||r.type==='holiday'?(r.in+'~'+r.out+' (휴게 '+r.breakMin+'분)'):'-')+'</td>' +
           '<td style="padding:5px 8px;color:var(--sub)">'+esc(r.raw)+'</td></tr>';
       }).join('') + '</table>' +
@@ -2714,7 +2714,11 @@ function attendOf(site, month, name) { return lmap('attend')[site + '|' + month 
 function leaveOf(site, year, name) { return lmap('leave')[site + '|' + year + '|' + name] || {}; }
 function severOf(site, name) { return lmap('sever')[site + '|' + name] || {}; }
 
-function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, ''); }
+/* ★ 2026-11-15 보안 — 따옴표만 지우던 것을 «& < > 도 바꾼다».
+   바깥에서 온 글(받은 메일 제목·첨부 이름·카톡 판독 이름)이 화면에 그대로 그려졌다.
+   ⚠ 따옴표 «지우기»는 그대로 둔다 — 이 함수가 onclick="f('…')" 안의 JS 글자에도 쓰인다(&#39; 로 바꾸면 속성을 풀 때 ' 로 되살아나 빠져나간다).
+   & < > 는 속성을 풀 때 원래 글자로 돌아오므로 onclick 안의 값·열쇠는 바뀌지 않는다. */
+function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmtComma(val) {
   if (val == null || val === '') return '';
   var n = Number(String(val).replace(/,/g, ''));
@@ -3417,7 +3421,7 @@ function shellMainHtml(m){
   }
   var mode = App.uiMode || 'focus';
   var chips=x.sites.length>1?('<span class="chips">자료 묶음 '+x.sites.map(function(s){
-      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+s+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
+      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+esc(s)+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
   var modeBar = '<div class="uimode-bar noprint">' +
     '<div class="uimode-btns">' +
       '<button type="button" class="uimode-btn" onclick="toggleSidebarFold()" title="왼쪽 담당자·사업장 목록을 접어 화면을 넓게 씁니다">' + (App.foldSide ? '▶ 좌측목록 펼치기' : '◀ 좌측목록 접기(넓게보기)') + '</button>' +
@@ -3486,7 +3490,7 @@ function coBarHtml(m){
     }
   }
   var RM=lmap('row_marks')||{}, ckKey=co?('co:'+co.id):('site:'+App.loose), ckEsc=co?('co:'+esc(co.id)):('site:'+esc(App.loose)), cmk=RM[ckKey]||{};
-  var h='<span class="cn" title="'+esc(name)+'">'+name+'</span>'
+  var h='<span class="cn" title="'+esc(name)+'">'+esc(name)+'</span>'
     +'<button type="button" class="rmk'+(cmk.chk?' on':'')+'" style="color:#fff" onclick="toggleRowMark(\''+ckEsc+'\',\'chk\',event)" title="사업장 체크 저장">'+(cmk.chk?'☑':'☐')+'</button>'
     +'<button type="button" class="rst'+(cmk.star?' on':'')+'" onclick="toggleRowMark(\''+ckEsc+'\',\'star\',event)" title="사업장 별표 저장">'+(cmk.star?'★':'☆')+'</button>'
     +'<span class="cm">'+[who, card?('급여일 '+(card.급여일||'미지정')):'', '기준 '+ymText(m.ym)].filter(Boolean).join(' · ')+'</span>'

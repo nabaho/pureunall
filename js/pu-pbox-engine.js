@@ -563,16 +563,120 @@
     return Array.from(names).sort(function (a, b) { return b.length - a.length; });
   }
 
+  function ndToDigitClient(ch) {
+    if (!/\p{Nd}/u.test(ch)) return -1;
+    var cp = ch.codePointAt(0);
+    var base = cp;
+    while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+    return (cp - base) % 10;
+  }
+
+  function findRrnSpansClient(raw) {
+    var s = String(raw == null ? '' : raw);
+    if (!s) return [];
+    var vis = [];
+    var idx = 0;
+    for (var ch of s) {
+      var start = idx;
+      idx += ch.length;
+      if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+      var d = ndToDigitClient(ch);
+      vis.push({
+        ch: ch,
+        pos: start,
+        end: idx,
+        d: d,
+        isHws: ch === '\t' || ch === '\v' || ch === '\f' || /\p{Zs}/u.test(ch),
+        isLb: ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029',
+        isWord: d >= 0 || /\p{L}/u.test(ch)
+      });
+    }
+    var maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var spans = [];
+    var i = 0;
+    while (i < vis.length) {
+      if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+      var cur = i;
+      var digits = [vis[cur].d];
+      var usedInnerSpace = false;
+      var usedDateDot = false;
+      var ok = true;
+      for (var k = 1; k < 6; k++) {
+        var sp = 0;
+        if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === '.' || vis[cur + 1].ch === '．')) {
+          sp = 1;
+          usedDateDot = true;
+        }
+        var hws = 0;
+        while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+        if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+        if (hws > 0) usedInnerSpace = true;
+        cur = cur + 1 + sp + hws;
+        digits.push(vis[cur].d);
+      }
+      if (!ok) { i++; continue; }
+      var mm = digits[2] * 10 + digits[3];
+      var dd = digits[4] * 10 + digits[5];
+      if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+      var sepEnd = cur + 1;
+      var sepSteps = 0;
+      var lbCount = 0;
+      var hasExplicitSep = false;
+      while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+        if (vis[sepEnd].isLb) {
+          if (!(vis[sepEnd].ch === '\n' && sepEnd > cur + 1 && vis[sepEnd - 1].ch === '\r')) {
+            lbCount++;
+          }
+          if (lbCount > 2) break;
+        } else if (!vis[sepEnd].isHws) {
+          hasExplicitSep = true;
+        }
+        sepEnd++;
+        sepSteps++;
+      }
+      if (usedDateDot && !hasExplicitSep) { i++; continue; }
+      if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+      cur = sepEnd;
+      digits.push(vis[cur].d);
+      for (var k2 = 1; k2 < 7; k2++) {
+        var sp2 = 0;
+        while (cur + 1 + sp2 < vis.length && vis[cur + 1 + sp2].isHws && sp2 < 2) sp2++;
+        if (cur + 1 + sp2 >= vis.length || vis[cur + 1 + sp2].d < 0) { ok = false; break; }
+        if (sp2 > 0) usedInnerSpace = true;
+        cur = cur + 1 + sp2;
+        digits.push(vis[cur].d);
+      }
+      if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+      if (usedInnerSpace) {
+        var lp = i - 1;
+        while (lp >= 0 && vis[lp].isHws) lp--;
+        if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+        var rp = cur + 1;
+        while (rp < vis.length && vis[rp].isHws) rp++;
+        if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+      }
+      spans.push({ start: vis[i].pos, end: vis[cur].end });
+      i = cur + 1;
+    }
+    return spans;
+  }
+
   function anonymizeLegalText(rawText, knownNames) {
     var counts = { rrn: 0, phone: 0, email: 0, account: 0, address: 0, name: 0 };
     var text = String(rawText || '');
 
-    /* ① 주민등록번호·외국인등록번호 (하이픈 유무 모두 포함: 생년월일 6자리 + 성별코드 1~8 + 6자리) */
-    text = text.replace(/(?:^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))(?:\s*[-~]\s*([1-8]\d{6})|([1-8]\d{6}))(?![\d])/g, function (m, front, backHy, backPlain) {
-      var lead = m.slice(0, m.length - (front + (backHy ? m.slice(m.indexOf(front) + 6) : backPlain)).length);
-      counts.rrn++;
-      return lead + '******-*******';
-    });
+    /* ① 주민등록번호·외국인등록번호 (원문 ①②·㈜·㎡ 불변 보존 + 모든 유니코드 십진수·비표시문자·구분자·띄어쓰기 구간 탐지 가림) */
+    var rrnSpans = findRrnSpansClient(text);
+    if (rrnSpans.length) {
+      var out = '';
+      var last = 0;
+      for (var si = 0; si < rrnSpans.length; si++) {
+        out += text.slice(last, rrnSpans[si].start) + '******-*******';
+        last = rrnSpans[si].end;
+        counts.rrn++;
+      }
+      text = out + text.slice(last);
+    }
 
     /* ② 휴대전화 및 일반전화번호 (사건번호·법령번호와 겹치지 않는 지역/통신망 번호만) */
     text = text.replace(/\b(01[016789])(?:[-\s.](\d{3,4})[-\s.](\d{4})|(\d{7,8}))\b/g, function (_, p1) {

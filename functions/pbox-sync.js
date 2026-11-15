@@ -364,12 +364,115 @@ function extractPartyNamesServer(combinedText, fileNameHint) {
 }
 
 /* 서버 업서트 전 공통 개인정보 비식별화 (주민번호 하이픈 유무·전화·이메일·계좌·호수·당사자 실명 사전 일괄 치환) */
+function ndToDigitServer(ch) {
+  if (!/\p{Nd}/u.test(ch)) return -1;
+  const cp = ch.codePointAt(0);
+  let base = cp;
+  while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+  return (cp - base) % 10;
+}
+
+function findRrnSpansServer(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!s) return [];
+  const vis = [];
+  let idx = 0;
+  for (const ch of s) {
+    const start = idx;
+    idx += ch.length;
+    if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+    const d = ndToDigitServer(ch);
+    vis.push({
+      ch,
+      pos: start,
+      end: idx,
+      d,
+      isHws: ch === "\t" || ch === "\v" || ch === "\f" || /\p{Zs}/u.test(ch),
+      isLb: ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029",
+      isWord: d >= 0 || /\p{L}/u.test(ch),
+    });
+  }
+  const maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const spans = [];
+  let i = 0;
+  while (i < vis.length) {
+    if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+    let cur = i;
+    const digits = [vis[cur].d];
+    let usedInnerSpace = false;
+    let usedDateDot = false;
+    let ok = true;
+    for (let k = 1; k < 6; k++) {
+      let sp = 0;
+      if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === "." || vis[cur + 1].ch === "．")) {
+        sp = 1;
+        usedDateDot = true;
+      }
+      let hws = 0;
+      while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+      if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+      if (hws > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp + hws;
+      digits.push(vis[cur].d);
+    }
+    if (!ok) { i++; continue; }
+    const mm = digits[2] * 10 + digits[3];
+    const dd = digits[4] * 10 + digits[5];
+    if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+    let sepEnd = cur + 1;
+    let sepSteps = 0;
+    let lbCount = 0;
+    let hasExplicitSep = false;
+    while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+      if (vis[sepEnd].isLb) {
+        if (!(vis[sepEnd].ch === "\n" && sepEnd > cur + 1 && vis[sepEnd - 1].ch === "\r")) {
+          lbCount++;
+        }
+        if (lbCount > 2) break;
+      } else if (!vis[sepEnd].isHws) {
+        hasExplicitSep = true;
+      }
+      sepEnd++;
+      sepSteps++;
+    }
+    if (usedDateDot && !hasExplicitSep) { i++; continue; }
+    if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+    cur = sepEnd;
+    digits.push(vis[cur].d);
+    for (let k = 1; k < 7; k++) {
+      let sp = 0;
+      while (cur + 1 + sp < vis.length && vis[cur + 1 + sp].isHws && sp < 2) sp++;
+      if (cur + 1 + sp >= vis.length || vis[cur + 1 + sp].d < 0) { ok = false; break; }
+      if (sp > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp;
+      digits.push(vis[cur].d);
+    }
+    if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+    if (usedInnerSpace) {
+      let lp = i - 1;
+      while (lp >= 0 && vis[lp].isHws) lp--;
+      if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+      let rp = cur + 1;
+      while (rp < vis.length && vis[rp].isHws) rp++;
+      if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+    }
+    spans.push({ start: vis[i].pos, end: vis[cur].end });
+    i = cur + 1;
+  }
+  return spans;
+}
+
 function scrubServerPii(raw, knownNames) {
   let s = String(raw || "");
-  s = s.replace(/(?:^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))(?:\s*[-~]\s*([1-8]\d{6})|([1-8]\d{6}))(?![\d])/g, (m, front, backHy, backPlain) => {
-    const lead = m.slice(0, m.length - (front + (backHy ? m.slice(m.indexOf(front) + 6) : backPlain)).length);
-    return lead + "******-*******";
-  });
+  const rrnSpans = findRrnSpansServer(s);
+  if (rrnSpans.length) {
+    let out = "", last = 0;
+    for (const sp of rrnSpans) {
+      out += s.slice(last, sp.start) + "******-*******";
+      last = sp.end;
+    }
+    s = out + s.slice(last);
+  }
   s = s.replace(/\b(01[016789])(?:[-\s.](\d{3,4})[-\s.](\d{4})|(\d{7,8}))\b/g, (_, p1) => p1 + "-****-****");
   s = s.replace(/\b(0(?:2|[3-6][1-5]|70))[-\s.](\d{3,4})[-\s.](\d{4})\b/g, (_, p1) => p1 + "-****-****");
   s = s.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "***@***.***");
@@ -422,9 +525,26 @@ function scrubDocumentObjectServer(d) {
   };
 }
 
+function collectStringsServer(val, out) {
+  if (typeof val === "string") { out.push(val); return; }
+  if (!val || typeof val !== "object") return;
+  if (Array.isArray(val)) {
+    for (const v of val) collectStringsServer(v, out);
+    return;
+  }
+  for (const k of Object.keys(val)) {
+    out.push(k);
+    collectStringsServer(val[k], out);
+  }
+}
+
 function hasResidualHardPii(rowObj) {
-  const dump = JSON.stringify(rowObj || {});
-  if (/(?:^|[^\d])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:\s*[-~]\s*[1-8]\d{6}|[1-8]\d{6})(?![\d])/.test(dump)) return true;
+  const parts = [];
+  collectStringsServer(rowObj, parts);
+  for (const str of parts) {
+    if (findRrnSpansServer(str).length > 0) return true;
+  }
+  const dump = parts.join("\n\n");
   if (/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(dump)) return true;
   if (/\b01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b/.test(dump)) return true;
   return false;

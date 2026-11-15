@@ -33,7 +33,7 @@ const {
 const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-        올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
+        올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
@@ -4627,6 +4627,7 @@ exports.newsView = functions
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
       /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
       res.set("Cache-Control", "public, max-age=300");
+      res.set("Content-Security-Policy", NV.전문보안);   // 2026-11-15 보안 — 전문 칸에 심은 스크립트·양식이 돌지 않게
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
@@ -6750,6 +6751,25 @@ exports.publishSite = functions
         res.status(413).json({ error: "너무 큽니다(" + Math.round(bytes / 1024) + "KB). "
           + "한도는 " + Math.round(한도 / 1024) + "KB 입니다." });
         return;
+      }
+
+      /* ★ 2026-11-15 보안 — «실행되는 조각»을 새로 넣는 올리기와 SVG 그림은 총괄관리자만(까닭은 site-publish.js 실행조각 머리).
+         글·표·그림(png·jpg·webp) 고치기는 지금처럼 재직 직원 누구나. 있던 쪽을 못 읽으면(새 쪽 포함) 빈 쪽과 견준다 — 막는 쪽으로 기운다. */
+      const 관리자인가 = ((await getDatabase().ref("uid_roles/" + decoded.uid + "/isAdmin").once("value")).val() === true);
+      if (!관리자인가) {
+        if (그림인가 && /\.svg$/i.test(String(path))) {
+          res.status(403).json({ error: "SVG 그림은 총괄관리자만 올릴 수 있습니다 — png·jpg·webp 로 올려 주세요." });
+          return;
+        }
+        if (!그림인가) {
+          let 있던쪽 = "";
+          try { 있던쪽 = await 새홈페이지쪽(홈페이지자리(path)); } catch (e) { 있던쪽 = ""; }
+          const 새것 = 새실행조각(있던쪽, String(content));
+          if (새것.length) {
+            res.status(403).json({ error: "스크립트·실행 코드가 새로 들어간 쪽은 총괄관리자만 올릴 수 있습니다(" + 새것.length + "곳). 글만 고쳐 다시 올려 주세요." });
+            return;
+          }
+        }
       }
 
       const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
