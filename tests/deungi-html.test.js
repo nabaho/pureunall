@@ -255,3 +255,9 @@ test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음
   assert.match(본문, /function sideSetW\(w\)\{ lsSet\('sideW'/);
   assert.match(본문, /role="separator" aria-orientation="vertical"/);
 });
+
+test('★ 보기 칸 — 그림은 확장자 형식으로 고정하고, 칸이 닫히면 더 그리지 않는다(보안·기능 재검증 2026-11-15)', () => {
+  assert.match(본문, /PV_URL=URL\.createObjectURL\(new Blob\(\[blob\], \{ type:ext==='png'\?'image\/png':'image\/jpeg' \}\)\)/);
+  assert.doesNotMatch(본문, /PV_URL=URL\.createObjectURL\(blob\)/);
+  assert.match(본문, /sideFit\(\); sideHead\(\); sideMark\(\);\n  if\(!SIDE \|\| !\$\('spv'\)\) return;/);
+});
