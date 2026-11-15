@@ -1551,3 +1551,332 @@ test('⑫ 지난메일(POP3 mailbox/old/msgs) 통합·사업장 약칭 2차 확�
   });
   assert.ok(getEl('mMailBody').textContent.includes('보관된 착수공문 요약글 900101-1******'), 'outOfWindow 과거 메일은 메모리 보관함의 요약을 주민번호 가림 처리하여 표시한다');
 });
+
+test('⑬ 현장 상담 실시간 음성녹취(Web Speech API) 좌·우 창 자동채움 및 과거 자료 이알피 번호 공란(erpDefer) 편입·일괄정리 검증', async () => {
+  const vm = require('node:vm');
+  const synthRrn = ['880707', '1234567'].join('-');
+
+  /* 1) C.buildErpSyncPayload & C.synthesizeWorkspaceFromCase 단위 검증 */
+  const deferCase = {
+    id: 'hc-defer-unit',
+    companyId: '',
+    companyName: '(주)과거보류점검',
+    category: 'harass',
+    title: '(주)과거보류점검 직장 내 괴롭힘 조사',
+    managerMain: 'P001',
+    receiveDate: '2022-04-10',
+    erpCaseId: '',
+    erpCaseNo: '',
+    erpDefer: true,
+    steps: {
+      intake: { done: true, date: '2022-04-10', note: '착수 공문 접수' },
+      victim: { done: true, date: '2022-04-15', note: '피해근로자 진술서 접수' },
+    },
+    mailLinks: [
+      { key: 'p:u1', slug: '*old', uid: 'u1', date: '2022-04-15', subject: '[(주)과거보류점검] 피해근로자 진술서 송부', docRole: 'victim_stmt', attNames: ['피해진술서.hwpx'] },
+    ],
+  };
+
+  assert.equal(C.buildErpSyncPayload(deferCase), null, 'erpDefer:true 이고 erpCaseId 가 비어 있으면 이알피 동기화 페이로드를 발행하지 않아 번호를 공란으로 유지한다');
+  const promotedPayload = C.buildErpSyncPayload(Object.assign({}, deferCase, { erpDefer: false }));
+  assert.ok(promotedPayload && promotedPayload.harassCaseId === 'hc-defer-unit', '추후 일괄정리에서 erpDefer:false 로 전환하면 이알피 채번·동기화 페이로드가 정상 생성된다');
+
+  const synInit = C.synthesizeWorkspaceFromCase(deferCase, {});
+  assert.ok(synInit.interviews.length >= 1, '수집 공문·기초정보로부터 좌측 면담·진술 기록이 자동 합성된다');
+  assert.ok(synInit.issues.length >= 1, '우측 법정 3요건 쟁점 검토표 기초 행이 자동 합성된다');
+  assert.ok(synInit.overview.includes('(주)과거보류점검'), '우측 신고 요지(overview)가 자동 합성된다');
+  assert.ok(synInit.recommendations.includes('근로기준법'), '우측 재발방지 권고안(recommendations)이 자동 합성된다');
+  assert.ok(synInit.conclusion.length > 10, '우측 종합 결론 요지(conclusion)가 자동 합성된다');
+  assert.ok(synInit.reportBody.includes('조사결과보고서'), '우측 표준 조사결과보고서 본문 초안(reportBody)이 자동 조립된다');
+  assert.equal(synInit.reportBodyAuto, true, '자동 생성된 보고서 본문은 reportBodyAuto:true 표식을 갖는다');
+
+  /* 사용자가 수동 작성해 저장한 보고서 본문(reportBodyAuto:false)은 새 면담 추가 시에도 보존된다 */
+  const manualSec = Object.assign({}, synInit, { reportBody: 'CUSTOM_MANUAL_REPORT_BODY', reportBodyAuto: false });
+  const synKeepManual = C.synthesizeWorkspaceFromCase(deferCase, manualSec, {
+    upsertInterview: {
+      id: 'iv-new',
+      role: 'victim',
+      alias: '신고인 가',
+      date: '2022-04-16',
+      qaList: [{ q: '회의 폭언 여부', a: '팀장이 공개석상에서 폭언과 업무 배제를 했습니다.' }],
+      summary: '공개 폭언 및 업무배제',
+    },
+    refreshReportBody: true,
+  });
+  assert.equal(synKeepManual.reportBody, 'CUSTOM_MANUAL_REPORT_BODY', '수동 편집된 보고서 본문(reportBodyAuto:false)은 덮어쓰지 않고 보존한다');
+  assert.ok(synKeepManual.issues.some((x) => x.title.includes('회의 폭언') || x.claimVictim.includes('폭언')), '새 면담의 3요건 쟁점 후보는 우측 검토표에 정상 추가된다');
+
+  /* 2) pu-erp.html 방어선: erpDefer:true 인 사건은 혹시 큐 조각이 남아 있어도 신규 채번하지 않는다 */
+  const erpSrc = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
+  const sIdx = erpSrc.indexOf('var _erpHarassSyncBusy = Object.create(null);');
+  const eIdx = erpSrc.indexOf('async function erpHarassInvestSync(', sIdx);
+  let mintedCount = 0;
+  const erpGuardCtx = vm.createContext({
+    Object, Array, String, Number, Date, Promise,
+    CASE_MEMO_KEY: 'case_memos',
+    PU_APP: 'erp',
+    _fbSynced: true,
+    CURRENT_USER: { sid: 'P001', isAdmin: true },
+    fbDb: { ref: (p) => ({ path: p }) },
+    CustomEvent: function (t, o) { this.type = t; this.detail = o && o.detail; },
+    getCaseTypes: () => [{ code: 'case-investigate', name: '조사', short: '조사' }],
+    genCaseNo: () => { mintedCount++; return '조사-2026-999'; },
+    dbGet: () => [],
+    dbUpsert: () => { mintedCount++; return true; },
+    dbPatch: () => true,
+    dbSet: () => true,
+    PuHarassCore: C,
+    PuOntologyWrite: { createGateway: () => ({ async save() { return { committed: true, snapshot: { val: () => ({}) } }; } }) },
+    dispatchEvent() {},
+  });
+  erpGuardCtx.window = erpGuardCtx;
+  vm.runInContext(erpSrc.slice(sIdx, eIdx), erpGuardCtx);
+  const blockedRes = await erpGuardCtx.erpApplyHarassSyncOne('hc-defer-unit', { id: 'hc-defer-unit', revision: 1 }, {}, { 'hc-defer-unit': deferCase });
+  assert.equal(blockedRes, false, 'pu-erp.html 은 erpDefer:true 사건에 대해 채번·반영을 건너뛴다');
+  assert.equal(mintedCount, 0, '과거 보류 사건에 대해 2026년 신규 이알피 사건번호가 절대 채번되지 않는다');
+
+  /* 3) PuHarassView 통합 검증: 과거 묶음 공란 편입 → 현장 상담 실시간 음성녹취(RRN 마스킹·문답·좌우 반영) → 추후 일괄 이알피 연결 */
+  const els = {};
+  const makeEl = (id) => ({
+    id, value: '', textContent: '', innerHTML: '', checked: id === 'ivSyncRightPane' || id === 'ivPledge', disabled: false,
+    scrollTop: 0, scrollHeight: 100,
+    style: { display: '' },
+    classList: {
+      _s: new Set(),
+      add(c) { this._s.add(c); },
+      remove(c) { this._s.delete(c); },
+      toggle(c, on) { const v = on === undefined ? !this._s.has(c) : !!on; if (v) this._s.add(c); else this._s.delete(c); },
+      contains(c) { return this._s.has(c); },
+    },
+    addEventListener(ev, fn) { (this._ev = this._ev || {})[ev] = fn; },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    focus() {},
+  });
+  const getEl = (id) => (els[id] = els[id] || makeEl(id));
+  const docListeners = {};
+
+  let activeRecog = null;
+  let recogStoppedCount = 0;
+  let trackStoppedCount = 0;
+  class MockSpeechRecognition {
+    constructor() {
+      this.lang = '';
+      this.continuous = false;
+      this.interimResults = false;
+      this.onresult = null;
+      this.onerror = null;
+      this.onend = null;
+      activeRecog = this;
+    }
+    start() { this.started = true; }
+    stop() { recogStoppedCount++; this.started = false; }
+  }
+  class MockMediaRecorder {
+    constructor(stream) {
+      this.stream = stream;
+      this.state = 'inactive';
+      this.mimeType = 'audio/webm';
+      this.ondataavailable = null;
+      this.onstop = null;
+    }
+    start() { this.state = 'recording'; }
+    stop() {
+      this.state = 'inactive';
+      if (this.ondataavailable) this.ondataavailable({ data: { size: 16 } });
+      if (this.onstop) this.onstop();
+    }
+  }
+
+  const dbStore = {
+    'uid_roles/uLive': { sid: 'P001', name: '점검대표', status: 'active', isAdmin: true },
+    'data/user_dir': [{ sid: 'P001', name: '점검대표', status: 'active' }],
+    'data/cases/v': [
+      { id: 'ec-exist-2023', caseNo: '조사-2023-007', typeCode: 'case-investigate', companyName: '(주)현장녹취점검', managerMain: 'P001' },
+    ],
+    'data/biz_case_types/v': [{ code: 'case-investigate', name: '조사', short: '조사' }],
+    'harass_invest/cases': {},
+    'harass_invest/erp_sync': {},
+    'mailbox/old/msgs': {
+      'hist_1': {
+        u: 'hist_1',
+        s: '[(주)다마바과거점검] 직장 내 괴롭힘 신고 조사 의뢰 및 착수공문',
+        f: '인사팀',
+        e: 'hr@damaba-past.example',
+        t: '370-6@daum.net',
+        d: Date.UTC(2023, 5, 10, 2, 0, 0),
+        a: 1,
+        an: ['착수공문_2023.hwp'],
+        p: '조사 착수 요청',
+      },
+    },
+  };
+
+  function makeRef(p) {
+    return {
+      path: p,
+      child(s) { return makeRef(p ? p + '/' + s : String(s)); },
+      on() {},
+      off() {},
+      once: () => Promise.resolve({ val: () => (dbStore[p] !== undefined ? dbStore[p] : null) }),
+    };
+  }
+
+  const ctx = vm.createContext({
+    console, setTimeout, clearTimeout, setInterval, clearInterval, Promise, URLSearchParams,
+    Blob: function (parts, opts) { this.parts = parts; this.type = opts && opts.type; },
+    URL: { createObjectURL: () => 'blob:live-rec', revokeObjectURL() {} },
+    confirm: () => true,
+    SpeechRecognition: MockSpeechRecognition,
+    MediaRecorder: MockMediaRecorder,
+    navigator: {
+      mediaDevices: {
+        async getUserMedia() {
+          return { getTracks: () => [{ stop() { trackStoppedCount++; } }] };
+        },
+      },
+    },
+    PuHarassCore: C,
+    PuGate: { show() {}, hide() {} },
+    PuOntologyWrite: {
+      createGateway: () => ({
+        async save(ref, fn) {
+          const prev = dbStore[ref.path] || null;
+          const next = typeof fn === 'function' ? fn(prev) : fn;
+          dbStore[ref.path] = next;
+          if (ref.path.startsWith('harass_invest/cases/')) {
+            const cid = ref.path.split('/')[2];
+            dbStore['harass_invest/cases'][cid] = next;
+          }
+          if (ref.path.startsWith('harass_invest/erp_sync/')) {
+            const cid = ref.path.split('/')[2];
+            dbStore['harass_invest/erp_sync'][cid] = next;
+          }
+          return { committed: true, snapshot: { val: () => next } };
+        },
+        async remove(ref) {
+          delete dbStore[ref.path];
+          if (ref.path.startsWith('harass_invest/erp_sync/')) {
+            delete dbStore['harass_invest/erp_sync'][ref.path.split('/')[2]];
+          }
+          return true;
+        },
+      }),
+    },
+    location: { search: '', hash: '', pathname: '/pu-harass.html', href: 'https://nabaho.github.io/pureunall/pu-harass.html' },
+    history: { replaceState() {} },
+    document: {
+      activeElement: null,
+      contains: () => false,
+      createElement: () => ({ click() {}, remove() {}, style: {} }),
+      body: { appendChild() {} },
+      getElementById: (id) => getEl(id),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener(ev, fn) { (docListeners[ev] = docListeners[ev] || []).push(fn); },
+      removeEventListener(ev, fn) {
+        if (docListeners[ev]) docListeners[ev] = docListeners[ev].filter((x) => x !== fn);
+      },
+    },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+
+  let authCb = null;
+  const curUser = { uid: 'uLive', getIdToken: async () => 'tok-live' };
+  ctx.PuHarassView.boot({
+    auth: Object.assign(() => ({ currentUser: curUser, setPersistence() {}, onAuthStateChanged(fn) { authCb = fn; } }), { Auth: { Persistence: { LOCAL: 'local' } } }),
+    database: () => ({ ref: (p) => makeRef(p || '') }),
+  });
+  await authCb(curUser);
+
+  /* 과거 미등록 메일 묶음(hist_1)을 [📥 편입(번호공란)]으로 등록 */
+  await getEl('tabs')._ev.click({
+    target: { closest: (s) => (s === 'button[data-tab]' ? { getAttribute: () => 'inbox' } : null) },
+  });
+  const bundleMatch = /data-act="regBundleDefer" data-id="([^"]+)"/.exec(getEl('inboxBox').innerHTML || '');
+  assert.ok(bundleMatch && bundleMatch[1], '미등록 후보 탭에 [📥 편입(번호공란)] 버튼이 렌더링된다');
+
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'regBundleDefer' : bundleMatch[1]) } : null) },
+    stopPropagation() {},
+  });
+
+  const deferCaseIds = Object.keys(dbStore['harass_invest/cases']).filter((k) => k.startsWith('hi_'));
+  assert.equal(deferCaseIds.length, 1, '과거 메일 묶음이 조사 사건(harass_invest/cases)으로 편입되었다');
+  const importedId = deferCaseIds[0];
+  const importedCase = dbStore['harass_invest/cases'][importedId];
+  assert.equal(importedCase.erpDefer, true, '편입된 과거 사건에 erpDefer:true 가 기록된다');
+  assert.equal(importedCase.erpCaseId, '', '편입된 과거 사건의 erpCaseId 는 공란으로 유지된다');
+  assert.equal(importedCase.erpCaseNo, '', '편입된 과거 사건의 erpCaseNo 는 공란으로 유지된다');
+  assert.equal(dbStore['harass_invest/erp_sync'][importedId], undefined, '공란 편입 사건은 푸른이알피 동기화 큐(erp_sync)에 올라가지 않는다');
+
+  const importedSec = dbStore[`harass_secret/${importedId}`];
+  assert.ok(importedSec && importedSec.interviews.length >= 1 && importedSec.issues.length >= 1 && importedSec.reportBody.includes('조사결과보고서'),
+    '과거 묶음 편입 즉시 좌측(진술 기록)과 우측(3요건 검토표·보고서 본문 초안)이 모두 채워진다');
+
+  /* 현장 상담 실시간 녹취 시작(liveRecIv) → 조사자 질문 & 진술인 답변(주민번호 포함) 음성 인식 → 종료 시 자동 문답·3요건·보고서 반영 */
+  ['ivRole', 'ivAlias', 'ivDept', 'ivDate', 'ivMethod', 'ivPledge', 'ivRaw', 'ivSum', 'ivAmend', 'ivQaBox', 'ivCandWrap', 'ivCandBox',
+    'ivLiveBar', 'ivLiveStartBtn', 'ivSpkQBtn', 'ivSpkABtn', 'ivLiveTimer', 'ivDlAudioBtn', 'ivLiveCap', 'ivLocalAudioBox',
+    'ivSyncRightPane', 'ivSaveBtn'].forEach(getEl);
+  getEl('ivRole').value = 'victim';
+  getEl('ivAlias').value = '신고인 현장상담';
+  getEl('ivDate').value = '2023-06-12';
+  getEl('ivMethod').value = '대면면담';
+  getEl('ivSyncRightPane').checked = true;
+
+  await docListeners.click[0]({
+    target: { closest: (sel) => (sel === '[data-act]' ? { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'liveRecIv' : '') } : null) },
+    stopPropagation() {},
+  });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.ok(activeRecog && activeRecog.started === true && activeRecog.lang === 'ko-KR', '현장 실시간 녹취 버튼 클릭 즉시 한국어(ko-KR) 연속 음성인식이 시작된다');
+
+  /* 조사자 질문 인식 */
+  activeRecog.onresult({
+    resultIndex: 0,
+    results: [{ isFinal: true, 0: { transcript: '상담에 오시게 된 구체적인 폭언 경위를 말씀해 주세요.' } }],
+  });
+  /* 화자 전환(답: 진술인) 후 주민등록번호가 섞인 답변 인식 */
+  getEl('ivSpkABtn')._ev.click();
+  activeRecog.onresult({
+    resultIndex: 0,
+    results: [{ isFinal: true, 0: { transcript: '본부장이 주간회의에서 전 직원이 보는 가운데 폭언과 업무 배제를 지시했습니다. 제 번호는 ' + synthRrn + ' 입니다.' } }],
+  });
+  assert.equal(C.hasUnmaskedRrn(getEl('ivRaw').value), false, '실시간 음성인식 중 주민등록번호가 들어와도 원문 창(#ivRaw)에 들어가는 즉시 마스킹된다');
+  assert.ok(getEl('ivRaw').value.includes('문: ') && getEl('ivRaw').value.includes('답: '), '화자 전환 버튼에 따라 [문:]과 [답:] 구분자가 자동 부여된다');
+
+  /* 녹취 종료 버튼 클릭 → 문답(Q&A)·요지·3요건 후보 자동 정리 및 마이크 트랙 해제 확인 */
+  getEl('ivLiveStartBtn')._ev.click();
+  assert.ok(recogStoppedCount >= 1 && trackStoppedCount >= 1, '녹취 종료 즉시 음성인식 및 마이크 스트림 트랙이 안전하게 정지된다');
+  assert.ok(getEl('ivSum').value.includes('본부장'), '실시간 상담 녹취 종료와 동시에 진술 핵심 요지가 자동 생성된다');
+  assert.ok(getEl('ivQaBox').innerHTML.includes('문답 1'), '실시간 상담 녹취 종료와 동시에 문답(Q&A) 카드가 자동 구조화된다');
+
+  /* collectQaFromDom 이 DOM 행을 읽을 수 있도록 1행 스텁 연결 후 [💾 저장] 실행 */
+  getEl('ivQaBox').querySelectorAll = () => [{
+    querySelector: (sel) => (sel === '[data-qa-q]'
+      ? { value: '상담에 오시게 된 구체적인 폭언 경위를 말씀해 주세요.' }
+      : { value: '본부장이 주간회의에서 전 직원이 보는 가운데 폭언과 업무 배제를 지시했습니다.' }),
+  }];
+  getEl('ivSaveBtn')._ev.click();
+  await new Promise((r) => setTimeout(r, 30));
+
+  const secAfterLive = dbStore[`harass_secret/${importedId}`];
+  assert.ok(secAfterLive.interviews.some((iv) => iv.alias === '신고인 현장상담' && iv.qaList.length === 1), '현장 상담 실시간 녹취록이 좌측 면담 진술 기록에 저장된다');
+  assert.ok(secAfterLive.issues.some((iss) => iss.claimVictim && iss.claimVictim.includes('본부장')), '현장 상담 진술에서 감지된 쟁점이 우측 법정 3요건 검토표에 자동 추가된다');
+  assert.ok(secAfterLive.reportBody.includes('신고인 현장상담'), '우측 조사결과보고서 본문 초안에도 방금 녹취한 상담 진술이 즉시 반영된다');
+  assert.equal(dbStore['harass_invest/cases'][importedId].steps.victim.done, true, '현장 상담 저장 시 4단계(피해자 면담)가 자동 완료된다');
+  assert.equal(dbStore['harass_invest/cases'][importedId].steps.review.done, true, '3요건 검토표 자동 구성과 함께 7단계(3요건 법리검토)도 자동 반영된다');
+  assert.equal(dbStore['harass_invest/erp_sync'][importedId], undefined, '진술·단계를 갱신해도 이알피 공란 보류(erpDefer:true) 사건은 여전히 채번을 유예한다');
+
+  /* 추후 [🏢 이알피 공란 정리] 모달에서 일괄 채번·연결 실행 */
+  getEl('mErpBatchRunBtn');
+  getEl('mErpBatchList').querySelectorAll = () => [{ checked: true, getAttribute: () => importedId }];
+  getEl('mErpBatchList').querySelector = () => ({ value: '' });
+  getEl('erpBatchBtn')._ev.click();
+  await getEl('mErpBatchRunBtn')._ev.click();
+
+  assert.equal(dbStore['harass_invest/cases'][importedId].erpDefer, false, '일괄 정리 실행 후 erpDefer 가 false 로 전환된다');
+  assert.ok(dbStore['harass_invest/erp_sync'][importedId], '일괄 정리 실행 즉시 푸른이알피 채번·동기화 큐(erp_sync)에 등록된다');
+});

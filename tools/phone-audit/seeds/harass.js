@@ -51,13 +51,14 @@ const harassCases = {
   'hc-2': {
     id: 'hc-2', entityType: 'Case', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 4, updatedAt: NOW - 7200e3, revision: 1,
+    erpCaseId: '', erpCaseNo: '', erpDefer: true,
     companyId: 'hco-2', companyName: '(주)다라점검바이오헬스케어시스템즈', bizNo: '123-81-20026',
     category: 'both', title: '연구소 직장 내 괴롭힘 및 성희롱 복합 조사 건',
     managerMain: 'P002', managerSubs: [],
-    receiveDate: '2026-11-01', dueDate: '2026-12-10', closeDate: '',
+    receiveDate: '2024-11-01', dueDate: '', closeDate: '',
     verdictSummary: '',
     steps: {
-      intake: { done: true, date: '2026-11-01', note: '착수 공문 접수' },
+      intake: { done: true, date: '2024-11-01', note: '과거 푸른메일 착수 공문 접수' },
     },
     mailLinks: [],
   },
@@ -78,7 +79,8 @@ const secrets = {
     ],
     conclusion: '쟁점 1은 근로기준법 제76조의2 요건을 모두 충족하여 직장 내 괴롭힘에 해당하며, 쟁점 2는 업무상 적정범위 내 인사조정으로 판단함.',
     recommendations: '피해근로자 희망 반영 부서 분리 유지 및 행위자 인사위원회 회부·재발방지 교육 권고.',
-    reportBody: '',
+    reportBody: '【 직장 내 괴롭힘 사안 외부전문가 조사결과보고서 】\n1. 사건 개요\n- 의뢰 사업장: (주)가나점검테크놀로지솔루션\n- 점검용 합성 본문 초안',
+    reportBodyAuto: true,
   },
 };
 
@@ -125,6 +127,6 @@ module.exports = {
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
     { name: 'yearly', run: async (p) => { await p.click('#tabs button[data-tab="yearly"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
-    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('button[data-act="wsMode"][data-id="doc"]'); } },
+    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="report"]'); } },
   ],
 };

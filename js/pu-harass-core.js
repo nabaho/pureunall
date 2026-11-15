@@ -1110,10 +1110,16 @@
     return trimmed ? (trimmed + '\n\n' + wrapped) : wrapped;
   }
 
-  /* 푸른이알피 동기화용 패치 & 업무 메모(case_memos) 결정적 목록 생성 */
-  function buildErpSyncPayload(caseRec) {
+  /* 푸른이알피 동기화용 패치 & 업무 메모(case_memos) 결정적 목록 생성
+   * - erpDefer === true 이고 아직 erpCaseId 가 없는 과거·보류 사건은
+   *   추후 일괄 정리 시점(opts.forceCreate === true 또는 erpDefer 해제)까지 이알피 자동 채번 큐를 발행하지 않는다.
+   */
+  function buildErpSyncPayload(caseRec, opts) {
     if (!obj(caseRec)) return null;
     var cid = str(caseRec.id);
+    var eid = str(caseRec.erpCaseId);
+    var forceCreate = !!(opts && opts.forceCreate === true);
+    if (!eid && caseRec.erpDefer === true && !forceCreate) return null;
     var steps = obj(caseRec.steps) ? caseRec.steps : {};
     var mails = Array.isArray(caseRec.mailLinks) ? caseRec.mailLinks : [];
     var prog = summarizeProgress(steps, caseRec.closeDate);
@@ -1638,6 +1644,253 @@
     return { qaList: qaList, summary: summary, candidateIssues: candidateIssues, truncatedQaCount: truncatedQaCount };
   }
 
+  /* ═══ 사건 메일·진행단계·상담녹취 기반 좌·우 통합작업실(Left/Right Pane) 자동 채움 합성기 ═══
+   * - 기존에 사람이 작성한 항목은 절대 덮어쓰지 않고(보존), 비어 있는 좌측 면담카드·우측 신고요지·3요건 검토표·권고안·결론·보고서 초안을 자동으로 채운다.
+   * - 현장 상담 녹취나 새 면담(opts.upsertInterview · opts.extraCandidateIssues)이 들어오면 좌측 면담 목록과 우측 3요건 검토표·보고서 본문까지 한 번에 연동 갱신한다.
+   */
+  function normIssueTitle(t) {
+    return str(t).replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g, '').toLowerCase();
+  }
+
+  function synthesizeWorkspaceFromCase(caseRec, existingSecret, opts) {
+    var c = obj(caseRec) ? caseRec : {};
+    var sec = obj(existingSecret) ? existingSecret : {};
+    var o = obj(opts) ? opts : {};
+    var cid = str(c.id || sec.id || 'case');
+    var catCode = CATEGORIES[c.category] ? c.category : 'harass';
+    var cat = CATEGORIES[catCode];
+    var steps = obj(c.steps) ? c.steps : {};
+    var prog = summarizeProgress(steps, c.closeDate);
+    var mails = Array.isArray(c.mailLinks) ? c.mailLinks : [];
+
+    /* 1) 좌측 단: 면담·상담 진술 목록 (interviews) */
+    var rawIvs = Array.isArray(sec.interviews) ? sec.interviews.slice() : [];
+    if (obj(o.upsertInterview) && str(o.upsertInterview.id)) {
+      var upIdx = rawIvs.findIndex(function (x) { return obj(x) && x.id === o.upsertInterview.id; });
+      if (upIdx >= 0) rawIvs[upIdx] = o.upsertInterview;
+      else rawIvs.push(o.upsertInterview);
+    }
+    var activeIvs = rawIvs.filter(function (x) { return obj(x) && !x._deleted; });
+
+    if (!activeIvs.length) {
+      var stmtMails = mails.filter(function (m) {
+        if (!obj(m)) return false;
+        if (m.docRole === 'victim_stmt' || m.docRole === 'accused_stmt' || m.docRole === 'witness_evid') return true;
+        var txt = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
+        return /진술|소명|면담|상담|녹취|문답|답변서|확인서|경위서/.test(txt);
+      });
+
+      stmtMails.slice(0, 6).forEach(function (ml, idx) {
+        var rCode = ml.docRole === 'accused_stmt' ? 'accused' : ml.docRole === 'witness_evid' ? 'witness' : 'victim';
+        var txt = str(ml.subject) + ' ' + (Array.isArray(ml.attNames) ? ml.attNames.join(' ') : '');
+        if (rCode === 'victim' && /피신고|행위자|가해|소명|반론/.test(txt)) rCode = 'accused';
+        else if (rCode === 'victim' && /참고인|목격/.test(txt)) rCode = 'witness';
+        var roleAlias = rCode === 'accused' ? '피신고인 측 소명·면담 기록' : rCode === 'witness' ? '참고인 진술·제출증거 기록' : '신고인(피해근로자) 상담·진술 기록';
+        var attList = (Array.isArray(ml.attNames) && ml.attNames.length) ? ml.attNames.map(maskRrnText).join(', ') : '';
+        var method = /서면|진술서|소명서|답변서|경위서|의견서/.test(txt) ? '서면진술' : '대면면담';
+        var qPrompt = rCode === 'accused'
+          ? '신고 사안에 대한 피신고인 측 사실관계 소명 및 입장 확인'
+          : rCode === 'witness'
+            ? '참고인 목격 경위 및 객관적 제출 증빙 확인'
+            : '신고 접수 경위 및 피해 주장 핵심 사실 확인';
+        var ansTxt = maskRrnText(str(ml.subject || '수집 진술 자료')) + (attList ? (' [첨부: ' + attList + ']') : '');
+        var sumLines = ['• [' + (str(ml.date) || '수집자료') + '] ' + maskRrnText(str(ml.subject || '진술·면담 관련 공문'))];
+        if (attList) sumLines.push('• 확인 첨부서류: ' + attList);
+        var synthIv = {
+          id: 'iv_auto_' + safeKey(cid + '_' + (ml.key || idx)),
+          role: rCode,
+          alias: roleAlias + (stmtMails.length > 1 ? ' #' + (idx + 1) : ''),
+          dept: '',
+          date: str(ml.date) || str(c.receiveDate) || ymdOf(Date.now()),
+          method: method,
+          pledgeSigned: !!(steps.pledge && steps.pledge.done),
+          summary: maskRrnText(sumLines.join('\n')),
+          qaList: [{ q: qPrompt, a: ansTxt }],
+          rawTranscript: '',
+          amendNote: '',
+          stmtSigned: false,
+          autoSynthesized: true
+        };
+        rawIvs.push(synthIv);
+        activeIvs.push(synthIv);
+      });
+
+      if (!activeIvs.length) {
+        var firstMail = mails[mails.length - 1] || mails[0] || null;
+        var baseDate = str(c.receiveDate) || (firstMail && str(firstMail.date)) || ymdOf(Date.now());
+        var intakeNote = (steps.intake && str(steps.intake.note)) || (firstMail && str(firstMail.subject)) || (str(c.title) || (cat.label + ' 조사 의뢰 접수'));
+        var docSummary = mails.length
+          ? ('수집 공문·서류 총 ' + mails.length + '건 (' + mails.slice(0, 3).map(function (m) { return maskRrnText(str(m.subject)).slice(0, 45); }).join(' / ') + ')')
+          : '초기 수임·상담 접수 기록 (현장 상담 실시간 녹취 또는 녹취록 파일 업로드로 상세 문답 추가 가능)';
+        var baseIv = {
+          id: 'iv_auto_intake_' + safeKey(cid),
+          role: 'victim',
+          alias: '초기 상담·접수 기초기록',
+          dept: '',
+          date: baseDate,
+          method: '대면면담',
+          pledgeSigned: !!(steps.pledge && steps.pledge.done),
+          summary: maskRrnText('• 접수·착수 요지: ' + intakeNote + '\n• 기초 수집현황: ' + docSummary),
+          qaList: [
+            {
+              q: '사건 의뢰 및 초기 상담·신고 접수 경위',
+              a: maskRrnText((str(c.companyName) ? str(c.companyName) + ' — ' : '') + intakeNote)
+            },
+            {
+              q: '수집 공문 및 진행 단계 확인 사항',
+              a: maskRrnText('현재 ' + prog.doneCount + '/8단계(' + prog.currentStepShort + ') 진행 · ' + docSummary)
+            }
+          ],
+          rawTranscript: '',
+          amendNote: '',
+          stmtSigned: false,
+          autoSynthesized: true
+        };
+        rawIvs.push(baseIv);
+        activeIvs.push(baseIv);
+      }
+    }
+
+    /* 2) 우측 단: 쟁점 행위별 사실인정 및 법정 3요건 검토표 (issues) */
+    var rawIssues = Array.isArray(sec.issues) ? sec.issues.slice() : [];
+    var activeIssues = rawIssues.filter(function (x) { return obj(x) && !x._deleted; });
+    var seenIssueNorm = {};
+    activeIssues.forEach(function (iss) {
+      var nk = normIssueTitle(iss.title);
+      if (nk) seenIssueNorm[nk] = 1;
+    });
+
+    var incomingCands = [];
+    if (Array.isArray(o.extraCandidateIssues)) {
+      incomingCands = incomingCands.concat(o.extraCandidateIssues);
+    }
+    activeIvs.forEach(function (iv) {
+      var extracted = extractCandidateIssuesFromQa(iv.qaList || [], iv.role || 'victim');
+      extracted.forEach(function (ci) {
+        incomingCands.push(Object.assign({}, ci, {
+          _sourceAlias: str(iv.alias)
+        }));
+      });
+    });
+
+    incomingCands.forEach(function (ci, idx) {
+      if (!obj(ci) || !str(ci.title)) return;
+      var nk = normIssueTitle(ci.title);
+      if (!nk || seenIssueNorm[nk]) return;
+      seenIssueNorm[nk] = 1;
+      var newIss = {
+        id: 'iss_auto_' + safeKey(cid + '_' + nk.slice(0, 24) + '_' + idx),
+        title: maskRrnText(str(ci.title).slice(0, 120)),
+        whenWhere: maskRrnText(str(ci.whenWhere).slice(0, 100)),
+        claimVictim: maskRrnText(str(ci.claimVictim).slice(0, 800)),
+        claimAccused: maskRrnText(str(ci.claimAccused).slice(0, 800)),
+        evidenceNote: maskRrnText(str(ci.evidenceNote) || ((ci._sourceAlias ? ci._sourceAlias + ' ' : '') + '면담·녹취 진술 및 수집 자료 대조')),
+        factStatus: 'hold',
+        elemSuperiority: 'hold',
+        elemBeyondScope: 'hold',
+        elemHarm: 'hold',
+        verdict: 'hold',
+        autoSynthesized: true
+      };
+      newIss.verdict = judgeIssue(newIss);
+      rawIssues.push(newIss);
+      activeIssues.push(newIss);
+    });
+
+    if (!activeIssues.length) {
+      var vCode = str(c.verdictSummary);
+      var defFact = vCode === 'recognized' ? 'recognized' : vCode === 'partial' ? 'partial' : vCode === 'unrecognized' ? 'unrecognized' : 'hold';
+      var defElem = vCode === 'recognized' ? 'yes' : vCode === 'unrecognized' ? 'no' : 'hold';
+      var vicIv = activeIvs.find(function (x) { return x.role === 'victim'; });
+      var accIv = activeIvs.find(function (x) { return x.role === 'accused'; });
+      var baseTitle = maskRrnText((str(c.title) || (cat.label + ' 신고 사안')) + ' 관련 핵심 행위 요건 검토');
+      var baseIss = {
+        id: 'iss_auto_base_' + safeKey(cid),
+        title: baseTitle.slice(0, 120),
+        whenWhere: maskRrnText(((str(c.receiveDate) ? str(c.receiveDate) + ' 전후 · ' : '') + (str(c.companyName) || '의뢰 사업장')).slice(0, 100)),
+        claimVictim: maskRrnText((vicIv && str(vicIv.summary)) ? str(vicIv.summary).replace(/^•\s*/gm, '').slice(0, 300) : '신고 접수 및 피해근로자 측 진술 요지 확인'),
+        claimAccused: maskRrnText((accIv && str(accIv.summary)) ? str(accIv.summary).replace(/^•\s*/gm, '').slice(0, 300) : '피신고인 측 업무상 경위 및 소명 의견 확인'),
+        evidenceNote: maskRrnText(mails.length ? ('수집 공문·첨부서류 ' + mails.length + '건 및 당사자 진술 교차 검토') : '상담·면담 진술 및 객관적 제출 증빙 대조'),
+        factStatus: defFact,
+        elemSuperiority: defFact === 'recognized' ? 'yes' : defElem,
+        elemBeyondScope: defElem,
+        elemHarm: defElem,
+        verdict: 'hold',
+        autoSynthesized: true
+      };
+      baseIss.verdict = vCode === 'recognized' ? 'yes' : vCode === 'unrecognized' ? 'no' : judgeIssue(baseIss);
+      rawIssues.push(baseIss);
+      activeIssues.push(baseIss);
+    }
+
+    /* 3) 우측 단: 신고요지(overview) · 맞춤권고(recommendations) · 결론요지(conclusion) */
+    var lawBasis = catCode === 'sexual'
+      ? '남녀고용평등법 제14조'
+      : catCode === 'both'
+        ? '근로기준법 제76조의2·제76조의3 및 남녀고용평등법 제14조'
+        : '근로기준법 제76조의2·제76조의3';
+
+    var nextOverview = str(sec.overview);
+    if (!nextOverview || o.forceOverwrite) {
+      var coTxt = str(c.companyName) || '의뢰 사업장';
+      var recvTxt = str(c.receiveDate) ? (str(c.receiveDate) + ' 수임·착수하여 ') : '';
+      var mailStatTxt = mails.length
+        ? ('푸른 메일함에서 관련 공문·진술·보고 자료 총 ' + mails.length + '건을 수집·대조하였으며, ')
+        : '';
+      nextOverview = maskRrnText(
+        coTxt + '에서 의뢰한 ' + cat.label + '(' + lawBasis + ') 조사 사안(' + (str(c.title) || cat.label + ' 조사') + ')으로, ' +
+        recvTxt + mailStatTxt + '현재 8단계 표준 조사 절차 중 ' + prog.doneCount + '단계(' + prog.currentStepName + ') 기준으로 면담 진술 및 법정 요건을 검토함.'
+      );
+    }
+
+    var nextRec = str(sec.recommendations);
+    if (!nextRec || o.forceOverwrite) {
+      if (catCode === 'sexual') {
+        nextRec = '남녀고용평등법 제14조에 따른 피해근로자 보호·근무장소 분리, 비밀유지 준수 및 전 직원 성희롱 예방 특별교육 권고';
+      } else if (catCode === 'both') {
+        nextRec = '근로기준법 제76조의3 및 남녀고용평등법 제14조에 따른 당사자 분리배치 유지, 피해자 의견청취 후 인사조치 및 조직문화·예방 특별교육 권고';
+      } else {
+        nextRec = '근로기준법 제76조의3에 따른 피해근로자 의견청취·보호조치(분리배치 등), 참여자 비밀유지 엄수 및 상호존중 조직문화 교육 실시 권고';
+      }
+    }
+
+    var nextConclusion = str(sec.conclusion);
+    if (!nextConclusion || o.forceOverwrite) {
+      var verdictInfo = VERDICTS[str(c.verdictSummary)] || VERDICTS[''];
+      if (str(c.closeDate) || (steps.report && steps.report.done)) {
+        nextConclusion = maskRrnText(
+          '수집된 공문·증빙(' + mails.length + '건)과 당사자 진술(' + activeIvs.length + '건), 쟁점 행위(' + activeIssues.length + '건)의 법정 요건 검토를 종합하여 최종 보고서 제출 및 조사를 종결함 (' + verdictInfo.label + ').'
+        );
+      } else {
+        nextConclusion = maskRrnText(
+          '당사자 상담·면담 진술(' + activeIvs.length + '건) 및 수집 자료(' + mails.length + '건)를 교차 대조하여 총 ' + activeIssues.length + '개 쟁점 행위의 사실인정 여부와 법정 3요건 충족 여부를 종합 판단함 (' + verdictInfo.label + ').'
+        );
+      }
+    }
+
+    var nextSec = Object.assign({}, sec, {
+      id: cid,
+      companyId: str(c.companyId || sec.companyId),
+      overview: maskRrnText(nextOverview),
+      conclusion: maskRrnText(nextConclusion),
+      recommendations: maskRrnText(nextRec),
+      interviews: rawIvs,
+      issues: rawIssues
+    });
+
+    var curBody = str(sec.reportBody);
+    var allowAutoRefresh = !curBody || o.forceOverwrite || (o.refreshReportBody && (o.forceRefreshBody || sec.reportBodyAuto !== false));
+    if (allowAutoRefresh) {
+      nextSec.reportBody = assembleReportDraft(c, nextSec);
+      nextSec.reportBodyAuto = true;
+    } else {
+      nextSec.reportBody = maskRrnText(curBody);
+      nextSec.reportBodyAuto = sec.reportBodyAuto === true;
+    }
+
+    return nextSec;
+  }
+
   return {
     STEPS: STEPS,
     CATEGORIES: CATEGORIES,
@@ -1675,6 +1928,8 @@
     buildErpSyncPayload: buildErpSyncPayload,
     judgeIssue: judgeIssue,
     assembleReportDraft: assembleReportDraft,
+    synthesizeWorkspaceFromCase: synthesizeWorkspaceFromCase,
+    extractCandidateIssuesFromQa: extractCandidateIssuesFromQa,
     parseTranscriptFallback: parseTranscriptFallback,
     buildTranscriptAiPrompt: buildTranscriptAiPrompt,
     normalizeTranscriptAiResult: normalizeTranscriptAiResult
