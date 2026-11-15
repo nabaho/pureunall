@@ -16,10 +16,12 @@ const DocReadServer = require('../functions/doc-read.js');
 const JSZip = require('../vendor/jszip.min.js');
 const XLSX = require('../vendor/xlsx.full.min.js');
 
-test('1. 카탈로그: 9대 분야 · 19개 공식 개선과제 · 12종 서류 · EOS 16개 문항 정합성', () => {
+test('1. 카탈로그: 9대 분야 · 19개 공식 개선과제 · 14종 서류 · EOS 16개 문항 정합성', () => {
   assert.equal(Cat.DOMAINS.length, 9);
   assert.equal(Cat.TASKS.length, 19);
-  assert.equal(Cat.DOC_KINDS.length, 12);
+  assert.equal(Cat.DOC_KINDS.length, 14);
+  assert.ok(Cat.getDocKind('mid_report_doc'));
+  assert.ok(Cat.getDocKind('final_report_doc'));
   const eosItems = Cat.EOS_AREAS.reduce((acc, a) => acc + a.items.length, 0);
   assert.equal(eosItems, 16);
 
@@ -367,7 +369,7 @@ test('9. 별첨 최종산출물 6종 패키지(DOCX 2종 · XLSX 6시트 · 통�
     ],
     followupChecks: {
       fu_rules_report: true,
-      fu_time_log: true
+      fu_visit_1: true
     }
   };
   const mid = Report.buildMidReport(proj, {}, [], null);
@@ -420,5 +422,555 @@ test('9. 별첨 최종산출물 6종 패키지(DOCX 2종 · XLSX 6시트 · 통�
   assert.match(viewJs, /function bindDragSel\(/);
   for (const tbl of ['projects', 'discover', 'preChk', 'preMails', 'preCards', 'rounds', 'midSecs', 'postChk', 'postMails', 'diffRows', 'deliverables', 'finalSecs', 'followups']) {
     assert.ok(viewJs.includes(`'${tbl}'`), `${tbl} 목록이 ☐+번호 선택 체계를 갖추어야 한다`);
+  }
+});
+
+test('10. 과거 POP3 메일 병합·중복제거 · PPTX 슬라이드 본문 추출 · 기수행 중간/최종보고서 원문 반영 검증', async () => {
+  /* ① IMAP + POP3(mailbox/old/msgs) 병합 및 동일 지문 중복제거 */
+  const tsSame = 1710000060000;
+  const tsOld = 1690000000000;
+  const folders = { inbox: { kind: 'inbox', name: '받은편지함' } };
+  const msgs = {
+    inbox: {
+      '1': { u: 1, s: '[가나상생] 중간보고서 자료 송부', f: '인사팀', e: 'hr@ganatech.example', t: '370-6@daum.net', d: tsSame, a: 1, an: ['중간보고서.pptx'] }
+    }
+  };
+  const oldMsgs = {
+    pop_dup: { s: '[가나상생] 중간보고서 자료 송부', f: '인사팀', e: 'hr@ganatech.example', t: '370-6@daum.net', d: tsSame, a: 1, an: ['중간보고서.pptx'], p: '중복 메일' },
+    pop_old_fin: { s: '[가나상생] 2024년 일터혁신 최종보고서 송부', f: '푸른', e: '370-6@daum.net', t: 'hr@ganatech.example', d: tsOld, a: 1, an: ['최종결과보고서.pptx'], p: '최종보고서 전달드립니다.' }
+  };
+  const flat = Intake.flattenMailboxRows(folders, msgs, oldMsgs);
+  assert.equal(flat.length, 2, 'IMAP과 동일한 POP3 메일은 중복 제거되고 과거 POP3 메일만 병합되어야 한다');
+  const popRow = flat.find(r => r.src === 'pop3');
+  assert.ok(popRow && popRow.key === 'o:pop_old_fin' && popRow.dir === 'out');
+
+  /* ② 서류 분류: 피드백은 design_feedback, 순수 중간/최종보고서는 mid_report_doc / final_report_doc */
+  assert.equal(Intake.classifyDocKind('중간보고 피드백 회신드립니다', [], '').code, 'design_feedback');
+  assert.equal(Intake.classifyDocKind('일터혁신 중간보고서 송부', ['중간보고서.pptx'], '').code, 'mid_report_doc');
+  assert.equal(Intake.classifyDocKind('일터혁신 최종보고서 제출본', ['최종결과보고서.pdf'], '').code, 'final_report_doc');
+
+  /* ③ PPTX 생성 바이트에서 extractPptxText 로 슬라이드 텍스트 역추출 검증 */
+  const proj = {
+    id: 'ilt-hist-1',
+    companyId: 'cons_hist_1',
+    consultingId: 'hist_1',
+    companyName: '(주)가나상생역사',
+    year: 2024,
+    programName: '일터혁신 상생컨설팅',
+    level: 'deep',
+    selectedTasks: ['wt_45day', 'wg_redesign']
+  };
+  const baseMid = Report.buildMidReport(proj, {}, [], null);
+  const pptBytes = await Pptx.generateMidPptxBytes(proj, baseMid);
+  const extractedPptText = await Intake.extractPptxText(pptBytes, JSZip);
+  assert.ok(extractedPptText.includes('[슬라이드 1]'));
+  assert.ok(extractedPptText.includes('중간보고서'));
+
+  /* ④ 과거 중간보고서·최종보고서 원문 카드가 중간·최종 보고서 섹션에 실제 반영되는지 검증 */
+  const midCard = Intake.sanitizeAndAnalyzeText('Ⅰ. 현황진단 핵심: 직무급 도입 필요성 및 교대근무 개편 방향 도출', {
+    companyName: proj.companyName,
+    docKind: 'mid_report_doc',
+    phase: 'pre_mid',
+    subject: '2024년 중간보고서.pptx'
+  });
+  const finCard = Intake.sanitizeAndAnalyzeText('Ⅰ. 최종 결과 요약: 기본급 호봉제 개편 및 주36시간 단축 모델 최종 확정', {
+    companyName: proj.companyName,
+    docKind: 'final_report_doc',
+    phase: 'post_mid',
+    subject: '2024년 최종결과보고서.pptx'
+  });
+  const histIntake = {
+    m1: Object.assign({ id: 'm1', analyzedAt: 10 }, midCard),
+    f1: Object.assign({ id: 'f1', analyzedAt: 20 }, finCard)
+  };
+  const enrichedMid = Report.buildMidReport(proj, histIntake, [], null);
+  const enrichedFin = Report.buildFinalReport(proj, enrichedMid, histIntake, [], null);
+  assert.ok(enrichedMid.sections.overview.includes('2024년 일터혁신 상생컨설팅'));
+  assert.ok(enrichedMid.sections.overview.includes('기수행 중간보고서·발표자료 원문 핵심 내용'));
+  assert.ok(enrichedMid.sections.overview.includes('직무급 도입 필요성'));
+  assert.ok(enrichedFin.sections.exec_summary.includes('기수행 최종·결과보고서 원문 핵심 요약'));
+  assert.ok(enrichedFin.sections.task_designs.includes('기본급 호봉제 개편'));
+});
+
+test('11. 비식별 보안 강화(미등록 인명·주소) · 공유 이메일/도메인 격리 · PPTX 자연정렬 · 공식 과제코드 정합성 검증', async () => {
+  const Backfill = require('../scripts/backfill-ilteo-history.js');
+
+  /* ① 미등록 한국어 인명(접두/접미) 및 도로명·지번 주소 차단·가림 검증 (합성 데이터 사용) */
+  const rawWithPii = [
+    '본 사업장 소재지는 서울시 가상구 예시로 123 이며 지번은 충남 천안시 서북구 백석동 123-4 입니다.',
+    '현장 인터뷰는 담당 근로자 홍가상 및 김바다 과장, 성명: 박하늘 사원과 진행하였습니다.'
+  ].join('\n');
+  assert.equal(Intake.hasResidualPii(rawWithPii), true, '미가림 인명·주소 원문은 잔존 개인정보로 탐지되어야 한다');
+
+  const sanitized = Intake.sanitizeAndAnalyzeText(rawWithPii, {
+    companyName: '(주)가나상생보안',
+    docKind: 'interview_survey',
+    phase: 'pre_mid',
+    subject: '현장 인터뷰 요약'
+  });
+  assert.equal(sanitized.ok, true);
+  assert.equal(sanitized.leakBlocked, false);
+  assert.equal(Intake.hasResidualPii(sanitized.maskedExcerpt), false);
+  assert.ok(!sanitized.maskedExcerpt.includes('홍가상'), '접두 문맥 미등록 인명이 가려져야 한다');
+  assert.ok(!sanitized.maskedExcerpt.includes('김바다'), '직급 접미 미등록 인명이 가려져야 한다');
+  assert.ok(!sanitized.maskedExcerpt.includes('박하늘'), '성명 라벨 뒤 인명이 가려져야 한다');
+  assert.ok(!sanitized.maskedExcerpt.includes('예시로 123'), '도로명 상세주소가 가려져야 한다');
+  assert.ok(!sanitized.maskedExcerpt.includes('백석동 123-4'), '지번 상세주소가 가려져야 한다');
+
+  const polish = Report.buildAiPolishPrompt('현황진단', rawWithPii, [{ v: '(주)가나상생보안', as: '[해당 기업]' }]);
+  assert.equal(polish.ok, true);
+  assert.ok(polish.prompt.includes('<<<초안 본문>>>'), '프롬프트 인젝션 격리 구분선이 포함되어야 한다');
+  assert.ok(!polish.prompt.includes('홍가상') && !polish.prompt.includes('예시로 123'));
+
+  /* ② 복수 기업이 공유하는 대표 메일/공유 도메인 자동 귀속 차단 검증 */
+  const coA = {
+    id: 'co_a',
+    name: '(주)알파제조',
+    email: 'shared@taxhub.example',
+    contacts: [{ email: 'only-a@alpha-corp.example' }, { email: 'info@shared-portal.example' }]
+  };
+  const coB = {
+    id: 'co_b',
+    name: '(주)베타물류',
+    email: 'shared@taxhub.example',
+    contacts: [{ email: 'only-b@beta-corp.example' }, { email: 'admin@shared-portal.example' }]
+  };
+  const profA = Intake.buildCompanyMailProfile({ companyId: 'co_a', companyName: '(주)알파제조' }, [coA, coB], []);
+  assert.ok(!profA.addrs['shared@taxhub.example'], '타 기업과 중복 등록된 공유 이메일은 제외되어야 한다');
+  assert.ok(!profA.domains['shared-portal.example'], '타 기업과 중복 등록된 공유 도메인은 제외되어야 한다');
+  assert.equal(profA.addrs['only-a@alpha-corp.example'], 1);
+  assert.equal(profA.domains['alpha-corp.example'], 1);
+
+  /* ③ PPTX 슬라이드 번호 자연 정렬(slide1 → slide2 → slide10) 검증 */
+  const z = new JSZip();
+  z.file('ppt/slides/slide1.xml', '<p:sld><a:t>첫번째장</a:t></p:sld>');
+  z.file('ppt/slides/slide10.xml', '<p:sld><a:t>열번째장</a:t></p:sld>');
+  z.file('ppt/slides/slide2.xml', '<p:sld><a:t>두번째장</a:t></p:sld>');
+  const mockPptBuf = await z.generateAsync({ type: 'uint8array' });
+  const slideOut = await Intake.extractPptxText(mockPptBuf, JSZip);
+  const idx1 = slideOut.indexOf('첫번째장');
+  const idx2 = slideOut.indexOf('두번째장');
+  const idx10 = slideOut.indexOf('열번째장');
+  assert.ok(idx1 >= 0 && idx2 > idx1 && idx10 > idx2, 'slide2가 slide10보다 먼저 추출되어야 한다');
+
+  /* ④ 백필 과제 추론 및 레거시 별칭 정규화가 100% 공식 Cat.TASKS 코드만 반환하는지 검증 */
+  const inferred = Backfill.inferSelectedTasks(
+    { consTypes: new Set(['일터혁신']), industry: '제조업' },
+    [{ title: '교대근무 개편 · 인사평가 공정화 · 교육훈련 체계 · 정년 계속고용', summaryLines: [], maskedExcerpt: '' }]
+  );
+  assert.ok(inferred.length >= 2);
+  for (const code of inferred) {
+    assert.ok(Cat.getTask(code), `추론된 코드 ${code}는 Cat.TASKS에 등록된 공식 코드여야 한다`);
+  }
+
+  const legacyProj = {
+    id: 'ilt_leg_2025',
+    companyId: 'co_leg',
+    companyName: '(주)가나레거시',
+    year: 2025,
+    selectedTasks: ['wt_flex', 'ev_fair', 'jb_skill']
+  };
+  const legMid = Report.buildMidReport(legacyProj, {}, [], null);
+  assert.ok(!legMid.sections.overview.includes('wt_flex'));
+  assert.ok(!legMid.sections.overview.includes('ev_fair'));
+  assert.ok(!legMid.sections.overview.includes('jb_skill'));
+  assert.ok(legMid.sections.overview.includes('근무체계 개편'));
+  assert.equal(Cat.normalizeTaskCode('wt_flex'), 'wt_shift');
+});
+
+test('12. 인명 끝글자(수·원·호) 가림 회귀 · ETag/If-Match 동시성 보호 · kordoc fail-closed 검증', async () => {
+  const Backfill = require('../scripts/backfill-ilteo-history.js');
+  const gw = OntWrite.createGateway({ mode: 'enforce', actor: 'SYSTEM_BACKFILL' });
+
+  /* ① 수/원/호로 끝나는 합성 인명(성명:김영수, 담당자:김지원, 성명:김철수, 박지호 대리) 탐지 및 100% 가림 검증 */
+  const edgeNames = '면담 기록 — 성명:김영수 / 담당자:김지원 / 성명:김철수 / 참석 박지호 대리 · 이승원 사원';
+  for (const probe of ['성명:김영수', '담당자:김지원', '성명:김철수', '박지호 대리', '이승원 사원']) {
+    assert.equal(Intake.hasResidualPii(probe), true, `${probe} 는 잔존 인명으로 탐지되어야 한다`);
+  }
+  const cleanRes = Intake.sanitizeAndAnalyzeText(edgeNames, {
+    companyName: '(주)가나상생보안',
+    docKind: 'interview_survey',
+    phase: 'pre_mid',
+    subject: '면담 기록'
+  });
+  assert.equal(cleanRes.ok, true);
+  assert.equal(Intake.hasResidualPii(cleanRes.maskedExcerpt), false);
+  for (const nm of ['김영수', '김지원', '김철수', '박지호', '이승원']) {
+    assert.ok(!cleanRes.maskedExcerpt.includes(nm), `${nm} 가 본문에 남지 않아야 한다`);
+  }
+  const pol = Report.buildAiPolishPrompt('면담 요약', edgeNames, [{ v: '(주)가나상생보안', as: '[해당 기업]' }]);
+  assert.equal(pol.ok, true);
+  for (const nm of ['김영수', '김지원', '김철수', '박지호', '이승원']) {
+    assert.ok(!pol.prompt.includes(nm), `${nm} 가 외부 AI 프롬프트에 남지 않아야 한다`);
+  }
+
+  /* ② 백필 conditionalWriteRecord: 동시 삭제(_deleted 묘비), 사용자 수정, 412 ETag 충돌 시 덮어쓰기 차단 검증 */
+  let putCalled = 0;
+  const tombSkip = await Backfill.conditionalWriteRecord(
+    '/scal_ilteo/intake/ilt_c1_2026/card1',
+    { id: 'card1', projectId: 'ilt_c1_2026', entityType: 'Document', companyId: 'c1', companyName: '(주)가나' },
+    'Document',
+    gw,
+    'tok',
+    {
+      getWithEtag: async () => ({
+        etag: '"etag-del"',
+        data: { id: 'card1', entityType: 'Document', companyId: 'c1', _deleted: true, revision: 2, updatedBy: 'U_STAFF' }
+      }),
+      putIfMatch: async () => { putCalled++; return { committed: true }; }
+    }
+  );
+  assert.equal(tombSkip.committed, false);
+  assert.equal(tombSkip.skipped, 'deleted_tombstone');
+  assert.equal(putCalled, 0, '삭제 표식(_deleted:true) 레코드는 절대 덮어쓰지 않아야 한다');
+
+  const userSkip = await Backfill.conditionalWriteRecord(
+    '/scal_ilteo/projects/ilt_c1_2026',
+    { id: 'ilt_c1_2026', entityType: 'Project', companyId: 'c1', companyName: '(주)가나' },
+    'Project',
+    gw,
+    'tok',
+    {
+      getWithEtag: async () => ({
+        etag: '"etag-user"',
+        data: { id: 'ilt_c1_2026', entityType: 'Project', companyId: 'c1', revision: 3, updatedBy: 'U_STAFF' }
+      }),
+      putIfMatch: async () => { putCalled++; return { committed: true }; }
+    }
+  );
+  assert.equal(userSkip.committed, false);
+  assert.equal(userSkip.skipped, 'user_modified');
+  assert.equal(putCalled, 0, '사용자가 수정한 레코드는 백필이 덮어쓰지 않아야 한다');
+
+  const conflictRes = await Backfill.conditionalWriteRecord(
+    '/scal_ilteo/projects/ilt_c1_2026',
+    { id: 'ilt_c1_2026', entityType: 'Project', companyId: 'c1', companyName: '(주)가나' },
+    'Project',
+    gw,
+    'tok',
+    {
+      getWithEtag: async () => ({
+        etag: '"etag-old"',
+        data: { id: 'ilt_c1_2026', entityType: 'Project', companyId: 'c1', companyName: '(주)가나', revision: 1, createdAt: 1000, createdBy: 'SYSTEM_BACKFILL', updatedAt: 1000, updatedBy: 'SYSTEM_BACKFILL' }
+      }),
+      putIfMatch: async (_p, _t, etag, body) => {
+        assert.equal(etag, '"etag-old"', 'If-Match 에 조회한 ETag 가 전달되어야 한다');
+        assert.equal(body.revision, 2, '최신 revision + 1 로 증가해야 한다');
+        return { committed: false, conflict: true };
+      }
+    }
+  );
+  assert.equal(conflictRes.committed, false);
+  assert.equal(conflictRes.conflict, true);
+
+  /* ③ 뷰 컨트롤러: 조건 없는 rootRef.update 제거·expectedRevision(-1/0) 명시·kordoc fail-closed 검증 */
+  const viewJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ilteo-view.js'), 'utf8');
+  assert.doesNotMatch(viewJs, /rootRef\.update\(/, '조건 없는 다건 덮어쓰기(rootRef.update) 대신 gate 트랜잭션을 사용해야 한다');
+  assert.match(viewJs, /function expectedRevOf\(/, '신규(-1) 및 revision 없는 기존(0) 모두 expectedRevision 을 명시 전달해야 한다');
+  assert.match(viewJs, /개인정보 1차 가림 모듈\(kordoc\)이 준비되지 않아 외부 AI 전송을 차단했습니다/);
+
+  /* ④ 띄어쓴 인명(성명: 김 영 수) 및 서술형 인명(김영수는 업무 개선을 요청했다) kordoc → buildAiPolishPrompt 연계 검증 */
+  const { pathToFileURL } = require('node:url');
+  const Kordoc = require('../functions/vendor/kordoc/pu-kordoc-text.js');
+  const KMod = await import(pathToFileURL(path.join(__dirname, '..', 'functions', 'vendor', 'kordoc', 'kordoc.browser.min.mjs')).href);
+  Kordoc._use(KMod);
+
+  const spacedAndNarrative = '성명: 김 영 수 / 담당자: 김 지 원 / 김영수는 업무 개선을 요청했다. 박지호에게 안내했고 남궁민수는 동의했다.';
+  assert.equal(Intake.hasResidualPii('성명: 김 영 수'), true, '띄어쓴 인명도 잔존 개인정보로 탐지되어야 한다');
+  assert.equal(Intake.hasResidualPii('김영수는 업무 개선을 요청했다'), true, '서술형 조사 결합 인명도 잔존 개인정보로 탐지되어야 한다');
+
+  const k1 = await Kordoc.redactFile(null, spacedAndNarrative, ['rrn', 'money', 'phone', 'email', 'id', 'person']);
+  const pol2 = Report.buildAiPolishPrompt('현장 면담', k1.text, [{ v: '(주)가나상생보안', as: '[해당 기업]' }]);
+  assert.equal(pol2.ok, true);
+  assert.ok(!pol2.prompt.includes('김 영 수') && !pol2.prompt.includes('김영수'));
+  assert.ok(!pol2.prompt.includes('김 지 원') && !pol2.prompt.includes('김지원'));
+  assert.ok(!pol2.prompt.includes('박지호') && !pol2.prompt.includes('남궁민수'));
+
+  /* ⑤ PuOntologyWrite expectedRevision(-1 신규 경쟁 / 0 레거시 동시수정) 충돌 차단 회귀 검증 */
+  const raceCreate = gw.prepare(
+    { id: 'ilt_race_2026', entityType: 'Project', companyId: 'c1', companyName: '(주)가나' },
+    { previous: { id: 'ilt_race_2026', entityType: 'Project', companyId: 'c1', revision: 1 }, expectedRevision: -1, entityType: 'Project' }
+  );
+  assert.equal(raceCreate.ok, false, '로컬에 없던 신규(-1) 저장 시 서버에 이미 활성 레코드가 있으면 덮어쓰지 않고 충돌 처리되어야 한다');
+
+  const raceLegacy = gw.prepare(
+    { id: 'ilt_leg0_2026', entityType: 'Project', companyId: 'c1', companyName: '(주)가나' },
+    { previous: { id: 'ilt_leg0_2026', entityType: 'Project', companyId: 'c1', revision: 2 }, expectedRevision: 0, entityType: 'Project' }
+  );
+  assert.equal(raceLegacy.ok, false, 'revision 없던 로컬 레거시(0) 저장 시 서버가 먼저 갱신되었으면 덮어쓰지 않고 충돌 처리되어야 한다');
+
+  /* ⑥ 2~4자 서술형 인명(외자 이름 김철은 · 성/자/비/제/율 끝글자 김민성은·김영자는·최은비는·강민제는·김소율은) 가림 및 오탐 0% 검증 */
+  const narrativeCases = [
+    { sentence: '김민성은 업무 개선을 요청했다', name: '김민성' },
+    { sentence: '김영자는 업무 개선을 요청했다', name: '김영자' },
+    { sentence: '김철은 업무 개선을 요청했다', name: '김철' },
+    { sentence: '김 민 성은 교대근무 단축에 동의했다', name: '김 민 성' },
+    { sentence: '박준서가 의견을 제시했고 최은비는 찬성했다', name: '박준서' },
+    { sentence: '강민제와 김소율은 개편안을 확인했다', name: '강민제' }
+  ];
+  for (const nc of narrativeCases) {
+    assert.equal(Intake.hasResidualPii(nc.sentence), true, `${nc.sentence} 는 잔존 인명으로 탐지되어야 한다`);
+    assert.equal(Backfill.passesIndependentAudit(nc.sentence), false, `${nc.sentence} 는 독립 감사를 통과하면 안 된다`);
+    const kdOut = await Kordoc.redactFile(null, nc.sentence, ['rrn', 'money', 'phone', 'email', 'id', 'person']);
+    const polCase = Report.buildAiPolishPrompt('현장 의견', kdOut.text, [{ v: '(주)가나상생보안', as: '[해당 기업]' }]);
+    assert.equal(polCase.ok, true);
+    assert.ok(!polCase.prompt.includes(nc.name) && !polCase.prompt.includes(nc.name.replace(/\s+/g, '')), `${nc.name} 가 외부 AI 프롬프트에 남지 않아야 한다`);
+    const sanCase = Intake.sanitizeAndAnalyzeText(nc.sentence, {
+      companyName: '(주)가나상생보안',
+      docKind: 'interview_survey',
+      phase: 'pre_mid',
+      subject: '현장 의견'
+    });
+    assert.equal(sanCase.ok, true);
+    assert.ok(!sanCase.maskedExcerpt.includes(nc.name.replace(/\s+/g, '')), `${nc.name} 가 수집 발췌문에 남지 않아야 한다`);
+  }
+
+  /* 19개 전체 공식 과제 보고서 본문이 서술형 인명 규칙에서 오탐(false positive) 없이 통과하는지 검증 */
+  const fullTaskProj = {
+    id: 'ilt_alltasks_2026',
+    companyId: 'co_all',
+    companyName: '(주)가나상생종합',
+    year: 2026,
+    level: 'deep',
+    industry: '정밀기계 제조업',
+    workerCount: 55,
+    selectedTasks: Cat.TASKS.map(t => t.code)
+  };
+  const fullMid = Report.buildMidReport(fullTaskProj, {}, [], null);
+  const fullFin = Report.buildFinalReport(fullTaskProj, fullMid, {}, [], null);
+  for (const [secKey, secTxt] of Object.entries(fullMid.sections)) {
+    const maskedMidSec = Intake.maskPiiStrict(secTxt, [{ v: fullTaskProj.companyName, as: '[해당 기업]' }]).text;
+    assert.equal(Intake.hasResidualPii(maskedMidSec), false, `중간보고서 ${secKey} 일반 문장에 인명 오탐이 없어야 한다`);
+    assert.ok(!maskedMidSec.includes('[가림]'), `중간보고서 ${secKey} 표준 문안이 [가림]으로 오탐 치환되지 않아야 한다`);
+  }
+  for (const [secKey, secTxt] of Object.entries(fullFin.sections)) {
+    const maskedFinSec = Intake.maskPiiStrict(secTxt, [{ v: fullTaskProj.companyName, as: '[해당 기업]' }]).text;
+    assert.equal(Intake.hasResidualPii(maskedFinSec), false, `최종보고서 ${secKey} 일반 문장에 인명 오탐이 없어야 한다`);
+    assert.ok(!maskedFinSec.includes('[가림]'), `최종보고서 ${secKey} 표준 문안이 [가림]으로 오탐 치환되지 않아야 한다`);
+  }
+
+  /* ⑦ 백필 doubleRedactText fail-closed 검증: kordoc 미준비·예외·비정상 응답 시 원문 반환 대신 즉시 reject */
+  await assert.rejects(
+    () => Backfill.doubleRedactText('민감 원문', { kordoc: null }),
+    /KORDOC_UNAVAILABLE/,
+    'kordoc 객체가 없으면 원문을 반환하지 않고 실패해야 한다'
+  );
+  await assert.rejects(
+    () => Backfill.doubleRedactText('민감 원문', { kordoc: { redactFile: async () => { throw new Error('BOOM'); } } }),
+    /BOOM/,
+    'kordoc.redactFile 예외 발생 시 삼키지 않고 reject 해야 한다'
+  );
+  await assert.rejects(
+    () => Backfill.doubleRedactText('민감 원문', { kordoc: { redactFile: async () => ({ ok: false }) } }),
+    /KORDOC_REDACT_FAILED/,
+    'kordoc 결과가 문자열이 아니면 원문 반환 대신 실패해야 한다'
+  );
+
+  /* ⑧ 레거시 과제 별칭(cp_channel → cp_partner) 단일 정규화 일관성 검증 */
+  const reportJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ilteo-report.js'), 'utf8');
+  assert.doesNotMatch(reportJs, /LEGACY_TASK_MAP/, '보고서 엔진에 중복 별칭 맵을 두지 않고 Cat.getTask 단일 경로를 써야 한다');
+  assert.doesNotMatch(viewJs, /LEGACY_TASK_ALIAS/, '뷰 컨트롤러에 중복 별칭 맵을 두지 않고 Cat.getTask 단일 경로를 써야 한다');
+  assert.equal(Cat.getTask('cp_channel').code, 'cp_partner');
+
+  /* ⑨ 희귀 성씨(피·궉·팽·태)·복성(사공·제갈·황목)·부분 띄어쓰기 가림 및 성씨 비의존 독립 감사·제목 kordoc 가림 검증 */
+  const rareAndPartialCases = [
+    { sentence: '피영수는 면담에 참석했다', token: '피영수' },
+    { sentence: '궉길동은 업무 개선을 요청했다', token: '궉길동' },
+    { sentence: '팽현숙이 의견을 제시했고 태진아는 동의했다', token: '팽현숙' },
+    { sentence: '사공민수는 찬성했고 황목치승은 참여했다', token: '사공민수' },
+    { sentence: '제갈량은 개편안을 확인했다', token: '제갈량' },
+    { sentence: '피 영수는 면담에 참석했다', token: '피 영수' },
+    { sentence: '피영 수는 면담에 참석했다', token: '피영 수' },
+    { sentence: '사공 민수는 교대제 개편에 동의했다', token: '사공 민수' },
+    { sentence: '성명: 피 영수 / 참석자 박 지호 대리', token: '피 영수' }
+  ];
+  for (const rc of rareAndPartialCases) {
+    assert.equal(Intake.hasResidualPii(rc.sentence), true, `${rc.sentence} 는 잔존 인명으로 탐지되어야 한다`);
+    assert.equal(Backfill.passesIndependentAudit(rc.sentence), false, `${rc.sentence} 는 독립 감사를 통과하면 안 된다`);
+    const maskedOut = Intake.maskPiiStrict(rc.sentence, []).text;
+    assert.ok(!maskedOut.includes(rc.token) && !maskedOut.includes(rc.token.replace(/\s+/g, '')), `${rc.token} 가 가려져야 한다`);
+    assert.equal(Intake.hasResidualPii(maskedOut), false);
+    assert.equal(Backfill.passesIndependentAudit(maskedOut), true);
+  }
+
+  /* 가림 규칙(성씨 사전)에 없는 비표준 호칭이라도 인간 행위·존칭·라벨 문맥이면 독립 감사가 별도로 차단(fail-closed)하는지 검증 */
+  assert.equal(Intake.hasIndependentPersonAuditLeak('테스형은 면담에 참석했다'), true);
+  assert.equal(Backfill.passesIndependentAudit('테스형은 면담에 참석했다'), false);
+  assert.equal(Report.buildAiPolishPrompt('면담', '테스형은 면담에 참석했다', []).ok, false);
+  assert.equal(Backfill.passesIndependentAudit('알파고한테 전달했다'), false);
+  assert.equal(Backfill.passesIndependentAudit('근로자는 면담에 참석했다'), true, '일반 역할 명사는 정상 통과해야 한다');
+
+  /* 제목·첨부명 sanitizeTitle 도 kordoc 1차 가림을 거치며 kordoc 실패 시 fail-closed 차단되는지 검증 */
+  const cleanTitle = await Backfill.sanitizeTitle('[가나상생보안] 피영수는 면담에 참석했다_중간보고서.pptx', { name: '(주)가나상생보안' });
+  assert.ok(cleanTitle.includes('(주)가나상생보안') || cleanTitle.includes('가나상생보안'));
+  assert.ok(!cleanTitle.includes('피영수'), '제목 속 희귀 성씨 인명도 가려져야 한다');
+  await assert.rejects(
+    () => Backfill.sanitizeTitle('중간보고서.pptx', { name: '(주)가나' }, { kordoc: null }),
+    /KORDOC_UNAVAILABLE/,
+    '제목 가림도 kordoc 미비 시 fail-closed 해야 한다'
+  );
+  assert.match(viewJs, /async function sanitizeMetaLabelAsync\(/, '브라우저 저장 제목·파일명도 kordoc 1차 가림을 거쳐야 한다');
+  assert.doesNotMatch(viewJs, /\bsanitizeMetaLabel\(/, '브라우저 모달 수기 입력을 포함한 모든 저장 경로에서 동기 sanitizeMetaLabel 호출이 없어야 한다');
+
+  /* ⑩ 어근+조사 접미 충돌(독고영재가·강민제도·김민성과·김건의) 및 행정 1글자 끝글자(김민국·박진표·이수록) 전 구간 연계 검증 */
+  const edgeNarrativeCases = [
+    { sentence: '김민국은 개선안을 확인했다', tokens: ['김민국'] },
+    { sentence: '독고영재가 참석했다', tokens: ['독고영재'] },
+    { sentence: '김영재가 의견을 제시했다', tokens: ['김영재'] },
+    { sentence: '박민재가 찬성했다', tokens: ['박민재'] },
+    { sentence: '강민제도 동의했다', tokens: ['강민제'] },
+    { sentence: '김민성과 이보경은 찬성했다', tokens: ['김민성', '이보경'] },
+    { sentence: '김건의 의견을 수렴했다', tokens: ['김건'] },
+    { sentence: '박진표는 검토했고 이수록도 동의했다', tokens: ['박진표', '이수록'] }
+  ];
+  for (const ec of edgeNarrativeCases) {
+    assert.equal(Intake.hasResidualPii(ec.sentence), true, `${ec.sentence} 는 잔존 인명으로 탐지되어야 한다`);
+    assert.equal(Backfill.passesIndependentAudit(ec.sentence), false, `${ec.sentence} 는 독립 감사를 통과하면 안 된다`);
+    const kdOut = await Backfill.doubleRedactText(ec.sentence);
+    const polishRes = Report.buildAiPolishPrompt('회의록', kdOut, []);
+    assert.equal(polishRes.ok, true, `${ec.sentence} 가 가려진 뒤 AI 윤문 프롬프트 생성이 성공해야 한다`);
+    for (const tk of ec.tokens) {
+      assert.ok(!polishRes.maskedText.includes(tk), `AI 프롬프트 본문에 ${tk} 원문이 남으면 안 된다`);
+      assert.ok(!polishRes.prompt.includes(tk), `AI 프롬프트 전체에 ${tk} 원문이 남으면 안 된다`);
+    }
+    const sanRes = Intake.sanitizeAndAnalyzeText(kdOut, { companyName: '(주)가나상생보안', subject: ec.sentence });
+    assert.equal(sanRes.ok, true);
+    for (const tk of ec.tokens) {
+      assert.ok(!sanRes.maskedExcerpt.includes(tk), `수집 카드 발췌본에 ${tk} 원문이 남으면 안 된다`);
+    }
+  }
+
+  /* 부분 띄어쓰기 비표준 호칭도 성씨 비의존 독립 감사가 차단(fail-closed)하는지 검증 */
+  assert.equal(Intake.hasIndependentPersonAuditLeak('테스 형은 면담에 참석했다'), true);
+  assert.equal(Backfill.passesIndependentAudit('테스 형은 면담에 참석했다'), false);
+  assert.equal(Report.buildAiPolishPrompt('면담', '테스 형은 면담에 참석했다', []).ok, false);
+  assert.equal(Intake.hasIndependentPersonAuditLeak('알 파고도 찬성했다'), true);
+  assert.equal(Intake.hasIndependentPersonAuditLeak('테스형의 의견을 수렴했다'), true);
+
+  /* 제목·파일명 구분자 및 숫자 접두·접미 결합 단독 인명 토큰('김민준1_중간보고서.pptx', '2026김민준_중간보고서.pptx' 등) 가림·독립 감사·AI 윤문 전 구간 검증 */
+  const standaloneFileCases = [
+    { raw: '김민준_중간보고서.pptx', token: '김민준' },
+    { raw: '김민준1_중간보고서.pptx', token: '김민준' },
+    { raw: '2026김민준_중간보고서.pptx', token: '김민준' },
+    { raw: '김민준A1_중간보고서.pptx', token: '김민준' },
+    { raw: '중간보고서_김민준A1.pptx', token: '김민준' },
+    { raw: '김민준ABCD_중간보고서.pptx', token: '김민준' },
+    { raw: '근로계약서(김민준A1).pdf', token: '김민준' },
+    { raw: '중간보고서_김민준2.pptx', token: '김민준' },
+    { raw: '[2026] 피영수-근로계약서_서명본.pdf', token: '피영수' },
+    { raw: '2026피 영수1_연차신청서.hwpx', token: '피영수' },
+    { raw: '박 지호_연차신청서.hwpx', token: '박지호' },
+    { raw: '독고영재_진술서.hwp', token: '독고영재' },
+    { raw: '김민국_개선안_검토본.docx', token: '김민국' }
+  ];
+  for (const fc of standaloneFileCases) {
+    assert.equal(Intake.hasStandaloneNameInLabel(fc.raw), true, `${fc.raw} 의 단독·숫자결합 인명 토큰이 탐지되어야 한다`);
+    assert.equal(Backfill.passesIndependentAudit(fc.raw), false, `${fc.raw} 원문은 독립 감사를 통과하면 안 된다`);
+    const st = await Backfill.sanitizeTitle(fc.raw, { name: '(주)가나상생보안' });
+    assert.ok(st.length > 0 && st.includes('[가림]'), `${fc.raw} 가 [가림] 처리된 안전 제목으로 반환되어야 한다`);
+    assert.ok(!st.replace(/\s+/g, '').includes(fc.token), `${fc.raw} 에서 ${fc.token} 원문이 제거되어야 한다`);
+    const polishFileRes = Report.buildAiPolishPrompt('첨부 검토', fc.raw, []);
+    assert.equal(polishFileRes.ok, true, `${fc.raw} 가 본문에 등장해도 가려진 뒤 AI 프롬프트 생성이 가능해야 한다`);
+    assert.ok(!polishFileRes.maskedText.replace(/\s+/g, '').includes(fc.token), `AI 프롬프트 본문에 ${fc.token} 원문이 남으면 안 된다`);
+    assert.ok(!polishFileRes.prompt.replace(/\s+/g, '').includes(fc.token), `AI 프롬프트 전체에 ${fc.token} 원문이 남으면 안 된다`);
+    const sanAtt = Intake.sanitizeAndAnalyzeText('취업규칙 개정 초안 검토 내용입니다.', {
+      companyName: '(주)가나상생보안',
+      subject: fc.raw,
+      attNames: [fc.raw]
+    });
+    assert.equal(sanAtt.ok, true, `${fc.raw} 제목·첨부명 단독 인명이 자동 가려져 분석 통과해야 한다`);
+  }
+  /* 성씨 사전에 없는 비표준 호칭과 순서·길이 무관 영숫자·문서명이 결합된 파일명도 독립 감사가 별도로 차단(fail-closed)하는지 검증 */
+  const nonSurnameAlnumFileCases = [
+    '테스형1_중간보고서.pptx',
+    '2026알파고_근로계약서.pdf',
+    '중간보고서_테스형2.pptx',
+    '테스형A1_중간보고서.pptx',
+    '중간보고서_테스형A1.pptx',
+    '테스형ABCD_중간보고서.pptx',
+    'A1테스형B2_v2_중간보고서.pptx',
+    '중간보고서_v2_ABCD테스형A1.pptx',
+    '근로계약서(테스형A1).pdf',
+    '근로계약서(2026_테스형A1).pdf',
+    '근로계약서(테스형A1_2026).pdf',
+    '테스형A1 중간보고서.pptx'
+  ];
+  for (const nsc of nonSurnameAlnumFileCases) {
+    assert.equal(Intake.hasIndependentPersonAuditLeak(nsc), true, `${nsc} 는 독립 파일명 감사에서 누출로 탐지되어야 한다`);
+    assert.equal(Backfill.passesIndependentAudit(nsc), false, `${nsc} 는 passesIndependentAudit=false 여야 한다`);
+    const blockedPol = Report.buildAiPolishPrompt('첨부 검토', nsc, []);
+    assert.equal(blockedPol.ok, false, `${nsc} 는 성씨 사전에 없더라도 외부 AI 전송이 차단(ok:false)되어야 한다`);
+  }
+
+  /* ⑪ 정량 엑셀(org_roster·time_leave)의 부서 등 자유문자 열에 이메일·연락처·실명·비표준 인명이 오입력된 경우 가림·독립 감사 및 저장 차단 회귀 검증 */
+  const dirtyRosterSheet = {
+    '인력명부': [
+      ['성명', '부서', '입사일', '재직상태'],
+      ['김가상', 'test@example.com', '2024-03-01', '재직'],
+      ['박예시', '010-1234-5678', '2023-05-10', '재직'],
+      ['이샘플', '김민준', '2022-07-01', '재직'],
+      ['최검증', '테스형은 면담에 참석했다', '2025-01-15', '재직'],
+      ['정정상', '생산1팀', '2021-02-01', '재직'],
+      ['한정상', '영업', '2024-09-01', '재직']
+    ]
+  };
+  const rosterQuant = Intake.analyzeTabularRows(dirtyRosterSheet, 'org_roster', { baseYear: 2026 });
+  assert.equal(rosterQuant.ok, true);
+  const rosterJson = JSON.stringify(rosterQuant);
+  for (const forbidden of ['test@example.com', '010-1234-5678', '김민준', '테스형']) {
+    assert.ok(!rosterJson.includes(forbidden), `정량 인력명부 결과에 ${forbidden} 원문이 잔존하면 안 된다`);
+  }
+  assert.ok(rosterQuant.stats.topDepts.some(d => d.dept === '생산1팀'), '정상 부서명(생산1팀)은 유지되어야 한다');
+  assert.ok(rosterQuant.stats.topDepts.some(d => d.dept === '영업'), '정상 부서명(영업)은 유지되어야 한다');
+
+  const dirtyTimeSheet = {
+    '근태기록': [
+      ['성명', '부서', '주근로시간', '퇴근시각'],
+      ['김가상', 'leak@example.com', 49, '20:30'],
+      ['박예시', '박지호 과장', 45, '19:40'],
+      ['정정상', '물류', 42, '19:20']
+    ]
+  };
+  const timeQuant = Intake.analyzeTabularRows(dirtyTimeSheet, 'time_leave', {});
+  assert.equal(timeQuant.ok, true);
+  const timeJson = JSON.stringify(timeQuant);
+  assert.ok(!timeJson.includes('leak@example.com') && !timeJson.includes('박지호'), '정량 근태 결과에 이메일·인명이 잔존하면 안 된다');
+  assert.ok(timeQuant.stats.topLateDepts.includes('물류'), '정상 부서명(물류)은 유지되어야 한다');
+
+  /* 정량 XLSX 파일이 Backfill.parseAttachmentBuffer 호출 시 kordoc 가림과 독립 감사를 거쳐 안전하게 반환되는지 검증 */
+  const XLSX = require('../vendor/xlsx.full.min.js');
+  const wbDirty = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wbDirty, XLSX.utils.aoa_to_sheet(dirtyRosterSheet['인력명부']), '인력명부');
+  const wbBuf = XLSX.write(wbDirty, { type: 'buffer', bookType: 'xlsx' });
+  const parsedQuant = await Backfill.parseAttachmentBuffer('인력명부.xlsx', wbBuf, { name: '(주)가나상생보안', latestYear: 2026 }, 'pre_mid', 0);
+  assert.ok(parsedQuant && parsedQuant.track === 'quant', '정화된 정량 엑셀은 정상 분석되어야 한다');
+  assert.ok(!JSON.stringify(parsedQuant).includes('test@example.com'));
+
+  /* 만약 정량 결과 자유문자 필드에 미가림 개인정보가 남아 auditQuantResultAsync 에 도달하면 fail-closed 차단되는지 검증 */
+  const blockedQuant = await Intake.auditQuantResultAsync(
+    {
+      ok: true,
+      docKind: 'org_roster',
+      track: 'quant',
+      stats: { topDepts: [{ dept: '테스형은 면담에 참석했다', count: 1, pct: 100 }] },
+      summaryLines: ['주요 부서 구성: 테스형은 면담에 참석했다 1명(100%)']
+    },
+    {
+      redactFn: (txt) => Backfill.doubleRedactText(txt),
+      auditFn: (txt) => Backfill.passesIndependentAudit(txt)
+    }
+  );
+  assert.equal(blockedQuant.ok, false, '독립 감사를 통과하지 못한 정량 자유문자 결과는 저장이 차단되어야 한다');
+  assert.equal(blockedQuant.leakBlocked, true);
+  await assert.rejects(
+    () => Intake.auditQuantResultAsync(rosterQuant, { redactFn: null }),
+    /KORDOC_UNAVAILABLE/,
+    '정량 결과 감사도 kordoc 가림 함수가 없으면 fail-closed 해야 한다'
+  );
+
+  const cleanDocNames = ['취업규칙_개정안_최종본.hwpx', '2026_중간보고서_발표본1.pptx', '중간보고서_초안A1.pptx', '임금대장_산정표_50인의.xlsx', '노사협의회_1회차_회의록.pdf'];
+  for (const dn of cleanDocNames) {
+    assert.equal(Intake.hasStandaloneNameInLabel(dn), false, `일반 문서명 ${dn} 에 단독 인명 오탐이 없어야 한다`);
+    assert.equal(await Backfill.sanitizeTitle(dn, { name: '(주)가나상생보안' }), dn);
   }
 });

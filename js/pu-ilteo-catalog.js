@@ -178,15 +178,15 @@
     }
   ];
 
-  /* 수신·첨부 서류 12종 분류 체계
-   * - track: 'quant'(브라우저 로컬 비식별 통계 전용 — AI·서버 원본 전송 절대 금지) | 'text'(2중 마스킹 후 쟁점·합의 추출) | 'meta'(회차·서명 상태 확인)
-   * - defaultPhase: 'pre_mid'(착수~중간보고 기초자료) | 'post_mid'(중간보고 이후 후속·결과보고 자료)
+  /* 수신·첨부 서류 14종 분류 체계 (기초·후속 컨설팅 자료 12종 + 중간·최종보고서 원문 2종)
+   * - track: 'quant'(브라우저 로컬 비식별 통계 전용 — AI·서버 원본 전송 절대 금지) | 'text'(2중 마스킹 후 쟁점·합의·원문 추출) | 'meta'(회차·서명 상태 확인)
+   * - defaultPhase: 'pre_mid'(착수~중간보고 기초자료·중간보고서) | 'post_mid'(중간보고 이후 후속·최종결과보고 자료)
    */
   var DOC_KINDS = [
     {
       code: 'guide_agree', name: '참여안내서·협약·디자인팀 명단', short: '협약·디자인팀',
       defaultPhase: 'pre_mid', track: 'meta', govStepKey: 'guide',
-      keywords: ['참여안내서', '참여 안내서', '협약서', '3자협약', '디자인팀', '추진팀', '위촉', '착수동의']
+      keywords: ['참여안내서', '참여 안내서', '협약서', '3자협약', '디자인팀', '추진팀', '위촉', '착수동의', '수행계획서']
     },
     {
       code: 'org_roster', name: '조직도·인력현황·3개년 입퇴사', short: '조직·인력현황',
@@ -224,9 +224,14 @@
       keywords: ['설문', '조직진단', 'eos', '응답률', '인식조사', '만족도조사', '사전설문']
     },
     {
+      code: 'mid_report_doc', name: '중간보고서 원문·발표자료(PPT/PDF/HWP)', short: '중간보고서 원문',
+      defaultPhase: 'pre_mid', track: 'text', govStepKey: 'mid',
+      keywords: ['중간보고서', '중간보고발표', '중간보고자료', '중간발표자료', '중간결과보고', '현황진단보고서']
+    },
+    {
       code: 'round_proof', name: '회차 수행 사진(타임스탬프)·서명지', short: '회차사진·서명지',
       defaultPhase: 'post_mid', track: 'meta', govStepKey: 'round',
-      keywords: ['타임스탬프', '시작사진', '종료사진', '서명지', '참석자서명', '참석명단', '수행사진', '회의사진']
+      keywords: ['타임스탬프', '시작사진', '종료사진', '서명지', '참석자서명', '참석명단', '수행사진', '회의사진', '수행일지', '자문일지']
     },
     {
       code: 'design_feedback', name: '중간보고 피드백·디자인팀 협의록·보완안', short: '피드백·협의회신',
@@ -237,6 +242,11 @@
       code: 'worker_consent', name: '근로자 의견수렴·시범운영·찬반투표·동의서', short: '찬반투표·동의서',
       defaultPhase: 'post_mid', track: 'text', govStepKey: 'final',
       keywords: ['의견수렴', '찬반투표', '과반수동의', '동의서', '근로자대표', '서면합의', '설명회', '시범운영', '시범작성', '신구대조표']
+    },
+    {
+      code: 'final_report_doc', name: '최종·결과보고서 원문·산출물(PPT/PDF/HWP)', short: '최종·결과보고서',
+      defaultPhase: 'post_mid', track: 'text', govStepKey: 'final',
+      keywords: ['최종보고서', '결과보고서', '완료보고서', '최종결과보고', '최종결과보고서', '수행결과보고서', '완료산출물', '최종발표자료']
     },
     {
       code: 'settle_eval', name: '최종평가·활동비 정산·이행결과 증빙', short: '정산·이행증빙',
@@ -322,6 +332,20 @@
     { code: 'fu_platform_close', month: 'M+3개월 (종결)', title: '노사발전재단 플랫폼 이행관리(2회)·이행결과표 등록 및 연계 정부지원금 신청 안내', proof: '플랫폼 이행결과표 등록 완료 확인' }
   ];
 
+  var LEGACY_TASK_ALIAS = {
+    wt_flex: 'wt_shift',
+    wt_leave: 'wt_mgmt',
+    wg_perf: 'wg_redesign',
+    ev_fair: 'ev_design',
+    jb_skill: 'sk_std',
+    sk_system: 'sk_std',
+    cp_comm: 'cp_partner',
+    cp_channel: 'cp_partner',
+    cu_harass: 'cu_protect',
+    cu_worklife: 'cu_balance',
+    hr_fair: 'hr_diag',
+    hr_recruit: 'hr_diag'
+  };
   var taskByCode = {};
   TASKS.forEach(function (t) { taskByCode[t.code] = t; });
   var domainByCode = {};
@@ -329,7 +353,14 @@
   var docKindByCode = {};
   DOC_KINDS.forEach(function (k) { docKindByCode[k.code] = k; });
 
-  function getTask(code) { return taskByCode[String(code || '')] || null; }
+  function normalizeTaskCode(code) {
+    var k = String(code || '').trim();
+    return LEGACY_TASK_ALIAS[k] || k;
+  }
+  function getTask(code) {
+    var k = normalizeTaskCode(code);
+    return taskByCode[k] || null;
+  }
   function getDomain(code) { return domainByCode[String(code || '')] || null; }
   function getDocKind(code) { return docKindByCode[String(code || '')] || null; }
   function getLevel(code) { return LEVELS[String(code || '')] || LEVELS.deep; }
@@ -465,6 +496,7 @@
     MID_SECTIONS: MID_SECTIONS,
     FINAL_SECTIONS: FINAL_SECTIONS,
     FOLLOWUP_ITEMS: FOLLOWUP_ITEMS,
+    normalizeTaskCode: normalizeTaskCode,
     getTask: getTask,
     getDomain: getDomain,
     getDocKind: getDocKind,
