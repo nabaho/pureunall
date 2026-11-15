@@ -351,7 +351,25 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 줄을 뺄 것. */
   /* ★ 2026-11-14 — 푸른등기 원본 서류 게시 완료(rules-deploy.js --deploy, 이 PC, 대표 「설정에서 허용하고 다시해라」): 새로 1 · 바뀜 1 · 사라짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-14.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
-  const PENDING = [];
+  /* ★ 2026-11-15 보안 다지기 2묶음 — 익명 토큰(auth != null)으로 쓰던 자리를 LOGIN(재직 직원)으로 «좁혔다»(넓어진 칸 없음).
+       게시(GitHub «Firebase 배포» rules=true) 뒤 새 기준 파일을 넣고 이 목록을 비운다. */
+  const PENDING = [
+    '/cal_private/$uid/.write',
+    '/data/cal_view/$uid/.write',
+    '/data/gov_dash_order/$uid/.write',
+    '/data/portal_prefs_uid/$uid/.write',
+    '/gov/$uid/.write',
+    '/kcareer/$uid/.write',
+    '/pucards_private/$uid/.write',
+    '/rules_mgmt/archive/$id/.write',
+    '/rules_mgmt/casebook/rev/$site/$rev/.write',
+    '/rules_mgmt/casebook/text/$site/$rev/$role/.write',
+    '/rules_mgmt/done/$site/$rev/.write',
+    '/rules_mgmt/index/$site/$rev/.write',
+    '/rules_mgmt/orig/$id/.write',
+    '/rules_mgmt/wip/$uid/.write',
+    '/rules_mgmt/worksession/$uid/.write',
+  ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
