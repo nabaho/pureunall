@@ -2019,6 +2019,16 @@
       '.pau-tbl{width:100%;min-width:1160px;border-collapse:collapse;table-layout:fixed;}',
       '.pau-tbl th,.pau-tbl td{padding:6px 8px;border-bottom:1px solid var(--pau-bd-lt);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12.5px;}',
       '.pau-tbl th{position:sticky;top:0;z-index:2;background:var(--pau-th);color:var(--pau-sub);font-weight:700;font-size:12px;}',
+      '.pau-tbl th.c-sort{padding:0;}',
+      '.pau-th-btn{cursor:pointer;width:100%;min-height:31px;padding:5px 8px;border:none;background:transparent;color:var(--pau-sub);font-family:inherit;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:4px;white-space:nowrap;overflow:hidden;text-align:left;}',
+      '.pau-th-btn > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}',
+      '.pau-th-ico{flex-shrink:0;font-size:11px;color:var(--pau-muted);line-height:1;}',
+      '.pau-th-btn:hover,.pau-th-btn:focus-visible{background:var(--pau-hov);color:var(--pau-pri);outline:2px solid #2563eb;outline-offset:-2px;}',
+      '.pau-th-btn.on{background:var(--pau-pri-bg);color:var(--pau-pri);font-weight:800;}',
+      '.pau-th-btn.on .pau-th-ico{color:var(--pau-pri);font-weight:900;}',
+      '.pau-root[data-theme="dark"] .pau-th-btn.on,body.dark .pau-root .pau-th-btn.on{background:#1e3a8a;color:#eff6ff;}',
+      '.pau-root[data-theme="dark"] .pau-th-btn.on .pau-th-ico,body.dark .pau-root .pau-th-btn.on .pau-th-ico{color:#93c5fd;}',
+      '.pau-sub-sort{height:30px;min-height:30px;padding:0 7px;font-weight:700;}',
       '.pau-tbl tr:hover td{background:var(--pau-hov);}',
       '.pau-tbl tr.pau-exp-row td{white-space:normal;overflow:visible;background:var(--pau-bg);padding:10px 12px;}',
       '.pau-tbl th.c-ck,.pau-tbl td.c-ck{width:34px;text-align:center;padding:0 2px;text-overflow:clip;}',
@@ -2521,23 +2531,27 @@
       rMuni: initialRMuni,
       rTypeGroup: '', // '' | 'LOCAL_CORP' | 'LOCAL_AFFIL' | 'LOCAL_DIRECT'
       rUnionFilter: '', // ''(노조우선 전체) | 'has_union' | 'multi' | 'no_union'
+      rSort: 'members_desc',
       rQuery: '',
       rChecked: {},
       mIssue: METRIC_DEFS[0].key,
       mScope: 'ALL',
       mType: '',
       mConfed: '',
+      mSort: 'members_desc',
       mQuery: '',
       mChecked: {},
       // 탭 4: 조문·원문 통합 (단체협약 조문 통합 검색 + 기관별 공시·별도합의·내부규정 원문)
       docMode: validUrlDoc || 'ARTICLES', // 'ARTICLES' | 'DISC'
       aScope: 'ALL',
       aCat: 'ALL',
+      aSort: '',
       aQuery: '',
       dScope: 'ALL',
       dOrganSearch: '',
       dOrgan: defaultOrganAid,
       dTax: 'ALL',
+      dSort: '',
       dQuery: '',
       dPage: 0,
       // 탭 5(유틸): 공공·법령 API 실시간 연동 센터
@@ -2790,7 +2804,106 @@
           }
           return;
         }
+
+        var thSortBtn = e.target.closest('[data-th-sort]');
+        if (thSortBtn) {
+          e.preventDefault();
+          var colId = thSortBtn.getAttribute('data-th-sort') || '';
+          if (colId) {
+            toggleColumnSort(colId);
+            if (bodyEl) {
+              var nextThBtn = bodyEl.querySelector('[data-th-sort="' + colId + '"]');
+              if (nextThBtn && typeof nextThBtn.focus === 'function') nextThBtn.focus();
+            }
+          }
+          return;
+        }
       });
+    }
+
+    function renderSortTh(widthPct, label, colId, curSort, activeKeys) {
+      var isAct = activeKeys.indexOf(curSort) >= 0;
+      var isAsc = isAct && curSort.slice(-4) === '_asc';
+      var ariaSort = isAct ? (isAsc ? 'ascending' : 'descending') : 'none';
+      var ico = isAct ? (isAsc ? '▲' : '▼') : '⇅';
+      var dirHint = isAct
+        ? (isAsc ? '오름차순 적용 중 · 클릭 시 내림차순(▼) 전환' : '내림차순 적용 중 · 클릭 시 오름차순(▲) 전환')
+        : '클릭하여 이 열 기준으로 정렬';
+      return '<th class="c-sort"' + (widthPct ? (' style="width:' + widthPct + ';"') : '') + ' aria-sort="' + ariaSort + '">' +
+        '<button type="button" class="pau-th-btn' + (isAct ? ' on' : '') + '" data-th-sort="' + esc(colId) + '" title="' + esc(label + ' (' + dirHint + ')') + '">' +
+          '<span>' + esc(label) + '</span>' +
+          '<span class="pau-th-ico" aria-hidden="true">' + ico + '</span>' +
+        '</button>' +
+      '</th>';
+    }
+
+    function toggleColumnSort(colId) {
+      if (colId.indexOf('u_') === 0) {
+        if (colId === 'u_name') {
+          state.uSort = state.uSort === 'name_asc' ? 'name_desc' : (state.uSort === 'ministry_asc' ? 'ministry_desc' : 'name_asc');
+        } else if (colId === 'u_sector') {
+          state.uSort = state.uSort === 'sector_asc' ? 'sector_desc' : 'sector_asc';
+        } else if (colId === 'u_union') {
+          state.uSort = state.uSort === 'union_desc' ? 'union_asc' : 'union_desc';
+        } else if (colId === 'u_confed') {
+          state.uSort = state.uSort === 'confed_asc' ? 'confed_desc' : 'confed_asc';
+        } else if (colId === 'u_elig') {
+          state.uSort = state.uSort === 'elig_desc' ? 'elig_asc' : 'elig_desc';
+        } else if (colId === 'u_members') {
+          if (state.uSort === 'orgrate_desc') state.uSort = 'orgrate_asc';
+          else if (state.uSort === 'orgrate_asc') state.uSort = 'orgrate_desc';
+          else state.uSort = state.uSort === 'members_desc' ? 'members_asc' : 'members_desc';
+        } else if (colId === 'u_timeoff') {
+          if (state.uSort === 'limitpct_desc') state.uSort = 'limitpct_asc';
+          else if (state.uSort === 'limitpct_asc') state.uSort = 'limitpct_desc';
+          else state.uSort = state.uSort === 'timeoff_desc' ? 'timeoff_asc' : 'timeoff_desc';
+        } else if (colId === 'u_domains') {
+          if (state.uSort === 'score_desc') state.uSort = 'score_asc';
+          else if (state.uSort === 'score_asc') state.uSort = 'score_desc';
+          else state.uSort = state.uSort === 'disc_desc' ? 'disc_asc' : 'disc_desc';
+        }
+        state.uPage = 0;
+        renderTabUnions();
+        return;
+      }
+      if (colId.indexOf('r_') === 0) {
+        if (colId === 'r_muni') state.rSort = state.rSort === 'muni_asc' ? 'muni_desc' : 'muni_asc';
+        else if (colId === 'r_name') state.rSort = state.rSort === 'name_asc' ? 'name_desc' : 'name_asc';
+        else if (colId === 'r_union') state.rSort = state.rSort === 'union_desc' ? 'union_asc' : 'union_desc';
+        else if (colId === 'r_members') {
+          if (state.rSort === 'orgrate_desc') state.rSort = 'orgrate_asc';
+          else if (state.rSort === 'orgrate_asc') state.rSort = 'orgrate_desc';
+          else state.rSort = state.rSort === 'members_desc' ? 'members_asc' : 'members_desc';
+        } else if (colId === 'r_timeoff') state.rSort = state.rSort === 'timeoff_desc' ? 'timeoff_asc' : 'timeoff_desc';
+        else if (colId === 'r_pers') state.rSort = state.rSort === 'pers_desc' ? 'pers_asc' : 'pers_desc';
+        else if (colId === 'r_leave') state.rSort = state.rSort === 'leave_desc' ? 'leave_asc' : 'leave_desc';
+        else if (colId === 'r_score') state.rSort = state.rSort === 'score_desc' ? 'score_asc' : 'score_desc';
+        renderTabMatrix();
+        return;
+      }
+      if (colId.indexOf('m_') === 0) {
+        if (colId === 'm_name') state.mSort = state.mSort === 'name_asc' ? 'name_desc' : 'name_asc';
+        else if (colId === 'm_union') state.mSort = state.mSort === 'union_asc' ? 'union_desc' : 'union_asc';
+        else if (colId === 'm_members') state.mSort = state.mSort === 'members_desc' ? 'members_asc' : 'members_desc';
+        else if (colId === 'm_val') state.mSort = state.mSort === 'val_desc' ? 'val_asc' : 'val_desc';
+        renderTabMatrix();
+        return;
+      }
+      if (colId.indexOf('a_') === 0) {
+        if (colId === 'a_name') state.aSort = state.aSort === 'name_asc' ? 'name_desc' : 'name_asc';
+        else if (colId === 'a_cat') state.aSort = state.aSort === 'cat_asc' ? 'cat_desc' : 'cat_asc';
+        else if (colId === 'a_no') state.aSort = state.aSort === 'no_asc' ? 'no_desc' : 'no_asc';
+        else if (colId === 'a_tit') state.aSort = state.aSort === 'tit_asc' ? 'tit_desc' : 'tit_asc';
+        renderTabArticles();
+        return;
+      }
+      if (colId.indexOf('d_') === 0) {
+        if (colId === 'd_name') state.dSort = state.dSort === 'name_asc' ? 'name_desc' : 'name_asc';
+        else if (colId === 'd_cat') state.dSort = state.dSort === 'cat_asc' ? 'cat_desc' : 'cat_asc';
+        else if (colId === 'd_date') state.dSort = state.dSort === 'date_desc' ? 'date_asc' : 'date_desc';
+        state.dPage = 0;
+        renderTabDetail();
+      }
     }
 
     function switchTab(nextTab, focusTabBtn) {
@@ -2909,26 +3022,108 @@
       });
 
       filtered.sort(function (a, b) {
-        if (state.uSort === 'name_asc') return a.name.localeCompare(b.name, 'ko');
-        if (state.uSort === 'timeoff_desc') {
-          if (b.timeoffHours !== a.timeoffHours) return b.timeoffHours - a.timeoffHours;
-          return b.memberTotal - a.memberTotal;
+        var s = state.uSort || 'members_desc';
+        if (s === 'name_asc') return a.name.localeCompare(b.name, 'ko');
+        if (s === 'name_desc') return b.name.localeCompare(a.name, 'ko');
+        if (s === 'ministry_asc' || s === 'ministry_desc') {
+          var ma = (a.ministry || '') + ' ' + (a.muniName || '');
+          var mb = (b.ministry || '') + ' ' + (b.muniName || '');
+          var mc = ma.localeCompare(mb, 'ko');
+          if (mc !== 0) return s === 'ministry_asc' ? mc : -mc;
+          return a.name.localeCompare(b.name, 'ko');
         }
-        if (state.uSort === 'orgrate_desc') {
+        if (s === 'sector_asc' || s === 'sector_desc') {
+          var sa = (a.scopeLabel || '') + ' ' + (a.sectorLabel || '') + ' ' + (a.inst_type || '');
+          var sb = (b.scopeLabel || '') + ' ' + (b.sectorLabel || '') + ' ' + (b.inst_type || '');
+          var sc = sa.localeCompare(sb, 'ko');
+          if (sc !== 0) return s === 'sector_asc' ? sc : -sc;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (s === 'union_desc') {
           if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
-          if (b.orgRate !== a.orgRate) return b.orgRate - a.orgRate;
-          return b.memberTotal - a.memberTotal;
+          if (b.unionCount !== a.unionCount) return b.unionCount - a.unionCount;
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
         }
-        if (state.uSort === 'score_desc') {
+        if (s === 'union_asc') {
           if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
-          if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+          var ua = a.repUnion ? (a.repUnion.union_name || '') : '';
+          var ub = b.repUnion ? (b.repUnion.union_name || '') : '';
+          var uc = ua.localeCompare(ub, 'ko');
+          if (uc !== 0) return uc;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (s === 'confed_asc' || s === 'confed_desc') {
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          var ca = a.repConfed || '미가입';
+          var cb = b.repConfed || '미가입';
+          var cc = ca.localeCompare(cb, 'ko');
+          if (cc !== 0) return s === 'confed_asc' ? cc : -cc;
           return b.memberTotal - a.memberTotal;
         }
-        if (state.uSort === 'disc_desc') {
-          if (b.discTotal !== a.discTotal) return b.discTotal - a.discTotal;
+        if (s === 'elig_desc' || s === 'elig_asc') {
+          var aHasEl = a.eligibleCount > 0;
+          var bHasEl = b.eligibleCount > 0;
+          if (aHasEl !== bHasEl) return bHasEl ? 1 : -1;
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (a.eligibleCount !== b.eligibleCount) {
+            return s === 'elig_desc' ? (b.eligibleCount - a.eligibleCount) : (a.eligibleCount - b.eligibleCount);
+          }
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (s === 'timeoff_desc' || s === 'timeoff_asc') {
+          var aHasTo = a.timeoffHours > 0;
+          var bHasTo = b.timeoffHours > 0;
+          if (aHasTo !== bHasTo) return bHasTo ? 1 : -1;
+          if (a.timeoffHours !== b.timeoffHours) {
+            return s === 'timeoff_desc' ? (b.timeoffHours - a.timeoffHours) : (a.timeoffHours - b.timeoffHours);
+          }
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
           return b.memberTotal - a.memberTotal;
         }
+        if (s === 'limitpct_desc' || s === 'limitpct_asc') {
+          var aHasLp = a.timeoffLimitPct > 0;
+          var bHasLp = b.timeoffLimitPct > 0;
+          if (aHasLp !== bHasLp) return bHasLp ? 1 : -1;
+          if (a.timeoffLimitPct !== b.timeoffLimitPct) {
+            return s === 'limitpct_desc' ? (b.timeoffLimitPct - a.timeoffLimitPct) : (a.timeoffLimitPct - b.timeoffLimitPct);
+          }
+          return b.timeoffHours - a.timeoffHours;
+        }
+        if (s === 'orgrate_desc' || s === 'orgrate_asc') {
+          var aHasOr = a.orgRate > 0;
+          var bHasOr = b.orgRate > 0;
+          if (aHasOr !== bHasOr) return bHasOr ? 1 : -1;
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (a.orgRate !== b.orgRate) {
+            return s === 'orgrate_desc' ? (b.orgRate - a.orgRate) : (a.orgRate - b.orgRate);
+          }
+          return b.memberTotal - a.memberTotal;
+        }
+        if (s === 'score_desc' || s === 'score_asc') {
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (a.totalScore !== b.totalScore) {
+            return s === 'score_desc' ? (b.totalScore - a.totalScore) : (a.totalScore - b.totalScore);
+          }
+          return b.memberTotal - a.memberTotal;
+        }
+        if (s === 'disc_desc' || s === 'disc_asc') {
+          if (a.discTotal !== b.discTotal) {
+            return s === 'disc_desc' ? (b.discTotal - a.discTotal) : (a.discTotal - b.discTotal);
+          }
+          if (a.totalScore !== b.totalScore) {
+            return s === 'disc_desc' ? (b.totalScore - a.totalScore) : (a.totalScore - b.totalScore);
+          }
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        var aHasMem = a.memberTotal > 0;
+        var bHasMem = b.memberTotal > 0;
+        if (aHasMem !== bHasMem) return bHasMem ? 1 : -1;
         if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+        if (s === 'members_asc') {
+          if (a.memberTotal !== b.memberTotal) return a.memberTotal - b.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
         if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
         if (b.discTotal !== a.discTotal) return b.discTotal - a.discTotal;
         return a.name.localeCompare(b.name, 'ko');
@@ -2937,7 +3132,7 @@
     }
 
     function filterFlatUnions() {
-      return activeUnions.filter(function (u) {
+      var list = activeUnions.filter(function (u) {
         var inst = instMap[u.apba_id] || u;
         var rec = organById[u.apba_id];
         if (!matchOrganScope(inst, state.uScope)) return false;
@@ -2959,6 +3154,113 @@
         if (!matchSmartQuery(hay, state.uQuery)) return false;
         return true;
       });
+      var s = state.uSort || 'members_desc';
+      list.sort(function (a, b) {
+        var an = String(a.inst_name || '');
+        var bn = String(b.inst_name || '');
+        if (s === 'name_asc') return an.localeCompare(bn, 'ko') || String(a.union_name || '').localeCompare(String(b.union_name || ''), 'ko');
+        if (s === 'name_desc') return bn.localeCompare(an, 'ko') || String(a.union_name || '').localeCompare(String(b.union_name || ''), 'ko');
+        if (s === 'ministry_asc' || s === 'ministry_desc') {
+          var mc = String(a.ministry || '').localeCompare(String(b.ministry || ''), 'ko');
+          if (mc !== 0) return s === 'ministry_asc' ? mc : -mc;
+          return an.localeCompare(bn, 'ko');
+        }
+        if (s === 'sector_asc' || s === 'sector_desc') {
+          var ta = (isLocalOrgan(a) ? '지방 ' : '중앙 ') + String(a.inst_type || '');
+          var tb = (isLocalOrgan(b) ? '지방 ' : '중앙 ') + String(b.inst_type || '');
+          var tc = ta.localeCompare(tb, 'ko');
+          if (tc !== 0) return s === 'sector_asc' ? tc : -tc;
+          return an.localeCompare(bn, 'ko');
+        }
+        if (s === 'union_asc' || s === 'union_desc') {
+          var uc = String(a.union_name || '').localeCompare(String(b.union_name || ''), 'ko');
+          if (uc !== 0) return s === 'union_asc' ? uc : -uc;
+          return an.localeCompare(bn, 'ko');
+        }
+        if (s === 'confed_asc' || s === 'confed_desc') {
+          var cfa = (a.confederation || '미가입') + ' ' + (a.federation || '');
+          var cfb = (b.confederation || '미가입') + ' ' + (b.federation || '');
+          var cc = cfa.localeCompare(cfb, 'ko');
+          if (cc !== 0) return s === 'confed_asc' ? cc : -cc;
+          return Number(b.member_total || 0) - Number(a.member_total || 0);
+        }
+        if (s === 'elig_desc' || s === 'elig_asc') {
+          var ea = Number(a.eligible_count || 0);
+          var eb = Number(b.eligible_count || 0);
+          if ((ea > 0) !== (eb > 0)) return eb > 0 ? 1 : -1;
+          if (ea !== eb) return s === 'elig_desc' ? (eb - ea) : (ea - eb);
+          return an.localeCompare(bn, 'ko');
+        }
+        if (s === 'limitpct_desc' || s === 'limitpct_asc') {
+          var limA = calcLegalTimeoffLimit(Number(a.member_total || 0));
+          var limB = calcLegalTimeoffLimit(Number(b.member_total || 0));
+          var lpA = (limA > 0 && Number(a.timeoff_hours || 0) > 0) ? ((Number(a.timeoff_hours || 0) / limA) * 100) : 0;
+          var lpB = (limB > 0 && Number(b.timeoff_hours || 0) > 0) ? ((Number(b.timeoff_hours || 0) / limB) * 100) : 0;
+          if ((lpA > 0) !== (lpB > 0)) return lpB > 0 ? 1 : -1;
+          if (lpA !== lpB) return s === 'limitpct_asc' ? (lpA - lpB) : (lpB - lpA);
+          return Number(b.timeoff_hours || 0) - Number(a.timeoff_hours || 0);
+        }
+        if (s === 'timeoff_desc' || s === 'timeoff_asc') {
+          var taH = Number(a.timeoff_hours || 0);
+          var tbH = Number(b.timeoff_hours || 0);
+          var aPos = taH > 0;
+          var bPos = tbH > 0;
+          if (aPos !== bPos) return bPos ? 1 : -1;
+          if (taH !== tbH) return s === 'timeoff_asc' ? (taH - tbH) : (tbH - taH);
+          return Number(b.member_total || 0) - Number(a.member_total || 0);
+        }
+        if (s === 'orgrate_desc' || s === 'orgrate_asc') {
+          var ra = Number(a.eligible_count || 0) > 0 ? (Number(a.member_total || 0) / Number(a.eligible_count)) : 0;
+          var rb = Number(b.eligible_count || 0) > 0 ? (Number(b.member_total || 0) / Number(b.eligible_count)) : 0;
+          if ((ra > 0) !== (rb > 0)) return rb > 0 ? 1 : -1;
+          if (ra !== rb) return s === 'orgrate_desc' ? (rb - ra) : (ra - rb);
+        }
+        if (s === 'score_desc' || s === 'score_asc' || s === 'disc_desc' || s === 'disc_asc') {
+          var oa = organById[a.apba_id];
+          var ob = organById[b.apba_id];
+          var va = oa ? (s.indexOf('score_') === 0 ? oa.totalScore : oa.discTotal) : 0;
+          var vb = ob ? (s.indexOf('score_') === 0 ? ob.totalScore : ob.discTotal) : 0;
+          if (va !== vb) return s.slice(-4) === '_asc' ? (va - vb) : (vb - va);
+        }
+        var maN = Number(a.member_total || 0);
+        var mbN = Number(b.member_total || 0);
+        if ((maN > 0) !== (mbN > 0)) return mbN > 0 ? 1 : -1;
+        if (s === 'members_asc') return (maN - mbN) || an.localeCompare(bn, 'ko');
+        return (mbN - maN) || an.localeCompare(bn, 'ko');
+      });
+      return list;
+    }
+
+    function renderUnionSortOptionsHtml() {
+      var optsList = [
+        ['members_desc', '정렬: 조합원 많은순 ▼'],
+        ['members_asc', '정렬: 조합원 적은순 ▲'],
+        ['orgrate_desc', '정렬: 조직률(%) 높은순 ▼'],
+        ['orgrate_asc', '정렬: 조직률(%) 낮은순 ▲'],
+        ['timeoff_desc', '정렬: 타임오프 많은순 ▼'],
+        ['timeoff_asc', '정렬: 타임오프 적은순 ▲'],
+        ['limitpct_desc', '정렬: 한도대비(%) 높은순 ▼'],
+        ['limitpct_asc', '정렬: 한도대비(%) 낮은순 ▲'],
+        ['disc_desc', '정렬: 6대영역 공시 많은순 ▼'],
+        ['disc_asc', '정렬: 6대영역 공시 적은순 ▲'],
+        ['score_desc', '정렬: 6대영역 점수 높은순 ▼'],
+        ['score_asc', '정렬: 6대영역 점수 낮은순 ▲'],
+        ['union_desc', '정렬: 노조수(복수우선)순 ▼'],
+        ['union_asc', '정렬: 노조명 가나다순 ▲'],
+        ['confed_asc', '정렬: 상급단체순 ▲'],
+        ['confed_desc', '정렬: 상급단체 역순 ▼'],
+        ['elig_desc', '정렬: 가입대상 많은순 ▼'],
+        ['elig_asc', '정렬: 가입대상 적은순 ▲'],
+        ['name_asc', '정렬: 기관명 가나다순 ▲'],
+        ['name_desc', '정렬: 기관명 역순 ▼'],
+        ['ministry_asc', '정렬: 소관·지자체순 ▲'],
+        ['ministry_desc', '정렬: 소관·지자체 역순 ▼'],
+        ['sector_asc', '정렬: 권역·업종순 ▲'],
+        ['sector_desc', '정렬: 권역·업종 역순 ▼']
+      ];
+      return optsList.map(function (it) {
+        return '<option value="' + esc(it[0]) + '"' + (state.uSort === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+      }).join('');
     }
 
     function renderUnionsDynHtml() {
@@ -3002,6 +3304,9 @@
           '  <span>조회 <b>' + fmtNum(organRows.length) + '곳</b> (노조 <b>' + fmtNum(unionizedRows.length) + '곳</b> · 단위노조 <b>' + fmtNum(totalUnionUnits) + '개</b> · 조합원 <b>' + fmtNum(totalMembers) + '명</b> · 평균 조직률 <b>' + avgOrgRate + '%</b> · 타임오프 <b>' + fmtNum(avgTimeoff) + 'h</b>)</span>',
           '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
           (activeProv ? '    <button type="button" class="pau-act-btn pri" data-jump-region="' + esc(activeProv) + '" data-jump-muni="' + esc(PROVINCE_BY_KEY[state.uMinistry] ? state.uMuni : '') + '">🗺️ ' + esc(PROVINCE_BY_KEY[activeProv].short) + ' 산하기관(' + fmtNum(activeProvCount) + '곳) 한눈비교 →</button>' : ''),
+          '    <select class="pau-sub-sort" data-u-sort aria-label="목록 정렬 기준" title="목록 정렬 기준 선택">',
+          renderUnionSortOptionsHtml(),
+          '    </select>',
           (listSource.length > pageSize ? [
             '    <span>' + (state.uPage + 1) + ' / ' + totalPages + ' 페이지</span>',
             '    <button type="button" class="pau-act-btn" data-u-prev' + (state.uPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
@@ -3016,12 +3321,12 @@
             '    <thead>',
             '      <tr>',
             '        <th class="c-no">№</th>',
-            '        <th style="width:19%;">기관명 · 소관부처/지자체 (클릭→별개 창)</th>',
-            '        <th style="width:12%;">권역 · 업종 · 유형</th>',
-            '        <th style="width:16%;">노조 구성 · 대표노조 · 상급단체</th>',
-            '        <th style="width:11%;">조합원 · 조직률(%)</th>',
-            '        <th style="width:10%;">타임오프 · 한도대비</th>',
-            '        <th style="width:14%;">기관 내부 6대 영역 현황</th>',
+            '        ' + renderSortTh('19%', '기관명 · 소관부처/지자체 (클릭→별개 창)', 'u_name', state.uSort, ['name_asc', 'name_desc', 'ministry_asc', 'ministry_desc']),
+            '        ' + renderSortTh('12%', '권역 · 업종 · 유형', 'u_sector', state.uSort, ['sector_asc', 'sector_desc']),
+            '        ' + renderSortTh('16%', '노조 구성 · 대표노조 · 상급단체', 'u_union', state.uSort, ['union_desc', 'union_asc', 'confed_asc', 'confed_desc']),
+            '        ' + renderSortTh('11%', '조합원 · 조직률(%)', 'u_members', state.uSort, ['members_desc', 'members_asc', 'orgrate_desc', 'orgrate_asc', 'elig_desc', 'elig_asc']),
+            '        ' + renderSortTh('10%', '타임오프 · 한도대비', 'u_timeoff', state.uSort, ['timeoff_desc', 'timeoff_asc', 'limitpct_desc', 'limitpct_asc']),
+            '        ' + renderSortTh('14%', '기관 내부 6대 영역 현황', 'u_domains', state.uSort, ['disc_desc', 'disc_asc', 'score_desc', 'score_asc']),
             '        <th style="width:18%;">한눈에 펼침 · 비교 · 상세</th>',
             '      </tr>',
             '    </thead>',
@@ -3086,13 +3391,13 @@
             '    <thead>',
             '      <tr>',
             '        <th class="c-no">№</th>',
-            '        <th style="width:20%;">기관명 · 소관부처/지자체 (클릭→별개 창)</th>',
-            '        <th style="width:14%;">구분 · 기관유형</th>',
-            '        <th style="width:18%;">노동조합명 · 교섭권</th>',
-            '        <th style="width:13%;">상급단체 (총연맹·연맹)</th>',
-            '        <th style="width:7%;">가입대상</th>',
-            '        <th style="width:7%;">조합원</th>',
-            '        <th style="width:9%;">타임오프</th>',
+            '        ' + renderSortTh('20%', '기관명 · 소관부처/지자체 (클릭→별개 창)', 'u_name', state.uSort, ['name_asc', 'name_desc', 'ministry_asc', 'ministry_desc']),
+            '        ' + renderSortTh('14%', '구분 · 기관유형', 'u_sector', state.uSort, ['sector_asc', 'sector_desc']),
+            '        ' + renderSortTh('18%', '노동조합명 · 교섭권', 'u_union', state.uSort, ['union_desc', 'union_asc']),
+            '        ' + renderSortTh('13%', '상급단체 (총연맹·연맹)', 'u_confed', state.uSort, ['confed_asc', 'confed_desc']),
+            '        ' + renderSortTh('7%', '가입대상', 'u_elig', state.uSort, ['elig_desc', 'elig_asc']),
+            '        ' + renderSortTh('7%', '조합원', 'u_members', state.uSort, ['members_desc', 'members_asc', 'orgrate_desc', 'orgrate_asc']),
+            '        ' + renderSortTh('9%', '타임오프', 'u_timeoff', state.uSort, ['timeoff_desc', 'timeoff_asc', 'limitpct_desc', 'limitpct_asc']),
             '        <th style="width:12%;">비교담기 · 원문</th>',
             '      </tr>',
             '    </thead>',
@@ -3133,8 +3438,12 @@
       };
     }
 
+    function calcExtraUnionFilterCount() {
+      return (state.uType ? 1 : 0) + (state.uConfed ? 1 : 0) + (state.uSort !== 'members_desc' ? 1 : 0) + (state.uViewMode === 'FLAT_UNION' ? 1 : 0);
+    }
+
     function renderTabUnions() {
-      var extraFilterCount = (state.uType ? 1 : 0) + (state.uConfed ? 1 : 0) + (state.uSort !== 'members_desc' ? 1 : 0) + (state.uViewMode === 'FLAT_UNION' ? 1 : 0);
+      var extraFilterCount = calcExtraUnionFilterCount();
       var selectedProv = (state.uMinistry && PROVINCE_BY_KEY[state.uMinistry]) ? state.uMinistry : '';
       var muniOptions = selectedProv ? getMunicipalitiesForProvince(selectedProv) : [];
       var dynRes = renderUnionsDynHtml();
@@ -3205,12 +3514,7 @@
           allConfeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.uConfed === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''),
           '  </select>',
           '  <select data-f="uSort" aria-label="기관 정렬 기준" title="정렬 기준">',
-          '    <option value="members_desc"' + (state.uSort === 'members_desc' ? ' selected' : '') + '>정렬: 조합원 규모순</option>',
-          '    <option value="timeoff_desc"' + (state.uSort === 'timeoff_desc' ? ' selected' : '') + '>정렬: 타임오프 시간순</option>',
-          '    <option value="orgrate_desc"' + (state.uSort === 'orgrate_desc' ? ' selected' : '') + '>정렬: 조직률(%)순</option>',
-          '    <option value="score_desc"' + (state.uSort === 'score_desc' ? ' selected' : '') + '>정렬: 종합점수순</option>',
-          '    <option value="disc_desc"' + (state.uSort === 'disc_desc' ? ' selected' : '') + '>정렬: 공시건수순</option>',
-          '    <option value="name_asc"' + (state.uSort === 'name_asc' ? ' selected' : '') + '>정렬: 가나다순</option>',
+          renderUnionSortOptionsHtml(),
           '  </select>',
           '  <div class="pau-seg" role="group" aria-label="목록 보기 방식">',
           '    <button type="button" class="pau-seg-btn' + (state.uViewMode === 'ORGAN' ? ' on' : '') + '" aria-pressed="' + (state.uViewMode === 'ORGAN' ? 'true' : 'false') + '" data-u-mode="ORGAN">🏢 기관 통합</button>',
@@ -3224,6 +3528,18 @@
       ].join('');
 
       function bindUnionsPager(totalPagesNow) {
+        var quickSortSel = bodyEl.querySelector('[data-u-sort]');
+        if (quickSortSel) {
+          quickSortSel.addEventListener('change', function () {
+            state.uSort = quickSortSel.value || 'members_desc';
+            state.uPage = 0;
+            var advSortSel = bodyEl.querySelector('select[data-f="uSort"]');
+            if (advSortSel) advSortSel.value = state.uSort;
+            updateUnionsDyn();
+            var nextQuickSort = bodyEl.querySelector('[data-u-sort]');
+            if (nextQuickSort && typeof nextQuickSort.focus === 'function') nextQuickSort.focus();
+          });
+        }
         var prevBtn = bodyEl.querySelector('[data-u-prev]');
         if (prevBtn) {
           prevBtn.addEventListener('click', function () {
@@ -3255,6 +3571,12 @@
             ? state.uMinistry
             : (inferProvinceFromQuery(state.uQuery) || state.rProvince || '충청남도');
           topJumpBtn.setAttribute('data-jump-region', nextTarget);
+        }
+        var moreFltBtn = bodyEl.querySelector('[data-toggle-more-flt]');
+        if (moreFltBtn) {
+          var nextExtraCnt = calcExtraUnionFilterCount();
+          moreFltBtn.classList.toggle('pri', !!(state.uShowMoreFilters || nextExtraCnt > 0));
+          moreFltBtn.textContent = '⚙️ 상세필터' + (nextExtraCnt > 0 ? ' (' + nextExtraCnt + ')' : '');
         }
         bindUnionsPager(nextRes.totalPages);
       }
@@ -3769,8 +4091,78 @@
         return true;
       });
 
+      var rs = state.rSort || 'members_desc';
       list.sort(function (a, b) {
+        if (rs === 'muni_asc' || rs === 'muni_desc') {
+          if (rs === 'muni_asc' && curProv !== 'ALL') {
+            var aHq = !!(a.muniName && a.muniName.indexOf('본청') >= 0);
+            var bHq = !!(b.muniName && b.muniName.indexOf('본청') >= 0);
+            if (aHq !== bHq) return aHq ? -1 : 1;
+          }
+          var aj = (a.provinceShort ? a.provinceShort + ' ' : '') + (a.muniName || a.ministry || '');
+          var bj = (b.provinceShort ? b.provinceShort + ' ' : '') + (b.muniName || b.ministry || '');
+          var jc = aj.localeCompare(bj, 'ko');
+          if (jc !== 0) return rs === 'muni_asc' ? jc : -jc;
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'name_asc') return a.name.localeCompare(b.name, 'ko');
+        if (rs === 'name_desc') return b.name.localeCompare(a.name, 'ko');
+        if (rs === 'union_desc' || rs === 'union_asc') {
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (rs === 'union_desc') {
+            if (b.unionCount !== a.unionCount) return b.unionCount - a.unionCount;
+            if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          } else {
+            if (a.unionCount !== b.unionCount) return a.unionCount - b.unionCount;
+            var au = (a.repUnion && a.repUnion.union_name) || '';
+            var bu = (b.repUnion && b.repUnion.union_name) || '';
+            var uc = au.localeCompare(bu, 'ko');
+            if (uc !== 0) return uc;
+          }
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'orgrate_desc' || rs === 'orgrate_asc') {
+          if ((a.orgRate > 0) !== (b.orgRate > 0)) return b.orgRate > 0 ? 1 : -1;
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (a.orgRate !== b.orgRate) return rs === 'orgrate_asc' ? (a.orgRate - b.orgRate) : (b.orgRate - a.orgRate);
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'timeoff_desc' || rs === 'timeoff_asc') {
+          var aHasTo = a.timeoffHours > 0;
+          var bHasTo = b.timeoffHours > 0;
+          if (aHasTo !== bHasTo) return bHasTo ? 1 : -1;
+          if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+          if (a.timeoffHours !== b.timeoffHours) return rs === 'timeoff_asc' ? (a.timeoffHours - b.timeoffHours) : (b.timeoffHours - a.timeoffHours);
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'pers_desc' || rs === 'pers_asc') {
+          var ap = ((a.issueScores.personnel_participation && a.issueScores.personnel_participation.score) || 0) + ((a.issueScores.discipline_committee && a.issueScores.discipline_committee.score) || 0);
+          var bp = ((b.issueScores.personnel_participation && b.issueScores.personnel_participation.score) || 0) + ((b.issueScores.discipline_committee && b.issueScores.discipline_committee.score) || 0);
+          if (ap !== bp) return rs === 'pers_asc' ? (ap - bp) : (bp - ap);
+          if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'leave_desc' || rs === 'leave_asc') {
+          var al = ((a.issueScores.paid_holidays_leave && a.issueScores.paid_holidays_leave.score) || 0) + ((a.issueScores.work_hours_overtime && a.issueScores.work_hours_overtime.score) || 0);
+          var bl = ((b.issueScores.paid_holidays_leave && b.issueScores.paid_holidays_leave.score) || 0) + ((b.issueScores.work_hours_overtime && b.issueScores.work_hours_overtime.score) || 0);
+          if (al !== bl) return rs === 'leave_asc' ? (al - bl) : (bl - al);
+          if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if (rs === 'score_desc' || rs === 'score_asc') {
+          if (a.totalScore !== b.totalScore) return rs === 'score_asc' ? (a.totalScore - b.totalScore) : (b.totalScore - a.totalScore);
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
+        if ((a.memberTotal > 0) !== (b.memberTotal > 0)) return b.memberTotal > 0 ? 1 : -1;
         if (a.hasUnion !== b.hasUnion) return b.hasUnion ? 1 : -1;
+        if (rs === 'members_asc') {
+          if (a.memberTotal !== b.memberTotal) return a.memberTotal - b.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        }
         if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
         if (b.timeoffHours !== a.timeoffHours) return b.timeoffHours - a.timeoffHours;
         if (b.discTotal !== a.discTotal) return b.discTotal - a.discTotal;
@@ -3796,7 +4188,7 @@
     }
 
     function filterMatrix() {
-      return safeMetrics.filter(function (m) {
+      var list = safeMetrics.filter(function (m) {
         if (m.metric_key !== state.mIssue) return false;
         var inst = instMap[m.apba_id] || { apba_id: m.apba_id, inst_type: m.inst_type };
         if (!matchOrganScope(inst, state.mScope)) return false;
@@ -3809,6 +4201,42 @@
         if (!matchSmartQuery(hay, state.mQuery)) return false;
         return true;
       });
+      var ms = state.mSort || 'members_desc';
+      function getRepUnionRow(aid) {
+        var ul = (unionsByAid[aid] || []).filter(function (u) { return u && u.union_structure !== '노조없음'; });
+        return ul[0] || {};
+      }
+      list.sort(function (a, b) {
+        if (ms === 'name_asc') return String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+        if (ms === 'name_desc') return String(b.inst_name || '').localeCompare(String(a.inst_name || ''), 'ko');
+        var au = getRepUnionRow(a.apba_id);
+        var bu = getRepUnionRow(b.apba_id);
+        if (ms === 'union_asc' || ms === 'union_desc') {
+          var aun = String(au.union_name || '');
+          var bun = String(bu.union_name || '');
+          if ((!!aun) !== (!!bun)) return bun ? 1 : -1;
+          var unc = aun.localeCompare(bun, 'ko');
+          if (unc !== 0) return ms === 'union_asc' ? unc : -unc;
+          return String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+        }
+        if (ms === 'val_desc' || ms === 'val_asc') {
+          var as = (organById[a.apba_id] && organById[a.apba_id].issueScores[state.mIssue] && organById[a.apba_id].issueScores[state.mIssue].score) || 0;
+          var bs = (organById[b.apba_id] && organById[b.apba_id].issueScores[state.mIssue] && organById[b.apba_id].issueScores[state.mIssue].score) || 0;
+          if (as !== bs) return ms === 'val_asc' ? (as - bs) : (bs - as);
+          var vc = String(a.metric_value || '').localeCompare(String(b.metric_value || ''), 'ko');
+          if (vc !== 0) return ms === 'val_asc' ? vc : -vc;
+          return String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+        }
+        var am = Number(au.member_total || 0);
+        var bm = Number(bu.member_total || 0);
+        if ((am > 0) !== (bm > 0)) return bm > 0 ? 1 : -1;
+        if (am !== bm) return ms === 'members_asc' ? (am - bm) : (bm - am);
+        var ato = Number(au.timeoff_hours || 0);
+        var bto = Number(bu.timeoff_hours || 0);
+        if (ato !== bto) return bto - ato;
+        return String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+      });
+      return list;
     }
 
     function renderTabMatrix() {
@@ -3989,6 +4417,31 @@
               '  <div class="pau-sec-tit">',
               '    <span>📋 ② ' + esc(regionTitleLabel) + ' 산하기관 전체 현황 · 핵심 근로조건 한눈 비교표 (' + fmtNum(regRows.length) + '곳' + (regRows.length > tableLimit ? ' 중 상위 ' + tableLimit + '곳 표시' : ' 전수') + ')</span>',
               '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+              '      <select class="pau-sub-sort" data-r-sort aria-label="지역 산하기관 정렬 기준">',
+              [
+                ['members_desc', '정렬: 조합원 많은순 ▼'],
+                ['members_asc', '정렬: 조합원 적은순 ▲'],
+                ['orgrate_desc', '정렬: 조직률 높은순 ▼'],
+                ['orgrate_asc', '정렬: 조직률 낮은순 ▲'],
+                ['timeoff_desc', '정렬: 타임오프 많은순 ▼'],
+                ['timeoff_asc', '정렬: 타임오프 적은순 ▲'],
+                ['score_desc', '정렬: 6대영역 점수 높은순 ▼'],
+                ['score_asc', '정렬: 6대영역 점수 낮은순 ▲'],
+                ['pers_desc', '정렬: 인사·징계 관여 높은순 ▼'],
+                ['pers_asc', '정렬: 인사·징계 관여 낮은순 ▲'],
+                ['leave_desc', '정렬: 휴가·근로시간 높은순 ▼'],
+                ['leave_asc', '정렬: 휴가·근로시간 낮은순 ▲'],
+                ['muni_asc', '정렬: 소속 지자체 가나다 ▲'],
+                ['muni_desc', '정렬: 소속 지자체 역순 ▼'],
+                ['name_asc', '정렬: 산하기관명 가나다 ▲'],
+                ['name_desc', '정렬: 산하기관명 역순 ▼'],
+                ['union_desc', '정렬: 산하 노조수 많은순 ▼'],
+                ['union_asc', '정렬: 대표노조 가나다 ▲']
+              ].map(function (it) {
+                var curRSort = state.rSort || 'members_desc';
+                return '<option value="' + esc(it[0]) + '"' + (curRSort === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+              }).join(''),
+              '      </select>',
               (checkedRegIds.length ? '      <button type="button" class="pau-act-btn" data-r-clr-ck>선택 해제 (' + checkedRegIds.length + ')</button>' : ''),
               '      <button type="button" class="pau-act-btn pri" data-r-go-studio>📊 ' + (checkedRegIds.length ? ('선택 ' + checkedRegIds.length + '곳') : '대표 산하기관(최대 6곳)') + ' 레이더·조문 심층대조 ↗</button>',
               '    </div>',
@@ -3999,14 +4452,14 @@
               '        <tr>',
               '          <th class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-r-ck-all aria-label="상위 6개 산하기관 전체 선택"' + (shownRegRows.length && shownRegRows.slice(0, 6).every(function (r) { return !!state.rChecked[r.aid]; }) ? ' checked' : '') + '></label></th>',
               '          <th class="c-no">№</th>',
-              '          <th style="width:9%;">소속 지자체</th>',
-              '          <th style="width:17%;">산하기관명 · 유형 (클릭→별개 창)</th>',
-              '          <th style="width:14%;">노조체계 · 대표노조</th>',
-              '          <th style="width:10%;">조합원 · 조직률</th>',
-              '          <th style="width:9%;">타임오프(한도%)</th>',
-              '          <th style="width:12%;">인사 · 징계 관여</th>',
-              '          <th style="width:11%;">휴가 · 근로시간</th>',
-              '          <th style="width:10%;">임금 · 정년 · 점수</th>',
+              '          ' + renderSortTh('9%', '소속 지자체', 'r_muni', state.rSort || 'members_desc', ['muni_asc', 'muni_desc']),
+              '          ' + renderSortTh('17%', '산하기관명 · 유형 (클릭→별개 창)', 'r_name', state.rSort || 'members_desc', ['name_asc', 'name_desc']),
+              '          ' + renderSortTh('14%', '노조체계 · 대표노조', 'r_union', state.rSort || 'members_desc', ['union_desc', 'union_asc']),
+              '          ' + renderSortTh('10%', '조합원 · 조직률', 'r_members', state.rSort || 'members_desc', ['members_desc', 'members_asc', 'orgrate_desc', 'orgrate_asc']),
+              '          ' + renderSortTh('9%', '타임오프(한도%)', 'r_timeoff', state.rSort || 'members_desc', ['timeoff_desc', 'timeoff_asc']),
+              '          ' + renderSortTh('12%', '인사 · 징계 관여', 'r_pers', state.rSort || 'members_desc', ['pers_desc', 'pers_asc']),
+              '          ' + renderSortTh('11%', '휴가 · 근로시간', 'r_leave', state.rSort || 'members_desc', ['leave_desc', 'leave_asc']),
+              '          ' + renderSortTh('10%', '임금 · 정년 · 점수', 'r_score', state.rSort || 'members_desc', ['score_desc', 'score_asc']),
               '          <th style="width:8%;">원문 · 상세</th>',
               '        </tr>',
               '      </thead>',
@@ -4163,6 +4616,15 @@
               updateRegionDyn();
             });
           }
+          var rSortSel = dynEl.querySelector('[data-r-sort]');
+          if (rSortSel) {
+            rSortSel.addEventListener('change', function () {
+              state.rSort = rSortSel.value || 'members_desc';
+              updateRegionDyn();
+              var nextRSel = bodyEl.querySelector('[data-r-sort]');
+              if (nextRSel && typeof nextRSel.focus === 'function') nextRSel.focus();
+            });
+          }
           var goStudioBtn = dynEl.querySelector('[data-r-go-studio]');
           if (goStudioBtn) {
             goStudioBtn.addEventListener('click', function () {
@@ -4225,7 +4687,12 @@
               '</div>',
               '<div class="pau-tbl-wrap" style="max-height:360px;">',
               '  <table class="pau-tbl">',
-              '    <thead><tr><th class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-m-all aria-label="상위 6개 기관 전체 선택"' + (rows.length && rows.slice(0, 6).every(function (r) { return !!state.mChecked[r.apba_id]; }) ? ' checked' : '') + '></label></th><th class="c-no">№</th><th style="width:18%;">기관명 (클릭→별개 창)</th><th style="width:15%;">대표노조 · 상급</th><th style="width:11%;">조합원 · 타임오프</th><th style="width:18%;">단협 핵심 지표 요약</th><th style="width:23%;">조문 발췌</th><th style="width:12%;">비교담기</th></tr></thead>',
+              '    <thead><tr><th class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-m-all aria-label="상위 6개 기관 전체 선택"' + (rows.length && rows.slice(0, 6).every(function (r) { return !!state.mChecked[r.apba_id]; }) ? ' checked' : '') + '></label></th><th class="c-no">№</th>' +
+                renderSortTh('18%', '기관명 (클릭→별개 창)', 'm_name', state.mSort || 'members_desc', ['name_asc', 'name_desc']) +
+                renderSortTh('15%', '대표노조 · 상급', 'm_union', state.mSort || 'members_desc', ['union_asc', 'union_desc']) +
+                renderSortTh('11%', '조합원 · 타임오프', 'm_members', state.mSort || 'members_desc', ['members_desc', 'members_asc']) +
+                renderSortTh('18%', '단협 핵심 지표 요약', 'm_val', state.mSort || 'members_desc', ['val_desc', 'val_asc']) +
+                '<th style="width:23%;">조문 발췌</th><th style="width:12%;">비교담기</th></tr></thead>',
               '    <tbody>',
               (rows.length ? rows.map(function (r, idx) {
                 var inst = instMap[r.apba_id] || { apba_id: r.apba_id, inst_type: r.inst_type };
@@ -4282,6 +4749,20 @@
           allConfeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.mConfed === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''),
           '  </select>',
           '  <input type="search" data-f="mQuery" aria-label="쟁점 조문 검색" placeholder="기관·지역·조문 검색" value="' + esc(state.mQuery) + '" style="min-width:155px;max-width:220px;">',
+          '  <select class="pau-sub-sort" data-f="mSort" aria-label="13대 쟁점 목록 정렬 기준">',
+          [
+            ['members_desc', '정렬: 조합원 많은순 ▼'],
+            ['members_asc', '정렬: 조합원 적은순 ▲'],
+            ['val_desc', '정렬: 쟁점수준 높은순 ▼'],
+            ['val_asc', '정렬: 쟁점수준 낮은순 ▲'],
+            ['name_asc', '정렬: 기관명 가나다 ▲'],
+            ['name_desc', '정렬: 기관명 역순 ▼'],
+            ['union_asc', '정렬: 대표노조 가나다 ▲'],
+            ['union_desc', '정렬: 대표노조 역순 ▼']
+          ].map(function (it) {
+            return '<option value="' + esc(it[0]) + '"' + ((state.mSort || 'members_desc') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+          }).join(''),
+          '  </select>',
           '  <span class="pau-flt-hint" style="font-size:12px;font-weight:700;">⚖️ ' + esc(def.lawTitle) + '</span>',
           '</div>',
           '<div data-m-list-dyn>' + initListRes.html + '</div>'
@@ -4692,7 +5173,7 @@
     }
 
     function filterArticles() {
-      return safeArticles.filter(function (a) {
+      var list = safeArticles.filter(function (a) {
         var inst = instMap[a.apba_id] || { apba_id: a.apba_id, inst_type: a.inst_type };
         if (!matchOrganScope(inst, state.aScope)) return false;
         if (state.aCat && state.aCat !== 'ALL' && a.taxonomy_code !== state.aCat) return false;
@@ -4700,6 +5181,32 @@
         if (!matchSmartQuery(hay, state.aQuery)) return false;
         return true;
       });
+      if (state.aSort) {
+        var as = state.aSort;
+        list.sort(function (a, b) {
+          if (as === 'name_asc' || as === 'name_desc') {
+            var nc = String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+            if (nc !== 0) return as === 'name_asc' ? nc : -nc;
+          } else if (as === 'cat_asc' || as === 'cat_desc') {
+            var cc = String(a.taxonomy_name || '').localeCompare(String(b.taxonomy_name || ''), 'ko');
+            if (cc !== 0) return as === 'cat_asc' ? cc : -cc;
+          } else if (as === 'no_asc' || as === 'no_desc') {
+            var am = String(a.article_no || '').match(/(\d+)/);
+            var bm = String(b.article_no || '').match(/(\d+)/);
+            var an = am ? Number(am[1]) : 999999;
+            var bn = bm ? Number(bm[1]) : 999999;
+            if ((an < 999999) !== (bn < 999999)) return an < 999999 ? -1 : 1;
+            if (an !== bn) return as === 'no_asc' ? (an - bn) : (bn - an);
+            var ac = String(a.article_no || '').localeCompare(String(b.article_no || ''), 'ko');
+            if (ac !== 0) return as === 'no_asc' ? ac : -ac;
+          } else if (as === 'tit_asc' || as === 'tit_desc') {
+            var tc = String(a.article_title || '').localeCompare(String(b.article_title || ''), 'ko');
+            if (tc !== 0) return as === 'tit_asc' ? tc : -tc;
+          }
+          return String(a.inst_name || '').localeCompare(String(b.inst_name || ''), 'ko');
+        });
+      }
+      return list;
     }
 
     function renderTabArticles() {
@@ -4710,10 +5217,10 @@
           '    <thead>',
           '      <tr>',
           '        <th class="c-no">№</th>',
-          '        <th style="width:18%;">기관명 (클릭→별개 창)</th>',
-          '        <th style="width:14%;">쟁점 분류</th>',
-          '        <th style="width:8%;">조문번호</th>',
-          '        <th style="width:16%;">조문제목</th>',
+          '        ' + renderSortTh('18%', '기관명 (클릭→별개 창)', 'a_name', state.aSort, ['name_asc', 'name_desc']),
+          '        ' + renderSortTh('14%', '쟁점 분류', 'a_cat', state.aSort, ['cat_asc', 'cat_desc']),
+          '        ' + renderSortTh('8%', '조문번호', 'a_no', state.aSort, ['no_asc', 'no_desc']),
+          '        ' + renderSortTh('16%', '조문제목', 'a_tit', state.aSort, ['tit_asc', 'tit_desc']),
           '        <th style="width:35%;">조문 본문</th>',
           '        <th style="width:9%;">비교담기</th>',
           '      </tr>',
@@ -4759,6 +5266,21 @@
         }).join(''),
         '  </select>',
         '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문·지역 검색 (예: 충남, 징계)" value="' + esc(state.aQuery) + '" style="min-width:210px;">',
+        '  <select class="pau-sub-sort" data-f="aSort" aria-label="단협 조문 정렬 기준">',
+        [
+          ['', '정렬: 기본순'],
+          ['name_asc', '정렬: 기관명 가나다 ▲'],
+          ['name_desc', '정렬: 기관명 역순 ▼'],
+          ['cat_asc', '정렬: 쟁점분류 가나다 ▲'],
+          ['cat_desc', '정렬: 쟁점분류 역순 ▼'],
+          ['no_asc', '정렬: 조문번호 오름차순 ▲'],
+          ['no_desc', '정렬: 조문번호 내림차순 ▼'],
+          ['tit_asc', '정렬: 조문제목 가나다 ▲'],
+          ['tit_desc', '정렬: 조문제목 역순 ▼']
+        ].map(function (it) {
+          return '<option value="' + esc(it[0]) + '"' + ((state.aSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+        }).join(''),
+        '  </select>',
         '  <span data-a-cnt style="font-size:12px;margin-left:auto;">조회 <b>' + fmtNum(initRows.length) + '</b>건</span>',
         '</div>',
         '<div data-a-dyn>' + renderArticlesDynHtml(initRows) + '</div>'
@@ -4776,7 +5298,7 @@
     }
 
     function filterDisclosures() {
-      return safeDiscs.filter(function (d) {
+      var list = safeDiscs.filter(function (d) {
         var inst = instMap[d.aid] || { apba_id: d.aid };
         if (!matchOrganScope(inst, state.dScope)) return false;
         if (state.dOrgan && d.aid !== state.dOrgan) return false;
@@ -4788,6 +5310,28 @@
         }
         return true;
       });
+      if (state.dSort) {
+        var ds = state.dSort;
+        list.sort(function (a, b) {
+          if (ds === 'name_asc' || ds === 'name_desc') {
+            var nc = String(a.iname || '').localeCompare(String(b.iname || ''), 'ko');
+            if (nc !== 0) return ds === 'name_asc' ? nc : -nc;
+          } else if (ds === 'cat_asc' || ds === 'cat_desc') {
+            var cc = String(a.cname || a.ccode || '').localeCompare(String(b.cname || b.ccode || ''), 'ko');
+            if (cc !== 0) return ds === 'cat_asc' ? cc : -cc;
+          } else if (ds === 'date_desc' || ds === 'date_asc') {
+            var ad = normalizeTimelineDate(a.edate || a.rdate || '');
+            var bd = normalizeTimelineDate(b.edate || b.rdate || '');
+            if ((!!ad) !== (!!bd)) return bd ? 1 : -1;
+            var dc = ad.localeCompare(bd);
+            if (dc !== 0) return ds === 'date_asc' ? dc : -dc;
+            var tc = String(a.title || '').localeCompare(String(b.title || ''), 'ko');
+            if (tc !== 0) return ds === 'date_asc' ? tc : -tc;
+          }
+          return String(a.iname || '').localeCompare(String(b.iname || ''), 'ko');
+        });
+      }
+      return list;
     }
 
     function renderTabDetail() {
@@ -4841,17 +5385,34 @@
           html: [
             '<div class="pau-subbar">',
             '  <span>조회 공시·사규 문서 <b>' + fmtNum(rows.length) + '</b>건' + (rows.length > pageSize ? ' (' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '번째 표시)' : '') + '</span>',
+            '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;">',
+            '    <select class="pau-sub-sort" data-d-sort aria-label="공시문서 정렬 기준">',
+            [
+              ['', '정렬: 기본순'],
+              ['date_desc', '정렬: 기준연혁일 최신순 ▼'],
+              ['date_asc', '정렬: 기준연혁일 오래된순 ▲'],
+              ['name_asc', '정렬: 기관명 가나다 ▲'],
+              ['name_desc', '정렬: 기관명 역순 ▼'],
+              ['cat_asc', '정렬: 공시분류 가나다 ▲'],
+              ['cat_desc', '정렬: 공시분류 역순 ▼']
+            ].map(function (it) {
+              return '<option value="' + esc(it[0]) + '"' + ((state.dSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
+            }).join(''),
+            '    </select>',
             (rows.length > pageSize ? [
-              '  <div style="display:flex;align-items:center;gap:6px;">',
               '    <span>' + (state.dPage + 1) + ' / ' + totalPages + ' 페이지</span>',
               '    <button type="button" class="pau-act-btn" data-d-prev' + (state.dPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
-              '    <button type="button" class="pau-act-btn" data-d-next' + (state.dPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>',
-              '  </div>'
+              '    <button type="button" class="pau-act-btn" data-d-next' + (state.dPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>'
             ].join('') : ''),
+            '  </div>',
             '</div>',
             '<div class="pau-tbl-wrap">',
             '  <table class="pau-tbl">',
-            '    <thead><tr><th class="c-no">№</th><th style="width:17%;">기관명 (클릭→별개 창)</th><th style="width:14%;">공시항목 분류</th><th style="width:23%;">문서 제목 · 기준연혁일</th><th style="width:22%;">원문 첨부파일 · 공시뷰어 API</th><th style="width:24%;">본문 요약 · 추출 미리보기</th></tr></thead>',
+            '    <thead><tr><th class="c-no">№</th>' +
+              renderSortTh('17%', '기관명 (클릭→별개 창)', 'd_name', state.dSort, ['name_asc', 'name_desc']) +
+              renderSortTh('14%', '공시항목 분류', 'd_cat', state.dSort, ['cat_asc', 'cat_desc']) +
+              renderSortTh('23%', '문서 제목 · 기준연혁일', 'd_date', state.dSort, ['date_desc', 'date_asc']) +
+              '<th style="width:22%;">원문 첨부파일 · 공시뷰어 API</th><th style="width:24%;">본문 요약 · 추출 미리보기</th></tr></thead>',
             '    <tbody>',
             (visibleRows.length ? visibleRows.map(function (d, idx) {
               var absIdx = startIdx + idx;
@@ -4916,6 +5477,16 @@
       ].join('');
 
       function bindDetailPager(totalPagesNow) {
+        var dSortSel = bodyEl.querySelector('[data-d-sort]');
+        if (dSortSel) {
+          dSortSel.addEventListener('change', function () {
+            state.dSort = dSortSel.value || '';
+            state.dPage = 0;
+            updateDetailDyn();
+            var nextDSel = bodyEl.querySelector('[data-d-sort]');
+            if (nextDSel && typeof nextDSel.focus === 'function') nextDSel.focus();
+          });
+        }
         var prevBtn = bodyEl.querySelector('[data-d-prev]');
         if (prevBtn) prevBtn.addEventListener('click', function () { if (state.dPage > 0) { state.dPage -= 1; updateDetailDyn(); } });
         var nextBtn = bodyEl.querySelector('[data-d-next]');
