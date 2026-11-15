@@ -296,7 +296,7 @@ rules.data = {
     '.read': MGR, '.write': MGR,
     $uid: {
       '.read':  `auth != null && (auth.uid === $uid || ${MGR})`,
-      '.write': `auth != null && (auth.uid === $uid || ${MGR})`
+      '.write': `(${LOGIN}) && (auth.uid === $uid || ${MGR})`
     }
   },
 
@@ -383,7 +383,7 @@ rules.data = {
      ⚠ 제 칸만 쓴다(uid 로 가른다). 남의 «보던 자리»를 고칠 까닭이 없다.
      ⚠ 읽기도 제 것만이다 — 누가 무엇을 보고 있었는지는 남이 알 일이 아니다. */
   cal_view: { '$uid': { '.read': "auth != null && auth.uid == $uid",
-                        '.write': "auth != null && auth.uid == $uid" } },
+                        '.write': `(${LOGIN}) && auth.uid == $uid` } },
 
   /* 사업(컨설팅 종류) 색표(푸른이알피 유형 코드 → 색) — «컨설팅일정»이 정하는 한 곳
      (대표 결정 2026-08-30 「㉮」). 사람 색과 방향이 반대다 — 푸른이알피의 컨설팅 유형
@@ -404,7 +404,7 @@ rules.data = {
     '.read': MGR, '.write': MGR,
     $uid: {
       '.read':  `auth != null && (auth.uid === $uid || ${MGR})`,
-      '.write': `auth != null && (auth.uid === $uid || ${MGR})`
+      '.write': `(${LOGIN}) && (auth.uid === $uid || ${MGR})`
     }
   },
 
@@ -901,7 +901,7 @@ rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
 /* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
    추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
-rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
 /* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」) ═══════════════
    받은 메일에서 서버(AI)가 뽑은 «일정 초안». 메일에서 나온 이름·전화·이메일이 들어 있다.
@@ -920,7 +920,7 @@ rules.cal_inbox = {
     } }
   }
 };
-rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
 /* ══ 반출 기록 — 기업정보함에서 «밖으로 나간 것» (대표 지시 2026-08-29) ══
    설계서: docs/superpowers/specs/2026-08-29-기업정보함-반출기록-design.md
@@ -1261,7 +1261,7 @@ rules.ilabor = { '.read': LOGIN, '.write': false };
      남의 고침을 덮지 않는다(거절되면 화면이 띠로 «저장/불러오기»를 고르게 한다).
    ⚠ prevAt 을 «안 보내는» 쓰기(옛 판 화면·통째 되돌리기)는 이 검사를 안 거친다 — 일부러다. 받는 칸 이름도 늘리지 말 것.
    ⚠ 첫 저장(at 이 아직 없음)은 그대로 받는다. */
-rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
   prevAt: { '.validate': "!data.parent().child('at').exists() || newData.val() === data.parent().child('at').val()" } } };
 
 /* ══ 정부사업신청(gov.html) — 대표 «개인» 자리 (2026-10-03) ═══════════════
@@ -1275,7 +1275,7 @@ rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write
      새 판은 칸마다 update() 하면서 sv:2 를 함께 쓴다(js/gov-sync.js). 옛 판의 통째 set() 에는 sv 가 없어
      이 규칙에 막힌다 — 그 화면은 「클라우드 저장 실패 — 권한」을 보이고 새로고침하면 새 판이 된다.
    ⚠ 지우기(newData 없음)는 그대로 받는다 — 대표가 자기 자리를 비울 길은 남긴다. */
-rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
   '.validate': "!newData.exists() || newData.child('sv').val() >= 2" } };
 
 /* ══ 컨설턴트 모집 감시(서버 recruitWatch) — 기관 게시판 새 모집 글 (2026-10-04) ══
@@ -1532,11 +1532,12 @@ rules.staff_secret = {
 };
 
 /* ══ 취업규칙 관리 ═════════════════════════════════════════════════════ */
-const revWrite = `auth != null && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
-const origWrite = `auth != null && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;
+/* 2026-11-15 보안 — 익명 로그인 토큰(auth != null)으로는 쓰지 못하게 LOGIN(재직 직원)으로 좁혔다. 위 개인 자리들도 같다(쓰기만, 읽기는 제 것). */
+const revWrite = `(${LOGIN}) && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
+const origWrite = `(${LOGIN}) && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;
 rules.rules_mgmt = {
   wip: { $uid: {
-    '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+    '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
     $site: { '.validate': "newData.hasChildren(['site','asof'])" }
   } },
   done: { '.read': LOGIN, $site: { $rev: {
@@ -1570,7 +1571,7 @@ rules.rules_mgmt = {
   } } },
   orig:    { '.read': LOGIN, $id: { '.write': origWrite } },
   archive: { '.read': LOGIN, $id: { '.write': origWrite } },
-  worksession: { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } },
+  worksession: { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } },
   decisions: { '.read': LOGIN, '.write': LOGIN },
   matchfix:  { '.read': LOGIN, '.write': LOGIN },
   /* ── 법 개정 감시 ─ 2026-09-26 ───────────────────────────────────────
