@@ -11,6 +11,28 @@ module.exports = {
       }
     },
     {
+      name: 'organ_history',
+      run: async (page) => {
+        await page.click('[data-tab="organ"]');
+        await page.waitForTimeout(200);
+        await page.selectOption('select[data-f="hOrgan"]', 'C0352');
+        await page.waitForTimeout(150);
+        await page.click('#pauOrganSubCard [data-h-sub="HISTORY"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'organ_issues',
+      run: async (page) => {
+        await page.click('[data-tab="organ"]');
+        await page.waitForTimeout(200);
+        await page.selectOption('select[data-f="hOrgan"]', 'C0005');
+        await page.waitForTimeout(150);
+        await page.click('#pauOrganSubCard [data-h-sub="ISSUES"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
       name: 'region',
       run: async (page) => {
         await page.click('[data-tab="matrix"]');

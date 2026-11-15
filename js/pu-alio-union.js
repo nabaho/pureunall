@@ -489,6 +489,10 @@
     return 'union_info';
   }
 
+  function stripFileExt(name) {
+    return String(name || '').replace(/\.(pdf|hwpx?|zip|xlsx?|docx?)$/i, '').replace(/\s+/g, ' ').trim();
+  }
+
   function renderFilePills(files, defaultLabel) {
     if (!Array.isArray(files) || !files.length) return '';
     var seen = {};
@@ -498,10 +502,65 @@
       var u = safeHttpUrl(f.url || f.download_url || '');
       if (!u || seen[u]) return;
       seen[u] = true;
-      var lbl = f.name ? String(f.name) : ((defaultLabel || '첨부원문') + (files.length > 1 ? ' ' + (idx + 1) : ''));
-      pills.push('<a class="pau-pill fktu" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer" title="' + esc(lbl) + '" style="text-decoration:none;max-width:210px;overflow:hidden;text-overflow:ellipsis;">📎 ' + esc(lbl) + '</a>');
+      var rawLbl = f.name ? String(f.name).trim() : ((defaultLabel || '첨부원문') + (files.length > 1 ? ' ' + (idx + 1) : ''));
+      var shortLbl = stripFileExt(rawLbl) || rawLbl;
+      pills.push('<a class="pau-pill fktu" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer" title="' + esc(rawLbl) + '" style="text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;">📎 ' + esc(shortLbl) + '</a>');
     });
     return pills.length ? (pills.join(' ') + ' ') : '';
+  }
+
+  function renderCompactFilePills(files, shortLabel) {
+    if (!Array.isArray(files) || !files.length) return '';
+    var valid = [];
+    var seen = {};
+    files.forEach(function (f) {
+      if (!f) return;
+      var u = safeHttpUrl(f.url || f.download_url || '');
+      if (!u || seen[u]) return;
+      seen[u] = true;
+      valid.push({ url: u, name: String(f.name || shortLabel || '원문').trim() });
+    });
+    if (!valid.length) return '';
+    var base = shortLabel || '원문';
+    if (valid.length === 1) {
+      return '<a class="pau-doc-dl" href="' + esc(valid[0].url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(valid[0].name) + '">📎 ' + esc(base) + '</a>';
+    }
+    return valid.slice(0, 2).map(function (vf, i) {
+      var tag = i === 0 ? base : ('첨부' + (i + 1));
+      return '<a class="pau-doc-dl" href="' + esc(vf.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(vf.name) + '">📎 ' + esc(tag) + '</a>';
+    }).join('');
+  }
+
+  function getReadableDocTitle(d) {
+    if (!d) return '';
+    var rawTit = String(d.title || d.cname || '').replace(/\s+/g, ' ').trim();
+    var isGeneric = /^(단체협약\s*정보|임금협약\s*정보|노사협의회\s*의결사항|단체협약상\s*별도\s*합의사항|단체협약\s*외의\s*별도\s*합의사항|제도운영\s*상황.*)$/.test(rawTit);
+    if (isGeneric && Array.isArray(d.files) && d.files.length) {
+      var f0 = d.files[0] && d.files[0].name ? stripFileExt(d.files[0].name) : '';
+      if (f0 && f0.length >= 4) {
+        return f0 + (d.files.length > 1 ? (' 외 ' + (d.files.length - 1) + '건') : '');
+      }
+    }
+    return rawTit || '공시 문서';
+  }
+
+  var NOISY_KV_KEY_RE = /^(category_code|기준일|제출일|최종수정일|체결일|합의일|의결일|회의일자|제·개정일|개정일|최종협약|주요개정내용|신구대비표|회의록|첨부파일|규정파일|\d+\.\s*수정대상.*)$/i;
+  var NOISY_KV_VAL_RE = /^(해당사항\s*없음|해당없음|없음|무|-|—|관련자료|규정내용|별첨|첨부\s*참조|첨부파일\s*참조)$/i;
+
+  function formatCleanKvPairs(kv, maxItems) {
+    if (!kv || typeof kv !== 'object') return [];
+    var limit = maxItems > 0 ? maxItems : 5;
+    var out = [];
+    Object.keys(kv).forEach(function (k) {
+      if (out.length >= limit) return;
+      var key = String(k || '').trim();
+      if (!key || NOISY_KV_KEY_RE.test(key)) return;
+      var val = String(kv[k] == null ? '' : kv[k]).replace(/\s+/g, ' ').trim();
+      if (!worth(val) || NOISY_KV_VAL_RE.test(val)) return;
+      if (/\.(pdf|hwpx?|zip|xlsx?|docx?)$/i.test(val)) return;
+      out.push({ key: key, val: val, text: key + ': ' + val });
+    });
+    return out;
   }
 
   function confedClass(c) {
@@ -710,35 +769,186 @@
     return { mode: 'POST', url: actionUrl, fields: fields, aid: aid, targetType: tType };
   }
 
+  function cleanRevisionClauseText(raw) {
+    var s = String(raw == null ? '' : raw)
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/\\~/g, '~')
+      .replace(/\r\n?/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    s = s.replace(/^[\s)]+/, '').replace(/\(\s*$/, '').trim();
+    return s || '—';
+  }
+
+  function isMarkdownPipeSummary(raw) {
+    var s = String(raw || '');
+    return /\|\s*---\s*\|/.test(s) || /^\s*\|\s*구\s*분\s*\|/.test(s);
+  }
+
+  function parseRevisionSummaryBullets(rawLines) {
+    var bullets = [];
+    var seen = {};
+    (rawLines || []).forEach(function (raw) {
+      var s = String(raw || '').trim();
+      if (!s || isMarkdownPipeSummary(s)) return;
+      s = s.replace(/<br\s*\/?>/gi, '\n').replace(/\\~/g, '~');
+      s = s.replace(/^[^\n]*단체협약\s*개정\s*주요내용\s*(?:\([^)]*\))?\s*/i, '');
+      s = s.replace(/\s*\d+\.\s*기타\s*참고사항\s*:\s*(?:없음|해당없음|해당사항\s*없음)[\s\S]*$/i, '');
+      var parts = s.split(/(?:\n+|(?=\s+[1-9]\.\s*(?:개정이유|주요내용|개정배경|주요골자|개정내용))|(?=\s+[가-하]\.\s+[가-힣]))/);
+      parts.forEach(function (p) {
+        var cl = p.replace(/\s+/g, ' ').replace(/^[-·•]\s*/, '').trim();
+        if (!cl || cl.length < 3) return;
+        if (/^\d+\.\s*(?:개정이유|주요내용|개정배경|주요골자|개정내용)\s*:?\s*$/.test(cl)) return;
+        if (!seen[cl]) {
+          seen[cl] = true;
+          bullets.push(cl);
+        }
+      });
+    });
+    return bullets.slice(0, 8);
+  }
+
   function normalizeRevisionsList(rawRev) {
     if (!rawRev) return [];
     var list = (Array.isArray(rawRev) ? rawRev : [rawRev]).filter(Boolean);
-    return list.map(function (r) {
-      var sumLines = [];
+    var parsed = list.map(function (r) {
+      var rawLines = [];
       if (Array.isArray(r.summary)) {
-        sumLines = r.summary.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+        rawLines = r.summary.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
       } else if (worth(r.summary)) {
-        sumLines = [String(r.summary).trim()];
+        rawLines = [String(r.summary).trim()];
       }
-      var diffs = (r.diffs || []).filter(Boolean).map(function (d) {
+      var summaryBullets = parseRevisionSummaryBullets(rawLines);
+      var rawDiffs = (r.diffs || []).filter(Boolean);
+      var hasRealBefore = rawDiffs.some(function (d) {
+        var bf = String(d.before || '').trim();
+        return bf && bf !== '기존 협약 조항' && bf !== '—' && bf !== '-';
+      });
+      var diffs = rawDiffs.map(function (d) {
+        var rawBf = String(d.before || '').trim();
+        var isPlaceholder = !rawBf || rawBf === '기존 협약 조항';
         return {
-          art: d.art || d.article || '개정 조항',
-          before: d.before || '—',
-          after: d.after || '—',
-          note: d.note || '단협·규정 개정'
+          art: cleanRevisionClauseText(d.art || d.article || '개정 조항'),
+          before: isPlaceholder ? '종전 규정 (개정 요약 참조)' : cleanRevisionClauseText(rawBf),
+          after: cleanRevisionClauseText(d.after || '—'),
+          note: cleanRevisionClauseText(d.note || '단협·규정 개정'),
+          isPlaceholder: isPlaceholder
         };
       });
+      var normDate = normalizeTimelineDate(r.date) || r.date || '최근 개정';
+      var files = [];
+      if (worth(r.url) || worth(r.file)) {
+        files.push({ name: r.file || r.title || '신·구 대비표 원문', url: r.url || '' });
+      }
       return {
-        dno: r.dno || '',
-        date: normalizeTimelineDate(r.date) || r.date || '최근 개정',
+        dno: String(r.dno || '').trim(),
+        date: normDate,
         rawDate: r.date || '최근 개정',
-        title: r.title || '단체협약 신·구 조문 대비표 및 개정 주요내용',
+        title: String(r.title || '단체협약 신·구 조문 대비표 및 개정 주요내용').trim(),
         file: r.file || '',
         url: r.url || '',
-        summaryLines: sumLines,
+        files: files,
+        summaryBullets: summaryBullets,
+        summaryLines: summaryBullets.length ? summaryBullets : rawLines.filter(function (x) { return !isMarkdownPipeSummary(x); }),
+        hasRealBefore: hasRealBefore,
         diffs: diffs
       };
     });
+
+    // 동일 공시번호(dno)에 '개정 주요내용(요약문)'과 '신구대비표(실제 조문 전·후)'가 분리 수록된 경우 하나로 병합
+    var merged = [];
+    var byGroupKey = Object.create(null);
+    parsed.forEach(function (item) {
+      var gk = item.dno ? ('DNO_' + item.dno) : '';
+      if (gk && byGroupKey[gk]) {
+        var target = byGroupKey[gk];
+        item.files.forEach(function (f) {
+          if (target.files.every(function (tf) { return (tf.url || tf.name) !== (f.url || f.name); })) {
+            target.files.push(f);
+          }
+        });
+        if (!target.url && item.url) target.url = item.url;
+        if (!target.file && item.file) target.file = item.file;
+        item.summaryBullets.forEach(function (b) {
+          if (target.summaryBullets.indexOf(b) === -1 && target.summaryBullets.length < 8) {
+            target.summaryBullets.push(b);
+          }
+        });
+        target.summaryLines = target.summaryBullets.length ? target.summaryBullets : target.summaryLines;
+        if (!target.hasRealBefore && item.hasRealBefore && item.diffs.length) {
+          target.diffs = item.diffs;
+          target.hasRealBefore = true;
+        } else if (target.hasRealBefore === item.hasRealBefore && item.diffs.length > target.diffs.length) {
+          target.diffs = item.diffs;
+        }
+        return;
+      }
+      if (gk) byGroupKey[gk] = item;
+      merged.push(item);
+    });
+    return merged;
+  }
+
+  function normalizeArticlesList(rawArticles) {
+    if (!Array.isArray(rawArticles)) return [];
+    var byKey = Object.create(null);
+    var orderKeys = [];
+    rawArticles.forEach(function (a) {
+      if (!a || !a.apba_id) return;
+      var rawTxt = String(a.text || '').replace(/\r\n?/g, '\n');
+      var hasDiffHeader = /구분\s*\n+\s*현\s*행\s*\n+\s*개\s*정\s*안/.test(rawTxt);
+      var cleanedLines = [];
+      rawTxt.split('\n').forEach(function (ln) {
+        var t = ln.trim();
+        if (!t) return;
+        if (/^(구분|현\s*행|개\s*정\s*안|개\s*정|정)$/.test(t)) return;
+        cleanedLines.push(t);
+      });
+      var joined = '';
+      for (var i = 0; i < cleanedLines.length; i++) {
+        var cur = cleanedLines[i];
+        if (!joined) {
+          joined = cur;
+          continue;
+        }
+        var prevLast = joined.slice(-1);
+        var curFirst = cur.charAt(0);
+        var prevShortFragment = /[가-힣]$/.test(prevLast) && /^[가-힣]/.test(curFirst) && cleanedLines[i - 1].length <= 15 && !/^(?:\d+[.)]|[가-하]\.|[①-⑳])/.test(cur);
+        joined += (prevShortFragment ? '' : ' ') + cur;
+      }
+      joined = joined.replace(/\s+/g, ' ').trim();
+      var tit = String(a.article_title || '').trim();
+      var mBr = /^(?:\d+\s*)?[【\[]([^】\]]+)[】\]]\s*:?\s*(.*)$/.exec(joined);
+      if (mBr) {
+        if (!tit) tit = mBr[1].trim();
+        joined = mBr[2].trim();
+      }
+      joined = joined.replace(/^[:：\-·]\s*/, '').trim();
+      var artNo = String(a.article_no || '').trim();
+      if (artNo && artNo.indexOf('제') !== 0 && /^\d+$/.test(artNo)) artNo = '제' + artNo + '조';
+
+      var normObj = {
+        apba_id: a.apba_id,
+        inst_name: a.inst_name || '',
+        inst_type: a.inst_type || '',
+        chapter: a.chapter || '',
+        article_no: artNo,
+        article_title: tit,
+        taxonomy_code: a.taxonomy_code || '',
+        taxonomy_name: a.taxonomy_name || '',
+        text: joined,
+        _hasDiffHeader: hasDiffHeader
+      };
+      var dedupKey = a.apba_id + '|' + artNo + '|' + tit + '|' + (a.taxonomy_code || '');
+      var prev = byKey[dedupKey];
+      if (!prev) {
+        byKey[dedupKey] = normObj;
+        orderKeys.push(dedupKey);
+      } else if ((prev._hasDiffHeader && !normObj._hasDiffHeader) || (prev._hasDiffHeader === normObj._hasDiffHeader && normObj.text.length > prev.text.length)) {
+        byKey[dedupKey] = normObj;
+      }
+    });
+    return orderKeys.map(function (k) { return byKey[k]; });
   }
 
   // ── ① 기관 연혁에 따른 노조·임단협·별도합의·내부규정 종합 타임라인 생성 ──
@@ -814,15 +1024,15 @@
 
       var rawDate = (d.kv && (d.kv['체결일'] || d.kv['합의일'] || d.kv['의결일'] || d.kv['기준일'])) || d.edate || d.rdate || '';
       var normDate = normalizeTimelineDate(rawDate) || baseDiscDate || normalizeTimelineDate(d.title) || '미상';
-      var kvParts = [];
-      Object.keys(d.kv || {}).forEach(function (k) {
-        if (k !== '기준일' && k !== '제출일' && worth(d.kv[k])) {
-          kvParts.push(k + ': ' + d.kv[k]);
-        }
-      });
+      var cleanKvList = formatCleanKvPairs(d.kv, 5);
+      var kvParts = cleanKvList.map(function (it) { return it.text; });
       if (Array.isArray(d.highlights) && d.highlights.length) {
         kvParts.push('주요내용: ' + d.highlights.slice(0, 3).join(' / '));
       }
+      if (!kvParts.length && Array.isArray(d.files) && d.files.length && d.files[0] && d.files[0].name) {
+        kvParts.push('첨부원문: ' + stripFileExt(d.files[0].name) + (d.files.length > 1 ? (' 외 ' + (d.files.length - 1) + '건') : ''));
+      }
+      var readTit = getReadableDocTitle(d);
 
       items.push({
         id: d.dno || ('DISC_' + aid + '_' + idx),
@@ -831,10 +1041,12 @@
         catGroup: catGroup,
         ccode: cc,
         cname: d.cname || '공시',
-        title: d.title || d.cname || '',
+        title: readTit || d.title || d.cname || '',
+        rawTitle: d.title || d.cname || '',
         union: (d.kv && d.kv['노조명']) || '',
         period: (d.kv && (d.kv['유효기간'] || d.kv['기준연도'])) || normDate || '',
-        summary: kvParts.join(' · ') || d.title || '—',
+        kvItems: cleanKvList,
+        summary: kvParts.join(' · ') || readTit || d.title || '—',
         files: d.files || [],
         dno: d.dno || ''
       });
@@ -846,6 +1058,10 @@
       if (da && !db) return -1;
       if (!da && db) return 1;
       if (da !== db) return db.localeCompare(da);
+      if (String(a.ccode || '') !== String(b.ccode || '')) {
+        if (String(a.ccode) === '21026') return -1;
+        if (String(b.ccode) === '21026') return 1;
+      }
       return String(a.title || '').localeCompare(String(b.title || ''));
     });
     return items;
@@ -1005,7 +1221,7 @@
     var safeUnions = ((data && data.unions) || []).filter(Boolean);
     var safeDiscs = ((data && data.disclosures) || []).filter(Boolean);
     var safeMetrics = ((data && data.metrics) || []).filter(Boolean);
-    var safeArticles = ((data && data.articles) || []).filter(Boolean);
+    var safeArticles = normalizeArticlesList((data && data.articles) || []);
     var revsMap = (data && data.revisions) || {};
 
     var unionsByAid = {};
@@ -1107,8 +1323,8 @@
       var unionStructLabel = !hasUnion ? '노조미설립' : (isMulti ? ('복수노조(' + activeU.length + '개)') : '단일노조');
 
       var dAll = (discsByAid[aid] || []).slice().sort(function (a, b) {
-        var da = String(a.edate || a.rdate || '');
-        var db = String(b.edate || b.rdate || '');
+        var da = normalizeTimelineDate(a.edate || a.rdate || '') || String(a.edate || a.rdate || '');
+        var db = normalizeTimelineDate(b.edate || b.rdate || '') || String(b.edate || b.rdate || '');
         return db.localeCompare(da);
       });
 
@@ -1128,7 +1344,12 @@
         } else if (cc === '21027') {
           wageDiscs.push(d);
         } else if (cc === '63796') {
-          wageDiscs.push(d);
+          var sepHay = (d.title || '') + ' ' + ((d.files || []).map(function (f) { return (f && f.name) || ''; }).join(' '));
+          if (/임금|보수|연봉|수당|성과급|퇴직|급여/.test(sepHay)) {
+            wageDiscs.push(d);
+          } else {
+            sepDiscs.push(d);
+          }
         } else if (cc === '63795' || cc === '21028') {
           sepDiscs.push(d);
         } else {
@@ -1724,15 +1945,15 @@
   }
 
   // ── ⑤ 기관 내부 6대 핵심 영역 한눈에 보기 보드 렌더러 (인라인 펼침 & 탭 2 공용) ──
-  function renderOrganSixDomainsBoard(rec, isCompact, inCompareTray, sectorBench) {
+  function renderOrganSixDomainsBoard(rec, isCompact, inCompareTray, sectorBench, boardOpts) {
     var dom = rec.domains;
     var aid = rec.aid;
     var isLoc = rec.isLocal;
     var isMois = rec.isMois;
+    var hideHeader = !!(boardOpts && boardOpts.hideHeader);
     var postAttrBase = (isLoc && !isMois) ? (' data-cleaneye-post="' + esc(aid) + '"') : '';
 
     var latestCa = dom.caDiscs[0] || null;
-    var latestSep = dom.sepDiscs[0] || null;
     var latestRule = dom.ruleDiscs[0] || null;
     var latestRev = dom.revisions[0] || null;
 
@@ -1752,74 +1973,108 @@
     var welfareOpenUrl = safeHttpUrl(buildOrganUrl(rec.inst, '', 'welfare'));
     var avgScoreTxt = sectorBench ? (' (업종평균 ' + sectorBench.totalScore + '점)') : '';
 
+    function renderDocRow(d, badgeFallback, fileLabel) {
+      var dt = normalizeTimelineDate(d.edate || d.rdate || '') || String(d.edate || d.rdate || badgeFallback || '공시').trim();
+      var tit = getReadableDocTitle(d);
+      var fBtn = renderCompactFilePills(d.files, fileLabel || '원문');
+      return '<div class="pau-doc-row">' +
+        '<span class="pau-doc-dt">' + esc(dt) + '</span>' +
+        '<span class="pau-doc-tit" title="' + esc(tit) + '">' + esc(tit) + '</span>' +
+        (fBtn ? ('<span class="pau-doc-acts">' + fBtn + '</span>') : '') +
+        '</div>';
+    }
+
+    var revPreviewItems = [];
+    if (latestRev) {
+      if (latestRev.summaryBullets && latestRev.summaryBullets.length) {
+        revPreviewItems = latestRev.summaryBullets.slice(0, 2).map(function (b) {
+          return '<div class="pau-rev-mini-item" title="' + esc(b) + '">• ' + esc(b) + '</div>';
+        });
+      } else if (latestRev.diffs && latestRev.diffs.length) {
+        revPreviewItems = latestRev.diffs.slice(0, 2).map(function (df) {
+          var fullTxt = df.art + ': ' + df.after;
+          return '<div class="pau-rev-mini-item" title="' + esc(fullTxt) + '"><b>' + esc(df.art) + '</b> → ' + esc(df.after) + '</div>';
+        });
+      }
+    }
+
     return [
-      '<div class="pau-dom-board">',
-      '  <div class="pau-dom-top">',
-      '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-      '      <span class="pau-pill ' + (isLoc ? 'loc' : 'fktu') + '">' + esc(rec.scopeLabel) + '</span>',
-      '      <span class="pau-pill">' + esc(rec.sectorLabel) + '</span>',
-      '      <b style="font-size:14px;">' + esc(rec.name) + '</b>',
-      '      <span style="font-size:12px;color:var(--pau-muted);">(' + esc(rec.ministry + ' · ' + rec.inst_type) + ')</span>',
-      '    </div>',
-      (isCompact ? [
+      '<div class="pau-dom-board' + (hideHeader ? ' plain' : '') + '">',
+      (!hideHeader ? [
+        '  <div class="pau-dom-top">',
         '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점</span>',
-        '      <button type="button" class="pau-act-btn' + (inCompareTray ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCompareTray ? '✓ 비교담김' : '+ 비교담기') + '</button>',
-        '      <button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔎 기관 상세</button>',
-        '      <button type="button" class="pau-act-btn" data-jump-organ="' + esc(aid) + '">↗ 독립 창</button>',
-        '    </div>'
-      ].join('') : [
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;">',
-        '      <span class="pau-pill">노조 ' + fmtNum(rec.unionCount) + '개 · 조합원 ' + fmtNum(rec.memberTotal) + '명</span>',
-        '      <span class="pau-pill fktu">조직률 ' + fmtPct(rec.orgRate) + '</span>',
-        '      <span class="pau-pill multi">타임오프 ' + fmtNum(rec.timeoffHours) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')</span>',
-        '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점' + esc(avgScoreTxt) + '</span>',
-        '    </div>'
-      ].join('')),
-      '  </div>',
+        '      <span class="pau-pill ' + (isLoc ? 'loc' : 'fktu') + '">' + esc(rec.scopeLabel) + '</span>',
+        '      <span class="pau-pill">' + esc(rec.sectorLabel) + '</span>',
+        '      <b style="font-size:14px;">' + esc(rec.name) + '</b>',
+        '      <span style="font-size:12px;color:var(--pau-muted);">(' + esc(rec.ministry + ' · ' + rec.inst_type) + ')</span>',
+        '    </div>',
+        (isCompact ? [
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점</span>',
+          '      <button type="button" class="pau-act-btn' + (inCompareTray ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCompareTray ? '✓ 비교담김' : '+ 비교담기') + '</button>',
+          '      <button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔎 기관 상세</button>',
+          '      <button type="button" class="pau-act-btn" data-jump-organ="' + esc(aid) + '">↗ 독립 창</button>',
+          '    </div>'
+        ].join('') : [
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;">',
+          '      <span class="pau-pill">노조 ' + fmtNum(rec.unionCount) + '개 · 조합원 ' + fmtNum(rec.memberTotal) + '명</span>',
+          '      <span class="pau-pill fktu">조직률 ' + fmtPct(rec.orgRate) + '</span>',
+          '      <span class="pau-pill multi">타임오프 ' + fmtNum(rec.timeoffHours) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')</span>',
+          '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점' + esc(avgScoreTxt) + '</span>',
+          '    </div>'
+        ].join('')),
+        '  </div>'
+      ].join('') : ''),
 
       '  <div class="pau-dom-grid">',
       // 영역 1: 노동조합 · 타임오프 구성
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>👥 ① 노동조합 · 타임오프 구조</span><span class="pau-pill ' + (rec.hasUnion ? (rec.isMulti ? 'multi' : 'fktu') : '') + '">' + esc(rec.unionStructLabel) + '</span></div>',
+      '      <div class="pau-dom-hd"><span>👥 ① 노동조합 · 타임오프</span><span class="pau-pill ' + (rec.hasUnion ? (rec.isMulti ? 'multi' : 'fktu') : '') + '">' + esc(rec.unionStructLabel) + '</span></div>',
       (rec.hasUnion ? [
-        '      <div class="pau-dom-stat">합산 조합원 <b>' + fmtNum(rec.memberTotal) + '명</b> / 가입대상 ' + fmtNum(rec.eligibleCount) + '명 (조직률 <b>' + fmtPct(rec.orgRate) + '</b>) · 타임오프 <b>' + fmtNum(rec.timeoffHours) + 'h</b> (법정한도 ' + fmtNum(rec.legalTimeoffLimit) + 'h 대비 <b>' + fmtPct(rec.timeoffLimitPct) + '</b>)</div>',
-        '      <div class="pau-dom-list">',
-        rec.unions.map(function (u) {
+        '      <div class="pau-kv-list">',
+        '        <div class="pau-kv-row"><span>합산 조합원 · 조직률</span><b>' + fmtNum(rec.memberTotal) + ' / ' + fmtNum(rec.eligibleCount) + '명 (' + fmtPct(rec.orgRate) + ')</b></div>',
+        '        <div class="pau-kv-row"><span>연간 타임오프 (법정한도)</span><b>' + fmtNum(rec.timeoffHours) + 'h / ' + fmtNum(rec.legalTimeoffLimit) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')</b></div>',
+        '      </div>',
+        '      <div class="pau-doc-list">',
+        rec.unions.slice(0, 3).map(function (u) {
           var isRep = String(u.bargaining_right || '').indexOf('대표') >= 0;
-          return '<div class="pau-dom-item">' +
-            '<span class="pau-pill ' + confedClass(u.confederation) + '">' + esc(u.confederation || '미가입') + '</span> ' +
-            (isRep ? '<span class="pau-pill ok">대표</span> ' : '') +
-            '<b>' + esc(u.union_name) + '</b> · ' + fmtNum(u.member_total) + '명' +
-            (Number(u.timeoff_hours || 0) ? (' · ' + fmtNum(u.timeoff_hours) + 'h') : '') +
-            (worth(u.established_date) ? (' <span style="color:var(--pau-muted);">(' + esc(u.established_date) + ')</span>') : '') +
+          var uMeta = fmtNum(u.member_total) + '명' + (Number(u.timeoff_hours || 0) ? (' · ' + fmtNum(u.timeoff_hours) + 'h') : '');
+          var uTip = u.union_name + ' (' + (u.confederation || '미가입') + (worth(u.established_date) ? ', 설립 ' + u.established_date : '') + ')';
+          return '<div class="pau-doc-row" title="' + esc(uTip) + '">' +
+            '<span class="pau-pill ' + confedClass(u.confederation) + '">' + esc(u.confederation || '미가입') + '</span>' +
+            (isRep ? '<span class="pau-pill ok">대표</span>' : '') +
+            '<span class="pau-doc-tit" style="font-weight:700;">' + esc(u.union_name) + '</span>' +
+            '<span class="pau-doc-meta">' + esc(uMeta) + '</span>' +
             '</div>';
         }).join(''),
+        (rec.unions.length > 3 ? '<div style="font-size:11.5px;color:var(--pau-muted);padding-left:4px;">+ 외 ' + fmtNum(rec.unions.length - 3) + '개 산하 단위노조</div>' : ''),
         '      </div>'
       ].join('') : '<div class="pau-dom-empty">현재 설립·공시된 노동조합이 없으며 취업규칙·내부규정 및 노사협의회 기준으로 운영됩니다.</div>'),
       '      <div class="pau-dom-foot">',
-      (unionOpenUrl ? '<a class="pau-pill ok" href="' + esc(unionOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="union_status"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 노조현황 원문</a>' : ''),
+      (unionOpenUrl ? '<a class="pau-pill ok" href="' + esc(unionOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="union_status"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 노조현황 공시원문</a>' : ''),
       '      </div>',
       '    </div>',
 
       // 영역 2: 임금 · 보수 · 퇴직금
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>💰 ② 임금 · 보수 · 퇴직금 영역</span><span class="pau-pill">' + fmtNum(dom.wageDiscs.length) + '건</span></div>',
-      '      <div class="pau-dom-stat">보수기준: <b>' + esc(rec.issueScores.wage_bonus_allowance.val) + '</b></div>',
-      '      <div class="pau-dom-list">',
-      (dom.wageDiscs.length ? dom.wageDiscs.slice(0, 3).map(function (d) {
-        return '<div class="pau-dom-item"><b>[' + esc(d.edate || d.rdate || '공시') + ']</b> ' + esc(d.title || d.cname) + ' ' + renderFilePills((d.files || []).slice(0, 2), '임협원문') + '</div>';
-      }).join('') : '<div class="pau-dom-item">별도 임금협약 공시문서 없음 — 보수규정·연봉규칙 및 통합 단체협약 내 임금 조항 적용</div>'),
+      '      <div class="pau-dom-hd"><span>💰 ② 임금 · 보수 · 퇴직금</span><span class="pau-pill">' + (dom.wageDiscs.length ? (fmtNum(dom.wageDiscs.length) + '건') : '사규적용') + '</span></div>',
+      '      <div class="pau-kv-list">',
+      '        <div class="pau-kv-row"><span>보수 · 수당 기준</span><b>' + esc(rec.issueScores.wage_bonus_allowance.val) + '</b></div>',
+      '        <div class="pau-kv-row"><span>정년 · 임금피크제</span><b>' + esc(rec.issueScores.retirement_age_peak.tag) + '</b></div>',
       '      </div>',
+      (dom.wageDiscs.length ? [
+        '      <div class="pau-doc-list">',
+        dom.wageDiscs.slice(0, 3).map(function (d) { return renderDocRow(d, '임협', '원문'); }).join(''),
+        '      </div>'
+      ].join('') : '<div class="pau-dom-empty">별도 임금협약 공시문서 없음 — 보수규정·연봉규칙 및 단체협약 보수 조항이 적용됩니다.</div>'),
       '      <div class="pau-dom-foot">',
-      '<span class="pau-pill">' + esc('정년·임금피크: ' + rec.issueScores.retirement_age_peak.tag) + '</span>',
+      (!isCompact && dom.wageDiscs.length ? '<button type="button" class="pau-act-btn" data-h-sub="HISTORY" data-h-cat="AGREEMENT">📂 임단협 연혁 보기 →</button>' : ''),
       '      </div>',
       '    </div>',
 
       // 영역 3: 단체협약 13대 핵심 근로조건
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>⚖️ ③ 단체협약 핵심 근로조건 요약</span><span class="pau-pill fktu">단협 ' + fmtNum(dom.caDiscs.length) + '건 · 조문 ' + fmtNum(dom.articles.length) + '개</span></div>',
-      (latestCa ? '<div class="pau-dom-stat">최근 단협: <b>' + esc((latestCa.edate || latestCa.rdate || '') + ' ' + latestCa.title) + '</b></div>' : '<div class="pau-dom-stat">13대 핵심 쟁점 표준 분석 등급:</div>'),
+      '      <div class="pau-dom-hd"><span>⚖️ ③ 단체협약 핵심 근로조건</span><span class="pau-pill fktu">단협 ' + fmtNum(dom.caDiscs.length) + '건</span></div>',
       '      <div class="pau-issue-mini-grid">',
       keyIssuesToPreview.map(function (k) {
         var def = METRIC_DEFS.find(function (x) { return x.key === k; });
@@ -1831,50 +2086,60 @@
       }).join(''),
       '      </div>',
       '      <div class="pau-dom-foot">',
-      (latestCa ? renderFilePills((latestCa.files || []).slice(0, 2), '단협원문') : ''),
-      (unionOpenUrl ? '<a class="pau-pill ok" href="' + esc(unionOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="union_info"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 단협·협약 공시</a>' : ''),
+      (latestCa ? renderCompactFilePills((latestCa.files || []).slice(0, 1), '단협서') : ''),
+      (unionOpenUrl ? '<a class="pau-pill ok" href="' + esc(unionOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="union_info"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 단협공시</a>' : ''),
+      (!isCompact ? '<button type="button" class="pau-act-btn" data-h-sub="ISSUES" style="margin-left:auto;">⚖️ 13대 전 항목 →</button>' : ''),
       '      </div>',
       '    </div>',
 
       // 영역 4: 별도합의 · 보충협약 · 노사협의회
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>🤝 ④ 별도합의 · 보충협약 · 노사협의회</span><span class="pau-pill multi">' + fmtNum(dom.sepDiscs.length) + '건</span></div>',
-      '      <div class="pau-dom-list">',
-      (dom.sepDiscs.length ? dom.sepDiscs.slice(0, 3).map(function (d) {
-        return '<div class="pau-dom-item"><b>[' + esc(d.edate || d.rdate || '합의') + ']</b> ' + esc(d.title || d.cname) + ' ' + renderFilePills((d.files || []).slice(0, 1), '합의서') + '</div>';
-      }).join('') : '<div class="pau-dom-empty">공시된 단협 외 별도합의서가 없으며 본 단체협약 및 정기 노사협의회 의결사항으로 통합 운영됩니다.</div>'),
+      '      <div class="pau-dom-hd"><span>🤝 ④ 별도합의 · 노사협의회</span><span class="pau-pill multi">' + fmtNum(dom.sepDiscs.length) + '건</span></div>',
+      (dom.sepDiscs.length ? [
+        '      <div class="pau-doc-list">',
+        dom.sepDiscs.slice(0, 3).map(function (d) { return renderDocRow(d, '합의', '원문'); }).join(''),
+        (dom.sepDiscs.length > 3 ? '<div style="font-size:11.5px;color:var(--pau-muted);padding-left:4px;">+ 외 ' + fmtNum(dom.sepDiscs.length - 3) + '건 별도합의·회의록 수록</div>' : ''),
+        '      </div>'
+      ].join('') : '<div class="pau-dom-empty">공시된 단협 외 별도합의서가 없으며 본 단체협약 및 정기 노사협의회 의결사항으로 운영됩니다.</div>'),
+      '      <div class="pau-dom-foot">',
+      (!isCompact && dom.sepDiscs.length ? '<button type="button" class="pau-act-btn" data-h-sub="HISTORY" data-h-cat="SEPARATE">📂 합의·회의록 연혁 →</button>' : ''),
       '      </div>',
-      (latestSep && latestSep.kv ? '<div class="pau-dom-foot"><span style="font-size:11.5px;color:var(--pau-muted);">' + esc(Object.keys(latestSep.kv).slice(0, 2).map(function (k) { return k + ': ' + latestSep.kv[k]; }).join(' · ')) + '</span></div>' : ''),
       '    </div>',
 
       // 영역 5: 취업규칙 · 내부규정 · 복리후생
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>📘 ⑤ 취업규칙 · 내부규정 · 복리후생</span><span class="pau-pill ok">' + (dom.ruleDiscs.length ? fmtNum(dom.ruleDiscs.length) + '건 수록' : '포털 직결') + '</span></div>',
-      '      <div class="pau-dom-stat">복리후생·모성보호: <b>' + esc(rec.issueScores.welfare_education_housing.tag + ' · ' + rec.issueScores.maternity_childcare.tag) + '</b></div>',
-      '      <div class="pau-dom-list">',
-      (dom.ruleDiscs.length ? dom.ruleDiscs.slice(0, 3).map(function (d) {
-        return '<div class="pau-dom-item"><b>[' + esc(d.cname || '사규') + ']</b> ' + esc(d.title) + ' ' + renderFilePills((d.files || []).slice(0, 2), '규정원문') + '</div>';
-      }).join('') : '<div class="pau-dom-item">인사규정 · 보수규정 · 복무규정 · 징계규칙 · 선택적복지 공시 원문 바로가기 지원</div>'),
+      '      <div class="pau-dom-hd"><span>📘 ⑤ 취업규칙 · 복리후생</span><span class="pau-pill ok">' + (dom.ruleDiscs.length ? fmtNum(dom.ruleDiscs.length) + '건 수록' : '포털 직결') + '</span></div>',
+      '      <div class="pau-kv-list">',
+      '        <div class="pau-kv-row"><span>복리후생 수준</span><b>' + esc(rec.issueScores.welfare_education_housing.tag) + '</b></div>',
+      '        <div class="pau-kv-row"><span>모성보호 · 육아휴직</span><b>' + esc(rec.issueScores.maternity_childcare.tag) + '</b></div>',
       '      </div>',
+      (dom.ruleDiscs.length ? [
+        '      <div class="pau-doc-list">',
+        dom.ruleDiscs.slice(0, 3).map(function (d) { return renderDocRow(d, '사규', '원문'); }).join(''),
+        '      </div>'
+      ].join('') : '<div class="pau-dom-empty">인사규정 · 보수규정 · 복무규정 · 징계규칙 · 선택적복지 공시 원문 바로가기 지원</div>'),
       '      <div class="pau-dom-foot">',
-      (ruleOpenUrl ? '<a class="pau-pill ok" href="' + esc(ruleOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="rules"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">📘 내부규정·정관 직결</a> ' : ''),
-      (isLoc && welfareOpenUrl ? '<a class="pau-pill fktu" href="' + esc(welfareOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="welfare"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🏖️ 휴가·복리후생 직결</a>' : ''),
+      (ruleOpenUrl ? '<a class="pau-pill ok" href="' + esc(ruleOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="rules"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">📘 내부규정·정관 직결</a>' : ''),
+      (isLoc && welfareOpenUrl ? '<a class="pau-pill fktu" href="' + esc(welfareOpenUrl) + '"' + (postAttrBase ? (postAttrBase + ' data-cleaneye-type="welfare"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🏖️ 복리후생 직결</a>' : ''),
       '      </div>',
       '    </div>',
 
       // 영역 6: 연혁 타임라인 & 과거↔현행 신·구 대비
       '    <div class="pau-dom-card">',
-      '      <div class="pau-dom-hd"><span>🔄 ⑥ 연혁 · 과거↔현행 신·구 조문 대비</span><span class="pau-pill ' + (latestRev ? 'fktu' : '') + '">' + (latestRev ? ('개정대비 ' + fmtNum(latestRev.diffs.length) + '건') : ('누적공시 ' + fmtNum(rec.discTotal) + '건')) + '</span></div>',
+      '      <div class="pau-dom-hd"><span>🔄 ⑥ 신·구 조문 대비 · 연혁</span><span class="pau-pill ' + (latestRev ? 'fktu' : '') + '">' + (latestRev ? ('조문대비 ' + fmtNum(latestRev.diffs.length) + '건') : ('누적공시 ' + fmtNum(rec.discTotal) + '건')) + '</span></div>',
       (latestRev ? [
-        '      <div class="pau-dom-stat"><b>' + esc(latestRev.title) + '</b> (' + esc(latestRev.date) + ')</div>',
-        '      <div class="pau-dom-list">',
-        latestRev.diffs.slice(0, 2).map(function (df) {
-          return '<div class="pau-dom-item"><b>' + esc(df.art) + ':</b> <span style="color:var(--pau-muted);">' + esc(String(df.before).slice(0, 38)) + '…</span> → <b style="color:var(--pau-pri);">' + esc(String(df.after).slice(0, 46)) + '</b></div>';
-        }).join(''),
+        '      <div class="pau-kv-list">',
+        '        <div class="pau-kv-row"><span>최근 개정 기준일</span><b>' + esc(latestRev.date) + '</b></div>',
+        '      </div>',
+        '      <div class="pau-rev-mini-list">',
+        revPreviewItems.join(''),
         '      </div>'
       ].join('') : '<div class="pau-dom-empty">연도별 공시 문서(' + fmtNum(rec.discTotal) + '건)를 기반으로 과거 시점(A)과 현행 시점(B)의 체결 내역을 직접 대조할 수 있습니다.</div>'),
       '      <div class="pau-dom-foot">',
-      (isCompact ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔄 과거↔현행 조문대비표 열기</button>' : '<button type="button" class="pau-act-btn" data-h-sub="HISTORY" data-scroll-sub="1">🔄 하단 연혁·신구대비 보기</button>'),
+      (latestRev ? renderCompactFilePills((latestRev.files || []).slice(0, 1), '신구대비') : ''),
+      (isCompact
+        ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '" data-open-sub="HISTORY" style="margin-left:auto;">🔄 신·구 조문대비표 열기</button>'
+        : '<button type="button" class="pau-act-btn pri" data-h-sub="HISTORY" style="margin-left:auto;">🔄 신·구 대비 · 연혁 →</button>'),
       '      </div>',
       '    </div>',
       '  </div>',
@@ -2065,20 +2330,70 @@
       '.pau-act-btn:hover,.pau-act-btn:focus-visible{background:var(--pau-th);border-color:#64748b;outline:2px solid #2563eb;outline-offset:1px;}',
       '.pau-act-btn.pri{background:#2563eb;border-color:#2563eb;color:#ffffff;}',
       '.pau-act-btn:disabled,.pau-btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none;}',
-      /* 기관 내부 6대 영역 보드 및 차트 스타일 */
-      '.pau-dom-board{background:var(--pau-card);border:1px solid var(--pau-bd);border-radius:10px;padding:10px 12px;}',
-      '.pau-dom-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--pau-bd-lt);}',
-      '.pau-dom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}',
+      /* 기관 내부 6대 영역 보드 · 통합 프로필 히어로 · 가독성 비교 카드 스타일 */
+      '.pau-dom-board{background:var(--pau-card);border:1px solid var(--pau-bd);border-radius:11px;padding:12px 14px;}',
+      '.pau-dom-board.plain{background:transparent;border:none;padding:0;}',
+      '.pau-dom-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--pau-bd-lt);}',
+      '.pau-dom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}',
       '@media (max-width:1100px){.pau-dom-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}',
-      '.pau-dom-card{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;}',
-      '.pau-dom-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;font-weight:800;font-size:12.5px;color:var(--pau-txt);}',
+      '.pau-dom-card{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:11px;padding:13px 15px;display:flex;flex-direction:column;gap:9px;box-shadow:0 1px 3px rgba(15,23,42,.04);min-width:0;}',
+      '.pau-dom-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;font-weight:800;font-size:13px;color:var(--pau-txt);padding-bottom:8px;border-bottom:1px solid var(--pau-bd-lt);}',
       '.pau-dom-stat{font-size:12px;color:var(--pau-sub);line-height:1.45;}',
       '.pau-dom-list{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--pau-txt);line-height:1.45;}',
       '.pau-dom-item{padding:3px 0;border-top:1px dashed var(--pau-bd-lt);word-break:keep-all;}',
-      '.pau-dom-empty{font-size:12px;color:var(--pau-muted);line-height:1.45;}',
+      '.pau-dom-empty{font-size:12px;color:var(--pau-muted);line-height:1.5;padding:6px 8px;border-radius:7px;background:var(--pau-bg);}',
       '.pau-dom-foot{margin-top:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-top:4px;}',
-      '.pau-issue-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;}',
-      '.pau-issue-mini{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:3px 6px;border-radius:6px;font-size:11px;border:1px solid var(--pau-bd-lt);background:var(--pau-card);overflow:hidden;}',
+      '.pau-kv-list{display:flex;flex-direction:column;gap:5px;}',
+      '.pau-kv-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.45;}',
+      '.pau-kv-row > span{color:var(--pau-muted);white-space:nowrap;}',
+      '.pau-kv-row > b{color:var(--pau-txt);font-weight:700;text-align:right;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '.pau-doc-list{display:flex;flex-direction:column;gap:5px;}',
+      '.pau-doc-row{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;background:var(--pau-bg);border:1px solid var(--pau-bd-lt);font-size:12px;min-width:0;}',
+      '.pau-doc-dt{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pau-muted);background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:5px;padding:1px 6px;white-space:nowrap;flex-shrink:0;}',
+      '.pau-doc-tit{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pau-txt);font-weight:600;}',
+      '.pau-doc-meta{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pau-sub);white-space:nowrap;flex-shrink:0;}',
+      '.pau-doc-acts{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:auto;}',
+      '.pau-doc-dl{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:700;background:#eff6ff;border:1px solid #93c5fd;color:#1e3a8a;text-decoration:none;white-space:nowrap;}',
+      '.pau-doc-dl:hover,.pau-doc-dl:focus-visible{background:#dbeafe;outline:2px solid #2563eb;outline-offset:1px;}',
+      '.pau-root[data-theme="dark"] .pau-doc-dl,body.dark .pau-root .pau-doc-dl{background:#1e3a8a;border-color:#60a5fa;color:#eff6ff;}',
+      '.pau-rev-mini-list{display:flex;flex-direction:column;gap:5px;}',
+      '.pau-rev-mini-item{font-size:12px;line-height:1.5;color:var(--pau-sub);padding:5px 8px;border-radius:7px;background:var(--pau-bg);border-left:3px solid #2563eb;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}',
+      '.pau-org-hero{background:var(--pau-card);border:1px solid var(--pau-bd);border-radius:12px;padding:14px 16px 0;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,23,42,.04);}',
+      '.pau-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}',
+      '.pau-hero-tit{margin:4px 0 2px;font-size:17.5px;font-weight:800;color:var(--pau-txt);line-height:1.3;}',
+      '.pau-hero-sub{font-size:12.5px;color:var(--pau-muted);}',
+      '.pau-hero-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px;}',
+      '.pau-hero-kpi{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:9px;padding:8px 11px;min-width:0;}',
+      '.pau-hero-kpi-lbl{font-size:11px;font-weight:700;color:var(--pau-muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-hero-kpi-val{font-size:14.5px;font-weight:800;color:var(--pau-txt);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-hero-kpi-sub{font-size:11px;color:var(--pau-sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-hero-nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-top:1px solid var(--pau-bd-lt);padding:8px 0;}',
+      '.pau-hero-tab{cursor:pointer;border:1px solid transparent;background:transparent;color:var(--pau-sub);padding:6px 12px;min-height:32px;border-radius:8px;font-size:12.5px;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}',
+      '.pau-hero-tab:hover,.pau-hero-tab:focus-visible{background:var(--pau-th);color:var(--pau-txt);outline:2px solid #2563eb;outline-offset:-1px;}',
+      '.pau-hero-tab.on{background:#1d4ed8;border-color:#1d4ed8;color:#ffffff;}',
+      '.pau-root[data-theme="dark"] .pau-hero-tab.on,body.dark .pau-root .pau-hero-tab.on{background:#2563eb;border-color:#3b82f6;color:#ffffff;}',
+      '.pau-bullet-box{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-left:3px solid #2563eb;border-radius:8px;padding:10px 14px;margin-bottom:12px;}',
+      '.pau-bullet-list{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;line-height:1.55;color:var(--pau-txt);}',
+      '.pau-diff-list{border:1px solid var(--pau-bd-lt);border-radius:10px;overflow:hidden;}',
+      '.pau-diff-hd{display:grid;grid-template-columns:185px minmax(0,1fr) minmax(0,1fr);gap:12px;padding:8px 12px;background:var(--pau-th);border-bottom:1px solid var(--pau-bd-lt);font-size:12px;font-weight:800;color:var(--pau-sub);}',
+      '.pau-diff-row{display:grid;grid-template-columns:185px minmax(0,1fr) minmax(0,1fr);gap:12px;padding:11px 12px;border-bottom:1px solid var(--pau-bd-lt);background:var(--pau-card);align-items:start;}',
+      '.pau-diff-row:last-child{border-bottom:none;}',
+      '.pau-diff-art{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:800;color:var(--pau-txt);line-height:1.45;}',
+      '.pau-diff-old{background:var(--pau-bg);border-left:3px solid #94a3b8;border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.6;color:var(--pau-sub);}',
+      '.pau-diff-new{background:#eff6ff;border-left:3px solid #2563eb;border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.6;color:#0f172a;font-weight:600;}',
+      '.pau-root[data-theme="dark"] .pau-diff-new,body.dark .pau-root .pau-diff-new{background:#172554;border-left-color:#60a5fa;color:#f8fafc;}',
+      '.pau-diff-mbl{display:none;font-size:11px;font-weight:800;margin-bottom:3px;color:var(--pau-muted);}',
+      '.pau-ab-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}',
+      '.pau-ab-card{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;}',
+      '.pau-ab-card.cur{background:var(--pau-card);border-color:#93c5fd;box-shadow:0 1px 3px rgba(37,99,235,.08);}',
+      '.pau-root[data-theme="dark"] .pau-ab-card.cur,body.dark .pau-root .pau-ab-card.cur{border-color:#3b82f6;}',
+      '.pau-ab-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;font-size:12.5px;line-height:1.5;padding-top:6px;border-top:1px dashed var(--pau-bd-lt);}',
+      '.pau-ab-lbl{font-weight:700;color:var(--pau-muted);font-size:12px;}',
+      '.pau-ab-sel{width:100%;max-width:100%;height:32px;min-height:32px;padding:0 8px;border:1px solid var(--pau-bd);border-radius:7px;background:var(--pau-card);color:var(--pau-txt);font-size:12.5px;font-weight:700;}',
+      '.pau-issue-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}',
+      '.pau-issue-card{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px;min-width:0;}',
+      '.pau-issue-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;}',
+      '.pau-issue-mini{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:5px 8px;border-radius:6px;font-size:11.5px;border:1px solid var(--pau-bd-lt);background:var(--pau-bg);overflow:hidden;}',
       '.pau-issue-mini span{color:var(--pau-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.pau-issue-mini b{white-space:nowrap;font-weight:700;}',
       '.pau-issue-mini.lv5,.pau-hm-cell.lv5{background:#dbeafe;border-color:#93c5fd;color:#1e3a8a;}',
@@ -2124,11 +2439,22 @@
       '  .pau-body{padding:6px 6px 16px;}',
       '  .pau-flt{padding:6px 8px;gap:4px;margin-bottom:6px;}',
       '  .pau-flt select{flex:1 1 calc(50% - 4px);min-width:120px;max-width:100%;height:32px;min-height:32px;font-size:16px!important;}',
+      '  .pau-ab-sel{font-size:16px!important;}',
       '  .pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{flex:1 1 100%;min-width:120px;max-width:100%;height:32px;min-height:32px;font-size:16px!important;}',
       '  .pau-kpis,.pau-kpis-6{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-bottom:6px;}',
       '  .pau-kpi{padding:4px 8px;}',
       '  .pau-kpi b{font-size:13px;}',
-      '  .pau-dom-grid,.pau-issue-mini-grid{grid-template-columns:1fr;}',
+      '  .pau-hero-tit{font-size:15.5px;}',
+      '  .pau-hero-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}',
+      '  .pau-hero-tab{padding:5px 9px;font-size:11.5px;min-height:30px;}',
+      '  .pau-dom-grid,.pau-issue-mini-grid,.pau-ab-grid,.pau-issue-detail-grid{grid-template-columns:1fr;}',
+      '  .pau-doc-row{flex-wrap:wrap;gap:4px 6px;}',
+      '  .pau-doc-tit{flex:1 1 100%;order:3;white-space:normal;}',
+      '  .pau-doc-meta{margin-left:auto;}',
+      '  .pau-diff-hd{display:none;}',
+      '  .pau-diff-row{grid-template-columns:1fr;gap:7px;padding:10px;}',
+      '  .pau-diff-mbl{display:block;}',
+      '  .pau-ab-row{grid-template-columns:1fr;gap:2px;}',
       '  .pau-tbl-wrap{max-height:none;overflow-x:hidden;border:none;background:transparent;}',
       '  .pau-tbl{min-width:0!important;width:100%!important;display:block;}',
       '  .pau-tbl thead{display:none;}',
@@ -2334,7 +2660,7 @@
     var safeUnions = (data.unions || []).filter(Boolean);
     var safeDiscs = (data.disclosures || []).filter(Boolean);
     var safeMetrics = (data.metrics || []).filter(Boolean);
-    var safeArticles = (data.articles || []).filter(Boolean);
+    var safeArticles = normalizeArticlesList(data.articles || []);
 
     var master = buildOrganMasterIndex(data);
     var organRecords = master.records;
@@ -2520,10 +2846,10 @@
       hScope: 'ALL',
       hSearch: '',
       hOrgan: defaultOrganAid,
-      hSubTab: 'HISTORY', // 'HISTORY' (연혁·신구대비) | 'PEERS' (유사기관 추천) | 'CHART' (업종 대비 진단 그래프)
+      hSubTab: 'OVERVIEW', // 'OVERVIEW' (6대영역 요약) | 'HISTORY' (신구대비·연혁) | 'ISSUES' (13대쟁점·조문) | 'PEERS' (유사기관) | 'CHART' (업종그래프)
       hCatFilter: '',
-      hVerA: 1,
-      hVerB: 0,
+      hVerA: null,
+      hVerB: null,
       hSimMode: 'ALL',
       // 탭 3: 그래프·히트맵 비교분석 스튜디오 & 지역·지자체 산하 비교 & 13대 핵심 쟁점 원문 대조
       mSubMode: initialMSubMode, // 'STUDIO' (다중기관 비교) | 'REGION' (지역·지자체 산하기관 전수 비교) | 'ALL_LIST' (단일쟁점 목록)
@@ -2762,7 +3088,8 @@
         if (hereBtn) {
           e.preventDefault();
           e.stopPropagation();
-          openOrganInHistoryTab(hereBtn.getAttribute('data-open-organ-here') || '', true);
+          var targetSub = hereBtn.getAttribute('data-open-sub') || 'OVERVIEW';
+          openOrganInHistoryTab(hereBtn.getAttribute('data-open-organ-here') || '', true, targetSub);
           return;
         }
 
@@ -2777,17 +3104,14 @@
         var hSubBtn = e.target.closest('[data-h-sub]');
         if (hSubBtn) {
           e.preventDefault();
-          var shouldScroll = hSubBtn.getAttribute('data-scroll-sub') === '1';
-          var nextHSub = hSubBtn.getAttribute('data-h-sub') || 'HISTORY';
+          var nextHSub = hSubBtn.getAttribute('data-h-sub') || 'OVERVIEW';
+          var nextCatAttr = hSubBtn.getAttribute('data-h-cat');
           state.hSubTab = nextHSub;
+          state.hCatFilter = nextCatAttr != null ? nextCatAttr : '';
           renderTabOrganHistory();
           if (bodyEl) {
-            if (shouldScroll) {
-              var subCard = bodyEl.querySelector('#pauOrganSubCard');
-              if (subCard && subCard.scrollIntoView) subCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
             var focusHSub = bodyEl.querySelector('#pauOrganSubCard [data-h-sub="' + nextHSub + '"]');
-            if (focusHSub && typeof focusHSub.focus === 'function') focusHSub.focus({ preventScroll: shouldScroll });
+            if (focusHSub && typeof focusHSub.focus === 'function') focusHSub.focus();
           }
           return;
         }
@@ -2925,14 +3249,16 @@
       renderCurrentTab();
     }
 
-    function openOrganInHistoryTab(aid, shouldSwitchHere) {
+    function openOrganInHistoryTab(aid, shouldSwitchHere, targetSubTab) {
       if (!aid || !instMap[aid]) return;
       state.hOrgan = aid;
       state.hSearch = '';
+      state.hCatFilter = '';
+      state.hSubTab = targetSubTab || 'OVERVIEW';
       state.dOrgan = aid;
       state.apiAlioAid = aid;
-      state.hVerA = 1;
-      state.hVerB = 0;
+      state.hVerA = null;
+      state.hVerB = null;
       if (shouldSwitchHere) {
         switchTab('organ');
       }
@@ -3632,7 +3958,7 @@
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // 탭 2: 기관 내부 6대 영역 종합 · 연혁 비교 · 유사기관 그래프 진단
+    // 탭 2: 기관 상세 — 통합 프로필 히어로 & 5대 포커스 서브탭 (6대영역·신구대비/연혁·13대쟁점/조문·유사기관·업종그래프)
     // ════════════════════════════════════════════════════════════════════════
     function renderTabOrganHistory() {
       if (!organRecords.length) {
@@ -3658,19 +3984,38 @@
             state.hOrgan = curInst.apba_id;
           } else if (cands.length > 0) {
             state.hOrgan = cands[0].apba_id;
-            state.hVerA = 1;
-            state.hVerB = 0;
+            state.hCatFilter = '';
+            state.hVerA = null;
+            state.hVerB = null;
           } else {
             state.hOrgan = curInst ? curInst.apba_id : defaultOrganAid;
           }
         } else if (cands.length > 0 && (preferTopMatch || cands.every(function (o) { return o.apba_id !== state.hOrgan; }))) {
           if (state.hOrgan !== cands[0].apba_id) {
             state.hOrgan = cands[0].apba_id;
-            state.hVerA = 1;
-            state.hVerB = 0;
+            state.hCatFilter = '';
+            state.hVerA = null;
+            state.hVerB = null;
           }
         }
         return cands;
+      }
+
+      function pickDefaultComparePair(list) {
+        if (!list || list.length < 2) return { a: 0, b: 0 };
+        var bIdx = 0;
+        var bItem = list[bIdx];
+        for (var i = 1; i < list.length; i++) {
+          if (bItem.ccode && list[i].ccode && String(list[i].ccode) === String(bItem.ccode)) {
+            return { a: i, b: bIdx };
+          }
+        }
+        for (var j = 1; j < list.length; j++) {
+          if (bItem.catGroup && list[j].catGroup === bItem.catGroup) {
+            return { a: j, b: bIdx };
+          }
+        }
+        return { a: 1, b: 0 };
       }
 
       function renderHistorySelectOptionsHtml(cands, activeAid) {
@@ -3694,6 +4039,15 @@
           '<button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCmp ? '✓ 비교담김' : '+ 비교담기') + '</button>',
           '<button type="button" class="pau-act-btn" data-jump-organ="' + esc(aid) + '">↗ 독립 창</button>'
         ].join('');
+      }
+
+      function renderPortalViewLink(inst, aid, item, isLoc, label) {
+        if (!item) return '';
+        var tType = resolveTargetTypeFromDisc(item);
+        var url = safeHttpUrl(buildOrganUrl(inst, item.dno, tType));
+        if (!url) return '';
+        var postAttr = (isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(tType) + '"') : '';
+        return '<a class="pau-pill ok" href="' + esc(url) + '"' + postAttr + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 ' + esc(label || '공시원문') + '</a>';
       }
 
       function renderHistoryDynHtml(cands) {
@@ -3733,8 +4087,9 @@
         if (agreementsForCompare.length < 2) agreementsForCompare = timelineAll.slice();
 
         var maxCmpIdx = Math.max(0, agreementsForCompare.length - 1);
-        var idxB = Math.min(Math.max(0, Number(state.hVerB != null ? state.hVerB : 0)), maxCmpIdx);
-        var idxA = Math.min(Math.max(0, Number(state.hVerA != null ? state.hVerA : (agreementsForCompare.length >= 2 ? 1 : 0))), maxCmpIdx);
+        var defPair = pickDefaultComparePair(agreementsForCompare);
+        var idxB = Math.min(Math.max(0, Number(state.hVerB != null ? state.hVerB : defPair.b)), maxCmpIdx);
+        var idxA = Math.min(Math.max(0, Number(state.hVerA != null ? state.hVerA : defPair.a)), maxCmpIdx);
         var verA = agreementsForCompare[idxA] || null;
         var verB = agreementsForCompare[idxB] || null;
 
@@ -3745,22 +4100,12 @@
           if (/^\d{4}-\d{2}-\d{2}$/.test(rev.date) && rev.date === ver.date) return true;
           return false;
         }
-        var revForA = allRevs.find(function (r) { return isRevMatchVersion(r, verA); }) || null;
-        var revForB = allRevs.find(function (r) { return isRevMatchVersion(r, verB); }) || null;
         var revList = allRevs.slice().sort(function (ra, rb) {
           var ma = (isRevMatchVersion(ra, verA) || isRevMatchVersion(ra, verB)) ? 1 : 0;
           var mb = (isRevMatchVersion(rb, verA) || isRevMatchVersion(rb, verB)) ? 1 : 0;
           return mb - ma;
         });
-
-        var matchedDiffPreviewA = revForA && revForA.diffs.length
-          ? revForA.diffs.slice(0, 3).map(function (d) { return d.art + '(개정후): ' + d.after; }).join(' / ')
-          : (revForB && revForB.diffs.length && verA && verB && verA.date < verB.date
-              ? revForB.diffs.slice(0, 3).map(function (d) { return d.art + '(개정전): ' + d.before; }).join(' / ')
-              : (verA ? ('대상노조: ' + (verA.union || '해당노조') + ' · 유효기간/기준: ' + (verA.period || verA.date)) : '—'));
-        var matchedDiffPreviewB = revForB && revForB.diffs.length
-          ? revForB.diffs.slice(0, 3).map(function (d) { return d.art + '(개정후): ' + d.after; }).join(' / ')
-          : (verB ? ('대상노조: ' + (verB.union || '해당노조') + ' · 유효기간/기준: ' + (verB.period || verB.date)) : '—');
+        var totalDiffCount = revList.reduce(function (acc, r) { return acc + (r.diffs ? r.diffs.length : 0); }, 0);
 
         var similars = findSimilarOrgans(data, aid, state.hSimMode || 'ALL');
         var topPeerRecs = similars.slice(0, 2).map(function (s) { return organById[s.apba_id]; }).filter(Boolean);
@@ -3770,119 +4115,154 @@
         var isLoc = isLocalOrgan(inst);
         var inCmp = state.compareIds.indexOf(aid) >= 0;
         var bannerProv = rec.provinceKey || inferProvinceFromQuery(state.hSearch);
+        var orgArticles = (rec.domains && rec.domains.articles) ? rec.domains.articles : [];
+        var curSub = state.hSubTab || 'OVERVIEW';
+        if (!/^(OVERVIEW|HISTORY|ISSUES|PEERS|CHART)$/.test(curSub)) curSub = 'OVERVIEW';
 
-        return [
-          (hasQ ? '<div class="pau-subbar" style="margin-bottom:6px;"><span>🔎 「<b>' + esc(state.hSearch) + '</b>」 검색 일치 기관 <b>' + fmtNum(cands.length) + '곳</b> 중 <b>' + esc(rec.name) + '</b> 선택됨 (상단 드롭다운에서 다른 일치 기관 전환 가능)</span>' + (bannerProv ? '<button type="button" class="pau-act-btn pri" data-jump-region="' + esc(bannerProv) + '">🗺️ ' + esc(bannerProv) + ' 산하기관(' + fmtNum(provinceCounts[bannerProv] || 0) + '곳) 전체 비교 →</button>' : '') + '</div>' : ''),
-          '<div style="margin-bottom:8px;">',
-          renderOrganSixDomainsBoard(rec, false, inCmp, sectorBench),
-          '</div>',
+        var kpiUnionVal = rec.hasUnion ? (rec.unionStructLabel + ' · ' + fmtNum(rec.unionCount) + '개') : '노조 미설립';
+        var kpiUnionSub = rec.hasUnion
+          ? ((rec.repUnion.confederation || '미가입') + ' · ' + (rec.repUnion.union_name || '단위노조'))
+          : '취업규칙 · 노사협의회 적용';
+        var kpiMemVal = rec.hasUnion ? (fmtNum(rec.memberTotal) + '명 (' + fmtPct(rec.orgRate) + ')') : '0명 (—)';
+        var kpiMemSub = rec.eligibleCount ? ('가입대상 ' + fmtNum(rec.eligibleCount) + '명 기준') : '가입대상 인원 미기재';
+        var kpiToVal = rec.timeoffHours
+          ? (fmtNum(rec.timeoffHours) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')')
+          : (rec.hasUnion ? '0h (미기재)' : '해당없음');
+        var kpiToSub = rec.legalTimeoffLimit
+          ? ('법정한도 ' + fmtNum(rec.legalTimeoffLimit) + 'h · 풀' + fmtNum(rec.timeoffFull) + '·파트' + fmtNum(rec.timeoffPart))
+          : '조합원 규모별 법정한도 적용';
+        var kpiDocVal = '공시 ' + fmtNum(timelineAll.length) + '건' + (totalDiffCount ? (' · 대비 ' + fmtNum(totalDiffCount) + '조항') : '');
+        var kpiDocSub = '유사기관 ' + fmtNum(similars.length) + '곳 · 추출조문 ' + fmtNum(orgArticles.length) + '건';
 
-          '<div class="pau-sec-card" id="pauOrganSubCard">',
-          '  <div class="pau-sec-tit">',
-          '    <div class="pau-seg" role="group" aria-label="기관 세부 분석 전환">',
-          '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'HISTORY' ? ' on' : '') + '" aria-pressed="' + (state.hSubTab === 'HISTORY' ? 'true' : 'false') + '" data-h-sub="HISTORY">🔄 연혁 · 과거↔현행 대비 (' + fmtNum(timelineAll.length) + '건)</button>',
-          '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'PEERS' ? ' on' : '') + '" aria-pressed="' + (state.hSubTab === 'PEERS' ? 'true' : 'false') + '" data-h-sub="PEERS">🏛️ 유사기관 추천 (' + fmtNum(similars.length) + '곳)</button>',
-          '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'CHART' ? ' on' : '') + '" aria-pressed="' + (state.hSubTab === 'CHART' ? 'true' : 'false') + '" data-h-sub="CHART">📈 업종 대비 그래프 진단</button>',
-          '    </div>',
-          (state.hSubTab === 'HISTORY' ? [
+        var subBodyHtml = '';
+        if (curSub === 'OVERVIEW') {
+          subBodyHtml = renderOrganSixDomainsBoard(rec, false, inCmp, sectorBench, { hideHeader: true });
+        } else if (curSub === 'HISTORY') {
+          var revCardsHtml = revList.length ? revList.map(function (rev, rIdx) {
+            var isSelectedMatch = isRevMatchVersion(rev, verA) || isRevMatchVersion(rev, verB);
+            return [
+              '<div class="pau-sec-card">',
+              '  <div class="pau-sec-tit">',
+              '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+              '      <span>📌 ' + (isSelectedMatch ? '⭐ ' : '') + '신·구 조문 대비표' + (revList.length > 1 ? (' #' + (rIdx + 1)) : '') + ' — ' + esc(rev.title) + '</span>',
+              '      <span class="pau-pill fktu">기준일 ' + esc(rev.date) + ' · ' + fmtNum(rev.diffs.length) + '개 조항</span>',
+              '    </div>',
+              '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' + renderCompactFilePills(rev.files, '대비표 원문') + '</div>',
+              '  </div>',
+              (rev.summaryBullets && rev.summaryBullets.length ? [
+                '  <div class="pau-bullet-box">',
+                '    <div style="font-size:12px;font-weight:800;color:var(--pau-pri);">📋 주요 개정 요약</div>',
+                '    <ul class="pau-bullet-list">',
+                rev.summaryBullets.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join(''),
+                '    </ul>',
+                '  </div>'
+              ].join('') : ''),
+              (rev.diffs && rev.diffs.length ? [
+                '  <div class="pau-diff-list">',
+                '    <div class="pau-diff-hd">',
+                '      <div>개정 조문 · 사유</div>',
+                '      <div>⏪ 종전 협약 (개정 전)</div>',
+                '      <div>⏩ 현행 협약 (개정 후)</div>',
+                '    </div>',
+                rev.diffs.map(function (d, dIdx) {
+                  return [
+                    '    <div class="pau-diff-row">',
+                    '      <div class="pau-diff-art">',
+                    '        <span>' + (dIdx + 1) + '. ' + esc(d.art) + '</span>',
+                    (worth(d.note) ? '        <span class="pau-pill" style="align-self:flex-start;">' + esc(d.note) + '</span>' : ''),
+                    '      </div>',
+                    '      <div class="pau-diff-old"><span class="pau-diff-mbl">⏪ 종전 협약 (개정 전)</span>' + esc(d.before) + '</div>',
+                    '      <div class="pau-diff-new"><span class="pau-diff-mbl">⏩ 현행 협약 (개정 후)</span>' + esc(d.after) + '</div>',
+                    '    </div>'
+                  ].join('');
+                }).join(''),
+                '  </div>'
+              ].join('') : ''),
+              '</div>'
+            ].join('');
+          }).join('') : '';
+
+          var abCompareHtml = (verA && verB) ? [
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
             '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-            '      <select data-f="hCatFilter" aria-label="연혁 구분 필터">',
+            '      <span>⚖️ 시점별 협약 · 공시 대조 (과거 A ↔ 현행 B)</span>',
+            (idxA === idxB && agreementsForCompare.length >= 2
+              ? '      <span class="pau-pill multi">동일 시점 문서 선택됨</span>'
+              : (verA.ccode && verB.ccode && String(verA.ccode) === String(verB.ccode)
+                  ? '      <span class="pau-pill ok">동일 분류(' + esc(verB.cname) + ') 시점 대조</span>'
+                  : '      <span class="pau-pill">선택 문서 1:1 대조</span>')),
+            '    </div>',
+            '  </div>',
+            '  <div class="pau-ab-grid">',
+            '    <div class="pau-ab-card">',
+            '      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">',
+            '        <span class="pau-pill">⏪ 비교 시점 A (과거)</span>',
+            '        <span style="font-size:11.5px;color:var(--pau-muted);font-weight:700;">' + esc(verA.date) + '</span>',
+            '      </div>',
+            '      <select class="pau-ab-sel" data-f="hVerA" aria-label="과거 임단협 시점 A 선택">',
+            agreementsForCompare.map(function (a, idx) {
+              return '<option value="' + idx + '"' + (idx === idxA ? ' selected' : '') + '>' + esc('[' + a.date + '] ' + a.title + ' (' + a.cname + ')') + '</option>';
+            }).join(''),
+            '      </select>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">문서 명칭</span><b style="color:var(--pau-txt);">' + esc(verA.title) + '</b></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">분류 · 기준일</span><span><span class="pau-pill">' + esc(verA.cname) + '</span> ' + esc(verA.date) + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">대상 · 유효기간</span><span>' + esc((verA.union ? (verA.union + ' · ') : '') + (verA.period || verA.date)) + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">주요 내용</span><span>' + esc(verA.summary || '첨부 원문 참조') + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">원문 · 공시</span><div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">' +
+              renderCompactFilePills(verA.files, '과거A 원문') +
+              renderPortalViewLink(inst, aid, verA, isLoc, '공시원문') +
+              (!verA.files.length && !safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA))) ? '—' : '') +
+            '</div></div>',
+            '    </div>',
+            '    <div class="pau-ab-card cur">',
+            '      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">',
+            '        <span class="pau-pill fktu">⏩ 비교 시점 B (현행)</span>',
+            '        <span style="font-size:11.5px;color:var(--pau-pri);font-weight:800;">' + esc(verB.date) + '</span>',
+            '      </div>',
+            '      <select class="pau-ab-sel" data-f="hVerB" aria-label="현행 임단협 시점 B 선택">',
+            agreementsForCompare.map(function (b, idx) {
+              return '<option value="' + idx + '"' + (idx === idxB ? ' selected' : '') + '>' + esc('[' + b.date + '] ' + b.title + ' (' + b.cname + ')') + '</option>';
+            }).join(''),
+            '      </select>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">문서 명칭</span><b style="color:var(--pau-pri);">' + esc(verB.title) + '</b></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">분류 · 기준일</span><span><span class="pau-pill fktu">' + esc(verB.cname) + '</span> ' + esc(verB.date) + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">대상 · 유효기간</span><span>' + esc((verB.union ? (verB.union + ' · ') : '') + (verB.period || verB.date)) + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">주요 내용</span><span>' + esc(verB.summary || '첨부 원문 참조') + '</span></div>',
+            '      <div class="pau-ab-row"><span class="pau-ab-lbl">원문 · 공시</span><div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">' +
+              renderCompactFilePills(verB.files, '현행B 원문') +
+              renderPortalViewLink(inst, aid, verB, isLoc, '공시원문') +
+              (!verB.files.length && !safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB))) ? '—' : '') +
+            '</div></div>',
+            '    </div>',
+            '  </div>',
+            '</div>'
+          ].join('') : '';
+
+          var timelineCardHtml = [
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
+            '    <span>📅 전체 공시 · 협약 · 사규 연혁 타임라인 (' + fmtNum(timeline.length) + '건)</span>',
+            '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+            '      <select class="pau-ab-sel" data-f="hCatFilter" aria-label="연혁 구분 필터" style="width:auto;">',
             '        <option value=""' + (!state.hCatFilter ? ' selected' : '') + '>연혁 전체 (' + timelineAll.length + '건)</option>',
             '        <option value="AGREEMENT"' + (state.hCatFilter === 'AGREEMENT' ? ' selected' : '') + '>단체협약·임금협약</option>',
             '        <option value="SEPARATE"' + (state.hCatFilter === 'SEPARATE' ? ' selected' : '') + '>별도합의·노사협의</option>',
             '        <option value="STATUS"' + (state.hCatFilter === 'STATUS' ? ' selected' : '') + '>노조·타임오프 현황</option>',
             '        <option value="RULE"' + (state.hCatFilter === 'RULE' ? ' selected' : '') + '>취업규칙·내부규정</option>',
             '      </select>',
-            '      <label style="font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">과거(A):',
-            '        <select data-f="hVerA" aria-label="과거 임단협 시점 A 선택" style="max-width:200px;">',
-            agreementsForCompare.map(function (a, idx) {
-              return '<option value="' + idx + '"' + (idx === idxA ? ' selected' : '') + '>' + esc('(' + a.date + ') ' + a.title) + '</option>';
-            }).join(''),
-            '        </select>',
-            '      </label>',
-            '      <label style="font-size:12px;color:var(--pau-pri);font-weight:800;display:inline-flex;align-items:center;gap:4px;">↔ 현행(B):',
-            '        <select data-f="hVerB" aria-label="현행 임단협 시점 B 선택" style="max-width:200px;">',
-            agreementsForCompare.map(function (b, idx) {
-              return '<option value="' + idx + '"' + (idx === idxB ? ' selected' : '') + '>' + esc('(' + b.date + ') ' + b.title) + '</option>';
-            }).join(''),
-            '        </select>',
-            '      </label>',
-            '    </div>'
-          ].join('') : (state.hSubTab === 'PEERS' ? [
-            '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-            '      <select data-f="hSimMode" aria-label="유사기관 추천 기준 선택">',
-            '        <option value="ALL"' + (state.hSimMode === 'ALL' ? ' selected' : '') + '>유사 기준: 종합 추천</option>',
-            '        <option value="SECTOR"' + (state.hSimMode === 'SECTOR' ? ' selected' : '') + '>동종 업종 (' + esc(rec.sectorLabel) + ')</option>',
-            '        <option value="MINISTRY"' + (state.hSimMode === 'MINISTRY' ? ' selected' : '') + '>동일 소관·지자체 (' + esc(inst.ministry || '') + ')</option>',
-            '        <option value="TYPE"' + (state.hSimMode === 'TYPE' ? ' selected' : '') + '>동일 기관유형 (' + esc(inst.inst_type || '') + ')</option>',
-            '      </select>',
-            '      <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 상위 유사기관 비교분석</button>',
-            '    </div>'
-          ].join('') : '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 비교분석 탭에서 다중기관 확장 ↗</button>')),
-          '  </div>',
-
-          (state.hSubTab === 'HISTORY' ? [
-            (verA && verB ? [
-              '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:10px;">',
-              '    <table class="pau-tbl">',
-              '      <thead>',
-              '        <tr>',
-              '          <th class="c-no">№</th>',
-              '          <th style="width:16%;">시점 비교 항목</th>',
-              '          <th style="width:42%;">⏪ 과거 임단협·공시 (시점 A: ' + esc(verA.date) + ')</th>',
-              '          <th style="width:42%;">⏩ 현행 임단협·공시 (시점 B: ' + esc(verB.date) + ')</th>',
-              '        </tr>',
-              '      </thead>',
-              '      <tbody>',
-              '        <tr><td class="c-no">1</td><td style="font-weight:700;">협약·공시 명칭</td><td title="' + esc(verA.title) + '">' + esc(verA.title) + '</td><td title="' + esc(verB.title) + '" style="font-weight:700;color:var(--pau-pri);">' + esc(verB.title) + '</td></tr>',
-              '        <tr><td class="c-no">2</td><td style="font-weight:700;">체결·공시 기준일</td><td>' + esc(verA.date + ' (' + verA.cname + ')') + '</td><td style="font-weight:700;">' + esc(verB.date + ' (' + verB.cname + ')') + '</td></tr>',
-              '        <tr><td class="c-no">3</td><td style="font-weight:700;">주요 체결·개정 요약</td><td title="' + esc(verA.summary) + '">' + esc(verA.summary || '—') + '</td><td title="' + esc(verB.summary) + '" style="font-weight:600;">' + esc(verB.summary || '—') + '</td></tr>',
-              '        <tr><td class="c-no">4</td><td style="font-weight:700;">핵심 조문 신·구 대비</td><td title="' + esc(matchedDiffPreviewA) + '">' + esc(matchedDiffPreviewA) + '</td><td title="' + esc(matchedDiffPreviewB) + '" style="font-weight:600;color:var(--pau-pri);">' + esc(matchedDiffPreviewB) + '</td></tr>',
-              '        <tr><td class="c-no">5</td><td style="font-weight:700;">원문 첨부 · 공시뷰어</td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
-                renderFilePills(verA.files, '과거A 원문') +
-                (safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verA)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
-                '</div></td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
-                renderFilePills(verB.files, '현행B 원문') +
-                (safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verB)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
-                (idxA === idxB && agreementsForCompare.length >= 2 ? ' <span class="pau-pill multi">동일 시점 문서 선택됨</span>' : '') +
-                '</div></td></tr>',
-              '      </tbody>',
-              '    </table>',
-              '  </div>'
-            ].join('') : ''),
-
-            (revList.length ? revList.map(function (rev, rIdx) {
-              var isSelectedMatch = isRevMatchVersion(rev, verA) || isRevMatchVersion(rev, verB);
-              return [
-                '  <div style="font-size:12.5px;font-weight:700;color:var(--pau-pri);margin:8px 0 4px;">📌 ' + (isSelectedMatch ? '⭐ 선택 시점 연동 ' : '') + '신·구 조문 대비표 #' + (rIdx + 1) + ' — ' + esc(rev.title) + ' (기준일: ' + esc(rev.date) + ' · 조문비교 ' + fmtNum(rev.diffs.length) + '건)</div>',
-                (rev.summaryLines.length ? '<div style="background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:8px;padding:7px 11px;margin-bottom:6px;font-size:12px;color:var(--pau-sub);line-height:1.5;"><b>주요 개정 요약:</b> ' + rev.summaryLines.slice(0, 6).map(function (s) { return esc(s); }).join(' · ') + '</div>' : ''),
-                (rev.diffs.length ? [
-                  '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:8px;">',
-                  '    <table class="pau-tbl">',
-                  '      <thead><tr><th class="c-no">№</th><th style="width:18%;">개정 조문 · 항목</th><th style="width:35%;">⏪ 과거 임단협 (개정 전)</th><th style="width:35%;">⏩ 현행 임단협 (개정 후)</th><th style="width:12%;">비고</th></tr></thead>',
-                  '      <tbody>',
-                  rev.diffs.map(function (d, idx) {
-                    return '<tr><td class="c-no">' + (idx + 1) + '</td><td title="' + esc(d.art) + '" style="font-weight:700;">' + esc(d.art) + '</td><td title="' + esc(d.before) + '">' + esc(d.before) + '</td><td title="' + esc(d.after) + '" style="color:var(--pau-pri);font-weight:600;">' + esc(d.after) + '</td><td>' + esc(d.note) + '</td></tr>';
-                  }).join(''),
-                  '      </tbody>',
-                  '    </table>',
-                  '  </div>'
-                ].join('') : '')
-              ].join('');
-            }).join('') : ''),
-
-            '  <div style="font-size:12px;font-weight:700;margin:6px 0 4px;">📅 전체 연혁 타임라인 (' + fmtNum(timeline.length) + '건)</div>',
-            '  <div class="pau-tbl-wrap" style="max-height:260px;">',
+            '    </div>',
+            '  </div>',
+            '  <div class="pau-tbl-wrap" style="max-height:340px;">',
             '    <table class="pau-tbl">',
-            '      <thead><tr><th class="c-no">№</th><th style="width:12%;">연혁 일자</th><th style="width:13%;">영역 분류</th><th style="width:23%;">임단협·공시·규정 제목</th><th style="width:20%;">체결·개정 주요 요약</th><th style="width:14%;">시점 대조</th><th style="width:18%;">원문 · 첨부</th></tr></thead>',
+            '      <thead><tr><th class="c-no">№</th><th style="width:12%;">기준일</th><th style="width:13%;">영역 분류</th><th style="width:23%;">문서 제목</th><th style="width:22%;">주요 내용 요약</th><th style="width:12%;">시점 지정</th><th style="width:18%;">첨부 · 공시</th></tr></thead>',
             '      <tbody>',
             (timeline.length ? timeline.map(function (t, i) {
               var cmpIdx = agreementsForCompare.findIndex(function (x) { return x.id === t.id; });
               var isA = verA && verA.id === t.id;
               var isB = verB && verB.id === t.id;
-              var tlTargetType = resolveTargetTypeFromDisc(t);
-              var safeView = safeHttpUrl(buildOrganUrl(inst, t.dno, tlTargetType));
-              var filePillsHtml = renderFilePills(t.files, '첨부원문');
+              var filePillsHtml = renderCompactFilePills(t.files, '원문');
+              var portalHtml = renderPortalViewLink(inst, aid, t, isLoc, '공시');
               return [
                 '<tr' + ((isA || isB) ? ' style="background:var(--pau-pri-bg);"' : '') + '>',
                 '  <td class="c-no">' + (i + 1) + '</td>',
@@ -3891,20 +4271,97 @@
                 '  <td title="' + esc(t.title) + '" style="font-weight:700;">' + esc(t.title) + '</td>',
                 '  <td title="' + esc(t.summary) + '">' + esc(t.summary || '—') + '</td>',
                 '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">',
-                (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isA ? ' pri' : '') + '" data-set-vera="' + cmpIdx + '">과거A' + (isA ? '✓' : '') + '</button>' : ''),
-                (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isB ? ' pri' : '') + '" data-set-verb="' + cmpIdx + '">현행B' + (isB ? '✓' : '') + '</button>' : ''),
+                (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isA ? ' pri' : '') + '" aria-pressed="' + (isA ? 'true' : 'false') + '" data-set-vera="' + cmpIdx + '">과거A' + (isA ? '✓' : '') + '</button>' : ''),
+                (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isB ? ' pri' : '') + '" aria-pressed="' + (isB ? 'true' : 'false') + '" data-set-verb="' + cmpIdx + '">현행B' + (isB ? '✓' : '') + '</button>' : ''),
                 '  </div></td>',
-                '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + filePillsHtml + (safeView ? '<a class="pau-pill ok" href="' + esc(safeView) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(tlTargetType) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '') + (!filePillsHtml && !safeView ? '—' : '') + '</div></td>',
+                '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + filePillsHtml + portalHtml + (!filePillsHtml && !portalHtml ? '—' : '') + '</div></td>',
                 '</tr>'
               ].join('');
             }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--pau-muted);">해당 영역 분류의 연혁 문서가 없습니다.</td></tr>'),
             '      </tbody>',
             '    </table>',
-            '  </div>'
-          ].join('') : (state.hSubTab === 'PEERS' ? [
-            '  <div class="pau-tbl-wrap" style="max-height:320px;">',
+            '  </div>',
+            '</div>'
+          ].join('');
+
+          subBodyHtml = revCardsHtml + abCompareHtml + timelineCardHtml;
+        } else if (curSub === 'ISSUES') {
+          var latestCaDoc = (rec.domains && rec.domains.caDiscs && rec.domains.caDiscs[0]) || null;
+          var latestWageDoc = (rec.domains && rec.domains.wageDiscs && rec.domains.wageDiscs[0]) || null;
+          subBodyHtml = [
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
+            '    <span>⚖️ 13대 핵심 근로조건 표준 진단 — 종합 ' + rec.totalScore + '점 (업종평균 ' + sectorBench.totalScore + '점)</span>',
+            '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 유사기관과 13대 쟁점 병렬 대조 ↗</button>',
+            '  </div>',
+            '  <div class="pau-issue-detail-grid">',
+            METRIC_DEFS.map(function (def, idx) {
+              var sc = rec.issueScores[def.key] || { level: 2, score: 50, tag: '기준확인', val: '—', art: '', snip: '' };
+              return [
+                '    <div class="pau-issue-card">',
+                '      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">',
+                '        <b style="font-size:13px;color:var(--pau-txt);">' + (idx + 1) + '. ' + esc(def.label) + '</b>',
+                '        <span class="pau-pill pau-hm-cell lv' + sc.level + '" style="font-weight:800;">' + esc(sc.tag) + ' · ' + sc.score + '점</span>',
+                '      </div>',
+                '      <div style="font-size:12.5px;font-weight:700;color:var(--pau-txt);">' + esc(sc.val) + (worth(sc.art) ? ' <span style="font-weight:600;color:var(--pau-pri);">(' + esc(sc.art) + ')</span>' : '') + '</div>',
+                (worth(sc.snip) ? '      <div style="font-size:12px;color:var(--pau-sub);line-height:1.55;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:6px;padding:6px 9px;">' + esc(sc.snip) + '</div>' : ''),
+                '      <div style="font-size:11px;color:var(--pau-muted);margin-top:auto;">⚖️ 관련법령: ' + esc(def.lawTitle) + '</div>',
+                '    </div>'
+              ].join('');
+            }).join(''),
+            '  </div>',
+            '</div>',
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
+            '    <span>📜 수록 단체협약 · 사규 주요 조문 원문 (' + fmtNum(orgArticles.length) + '건)</span>',
+            '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+            (latestCaDoc ? renderCompactFilePills(latestCaDoc.files, '단협 전문') : ''),
+            (latestWageDoc ? renderCompactFilePills(latestWageDoc.files, '임협 전문') : ''),
+            '    </div>',
+            '  </div>',
+            (orgArticles.length ? [
+              '  <div class="pau-issue-detail-grid">',
+              orgArticles.map(function (a) {
+                return [
+                  '    <div class="pau-issue-card">',
+                  '      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+                  '        <span class="pau-pill fktu">' + esc(a.taxonomy_name || '기타') + '</span>',
+                  '        <b style="font-size:13px;color:var(--pau-txt);">' + esc(a.article_no || '조문') + (worth(a.article_title) ? (' (' + esc(a.article_title) + ')') : '') + '</b>',
+                  '      </div>',
+                  '      <div style="font-size:12.5px;line-height:1.6;color:var(--pau-sub);">' + esc(a.text) + '</div>',
+                  '    </div>'
+                ].join('');
+              }).join(''),
+              '  </div>'
+            ].join('') : [
+              '  <div class="pau-dom-empty" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
+              '    <span>이 기관의 단체협약·임금협약은 HWP·PDF 첨부파일 원문 형태로 공시되어 있습니다. 오른쪽 버튼에서 전문을 바로 열람할 수 있습니다.</span>',
+              '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
+                (latestCaDoc ? renderCompactFilePills(latestCaDoc.files, '단협 원문') : '') +
+                renderPortalViewLink(inst, aid, latestCaDoc || timelineAll[0], isLoc, '공시포털 원문') +
+              '    </div>',
+              '  </div>'
+            ].join('')),
+            '</div>'
+          ].join('');
+        } else if (curSub === 'PEERS') {
+          subBodyHtml = [
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
+            '    <span>🏛️ 유사 공공기관 추천 (' + fmtNum(similars.length) + '곳)</span>',
+            '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+            '      <select class="pau-ab-sel" data-f="hSimMode" aria-label="유사기관 추천 기준 선택" style="width:auto;">',
+            '        <option value="ALL"' + (state.hSimMode === 'ALL' ? ' selected' : '') + '>유사 기준: 종합 추천</option>',
+            '        <option value="SECTOR"' + (state.hSimMode === 'SECTOR' ? ' selected' : '') + '>동종 업종 (' + esc(rec.sectorLabel) + ')</option>',
+            '        <option value="MINISTRY"' + (state.hSimMode === 'MINISTRY' ? ' selected' : '') + '>동일 소관·지자체 (' + esc(inst.ministry || '') + ')</option>',
+            '        <option value="TYPE"' + (state.hSimMode === 'TYPE' ? ' selected' : '') + '>동일 기관유형 (' + esc(inst.inst_type || '') + ')</option>',
+            '      </select>',
+            '      <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 상위 유사기관 비교분석</button>',
+            '    </div>',
+            '  </div>',
+            '  <div class="pau-tbl-wrap" style="max-height:380px;">',
             '    <table class="pau-tbl">',
-            '      <thead><tr><th class="c-no">№</th><th style="width:19%;">기관명 · 소관 (클릭→별개 창)</th><th style="width:13%;">권역 · 유형</th><th style="width:15%;">대표노조 · 상급</th><th style="width:10%;">조합원 · 조직률</th><th style="width:9%;">타임오프</th><th style="width:18%;">유사 선정 사유 · 점수</th><th style="width:16%;">비교담기 · 상세</th></tr></thead>',
+            '      <thead><tr><th class="c-no">№</th><th style="width:20%;">기관명 · 소관 (클릭→별개 창)</th><th style="width:13%;">권역 · 유형</th><th style="width:15%;">대표노조 · 상급</th><th style="width:10%;">조합원 · 조직률</th><th style="width:9%;">타임오프</th><th style="width:17%;">유사 선정 사유 · 점수</th><th style="width:16%;">비교담기 · 상세</th></tr></thead>',
             '      <tbody>',
             (similars.length ? similars.map(function (sim, idx) {
               var sRec = organById[sim.apba_id];
@@ -3929,8 +4386,16 @@
             }).join('') : '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--pau-muted);">선택한 추천 기준에 해당하는 유사기관이 없습니다.</td></tr>'),
             '      </tbody>',
             '    </table>',
-            '  </div>'
-          ].join('') : [
+            '  </div>',
+            '</div>'
+          ].join('');
+        } else {
+          subBodyHtml = [
+            '<div class="pau-sec-card">',
+            '  <div class="pau-sec-tit">',
+            '    <span>📈 동종업종(' + esc(rec.sectorLabel) + ') 평균 및 유사기관 그래프 진단</span>',
+            '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 비교분석 탭에서 다중기관 확장 ↗</button>',
+            '  </div>',
             '  <div class="pau-vis-grid">',
             '    <div class="pau-card">',
             '      <div class="pau-card-hd"><span>🕸️ 6대 영역 프로파일 레이더 비교 (기준 vs 유사기관 vs 업종평균)</span></div>',
@@ -3941,9 +4406,43 @@
             renderScatterTimeoffSvg(sectorPool, [rec].concat(topPeerRecs)),
             '    </div>',
             '  </div>',
-            renderGroupedKpiBarsHtml([rec].concat(topPeerRecs), sectorBench)
-          ].join(''))),
-          '</div>'
+            renderGroupedKpiBarsHtml([rec].concat(topPeerRecs), sectorBench),
+            '</div>'
+          ].join('');
+        }
+
+        return [
+          (hasQ ? '<div class="pau-subbar" style="margin-bottom:8px;"><span>🔎 「<b>' + esc(state.hSearch) + '</b>」 검색 일치 기관 <b>' + fmtNum(cands.length) + '곳</b> 중 <b>' + esc(rec.name) + '</b> 선택됨 (상단 드롭다운에서 전환 가능)</span>' + (bannerProv ? '<button type="button" class="pau-act-btn pri" data-jump-region="' + esc(bannerProv) + '">🗺️ ' + esc(bannerProv) + ' 산하기관(' + fmtNum(provinceCounts[bannerProv] || 0) + '곳) 전체 비교 →</button>' : '') + '</div>' : ''),
+          '<div class="pau-org-hero">',
+          '  <div class="pau-hero-top">',
+          '    <div>',
+          '      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '        <span class="pau-pill ' + (isLoc ? 'loc' : 'fktu') + '">' + esc(rec.scopeLabel) + '</span>',
+          '        <span class="pau-pill">' + esc(rec.sectorLabel) + '</span>',
+          '        <span class="pau-pill">기관코드 ' + esc(aid) + '</span>',
+          '      </div>',
+          '      <h2 class="pau-hero-tit">' + esc(rec.name) + '</h2>',
+          '      <div class="pau-hero-sub">' + esc(rec.ministry + ' · ' + rec.inst_type + (rec.muniName ? (' · ' + rec.muniName) : '')) + '</div>',
+          '    </div>',
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '      <span class="pau-pill ok" style="font-size:12.5px;padding:4px 10px;">종합 ' + rec.totalScore + '점 · 업종평균 ' + sectorBench.totalScore + '점</span>',
+          '    </div>',
+          '  </div>',
+          '  <div class="pau-hero-kpis">',
+          '    <div class="pau-hero-kpi"><div class="pau-hero-kpi-lbl">노조 체계 · 대표노조</div><div class="pau-hero-kpi-val" title="' + esc(kpiUnionVal) + '">' + esc(kpiUnionVal) + '</div><div class="pau-hero-kpi-sub" title="' + esc(kpiUnionSub) + '">' + esc(kpiUnionSub) + '</div></div>',
+          '    <div class="pau-hero-kpi"><div class="pau-hero-kpi-lbl">합산 조합원 · 조직률</div><div class="pau-hero-kpi-val" title="' + esc(kpiMemVal) + '">' + esc(kpiMemVal) + '</div><div class="pau-hero-kpi-sub" title="' + esc(kpiMemSub) + '">' + esc(kpiMemSub) + '</div></div>',
+          '    <div class="pau-hero-kpi"><div class="pau-hero-kpi-lbl">연간 타임오프 · 한도대비</div><div class="pau-hero-kpi-val" title="' + esc(kpiToVal) + '">' + esc(kpiToVal) + '</div><div class="pau-hero-kpi-sub" title="' + esc(kpiToSub) + '">' + esc(kpiToSub) + '</div></div>',
+          '    <div class="pau-hero-kpi"><div class="pau-hero-kpi-lbl">수록 공시 · 신구대비</div><div class="pau-hero-kpi-val" title="' + esc(kpiDocVal) + '">' + esc(kpiDocVal) + '</div><div class="pau-hero-kpi-sub" title="' + esc(kpiDocSub) + '">' + esc(kpiDocSub) + '</div></div>',
+          '  </div>',
+          '  <div class="pau-hero-nav" id="pauOrganSubCard" role="group" aria-label="기관 세부 분석 전환">',
+          '    <button type="button" class="pau-hero-tab' + (curSub === 'OVERVIEW' ? ' on' : '') + '" aria-pressed="' + (curSub === 'OVERVIEW' ? 'true' : 'false') + '" data-h-sub="OVERVIEW">📋 6대영역 요약</button>',
+          '    <button type="button" class="pau-hero-tab' + (curSub === 'HISTORY' ? ' on' : '') + '" aria-pressed="' + (curSub === 'HISTORY' ? 'true' : 'false') + '" data-h-sub="HISTORY">🔄 신·구대비·연혁 (' + fmtNum(timelineAll.length) + ')</button>',
+          '    <button type="button" class="pau-hero-tab' + (curSub === 'ISSUES' ? ' on' : '') + '" aria-pressed="' + (curSub === 'ISSUES' ? 'true' : 'false') + '" data-h-sub="ISSUES">⚖️ 13대쟁점·조문 (' + fmtNum(13 + orgArticles.length) + ')</button>',
+          '    <button type="button" class="pau-hero-tab' + (curSub === 'PEERS' ? ' on' : '') + '" aria-pressed="' + (curSub === 'PEERS' ? 'true' : 'false') + '" data-h-sub="PEERS">🏛️ 유사기관 (' + fmtNum(similars.length) + ')</button>',
+          '    <button type="button" class="pau-hero-tab' + (curSub === 'CHART' ? ' on' : '') + '" aria-pressed="' + (curSub === 'CHART' ? 'true' : 'false') + '" data-h-sub="CHART">📈 업종그래프</button>',
+          '  </div>',
+          '</div>',
+          subBodyHtml
         ].join('');
       }
 
@@ -3987,14 +4486,20 @@
         });
         Array.prototype.forEach.call(dynEl.querySelectorAll('[data-set-vera]'), function (b) {
           b.addEventListener('click', function () {
-            state.hVerA = Number(b.getAttribute('data-set-vera') || 0);
+            var rawA = b.getAttribute('data-set-vera') || '0';
+            state.hVerA = Number(rawA);
             renderTabOrganHistory();
+            var nextA = bodyEl.querySelector('[data-set-vera="' + rawA + '"]');
+            if (nextA && typeof nextA.focus === 'function') nextA.focus();
           });
         });
         Array.prototype.forEach.call(dynEl.querySelectorAll('[data-set-verb]'), function (b) {
           b.addEventListener('click', function () {
-            state.hVerB = Number(b.getAttribute('data-set-verb') || 0);
+            var rawB = b.getAttribute('data-set-verb') || '0';
+            state.hVerB = Number(rawB);
             renderTabOrganHistory();
+            var nextB = bodyEl.querySelector('[data-set-verb="' + rawB + '"]');
+            if (nextB && typeof nextB.focus === 'function') nextB.focus();
           });
         });
         var clrBtn = dynEl.querySelector('[data-h-clear-search]');
@@ -4036,8 +4541,9 @@
             var k = sel.getAttribute('data-f');
             state[k] = sel.value;
             if (k === 'hOrgan') {
-              state.hVerA = 1;
-              state.hVerB = 0;
+              state.hCatFilter = '';
+              state.hVerA = null;
+              state.hVerB = null;
             }
             renderTabOrganHistory();
             var next = bodyEl.querySelector('[data-f="' + k + '"]');
@@ -5421,13 +5927,13 @@
               var dTargetType = resolveTargetTypeFromDisc(d);
               var filePillsHtml = renderFilePills(files, '원문다운');
               var safeViewerUrl = safeHttpUrl(buildOrganUrl(instMap[d.aid] || d.aid, d.dno, dTargetType));
-              var kvParts = [];
-              Object.keys(d.kv || {}).forEach(function (k) {
-                if (worth(d.kv[k])) kvParts.push(k + ': ' + d.kv[k]);
-              });
+              var kvParts = formatCleanKvPairs(d.kv, 4).map(function (it) { return it.text; });
+              if (!kvParts.length && firstFile && firstFile.name) {
+                kvParts.push('첨부원문: ' + stripFileExt(firstFile.name) + (files.length > 1 ? (' 외 ' + (files.length - 1) + '건') : ''));
+              }
               var prev = ((d.highlights || []).join(' ') || kvParts.join(' · ')).replace(/\s+/g, ' ').trim();
               var dt = d.edate || d.rdate || '';
-              var titFull = (d.title || '') + (dt ? ' (' + dt + ')' : '');
+              var titFull = getReadableDocTitle(d) + (dt ? ' (' + dt + ')' : '');
               return [
                 '<tr>',
                 '  <td class="c-no">' + (absIdx + 1) + '</td>',
@@ -5754,8 +6260,9 @@
               state.dPage = 0;
             }
             if (key === 'hOrgan') {
-              state.hVerA = 1;
-              state.hVerB = 0;
+              state.hCatFilter = '';
+              state.hVerA = null;
+              state.hVerB = null;
             }
             rerender();
             var next = bodyEl.querySelector('[data-f="' + key + '"]');
