@@ -242,23 +242,26 @@ test('글꼴 — Roboto 가 한글보다 앞(숫자·영문은 구글 앱과 같
   assert.strictEqual(차례[차례.length - 1], 'sans-serif');
 });
 
-/* ── 일정 칩은 구글 공식 화면 실측 크기 (2026-10-11) ── */
-test('칩 크기 — 구글 실측(글자 12px · 굵기 500 · 줄 20px · 모서리 6px), 칩 사이 틈 2px(= 24px 간격)', () => {
+/* ── 일정 칩은 구글 «앱» 실측 크기 (2026-11-15) — 전에는 공개 embed 화면에서 쟀다(굵기 500·왼쪽 여백 6px)가 앱과 달랐다 ── */
+test('칩 크기 — 구글 앱 실측(글자 12px · 굵기 400 · 줄 20px · 모서리 6px · 좌우 여백 8px), 칩 사이 틈 2px(= 24px 간격)', () => {
   const 칩 = 캘린더.match(/\n\s*\.ev\{padding:([^;]+);border-radius:(\d+)px;font-size:(\d+)px;font-weight:(\d+);line-height:(\d+)px;/);
   assert.ok(칩, '.ev 규칙을 못 찾았습니다');
-  assert.deepStrictEqual([칩[2], 칩[3], 칩[4], 칩[5]], ['6', '12', '500', '20'], '구글 실측(6px·12px·500·20px)과 다릅니다: ' + 칩.slice(1).join(' / '));
+  /* 검사고정-허용: 6·12·400·20 과 8px 는 구글 앱(calendar.google.com, 2026-11-15 대표 PC 에서 computed style 로 잰) 값 — 값 자체가 «구글과 같게»라는 규칙이다 */
+  assert.deepStrictEqual([칩[2], 칩[3], 칩[4], 칩[5]], ['6', '12', '400', '20'], '구글 앱 실측(6px·12px·400·20px)과 다릅니다: ' + 칩.slice(1).join(' / '));
+  assert.strictEqual(칩[1], '1px 8px', '좌우 여백이 구글 앱(8px)과 다릅니다: ' + 칩[1]);
   assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
   /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
   assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
 });
 
 /* ── 상세 팝업·시각 일정 글자는 구글 공식 화면 실측 (2026-10-11) ── */
-test('상세 팝업 — 구글 실측: 상자 448px · 모서리 28px · 배경 #f0f4f9 · 날짜 「10월 12일 (월요일)」 진한 글자', () => {
+test('상세 팝업 — 구글 앱 실측(2026-11-15): 상자 496px · 모서리 28px · 배경 #f0f4f9 · 도구줄 40×40 · 날짜 「10월 12일 (월요일)」 진한 글자', () => {
   const 팝업 = 캘린더.match(/\n\s*\.modal\.det\{[^}]*\}/);
   assert.ok(팝업, '.modal.det 규칙을 못 찾았습니다');
-  assert.match(팝업[0], /border-radius:28px/); assert.match(팝업[0], /max-width:min\(448px/); assert.match(팝업[0], /background:#f0f4f9/);
+  /* 검사고정-허용: 496 은 구글 앱 상세 팝업의 실측 폭(전 448 은 embed 값) — «구글과 같게»가 규칙이다 */
+  assert.match(팝업[0], /border-radius:28px/); assert.match(팝업[0], /max-width:min\(496px/); assert.match(팝업[0], /background:#f0f4f9/);
   assert.match(캘린더, /:root\[data-theme="dark"\] \.modal\.det\{background:var\(--panel\)\}/, '어두운 화면은 판색을 따른다');
-  assert.match(캘린더, /\.dwhen\{font-size:14px;line-height:20px;color:var\(--gtext\)/, '날짜 줄이 구글처럼 진한 글자가 아닙니다');
+  assert.match(캘린더, /\.dwhen\{font-size:14px;line-height:18px;color:var\(--gtext\)/, '날짜 줄이 구글처럼 진한 글자가 아닙니다');
   const b = 상자();
   vm.runInContext(함수몸('function 상세날짜글(ymd){'), b);
   const 글 = (v) => vm.runInContext('상세날짜글("' + v + '")', b);
@@ -266,8 +269,9 @@ test('상세 팝업 — 구글 실측: 상자 448px · 모서리 28px · 배경 
   assert.match(글('2025-12-31'), /^2025년 12월 31일 \(수요일\)$/);
 });
 
-test('시각 일정 칩 — 구글 실측: 시각 12px/400 · 제목 12px/500', () => {
-  assert.match(캘린더, /\.ev\[data-g="t"\]\{padding:1px 4px;font-weight:500;background:transparent\}/);
+test('시각 일정 칩 — 구글 앱 실측(2026-11-15): 시각·제목 12px/400 · 좌우 8px · 점 8px + 오른쪽 6px · 시각 뒤 4px', () => {
+  assert.match(캘린더, /\.ev\[data-g="t"\]\{padding:1px 8px;font-weight:400;background:transparent\}/);
+  assert.match(캘린더, /\.ev \.gdot\{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px/);
   assert.match(캘린더, /\.ev \.gtm\{margin-right:4px;font-weight:400\}/);
 });
 
@@ -276,10 +280,10 @@ test('PC 이전·다음 달 단추 — 구글 공식 실측 32×32 원(2026-10-1
   assert.match(캘, /\.mv\{border:none;background:transparent;border-radius:50%;width:32px;height:32px;/);
 });
 
-test('PC 「오늘」 단추·월 제목 — 구글 실측(78×36, 1px #747775, 모서리 18px, 14px/500, 제목 18px)', () => {
+test('PC 「오늘」 단추·월 제목 — 구글 앱 실측(76×40, 1px #747775, 모서리 20px, 14px/500, 제목 22px/줄 28)', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
-  assert.match(캘, /\.todaybtn\{padding:0 24px;height:36px;border:1px solid #747775;[^}]*border-radius:18px;\s*cursor:pointer;font-size:14px;font-weight:500/);
-  assert.match(캘, /\.monthbar \.ym\{font-size:18px;font-weight:400/);
+  assert.match(캘, /\.todaybtn\{padding:0 24px;height:40px;border:1px solid #747775;[^}]*border-radius:20px;\s*cursor:pointer;font-size:14px;font-weight:500/);
+  assert.match(캘, /\.monthbar \.ym\{font-size:22px;line-height:28px;font-weight:400/);
 });
 
 test('첨부파일 줄 — 새 일정에 드라이브 링크 입력, 다른 주소는 막는다', () => {
@@ -289,9 +293,9 @@ test('첨부파일 줄 — 새 일정에 드라이브 링크 입력, 다른 주�
   assert.match(캘, /첨부는 구글 드라이브 링크/);
 });
 
-test('「N개 더보기」 — 구글 실측(12px/500, 줄 20px, 상자 22px)', () => {
+test('「N개 더보기」 — 구글 앱 실측(12px/400, 줄 20px, 상자 22px, 좌우 8px)', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
-  assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 6px;cursor:pointer;line-height:20px;\s*font-weight:500;border-radius:6px;/);
+  assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 8px;cursor:pointer;line-height:20px;\s*font-weight:400;border-radius:6px;/);
 });
 
 test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 네모, 머리에는 «오늘» 단추', () => {
@@ -373,11 +377,36 @@ test('폰 일정 보기 카드 — 장소가 있으면 「장소, 시각」', ()
   assert.match(캘, /if\(e\.place\) 언제 = String\(e\.place\)\.trim\(\) \+ \(언제 \? ", " \+ 언제 : ""\);/);
 });
 
-test('「구글 앱 색」 — 서랍에서 켜면 구글 색 없는 일정이 전부 캘린더 초록(#87ac5c), 끄면(기본) 사람별 색', () => {
+test('「구글 앱 색」 — 기본 «꺼짐»(사람별 색이 기본): 켜면 구글 색 번호 없는 칩이 전부 구글 캘린더 초록, 번호 있는 구글 일정은 그 색 (대표 지시 2026-11-15 「사람들 색 기존으로 돌려라」)', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
-  assert.match(캘, /if\(!gColor && localStorage\.getItem\("pucal_gmono"\) === "1"\) color = "#87ac5c";/);
   assert.match(캘, /data-dmono="1">/);
   assert.match(캘, /localStorage\.setItem\("pucal_gmono", _모노\(\) \? "0" : "1"\)/);
+  /* 돌려서 본다 — 저장값 없음=꺼짐(기본) · "1"=켜짐 · 읽기 실패=꺼짐(모를 때는 사람별 색 그대로) */
+  let 저장 = null, 던짐 = false;
+  const b = { String, Object, Array, JSON, Math, Date, Number, RegExp, 구글캘린더색: '#GREEN',
+    localStorage: { getItem: () => { if (던짐) throw new Error('막힘'); return 저장; } } };
+  vm.createContext(b);
+  vm.runInContext(함수몸('function _모노(){'), b);
+  vm.runInContext(함수몸('function 칩색정리(목록){'), b);
+  const 목록 = [
+    { kind: 'gcal', id: 'g1', color: '#사람', gc: false }, { kind: 'gcal', id: 'g2', color: '#구글색번호', gc: true },
+    { kind: 'sch', id: 's', color: '#사람' }, { kind: 'priv', id: 'p', color: '#사람' }, { kind: 'att', id: 'a', color: '#사람' }, { kind: 'eum', id: 'e', color: '#사람' },
+    { kind: 'hol', id: 'h', color: '#공휴' }, { kind: 'gone', id: 'x', color: '#지움' }, { kind: 'due', id: 'd', color: '#기한' }];
+  const 색들 = (r) => r.map((e) => e.color).join(' ');
+  저장 = null;
+  assert.strictEqual(색들(b.칩색정리(목록)), '#사람 #구글색번호 #사람 #사람 #사람 #사람 #공휴 #지움 #기한',
+    '★ 저장값이 없을 때(기본) 사람별 색이 그대로여야 한다 — 대표 지시 「사람들 색 기존으로 모두 돌려라」');
+  저장 = '0';
+  assert.strictEqual(색들(b.칩색정리(목록)), '#사람 #구글색번호 #사람 #사람 #사람 #사람 #공휴 #지움 #기한', '★ 끄면(0) 사람별 색이 그대로여야 한다');
+  저장 = '1';
+  assert.strictEqual(색들(b.칩색정리(목록)), '#GREEN #구글색번호 #GREEN #GREEN #GREEN #GREEN #공휴 #지움 #기한',
+    '★ 켜면(1) 구글 색 번호 없는 칩이 캘린더 초록이어야 한다 / 번호 있는 구글 일정·공휴일·기한 색은 그대로');
+  assert.strictEqual(목록[0].color, '#사람', '★ 원본 칩을 고쳤다 — 끄면 사람별 색이 돌아와야 한다(복사본만 바꾼다)');
+  저장 = '1'; 던짐 = true;
+  assert.strictEqual(b._모노(), false, '★ 저장소를 못 읽을 때는 꺼짐(사람별 색 그대로)이어야 한다');
+  /* 구글 캘린더 색 — 구글 앱에서 잰 값(2026-11-15 #7cb342). 예전 #87ac5c 는 캡처에서 눈으로 뽑은 값이라 앱과 달랐다 */
+  assert.match(캘, /var 구글캘린더색 = "#7cb342";/);
+  assert.match(캘, /return typeof 칩색정리 === "function" \? 칩색정리\(out\) : out;/, '그리는 쪽 입구(eventsOn 끝)에서 한 번에 거르지 않는다');
 });
 
 test('폰 일정 보기 — 주마다 「10월 4일~10일」 머리(일요일 시작)', () => {
@@ -414,4 +443,12 @@ test('폰 새 일정 입력 — 캘린더 칩 줄(푸른노무법인 · 공용 /
 test('폰 일정 상세 — 구글 일정에는 맨 아래 「캘린더」 줄(푸른노무법인)', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /d\.kind === "gcal"\)\s*\? '<div class="drows"><div class="drow"><span class="di">' \+ 선아이콘\("calendar"\) \+ '<\/span><span class="dt">푸른노무법인<\/span>/);
+});
+
+test('「더보기」 창 머리(요일·날짜·✕) — 어두운 화면에서 판 글자색을 따른다 (밝은 값 #444746 그대로면 어두운 바탕에서 안 읽힌다)', () => {
+  /* 까닭: 밝은 화면용 #444746 을 어두운 판(#1b1b1d) 위에 그대로 두면 대비가 1.8:1 이었다(검토 2026-11-15) */
+  const 있다 = (조각) => 캘린더.replace(/\r\n/g, '\n').includes(조각);
+  assert.ok(있다(':root[data-theme="dark"] .pop{background:var(--panel)}'), '어두운 화면에서 더보기 창 바탕이 판색이어야 합니다');
+  assert.ok(있다(':root[data-theme="dark"] .pop .ph .wd{color:var(--gsub)}'), '어두운 화면 요일 글자색 덧씌움이 없습니다');
+  assert.ok(있다(':root[data-theme="dark"] .pop .ph .big,:root[data-theme="dark"] .pop .ph .x{color:var(--gtext)}'), '어두운 화면 날짜·✕ 글자색 덧씌움이 없습니다');
 });

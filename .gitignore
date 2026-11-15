@@ -80,6 +80,8 @@ serviceAccount*.json
 firebase-admin*.json
 *.key
 *.pem
+*.jks
+*.keystore
 
 # --- 파이썬 캐시/임시 ---
 __pycache__/

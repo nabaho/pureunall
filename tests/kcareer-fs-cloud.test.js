@@ -43,6 +43,7 @@ test('③ 열기 — 폴더 원본이 먼저, 없을 때만 사본 (두 입구)'
   const r = strip(떼기('async function recFileAsync('));
   assert.ok(r.indexOf('_fsFileOf(rec.relPath)') < r.indexOf('_fsCloudFile(rec.relPath)'), '서식 채우기·판독 입구도 같다');
   const c = strip(떼기('async function _fsCloudFile('));
-  assert.ok(/r\.relPath===relPath && r\.fsCloud/.test(c), '그 경로를 가진 기록의 사본만');
+  /* 같은 경로로 본다 = 적힌 그대로 같거나, 번호 있는/없는 7번 폴더 이름만 다른 것(KcareerScan.canonRelPath 로 통일). 어느 쪽이든 «그 경로를 가진 기록의 사본만» */
+  assert.ok(/(r\.relPath===relPath|canonRelPath\(r\.relPath\)\s*===\s*KcareerScan\.canonRelPath\(relPath\))\s*&&\s*r\.fsCloud/.test(c), '그 경로를 가진 기록의 사본만');
   assert.ok(/KC_FS_STORES/.test(c));
 });

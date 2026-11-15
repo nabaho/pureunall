@@ -224,7 +224,7 @@ test('ⓘ 내용 고치기 — 한글 원본을 저장소 안 편집기로 고�
   assert.match(g, /withNewOriginal\(keep, nu\)/);
 });
 
-/* ⓙ 왼쪽 메뉴 — 한 곳만 눌림 · 세트 보기 · 세트마다 색 (대표 지시 2026-10-10) */
+/* ⓙ 왼쪽 메뉴 — 한 곳만 눌림 · 분류 아래 하위 세트 통합 (대표 지시 2026-10-10 · 2026-11-12) */
 test('ⓙ 왼쪽 메뉴 — 종류·종료 서식·세트 중 한 곳만 눌리고, 세트를 누르면 목록이 그 세트의 서류만 보인다', () => {
   assert.match(SRC, /S\.kind = v; S\.setView = null; S\.quote = false; resetFilters\(\);/, '종류를 누르면 세트 보기가 풀린다');
   assert.match(SRC, /var on = !S\.setView && !S\.quote && S\.kind === k\.v;/, '종류는 세트·견적서 보기 중엔 눌림 표시를 하지 않는다');
@@ -233,18 +233,17 @@ test('ⓙ 왼쪽 메뉴 — 종류·종료 서식·세트 중 한 곳만 눌리�
   assert.match(SRC, /S\.setView = st\.id;/, '세트를 누르면 세트 보기로');
   const i = SRC.indexOf('function setViewList() {'), j = SRC.indexOf('function shown() {', i);
   const f = SRC.slice(i, j);
-  assert.match(f, /\(st\.formIds \|\| \[\]\)\.map/, '세트에 든 순서대로');
+  assert.match(f, /listOf\(st\.formIds\)\.map/, '세트에 든 순서대로');
   assert.match(f, /!isClosed\(f\)/, '종료한 서식은 세트 보기에서도 빠진다');
 });
-test('ⓙ 색은 「📦 세트」 머리글에만 — 세트 이름 줄·목록 안내줄은 무색 (대표 2026-10-11)', () => {
-  assert.match(SRC, /foldHead\('sets', '📦 세트', 'pcf-thset'/);
-  assert.match(SRC, /\.pcf-th\.pcf-thset\{background:#1d4ed8/);
+test('ⓙ 별도 「📦 세트」 구역 없이 각 계약 분류 아래 하위 세트로 통합 · 세트마다 무지개 색 없음 (대표 2026-11-12)', () => {
+  assert.doesNotMatch(SRC, /foldHead\('sets'|📦 세트/, '계약서 양식과 세트를 나누던 별도 「📦 세트」 머리글은 없앴다');
   assert.doesNotMatch(SRC, /SET_COLORS|function setColor|pcf-tset/, '세트마다 색 코드가 없다');
 });
 
-test('ⓚ 왼쪽 메뉴 — 상위 머리글(서식 종류·세트) 접고 펴기 + 같은 칸 안 끌어 바꾸기 (대표 2026-10-11)', () => {
-  assert.doesNotMatch(SRC, /foldHead\('kinds'/, '「서식 종류」 머리글은 뺐다'); assert.match(SRC, /foldHead\('sets', '📦 세트', 'pcf-thset'/);
-  assert.match(SRC, /'aria-expanded': f \? 'false' : 'true'/);
+test('ⓚ 왼쪽 메뉴 — 각 분류의 하위 세트 접고 펴기(aria-expanded) + 같은 칸 안 끌어 바꾸기 (대표 2026-10-11 · 2026-11-12)', () => {
+  assert.doesNotMatch(SRC, /foldHead\('kinds'/, '「서식 종류」 머리글은 뺐다');
+  assert.match(SRC, /'aria-expanded': folded \? 'false' : 'true'/, '하위 세트 접기 단추에 aria-expanded 표시');
   assert.match(SRC, /function lsGet\(k\) \{ try \{ return w\.localStorage\.getItem\(k\); \} catch \(e\) \{ return null; \} \}/, '저장소가 막혀도 그려진다');
   assert.match(SRC, /dragSort\(kindRows, moveKind\);/, '서식 종류도 끌어서 차례를 바꾼다');
   assert.match(SRC, /dragSort\(setRows, moveSet\);/, '세트는 세트 데이터에 저장');

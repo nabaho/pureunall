@@ -159,7 +159,7 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=2"></script>
+<script src="js/kcareer-mailreq.js?v=3"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -227,6 +227,10 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   padding:4px 14px;cursor:pointer;transition:.15s;}
 .pill.on{border-color:var(--accent);color:var(--accent);font-weight:700;background:#fff;}
 .foot{margin-top:26px;font-size:.68rem;color:var(--mute);text-align:center;}
+.foot-links{margin-top:8px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;font-size:.74rem;color:#64748b;}
+.foot-links a{display:inline-block;padding:6px 4px;color:#475569;text-decoration:none;font-weight:600;}
+.foot-links a:hover{color:#1e40af;text-decoration:underline;}
+#camFab[hidden],#sgFab[hidden],#chatFab[hidden],#fabBar[hidden],#moreDock[hidden]{display:none!important;}
 
 /* ---------- 포털 홈 ---------- */
 .portal{display:none;width:100%;max-width:920px;}
@@ -245,6 +249,32 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
    예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
    여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
 .pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
+/* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
+   챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
+   ⚠ 폰·태블릿(≤900px)은 그림만 남긴다(글자는 title·aria-label 로) — 머리줄이 한 줄을 넘지 않게. */
+.pbar .hd-app{order:4;display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;border-radius:14px;background:#fff;
+  border:2px solid var(--accent);box-shadow:0 2px 10px rgba(30,64,175,.2);color:var(--ink);text-decoration:none;white-space:nowrap;cursor:pointer;}
+.pbar .hd-app[hidden]{display:none;}
+.pbar .hd-app:hover{box-shadow:0 3px 12px rgba(30,64,175,.3);}
+.pbar .hd-app:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.pbar .hd-ico{width:30px;height:32px;border-radius:7px;background:#fff;border:1px solid #cbd5e1;overflow:hidden;display:flex;flex-direction:column;flex:none;}
+.pbar .hd-ico i{font-style:normal;display:block;height:11px;line-height:11px;background:#dc2626;color:#fff;font-size:9px;font-weight:800;text-align:center;}
+.pbar .hd-ico em{font-style:normal;flex:1;display:grid;place-items:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
+.pbar .hd-app{position:relative;}
+.pbar .hd-tx{display:flex;flex-direction:column;line-height:1.2;}
+.pbar .hd-tx b{font-size:.84rem;font-weight:800;}
+/* 「오늘 N건」(구글 공용 달력 오늘 일정, 대표 지시 2026-11-15) — PC 는 이름 아래 한 줄, 폰·태블릿은 그림 모서리의 빨간 숫자 딱지.
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있다. 못 받았을 때·폰에서 0건은 «안 보인다»(못 받음을 0으로 쓰지 않는다). */
+.pbar .hd-n{font-size:.7rem;font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums;}
+.pbar .hd-n[hidden]{display:none;}
+.pbar .hd-n.is-zero{color:#64748b;font-weight:600;}
+@media(max-width:900px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:contents;} .pbar .hd-tx b{display:none;}
+  .pbar .hd-n{position:absolute;top:-9px;right:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff;}
+  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;} }
+/* 태블릿(521~900px)은 머리줄이 한 줄(nowrap)이라 단추 글자까지 두면 오른쪽(로그아웃)이 화면 밖으로 밀렸다(768px 에서 102px — 2026-11-15 검증 작업자 지적·직접 쟀다).
+   그림만 남기고(위 ≤900px 규칙) 줄 사이 틈도 줄여 768·744px(아이패드 세로)에서 한 줄에 들어오게 한다. 폰(≤520px)은 줄이 접히므로 틈은 그대로. */
+@media(min-width:521px) and (max-width:900px){ .pbar{gap:6px;} }
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
@@ -1394,6 +1424,13 @@ body.portal-mode #moreFab{display:flex;}
     <!-- 지난번에 왜 풀렸나 — 다시 생기면 이 줄을 찍어 보내 주시면 원인을 바로 짚는다 -->
     <div id="logoutWhy" style="display:none;margin:10px auto 0;max-width:420px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center"></div>
     <div class="foot">© 2026 푸른노무법인 · 통합 포털 · 안전한 인증 연결</div>
+    <nav class="foot-links" aria-label="약관 및 정책 안내">
+      <a href="policy/privacy.html">개인정보처리방침</a>
+      <span aria-hidden="true">·</span>
+      <a href="policy/terms.html">이용약관</a>
+      <span aria-hidden="true">·</span>
+      <a href="policy/account-deletion.html">계정·데이터 삭제 안내</a>
+    </nav>
   </div>
 
   <!-- 포털 홈 -->
@@ -1402,6 +1439,12 @@ body.portal-mode #moreFab{display:flex;}
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
       <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
+      <!-- 📅 머리줄 앱 단추 — APPS 의 head:true 앱(지금은 푸른 캘린더)이 줄 타일 대신 여기 선다 (대표 지시 2026-11-14, 목업 A안).
+           처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
+      <a id="headApp_cal" class="hd-app" data-head-app="1" data-name="푸른 캘린더" href="pu-cal.html?sso=1" hidden>
+        <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
+        <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
+      </a>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
@@ -1587,8 +1630,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>538번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
+        — 하루 <b>539번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -2029,7 +2072,7 @@ body.portal-mode #moreFab{display:flex;}
        그림글자에 달력은 📅 📆 🗓️ 셋뿐이고 작아지면 서로 같아 보였다.
        ⚠ icon 값이 이제 «HTML 문자열»이다(innerHTML 로 꽂는다). enter.html 이 그렇게 쓴다.
        ⚠ 탭 그림글자·바탕화면 아이콘도 같은 그림이다 — tests/app-icons.test.js 가 견준다. */
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client' },
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client', head:true, count:'gcalToday' },   /* head — 타일 대신 «머리줄 큰 단추»(#headApp_cal)로 선다 (대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 한 번에 클릭」 → A안). count — 단추에 「오늘 N건」(구글 공용 달력 오늘 일정, 2026-11-15) */
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱을 만들어 진행」).
        ⚠ 이 앱은 «보고 건너가는 곳»이다 — 초안·AI·HWPX·확정은 정부사업일정의 보고서 창이 한다(#rpt= 로 건너감).
@@ -2038,6 +2081,9 @@ body.portal-mode #moreFab{display:flex;}
     /* 정부지원금 — 지원사업 사전 + 기존·예비 고객사 후보 + 노무사 검토(대표 지시 2026-10-11). 재직 직원 전원(규칙 govaid).
        2026-10-12 「의뢰인 업무로 넣어달라」 — 영업관리에서 옮김(옛 줄은 ROW_MOVED_FROM 이 없던 일로 친다). */
     { key:'govaid',  name:'기업정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'client' },
+    { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
+    { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
+    { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -2049,6 +2095,9 @@ body.portal-mode #moreFab{display:flex;}
     { key:'fin',     name:'재무관리',      desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inside' },
     /* 컨설팅정산(2026-10-31 대표 지시) — 개인입금 사업 정산. 재무관리와 같은 사람만(perm 'fin' — 새 권한 깃발을 만들지 않는다) */
     { key:'settle',  name:'컨설팅정산',    desc:'개인입금 사업 정산', icon:'🧾', url:'pu-settle.html',      roles:null, perm:'fin', row:'inside' },
+    /* 푸른등기(2026-11-14 대표 지시 「내부관리에 프로그램을 넣어라」) — 노무법인 변경등기 서류·필요서류. 사원 주소·생년월일이 든 자리라
+       대표·위임관리인만 — perm 'deungi' 는 아무에게도 주지 않은 깃발이라 관리자·위임관리인에게만 보인다(규칙 deungi 와 같은 사람). */
+    { key:'deungi',  name:'푸른등기',     desc:'변경등기 서류·체크', icon:'🖋', url:'pu-deungi.html',      roles:null, perm:'deungi', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
@@ -2085,14 +2134,17 @@ body.portal-mode #moreFab{display:flex;}
        앱 머리줄의 세 갈래 단추(✏️ 검토·개정 · 📚 조별 문안 · 📥 모은 자료)로 들어간다.
        ⚠ 타일을 다시 둘로 나누지 말 것 — 같은 앱의 문이 둘이면 사람이 어느 쪽인지 헷갈린다.
        첫 화면은 🏢 사업장(2026-10-04 대표 「추천」) — 타일은 rules-v2.html 로 열고, ✏️ 검토·개정은 머리줄 단추로 간다.
-       준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게).
-       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
-    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
+       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸고,
+       2026-11-15 대표 「기업규정집 준비중 열어라」로 준비중 딱지(soon)와 두 화면 안쪽 문(rules-v2.html·rules.html 의
+       PuGate.soonUnlessAdmin)을 «짝으로 함께» 걷었다 — 직원도 연다(푸른 메일·문서관리와 같다. tests/app-soon-gate.test.js ⑩). */
+    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
+    /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
+    { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
     { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, soon:true, row:'client' },  /* 2026-10-20 대표 「급여관리도 준비중으로」 · 2026-10-24 off 로 감췄다가 2026-11-02 대표 「여기에 급여아웃소싱(준비중) 앱만들어 달라」로 off 걷고 이름 변경 — 안쪽 문과 짝 */
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
@@ -2176,7 +2228,7 @@ body.portal-mode #moreFab{display:flex;}
      옮기기 전에 한 번이라도 끌었던 사람은 옛 줄이 남아, 앱의 row 를 바꿔도 화면이 그대로였다
      (대표 보고 2026-10-10 「계약서등관리 자료함으로 옮겨줘」 — 10-05 에 row 를 바꿨는데 의뢰인 업무 줄에 남음).
      ⚠ 줄 사이 옮기기는 원래 막혀 있어(관리자가 풀어야 한다) 옛 줄 값은 «일부러 둔 자리»가 아니다. */
-  var ROW_MOVED_FROM = { docs:'client', govaid:'sales' };
+  var ROW_MOVED_FROM = { docs:'client', govaid:'sales', pbox:'client' };
   function savedRowOf(key, dflt){
     var r = tilePrefs && tilePrefs.rows && tilePrefs.rows[key];
     if(ROW_MOVED_FROM[key] && r === ROW_MOVED_FROM[key]) return dflt;
@@ -2787,12 +2839,34 @@ body.portal-mode #moreFab{display:flex;}
     if($('kkModal').style.display === 'flex') kkOpenProfile();
   }
 
+  /* ── 약관·개인정보처리방침·계정 삭제 안내 카드 (내 정보 창 공용) ── */
+  function puPolicyLinksHtml(){
+    return '<div class="cfg-tool" style="margin:10px 0 0;display:block">'
+      + '<div><b>📄 약관 · 개인정보 · 계정 삭제 안내</b>'
+      + '<span>개인정보 처리 기준과 계정·데이터 삭제 절차를 확인할 수 있습니다</span></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:.78rem;">'
+      + '<a href="policy/privacy.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#1e40af;font-weight:700;text-decoration:none;">개인정보처리방침 ↗</a>'
+      + '<span aria-hidden="true" style="color:#cbd5e1">·</span>'
+      + '<a href="policy/terms.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#1e40af;font-weight:700;text-decoration:none;">이용약관 ↗</a>'
+      + '<span aria-hidden="true" style="color:#cbd5e1">·</span>'
+      + '<a href="policy/account-deletion.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#dc2626;font-weight:700;text-decoration:none;">계정·데이터 삭제 요청 ↗</a>'
+      + '</div></div>';
+  }
+
   /* ── 내 정보 — 이름·아바타를 눌러 연다(직원 누구나) ── */
   function kkOpenProfile(){
     var uid = auth.currentUser && auth.currentUser.uid;
     var body = $('kkBody');
     if(!uid || !body) return;
     $('kkModal').style.display = 'flex';
+    if(_curRole === 'reviewer'){
+      body.innerHTML =
+        '<div class="cfg-tool" style="margin-bottom:0">'
+        + '<div><b>🔒 스토어 심사 전용 계정</b><span>의뢰인·구성원 실데이터 접근이 분리된 심사 환경입니다</span></div>'
+        + '</div>'
+        + puPolicyLinksHtml();
+      return;
+    }
     body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">불러오는 중…</p>';
     db.ref('uid_kakao/' + uid).once('value').then(function(snap){
       var v = snap.val();
@@ -2806,14 +2880,15 @@ body.portal-mode #moreFab{display:flex;}
         + '</div>'
         + '<div class="cfg-tool" style="margin:10px 0 0"><div><b>🔐 인증 앱 2단계 인증</b>'
         + '<span id="mfaProfileState">등록 여부를 확인하는 중…</span></div>'
-        + '<button type="button" id="mfaEnrollBtn" disabled>확인 중</button></div>';
+        + '<button type="button" id="mfaEnrollBtn" disabled>확인 중</button></div>'
+        + puPolicyLinksHtml();
       $('kkLinkBtn').addEventListener('click', function(){
         if(linked) kkUnlinkSelf(); else kkStartLink();
       });
       mfaRefreshProfile();
       homeCareerOpen(body);
     }).catch(function(){
-      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>';
+      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>' + puPolicyLinksHtml();
     });
   }
   /* ── 홈페이지 경력 (대표 지시 2026-11-01 「최근것 10개 이하로 넣고 필요시 개인이 추가할 수 있게」) ──
@@ -2917,7 +2992,7 @@ body.portal-mode #moreFab{display:flex;}
       .finally(function(){ if(btn) btn.disabled=false; });
   }
   function mfaOfferAfterLogin(role, via){
-    if(via !== 'login' || role === 'admin' || !auth.currentUser) return;
+    if(via !== 'login' || role === 'admin' || role === 'reviewer' || !auth.currentUser) return;
     var u=auth.currentUser, key='pu_mfa_offer:'+u.uid;
     try { if(sessionStorage.getItem(key)==='1') return; sessionStorage.setItem(key,'1'); } catch(_e){}
     puLoadMFA().then(function(mfa){ return Promise.all([mfa.status(), u.getIdTokenResult()]); }).then(function(all){
@@ -3269,6 +3344,22 @@ body.portal-mode #moreFab{display:flex;}
     return true;
   }
 
+  /* ── 스토어 심사 전용 격리 계정 판별 ──
+     Google Play 앱 심사관 전용 계정(playreviewer@pureun.kr)은 uid_roles 에 등록하지 않아
+     서버 보안 규칙이 모든 의뢰인·인사 실데이터 읽기를 원천 차단한다.
+     포털에서는 명부 미등록 경고를 띄우지 않고, 로컬·공공데이터 프로그램만 노출한다. */
+  function puPlayReviewerAcct(email){
+    var em = String(email || '').trim().toLowerCase();
+    if(em !== 'playreviewer@pureun.kr') return null;
+    return {
+      sid: 'PLAYREVIEWER',
+      name: '심사 점검 계정',
+      role: 'reviewer',
+      status: 'reviewer',
+      title: '앱 심사 전용'
+    };
+  }
+
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
   function enterPortal(user, verifiedProfile){
     if(_returnToApp(user)) return;     // 로그아웃으로 밀려났던 앱 탭 — 하던 앱으로 돌아간다
@@ -3332,6 +3423,11 @@ body.portal-mode #moreFab{display:flex;}
       }
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
       window.__puPortalEntering = false;
+    }
+    var _revAcct = puPlayReviewerAcct(user && user.email);
+    if(_revAcct){
+      _show({ acct: _revAcct, all: [_revAcct] }, true);
+      return;
     }
     /* 이 정보는 카카오 인가코드·재직 확인을 마친 서버가 같은 응답으로 보낸 것만 쓴다.
        Firebase가 실제로 연 계정 이메일과 사번이 다르면 기존 명부 조회로 돌아간다. */
@@ -3804,8 +3900,13 @@ body.portal-mode #moreFab{display:flex;}
     var role = acct ? acct.role : 'member';
     _curRole = role;   // 바로가기(홈 앱) 권한 판정용
     _curName = name || '';
-    try { kkAfterLogin(); } catch(e){}
-    try { kkSetupRegRow(mySid); } catch(e){}
+    if(role === 'reviewer'){
+      var _kr = $('kkRegRow');
+      if(_kr) _kr.style.display = 'none';
+    } else {
+      try { kkAfterLogin(); } catch(e){}
+      try { kkSetupRegRow(mySid); } catch(e){}
+    }
     try { billStart(role); } catch(e){}   // 💳 사용액 — 관리자일 때만 안이 돈다
     var title = acct ? (acct.title || '') : '';
     /* ★ 화면에는 «이름»만 쓴다 — 사번도, 로그인 이메일도 안 쓴다 (대표 결정 2026-10-25 「이름만 있어야한다」).
@@ -3847,6 +3948,8 @@ body.portal-mode #moreFab{display:flex;}
       // ⚠ 이메일(= 로그인 아이디)은 글자로 안 적는다(대표 결정 2026-10-25) — 「이 계정」이라고만 한다
       puIdentityBand('⚠️ 로그인은 되었지만 직원명부에서 <b>이 계정</b>을 찾지 못했습니다.<br>'
         + '이름·권한이 제대로 나오지 않습니다 — 관리자에게 알려주세요.', 'warn');
+    } else if(role === 'reviewer'){
+      puIdentityBand('🔒 의뢰인 개인정보 보호를 위해 실제 수임·인사 데이터가 분리된 <b>스토어 심사 전용 화면</b>입니다.');
     } else {
       /* 여느 때는 띠를 안 그린다.
          ★ 「자동 로그인되었습니다 — 본인이 아니면 로그아웃」 안내는 걷어냈다(2026-08-10 대표 지시).
@@ -3866,10 +3969,16 @@ body.portal-mode #moreFab{display:flex;}
     _layoutEdit = false;
     layoutPanelClose();
     tileConts().forEach(function(c){ c.innerHTML = ''; });
+    portalHeadAppsHide();     // 머리줄 단추는 먼저 감춘다 — 아래 반복에서 «볼 수 있는 사람»에게만 다시 켠다
     wireCamFab();
     APPS.forEach(function(app){
       // 역할 제한이 있으면 확인
       if(app.roles && app.roles.indexOf(role) < 0) return;
+      /* 스토어 심사 전용 계정(reviewer)은 준비중·PC 전용·사내 실데이터 화면을 노출하지 않고,
+         로컬·공공데이터 프로그램(한글 편집기·공공임단협)만 그대로 연다.
+         ⚠ tests/portal-cal-head-button.test.js 가 'APPS.forEach...// 역할 제한이 있으면 확인' 첫머리를 보고,
+           tests/portal-soon-locked.test.js 가 APPS.forEach 블록을 vm 에서 돌리므로 이 자리에서 role 로 거른다. */
+      if(role === 'reviewer' && app.key !== 'hangul' && app.key !== 'aliounion') return;
       /* 관리자 전용 타일(경력관리·홈페이지 관리·⚙설정·백업) —
          ★ 이 자리에서는 sgIsAdmin() 을 쓰지 않는다. 그것은 건의함이 뜰 때 채워지므로
            타일을 그리는 지금은 아직 비어 있어, 대표님에게까지 타일이 사라졌다
@@ -3884,6 +3993,9 @@ body.portal-mode #moreFab{display:flex;}
          준비중 타일로 돌아온다. 앱 막대(js/pu-appbar.js)의 off 와 짝이다. */
       if(app.off) return;
       if(app.adminOnly && !_isAdm) return;
+      /* 머리줄 단추 앱(head) — 줄 타일을 «만들지 않는다». 저장된 공용 배치(app_config)에 자료함 따위로 적혀 있어도
+         타일 자체가 없으니 그 자리에 안 남는다(대표 지시 2026-11-14). 단추 쪽은 portalHeadAppPaint 가 그린다. */
+      if(app.head){ portalHeadAppPaint(app); return; }
       /* 직원 인사·재무 — 관리자이거나 그 권한이 있을 때만(APPS 의 perm 머리글).
          권한표(uid_roles)는 뒤에서 읽는다 — 그래서 타일은 만들어 두고 «감춰» 둔다(포털을 통째로 다시 그리지 않게).
          읽고 나면 portalApplyAppPerm 이 보이거나 감춘다. */
@@ -3992,17 +4104,164 @@ body.portal-mode #moreFab{display:flex;}
     // 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
     initFold();
 
-    // 건의함: 현재 사용자 정보 전달 + 플로팅 버튼 표시
-    if(window.sgSetUser) window.sgSetUser(acct);
-    initPortalHanaAlerts(role);
-    initPortalExpAlerts();
-    portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
+    // 건의함: 현재 사용자 정보 전달 + 플로팅 버튼 표시 (심사 전용 계정은 사내 건의·설정·촬영·알림을 감춘다)
+    if(role === 'reviewer'){
+      SG.role = 'reviewer';
+      try { cfgShowFab(); } catch(e){}
+    } else {
+      if(window.sgSetUser) window.sgSetUser(acct);
+      initPortalHanaAlerts(role);
+      initPortalExpAlerts();
+      portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
+    }
     mfaOfferAfterLogin(role, info.via);
-    /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
-       다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
-    portalHanaPaintBadge();
-    initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+    if(role !== 'reviewer'){
+      /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
+         다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
+      portalHanaPaintBadge();
+      initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+    }
+    ['camFab', 'sgFab', 'chatFab', 'fabBar', 'moreDock'].forEach(function(id){
+      var el = $(id);
+      if(el) el.hidden = (role === 'reviewer');
+    });
   }
+
+  /* ── 머리줄 단추 앱 (APPS 의 head:true) — 타일 대신 머리줄(.pbar)에 큰 단추로 선다 ──
+     대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 별도로 관리해서 한 번에 클릭」 → 목업 A안.
+     ★ 눌렀을 때는 «타일과 같은 길»이다 — PC 는 openPortalApp(창 이름·재사용·10분 캐시 버킷), 폰은 그냥 링크(sso=1).
+     ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
+     ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
+  function portalHeadAppsHide(){
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++) els[i].hidden = true;
+  }
+  function portalHeadAppDate(el){
+    var d = new Date(), mo = (d.getMonth() + 1) + '월', da = String(d.getDate());
+    var m = el.querySelector('.hd-m'), n = el.querySelector('.hd-d');
+    if(m) m.textContent = mo;
+    if(n) n.textContent = da;
+    el.setAttribute('data-today', mo + ' ' + da + '일');
+    portalHeadAppLabel(el);
+  }
+  /* 접근성 이름·말풍선 — 날짜는 항상, 「오늘 N건」은 «받았을 때만». 숫자가 무슨 뜻인지(구글 공용 달력만)도 말풍선에 밝힌다. */
+  function portalHeadAppLabel(el){
+    var name = el.getAttribute('data-name') || '', day = el.getAttribute('data-today') || '';
+    var n = el.getAttribute('data-n');
+    var cnt = (n !== null && n !== '') ? ' · 오늘 구글 공용 달력 일정 ' + n + '건' : '';
+    el.setAttribute('aria-label', name + ' — 오늘 ' + day + cnt);
+    el.title = (el.getAttribute('data-title') || name) + (cnt ? cnt + ' (연차·출장·나만 보기 일정은 달력에서)' : '');
+  }
+  function portalHeadAppPaint(app){
+    var el = document.getElementById('headApp_' + app.key);
+    if(!el) return;
+    var join = app.url.indexOf('?') >= 0 ? '&' : '?';
+    el.hidden = false;
+    el.href = app.url + join + 'sso=1';
+    el.setAttribute('data-title', app.name + (app.desc ? ' — ' + app.desc : ''));
+    el.setAttribute('data-count', app.count || '');
+    if(!isMobile()) el.target = portalAppWindowName(app.key); else el.removeAttribute('target');
+    portalHeadAppDate(el);       // 말풍선·접근성 이름도 여기서 맞춘다(portalHeadAppLabel)
+    portalHeadAppCount(el);      // 「오늘 N건」 — 받는 동안은 숫자 없이 선다
+    if(el.getAttribute('data-wired') === '1') return;
+    el.setAttribute('data-wired', '1');
+    el.addEventListener('click', function(ev){
+      if(isMobile()) return;                      // 폰은 링크가 그대로 연다(타일과 같다)
+      ev.preventDefault();
+      var v = Math.floor(Date.now() / 600000);    // 10분 버킷 캐시 우회 — 타일과 같다
+      openPortalApp(app, app.url + join + 'sso=1&v=' + v);
+    });
+  }
+  /* ── 오늘 N건 (머리줄 단추) ── 대표 지시 2026-11-15 「네, 이어서」 (목업 A안의 「오늘 N건」)
+     ★ 무엇을 세나: 구글 «공용 달력»의 오늘 일정 건수다. 푸른 캘린더 화면이 «구글» 일정을 받는 것과 같은 달력·같은 열쇠
+       (pu-cal.html 의 GCAL_CAL_ID·GCAL_API_KEY — tests/portal-cal-head-button.test.js 가 맞대 본다)로 «하루치»만 받는다.
+       걸친 날 계산도 달력과 같다(종일 일정의 끝날은 하루 당김 · 자정에 끝나면 그날은 안 든다 · 여러 날 일정은 걸친 날마다 든다).
+       달력의 «오늘 칸»은 줄이 더 많을 수 있다(연차·출장·이음 근무 근태, 사건 마감, 나만 보기) — 그것은 세지 않는다.
+       그래서 말풍선이 「구글 공용 달력 일정 N건」이라고 «정확히» 말한다(portalHeadAppLabel).
+     ★ 못 받았으면 숫자를 «안 보인다» — 0건으로 쳐서 「오늘 0건」이라 하면 거짓말이다(못 받음 ≠ 0). 하루에 250건 넘게 와서 쪽이 나뉘어도 같다(모르는 것을 모른다고 한다).
+     ★ 하루치 한 번 — 5분 안에는 다시 안 받고(캐시), 실패하면 1분은 쉰다. 두 번 그려도 한 번만 받는다. 날이 바뀌면 어제 숫자는 지운다.
+     ⚠ 서버 표(my_schedules 등)는 읽지 않는다 — 달력 내용 대부분이 구글 쪽이고 서버 표에는 옛 기록 25건뿐이다(pu-cal.html «구글 캘린더» 머리말).
+     ⚠ 포털이 구글 달력 열쇠를 «또» 갖는다 — 열쇠는 사이트 제한(docs/구글캘린더-API키-사이트제한.md)이 지킨다. 같은 사이트(nabaho.github.io)에서 부르므로 제한에 걸리지 않는다. */
+  var PORTAL_GCAL = { key: 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo', cal: 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com' };
+  var PORTAL_CAL_FRESH_MS = 5 * 60 * 1000, PORTAL_CAL_RETRY_MS = 60 * 1000;
+  var portalCalCount = { ymd: '', at: 0, n: null, failAt: 0, pending: null, pendingYmd: '' };
+  function portalYmdOf(d){
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function portalShiftYmd(ymd, days){
+    var p = String(ymd).split('-'), t = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + days));
+    return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + t.getUTCDate()).slice(-2);
+  }
+  /* 그 날(ymd)에 걸친 구글 일정 건수 — pu-cal.html 의 gcalToEvent(date·끝)·eventsOn(걸침 판단)과 «같은 규칙» */
+  function portalCountGcalOn(items, ymd){
+    var n = 0;
+    (items || []).forEach(function(ev){
+      if(!ev || !ev.start || !(ev.start.date || ev.start.dateTime)) return;
+      var date = String(ev.start.date || ev.start.dateTime).slice(0, 10), end = date;
+      if(ev.end && ev.end.date) end = portalShiftYmd(String(ev.end.date).slice(0, 10), -1);       // 종일 일정의 end.date 는 «다음 날»
+      else if(ev.end && ev.end.dateTime){
+        end = String(ev.end.dateTime).slice(0, 10);
+        if(String(ev.end.dateTime).slice(11, 16) === '00:00' && end > date) end = portalShiftYmd(end, -1);   // 자정에 끝나면 그날은 안 든다
+      }
+      if(!end || end < date) end = date;
+      if(date === ymd || (date < ymd && ymd <= end)) n++;
+    });
+    return n;
+  }
+  /* 오늘 구글 공용 달력 일정 건수 → Promise<숫자 | null(못 받음)> */
+  function portalCalTodayCount(){
+    var c = portalCalCount, ymd = portalYmdOf(new Date()), now = Date.now();
+    if(c.ymd === ymd && c.n !== null && now - c.at < PORTAL_CAL_FRESH_MS) return Promise.resolve(c.n);
+    if(c.ymd === ymd && c.n === null && c.failAt && now - c.failAt < PORTAL_CAL_RETRY_MS) return Promise.resolve(null);
+    if(c.pending && c.pendingYmd === ymd) return c.pending;
+    var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(PORTAL_GCAL.cal) + '/events?key=' + PORTAL_GCAL.key
+      + '&timeMin=' + encodeURIComponent(ymd + 'T00:00:00+09:00') + '&timeMax=' + encodeURIComponent(portalShiftYmd(ymd, 1) + 'T00:00:00+09:00')
+      + '&singleEvents=true&orderBy=startTime&maxResults=250&fields=' + encodeURIComponent('nextPageToken,items(start,end)');
+    c.pendingYmd = ymd;
+    var p = Promise.resolve().then(function(){ return fetch(url); })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || d.error || !Array.isArray(d.items) || d.nextPageToken) throw new Error('오늘 일정을 셀 수 없습니다');
+        return portalCountGcalOn(d.items, ymd);
+      })
+      .then(function(n){ c.ymd = ymd; c.at = Date.now(); c.n = n; c.failAt = 0; return n; },
+            function(){ c.ymd = ymd; c.at = 0; c.n = null; c.failAt = Date.now(); return null; })
+      .then(function(n){ if(c.pending === p) c.pending = null; return n; });
+    c.pending = p;
+    return p;
+  }
+  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount };
+  function portalHeadAppCountApply(el, n, ymd){
+    var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv');
+    if(n === null || n === undefined){
+      el.removeAttribute('data-n'); el.removeAttribute('data-n-ymd');
+      if(box) box.hidden = true;
+    } else {
+      el.setAttribute('data-n', String(n)); el.setAttribute('data-n-ymd', ymd || '');
+      if(v) v.textContent = String(n);
+      if(box){ box.hidden = false; box.classList.toggle('is-zero', n === 0); }
+    }
+    portalHeadAppLabel(el);
+  }
+  function portalHeadAppCount(el){
+    var fn = PORTAL_HEAD_COUNTERS[el.getAttribute('data-count') || ''];
+    if(!fn) return;
+    var ymd = portalYmdOf(new Date());
+    if(el.getAttribute('data-n-ymd') !== ymd) portalHeadAppCountApply(el, null);    // 어제 숫자를 오늘 것처럼 두지 않는다
+    var p; try{ p = fn(); }catch(_e){ return; }
+    if(!p || typeof p.then !== 'function') return;
+    p.then(function(n){
+      if(el.hidden) return;                              // 그 사이 감춰졌다(다른 사람으로 바뀜)
+      if(portalYmdOf(new Date()) !== ymd) return;        // 받는 사이 자정을 넘겼다 — 다음에 다시 센다
+      portalHeadAppCountApply(el, n, ymd);
+    }, function(){});
+  }
+  /* ── 오늘 N건 끝 ── */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++){ if(!els[i].hidden){ portalHeadAppDate(els[i]); portalHeadAppCount(els[i]); } }
+  });
 
   // ══════════ 앱 배치: 관리자만 끌어 옮김 + 📌 틀 고정 (공용 한 벌 · 즐겨찾기·접힘은 사람별) ══════════
   // 타일은 영역(APP_ROWS)마다 각각의 상자에 담긴다. 영역 사이 이동은 관리자가 «배치 편집» 중에만 하고,
@@ -5693,7 +5952,16 @@ body.portal-mode #moreFab{display:flex;}
     try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
     try {
       if(window.indexedDB && indexedDB.deleteDatabase){
-        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        if(typeof indexedDB.databases === 'function'){
+          indexedDB.databases().then(function(ls){
+            (ls || []).forEach(function(it){
+              if(it && it.name && it.name.indexOf('pu_pbox_workspace_v1') === 0){
+                try { indexedDB.deleteDatabase(it.name); } catch(_){}
+              }
+            });
+          }).catch(function(){});
+        }
       }
     } catch(_idb){}
   }
@@ -7516,7 +7784,7 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=4"></script>
-<script src="js/pu-chatbot.js?v=4"></script>
+<script src="js/pu-chatbot-kb.js?v=9"></script>
+<script src="js/pu-chatbot.js?v=5"></script>
 </body>
 </html>

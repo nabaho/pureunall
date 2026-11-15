@@ -16,10 +16,12 @@
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
   'use strict';
 
-  /* 남의 견적(우리가 «달라고» 하는 메일·견적 의뢰·물품 견적)은 우리 견적이 아니다 */
-  var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신)|견적\s*(의뢰|요청)|상품\s*견적|루나랩/;
-  var CONTRACT = /(자문|위임|용역|컨설팅|교육|위탁|대행|고문)\s*(계약서|약정서)|위임\s*약정|약정서\s*(및\s*위임장)?/;
-  var NOT_CONTRACT = /(근로|연봉|급여)\s*계약서/;
+  /* 남의 견적(우리가 «달라고» 하는 메일·견적/제안 의뢰·물품/제작 견적)은 제목·첨부 이름 어느 쪽에 있어도 우리 견적이 아니다 */
+  var EXCL_QUOTE = /비교\s*견적서?\s*(요청|작성|회신)|(견적|제안)서?\s*(의뢰|요청)|상품\s*견적|(사무\s*용품|물품|비품|인쇄|웹사이트|홈페이지|쇼핑몰|인테리어|소프트웨어|전산\s*장비)[^\n]{0,20}(견적|제안)서?|루나랩/;
+  var QUOTE_RE = /견적|수임료\s*안내|비용\s*안내|보수\s*안내|수수료\s*안내|(인사\s*노무|노무|노사|컨설팅|자문|조사|기금|교섭|교육|강의|산재|안전|중대\s*재해|원가|취업\s*규칙|급여|진단)\s*([가-힣·\s]{0,12})?제안서/;
+  var CONTRACT = /(자문|위임|용역|컨설팅|교육|강의|위탁|대행|고문|직장\s*내\s*괴롭힘(\s*조사)?|괴롭힘(\s*조사)?|성희롱(\s*조사)?|진상\s*조사|실태\s*조사|조사|노무\s*진단|조직\s*진단|진단|기금(\s*설립)?|설립\s*지원|노사\s*관계|노사\s*협의회|노동\s*조합|노조|단체\s*교섭|임금\s*교섭|교섭|취업\s*규칙|인사\s*규정|직무\s*분석|원가\s*산정|법률\s*의견|노무\s*의견|의견서|산업\s*안전|중대\s*재해|안전\s*보건|급여\s*관리|아웃소싱|사무\s*위탁|업무\s*대행|비밀\s*유지|화해|변경|갱신|연장)\s*(계약서|약정서|합의서|협약서|서약서)|위임\s*약정|약정서\s*(및\s*위임장)?|(변경|갱신|연장|화해)\s*합의|업무\s*협약서|(단체\s*교섭|교섭권)\s*위임장/;
+  var NOT_CONTRACT = /(근로|연봉|급여|촉탁)\s*계약서/;
+  var SIGNED_HINT = /체결|서명|날인|도장|직인|확정|스캔|회신|날인본|서명본|계약\s*완료/;
   /* 비교견적 — 제목에 «견적서 요청/작성»이 있으면 우리가 남에게 달라고 한 것, «회신/제출»이면 남이 낸 것 */
   var COMPARE = /비교\s*견적/;
   var COMPARE_ASK = /비교\s*견적서?\s*(요청|작성)/;
@@ -37,17 +39,24 @@
   }
   function joined(attNames) { return namesOf(attNames).join(' '); }
 
-  /* 제목·첨부 이름에 «견적» — 단 남의 견적(비교견적 요청·견적 의뢰·물품 견적)은 제목으로 거른다 */
+  function words(subject, attNames) { return (s(subject) + ' ' + joined(attNames)).replace(/_/g, ' '); }
+
+  /* 제목·첨부 이름에 «견적·수임료 안내» — 단 남의 견적(비교견적 요청·견적서 요청/의뢰·물품/제작 견적·제안서)은 제목·첨부 모두 거른다 */
   function isOurQuote(subject, attNames) {
-    var subj = s(subject);
-    if (EXCL_QUOTE.test(subj)) return false;
-    return /견적/.test(subj + ' ' + joined(attNames));
+    var t = words(subject, attNames);
+    if (EXCL_QUOTE.test(t)) return false;
+    return QUOTE_RE.test(t);
   }
-  /* 「자문·위임·용역·컨설팅·교육·위탁·대행 계약서」 — 근로계약서는 아니다 */
+  /* 「자문·위임·용역·컨설팅·괴롭힘조사·산업안전·기금·단체교섭·변경합의 등 우리 계약서」 — 근로계약서는 아니다 */
   function isOurContract(subject, attNames) {
-    var subj = s(subject);
-    if (NOT_CONTRACT.test(subj + ' ' + joined(attNames))) return false;
-    return CONTRACT.test(subj + ' ' + joined(attNames));
+    var t = words(subject, attNames);
+    if (NOT_CONTRACT.test(t)) return false;
+    return CONTRACT.test(t);
+  }
+  /* 확정·서명·날인·회신 단서가 있는 우리 계약서 메일인지 판별 */
+  function isSignedContract(subject, attNames) {
+    if (!isOurContract(subject, attNames)) return false;
+    return SIGNED_HINT.test(words(subject, attNames));
   }
   /* 한 메일이 견적도 계약서도 말하면 계약서가 이긴다(메일 하나에 기록 하나) */
   function docOf(subject, attNames) {
@@ -84,8 +93,8 @@
   function domainOf(addr) { var m = /@([^@\s>]+)/.exec(s(addr)); return m ? m[1].toLowerCase() : ''; }
 
   return {
-    EXCL_QUOTE: EXCL_QUOTE, CONTRACT: CONTRACT, NOT_CONTRACT: NOT_CONTRACT,
-    s: s, nfc: nfc, namesOf: namesOf, isOurQuote: isOurQuote, isOurContract: isOurContract, docOf: docOf,
+    EXCL_QUOTE: EXCL_QUOTE, QUOTE_RE: QUOTE_RE, CONTRACT: CONTRACT, NOT_CONTRACT: NOT_CONTRACT, SIGNED_HINT: SIGNED_HINT,
+    s: s, nfc: nfc, namesOf: namesOf, isOurQuote: isOurQuote, isOurContract: isOurContract, isSignedContract: isSignedContract, docOf: docOf,
     compareHint: compareHint, addrsOf: addrsOf, domainOf: domainOf
   };
 });

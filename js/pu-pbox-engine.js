@@ -1,0 +1,2889 @@
+/* P박스 핵심 법률 엔진 (법령 마크다운 파서 · 3단계 중복제거 · 하급심 비식별 수집 · 하이브리드 검색 · 인용 검증기)
+ *
+ * 브라우저(window.PuPBoxEngine)와 Node 검사(require('./js/pu-pbox-engine.js')) 양쪽에서 똑같이 동작한다.
+ */
+(function (global) {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════════
+   * 1. 대한민국 법령 마크다운 파서 & 시행일 판별기
+   * ══════════════════════════════════════════════════════════════ */
+  function todayKstYmd(nowMs) {
+    var t = (typeof nowMs === 'number' ? nowMs : Date.now()) + 9 * 3600 * 1000;
+    return new Date(t).toISOString().slice(0, 10);
+  }
+
+  function unescapeMd(s) {
+    return String(s || '')
+      .replace(/(\d+)\\\./g, '$1.')
+      .replace(/\\([()[\]*_~`])/g, '$1');
+  }
+
+  function parseYamlFrontmatter(raw) {
+    var text = String(raw || '').replace(/\r\n/g, '\n');
+    if (text.indexOf('---\n') !== 0) return { meta: {}, body: text };
+    var end = text.indexOf('\n---\n', 4);
+    if (end < 0) return { meta: {}, body: text };
+    var yaml = text.slice(4, end);
+    var body = text.slice(end + 5);
+    var meta = { departments: [], attachments: [] };
+    var lines = yaml.split('\n');
+    var mode = '';
+    var curAtt = null;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line.trim()) continue;
+      if (/^소관부처:\s*$/.test(line)) { mode = 'dept'; continue; }
+      if (/^첨부파일:\s*\[\]/.test(line)) { mode = ''; continue; }
+      if (/^첨부파일:\s*$/.test(line)) { mode = 'att'; continue; }
+
+      if (mode === 'dept' && /^\s*-\s+/.test(line)) {
+        meta.departments.push(line.replace(/^\s*-\s+/, '').trim().replace(/^['"]|['"]$/g, ''));
+        continue;
+      }
+      if (mode === 'att' && /^\s*-\s+/.test(line)) {
+        curAtt = {};
+        meta.attachments.push(curAtt);
+        var kv0 = line.replace(/^\s*-\s+/, '').split(':');
+        if (kv0.length >= 2) {
+          curAtt[kv0[0].trim()] = kv0.slice(1).join(':').trim().replace(/^['"]|['"]$/g, '');
+        }
+        continue;
+      }
+      if (mode === 'att' && curAtt && /^\s{2,}[가-힣A-Za-z]+:/.test(line)) {
+        var idx = line.indexOf(':');
+        var k = line.slice(0, idx).trim();
+        var v = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, '');
+        curAtt[k] = v;
+        continue;
+      }
+
+      mode = '';
+      var colon = line.indexOf(':');
+      if (colon > 0) {
+        var key = line.slice(0, colon).trim();
+        var val = line.slice(colon + 1).trim().replace(/^['"]|['"]$/g, '');
+        if (key === '제목') meta.title = val;
+        else if (key === '법령MST') meta.mst = val;
+        else if (key === '법령ID') meta.lawId = val;
+        else if (key === '법령구분') meta.lawKind = val;
+        else if (key === '공포일자') meta.promulgationDate = val;
+        else if (key === '공포번호') meta.promulgationNo = val;
+        else if (key === '시행일자') meta.effectiveDate = val;
+        else if (key === '상태') meta.status = val;
+        else if (key === '출처') meta.sourceUrl = val;
+      }
+    }
+    return { meta: meta, body: body };
+  }
+
+  function effectiveState(effectiveDate, refTodayYmd) {
+    var eff = String(effectiveDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eff)) {
+      return { status: 'unknown', label: eff ? ('시행 ' + eff) : '시행일 정보 없음', daysUntil: 0 };
+    }
+    var today = refTodayYmd || todayKstYmd();
+    if (eff <= today) {
+      return { status: 'enforced', label: '현행 시행중 (' + eff + ' 시행)', daysUntil: 0 };
+    }
+    var d1 = Date.parse(today + 'T00:00:00Z');
+    var d2 = Date.parse(eff + 'T00:00:00Z');
+    var diff = Math.max(1, Math.round((d2 - d1) / 86400000));
+    return { status: 'upcoming', label: '시행예정 D-' + diff + ' (' + eff + ' 시행)', daysUntil: diff };
+  }
+
+  function parseLawMarkdown(rawMd, fallbackMeta, refTodayYmd) {
+    fallbackMeta = fallbackMeta || {};
+    var parsed = parseYamlFrontmatter(rawMd);
+    var meta = parsed.meta;
+    var body = parsed.body;
+
+    var lines = body.split('\n');
+    var chapters = [];
+    var articles = [];
+    var addendaLines = [];
+    var curChapter = '';
+    var curArt = null;
+    var inAddenda = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var rawLine = lines[i];
+      var trimmed = rawLine.trim();
+
+      if (/^##\s+부칙/.test(trimmed)) {
+        if (curArt) {
+          curArt.text = unescapeMd(curArt._lines.join('\n')).trim();
+          delete curArt._lines;
+          articles.push(curArt);
+          curArt = null;
+        }
+        inAddenda = true;
+        addendaLines.push(trimmed.replace(/^##\s+/, ''));
+        continue;
+      }
+
+      if (inAddenda) {
+        addendaLines.push(unescapeMd(rawLine));
+        continue;
+      }
+
+      var chapMatch = /^##\s+(제\d+장[^\n]*)/.exec(trimmed);
+      if (chapMatch) {
+        curChapter = chapMatch[1].trim();
+        chapters.push(curChapter);
+        continue;
+      }
+
+      var artMatch = /^#{3,6}\s*(제\d+조(?:의\d+)?)\s*(?:\(([^)]*)\))?(.*)$/.exec(trimmed);
+      if (artMatch) {
+        if (curArt) {
+          curArt.text = unescapeMd(curArt._lines.join('\n')).trim();
+          delete curArt._lines;
+          articles.push(curArt);
+        }
+        var artNo = artMatch[1].trim();
+        var artHeading = (artMatch[2] || '').trim();
+        var rest = (artMatch[3] || '').trim();
+        curArt = {
+          no: artNo,
+          numKey: artNo.replace(/^제|조$/g, ''),
+          heading: artHeading,
+          chapter: curChapter,
+          _lines: rest ? [rest] : []
+        };
+        continue;
+      }
+
+      if (curArt) {
+        curArt._lines.push(rawLine);
+      }
+    }
+
+    if (curArt) {
+      curArt.text = unescapeMd(curArt._lines.join('\n')).trim();
+      delete curArt._lines;
+      articles.push(curArt);
+    }
+
+    var cleanFullBody = unescapeMd(body).trim();
+    var isRepealStub = articles.length <= 1 && /이를\s*폐지한다/.test(cleanFullBody);
+    var title = meta.title || fallbackMeta.title || fallbackMeta.dir || '법령';
+    var effInfo = effectiveState(meta.effectiveDate, refTodayYmd);
+
+    return {
+      id: 'law-' + (meta.lawId || fallbackMeta.dir || title) + '-' + (fallbackMeta.fileName || 'main'),
+      docType: 'law',
+      dir: fallbackMeta.dir || title.replace(/\s+/g, ''),
+      fileName: fallbackMeta.fileName || '법률.md',
+      lawId: meta.lawId || '',
+      mst: meta.mst || '',
+      title: title,
+      lawKind: meta.lawKind || fallbackMeta.lawKind || '법령',
+      departments: (meta.departments && meta.departments.length) ? meta.departments : (fallbackMeta.dept ? [fallbackMeta.dept] : []),
+      promulgationDate: meta.promulgationDate || '',
+      promulgationNo: meta.promulgationNo || '',
+      effectiveDate: meta.effectiveDate || '',
+      effectiveState: effInfo,
+      sourceUrl: meta.sourceUrl || ('https://www.law.go.kr/법령/' + encodeURIComponent(title)),
+      attachments: meta.attachments || [],
+      chapters: chapters,
+      articles: articles,
+      articleCount: articles.length,
+      addenda: addendaLines.join('\n').trim(),
+      isRepealStub: isRepealStub,
+      plainText: cleanFullBody
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 2. 3단계 정밀 중복제거 엔진 (PBoxDedup)
+   * ══════════════════════════════════════════════════════════════ */
+  var COURT_ALIASES = [
+    [/^대법원.*|^대법$/, '대법원'],
+    [/^헌법재판소.*|^헌재$/, '헌법재판소'],
+    [/^중앙노동위원회.*|^중노위$/, '중앙노동위원회'],
+    [/^서울지방노동위원회.*|^서울지노위$/, '서울지방노동위원회'],
+    [/^고용노동부.*|^노동부.*/, '고용노동부'],
+    [/^법제처.*/, '법제처'],
+    [/^근로복지공단.*/, '근로복지공단'],
+    [/^국가인권위원회.*|^인권위$/, '국가인권위원회'],
+    [/^개인정보보호위원회.*|^개보위$/, '개인정보보호위원회'],
+    [/^중앙행정심판위원회.*|^국민권익위원회.*/, '중앙행정심판위원회']
+  ];
+
+  function normalizeCourt(raw) {
+    var s = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!s) return '미상기관';
+    for (var i = 0; i < COURT_ALIASES.length; i++) {
+      if (COURT_ALIASES[i][0].test(s)) return COURT_ALIASES[i][1];
+    }
+    return s.replace(/\s+/g, '');
+  }
+
+  function normalizeCaseNo(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return '';
+    /* 괄호 부기, '선고', '판결', '결정', '사건', 공백 제거 */
+    s = s
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(/\((?:전원합의체|전합|산재|본소|반소|재심|초심)[^)]*\)/g, '')
+      .replace(/\b(?:선고|판결|결정|재결|판정|사건|회시)\b/g, '')
+      .replace(/\s+/g, '');
+
+    /* 법원·헌재·노동위 사건번호 패턴 우선 추출 */
+    var mCourt = /((?:19|20)?\d{2}[가-힣]{1,4}\d{1,8})/.exec(s);
+    if (mCourt) return mCourt[1];
+
+    /* 행정해석 문서번호 패턴 (예: 임금근로시간과-2271, 근기68207-1234) */
+    var mDoc = /([가-힣A-Za-z0-9]+-[0-9가-힣A-Za-z]+)/.exec(s);
+    if (mDoc) return mDoc[1];
+
+    return s.replace(/[^0-9A-Za-z가-힣-]/g, '');
+  }
+
+  function normalizeTitle(raw) {
+    return String(raw || '')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^0-9a-z가-힣]/g, '');
+  }
+
+  function deterministicDocHash16(title, body) {
+    var str = String(title || '').trim() + '|' + String(body || '').trim().slice(0, 600);
+    var h1 = 0x811c9dc5;
+    var h2 = 0x9e3779b9;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 0x01000193) >>> 0;
+      h2 ^= (c + ((i & 0xff) << 8));
+      h2 = Math.imul(h2, 0x85ebca6b) >>> 0;
+    }
+    return ('00000000' + h1.toString(16)).slice(-8) + ('00000000' + h2.toString(16)).slice(-8);
+  }
+
+  function canonicalKeyOf(doc) {
+    if (!doc || typeof doc !== 'object') return '';
+    if (doc.docType === 'law') {
+      var lid = String(doc.lawId || doc.dir || normalizeTitle(doc.title));
+      var eff = String(doc.effectiveDate || '0000-00-00');
+      var fn = String(doc.fileName || '법률.md');
+      return 'law|' + lid + '|' + fn + '|' + eff;
+    }
+    var cno = normalizeCaseNo(doc.caseNo || doc.docNo || '');
+    if (cno) {
+      var court = normalizeCourt(doc.court || doc.agency || '');
+      return 'case|' + court + '|' + cno;
+    }
+    return '';
+  }
+
+  /* 서버(functions/pbox-sync.js)와 바이트 단위로 동일한 공유 저장소 canonical_key 산출 (무번호 문서 삭제 동기화용) */
+  function serverCanonicalKeyOf(doc, ownerUid) {
+    if (!doc || typeof doc !== 'object') return '';
+    var court = normalizeCourt(doc.court || doc.agency || '');
+    var cno = normalizeCaseNo(doc.caseNo || doc.case_no || doc.docNo || '');
+    if (cno) return 'case|' + court + '|' + cno;
+    var hash = deterministicDocHash16(doc.title, doc.body);
+    var cleanOwner = String(ownerUid || '').trim();
+    var ownerScope = (cleanOwner && cleanOwner !== 'guest' && cleanOwner !== 'system_sync')
+      ? (cleanOwner.slice(0, 48) + '|')
+      : '';
+    return 'hash|' + ownerScope + court + '|' + hash;
+  }
+
+  function secondaryKeyOf(doc) {
+    if (!doc || doc.docType === 'law') return '';
+    var t = normalizeTitle(doc.title);
+    var dt = String(doc.decisionDate || '').slice(0, 10);
+    var org = normalizeCourt(doc.court || doc.agency || '');
+    if (t && dt && org) return 'meta|' + org + '|' + dt + '|' + t;
+    return '';
+  }
+
+  function buildShingles(text) {
+    var clean = String(text || '')
+      .replace(/【[^】]*】/g, '')
+      .replace(/\s+/g, '')
+      .replace(/[^0-9a-zA-Z가-힣]/g, '');
+    var set = new Set();
+    if (clean.length < 16) {
+      if (clean) set.add(clean);
+      return set;
+    }
+    var k = 5;
+    var total = clean.length - k + 1;
+    var step = total > 500 ? Math.floor(total / 500) : 1;
+    for (var i = 0; i < total; i += step) {
+      set.add(clean.slice(i, i + k));
+    }
+    return set;
+  }
+
+  function shingleSimilarity(textA, textB) {
+    var a = buildShingles(textA);
+    var b = buildShingles(textB);
+    if (!a.size || !b.size) return 0;
+    var inter = 0;
+    a.forEach(function (sh) {
+      if (b.has(sh)) inter++;
+    });
+    var union = a.size + b.size - inter;
+    return union > 0 ? inter / union : 0;
+  }
+
+  function mergeTwoDocs(target, incoming, stageLabel) {
+    var out = Object.assign({}, target);
+    var srcSet = new Set([].concat(target.sources || [], incoming.sources || []).filter(Boolean));
+    out.sources = Array.from(srcSet);
+
+    var tagSet = new Set([].concat(target.tags || [], incoming.tags || []).filter(Boolean));
+    out.tags = Array.from(tagSet);
+
+    var lawSet = new Set([].concat(target.refLaws || [], incoming.refLaws || []).filter(Boolean));
+    out.refLaws = Array.from(lawSet);
+
+    var caseSet = new Set([].concat(target.refCases || [], incoming.refCases || []).filter(Boolean));
+    out.refCases = Array.from(caseSet);
+
+    if (String(incoming.body || '').length > String(target.body || '').length) {
+      out.body = incoming.body;
+    }
+    if (String(incoming.summary || '').length > String(target.summary || '').length) {
+      out.summary = incoming.summary;
+    }
+    if (!out.decisionDate && incoming.decisionDate) out.decisionDate = incoming.decisionDate;
+    if (!out.caseNo && incoming.caseNo) out.caseNo = incoming.caseNo;
+    if (incoming.verified) out.verified = true;
+
+    out.dupMergedCount = (Number(target.dupMergedCount) || 0) + 1;
+    out.lastMergedStage = stageLabel;
+    return out;
+  }
+
+  function deduplicateDocs(existingDocs, incomingDocs, opts) {
+    opts = opts || {};
+    var simThreshold = typeof opts.similarityThreshold === 'number' ? opts.similarityThreshold : 0.92;
+    var result = (Array.isArray(existingDocs) ? existingDocs : []).map(function (d) {
+      return Object.assign({}, d);
+    });
+
+    var byCanonical = new Map();
+    var bySecondary = new Map();
+
+    function addSecondaryIdx(sk, idx) {
+      if (!sk) return;
+      var arr = bySecondary.get(sk);
+      if (arr) arr.push(idx);
+      else bySecondary.set(sk, [idx]);
+    }
+
+    for (var i = 0; i < result.length; i++) {
+      var ck = canonicalKeyOf(result[i]);
+      if (ck) byCanonical.set(ck, i);
+      addSecondaryIdx(secondaryKeyOf(result[i]), i);
+    }
+
+    var stats = {
+      incoming: Array.isArray(incomingDocs) ? incomingDocs.length : 0,
+      added: 0,
+      mergedStage1: 0,
+      mergedStage2: 0,
+      mergedStage3: 0,
+      logs: []
+    };
+
+    var list = Array.isArray(incomingDocs) ? incomingDocs : [];
+    for (var j = 0; j < list.length; j++) {
+      var inc = list[j];
+      if (!inc || typeof inc !== 'object') continue;
+
+      /* 1단계: 정규화 사건번호·회시문서번호·법령시행일 키 대조 */
+      var cKey = canonicalKeyOf(inc);
+      if (cKey && byCanonical.has(cKey)) {
+        var idx1 = byCanonical.get(cKey);
+        result[idx1] = mergeTwoDocs(result[idx1], inc, 'stage1_canonical');
+        stats.mergedStage1++;
+        stats.logs.push({ stage: 1, key: cKey, title: inc.title || inc.caseNo });
+        continue;
+      }
+
+      /* 2단계: 기관 + 선고/회시일자 + 정규화 제목 대조
+       * 단, 양쪽 모두 명시적 사건·문서번호(canonicalKey)가 있는데 서로 다른 번호면 별개 사건이므로 병합하지 않는다 */
+      var sKey = secondaryKeyOf(inc);
+      var idx2 = -1;
+      if (sKey && bySecondary.has(sKey)) {
+        var sCands = bySecondary.get(sKey);
+        for (var sc = 0; sc < sCands.length; sc++) {
+          var candIdx = sCands[sc];
+          var ckCand = canonicalKeyOf(result[candIdx]);
+          if (cKey && ckCand && cKey !== ckCand) continue;
+          idx2 = candIdx;
+          break;
+        }
+      }
+      if (idx2 >= 0) {
+        result[idx2] = mergeTwoDocs(result[idx2], inc, 'stage2_meta_title');
+        if (cKey) byCanonical.set(cKey, idx2);
+        stats.mergedStage2++;
+        stats.logs.push({ stage: 2, key: sKey, title: inc.title });
+        continue;
+      }
+
+      /* 3단계: 본문 Shingle Jaccard 유사도(>= 0.92) 병합 (법령 연혁본끼리는 별개 보존) */
+      var matchedIdx3 = -1;
+      var incText = (inc.summary || '') + '\n' + (inc.body || '');
+      if (inc.docType !== 'law' && incText.trim().length >= 60) {
+        for (var r = 0; r < result.length; r++) {
+          if (result[r].docType === 'law') continue;
+          /* 사건번호가 서로 뚜렷이 다른 두 별개 사건은 본문 양식이 비슷해도 합치지 않는다 */
+          var ckA = canonicalKeyOf(result[r]);
+          if (cKey && ckA && cKey !== ckA) continue;
+          var refText = (result[r].summary || '') + '\n' + (result[r].body || '');
+          if (refText.trim().length < 60) continue;
+          var sim = shingleSimilarity(incText, refText);
+          if (sim >= simThreshold) {
+            matchedIdx3 = r;
+            break;
+          }
+        }
+      }
+
+      if (matchedIdx3 >= 0) {
+        result[matchedIdx3] = mergeTwoDocs(result[matchedIdx3], inc, 'stage3_shingle');
+        if (cKey) byCanonical.set(cKey, matchedIdx3);
+        addSecondaryIdx(sKey, matchedIdx3);
+        stats.mergedStage3++;
+        stats.logs.push({ stage: 3, key: inc.caseNo || inc.title || 'shingle', title: inc.title });
+        continue;
+      }
+
+      /* 신규 문서 추가 */
+      var newIdx = result.length;
+      var copy = Object.assign({}, inc);
+      if (!copy.id) copy.id = 'doc-' + Date.now().toString(36) + '-' + j;
+      if (!Array.isArray(copy.sources) || !copy.sources.length) {
+        copy.sources = [copy.source || '수집 문서'];
+      }
+      result.push(copy);
+      if (cKey) byCanonical.set(cKey, newIdx);
+      addSecondaryIdx(sKey, newIdx);
+      stats.added++;
+    }
+
+    return { docs: result, stats: stats };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 3. 하급심(1·2심)·결정서 비식별화 및 메타 자동추출 (PBoxIngest)
+   * ══════════════════════════════════════════════════════════════ */
+  var NON_PERSON_NAME_RE = /^(?:주식회사|유한회사|합자회사|합명회사|사단법인|재단법인|학교법인|의료법인|사회복지|법무법인|노무법인|노동조합|지회|지부|분회|위원회|중앙노동|지방노동|근로복지|공단|장관|청장|시장|군수|구청장|도지사|지사|교육감|대리인|소송대리|변호사|공인노무|노무사|대표이사|대한민국|정부|회사|사용자|사업주|참가인|보조참가|선정당사|원심판결|피고보조|원고보조|행정법원|고등법원|지방법원|대법원|헌법재판|청구취지|판결선고|항소기각|처분취소|부당해고|통상임금|평균임금|최저임금|퇴직급여|퇴직연금|산재보험|고용보험|손해배상|요양급여|장해급여|유족급여|재심판정|초심판정|취업규칙|단체협약|근로계약|근로기준|산업재해|직장내|해고무효|임금청구|체불임금|연장근로|휴일근로|연차수당|주휴수당|해고예고|육아휴직|징계해고|판결문|결정문|결정서|판정서|재결례|행정해석|유권해석)$/;
+  var NON_PERSON_SUFFIX_RE = /(?:법원|위원회|공단|조합|회사|법인|부처|장관|청장|시장|군수|구청장|지청|협회|병원|의원|학교|대학|은행|보험|증권|건설|산업|전자|물산|시스템|솔루션|판결|결정|사건|처분|청구|항소|상고|취소|무효|기각|인용)$/;
+  var KOREAN_SURNAME_RE = /^[김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구라민진지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편가]([가-힣]{1,2})$/;
+
+  function isLikelyPersonName(cand) {
+    var w = String(cand || '').trim();
+    if (w.length < 2 || w.length > 4) return false;
+    if (NON_PERSON_NAME_RE.test(w) || NON_PERSON_SUFFIX_RE.test(w)) return false;
+    if (/OO|○○|\*\*/.test(w)) return false;
+    return true;
+  }
+
+  function maskPersonName(nm) {
+    var w = String(nm || '');
+    if (!w) return w;
+    return w.charAt(0) + (w.length >= 4 ? 'OOO' : 'OO');
+  }
+
+  function escapeRegExp(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  var DOUBLE_SURNAME_RE = /^(?:남궁|황보|제갈|선우|독고|사공|서문|동방)/;
+  var MULTI_JOSA_SUFFIX_RE = /(?:으로부터|로부터|에게는|에서는|이라도|까지는|부터는|으로서|으로써|에게서|이라|이란|께서|에게|에서|으로|로써|로서|부터|까지|처럼|보다|하고|이나|거나|조차|마저|밖에)$/;
+  var SINGLE_JOSA_SUFFIX_RE = /(?:은|는|이|가|을|를|의|도|만|와|과|랑|로|에|측)$/;
+
+  function splitPartyNameAndJosa(rawWord, fullText) {
+    var w = String(rawWord || '').trim();
+    if (!w) return { stem: '', josa: '' };
+    var isDouble = DOUBLE_SURNAME_RE.test(w);
+    var maxNameLen = isDouble ? 4 : 3;
+
+    var mMulti = MULTI_JOSA_SUFFIX_RE.exec(w);
+    if (mMulti) {
+      var stemMulti = w.slice(0, w.length - mMulti[0].length);
+      if (stemMulti.length >= 2 && stemMulti.length <= maxNameLen && isLikelyPersonName(stemMulti)) {
+        return { stem: stemMulti, josa: mMulti[0] };
+      }
+    }
+
+    var mSingle = SINGLE_JOSA_SUFFIX_RE.exec(w);
+    if (mSingle) {
+      var stemSingle = w.slice(0, w.length - 1);
+      if (stemSingle.length >= 3 && stemSingle.length <= maxNameLen && isLikelyPersonName(stemSingle)) {
+        return { stem: stemSingle, josa: mSingle[0] };
+      }
+      if (stemSingle.length === 2 && KOREAN_SURNAME_RE.test(stemSingle) && isLikelyPersonName(stemSingle) && fullText) {
+        var probe = new RegExp(escapeRegExp(stemSingle) + '(?:은|는|이|가|을|를|의|도|만|와|과|에게|에서|으로|\\s|[,.()\\[\\];:]|$)', 'g');
+        var hits = String(fullText).match(probe);
+        if (hits && hits.some(function (h) { return h !== w; })) {
+          return { stem: stemSingle, josa: mSingle[0] };
+        }
+      }
+    }
+
+    if (w.length >= 2 && w.length <= maxNameLen && isLikelyPersonName(w)) {
+      return { stem: w, josa: '' };
+    }
+    return { stem: '', josa: '' };
+  }
+
+  /* 본문 및 메타(파일명·제목 포함)에서 당사자 실명 사전을 먼저 뽑아 재등장 실명까지 일괄 치환한다 */
+  function extractPartyNames(combinedText, fileNameHint) {
+    var names = new Set();
+    var src = String(combinedText || '');
+    var roleRe = /(?:^|[^가-힣])(원고|피고|신청인|피신청인|청구인|피청구인|재해자|진정인|피진정인|고소인|피고인|피의자|망인|망|소외|근로자|선정자|보조참가인|참가인)(?:\s*\([가-힣0-9,\s]{1,16}\))?(?:\s*\d+\s*\.)?(?:\s*[:：]\s*|\s+)([가-힣]{2,7})(?=\s|[,\.\(\)\[\]:：/_;\-]|$)/g;
+    var m;
+    while ((m = roleRe.exec(src))) {
+      var sp = splitPartyNameAndJosa(m[2], src);
+      if (sp.stem) names.add(sp.stem);
+    }
+
+    var fn = String(fileNameHint || '').replace(/\.[A-Za-z0-9]+$/, '');
+    if (fn) {
+      var tokens = fn.split(/[\s_\-.,()[\]/]+/).filter(Boolean);
+      for (var i = 0; i < tokens.length; i++) {
+        var tk = tokens[i];
+        if (tk.length === 3 && KOREAN_SURNAME_RE.test(tk) && isLikelyPersonName(tk)) {
+          names.add(tk);
+        }
+      }
+    }
+    return Array.from(names).sort(function (a, b) { return b.length - a.length; });
+  }
+
+  function ndToDigitClient(ch) {
+    if (!/\p{Nd}/u.test(ch)) return -1;
+    var cp = ch.codePointAt(0);
+    var base = cp;
+    while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+    return (cp - base) % 10;
+  }
+
+  function findRrnSpansClient(raw) {
+    var s = String(raw == null ? '' : raw);
+    if (!s) return [];
+    var vis = [];
+    var idx = 0;
+    for (var ch of s) {
+      var start = idx;
+      idx += ch.length;
+      if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+      var d = ndToDigitClient(ch);
+      vis.push({
+        ch: ch,
+        pos: start,
+        end: idx,
+        d: d,
+        isHws: ch === '\t' || ch === '\v' || ch === '\f' || /\p{Zs}/u.test(ch),
+        isLb: ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029',
+        isWord: d >= 0 || /\p{L}/u.test(ch)
+      });
+    }
+    var maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var spans = [];
+    var i = 0;
+    while (i < vis.length) {
+      if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+      var cur = i;
+      var digits = [vis[cur].d];
+      var usedInnerSpace = false;
+      var usedDateDot = false;
+      var ok = true;
+      for (var k = 1; k < 6; k++) {
+        var sp = 0;
+        if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === '.' || vis[cur + 1].ch === '．')) {
+          sp = 1;
+          usedDateDot = true;
+        }
+        var hws = 0;
+        while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+        if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+        if (hws > 0) usedInnerSpace = true;
+        cur = cur + 1 + sp + hws;
+        digits.push(vis[cur].d);
+      }
+      if (!ok) { i++; continue; }
+      var mm = digits[2] * 10 + digits[3];
+      var dd = digits[4] * 10 + digits[5];
+      if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+      var sepEnd = cur + 1;
+      var sepSteps = 0;
+      var lbCount = 0;
+      var hasExplicitSep = false;
+      while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+        if (vis[sepEnd].isLb) {
+          if (!(vis[sepEnd].ch === '\n' && sepEnd > cur + 1 && vis[sepEnd - 1].ch === '\r')) {
+            lbCount++;
+          }
+          if (lbCount > 2) break;
+        } else if (!vis[sepEnd].isHws) {
+          hasExplicitSep = true;
+        }
+        sepEnd++;
+        sepSteps++;
+      }
+      if (usedDateDot && !hasExplicitSep) { i++; continue; }
+      if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+      cur = sepEnd;
+      digits.push(vis[cur].d);
+      for (var k2 = 1; k2 < 7; k2++) {
+        var sp2 = 0;
+        while (cur + 1 + sp2 < vis.length && vis[cur + 1 + sp2].isHws && sp2 < 2) sp2++;
+        if (cur + 1 + sp2 >= vis.length || vis[cur + 1 + sp2].d < 0) { ok = false; break; }
+        if (sp2 > 0) usedInnerSpace = true;
+        cur = cur + 1 + sp2;
+        digits.push(vis[cur].d);
+      }
+      if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+      if (usedInnerSpace) {
+        var lp = i - 1;
+        while (lp >= 0 && vis[lp].isHws) lp--;
+        if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+        var rp = cur + 1;
+        while (rp < vis.length && vis[rp].isHws) rp++;
+        if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+      }
+      spans.push({ start: vis[i].pos, end: vis[cur].end });
+      i = cur + 1;
+    }
+    return spans;
+  }
+
+  /* 계좌번호·가상이체번호·전화번호 공통 구간 탐지기 (클라이언트)
+   * - 혼합 구분자(123-456 789012), 길이 무제한 연속 수평공백(123         456 789012), 공백 섞인 대시(123 - 456 - 789012),
+   *   날짜형 접두 혼합 숫자열(2024-01-01 234567, 2024 01 01 234567), 전각 숫자·비표시 제어문자·다중 그룹을 서버와 대칭으로 탐지한다. */
+  function findNumericPiiSpansClient(raw) {
+    var s = String(raw == null ? '' : raw);
+    if (!s) return [];
+    var vis = [];
+    var idx = 0;
+    for (var ch of s) {
+      var start = idx;
+      idx += ch.length;
+      if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+      var d = ndToDigitClient(ch);
+      vis.push({
+        ch: ch,
+        pos: start,
+        end: idx,
+        d: d,
+        isHws: ch === '\t' || ch === '\v' || ch === '\f' || /\p{Zs}/u.test(ch),
+        isDash: /^[-‐‑‒–—―﹣－]$/.test(ch),
+        isDot: /^[.．·]$/.test(ch),
+        isAsciiWord: /^[A-Za-z_]$/.test(ch),
+        isHangul: /^[가-힣]$/.test(ch)
+      });
+    }
+    var runs = [];
+    var vi = 0;
+    while (vi < vis.length) {
+      if (vis[vi].d < 0) { vi++; continue; }
+      var startVis = vi;
+      var digits = '';
+      while (vi < vis.length && vis[vi].d >= 0) {
+        digits += String(vis[vi].d);
+        vi++;
+      }
+      var endVis = vi - 1;
+      var isCaseYearPrefix = false;
+      if (/^(?:(?:19|20)\d{2}|9\d)$/.test(digits) && endVis + 2 < vis.length && vis[endVis + 1].isHangul) {
+        var hk = endVis + 1;
+        var hStr = '';
+        while (hk < vis.length && vis[hk].isHangul && hk - endVis <= 4) {
+          hStr += vis[hk].ch;
+          hk++;
+        }
+        if (hk > endVis + 1 && hk < vis.length && vis[hk].d >= 0 && /^(?:다|두|도|마|모|바|부|스|으|추|초|카|쿠|크|트|프|허|후|히|가합|가단|가소|나|노|누|구합|구단|고합|고단|고정|고약|즈단|즈기|카합|카단|카기|타채|하합|하단|회합|회단|간|재다|재두|재도|헌마|헌바|헌가|헌나|헌라|헌사|헌아|행심|부해|부노|차별)$/.test(hStr)) {
+          isCaseYearPrefix = true;
+        }
+      }
+      var isTimeAdj = (startVis > 0 && vis[startVis - 1].ch === ':' && startVis > 1 && vis[startVis - 2].d >= 0) ||
+        (endVis + 2 < vis.length && vis[endVis + 1].ch === ':' && vis[endVis + 2].d >= 0);
+      runs.push({
+        startVis: startVis,
+        endVis: endVis,
+        pos: vis[startVis].pos,
+        end: vis[endVis].end,
+        digits: digits,
+        len: digits.length,
+        isTimeAdj: isTimeAdj,
+        isCaseYearPrefix: isCaseYearPrefix,
+        leftBlocked: (startVis > 0 && vis[startVis - 1].isAsciiWord) || isTimeAdj,
+        rightBlocked: (endVis + 1 < vis.length && vis[endVis + 1].isAsciiWord) || isTimeAdj
+      });
+    }
+    if (!runs.length) return [];
+
+    function classifySep(rA, rB, allowAreaParen) {
+      var gapLen = rB.startVis - rA.endVis - 1;
+      if (gapLen < 1) return null;
+      var punctCount = 0;
+      var hasDash = false;
+      var hasDot = false;
+      var hasSpaceAfterPunct = false;
+      for (var k = rA.endVis + 1; k < rB.startVis; k++) {
+        var v = vis[k];
+        if (v.isDash) { punctCount++; hasDash = true; }
+        else if (v.isDot) { punctCount++; hasDot = true; }
+        else if (allowAreaParen && v.ch === ')') { punctCount++; }
+        else if (v.isHws) { if (punctCount > 0) hasSpaceAfterPunct = true; }
+        else return null;
+      }
+      if (punctCount > 1) return null;
+      return { hasPunct: punctCount === 1, hasDash: hasDash, hasDot: hasDot, hasSpaceAfterPunct: hasSpaceAfterPunct };
+    }
+
+    function isFormattedDateTripleAt(idx) {
+      if (idx < 0 || idx + 2 >= runs.length) return false;
+      var yR = runs[idx], mR = runs[idx + 1], dR = runs[idx + 2];
+      if (yR.len !== 4 || !/^(?:19|20)\d{2}$/.test(yR.digits)) return false;
+      if (mR.len < 1 || mR.len > 2 || dR.len < 1 || dR.len > 2) return false;
+      var mm = Number(mR.digits), dd = Number(dR.digits);
+      if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
+      var s1 = classifySep(yR, mR, false);
+      var s2 = classifySep(mR, dR, false);
+      if (!s1 || !s2 || !s1.hasPunct || !s2.hasPunct) return false;
+      return s1.hasDash === s2.hasDash && s1.hasDot === s2.hasDot;
+    }
+
+    var datePartRole = new Array(runs.length).fill(0);
+    for (var i = 0; i + 2 < runs.length; i++) {
+      if (datePartRole[i] !== 0) continue;
+      if (!isFormattedDateTripleAt(i)) continue;
+      var yR = runs[i], dR = runs[i + 2];
+
+      var leftSafe = true;
+      if (i > 0) {
+        var prevSep = classifySep(runs[i - 1], yR, false);
+        if (prevSep && !runs[i - 1].rightBlocked && !yR.leftBlocked) {
+          var prevIsDate = datePartRole[i - 1] === 3;
+          var prevIsListNum = runs[i - 1].len <= 2 && prevSep.hasDot && prevSep.hasSpaceAfterPunct;
+          if (!prevIsDate && !prevIsListNum) leftSafe = false;
+        }
+      }
+
+      var rightSafe = true;
+      if (i + 3 < runs.length) {
+        var nextR = runs[i + 3];
+        var nextSep = classifySep(dR, nextR, false);
+        if (nextSep && !dR.rightBlocked && !nextR.leftBlocked) {
+          var nextIsTimeOrCase = nextR.isTimeAdj || nextR.isCaseYearPrefix;
+          var nextIsStandaloneDate = isFormattedDateTripleAt(i + 3) &&
+            (i + 6 >= runs.length || classifySep(runs[i + 5], runs[i + 6], false) === null || runs[i + 6].isTimeAdj || runs[i + 6].isCaseYearPrefix);
+          if (!nextIsTimeOrCase && !nextIsStandaloneDate) rightSafe = false;
+        }
+      }
+
+      if (leftSafe && rightSafe) {
+        datePartRole[i] = 1;
+        datePartRole[i + 1] = 2;
+        datePartRole[i + 2] = 3;
+      }
+    }
+
+    var phonePrefixRe = /^0(?:1[016789]|2|[3-6][1-5]|70|80|50\d?)$/;
+    var phoneFullRe = /^(0(?:1[016789]|2|[3-6][1-5]|70|80|50\d?))(\d{7,8})$/;
+    var spans = [];
+    var ri = 0;
+    while (ri < runs.length) {
+      if (datePartRole[ri] !== 0) {
+        ri += (datePartRole[ri] === 1 ? 3 : 1);
+        continue;
+      }
+      if (runs[ri].leftBlocked) {
+        ri++;
+        continue;
+      }
+      var matched = null;
+      var maxK = Math.min(19, runs.length - ri);
+      for (var k = maxK; k >= 1; k--) {
+        var endIdx = ri + k - 1;
+        if (runs[endIdx].rightBlocked) continue;
+        if (k === 1) {
+          var r0 = runs[ri];
+          var pm0 = phoneFullRe.exec(r0.digits);
+          if (pm0) {
+            matched = { pos: r0.pos, end: r0.end, nextIdx: ri + 1, kind: 'phone', prefix: pm0[1] };
+            break;
+          }
+          if (r0.len >= 10 && r0.len <= 19) {
+            matched = { pos: r0.pos, end: r0.end, nextIdx: ri + 1, kind: 'account', prefix: '' };
+            break;
+          }
+          continue;
+        }
+        if (runs[ri].len > 18) continue;
+        var firstIsArea = phonePrefixRe.test(runs[ri].digits);
+        var chainOk = true;
+        var anyPunct = false;
+        var usedAreaParen = false;
+        var totalDigits = runs[ri].len;
+        var fullDigits = runs[ri].digits;
+        for (var m = ri; m < endIdx; m++) {
+          if (runs[m].rightBlocked || runs[m + 1].leftBlocked || datePartRole[m + 1] !== 0 || runs[m + 1].len > 18) {
+            chainOk = false;
+            break;
+          }
+          var sep = classifySep(runs[m], runs[m + 1], m === ri && firstIsArea);
+          if (!sep) {
+            chainOk = false;
+            break;
+          }
+          if (m === ri && firstIsArea) {
+            for (var pk = runs[m].endVis + 1; pk < runs[m + 1].startVis; pk++) {
+              if (vis[pk].ch === ')') usedAreaParen = true;
+            }
+          }
+          if (sep.hasPunct) anyPunct = true;
+          totalDigits += runs[m + 1].len;
+          fullDigits += runs[m + 1].digits;
+        }
+        if (!chainOk || totalDigits < 9 || totalDigits > 19) continue;
+
+        var pm = phoneFullRe.exec(fullDigits);
+        if (pm && firstIsArea) {
+          var openParenPos = (usedAreaParen && runs[ri].startVis > 0 && vis[runs[ri].startVis - 1].ch === '(')
+            ? vis[runs[ri].startVis - 1].pos
+            : runs[ri].pos;
+          matched = { pos: openParenPos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: 'phone', prefix: runs[ri].digits };
+          break;
+        }
+        if (usedAreaParen) continue;
+        if (anyPunct) {
+          matched = { pos: runs[ri].pos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: 'account', prefix: '' };
+          break;
+        } else if (totalDigits >= 10) {
+          matched = { pos: runs[ri].pos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: 'account', prefix: '' };
+          break;
+        }
+      }
+      if (matched) {
+        spans.push(matched);
+        ri = matched.nextIdx;
+      } else {
+        ri++;
+      }
+    }
+    return spans;
+  }
+
+  function anonymizeLegalText(rawText, knownNames) {
+    var counts = { rrn: 0, phone: 0, email: 0, account: 0, address: 0, name: 0 };
+    var text = String(rawText || '');
+
+    /* ① 주민등록번호·외국인등록번호 (원문 ①②·㈜·㎡ 불변 보존 + 모든 유니코드 십진수·비표시문자·구분자·띄어쓰기 구간 탐지 가림) */
+    var rrnSpans = findRrnSpansClient(text);
+    if (rrnSpans.length) {
+      var out = '';
+      var last = 0;
+      for (var si = 0; si < rrnSpans.length; si++) {
+        out += text.slice(last, rrnSpans[si].start) + '******-*******';
+        last = rrnSpans[si].end;
+        counts.rrn++;
+      }
+      text = out + text.slice(last);
+    }
+
+    /* ② 이메일 주소 */
+    text = text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, function () {
+      counts.email++;
+      return '***@***.***';
+    });
+
+    /* ③ 계좌번호·가상이체번호·유무선 전화번호 (접두어 유무·혼합 구분자·연속 공백·공백 대시·유니코드 숫자/대시 통합 탐지 가림) */
+    text = text.replace(/((?:은행|계좌|계좌번호|입금계좌|예금)\s*[:：]?\s*(?:[가-힣A-Za-z]{2,10}\s+)?)(\d{1,6}(?:[^\S\r\n.．·-‐‑‒–—―﹣－]*[.．·-‐‑‒–—―﹣－\t\v\f \u00A0\u3000][^\S\r\n]*\d{1,8}){1,8}|\d{8,19})\b/g, function (_, prefix) {
+      counts.account++;
+      return prefix + '***-***-******';
+    });
+    for (var np = 0; np < 3; np++) {
+      var numSpans = findNumericPiiSpansClient(text);
+      if (!numSpans.length) break;
+      var outNum = '';
+      var lastNum = 0;
+      for (var ni = 0; ni < numSpans.length; ni++) {
+        var ns = numSpans[ni];
+        if (ns.kind === 'phone') {
+          counts.phone++;
+          outNum += text.slice(lastNum, ns.pos) + ns.prefix + '-****-****';
+        } else {
+          counts.account++;
+          outNum += text.slice(lastNum, ns.pos) + '***-***-******';
+        }
+        lastNum = ns.end;
+      }
+      text = outNum + text.slice(lastNum);
+    }
+
+    /* ⑤ 상세 동·호수 주소 (시·구·동 행정구역은 관할 판단을 위해 남기고 상세 호수만 가림) */
+    text = text.replace(/(\d{1,4})동\s*(\d{1,5})호/g, function () {
+      counts.address++;
+      return '***동 ***호';
+    });
+
+    /* ⑥ 당사자 실명 (조사 결합 원고:가나람은 / 원고 홍길동 모두 탐지 + 사전 기반 본문 재등장 일괄 치환) */
+    var dict = Array.isArray(knownNames) && knownNames.length
+      ? knownNames
+      : extractPartyNames(text, '');
+
+    text = text.replace(/(^|[^가-힣])(원고|피고|신청인|피신청인|청구인|피청구인|재해자|진정인|피진정인|고소인|피고인|피의자|망인|망|소외|근로자|선정자|보조참가인|참가인)((?:\s*\([가-힣0-9,\s]{1,16}\))?(?:\s*\d+\s*\.)?(?:\s*[:：]\s*|\s+))([가-힣]{2,7})(?=\s|[,\.\(\)\[\]:：/_;\-]|$)/g, function (full, pre, role, sep, cand) {
+      var sp = splitPartyNameAndJosa(cand, text);
+      if (!sp.stem) return full;
+      counts.name++;
+      return pre + role + sep + maskPersonName(sp.stem) + sp.josa;
+    });
+
+    for (var n = 0; n < dict.length; n++) {
+      var nm = dict[n];
+      if (!nm || nm.length < 2) continue;
+      var nameRe = new RegExp(escapeRegExp(nm), 'g');
+      text = text.replace(nameRe, function () {
+        counts.name++;
+        return maskPersonName(nm);
+      });
+    }
+
+    var totalMasked = counts.rrn + counts.phone + counts.email + counts.account + counts.address + counts.name;
+    return {
+      text: text,
+      counts: counts,
+      totalMasked: totalMasked
+    };
+  }
+
+  function hasResidualHardPiiClient(rawText) {
+    var s = String(rawText == null ? '' : rawText);
+    if (!s) return false;
+    if (findRrnSpansClient(s).length > 0) return true;
+    if (findNumericPiiSpansClient(s).length > 0) return true;
+    if (/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(s)) return true;
+    if (/(?:은행|계좌|계좌번호|입금계좌|예금)\s*[:：]?\s*(?:[가-힣A-Za-z]{2,10}\s+)?(?:\d{1,6}(?:[^\S\r\n.．·-‐‑‒–—―﹣－]*[.．·-‐‑‒–—―﹣－\t\v\f \u00A0\u3000][^\S\r\n]*\d{1,8}){1,8}|\d{8,19})\b/.test(s)) return true;
+    return false;
+  }
+
+  function mergeAnonCounts(targetAnon, extraAnon) {
+    if (!extraAnon || !extraAnon.counts) return;
+    var keys = ['rrn', 'phone', 'email', 'account', 'address', 'name'];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      targetAnon.counts[k] = (targetAnon.counts[k] || 0) + (extraAnon.counts[k] || 0);
+    }
+    targetAnon.totalMasked = (targetAnon.totalMasked || 0) + (extraAnon.totalMasked || 0);
+  }
+
+  function extractDateYmd(text) {
+    var m1 = /(20\d{2}|19\d{2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(?:선고|자|결정|판정|회시)?/.exec(text);
+    if (m1) {
+      return m1[1] + '-' + String(m1[2]).padStart(2, '0') + '-' + String(m1[3]).padStart(2, '0');
+    }
+    var m2 = /(20\d{2}|19\d{2})-(\d{2})-(\d{2})/.exec(text);
+    if (m2) return m2[0];
+    return '';
+  }
+
+  function extractRulingMeta(cleanText, fileName) {
+    var head = String(cleanText || '').slice(0, 3500);
+    var court = '';
+    var courtMatch = /(대법원|헌법재판소|[가-힣]{2,6}고등법원|특허법원|서울행정법원|[가-힣]{2,6}지방법원(?:\s*[가-힣]{2,5}지원)?|중앙노동위원회|[가-힣]{2,5}지방노동위원회|중앙행정심판위원회|근로복지공단(?:\s*산재재심사위원회)?|국가인권위원회|개인정보보호위원회|고용노동부)/.exec(head);
+    if (courtMatch) court = courtMatch[1].replace(/\s+/g, ' ').trim();
+
+    var caseNo = '';
+    var caseMatch = /((?:19|20)\d{2}\s*[가-힣]{1,4}\s*\d{1,7})/.exec(head) ||
+                    /(\b9\d\s*[가-힣]{1,4}\s*\d{1,7})/.exec(head) ||
+                    /([가-힣]{2,12}과-\d{1,6})/.exec(head);
+    if (caseMatch) caseNo = caseMatch[1].replace(/\s+/g, '');
+
+    var decisionDate = extractDateYmd(head);
+
+    var eventTitle = '';
+    var mEvent = /사\s*건\s*[:：]?\s*(?:(?:19|20)?\d{2}\s*[가-힣]{1,4}\s*\d{1,7}\s*)?([^\n\r]{3,60})/.exec(head);
+    if (mEvent) eventTitle = mEvent[1].trim();
+
+    var baseName = String(fileName || '').replace(/\.[A-Za-z0-9]+$/, '').trim();
+    var title = eventTitle
+      ? ((court ? court + ' ' : '') + (caseNo ? caseNo + ' ' : '') + eventTitle)
+      : (baseName || ((court || '판결·결정') + ' ' + (caseNo || '문서')));
+
+    /* 참조 법령 조문 추출 */
+    var refLawsSet = new Set();
+    var lawRegex = /([가-힣ㆍ\s]{2,22}(?:법률|법|시행령|시행규칙))\s*제\s*(\d+)\s*조(?:의\s*(\d+))?/g;
+    var lm;
+    while ((lm = lawRegex.exec(cleanText)) && refLawsSet.size < 12) {
+      var lname = lm[1].trim().replace(/\s+/g, ' ');
+      if (lname.length >= 2) {
+        refLawsSet.add(lname + ' 제' + lm[2] + '조' + (lm[3] ? '의' + lm[3] : ''));
+      }
+    }
+
+    /* 참조 판례 사건번호 추출 */
+    var refCasesSet = new Set();
+    var rcRegex = /(?:대법원|헌법재판소|[가-힣]{2,6}법원)\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.\s*(?:선고|자)\s*((?:19|20)?\d{2}[가-힣]{1,3}\d{1,7})/g;
+    var rcm;
+    while ((rcm = rcRegex.exec(cleanText)) && refCasesSet.size < 10) {
+      if (rcm[1] !== caseNo) refCasesSet.add(rcm[0].replace(/\s+/g, ' ').trim());
+    }
+
+    /* 판결요지 또는 주문 요약 생성 */
+    var summary = '';
+    var mHold = /주\s*문\s*\n+([\s\S]{10,360}?)(?:\n\s*청\s*구\s*취\s*지|\n\s*이\s*유|\n\n)/.exec(cleanText);
+    if (mHold) summary = '[주문] ' + mHold[1].replace(/\s+/g, ' ').trim();
+    if (!summary) {
+      summary = cleanText.replace(/\s+/g, ' ').trim().slice(0, 260);
+    }
+
+    var docType = 'internal_case';
+    if (court === '대법원' || court === '헌법재판소') docType = 'prec_sc';
+    else if (/법원/.test(court)) docType = 'prec_lower';
+    else if (/위원회|공단/.test(court)) docType = 'dec_nlrc';
+    else if (/노동부/.test(court)) docType = 'interp_moel';
+
+    return {
+      docType: docType,
+      court: court || '하급심·기타기관',
+      agency: court || '사무실 수집 자료',
+      caseNo: caseNo,
+      decisionDate: decisionDate || todayKstYmd(),
+      title: title,
+      summary: summary,
+      refLaws: Array.from(refLawsSet),
+      refCases: Array.from(refCasesSet)
+    };
+  }
+
+  function ingestRawDocument(rawText, opts) {
+    opts = opts || {};
+    var combinedInput = [
+      rawText, opts.fileName, opts.title, opts.court, opts.agency, opts.caseNo, opts.sourceLabel
+    ].concat(Array.isArray(opts.tags) ? opts.tags : []).filter(Boolean).join('\n');
+    var partyNames = extractPartyNames(combinedInput, opts.fileName || opts.title || '');
+
+    var anon = anonymizeLegalText(rawText, partyNames);
+    var cleanBody = anon.text.trim();
+    if (cleanBody.length < 20) {
+      throw new Error('추출된 본문이 비어 있거나 너무 짧습니다(20자 미만). 스캔 이미지 PDF는 텍스트(OCR) 변환 후 등록해 주세요.');
+    }
+
+    var safeFileAnim = anonymizeLegalText(opts.fileName || '', partyNames);
+    mergeAnonCounts(anon, safeFileAnim);
+
+    var meta = extractRulingMeta(cleanBody, safeFileAnim.text);
+
+    var titleAnim = anonymizeLegalText(opts.title || meta.title, partyNames);
+    var summaryAnim = anonymizeLegalText(meta.summary, partyNames);
+    var srcAnim = anonymizeLegalText(opts.sourceLabel || '사무실 수집 (비식별화 완료)', partyNames);
+    var courtAnim = anonymizeLegalText(opts.court || meta.court, partyNames);
+    var agencyAnim = anonymizeLegalText(opts.agency || meta.agency, partyNames);
+    var caseNoAnim = anonymizeLegalText(opts.caseNo || meta.caseNo, partyNames);
+    mergeAnonCounts(anon, titleAnim);
+    mergeAnonCounts(anon, summaryAnim);
+    mergeAnonCounts(anon, srcAnim);
+    mergeAnonCounts(anon, courtAnim);
+    mergeAnonCounts(anon, agencyAnim);
+    mergeAnonCounts(anon, caseNoAnim);
+
+    var rawTags = Array.isArray(opts.tags) && opts.tags.length ? opts.tags : ['수집판결문', courtAnim.text].filter(Boolean);
+    var cleanTags = rawTags.map(function (tg) {
+      var ta = anonymizeLegalText(String(tg || ''), partyNames);
+      mergeAnonCounts(anon, ta);
+      return ta.text.trim();
+    }).filter(Boolean);
+
+    var combinedRefLaws = [].concat(Array.isArray(opts.refLaws) ? opts.refLaws : [], meta.refLaws || []);
+    var cleanRefLaws = Array.from(new Set(combinedRefLaws.map(function (rl) {
+      var ra = anonymizeLegalText(String(rl || ''), partyNames);
+      mergeAnonCounts(anon, ra);
+      return ra.text.trim();
+    }).filter(Boolean)));
+
+    var combinedRefCases = [].concat(Array.isArray(opts.refCases) ? opts.refCases : [], meta.refCases || []);
+    var cleanRefCases = Array.from(new Set(combinedRefCases.map(function (rc) {
+      var rca = anonymizeLegalText(String(rc || ''), partyNames);
+      mergeAnonCounts(anon, rca);
+      return rca.text.trim();
+    }).filter(Boolean)));
+
+    return {
+      doc: {
+        id: opts.id || ('ing-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)),
+        docType: opts.docType || meta.docType,
+        fileName: safeFileAnim.text,
+        court: courtAnim.text,
+        agency: agencyAnim.text,
+        caseNo: caseNoAnim.text,
+        decisionDate: opts.decisionDate || meta.decisionDate,
+        title: titleAnim.text,
+        subType: opts.subType || '비식별 수집 판결·결정문',
+        tags: cleanTags,
+        refLaws: cleanRefLaws,
+        refCases: cleanRefCases,
+        summary: summaryAnim.text,
+        body: cleanBody,
+        sources: [srcAnim.text],
+        verified: true,
+        userIngested: true,
+        piiMasked: anon.totalMasked
+      },
+      anonymization: anon
+    };
+  }
+
+  /* AI-Hub 법률/판결문 개방 데이터 JSON 또는 범용 판례 배열 JSON 일괄 변환 */
+  function ingestJsonDataset(jsonInput, sourceLabel) {
+    var parsed = typeof jsonInput === 'string' ? JSON.parse(jsonInput) : jsonInput;
+    var items = [];
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else if (parsed && Array.isArray(parsed.documents)) {
+      items = parsed.documents;
+    } else if (parsed && Array.isArray(parsed.docs)) {
+      items = parsed.docs;
+    } else if (parsed && parsed.info && (parsed.dcss || parsed.assrs || parsed.close)) {
+      items = [parsed];
+    } else if (parsed && typeof parsed === 'object') {
+      items = [parsed];
+    }
+
+    var outDocs = [];
+    var totalMasked = 0;
+    var skippedEmpty = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || typeof it !== 'object') continue;
+
+      /* AI-Hub 판결문 표준 스키마 (info / assrs / dcss / close) 지원 */
+      if (it.info && typeof it.info === 'object') {
+        var inf = it.info;
+        var rawParts = [];
+        if (it.assrs && it.assrs.acusrAssrs) rawParts.push('【주장 요지】\n' + [].concat(it.assrs.acusrAssrs).join('\n'));
+        if (it.dcss && it.dcss.courtDcss) rawParts.push('【법원의 판단】\n' + [].concat(it.dcss.courtDcss).join('\n'));
+        if (it.close && it.close.cnclsns) rawParts.push('【결론·주문】\n' + [].concat(it.close.cnclsns).join('\n'));
+        var combined = rawParts.join('\n\n');
+        if (combined.trim().length < 20) {
+          skippedEmpty++;
+          continue;
+        }
+        var rawDate = String(inf.judmnAdjuDe || '').replace(/\./g, '-').replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+        var res = ingestRawDocument(combined, {
+          court: inf.courtNm || '법원',
+          caseNo: inf.caseNo || '',
+          decisionDate: rawDate || todayKstYmd(),
+          title: [inf.courtNm, inf.caseNo, inf.caseNm].filter(Boolean).join(' '),
+          docType: inf.courtNm === '대법원' ? 'prec_sc' : 'prec_lower',
+          sourceLabel: sourceLabel || 'AI-Hub 법률 데이터셋'
+        });
+        totalMasked += res.anonymization.totalMasked;
+        outDocs.push(res.doc);
+        continue;
+      }
+
+      /* 일반 판례·해석례 JSON 객체 */
+      var bodyText = it.body || it.content || it.판결내용 || it.판결요지 || it.회시내용 || it.결정요지 || '';
+      var sumText = it.summary || it.판시사항 || it.질의요지 || '';
+      var full = (sumText ? sumText + '\n\n' : '') + bodyText;
+      if (full.trim().length < 20) {
+        skippedEmpty++;
+        continue;
+      }
+      var r2 = ingestRawDocument(full, {
+        court: it.court || it.법원명 || it.기관명 || it.agency || '',
+        caseNo: it.caseNo || it.사건번호 || it.문서번호 || '',
+        decisionDate: it.decisionDate || it.선고일자 || it.회시일자 || '',
+        title: it.title || it.사건명 || it.안건명 || '',
+        docType: it.docType || it.doc_type || '',
+        tags: Array.isArray(it.tags) ? it.tags : [],
+        refLaws: Array.isArray(it.refLaws || it.ref_laws) ? (it.refLaws || it.ref_laws) : [],
+        refCases: Array.isArray(it.refCases || it.ref_cases) ? (it.refCases || it.ref_cases) : [],
+        sourceLabel: (Array.isArray(it.sources) && it.sources[0]) || sourceLabel || '공공 JSON 데이터'
+      });
+      totalMasked += r2.anonymization.totalMasked;
+      outDocs.push(r2.doc);
+    }
+
+    if (!outDocs.length) {
+      throw new Error('JSON 파일에서 적재 가능한 본문(20자 이상)을 찾지 못했습니다.');
+    }
+
+    return { docs: outDocs, totalMasked: totalMasked, skippedEmpty: skippedEmpty };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 4. 하이브리드 법률 검색 · 오프라인 초안 합성 · 기계적 인용 검증기
+   * ══════════════════════════════════════════════════════════════ */
+  var SYNONYM_MAP = {
+    '허리디스크': ['추간판탈출증', '요추', '근골격계'],
+    '추간판탈출증': ['허리디스크', '요추'],
+    '목디스크': ['경추', '추간판탈출증'],
+    '난청': ['소음성난청', '85db', '장해급여'],
+    '학폭': ['괴롭힘'],
+    '괴롭힘': ['직장내괴롭힘', '제76조의2', '제76조의3', '분리조치'],
+    '고정성': ['통상임금', '2020다247190', '재직조건'],
+    '상여금': ['통상임금', '정기상여금', '재직조건', '근무일수'],
+    'db형': ['확정급여형', '퇴직연금', '중도인출', '중간정산'],
+    'dc형': ['확정기여형', '퇴직연금', '중도인출'],
+    '수습': ['시용', '본채용거부', '부당해고'],
+    '프리랜서': ['근로자성', '사용종속관계', '2004다29736'],
+    '하청': ['사내하도급', '불법파견', '근로자파견', '2010다106436'],
+    '알바': ['단시간근로자', '기간제', '상시근로자수'],
+    '5인미만': ['상시근로자수', '제11조', '시행령제7조의2'],
+    '과로사': ['뇌출혈', '뇌경색', '뇌심혈관', '상당인과관계', '고시'],
+    '과로': ['뇌심혈관', '뇌출혈', '심근경색', '주52시간과로', '상당인과관계'],
+    '중처법': ['중대재해처벌법', '안전보건확보의무', '경영책임자'],
+    '저성과': ['저성과자', '통상해고', '인사평가', '2018두62492'],
+    '포괄임금': ['포괄임금제', '연장근로수당', '근로시간산정', '2008다6052', '고정ot'],
+    '고정ot': ['포괄임금제', '연장근로수당', '임금명세서', '차액정산'],
+    '전보': ['부당전보', '인사발령', '생활상불이익', '94다52928'],
+    '출퇴근': ['출퇴근재해', '출퇴근산재', '통상적인경로', '일탈중단예외', '2014헌바254'],
+    '출근길': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고'],
+    '퇴근길': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고'],
+    '교통사고': ['출퇴근재해', '출퇴근산재', '통상적인경로', '산재보험법'],
+    '어린이집': ['출퇴근재해', '일탈중단예외', '자녀등하원', '시행령제35조'],
+    '카톡': ['서면통지', '카톡해고', '문자해고', '2015두41401'],
+    '카카오톡': ['서면통지', '카톡해고', '문자해고', '2015두41401'],
+    '문자': ['서면통지', '문자해고', '카톡해고', '2015두41401'],
+    '권고사직': ['부당해고', '사직의사', '서면통지', '해고예고수당'],
+    '육아휴직': ['남녀고용평등법', '불리한처우', '동등업무복귀'],
+    '출산휴가': ['남녀고용평등법', '육아휴직', '해고금지']
+  };
+
+  var DEFAULT_LAW_ABBREV_MAP = {
+    '근기법': '근로기준법',
+    '근기': '근로기준법',
+    '산재법': '산업재해보상보험법',
+    '산재보험법': '산업재해보상보험법',
+    '산안법': '산업안전보건법',
+    '중처법': '중대재해처벌등에관한법률',
+    '중대재해처벌법': '중대재해처벌등에관한법률',
+    '중대재해법': '중대재해처벌등에관한법률',
+    '노조법': '노동조합및노동관계조정법',
+    '근참법': '근로자참여및협력증진에관한법률',
+    '퇴직급여법': '근로자퇴직급여보장법',
+    '근퇴법': '근로자퇴직급여보장법',
+    '기간제법': '기간제및단시간근로자보호등에관한법률',
+    '파견법': '파견근로자보호등에관한법률',
+    '남고법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '고평법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '남녀고용평등법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '최임법': '최저임금법',
+    '임채법': '임금채권보장법',
+    '고보법': '고용보험법',
+    '고령자법': '고용상연령차별금지및고령자고용촉진에관한법률',
+    '채용절차법': '채용절차의공정화에관한법률',
+    '외고법': '외국인근로자의고용등에관한법률',
+    '장고법': '장애인고용촉진및직업재활법',
+    '노무사법': '공인노무사법',
+    '개보법': '개인정보보호법',
+    '행소법': '행정소송법',
+    '행심법': '행정심판법',
+    '행절법': '행정절차법',
+    '민소법': '민사소송법',
+    '형소법': '형사소송법',
+    '채무자회생법': '채무자회생및파산에관한법률',
+    '공정거래법': '독점규제및공정거래에관한법률',
+    '하도급법': '하도급거래공정화에관한법률',
+    '국기법': '국세기본법'
+  };
+
+  var CHOSUNG_TABLE = [
+    'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ',
+    'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
+  ];
+
+  function getAbbrevMap(customMap) {
+    var corpusMap = (global.PuPBoxCorpus && global.PuPBoxCorpus.LAW_ABBREV_MAP) || null;
+    if (!customMap && !corpusMap) return DEFAULT_LAW_ABBREV_MAP;
+    return Object.assign({}, DEFAULT_LAW_ABBREV_MAP, corpusMap || {}, customMap || {});
+  }
+
+  function extractChosung(str) {
+    var s = String(str || '');
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        out += CHOSUNG_TABLE[Math.floor((code - 0xAC00) / 588)];
+      } else {
+        out += s.charAt(i);
+      }
+    }
+    return out;
+  }
+
+  function isChosungOnly(str) {
+    var clean = String(str || '').replace(/\s+/g, '');
+    return clean.length >= 2 && /^[ㄱ-ㅎ]+$/.test(clean);
+  }
+
+  function normalizeArticleRef(rawArt) {
+    var s = String(rawArt || '').trim().replace(/\s+/g, '');
+    if (!s) return '';
+    var m = /^(?:제)?(\d{1,4})(?:조)?(?:의(\d{1,3}))?(?:제\d+항)?$/.exec(s);
+    if (!m) return '';
+    return '제' + m[1] + '조' + (m[2] ? ('의' + m[2]) : '');
+  }
+
+  /* 약칭·초성·조문번호 즉시 해석기 (예: '근기법 23' → 근로기준법 제23조, 'ㄱㄹㄱㅈㅂ' → 근로기준법) */
+  function resolveSmartLawJump(rawQuery, lawIndex, customAbbrevMap) {
+    var q = String(rawQuery || '').trim();
+    if (!q) return null;
+    var abbrev = getAbbrevMap(customAbbrevMap);
+    var idx = Array.isArray(lawIndex) ? lawIndex : [];
+
+    var m = /^([가-힣ㄱ-ㅎㆍ·\s]{2,28}?)(?:\s*(시행령|시행규칙))?(?:\s+(?:제\s*)?(\d{1,4}(?:\s*조)?(?:\s*의\s*\d{1,3})?)(?:\s*조)?)?$/.exec(q);
+    if (!m) return null;
+
+    var rawName = String(m[1] || '').replace(/\s+/g, '');
+    var subKind = String(m[2] || '').trim();
+    var rawArt = String(m[3] || '').trim();
+
+    if (!subKind && /시행령$/.test(rawName)) {
+      subKind = '시행령';
+      rawName = rawName.replace(/시행령$/, '');
+    } else if (!subKind && /시행규칙$/.test(rawName)) {
+      subKind = '시행규칙';
+      rawName = rawName.replace(/시행규칙$/, '');
+    }
+
+    var canonicalDir = abbrev[rawName] || '';
+    var articleNo = normalizeArticleRef(rawArt);
+    var matchedFam = null;
+
+    if (idx.length) {
+      if (canonicalDir) {
+        matchedFam = idx.find(function (f) {
+          return f.dir === canonicalDir || f.title.replace(/\s+/g, '') === canonicalDir;
+        }) || null;
+      }
+      if (!matchedFam && isChosungOnly(rawName)) {
+        matchedFam = idx.find(function (f) {
+          var choDir = extractChosung(f.dir.replace(/[ㆍ·\s]/g, ''));
+          var choTitle = extractChosung(f.title.replace(/[ㆍ·\s]/g, ''));
+          return choDir === rawName || choTitle === rawName || (rawName.length >= 4 && choDir.indexOf(rawName) === 0);
+        }) || null;
+      }
+      if (!matchedFam) {
+        matchedFam = idx.find(function (f) {
+          return f.dir === rawName || f.title.replace(/\s+/g, '') === rawName;
+        }) || null;
+      }
+    }
+
+    if (!matchedFam && !canonicalDir) return null;
+
+    var dir = matchedFam ? matchedFam.dir : canonicalDir;
+    var title = matchedFam ? matchedFam.title : canonicalDir;
+    var isDecree = subKind === '시행령';
+    var isRule = subKind === '시행규칙';
+    var fileName = resolveTargetLawFile(matchedFam, isDecree, isRule);
+    var displayLaw = title + (isDecree ? ' 시행령' : (isRule ? ' 시행규칙' : ''));
+
+    return {
+      matched: true,
+      dir: dir,
+      lawDir: dir,
+      title: title,
+      lawTitle: title,
+      displayLaw: displayLaw,
+      fileName: fileName,
+      articleNo: articleNo,
+      isDecree: isDecree,
+      isRule: isRule,
+      label: displayLaw + (articleNo ? (' ' + articleNo) : '')
+    };
+  }
+
+  /* 불리언 연산자(+필수, -제외, "정확구문") 및 법령 약칭 자동 확장 파서 */
+  function parseSmartQueryOperators(rawQuery, customAbbrevMap) {
+    var src = String(rawQuery || '').trim();
+    var phrases = [];
+    var mustTokens = [];
+    var excludeTokens = [];
+    var abbrev = getAbbrevMap(customAbbrevMap);
+
+    var rest = src.replace(/"([^"]{2,60})"|“([^”]{2,60})”/g, function (_, p1, p2) {
+      var ph = String(p1 || p2 || '').trim().toLowerCase();
+      if (ph) phrases.push(ph);
+      return ' ';
+    });
+
+    var parts = rest.split(/\s+/).filter(Boolean);
+    var cleanParts = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.charAt(0) === '-' && p.length >= 2) {
+        excludeTokens.push(p.slice(1).toLowerCase());
+      } else if (p.charAt(0) === '+' && p.length >= 2) {
+        var mustTerm = p.slice(1);
+        mustTokens.push((abbrev[mustTerm] || mustTerm).toLowerCase());
+        cleanParts.push(mustTerm);
+      } else {
+        cleanParts.push(p);
+      }
+    }
+
+    /* 약칭 및 조문 축약형('근기법 23' → '근로기준법 제23조') 확장 */
+    var expandedExtras = [];
+    for (var j = 0; j < cleanParts.length; j++) {
+      var tok = cleanParts[j];
+      var tokNorm = tok.replace(/(?:시행령|시행규칙)$/, '');
+      if (abbrev[tok]) expandedExtras.push(abbrev[tok]);
+      else if (abbrev[tokNorm]) expandedExtras.push(abbrev[tokNorm]);
+
+      if (/^\d{1,4}조(?:의\d{1,3})?$/.test(tok)) {
+        expandedExtras.push('제' + tok);
+      } else if (j > 0 && /^\d{1,4}(?:의\d{1,3})?$/.test(tok) && (abbrev[cleanParts[j - 1]] || /법$/.test(cleanParts[j - 1]))) {
+        expandedExtras.push(normalizeArticleRef(tok));
+      }
+    }
+
+    var baseQuery = phrases.concat(cleanParts).join(' ').trim();
+    var expandedQuery = baseQuery + (expandedExtras.length ? (' ' + expandedExtras.join(' ')) : '');
+
+    return {
+      phrases: phrases,
+      mustTokens: mustTokens,
+      excludeTokens: excludeTokens,
+      baseQuery: baseQuery,
+      expandedQuery: expandedQuery.trim()
+    };
+  }
+
+  function extractHighlightTerms(rawQuery, subQuery) {
+    var ops = parseSmartQueryOperators(rawQuery);
+    var combined = [ops.baseQuery, String(subQuery || '').trim()].filter(Boolean).join(' ');
+    if (!combined) return [];
+    var rawList = ops.phrases.slice();
+    var splitWords = combined.split(/[\s,·/()[\]"'“”‘’?!+-]+/).filter(Boolean);
+    for (var i = 0; i < splitWords.length; i++) {
+      var w = splitWords[i].replace(/(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만)$/, '');
+      if (w.length >= 2 && rawList.indexOf(w) < 0) rawList.push(w);
+    }
+    return rawList.slice(0, 8);
+  }
+
+  function courtTierRank(doc) {
+    var c = String((doc && doc.court) || '');
+    if (c.indexOf('전원합의체') >= 0) return 1;
+    if (c.indexOf('대법원') >= 0 || c.indexOf('헌법재판소') >= 0) return 2;
+    if (c.indexOf('고등법원') >= 0 || c.indexOf('특허법원') >= 0) return 3;
+    if (c.indexOf('법원') >= 0) return 4;
+    if (c.indexOf('중앙노동위원회') >= 0 || c.indexOf('심판') >= 0 || c.indexOf('위원회') >= 0) return 5;
+    return 6;
+  }
+
+  function tokenizeQuery(q) {
+    var raw = String(q || '').toLowerCase().trim();
+    if (!raw) return [];
+    var abbrev = getAbbrevMap();
+    var rawTokens = raw.split(/[\s,·/()[\]"'“”‘’?!]+/).filter(Boolean);
+    var out = new Set();
+    for (var i = 0; i < rawTokens.length; i++) {
+      var tok0 = rawTokens[i].replace(/^[+-]/, '');
+      if (!tok0) continue;
+      var t = tok0.replace(/(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만|란|이란|여부|기준|판례|법리)$/, '');
+      if (t.length >= 2) out.add(t);
+      if (tok0.length >= 2) out.add(tok0);
+      if (abbrev[t]) out.add(abbrev[t].toLowerCase());
+      if (abbrev[tok0]) out.add(abbrev[tok0].toLowerCase());
+      var syns = SYNONYM_MAP[t] || SYNONYM_MAP[tok0];
+      if (syns) {
+        for (var s = 0; s < syns.length; s++) out.add(syns[s].toLowerCase());
+      }
+    }
+    return Array.from(out);
+  }
+
+  function scoreDocument(doc, tokens, rawQueryNorm) {
+    if (!tokens.length && !rawQueryNorm) return 1;
+    var cno = String(doc.caseNo || '').toLowerCase().replace(/\s+/g, '');
+    var title = String(doc.title || '').toLowerCase();
+    var summary = String(doc.summary || '').toLowerCase();
+    var body = String(doc.body || '').toLowerCase();
+    var tags = (doc.tags || []).join(' ').toLowerCase();
+    var refs = [].concat(doc.refLaws || [], doc.refCases || []).join(' ').toLowerCase();
+    var refsNoSpace = refs.replace(/\s+/g, '');
+
+    var score = 0;
+    if (rawQueryNorm && cno && rawQueryNorm.indexOf(cno) >= 0) score += 120;
+    if (rawQueryNorm && title.replace(/\s+/g, '').indexOf(rawQueryNorm) >= 0) score += 60;
+
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i];
+      var tkNoSpace = tk.replace(/\s+/g, '');
+      if (cno && cno.indexOf(tkNoSpace) >= 0) score += 80;
+      if (title.indexOf(tk) >= 0) score += 22;
+      if (tags.indexOf(tk) >= 0) score += 18;
+      if (refs.indexOf(tk) >= 0 || (tkNoSpace.length >= 3 && refsNoSpace.indexOf(tkNoSpace) >= 0)) score += 16;
+      if (summary.indexOf(tk) >= 0) score += 10;
+      if (body.indexOf(tk) >= 0) score += 5;
+    }
+    return score;
+  }
+
+  function searchCorpus(query, opts) {
+    opts = opts || {};
+    var docs = Array.isArray(opts.docs) ? opts.docs : [];
+    var loadedLaws = Array.isArray(opts.loadedLaws) ? opts.loadedLaws : [];
+    var lawIndex = Array.isArray(opts.lawIndex) ? opts.lawIndex : [];
+    var docTypeFilter = opts.docType || 'all';
+    var limit = opts.limit || 50;
+    var subQueryStr = String(opts.subQuery || '').trim().toLowerCase();
+    var subTokens = subQueryStr ? subQueryStr.split(/\s+/).filter(Boolean) : [];
+    var dateRange = String(opts.dateRange || 'all');
+    var sortBy = String(opts.sortBy || 'relevance');
+    var courtContains = String(opts.courtContains || '').trim().toLowerCase();
+
+    var minDateYmd = '';
+    if (dateRange === '1y' || dateRange === '3y' || dateRange === '5y') {
+      var yrs = dateRange === '1y' ? 1 : (dateRange === '3y' ? 3 : 5);
+      var todayParts = todayKstYmd().split('-');
+      minDateYmd = String(Number(todayParts[0]) - yrs) + '-' + todayParts[1] + '-' + todayParts[2];
+    }
+
+    var qStr = String(query || '').trim();
+    var ops = parseSmartQueryOperators(qStr);
+    var qNorm = ops.baseQuery.toLowerCase().replace(/\s+/g, '');
+    var tokens = tokenizeQuery(ops.expandedQuery);
+
+    var docHits = [];
+    for (var i = 0; i < docs.length; i++) {
+      var d = docs[i];
+      if (docTypeFilter !== 'all' && d.docType !== docTypeFilter) continue;
+      if (opts.court && normalizeCourt(d.court) !== normalizeCourt(opts.court)) continue;
+      if (courtContains) {
+        var cHay = (String(d.court || '') + ' ' + String(d.agency || '')).toLowerCase();
+        if (cHay.indexOf(courtContains) < 0) continue;
+      }
+      if (minDateYmd && d.decisionDate && String(d.decisionDate) < minDateYmd) continue;
+
+      var fullDocHay = [
+        d.caseNo || '',
+        d.court || '',
+        d.agency || '',
+        d.title || '',
+        d.summary || '',
+        d.body || '',
+        (d.tags || []).join(' '),
+        (d.refLaws || []).join(' '),
+        (d.refCases || []).join(' ')
+      ].join(' ').toLowerCase();
+      var fullDocNoSpace = fullDocHay.replace(/\s+/g, '');
+
+      /* 제외어(-단어) 필터 */
+      var excluded = false;
+      for (var ex = 0; ex < ops.excludeTokens.length; ex++) {
+        if (fullDocHay.indexOf(ops.excludeTokens[ex]) >= 0) {
+          excluded = true;
+          break;
+        }
+      }
+      if (excluded) continue;
+
+      /* 필수어(+단어) 필터 */
+      var missingMust = false;
+      for (var mu = 0; mu < ops.mustTokens.length; mu++) {
+        var mt = ops.mustTokens[mu].replace(/\s+/g, '');
+        if (fullDocHay.indexOf(ops.mustTokens[mu]) < 0 && fullDocNoSpace.indexOf(mt) < 0) {
+          missingMust = true;
+          break;
+        }
+      }
+      if (missingMust) continue;
+
+      /* 따옴표 구문("...") 필터 */
+      var missingPhrase = false;
+      for (var ph = 0; ph < ops.phrases.length; ph++) {
+        if (fullDocHay.indexOf(ops.phrases[ph]) < 0) {
+          missingPhrase = true;
+          break;
+        }
+      }
+      if (missingPhrase) continue;
+
+      /* 결과 내 재검색(subQuery) 필터 */
+      if (subTokens.length) {
+        var missingSub = false;
+        for (var st = 0; st < subTokens.length; st++) {
+          if (fullDocHay.indexOf(subTokens[st]) < 0 && fullDocNoSpace.indexOf(subTokens[st]) < 0) {
+            missingSub = true;
+            break;
+          }
+        }
+        if (missingSub) continue;
+      }
+
+      var hasPositiveCriteria = Boolean(ops.baseQuery || ops.mustTokens.length || ops.phrases.length);
+      var sc = scoreDocument(d, tokens, qNorm);
+      for (var ph2 = 0; ph2 < ops.phrases.length; ph2++) {
+        sc += 40;
+      }
+      if (!hasPositiveCriteria || sc > 0) {
+        docHits.push({ item: d, score: sc });
+      }
+    }
+
+    docHits.sort(function (a, b) {
+      if (sortBy === 'date_desc') {
+        var cmpDate = String(b.item.decisionDate || '').localeCompare(String(a.item.decisionDate || ''));
+        if (cmpDate !== 0) return cmpDate;
+        return b.score - a.score;
+      }
+      if (sortBy === 'court_tier') {
+        var tDiff = courtTierRank(a.item) - courtTierRank(b.item);
+        if (tDiff !== 0) return tDiff;
+        if (b.score !== a.score) return b.score - a.score;
+        return String(b.item.decisionDate || '').localeCompare(String(a.item.decisionDate || ''));
+      }
+      if (b.score !== a.score) return b.score - a.score;
+      return String(b.item.decisionDate || '').localeCompare(String(a.item.decisionDate || ''));
+    });
+
+    /* 적재된 법령 조문 검색 */
+    var articleHits = [];
+    if (qStr) {
+      for (var l = 0; l < loadedLaws.length; l++) {
+        var law = loadedLaws[l];
+        if (!law || law.isRepealStub) continue;
+        var lawTitleLow = String(law.title || '').toLowerCase();
+        var arts = law.articles || [];
+        for (var a = 0; a < arts.length; a++) {
+          var art = arts[a];
+          var hay = (lawTitleLow + ' ' + art.no + ' ' + (art.heading || '') + ' ' + (art.text || '')).toLowerCase();
+          var asc = 0;
+          if (qNorm && hay.replace(/\s+/g, '').indexOf(qNorm) >= 0) asc += 45;
+          for (var t = 0; t < tokens.length; t++) {
+            if (hay.indexOf(tokens[t]) >= 0) asc += (art.heading && art.heading.toLowerCase().indexOf(tokens[t]) >= 0) ? 16 : 7;
+          }
+          if (asc > 0) {
+            articleHits.push({
+              lawDir: law.dir,
+              lawTitle: law.title,
+              fileName: law.fileName,
+              effectiveDate: law.effectiveDate,
+              articleNo: art.no,
+              heading: art.heading,
+              snippet: String(art.text || '').slice(0, 240),
+              score: asc
+            });
+          }
+        }
+      }
+      articleHits.sort(function (a, b) { return b.score - a.score; });
+    }
+
+    /* 5,773개 전 법령 제목 색인 매칭 (약칭·초성 검색 포함) */
+    var lawTitleHits = [];
+    var smartJump = (qStr && lawIndex.length) ? resolveSmartLawJump(qStr, lawIndex) : null;
+    if (qStr && lawIndex.length) {
+      var choQuery = isChosungOnly(qStr) ? qStr.replace(/\s+/g, '') : '';
+      for (var k = 0; k < lawIndex.length; k++) {
+        var fam = lawIndex[k];
+        var fHay = (fam.title + ' ' + fam.dir + ' ' + (fam.dept || '')).toLowerCase();
+        var fNorm = fHay.replace(/\s+/g, '');
+        var lsc = 0;
+        if (smartJump && smartJump.dir === fam.dir) lsc += 120;
+        if (choQuery) {
+          var famCho = extractChosung(fam.dir.replace(/[ㆍ·\s]/g, ''));
+          if (famCho === choQuery) lsc += 100;
+          else if (famCho.indexOf(choQuery) === 0) lsc += 70;
+          else if (famCho.indexOf(choQuery) >= 0) lsc += 40;
+        }
+        if (qNorm && fNorm.indexOf(qNorm) >= 0) lsc += 50;
+        for (var tkIdx = 0; tkIdx < tokens.length; tkIdx++) {
+          if (fHay.indexOf(tokens[tkIdx]) >= 0 || fNorm.indexOf(tokens[tkIdx]) >= 0) lsc += 20;
+        }
+        if (lsc > 0) {
+          lawTitleHits.push({ family: fam, score: lsc + (fam.priority ? 10 : 0) });
+        }
+      }
+      lawTitleHits.sort(function (a, b) { return b.score - a.score; });
+    }
+
+    return {
+      docs: docHits.slice(0, limit).map(function (h) { return h.item; }),
+      totalMatchedDocs: docHits.length,
+      articles: articleHits.slice(0, 20),
+      lawFamilies: lawTitleHits.slice(0, 20).map(function (h) { return h.family; }),
+      smartLawJump: smartJump,
+      tokens: tokens
+    };
+  }
+
+  /* ── 사실관계 타이핑 · 음성 설명 실시간 자동 법리검토 규칙 사전 ── */
+  var FACT_ISSUE_RULES = [
+    {
+      id: 'commute_accident',
+      title: '출퇴근 재해 · 경로 일탈·중단 예외 인정 여부',
+      canonicalQuery: '출퇴근재해 통상적인 경로 일탈 예외',
+      boostQuery: '출퇴근재해 출퇴근산재 통상적인경로 일탈중단예외 교통사고 산업재해보상보험법 산재보험법 제37조 시행령 제35조 2014헌바254',
+      pattern: /(?:출근|퇴근|출퇴근)[\s\S]{0,80}(?:사고|교통사고|추돌|접촉|넘어|낙상|골절|다쳤|부상|어린이집|유치원|등원|하원|병원|마트|산재)|(?:교통사고|어린이집|등원|하원)[\s\S]{0,80}(?:출근|퇴근|출퇴근|산재)/,
+      coreLaws: ['산업재해보상보험법 제37조 제1항 제3호', '산업재해보상보험법 시행령 제35조 제2항'],
+      conclusion: '통상적인 경로와 방법으로 출퇴근하던 중 발생한 사고는 사업주 지배관리 여부와 무관하게 업무상 재해(출퇴근재해)로 인정됩니다. 경로 일탈·중단이 있더라도 자녀 보육·교육기관 등하원, 일용품 구입, 진료 등 산재보험법 시행령 제35조 제2항의 일상생활 필요 행위 전후 이동 중 사고라면 예외적으로 산재 승인 대상입니다.',
+      checklist: [
+        '자택~사업장 평소 이동 경로(내비게이션·블랙박스·교통카드 기록) 및 사고 시각·지점 특정',
+        '경로 우회·중단이 있었다면 시행령 제35조 제2항 예외(어린이집 등하원·진료·생필품 구입 등) 증빙 확보',
+        '음주·무면허·중앙선침범 등 중과실 범죄행위 해당 여부 배제 확인'
+      ]
+    },
+    {
+      id: 'dismissal_written',
+      title: '해고·수습 본채용거부의 정당한 이유 및 서면통지·해고예고 준수 여부',
+      canonicalQuery: '부당해고 서면통지 수습 본채용거부',
+      boostQuery: '서면통지 부당해고 카톡해고 문자해고 수습 시용 본채용거부 해고예고수당 근로기준법 제23조 제26조 제27조 2015두41401',
+      pattern: /(?:해고|권고사직|나가라고|그만두라고|출근하지\s*말|본채용[\s\S]{0,16}거부|수습[\s\S]{0,24}(?:탈락|종료|해지|해고)|카톡|카카오톡|문자메시지|구두로?\s*통보)/,
+      coreLaws: ['근로기준법 제23조 제1항', '근로기준법 제26조', '근로기준법 제27조'],
+      conclusion: '상시 5인 이상 사업장에서 해고(수습 본채용 거부 포함)를 하려면 정당한 이유와 함께 해고사유·해고시기를 종이 서면으로 통지해야 효력이 있습니다(문자·카톡·구두 해고는 서면통지 위반 당연무효). 또한 계속근로 3개월 이상이면 30일 전 예고 또는 30일분 통상임금(해고예고수당) 지급 의무가 발생합니다.',
+      checklist: [
+        '상시근로자 수 5인 이상 여부(제23조·제27조 적용 요건) 및 계속근로 3개월 이상 여부(제26조 해고예고수당)',
+        '해고사유·시기가 명시된 종이 서면 교부 여부(문자·카톡·구두 통보 녹취·캡처 확보)',
+        '해고일로부터 3개월 이내 지방노동위원회 부당해고 구제신청 제척기간 확인'
+      ]
+    },
+    {
+      id: 'ordinary_wage',
+      title: '통상임금 해당 여부 (재직조건·근무일수 조건부 정기상여금·수당 산입)',
+      canonicalQuery: '통상임금 재직조건 정기상여금',
+      boostQuery: '통상임금 재직조건 정기상여금 소정근로 일률성 근로기준법 제2조 제56조 2020다247190',
+      pattern: /(?:통상임금|정기상여|상여금|재직조건|재직자만|근무일수\s*조건)/i,
+      coreLaws: ['근로기준법 제2조', '근로기준법 시행령 제6조', '근로기준법 제56조'],
+      conclusion: '대법원 2020다247190 전원합의체 판결에 따라 고정성 요건이 폐기되었으므로, 소정근로의 대가로 정기적·일률적으로 지급되는 정기상여금·제수당은 지급일 재직조건이나 최소 근무일수 조건이 붙어 있어도 통상임금에 산입됩니다.',
+      checklist: [
+        '취업규칙·급여규정상 정기상여금·제수당 지급주기와 소정근로 대가성 확인',
+        '통상임금 재산정에 따른 연장·야간·휴일근로수당 및 연차수당 차액 산출',
+        '전원합의체 판결 선고일(2024.12.19.) 이후 산정 대상 근로 여부 및 소멸시효 3년 확인'
+      ]
+    },
+    {
+      id: 'blanket_wage_overtime',
+      title: '포괄임금(고정OT) 유효성 · 실연장수당 차액정산 및 임금명세서 교부 의무',
+      canonicalQuery: '포괄임금 고정OT 연장근로수당',
+      boostQuery: '포괄임금 포괄임금제 고정OT 연장근로수당 야간근로 임금명세서 근로기준법 제48조 제56조 2008다6052',
+      pattern: /(?:포괄임금|고정\s*OT|고정연장|연장수당|야간수당|휴일수당|야근수당|임금명세서)/i,
+      coreLaws: ['근로기준법 제17조', '근로기준법 제48조', '근로기준법 제56조'],
+      conclusion: '감시·단속적 근로 등 근로시간 산정이 어려운 예외가 아니라면 포괄임금·고정OT 약정이 있더라도 실제 연장·야간·휴일근로에 따른 법정 가산수당에 미달하는 차액은 무효로서 추가 지급해야 하며, 임금명세서에 구성항목·산출방법을 기재해 교부해야 합니다.',
+      checklist: [
+        '출퇴근기록·PC 로그·교통비 내역으로 실연장·야간·휴일근로시간 산정 후 고정OT 수당과 차액 대조',
+        '근로기준법 제48조 제2항에 따른 임금명세서 구성항목·산출식 기재 여부 점검',
+        '임금채권 소멸시효 3년(근로기준법 제49조) 이내 미지급 법정수당 산출'
+      ]
+    },
+    {
+      id: 'worker_status_freelancer',
+      title: '프리랜서·위탁계약자(3.3% 공제)의 근로기준법상 근로자성 및 퇴직금 검토',
+      canonicalQuery: '프리랜서 근로자성 사용종속관계 퇴직금',
+      boostQuery: '프리랜서 근로자성 사용종속관계 위탁계약 사업소득세 퇴직금 2004다29736 근로기준법 제2조',
+      pattern: /(?:프리랜서|3\.3\s*%|사업소득|위탁계약|용역계약|근로자성|가짜\s*3\.3)[\s\S]{0,120}(?:출퇴근|지시|퇴직금|주휴|연차|4대보험|근무)|(?:퇴직금|주휴수당)[\s\S]{0,80}(?:프리랜서|3\.3\s*%|위탁|용역)/,
+      coreLaws: ['근로기준법 제2조 제1항 제1호', '근로자퇴직급여 보장법 제4조'],
+      conclusion: '계약 형식이 프리랜서·위탁계약이고 3.3% 사업소득세를 원천징수했더라도, 출퇴근 시간·근무장소 구속, 구체적 업무지시·결재, 비품 제공, 고정급 성격 보수 등 실질적 사용종속관계가 인정되면 근로기준법상 근로자로서 퇴직금·주휴·연차수당 청구권이 인정됩니다.',
+      checklist: [
+        '메신저·이메일 업무지시 내역, 일일·주간 업무보고서, 근태 통제 증거 확보',
+        '제3자 대체근무 가능 여부, 독자적 사업자 설비 보유 여부, 보수의 근로 자체 대가성 점검',
+        '1주 소정근로시간 15시간 이상 및 계속근로기간 1년 이상 충족 여부 확인'
+      ]
+    },
+    {
+      id: 'overwork_disease_sanjae',
+      title: '과로(뇌심혈관) · 근골격계(디스크) · 난청 · 직무스트레스 업무상 질병 산재 검토',
+      canonicalQuery: '업무상질병 과로 뇌심혈관 추간판탈출증',
+      boostQuery: '과로산재 뇌심혈관 뇌출혈 심근경색 추간판탈출증 소음성난청 우울증산재 상당인과관계 산업재해보상보험법 고용노동부고시 2020두39297 2015두8848 2017두59949',
+      pattern: /(?:뇌출혈|뇌경색|심근경색|뇌심혈관|과로|주\s*52시간|주\s*60시간|허리디스크|목디스크|추간판|근골격|난청|우울증|적응장애|극단적\s*선택|자살)[\s\S]{0,80}(?:산재|업무|근무|교대|야간|스트레스|불승인|요양)?/,
+      coreLaws: ['산업재해보상보험법 제37조 제1항 제2호', '산업재해보상보험법 시행령 제34조'],
+      conclusion: '뇌심혈관 질병은 발병 전 12주 평균 주 60시간(4주 64시간) 초과 시 업무관련성이 강하며, 주 52시간 초과 + 야간근무(30% 가산)·교대제·휴일부족·정신적 긴장 등 가중요인 결합 시 산재로 인정됩니다. 기저질환·퇴행성 소인이 있더라도 당해 근로자 기준으로 자연경과 이상 악화되었다면 상당인과관계가 인정됩니다.',
+      checklist: [
+        '발병 전 24시간·1주·4주·12주 실업무시간 산정표 작성(22시~06시 야간근무 30% 가산 반영)',
+        '교대제·휴일부족·돌발업무·유해환경·중량물 반복취급 등 고용노동부 고시 업무부담 가중요인 특정',
+        '의무기록지·건강검진 이력 및 직업환경의학과 업무관련성 소견 대조'
+      ]
+    },
+    {
+      id: 'workplace_harassment_sex',
+      title: '직장 내 괴롭힘 · 성희롱 조사·보호조치 의무 및 불리한 처우 금지 검토',
+      canonicalQuery: '직장 내 괴롭힘 조사 분리조치 성희롱',
+      boostQuery: '직장내괴롭힘 근로기준법 제76조의2 제76조의3 분리조치 비밀누설 직장내성희롱 남녀고용평등 성인지감수성 2017두74702',
+      pattern: /(?:괴롭힘|폭언|욕설|따돌림|집단\s*배제|업무\s*배제|사적\s*심부름|성희롱|성추행|2차\s*가해|분리조치)/,
+      coreLaws: ['근로기준법 제76조의2', '근로기준법 제76조의3', '남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제14조'],
+      conclusion: '지위·관계의 우위를 이용해 업무상 적정범위를 넘어 신체적·정신적 고통을 주거나 근무환경을 악화시키는 행위는 직장 내 괴롭힘에 해당합니다. 사용자는 신고 접수 즉시 지체 없는 객관적 조사, 피해근로자 보호(유급휴가·근무장소 변경 등), 비밀유지 의무를 부담하며 신고자 불이익 처우는 형사처벌 대상입니다.',
+      checklist: [
+        '① 지위·관계 우위성, ② 업무상 적정범위 일탈, ③ 신체적·정신적 고통/근무환경 악화 3요건 일자별 입증자료 정리',
+        '신고 직후 가해자 분리조치·조사 공정성·비밀유지 서약 절차 이행 여부 점검',
+        '신고·피해 주장을 이유로 한 전보·징계·평가 불이익(제76조의3 제6항 위반) 유무 확인'
+      ]
+    },
+    {
+      id: 'under5_workplace',
+      title: '상시 5인 미만 사업장 산정 기준 및 적용·제외 법규 구분 검토',
+      canonicalQuery: '상시 5인 미만 사업장 산정 해고예고 퇴직금',
+      boostQuery: '5인미만 상시근로자수 산정 해고예고수당 퇴직금 주휴수당 근로기준법 제11조 시행령 제7조의2 2022두58959',
+      pattern: /(?:5인\s*미만|5명\s*미만|4인\s*사업장|3인\s*사업장|상시\s*근로자\s*수|직원[이\s]*[1234]명)/,
+      coreLaws: ['근로기준법 제11조', '근로기준법 시행령 제7조의2', '근로기준법 제26조'],
+      conclusion: '상시 5인 미만 사업장은 부당해고 구제신청(제23조·제28조), 연장·야간·휴일 가산수당(제56조), 연차유급휴가(제60조)가 제외되지만, 30일 전 해고예고수당(제26조), 퇴직금, 주휴수당, 최저임금, 출산·육아휴직, 산재보험은 동일하게 적용됩니다. 알바·일용직을 포함한 사유발생 전 1개월 연인원÷가동일수로 5인 이상 여부를 먼저 재검산해야 합니다.',
+      checklist: [
+        '사유 발생 전 1개월간 단시간(알바)·일용직·외국인 포함 일별 출근 인원표로 상시 5인 이상 해당 여부 검증',
+        '실질적으로 하나의 사업장임에도 법인·사업자등록만 쪼갠(쪼개기 사업장) 경우 합산 판단(2022두58959)',
+        '5인 미만 확정 시에도 해고예고수당·퇴직금·주휴수당·최저임금 미지급분 청구 가능 여부 확인'
+      ]
+    },
+    {
+      id: 'parental_leave_transfer',
+      title: '육아휴직 복귀 후 불리한 처우 금지 · 전보 인사명령 정당성 검토',
+      canonicalQuery: '육아휴직 불리한 처우 부당전보 복귀',
+      boostQuery: '육아휴직 불리한처우 동등업무복귀 부당전보 생활상불이익 남녀고용평등 근로기준법 제19조 94다52928',
+      pattern: /(?:육아휴직|출산휴가|복직|전보|발령|인사명령|원거리\s*발령|보직\s*해임)/,
+      coreLaws: ['남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제19조', '근로기준법 제23조'],
+      conclusion: '육아휴직 종료 후에는 휴직 전과 같은 업무 또는 같은 수준의 임금을 지급하는 직무에 복귀시켜야 하며 실질적 한직 발령·임금 삭감은 위법합니다. 일반 전보명령 역시 업무상 필요성과 근로자의 생활상 불이익(통근·보육 등), 사전 성실 협의 여부를 비교·교량해 권리남용 여부를 판단합니다.',
+      checklist: [
+        '휴직 전후 직무 내용·직책·임금 수준 비교 및 대체인력 운영·조직개편의 객관적 필요성 확인',
+        '원거리 발령 등에 따른 통근시간·자녀보육 등 생활상 불이익 정도와 보전수당 유무 확인',
+        '발령 전 본인과의 사전 면담·협의 절차 이행 여부 확인'
+      ]
+    }
+  ];
+
+  function detectFactIssues(rawText) {
+    var src = String(rawText || '').trim();
+    if (!src) return [];
+    var out = [];
+    for (var i = 0; i < FACT_ISSUE_RULES.length; i++) {
+      var rule = FACT_ISSUE_RULES[i];
+      if (rule.pattern.test(src)) {
+        out.push(rule);
+      }
+    }
+    return out;
+  }
+
+  var ALLOWLISTED_OFFICIAL_LEGAL_TERMS = (function () {
+    var set = new Set([
+      '해고', '부당해고', '통상해고', '징계해고', '정리해고', '경영상해고', '징계', '정직', '감봉', '견책',
+      '전보', '전직', '인사발령', '대기발령', '직위해제', '권고사직', '사직', '사직서', '수습', '시용', '본채용거부',
+      '서면통지', '해고예고', '해고예고수당', '부당전보', '인사권',
+      '통상임금', '평균임금', '포괄임금', '포괄임금제', '고정OT', '고정연장수당', '연장근로', '야간근로', '휴일근로',
+      '가산수당', '주휴수당', '주휴일', '연차', '연차휴가', '연차유급휴가', '연차수당', '미사용수당', '출근율',
+      '퇴직금', '퇴직급여', '퇴직연금', '확정급여형', '확정기여형', '중간정산', '중도인출', '분할약정',
+      '임금', '임금체불', '체불', '대지급금', '최저임금', '임금명세서', '상여금', '정기상여금', '성과급', '경영성과급',
+      '산재', '산업재해', '출퇴근재해', '출퇴근산재', '출퇴근', '교통사고', '업무상재해', '업무상질병',
+      '요양급여', '휴업급여', '장해급여', '유족급여', '장의비', '상병보상연금', '최초요양', '재요양',
+      '소음성난청', '난청', '추간판탈출증', '허리디스크', '근골격계', '뇌심혈관', '뇌출혈', '뇌경색', '심근경색',
+      '과로', '과로사', '우울증', '적응장애', '자살', '상당인과관계',
+      '직장내괴롭힘', '괴롭힘', '성희롱', '직장내성희롱', '분리조치', '비밀유지의무', '불이익처우',
+      '육아휴직', '출산휴가', '출산전후휴가', '배우자출산휴가', '육아기근로시간단축', '모성보호',
+      '기간제', '계약직', '갱신기대권', '무기계약직', '단시간', '초단시간', '차별시정',
+      '파견', '불법파견', '근로자파견', '도급', '위장도급', '사내하청', '직접고용',
+      '프리랜서', '근로자성', '사용종속관계', '위탁계약', '용역계약', '특수형태근로종사자', '노무제공자',
+      '취업규칙', '불이익변경', '사회통념상합리성', '과반수동의', '근로계약', '근로계약서',
+      '단체협약', '단체교섭', '노동조합', '노조', '복수노조', '교섭창구단일화', '공정대표의무', '근로시간면제',
+      '부당노동행위', '지배개입', '불이익취급', '쟁의행위', '파업', '직장폐쇄',
+      '중대재해', '중대산업재해', '중대재해처벌법', '안전보건확보의무', '산업안전', '안전보건', '위험성평가',
+      '상시근로자', '상시근로자수', '5인미만', '하나의사업장',
+      '구제신청', '노동위원회', '중앙노동위원회', '초심', '재심', '재심사', '행정심판', '행정소송',
+      '손해배상', '위약예정', '손해배상예정', '전차금', '강제근로', '경업금지', '전직금지', '영업비밀',
+      '개인정보', '영상정보처리기기', '노사협의회', '채용절차',
+      '실업급여', '구직급여', '고용유지지원금', '고용보험', '국민연금', '건강보험', '산재보험',
+      '소멸시효', '제척기간', '부당이득', '신의칙', '통상근로자', '감시단속적근로', '휴게시간', '유급휴일', '공휴일'
+    ]);
+    Object.keys(SYNONYM_MAP).forEach(function (k) {
+      var kk = String(k || '').trim();
+      if (kk.length >= 2) set.add(kk);
+      (SYNONYM_MAP[k] || []).forEach(function (v) {
+        String(v || '').split(/\s+/).forEach(function ( piece) {
+          var p = piece.trim();
+          if (p.length >= 2) set.add(p);
+        });
+      });
+    });
+    var abMap = getAbbrevMap();
+    Object.keys(abMap).forEach(function (ak) {
+      if (ak && ak.length >= 2) set.add(ak);
+      var av = String(abMap[ak] || '').trim();
+      if (av.length >= 2) set.add(av);
+    });
+    return set;
+  })();
+
+  var OFFICIAL_CASE_TOKEN_RE = /^(?:(?:19|20)\d{2}|9\d)(?:다|두|도|누|구합|구단|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결|재심사)\d{1,8}$/;
+  var OFFICIAL_INTERP_TOKEN_RE = /^[가-힣]{2,14}(?:과|팀|부|실|위원회|고시|재심사)-\d{1,8}$/;
+
+  /* 자동 외부 공공 API 조회용 화이트리스트 검색어 추출기:
+   * - 역할어 없는 실명('김가람 해고')·법인/업체명('주식회사 가상기업 부당해고') 등 비법률 고유명사는 절대 외부 전송하지 않음
+   * - 오직 검증된 법령명·조문, 표준 쟁점 쿼리(canonicalQuery), 공식 사건/회시번호, 허용 법률용어 사전 토큰만 통과 */
+  function extractSafeLegalOfficialQuery(rawText, lawIndex) {
+    var raw = String(rawText || '').trim();
+    if (!raw || hasResidualHardPiiClient(raw)) return '';
+
+    var partyNames = extractPartyNames(raw, '');
+    var scrubbed = anonymizeLegalText(raw, partyNames).text;
+    var smartJump = resolveSmartLawJump(scrubbed, lawIndex || []);
+    if (smartJump && smartJump.title) {
+      return (smartJump.title + (smartJump.articleNo ? (' ' + smartJump.articleNo) : '')).slice(0, 36).trim();
+    }
+
+    var matchedIssues = detectFactIssues(scrubbed);
+    if (matchedIssues.length > 0 && matchedIssues[0].canonicalQuery) {
+      return String(matchedIssues[0].canonicalQuery).slice(0, 36).trim();
+    }
+
+    var lawTitleSet = new Set();
+    var idx = Array.isArray(lawIndex) ? lawIndex : [];
+    for (var li = 0; li < idx.length; li++) {
+      if (idx[li] && idx[li].title) {
+        lawTitleSet.add(String(idx[li].title).replace(/\s+/g, ''));
+      }
+      if (idx[li] && idx[li].dir) {
+        lawTitleSet.add(String(idx[li].dir).replace(/\s+/g, ''));
+      }
+    }
+
+    var rawTokens = scrubbed
+      .replace(/[()[\]{}"'“”‘’,.:;!?/\\|~`@#$%^&*+=<>]+/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+
+    var safeTokens = [];
+    var seenTok = new Set();
+    for (var ti = 0; ti < rawTokens.length; ti++) {
+      var tok = rawTokens[ti].trim();
+      if (!tok || tok.indexOf('*') >= 0 || /OO/.test(tok)) continue;
+      if (/^(?:주식회사|유한회사|합자회사|합명회사|사단법인|재단법인|법무법인|노무법인|회사|대표|원고|피고|신청인|피신청인|근로자|재해자)$/.test(tok)) {
+        continue;
+      }
+      var normCaseTok = tok.replace(/\s+/g, '');
+      if (OFFICIAL_CASE_TOKEN_RE.test(normCaseTok) || OFFICIAL_INTERP_TOKEN_RE.test(normCaseTok)) {
+        if (!seenTok.has(normCaseTok)) {
+          seenTok.add(normCaseTok);
+          safeTokens.push(normCaseTok);
+        }
+        continue;
+      }
+      var cands = [tok];
+      var strippedMulti = tok.replace(/(?:으로부터|로부터|에게는|에서는|이라도|까지는|으로서|으로써|에게|에서|으로|로써|로서|부터|까지|이나|거나)$/, '');
+      if (strippedMulti && strippedMulti !== tok) cands.push(strippedMulti);
+      var strippedSingle = tok.replace(/(?:은|는|이|가|을|를|의|도|만|와|과|로|에)$/, '');
+      if (strippedSingle && strippedSingle !== tok) cands.push(strippedSingle);
+
+      for (var ci = 0; ci < cands.length; ci++) {
+        var c = cands[ci];
+        if (!c || c.length < 2) continue;
+        if (ALLOWLISTED_OFFICIAL_LEGAL_TERMS.has(c) || lawTitleSet.has(c)) {
+          if (!seenTok.has(c)) {
+            seenTok.add(c);
+            safeTokens.push(c);
+          }
+          break;
+        }
+      }
+      if (safeTokens.length >= 4) break;
+    }
+
+    return safeTokens.join(' ').slice(0, 36).trim();
+  }
+
+  /* 입력 문장이 단순 키워드 검색인지, 사실관계·계약문안 자동검토 대상인지 판별하고 외부 전송용 안전 키워드를 산출 */
+  function classifyPromptIntent(rawText, lawIndex) {
+    var raw = String(rawText || '').trim();
+    if (!raw) {
+      return {
+        intent: 'empty',
+        isFactNarrative: false,
+        recommendedMode: 'auto',
+        hasHardPii: false,
+        matchedIssues: [],
+        smartLawJump: null,
+        safeOfficialQuery: ''
+      };
+    }
+
+    var hasHardPii = hasResidualHardPiiClient(raw);
+    var partyNames = extractPartyNames(raw, '');
+    var scrubbed = anonymizeLegalText(raw, partyNames).text;
+    var smartJump = resolveSmartLawJump(scrubbed, lawIndex || []);
+    var matchedIssues = detectFactIssues(scrubbed);
+    var clauseDiag = analyzeDocumentClauses(scrubbed);
+
+    var hasNarrativeCue = /(?:\?|까요|나요|인가요|는지|여부|경우|했는데|하다가|당했|받았|통보|중입니다|어떻게|되나요|주나요|안\s*줍|못\s*받|계약서|제\s*\d+\s*조)/.test(scrubbed);
+    var wordCount = scrubbed.split(/\s+/).filter(Boolean).length;
+    var isFactNarrative = !smartJump && (
+      clauseDiag.findings.length > 0 ||
+      scrubbed.length >= 28 ||
+      wordCount >= 6 ||
+      (scrubbed.length >= 12 && hasNarrativeCue) ||
+      (matchedIssues.length > 0 && (wordCount >= 4 || hasNarrativeCue))
+    );
+
+    var safeOfficialQuery = hasHardPii ? '' : extractSafeLegalOfficialQuery(raw, lawIndex);
+
+    return {
+      intent: isFactNarrative ? 'fact_review' : 'search',
+      isFactNarrative: isFactNarrative,
+      recommendedMode: isFactNarrative ? 'review' : 'search',
+      hasHardPii: hasHardPii,
+      matchedIssues: matchedIssues,
+      clauseFindingsCount: clauseDiag.findings.length,
+      smartLawJump: smartJump,
+      safeOfficialQuery: safeOfficialQuery
+    };
+  }
+
+  function isDecisionDoc(d) {
+    if (!d) return false;
+    var dt = String(d.docType || '');
+    var ca = String((d.court || '') + ' ' + (d.agency || ''));
+    return dt === 'dec_nlrc' || /(?:노동위원회|재심사위원회|심판원|행정심판|위원회)/.test(ca);
+  }
+
+  function isInterpDoc(d) {
+    if (!d) return false;
+    var dt = String(d.docType || '');
+    return dt === 'interp_moel' || dt === 'interp_gov';
+  }
+
+  function isPrecedentDoc(d) {
+    if (!d) return false;
+    var dt = String(d.docType || '');
+    return dt === 'prec_sc' || dt === 'prec_const' || dt === 'prec_lower' || (!isDecisionDoc(d) && !isInterpDoc(d));
+  }
+
+  /* 검색 결과를 [법령 · 판례 · 결정례 · 행정해석/유권해석] 4대 기둥으로 분류하고 균형 배분 목록을 생성 */
+  function groupUnifiedAuthorities(searchRes, opts) {
+    opts = opts || {};
+    var ragLimit = opts.ragLimit || 8;
+    var docs = (searchRes && Array.isArray(searchRes.docs)) ? searchRes.docs : [];
+    var articles = (searchRes && Array.isArray(searchRes.articles)) ? searchRes.articles : [];
+    var lawFamilies = (searchRes && Array.isArray(searchRes.lawFamilies)) ? searchRes.lawFamilies : [];
+
+    var precedents = [];
+    var decisions = [];
+    var interpretations = [];
+
+    for (var i = 0; i < docs.length; i++) {
+      var d = docs[i];
+      if (isInterpDoc(d)) interpretations.push(d);
+      else if (isDecisionDoc(d)) decisions.push(d);
+      else if (isPrecedentDoc(d)) precedents.push(d);
+    }
+
+    /* 판례만 독점하지 않고 판례 + 행정해석·유권해석 + 위원회 결정례가 함께 들어가도록 균형 배분 */
+    var balancedDocs = [];
+    var pickedIds = new Set();
+    function takeFrom(arr, maxCount) {
+      var cnt = 0;
+      for (var k = 0; k < arr.length && cnt < maxCount && balancedDocs.length < ragLimit; k++) {
+        var item = arr[k];
+        var key = item.id || item.caseNo || item.title;
+        if (pickedIds.has(key)) continue;
+        pickedIds.add(key);
+        balancedDocs.push(item);
+        cnt++;
+      }
+    }
+
+    takeFrom(precedents, 3);
+    takeFrom(interpretations, 3);
+    takeFrom(decisions, 2);
+    takeFrom(docs, ragLimit);
+
+    return {
+      laws: {
+        articles: articles,
+        families: lawFamilies,
+        totalCount: articles.length + lawFamilies.length
+      },
+      precedents: precedents,
+      decisions: decisions,
+      interpretations: interpretations,
+      balancedDocs: balancedDocs,
+      counts: {
+        laws: articles.length || lawFamilies.length,
+        articles: articles.length,
+        lawFamilies: lawFamilies.length,
+        precedents: precedents.length,
+        decisions: decisions.length,
+        interpretations: interpretations.length,
+        totalDocs: docs.length
+      }
+    };
+  }
+
+  /* 사실관계 문장이나 검색어 하나로 법령·판례·결정례·행정해석 전 영역을 한 번에 통합 검색 */
+  function searchUnifiedAllInOne(query, opts) {
+    opts = opts || {};
+    var raw = String(query || '').trim();
+    var matchedIssues = detectFactIssues(raw);
+    var hasOperators = /[+"“”]|\s-\S/.test(raw);
+    var effectiveQuery = raw;
+
+    if (matchedIssues.length > 0 && !hasOperators) {
+      var boostParts = matchedIssues.map(function (m) { return m.boostQuery; }).join(' ');
+      effectiveQuery = (raw + ' ' + boostParts).trim();
+    }
+
+    var searchOpts = Object.assign({}, opts, {
+      limit: Math.max(opts.limit || 60, 60)
+    });
+    var baseRes = searchCorpus(effectiveQuery, searchOpts);
+    if (!baseRes.smartLawJump && raw !== effectiveQuery) {
+      baseRes.smartLawJump = resolveSmartLawJump(raw, opts.lawIndex || []);
+    }
+    if (!raw && (!baseRes.articles || !baseRes.articles.length) && (!baseRes.lawFamilies || !baseRes.lawFamilies.length) && Array.isArray(opts.lawIndex) && opts.lawIndex.length) {
+      var prioLaws = opts.lawIndex.filter(function (f) { return f && f.priority; });
+      baseRes.lawFamilies = (prioLaws.length ? prioLaws : opts.lawIndex).slice(0, 8);
+    }
+    var unified = groupUnifiedAuthorities(baseRes, { ragLimit: opts.ragLimit || 8 });
+    baseRes.unified = unified;
+    baseRes.balancedDocs = unified.balancedDocs;
+    baseRes.matchedIssues = matchedIssues;
+    return baseRes;
+  }
+
+  /* 타이핑 · 음성 입력 즉시 작동하는 실시간 사실관계 자동 법리검토기 (₩0 · 로컬 비식별) */
+  function analyzeFactPatternInstant(rawText, opts) {
+    opts = opts || {};
+    var src = String(rawText || '').trim();
+    if (!src) {
+      return {
+        empty: true,
+        safeText: '',
+        maskedCount: 0,
+        hasHardPii: false,
+        intent: classifyPromptIntent('', opts.lawIndex || []),
+        matchedIssues: [],
+        clauseDiag: { findings: [], highCount: 0, warnCount: 0, clauseCount: 0 },
+        searchRes: null,
+        unified: null
+      };
+    }
+
+    var hasHardPii = hasResidualHardPiiClient(src);
+    var names = extractPartyNames(src, '');
+    var anon = anonymizeLegalText(src, names);
+    var safeText = anon.text;
+    var intent = classifyPromptIntent(src, opts.lawIndex || []);
+    var clauseDiag = analyzeDocumentClauses(safeText);
+    var searchRes = searchUnifiedAllInOne(safeText, {
+      docs: opts.docs || [],
+      loadedLaws: opts.loadedLaws || [],
+      lawIndex: opts.lawIndex || [],
+      limit: 60,
+      ragLimit: 8
+    });
+
+    return {
+      empty: false,
+      safeText: safeText,
+      maskedCount: anon.totalMasked || anon.maskedCount || 0,
+      hasHardPii: hasHardPii,
+      intent: intent,
+      matchedIssues: searchRes.matchedIssues || [],
+      clauseDiag: clauseDiag,
+      searchRes: searchRes,
+      unified: searchRes.unified
+    };
+  }
+
+  /* AI 질의용 근거 프롬프트 조립 (환각 차단용 원문 강제 주입 + 외부 AI 전달 전 전체 민감정보 비식별 관문 통과) */
+  function buildRagPrompt(params) {
+    params = params || {};
+    var rawQuery = String(params.query || '').trim();
+    var mode = params.mode || 'auto';
+    var workflow = params.workflow || null;
+    var attached = Array.isArray(params.attached) ? params.attached : [];
+    var retrievedDocs = Array.isArray(params.retrievedDocs) ? params.retrievedDocs : [];
+    var retrievedArticles = Array.isArray(params.retrievedArticles) ? params.retrievedArticles : [];
+
+    var combinedForNames = [rawQuery, workflow ? (workflow.title + ' ' + workflow.desc) : '']
+      .concat(attached.map(function (x) { return (x.title || '') + '\n' + (x.body || x.plainText || x.summary || ''); }))
+      .join('\n');
+    var promptNames = extractPartyNames(combinedForNames, '');
+    var scrub = function (s) { return anonymizeLegalText(String(s || ''), promptNames).text; };
+    var query = scrub(rawQuery);
+    var matchedIssues = detectFactIssues(query);
+
+    var ctxLines = [];
+    ctxLines.push('당신은 푸른노무법인의 법률·노무 AI 리서치 시스템 「P박스」입니다.');
+    ctxLines.push('반드시 아래 [제공된 검증 원문 자료]에 있는 법령 조문·판례 사건번호·행정해석 문서번호만 인용하여 한국어로 답변하십시오.');
+    ctxLines.push('원문 자료에 없는 사건번호나 문서번호를 절대 임의로 지어내지 마십시오(환각 금지). 근로기준법상 용어는 반드시 「근로자」와 「임금」을 정확히 사용하십시오.');
+    ctxLines.push('판례(대법원·헌법재판소·하급심)뿐만 아니라 제공된 자료 내 행정해석·유권해석(고용노동부·법제처) 및 위원회 결정·재결례(노동위원회·산재재심사위)도 빠짐없이 함께 구분하여 제시하십시오.');
+    if (workflow) {
+      ctxLines.push('\n[선택된 전문 워크플로]: ' + scrub(workflow.title) + ' — ' + scrub(workflow.desc));
+    }
+    if (matchedIssues.length) {
+      ctxLines.push('\n[자동 포착된 핵심 법리 쟁점]: ' + matchedIssues.map(function (m) { return m.title + ' (' + m.coreLaws.join(', ') + ')'; }).join(' / '));
+    }
+    if (mode === 'draft') {
+      ctxLines.push('출력 형식: 1. 사건 개요 및 핵심 쟁점, 2. 관련 법령 조문, 3. 대법원·하급심 판례 법리, 4. 고용노동부 행정해석·유권해석 및 위원회 재결례, 5. 본 사안에의 포섭(논증) 및 입증 체크리스트 순서로 서면 초안을 작성하십시오.');
+    } else if (mode === 'review') {
+      ctxLines.push('출력 형식(내용·사실관계 검토 보고서): 1. 검토 요약 및 위험도·인정가능성 총평, 2. 사실관계·조항별 법령 위반 및 요건사실 정밀 검토, 3. 관련 대법원·하급심 판례 요지, 4. 관련 고용노동부 행정해석·법제처 유권해석·결정례 요지, 5. 실무 보완 및 입증 체크리스트 순서로 명확히 작성하십시오.');
+    } else {
+      ctxLines.push('출력 형식: 1. 핵심 결론 요약, 2. 근거 법령, 3. 관련 판례(대법원·헌재·하급심) 요지, 4. 관련 행정해석·유권해석·결정례 요지, 5. 실무 유의사항 순서로 명확히 정리하십시오.');
+    }
+
+    ctxLines.push('\n═══ [제공된 검증 원문 자료] ═══');
+    for (var a = 0; a < attached.length; a++) {
+      var att = attached[a];
+      ctxLines.push('[사용자 @첨부 ' + (a + 1) + '] ' + scrub(att.title || '') + (att.caseNo ? ' (' + scrub(att.caseNo) + ')' : '') + '\n' + scrub(String(att.body || att.plainText || att.summary || '').slice(0, 2200)));
+    }
+    for (var r = 0; r < Math.min(retrievedArticles.length, 6); r++) {
+      var art = retrievedArticles[r];
+      ctxLines.push('[법령 조문 ' + (r + 1) + '] ' + art.lawTitle + ' ' + art.articleNo + (art.heading ? '(' + art.heading + ')' : '') + ' [시행 ' + (art.effectiveDate || '현행') + ']\n' + art.snippet);
+    }
+    for (var d = 0; d < Math.min(retrievedDocs.length, 8); d++) {
+      var doc = retrievedDocs[d];
+      var kindTag = isInterpDoc(doc) ? '행정해석·유권해석' : (isDecisionDoc(doc) ? '위원회 결정·재결례' : '법원·헌재 판례');
+      ctxLines.push('[' + kindTag + ' ' + (d + 1) + '] ' + scrub(doc.court || doc.agency || '') + ' ' + (doc.decisionDate || '') + ' ' + scrub(doc.caseNo || '') + ' — ' + scrub(doc.title || '') + '\n' + scrub(String(doc.body || doc.summary || '').slice(0, 1400)));
+    }
+    ctxLines.push('═══════════════════════════════\n');
+    ctxLines.push('[사용자 질의 / 사실관계]:\n' + query);
+
+    return ctxLines.join('\n');
+  }
+
+  /* 계약서·취업규칙·인사문서 조항별 강행규정 위반 및 법적 리스크 자동 진단기 (내용 검토 관리용) */
+  var CLAUSE_RISK_RULES = [
+    {
+      id: 'penalty_ban',
+      severity: 'high',
+      badge: '고위험 · 강행규정 위반',
+      title: '위약 예정 · 임금 일방 공제 위험',
+      pattern: /(?:위약금|손해배상액[을\s]*예정|퇴사\s*시[\s\S]{0,24}(?:반환|배상|공제)|급여에서\s*(?:차감|공제)|교육비[\s\S]{0,18}반환)/,
+      basis: '근로기준법 제20조(위약 예정의 금지) 및 근로기준법 제43조(임금 전액불 원칙)',
+      issue: '근로계약 불이행에 대한 위약금 또는 손해배상액을 예정하거나 근로자 동의·법령 근거 없이 임금에서 일방 공제하는 약정은 무효이며 형사처벌 대상이 될 수 있습니다.',
+      suggestion: '근로기준법 제20조 및 제43조에 위반되는 사전 위약금 약정 및 급여 일방 공제 문구는 삭제하고, 근로자의 고의·중과실로 실제 발생한 손해는 민사상 실손해 입증 절차를 따른다는 문구로 수정합니다.'
+    },
+    {
+      id: 'blanket_wage',
+      severity: 'high',
+      badge: '고위험 · 수당 분쟁',
+      title: '포괄임금 · 법정수당 청구권 사전 포기 위험',
+      pattern: /(?:포괄하여\s*지급|포괄임금|(?:연장|야간|휴일)[\s\S]{0,28}(?:포괄|포함)|추가\s*수당을\s*청구하지|일체의\s*수당[\s\S]{0,16}(?:포괄|포함))/,
+      basis: '근로기준법 제56조(연장·야간 및 휴일 근로) 및 근로기준법 제15조',
+      issue: '근로시간 산정이 어렵지 않은 직무에서 연장·야간·휴일근로수당을 포괄 산입하거나 추가 청구를 금지하면 근로자에게 불리한 부분(법정수당 미달분)은 무효가 됩니다.',
+      suggestion: '기본급과 고정 연장·야간·휴일근로 시간 수 및 각 수당 금액을 명확히 구분 기재하고, 약정 시간을 초과한 실근로 시 법정 가산수당을 별도 정산한다는 조항으로 수정합니다.'
+    },
+    {
+      id: 'ordinary_wage_cond',
+      severity: 'high',
+      badge: '고위험 · 2024 전합 변경',
+      title: '재직조건부 · 근무일수 조건 정기상여금 통상임금 리스크',
+      pattern: /(?:재직자에\s*한하|지급일\s*현재\s*재직|재직\s*중인\s*자|소정근로일수의\s*\d+%)/,
+      basis: '대법원 2020다247190 전원합의체 판결 · 근로기준법 제2조',
+      issue: '2024년 대법원 전원합의체 판례 변경으로 고정성 요건이 폐기되어, 소정근로 대가로 정기적·일률적으로 지급되는 상여금은 재직조건이나 기준일수 조건이 붙어 있어도 통상임금에 해당할 가능성이 높습니다.',
+      suggestion: '정기상여금이 통상임금에 산입될 경우의 연장·야간·휴일수당 및 연차수당 증액분을 재산정하고, 성과 연동형 인센티브와 소정근로 대가성 급여의 성격을 명확히 분리 설계합니다.'
+    },
+    {
+      id: 'disguised_freelancer',
+      severity: 'high',
+      badge: '고위험 · 근로자성 인정',
+      title: '용역·프리랜서 계약 내 지휘감독·전속성·퇴직금 배제 충돌',
+      pattern: /(?:용역계약|위탁계약|프리랜서)[\s\S]{0,400}(?:출퇴근|근무시간|근무장소|업무지시|겸업\s*금지|징계|결근|지각)|(?:출퇴근|근무시간|업무지시|징계)[\s\S]{0,400}(?:용역계약|위탁계약|프리랜서)|(?:출퇴근|근무시간|업무지시|결재|징계)[\s\S]{0,400}퇴직금[은을\s]*지급하지|퇴직금[은을\s]*지급하지[\s\S]{0,400}(?:출퇴근|근무시간|업무지시|결재|징계)/,
+      basis: '근로기준법 제2조 제1항 제1호 (대법원 2004다29736 근로자성 판단기준)',
+      issue: '계약 명칭이 용역·위탁이더라도 출퇴근 시간 지정, 근무장소 구속, 구체적 업무지시, 징계·겸업금지 조항이 존재하면 실질적 사용종속관계가 인정되어 퇴직금·주휴·연차수당 지급의무가 발생할 수 있습니다.',
+      suggestion: '독립 사업자 위탁 형태라면 출퇴근·근무장소 강제 및 징계·지시 조항을 제거해 업무 완수 결과물 중심으로 개편하거나, 지휘감독이 필수적이면 정규·기간제 근로계약으로 전환합니다.'
+    },
+    {
+      id: 'summary_dismissal',
+      severity: 'high',
+      badge: '고위험 · 부당해고',
+      title: '즉시해고 · 서면통지 및 해고예고 누락 위험',
+      pattern: /(?:즉시\s*해고|예고\s*없이\s*(?:해고|해지)|구두로?\s*(?:해고|통보)|임의로\s*(?:해고|계약[을\s]*해지))/,
+      basis: '근로기준법 제23조 · 근로기준법 제26조(해고의 예고) · 근로기준법 제27조(서면통지)',
+      issue: '정당한 이유 없는 임의 해지나 해고사유·시기의 서면통지 결여는 부당해고 무효 사유가 되며, 법정 예외 사유 없는 즉시해고는 30일분 이상의 해고예고수당 지급의무를 발생시킵니다.',
+      suggestion: '해고·계약해지 시 소명 기회 부여 등 인사위원회 절차와 해고사유·해고시기의 서면 통지 의무, 30일 전 예고(또는 예고수당 지급) 기준을 명시합니다.'
+    },
+    {
+      id: 'probation_wage_dismiss',
+      severity: 'warn',
+      badge: '주의 · 수습·최저임금',
+      title: '수습기간 급여 감액 한도 및 본채용 거절 요건 점검',
+      pattern: /(?:수습\s*기간|시용\s*기간)[\s\S]{0,120}(?:[5678]\d\s*%|임의\s*해지|조건\s*없이\s*해지|본채용을?\s*거부)/,
+      basis: '최저임금법 제5조 제2항 · 근로기준법 제23조',
+      issue: '1년 미만 기간제 근로자 또는 단순노무종사자에게는 수습 최저임금 감액(90%)을 적용할 수 없으며, 수습 중 본채용 거절 역시 객관적·합리적 평가 기준과 서면통지가 필요합니다.',
+      suggestion: '계약기간(1년 이상 여부)·직종(단순노무 해당 여부)을 확인해 최저임금 90% 이상을 보장하고, 객관적 수습평가표 및 서면 통지 절차를 명시합니다.'
+    },
+    {
+      id: 'annual_leave_waiver',
+      severity: 'warn',
+      badge: '주의 · 연차휴가',
+      title: '연차유급휴가 미사용수당 소멸 · 포괄산입 요건 점검',
+      pattern: /(?:연차수당[을\s]*지급하지|연차[\s\S]{0,18}자동\s*소멸|연차유급휴가[\s\S]{0,20}포기)/,
+      basis: '근로기준법 제60조 · 근로기준법 제61조(연차유급휴가의 사용 촉진)',
+      issue: '근로기준법 제61조가 정한 시기별 서면 촉진 절차를 적법하게 이행하지 않은 상태에서 연차미사용수당을 자동 소멸시키는 조항은 효력이 없습니다.',
+      suggestion: '근로기준법 제61조에 따른 1차(사용시기 지정 촉구)·2차(사용시기 지정 통보) 서면 촉진 절차를 모두 준수한 경우에 한하여 보상 의무가 면제됨을 명시합니다.'
+    },
+    {
+      id: 'work_rules_adverse',
+      severity: 'warn',
+      badge: '주의 · 취업규칙 변경',
+      title: '취업규칙·인사규정 일방적 불이익변경 절차 점검',
+      pattern: /(?:회사가\s*임의로\s*(?:변경|개정)|일방적으로\s*(?:변경|개정)|동의\s*없이\s*취업규칙)/,
+      basis: '근로기준법 제94조 제1항 단서 · 대법원 2018다200709 전원합의체 판결',
+      issue: '근로조건을 근로자에게 불리하게 변경하는 취업규칙 개정은 근로자 과반수(또는 과반수 노조)의 집단적 동의를 받지 않으면 원칙적으로 무효입니다.',
+      suggestion: '법령 개정 반영이나 유리한 변경은 의견청취로, 근로조건 불이익 변경 시에는 근로기준법 제94조 제1항 단서에 따른 과반수 집단적 동의 절차를 거친다는 문구로 수정합니다.'
+    }
+  ];
+
+  function analyzeDocumentClauses(rawText) {
+    var srcRaw = String(rawText || '').trim();
+    if (!srcRaw) {
+      return { findings: [], highCount: 0, warnCount: 0, clauseCount: 0 };
+    }
+    var partyNames = extractPartyNames(srcRaw, '');
+    var safeText = anonymizeLegalText(srcRaw, partyNames).text;
+
+    /* 조항(제N조) 단위 분할 시도 후, 조항 표기가 없으면 문단 단위 분할 */
+    var rawBlocks = safeText.split(/(?=(?:^|\n)\s*제\s*\d+\s*조)/g).map(function (b) { return b.trim(); }).filter(Boolean);
+    if (rawBlocks.length <= 1) {
+      rawBlocks = safeText.split(/\n{2,}/).map(function (b) { return b.trim(); }).filter(Boolean);
+    }
+
+    var findings = [];
+    var matchedRuleIds = new Set();
+
+    for (var bIdx = 0; bIdx < rawBlocks.length; bIdx++) {
+      var blk = rawBlocks[bIdx];
+      var clauseLabelMatch = /^(제\s*\d+\s*조(?:\s*\([^)]+\))?)/.exec(blk);
+      var clauseLabel = clauseLabelMatch ? clauseLabelMatch[1].replace(/\s+/g, ' ') : ('문단 ' + (bIdx + 1));
+      for (var rIdx = 0; rIdx < CLAUSE_RISK_RULES.length; rIdx++) {
+        var rule = CLAUSE_RISK_RULES[rIdx];
+        if (matchedRuleIds.has(rule.id)) continue;
+        if (rule.pattern.test(blk)) {
+          matchedRuleIds.add(rule.id);
+          findings.push({
+            id: rule.id,
+            ruleId: rule.id,
+            clauseLabel: clauseLabel,
+            severity: rule.severity,
+            badge: rule.badge,
+            title: rule.title,
+            excerpt: blk.length > 220 ? (blk.slice(0, 220) + '…') : blk,
+            basis: rule.basis,
+            issue: rule.issue,
+            suggestion: rule.suggestion
+          });
+        }
+      }
+    }
+
+    /* 문단 분할 경계를 넘어 전체 본문에서 탐지되는 복합 조항(예: 서두 용역계약 + 후반 출퇴근 조항) 추가 점검 */
+    for (var gIdx = 0; gIdx < CLAUSE_RISK_RULES.length; gIdx++) {
+      var gRule = CLAUSE_RISK_RULES[gIdx];
+      if (matchedRuleIds.has(gRule.id)) continue;
+      var gm = gRule.pattern.exec(safeText);
+      if (gm) {
+        matchedRuleIds.add(gRule.id);
+        var start = Math.max(0, gm.index - 20);
+        var snip = safeText.slice(start, Math.min(safeText.length, start + 200)).replace(/\s+/g, ' ');
+        findings.push({
+          id: gRule.id,
+          ruleId: gRule.id,
+          clauseLabel: '문서 종합',
+          severity: gRule.severity,
+          badge: gRule.badge,
+          title: gRule.title,
+          excerpt: snip + (safeText.length > start + 200 ? '…' : ''),
+          basis: gRule.basis,
+          issue: gRule.issue,
+          suggestion: gRule.suggestion
+        });
+      }
+    }
+
+    var highCount = findings.filter(function (f) { return f.severity === 'high'; }).length;
+    var warnCount = findings.filter(function (f) { return f.severity === 'warn'; }).length;
+    return {
+      findings: findings,
+      highCount: highCount,
+      warnCount: warnCount,
+      clauseCount: rawBlocks.length
+    };
+  }
+
+  /* 무료 오프라인 추출형 법률 분석·서면 합성기 (AI API 키·한도 없이도 ₩0 즉시 작동 · 판례+결정례+행정해석 동시 출력) */
+  function synthesizeOfflineAnswer(params, legacyDocs, legacyArticles, legacyWf, legacyExtra) {
+    if (typeof params === 'string') {
+      var ex = legacyExtra || {};
+      params = {
+        query: params,
+        mode: ex.mode || 'auto',
+        workflow: legacyWf || ex.workflow || null,
+        attached: ex.attached || [],
+        retrievedDocs: legacyDocs || ex.retrievedDocs || [],
+        retrievedArticles: legacyArticles || ex.retrievedArticles || [],
+        retrievedLawFamilies: ex.retrievedLawFamilies || []
+      };
+    } else {
+      params = params || {};
+    }
+    var rawQuery = String(params.query || '').trim();
+    var mode = params.mode || 'auto';
+    var query = anonymizeLegalText(rawQuery, extractPartyNames(rawQuery, '')).text;
+    var workflow = params.workflow || null;
+    var attached = Array.isArray(params.attached) ? params.attached : [];
+    var docs = Array.isArray(params.retrievedDocs) ? params.retrievedDocs.slice(0, 8) : [];
+    var arts = Array.isArray(params.retrievedArticles) ? params.retrievedArticles.slice(0, 5) : [];
+    var fams = Array.isArray(params.retrievedLawFamilies) ? params.retrievedLawFamilies.slice(0, 4) : [];
+
+    var combinedReviewSource = [query].concat(attached.map(function (a) {
+      return String(a.body || a.plainText || a.summary || '');
+    })).join('\n\n');
+    var clauseDiag = analyzeDocumentClauses(combinedReviewSource);
+    var matchedIssues = detectFactIssues(combinedReviewSource);
+
+    var precDocs = docs.filter(function (d) { return isPrecedentDoc(d); });
+    var interpAndDecDocs = docs.filter(function (d) { return isInterpDoc(d) || isDecisionDoc(d); });
+
+    var lines = [];
+    var secNo = 1;
+    var headTitle = workflow
+      ? ('### 📋 ' + workflow.title)
+      : (mode === 'review' ? '### ✦ 사실관계 · 문서 내용 검토 보고서 (법령·판례·유권해석 동시 대조)' : (mode === 'draft' ? '### ✎ 법률서면 · 의견서 초안' : '### ⚖️ P박스 법령·판례·결정례·행정해석 통합 검토'));
+    lines.push(headTitle);
+    lines.push('');
+    lines.push('#### ' + (secNo++) + '. 검토 요약 및 핵심 법리 진단');
+    lines.push('- **검토 대상 사실관계·질의**: ' + (query.length > 220 ? query.slice(0, 220) + '…' : query));
+    if (attached.length) {
+      lines.push('- **검토 대상 첨부 자료**: ' + attached.map(function (x) { return '`' + (x.title || x.caseNo) + '`'; }).join(', '));
+    }
+    if (matchedIssues.length) {
+      for (var mIdx = 0; mIdx < matchedIssues.length; mIdx++) {
+        var mi = matchedIssues[mIdx];
+        lines.push('- **[' + mi.title + ']**: ' + mi.conclusion);
+      }
+    } else if (clauseDiag && clauseDiag.findings.length) {
+      lines.push('- **조항 리스크 진단**: 총 **' + clauseDiag.findings.length + '건** (고위험 **' + clauseDiag.highCount + '건** · 주의 **' + clauseDiag.warnCount + '건**) 탐지됨');
+    } else if (docs.length) {
+      lines.push('- **핵심 판단 요약**: ' + docs[0].summary);
+    } else {
+      lines.push('- **핵심 판단 요약**: 관련 현행 법령 조문 및 유사 판례·행정해석의 요건사실 충족 여부를 단계별로 대조하여야 합니다.');
+    }
+
+    if (clauseDiag && clauseDiag.findings.length) {
+      lines.push('');
+      lines.push('#### ' + (secNo++) + '. 조항·쟁점별 위험요소 및 적법 수정 권고');
+      for (var cIdx = 0; cIdx < clauseDiag.findings.length; cIdx++) {
+        var cf = clauseDiag.findings[cIdx];
+        lines.push('- **[' + cf.badge + '] ' + cf.clauseLabel + ' — ' + cf.title + '**');
+        lines.push('  - **근거**: ' + cf.basis);
+        lines.push('  - **검토 의견**: ' + cf.issue);
+        lines.push('  - **수정 권고안**: ' + cf.suggestion);
+      }
+    }
+
+    lines.push('');
+    lines.push('#### ' + (secNo++) + '. 근거 법령 및 조문');
+    if (arts.length) {
+      for (var i = 0; i < arts.length; i++) {
+        var ar = arts[i];
+        lines.push('- **' + ar.lawTitle + ' ' + ar.articleNo + (ar.heading ? '(' + ar.heading + ')' : '') + '** *(시행 ' + (ar.effectiveDate || '현행') + ')*');
+        lines.push('  > ' + ar.snippet.replace(/\n+/g, ' '));
+      }
+    } else if (matchedIssues.length && matchedIssues[0].coreLaws && matchedIssues[0].coreLaws.length) {
+      for (var cl = 0; cl < matchedIssues[0].coreLaws.length; cl++) {
+        lines.push('- **' + matchedIssues[0].coreLaws[cl] + '**');
+      }
+    } else if (fams.length) {
+      for (var f = 0; f < fams.length; f++) {
+        lines.push('- **' + fams[f].title + '** (' + fams[f].files.join(' · ') + ') — 오른쪽 통합 근거창 또는 원문 보기에서 전체 조문을 즉시 열람할 수 있습니다.');
+      }
+    } else if (docs.length && docs[0].refLaws && docs[0].refLaws.length) {
+      for (var rl = 0; rl < docs[0].refLaws.length; rl++) {
+        lines.push('- **' + docs[0].refLaws[rl] + '**');
+      }
+    } else {
+      lines.push('- 근로기준법, 산업재해보상보험법 등 개별 노동관계법령의 강행규정 및 시행령 별표 기준을 우선 확인합니다.');
+    }
+
+    lines.push('');
+    lines.push('#### ' + (secNo++) + '. 대법원·헌법재판소·하급심 판례 법리');
+    if (precDocs.length) {
+      for (var p = 0; p < precDocs.length; p++) {
+        var pd = precDocs[p];
+        var pHead = [pd.court || pd.agency, pd.decisionDate, pd.caseNo].filter(Boolean).join(' ');
+        lines.push('- **[' + pHead + '] ' + pd.title + '**');
+        lines.push('  - ' + pd.summary);
+      }
+    } else {
+      lines.push('- 오른쪽 「통합 법령·판례·결정례·행정해석 한번에 보기」 패널의 실시간 수집 버튼으로 최신 판례를 추가 조회할 수 있습니다.');
+    }
+
+    lines.push('');
+    lines.push('#### ' + (secNo++) + '. 고용노동부·법제처 행정해석·유권해석 및 노동위·산재 결정례');
+    if (interpAndDecDocs.length) {
+      for (var idIdx = 0; idIdx < interpAndDecDocs.length; idIdx++) {
+        var idDoc = interpAndDecDocs[idIdx];
+        var iHead = [idDoc.court || idDoc.agency, idDoc.decisionDate, idDoc.caseNo].filter(Boolean).join(' ');
+        lines.push('- **[' + iHead + '] ' + idDoc.title + '**');
+        lines.push('  - ' + idDoc.summary);
+      }
+    } else {
+      lines.push('- 오른쪽 통합 근거창에서 고용노동부 행정해석·법제처 법령해석·중앙노동위원회 재결례 실시간 수집을 눌러 최신 유권해석을 즉시 보강할 수 있습니다.');
+    }
+
+    lines.push('');
+    lines.push('#### ' + (secNo++) + '. 실무 포섭 및 입증 체크리스트');
+    if (matchedIssues.length && matchedIssues[0].checklist && matchedIssues[0].checklist.length) {
+      for (var ck = 0; ck < matchedIssues[0].checklist.length; ck++) {
+        lines.push((ck + 1) + '. ' + matchedIssues[0].checklist[ck]);
+      }
+    } else {
+      lines.push('1. **처분·계약 문서 확인**: 근로계약서, 취업규칙·단체협약(시행일 기준 현행본), 임금명세서, 서면통지서 교부 여부 확인');
+      lines.push('2. **사실관계 객관화**: 근무시간·업무강도·지휘감독 또는 업무상 부담 내역을 일자별·수치별로 특정');
+      lines.push('3. **인용 원문 대조**: 우측 「판례·결정례·행정해석·법령 한번에 보기」 카드와 상단 인용 검증 배지를 눌러 원문을 직접 대조하십시오.');
+    }
+
+    return lines.join('\n');
+  }
+
+  var LEADING_CITE_STOP_RE = /^(?:또한|그리고|그러나|하지만|따라서|그러므로|한편|다만|즉|특히|아울러|나아가|반면|결국|우선|먼저|예컨대|가령|혹은|또는|및|내지|현행|구|개정|신|관련|위|해당|따라|따른|의한|의하여|비추어|위반한|적용되는|규정한|대법원|판결|결정|해석|참조)$/;
+
+  function resolveTargetLawFile(indexed, isDecree, isRule) {
+    var files = (indexed && Array.isArray(indexed.files)) ? indexed.files : [];
+    if (isDecree) {
+      var decAlt = files.find(function (fn) { return /^시행령\(/.test(fn); });
+      return (decAlt || '시행령') + '.md';
+    }
+    if (isRule) {
+      var ruleAlt = files.find(function (fn) { return /^시행규칙\(/.test(fn); });
+      return (ruleAlt || '시행규칙') + '.md';
+    }
+    return (indexed && indexed.primaryFile) ? indexed.primaryFile : '법률.md';
+  }
+
+  /* 띄어쓰기된 법령명('개인정보 보호법')과 하위법령('근로기준법 시행령')까지 놓치지 않고 추출하는 공통 파서 */
+  function extractLawCitationsFromText(text, lawDirSet) {
+    var src = String(text || '');
+    var out = [];
+    var artRe = /(제\s*\d+\s*조(?:\s*의\s*\d+)?)/g;
+    var am;
+    while ((am = artRe.exec(src))) {
+      var rawArtNo = am[1].replace(/\s+/g, '');
+      var endPos = am.index;
+      var beforeSlice = src.slice(Math.max(0, endPos - 64), endPos);
+      var tailMatch = /(?:^|[^0-9A-Za-z가-힣ㆍ])([가-힣ㆍ][가-힣ㆍ\s]{1,57})\s*$/.exec(beforeSlice);
+      if (!tailMatch) continue;
+
+      var candPhrase = tailMatch[1].trim().replace(/\s+/g, ' ');
+      if (!/(?:법률|법|시행령|시행규칙|헌법)$/.test(candPhrase)) continue;
+
+      var tokens = candPhrase.split(' ').filter(Boolean);
+      if (!tokens.length) continue;
+
+      /* 1순위: 국가법령 색인에 등록된 실제 법령명(공백 포함 최장 일치) 우선 매칭 */
+      var matchedRaw = '';
+      if (lawDirSet && lawDirSet.size > 0) {
+        for (var sIdx = 0; sIdx < tokens.length; sIdx++) {
+          var subRaw = tokens.slice(sIdx).join(' ');
+          var subNorm = subRaw.replace(/\s+/g, '');
+          var subBaseNorm = subNorm.replace(/(?:시행령|시행규칙)$/, '');
+          if (lawDirSet.has(subNorm) || (subBaseNorm.length >= 2 && lawDirSet.has(subBaseNorm))) {
+            matchedRaw = subRaw;
+            break;
+          }
+        }
+      }
+
+      /* 2순위: 색인 미제공 또는 미등록/가공 법령명('가짜 노동 특별법 시행령', '근로기준법 시행령' 등) 추출 */
+      if (!matchedRaw) {
+        var cutIdx = 0;
+        /* 앞쪽에 이전 절의 다른 법령 끝단어가 끼어 있으면 가장 마지막 법령 시작점 이후로 자름 */
+        for (var pIdx = 0; pIdx < tokens.length - 1; pIdx++) {
+          var tok = tokens[pIdx];
+          var nextTok = tokens[pIdx + 1] || '';
+          var isSubNext = /^(?:시행령|시행규칙)$/.test(nextTok);
+          if (/(?:법률|법|시행령|시행규칙)$/.test(tok) && !isSubNext) {
+            cutIdx = pIdx + 1;
+          }
+        }
+        while (cutIdx < tokens.length - 1) {
+          var w = tokens[cutIdx];
+          if (LEADING_CITE_STOP_RE.test(w) || /^(?:조|항|호|목)$/.test(w) || /(?:은|는|이|가|을|를|도|만|와|과|에서|에게|으로|로써|로서|부터|까지|처럼|보다|라고|라며|상)$/.test(w)) {
+            cutIdx++;
+          } else {
+            break;
+          }
+        }
+        matchedRaw = tokens.slice(cutIdx).join(' ').trim();
+      }
+
+      if (matchedRaw.replace(/\s+/g, '').length < 2) continue;
+      /* 단독 '시행령 제3조'처럼 본법 없이 시행령만 적힌 일반 지칭은 제외 */
+      if (/^(?:법|법률|시행령|시행규칙)$/.test(matchedRaw.replace(/\s+/g, ''))) continue;
+
+      out.push({
+        rawLawName: matchedRaw,
+        rawArtNo: rawArtNo
+      });
+    }
+    return out;
+  }
+
+  /* 답변 문자열에서 인용된 현행 국가법령 목록 추출 (검증 전 조문 자동 로드용) */
+  function extractCitedLawTargets(answerText, lawIndex) {
+    var idxArr = Array.isArray(lawIndex) ? lawIndex : [];
+    var lawDirSet = new Map();
+    for (var k = 0; k < idxArr.length; k++) {
+      lawDirSet.set(idxArr[k].dir, idxArr[k]);
+      lawDirSet.set(idxArr[k].title.replace(/\s+/g, ''), idxArr[k]);
+    }
+    var cites = extractLawCitationsFromText(answerText, lawDirSet);
+    var out = [];
+    var seen = new Set();
+    for (var i = 0; i < cites.length; i++) {
+      var rawLawName = cites[i].rawLawName;
+      var isDecree = /시행령$/.test(rawLawName);
+      var isRule = /시행규칙$/.test(rawLawName);
+      var exactNorm = rawLawName.replace(/\s+/g, '');
+      var baseLawNorm = exactNorm.replace(/(?:시행령|시행규칙)$/, '');
+      var indexed = lawDirSet.get(exactNorm) || lawDirSet.get(baseLawNorm);
+      if (!indexed) continue;
+      var targetFile = resolveTargetLawFile(indexed, isDecree, isRule);
+      var cKey = indexed.dir + '/' + targetFile;
+      if (seen.has(cKey)) continue;
+      seen.add(cKey);
+      out.push({ dir: indexed.dir, fileName: targetFile });
+    }
+    return out;
+  }
+
+  /* 기계적 인용 검증기 — AI 답변 속 사건번호·문서번호·법령 조문이 실제 원문 코퍼스에 존재하는지 엄격 대조 */
+  function verifyCitations(answerText, opts) {
+    opts = opts || {};
+    var docs = Array.isArray(opts.docs) ? opts.docs : [];
+    var loadedLaws = Array.isArray(opts.loadedLaws) ? opts.loadedLaws : [];
+    var lawIndex = Array.isArray(opts.lawIndex) ? opts.lawIndex : [];
+    var text = String(answerText || '');
+
+    var docMap = new Map();
+    var refOnlyMap = new Map();
+    for (var i = 0; i < docs.length; i++) {
+      var hasBody = String(docs[i].body || '').trim().length >= 20;
+      var cno = normalizeCaseNo(docs[i].caseNo);
+      if (cno && hasBody) docMap.set(cno, docs[i]);
+      var refs = docs[i].refCases || [];
+      for (var r = 0; r < refs.length; r++) {
+        var rc = normalizeCaseNo(refs[r]);
+        if (rc && !docMap.has(rc) && !refOnlyMap.has(rc)) {
+          refOnlyMap.set(rc, { parentId: docs[i].id, parentCaseNo: docs[i].caseNo, rawRef: refs[r] });
+        }
+      }
+    }
+
+    var loadedByKey = new Map();
+    var loadedByTitle = new Map();
+    for (var l = 0; l < loadedLaws.length; l++) {
+      var lw = loadedLaws[l];
+      if (!lw || lw.isRepealStub) continue;
+      if (lw.dir && lw.fileName) loadedByKey.set(lw.dir + '/' + lw.fileName, lw);
+      if (lw.title) loadedByTitle.set(lw.title.replace(/\s+/g, ''), lw);
+      if (lw.dir && (!lw.fileName || /^법률/.test(lw.fileName))) {
+        loadedByTitle.set(lw.dir, lw);
+      }
+    }
+
+    var lawDirSet = new Map();
+    for (var k = 0; k < lawIndex.length; k++) {
+      lawDirSet.set(lawIndex[k].dir, lawIndex[k]);
+      lawDirSet.set(lawIndex[k].title.replace(/\s+/g, ''), lawIndex[k]);
+    }
+
+    var items = [];
+    var seen = new Set();
+
+    /* ① 판례·재결 사건번호 검출 (단자리 일련번호 2025다1 포함 · 날짜/단위 숫자 오탐 제외) */
+    var caseRe = /(?:^|[^\d])((?:19|20)\d{2}\s*(?:다|두|도|누|구합|구단|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결)\s*\d{1,8}|(?:19|20)\d{2}[가-힣]{1,3}\d{2,8}|9\d[가-힣]{1,3}\d{1,8})(?![\d])/g;
+    var cm;
+    while ((cm = caseRe.exec(text))) {
+      var rawCase = cm[1].replace(/\s+/g, '');
+      if (/^\d{2,4}(?:년|월|일|원|명|시간|회|조|항|호|차|편|건|개|세|배|기)\d*$/.test(rawCase)) continue;
+      if (seen.has('case:' + rawCase)) continue;
+      seen.add('case:' + rawCase);
+      var normCase = normalizeCaseNo(rawCase);
+      var hitDoc = docMap.get(normCase);
+      var refHit = !hitDoc ? refOnlyMap.get(normCase) : null;
+      items.push({
+        raw: rawCase,
+        kind: 'case',
+        verified: !!hitDoc,
+        status: hitDoc ? 'verified' : (refHit ? 'ref_only' : 'missing'),
+        targetId: hitDoc ? hitDoc.id : '',
+        matchedTitle: hitDoc
+          ? hitDoc.title
+          : (refHit
+            ? (refHit.parentCaseNo + ' 본문 내 참조판례로만 언급됨 (단독 전문 미보유 — 원문 직접 확인 필요)')
+            : '내장·수집 코퍼스에 원문 미보유 (외부 선고번호 직접 확인 권장)')
+      });
+    }
+
+    /* ② 행정해석·고시·재심사·판정기준 문서번호 검출 (예: 임금근로시간과-2271, 산재보상정책과-출퇴근재해지침, 중노위 판정기준-수습본채용거부) */
+    var interpRe = /([가-힣]{1,14}(?:\s*판정기준|과|팀|부|실|위원회|위|고시|재심사)-[0-9가-힣]{1,18})/g;
+    var im;
+    while ((im = interpRe.exec(text))) {
+      var rawDocNo = im[1];
+      if (seen.has('interp:' + rawDocNo)) continue;
+      seen.add('interp:' + rawDocNo);
+      var hitInterp = docMap.get(normalizeCaseNo(rawDocNo));
+      items.push({
+        raw: rawDocNo,
+        kind: 'interp',
+        verified: !!hitInterp,
+        status: hitInterp ? 'verified' : 'missing',
+        targetId: hitInterp ? hitInterp.id : '',
+        matchedTitle: hitInterp ? hitInterp.title : '수집 코퍼스에 원문 미보유'
+      });
+    }
+
+    /* ③ 법령 조문 검출 (띄어쓴 법령명 '개인정보 보호법', 하위법령 '근로기준법 시행령', 가공 법령 '가짜법' 모두 포착) */
+    var lawCites = extractLawCitationsFromText(text, lawDirSet);
+    for (var lc = 0; lc < lawCites.length; lc++) {
+      var rawLawName = lawCites[lc].rawLawName;
+      var rawArtNo = lawCites[lc].rawArtNo;
+      var keyStr = rawLawName + ' ' + rawArtNo;
+      if (seen.has('law:' + keyStr)) continue;
+      seen.add('law:' + keyStr);
+
+      var isDecree = /시행령$/.test(rawLawName);
+      var isRule = /시행규칙$/.test(rawLawName);
+      var exactNorm = rawLawName.replace(/\s+/g, '');
+      var baseLawNorm = exactNorm.replace(/(?:시행령|시행규칙)$/, '');
+      var indexed = lawDirSet.get(exactNorm) || lawDirSet.get(baseLawNorm) || null;
+      var targetFile = resolveTargetLawFile(indexed, isDecree, isRule);
+
+      var loaded = loadedByTitle.get(exactNorm) || null;
+      if (!loaded && indexed) {
+        loaded = loadedByKey.get(indexed.dir + '/' + targetFile) || null;
+      }
+      if (!loaded && !isDecree && !isRule) {
+        loaded = loadedByTitle.get(baseLawNorm) || null;
+      }
+
+      if (loaded && Array.isArray(loaded.articles) && loaded.articles.length > 0) {
+        var foundArt = loaded.articles.find(function (a) { return a.no === rawArtNo; });
+        items.push({
+          raw: keyStr,
+          kind: 'law',
+          verified: !!foundArt,
+          status: foundArt ? 'verified' : 'missing_article',
+          lawDir: loaded.dir,
+          fileName: loaded.fileName || targetFile,
+          articleNo: rawArtNo,
+          matchedTitle: foundArt
+            ? (loaded.title + ' ' + foundArt.no + (foundArt.heading ? '(' + foundArt.heading + ')' : '') + ' — 조문 실재 확인')
+            : (loaded.title + ' 원문 내 ' + rawArtNo + ' 조문 없음 (조문 번호 오류 또는 삭제 여부 확인 필요)')
+        });
+      } else if (indexed) {
+        var expectedBase = targetFile.replace(/\.md$/, '');
+        var hasFileInFam = !Array.isArray(indexed.files) || indexed.files.some(function (fn) {
+          return fn === expectedBase ||
+            (isDecree && /^시행령/.test(fn)) ||
+            (isRule && /^시행규칙/.test(fn)) ||
+            (!isDecree && !isRule && /^법률/.test(fn));
+        });
+        if (!hasFileInFam) {
+          items.push({
+            raw: keyStr,
+            kind: 'law',
+            verified: false,
+            status: 'missing_law',
+            lawDir: indexed.dir,
+            fileName: '',
+            articleNo: rawArtNo,
+            matchedTitle: rawLawName + ' — 해당 하위법령(시행령·시행규칙) 미존재'
+          });
+        } else {
+          /* 조문 본문을 아직 열지 않은 상태에서는 임의 조문번호(예: 제99999조)를 검증 완료로 오판하지 않는다 */
+          items.push({
+            raw: keyStr,
+            kind: 'law',
+            verified: false,
+            status: 'unfetched_law',
+            lawDir: indexed.dir,
+            fileName: targetFile,
+            articleNo: rawArtNo,
+            matchedTitle: indexed.title + (isDecree ? ' 시행령' : (isRule ? ' 시행규칙' : '')) + ' (국가법령 색인 확인 · 조문 본문 미로드 — 클릭하여 실제 조문 대조)'
+          });
+        }
+      } else {
+        items.push({
+          raw: keyStr,
+          kind: 'law',
+          verified: false,
+          status: 'missing_law',
+          lawDir: '',
+          fileName: '',
+          articleNo: rawArtNo,
+          matchedTitle: rawLawName + ' — 현행 국가법령(5,773편)에 등록되지 않은 법령명'
+        });
+      }
+    }
+
+    var verifiedCount = items.filter(function (x) { return x.verified; }).length;
+    var unverifiedCount = items.length - verifiedCount;
+
+    return {
+      items: items,
+      verifiedCount: verifiedCount,
+      unverifiedCount: unverifiedCount,
+      allVerified: unverifiedCount === 0
+    };
+  }
+
+  function anonymizeText(rawText, fileName) {
+    var src = String(rawText || '');
+    var fn = String(fileName || '');
+    var names = extractPartyNames(src, fn);
+    return anonymizeLegalText(src, names);
+  }
+
+  global.PuPBoxEngine = {
+    todayKstYmd: todayKstYmd,
+    parseYamlFrontmatter: parseYamlFrontmatter,
+    effectiveState: effectiveState,
+    parseLawMarkdown: parseLawMarkdown,
+    normalizeCourt: normalizeCourt,
+    normalizeCaseNo: normalizeCaseNo,
+    deterministicDocHash16: deterministicDocHash16,
+    canonicalKeyOf: canonicalKeyOf,
+    serverCanonicalKeyOf: serverCanonicalKeyOf,
+    shingleSimilarity: shingleSimilarity,
+    deduplicateDocs: deduplicateDocs,
+    extractPartyNames: extractPartyNames,
+    anonymizeLegalText: anonymizeLegalText,
+    hasResidualHardPiiClient: hasResidualHardPiiClient,
+    anonymizeText: anonymizeText,
+    extractRulingMeta: extractRulingMeta,
+    ingestRawDocument: ingestRawDocument,
+    ingestJsonDataset: ingestJsonDataset,
+    extractChosung: extractChosung,
+    isChosungOnly: isChosungOnly,
+    resolveSmartLawJump: resolveSmartLawJump,
+    parseSmartQueryOperators: parseSmartQueryOperators,
+    extractHighlightTerms: extractHighlightTerms,
+    tokenizeQuery: tokenizeQuery,
+    searchCorpus: searchCorpus,
+    detectFactIssues: detectFactIssues,
+    extractSafeLegalOfficialQuery: extractSafeLegalOfficialQuery,
+    classifyPromptIntent: classifyPromptIntent,
+    groupUnifiedAuthorities: groupUnifiedAuthorities,
+    searchUnifiedAllInOne: searchUnifiedAllInOne,
+    analyzeFactPatternInstant: analyzeFactPatternInstant,
+    analyzeDocumentClauses: analyzeDocumentClauses,
+    buildRagPrompt: buildRagPrompt,
+    synthesizeOfflineAnswer: synthesizeOfflineAnswer,
+    extractLawCitationsFromText: extractLawCitationsFromText,
+    extractCitedLawTargets: extractCitedLawTargets,
+    verifyCitations: verifyCitations
+  };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = global.PuPBoxEngine;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);

@@ -18,11 +18,11 @@ function 떼기(머리) {
 const 폴더 = (name, subs) => ({ name, getDirectoryHandle: async (n) => { if ((subs || []).indexOf(n) < 0) throw new Error('없음'); return {}; } });
 function 상자(이어둔, 고를것들) {
   const 기록 = { 고르기: 0, 알림: [] };
-  const ctx = { console, KcareerCases: { CASE_ROOT: '7. 컨설턴트,위원신청등' },
+  const ctx = { console, KcareerCases: { CASE_ROOT: '7. 컨설턴트,위원신청등' }, KcareerScan: require('../js/kcareer-scan.js'),   /* _fsDir 가 번호 있는·없는 이름을 같이 본다(2026-11-15) */
     fsRoot: async () => 이어둔, fsConnectFolder: async () => { 기록.고르기++; return 고를것들.shift() || null; },
     toast: (m) => 기록.알림.push(m) };
   vm.createContext(ctx);
-  vm.runInContext(['var _fsRepick=false;', 떼기('async function _fsHas('), 떼기('async function fsRootOrConnect(')].join('\n'), ctx);
+  vm.runInContext(['var _fsRepick=false;', 떼기('async function _fsDir('), 떼기('async function _fsHas('), 떼기('async function fsRootOrConnect(')].join('\n'), ctx);
   return { ctx, 기록 };
 }
 const 칠 = '7. 컨설턴트,위원신청등';

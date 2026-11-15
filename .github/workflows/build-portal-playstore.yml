@@ -1,0 +1,133 @@
+name: 푸른포털 Play 스토어 앱 빌드 (AAB·APK)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/portal-twa/**'
+      - '.github/workflows/build-portal-playstore.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'android/portal-twa/**'
+      - '.github/workflows/build-portal-playstore.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # PR 및 비기본 브랜치 검증 빌드: 업로드 서명 시크릿을 일절 주입하지 않고 API 36 컴파일·축소·번들링만 안전하게 검증한다.
+  verify-pr:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/portal-twa
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Java 17 준비
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 준비
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Android SDK 36 라이선스 승인
+        run: |
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          fi
+
+      - name: PR 검증용 AAB·APK 컴파일 확인
+        run: gradle :app:bundleRelease :app:assembleRelease --no-daemon
+
+  # 보호된 main 브랜치(refs/heads/main)의 푸시 또는 main 수동 실행에서만 서명 시크릿을 사용한다.
+  build-release:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/portal-twa
+    env:
+      PORTAL_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PORTAL_UPLOAD_KEYSTORE_BASE64 }}
+      PORTAL_UPLOAD_STORE_PASSWORD: ${{ secrets.PORTAL_UPLOAD_STORE_PASSWORD }}
+      PORTAL_UPLOAD_KEY_ALIAS: ${{ secrets.PORTAL_UPLOAD_KEY_ALIAS }}
+      PORTAL_UPLOAD_KEY_PASSWORD: ${{ secrets.PORTAL_UPLOAD_KEY_PASSWORD }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Java 17 준비
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 준비
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Android SDK 36 라이선스 승인
+        run: |
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          fi
+
+      - name: 업로드 서명키 4종 시크릿 검증 및 준비
+        run: |
+          if [ -n "$PORTAL_UPLOAD_KEYSTORE_BASE64" ] && \
+             [ -n "$PORTAL_UPLOAD_STORE_PASSWORD" ] && \
+             [ -n "$PORTAL_UPLOAD_KEY_ALIAS" ] && \
+             [ -n "$PORTAL_UPLOAD_KEY_PASSWORD" ]; then
+            printf '%s' "$PORTAL_UPLOAD_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/portal-upload.jks"
+            echo "PORTAL_UPLOAD_KEYSTORE_FILE=$RUNNER_TEMP/portal-upload.jks" >> "$GITHUB_ENV"
+            echo "PORTAL_UPLOAD_SIGNING_READY=1" >> "$GITHUB_ENV"
+            echo "고정 업로드 서명키 4종 확인 완료 — Play Console 제출용 정식 AAB가 생성됩니다."
+          else
+            echo "PORTAL_UPLOAD_SIGNING_READY=0" >> "$GITHUB_ENV"
+            echo "::notice::PORTAL_UPLOAD_* 4개 시크릿이 모두 채워지지 않아 검증용 임시 서명으로 빌드합니다."
+          fi
+
+      - name: Play 스토어용 AAB 및 점검용 APK 빌드
+        run: gradle :app:bundleRelease :app:assembleRelease --no-daemon
+
+      - name: 서명 지문 및 제출 안내 요약 출력
+        run: |
+          {
+            echo "## 푸른포털 Google Play 스토어 빌드 결과"
+            echo "- 패키지 ID: \`kr.pureun.portal\`"
+            echo "- 대상 SDK: \`targetSdk = 36\` / \`compileSdk = 36\` / \`minSdk = 26\`"
+            if [ "${PORTAL_UPLOAD_SIGNING_READY:-0}" = "1" ] && [ -f "${PORTAL_UPLOAD_KEYSTORE_FILE:-}" ]; then
+              SHA256=$(keytool -list -v -keystore "$PORTAL_UPLOAD_KEYSTORE_FILE" -alias "$PORTAL_UPLOAD_KEY_ALIAS" -storepass:env PORTAL_UPLOAD_STORE_PASSWORD | grep -m1 'SHA256:' | sed 's/.*SHA256:[[:space:]]*//')
+              echo "- 서명 상태: **정식 업로드 서명키 적용 완료**"
+              echo "- 업로드 키 SHA-256 지문: \`$SHA256\`"
+              echo ""
+              echo "> **중요**: Google Play 앱 서명(Play App Signing) 사용 시 Play Console **설정 → 앱 무결성 → 앱 서명 키 인증서**의 SHA-256 지문도 \`assetlinks.json\`에 함께 등록하세요."
+            else
+              echo "- 서명 상태: **검증용 임시 서명 (Play Console 업로드 전 \`node scripts/play-store-setup.js --init-keystore\` 실행 필요)**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Play Console 제출용 AAB 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: pureun-portal-playstore-aab
+          path: android/portal-twa/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 사전 기기 점검용 APK 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: pureun-portal-playstore-apk
+          path: android/portal-twa/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

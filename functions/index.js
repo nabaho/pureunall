@@ -33,7 +33,7 @@ const {
 const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-        올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
+        올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
@@ -59,6 +59,7 @@ function geoip나라(ip) {
 }
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
+const MailReqScope = require("./mail-req-scope");   /* 경력관리 «요청 메일» 범위 분류(업무 vs 이력·회의·비용) — 애매한 건만 Jev 에게 */
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
@@ -2116,13 +2117,15 @@ exports.newsletterWatchSunday = functions
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
     const 회차 = await 감시용회차(db, 열쇠);
     const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
-    const [판례모음, 지난것, 노무사회메타] = await Promise.all([
+    /* ★ 판례탈 — 판례 모으개가 남긴 «못 모은 까닭»(2026-11-15). 「3주 넘게 새로 없음」에 까닭을 붙인다 */
+    const [판례모음, 지난것, 노무사회메타, 판례탈] = await Promise.all([
       db.ref("homepage/newsPrec/모음").once("value"),
       db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value"),
-      db.ref("ilabor/meta").once("value")]);
+      db.ref("ilabor/meta").once("value"),
+      db.ref("homepage/newsPrec/탈").once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
-      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
+      판례모음: 판례모음.val(), 판례탈: 판례탈.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
     /* ★ AI 교정 (2026-10-05) — 우리 말·한마디를 원문(판례 사건번호·선고일·판시사항, 법제처 조문)과 대조.
          AI 는 «확인할 것»만 올린다. 실패하면 그 줄만 빠지고 규칙 점검은 그대로 간다. */
     try {
@@ -3666,6 +3669,39 @@ exports.typeSafeEvaluate = functions
     }
   });
 
+/* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
+   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
+   본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
+   ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
+   ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
+exports.mailReqScope = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let who;
+    try { who = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    try {
+      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
+      res.status(out.status).json(out.body);
+    } catch (e) {
+      console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
+
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
      enter·경력관리)을 다 옮기고 `firebase functions:secrets:set GEMINI_KEY` 를
@@ -3782,6 +3818,21 @@ exports.readDoc = functions
     if (body.freeFirst !== false) {
       const 줄인것 = await freeFirstSlim(v.parts, v.app);
       if (줄인것) parts = 줄인것;
+    }
+    if (v.app === "pbox") {
+      if (parts.some((p) => !p || typeof p !== "object" || Object.keys(p).length !== 1 || typeof p.text !== "string")) {
+        res.status(400).json({ ok: false, error: "P박스 AI 질의는 비식별 텍스트만 허용됩니다.", status: 400 });
+        return;
+      }
+      const PBoxSync = require("./pbox-sync");
+      parts = parts.map(function (p) {
+        const names = PBoxSync.extractPartyNamesServer(p.text, "");
+        return { text: PBoxSync.scrubServerPii(p.text, names) };
+      });
+      if (PBoxSync.hasResidualHardPii(parts)) {
+        res.status(400).json({ ok: false, error: "민감 개인정보가 감지되어 외부 AI 호출을 차단했습니다.", status: 400 });
+        return;
+      }
     }
 
     // cfg = 부르는 쪽이 정한 값(온도·최대 길이). 걸러진 것만 넘어온다.
@@ -4612,6 +4663,7 @@ exports.newsView = functions
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
       /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
       res.set("Cache-Control", "public, max-age=300");
+      res.set("Content-Security-Policy", NV.전문보안);   // 2026-11-15 보안 — 전문 칸에 심은 스크립트·양식이 돌지 않게
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
@@ -4705,8 +4757,12 @@ exports.newsFullPage = functions
       const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
+        /* ★★ 못 받아 오면 «오류 쪽»이 아니라 국가법령정보센터 공개 쪽으로 곧장 보낸다 (2026-11-15).
+             법제처 DRF 가 OC=test 를 거절하면서 받는 분이 「전문 보기」를 누를 때마다 «받아 오지 못했습니다»
+             쪽을 먼저 보고, 그 아래 단추를 한 번 더 눌러야 했다(그 단추마저 예전에는 실패 쪽이었다).
+           ⚠ 공개 쪽은 우리 양식이 아니다 — 그래도 판례를 «바로» 보시는 편이 오류 쪽보다 낫다. 굳히지 않는다. */
         res.set("Cache-Control", "no-store");
-        res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
+        res.redirect(302, 법제처);
         return;
       }
       /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
@@ -4721,8 +4777,9 @@ exports.newsFullPage = functions
       res.status(200).send(NF.쪽(것, 법제처));
     } catch (e) {
       console.warn("newsFullPage", (e && e.message) || e);
+      /* 받다가 끊겨도 같다 — 공개 쪽으로 곧장(위 ★★ 참고) */
       res.set("Cache-Control", "no-store");
-      res.status(502).send(NF.오류쪽(NF.까닭말["못받음"], 법제처));
+      res.redirect(302, 법제처);
     }
   });
 
@@ -5973,13 +6030,26 @@ async function 자료거리모으기(몇개) {
      편지 짓는 층을 안 고쳐도 되고, 한 꼭지에 섞여 나란히 실린다. */
 const 해석찾을말 = ["근로기준법", "근로자퇴직급여", "산업안전보건법", "노동조합"];
 
+/* ★ 법제처 DRF 목록을 받는다 — «거절»(200 인데 「사용자 정보 검증에 실패」)이면 던진다 (2026-11-15).
+   ⚠⚠ 예전에는 거절 몸을 그대로 읽어 «0건»으로 넘어갔다. 탈(오류) 칸이 비어 있으니 감시꾼은
+     「판례가 3주 넘게 새로 안 들어왔습니다」만 알 뿐 까닭을 몰랐다(10월 9일부터 다섯 주).
+   ⚠ 낱말 «하나»가 거절되면 다른 낱말도 다 거절이다(같은 열쇠) — 모두 거절이면 모으기 전체를 탈로 남긴다. */
+const 법제처거절말 = "법제처 공동활용(DRF)이 열쇠 OC=test 를 거절했습니다 — 「사용자 정보 검증에 실패」. "
+  + "법제처 OPEN API 열쇠를 새로 받아 서버 주소를 등록해야 판례·행정해석을 다시 모읍니다";
+async function 법제처목록받기(주소) {
+  const 글 = await 쪽받기(주소);
+  if (판례부품.거절인가(글)) { const e = new Error(법제처거절말); e.거절 = true; throw e; }
+  return 글;
+}
+
 async function 해석거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(6, Number(몇개) || 2));
-  let 다 = [];
+  let 다 = [], 거절 = 0;
   for (const w of 해석찾을말) {
-    try { 다 = 다.concat(판례부품.해석목록읽기(await 쪽받기(판례부품.해석목록주소(w, 5)))); }
-    catch (e) { console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
+    try { 다 = 다.concat(판례부품.해석목록읽기(await 법제처목록받기(판례부품.해석목록주소(w, 5)))); }
+    catch (e) { if (e.거절) 거절++; console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
   }
+  if (거절 === 해석찾을말.length) throw new Error(법제처거절말);
   const out = [];
   for (const c of 판례부품.해석추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
@@ -5999,11 +6069,13 @@ async function 해석거리모으기(몇개, 모아둔것) {
 /* 법제처에서 노무 판례를 모은다 — 판시사항이 있는 것만 */
 async function 판례거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(8, Number(몇개) || 4));
-  let 다 = [];
+  let 다 = [], 거절 = 0;
   for (const w of 판례찾을말) {
-    try { 다 = 다.concat(판례부품.목록읽기(await 쪽받기(판례부품.목록주소(w, 5)))); }
-    catch (e) { console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
+    try { 다 = 다.concat(판례부품.목록읽기(await 법제처목록받기(판례부품.목록주소(w, 5)))); }
+    catch (e) { if (e.거절) 거절++; console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
   }
+  /* 모두 거절이면 «0건»이 아니라 «못 모았다» — 자료판례모아담기 가 탈로 남기고 감시꾼이 까닭을 보인다 */
+  if (거절 === 판례찾을말.length) throw new Error(법제처거절말);
   const out = [];
   for (const c of 판례부품.판례추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
@@ -6735,6 +6807,25 @@ exports.publishSite = functions
         res.status(413).json({ error: "너무 큽니다(" + Math.round(bytes / 1024) + "KB). "
           + "한도는 " + Math.round(한도 / 1024) + "KB 입니다." });
         return;
+      }
+
+      /* ★ 2026-11-15 보안 — «실행되는 조각»을 새로 넣는 올리기와 SVG 그림은 총괄관리자만(까닭은 site-publish.js 실행조각 머리).
+         글·표·그림(png·jpg·webp) 고치기는 지금처럼 재직 직원 누구나. 있던 쪽을 못 읽으면(새 쪽 포함) 빈 쪽과 견준다 — 막는 쪽으로 기운다. */
+      const 관리자인가 = ((await getDatabase().ref("uid_roles/" + decoded.uid + "/isAdmin").once("value")).val() === true);
+      if (!관리자인가) {
+        if (그림인가 && /\.svg$/i.test(String(path))) {
+          res.status(403).json({ error: "SVG 그림은 총괄관리자만 올릴 수 있습니다 — png·jpg·webp 로 올려 주세요." });
+          return;
+        }
+        if (!그림인가) {
+          let 있던쪽 = "";
+          try { 있던쪽 = await 새홈페이지쪽(홈페이지자리(path)); } catch (e) { 있던쪽 = ""; }
+          const 새것 = 새실행조각(있던쪽, String(content));
+          if (새것.length) {
+            res.status(403).json({ error: "스크립트·실행 코드가 새로 들어간 쪽은 총괄관리자만 올릴 수 있습니다(" + 새것.length + "곳). 글만 고쳐 다시 올려 주세요." });
+            return;
+          }
+        }
       }
 
       const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
@@ -8162,5 +8253,90 @@ exports.visitSmsSend = functions
     } catch (e) {
       if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
       res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
+    }
+  });
+
+/* ── P박스(pu-pbox.html) 법령·판례·행정해석·산재하급심 자동 동기화 (2026-11-14) ──
+   선언되지 않은 비밀키로 배포가 막히지 않게 secrets 배열을 두지 않고 process.env 에서 선택적으로 읽는다.
+   파이어베이스 실시간DB에는 아무것도 쓰지 않아 RTDB 저장·대역폭 비용이 0원이다. */
+exports.pboxDailySync = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 180, memory: "256MB" })
+  .pubsub.schedule("every day 03:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const PBoxSync = require("./pbox-sync");
+    const r = await PBoxSync.runSync({ env: process.env });
+    console.log("[P박스 일일 동기화]", JSON.stringify({
+      krTreeSha: r.krTreeSha,
+      dedupedCount: r.dedupedCount,
+      supabasePushed: r.supabasePushed
+    }));
+    return null;
+  });
+
+const _pboxRateState = {
+  globalByAct: Object.create(null),
+  uidByAct: new Map()
+};
+
+async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs) {
+  const now = Date.now();
+  if (_pboxRateState.uidByAct.size > 500) {
+    for (const [k, ts] of _pboxRateState.uidByAct.entries()) {
+      if (now - ts > 300000) _pboxRateState.uidByAct.delete(k);
+    }
+  }
+  const gLast = _pboxRateState.globalByAct[action] || 0;
+  if (globalMinMs > 0 && now - gLast < globalMinMs) {
+    const waitSec = Math.max(1, Math.ceil((globalMinMs - (now - gLast)) / 1000));
+    return "공용 공공API 한도 보호를 위해 잠시 후(" + waitSec + "초 뒤) 다시 시도해 주세요.";
+  }
+  const uKey = String(uid || "") + ":" + action;
+  const uLast = _pboxRateState.uidByAct.get(uKey) || 0;
+  if (uidMinMs > 0 && now - uLast < uidMinMs) {
+    const waitSec2 = Math.max(1, Math.ceil((uidMinMs - (now - uLast)) / 1000));
+    return "연속 수집 요청 간격 제한입니다. " + waitSec2 + "초 후 다시 시도해 주세요.";
+  }
+  const shared = await PBoxSync.claimActionCooldownShared({
+    db: getDatabase(),
+    uid,
+    action,
+    uidMinMs,
+    globalMinMs,
+    nowMs: now
+  });
+  if (!shared || shared.ok !== true) {
+    return (shared && shared.error) || "수집 호출 제한 확인 중 잠시 후 다시 시도해 주세요.";
+  }
+  _pboxRateState.globalByAct[action] = now;
+  _pboxRateState.uidByAct.set(uKey, now);
+  return "";
+}
+
+exports.pboxApi = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const PBoxSync = require("./pbox-sync");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    try {
+      const result = await PBoxSync.handleApiAction({
+        body,
+        uid: me.uid,
+        env: process.env,
+        fetchFn: fetch,
+        enforceCooldown: (uid, action, uidMinMs, globalMinMs) =>
+          enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs)
+      });
+      res.status(result.status).json(result.payload);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 240) });
     }
   });

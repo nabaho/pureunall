@@ -30,10 +30,20 @@ function 한건주소(일련번호) {
   return 밑 + "/DRF/lawService.do?OC=test&target=prec&type=XML&ID="
     + encodeURIComponent(String(일련번호 || ""));
 }
-/* 사람이 눌러 볼 자리 — 서식 있는 쪽 */
+/* 사람이 눌러 볼 자리 — 국가법령정보센터의 «공개 쪽»(열쇠 없이 열린다).
+   ⚠⚠ 예전에는 DRF 의 서식 쪽(type=HTML·OC=test)이었다. 법제처가 OC=test 를 거절하면서 그 쪽은
+     받는 분 눈에 「국가법령정보 공동활용 페이지 접속에 실패하였습니다」가 됐다(2026-11-15 실측).
+     같은 번호(일련번호 = precSeq)로 공개 쪽이 그 판례를 그대로 연다. 옛 꼴은 Core.법제처사람주소 가 바꾼다. */
 function 보는주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=prec&type=HTML&ID="
+  return 밑 + "/LSW/precInfoP.do?precSeq="
     + encodeURIComponent(String(일련번호 || ""));
+}
+
+/* 법제처 DRF 가 우리를 «거절»했나 — 응답은 200 인데 몸이 「사용자 정보 검증에 실패」다(2026-11-15 실측).
+   ⚠⚠ 200 이라 오류로 안 잡히고 «0건»으로 조용히 넘어갔다 — 그래서 10월 9일 뒤로 판례가 한 건도
+     안 들어왔는데 탈(오류) 칸은 늘 비어 있었다. 이 말이 보이면 «못 읽었다»로 친다. */
+function 거절인가(글) {
+  return /사용자 정보 검증에 실패|공동활용 페이지 접속에 실패/.test(String(글 == null ? "" : 글));
 }
 
 /* ── 글자 다듬기 ────────────────────────────────────────────────────── */
@@ -273,8 +283,9 @@ function 해석한건주소(일련번호) {
   return 밑 + "/DRF/lawService.do?OC=test&target=expc&type=XML&ID="
     + encodeURIComponent(String(일련번호 || ""));
 }
+/* 사람이 눌러 볼 자리 — 판례(보는주소)와 같은 까닭으로 공개 쪽이다(2026-11-15) */
 function 해석보는주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=expc&type=HTML&ID="
+  return 밑 + "/LSW/expcInfoP.do?expcSeq="
     + encodeURIComponent(String(일련번호 || ""));
 }
 
@@ -420,7 +431,7 @@ function 안모은것만(후보들, 모아둔것) {
 
 module.exports = {
   안모은것만: 안모은것만,
-  밑: 밑, 목록주소: 목록주소, 한건주소: 한건주소, 보는주소: 보는주소,
+  밑: 밑, 목록주소: 목록주소, 한건주소: 한건주소, 보는주소: 보는주소, 거절인가: 거절인가,
   해석목록주소: 해석목록주소, 해석한건주소: 해석한건주소, 해석보는주소: 해석보는주소,
   해석목록읽기: 해석목록읽기, 해석한건읽기: 해석한건읽기, 노무해석인가: 노무해석인가,
   안건다듬기: 안건다듬기, 회답고르기: 회답고르기,

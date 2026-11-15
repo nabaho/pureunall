@@ -108,9 +108,9 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- Daum 우편번호 서비스 (무료, 가입 불필요) -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
-<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=69"></script>
+<script src="js/pu-contract-forms.js?v=71"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -177,11 +177,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=44">
+<link rel="stylesheet" href="css/pu-erp.css?v=46">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=42"></script>
+  <script src="js/pu-appbar.js?v=47"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -206,6 +206,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-hr-excel-sync.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
 <script src="js/pu-case-jur-mail.js?v=1"></script>
+<script src="js/pu-case-stage.js?v=1"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
 <script src="js/pu-ieum-public.js?v=2"></script>
@@ -218,7 +219,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=100"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -237,6 +238,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <script src="js/pu-sanjae-cases.js?v=2"></script>
+<script src="js/pu-sanjae-kit.js?v=1"></script>
+<script src="js/pu-harass-core.js?v=12"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
@@ -3090,6 +3093,8 @@ var FB_ALL_SYNC_KEYS = [
   'co_mgr_requests',
   /* 사건 «업무 메모» — 2026-10-05 까지 그 PC 의 localStorage 에만 있었다(CaseMemoPanel 머리글) */
   'case_memos',
+  /* 🧰 산재 묶음 (2026-11-15) — 산재 사건마다 한 줄: 고른 급여·서류 받음/제출·기한 날짜(js/pu-sanjae-kit.js) */
+  'case_sanjae',
   /* 💬 누구 입금인가요? (2026-10-24) — 재무가 묻고 직원이 답한다. 날짜·금액·보낸 사람 이름만 */
   'deposit_asks'
 ];
@@ -5407,7 +5412,7 @@ try { window.addEventListener('fb_initial_done', function(){ setTimeout(function
   try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
 }, 4000); }); } catch(e){}
 /* user_accounts — 2026-10-10 사번 열쇠 지도로(번호 = 사번, dbSet 이 붙인다) */
-var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos','deposit_asks'];
+var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos','case_sanjae','deposit_asks'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
      다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
@@ -14040,6 +14045,9 @@ function MonthKpiHeader(props){
      ★ 기본값은 지금과 같다. 안 주면 화면 넓이로 판단하던 그대로다 —
        이 부품은 여러 화면이 함께 쓰므로 새 옵션이 다른 화면을 건드리면 안 된다. */
   var inlineKpi = !props.kpiOwnRow && kpis.length > 0 && (winW - 250 - 200 - 240) >= kpis.length * 100;   // 240 = 사이드바
+  /* 폰에서 «요약 한 줄»을 월 줄 안에 넣는다 — props.phoneKpiInline 을 준 화면만(업체관리, 대표 지시 2026-11-15 「상단 ui 간략하게」).
+     접힌 요약(📊 …▾)은 한 줄짜리 단추라 월 줄 남는 자리에 들어간다. 펼치면 예전처럼 아랫줄. 다른 화면은 그대로다. */
+  var phoneSumInline = !!props.phoneKpiInline && winW <= 768 && !kpiOpen && kpis.length > 0;
   return h('div', { style:{ marginBottom:'6px' } },
     // 월 네비 (배경/border 제거 - KPI와 자연스럽게 연결)
     h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', marginBottom: inlineKpi ? '0' : '5px',
@@ -14065,7 +14073,9 @@ function MonthKpiHeader(props){
       // 넓을 때: 월 네비와 오른쪽 단추 사이에 KPI를 끼운다
       inlineKpi
         ? h('div', { style:{ flex:1, minWidth:0, margin:'0 8px' } }, kpiGrid)
-        : h('div', { style:{ flex:1 } }),
+        : phoneSumInline
+          ? h('div', { style:{ flex:'1 1 0', minWidth:0, margin:'0 2px' } }, kpiGrid)
+          : h('div', { style:{ flex:1 } }),
       /* 오른쪽 단추 묶음 — 폰에서는 이 줄 «안에서» 옆으로 민다 (폰화면관리 2026-10-18).
          계약관리는 단추가 넷이라 줄이 474px 로 늘어 «화면 전체»가 옆으로 굴렀다(본문 498px · 화면 360px)
          「2026년 10월」도 두 줄로 꺾였다. ⚠ 넓은 화면은 .mkh-extra 가 display:contents — 겹이 없는 것과 같다.
@@ -14073,7 +14083,7 @@ function MonthKpiHeader(props){
       (props.extra && !props.kpiOwnRow) ? h('div', { className:'mkh-extra' }, props.extra) : props.extra
     ),
     // 좁을 때: 예전처럼 아랫줄에
-    !inlineKpi && kpiGrid
+    !inlineKpi && !phoneSumInline && kpiGrid
   );
 }
 
@@ -21031,6 +21041,185 @@ function erpContractDupBlock(form, contracts){
   });
 }
 
+/* ══════ 📌 계약의 «심급·단계»(노동위원회·산재) 읽어 달기 · 보이기 (견적·계약 자동화 계획 5, 대표 승인 2026-11-15) ══════
+   견적서·계약서 자동 길이 만든 «사건» 계약에, 글에서 읽은 단계를 `stageMarks` 로 달아 둔다 — 읽는 일은 js/pu-case-stage.js(순수 함수).
+
+   ■ 지키는 것
+     · 읽은 것은 늘 'auto'(확인 필요). 사람이 계약 창에서 ☑ 해야 'checked', ✕ 하면 'dismissed'(다시 안 띄움).
+     · 계약 상태(상담접수·계약협의·계약확정)·금액·계약번호·`stageCode`(현재 단계)는 «여기서» 안 바꾼다.
+       `stageCode` 는 이관 때 사건의 단계로 승계되므로, 사람이 ☑ 한 뒤 「현재 단계로」를 눌러야 바뀐다.
+     · 새로 더할 것이 없으면 계약을 건드리지 않는다(null) — 같은 메일이 두 번 와도 표시가 겹치지 않는다.
+     · 모듈(PuCaseStage)을 못 불러오면 아무것도 안 한다 — 계약 만들기를 막지 않는다. */
+function erpStageMarksMerge(prevMarks, parts, hint, srcDoc){
+  var S = window.PuCaseStage;
+  if(!S || typeof S.detect !== 'function') return null;
+  var found = S.detect(parts, hint);
+  if(!found.length) return null;
+  var r = S.merge(prevMarks, found, { now: Date.now(), srcDoc: srcDoc });
+  return r.added.length ? r.marks : null;
+}
+/* 계약서 길 — 이미 읽혀 요청에 실려 온 칸만(본문을 새로 읽지 않는다) */
+function erpStagePartsFromContract(cf, req){
+  var c = cf || {}, mm = (req && req.mailMeta) || {};
+  return [{ where:'docName', text:c.docName }, { where:'scope', text:c.scope }, { where:'memo', text:c.memo },
+    { where:'subject', text:mm.subject }];
+}
+/* 견적 길 — 메일 제목·첨부 이름뿐 */
+function erpStagePartsFromQuote(req){
+  var r = req || {};
+  return [{ where:'subject', text:r.subject }, { where:'atts', text:(Array.isArray(r.atts) ? r.atts : []).join(' ') }];
+}
+/* 카드·표에 그릴 칩 글 — 다시 안 띄우기로 한 단계는 뺀다. 없으면 null */
+function erpStageChipInfo(c){
+  var S = window.PuCaseStage;
+  if(!S || !c || !c.stageMarks) return null;
+  var chips = S.summary(c.stageMarks);
+  if(!chips.length) return null;
+  var anyAuto = chips.some(function(x){ return x.state === 'auto'; });
+  return { text:'⚖ ' + chips.map(function(x){ return x.short; }).join(' · '), anyAuto:anyAuto,
+    title: anyAuto ? '계약서에서 읽은 단계입니다 — 계약 창의 «⚖ 심급·단계»에서 확인(☑)해 주세요'
+                   : '확인한 심급·단계입니다 (' + chips.map(function(x){ return x.name; }).join(' · ') + ')' };
+}
+function erpStageChip(c){
+  var i = erpStageChipInfo(c);
+  if(!i) return null;
+  return h('span', { className:'stg-chip' + (i.anyAuto ? ' stg-auto' : ''), title:i.title }, i.text + (i.anyAuto ? ' ?' : ''));
+}
+/* 계약 창 «⚖ 심급·단계» 줄 — 읽은 것이 있을 때만 그린다(평소 계약 창은 그대로).
+   opts: 이 사건 유형에서 고를 수 있는 단계 목록(caseStageOpts) — «현재 단계로»·«단계 추가»는 이 안에서만 */
+function erpStageBox(f, setF, opts){
+  var S = window.PuCaseStage;
+  if(!S || !f) return null;
+  var marks = S.clean(f.stageMarks);
+  if(!marks.length) return null;
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
+  var allowed = (opts || []).map(function(st){ return st && st.code; });
+  function put(code, state){
+    setF(function(prev){ return Object.assign({}, prev, { stageMarks: S.setState(prev.stageMarks, code, state, me, Date.now()) }); });
+  }
+  function btn(label, title, on, kind){
+    return h('button', { type:'button', className:'stg-b' + (kind ? ' ' + kind : ''), title:title, onClick:on }, label);
+  }
+  var have = {};
+  marks.forEach(function(m){ have[m.code] = 1; });
+  var addable = (opts || []).filter(function(st){ return st && !have[st.code]; });
+  return h('div', { className:'pu-krow pu-stgrow' },
+    h('span', { className:'stg-lbl', title:'계약서·메일에서 읽은 심급·단계입니다. 기계가 읽은 것은 «확인 필요» — ☑ 해야 확인한 단계가 됩니다.' }, '⚖ 심급·단계'),
+    marks.map(function(m){
+      var inf = S.info(m.code) || { short:m.code, name:m.code };
+      var ck = m.state === 'checked', no = m.state === 'dismissed';
+      return h('span', { key:m.code, className:'stg-it' + (ck ? ' stg-ck' : '') + (no ? ' stg-no' : '') + (m.strength === 'weak' && !ck && !no ? ' stg-weak' : ''), title:inf.name },
+        h('span', { className:'stg-nm' }, (ck ? '☑ ' : no ? '✕ ' : '') + inf.short),
+        h('span', { className:'stg-st' }, ck ? '확인함' : no ? '아님' : (m.strength === 'weak' ? '확인 필요(불확실)' : '확인 필요')),
+        !ck && !no && btn('☑', inf.name + ' — 맞습니다', function(){ put(m.code, 'checked'); }, 'ok'),
+        !ck && !no && btn('✕', inf.name + ' — 아닙니다(다시 안 띄움)', function(){ put(m.code, 'dismissed'); }),
+        (ck || no) && btn('되돌리기', '확인 전 상태로', function(){ put(m.code, 'auto'); }),
+        ck && allowed.indexOf(m.code) >= 0 && f.stageCode !== m.code && btn('현재 단계로', '이 계약의 «현재 심급·단계» 칸에 ' + inf.name + ' 을 넣습니다(이관할 때 사건의 단계가 됩니다)',
+          function(){ setF(function(prev){ return Object.assign({}, prev, { stageCode:m.code }); }); }),
+        ck && f.stageCode === m.code && h('span', { className:'stg-cur', title:'현재 단계로 지정됨' }, '현재'),
+        !no && m.evidence && h('span', { className:'stg-ev', title:'읽은 글: ' + m.evidence + (m.srcDoc ? '\n(' + m.srcDoc + ')' : '') }, '「' + m.evidence + '」'));
+    }),
+    addable.length > 0 && h('select', { className:'stg-add', value:'', 'aria-label':'심급·단계 직접 추가', title:'계약서에서 못 읽은 단계를 직접 더합니다(확인함으로 들어갑니다)',
+      onChange:function(e){ var c = e.target.value; if(c) put(c, 'checked'); } },
+      h('option', { value:'' }, '＋ 단계 추가'),
+      addable.map(function(st){ return h('option', { key:st.code, value:st.code }, st.name); })));
+}
+
+/* ══════ ↪ «후속 계약 후보» — 확인한 단계의 «다음 단계»를 제안만 한다 (계획 5 · 단계 D, 대표 승인 2026-11-15 「D 만들기」) ══════
+   계약 창의 «⚖ 심급·단계» 줄 아래에, 사람이 ☑ 한 단계의 다음 단계(`caseNextStageCode`: 지노위→중노위→행정소송 · 요양→심사→재심사→행정소송)를
+   «후속 계약 후보»로 보여 준다. 누르면 사건의 「재심·후속사건 계약 등록」과 «같은 길»(씨앗 → 새 계약 창)로 열린다.
+
+   ■ 지키는 것
+     · 자동으로 계약을 만들지 않는다 — 새 계약 창이 «열릴 뿐»이고 저장은 사람이 한다(월 잠금·업체 연결·중복 검사는 여느 새 계약과 같다).
+     · 후보는 «사람이 ☑ 한(checked)» 단계에서만 나온다 — 기계가 읽기만 한(auto) 단계로는 안 낸다.
+     · 계약확정 뒤에만 낸다(확정·이관·종료). 상담접수·계약협의 중이거나 취소된 계약에서는 안 낸다.
+     · 금액·기간은 씨앗에 안 싣는다 — 단계마다 새 계약이라 금액은 사람이 새로 넣는다(겹쳐 잡히지 않게).
+     · 이미 만든 후속 계약(`parentContractId`+`stageCode`)이 있으면 단추 대신 «있음»만 보인다 · ✕ 한 다음 단계는 안 낸다.
+     · 이 사건 유형에서 고를 수 없는 단계는 안 낸다(저장 때 조용히 지워지므로).
+     · 원계약은 건드리지 않는다. */
+function erpStageNextCandidates(cur, contracts, allowedOpts){
+  var S = window.PuCaseStage;
+  if(!S || !cur || !cur.id) return [];
+  if(['signed', 'transferred', 'closed'].indexOf(cur.status) < 0) return [];
+  var marks = S.clean(cur.stageMarks);
+  var allowed = (allowedOpts || []).map(function(st){ return st && st.code; });
+  var seen = {}, out = [];
+  marks.filter(function(m){ return m.state === 'checked'; }).forEach(function(m){
+    var nx = (typeof caseNextStageCode === 'function') ? caseNextStageCode(m.code) : '';
+    if(!nx || seen[nx] || !S.info(nx) || allowed.indexOf(nx) < 0) return;
+    var have = marks.find(function(x){ return x.code === nx; });
+    if(have) return;   // 이미 이 계약이 맡은(☑)·아닌(✕)·읽은(auto) 단계다 — 후보가 아니다
+    seen[nx] = 1;
+    var made = (contracts || []).find(function(c){
+      return c && !c._deleted && c.parentContractId === cur.id && c.stageCode === nx;
+    });
+    var inf = S.info(nx);
+    out.push({ code:nx, name:inf.name, short:inf.short, from:m.code, madeNo: made ? (made.contractNo || '번호 없음') : '' });
+  });
+  return out;
+}
+/* 후속 계약 씨앗 — 사건의 erpCaseToFollowupContract 와 «같은 모양». 금액·기간은 싣지 않는다. */
+function erpContractFollowupSeed(cur, nextCode, cases){
+  var S = window.PuCaseStage;
+  var inf = S && S.info ? S.info(nextCode) : null;
+  if(!cur || !cur.id || !inf) return null;
+  var co = cur.company || {};
+  var seedCo = { name:String(cur.companyName || co.name || '').trim(), bizNo:String(cur.bizNo || co.bizNo || '').trim() };
+  if(!seedCo.name) return null;
+  var put = function(k, v){ var s = String(v == null ? '' : v).trim(); if(s) seedCo[k] = s; };
+  ['ceo', 'ceo2', 'corpRegNo', 'zipcode', 'address', 'addressDetail', 'phone', 'fax', 'email', 'bizType', 'bizCategory', 'companySize']
+    .forEach(function(k){ put(k, co[k]); });
+  if(Number(co.employmentInsuredCount || 0) > 0) seedCo.employmentInsuredCount = Number(co.employmentInsuredCount);
+  if(Number(co.injuryInsuredCount || 0) > 0) seedCo.injuryInsuredCount = Number(co.injuryInsuredCount);
+  if(Array.isArray(co.contacts) && co.contacts.length) seedCo.contacts = co.contacts;
+  var parentCase = (cases || []).find(function(c){ return c && !c._deleted && c.sourceContractId === cur.id; }) || null;
+  var workers = (Array.isArray(co.workers) ? co.workers : []).filter(function(w){ return w && String(w.name || '').trim(); }).map(function(w){
+    return { id:'wk-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      name:String(w.name || '').trim(), phone:String(w.phone || '').trim(), email:String(w.email || '').trim(),
+      address:String(w.address || '').trim(), position:String(w.position || w.role || '').trim(), dept:String(w.dept || '').trim(),
+      hireDate:String(w.hireDate || '').trim(), resignDate:String(w.resignDate || '').trim(), note:String(w.note || '').trim() };
+  });
+  var origBrief = String((cur.briefs && cur.briefs.case) || '').trim();
+  var seed = {
+    company:seedCo, at:Date.now(), source:'followup_contract',
+    companyId:cur.companyId ? String(cur.companyId) : '', companyLinkStatus:cur.companyLinkStatus || '',
+    typeCodes:(cur.typeCodes && cur.typeCodes.case) ? { case:String(cur.typeCodes.case) } : {},
+    parentContractId:String(cur.id),
+    parentCaseId:parentCase ? String(parentCase.id) : '', parentCaseNo:parentCase && parentCase.caseNo ? String(parentCase.caseNo) : '',
+    stageCode:nextCode,
+    managerMain:cur.managerMain ? String(cur.managerMain) : '',
+    managerSubs:Array.isArray(cur.managerSubs) ? cur.managerSubs.slice() : [],
+    workers:workers,
+    briefs:{ case:('[' + inf.short + '] ' + origBrief).trim().slice(0, 40) },
+    note:'↪ 원계약(' + (cur.contractNo || cur.id) + ')의 ' + inf.name + ' 단계 후속 계약 — 금액·기간은 새로 넣어 주세요'
+  };
+  return seed.typeCodes.case ? seed : null;   // 사건 유형이 없으면 «사건 후속 계약»으로 열 수 없다
+}
+/* 눌렀을 때 — 씨앗을 세션에 넣고 계약 창을 닫는다. 닫히면 계약관리가 씨앗을 받아 «새 계약 창»을 연다(여느 새 계약과 같은 길).
+   ⚠ 쓰던 창의 입력은 임시저장(draft)에 남는다 — 닫는다고 사라지지 않는다. */
+function erpStageGoFollowup(cur, nextCode, onClose){
+  var seed = erpContractFollowupSeed(cur, nextCode, dbGet('cases', []) || []);
+  if(!seed){ showToast('후속 계약 창을 열 수 없습니다 — 이 계약의 사건 유형을 먼저 골라 주세요'); return false; }
+  try { sessionStorage.setItem(ERP_CT_SEED_KEY, JSON.stringify(seed)); }
+  catch(e){ showToast('계약 창으로 넘기지 못했습니다: ' + ((e && e.message) || e)); return false; }
+  if(typeof onClose === 'function') onClose();
+  return true;
+}
+function erpStageNextRow(cur, contracts, allowedOpts, onGo){
+  var list = erpStageNextCandidates(cur, contracts, allowedOpts);
+  if(!list.length) return null;
+  return h('div', { className:'pu-krow pu-stgrow pu-stgnext' },
+    h('span', { className:'stg-lbl', title:'☑ 한 단계의 다음 단계입니다. 누르면 «후속 계약» 창이 열리고, 저장은 직접 하셔야 합니다(자동으로 만들지 않습니다).' }, '↪ 후속 계약 후보'),
+    list.map(function(x){
+      return h('span', { key:x.code, className:'stg-it stg-nx' + (x.madeNo ? ' stg-ck' : ''), title:x.name },
+        h('span', { className:'stg-nm' }, x.short),
+        x.madeNo
+          ? h('span', { className:'stg-st' }, '✔ 후속 계약 있음 · ' + x.madeNo)
+          : h('button', { type:'button', className:'stg-b ok', title:x.name + ' 후속 계약 창을 엽니다 — 원계약 정보를 이어받고 금액·기간은 새로 넣습니다',
+              onClick:function(){ onGo(x.code); } }, '후속 계약 만들기'));
+    }));
+}
+
 /* ══════ 견적 길 요청 «계획» (견적·계약 자동화 계획 3 · 작업 2, 2026-11-08) ══════
    푸른메일 보낸메일함에서 우리 견적서가 나가면 서버 감지 훅이 `data/contract_requests` 에 «요청»을 남긴다.
    이 길은 ctReqWhy(사진첩·중진공용 문턱: 사업자번호·컨설팅 유형·주담당 필수)를 «안 탄다» — 견적 단계는 «간략 등록»이라 따로 판단한다.
@@ -21141,6 +21330,9 @@ function erpQuoteLanePlan(req, cos, cts, users){
   form.srcMails = reqSrcMails;
   var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred' || c.status === 'closed'; });
   form.note = note + (renewal ? '\n재계약일 수 있음 — 이 사업장에 이미 계약확정된 계약이 있음.' : '');
+  /* 📌 사건 계약이면 제목·첨부 이름에서 읽은 심급·단계를 «확인 필요»로 단다(계획 5) */
+  var stgQ = erpStageMarksMerge([], erpStagePartsFromQuote(r), { kinds:form.kinds, inferredKind:r.inferredKind }, '');
+  if(stgQ) form.stageMarks = stgQ;
   return { action:'create', form:form };
 }
 
@@ -24513,6 +24705,10 @@ function ContractModal(props){
                         onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '성공보수', e.target); } }),
                   vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '성공보수'))
               ),
+              /* 📌 읽은 심급·단계가 있을 때만 — 평소 계약 창은 그대로(erpStageBox) */
+              isCase && erpStageBox(f, setF, caseStageOpts),
+              /* ↪ ☑ 한 단계의 다음 단계를 «후속 계약 후보»로 — 저장된 계약(props.cur)에서만, 누르면 후속 계약 창이 열린다(erpStageNextRow) */
+              isCase && erpStageNextRow(props.cur, dbGet('contracts', []) || [], caseStageOpts, function(nx){ erpStageGoFollowup(props.cur, nx, props.onClose); }),
               /* ─── 줄 2 (컨설팅만): 일수 계산 + 잔금 — «다른 이야기」라 한 줄로 안 합친다.
                  「3일」만 치면 =3×350,000+부가세105,000=1,155,000원 이 뜨고 잔금으로 간다.
                  단가가 없는 유형이면 일수 칸 없이 잔금만 나온다. */
@@ -26728,7 +26924,9 @@ function ContractManagement(props){
       ? '🏢 「' + nm + '」 정보를 「' + (coTy.name || coTy.code) + '」 업체계약으로 채웠습니다 — 주담당·기간·금액만 넣어 주세요'
         + (seed.note ? ' · 메모도 확인해 주세요' : '')
       : (seed.typeCodes && seed.typeCodes.case)
-      ? '⚖️ 「' + nm + '」 원심 사건 정보를 이어받아 후속사건 계약으로 채웠습니다 — 착수금·성공보수를 확인해 주세요'
+      ? (seed.source === 'followup_contract'
+          ? '↪ 「' + nm + '」 원계약 정보를 이어받아 ' + (function(){ var si = window.PuCaseStage && window.PuCaseStage.info(seed.stageCode); return si ? si.name + ' ' : ''; })() + '후속 계약으로 채웠습니다 — 착수금·성공보수·기간은 새로 넣어 주세요'
+          : '⚖️ 「' + nm + '」 원심 사건 정보를 이어받아 후속사건 계약으로 채웠습니다 — 착수금·성공보수를 확인해 주세요')
       : (seed.typeCodes && seed.typeCodes.consulting && ty)
       ? '📋 「' + docName + '」 으로 유형을 「' + (ty.name || '') + '」 으로 골라 뒀습니다 — 기간·금액만 넣어 주세요'
       : '📋 「' + nm + '」 의 회사 정보를 채웠습니다 — 유형·기간·금액을 골라 주세요', 9000);
@@ -26899,6 +27097,8 @@ function ContractManagement(props){
           advPatch.note = (plan.target.note ? plan.target.note + '\n\n' : '') + sn;
         }
       }
+      var stgV = erpStageMarksMerge(plan.target.stageMarks, erpStagePartsFromQuote(req), { kinds:plan.target.kinds, inferredKind:req && req.inferredKind }, '');
+      if(stgV) advPatch.stageMarks = stgV;
       if(!patchOne(plan.target.id, advPatch)) return await stop('계약관리가 저장을 막았습니다 (월 잠금 등)');
       await drop();
       return { lane:'quote', advanced:plan.target };
@@ -26912,6 +27112,8 @@ function ContractManagement(props){
         note: (t.note ? t.note + '\n\n' : '') + plan.note,
         srcMails: attSrc
       });
+      var stgA = erpStageMarksMerge(t.stageMarks, erpStagePartsFromQuote(req), { kinds:t.kinds, inferredKind:req && req.inferredKind }, '');
+      if(stgA) upd.stageMarks = stgA;
       if(!persistOne(upd)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
       await drop();
       return { lane:'quote', attached:t };
@@ -27070,6 +27272,8 @@ function ContractManagement(props){
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.endDate || ''))) upd.endDate = cf.endDate;
       if(srcPhoto) upd.srcPhoto = srcPhoto;
+      var stgU = erpStageMarksMerge(cur.stageMarks, erpStagePartsFromContract(cf, req), { kinds:nextKinds, inferredKind:req && req.inferredKind }, cf.docName);
+      if(stgU) upd.stageMarks = stgU;
       if(reqSrcMails.length){
         var curSrc = (cur.srcMails || []).slice();
         reqSrcMails.forEach(function(sk){ if(sk && curSrc.indexOf(sk) < 0) curSrc.push(sk); });
@@ -27130,6 +27334,8 @@ function ContractManagement(props){
       + (briefText ? '\n업무: ' + briefText : '')
       + (req.by ? ' · 담당 ' + req.by : '')
       + (synthNote ? '\n' + synthNote : '');
+    var stgC = erpStageMarksMerge([], erpStagePartsFromContract(cf, req), { kinds:form.kinds, inferredKind:req && req.inferredKind }, cf.docName);
+    if(stgC) form.stageMarks = stgC;
     form = erpDeferCoLinkIfNew(form) || form;
     var clash = erpBiznoClash(form, cos);
     if(clash) return await stop('같은 사업자번호가 다른 업체(' + (clash.name || '-') + ')에 이미 있습니다');
@@ -28067,6 +28273,9 @@ function ContractManagement(props){
             var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean);
             /* 📈 성과추적 — 고정 너비 열이라 따로 꼬리표를 달면 뒤 열이 밀린다. 글자에 붙이고 전문은 title 에 */
             var text = subs.join(' / ') + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');
+            /* 📌 읽은 심급·단계 — 위 한 줄(세부 종류·성과추적)은 그대로 두고 «뒤에» 붙인다 */
+            var stgL = erpStageChipInfo(c);
+            if(stgL) text = [text, stgL.text + (stgL.anyAuto ? ' ?' : '')].filter(Boolean).join(' · ');
             return h('span', { title: text || undefined, style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
               color: text ? '#2563eb' : 'transparent',
               background: text ? '#eff6ff' : 'transparent',
@@ -28118,6 +28327,8 @@ function ContractManagement(props){
       var mk0 = kindInfo(kindsArr[0] || '');
       var mSub = (kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '')
         + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');   /* 📈 2026-10-20 */
+      var stgP = erpStageChipInfo(c);
+      if(stgP) mSub = [mSub, stgP.text + (stgP.anyAuto ? ' ?' : '')].filter(Boolean).join(' · ');
       return h('div', { key:c.id,
         onClick:function(){ openEdit(c); },
         style:{ background: justMoved ? '#eff6ff' : '#fff', border:'1px solid '+(justMoved?'#2563eb':'#e2e8f0'), borderRadius:'6px',
@@ -28200,6 +28411,7 @@ function ContractManagement(props){
             fontSize:'10px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
           '🆕 오늘 ' + regTimeText(c)) : null,
         h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0, whiteSpace:'nowrap' } }, c.contractNo),
+        erpStageChip(c),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
@@ -28245,7 +28457,28 @@ function ContractManagement(props){
         { label:'🛡️ 계약협의', value:monthContracts.filter(function(c){return c.status==='review';}).length+'건', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'📊 전체(누적)', value:contracts.length+'건', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' }
       ],
-      extra: [ h('button', { key:'chelp', onClick:function(){ setShowHelp(true); },
+      phoneKpiInline: true,   /* 폰: 요약 한 줄을 월 줄 안에 (대표 지시 2026-11-15 계약관리도) */
+      extra: window.innerWidth <= 768
+      ? /* 폰: 단추 넷(사용법·이번 달만·실적 띠·지난 중복 훑기)을 «⋯ 고르기 하나»로 (대표 지시 2026-11-15 「상단 간략하게」).
+           고르면 바로 하고 도로 「⋯」로 돌아온다. 「걸린 요청」 배지는 알림이라 밖에 그대로 둔다. */
+        [ h('select', { key:'cmore', value:'', 'aria-label':'계약관리 더보기', title:'사용법 · 이번 달만 · 실적 · 지난 중복 훑기',
+            onChange:function(e){ var v = e.target.value; e.target.value = '';
+              if(v === 'help') setShowHelp(true);
+              else if(v === 'mo') setMonthOnly(!monthOnly);
+              else if(v === 'unit') setUnitStrip(!unitStrip);
+              else if(v === 'dup') setDupSweep(dupSweepScan()); },
+            style:{ padding:'5px 4px', background: monthOnly ? '#1e40af' : '#eff6ff', color: monthOnly ? '#fff' : '#1e40af',
+              border:'1px solid #bfdbfe', borderRadius:'5px', fontSize:'13px', fontWeight:700, cursor:'pointer', maxWidth:'92px' } },
+            h('option', { value:'' }, monthOnly ? '✓ 이번 달' : '⋯ 더보기'),
+            h('option', { value:'help' }, '❓ 사용법'),
+            h('option', { value:'mo' }, monthOnly ? '✓ 이번 달만 끄기' : '📅 이번 달만'),
+            h('option', { value:'unit' }, (unitStrip ? '▾ 실적 띠 접기' : '▸ 클리닉·기술보호 실적')),
+            h('option', { value:'dup' }, '🔎 지난 중복 훑기')) ].concat(
+          blockedReqs.length > 0 ? [ h('button', { key:'blkreq', onClick:function(){ setShowBlockedReqs(true); },
+            title:'사진첩에서 온 자동 등록 요청 중 막힌 것',
+            style:{ padding:'5px 7px', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px',
+              cursor:'pointer', fontSize:'11px', fontWeight:700, whiteSpace:'nowrap' } }, '⚠ ' + blockedReqs.length) ] : [])
+      : [ h('button', { key:'chelp', onClick:function(){ setShowHelp(true); },
           title:'계약관리 사용법',
           style:{ padding: window.innerWidth<=768?'5px 9px':'6px 12px', background:'#eff6ff', color:'#1e40af',
             border:'1px solid #bfdbfe', borderRadius:'5px', cursor:'pointer',
@@ -28325,16 +28558,17 @@ function ContractManagement(props){
       h('div', { className:'tb-filters' },
         h('select', { value:kindFilter, onChange:function(e){ setKindFilter(e.target.value); setSelSubType('all'); },
           style:{ padding:'6px 10px', border:'1px solid '+(kindFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:kindFilter!=='all'?'#1e40af':'#475569', fontWeight:kindFilter!=='all'?700:400, cursor:'pointer' } },
-          [{ v:'all', label:'전체', icon:'📊' }].concat(CONTRACT_KINDS).map(function(k){ return h('option', { key:k.v, value:k.v }, k.icon + ' ' + k.label); })),
+          [{ v:'all', label:'전체', icon:'📊' }].concat(CONTRACT_KINDS).map(function(k){ return h('option', { key:k.v, value:k.v },
+            window.innerWidth <= 768 ? (k.v === 'all' ? '종류 전체' : k.label) : (k.icon + ' ' + k.label)); })),   /* 폰은 그림 글자를 뺀다 — 칸이 좁아 잘렸다(2026-11-15) */
         h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:700, whiteSpace:'nowrap' } }, kindCount(kindFilter) + '건'),
         h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
           style:{ padding:'6px 10px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:mgrFilter!=='all'?'#1e40af':'#475569', fontWeight:mgrFilter!=='all'?700:400, cursor:'pointer' } },
-          h('option', { value:'all' }, '👤 전체 담당자'),
+          h('option', { value:'all' }, window.innerWidth <= 768 ? '담당 전체' : '👤 전체 담당자'),
           h('option', { value:'mine' }, '⭐ 내 업무'),
           users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
         h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
           style:{ padding:'6px 10px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:subMgrFilter!=='all'?'#2563eb':'#475569', fontWeight:subMgrFilter!=='all'?700:400, cursor:'pointer' } },
-          h('option', { value:'all' }, '👥 부담당'),
+          h('option', { value:'all' }, window.innerWidth <= 768 ? '부담당' : '👥 부담당'),
           users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); }))),
       // 칸마다 깔때기가 걸려 있으면 한 번에 푸는 단추 (걸린 게 있을 때만)
       Object.keys(stageSel).length > 0 && h('button', { onClick:stClearAll,
@@ -28370,8 +28604,8 @@ function ContractManagement(props){
         title:'계약-2026 빈 번호 메우기',
         style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
         '🔢 번호 재정렬'),
-      // 지난 자료 중복 훑기 — 누를 때만 훑는다(매번 훑으면 목록이 느려진다)
-      h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan()); },
+      // 지난 자료 중복 훑기 — 누를 때만 훑는다(매번 훑으면 목록이 느려진다). 폰은 위 「⋯ 더보기」 안에 있다(2026-11-15)
+      window.innerWidth > 768 && h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan()); },
         title:'이미 쌓인 계약·컨설팅·사건·기금·기타·일반업무끼리 중복인지 한 번 훑습니다 (읽기만 함)',
         style:{ padding: window.innerWidth <= 768 ? '5px 9px' : '6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize: window.innerWidth <= 768 ? '11px' : '11.5px', fontWeight:600 } },
         '🔎 지난 중복 훑기')
@@ -31289,14 +31523,38 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     return h('select', { value:val, 'aria-label':'유형',
         onChange:function(e){ var v = e.target.value; if(v === '__many') return;
           cSet('type', v === 'all' ? [] : [v]); if(pg.setPage) pg.setPage(1); },
-        style:{ flex:'1 1 96px', minWidth:0, padding:'7px 6px', border:'1px solid '+(on?'#1e40af':'#cbd5e1'),
+        style:{ flex:'1 1 0', minWidth:0, padding:'7px 4px', border:'1px solid '+(on?'#1e40af':'#cbd5e1'),
           borderRadius:'8px', fontSize:'13px', fontWeight:700, background: on?'#eff6ff':'#fff',
           color: on?'#1e40af':'#475569', cursor:'pointer' } },
       COMPANY_TYPE_FILTERS.map(function(t){
         return h('option', { key:t.v, value:t.v },
-          t.v === 'all' ? '🏷 유형 전체' : (t.icon + ' ' + t.label + ' ' + (n[t.v] || 0)));
+          t.v === 'all' ? '유형 전체' : (t.label + ' ' + (n[t.v] || 0)));   /* 폰 칸이 좁아 그림 글자는 뺐다(2026-11-15) */
       }),
       val === '__many' && h('option', { value:'__many' }, '여러 유형 (' + sel.length + ')'));
+  }
+  /* 폰용 «담당자» 고르기 (대표 지시 2026-11-15 「담당자별로 찾아야 하는데 한번에 못 찾겠다」).
+     표 머리 「담당」 깔때기와 «같은 상태»(coSel.mgr)를 쓴다 — 거르는 규칙을 새로 만들지 않았다.
+     「내 담당 먼저」 칩을 따로 두지 않고 이 상자 맨 위 「담당 전체(내 것 먼저)」로 합쳤다 — 줄이 하나 준다. */
+  function mgrSelect(){
+    var items = cItems('mgr');
+    var sel = cGet('mgr');
+    var mine = myOwnSid();
+    var val = sel.length === 0 ? (mineFirst ? '__allmine' : '__all') : (sel.length === 1 ? sel[0] : '__many');
+    var on = sel.length > 0;
+    return h('select', { value:val, 'aria-label':'담당자',
+        onChange:function(e){ var v = e.target.value; if(v === '__many') return;
+          if(v === '__all' || v === '__allmine'){ cSet('mgr', []); setMineFirst(v === '__allmine'); }
+          else cSet('mgr', [v]);
+          if(pg.setPage) pg.setPage(1); },
+        style:{ flex:'1 1 0', minWidth:0, padding:'7px 4px', border:'1px solid '+(on?'#166534':'#cbd5e1'),
+          borderRadius:'8px', fontSize:'13px', fontWeight:700, background: on?'#f0fdf4':'#fff',
+          color: on?'#166534':'#475569', cursor:'pointer' } },
+      mine && h('option', { value:'__allmine' }, '담당 전체'),
+      h('option', { value:'__all' }, mine ? '담당 전체(내 것 먼저 끄기)' : '담당 전체'),
+      items.map(function(x){
+        return h('option', { key:x.v, value:x.v }, (x.v === mine ? '★ ' : '') + x.label + ' ' + x.n);
+      }),
+      val === '__many' && h('option', { value:'__many' }, '여러 담당 (' + sel.length + ')'));
   }
   var moS = useState(false); var monthOnly = moS[0]; var setMonthOnly = moS[1];
   var ymS = usePersistedState('company_month', todayYM()); var selYM = ymS[0]; var setSelYM = ymS[1];
@@ -32082,6 +32340,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     // 통일 헤더: 월 네비 + KPI 4개
     h(MonthKpiHeader, {
       selYM: selYM,
+      phoneKpiInline: true,   /* 폰: 요약 한 줄을 월 줄 안에 (2026-11-15) */
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
       kpis: [
         { label:'🏢 운영 업체', value:companies.filter(erpCoAlive).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
@@ -32186,16 +32445,16 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             '전체'),
           h('select', { value:statusTab, 'aria-label':'상태',
               onChange:function(e){ setStatusTab(e.target.value); if(pg.setPage) pg.setPage(1); },
-              style:{ flex:'1 1 96px', minWidth:0, padding:'7px 6px', border:'1px solid '+(statusTab==='suboffice'?'#854d0e':'#1e40af'),
+              style:{ flex:'1 1 0', minWidth:0, padding:'7px 4px', border:'1px solid '+(statusTab==='suboffice'?'#854d0e':'#1e40af'),
                 borderRadius:'8px', fontSize:'13px', fontWeight:700, background:'#fff',
                 color: statusTab==='suboffice'?'#854d0e':'#1e40af', cursor:'pointer' } },
-            h('option', { value:'active' }, '💼 활성 ' + activeCount),
-            h('option', { value:'suboffice' }, '📁 사무대행 ' + subofficeCount),
+            h('option', { value:'active' }, '활성 ' + activeCount),
+            h('option', { value:'suboffice' }, '사무대행 ' + subofficeCount),
             /* 다른 화면(PC)에서 「계약 중단」 탭을 고른 채 왔으면 그 값도 보여 준다 — 빈칸이 되면 안 된다 */
-            statusTab === 'suspended' && h('option', { value:'suspended' }, '⏸ 계약 중단 ' + suspendedCount)),
+            statusTab === 'suspended' && h('option', { value:'suspended' }, '중단 ' + suspendedCount)),
           /* 유형은 건수가 보여야 한다 — 고르기 상자 안에 건수를 그대로 적는다 */
           typeSelect(),
-          h(MineFirstChip, { on:mineFirst, onToggle:function(){ setMineFirst(!mineFirst); } }),
+          mgrSelect(),
           activeFilterCount > 0 && h('button', { onClick:cClearAll,
             style:{ padding:'5px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:700, flexShrink:0,
               background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', cursor:'pointer', whiteSpace:'nowrap' } },
@@ -37498,7 +37757,16 @@ function CaseDetailModal(props){
          그 자리에서 찾는다(js/pu-sanjae-cases.js). 고른 사례는 이 사건의 업무 메모(case_memos)에 출처와 함께 붙는다. */
       erpIsInjuryCase(c, t) && window.PuSanjae ? ['산재 사례', h('button', { onClick:function(){ window.PuSanjae.open({ kind:'jil', q:window.PuSanjae.guessQuery(c),
           onAttach:function(txt){ erpCaseMemoAdd(c.id, '⚖ 참고 사례 — ' + txt); } }); },
-        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null,
+      /* 🧰 산재 묶음 — 급여·서류·기한·계산·유족·소식 (대표 「모든 단계 한번에 진행해라」 2026-11-15, js/pu-sanjae-kit.js) */
+      erpIsInjuryCase(c, t) && window.PuSanjaeKit ? ['산재 묶음', h('button', { onClick:function(){ erpSanjaeKitOpen(c); },
+        title:'청구 급여·챙길 서류·심사/재심사 기한·소멸시효·급여 어림·유족 순위',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '🧰 서류·기한·계산 열기')] : null,
+      /* 🛡️ 괴롭힘·성희롱 조사 전용 연동 — 조사 사건일 때 조사실·보고서 바로가기 단추 노출 */
+      (window.PuHarassCore && window.PuHarassCore.isErpInvestigateCase(c, caseTypes)) ? ['조사실·보고서', h('a', {
+        href:'pu-harass.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🛡️ 조사실·보고서 열기 ›')] : null
     ].filter(function(x){ return x; })
   };
 
@@ -37530,11 +37798,33 @@ function CaseDetailModal(props){
     ]
   } : null;
 
+  var harassSection = (c.harassSummary && Array.isArray(c.harassSummary.steps)) ? {
+    icon:'🛡️',
+    title:'괴롭힘·성희롱 조사 진행과정 (' + Number(c.harassSummary.doneCount || 0) + '/' + Number(c.harassSummary.totalCount || 8) + '단계 · ' + Number(c.harassSummary.progressPct || 0) + '%)',
+    bg:'#eff6ff', border:'#bfdbfe', headColor:'#1e40af', headBorder:'#2563eb',
+    rows:[
+      ['현재 단계', h('span', { style:{ fontWeight:700, color:'#1e40af' } }, (c.harassSummary.currentStepName || '진행 중') + ' · 수집 공문 ' + Number(c.harassSummary.mailCount || 0) + '건')],
+      c.harassSummary.verdictSummary ? ['종합 판단', h('span', { style:{ background:'#fff', color:'#1e293b', border:'1px solid #cbd5e1', borderRadius:'4px', padding:'2px 8px', fontSize:'11px', fontWeight:700 } },
+        (window.PuHarassCore && window.PuHarassCore.VERDICTS && window.PuHarassCore.VERDICTS[c.harassSummary.verdictSummary] ? window.PuHarassCore.VERDICTS[c.harassSummary.verdictSummary].label : c.harassSummary.verdictSummary))] : null,
+      ['8단계 현황', h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px' } },
+        c.harassSummary.steps.map(function(st){
+          var done = !!st.done;
+          return h('span', { key:st.code || String(st.no), style:{
+            background: done ? '#f0fdf4' : '#f8fafc',
+            color: done ? '#166534' : '#64748b',
+            border: '1px solid ' + (done ? '#bbf7d0' : '#e2e8f0'),
+            borderRadius:'4px', padding:'2px 7px', fontSize:'11px', fontWeight: done ? 700 : 500
+          } }, (done ? '✓ ' : '○ ') + st.no + '.' + st.short + (st.date ? ' (' + st.date.slice(5) + ')' : ''));
+        })
+      )]
+    ].filter(function(x){ return x; })
+  } : null;
+
   return h(UnifiedDetailModal, {
     cur: c,
     headerIcon: '⚖️',
     headerTitle: c.caseNo + ' - ' + c.companyName,
-    extraSections: [moduleSection, feeSection].concat(jurSection ? [jurSection] : []),
+    extraSections: [moduleSection].concat(harassSection ? [harassSection] : []).concat([feeSection]).concat(jurSection ? [jurSection] : []),
     finIncomes: finIncomes,
     extraFooter: h('button', {
       type:'button',
@@ -37847,6 +38137,225 @@ function erpCaseMemoMigrate(){
 }
 window.erpCaseMemoMigrate = erpCaseMemoMigrate;
 try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ try { erpCaseMemoMigrate(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, 5000); }); } catch(e){}
+
+/* 🛡️ 괴롭힘·성희롱 조사(pu-harass.html) → 푸른이알피 자동 동기화 (2026-11-11)
+   harass_invest/erp_sync/{hid} 에 올라온 8단계 진행현황·일정·요약·공문 타임라인 메모를
+   이알피 사건(data/cases)과 업무 메모(case_memos)에 반영하고 erp_ack/{hid} 에 수신 확인을 남긴다.
+   ⚠ 주의: 함수 본문 중괄호 절단 검사 보호를 위해 정규식 수량자 중괄호를 쓰지 않는다. */
+var _erpHarassSyncBusy = Object.create(null);
+var _erpHarassWatchAttached = false;
+async function erpApplyHarassSyncOne(hid, sync, ackMap, caseMap){
+  if(!hid || !sync || typeof sync !== 'object' || sync._deleted) return false;
+  if(!fbDb || !window.PuHarassCore || (typeof _fbSynced !== 'undefined' && !_fbSynced)) return false;
+  if(typeof PU_APP !== 'undefined' && PU_APP !== 'erp') return false;
+  if(_erpHarassSyncBusy[hid]) return false;
+  var caseRec = caseMap && caseMap[hid];
+  if(!caseRec || typeof caseRec !== 'object' || caseRec._deleted) return false;
+  var C = window.PuHarassCore;
+  var curMe = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? {
+    sid: String(CURRENT_USER.sid || ''),
+    isAdmin: !!(CURRENT_USER.isAdmin || CURRENT_USER.isOwner || CURRENT_USER.role === 'admin')
+  } : null;
+  if(!C.canAccessSecret(caseRec, curMe)) return false;
+  if(!String(caseRec.erpCaseId || '') && (caseRec.erpDefer === true || sync.action === 'defer')) return false;
+  var canonical = C.buildErpSyncPayload(caseRec);
+  if(!canonical) return false;
+  var ack = ackMap && ackMap[hid];
+  var syncRev = Number(sync.revision || 0);
+  if(syncRev <= 0) return false;
+  var ackRev = ack ? Number(ack.syncedRevision || 0) : 0;
+  var detId = 'c-hi-' + C.safeKey(hid);
+  var allCases = dbGet('cases', []) || [];
+  /* ★ ACK 의 erpCaseId 는 연결 대상 탐색에 절대 신뢰하지 않고 사건 원장(caseRec.erpCaseId) 또는 결정적 ID·연결표식만 사용한다 */
+  var wantErpId = String(caseRec.erpCaseId || '');
+  var anyMatch = allCases.find(function(x){
+    if(!x) return false;
+    if(wantErpId && x.id === wantErpId) return true;
+    return x.id === detId || x.harassCaseId === hid;
+  });
+  if(anyMatch && anyMatch._deleted) return false; // 휴지통에 버려진 사건은 되살리지 않는다
+  if(anyMatch){
+    /* 타 업무 사건이나 다른 회사 사건을 잘못 덮어쓰는 우회를 차단한다 */
+    var caseTypes = typeof getCaseTypes === 'function' ? getCaseTypes() : [];
+    if(!C.isErpInvestigateCase(anyMatch, caseTypes)) return false;
+    if(anyMatch.harassCaseId && anyMatch.harassCaseId !== hid) return false;
+    if(anyMatch.companyId && canonical.companyId && anyMatch.companyId !== canonical.companyId) return false;
+  }
+  if(anyMatch && ack && ackRev === syncRev && ack.erpCaseId === anyMatch.id && anyMatch.harassSummary) return false;
+
+  _erpHarassSyncBusy[hid] = true;
+  try {
+    var nowIso = (new Date()).toISOString();
+    var targetCase = null;
+    if(!anyMatch){
+      var newCase = {
+        id: detId,
+        caseNo: genCaseNo('case-investigate'),
+        typeCode: 'case-investigate',
+        companyId: String(canonical.companyId || ''),
+        companyName: String(canonical.companyName || '(미지정 사업장)'),
+        bizNo: String(canonical.bizNo || ''),
+        managerMain: String(canonical.managerMain || ''),
+        managerSubs: Array.isArray(canonical.managerSubs) ? canonical.managerSubs.slice(0, 5) : [],
+        entityType: 'Case',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        receiveDate: String(canonical.receiveDate || nowIso.slice(0, 10)),
+        dueDate: String(canonical.dueDate || ''),
+        closeDate: String(canonical.closeDate || ''),
+        status: String(canonical.erpStatus || 'pending'),
+        brief: String(canonical.erpBrief || ''),
+        note: C.mergeErpNote('', canonical.erpNoteBlock || ''),
+        harassCaseId: hid,
+        harassSummary: canonical.harassSummary || null
+      };
+      if(typeof CompanyRef !== 'undefined' && CompanyRef && typeof CompanyRef.attachId === 'function' && !newCase.companyId){
+        try { CompanyRef.attachId(newCase); } catch(_){}
+      }
+      if(!dbUpsert('cases', newCase)) return false;
+      targetCase = newCase;
+    } else {
+      var patch = {
+        updatedAt: nowIso,
+        harassCaseId: hid,
+        harassSummary: canonical.harassSummary || null,
+        brief: String(canonical.erpBrief || anyMatch.brief || ''),
+        note: C.mergeErpNote(anyMatch.note || '', canonical.erpNoteBlock || ''),
+        dueDate: String(canonical.dueDate || ''),
+        closeDate: String(canonical.closeDate || '')
+      };
+      if(canonical.erpStatus) patch.status = String(canonical.erpStatus);
+      if(!anyMatch.receiveDate && canonical.receiveDate) patch.receiveDate = String(canonical.receiveDate);
+      if(!anyMatch.managerMain && canonical.managerMain) patch.managerMain = String(canonical.managerMain);
+      if(!dbPatch('cases', anyMatch.id, patch)) return false;
+      targetCase = Object.assign({}, anyMatch, patch);
+    }
+
+    var syncMemos = Array.isArray(canonical.memos) ? canonical.memos : [];
+    if(syncMemos.length){
+      var curMemos = (dbGet(CASE_MEMO_KEY, []) || []).slice();
+      var idxById = Object.create(null);
+      curMemos.forEach(function(m, idx){ if(m && m.id) idxById[String(m.id)] = idx; });
+      var addedMemos = [];
+      var memoDirty = false;
+      syncMemos.forEach(function(mm){
+        if(!mm) return;
+        var mid = String(mm.memoKey || '');
+        if(!mid || /[.#$\[\]\/]/.test(mid)) return;
+        var txt = String(mm.text || '').trim();
+        if(!txt) return;
+        var atIso = mm.date ? (String(mm.date).slice(0, 10) + 'T09:00:00.000Z') : nowIso;
+        var hitIdx = idxById[mid];
+        if(hitIdx === undefined){
+          addedMemos.push({
+            id: mid, entityType: 'case_memo', caseId: targetCase.id, text: txt,
+            author: '조사자동연동', authorSid: String(canonical.managerMain || ''),
+            at: atIso, createdAt: atIso, updatedAt: nowIso, harassSync: true
+          });
+          memoDirty = true;
+        } else {
+          var prevMemo = curMemos[hitIdx];
+          if(prevMemo && !prevMemo._deleted && (prevMemo.text !== txt || prevMemo.caseId !== targetCase.id)){
+            curMemos[hitIdx] = Object.assign({}, prevMemo, { caseId: targetCase.id, text: txt, updatedAt: nowIso });
+            memoDirty = true;
+          }
+        }
+      });
+      if(memoDirty){
+        if(!dbSet(CASE_MEMO_KEY, addedMemos.concat(curMemos))){
+          try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: 'cases' })); } catch(_){}
+          return false;
+        }
+        try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: CASE_MEMO_KEY })); } catch(_){}
+      }
+    }
+
+    try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: 'cases' })); } catch(_){}
+
+    if(!window.PuOntologyWrite || typeof window.PuOntologyWrite.createGateway !== 'function') return false;
+    var actorSid = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) ? CURRENT_USER.sid : 'erp';
+    var gw = window.PuOntologyWrite.createGateway({ mode: 'enforce', actor: actorSid });
+
+    if(caseRec.erpCaseId !== targetCase.id || caseRec.erpCaseNo !== targetCase.caseNo){
+      try {
+        await gw.save(fbDb.ref('harass_invest/cases/' + hid), function(prev){
+          var baseObj = (prev && typeof prev === 'object') ? prev : caseRec;
+          return Object.assign({}, baseObj, {
+            erpCaseId: targetCase.id,
+            erpCaseNo: String(targetCase.caseNo || ''),
+            sourceKind: 'case',
+            sourceId: targetCase.id
+          });
+        }, { entityType: 'Case', allowPendingCompany: true });
+      } catch(_){}
+    }
+
+    var ackRes = await gw.save(fbDb.ref('harass_invest/erp_ack/' + hid), function(prev){
+      return Object.assign({}, prev || {}, {
+        id: hid,
+        harassCaseId: hid,
+        erpCaseId: targetCase.id,
+        erpCaseNo: String(targetCase.caseNo || ''),
+        syncedRevision: syncRev,
+        syncedAt: Date.now(),
+        sourceKind: 'case',
+        sourceId: targetCase.id
+      });
+    }, { entityType: 'Task', allowPendingCompany: true });
+    if(!ackRes || ackRes.committed === false) return false;
+    return true;
+  } catch(err){
+    if(window._erpErrLog) window._erpErrLog(err);
+    return false;
+  } finally {
+    delete _erpHarassSyncBusy[hid];
+  }
+}
+
+async function erpHarassInvestSync(){
+  if(!fbDb || !window.PuHarassCore || (typeof _fbSynced !== 'undefined' && !_fbSynced)) return 0;
+  if(typeof PU_APP !== 'undefined' && PU_APP !== 'erp') return 0;
+  try {
+    var snaps = await Promise.all([
+      fbDb.ref('harass_invest/erp_sync').once('value'),
+      fbDb.ref('harass_invest/erp_ack').once('value'),
+      fbDb.ref('harass_invest/cases').once('value')
+    ]);
+    var syncMap = (snaps[0] && snaps[0].val()) || {};
+    var ackMap = (snaps[1] && snaps[1].val()) || {};
+    var caseMap = (snaps[2] && snaps[2].val()) || {};
+    var keys = Object.keys(syncMap);
+    var count = 0;
+    for(var i = 0; i < keys.length; i++){
+      var k = keys[i];
+      if(await erpApplyHarassSyncOne(k, syncMap[k], ackMap, caseMap)) count++;
+    }
+    if(!_erpHarassWatchAttached){
+      _erpHarassWatchAttached = true;
+      var onLive = function(snap){
+        if(!snap) return;
+        var k = snap.key, v = snap.val();
+        if(!k || !v) return;
+        Promise.all([
+          fbDb.ref('harass_invest/erp_ack/' + k).once('value'),
+          fbDb.ref('harass_invest/cases/' + k).once('value')
+        ]).then(function(pair){
+          var am = {}; am[k] = pair[0] ? pair[0].val() : null;
+          var cm = {}; cm[k] = pair[1] ? pair[1].val() : null;
+          erpApplyHarassSyncOne(k, v, am, cm);
+        }).catch(function(){});
+      };
+      fbDb.ref('harass_invest/erp_sync').on('child_added', onLive);
+      fbDb.ref('harass_invest/erp_sync').on('child_changed', onLive);
+    }
+    return count;
+  } catch(e){
+    if(window._erpErrLog) window._erpErrLog(e);
+    return 0;
+  }
+}
+window.erpHarassInvestSync = erpHarassInvestSync;
+try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ try { erpHarassInvestSync(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, 3500); }); } catch(e){}
 /* 산재 사건인가 — 유형 코드 case-injury(산재등) 또는 약어 「산재」 */
 function erpIsInjuryCase(c, t){
   return !!c && (c.typeCode === 'case-injury' || !!(t && /산재/.test(String(t.short || t.name || ''))));
@@ -37860,6 +38369,43 @@ function erpCaseMemoAdd(caseId, text){
   if(!dbSet(CASE_MEMO_KEY, [row].concat(dbGet(CASE_MEMO_KEY, []) || []))){ showToast('❌ 메모 저장 실패'); return false; }
   try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: CASE_MEMO_KEY })); } catch(_){}
   return true;
+}
+/* 🧰 산재 묶음 (대표 「모든 단계 한번에 진행해라」 2026-11-15) — 산재 사건마다 «한 줄»(js/pu-sanjae-kit.js).
+   ■ 표 하나(case_sanjae)에 caseId 를 달아 dbSet 으로 저장한다 — 업무 메모(case_memos)와 같은 길(건별 저장 표 DIFF_KEYS).
+     ⚠ 사건마다 열쇠를 만들지 말 것(부팅 계획이 data 아래 이름을 «전부 표로» 받는다 — CASE_MEMO_KEY 머리글).
+   ■ 담는 것: 재해·질병 갈래, 고른 급여, 서류 받음/제출 날짜, 직접 넣은 서류 이름, 기한 계산용 날짜.
+     임금(계산 칸)·가족(유족 표)은 모듈이 저장하지 않는다 — 남길 것은 사람이 업무 메모로.
+   ■ 원본(사건)을 가리킬 때는 sourceKind 'case' · sourceId(사건 영구 id) — 온톨로지 SOURCE_KIND_STORE.
+   ■ 끝난 사건(erpIsTerminalRecord)은 모듈이 «보기만» 연다 — 여기서도 한 번 더 막는다. */
+var SANJAE_KIT_KEY = 'case_sanjae';
+function erpSanjaeKitGet(caseId){
+  var cid = String(caseId || ''); if(!cid) return null;
+  return (dbGet(SANJAE_KIT_KEY, []) || []).filter(function(r){ return r && r.caseId === cid && !r._deleted; })[0] || null;
+}
+function erpSanjaeKitPut(rec, caseRow){
+  if(!rec || !rec.caseId) return false;
+  if(caseRow && erpIsTerminalRecord(caseRow)){ showToast('끝난 사건은 보기만 할 수 있습니다'); return false; }
+  var cid = String(rec.caseId), now = (new Date()).toISOString();
+  var all = dbGet(SANJAE_KIT_KEY, []) || [];
+  var cur = all.filter(function(r){ return r && r.caseId === cid && !r._deleted; })[0] || null;
+  var row = Object.assign({}, cur || {}, rec, {
+    id: (cur && cur.id) || uid('sj'), entityType: 'SanjaeKit', schemaVersion: 1,
+    caseId: cid, sourceKind: 'case', sourceId: cid,
+    createdAt: (cur && cur.createdAt) || now, updatedAt: now,
+    updatedBy: (CURRENT_USER && CURRENT_USER.sid) || '', revision: ((cur && cur.revision) || 0) + 1 });
+  var next = cur ? all.map(function(r){ return r === cur ? row : r; }) : [row].concat(all);
+  if(!dbSet(SANJAE_KIT_KEY, next)){ showToast('❌ 산재 묶음 저장 실패'); return false; }
+  try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: SANJAE_KIT_KEY })); } catch(_){}
+  return true;
+}
+function erpSanjaeKitOpen(c){
+  if(!c || !c.id || !window.PuSanjaeKit) return;
+  var hol = []; try { hol = (erpHolidays() || []).map(function(x){ return x && x.date; }).filter(Boolean); } catch(_){}
+  window.PuSanjaeKit.open({ caseId: c.id, title: c.title || c.caseNo || '', readOnly: erpIsTerminalRecord(c), holidays: hol,
+    query: window.PuSanjae ? window.PuSanjae.guessQuery(c) : '',
+    load: function(){ return erpSanjaeKitGet(c.id); },
+    save: function(rec){ return erpSanjaeKitPut(rec, c); },
+    onMemo: function(txt){ return erpCaseMemoAdd(c.id, txt); } });
 }
 function CaseMemoPanel(props){
   var cid = String(props.caseId || '');
@@ -40567,11 +41113,11 @@ var BIZ_CASE_STAGE_SEED = [
     dueVerified:false, sortOrder:30 },
   { code:'wc-apply',     name:'요양신청', short:'요양', orgKind:'wc',
     forTypes:['case-injury'],
-    dueDays:90, dueFrom:'notice', dueNote:'결정 통보받은 날부터 90일 이내 심사청구',
+    dueDays:90, dueFrom:'notice', dueNote:'보험급여 결정이 있음을 안 날부터 90일 이내 심사청구 (산재보험법 제103조③) — 업무상질병판정위원회 심의를 거친 결정은 심사청구 없이 바로 재심사청구도 가능(제106조① 단서·③ 단서)',
     dueVerified:false, sortOrder:40 },
   { code:'wc-review',    name:'심사청구', short:'심사', orgKind:'wc',
     forTypes:['case-injury'],
-    dueDays:90, dueFrom:'notice', dueNote:'심사 결정 통보받은 날부터 90일 이내 재심사청구',
+    dueDays:90, dueFrom:'notice', dueNote:'심사 결정이 있음을 안 날부터 90일 이내 재심사청구 (산재보험법 제106조③)',
     dueVerified:false, sortOrder:50 },
   { code:'wc-rereview',  name:'재심사청구', short:'재심', orgKind:'wc',
     forTypes:['case-injury'],
@@ -40609,7 +41155,14 @@ function caseStageColor(orgKind){
    시드는 목록이 비었을 때만 쓰이므로, 고치기만 하면 이미 저장된 대표 화면엔 안 닿는다.
    ⚠ 빈 칸만 채운다 — 대표가 적은 설명은 덮지 않는다.
    ⚠ 한 번 채운 단계엔 seedNoteV 를 남긴다 — 대표가 일부러 비우면 다시 살아나지 않게. */
-var CASE_STAGE_SEED_NOTE_V = 1;
+/* 2판(2026-11-15) — 산재 두 단계 설명을 법 원문(«결정이 있음을 안 날», 제103조③·제106조③)으로 고쳤다.
+   ⚠ 옛 시드 글자 «그대로»인 것만 새 글로 바꾼다 — 대표가 고쳐 쓴 설명은 덮지 않는다.
+   ⚠ 1판에서 이미 채운 뒤 일부러 비운 칸은 2판에서도 다시 채우지 않는다. */
+var CASE_STAGE_SEED_NOTE_V = 2;
+var CASE_STAGE_OLD_SEED_NOTES = {
+  'wc-apply':  ['결정 통보받은 날부터 90일 이내 심사청구'],
+  'wc-review': ['심사 결정 통보받은 날부터 90일 이내 재심사청구']
+};
 function caseStageFillSeedNotes(arr){
   if(!Array.isArray(arr)) return arr;
   var changed = false;
@@ -40619,7 +41172,9 @@ function caseStageFillSeedNotes(arr){
     if(!s || !s.dueNote) return x;
     changed = true;
     var y = Object.assign({}, x, { seedNoteV: CASE_STAGE_SEED_NOTE_V });
-    if(!String(x.dueNote||'').trim()) y.dueNote = s.dueNote;
+    var cur = String(x.dueNote||'').trim();
+    if(!cur){ if(!(x.seedNoteV||0)) y.dueNote = s.dueNote; }
+    else if((CASE_STAGE_OLD_SEED_NOTES[x.code] || []).indexOf(cur) >= 0) y.dueNote = s.dueNote;
     return y;
   });
   if(changed) dbSet(BIZ_CASE_STAGE_KEY, out);

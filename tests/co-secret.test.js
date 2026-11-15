@@ -101,3 +101,33 @@ test('ⓓ 사진첩에서 가져오기도 기본 🔒 서명본 — 사진첩의
   assert.match(f, /src: 'photo', secret: secret/, '기업별 서류 줄에도 🔒 표시');
   assert.doesNotMatch(f, /가져온 것은 전 직원이 봅니다/);
 });
+
+/* 2026-11-14 보안 검토 — 올리는 도중 로그아웃·계정이 바뀌면 멈추고, 연결은 «부른 순간» 것을 쓴다 */
+test('putOriginal — alive 가 false 가 되면 창고·색인을 쓰지 않고, 도중에 init 이 바뀌어도 처음 사람 이름으로만 쓴다', async () => {
+  const S = loadStore(), db = fakeDb(), st = fakeStorage();
+  S.init({ db, storage: st, uid: 'uA', name: '가' });
+  let ok = true;
+  const p = S.putOriginal({ name: 'x.pdf', size: 3, type: 'application/pdf', bytes: new Uint8Array([7, 7, 7]) }, { kind: 'deungi' }, { secret: true, alive: () => ok });
+  ok = false;
+  await assert.rejects(p, /멈췄습니다/);
+  assert.equal(st.puts.length, 0, '멈춘 뒤 창고에 올리면 안 된다');
+  assert.equal(Object.keys(db.store).filter((k) => /^pu_docs\/originals\//.test(k)).length, 0);
+  /* 도중에 다른 사람으로 init — 색인의 by 는 처음 사람 */
+  const db2 = fakeDb();
+  S.init({ db, storage: st, uid: 'uA', name: '가' });
+  const q = S.putOriginal({ name: 'y.pdf', size: 3, type: 'application/pdf', bytes: new Uint8Array([8, 8, 8]) }, { kind: 'deungi' }, { secret: true });
+  S.init({ db: db2, storage: fakeStorage(), uid: 'uB', name: '나' });
+  const r = await q;
+  assert.equal(db.store['pu_docs/originals/' + r.fileId].by, 'uA');
+  assert.equal(Object.keys(db2.store).length, 0, '바뀐 사람의 DB 에 쓰면 안 된다');
+});
+
+test('putOriginal — 색인을 쓴 뒤 멈추면 해시(같은 파일 찾기)는 쓰지 않는다(보안 재검토 2026-11-14)', async () => {
+  const S = loadStore(), st = fakeStorage();
+  const db = fakeDb(); let ok = true;
+  const orig = db.ref.bind(db);
+  db.ref = (p) => { const r = orig(p); if (/^pu_docs\/originals\/f/.test(p)) { const set = r.set; r.set = (v) => set(v).then(() => { ok = false; }); } return r; };
+  S.init({ db, storage: st, uid: 'uA', name: '가' });
+  await assert.rejects(S.putOriginal({ name: 'z.pdf', size: 3, type: 'application/pdf', bytes: new Uint8Array([9, 9, 9]) }, { kind: 'deungi' }, { secret: true, alive: () => ok }), /멈췄습니다/);
+  assert.equal(Object.keys(db.store).filter((k) => /^pu_docs\/hash\//.test(k)).length, 0, '멈춘 뒤 해시를 쓰면 안 된다');
+});

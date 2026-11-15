@@ -363,7 +363,7 @@ test('★★ 푸른카메라 — 로그아웃·옆 탭 로그아웃 때 찍어 �
 
 /* ══ ⑥ 모바일 외부 링크 화면 리퍼러·전역 노출·이미지 출처 차단 ══ */
 test('★★ 외부 링크 화면 — no-referrer·noindex 를 갖추고 평문 전역 노출·외부 추적 이미지를 막는다', () => {
-  for (const f of ['sign.html', 'sign-contract.html', 'ieum-view.html', 'clinic-intake.html']) {
+  for (const f of ['sign.html', 'sign-contract.html', 'sign-harass.html', 'ieum-view.html', 'clinic-intake.html']) {
     const html = read(f);
     assert.match(html, /<meta name="referrer" content="no-referrer">/i, f + ' 에 no-referrer 가 없습니다');
     assert.match(html, /<meta name="robots" content="noindex,nofollow">/i, f + ' 에 noindex 가 없습니다');

@@ -73,6 +73,8 @@
     { code:'{{추가인원단위}}', desc:'급여 계약: 추가 보수를 셈하는 근로자 수 단위 (예: 5 → 5명당)' },
     { code:'{{추가금액}}',   desc:'급여 계약: 추가 단위당 추가 보수 (원)' },
     { code:'{{성공보수}}',   desc:'성공보수 (정액/정률)' },
+    { code:'{{과업내용}}',   desc:'과업·위탁·조사 업무 내용' },
+    { code:'{{대상인원}}',   desc:'조사·컨설팅·교육 대상 인원' },
     { code:'{{주담당}}',     desc:'노무사 주담당' },
     { code:'{{부담당}}',     desc:'노무사 부담당' },
     { code:'{{오늘날짜}}',   desc:'오늘 날짜 (YYYY-MM-DD)' },
@@ -125,7 +127,118 @@
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-cms', kind:'company', name:'CMS 자동이체 이용신청서 (푸른 표준)',
       body:'         계좌/신용카드 자동출금 이용신청서 (■신규 □변경 □해지)\n\n                                                     계약번호: {{계약번호}}\n\n※ 전자금융거래법 관련 규정(시행령 10조)에 의거, 자동이체 신청시에는 반드시\n   서면/공동인증서/녹취를 통한 예금주/카드주/휴대폰명의자 본인의 동의가\n   필요합니다.\n※ 신용카드 이용시 카드이용내역서상 카드사에 따라 결제대행기관인 나이스\n   또는 나이스(올더게이트)의 이름으로 청구될 수 있으며, 계좌출금 시에는\n   통장 내역에 수납기관이 지정한 통장기재내역으로 6자 이내 표시됩니다.\n\n◈ 수납기관 및 요금정보 (수납기관 기재란)\n   수납기관명    : 푸른노무법인\n   자동이체사유  : 월 자문료\n   금     액     : {{계약금액}}원\n   비     고     : 통장기재내역: 푸른노무법인\n\n◈ 납부자 정보 (수납기관 기재란)\n   납부자 번호 (고객번호): __________________\n   이체개시 년월         : {{계약시작일}}\n   지정 출금일           : 매월 ___일\n\n◈ 신청인 정보 입력\n   신청인 성명           : {{회사명}}\n   이 메 일             : {{대표이메일}}\n   주     소             : {{주소}}\n   연 락 처              : {{대표전화}}\n   휴대폰번호            : __________________\n\n   결제수단 선택         : ■ 계좌(CMS)  □ 신용카드\n                          *계좌이용시 휴대폰번호 등으로 개설된 평생계좌번호는\n                           이용 불가\n\n   은행명/카드사         : __________________\n   사업자번호            : {{사업자번호}}\n   예금주/카드주 본인명  : __________________\n   계좌/카드번호         : __________________\n   예금주/카드주 본인 주민번호 앞6자리: ______ - *******\n   카드유효기간          : ___/___ (월/년)  *카드 선택시\n\n※ 법인공용카드, 선불카드, 해외발행카드 등 일부 카드는 이용이 불가능할 수\n   있습니다.\n※ 연체, 잔액부족 등의 사유로 납부가 지연되는 경우가 발생하지 않도록 유의\n   하여 주십시오.\n\n[자동이체 서비스 이용 약관 / 개인정보 수집·이용동의 / 개인정보 취급위탁 /\n 문자(SMS) 발송 동의]\n   상기 자동이체 신청과 관련하여 계좌예금주/카드주로서 자동이체서비스\n   이용약관과 개인정보 수집 및 이용동의, 개인정보 취급 위탁에 동의,\n   문자(SMS) 발송에 동의하며, 자동출금이체서비스를 신청합니다.\n\n                              {{계약일}}\n\n   신청인               : {{대표자}}                  (인 또는 서명)\n   예금주/카드주 동의란 :                              (인 또는 서명)\n\n   * 신청인과 예금주/카드주가 상이한 경우에는 예금주/카드주의 동의가 필요\n     하며, 날인 또는 서명은 출금통장의 거래날인, 서명 사용\n',
-      attachments:[], enabled:true, createdAt:'2026-05-08' }
+      attachments:[], enabled:true, createdAt:'2026-05-08' },
+    // ── 업체계약·노사관계·괴롭힘조사·규정·원가·의견서·컨설팅·사건 표준 계약서 & 견적서 ──
+    { id:'fm-pr-union', kind:'company', name:'노동조합 자문계약서 (자동출금 신청서 포함)',
+      body:'                    노동조합 노무자문 계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} 노동조합(이하 "갑")과 푸른노무법인(이하 "을")은 노동조합 운영, 단체교섭,\n   노동관계법령 자문 일체에 관하여 다음과 같이 계약을 체결한다.\n\n제1조 【자문 범위】 조합 규약·단체협약 검토, 단체교섭·쟁의행위 법률자문, 부당노동행위·징계 대응 상담\n제2조 【자문 보수】 매월 금 {{계약금액}}원 ({{부가세처리}})\n제3조 【계약 기간】 {{계약시작일}} ~ {{계약종료일}} (1년, 별도 통보 없을 시 자동 연장)\n제4조 【담당 노무사】 {{주담당}}\n\n                              {{계약일}}\n\n   갑: {{회사명}}  대표자 {{대표자}} (인)\n   을: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-05-08' },
+    { id:'fm-pq-01', kind:'company', groupName:'제안서·견적서', name:'노무자문 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (상시 인사노무 자문)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 과 업 명: 상시 인사노무 법률자문 및 노무관리 지원\n2. 계약기간: {{계약기간}}\n3. 월 자문료: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-02', kind:'company', groupName:'제안서·견적서', name:'입찰·인건비 산정 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (입찰·인건비 원가산정)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 산정대상: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n[세부 수행 범위]\n  - 용역·입찰 대상 직종별 기본급·제수당·퇴직급여·4대보험료 법정 원가 산출\n  - 기획재정부 계약예규 및 예정가격 작성기준 적정성 검토\n  - 인건비 원가산정 결과보고서 및 산출내역서 제출\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n※ 문의전화: 041-556-0034~6\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[{ id:'at-fm-pq-02', name:'입찰·인건비 산정 견적서.hwpx', size:50115, fileId:'-P3_FSOYkSByHPy2xT-E' }],
+      originals:[{ attId:'at-fm-pq-02', fileId:'-P3_FSOYkSByHPy2xT-E', name:'입찰·인건비 산정 견적서.hwpx', size:50115 }],
+      enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pr-payroll-quote', kind:'company', groupName:'제안서·견적서', name:'급여관리·4대보험 아웃소싱 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (급여관리 · 4대보험 사무위탁)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 위탁과업: 매월 급여대장 산출·명세서 교부 지원, 퇴직금 정산, 4대보험 취득·상실·보수총액 EDI 신고\n2. 기준인원: {{기준인원}}명 (초과 시 {{추가인원단위}}명당 {{추가금액}}원 가산)\n3. 계약기간: {{계약기간}}\n4. 월 위탁보수: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-harass', kind:'company', name:'직장 내 괴롭힘·성희롱 조사 위탁계약서 (푸른 표준)',
+      body:'        직장 내 괴롭힘·성희롱 사안 조사 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은\n   근로기준법 제76조의3 및 남녀고용평등법 제14조에 따른 객관적·공정한 사안 조사를\n   위하여 다음과 같이 조사 위탁계약을 체결한다.\n\n제1조 【위탁 과업의 범위】\n   ① 과업내용: {{과업내용}}\n   ② 조사 대상 인원(예정): {{대상인원}}\n   ③ 을은 관련 법령에 따라 신고인·피신고인·참고인 면담, 객관적 증거자료 검토,\n      사실관계 확정 및 법적 해당 여부 판단, 최종 조사보고서 작성을 수행한다.\n\n제2조 【독립성 및 공정성 보장】\n   갑은 을이 독립적이고 중립적인 지위에서 조사를 수행할 수 있도록 보장하며,\n   조사 대상자의 출석 협조 및 관련 자료 제출에 적극 협조한다.\n\n제3조 【비밀유지 및 2차 피해 방지】\n   갑과 을은 근로기준법 제76조의3 제7항에 따라 조사 과정에서 알게 된 비밀을\n   누설하지 아니하며, 피해근로자 및 조사 참여자에 대한 2차 피해가 발생하지 않도록 한다.\n\n제4조 【수행 기간】\n   조사 수행 기간은 {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})로 하되,\n   조사 대상 추가 등 부득이한 사유가 있는 경우 상호 협의하여 연장할 수 있다.\n\n제5조 【위탁 보수】\n   ① 기본 조사 보수: 금 {{계약금액}}원 ({{부가세처리}})\n   ② 조사 대상 인원이 약정 기준을 초과하거나 출장·추가 심층조사가 필요한 경우\n      상호 협의하여 추가 보수를 정한다.\n   ③ 지급계좌: 하나은행 680-910005-45904 [푸른노무법인]\n\n제6조 【담당 노무사】\n   책임 수행 노무사: {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자)  상    호: {{회사명}} (사업자번호: {{사업자번호}})\n               주    소: {{주소}}\n               대 표 자: {{대표자}}                          (인)\n\n   을(수탁자)  상    호: 푸른노무법인\n               주    소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n               대 표 자: 권 형 하                            (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-harass-nda', kind:'company', name:'직장 내 괴롭힘·성희롱 조사 비밀유지 서약서 (푸른 표준)',
+      body:'        직장 내 괴롭힘·성희롱 조사 비밀유지 서약서\n\n■ 소속 사업장: {{회사명}}\n■ 조사 사안명: {{과업내용}}\n\n   본인은 근로기준법 제76조의3 제7항 및 남녀고용평등법 제14조 제7항에 의거하여,\n   위 사안의 조사 과정에서 알게 된 피해근로자·신고인·피신고인·참고인의 인적사항,\n   진술 내용, 제출 증거 및 조사 진행 상황에 관한 일체의 비밀을 조사 종료 후에도\n   정당한 사유 없이 타인에게 누설하거나 2차 피해가 발생하는 행위를 하지 않을 것을\n   엄숙히 서약합니다.\n\n   만일 이를 위반할 경우 관련 법령 및 사규에 따른 불이익 처분과 법적 책임을\n   감수할 것을 확인합니다.\n\n                              {{계약일}}\n\n   조사 수행기관: 푸른노무법인 담당노무사 {{주담당}}\n   서   약   자: 소 속 ______________  성 명 ______________ (서명 또는 인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-harass-quote', kind:'company', groupName:'제안서·견적서', name:'직장 내 괴롭힘·성희롱 조사 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (직장 내 괴롭힘·성희롱 조사)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 건    명: {{과업내용}}\n2. 조사대상: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n[세부 수행 범위]\n  - 신고인·피신고인·참고인 심층 면담 조사 및 진술록 확인\n  - 객관적 증거자료 검토 및 법리 판단\n  - 최종 조사결과 보고서 제출 및 후속 인사·징계조치 자문\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n※ 문의전화: 041-556-0034~6\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-bargain', kind:'company', name:'노사관계·임금·단체교섭 위임계약서 (푸른 표준)',
+      body:'          노사관계 자문 및 임금·단체교섭 위임계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은 노동조합과의\n   임금교섭·단체교섭 및 노사관계 안정화 지원 업무에 관하여 다음과 같이 위임계약을 체결한다.\n\n제1조 【위임 범위】\n   ① 과업내용: {{과업내용}}\n   ② 세부 범위: 요구안 법리 검토, 교섭 전략 수립, 본교섭·실무교섭 참석 및 교섭권 대행,\n      노동위원회 조정·중재 대응 자문, 단체협약·임금협정서 문안 작성\n\n제2조 【계약 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【위임 보수】\n   ① 기본 위임보수: 금 {{계약금액}}원 ({{부가세처리}})\n   ② 타결·성과 약정: {{성공보수}}\n   ③ 입금계좌: 하나은행 680-910005-45904 [푸른노무법인]\n\n제4조 【담당 노무사】\n   책임 수행 노무사: {{주담당}} / 부담당: {{부담당}}\n\n                              {{계약일}}\n\n   갑(위임인): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수임인): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-bargain-power', kind:'company', name:'임금·단체교섭 교섭권 위임장 (푸른 표준)',
+      body:'                  교 섭 권  위 임 장\n\n■ 위 임 인 (사용자)\n   상        호 : {{회사명}} (사업자등록번호: {{사업자번호}})\n   소   재   지 : {{주소}}\n   대   표   자 : {{대표자}}\n\n■ 수 임 인 (교섭수임 공인노무사)\n   법   인   명 : 푸른노무법인\n   소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n   연   락   처 : TEL 041-556-0034~6 / FAX 041-556-3656\n   수임 노무사 : {{공인노무사명단}}\n\n■ 위임 사항 (노동조합 및 노동관계조정법 제29조 제2항·제3항)\n   1. 교섭 대상 및 범위: {{과업내용}}\n   2. 위임 권한: 본교섭·실무교섭 참석, 교섭안 제안·협의, 잠정합의 및 부속 합의에 관한 교섭 권한 일체\n   3. 위임 기간: {{계약기간}}\n\n   노동조합 및 노동관계조정법 제29조에 의거하여 상기 수임인에게 위 사항에 관한\n   교섭 권한을 위임합니다.\n\n                              {{계약일}}\n\n                    위임인: {{회사명}}  대표자 {{대표자}} (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-bargain-quote', kind:'company', groupName:'제안서·견적서', name:'노사관계·임금·단체교섭 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (노사관계 자문 · 임금·단체교섭)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 수행기간: {{계약기간}}\n3. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n4. 타결·성공보수 조건: {{성공보수}}\n\n[세부 수행 범위]\n  - 노조 요구안 조문별 법리·타사 사례 분석 및 사측 교섭안 수립\n  - 본교섭·실무교섭 위임 참석 및 쟁점 조율\n  - 노동위원회 노동쟁의 조정 대응 및 단체협약·임금협정서 체결 자문\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-rules', kind:'company', name:'취업규칙·인사규정 제·개정 위탁계약서 (푸른 표준)',
+      body:'          취업규칙 및 인사제규정 정비 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 근로기준법 제93조·제94조 및\n   최신 개정 노동관계법령에 부합하는 취업규칙·인사규정 제·개정 업무를 위하여 다음과 같이 계약한다.\n\n제1조 【위탁 범위】\n   ① 과업내용: {{과업내용}}\n   ② 세부 범위: 현행 취업규칙·근로계약서·제규정 적법성 진단, 개정안 작성, 근로자 과반수\n      의견청취·동의 절차 지도 및 관할 지방고용노동관서 변경신고 대행\n\n제2조 【수행 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【위탁 보수】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【담당 노무사】\n   주담당 노무사: {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-rules-quote', kind:'company', groupName:'제안서·견적서', name:'취업규칙·인사규정 정비 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n            견   적   서 (취업규칙 · 인사제규정 정비)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 대상규모: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n[세부 수행 범위]\n  - 현행 취업규칙·인사규정·근로계약서 법령 위반 및 노무 리스크 정밀 진단\n  - 최신 노동법·판례 반영 개정안 및 신·구 조문 대비표 작성\n  - 적법한 의견청취·동의 절차 지원 및 고용노동청 취업규칙 신고 대행\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-costing', kind:'company', name:'입찰·인건비 원가산정 용역계약서 (푸른 표준)',
+      body:'              입찰·인건비 원가산정 용역계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 인건비 원가산정 및 적정 노무비\n   산출 용역에 관하여 다음과 같이 계약을 체결한다.\n\n제1조 【용역 범위】\n   ① 과업내용: {{과업내용}}\n   ② 산정 대상: {{대상인원}}\n\n제2조 【수행 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【용역 보수】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【담당 노무사】\n   {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-opinion', kind:'company', name:'법률의견서·노무검토 약정서 (푸른 표준)',
+      body:'              노무 법률의견서 작성 위임약정서\n\n                                                     계약번호: {{계약번호}}\n\n   위임인 {{회사명}}(대표자 {{대표자}})은 수임인 푸른노무법인에게 아래 사안에 관한\n   노동관계법령 검토 및 법률의견서 작성을 위임한다.\n\n1. 검토 과업: {{과업내용}}\n2. 제출 기한: {{계약기간}}\n3. 위임 보수: 금 {{계약금액}}원 ({{부가세처리}})\n4. 담당 노무사: {{주담당}}\n\n   수임인은 위임인이 제공한 사실관계 및 자료에 기초하여 성실히 의견서를 작성하며,\n   위임인은 본 의견서를 약정 목적 범위 내에서 사용한다.\n\n                              {{계약일}}\n\n   위임인: {{회사명}}  대표자 {{대표자}} (인)\n   수임인: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-amend', kind:'company', name:'계약 변경·연장 합의서 (푸른 표준)',
+      body:'                  계 약 변 경 · 연 장 합 의 서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 양 당사자 간 기 체결한\n   원 계약의 조건을 다음과 같이 변경·연장하기로 상호 합의한다.\n\n제1조 【변경·연장 대상 과업】\n   {{과업내용}}\n\n제2조 【변경 후 계약기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【변경 후 계약금액(보수)】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【효력】\n   본 합의서에서 변경한 사항 외의 나머지 조항은 원 계약서의 내용을 그대로 적용한다.\n\n                              {{계약일}}\n\n   갑   상 호: {{회사명}} (사업자번호: {{사업자번호}})\n        주 소: {{주소}}\n        대표자: {{대표자}}                              (인)\n\n   을   상 호: 푸른노무법인\n        주 소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n        대표자: 권 형 하                                (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-safety', kind:'consulting', name:'산업안전·중대재해 컨설팅 위탁계약서 (푸른 표준)',
+      body:'          산업안전보건·중대재해예방 컨설팅 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 산업안전보건법 및\n   중대재해처벌법에 따른 안전보건관리체계 구축·점검 컨설팅을 위하여 다음과 같이 계약한다.\n\n제1조 【컨설팅 과업】\n   {{과업내용}}\n\n제2조 【수행 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【용역 보수】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【수행 담당】\n   주담당 노무사: {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-safety-quote', kind:'consulting', groupName:'제안서·견적서', name:'산업안전·중대재해예방 컨설팅 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (산업안전보건 · 중대재해예방 컨설팅)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 대상사업장·인원: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n[세부 수행 범위]\n  - 중대재해처벌법상 안전보건확보의무 이행실태 반기별 점검·진단\n  - 위험성평가 체계 및 안전보건관리규정·매뉴얼 정비\n  - 도급·용역·위탁 시 안전보건 적격수급인 평가체계 자문 및 보고서 제출\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-dispatch', kind:'consulting', name:'불법파견·사내하도급 노무진단 컨설팅 계약서 (푸른 표준)',
+      body:'          사내하도급 적법성 및 노무관리 진단 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 사내하도급·용역 운영 실태\n   적법성 진단 및 인사노무 개선방안 수립을 위하여 다음과 같이 계약을 체결한다.\n\n제1조 【진단 과업】\n   {{과업내용}} (대상 인원·공정: {{대상인원}})\n\n제2조 【수행 기간】\n   {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n\n제3조 【용역 보수】\n   금 {{계약금액}}원 ({{부가세처리}})\n\n제4조 【담당 노무사】\n   {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-consulting-quote', kind:'consulting', groupName:'제안서·견적서', name:'인사노무 컨설팅·진단·자문 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n                        견     적     서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (사업자번호: {{사업자번호}} / 담당: {{담당자}})\n■ 발 신: 푸른노무법인 (사업자번호: 312-81-52792 / 대표: 권형하)\n■ 일 자: {{계약일}}\n\n1. 과 업 명: {{과업내용}}\n2. 대상인원: {{대상인원}}\n3. 수행기간: {{계약기간}}\n4. 합계금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n5. 담당노무사: {{주담당}}\n\n※ 본 견적의 유효기간은 발행일로부터 30일입니다.\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pq-03', kind:'consulting', groupName:'제안서·견적서', name:'산업안전 자문 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (산업안전보건 자문)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 과 업: {{과업내용}}\n■ 금 액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-04', kind:'other', groupName:'제안서·견적서', name:'성희롱 예방교육 강의 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (법정의무·노무교육 출강)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 강의명: {{과업내용}}\n■ 강의료: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-05', kind:'company', groupName:'제안서·견적서', name:'의견서 작성 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (노무 법률의견서 작성)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 검토주제: {{과업내용}}\n■ 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-06', kind:'company', groupName:'제안서·견적서', name:'임금협상 교섭 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (임금협상 · 단체교섭 대행)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 과 업: {{과업내용}}\n■ 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-07', kind:'fund', groupName:'제안서·견적서', name:'공동근로복지기금 제안서 및 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n      제안서 및 견적서 (사내·공동근로복지기금 설립·운영)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 과 업: {{과업내용}}\n■ 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-08', kind:'consulting', groupName:'제안서·견적서', name:'컨설팅 비교견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              비 교 견 적 서 (인사노무 컨설팅)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 과 업: {{과업내용}}\n■ 견적금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-09', kind:'other', groupName:'제안서·견적서', name:'조사·컨설팅 비용 청구서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              청   구   서 (조사 · 컨설팅 보수)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중\n■ 일 자: {{계약일}}\n■ 청구내역: {{과업내용}}\n■ 청구금액: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n■ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pq-10', kind:'other', groupName:'제안서·견적서', name:'질의회시 공문 틀',
+      body:'푸 른 노 무 법 인\n\n문서번호: 푸른-{{계약일}}\n수    신: {{회사명}} 대표이사 (참조: {{담당자}})\n제    목: {{과업내용}} 관련 노무법률 질의 회시\n\n1. 귀 사의 무궁한 발전을 기원합니다.\n2. 귀 사에서 질의하신 사안에 대하여 노동관계법령 및 행정해석·판례를 검토한 결과를 붙임과 같이 회시합니다.\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-10-08' },
+    { id:'fm-pr-case-quote', kind:'other', groupName:'제안서·견적서', name:'노동·산재사건 수임료 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n              견   적   서 (노동위원회 · 노동청 · 산재 사건 대리)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 사건 내용: {{과업내용}}\n2. 수행 범위: 사건 사실관계·법리 검토, 이유서·답변서 작성·제출, 조사·심문기일 대리 출석\n3. 착 수 금: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n4. 성공보수: {{성공보수}}\n\n※ 심급(지노위·중노위·재심사 등) 단위로 산정하며, 입금계좌는 하나은행 680-910005-45904 (푸른노무법인)입니다.\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-case-ulabor', kind:'case', side:'employer', groupName:'노사', name:'부당노동행위·노동쟁의 사건 위임약정서 및 위임장 (푸른 표준)',
+      body:'        노동위원회 부당노동행위·노동쟁의 사건 위임약정서\n\n   위임인 {{회사명}}(대표자 {{대표자}})은 수임인 푸른노무법인에게 아래 노동위원회 사건의\n   대리 업무 일체를 위임하고 다음과 같이 약정한다.\n\n제1조 【위임 사건】 {{과업내용}}\n제2조 【착수 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제3조 【성공 보수】 {{성공보수}} (지급 지체 시 지급기일 다음날부터 연 12%의 이자를 가산한다)\n제4조 【담당 노무사】 {{공인노무사명단}}\n\n                              {{계약일}}\n\n   위임인: {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   수임인: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-case-harass', kind:'case', side:'employer', groupName:'조사', name:'직장 내 괴롭힘·성희롱 사건 대리 위임약정서 및 위임장 (푸른 표준)',
+      body:'        직장 내 괴롭힘·성희롱 사건 대리 위임약정서\n\n   위임인 {{회사명}}(대표자 {{대표자}})은 수임인 푸른노무법인에게 직장 내 괴롭힘·성희롱 관련\n   노동청 진정·노동위원회 사건 대리 업무를 위임하고 다음과 같이 약정한다.\n\n제1조 【위임 사건】 {{과업내용}}\n제2조 【착수 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제3조 【성공 보수】 {{성공보수}} (지급 지체 시 지급기일 다음날부터 연 12%의 이자를 가산한다)\n제4조 【담당 노무사】 {{공인노무사명단}}\n\n                              {{계약일}}\n\n   위임인: {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   수임인: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-case-ind', kind:'case', side:'worker', groupName:'산재등', name:'산재보험 요양·장해·유족급여 청구 위임약정서 및 위임장 (푸른 표준)',
+      body:'              산재보상 청구 사건 위임약정서\n\n   위임인 {{근로자명}}(연락처: {{근로자연락처}}, 주소: {{근로자주소}})은 수임인 푸른노무법인에게\n   근로복지공단 산업재해보상보험 급여 청구 및 재심사 사건 일체를 위임한다.\n\n제1조 【위임 사건】 {{과업내용}} (소속 사업장: {{회사명}})\n제2조 【착수금】 금 {{착수금}}원 (부가세포함)\n제3조 【성공보수】 결정·지급 수령액의 {{성공보수율}} (부가세포함, 미지급 시 7일 경과 후부터 연 12%의 이자)\n제4조 【수임 노무사】 {{공인노무사명단}}\n\n                              {{계약일}}\n\n   위임인: {{근로자명}} (서명 또는 인)\n   수임인: 푸른노무법인 대표노무사 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-case-etc', kind:'case', side:'both', groupName:'행심', name:'노동청 진정·행정심판 대리 위임약정서 및 위임장 (푸른 표준)',
+      body:'          고용노동청 진정·고소 및 행정심판 사건 위임약정서\n\n   위임인 {{회사명}}(또는 {{근로자명}})은 수임인 푸른노무법인에게 아래 노동청·행정심판 사건의\n   법률 대리 및 서면 작성·출석 업무 일체를 위임한다.\n\n제1조 【위임 사건】 {{과업내용}}\n제2조 【착수 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제3조 【성공 보수】 {{성공보수}} (지급 지체 시 지급기일 다음날부터 연 12%의 이자를 가산한다)\n제4조 【수임 노무사】 {{공인노무사명단}}\n\n                              {{계약일}}\n\n   위임인: {{회사명}} {{대표자}} / {{근로자명}} (인)\n   수임인: 푸른노무법인 대표노무사 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-fund-company', kind:'fund', name:'사내근로복지기금 설립·운영 자문 위탁계약서 (푸른 표준)',
+      body:'          사내근로복지기금 설립 및 운영자문 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 근로복지기본법에 따른 사내근로복지기금법인\n   설립 인가·등기 지원 및 운영·결산 자문에 관하여 다음과 같이 계약을 체결한다.\n\n제1조 【위탁 과업】 {{과업내용}}\n제2조 【계약 기간】 {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n제3조 【위탁 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제4조 【담당 노무사】 {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-fund-project', kind:'fund', name:'공동근로복지기금 지원사업 신청·수행 위탁계약서 (푸른 표준)',
+      body:'        공동근로복지기금 지원사업 신청·운영 컨설팅 위탁계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑")과 푸른노무법인 (이하 "을")은 근로복지공단 공동근로복지기금 지원사업\n   사업계획서 작성·보조금 신청 및 정산 자문 업무에 관하여 다음과 같이 계약을 체결한다.\n\n제1조 【위탁 과업】 {{과업내용}}\n제2조 【계약 기간】 {{계약기간}} ({{계약시작일}} ~ {{계약종료일}})\n제3조 【위탁 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제4조 【담당 노무사】 {{주담당}}\n\n                              {{계약일}}\n\n   갑(위탁자): {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   을(수탁자): 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-11' },
+    { id:'fm-pr-consult-quote', kind:'other', groupName:'제안서·견적서', name:'심층 노무상담·법률검토 표준 견적서',
+      body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          견   적   서 (심층 노무상담 · 법률검토)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 수 신: {{회사명}} 귀중 (담당: {{담당자}})\n■ 발 신: 푸른노무법인 (대표노무사 권형하 / 담당: {{주담당}})\n■ 일 자: {{계약일}}\n\n1. 상담·검토 건명: {{과업내용}}\n2. 수행기간: {{계약기간}}\n3. 상담·검토 보수: 일금 {{계약금액한글}}원정 (₩{{계약금액}} / {{부가세처리}})\n\n※ 입금계좌: 하나은행 680-910005-45904 (예금주: 푸른노무법인)\n\n                    푸 른 노 무 법 인  대표노무사 권 형 하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-12' },
+    { id:'fm-pr-consult-contract', kind:'consult', name:'심층 노무상담·법률검토 위임약정서 (푸른 표준)',
+      body:'            심층 노무상담 및 법률검토 위임약정서\n\n                                                     계약번호: {{계약번호}}\n\n   위임인 {{회사명}}(대표자 {{대표자}})은 수임인 푸른노무법인에게 아래 노무 현안에 대한\n   심층 상담 및 관련 법령·판례 검토 업무를 위임하고 다음과 같이 약정한다.\n\n제1조 【위임 범위】 {{과업내용}}\n제2조 【수행 기간】 {{계약기간}}\n제3조 【상담·검토 보수】 금 {{계약금액}}원 ({{부가세처리}})\n제4조 【담당 노무사】 {{주담당}}\n\n                              {{계약일}}\n\n   위임인: {{회사명}}  대표자 {{대표자}} (인)  [{{주소}}]\n   수임인: 푸른노무법인  대표자 권형하 (인)\n',
+      attachments:[], enabled:true, createdAt:'2026-11-12' }
   ];
 
   // ── 체당금 사건 양식 시드 (4종) ──
@@ -339,6 +452,44 @@
     var d = new Date();
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
+  /* 외부(보낸 견적서 관리 · 확정 계약서 관리)에서 한글·문서 파일을 곧바로 새 계약서·견적서 양식으로 등록 */
+  function scrubFormBody(s) {
+    var t = String(s == null ? '' : s);
+    if (w.PuRrnMask && typeof w.PuRrnMask.maskRrnInText === 'function') return w.PuRrnMask.maskRrnInText(t).text;
+    return t.replace(/(^|[^0-9])(\d{6}[-–—]\s?\d{7})([^0-9]|$)/g, '$1******-*******$3')
+            .replace(/(^|[^0-9])(\d{13})([^0-9]|$)/g, '$1******-*******$3');
+  }
+  function registerForm(db, o) {
+    o = o || {};
+    var id = o.id || newId('fm-');
+    var kind = o.kind || 'company';
+    var fname = String(o.fileName || ((o.name || '양식') + '.hwp'));
+    var fsize = o.size || o.fileSize || 0;
+    var attId = o.fileId ? newId('att-') : '';
+    var atts = Array.isArray(o.attachments) ? o.attachments.slice()
+      : (o.fileId ? [{ id: attId, name: fname, size: fsize, type: o.mime || '', fileId: o.fileId }] : []);
+    var origs = Array.isArray(o.originals) ? o.originals.slice()
+      : (o.fileId ? [{ attId: attId, name: fname, fileId: o.fileId }] : []);
+    var grp = String(o.groupName || '').trim();
+    if (!grp && o.docRole === 'quote' && twoGroups(kind)) grp = PROPOSAL_GROUP;
+    var fm = {
+      id: id,
+      kind: kind,
+      groupName: grp,
+      name: String(o.name || '새 양식').trim().slice(0, 120),
+      body: scrubFormBody(o.body || ''),
+      enabled: o.enabled !== false,
+      createdAt: todayYMD(),
+      attachments: atts,
+      originals: origs
+    };
+    if (o.docRole === 'quote' || o.docRole === 'contract') fm.docRole = o.docRole;
+    if (o.side) fm.side = o.side;
+    return db.ref(PATH_RM).once('value').then(function (rmSnap) {
+      var rm = listOf(rmSnap && rmSnap.val() && rmSnap.val().v);
+      return changeForms(db, rm, function (list) { return list.concat([fm]); });
+    }).then(function () { return fm; });
+  }
   function kindInfo(v) { return KINDS.filter(function (k) { return k.v === v; })[0] || KINDS[0]; }
 
   var ATTACH_MAX = 1024 * 1024; // 양식 첨부(base64)는 1MB 까지 — 이알피가 통표로 받는다
@@ -409,7 +560,8 @@
     var m = TYPE_SET[kv]; if (!m || !sets) return null;
     var id = m[typeCode] || m['*']; if (!id) return null;
     var st = (sets || []).filter(function (s) { return s && s.id === id; })[0];
-    return st && (st.formIds || []).length ? st.formIds.slice() : null;
+    var fids = st ? listOf(st.formIds) : [];
+    return fids.length ? fids.slice() : null;
   }
   function contractPick(forms, info) {
     info = info || {};
@@ -620,25 +772,98 @@
      data/contract_form_sets = { v:[세트…], rm:[지운 기본 세트 id…], u } — 계약서 양식과 같은 통표·거래 방식.
      ⚠ 저장은 changeSets 한 길 — 들고 있던 사본을 통째로 밀면 그사이 남이 만든 세트를 지운다. */
   var PATH_SETS = 'data/contract_form_sets';
-  /* 업무별 세트 (대표 「추천대로」 2026-10-07) — 자문·급여는 CONTRACT_SETS(이알피 계약서 출력)와 «같은 양식» */
+  /* 업무·갈래별 하위 세트 (대표 지시 2026-11-12 「계약서 양식과 세트 나누지 말고 업체계약 안에 세트 하위로 다른 서류들도 동종내용으로 하위 세트로 모두 넣어서 한번에 바로 관리 처리하게 해달라」)
+     · 각 갈래(업체계약·사건계약·컨설팅계약·기금관리·기타사업·상담사항) 아래에 동종 업무의 견적서+계약서+부속서류를 한 묶음 하위 세트로 둔다.
+     · 이알피 「계약서 출력」(contractPick·ERP_TYPE_SET)은 groupName === PROPOSAL_GROUP(제안서·견적서)을 자동으로 빼므로, 하위 세트에 견적서를 함께 담아도 이알피 자동 체크 목록은 계약서만 유지된다. */
   var SET_SEED = [
-    { id: 'fs-advisory', name: '자문 세트', kind: 'company', formIds: ['fm-pr-advisory', 'fm-pr-cms'] },
-    { id: 'fs-payroll', name: '급여 세트', kind: 'company', formIds: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] },
-    { id: 'fs-fund', name: '기금 세트', kind: 'fund', formIds: ['fm-5', 'fm-pq-07'] },
-    /* 기금 계약은 갈래가 달라 세트를 나눈다(대표 「세트 만들어라」 2026-10-10) — fs-fund 는 이알피 계약서 출력이 읽으므로 그대로 둔다 */
-    { id: 'fs-fund-company', name: '사내기금 세트', kind: 'fund', formIds: ['fm-fund-found', 'fm-fund-company', 'fm-fund-loan', 'fm-pq-07'] },
-    { id: 'fs-fund-joint', name: '공동기금 운영·결산 세트', kind: 'fund', formIds: ['fm-5', 'fm-fund-closing', 'fm-fund-annual', 'fm-fund-year'] },
-    { id: 'fs-fund-project', name: '공동기금 지원사업 세트', kind: 'fund', formIds: ['fm-fund-project', 'fm-fund-multi'] },
-    { id: 'fs-union', name: '노조 세트', kind: 'company', formIds: ['fm-pr-union'] },
-    { id: 'fs-office', name: '사무대행 세트', kind: 'company', formIds: ['fm-pr-employment', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-cms'] },
+    /* 🏢 업체계약 하위 세트 */
+    { id: 'fs-advisory', name: '자문 세트', kind: 'company', formIds: ['fm-pr-advisory', 'fm-pr-cms', 'fm-pq-01'] },
+    { id: 'fs-payroll', name: '급여 세트', kind: 'company', formIds: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms', 'fm-pr-payroll-quote'] },
+    { id: 'fs-office', name: '사무대행 세트', kind: 'company', formIds: ['fm-pr-employment', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-cms', 'fm-pr-payroll-quote'] },
+    { id: 'fs-harass', name: '직장 내 괴롭힘·성희롱 조사 세트', kind: 'company', formIds: ['fm-pr-harass-quote', 'fm-pr-harass', 'fm-mv1nad0uo76-x2a', 'fm-pr-harass-nda', 'fm-pq-09'] },
+    { id: 'fs-bargain', name: '노사관계·임금·단체교섭 세트', kind: 'company', formIds: ['fm-pq-06', 'fm-pr-bargain-quote', 'fm-pr-bargain', 'fm-pr-bargain-power', 'fm-pr-union', 'fm-pr-cms'] },
+    { id: 'fs-union', name: '노조 세트', kind: 'company', formIds: ['fm-pr-union', 'fm-pq-01'] },
+    { id: 'fs-rules', name: '취업규칙·인사규정 정비 세트', kind: 'company', formIds: ['fm-pr-rules-quote', 'fm-pr-rules'] },
+    { id: 'fs-costing', name: '입찰·인건비 원가산정 세트', kind: 'company', formIds: ['fm-pq-02', 'fm-pr-costing', 'fm-pq-09'] },
+    { id: 'fs-opinion', name: '법률의견서·노무검토 세트', kind: 'company', formIds: ['fm-pq-05', 'fm-pr-opinion', 'fm-pq-10'] },
+    { id: 'fs-amend', name: '계약 변경·연장 세트', kind: 'company', formIds: ['fm-pr-amend', 'fm-pr-cms', 'fm-pq-01'] },
+    /* ⚖️ 사건계약 하위 세트 */
     { id: 'fs-chedang', name: '체당금 접수 세트', kind: 'case', side: 'worker', groupName: '체당금',
-      formIds: ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04'] }
+      formIds: ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04'] },
+    { id: 'fs-case-wage', name: '임금체불·대지급금 사건 세트', kind: 'case',
+      formIds: ['fm-pr-case-quote', 'fm-mv1nad0slog-her', 'fm-mv1nad0t9ap-tiw', 'fm-mv1nad0tsns-e3o', 'fm-case-worker-wi', 'fm-case-cd-01', 'fm-case-cd-02'] },
+    { id: 'fs-case-dismiss', name: '부당해고·징계 구제 세트', kind: 'case',
+      formIds: ['fm-pr-case-quote', 'fm-mv1nad0teyj-8hy', 'fm-mv1nad0tlyw-u7z', 'fm-mv1nad0tz0w-7xh', 'fm-3'] },
+    { id: 'fs-case-ulabor', name: '부당노동행위·노동위 세트', kind: 'case',
+      formIds: ['fm-pr-case-quote', 'fm-pr-case-ulabor', 'fm-mv1nad0t0rv-xqn', 'fm-mv1nad0uhts-z3n', 'fm-mv1nad0umus-ahg', 'fm-mv1nad0u1n2-xhi', 'fm-mv1nad0tz0w-7xh'] },
+    { id: 'fs-case-harass', name: '괴롭힘·성희롱 사건대리 세트', kind: 'case',
+      formIds: ['fm-pr-harass-quote', 'fm-pr-case-harass', 'fm-mv1nad0uo76-x2a', 'fm-mv1nad0vw33-7x8', 'fm-mv1nad0vfhr-rei', 'fm-mv1nad0vhtn-sf8', 'fm-mv1nad0vb7f-tvd'] },
+    { id: 'fs-case-ind', name: '산재·산업안전 사건 세트', kind: 'case',
+      formIds: ['fm-pq-03', 'fm-pr-case-quote', 'fm-pr-case-ind', 'fm-mv1nad0ukpw-0vy', 'fm-mv1nad0uy20-ine', 'fm-mv1nad0u4l8-3np', 'fm-mv1nx2p59hj-tey', 'fm-mv1nx2p68fu-u9h'] },
+    { id: 'fs-case-etc', name: '노동청·행정심판·공통위임 세트', kind: 'case',
+      formIds: ['fm-pr-case-quote', 'fm-pr-case-etc', 'fm-mv1nad0tain-7a2', 'fm-mv1nad0t7ls-n6h', 'fm-mv1nad0ub00-2sm', 'fm-mv1r2xyxin5-yva', 'fm-mv1r2xyya4a-hti'] },
+    /* 📊 컨설팅계약 하위 세트 */
+    { id: 'fs-consulting-hr', name: '인사노무·직무·임금 컨설팅 세트', kind: 'consulting',
+      formIds: ['fm-pr-consulting-quote', 'fm-pq-08', 'fm-4', 'fm-mq4zdc3my30-n48'] },
+    { id: 'fs-consulting-safety', name: '산업안전·중대재해 컨설팅 세트', kind: 'consulting',
+      formIds: ['fm-pq-03', 'fm-pr-safety-quote', 'fm-pr-safety', 'fm-mq4zdc3my30-n48'] },
+    { id: 'fs-consulting-dispatch', name: '불법파견·사내하도급 진단 세트', kind: 'consulting',
+      formIds: ['fm-pr-consulting-quote', 'fm-pq-08', 'fm-pr-dispatch'] },
+    /* 🏦 기금관리 하위 세트 */
+    { id: 'fs-fund', name: '기금 세트', kind: 'fund', formIds: ['fm-5', 'fm-pq-07'] },
+    { id: 'fs-fund-company', name: '사내기금 세트', kind: 'fund', formIds: ['fm-fund-found', 'fm-fund-company', 'fm-fund-loan', 'fm-pq-07'] },
+    { id: 'fs-fund-joint', name: '공동기금 운영·결산 세트', kind: 'fund', formIds: ['fm-5', 'fm-fund-closing', 'fm-fund-annual', 'fm-fund-year', 'fm-pq-07'] },
+    { id: 'fs-fund-project', name: '공동기금 지원사업 세트', kind: 'fund', formIds: ['fm-fund-project', 'fm-fund-multi', 'fm-pq-07'] },
+    /* 📋 기타사업 하위 세트 */
+    { id: 'fs-edu', name: '성희롱예방·노무교육 강의 세트', kind: 'other', formIds: ['fm-pq-04', 'fm-6', 'fm-pq-09'] },
+    { id: 'fs-official', name: '질의회시 공문·청구 세트', kind: 'other', formIds: ['fm-pq-05', 'fm-pr-opinion', 'fm-pq-10', 'fm-pq-09'] },
+    /* 📞 상담사항 하위 세트 */
+    { id: 'fs-consult', name: '노무상담·확인 세트', kind: 'consult', formIds: ['fm-pr-consult-quote', 'fm-pr-consult-contract', 'fm-1', 'fm-pq-10'] }
   ];
+  function seedSetById(id) {
+    for (var i = 0; i < SET_SEED.length; i++) if (SET_SEED[i].id === id) return SET_SEED[i];
+    return null;
+  }
+  function activeFormMap(forms) {
+    var m = {}, list = forms || [];
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      if (f && f.id && !isClosed(f)) m[f.id] = f;
+    }
+    return m;
+  }
+  function setKindOf(st, forms) {
+    if (st && st.kind && KINDS.some(function (k) { return k.v === st.kind; })) return st.kind;
+    var sd = st && st.id ? seedSetById(st.id) : null;
+    if (sd && sd.kind) return sd.kind;
+    var fids = listOf(st && st.formIds), id0 = fids[0], list = forms || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === id0 && list[i].kind) return list[i].kind;
+    }
+    return 'company';
+  }
+  function setsForKind(sets, forms, kv) {
+    return (sets || []).filter(function (st) { return st && setKindOf(st, forms) === kv; });
+  }
   function setsOf(doc) {
-    var list = listOf(doc && doc.v).slice(), rm = listOf(doc && doc.rm), have = {};
-    list.forEach(function (s) { if (s && s.id) have[s.id] = 1; });
+    var raw = listOf(doc && doc.v), rm = listOf(doc && doc.rm), have = {}, list = [];
+    raw.forEach(function (s) {
+      if (!s || !s.id || have[s.id]) return;
+      have[s.id] = 1;
+      var cp = JSON.parse(JSON.stringify(s));
+      cp.formIds = listOf(cp.formIds).filter(function (id) { return typeof id === 'string' && id; });
+      var sd = seedSetById(cp.id);
+      if (sd && !cp.kind) cp.kind = sd.kind;
+      list.push(cp);
+    });
     SET_SEED.forEach(function (s) { if (!have[s.id] && rm.indexOf(s.id) < 0) list.push(JSON.parse(JSON.stringify(s))); });
     return list;
+  }
+  function missingSeedFormIds(st, forms) {
+    var sd = st && st.id ? seedSetById(st.id) : null;
+    if (!sd) return [];
+    var have = activeFormMap(forms), curIds = listOf(st.formIds);
+    return listOf(sd.formIds).filter(function (id) { return !!have[id] && curIds.indexOf(id) < 0; });
   }
   function changeSets(db, fn) {
     return new Promise(function (res, rej) {
@@ -1041,9 +1266,11 @@
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
-    + '.pcf-tsub{padding-left:26px!important;font-size:12px}.pcf-tclosed{margin-top:4px;border-top:1px dashed #e2e8f0;color:#64748b}'
-    + '.pcf-thbtn{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 24px);border:0;background:none;cursor:pointer;text-align:left;font-family:inherit}.pcf-thbtn:hover{filter:brightness(.92)}.pcf-thbtn i{font-style:normal;font-size:10.5px;opacity:.8}'
-    + '.pcf-th.pcf-thset{background:#1d4ed8;color:#fff;border-radius:5px;padding:4px 10px;margin:12px 0 4px;font-size:12px}'
+    + '.pcf-tsub{padding-left:28px!important;font-size:12px}.pcf-tsub-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}.pcf-tclosed{margin-top:4px;border-top:1px dashed #e2e8f0;color:#64748b}'
+    + '.pcf-tkrow{display:flex;align-items:center;gap:2px}.pcf-tkrow .pcf-tk{flex:1;min-width:0}.pcf-tk.hasfold{padding-left:6px}'
+    + 'button.pcf-kfold{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:0;border:none;background:none;color:#64748b;font-size:11.5px;border-radius:6px;cursor:pointer;flex:none;font-family:inherit}button.pcf-kfold:hover{background:#dbeafe;color:#1e40af}'
+    + '.pcf-tk.subparent{background:#f8fafc;color:#1e40af;font-weight:700;box-shadow:inset 3px 0 0 #93c5fd}'
+    + '.pcf-seted-list{max-height:46vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;margin-top:8px}.pcf-seted-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:12.5px;cursor:pointer}.pcf-seted-row:hover{background:#f8fafc}.pcf-seted-row input[type=checkbox]{width:24px;height:24px;cursor:pointer;margin:0}.pcf-seted-row span.nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
@@ -1119,7 +1346,7 @@
     + '.pcf-pvbar{display:flex;gap:6px;justify-content:flex-end;max-width:880px;margin:0 auto 8px}'
     + '.pcf-orig{min-height:200px;text-align:center}.pcf-orig .pcf-muted{padding:40px}'
     + '.pcf-offband{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:6px 10px;border-radius:4px;margin-bottom:16px}'
-    + '.pcf-body{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
+    + '.pcf-body{white-space:pre-wrap;overflow-wrap:anywhere;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
     + '.pcf-v{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}'
     + '.pcf-muted{color:#94a3b8}'
     /* 채워서 받기 창 */
@@ -1165,7 +1392,7 @@
     + '.pcf-lt{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}'
     + '.pcf-lt thead th{position:sticky;top:0;z-index:1;background:#f8fafc;color:#475569;font-size:11.5px;font-weight:600;text-align:left;padding:6px 4px;border-bottom:1px solid #e2e8f0}'
     + '.pcf-lt td{padding:6px 4px;border-bottom:1px solid #f1f5f9;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-    + '.pcf-lt .pcf-lc{width:26px;text-align:center}.pcf-lt .pcf-lc input{cursor:pointer;margin:0}'
+    + '.pcf-lt .pcf-lc{width:32px;text-align:center}.pcf-lt .pcf-lc input{width:24px;height:24px;cursor:pointer;margin:0}'
     + '.pcf-lt .pcf-ln2{width:28px;color:#94a3b8;font-size:11.5px}'
     + '.pcf-lt .pcf-lsrc{width:46px;font-size:11px;color:#64748b}.pcf-lt td.pcf-lsrc.hwp{color:#1e40af}.pcf-lt td.pcf-lsrc.xlsx{color:#166534}.pcf-lt td.pcf-lsrc.pdf{color:#991b1b}'
     + '.pcf-lt .pcf-lnm .pcf-ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
@@ -1195,6 +1422,7 @@
     + '.pcf-menu{position:absolute;right:0;top:110%;z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.15);padding:4px;min-width:220px;display:flex;flex-direction:column}'
     + '.pcf-menu.up{top:auto;bottom:110%}.pcf-menu[hidden]{display:none}.pcf-menu button{background:none;border:none;text-align:left;padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;color:#1e293b}'
     + '.pcf-menu button:hover{background:#eff6ff}.pcf-menu hr{border:none;border-top:1px solid #e2e8f0;margin:4px 0}'
+    + '@media(min-width:701px) and (max-width:1020px){.pcf-cols{flex-direction:column;align-items:stretch;height:auto}.pcf-lp{width:auto;border-right:1px solid #e2e8f0;border-radius:8px;max-height:42vh}.pcf-cols .pcf-sheetwrap{height:auto;overflow:visible}.pcf-cards{height:auto}.pcf-vp{margin-top:10px}.pcf-vp .pcf-top{border-radius:8px 8px 0 0}.pcf-vp .pcf-sheetwrap{border-radius:0 0 8px 8px}.pcf-sheetwrap{padding:12px}.pcf-sheet{padding:24px 20px;min-height:0}}'
     + '@media(max-width:700px){.pcf-lp{width:auto;border-right:1px solid #e2e8f0;border-radius:8px}.pcf-lbody{max-height:40vh}.pcf-vp .pcf-top{border-radius:8px 8px 0 0;margin-top:8px}}'
     + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:6px}'
     + '.pcf-mk-kind{border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px;text-align:left;cursor:pointer;font:inherit;font-size:13px}'
@@ -1544,6 +1772,7 @@
     if (!CF || !host.cards) { toast('ERP 업체정보 연결을 불러오지 못했습니다'); return; }
     fms = (fms || []).filter(Boolean);
     if (!fms.length) return;
+    var opts = arguments[3] || {};
     ensureCss();
     var one = fms.length === 1;
     var items = fms.map(function (fm) {
@@ -1556,10 +1785,29 @@
     /* 근로자 사건은 모두 부가세 포함 (대표 2026-10-24) — 고른 양식이 모두 근로자측이면 「포함」에서 시작한다 */
     if (fms.every(function (fm) { return sideOf(fm) === 'worker'; })) st.wi.vat = 'incl';
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
+    /* 지난 견적서·확정 계약서에서 참고하여 불러온 초기값 반영 */
+    if (opts.initial && typeof opts.initial === 'object') {
+      Object.keys(opts.initial).forEach(function (k) {
+        var v = opts.initial[k];
+        if (v != null && String(v).trim() !== '') st.edits[k] = String(v).trim();
+      });
+      var initAmt = opts.initial['견적금액'] || opts.initial['계약금액'];
+      if (initAmt) st.pv.amount = String(initAmt);
+      var initVat = String(opts.initial['부가세처리'] || '');
+      if (initVat) {
+        var vatCode = /별도/.test(initVat) ? 'excl' : 'incl';
+        st.pv.vat = vatCode; st.wi.vat = vatCode;
+      }
+    }
+    var prevFillFocus = (opts && opts.returnFocus) || document.activeElement;
     var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var caseBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
-    function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      bg.remove();
+      if (prevFillFocus && typeof prevFillFocus.focus === 'function') { try { prevFillFocus.focus(); } catch (_) {} }
+    }
     function onKey(e) { if (e.key === 'Escape') close(); }
     document.addEventListener('keydown', onKey);
 
@@ -2180,11 +2428,16 @@
     /* 기업정보함 「📨 제안서 보내기」로 왔으면 그 회사를 골라 둔다 (설계 2026-09-29 §8).
        ⚠ «회사» 줄만 — 사람(명함·담당자) 줄도 같은 회사 이름을 가져 먼저 걸리면 회사 칸이 비뚤어진다. */
     var preKey = host.propose || host.make || (host.contractCtx && host.contractCtx.coKey) || '';
-    if (preKey) withRows(function (rows) {
+    var preBz = String(opts.bizNo || (opts.initial && opts.initial['사업자번호']) || '').replace(/\D/g, '');
+    var preCo = String(opts.coName || (opts.initial && opts.initial['회사명']) || '').trim();
+    if (preKey || preBz || preCo) withRows(function (rows) {
       if (st.co) return;
-      var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0];
+      var coRows = rows.filter(function (x) { return x.k === 'biz' || x.k === 'erp' || x.k === 'card-co'; });
+      var r = preKey ? coRows.filter(function (x) { return CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0] : null;
+      if (!r && preBz.length === 10) r = coRows.filter(function (x) { return String(x.bz || '').replace(/\D/g, '') === preBz; })[0];
+      if (!r && preCo) r = coRows.filter(function (x) { return CF.sameCo(x.c) === CF.sameCo(preCo); })[0];
       if (r) pickCo(r);
-      else note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
+      else if (preKey) note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
     });
     refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
@@ -2623,7 +2876,7 @@
       if (!st) return null;
       var by = {}; S.forms.forEach(function (f) { by[f.id] = f; });
       var q = String(S.q || '').trim().toLowerCase();
-      return (st.formIds || []).map(function (id) { return by[id]; }).filter(function (f) {
+      return listOf(st.formIds).map(function (id) { return by[id]; }).filter(function (f) {
         return f && !isClosed(f) && (!q || String(f.name || '').toLowerCase().indexOf(q) >= 0);
       });
     }
@@ -3007,13 +3260,6 @@
     function lsGet(k) { try { return w.localStorage.getItem(k); } catch (e) { return null; } }
     function lsSet(k, v) { try { w.localStorage.setItem(k, v); } catch (e) {} }
     function isFolded(key) { return lsGet('pcf-fold-' + key) === '1'; }
-    function foldHead(key, text, cls, count) {
-      var f = isFolded(key);
-      return el('button', { type: 'button', 'class': 'pcf-th pcf-thbtn' + (cls ? ' ' + cls : ''), 'aria-expanded': f ? 'false' : 'true',
-        title: f ? '눌러서 펼칩니다' : '눌러서 접습니다',
-        onclick: function () { lsSet('pcf-fold-' + key, f ? '0' : '1'); drawTree(); } },
-        [el('span', { text: (f ? '▸ ' : '▾ ') + text }), f && count != null ? el('i', { text: String(count) }) : null]);
-    }
     function orderedKinds() {
       var saved = []; try { saved = JSON.parse(lsGet('pcf-kind-order') || '[]'); } catch (e) {}
       if (!Array.isArray(saved)) saved = [];
@@ -3031,49 +3277,66 @@
       var t = host.tree; if (!t) return;
       t.innerHTML = '';
       if (!S.loaded) return;
-      /* 「📂 서식 종류」 머리글은 뺐다(대표 2026-10-11) — 접고 펴기는 상위 「📄 계약서 양식」 단추가 한다(docs-esign.html) */
-      var kindRows = [];
-      orderedKinds().forEach(function (k) {
-        var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
-        var on = !S.setView && !S.quote && S.kind === k.v;
-        var kb = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
-          title: '누르면 이 종류의 양식이 나옵니다 · 끌어서 차례를 바꿉니다',
-          onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]);
-        t.appendChild(kb); kindRows.push({ id: k.v, node: kb });
-      });
-      dragSort(kindRows, moveKind);
-      /* 🧾 견적서·제안서 — 계약서와 따로 검토하는 일이 많아 종류를 가로질러 모아 본다(원래 종류에서도 그대로 보인다) */
-      var nQuote = filterForms(S.forms, { quote: true }).length;
-      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (S.quote && !S.setView ? ' on' : ''), 'aria-current': S.quote && !S.setView ? 'true' : null,
-        title: '업체·컨설팅·기타사업·기금의 견적서·제안서를 한곳에서 봅니다', onclick: pickQuote }, [el('span', { text: '🧾 견적서·제안서' }), el('i', { text: String(nQuote) })]));
-      /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
-      var nClosed = S.forms.filter(isClosed).length;
-      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && !S.quote && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && !S.quote && S.kind === '_closed' ? 'true' : null,
-        title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
-      /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
-      t.appendChild(foldHead('sets', '📦 세트', 'pcf-thset', S.sets.length));   // 색은 이 머리글에만(대표 2026-10-11) — 세트 이름 줄은 무색
-      var foldSets = isFolded('sets');
-      var setRows = foldSets ? [] : S.sets.map(function (st) {
-        var on = S.setView === st.id;
-        var b = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
-          title: st.name + ' — 누르면 이 세트의 서류만 목록에 체크되어 나옵니다 · 끌어서 차례를 바꿉니다',
-          onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]);
-        t.appendChild(b);
-        if (st.id === CHEDANG_SET_ID) esignTk();   // 👥 집단체불 세트는 체당금 접수 세트 바로 밑
-        return { id: st.id, node: b };
-      });
-      dragSort(setRows, moveSet);
-      if (!foldSets && !S.sets.some(function (s) { return s.id === CHEDANG_SET_ID; })) esignTk();
-      /* 👥 집단체불 세트 (대표 「추천대로」 2026-10-09 — 사건계약 밑에서 세트 칸으로) — 체당금 접수 세트를 여러 근로자에게 링크로.
-         끌어서 옮기는 세트가 아니다(사건 목록 화면으로 가는 길). 문서관리만 길을 준다 */
+      /* 👥 집단체불 세트 (대표 「추천대로」 2026-10-09) — 체당금 접수 세트 바로 밑에 두어 근로자 여러 명에게 링크로 받는다 */
       function esignTk() {
         if (!host.openEsign) return;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (w.location && w.location.hash === '#esign' ? ' on' : ''), 'data-pane': 'esign',
           title: '체당금 접수 세트를 근로자 여러 명에게 링크로 보내 폰에서 받습니다(사건별)', onclick: function () { host.openEsign(); } }, [el('span', { text: '└ 👥 집단체불 세트' })]));
       }
-      if (!foldSets) t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
-        if (S.checked.length) saveAsSet(); else toast('목록에서 양식을 체크한 뒤 다시 누르세요 — 체크한 양식으로 세트를 만듭니다');
-      } }));
+      /* 계약서 양식과 세트를 따로 나누지 않고 각 분류(업체계약·사건계약·컨설팅계약·기금관리·기타사업·상담사항) 바로 밑에
+         동종 업무의 견적서+계약서+부속서류 하위 세트를 함께 펼쳐 한 번에 관리·처리한다 (대표 지시 2026-11-12) */
+      var haveMap = activeFormMap(S.forms);
+      var activeSet = S.setView ? setById(S.setView) : null;
+      var activeSetKind = activeSet ? setKindOf(activeSet, S.forms) : '';
+      var kindRows = [];
+      orderedKinds().forEach(function (k) {
+        var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
+        var kSets = setsForKind(S.sets, S.forms, k.v);
+        var folded = isFolded('kset-' + k.v);
+        var on = !S.setView && !S.quote && S.kind === k.v;
+        var subOn = !on && activeSetKind === k.v;
+        var chev = kSets.length ? el('button', { type: 'button', 'class': 'pcf-kfold',
+          'aria-expanded': folded ? 'false' : 'true',
+          'aria-label': k.label + ' 하위 세트 ' + (folded ? '펼치기' : '접기'),
+          title: folded ? '하위 세트 펼치기 (' + kSets.length + '개)' : '하위 세트 접기',
+          text: folded ? '▸' : '▾',
+          onclick: function () { lsSet('pcf-fold-kset-' + k.v, folded ? '0' : '1'); drawTree(); } }) : null;
+        var kb = el('button', { type: 'button', 'class': 'pcf-tk' + (chev ? ' hasfold' : '') + (on ? ' on' : (subOn ? ' subparent' : '')), 'aria-current': on ? 'true' : null,
+          title: '누르면 이 종류의 전체 양식이 나옵니다 · 아래 하위 세트를 누르면 동종 견적서·계약서 묶음을 한 번에 관리합니다 · 끌어서 차례를 바꿉니다',
+          onclick: function () { lsSet('pcf-fold-kset-' + k.v, '0'); pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]);
+        var rowWrap = chev ? el('div', { 'class': 'pcf-tkrow' }, [chev, kb]) : kb;
+        t.appendChild(rowWrap); kindRows.push({ id: k.v, node: rowWrap });
+        if (!folded) {
+          var setRows = [];
+          kSets.forEach(function (st) {
+            var on = S.setView === st.id;
+            var cnt = listOf(st.formIds).filter(function (id) { return !!haveMap[id]; }).length;
+            var b = el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
+              title: st.name + ' — 동종 견적서·계약서 ' + cnt + '종 묶음을 한 번에 보고 채웁니다 · 끌어서 차례를 바꿉니다',
+              onclick: function () { applySet(st.id); } }, [el('span', { 'class': 'pcf-tsub-nm', text: '└ ' + st.name }), el('i', { text: String(cnt) })]);
+            t.appendChild(b);
+            if (st.id === CHEDANG_SET_ID) esignTk();   // 👥 집단체불 세트는 체당금 접수 세트 바로 밑
+            setRows.push({ id: st.id, node: b });
+          });
+          dragSort(setRows, moveSet);
+          if (k.v === 'case' && !kSets.some(function (s) { return s.id === CHEDANG_SET_ID; })) esignTk();
+          if ((on || subOn) && !S.quote) {
+            t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub add',
+              title: k.label + ' 아래에 동종 견적서·계약서 하위 세트를 새로 만듭니다',
+              text: '└ + 하위 세트 만들기',
+              onclick: function () { if (S.checked.length && !S.setView) saveAsSet(k.v); else openEditSetModal(null, k.v); } }));
+          }
+        }
+      });
+      dragSort(kindRows, moveKind);
+      /* 🧾 견적서·제안서 — 계약서와 따로 검토하는 일이 많아 종류를 가로질러 모아 본다(원래 종류·하위 세트에서도 그대로 보인다) */
+      var nQuote = filterForms(S.forms, { quote: true }).length;
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (S.quote && !S.setView ? ' on' : ''), 'aria-current': S.quote && !S.setView ? 'true' : null,
+        title: '업체·사건·컨설팅·기금·기타사업의 모든 견적서·제안서를 한곳에서 봅니다', onclick: pickQuote }, [el('span', { text: '🧾 견적서·제안서' }), el('i', { text: String(nQuote) })]));
+      /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
+      var nClosed = S.forms.filter(isClosed).length;
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && !S.quote && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && !S.quote && S.kind === '_closed' ? 'true' : null,
+        title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
     }
 
     /* ── 오른쪽 ── */
@@ -3317,15 +3580,37 @@
             el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(S.kind === '_closed' ? 'company' : S.kind); } })])]);
       }
       if (setNow) {
+        var pk = setKindOf(setNow, S.forms), pkInfo = kindInfo(pk);
+        var missSeed = missingSeedFormIds(setNow, S.forms);
         return el('div', { 'class': 'pcf-lh' }, [
           el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
             chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
             chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
           el('div', { 'class': 'pcf-setnote' }, [
-            el('b', { text: '📦 ' + setNow.name }), el('span', { text: ' — 이 세트의 서류 ' + (setViewList() || []).length + '개가 체크되어 있습니다' }),
-            el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(S.kind === '_closed' ? 'company' : S.kind); } })])]);
+            el('b', { text: pkInfo.icon + ' ' + pkInfo.label + ' ▸ 📦 ' + setNow.name }),
+            el('span', { text: ' — 동종 견적서·계약서 ' + (setViewList() || []).length + '종 묶음' }),
+            el('span', { style: 'margin-left:auto;display:inline-flex;gap:4px;flex-wrap:wrap' }, [
+              missSeed.length ? el('button', { type: 'button', 'class': 'pcf-b b',
+                title: '새로 추가된 기본 동종 서류(견적서·계약서 ' + missSeed.length + '종)를 기존 구성을 유지한 채 이 세트에 보강합니다',
+                text: '🔄 기본 구성 보강 (+' + missSeed.length + ')',
+                onclick: function () { syncSeedSetForms(setNow); } }) : null,
+              el('button', { type: 'button', 'class': 'pcf-b', text: '✎ 세트 서류 편집', onclick: function () { openEditSetModal(setNow, pk); } }),
+              el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(pk); } })])])]);
       }
       if (kind === '_closed') row.push(el('div', { 'class': 'pcf-muted', style: 'font-size:11.5px', text: '종료한 서식 — 목록과 계약서 출력에서 빠져 있습니다. 되살리거나 완전히 지울 수 있습니다.' }));
+      if (kind !== '_closed') {
+        var subSets = setsForKind(S.sets, S.forms, kind), haveNow = activeFormMap(S.forms);
+        if (subSets.length) {
+          var ssel = el('select', { 'class': 'pcf-tsel', 'aria-label': '하위 세트 바로가기' },
+            [el('option', { value: '', text: '📦 동종 하위 세트 바로 열기 (' + subSets.length + '개 묶음 — 견적서+계약서 한 번에)' })].concat(subSets.map(function (st) {
+              var scnt = listOf(st.formIds).filter(function (id) { return !!haveNow[id]; }).length;
+              return el('option', { value: st.id, text: '└ ' + st.name + ' · ' + scnt + '종' });
+            })));
+          ssel.value = '';
+          ssel.addEventListener('change', function () { var v = ssel.value; ssel.value = ''; if (v) applySet(v); });
+          row.push(el('div', { 'class': 'pcf-stepbox' }, [el('div', { 'class': 'pcf-step', text: '하위 세트 (견적서·계약서 동종 묶음)' }), ssel]));
+        }
+      }
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
         var sideItems = [{ v: 'all', label: '전체', n: fc.sides.all, title: '근로자측·사용자측 모두' },
@@ -3406,7 +3691,7 @@
         var at = -1;
         doc.v.forEach(function (s, i) { if (s && s.id === id) at = i; });
         /* 세트에 있었지만 지금 없는(지워진) 양식은 끝에 그대로 둔다 — 되살아나면 다시 쓰인다 */
-        var keep = function (old) { return ids.concat((old || []).filter(function (x) { return ids.indexOf(x) < 0; })); };
+        var keep = function (old) { return ids.concat(listOf(old).filter(function (x) { return ids.indexOf(x) < 0; })); };
         if (at >= 0) doc.v[at].formIds = keep(doc.v[at].formIds);
         /* 기본 세트를 처음 고치면 — 세트 목록 «전체»를 저장본에 옮겨 담는다(그 세트만 담으면 목록 맨 위로 튄다) */
         else if (isSeedSet(id) && doc.rm.indexOf(id) < 0) {
@@ -3432,26 +3717,200 @@
     }
     function applySet(id) {
       var st = setById(id); if (!st) return;
-      var have = {}; S.forms.forEach(function (f) { have[f.id] = 1; });
-      S.checked = (st.formIds || []).filter(function (x) { return have[x]; });
+      var have = activeFormMap(S.forms), fids = listOf(st.formIds);
+      S.checked = fids.filter(function (x) { return !!have[x]; });
       S.setId = st.id;
       if (!S.checked.length) { toast('이 세트의 양식이 모두 지워졌습니다'); drawMain(); return; }
-      if (S.checked.length < (st.formIds || []).length) toast('세트 양식 ' + ((st.formIds || []).length - S.checked.length) + '개는 지워져 뺐습니다');
-      S.setView = st.id; S.quote = false;
+      if (!isSeedSet(st.id) && S.checked.length < fids.length) {
+        toast('세트 양식 ' + (fids.length - S.checked.length) + '개는 지워져 뺐습니다');
+      }
+      S.setView = st.id; S.quote = false; S.kind = setKindOf(st, S.forms);
+      lsSet('pcf-fold-kset-' + S.kind, '0');
       var first = S.forms.filter(function (f) { return f.id === S.checked[0]; })[0];
       if (first) select(first.id); else drawMain();
     }
-    function saveAsSet() {
+    function syncSeedSetForms(st) {
+      var addIds = missingSeedFormIds(st, S.forms);
+      if (!st || !addIds.length) return;
+      var sid = st.id, tk = setKindOf(st, S.forms);
+      track(changeSets(db, function (doc) {
+        var at = -1;
+        doc.v.forEach(function (s, i) { if (s && s.id === sid) at = i; });
+        if (at >= 0) {
+          var curIds = listOf(doc.v[at].formIds);
+          addIds.forEach(function (x) { if (curIds.indexOf(x) < 0) curIds.push(x); });
+          doc.v[at].formIds = curIds;
+          if (!doc.v[at].kind) doc.v[at].kind = tk;
+        }
+        return doc;
+      })).then(function (list) {
+        S.sets = list; applySet(sid);
+        toast('기본 동종 서류 ' + addIds.length + '종을 세트에 보강했습니다 — ' + st.name);
+      }, function (e) { toast('⚠ 보강 저장 실패 — ' + ((e && e.message) || e)); });
+    }
+    function saveAsSet(forceKind) {
       var ids = checkedForms().map(function (f) { return f.id; }); if (!ids.length) return;   // 그사이 지워진 양식은 넣지 않는다
-      var name = w.prompt('세트 이름 (예: 부당해고 구제 세트)', '');
+      var name = w.prompt('하위 세트 이름 (예: 직장 내 괴롭힘 조사 세트)', '');
       if (name == null) return;
       name = String(name).trim().slice(0, 40);
       if (!name) { toast('세트 이름을 넣어 주세요'); return; }
       var fs0 = S.forms.filter(function (f) { return f.id === ids[0]; })[0] || {};
-      var ns = { id: newId('fs-'), name: name, formIds: ids, kind: fs0.kind || S.kind, at: Date.now() };
+      var targetKind = (typeof forceKind === 'string' && KINDS.some(function (k) { return k.v === forceKind; }))
+        ? forceKind : (fs0.kind || (S.kind === '_closed' ? 'company' : S.kind));
+      var ns = { id: newId('fs-'), name: name, formIds: ids, kind: targetKind, at: Date.now() };
       track(changeSets(db, function (doc) { doc.v.push(ns); return doc; })).then(function (list) {
-        S.sets = list; S.setId = ns.id; S.setView = ns.id; drawTree(); drawMain(); toast('세트를 저장했습니다 — ' + name);
+        S.sets = list; S.setId = ns.id; S.setView = ns.id; S.kind = targetKind; lsSet('pcf-fold-kset-' + targetKind, '0');
+        drawTree(); drawMain(); toast('하위 세트를 저장했습니다 — ' + name);
       }, function (e) { toast('⚠ 세트를 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
+    /* 하위 세트 서류 편집·새 하위 세트 만들기 모달 — 견적서·계약서·위임장·부속서류를 한 묶음으로 조합 */
+    function openEditSetModal(curSet, defaultKind) {
+      ensureCss();
+      var prevFocus = document.activeElement;
+      var isEdit = !!curSet;
+      var initKind = isEdit ? setKindOf(curSet, S.forms) : (defaultKind && KINDS.some(function (k) { return k.v === defaultKind; }) ? defaultKind : (S.kind === '_closed' ? 'company' : S.kind));
+      var picked = {}, orderIds = [];
+      (isEdit ? listOf(curSet.formIds) : S.checked).forEach(function (id) {
+        if (!picked[id]) { picked[id] = true; orderIds.push(id); }
+      });
+      var bg = el('div', { 'class': 'pcf-mbg' }), busy = false, m = null;
+      function close(skipFocus) {
+        if (busy) return;
+        document.removeEventListener('keydown', onKey);
+        bg.remove();
+        if (skipFocus !== true && prevFocus && typeof prevFocus.focus === 'function') { try { prevFocus.focus(); } catch (_) {} }
+      }
+      function focusSavedSet() {
+        var fBtn = (host.tree && host.tree.querySelectorAll && Array.prototype.slice.call(host.tree.querySelectorAll('button')).filter(function (b) { return b.getAttribute('aria-current') === 'true'; })[0])
+          || (root && root.querySelector && root.querySelector('button'));
+        if (fBtn && typeof fBtn.focus === 'function') { try { fBtn.focus(); } catch (_) {} }
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+        if (e.key === 'Tab' && m && m.querySelectorAll) {
+          var fcs = Array.prototype.slice.call(m.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+          if (!fcs.length) return;
+          var firstEl = fcs[0], lastEl = fcs[fcs.length - 1];
+          if (e.shiftKey && (document.activeElement === firstEl || !m.contains(document.activeElement))) { e.preventDefault(); lastEl.focus(); }
+          else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+        }
+      }
+      document.addEventListener('keydown', onKey);
+      var nameIn = el('input', { type: 'text', placeholder: '예: 직장 내 괴롭힘·성희롱 조사 세트', value: isEdit ? (curSet.name || '') : '', 'aria-label': '하위 세트 이름' });
+      var kindSel = el('select', { 'class': 'pcf-tsel', 'aria-label': '소속 분류' }, KINDS.map(function (k) {
+        return el('option', { value: k.v, text: k.icon + ' ' + k.label, selected: k.v === initKind });
+      }));
+      var fq = el('input', { type: 'text', placeholder: '서류 이름 찾기 (견적서·계약서·위임장 등)', 'aria-label': '세트 서류 찾기' });
+      var listBox = el('div', { 'class': 'pcf-seted-list' });
+      var sumNote = el('div', { style: 'margin-top:6px;font-size:12px;color:#475569' });
+      var missSeed = isEdit ? missingSeedFormIds(curSet, S.forms) : [];
+      var btnSeedSync = missSeed.length ? el('button', { type: 'button', 'class': 'pcf-b b',
+        title: '기본 세트의 새로 추가된 동종 서류를 체크 목록에 추가합니다',
+        text: '🔄 기본 서류 추가 (+' + missSeed.length + ')',
+        onclick: function () {
+          missSeed.forEach(function (id) { picked[id] = true; if (orderIds.indexOf(id) < 0) orderIds.push(id); });
+          btnSeedSync.remove();
+          drawRows();
+        } }) : null;
+      var btnSave = el('button', { type: 'button', 'class': 'pcf-b pcf-go', style: 'background:#166534;color:#fff;font-weight:700', onclick: onSave });
+      function activeFormsSorted() {
+        var tk = kindSel.value, qq = fq.value.trim().toLowerCase();
+        return S.forms.filter(function (f) {
+          if (!f || isClosed(f)) return false;
+          if (!qq) return true;
+          return String(f.name || '').toLowerCase().indexOf(qq) >= 0 || kindInfo(f.kind).label.indexOf(qq) >= 0;
+        }).slice().sort(function (a, b) {
+          var pa = picked[a.id] ? 0 : 1, pb = picked[b.id] ? 0 : 1;
+          if (pa !== pb) return pa - pb;
+          if (pa === 0) return orderIds.indexOf(a.id) - orderIds.indexOf(b.id);
+          var ka = a.kind === tk ? 0 : 1, kb = b.kind === tk ? 0 : 1;
+          if (ka !== kb) return ka - kb;
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
+      }
+      function syncUi() {
+        var have = activeFormMap(S.forms);
+        var validIds = orderIds.filter(function (id) { return picked[id] && have[id]; });
+        sumNote.textContent = '선택된 동종 서류 ' + validIds.length + '종 (견적서·계약서·위임장·부속서류를 함께 묶어 한 번에 관리합니다)';
+        btnSave.textContent = isEdit ? ('💾 세트 저장 (' + validIds.length + '종)') : ('➕ 하위 세트 만들기 (' + validIds.length + '종)');
+        btnSave.disabled = busy || !validIds.length;
+      }
+      function drawRows() {
+        listBox.innerHTML = '';
+        var rows = activeFormsSorted();
+        if (!rows.length) { listBox.appendChild(el('div', { style: 'padding:14px;color:#475569', text: '맞는 양식이 없습니다' })); syncUi(); return; }
+        rows.forEach(function (f) {
+          var isQ = groupOf(f) === PROPOSAL_GROUP;
+          var ck = el('input', { type: 'checkbox', checked: !!picked[f.id], onchange: function () {
+            if (ck.checked) { picked[f.id] = true; if (orderIds.indexOf(f.id) < 0) orderIds.push(f.id); }
+            else { delete picked[f.id]; }
+            syncUi();
+          } });
+          listBox.appendChild(el('label', { 'class': 'pcf-seted-row' }, [
+            ck,
+            el('span', { 'class': 'nm', title: f.name, text: f.name }),
+            el('span', { 'class': 'pcf-sd ' + (isQ ? 'employer' : 'worker'), text: isQ ? '견적·제안' : '계약·부속' }),
+            el('span', { 'class': 'pcf-sd both', text: kindInfo(f.kind).label })]));
+        });
+        syncUi();
+      }
+      fq.addEventListener('input', drawRows);
+      kindSel.addEventListener('change', drawRows);
+      function onSave() {
+        var nm = String(nameIn.value || '').trim().slice(0, 40);
+        if (!nm) { toast('세트 이름을 넣어 주세요'); nameIn.focus(); return; }
+        var have = activeFormMap(S.forms);
+        var ids = orderIds.filter(function (id) { return picked[id] && have[id]; });
+        if (!ids.length) { toast('세트에 넣을 서류를 하나 이상 체크해 주세요'); return; }
+        var tk = kindSel.value || 'company';
+        busy = true; syncUi();
+        if (isEdit) {
+          var sid = curSet.id, gone = false;
+          track(changeSets(db, function (doc) {
+            gone = false;
+            var at = -1;
+            doc.v.forEach(function (s, i) { if (s && s.id === sid) at = i; });
+            if (at >= 0) { doc.v[at].name = nm; doc.v[at].kind = tk; doc.v[at].formIds = ids; }
+            else if (isSeedSet(sid) && doc.rm.indexOf(sid) < 0) {
+              doc.v = setsOf(doc).map(function (s) { return JSON.parse(JSON.stringify(s)); });
+              doc.v.forEach(function (s) { if (s.id === sid) { s.name = nm; s.kind = tk; s.formIds = ids; } });
+            } else {
+              gone = true;
+            }
+            return doc;
+          })).then(function (list) {
+            busy = false; S.sets = list;
+            if (gone) {
+              isEdit = false; curSet = null; syncUi();
+              toast('⚠ 다른 곳에서 지워진 세트입니다 — 고른 구성을 유지했으니 「하위 세트 만들기」로 저장해 주세요');
+              return;
+            }
+            close(true); lsSet('pcf-fold-kset-' + tk, '0'); applySet(sid); focusSavedSet();
+            toast('하위 세트를 수정했습니다 — ' + nm);
+          }, function (e) { busy = false; syncUi(); toast('⚠ 저장 실패 — ' + ((e && e.message) || e)); });
+        } else {
+          var ns = { id: newId('fs-'), name: nm, kind: tk, formIds: ids, at: Date.now() };
+          track(changeSets(db, function (doc) { doc.v.push(ns); return doc; })).then(function (list) {
+            busy = false; S.sets = list; close(true); lsSet('pcf-fold-kset-' + tk, '0'); applySet(ns.id); focusSavedSet();
+            toast('하위 세트를 만들었습니다 — ' + nm);
+          }, function (e) { busy = false; syncUi(); toast('⚠ 저장 실패 — ' + ((e && e.message) || e)); });
+        }
+      }
+      m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-modal': 'true', 'aria-label': isEdit ? '하위 세트 편집' : '하위 세트 만들기', style: 'width:680px' }, [
+        el('div', { 'class': 'pcf-mh' }, [
+          el('span', { text: isEdit ? ('✎ 하위 세트 편집 — ' + curSet.name) : '➕ 동종 서류 하위 세트 만들기' }),
+          el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: function () { close(); } })]),
+        el('div', { 'class': 'pcf-mb' }, [
+          el('label', { 'class': 'l', text: '상위 계약 분류 (어느 메뉴 아래에 둘까요?)' }), kindSel,
+          el('label', { 'class': 'l', text: '하위 세트 이름' }), nameIn,
+          el('label', { 'class': 'l', text: '포함할 동종 서류 (견적서·계약서·위임장·부속서류 모두 가능)' }), fq, listBox, sumNote]),
+        el('div', { 'class': 'pcf-mf' }, [
+          btnSeedSync,
+          el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: function () { close(); } }), btnSave])
+      ]);
+      bg.appendChild(m); document.body.appendChild(bg);
+      drawRows();
+      nameIn.focus();
     }
     /* 이름 바꾸기·지우기. 기본 세트를 지우면 rm 에 남긴다(안 남기면 다음에 도로 생긴다) */
     function editSet(id, rename) {
@@ -3484,14 +3943,26 @@
       }, function (e) { toast('⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     function setPicker() {
+      var haveNow = activeFormMap(S.forms);
+      var groups = KINDS.map(function (k) {
+        var ks = setsForKind(S.sets, S.forms, k.v);
+        if (!ks.length) return null;
+        return el('optgroup', { label: k.icon + ' ' + k.label + ' 하위 세트' }, ks.map(function (s) {
+          var cnt = listOf(s.formIds).filter(function (id) { return !!haveNow[id]; }).length;
+          return el('option', { value: s.id, text: '└ ' + s.name + ' (' + cnt + ')', selected: S.setView === s.id });
+        }));
+      }).filter(Boolean);
       var sel = el('select', { 'class': 'pcf-set', 'aria-label': '묶음 세트', onchange: function () {
-        var v = sel.value; sel.value = '';
-        if (v.indexOf('ren:') === 0) editSet(v.slice(4), true);
+        var v = sel.value; sel.value = S.setView || '';
+        if (v === '_new') openEditSetModal(null, S.kind === '_closed' ? 'company' : S.kind);
+        else if (v.indexOf('edt:') === 0) { var se = setById(v.slice(4)); if (se) openEditSetModal(se, setKindOf(se, S.forms)); }
+        else if (v.indexOf('ren:') === 0) editSet(v.slice(4), true);
         else if (v.indexOf('del:') === 0) editSet(v.slice(4), false);
         else if (v) applySet(v);
-      } }, [el('option', { value: '', text: '📚 세트' })]
-        .concat(S.sets.map(function (s) { return el('option', { value: s.id, text: s.name + ' (' + (s.formIds || []).length + ')' }); }))
-        .concat(S.sets.length ? [el('option', { value: '', disabled: true, text: '──────' })] : [])
+      } }, [el('option', { value: '', text: '📦 하위 세트' })]
+        .concat(groups)
+        .concat([el('option', { value: '', disabled: true, text: '──────' }), el('option', { value: '_new', text: '➕ 새 하위 세트 만들기' })])
+        .concat(S.sets.map(function (s) { return el('option', { value: 'edt:' + s.id, text: '✎ 서류 편집 — ' + s.name }); }))
         .concat(S.sets.map(function (s) { return el('option', { value: 'ren:' + s.id, text: '✏ 이름 바꾸기 — ' + s.name }); }))
         .concat(S.sets.map(function (s) { return el('option', { value: 'del:' + s.id, text: '🗑 지우기 — ' + s.name }); })));
       return sel;
@@ -3514,9 +3985,12 @@
       var chips = fms.map(function (f, i) { return { id: f.id, node: el('span', { 'class': 'pcf-bchip', title: '끌어서 차례를 바꿉니다 — ' + f.name, text: (i + 1) + '. ' + f.name }) }; });
       b.appendChild(el('span', { 'class': 'pcf-bnames', title: '끌어서 차례를 바꿉니다' }, chips.map(function (c) { return c.node; })));
       dragSort(chips, moveChecked);
-      if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
-      else { b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
-        b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } })); }
+      if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: function () { saveAsSet(); } }));
+      else {
+        b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✎ 세트 서류 편집', onclick: function () { openEditSetModal(st, setKindOf(st, S.forms)); } }));
+        b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
+        b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } }));
+      }
       if (st && st.id === CHEDANG_SET_ID && host.openEsign) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '근로자 여러 명에게 링크를 보내 폰에서 받습니다 — 👥 집단체불 세트 새 사건',
         text: '👥 여러 명에게 링크로 받기', onclick: function () { host.openEsign({ newCase: true }); } }));
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
@@ -3605,7 +4079,7 @@
        종이 끝을 보려고 제목·칩이 화면 밖으로 밀려난다. 휴대폰(세로로 쌓는 화면)은 묶지 않는다. */
     function fitHeight() {
       var box = S.bodyEl; if (!box || !box.isConnected) return;
-      if (w.innerWidth <= 700) { box.style.height = ''; return; }
+      if (w.innerWidth <= 700 || w.innerWidth <= 1020) { box.style.height = ''; return; }
       var top = box.getBoundingClientRect().top + (w.pageYOffset || 0);
       var h = Math.max(320, w.innerHeight - top - 16);
       box.style.height = h + 'px';
@@ -3634,13 +4108,14 @@
 
     drawTree(); drawMain();
     load();
-    return { reload: load, select: select, current: function () { return S.sel; }, fit: fitHeight };
+    return { reload: load, select: select, current: function () { return S.sel; }, fit: fitHeight, applySet: applySet };
   }
 
   w.PuContractForms = {
     KINDS: KINDS,
     VARS: CONTRACT_FORM_VARS,
     SEED: CONTRACT_FORM_SEED,
+    SET_SEED: SET_SEED,
     CHEDANG: CASE_CHEDANG_FORMS,
     mergeSeeds: mergeSeeds,
     isSeedId: isSeedId,
@@ -3656,6 +4131,9 @@
     filterForms: filterForms, isClosed: isClosed,
     facetCounts: facetCounts,
     setsOf: setsOf,
+    setKindOf: setKindOf,
+    setsForKind: setsForKind,
+    missingSeedFormIds: missingSeedFormIds,
     changeSets: changeSets,
     orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo, powerFor: powerFor, withLawyerNames: withLawyerNames,
     bundleMarkers: bundleMarkers,
@@ -3669,6 +4147,7 @@
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,
     hwpSources: hwpSources,
+    registerForm: registerForm,
     openFill: openFill,
     mount: mount
   };

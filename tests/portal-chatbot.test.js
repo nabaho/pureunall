@@ -4,7 +4,7 @@
  *    (tests/portal-chatbot.test.js)
  *
  * 검증 범위:
- *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 24개 앱) 및 RAG 정확도
+ *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 25개 앱) 및 RAG 정확도
  *   2. 개인·기업 식별정보 자동 마스킹(현재 질문 + 멀티턴 대화 맥락 + 자동 개선요청 티켓 본문·제목)
  *   3. 코딩·문제해결 필요 의도 자동 판별(detectImproveIntent — 단순 질문 오탐 차단 + 오류/개선 감지)
  *   4. 간소화 UI(PuChatbotUI) — 비사전 모드 범주줄 숨김, 우측하단 단추 비간섭 배치, 압축 연결도 칩
@@ -41,7 +41,7 @@ function loadWithFundKb() {
 }
 
 /* ── 1. 통합 지식베이스 · 연결도 지도 · RAG 검색 정확도 ── */
-test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 24개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
+test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 25개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
   const ctx = loadWithFundKb();
   const C = ctx.PuChatbot;
   assert.ok(C, 'PuChatbot 전역 객체가 생성되어야 합니다');
@@ -65,7 +65,8 @@ test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결
 
   assert.deepEqual(Array.from(C.PORTAL_ROWS_GUIDE.map((r) => r.id)), ['client', 'store', 'sales', 'inside']);
   const totalRowApps = C.PORTAL_ROWS_GUIDE.reduce((sum, r) => sum + r.apps.length, 0);
-  assert.equal(totalRowApps, 24, '포털 4대 영역 24개 앱 전체가 수록되어야 합니다');
+  /* 2026-11-14 푸른등기(내부관리) 25개 · 2026-11-15 P박스(자료함) 더해 26개 */
+  assert.equal(totalRowApps, 26, '포털 4대 영역 26개 앱 전체가 수록되어야 합니다');
   for (const r of C.PORTAL_ROWS_GUIDE) {
     for (const ap of r.apps) {
       assert.ok(ap.key && ap.name && ap.when && ap.from && ap.to && ap.ask, ap.key + ' 입출력 설명이 모두 있어야 합니다');
@@ -122,11 +123,78 @@ test('RAG 검색 & 간결 요약: 4대 영역·연결도·수임 순서·노동�
 
 /* ── 2. 코딩·문제해결 의도 판별(detectImproveIntent) 및 개인정보 마스킹 ── */
 test('개선요청 자동 판별 & 개인정보 가림: 단순 사용법 질문은 오탐하지 않고 실제 오류·수정 요청만 잡아내며 개인정보를 가린다', () => {
-  // 단순 사용법·법령 질문 → needed: false (오탐 방지)
+  // 단순 사용법·법령·권한 질문 → needed: false (오탐 방지)
   assert.equal(PuChatbot.detectImproveIntent('업무관리에 거래처 메일이 안 보일 때는 어떻게 연결해?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('푸른이알피에서 입금 매칭 오류 내역은 어디서 어떻게 확인하나요?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('기금 감사가 이사를 겸직할 수 있나요?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('연차 안 쓰면 수당은 어떻게 되나요?').needed, false);
+  assert.equal(PuChatbot.detectImproveIntent('의뢰인 주민등록번호가 들어있는 한글(.hwp) 서식을 고쳐야 하는데 서버에 안 남기고 내 PC에서만 안전하게 편집하려면 뭘 써?').needed, false);
+  assert.equal(PuChatbot.detectImproveIntent('기업규정집이랑 급여아웃소싱 타일에 준비중이라고 떠 있고 일반 직원 계정에서는 클릭이 안 되는데 왜 그런 거야?').needed, false);
+
+  // 시스템 예시 고유번호(자문-10001·급여-10001)와 조사(상호가·에서·으로)는 보존하고 실제 상호·내부사건번호·지노위사건번호·계좌번호는 모두 가려야 한다
+  const codeMask = PuChatbot.maskPersonal('거래처 상호가 (주)대한에서 (주)한빛으로 바뀌거나 자문-10001이 급여-10001로 바뀌고 사건 서울부해-2026-123 접수 시 연결');
+  assert.match(codeMask.text, /거래처 상호가 \(주\)○○에서 \(주\)○○으로 바뀌거나 자문-10001이 급여-10001로/);
+  assert.doesNotMatch(codeMask.text, /대한|한빛|서울부해-2026-123/);
+
+  const realCaseAndSpacedCorp = '한빛 (주) 및 한빛 산업 (주), 주식회사한빛, 주식회사 한빛 산업, 홍길동 대표에게 연락, 홍길동 대표입니다, 성명: 이영희님, 사건-54321 및 사건-54321-7, 서울2026부해123, 계좌 110-000-000000, 계좌 123456789012, 계좌 123 456 789012, 계좌 123-456789-01 업로드 오류 고쳐줘';
+  const mReal = PuChatbot.maskPersonal(realCaseAndSpacedCorp);
+  assert.doesNotMatch(mReal.text, /한빛|산업|홍길동|이영희|54321|부해123|110-000|123456789012|789012|456789/);
+  const prReal = PuChatbot.makePrompt([], realCaseAndSpacedCorp, { history: [{ q: realCaseAndSpacedCorp, answer: '가'.repeat(195) + ' 110-000-000000' }] });
+  assert.doesNotMatch(prReal.user, /한빛|산업|홍길동|이영희|54321|부해123|110-|123456789012|789012|456789/);
+  const payReal = PuChatbot.buildImprovePayload(realCaseAndSpacedCorp, [{ q: realCaseAndSpacedCorp, answer: '가'.repeat(175) + ' 110-000-000000' }], [], null);
+  assert.doesNotMatch(payReal.title + '\n' + payReal.content, /한빛|산업|홍길동|이영희|54321|부해123|110-|123456789012|789012|456789/);
+
+  // 2000자 경계선 절단 시에도 경계에 걸친 계좌·주민번호 조각이 미가림 상태로 남으면 안 된다
+  const boundaryMask = PuChatbot.maskPersonal('가'.repeat(1995) + ' 110-000-000000');
+  assert.doesNotMatch(boundaryMask.text, /110-|000000/);
+  // 법령·실무 일반 용어(회사 대표이사, 기금 감사)는 사람 이름으로 오탐하지 않아야 한다
+  assert.match(PuChatbot.maskPersonal('회사 대표이사나 기금 감사 겸직 기준').text, /회사 대표이사나 기금 감사/);
+
+  // 100문항 상호검증 회귀 방어: 기금 무관 질문의 기금 유권해석 노이즈 차단 · 멀티턴 주제 전환 오염 방지 · 사진첩 개선요청 분류 보정
+  const ctx100 = loadWithFundKb();
+  const C100 = ctx100.PuChatbot;
+  const pFlex = C100.pick('전일제 근로자가 학업이나 가족돌봄 때문에 주 20시간으로 소정근로시간을 줄일 때 회사가 받는 지원금은 뭐야?');
+  assert.equal(pFlex[0].id, 'GOV-flex-01');
+  assert.ok(pFlex.every((x) => x.cat !== 'fund'), '기금과 무관한 장려금 질문에 기금 유권해석이 섞이면 안 됩니다');
+
+  // 직전에 기금 질문을 했더라도 지시어 없는 독립 주제 전환(연차·주휴수당·휴게시간·무관어) 시 기금 유권해석이 섞이면 안 된다
+  const fundHist = [{ q: '사내근로복지기금 대부사업 무이자 대출 증여세 비과세 한도 알려줘', answer: '연간 증여이익 1천만 원 미만 비과세입니다.' }];
+  assert.equal(C100.pick('연차', { history: fundHist })[0].id, 'LAB-leave-01');
+  assert.equal(C100.pick('주휴수당', { history: fundHist })[0].id, 'LAB-minwage-01');
+  const pBreak = C100.pick('휴게시간', { history: fundHist });
+  assert.ok(pBreak.length > 0 && pBreak.every((x) => x.cat !== 'fund'));
+  const pBreakIf = C100.pick('만약 휴게시간에 일을 시키면?', { history: fundHist });
+  assert.ok(pBreakIf.length > 0 && pBreakIf[0].id === 'LAB-contract-01' && pBreakIf.every((x) => x.cat !== 'fund'));
+  const pBreakEx = C100.pick('휴게시간 예외는?', { history: fundHist });
+  assert.ok(pBreakEx.length > 0 && pBreakEx.every((x) => x.cat !== 'fund'));
+  assert.equal(C100.pick('블록체인암호화폐채굴', { history: fundHist }).length, 0);
+
+  const pPokwal = C100.pick('포괄임금제 약정이 있어도 실제 연장근로시간을 계산했을 때 약정 수당보다 부족하면 차액을 추가로 지급해야 하나요?');
+  assert.equal(pPokwal[0].id, 'LAB-pokwal-01');
+
+  const pMailMulti = C100.pick('만약 개인 지메일로 와서 자동으로 안 붙으면 어디서 손으로 연결해?', {
+    history: [{ q: '자료함에서 푸른 메일이랑 업무관리는 어떻게 이어져?', answer: '거래처와 주고받은 메일이 사업장별로 분류됩니다.' }]
+  });
+  assert.ok(pMailMulti.some((x) => x.id === 'SYS-cards-mail-01' || x.id === 'SYS-row-store'));
+
+  const pFundDup = C100.pick('사내근로복지기금이 이미 있는 회사가 협력사들이랑 공동근로복지기금에도 중복 참여해서 출연할 수 있어?');
+  assert.equal(pFundDup[0].id, 'MOEL-setup-02');
+
+  const photoPayload = C100.buildImprovePayload(
+    '사진첩에서 사업자등록증 PDF 업로드 창이 모바일에서 깨져서 안 열려요',
+    [],
+    [],
+    { needed: true, cat: 'etc', title: '사진첩 업로드 창 모바일 깨짐' }
+  );
+  assert.equal(photoPayload.cat, 'cards', 'AI가 etc 로 모호하게 답해도 명시된 앱(사진첩→cards) 분류가 우선되어야 합니다');
+
+  const switchedImprovePayload = C100.buildImprovePayload(
+    '업로드 창이 안 열려요',
+    [{ q: '기금관리 어떻게 써?', answer: '기금관리 안내입니다.' }],
+    [],
+    { needed: true, cat: 'cards', title: '사진첩 업로드 오류' }
+  );
+  assert.equal(switchedImprovePayload.cat, 'cards', '현재 발화에 앱 이름이 없을 때 AI가 특정한 유효 분류(cards)를 이전 대화의 앱(fund)이 덮어쓰면 안 됩니다');
 
   // 실제 화면 오류·기능 개선·코딩 수정 요청 → needed: true + 유효 분류키
   const d1 = PuChatbot.detectImproveIntent('푸른이알피에서 계약 저장 버튼이 안 눌려요 오류 확인해주세요');
@@ -703,4 +771,28 @@ test('배선·위치·팔레트·모바일 규칙: 우측하단 단추와 겹치
     '.puc-imp-st.s-wait 배지는 WCAG AA 명암비(4.5:1 이상)를 만족해야 합니다'
   );
   assert.match(fundHtml, /openFundChat\(\)/);
+  const fundRefInHtml = /fund_kb\.js\?[^"']+/.exec(fundHtml);
+  const fundRefInUi = /fund_kb\.js\?[^"']+/.exec(uiSrc);
+  assert.ok(fundRefInHtml && fundRefInUi && fundRefInHtml[0] === fundRefInUi[0], 'fund.html 과 js/pu-chatbot.js 지연 로더의 fund_kb.js 참조 문자열이 일치해야 합니다');
 });
+
+/* 2026-11-14 기능 검증 2차: 푸른등기를 길잡이에 넣고도 검색·연결이 빠져 «수임 순서» 글이 뽑혔다 */
+test('푸른등기 질문은 푸른등기 길잡이로 — 내부관리 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'inside').apps.find((a) => a.key === 'deungi').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-deungi-01');
+  assert.equal(PuChatbot.pick('푸른등기 사용법')[0].id, 'SYS-deungi-01');
+  const inside = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-inside');
+  assert.ok(inside.apps.indexOf('deungi') >= 0 && inside.tags.indexOf('푸른등기') >= 0 && /푸른등기/.test(inside.law));
+  assert.match(kbSrc, /deungi: 'erp'/);
+  assert.match(kbSrc, /deungi:푸른등기/);
+});
+test('P박스 질문은 P박스 길잡이로 — 자료함(store) 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'store').apps.find((a) => a.key === 'pbox').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-pbox-01');
+  assert.equal(PuChatbot.pick('P박스 사용법')[0].id, 'SYS-pbox-01');
+  const store = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-store');
+  assert.ok(store.apps.indexOf('pbox') >= 0 && store.tags.indexOf('P박스') >= 0 && /P박스/.test(store.law));
+  assert.match(kbSrc, /pbox: 'portal'/);
+  assert.match(kbSrc, /pbox:P박스/);
+});
+function C0(k) { return PuChatbot[k]; }

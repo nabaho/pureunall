@@ -1656,16 +1656,22 @@
       savedAt: Date.now()
     };
     try { localStorage.setItem('pureun_hangul_save', JSON.stringify(msg)); } catch (e) {}
-    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (e) {}
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, location.origin); } catch (e) {}   // 2026-11-15 보안 — 같은 주소의 기금 창에만
     try { if (typeof BroadcastChannel !== 'undefined') new BroadcastChannel('pureun_hangul_channel').postMessage(msg); } catch (e) {}
     cur.dirty = false; renderTabs();
     toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
   }
+  const _seenBridgeIds = new Set();
   async function loadFromFundPayload(p) {
     if (!p || typeof p !== 'object') return;
-    fundCtx = { fundId: p.fundId || '', fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' };
+    if (p.bridgeId) {
+      if (_seenBridgeIds.has(p.bridgeId)) return;
+      _seenBridgeIds.add(p.bridgeId);
+    }
+    fundCtx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
     _renderFundBridgeBar();
-    const docName = (p.name || p.label || '기금서식').replace(/\.(hwpx|hwp|hwt)$/i, '');
+    const srcLabel = p.sourceLabel || '기금관리';
+    const docName = (p.name || p.label || '서식문서').replace(/\.(hwpx|hwp|hwt)$/i, '');
     if (p.b64) {
       try {
         const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
@@ -1681,7 +1687,7 @@
       const pg = Hx.defaultPage();
       if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
       addDoc({ name: docName, html: p.html, page: pg, pristine: false });
-      toast(`기금관리에서 '${docName}' 서식을 불러왔습니다.`);
+      toast(`${srcLabel}에서 '${docName}' 서식을 불러왔습니다.`);
     }
   }
   try {
@@ -1689,12 +1695,15 @@
     if (raw) {
       localStorage.removeItem('pureun_hangul_bridge');
       const p = JSON.parse(raw);
-      if (p && (new URLSearchParams(location.search).get('from') === 'fund' || Date.now() - (p.sentAt || 0) < 60000)) {
+      const fromParam = new URLSearchParams(location.search).get('from');
+      const freshMs = fromParam === 'jobtrans' ? 300000 : 60000;
+      if (p && (fromParam === 'fund' || Date.now() - (p.sentAt || 0) < freshMs)) {
         setTimeout(() => loadFromFundPayload(p), 60);
       }
     }
   } catch (e) {}
   window.addEventListener('message', e => {
+    if (!e || e.origin !== location.origin) return;   // 2026-11-15 보안 — 다른 사이트가 보낸 «열기» 쪽지는 무시
     const d = e && e.data;
     if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
   });
@@ -1705,6 +1714,16 @@
         const d = e && e.data;
         if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
       };
+      const initFrom = new URLSearchParams(location.search).get('from');
+      if (initFrom === 'jobtrans' || initFrom === 'fund') {
+        try { bc.postMessage({ type: 'pureun_hangul_ready', from: initFrom }); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  try {
+    const initFrom2 = new URLSearchParams(location.search).get('from');
+    if ((initFrom2 === 'jobtrans' || initFrom2 === 'fund') && window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'pureun_hangul_ready', from: initFrom2 }, location.origin);
     }
   } catch (e) {}
   window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund };

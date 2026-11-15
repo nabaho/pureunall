@@ -73,6 +73,10 @@ function kboxCtx(kindV, extraF){
     consDayMayFill(){ return true; },
     /* 📈 성과추적관리 알약(2026-10-19)은 현장클리닉일 때만 — 위 유형(t1 「이름」)은 현장클리닉이 아니다 */
     clinicIsType(){ return false; },
+    /* 📌 심급·단계 줄(계획 5)은 이 검사의 대상이 아니다 — 이름만 있으면 된다(실제 동작은 tests/erp-stage-marks.test.js) */
+    erpStageBox(){ return null; },
+    /* ↪ 후속 계약 후보 줄(계획 5 · D)도 같다 — 이름만 있으면 된다(실제 동작은 tests/erp-stage-next.test.js) */
+    erpStageNextRow(){ return null; }, erpStageGoFollowup(){}, props:{}, dbGet(){ return []; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       return { tag, props: props || {}, kids };
@@ -159,6 +163,8 @@ function cmsCtx(isCMS, extra){
     setF(){},
     /* 👤 개인입금 사업(2026-10-05) — 개인입금 칸이 유형 규칙을 읽는다. 이 검사는 CMS 줄 모양만 보므로 «꺼짐»으로 둔다. */
     erpPersonalDepositInfo(){ return { on:false, why:'', typeOn:false }; },
+    /* 📌 심급·단계 줄(계획 5)은 이 검사의 대상이 아니다 — 계약 창 조각을 떠 올 때 «이름만» 있으면 된다(실제 동작은 tests/erp-stage-marks.test.js) */
+    erpStageBox(){ return null; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       const node = { tag, props: props || {}, kids };

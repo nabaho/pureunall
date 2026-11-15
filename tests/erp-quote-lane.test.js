@@ -22,13 +22,19 @@ const { cutFn } = require('./cut-fn.js');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 
+/* 📌 심급·단계 도우미(계획 5)는 견적 길 계획·처리 함수가 «부른다» — 함수를 떠 올 때 같이 실어야 한다
+   (읽는 일은 js/pu-case-stage.js · 이 검사는 «달기 전·후 값이 그대로인지»만 본다, 단계 쪽은 tests/erp-stage-marks.test.js) */
+const STAGE_FNS = ['function erpStageMarksMerge(', 'function erpStagePartsFromContract(', 'function erpStagePartsFromQuote('];
+const STAGE_SRC = STAGE_FNS.map((d) => cutFn(SRC, d)).join('\n');
+const PuCaseStage = require('../js/pu-case-stage.js');
+
 const PURE = ['function erpQuoteLaneReq(', 'function erpQuoteDay(', 'function erpQuoteNote(', 'function erpQuoteLanePlan(',
-  'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey('].map((d) => cutFn(SRC, d)).join('\n');
+  'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey('].map((d) => cutFn(SRC, d)).join('\n') + '\n' + STAGE_SRC;
 
 function pure() {
-  const ctx = { console, Date, Object, Array, String, Number, JSON, Math, todayYMD: () => '2026-11-08' };
+  const ctx = { console, Date, Object, Array, String, Number, JSON, Math, todayYMD: () => '2026-11-08', window: { PuCaseStage } };
   vm.createContext(ctx);
-  vm.runInContext(PURE + '\nthis.api={erpQuoteLaneReq,erpQuoteDay,erpQuoteNote,erpQuoteLanePlan};', ctx);
+  vm.runInContext(PURE + '\nthis.api={erpQuoteLaneReq,erpQuoteDay,erpQuoteNote,erpQuoteLanePlan,erpStageMarksMerge,erpStagePartsFromQuote,erpStagePartsFromContract};', ctx);
   return ctx.api;
 }
 const P = pure();
@@ -158,6 +164,7 @@ function wrap(env) {
     dbGet: (k, d) => (env.data && env.data[k]) || d,
     getActiveUsers: () => USERS,
     erpQuoteLanePlan: (r, c, t, u) => P.erpQuoteLanePlan(r, c, t, u),
+    erpStageMarksMerge: P.erpStageMarksMerge, erpStagePartsFromQuote: P.erpStagePartsFromQuote,
     erpDeferCoLinkIfNew: (f) => Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' }),
     isContractLocked: (ym) => ym === (env.lockedYm || ''),
     genContractNo: () => '계약-2026-196',
@@ -319,7 +326,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
     'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
     'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('
-  ].map((d) => cutFn(SRC, d)).join('\n');
+  ].map((d) => cutFn(SRC, d)).join('\n') + '\n' + STAGE_SRC;
   const CO_V = Object.assign({}, CO, { bizNo: '1234567891' });
   const cardV = (o) => card(Object.assign({ company: { name: '가나기관', bizNo: '1234567891' } }, o || {}));
   const calls = { persist: [], remove: 0, update: [] };
@@ -337,7 +344,7 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
     persistOne: (o) => { calls.persist.push(o); return true; }
   };
   const DOCREAD_BOOT = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8');
-  ctx.window = ctx; ctx.global = ctx; ctx.setTimeout = setTimeout;
+  ctx.window = ctx; ctx.global = ctx; ctx.setTimeout = setTimeout; ctx.PuCaseStage = PuCaseStage;
   vm.createContext(ctx);
   vm.runInContext(DOCREAD_BOOT, ctx);
   vm.runInContext(FN + '\nthis.run=processPhotoContractRequest;', ctx);

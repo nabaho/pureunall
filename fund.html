@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=100"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -22,7 +22,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="js/pu-hwpx-fill.js?v=6"></script>
 <script src="js/pu-ocr-kr.js?v=3"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
@@ -35,7 +35,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=4"></script>
+<script src="fund_forms.js?v=7"></script><script src="fund_kb.js?v=5"></script>
 <!-- 다음(Daum) 우편번호 서비스 — 무료, 가입 불필요. 푸른이알피(pu-erp.html)에서 이미 쓰는 것과 같다 -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
@@ -561,7 +561,7 @@
   .libnav>div.on{background:var(--acc-soft);color:var(--acc)}
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=42"></script>
+  <script src="js/pu-appbar.js?v=47"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -5494,7 +5494,7 @@ function _pureunHangulSend(payload,win){
     }catch(e2){}
   }
   var sendMsg=function(){
-    try{ if(win&&!win.closed) win.postMessage({type:'pureun_hangul_open',payload:payload},'*'); }catch(e){}
+    try{ if(win&&!win.closed) win.postMessage({type:'pureun_hangul_open',payload:payload},location.origin); }catch(e){}
     try{ if(typeof BroadcastChannel!=='undefined') new BroadcastChannel('pureun_hangul_channel').postMessage({type:'pureun_hangul_open',payload:payload}); }catch(e){}
   };
   setTimeout(sendMsg,350);
@@ -5617,7 +5617,8 @@ function _applyPureunHangulSave(msg){
     toast('푸른한글프로그램에서 고친 「'+(msg.label||docLabel(kind))+'」 내용을 이 기금에 저장했습니다');
   });
 }
-window.addEventListener('message',function(e){ if(e&&e.data&&e.data.type==='pureun_hangul_save') _applyPureunHangulSave(e.data); });
+/* ★ 2026-11-15 보안 — 보낸 곳을 본다. 푸른한글(hangul.html)은 같은 주소에서 열린다 — 다른 사이트가 이 창에 «저장» 쪽지를 보내 문서를 바꿔치기하지 못하게. */
+window.addEventListener('message',function(e){ if(!e||e.origin!==location.origin) return; if(e.data&&e.data.type==='pureun_hangul_save') _applyPureunHangulSave(e.data); });
 window.addEventListener('storage',function(e){
   if(e&&e.key==='pureun_hangul_save'&&e.newValue){
     try{ _applyPureunHangulSave(JSON.parse(e.newValue)); }catch(err){}
@@ -10877,11 +10878,19 @@ function sanitizeDocHTML(html){
   s=s.replace(/<style[\s\S]*?<\/style>/gi,'')          // 전역 style 유출 차단
      .replace(/<script[\s\S]*?<\/script>/gi,'')
      .replace(/<\/?(iframe|object|embed|link|meta|form|base)\b[^>]*>/gi,'');
+  /* ★ 2026-11-15 보안 — 글자 지우기는 한 번만 하면 «지운 자리에서 새 태그가 생긴다»(<if<embed>rame …> → <iframe …>).
+     그래서 ① 글자 지우기를 바뀌지 않을 때까지 되풀이하고 ② 나무(DOM)로 푼 «뒤»에 위험한 태그를 한 번 더 걷고
+     ③ srcdoc(같은 출처로 도는 iframe 내용)·formaction 같은 속성도 지운다. */
+  for(var _k=0;_k<10;_k++){ var _p=s;
+    s=s.replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<\/?(iframe|object|embed|link|meta|form|base)\b[^>]*>/gi,'');
+    if(s===_p) break; }
   var box=document.createElement('div'); box.innerHTML=s;
+  var _bad=box.querySelectorAll('script,style,iframe,frame,frameset,object,embed,link,meta,form,base,applet,noscript,template,portal');
+  for(var _b=0;_b<_bad.length;_b++){ if(_bad[_b].parentNode) _bad[_b].parentNode.removeChild(_bad[_b]); }
   var all=box.querySelectorAll('*');
   for(var i=0;i<all.length;i++){ var el=all[i];
     for(var j=el.attributes.length-1;j>=0;j--){ var a=el.attributes[j], n=a.name.toLowerCase(), v=String(a.value||'');
-      if(n.indexOf('on')===0) el.removeAttribute(a.name);                                  // onerror/onclick 등
+      if(n.indexOf('on')===0||n==='srcdoc'||n==='formaction'||n==='action') el.removeAttribute(a.name);                                  // onerror/onclick·srcdoc 등
       else if((n==='href'||n==='src'||n==='xlink:href')&&/^\s*(javascript|data(?!:image\/(png|jpe?g|gif|webp|svg\+xml);)|vbscript):/i.test(v)) el.removeAttribute(a.name);
       else if(n==='style'&&/expression\s*\(|javascript:/i.test(v)) el.removeAttribute(a.name);
     }

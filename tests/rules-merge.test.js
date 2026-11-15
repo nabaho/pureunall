@@ -112,12 +112,13 @@ test('④★★ rules-v2 는 갈래를 «제자리에서» 바꾸고, 켜짐도 
   assert.match(route, /pushState/, '★★ 갈래 바꾸기가 기록을 안 남긴다 — 뒤로가기로 못 돌아온다');
 });
 
-test('⑤★ 준비중 문 이름이 포털 타일 이름과 짝이다', () => {
-  const name = 포털().find((a) => a.key === 'rules').name;
+test('⑤★ 준비중은 «세 곳이 짝»이다 — 포털 딱지와 두 화면 안쪽 문이 함께 있거나 함께 없다 (지금은 함께 없다: 2026-11-15 대표 「기업규정집 준비중 열어라」)', () => {
+  const 포털줄 = R('enter.html').split('\n').find((l) => l.indexOf("key:'rules'") >= 0);
+  const 딱지 = /soon:\s*true/.test(포털줄);
   ['rules.html', 'rules-v2.html'].forEach((f) => {
     const m = stripComments(R(f)).match(/PuGate\.soonUnlessAdmin\('([^']+)'\)/);
-    assert.ok(m, '★★ ' + f + ' 에 준비중 문이 없다');
-    assert.equal(m[1], name, '★ ' + f + ' 준비중 문 이름이 포털 타일과 다르다');
+    assert.equal(!!m, 딱지, '★★ ' + f + ' 의 안쪽 준비중 문(' + (m ? '있음' : '없음') + ')과 포털 타일 딱지(' + (딱지 ? '있음' : '없음') + ')가 짝이 아니다 — 하나만 남으면 반쪽이 된다');
+    if (m) assert.equal(m[1], 포털().find((a) => a.key === 'rules').name, '★ ' + f + ' 준비중 문 이름이 포털 타일 이름과 다르다');
   });
 });
 
