@@ -154,52 +154,6 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   .tab:hover{background:var(--bg)}
   .tab.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
   .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
-  /* ── PC 윗줄 «구글 꼴 한 줄» (대표 결정 2026-11-15 「구글처럼 한 줄로」) ──
-       [☰] [푸른 캘린더] [오늘] ‹ › 2026년 11월 ·········· 🔍 [월 ▾] [내 동그라미]
-     탭·사람 거르개·화면 밝기·회전·구글 앱 색은 ☰ 서랍으로 옮겼다 — «없애지 않았다».
-     ⚠ hidden 속성은 display 를 주면 풀린다 — [hidden] 줄이 따로 있어야 감춤이 먹는다.
-     ⚠ 폰(≤700px)은 이 규칙을 안 쓴다 — 폰은 위젯 꼴 머리(폰머리Html)와 자기 서랍(S.drawer)이 있다. */
-  .hamb{display:none;width:40px;height:40px;border:none;border-radius:50%;background:transparent;color:var(--gsub);
-    font-size:20px;line-height:1;cursor:pointer;flex-shrink:0;padding:0;font-family:inherit;align-items:center;justify-content:center}
-  .hamb:hover{background:var(--bg)}
-  @media (min-width:701px){
-    .hamb:not([hidden]){display:inline-flex}
-    #themeToggle,#rotToggle{display:none}
-  }
-  body.mob .hamb{display:none!important}
-  #tabs.gl1{overflow:visible}
-  #tabs.gl1 .ctools{margin-left:auto;gap:8px}
-  @media (min-width:701px){ .lun,.monthbar .lunrange{display:none} }   /* 구글 화면에는 음력이 없다 — 글자 내용을 같게(폰은 위젯 꼴이라 그대로) */
-  .pcveil{position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.32)}
-  .pcdrawer{position:fixed;left:0;top:0;bottom:0;width:320px;max-width:86vw;z-index:45;background:var(--panel);overflow-y:auto;
-    border-radius:0 28px 28px 0;box-shadow:0 3px 4px 0 rgba(0,0,0,.14),0 3px 3px -2px rgba(0,0,0,.12),0 1px 8px 0 rgba(0,0,0,.2);padding-bottom:16px}
-  .pcdrawer[hidden],.pcveil[hidden]{display:none}
-  .pcdh{display:flex;align-items:center;gap:8px;padding:12px 12px 4px 20px;font-size:22px;line-height:28px;color:var(--gtext)}
-  .pcdh .sp{flex:1}
-  .pcdsec{font-size:11px;font-weight:500;color:var(--gsub);padding:16px 20px 6px}
-  .pcdtabs{display:flex;flex-direction:column;padding:0 12px}
-  .pcdtabs .tab{display:block;width:100%;text-align:left;height:40px;padding:0 16px;font-size:14px;border-radius:20px}
-  .pcdchips{padding:0 16px}
-  .pcdchips .chips{flex-wrap:wrap;gap:6px;margin-bottom:0}
-  .pcdi{display:flex;align-items:center;gap:12px;width:100%;height:40px;padding:0 20px;border:none;background:transparent;
-    font-size:14px;color:var(--gtext);cursor:pointer;font-family:inherit;text-align:left}
-  .pcdi:hover{background:var(--bg)}
-  .pcdi .ck{width:16px;height:16px;border-radius:4px;border:2px solid var(--ck,var(--gsub));display:inline-flex;align-items:center;justify-content:center;
-    font-size:11px;color:#fff;font-style:normal;flex:none;box-sizing:border-box}
-  .pcdi .ck.on{background:var(--ck,var(--gsub))}
-  .pcdg{padding:8px 20px 0}
-  /* 보기 고르기 — 구글의 「월 ▾」 단추와 펼침 메뉴(앱 실측: 단추 높이 40 · 모서리 20 · 테두리 1px #747775) */
-  .pcvwrap{position:relative;display:inline-flex}
-  .pcvbtn{height:40px;padding:0 12px 0 16px;border:1px solid #747775;border-radius:20px;background:var(--panel);color:var(--gtext);
-    font-size:14px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-family:inherit}
-  .pcvbtn:hover{background:var(--bg)}
-  .pcvbtn i{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid currentColor}
-  .pcvmenu{position:absolute;right:0;top:46px;z-index:46;min-width:150px;background:var(--panel);border-radius:8px;padding:8px 0;
-    box-shadow:0 3px 4px 0 rgba(0,0,0,.14),0 3px 3px -2px rgba(0,0,0,.12),0 1px 8px 0 rgba(0,0,0,.2)}
-  .pcvmenu button{display:block;width:100%;text-align:left;height:36px;padding:0 16px;border:none;background:transparent;
-    font-size:14px;color:var(--gtext);cursor:pointer;font-family:inherit}
-  .pcvmenu button:hover{background:var(--bg)}
-  .pcvmenu button.on{color:var(--gtoday);font-weight:500}
   /* 탭 줄에 얹은 사람 칩 — 오른쪽 끝에 붙는다(왼쪽 탭과 안 섞이게) */
   .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:12px}
   .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
@@ -446,7 +400,6 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
        그래서 상세 창 줄은 body:not(.mob) .modal.det 로 «좁혀서» 쓴다(폰 규칙 body.mob … 보다 세지만 폰에는 안 먹는다). */
   body:not(.mob) .modal.det .drows{padding:0 28px 14px}
   body:not(.mob) .modal.det .drow{display:flex;gap:20px;font-size:14px;line-height:20px;padding:8px 0;align-items:flex-start;color:var(--gtext)}
-  body:not(.mob) .modal.det .dsub{display:block;font-size:12px;line-height:16px;color:var(--gsub)}
   .drow .di{width:20px;flex-shrink:0;color:var(--gsub);display:flex;justify-content:center;padding-top:0}
   .drow .di .gic{width:20px;height:20px}
   .drow .dt{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
@@ -702,50 +655,17 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      방법: ① 칸을 «두 열»로 나눠 흐르게(column-count — 한 칸은 둘로 안 쪼갠다) ② 일정/연차 탭과 캡처·말 단추를 «한 줄»로 ③ 칸 높이 48→42px
            ④ 창이 화면보다 커지지 않게 상한(100vh − 24px). 넘치면 그때만 스크롤.
      ⚠ PC 폭(900px 이상)·폰이 아닌 화면·«옵션 더보기(전체 화면)»가 아닐 때만 — 폰은 그대로다. */
-  @media (min-width:701px){
-    /* ★★ 2026-11-15 — PC 새 일정 «빠른» 창을 구글 앱 빠른 창과 같게 (대표 결정 「바꿔 주세요」 — 전: 폭 860 두 열, 2026-10-31 「한 화면에」).
-         구글 앱에서 잰 값(저장 없이 열었다 닫음): 폭 448 · 모서리 28 · 바탕 #f0f4f9 · 끌개 (19,14) · ✕ (409,14) 20px ·
-         제목 22px 이 x=68 폭 364 · 탭 높이 36 · 줄 아이콘 20px 이 x=24 · 줄 글 14px 이 x=68 · 줄 높이 40 ·
-         「시간 추가」 14px/500 #0b57d0 · 저장 74×40 · 옵션 더보기 92×40.
-         「한 화면」은 칸을 «구글 빠른 창 것만» 보이게 해서 지킨다 — 안 보이는 칸(gxf)은 DOM 에 그대로 있고(저장이 값을 읽는다)
-         「옵션 더보기」(큰 창)에서 전부 보인다. ⚠ 전체 화면(.full)과 폰(body.mob)은 안 건드린다. */
-    body:not(.mob) .modal.gform:not(.full){width:min(448px,94vw);max-height:calc(100vh - 24px);overflow-y:auto;padding:0 0 12px;
-      background:#f0f4f9;border:none;box-shadow:0 3px 4px 0 rgba(0,0,0,.14),0 3px 3px -2px rgba(0,0,0,.12),0 1px 8px 0 rgba(0,0,0,.2)}
-    :root[data-theme="dark"] body:not(.mob) .modal.gform:not(.full){background:var(--panel)}
-    body:not(.mob) .gform:not(.full) .ghd{margin:0;padding:8px 12px 0 19px;height:44px}
-    body:not(.mob) .gform:not(.full) .ggrip{padding:0;color:#747775;display:flex;align-items:center;cursor:grab}
-    body:not(.mob) .gform:not(.full) .ggrip .gic{width:20px;height:20px}
-    body:not(.mob) .gform:not(.full) .gx{width:32px;height:32px}
-    body:not(.mob) .gform:not(.full) .gx .gic{width:20px;height:20px}
-    body:not(.mob) .gform:not(.full) .gtitle{width:calc(100% - 84px);margin:0 0 4px 68px;padding:4px 0 6px;font-size:22px;line-height:28px}
-    body:not(.mob) .gform:not(.full) .gtabs:not(.gcalchips){margin:8px 0 4px 68px;gap:4px}
-    body:not(.mob) .gform:not(.full) .gtabs:not(.gcalchips) button{height:36px;border:none;border-radius:18px;padding:0 12px;font-size:14px;font-weight:500;color:#444746}
-    body:not(.mob) .gform:not(.full) .gtabs:not(.gcalchips) button.on{background:#c2e7ff;color:#004a77}
-    body:not(.mob) .gform:not(.full) .grow{min-height:40px;padding:0 16px 0 24px}
-    body:not(.mob) .gform:not(.full) .gi{width:44px;min-height:40px}
-    body:not(.mob) .gform:not(.full) .grow.top .gi{padding-top:10px;min-height:0}
-    body:not(.mob) .gform:not(.full) .gic{width:20px;height:20px}
-    body:not(.mob) .gform:not(.full) .gbody > input,body:not(.mob) .gform:not(.full) .gbody > select,body:not(.mob) .gform:not(.full) .gbody > textarea{font-size:14px;padding:10px 0}
-    body:not(.mob) .gform:not(.full) .gbody textarea{min-height:40px}
-    body:not(.mob) .gform:not(.full) .gpick{font-size:14px;min-height:40px}
-    body:not(.mob) .gform:not(.full) .gtxt{font-size:14px}
-    body:not(.mob) .gform:not(.full) .gxf{display:none}
-    /* 시간 줄 — 「11월 28일 (토요일) 오후 1:00 – 오후 2:00」 / 아래 12px 「반복 안함」 / 오른쪽 「종일」·「시간 추가」 */
-    body:not(.mob) .gform:not(.full) .gqt{flex:1;min-width:0}
-    body:not(.mob) .gform:not(.full) .gqdt{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px}
-    body:not(.mob) .gform:not(.full) .gdash{font-size:14px;color:var(--gtext)}
-    body:not(.mob) .gform:not(.full) .gqsub{margin-top:-8px;padding-bottom:6px}
-    body:not(.mob) .gform:not(.full) .gqsub select{border:none;background:transparent;font-size:12px;color:#444746;padding:0;margin:0;width:auto;max-width:100%;font-family:inherit;cursor:pointer;outline:none}
-    body:not(.mob) .gform:not(.full) .gqbtn{flex:none;border:none;background:transparent;color:#0b57d0;font-size:14px;font-weight:500;padding:0 10px;height:32px;border-radius:16px;cursor:pointer;font-family:inherit}
-    body:not(.mob) .gform:not(.full) .gqbtn:hover{background:rgba(11,87,208,.08)}
-    body:not(.mob) .gform:not(.full) .ghint{padding-left:68px!important;margin:0 16px 4px 0;font-size:12px;color:#444746}
-    body:not(.mob) .gform:not(.full) .werr{margin:0 16px 8px}
-    /* 「Google Meet 화상 회의 추가」 — 구글 빠른 창은 알약 단추가 아니라 «글자 줄»(14px/400 #444746). 켜면 파란 글자 */
-    body:not(.mob) .gform:not(.full) .gmeet{background:transparent;color:#444746;border:none;border-radius:0;height:auto;padding:10px 0;font-size:14px;font-weight:400;text-align:left;cursor:pointer;font-family:inherit}
-    body:not(.mob) .gform:not(.full) .gmeet.on{color:#0b57d0;font-weight:500}
-    /* 「옵션 더보기·저장」 줄은 창이 낮아 스크롤이 생겨도 아래에 붙어 늘 보인다 */
-    body:not(.mob) .gform:not(.full) .mbtns{position:sticky;bottom:-12px;z-index:2;background:#f0f4f9;padding:8px 16px 12px;margin:0 0 -12px}
-    :root[data-theme="dark"] body:not(.mob) .gform:not(.full) .mbtns{background:var(--panel)}
+  @media (min-width:900px){
+    body:not(.mob) .modal.gform:not(.full){width:min(860px,94vw);max-height:calc(100vh - 24px);padding:8px 20px 14px}
+    body:not(.mob) .gform:not(.full) .gcols{column-count:2;column-gap:40px}
+    body:not(.mob) .gform:not(.full) .gmain, body:not(.mob) .gform:not(.full) .gside{display:contents}
+    body:not(.mob) .gform:not(.full) .gcols .grow{min-height:42px;break-inside:avoid}
+    body:not(.mob) .gform:not(.full) .gcols .ghint{break-inside:avoid}
+    body:not(.mob) .gform:not(.full) .gtabs:not(.gcalchips){display:inline-flex;margin-bottom:6px;vertical-align:top}
+    body:not(.mob) .gform:not(.full) .gtabs.gcapbar{margin-left:10px}
+    body:not(.mob) .gform:not(.full) .gtitle{padding-top:6px;padding-bottom:4px}
+    /* 창이 화면보다 낮아 스크롤이 생기는 경우에도 「옵션 더보기·저장」 줄은 아래에 붙어 늘 보인다 */
+    body:not(.mob) .gform:not(.full) .mbtns{position:sticky;bottom:-14px;z-index:2;background:var(--panel);padding:8px 0 14px;margin-bottom:-14px}
   }
   /* 기업정보함에서 불러오기 — 창 맨 위 한 칸(고르면 초록으로 «불러옴») */
   .cpull{display:flex;align-items:center;gap:8px;border:1.5px solid #bfdbfe;background:var(--acc-soft);
@@ -1217,7 +1137,6 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <body>
 
 <div id="topbar">
-  <button class="hamb" id="pcHamb" data-pcdrawer="1" type="button" title="메뉴 — 탭·사람 거르개·화면 설정" aria-label="메뉴" aria-expanded="false" hidden>☰</button>
   <span class="brand"><svg viewBox="0 0 100 100" style="width:22px;height:22px;vertical-align:-5px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> <span class="bt">푸른 캘린더</span></span>
   <span id="tabs"></span>
   <button class="themebtn" id="themeToggle" title="화면 밝기 — 자동·밝게·어둡게">🌗 자동</button>
@@ -1237,8 +1156,6 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
     </div>
   </span>
 </div>
-<div class="pcveil" id="pcveil" data-pcdclose="1" hidden></div>
-<aside class="pcdrawer" id="pcdrawer" aria-label="메뉴" hidden></aside>
 <div id="app"><div class="panel muted">불러오는 중…</div></div>
 
 <script>
@@ -1275,8 +1192,6 @@ var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toa
           sheet:false,
           /* vmenu — 폰 머리의 «보기 고르기»(월·일정·주·일) 메뉴가 열렸나 (2026-10-11) */
           vmenu:false,
-          /* pcDrawer — PC 윗줄 «구글 꼴 한 줄»의 ☰ 서랍(탭·사람 거르개·밝기·회전·앱 색)이 열렸나 (2026-11-15) */
-          pcDrawer:false,
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'',
           /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
@@ -1567,8 +1482,7 @@ var 구글요즘색 = { "1":"#7986cb", "2":"#33b679", "3":"#8e24aa", "4":"#e67c7
 /* 구글 앱에서 「푸른노무법인」 공용 달력의 일정이 «색 번호가 없을 때» 칠해지는 색 — 대표 PC 의 로그인된 구글 캘린더 앱에서
    computed style 로 쟀다(2026-11-15: 칩 바탕 #7cb342, 지난 날 칩은 이 색을 30% 로 흰색에 섞은 #d8e8c6).
    ⚠ 예전 값 #87ac5c 는 캡처 그림에서 눈으로 뽑은 것이라 앱의 실제 값과 달랐다.
-   「구글 앱 색」(기본 켜짐)일 때 «구글 색 번호가 없는 모든 칩»(구글 일정·우리 일정·근태·이음 근무)에 이 색을 쓴다 —
-   구글 화면에는 사람별 색이 없다. 사람 구분은 윗줄 사람 거르개(색 동그라미)에서만 남는다(대표 결정 2026-11-15). */
+   「구글 앱 색」을 «켠 사람만»(기본은 꺼짐 — 사람별 색이 기본이다, 대표 지시 2026-11-15) «구글 색 번호가 없는 모든 칩»(구글 일정·우리 일정·근태·이음 근무)에 이 색을 쓴다. */
 var 구글캘린더색 = "#7cb342";
 function gcalLoadColors(){
   if(window._gcalColors) return Promise.resolve(window._gcalColors);
@@ -3072,9 +2986,9 @@ function 폰(){
     && window.matchMedia("(max-width:700px), (max-height:500px) and (pointer:coarse)").matches; }
   catch(e){ return false; }
 }
-/* 「구글 앱 색」 — 기본 «켜짐»(대표 결정 2026-11-15 「구글과 똑같이」). 서랍에서 끄면 "0" 이 저장되어 사람별 색으로 돌아간다.
-   저장값이 없거나 읽을 수 없으면 켜짐 — 구글 화면과 같아야 하므로 «모를 때는 구글처럼». */
-function _모노(){ try{ return localStorage.getItem("pucal_gmono") !== "0"; }catch(_){ return true; } }
+/* 「구글 앱 색」 — 기본 «꺼짐»(사람별 색이 기본이다 — 대표 지시 2026-11-15 「사람들 색 기존으로 모두 돌려라」).
+   폰 메뉴의 «구글 앱 색(모두 초록)» 스위치를 켠 사람만 "1" 이 저장되어 모든 칩이 캘린더 초록이 된다. 저장값이 없거나 읽을 수 없으면 꺼짐. */
+function _모노(){ try{ return localStorage.getItem("pucal_gmono") === "1"; }catch(_){ return false; } }
 /* 구글 색 번호가 없는 칩은 캘린더 초록으로 — 구글 화면에는 사람별 색이 없다.
    바꾸는 것: 구글 일정(색 번호 없는 것) · 우리 일정 · 근태 · 이음 근무 · 나만 보기.
    안 바꾸는 것: 공휴일(구글 「대한민국의 휴일」 색) · 지워진 일정(점선) · 사건 기한·휴직·모집(뜻이 색에 있다).
@@ -3123,7 +3037,7 @@ function 폰머리Html(){
         + '<hr>' + [["shared","공용 일정","var(--acc)"],["priv","나만 보기","var(--gsub)"]].map(function(c){
             var 켜짐 = S.filter === null || S.filter === undefined || S.filter === c[0];
             return '<button class="dcal" data-dcal="' + c[0] + '"><i class="dck' + (켜짐 ? ' on' : '') + '" style="--ck:' + c[2] + '">' + (켜짐 ? '✓' : '') + '</i>' + c[1] + '</button>'; }).join("")
-        + '<hr><button class="dcal" data-dmono="1"><i class="dck' + (_모노() ? ' on' : '') + '" style="--ck:' + 구글캘린더색 + '">' + (_모노() ? '✓' : '') + '</i>구글 앱 색(사람별 색 끄기)</button>'
+        + '<hr><button class="dcal" data-dmono="1"><i class="dck' + (_모노() ? ' on' : '') + '" style="--ck:' + 구글캘린더색 + '">' + (_모노() ? '✓' : '') + '</i>구글 앱 색(모두 초록)</button>'
         + (관리자인가() ? '<button data-dobs="1" title="일정을 옵시디언 보관함의 «일정» 폴더에 적습니다(설명·참석자 제외)">🪨 옵시디언으로 내보내기</button>' : '')
         + '<button data-dreload="1">' + 선아이콘("refresh") + '새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
@@ -4398,25 +4312,16 @@ function 구글상세(id){
   if(!e) return null;
   var rows = [];
   var 누구 = e.mailSid ? nameOf(e.mailSid) : "";
-  var 폰이다 = typeof 폰 === "function" && 폰();
-  /* ★ 글자 내용을 구글 앱 상세와 같게 (대표 지시 2026-11-15 「글자내용까지 구글과 똑같이」, 구글 앱에서 확인):
-       장소 → 설명 → (구글 연결로 받은 참석자·회의·첨부·알림 줄) → 맨 아래 «캘린더 이름 + 생성자».
-     ⚠ 예전의 「👤 담당 이름」·「✉ 메일 이 만듦」·「🕒 넣은 날 · 마지막 고침」 줄은 구글 상세에 없어 걷었다
-       (담당자는 맨 아래 «생성자»로, 넣은 날·고친 날은 구글 화면에서 본다). 폰은 폰 상세가 따로 있다. */
-  if(폰이다 && 누구) rows.push({ i:"👤", t:누구 });
+  if(누구) rows.push({ i:"👤", t:누구 });
   if(e.place) rows.push({ i:"📍", t:e.place });
   if(e.desc) rows.push({ i:"≡", t:e.desc });
-  if(폰이다){
-    if(e.mail) rows.push({ i:"✉", t:e.mail + " 이 만듦" });
-    /* 🕒 언제 넣고 고쳤나 — 「누가 언제 바꿨지?」를 구글에 안 가고 본다 (2026-10-04) — 폰만 */
-    var 넣음 = 언제적(e.created), 고침 = 언제적(e.updated);
-    if(넣음 || 고침) rows.push({ i:"🕒", t:(넣음 ? "넣은 날 " + 넣음 : "")
-      + (고침 && 고침 !== 넣음 ? (넣음 ? " · " : "") + "마지막 고침 " + 고침 : "") });
-  }
+  if(e.mail) rows.push({ i:"✉", t:e.mail + " 이 만듦" });
+  /* 🕒 언제 넣고 고쳤나 — 「누가 언제 바꿨지?」를 구글에 안 가고 본다 (2026-10-04) */
+  var 넣음 = 언제적(e.created), 고침 = 언제적(e.updated);
+  if(넣음 || 고침) rows.push({ i:"🕒", t:(넣음 ? "넣은 날 " + 넣음 : "")
+    + (고침 && 고침 !== 넣음 ? (넣음 ? " · " : "") + "마지막 고침 " + 고침 : "") });
   /* 제목 시각을 대신 보여 주었으면 그렇다고 말한다 — 구글에서 열면 다른 시각이 보이므로 */
   if(e.gTime) rows.push({ i:"⏱", t:"구글에는 " + e.gTime + " 으로 들어 있습니다 — 제목에 적힌 시각을 보여 드립니다" });
-  /* 맨 아래 «캘린더 이름 + 생성자» — 구글 앱 상세와 같다(폰은 detailHtml 이 이름 줄을 따로 붙인다) */
-  if(!폰이다) rows.push({ i:"📅", t:"푸른노무법인", sub:(누구 || e.mail) ? "생성자: " + (누구 || e.mail) : "" });
   /* 칩과 «같은 색» — 구글 앱 색(칩색정리)을 거친 값. 칩은 초록인데 상세의 네모만 사람색이면 어긋난다 */
   var 색 = (typeof 칩색정리 === "function" && 칩색정리([e])[0] || e).color;
   return { kind:"gcal", gid:e.id, title:e.text, color:색, date:e.date, end:e.end || "",
@@ -4523,7 +4428,7 @@ function 구글더받기(id){
     var 더 = 구글더줄(x.ev, x.rr);
     /* 자리 — 👤📍 다음, ≡설명·✉·🕒·⏱ 앞(목업 차례) */
     var rows = 열린.rows.slice(), at = rows.length;
-    for(var i = 0; i < rows.length; i++){ if(["≡","✉","🕒","⏱","📅"].indexOf(rows[i].i) >= 0){ at = i; break; } }
+    for(var i = 0; i < rows.length; i++){ if(["≡","✉","🕒","⏱"].indexOf(rows[i].i) >= 0){ at = i; break; } }
     S.detail = Object.assign({}, 열린, { rows:rows.slice(0, at).concat(더, rows.slice(at)), loading:false, more:true });
     render();
   }, function(e){
@@ -4549,7 +4454,7 @@ function 공휴일상세(ymd){
     time:"", endAt:0, rows:[], hint:[], url:"" };
 }
 /* 상세 창의 줄 앞 그림글자(이모지) → 구글 «선 아이콘». 모르는 글자는 그대로 둔다 */
-var 행그림 = { "👤":"person", "📍":"place", "≡":"notes", "✉":"mail", "🕒":"history", "⏱":"schedule", "👥":"group", "📅":"calendar",
+var 행그림 = { "👤":"person", "📍":"place", "≡":"notes", "✉":"mail", "🕒":"history", "⏱":"schedule", "👥":"group",
   "🔔":"notifications", "🔁":"repeat", "🎥":"videocam", "📎":"attach", "🏢":"business" };
 /* 상세 팝업의 날짜 — 구글 실측: 「10월 12일 (월요일)」(입력 창·목록의 「(월)」과 다르다). 올해가 아니면 연도 */
 function 상세날짜글(ymd){
@@ -4607,7 +4512,7 @@ function detailHtml(){
             else if(r.i === "📍" && typeof PuCalMap !== "undefined" && PuCalMap.cleanPlace(r.t))
               글 = '<a class="maplink" href="#" data-map="det" data-lp="' + esc(r.t) + '" title="지도 보기 · 길게 누르면 제네시스로 보내기">' + 글 + '</a>';
             return '<div class="drow"><span class="di">' + 행아이콘(r.i) + '</span>'
-              + '<span class="dt">' + 글 + (r.sub ? '<span class="dsub">' + esc(r.sub) + '</span>' : '') + '</span></div>';
+              + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
         : "")
     /* ★ 폰 — 구글 앱 일정 상세의 맨 아래 「캘린더」 줄(캡처: 달력 아이콘 + 「내 캘린더 / 메일」). 우리는 공용 구글 달력 이름 */
@@ -4671,7 +4576,6 @@ var GIC = {
   v_week:"M3 5h2v14H3zM6.5 5h2v14h-2zM10 5h2v14h-2zM13.5 5h2v14h-2zM17 5h2v14h-2zM20.5 5h1v14h-1z",
   v_month:"M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z",
   more_vert:"M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
-  drag_handle:"M20 9H4v2h16V9zM4 15h16v-2H4v2z",
   refresh:"M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
 };
 /* ★ 「반복 안 함」·「알림 추가」 줄 (구글 입력 화면, 2026-10-11) — 구글 일정의 recurrence·reminders 로 그대로 간다.
@@ -4717,7 +4621,7 @@ function 참석자줄(m){
   return '<div class="grow"><span class="gi" title="참석자">' + 선아이콘("group") + '</span><div class="gbody">'
     + '<input data-m="guests" value="' + esc(m.guests || "") + '" placeholder="' + ((typeof 폰 === "function" && 폰()) ? '사용자 추가 (메일 — 여러 명은 쉼표로)' : '참석자 추가 (메일 — 여러 명은 쉼표로)') + '" inputmode="email" autocomplete="off"></div></div>'
     + (String(m.guests || "").trim() ? '<div class="ghint" style="padding-left:56px">초대 메일은 보내지 않습니다 — 구글 일정에만 참석자로 붙습니다.</div>' : '')
-    + '<div class="grow gxf"><span class="gi" title="첨부파일">' + 선아이콘("attach") + '</span><div class="gbody">'
+    + '<div class="grow"><span class="gi" title="첨부파일">' + 선아이콘("attach") + '</span><div class="gbody">'
     + '<input data-m="attach" value="' + esc(m.attach || "") + '" placeholder="첨부파일 추가 (구글 드라이브 링크)" autocomplete="off"></div></div>'
     + '<div class="grow"><span class="gi" title="Google Meet">' + 선아이콘("videocam") + '</span><div class="gbody">'
     + '<button class="gmeet' + (m.meet ? ' on' : '') + '" data-meet="1">' + (m.meet ? '✓ Google Meet 화상 회의가 추가됩니다' : ((typeof 폰 === "function" && 폰()) ? '화상 회의 추가' : 'Google Meet 화상 회의 추가')) + '</button></div></div>';
@@ -4766,10 +4670,6 @@ function modalHtml(){
   var 새것 = m.mode==="new";
   var 일정 = m.kind==="sch";
   var 넓게 = !!m.full || (typeof 폰 === "function" && 폰());
-  /* 간략 — PC 의 «빠른 창»(구글 앱 빠른 창: 폭 448 · 제목·시간·참석자·Meet·위치·설명·캘린더 + 옵션 더보기·저장). 대표 결정 2026-11-15 「바꿔 주세요」.
-     ⚠ 빠른 창에 «안 보이는» 칸(캡처·반복 알림 줄·첨부·기업정보함 불러오기·담당자·담당 직원)도 «그대로 그려 두고 CSS(gxf)로 감춘다» —
-       modalRead 가 칸 값을 읽어 가므로 칸이 없어지면 값이 지워진다. 「옵션 더보기」(큰 창)에서는 전부 보인다. */
-  var 간략 = !넓게 && 새것 && 일정;
   var 유형들 = PuWork.typesFor("calendar");
   var 불러옴 = m.card ? " <span class=\"from\">불러옴</span>" : "";
   function 아이콘(이름){ return '<svg class="gic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + GIC[이름] + '"/></svg>'; }
@@ -4778,8 +4678,8 @@ function modalHtml(){
       + '<div class="gbody">' + 안 + '</div></div>';
   }
   /* 날짜·시간은 «글자»로 보이고, 진짜 입력칸(투명)이 그 위를 덮는다 — 누르면 기기의 고르개가 뜬다 */
-  function 날짜칸(필드, 값, 길게){
-    return '<label class="gpick gdate">' + esc(길게 ? 상세날짜글(값) : 입력날짜글(값)) + '<input type="date" data-m="' + 필드 + '" value="' + esc(값 || "") + '"></label>';
+  function 날짜칸(필드, 값){
+    return '<label class="gpick gdate">' + esc(입력날짜글(값)) + '<input type="date" data-m="' + 필드 + '" value="' + esc(값 || "") + '"></label>';
   }
   function 시간칸(필드, 값, 미리){
     var v = 값 || "";
@@ -4796,19 +4696,6 @@ function modalHtml(){
     : 줄("schedule", 날짜칸("date", m.date)
         + (m.type==="leave-hour"
             ? '<span class="trange"><input type="number" min="1" max="8" data-m="hours" value="' + esc(m.hours) + '"><span>시간</span></span>' : ''), "날짜");
-  var 반복옵션글 = 반복글(m.date);
-  var 간략시각줄 = 줄("schedule",
-      '<div class="gqt"><div class="gqdt">' + 날짜칸("date", m.date, true)
-      + (m.timed
-          ? 시간칸("time", m.time, "09:00") + '<span class="gdash">–</span>'
-            + ((끝날 !== m.date) ? 날짜칸("endDate", 끝날, true) : '<input type="hidden" data-m="endDate" value="' + esc(끝날) + '">')
-            + 시간칸("endTime", m.endTime, 한시간뒤(m.time))
-          : '<span class="gdash">–</span>' + 날짜칸("endDate", 끝날, true))
-      + '</div><div class="gqsub"><select data-m="repeat" title="반복">'
-      + [["", "반복 안함"], ["DAILY", 반복옵션글.D], ["WEEKLY", 반복옵션글.W], ["MONTHLY", 반복옵션글.M], ["YEARLY", 반복옵션글.Y]].map(function(o){
-          return '<option value="' + o[0] + '"' + (String(m.repeat || "") === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join("")
-      + '</select></div></div>'
-      + '<button class="gqbtn" type="button" data-mtime="' + (m.timed ? '0' : '1') + '">' + (m.timed ? '종일' : '시간 추가') + '</button>', "일시");
   var 누가 = '<select data-m="sid" title="누구">'
     + 사번순(users(), ME && ME.sid).map(function(u){ return '<option value="' + esc(u.sid) + '"' + (u.sid===m.sid ? ' selected' : '') + '>' + esc(u.name||'이름 미확인') + '</option>'; }).join("")
     + '</select>';
@@ -4824,7 +4711,7 @@ function modalHtml(){
   달력힌트 = 달력힌트.replace('<div class="ghint">', '<div class="ghint" style="padding-left:56px">');
   var 저장단추 = '<button class="gsave" data-act="save"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? '저장 중…' : '저장') + '</button>';
   return '<div class="veil" data-close="1"></div><div class="modal gform' + (넓게 ? ' full' : '') + '">'
-    + '<div class="ghd">' + (넓게 ? '<button class="gx" data-close="1" title="닫기">' + 아이콘("close") + '</button>' : '<span class="ggrip">' + (간략 ? 아이콘("drag_handle") : '═') + '</span>')
+    + '<div class="ghd">' + (넓게 ? '<button class="gx" data-close="1" title="닫기">' + 아이콘("close") + '</button>' : '<span class="ggrip">═</span>')
     +   '<span class="sp"></span>'
     +   (넓게 ? 저장단추 : '<button class="gx" data-close="1" title="닫기">' + 아이콘("close") + '</button>')
     + '</div>'
@@ -4836,26 +4723,26 @@ function modalHtml(){
                 + esc(t.icon + " " + PuWork.labelFor(t.code, "calendar")) + '</option>'; }).join("") + '</select>')
     + (새것 ? '<div class="gtabs"><button data-mk="sch"' + (일정 ? ' class="on"' : '') + '>일정</button>'
         + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
-    + (일정 && 새것 && m.store !== "gcal" ? '<div class="gxf">' + 캡처줄Html(m) + '</div>' : '')
+    + (일정 && 새것 && m.store !== "gcal" ? 캡처줄Html(m) : '')
     /* ★ 폰 — 구글 앱 입력 화면의 «캘린더 칩 줄»(내 캘린더 / 가족 / 업무처리 — 캡처 2026-10-11). 우리는 「푸른노무법인 · 공용」과 「나만 보기」 둘 */
     + ((typeof 폰 === "function" && 폰() && 일정 && m.store !== "gcal")
         ? '<div class="gtabs gcalchips">' + [["shared","푸른노무법인 · 공용","var(--gtoday)"],["private","나만 보기","var(--gsub)"]].map(function(c){
             return '<button data-mvis="' + c[0] + '"' + ((m.vis === "private" ? "private" : "shared") === c[0] ? ' class="on"' : '') + '><i class="cdot" style="background:' + c[2] + '"></i>' + c[1] + '</button>'; }).join("") + '</div>' : '')
     + '<div class="gcols"><div class="gmain">'
-    +   (간략 ? 간략시각줄 : 시각줄)
-    +   (일정 && 새것 ? (간략 ? '' : 반복알림줄(m)) + 참석자줄(m) : '')
-    +   (일정 && 새것 ? '<div class="gxf">' + 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") + '</div>' : '')
+    +   시각줄
+    +   (일정 && 새것 ? 반복알림줄(m) + 참석자줄(m) : '')
+    +   (일정 && 새것 ? 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") : '')
     +   (일정 ? 줄("place", '<input data-m="place" value="' + esc(m.place||"") + '" placeholder="위치 추가">'
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
           + (typeof PuCalMap !== "undefined" ? '<button class="gmapbtn" data-map="form" title="지도 보기">' + 아이콘("map") + '</button>' : '')
           /* 정보함 주소가 그대로 들어갔거나 다르면 «확인하세요» — 업체는 이전이 잦다(2026-10-19) */
           + '<div id="addrcheck">' + 주소확인Html(m) + '</div>', "장소", true) : '')
-    +   (일정 ? '<div' + (간략 ? ' class="gxf"' : '') + '>' + 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 이름을 치면 기업정보함에서 찾습니다 (이름 · 전화)" autocomplete="off">'
+    +   (일정 ? 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 이름을 치면 기업정보함에서 찾습니다 (이름 · 전화)" autocomplete="off">'
           /* 이름을 치면 정보함에서 찾아 이름·직함·전화·주소를 채운다. 전화번호가 없으면 안내(2026-10-19) */
-          + '<div id="contactres">' + 연락처결과Html(m) + '</div>', "담당자", true) + '</div>' : '')
+          + '<div id="contactres">' + 연락처결과Html(m) + '</div>', "담당자", true) : '')
     +   줄("notes", '<textarea data-m="note" rows="1" placeholder="설명 추가">' + esc(m.note||"") + '</textarea>', "설명", true)
     + '</div><div class="gside">'
-    +   (간략 ? '<div class="gxf">' + 줄("badge", 누가, "담당 직원") + '</div>' : 줄("badge", 누가, "담당 직원"))
+    +   줄("badge", 누가, "담당 직원")
     +   (일정 && m.store !== "gcal" ? ((typeof 폰 === "function" && 폰()) ? 달력힌트 : 줄("calendar", 달력, "누가 보나") + 달력힌트) : '')
     +   (m.store === "gcal" ? '<div class="ghint" style="padding-left:56px">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다'
           + (m.recur ? ' (반복 일정은 «이 날 것만» 바뀝니다)' : '') + '.</div>' : '')
@@ -6068,58 +5955,15 @@ function renderTabs(){
     ? '<span class="tabchips">' + chipsHtml(S.tab === 'eumcal') + '</span>' : '';
   /* ★ 달 이동([오늘] ‹ › 2026년 9월)도 이 한 줄에 — 예전엔 달력 위에 따로 한 줄이었다.
      도구(계정 잇기 · 🔍 · 월|주|일)는 사람 칩 «뒤», 오른쪽 끝(구글과 같은 차례). */
-  /* ★ PC 달력은 «구글 꼴 한 줄» (대표 결정 2026-11-15 「구글처럼 한 줄로」) —
-       [☰] [푸른 캘린더] [오늘] ‹ › 제목 ···· 🔍 [월 ▾] [내 동그라미]. 탭·사람 거르개·밝기·회전·앱 색은 ☰ 서랍으로.
-       다른 탭(인원 현황·외부 공유)과 폰은 예전 머리 그대로(폰은 위젯 꼴 머리가 따로 있다). */
-  var 구글식 = 달력탭 && !(typeof 폰 === "function" && 폰());
-  if(구글식){
-    $('tabs').className = 'gl1';
-    $('tabs').innerHTML = calheadHtml(S.tab === 'eumcal') + '<span class="ctools">' + srchHtml() + 뷰단추Html() + '</span>';
-  } else {
-    var 머리 = 달력탭 ? '<span class="srcsep"></span>' + calheadHtml(S.tab === 'eumcal') : '';
-    var 도구 = 달력탭 ? '<span class="ctools">' + srchHtml() + segHtml() + '</span>' : '';
-    $('tabs').className = '';
-    $('tabs').innerHTML = 탭들 + 머리 + 칩 + 도구;
-  }
-  서랍그리기(구글식, 탭들);
+  var 머리 = 달력탭 ? '<span class="srcsep"></span>' + calheadHtml(S.tab === 'eumcal') : '';
+  var 도구 = 달력탭 ? '<span class="ctools">' + srchHtml() + segHtml() + '</span>' : '';
+  $('tabs').innerHTML = 탭들 + 머리 + 칩 + 도구;
   /* 내 동그라미 창 안의 도구 — 관리자 일(색 바꾸기)·구글 연결은 여기로 모았다 */
   var 창도구 = (typeof document !== "undefined") ? document.getElementById('avaTools') : null;
   if(창도구) 창도구.innerHTML = 창도구Html();
   /* 구글 «늘 연결» 표시 — 머리줄 오른쪽(앱 단추 앞) */
   var 구글칸 = (typeof document !== "undefined") ? document.getElementById('gstat') : null;
-  /* 구글 꼴 한 줄에서는 «이어진 상태 알림»은 서랍으로 — 머리에는 «할 일이 있을 때»(연결 필요·고장)만 남긴다 */
-  if(구글칸) 구글칸.innerHTML = (구글식 && GLINK.st === "on") ? '' : 구글표시Html();
-}
-/* 구글의 「월 ▾」 — 보기 고르기 단추와 펼침 메뉴. 보기 바꾸기는 기존 data-view 처리를 그대로 탄다 */
-function 뷰단추Html(){
-  var 이름 = { month:"월", sched:"일정", week:"주", day:"일", "3day":"3일" };
-  var 보기들 = [["day","일"],["week","주"],["month","월"],["sched","일정"]];   /* 구글 차례(일·주·월·…·일정) */
-  var 열림 = !!S.vmenu;
-  return '<span class="pcvwrap"><button class="pcvbtn" data-vmenu="1" aria-haspopup="menu" aria-expanded="' + (열림 ? "true" : "false")
-    + '" title="보기 고르기">' + esc(이름[S.view] || "월") + '<i></i></button>'
-    + (열림 ? '<div class="vveil" data-vclose="1"></div><div class="pcvmenu" role="menu">' + 보기들.map(function(v){
-        return '<button role="menuitem" data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>'; }).join("") + '</div>' : "")
-    + '</span>';
-}
-/* ☰ 서랍 — 윗줄에서 뺀 것들(탭 · 사람 거르개 · 밝기 · 회전 · 구글 앱 색 · 구글 연결 표시)을 «그대로» 담는다.
-   누르는 처리는 모두 기존 data-* 를 탄다(서랍 안이어도 같다). 달력이 아닌 탭·폰에서는 서랍과 ☰ 를 감춘다 */
-function 서랍그리기(쓴다, 탭들){
-  var d = document.getElementById('pcdrawer'), v = document.getElementById('pcveil'), h = document.getElementById('pcHamb');
-  if(!d || !v || !h) return;
-  if(!쓴다){ S.pcDrawer = false; h.hidden = true; h.setAttribute('aria-expanded', 'false'); d.hidden = true; v.hidden = true; d.innerHTML = ''; return; }
-  var 켜짐 = !!S.pcDrawer;
-  h.hidden = false; h.setAttribute('aria-expanded', 켜짐 ? 'true' : 'false');
-  d.hidden = !켜짐; v.hidden = !켜짐;
-  if(!켜짐){ d.innerHTML = ''; return; }
-  var 밝기 = document.getElementById('themeToggle'), 회전 = document.getElementById('rotToggle');
-  d.innerHTML = '<div class="pcdh"><span>푸른 캘린더</span><span class="sp"></span>' + 도구단추('data-pcdclose="1"', "close", "닫기") + '</div>'
-    + '<div class="pcdsec">화면</div><div class="pcdtabs">' + 탭들 + '</div>'
-    + '<div class="pcdsec">사람</div><div class="pcdchips">' + chipsHtml(S.tab === 'eumcal') + '</div>'
-    + '<div class="pcdsec">보기 설정</div>'
-    + (밝기 ? '<button class="pcdi" data-pcd-theme="1">' + esc(밝기.textContent) + '</button>' : '')
-    + (회전 ? '<button class="pcdi" data-pcd-rot="1">' + esc(회전.textContent) + '</button>' : '')
-    + '<button class="pcdi" data-dmono="1"><i class="ck' + (_모노() ? ' on' : '') + '" style="--ck:' + 구글캘린더색 + '">' + (_모노() ? '✓' : '') + '</i>구글 앱 색 (사람별 색 끄기)</button>'
-    + (구글표시Html() ? '<div class="pcdg">' + 구글표시Html() + '</div>' : '');
+  if(구글칸) 구글칸.innerHTML = 구글표시Html();
 }
 /* 내 동그라미 창에 들어가는 것 — 없으면 빈 칸(줄도 안 그린다) */
 function 창도구Html(){
@@ -6365,7 +6209,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-dobs],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-pcdrawer],[data-pcdclose],[data-pcd-theme],[data-pcd-rot],[data-dmail],[data-dopt],[data-cand],[data-gen],[data-sgo]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-dobs],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr],[data-dmail],[data-dopt],[data-cand],[data-gen],[data-sgo]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -6416,7 +6260,7 @@ document.addEventListener('click', function(e){
     글복사(PuCalMap.routeText(S.route.date, 고른동선()), "📋 동선을 복사했습니다");
     return;
   }
-  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; S.pcDrawer = false; render(); return; }
+  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-sheetclose')){ S.sheet = false; render(); return; }
   if(t.hasAttribute('data-mv')){
     S.sheet = false;
@@ -6492,15 +6336,6 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
   if(t.hasAttribute('data-gotoday')){ S.date = t.getAttribute('data-gotoday'); S.ym = S.date.slice(0,7); S.view = 'day'; S.gridScroll = true; render(); return; }
   if(t.hasAttribute('data-meet')){ modalRead(); if(S.modal){ S.modal.meet = !S.modal.meet; render(); } return; }
-  /* ☰ 서랍(PC 구글 꼴 한 줄) — 열기·닫기, 그리고 서랍 안의 밝기·회전은 «원래 단추를 대신 누른다»(처리가 한 곳에만 있게) */
-  if(t.hasAttribute('data-pcdrawer')){ S.pcDrawer = !S.pcDrawer; render(); return; }
-  if(t.hasAttribute('data-pcdclose')){ S.pcDrawer = false; render(); return; }
-  if(t.hasAttribute('data-pcd-theme') || t.hasAttribute('data-pcd-rot')){
-    var 원래 = document.getElementById(t.hasAttribute('data-pcd-theme') ? 'themeToggle' : 'rotToggle');
-    if(원래) 원래.click();
-    setTimeout(function(){ render(); }, 0);       /* 원래 단추가 글자를 바꾼 «뒤»에 서랍 글자를 맞춘다 */
-    return;
-  }
   if(t.hasAttribute('data-vmenu')){ S.vmenu = !S.vmenu; render(); return; }
   if(t.hasAttribute('data-vclose')){ S.vmenu = false; render(); return; }
   if(t.hasAttribute('data-view')){

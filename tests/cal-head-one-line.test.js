@@ -40,13 +40,8 @@ function 함수몸(src, head) {
 }
 
 /* 머리줄을 실제로 그려 본다 — $ 는 innerHTML 만 받아 두는 가짜를 준다 */
-function 머리그려본다(탭, 더, 서랍) {
-  const 담기 = { innerHTML: '', className: '' };
-  /* ☰ 서랍 — 가짜 document. 서랍(pcdrawer)에 그려진 글을 받아 둔다(서랍 인자가 true 일 때 그것을 돌려준다) */
-  const 칸 = { pcdrawer: { innerHTML: '', hidden: true }, pcveil: { hidden: true },
-    pcHamb: { hidden: true, setAttribute() {} },
-    themeToggle: { textContent: '🌗 자동' }, rotToggle: { textContent: '🔄 자동 회전' } };
-  const 문서 = { getElementById: (id) => 칸[id] };
+function 머리그려본다(탭, 더) {
+  const 담기 = { innerHTML: '' };
   const 상자 = {
     D: {
       my_schedules: [{ id: 's1', date: '2026-09-18', sid: 'P-001', type: 'meet', title: '가나상사 면담' }],
@@ -56,9 +51,9 @@ function 머리그려본다(탭, 더, 서랍) {
     PuWork: require(path.join(ROOT, 'js', 'pu-work-core.js')),
     console, String, Object, Array, JSON, Math, Date, Intl,
     parseInt, parseFloat, isFinite, encodeURIComponent,
-    window: { _gcalColors: {} }, fbDb: null, document: 문서,
+    window: { _gcalColors: {} }, fbDb: null,
     $: () => 담기,
-    S: Object.assign({ filter: null, q: '', scope: 'month', ym: '2026-09', view: 'month', date: '2026-09-18', tab: 탭 }, 더 || {}, 서랍 ? { pcDrawer: true } : {})
+    S: Object.assign({ filter: null, q: '', scope: 'month', ym: '2026-09', view: 'month', date: '2026-09-18', tab: 탭 }, 더 || {})
   };
   vm.createContext(상자);
   const 이름들 = ['function esc(s){', 'function arr(v){', 'function todayYMD(){',
@@ -74,66 +69,26 @@ function 머리그려본다(탭, 더, 서랍) {
     'function 메일줄들(){', 'function 안이은수(){',
     'function 이어진건있나(){', 'function 구글단추Html(){', 'function 잇기단추Html(){',
     'function monthbarHtml(){', 'function segHtml(){', 'function srchHtml(){', 'function chipsHtml(eumOnly){',
-    'function calheadHtml(eumOnly){', 'function 창도구Html(){', 'function renderTabs(){',
-    'function 뷰단추Html(){', 'function 서랍그리기(쓴다, 탭들){', 'function 선아이콘(이름){', 'function 도구단추(속성, 이름, 뜻){',
-    'function _모노(){', 'function 구글표시Html(){'];
+    'function calheadHtml(eumOnly){', 'function 창도구Html(){', 'function renderTabs(){'];
   let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
     + 'var ME = { sid:"P-001" };\n'
     + (캘린더.match(/var TABS = \[[\s\S]*?\n\];/) || [''])[0] + '\n';
   이름들.forEach((h) => { 조각 += 함수몸(캘린더, h) + '\n'; });
   조각 += (캘린더.match(/var ATT_SHOW = \[[\s\S]*?\];/) || [''])[0] + '\n';
-  조각 += (캘린더.match(/var GIC = \{[\s\S]*?\n\};/) || [''])[0] + '\n'
-    + 'var GLINK = { st:"on", email:"", why:"", busy:false, err:"" }; var 구글캘린더색 = "#7cb342";\n'
-    + 'var localStorage = { getItem: function(){ return null; } };\n';
   vm.runInContext(조각 + '\nrenderTabs();', 상자);
-  return 서랍 ? 칸.pcdrawer.innerHTML : 담기.innerHTML;
+  return 담기.innerHTML;
 }
 
-test('⑦ PC 달력 머리줄은 구글 꼴 «한 그릇(#tabs)» — [오늘] ‹ › 제목 ··· 🔍 [월 ▾] 차례 (탭·사람 칩은 ☰ 서랍으로 — 대표 결정 2026-11-15)', () => {
+test('⑦ 탭 · 달 이동 · 사람 칩 · 도구가 «한 그릇(#tabs)»에 차례대로 든다 — 구글 머리줄 차례', () => {
   const h = 머리그려본다('cal');
-  const 자리 = ['class="monthbar"', 'data-srch', 'class="pcvbtn"']
+  const 자리 = ['data-t="cal"', 'class="monthbar"', 'class="chips"', 'data-srch', 'class="seg"']
     .map((부품) => {
       const i = h.indexOf(부품);
       assert.ok(i >= 0, 부품 + ' 가 머리줄에 없습니다(따로 줄에 있으면 그게 두 줄이다)');
       return i;
     });
   const 차례 = 자리.slice().sort((a, b) => a - b);
-  assert.deepStrictEqual(자리, 차례, '차례가 구글과 다릅니다(달 이동 → 🔍 → 월 ▾)');
-  /* 구글 머리줄에는 탭·사람 칩·월|주|일 알약이 없다 — 서랍(☰)으로 옮겼다. 머리줄에 도로 나오면 한 줄이 다시 붐빈다 */
-  assert.strictEqual(h.indexOf('data-t="') >= 0, false, '탭이 머리줄에 도로 나왔습니다 — 서랍으로 가야 합니다');
-  assert.strictEqual(h.indexOf('class="chips"') >= 0, false, '사람 칩이 머리줄에 도로 나왔습니다 — 서랍으로 가야 합니다');
-  assert.strictEqual(h.indexOf('class="seg"') >= 0, false, '월|주|일 알약이 도로 나왔습니다 — 「월 ▾」 하나로 합쳤습니다');
-});
-
-test('⑦-3 ☰ 서랍에 «빠진 것 없이» 다 있다 — 탭 넷 · 사람 칩 · 밝기 · 회전 · 구글 앱 색 (옮겼지 없애지 않았다)', () => {
-  const d = 머리그려본다('cal', null, true);
-  ['cal', 'eumcal', 'eumppl', 'eumshare'].forEach((t) => {
-    assert.ok(d.indexOf('data-t="' + t + '"') >= 0, '서랍에 탭 ' + t + ' 가 없습니다 — 그 화면으로 가는 길이 사라졌습니다');
-  });
-  assert.ok(d.indexOf('class="chips"') >= 0, '서랍에 사람 칩(거르개)이 없습니다 — 사람별로 거르는 길이 사라졌습니다');
-  assert.ok(d.indexOf('data-pcd-theme') >= 0 && d.indexOf('data-pcd-rot') >= 0, '서랍에 화면 밝기·회전 단추가 없습니다');
-  assert.ok(d.indexOf('data-dmono="1"') >= 0, '서랍에 「구글 앱 색」 스위치가 없습니다 — 사람별 색으로 돌리는 길이 사라졌습니다');
-  assert.ok(d.indexOf('data-pcdclose') >= 0, '서랍에 닫는 단추가 없습니다');
-});
-
-test('⑦-4 서랍이 닫혀 있으면 아무것도 안 그린다 · 달력이 아닌 탭에서는 ☰ 와 서랍을 감춘다', () => {
-  const 닫힘칸 = { pcdrawer: { innerHTML: 'x', hidden: false }, pcveil: { hidden: false }, pcHamb: { hidden: true, setAttribute() {} } };
-  const 닫힘상자 = { S: { pcDrawer: false, tab: 'cal' }, document: { getElementById: (id) => 닫힘칸[id] } };
-  vm.createContext(닫힘상자);
-  vm.runInContext(함수몸(캘린더, 'function 서랍그리기(쓴다, 탭들){'), 닫힘상자);
-  vm.runInContext('서랍그리기(true, "탭")', 닫힘상자);
-  assert.strictEqual(닫힘칸.pcdrawer.innerHTML, '', '서랍을 안 열었는데 서랍 글이 그려졌습니다');
-  assert.strictEqual(닫힘칸.pcdrawer.hidden, true, '서랍을 안 열었는데 서랍이 보입니다');
-  assert.strictEqual(닫힘칸.pcHamb.hidden, false, '달력인데 ☰ 단추가 안 보입니다');
-  const 칸 = { pcdrawer: { innerHTML: 'x', hidden: false }, pcveil: { hidden: false }, pcHamb: { hidden: false, setAttribute() {} } };
-  const 상자 = { S: { pcDrawer: true }, document: { getElementById: (id) => 칸[id] } };
-  vm.createContext(상자);
-  vm.runInContext(함수몸(캘린더, 'function 서랍그리기(쓴다, 탭들){'), 상자);
-  vm.runInContext('서랍그리기(false, "")', 상자);
-  assert.strictEqual(칸.pcHamb.hidden, true, '달력이 아닌데 ☰ 단추가 남았습니다');
-  assert.strictEqual(칸.pcdrawer.hidden, true, '달력이 아닌데 서랍이 열려 있습니다');
-  assert.strictEqual(칸.pcveil.hidden, true, '달력이 아닌데 가림막이 남았습니다');
-  assert.strictEqual(상자.S.pcDrawer, false, '서랍 열림 상태가 안 꺼졌습니다');
+  assert.deepStrictEqual(자리, 차례, '차례가 구글과 다릅니다(탭 → 달 이동 → 사람 칩 → 🔍 → 월|주|일)');
 });
 
 test('⑦-2 그 그릇은 맨 위 머리줄(#topbar) «안»에 있다 — 따로 한 줄을 차지하지 않는다', () => {
@@ -181,8 +136,8 @@ test('⑧ 머리줄은 가로로 눕고 «안 접힌다» — 넘치면 줄이�
 
 /* ── 겹치던 것 합치기 (대표 지시 2026-09-27 「이음합치고 추천대로」) ── */
 
-test('④ 캘린더 안 「이음」 거르개는 없다 — 「이음 근무」 탭 하나로 합쳤다 (탭은 ☰ 서랍 안)', () => {
-  const h = 머리그려본다('cal', null, true);
+test('④ 캘린더 안 「이음」 거르개는 없다 — 「이음 근무」 탭 하나로 합쳤다', () => {
+  const h = 머리그려본다('cal');
   assert.strictEqual(/data-f="eumwork"/.test(h), false, '「이음」 거르개가 되살아났습니다 — 탭과 겹칩니다');
   assert.ok(/data-t="eumcal"/.test(h), '「이음 근무」 탭이 없습니다 — 이음 근무만 보는 길이 사라졌습니다');
 });
