@@ -3,7 +3,7 @@
 - 배경: ERP 를 2026-11-15 23:03 KST 에 `https://erp.pureunlabor.co.kr` 로 전환(Pages 사용자 도메인·인증서·HTTPS 강제). 서버 두 출처 허용(PR #3101)·화면 두 주소 동작(PR #3102) 뒤의 정리.
 - 사람에게 «내보내는» 링크를 새 주소로
   - `functions/erp-origins.js` — `ERP_LINK_BASE`(= 새 출처, ERP 화면 링크 뿌리)·`PUBLIC_HOME`(공개 홈페이지) 더함. 옛 출처는 받는 목록에 «2026-02-15 무렵까지» 남긴다고 날짜와 함께 적음.
-  - `functions/news-friday.js` 검토 메일 «관리 화면» 링크, `functions/recruit-digest.js` 정부사업 화면 링크 → `ERP_LINK_BASE`.
+  - `functions/news-friday.js` 검토 메일 «관리 화면» 링크 → `ERP_LINK_BASE`. `functions/recruit-digest.js` 정부사업 화면 링크는 그 모듈이 «순수(require 없음)» 규칙이라 새 주소를 글자로 두고, `tests/erp-move-finish.test.js` 가 build() 를 돌려 `ERP_LINK_BASE` 와 같은지 견준다(CI 의 functions/recruit-digest.test.js 가 처음 판을 잡아 고침).
   - `functions/index.js` newsClick «모르는 번호» 302 → `PUBLIC_HOME`(판단: 누르는 분은 뉴스레터 받은 바깥 사람 — ERP 로그인 문이 아니라 공개 홈페이지. 주석의 «우리 홈페이지로» 그대로).
   - `hosting/index.html`(news.fairrunlabor.com 첫 화면) «푸른노무법인 홈으로» → 공개 홈페이지. 호스팅은 합친 뒤 `firebase deploy --only hosting` 로 따로 올린다(Firebase 배포 작업은 규칙·함수만 다룸).
   - 웹푸시 url 의 상대경로 `/pureunall/…` 8곳은 **그대로** — 알림 워커가 새 출처에서 앞머리를 뗀다(PR #3102). 그림 «받는» 허용 목록 4곳(mail-send·news-lib 둘·news-view)의 옛 주소도 그대로(지난 회차 편지 그림).
