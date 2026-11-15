@@ -19,8 +19,17 @@ const path = require('node:path');
 
 const R = path.join(__dirname, '..');
 const SITE = path.join(R, 'site');
-const 진짜도메인 = 'https://푸른노무법인.kr';
-const 옛도메인들 = [진짜도메인, 'https://xn--o80bs5mdnbm0bf80anms.kr'];
+/* 「진짜 주소」는 굳히개의 한 자리(REAL_ORIGIN)에서 가져온다 — 여기 따로 박으면 도메인을 옮길 때
+   한쪽만 바뀌어 검사가 옛 주소를 지키게 된다(2026-11-15 pureunlabor.co.kr 로 옮길 때 실제로 그랬다). */
+const 진짜도메인 = (/const REAL_ORIGIN = ['"]([^'"]+)['"]/.exec(
+  fs.readFileSync(path.join(R, 'scripts', 'freeze-homepage.js'), 'utf8')) || [, ''])[1];
+/* 접은 옛 홈페이지(2026-11-27 만료, 연장 안 함) — 방문자를 이리로 보내면 막다른 길이다 */
+const 옛도메인들 = ['https://푸른노무법인.kr', 'https://xn--o80bs5mdnbm0bf80anms.kr'];
+
+test('「진짜 주소」를 굳히개에서 읽었고, 접은 옛 도메인이 아니다', () => {
+  assert.match(진짜도메인, /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i, '★ 굳히개의 REAL_ORIGIN 을 못 읽었다: ' + 진짜도메인);
+  assert.ok(옛도메인들.indexOf(진짜도메인) < 0, '★★ 「진짜 주소」가 접은 옛 도메인이다: ' + 진짜도메인);
+});
 
 function 쪽들() {
   if (!fs.existsSync(SITE)) return [];
