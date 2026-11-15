@@ -1659,7 +1659,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/kcareer-scan.js?v=2"></script>
+<script src="js/kcareer-scan.js?v=3"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
 <script src="js/kcareer-biz.js?v=9"></script>
@@ -4584,7 +4584,7 @@ async function fsSaveToFolder(fileRec, store, type, rec){
   var sub=fsFolderFor(store,type); if(!sub) return null;
   if(!await fsEnsureWrite(root)) return null;
   var dir;
-  try{ dir=await root.getDirectoryHandle(sub); }
+  try{ dir=await _fsDir(root, sub); }
   catch(e){ console.warn('폴더 없음: '+sub); return null; }   /* ⚠ 폴더를 새로 만들지 않는다 */
   /* 원본 파일 이름 대신 «기록에서 지은» 이름으로 저장한다 — 나중에 폴더에서 바로 알아본다 */
   var ext=(fileRec.ext || String(fileRec.name||'').split('.').pop() || '').toLowerCase();
@@ -4604,7 +4604,16 @@ async function fsSaveToFolder(fileRec, store, type, rec){
    ⚠ 무엇을 골라야 하는지는 고르기 전에 알린다 — «7. 컨설턴트,위원신청등» 이 들어 있는 윗폴더다. */
 /* need = 그 안에 있어야 할 하위 폴더 이름. 엉뚱한 폴더를 이어 두면 다음에 눌러도 또 막히므로 «다시 고르기»로 돌린다 */
 var _fsRepick=false;
-async function _fsHas(root, name){ try{ await root.getDirectoryHandle(name); return true; }catch(e){ return false; } }
+/* ★ 폴더를 «이름으로» 찾는 곳은 여기 한 곳이다 — 번호 접두어(«7. »)가 있는 이름과 없는 이름을 같은 폴더로 본다(대표 지시 2026-11-15).
+   이 PC 의 서류 폴더는 «컨설턴트,위원신청등»(번호 없음)이라 «7. 컨설턴트,위원신청등» 만 찾던 제출서류·새 지원 건 찾기가 「폴더가 없습니다」라고 했다.
+   ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름이다. 폴더를 새로 만들거나 이름을 바꾸지 않는다(opt 로 create 를 준 곳만 만든다).
+   ⚠ 기록에 적는 경로(relPath·caseDir)는 늘 «번호 있는 이름» 기준이다 — 파일을 열 때 여기서 실제 이름으로 바뀐다. */
+async function _fsDir(parent, name, opt){
+  var 후보=KcareerScan.dirNameChoices(name), last=null;
+  for(var i=0;i<후보.length;i++){ try{ return await parent.getDirectoryHandle(후보[i], opt); }catch(e){ last=e; } }
+  throw last || new Error('폴더 없음: '+name);
+}
+async function _fsHas(root, name){ try{ await _fsDir(root, name); return true; }catch(e){ return false; } }
 async function fsRootOrConnect(need){
   var root=_fsRepick ? null : await fsRoot();
   if(root && need && !(await _fsHas(root, need))){
@@ -4949,7 +4958,7 @@ async function _fsFileOf(relPath){
   var root = await fsRoot();
   if(!root) return null;
   var segs = String(relPath).split('/'), dir = root;
-  for(var i = 0; i < segs.length - 1; i++) dir = await dir.getDirectoryHandle(segs[i]);
+  for(var i = 0; i < segs.length - 1; i++) dir = await _fsDir(dir, segs[i]);
   return await (await dir.getFileHandle(segs[segs.length - 1])).getFile();
 }
 
@@ -5431,7 +5440,7 @@ async function _caseRootQuiet(){
 /* 7번 › 연도 › 건 폴더 이름만 — 파일은 읽지 않는다(가볍다) */
 async function fsCaseDirs(root){
   var out = [], top;
-  try{ top = await root.getDirectoryHandle(KcareerCases.CASE_ROOT); }catch(e){ return null; }   /* 폴더가 없다 */
+  try{ top = await _fsDir(root, KcareerCases.CASE_ROOT); }catch(e){ return null; }   /* 폴더가 없다 — «7. »이 있든 없든 */
   for await (var y of top.entries()){
     if(y[1].kind !== 'directory' || !KcareerCases.YEAR_DIR.test(y[0])) continue;
     for await (var c of y[1].entries()){
@@ -7896,7 +7905,7 @@ async function docImportResumeFolder(){
   var root=await fsRootOrConnect(fsFolderFor('resume'));
   if(!root) return;   /* 고르기를 취소했다 — 조용히 멈춘다 */
   var 폴더명=fsFolderFor('resume'), dir=null;
-  try{ dir=await root.getDirectoryHandle(폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
+  try{ dir=await _fsDir(root, 폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
   var 목록=[];
   for await (var ent of dir.entries()){
     if(ent[1].kind!=='file' || KcareerScan.isIgnoredFile(ent[0])) continue;
@@ -8954,7 +8963,7 @@ async function _cdFileBytes(r){
     var root = await fsRoot();
     if(!root){ toast('서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return null; }
     var segs = String(r.relPath).split('/'), dir = root;
-    for(var i = 0; i < segs.length - 1; i++) dir = await dir.getDirectoryHandle(segs[i]);
+    for(var i = 0; i < segs.length - 1; i++) dir = await _fsDir(dir, segs[i]);
     var fh = await dir.getFileHandle(segs[segs.length - 1]);
     var f = await fh.getFile();
     nm = segs[segs.length - 1];
@@ -17299,7 +17308,7 @@ async function _pkRootForSave(){
   if(!hs.length){ toast('서류 폴더가 연결돼 있지 않아 zip 을 내려받습니다 — 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결'); return null; }
   for(var i=0;i<hs.length;i++){
     if(!await fsEnsureWrite(hs[i])) continue;
-    try{ return { root:hs[i], top:await hs[i].getDirectoryHandle(KcareerCases.CASE_ROOT) }; }catch(e){}
+    try{ return { root:hs[i], top:await _fsDir(hs[i], KcareerCases.CASE_ROOT) }; }catch(e){}
   }
   toast('연결한 폴더에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없거나 쓰기를 허락받지 못해 zip 을 내려받습니다', 6000);
   return null;
