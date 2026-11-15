@@ -1586,6 +1586,59 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   .toolbar{padding:6px 7px!important}
   .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
 }
+/* ===== 어두운 테마 — 공용 표면 (대표 지시 2026-11-15 「경력관리 다른 화면의 어두운 테마도 고쳐 주세요」) =====
+   원칙: 어두운 판에서는 «바탕은 어둡게, 글자는 밝게»가 한 벌이어야 한다. 밝은 바탕을 하드코딩하고 글자색은 안 박거나 var(--text)(어두운 판에선 밝은색)로 두면
+   글자만 밝아져 1.2:1 이 된다(실측 28개 화면·창 39개에서 948건). 종이(흰 바탕+짙은 글자)는 일부러 흰색으로 두고 «안쪽 변수»를 밝은 판 값으로 되돌린다.
+   ⚠ 이 규칙들은 html.dark 안에만 — 밝은 판은 그대로다. 색은 팔레트 27색만(tests/color-palette-apps.test.js).
+   지킴: tests/kcareer-dark-surfaces.test.js · 기록: status/2026-11-15-kcareer-dark-surfaces.md */
+/* ① 브랜드 글자색 변수를 어두운 카드 위에서 읽히는 밝은 값으로(teal 2.05:1·red 2.96:1·amber 4.4:1·blue 2.9:1 였다). ⚠ --navy 는 안 바꾼다 — 흰 글자 단추의 «바탕»이 같은 값(540행 근처 선례) */
+html.dark{--teal:#4ade80;--red:#f87171;--amber:#fbbf24;--blue:#60a5fa;--green:#4ade80;--bzc-add:#166534;--bzc-del:#991b1b;--bzc-chg:#854d0e}
+/* ② «바탕»으로 쓰인 브랜드 색(흰 글자 단추·삭제 단추)은 흰 글자가 읽히는 원래 값으로 되박는다 — 변수가 밝아져서 */
+html.dark :is([style*="background:var(--teal)"],[style*="background: var(--teal)"],#sidePreviewHead .sp-type){background:#166534!important;border-color:#166534!important}
+html.dark :is([style*="background:var(--red)"],[style*="background: var(--red)"]){background:#dc2626!important;border-color:#dc2626!important}
+/* ③ 종이(문서 미리보기·서식 채우기·이력서 편집 용지) — 흰 바탕을 남기고 안쪽 변수를 밝은 판 값으로 되돌린다 */
+html.dark :is(.kf-paper,.kf-sheet,#kfSheetWrap,.cv-sheet,#rhwpEditor,#p1Paper){--bg:#f8fafc;--card:#fff;--ink:#1e293b;--border:#e2e8f0;--border-soft:#e2e8f0;--hover:#e2e8f0;--text:#1e293b;--text-sub:#475569;--text-mute:#475569;--soft:#f8fafc;--teal:#166534;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--green:#16a34a}   /* --text-mute 는 #64748b 가 아니라 #475569 — 회색 판(#e2e8f0) 위에서 3.86:1 이라 */
+html.dark :is(.kf-paper,.kf-sheet,#kfSheetWrap,#rhwpEditor){color:var(--text)}
+/* ④ 단추·표면 — 기본 단추는 흰 바탕+밝은 글자였고, 가로 줄(툴바)·표·빈 칸·칩·메뉴·미리보기 판은 흰 바탕을 하드코딩했다 */
+html.dark .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
+html.dark .btn:not(.primary):hover{background:#475569}
+html.dark .toolbar,html.dark .dt .empty,html.dark .fee-chip,html.dark .puag-kind,html.dark .more-menu,html.dark .rc-fill,html.dark #sidePreview,html.dark #hoverPrev,html.dark .hj-c,html.dark .rh-pgrow button,html.dark .rh-slot.ok,html.dark .rh-slot.miss,html.dark .cv-pp-inner,html.dark .cp-chip,html.dark .rh-fitrow button,html.dark .dropzone{background:var(--card)}
+@media (min-width:521px){ html.dark .dt table{background:var(--card)} }   /* 폰에서는 줄마다 카드라 표 바깥 상자가 투명이다(폰 블록) — 그대로 둔다 */
+html.dark #sidePreviewFoot,html.dark .ocr-zone,html.dark .kc-dying,html.dark .dropzone.drag,html.dark .dup-badge-bar{background:var(--soft)!important}
+html.dark .ocr-zone.drag{background:#475569!important}
+html.dark #sidePreviewBody,html.dark .ds-pv-img,html.dark .kc-hwp-preview,html.dark #hwpViewBody,html.dark .cv-hwp-body{background:var(--soft)}   /* 종이(그림) 뒤 회색 판 — #kfSheetWrap 은 글자가 직접 놓이는 «종이 구역»이라 밝게 둔다(③) */
+html.dark #page-docbox .ds-card[data-dsrow].pick{background:#1e40af}
+html.dark #page-docbox .ds-card[data-dsrow]:hover{background:#475569}   /* 바탕 규칙이 id 를 달아 특이도가 높다 — 호버 때 밝아지는 것을 막는다 */
+html.dark .topbar{background:rgba(16,21,29,.92)!important}   /* 바탕 규칙이 !important 라 더 센 !important 로 */
+/* ⑤ 표 — 칸 글자색이 #1e293b 로 박혀 바탕(#1e293b)과 같았다(1.00:1). 머리줄·호버 줄은 바탕 규칙이 !important */
+html.dark .dt tbody td{color:var(--text)}
+html.dark .dt thead th{background:#1e293b!important;color:var(--text)!important}
+html.dark .dt tbody tr:hover,html.dark .dt tbody tr.row-warn{background:#475569!important}
+html.dark .id-chip{background:#475569;color:#e2e8f0;border-color:#64748b}
+html.dark input::placeholder,html.dark textarea::placeholder{color:#94a3b8;opacity:1}
+/* ⑥ 글자색만 문제인 것 — 어두운 카드 위 짙은 글자 / 밝은 칩 위 변수 글자 */
+html.dark :is(.fd-months,.rh-pgrow,.rh-fitrow) button{color:var(--text)}
+html.dark :is(.firm-note,.ds-same.same,.rh-chip-go,.rh-chip-drop,.at-warn){color:#fbbf24}
+html.dark .kf-hint{color:#94a3b8}
+html.dark :is(.kf-sheet,#kfSheetWrap,.kf-paper) .kf-hint{color:#475569}   /* 종이 구역 안은 밝은 바탕 */
+html.dark :is(#kcLock h2,.hy-tbl td.hy-y,.hy-tbl td.hy-sum,.tag.purple){color:var(--ink)}
+html.dark .kpi.kpi-btn .k-go{color:var(--text-sub)}
+html.dark .tag.red{color:#991b1b}
+html.dark :is(.fs-pill,.page-drop-overlay span){color:#166534}
+html.dark .cv-rowdel{color:#dc2626}
+html.dark .warn-banner{color:#991b1b}   /* #dc2626 on #FEF2F2 는 4.41:1 — 밝은 판에서도 모자랐던 값이라 한 단계 짙게 */
+html.dark .rh-warn,html.dark .ds-dupbar .m{color:#854d0e}
+/* ⑦ 화면에 «직접 박힌» 짙은 글자색 — 어두운 바탕 위에서는 밝은 계열로(540행 근처 navy 선례와 같다). 자기 바탕을 따로 박은 것·종이 안은 뺀다.
+   ⚠ style 속성이 JS(style.cssText)로 다시 쓰이면 «color: #x»(공백)·rgb() 꼴이 되므로 셋을 다 본다
+   ⚠ 밝은 바탕과 글자색을 함께 박은 «밝은 안내줄»(#fbNotice 등)은 그대로 두고, 그 안의 링크도 뺀다(마지막 :not) — 밝은 바탕 위에 밝은 글자가 되므로 */
+html.dark :is([style*="color:#854d0e" i],[style*="color: #854d0e" i],[style*="color:#d97706" i],[style*="color: #d97706" i],[style*="color: rgb(133, 77, 14)"],[style*="color: rgb(217, 119, 6)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#fbbf24!important}
+html.dark :is([style*="color:#166534" i],[style*="color: #166534" i],[style*="color:#16a34a" i],[style*="color: #16a34a" i],[style*="color: rgb(22, 101, 52)"],[style*="color: rgb(22, 163, 74)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#4ade80!important}
+html.dark :is([style*="color:#991b1b" i],[style*="color: #991b1b" i],[style*="color:#dc2626" i],[style*="color: #dc2626" i],[style*="color: rgb(153, 27, 27)"],[style*="color: rgb(220, 38, 38)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#f87171!important}
+html.dark :is([style*="color:#1e40af" i],[style*="color: #1e40af" i],[style*="color:#2563eb" i],[style*="color: #2563eb" i],[style*="color: rgb(30, 64, 175)"],[style*="color: rgb(37, 99, 235)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#60a5fa!important}
+html.dark :is([style*="color:#1e293b" i],[style*="color: #1e293b" i],[style*="color: rgb(30, 41, 59)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#e2e8f0!important}
+html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="color:#64748b" i],[style*="color: #64748b" i],[style*="color: rgb(71, 85, 105)"],[style*="color: rgb(100, 116, 139)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#94a3b8!important}
+/* ⑧ 화면에 «직접 박힌» 밝은 바탕(글자색 안 박은 것) → 어두운 바탕. 글자색을 같이 박은 밝은 칩·종이·프로필 1장 안내 상자는 뺀다 */
+html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -8015,7 +8068,7 @@ function renderProfile1(){
     +'<textarea class="tb-input" rows="3" style="width:100%;min-width:0;font-size:16px;resize:vertical" placeholder="2024 근로시간 제도 개편 칼럼 · ○○일보&#10;2023 공저 「일터혁신 실무」" onchange="p1Pubs(this.value)">'+escapeHtml(o.pubs||'')+'</textarea>'
     +'<div style="color:var(--text-mute);font-size:12px;margin-top:2px">앞에 4자리 연도를 적으면 연도 칸에 들어갑니다 · 위 「연구·저서·기고」 칸을 켜면 나옵니다</div>'
     +'<div style="font-weight:700;margin:12px 0 6px">용도</div>'
-    +'<select class="tb-select" style="width:100%" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
+    +'<select class="tb-select" style="width:100%" aria-label="용도" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
     +'<label style="'+row+';margin-top:8px"><input type="checkbox"'+(o.photo?' checked':'')+' onchange="p1Photo(this.checked)"> 증명사진 넣기 <span style="margin-left:auto;color:var(--text-mute);font-size:12px">미리보기·PDF</span></label>'
     +(o.photo&&!_p1PhotoUrl&&_p1PhotoWhy?'<div style="color:var(--red);font-size:12px;margin:-2px 0 4px;white-space:normal">⚠ '+escapeHtml(_p1PhotoWhy)+'</div>':'')
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'
