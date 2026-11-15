@@ -14,8 +14,16 @@
    그래서 **같은 파일 하나를 네 앱이 함께 등록**한다. 같은 주소·같은 scope면
    다시 등록해도 밀어내기가 일어나지 않는다.
 
+   ★ 2026-11-15 이알피도 이 파일로 들어왔다. 이알피만 자기 일꾼(pu-erp-sw.js)을
+     같은 scope 에 등록해 위 약속을 어기고 있었다 — 이알피를 연 뒤에는 기업정보함·
+     사진첩·급여데이터함·문서뷰어의 공유가 죽고, 다른 앱을 연 뒤에는 이알피 공유가 죽었다.
+     이알피 몫은 아래 takeErp(받은 사진을 사진첩 받은 함에 넣는다)이다.
+     ⚠ scope 를 좁히지 않은 등록은 «어느 화면이든» 이 파일이어야 한다 —
+       tests/sw-one-root-worker.test.js 가 저장소의 모든 html·js 를 훑어 지킨다.
+
    ※ 포털 웹푸시(firebase-messaging-sw.js)는 여기 끼우지 않는다. 그쪽은
      /pureunall/push/ 로 scope를 좁혀 등록하므로 애초에 서로 부딪히지 않는다.
+     푸른캘린더 공유(pu-cal-share-sw.js)도 /pureunall/cal-share/ 로 좁혀 따로 산다.
 
    ⚠ 이 워커는 **아무것도 캐시하지 않는다.**
    캐시를 두면 pu-version.js 의 「새 버전 자동 적용」과 싸워 옛 화면이 남는다.
@@ -38,6 +46,7 @@ var CARDS_SHARE = '/pu-cards-share';    // 기업정보함 manifest 의 share_ta
 var PHOTOS_SHARE = '/pu-photos.html';   // 사진첩 manifest 의 share_target.action
 var PAYDATA_SHARE = '/pu-paydata.html'; // 급여데이터함 manifest 의 share_target.action
 var VIEWER_SHARE = '/pu-viewer.html';   // 문서뷰어 manifest 의 share_target.action
+var ERP_SHARE = '/pu-erp.html';         // 이알피 manifest 의 share_target.action (받은 것은 사진첩 함으로 간다)
 
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'POST') return;          // GET 등은 건드리지 않는다(캐시 없음)
@@ -48,6 +57,7 @@ self.addEventListener('fetch', function (e) {
   if (p.slice(-PHOTOS_SHARE.length) === PHOTOS_SHARE) { e.respondWith(takePhotos(e.request, url)); return; }
   if (p.slice(-PAYDATA_SHARE.length) === PAYDATA_SHARE) { e.respondWith(takePaydata(e.request, url)); return; }
   if (p.slice(-VIEWER_SHARE.length) === VIEWER_SHARE) { e.respondWith(takeViewer(e.request, url)); return; }
+  if (p.slice(-ERP_SHARE.length) === ERP_SHARE) { e.respondWith(takeErp(e.request, url)); return; }
 });
 
 /* 303 — 받은 POST 를 GET 으로 바꿔 돌려보낸다(새로고침해도 다시 안 보낸다) */
@@ -129,6 +139,33 @@ function takePhotos(req, url) {
   }).catch(function (err) {
     if (self.console) console.warn('[사진첩 공유 받기]', err);
     return redirect(back + '?share=err');
+  });
+}
+
+/* ══════ 이알피: 받은 사진은 «사진첩의 받은 함»에 넣고 사진첩 화면으로 넘긴다 ══════
+   대표 지시 2026-09-17 「이알피에도 공유받기 붙여라」 — 2026-11-15 옛 pu-erp-sw.js 에서 옮겨 왔다.
+   까닭 — 이알피에는 사진이 들어갈 «자리»가 없다. 사진은 사건·업체·계약에 붙는 것이라
+   어느 건인지 모르는 채로는 넣을 데가 없다. 사진첩은 받아서 «명함 판독»까지 하고
+   기업정보함으로 넘기는 길이 이미 있다 — 그 길로 태우는 것이 가장 짧다.
+   그래서 담는 곳은 사진첩 몫과 «같은» keepPhotos 다(이름·판 번호를 따로 들지 않는다 —
+   따로 들면 언젠가 어긋나 사진첩이 빈 함을 열고 「보낸 게 없다」고 한다).
+   ⚠ 파일 칸 이름은 pu-erp-manifest.json 의 params.files[0].name 과 짝이다. */
+function takeErp(req, url) {
+  /* 넘길 곳은 «이 앱과 같은 폴더»의 사진첩이다 — 주소를 손으로 붙이지 않고 받은 주소에서 만든다 */
+  var photos = url.origin + url.pathname.slice(0, url.pathname.length - ERP_SHARE.length) + PHOTOS_SHARE;
+  return req.formData().then(function (fd) {
+    var files = fd.getAll('photos').filter(function (f) {
+      return f && typeof f === 'object' && f.size > 0;
+    });
+    if (!files.length) return 0;
+    return keepPhotos(files);
+  }).then(function (n) {
+    /* 한 장도 못 받았으면 그 사실을 사진첩 화면이 알린다 — 조용히 넘기면
+       "공유했는데 아무 일도 없다"가 되고, 사람은 올라간 줄 안다. */
+    return redirect(photos + (n ? '?share=1' : '?share=none'));
+  }).catch(function (err) {
+    if (self.console) console.warn('[이알피 공유 받기]', err);
+    return redirect(photos + '?share=err');
   });
 }
 
