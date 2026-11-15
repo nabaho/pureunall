@@ -115,7 +115,7 @@ test('이미 범위가 있는 건은 다시 안 가른다(사람이 되돌린 �
 
 /* ── ③ Jev(2차) ── */
 const unsureItem = (n, extra) => OLD(IN + '~' + n, 'new', '서류 제출 요청드립니다 ' + n, Object.assign({ scope: 'unsure', scopeBy: 'rule', an: ['양식.hwp'], d: NOW - DAY }, extra || {}));
-test('Jev 는 «애매한 새 요청»만 받는다 — 보내는 것은 건 번호·제목·첨부 이름뿐(본문·보낸이·주소는 안 간다)', async () => {
+test('Jev 길에는 «애매한 새 요청»의 건 번호만 간다 — 제목·첨부 이름도 서버가 직접 읽는다(화면이 글을 싣지 않고, 본문·보낸이·주소는 어디에도 안 간다)', async () => {
   const f = dbWith({}, {
     [IN + '~1']: unsureItem(1),
     [IN + '~2']: OLD(IN + '~2', 'new', '이력서 제출 요청', { scope: 'personal', scopeBy: 'rule' }),
@@ -125,7 +125,7 @@ test('Jev 는 «애매한 새 요청»만 받는다 — 보내는 것은 건 번
   let sent = null;
   const r = await Q.scopeAsk({ db: f, uid: 'U1', now: NOW, ask: async (list) => { sent = list; return { ok: true, results: {} }; } });
   assert.deepEqual(sent.map((x) => x.id), [IN + '~1'], '애매한 «새 요청»만(개인·업무로 이미 가른 것과 처리 완료는 안 보낸다)');
-  assert.deepEqual(Object.keys(sent[0]).sort(), ['an', 'id', 's'], '제목·첨부 이름·번호만 — 보낸이(f·e)·회신 주소·본문 단서는 안 간다');
+  assert.deepEqual(Object.keys(sent[0]), ['id'], '건 번호만 — 제목·첨부 이름도 서버가 그 사람의 기록에서 직접 읽는다');
   assert.equal(r.asked, 0, '답이 없으면 아무것도 바꾸지 않았다');
 });
 test('Jev 가 «업무»라 하면 새 요청은 자동 제외 · «개인»이면 남김 · «애매»여도 한 번 물은 건은 다시 안 묻는다', async () => {
@@ -188,17 +188,39 @@ test('딱지는 «자동으로 치운 건»에만 — 규칙이 한 일과 Jev �
 test('화면: 훑은 뒤 Jev 를 돌리고, 켜고 끄는 단추·자동 제외 딱지·쉬는 표시가 있고, 실패하면 30분 쉰다', () => {
   assert.ok(/await KcareerMailReq\.scan\([\s\S]*?await mrJevRun\(\)/.test(kc), '훑기 뒤에 Jev 단계');
   assert.match(kc, /function mrJevToggle\(/); assert.match(kc, /onclick="mrJevToggle\(\)"/);
-  assert.ok(kc.indexOf('Q.scopeMark(x)') >= 0, '목록 줄에 자동 제외 딱지');
+  const rowFn = kc.slice(kc.indexOf('function mrRowHtml('), kc.indexOf('/* 지금 탭에서 «보이는» 줄'));
+  assert.match(rowFn, /Q\.scopeMark\(x\)[\s\S]*?x\.st==='ignored'[\s\S]*?mr-chip ignored" title="'\+escapeHtml\(sm\.title\)\+'">'\+escapeHtml\(sm\.text\)/, '목록 줄(상태 칸)에 자동 제외 딱지 — 치운 건에만, 까닭은 title');
   assert.match(kc, /if\(r\.errors\.length\)\{ mrLocal\('jevPause', String\(Date\.now\(\)\+30\*60\*1000\)\)/, '못 받았다고 알리면 한동안 쉰다');
   assert.match(kc, /catch\(e\)\{ mrLocal\('jevPause', String\(Date\.now\(\)\+30\*60\*1000\)\)/, '던져도 한동안 쉰다');
   assert.match(kc, /BIZ_MB_FN\+'mailReqScope'/, '서버 함수 이름');
   assert.ok(kc.indexOf("mrLocal('jev')!=='0'") >= 0, '켜짐이 기본 — 이 기기에서 끈다');
   assert.match(kc, /ask:mrJevCall/);
 });
-test('모듈: 본문·보낸이 주소를 Jev 길로 내보내지 않는다 — scopeAsk 가 서버에 주는 칸은 id·s·an 뿐', () => {
+test('모듈: 본문·보낸이 주소·제목까지 Jev 길로 내보내지 않는다 — scopeAsk 가 서버에 주는 칸은 id 뿐', () => {
   const fn = mod.slice(mod.indexOf('async function scopeAsk('), mod.indexOf('/* 본문을 열어 기한'));
   assert.ok(fn.length > 200 && fn.indexOf('async function enrich') < 0, '자른 범위가 scopeAsk 하나뿐이다');
-  assert.match(fn, /env\.ask\(todo\.map\(function \(x\) \{ return \{ id: x\.id, s: x\.s, an: x\.an \}; \}\)\)/);
+  assert.match(fn, /env\.ask\(todo\.map\(function \(x\) \{ return \{ id: x\.id \}; \}\)\)/);
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   assert.ok(!/replyTo|x\.e\b|x\.f\b|bodyOf|readBody/.test(code), 'scopeAsk 가 보낸이·본문을 만지지 않는다');
+});
+
+/* ── 검토 지적 반영 (2026-11-15) ── */
+test('사람이 상태를 바꾸면 «기계가 치웠다» 표시(autoIgnored)가 지워진다 — 되돌린 건이 자동 제외로 계속 세지거나, 사람이 다시 치운 것이 기계가 한 것처럼 보이지 않게', async () => {
+  const f = dbWith({}, { [IN + '~1']: OLD(IN + '~1', 'ignored', '고객사 보고서 수정 요청의 건', { scope: 'work', scopeBy: 'rule', autoIgnored: NOW - 3600e3 }) });
+  assert.ok(Q.scopeMark(items(f)[IN + '~1']), '처음에는 자동 제외 딱지');
+  await f.ref('kcareer/U1/mailreq/items').update(Q.stateUpdate([IN + '~1'], 'doing', NOW));          // 사람이 ↩ 되돌림
+  assert.ok(!items(f)[IN + '~1'].autoIgnored, '되돌리면 표시가 지워진다');
+  await f.ref('kcareer/U1/mailreq/items').update(Q.stateUpdate([IN + '~1'], 'ignored', NOW + 1));   // 사람이 다시 «요청 아님»
+  const x = items(f)[IN + '~1'];
+  assert.equal(x.st, 'ignored'); assert.equal(Q.scopeMark(x), null, '사람이 치운 것에 «자동 제외» 딱지가 다시 붙지 않는다');
+  assert.equal(x.scope, 'work', '범위 딱지(왜 업무로 봤는지)는 남는다');
+});
+test('화면: 자동 제외 건수는 «지금도 기계가 치운 채인 건»만 센다 · 알리는 순간 상태를 다시 본다 · 까닭이 팝업과 글자로도 보인다', () => {
+  const line = kc.slice(kc.indexOf('function mrJevLine('), kc.indexOf('function mrRowHtml('));
+  assert.match(line, /x\.autoIgnored && x\.st==='ignored'/, '되돌린 건은 세지 않는다');
+  assert.match(line, /String\(_mr\.jevMsg\)\.slice\(0,60\)/, '쉬는 까닭이 마우스를 올리지 않아도 글자로 보인다');
+  assert.ok(/_mr\.freshQ\.map\(function\(x\)\{ return \(_mr\.items&&_mr\.items\[x\.id\]\)\|\|x; \}\)\.filter\(function\(x\)\{ return x\.st==='new'; \}\)/.test(kc),
+    '1.5초 뒤 알릴 때 그 사이 업무로 치운 건을 거른다');
+  const det = kc.slice(kc.indexOf('function mrDetRender('), kc.indexOf('async function mrDetLoadBody('));
+  assert.match(det, /행\('자동 제외', escapeHtml\(sm\.title\)\)/, '팝업에도 자동 제외 까닭을 글자로');
 });

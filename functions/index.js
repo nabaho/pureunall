@@ -3668,6 +3668,7 @@ exports.typeSafeEvaluate = functions
   });
 
 /* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
+   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
    본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
    ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
    ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
@@ -3691,7 +3692,7 @@ exports.mailReqScope = functions
       return;
     }
     try {
-      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST() }, req.body);
+      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
       res.status(out.status).json(out.body);
     } catch (e) {
       console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));

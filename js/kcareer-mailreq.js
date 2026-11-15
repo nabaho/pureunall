@@ -344,6 +344,7 @@
       if (typeof id !== 'string' || !/^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id)) return;
       u[id + '/st'] = st; u[id + '/updatedAt'] = now;
       u[id + '/doneAt'] = st === 'done' ? now : null;
+      u[id + '/autoIgnored'] = null;     // 사람이 상태를 바꾸면 «기계가 치웠다» 표시는 지운다 — 되돌린 건이 자동 제외로 계속 세지고, 사람이 다시 치운 것이 기계가 한 것처럼 보이지 않게
     });
     return u;
   }
@@ -477,7 +478,8 @@
   }
   /* ── 2차 — 규칙이 못 가른 «애매한 건»만 Jev 에게 묻는다 ──
      env = { db, uid, now?, ask(items) → { results: { <id>: { scope } } } }  (ask 는 화면이 준다 — 로그인 토큰을 붙여 서버 함수 mailReqScope 를 부른다)
-     ⚠ 묻는 것은 제목·첨부 이름뿐이다(본문·보낸이 주소는 안 보낸다). 이름 가림·관리자 확인·하루 한도는 서버가 한다.
+     ⚠ 화면은 «건 번호»만 서버에 준다 — 서버가 그 사람의 기록(kcareer/{uid}/mailreq/items)에서 제목·첨부 이름만 직접 읽어 Jev 에게 묻는다(본문·보낸이 주소는 어디에도 안 간다).
+       이름 가림·관리자 확인·하루 한도는 서버가 한다.
      ⚠ 이미 «사람이 만진»(확인함) 건도 범위 딱지는 붙이되 상태는 안 바꾼다. 못 물으면(열쇠·한도·업체 오류) 던지지 않고 res.errors 에 적는다 — 화면이 한동안 쉰다.
      ⚠ 한 번 물은 건은 다시 안 묻는다(scopeAsked). 답이 «애매»여도 마찬가지 — 사람이 본다. */
   var JEV_MAX = 10, JEV_TRY = 2;
@@ -493,7 +495,7 @@
     }).sort(function (a, b) { return (Number(b.d) || 0) - (Number(a.d) || 0); }).slice(0, JEV_MAX);
     if (!todo.length) return res;
     var ans;
-    try { ans = await env.ask(todo.map(function (x) { return { id: x.id, s: x.s, an: x.an }; })); }
+    try { ans = await env.ask(todo.map(function (x) { return { id: x.id }; })); }       // 건 번호만 — 서버가 그 사람의 기록에서 제목·첨부 이름을 «직접» 읽는다(화면이 글을 실어 보내지 않는다)
     catch (e) { res.errors.push(cut(e && e.message || e, 80)); return res; }
     var got = obj(ans && ans.results) ? ans.results : {};
     for (var i = 0; i < todo.length; i++) {

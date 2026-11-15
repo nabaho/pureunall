@@ -16013,7 +16013,7 @@ function mrOnData(v){
   if(_mr.detId && !v[_mr.detId]) mrDetClose();      /* 보던 건이 사라졌다(다른 곳에서 지움) — 팝업을 닫는다 */
   /* 처음 받은 판은 «조용히» — 열 때마다 알림이 쏟아지면 안 된다. 그 몫은 띠가 말한다 */
   /* 건이 하나씩 들어와도(건마다 저장) 알림은 «한 번에 모아» — 처음 훑을 때 알림이 건수만큼 깜박이지 않게 */
-  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ; _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }
+  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ.map(function(x){ return (_mr.items&&_mr.items[x.id])||x; }).filter(function(x){ return x.st==='new'; }); _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }   /* 알리는 «그 순간»의 상태를 다시 본다 — 그 사이 Jev·규칙이 업무로 치운 건은 알리지 않는다 */
   _mr.seen=ids;
   mrPaint(); mrRender();
 }
@@ -16130,11 +16130,12 @@ function mrStatusLine(){
 }
 /* 상태줄 끝 — 자동으로 치운 건수 · Jev 분류가 켜져 있는지/쉬는지(쉬는 까닭은 마우스를 올리면) */
 function mrJevLine(){
-  var n=KcareerMailReq.toList(_mr.items).filter(function(x){ return x.autoIgnored; }).length;
+  var n=KcareerMailReq.toList(_mr.items).filter(function(x){ return x.autoIgnored && x.st==='ignored'; }).length;   /* 지금도 «기계가 치운 채»인 건만 — 되돌린 건은 안 센다 */
   var 말=(n?' · 🤖 업무 관련 '+n+'건 자동 제외(«요청 아님» 탭)':'');
   if(!mrJevOn()) return 말+' · Jev 분류 꺼짐(규칙으로만 가름)';
   var p=mrJevPaused();
-  return 말+(p?' · <span title="'+escapeHtml(_mr.jevMsg||'')+'">Jev 분류 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로</span>':' · Jev 분류 켜짐');
+  /* 쉬는 까닭은 «글자»로 보인다 — 마우스를 올려야만 보이면 폰·키보드에서는 못 본다 */
+  return 말+(p?' · <span title="'+escapeHtml(_mr.jevMsg||'')+'">Jev 분류 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로'+(_mr.jevMsg?' · <span style="color:var(--text-mute)">'+escapeHtml(String(_mr.jevMsg).slice(0,60))+'</span>':'')+'</span>':' · Jev 분류 켜짐');
 }
 function mrRowHtml(x, i, now){
   var Q=KcareerMailReq, u=Q.urgency(x, now), dd=Q.ddayOf(x.deadline, now), 종류=(x.kinds||[]).map(Q.kindMeta).filter(Boolean), st=Q.STATES[x.st]?x.st:'new';   /* 아는 상태만 — 클래스에 DB 값이 그대로 들어가지 않게 */
@@ -16286,6 +16287,7 @@ function mrDetRender(x){
     +(x.an&&x.an.length?행('첨부', x.an.map(function(n){ return '📎 '+escapeHtml(n); }).join('<br>')):'')
     +(x.replyTo?행('회신 주소', escapeHtml(x.replyTo)):'')
     +(x.why&&x.why.length?행('알아본 까닭', x.why.map(escapeHtml).join(' · ')):'')
+    +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? 행('자동 제외', escapeHtml(sm.title)) : ''; })()     /* 딱지의 까닭을 팝업에도 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게 */
     +행('메모', '<textarea id="mrDetMemo" maxlength="'+Q.MEMO_MAX+'" placeholder="예) 담당자에게 전화함 · 서류는 11월 둘째 주에 보냄" aria-label="메모">'+escapeHtml(x.memo||'')+'</textarea>')
     +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><b style="font-size:13px">메일 내용</b>'
     +'<button class="btn sm" type="button" onclick="mrDetLoadBody(_mr.items[_mr.detId], true)" title="메일 내용을 다시 읽습니다">↻ 다시 읽기</button>'
