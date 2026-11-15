@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=44">
+<link rel="stylesheet" href="css/pu-erp.css?v=45">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -206,6 +206,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-hr-excel-sync.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
 <script src="js/pu-case-jur-mail.js?v=1"></script>
+<script src="js/pu-case-stage.js?v=1"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
 <script src="js/pu-ieum-public.js?v=2"></script>
@@ -21032,6 +21033,90 @@ function erpContractDupBlock(form, contracts){
   });
 }
 
+/* ══════ 📌 계약의 «심급·단계»(노동위원회·산재) 읽어 달기 · 보이기 (견적·계약 자동화 계획 5, 대표 승인 2026-11-15) ══════
+   견적서·계약서 자동 길이 만든 «사건» 계약에, 글에서 읽은 단계를 `stageMarks` 로 달아 둔다 — 읽는 일은 js/pu-case-stage.js(순수 함수).
+
+   ■ 지키는 것
+     · 읽은 것은 늘 'auto'(확인 필요). 사람이 계약 창에서 ☑ 해야 'checked', ✕ 하면 'dismissed'(다시 안 띄움).
+     · 계약 상태(상담접수·계약협의·계약확정)·금액·계약번호·`stageCode`(현재 단계)는 «여기서» 안 바꾼다.
+       `stageCode` 는 이관 때 사건의 단계로 승계되므로, 사람이 ☑ 한 뒤 「현재 단계로」를 눌러야 바뀐다.
+     · 새로 더할 것이 없으면 계약을 건드리지 않는다(null) — 같은 메일이 두 번 와도 표시가 겹치지 않는다.
+     · 모듈(PuCaseStage)을 못 불러오면 아무것도 안 한다 — 계약 만들기를 막지 않는다. */
+function erpStageMarksMerge(prevMarks, parts, hint, srcDoc){
+  var S = window.PuCaseStage;
+  if(!S || typeof S.detect !== 'function') return null;
+  var found = S.detect(parts, hint);
+  if(!found.length) return null;
+  var r = S.merge(prevMarks, found, { now: Date.now(), srcDoc: srcDoc });
+  return r.added.length ? r.marks : null;
+}
+/* 계약서 길 — 이미 읽혀 요청에 실려 온 칸만(본문을 새로 읽지 않는다) */
+function erpStagePartsFromContract(cf, req){
+  var c = cf || {}, mm = (req && req.mailMeta) || {};
+  return [{ where:'docName', text:c.docName }, { where:'scope', text:c.scope }, { where:'memo', text:c.memo },
+    { where:'subject', text:mm.subject }];
+}
+/* 견적 길 — 메일 제목·첨부 이름뿐 */
+function erpStagePartsFromQuote(req){
+  var r = req || {};
+  return [{ where:'subject', text:r.subject }, { where:'atts', text:(Array.isArray(r.atts) ? r.atts : []).join(' ') }];
+}
+/* 카드·표에 그릴 칩 글 — 다시 안 띄우기로 한 단계는 뺀다. 없으면 null */
+function erpStageChipInfo(c){
+  var S = window.PuCaseStage;
+  if(!S || !c || !c.stageMarks) return null;
+  var chips = S.summary(c.stageMarks);
+  if(!chips.length) return null;
+  var anyAuto = chips.some(function(x){ return x.state === 'auto'; });
+  return { text:'⚖ ' + chips.map(function(x){ return x.short; }).join(' · '), anyAuto:anyAuto,
+    title: anyAuto ? '계약서에서 읽은 단계입니다 — 계약 창의 «⚖ 심급·단계»에서 확인(☑)해 주세요'
+                   : '확인한 심급·단계입니다 (' + chips.map(function(x){ return x.name; }).join(' · ') + ')' };
+}
+function erpStageChip(c){
+  var i = erpStageChipInfo(c);
+  if(!i) return null;
+  return h('span', { className:'stg-chip' + (i.anyAuto ? ' stg-auto' : ''), title:i.title }, i.text + (i.anyAuto ? ' ?' : ''));
+}
+/* 계약 창 «⚖ 심급·단계» 줄 — 읽은 것이 있을 때만 그린다(평소 계약 창은 그대로).
+   opts: 이 사건 유형에서 고를 수 있는 단계 목록(caseStageOpts) — «현재 단계로»·«단계 추가»는 이 안에서만 */
+function erpStageBox(f, setF, opts){
+  var S = window.PuCaseStage;
+  if(!S || !f) return null;
+  var marks = S.clean(f.stageMarks);
+  if(!marks.length) return null;
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
+  var allowed = (opts || []).map(function(st){ return st && st.code; });
+  function put(code, state){
+    setF(function(prev){ return Object.assign({}, prev, { stageMarks: S.setState(prev.stageMarks, code, state, me, Date.now()) }); });
+  }
+  function btn(label, title, on, kind){
+    return h('button', { type:'button', className:'stg-b' + (kind ? ' ' + kind : ''), title:title, onClick:on }, label);
+  }
+  var have = {};
+  marks.forEach(function(m){ have[m.code] = 1; });
+  var addable = (opts || []).filter(function(st){ return st && !have[st.code]; });
+  return h('div', { className:'pu-krow pu-stgrow' },
+    h('span', { className:'stg-lbl', title:'계약서·메일에서 읽은 심급·단계입니다. 기계가 읽은 것은 «확인 필요» — ☑ 해야 확인한 단계가 됩니다.' }, '⚖ 심급·단계'),
+    marks.map(function(m){
+      var inf = S.info(m.code) || { short:m.code, name:m.code };
+      var ck = m.state === 'checked', no = m.state === 'dismissed';
+      return h('span', { key:m.code, className:'stg-it' + (ck ? ' stg-ck' : '') + (no ? ' stg-no' : '') + (m.strength === 'weak' && !ck && !no ? ' stg-weak' : ''), title:inf.name },
+        h('span', { className:'stg-nm' }, (ck ? '☑ ' : no ? '✕ ' : '') + inf.short),
+        h('span', { className:'stg-st' }, ck ? '확인함' : no ? '아님' : (m.strength === 'weak' ? '확인 필요(불확실)' : '확인 필요')),
+        !ck && !no && btn('☑', inf.name + ' — 맞습니다', function(){ put(m.code, 'checked'); }, 'ok'),
+        !ck && !no && btn('✕', inf.name + ' — 아닙니다(다시 안 띄움)', function(){ put(m.code, 'dismissed'); }),
+        (ck || no) && btn('되돌리기', '확인 전 상태로', function(){ put(m.code, 'auto'); }),
+        ck && allowed.indexOf(m.code) >= 0 && f.stageCode !== m.code && btn('현재 단계로', '이 계약의 «현재 심급·단계» 칸에 ' + inf.name + ' 을 넣습니다(이관할 때 사건의 단계가 됩니다)',
+          function(){ setF(function(prev){ return Object.assign({}, prev, { stageCode:m.code }); }); }),
+        ck && f.stageCode === m.code && h('span', { className:'stg-cur', title:'현재 단계로 지정됨' }, '현재'),
+        !no && m.evidence && h('span', { className:'stg-ev', title:'읽은 글: ' + m.evidence + (m.srcDoc ? '\n(' + m.srcDoc + ')' : '') }, '「' + m.evidence + '」'));
+    }),
+    addable.length > 0 && h('select', { className:'stg-add', value:'', 'aria-label':'심급·단계 직접 추가', title:'계약서에서 못 읽은 단계를 직접 더합니다(확인함으로 들어갑니다)',
+      onChange:function(e){ var c = e.target.value; if(c) put(c, 'checked'); } },
+      h('option', { value:'' }, '＋ 단계 추가'),
+      addable.map(function(st){ return h('option', { key:st.code, value:st.code }, st.name); })));
+}
+
 /* ══════ 견적 길 요청 «계획» (견적·계약 자동화 계획 3 · 작업 2, 2026-11-08) ══════
    푸른메일 보낸메일함에서 우리 견적서가 나가면 서버 감지 훅이 `data/contract_requests` 에 «요청»을 남긴다.
    이 길은 ctReqWhy(사진첩·중진공용 문턱: 사업자번호·컨설팅 유형·주담당 필수)를 «안 탄다» — 견적 단계는 «간략 등록»이라 따로 판단한다.
@@ -21142,6 +21227,9 @@ function erpQuoteLanePlan(req, cos, cts, users){
   form.srcMails = reqSrcMails;
   var renewal = same.some(function(c){ return c.status === 'signed' || c.status === 'transferred' || c.status === 'closed'; });
   form.note = note + (renewal ? '\n재계약일 수 있음 — 이 사업장에 이미 계약확정된 계약이 있음.' : '');
+  /* 📌 사건 계약이면 제목·첨부 이름에서 읽은 심급·단계를 «확인 필요»로 단다(계획 5) */
+  var stgQ = erpStageMarksMerge([], erpStagePartsFromQuote(r), { kinds:form.kinds, inferredKind:r.inferredKind }, '');
+  if(stgQ) form.stageMarks = stgQ;
   return { action:'create', form:form };
 }
 
@@ -24514,6 +24602,8 @@ function ContractModal(props){
                         onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '성공보수', e.target); } }),
                   vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '성공보수'))
               ),
+              /* 📌 읽은 심급·단계가 있을 때만 — 평소 계약 창은 그대로(erpStageBox) */
+              isCase && erpStageBox(f, setF, caseStageOpts),
               /* ─── 줄 2 (컨설팅만): 일수 계산 + 잔금 — «다른 이야기」라 한 줄로 안 합친다.
                  「3일」만 치면 =3×350,000+부가세105,000=1,155,000원 이 뜨고 잔금으로 간다.
                  단가가 없는 유형이면 일수 칸 없이 잔금만 나온다. */
@@ -26900,6 +26990,8 @@ function ContractManagement(props){
           advPatch.note = (plan.target.note ? plan.target.note + '\n\n' : '') + sn;
         }
       }
+      var stgV = erpStageMarksMerge(plan.target.stageMarks, erpStagePartsFromQuote(req), { kinds:plan.target.kinds, inferredKind:req && req.inferredKind }, '');
+      if(stgV) advPatch.stageMarks = stgV;
       if(!patchOne(plan.target.id, advPatch)) return await stop('계약관리가 저장을 막았습니다 (월 잠금 등)');
       await drop();
       return { lane:'quote', advanced:plan.target };
@@ -26913,6 +27005,8 @@ function ContractManagement(props){
         note: (t.note ? t.note + '\n\n' : '') + plan.note,
         srcMails: attSrc
       });
+      var stgA = erpStageMarksMerge(t.stageMarks, erpStagePartsFromQuote(req), { kinds:t.kinds, inferredKind:req && req.inferredKind }, '');
+      if(stgA) upd.stageMarks = stgA;
       if(!persistOne(upd)) return await stop('계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)');
       await drop();
       return { lane:'quote', attached:t };
@@ -27071,6 +27165,8 @@ function ContractManagement(props){
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.endDate || ''))) upd.endDate = cf.endDate;
       if(srcPhoto) upd.srcPhoto = srcPhoto;
+      var stgU = erpStageMarksMerge(cur.stageMarks, erpStagePartsFromContract(cf, req), { kinds:nextKinds, inferredKind:req && req.inferredKind }, cf.docName);
+      if(stgU) upd.stageMarks = stgU;
       if(reqSrcMails.length){
         var curSrc = (cur.srcMails || []).slice();
         reqSrcMails.forEach(function(sk){ if(sk && curSrc.indexOf(sk) < 0) curSrc.push(sk); });
@@ -27131,6 +27227,8 @@ function ContractManagement(props){
       + (briefText ? '\n업무: ' + briefText : '')
       + (req.by ? ' · 담당 ' + req.by : '')
       + (synthNote ? '\n' + synthNote : '');
+    var stgC = erpStageMarksMerge([], erpStagePartsFromContract(cf, req), { kinds:form.kinds, inferredKind:req && req.inferredKind }, cf.docName);
+    if(stgC) form.stageMarks = stgC;
     form = erpDeferCoLinkIfNew(form) || form;
     var clash = erpBiznoClash(form, cos);
     if(clash) return await stop('같은 사업자번호가 다른 업체(' + (clash.name || '-') + ')에 이미 있습니다');
@@ -28068,6 +28166,9 @@ function ContractManagement(props){
             var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean);
             /* 📈 성과추적 — 고정 너비 열이라 따로 꼬리표를 달면 뒤 열이 밀린다. 글자에 붙이고 전문은 title 에 */
             var text = subs.join(' / ') + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');
+            /* 📌 읽은 심급·단계 — 위 한 줄(세부 종류·성과추적)은 그대로 두고 «뒤에» 붙인다 */
+            var stgL = erpStageChipInfo(c);
+            if(stgL) text = [text, stgL.text + (stgL.anyAuto ? ' ?' : '')].filter(Boolean).join(' · ');
             return h('span', { title: text || undefined, style:{ display:'inline-block', width:'150px', minWidth:'150px', maxWidth:'150px', fontSize:'10.5px',
               color: text ? '#2563eb' : 'transparent',
               background: text ? '#eff6ff' : 'transparent',
@@ -28119,6 +28220,8 @@ function ContractManagement(props){
       var mk0 = kindInfo(kindsArr[0] || '');
       var mSub = (kindsArr.length ? kindSubLabel(c, kindsArr[0]) : '')
         + (clinicIsPerf(c, contractSubtypeCode(c, 'consulting')) ? ' · 📈 성과추적' : '');   /* 📈 2026-10-20 */
+      var stgP = erpStageChipInfo(c);
+      if(stgP) mSub = [mSub, stgP.text + (stgP.anyAuto ? ' ?' : '')].filter(Boolean).join(' · ');
       return h('div', { key:c.id,
         onClick:function(){ openEdit(c); },
         style:{ background: justMoved ? '#eff6ff' : '#fff', border:'1px solid '+(justMoved?'#2563eb':'#e2e8f0'), borderRadius:'6px',
@@ -28201,6 +28304,7 @@ function ContractManagement(props){
             fontSize:'10px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
           '🆕 오늘 ' + regTimeText(c)) : null,
         h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0, whiteSpace:'nowrap' } }, c.contractNo),
+        erpStageChip(c),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
