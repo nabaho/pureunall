@@ -50,6 +50,7 @@
     { key: 'govreport', row: 'client', name: '컨설팅보고서', icon: '📑', url: 'gov-report.html',     desc: '보고서 현황·작성' },
     { key: 'govaid',  row: 'client', name: '기업정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
+    { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
     /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
