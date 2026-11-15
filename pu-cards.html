@@ -1346,29 +1346,43 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .gn-m .l1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mck .gn-m .l2{margin-top:6px;text-align:left}
 .mck .gn-m .l2 button{height:34px}
-/* ── 첨부 미리보기 창 (대표 승인 목업 2026-09-05) ──
-   ⚠ 창을 크게 잡는다. 서식이 든 문서는 좁으면 줄이 접혀 무엇인지 더 알기 어렵다. */
-.mck.pvbox{width:min(1080px,100%);height:90vh;max-height:92vh}
-.mck.pvbox>header{flex:none}
+/* ── 첨부 미리보기 창 (대표 승인 목업 2026-09-05 · 배율 조절·2쪽이상 보기 2026-11-15) ──
+   ⚠ 창을 크게 잡는다. 2쪽 나란히 보기와 배율 축소·확대가 한눈에 들어오도록 넓히고 모서리 끌기·전체창도 지원한다. */
+.mck.pvbox{width:min(1440px,96vw);height:92vh;max-height:94vh;min-width:min(360px,100%);min-height:320px;resize:both}
+.mck.pvbox.pvwide{width:98vw;height:96vh;max-width:98vw;max-height:96vh}
+.mck.pvbox>header{flex:none;gap:8px;padding:11px 16px}
 .mck.pvbox>header h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mck.pvbox>header .x{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px}
-.mck.pvbox .pvsz{flex:none;font-size:12px;color:#475569}
+.mck.pvbox .pvsz{flex:none;font-size:12px;color:#475569;white-space:nowrap}
+.mck.pvbox .pvtools{flex:none;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.mck.pvbox .pvseg{display:inline-flex;align-items:center;border:1px solid #cbd5e1;border-radius:7px;overflow:hidden;background:#f8fafc}
+.mck.pvbox .pvseg button{height:28px;padding:0 9px;border:none;border-right:1px solid #e2e8f0;background:transparent;color:#475569;font-size:12px;cursor:pointer;white-space:nowrap}
+.mck.pvbox .pvseg button:last-child{border-right:none}
+.mck.pvbox .pvseg button:hover:not(:disabled){background:#eff6ff;color:#1e293b}
+.mck.pvbox .pvseg button.on{background:#2563eb;color:#ffffff;font-weight:600}
+.mck.pvbox .pvseg button:disabled{opacity:.42;cursor:default}
+.mck.pvbox .pvzoom-sel{height:28px;border:none;border-right:1px solid #e2e8f0;background:#ffffff;color:#1e293b;font-size:12px;font-weight:600;padding:0 6px;cursor:pointer;font-variant-numeric:tabular-nums}
+.mck.pvbox .pvwbtn{height:28px;padding:0 9px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#475569;font-size:12px;cursor:pointer;white-space:nowrap}
+.mck.pvbox .pvwbtn.on{border-color:#2563eb;background:#eff6ff;color:#1e40af;font-weight:600}
 .mck.pvbox>footer{flex:none}
 .pvstage{flex:1 1 auto;min-height:0;overflow:auto;background:#e2e8f0;display:flex;align-items:flex-start;
-  justify-content:center;padding:14px 12px}
+  justify-content:flex-start;padding:14px 12px}
 .pvstage .pvpdf{margin:auto;max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.14)}
-.pvstage .pvhwp{align-self:stretch;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding:2px 0 10px}
-.pvstage .pvhwp .pvhwp-pg{background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.16);max-width:100%;overflow:hidden;flex:none}
-.pvstage .pvhwp canvas{display:block;margin:0;max-width:100%}
-.mck.pvbox>footer .pvpg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#475569}
+.pvstage .pvhwp{flex:none;align-self:flex-start;margin:0 auto;min-width:0;width:100%;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;align-content:flex-start;gap:14px;padding:2px 0 10px}
+.pvstage .pvhwp[data-cols="1"]{flex-direction:column;flex-wrap:nowrap;align-items:center}
+.pvstage .pvhwp[data-overflow="1"]{margin:0;justify-content:flex-start;align-items:flex-start}
+.pvstage .pvhwp .pvhwp-pg{position:relative;background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.16);overflow:hidden;flex:none}
+.pvstage .pvhwp .pvhwp-pg[data-pg]::after{content:attr(data-pg);position:absolute;right:6px;bottom:6px;padding:1px 6px;border-radius:5px;background:rgba(15,23,42,.56);color:#ffffff;font-size:11px;font-variant-numeric:tabular-nums;pointer-events:none}
+.pvstage .pvhwp canvas{display:block;margin:0}
+.mck.pvbox>footer .pvpg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#475569;font-variant-numeric:tabular-nums}
 .mck.pvbox>footer .pvpg button{height:30px;padding:0 10px}
 .mck.pvbox>footer .pvpg b{color:#1e293b}
-.pvstage .pvimg{margin:auto;max-width:100%;max-height:70vh;background:#fff;
+.pvstage .pvimg{flex:none;margin:auto;max-width:100%;max-height:78vh;background:#fff;
   box-shadow:0 2px 10px rgba(0,0,0,.14)}
-.pvstage .pvtext{margin:0;align-self:stretch;width:100%;background:#fff;padding:18px 22px;
+.pvstage .pvtext{margin:0 auto;align-self:stretch;width:100%;background:#fff;padding:18px 22px;
   font:13px/1.9 "Malgun Gothic",monospace;color:#1e293b;white-space:pre-wrap;word-break:break-word;
   box-shadow:0 2px 10px rgba(0,0,0,.14)}
-.pvstage .pvsheet{align-self:stretch;width:100%;overflow:auto;background:#fff;padding:10px;
+.pvstage .pvsheet{margin:0 auto;align-self:stretch;width:100%;overflow:auto;background:#fff;padding:10px;
   box-shadow:0 2px 10px rgba(0,0,0,.14)}
 .pvstage .pvsheet table{border-collapse:collapse;font-size:12.5px}
 .pvstage .pvsheet td,.pvstage .pvsheet th{border:1px solid #e2e8f0;padding:4px 8px;
@@ -1383,7 +1397,14 @@ table.mstab2 tr:last-child td{border-bottom:none}
      줄을 늘린다. 손가락 자리라 높이도 넉넉히 둔다. */
 .mck.pvbox>footer button{white-space:nowrap;flex:none}
 @media(max-width:760px){
-  .mck-dim.pvdim{padding:10px}
+  .mck-dim.pvdim{padding:8px}
+  .mck.pvbox{width:100%;height:92vh;resize:none}
+  .mck.pvbox>header{flex-wrap:wrap;padding:10px 12px;gap:6px}
+  .mck.pvbox .pvsz{display:none}
+  .mck.pvbox .pvtools{order:3;width:100%;justify-content:space-between;overflow-x:auto}
+  .mck.pvbox .pvwbtn{display:none}
+  .mck.pvbox .pvseg button{height:34px;min-width:34px;padding:0 10px}
+  .mck.pvbox .pvzoom-sel{height:34px;font-size:16px}
   .mck.pvbox>footer{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px}
   .mck.pvbox>footer .sp{display:none}
   .mck.pvbox>footer .pvpg{grid-column:1/-1;justify-content:center}
@@ -29526,9 +29547,195 @@ function mbAttPeekHover(i){
   }, MB_ATT_HOVER_MS);
 }
 function mbAttPeekHoverCancel(){ clearTimeout(_mbAttHoverT); }
+/* 배율·다단 보기 상수 — 팝업창에서 비율로 크게/작게 조절하고 2쪽 이상을 한눈에 본다 */
+const MB_PV_ZOOM_MIN = 40;
+const MB_PV_ZOOM_MAX = 250;
+const MB_PV_ZOOMS = [40, 50, 65, 75, 85, 100, 115, 130, 150, 175, 200, 250];
+let _mbPvWide = false;
+function mbPvZoomOf(p){
+  const z = Number(p && p.zoom);
+  return (Number.isFinite(z) && z > 0) ? Math.max(40, Math.min(250, Math.round(z))) : 100;
+}
+function mbPvColsOf(p, stW){
+  if(!p) return 1;
+  const paged = !!((p.kind === 'pdf' && p.pdf) || p.hwp);
+  if(!paged || !(Number(p.pages) > 1)) return 1;
+  if(p.cols === 1 || p.cols === 2 || p.cols === 0) return p.cols;
+  const w = Number(stW) || (typeof window !== 'undefined' && Number(window.innerWidth)) || 1280;
+  return w < 680 ? 1 : 2;
+}
+function mbPvCalcBox(w0, h0, stage, cols, zoomPct, maxBaseSc){
+  const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+  const stH = (stage && stage.clientHeight) ? stage.clientHeight : 760;
+  const pad = stW < 520 ? 12 : 28;
+  const gap = 14;
+  const box = Math.max(200, stW - pad);
+  const capSc = maxBaseSc || 2.2;
+  let baseSc;
+  if(cols === 2){
+    const availW2 = Math.max(140, (box - gap) / 2);
+    const availH = Math.max(420, stH - 24);
+    const fitW = availW2 / w0, fitH = availH / h0;
+    const floorSc = Math.min(fitW, 420 / w0);
+    baseSc = Math.min(capSc, Math.min(fitW, Math.max(fitH, floorSc)));
+  } else if(cols === 0){
+    const availW3 = Math.max(120, (box - gap * 2) / 3);
+    const availH3 = Math.max(300, (stH - gap - 24) * 0.72);
+    baseSc = Math.min(capSc, Math.min(availW3 / w0, availH3 / h0));
+  } else {
+    const maxW = w0 > h0 ? 1040 : 860;
+    baseSc = Math.min(capSc, Math.min(box, maxW) / w0);
+  }
+  const z = Math.max(40, Math.min(250, Number(zoomPct) || 100)) / 100;
+  let cssSc = baseSc * z;
+  if(h0 * cssSc > 4096) cssSc = 4096 / h0;
+  return {
+    w0:w0, h0:h0, cssSc:cssSc, cols:cols, box:box, gap:gap,
+    cssW:Math.max(1, Math.round(w0 * cssSc)),
+    cssH:Math.max(1, Math.round(h0 * cssSc)),
+  };
+}
+function mbPvApplyContentZoom(){
+  const p = state.mbPv;
+  if(!p || typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const dlg = document.querySelector('.mck.pvbox');
+  if(!dlg || typeof dlg.querySelector !== 'function') return;
+  const z = mbPvZoomOf(p);
+  const img = dlg.querySelector('.pvstage .pvimg');
+  if(img && img.style){
+    if(z === 100){
+      img.style.width = '';
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '78vh';
+    } else {
+      if(!img._pvBaseW){
+        const st = dlg.querySelector('.pvstage');
+        img._pvBaseW = Math.max(240, Number(img.clientWidth) || Number(img.naturalWidth) || ((st && st.clientWidth) ? st.clientWidth - 40 : 720));
+      }
+      img.style.maxWidth = 'none';
+      img.style.maxHeight = 'none';
+      img.style.width = Math.max(80, Math.round(img._pvBaseW * z / 100)) + 'px';
+    }
+  }
+  const sheetTbl = dlg.querySelector('.pvstage .pvsheet table');
+  if(sheetTbl && sheetTbl.style){
+    sheetTbl.style.zoom = z === 100 ? '' : String(z / 100);
+    sheetTbl.style.fontSize = (12.5 * z / 100).toFixed(2) + 'px';
+  }
+  const txt = dlg.querySelector('.pvstage .pvtext');
+  if(txt && txt.style){
+    txt.style.fontSize = (13 * z / 100).toFixed(2) + 'px';
+  }
+}
+function mbPvSyncView(jumpKeep){
+  const p = state.mbPv;
+  if(!p) return;
+  const z = mbPvZoomOf(p);
+  const wideOn = !!(p.wide != null ? p.wide : _mbPvWide);
+  if(typeof document !== 'undefined' && typeof document.querySelector === 'function'){
+    const dlg = document.querySelector('.mck.pvbox');
+    if(dlg){
+      if(dlg.classList) dlg.classList.toggle('pvwide', wideOn);
+      if(typeof dlg.querySelector === 'function'){
+        const st = dlg.querySelector('.pvstage');
+        const cols = mbPvColsOf(p, st && st.clientWidth);
+        const colBtns = dlg.querySelectorAll ? dlg.querySelectorAll('.pvcols button[data-cols]') : [];
+        Array.from(colBtns).forEach(btn=>{
+          const on = Number(btn.getAttribute('data-cols')) === cols;
+          if(btn.classList) btn.classList.toggle('on', on);
+          if(btn.setAttribute) btn.setAttribute('aria-pressed', String(on));
+        });
+        const sel = dlg.querySelector('.pvzoom-sel');
+        const outBtn = dlg.querySelector('.pvz-out');
+        const inBtn = dlg.querySelector('.pvz-in');
+        if(sel){
+          let hasOpt = Array.from(sel.options || []).some(op=>Number(op.value) === z);
+          if(!hasOpt && typeof document.createElement === 'function'){
+            const stops = MB_PV_ZOOMS.concat([z]).sort((a,b)=>a-b);
+            sel.textContent = '';
+            stops.forEach(v=>{
+              const op = document.createElement('option');
+              op.value = String(v);
+              op.textContent = v + '%';
+              if(v === z) op.selected = true;
+              sel.appendChild(op);
+            });
+          }
+          sel.value = String(z);
+        }
+        const outDis = z <= MB_PV_ZOOM_MIN, inDis = z >= MB_PV_ZOOM_MAX;
+        if(outBtn){
+          const hadFocus = document.activeElement === outBtn;
+          outBtn.disabled = outDis;
+          if(outDis && hadFocus && sel && typeof sel.focus === 'function'){ try{ sel.focus(); }catch(_){} }
+        }
+        if(inBtn){
+          const hadFocus = document.activeElement === inBtn;
+          inBtn.disabled = inDis;
+          if(inDis && hadFocus && sel && typeof sel.focus === 'function'){ try{ sel.focus(); }catch(_){} }
+        }
+        const wBtn = dlg.querySelector('.pvwbtn');
+        if(wBtn){
+          if(wBtn.classList) wBtn.classList.toggle('on', wideOn);
+          wBtn.textContent = wideOn ? '기본창' : '전체창';
+          if(wBtn.setAttribute){
+            wBtn.setAttribute('aria-pressed', String(wideOn));
+            wBtn.setAttribute('aria-label', wideOn ? '기본 창 크기' : '전체 창 크기');
+            wBtn.setAttribute('title', wideOn ? '기본 창 크기로 줄이기' : '팝업창 화면에 꽉 차게 넓히기');
+          }
+        }
+      }
+    }
+  }
+  if(p.pdf && typeof p._pdfRelayout === 'function') p._pdfRelayout(!!jumpKeep);
+  else if(p.hwp && typeof p._hwpRelayout === 'function') p._hwpRelayout(!!jumpKeep);
+  else mbPvApplyContentZoom();
+}
+function mbPvZoomSet(val){
+  const p = state.mbPv;
+  if(!p || p.loading || p.err) return;
+  const next = Math.max(MB_PV_ZOOM_MIN, Math.min(MB_PV_ZOOM_MAX, Math.round(Number(val) || 100)));
+  p.zoom = next;
+  mbPvSyncView(false);
+}
+function mbPvZoomStep(dir){
+  const p = state.mbPv;
+  if(!p || p.loading || p.err) return;
+  const cur = mbPvZoomOf(p);
+  const d = Number(dir) || 0;
+  if(!d) return;
+  let next = cur;
+  if(d > 0){
+    const found = MB_PV_ZOOMS.find(v => v >= cur + 5);
+    next = found != null ? found : Math.min(MB_PV_ZOOM_MAX, cur + 15);
+  } else {
+    for(let k = MB_PV_ZOOMS.length - 1; k >= 0; k--){
+      if(MB_PV_ZOOMS[k] <= cur - 5){ next = MB_PV_ZOOMS[k]; break; }
+    }
+    if(next === cur) next = Math.max(MB_PV_ZOOM_MIN, cur - 15);
+  }
+  mbPvZoomSet(next);
+}
+function mbPvColsSet(cols){
+  const p = state.mbPv;
+  if(!p || p.loading || p.err) return;
+  const c = Number(cols);
+  p.cols = (c === 1 || c === 2 || c === 0) ? c : 2;
+  p.zoom = 100;
+  mbPvSyncView(true);
+}
+function mbPvWideToggle(){
+  const p = state.mbPv;
+  if(!p) return;
+  const next = !(p.wide != null ? p.wide : _mbPvWide);
+  p.wide = next;
+  _mbPvWide = next;
+  mbPvSyncView(false);
+}
 /* 열린 문서(WASM 한글·PDF·관찰기) 뒷정리 — 안 놓아 주면 WASM 메모리가 쌓인다 */
 function mbPvRelease(p){
   if(!p) return;
+  if(p._roCleanup){ try{ p._roCleanup(); }catch(_){} p._roCleanup = null; }
   if(p._hwpCleanup){ try{ p._hwpCleanup(); }catch(_){} p._hwpCleanup = null; }
   if(p._pdfCleanup){ try{ p._pdfCleanup(); }catch(_){} p._pdfCleanup = null; }
   if(p.hwp && typeof p.hwp.free === 'function'){ try{ p.hwp.free(); }catch(_){} p.hwp = null; }
@@ -29563,7 +29770,8 @@ function mbAttPeek(i){
   const prevFocus = (state.mbPv && state.mbPv._prevFocus) || (typeof document !== 'undefined' && document.activeElement) || null;
   mbPvReset();
   const tok = ++_mbPvSeq;
-  state.mbPv = { i:i, tok:tok, name:String(a.name||'첨부'), size:sz, kind:kind, loading:true, err:'', url:'', text:'', _prevFocus:prevFocus };
+  const initWide = typeof _mbPvWide === 'boolean' ? _mbPvWide : false;
+  state.mbPv = { i:i, tok:tok, name:String(a.name||'첨부'), size:sz, kind:kind, zoom:100, wide:initWide, loading:true, err:'', url:'', text:'', _prevFocus:prevFocus };
   renderMailPage();
   const u = firebase.auth().currentUser;
   if(!u){ state.mbPv.loading=false; state.mbPv.err='로그인이 필요합니다'; return renderMailPage(); }
@@ -29577,6 +29785,7 @@ function mbAttPeek(i){
         return;
       }
       Object.assign(state.mbPv, { loading:false }, got);
+      if(state.mbPv.cols == null) state.mbPv.cols = mbPvColsOf(state.mbPv);
       renderMailPage();
     })
     .catch(e=>{
@@ -29678,7 +29887,7 @@ function mbPvDraw(kind, buf, a){
   }
   return readDocText();
 }
-/* PDF 전체 쪽을 세로 연속 스크롤로 캔버스에 그린다 — 화면이 그려진 «뒤»에 부른다(mbPvAfter) */
+/* PDF 전체 쪽을 연속·다단(2쪽 이상) 스크롤로 캔버스에 그린다 — 화면이 그려진 «뒤»에 부른다(mbPvAfter) */
 function mbPvPdfDraw(){
   const p = state.mbPv;
   if(!p || p.kind !== 'pdf' || !p.pdf) return;
@@ -29686,7 +29895,8 @@ function mbPvPdfDraw(){
   const host = document.getElementById('mbPvPdf');
   if(!host){
     const cv = document.getElementById('mbPvCanvas');
-    const tag = String(p.tok || 0) + ':' + String(p.page);
+    const zPct = (typeof mbPvZoomOf === 'function') ? mbPvZoomOf(p) : (Number(p.zoom) || 100);
+    const tag = String(p.tok || 0) + ':' + String(p.page) + ':' + String(zPct);
     if(!cv || cv.getAttribute('data-page') === tag) return;
     cv.setAttribute('data-page', tag);
     const drawSeq = (p._pdfSeq = (p._pdfSeq || 0) + 1);
@@ -29697,7 +29907,7 @@ function mbPvPdfDraw(){
       const w0 = (Number.isFinite(v0.width) && v0.width > 0) ? v0.width : 595;
       const h0 = (Number.isFinite(v0.height) && v0.height > 0) ? v0.height : 842;
       if(w0 > 200000 || h0 > 200000) throw new Error('문서 쪽 크기가 비정상적입니다');
-      let sc = Math.min(2.2, box / w0);
+      let sc = Math.min(2.2, box / w0) * (zPct / 100);
       if(h0 * sc > 4096) sc = 4096 / h0;
       const cssW = Math.max(1, Math.floor(w0 * sc)), cssH = Math.max(1, Math.floor(h0 * sc));
       const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
@@ -29720,7 +29930,10 @@ function mbPvPdfDraw(){
     return;
   }
   const tag = String(p.tok || 0);
-  if(host.getAttribute('data-tok') === tag) return;
+  if(host.getAttribute('data-tok') === tag){
+    if(typeof p._pdfRelayout === 'function') p._pdfRelayout(false);
+    return;
+  }
   if(p._pdfCleanup){ try{ p._pdfCleanup(); }catch(_){} p._pdfCleanup = null; }
   host.setAttribute('data-tok', tag);
   const firstCv = document.getElementById('mbPvCanvas');
@@ -29729,69 +29942,153 @@ function mbPvPdfDraw(){
   const count = Math.max(1, Number(p.pages) || 1);
   const base = p.pdfBase || { w: 595, h: 842 };
   const pageSizes = [];
-  const pgs = [], drawn = [], tasks = [];
-  let alive = true;
+  const pgs = [], drawn = [], renderedSc = [], tasks = [], renderEpoch = [];
+  let alive = true, relayoutT = 0;
+  const effCols = ()=>{
+    if(count <= 1) return 1;
+    if(p.cols === 1 || p.cols === 2 || p.cols === 0) return p.cols;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    return stW < 680 ? 1 : 2;
+  };
   const calcSize = (idx)=>{
     const s = pageSizes[idx] || base;
     const rw = Number(s.w), rh = Number(s.h);
     const w0 = (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 595;
     const h0 = (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 842;
-    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 900;
-    const pad = stW < 520 ? 12 : 28;
-    const box = Math.max(200, stW - pad);
-    const maxW = w0 > h0 ? 980 : 880;
-    let cssSc = Math.min(2.2, Math.min(box, maxW) / w0);
+    const zPct = (typeof mbPvZoomOf === 'function') ? mbPvZoomOf(p) : (Number(p.zoom) || 100);
+    if(typeof mbPvCalcBox === 'function') return mbPvCalcBox(w0, h0, stage, effCols(), zPct, 2.2);
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    const stH = (stage && stage.clientHeight) ? stage.clientHeight : 760;
+    const pad = stW < 520 ? 12 : 28, gap = 14, box = Math.max(200, stW - pad), cols = effCols();
+    let baseSc = cols === 2 ? Math.min((box - gap) / (2 * w0), Math.max((stH - 24) / h0, Math.min((box - gap) / (2 * w0), 420 / w0)))
+               : cols === 0 ? Math.min((box - gap * 2) / (3 * w0), ((stH - gap - 24) * 0.72) / h0)
+               : Math.min(2.2, Math.min(box, w0 > h0 ? 1040 : 860) / w0);
+    let cssSc = Math.min(2.2, baseSc) * (Math.max(40, Math.min(250, zPct)) / 100);
     if(h0 * cssSc > 4096) cssSc = 4096 / h0;
-    return {
-      w0:w0, h0:h0, cssSc:cssSc,
-      cssW:Math.max(1, Math.round(w0 * cssSc)),
-      cssH:Math.max(1, Math.round(h0 * cssSc)),
-    };
+    return { w0:w0, h0:h0, cssSc:cssSc, cols:cols, box:box, gap:gap, cssW:Math.max(1, Math.round(w0 * cssSc)), cssH:Math.max(1, Math.round(h0 * cssSc)) };
   };
-  const drawOne = (idx)=>{
-    if(!alive || drawn[idx] || !p.pdf) return;
+  const syncHostLayout = ()=>{
+    const cols = effCols();
+    if(host.setAttribute) host.setAttribute('data-cols', String(cols));
+    if(!host.style) return;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    const stageInnerW = Math.max(160, stW - 24);
+    let maxCssW = 0;
+    for(let k = 0; k < count; k++){
+      const gk = calcSize(k);
+      if(gk.cssW > maxCssW) maxCssW = gk.cssW;
+    }
+    const g0 = calcSize(0);
+    const over = maxCssW > stageInnerW;
+    if(host.setAttribute) host.setAttribute('data-overflow', over ? '1' : '0');
+    if(over){
+      host.style.width = maxCssW + 'px';
+      host.style.maxWidth = '';
+    } else {
+      host.style.width = '100%';
+      if(cols === 2 && count > 1){
+        const twoW = g0.cssW * 2 + g0.gap + 4;
+        host.style.maxWidth = (twoW <= g0.box + 4) ? (twoW + 'px') : '';
+      } else {
+        host.style.maxWidth = '';
+      }
+    }
+  };
+  const isNearVisible = (idx)=>{
+    if(!stage || !stage.clientHeight) return true;
+    const el = pgs[idx];
+    if(!el || !Number.isFinite(Number(el.offsetTop))) return true;
+    const top = Number(el.offsetTop);
+    const h = Number(el.offsetHeight) || calcSize(idx).cssH;
+    const vTop = (Number(stage.scrollTop) || 0) - 1400;
+    const vBot = (Number(stage.scrollTop) || 0) + stage.clientHeight + 1400;
+    return (top + h >= vTop) && (top <= vBot);
+  };
+  const targetRenderSc = (idx)=>{
+    const g = calcSize(idx);
+    const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
+    const pxCapSc = Math.sqrt(maxPx / Math.max(1, g.w0 * g.h0)) * 0.99;
+    return Math.min(g.cssSc * rawDpr, pxCapSc);
+  };
+  const drawOne = (idx, forceRescale)=>{
+    if(!alive || !p.pdf || idx < 0 || idx >= count) return;
+    if(drawn[idx] === 1 && !forceRescale) return;
+    if(drawn[idx] === 2){
+      if(!forceRescale) return;
+      if(Math.abs((renderedSc[idx] || 0) - targetRenderSc(idx)) <= 0.04) return;
+    }
+    const ep = (renderEpoch[idx] = (renderEpoch[idx] || 0) + 1);
+    if(tasks[idx] && typeof tasks[idx].cancel === 'function'){ try{ tasks[idx].cancel(); }catch(_){} }
+    tasks[idx] = null;
     drawn[idx] = 1;
     p.pdf.getPage(idx + 1).then(pg=>{
-      if(!alive || drawn[idx] !== 1 || state.mbPv !== p || !p.pdf) return;
+      if(!alive || renderEpoch[idx] !== ep || state.mbPv !== p || !p.pdf) return;
       const v0 = pg.getViewport({ scale: 1 });
       const w0 = (Number.isFinite(v0.width) && v0.width > 0) ? v0.width : 595;
       const h0 = (Number.isFinite(v0.height) && v0.height > 0) ? v0.height : 842;
       if(w0 > 200000 || h0 > 200000) throw new Error('문서 쪽 크기가 비정상적입니다');
+      const prevSz = pageSizes[idx];
       pageSizes[idx] = { w: w0, h: h0 };
+      if(!prevSz || Math.abs(prevSz.w - w0) > 1) syncHostLayout();
       const g = calcSize(idx);
       const pgBox = pgs[idx]; if(!pgBox) return;
       pgBox.style.width = g.cssW + 'px';
       pgBox.style.height = g.cssH + 'px';
-      let cv = pgBox.querySelector('canvas');
-      if(!cv){
-        cv = document.createElement('canvas');
-        cv.className = 'pvpdf';
-        if(idx === 0 && cv.setAttribute) cv.setAttribute('id', 'mbPvCanvas');
-        pgBox.textContent = '';
-        pgBox.appendChild(cv);
-      }
-      if(cv.setAttribute){
-        cv.setAttribute('role', 'img');
-        cv.setAttribute('aria-label', String(p.name || 'PDF 문서') + ' ' + String(idx + 1) + '쪽');
-      }
       const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
       const pxCapSc = Math.sqrt(maxPx / Math.max(1, w0 * h0)) * 0.99;
       const renderSc = Math.min(g.cssSc * rawDpr, pxCapSc);
       const vp = pg.getViewport({ scale: renderSc });
       const pxW = Math.max(1, Math.floor(vp.width)), pxH = Math.max(1, Math.floor(vp.height));
       if(!Number.isFinite(pxW) || !Number.isFinite(pxH) || pxW * pxH > maxPx) throw new Error('문서 쪽 해상도가 한도를 넘습니다');
+      const existingCv = pgBox.querySelector('canvas');
+      const swapMode = !!(existingCv && existingCv.width > 0);
+      let cv = swapMode ? document.createElement('canvas') : existingCv;
+      if(!cv){
+        cv = document.createElement('canvas');
+        cv.className = 'pvpdf';
+        if(idx === 0 && cv.setAttribute) cv.setAttribute('id', 'mbPvCanvas');
+        pgBox.textContent = '';
+        pgBox.appendChild(cv);
+      } else if(swapMode){
+        cv.className = 'pvpdf';
+      }
+      if(cv.setAttribute){
+        cv.setAttribute('role', 'img');
+        cv.setAttribute('aria-label', String(p.name || 'PDF 문서') + ' ' + String(idx + 1) + '쪽');
+      }
       cv.width = pxW; cv.height = pxH;
       cv.style.width = g.cssW + 'px'; cv.style.height = g.cssH + 'px';
       const task = pg.render({ canvasContext: cv.getContext('2d'), viewport: vp });
       tasks[idx] = task;
       return (task && task.promise ? task.promise : Promise.resolve()).then(()=>{
-        tasks[idx] = null;
-        if(alive && drawn[idx] === 1) drawn[idx] = 2;
+        if(tasks[idx] === task) tasks[idx] = null;
+        if(!alive || renderEpoch[idx] !== ep || state.mbPv !== p){
+          if(swapMode){ cv.width = 0; cv.height = 0; }
+          return;
+        }
+        if(swapMode && pgBox){
+          if(idx === 0 && cv.setAttribute) cv.setAttribute('id', 'mbPvCanvas');
+          if(existingCv){
+            existingCv.width = 0; existingCv.height = 0;
+            if(existingCv.parentNode === pgBox && typeof pgBox.replaceChild === 'function'){
+              pgBox.replaceChild(cv, existingCv);
+            } else {
+              pgBox.textContent = '';
+              pgBox.appendChild(cv);
+            }
+          } else {
+            pgBox.textContent = '';
+            pgBox.appendChild(cv);
+          }
+        }
+        renderedSc[idx] = renderSc;
+        drawn[idx] = 2;
       });
     }).catch(e=>{
       tasks[idx] = null;
-      if(!alive || state.mbPv !== p) return;
-      if(e && e.name === 'RenderingCancelledException'){ drawn[idx] = 0; return; }
+      if(!alive || renderEpoch[idx] !== ep || state.mbPv !== p) return;
+      const curCv = pgs[idx] && pgs[idx].querySelector('canvas');
+      if(e && e.name === 'RenderingCancelledException'){ drawn[idx] = (curCv && curCv.width > 0) ? 2 : 0; return; }
       drawn[idx] = 0;
       console.warn('[첨부 미리보기]', (e&&e.message)||e);
       mbPvRelease(p);
@@ -29803,19 +30100,24 @@ function mbPvPdfDraw(){
     if(!drawn[idx]) return;
     if(!force){
       const cur = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
-      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= 1) return;
+      const keepSpan = Math.max(2, (effCols() === 0 ? 4 : effCols()) * 2);
+      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= keepSpan) return;
     }
+    renderEpoch[idx] = (renderEpoch[idx] || 0) + 1;
     drawn[idx] = 0;
+    renderedSc[idx] = 0;
     if(tasks[idx] && typeof tasks[idx].cancel === 'function'){ try{ tasks[idx].cancel(); }catch(_){} }
     tasks[idx] = null;
     const pgBox = pgs[idx];
     const cv = pgBox && pgBox.querySelector('canvas');
     if(cv){ cv.width = 0; cv.height = 0; }
   };
+  syncHostLayout();
   for(let k = 0; k < count; k++){
     const d = document.createElement('div');
     d.className = 'pvhwp-pg';
     d.setAttribute('data-i', String(k));
+    if(count > 1 && d.setAttribute) d.setAttribute('data-pg', (k + 1) + ' / ' + count);
     const g = calcSize(k);
     d.style.width = g.cssW + 'px';
     d.style.height = g.cssH + 'px';
@@ -29826,63 +30128,137 @@ function mbPvPdfDraw(){
     host.appendChild(d);
     pgs.push(d);
   }
+  const rowBounds = (idx)=>{
+    const el = pgs[idx];
+    const ot = el ? Number(el.offsetTop) : NaN;
+    const ol = el ? Number(el.offsetLeft) : NaN;
+    if(!Number.isFinite(ot) || !Number.isFinite(ol)) return { start: idx, end: idx };
+    let s = idx, e = idx;
+    while(s > 0 && Number.isFinite(Number(pgs[s - 1].offsetTop)) && Math.abs(Number(pgs[s - 1].offsetTop) - ot) <= 4
+      && Number(pgs[s - 1].offsetLeft) < Number(pgs[s].offsetLeft)) s--;
+    while(e + 1 < count && Number.isFinite(Number(pgs[e + 1].offsetTop)) && Math.abs(Number(pgs[e + 1].offsetTop) - ot) <= 4
+      && Number(pgs[e + 1].offsetLeft) > Number(pgs[e].offsetLeft)) e++;
+    return { start: s, end: e };
+  };
   const io = (typeof IntersectionObserver === 'function' && stage)
     ? new IntersectionObserver((ents)=>{
         ents.forEach((en)=>{
           const idx = Number(en.target.getAttribute('data-i'));
-          if(en.isIntersecting) drawOne(idx); else releaseOne(idx, false);
+          if(en.isIntersecting) drawOne(idx, false); else releaseOne(idx, false);
         });
       }, { root: stage, rootMargin: '2400px 0px' })
     : null;
   const syncPagerDom = ()=>{
     const bar = stage && stage.parentNode && stage.parentNode.querySelector('.pvpg');
     if(!bar) return;
-    const b = bar.querySelector('b'); if(b) b.textContent = String(p.page);
+    const curIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    const rb = rowBounds(curIdx);
+    const b = bar.querySelector('b');
+    if(b) b.textContent = (rb.end > rb.start) ? ((rb.start + 1) + '–' + (rb.end + 1)) : String(p.page);
     const btns = bar.querySelectorAll('button');
-    if(btns[0]) btns[0].disabled = p.page <= 1;
-    if(btns[1]) btns[1].disabled = p.page >= count;
+    if(btns[0]) btns[0].disabled = rb.start <= 0 && p.page <= 1;
+    if(btns[1]) btns[1].disabled = rb.end >= count - 1 && p.page >= count;
   };
   const onScroll = ()=>{
     if(!alive || !stage) return;
     p._scrollTop = stage.scrollTop;
     const mid = stage.scrollTop + stage.clientHeight / 2;
-    let curIdx = 0;
+    let curIdx = 0, rowTop = -1;
     for(let k = 0; k < pgs.length; k++){
-      if(pgs[k].offsetTop <= mid) curIdx = k; else break;
+      const ot = Number(pgs[k].offsetTop);
+      if(!Number.isFinite(ot)) continue;
+      if(ot <= mid){
+        if(rowTop < 0 || ot - rowTop > 4){ rowTop = ot; curIdx = k; }
+      } else break;
     }
     if(curIdx + 1 !== p.page){ p.page = curIdx + 1; syncPagerDom(); }
   };
   if(stage) stage.addEventListener('scroll', onScroll, { passive: true });
   p._pdfGoto = (n)=>{
     const idx = Math.max(0, Math.min(count - 1, (Number(n) || 1) - 1));
+    const rb = rowBounds(idx);
     p.page = idx + 1;
-    drawOne(idx);
-    if(idx + 1 < count) drawOne(idx + 1);
-    if(stage && pgs[idx]) stage.scrollTop = Math.max(0, pgs[idx].offsetTop - 8);
+    for(let k = rb.start; k <= Math.min(count - 1, rb.end + 2); k++) drawOne(k, false);
+    if(stage && pgs[idx] && Number.isFinite(Number(pgs[idx].offsetTop))) stage.scrollTop = Math.max(0, Number(pgs[idx].offsetTop) - 8);
     syncPagerDom();
+  };
+  p._pdfStep = (step)=>{
+    const d = Number(step) || 0;
+    if(!d) return;
+    const curIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    const rb = rowBounds(curIdx);
+    if(rb.end > rb.start){
+      if(d > 0){
+        if(rb.end >= count - 1) return;
+        p._pdfGoto(rb.end + 2);
+      } else {
+        if(rb.start <= 0) return;
+        const prevRb = rowBounds(rb.start - 1);
+        p._pdfGoto(prevRb.start + 1);
+      }
+      return;
+    }
+    const next = Math.min(count, Math.max(1, curIdx + 1 + d));
+    if(next === p.page) return;
+    p._pdfGoto(next);
+  };
+  p._pdfRelayout = (jumpKeep)=>{
+    if(!alive || state.mbPv !== p) return;
+    const keepIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    syncHostLayout();
+    for(let k = 0; k < pgs.length; k++){
+      const g = calcSize(k);
+      pgs[k].style.width = g.cssW + 'px';
+      pgs[k].style.height = g.cssH + 'px';
+      const cv = pgs[k].querySelector && pgs[k].querySelector('canvas');
+      if(cv && cv.style){
+        cv.style.width = g.cssW + 'px';
+        cv.style.height = g.cssH + 'px';
+      }
+    }
+    if(jumpKeep && stage && pgs[keepIdx] && Number.isFinite(Number(pgs[keepIdx].offsetTop))){
+      stage.scrollTop = Math.max(0, Number(pgs[keepIdx].offsetTop) - 8);
+    }
+    syncPagerDom();
+    clearTimeout(relayoutT);
+    relayoutT = setTimeout(()=>{
+      if(!alive || state.mbPv !== p) return;
+      for(let k = 0; k < count; k++){
+        if(isNearVisible(k)) drawOne(k, true);
+        else if(drawn[k]) releaseOne(k, false);
+      }
+      syncPagerDom();
+    }, 80);
   };
   p._pdfCleanup = ()=>{
     alive = false;
+    clearTimeout(relayoutT);
     if(io) io.disconnect();
     if(stage) stage.removeEventListener('scroll', onScroll);
     p._pdfGoto = null;
+    p._pdfStep = null;
+    p._pdfRelayout = null;
     for(let k = 0; k < count; k++) releaseOne(k, true);
   };
   if(io) pgs.forEach(d=>io.observe(d));
-  else for(let k = 0; k < count && alive; k++) drawOne(k);
+  else for(let k = 0; k < count && alive; k++) drawOne(k, false);
   const startIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
-  if(alive) drawOne(startIdx);
-  if(alive && startIdx + 1 < count) drawOne(startIdx + 1);
+  const initSpan = effCols() === 0 ? 5 : (effCols() === 2 ? 3 : 1);
+  for(let k = startIdx; k <= Math.min(count - 1, startIdx + initSpan) && alive; k++) drawOne(k, false);
   if(alive && stage && p._scrollTop) stage.scrollTop = p._scrollTop;
+  syncPagerDom();
 }
-/* 한글(.hwp·.hwpx) 쪽들을 종이 모양 그대로 캔버스에 그린다 — 전 쪽 세로 연속 스크롤 */
+/* 한글(.hwp·.hwpx) 쪽들을 종이 모양 그대로 캔버스에 그린다 — 연속·다단(2쪽 이상) 스크롤 */
 function mbPvHwpDraw(){
   const p = state.mbPv;
   if(!p || !p.hwp) return;
   const host = document.getElementById('mbPvHwp');
   if(!host) return;
   const tag = String(p.tok || 0);
-  if(host.getAttribute('data-tok') === tag) return;
+  if(host.getAttribute('data-tok') === tag){
+    if(typeof p._hwpRelayout === 'function') p._hwpRelayout(false);
+    return;
+  }
   if(p._hwpCleanup){ try{ p._hwpCleanup(); }catch(_){} p._hwpCleanup = null; }
   host.setAttribute('data-tok', tag);
   host.textContent = '';
@@ -29890,42 +30266,91 @@ function mbPvHwpDraw(){
   const stage = host.parentNode;
   const count = Number(p.pages) || 1;
   const sizes = p.hwpSizes || [];
-  const pgs = [], drawn = [];
-  let alive = true;
+  const pgs = [], drawn = [], renderedSc = [];
+  let alive = true, relayoutT = 0;
+  const effCols = ()=>{
+    if(count <= 1) return 1;
+    if(p.cols === 1 || p.cols === 2 || p.cols === 0) return p.cols;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    return stW < 680 ? 1 : 2;
+  };
   const calcSize = (idx)=>{
     const s = sizes[idx] || { w: 794, h: 1123 };
     const rw = Number(s.w), rh = Number(s.h);
     const w0 = (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 794;
     const h0 = (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 1123;
-    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 900;
-    const pad = stW < 520 ? 12 : 28;
-    const box = Math.max(200, stW - pad);
-    const maxW = w0 > h0 ? 980 : 880;
-    let cssSc = Math.min(1.15, Math.min(box, maxW) / w0);
+    const zPct = (typeof mbPvZoomOf === 'function') ? mbPvZoomOf(p) : (Number(p.zoom) || 100);
+    if(typeof mbPvCalcBox === 'function') return mbPvCalcBox(w0, h0, stage, effCols(), zPct, 1.35);
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    const stH = (stage && stage.clientHeight) ? stage.clientHeight : 760;
+    const pad = stW < 520 ? 12 : 28, gap = 14, box = Math.max(200, stW - pad), cols = effCols();
+    let baseSc = cols === 2 ? Math.min((box - gap) / (2 * w0), Math.max((stH - 24) / h0, Math.min((box - gap) / (2 * w0), 420 / w0)))
+               : cols === 0 ? Math.min((box - gap * 2) / (3 * w0), ((stH - gap - 24) * 0.72) / h0)
+               : Math.min(1.35, Math.min(box, w0 > h0 ? 1040 : 860) / w0);
+    let cssSc = Math.min(1.35, baseSc) * (Math.max(40, Math.min(250, zPct)) / 100);
     if(h0 * cssSc > 4096) cssSc = 4096 / h0;
-    return {
-      w0:w0, h0:h0, cssSc:cssSc,
-      cssW:Math.max(1, Math.round(w0 * cssSc)),
-      cssH:Math.max(1, Math.round(h0 * cssSc)),
-    };
+    return { w0:w0, h0:h0, cssSc:cssSc, cols:cols, box:box, gap:gap, cssW:Math.max(1, Math.round(w0 * cssSc)), cssH:Math.max(1, Math.round(h0 * cssSc)) };
   };
-  const drawOne = (idx)=>{
-    if(!alive || drawn[idx] || !p.hwp) return;
+  const syncHostLayout = ()=>{
+    const cols = effCols();
+    if(host.setAttribute) host.setAttribute('data-cols', String(cols));
+    if(!host.style) return;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 1200;
+    const stageInnerW = Math.max(160, stW - 24);
+    let maxCssW = 0;
+    for(let k = 0; k < count; k++){
+      const gk = calcSize(k);
+      if(gk.cssW > maxCssW) maxCssW = gk.cssW;
+    }
+    const g0 = calcSize(0);
+    const over = maxCssW > stageInnerW;
+    if(host.setAttribute) host.setAttribute('data-overflow', over ? '1' : '0');
+    if(over){
+      host.style.width = maxCssW + 'px';
+      host.style.maxWidth = '';
+    } else {
+      host.style.width = '100%';
+      if(cols === 2 && count > 1){
+        const twoW = g0.cssW * 2 + g0.gap + 4;
+        host.style.maxWidth = (twoW <= g0.box + 4) ? (twoW + 'px') : '';
+      } else {
+        host.style.maxWidth = '';
+      }
+    }
+  };
+  const isNearVisible = (idx)=>{
+    if(!stage || !stage.clientHeight) return true;
+    const el = pgs[idx];
+    if(!el || !Number.isFinite(Number(el.offsetTop))) return true;
+    const top = Number(el.offsetTop);
+    const h = Number(el.offsetHeight) || calcSize(idx).cssH;
+    const vTop = (Number(stage.scrollTop) || 0) - 1400;
+    const vBot = (Number(stage.scrollTop) || 0) + stage.clientHeight + 1400;
+    return (top + h >= vTop) && (top <= vBot);
+  };
+  const drawOne = (idx, forceRescale)=>{
+    if(!alive || !p.hwp || idx < 0 || idx >= count) return;
+    const g = calcSize(idx);
+    const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
+    const pxCapSc = Math.sqrt(maxPx / Math.max(1, g.w0 * g.h0)) * 0.99;
+    const sc = Math.min(g.cssSc * rawDpr, pxCapSc);
+    if(drawn[idx]){
+      if(!forceRescale) return;
+      if(Math.abs((renderedSc[idx] || 0) - sc) <= 0.04) return;
+    }
     drawn[idx] = true;
     try{
-      const g = calcSize(idx);
       const pg = pgs[idx]; if(!pg) return;
       pg.style.width = g.cssW + 'px';
       pg.style.height = g.cssH + 'px';
-      let cv = pg.querySelector('canvas');
+      const existingCv = pg.querySelector('canvas');
+      const swapMode = !!(existingCv && existingCv.width > 0);
+      let cv = swapMode ? document.createElement('canvas') : existingCv;
       if(!cv){ cv = document.createElement('canvas'); pg.textContent = ''; pg.appendChild(cv); }
       if(cv.setAttribute){
         cv.setAttribute('role', 'img');
         cv.setAttribute('aria-label', String(p.name || '한글 문서') + ' ' + String(idx + 1) + '쪽');
       }
-      const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
-      const pxCapSc = Math.sqrt(maxPx / Math.max(1, g.w0 * g.h0)) * 0.99;
-      const sc = Math.min(g.cssSc * rawDpr, pxCapSc);
       const pxW = Math.max(1, Math.round(g.w0 * sc));
       const pxH = Math.max(1, Math.round(g.h0 * sc));
       if(!Number.isFinite(pxW) || !Number.isFinite(pxH) || pxW * pxH > maxPx) throw new Error('문서 쪽 해상도가 한도를 넘습니다');
@@ -29934,8 +30359,19 @@ function mbPvHwpDraw(){
       p.hwp.renderPageToCanvas(idx, cv, sc);
       cv.style.width = g.cssW + 'px';
       cv.style.height = g.cssH + 'px';
+      if(swapMode){
+        existingCv.width = 0; existingCv.height = 0;
+        if(existingCv.parentNode === pg && typeof pg.replaceChild === 'function'){
+          pg.replaceChild(cv, existingCv);
+        } else {
+          pg.textContent = '';
+          pg.appendChild(cv);
+        }
+      }
+      renderedSc[idx] = sc;
     }catch(e){
       drawn[idx] = false;
+      renderedSc[idx] = 0;
       console.warn('[한글 미리보기]', (e&&e.message)||e);
       if(state.mbPv === p){
         mbPvRelease(p);
@@ -29948,75 +30384,152 @@ function mbPvHwpDraw(){
     if(!drawn[idx]) return;
     if(!force){
       const cur = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
-      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= 1) return;
+      const keepSpan = Math.max(2, (effCols() === 0 ? 4 : effCols()) * 2);
+      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= keepSpan) return;
     }
     drawn[idx] = false;
+    renderedSc[idx] = 0;
     const pg = pgs[idx];
     const cv = pg && pg.querySelector('canvas');
     if(cv){ cv.width = 0; cv.height = 0; }
   };
+  syncHostLayout();
   for(let k = 0; k < count; k++){
     const d = document.createElement('div');
     d.className = 'pvhwp-pg';
     d.setAttribute('data-i', String(k));
+    if(count > 1 && d.setAttribute) d.setAttribute('data-pg', (k + 1) + ' / ' + count);
     const g = calcSize(k);
     d.style.width = g.cssW + 'px';
     d.style.height = g.cssH + 'px';
     host.appendChild(d);
     pgs.push(d);
   }
+  const rowBounds = (idx)=>{
+    const el = pgs[idx];
+    const ot = el ? Number(el.offsetTop) : NaN;
+    const ol = el ? Number(el.offsetLeft) : NaN;
+    if(!Number.isFinite(ot) || !Number.isFinite(ol)) return { start: idx, end: idx };
+    let s = idx, e = idx;
+    while(s > 0 && Number.isFinite(Number(pgs[s - 1].offsetTop)) && Math.abs(Number(pgs[s - 1].offsetTop) - ot) <= 4
+      && Number(pgs[s - 1].offsetLeft) < Number(pgs[s].offsetLeft)) s--;
+    while(e + 1 < count && Number.isFinite(Number(pgs[e + 1].offsetTop)) && Math.abs(Number(pgs[e + 1].offsetTop) - ot) <= 4
+      && Number(pgs[e + 1].offsetLeft) > Number(pgs[e].offsetLeft)) e++;
+    return { start: s, end: e };
+  };
   const io = (typeof IntersectionObserver === 'function' && stage)
     ? new IntersectionObserver((ents)=>{
         ents.forEach((en)=>{
           const idx = Number(en.target.getAttribute('data-i'));
-          if(en.isIntersecting) drawOne(idx); else releaseOne(idx, false);
+          if(en.isIntersecting) drawOne(idx, false); else releaseOne(idx, false);
         });
       }, { root: stage, rootMargin: '2400px 0px' })
     : null;
   const syncPagerDom = ()=>{
     const bar = stage && stage.parentNode && stage.parentNode.querySelector('.pvpg');
     if(!bar) return;
-    const b = bar.querySelector('b'); if(b) b.textContent = String(p.page);
+    const curIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    const rb = rowBounds(curIdx);
+    const b = bar.querySelector('b');
+    if(b) b.textContent = (rb.end > rb.start) ? ((rb.start + 1) + '–' + (rb.end + 1)) : String(p.page);
     const btns = bar.querySelectorAll('button');
-    if(btns[0]) btns[0].disabled = p.page <= 1;
-    if(btns[1]) btns[1].disabled = p.page >= count;
+    if(btns[0]) btns[0].disabled = rb.start <= 0 && p.page <= 1;
+    if(btns[1]) btns[1].disabled = rb.end >= count - 1 && p.page >= count;
   };
   const onScroll = ()=>{
     if(!alive || !stage) return;
     p._scrollTop = stage.scrollTop;
     const mid = stage.scrollTop + stage.clientHeight / 2;
-    let curIdx = 0;
+    let curIdx = 0, rowTop = -1;
     for(let k = 0; k < pgs.length; k++){
-      if(pgs[k].offsetTop <= mid) curIdx = k; else break;
+      const ot = Number(pgs[k].offsetTop);
+      if(!Number.isFinite(ot)) continue;
+      if(ot <= mid){
+        if(rowTop < 0 || ot - rowTop > 4){ rowTop = ot; curIdx = k; }
+      } else break;
     }
     if(curIdx + 1 !== p.page){ p.page = curIdx + 1; syncPagerDom(); }
   };
   if(stage) stage.addEventListener('scroll', onScroll, { passive: true });
   p._hwpGoto = (n)=>{
     const idx = Math.max(0, Math.min(count - 1, (Number(n) || 1) - 1));
+    const rb = rowBounds(idx);
     p.page = idx + 1;
-    drawOne(idx);
-    if(idx + 1 < count) drawOne(idx + 1);
-    if(stage && pgs[idx]) stage.scrollTop = Math.max(0, pgs[idx].offsetTop - 8);
+    for(let k = rb.start; k <= Math.min(count - 1, rb.end + 2); k++) drawOne(k, false);
+    if(stage && pgs[idx] && Number.isFinite(Number(pgs[idx].offsetTop))) stage.scrollTop = Math.max(0, Number(pgs[idx].offsetTop) - 8);
     syncPagerDom();
+  };
+  p._hwpStep = (step)=>{
+    const d = Number(step) || 0;
+    if(!d) return;
+    const curIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    const rb = rowBounds(curIdx);
+    if(rb.end > rb.start){
+      if(d > 0){
+        if(rb.end >= count - 1) return;
+        p._hwpGoto(rb.end + 2);
+      } else {
+        if(rb.start <= 0) return;
+        const prevRb = rowBounds(rb.start - 1);
+        p._hwpGoto(prevRb.start + 1);
+      }
+      return;
+    }
+    const next = Math.min(count, Math.max(1, curIdx + 1 + d));
+    if(next === p.page) return;
+    p._hwpGoto(next);
+  };
+  p._hwpRelayout = (jumpKeep)=>{
+    if(!alive || state.mbPv !== p) return;
+    const keepIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+    syncHostLayout();
+    for(let k = 0; k < pgs.length; k++){
+      const g = calcSize(k);
+      pgs[k].style.width = g.cssW + 'px';
+      pgs[k].style.height = g.cssH + 'px';
+      const cv = pgs[k].querySelector && pgs[k].querySelector('canvas');
+      if(cv && cv.style){
+        cv.style.width = g.cssW + 'px';
+        cv.style.height = g.cssH + 'px';
+      }
+    }
+    if(jumpKeep && stage && pgs[keepIdx] && Number.isFinite(Number(pgs[keepIdx].offsetTop))){
+      stage.scrollTop = Math.max(0, Number(pgs[keepIdx].offsetTop) - 8);
+    }
+    syncPagerDom();
+    clearTimeout(relayoutT);
+    relayoutT = setTimeout(()=>{
+      if(!alive || state.mbPv !== p) return;
+      for(let k = 0; k < count; k++){
+        if(isNearVisible(k)) drawOne(k, true);
+        else if(drawn[k]) releaseOne(k, false);
+      }
+      syncPagerDom();
+    }, 80);
   };
   p._hwpCleanup = ()=>{
     alive = false;
+    clearTimeout(relayoutT);
     if(io) io.disconnect();
     if(stage) stage.removeEventListener('scroll', onScroll);
     p._hwpGoto = null;
+    p._hwpStep = null;
+    p._hwpRelayout = null;
     for(let k = 0; k < count; k++) releaseOne(k, true);
   };
   if(io) pgs.forEach(d=>io.observe(d));
-  else for(let k = 0; k < count && alive; k++) drawOne(k);
+  else for(let k = 0; k < count && alive; k++) drawOne(k, false);
   const startIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
-  if(alive) drawOne(startIdx);
-  if(alive && startIdx + 1 < count) drawOne(startIdx + 1);
+  const initSpan = effCols() === 0 ? 5 : (effCols() === 2 ? 3 : 1);
+  for(let k = startIdx; k <= Math.min(count - 1, startIdx + initSpan) && alive; k++) drawOne(k, false);
   if(alive && stage && p._scrollTop) stage.scrollTop = p._scrollTop;
+  syncPagerDom();
 }
 function mbPvPage(step){
   const p = state.mbPv;
   if(!p || !p.pages) return;
+  if(p.hwp && typeof p._hwpStep === 'function'){ p._hwpStep(step); return; }
+  if(p.pdf && typeof p._pdfStep === 'function'){ p._pdfStep(step); return; }
   const n = Math.min(p.pages, Math.max(1, Number(p.page||1) + Number(step)));
   if(n === p.page) return;
   if(p.hwp && typeof p._hwpGoto === 'function'){ p._hwpGoto(n); return; }
@@ -30033,22 +30546,67 @@ function mbPvAfter(){
       if(!dlg._pvKeyBound){
         dlg._pvKeyBound = true;
         dlg.addEventListener('keydown', (ev)=>{
-          if(ev.key !== 'Tab') return;
-          const items = Array.from(dlg.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])'));
-          if(!items.length) return;
-          const first = items[0], last = items[items.length - 1];
-          if(ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus(); }
-          else if(!ev.shiftKey && document.activeElement === last){ ev.preventDefault(); first.focus(); }
+          if(ev.key === 'Tab'){
+            const items = Array.from(dlg.querySelectorAll('button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+            if(!items.length) return;
+            const first = items[0], last = items[items.length - 1];
+            if(ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus(); }
+            else if(!ev.shiftKey && document.activeElement === last){ ev.preventDefault(); first.focus(); }
+            return;
+          }
+          const tag = ev.target && ev.target.tagName ? String(ev.target.tagName).toUpperCase() : '';
+          if(tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+          if(ev.key === '+' || ev.key === '='){
+            ev.preventDefault();
+            if(typeof mbPvZoomStep === 'function') mbPvZoomStep(1);
+          } else if(ev.key === '-' || ev.key === '_'){
+            ev.preventDefault();
+            if(typeof mbPvZoomStep === 'function') mbPvZoomStep(-1);
+          } else if(ev.key === '0' && (ev.ctrlKey || ev.metaKey)){
+            ev.preventDefault();
+            if(typeof mbPvZoomSet === 'function') mbPvZoomSet(100);
+          }
         });
+        dlg.addEventListener('wheel', (ev)=>{
+          if(!ev || (!ev.ctrlKey && !ev.metaKey)) return;
+          if(!state.mbPv || state.mbPv.loading || state.mbPv.err) return;
+          ev.preventDefault();
+          const dy = Number(ev.deltaY) || 0;
+          if(!dy || typeof mbPvZoomSet !== 'function') return;
+          const cur = (typeof mbPvZoomOf === 'function') ? mbPvZoomOf(state.mbPv) : 100;
+          mbPvZoomSet(cur + (dy < 0 ? 10 : -10));
+        }, { passive: false });
       }
-      if(!dlg.contains(document.activeElement)){
+      if(typeof dlg.contains === 'function' && !dlg.contains(document.activeElement)){
         const closeBtn = dlg.querySelector('footer button:last-child') || dlg;
         if(closeBtn && typeof closeBtn.focus === 'function'){ try{ closeBtn.focus(); }catch(_){} }
+      }
+      if(typeof ResizeObserver === 'function' && !state.mbPv._roCleanup && typeof dlg.querySelector === 'function'){
+        const st = dlg.querySelector('.pvstage');
+        if(st){
+          let lastW = Number(st.clientWidth) || 0, lastH = Number(st.clientHeight) || 0, roT = 0;
+          const curPv = state.mbPv;
+          const ro = new ResizeObserver(()=>{
+            if(state.mbPv !== curPv) return;
+            const nw = Number(st.clientWidth) || 0, nh = Number(st.clientHeight) || 0;
+            if(Math.abs(nw - lastW) <= 6 && Math.abs(nh - lastH) <= 6) return;
+            lastW = nw; lastH = nh;
+            clearTimeout(roT);
+            roT = setTimeout(()=>{
+              if(state.mbPv !== curPv) return;
+              if(curPv.pdf && typeof curPv._pdfRelayout === 'function') curPv._pdfRelayout(false);
+              else if(curPv.hwp && typeof curPv._hwpRelayout === 'function') curPv._hwpRelayout(false);
+            }, 90);
+          });
+          try{ ro.observe(st); }catch(_){}
+          curPv._roCleanup = ()=>{ clearTimeout(roT); try{ ro.disconnect(); }catch(_){} };
+        }
       }
     }
   }
   if(state.mbPv.kind === 'pdf' && state.mbPv.pdf) setTimeout(mbPvPdfDraw, 0);
   else if(state.mbPv.hwp) setTimeout(mbPvHwpDraw, 0);
+  else if(typeof mbPvApplyContentZoom === 'function') setTimeout(mbPvApplyContentZoom, 0);
 }
 
 /* ══ 미리보기 창 ══ */
@@ -30056,6 +30614,32 @@ function mbPvHtml(){
   const p = state.mbPv;
   if(!p) return '';
   const paged = !!((p.kind === 'pdf' && p.pdf) || p.hwp);
+  const effCols = (paged && p.pages > 1)
+    ? ((typeof mbPvColsOf === 'function') ? mbPvColsOf(p) : (p.cols === 1 || p.cols === 2 || p.cols === 0 ? p.cols : 2))
+    : 1;
+  const zoom = (typeof mbPvZoomOf === 'function') ? mbPvZoomOf(p) : (Math.max(40, Math.min(250, Math.round(Number(p.zoom) || 100))));
+  const zMin = typeof MB_PV_ZOOM_MIN === 'number' ? MB_PV_ZOOM_MIN : 40;
+  const zMax = typeof MB_PV_ZOOM_MAX === 'number' ? MB_PV_ZOOM_MAX : 250;
+  const zList = (typeof MB_PV_ZOOMS !== 'undefined' && Array.isArray(MB_PV_ZOOMS)) ? MB_PV_ZOOMS : [50, 75, 100, 125, 150, 200];
+  const zStops = zList.indexOf(zoom) >= 0 ? zList : zList.concat([zoom]).sort((a,b)=>a-b);
+  const canZoom = !p.loading && !p.err && (paged || p.kind === 'img' || p.grid || p.text);
+  const colBar = (!p.loading && !p.err && paged && p.pages > 1)
+    ? `<span class="pvseg pvcols" role="group" aria-label="쪽 배치">`
+      + `<button type="button" data-cols="1" class="${effCols===1?'on':''}" aria-pressed="${effCols===1}" title="한 줄에 1쪽씩 크게 보기" onclick="mbPvColsSet(1)">1쪽</button>`
+      + `<button type="button" data-cols="2" class="${effCols===2?'on':''}" aria-pressed="${effCols===2}" title="나란히 2쪽 한눈에 보기" onclick="mbPvColsSet(2)">2쪽</button>`
+      + `<button type="button" data-cols="0" class="${effCols===0?'on':''}" aria-pressed="${effCols===0}" title="여러 쪽 모아보기" onclick="mbPvColsSet(0)">여러쪽</button>`
+      + `</span>` : '';
+  const zoomBar = canZoom
+    ? `<span class="pvseg pvzoom" role="group" aria-label="화면 배율">`
+      + `<button type="button" class="pvz-out" aria-label="화면 축소" title="비율 작게 (Ctrl + 마우스 휠 아래로)" onclick="mbPvZoomStep(-1)" ${zoom<=zMin?'disabled':''}>−</button>`
+      + `<select class="pvzoom-sel" aria-label="배율 선택" title="화면 비율 선택" onchange="mbPvZoomSet(this.value)">`
+      + zStops.map(v=>`<option value="${v}"${v===zoom?' selected':''}>${v}%</option>`).join('')
+      + `</select>`
+      + `<button type="button" class="pvz-in" aria-label="화면 확대" title="비율 크게 (Ctrl + 마우스 휠 위로)" onclick="mbPvZoomStep(1)" ${zoom>=zMax?'disabled':''}>+</button>`
+      + `</span>` : '';
+  const wideOn = !!(p.wide != null ? p.wide : (typeof _mbPvWide === 'boolean' && _mbPvWide));
+  const wideBtn = `<button type="button" class="pvwbtn${wideOn?' on':''}" aria-pressed="${wideOn}" aria-label="${wideOn?'기본 창 크기':'전체 창 크기'}" title="${wideOn?'기본 창 크기로 줄이기':'팝업창 화면에 꽉 차게 넓히기'}" onclick="mbPvWideToggle()">${wideOn?'기본창':'전체창'}</button>`;
+  const tools = `<span class="pvtools">${colBar}${zoomBar}${wideBtn}</span>`;
   const pager = (paged && p.pages > 1)
     ? `<span class="pvpg"><button type="button" aria-label="이전 쪽" onclick="mbPvPage(-1)" ${p.page<=1?'disabled':''}>◀</button>
         <b>${p.page}</b> / ${p.pages}
@@ -30070,11 +30654,11 @@ function mbPvHtml(){
   else if(p.err) stage = '<div class="pvnone"><b>못 열었습니다</b>' + esc(p.err)
     + '<br>내려받아 여시거나 급여데이터함으로 담으십시오.</div>';
   else if(p.kind === 'pdf' && p.pdf)
-    /* ⚠ 모든 쪽을 세로로 이어 캔버스에 «그림으로» 그린다 — PDF 안의 무엇도 돌지 않는다(mbPvPdfDraw) */
-    stage = `<div id="mbPvPdf" class="pvhwp" role="region" aria-label="${esc(p.name)} PDF 미리보기"><div class="pvhwp-pg" data-i="0"><canvas id="mbPvCanvas" class="pvpdf" role="img" aria-label="${esc(p.name)} 1쪽"></canvas></div></div>`;
+    /* ⚠ 모든 쪽을 이어 캔버스에 «그림으로» 그린다 — PDF 안의 무엇도 돌지 않는다(mbPvPdfDraw) */
+    stage = `<div id="mbPvPdf" class="pvhwp" data-cols="${effCols}" role="region" aria-label="${esc(p.name)} PDF 미리보기"><div class="pvhwp-pg" data-i="0"><canvas id="mbPvCanvas" class="pvpdf" role="img" aria-label="${esc(p.name)} 1쪽"></canvas></div></div>`;
   else if(p.hwp)
     /* ⚠ 한글도 WASM 엔진으로 캔버스에 «종이 모양 그대로» 그린다 — 문서 안의 무엇도 돌지 않는다(mbPvHwpDraw) */
-    stage = `<div id="mbPvHwp" class="pvhwp" role="region" aria-label="${esc(p.name)} 한글 양식 미리보기"></div>`;
+    stage = `<div id="mbPvHwp" class="pvhwp" data-cols="${effCols}" role="region" aria-label="${esc(p.name)} 한글 양식 미리보기"></div>`;
   else if(p.kind === 'img')
     stage = `<img class="pvimg" src="${esc(p.url)}" alt="${esc(p.name)}">`;
   else if(p.grid)
@@ -30092,9 +30676,10 @@ function mbPvHtml(){
             : p.kind === 'xls' ? (p.sheets > 1 ? ` · 「${esc(p.sheet)}」 등 ${p.sheets}장 중 첫 장` : '')
             : '';
   return `<div class="mck-dim pvdim" onclick="if(event.target===this)mbPvClose()">
-    <div class="mck pvbox" role="dialog" aria-modal="true" aria-labelledby="mbPvTitle" tabindex="-1">
+    <div class="mck pvbox${wideOn?' pvwide':''}" role="dialog" aria-modal="true" aria-labelledby="mbPvTitle" tabindex="-1">
       <header><span aria-hidden="true">👁</span><h2 id="mbPvTitle">${esc(p.name)}</h2>
         <span class="pvsz">${p.size?esc(fmtMB(p.size)):''}${sub}</span>
+        ${tools}
         <span class="x" role="button" tabindex="0" aria-label="닫기" title="닫기" onclick="mbPvClose()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();mbPvClose()}">✕</span></header>
       <div class="pvstage">${stage}</div>
       ${foot}
