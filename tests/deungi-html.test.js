@@ -47,8 +47,8 @@ test('온톨로지 — 프로그램·개체·읽기 어댑터(앱 안에서만)�
 
 test('★ 주민번호 뒷자리(RRN)는 저장하지 않는다 — 파이어베이스·localStorage 로 가는 길에 안 실린다', () => {
   assert.ok(본문.length > 1000, '앱 본문 스크립트를 못 찾았다');
-  /* lsSet 은 탭·연 건 열쇠만 */
-  (본문.match(/lsSet\('([^']+)'/g) || []).forEach((s) => assert.match(s, /lsSet\('(tab|cur|mode)'/, '저장하는 열쇠: ' + s));
+  /* lsSet 은 탭·연 건·화면 모양·보기 칸 너비 열쇠만 */
+  (본문.match(/lsSet\('([^']+)'/g) || []).forEach((s) => assert.match(s, /lsSet\('(tab|cur|mode|sideW)'/, '저장하는 열쇠: ' + s));
   assert.doesNotMatch(본문, /(localStorage|sessionStorage)\.setItem\([^)]*RRN/);
   /* 저장 레코드를 만드는 곳(caseRecord)은 정리 함수(normCase)를 거친다 — 모르는 칸(RRN 포함)이 떨어진다 */
   assert.match(본문, /function caseRecord\(raw\)\{\s*var n=C\.normCase\(raw\)/);
@@ -140,7 +140,8 @@ test('★ 원본 파일은 원본 보관함 🔒 자리에(from.kind deungi) 올
   assert.match(html, /js\/pu-office-store\.js\?v=/);
   /* 로그아웃 때 묶음·보관함 연결·미리보기 주소를 비운다 */
   const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
-  ['ARCH={}', 'arcRevoke()', 'PuOfficeStore.init({})'].forEach((k) => assert.ok(wipe.indexOf(k) >= 0, 'wipe 가 비우지 않는 것: ' + k));
+  ['ARCH={}', 'sideClose()', 'PuOfficeStore.init({})'].forEach((k) => assert.ok(wipe.indexOf(k) >= 0, 'wipe 가 비우지 않는 것: ' + k));
+  assert.match(본문, /function sideClose\(\)\{\n[^\n]*\n  var had=!!SIDE, row=sideMark\(\)[^\n]*arcRevoke\(\);/);
   /* 묶음 저장은 관문으로, 세대 검사를 거친다 */
   assert.match(본문, /save\('deungi\/archive\/'\+id, 'DeungiArchive'/);
 });
@@ -216,4 +217,47 @@ test('넣다 만 변경은 반영 단추·다음 단추를 막고, 자세히 화
   assert.match(본문, /if\(!C\.hasEffect\(a\)\) return toast\(/);
   assert.match(본문, /n\.meeting\.date && C\.hasEffect\(a\)\)/);
   assert.doesNotMatch(본문, /«등기 완료» 날짜를 넣고 빨간 글이 없을 때 누를 수 있습니다/);
+});
+
+/* 2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」 */
+test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음으로 하나씩, 늦은 응답은 버린다', () => {
+  assert.match(html, /<aside id="side" role="complementary" aria-label="원본 서류 보기"><\/aside>/);
+  /* 넓은 화면은 본문이 왼쪽으로 좁아지고, 좁은 화면(1080px 미만)은 전체를 덮는다 */
+  assert.match(html, /body\.withSide main\{margin-right:var\(--sideW,46vw\)\}/);
+  assert.match(html, /@media \(max-width:1079px\)\{\n  #side\.on\{top:0;left:0;width:auto;z-index:45/);
+  assert.match(본문, /function sideOverlay\(\)\{ try\{ return window\.matchMedia\('\(max-width:1079px\)'\)\.matches;/);
+  /* 보기는 덮는 창(openModal)을 쓰지 않는다 */
+  const v = 본문.slice(본문.indexOf('function arcView('), 본문.indexOf('function sideNav('));
+  assert.doesNotMatch(v, /openModal\(/);
+  assert.match(v, /SIDE=\{ ev:evId, fid:fid \}/);
+  /* 파일마다 새 그릴 자리 + 세대·차례·자리 검사 */
+  assert.match(v, /live=function\(\)\{ return g===GEN && seq===PV_SEQ && box\.isConnected; \}/);
+  assert.match(v, /PureunHwp\.renderPreview\(box, PV_BYTES\.u8, f\.name\)/);
+  /* 이전·다음 — 모든 묶음 파일을 목록 차례대로, 지금 줄을 칠한다 */
+  assert.match(본문, /data-act="sideNav" data-d="-1">◀ 이전<\/button>/);
+  assert.match(본문, /data-act="sideNav" data-d="1">다음 ▶<\/button>/);
+  assert.match(본문, /function arcFlat\(\)\{ var out=\[\]; arcRows\(\)\.forEach/);
+  assert.match(본문, /r\.classList\.toggle\('cur', yes\)/);
+  /* 칸 받기·닫기·Esc */
+  assert.match(본문, /act==='sideDl'\)\{ if\(SIDE\) arcDownload\(\[\{ ev:SIDE\.ev, fid:SIDE\.fid \}\]\); \}/);
+  assert.match(본문, /if\(SIDE && sd\)\{\n    var ov=sideOverlay\(\);\n    if\(ev\.key==='Escape'\)\{ ev\.preventDefault\(\); sideClose\(\); return; \}/);
+  /* 외부 검토 2026-11-15 — 좁아진 본문은 카드 표 · 덮는 모양은 뒤를 inert · 빠진 파일은 칸 닫기 · 너비가 바뀔 때만 새 자리에 다시 그림 · 뒤로가기 */
+  assert.match(html, /body\.slim \.t thead\{display:none\}/);
+  assert.match(본문, /document\.body\.classList\.toggle\('slim', !!SIDE && !ov && document\.documentElement\.clientWidth-w < 820\)/);
+  assert.match(본문, /if\(e\) e\.inert=!!\(SIDE && ov\)/);
+  assert.match(본문, /if\(!f \|\| i<0\)\{ sideClose\(\);/);
+  assert.match(본문, /\$\('histBox'\)\.innerHTML=drawArchive\(\)\+h;\n  sideMark\(\); sideHead\(\);/);
+  assert.match(본문, /if\(!w \|\| Math\.abs\(w-SIDE_RW\)<8\) return;/);
+  assert.match(html, /if\(window\.SIDE && window\.sideClose\)\{ sideClose\(\); return true; \}/);
+  /* 덮는 창 닫기가 보기 칸 주소를 지우지 않는다 */
+  assert.match(본문, /function closeModal\(\)\{ var m=\$\('modal'\);/);
+  /* 너비는 이 브라우저에만(lsSet) — 끌기·←/→ */
+  assert.match(본문, /function sideSetW\(w\)\{ lsSet\('sideW'/);
+  assert.match(본문, /role="separator" aria-orientation="vertical"/);
+});
+
+test('★ 보기 칸 — 그림은 확장자 형식으로 고정하고, 칸이 닫히면 더 그리지 않는다(보안·기능 재검증 2026-11-15)', () => {
+  assert.match(본문, /PV_URL=URL\.createObjectURL\(new Blob\(\[blob\], \{ type:ext==='png'\?'image\/png':'image\/jpeg' \}\)\)/);
+  assert.doesNotMatch(본문, /PV_URL=URL\.createObjectURL\(blob\)/);
+  assert.match(본문, /sideFit\(\); sideHead\(\); sideMark\(\);\n  if\(!SIDE \|\| !\$\('spv'\)\) return;/);
 });
