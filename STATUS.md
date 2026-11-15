@@ -235,8 +235,17 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 PR #3114 · `status/2026-11-16-home-newsite-gaps.md`. 가짜 파이어베이스·사이트 사본으로만 시험했고, 대표 결정(2026-11-16 「2」 바로 합치기)으로 실데이터 시험 전에 합쳤다 — 첫 실제 올리기가 곧 시험이다.
 - [ ] 이알피 「홈페이지」에서 노무사 한 분의 «새 사이트 — 얼굴 사진»을 담고 「새 사이트에 올리기」 → pureunlabor.co.kr/people 에 사진이 바뀌는지 확인(안 되면 이 항목에 증상을 적는다)
-- [ ] 합친 뒤 `gh workflow run "Firebase 배포" --ref main -f functions=publishSite,monthlyHomepageAuto,dailyHomepageKeyCheck` 와 성공 확인
+  - 11-16 오전 확인: 서버 쪽은 준비됨 — 새 주소에서 publishSite 예비요청 허용(204), 올리기 열쇠 점검 «이상 없음»(22:50Z). 실서버 구성원 14명 중 사진을 담아 둔 사람 **0명** → 대표가 새 주소에 로그인해 올릴 사진을 골라야 시험이 된다(사람 얼굴을 공개 사이트에 올리는 일이라 AI 가 고르지 않는다).
+- [x] 합친 뒤 함수 3개 배포 — 실행 43736600904 성공(2026-11-16). ⚠ bash 에서는 한글 작업 이름이 안 넘어가니 `gh workflow run firebase-deploy.yml --ref main -f functions=…` 로 부른다
 - [ ] 다음 달 1일 자동(`homepage/auto/newsite`·`newsiteLogos`) 기록에서 숨긴 로고·멈춤 사유 확인
+
+### 🌐 도메인 이사 뒤 남은 것 — 사람이 로그인만 해 주면 AI 가 이어서 끝낸다 (2026-11-16 확인)
+
+인수인계: `docs/superpowers/plans/2026-11-15-ERP-주소-이사-진행상황.md`(PR #3096). 크롬·에고라이트 둘 다 아래 두 곳이 로그인 화면이다 — 비밀번호는 AI 가 넣지 않는다.
+- [ ] 가비아 로그인 → `pureunlabor.com` 을 `pureunlabor.co.kr` 로 넘김(TXT `_github-pages-challenge-nabaho` → GitHub Verify → A 4줄·`www` CNAME → `nabaho/pureunlabor-com` cname → HTTPS 강제)
+- [ ] 네이버 로그인 → 서치어드바이저 사이트 등록(`https://pureunlabor.co.kr`, HTML 파일 확인 → pureun-site 뿌리) · 사이트맵 제출. 크롬 확장은 이 사이트를 막아 둠
+- [x] 구글 서치콘솔 sitemap.xml — «성공 · 발견한 페이지 17»(2026-11-16)
+- [ ] 2027-02-15 무렵 `functions/erp-origins.js` 의 옛 출처 빼기
 
 ### 📰 뉴스레터 판례 — ✅ 끝남(2026-11-16): 국가법령정보센터 공개 쪽 읽기로 되살림 · 배포·규칙 게시·첫 모으기 확인
 
