@@ -1,0 +1,9 @@
+# 2026-11-16 · 홈페이지 원본 주소에 끝 빗금 (claude/home-canonical-slash)
+
+- 왜: 구글 서치콘솔에 sitemap 을 낼 때 보니 하위 쪽 주소가 `https://pureunlabor.co.kr/greeting` 처럼 빗금 없이 적혀 있었다.
+  쪽은 폴더(`greeting/index.html`)라 깃허브가 301 로 `/greeting/` 에 넘긴다 → 검색엔진에 «넘어가는 주소»를 원본이라 알리는 셈.
+- `scripts/freeze-homepage.js` — `쪽주소(mid)` 하나로 canonical·og:url·sitemap 주소를 만든다(하위 쪽은 끝 빗금, 뿌리는 그대로). 굳히개는 실행하지 않음(운영 중 멈춤 장치).
+- `site/` 쪽 16개 + `sitemap.xml` — 내려받기 없이 글자만 끝 빗금 꼴로. 홈페이지 저장소 nabaho/pureun-site 에도 같은 변환(별도 PR).
+- `functions/notice-lib.js` — 새 공지 sitemap 줄을 끝 빗금으로 만들고, `/notice/` 꼴과 옛 `/notice` 꼴을 다 읽으며, 옛 꼴로 이미 실린 번호는 다시 안 넣는다.
+  새 공지 쪽의 canonical·og:url 은 본(다른 공지 쪽)을 복사하며 `notice/옛번호/` → `notice/새번호/` 로 바꾸므로 따로 고칠 곳이 없다(pu-home.html·site-publish.js 손대지 않음).
+- 검사: `homepage-static` 에 «진짜 주소 = 그 쪽 폴더 자리(끝 빗금)»·«sitemap 하위 주소 끝 빗금»·«굳히개 쪽주소를 돌려 보기», `homepage-notice` 에 «끝 빗금·옛 꼴 섞여도 중복 없음». 고장넣기 8개 모두 잡힘.

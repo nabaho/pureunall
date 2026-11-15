@@ -59,6 +59,13 @@ const OUT = (() => {
    (그날 사본은 내려받기 없이 머리만 바꿔 «운영용»으로 돌렸다 — status/2026-11-15-home-go-live.md) */
 const REAL_ORIGIN = 'https://pureunlabor.co.kr';
 
+/* 쪽 하나의 «최종» 주소 — 하위 쪽은 폴더(index.html)라 끝 빗금까지 붙여야 301 없이 바로 열린다.
+   빗금 없이 적으면(…/greeting) 깃허브가 …/greeting/ 로 넘기므로, 검색엔진에 «넘어가는 주소»를
+   원본이라 알리는 셈이 된다(2026-11-16 서치콘솔 제출 때 실측). 뿌리는 `${REAL_ORIGIN}/` 그대로. */
+function 쪽주소(mid) {
+  return REAL_ORIGIN + '/' + (mid ? String(mid).replace(/\/+$/, '') + '/' : '');
+}
+
 /* ★ 굳힌 쪽이 «실제로 얹히는» 주소. 깃허브 페이지가 CNAME 파일로 이 주소를 받는다.
    2026-09-03 대표 지시로 fairrunlabor.com 에 붙였으나 그 DNS 가 끝내 스퀘어스페이스
    자리표(「곧 출시 예정」)를 가리켜 홈페이지가 밖에서 안 보였다.
@@ -204,7 +211,7 @@ function 쪽고치기(html, mid) {
         그러면 임시 주소가 «자기가 원본»이라고 검색엔진에 말하게 된다 —
         진짜 홈페이지와 검색에서 서로 잡아먹고, 검색 결과에 깃허브 주소가 뜬다.
         도메인을 옮긴 뒤에는 이 주소가 곧 제 주소라 그대로 맞다. */
-  const 진짜주소 = REAL_ORIGIN + '/' + mid;
+  const 진짜주소 = 쪽주소(mid);
   s = s.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi,
     '<link rel="canonical" href="' + 진짜주소 + '" />');
   s = s.replace(/(<meta[^>]+property=["']og:url["'][^>]*content=")[^"]*(")/gi,
@@ -370,7 +377,7 @@ function 게시글주소들(html, mid) {
      주소를 그대로 지켰으므로 옮긴 뒤 색인이 빨리 따라온다. */
   const 오늘 = new Date().toISOString().slice(0, 10);
   const 목록 = Object.keys(쪽글).map(mid =>
-    '  <url><loc>' + REAL_ORIGIN + '/' + mid + '</loc>'
+    '  <url><loc>' + 쪽주소(mid) + '</loc>'
     + '<lastmod>' + 오늘 + '</lastmod></url>').join('\n');
   담기('sitemap.xml', Buffer.from(
     '<?xml version="1.0" encoding="UTF-8"?>\n'
