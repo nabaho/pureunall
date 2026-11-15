@@ -496,6 +496,10 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   .pop .ph .x{position:absolute;right:4px;top:9px;width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:#444746;
     font-size:18px;line-height:1;padding:0;border-radius:50%;font-family:inherit;display:flex;align-items:center;justify-content:center}
   .pop .ph .x:hover{background:rgba(0,0,0,.06)}
+  /* 어두운 화면 — 바탕이 판색(어둡다)이 되므로 머리 글자도 판 글자색을 따른다(#444746 그대로면 대비 1.8:1 로 안 읽힌다 — 검토 2026-11-15) */
+  :root[data-theme="dark"] .pop .ph .wd{color:var(--gsub)}
+  :root[data-theme="dark"] .pop .ph .big,:root[data-theme="dark"] .pop .ph .x{color:var(--gtext)}
+  :root[data-theme="dark"] .pop .ph .x:hover{background:rgba(255,255,255,.1)}
   .pop .evs{gap:2px}
 
   /* 주 보기 */
