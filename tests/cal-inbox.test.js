@@ -3,7 +3,7 @@
    대표 지시 2026-10-24 「메일·문자·카톡으로 온 것을 일정표에 넣어야 할 때가 잦다 — 자동화」→ 추천대로(메일부터).
 
    ★ 이 검사가 지키는 것
-     ① 기본은 «꺼짐» — config/calInbox.on 이 켜지기 전에는 AI 를 한 번도 안 부른다
+     ① 기본은 «꺼짐» — 총괄관리자 전용 경로(cal_inbox/cfg.on)가 켜지기 전에는 AI 를 한 번도 안 부른다
      ② 일정이 있어 보이는 메일만 보낸다 — 광고·자동발송·날짜 없는 인사말은 안 보낸다
      ③ 메일 본문은 «저장하지 않는다»(후보에는 초안 칸만) · 주민번호 꼴은 보내기 전에 가린다
      ④ 한 회차·하루·이번 달 요금 한도를 넘으면 멈춘다 · 마감이 코앞이면 부르지 않는다
@@ -143,7 +143,7 @@ const 깨끗한답 = { events: [
 
 async function 돌리기(옵션) {
   옵션 = 옵션 || {};
-  const db = 옵션.db || 가짜DB(Object.assign({ 'pucards/config/calInbox/on': true }, 옵션.처음 || {}), 옵션.dbopt);
+  const db = 옵션.db || 가짜DB(Object.assign({ 'cal_inbox/cfg/on': true }, 옵션.처음 || {}), 옵션.dbopt);
   const fetchFn = 옵션.fetchFn || 가짜구글(옵션.답 === undefined ? 깨끗한답 : 옵션.답);
   const client = 옵션.client || 가짜메일(옵션.본문들 || { 101: 본문 });
   const rows = 옵션.rows || [행(101)];
@@ -160,21 +160,24 @@ async function 돌리기(옵션) {
   }
 }
 
-/* ① 기본 꺼짐 · 켜짐+자동등록 · 명시적 끔 */
-test('① 설정이 없거나 on 이 참이 아니면(기본 꺼짐) AI 도, 본문 받기도, 후보도 없다', async () => {
+/* ① 기본 꺼짐 · 켜짐+자동등록 · 명시적 끔 · 일반 직원 경로(pucards) 무시 */
+test('① 설정이 없거나 on 이 참이 아니면(기본 꺼짐, 일반 직원이 쓰는 pucards/config/calInbox 만 켜진 경우 포함) AI 도, 본문 받기도, 후보도 없다', async () => {
   for (const on of [undefined, false, 'true', 1, 0]) {
-    const init = on === undefined ? {} : { 'pucards/config/calInbox/on': on };
+    const init = on === undefined ? {} : { 'cal_inbox/cfg/on': on };
     const { r, fetchFn, client } = await 돌리기({ db: 가짜DB(init) });
     assert.strictEqual(r.ran, false, 'on=' + JSON.stringify(on));
     assert.strictEqual(fetchFn.calls.length, 0);
     assert.strictEqual(client.calls.length, 0);
   }
+  const staffEsc = await 돌리기({ db: 가짜DB({ 'pucards/config/calInbox/on': true, 'pucards/config/calInbox/autoAdd': true }) });
+  assert.strictEqual(staffEsc.r.ran, false, '일반 직원 쓰기 경로(pucards/config/calInbox)로는 절대 켜지지 않아야 한다');
+  assert.strictEqual(staffEsc.fetchFn.calls.length, 0);
 });
 
 test('① on:true, autoAdd:true 이고 검증된 발신자(공공기관 도메인 또는 등록 거래처)면 회의·강의 일정을 달력에 자동 등록하고 마감은 후보함에 남긴다', async () => {
   const db = 가짜DB({
-    'pucards/config/calInbox/on': true,
-    'pucards/config/calInbox/autoAdd': true,
+    'cal_inbox/cfg/on': true,
+    'cal_inbox/cfg/autoAdd': true,
     'pucards/items/card_1/email': 'hong@example.com',
   });
   const { r, fetchFn, client } = await 돌리기({ db });
@@ -283,7 +286,7 @@ test('③ 본문을 못 받으면 미리보기로 물러선다(그래도 부른�
 /* ④ 한도 */
 test('④ 한 회차 한도 — 일정 같은 메일이 많아도 perRunMax 까지만 부른다', async () => {
   const rows = [1, 2, 3, 4, 5].map((u) => 행(100 + u));
-  const { r, fetchFn } = await 돌리기({ rows, 처음: { 'pucards/config/calInbox/perRunMax': 2 }, 본문들: {} });
+  const { r, fetchFn } = await 돌리기({ rows, 처음: { 'cal_inbox/cfg/perRunMax': 2 }, 본문들: {} });
   assert.strictEqual(r.tried, 2);
   assert.strictEqual(fetchFn.calls.length, 2);
   assert.strictEqual(r.skipped, 3);
@@ -324,7 +327,7 @@ test('④ 마감이 코앞이면 부르지 않는다(동기화의 다른 폴더�
 
 /* ⑤ 중복 */
 test('⑤ 같은 메일을 두 번 돌려도 AI 는 한 번만 부른다(요금이 두 번 나가지 않는다)', async () => {
-  const db = 가짜DB({ 'pucards/config/calInbox/on': true });
+  const db = 가짜DB({ 'cal_inbox/cfg/on': true });
   const fetchFn = 가짜구글(깨끗한답);
   await 돌리기({ db, fetchFn });
   const 두번째 = await 돌리기({ db, fetchFn });
@@ -342,7 +345,7 @@ test('⑥ 날짜를 못 찾은(없는 날 2월 31일 포함) 초안은 후보로
 
 test('⑥ 날짜 있는 초안만 남기고 «걸러낸 뒤의 순서»로 열쇠를 매긴다 — 첫째가 빠져도 같은 메일을 다시 안 부른다', async () => {
   const 답 = { events: [{ title: '날짜 없음', date: '' }, { title: '1000 가나상사 방문', date: '2026-10-30', time: '10:00', place: '서천', contact: '임꺽정 · 010-0000-0000' }] };
-  const db = 가짜DB({ 'pucards/config/calInbox/on': true });
+  const db = 가짜DB({ 'cal_inbox/cfg/on': true });
   const fetchFn = 가짜구글(답);
   const 첫째 = await 돌리기({ db, fetchFn });
   assert.strictEqual(첫째.r.made, 1);
@@ -428,7 +431,7 @@ test('⑨ 본문에 "붙임과 같이 개최"만 있어도 첨부 한글(.hwpx) 
     },
     download: async () => ({ content: hwpxBuf }),
   };
-  const db = 가짜DB({ 'pucards/config/calInbox/on': true, 'pucards/config/calInbox/autoAdd': true });
+  const db = 가짜DB({ 'cal_inbox/cfg/on': true, 'cal_inbox/cfg/autoAdd': true });
   const fetchFn = 가짜구글({
     events: [{
       title: '1400-1600 가나지방해양청 인사관리위원회',
@@ -464,8 +467,8 @@ test('⑨ 본문에 "붙임과 같이 개최"만 있어도 첨부 한글(.hwpx) 
 
 test('⑨ 같은 날·같은 시작 시각에 기존 회의가 있으면 중복 생성하지 않고 트랜잭션으로 기존 일정을 고쳐 주소·연락처·회의내용을 채운다(구글 달력 PUT 포함)', async () => {
   const db = 가짜DB({
-    'pucards/config/calInbox/on': true,
-    'pucards/config/calInbox/autoAdd': true,
+    'cal_inbox/cfg/on': true,
+    'cal_inbox/cfg/autoAdd': true,
     'pucards/items/card_1/email': 'hong@example.com',
     'uid_roles/u_ceo/sid': 'P-001',
     'uid_roles/u_ceo/status': 'active',
@@ -537,8 +540,8 @@ test('⑨ 같은 날·같은 시작 시각에 기존 회의가 있으면 중복 
 
 test('⑩ 미등록 발신자·인증 헤더 누락·도메인 불일치·외부 MX 주입·SPF 실패 위조 메일은 기존 달력을 고치거나 자동 등록하지 않고 후보함(new)에만 남긴다', async () => {
   const db = 가짜DB({
-    'pucards/config/calInbox/on': true,
-    'pucards/config/calInbox/autoAdd': true,
+    'cal_inbox/cfg/on': true,
+    'cal_inbox/cfg/autoAdd': true,
     'data/my_schedules/v/sch_exist/id': 'sch_exist',
     'data/my_schedules/v/sch_exist/sid': 'P-001',
     'data/my_schedules/v/sch_exist/date': '2026-10-30',
@@ -614,8 +617,8 @@ test('⑪ 띄어쓴 주민등록번호가 여러 개 들어 있어도 본문·�
   const 복수본문 = '회의 참석 요청 건. 참고 9 0 0 1 0 1 - 1 2 3 4 5 6 7 및 8 5 0 2 0 2 - 2 3 4 5 6 7 8 확인 바람.';
   const id0 = CI.candId('INBOX-abcd1234', 401, 0);
   const db = 가짜DB({
-    'pucards/config/calInbox/on': true,
-    'pucards/config/calInbox/autoAdd': true,
+    'cal_inbox/cfg/on': true,
+    'cal_inbox/cfg/autoAdd': true,
     /* 사용자가 달력에서 삭제해 무덤(_deleted:true)으로 남아 있고 30일 지나 후보함 열쇠는 지워진 상태 */
     ['data/my_schedules/v/mail_' + id0 + '/id']: 'mail_' + id0,
     ['data/my_schedules/v/mail_' + id0 + '/sid']: 'P-001',
@@ -675,8 +678,8 @@ test('⑪ 띄어쓴 주민등록번호가 여러 개 들어 있어도 본문·�
 
 test('⑫ 해외 다중 라벨 도메인(.co.uk) 우회·header.from 없는 dmarc=pass·헤더 겹치기 차단 + 동시 삭제 경쟁 시 구글 PUT 0회 보장', async () => {
   const db = 가짜DB({
-    'pucards/config/calInbox/on': true,
-    'pucards/config/calInbox/autoAdd': true,
+    'cal_inbox/cfg/on': true,
+    'cal_inbox/cfg/autoAdd': true,
     'pucards/items/card_uk/email': 'person@trusted.co.uk',
     'pucards/items/card_kr/email': 'hong@example.com',
     'uid_roles/u_ceo/sid': 'P-001',
@@ -777,8 +780,8 @@ test('⑬ PRIVATE 접미사(eu.org) 타 테넌트 위조 차단 + Google PUT 도
   try {
     /* 1) eu.org 아래 다른 테넌트(attacker.eu.org) SPF 통과로 등록 발신자(person@trusted.eu.org) 위조 시도 → exact host 불일치로 차단 */
     const dbEu = 가짜DB({
-      'pucards/config/calInbox/on': true,
-      'pucards/config/calInbox/autoAdd': true,
+      'cal_inbox/cfg/on': true,
+      'cal_inbox/cfg/autoAdd': true,
       'pucards/items/card_eu/email': 'person@trusted.eu.org',
     });
     const rEu = await CI.extractFromNewMail({ getDatabase: () => dbEu }, {
@@ -792,8 +795,8 @@ test('⑬ PRIVATE 접미사(eu.org) 타 테넌트 위조 차단 + Google PUT 도
 
     /* 2) Google PUT 응답이 오기 직전(PUT 진행 중) 사용자가 로컬 일정을 _deleted:true 로 지운 경쟁 → 보상 DELETE 호출 + 실패(new) 유지 */
     const dbDel = 가짜DB({
-      'pucards/config/calInbox/on': true,
-      'pucards/config/calInbox/autoAdd': true,
+      'cal_inbox/cfg/on': true,
+      'cal_inbox/cfg/autoAdd': true,
       'pucards/items/card_kr/email': 'hong@example.com',
       'uid_roles/u_ceo/sid': 'P-001',
       'uid_roles/u_ceo/status': 'active',
@@ -838,8 +841,8 @@ test('⑬ PRIVATE 접미사(eu.org) 타 테넌트 위조 차단 + Google PUT 도
 
     /* 3) Google PUT 도중 사용자가 로컬 일정을 직접 수정해 revision 이 바뀐 경쟁 → 사용자 수정본 보존·구글 재반영 + 후보함(new) 유지 */
     const dbRev = 가짜DB({
-      'pucards/config/calInbox/on': true,
-      'pucards/config/calInbox/autoAdd': true,
+      'cal_inbox/cfg/on': true,
+      'cal_inbox/cfg/autoAdd': true,
       'pucards/items/card_kr/email': 'hong@example.com',
       'uid_roles/u_ceo/sid': 'P-001',
       'uid_roles/u_ceo/status': 'active',
@@ -893,8 +896,8 @@ test('⑬ PRIVATE 접미사(eu.org) 타 테넌트 위조 차단 + Google PUT 도
 
     /* 4) 두 번째 복구 PUT 도중 사용자가 일정을 삭제(_deleted:true)한 경우 → 보상 DELETE 호출 */
     const dbRevDel = 가짜DB({
-      'pucards/config/calInbox/on': true,
-      'pucards/config/calInbox/autoAdd': true,
+      'cal_inbox/cfg/on': true,
+      'cal_inbox/cfg/autoAdd': true,
       'pucards/items/card_kr/email': 'hong@example.com',
       'uid_roles/u_ceo/sid': 'P-001',
       'uid_roles/u_ceo/status': 'active',
@@ -943,8 +946,8 @@ test('⑬ PRIVATE 접미사(eu.org) 타 테넌트 위조 차단 + Google PUT 도
 
     /* 5) 복구 요청이 일시 오류로 모두 실패하면 cal_inbox/resync 에 남기고 flushPendingResync 가 다음 회차에 끝낸다 */
     const dbRs = 가짜DB({
-      'pucards/config/calInbox/on': true,
-      'pucards/config/calInbox/autoAdd': true,
+      'cal_inbox/cfg/on': true,
+      'cal_inbox/cfg/autoAdd': true,
       'pucards/items/card_kr/email': 'hong@example.com',
       'uid_roles/u_ceo/sid': 'P-001',
       'uid_roles/u_ceo/status': 'active',
@@ -1014,8 +1017,8 @@ test('⑮ 충돌 복구 중 RTDB 읽기 실패(최초·삭제 후 재읽기·최
     function 만들기(extra) {
       const dbopt = {};
       const db = 가짜DB(Object.assign({
-        'pucards/config/calInbox/on': true,
-        'pucards/config/calInbox/autoAdd': true,
+        'cal_inbox/cfg/on': true,
+        'cal_inbox/cfg/autoAdd': true,
         'pucards/items/card_kr/email': 'hong@example.com',
         'uid_roles/u_ceo/sid': 'P-001',
         'uid_roles/u_ceo/status': 'active',

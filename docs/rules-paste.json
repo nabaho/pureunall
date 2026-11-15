@@ -1347,21 +1347,6 @@
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
         }
       },
-      "config": {
-        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
-        "calInbox": {
-          ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
-        },
-        "mailAiClassify": {
-          ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
-        },
-        "mailPushMaster": {
-          ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
-        },
-        "$k2": {
-          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
-        }
-      },
       "$k": {
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
@@ -1384,6 +1369,30 @@
     },
     "cal_inbox": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "cfg": {
+        ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "on": {
+          ".validate": "newData.isBoolean()"
+        },
+        "autoAdd": {
+          ".validate": "newData.isBoolean()"
+        },
+        "perRunMax": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 30"
+        },
+        "dayLimit": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 300"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "by": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
       "cand": {
         ".indexOn": [
           "at"

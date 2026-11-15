@@ -72,8 +72,11 @@ function clampInt(v, fallback, min, max) {
 
 async function loadGate(db) {
   let v = {};
-  try { v = (await db.ref(MAIL_ROOT + "/config/calInbox").once("value")).val() || {}; }
-  catch (e) {
+  try {
+    /* ★ 보안: 총괄관리자(ADMIN)만 읽고 쓸 수 있는 cal_inbox/cfg 만 읽는다 —
+       일반 직원(LOGIN)이 쓸 수 있는 pucards/$k/$k2 는 신뢰하지 않는다. */
+    v = (await db.ref(ROOT + "/cfg").once("value")).val() || {};
+  } catch (e) {
     console.warn("calInbox 설정을 못 읽었습니다(꺼진 채로 봅니다):", String((e && e.message) || e));
     return { on: false, autoAdd: false, perRunMax: DEFAULTS.perRunMax, dayLimit: DEFAULTS.dayLimit };
   }

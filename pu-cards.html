@@ -20695,17 +20695,20 @@ function mbPushMasterSet(on){
       toast(want ? '🔔 받은 메일 폰 알림을 켰습니다' : '🔕 받은 메일 폰 알림을 껐습니다 — 띠와 기록은 그대로 보입니다', 7000); })
     .catch(e=>toast('바꾸지 못했습니다 — ' + ((e&&e.message)||e), 9000));
 }
-/* 📅 받은 메일(본문·첨부 공문) 일정 → 푸른캘린더·구글캘린더 자동 등록 스위치 (2026-11-15 대표 지시) */
-let _mbCalInbox = null;
+/* 📅 받은 메일(본문·첨부 공문) 일정 → 푸른캘린더·구글캘린더 자동 등록 스위치 (2026-11-15 대표 지시)
+   ★ 총괄관리자(ADMIN) 전용 경로(cal_inbox/cfg)를 읽고 쓴다 — 일반 직원(LOGIN)은 접근할 수 없다. */
+let _mbCalInbox = null, _mbCalInboxBusy = false;
 function mbCalInboxLoad(){
+  if(!state.isAdmin || _mbCalInboxBusy) return;
   if(typeof Store==='undefined' || Store.mode!=='firebase') return;
-  firebase.database().ref(DB_ROOT+'/config/calInbox').once('value')
-    .then(s=>{ _mbCalInbox = s.val() || {}; if(state.view==='mail') mbDrawSoon(); })
-    .catch(()=>{ /* 못 읽어도 메일함은 그대로 돈다 */ });
+  _mbCalInboxBusy = true;
+  firebase.database().ref('cal_inbox/cfg').once('value')
+    .then(s=>{ _mbCalInboxBusy = false; _mbCalInbox = s.val() || {}; if(state.view==='mail') mbDrawSoon(); })
+    .catch(()=>{ _mbCalInboxBusy = false; /* 못 읽어도 메일함은 그대로 돈다 */ });
 }
 function mbCalInboxInner(){
   const m = _mbCalInbox;
-  if(m === null) return '<span style="color:#475569">확인 중…</span>';
+  if(m === null){ mbCalInboxLoad(); return '<span style="color:#475569">확인 중…</span>'; }
   const on = m.on === true;
   const auto = m.autoAdd === true;
   return (on ? '<b style="color:#166534">' + (auto ? '켜짐 (푸른캘린더·구글캘린더 자동 입력·병합)' : '켜짐 (후보함만)') + '</b>'
@@ -20717,10 +20720,18 @@ function mbCalInboxInner(){
 function mbCalInboxSet(on){
   if(!state.isAdmin) return toast('대표님만 바꾸실 수 있습니다', 6000);
   if(typeof Store==='undefined' || Store.mode!=='firebase') return;
+  if(_mbCalInbox === null) return toast('지금 상태를 아직 못 읽었습니다 — 잠시 뒤 다시 눌러 주세요', 6000);
   const want = !!on;
   const prev = _mbCalInbox || {};
-  const rec = Object.assign({}, prev, { on: want, autoAdd: want ? true : (prev.autoAdd === true), at: Date.now(), by: mbMyName() || '대표' });
-  firebase.database().ref(DB_ROOT+'/config/calInbox').set(rec)
+  const rec = {
+    on: want,
+    autoAdd: want ? true : (prev.autoAdd === true),
+    perRunMax: Math.max(1, Math.min(30, Math.round(Number(prev.perRunMax) || 8))),
+    dayLimit: Math.max(1, Math.min(300, Math.round(Number(prev.dayLimit) || 40))),
+    at: Date.now(),
+    by: String(mbMyName() || '대표').slice(0, 40)
+  };
+  firebase.database().ref('cal_inbox/cfg').set(rec)
     .then(()=>{ _mbCalInbox = rec; if(state.view==='mail') renderMailPage();
       toast(want ? '📅 메일 일정 자동 등록을 켰습니다' : '⏸ 메일 일정 자동 등록을 멈췄습니다', 6000); })
     .catch(e=>toast('바꾸지 못했습니다 — ' + ((e&&e.message)||e), 8000));

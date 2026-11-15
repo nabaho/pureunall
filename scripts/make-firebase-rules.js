@@ -900,16 +900,6 @@ rules.pucards = {
   /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
      쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
   idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
-  /* ⚙️ 기업정보함·메일 공용 설정 — 일반 칸($k2: 분류·자문사 연결·알림 시험 등)은 예전($k.$k2) 그대로 재직 직원(LOGIN) 쓰기를 유지하고,
-     대표 전용 스위치(calInbox: 메일 일정 자동등록·한도, mailAiClassify: Jev 자동분류, mailPushMaster: 폰 알림 총스위치)만 총괄관리자(ADMIN) 쓰기로 잠근다 (2026-11-15 보안).
-     ⚠ RTDB 규칙은 위에서 허락한 쓰기를 아래에서 못 거두므로 config 자체의 .write 는 ADMIN 만 두고 갈래($k2)에서 연다. */
-  config: {
-    '.write': ADMIN,
-    calInbox:       { '.write': `auth != null && ${ADMIN}` },
-    mailAiClassify: { '.write': `auth != null && ${ADMIN}` },
-    mailPushMaster: { '.write': `auth != null && ${ADMIN}` },
-    $k2: { '.write': LOGIN }
-  },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
@@ -919,15 +909,25 @@ rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
 rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
-/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」) ═══════════════
+/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」 · 2026-11-15 자동등록·병합) ═══
    받은 메일에서 서버(AI)가 뽑은 «일정 초안». 메일에서 나온 이름·전화·이메일이 들어 있다.
    ⚠ 읽기는 «관리자(대표)만». 메일함은 직원이 함께 읽지만 후보함은 대표 몫이다 —
      위쪽 읽기가 막혀 있으니(위에서 허락해야 아래에서도 읽힌다) 직원은 못 읽는다.
-   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»만 바꾼다
-     (new → added | dismissed). 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
+   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»(cand/$id/status)과
+     자동등록 스위치·한도(cfg)만 바꾼다. 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
    ⚠ at 색인 — 30일 지난 후보를 서버가 정리할 때 쓴다. state 는 서버가 적는 «마지막 돈 기록»(한도 멈춤 표시 포함). */
 rules.cal_inbox = {
   '.read': `auth != null && ${ADMIN}`,
+  cfg: {
+    '.write': `auth != null && ${ADMIN}`,
+    on:        { '.validate': 'newData.isBoolean()' },
+    autoAdd:   { '.validate': 'newData.isBoolean()' },
+    perRunMax: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 30' },
+    dayLimit:  { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 300' },
+    at:        { '.validate': 'newData.isNumber()' },
+    by:        { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    $other:    { '.validate': false }
+  },
   cand: {
     '.indexOn': ['at'],
     $id: { status: {
