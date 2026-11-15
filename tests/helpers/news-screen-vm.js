@@ -34,7 +34,7 @@ function 화면올리기(App덧) {
     addEventListener() {}, body: 요소(), documentElement: 요소(), head: 요소(), title: ''
   };
   const 빈참조 = () => ({ once: () => new Promise(() => {}), on() {}, off() {}, child: 빈참조,
-    orderByKey: 빈참조, limitToLast: 빈참조, orderByChild: 빈참조, equalTo: 빈참조,
+    orderByKey: 빈참조, limitToLast: 빈참조, endAt: 빈참조, orderByChild: 빈참조, equalTo: 빈참조,
     set: async () => {}, update: async () => {}, remove: async () => {}, transaction: async () => ({}) });
   const 짐 = {
     console: { log() {}, warn() {}, error() {}, info() {} },

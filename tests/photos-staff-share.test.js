@@ -358,7 +358,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
   /* ★ 2026-11-15 — 산재 묶음 data/case_sanjae 게시 완료(GitHub 「Firebase 배포」 실행 43689262672 · rules-deploy.js --deploy, 클라우드 방):
        새로 1 · 바뀜 0 · 사라짐 0 · 넓어짐 0. 새 기준 docs/firebase-rules-콘솔원문-2026-11-15.json(만들개 출력과 같다 — 같은 날 판을 갈아 끼움) — 목록을 비운다. */
-  const PENDING = [];
+  /* 2026-11-16 게시 전 — 뉴스레터 자동 모으개 밑감(homepage/newsBrief·newsDocs·newsPrec)에 이름을 붙여 쓰기를 총괄관리자(+서버)로 좁혔다
+     (대표 「남은거 모두해라」 · 11-15 보안 검토 «낮음»). 새로 생김 3 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 읽기는 그대로(재직 직원),
+     화면에서 그 자리에 쓰는 곳은 없다(서버만 쓴다). 에뮬레이터 짝 시험: 새 규칙 7/7, 옛 규칙에서는 직원 쓰기 셋이 통과(구멍 확인).
+     게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
+  const PENDING = ['/homepage/newsBrief', '/homepage/newsDocs', '/homepage/newsPrec'];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

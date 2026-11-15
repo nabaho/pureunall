@@ -808,7 +808,8 @@
         안.policy.push({
           갈래: '법령', 제목: x.이름, 구분: x.구분 || '', 고친결: x.고친결 || '',
           공포일: x.공포일 || '', 시행일: x.시행일 || '', 부처: x.부처 || '',
-          링크: x.링크 ? ('https://www.law.go.kr' + x.링크) : ''
+          /* 옛 꼴(DRF·OC=test)로 모아 둔 법령도 공개 쪽으로 — 법제처사람주소 (2026-11-16) */
+          링크: x.링크 ? 법제처사람주소('https://www.law.go.kr' + x.링크) : ''
         });
       });
     }
@@ -2662,13 +2663,20 @@
        접속에 실패하였습니다」가 뜬다. 10월 9일 뒤로 판례가 한 건도 새로 안 들어온 까닭도 이것이다.
      ★ 국가법령정보센터의 «사람이 보는 쪽»(LSW)은 열쇠 없이 열린다 — 같은 번호(precSeq·expcSeq)다.
      ⚠ 이미 모아 둔 판례·지난 편지에는 옛 꼴이 그대로 들어 있다. 사람에게 보낼 때·견줄 때 «여기서» 바꾼다.
-     ⚠ 법제처 판례·해석 한 건 주소만 바꾼다. 그 밖(법령·다른 집)은 받은 그대로 돌려준다. */
+     ★ 법령 한 편(target=law · MST=번호)도 같은 까닭으로 공개 쪽(lsInfoP.do?lsiSeq=번호)으로 바꾼다(2026-11-16) —
+       법령 소식(브리핑)의 「법제처에서 보기」도 DRF 서식 쪽이었다. MST 와 lsiSeq 는 같은 번호다(근로기준법 285279 실측).
+     ⚠ 법제처 DRF 한 건 주소만 바꾼다. 그 밖(다른 집·이미 공개 쪽)은 받은 그대로 돌려준다. */
   function 법제처사람주소(u) {
     var s = String(u == null ? '' : u).trim();
     if (!/^https?:\/\/(www\.)?law\.go\.kr\/DRF\/lawService\.do\?/i.test(s)) return s;
-    var g = /[?&]target=(prec|expc)(?:&|$)/i.exec(s);
+    var g = /[?&]target=(prec|expc|law)(?:&|$)/i.exec(s);
+    if (!g) return s;
+    if (g[1].toLowerCase() === 'law') {
+      var mst = /[?&]MST=(\d{1,12})(?:&|$)/i.exec(s);
+      return mst ? 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=' + mst[1] : s;
+    }
     var n = /[?&]ID=(\d{1,12})(?:&|$)/i.exec(s);
-    if (!g || !n) return s;
+    if (!n) return s;
     return g[1].toLowerCase() === 'expc'
       ? 'https://www.law.go.kr/LSW/expcInfoP.do?expcSeq=' + n[1]
       : 'https://www.law.go.kr/LSW/precInfoP.do?precSeq=' + n[1];

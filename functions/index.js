@@ -1929,7 +1929,8 @@ async function 뉴스레터전달경보다시보기(db, 열쇠, w, 반송들) {
    가장 최근 회차의 감시 기록에서 «지금 사람이 볼 것»을 세어 둔다. 포털이 이 한 칸만 읽는다.
    ⚠ 3시간마다(감시꾼) · 점검 · 경보 · 발송 · 전달 뒤에 늘 새로 쓴다 — 고치면 저절로 사라진다. */
 async function 뉴스레터경고판갱신(db) {
-  const v = (await db.ref("newsletter/watch").orderByKey().limitToLast(4).once("value")).val() || {};
+  /* ★ 숫자로 시작하는 열쇠(회차)만 읽는다 — «현재» 같은 글자 열쇠가 늘어도 회차가 창 밖으로 밀리지 않는다(2026-11-16) */
+  const v = (await db.ref("newsletter/watch").orderByKey().endAt("9\uf8ff").limitToLast(3).once("value")).val() || {};
   const 열쇠 = Object.keys(v).filter((k) => /^\d{4}-\d{2}-w\d{1,2}$/.test(k)).sort().pop();
   const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
   /* ★ 걸려 있는 «전달 실패» 경고를 다시 센다 — 못 간 주소를 서버가 이미 처리했으면(반송 자동 확인이 «없는 주소» 로 뺌 등)
@@ -1948,35 +1949,59 @@ async function 뉴스레터경고판갱신(db) {
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 법제처 원문 조문 읽기 (대표 결정 2026-10-05 「추천대로」 — 서버가 원문을 직접 읽어 AI 에게 넘긴다)
-   ⚠ 공개 열쇠(OC=test) — 판례 모으개(news-prec.js)와 같은 문. 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다). */
+   ★ 국가법령정보센터 «공개 쪽»에서 읽는다 (2026-11-16 — 법제처 DRF 가 OC=test 를 거절해 옮겼다. 판례 모으개와 같은 까닭).
+     ① lsLinkProc.do?lsNm=법이름 → 그 법의 현행 번호(lsiSeq)·시행일(frm_efYd)·이름(lsNm)이 숨은 칸으로 온다
+     ② lsInfoR.do 에 POST(lsiSeq·efYd) → 법 전문 HTML. 조마다 <a name="J60:0"> 표지가 붙는다(제18조의2 = J18:2)
+     ③ 그 표지부터 다음 조 표지 앞까지를 글자로 — 아이콘 줄·「<개정 …>」 표지는 뺀다
+   ⚠ 이름이 «정확히 같은» 법만 쓴다 — 다른 법(시행령 등)으로 넘어가면 그 조문은 뺀다(2026-10-05 시행령 제60조가 왔던 일).
+   ⚠ 공개 쪽은 번호를 «한 번만» 적는다 — 예전 XML 의 「① ①」 겹침(2026-10-11 제55조 오탐)은 이 길에서 생기지 않는다.
+   ⚠ 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다).
+   ⚠ 이 함수는 «혼자 선다» — 검사(news-ai-review·news-law-numbering)가 본문을 잘라 가짜 fetch 로 돌린다. 바깥 도우미를 부르지 말 것. */
 async function 법조문원문(조목록) {
-  const 밑 = "https://www.law.go.kr/DRF/";
-  /* ⚠ 법제처 XML 은 «번호 칸»(<항번호>①)과 «내용 칸»(<항내용>① 사용자는…)이 둘 다 번호를 적는다 — 태그만 걷으면
-       「① ① 사용자는」 이 되어 AI 교정자가 «번호 중복»이라고 올린다(2026-10-11 근로기준법 제55조 오탐, 편지는 멀쩡했다).
-       내용 맨 앞에 «같은 번호»가 있을 때만 번호 칸을 버린다(없으면 번호를 살린다). 항·호·목이 같은 모양이다. */
-  const 번호겹침 = /<(항|호|목)번호>\s*([^<]*?)\s*<\/\1번호>\s*(<\1내용>\s*)(?=\2\s)/g;
-  const 받기 = async (u) => {
+  const 밑 = "https://www.law.go.kr/LSW/";
+  const 머리 = { "User-Agent": "pureun-erp-news-watch" };
+  const 받기 = async (u, 몸) => {
     const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
-    try { const r = await fetch(u, { signal: ac.signal }); return r.ok ? await r.text() : ""; }
-    catch (_) { return ""; } finally { clearTimeout(t); }
+    try {
+      const r = await fetch(u, 몸
+        ? { method: "POST", body: 몸, signal: ac.signal,
+          headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" }, 머리) }
+        : { signal: ac.signal, headers: 머리 });
+      return r.ok ? await r.text() : "";
+    } catch (_) { return ""; } finally { clearTimeout(t); }
   };
+  const 같게 = (t) => String(t).replace(/[\s·ㆍ・]/g, "");   /* 가운뎃점 모양(· ㆍ)이 법마다 다르다 */
+  const 값 = (h, id) => ((new RegExp('id="' + id + '"[^>]*value="([^"]*)"').exec(h) || [])[1] || "");
+  const 글로 = (h) => h
+    .replace(/<ul class="lawico01">[\s\S]*?<\/ul>/g, " ")           /* 조문체계도·연혁 아이콘 줄 */
+    .replace(/<span class="sfon">[\s\S]*?<\/span>/g, " ")           /* 「<개정 2012. 2. 1.>」 고친 표지 */
+    .replace(/<\/?(?:a|span|strong|b|label|input|img)\b[^>]*>/gi, "") /* 글 속 꾸밈 — 「제60조(연차 유급휴가)」가 벌어지지 않게 */
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0*39;/g, "'")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ").trim();
+  const 법전문 = {};   /* 같은 법의 조문이 여럿이면 한 번만 받는다 */
   const 결과 = [];
   for (const c of (조목록 || []).slice(0, 5)) {
-    const 찾음 = await 받기(밑 + "lawSearch.do?OC=test&target=law&type=XML&display=20&query=" + encodeURIComponent(c.법.replace(/[·・]/g, "ㆍ")));
-    /* ⚠ 한 법령씩 잘라 읽는다 — 목록은 «일련번호가 이름보다 앞»이라, 이름 뒤의 번호를 잡으면
-         다음 법령(시행령)의 번호를 가져온다(2026-10-05 근로기준법 제60조가 시행령 제60조로 왔다). */
-    const 줄 = [...찾음.matchAll(/<law [^>]*>([\s\S]*?)<\/law>/g)].map((m) => [m[0],
-      ((m[1].match(/<법령명한글><!\[CDATA\[(.*?)\]\]>/) || [])[1] || ""),
-      ((m[1].match(/<법령일련번호>(\d+)<\/법령일련번호>/) || [])[1] || "")]);
-    const 같게 = (t) => String(t).replace(/[\s·ㆍ・]/g, "");   /* 가운뎃점 모양(· ㆍ)이 법마다 다르다 */
-    const 맞음 = 줄.find((m) => m[2] && 같게(m[1]) === 같게(c.법)) || null;
-    if (!맞음) continue;
-    const JO = String(c.조).padStart(4, "0") + String(c.의 || 0).padStart(2, "0");
-    const 글 = await 받기(밑 + "lawService.do?OC=test&target=law&type=XML&MST=" + 맞음[2] + "&JO=" + JO);
-    const 조 = 글.replace(/<!\[CDATA\[|\]\]>/g, "").match(/<조문내용>[\s\S]*?<\/조문단위>/);
-    if (!조) continue;
-    결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""),
-      원문: 조[0].replace(번호겹침, "$3").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
+    const 이름 = String(c.법 || "").replace(/[·・]/g, "ㆍ");
+    if (!(이름 in 법전문)) {
+      법전문[이름] = "";
+      const 문 = await 받기(밑 + "lsLinkProc.do?lsNm=" + encodeURIComponent(이름) + "&chrClsCd=010202&mode=20");
+      const 번 = 값(문, "lsiSeq"), 날 = 값(문, "frm_efYd");
+      if (/^\d{1,12}$/.test(번) && /^\d{8}$/.test(날) && 같게(값(문, "lsNm")) === 같게(c.법)) {
+        법전문[이름] = await 받기(밑 + "lsInfoR.do", "lsiSeq=" + 번 + "&efYd=" + 날 + "&chrClsCd=010202&ancYnChk=0");
+      }
+    }
+    const 전 = 법전문[이름];
+    if (!전) continue;
+    const 표 = 'id="J' + Number(c.조) + ":" + Number(c.의 || 0) + '"';
+    const i = 전.indexOf(표);
+    if (i < 0) continue;
+    const 뒤 = 전.slice(i + 표.length);
+    const j = 뒤.search(/<a name="J\d+:\d+"/);
+    const 조 = 글로((j < 0 ? 뒤.slice(0, 30000) : 뒤.slice(0, j)).replace(/^[^<]*/, ""));
+    if (!/^제\d+조/.test(조)) continue;   /* 조문 머리(「제60조(…)」)가 아니면 모양이 바뀐 것 — 엉뚱한 글을 원문이라 넘기지 않는다 */
+    결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""), 원문: 조.slice(0, 1500) });
   }
   return 결과;
 }
@@ -4752,9 +4777,11 @@ exports.newsFullPage = functions
       const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
-        /* ★★ 못 받아 오면 «오류 쪽»이 아니라 국가법령정보센터 공개 쪽으로 곧장 보낸다 (2026-11-15).
+        /* ★★ 못 펴면 «오류 쪽»이 아니라 국가법령정보센터 공개 쪽으로 곧장 보낸다 (2026-11-15).
              법제처 DRF 가 OC=test 를 거절하면서 받는 분이 「전문 보기」를 누를 때마다 «받아 오지 못했습니다»
              쪽을 먼저 보고, 그 아래 단추를 한 번 더 눌러야 했다(그 단추마저 예전에는 실패 쪽이었다).
+           ★ 2026-11-16 부터는 그 공개 쪽을 우리가 읽어 우리 양식으로 편다 — 여기로 오는 것은 공개 쪽 모양이
+             바뀌었거나 그 쪽이 안 열릴 때뿐이다.
            ⚠ 공개 쪽은 우리 양식이 아니다 — 그래도 판례를 «바로» 보시는 편이 오류 쪽보다 낫다. 굳히지 않는다. */
         res.set("Cache-Control", "no-store");
         res.redirect(302, 법제처);
@@ -4763,8 +4790,8 @@ exports.newsFullPage = functions
       /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
            것이 하루까지 그대로 나왔다 — 2026-09-20 실측(age=15056 으로 옛 모양).
            대표께서 고친 것을 눌러 보시고 «안 고쳐졌다»고 보시게 된다.
-         ★ 한 시간으로 줄인다. 법제처 문을 두드리는 횟수는 여전히 24 배 적고
-           (OC 가 시험 계정이라 한도가 있다 — 그래서 아주 끄지는 않는다),
+         ★ 한 시간으로 줄인다. 국가법령정보센터를 두드리는 횟수는 여전히 24 배 적고
+           (남의 공개 쪽이라 자주 두드리지 않는다 — 그래서 아주 끄지는 않는다),
            모양을 고치면 한 시간 안에 모두에게 닿는다.
          ★ 그래도 «지금 당장» 바꿔야 할 때가 있다 — 그때는 편지가 주소 끝에 붙이는
            모양 판(js/pu-news-tpl.js 전문쪽모양판)을 올린다. 주소가 달라져 곧바로 새것이 된다. */
@@ -5808,9 +5835,9 @@ async function 브리핑거리모으기(법령몇) {
   }
   for (const w of 브리핑샘.법령말) {
     try {
-      const xml = await 글자로받기("https://www.law.go.kr/DRF/lawSearch.do?OC=test"
-        + "&target=law&type=XML&sort=ddes&display=" + 몇 + "&query=" + encodeURIComponent(w));
-      법령 = 법령.concat(브리핑부품.법령읽기(xml));
+      /* ★ 국가법령정보센터 공개 쪽(공포일 내림차순) — DRF 가 OC=test 를 거절해 옮겼다(2026-11-16, news-brief.js 공개법령목록읽기) */
+      const 글 = await 글자로받기(브리핑부품.공개법령목록주소(w, 몇));
+      법령 = 법령.concat(브리핑부품.법령읽기(글));
     } catch (e) { console.warn("[브리핑] 법령(" + w + ")을 못 읽었습니다", e.message); }
   }
   return { 뉴스: 뉴스, 법령: 브리핑부품.법령추리기(법령, 몇) };
@@ -5962,7 +5989,7 @@ exports.dailyRegionalNewsCollect = functions
    ★ 어디서 오는가
      · 자료 — 고용노동부 «정책자료실». 받으신 원본(8월 5주차)에 실린 두 건이
               그대로 여기 있었다(2026-09-05 실측). 짐작이 아니라 맞춰 본 것이다.
-     · 판례 — 법제처 판례 API. 판결문은 저작권 대상이 아니라 «내용까지» 싣는다.
+     · 판례 — 국가법령정보센터 공개 쪽(2026-11-16 까지는 법제처 DRF). 판결문은 저작권 대상이 아니라 «내용까지» 싣는다.
 
    ★ 「다운받아서 확인할 수 있게」 — 파일을 실제로 «내려받아» 본다.
      ① 크기를 재서 편지에 적는다(누르기 전에 얼마짜리인지 알게)
@@ -6045,31 +6072,45 @@ async function 자료거리모으기(몇개) {
      편지 짓는 층을 안 고쳐도 되고, 한 꼭지에 섞여 나란히 실린다. */
 const 해석찾을말 = ["근로기준법", "근로자퇴직급여", "산업안전보건법", "노동조합"];
 
-/* ★ 법제처 DRF 목록을 받는다 — «거절»(200 인데 「사용자 정보 검증에 실패」)이면 던진다 (2026-11-15).
-   ⚠⚠ 예전에는 거절 몸을 그대로 읽어 «0건»으로 넘어갔다. 탈(오류) 칸이 비어 있으니 감시꾼은
-     「판례가 3주 넘게 새로 안 들어왔습니다」만 알 뿐 까닭을 몰랐다(10월 9일부터 다섯 주).
-   ⚠ 낱말 «하나»가 거절되면 다른 낱말도 다 거절이다(같은 열쇠) — 모두 거절이면 모으기 전체를 탈로 남긴다. */
-const 법제처거절말 = "법제처 공동활용(DRF)이 열쇠 OC=test 를 거절했습니다 — 「사용자 정보 검증에 실패」. "
-  + "법제처 OPEN API 열쇠를 새로 받아 서버 주소를 등록해야 판례·행정해석을 다시 모읍니다";
-async function 법제처목록받기(주소) {
+/* ★ 국가법령정보센터 «공개 쪽»에서 읽는다 (2026-11-16 대표 「남은거 모두해라」).
+     법제처 DRF 가 공개 열쇠(OC=test)를 거절해(2026-10-09 무렵부터) 열쇠 없이 열리는 사람용 쪽으로 옮겼다.
+     쪽 모양 읽기는 functions/news-prec.js 「⑥ 공개 쪽」 — 여기는 두드리고 세기만 한다.
+   ⚠⚠ 예전에는 거절 몸이 «0건»으로 조용히 넘어가 다섯 주를 몰랐다(10-09 ~ 11-15).
+     그래서 «모든 낱말이 빈손»이면 모으기 전체를 탈로 남긴다 — 노무 낱말 네댓 개가 한꺼번에 0건일 리 없다.
+     그때는 쪽 모양이 바뀌었거나 막힌 것이다. 한 건 쪽을 «하나도» 못 읽어도 마찬가지다. */
+const 공개쪽못읽음말 = "국가법령정보센터 공개 쪽을 읽지 못했습니다 — 쪽 모양이 바뀌었거나 막혔을 수 있습니다"
+  + "(functions/news-prec.js ⑥ 공개 쪽 읽기를 실제 쪽과 견줘 고쳐야 합니다)";
+async function 공개쪽받기(주소) {
   const 글 = await 쪽받기(주소);
-  if (판례부품.거절인가(글)) { const e = new Error(법제처거절말); e.거절 = true; throw e; }
+  /* 혹시 공개 쪽에도 공동활용 실패 쪽이 오면 «못 읽음»이다 — 빈손으로 넘기지 않는다 */
+  if (판례부품.거절인가(글)) throw new Error("법제처가 거절한 쪽입니다: " + 주소);
   return 글;
+}
+/* 낱말마다 목록을 읽어 모은다. 모두 빈손이면 던진다(위 머리글). */
+async function 공개목록모으기(이름, 낱말들, 주소짓기, 읽기) {
+  let 다 = [], 빈손 = 0;
+  for (const w of 낱말들) {
+    try {
+      const 줄 = 읽기(await 공개쪽받기(주소짓기(w, 5)));
+      if (!줄.length) 빈손++;
+      다 = 다.concat(줄);
+    } catch (e) { 빈손++; console.warn("[" + 이름 + "] " + w + " 를 못 읽었습니다: " + e.message); }
+  }
+  if (빈손 === 낱말들.length) throw new Error(이름 + " 목록 — " + 공개쪽못읽음말);
+  return 다;
 }
 
 async function 해석거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(6, Number(몇개) || 2));
-  let 다 = [], 거절 = 0;
-  for (const w of 해석찾을말) {
-    try { 다 = 다.concat(판례부품.해석목록읽기(await 법제처목록받기(판례부품.해석목록주소(w, 5)))); }
-    catch (e) { if (e.거절) 거절++; console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
-  }
-  if (거절 === 해석찾을말.length) throw new Error(법제처거절말);
+  const 다 = await 공개목록모으기("해석", 해석찾을말, 판례부품.해석목록주소, 판례부품.해석목록읽기);
   const out = [];
+  let 부른 = 0, 읽은 = 0;
   for (const c of 판례부품.해석추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
-      const one = 판례부품.해석한건읽기(await 쪽받기(판례부품.해석한건주소(c.일련번호)));
+      부른++;
+      const one = 판례부품.해석한건읽기(await 공개쪽받기(판례부품.해석한건주소(c.일련번호)), c.일련번호);
+      if (one) 읽은++;
       if (!one || !판례부품.노무해석인가(one)) continue;
       const it = 판례부품.해석으로만들기(one);
       if (it) out.push(it);
@@ -6077,25 +6118,24 @@ async function 해석거리모으기(몇개, 모아둔것) {
       console.warn("[해석] " + c.일련번호 + " 를 못 읽었습니다: " + e.message);
     }
   }
+  if (부른 && !읽은) throw new Error("해석 한 건 쪽 — " + 공개쪽못읽음말);
   console.log("[해석] " + out.length + "건");
   return out;
 }
 
-/* 법제처에서 노무 판례를 모은다 — 판시사항이 있는 것만 */
+/* 노무 판례를 모은다 — 판시사항이 있는 것만 */
 async function 판례거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(8, Number(몇개) || 4));
-  let 다 = [], 거절 = 0;
-  for (const w of 판례찾을말) {
-    try { 다 = 다.concat(판례부품.목록읽기(await 법제처목록받기(판례부품.목록주소(w, 5)))); }
-    catch (e) { if (e.거절) 거절++; console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
-  }
-  /* 모두 거절이면 «0건»이 아니라 «못 모았다» — 자료판례모아담기 가 탈로 남기고 감시꾼이 까닭을 보인다 */
-  if (거절 === 판례찾을말.length) throw new Error(법제처거절말);
+  /* 모두 빈손이면 «0건»이 아니라 «못 모았다» — 자료판례모아담기 가 탈로 남기고 감시꾼이 까닭을 보인다 */
+  const 다 = await 공개목록모으기("판례", 판례찾을말, 판례부품.목록주소, 판례부품.목록읽기);
   const out = [];
+  let 부른 = 0, 읽은 = 0;
   for (const c of 판례부품.판례추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
-      const one = 판례부품.한건읽기(await 쪽받기(판례부품.한건주소(c.일련번호)));
+      부른++;
+      const one = 판례부품.한건읽기(await 공개쪽받기(판례부품.한건주소(c.일련번호)), c.일련번호);
+      if (one) 읽은++;
       if (!one || !판례부품.노무판례인가(one)) continue;
       const it = 판례부품.판례로만들기(one);
       if (it) out.push(it);
@@ -6103,6 +6143,7 @@ async function 판례거리모으기(몇개, 모아둔것) {
       console.warn("[판례] " + c.일련번호 + " 를 못 읽었습니다: " + e.message);
     }
   }
+  if (부른 && !읽은) throw new Error("판례 한 건 쪽 — " + 공개쪽못읽음말);
   return out;
 }
 

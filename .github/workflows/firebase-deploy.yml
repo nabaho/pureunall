@@ -91,11 +91,22 @@ jobs:
         if: inputs.rules
         run: node scripts/rules-deploy.js --deploy
 
+      # ⚠ firebase-tools 는 함수 몇 개를 못 올려도 종료코드 0 을 낸다 — 2026-11-15 실행(43715591212)이
+      #   여덟 개 중 둘을 못 올리고도 «성공»이었다. 그래서 로그를 함수마다 대조하고(scripts/firebase-deploy-verify.js),
+      #   안 올라간 것만 한 번 더 올린다. 그래도 남으면 빨갛게(exit 1) 끝낸다.
       - name: ② 서버 함수 배포 (이름 찍어서)
         if: inputs.functions != ''
         run: |
           (cd functions && npm ci --no-audit --no-fund)
-          firebase deploy --only "$ONLY" --project "$PROJECT" --non-interactive
+          firebase deploy --only "$ONLY" --project "$PROJECT" --non-interactive 2>&1 | tee "$RUNNER_TEMP/deploy1.log" || true
+          if LEFT="$(node scripts/firebase-deploy-verify.js "$FN_INPUT" "$RUNNER_TEMP/deploy1.log")"; then exit 0; fi
+          if [ -z "$LEFT" ]; then echo "::error::배포 결과를 대조하지 못했습니다"; exit 1; fi
+          echo "::warning::안 올라간 함수가 있어 한 번 더 올립니다: $LEFT"
+          ONLY2="$(node scripts/firebase-deploy-check.js "$LEFT")" || exit 1
+          firebase deploy --only "$ONLY2" --project "$PROJECT" --non-interactive 2>&1 | tee "$RUNNER_TEMP/deploy2.log" || true
+          if node scripts/firebase-deploy-verify.js "$LEFT" "$RUNNER_TEMP/deploy2.log" > /dev/null; then exit 0; fi
+          echo "::error::두 번 올려도 안 올라간 함수가 있습니다 — 위 요약의 ✖ 를 사람이 확인해 주세요"
+          exit 1
 
       - name: ③ 취업규칙 매일 정리 스위치
         if: inputs.daily_mode != ''
