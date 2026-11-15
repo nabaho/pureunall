@@ -49,7 +49,7 @@
 <script src="js/rules-v2/lib-sites.js?v=6"></script>
 <script src="js/rules-v2/store.js?v=8"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
-<script src="js/rules-v2/view-topics.js?v=7"></script>
+<script src="js/rules-v2/view-topics.js?v=8"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
 <!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
@@ -933,16 +933,8 @@ table.daejo td.dj2{padding:0}
   <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
-<script>
-/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
-   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
-   주소창에 rules.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
-   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
-     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
-   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
-/* 이름은 포털 타일과 같게 — 「취업규칙」 타일 하나(두 앱 합치기 2026-10-04), rules-v2.html 도 같은 이름 */
-try { PuGate.soonUnlessAdmin('기업규정집'); } catch(_){}
-</script>
+<!-- 「준비중」 문(PuGate.soonUnlessAdmin)은 2026-11-15 대표 「기업규정집 준비중 열어라」로 걷었다 — 포털 타일의 준비중 딱지와 «짝»이라 함께 뺐다
+     (2026-09-23 대표 지시로 달았던 문이다). 로그인 화면(PuGate.show·hide)은 아래에서 그대로 쓴다 -->
   <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
        자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
        이 화면은 머리줄 #who 에 updateWho() 로 스스로 그리므로 뜬 표가 그 위에 겹친다. -->

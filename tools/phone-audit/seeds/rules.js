@@ -123,6 +123,15 @@ module.exports = {
       await page.click('#lib [data-act="view"][data-v="daily"]');
     } },
     { name: 'topics', wait: 4000, run: async (page) => { await page.evaluate(() => { history.pushState(null, '', '#topics'); window.rv2Route(); }); } },
+    /* 📚 조별 문안의 «본문 찾기»(2026-11-15) — 이름은 안 맞아도 본문에 말이 든 조가 「본문에 있는 조」로 따로 뜨고, 고른 조의 카드에 형광이 칠해진다 */
+    { name: 'topics-find', wait: 1500, run: async (page) => {
+      await page.evaluate(() => { history.pushState(null, '', '#topics'); window.rv2Route(); });
+      await page.waitForSelector('#topics .tq', { timeout: 20000 });
+      await page.fill('#topics .tq', '근로시간');
+      await page.waitForTimeout(600);
+      const b = await page.$('#topics .tp.bd');
+      if (b) await b.click();
+    } },
     /* ✏️ 검토·개정(rules.html)의 💬 묻기 탭 (설계 §13) — 화면 안 «지어낸 샘플 문서»에 지어낸 답 한 줄을 그려 잰다.
        AI 는 안 부른다. ⚠ 다른 화면(rules.html)으로 넘어가므로 «맨 끝»에 둔다 — 뒤에 둔 view 는 rules-v2 를 못 찾는다 */
     { name: 'ask', wait: 2500, run: async (page) => {

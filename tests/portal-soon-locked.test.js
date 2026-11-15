@@ -81,8 +81,9 @@ function 그려보기(role, offLifted) {
 /* ⚠ 처음 지목은 다섯이었는데 둘이 열렸다 — 수가 아니라 «이 목록»이 기준이다.
    · 문서관리(docs) 2026-10-04 대표 「직원도 문서관리 모두 본다」 — app-soon-gate ⑦
    · 푸른 메일(mail) 2026-10-09 대표 「푸른메일은 준비중 풀어도 된다」 — app-soon-gate ⑧
-   · 급여관리(payroll) 2026-10-09 대표 「준비중 풀기」 → 2026-10-20 「급여관리도 준비중으로」 다시 닫음 — app-soon-gate ⑨ */
-const 준비중앱 = ['rules', 'payroll', 'paydata'];
+   · 급여관리(payroll) 2026-10-09 대표 「준비중 풀기」 → 2026-10-20 「급여관리도 준비중으로」 다시 닫음 — app-soon-gate ⑨
+   · 기업규정집(rules) 2026-11-15 대표 「기업규정집 준비중 열어라」 — app-soon-gate ⑩ */
+const 준비중앱 = ['payroll', 'paydata'];
 
 test('①★★ 아직 준비중인 앱에 표가 붙어 있다', () => {
   const A = SRC.indexOf('var APPS = [');
@@ -181,10 +182,10 @@ test('④★★ 눌렀을 때 «까닭을 말한다» — 아무 일도 안 나�
      같은 칸에 붙은 다른 처리는 그대로 돈다 — PC 에서 그냥 열렸다.
      이 검사가 그것을 잡았다(openPortalApp is not defined). 글자만 봤으면 못 잡는다. */
   let 막았나 = false;
-  타일['rules']._clicks.forEach(fn => fn({ preventDefault(){ 막았나 = true; }, stopPropagation(){} }));
+  타일['payroll']._clicks.forEach(fn => fn({ preventDefault(){ 막았나 = true; }, stopPropagation(){} }));
   assert.ok(막았나, '★★ 누르면 그대로 넘어간다');
-  assert.equal(타일['rules']._clicks.length, 1,
-    '★★ 누를 때 도는 처리가 ' + 타일['rules']._clicks.length + '개다 — 하나는 «여는» 처리다.\n' +
+  assert.equal(타일['payroll']._clicks.length, 1,
+    '★★ 누를 때 도는 처리가 ' + 타일['payroll']._clicks.length + '개다 — 하나는 «여는» 처리다.\n' +
     '  막는 처리를 앞에 붙여도 같은 칸의 다른 처리는 그대로 돈다. 아예 안 붙여야 한다.');
   assert.equal(외침.length, 1, '★★ 눌렀는데 아무 말이 없다 — 고장난 줄 안다');
   assert.match(외침[0], /준비중/, '★ 무엇 때문에 안 열리는지 말하지 않는다');
@@ -242,7 +243,7 @@ test('⑨★★ 안 쓰는 앱은 누구 화면에도 타일이 없다 — 대�
 
 /* ⑩ 되살린 취업규칙 — 대표 지시 2026-10-30 「프로그램 만들었던것 삭제를 했었다 … 다시 살릴수 있나」 → 「1」(off 만 걷기)
    off 를 걷으면 10-24 이전 모습 그대로 «준비중 타일»이다 — 대표는 열고, 직원은 흐린 준비중 타일을 본다.
-   ⚠ 준비중 딱지까지 걷지 않는다 — 직원에게 여는 일은 따로 정한다(안쪽 PuGate.soonUnlessAdmin 과 짝). */
+   (그 뒤 2026-11-15 대표 「기업규정집 준비중 열어라」로 딱지와 안쪽 문도 걷었다 — 아래는 «감춤 없이 보이는가»만 본다) */
 test('⑩★★ 취업규칙은 다시 보인다 — 감춤 없이 준비중 타일로 (대표 지시 2026-10-30)', () => {
   const A = SRC.indexOf('var APPS = [');
   const 목록 = SRC.slice(A, SRC.indexOf('\n  ];', A));
@@ -251,7 +252,8 @@ test('⑩★★ 취업규칙은 다시 보인다 — 감춤 없이 준비중 타
   assert.ok(급여줄 && !/off:\s*true/.test(급여줄) && /soon:\s*true/.test(급여줄) && /name:'급여아웃소싱'/.test(급여줄), '★★ 급여아웃소싱(준비중) 타일 설정이 올바르지 않다');
   assert.ok(줄, '★★ 취업규칙이 목록에서 사라졌다');
   assert.doesNotMatch(줄, /off:\s*true/, '★★ 취업규칙이 다시 감춰졌다 — 대표가 되살리라 하셨다');
-  assert.match(줄, /soon:\s*true/, '★ 준비중 딱지까지 걷혔다 — 직원에게 여는 일은 따로 정한다');
+  /* 준비중 딱지는 2026-11-15 대표 「기업규정집 준비중 열어라」로 걷었다(app-soon-gate ⑩ 이 지킨다) — 다시 감추지만 않으면 된다 */
+  assert.doesNotMatch(줄, /soon:\s*true/, '★ 준비중 딱지가 다시 붙었다 — 대표가 열라 하셨다(2026-11-15)');
   ['admin', 'member'].forEach(role => {
     const { 타일 } = 그려보기(role);
     assert.ok(타일.rules, '★★ ' + role + ' 화면에 취업규칙 타일이 없다');

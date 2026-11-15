@@ -136,7 +136,7 @@
       byTopic[t.key] = T().groupVariants(byKey[t.key]).map(function (g) { g.places = places(g.members); return g; })
         .sort(function (a, b) { return b.finals - a.finals || b.places - a.places || b.last - a.last; });
     });
-    return { docKind: dk, topics: topics, byTopic: byTopic, docs: docs, today: today || todayKst(), criteria: dk === '규칙본문' ? (criteria || CR()) : null, prepared: Object.create(null) };
+    return { docKind: dk, topics: topics, byTopic: byTopic, articles: byKey, docs: docs, today: today || todayKst(), criteria: dk === '규칙본문' ? (criteria || CR()) : null, prepared: Object.create(null) };
   }
 
   /* 덩어리 하나에 검토 기준 — 대표 문서의 그 조를 «한 조짜리 문서»로 판정한다.
@@ -183,19 +183,64 @@
     }).join('') + '</div>';
   }
 
-  /* ── 왼쪽 — 주제 목록. 찾기 글은 주제 «이름»만 거른다 ── */
-  function listHtml(M, sel, q) {
-    var qq = String(q || '').replace(/\s+/g, '').toLowerCase();
-    var shown = (M.topics || []).filter(function (t) {
-      return !qq || String(t.title).replace(/\s+/g, '').toLowerCase().indexOf(qq) >= 0 || String(t.key).toLowerCase().indexOf(qq) >= 0;
+  /* ── 찾기 (2026-11-15 대표 「기업규정집 … 사용하고 검색할 수 있게」) ──
+     ① 주제 «이름»이 맞는 것이 먼저(예전과 같다 — 제목은 한 글자부터)
+     ② 이름은 안 맞아도 «본문»에 그 말이 든 조는 아래 「본문에 있는 조」로 따로 모은다 — 두 글자부터(한 글자는 거의 모든 조가 걸린다)
+        띄어쓰기는 보지 않는다(「연차 유급」 = 「연차유급」) · 칸 위 숫자는 «그 말이 든 곳(회사) 수»
+     ③ 고른 조의 문안 카드에서는 찾은 말에 형광을 칠한다(markIn — 태그 «밖»의 글자에만)
+     ⚠ 본문을 훑는 값은 모델마다·찾는 말마다 한 번만 센다(M._hit) — 글자를 칠 때마다 수만 조를 다시 훑지 않는다 */
+  var BODY_MIN = 2;
+  function qNorm(q) { return String(q || '').replace(/\s+/g, '').toLowerCase(); }
+  function reEsc(c) { return c.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'); }
+  // 글자 사이에 공백이 있어도 맞는 식 — 「연차유급」 → 연\s*차\s*유\s*급
+  function bodyRe(qq) { return new RegExp(qq.split('').map(reEsc).join('\\s*'), 'i'); }
+  function bodyHits(M, q) {
+    var qq = qNorm(q);
+    if (qq.length < BODY_MIN) return {};
+    if (M._hit && M._hit.q === qq) return M._hit.res;
+    var re = bodyRe(qq), res = {};
+    Object.keys(M.articles || {}).forEach(function (k) {
+      var hit = (M.articles[k] || []).filter(function (e) { return re.test(String(e.body || '')); });
+      if (hit.length) res[k] = places(hit);
     });
-    if (!shown.length) return '<div class="none">' + (M.topics && M.topics.length ? '맞는 조 주제가 없습니다' : '아직 조별 문안이 없습니다') + '</div>';
+    M._hit = { q: qq, res: res };
+    return res;
+  }
+  function titleHit(t, qq) {
+    return String(t.title).replace(/\s+/g, '').toLowerCase().indexOf(qq) >= 0 || String(t.key).toLowerCase().indexOf(qq) >= 0;
+  }
+  /* 찾은 말에 형광 — html 은 이미 esc 를 거친 글이다. 태그(<ins>·<del>)는 건드리지 않고 그 «사이 글자»에서만 찾는다 */
+  function markIn(html, q) {
+    var qq = qNorm(q);
+    if (qq.length < BODY_MIN) return html;
+    var re = new RegExp(qq.split('').map(function (c) { return reEsc(esc(c)); }).join('\\s*'), 'gi');
+    return String(html).split(/(<[^>]*>)/).map(function (seg) {
+      return seg.charAt(0) === '<' ? seg : seg.replace(re, function (m) { return '<mark>' + m + '</mark>'; });
+    }).join('');
+  }
+
+  /* ── 왼쪽 — 주제 목록. 이름이 맞는 조 → 본문에 말이 든 조 ── */
+  function listHtml(M, sel, q) {
+    var qq = qNorm(q);
+    var shown = (M.topics || []).filter(function (t) { return !qq || titleHit(t, qq); });
+    var hits = qq ? bodyHits(M, q) : {};
+    var bodyOnly = (M.topics || []).filter(function (t) { return qq && !titleHit(t, qq) && hits[t.key]; })
+      .sort(function (a, b) { return hits[b.key] - hits[a.key]; });
+    if (!shown.length && !bodyOnly.length) return '<div class="none">' + (M.topics && M.topics.length ? '맞는 조 주제가 없습니다' + (qq.length === 1 ? ' — 본문은 두 글자부터 찾습니다' : '') : '아직 조별 문안이 없습니다') + '</div>';
     var out = '', ch = null;
     shown.forEach(function (t) {
       if (t.chapter !== ch) { ch = t.chapter; out += '<div class="ch" title="' + esc(ch) + '">' + esc(ch) + '</div>'; }
       out += '<button class="tp' + (t.key === sel ? ' on' : '') + '" data-act="topic" data-k="' + esc(t.key) + '" title="' + esc(t.title + ' · ' + t.count + '곳') + '">'
         + '<span>' + esc(t.title) + '</span><i>' + t.count + '곳</i></button>';
     });
+    if (bodyOnly.length) {
+      var head = '본문에 「' + String(q || '').trim() + '」 이(가) 든 조';
+      out += '<div class="ch" title="' + esc(head) + '">' + esc(head) + '</div>';
+      bodyOnly.forEach(function (t) {
+        out += '<button class="tp bd' + (t.key === sel ? ' on' : '') + '" data-act="topic" data-k="' + esc(t.key) + '" title="' + esc(t.title + ' — 본문에 «' + String(q || '').trim() + '» 이(가) 든 곳 ' + hits[t.key] + '곳 (이 조를 쓴 회사 ' + t.count + '곳 중)') + '">'
+          + '<span>' + esc(t.title) + '</span><i>본문 ' + hits[t.key] + '곳</i></button>';
+      });
+    }
     return out;
   }
 
@@ -220,7 +265,7 @@
   }
 
   /* ── 오른쪽 — 한 주제의 문안 덩어리 ── */
-  function topicHtml(M, key, openSet) {
+  function topicHtml(M, key, openSet, q) {
     var t = (M.topics || []).filter(function (x) { return x.key === key; })[0];
     if (!t) return '<div class="msg">왼쪽에서 조 주제를 고르세요</div>';
     prepare(M, key);
@@ -236,7 +281,7 @@
         + '<span class="r"><button class="btn" data-act="copy" data-k="' + esc(key) + '" data-g="' + i + '"'
         + ' title="이 문안을 복사합니다 — 회사 이름·호칭은 {회사}·{근로자} 자리표시로 들어 있으니 붙여 넣은 뒤 바꾸세요">📋 복사</button>'
         + '<button class="btn" data-act="who" data-k="' + esc(key) + '" data-g="' + i + '" title="곳 = 회사 수(미확정 문서는 한 건이 한 곳) · 건 = 펼치면 보이는 조 줄 수">쓴 회사 ' + g.places + '곳 · ' + g.members.length + '건 ' + (on ? '▾' : '▸') + '</button></span></div>'
-        + '<div class="txt">' + (i ? diffHtml(g.segs) : esc(lines(g.text))) + '</div>'
+        + '<div class="txt">' + markIn(i ? diffHtml(g.segs) : esc(lines(g.text)), q) + '</div>'
         + warnHtml(g)
         + (on ? whoHtml(g) : '')
         + '</div>';
@@ -269,13 +314,13 @@
     }
     function mainHtml() {
       return (st.failed.length ? '<div class="fail" title="이 문서들은 빼고 나머지로 묶었습니다">글을 못 읽은 문서 ' + st.failed.length + '건 — 빼고 묶었습니다</div>' : '')
-        + topicHtml(st.M, st.sel, st.open);
+        + topicHtml(st.M, st.sel, st.open, st.q);
     }
     function drawAll() {
       if (!st.M) { el.innerHTML = msgHtml(); return; }
       el.innerHTML = '<div class="tpx"><div class="left">'
         + catHtml(st.docKind)
-        + '<input class="tq" data-role="tq" placeholder="🔍 조 주제 찾기 (예: 연차)" value="' + esc(st.q) + '">'
+        + '<input class="tq" data-role="tq" placeholder="🔍 조 주제·본문 찾기 (예: 연차)" value="' + esc(st.q) + '">'
         + '<div data-role="tlist">' + listHtml(st.M, st.sel, st.q) + '</div></div>'
         + '<div class="main" data-role="tmain">' + mainHtml() + '</div></div>';
     }
@@ -302,7 +347,8 @@
         }
         return build(false);
       },
-      search: function (q) { st.q = String(q || ''); draw(true); },
+      // 본문까지 찾으므로 목록 «과» 고른 조의 형광을 함께 다시 그린다(통째로가 아니라 두 칸만 — 글을 치던 칸은 그대로)
+      search: function (q) { st.q = String(q || ''); draw(false); },
       toggle: function (k, gi) { var id = k + '|' + gi; if (st.open.has(id)) st.open.delete(id); else st.open.add(id); draw(); }
     };
 
@@ -315,7 +361,17 @@
       else if (a === 'who') api2.toggle(b.dataset.k, +b.dataset.g);
       else if (a === 'copy') copy(copyText(st.M, b.dataset.k, +b.dataset.g), b);
     };
-    el.oninput = function (ev) { var t = ev.target; if (t && t.dataset && t.dataset.role === 'tq') api2.search(t.value); };
+    /* 글자를 칠 때마다 수만 조를 훑지 않게 잠깐(140ms) 기다린다 — 한글은 조합 중에도 input 이 쏟아진다.
+       api2.search(q) 는 지연 없이 바로 그린다(검사·다른 곳이 손잡이로 부른다) */
+    var qTimer = null;
+    el.oninput = function (ev) {
+      var t = ev.target;
+      if (!(t && t.dataset && t.dataset.role === 'tq')) return;
+      var v = t.value;
+      if (typeof setTimeout !== 'function') { api2.search(v); return; }
+      if (qTimer) clearTimeout(qTimer);
+      qTimer = setTimeout(function () { qTimer = null; api2.search(v); }, 140);
+    };
 
     drawAll();
     // 사람이 고친 조문 연결(교정 기억) — 규정관리와 같은 판정이 되게 한 번 읽어 넘긴다. 못 읽으면 교정 없이.
@@ -380,7 +436,7 @@
   }
 
   var api = { model: model, listHtml: listHtml, topicHtml: topicHtml, copyText: copyText, mount: mount,
-    places: places, warnsOf: warnsOf, judgeWarns: judgeWarns, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER, DOC_KINDS: DOC_KINDS };
+    places: places, bodyHits: bodyHits, markIn: markIn, BODY_MIN: BODY_MIN, warnsOf: warnsOf, judgeWarns: judgeWarns, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER, DOC_KINDS: DOC_KINDS };
   if (root) root.PuRulesV2TopicsView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

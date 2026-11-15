@@ -2133,9 +2133,10 @@ body.portal-mode #moreFab{display:flex;}
        앱 머리줄의 세 갈래 단추(✏️ 검토·개정 · 📚 조별 문안 · 📥 모은 자료)로 들어간다.
        ⚠ 타일을 다시 둘로 나누지 말 것 — 같은 앱의 문이 둘이면 사람이 어느 쪽인지 헷갈린다.
        첫 화면은 🏢 사업장(2026-10-04 대표 「추천」) — 타일은 rules-v2.html 로 열고, ✏️ 검토·개정은 머리줄 단추로 간다.
-       준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게).
-       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
-    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
+       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸고,
+       2026-11-15 대표 「기업규정집 준비중 열어라」로 준비중 딱지(soon)와 두 화면 안쪽 문(rules-v2.html·rules.html 의
+       PuGate.soonUnlessAdmin)을 «짝으로 함께» 걷었다 — 직원도 연다(푸른 메일·문서관리와 같다. tests/app-soon-gate.test.js ⑩). */
+    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
