@@ -23,6 +23,7 @@
    ⚠ 여기는 DB·fetch 를 «받아서» 쓴다(주입) — tests/news-watch.test.js 가 가짜로 돌린다. */
 
 const Core = require('./news-lib/pu-news-core.js');
+const 판례부품 = require('./news-prec.js');
 
 const 다시하기한도 = 6;             /* 한 회차에 금요일 준비를 다시 하는 횟수 — 넘으면 알린다 */
 /* 금요일 준비가 회차.고친이 로 남기는 이름 — 이것이 아니면 «사람이 고친 회차»다 */
@@ -195,7 +196,8 @@ function 편지링크들(회차) {
   Core.꼭지들.forEach((g) => {
     (안[g.키] || []).forEach((x) => {
       if (!x || !Core.실릴까(x)) return;
-      const u = String(x.링크 || x.주소 || '').trim();
+      /* ★ 받는 분이 «실제로 가는» 주소를 잰다 — 옛 꼴 법제처 주소는 편지가 공개 쪽으로 바꿔 건다(2026-11-15) */
+      const u = Core.법제처사람주소(String(x.링크 || x.주소 || '').trim());
       if (!/^https?:\/\//i.test(u) || 본[u]) return;
       본[u] = 1;
       줄.push({ 주소: u, 제목: String(x.제목 || '').slice(0, 80), 꼭지: g.이름 });
@@ -216,9 +218,17 @@ async function 링크재기(링크들, fetchFn, 옵션) {
     try {
       const r = await fetchFn(l.주소, { method: 'GET', redirect: 'follow', signal: ac && ac.signal,
         headers: { 'user-agent': 'Mozilla/5.0 (pureun-newsletter-check)' } });
-      try { if (r && r.body && r.body.cancel) await r.body.cancel(); } catch (_) { /* 몸은 안 읽는다 */ }
       const s = Number(r && r.status) || 0;
-      결과[i] = Object.assign({}, l, { 코드: s, 상태: (s === 404 || s === 410) ? '깨짐' : (s >= 200 && s < 400) ? '됨' : '모름' });
+      let 상태 = (s === 404 || s === 410) ? '깨짐' : (s >= 200 && s < 400) ? '됨' : '모름';
+      /* ★★ 법제처는 «200 인데 실패 쪽»을 준다 — 「국가법령정보 공동활용 페이지 접속에 실패하였습니다」(2026-11-15 실측).
+           코드만 보던 이 점검은 그 링크를 «모두 열림»이라 했다. 법제처 쪽만 몸을 읽어 그 말이 있으면 «깨짐».
+         ⚠ 다른 집은 여전히 몸을 안 읽는다(파일이 수백 MB 일 수 있다). */
+      if (상태 === '됨' && /^https?:\/\/(www\.)?law\.go\.kr\//i.test(l.주소) && r && typeof r.text === 'function') {
+        if (판례부품.거절인가(await r.text())) 상태 = '깨짐';
+      } else {
+        try { if (r && r.body && r.body.cancel) await r.body.cancel(); } catch (_) { /* 몸은 안 읽는다 */ }
+      }
+      결과[i] = Object.assign({}, l, { 코드: s, 상태 });
     } catch (e) {
       const 말 = String((e && (e.cause && e.cause.code)) || (e && e.code) || (e && e.message) || e);
       결과[i] = Object.assign({}, l, { 코드: 0, 상태: /ENOTFOUND|EAI_AGAIN/.test(말) ? '깨짐' : '모름', 오류: 말.slice(0, 80) });
@@ -278,13 +288,21 @@ function 점검하기(o) {
        ② 이번 편지의 자료·판례가 «보낸» 편지와 겹치는가 (시험만 한 회차는 안 센다) */
   {
     const 모음 = o.판례모음 || null;
+    /* ★ 판례탈 — 모으개가 남긴 «못 모은 까닭»(homepage/newsPrec/탈, 2026-11-15).
+         예전에는 까닭 없이 「3주 넘게 새로 없음」만 떠서, 법제처가 열쇠를 거절한 것을 다섯 주 동안 몰랐다. */
+    const 판례탈 = String(o.판례탈 == null ? '' : o.판례탈).trim().slice(0, 200);
+    let 묵음 = false;
     if (모음) {
       const 날들 = Object.keys(모음).map((k) => String((모음[k] || {}).모은날 || '')).filter(Boolean).sort();
       const 마지막 = 날들[날들.length - 1] || '';
       if (!마지막 || 마지막 < 날더하기(서울때(o.now).날, -21)) {
-        넣('you', '판례가 3주 넘게 새로 안 들어왔습니다', (마지막 ? 마지막 + ' 뒤로 ' : '') + '같은 판례가 되풀이될 수 있습니다');
+        묵음 = true;
+        넣('you', '판례가 3주 넘게 새로 안 들어왔습니다', (마지막 ? 마지막 + ' 뒤로 ' : '') + '같은 판례가 되풀이될 수 있습니다'
+          + (판례탈 ? ' · 까닭: ' + 판례탈 : ''));
       }
     }
+    /* 아직 3주는 안 됐어도 «못 모으고 있다»는 것은 미리 알린다 — 3주를 기다리면 그만큼 같은 판례가 나간다 */
+    if (판례탈 && !묵음) 넣('you', '판례·행정해석을 못 모으고 있습니다', 판례탈);
     if (회차 && o.지난회차들) {
       const 보낸 = Core.보낸것들(o.지난회차들, 열쇠);
       const 겹 = ['policy', 'special', 'case', 'hr'].reduce((n, k) =>

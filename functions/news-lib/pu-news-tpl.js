@@ -922,6 +922,10 @@
   function _법제처짝(링크) {
     var s = String(링크 == null ? '' : 링크);
     if (s.indexOf('law.go.kr') < 0) return null;
+    /* ★ 새 꼴(공개 쪽 — precInfoP.do?precSeq= · expcInfoP.do?expcSeq=)도 같은 한 건이다(2026-11-15).
+         법제처 DRF 가 OC=test 를 거절해 모으개가 이 꼴로 담는다(Core.법제처사람주소). */
+    var 공 = /\/(prec|expc)InfoP\.do\?(?:[^#]*&)?(?:precSeq|expcSeq)=(\d{1,12})\b/i.exec(s);
+    if (공) return { 갈래: 공[1].toLowerCase(), 번호: 공[2] };
     var g = /[?&]target=(prec|expc)\b/.exec(s);
     var n = /[?&]ID=(\d{1,12})\b/i.exec(s);
     return (g && n) ? { 갈래: g[1], 번호: n[1] } : null;
@@ -986,7 +990,8 @@
       : 온제목);
     var 제 = esc(쓸것);
     var 인 = esc(String(x.인용 || '').trim());
-    var u = href(x.링크);
+    /* ⚠ 옛 꼴 법제처 주소(DRF·OC=test)는 받는 분 눈에 «접속 실패» 쪽이다 — 공개 쪽으로 바꿔 건다(2026-11-15) */
+    var u = href(Core.법제처사람주소(x.링크));
     /* ★★★ 법제처 판례·행정해석이면 손잡이가 «우리 쪽»(newsFullPage)이다.
          지을 수 없으면(밑주소 없음·법제처 링크 아님) 그대로 u(법제처 원문)다.
        ⚠⚠ u 는 href() 를 지나 «이미 씻겨»(esc) 있다. _전문쪽주소() 의 결과는
@@ -1830,7 +1835,7 @@
           if (x.요지) 줄.push('    ' + x.요지);
           /* ⚠ 서식 쪽(판례한칸)과 «같은 잣대»다 — 그 한 건으로 가는 주소일 때만 적는다.
                법제처 대문 주소를 적어 두면 눌러 놓고 손으로 찾으셔야 한다. */
-          if (x.링크 && _한건주소인가(x.링크)) 줄.push('  ' + x.링크);
+          if (x.링크 && _한건주소인가(x.링크)) 줄.push('  ' + Core.법제처사람주소(x.링크));
         } else if (x.갈래 === '법령') {
           줄.push('· ' + (x.제목 || '')
             + (x.시행일 ? ' (시행 ' + 날짜꼴(x.시행일) + ')' : ''));
