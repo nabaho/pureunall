@@ -28,6 +28,14 @@
     companies: [],
     cardIdx: {},
     erpCases: [],
+    caseMemos: [],
+    contracts: [],
+    quotes: [],
+    otherProjects: [],
+    consultings: [],
+    workItems: {},
+    workItemLogs: {},
+    schedules: [],
     caseTypes: [],
     mailFolders: {},
     mailMsgs: {},
@@ -36,10 +44,12 @@
     imapHitKeys: {},
     secretCache: {},
     secretDenied: {},
-    signReqs: {}
+    signReqs: {},
+    userDir: {}
   };
 
-  var NAMES = {};
+  var NAMES = Object.create(null);
+  var SID_CANON = Object.create(null);
   var STAFF = [];
   var CO_DIR = null;
   var MAIL_ROWS = [];
@@ -54,6 +64,8 @@
   var SEL = {};
   var SESSION_UNLINKED = {};
   var ACK_WATCHED = false;
+  var LIVE_WATCH_REFS = [];
+  var LIVE_SYNC_TIMER = null;
   var SECRET_LOADING = {};
   var SIGN_LOADING = {};
   var DIRTY_RPT = {};
@@ -163,16 +175,56 @@
     if (ME.isAdmin) return true;
     return C.canAccessSecret(rec, ME);
   }
+  function isVirtualCase(rec) {
+    return !!(rec && (rec._virtualFromErp || rec._virtualFromExt));
+  }
   function canChangeManagers(rec) {
     if (!ME || !C.str(ME.sid)) return false;
     if (ME.isAdmin) return true;
-    if (!rec || !rec.id || (!D.cases[rec.id] && !rec._virtualFromErp)) return true;
+    if (!rec || !rec.id || (!D.cases[rec.id] && !isVirtualCase(rec))) return true;
     return C.str(rec.managerMain) === C.str(ME.sid);
   }
   function catChip(code) {
     var c = C.CATEGORIES[code] || C.CATEGORIES.harass;
     var cls = code === 'sexual' ? 'c-red' : code === 'both' ? 'c-amber' : 'c-blue';
     return '<span class="chip ' + cls + '">' + esc(c.short) + '</span>';
+  }
+  function casePerformMode(c) {
+    if (!c) return 'advisory_rep';
+    if (c._performMode && C.PERFORM_MODES && C.PERFORM_MODES[c._performMode]) return c._performMode;
+    return typeof C.classifyPerformMode === 'function' ? C.classifyPerformMode(c) : 'advisory_rep';
+  }
+  function matchPerformFilter(c, perfVal) {
+    if (!perfVal) return true;
+    var pm = casePerformMode(c);
+    if (perfVal === 'direct_all') return pm === 'direct_report' || pm === 'direct_active';
+    return pm === perfVal;
+  }
+  function perfChip(c) {
+    var pm = casePerformMode(c);
+    var meta = (C.PERFORM_MODES && C.PERFORM_MODES[pm]) || { short: '대리·자문·검토', label: '당사자 대리 · 법률자문 · 보고서검토', icon: '⚖️' };
+    var cls = pm === 'direct_report' ? 'c-direct'
+      : pm === 'direct_active' ? 'c-direct-ing'
+      : pm === 'committee_collab' ? ''
+      : 'c-amber';
+    return '<span class="chip' + (cls ? ' ' + cls : '') + '" title="' + esc(meta.label) + '">' + esc(meta.icon + ' ' + meta.short) + '</span>';
+  }
+  function extSourceChips(c, maxCnt) {
+    var list = (c && Array.isArray(c._linkedSources))
+      ? c._linkedSources.filter(function (s) { return s && s.kind && s.kind !== 'erp'; })
+      : [];
+    if (!list.length) return '';
+    var cap = maxCnt || 2;
+    var iconMap = { contract: '📄', quote: '🧾', other: '📌', consulting: '💼', work: '🗂️', schedule: '📅' };
+    var shown = list.slice(0, cap).map(function (s) {
+      var ic = iconMap[s.kind] || '🔗';
+      var cls = (s.kind === 'contract' || s.kind === 'other' || s.kind === 'consulting') ? 'c-blue' : '';
+      return ' <span class="chip' + (cls ? ' ' + cls : '') + '" title="자동 분류 연동 원천: ' + esc(s.label) + '">' + esc(ic + ' ' + s.label) + '</span>';
+    }).join('');
+    if (list.length > cap) {
+      shown += ' <span class="chip" title="외 ' + (list.length - cap) + '개 연동 원천">+' + (list.length - cap) + '</span>';
+    }
+    return shown;
   }
   function stepDots(steps) {
     var st = steps || {};
@@ -273,6 +325,21 @@
     return true;
   }
 
+  function detachLiveWatchers() {
+    if (LIVE_SYNC_TIMER) {
+      clearTimeout(LIVE_SYNC_TIMER);
+      LIVE_SYNC_TIMER = null;
+    }
+    LIVE_WATCH_REFS.forEach(function (entry) {
+      try {
+        if (entry && entry.ref && typeof entry.ref.off === 'function') {
+          entry.ref.off('value', entry.fn);
+        }
+      } catch (e) {}
+    });
+    LIVE_WATCH_REFS = [];
+  }
+
   /* ═══ 로그아웃·계정 전환 시 기밀 상태 및 DOM 즉시 폐기 ═══ */
   function purgeSessionState() {
     SESSION_EPOCH++;
@@ -280,6 +347,7 @@
       try { fbDb.ref('harass_invest/erp_ack').off(); } catch (e) {}
     }
     ACK_WATCHED = false;
+    detachLiveWatchers();
     gate = null;
     ME = { uid: '', sid: '', name: '', isAdmin: false, isSubAdmin: false };
     TAB = 'cases';
@@ -298,6 +366,14 @@
     D.companies = [];
     D.cardIdx = {};
     D.erpCases = [];
+    D.caseMemos = [];
+    D.contracts = [];
+    D.quotes = [];
+    D.otherProjects = [];
+    D.consultings = [];
+    D.workItems = {};
+    D.workItemLogs = {};
+    D.schedules = [];
     D.caseTypes = [];
     D.mailFolders = {};
     D.mailMsgs = {};
@@ -307,6 +383,10 @@
     D.secretCache = {};
     D.secretDenied = {};
     D.signReqs = {};
+    D.userDir = {};
+    NAMES = Object.create(null);
+    SID_CANON = Object.create(null);
+    STAFF = [];
     MERGED_CASES = [];
     BUNDLES = [];
     YEARLY_DATA = null;
@@ -331,7 +411,10 @@
       '</tr></thead><tbody>';
     rows.forEach(function (r, idx) {
       var ckKey = name + '|' + r.id;
-      var trCls = (curId && r.id === curId) ? ' class="cur"' : '';
+      var clsList = [];
+      if (curId && r.id === curId) clsList.push('cur');
+      if (r.rowCls) clsList.push(r.rowCls);
+      var trCls = clsList.length ? ' class="' + esc(clsList.join(' ')) + '"' : '';
       html += '<tr data-row="' + esc(r.id) + '" data-tname="' + esc(name) + '"' + trCls + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + (idx + 1) + '번 선택"></td>' +
         '<td class="n">' + (idx + 1) + '</td>' +
@@ -528,15 +611,36 @@
       };
     });
 
+    /* 2-b) 계약·견적·기타사업·컨설팅·업무관리·이알피메모·캘린더일정 실시간 자동 분류·진행과정 통합 */
+    if (typeof C.integrateExternalSources === 'function') {
+      var extRes = C.integrateExternalSources(byId, {
+        contracts: D.contracts,
+        quotes: D.quotes,
+        otherProjects: D.otherProjects,
+        consultings: D.consultings,
+        workItems: D.workItems,
+        workItemLogs: D.workItemLogs,
+        caseMemos: D.caseMemos,
+        schedules: D.schedules,
+        userDir: D.userDir,
+        staffList: STAFF
+      }, CO_DIR, D.userDir);
+      if (extRes && extRes.casesById) byId = extRes.casesById;
+    }
+
     /* 3) 동일 사업장 동시 사건 충돌 방지를 위해 전체 peer 목록을 함께 전달하여 메일·모호건·한도초과 계산 */
     var rawPeers = Object.keys(byId).map(function (id) { return byId[id]; });
     rawPeers.forEach(function (c) {
       var scan = C.scanMailsForCaseInternal(c, MAIL_ROWS, CO_DIR, rawPeers);
-      if (c._virtualFromErp || (!(Array.isArray(c.mailLinks) && c.mailLinks.length) && !SESSION_UNLINKED[c.id])) {
-        if (scan.items.length || c._virtualFromErp) {
+      var virt = isVirtualCase(c);
+      if (virt || (!(Array.isArray(c.mailLinks) && c.mailLinks.length) && !SESSION_UNLINKED[c.id])) {
+        if (scan.items.length || virt) {
           c.mailLinks = scan.items;
           c.steps = C.deriveStepsFromMails(c.steps || {}, c.mailLinks, c.receiveDate, c.closeDate);
         }
+      }
+      if (Array.isArray(c._autoLogs) && c._autoLogs.length && typeof C.applyExternalLogsToSteps === 'function') {
+        c.steps = C.applyExternalLogsToSteps(c.steps || {}, c._autoLogs, c.receiveDate, c.closeDate);
       }
       c._ambiguousMails = scan.ambiguous || [];
       c._truncatedMails = scan.truncated || 0;
@@ -544,6 +648,8 @@
 
     MERGED_CASES = rawPeers.map(function (c) {
       c.progress = C.summarizeProgress(c.steps, c.closeDate);
+      c._performMode = typeof C.classifyPerformMode === 'function' ? C.classifyPerformMode(c) : 'advisory_rep';
+      c._hasDirectReport = typeof C.hasDirectResultReport === 'function' ? C.hasDirectResultReport(c) : (c._performMode === 'direct_report');
       return c;
     }).sort(function (a, b) {
       var da = C.str(a.receiveDate) || '0000-00-00';
@@ -570,11 +676,31 @@
   }
 
   /* ═══ 저장 헬퍼 (온톨로지 강제 관문 통과 + 이알피 동기화 큐 발행) ═══ */
+  function resolveStaffSid(raw) {
+    var v = C.str(raw);
+    if (!v) return '';
+    if (/^[A-Za-z0-9_-]{1,20}$/.test(v)) {
+      if (ME && C.str(ME.sid) && sidKey(ME.sid) === sidKey(v)) return C.str(ME.sid);
+      if (!Object.keys(SID_CANON).length) return v;
+      return SID_CANON[sidKey(v)] || '';
+    }
+    var cleaned = v.replace(/(대표)?노무사|팀장|실장|과장|대리|사원/g, '').replace(/\s+/g, '');
+    for (var i = 0; i < STAFF.length; i++) {
+      var st = STAFF[i];
+      if (!st) continue;
+      var nm = C.str(st.name).replace(/\s+/g, '');
+      if (nm && (nm === cleaned || nm === v.replace(/\s+/g, '')) && /^[A-Za-z0-9_-]{1,20}$/.test(C.str(st.sid))) {
+        return C.str(st.sid);
+      }
+    }
+    return '';
+  }
+
   function normalizeSubs(subs, mainSid) {
     var out = [];
-    var m = C.str(mainSid);
+    var m = resolveStaffSid(mainSid);
     (Array.isArray(subs) ? subs : []).forEach(function (s) {
-      var v = C.str(s);
+      var v = resolveStaffSid(s);
       if (!v || v === m || out.indexOf(v) >= 0) return;
       if (!/^[A-Za-z0-9_-]{1,20}$/.test(v)) return;
       if (out.length < 5) out.push(v);
@@ -632,7 +758,7 @@
 
   function cleanCaseForSave(rec) {
     var eid = C.str(rec.erpCaseId);
-    var mainSid = C.str(rec.managerMain);
+    var mainSid = resolveStaffSid(rec.managerMain);
     var out = {
       id: C.str(rec.id),
       companyId: C.str(rec.companyId),
@@ -654,6 +780,13 @@
       steps: rec.steps || {},
       mailLinks: trimCaseMails(rec.mailLinks)
     };
+    var pm = C.str(rec.performMode);
+    if (pm && C.PERFORM_MODES && C.PERFORM_MODES[pm]) {
+      out.performMode = pm;
+      out.hasResultReport = (pm === 'direct_report');
+    } else {
+      out.hasResultReport = !!(C.hasDirectResultReport && C.hasDirectResultReport(rec));
+    }
     if (eid) {
       out.sourceKind = 'case';
       out.sourceId = eid;
@@ -676,11 +809,23 @@
     var next = Object.assign({}, prev || {}, src);
     if (m.fields && typeof m.fields === 'object') {
       Object.keys(m.fields).forEach(function (k) {
-        if (m.fields[k] !== undefined) next[k] = m.fields[k];
+        if (m.fields[k] === undefined) return;
+        if (k === 'performMode') {
+          var nextPm = C.str(m.fields.performMode);
+          if (!nextPm) {
+            delete next.performMode;
+            delete next.hasResultReport;
+          } else if (C.PERFORM_MODES && C.PERFORM_MODES[nextPm]) {
+            next.performMode = nextPm;
+            next.hasResultReport = (nextPm === 'direct_report');
+          }
+          return;
+        }
+        next[k] = m.fields[k];
       });
     }
     next.companyLinkStatus = C.str(next.companyId) ? 'linked' : 'pending';
-    next.managerMain = C.str(next.managerMain);
+    next.managerMain = resolveStaffSid(next.managerMain);
     next.managerSubs = normalizeSubs(next.managerSubs, next.managerMain);
     next.erpDefer = C.str(next.erpCaseId) ? false : !!next.erpDefer;
     if (!C.str(next.erpCaseId)) next.erpCaseNo = '';
@@ -866,7 +1011,7 @@
     var c = caseById(cid);
     if (!c) throw new Error('사건을 찾지 못했습니다.');
     if (!C.canAccessSecret(c, ME)) throw new Error('담당 노무사 또는 대표만 저장할 수 있습니다.');
-    if (c._virtualFromErp) {
+    if (isVirtualCase(c)) {
       await saveCaseAndSync(c, false, null, reqEpoch, reqUid);
       if (!isSessionCurrent(reqEpoch, reqUid)) return null;
     }
@@ -959,6 +1104,45 @@
     return saved;
   }
 
+  function scheduleLiveRedraw() {
+    if (LIVE_SYNC_TIMER) clearTimeout(LIVE_SYNC_TIMER);
+    LIVE_SYNC_TIMER = setTimeout(function () {
+      LIVE_SYNC_TIMER = null;
+      if (!isSessionCurrent(SESSION_EPOCH, ME && ME.uid)) return;
+      rebuildDerived();
+      draw();
+    }, 60);
+  }
+
+  function attachLiveWatchers() {
+    if (LIVE_WATCH_REFS.length || !fbDb) return;
+    var specs = [
+      { path: 'harass_invest/cases', apply: function (v) { D.cases = v || {}; } },
+      { path: 'data/cases/v', apply: function (v) { D.erpCases = rowsOf(v || []); } },
+      { path: 'data/case_memos/v', apply: function (v) { D.caseMemos = rowsOf(v || []); } },
+      { path: 'data/contracts/v', apply: function (v) { D.contracts = rowsOf(v || []); } },
+      { path: 'pu_quotes', apply: function (v) { D.quotes = rowsOf(v || []); } },
+      { path: 'data/other_projects/v', apply: function (v) { D.otherProjects = rowsOf(v || []); } },
+      { path: 'data/consultings/v', apply: function (v) { D.consultings = rowsOf(v || []); } },
+      { path: 'work_erp/items', apply: function (v) { D.workItems = v || {}; } },
+      { path: 'work_erp/itemlogs', apply: function (v) { D.workItemLogs = v || {}; } },
+      { path: 'data/my_schedules/v', apply: function (v) { D.schedules = rowsOf(v || []); } }
+    ];
+    specs.forEach(function (sp) {
+      try {
+        var r = fbDb.ref(sp.path);
+        if (!r || typeof r.on !== 'function') return;
+        var fn = function (snap) {
+          if (!isSessionCurrent(SESSION_EPOCH, ME && ME.uid)) return;
+          sp.apply(snap ? snap.val() : null);
+          scheduleLiveRedraw();
+        };
+        r.on('value', fn);
+        LIVE_WATCH_REFS.push({ ref: r, fn: fn });
+      } catch (e) {}
+    });
+  }
+
   /* ═══ 전체 데이터 적재 ═══ */
   async function reload(optEpoch, optUid) {
     var reqEpoch = optEpoch || SESSION_EPOCH;
@@ -975,15 +1159,23 @@
       fbDb.ref('mailbox/folders').once('value'),
       fbDb.ref('mailbox/msgs').once('value'),
       fbDb.ref('mailbox/old/msgs').once('value'),
-      fbDb.ref('pucards/idx').once('value')
+      fbDb.ref('pucards/idx').once('value'),
+      fbDb.ref('data/case_memos/v').once('value'),
+      fbDb.ref('data/contracts/v').once('value'),
+      fbDb.ref('pu_quotes').once('value'),
+      fbDb.ref('data/other_projects/v').once('value'),
+      fbDb.ref('data/consultings/v').once('value'),
+      fbDb.ref('work_erp/items').once('value'),
+      fbDb.ref('work_erp/itemlogs').once('value'),
+      fbDb.ref('data/my_schedules/v').once('value')
     ];
     var labels = ['조사사건', '동기화큐', '동기화응답', '제외목록', '업체원장', '이알피사건', '사건유형', '메일폴더', '메일목록', '지난메일', '명함색인'];
     var res = await Promise.allSettled(tasks);
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var fails = [];
-    function valAt(i, fallback) {
-      if (res[i].status === 'fulfilled') return res[i].value.val() || fallback;
-      fails.push(labels[i]);
+    function valAt(i, fallback, optional) {
+      if (res[i] && res[i].status === 'fulfilled') return res[i].value.val() || fallback;
+      if (!optional && labels[i]) fails.push(labels[i]);
       return fallback;
     }
     D.cases = valAt(0, {});
@@ -1009,6 +1201,14 @@
       });
     }
     D.cardIdx = slimCardIdx;
+    D.caseMemos = rowsOf(valAt(11, [], true));
+    D.contracts = rowsOf(valAt(12, [], true));
+    D.quotes = rowsOf(valAt(13, [], true));
+    D.otherProjects = rowsOf(valAt(14, [], true));
+    D.consultings = rowsOf(valAt(15, [], true));
+    D.workItems = valAt(16, {}, true);
+    D.workItemLogs = valAt(17, {}, true);
+    D.schedules = rowsOf(valAt(18, [], true));
 
     var noteEl = $('loadNote');
     if (noteEl) {
@@ -1027,6 +1227,7 @@
         });
       } catch (e) {}
     }
+    attachLiveWatchers();
 
     rebuildDerived();
     applyUrlDeepLink();
@@ -1076,6 +1277,20 @@
     var allCnt = mode === 'cases' ? yd.totalCases : mode === 'inbox' ? yd.totalBundles : yd.totalItems;
     var allOn = YEAR_FILTER === '';
     var pills = ['<button type="button" class="' + (allOn ? 'on' : '') + '" aria-pressed="' + (allOn ? 'true' : 'false') + '" data-act="setYear" data-id="">📅 전체 연도 (' + allCnt + ')</button>'];
+    if (mode === 'cases' || mode === 'all') {
+      var curPerf = mode === 'cases' ? C.str($('casePerf') && $('casePerf').value) : C.str($('yrPerf') && $('yrPerf').value);
+      var drCnt = 0, daCnt = 0;
+      MERGED_CASES.forEach(function (c) {
+        if (YEAR_FILTER && C.caseYearOf(c) !== YEAR_FILTER) return;
+        var pm = casePerformMode(c);
+        if (pm === 'direct_report') drCnt++;
+        else if (pm === 'direct_active') daCnt++;
+      });
+      var isDrOn = curPerf === 'direct_report';
+      var isAllDirOn = curPerf === 'direct_all';
+      pills.push('<button type="button" class="pill-direct' + (isDrOn ? ' on' : '') + '" aria-pressed="' + (isDrOn ? 'true' : 'false') + '" data-act="quickPerfFilter" data-id="direct_report" title="푸른노무법인 직접 조사 수행 및 결과보고 완료 사건만 보기">🏅 직접수행·결과보고 (' + drCnt + ')</button>');
+      pills.push('<button type="button" class="' + (isAllDirOn ? 'on' : '') + '" aria-pressed="' + (isAllDirOn ? 'true' : 'false') + '" data-act="quickPerfFilter" data-id="direct_all" title="푸른노무법인 직접 조사 수행 전체(결과보고 완료 + 진행중) 보기">🛡️ 직접조사 전체 (' + (drCnt + daCnt) + ')</button>');
+    }
     yd.groups.forEach(function (g) {
       var cnt = mode === 'cases' ? g.caseCount : mode === 'inbox' ? g.bundleCount : g.totalCount;
       if (cnt <= 0 && YEAR_FILTER !== g.year) return;
@@ -1111,21 +1326,31 @@
   }
 
   function drawCasesPane() {
-    var openCnt = 0, closedCnt = 0, totalMails = 0, linkedCnt = 0, unlinkedCnt = 0;
+    var openCnt = 0, closedCnt = 0, totalMails = 0, totalAutoLogs = 0;
+    var linkedCnt = 0, unlinkedCnt = 0, anyExtLinkedCnt = 0;
+    var directReportCnt = 0, directActiveCnt = 0;
     MERGED_CASES.forEach(function (c) {
       if (c.progress.erpStatus === 'closed') closedCnt++; else openCnt++;
       totalMails += (c.mailLinks || []).length;
-      if (isCaseErpLinked(c)) linkedCnt++; else unlinkedCnt++;
+      totalAutoLogs += (c._autoLogs || []).length;
+      var erpOn = isCaseErpLinked(c);
+      if (erpOn) linkedCnt++; else unlinkedCnt++;
+      if (erpOn || (c._linkedSources && c._linkedSources.length)) anyExtLinkedCnt++;
+      var pm = casePerformMode(c);
+      if (pm === 'direct_report') directReportCnt++;
+      else if (pm === 'direct_active') directActiveCnt++;
     });
-    var fourthLabel = BUNDLES.length > 0 ? '이알피 공란 · 후보' : '이알피 연동 · 공란';
+    var perfF = C.str($('casePerf') && $('casePerf').value);
+    var isDirectKpiOn = perfF === 'direct_report';
+    var fourthLabel = BUNDLES.length > 0 ? '이알피·계약·기타 연동' : '이알피 · 계약 · 기타 연동';
     var fourthVal = BUNDLES.length > 0
-      ? ('공란 ' + unlinkedCnt + ' · 후보 ' + BUNDLES.length)
-      : ('연동 ' + linkedCnt + ' · 공란 ' + unlinkedCnt);
+      ? ('연동 ' + anyExtLinkedCnt + ' · 후보 ' + BUNDLES.length)
+      : ('연동 ' + anyExtLinkedCnt + ' · 공란 ' + unlinkedCnt);
     $('kpiBox').innerHTML =
-      '<div class="kpi k-blue"><span>전체 조사 사건</span><b>' + MERGED_CASES.length + '건</b></div>' +
-      '<div class="kpi k-green"><span>진행·법리검토 중</span><b>' + openCnt + '건 (종결 ' + closedCnt + ')</b></div>' +
-      '<div class="kpi"><span>사건별 수집 공문·메일</span><b>' + totalMails + '건</b></div>' +
-      '<div class="kpi k-amber" title="푸른이알피 연결 ' + linkedCnt + '건 · 이알피 번호 공란(추후정리) ' + unlinkedCnt + '건 · 미등록 메일묶음 ' + BUNDLES.length + '묶음"><span>' + fourthLabel + '</span><b>' + fourthVal + '</b></div>';
+      '<div class="kpi k-blue" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (!perfF ? 'true' : 'false') + '" title="전체 조사·자문 사건 보기"><span>전체 조사·자문 사건</span><b>' + MERGED_CASES.length + '건 (진행 ' + openCnt + ' · 종결 ' + closedCnt + ')</b></div>' +
+      '<div class="kpi k-green' + (isDirectKpiOn ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (isDirectKpiOn ? 'true' : 'false') + '" title="클릭하면 푸른노무법인이 직접 조사를 수행하고 결과보고서까지 완료한 사건만 모아 봅니다"><span>🏅 직접수행 · 결과보고 완료</span><b>' + directReportCnt + '건' + (directActiveCnt ? ' (직접진행 ' + directActiveCnt + '건)' : '') + '</b></div>' +
+      '<div class="kpi" title="메일함 수집 공문 ' + totalMails + '건 + 이알피·계약·기타사업·업무관리·일정 자동분류 진행기록 ' + totalAutoLogs + '건"><span>자동분류 공문·진행기록</span><b>메일 ' + totalMails + ' · 진행 ' + totalAutoLogs + '건</b></div>' +
+      '<div class="kpi k-amber" title="푸른이알피 연결 ' + linkedCnt + '건 · 계약·기타사업·업무관리 연동 포함 ' + anyExtLinkedCnt + '건 · 이알피 번호 공란(추후정리) ' + unlinkedCnt + '건 · 미등록 메일묶음 ' + BUNDLES.length + '묶음"><span>' + fourthLabel + '</span><b>' + fourthVal + '</b></div>';
 
     if ($('erpBatchBtn')) {
       $('erpBatchBtn').textContent = '🏢 이알피 공란 정리' + (unlinkedCnt ? ' (' + unlinkedCnt + ')' : '');
@@ -1141,6 +1366,7 @@
     var filtered = MERGED_CASES.filter(function (c) {
       if (YEAR_FILTER && C.caseYearOf(c) !== YEAR_FILTER) return false;
       if (cat && c.category !== cat) return false;
+      if (!matchPerformFilter(c, perfF)) return false;
       if (st === 'open' && c.progress.erpStatus === 'closed') return false;
       if (st === 'closed' && c.progress.erpStatus !== 'closed') return false;
       if (erpF === 'linked' && !isCaseErpLinked(c)) return false;
@@ -1148,7 +1374,9 @@
       if (mgr && c.managerMain !== mgr && (c.managerSubs || []).indexOf(mgr) < 0) return false;
       if (q) {
         var dispQ = resolveDisplayCompanyAndTitle(c);
-        var hay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
+        var pmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[casePerformMode(c)]) || {};
+        var extTxt = (c._linkedSources || []).map(function (s) { return s.label; }).join(' ');
+        var hay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo, extTxt, pmMeta.label, pmMeta.short, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -1156,10 +1384,10 @@
 
     if (!filtered.length && YEAR_FILTER) {
       var yrB = YEARLY_DATA && YEARLY_DATA.byYear && YEARLY_DATA.byYear[YEAR_FILTER];
-      var extraHint = (yrB && yrB.bundleCount > 0)
+      var extraHint = (yrB && yrB.bundleCount > 0 && !perfF)
         ? ('<br><button class="sm pri" style="margin-top:8px" data-act="goYearly" data-id="' + esc(YEAR_FILTER) + '">📅 ' + esc(YEAR_FILTER) + '년 미등록 메일 묶음(' + yrB.bundleCount + '건) 열람·등록하러 가기</button>')
         : '';
-      $('casesBox').innerHTML = '<div class="empty">' + esc(YEAR_FILTER) + '년에 등록된 조사 사건이 없습니다.' + extraHint + '</div>';
+      $('casesBox').innerHTML = '<div class="empty">' + esc(YEAR_FILTER) + '년에 조건에 맞는 조사 사건이 없습니다.' + extraHint + '</div>';
       return;
     }
 
@@ -1170,15 +1398,20 @@
       var yrBadge = /^20\d{2}$/.test(yr) ? ('<span class="chip">' + esc(yr) + '</span> ') : '';
       var disp = resolveDisplayCompanyAndTitle(c);
       var fullLabel = disp.companyName + ' — ' + disp.title;
+      var pm = casePerformMode(c);
+      var autoLogCnt = (c._autoLogs || []).length;
+      var docAndLogChip = '<span class="chip c-blue">📧 ' + (c.mailLinks || []).length + '건</span>' +
+        (autoLogCnt ? ' <span class="chip c-green" title="이알피·계약·기타사업·업무관리·일정에서 자동 분류된 진행기록 ' + autoLogCnt + '건">🗂️ 진행 ' + autoLogCnt + '</span>' : '');
       return {
         id: c.id,
+        rowCls: pm === 'direct_report' ? 'perf-direct' : '',
         cells: [
           { cls: 'ti', title: fullLabel, html: yrBadge + esc(disp.companyName) + ' — ' + esc(disp.title) },
-          { k: 'badge', html: catChip(c.category) },
+          { k: 'badge', html: perfChip(c) + ' ' + catChip(c.category) },
           { html: esc(mgrText(c)) },
           { html: stepDots(c.steps) + '<b>' + p.doneCount + '/' + p.totalCount + '</b> ' + esc(p.currentStepShort + vLbl) },
-          { html: '<span class="chip c-blue">📧 ' + (c.mailLinks || []).length + '건</span>' },
-          { html: erpLinkChip(c) },
+          { html: docAndLogChip },
+          { html: erpLinkChip(c) + extSourceChips(c, 2) },
           { k: 'act', html:
             '<button class="sm pri" data-act="openDetail" data-id="' + esc(c.id) + '">진행·공문</button> ' +
             '<button class="sm" data-act="openReport" data-id="' + esc(c.id) + '">🔒 보고서</button>'
@@ -1186,7 +1419,7 @@
         ]
       };
     });
-    $('casesBox').innerHTML = renderTable('cases', ['사업장 · 사건명', '구분', '담당 노무사', '8단계 진행현황', '수집 공문', '푸른이알피 연동', '열기'], rows, CUR_ID);
+    $('casesBox').innerHTML = renderTable('cases', ['사업장 · 사건명', '수행구분 · 유형', '담당 노무사', '8단계 진행현황', '수집 공문 · 진행', '이알피 · 계약 · 기타 연동', '열기'], rows, CUR_ID);
   }
 
   function drawInboxPane() {
@@ -1230,6 +1463,7 @@
   function getFilteredYearlyGroups(yd) {
     var q = C.str($('yrQ') && $('yrQ').value).toLowerCase();
     var cat = C.str($('yrCat') && $('yrCat').value);
+    var perf = C.str($('yrPerf') && $('yrPerf').value);
     var kind = C.str($('yrKind') && $('yrKind').value);
     var out = [];
     if (!yd || !Array.isArray(yd.groups)) return out;
@@ -1238,16 +1472,19 @@
 
       var fCases = kind === 'bundle' ? [] : g.cases.filter(function (c) {
         if (cat && c.category !== cat) return false;
+        if (!matchPerformFilter(c, perf)) return false;
         if (q) {
           var dispY = resolveDisplayCompanyAndTitle(c);
+          var pmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[casePerformMode(c)]) || {};
+          var extTxt = (c._linkedSources || []).map(function (s) { return s.label; }).join(' ');
           var mTxt = (c.mailLinks || []).map(function (m) { return m.subject + ' ' + (m.attNames || []).join(' '); }).join(' ');
-          var hay = [g.year, dispY.companyName, dispY.title, c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), mTxt].join(' ').toLowerCase();
+          var hay = [g.year, dispY.companyName, dispY.title, c.companyName, c.title, c.erpCaseNo, extTxt, pmMeta.label, pmMeta.short, nameOf(c.managerMain), mTxt].join(' ').toLowerCase();
           if (hay.indexOf(q) < 0) return false;
         }
         return true;
       });
 
-      var fBundles = kind === 'case' ? [] : g.bundles.filter(function (b) {
+      var fBundles = (kind === 'case' || !!perf) ? [] : g.bundles.filter(function (b) {
         if (cat && b.category !== cat) return false;
         if (q) {
           var mTxt = (b.mails || []).map(function (m) { return m.subject + ' ' + (m.attNames || []).join(' '); }).join(' ');
@@ -1267,10 +1504,12 @@
     var yd = YEARLY_DATA || C.buildYearlyArchive(MERGED_CASES, BUNDLES);
     var yrSpan = yd.years.filter(function (y) { return /^20\d{2}$/.test(y); });
     var spanLbl = yrSpan.length ? (yrSpan[yrSpan.length - 1] + '~' + yrSpan[0] + '년 전체') : '전체 사건·자문';
+    var yrPerfVal = C.str($('yrPerf') && $('yrPerf').value);
+    var directRepTotal = Number(yd.totalDirectReport || 0);
     if ($('yrKpiBox')) {
       $('yrKpiBox').innerHTML =
-        '<div class="kpi k-blue" title="연도별 전체 사건·자문 (' + esc(spanLbl) + ')"><span>' + esc(spanLbl) + '</span><b>' + yd.totalItems + '건</b></div>' +
-        '<div class="kpi k-green"><span>이알피·원장 등록</span><b>' + yd.totalCases + '건</b></div>' +
+        '<div class="kpi k-blue" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (!yrPerfVal ? 'true' : 'false') + '" title="연도별 전체 사건·자문 (' + esc(spanLbl) + ')"><span>' + esc(spanLbl) + '</span><b>' + yd.totalItems + '건 (등록 ' + yd.totalCases + ')</b></div>' +
+        '<div class="kpi k-green' + (yrPerfVal === 'direct_report' ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (yrPerfVal === 'direct_report' ? 'true' : 'false') + '" title="클릭하면 푸른노무법인 직접수행·결과보고 완료 건만 연도별로 모아 봅니다"><span>🏅 직접수행 · 결과보고</span><b>' + directRepTotal + '건</b></div>' +
         '<div class="kpi k-amber"><span>미등록 메일묶음</span><b>' + yd.totalBundles + '묶음</b></div>' +
         '<div class="kpi"><span>수집 공문·보고서</span><b>' + yd.totalMails.toLocaleString() + '통</b></div>';
     }
@@ -1287,21 +1526,26 @@
 
       var rows = [];
       var secMailSum = 0;
+      var secDirectRep = 0;
 
       fCases.forEach(function (c) {
         var p = c.progress || C.summarizeProgress(c.steps, c.closeDate);
         var mc = (c.mailLinks || []).length;
+        var lc = (c._autoLogs || []).length;
         secMailSum += mc;
+        var pm = casePerformMode(c);
+        if (pm === 'direct_report') secDirectRep++;
         var attSum = (c.mailLinks || []).reduce(function (s, m) { return s + (Number(m.attCount) || (m.attNames || []).length || 0); }, 0);
         var period = (c.receiveDate || '-') + (c.closeDate ? (' ~ ' + c.closeDate) : ' ~ 진행중');
         var disp = resolveDisplayCompanyAndTitle(c);
         var fullCaseTi = disp.companyName + ' — ' + disp.title;
         rows.push({
           id: 'c:' + c.id,
+          rowCls: pm === 'direct_report' ? 'perf-direct' : '',
           cells: [
-            { cls: 'ti', title: fullCaseTi, html: '<span class="chip c-green">✓ 등록사건</span> ' + esc(disp.companyName) + ' — ' + esc(disp.title) },
-            { k: 'badge', html: catChip(c.category) },
-            { html: stepDots(c.steps) + '<b>' + p.doneCount + '/8</b> · 메일 <b>' + mc + '</b>통' + (attSum ? (' (첨부 ' + attSum + ')') : '') },
+            { cls: 'ti', title: fullCaseTi, html: '<span class="chip c-green">✓ 등록사건</span> ' + esc(disp.companyName) + ' — ' + esc(disp.title) + extSourceChips(c, 1) },
+            { k: 'badge', html: perfChip(c) + ' ' + catChip(c.category) },
+            { html: stepDots(c.steps) + '<b>' + p.doneCount + '/8</b> · 메일 <b>' + mc + '</b>통' + (attSum ? (' (첨부 ' + attSum + ')') : '') + (lc ? (' · 진행 ' + lc) : '') },
             { html: esc(period + ' · ' + mgrText(c)) },
             { k: 'act', html:
               '<button class="sm pri" data-act="openDetail" data-id="' + esc(c.id) + '">진행·공문(' + mc + ')</button> ' +
@@ -1350,11 +1594,12 @@
         '<div class="sec">' +
         '<span>📅 ' + esc(yrTitle) + ' 괴롭힘·성희롱 조사·자문 자료 (<b>' + rows.length + '</b>건 — 등록 ' + fCases.length + '건 · 메일묶음 ' + fBundles.length + '건 · 관련 메일 ' + secMailSum + '통)</span>' +
         '<span class="sp"></span>' +
+        (secDirectRep ? ('<span class="chip c-direct">🏅 직접수행·결과보고 ' + secDirectRep + '</span>') : '') +
         '<span class="chip c-blue">괴롭힘 ' + (secCats.harass || 0) + '</span>' +
         '<span class="chip c-red">성희롱 ' + (secCats.sexual || 0) + '</span>' +
         (secCats.both ? ('<span class="chip c-amber">복합 ' + secCats.both + '</span>') : '') +
         '</div>' +
-        renderTable('yr_' + C.safeKey(g.year), ['구분 · 의뢰처 · 사건명', '유형', '진행단계 · 수집서류', '기간 · 담당', '열람 · 등록'], rows, CUR_ID ? ('c:' + CUR_ID) : '') +
+        renderTable('yr_' + C.safeKey(g.year), ['구분 · 의뢰처 · 사건명', '수행구분 · 유형', '진행단계 · 수집서류', '기간 · 담당', '열람 · 등록'], rows, CUR_ID ? ('c:' + CUR_ID) : '') +
         '</div>'
       );
     });
@@ -1379,8 +1624,8 @@
       return;
     }
     var lines = [[
-      '연도', '상태구분', '의뢰사업장', '사건명', '조사유형', '진행단계',
-      '수집메일수', '첨부파일수', '최초일자', '최근일자', '담당노무사', '이알피사건번호', '주요메일_첨부요약'
+      '연도', '상태구분', '수행구분', '의뢰사업장', '사건명', '조사유형', '진행단계',
+      '수집메일수', '첨부파일수', '최초일자', '최근일자', '담당노무사', '이알피_연동원천', '주요메일_첨부요약'
     ].join(',')];
 
     filteredGroups.forEach(function (entry) {
@@ -1388,6 +1633,8 @@
       entry.cases.forEach(function (c) {
         var p = c.progress || C.summarizeProgress(c.steps, c.closeDate);
         var dispC = resolveDisplayCompanyAndTitle(c);
+        var pmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[casePerformMode(c)]) || { label: '대리·자문·검토' };
+        var extSummary = [c.erpCaseNo || ''].concat((c._linkedSources || []).map(function (s) { return s.label; })).filter(Boolean).join(' · ');
         var mails = c.mailLinks || [];
         var attSum = mails.reduce(function (s, m) { return s + (Number(m.attCount) || (m.attNames || []).length || 0); }, 0);
         var sample = mails.slice(0, 3).map(function (m) {
@@ -1395,11 +1642,11 @@
           return (m.date || '') + ' ' + (m.subject || '') + an;
         }).join(' / ');
         lines.push([
-          g.year, '등록사건', dispC.companyName || '', dispC.title || '',
+          g.year, '등록사건', pmMeta.label, dispC.companyName || '', dispC.title || '',
           (C.CATEGORIES[c.category] || C.CATEGORIES.harass).label,
           p.doneCount + '/8 (' + p.currentStepShort + ')',
           String(mails.length), String(attSum),
-          c.receiveDate || '', c.closeDate || '', mgrText(c), c.erpCaseNo || '', sample
+          c.receiveDate || '', c.closeDate || '', mgrText(c), extSummary, sample
         ].map(csvCellSafe).join(','));
       });
       entry.bundles.forEach(function (b) {
@@ -1410,7 +1657,7 @@
           return (m.date || '') + ' ' + (m.subject || '') + an;
         }).join(' / ');
         lines.push([
-          g.year, b.companyId ? '미등록묶음(업체원장일치)' : '미등록묶음',
+          g.year, b.companyId ? '미등록묶음(업체원장일치)' : '미등록묶음', '자동판별대기',
           b.companyName || '', b.suggestedTitle || '',
           (C.CATEGORIES[b.category] || C.CATEGORIES.harass).label,
           b.summary.doneCount + '/8 (' + b.summary.currentStepShort + ')',
@@ -1496,7 +1743,7 @@
     return '<div class="bar">' +
       '<label class="hint" for="curCaseSel">사건 선택</label>' +
       '<select id="curCaseSel" data-casesel="1" style="min-width:220px;max-width:440px;font-weight:600">' + opts + '</select>' +
-      catChip(c.category) + ' ' + erpLinkChip(c) + ' ' + erpBtn +
+      perfChip(c) + ' ' + catChip(c.category) + ' ' + erpLinkChip(c) + extSourceChips(c, 3) + ' ' + erpBtn +
       '<span class="sp"></span>' +
       actBtns +
       '</div>' +
@@ -1583,11 +1830,41 @@
       : '';
 
     var dispCur = resolveDisplayCompanyAndTitle(c);
+    var curPm = casePerformMode(c);
+    var curPmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[curPm]) || { icon: '⚖️', label: '당사자 대리 · 법률자문 · 보고서검토' };
+    var autoLogs = Array.isArray(c._autoLogs) ? c._autoLogs : [];
+    var extLogRows = autoLogs.map(function (lg, idx) {
+      var stepShortTxt = (Array.isArray(lg.stepCodes) ? lg.stepCodes : []).map(function (sc) {
+        var sd = C.STEPS.find(function (s) { return s.code === sc; });
+        return sd ? sd.short : sc;
+      }).join(' · ');
+      var srcChipCls = (lg.sourceKind === 'contract' || lg.sourceKind === 'other' || lg.sourceKind === 'consulting') ? 'c-blue'
+        : lg.sourceKind === 'work' ? 'c-green'
+        : lg.sourceKind === 'erp_memo' ? 'c-amber'
+        : '';
+      return {
+        id: lg.id || ('extlog_' + idx),
+        cells: [
+          { html: esc(lg.date || '-') },
+          { k: 'badge', html: '<span class="chip' + (srcChipCls ? ' ' + srcChipCls : '') + '">' + esc(lg.sourceBadge || '연동') + (lg.sourceNo && lg.sourceNo !== lg.sourceBadge ? (' · ' + esc(lg.sourceNo)) : '') + '</span>' },
+          { html: esc(stepShortTxt || '진행기록') },
+          { cls: 'ti wide', title: lg.text || '', html: esc(lg.text || '') }
+        ]
+      };
+    });
+    var extCardHtml = '<div class="card">' +
+      '<div class="sec">② 이알피 · 계약 · 기타사업 · 업무관리 자동분류 진행과정 (' + autoLogs.length + '건) <span class="hint">푸른이알피·계약서류·기타사업·업무관리·일정에서 등록·진행되면 자동으로 분류되어 위 8단계와 타임라인에 정리됩니다</span></div>' +
+      (extLogRows.length
+        ? renderTable('extlogs', ['진행일자', '분류 원천 · 번호', '자동매칭 단계', '진행 내용 · 계약/업무 기록'], extLogRows, '')
+        : '<div class="empty">아직 연결된 계약·기타사업·업무관리·이알피 진행기록이 없습니다. 푸른이알피나 계약·기타사업·업무관리에서 관련 건이 진행되면 자동으로 이곳에 분류·정리됩니다.</div>') +
+      '</div>';
+
     box.innerHTML =
       '<div class="card">' +
       casePickerBar(c) +
       '<div class="prof">' +
       '<span><b>의뢰 사업장</b>' + esc(dispCur.companyName || '-') + (c.bizNo ? ' (' + esc(c.bizNo) + ')' : '') + '</span>' +
+      '<span><b>수행 구분</b>' + esc(curPmMeta.icon + ' ' + curPmMeta.label) + '</span>' +
       '<span><b>담당 노무사</b>' + esc(mgrText(c)) + '</span>' +
       '<span><b>수임·착수일</b>' + esc(c.receiveDate || '-') + '</span>' +
       '<span><b>보고 기한</b>' + esc(c.dueDate || '-') + '</span>' +
@@ -1597,11 +1874,12 @@
       '</div>' +
       '</div>' +
       '<div class="card">' +
-      '<div class="sec">① 8단계 표준 조사 진행 과정 <span class="hint">체크·수정한 모든 단계는 푸른이알피 사건 상태·요약·업무메모에 자동 기록됩니다</span></div>' +
+      '<div class="sec">① 8단계 표준 조사 진행 과정 <span class="hint">메일·계약·업무관리 자동분류 및 수기 수정 단계가 푸른이알피 사건 상태·요약·업무메모에 자동 기록됩니다</span></div>' +
       renderTable('steps', ['조사 단계', '상태', '진행일', '진행 근거 · 메모', '관리'], stepRows, '') +
       '</div>' +
+      extCardHtml +
       '<div class="card">' +
-      '<div class="sec">② 사건별 수집 공문·서류 메일함 (' + mails.length + '건) <span class="sp"></span>' + docBtns + '</div>' +
+      '<div class="sec">③ 사건별 수집 공문·서류 메일함 (' + mails.length + '건) <span class="sp"></span>' + docBtns + '</div>' +
       ambigHtml + truncHtml +
       renderTable('mails', ['수발신 · 일자', '문서 분류', '연결 단계', '제목 · 첨부파일', '열람 · 관리'], mailRows, '') +
       '</div>';
@@ -1898,6 +2176,8 @@
         return '<option value="' + esc(cid) + '"' + sel + '>' + esc(co.name) + (co.bizNo ? ' (' + esc(co.bizNo) + ')' : '') + '</option>';
       }).join('');
     var catVal = c.category || (b && b.category) || 'harass';
+    var initPerfMode = (C.PERFORM_MODES && C.PERFORM_MODES[C.str(c.performMode)]) ? C.str(c.performMode) : '';
+    var autoPerfNow = existing ? ((C.PERFORM_MODES && C.PERFORM_MODES[casePerformMode(Object.assign({}, c, { performMode: '' }))]) || {}).short : '';
     var mainMgr = c.managerMain || (b && b.managerMain) || ME.sid;
     var curSubs = Array.isArray(c.managerSubs) ? c.managerSubs.slice() : [];
     if (!existing && !ME.isAdmin && mainMgr !== ME.sid && curSubs.indexOf(ME.sid) < 0) {
@@ -1942,6 +2222,13 @@
       '<option value="sexual"' + (catVal === 'sexual' ? ' selected' : '') + '>직장 내 성희롱</option>' +
       '<option value="both"' + (catVal === 'both' ? ' selected' : '') + '>괴롭힘·성희롱 복합</option>' +
       '</select></div></div>' +
+      '<div class="fr"><label for="mPerfMode">수행 구분</label><div class="fv"><select id="mPerfMode">' +
+      '<option value=""' + (initPerfMode === '' ? ' selected' : '') + '>🤖 자동 분류 (메일·계약·이알피·업무기록 기준' + (autoPerfNow ? ' — ' + esc(autoPerfNow) : '') + ')</option>' +
+      '<option value="direct_report"' + (initPerfMode === 'direct_report' ? ' selected' : '') + '>🏅 푸른노무법인 직접수행 · 결과보고 완료</option>' +
+      '<option value="direct_active"' + (initPerfMode === 'direct_active' ? ' selected' : '') + '>🔍 푸른노무법인 직접조사 수행 (진행·착수)</option>' +
+      '<option value="advisory_rep"' + (initPerfMode === 'advisory_rep' ? ' selected' : '') + '>⚖️ 당사자 대리 · 법률자문 · 보고서검토</option>' +
+      '<option value="committee_collab"' + (initPerfMode === 'committee_collab' ? ' selected' : '') + '>🏛️ 외부위원 위촉 · 타법인 협업</option>' +
+      '</select></div></div>' +
       '<div class="fr"><label for="mErpMode">푸른이알피 번호</label><div class="fv">' +
       '<select id="mErpMode">' +
       '<option value="defer"' + (initErpMode === 'defer' ? ' selected' : '') + '>⏸ 이알피 번호 비워두고 등록 (추후 한 번에 일괄 정리)</option>' +
@@ -1964,6 +2251,9 @@
       '<div class="mft"><button data-mclose="1">취소</button><button class="pri" id="mSaveCaseBtn">💾 저장</button></div>'
     );
 
+    if ($('mPerfMode') && !$('mPerfMode').options && !$('mPerfMode').value && initPerfMode) {
+      $('mPerfMode').value = initPerfMode;
+    }
     if ($('mErpMode') && $('mErpMode').addEventListener) {
       $('mErpMode').addEventListener('change', function () {
         if ($('mErpPick')) $('mErpPick').style.display = this.value === 'link' ? '' : 'none';
@@ -2008,7 +2298,8 @@
         closeDate: C.str($('mClose').value),
         erpCaseId: nextErpId,
         erpCaseNo: nextErpNo,
-        erpDefer: nextErpDefer
+        erpDefer: nextErpDefer,
+        performMode: $('mPerfMode') ? C.str($('mPerfMode').value) : initPerfMode
       };
     }
 
@@ -2036,10 +2327,10 @@
         mailLinks: existing ? (existing.mailLinks || []) : (b ? b.mails.slice() : [])
       });
 
-      var changedFields = (existing && !existing._virtualFromErp)
+      var changedFields = (existing && !isVirtualCase(existing))
         ? diffCaseModalFields(initialFields, allModalFields)
         : allModalFields;
-      var needMailRescan = !existing || !!existing._virtualFromErp ||
+      var needMailRescan = !existing || isVirtualCase(existing) ||
         changedFields.companyId !== undefined || changedFields.companyName !== undefined ||
         changedFields.bizNo !== undefined || changedFields.email !== undefined ||
         changedFields.receiveDate !== undefined || changedFields.closeDate !== undefined;
@@ -2058,7 +2349,7 @@
 
       try {
         $('mSaveCaseBtn').disabled = true;
-        var mut = (existing && !existing._virtualFromErp)
+        var mut = (existing && !isVirtualCase(existing))
           ? (needMailRescan
             ? { fields: changedFields, addedMails: collected, rederiveSteps: true }
             : { fields: changedFields })
@@ -2094,7 +2385,7 @@
     var mails = C.collectMailsForCase(c, MAIL_ROWS, CO_DIR, MERGED_CASES);
     var steps = C.deriveStepsFromMails(c.steps, mails, c.receiveDate, c.closeDate);
     var next = Object.assign({}, c, { mailLinks: mails, steps: steps });
-    return saveCaseAndSync(next, false, c._virtualFromErp ? null : { syncedAutoMails: mails, rederiveSteps: true });
+    return saveCaseAndSync(next, false, isVirtualCase(c) ? null : { syncedAutoMails: mails, rederiveSteps: true });
   }
 
   async function syncAllCases(targetIds) {
@@ -2309,7 +2600,7 @@
               ? { erpCaseId: chosenErpId, erpCaseNo: matchedEc ? C.str(matchedEc.caseNo) : '', erpDefer: false }
               : { erpDefer: false };
             var nextObj = Object.assign({}, cRec, fieldsPatch);
-            await saveCaseAndSync(nextObj, false, cRec._virtualFromErp ? null : { fields: fieldsPatch }, reqEpoch, reqUid);
+            await saveCaseAndSync(nextObj, false, isVirtualCase(cRec) ? null : { fields: fieldsPatch }, reqEpoch, reqUid);
             if (chosenErpId) linkedExist++; else queuedNew++;
           }
           if (!isSessionCurrent(reqEpoch, reqUid)) return;
@@ -2756,7 +3047,7 @@
           mut.closeDate = closeDate;
         }
         var nextSteps = Object.assign({}, c.steps || {}, mut.stepPatches);
-        await saveCaseAndSync(Object.assign({}, c, { steps: nextSteps, closeDate: closeDate }), false, c._virtualFromErp ? null : mut);
+        await saveCaseAndSync(Object.assign({}, c, { steps: nextSteps, closeDate: closeDate }), false, isVirtualCase(c) ? null : mut);
         closeModal();
         draw();
         toast('✅ 단계 기록 및 푸른이알피 반영 완료');
@@ -2800,7 +3091,7 @@
           return x.key === mailKey ? updatedMail : x;
         });
         var nextSteps = C.deriveStepsFromMails(c.steps, nextLinks, c.receiveDate, c.closeDate);
-        await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, c._virtualFromErp ? null : { upsertMail: updatedMail });
+        await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, isVirtualCase(c) ? null : { upsertMail: updatedMail });
         closeModal();
         draw();
         toast('서류 분류가 갱신되었습니다.');
@@ -2825,7 +3116,7 @@
     };
     var nextLinks = [item].concat((c.mailLinks || []).filter(function (x) { return x.key !== key; }));
     var nextSteps = C.deriveStepsFromMails(c.steps, nextLinks, c.receiveDate, c.closeDate);
-    await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, c._virtualFromErp ? null : { upsertMail: item });
+    await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, isVirtualCase(c) ? null : { upsertMail: item });
     draw();
     toast('✅ 메일이 사건 공문함에 연결되었습니다');
   }
@@ -2909,7 +3200,7 @@
         };
         var nextLinks = [item].concat(c.mailLinks || []);
         var nextSteps = C.deriveStepsFromMails(c.steps, nextLinks, c.receiveDate, c.closeDate);
-        await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, c._virtualFromErp ? null : { upsertMail: item });
+        await saveCaseAndSync(Object.assign({}, c, { mailLinks: nextLinks, steps: nextSteps }), false, isVirtualCase(c) ? null : { upsertMail: item });
         closeModal();
         draw();
         toast('✅ 서류 기록 및 푸른이알피 반영 완료');
@@ -3026,7 +3317,7 @@
       autoSteps.pledge = { done: true, date: item.date || C.ymdOf(Date.now()), note: '면담 참여자 비밀유지서약 징구', srcMail: '', manual: false };
       if (!ns.pledge || (!ns.pledge.done && !ns.pledge.manual)) ns.pledge = autoSteps.pledge;
     }
-    await saveCaseAndSync(Object.assign({}, c, { steps: ns }), false, c._virtualFromErp ? null : { autoStepPatches: autoSteps }, reqEpoch, reqUid);
+    await saveCaseAndSync(Object.assign({}, c, { steps: ns }), false, isVirtualCase(c) ? null : { autoStepPatches: autoSteps }, reqEpoch, reqUid);
   }
 
   /* ⚠ 주민등록번호 사전 가림 원칙 강제: 바이너리(inline_data) 전송을 원천 차단하고 가림된 글자(text)만 AI에 전달 */
@@ -3776,7 +4067,7 @@
           if (cNow && (!cNow.steps || !cNow.steps.review || (!cNow.steps.review.done && !cNow.steps.review.manual))) {
             var revAuto = { done: true, date: item.date || C.ymdOf(Date.now()), note: '상담·면담 진술 기반 3요건 검토표 자동 구성', srcMail: '', manual: false };
             var ns2 = Object.assign({}, cNow.steps || {}, { review: revAuto });
-            await saveCaseAndSync(Object.assign({}, cNow, { steps: ns2 }), false, cNow._virtualFromErp ? null : { autoStepPatches: { review: revAuto } }, reqEpoch, reqUid);
+            await saveCaseAndSync(Object.assign({}, cNow, { steps: ns2 }), false, isVirtualCase(cNow) ? null : { autoStepPatches: { review: revAuto } }, reqEpoch, reqUid);
             if (!isSessionCurrent(reqEpoch, reqUid)) return;
           }
         }
@@ -4135,7 +4426,7 @@
       var btn = $('srIssueBtn');
       try {
         btn.disabled = true;
-        if (c._virtualFromErp) {
+        if (isVirtualCase(c)) {
           await saveCaseAndSync(c, false, null, reqEpoch, reqUid);
           if (!isSessionCurrent(reqEpoch, reqUid)) return;
         }
@@ -4472,7 +4763,7 @@
         if (c && (!c.steps || !c.steps.review || (!c.steps.review.done && !c.steps.review.manual))) {
           var revStep = { done: true, date: C.ymdOf(Date.now()), note: '쟁점별 사실인정 및 3요건 법리검토 작성', srcMail: '', manual: false };
           var ns = Object.assign({}, c.steps || {}, { review: revStep });
-          await saveCaseAndSync(Object.assign({}, c, { steps: ns }), false, c._virtualFromErp ? null : { autoStepPatches: { review: revStep } }, reqEpoch, reqUid);
+          await saveCaseAndSync(Object.assign({}, c, { steps: ns }), false, isVirtualCase(c) ? null : { autoStepPatches: { review: revStep } }, reqEpoch, reqUid);
           if (!isSessionCurrent(reqEpoch, reqUid)) return;
         }
         if (MODAL_SEQ === reqModalSeq) closeModal();
@@ -4528,7 +4819,7 @@
     var savedSec = await saveSecretRecord(c.id, patch, reqEpoch, reqUid);
     if (!savedSec || !isSessionCurrent(reqEpoch, reqUid)) return;
     if (vVal !== C.str(c.verdictSummary)) {
-      await saveCaseAndSync(Object.assign({}, c, { verdictSummary: vVal }), false, c._virtualFromErp ? null : { fields: { verdictSummary: vVal } }, reqEpoch, reqUid);
+      await saveCaseAndSync(Object.assign({}, c, { verdictSummary: vVal }), false, isVirtualCase(c) ? null : { fields: { verdictSummary: vVal } }, reqEpoch, reqUid);
       if (!isSessionCurrent(reqEpoch, reqUid)) return;
     }
     draw();
@@ -4648,7 +4939,7 @@
         bulkMut.closeDate = nextClose;
       }
       clearSel(['steps']);
-      await saveCaseAndSync(Object.assign({}, c, { steps: ns, closeDate: nextClose }), false, c._virtualFromErp ? null : bulkMut);
+      await saveCaseAndSync(Object.assign({}, c, { steps: ns, closeDate: nextClose }), false, isVirtualCase(c) ? null : bulkMut);
       draw();
       toast('✅ 선택 단계가 업데이트되고 푸른이알피에 동기화되었습니다.');
       return;
@@ -4661,7 +4952,7 @@
       var kept = (cm.mailLinks || []).filter(function (m) { return !dropSet[m.key]; });
       if (!kept.length) SESSION_UNLINKED[cm.id] = 1;
       clearSel(['mails']);
-      await saveCaseAndSync(Object.assign({}, cm, { mailLinks: kept }), false, cm._virtualFromErp ? null : { removeMailKeys: dropSet });
+      await saveCaseAndSync(Object.assign({}, cm, { mailLinks: kept }), false, isVirtualCase(cm) ? null : { removeMailKeys: dropSet });
       draw();
       toast('선택 메일 연결을 해제했습니다.');
       return;
@@ -4743,7 +5034,7 @@
       });
     }
     ['caseQ', 'inQ', 'yrQ'].forEach(function (id) { if ($(id)) $(id).addEventListener('input', draw); });
-    ['caseCat', 'caseSt', 'caseErp', 'caseMgr', 'yrCat', 'yrKind'].forEach(function (id) { if ($(id)) $(id).addEventListener('change', draw); });
+    ['caseCat', 'casePerf', 'caseSt', 'caseErp', 'caseMgr', 'yrCat', 'yrPerf', 'yrKind'].forEach(function (id) { if ($(id)) $(id).addEventListener('change', draw); });
 
     document.addEventListener('input', function (e) {
       var fld = e.target && e.target.getAttribute && e.target.getAttribute('data-rptfld');
@@ -4752,7 +5043,13 @@
 
     document.addEventListener('keydown', function (e) {
       var modal = $('modal');
-      if (!modal || modal.style.display === 'none') return;
+      if (!modal || modal.style.display === 'none') {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute && e.target.getAttribute('role') === 'button' && e.target.getAttribute('data-act')) {
+          e.preventDefault();
+          if (typeof e.target.click === 'function') e.target.click();
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         e.preventDefault();
         closeModal();
@@ -4855,6 +5152,18 @@
             }
           }
           else if (act === 'goYearly') { YEAR_FILTER = id || ''; TAB = 'yearly'; clearSel(); draw(); }
+          else if (act === 'quickPerfFilter') {
+            var selEl = (TAB === 'yearly') ? $('yrPerf') : $('casePerf');
+            if (selEl) {
+              var curV = C.str(selEl.value);
+              var nextV = (!id || curV === id) ? '' : id;
+              selEl.value = nextV;
+              if (TAB === 'cases' && $('yrPerf')) $('yrPerf').value = nextV;
+              if (TAB === 'yearly' && $('casePerf')) $('casePerf').value = nextV;
+            }
+            clearSel();
+            draw();
+          }
           else if (act === 'openReport') {
             CUR_ID = id; TAB = 'report'; RPT_MODE = 'split'; clearSel();
             await ensureSecretLoaded(id, evEpoch, evUid);
@@ -4974,7 +5283,7 @@
             }
             actBtn.disabled = true;
             try {
-              await saveCaseAndSync(Object.assign({}, ct, { steps: ns, closeDate: cDate }), false, ct._virtualFromErp ? null : toggleMut);
+              await saveCaseAndSync(Object.assign({}, ct, { steps: ns, closeDate: cDate }), false, isVirtualCase(ct) ? null : toggleMut);
               draw();
               toast(nextDone ? '✓ 완료 처리 및 푸른이알피 반영 완료' : '대기 상태로 되돌렸습니다');
             } finally { actBtn.disabled = false; }
@@ -5158,17 +5467,23 @@
       var raw = (await fbDb.ref('data/user_dir').once('value')).val();
       if (!isSessionCurrent(reqEpoch, reqUid)) return;
       var list = rowsOf(raw);
-      NAMES = {};
-      var seen = {};
+      NAMES = Object.create(null);
+      SID_CANON = Object.create(null);
+      var udMap = Object.create(null);
+      var seen = Object.create(null);
       STAFF = [];
       list.forEach(function (x) {
         if (!x || !x.sid || !x.name) return;
-        NAMES[sidKey(x.sid)] = String(x.name);
+        var sk = sidKey(x.sid);
+        NAMES[sk] = String(x.name);
+        SID_CANON[sk] = String(x.sid);
+        udMap[String(x.sid)] = x;
         if ((!x.status || x.status === 'active') && !seen[x.sid]) {
           seen[x.sid] = 1;
           STAFF.push({ sid: String(x.sid), name: String(x.name), ord: typeof x.sortOrder === 'number' ? x.sortOrder : 9999 });
         }
       });
+      D.userDir = udMap;
       STAFF.sort(function (a, b) { return (a.ord - b.ord) || a.name.localeCompare(b.name, 'ko'); });
       fillMgrFilter();
     } catch (e) {}

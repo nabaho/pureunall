@@ -45,7 +45,7 @@
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible,.kpi[role="button"]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
 button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:600}
 button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
@@ -69,6 +69,8 @@ a{color:var(--blue-d);text-decoration:none}
 .c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
 .c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
 .c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+.c-direct{background:var(--ok-bg);color:#ffffff;border-color:var(--ok-bg);font-weight:700}
+.c-direct-ing{background:var(--pri-bg);color:#ffffff;border-color:var(--pri-bg);font-weight:600}
 main{padding:12px 20px 48px;width:100%;max-width:none;margin:0}
 .pane{display:none}
 .pane.on{display:block}
@@ -86,6 +88,9 @@ main{padding:12px 20px 48px;width:100%;max-width:none;margin:0}
 .kpi.k-blue b{color:var(--blue-d)}
 .kpi.k-green b{color:var(--green)}
 .kpi.k-amber b{color:var(--amber)}
+.kpi[data-act]{cursor:pointer}
+.kpi[data-act]:hover{border-color:var(--blue)}
+.kpi.k-on{border-color:var(--green-m);background:var(--green-bg)}
 .prof{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 12px;font-size:12.5px;border-bottom:1px solid var(--line)}
 .prof span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prof b{color:var(--mute);font-weight:500;margin-right:4px}
@@ -110,6 +115,7 @@ table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
 table.t tr.cur>td{background:var(--blue-bg)}
 table.t tr.cur>td.n{color:var(--ink2)}
+table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .empty{padding:28px 12px;text-align:center;color:var(--mute)}
 .hint{font-size:12px;color:var(--mute)}
 .fr{display:flex;gap:10px;padding:7px 14px;align-items:center}
@@ -149,6 +155,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .yr-pills:empty{display:none}
 .yr-pills button{font-size:12px;padding:4px 10px;border-radius:16px;min-height:30px;background:var(--card);border:1px solid var(--line2);color:var(--ink2)}
 .yr-pills button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.yr-pills button.pill-direct.on{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff}
 .ws-split{display:grid;grid-template-columns:minmax(360px,1fr) minmax(0,1.15fr);gap:14px;align-items:start}
 .ws-split.focus-iv{grid-template-columns:1fr}
 .ws-split.focus-iv .ws-col-right{display:none}
@@ -235,6 +242,8 @@ table.t tr.cur>td.n{color:var(--ink2)}
   table.t[data-name] thead th.c{display:block;width:40px;padding:6px 0;margin-left:4px}
   table.t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0;white-space:nowrap}
   table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 74px;min-height:46px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr.perf-direct{box-shadow:inset 3px 0 0 var(--green-m)}
+  table.t[data-name] tbody tr.perf-direct>td:first-child{box-shadow:none}
   table.t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
   table.t[data-name] tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;order:6;color:var(--ink2);font-size:12.5px}
   table.t[data-name] tbody td:empty{display:none}
@@ -257,7 +266,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <div id="head">
   <div class="top">
     <h1>🛡️ 괴롭힘·성희롱 조사</h1>
-    <span class="sub">공문 자동수집 · 녹취록 자동정리 · 비밀 전자서명 · 한글(.hwpx) 보고서 · 이알피 연동</span>
+    <span class="sub">공문 자동수집 · 직접수행·결과보고 구분 · 이알피·계약·기타·업무관리 자동분류 · 녹취·전자서명 · 한글(.hwpx)</span>
     <span id="who"></span>
     <span class="sp"></span>
     <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">메일 자동수집 · 이알피 동기화</span><span class="phone-only">자동수집</span></button>
@@ -294,6 +303,14 @@ table.t tr.cur>td.n{color:var(--ink2)}
           <option value="harass">직장 내 괴롭힘</option>
           <option value="sexual">직장 내 성희롱</option>
           <option value="both">괴롭힘·성희롱 복합</option>
+        </select>
+        <select id="casePerf" aria-label="수행 유형 필터">
+          <option value="">수행 유형 전체</option>
+          <option value="direct_report">🏅 직접수행·결과보고 완료</option>
+          <option value="direct_active">🔍 직접조사 수행(진행)</option>
+          <option value="direct_all">🛡️ 직접조사 전체(보고+진행)</option>
+          <option value="advisory_rep">⚖️ 대리·자문·보고서검토</option>
+          <option value="committee_collab">🏛️ 외부위원·타법인협업</option>
         </select>
         <select id="caseSt" aria-label="진행상태 필터">
           <option value="">진행상태 전체</option>
@@ -346,6 +363,13 @@ table.t tr.cur>td.n{color:var(--ink2)}
           <option value="harass">직장 내 괴롭힘</option>
           <option value="sexual">직장 내 성희롱</option>
           <option value="both">괴롭힘·성희롱 복합</option>
+        </select>
+        <select id="yrPerf" aria-label="연도별 수행 유형 필터">
+          <option value="">수행 유형 전체</option>
+          <option value="direct_report">🏅 직접수행·결과보고 완료</option>
+          <option value="direct_all">🛡️ 직접조사 전체(보고+진행)</option>
+          <option value="advisory_rep">⚖️ 대리·자문·보고서검토</option>
+          <option value="committee_collab">🏛️ 외부위원·타법인협업</option>
         </select>
         <select id="yrKind" aria-label="등록 상태 필터">
           <option value="">등록사건 + 미등록 묶음 전체</option>
@@ -400,10 +424,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-harass-core.js?v=11"></script>
+<script src="js/pu-harass-core.js?v=12"></script>
 <script src="js/pu-harass-sign.js?v=3"></script>
 <script src="js/pu-harass-hwpx.js?v=5"></script>
-<script src="js/pu-harass-view.js?v=15"></script>
+<script src="js/pu-harass-view.js?v=16"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
