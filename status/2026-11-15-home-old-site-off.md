@@ -19,10 +19,23 @@
 - 함수 안에서는 `typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true` 로 읽는다 — 검사 상자에 상수가 없으면 통째로 죽는다(첫 판에서 46건이 그렇게 죽었다). 상자 안에서는 옛 동작 그대로 = 대조군.
 
 ## 검사
-- 새 `tests/home-old-site-off.test.js` 13건(서버 함수를 떠 돌려 요청 0건·비밀값 0회·돌기 0회, 화면 함수를 상자에서 돌려 새 길/옛 길 대조) + `tests/pu-home-screen.test.js` 3건(할 일·쪽 단추).
-- 고장넣기 11가지 모두 잡힘 → 원복. 전체 검사 30,058건 실패 0.
+- 새 `tests/home-old-site-off.test.js` 13건(서버 함수를 떠 돌려 요청 0건·비밀값 0회·돌기 0회, 화면 함수를 상자에서 돌려 새 길/옛 길 대조) + `tests/pu-home-screen.test.js` 5건(할 일·쪽 단추·줄 치는 길·📷 여러 장).
+- 고장넣기 14가지(1차 11 + 검토 뒤 3) 모두 잡힘 → 원복. 전체 검사 30,058건 실패 0(검토 뒤 고침 전 기준 — 고친 뒤 관련 검사 180건 다시 통과).
 - 화면: 가짜 파이어베이스(tools/phone-audit) + 지어낸 자료로 PC 1366·폰 360 확인 — 옆 넘침 없음(잘림 상자 안 개수 딱지 하나는 main 에서도 같음).
 
+## 자동 검토(ow review) — 1차 «실패» → 고침 → 재검증
+- 기능(antigravity gemini): 높음 1 — 접은 뒤 쪽 줄을 «칠 때»(다시 안 그리고 #pfixBtn 글만 갈아 끼우는 길) 올리기 단추가 안 나오고
+  눌러도 안 되는 옛 복사 문구가 떴다(처음 화면에 올리기 단추를 안 그려 둔 탓). → 고친 줄 0 이어도 잠근 채 늘 그리고,
+  pageRunEdit 가 접음이면 「홈페이지에 올리기 (N줄)」로 갈아 끼움. 중간 1 — 목록 머리 「📷 여러 장」 안 숨김 → 숨김.
+  둘 다 검사 추가(치는 길을 상자에서 돌림) + 고장넣기 3 잡힘 + 실제 화면에서 글을 쳐서 확인.
+  ⚠ 1차 때 화면 확인을 `App.render()` 를 손으로 불러 했기 때문에 «치는 길»을 놓쳤다 — 화면 확인은 «사람이 하는 그대로»(실제 입력) 할 것.
+- 보안(antigravity claude-opus): 높음 0. 중간 1 은 «기존» — 미리보기 iframe(srcdoc·sandbox 없음)·openPreviewWindow(document.write)가
+  쪽 HTML 의 script 를 ERP 출처에서 돌린다. 이번에 바탕이 같은 출처 사본으로 바뀌어 만료 도메인 위험은 줄었다. 이 PR 범위 밖 — 남은 일.
+  낮음: HOME_ADMIN_ID/PW secrets 바인딩 떼기(11-27 뒤) · PuHomeExport.ORIGIN/editUrl 을 접음일 때 한곳에서 막기(지금은 숨김 가드에만 기댐).
+
 ## 남은 일(이 PR 밖)
+- 미리보기 iframe 에 sandbox(allow-same-origin, allow-scripts 없음) 또는 script 걷기 — 보안 검토 «중간·기존».
+- PuHomeExport.ORIGIN·editUrl 을 접음일 때 빈 값/SITE_VIEW 로 — 숨김 가드가 하나라도 풀리면 다시 산 도메인의 가짜 관리자 화면으로 갈 수 있다(낮음).
+- 안내 문구 몇 곳이 숨긴 옛 단추를 아직 가리킨다(memberBandHtml·partnerEdit·pagePasteWhy·pageEdit 머리 — 낮음).
 - 새 사이트용: 얼굴 사진 올리기 · 글 번호 없는 새 노무사 넣기 · 계약 끝난 자문사 로고 저절로 숨기기.
 - 11-27 뒤 서버 비밀값 `HOME_ADMIN_ID/PW` 지우거나 바꾸기(대표 결정).

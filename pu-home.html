@@ -7378,6 +7378,7 @@ function listCountHtml() {
 }
 
 function listHtml() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   let h = '<div class="list">';
   h += '<div class="lh"><span id="listCount">' + listCountHtml() + '</span>'
     + '<span style="flex:1"></span>'
@@ -7386,11 +7387,13 @@ function listHtml() {
          직원은 새 사이트에만 있어 이것이 «반영» 단추다. 사진은 직원에게 아직 없다(2단계). */
     + (App.group === 'members' && App.filter === 'staff'
         ? '<button class="btn sm pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '') + '>'
-          + (App.publishing ? '올리는 중…' : '새 사이트에 올리기') + '</button>'
+          + (App.publishing ? '올리는 중…' : (접음 ? '홈페이지에 올리기' : '새 사이트에 올리기')) + '</button>'
         : '')
     /* ★ 사진 여러 장 (대표 지시 2026-09-14 「여러 명도」) — 여러 사람 일이라
-         한 사람 편집칸이 아니라 «목록 머리»가 제자리다. */
-    + (App.group === 'members' && App.filter !== 'staff'
+         한 사람 편집칸이 아니라 «목록 머리»가 제자리다.
+       ⚠ 옛 게시판 «메인 이미지» 칸으로 보내는 길이라 접은 뒤(OLD_SITE_OFF)에는 숨긴다 — 눌러도 서버가 410 으로 돌려보낸다
+         (2026-11-15 검토 «중간»). 새 사이트용 사진 올리기는 남은 일. */
+    + (!접음 && App.group === 'members' && App.filter !== 'staff'
         ? '<button class="btn sm" onclick="사진여럿열기()"'
           + ' title="사진 여러 장을 한 번에 올립니다 — 파일 이름으로 주인을 찾아 드립니다">'
           + '📷 여러 장</button>'
@@ -9116,12 +9119,17 @@ function pageRunEdit(mid, key, text, val, i) {
   }
   /* ★ 다시 그리지 않는다 — 글을 치는 중에 다시 그리면 커서가 맨 앞으로 튄다.
      단추의 숫자만 손으로 갈아 끼운다. */
+  /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF)에는 그 단추가 «홈페이지에 올리기»다 — 옛 복사 문구로 덮지 않는다.
+       typeof 로 읽는다(이 함수를 떼어 돌리는 검사 상자에 상수가 없어도 죽지 않게). */
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;
   const b = document.getElementById('pfixBtn');
   if (b) {
     const n = pageFixList(mid).length;
-    b.disabled = !n;
-    b.textContent = n ? ('홈페이지에 채우기용 복사 (' + n + '줄)') : '고친 줄이 없습니다';
+    b.disabled = !n || (접음 && !!App.publishing);
+    b.textContent = n ? ((접음 ? '홈페이지에 올리기 (' : '홈페이지에 채우기용 복사 (') + n + '줄)') : '고친 줄이 없습니다';
   }
+  const r = 접음 ? document.getElementById('pfixReset') : null;
+  if (r) r.disabled = !pageFixList(mid).length;
 }
 window.pageRunEdit = pageRunEdit;
 
@@ -9279,18 +9287,27 @@ function pageLinesHtml(mid) {
     + '<div class="pfixbar">'
     /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF): 「채우기용 복사」(옛 관리자 화면에 붙여넣기)는 갈 곳이 없어 숨기고,
          「홈페이지에 올리기」가 파란 단추가 된다 — 손님이 보는 홈페이지가 이제 새 사이트 하나다. */
+    /* ⚠ 접은 뒤의 두 단추는 «고친 줄이 0 이어도» 늘 그려 둔다(잠가서). 줄을 칠 때는 커서가 튀지 않게 다시 그리지
+         않고 pageRunEdit 가 #pfixBtn·#pfixReset 의 잠금·숫자만 갈아 끼우는데, 처음에 안 그려 두면 갈아 낄 단추가 없다
+         (2026-11-15 검토 «높음» — 줄을 고쳐도 올리기 단추가 안 나오고 눌러도 안 되는 옛 복사 문구가 떴다). */
     + (접음
-        ? (고친수 ? '' : '<button class="btn pri sm" id="pfixBtn" disabled>고친 줄이 없습니다</button>')
+        ? '<button class="btn pri sm" id="pfixBtn" onclick="publishPage(\'' + esc(mid) + '\')"'
+          + ((고친수 && !App.publishing) ? '' : ' disabled')
+          + ' title="홈페이지에 고친 줄만 갈아 끼워 올립니다">'
+          + (App.publishing ? '올리는 중…' : (고친수 ? '홈페이지에 올리기 (' + 고친수 + '줄)' : '고친 줄이 없습니다'))
+          + '</button>'
+          + '<button class="btn sm" id="pfixReset" onclick="resetPageFix(\'' + esc(mid) + '\')"'
+          + (고친수 ? '' : ' disabled') + '>고친 줄 되돌리기</button>'
         : '<button class="btn pri sm" id="pfixBtn" onclick="copyPageFix(\'' + esc(mid) + '\')"'
           + (고친수 ? '' : ' disabled') + '>'
-          + (고친수 ? '홈페이지에 채우기용 복사 (' + 고친수 + '줄)' : '고친 줄이 없습니다') + '</button>')
-    + (고친수 ? '<button class="btn ' + (접음 ? 'pri ' : '') + 'sm" onclick="publishPage(\'' + esc(mid) + '\')"'
-               + (App.publishing ? ' disabled' : '')
-               + ' title="' + (접음 ? '홈페이지에 고친 줄만 갈아 끼워 올립니다' : '새 홈페이지(미리보기)에 고친 줄만 갈아 끼워 올립니다') + '">'
-               + (App.publishing ? '올리는 중…' : (접음 ? '홈페이지에 올리기 (' : '새 홈페이지에 올리기 (') + 고친수 + '줄)')
-               + '</button>' : '')
-    + (고친수 ? '<button class="btn sm" onclick="resetPageFix(\'' + esc(mid)
-               + '\')">고친 줄 되돌리기</button>' : '')
+          + (고친수 ? '홈페이지에 채우기용 복사 (' + 고친수 + '줄)' : '고친 줄이 없습니다') + '</button>'
+          + (고친수 ? '<button class="btn sm" onclick="publishPage(\'' + esc(mid) + '\')"'
+                     + (App.publishing ? ' disabled' : '')
+                     + ' title="새 홈페이지(미리보기)에 고친 줄만 갈아 끼워 올립니다">'
+                     + (App.publishing ? '올리는 중…' : '새 홈페이지에 올리기 (' + 고친수 + '줄)')
+                     + '</button>' : '')
+          + (고친수 ? '<button class="btn sm" onclick="resetPageFix(\'' + esc(mid)
+                     + '\')">고친 줄 되돌리기</button>' : ''))
     + '<span class="tip" style="flex:1">고친 줄만 갈아 끼웁니다 — 지도·표·구획은 그대로입니다. '
     + (접음 ? '올리면 1~2분 뒤 홈페이지에 뜹니다.' : '저장은 홈페이지에서 사람이 누릅니다.') + '</span></div>'
     + '<div class="legend2"><span><b class="k-head">굵은 남색</b> 쪽 제목·소제목</span>'

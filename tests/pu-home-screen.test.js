@@ -3024,3 +3024,45 @@ test('★★ 옛 홈페이지를 접으면 쪽 고친 줄은 «홈페이지에 �
   assert.match(단추, /\bpri\b/, '★ 올리기가 파란(으뜸) 단추가 아닙니다 — 이제 이것이 본길이다');
   assert.ok(옛.indexOf('copyPageFix') > 0, '대조군: 스위치가 없으면 옛 복사 단추 그대로여야 합니다');
 });
+
+/* 2026-11-15 검토 «높음» — 줄을 «칠 때»는 다시 그리지 않고 단추 글만 갈아 끼운다. 처음 그린 화면(고친 줄 0)에
+   올리기 단추가 없으면 갈아 낄 것이 없어, 눌러도 안 되는 옛 복사 문구가 떴다. «치는 길»을 그대로 돌려 본다. */
+test('★★ 옛 홈페이지를 접으면 줄을 «치는 중»에도 올리기 단추가 살아난다 — 옛 복사 문구로 덮지 않는다', () => {
+  const runs = [{ text: '첫 줄', n: 1, of: 1, ok: true, why: '' }];
+  const 접상자 = 쪽화면(runs);
+  접상자.OLD_SITE_OFF = true;
+  const 처음 = 접상자.pageLinesHtml('work1');
+  /* 처음(고친 줄 0): 올리기 단추가 «잠긴 채» 이미 있다 — publishPage 를 부르는 #pfixBtn */
+  const i = 처음.indexOf('id="pfixBtn"');
+  assert.ok(i > 0, '★★ 처음 화면에 #pfixBtn 이 없습니다');
+  const 단추 = 처음.slice(처음.lastIndexOf('<button', i), 처음.indexOf('</button>', i));
+  assert.match(단추, /onclick="publishPage\(/, '★★ 처음 화면의 #pfixBtn 이 올리기가 아닙니다 — 줄을 쳐도 갈 곳이 없다');
+  assert.match(단추, / disabled/, '★ 고친 줄이 없는데 올리기가 열려 있습니다');
+  /* 줄을 «친다» — 화면을 다시 그리지 않고 단추만 갈아 끼우는 그 길 */
+  const 단추들 = {};
+  const 가짜단추 = (id) => (단추들[id] = 단추들[id] || { id, disabled: true, textContent: '' });
+  접상자.document = { getElementById: (id) => (id === 'pfixBtn' || id === 'pfixReset') ? 가짜단추(id) : null,
+    querySelector: () => null };
+  접상자.pageFrameDoc안 = () => null;
+  접상자.pageRunEdit('work1', '1' + String.fromCharCode(1) + '첫 줄', '첫 줄', '고친 첫 줄', 0);
+  assert.equal(단추들.pfixBtn.disabled, false, '★★ 줄을 고쳤는데 올리기 단추가 잠겨 있습니다');
+  assert.match(단추들.pfixBtn.textContent, /홈페이지에 올리기 \(1줄\)/, '★★ 줄을 고치니 단추 글이 «' + 단추들.pfixBtn.textContent + '» 입니다');
+  assert.ok(!/채우기용 복사/.test(단추들.pfixBtn.textContent), '★★ 접었는데 옛 복사 문구로 덮었습니다');
+  assert.equal(단추들.pfixReset && 단추들.pfixReset.disabled, false, '★ 되돌리기 단추가 안 풀립니다');
+  /* 대조군 — 스위치가 없으면 옛 문구 그대로 */
+  const 옛상자 = 쪽화면(runs);
+  const 옛단추 = { disabled: true, textContent: '' };
+  옛상자.document = { getElementById: (id) => id === 'pfixBtn' ? 옛단추 : null, querySelector: () => null };
+  옛상자.pageFrameDoc안 = () => null;
+  옛상자.pageRunEdit('work1', '1' + String.fromCharCode(1) + '첫 줄', '첫 줄', '고친 첫 줄', 0);
+  assert.match(옛단추.textContent, /채우기용 복사 \(1줄\)/, '대조군: 스위치가 없으면 옛 복사 문구여야 합니다');
+});
+
+test('★★ 옛 홈페이지를 접으면 구성원 목록 머리의 «📷 여러 장»(옛 게시판 사진 칸)이 안 나온다', () => {
+  const 몸 = fnSource('listHtml');
+  const i = 몸.indexOf('사진여럿열기()');
+  assert.ok(i > 0, '「📷 여러 장」 단추를 못 찾았습니다(되살릴 길이 사라졌다)');
+  const 앞 = 몸.slice(Math.max(0, 몸.lastIndexOf('+ (', i) - 1), i);
+  assert.match(앞, /!접음\s*&&/, '★★ 「📷 여러 장」이 접음과 상관없이 나옵니다 — 눌러도 서버가 410 으로 돌려보낸다');
+  assert.match(몸, /const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true/, '★ listHtml 이 접음을 typeof 로 안 읽습니다');
+});
