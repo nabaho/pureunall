@@ -39,6 +39,10 @@
 - 새 길에 맞춰 고침: `news-ai-review`(③ 조문) · `news-law-numbering`(공개 쪽 모양) · `news-lawgo-refused`(② 법령 주소 · ③ 빈손 세기) · `newsletter-full-text`(받는 주소)
 - 실제 쪽으로 손 확인: 판례 목록 17줄 · 한 건(2024다206043) · 해석 목록·한 건 · 전문 보기 푸른 양식 · 조문 4개(제60조·제76조의2·남녀고용평등법 제18조의2·제55조) · 법령 목록 20줄
 
+- 전체 검사 30,159 · 실패 0, 서버 쪽 411 · 실패 0. 보안규칙 에뮬레이터 짝 시험 7/7(옛 규칙에서는 직원 쓰기 셋이 통과 — 구멍 확인).
+- 콘솔 대조(rules-deploy.js 보기): 새로 3(/homepage/newsBrief·newsDocs·newsPrec) · 바뀜 0 · 사라짐 0.
+- 자동 검토(ow review): 기능 검증 antigravity:gemini-4-argon-high «통과»(높음·중간·낮음 0) · 보안 codex «발견 없음».
+
 ## 남은 일
 - 합친 뒤 함수 배포: dailyDocsCollect · newsDocsPull · newsletterSundayRefill(모으개) · newsFull · newsFullPage(전문 보기) ·
   newsletterWatchSunday(AI 교정 조문·경고판) · 브리핑 법령을 쓰는 함수 · 경고판 갱신을 부르는 함수들. 규칙은 `node scripts/rules-deploy.js --deploy`.
