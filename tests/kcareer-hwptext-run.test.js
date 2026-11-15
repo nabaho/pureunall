@@ -347,7 +347,8 @@ test('★★★ 한글을 읽는 문 넷이 모두 _hwpTextOf 를 쓴다 — 갈
               'async function extractTextForm(', 'async function _cdFileBytes(',
               'async function packNoticeFile(',    /* 📦 제출 꾸러미 — 공고문 읽기(2026-10-05) */
               'async function _bizDocText(',       /* 🏢 사업관리 — 두 서류 비교(2026-10-05) */
-              'async function _bizAttText('];      /* 👤 결과보고서 속 담당자 읽기(2026-10-09) */
+              'async function _bizAttText(',       /* 👤 결과보고서 속 담당자 읽기(2026-10-09) */
+              'async function feeDocText('];       /* 🧾 비용 서류 판정 — 서류 글을 이 기기 안에서 읽는다(2026-11-15). 새로 뽑는 코드를 만들지 않고 _hwpTextOf 를 부른다 */
   문.forEach(function (f) {
     assert.match(떼기(f), /_hwpTextOf\(/, f + ' 이 한글을 못 읽습니다');
   });
