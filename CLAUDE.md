@@ -70,6 +70,12 @@
 - 그것들은 CLAUDE.md 를 안 읽고 AGENTS.md 를 읽는다. 규칙을 고치면 두 파일을 «함께» 고친다. 어긋나면 CLAUDE.md 가 이긴다.
 - 지킴: `tests/agents-md.test.js`(특히 「배포에서 지우는 목록」). Codex 저장소 스킬 자리 `.agents/skills/` 는 배포 게이트에 미리 넣어 두었다.
 
+## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
+
+- 배포 주소는 erp.pureunlabor.co.kr, 홈페이지는 pureunlabor.co.kr. 옛 `nabaho.github.io/pureunall/` 은 301 이라 «동작은 하지만» 새 코드·안내에 쓰지 않는다.
+- 화면은 상대경로만(절대 `/pureunall/` 금지), 서버는 `functions/erp-origins.js` 의 `ERP_ORIGINS`·`ERP_LINK_BASE`·`PUBLIC_HOME` 만 쓴다 — 주소 글자를 새로 박지 않는다.
+- 지킴: `tests/no-hardcoded-old-erp-url.test.js` · 자세히: `docs/규칙/ERP-주소.md`
+
 ## 보안 점검 결과는 공개 저장소에 적지 않는다 (대표 지시 2026-11-15)
 
 - 이 저장소는 공개다 — «고치기 전의 약점 목록»은 저장소·PR 설명에 쓰지 않고 대표에게만 따로 건넨다. PR 에는 «무엇을 막았나»만 짧게.
