@@ -104,14 +104,11 @@ const REPLY_TO = process.env.PAYSLIP_REPLY_TO || "370-6@daum.net";
 
 // 발송 창구는 우리 포털에서만 연다. 예전에는 "*" 라서 주소만 알면
 // 전 세계 누구나 푸른노무법인 이름으로 메일을 보낼 수 있었다.
-const MAIL_ORIGIN = "https://nabaho.github.io";
+// 받아 주는 출처는 ./erp-origins 한 자리 — 옛(nabaho.github.io)·새(erp.pureunlabor.co.kr) 둘 다 (2026-11-15 ERP 주소 이사).
+const ERP_ORIGINS_LIB = require("./erp-origins");
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === MAIL_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   // Authorization 을 허용해야 브라우저가 토큰을 붙인 요청을 보낼 수 있다.
   res.set("Access-Control-Allow-Headers", "Authorization,Content-Type");
@@ -233,14 +230,9 @@ exports.sendPayslip = functions
   }
 });
 
-const PORTAL_ORIGIN = "https://nabaho.github.io";
-
+/* 자동화 창구도 같은 출처 목록(./erp-origins)을 쓴다 — 옛·새 ERP 주소 둘 다 */
 function setAutomationCors(req, res) {
-  const origin = String(req.headers.origin || "");
-  if (origin === PORTAL_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Automation-Bridge");
   res.set("Cache-Control", "no-store");

@@ -37,9 +37,15 @@ const verifyAuthenticationResponse = (o) => swa().verifyAuthenticationResponse(o
 /* 로그인은 기다림이 바로 느껴지는 자리라 가까운 곳(서울)에 둔다.
    ⚠ 리전을 바꾸면 주소가 바뀐다 — js/pu-passkey.js 의 BASE 도 함께 고쳐야 한다. */
 const REGION = "asia-northeast3";
+/* ⚠ RP_ID·ORIGIN(검증 기준)은 «옛 출처 그대로» 둔다 (2026-11-15 ERP 주소 이사).
+   패스키 화면은 2026-10-09 에 걷혀(enter.html) 지금 부르는 곳이 없는 «휴면» 기능이다.
+   WebAuthn 규칙상 RP_ID 를 erp.pureunlabor.co.kr 로 바꾸면 이미 등록한 패스키가 전부 무효가
+   되므로, 되살리는 날 «전원 재등록 + passkeys/creds 정리»와 함께 바꾼다.
+   CORS 만은 공용 출처 목록(./erp-origins)을 따른다 — 함수 7곳이 한 잣대를 쓰게. */
 const RP_ID = "nabaho.github.io";
 const RP_NAME = "푸른통합시스템";
 const ORIGIN = "https://nabaho.github.io";
+const ERP_ORIGINS_LIB = require("./erp-origins");
 
 const CHALLENGE_TTL_MS = 3 * 60 * 1000;   // 3분 — 넉넉하되 오래 굴러다니지 않게
 const MAX_DEVICES = 5;                    // 한 사람이 등록할 수 있는 기기 수
@@ -79,11 +85,7 @@ async function canManageDevices(user, sid, have, gate) {
 }
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
 }

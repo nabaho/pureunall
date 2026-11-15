@@ -52,10 +52,20 @@ async function kakaoFailTrail(req, key, code, alert) {
   }
 }
 
-/* 지문과 같은 도메인·같은 리전 — 바꾸면 이미 연결된 카카오 계정이 전부 무효가 된다. */
+/* 지문과 같은 리전.
+   ★ 카카오 연결(kakao_links)은 «카카오 회원번호 지문»으로 묶여 있어 도메인과 무관하다 —
+     ERP 주소를 옮겨도 이미 연결한 카카오는 그대로다(2026-11-15 ERP 주소 이사 조사). */
 const REGION = "asia-northeast3";
-const ORIGIN = "https://nabaho.github.io";
-const REDIRECT_URI = ORIGIN + "/pureunall/enter.html";
+/* 받아 주는 출처·돌아올 주소는 공용 목록(./erp-origins) — 옛(nabaho.github.io/pureunall)·새(erp.pureunlabor.co.kr) 둘 다.
+   ★ 돌아올 주소(redirect_uri)는 «요청이 온 출처»의 enter.html 이다. 인가(①)와 code 교환(②③)이
+     같은 값을 써야 카카오가 받아 주므로, ①에서 고른 출처 «번호»를 state 에 서명해 싣고
+     ②③은 그 번호로 같은 주소를 다시 만든다(교환 요청이 어느 출처에서 오든 어긋나지 않게).
+   ⚠ 두 주소 모두 카카오 콘솔 「Redirect URI」·「로그아웃 리다이렉트 URI」 에 등록돼 있어야 한다. */
+const ERP_ORIGINS_LIB = require("./erp-origins");
+const REDIRECT_PAGE = "/enter.html";
+function redirectUriAt(index) { return ERP_ORIGINS_LIB.baseAt(index) + REDIRECT_PAGE; }
+/* 옛 이름 — 옛 출처의 돌아올 주소(검사·옛 state 가 쓴다) */
+const REDIRECT_URI = redirectUriAt(0);
 
 const DB_LINK = "kakao_links";   // {카카오번호 지문} = { uid, sid, at } — 서버만 읽는다
 const DB_UID = "uid_kakao";      // {uid} = { linked, linkKey, sid, at } — 본인·관리자에게 연결 여부만 보인다
@@ -68,11 +78,7 @@ const LINK_LOCK_TTL_MS = 30 * 1000;
 function db() { return OntologyServerWrite.wrapDatabase(getRawDatabase(), { program: "kakao" }); }
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   /* 예전 화면은 본문 없는 GET 에도 JSON 헤더를 붙여 OPTIONS 를 보낸다.
      새 화면은 바로 GET 하지만 캐시된 옛 화면도 로그인 길이 막히지 않게 허용한다. */
   res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -113,15 +119,28 @@ function stateKey(state) {
 function kakaoLinkKey(kakaoId) {
   return "k_" + crypto.createHash("sha256").update("pureun-kakao:" + String(kakaoId || "")).digest("hex");
 }
-function issueState(mode, secret) {
+/* state = mode.시각.(o<출처번호>+무작위32자).서명 — 4조각 그대로다.
+   ⚠ 조각 수를 늘리지 말 것: 화면(js/pu-kakao.js)이 state 모양을 4조각 정규식으로 검사한다 —
+     5조각으로 바꾸면 화면이 「서버 응답이 이상하다」로 카카오 로그인을 통째로 막는다.
+   출처 번호(o0 옛 · o1 새)는 셋째 조각 «앞 두 글자»에 싣는다 — 길이가 34자라 옛 꼴(무작위 32자)과
+   헷갈리지 않고, 서명 안에 들어 바꿔 치기가 안 된다. originIdx 를 안 주면 0(옛 출처) — 전과 같은 동작. */
+function issueState(mode, secret, originIdx) {
   const at = Date.now();
-  const payload = mode + "." + at + "." + crypto.randomBytes(24).toString("base64url");
+  const oi = Math.max(0, Math.min(9, Number(originIdx) || 0));
+  const payload = mode + "." + at + ".o" + oi + crypto.randomBytes(24).toString("base64url");
   const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
   return payload + "." + sig;
 }
+/* 셋째 조각에서 출처 번호 — 34자이고 «o숫자»로 시작하면 그 번호, 아니면(옛 꼴 32자) 0 */
+function originIdxOfNonce(nonce) {
+  const n = String(nonce || "");
+  return (n.length === 34 && /^o\d/.test(n)) ? Number(n.charAt(1)) : 0;
+}
 /* state 발급 때는 DB 에 쓰지 않는다 — 공개 로그인 단추를 자동 호출해 빈 표를 무한히
    쌓는 공격을 막는다. 서버 비밀값으로 서명하고, 실제 code 교환 때만 「사용함」 한 줄을
-   transaction 으로 만든다. 같은 state 를 두 요청이 동시에 보내도 첫 요청만 성공한다. */
+   transaction 으로 만든다. 같은 state 를 두 요청이 동시에 보내도 첫 요청만 성공한다.
+   돌려주는 값: 실패면 false, 성공이면 { originIdx } (돌아올 주소를 다시 만드는 데 쓴다).
+   ★ 출처 번호가 없는 옛 꼴(이 배포 전에 발급돼 10분 안에 돌아오는 것)도 받는다 → 옛 출처(0). */
 async function takeState(state, mode, secret) {
   const raw = String(state || "");
   const parts = raw.split(".");
@@ -134,9 +153,11 @@ async function takeState(state, mode, secret) {
   if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
   const age = Date.now() - Number(parts[1]);
   if (age < 0 || age > STATE_TTL_MS) return false;
+  const originIdx = originIdxOfNonce(parts[2]);
+  if (!ERP_ORIGINS_LIB.ERP_ORIGINS[originIdx]) return false;
   const ref = getRawDatabase().ref(DB_STATE + "/" + stateKey(raw));
   const result = await ref.transaction((cur) => cur ? undefined : { at: Date.now() }, undefined, false);
-  return !!(result && result.committed === true);
+  return (result && result.committed === true) ? { originIdx } : false;
 }
 
 async function acquireLinkLock(uid) {
@@ -222,7 +243,7 @@ function clientSecretOf() {
 
 /* 인가코드를 카카오 토큰으로, 토큰을 카카오 회원번호로 바꾼다.
    ⚠ 여기서 실패하면 그대로 던진다 — 「그런 셈 쳐 준다」가 없다. */
-async function kakaoIdFromCode(code, restKey, clientSecret) {
+async function kakaoIdFromCode(code, restKey, clientSecret, redirectUri) {
   const tokRes = await fetch("https://kauth.kakao.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -230,7 +251,8 @@ async function kakaoIdFromCode(code, restKey, clientSecret) {
       grant_type: "authorization_code",
       client_id: restKey,
       client_secret: clientSecret,
-      redirect_uri: REDIRECT_URI,
+      /* ★ 인가 때와 «같은» 돌아올 주소 — state 에 실린 출처 번호로 다시 만든 값 */
+      redirect_uri: redirectUri || REDIRECT_URI,
       code: String(code || ""),
     }).toString(),
   });
@@ -267,19 +289,22 @@ exports.kakaoAuthUrl = functions
          브라우저에 남아 다음 사람(임꺽정)이 노란 단추를 누르는 순간 «홍길동으로» 들어간다.
        ⚠ 돌아올 주소(REDIRECT_URI)가 카카오 콘솔 「로그아웃 리다이렉트 URI」 에 등록돼 있어야 한다 —
          안 돼 있으면 카카오가 오류 화면을 띄운다(파이어베이스 쪽은 이미 끊긴 뒤라 들어가지는 못한다). */
+    /* 요청이 온 출처(옛·새) — 돌아올 주소를 그 출처의 enter.html 로 (localhost 는 옛 출처) */
+    const originIdx = ERP_ORIGINS_LIB.originIndex(ERP_ORIGINS_LIB.originOf(req));
+    const redirectUri = redirectUriAt(originIdx);
     if (String((req.query && req.query.kind) || "") === "logout") {
       return res.json({ ok: true, url: "https://kauth.kakao.com/oauth/logout"
         + "?client_id=" + encodeURIComponent(restKey)
-        + "&logout_redirect_uri=" + encodeURIComponent(REDIRECT_URI) });
+        + "&logout_redirect_uri=" + encodeURIComponent(redirectUri) });
     }
     const mode = String((req.query && req.query.mode) || "") === "link" ? "link" : "login";
-    const state = issueState(mode, clientSecret);
+    const state = issueState(mode, clientSecret, originIdx);
     /* ★ 처음 쓰는 기기에서는 카카오가 «늘 다시 묻게» 한다(prompt=login) — 브라우저에 누군가의
        카카오 로그인이 남아 있어도 그대로 통과하지 않는다. 값은 'login' 하나만 받는다(다른 것은 버린다). */
     const prompt = String((req.query && req.query.prompt) || "") === "login";
     const url = "https://kauth.kakao.com/oauth/authorize"
       + "?client_id=" + encodeURIComponent(restKey)
-      + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI)
+      + "&redirect_uri=" + encodeURIComponent(redirectUri)
       + "&response_type=code"
       + (prompt ? "&prompt=login" : "")
       + (state ? "&state=" + encodeURIComponent(state) : "");
@@ -306,7 +331,8 @@ exports.kakaoLink = functions
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
     const rk = restKeyOf(), cs = clientSecretOf();
     if (!rk || !cs) return bad(res, 500, KEY_BAD);
-    if (!await takeState(state, "link", cs)) return bad(res, 400, "카카오 연결 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
+    const took = await takeState(state, "link", cs);
+    if (!took) return bad(res, 400, "카카오 연결 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
 
     /* ⚠ 등록된 재직자만 — 익명 로그인(sign.html 등도 쓴다) 증표로 연결을 만들지 못하게. */
     const role = await roleOf(user.uid);
@@ -314,7 +340,7 @@ exports.kakaoLink = functions
 
     let kakaoId;
     try {
-      kakaoId = await kakaoIdFromCode(code, rk, cs);
+      kakaoId = await kakaoIdFromCode(code, rk, cs, redirectUriAt(took.originIdx));
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
@@ -418,14 +444,15 @@ exports.kakaoLoginFinish = functions
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
     const rk = restKeyOf(), cs = clientSecretOf();
     if (!rk || !cs) return bad(res, 500, KEY_BAD);
-    if (!await takeState(state, "login", cs)) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
+    const took = await takeState(state, "login", cs);
+    if (!took) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
 
     /* DB 연결을 카카오에 묻는 «동안» 맺는다 — 예전에는 카카오 답을 다 받은 뒤에야 시작했다 */
     const t0 = Date.now();
     getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
     let kakaoId;
     try {
-      kakaoId = await kakaoIdFromCode(code, rk, cs);
+      kakaoId = await kakaoIdFromCode(code, rk, cs, redirectUriAt(took.originIdx));
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }

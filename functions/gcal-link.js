@@ -34,9 +34,15 @@ const crypto = require("crypto");
 
 /* 카카오·지문과 같은 리전 */
 const REGION = "asia-northeast3";
-const ORIGIN = "https://nabaho.github.io";
-/* ⚠ 구글 콘솔 OAuth 클라이언트의 «승인된 리디렉션 URI» 에 이 주소가 들어 있어야 한다 */
-const REDIRECT_URI = ORIGIN + "/pureunall/pu-cal.html";
+/* 받아 주는 출처·돌아올 주소는 공용 목록(./erp-origins) — 옛(nabaho.github.io/pureunall)·새(erp.pureunlabor.co.kr) 둘 다
+   (2026-11-15 ERP 주소 이사). 돌아올 주소는 «요청이 온 출처»의 pu-cal.html 이고, 그 출처 번호를
+   state 에 서명해 실어 code 교환(②)도 같은 주소를 쓴다 — 카카오(kakao.js)와 같은 짜임.
+   ⚠ 구글 콘솔 OAuth 클라이언트의 «승인된 리디렉션 URI» 에 두 주소가 다 들어 있어야 한다. */
+const ERP_ORIGINS_LIB = require("./erp-origins");
+const REDIRECT_PAGE = "/pu-cal.html";
+function redirectUriAt(index) { return ERP_ORIGINS_LIB.baseAt(index) + REDIRECT_PAGE; }
+/* 옛 이름 — 옛 출처의 돌아올 주소(검사가 쓴다) */
+const REDIRECT_URI = redirectUriAt(0);
 /* 화면(pu-cal.html GCAL_OAUTH_ID)과 같은 클라이언트 — 클라이언트 번호는 비밀이 아니다 */
 const CLIENT_ID = "30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com";
 const SCOPE = "https://www.googleapis.com/auth/calendar.events";
@@ -49,11 +55,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const SECRETS = ["GCAL_OAUTH_SECRET"];
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
   res.set("Cache-Control", "no-store");
@@ -86,11 +88,19 @@ function isActive(role) { return !!role && role.status === "active"; }
    카카오와 같이 서버 비밀값으로 서명한다. 거기에 «누가 요청했나(uid 지문)» 를 함께 묶는다 —
    남이 받아 둔 code 를 내 계정에 붙이지 못하게. 발급 때는 DB 에 안 쓰고, 쓸 때 한 번만 표시한다. */
 function uidTag(uid) { return crypto.createHash("sha256").update("pureun-gcal:" + String(uid)).digest("base64url").slice(0, 16); }
-function issueState(uid, secret) {
-  const payload = "gl." + Date.now() + "." + uidTag(uid) + "." + crypto.randomBytes(18).toString("base64url");
+/* 넷째 조각 = «o<출처번호>» + 무작위 24자(26자). 옛 꼴은 무작위 24자뿐 → 옛 출처(0).
+   조각 수는 그대로(5) — 화면(js/pu-gcal-auth.js)이 «gl.» 로 시작하는지만 보지만, 카카오와 같은 규칙으로 둔다. */
+function issueState(uid, secret, originIdx) {
+  const oi = Math.max(0, Math.min(9, Number(originIdx) || 0));
+  const payload = "gl." + Date.now() + "." + uidTag(uid) + ".o" + oi + crypto.randomBytes(18).toString("base64url");
   const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
   return payload + "." + sig;
 }
+function originIdxOfNonce(nonce) {
+  const n = String(nonce || "");
+  return (n.length === 26 && /^o\d/.test(n)) ? Number(n.charAt(1)) : 0;
+}
+/* 돌려주는 값: 실패면 false, 성공이면 { originIdx } */
 async function takeState(state, uid, secret) {
   const raw = String(state || "");
   const p = raw.split(".");
@@ -102,9 +112,11 @@ async function takeState(state, uid, secret) {
   if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
   const age = Date.now() - Number(p[1]);
   if (age < 0 || age > STATE_TTL_MS) return false;
+  const originIdx = originIdxOfNonce(p[3]);
+  if (!ERP_ORIGINS_LIB.ERP_ORIGINS[originIdx]) return false;
   const key = crypto.createHash("sha256").update(raw).digest("hex");
   const r = await getDatabase().ref(DB_STATE + "/" + key).transaction((cur) => cur ? undefined : { at: Date.now() }, undefined, false);
-  return !!(r && r.committed === true);
+  return (r && r.committed === true) ? { originIdx } : false;
 }
 
 /* 구글 토큰 창구에 묻는다 — 실패는 그대로 던진다(⑤: «그런 셈 쳐 주기» 없음) */
@@ -151,13 +163,15 @@ exports.gcalAuthUrl = functions.region(REGION).runWith({ secrets: SECRETS }).htt
   if (!secret) return bad(res, 500, SECRET_BAD);
   /* ★ access_type=offline + prompt=consent — 이 둘이 있어야 구글이 «갱신 열쇠» 를 준다.
      prompt=consent 가 없으면 예전에 동의한 사람에게는 갱신 열쇠를 다시 안 준다. */
+  /* 요청이 온 출처(옛·새)의 pu-cal.html 로 돌아오게 — 그 번호를 state 에 싣는다 */
+  const originIdx = ERP_ORIGINS_LIB.originIndex(ERP_ORIGINS_LIB.originOf(req));
   const url = "https://accounts.google.com/o/oauth2/v2/auth"
     + "?client_id=" + encodeURIComponent(CLIENT_ID)
-    + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI)
+    + "&redirect_uri=" + encodeURIComponent(redirectUriAt(originIdx))
     + "&response_type=code"
     + "&scope=" + encodeURIComponent(SCOPE)
     + "&access_type=offline&prompt=consent&include_granted_scopes=true"
-    + "&state=" + encodeURIComponent(issueState(user.uid, secret));
+    + "&state=" + encodeURIComponent(issueState(user.uid, secret, originIdx));
   res.json({ ok: true, url });
 });
 
@@ -173,7 +187,8 @@ exports.gcalLink = functions.region(REGION).runWith({ secrets: SECRETS }).https.
   const code = String((req.body && req.body.code) || "");
   const state = String((req.body && req.body.state) || "");
   if (!code) return bad(res, 400, "구글에서 받은 연결 번호(code)가 없습니다");
-  if (!await takeState(state, user.uid, secret)) {
+  const took = await takeState(state, user.uid, secret);
+  if (!took) {
     return bad(res, 400, "구글 연결 요청이 만료됐거나 이미 쓰였습니다 — 다시 눌러 주세요");
   }
   const role = await roleOf(user.uid);
@@ -181,8 +196,9 @@ exports.gcalLink = functions.region(REGION).runWith({ secrets: SECRETS }).https.
 
   let j;
   try {
+    /* ★ 인가 때와 «같은» 돌아올 주소 — state 에 실린 출처 번호로 다시 만든다 */
     j = await googleToken({ grant_type: "authorization_code", code, client_id: CLIENT_ID,
-      client_secret: secret, redirect_uri: REDIRECT_URI });
+      client_secret: secret, redirect_uri: redirectUriAt(took.originIdx) });
   } catch (e) {
     return bad(res, 400, "구글 연결에 실패했습니다: " + String((e && e.message) || e));
   }
