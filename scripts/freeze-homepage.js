@@ -59,6 +59,13 @@ const OUT = (() => {
    (그날 사본은 내려받기 없이 머리만 바꿔 «운영용»으로 돌렸다 — status/2026-11-15-home-go-live.md) */
 const REAL_ORIGIN = 'https://pureunlabor.co.kr';
 
+/* 쪽 하나의 «최종» 주소 — 하위 쪽은 폴더(index.html)라 끝 빗금까지 붙여야 301 없이 바로 열린다.
+   빗금 없이 적으면(…/greeting) 깃허브가 …/greeting/ 로 넘기므로, 검색엔진에 «넘어가는 주소»를
+   원본이라 알리는 셈이 된다(2026-11-16 서치콘솔 제출 때 실측). 뿌리는 `${REAL_ORIGIN}/` 그대로. */
+function 쪽주소(mid) {
+  return REAL_ORIGIN + '/' + (mid ? String(mid).replace(/\/+$/, '') + '/' : '');
+}
+
 /* ★ 굳힌 쪽이 «실제로 얹히는» 주소. 깃허브 페이지가 CNAME 파일로 이 주소를 받는다.
    2026-09-03 대표 지시로 fairrunlabor.com 에 붙였으나 그 DNS 가 끝내 스퀘어스페이스
    자리표(「곧 출시 예정」)를 가리켜 홈페이지가 밖에서 안 보였다.
@@ -88,12 +95,23 @@ if (!LIVE && process.argv.indexOf('--preview') < 0) {
 }
 
 /* ── 내려받기 (한 번에 넷까지, 예의 있게) ── */
-function fetchBin(url) {
+/* ★ 넘김(3xx)도 «우리 출처 https» 안에서만 따라간다(2026-11-16 보안 재검증 중간) —
+     첫 주소만 검사하면 우리 서버가 302 로 남의 주소를 가리킬 때 그 응답이 우리 자산 자리에 담긴다.
+     넘김은 5번까지만(돌고 도는 넘김 방지). */
+function fetchBin(url, 남은넘김) {
+  if (남은넘김 == null) 남은넘김 = 5;
+  const 빈것 = { code: 0, buf: Buffer.alloc(0), type: '' };
   return new Promise(resolve => {
     const req = https.get(url, { timeout: 30000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return resolve(fetchBin(new URL(res.headers.location, url).href));
+        let 다음;
+        try { 다음 = new URL(res.headers.location, url); } catch (e) { return resolve(빈것); }
+        if (남은넘김 <= 0 || 다음.protocol !== 'https:' || 다음.origin !== new URL(ORIGIN).origin) {
+          console.warn('■ 넘김 건너뜀 — 우리 출처 밖: ' + 다음.href);
+          return resolve(빈것);
+        }
+        return resolve(fetchBin(다음.href, 남은넘김 - 1));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));
@@ -132,8 +150,12 @@ function 자산주소들(글, 기준) {
           || u.startsWith('tel:') || u.startsWith('javascript:')) return;
       let abs;
       try { abs = new URL(u, 기준).href; } catch (e) { return; }
-      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다 */
-      if (abs.indexOf(ORIGIN) !== 0 && abs.indexOf(ORIGIN_HANGUL) !== 0) return;
+      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다.
+         ★ 앞글자 비교가 아니라 «출처가 정확히 같은가»로 본다(2026-11-16 보안 검토 중간) —
+           `https://xn--…kr.evil.example/…` 처럼 앞이 같은 남의 주소가 끼어들지 못하게. */
+      let 출처 = '';
+      try { 출처 = new URL(abs).origin; } catch (e) { return; }
+      if (출처 !== new URL(ORIGIN).origin) return;
       if (/[?&]act=|[?&]mid=/.test(abs)) return;          // 쪽 주소는 자산이 아니다
       out.add(abs.split('#')[0]);
     });
@@ -153,10 +175,18 @@ function 자산경로(abs) {
   return p;
 }
 
+/* ★ 출력 폴더(OUT) 밖으로는 절대 안 쓴다(2026-11-16 보안 검토 중간) — 자산 주소를 풀면(%2e%2e%2f)
+     `../` 가 되어 저장소의 코드·설정을 덮을 수 있었다. 풀린 자리가 OUT 안이 아니면 건너뛴다. */
 function 담기(파일, buf) {
-  const 자리 = path.join(OUT, 파일);
+  const 자리 = path.resolve(OUT, 파일);
+  const 상대 = path.relative(OUT, 자리);
+  if (!상대 || 상대.split(path.sep)[0] === '..' || path.isAbsolute(상대)) {
+    console.warn('■ 건너뜀 — 출력 폴더 밖 자리: ' + 파일);
+    return false;
+  }
   fs.mkdirSync(path.dirname(자리), { recursive: true });
   fs.writeFileSync(자리, buf);
+  return true;
 }
 
 /* ── 쪽 글자 고치기 ── */
@@ -204,7 +234,7 @@ function 쪽고치기(html, mid) {
         그러면 임시 주소가 «자기가 원본»이라고 검색엔진에 말하게 된다 —
         진짜 홈페이지와 검색에서 서로 잡아먹고, 검색 결과에 깃허브 주소가 뜬다.
         도메인을 옮긴 뒤에는 이 주소가 곧 제 주소라 그대로 맞다. */
-  const 진짜주소 = REAL_ORIGIN + '/' + mid;
+  const 진짜주소 = 쪽주소(mid);
   s = s.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi,
     '<link rel="canonical" href="' + 진짜주소 + '" />');
   s = s.replace(/(<meta[^>]+property=["']og:url["'][^>]*content=")[^"]*(")/gi,
@@ -370,7 +400,7 @@ function 게시글주소들(html, mid) {
      주소를 그대로 지켰으므로 옮긴 뒤 색인이 빨리 따라온다. */
   const 오늘 = new Date().toISOString().slice(0, 10);
   const 목록 = Object.keys(쪽글).map(mid =>
-    '  <url><loc>' + REAL_ORIGIN + '/' + mid + '</loc>'
+    '  <url><loc>' + 쪽주소(mid) + '</loc>'
     + '<lastmod>' + 오늘 + '</lastmod></url>').join('\n');
   담기('sitemap.xml', Buffer.from(
     '<?xml version="1.0" encoding="UTF-8"?>\n'
