@@ -40,7 +40,8 @@ test('문서가 말한 저장 자리를 코드가 실제로 쓴다 — items · 
   assert.ok(!/\/ls\b|'\/at'/.test(mod), '모듈이 자료 통(ls)·at 을 건드리면 안 된다');
 });
 test('문서가 말한 화면 요소가 실제로 있다 — 옆줄 이름 · 단추 · 「나중에」 · 포털 딱지', () => {
-  assert.match(kc, /\{g:'요청 메일', items:\[\['page-mailreq','📬 요청 메일'\]\]\}/);
+  assert.ok(/\{g:'이력서관리', items:\[(?:\['[^']*','[^']*'\],)*\['page-mailreq','📬 요청 메일'\]\]\}/.test(kc), '옆줄 이력서관리 묶음 안에 요청 메일');
+  assert.match(doc, /이력서관리 › 📬 요청 메일/, '문서가 메뉴 자리를 이력서관리 안이라고 적는다');
   assert.ok(kc.indexOf('<span class="mr-btx"> 메일함 열기</span>') >= 0 && /📬 메일함 열기/.test(doc));
   assert.ok(kc.indexOf('나중에</a>') >= 0 && /«나중에»/.test(doc));
   assert.ok(kc.indexOf("단추('ignored','🚫','아님'") >= 0 && /«🚫 아님»/.test(doc));
@@ -52,10 +53,49 @@ test('문서가 약속한 «폰 푸시는 건드리지 않았다» — 새 코�
   const pm = portal.slice(portal.indexOf('// ── 📬 경력관리 «요청 메일»'), portal.indexOf('// 로그인 직후 바로 찍기'));
   [mod, mr, pm].forEach((src) => assert.ok(!/fcm_tokens|messaging\(|pushListen|push-admins|sendTo\(|mailPush/.test(src), '폰 푸시 길을 건드리면 안 된다'));
 });
+test('문서가 말한 팝업이 코드에서 참이다 — 메모 글자 수 · 내용 길이 · 읽기만 · 고친 칸 표시(fixed) · 제목을 누르면 열림', () => {
+  assert.equal(Number(/메모\((\d+)자\)/.exec(doc)[1]), Q.MEMO_MAX);
+  assert.equal(Number(/앞 (\d+)자\)/.exec(doc)[1]), 4000);
+  assert.ok(kc.indexOf("t.length>4000?t.slice(0,4000)") >= 0, '문서가 말한 «앞 4000자»가 화면 코드와 같다');
+  assert.ok(kc.indexOf('class="mr-open" data-mr=') >= 0 && kc.indexOf('onclick="mrOpen(') >= 0 && /제목을 누르면/.test(doc));
+  assert.match(doc, /`fixed`/); assert.match(mod, /fixed/);
+  assert.match(doc, /읽기만/); assert.ok(kc.indexOf("readMailMessage', { slug:x.slug, uid:x.uid, peek:1 }") >= 0, '내용은 peek 로 읽는다');
+  assert.match(doc, /저장하지 않는다/);
+});
 test('문서가 말한 «답장(RE:)은 새 요청이 아니다»가 코드에서 참이다', () => {
   assert.match(doc, /답장\(`RE:`/);
   assert.equal(Q.detect({ s: 'RE: 개인정보 동의서', an: ['동의서(서명본).hwp'], p: '서명하여 첨부합니다', d: Date.now() }), null);
 });
 test('문서가 «아직 안 되는 것»을 적는다 — 서버 상시 감지 · 말 목록의 한계 · 실측 못 함', () => {
   assert.match(doc, /켜 둔 동안/); assert.match(doc, /손으로 정한 목록/); assert.match(doc, /\[확인 필요\]/);
+});
+
+/* ── 범위(업무는 뺀다) — 문서가 코드와 어긋나지 않는다 (대표 지시 2026-11-15) ── */
+const MRS = require('../functions/mail-req-scope.js');
+const srows = doc.split('\n').filter((l) => /^\|\s*(personal|work)\s*\|/.test(l)).map((l) => l.split('|').map((c) => c.trim()));
+test('문서의 «범위» 말이 코드의 말 목록에 모두 걸린다(문서가 코드가 모르는 말을 약속하지 않는다)', () => {
+  assert.equal(srows.length, 2, '개인 · 업무 두 줄');
+  srows.forEach((r) => {
+    const re = r[1] === 'personal' ? Q.SCOPE_PERSONAL : Q.SCOPE_WORK;
+    const words = [...r[2].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+    assert.ok(words.length >= 5, r[1] + ' 말이 너무 적다');
+    words.forEach((w) => assert.ok(re.test(w), '문서가 «' + w + '» 를 ' + r[1] + ' 말이라고 하는데 코드가 못 알아본다'));
+  });
+});
+test('문서의 Jev 숫자가 코드와 같다 — 한 번에 건수 · 하루 건수 · 셈 자리 · 쉬는 시간', () => {
+  assert.equal(Number(/한 번에 최대 \*\*(\d+)건\*\*/.exec(doc)[1]), Q.JEV_MAX);
+  assert.equal(Q.JEV_MAX, MRS.MAX_ITEMS, '화면이 묻는 건수와 서버가 받는 건수가 같다');
+  assert.equal(Number(/하루 최대 \*\*(\d+)건\*\*/.exec(doc)[1]), MRS.DAY_LIMIT);
+  assert.ok(doc.indexOf('`' + MRS.TALLY_ROOT + '`') >= 0, '문서가 셈 자리를 적는다');
+  assert.equal(Number(/\*\*(\d+)분 쉰다\*\*/.exec(doc)[1]), 30);
+  assert.ok(kc.indexOf('Date.now()+30*60*1000') >= 0, '화면이 실제로 30분 쉰다');
+  assert.equal(Number(/한 번에 (\d+)건까지\)/.exec(doc)[1]), 60, '옛 건 한 번 가르기 한도');
+  assert.ok(mod.indexOf('SCOPE_BACKFILL_MAX = 60') >= 0);
+});
+test('문서가 약속한 것이 코드에서 참이다 — 자동 제외 딱지 · 켜짐 기본 · 서버 함수 이름 · 본문은 안 본다', () => {
+  assert.ok(doc.indexOf('「🤖 업무 관련 · 자동 제외」') >= 0 && Q.scopeMark({ st: 'ignored', autoIgnored: 1 }).text === '🤖 업무 관련 · 자동 제외');
+  assert.match(doc, /켜짐이 기본/); assert.ok(kc.indexOf("mrLocal('jev')!=='0'") >= 0);
+  assert.match(doc, /mailReqScope/); assert.ok(kc.indexOf("BIZ_MB_FN+'mailReqScope'") >= 0);
+  assert.match(doc, /본문은 안 본다/); assert.match(doc, /\[확인 필요\]/);
+  assert.match(doc, /«새 요청»에만/);
 });

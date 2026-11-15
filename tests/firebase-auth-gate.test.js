@@ -147,7 +147,8 @@ test('★ 익명으로 열리는 자리는 «정해진 곳»뿐이다 (전자서
   /* 2026-10-09 대표 「1단계부터 진행해라」 — ✍ 계약서 서명 요청: 받는 사람이 폰(익명)으로 «열어 봄»·«제출» 한 번.
      제출은 한 번만·기한 안·취소 안 됨·휴대폰 끝 4자리 일치·문서 지문 일치일 때만(규칙이 막는다). */
   /* 2026-10-09 검토(대표 「추천대로」) — 서명 링크 칸 읽기를 «아무나»에서 «익명 로그인»으로 좁혔다(서명 화면은 익명 로그인 뒤 읽는다) */
-  const 허락 = ['/ieum_public', '/esign/cases/$caseId/meta', '/pu_sign/open/$t', '/pu_sign/open/$t/seen', '/pu_sign/open/$t/sub'];
+  /* 2026-11-12 — 🛡️ 괴롭힘·성희롱 조사 진술·비밀서약 전자서명(sign-harass.html): 128비트 열쇠 슬롯(AES-256-GCM 암호문만 보관, 평문 없음) 열람·1회 제출(끝 4자리·문서지문 규칙 강제) */
+  const 허락 = ['/ieum_public', '/esign/cases/$caseId/meta', '/pu_sign/open/$t', '/pu_sign/open/$t/seen', '/pu_sign/open/$t/sub', '/harass_sign/open/$t', '/harass_sign/open/$t/seen', '/harass_sign/open/$t/sub'];
   const 익명가능 = 모두.filter(function (x) {
     if (x.k === '.validate') return false;
     const v = x.v;

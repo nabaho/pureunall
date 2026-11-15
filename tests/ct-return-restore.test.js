@@ -95,6 +95,22 @@ test('④ 번호 없이 ID 만 있어도 찾는다 — 옛 기록은 꼴이 제�
     '★ 사진·명함에서 온 것까지 계약으로 읽으면 안 됩니다');
 });
 
+test('④-1 ★ sourceContractId 가 지워진 옛 사본을 가리켜도 같은 계약번호의 살아 있는 원본이 있으면 되살린다', function () {
+  const mixed = [
+    Object.assign({}, LIVE[0], { id: 'ct-old', _deleted: true }),
+    Object.assign({}, LIVE[0], { id: 'ct-live' })
+  ];
+  const staleIdItem = Object.assign({}, ITEM, { sourceContractId: 'ct-old', sourceId: 'ct-old' });
+  const p1 = plan(staleIdItem, mixed);
+  assert.equal(p1.mode, 'restore', '★ 살아 있는 같은 계약번호 원본을 놔두고 새로 만들면 계약번호 중복이 생깁니다');
+  assert.equal(p1.contract.id, 'ct-live');
+
+  const missingIdItem = Object.assign({}, ITEM, { sourceContractId: 'ct-gone', sourceId: 'ct-gone' });
+  const p2 = plan(missingIdItem, [Object.assign({}, LIVE[0], { id: 'ct-live-2' })]);
+  assert.equal(p2.mode, 'restore', '★ ID 로 못 찾아도 살아 있는 같은 계약번호 원본으로 되살려야 합니다');
+  assert.equal(p2.contract.id, 'ct-live-2');
+});
+
 // ══════════════════════════════════════════════════════════════════
 test('⑤ ★ 모듈에서 고쳐진 금액은 «덮지 않고 알린다» — 말없이 옛 금액으로 돌리면 돈이 틀린다', function () {
   const edited = Object.assign({}, ITEM, { contractFee: 5000000 });

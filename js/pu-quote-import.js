@@ -25,6 +25,8 @@
   var D = w.PuQuoteDetect;
   if (!D) throw new Error('PuQuoteDetect(js/pu-quote-detect.js)가 pu-quote-import.js 보다 먼저 실려야 합니다');
   var DOC_EXT = /\.(pdf|hwp|hwpx)$/i;
+  var EXTRA_EXT = /\.(xlsx|xls|docx|doc)$/i;
+  var NAMED_DOC = /견적|계약|약정|합의|협약|수임료|비용\s*안내|보수\s*안내/;
   var NAME_CUT = 60;                    /* 메일 줄(an)의 첨부 이름은 60자에서 잘려 있다(functions/mail-box.js attNames) */
   var QUOTA = /한도|quota|429|RESOURCE_EXHAUSTED/i;
   var DENIED = /permission[_ ]denied/i;
@@ -33,8 +35,11 @@
      (제목·첨부 이름에 «견적» — 남의 견적은 거름 · 「자문·위임·… 계약서」 — 근로계약서는 아님 · 둘 다면 계약서가 이김) */
   var s = D.s, nfc = D.nfc, namesOf = D.namesOf;
   var isOurQuote = D.isOurQuote, isOurContract = D.isOurContract, docOf = D.docOf;
-  /* 이름이 60자에서 잘렸으면 확장자를 알 수 없다 — 받아 보고 정한다(지금은 후보로 둔다) */
-  function okExt(name) { return DOC_EXT.test(name) || name.length >= NAME_CUT; }
+  /* 이름이 60자에서 잘렸으면 확장자를 알 수 없다 — 받아 보고 정한다(지금은 후보로 둔다).
+     엑셀·워드는 파일 이름에 견적·계약이 분명히 적힌 경우에만 허용한다(일반 표.xlsx 등은 제외). */
+  function okExt(name) {
+    return DOC_EXT.test(name) || (EXTRA_EXT.test(name) && NAMED_DOC.test(name)) || name.length >= NAME_CUT;
+  }
 
   /* 받을 첨부 하나 — 문서 종류에 맞는 이름(견적/계약서)을 먼저, «푸른» 이 든 것을 먼저. 없으면 -1.
      이름이 맞는 것이 없어도 pdf·hwp·hwpx 가 있으면 그 첫 번째를 쓴다(제목이 견적이라는 말인데 첨부 이름만 다른 경우) */
@@ -50,19 +55,33 @@
   }
 
   /* 받아 둔 메일 줄들 → 가져올 후보. 최근 것이 먼저(한도에 걸려 멈추면 최근 것이 들어가 있게).
+     opts.allAtts 가 켜지면 한 메일 안에 견적서·계약서 첨부가 여러 개(1안·2안, 견적서+계약서)일 때 빠짐없이 각각 후보로 잡는다.
      msg 칸: s 제목 · d 시각(ms) · t 받는 주소 · tn 받는 이름 · an 첨부 이름 · a 첨부 수 · u IMAP 번호 */
-  function candidates(msgs, slug) {
+  function candidates(msgs, slug, opts) {
+    opts = opts || {};
     var out = [];
     Object.keys(msgs || {}).forEach(function (key) {
       var m = msgs[key] || {};
       var names = namesOf(m.an), doc = docOf(m.s, names);
       if (!doc) return;
       var uid = /^\d+$/.test(s(m.u)) && Number(m.u) > 0 ? s(m.u) : '';
-      var idx = uid ? pickAtt(names, doc) : -1;      /* 번호를 모르면 첨부를 받을 수 없다 — 기록만 */
+      var primaryIdx = uid ? pickAtt(names, doc) : -1;      /* 번호를 모르면 첨부를 받을 수 없다 — 기록만 */
+      var baseKey = s(slug) + '|' + s(key);
       out.push({ slug: s(slug), key: s(key), uid: uid, subject: s(m.s), date: Number(m.d) || 0,
         to: s(m.t).split(',')[0], toName: s(m.tn), doc: doc,
-        attIndex: idx, attName: idx >= 0 ? names[idx] : '', attCount: Number(m.a) || names.length,
-        srcKey: s(slug) + '|' + s(key) });
+        attIndex: primaryIdx, attName: primaryIdx >= 0 ? names[primaryIdx] : '', attCount: Number(m.a) || names.length,
+        srcKey: baseKey });
+      if (opts.allAtts && uid && primaryIdx >= 0) {
+        names.forEach(function (nm, idx) {
+          if (idx === primaryIdx || !okExt(nm)) return;
+          var subDoc = docOf('', [nm]);
+          if (!subDoc) return;
+          out.push({ slug: s(slug), key: s(key), uid: uid, subject: s(m.s), date: Number(m.d) || 0,
+            to: s(m.t).split(',')[0], toName: s(m.tn), doc: subDoc,
+            attIndex: idx, attName: nm, attCount: Number(m.a) || names.length,
+            srcKey: baseKey + '#' + idx });
+        });
+      }
     });
     return out.sort(function (a, b) { return b.date - a.date; });
   }
@@ -99,12 +118,15 @@
   function shortSubject(t) { t = trim(t); return t.length > 40 ? t.slice(0, 40) + '…' : t; }
 
   /* 하나씩 가져온다.
+     opts.skipAi 가 켜지면 AI 판독을 부르지 않고 원본 파일과 메일 기본정보만 빠르게 전량 가져온다(하루 한도와 무관).
      host: { have(srcKey)→Promise<bool> · fetchAtt(c)→Promise<{name,type,bytes}> · store(file, c)→Promise<fileId>
              extractText(bytes, name)→Promise<string> · readText(prompt, text)→Promise<{ok,data,why}>
              save(rec, amt)→Promise<qid> · log(kind, o) · now()→ms }
      돌려주는 것: { done, skipped, failed, left, check, stopped? } */
-  function runImport(list, host, onStep) {
+  function runImport(list, host, onStep, opts) {
     list = list || [];
+    opts = opts || {};
+    var skipAi = !!opts.skipAi;
     var res = { done: 0, skipped: 0, failed: 0, left: 0, check: 0 };
     var step = typeof onStep === 'function' ? onStep : function () {};
     var now = typeof host.now === 'function' ? host.now : Date.now;
@@ -124,7 +146,7 @@
           return Promise.resolve(host.save(out.rec, out.amt)).then(function (qid) {
             res.done++;
             if (out.rec.review === 'check') res.check++;
-            if (typeof host.log === 'function') host.log('auto_detect', { target: s(qid), note: shortSubject(c.subject), auto: '보낸메일 가져오기' });
+            if (typeof host.log === 'function') host.log('auto_detect', { target: s(qid), note: shortSubject(c.subject), auto: skipAi ? '보낸메일 빠른가져오기' : '보낸메일 가져오기' });
             return one(i + 1);
           }, function (e) {
             var msg = (e && e.message) || s(e);
@@ -135,11 +157,15 @@
       });
     }
 
-    /* 첨부 받기 → 🔒 저장 → 글자 뽑기 → AI. 돌려주는 것: {fields, fileId} | {fail:true} | {stop:'까닭'} */
+    /* 첨부 받기 → 🔒 저장 → (선택) 글자 뽑기 → AI. 돌려주는 것: {fields, fileId} | {fail:true} | {stop:'까닭'} */
     function prepare(c) {
       if (c.attIndex < 0) return Promise.resolve({ fields: null, fileId: '' });   /* 첨부가 없다 — 기록만(확인 필요) */
       return Promise.resolve().then(function () { return host.fetchAtt(c); }).then(function (a) {
         return Promise.resolve(host.store({ name: a.name, size: a.bytes.length, type: a.type || '', bytes: a.bytes }, c)).then(function (fileId) {
+          if (skipAi) {
+            var guessedCo = w.PuCoRoster && w.PuCoRoster.coFromPath ? w.PuCoRoster.coFromPath(a.name) : '';
+            return { fields: { 의뢰처: guessedCo, 과업내용: trim(c.subject).replace(/^(\s*(RE|FW|FWD)\s*:\s*)+/i, '').replace(/^\[푸른노무법인\]\s*/, '') }, fileId: fileId };
+          }
           return Promise.resolve(host.extractText(a.bytes, a.name)).then(function (t) { return trim(t) ? s(t).trim() : ''; }, function () { return ''; })
             .then(function (text) {
               if (!text) return { fields: null, fileId: fileId };       /* 글자를 못 뽑았다 — AI 를 부르지 않는다 */

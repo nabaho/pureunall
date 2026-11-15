@@ -69,6 +69,15 @@ final class SecureStore {
         prefs(context).edit().remove(KEY_UID).remove(KEY_TOKEN).apply();
     }
 
+    /* 연결 해제·권한 회수 시 폰에 남은 업무방 목록·카톡 임시파일·문자 대기열·주기 훑기를 한꺼번에 비운다 */
+    static void clearAll(Context context) {
+        clearConnection(context);
+        try { KakaoRooms.clear(context); } catch (Exception ignored) {}
+        try { KakaoUploadWorker.clearPending(context); } catch (Exception ignored) {}
+        try { VisitSmsSender.clear(context); } catch (Exception ignored) {}
+        try { HanaSweepWorker.cancel(context); } catch (Exception ignored) {}
+    }
+
     static void setLastStatus(Context context, String status) {
         prefs(context).edit().putString("last_status", status).apply();
     }

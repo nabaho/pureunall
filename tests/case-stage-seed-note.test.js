@@ -57,3 +57,23 @@ test('시드에 없는(대표가 만든) 단계는 건드리지 않는다', () =
   c.getCaseStagesAll(true);
   assert.equal(writes(), 0);
 });
+
+/* ── 2판(2026-11-15) — 산재 두 단계 설명을 법 원문(«결정이 있음을 안 날»)으로 (대표 「모든 단계 한번에 진행해라」) ── */
+test('2판: 산재 시드 설명이 법 원문 — «안 날»·제103조③·제106조 단서', () => {
+  const { c } = box(null);
+  const apply = c.BIZ_CASE_STAGE_SEED.find((x) => x.code === 'wc-apply');
+  const review = c.BIZ_CASE_STAGE_SEED.find((x) => x.code === 'wc-review');
+  assert.match(apply.dueNote, /안 날/); assert.match(apply.dueNote, /제103조③/); assert.match(apply.dueNote, /제106조① 단서/);
+  assert.match(review.dueNote, /안 날/); assert.match(review.dueNote, /제106조③/);
+  assert.doesNotMatch(apply.dueNote + review.dueNote, /통보받은 날/, '법 원문은 «통보받은 날»이 아니라 «안 날»');
+});
+
+test('★ 2판: 옛 시드 글자 «그대로»인 설명만 새 글로 — 대표가 고친 글은 그대로', () => {
+  const { c, store } = box([
+    { code: 'wc-apply', dueNote: '결정 통보받은 날부터 90일 이내 심사청구', seedNoteV: 1 },
+    { code: 'wc-review', dueNote: '심사 결정 통보받은 날부터 90일 이내 재심사청구 — 대표 덧붙임', seedNoteV: 1 }]);
+  const out = c.getCaseStagesAll(true);
+  assert.match(note(out, 'wc-apply'), /안 날/, '옛 시드 그대로면 새 글로');
+  assert.equal(note(out, 'wc-review'), '심사 결정 통보받은 날부터 90일 이내 재심사청구 — 대표 덧붙임', '★ 대표가 고친 글을 덮었습니다');
+  assert.match(note(store.biz_case_stages, 'wc-apply'), /안 날/, '저장까지 돼야 다른 PC 에도');
+});

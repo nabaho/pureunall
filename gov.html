@@ -306,11 +306,12 @@ table.cmp td{white-space:nowrap}
    ⚠ ☐·№ 는 폰에서도 맨 왼쪽에 남긴다(자료 목록 규칙) — 머리 ☐(보이는 것 모두)도 그대로 쓴다. */
 .m-only{display:none}
 @media (max-width:640px){
-  #top{flex-wrap:nowrap;gap:6px;padding:6px 10px}
+  #top{flex-wrap:nowrap;gap:2px;padding:4px 4px;max-width:100%}
   #top>div:first-child .sub{display:none}
-  #top .ttl{font-size:15px;white-space:nowrap}
-  #who{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #top .btn{flex:none;padding:6px 9px;white-space:nowrap}
+  #top .ttl{font-size:11.5px;white-space:nowrap}
+  #who{display:none}
+  #top .sp{flex:1 1 0;min-width:0}
+  #top .btn{flex:none;padding:3px 4px;min-height:28px;font-size:10.5px;white-space:nowrap;min-width:0}
   #tabs{gap:0;padding:0 4px;overflow-x:auto;scrollbar-width:none}
   #tabs .tb{flex:1 0 auto;padding:8px 6px;font-size:12.5px;white-space:nowrap}
   .rsubs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0}   /* 컨설턴트 모집 하위 탭도 한 줄 */
@@ -361,7 +362,7 @@ table.cmp td{white-space:nowrap}
   td.nm>.tag,td.nm>.orgrec,td.nm>.kwt{display:none}
   td.nm>b{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px}
   td.nm>.mdd{display:inline-flex;flex:none;font-size:11.5px}
-  td.nm>.msub{display:flex;flex:1 0 100%;min-width:0;align-items:center;gap:4px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}   /* 간격 4px — 딱지 둘 + 금액 + 기관이 360px 에서 5~19px 넘쳤다(2026-10-18 실측) */
+  td.nm>.msub{display:flex;flex-wrap:wrap;flex:1 0 100%;min-width:0;align-items:center;gap:2px 5px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}   /* 간격 4px — 딱지 둘 + 금액 + 기관이 360px 에서 5~19px 넘쳤다(2026-10-18 실측) */
   .msub>*{flex:none}
   .msub .mog,.msub .mst{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .msub .mog{flex-shrink:9;min-width:2.5em}   /* 넘치면 기관이 먼저 줄어든다(전문은 줄을 눌러 상세) */
@@ -536,7 +537,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=91"></script>
+<script src="js/pu-ontology.js?v=99"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -544,7 +545,7 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=40"></script>
+<script src="js/pu-appbar.js?v=46"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -553,7 +554,7 @@ table.cmp td{white-space:nowrap}
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
 </script>
-<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=3"></script>
 <script src="js/gov-g2b.js?v=10"></script>
@@ -561,7 +562,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=3"></script>
 <script src="js/gov-recruit.js?v=7"></script>
-<script src="js/gov-submit.js?v=3"></script>
+<script src="js/gov-submit.js?v=4"></script>
 <script src="js/gov-sync.js?v=10"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
@@ -1693,11 +1694,17 @@ async function _recOk(h){ if(!h) return false;
   try{ if(await h.queryPermission({mode:'read'})==='granted') return true;
     return (await h.requestPermission({mode:'read'}))==='granted'; }catch(e){ return false; } }
 /* 받은 폴더가 7번 자체인지, 그 위(서류 폴더 전체)인지 가린다 */
+/* ★ «7. »이 붙은 이름과 안 붙은 이름을 같은 폴더로 본다(대표 지시 2026-11-15) — 이 PC 의 폴더는 «컨설턴트,위원신청등»(번호 없음)이라
+   «7. 컨설턴트,위원신청등» 만 찾으면 「폴더가 없다」가 됐다. 경력관리(kcareer-scan.js 의 dirNameChoices)와 같은 규칙이다.
+   ⚠ 먼저 정확한 이름, 없을 때만 번호 뗀 이름. */
+var REC_NAME_BARE=REC_DIR.replace(/^\s*\d+\s*\.\s*/,'');
+function _isRec7Name(n){ n=String(n||''); return n===REC_DIR || n===REC_NAME_BARE || (/^7\./.test(n) && /신청/.test(n)); }
 async function _recFind7(h){
   if(!h) return null;
-  if(/^7\./.test(h.name)) return h;
+  if(/^7\./.test(h.name) || h.name===REC_NAME_BARE) return h;
   try{ return await h.getDirectoryHandle(REC_DIR); }catch(e){}
-  try{ for await (var e of h.values()){ if(e.kind==='directory' && /^7\./.test(e.name) && /신청/.test(e.name)) return e; } }catch(e){}
+  try{ return await h.getDirectoryHandle(REC_NAME_BARE); }catch(e){}
+  try{ for await (var e of h.values()){ if(e.kind==='directory' && _isRec7Name(e.name)) return e; } }catch(e){}
   return null;
 }
 async function recDirGet(ask){

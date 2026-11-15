@@ -1656,7 +1656,7 @@
       savedAt: Date.now()
     };
     try { localStorage.setItem('pureun_hangul_save', JSON.stringify(msg)); } catch (e) {}
-    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (e) {}
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, location.origin); } catch (e) {}   // 2026-11-15 보안 — 같은 주소의 기금 창에만
     try { if (typeof BroadcastChannel !== 'undefined') new BroadcastChannel('pureun_hangul_channel').postMessage(msg); } catch (e) {}
     cur.dirty = false; renderTabs();
     toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
@@ -1695,6 +1695,7 @@
     }
   } catch (e) {}
   window.addEventListener('message', e => {
+    if (!e || e.origin !== location.origin) return;   // 2026-11-15 보안 — 다른 사이트가 보낸 «열기» 쪽지는 무시
     const d = e && e.data;
     if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
   });

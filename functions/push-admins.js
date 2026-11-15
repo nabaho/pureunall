@@ -23,7 +23,8 @@ async function adminUids(db) {
   const out = [];
   rolesSnap.forEach((child) => {
     const v = child.val() || {};
-    if (v.isAdmin === true && v.status !== "resigned") out.push(child.key);
+    /* 퇴사(resigned·retired)·중지(inactive·suspended) 상태는 빼고 재직(active 또는 옛 빈칸) 관리자만 고른다 */
+    if (v.isAdmin === true && (!v.status || v.status === "active") && v.status !== "resigned") out.push(child.key);
   });
   return out;
 }

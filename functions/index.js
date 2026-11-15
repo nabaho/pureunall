@@ -33,7 +33,7 @@ const {
 const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-        올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
+        올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
@@ -59,6 +59,7 @@ function geoip나라(ip) {
 }
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
+const MailReqScope = require("./mail-req-scope");   /* 경력관리 «요청 메일» 범위 분류(업무 vs 이력·회의·비용) — 애매한 건만 Jev 에게 */
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
@@ -3666,6 +3667,39 @@ exports.typeSafeEvaluate = functions
     }
   });
 
+/* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
+   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
+   본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
+   ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
+   ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
+exports.mailReqScope = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let who;
+    try { who = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    try {
+      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
+      res.status(out.status).json(out.body);
+    } catch (e) {
+      console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
+
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
      enter·경력관리)을 다 옮기고 `firebase functions:secrets:set GEMINI_KEY` 를
@@ -3782,6 +3816,21 @@ exports.readDoc = functions
     if (body.freeFirst !== false) {
       const 줄인것 = await freeFirstSlim(v.parts, v.app);
       if (줄인것) parts = 줄인것;
+    }
+    if (v.app === "pbox") {
+      if (parts.some((p) => !p || typeof p !== "object" || Object.keys(p).length !== 1 || typeof p.text !== "string")) {
+        res.status(400).json({ ok: false, error: "P박스 AI 질의는 비식별 텍스트만 허용됩니다.", status: 400 });
+        return;
+      }
+      const PBoxSync = require("./pbox-sync");
+      parts = parts.map(function (p) {
+        const names = PBoxSync.extractPartyNamesServer(p.text, "");
+        return { text: PBoxSync.scrubServerPii(p.text, names) };
+      });
+      if (PBoxSync.hasResidualHardPii(parts)) {
+        res.status(400).json({ ok: false, error: "민감 개인정보가 감지되어 외부 AI 호출을 차단했습니다.", status: 400 });
+        return;
+      }
     }
 
     // cfg = 부르는 쪽이 정한 값(온도·최대 길이). 걸러진 것만 넘어온다.
@@ -4612,6 +4661,7 @@ exports.newsView = functions
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
       /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
       res.set("Cache-Control", "public, max-age=300");
+      res.set("Content-Security-Policy", NV.전문보안);   // 2026-11-15 보안 — 전문 칸에 심은 스크립트·양식이 돌지 않게
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
@@ -6737,6 +6787,25 @@ exports.publishSite = functions
         return;
       }
 
+      /* ★ 2026-11-15 보안 — «실행되는 조각»을 새로 넣는 올리기와 SVG 그림은 총괄관리자만(까닭은 site-publish.js 실행조각 머리).
+         글·표·그림(png·jpg·webp) 고치기는 지금처럼 재직 직원 누구나. 있던 쪽을 못 읽으면(새 쪽 포함) 빈 쪽과 견준다 — 막는 쪽으로 기운다. */
+      const 관리자인가 = ((await getDatabase().ref("uid_roles/" + decoded.uid + "/isAdmin").once("value")).val() === true);
+      if (!관리자인가) {
+        if (그림인가 && /\.svg$/i.test(String(path))) {
+          res.status(403).json({ error: "SVG 그림은 총괄관리자만 올릴 수 있습니다 — png·jpg·webp 로 올려 주세요." });
+          return;
+        }
+        if (!그림인가) {
+          let 있던쪽 = "";
+          try { 있던쪽 = await 새홈페이지쪽(홈페이지자리(path)); } catch (e) { 있던쪽 = ""; }
+          const 새것 = 새실행조각(있던쪽, String(content));
+          if (새것.length) {
+            res.status(403).json({ error: "스크립트·실행 코드가 새로 들어간 쪽은 총괄관리자만 올릴 수 있습니다(" + 새것.length + "곳). 글만 고쳐 다시 올려 주세요." });
+            return;
+          }
+        }
+      }
+
       const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
       const 사연글 = 사연(누가, path, (req.body && req.body.note) || "");
       const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
@@ -6844,6 +6913,18 @@ async function hanaNoteSkip(linked, reason) {
   } catch (err) { /* 기록에 실패해도 문자 처리를 막지 않는다 */ }
 }
 
+/* ★ 연결된 휴대폰 주인(uid)이 «지금도 재직 중인 관리자·재무 담당자»인지 확인한다 (2026-11-11 폰 보안 점검).
+   연결 당시 권한이 있었더라도 퇴사·권한 회수 뒤에 기기 열쇠만으로 입금 내역 올리기·카톡 업무방 목록 받기·
+   방문 안내 문자(고객 번호) 가져가기가 계속 도는 것을 막는다. 403 을 돌려주면 폰 앱도 스스로 연결을 지운다. */
+async function hanaStaffRoleOk(db, uid) {
+  if (!uid) return false;
+  const role = (await db.ref(`uid_roles/${uid}`).once("value")).val() || {};
+  return role.status === "active" && (role.isAdmin === true || role.fin === true);
+}
+
+const HANA_PAIR_WINDOW_MS = 10 * 60 * 1000;
+const HANA_PAIR_MAX_FAILS = 5;
+
 async function requireHanaDevice(req, body) {
   const match = /^Device\s+(.+)$/i.exec(String(req.headers.authorization || ""));
   const uid = String(body.uid || "").trim();
@@ -6853,7 +6934,8 @@ async function requireHanaDevice(req, body) {
     error.status = 401;
     throw error;
   }
-  const ref = getDatabase().ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
+  const db = getDatabase();
+  const ref = db.ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
   const snap = await ref.once("value");
   const device = snap.val() || {};
   if (device.disabled === true || !device.tokenHash || !hanaSafeEqual(device.tokenHash, hanaHash(match[1]))) {
@@ -6862,7 +6944,7 @@ async function requireHanaDevice(req, body) {
        그래서 화면은 「연결 뒤 문자 0건」이라고만 했고, 대표는
        「앱이 지워졌나 · 알림이 꺼졌나 · 절전인가」를 셋 다 헤매야 했다.
        실은 «앱은 멀쩡히 살아 말을 걸고 있는데 연결만 끊긴» 것일 수 있다.
-     ⚠ «그 폰이 실제로 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
+     ⚠ «그 폰이 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
        아무 uid 나 적게 하면 모르는 사람이 남의 칸에 글을 쓸 수 있다. */
     if (device.tokenHash) {
       ref.child("lastReject").set({ at: Date.now(), reason: device.disabled === true ? "disabled" : "bad_token" })
@@ -6870,6 +6952,12 @@ async function requireHanaDevice(req, body) {
     }
     const error = new Error("휴대폰 연결이 만료되었거나 해제되었습니다.");
     error.status = 401;
+    throw error;
+  }
+  if (!(await hanaStaffRoleOk(db, uid))) {
+    ref.update({ disabled: true, lastReject: { at: Date.now(), reason: "role_revoked" } }).catch(() => {});
+    const error = new Error("재무·관리자 권한이 없거나 재직 중인 계정이 아닙니다.");
+    error.status = 403;
     throw error;
   }
   /* 잘 들어왔으면 「끊김」 자국을 지운다 — 지난 자국이 남아 계속 붉으면 못 믿는 표가 된다. */
@@ -6897,26 +6985,50 @@ exports.hanaMessageBridge = functions
         if (!/^\d{8}$/.test(code) || !deviceId || deviceId.length > 200) {
           hanaJson(res, 400, { ok: false, error: "8자리 연결번호와 휴대폰 정보가 필요합니다." }); return;
         }
+        /* 8자리 연결번호 무차별 대입 차단 — 기기·접속지별 실패 횟수를 세어 한도를 넘기면 잠근다 */
+        const callerIp = String((req.headers["x-forwarded-for"] || req.ip || "")).split(",")[0].trim();
+        const guardKey = hanaHash("pair:" + (callerIp || deviceId));
+        const guardRef = db.ref(`hanaSmsBridge/pairAttempts/${guardKey}`);
+        const guardVal = (await guardRef.once("value")).val() || {};
+        const nowAt = Date.now();
+        const recentFails = (nowAt - Number(guardVal.windowAt || 0) < HANA_PAIR_WINDOW_MS) ? Number(guardVal.count || 0) : 0;
+        if (recentFails >= HANA_PAIR_MAX_FAILS) {
+          hanaJson(res, 429, { ok: false, error: "연결 시도가 너무 많습니다. 10분 뒤 다시 시도해 주세요." }); return;
+        }
+        const notePairFail = () => guardRef.set({
+          count: recentFails + 1,
+          windowAt: recentFails > 0 ? Number(guardVal.windowAt || nowAt) : nowAt,
+          lastAt: nowAt,
+        }).catch(() => {});
+
         const pairRef = db.ref(`hanaSmsBridge/pairs/${hanaHash(code)}`);
         const pairSnap = await pairRef.once("value");
         const pair = pairSnap.val() || {};
-        if (!pair.uid || Number(pair.expiresAt || 0) < Date.now()) {
+        if (!pair.uid || Number(pair.expiresAt || 0) < nowAt) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "연결번호가 만료되었습니다. ERP에서 다시 발급해 주세요." }); return;
         }
         const currentPair = await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).once("value");
         if (String(currentPair.val() || "") !== hanaHash(code)) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "새 연결번호가 발급되었습니다. 가장 최근 번호를 입력해 주세요." }); return;
         }
+        if (!(await hanaStaffRoleOk(db, pair.uid))) {
+          await pairRef.remove().catch(() => {});
+          await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).remove().catch(() => {});
+          hanaJson(res, 403, { ok: false, error: "재무·관리자 권한이 있는 재직 계정만 휴대폰을 연결할 수 있습니다." }); return;
+        }
+        await guardRef.remove().catch(() => {});
         const token = crypto.randomBytes(32).toString("base64url");
         const deviceKey = hanaDeviceKey(deviceId);
         await db.ref(`hanaSmsBridge/devices/${pair.uid}`).set({
           [deviceKey]: {
             tokenHash: hanaHash(token),
             deviceName,
-            pairedAt: Date.now(),
-            lastSeenAt: Date.now(),
+            pairedAt: nowAt,
+            lastSeenAt: nowAt,
             disabled: false,
           },
         });
@@ -8119,5 +8231,90 @@ exports.visitSmsSend = functions
     } catch (e) {
       if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
       res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
+    }
+  });
+
+/* ── P박스(pu-pbox.html) 법령·판례·행정해석·산재하급심 자동 동기화 (2026-11-14) ──
+   선언되지 않은 비밀키로 배포가 막히지 않게 secrets 배열을 두지 않고 process.env 에서 선택적으로 읽는다.
+   파이어베이스 실시간DB에는 아무것도 쓰지 않아 RTDB 저장·대역폭 비용이 0원이다. */
+exports.pboxDailySync = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 180, memory: "256MB" })
+  .pubsub.schedule("every day 03:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const PBoxSync = require("./pbox-sync");
+    const r = await PBoxSync.runSync({ env: process.env });
+    console.log("[P박스 일일 동기화]", JSON.stringify({
+      krTreeSha: r.krTreeSha,
+      dedupedCount: r.dedupedCount,
+      supabasePushed: r.supabasePushed
+    }));
+    return null;
+  });
+
+const _pboxRateState = {
+  globalByAct: Object.create(null),
+  uidByAct: new Map()
+};
+
+async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs) {
+  const now = Date.now();
+  if (_pboxRateState.uidByAct.size > 500) {
+    for (const [k, ts] of _pboxRateState.uidByAct.entries()) {
+      if (now - ts > 300000) _pboxRateState.uidByAct.delete(k);
+    }
+  }
+  const gLast = _pboxRateState.globalByAct[action] || 0;
+  if (globalMinMs > 0 && now - gLast < globalMinMs) {
+    const waitSec = Math.max(1, Math.ceil((globalMinMs - (now - gLast)) / 1000));
+    return "공용 공공API 한도 보호를 위해 잠시 후(" + waitSec + "초 뒤) 다시 시도해 주세요.";
+  }
+  const uKey = String(uid || "") + ":" + action;
+  const uLast = _pboxRateState.uidByAct.get(uKey) || 0;
+  if (uidMinMs > 0 && now - uLast < uidMinMs) {
+    const waitSec2 = Math.max(1, Math.ceil((uidMinMs - (now - uLast)) / 1000));
+    return "연속 수집 요청 간격 제한입니다. " + waitSec2 + "초 후 다시 시도해 주세요.";
+  }
+  const shared = await PBoxSync.claimActionCooldownShared({
+    db: getDatabase(),
+    uid,
+    action,
+    uidMinMs,
+    globalMinMs,
+    nowMs: now
+  });
+  if (!shared || shared.ok !== true) {
+    return (shared && shared.error) || "수집 호출 제한 확인 중 잠시 후 다시 시도해 주세요.";
+  }
+  _pboxRateState.globalByAct[action] = now;
+  _pboxRateState.uidByAct.set(uKey, now);
+  return "";
+}
+
+exports.pboxApi = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const PBoxSync = require("./pbox-sync");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    try {
+      const result = await PBoxSync.handleApiAction({
+        body,
+        uid: me.uid,
+        env: process.env,
+        fetchFn: fetch,
+        enforceCooldown: (uid, action, uidMinMs, globalMinMs) =>
+          enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs)
+      });
+      res.status(result.status).json(result.payload);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 240) });
     }
   });

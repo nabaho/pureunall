@@ -221,3 +221,106 @@ test('화면에 «닫기»라고 적힌 것만 누른다', () => {
   const fn = lib.slice(at, lib.indexOf('\n  }', at));
   assert.match(fn, /닫기말\.indexOf\(t\) >= 0/, '적힌 글자를 안 봅니다');
 });
+
+test('★★ 안드로이드 크롬 보호: 사람 손길이 처음 닿을 때 걸음을 다지고, 첫 화면에서는 두 번 눌러야 나간다', () => {
+  const 기록 = [];
+  let 팝 = null;
+  const 문서귀 = {};
+  const 토스트들 = [];
+  let 시각 = 10000;
+  const ctx = {
+    console: { warn() {} },
+    Date: { now: () => 시각 },
+    setTimeout(fn) { try { fn(); } catch (_) {} },
+    navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 14)' },
+    document: {
+      body: { appendChild(el) { 토스트들.push(el); }, querySelectorAll: () => [] },
+      createElement() { return { style: {}, setAttribute() {}, remove() {} }; },
+      getElementById() { return null; },
+      addEventListener(ev, fn) { 문서귀[ev] = fn; }
+    },
+    location: { href: 'app.html', replace(u) { ctx.간곳 = u; } },
+    history: { pushState(st) { 기록.push(st); } },
+    window: { addEventListener(ev, fn) { if (ev === 'popstate') 팝 = fn; } },
+    module: { exports: {} }
+  };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(읽기('js/pu-back.js'), ctx);
+  ctx.module.exports.guard(() => false);
+  assert.equal(기록.length, 1, '화면 열릴 때 첫 걸음');
+  문서귀.touchstart();
+  assert.equal(기록.length, 2, '첫 터치에서 안드로이드 크롬 보호용 걸음을 한 번 다진다');
+  문서귀.touchstart();
+  assert.equal(기록.length, 2, '터치할 때마다 걸음을 계속 쌓으면 안 된다');
+
+  /* 첫 화면에서 첫 번째 뒤로가기 → 토스트만 띄우고 나가지 않는다 */
+  팝();
+  assert.equal(ctx.간곳, undefined, '첫 번째 뒤로가기에 바로 나가면 안 됩니다');
+  assert.equal(토스트들.length, 1, '나가기 안내 토스트가 떠야 합니다');
+  assert.match(토스트들[0].textContent, /한 번 더 누르면/);
+
+  /* 2.5초 안에 두 번째 뒤로가기 → 포털로 나간다 */
+  시각 += 800;
+  팝();
+  assert.equal(ctx.간곳, 'enter.html', '두 번 연속 누르면 포털로 나가야 합니다');
+});
+
+test('★ 앱 안에서 옮긴 탭은 뒤로가기로 직전 탭부터 되돌린다', () => {
+  let 팝 = null;
+  const 문서귀 = {};
+  function 탭만들기(이름, 켜짐) {
+    const 목록 = new Set(켜짐 ? ['active'] : []);
+    return {
+      name: 이름,
+      offsetWidth: 80, offsetHeight: 36,
+      getClientRects: () => [1],
+      classList: {
+        contains: (c) => 목록.has(c),
+        add: (c) => 목록.add(c),
+        remove: (c) => 목록.delete(c)
+      },
+      getAttribute: () => null,
+      closest(sel) { return sel.indexOf('.tab') >= 0 ? this : null; },
+      click() {
+        형제들.forEach((x) => x.classList.remove('active'));
+        this.classList.add('active');
+      }
+    };
+  }
+  const 탭1 = 탭만들기('달력', true);
+  const 탭2 = 탭만들기('진행목록', false);
+  const 형제들 = [탭1, 탭2];
+  const 어미 = { querySelectorAll: () => 형제들 };
+  탭1.parentElement = 어미;
+  탭2.parentElement = 어미;
+
+  const ctx = {
+    console: { warn() {} },
+    setTimeout(fn) { fn(); },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible', opacity: '1' }),
+    document: {
+      body: { querySelectorAll: () => [] },
+      addEventListener(ev, fn) { 문서귀[ev] = fn; }
+    },
+    location: { href: 'app.html', replace(u) { ctx.간곳 = u; } },
+    history: { pushState() {} },
+    window: { addEventListener(ev, fn) { if (ev === 'popstate') 팝 = fn; } },
+    module: { exports: {} }
+  };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(읽기('js/pu-back.js'), ctx);
+
+  /* 사람이 탭2를 눌러 탭2가 켜졌다 */
+  let 예약 = null;
+  ctx.setTimeout = (fn) => { 예약 = fn; };
+  문서귀.click({ target: 탭2 });
+  탭2.click();
+  예약();
+
+  /* 뒤로가기를 누르면 앱을 나가지 않고 탭1로 돌아간다 */
+  팝();
+  assert.equal(탭1.classList.contains('active'), true, '직전 탭(달력)으로 돌아가야 합니다');
+  assert.equal(ctx.간곳, undefined, '탭을 되돌렸는데 앱을 나가면 안 됩니다');
+});

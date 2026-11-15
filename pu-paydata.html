@@ -24,7 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=91"></script>
+<script src="js/pu-ontology.js?v=99"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
@@ -43,7 +43,7 @@
 <!-- ⚠ 둘 다 올린 것이다. rrn-mask v=4 는 다른 작업이, doc-read 는
      한 줄 요약(2026-08-29)과 보낼 크기 상한(2026-08-30)이 올렸다 —
      한쪽만 살리면 그쪽 고침이 배포에 안 실린다. -->
-<script src="js/pu-doc-read.js?v=52"></script>
+<script src="js/pu-doc-read.js?v=53"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <!-- 사진이 아닌 자료(엑셀·한글·PDF)를 글자로 뽑는다 (2026-08-23).
      ⚠ 엑셀 읽기 도구(vendor/xlsx.full.min.js, 1MB)는 여기서 안 싣는다 —
@@ -52,11 +52,11 @@
 <script src="js/pu-paydata-files.js?v=2"></script>
 <!-- 긋기·사본 만들기 — 사진첩과 나눠 쓴다(2026-08-17 「안 1」) -->
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
-<script src="js/pu-appbar.js?v=40"></script>
+<script src="js/pu-appbar.js?v=46"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-authsync.js?v=5"></script>
+<script src="js/pu-authsync.js?v=6"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -629,7 +629,8 @@ h1{font-size:18px;margin-bottom:4px}
     justify-content:flex-end}
   header .who::-webkit-scrollbar{display:none}
   header .who #whoami{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
-  header .who .out{flex:0 0 auto;white-space:nowrap;font-size:11.5px;padding:4px 8px}
+  header .who .out{flex:0 0 auto;white-space:nowrap;font-size:11px;padding:4px 6px}
+  header .who #whoami{min-width:3.2em}
   /* 곁다리 단추 둘은 그림쇠만 남긴다 — 글씨를 접으면 이름이 「권형…」으로 잘리지 않는다.
      (지우는 것이 아니다. 눌리는 자리는 그대로고, aria-label 로 이름도 남는다.) */
   header .who #btnStaff,header .who #btnDeputy{font-size:0;padding:4px 7px}
@@ -691,7 +692,11 @@ table.grid td.iffy{background:#fffbeb}
 .sl2,.dl2,.dl2b{display:contents}
 @media(max-width:760px){
   /* 머리줄 — 넘치면 접는다(옆으로 밀지 않는다). 단추 묶음은 제 줄에서 옆으로 민다. */
-  .dhead[data-h]{flex-wrap:wrap;row-gap:6px}
+  .dhead,.dhead[data-h]{flex-wrap:wrap;row-gap:6px}
+  .dhead .dacts{flex:0 1 auto;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .dhead .dacts::-webkit-scrollbar{display:none}
+  .dhead .dacts>*{flex:0 0 auto;white-space:nowrap}
+  .row>.btn{flex:0 0 auto;white-space:nowrap}
   .dhead[data-h] .dtitle{flex:1 1 0;min-width:60px}
   .dhead[data-h] .dkpi{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .dhead[data-h] .dacts{flex:0 1 auto;min-width:0;max-width:100%;overflow-x:auto;
@@ -6321,7 +6326,7 @@ window.cancelDeputy = cancelDeputy;
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

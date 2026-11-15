@@ -35,6 +35,120 @@ function isTransient(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
 }
 
+function ndToDigit(ch) {
+  if (!/\p{Nd}/u.test(ch)) return -1;
+  const cp = ch.codePointAt(0);
+  let base = cp;
+  while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+  return (cp - base) % 10;
+}
+
+function findRrnSpans(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!s) return [];
+  const vis = [];
+  let idx = 0;
+  for (const ch of s) {
+    const start = idx;
+    idx += ch.length;
+    if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+    const d = ndToDigit(ch);
+    vis.push({
+      ch,
+      pos: start,
+      end: idx,
+      d,
+      isHws: ch === "\t" || ch === "\v" || ch === "\f" || /\p{Zs}/u.test(ch),
+      isLb: ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029",
+      isWord: d >= 0 || /\p{L}/u.test(ch),
+    });
+  }
+  const maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const spans = [];
+  let i = 0;
+  while (i < vis.length) {
+    if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+    let cur = i;
+    const digits = [vis[cur].d];
+    let usedInnerSpace = false;
+    let usedDateDot = false;
+    let ok = true;
+    for (let k = 1; k < 6; k++) {
+      let sp = 0;
+      if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === "." || vis[cur + 1].ch === "．")) {
+        sp = 1;
+        usedDateDot = true;
+      }
+      let hws = 0;
+      while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+      if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+      if (hws > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp + hws;
+      digits.push(vis[cur].d);
+    }
+    if (!ok) { i++; continue; }
+    const mm = digits[2] * 10 + digits[3];
+    const dd = digits[4] * 10 + digits[5];
+    if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+
+    let sepEnd = cur + 1;
+    let sepSteps = 0;
+    let lbCount = 0;
+    let hasExplicitSep = false;
+    while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+      if (vis[sepEnd].isLb) {
+        if (!(vis[sepEnd].ch === "\n" && sepEnd > cur + 1 && vis[sepEnd - 1].ch === "\r")) {
+          lbCount++;
+        }
+        if (lbCount > 2) break;
+      } else if (!vis[sepEnd].isHws) {
+        hasExplicitSep = true;
+      }
+      sepEnd++;
+      sepSteps++;
+    }
+    if (usedDateDot && !hasExplicitSep) { i++; continue; }
+    if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+
+    cur = sepEnd;
+    digits.push(vis[cur].d);
+    for (let k = 1; k < 7; k++) {
+      let sp = 0;
+      while (cur + 1 + sp < vis.length && vis[cur + 1 + sp].isHws && sp < 2) sp++;
+      if (cur + 1 + sp >= vis.length || vis[cur + 1 + sp].d < 0) { ok = false; break; }
+      if (sp > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp;
+      digits.push(vis[cur].d);
+    }
+    if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+    if (usedInnerSpace) {
+      let lp = i - 1;
+      while (lp >= 0 && vis[lp].isHws) lp--;
+      if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+      let rp = cur + 1;
+      while (rp < vis.length && vis[rp].isHws) rp++;
+      if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+    }
+    spans.push({ start: vis[i].pos, end: vis[cur].end, front: digits.slice(0, 6).join(""), gender: String(digits[6]) });
+    i = cur + 1;
+  }
+  return spans;
+}
+
+/* 괴롭힘 조사 앱(pu-harass-core.js · tests/harass-invest.test.js)은 당사자 동명이인 구별용으로
+   생년월일+성별 첫 자리(YYMMDD-G******) 가림 규약을 사용하므로 동일 형식을 유지한다(P박스는 13자리 전량 차단·전량 마스킹). */
+function maskHarassRrn(text) {
+  const s = String(text == null ? "" : text);
+  const spans = findRrnSpans(s);
+  if (!spans.length) return s;
+  let out = "", last = 0;
+  for (const sp of spans) {
+    out += s.slice(last, sp.start) + sp.front + "-" + sp.gender + "******";
+    last = sp.end;
+  }
+  return out + s.slice(last);
+}
+
 /* 요청이 말이 되는지 본다. 못 알아보면 **부르기 전에** 돌려보낸다 —
    구글을 부르고 나서 실패하면 그만큼이 그대로 요금이다. */
 function validate(body) {
@@ -42,9 +156,29 @@ function validate(body) {
   const parts = body.parts;
   if (!Array.isArray(parts) || !parts.length) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const resolvedApp = appOf(body.app);
   let imgs = 0, chars = 0;
+  const cleanHarassParts = [];
+
   for (const p of parts) {
-    if (!p || typeof p !== "object") return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    if (!p || typeof p !== "object" || Array.isArray(p)) {
+      return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    }
+    if (resolvedApp === "harass" || resolvedApp === "ilteo") {
+      /* 괴롭힘 조사 앱 및 일터상생혁신 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+         오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
+      const keys = Object.keys(p);
+      if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : "괴롭힘 조사 앱은 ") + "주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
+      }
+      const masked = maskHarassRrn(p.text);
+      if (findRrnSpans(masked).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      chars += masked.trim().length;
+      cleanHarassParts.push({ text: masked });
+      continue;
+    }
     if (p.inline_data) {
       const d = p.inline_data.data;
       if (typeof d !== "string" || !d) return { ok: false, error: "사진을 읽을 수 없습니다" };
@@ -66,13 +200,28 @@ function validate(body) {
      ⚠ 그림도 글자도 없으면 그대로 돌려보낸다 — 부르는 만큼이 요금이다. */
   if (!imgs && !chars) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const outParts = (resolvedApp === "harass" || resolvedApp === "ilteo") ? cleanHarassParts : parts;
   const size = Buffer.byteLength(JSON.stringify(body), "utf8");
   if (size > MAX_BODY_BYTES) {
     return { ok: false, error: imgs
       ? "사진이 너무 큽니다 — 장수를 나눠 판독해 주세요"
       : "글자가 너무 많습니다 — 나눠서 판독해 주세요" };
   }
-  return { ok: true, parts: parts, cfg: body.generationConfig, app: appOf(body.app) };
+  if (resolvedApp === "pbox") {
+    const cleanPboxParts = [];
+    for (const p of parts) {
+      const pKeys = Object.keys(p);
+      if (pKeys.length !== 1 || pKeys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: "P박스 AI 질의는 비식별 텍스트(text 단일 속성)만 허용되며 이미지·첨부 데이터 전송은 차단됩니다." };
+      }
+      if (findRrnSpans(p.text).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      cleanPboxParts.push({ text: p.text });
+    }
+    return { ok: true, parts: cleanPboxParts, cfg: body.generationConfig, app: resolvedApp };
+  }
+  return { ok: true, parts: outParts, cfg: body.generationConfig, app: resolvedApp };
 }
 
 /* ══ ⑤ 어느 앱이 몫을 썼나 (대표 물음 2026-09-08 「판독 한도 어떻게 해결할까」) ══
@@ -85,7 +234,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";

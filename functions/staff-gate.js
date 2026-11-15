@@ -45,7 +45,13 @@ function makeStaffGate(deps) {
       throw 막음();
     }
     if (ok.size > CACHE_MAX) ok.clear();
-    const role = { sid: String(v.sid), status: v.status };
+    const role = {
+      sid: String(v.sid),
+      status: v.status,
+      isAdmin: v.isAdmin === true,
+      isSubAdmin: v.isSubAdmin === true,
+      fin: v.fin === true,
+    };
     ok.set(u, { at: now(), role: role });
     return role;
   }

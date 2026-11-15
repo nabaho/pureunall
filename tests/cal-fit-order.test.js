@@ -105,9 +105,10 @@ test('③ 이음(외부 협력자 포함) 칩 줄은 그대로다 — 사번이 
   assert.ok(/eumOnly \? ieumPeople\(\)\.filter\(function\(p\)\{ return !p\.left; \}\) :/.test(캘린더));
 });
 
-/* ④⑤ 레이아웃 */
+/* ④⑤ 레이아웃 — 2026-11-15 대표 「바꿔 주세요」: 폭 860 두 열 → 구글 앱 빠른 창(폭 448 한 열). 「한 화면」은 «구글 빠른 창 칸만 보이게»로 지킨다.
+   (예전 두 열 규칙 검사는 새 규칙 검사로 바꿨다 — 칸을 감추는 gxf 는 DOM 에 그대로 있다: tests/cal-quick-add-google.test.js) */
 function PC블록() {
-  const a = 캘린더.indexOf('@media (min-width:900px){\n    body:not(.mob) .modal.gform:not(.full)');
+  const a = 캘린더.indexOf('@media (min-width:701px){\n    /* ★★ 2026-11-15 — PC 새 일정 «빠른» 창');
   assert.ok(a >= 0, 'PC 한 화면 규칙 블록을 못 찾았다');
   let d = 0;
   for (let k = 캘린더.indexOf('{', a); k < 캘린더.length; k++) {
@@ -117,40 +118,43 @@ function PC블록() {
   throw new Error('닫는 괄호 없음');
 }
 
-test('④ PC 규칙은 폭 900px 이상 «미디어 쿼리 안»에만 있고, 모든 규칙이 폰이 아님·전체 화면이 아님으로 좁혀져 있다', () => {
+test('④ PC 규칙은 폭 701px 이상 «미디어 쿼리 안»에만 있고, 모든 규칙이 폰이 아님·전체 화면이 아님으로 좁혀져 있다', () => {
   const { 글 } = PC블록();
   /* 「{ … }」가 있는 줄 전부(맨 앞 @media 줄 제외) — body: 로 시작하는 줄만 고르면 가림이 빠진 줄이 검사에서 사라진다 */
   const 규칙들 = 글.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.trim()).filter((l) => /\{[^{}]*\}\s*$/.test(l) && !/^@media/.test(l));
   assert.ok(규칙들.length >= 6, '규칙이 너무 적다 — ' + 규칙들.length);
   규칙들.forEach((l) => {
-    assert.ok(/^body:not\(\.mob\)/.test(l), '폰을 안 가린 규칙: ' + l.slice(0, 60));
+    /* 어두운 화면 덧씌움(:root[data-theme="dark"] …)도 «폰이 아님»을 가려야 한다 — 앞 접두어만 허용 */
+    assert.ok(/^(:root\[data-theme="dark"\] )?body:not\(\.mob\)/.test(l), '폰을 안 가린 규칙: ' + l.slice(0, 60));
     assert.ok(/:not\(\.full\)/.test(l), '전체 화면을 안 가린 규칙: ' + l.slice(0, 60));
   });
 });
 
-test('④ 미디어 쿼리 «밖»에는 gform 두 열·상한·붙박이 저장 줄이 없다 — 폰·좁은 창은 그대로', () => {
+test('④ 미디어 쿼리 «밖»에는 gform 빠른 창 규칙(감춤·상한·붙박이 저장 줄)이 없다 — 폰·좁은 창은 그대로', () => {
   const { 앞, 뒤 } = PC블록();
   const 밖 = (앞 + 뒤).replace(/\/\*[\s\S]*?\*\//g, '');
-  assert.ok(!/\.gform[^{}]*\.gcols\{[^}]*column-count/.test(밖));
+  assert.ok(!/\.gform[^{}]*\.gcols\{[^}]*column-count/.test(밖), '두 열 규칙이 되살아났습니다');
   assert.ok(!/\.gform[^{}]*\.mbtns\{[^}]*position:sticky/.test(밖));
   assert.ok(!/\.modal\.gform[^{}]*\{[^}]*max-height:\s*calc\(100vh/.test(밖));
+  assert.ok(!/\.gxf\{[^}]*display:none/.test(밖), '「빠른 창에서 감춤」이 미디어 쿼리 밖에 있습니다 — 폰·큰 창에서도 칸이 사라집니다');
 });
 
-test('⑤ 두 열: 칸 하나는 둘로 안 쪼개고(break-inside:avoid), 옆 칸(gmain·gside)도 같은 열 흐름에 합친다', () => {
+test('⑤ 빠른 창은 한 열(구글 빠른 창) — 두 열 규칙이 없고, 구글 빠른 창에 없는 칸은 감춘다(gxf · 칸은 DOM 에 그대로)', () => {
   const { 글 } = PC블록();
-  assert.ok(/\.gcols\{column-count:2;column-gap:\d+px\}/.test(글));
-  assert.ok(/\.gmain, body:not\(\.mob\) \.gform:not\(\.full\) \.gside\{display:contents\}/.test(글));
-  assert.ok(/\.gcols \.grow\{min-height:42px;break-inside:avoid\}/.test(글));
+  assert.ok(!/column-count/.test(글), '빠른 창이 두 열로 돌아갔습니다 — 구글 빠른 창은 한 열입니다');
+  assert.ok(/\.gform:not\(\.full\) \.gxf\{display:none\}/.test(글), '구글 빠른 창에 없는 칸을 감추는 규칙이 없습니다');
+  /* 검사고정-허용: 448·28·#f0f4f9 는 구글 앱 빠른 창의 실측값(2026-11-15) — «구글과 같게»가 규칙이다 */
+  assert.ok(/\.modal\.gform:not\(\.full\)\{width:min\(448px,94vw\)/.test(글), '빠른 창 폭이 구글 앱(448px)과 다릅니다');
+  assert.ok(/border-radius:28px|background:#f0f4f9/.test(글) && /background:#f0f4f9/.test(글));
 });
 
-test('⑤ 창이 화면보다 커지지 않고(높이 한도) · 스크롤이 생겨도 「저장」 줄이 아래에 붙는다 · 탭과 캡처 단추는 한 줄', () => {
+test('⑤ 창이 화면보다 커지지 않고(높이 한도) · 스크롤이 생겨도 「옵션 더보기·저장」 줄이 아래에 붙는다', () => {
   const { 글 } = PC블록();
   assert.ok(/\.modal\.gform:not\(\.full\)\{width:min\(\d+px,\d+vw\);max-height:calc\(100vh - \d+px\)/.test(글));
-  assert.ok(/\.mbtns\{position:sticky;bottom:-14px/.test(글) && /background:var\(--panel\)/.test(글));
-  assert.ok(/\.gtabs:not\(\.gcalchips\)\{display:inline-flex/.test(글) && /\.gtabs\.gcapbar\{margin-left:\d+px\}/.test(글), '일정/연차 탭 + 캡처·말 단추를 한 줄에');
+  assert.ok(/\.mbtns\{position:sticky;bottom:-12px/.test(글) && /\.mbtns\{[^}]*background:#f0f4f9/.test(글), '저장 줄이 아래에 안 붙습니다');
 });
 
 test('⑤ 폰 칩 줄(.gcalchips)은 한 줄 묶기에서 빠진다 · 기존 폰 규칙이 그대로 있다', () => {
-  assert.ok(/body\.mob \.gform \.gtabs button\{height:36px;border-radius:18px\}/.test(캘린더));
+  assert.ok(/body\.mob \.gform \.gtabs button\{height:\d+px;border-radius:\d+px/.test(캘린더));
   assert.ok(/\.gform\.full \.gcols\{display:grid;grid-template-columns:minmax\(0,2fr\) minmax\(0,1fr\);gap:28px\}/.test(캘린더), '전체 화면(옵션 더보기)의 기존 두 칸 배치가 그대로');
 });

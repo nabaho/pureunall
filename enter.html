@@ -159,7 +159,7 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=2"></script>
+<script src="js/kcareer-mailreq.js?v=3"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -239,11 +239,38 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm{margin-right:auto;}
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
+.pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
 /* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
    예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
    여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
 .pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
+/* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
+   챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
+   ⚠ 폰·태블릿(≤900px)은 그림만 남긴다(글자는 title·aria-label 로) — 머리줄이 한 줄을 넘지 않게. */
+.pbar .hd-app{order:4;display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;border-radius:14px;background:#fff;
+  border:2px solid var(--accent);box-shadow:0 2px 10px rgba(30,64,175,.2);color:var(--ink);text-decoration:none;white-space:nowrap;cursor:pointer;}
+.pbar .hd-app[hidden]{display:none;}
+.pbar .hd-app:hover{box-shadow:0 3px 12px rgba(30,64,175,.3);}
+.pbar .hd-app:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.pbar .hd-ico{width:30px;height:32px;border-radius:7px;background:#fff;border:1px solid #cbd5e1;overflow:hidden;display:flex;flex-direction:column;flex:none;}
+.pbar .hd-ico i{font-style:normal;display:block;height:11px;line-height:11px;background:#dc2626;color:#fff;font-size:9px;font-weight:800;text-align:center;}
+.pbar .hd-ico em{font-style:normal;flex:1;display:grid;place-items:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
+.pbar .hd-app{position:relative;}
+.pbar .hd-tx{display:flex;flex-direction:column;line-height:1.2;}
+.pbar .hd-tx b{font-size:.84rem;font-weight:800;}
+/* 「오늘 N건」(구글 공용 달력 오늘 일정, 대표 지시 2026-11-15) — PC 는 이름 아래 한 줄, 폰·태블릿은 그림 모서리의 빨간 숫자 딱지.
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있다. 못 받았을 때·폰에서 0건은 «안 보인다»(못 받음을 0으로 쓰지 않는다). */
+.pbar .hd-n{font-size:.7rem;font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums;}
+.pbar .hd-n[hidden]{display:none;}
+.pbar .hd-n.is-zero{color:#64748b;font-weight:600;}
+@media(max-width:900px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:contents;} .pbar .hd-tx b{display:none;}
+  .pbar .hd-n{position:absolute;top:-9px;right:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff;}
+  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;} }
+/* 태블릿(521~900px)은 머리줄이 한 줄(nowrap)이라 단추 글자까지 두면 오른쪽(로그아웃)이 화면 밖으로 밀렸다(768px 에서 102px — 2026-11-15 검증 작업자 지적·직접 쟀다).
+   그림만 남기고(위 ≤900px 규칙) 줄 사이 틈도 줄여 768·744px(아이패드 세로)에서 한 줄에 들어오게 한다. 폰(≤520px)은 줄이 접히므로 틈은 그대로. */
+@media(min-width:521px) and (max-width:900px){ .pbar{gap:6px;} }
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
@@ -499,7 +526,19 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
        차라리 자주 쓰는 앱은 꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것 같다」 → 「맨 위 줄 없애기」) ──
      앱을 «꾹 누르면» 그 자리 칩에 ★·노란 테두리가 붙고, 다시 꾹 누르면 빠진다(initFold 의 꾹 누르기).
      ⚠ 같은 별표 목록(tilePrefs.pins)을 쓴다 — 폰에서 붙인 ★ 는 PC 의 자주 쓰는 앱 줄에 그대로 올라간다. */
-  #pinRow{display:none;}
+  #pinRow{background:rgba(255,251,235,.92);border:1.5px solid #fde68a;border-radius:14px;padding:6px 8px 8px;margin-bottom:8px;box-shadow:0 2px 8px rgba(217,119,6,.10);}
+  #pinRow.empty{display:none;}
+  #pinTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;padding:4px 2px 2px;}
+  #pinRow .tile{flex-direction:row;width:auto;min-width:0;max-width:100%;gap:5px;padding:4px 9px 4px 5px;border-radius:99px;transition:none;background:#fff;border:1px solid #fde68a;box-shadow:0 1px 3px rgba(20,30,80,.07);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+  #pinRow .tile .ic{width:20px;height:20px;font-size:.85rem;margin:0;border:0;background:none;backdrop-filter:none;flex:none;transition:none;}
+  #pinRow .tile .ic svg{width:100%;height:100%;}
+  #pinRow .tile .tx{min-width:0;overflow:hidden;}
+  #pinRow .tile b{font-size:.76rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #pinRow .tile .tx span,#pinRow .tile .newtab,#pinRow .tile .pin-star{display:none;}
+  #pinRow .tile::after{content:'★';margin-left:auto;padding-left:4px;color:#d97706;font-size:.82rem;line-height:1;flex:none;}
+  #pinRow .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;font-size:10px;border-width:2px;box-shadow:0 2px 6px rgba(185,28,28,.35);z-index:2;}
+  #pinRow .tile .nl-warn{position:absolute;right:-4px;top:-8px;transform:none;min-width:18px;height:18px;line-height:18px;padding:0 5px;z-index:2;}
+  #pinRow .tile .tile-soon-pill{position:absolute;left:auto;right:6px;top:-7px;transform:none;font-size:9px;padding:2px 5px;line-height:1;white-space:nowrap;z-index:2;}
   .tilerow.fold .tile.is-pin{background:#fffbeb;border-color:#fde68a;}
   .tilerow.fold .tile.is-pin::after{content:'★';margin-left:auto;padding-left:4px;color:#d97706;font-size:.82rem;line-height:1;flex:none;}
   .pin-star:not(.on){display:none;}   /* 펼친 줄(동그란 타일)에서도 빈 ☆ 단추는 안 보인다 — 넣기는 꾹 누르기로 */
@@ -666,6 +705,8 @@ body.portal-mode #camFab{display:flex;}
    한 줄을 지키려면 여기서 한 치수 더 줄여야 한다. 줄이 늘어나는 것보다 낫다. */
 @media (max-width:380px){
   .pbar{gap:4px 6px;padding:2px 2px 8px;}
+  .pbar #chatFab{padding:5px 8px;}
+  .pbar #chatFab .chat-lb{display:none;}
   .pbar .nm small{display:none;}
   .pbar .pmeta{font-size:.68rem;gap:5px;}
   .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
@@ -702,6 +743,16 @@ body.portal-mode #camFab{display:flex;}
 .connection-status[data-state="offline"]{color:#991b1b;}
 .statusbadge .clock{color:var(--mute);border-left:1px solid rgba(10,20,60,.14);padding-left:9px;}
 @media(max-width:520px){ .topfix{display:none;} }
+/* ── 푸른 통합 AI 챗봇 — 머리줄 건의하기 왼쪽 동그란 파란 단추 ── */
+#chatFab{position:relative;display:none;align-items:center;gap:5px;white-space:nowrap;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;border:none;padding:8px 15px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;font-family:inherit;cursor:pointer;box-shadow:0 5px 14px -3px rgba(37,99,235,.45),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
+#chatFab:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(37,99,235,.52);}
+#chatFab:active{transform:translateY(0) scale(.97);}
+#chatFab[aria-expanded="true"]{outline:2px solid #bfdbfe;outline-offset:1px;}
+#chatFab:focus-visible{outline:2px solid #bfdbfe;outline-offset:2px;}
+@media(max-width:520px){
+  #chatFab{min-height:30px;padding:5px 10px;font-size:.72rem;border-radius:999px;flex:0 0 auto;}
+  .pbar #chatFab{order:4;}
+}
 /* ── 프로그램 건의함 — 헤더 바(캡쳐2) 안 왼쪽, 브랜드 옆 동그란 눈에 띄는 버튼 ── */
 #sgFab{position:relative;display:none;align-items:center;gap:6px;white-space:nowrap;background:linear-gradient(135deg,#d97706,#dc2626);color:#fff;border:none;padding:8px 16px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;cursor:pointer;box-shadow:0 5px 14px -3px rgba(239,68,68,.5),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
 #sgFab:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(239,68,68,.55);}
@@ -820,6 +871,7 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ order 로 «늘» 끝에 둔다 — 백업·복구는 로그인 뒤 늦게 생겨 막대 맨 뒤에 붙는다. 차례에 기대면
        건의하기 «오른쪽»에 붙어 가운데 📷 와 겹쳤다(2026-10-24 대표 폰 캡처). */
   #fabBar > #sgFab{position:relative!important;margin-left:auto!important;order:9;}
+  #fabBar > #pu-health-admin-badge,#fabBar > #pu-resilience-badge{position:absolute!important;left:12px!important;bottom:calc(100% + 6px)!important;box-shadow:0 4px 12px rgba(185,28,28,.28)!important;}
   body.portal-mode #camFab{left:50%;right:auto;margin-left:-27px;width:54px;height:54px;z-index:62;
     bottom:calc(16px + env(safe-area-inset-bottom));}
   #moreDock{bottom:calc(68px + env(safe-area-inset-bottom));}
@@ -1375,6 +1427,13 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
+      <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
+      <!-- 📅 머리줄 앱 단추 — APPS 의 head:true 앱(지금은 푸른 캘린더)이 줄 타일 대신 여기 선다 (대표 지시 2026-11-14, 목업 A안).
+           처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
+      <a id="headApp_cal" class="hd-app" data-head-app="1" data-name="푸른 캘린더" href="pu-cal.html?sso=1" hidden>
+        <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
+        <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
+      </a>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
@@ -1560,8 +1619,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>538번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
+        — 하루 <b>539번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -2002,7 +2061,7 @@ body.portal-mode #moreFab{display:flex;}
        그림글자에 달력은 📅 📆 🗓️ 셋뿐이고 작아지면 서로 같아 보였다.
        ⚠ icon 값이 이제 «HTML 문자열»이다(innerHTML 로 꽂는다). enter.html 이 그렇게 쓴다.
        ⚠ 탭 그림글자·바탕화면 아이콘도 같은 그림이다 — tests/app-icons.test.js 가 견준다. */
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client' },
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client', head:true, count:'gcalToday' },   /* head — 타일 대신 «머리줄 큰 단추»(#headApp_cal)로 선다 (대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 한 번에 클릭」 → A안). count — 단추에 「오늘 N건」(구글 공용 달력 오늘 일정, 2026-11-15) */
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱을 만들어 진행」).
        ⚠ 이 앱은 «보고 건너가는 곳»이다 — 초안·AI·HWPX·확정은 정부사업일정의 보고서 창이 한다(#rpt= 로 건너감).
@@ -2011,6 +2070,8 @@ body.portal-mode #moreFab{display:flex;}
     /* 정부지원금 — 지원사업 사전 + 기존·예비 고객사 후보 + 노무사 검토(대표 지시 2026-10-11). 재직 직원 전원(규칙 govaid).
        2026-10-12 「의뢰인 업무로 넣어달라」 — 영업관리에서 옮김(옛 줄은 ROW_MOVED_FROM 이 없던 일로 친다). */
     { key:'govaid',  name:'기업정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'client' },
+    { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
+    { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -2022,6 +2083,9 @@ body.portal-mode #moreFab{display:flex;}
     { key:'fin',     name:'재무관리',      desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inside' },
     /* 컨설팅정산(2026-10-31 대표 지시) — 개인입금 사업 정산. 재무관리와 같은 사람만(perm 'fin' — 새 권한 깃발을 만들지 않는다) */
     { key:'settle',  name:'컨설팅정산',    desc:'개인입금 사업 정산', icon:'🧾', url:'pu-settle.html',      roles:null, perm:'fin', row:'inside' },
+    /* 푸른등기(2026-11-14 대표 지시 「내부관리에 프로그램을 넣어라」) — 노무법인 변경등기 서류·필요서류. 사원 주소·생년월일이 든 자리라
+       대표·위임관리인만 — perm 'deungi' 는 아무에게도 주지 않은 깃발이라 관리자·위임관리인에게만 보인다(규칙 deungi 와 같은 사람). */
+    { key:'deungi',  name:'푸른등기',     desc:'변경등기 서류·체크', icon:'🖋', url:'pu-deungi.html',      roles:null, perm:'deungi', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
@@ -2062,10 +2126,12 @@ body.portal-mode #moreFab{display:flex;}
        2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
-,
+    { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
+    /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
+    { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
     { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, soon:true, row:'client' },  /* 2026-10-20 대표 「급여관리도 준비중으로」 · 2026-10-24 off 로 감췄다가 2026-11-02 대표 「여기에 급여아웃소싱(준비중) 앱만들어 달라」로 off 걷고 이름 변경 — 안쪽 문과 짝 */
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
@@ -2149,7 +2215,7 @@ body.portal-mode #moreFab{display:flex;}
      옮기기 전에 한 번이라도 끌었던 사람은 옛 줄이 남아, 앱의 row 를 바꿔도 화면이 그대로였다
      (대표 보고 2026-10-10 「계약서등관리 자료함으로 옮겨줘」 — 10-05 에 row 를 바꿨는데 의뢰인 업무 줄에 남음).
      ⚠ 줄 사이 옮기기는 원래 막혀 있어(관리자가 풀어야 한다) 옛 줄 값은 «일부러 둔 자리»가 아니다. */
-  var ROW_MOVED_FROM = { docs:'client', govaid:'sales' };
+  var ROW_MOVED_FROM = { docs:'client', govaid:'sales', pbox:'client' };
   function savedRowOf(key, dflt){
     var r = tilePrefs && tilePrefs.rows && tilePrefs.rows[key];
     if(ROW_MOVED_FROM[key] && r === ROW_MOVED_FROM[key]) return dflt;
@@ -2441,22 +2507,24 @@ body.portal-mode #moreFab{display:flex;}
       if(user && user.email){
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
         if(_handled && _portalUid && user.uid !== _portalUid){
-          // 다른 사람이 들어온 경우 이전 사람의 타일을 다시 드러내지 않는다.
+          // 다른 사람이 들어온 경우 이전 사람의 타일·빠른 복원 캐시를 지우고 다시 그리지 않는다.
+          try { sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_fc0){}
           _loginGuard.cover();
-          location.replace(location.pathname + '?v=' + Date.now());
-          return;
+          location.replace(location.pathname + '?v=' + Date.now()); return;
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
         }
         try { _loginGuard.userSeen(); } catch(_g){}
-        window._puAuthAt = Date.now();
+        window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
-        else if(_handled && _portalReady && _portalUid === user.uid) _rmBootSplash();
+        else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); if(window._fastRestored){ window._fastRestored = false; enterPortal(user); } }
       } else if(_handled){
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
         // 실제 로그아웃 신호가 있으면 기다리지 않는다.
+        try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
         _loginGuard.cover();
         if(_authRecheckTimer) clearTimeout(_authRecheckTimer);
         var logoutAt = 0;
@@ -2467,13 +2535,13 @@ body.portal-mode #moreFab{display:flex;}
           _handled = false;
           _portalUid = '';
           _portalReady = false;
-          try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
+          try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
           try { location.replace(location.pathname + '?v=' + Date.now()); }
           catch(_) { location.reload(); }
         }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : AUTH_RECOVERY_MS);
       } else {
-        // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
-        try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
+        // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시 (빠른 복원 캐시도 비움)
+        try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
         // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다.
         // ⚠ 여기서 카카오 로그아웃으로 «보내지 않는다» (대표 2026-09-29 「로그인 눌렀는데 로그아웃 화면이 나온다」).
         //   카카오 로그아웃은 조용히 끝나지 않고 «로그아웃하시겠습니까?» 를 묻는 화면이다 — 로그인하러 온
@@ -2494,6 +2562,31 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 서버 함수(functions/passkey.js)·규칙의 passkey 칸은 그대로 남아 있다(지금 아무도 부르지 않는다).
        되살릴 때는 git 이력(이 커밋의 앞)에서 화면을 가져온다. */
   try { localStorage.removeItem('pu_passkey_sid'); localStorage.removeItem('pu_passkey_later'); } catch(e){}
+  /* ★ 앱에서 뒤로가기·홈으로 돌아왔을 때 「로그인 상태 확인 중…」 대기 없이 즉시 포털 타일을 표시한다 (2026-11-10):
+     같은 탭(sessionStorage)에 방금 확인된 인증 힌트와 직원 프로필 사본이 있고 로그아웃 신호가 없으면
+     IndexedDB 복원을 기다리지 않고 즉시 포털 화면을 연다. 뒤이어 onAuthStateChanged 가 도착하면 이어받는다. */
+  (function _instantReturnFromApp(){
+    try {
+      if(_handled || window.__kkReturning || _kkLoginStarting) return;
+      if(sessionStorage.getItem('pu_auth_hint') !== '1') return;
+      var raw = sessionStorage.getItem('pu_portal_fast_acct');
+      if(!raw) return;
+      var cached = JSON.parse(raw);
+      if(!cached || !cached.uid || !cached.acct) return;
+      if(cached.acct.status && cached.acct.status !== 'active'){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      /* 옆 탭에서 다른 사람으로 바뀐 경우(pu_auth_uid 불일치) 또는 12시간 지난 사본은 즉시 폐기 */
+      var activeUid = String(localStorage.getItem('pu_auth_uid') || '');
+      if(activeUid && activeUid !== cached.uid){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      if(!cached.at || Date.now() - Number(cached.at) > 12 * 3600 * 1000){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
+      if(logoutAt && logoutAt >= cached.at){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
+      window._fastRestored = true;
+      _handled = true;
+      renderPortal(cached.acct, { email: cached.email || '', all: cached.all || [], via: 'auto' });
+      $('portalView').style.display = 'block'; _portalReady = true; _portalUid = cached.uid; _rmBootSplash();
+    } catch(_ir){}
+  })();
 
   /* ══ 카카오로 로그인 (2026-09-27, 대표 「추천대로」) ══════════════════════════
      ★ 지문과 달리 «이 기기에 등록했나» 가 아니라 «내 카카오 계정을 이 직원 계정에
@@ -3232,11 +3325,28 @@ body.portal-mode #moreFab{display:flex;}
     var _via = _freshLogin ? 'login' : 'auto';
     _freshLogin = false;
     // 직원명부에서 이 사용자(이메일 매칭) 찾아 이름·역할 확정 → 그 후에 한 번에 표시
-    function _show(m){
+    function _show(m, fromCache){
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
       _portalReady = true;
       armKakaoPortalHistory();
+      try {
+        if(m && m.acct && !fromCache){
+          /* 빠른 복원 사본은 현재 탭(sessionStorage)에만 두고 영구 localStorage 에는 남기지 않는다(사번 이메일·프로필 잔류 차단) */
+          var _fastAcct = JSON.stringify({ uid:user.uid||'', acct:m.acct, all:m.all||[], at:Date.now() });
+          sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
+          localStorage.removeItem('pu_portal_fast_acct');
+        }
+      } catch(_fc){}
+      try {
+        if(!auth.currentUser && auth.onAuthStateChanged){
+          var _unFast = auth.onAuthStateChanged(function(u){
+            if(!u || u.uid !== _portalUid) return;
+            try { if(typeof _unFast === 'function') _unFast(); } catch(_){}
+            try { renderPortal(m.acct, { email:(u.email||''), all:m.all, via:_via }); } catch(_){}
+          });
+        }
+      } catch(_fa){}
       try {
         var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
         if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
@@ -3269,6 +3379,20 @@ body.portal-mode #moreFab{display:flex;}
       _show(verifiedProfile);
       return;
     }
+    /* 같은 계정의 최근 확인된 명부 사본이 현재 탭(sessionStorage)에 있으면 3.5초 서버 명부 조회를 기다리지 않고 즉시 타일을 먼저 그린다 */
+    try {
+      var _fastRaw = sessionStorage.getItem('pu_portal_fast_acct');
+      if(_fastRaw){
+        var _fp = JSON.parse(_fastRaw);
+        if(_fp && _fp.acct && _fp.acct.status === 'active'
+           && _fp.uid === (user.uid || '')
+           && sidToEmail(_fp.acct.sid) === String(user.email || '').toLowerCase()
+           && (Date.now() - Number(_fp.at || 0) < 12 * 3600 * 1000)){
+          _show({ acct: _fp.acct, all: _fp.all || [_fp.acct] }, true);
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
+        }
+      }
+    } catch(_fe){}
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){
       var read = null;
@@ -3398,6 +3522,22 @@ body.portal-mode #moreFab{display:flex;}
     try { ref.focus(); } catch(e){}
     return ref;
   }
+
+  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일 표시·비활성·권한을 그대로 지킨다) ── */
+  window.portalLaunchApp = function(key, extraQuery){
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === key){ app = APPS[i]; break; } }
+    if(!app || app.off) return false;
+    var tile = document.querySelector('#appRows .tile[data-key="' + key + '"]') || document.querySelector('.tile[data-key="' + key + '"]');
+    if(!tile || tile.style.display === 'none' || tile.getAttribute('aria-disabled') === 'true' || tile.getAttribute('href') === '#') return false;
+    if(typeof app.act === 'function'){ app.act(); return true; }
+    var v = Math.floor(Date.now() / 600000);
+    var q = String(extraQuery || '').replace(/^[?&]+/, '');
+    var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + v + (q ? '&' + q : '');
+    if(isMobile()) location.href = url;
+    else openPortalApp(app, url);
+    return true;
+  };
 
   // ── 하나은행·하나카드 입금 확인 알림 (총괄관리자 전용) ──
   // 큰 거래표를 감시하지 않고 작은 서버 요약만 로그인 때 1회, 이후 3분마다 확인한다.
@@ -3765,6 +3905,7 @@ body.portal-mode #moreFab{display:flex;}
     _layoutEdit = false;
     layoutPanelClose();
     tileConts().forEach(function(c){ c.innerHTML = ''; });
+    portalHeadAppsHide();     // 머리줄 단추는 먼저 감춘다 — 아래 반복에서 «볼 수 있는 사람»에게만 다시 켠다
     wireCamFab();
     APPS.forEach(function(app){
       // 역할 제한이 있으면 확인
@@ -3783,6 +3924,9 @@ body.portal-mode #moreFab{display:flex;}
          준비중 타일로 돌아온다. 앱 막대(js/pu-appbar.js)의 off 와 짝이다. */
       if(app.off) return;
       if(app.adminOnly && !_isAdm) return;
+      /* 머리줄 단추 앱(head) — 줄 타일을 «만들지 않는다». 저장된 공용 배치(app_config)에 자료함 따위로 적혀 있어도
+         타일 자체가 없으니 그 자리에 안 남는다(대표 지시 2026-11-14). 단추 쪽은 portalHeadAppPaint 가 그린다. */
+      if(app.head){ portalHeadAppPaint(app); return; }
       /* 직원 인사·재무 — 관리자이거나 그 권한이 있을 때만(APPS 의 perm 머리글).
          권한표(uid_roles)는 뒤에서 읽는다 — 그래서 타일은 만들어 두고 «감춰» 둔다(포털을 통째로 다시 그리지 않게).
          읽고 나면 portalApplyAppPerm 이 보이거나 감춘다. */
@@ -3902,6 +4046,142 @@ body.portal-mode #moreFab{display:flex;}
     portalHanaPaintBadge();
     initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
   }
+
+  /* ── 머리줄 단추 앱 (APPS 의 head:true) — 타일 대신 머리줄(.pbar)에 큰 단추로 선다 ──
+     대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 별도로 관리해서 한 번에 클릭」 → 목업 A안.
+     ★ 눌렀을 때는 «타일과 같은 길»이다 — PC 는 openPortalApp(창 이름·재사용·10분 캐시 버킷), 폰은 그냥 링크(sso=1).
+     ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
+     ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
+  function portalHeadAppsHide(){
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++) els[i].hidden = true;
+  }
+  function portalHeadAppDate(el){
+    var d = new Date(), mo = (d.getMonth() + 1) + '월', da = String(d.getDate());
+    var m = el.querySelector('.hd-m'), n = el.querySelector('.hd-d');
+    if(m) m.textContent = mo;
+    if(n) n.textContent = da;
+    el.setAttribute('data-today', mo + ' ' + da + '일');
+    portalHeadAppLabel(el);
+  }
+  /* 접근성 이름·말풍선 — 날짜는 항상, 「오늘 N건」은 «받았을 때만». 숫자가 무슨 뜻인지(구글 공용 달력만)도 말풍선에 밝힌다. */
+  function portalHeadAppLabel(el){
+    var name = el.getAttribute('data-name') || '', day = el.getAttribute('data-today') || '';
+    var n = el.getAttribute('data-n');
+    var cnt = (n !== null && n !== '') ? ' · 오늘 구글 공용 달력 일정 ' + n + '건' : '';
+    el.setAttribute('aria-label', name + ' — 오늘 ' + day + cnt);
+    el.title = (el.getAttribute('data-title') || name) + (cnt ? cnt + ' (연차·출장·나만 보기 일정은 달력에서)' : '');
+  }
+  function portalHeadAppPaint(app){
+    var el = document.getElementById('headApp_' + app.key);
+    if(!el) return;
+    var join = app.url.indexOf('?') >= 0 ? '&' : '?';
+    el.hidden = false;
+    el.href = app.url + join + 'sso=1';
+    el.setAttribute('data-title', app.name + (app.desc ? ' — ' + app.desc : ''));
+    el.setAttribute('data-count', app.count || '');
+    if(!isMobile()) el.target = portalAppWindowName(app.key); else el.removeAttribute('target');
+    portalHeadAppDate(el);       // 말풍선·접근성 이름도 여기서 맞춘다(portalHeadAppLabel)
+    portalHeadAppCount(el);      // 「오늘 N건」 — 받는 동안은 숫자 없이 선다
+    if(el.getAttribute('data-wired') === '1') return;
+    el.setAttribute('data-wired', '1');
+    el.addEventListener('click', function(ev){
+      if(isMobile()) return;                      // 폰은 링크가 그대로 연다(타일과 같다)
+      ev.preventDefault();
+      var v = Math.floor(Date.now() / 600000);    // 10분 버킷 캐시 우회 — 타일과 같다
+      openPortalApp(app, app.url + join + 'sso=1&v=' + v);
+    });
+  }
+  /* ── 오늘 N건 (머리줄 단추) ── 대표 지시 2026-11-15 「네, 이어서」 (목업 A안의 「오늘 N건」)
+     ★ 무엇을 세나: 구글 «공용 달력»의 오늘 일정 건수다. 푸른 캘린더 화면이 «구글» 일정을 받는 것과 같은 달력·같은 열쇠
+       (pu-cal.html 의 GCAL_CAL_ID·GCAL_API_KEY — tests/portal-cal-head-button.test.js 가 맞대 본다)로 «하루치»만 받는다.
+       걸친 날 계산도 달력과 같다(종일 일정의 끝날은 하루 당김 · 자정에 끝나면 그날은 안 든다 · 여러 날 일정은 걸친 날마다 든다).
+       달력의 «오늘 칸»은 줄이 더 많을 수 있다(연차·출장·이음 근무 근태, 사건 마감, 나만 보기) — 그것은 세지 않는다.
+       그래서 말풍선이 「구글 공용 달력 일정 N건」이라고 «정확히» 말한다(portalHeadAppLabel).
+     ★ 못 받았으면 숫자를 «안 보인다» — 0건으로 쳐서 「오늘 0건」이라 하면 거짓말이다(못 받음 ≠ 0). 하루에 250건 넘게 와서 쪽이 나뉘어도 같다(모르는 것을 모른다고 한다).
+     ★ 하루치 한 번 — 5분 안에는 다시 안 받고(캐시), 실패하면 1분은 쉰다. 두 번 그려도 한 번만 받는다. 날이 바뀌면 어제 숫자는 지운다.
+     ⚠ 서버 표(my_schedules 등)는 읽지 않는다 — 달력 내용 대부분이 구글 쪽이고 서버 표에는 옛 기록 25건뿐이다(pu-cal.html «구글 캘린더» 머리말).
+     ⚠ 포털이 구글 달력 열쇠를 «또» 갖는다 — 열쇠는 사이트 제한(docs/구글캘린더-API키-사이트제한.md)이 지킨다. 같은 사이트(nabaho.github.io)에서 부르므로 제한에 걸리지 않는다. */
+  var PORTAL_GCAL = { key: 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo', cal: 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com' };
+  var PORTAL_CAL_FRESH_MS = 5 * 60 * 1000, PORTAL_CAL_RETRY_MS = 60 * 1000;
+  var portalCalCount = { ymd: '', at: 0, n: null, failAt: 0, pending: null, pendingYmd: '' };
+  function portalYmdOf(d){
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function portalShiftYmd(ymd, days){
+    var p = String(ymd).split('-'), t = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + days));
+    return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + t.getUTCDate()).slice(-2);
+  }
+  /* 그 날(ymd)에 걸친 구글 일정 건수 — pu-cal.html 의 gcalToEvent(date·끝)·eventsOn(걸침 판단)과 «같은 규칙» */
+  function portalCountGcalOn(items, ymd){
+    var n = 0;
+    (items || []).forEach(function(ev){
+      if(!ev || !ev.start || !(ev.start.date || ev.start.dateTime)) return;
+      var date = String(ev.start.date || ev.start.dateTime).slice(0, 10), end = date;
+      if(ev.end && ev.end.date) end = portalShiftYmd(String(ev.end.date).slice(0, 10), -1);       // 종일 일정의 end.date 는 «다음 날»
+      else if(ev.end && ev.end.dateTime){
+        end = String(ev.end.dateTime).slice(0, 10);
+        if(String(ev.end.dateTime).slice(11, 16) === '00:00' && end > date) end = portalShiftYmd(end, -1);   // 자정에 끝나면 그날은 안 든다
+      }
+      if(!end || end < date) end = date;
+      if(date === ymd || (date < ymd && ymd <= end)) n++;
+    });
+    return n;
+  }
+  /* 오늘 구글 공용 달력 일정 건수 → Promise<숫자 | null(못 받음)> */
+  function portalCalTodayCount(){
+    var c = portalCalCount, ymd = portalYmdOf(new Date()), now = Date.now();
+    if(c.ymd === ymd && c.n !== null && now - c.at < PORTAL_CAL_FRESH_MS) return Promise.resolve(c.n);
+    if(c.ymd === ymd && c.n === null && c.failAt && now - c.failAt < PORTAL_CAL_RETRY_MS) return Promise.resolve(null);
+    if(c.pending && c.pendingYmd === ymd) return c.pending;
+    var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(PORTAL_GCAL.cal) + '/events?key=' + PORTAL_GCAL.key
+      + '&timeMin=' + encodeURIComponent(ymd + 'T00:00:00+09:00') + '&timeMax=' + encodeURIComponent(portalShiftYmd(ymd, 1) + 'T00:00:00+09:00')
+      + '&singleEvents=true&orderBy=startTime&maxResults=250&fields=' + encodeURIComponent('nextPageToken,items(start,end)');
+    c.pendingYmd = ymd;
+    var p = Promise.resolve().then(function(){ return fetch(url); })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || d.error || !Array.isArray(d.items) || d.nextPageToken) throw new Error('오늘 일정을 셀 수 없습니다');
+        return portalCountGcalOn(d.items, ymd);
+      })
+      .then(function(n){ c.ymd = ymd; c.at = Date.now(); c.n = n; c.failAt = 0; return n; },
+            function(){ c.ymd = ymd; c.at = 0; c.n = null; c.failAt = Date.now(); return null; })
+      .then(function(n){ if(c.pending === p) c.pending = null; return n; });
+    c.pending = p;
+    return p;
+  }
+  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount };
+  function portalHeadAppCountApply(el, n, ymd){
+    var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv');
+    if(n === null || n === undefined){
+      el.removeAttribute('data-n'); el.removeAttribute('data-n-ymd');
+      if(box) box.hidden = true;
+    } else {
+      el.setAttribute('data-n', String(n)); el.setAttribute('data-n-ymd', ymd || '');
+      if(v) v.textContent = String(n);
+      if(box){ box.hidden = false; box.classList.toggle('is-zero', n === 0); }
+    }
+    portalHeadAppLabel(el);
+  }
+  function portalHeadAppCount(el){
+    var fn = PORTAL_HEAD_COUNTERS[el.getAttribute('data-count') || ''];
+    if(!fn) return;
+    var ymd = portalYmdOf(new Date());
+    if(el.getAttribute('data-n-ymd') !== ymd) portalHeadAppCountApply(el, null);    // 어제 숫자를 오늘 것처럼 두지 않는다
+    var p; try{ p = fn(); }catch(_e){ return; }
+    if(!p || typeof p.then !== 'function') return;
+    p.then(function(n){
+      if(el.hidden) return;                              // 그 사이 감춰졌다(다른 사람으로 바뀜)
+      if(portalYmdOf(new Date()) !== ymd) return;        // 받는 사이 자정을 넘겼다 — 다음에 다시 센다
+      portalHeadAppCountApply(el, n, ymd);
+    }, function(){});
+  }
+  /* ── 오늘 N건 끝 ── */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++){ if(!els[i].hidden){ portalHeadAppDate(els[i]); portalHeadAppCount(els[i]); } }
+  });
 
   // ══════════ 앱 배치: 관리자만 끌어 옮김 + 📌 틀 고정 (공용 한 벌 · 즐겨찾기·접힘은 사람별) ══════════
   // 타일은 영역(APP_ROWS)마다 각각의 상자에 담긴다. 영역 사이 이동은 관리자가 «배치 편집» 중에만 하고,
@@ -4738,6 +5018,7 @@ body.portal-mode #moreFab{display:flex;}
     tilesToDefault();
     applyTileOrder();
     updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
     var panel = $('layoutPanel'); if(panel && !panel.hidden) lpRender();
   }
   function layoutLoad(){
@@ -4813,6 +5094,7 @@ body.portal-mode #moreFab{display:flex;}
     _layoutEdit = !_layoutEdit;
     layoutSay('');
     updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
   }
 
   /* ── 📋 목록 창 — 영역별 목록. ☐ 고르기 · № · 이름 · 📌 · ▲▼ · 영역 (모든 줄이 «같은 길»(layMove)로 바뀐다) ── */
@@ -5145,6 +5427,7 @@ body.portal-mode #moreFab{display:flex;}
     _layout = layoutCacheRead();   // 관리자가 저장한 공용 배치(이 기기에 마지막으로 받아 둔 것) — 곧바로 그린다
     applyTileOrder();
     updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
     if(!isMobile()){
       // 2) 드래그 배선 (컨테이너 이벤트는 1회만) — 영역 상자 모두
       //    ⚠ 직원 화면에도 배선한다 — 앱을 끌어 ★ 자주 쓰는 앱 줄에 넣는 길이 이것을 쓴다. 배치는 onTileDragOver 가 관리자 편집 중에만 바꾼다.
@@ -5180,6 +5463,7 @@ body.portal-mode #moreFab{display:flex;}
           try { localStorage.setItem(tilePrefLocalKey(), JSON.stringify(tilePrefs)); } catch(e){}
           applyTileOrder();
           updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
           refreshFoldUi();   // 다른 기기에서 고른 별표·접힘도 곧바로
         }
       }).catch(function(){});
@@ -5436,7 +5720,7 @@ body.portal-mode #moreFab{display:flex;}
            — PC 오른쪽 단추 메뉴는 그대로 둔다. 밀어 내리는 중(10px 넘게 움직임)이면 꾹 누르기가 아니다. */
       var lpTile = function(e){
         var t = e.target && e.target.closest ? e.target.closest('.tile') : null;
-        return (t && host.contains(t) && t.dataset.key && t.getAttribute('aria-disabled') !== 'true') ? t : null;
+        return (t && (host.contains(t) || pt.contains(t)) && (t.dataset.key || t.dataset.pinOf) && t.getAttribute('aria-disabled') !== 'true') ? t : null;
       };
       var lpStop = function(){ if(_lp){ clearTimeout(_lp.timer); _lp = null; } };
       host.addEventListener('touchstart', function(e){
@@ -5445,7 +5729,7 @@ body.portal-mode #moreFab{display:flex;}
         me.timer = setTimeout(function(){
           if(_lp !== me) return;
           me.fired = true; _lpAt = Date.now();
-          togglePin(t.dataset.key);
+          togglePin(t.dataset.key || t.dataset.pinOf);
           try { if(navigator.vibrate) navigator.vibrate(25); } catch(_v){}
         }, LONG_MS);
         _lp = me;
@@ -5461,6 +5745,30 @@ body.portal-mode #moreFab{display:flex;}
         if(Date.now() - _lpAt < 800 && lpTile(e)){ e.preventDefault(); e.stopPropagation(); }
       }, true);
       host.addEventListener('contextmenu', function(e){
+        if(lpTile(e) && (_lp || Date.now() - _lpAt < 800)) e.preventDefault();
+      });
+      pt.addEventListener('touchstart', function(e){
+        var t = lpTile(e); if(!t || e.touches.length !== 1) return;
+        var p = e.touches[0], me = { x: p.clientX, y: p.clientY, fired: false };
+        me.timer = setTimeout(function(){
+          if(_lp !== me) return;
+          me.fired = true; _lpAt = Date.now();
+          togglePin(t.dataset.key || t.dataset.pinOf);
+          try { if(navigator.vibrate) navigator.vibrate(25); } catch(_v){}
+        }, LONG_MS);
+        _lp = me;
+      }, { passive: true });
+      pt.addEventListener('touchmove', function(e){
+        if(!_lp || _lp.fired) return;
+        var p = e.touches[0];
+        if(Math.abs(p.clientX - _lp.x) > 10 || Math.abs(p.clientY - _lp.y) > 10) lpStop();
+      }, { passive: true });
+      pt.addEventListener('touchend', function(e){ if(_lp && _lp.fired) e.preventDefault(); lpStop(); });
+      pt.addEventListener('touchcancel', lpStop);
+      pt.addEventListener('click', function(e){
+        if(Date.now() - _lpAt < 800 && lpTile(e)){ e.preventDefault(); e.stopPropagation(); }
+      }, true);
+      pt.addEventListener('contextmenu', function(e){
         if(lpTile(e) && (_lp || Date.now() - _lpAt < 800)) e.preventDefault();
       });
       /* 끌어 올리기 — 줄 안의 진짜 타일(접힌 칩도 같은 타일)을 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다.
@@ -5549,12 +5857,33 @@ body.portal-mode #moreFab{display:flex;}
      그 시각을 보고 스스로 끊는다(js/pu-authsync.js). 포털은 authsync 를 안 싣으므로 같은 열쇠를 직접 적는다.
      ⚠ 열쇠 이름은 pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다 — tests/authsync-global-logout.test.js 가 견준다. */
   function broadcastLogout(){
+    try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
     try {
       localStorage.setItem('pu_auth_logout_at', String(Date.now()));
       localStorage.removeItem('pu_auth_uid');
       localStorage.removeItem('pureun_v6_autologin_sid');
       sessionStorage.removeItem('pureun_v6_session_sid');
+      localStorage.removeItem('pu_portal_fast_acct');
+      sessionStorage.removeItem('pu_portal_fast_acct');
+      localStorage.removeItem('pu_sid_guard_known');
+      sessionStorage.removeItem('pu_open_camera');
+      sessionStorage.removeItem('pu_return_app');
     } catch(e){}
+    try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
+    try {
+      if(window.indexedDB && indexedDB.deleteDatabase){
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        if(typeof indexedDB.databases === 'function'){
+          indexedDB.databases().then(function(ls){
+            (ls || []).forEach(function(it){
+              if(it && it.name && it.name.indexOf('pu_pbox_workspace_v1') === 0){
+                try { indexedDB.deleteDatabase(it.name); } catch(_){}
+              }
+            });
+          }).catch(function(){});
+        }
+      }
+    } catch(_idb){}
   }
   $('logoutBtn').addEventListener('click', function(){
     try { window.PuLogoutWhy && PuLogoutWhy.why('로그아웃 단추 누름'); } catch(_w){}
@@ -5677,6 +6006,8 @@ body.portal-mode #moreFab{display:flex;}
     SG.email = (auth.currentUser && auth.currentUser.email) || '';
     SG.role = acct ? acct.role : 'member';
     $('sgFab').style.display = 'inline-flex';
+    if($('chatFab')) $('chatFab').style.display = 'inline-flex';
+    chatImpStartWatch();  // 길잡이 채팅방 내 개선요청 실시간 상태·결과 답변·승인 동기화
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
     sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
@@ -6631,6 +6962,119 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ══ 💬 길잡이 채팅방 ↔ 건의·개선요청 폐루프 연동 다리 (portalChatImprove) ══
+     채팅 중 코딩·문제해결이 필요할 때 건의함(suggestions_private · suggestions_meta_private ·
+     suggestions_resolved_private/{uid})과 동일한 통로로 접수하고, 개선 결과 답변이 오면
+     채팅방 안에서 실시간으로 받아 채팅자가 「확인·승인(완성)」 또는 「보완 재요청」까지 마친다. */
+  var _chatImpWatchRef = null;
+  var _chatImpWatchFn = null;
+  var _chatImpMap = {};
+  var _chatImpSubs = [];
+  function _chatImpValidId(id){ return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id); }
+  function _chatImpEmit(){
+    var uid = SG.uid || '';
+    _chatImpSubs.slice().forEach(function(fn){ try { fn(_chatImpMap, uid); } catch(_){} });
+  }
+  function chatImpStopWatch(){
+    if(_chatImpWatchRef && _chatImpWatchFn){
+      try { _chatImpWatchRef.off('value', _chatImpWatchFn); } catch(_){}
+    }
+    _chatImpWatchRef = null;
+    _chatImpWatchFn = null;
+    _chatImpMap = {};
+    _chatImpEmit();
+  }
+  function chatImpStartWatch(){
+    chatImpStopWatch();
+    if(!SG.uid) return;
+    var ref = db.ref(sgResolvedUidPath(SG.uid));
+    var fn = function(snap){
+      _chatImpMap = (snap && snap.val()) || {};
+      _chatImpEmit();
+    };
+    _chatImpWatchRef = ref;
+    _chatImpWatchFn = fn;
+    ref.on('value', fn, function(){});
+  }
+  window.portalChatImprove = {
+    submit: function(opts){
+      if(!auth.currentUser || !SG.uid) return Promise.reject(new Error('로그인 후 이용할 수 있습니다.'));
+      var o = opts || {};
+      var cat = sgCatClass(o.cat || 'portal');
+      var title = String(o.title || '').trim().slice(0, 200) || '[챗봇] 시스템 개선 요청';
+      var content = String(o.content || '').trim().slice(0, 9500) || title;
+      var now = Date.now();
+      var rec = {
+        cat: cat, title: title, content: content,
+        images: [],
+        author: SG.name || '사용자', authorEmail: SG.email || '', authorUid: SG.uid,
+        status: 'new', reply: '', source: 'chatbot', createdAt: now
+      };
+      if(o.relatedId && _chatImpValidId(o.relatedId)) rec.relatedId = o.relatedId;
+      var ref = db.ref(SG_PRIVATE_PATH).push();
+      return ref.set(rec).then(function(){
+        var ownRec = { title: rec.title, cat: rec.cat, status: 'new', at: rec.createdAt, seen: true, source: 'chatbot' };
+        if(rec.relatedId) ownRec.relatedId = rec.relatedId;
+        return Promise.all([
+          db.ref(SG_META_PRIVATE_PATH+'/'+ref.key).set({
+            author: rec.author, authorEmail: rec.authorEmail, authorUid: rec.authorUid,
+            status: 'new', cat: rec.cat, title: rec.title, createdAt: rec.createdAt
+          }).catch(function(){}),
+          db.ref(sgResolvedUidPath(SG.uid)+'/'+ref.key).set(ownRec).catch(function(){})
+        ]).then(function(){
+          if(sgIsAdmin()) sgUpdateBadge();
+          return { id: ref.key, cat: cat, catName: sgCatName(cat), title: title, status: 'new', at: now };
+        });
+      });
+    },
+    approve: function(id){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var now = Date.now();
+      return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+        seen: true, resolvedOk: true, resolvedAt: now
+      }).then(function(){
+        sgUpdateBadge();
+        return { ok: true, id: id, resolvedAt: now };
+      });
+    },
+    reopen: function(id, feedbackText){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var txt = String(feedbackText || '').trim();
+      if(!txt) return Promise.reject(new Error('보완이 필요한 내용을 적어주세요.'));
+      var orig = (_chatImpMap && _chatImpMap[id]) || {};
+      var cat = sgCatClass(orig.cat || 'portal');
+      var reTitle = ('↩ 재요청: ' + (orig.title || '개선 요청')).slice(0, 200);
+      return window.portalChatImprove.submit({
+        cat: cat, title: reTitle, content: txt, relatedId: id
+      }).then(function(res){
+        return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+          seen: true, resolvedOk: false, feedback: txt.slice(0, 2000), feedbackAt: Date.now()
+        }).catch(function(){}).then(function(){
+          sgUpdateBadge();
+          return { ok: true, id: res.id, relatedId: id, title: reTitle, cat: cat };
+        });
+      });
+    },
+    subscribe: function(fn){
+      if(typeof fn !== 'function') return function(){};
+      if(_chatImpSubs.indexOf(fn) < 0) _chatImpSubs.push(fn);
+      if(SG.uid) { try { fn(_chatImpMap, SG.uid); } catch(_){} }
+      return function(){
+        var idx = _chatImpSubs.indexOf(fn);
+        if(idx >= 0) _chatImpSubs.splice(idx, 1);
+      };
+    },
+    stop: chatImpStopWatch,
+    isAdmin: sgIsAdmin,
+    catName: sgCatName,
+    openAdminDetail: function(id){
+      if(!sgIsAdmin() || !_chatImpValidId(id)) return false;
+      sgOpen();
+      sgViewDetail(id);
+      return true;
+    }
+  };
+
   /* ══ 🤖 AI 답변 도움 (대표 지시 2026-09-11) ══════════════════════════════
      건의가 올라오면 서버(suggestionAssist)가 요약·종류·짐작·답변 초안을 지어
      suggestions_private/{id}/assist 에 적어 둔다.
@@ -7259,5 +7703,8 @@ window.PU_TYPESAFE_MOUNT = function(){
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=9"></script>
+<script src="js/pu-chatbot.js?v=5"></script>
 </body>
 </html>

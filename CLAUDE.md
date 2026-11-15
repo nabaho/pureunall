@@ -70,6 +70,11 @@
 - 그것들은 CLAUDE.md 를 안 읽고 AGENTS.md 를 읽는다. 규칙을 고치면 두 파일을 «함께» 고친다. 어긋나면 CLAUDE.md 가 이긴다.
 - 지킴: `tests/agents-md.test.js`(특히 「배포에서 지우는 목록」). Codex 저장소 스킬 자리 `.agents/skills/` 는 배포 게이트에 미리 넣어 두었다.
 
+## 보안 점검 결과는 공개 저장소에 적지 않는다 (대표 지시 2026-11-15)
+
+- 이 저장소는 공개다 — «고치기 전의 약점 목록»은 저장소·PR 설명에 쓰지 않고 대표에게만 따로 건넨다. PR 에는 «무엇을 막았나»만 짧게.
+- 점검은 코드·규칙·설정만 본다(고객 자료·살아 있는 서버 찌르기 금지). 미토스(보안 전용 모델) 연결도 같은 규칙 · 자세히: `docs/규칙/보안점검-미토스.md`
+
 ## 붙여 둔 도구 — `.claude/skills/hwpx/` · `.mcp.json` (2026-08-30)
 
 - 한글 서식 스킬과 인사·법령·문서·통계·건축·특허·공시 MCP. 원격 MCP 는 «남의 서버» — 질문에 고객 이름·주민번호를 넣지 않는다.
@@ -92,6 +97,12 @@
 - 모든 등록 프로그램은 Firebase 초기화 전에 `js/pu-ontology-write.js` 를 싣는다. 새 프로그램은 `PROGRAMS.writeContracts` 를 선언해야 한다(없으면 배포검사 실패).
 - ★ 계약·사건 입력, 일괄 입력, 은행·카드 문자 수집, 재무 가져오기, 저장 관문·자료 이관, Cloud Functions 쓰기를 만질 때는 **먼저 `docs/규칙/온톨로지.md` 를 읽는다**(검증 함수·금액 자동 대입 금지 등 세부 규칙).
 - 지킴: `tests/ontology-contract.test.js` — 우회하지 않는다. 설계: `docs/푸른통합온톨로지-1단계.md`
+
+## 종료·삭제·되돌림 불변 — 끝난 건은 되살리거나 번호·상태를 바꾸지 않는다 (대표 지시 2026-11-11)
+
+- 코딩·데이터 검토 모두 종결·이관·취소(`closed`·`transferred`·`cancelled`)·마감월(`locked_*`)·휴지통(`_deleted`)·확정 되돌림(`undoneDate`) 건의 번호·상태를 자동 변경하거나 통째 덮어쓰기(`data/<표>`)·물리 삭제로 되살리지 않는다.
+- 입금·성과 조회는 `erpIncomeLive`·`erpPerfCounts` 거르개를 반드시 거치고, 데이터 정리 전후에는 `node scripts/erp-integrity-audit.js` 로 불변성을 검증한다.
+- 지킴: `tests/anti-resurrection-guards.test.js` · 자세히: `docs/규칙/종료-삭제-되돌림-불변.md`
 
 ## 어느 방이든 — 공용 상태 파일 `STATUS.md`
 

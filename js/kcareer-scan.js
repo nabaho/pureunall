@@ -117,6 +117,28 @@
      7번 폴더 파일은 '위촉장.jpg'처럼 맨몸 이름이 많아 연도·기관을 경로에서 얻어야 한다. */
   var CASE_ROOT = '7. 컨설턴트,위원신청등';
 
+  /* ★ 번호 접두어(«7. »)가 있는 폴더 이름과 없는 폴더 이름을 «같은 폴더»로 본다 (대표 지시 2026-11-15 「네, 둘 다 고쳐 주세요」).
+     이 PC 의 서류 폴더는 «컨설턴트,위원신청등»(번호 없음)이라, «7. 컨설턴트,위원신청등» 만 찾던 제출서류·새 지원 건 찾기가
+     「폴더가 없습니다」라고 했다. 폴더 이름을 바꾸게 하지 않고(OneDrive 사본·바로가기에 영향) 앱이 두 이름을 다 읽는다.
+     ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름 — 둘 다 있으면 정확한 쪽이 이긴다.
+     ⚠ 기록에 적는 경로·건 키는 늘 «번호 있는 이름»(CASE_ROOT) 기준이다 — 번호 없는 PC 와 있는 PC 가 같은 기록을 쓴다. */
+  var NUM_PREFIX = /^\s*\d+\s*\.\s*/;
+  var CASE_ROOT_BARE = CASE_ROOT.replace(NUM_PREFIX, '');
+  function dirNameChoices(name) {
+    var n = String(name == null ? '' : name), bare = n.replace(NUM_PREFIX, '');
+    if (bare && bare !== n) return [n, bare];
+    /* 반대 방향 — 번호 «없는» 7번 폴더 이름으로 적힌 옛 기록(번호 없는 PC 에서 전체 스캔으로 만든 것)을 번호 «있는» PC 에서도 열려면
+       번호 있는 이름도 후보로 둔다(재검증 2026-11-15). 다른 폴더는 번호를 짐작하지 않는다. */
+    if (n === CASE_ROOT_BARE) return [n, CASE_ROOT];
+    return [n];
+  }
+  function isCaseRootName(seg) { seg = String(seg == null ? '' : seg); return seg === CASE_ROOT || seg === CASE_ROOT_BARE; }
+  /* 기록에 적는 경로는 늘 «번호 있는 이름» — 첫 칸이 번호 없는 7번 폴더 이름이면 바꾼다(전체 스캔·건 등록 어느 길이든 같은 경로) */
+  function canonRelPath(relPath) {
+    var p = String(relPath == null ? '' : relPath), i = p.indexOf('/');
+    return i > 0 && isCaseRootName(p.slice(0, i)) ? CASE_ROOT + p.slice(i) : p;
+  }
+
   function pickYear(name, relPath, mtimeISO) {
     var m = String(name == null ? '' : name).match(/(20\d{2})/);
     if (m) return { year: m[1], from: 'name', needCheck: false };
@@ -137,7 +159,8 @@
   // 7번 폴더의 '연도/건' 2단계까지를 건 키로 본다. 그 밖은 파일 1개 = 1건.
   function caseKeyOf(relPath) {
     var segs = String(relPath == null ? '' : relPath).split('/');
-    if (segs[0] === CASE_ROOT && segs.length >= 4) return segs.slice(0, 3).join('/');
+    /* 첫 칸이 «번호 없는 이름»이어도 7번 폴더로 본다 — 키는 번호 있는 이름으로 통일(두 PC 가 같은 건을 같은 키로) */
+    if (isCaseRootName(segs[0]) && segs.length >= 4) return [CASE_ROOT].concat(segs.slice(1, 3)).join('/');
     return null;
   }
 
@@ -151,6 +174,10 @@
     var copySeen = {};       // name|size → 최초 relPath
     var caseMap = {};        // caseKey → 건 레코드
     var caseOrder = [];
+
+    /* 입력이 번호 없는 7번 폴더 경로여도 기록은 «번호 있는 이름»으로 — 건 키(caseDir)와 파일 경로(relPath)가 어긋나면
+       다른 PC 에서 원본이 안 열리고, 같은 파일이 두 번 등록된다(재검증 2026-11-15) */
+    files = (files || []).map(function (f) { return f && f.relPath ? Object.assign({}, f, { relPath: canonRelPath(f.relPath) }) : f; });
 
     (files || []).forEach(function (f) {
       if (isIgnoredFile(f.name)) { out.ignored++; return; }
@@ -213,6 +240,9 @@
 
   var api = {
     CASE_ROOT: CASE_ROOT,
+    dirNameChoices: dirNameChoices,
+    isCaseRootName: isCaseRootName,
+    canonRelPath: canonRelPath,
     buildRecords: buildRecords,
     extOf: extOf,
     isIgnoredFile: isIgnoredFile,

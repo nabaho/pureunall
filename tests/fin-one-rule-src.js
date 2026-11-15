@@ -17,6 +17,7 @@ const FIN_RULE_FNS = [
   'function incomeIsCo(',
   'function erpIncomeLive(',
   'function erpIncomeIsRevenue(',
+  'function erpIncomeSourceStore(',
   'function erpAdvisoryYmOf(',
   'function erpIsAdvisoryIncome(',
   'function erpAdvisoryIndex(',

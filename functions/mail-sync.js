@@ -430,6 +430,7 @@ async function runSync(deps, opts) {
 
       /* 서버가 번호를 다시 매겼다 — 지난 목록은 다른 메일을 가리킨다. 버리고 다시 시작한다. */
       if (MB.uidReset(p.sync, p.st.uidValidity)) {
+        msgBodyForget(p.slug);
         await db.ref(ROOT + '/msgs/' + p.slug).remove();
         p.sync = {};
       }
@@ -485,12 +486,13 @@ async function runSync(deps, opts) {
             try {
               for await (const msg of client.fetch(
                 MB.uidSet(r.uids),
-                { uid: true, envelope: true, flags: true, size: true, bodyStructure: true },
+                { uid: true, envelope: true, flags: true, size: true, bodyStructure: true, headers: ['authentication-results'] },
                 { uid: true }
               )) {
                 const row = MB.msgRow(msg);
                 if (!row.u) continue;
-                held.push({ row: row, tp: MB.textPartOf(msg.bodyStructure, 0) });
+                const authHdr = msg.headers ? MB.toText(msg.headers, 'utf-8') : '';
+                held.push({ row: row, tp: MB.textPartOf(msg.bodyStructure, 0), atts: pickParts(msg.bodyStructure, null, 0).atts, authHdr: authHdr });
                 seen.push(row.u); n++; out.rows++;
                 if (nowMs() > deadline || out.rows >= MAX_ROWS) { cut = true; break; }
               }
@@ -580,11 +582,15 @@ async function runSync(deps, opts) {
               /* ── 📥 일정 후보함 — 일정이 있어 보이는 새 메일에서 초안을 뽑아 후보로 쌓는다 (대표 지시 2026-10-24) ──
                  ⚠ 기본 꺼짐(pucards/config/calInbox.on). 본문은 저장하지 않는다 — 까닭·규칙은 cal-inbox.js.
                  ⚠ 실패해도 던지지 않는다 — 후보함이 죽어도 동기화는 계속된다. */
-              try {
-                const cal = await CALINBOX.extractFromNewMail(deps, { client: client, slug: p.slug, held: held, deadline: deadline });
-                if (cal.ran) console.log('cal-inbox', JSON.stringify(cal));
-              } catch (e) {
-                console.warn('cal-inbox 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              if (!o.manualPull) {
+                try {
+                  const cal = await CALINBOX.extractFromNewMail(deps, {
+                    client: client, slug: p.slug, held: held, deadline: deadline, readCompanies: readCompanies,
+                  });
+                  if (cal.ran) console.log('cal-inbox', JSON.stringify(cal));
+                } catch (e) {
+                  console.warn('cal-inbox 실패(동기화는 계속합니다):', String((e && e.message) || e));
+                }
               }
               /* ── 📥 회사 도메인이 같은 업체 «한 곳» 담당자로 채운다 (2026-10-07 기업정보함 점검 ③-A) ──
                  예전에는 대표님 PC 에서 메일 화면이 열려 있을 때만 채웠다. 잣대·까닭은 mail-fill.js.
@@ -856,6 +862,9 @@ async function runSync(deps, opts) {
     /* 📦 지난 메일 «열 수 있는 것이 얼마인가» — 부탁이 있을 때만(위 oldProbe 머리글). 못 해도 동기화는 멀쩡해야 한다 */
     if (!o.client) {
       try { await oldProbe(deps, db, deadline); } catch (e) { console.warn('oldProbe 실패:', String((e && e.message) || e).slice(0, 200)); }
+      if (!o.manualPull) {
+        try { await CALINBOX.flushPendingResync(deps, { deadline: deadline }); } catch (e) { console.warn('cal-inbox resync 실패:', String((e && e.message) || e).slice(0, 160)); }
+      }
     }
     await db.ref(ROOT + '/meta').update({
       at: nowMs(), ok: true, folders: out.folders, rows: out.rows,
@@ -926,8 +935,42 @@ async function runSync(deps, opts) {
      다음 부름은 새로 묻는다. 낡은 주소 때문에 «계속» 실패하는 일은 없다. */
 const PATH_TTL_MS = 10 * 60 * 1000;
 const _pathCache = new Map();          /* slug → { path, at } */
+/* ⚡ 메일 본문 메모리 캐시 (그릇 RAM 전용 · 실시간DB 에는 절대 적지 않음, 2026-11-15)
+   미리 받기(peek)로 받아 둔 통이나 방금 연 통을 다시 열 때 IMAP 왕복과 파싱을 건너뛴다. */
+const MSG_BODY_TTL_MS = 5 * 60 * 1000;
+const MSG_BODY_KEEP = 40;
+const MSG_BODY_MAX_CHARS = 300000;
+const _msgBodyCache = new Map();       /* 'slug:uid' → { html, text, atts, full, at } */
+function msgBodyForget(slug, uid) {
+  if (slug === undefined) { _msgBodyCache.clear(); return; }
+  if (uid !== undefined) { _msgBodyCache.delete(String(slug) + ':' + String(uid)); return; }
+  const pre = String(slug) + ':';
+  for (const k of Array.from(_msgBodyCache.keys())) { if (k.startsWith(pre)) _msgBodyCache.delete(k); }
+}
+function msgBodyGet(slug, uid) {
+  const k = String(slug) + ':' + String(uid);
+  const hit = _msgBodyCache.get(k);
+  if (!hit) return null;
+  if ((nowMs() - hit.at) >= MSG_BODY_TTL_MS) { _msgBodyCache.delete(k); return null; }
+  return { html: hit.html, text: hit.text, atts: hit.atts, full: hit.full };
+}
+function msgBodyPut(slug, uid, o) {
+  if (!o) return o;
+  const len = String(o.html || '').length + String(o.text || '').length;
+  if (len > MSG_BODY_MAX_CHARS) return o;
+  const k = String(slug) + ':' + String(uid);
+  if (_msgBodyCache.has(k)) _msgBodyCache.delete(k);
+  _msgBodyCache.set(k, { html: o.html || '', text: o.text || '', atts: o.atts || [], full: !!o.full, at: nowMs() });
+  while (_msgBodyCache.size > MSG_BODY_KEEP) {
+    const oldest = _msgBodyCache.keys().next().value;
+    if (oldest === undefined) break;
+    _msgBodyCache.delete(oldest);
+  }
+  return o;
+}
 function folderPathForget(slug) {
   if (slug === undefined) _pathCache.clear(); else _pathCache.delete(String(slug));
+  msgBodyForget(slug);
 }
 async function folderPath(deps, slug) {
   const hit = _pathCache.get(String(slug));
@@ -1062,6 +1105,7 @@ async function withFolder(deps, slug, fn, opts) {
    ⚠ 미리 받기(peek)에서도 뺀다 — 이웃 통을 미리 받다 알게 된 것도 같은 사실이다.
    MB_404 로그로 둘이 얼마나 나는지 센다(창 밖을 열 수 있는지 아직 재 보지 못했다). */
 async function notHere(deps, client, slug, uid, peek) {
+  msgBodyForget(slug, uid);
   let all = [];
   try { all = (await client.search({ all: true }, { uid: true })) || []; } catch (_) { all = []; }
   const nums = all.map(Number).filter((n) => n > 0);
@@ -1673,8 +1717,8 @@ module.exports = function build(deps) {
       .region(REGION)
       /* ⚠ TYPESAFE_API_KEY — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
            config/mailAiClassify.on 이 꺼져 있으면 이 열쇠는 «읽히기만 하고 안 쓰인다». */
-      /* ⚠ GEMINI_KEY — 일정 후보함(cal-inbox)이 쓴다. config/calInbox.on 이 꺼져 있으면 «읽히기만 하고 안 쓰인다». */
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY', 'GEMINI_KEY'], timeoutSeconds: 540, memory: '512MB' })
+      /* ⚠ GEMINI_KEY · GCAL_OAUTH_SECRET — 메일 일정 자동등록·후보함(cal-inbox)이 푸른캘린더·구글캘린더에 넣을 때 쓴다. */
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY', 'GEMINI_KEY', 'GCAL_OAUTH_SECRET'], timeoutSeconds: 540, memory: '512MB' })
       .pubsub.schedule('*/3 7-21 * * *')
       .timeZone('Asia/Seoul')
       .onRun(async () => {
@@ -1720,7 +1764,7 @@ module.exports = function build(deps) {
       .region(REGION)
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 300, memory: '512MB' })
       .https.onRequest((req, res) => gate(req, res, async () => {
-        const r = await runSync(deps, { deadlineMs: 230000 });
+        const r = await runSync(deps, { deadlineMs: 230000, manualPull: true });
         reply(res, r.ok ? 200 : 500, Object.assign({ ok: r.ok }, r));
       })),
 
@@ -1746,30 +1790,27 @@ module.exports = function build(deps) {
         const peek = !!b.peek;
         if (!slug || !/^\d+$/.test(uid)) { reply(res, 400, { ok: false, error: '어느 메일인지 알 수 없습니다.' }); return; }
 
-        const got = await withFolder(deps, slug, async (client) => {
-          const head = await client.fetchOne(uid, { uid: true, size: true, bodyStructure: true, envelope: true }, { uid: true });
-          if (!head) throw await notHere(deps, client, slug, uid, peek);
+        const memHit = msgBodyGet(slug, uid);
+        if (peek && memHit) { reply(res, 200, Object.assign({ ok: true }, memHit)); return; }
 
-          /* 읽음 표시 — 다음메일에서 열었을 때와 «같게» 만든다. 이것을 안 하면 앱에서
-             다 읽었는데도 옆줄의 「안읽음」이 영원히 그 수로 남는다.
-             ⚠ 실패해도 본문은 보여 준다. 표시가 안 된 것보다 못 읽는 것이 나쁘다.
-             ★ peek 이면 «아무것도 안 건드린다» (2026-08-30) — 앱이 다음·이전 통을
-               미리 받아 둘 때 쓰는 길이다. 미리 받았다고 안 읽은 메일이 읽음으로
-               바뀌면, 대표께서 열어 보시지도 않은 메일이 조용히 사라진 것처럼 된다. */
-          /* ★ 목록 쪽 표시(실시간DB)는 본문과 «함께» 적는다 (2026-09-27, 대표 지시
-               「메일을 열면 전송이 늦어 메일이 늦게 나온다」). 실시간DB 는 미국에 있어
-               한 번 적는 데 150~300ms 인데, 예전에는 그것을 «다 기다린 뒤에야» 본문을
-               받으러 갔다 — 사람은 읽음 표시가 아니라 본문을 기다리고 있다.
-             ⚠ 기다리기는 한다(맨 끝 markDb) — 1세대 함수는 답을 보낸 뒤의 일을
-               끝까지 해 준다는 보장이 없다. 다만 «본문 받는 동안» 같이 간다. */
+        const got = await withFolder(deps, slug, async (client) => {
+          const hit2 = msgBodyGet(slug, uid);
+          let head = null;
+          if (!hit2) {
+            head = await client.fetchOne(uid, { uid: true, size: true, bodyStructure: true, envelope: true }, { uid: true });
+            if (!head) throw await notHere(deps, client, slug, uid, peek);
+          }
+
           let markDb = null;
           if (!peek) {
-            try { await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true }); } catch (_) { /* 표시만 못 했다 */ }
             markDb = Promise.resolve()
-              .then(() => deps.getDatabase().ref(ROOT + '/msgs/' + slug + '/' + uid + '/r').set(1))
-              .catch(() => { /* 목록 쪽 표시는 다음 회차에 맞춰진다 */ });
+              .then(() => Promise.all([
+                client.messageFlagsAdd(uid, ['\\Seen'], { uid: true }).catch(() => { /* 표시만 못 했다 */ }),
+                deps.getDatabase().ref(ROOT + '/msgs/' + slug + '/' + uid + '/r').set(1).catch(() => { /* 목록 쪽 표시는 다음 회차에 맞춰진다 */ }),
+              ]));
           }
           const done = async (o) => { if (markDb) await markDb; return o; };
+          if (hit2) return done({ html: hit2.html, text: hit2.text, atts: hit2.atts, full: hit2.full });
 
           /* ── 첨부 목록은 «한 벌»로 만든다 (2026-08-27) ──
              ⚠ 예전에는 작은 메일은 mailparser 가, 첨부를 내려받는 쪽은 pickParts 가
@@ -1801,8 +1842,9 @@ module.exports = function build(deps) {
             text = MB.toText(await drain(d.content, BODY_FULL_MAX), parts.textCs);
           }
           return done({ html: html, text: text, atts: atts, full: false });
-        }, { write: true });
+        }, { write: !peek });
 
+        msgBodyPut(slug, uid, got);
         reply(res, 200, Object.assign({ ok: true }, got));
       })),
 
@@ -2081,7 +2123,7 @@ module.exports = function build(deps) {
 
         /* 우리 목록에서도 곧바로 뺀다 — 다음 회차를 기다리면 지운 것이 잠깐 되살아 보인다 */
         const up = {};
-        uids.forEach((u) => { up[ROOT + '/msgs/' + from + '/' + u] = null; });
+        uids.forEach((u) => { msgBodyForget(from, u); up[ROOT + '/msgs/' + from + '/' + u] = null; });
         await deps.getDatabase().ref().update(up);
 
         reply(res, 200, { ok: true, moved: uids.length });
@@ -2125,7 +2167,7 @@ module.exports = function build(deps) {
         /* 우리 목록에서도 곧바로 뺀다 — 스팸함은 애초에 안 가져오므로 다음 회차를
            기다려도 «다시 오지» 않는다. 여기서 안 지우면 신고했는데도 화면에 남는다. */
         const up = {};
-        uids.forEach((u) => { up[ROOT + '/msgs/' + from + '/' + u] = null; });
+        uids.forEach((u) => { msgBodyForget(from, u); up[ROOT + '/msgs/' + from + '/' + u] = null; });
         await deps.getDatabase().ref().update(up);
 
         reply(res, 200, { ok: true, moved: moved });
@@ -2428,3 +2470,6 @@ module.exports.oldPopOpen = oldPopOpen;
 module.exports.notHere = notHere;
 /* 지난 메일 «열 수 있는 것이 얼마인가» 세기 — 가짜 POP3(deps.openPop)로 돌려 본다(2026-10-31) */
 module.exports.oldProbe = oldProbe;
+module.exports.msgBodyGet = msgBodyGet;
+module.exports.msgBodyPut = msgBodyPut;
+module.exports.msgBodyForget = msgBodyForget;

@@ -37,6 +37,7 @@ const code = (f) => (/\.html$/.test(f) ? stripComments(read(f)) : stripJs(read(f
 const EXTERNAL = {
   'sign.html': '서명 요청을 받은 외부인 화면',
   'sign-contract.html': '계약서 서명 외부인 화면',
+  'sign-harass.html': '괴롭힘·성희롱 조사 비밀유지서약·진술확인 서명 외부인 화면',
   'ieum-view.html': '이음 공개 명단을 보는 외부인 화면',
 };
 

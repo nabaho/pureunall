@@ -37,7 +37,8 @@ test('★★ ① 한 장에 맞춘다 — 넘치면 «최근 N»을 줄이고 �
   assert.equal(by.wic.rows[0][0], '2025', '위촉도 최근 것부터(점·줄표 섞인 일자도)');
   assert.equal(by.cert.n, 1, '수료는 자격이 아니다');
   assert.ok(m.kpis.find((k) => k.label === '컨설팅 실적').n === 120 && m.kpis.find((k) => k.label === '위촉·위원').n === 40, '표창은 위촉 수에 안 섞는다');
-  assert.match(m.perfByYear, /^2025 \d+ · 2024 \d+/, '연도별 실적 수를 한 줄로');
+  assert.equal(m.perfByYear, undefined, '★ 「연도별 실적 수」는 없앴다(대표 2026-11-12) — 제출하는 종이에는 제출한 내용만');
+  assert.doesNotMatch(P1.toHtml(m, ''), /연도별/);
   /* 바닥 아래로는 안 줄인다 */
   assert.ok(by.perf.show >= 3 && by.wic.show >= 4);
 });
@@ -67,7 +68,6 @@ test('③ 용도에 따라 몫이 달라진다 · 끈 칸은 안 나온다 · �
 test('★★ ⑤ 숫자 칸(KPI)·컨설팅 실적은 기본으로 안 넣는다 (대표 2026-10-07 「kpi 필요없다 · 컨설팅실적은 필요없고」)', () => {
   const m = P1.build(재료(), { use: 'general' });
   assert.ok(!m.sections.some((x) => x.key === 'perf'), '★ 켜지 않았는데 실적이 나온다');
-  assert.equal(m.perfByYear, '', '실적을 안 넣으면 «연도별» 줄도 없다');
   const 글 = P1.toHtml(m, '');
   assert.doesNotMatch(글, /class="kp"/, '★ 숫자 칸이 다시 그려진다');
   assert.doesNotMatch(글, /컨설팅 실적/);
@@ -201,7 +201,7 @@ test('★★ ⑩ ⭐ 중요로 고른 위촉은 오래된 것이어도 맨 앞�
     /* 한 장이 아주 작아도 고른 것은 바닥으로 남는다 */
     const 작게 = P1.fit(P1.build(src, { use: 'general', pins: { wic: [옛것.id] } }), 5);
     assert.ok(작게.sections.find((x) => x.key === 'wic').rows.some((r) => r[1] === 옛것.org), '★ 줄이느라 사람이 고른 것을 빼면 안 된다');
-    assert.match(P1.toHtml(m, ''), /\(주요 1 · 최근 \d+ · 전체 \d+\)/, '고른 것과 최근 것을 나눠 밝힌다');
+    assert.doesNotMatch(P1.toHtml(m, ''), /\(주요 \d+|최근 \d+|전체 \d+/, '★ 고른 것·최근 것 건수는 종이에 안 적는다(대표 2026-11-12)');
     /* 바닥(4줄)보다 많이 골라도 모두 남는다 */
     const 여섯 = src.wiccok.filter((r) => r.type === '위촉장').sort((a, b) => P1.dkey(a.issueDate).localeCompare(P1.dkey(b.issueDate))).slice(0, 6).map((r) => r.id);
     const 꽉 = P1.fit(P1.build(src, { use: 'general', pins: { wic: 여섯 } }), 5).sections.find((x) => x.key === 'wic');
@@ -223,4 +223,157 @@ test('⑪ 화면 배선 — 금액은 이알피에서 «고르는 데만» · �
   assert.match(save, /_p1Keep\(\)/);
   assert.doesNotMatch(bare.match(/var FB_SKIP=\[[\s\S]*?\];/)[0], /'p1_opts'/, '★ 고른 것은 클라우드로 함께 가야 다른 PC 에서도 그대로다');
   assert.match(bare, /KC_MODAL_NO_BACKDROP=\{[^}]*modalP1Pick:1/, '여러 개 고르다 바깥 한 번 눌러 날아가면 안 된다');
+});
+
+/* ── ⑫ «고른 것만 넣기» (대표 2026-11-12 「위촉위원과 컨설팅 실적에 대해서 선택을 하고 싶다 · 제출하면 제출된 내용만」) ── */
+test('★★ ⑫ 고른 것만 넣기 — 고른 줄만 나오고, 자동 채움·금액 문턱·건수·한 장 맞추기가 고른 줄을 건드리지 않는다', () => {
+  const src = 재료();
+  src.wiccok.forEach((r, i) => { r.id = 'K' + i; });
+  src.consult.forEach((r, i) => { r.id = 'C' + i; });
+  const 고른위촉 = ['K3', 'K11', 'K20'], 고른실적 = ['C5', 'C77'];
+  const amtOf = () => 1000000;                         /* 전부 «미만» — 자동이면 하나도 안 들어갈 값 */
+  const m = P1.build(src, { use: 'general', on: { perf: true }, amtOf, pins: { wic: 고른위촉, perf: 고른실적 }, only: { wic: true, perf: true } });
+  const wic = m.sections.find((x) => x.key === 'wic'), perf = m.sections.find((x) => x.key === 'perf');
+  assert.equal(wic.n, 3, '★ 고른 위촉 3건만(자동으로 최근 것을 더 채우지 않는다)');
+  assert.equal(wic.show, 3); assert.equal(wic.more, 0);
+  assert.equal(wic.fixed, true, '고른 칸은 «고정» — 한 장 맞추기가 줄이지 않는다');
+  assert.equal(perf.n, 2, '★ 금액 문턱(미만)이어도 고른 것은 들어간다 · 고르지 않은 것은 안 들어간다');
+  /* 한 장에 맞추기·남는 자리 채우기도 고른 줄 수를 그대로 둔다 */
+  const 작게 = P1.fit(P1.build(src, { use: 'general', on: { perf: true }, amtOf, pins: { wic: 고른위촉, perf: 고른실적 }, only: { wic: true, perf: true } }), 5);
+  assert.equal(작게.sections.find((x) => x.key === 'wic').rows.length, 3, '★ 줄이느라 고른 것을 빼면 안 된다');
+  const 채움 = P1.fill(P1.build(src, { use: 'committee', on: { perf: true }, amtOf, pins: { wic: 고른위촉 }, only: { wic: true } }), () => true);
+  assert.equal(채움.sections.find((x) => x.key === 'wic').rows.length, 3, '★ 남는 자리가 있어도 고르지 않은 위촉을 채워 넣지 않는다');
+  /* 종이에는 고른 줄만 — 건수 표시는 없다 */
+  const 글 = P1.toHtml(m, '');
+  assert.doesNotMatch(글, /전체\s*\d+|최근\s*\d+|주요\s*\d+|연도별/);
+  /* 고른 것이 없으면 그 칸은 비어 종이에 안 나온다(지어서 채우지 않는다) */
+  const 빈 = P1.build(src, { use: 'general', on: { perf: true }, pins: {}, only: { wic: true, perf: true } });
+  assert.ok(!빈.sections.some((x) => x.key === 'wic' || x.key === 'perf'), '고른 것이 없으면 칸이 빠진다');
+  /* only 를 안 켜면 예전 그대로 — 고른 것 + 자동 */
+  const 예전 = P1.build(src, { use: 'general', pins: { wic: 고른위촉 } }).sections.find((x) => x.key === 'wic');
+  assert.ok(예전.n > 3, '켜지 않으면 자동 채움이 그대로다');
+  /* 고를 수 없는 칸(학력·주요 직책·연구기고)에 only 를 줘도 무시한다 */
+  const 학력 = P1.build(src, { use: 'general', only: { edu: true } }).sections.find((x) => x.key === 'edu');
+  assert.ok(학력 && 학력.n === 1, '고르기 칸이 아닌 곳은 only 가 걸리지 않는다');
+});
+
+test('★★ ⑮ 경력·강의·자격·수상도 고른다 — 고른 것은 앞으로(자동) · 고른 것만(only) · 앱이 정한 차례와 거름은 그대로 (대표 2026-11-12)', () => {
+  assert.deepEqual([...P1.PIN_KEYS].sort(), ['award', 'cert', 'lec', 'perf', 'wic', 'work'], '고를 수 있는 칸 여섯');
+  const src = 재료();
+  src.work.forEach((r, i) => { r.id = 'W' + i; });                      /* 앱이 정한 차례 = 배열 차례(들어간 날 최근 것 먼저) */
+  src.lecture.forEach((r, i) => { r.id = 'L' + i; });
+  src.cert = [{ id: 'T1', title: '공인노무사', date: '2006.11.20', org: '고용노동부' }, { id: 'T2', title: '정보처리기사', date: '2007.5.1', org: '산업인력공단' },
+    { id: 'T3', title: '노무관리 과정 수료', date: '2020.1.1', org: '협회' }, { id: 'T4', title: '직업상담사 2급', date: '2011.8.1', org: '산업인력공단' }];
+  src.wiccok.forEach((r, i) => { r.id = 'K' + i; });                    /* 40번째(K40)는 표창 */
+  const by = (m, k) => m.sections.find((x) => x.key === k);
+
+  /* ── 자동(기본): 고른 것은 오래된 것이어도 맨 앞으로, 나머지는 예전 차례 ── */
+  const 자동 = P1.build(src, { use: 'general', pins: { work: ['W5'], lec: ['L0'], cert: ['T4'], award: ['K40'] } });
+  assert.equal(by(자동, 'work').rows[0][1].indexOf('가나5') >= 0, true, '★ 고른 경력이 맨 앞');
+  assert.equal(by(자동, 'work').pin, 1);
+  assert.equal(by(자동, 'cert').rows[0][1], '직업상담사 2급', '★ 고른 자격이 맨 앞(국가자격 먼저 차례보다 앞)');
+  assert.equal(by(자동, 'award').pin, 1);
+  /* 고른 것은 한 장 맞추기에서도 안 빠진다 */
+  const 작게 = P1.fit(P1.build(src, { use: 'general', pins: { work: ['W5'], lec: ['L8'] } }), 5);
+  assert.ok(by(작게, 'work').rows.some((r) => r[1].indexOf('가나5') >= 0), '★ 줄이느라 고른 경력을 빼면 안 된다');
+  assert.ok(by(작게, 'lec').rows.some((r) => r[1].indexOf('교육8') >= 0), '★ 줄이느라 고른 강의를 빼면 안 된다');
+
+  /* ── 고른 것만: 고른 줄만, 거름(수료는 자격이 아니다·표창은 위촉이 아니다)과 차례는 그대로 ── */
+  const 만 = P1.build(src, { use: 'general', pins: { work: ['W3', 'W1'], lec: ['L2', 'L7'], cert: ['T2', 'T1', 'T3'], award: ['K40'] }, only: { work: true, lec: true, cert: true, award: true } });
+  assert.equal(by(만, 'work').n, 2, '고른 경력 2건만');
+  assert.ok(by(만, 'work').rows[0][1].indexOf('가나1') >= 0 && by(만, 'work').rows[1][1].indexOf('가나3') >= 0, '★ 경력은 앱이 정한 차례 그대로(고른 순서가 아니라)');
+  assert.equal(by(만, 'lec').n, 2, '고른 강의 2건만');
+  assert.equal(by(만, 'cert').n, 2, '★ 고른 T3 는 «수료»라 자격이 아니므로 안 나온다(거름 그대로)');
+  assert.equal(by(만, 'award').n, 1, '고른 표창 1건');
+  [by(만, 'work'), by(만, 'lec'), by(만, 'cert'), by(만, 'award')].forEach((x) => { assert.equal(x.fixed, true); assert.equal(x.more, 0); });
+  /* 한 장 맞추기·채우기가 고른 칸을 건드리지 않는다 */
+  const 채움 = P1.fill(P1.build(src, { use: 'lecturer', pins: { lec: ['L2'] }, only: { lec: true } }), () => true);
+  assert.equal(by(채움, 'lec').rows.length, 1, '★ 강의 위주 용도라도 고른 것만 — 남는 자리를 최근 강의로 채우지 않는다');
+  /* 고른 것이 없으면 그 칸은 빠진다(지어서 채우지 않는다) */
+  const 빈 = P1.build(src, { use: 'general', pins: {}, only: { work: true, lec: true, cert: true, award: true } });
+  ['work', 'lec', 'cert', 'award'].forEach((k) => assert.ok(!by(빈, k), k + ' 칸이 빠져야 한다'));
+  /* 종이에는 건수 표시가 없다 */
+  assert.doesNotMatch(P1.toHtml(만, ''), /전체\s*\d+|최근\s*\d+|주요\s*\d+|연도별/);
+});
+
+test('⑬ 화면 배선 — 고른 것만 넣기를 모델에 넘기고·저장하고 · 건수 표시는 한글 내보내기에도 없다', () => {
+  const mod = bare.slice(bare.indexOf('function _p1Model('), bare.indexOf('function renderProfile1('));
+  assert.match(mod, /only:o\.only\|\|\{\}/, '모델에 «고른 것만»을 넘긴다 — 종이(미리보기·PDF·한글)가 같은 모델을 쓴다');
+  const save = bare.slice(bare.indexOf('function p1PickSave('), bare.indexOf('function _p1Name('));
+  assert.match(save, /o\.only=Object\.assign\(\{\}, o\.only\|\|\{\}\)/);
+  assert.match(save, /P\.mode==='only'\) o\.only\[P\.k\]=true; else delete o\.only\[P\.k\]/, '방식은 칸마다 저장하고, 자동이면 지운다');
+  assert.match(bare, /function p1PickMode\(/, '고르기 창에 방식 스위치');
+  assert.match(bare, /✅ 고른 것만 넣기/);
+  /* 한글(hwpx) — 칸 제목 옆 건수와 «연도별» 줄이 없다 */
+  const hw = bare.slice(bare.indexOf('function _p1Bytes('), bare.indexOf('function p1Hwpx('));
+  assert.doesNotMatch(hw, /최근 '\+|전체 '\+|연도별|perfByYear/, '★ 한글 문서에도 건수 표시·연도별 줄을 찍지 않는다');
+  /* 화면 옆 «넣을 칸 고르기»에는 건수가 남는다(종이가 아니라 고르는 곳) */
+  const side = bare.slice(bare.indexOf('function renderProfile1('), bare.indexOf('function _p1Scale('));
+  assert.match(side, /' · 넣음 '/);
+  assert.doesNotMatch(side, /perfByYear/);
+});
+
+test('⑭ 고르기 창 — 접근성(대화상자·스위치 눌림 표시)·빈 목록 안내 · 고른 것만 넣는 칸은 «몇 건» 상자를 막는다 (자동 검증 낮음 지적 반영)', () => {
+  assert.match(SRC, /<div class="modal" role="dialog" aria-modal="true" aria-labelledby="p1PickTitle"/, '고르기 창은 대화상자로 알린다');
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.match(draw, /data-m="auto" aria-pressed="false"/); assert.match(draw, /data-m="only" aria-pressed="false"/);
+  assert.match(draw, /id="p1PickQ"[^>]*aria-label="[^"]+"/, '찾기칸에 이름');
+  assert.match(draw, /찾는 줄이 없습니다/, '검색·«고른 것만 보기» 결과가 0건이면 빈 표 대신 안내');
+  const mode = bare.slice(bare.indexOf('function _p1PickModeDraw('), bare.indexOf('function p1PickMode('));
+  assert.match(mode, /setAttribute\('aria-pressed'/, '방식을 바꾸면 눌림 표시도 바꾼다');
+  const panel = bare.slice(bare.indexOf('function p1Panel('), bare.indexOf('function p1Lim('));
+  assert.match(panel, /\(만\?' disabled':''\)/, '★ 고른 것만 넣는 칸은 건수를 안 보므로 «몇 건» 상자를 막는다');
+  assert.match(panel, /고른 것만 넣는 중 — 건수는 적용되지 않습니다/);
+});
+
+test('★★ ⑯ 고르기 창은 «고를 수 있는 칸 전부»를 한 표(P1_PICK)로 안다 — 종이를 짓는 길과 같은 거름·같은 차례·같은 번호 (대표 2026-11-12)', () => {
+  /* 표의 열쇠 = 계산이 «고를 수 있다»고 하는 칸 — 어긋나면 단추는 있는데 창이 안 열리거나, 창은 있는데 종이가 안 따른다 */
+  const tbl = bare.slice(bare.indexOf('var P1_PICK={'), bare.indexOf('function p1PickOpen('));
+  const keys = [...tbl.matchAll(/^  (\w+):\{ title:/gm)].map((m) => m[1]).sort();
+  assert.deepEqual(keys, [...P1.PIN_KEYS].sort(), '★ 고르기 창이 아는 칸 = 계산이 고를 수 있다는 칸');
+  [...P1.PIN_KEYS].forEach((k) => assert.match(tbl, new RegExp('  ' + k + ':\\{ title:\\x27[^\\x27]+\\x27, heads:\\[\\x27[^\\x27]+\\x27,\\x27[^\\x27]+\\x27,\\x27[^\\x27]+\\x27\\]'), k + ' 칸에 이름과 열 머리'));
+  /* 같은 거름 — 수상/수료 판정은 계산의 것을 그대로 쓴다(따로 정규식을 두면 어긋난다) */
+  assert.match(tbl, /KcareerProfile1\.isAward/); assert.match(tbl, /KcareerProfile1\.isCourse/);
+  assert.doesNotMatch(tbl, /표창\|상장|수료\|이수/, '★ 수상·수료 판정을 창이 따로 갖지 않는다');
+  /* 경력 — 앱이 정한 차례를 «날짜로 다시 줄 세우지 않는다»·종이와 같은 함수(_p1WorkRows) */
+  const work = tbl.slice(tbl.indexOf('  work:{'), tbl.indexOf('  lec:{'));
+  assert.match(work, /_p1WorkRows\(\)/); assert.doesNotMatch(work, /date:function/, '경력은 날짜 정렬 함수를 두지 않는다');
+  assert.match(bare, /work:_p1WorkRows\(\)/, '종이를 짓는 재료(_p1Src)도 같은 함수');
+  const open = bare.slice(bare.indexOf('function p1PickOpen('), bare.indexOf('function p1PickDraw('));
+  assert.match(open, /if\(def\.order\) 목록\.sort\(def\.order\);\s*else if\(def\.date\) 목록\.sort/, '차례 함수가 있으면 그것(자격), 없으면 날짜가 있는 칸만 최근 것 먼저');
+  assert.match(tbl.slice(tbl.indexOf('  cert:{')), /order:function\(a,b\)\{ return KcareerProfile1\.certCmp\(a,b\); \}/, '★ 자격은 종이와 «같은 비교 함수»로 줄 세운다(창만 날짜순이면 번호가 어긋난다)');
+  assert.match(open, /id!=null|list\(\)/, '번호(id) 없는 기록은 고를 수 없다');
+  /* 열 머리·칸 글은 표에서 읽는다 — 위촉·실적 둘만 가정한 분기(P.k==='wic')가 남아 있으면 안 된다 */
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.doesNotMatch(draw, /P\.k===\x27wic\x27/, '★ 위촉 하나만 가정한 분기가 남았다');
+  assert.match(draw, /def\.heads\[0\]/); assert.match(draw, /def\.amt/, '금액 딱지는 실적만(표의 amt)');
+  assert.match(bare.slice(bare.indexOf('function p1PickSave('), bare.indexOf('function _p1Name(')), /P1_PICK\[P\.k\]\.title/);
+});
+
+test('★★ ⑰ 폰 폭(≤520px) — 고르기 창 표의 끝 칸은 «관리 단추 열»이 아니다 · 칸마다 이름표 · 자격 차례는 종이와 같다 (자동 검증 2026-11-14 지적)', () => {
+  /* 자격 차례 — 국가자격 먼저, 그 안에서 최근 것 먼저. 종이(build)와 창(certCmp)이 같은 비교를 쓴다 */
+  const 줄 = [{ id: 'a', title: '직업상담사 2급', date: '2015.1.1' }, { id: 'b', title: '공인노무사', date: '2006.11.20' },
+    { id: 'c', title: '정보처리기사', date: '2007.5.1' }, { id: 'd', title: '컴퓨터활용능력', date: '2020.3.1' }];
+  const 창 = 줄.slice().sort(P1.certCmp).map((r) => r.title);
+  const 종이 = P1.build({ cert: 줄.map((r) => ({ ...r, org: '기관' })) }, { use: 'general' }).sections.find((x) => x.key === 'cert').all.map((r) => r[1]);
+  assert.deepEqual(창, 종이, '★ 고르기 창의 자격 차례 = 종이의 차례');
+  assert.deepEqual(창.slice(0, 2), ['정보처리기사', '공인노무사'], '국가자격이 먼저, 그 안에서 최근 것 먼저');
+  /* 폰 카드(공용 .dt)는 끝 칸을 «관리 단추 열»(오른쪽 72px)로 세운다 — 이 표는 끝 칸이 값이라 같은 칸 줄에 놓는다 */
+  assert.match(SRC, /@media \(max-width:520px\)\{\s*#p1PickTbl \.dt td:last-child\{[^}]*grid-column:1 \/ 3[^}]*border-left:none!important/, '★ 고르기 창 표만 끝 칸을 일반 칸처럼(폰 폭에서만)');
+  assert.match(SRC, /#p1PickTbl \.dt td:last-child::before\{content:attr\(data-label\)\}/, '끝 칸에도 이름표');
+  assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#p1PickTbl \.dt tr\{grid-template-columns:66px minmax\(0,1fr\)\}/, '★ 관리 단추 열이 없으니 두 칸(이름표 + 값) — 안 그러면 값이 절반 폭에서 잘린다');
+  /* 자동 검증 재지적(2026-11-14): 검색줄 넘침·폰에서 저장 단추 밀림·안내 행 빈 이름표·어두운 테마 글자 — 모두 고르기 창(#modalP1Pick·#p1PickTbl·#p1PickQ)에만 */
+  assert.match(SRC, /#p1PickQ\{min-width:0!important\}/, '★ 검색줄: 공용 .tb-input 의 min-width:100%!important 를 이겨야 옆 단추가 안 밀려난다');
+  assert.match(SRC, /@media \(max-width:520px\)\{[^@]*#modalP1Pick \.modal\{max-height:calc\(100vh[^)]*\);display:flex;flex-direction:column\}[^@]*#modalP1Pick \.modal-b\{overflow:auto;min-height:0;flex:1 1 auto\}/, '★ 폰: 줄이 수십 건이어도 «저장» 단추가 창 아래에 남고 본문만 스크롤');
+  assert.match(SRC, /#p1PickTbl \.dt td\[colspan\]::before\{content:none\}/, '안내 행에 빈 이름표 칸이 없다');
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt td\{color:var\(--text\)\}/, '★ 어두운 테마: 카드 글자가 어두운 바탕에 묻히지 않는다');
+  /* 어두운 테마는 «바탕·글자·머리줄» 세 벌이 한 짝 — 글자만 밝히면 520px 넘는 폭(태블릿·PC)에서 흰 바탕에 밝은 글자가 된다(재검증 2회차) */
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt table\{background:var\(--card\)\}/, '★ 어두운 테마: 표 바탕도 함께(글자만 바꾸면 흰 바탕에 밝은 글자)');
+  assert.match(SRC, /html\.dark #p1PickTbl \.dt thead th\{[^}]*color:var\(--text\)/, '표 머리줄');
+  assert.match(SRC, /html\.dark #modalP1Pick \.btn:not\(\.primary\)\{[^}]*color:var\(--text\)/, '어두운 테마의 기본 단추');
+  assert.doesNotThrow(() => [{ title: '공인노무사', date: '2006' }, null, { title: '' }].sort(P1.certCmp), '빈 기록이 섞여도 자격을 줄 세운다');
+  /* 칸마다 이름표(data-label) — 카드에서 값이 무엇인지 말한다 */
+  const draw = bare.slice(bare.indexOf('function p1PickDraw('), bare.indexOf('function _p1PickSum('));
+  assert.ok((draw.match(/<td data-label="/g) || []).length >= 4, '일자·이름·내용·금액 칸에 이름표');
+  assert.match(draw, /data-label="\x27\+escapeHtml\(def\.heads\[0\]\)/, '이름표는 표의 열 머리에서 읽는다');
 });

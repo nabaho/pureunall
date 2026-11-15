@@ -103,5 +103,32 @@ async function 올리기(githubRequest, token, repo, path, content, message, bas
   });
 }
 
+/* ── 실행되는 조각 (2026-11-15 보안) ───────────────────────────────────────────
+   홈페이지 쪽은 이알피와 «같은 주소»(nabaho.github.io/pureunall/site/…)에서도 열린다.
+   그래서 직원 계정 하나가 털려 <script> 를 심은 쪽을 올리면, 관리자가 그 링크를 여는 순간 이알피 로그인이 넘어간다.
+   ★ 직원은 «글·그림·표»를 고칠 수 있다(대표 지시 2026-10-30 그대로). 다만 «실행되는 조각»을 새로 넣거나 바꾸는 것은 총괄관리자만.
+   실행되는 조각 = <script>…</script> 덩어리 · on…= 속성 · javascript: 주소 · iframe/object/embed/base/meta-refresh 태그.
+   비교는 «있던 쪽에 같은 조각이 있었나» — 원래 있던 스크립트를 그대로 둔 채 글만 고치면 통과한다. */
+function 실행조각(html) {
+  const s = String(html == null ? "" : html);
+  const out = new Set();
+  const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
+  let m;
+  const re1 = /<script\b[\s\S]*?<\/script\s*>/gi;
+  while ((m = re1.exec(s))) out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, ""));
+  const re2 = /\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
+  while ((m = re2.exec(s))) out.add("H:" + norm(m[0]));
+  const re3 = /(?:href|src|action|formaction|data)\s*=\s*["']?\s*(?:javascript|vbscript|data:text\/html)/gi;
+  while ((m = re3.exec(s))) out.add("J:" + norm(m[0]));
+  const re4 = /<(?:iframe|object|embed|base|frame|applet)\b[^>]*>|<meta\b[^>]*http-equiv[^>]*>/gi;
+  while ((m = re4.exec(s))) out.add("T:" + norm(m[0]));
+  return out;
+}
+/* 새 쪽에만 있는 실행 조각들(있던 쪽에 없던 것). 비어 있으면 «글만 고친 것». */
+function 새실행조각(old, neu) {
+  const a = 실행조각(old), b = 실행조각(neu);
+  return [...b].filter((x) => !a.has(x));
+}
+
 module.exports = { PATH_RE, MAX_BYTES, IMAGE_RE, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-                   올릴자리인가, 올릴그림자리인가, 사연, 올리기 };
+                   올릴자리인가, 올릴그림자리인가, 사연, 올리기, 실행조각, 새실행조각 };
