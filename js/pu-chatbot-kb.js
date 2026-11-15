@@ -137,15 +137,18 @@
   var PORTAL_ROWS_GUIDE = [
     {
       id: 'client',
-      title: '① 의뢰인 업무 (8개 앱)',
+      title: '① 의뢰인 업무 (11개 앱)',
       badge: '고객사 직접 수행 업무',
-      summary: '자문사·사건 의뢰인·컨설팅·기금 등 고객사 업무를 직접 처리하는 핵심 줄입니다. 모든 업체·계약·사건의 뿌리는 [푸른이알피]입니다.',
+      summary: '자문사·사건 의뢰인·조사·컨설팅·기금 등 고객사 업무를 직접 처리하는 핵심 줄입니다. 모든 업체·계약·사건의 뿌리는 [푸른이알피]입니다.',
       apps: [
         { key: 'erp',       icon: '🏢', name: '푸른이알피',     when: '신규 거래처 등록, 자문·컨설팅 계약, 부당해고·체불·산재 사건 관리', from: '기업정보함(사업자·대표자), 사진첩(판독 서류·통장), 계약서등관리', to: '업무관리, 재무관리, 뉴스레터, 기업정부지원금, 정부사업일정, 경력관리 전 앱의 원본', ask: '푸른이알피는 어떻게 쓰고 다른 앱들과 어떻게 연결되나요?' },
         { key: 'fund',      icon: '🪙', name: '기금관리',       when: '사내·공동근로복지기금 설립, 회계·결산, 별지 서식 자동채움, 기금 법령챗봇', from: '기업정보함(사업자·명함·기업상세), 푸른이알피(참여사업장 연결)', to: '푸른 메일(설립 준비서류 안내 메일 자동 채움)', ask: '기금관리 앱의 주요 기능과 기업정보함·메일 연결 방법을 알려줘' },
         { key: 'govreport', icon: '📑', name: '컨설팅보고서',   when: '전 사업장 컨설팅 보고서 진행률, ③서명본·④별첨·⑤제출 체크, 받은 서류함·한글 미리보기', from: '정부사업일정(보고서·일정 읽기), 푸른이알피(컨설팅 사업), 푸른 메일(첨부 서류 후보)', to: '정부사업일정 보고서 작성 창(#rpt=)으로 바로 점프', ask: '컨설팅보고서 앱은 정부사업일정·푸른 메일과 어떻게 연결되나요?' },
         { key: 'consult',   icon: '📅', name: '정부사업일정',   when: '수임한 컨설팅(일터혁신·산업일자리·상의·기술보호 등) 회차 일정·현장사진·보고서 초안/HWPX 작성', from: '푸른이알피(수임 컨설팅), 사진첩(현장사진)', to: '컨설팅보고서 현황판 및 HWPX 보고서 파일 생성', ask: '정부사업일정 앱에서는 어떤 순서로 업무를 처리하나요?' },
         { key: 'govaid',    icon: '🎯', name: '기업정부지원금', when: '고용장려금·지원사업 사전 검색, 기존·예비 고객사 수급 가능성 매칭 및 노무사 검토', from: '푸른이알피(업체 원장), 고용보험 피보험자수 공시(사업자번호 기준)', to: '업무관리(신청 대행 확정 시 할 일 자동 생성)', ask: '기업정부지원금 앱 사용법과 업무관리 자동 연결 흐름을 알려줘' },
+        { key: 'harass',    icon: '🛡️', name: '괴롭힘·성희롱 조사', when: '직장 내 괴롭힘·성희롱 사건 공문 메일 자동수집, 8단계 표준 조사 진행, 암호화 비밀 전자서명 및 조사결과보고서(.hwpx) 작성', from: '푸른 메일(조사 공문·진술·증거 후보 묶음), 푸른이알피(업체·사건 원장)', to: '푸른이알피 사건관리·업무 메모 자동 반영 및 진술확인서·조사결과보고서(.hwpx) 출력', ask: '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?' },
+        { key: 'ilteo',     icon: '🏭', name: '일터상생혁신',   when: '노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 로컬 비식별 정량 진단, 중간·최종 결과보고서(.pptx) 및 사후 이행관리 자동화', from: '푸른이알피·정부사업일정(참여 사업장), 푸른 메일(기초자료·후속 피드백 메일)', to: '중간·최종보고서(.pptx)·별첨 규정(.docx)·모의계산(.xlsx)·통합 패키지(.zip) 생성', ask: '일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘' },
+        { key: 'jobtrans',  icon: '⚡', name: '산업일자리전환', when: '능률협회(KMAC 구조혁신)·충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계(.hwpx) 자동 작성 및 비식별 재무·인력 집계', from: '푸른이알피·정부사업일정(계약 확정 사업장), 푸른 메일(기초자료 메일 거울)', to: '운영기관별 정식 한글(.hwpx) 보고서·완료계 내려받기 및 한글 편집기 바로 열기', ask: '산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?' },
         { key: 'hangul',    icon: '📝', name: '한글 편집기',     when: '한글 프로그램 없는 PC나 민감정보(주민번호)가 든 .hwp/.hwpx 문서를 바로 열고 고칠 때', from: '내 PC 파일 (서버·파이어베이스로 전송하지 않음)', to: '수정한 .hwpx 파일 내 PC 즉시 저장', ask: '한글 편집기는 어떤 상황에서 쓰면 좋나요?' },
         { key: 'rules',     icon: '📜', name: '기업규정집',     when: '취업규칙·노사협의회·단체협약 법령 위반 검토, 회차별 개정·신구대조표, 문서 내 AI 질문', from: '푸른 메일(취업규칙 첨부 자동 수집), 푸른이알피(업체 목록)', to: '기업정보함(업체 상세 업무 이력에 완료 회차 표시), 업무관리(이력 조회)', ask: '기업규정집은 메일·기업정보함·업무관리와 어떻게 이어지나요?' },
         { key: 'payroll',   icon: '💰', name: '급여아웃소싱',   when: '고객사 임금 대행·근태·임금명세서·연차 정산 (우리 법인 내부 급여인 인사관리와 별개)', from: '고객사 급여·근태 기초자료', to: '임금대장·임금명세서 산출', ask: '급여아웃소싱과 내부관리의 인사관리는 무엇이 다른가요?' }
@@ -204,25 +207,25 @@
       flowId: 'flow-core',
       source: '푸른포털 시스템 길잡이',
       docNo: '포털 4대 영역 전체 지도',
-      law: '의뢰인 업무(8) · 자료함(7) · 영업관리(5) · 내부관리(5) · 머리줄 캘린더 단추',
+      law: '의뢰인 업무(11) · 자료함(7) · 영업관리(5) · 내부관리(5) · 머리줄 캘린더 단추',
       title: '푸른통합시스템 4대 영역 구성과 한눈에 보는 사용 원칙',
       q: '푸른포털의 의뢰인 업무, 자료함, 영업관리, 내부관리 줄은 각각 언제 어떻게 쓰나요?',
       a: [
-        '푸른포털 26개 앱은 업무 흐름 그대로 네 줄로 나뉩니다.',
+        '푸른포털 29개 앱은 업무 흐름 그대로 네 줄과 위쪽 머리줄 단추로 나뉩니다.',
         '① [자료함(7개)]: 사진첩·기업정보함·푸른 메일·계약서등관리·업무관리·공공임단협·P박스 — 서류·명함·메일·법령·판례를 모아 다듬는 곳입니다.',
         '• [푸른 캘린더]: 줄 타일이 아니라 위쪽 머리줄(건의하기 왼쪽)의 큰 단추로 한 번에 엽니다. 단추에는 오늘 «구글 공용 달력» 일정 건수가 보입니다(폰은 그림 모서리 숫자 딱지 · 연차·출장·나만 보기 일정은 안 세고, 못 받으면 숫자가 안 보입니다).',
-        '② [의뢰인 업무(8개)]: 푸른이알피·기금관리·컨설팅보고서·정부사업일정·기업정부지원금·한글 편집기·기업규정집·급여아웃소싱 — 고객사 계약·사건·컨설팅·기금을 실제 수행하는 곳이며, 모든 업체·계약·사건의 원본 주인은 [푸른이알피] 하나입니다.',
+        '② [의뢰인 업무(11개)]: 푸른이알피·기금관리·컨설팅보고서·정부사업일정·기업정부지원금·괴롭힘·성희롱 조사·일터상생혁신·산업일자리전환·한글 편집기·기업규정집·급여아웃소싱 — 고객사 계약·사건·조사·컨설팅·기금을 실제 수행하는 곳이며, 모든 업체·계약·사건의 원본 주인은 [푸른이알피] 하나입니다.',
         '③ [영업관리(5개)]: 뉴스레터·홈페이지·회생광고·전광판·정부사업신청 — 전 직원이 대외 홍보와 신규 입찰 공고를 발굴하는 곳입니다.',
         '④ [내부관리(5개)]: 인사관리·재무관리·컨설팅정산·푸른등기·경력관리 — 권한 보유자가 법인 내부 급여·입출금·정산·변경등기를 관리하는 곳입니다.'
       ].join('\n'),
       points: [
         '한 줄 기억법: [자료함]에서 서류·명함·메일을 모아 ➔ [푸른이알피(의뢰인 업무)]에 원본을 세우고 ➔ [영업관리]로 알리며 ➔ [내부관리]로 입금·정산합니다',
-        '상단 [🔗 연결도] 버튼을 누르면 4대 영역의 모든 앱이 무엇을 주고받는지 화살표 지도로 한눈에 볼 수 있습니다',
+        '새로 추가되는 포털 프로그램도 챗봇이 앱 목록·온톨로지 연결도·화면 구성을 자동으로 읽어 사용법과 입출력 연결을 즉시 안내합니다',
         '자주 쓰는 앱은 타일 별표(★)를 누르면(폰은 길게 누름) 맨 위 [자주 쓰는 앱] 상자에 고정됩니다'
       ],
       followUps: [
-        '의뢰인 업무 줄 8개 앱은 서로 어떻게 연결되어 있어?',
-        '자료함 줄 8개 앱(사진첩·기업정보함·메일·업무관리·P박스) 연결도를 알려줘',
+        '의뢰인 업무 줄 11개 앱은 서로 어떻게 연결되어 있어?',
+        '자료함 줄 앱들(사진첩·기업정보함·메일·업무관리·P박스) 연결도를 알려줘',
         '영업관리 줄 5개 앱은 어떻게 사용하고 어디와 연결돼?',
         '신규 거래처를 맡았을 때 처음부터 입력하는 순서가 궁금해'
       ],
@@ -257,21 +260,21 @@
       flowId: 'flow-gov',
       source: '푸른포털 영역별 길잡이',
       docNo: '① 의뢰인 업무 줄 사용법·연결도',
-      law: '푸른이알피 · 기금관리 · 컨설팅보고서 · 정부사업일정 · 기업정부지원금 · 한글 편집기 · 기업규정집 · 급여아웃소싱',
-      title: '[의뢰인 업무] 8개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나',
+      law: '푸른이알피 · 기금관리 · 컨설팅보고서 · 정부사업일정 · 기업정부지원금 · 괴롭힘·성희롱 조사 · 일터상생혁신 · 산업일자리전환 · 한글 편집기 · 기업규정집 · 급여아웃소싱',
+      title: '[의뢰인 업무] 11개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나',
       q: '의뢰인 업무 줄에 있는 프로그램들은 각각 언제 어떻게 사용하고 서로 어떻게 연결되어 있나요?',
-      a: '[의뢰인 업무] 줄은 고객사 일을 직접 처리하는 8개 앱입니다.\n• [푸른이알피]: 모든 거래처·자문계약·노동사건·컨설팅 수임의 출발점(원본)입니다. 처음 수임하면 여기서 업체를 먼저 세웁니다.\n• [정부사업일정] ➔ [컨설팅보고서]: 수임한 컨설팅의 방문 회차·사진·보고서 초안(HWPX) 작성은 [정부사업일정]에서 하고, 전사 보고서 진행률 점검과 ③서명본·④별첨·⑤제출 체크 및 메일 첨부 서류 연결은 [컨설팅보고서] 현황판에서 합니다.\n• [기업정부지원금]: 이알피 고객사 원장과 고용보험 인원을 읽어 받을 수 있는 지원금을 매칭하며, 「신청 대행」으로 결정하면 [업무관리]에 할 일이 자동 생성됩니다.\n• [기금관리]: 사내·공동기금 설립·결산·표준서식을 다루며, [기업정보함]에서 사업자 정보를 당겨오고 [푸른 메일] 쓰기 창으로 준비서류 안내를 넘깁니다.\n• [기업규정집] & [한글 편집기] & [급여아웃소싱]: 각각 취업규칙 검토·개정(기업정보함 이력 연동), 민감 한글파일 브라우저 편집(서버 무전송), 고객사 임금 대행을 맡습니다.',
+      a: '[의뢰인 업무] 줄은 고객사 일을 직접 처리하는 11개 앱입니다.\n• [푸른이알피]: 모든 거래처·자문계약·노동사건·컨설팅 수임의 출발점(원본)입니다. 처음 수임하면 여기서 업체를 먼저 세웁니다.\n• [정부사업일정] ➔ [컨설팅보고서] & [일터상생혁신] · [산업일자리전환]: 수임 컨설팅의 회차·방문사진·초안은 [정부사업일정]에서, 전사 진도·③서명본~⑤제출 체크는 [컨설팅보고서]에서 하며, 노사발전재단 일터혁신(.pptx)과 KMAC·CEPA 산업일자리전환(.hwpx)은 각각 전용 워크스페이스에서 비식별 집계·보고서를 자동 생성합니다.\n• [괴롭힘·성희롱 조사]: 조사 공문 메일을 자동 수집해 8단계 표준 조사·종단간 암호화 비밀 전자서명·조사결과보고서(.hwpx)를 작성하고 푸른이알피 사건관리와 동기화합니다.\n• [기업정부지원금] & [기금관리]: 이알피 고객사 수급 가능 지원금을 매칭해 「신청 대행」 시 [업무관리] 할 일을 자동 생성하며, 기금관리는 기업정보함·푸른 메일과 연결해 기금 설립·결산·법령챗봇을 지원합니다.\n• [기업규정집] & [한글 편집기] & [급여아웃소싱]: 각각 취업규칙 개정(기업정보함 이력 연동), 민감 한글파일 로컬 편집(서버 무전송), 고객사 임금 대행을 맡습니다.',
       points: [
         '컨설팅보고서 현황판에서 초안을 고치고 싶을 때 단추를 누르면 `정부사업일정`의 해당 보고서 작성 창으로 바로 건너갑니다',
         '고객사 임금 대행은 [급여아웃소싱], 우리 노무법인 내부 직원 급여는 맨 아랫줄 [인사관리]입니다'
       ],
       followUps: [
-        '자료함 줄에 있는 7개 앱은 의뢰인 업무와 어떻게 연결돼?',
-        '기업정부지원금에서 신청 대행을 누르면 업무관리에 어떻게 나타나?',
-        '기금관리에서 기업에 설립 준비서류 메일을 보내는 방법은?'
+        '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?',
+        '일터상생혁신 앱과 산업일자리전환 앱은 각각 어떻게 쓰나요?',
+        '기업정부지원금에서 신청 대행을 누르면 업무관리에 어떻게 나타나?'
       ],
-      tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도'],
-      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'hangul']
+      tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도', '괴롭힘성희롱조사', '일터상생혁신', '산업일자리전환'],
+      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'hangul']
     },
     {
       id: 'SYS-row-store',
@@ -373,10 +376,73 @@
         '파이어베이스 실시간DB에 원문을 쌓지 않고 브라우저 로컬 저장소(IndexedDB)와 비식별 텍스트 게이트만 쓰므로 추가 서버 비용 없이 안전하게 운영됩니다'
       ],
       followUps: [
-        '자료함 줄 8개 앱(사진첩·기업정보함·메일·업무관리·P박스) 연결도를 알려줘'
+        '자료함 줄 앱들(사진첩·기업정보함·메일·업무관리·P박스) 연결도를 알려줘'
       ],
       tags: ['P박스', '피박스', 'pbox', '법령전수함', '국가법령', '판례검색', '하급심', '행정해석', '유권해석', '내용검토', '문서작성', '위험진단', '인용검증'],
       apps: ['pbox']
+    },
+    {
+      id: 'SYS-harass-01',
+      cat: 'system',
+      flowId: 'flow-core',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 괴롭힘·성희롱 조사 사용법',
+      law: '공문 메일 후보 수집 ➔ 8단계 표준 조사 ➔ 비밀유지 암호화 전자서명 ➔ 조사결과보고서(.hwpx) ➔ 푸른이알피 동기화',
+      title: '[괴롭힘·성희롱 조사] 조사 사건 공문 메일 수집·8단계 진행·비밀 전자서명·결과보고서(.hwpx) 사용법',
+      q: '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?',
+      a: '[괴롭힘·성희롱 조사]는 포털 [의뢰인 업무] 줄에서 직장 내 괴롭힘·성희롱 사건 조사를 전담하는 보안 워크스페이스입니다.\n① [공문·자료 수집 & 사건 연결]: [푸른 메일]에서 들어온 조사 의뢰 공문·진술·증거 메일 후보를 묶어 오고 [푸른이알피] 업체·사건 원장과 연결해 사건을 개설합니다.\n② [8단계 표준 조사 & 비밀유지 분리]: 전체 목록·8단계 진행 상태는 재직 직원이 확인하되, 면담 진술록·쟁점 사실인정·조사결과보고서 본문(`harass_secret`)과 비밀서약·진술확인 종단간 암호화 전자서명(`harass_sign`)은 근로기준법 제76조의3 제7항 비밀유지 원칙에 따라 사건 주·부담당 노무사와 대표만 열람·작성할 수 있습니다.\n③ [보고서 출력 & 이알피 자동 반영]: 진술확인서와 최종 조사결과보고서를 `.hwpx` 한글 파일로 내려받고 진행 상태를 [푸른이알피] 사건관리에 자동 동기화합니다.',
+      points: [
+        '면담 진술 본문과 전자서명 자료는 주·부담당 노무사 및 대표 외에는 서버 규칙으로 접근이 원천 차단됩니다',
+        '직장 내 괴롭힘 발생 시 사용자의 법정 조치 의무·과태료 기준도 함께 질문하실 수 있습니다'
+      ],
+      followUps: [
+        '직장 내 괴롭힘이나 성희롱 신고가 들어오면 회사가 반드시 밟아야 하는 절차는?',
+        '의뢰인 업무 줄 11개 앱은 서로 어떻게 연결되어 있어?'
+      ],
+      tags: ['괴롭힘성희롱조사', '괴롭힘·성희롱 조사', '괴롭힘조사', '성희롱조사', 'harass', '진술확인서', '조사결과보고서', '비밀서약', '8단계조사'],
+      apps: ['harass', 'erp', 'mail']
+    },
+    {
+      id: 'SYS-ilteo-01',
+      cat: 'system',
+      flowId: 'flow-gov',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 일터상생혁신 사용법',
+      law: '이알피·정부사업일정·메일 연동 ➔ 브라우저 로컬 비식별 통계 진단 ➔ 중간·최종보고서(.pptx)·규정(.docx)·모의계산(.xlsx) 생성',
+      title: '[일터상생혁신] 노사발전재단 일터혁신 상생컨설팅 비식별 진단 · 보고서(.pptx) 자동화 사용법',
+      q: '일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘',
+      a: '[일터상생혁신]은 포털 [의뢰인 업무] 줄에서 노사발전재단 일터혁신 상생컨설팅 수행 전 과정을 처리하는 전용 앱입니다.\n① [사업장·메일 연결]: [푸른이알피]·[정부사업일정]의 참여 사업장 목록과 [푸른 메일]의 기초자료·후속 피드백 메일을 읽기 전용으로 불러와 프로젝트를 세팅합니다.\n② [로컬 비식별 정량 진단]: 임금대장·근태·명부 엑셀을 넣으면 원본 개인정보를 서버나 외부 AI로 절대 보내지 않고 내 브라우저 안에서만 비식별 통계로 집계해 진단 요약을 산출합니다.\n③ [산출물 자동 생성 & 불변 스냅샷]: 중간보고서·최종결과보고서(`.pptx`), 별첨 규정안(`.docx`), 모의계산표(`.xlsx`) 및 통합 패키지(`.zip`)를 자동 생성하며 확정본은 불변 스냅샷(`scal_ilteo`)으로 안전하게 보관합니다.',
+      points: [
+        '임금대장·명부 원본 파일은 DB나 외부 AI에 전송되지 않고 브라우저 로컬 비식별 통계만 활용합니다',
+        '이알피·정부사업일정·컨설팅보고서 원본은 읽기만 하고 전용 저장소(`scal_ilteo`)에만 기록합니다'
+      ],
+      followUps: [
+        '산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?',
+        '정부사업일정·컨설팅보고서와는 어떻게 역할이 나뉘나요?'
+      ],
+      tags: ['일터상생혁신', 'ilteo', '노사발전재단', '상생컨설팅', '일터혁신보고서', '비식별진단', '중간보고서', '최종결과보고서', 'pptx'],
+      apps: ['ilteo', 'consult', 'govreport', 'mail']
+    },
+    {
+      id: 'SYS-jobtrans-01',
+      cat: 'system',
+      flowId: 'flow-gov',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 산업일자리전환 사용법',
+      law: '이알피·정부사업일정·메일 연동 ➔ 로컬 비식별 재무·인력 집계 ➔ KMAC·CEPA 맞춤 중간·최종보고서·완료계(.hwpx)',
+      title: '[산업일자리전환] KMAC 구조혁신 · CEPA 산업일자리전환 맞춤 보고서·완료계(.hwpx) 사용법',
+      q: '산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?',
+      a: '[산업일자리전환]은 포털 [의뢰인 업무] 줄에서 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 컨설팅을 수행하는 전용 앱입니다.\n① [사업장·기초자료 연결]: [푸른이알피]·[정부사업일정]의 계약 확정 사업장과 [푸른 메일] 기초자료 메일을 읽기 전용으로 불러오고 운영기관(KMAC·CEPA) 양식을 고릅니다.\n② [로컬 비식별 정량 집계]: 재무·인력·임금·설문 엑셀 원본은 브라우저 로컬에서만 비식별 집계하며 DB나 외부 AI로 전송하지 않습니다.\n③ [정식 한글(.hwpx) 보고서·완료계 출력]: 운영기관별 맞춤 중간보고서·최종보고서·완료계를 정식 `.hwpx` 파일로 생성해 내려받거나 [한글 편집기]로 바로 넘겨 다듬을 수 있습니다.',
+      points: [
+        '운영기관(능률협회 KMAC / 충남경제진흥원 CEPA) 양식 규격에 맞춘 한글(`.hwpx`) 산출물과 불변 스냅샷(`scal_jobtrans`)을 자동 관리합니다',
+        '내려받은 `.hwpx` 파일을 한컴오피스 없이 바로 손보려면 [한글 편집기] 앱과 함께 쓰면 편리합니다'
+      ],
+      followUps: [
+        '일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘',
+        '한글 편집기는 어떤 상황에서 쓰면 좋나요?'
+      ],
+      tags: ['산업일자리전환', 'jobtrans', '구조혁신', '능률협회', 'KMAC', '충남경제진흥원', 'CEPA', '완료계', '일자리전환'],
+      apps: ['jobtrans', 'consult', 'hangul', 'mail']
     },
     {
       id: 'SYS-onboard-newco',
@@ -735,7 +801,7 @@
         '취업규칙 작성·신고 의무 인원 기준과 불이익변경 절차는?'
       ],
       tags: ['직장내괴롭힘', '괴롭힘', '갑질', '성희롱', '객관적조사', '비밀유지', '피해자보호', '불리한처우', '징계'],
-      apps: ['erp', 'rules']
+      apps: ['erp', 'rules', 'harass']
     },
     {
       id: 'LAB-maternity-01',
@@ -974,7 +1040,7 @@
         '정부사업신청·정부사업일정·컨설팅보고서·컨설팅정산 5단계 연결도를 보여줘'
       ],
       tags: ['일터혁신', '상생컨설팅', '산업일자리전환', '현장클리닉', '기술보호', '기술보호울타리', '무료컨설팅', '정부컨설팅'],
-      apps: ['consult', 'govreport', 'govaid']
+      apps: ['consult', 'govreport', 'govaid', 'ilteo', 'jobtrans']
     }
   ];
 
@@ -1069,9 +1135,596 @@
     return null;
   }
 
-  /* ── 전체 통합 항목 목록 (내장 PORTAL_KB + fund_kb.js 의 FUND_KB 자동 병합) ── */
+  /* ── Ⅳ. 신규 프로그램 무보수 자동 감지 · 온톨로지 연결도 · 화면 HTML 파서 엔진 ── */
+  var STATIC_COVERED_APPS = {
+    erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1,
+    hangul: 1, rules: 1, payroll: 1, cal: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
+    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1,
+    hr: 1, fin: 1, settle: 1, deungi: 1, career: 1
+  };
+  var SINGLE_APP_DOC_ID = {
+    erp: 'SYS-erp-01',
+    fund: 'SYS-fund-01',
+    deungi: 'SYS-deungi-01',
+    pbox: 'SYS-pbox-01',
+    harass: 'SYS-harass-01',
+    ilteo: 'SYS-ilteo-01',
+    jobtrans: 'SYS-jobtrans-01'
+  };
+  var ROW_LABELS = {
+    client: '의뢰인 업무',
+    store: '자료함',
+    sales: '영업관리',
+    inside: '내부관리'
+  };
+  var ROOT_KO_MAP = [
+    { prefix: 'data/companies', label: '푸른이알피(업체 원장)', app: 'erp' },
+    { prefix: 'data/contracts', label: '푸른이알피(계약 원장)', app: 'erp' },
+    { prefix: 'data/contract_requests', label: '푸른이알피(계약 생성 요청)', app: 'erp' },
+    { prefix: 'data/contract_forms', label: '푸른이알피(계약서 양식)', app: 'erp' },
+    { prefix: 'data/cases', label: '푸른이알피(사건 원장)', app: 'erp' },
+    { prefix: 'data/consultings', label: '푸른이알피(컨설팅 원장)', app: 'erp' },
+    { prefix: 'data/biz_cons_types', label: '푸른이알피(컨설팅 사업 분류)', app: 'erp' },
+    { prefix: 'data/funds', label: '기금관리(기금 원장)', app: 'fund' },
+    { dataPrefix: 'finance_', label: '재무관리(입출금·세금계산서)', app: 'fin' },
+    { dataPrefix: 'ledger_', label: '재무관리(거래내역 대조)', app: 'fin' },
+    { prefix: 'hanaSmsBridge', label: '재무관리(은행 입출금 알림)', app: 'fin' },
+    { dataPrefix: 'payroll_', label: '인사관리(임금·급여)', app: 'hr' },
+    { dataPrefix: 'attendance_', label: '인사관리·캘린더(근태 기록)', app: 'hr' },
+    { dataPrefix: 'leave_', label: '인사관리(연차 원장)', app: 'hr' },
+    { prefix: 'data/my_schedules', label: '푸른 캘린더·이알피(일정 공유)', app: 'cal' },
+    { prefix: 'cal_', label: '푸른 캘린더(개인·수신 일정)', app: 'cal' },
+    { prefix: 'pucards/mailbox', label: '푸른 메일(메일함)', app: 'mail' },
+    { prefix: 'pucards/sentBox', label: '푸른 메일(보낸편지함)', app: 'mail' },
+    { prefix: 'pucards/scheduled', label: '푸른 메일(예약발송함)', app: 'mail' },
+    { prefix: 'mailbox', label: '푸른 메일(수발신 메일함)', app: 'mail' },
+    { prefix: 'pucards', label: '기업정보함(사업자·명함 색인)', app: 'cards' },
+    { prefix: 'puphotos', label: '사진첩(촬영·판독 서류)', app: 'photos' },
+    { prefix: 'work_erp', label: '업무관리(주간 할 일)', app: 'work' },
+    { prefix: 'scal_docs', label: '컨설팅보고서(서류 체크표)', app: 'govreport' },
+    { prefix: 'scal_ilteo', label: '일터상생혁신(전용 작업공간)', app: 'ilteo' },
+    { prefix: 'scal_jobtrans', label: '산업일자리전환(전용 작업공간)', app: 'jobtrans' },
+    { prefix: 'scal_', label: '정부사업일정(회차·보고서)', app: 'consult' },
+    { prefix: 'govaid', label: '기업정부지원금(지원사업 매칭)', app: 'govaid' },
+    { prefix: 'harass_', label: '괴롭힘·성희롱 조사(보안 사건함)', app: 'harass' },
+    { prefix: 'rules_mgmt', label: '기업규정집(취업규칙 회차)', app: 'rules' },
+    { prefix: 'chwieop', label: '기업규정집(규정 원문)', app: 'rules' },
+    { prefix: 'pu_docs', label: '계약서등관리(원본 보관함)', app: 'docs' },
+    { prefix: 'esign', label: '계약서등관리(전자서명)', app: 'docs' },
+    { prefix: 'payroll_os', label: '급여아웃소싱(임금 대행)', app: 'payroll' },
+    { prefix: 'paydata', label: '급여데이터함(고객사 급여·입퇴사 자료)', app: 'paydata' },
+    { prefix: 'newsletter', label: '뉴스레터(주간지·발송 명단)', app: 'news' },
+    { prefix: 'homepage', label: '홈페이지(주간 브리핑·게시글)', app: 'home' },
+    { prefix: 'rehab_ad', label: '회생광고(회생공고 선별)', app: 'rehabad' },
+    { prefix: 'signboard', label: '전광판(광고 문안 송출)', app: 'signboard' },
+    { prefix: 'gov_feed', label: '정부사업신청(입찰 공고 수집함)', app: 'govbid' },
+    { prefix: 'gov/', label: '정부사업신청(공고 검토)', app: 'govbid' },
+    { prefix: 'settle', label: '컨설팅정산(주관·담당 정산표)', app: 'settle' },
+    { prefix: 'deungi', label: '푸른등기(법인 변경등기)', app: 'deungi' },
+    { prefix: 'kcareer', label: '경력관리(수행실적·이력서)', app: 'career' },
+    { prefix: 'pubdata/co', label: '공공데이터(고용보험·국민연금 인원)', app: '' },
+    { prefix: 'data/user_dir', label: '직원 명부(담당자 확인)', app: '' },
+    { prefix: 'uid_roles', label: '포털 재직·권한 확인', app: '' },
+    { prefix: 'users', label: '로그인 구성원 정보', app: '' },
+    { prefix: 'data', label: '푸른이알피(통합 원장)', app: 'erp' }
+  ];
+
+  var LIVE_APPS = {};
+  var LIVE_ONTOLOGY = {};
+  var LIVE_DETAILS = {};
+  var AUTO_APP_KB = [];
+
+  function stripHtmlTags(s) {
+    return String(s || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&middot;/gi, '·')
+      .replace(/&rarr;/gi, '→')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /* 동일 출처 <app>.html 문자열에서 스크립트 실행 없이 제목·주석·탭·단계·주요 단추를 안전하게 추출 */
+  function extractHtmlAppDetail(htmlText, appMeta) {
+    var raw = String(htmlText || '');
+    if (!raw) return null;
+    var headSlice = raw.slice(0, 18000);
+    var doings = [];
+    var comments = headSlice.match(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g) || [];
+    comments.slice(0, 4).forEach(function (c) {
+      var lines = c.split(/\r?\n/);
+      var inDoing = false;
+      lines.forEach(function (ln) {
+        var clean = ln.replace(/^[\s/*<!-]+|[-*/>\s]+$/g, '').trim();
+        if (!clean) return;
+        if (/하는\s*일|주요\s*기능|사용\s*순서/.test(clean)) { inDoing = true; return; }
+        if (/^[⚠!]/.test(clean)) { inDoing = false; return; }
+        var numM = /^(?:(\d+)[.)]|([①②③④⑤⑥⑦⑧]))\s*(.+)$/.exec(clean);
+        if (numM && (inDoing || doings.length < 5)) {
+          var itemTxt = numM[3].trim();
+          if (itemTxt.length >= 4 && itemTxt.length <= 110 && doings.indexOf(itemTxt) < 0) doings.push(itemTxt);
+        }
+      });
+    });
+
+    var noCode = raw
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+
+    var titleM = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(noCode);
+    var title = titleM ? stripHtmlTags(titleM[1]).replace(/\s*[—|-]\s*푸른.*$/, '').trim() : ((appMeta && appMeta.name) || '');
+
+    var subM = /class="[^"]*\b(?:sub|subtitle|app-sub|hd-sub)\b[^"]*"[^>]*>([\s\S]*?)<\//i.exec(noCode);
+    var sub = subM ? stripHtmlTags(subM[1]).slice(0, 120) : '';
+
+    function collectUnique(re, maxLen, limit) {
+      var out = [];
+      var m;
+      while ((m = re.exec(noCode)) && out.length < limit) {
+        var txt = stripHtmlTags(m[1]);
+        if (!txt || txt.length < 2 || txt.length > maxLen) continue;
+        if (/^(닫기|취소|확인|삭제|로그아웃|홈|포털|✕|×|…|\.\.\.)$/.test(txt)) continue;
+        if (out.indexOf(txt) < 0) out.push(txt);
+      }
+      return out;
+    }
+
+    var tabs = [];
+    var navRe = /<(?:nav|div)[^>]*\b(?:class="[^"]*\b(?:tabs|tab-bar|nav-tabs|top-tabs|mode-tabs)\b[^"]*"|role="tablist")[^>]*>([\s\S]*?)<\/(?:nav|div)>/gi;
+    var navM;
+    while ((navM = navRe.exec(noCode)) && tabs.length < 7) {
+      var btnRe = /<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/gi;
+      var bm;
+      while ((bm = btnRe.exec(navM[1])) && tabs.length < 7) {
+        var bt = stripHtmlTags(bm[1]);
+        if (bt && bt.length >= 2 && bt.length <= 28 && !/^(닫기|포털|홈)$/.test(bt) && tabs.indexOf(bt) < 0) {
+          tabs.push(bt);
+        }
+      }
+    }
+
+    var steps = collectUnique(/class="[^"]*\b(?:ws-step|step-item|step-btn|wiz-step)\b[^"]*"[^>]*>([\s\S]*?)<\/(?:button|div|li|a)>/gi, 34, 8);
+    var sections = collectUnique(/<(?:h2|h3)\b[^>]*>([\s\S]*?)<\/(?:h2|h3)>/gi, 36, 6);
+    var actions = collectUnique(/<button\b[^>]*class="[^"]*\b(?:pri|ok|btn-pri|btn-primary)\b[^"]*"[^>]*>([\s\S]*?)<\/button>/gi, 26, 6);
+
+    return {
+      title: title,
+      sub: sub,
+      doings: doings.slice(0, 5),
+      tabs: tabs,
+      steps: steps,
+      sections: sections,
+      actions: actions
+    };
+  }
+
+  function resolveRootDesc(rootPath, selfKey) {
+    var rp = String(rootPath || '').trim();
+    if (!rp) return null;
+    for (var i = 0; i < ROOT_KO_MAP.length; i++) {
+      var m = ROOT_KO_MAP[i];
+      var hit = m.dataPrefix
+        ? (rp.indexOf('data' + '/' + m.dataPrefix) === 0)
+        : (rp === m.prefix || rp.indexOf(m.prefix) === 0);
+      if (hit) {
+        if (m.app === selfKey) return null;
+        return { label: m.label, app: m.app };
+      }
+    }
+    /* 온톨로지에 새로 등록된 타 프로그램 소유 뿌리(primaryRoots)와 실시간 교차 매칭 */
+    var ontKeys = Object.keys(LIVE_ONTOLOGY);
+    for (var j = 0; j < ontKeys.length; j++) {
+      var ok = ontKeys[j];
+      if (ok === selfKey || ok === 'erp') continue;
+      var prog = LIVE_ONTOLOGY[ok];
+      var prs = (prog && prog.primaryRoots) || [];
+      for (var p = 0; p < prs.length; p++) {
+        if (prs[p] && (rp === prs[p] || rp.indexOf(prs[p] + '/') === 0)) {
+          var oName = (LIVE_APPS[ok] && LIVE_APPS[ok].name) || prog.name || ok;
+          return { label: oName + '(' + prs[p] + ')', app: ok };
+        }
+      }
+    }
+    return null;
+  }
+
+  function describeOntologyConnections(key, app, ont) {
+    var related = [];
+    function addRel(k) {
+      if (k && k !== key && related.indexOf(k) < 0) related.push(k);
+    }
+    if (ont && ont.localOnly) {
+      return {
+        from: '내 PC 문서·브라우저 로컬 입력 (파이어베이스 서버로 원본 미전송)',
+        to: ont.note || '브라우저 안에서 즉시 처리 및 결과 파일 내려받기 (서버 무저장)',
+        relatedApps: related
+      };
+    }
+    var fromLabels = [];
+    var shared = (ont && Array.isArray(ont.sharedRoots)) ? ont.sharedRoots : [];
+    shared.forEach(function (sr) {
+      var r = resolveRootDesc(sr, key);
+      if (!r) return;
+      if (r.app) addRel(r.app);
+      if (fromLabels.indexOf(r.label) < 0) fromLabels.push(r.label);
+    });
+
+    var toLabels = [];
+    var writes = (ont && Array.isArray(ont.writeContracts)) ? ont.writeContracts : [];
+    writes.forEach(function (wc) {
+      var wp = typeof wc === 'string' ? wc : (wc && wc.path) || '';
+      if (!wp) return;
+      var wr = resolveRootDesc(wp, key);
+      if (wr && wr.app && wr.app !== key) {
+        addRel(wr.app);
+        var outLbl = wr.label + ' 연동 기록';
+        if (toLabels.indexOf(outLbl) < 0) toLabels.push(outLbl);
+      }
+    });
+    var primaries = (ont && Array.isArray(ont.primaryRoots)) ? ont.primaryRoots : [];
+    if (primaries.length) {
+      var cleanRoots = primaries.filter(function (pr) { return pr && pr.indexOf('activeWriter/') !== 0; });
+      if (cleanRoots.length) {
+        toLabels.unshift(((app && app.name) || (ont && ont.name) || key) + ' 전용 저장소(' + cleanRoots.slice(0, 2).join('·') + ') 보관');
+      }
+    }
+    return {
+      from: fromLabels.slice(0, 4).join(', ') || '사용자 직접 입력 및 첨부 자료',
+      to: toLabels.slice(0, 3).join(', ') || (((app && app.name) || key) + ' 작업 결과 저장 및 서류 출력'),
+      relatedApps: related.slice(0, 3)
+    };
+  }
+
+  function inferSGCategoryForApp(key, app, ont) {
+    if (APP_TO_SG_CAT[key] && SG_CAT_ALLOW[APP_TO_SG_CAT[key]]) return APP_TO_SG_CAT[key];
+    var hay = [key, (app && app.name) || '', (app && app.desc) || '', ((ont && ont.primaryRoots) || []).join(' ')].join(' ');
+    if (/기금|fund/i.test(hay)) return 'fund';
+    if (/규정|취업규칙|rules/i.test(hay)) return 'rules';
+    if (/급여아웃소싱|paydata|급여데이터|payroll/i.test(hay)) return 'payroll';
+    if (/컨설팅|정부사업|일터|일자리전환|scal_|consult|settle/i.test(hay)) return 'consult';
+    if (/업무관리|메일|캘린더|work_erp|mailbox|cal_/i.test(hay)) return 'work';
+    if (/명함|정보함|사진첩|카메라|pucards|puphotos/i.test(hay)) return 'cards';
+    if (/계약서|위임장|전자서명|한글|esign|pu_docs|hangul/i.test(hay)) return 'docs';
+    if (app && (app.row === 'inside' || app.row === 'client')) return 'erp';
+    return 'portal';
+  }
+
+  function inferAutoFlowId(key, app, relApps) {
+    var row = (app && app.row) || '';
+    var joined = ([key].concat(relApps || [])).join(',');
+    if (/consult|govreport|ilteo|jobtrans|settle/.test(joined)) return 'flow-gov';
+    if (/govaid/.test(joined)) return 'flow-govaid';
+    if (/fund|rules|hangul/.test(joined)) return 'flow-fund-rules';
+    if (row === 'sales') return 'flow-sales';
+    if (row === 'inside' || /fin|docs/.test(joined)) return 'flow-contract';
+    return 'flow-core';
+  }
+
+  function buildAccessText(app) {
+    if (!app) return '재직 직원 권한 확인 후 이용';
+    if (app.off) return '현재 포털 타일 비공개(준비·내부 전환 중) 상태';
+    if (app.soon) return '출시 점검 중(「준비중」 표시 — 현재 관리자 계정에서 우선 열람 가능)';
+    if (app.adminOnly) return '관리자·위임관리인 전용 노출';
+    if (app.perm === 'hr') return '인사 권한(`hr`) 보유자 및 관리자 전용';
+    if (app.perm === 'fin') return '재무 권한(`fin`) 보유자 및 관리자 전용';
+    if (app.row === 'sales') return '전 재직 직원 공개';
+    return '재직 직원 사용 가능';
+  }
+
+  function buildAutoAppEntry(key) {
+    var app = LIVE_APPS[key] || {};
+    var ont = LIVE_ONTOLOGY[key] || null;
+    var det = LIVE_DETAILS[key] || null;
+    var name = app.name || (ont && ont.name) || (det && det.title) || key;
+    var rowId = app.row || 'client';
+    var rowLabel = app.head ? '위쪽 머리줄 단추' : ('[' + (ROW_LABELS[rowId] || '포털') + '] 줄');
+    var desc = app.desc || (det && det.sub) || (ont && ont.note) || (name + ' 업무 처리');
+    var conn = describeOntologyConnections(key, app, ont);
+    var accessTxt = buildAccessText(app);
+
+    var stepParts = [];
+    if (det && det.steps && det.steps.length) {
+      stepParts.push('화면 단계(' + det.steps.slice(0, 6).join(' ➔ ') + ') 순서대로 진행합니다.');
+    } else if (det && det.tabs && det.tabs.length) {
+      stepParts.push('상단 탭(' + det.tabs.slice(0, 6).join(' · ') + ')에서 원하는 메뉴를 골라 작업합니다.');
+    }
+    if (det && det.doings && det.doings.length) {
+      stepParts.push(det.doings.slice(0, 3).join(' / '));
+    }
+    if (det && det.actions && det.actions.length) {
+      stepParts.push('주요 실행 단추: [' + det.actions.slice(0, 4).join('], [') + ']');
+    }
+    if (!stepParts.length) {
+      stepParts.push(desc + ' 업무를 처리하며, 필요한 기초자료를 불러와 확인 후 저장·출력합니다.');
+    }
+
+    var lines = [
+      '[' + name + '] 프로그램은 포털 ' + rowLabel + '에서 열 수 있습니다 (' + accessTxt + ').',
+      '① [주요 역할·사용법]: ' + desc + '. ' + stepParts.join(' '),
+      '② [데이터 연결도]: ← 받아오는 곳: ' + conn.from + ' / → 저장·이어지는 곳: ' + conn.to + '.'
+    ];
+
+    var pts = [
+      '접근 권한·위치: ' + rowLabel + ' · ' + accessTxt,
+      (ont && ont.localOnly)
+        ? '파이어베이스 서버에 원문을 저장하지 않고 내 브라우저 안에서만 안전하게 처리합니다'
+        : '공유 원본(푸른이알피·기업정보함·메일 등)은 임의로 덮어쓰지 않고 약속된 전용 경로에만 기록합니다'
+    ];
+    if (det && det.sections && det.sections.length) {
+      pts.push('화면 주요 구성: ' + det.sections.slice(0, 5).join(' · '));
+    }
+
+    var nameCompact = name.replace(/[\s·()]/g, '');
+    var tags = [name, key, name + '사용법', name + '연결도', ROW_LABELS[rowId] || '포털'];
+    if (nameCompact && nameCompact !== name) tags.push(nameCompact, nameCompact + '사용법');
+    if (det && det.tabs) det.tabs.slice(0, 4).forEach(function (t) { tags.push(t); });
+    if (det && det.steps) det.steps.slice(0, 4).forEach(function (s) { tags.push(s); });
+
+    var flowId = inferAutoFlowId(key, app, conn.relatedApps);
+    return {
+      id: 'SYS-auto-' + key,
+      _autoKey: key,
+      cat: 'system',
+      flowId: flowId,
+      source: '푸른포털 실시간 앱·온톨로지 자동 길잡이',
+      docNo: (ROW_LABELS[rowId] || '포털') + ' · ' + name + ((ont && ont.file) ? ' (' + ont.file + ')' : (app.url ? ' (' + app.url + ')' : '')),
+      law: '입력(← ' + conn.from + ') ➔ [' + name + '] ➔ 출력(→ ' + conn.to + ')',
+      title: '[' + name + '] 사용법 · 화면 구성 · 데이터 연결도 자동 안내',
+      q: name + ' 프로그램은 언제 어떻게 사용하고 다른 앱과는 어떻게 연결되나요?',
+      a: lines.join('\n'),
+      points: pts,
+      followUps: [
+        (ROW_LABELS[rowId] || '의뢰인 업무') + ' 줄에 있는 다른 프로그램들과는 어떻게 연결돼?',
+        '푸른통합시스템 전체 연결도 원리를 알려줘'
+      ],
+      tags: tags,
+      apps: [key].concat(conn.relatedApps).slice(0, 4)
+    };
+  }
+
+  function findStaticEntryById(id) {
+    for (var i = 0; i < PORTAL_KB.length; i++) {
+      if (PORTAL_KB[i].id === id) return PORTAL_KB[i];
+    }
+    return null;
+  }
+
+  /* 포털 카탈로그(enter.html) + 온톨로지(pu-ontology.js) + 개별 앱 HTML 상세정보를 실시간 동기화 */
+  function syncCatalog(spec) {
+    spec = spec || {};
+    if (spec.ontologyPrograms && typeof spec.ontologyPrograms === 'object') {
+      Object.keys(spec.ontologyPrograms).forEach(function (k) {
+        if (spec.ontologyPrograms[k]) LIVE_ONTOLOGY[k] = spec.ontologyPrograms[k];
+      });
+    }
+    if (spec.appDetails && typeof spec.appDetails === 'object') {
+      Object.keys(spec.appDetails).forEach(function (k) {
+        if (spec.appDetails[k]) LIVE_DETAILS[k] = spec.appDetails[k];
+      });
+    }
+
+    var dynamicRowChanged = false;
+    if (Array.isArray(spec.apps)) {
+      spec.apps.forEach(function (ap) {
+        if (!ap || !ap.key) return;
+        var prev = LIVE_APPS[ap.key] || {};
+        LIVE_APPS[ap.key] = {
+          key: ap.key,
+          name: ap.name || prev.name || ap.key,
+          desc: ap.desc != null ? ap.desc : (prev.desc || ''),
+          icon: ap.icon || prev.icon || '📌',
+          url: ap.url || prev.url || '',
+          row: ap.row || prev.row || 'client',
+          head: !!(ap.head != null ? ap.head : prev.head),
+          soon: !!(ap.soon != null ? ap.soon : prev.soon),
+          off: !!(ap.off != null ? ap.off : prev.off),
+          adminOnly: !!(ap.adminOnly != null ? ap.adminOnly : prev.adminOnly),
+          perm: ap.perm != null ? ap.perm : (prev.perm || '')
+        };
+      });
+    }
+
+    /* 새로 만들어진 활성(!off) 앱을 PORTAL_ROWS_GUIDE 및 SYS-row-* / SYS-map-01 에 자동 편입 */
+    Object.keys(LIVE_APPS).forEach(function (k) {
+      var ap = LIVE_APPS[k];
+      var ont = LIVE_ONTOLOGY[k];
+      if (!ap || ap.off || (ont && ont.portal === false)) return;
+      var sgCat = inferSGCategoryForApp(k, ap, ont);
+      if (!APP_TO_SG_CAT[k] || !STATIC_COVERED_APPS[k]) APP_TO_SG_CAT[k] = sgCat;
+
+      var targetRowId = ROW_LABELS[ap.row] ? ap.row : 'client';
+      var rowObj = null;
+      for (var r = 0; r < PORTAL_ROWS_GUIDE.length; r++) {
+        if (PORTAL_ROWS_GUIDE[r].id === targetRowId) rowObj = PORTAL_ROWS_GUIDE[r];
+      }
+      if (!rowObj) return;
+      var existing = null;
+      for (var i = 0; i < rowObj.apps.length; i++) {
+        if (rowObj.apps[i].key === k) { existing = rowObj.apps[i]; break; }
+      }
+      if (!existing) {
+        var conn = describeOntologyConnections(k, ap, ont);
+        rowObj.apps.push({
+          key: k,
+          icon: ap.icon || '📌',
+          name: ap.name || k,
+          when: ap.desc || (ont && ont.note) || ((ap.name || k) + ' 실무 처리'),
+          from: conn.from,
+          to: conn.to,
+          ask: (ap.name || k) + ' 프로그램은 어떻게 사용하고 다른 앱과 어떻게 연결되나요?',
+          _autoRow: true
+        });
+        dynamicRowChanged = true;
+      } else {
+        if (ap.name && existing.name !== ap.name) {
+          existing.name = ap.name;
+          dynamicRowChanged = true;
+        }
+        if (existing._autoRow) {
+          var nextConn = describeOntologyConnections(k, ap, ont);
+          var nextWhen = ap.desc || (ont && ont.note) || ((ap.name || k) + ' 실무 처리');
+          if (existing.when !== nextWhen || existing.from !== nextConn.from || existing.to !== nextConn.to) {
+            existing.when = nextWhen;
+            existing.from = nextConn.from;
+            existing.to = nextConn.to;
+            dynamicRowChanged = true;
+          }
+        }
+      }
+    });
+
+    /* 온톨로지에만 먼저 등록된 신규 프로그램도 LIVE_APPS 기본 메타와 분류키를 자동 준비 */
+    Object.keys(LIVE_ONTOLOGY).forEach(function (k) {
+      if (k === 'portal') return;
+      var ont = LIVE_ONTOLOGY[k];
+      if (!ont || ont.portal === false) return;
+      if (!LIVE_APPS[k]) {
+        LIVE_APPS[k] = {
+          key: k,
+          name: ont.name || k,
+          desc: ont.note || '',
+          icon: '📌',
+          url: ont.file || '',
+          row: 'client',
+          head: false,
+          soon: false,
+          off: true,
+          adminOnly: false,
+          perm: ''
+        };
+      }
+      if (!APP_TO_SG_CAT[k] || !STATIC_COVERED_APPS[k]) APP_TO_SG_CAT[k] = inferSGCategoryForApp(k, LIVE_APPS[k], ont);
+    });
+
+    if (dynamicRowChanged) {
+      var rowPrefixes = { client: '① 의뢰인 업무', store: '② 자료함', sales: '③ 영업관리', inside: '④ 내부관리' };
+      var rowCardIds = { client: 'SYS-row-client', store: 'SYS-row-store', sales: 'SYS-row-sales', inside: 'SYS-row-inside' };
+      PORTAL_ROWS_GUIDE.forEach(function (r) {
+        var cnt = r.apps.length;
+        if (r.id === 'store') {
+          var tileCnt = r.apps.filter(function (x) { return !(LIVE_APPS[x.key] && LIVE_APPS[x.key].head) && x.key !== 'cal'; }).length;
+          r.title = rowPrefixes.store + ' (' + tileCnt + '개 앱 · 캘린더는 머리줄 단추)';
+        } else if (rowPrefixes[r.id]) {
+          r.title = rowPrefixes[r.id] + ' (' + cnt + '개 앱)';
+        }
+        var rowCard = findStaticEntryById(rowCardIds[r.id]);
+        if (rowCard) {
+          rowCard.law = r.apps.map(function (x) { return x.name; }).join(' · ');
+          rowCard.title = '[' + (ROW_LABELS[r.id] || r.id) + '] ' + cnt + '개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나';
+          r.apps.forEach(function (x) {
+            if (rowCard.apps.indexOf(x.key) < 0) rowCard.apps.push(x.key);
+            if (rowCard.tags.indexOf(x.name) < 0) rowCard.tags.push(x.name);
+          });
+          var extraApps = r.apps.filter(function (x) { return !STATIC_COVERED_APPS[x.key]; });
+          if (extraApps.length) {
+            var baseLines = String(rowCard.a || '').split('\n').filter(function (ln) { return ln.indexOf('• [신규 추가 앱]') !== 0; });
+            baseLines.push('• [신규 추가 앱]: ' + extraApps.map(function (x) { return '[' + x.name + '](' + x.when + ')'; }).join(', '));
+            rowCard.a = baseLines.join('\n');
+          }
+        }
+      });
+
+      var mapCard = findStaticEntryById('SYS-map-01');
+      if (mapCard) {
+        var byRow = {};
+        PORTAL_ROWS_GUIDE.forEach(function (r) { byRow[r.id] = r.apps; });
+        var storeTiles = (byRow.store || []).filter(function (x) { return !(LIVE_APPS[x.key] && LIVE_APPS[x.key].head) && x.key !== 'cal'; });
+        var clientApps = byRow.client || [];
+        var salesApps = byRow.sales || [];
+        var insideApps = byRow.inside || [];
+        var totalActive = storeTiles.length + 1 + clientApps.length + salesApps.length + insideApps.length;
+        mapCard.law = '의뢰인 업무(' + clientApps.length + ') · 자료함(' + storeTiles.length + ') · 영업관리(' + salesApps.length + ') · 내부관리(' + insideApps.length + ') · 머리줄 캘린더 단추';
+        mapCard.a = [
+          '푸른포털 ' + totalActive + '개 앱은 업무 흐름 그대로 네 줄과 위쪽 머리줄 단추로 나뉩니다.',
+          '① [자료함(' + storeTiles.length + '개)]: ' + storeTiles.map(function (x) { return x.name; }).join('·') + ' — 서류·명함·메일·법령·판례를 모아 다듬는 곳입니다.',
+          '• [푸른 캘린더]: 줄 타일이 아니라 위쪽 머리줄(건의하기 왼쪽)의 큰 단추로 한 번에 엽니다. 단추에는 오늘 «구글 공용 달력» 일정 건수가 보입니다(폰은 그림 모서리 숫자 딱지 · 연차·출장·나만 보기 일정은 안 세고, 못 받으면 숫자가 안 보입니다).',
+          '② [의뢰인 업무(' + clientApps.length + '개)]: ' + clientApps.map(function (x) { return x.name; }).join('·') + ' — 고객사 계약·사건·조사·컨설팅·기금을 실제 수행하는 곳이며, 모든 업체·계약·사건의 원본 주인은 [푸른이알피] 하나입니다.',
+          '③ [영업관리(' + salesApps.length + '개)]: ' + salesApps.map(function (x) { return x.name; }).join('·') + ' — 전 직원이 대외 홍보와 신규 입찰 공고를 발굴하는 곳입니다.',
+          '④ [내부관리(' + insideApps.length + '개)]: ' + insideApps.map(function (x) { return x.name; }).join('·') + ' — 권한 보유자가 법인 내부 급여·입출금·정산·변경등기를 관리하는 곳입니다.'
+        ].join('\n');
+      }
+    }
+
+    /* 수동 단일 카드가 없는 모든 앱(신규 프로그램 및 비공개 앱 포함)의 자동 KB 카드 생성·갱신 */
+    var nextAuto = [];
+    Object.keys(LIVE_APPS).forEach(function (k) {
+      if (k === 'portal') return;
+      var ont = LIVE_ONTOLOGY[k];
+      if (ont && ont.portal === false) return;
+      if (!STATIC_COVERED_APPS[k]) {
+        nextAuto.push(buildAutoAppEntry(k));
+      } else if (LIVE_DETAILS[k] && SINGLE_APP_DOC_ID[k]) {
+        var stEntry = findStaticEntryById(SINGLE_APP_DOC_ID[k]);
+        var d = LIVE_DETAILS[k];
+        if (stEntry && d) {
+          stEntry._liveDetail = d;
+          var uiHint = (d.steps && d.steps.length)
+            ? ('실시간 화면 단계: ' + d.steps.slice(0, 6).join(' ➔ '))
+            : ((d.tabs && d.tabs.length) ? ('실시간 화면 탭: ' + d.tabs.slice(0, 6).join(' · ')) : '');
+          if (uiHint && stEntry.points.indexOf(uiHint) < 0 && stEntry.points.length < 4) {
+            stEntry.points.push(uiHint);
+          }
+        }
+      }
+    });
+    AUTO_APP_KB = nextAuto;
+    return { totalApps: Object.keys(LIVE_APPS).length, autoDocs: AUTO_APP_KB.length };
+  }
+
+  function detectMentionedApps(question) {
+    var q = String(question || '').trim();
+    if (!q) return [];
+    var qLow = q.toLowerCase();
+    var qNorm = qLow.replace(/[\s·()]/g, '');
+    var hits = [];
+    Object.keys(LIVE_APPS).forEach(function (k) {
+      var ap = LIVE_APPS[k];
+      if (!ap) return;
+      var nm = String(ap.name || '').trim();
+      var nmNorm = nm.toLowerCase().replace(/[\s·()]/g, '');
+      var matched = false;
+      if (nmNorm.length >= 2 && qNorm.indexOf(nmNorm) >= 0) matched = true;
+      else if (k.length >= 3 && new RegExp('(?:^|[^a-z0-9])' + k.toLowerCase().replace(/[^a-z0-9_-]/g, '') + '(?:$|[^a-z0-9])').test(qLow)) matched = true;
+      if (matched && hits.indexOf(k) < 0) hits.push(k);
+    });
+    return hits;
+  }
+
+  /* 음성 합성(TTS) 읽기용 한국어 문장 정리 (기호·이모지·코드경로 정돈) */
+  function cleanTextForSpeech(text) {
+    var s = String(text || '');
+    if (!s) return '';
+    var circled = ['첫째, ', '둘째, ', '셋째, ', '넷째, ', '다섯째, ', '여섯째, ', '일곱째, ', '여덟째, ', '아홉째, ', '열째, '];
+    '①②③④⑤⑥⑦⑧⑨⑩'.split('').forEach(function (ch, idx) {
+      s = s.split(ch).join(circled[idx]);
+    });
+    s = s
+      .replace(/➔|→|->/g, ', 다음으로 ')
+      .replace(/↔/g, ' 및 ')
+      .replace(/←/g, ', 받아오는 곳은 ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\([a-z0-9_./?=#-]{4,}\)/gi, '')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+      .replace(/[•▪▸›«»「」『』【】\[\]]/g, ' ')
+      .replace(/\s*\n+\s*/g, '. ')
+      .replace(/\.\s*\./g, '.')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (s.length > 650) {
+      s = s.slice(0, 650).replace(/[^.?!]+$/, '').trim() || s.slice(0, 650);
+    }
+    return s;
+  }
+
+  /* ── 전체 통합 항목 목록 (내장 PORTAL_KB + 자동생성 AUTO_APP_KB + fund_kb.js 의 FUND_KB 자동 병합) ── */
   function allItems(extraFundKb) {
-    var base = PORTAL_KB.slice();
+    var base = PORTAL_KB.concat(AUTO_APP_KB);
     var fkb = Array.isArray(extraFundKb) ? extraFundKb : (root && Array.isArray(root.FUND_KB) ? root.FUND_KB : []);
     for (var i = 0; i < fkb.length; i++) {
       var x = fkb[i];
@@ -1200,6 +1853,15 @@
     if (/급여아웃소싱/.test(q) && it.id === 'SYS-row-client') score += 28;
     if (/공공임단협|알리오|타임오프/.test(q) && it.id === 'SYS-work-cal-01') score += 34;
     if (/p박스|피박스|\bpbox\b/i.test(q) && it.id === 'SYS-pbox-01') score += 45;
+    if ((/괴롭힘[·\s]*성희롱\s*조사|\bharass\b/i.test(q) || (/괴롭힘/.test(q) && /앱|프로그램|화면|타일|사용법|어디서|연결도|공문\s*메일|8단계|진술확인서/.test(q))) && it.id === 'SYS-harass-01') score += 48;
+    if (/일터상생혁신|\bilteo\b/i.test(q) && it.id === 'SYS-ilteo-01') score += 48;
+    if (/산업일자리전환|\bjobtrans\b/i.test(q) && !/무료.*컨설팅.*종류/.test(q) && it.id === 'SYS-jobtrans-01') score += 48;
+    if (it._autoKey) {
+      var mentionedAuto = detectMentionedApps(q);
+      if (mentionedAuto.indexOf(it._autoKey) >= 0) {
+        score += (mentionedAuto.length === 1 && !/의뢰인\s*업무\s*줄|자료함\s*줄|영업관리\s*줄|내부관리\s*줄|4대\s*영역/.test(q)) ? 56 : 32;
+      }
+    }
     if (/고용유지지원금|유급휴업/.test(q) && it.id === 'GOV-retain-01') score += 65;
     if (/포괄임금|고정\s*연장|고정\s*ot|고정오티/i.test(q) && it.id === 'LAB-pokwal-01') score += 38;
     if (/중복\s*(참여|설립|운영)|동시\s*운영/.test(q) && it.id === 'MOEL-setup-02') score += 42;
@@ -1342,12 +2004,12 @@
     office: 1, hrwelf: 1, etc: 1
   };
   var APP_TO_SG_CAT = {
-    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', govaid: 'erp', deungi: 'erp',
-    consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult',
+    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
+    consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult',
     work: 'work', mail: 'work', cal: 'work',
     fund: 'fund',
     rules: 'rules',
-    payroll: 'payroll',
+    payroll: 'payroll', paydata: 'payroll',
     cards: 'cards', photos: 'cards',
     docs: 'docs', hangul: 'docs',
     news: 'portal', home: 'portal', rehabad: 'portal', signboard: 'portal', aliounion: 'portal', pbox: 'portal', portal: 'portal'
@@ -1356,14 +2018,19 @@
   function matchExplicitImproveCat(text) {
     var hay = String(text || '');
     if (/기금관리|사내기금|공동기금|복지기금/.test(hay)) return 'fund';
-    if (/정부사업|컨설팅보고서|컨설팅정산/.test(hay)) return 'consult';
+    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|\bilteo\b|\bjobtrans\b/i.test(hay)) return 'consult';
     if (/업무관리|푸른\s*메일|메일함|캘린더/.test(hay)) return 'work';
     if (/기업정보함|사진첩|푸른카메라|카메라|명함/.test(hay)) return 'cards';
     if (/계약서등관리|한글\s*편집|전자서명|위임장/.test(hay)) return 'docs';
     if (/기업규정집|취업규칙/.test(hay)) return 'rules';
-    if (/급여아웃소싱/.test(hay)) return 'payroll';
-    if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|자문계약|사건관리|업체관리|계약\s*저장/.test(hay)) return 'erp';
+    if (/급여아웃소싱|급여데이터함|\bpaydata\b/i.test(hay)) return 'payroll';
+    if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|괴롭힘[·\s]*성희롱\s*조사|\bharass\b|자문계약|사건관리|업체관리|계약\s*저장/i.test(hay)) return 'erp';
     if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|P박스|p박스|피박스|\bpbox\b/i.test(hay)) return 'portal';
+    var dynApps = detectMentionedApps(hay);
+    for (var i = 0; i < dynApps.length; i++) {
+      var mapped = APP_TO_SG_CAT[dynApps[i]];
+      if (mapped && SG_CAT_ALLOW[mapped]) return mapped;
+    }
     return '';
   }
 
@@ -1395,8 +2062,9 @@
     );
     if (pureHowTo) return { needed: false, cat: 'portal', title: '' };
 
-    var targetHit = /(화면|버튼|단추|창|탭|목록|저장|입력|업로드|다운로드|인쇄|알림|배지|검색|필터|속도|글자|스크롤|칸|표|연동|로그인|챗봇|길잡이|이알피|기금|컨설팅|지원금|한글|규정|급여|캘린더|사진첩|정보함|계약서|업무관리|메일|뉴스레터|홈페이지|회생|전광판|재무|인사|정산|경력|등기|P박스|피박스|포털)/i.test(q);
-    var brokenHit = /(오류|에러|버그|먹통|멈춤|멈춰|깨짐|깨져|흰\s*화면|작동\s*안|동작\s*안|안\s*열려|안\s*눌려|안\s*떠|안\s*넘어가|저장이?\s*안\s*(돼|됨|됩니다)|클릭이?\s*안\s*(돼|됨|됩니다)|실행이?\s*안\s*(돼|됨|됩니다)|반영이?\s*안\s*(돼|됨|됩니다)|연동이?\s*안\s*(돼|됨|됩니다)|안\s*나와요|안\s*바뀌어)/.test(q);
+    var targetHit = /(화면|버튼|단추|창|탭|목록|저장|입력|업로드|다운로드|인쇄|알림|배지|검색|필터|속도|글자|스크롤|칸|표|연동|로그인|챗봇|길잡이|이알피|기금|컨설팅|지원금|한글|규정|급여|캘린더|사진첩|정보함|계약서|업무관리|메일|뉴스레터|홈페이지|회생|전광판|재무|인사|정산|경력|등기|괴롭힘|일터상생|산업일자리|P박스|피박스|포털)/i.test(q)
+      || detectMentionedApps(q).length > 0;
+    var brokenHit = /(오류|에러|버그|먹통|멈춤|멈춰|깨짐|깨져|흰\s*화면|작동\s*안|동작\s*안|안\s*열려|안\s*눌려|안\s*떠|안\s*넘어가|(?:저장이?|클릭이?|실행이?|반영이?|연동이?|생성이?|출력이?|다운로드가?|업로드가?)\s*안\s*(돼|됨|됩니다)|안\s*나와요|안\s*바뀌어)/.test(q);
 
     if (!explicitFix && !(targetHit && brokenHit)) {
       return { needed: false, cat: inferImproveCat(q, picked, history), title: '' };
@@ -1503,13 +2171,24 @@
     };
   }
 
+  function defaultAppCatalogString() {
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리';
+    var extra = [];
+    Object.keys(LIVE_APPS).forEach(function (k) {
+      var ap = LIVE_APPS[k];
+      if (!ap || ap.off || STATIC_COVERED_APPS[k]) return;
+      extra.push(k + ':' + (ap.name || k));
+    });
+    return extra.length ? (baseStr + ', ' + extra.join(', ')) : baseStr;
+  }
+
   /* ── AI 프롬프트 조립 (멀티턴 대화 기억 + 개인정보 가림 + 간결 대화형 + 개선요청 자동판단) ── */
   function makePrompt(picked, rawQuestion, opts) {
     opts = opts || {};
     var masked = maskPersonal(rawQuestion);
     var appCatalog = Array.isArray(opts.apps) && opts.apps.length
       ? opts.apps.map(function (a) { return a.key + ':' + a.name + '(' + (a.desc || '') + ')'; }).join(', ')
-      : 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리';
+      : defaultAppCatalogString();
 
     var flowCatalog = PORTAL_FLOWS.map(function (f) {
       var chain = f.steps.map(function (s) { return s.name + '(' + s.role + ')'; }).join(' -> ');
@@ -1654,6 +2333,32 @@
     };
   }
 
+  /* ── 초기 앱 카탈로그 · 온톨로지 자동 시드 (내장 줄 가이드 + 전역/모듈 PuOntology) ── */
+  (function initAutoSeed() {
+    var seedApps = [];
+    PORTAL_ROWS_GUIDE.forEach(function (r) {
+      (r.apps || []).forEach(function (ap) {
+        seedApps.push({
+          key: ap.key,
+          name: ap.name,
+          desc: ap.when,
+          icon: ap.icon,
+          row: r.id,
+          head: ap.key === 'cal',
+          off: false
+        });
+      });
+    });
+    var seedOnt = (root && root.PuOntology && root.PuOntology.PROGRAMS) ? root.PuOntology.PROGRAMS : null;
+    if (!seedOnt && typeof require === 'function') {
+      try {
+        var reqOnt = require('./pu-ontology.js');
+        if (reqOnt && reqOnt.PROGRAMS) seedOnt = reqOnt.PROGRAMS;
+      } catch (_) {}
+    }
+    syncCatalog({ apps: seedApps, ontologyPrograms: seedOnt });
+  })();
+
   var api = {
     CHAT_CATS: CHAT_CATS,
     PORTAL_FLOWS: PORTAL_FLOWS,
@@ -1674,7 +2379,11 @@
     buildImprovePayload: buildImprovePayload,
     localAnswer: localAnswer,
     makePrompt: makePrompt,
-    parseReply: parseReply
+    parseReply: parseReply,
+    syncCatalog: syncCatalog,
+    extractHtmlAppDetail: extractHtmlAppDetail,
+    detectMentionedApps: detectMentionedApps,
+    cleanTextForSpeech: cleanTextForSpeech
   };
 
   if (root) root.PuChatbot = api;
