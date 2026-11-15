@@ -699,6 +699,185 @@ test('⑩ URL 딥링크(?region=충남&muni=천안시, ?compare=중복제거, ?t
   assert.equal(decodeURIComponent(r3.loc.search), '?tab=articles&doc=DISC');
 });
 
+test('⑪ 기관 목록 상단 바 빠른 정렬(data-u-sort) 및 전 목록 표 머리글(data-th-sort) 클릭 오름차순·내림차순(▲/▼) 정렬이 정확히 동작한다', () => {
+  function mountTestable(initialSearch) {
+    const loc = {
+      protocol: 'https:',
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch || '',
+      hash: ''
+    };
+    const sortSelectNode = {
+      tagName: 'SELECT',
+      value: 'members_desc',
+      listeners: {},
+      addEventListener(ev, fn) { this.listeners[ev] = fn; },
+      focus() {}
+    };
+    function makeNode(tag) {
+      const attrs = {};
+      const listeners = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const uDynNode = makeNode('DIV');
+    const moreFltBtn = makeNode('BUTTON');
+    bodyEl.querySelector = (sel) => {
+      if (sel === '[data-u-sort]') return sortSelectNode;
+      if (sel === '[data-u-dyn]') return uDynNode;
+      if (sel === '[data-toggle-more-flt]') return moreFltBtn;
+      return null;
+    };
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    function clickHeaderSort(colId) {
+      const thBtn = {
+        getAttribute: (k) => (k === 'data-th-sort' ? colId : ''),
+        focus: () => {}
+      };
+      bodyEl.trigger('click', {
+        preventDefault: () => {},
+        target: {
+          closest: (sel) => (sel === '[data-th-sort]' ? thBtn : null)
+        }
+      });
+    }
+
+    function extractRowOrganIds(html) {
+      const tbodyMatch = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+      if (!tbodyMatch) return [];
+      return [...tbodyMatch[1].matchAll(/data-jump-organ="([^"]+)"/g)].map((m) => m[1].trim());
+    }
+
+    return { bodyEl, uDynNode, moreFltBtn, sortSelectNode, clickHeaderSort, extractRowOrganIds };
+  }
+
+  const master = (() => {
+    const sb = { URL, URLSearchParams };
+    sb.window = sb;
+    vm.runInNewContext(uiSrc, sb);
+    return sb.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  })();
+
+  // 1) 탭 1 기관 목록 초기 렌더링 시 상단 바 빠른 정렬(data-u-sort)과 클릭형 열 머리글(data-th-sort) 및 aria-sort="descending" 확인
+  const t1 = mountTestable('');
+  assert.match(t1.bodyEl.innerHTML, /data-u-sort/, '페이지네이션 상단 바에 빠른 정렬 드롭다운(data-u-sort)이 즉시 노출되어야 합니다');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_members"/, '초기 조합원 열 머리글이 내림차순(descending) 활성 상태여야 합니다');
+  const descIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(descIds.length >= 10);
+  assert.ok(master.byId[descIds[0]].memberTotal >= master.byId[descIds[1]].memberTotal, '초기 조합원 내림차순이 적용되어야 합니다');
+
+  // 2) 조합원 열 머리글(u_members) 클릭 시 오름차순(members_asc) 전환 — 미설립(—) 기관이 아니라 최소 규모 노조보유 기관이 먼저 나와야 함
+  t1.clickHeaderSort('u_members');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="u_members"/, 'u_members 클릭 후 오름차순(ascending)으로 전환되어야 합니다');
+  const ascIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.notEqual(ascIds[0], descIds[0], '오름차순 전환 시 첫 번째 행 기관이 바뀌어야 합니다');
+  const firstAscRec = master.byId[ascIds[0]];
+  assert.ok(firstAscRec && firstAscRec.hasUnion && firstAscRec.memberTotal >= 1, '조합원 적은순(▲) 정렬 시 미설립(—)이나 0명 노조가 아닌 실제 1명 이상 노조보유 기관이 상위에 표시되어야 합니다');
+  assert.ok(firstAscRec.memberTotal <= master.byId[ascIds[1]].memberTotal, '조합원 오름차순이 정확히 적용되어야 합니다');
+
+  // 3) 기관명 열 머리글(u_name) 클릭 시 가나다 오름차순(▲) → 재클릭 시 역순 내림차순(▼) 전환 검증
+  t1.clickHeaderSort('u_name');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="u_name"/);
+  const nameAscIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(master.byId[nameAscIds[0]].name.localeCompare(master.byId[nameAscIds[1]].name, 'ko') <= 0, '기관명 가나다 오름차순이 적용되어야 합니다');
+
+  t1.clickHeaderSort('u_name');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_name"/);
+  const nameDescIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(master.byId[nameDescIds[0]].name.localeCompare(master.byId[nameDescIds[1]].name, 'ko') >= 0, '기관명 재클릭 시 가나다 역순(내림차순)이 적용되어야 합니다');
+
+  // 4) 상단 바 빠른 정렬 드롭다운(data-u-sort) 변경 시 즉시 반영 및 상세필터 배지 동기화 검증
+  t1.sortSelectNode.value = 'score_desc';
+  t1.sortSelectNode.listeners.change();
+  assert.match(t1.uDynNode.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_domains"/, '종합점수 높은순 선택 시 6대영역 열 머리글이 내림차순 표시로 동기화되어야 합니다');
+  assert.match(t1.moreFltBtn.textContent, /\(1\)/, '상단 빠른 정렬 변경 시 상세필터 활성 개수 배지도 즉시 갱신되어야 합니다');
+  const scoreDescIds = t1.extractRowOrganIds(t1.uDynNode.innerHTML);
+  assert.ok(master.byId[scoreDescIds[0]].totalScore >= master.byId[scoreDescIds[1]].totalScore, '종합점수 내림차순 정렬이 정확히 적용되어야 합니다');
+
+  // 5) 지역산하비교(REGION), 13대쟁점목록(ALL_LIST), 단협조문(ARTICLES), 공시원문(DISC) 열 머리글 정렬 동작 검증
+  const tReg = mountTestable('?region=%EC%B6%A9%EB%82%A8');
+  assert.match(tReg.bodyEl.innerHTML, /data-r-sort/);
+  tReg.clickHeaderSort('r_score');
+  assert.match(tReg.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="r_score"/);
+
+  const tAllList = mountTestable('?tab=matrix&mode=ALL_LIST');
+  tAllList.clickHeaderSort('m_name');
+  assert.match(tAllList.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="m_name"/);
+
+  const tArt = mountTestable('?tab=articles');
+  tArt.clickHeaderSort('a_no');
+  assert.match(tArt.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="a_no"/);
+  const artNos = [...tArt.bodyEl.innerHTML.matchAll(/<td style="font-weight:700;">제?(\d+)조?/g)].map((m) => Number(m[1]));
+  assert.ok(artNos.length >= 2 && artNos[0] <= artNos[1], '조문번호 오름차순 정렬 시 숫자 기준(제1조, 제2조...)으로 정렬되어야 합니다');
+
+  const tDisc = mountTestable('?tab=articles&doc=DISC');
+  assert.match(tDisc.bodyEl.innerHTML, /data-d-sort/);
+  tDisc.clickHeaderSort('d_date');
+  assert.match(tDisc.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="d_date"/);
+  const discDatesDesc = [...tDisc.bodyEl.innerHTML.matchAll(/\((20\d{2}[^()]{3,18})\)<\/td>/g)]
+    .map((m) => {
+      const n = m[1].trim().match(/^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+      return n ? `${n[1]}-${n[2].padStart(2, '0')}-${n[3].padStart(2, '0')}` : '';
+    })
+    .filter(Boolean);
+  assert.ok(discDatesDesc.length >= 5);
+  for (let i = 1; i < discDatesDesc.length; i++) {
+    assert.ok(discDatesDesc[i - 1] >= discDatesDesc[i], `공시 기준연혁일 내림차순이 혼재 날짜 형식에서도 시간순이어야 합니다: ${discDatesDesc[i - 1]} vs ${discDatesDesc[i]}`);
+  }
+});
+
+
 
 
 
