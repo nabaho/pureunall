@@ -27,3 +27,14 @@ test('월 줄 안에 요약을 넣는 것은 «부탁한 화면만»(업체관�
   assert.match(fn, /props\.phoneKpiInline/);
   assert.equal((APP.match(/phoneKpiInline:\s*true/g) || []).length >= 1, true);
 });
+
+test('계약관리 폰 — 윗단추 넷은 «⋯ 더보기» 하나로, 지난 중복 훑기도 그 안에 (2026-11-15)', () => {
+  const at = APP.indexOf("'aria-label':'계약관리 더보기'");
+  assert.ok(at > 0, '폰 «더보기» 고르기가 없습니다');
+  const sel = APP.slice(at, at + 1500);
+  ['help', 'mo', 'unit', 'dup'].forEach(function (v) {
+    assert.match(sel, new RegExp("v === '" + v + "'"), v + ' 일을 할 길이 없습니다');
+  });
+  assert.match(APP, /window\.innerWidth > 768 && h\('button', \{ type:'button', onClick:function\(\)\{ setDupSweep\(dupSweepScan\(\)\); \}/,
+    'PC 는 단추 그대로, 폰은 더보기 안으로');
+});

@@ -28457,7 +28457,28 @@ function ContractManagement(props){
         { label:'🛡️ 계약협의', value:monthContracts.filter(function(c){return c.status==='review';}).length+'건', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'📊 전체(누적)', value:contracts.length+'건', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' }
       ],
-      extra: [ h('button', { key:'chelp', onClick:function(){ setShowHelp(true); },
+      phoneKpiInline: true,   /* 폰: 요약 한 줄을 월 줄 안에 (대표 지시 2026-11-15 계약관리도) */
+      extra: window.innerWidth <= 768
+      ? /* 폰: 단추 넷(사용법·이번 달만·실적 띠·지난 중복 훑기)을 «⋯ 고르기 하나»로 (대표 지시 2026-11-15 「상단 간략하게」).
+           고르면 바로 하고 도로 「⋯」로 돌아온다. 「걸린 요청」 배지는 알림이라 밖에 그대로 둔다. */
+        [ h('select', { key:'cmore', value:'', 'aria-label':'계약관리 더보기', title:'사용법 · 이번 달만 · 실적 · 지난 중복 훑기',
+            onChange:function(e){ var v = e.target.value; e.target.value = '';
+              if(v === 'help') setShowHelp(true);
+              else if(v === 'mo') setMonthOnly(!monthOnly);
+              else if(v === 'unit') setUnitStrip(!unitStrip);
+              else if(v === 'dup') setDupSweep(dupSweepScan()); },
+            style:{ padding:'5px 4px', background: monthOnly ? '#1e40af' : '#eff6ff', color: monthOnly ? '#fff' : '#1e40af',
+              border:'1px solid #bfdbfe', borderRadius:'5px', fontSize:'13px', fontWeight:700, cursor:'pointer', maxWidth:'92px' } },
+            h('option', { value:'' }, monthOnly ? '✓ 이번 달' : '⋯ 더보기'),
+            h('option', { value:'help' }, '❓ 사용법'),
+            h('option', { value:'mo' }, monthOnly ? '✓ 이번 달만 끄기' : '📅 이번 달만'),
+            h('option', { value:'unit' }, (unitStrip ? '▾ 실적 띠 접기' : '▸ 클리닉·기술보호 실적')),
+            h('option', { value:'dup' }, '🔎 지난 중복 훑기')) ].concat(
+          blockedReqs.length > 0 ? [ h('button', { key:'blkreq', onClick:function(){ setShowBlockedReqs(true); },
+            title:'사진첩에서 온 자동 등록 요청 중 막힌 것',
+            style:{ padding:'5px 7px', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px',
+              cursor:'pointer', fontSize:'11px', fontWeight:700, whiteSpace:'nowrap' } }, '⚠ ' + blockedReqs.length) ] : [])
+      : [ h('button', { key:'chelp', onClick:function(){ setShowHelp(true); },
           title:'계약관리 사용법',
           style:{ padding: window.innerWidth<=768?'5px 9px':'6px 12px', background:'#eff6ff', color:'#1e40af',
             border:'1px solid #bfdbfe', borderRadius:'5px', cursor:'pointer',
@@ -28537,16 +28558,17 @@ function ContractManagement(props){
       h('div', { className:'tb-filters' },
         h('select', { value:kindFilter, onChange:function(e){ setKindFilter(e.target.value); setSelSubType('all'); },
           style:{ padding:'6px 10px', border:'1px solid '+(kindFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:kindFilter!=='all'?'#1e40af':'#475569', fontWeight:kindFilter!=='all'?700:400, cursor:'pointer' } },
-          [{ v:'all', label:'전체', icon:'📊' }].concat(CONTRACT_KINDS).map(function(k){ return h('option', { key:k.v, value:k.v }, k.icon + ' ' + k.label); })),
+          [{ v:'all', label:'전체', icon:'📊' }].concat(CONTRACT_KINDS).map(function(k){ return h('option', { key:k.v, value:k.v },
+            window.innerWidth <= 768 ? (k.v === 'all' ? '종류 전체' : k.label) : (k.icon + ' ' + k.label)); })),   /* 폰은 그림 글자를 뺀다 — 칸이 좁아 잘렸다(2026-11-15) */
         h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:700, whiteSpace:'nowrap' } }, kindCount(kindFilter) + '건'),
         h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
           style:{ padding:'6px 10px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:mgrFilter!=='all'?'#1e40af':'#475569', fontWeight:mgrFilter!=='all'?700:400, cursor:'pointer' } },
-          h('option', { value:'all' }, '👤 전체 담당자'),
+          h('option', { value:'all' }, window.innerWidth <= 768 ? '담당 전체' : '👤 전체 담당자'),
           h('option', { value:'mine' }, '⭐ 내 업무'),
           users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
         h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
           style:{ padding:'6px 10px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:subMgrFilter!=='all'?'#2563eb':'#475569', fontWeight:subMgrFilter!=='all'?700:400, cursor:'pointer' } },
-          h('option', { value:'all' }, '👥 부담당'),
+          h('option', { value:'all' }, window.innerWidth <= 768 ? '부담당' : '👥 부담당'),
           users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); }))),
       // 칸마다 깔때기가 걸려 있으면 한 번에 푸는 단추 (걸린 게 있을 때만)
       Object.keys(stageSel).length > 0 && h('button', { onClick:stClearAll,
@@ -28582,8 +28604,8 @@ function ContractManagement(props){
         title:'계약-2026 빈 번호 메우기',
         style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
         '🔢 번호 재정렬'),
-      // 지난 자료 중복 훑기 — 누를 때만 훑는다(매번 훑으면 목록이 느려진다)
-      h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan()); },
+      // 지난 자료 중복 훑기 — 누를 때만 훑는다(매번 훑으면 목록이 느려진다). 폰은 위 「⋯ 더보기」 안에 있다(2026-11-15)
+      window.innerWidth > 768 && h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan()); },
         title:'이미 쌓인 계약·컨설팅·사건·기금·기타·일반업무끼리 중복인지 한 번 훑습니다 (읽기만 함)',
         style:{ padding: window.innerWidth <= 768 ? '5px 9px' : '6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize: window.innerWidth <= 768 ? '11px' : '11.5px', fontWeight:600 } },
         '🔎 지난 중복 훑기')
