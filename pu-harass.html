@@ -53,6 +53,7 @@ button.warn-btn{background:var(--amber-bg);border-color:var(--amber-line);color:
 button.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
 button.sm{padding:5px 10px;min-height:32px;font-size:12px}
 input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+input:not([type=checkbox]):not([type=radio]),select{min-height:32px}
 textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55}
 a{color:var(--blue-d);text-decoration:none}
 #head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
@@ -71,7 +72,7 @@ a{color:var(--blue-d);text-decoration:none}
 .c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
 .c-direct{background:var(--ok-bg);color:#ffffff;border-color:var(--ok-bg);font-weight:700}
 .c-direct-ing{background:var(--pri-bg);color:#ffffff;border-color:var(--pri-bg);font-weight:600}
-main{padding:12px 20px 48px;width:100%;max-width:none;margin:0}
+main{padding:12px 28px 48px 14px;width:100%;max-width:none;margin:0}
 .pane{display:none}
 .pane.on{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
@@ -94,23 +95,28 @@ main{padding:12px 20px 48px;width:100%;max-width:none;margin:0}
 .prof{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 12px;font-size:12.5px;border-bottom:1px solid var(--line)}
 .prof span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prof b{color:var(--mute);font-weight:500;margin-right:4px}
-.pbar{display:inline-flex;gap:2px;align-items:center;vertical-align:middle;margin-right:5px}
-.pdot{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line2)}
+.pbar{display:inline-flex;gap:2px;align-items:center;vertical-align:middle;margin-right:4px}
+.pdot{display:inline-block;width:7.5px;height:8.5px;border-radius:2px;background:var(--line2)}
 .pdot.done{background:var(--green-m)}
 .pdot.cur{background:var(--blue)}
 .bulk{display:none;gap:6px;align-items:center;padding:6px 12px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);font-size:12.5px;flex-wrap:wrap}
 .bulk.on{display:flex}
 .scroll{overflow:auto}
 table.t{width:100%;border-collapse:collapse}
-table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.t th,table.t td{padding:7px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
-table.t td{overflow:hidden;text-overflow:ellipsis;max-width:340px}
-table.t td.ti{font-weight:600;max-width:300px}
-table.t td.wide{max-width:420px}
-table.t th.c,table.t td.c{width:40px;text-align:center}
+table.t td{overflow:hidden;text-overflow:ellipsis;max-width:240px}
+table.t td.ti{font-weight:600;max-width:205px}
+table.t[data-name="cases"] td{max-width:215px}
+table.t[data-name^="yr_"] td{max-width:200px}
+table.t[data-name^="yr_"] td.ti{max-width:220px}
+table.t td.wide{max-width:360px}
+table.t td[data-k="act"]{max-width:none;overflow:visible;text-overflow:clip}
+.ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti{max-width:165px}
+table.t th.c,table.t td.c{width:34px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
-table.t th.n,table.t td.n{width:42px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.t th.n,table.t td.n{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
 table.t tr.cur>td{background:var(--blue-bg)}
@@ -122,7 +128,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .fr>label{width:110px;flex:none;color:var(--ink2);font-size:12.5px;font-weight:600;white-space:nowrap}
 .fv{flex:1;min-width:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .fv input[type=text],.fv input[type=email],.fv select{flex:1;min-width:140px}
-.rpt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:10px 12px}
+.rpt-grid{display:grid;grid-template-columns:minmax(185px,.68fr) minmax(0,1.32fr);gap:10px;padding:10px 12px}
 .rpt-grid .full{grid-column:1 / -1}
 .rpt-lbl{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px}
 .rpt-paper{padding:14px;background:var(--bg);border-top:1px solid var(--line)}
@@ -168,10 +174,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .live-rec-bar.on .live-dot,.live-rec-bar.rec .live-dot{background:var(--red-m)}
 .spk-btn.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
 .live-cap{width:100%;font-size:12px;color:var(--ink2);padding-top:2px;min-height:18px;white-space:normal}
-@media (min-width:1440px){
+@media (min-width:1520px){
+  table.t th,table.t td{padding:7px 9px}
   table.t td{max-width:480px}
   table.t td.ti{max-width:460px}
   table.t td.wide{max-width:580px}
+  table.t td[data-k="act"]{max-width:none}
+  .ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti{max-width:250px}
 }
 .drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color .15s}
 .drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--card)}
@@ -200,6 +209,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .evid-row .evid-ti{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #printArea{display:none}
 .phone-only{display:none}
+@media (min-width:1520px){
+  main{padding:12px 30px 48px 20px}
+  table.t td,table.t[data-name="cases"] td{max-width:340px}
+  table.t td.ti,table.t[data-name^="yr_"] td.ti{max-width:370px}
+  table.t[data-name^="yr_"] td{max-width:300px}
+  .ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti{max-width:230px}
+}
 @media (max-width:1024px){
   .ws-steps{grid-template-columns:repeat(4,minmax(0,1fr))}
   .ws-split,.studio-grid{grid-template-columns:1fr}
@@ -229,6 +245,9 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   .card{border-left:0;border-right:0;border-radius:0}
   .note,.warn,.secret-lock{margin:0 10px 10px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
+  .bar{padding:7px 10px;gap:5px}
+  .bar input[type="search"]{flex:1 1 100% !important;max-width:none !important;min-width:0 !important}
+  .bar select{flex:1 1 calc(50% - 4px);min-width:0}
   .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 10px}
   .ws-split,.studio-grid{grid-template-columns:1fr;gap:8px}
   .iv-list{padding:8px 10px}
@@ -251,8 +270,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:24px;text-align:right;order:0}
   table.t[data-name] tbody td.ti{order:1;flex:1 1 0;font-size:13.5px;font-weight:600;color:var(--ink)}
   table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
-  table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
+  table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px;overflow:visible;white-space:normal}
   table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
+}
+@media (max-width:560px){
+  table.t[data-name] tbody td.ti{flex:1 1 100%}
+  table.t[data-name] tbody tr::after{order:2}
+  table.t[data-name] tbody td[data-k="badge"]{order:3}
 }
 @media (max-width:520px){#who{display:none}}
 @media print{
@@ -297,7 +321,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card">
       <div class="yr-pills" id="caseYrBar"></div>
       <div class="bar">
-        <input id="caseQ" type="search" aria-label="사건 검색" placeholder="사업장·사건명·사건번호 찾기" style="flex:1;min-width:160px;max-width:300px">
+        <input id="caseQ" type="search" aria-label="사건 검색" placeholder="사업장·사건명·사건번호 찾기" style="flex:1;min-width:205px;max-width:265px">
         <select id="caseCat" aria-label="조사 구분 필터">
           <option value="">조사 구분 전체</option>
           <option value="harass">직장 내 괴롭힘</option>
@@ -323,7 +347,9 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
           <option value="deferred">⏸ 번호 공란(추후정리)</option>
         </select>
         <select id="caseMgr" aria-label="담당 노무사 필터"><option value="">담당 노무사 전체</option></select>
+        <button class="sm" id="caseResetBtn" style="display:none" title="검색어·연도·필터 조건을 모두 초기화합니다">↺ 초기화</button>
         <span class="sp"></span>
+        <button class="sm" id="caseCsvBtn" title="현재 필터된 조사 사건 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 현황 CSV</button>
         <button class="sm warn-btn" id="erpBatchBtn" title="이알피 사건번호를 비워둔 과거·보류 사건을 모아 한 번에 채번·연결합니다">🏢 이알피 공란 일괄정리</button>
         <button class="sm" id="imapScanBtn" title="다음메일 서버 전체 폴더에서 지난 괴롭힘·성희롱 공문까지 심층 검색합니다">🔍 과거 메일 심층검색</button>
         <button class="sm pri" id="newCaseBtn">+ 새 조사 사건</button>
@@ -341,7 +367,8 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card">
       <div class="yr-pills" id="inboxYrBar"></div>
       <div class="bar">
-        <input id="inQ" type="search" aria-label="미등록 후보 검색" placeholder="의뢰처·메일 제목·첨부파일 찾기" style="flex:1;min-width:160px;max-width:320px">
+        <input id="inQ" type="search" aria-label="미등록 후보 검색" placeholder="의뢰처·메일 제목·첨부파일 찾기" style="flex:1;min-width:175px;max-width:300px">
+        <button class="sm" id="inResetBtn" style="display:none" title="검색어 및 연도 필터를 초기화합니다">↺ 초기화</button>
         <button class="sm" id="imapInboxBtn">🔍 키워드 지정 메일함 심층검색</button>
         <button class="sm pri" id="importAllDeferBtn" title="미등록 메일 묶음 전체를 이알피 번호 공란 상태로 사건 현황에 편입하고 좌·우 작업실을 자동 채웁니다">📥 미등록 전체 편입(번호공란)</button>
         <span class="sp"></span>
@@ -357,7 +384,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card">
       <div class="yr-pills" id="yrPillsBar"></div>
       <div class="bar">
-        <input id="yrQ" type="search" aria-label="연도별 자료 검색" placeholder="연도·의뢰처·사건명·메일 제목·첨부파일 찾기" style="flex:1;min-width:160px;max-width:320px">
+        <input id="yrQ" type="search" aria-label="연도별 자료 검색" placeholder="연도·의뢰처·사건명·제목·첨부 찾기" style="flex:1;min-width:185px;max-width:300px">
         <select id="yrCat" aria-label="연도별 조사 구분 필터">
           <option value="">조사 구분 전체</option>
           <option value="harass">직장 내 괴롭힘</option>
@@ -367,6 +394,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
         <select id="yrPerf" aria-label="연도별 수행 유형 필터">
           <option value="">수행 유형 전체</option>
           <option value="direct_report">🏅 직접수행·결과보고 완료</option>
+          <option value="direct_active">🔍 직접조사 수행(진행)</option>
           <option value="direct_all">🛡️ 직접조사 전체(보고+진행)</option>
           <option value="advisory_rep">⚖️ 대리·자문·보고서검토</option>
           <option value="committee_collab">🏛️ 외부위원·타법인협업</option>
@@ -376,6 +404,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
           <option value="case">등록된 조사 사건만</option>
           <option value="bundle">미등록 메일 묶음만</option>
         </select>
+        <button class="sm" id="yrResetBtn" style="display:none" title="연도·검색어·필터 조건을 모두 초기화합니다">↺ 초기화</button>
         <span class="sp"></span>
         <button class="sm" id="yrCsvBtn" title="연도별 전체 괴롭힘·성희롱 사건 및 메일 묶음 목록을 CSV(엑셀) 파일로 내려받습니다">📥 연도별 목록 CSV 받기</button>
       </div>
@@ -426,8 +455,8 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-harass-core.js?v=12"></script>
 <script src="js/pu-harass-sign.js?v=3"></script>
-<script src="js/pu-harass-hwpx.js?v=5"></script>
-<script src="js/pu-harass-view.js?v=16"></script>
+<script src="js/pu-harass-hwpx.js?v=6"></script>
+<script src="js/pu-harass-view.js?v=17"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};

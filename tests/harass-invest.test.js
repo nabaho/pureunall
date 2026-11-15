@@ -419,6 +419,7 @@ test('⑦ 동시 단계·필드 수정 병합, 종결단계 취소 시 종결일
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
 
   /* 1) 서로 다른 단계·필드 동시 수정 및 편집창 부분 필드 수정 시 최신 서버 스냅샷(prev) 보존 검증 */
@@ -1207,6 +1208,7 @@ test('⑪ 모바일 전자서명 수거(harvestCaseSignatures) — 복호화 검
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
 
   let authCb = null;
@@ -1475,6 +1477,7 @@ test('⑫ 지난메일(POP3 mailbox/old/msgs) 통합·사업장 약칭 2차 확�
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
 
   let authCb = null;
@@ -1781,6 +1784,7 @@ test('⑬ 현장 상담 실시간 음성녹취(Web Speech API) 좌·우 창 자�
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
 
   let authCb = null;
@@ -2065,6 +2069,7 @@ test('⑭ 한국어 사업장·사건명 정밀 식별 — 영문 이메일·머
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
   let authCb = null;
   const curUser = { uid: 'uView', getIdToken: async () => 'tok' };
@@ -2276,6 +2281,7 @@ test('⑮ 푸른노무법인 직접수행·결과보고 완료 구분 및 이알
   });
   ctx.window = ctx;
   ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
 
   let authCb = null;
@@ -2336,4 +2342,254 @@ test('⑮ 푸른노무법인 직접수행·결과보고 완료 구분 및 이알
   await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-act]' ? detailBtn : null) }, stopPropagation() {} });
   assert.equal(getEl('detailBox').innerHTML.includes('<img'), false, '자동분류 진행과정 번호(sourceNo)에 포함된 태그가 DOM 에 삽입되지 않는다');
   assert.ok(getEl('detailBox').innerHTML.includes('&lt;img'), '자동분류 진행과정 번호(sourceNo)가 HTML 엔티티로 안전하게 이스케이프된다');
+});
+
+test('⑯ 조사 필수 공문·서식 4종 정식 한글(.hwpx) 생성 · 기한 배지 · 필터 초기화 · 진행기록 인용 · 판정 미저장 보존 검증', async () => {
+  const vm = require('vm');
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const html = fs.readFileSync(path.join(ROOT, 'pu-harass.html'), 'utf8');
+  assert.ok(html.includes('id="caseCsvBtn"') && html.includes('id="caseResetBtn"'), '현황 CSV 내려받기 및 필터 초기화 단추가 마크업에 배선되어 있다');
+  assert.ok(/id="yrPerf"[\s\S]*?value="direct_active"/.test(html), '연도별 자료함 수행유형 필터에도 직접조사 수행(진행) 선택지가 포함되어 있다');
+
+  /* 1) 4종 조사 필수 공문·서식(.hwpx) 생성 및 주민번호 자동 가림 · 왕복 추출 검증 */
+  const synthRrn = ['850505', '1234567'].join('-');
+  const sampleCase = {
+    id: 'hc-doc-1',
+    companyName: '(주)가상공문발급기업',
+    category: 'both',
+    title: '(주)가상공문발급기업 복합 조사 사건',
+    erpCaseNo: '성,직괴-2026-099',
+    receiveDate: '2026-11-01',
+  };
+  for (const docType of ['plan_req', 'attend_notice', 'pledge_form', 'measure_rec']) {
+    const bytes = H.buildOfficialDocHwpx(docType, sampleCase, {
+      issueDate: '2026-11-15',
+      managerText: '가상담당노무사',
+      targetRole: docType === 'attend_notice' ? 'accused' : 'victim',
+      targetName: '피신고인 가 ' + synthRrn,
+      targetDept: '생산관리팀 ' + synthRrn,
+      meetWhen: '2026-11-20 14:00',
+      meetWhere: '본사 소회의실 ' + synthRrn,
+      recommendations: '피해근로자 희망 반영 근무장소 분리 및 재발방지 교육 실시 ' + synthRrn,
+      customBody: '기초자료 협조 메모 ' + synthRrn,
+    });
+    assert.ok(bytes instanceof Uint8Array && bytes.byteLength > 500, docType + ' .hwpx 바이트가 생성된다');
+    assert.equal(bytes[0], 0x50, docType + ' 결과물이 정식 OWPML ZIP 패키지 시그니처를 가진다');
+    const extracted = await H.extractDocumentText(bytes, docType + '.hwpx');
+    assert.equal(extracted.ok, true, docType + ' .hwpx 텍스트 왕복 추출이 성공한다');
+    assert.ok(extracted.text.includes('(주)가상공문발급기업'), docType + ' 본문에 의뢰 사업장명이 포함된다');
+    assert.ok(extracted.text.includes('근로기준법') && extracted.text.includes('남녀고용평등'), docType + ' 복합 사건 공문에 양 법률 근거가 병기된다');
+    assert.equal(C.hasUnmaskedRrn(extracted.text), false, docType + ' 생성 공문에 가려지지 않은 주민등록번호가 남지 않는다');
+  }
+
+  /* 2) 화면 제어기: 기한 배지, 필터 초기화, 현황 CSV, 공문 발급 자동기록, 진행기록 인용, 판정 미저장 보존, 행 클릭 검증 */
+  const els = Object.create(null);
+  function makeEl(id) {
+    return {
+      id, innerHTML: '', textContent: '', value: '', checked: false, disabled: false, className: '',
+      classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+      style: { display: '' }, listeners: Object.create(null),
+      addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
+      getAttribute(nm) {
+        if (nm === 'data-rptfld') {
+          if (id === 'rVerdict') return 'verdict';
+          if (id === 'rBody') return 'reportBody';
+          if (id === 'rOverview') return 'overview';
+          if (id === 'rConclusion') return 'conclusion';
+          if (id === 'rRec') return 'recommendations';
+        }
+        return '';
+      },
+      matches(sel) {
+        if (sel === '[data-casesel]') return id === 'curCaseSel';
+        return false;
+      },
+      focus() {}, click() {}, select() {}, remove() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+    };
+  }
+  function getEl(id) { if (!els[id]) els[id] = makeEl(id); return els[id]; }
+  [
+    'app', 'lock', 'lockWhy', 'who', 'outBtn', 'tabs', 'toast', 'loadNote', 'modal', 'mbox', 'printArea',
+    'nCases', 'nInbox', 'nYearly', 'kpiBox', 'casesBox', 'caseYrBar', 'caseQ', 'caseCat', 'casePerf', 'caseSt', 'caseErp', 'caseMgr',
+    'caseCsvBtn', 'caseResetBtn', 'erpBatchBtn', 'imapScanBtn', 'newCaseBtn', 'reloadBtn', 'syncAllBtn',
+    'inboxYrBar', 'inQ', 'inResetBtn', 'imapInboxBtn', 'importAllDeferBtn', 'mailStat', 'inboxBox',
+    'yrKpiBox', 'yrPillsBar', 'yrQ', 'yrCat', 'yrPerf', 'yrKind', 'yrResetBtn', 'yrCsvBtn', 'yearlyBox',
+    'detailBox', 'reportBox',
+  ].forEach(getEl);
+
+  const docListeners = Object.create(null);
+  const liveListeners = Object.create(null);
+  const downloads = [];
+  let copiedClipboard = '';
+  const tomorrowYmd = C.ymdOf(Date.now() + 86400000 * 2);
+
+  const savedStore = {
+    'hc-u1': {
+      id: 'hc-u1', erpCaseId: 'ec-u1', erpCaseNo: '조사-2026-101', companyId: 'co-u1',
+      companyName: '(주)가상통합점검기업', title: '(주)가상통합점검기업 직장 내 괴롭힘 조사',
+      category: 'harass', performMode: 'direct_active', managerMain: 'P001',
+      receiveDate: '2026-11-01', dueDate: tomorrowYmd, verdictSummary: 'hold',
+      steps: { intake: { done: true, date: '2026-11-01', note: '조사 수임' } },
+      mailLinks: [],
+    },
+  };
+  const secretStore = {
+    'hc-u1': {
+      caseId: 'hc-u1',
+      overview: '초기 개요',
+      conclusion: '초기 결론',
+      recommendations: '분리조치 권고',
+      reportBody: '초기 보고서 본문',
+      interviews: [{ id: 'iv-u1', role: 'victim', alias: '신고인 가', dept: '영업팀', date: '2026-11-05', summary: '면담 요지' }],
+      issues: [{ id: 'iss-u1', title: '회의 중 폭언', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes' }],
+    },
+  };
+  const mockDb = {
+    'uid_roles/uFull': { status: 'active', sid: 'P001', name: '가상대표노무사', isAdmin: true },
+    'data/user_dir': [{ sid: 'P001', name: '가상대표노무사', status: 'active', sortOrder: 1 }],
+    'data/companies/v': [{ id: 'co-u1', name: '(주)가상통합점검기업', bizno: '123-81-00999' }],
+    'data/cases/v': [{ id: 'ec-u1', caseNo: '조사-2026-101', type: '직장내괴롭힘·성희롱 조사', title: '조사 사건', companyId: 'co-u1', companyName: '(주)가상통합점검기업', managerMain: 'P001', status: 'ongoing' }],
+    'data/contracts/v': [{ id: 'ct-u1', contractNo: '계약-2026-101', companyId: 'co-u1', companyName: '(주)가상통합점검기업', signDate: '2026-11-02', briefs: { case: '직장 내 괴롭힘 조사 위임계약 체결' }, managerMain: '가상대표노무사' }],
+    'harass_invest/cases': savedStore,
+  };
+  function makeRef(p) {
+    return {
+      path: p,
+      child(s) { return makeRef(p ? p + '/' + s : String(s)); },
+      on(ev, fn) { if (ev === 'value') liveListeners[p] = fn; },
+      off() { delete liveListeners[p]; },
+      once: () => Promise.resolve({
+        val: () => {
+          if (p === 'harass_invest/cases') return JSON.parse(JSON.stringify(savedStore));
+          if (p === 'harass_secret/hc-u1') return JSON.parse(JSON.stringify(secretStore['hc-u1']));
+          return mockDb[p] !== undefined ? mockDb[p] : null;
+        },
+      }),
+    };
+  }
+  const ctx = vm.createContext({
+    console, setTimeout, clearTimeout, Promise, URLSearchParams, Blob, Uint8Array,
+    PuHarassCore: C, PuHarassHwpx: H, PuGate: { show() {}, hide() {} },
+    navigator: { clipboard: { async writeText(t) { copiedClipboard = String(t); } } },
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    PuOntologyWrite: {
+      createGateway: () => ({
+        async save(r, fn) {
+          const pathStr = r && r.path ? r.path : '';
+          let cur = null;
+          if (pathStr.startsWith('harass_invest/cases/')) {
+            const cid = pathStr.split('/')[2];
+            cur = savedStore[cid] || null;
+            const next = typeof fn === 'function' ? fn(cur) : fn;
+            savedStore[cid] = next;
+            return { committed: true, snapshot: { val: () => next } };
+          }
+          if (pathStr.startsWith('harass_secret/')) {
+            const cid = pathStr.split('/')[1];
+            cur = secretStore[cid] || null;
+            const next = typeof fn === 'function' ? fn(cur) : fn;
+            secretStore[cid] = next;
+            return { committed: true, snapshot: { val: () => next } };
+          }
+          const v = typeof fn === 'function' ? fn(null) : fn;
+          return { committed: true, snapshot: { val: () => v } };
+        },
+      }),
+    },
+    location: { search: '', hash: '', pathname: '/pu-harass.html' },
+    history: { replaceState() {} },
+    confirm: () => true,
+    document: {
+      activeElement: null,
+      body: { appendChild() {} },
+      contains: () => false,
+      createElement(tag) {
+        if (tag === 'a') {
+          const a = { href: '', download: '', click() { downloads.push(this.download); }, remove() {} };
+          return a;
+        }
+        return makeEl('tmp_' + tag);
+      },
+      execCommand: () => true,
+      getElementById: (id) => getEl(id),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener(ev, fn) { (docListeners[ev] = docListeners[ev] || []).push(fn); },
+    },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-rrn-mask.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+
+  let authCb = null;
+  const curUser = { uid: 'uFull', getIdToken: async () => 'tok' };
+  ctx.PuHarassView.boot({
+    auth: Object.assign(() => ({ currentUser: curUser, setPersistence() {}, onAuthStateChanged(fn) { authCb = fn; } }), { Auth: { Persistence: { LOCAL: 'local' } } }),
+    database: () => ({ ref: (p) => makeRef(p || '') }),
+  });
+  await authCb(curUser);
+
+  /* 기한 임박 배지(⏰ D-2) 및 현황 CSV 내려받기, 검색 초기화 작동 확인 */
+  assert.ok(getEl('casesBox').innerHTML.includes('⏰ D-'), '미종결 사건의 보고기한이 7일 이내면 D-N 임박 배지가 표시된다');
+  getEl('caseCsvBtn').listeners.click[0]();
+  assert.ok(downloads.some((d) => d.includes('조사사건현황_') && d.endsWith('.csv')), '현황 CSV 단추 클릭 시 .csv 파일이 내려받아진다');
+
+  getEl('caseQ').value = '없는검색어';
+  getEl('caseQ').listeners.input[0]();
+  assert.equal(getEl('caseResetBtn').style.display, '', '검색 조건 활성화 시 초기화 단추가 표시된다');
+  assert.ok(getEl('casesBox').innerHTML.includes('resetCaseFilter'), '빈 검색 결과 화면에도 조건 초기화 바로가기 단추가 제공된다');
+  getEl('caseResetBtn').listeners.click[0]();
+  assert.equal(getEl('caseQ').value, '', '초기화 단추 클릭 시 검색어가 비워지고 전체 목록이 복원된다');
+
+  /* 공문·서식(.hwpx) 발급 모달 실행 → 내려받기 + 공문함·8단계 자동 기록 검증 */
+  const openDocBtn = { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'openOfficialDoc' : n === 'data-id' ? 'hc-u1' : '') };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-act]' ? openDocBtn : null) }, stopPropagation() {} });
+  assert.ok(getEl('mbox').innerHTML.includes('조사 단계별 실무 공문'), '공문·서식(.hwpx) 발급 모달이 열린다');
+  getEl('odType').value = 'plan_req';
+  getEl('odDate').value = '2026-11-15';
+  getEl('odMgr').value = '가상대표노무사';
+  getEl('odLogCk').checked = true;
+  await getEl('odDownloadBtn').listeners.click[0]();
+  assert.ok(downloads.some((d) => d.includes('조사계획') && d.endsWith('.hwpx')), '공문·서식 모달에서 정식 .hwpx 공문 파일이 내려받아진다');
+  assert.equal(downloads.some((d) => d.includes('[object')), false, 'PuRrnMask.maskRrnInText({text,count})가 로드된 실브라우저 환경에서도 파일명·본문이 [object Object]로 깨지지 않는다');
+  assert.equal(savedStore['hc-u1'].steps.plan.done, true, '공문 발급 시 자동기록 옵션에 따라 2단계(조사계획·착수공문)가 완료 처리된다');
+  assert.ok((savedStore['hc-u1'].mailLinks || []).some((m) => m.docRole === 'official_plan'), '발급된 공문 이력이 사건 공문 목록(mailLinks)에 표준 공문역할(official_plan)로 자동 기록된다');
+
+  /* 상세 탭 → 자동분류 진행기록 보고서 인용(quoteExtLog) 및 복사(copyExtLog) 검증 */
+  const openDetailBtn = { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'openDetail' : n === 'data-id' ? 'hc-u1' : '') };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-act]' ? openDetailBtn : null) }, stopPropagation() {} });
+  assert.ok(getEl('detailBox').innerHTML.includes('docs-esign.html'), '자동분류 진행과정 표에 원천 프로그램(계약서류관리) 바로가기 링크가 연결된다');
+  const mLogId = getEl('detailBox').innerHTML.match(/data-act="quoteExtLog"\s+data-id="([^"]+)"/);
+  assert.ok(mLogId && mLogId[1], '자동분류 진행과정 행마다 [+ 보고서 인용] 단추가 배선되어 있다');
+  getEl('rBody').value = '기존 본문';
+  const quoteLogBtn = { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'quoteExtLog' : n === 'data-id' ? mLogId[1] : '') };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-act]' ? quoteLogBtn : null) }, stopPropagation() {} });
+  assert.ok(getEl('rBody').value.includes('계약-2026-101'), '[+ 보고서 인용] 클릭 시 보고서 탭으로 전환되어 자동분류 진행기록이 본문에 삽입된다');
+
+  const copyLogBtn = { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'copyExtLog' : n === 'data-id' ? mLogId[1] : '') };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-act]' ? copyLogBtn : null) }, stopPropagation() {} });
+  assert.ok(copiedClipboard.includes('계약-2026-101'), '[복사] 클릭 시 자동분류 진행기록 문구가 클립보드에 복사된다');
+
+  /* 종합 판단 결과(#rVerdict) 변경 후 재렌더링(실시간 갱신 등) 발생 시 미저장 선택값 유지 검증 */
+  getEl('rVerdict').value = 'recognized';
+  await docListeners.change[0]({ target: getEl('rVerdict') });
+  liveListeners['data/contracts/v']({ val: () => mockDb['data/contracts/v'] });
+  await new Promise((r) => setTimeout(r, 120));
+  assert.ok(getEl('reportBox').innerHTML.includes('value="recognized" selected'), '저장 전 실시간 갱신이 일어나도 변경 중인 종합 판단 결과(#rVerdict)가 초기화되지 않고 보존된다');
+
+  /* 3요건 검토표 행 클릭 시 쟁점 수정 모달이 즉시 열린다 */
+  const issRow = { getAttribute: (n) => (n === 'data-tname' ? 'issues' : n === 'data-row' ? 'iss-u1' : '') };
+  await docListeners.click[0]({
+    target: {
+      closest(sel) {
+        if (sel === 'tr[data-row]') return issRow;
+        return null;
+      },
+    },
+    stopPropagation() {},
+  });
+  assert.ok(getEl('mbox').innerHTML.includes('회의 중 폭언'), '3요건 검토표 행을 클릭하면 해당 쟁점 행위 수정 모달이 열린다');
 });
