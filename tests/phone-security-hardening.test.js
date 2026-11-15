@@ -172,22 +172,40 @@ test('★★ 안드로이드 하나문자 앱 — 401/403 및 연결 지우기 �
 });
 
 /* ══ ③ 푸시 알림 주소 검증 및 중지·퇴직 관리자 제외 ══ */
-test('★★ 웹푸시 서비스워커 — 같은 출처 /pureunall/ 만 열고 외부 주소는 기본 포털로 되돌린다', () => {
-  const swSrc = read('firebase-messaging-sw.js');
-  const fnSrc = cutBlock(swSrc, 'function safePortalUrl(');
+/* 워커를 «통째로» 그 출처에서 돌린다 — 2026-11-15 ERP 주소 이사 준비로 앱 뿌리(APP_BASE)를
+   워커 자리에서 읽게 바뀌어, 함수 하나만 떠서는 뿌리가 안 잡힌다. */
+function 워커돌리기(origin, swPath) {
   const ctx = {
-    PORTAL_URL: '/pureunall/enter.html?sg=1',
-    self: { location: { origin: 'https://nabaho.github.io' } },
-    URL, String,
+    importScripts() {}, URL, String,
+    firebase: { initializeApp() {}, messaging: () => ({ onBackgroundMessage() {} }) },
+    self: { location: { origin, pathname: swPath }, addEventListener() {}, registration: {}, clients: {} },
   };
   vm.createContext(ctx);
-  vm.runInContext(fnSrc, ctx);
+  vm.runInContext(read('firebase-messaging-sw.js'), ctx);
+  return ctx;
+}
 
+test('★★ 웹푸시 서비스워커 — 같은 출처 앱 뿌리 안쪽만 열고 외부 주소는 기본 포털로 되돌린다 (옛 주소)', () => {
+  const ctx = 워커돌리기('https://nabaho.github.io', '/pureunall/firebase-messaging-sw.js');
   assert.equal(ctx.safePortalUrl('/pureunall/pu-cards.html?mailbox=1'), 'https://nabaho.github.io/pureunall/pu-cards.html?mailbox=1');
   assert.equal(ctx.safePortalUrl('https://evil.example/phish'), 'https://nabaho.github.io/pureunall/enter.html?sg=1');
   assert.equal(ctx.safePortalUrl('//evil.example/pureunall/enter.html'), 'https://nabaho.github.io/pureunall/enter.html?sg=1');
   assert.equal(ctx.safePortalUrl('javascript:alert(1)'), 'https://nabaho.github.io/pureunall/enter.html?sg=1');
   assert.equal(ctx.safePortalUrl('/other-repo/index.html'), 'https://nabaho.github.io/pureunall/enter.html?sg=1');
+  assert.equal(ctx.safePortalUrl('/pureunall//evil.com'), 'https://nabaho.github.io/pureunall/enter.html?sg=1', '뿌리 뒤 «//» 를 막지 않는다');
+});
+
+test('★★ 웹푸시 서비스워커 — 새 주소(erp.pureunlabor.co.kr)에서는 옛 꼴 /pureunall/… 앞머리를 떼고, 막을 것은 똑같이 막는다', () => {
+  const ctx = 워커돌리기('https://erp.pureunlabor.co.kr', '/firebase-messaging-sw.js');
+  const 포털 = 'https://erp.pureunlabor.co.kr/enter.html?sg=1';
+  assert.equal(ctx.safePortalUrl('/pureunall/pu-cards.html?mailbox=1#k=1'), 'https://erp.pureunlabor.co.kr/pu-cards.html?mailbox=1#k=1',
+    '★★ 서버가 보내는 옛 꼴 주소가 새 주소에서 404 가 된다');
+  assert.equal(ctx.safePortalUrl('/pu-cards.html?view=mail'), 'https://erp.pureunlabor.co.kr/pu-cards.html?view=mail');
+  assert.equal(ctx.safePortalUrl(''), 포털);
+  assert.equal(ctx.safePortalUrl('https://evil.example/phish'), 포털);
+  assert.equal(ctx.safePortalUrl('//evil.example/x'), 포털);
+  assert.equal(ctx.safePortalUrl('javascript:alert(1)'), 포털);
+  assert.equal(ctx.safePortalUrl('/pureunall//evil.com'), 포털, '★★ 앞머리를 떼면 //evil.com 이 된다 — 막아야 한다');
 });
 
 test('★ 관리자 푸시 대상 — retired·inactive·suspended 계정은 빼고 active·기존 관리자만 남긴다', async () => {

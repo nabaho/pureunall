@@ -7,7 +7,10 @@
 'use strict';
 importScripts('ver.js');                 /* DISK_VER — 지금 돌고 있는 판 */
 var REM_HOME = 'https://card.rememberapp.co.kr/book/groups';
+/* 받는 화면 — 옛 주소로 연다. ERP 가 erp.pureunlabor.co.kr 로 옮겨 가면 GitHub 이 새 주소로 넘긴다.
+   이미 열린 탭은 두 주소 어느 쪽이든 찾는다 (2026-11-15 ERP 주소 이사 준비). */
 var INTAKE = 'https://nabaho.github.io/pureunall/remember-intake.html';
+var INTAKE_ANY = [INTAKE, 'https://erp.pureunlabor.co.kr/remember-intake.html'];
 var EVERY_MIN = 30;
 var IMG_OK = /^https:\/\/remember-cdn\.rememberapp\.co\.kr\/[^\s"'<>]+$/;
 var IMG_MAX = 4 * 1024 * 1024;
@@ -77,7 +80,8 @@ function note(badge, why) {
 function sleep(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
 async function findOrOpen(prefix, url) {
   var all = await chrome.tabs.query({});
-  var hit = all.find(function (t) { return t.url && t.url.indexOf(prefix) === 0; });
+  var prefixes = Array.isArray(prefix) ? prefix : [prefix];
+  var hit = all.find(function (t) { return t.url && prefixes.some(function (p) { return t.url.indexOf(p) === 0; }); });
   if (hit) return hit;
   return chrome.tabs.create({ url: url, pinned: true, active: false });
 }
@@ -150,7 +154,7 @@ async function run() {
   var itId = 0;
   try {
     /* ① 받는 화면 */
-    var it = await findOrOpen(INTAKE, INTAKE);
+    var it = await findOrOpen(INTAKE_ANY, INTAKE);
     itId = it.id;
     await waitLoaded(it.id, 60000);
     var hello = await askReady(it.id);

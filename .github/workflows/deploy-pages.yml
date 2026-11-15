@@ -76,21 +76,27 @@ jobs:
           #   rules_std·std_2026·xlsx_gen 과 서비스워커들을 HTML 이 실제로 부른다.
           # package-lock.json 은 npm 이 남길 수 있다 — 앱과 무관하다.
           # .gitignore(실무자 폴더 이름이 적혀 있다)·firebase.database.json(규칙 배포 설정)도 앱이 부르지 않는다 (2026-10-14).
-          rm -f -- *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json
-          echo "제외: 최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json"
+          # .gitattributes(줄끝 규칙)도 앱이 부르지 않는다 — 아래 «숨은 파일도 싣기»를 켜면서 함께 뺀다 (2026-11-15).
+          rm -f -- *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json .gitattributes
+          echo "제외: 최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json .gitattributes"
           # 앱이 실제로 쓰는 것이 실수로 사라졌으면 여기서 배포를 멈춘다
           # ⚠ install.html·아이콘도 «앱으로 깔기» 의 길이다 — 사라지면 폰에 못 깐다
           # ⚠ hana-bridge.apk 는 휴대폰 하나문자 앱이다 (2026-08-29).
           #   사라지면 대표가 다시 GitHub Actions → Artifacts 를 뒤져야 한다 —
           #   「받아서 폰으로 옮기는 게 귀찮다」가 이것을 만든 까닭이다.
+          # ⚠ .well-known/assetlinks.json 은 플레이스토어 앱(TWA)이 «이 주소가 우리 것»임을 확인하는 파일이다.
+          #   새 주소(erp.pureunlabor.co.kr)에서는 사이트 뿌리가 곧 이 저장소라 여기서 내려준다 (2026-11-15 주소 이사 준비).
+          #   index.html·404.html 은 뿌리 주소·옛 꼴(/pureunall/…) 주소를 포털로 잇는다.
           for keep in js css vendor enter.html fund.html work.html pu-erp.html \
                       manifest.json hwpx_gen.js pu-sw.js hana-bridge.apk \
-                      install.html icon-portal-192.png icon-portal-512.png; do
+                      install.html icon-portal-192.png icon-portal-512.png \
+                      index.html 404.html .well-known/assetlinks.json; do
             test -e "$keep" || { echo "::error::배포에 필요한 $keep 이 없습니다"; exit 1; }
           done
           # 개발용이 하나라도 남았으면 멈춘다 — 지우는 목록이 낡아도 여기서 걸린다
           for gone in payroll-STATUS.md work-STATUS.md CLAUDE.md AGENTS.md GEMINI.md README.md \
-                      firebase.json .mcp.json .claude tests docs fund-erp functions status; do
+                      firebase.json .mcp.json .claude tests docs fund-erp functions status \
+                      .gitattributes .gitignore .firebaserc .github .githooks .agents; do
             test ! -e "$gone" || { echo "::error::개발용 $gone 이 아직 남아 있습니다"; exit 1; }
           done
           echo "남은 최상위 항목:"; ls -1
@@ -100,6 +106,10 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: .
+          # ★ 숨은 파일도 싣는다 — v4 부터 «점(.)으로 시작하는 것»을 기본으로 뺀다(.git·.github 는 늘 뺀다).
+          #   그래서 .well-known/assetlinks.json 이 한 번도 안 올라가 404 였다(2026-11-15 확인).
+          #   개발용 숨은 파일은 위에서 지웠고, 남았으면 위 «gone» 확인이 배포를 멈춘다.
+          include-hidden-files: true
 
   deploy:
     name: Deploy verified version

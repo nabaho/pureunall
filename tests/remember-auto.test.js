@@ -125,7 +125,8 @@ test('★★ ⑦ 그림은 리멤버 창고만 · 확장은 좁은 권한 · 인
   const hook = man.content_scripts.find((c) => c.js.includes('hook.js'));
   assert.equal(hook.world, 'MAIN', '화면 공간이어야 리멤버 목록 머리를 빌릴 수 있다');
   assert.deepEqual(man.permissions.sort(), ['alarms', 'tabs'], '★★ 필요 없는 권한이 붙었다');
-  assert.ok(man.host_permissions.every((h) => /rememberapp\.co\.kr|nabaho\.github\.io\/pureunall\/remember-intake/.test(h)), '★★ 다른 집까지 권한을 받는다');
+  /* 받는 화면은 옛 주소·새 주소(2026-11-15 ERP 주소 이사 준비) 둘 — 그 «한 화면»만 */
+  assert.ok(man.host_permissions.every((h) => /rememberapp\.co\.kr|nabaho\.github\.io\/pureunall\/remember-intake|^https:\/\/erp\.pureunlabor\.co\.kr\/remember-intake/.test(h)), '★★ 다른 집까지 권한을 받는다');
   const bg = strip(read(path.join(EXT, 'bg.js')));
   assert.match(bg, /IMG_OK\.test\(url/, '★★ 그림 주소를 거르지 않는다');
   const wf = read(path.join(__dirname, '..', '.github', 'workflows', 'deploy-pages.yml'));

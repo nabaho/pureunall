@@ -7,7 +7,8 @@
   "host_permissions": [
     "https://card.rememberapp.co.kr/*",
     "https://remember-cdn.rememberapp.co.kr/*",
-    "https://nabaho.github.io/pureunall/remember-intake.html*"
+    "https://nabaho.github.io/pureunall/remember-intake.html*",
+    "https://erp.pureunlabor.co.kr/remember-intake.html*"
   ],
   "action": { "default_title": "푸른 리멤버 연결 — 눌러서 지금 돌리기" },
   "background": { "service_worker": "bg.js" },
@@ -24,7 +25,7 @@
       "run_at": "document_start"
     },
     {
-      "matches": ["https://nabaho.github.io/pureunall/remember-intake.html*"],
+      "matches": ["https://nabaho.github.io/pureunall/remember-intake.html*", "https://erp.pureunlabor.co.kr/remember-intake.html*"],
       "js": ["intake-relay.js"],
       "run_at": "document_idle"
     }

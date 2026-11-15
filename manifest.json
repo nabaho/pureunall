@@ -4,7 +4,7 @@
   "description": "푸른노무법인 통합 업무관리 — 인사·급여·재무·계약·일정",
   "id": "/pureunall/enter.html",
   "start_url": "enter.html",
-  "scope": "/pureunall/",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#1e3a8a",
   "theme_color": "#1e3a8a",
