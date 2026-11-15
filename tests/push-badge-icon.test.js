@@ -16,7 +16,8 @@ const sw = fs.readFileSync(path.join(ROOT, 'firebase-messaging-sw.js'), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 function badgeFile() {
-  const m = sw.match(/badge\s*:\s*['"]([^'"]+)['"]/);
+  /* 2026-11-15 부터 앱 뿌리(APP_BASE)에 붙여 쓴다 — 옛 주소·새 주소 양쪽에서 그림을 찾게. 박아 쓴 옛 꼴도 읽는다 */
+  const m = sw.match(/badge\s*:\s*(?:APP_BASE\s*\+\s*)?['"]([^'"]+)['"]/);
   assert.ok(m, '알림 워커에 badge 가 있어야 한다');
   return m[1].replace(/^\/pureunall\//, '');
 }
