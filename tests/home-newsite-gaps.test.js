@@ -75,10 +75,15 @@ test('★★★ 글 번호 없는 새 노무사 — 사진·허락·열쇠가 �
   const r = P.올릴사람(사람쪽, [다있음]);
   assert.equal(r.갈것.length, 1, '★★★ 다 갖춘 새 노무사가 못 간다: ' + JSON.stringify(r.못갈것));
   assert.equal(r.갈것[0].srl, 'new-1', '★★ 카드 열쇠가 구성원 열쇠가 아니다');
+  /* 화면 「줄마다 감싸기」(div) 모양으로 허락한 글도 같은 경력으로 본다 · 빈칸만 다른 것도 같다 */
+  assert.equal(P.올릴사람(사람쪽, [Object.assign({}, 다있음, { publishOk: { 경력글: '<div>現 노무사</div>' } })]).갈것.length, 1);
+  assert.equal(P.올릴사람(사람쪽, [Object.assign({}, 다있음, { careers: ['  現   노무사 '] })]).갈것.length, 1);
   [
-    [Object.assign({}, 다있음, { publishOk: null }), /허락/],
+    [Object.assign({}, 다있음, { publishOk: null }), /허락이 없습니다/],
     [Object.assign({}, 다있음, { photo: { bytes: 10, ver: '1' } }), /사진/],
-    [Object.assign({}, 다있음, { key: '../x' }), /글 번호/]
+    [Object.assign({}, 다있음, { key: '../x' }), /글 번호/],
+    /* 허락한 뒤 경력을 고쳤으면 — 매달 자동 재게시도 고친 경력을 올리지 않는다 */
+    [Object.assign({}, 다있음, { careers: ['現 노무사', '前 다른 곳'] }), /다시 허락/]
   ].forEach(([m, 까닭]) => {
     const x = P.올릴사람(사람쪽, [m]);
     assert.equal(x.갈것.length, 0, '★★★ 빠진 것이 있는데 새 사이트에 올라간다');
@@ -301,4 +306,43 @@ test('★★★ 서버 매달 자동은 «실행되는 조각»이 새로 든 �
   assert.match(몸, /새실행조각\(/, '★★★ 자동 올리기에 실행 조각 검사가 없다');
   const 막기 = (몸.match(/await 실행조각막기\(/g) || []).length;
   assert.ok(막기 >= 2, '★★★ 구성원·로고 두 올리기 모두 검사해야 한다 (지금 ' + 막기 + '곳)');
+});
+
+test('★★★ 실행 조각 검사는 글자 참조·탭으로 감춘 주소도 본다 (있던 쪽·새 쪽 같은 잣대)', () => {
+  const SP = require(path.join(R, 'functions', 'site-publish.js'));
+  const 있던 = '<p>가</p>';
+  [
+    '<a href="java&#x73;cript:alert(1)">누르기</a>',
+    '<a href="&#106;avascript:alert(1)">누르기</a>',
+    '<a href="javascript&colon;alert(1)">누르기</a>',
+    '<a href="jav&Tab;ascript:alert(1)">누르기</a>',
+    '<a href="java\tscript:alert(1)">누르기</a>',
+    '<a href=" &#14;javascript:alert(1)">누르기</a>',
+    '<svg><a><set attributeName="href" to="javascript:alert(1)"/></a></svg>'
+  ].forEach(나쁜 => {
+    assert.ok(SP.새실행조각(있던, 있던 + 나쁜).length >= 1, '★★★ 감춘 실행 주소가 빠져나간다: ' + 나쁜);
+  });
+  /* 글만 고친 것은 그대로 통과 — 주소 글자가 «javascript» 로 시작하는 보통 파일은 실행 주소가 아니다 */
+  assert.deepEqual(SP.새실행조각(있던, '<p>나</p><a href="javascript-guide.html">안내</a>'), []);
+  const 감춘것 = '<p>가</p><a href="java&#x73;cript:x()">a</a>';
+  assert.deepEqual(SP.새실행조각(감춘것, 감춘것.replace('가', '나')), [], '있던 조각을 그대로 두고 글만 고치면 통과');
+});
+
+test('★★★ 자문사 로고 — 「추가」 목록의 이상한 열쇠·그림은 담지 않고, 칸그리기는 그림 주소도 본다', () => {
+  const 로고 = Array.from(Pa.로고읽기(자문사쪽));
+  const 고른것 = Pa.올릴로고(자문사쪽, { 추가: [
+    { srl: "n1');alert(1);//", 그림: '../files/logo/n1.png' },
+    { srl: 'n2', 그림: 'x" onerror="alert(1)' },
+    { srl: 'n3', 그림: 'javascript:alert(1)' },
+    { srl: 'n4', 그림: '../files/logo/n4.png' }
+  ] });
+  const 열쇠 = Array.from(고른것.갈것, x => x.srl);
+  assert.ok(열쇠.indexOf('n4') >= 0, '★★ 바른 새 로고가 빠졌다');
+  ['n2', 'n3'].forEach(k => assert.ok(열쇠.indexOf(k) < 0, '★★★ 안전하지 않은 그림이 담겼다: ' + k));
+  assert.ok(!열쇠.some(k => /['()";]/.test(k)), '★★★ 따옴표 든 열쇠가 담겼다');
+  assert.equal(고른것.갈것.length, 로고.length + 1);
+  assert.throws(() => Pa.쪽그리기(자문사쪽, [{ srl: 'n5', 그림: 'x" onerror="alert(1)' }]), /그림/);
+  assert.throws(() => Pa.쪽그리기(자문사쪽, [{ srl: 'n5', 그림: 'javascript:alert(1)' }]), /그림/);
+  /* 지금 쪽의 로고(상대 주소)와 http(s) 주소는 그대로 그려진다 */
+  assert.ok(Pa.쪽그리기(자문사쪽, 로고.concat([{ srl: 'n6', 그림: 'https://pureunlabor.co.kr/files/logo/n6.png' }])).length > 0);
 });

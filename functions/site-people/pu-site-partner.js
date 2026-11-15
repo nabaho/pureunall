@@ -58,14 +58,25 @@
     }).filter(function (x) { return x.그림; });
   }
 
+  /* ★ 열쇠·그림 주소는 쪽 속성(그리고 이알피 화면의 onclick)에 그대로 들어간다 — 안전한 모양만 받는다(2026-11-16 검토).
+       그림은 따옴표·꺾쇠·빈칸·역빗금이 없고, 주소라면 http(s) 만. 열쇠는 영문·숫자·_- 만. */
+  var 로고열쇠꼴 = /^[A-Za-z0-9_-]{1,60}$/;
+  function 로고그림안전(g) {
+    var s = String(g == null ? '' : g);
+    if (!s || /["'<>`\\\s\u0000-\u001f]/.test(s) || /&#|&[a-z]+;/i.test(s)) return false;
+    var 머리 = /^([a-z][a-z0-9+.-]*):/i.exec(s);
+    return !머리 || /^https?$/i.test(머리[1]);
+  }
+
   function 칸그리기(본, 로고, 자리) {
     var h = 본;
+    if (!로고그림안전(로고 && 로고.그림)) throw new Error('로고 그림 주소 모양이 틀렸습니다');
     h = h.replace(/(<div class="bh bh_item item item)\d+/, '$1' + (자리 + 1));
     h = h.replace(/(<img[^>]+src=")[^"]*(")/, '$1' + 로고.그림 + '$2');
     /* 로고를 누를 자리는 지금도 «주석»으로 막혀 있다 — 그 모양을 그대로 지킨다
        ★ 본 칸이 새 로고(n…)여도 갈린다 — 숫자만 잡으면 첫 칸이 새 로고일 때 열쇠가 그대로 복사된다(2026-11-16 검토 낮음).
        ★ 열쇠는 속성에 그대로 들어가므로 안전한 글자만 받는다. */
-    if (로고.srl && !/^[A-Za-z0-9_-]{1,60}$/.test(String(로고.srl))) throw new Error('로고 열쇠 모양이 틀렸습니다');
+    if (로고.srl && !로고열쇠꼴.test(String(로고.srl))) throw new Error('로고 열쇠 모양이 틀렸습니다');
     h = h.replace(/data-srl="[A-Za-z0-9_-]*"/g, 'data-srl="' + (로고.srl || '') + '"');
     return h;
   }
@@ -105,8 +116,11 @@
        (올리고 나면 쪽에서 읽히므로 다음부터는 이 길로 안 온다.) */
     var 있는열쇠 = {};
     다.forEach(function (x) { 있는열쇠[x.srl] = 1; });
+    /* ★ 「추가」 목록은 로그인한 누구나 쓸 수 있는 자리다 — 우리가 지은 모양(n<시각>)이 아닌 열쇠·
+         안전하지 않은 그림 주소는 담지 않는다. 화면 단추(onclick)와 쪽 속성에 그대로 들어가기 때문이다. */
     ((정한것 && 정한것.추가) || []).forEach(function (x) {
       if (!x || !x.그림 || 있는열쇠[x.srl]) return;
+      if (!로고열쇠꼴.test(String(x.srl)) || !로고그림안전(x.그림)) return;
       다.push({ srl: String(x.srl), 그림: String(x.그림) });
       있는열쇠[x.srl] = 1;
     });

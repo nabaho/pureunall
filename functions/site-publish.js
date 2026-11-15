@@ -116,6 +116,20 @@ async function 올리기(githubRequest, token, repo, path, content, message, bas
    ★ 직원은 «글·그림·표»를 고칠 수 있다(대표 지시 2026-10-30 그대로). 다만 «실행되는 조각»을 새로 넣거나 바꾸는 것은 총괄관리자만.
    실행되는 조각 = <script>…</script> 덩어리 · on…= 속성 · javascript: 주소 · iframe/object/embed/base/meta-refresh 태그.
    비교는 «있던 쪽에 같은 조각이 있었나» — 원래 있던 스크립트를 그대로 둔 채 글만 고치면 통과한다. */
+/* ★ 브라우저는 속성 값의 글자 참조(&#x73; · &#115; · &colon; · &Tab; …)를 먼저 풀고,
+     주소에서는 탭·줄바꿈을 지운 뒤 읽는다(2026-11-16 검토). 그래서 주소 조각(J:)은 브라우저처럼
+     «풀고 지운 사본»에서 찾는다 — 있던 쪽·새 쪽 둘 다 같은 잣대. */
+function 한글자(n) {
+  try { return String.fromCodePoint(n); } catch (e) { return ""; }
+}
+const 이름참조 = { colon: ":", tab: "\t", newline: "\n", sol: "/", lpar: "(", rpar: ")", period: ".",
+  quot: "\"", apos: "'", amp: "&", lt: "<", gt: ">", nbsp: " " };
+function 글자참조풀기(s) {
+  return String(s)
+    .replace(/&#x0*([0-9a-f]{1,6});?/gi, (_, h) => 한글자(parseInt(h, 16)))
+    .replace(/&#0*([0-9]{1,7});?/g, (_, d) => 한글자(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, n) => (이름참조[n.toLowerCase()] !== undefined ? 이름참조[n.toLowerCase()] : m));
+}
 function 실행조각(html) {
   const s = String(html == null ? "" : html);
   const out = new Set();
@@ -125,8 +139,10 @@ function 실행조각(html) {
   while ((m = re1.exec(s))) out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, ""));
   const re2 = /\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
   while ((m = re2.exec(s))) out.add("H:" + norm(m[0]));
-  const re3 = /(?:href|src|action|formaction|data)\s*=\s*["']?\s*(?:javascript|vbscript|data:text\/html)/gi;
-  while ((m = re3.exec(s))) out.add("J:" + norm(m[0]));
+  /* 속성 이름은 가리지 않는다 — href·src 말고도 SVG <set to=…>·<animate values=…> 가 주소를 바꿀 수 있다. */
+  const 풀린 = 글자참조풀기(s).replace(/[\u0000-\u001f\u007f]/g, "");
+  const re3 = /[\w:-]+\s*=\s*["']?[\s ]*(?:javascript\s*:|vbscript\s*:|data:text\/html)/gi;
+  while ((m = re3.exec(풀린))) out.add("J:" + norm(m[0]));
   const re4 = /<(?:iframe|object|embed|base|frame|applet)\b[^>]*>|<meta\b[^>]*http-equiv[^>]*>/gi;
   while ((m = re4.exec(s))) out.add("T:" + norm(m[0]));
   return out;
