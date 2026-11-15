@@ -142,7 +142,7 @@ test('③-1★ 옛 일정 설명의 「푸른 담당: 이름 (P-005)」 — 보�
   assert.match(몸, /var 담당 = 일정담당\(ev\)/, '담당 찾기가 원문을 읽는 길이 사라졌습니다');
 });
 
-test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {
+test('③-2 상세 창이 장소·설명을 내고 맨 아래에 «캘린더 이름 + 생성자»를 낸다 (구글 앱 상세와 같은 글자 내용 — 2026-11-15)', () => {
   const b = 상자({ 구글: [{ id: 'g1', text: '가나상사 방문', color: '#039be5', date: '2026-09-16',
     time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), place: '천안시 서북구', desc: '설문지 지참', mail: 'hong@example.com', mailSid: 'P-001',
     gcalUrl: 'https://x' }] });
@@ -150,13 +150,17 @@ test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {
   /* ⚠ 상자 안에서 «만들어진» 배열은 겉보기가 같아도 deepEqual 이 튕긴다 —
      글자로 바꿔 견준다(2026-09-27 에 여기서 한 번 헛돌았다). */
   const 줄 = vm.runInContext('구글상세("g1").rows.map(function(r){return r.i+" "+r.t;}).join(" | ")', b);
-  assert.strictEqual(줄, '👤 홍길동 | 📍 천안시 서북구 | ≡ 설문지 지참 | ✉ hong@example.com 이 만듦');
+  /* ⚠ 예전의 「👤 담당」·「✉ 메일 이 만듦」·「🕒 넣은 날」 줄은 구글 앱 상세에 없어 걷었다(담당자는 맨 아래 «생성자»로). 폰은 폰 상세가 따로다 */
+  assert.strictEqual(줄, '📍 천안시 서북구 | ≡ 설문지 지참 | 📅 푸른노무법인');
+  const 생성자 = vm.runInContext('구글상세("g1").rows.filter(function(r){return r.i==="📅";})[0].sub', b);
+  assert.strictEqual(생성자, '생성자: 홍길동', '★ 맨 아래 줄에 «생성자: 이름»이 없습니다(명부에 있으면 이름, 없으면 메일)');
   assert.strictEqual(d.url, 'https://x', '구글로 갈 주소가 없습니다');
 });
 
 test('③-3 빈 칸은 «줄을 만들지 않는다» — 빈 줄이 자리만 먹는다', () => {
   const b = 상자({ 구글: [{ id: 'g1', text: '회의', color: '#039be5', date: '2026-09-16' }] });
-  const 몇줄 = vm.runInContext('구글상세("g1").rows.length', b);
+  /* 맨 아래 «캘린더 이름» 줄은 늘 있다(구글 앱 상세도 그렇다) — 그것 말고는 «비어 있는 칸의 줄»이 없어야 한다 */
+  const 몇줄 = vm.runInContext('구글상세("g1").rows.filter(function(r){return r.i!=="📅";}).length', b);
   assert.strictEqual(몇줄, 0, '★ 빈 줄을 만들었습니다');
 });
 
@@ -221,7 +225,12 @@ test('★ 시각이 있으면 «몇 시부터 몇 시까지»를 적는다', () 
     end: '', time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), rows: [], hint: [], url: 'https://x' } });
   const html = vm.runInContext('detailHtml()', b);
   assert.match(html, /오후 2:00~오후 4:00/, '★ 끝 시각을 안 적습니다(구글 꼴 「오후 2:00~오후 4:00」)');
-  assert.match(html, /data-dgo="1"/, '★ 구글 일정인데 「구글에서 열기」가 없습니다');
+  /* PC — 「구글에서 열기」는 구글 앱처럼 ⋮ 옵션 메뉴 안에 있다(메뉴를 열었을 때 나온다). 도구줄에는 ✏️ 🗑 ✉ ⋮ ✕ */
+  assert.match(html, /data-dopt="1"/, '★ 구글 일정인데 ⋮ 옵션 단추가 없습니다(「구글에서 열기」가 들어 있다)');
+  assert.ok(html.indexOf('data-dgo') < 0, '메뉴를 열기 전에는 「구글에서 열기」가 안 보여야 합니다');
+  const 연 = 상자({ 상세: { kind: 'gcal', title: '방문', color: '#039be5', date: '2026-09-16', menu: true,
+    end: '', time: '14:00', endAt: 0, rows: [], hint: [], url: 'https://x' } });
+  assert.match(vm.runInContext('detailHtml()', 연), /data-dgo="1"/, '★ ⋮ 메뉴를 열었는데 「구글에서 열기」가 없습니다');
 });
 
 test('★ ESC 로 닫힌다 — 창이 열렸는데 못 닫으면 화면이 잠긴다', () => {
