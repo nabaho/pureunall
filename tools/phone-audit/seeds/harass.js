@@ -59,8 +59,12 @@ const harassCases = {
     verdictSummary: '',
     steps: {
       intake: { done: true, date: '2024-11-01', note: '과거 푸른메일 착수 공문 접수' },
+      report: { done: true, date: '2024-12-05', note: '최종 조사결과보고서 송부 완료' },
     },
-    mailLinks: [],
+    closeDate: '2024-12-05',
+    mailLinks: [
+      { key: 'i:sent:905', slug: 'sent', uid: '905', dir: 'out', date: '2024-12-05', ts: Date.UTC(2024, 11, 5, 2, 0, 0), from: '점검대표 <370-6@daum.net>', to: 'audit@dara-check.example', subject: '[푸른노무법인] (주)다라점검바이오 직장 내 괴롭힘 조사보고서 송부의 건', docRole: 'final_report', stepCode: 'report', attCount: 1, attNames: ['조사결과보고서_점검용.hwpx'] },
+    ],
   },
 };
 
@@ -115,7 +119,27 @@ module.exports = {
     data: {
       companies: { v: companies },
       cases: { v: erpCases },
+      contracts: {
+        v: [
+          { id: 'ct-hi-1', contractNo: '계약-2026-001', arrivedCaseId: 'ec-hi-1', companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', contractDate: '2026-10-05', title: '직장 내 괴롭힘 조사 대행 위임계약', scope: '직장 내 괴롭힘 외부전문가 조사 및 조사보고서 작성', managerMain: 'P001' },
+        ],
+      },
+      other_projects: {
+        v: [
+          { id: 'op-hi-1', no: '문서작성-2026-001', sourceContractId: 'ct-hi-1', companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', startDate: '2026-10-06', title: '생산품질본부 괴롭힘 조사 지원', managerMain: 'P001' },
+        ],
+      },
       biz_case_types: { v: [{ code: 'case-investigate', short: '조사', name: '조사', sortOrder: 100 }] },
+    },
+    work_erp: {
+      items: {
+        'wk-hi-1': { id: 'wk-hi-1', no: '2026-조사-001', cat: '조사', co: '(주)가나점검테크놀로지솔루션', companyId: 'hco-1', title: '생산품질본부 괴롭힘 조사', mgr: 'P001', startDate: '2026-10-05' },
+      },
+      itemlogs: {
+        'wk-hi-1': {
+          l1: { date: '2026-10-14', txt: '신고인 및 참고인 대면 면담 진행 완료' },
+        },
+      },
     },
     mailbox: {
       folders: mailboxFolders,

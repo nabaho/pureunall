@@ -251,6 +251,8 @@ rules.data = {
      (2026-09-06 메일 수집기가 이 자리의 업체 담당자 주소를 읽게 되면서 드러났다) */
   cases:          { '.read': LOGIN, '.write': LOGIN,     /* 사건 기록 */
                     v: { $id: { workers: { $i: 근로자칸막기 } } } },
+  other_projects: { '.read': LOGIN, '.write': LOGIN,     /* 기타사업 기록(이알피·업무관리·괴롭힘조사 연동) */
+                    v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 «업무 메모» (2026-10-05) — 여태 그 PC 의 localStorage 에만 있어 다른 PC 에서 안 보였다
      (pu-erp.html CaseMemoPanel). 권한은 사건 기록과 «같게» — 사건을 보는 사람이 그 메모도 본다. */
   case_memos:     { '.read': LOGIN, '.write': LOGIN },
