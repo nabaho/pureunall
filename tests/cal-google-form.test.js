@@ -184,7 +184,8 @@ test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 
   vm.runInContext(함수몸('function 반복글(ymd){'), b);
   const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
   assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
-  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
+  /* 큰 창(옵션 더보기·폰)은 반복·알림 줄, 빠른 창(PC)은 시간 줄 안의 「반복 안함」 선택 — 둘 다 «새 일정에만» */
+  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? \(간략 \? '' : 반복알림줄\(m\)\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
   assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');
   assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
   assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
@@ -219,7 +220,7 @@ test('참석자·Meet — 서버 대신 넣기: 우리 표의 값을 넘기고, 
 });
 
 test('참석자·Meet — 화면: 줄은 새 일정에만 · 메일 검사 · 초대 메일 안 보냄을 말한다 · 클라이언트 Meet 실패 대비', () => {
-  assert.match(함수몸('function modalHtml(){'), /반복알림줄\(m\) \+ 참석자줄\(m\)/);
+  assert.match(함수몸('function modalHtml(){'), /\(간략 \? '' : 반복알림줄\(m\)\) \+ 참석자줄\(m\)/);
   assert.match(함수몸('function 참석자줄(m){'), /초대 메일은 보내지 않습니다/, '초대 메일이 안 간다는 말이 없습니다');
   assert.match(함수몸('function doSave(){'), /참석자 메일이 올바르지 않습니다/, '틀린 메일을 막지 않습니다');
   assert.match(함수몸('function 구글에넣기(m){'), /attendees: 참석자목록\(m\.guests\)\.메일, meet: !!m\.meet, meetId:/);
