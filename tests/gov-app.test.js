@@ -194,7 +194,9 @@ test('★ 인증키가 없으면 받는 방법을 화면에 적는다', () => {
   assert.match(h, /Decoding/);
   assert.match(h, /15129394/, '나라장터 신청 자리');
   assert.match(h, /15125273/, '알리오 신청 자리 — 빠지면 그쪽만 0건이 됩니다');
-  assert.match(h, /nabaho\.github\.io\/pureunall\/gov\.html/, '기업마당이 묻는 시스템 URL');
+  assert.match(h, /erp\.pureunlabor\.co\.kr\/gov\.html/, '기업마당이 묻는 시스템 URL — 2026-11-15 이사한 새 ERP 주소');
+  assert.doesNotMatch(h, /nabaho\.github\.io\/pureunall/,
+    '기업마당에 옛 ERP 주소를 등록하라고 안내하면 안 된다(301 로 넘어가 등록 주소와 실제 주소가 어긋난다)');
 });
 
 /* ═══════ 경력관리 자료 — 견주기 전용 (대표 지시 2026-10-07 「신청재료 필요없다 모두 정리해달라」) ═══════

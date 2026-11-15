@@ -97,6 +97,13 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 
 ---
 
+## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
+
+배포 주소는 `https://erp.pureunlabor.co.kr`, 홈페이지는 `https://pureunlabor.co.kr` 이다. 옛 `https://nabaho.github.io/pureunall/*` 은 GitHub 이 301 로 새 주소에 넘긴다 — «동작은 하지만» 새 코드·문서·안내 글에 쓰지 않는다.
+화면 코드는 상대경로만 쓴다(절대 `/pureunall/` 경로 금지 — 새 주소에는 그 앞머리가 없다). 서버(functions)는 `functions/erp-origins.js` 의 `ERP_ORIGINS`(받아 주는 출처 — 옛 출처는 2027-02-15 무렵까지 남김)·`ERP_LINK_BASE`(사람에게 내보내는 링크 뿌리)·`PUBLIC_HOME`(공개 홈페이지)만 쓰고, 주소 글자를 새로 박지 않는다.
+브라우저 저장소(localStorage·IndexedDB·로그인)는 출처별이라 옛 주소 것은 새 주소에서 안 보인다 — 이사 전 기기 자료는 구출 쪽 `https://nabaho.github.io/pureunall-rescue/` 로 꺼낸다.
+→ `tests/no-hardcoded-old-erp-url.test.js` · `docs/규칙/ERP-주소.md`
+
 ## 건의함의 고칠 일은 점수와 상관없이 직접 검토하고 고친다 (2026-10-18)
 
 - 포털 💬 건의함(`suggestions_private`)의 건 중 코드를 고칠 일은 읽고·고치고·검사하고·PR 로 올린 뒤 답변까지 넣는다.
