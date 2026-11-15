@@ -444,3 +444,11 @@ test('폰 일정 상세 — 구글 일정에는 맨 아래 「캘린더」 줄(�
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /d\.kind === "gcal"\)\s*\? '<div class="drows"><div class="drow"><span class="di">' \+ 선아이콘\("calendar"\) \+ '<\/span><span class="dt">푸른노무법인<\/span>/);
 });
+
+test('「더보기」 창 머리(요일·날짜·✕) — 어두운 화면에서 판 글자색을 따른다 (밝은 값 #444746 그대로면 어두운 바탕에서 안 읽힌다)', () => {
+  /* 까닭: 밝은 화면용 #444746 을 어두운 판(#1b1b1d) 위에 그대로 두면 대비가 1.8:1 이었다(검토 2026-11-15) */
+  const 있다 = (조각) => 캘린더.replace(/\r\n/g, '\n').includes(조각);
+  assert.ok(있다(':root[data-theme="dark"] .pop{background:var(--panel)}'), '어두운 화면에서 더보기 창 바탕이 판색이어야 합니다');
+  assert.ok(있다(':root[data-theme="dark"] .pop .ph .wd{color:var(--gsub)}'), '어두운 화면 요일 글자색 덧씌움이 없습니다');
+  assert.ok(있다(':root[data-theme="dark"] .pop .ph .big,:root[data-theme="dark"] .pop .ph .x{color:var(--gtext)}'), '어두운 화면 날짜·✕ 글자색 덧씌움이 없습니다');
+});
