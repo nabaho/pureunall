@@ -101,6 +101,12 @@ const 쇼보안 = "default-src 'none'; "
   + "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
   + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
+/* ★ 2026-11-15 보안 — «전문 보기» 쪽의 문지기. 전문은 글·표·그림뿐이라 스크립트가 필요 없다.
+   회차의 전문 칸에 누가 스크립트·입력 양식을 심어도 받는 분 브라우저가 실행·전송하지 않게 막는다.
+   그림은 https 면 어디든(지난 회차 그림 주소를 바꾸지 않으려고), 링크는 그대로 눌린다. */
+const 전문보안 = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; "
+  + "font-src https:; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
 /* 보여 줄 수 있는 회차인가.
    ⚠ 「없다」와 「아직 안 보냈다」를 가른다 — 사람에게 하는 말이 달라야 한다. */
 function 볼수있나(상태, 전문) {
@@ -584,4 +590,4 @@ function 없는쪽(까닭) {
 }
 
 module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목, 전문폭,
-  그림열쇠, 쇼볼수있나, 쇼보안, 파일열쇠, 내려받기머리, 파일끝들 };
+  그림열쇠, 쇼볼수있나, 쇼보안, 전문보안, 파일열쇠, 내려받기머리, 파일끝들 };
