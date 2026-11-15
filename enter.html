@@ -248,7 +248,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 /* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
    챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
    ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
-   ⚠ 폰(≤520px)은 그림만 남긴다(글자는 title·aria-label 로) — 머리줄이 한 줄을 넘지 않게. */
+   ⚠ 폰·태블릿(≤900px)은 그림만 남긴다(글자는 title·aria-label 로) — 머리줄이 한 줄을 넘지 않게. */
 .pbar .hd-app{order:4;display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;border-radius:14px;background:#fff;
   border:2px solid var(--accent);box-shadow:0 2px 10px rgba(30,64,175,.2);color:var(--ink);text-decoration:none;white-space:nowrap;cursor:pointer;}
 .pbar .hd-app[hidden]{display:none;}
@@ -257,8 +257,20 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .hd-ico{width:30px;height:32px;border-radius:7px;background:#fff;border:1px solid #cbd5e1;overflow:hidden;display:flex;flex-direction:column;flex:none;}
 .pbar .hd-ico i{font-style:normal;display:block;height:11px;line-height:11px;background:#dc2626;color:#fff;font-size:9px;font-weight:800;text-align:center;}
 .pbar .hd-ico em{font-style:normal;flex:1;display:grid;place-items:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
+.pbar .hd-app{position:relative;}
+.pbar .hd-tx{display:flex;flex-direction:column;line-height:1.2;}
 .pbar .hd-tx b{font-size:.84rem;font-weight:800;}
-@media(max-width:520px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:none;} }
+/* 「오늘 N건」(구글 공용 달력 오늘 일정, 대표 지시 2026-11-15) — PC 는 이름 아래 한 줄, 폰·태블릿은 그림 모서리의 빨간 숫자 딱지.
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있다. 못 받았을 때·폰에서 0건은 «안 보인다»(못 받음을 0으로 쓰지 않는다). */
+.pbar .hd-n{font-size:.7rem;font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums;}
+.pbar .hd-n[hidden]{display:none;}
+.pbar .hd-n.is-zero{color:#64748b;font-weight:600;}
+@media(max-width:900px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:contents;} .pbar .hd-tx b{display:none;}
+  .pbar .hd-n{position:absolute;top:-9px;right:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff;}
+  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;} }
+/* 태블릿(521~900px)은 머리줄이 한 줄(nowrap)이라 단추 글자까지 두면 오른쪽(로그아웃)이 화면 밖으로 밀렸다(768px 에서 102px — 2026-11-15 검증 작업자 지적·직접 쟀다).
+   그림만 남기고(위 ≤900px 규칙) 줄 사이 틈도 줄여 768·744px(아이패드 세로)에서 한 줄에 들어오게 한다. 폰(≤520px)은 줄이 접히므로 틈은 그대로. */
+@media(min-width:521px) and (max-width:900px){ .pbar{gap:6px;} }
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
@@ -1420,7 +1432,7 @@ body.portal-mode #moreFab{display:flex;}
            처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
       <a id="headApp_cal" class="hd-app" data-head-app="1" data-name="푸른 캘린더" href="pu-cal.html?sso=1" hidden>
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
-        <span class="hd-tx"><b>푸른 캘린더</b></span>
+        <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
       </a>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
@@ -2049,7 +2061,7 @@ body.portal-mode #moreFab{display:flex;}
        그림글자에 달력은 📅 📆 🗓️ 셋뿐이고 작아지면 서로 같아 보였다.
        ⚠ icon 값이 이제 «HTML 문자열»이다(innerHTML 로 꽂는다). enter.html 이 그렇게 쓴다.
        ⚠ 탭 그림글자·바탕화면 아이콘도 같은 그림이다 — tests/app-icons.test.js 가 견준다. */
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client', head:true },   /* head — 타일 대신 «머리줄 큰 단추»(#headApp_cal)로 선다 (대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 한 번에 클릭」 → A안) */
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client', head:true, count:'gcalToday' },   /* head — 타일 대신 «머리줄 큰 단추»(#headApp_cal)로 선다 (대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 한 번에 클릭」 → A안). count — 단추에 「오늘 N건」(구글 공용 달력 오늘 일정, 2026-11-15) */
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱을 만들어 진행」).
        ⚠ 이 앱은 «보고 건너가는 곳»이다 — 초안·AI·HWPX·확정은 정부사업일정의 보고서 창이 한다(#rpt= 로 건너감).
@@ -4036,7 +4048,7 @@ body.portal-mode #moreFab{display:flex;}
      대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 별도로 관리해서 한 번에 클릭」 → 목업 A안.
      ★ 눌렀을 때는 «타일과 같은 길»이다 — PC 는 openPortalApp(창 이름·재사용·10분 캐시 버킷), 폰은 그냥 링크(sso=1).
      ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
-     ⚠ 「오늘 N건」은 일부러 안 넣었다 — 달력 화면이 보여 주는 것과 «다른 수»가 나오면 틀린 말이 된다. */
+     ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
   function portalHeadAppsHide(){
     var els = document.querySelectorAll('[data-head-app]');
     for(var i = 0; i < els.length; i++) els[i].hidden = true;
@@ -4046,7 +4058,16 @@ body.portal-mode #moreFab{display:flex;}
     var m = el.querySelector('.hd-m'), n = el.querySelector('.hd-d');
     if(m) m.textContent = mo;
     if(n) n.textContent = da;
-    el.setAttribute('aria-label', (el.getAttribute('data-name') || '') + ' — 오늘 ' + mo + ' ' + da + '일');
+    el.setAttribute('data-today', mo + ' ' + da + '일');
+    portalHeadAppLabel(el);
+  }
+  /* 접근성 이름·말풍선 — 날짜는 항상, 「오늘 N건」은 «받았을 때만». 숫자가 무슨 뜻인지(구글 공용 달력만)도 말풍선에 밝힌다. */
+  function portalHeadAppLabel(el){
+    var name = el.getAttribute('data-name') || '', day = el.getAttribute('data-today') || '';
+    var n = el.getAttribute('data-n');
+    var cnt = (n !== null && n !== '') ? ' · 오늘 구글 공용 달력 일정 ' + n + '건' : '';
+    el.setAttribute('aria-label', name + ' — 오늘 ' + day + cnt);
+    el.title = (el.getAttribute('data-title') || name) + (cnt ? cnt + ' (연차·출장·나만 보기 일정은 달력에서)' : '');
   }
   function portalHeadAppPaint(app){
     var el = document.getElementById('headApp_' + app.key);
@@ -4054,9 +4075,11 @@ body.portal-mode #moreFab{display:flex;}
     var join = app.url.indexOf('?') >= 0 ? '&' : '?';
     el.hidden = false;
     el.href = app.url + join + 'sso=1';
-    el.title = app.name + (app.desc ? ' — ' + app.desc : '');
+    el.setAttribute('data-title', app.name + (app.desc ? ' — ' + app.desc : ''));
+    el.setAttribute('data-count', app.count || '');
     if(!isMobile()) el.target = portalAppWindowName(app.key); else el.removeAttribute('target');
-    portalHeadAppDate(el);
+    portalHeadAppDate(el);       // 말풍선·접근성 이름도 여기서 맞춘다(portalHeadAppLabel)
+    portalHeadAppCount(el);      // 「오늘 N건」 — 받는 동안은 숫자 없이 선다
     if(el.getAttribute('data-wired') === '1') return;
     el.setAttribute('data-wired', '1');
     el.addEventListener('click', function(ev){
@@ -4066,10 +4089,95 @@ body.portal-mode #moreFab{display:flex;}
       openPortalApp(app, app.url + join + 'sso=1&v=' + v);
     });
   }
+  /* ── 오늘 N건 (머리줄 단추) ── 대표 지시 2026-11-15 「네, 이어서」 (목업 A안의 「오늘 N건」)
+     ★ 무엇을 세나: 구글 «공용 달력»의 오늘 일정 건수다. 푸른 캘린더 화면이 «구글» 일정을 받는 것과 같은 달력·같은 열쇠
+       (pu-cal.html 의 GCAL_CAL_ID·GCAL_API_KEY — tests/portal-cal-head-button.test.js 가 맞대 본다)로 «하루치»만 받는다.
+       걸친 날 계산도 달력과 같다(종일 일정의 끝날은 하루 당김 · 자정에 끝나면 그날은 안 든다 · 여러 날 일정은 걸친 날마다 든다).
+       달력의 «오늘 칸»은 줄이 더 많을 수 있다(연차·출장·이음 근무 근태, 사건 마감, 나만 보기) — 그것은 세지 않는다.
+       그래서 말풍선이 「구글 공용 달력 일정 N건」이라고 «정확히» 말한다(portalHeadAppLabel).
+     ★ 못 받았으면 숫자를 «안 보인다» — 0건으로 쳐서 「오늘 0건」이라 하면 거짓말이다(못 받음 ≠ 0). 하루에 250건 넘게 와서 쪽이 나뉘어도 같다(모르는 것을 모른다고 한다).
+     ★ 하루치 한 번 — 5분 안에는 다시 안 받고(캐시), 실패하면 1분은 쉰다. 두 번 그려도 한 번만 받는다. 날이 바뀌면 어제 숫자는 지운다.
+     ⚠ 서버 표(my_schedules 등)는 읽지 않는다 — 달력 내용 대부분이 구글 쪽이고 서버 표에는 옛 기록 25건뿐이다(pu-cal.html «구글 캘린더» 머리말).
+     ⚠ 포털이 구글 달력 열쇠를 «또» 갖는다 — 열쇠는 사이트 제한(docs/구글캘린더-API키-사이트제한.md)이 지킨다. 같은 사이트(nabaho.github.io)에서 부르므로 제한에 걸리지 않는다. */
+  var PORTAL_GCAL = { key: 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo', cal: 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com' };
+  var PORTAL_CAL_FRESH_MS = 5 * 60 * 1000, PORTAL_CAL_RETRY_MS = 60 * 1000;
+  var portalCalCount = { ymd: '', at: 0, n: null, failAt: 0, pending: null, pendingYmd: '' };
+  function portalYmdOf(d){
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function portalShiftYmd(ymd, days){
+    var p = String(ymd).split('-'), t = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + days));
+    return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + t.getUTCDate()).slice(-2);
+  }
+  /* 그 날(ymd)에 걸친 구글 일정 건수 — pu-cal.html 의 gcalToEvent(date·끝)·eventsOn(걸침 판단)과 «같은 규칙» */
+  function portalCountGcalOn(items, ymd){
+    var n = 0;
+    (items || []).forEach(function(ev){
+      if(!ev || !ev.start || !(ev.start.date || ev.start.dateTime)) return;
+      var date = String(ev.start.date || ev.start.dateTime).slice(0, 10), end = date;
+      if(ev.end && ev.end.date) end = portalShiftYmd(String(ev.end.date).slice(0, 10), -1);       // 종일 일정의 end.date 는 «다음 날»
+      else if(ev.end && ev.end.dateTime){
+        end = String(ev.end.dateTime).slice(0, 10);
+        if(String(ev.end.dateTime).slice(11, 16) === '00:00' && end > date) end = portalShiftYmd(end, -1);   // 자정에 끝나면 그날은 안 든다
+      }
+      if(!end || end < date) end = date;
+      if(date === ymd || (date < ymd && ymd <= end)) n++;
+    });
+    return n;
+  }
+  /* 오늘 구글 공용 달력 일정 건수 → Promise<숫자 | null(못 받음)> */
+  function portalCalTodayCount(){
+    var c = portalCalCount, ymd = portalYmdOf(new Date()), now = Date.now();
+    if(c.ymd === ymd && c.n !== null && now - c.at < PORTAL_CAL_FRESH_MS) return Promise.resolve(c.n);
+    if(c.ymd === ymd && c.n === null && c.failAt && now - c.failAt < PORTAL_CAL_RETRY_MS) return Promise.resolve(null);
+    if(c.pending && c.pendingYmd === ymd) return c.pending;
+    var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(PORTAL_GCAL.cal) + '/events?key=' + PORTAL_GCAL.key
+      + '&timeMin=' + encodeURIComponent(ymd + 'T00:00:00+09:00') + '&timeMax=' + encodeURIComponent(portalShiftYmd(ymd, 1) + 'T00:00:00+09:00')
+      + '&singleEvents=true&orderBy=startTime&maxResults=250&fields=' + encodeURIComponent('nextPageToken,items(start,end)');
+    c.pendingYmd = ymd;
+    var p = Promise.resolve().then(function(){ return fetch(url); })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || d.error || !Array.isArray(d.items) || d.nextPageToken) throw new Error('오늘 일정을 셀 수 없습니다');
+        return portalCountGcalOn(d.items, ymd);
+      })
+      .then(function(n){ c.ymd = ymd; c.at = Date.now(); c.n = n; c.failAt = 0; return n; },
+            function(){ c.ymd = ymd; c.at = 0; c.n = null; c.failAt = Date.now(); return null; })
+      .then(function(n){ if(c.pending === p) c.pending = null; return n; });
+    c.pending = p;
+    return p;
+  }
+  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount };
+  function portalHeadAppCountApply(el, n, ymd){
+    var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv');
+    if(n === null || n === undefined){
+      el.removeAttribute('data-n'); el.removeAttribute('data-n-ymd');
+      if(box) box.hidden = true;
+    } else {
+      el.setAttribute('data-n', String(n)); el.setAttribute('data-n-ymd', ymd || '');
+      if(v) v.textContent = String(n);
+      if(box){ box.hidden = false; box.classList.toggle('is-zero', n === 0); }
+    }
+    portalHeadAppLabel(el);
+  }
+  function portalHeadAppCount(el){
+    var fn = PORTAL_HEAD_COUNTERS[el.getAttribute('data-count') || ''];
+    if(!fn) return;
+    var ymd = portalYmdOf(new Date());
+    if(el.getAttribute('data-n-ymd') !== ymd) portalHeadAppCountApply(el, null);    // 어제 숫자를 오늘 것처럼 두지 않는다
+    var p; try{ p = fn(); }catch(_e){ return; }
+    if(!p || typeof p.then !== 'function') return;
+    p.then(function(n){
+      if(el.hidden) return;                              // 그 사이 감춰졌다(다른 사람으로 바뀜)
+      if(portalYmdOf(new Date()) !== ymd) return;        // 받는 사이 자정을 넘겼다 — 다음에 다시 센다
+      portalHeadAppCountApply(el, n, ymd);
+    }, function(){});
+  }
+  /* ── 오늘 N건 끝 ── */
   document.addEventListener('visibilitychange', function(){
     if(document.hidden) return;
     var els = document.querySelectorAll('[data-head-app]');
-    for(var i = 0; i < els.length; i++){ if(!els[i].hidden) portalHeadAppDate(els[i]); }
+    for(var i = 0; i < els.length; i++){ if(!els[i].hidden){ portalHeadAppDate(els[i]); portalHeadAppCount(els[i]); } }
   });
 
   // ══════════ 앱 배치: 관리자만 끌어 옮김 + 📌 틀 고정 (공용 한 벌 · 즐겨찾기·접힘은 사람별) ══════════
@@ -7584,7 +7692,7 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=7"></script>
+<script src="js/pu-chatbot-kb.js?v=8"></script>
 <script src="js/pu-chatbot.js?v=5"></script>
 </body>
 </html>
