@@ -5560,6 +5560,20 @@ async function 새사이트한번(누가) {
       catch (e) { console.warn("[새 사이트 자동] 사본 올리기 실패", (e && e.message) || e); }
       return 답;
     },
+    /* 계약 끝난 자문사 로고 숨기기(2026-11-16) — 자문사 쪽·메인 쪽만. 자리는 HN 이 정한 둘뿐이고,
+       올릴자리인가(site/ 아래 .html) 를 한 번 더 지난다 — 엉뚱한 자리에 쓰지 않게 */
+    파일읽기: (자리) => {
+      if (자리 !== HN.자문사자리 && 자리 !== HN.메인자리) return Promise.reject(new Error("읽을 수 없는 자리: " + 자리));
+      return 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(자리));
+    },
+    파일올리기: async (자리, html, note) => {
+      if ((자리 !== HN.자문사자리 && 자리 !== HN.메인자리) || !올릴자리인가(자리)) throw new Error("올릴 수 없는 자리: " + 자리);
+      const 사연글 = 사연(누가, 자리, note);
+      const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(자리), html, 사연글);
+      try { await 올리기(githubRequest, 토큰, REPO, 자리, html, 사연글); }
+      catch (e) { console.warn("[새 사이트 자동] 로고 사본 올리기 실패", (e && e.message) || e); }
+      return 답;
+    },
     지금: () => Date.now(),
     누가: 누가
   });
@@ -5581,6 +5595,8 @@ exports.monthlyHomepageAuto = functions
     const n = await 새사이트한번("auto");
     console.log("[새 사이트 자동] " + (n.꺼짐 ? "꺼져 있음" : n.ok ? (n.멈춤 ? "멈춤 " + n.멈춤
       : n.올림 ? "올림 " + n.인원 + "명 · 뺌 " + n.뺀수 : "바뀐 것 없음") : "실패 " + n.실패));
+    if (n.로고) console.log("[새 사이트 자동·로고] " + (n.로고.ok ? (n.로고.멈춤 ? "멈춤 " + n.로고.멈춤
+      : n.로고.올림 ? "계약 끝난 로고 " + n.로고.숨김수 + "장 숨김" : "숨길 것 없음") : "실패 " + n.로고.실패));
     return null;
   });
 
@@ -6843,7 +6859,7 @@ exports.publishSite = functions
       const path = (req.body && req.body.path) || "";
       const content = (req.body && req.body.content) || "";
       /* ★ 그림(base64)인지 쪽(글자)인지에 따라 «자리도 한도도» 다르다.
-         그림은 site/files/logo/ 아래만, 700KB 까지. 한 규칙으로 뭉뚱그리면
+         그림은 site/files/logo/ · site/files/people/(얼굴 사진, 2026-11-16 — SVG 안 받음) 아래만, 700KB 까지. 한 규칙으로 뭉뚱그리면
          쪽 자리에 그림을, 그림 자리에 쪽을 넣을 수 있게 된다. */
       const 그림인가 = (req.body && req.body.image) === true;
       if (그림인가 ? !올릴그림자리인가(path) : !올릴자리인가(path)) {

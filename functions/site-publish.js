@@ -46,6 +46,11 @@ const MAX_BYTES = 2 * 1024 * 1024;
    ★ 자리를 «아주 좁게» 연다 — site/files/logo/ 아래 그림 한 겹만.
      넓히면 화면에서 저장소에 아무 파일이나 넣을 수 있게 된다. */
 const IMAGE_RE = /^site\/files\/logo\/[a-z0-9_-]{1,60}\.(?:png|jpg|jpeg|webp|svg)$/;
+/* ── 구성원 얼굴 사진 (2026-11-16 — 옛 홈페이지를 접어 «새 사이트에 사진 올리기»가 필요해졌다) ──
+   ★ 한 겹 더 열되 역시 «아주 좁게» — site/files/people/ 아래 그림 한 겹, SVG 는 안 받는다(사진에 쓸 일이 없고 스크립트가 숨는다).
+   ★ 파일 이름은 RTDB 구성원 열쇠(숫자 글 번호 또는 new-시각) — 화면 js/pu-site-people.js 사진자리 와 같은 모양.
+     이름·사번은 주소에 안 들어간다(사번에서 로그인 아이디가 나온다 — 대표 결정 2026-10-25). */
+const PEOPLE_IMAGE_RE = /^site\/files\/people\/[a-z0-9_-]{1,60}\.(?:png|jpg|jpeg|webp)$/;
 
 /* 로고 한 장의 크기 한도. 홈페이지 로고는 5~70KB 라 넉넉하다 —
    넉넉히 열어 두면 사진기로 찍은 원본(수 MB)이 그대로 들어와 저장소가 부푼다. */
@@ -55,7 +60,7 @@ function 올릴그림자리인가(p) {
   const s = String(p == null ? "" : p);
   if (s.length > 200) return false;
   if (s.indexOf("..") >= 0 || s.indexOf("//") >= 0 || s.indexOf("\\") >= 0) return false;
-  return IMAGE_RE.test(s);
+  return IMAGE_RE.test(s) || PEOPLE_IMAGE_RE.test(s);
 }
 
 function 올릴자리인가(p) {
@@ -132,5 +137,5 @@ function 새실행조각(old, neu) {
   return [...b].filter((x) => !a.has(x));
 }
 
-module.exports = { PATH_RE, MAX_BYTES, IMAGE_RE, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
+module.exports = { PATH_RE, MAX_BYTES, IMAGE_RE, PEOPLE_IMAGE_RE, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
                    올릴자리인가, 올릴그림자리인가, 사연, 올리기, 실행조각, 새실행조각 };

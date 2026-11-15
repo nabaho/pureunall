@@ -174,7 +174,43 @@
     return html;
   }
 
+  /* ── 계약 끝난 자문사 로고 (2026-11-16 — 옛 홈페이지 자동 «휴지통 내리기»를 새 사이트로 옮김) ──
+     옛 서버 자동(functions/homepage-auto.js 고르기 «자문사현황 로고 글 ↔ 업체»)과 «같은 잣대»:
+       업체관리에서 거래 종료(status === 'closed', 지운 업체 아님) · 로고와 이어 둠(boardSrl — 로고 칸의 data-srl) ·
+       「계약이 끝나도 남기기」(keep, 사유 있음) 아님.
+     ★ 회사 열쇠(companyId)로만 맞춘다 — 이름으로 짐작하지 않는다(온톨로지 규칙).
+     ★ 한 로고 번호를 두 회사가 가리키면 «숨기지 않는다» — 그 로고가 누구 것인지 모른다(옛 자동도 「글 번호가 겹침」으로 멈췄다).
+     ⚠ 아무것도 쓰지 않는다 — 회사 상태·로고 기록을 바꾸지 않고 «이번에 올릴 쪽에서 뺄 것»만 돌려준다
+       (종료·삭제·되돌림 불변 — 종결 건을 되살리거나 상태를 바꾸지 않는다). 업체를 못 읽었으면(목록 없음) 아무것도 안 숨긴다. */
+  function 계약끝난로고(partners, companies) {
+    var 숨길 = {}, 목록 = [], 겹침 = [];
+    var 회사 = {};
+    var 업체 = Array.isArray(companies) ? companies : (companies && typeof companies === 'object'
+      ? Object.keys(companies).map(function (k) { return companies[k]; }) : null);
+    if (!업체 || !업체.length) return { 숨길: 숨길, 목록: 목록, 겹침: 겹침, 못읽음: true };
+    업체.forEach(function (c) { if (c && c.id && !c._deleted) 회사[String(c.id)] = c; });
+    var 묶음 = (partners && typeof partners === 'object') ? partners : {};
+    var 번호셈 = {};
+    Object.keys(묶음).forEach(function (id) {
+      var n = Number((묶음[id] || {}).boardSrl);
+      if (Number.isInteger(n) && n > 0) 번호셈[n] = (번호셈[n] || 0) + 1;
+    });
+    Object.keys(묶음).forEach(function (id) {
+      var p = 묶음[id] || {};
+      var n = Number(p.boardSrl);
+      if (!(Number.isInteger(n) && n > 0)) return;
+      var c = 회사[String(id)];
+      if (!c || String(c.status || '') !== 'closed') return;
+      if (p.keep && typeof p.keep === 'object' && String(p.keep.why || '').trim()) return;
+      if (번호셈[n] > 1) { 겹침.push({ srl: String(n), companyId: String(id) }); return; }
+      숨길[String(n)] = true;
+      목록.push({ srl: String(n), companyId: String(id) });
+    });
+    return { 숨길: 숨길, 목록: 목록, 겹침: 겹침, 못읽음: false };
+  }
+
   global.PuSitePartner = {
+    계약끝난로고: 계약끝난로고,
     로고읽기: 로고읽기,
     쪽그리기: 쪽그리기,
     올릴로고: 올릴로고,

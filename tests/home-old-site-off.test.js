@@ -230,7 +230,8 @@ test('★★ 새 사이트 쪽 읽기 — 원본 자리·묵은 사본 피하기
 /* ══════ ③ 화면 — 옛 사이트에만 있던 칸은 숨긴다 ══════ */
 
 test('★★ 접으면 옛 사이트 전용 칸(사진 바꾸기·자동 연결 카드·새로 올리기·로고와 잇기)이 그려지지 않는다', () => {
-  const 칸들 = ['사진칸Html', '자동카드Html', '새로올리기칸Html', '로고연결칸Html', '새노무사칸Html'];
+  /* (2026-11-16) 새노무사칸Html 은 접으면 «새 사이트» 칸으로 바뀐다 — 아래 검사가 따로 본다 */
+  const 칸들 = ['사진칸Html', '자동카드Html', '새로올리기칸Html', '로고연결칸Html'];
   칸들.forEach(이름 => {
     const ctx = { OLD_SITE_OFF: true, App: {} };
     vm.createContext(ctx);
@@ -238,6 +239,28 @@ test('★★ 접으면 옛 사이트 전용 칸(사진 바꾸기·자동 연결 
     const d = { key: 'k', srl: '190', mkind: 'labor' };
     assert.equal(ctx[이름](d), '', '★★ 접었는데 「' + 이름 + '」가 그려집니다 — 눌러도 갈 곳이 없는 칸이다');
   });
+});
+
+test('★★ 접으면 새노무사칸은 «새 사이트» 칸이 된다 — 옛 게시판(다음 달 1일 자동 올리기) 말이 안 나온다', () => {
+  const ctx = { OLD_SITE_OFF: true, App: { members: {} }, esc: (s) => String(s),
+                PuSitePeople: { 직원인가: (m) => String((m || {}).kind || '') === 'staff' },
+                새노무사준비: () => ({ 준비: false, 빠진것: ['사진'], 낡은허락: false }), 기록자이름: (x) => String(x || '') };
+  vm.createContext(ctx);
+  vm.runInContext(['새노무사칸Html', '새사이트사진칸Html', '사진판', '사진새사이트에있나'].map(화면함수).join('\n'), ctx);
+  /* 글 번호 있는 노무사 — 사진 칸만(허락 줄 없음) */
+  ctx.App.members.k = { name: '가', kind: 'labor', srl: '190' };
+  const 있음 = ctx.새노무사칸Html({ key: 'k', srl: '190', mkind: 'labor' });
+  assert.match(있음, /새사진넣기\(/, '★★ 글 번호 있는 노무사에게 «새 사이트 사진 바꾸기» 칸이 없다');
+  assert.doesNotMatch(있음, /올리기허락\(/, '★ 글 번호 있는 분에게 «올리기 허락»을 묻는다 — 이미 홈페이지에 있는 분이다');
+  /* 글 번호 없는 새 노무사 — 사진 + 허락 */
+  ctx.App.members.n = { name: '나', kind: 'labor', srl: '' };
+  const 새 = ctx.새노무사칸Html({ key: 'n', srl: '', mkind: 'labor' });
+  assert.match(새, /새사진넣기\(/, '★★ 새 노무사에게 사진 칸이 없다');
+  assert.match(새, /올리기허락\(/, '★★ 새 노무사에게 «올리기 허락» 줄이 없다 — 허락 없이는 새 사이트에 못 간다');
+  [있음, 새].forEach(h => assert.doesNotMatch(h, /다음 달 1일/, '★★ 접었는데 옛 게시판의 «다음 달 1일 자동 올리기»를 말한다'));
+  /* 직원은 카드가 아니다 — 칸 없음 */
+  ctx.App.members.s = { name: '다', kind: 'staff' };
+  assert.equal(ctx.새노무사칸Html({ key: 's', srl: '', mkind: 'staff' }), '', '★ 직원에게 얼굴 사진 칸을 그린다');
 });
 
 test('★ 접어도 「되살릴 길」은 남아 있다 — 칸 함수는 지우지 않고 스위치로만 숨긴다', () => {
