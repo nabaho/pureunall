@@ -86,17 +86,25 @@ for (let i = 0; i < 30; i++) {
   { id: 'ct-pa-stg2', no: 91, st: 'review', i: 31, marks: [
     { code: 'wc-apply', state: 'checked', strength: 'strong', evidence: '산재 요양급여 신청 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
     { code: 'wc-review', state: 'auto', strength: 'strong', evidence: '불승인 시 심사청구 대리', srcDoc: '수임계약서', at: U }] },
+  /* ③ 계약확정 · 지노위(확인함) → 다음 단계 중노위가 «후속 계약 후보»로 뜬다(2026-11-15, 계획 5 · D)
+     ④ 계약확정 · 지노위·중노위(둘 다 확인함) → 다음은 행정소송 후보, 이미 만든 후속 계약(⑤)이 있어 «있음»으로 보인다 */
+  { id: 'ct-pa-stg3', no: 92, st: 'signed', i: 28, marks: [
+    { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '구제신청(지방노동위원회) 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
+  { id: 'ct-pa-stg4', no: 93, st: 'signed', i: 27, marks: [
+    { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '지방노동위원회 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
+    { code: 'lrc-central', state: 'checked', strength: 'strong', evidence: '중앙노동위원회 재심 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
+  { id: 'ct-pa-stg5', no: 94, st: 'consult', i: 27, marks: [], extra: { parentContractId: 'ct-pa-stg4', stageCode: 'court-admin' } },
 ].forEach((x) => {
-  계약.push({
+  계약.push(Object.assign({
     id: x.id, entityType: 'contract', contractNo: `계약-2026-${String(100 + x.no)}`,
     companyName: 업체명(x.i), clientName: 업체명(x.i), bizNo: 사업자(x.i), companyId: 'co-pa' + (x.i % 32),
     managerMain: 담당(x.i), managerSubs: [], kind: 'case', kinds: ['case'],
     typeCodes: { case: 'case-dismiss' }, amounts: { case: 0 }, briefs: { case: '점검 구제신청 대리' },
     company: { name: 업체명(x.i), bizNo: 사업자(x.i), ceo: '점검대표자' + x.i, address: '', phone: '', email: '', fax: '', contacts: [{ name: '점검담당' + x.i }] },
-    status: x.st, programName: '부당해고 구제신청', stageMarks: x.marks,
+    status: x.st, programName: '부당해고 구제신청', stageMarks: x.marks && x.marks.length ? x.marks : undefined,
     consultDate: 날(11, 10), contractDate: 날(11, 10), note: '📄 계약서 자동 정리 (수임계약서)',
     createdAt: '2026-11-10T01:00:00.000Z', regAt: '2026-11-10T01:00:00.000Z',
-  });
+  }, x.extra || {}));
 });
 
 /* ── 사건 28 ── */
