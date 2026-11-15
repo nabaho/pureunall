@@ -356,7 +356,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* 2026-11-15 게시 전 — 🧰 산재 묶음 data/case_sanjae 에 이름을 붙였다(대표 「모든 단계 한번에 진행해라」, js/pu-sanjae-kit.js).
      새로 생김 1 · 바뀜 0 · 사라짐 0. 넓어지는 권한 없음 — 읽기·쓰기 조건이 $other·case_memos 와 글자까지 같다(재직 직원).
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 같다($other 가 같은 권한). */
-  const PENDING = ['/data/case_sanjae'];
+  /* ★ 2026-11-15 — 산재 묶음 data/case_sanjae 게시 완료(GitHub 「Firebase 배포」 실행 43689262672 · rules-deploy.js --deploy, 클라우드 방):
+       새로 1 · 바뀜 0 · 사라짐 0 · 넓어짐 0. 새 기준 docs/firebase-rules-콘솔원문-2026-11-15.json(만들개 출력과 같다 — 같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
