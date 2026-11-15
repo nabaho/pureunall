@@ -394,6 +394,13 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-art-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;color:#1e293b}
 .pbox-art-txt{font-size:13px;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}
 .pbox-addenda{margin-top:14px;font-size:12px;color:#475569}
+.pbox-annex-details summary{cursor:pointer;font-weight:700;color:#1e293b;padding:4px 0}
+.pbox-annex-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pbox-annex-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#1e293b}
+.pbox-annex-row.highlight{border:2px solid #2563eb;background:#eff6ff}
+.pbox-annex-main{min-width:0;flex:1;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.pbox-annex-acts{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.pbox-annex-acts a{text-decoration:none}
 .pbox-doc-meta-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
 .pbox-doc-summary-box{background:#eff6ff;color:#1e293b;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;overflow-wrap:anywhere}
 .pbox-doc-body-text{font-size:13px;line-height:1.78;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}
@@ -457,6 +464,12 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-table td.pbox-cell-meta{grid-column:2 / 4;grid-row:2;font-size:11px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pbox-table td.pbox-cell-hide-m{display:none}
   .pbox-table td.pbox-cell-actions{grid-column:4;grid-row:2;justify-self:end;display:inline-flex;align-items:center;gap:4px}
+  .pbox-channel-table thead{display:none}
+  .pbox-channel-table tbody tr{grid-template-columns:32px minmax(0,1fr) auto}
+  .pbox-channel-table td.col-num{grid-column:1;grid-row:1}
+  .pbox-channel-table td.pbox-cell-main{grid-column:2 / 4;grid-row:1}
+  .pbox-channel-table td.pbox-cell-meta{grid-column:2;grid-row:2}
+  .pbox-channel-table td.pbox-cell-actions{grid-column:3;grid-row:2}
 }
 
 /* 어두운 테마 지원 (모바일 미디어쿼리 뒤에 배치하여 PC·모바일·모달 모든 상태에서 WCAG AA 4.5:1~13:1 고대비 보장) */
@@ -479,7 +492,9 @@ html[data-theme="dark"] .pbox-cert-pill,html[data-theme="dark"] .pbox-brand-subb
 html[data-theme="dark"] .pbox-sync-pill,html[data-theme="dark"] .pbox-btn-live{background:#166534;color:#ffffff;border-color:#4ade80}
 html[data-theme="dark"] .pbox-nav-cnt.alert,html[data-theme="dark"] .pbox-badge-red{background:#991b1b;color:#ffffff;border-color:#f87171}
 @media (max-width:768px){html[data-theme="dark"] .pbox-filter-card,html[data-theme="dark"] .pbox-list-card,html[data-theme="dark"] .pbox-flat-m,html[data-theme="dark"] .pbox-unified-board,html[data-theme="dark"] .pbox-unified-col,html[data-theme="dark"] .pbox-live-review-box,html[data-theme="dark"] .pbox-home-dash-grid>.pbox-lbox-sec{background:transparent;color:#f8fafc}}
-html[data-theme="dark"] .pbox-table tbody tr:hover,html[data-theme="dark"] .pbox-recent-row:hover,html[data-theme="dark"] .pbox-wf-card.active,html[data-theme="dark"] .pbox-proj-item.active,html[data-theme="dark"] .pbox-law-art.highlight,html[data-theme="dark"] .pbox-matched-arts,html[data-theme="dark"] .pbox-doc-summary-box,html[data-theme="dark"] .pbox-clause-suggest,html[data-theme="dark"] .pbox-smart-jump,html[data-theme="dark"] .pbox-dropzone{background:#000000;color:#f8fafc;border-color:#60a5fa}
+html[data-theme="dark"] .pbox-table tbody tr:hover,html[data-theme="dark"] .pbox-recent-row:hover,html[data-theme="dark"] .pbox-wf-card.active,html[data-theme="dark"] .pbox-proj-item.active,html[data-theme="dark"] .pbox-law-art.highlight,html[data-theme="dark"] .pbox-annex-row.highlight,html[data-theme="dark"] .pbox-matched-arts,html[data-theme="dark"] .pbox-doc-summary-box,html[data-theme="dark"] .pbox-clause-suggest,html[data-theme="dark"] .pbox-smart-jump,html[data-theme="dark"] .pbox-dropzone{background:#000000;color:#f8fafc;border-color:#60a5fa}
+html[data-theme="dark"] .pbox-annex-row{background:#1e293b;color:#f8fafc;border-color:#475569}
+html[data-theme="dark"] .pbox-annex-details summary{color:#f8fafc}
 html[data-theme="dark"] .pbox-dropzone:hover{background:#1e293b;color:#f8fafc;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-preview-box,html[data-theme="dark"] .pbox-status-banner.ok{background:#000000;color:#4ade80;border-color:#16a34a}
 html[data-theme="dark"] .pbox-status-banner.warn{background:#000000;color:#fbbf24;border-color:#d97706}
@@ -555,10 +570,10 @@ html[data-theme="dark"] .pbox-star{color:#fbbf24}
 <script src="js/pu-back.js?v=5"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-pbox-lawindex.js?v=1"></script>
-<script src="js/pu-pbox-corpus.js?v=3"></script>
-<script src="js/pu-pbox-engine.js?v=15"></script>
-<script src="js/pu-pbox-store.js?v=15"></script>
-<script src="js/pu-pbox-app.js?v=16"></script>
+<script src="js/pu-pbox-corpus.js?v=4"></script>
+<script src="js/pu-pbox-engine.js?v=16"></script>
+<script src="js/pu-pbox-store.js?v=16"></script>
+<script src="js/pu-pbox-app.js?v=17"></script>
 <script>
 try {
   PuBack.guard(function () {
