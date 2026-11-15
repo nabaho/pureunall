@@ -367,7 +367,17 @@
                       {path:'harass_secret/{id}',entityType:'Document'},
                       {path:'harass_sign/req/{cid}/{id}',entityType:'Submission'},
                       {path:'harass_sign/open/{id}',entityType:'Submission'}],
-      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] }
+      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] },
+    /* 일터상생혁신(ilteo.html) — 노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 비식별 진단 요약, 중간보고서·최종결과보고서·PPTX 자동화(2026-11-15).
+       ★ 임금대장·근태·명부 원본은 브라우저 로컬 비식별 통계만 산출하고 DB·외부 AI 로 전송하지 않는다. 확정 스냅샷(snapshots)은 불변으로 보관한다. */
+    ilteo:{ name:'일터상생혁신', file:'ilteo.html', primaryRoots:['scal_ilteo'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_ilteo/projects/{id}',entityType:'Project'},
+                      {path:'scal_ilteo/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/mid/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/final/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -635,6 +645,9 @@
     /* 푸른등기 — 사원 주소·생년월일이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     deungi_core:{program:'deungi',strategy:'in_app',path:'deungi',parser:'coverage',
       gives:'등기 현황·변경등기 건·지난 등기 원본 서류 묶음 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 일터상생혁신 — 고객사 진단 요약·중간보고서·최종보고서 원고가 든 자리라 통합 진단에서 읽지 않고 앱 안에서만 본다. */
+    ilteo_core:{program:'ilteo',strategy:'in_app',path:'scal_ilteo',parser:'coverage',
+      gives:'일터상생혁신 사업장 워크스페이스·비식별 분석 카드·중간보고·최종보고 원고 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

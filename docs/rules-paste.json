@@ -3054,6 +3054,46 @@
       "$other": {
         ".validate": false
       }
+    },
+    "scal_ilteo": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+        }
+      },
+      "intake": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+          }
+        }
+      },
+      "mid": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+        }
+      },
+      "final": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+        }
+      },
+      "snapshots": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists() && (!data.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+          }
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
     }
   }
 }
