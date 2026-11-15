@@ -171,7 +171,8 @@ test('⑤ 규칙은 한 곳(APPLY_FORM)이고 모집 대상 낱말·고객 낱�
   assert.match(코드, /var APPLY_FORM\s*=\s*\/[^/]*신청서[^/]*제출[^/]*\//);
   assert.match(코드, /var CLIENT_FORM\s*=\s*\/[^/]*상담[^/]*신청서[^/]*\//);
   const 줄 = 코드.match(/if \(\(sent \|\| reply\)[^\n]*\{/)[0];
-  assert.match(줄, /APPLY_FORM\.test\(subj\)\s*&&\s*WHO\.test\(subj\)\s*&&\s*!CLIENT_FORM\.test\(subj\)/); assert.match(줄, /!CLIENT\.test\(subj\)/);
+  assert.match(줄, /APPLY_FORM\.test\(subj\)\s*&&\s*WHO_FORM\.test\(subj\)\s*&&\s*!CLIENT_FORM\.test\(subj\)/); assert.match(줄, /!CLIENT\.test\(subj\)/);
+  assert.match(코드, /var WHO_FORM\s*=\s*\/[^/]*지원단[^/]*\//, '이 길의 모집 대상 낱말은 WHO(노무사·임원·강사까지 넓다)보다 좁다');
 });
 
 /* ───────── ⑥ 재검증(2026-11-15) 지적 — 기록의 경로는 어느 길로 들어와도 «번호 있는 이름» ───────── */
@@ -217,4 +218,57 @@ test('⑥ 전체 스캔이 올린 파일은 건 등록(fsCaseFiles) 경로와 �
   const 건등록경로 = Cases.caseDirOf('2026년', '2026 ○○') + '/접수서류/신청서.pdf';
   const 스캔경로 = Scan.canonRelPath('컨설턴트,위원신청등/2026년/2026 ○○/접수서류/신청서.pdf');
   assert.equal(스캔경로, 건등록경로, '⚠ 두 길의 경로가 다르면 fsKnownKeys(경로|크기|수정일)가 어긋나 같은 파일이 두 번 등록됩니다');
+});
+
+/* ───────── ⑦ 재검증 1회차(2026-11-15) 지적 ───────── */
+test('⑦ 이 고침 전에 번호 없는 PC 에서 저장한 옛 기록(번호 없는 경로)도 «이미 등록한 파일»로 알아본다 — 새 스캔이 또 올리지 않는다', () => {
+  const 옛 = { id: 'W-1', src: 'fs', relPath: '컨설턴트,위원신청등/2024년/2024 ○○/접수서류/위촉장.pdf', fileSize: 10, fileMtime: '2024-01-01T00:00:00.000Z' };
+  const 건 = { id: 'S-1', files: [{ relPath: '컨설턴트,위원신청등/2025년/2025 ○○/접수서류/신청서.pdf', size: 20, mtime: '2025-01-01T00:00:00.000Z' }] };
+  const ctx = { KcareerScan: Scan, get: (k) => (k === 'wiccok' ? [옛] : k === 'submission' ? [건] : []) };
+  vm.createContext(ctx); vm.runInContext(떼기(KC, 'function fsKnownKeys('), ctx);
+  const 키 = ctx.fsKnownKeys();
+  /* 새 스캔은 경로를 «번호 있는 이름»으로 만든다 */
+  assert.ok(키['7. 컨설턴트,위원신청등/2024년/2024 ○○/접수서류/위촉장.pdf|10|2024-01-01T00:00:00.000Z'], '⚠ 옛 기록(번호 없는 경로)을 통일해서 견주지 않아 같은 파일이 «새 파일»로 또 올라갑니다');
+  assert.ok(키['7. 컨설턴트,위원신청등/2025년/2025 ○○/접수서류/신청서.pdf|20|2025-01-01T00:00:00.000Z'], '건 안의 파일도 같다');
+  assert.ok(키['컨설턴트,위원신청등/2024년/2024 ○○/접수서류/위촉장.pdf|10|2024-01-01T00:00:00.000Z'], '적힌 그대로의 키도 둔다');
+  assert.equal(옛.relPath.startsWith('컨설턴트'), true, '기록 자체는 고치지 않는다(견주는 키만 늘린다)');
+  const 증명서 = strip(떼기(KC, 'async function cdScanNow('));
+  assert.match(증명서, /known\[KcareerScan\.canonRelPath\(r\.relPath\)\]\s*=\s*true/, '증명서 스캔의 «이미 등록한 경로»도 같은 규칙');
+});
+test('⑦ 서류 폴더 바로 아래에 «7. …»과 번호 없는 폴더가 둘 다 있으면 번호 없는 쪽은 건너뛰고 알린다 — 기록의 경로는 늘 번호 있는 이름이라 번호 없는 쪽 파일은 열 수 없는 기록이 된다', async () => {
+  const 파일 = (n) => ({ kind: 'file', name: n, getFile: async () => ({ size: 5, lastModified: 0 }) });
+  const 건 = (이름) => new 폴더(이름, { '2024년': new 폴더('2024년', { '2024 ○○': new 폴더('2024 ○○', { '접수서류': new 폴더('접수서류', { [이름 + '.pdf']: 파일(이름 + '.pdf') }) }) }) });
+  const 알림 = [];
+  const ctx = { Promise, Date, String, console, KcareerScan: Scan, KcareerCases: Cases, toast: (m) => 알림.push(m),
+    fsRoot: async () => new 폴더('서류', { '7. 컨설턴트,위원신청등': 건('번호있는쪽'), '컨설턴트,위원신청등': 건('번호없는쪽') }) };
+  vm.createContext(ctx); vm.runInContext(떼기(KC, 'async function fsScanAll('), ctx);
+  const 파일들 = [...(await ctx.fsScanAll())];
+  assert.deepEqual(파일들.map((f) => f.name), ['번호있는쪽.pdf'], '⚠ 번호 없는 쪽 파일까지 «번호 있는 폴더» 경로로 기록되면 열 때 못 엽니다');
+  assert.ok(파일들.every((f) => f.relPath.startsWith('7. 컨설턴트,위원신청등/')));
+  assert.equal(알림.length, 1, '건너뛴 사실을 한 번 알린다');
+  assert.match(알림[0], /둘 다 있어/); assert.ok(알림[0].includes('컨설턴트,위원신청등'));
+  /* 번호 없는 폴더만 있을 때는 건너뛰지 않고 번호 있는 이름으로 적는다 */
+  const 알림2 = [], ctx2 = { Promise, Date, String, console, KcareerScan: Scan, KcareerCases: Cases, toast: (m) => 알림2.push(m), fsRoot: async () => new 폴더('서류', { '컨설턴트,위원신청등': 건('번호없는쪽') }) };
+  vm.createContext(ctx2); vm.runInContext(떼기(KC, 'async function fsScanAll('), ctx2);
+  const 하나 = [...(await ctx2.fsScanAll())];
+  assert.equal(하나.length, 1); assert.ok(하나[0].relPath.startsWith('7. 컨설턴트,위원신청등/')); assert.equal(알림2.length, 0);
+});
+test('⑦ 폴더에 원본이 없을 때 클라우드 사본 찾기 — 번호 없는 이름으로 적힌 옛 기록도 번호 있는 경로로 물으면 찾는다', async () => {
+  const 옛 = { id: 'W-1', src: 'fs', relPath: '컨설턴트,위원신청등/2024년/2024 ○○/접수서류/위촉장.pdf', fsCloud: 'kcareer/W-1.pdf' };
+  const 받은 = [];
+  const ctx = { KC_FS_STORES: ['wiccok'], KcareerScan: Scan, get: (k) => (k === 'wiccok' ? [옛] : []),
+    kcFormStorage: () => ({ ref: (자리) => ({ getDownloadURL: async () => { 받은.push(자리); return '주소-' + 자리; } }) }),
+    kcFetch: async () => ({ arrayBuffer: async () => new ArrayBuffer(3) }), String, console };
+  vm.createContext(ctx); vm.runInContext(떼기(KC, 'async function _fsCloudFile('), ctx);
+  const 찾음 = await ctx._fsCloudFile('7. 컨설턴트,위원신청등/2024년/2024 ○○/접수서류/위촉장.pdf');
+  assert.ok(찾음, '⚠ 번호 없는 이름으로 적힌 옛 기록의 클라우드 사본을 못 찾습니다');
+  assert.deepEqual(받은, ['kcareer/W-1.pdf']); assert.equal(찾음.name, '위촉장.pdf');
+  assert.equal(await ctx._fsCloudFile('7. 컨설턴트,위원신청등/2024년/다른 건/접수서류/위촉장.pdf'), null, '경로가 다르면 찾지 않는다');
+});
+test('⑦ 지원 메일 — 이 길의 모집 대상 낱말은 «지원단·상담위원·전문위원·자문위원·평가위원·심사위원·컨설턴트·인력풀»뿐, 고객 노무 업무(대지급금·등기·직업훈련 …)와 회사 꼴 괄호는 지원이 아니다', () => {
+  for (const 제목 of ['공인노무사 신청서 제출(김가나, 대지급금)', '임원 변경 신청서 제출(가나상사, 등기)', '강사 신청서 제출(가나기업, 직업훈련)', '충남 비즈니스지원단 신청서 제출(가나산업, 컨설팅)',
+    '충남 비즈니스지원단 신청서 제출(홍길동, 대지급금)', '충남 비즈니스지원단 신청서 제출(홍길동, 실업급여)']) {
+    assert.equal(분류(제목, true), null, '⚠ 고객 노무 업무를 지원으로 적습니다: ' + 제목);
+  }
+  assert.ok(분류('○○ 평가위원 신청서 제출(홍길동, 경영)', true), '평가위원 모집도 같은 꼴이면 지원이다');
 });

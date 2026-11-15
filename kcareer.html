@@ -4321,7 +4321,7 @@ async function kcFsBackupUp(quiet){
 /* 폴더에 없을 때 — 그 경로를 가진 기록의 클라우드 사본을 받아 온다. 없으면 null */
 async function _fsCloudFile(relPath){
   var 자리='';
-  KC_FS_STORES.some(function(st){ return (get(st)||[]).some(function(r){ if(r && r.relPath===relPath && r.fsCloud){ 자리=r.fsCloud; return true; } return false; }); });
+  KC_FS_STORES.some(function(st){ return (get(st)||[]).some(function(r){ if(r && r.relPath && KcareerScan.canonRelPath(r.relPath)===KcareerScan.canonRelPath(relPath) && r.fsCloud){ 자리=r.fsCloud; return true; } return false; }); });
   var s=kcFormStorage(); if(!자리 || !s) return null;
   try{ var url=await s.ref(자리).getDownloadURL(); var buf=await (await kcFetch(url)).arrayBuffer();
     var nm=String(relPath).split('/').pop(); return { name:nm, buf:buf }; }
@@ -4665,13 +4665,19 @@ async function fsScanAll(onProgress){
   var root = await fsRoot();
   if(!root){ toast('먼저 ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return null; }
   var files = [], n = 0;
+  /* 서류 폴더 바로 아래에 «7. …»(번호 있음)이 «이미 있는지» — 둘 다 있으면 번호 없는 쪽은 «건너뛰고 알린다».
+     기록의 경로는 늘 «번호 있는 이름»이라(buildRecords 가 통일) 번호 없는 쪽 파일도 번호 있는 폴더 경로로 적혀, 열 때 _fsDir 가 번호 있는 쪽만 보고 못 연다(재검증 2026-11-15). */
+  var 번호있는7번 = false, 건너뛴폴더 = '';
+  try{ for await (var 맨위 of root.entries()){ if(맨위[1].kind === 'directory' && 맨위[0] === KcareerCases.CASE_ROOT) 번호있는7번 = true; } }catch(e){}
   async function walk(dir, prefix){
     for await (var ent of dir.entries()){
       var name = ent[0], h = ent[1];
       if(h.kind === 'directory'){
         /* 서류 폴더 바로 아래의 «번호 없는» 7번 폴더는 기록에 «번호 있는 이름»으로 적는다 — 건 등록(fsCaseFiles)과 같은 경로여야
            두 PC 가 같은 기록을 쓰고, 이미 등록한 파일을 «새 파일»로 또 올리지 않는다(재검증 2026-11-15). 열 때는 _fsDir 가 실제 이름으로 바꾼다. */
-        await walk(h, prefix ? prefix + '/' + name : (KcareerScan.isCaseRootName(name) ? KcareerCases.CASE_ROOT : name)); continue; }
+        if(!prefix && 번호있는7번 && name !== KcareerCases.CASE_ROOT && KcareerScan.isCaseRootName(name)){ 건너뛴폴더 = name; continue; }
+        var 칸이름 = (!prefix && KcareerScan.isCaseRootName(name)) ? KcareerCases.CASE_ROOT : name;
+        await walk(h, prefix ? prefix + '/' + name : 칸이름); continue; }
       try{
         var f = await h.getFile();     /* 메타데이터만 사용 — 내용은 읽지 않는다 */
         files.push({ name:name, relPath:(prefix ? prefix + '/' : '') + name,
@@ -4682,15 +4688,20 @@ async function fsScanAll(onProgress){
   }
   await walk(root, '');
   if(onProgress) onProgress(n);
+  if(건너뛴폴더) toast('「' + KcareerCases.CASE_ROOT + '」와 「' + 건너뛴폴더 + '」가 둘 다 있어 «번호 있는 폴더»만 읽었습니다. 두 폴더가 같은 것이면 하나로 합쳐 주세요.');
   return files;
 }
 
 /* 이미 등록된 파일 건너뛰기 — 경로+크기+수정일이 같으면 같은 파일로 본다 */
 function fsKnownKeys(){
   var map = {};
+  /* ⚠ 저장된 기록의 경로는 «적힌 그대로»와 «번호 있는 이름으로 통일한 것» 둘 다 키로 둔다 — 이 고침 전에 번호 없는 PC 에서 전체 스캔으로 저장한 기록(「컨설턴트,위원신청등/…」)이 있다.
+     새 스캔은 경로를 «7. 컨설턴트,위원신청등/…»으로 만들므로, 옛 기록을 통일해서도 견주지 않으면 이미 등록한 파일을 «새 파일»로 또 올린다(재검증 2026-11-15).
+     기록 자체는 고치지 않는다(견주는 키만 늘린다). */
+  function key(p, a, b){ return p + '|' + a + '|' + b; }
   function add(r){
-    if(r && r.src === 'fs' && r.relPath) map[r.relPath + '|' + r.fileSize + '|' + r.fileMtime] = true;
-    if(r && r.files) r.files.forEach(function(f){ map[f.relPath + '|' + f.size + '|' + f.mtime] = true; });
+    if(r && r.src === 'fs' && r.relPath){ map[key(r.relPath, r.fileSize, r.fileMtime)] = true; map[key(KcareerScan.canonRelPath(r.relPath), r.fileSize, r.fileMtime)] = true; }
+    if(r && r.files) r.files.forEach(function(f){ map[key(f.relPath, f.size, f.mtime)] = true; map[key(KcareerScan.canonRelPath(f.relPath), f.size, f.mtime)] = true; });
   }
   ['wiccok','cert','certdoc','submission'].forEach(function(k){ get(k).forEach(add); });
   return map;
@@ -8862,7 +8873,7 @@ async function cdScanNow(){
   if(!files) return;
   var db = get('certdoc');
   var known = {};
-  db.forEach(function(r){ if(r.relPath) known[r.relPath] = true; });
+  db.forEach(function(r){ if(r.relPath){ known[r.relPath] = true; known[KcareerScan.canonRelPath(r.relPath)] = true; } });   /* 번호 없는 이름으로 저장된 옛 기록도 같은 경로로 본다(재검증 2026-11-15) */
   var ext = [], own = [], attaches = [], seen = {};
   files.forEach(function(f){
     var c = KcareerScan.classify(f.name);
