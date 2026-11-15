@@ -72,6 +72,14 @@ module.exports = {
       }
     },
     {
+      name: 'sites',
+      run: async (page) => {
+        await page.evaluate(() => {
+          if (window.PuPBoxApp) window.PuPBoxApp.switchView('sites');
+        });
+      }
+    },
+    {
       name: 'workflows',
       run: async (page) => {
         await page.evaluate(() => {

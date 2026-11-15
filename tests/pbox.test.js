@@ -1919,3 +1919,672 @@ test('⑩ 엘박스형 조항별 위험진단(analyzeDocumentClauses) · 내용�
   assert.ok(fileReviewThread && fileReviewThread.mode === 'review', '문서 열기 완료 후 내용검토 작업 스레드가 생성되어야 합니다');
   assert.ok(!JSON.stringify(fileReviewThread).includes(synthRrn) && !JSON.stringify(fileReviewThread).includes('가나람'), '문서 열기 시 파일명·제목·본문·답변 어디에도 주민번호나 당사자 실명이 남지 않아야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════
+ * 11. 스마트 판례·조문 검색 · 대형로펌 DB/전국 법률사이트 직접검색 · 전 기관 실시간 수집 검증
+ * ══════════════════════════════════════════════════════════════ */
+test('⑪ 스마트 약칭·초성·불리언 판례검색 · 전국 35개 법률사이트 직행 · 전 기관 실시간 자동수집(live_search) 검증', async () => {
+  const lawIdx = loadLawIndex().list();
+
+  /* 1) 약칭·초성·조문 스마트 점프(resolveSmartLawJump) 검증 */
+  const jump1 = Engine.resolveSmartLawJump('근기법 23', lawIdx);
+  assert.ok(jump1 && jump1.lawDir === '근로기준법' && jump1.articleNo === '제23조', '근기법 23 입력 시 근로기준법 제23조로 즉시 점프해야 합니다');
+
+  const jump2 = Engine.resolveSmartLawJump('근기법 시행령 제6조', lawIdx);
+  assert.ok(jump2 && jump2.lawDir === '근로기준법' && jump2.fileName === '시행령.md' && jump2.articleNo === '제6조', '시행령 약칭+조문도 하위법령 파일로 정확히 매핑되어야 합니다');
+
+  const jump3 = Engine.resolveSmartLawJump('산재법 37조', lawIdx);
+  assert.ok(jump3 && jump3.lawTitle === '산업재해보상보험법' && jump3.articleNo === '제37조');
+
+  const jumpCho = Engine.resolveSmartLawJump('ㄱㄹㄱㅈㅂ', lawIdx);
+  assert.ok(jumpCho && jumpCho.lawDir === '근로기준법', '초성(ㄱㄹㄱㅈㅂ) 입력 시에도 근로기준법을 찾아야 합니다');
+
+  /* 2) 불리언 연산자(+필수, -제외, "구문"), 결과 내 재검색(subQuery), 정렬(sortBy) 검증 */
+  const docs = Corpus.SEED_DOCS;
+  assert.ok(docs.length >= 30, '확장된 내장 검증 판례·결정례·유권해석 코퍼스가 30건 이상이어야 합니다');
+
+  const boolRes = Engine.searchCorpus('해고 +수습 -저성과', { docs, lawIndex: lawIdx });
+  assert.ok(boolRes.docs.length >= 1, '+수습 필수어가 포함된 해고 사건이 검색되어야 합니다');
+  assert.ok(boolRes.docs.every((d) => {
+    const h = (d.title + ' ' + d.summary + ' ' + d.body).toLowerCase();
+    return h.includes('수습') && !h.includes('저성과');
+  }), '+필수어 미포함 문서와 -제외어 포함 문서는 모두 걸러져야 합니다');
+
+  const allDismissRes = Engine.searchCorpus('해고', { docs, lawIndex: lawIdx });
+  const subRes = Engine.searchCorpus('해고', { docs, lawIndex: lawIdx, subQuery: '저성과' });
+  assert.ok(
+    subRes.docs.length >= 1 &&
+    subRes.docs.length < allDismissRes.docs.length &&
+    subRes.docs.every((d) => JSON.stringify(d).includes('저성과')),
+    '결과 내 재검색(subQuery)이 정확히 교집합 필터링되어야 합니다'
+  );
+
+  const sortedDate = Engine.searchCorpus('임금', { docs, lawIndex: lawIdx, sortBy: 'date_desc' });
+  if (sortedDate.docs.length >= 2) {
+    assert.ok(String(sortedDate.docs[0].decisionDate || '') >= String(sortedDate.docs[1].decisionDate || ''), '최신일자순 정렬 시 선고·회시일 내림차순이어야 합니다');
+  }
+
+  /* 3) 김앤장·대형로펌 5단계 리서치 가이드, SEED_DOCS 고유성, 대한민국 36개 사이트 HTTPS 보안 검증 */
+  const seedIdSet = new Set(Corpus.SEED_DOCS.map((d) => d.id));
+  assert.equal(seedIdSet.size, Corpus.SEED_DOCS.length, 'SEED_DOCS의 모든 문서 ID는 중복 없이 고유해야 합니다');
+  assert.ok(Array.isArray(Corpus.BIGLAW_RESEARCH_GUIDE) && Corpus.BIGLAW_RESEARCH_GUIDE.length >= 5, '김앤장·대형로펌 5단계 법률리서치 체계가 수록되어야 합니다');
+  assert.ok(Array.isArray(Corpus.KOREA_LEGAL_SITES) && Corpus.KOREA_LEGAL_SITES.length >= 36, '대한민국 주요 법률·공공사이트 36곳 이상이 연결되어야 합니다');
+  assert.ok(Corpus.KOREA_LEGAL_SITES.some((s) => s.bigLawPick === true), '대형로펌 필수 픽(bigLawPick) 배지 대상 사이트가 지정되어야 합니다');
+  for (const s of Corpus.KOREA_LEGAL_SITES) {
+    assert.match(s.homeUrl, /^https:\/\//, `모든 외부 연결 사이트(${s.id}) homeUrl은 HTTPS여야 합니다`);
+    assert.match(s.searchUrl, /^https:\/\//, `모든 외부 연결 사이트(${s.id}) searchUrl은 HTTPS여야 합니다`);
+    const built = Corpus.buildSiteSearchUrl(s, '근로기준법 제23조 & 부당해고');
+    assert.match(built, /^https:\/\//);
+    assert.ok(!built.includes(' '), '검색어 공백·특수문자가 안전하게 URL 인코딩되어야 합니다');
+    const gBuilt = Corpus.buildSiteGoogleUrl(s, '통상임금');
+    assert.ok(gBuilt.startsWith('https://www.google.com/search?q=') && gBuilt.includes(encodeURIComponent('site:' + s.domain)));
+  }
+
+  /* 4) 서버 전 기관 실시간 수집(liveSearchOfficialApis) · 하급심 수집(pullLowerCourtBundle) PII 차단·실명 마스킹·중앙 원자적 쿨다운 검증 */
+  const PBoxSync = require('../functions/pbox-sync');
+  const OntologyServerWrite = require('../functions/ontology-write-server');
+  const synthRrn = '890505' + '-' + '1' + '234567';
+  const synthPhone = '010' + '-' + '9876' + '-' + '5432';
+  const piiBlocked = await PBoxSync.liveSearchOfficialApis({ lawOc: 'test_oc', query: synthRrn });
+  assert.equal(piiBlocked.ok, false);
+  assert.equal(piiBlocked.status, 400);
+  assert.match(piiBlocked.error, /개인정보/);
+
+  let lowerLeakFetches = 0;
+  const synthLandline = '02' + '1234' + '5678';
+  const synthAcct = '123' + '-' + '456' + '-' + '789012';
+  const boundaryPii40 = '가'.repeat(35) + ' ' + synthPhone;
+  const boundaryPii50 = '가'.repeat(45) + ' ' + synthPhone;
+  for (const badQ of [
+    '부당해고 sample@example.invalid',
+    '임금 ' + synthPhone,
+    '산재 ' + synthRrn,
+    '부당해고 ' + synthLandline,
+    '임금 ' + synthAcct,
+    boundaryPii40
+  ]) {
+    const lb1 = await PBoxSync.pullLowerCourtBundle({
+      lawOc: 'test_oc',
+      query: badQ,
+      fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+    });
+    assert.equal(lb1.ok, false);
+    assert.equal(lb1.status, 400);
+    assert.match(lb1.error, /개인정보/);
+
+    const directLower1 = await PBoxSync.pullLawGoKrLowerCourt(
+      'test_oc',
+      async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; },
+      { query: badQ }
+    );
+    assert.equal(directLower1.invalidInput, true);
+    assert.equal(directLower1.attempted, 0);
+  }
+  const directLowerArr = await PBoxSync.pullLawGoKrLowerCourt(
+    'test_oc',
+    async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; },
+    { queries: ['통상임금', '임금 ' + synthAcct] }
+  );
+  assert.equal(directLowerArr.invalidInput, true);
+  assert.equal(directLowerArr.attempted, 0);
+
+  const liveBoundaryBlocked = await PBoxSync.liveSearchOfficialApis({
+    lawOc: 'test_oc',
+    query: boundaryPii50,
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(liveBoundaryBlocked.ok, false);
+  assert.equal(liveBoundaryBlocked.status, 400);
+  assert.match(liveBoundaryBlocked.error, /개인정보/);
+
+  const overLenBlocked = await PBoxSync.pullLowerCourtBundle({
+    lawOc: 'test_oc',
+    query: '가'.repeat(60),
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(overLenBlocked.ok, false);
+  assert.equal(overLenBlocked.status, 400);
+
+  const lbArrBlocked = await PBoxSync.pullLowerCourtBundle({
+    lawOc: 'test_oc',
+    queries: ['통상임금', '연락처 sample@example.invalid'],
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(lbArrBlocked.ok, false);
+  assert.equal(lbArrBlocked.status, 400);
+
+  /* HTTP 처리기(handleApiAction) 경계 검증: 공백 1000개 + PII 및 30개 초과 배열 뒤쪽 PII 모두 사전 slice 없이 즉시 400 거부 */
+  const paddedEmailQuery = '통상임금' + ' '.repeat(1000) + 'sample@example.invalid';
+  const httpLowerPadded = await PBoxSync.handleApiAction({
+    body: { action: 'pull_lower_court', lawOc: 'test_oc', query: paddedEmailQuery },
+    uid: 'staff-a',
+    env: {},
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(httpLowerPadded.status, 400);
+  assert.match(httpLowerPadded.payload.error, /개인정보/);
+
+  const httpLivePadded = await PBoxSync.handleApiAction({
+    body: { action: 'live_search', lawOc: 'test_oc', query: paddedEmailQuery },
+    uid: 'staff-a',
+    env: {},
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(httpLivePadded.status, 400);
+  assert.match(httpLivePadded.payload.error, /개인정보/);
+
+  const manyQueriesWithTailPii = Array.from({ length: 34 }, () => '통상임금').concat(['연락처 sample@example.invalid']);
+  const httpManyArr = await PBoxSync.handleApiAction({
+    body: { action: 'pull_lower_court', lawOc: 'test_oc', queries: manyQueriesWithTailPii },
+    uid: 'staff-a',
+    env: {},
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(httpManyArr.status, 400);
+  assert.match(httpManyArr.payload.error, /개인정보/);
+
+  const httpOverMaxArr = await PBoxSync.handleApiAction({
+    body: { action: 'pull_lower_court', lawOc: 'test_oc', queries: Array.from({ length: 12 }, (_, i) => '통상임금' + i) },
+    uid: 'staff-a',
+    env: {},
+    fetchFn: async () => { lowerLeakFetches++; return { ok: true, status: 200, json: async () => ({}) }; }
+  });
+  assert.equal(httpOverMaxArr.status, 400);
+  assert.equal(lowerLeakFetches, 0, 'PII 또는 길이초과 검색어는 절단 없이 즉시 차단되어 외부 API 요청이 0건이어야 합니다');
+
+  /* 접두어 없는 하이픈 계좌번호·12자리/19자리 가상이체번호 서버 마스킹·잔존검사·upsertToSupabase 검증 */
+  const synthPlain12 = '110' + '23456' + '7890';
+  const synthVirtual19 = '356' + '12345678' + '90123456';
+  assert.equal(PBoxSync.hasResidualHardPii({ body: '매월 ' + synthAcct + ' 송금' }), true);
+  assert.equal(PBoxSync.hasResidualHardPii({ body: '이체 ' + synthPlain12 }), true);
+  assert.equal(PBoxSync.hasResidualHardPii({ body: '가상번호 ' + synthVirtual19 }), true);
+  assert.equal(PBoxSync.hasResidualHardPii({ title: '정상 판결', body: '포괄임금 약정 무효 확인 판결 본문입니다.', ingested_by: 'kakao:' + '3456789012', canonical_key: 'hash|kakao:' + '3456789012|서울행정법원|0123456789012345' }), false, '카카오 UID나 결정적 해시 접미사는 오탐하지 않아야 합니다');
+
+  const postedBodies = [];
+  const upResAcct = await PBoxSync.upsertToSupabase([
+    {
+      docType: 'prec_lower',
+      court: '서울중앙지방법원',
+      caseNo: '2025가합54321',
+      decisionDate: '2026-04-01',
+      title: '임금 지급 청구',
+      body: '피고는 원고에게 ' + synthAcct + ' 및 ' + synthPlain12 + ', 가상번호 ' + synthVirtual19 + '로 임금을 송금하였다.'
+    }
+  ], {
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'srv_secret'
+  }, async (url, init) => {
+    const m = (init && init.method) || 'GET';
+    if (m === 'GET') return { ok: true, status: 200, json: async () => [] };
+    if (m === 'POST') {
+      postedBodies.push(String(init.body || ''));
+      const arr = JSON.parse(init.body || '[]');
+      return { ok: true, status: 201, json: async () => arr.map((x) => ({ canonical_key: x.canonical_key })) };
+    }
+    return { ok: true, status: 200, json: async () => [] };
+  }, 'kakao:' + '3456789012', {});
+  assert.equal(upResAcct.ok, true);
+  assert.equal(postedBodies.length, 1);
+  assert.ok(!postedBodies[0].includes(synthAcct) && !postedBodies[0].includes(synthPlain12) && !postedBodies[0].includes(synthVirtual19), '접두어 없는 하이픈·연속 계좌번호도 upsertToSupabase POST 본문에 절대 남지 않아야 합니다');
+  assert.ok(postedBodies[0].includes('***-***-******'), '마스킹 치환 문자열이 POST 본문에 반영되어야 합니다');
+
+  const clientAnonAcct = Engine.anonymizeLegalText('송금번호 ' + synthAcct + ', ' + synthPlain12 + ', ' + synthVirtual19 + ' 이체 내역');
+  assert.ok(!clientAnonAcct.text.includes(synthAcct) && !clientAnonAcct.text.includes(synthPlain12) && !clientAnonAcct.text.includes(synthVirtual19), '클라이언트 anonymizeLegalText에서도 접두어 없는 계좌·가상번호가 가려져야 합니다');
+  assert.equal(Engine.hasResidualHardPiiClient(clientAnonAcct.text), false);
+
+  /* 혼합 구분자·장문 연속 공백(9칸+)·날짜형 접두 혼합 숫자열·다중 그룹·전각 숫자·지역번호 괄호 변형 회귀 검증 */
+  const mixedAcctVariants = [
+    '123-456' + ' ' + '789012',
+    '123' + '  ' + '456' + '  ' + '789012',
+    '123' + '         ' + '456 789012',
+    '123 - 456 - 789012',
+    '2024-01-01 234567',
+    '2024 01 01 234567',
+    '123-2024-01-01',
+    '12-34-56-78-90',
+    '1-2-3-4-5-6-7-8-9-0',
+    '１２３ - ４５６  ７８９０１２',
+    '(02) 123  4567'
+  ];
+  for (const mv of mixedAcctVariants) {
+    assert.equal(PBoxSync.hasResidualHardPii({ body: '이체 ' + mv }), true, '서버 잔존 PII 검사가 혼합 구분자 번호를 탐지해야 합니다: ' + mv);
+    assert.equal(Engine.hasResidualHardPiiClient('이체 ' + mv), true, '클라이언트 잔존 PII 검사가 혼합 구분자 번호를 탐지해야 합니다: ' + mv);
+    const srvScrubbedMv = PBoxSync.scrubServerPii('이체 ' + mv, []);
+    assert.ok(!srvScrubbedMv.includes(mv) && !PBoxSync.hasResidualHardPii({ body: srvScrubbedMv }), '서버 가림 함수가 혼합 구분자 번호를 완전 제거해야 합니다: ' + mv);
+    const cliScrubbedMv = Engine.anonymizeLegalText('이체 ' + mv, []);
+    assert.ok(!cliScrubbedMv.text.includes(mv) && !Engine.hasResidualHardPiiClient(cliScrubbedMv.text), '클라이언트 가림 함수가 혼합 구분자 번호를 완전 제거해야 합니다: ' + mv);
+
+    let mvFetchCount = 0;
+    const mvApiRes = await PBoxSync.handleApiAction({
+      body: { action: 'live_search', query: '통상임금 ' + mv },
+      uid: 'staff-mv',
+      env: { LAW_OC: 'mock_oc' },
+      fetchFn: async () => { mvFetchCount++; return { ok: true, status: 200, json: async () => ({}) }; }
+    });
+    assert.equal(mvApiRes.status, 400, '혼합 구분자 계좌·연락처가 포함된 live_search는 HTTP 400으로 거부되어야 합니다: ' + mv);
+    const mvLowerRes = await PBoxSync.handleApiAction({
+      body: { action: 'pull_lower_court', query: '부당해고 ' + mv },
+      uid: 'staff-mv',
+      env: { LAW_OC: 'mock_oc' },
+      fetchFn: async () => { mvFetchCount++; return { ok: true, status: 200, json: async () => ({}) }; }
+    });
+    assert.equal(mvLowerRes.status, 400, '혼합 구분자 계좌·연락처가 포함된 pull_lower_court도 HTTP 400으로 거부되어야 합니다: ' + mv);
+    assert.equal(mvFetchCount, 0, '혼합 구분자 계좌·연락처 입력 시 두 수집 액션 모두 외부 API 요청이 0건이어야 합니다: ' + mv);
+  }
+  const mixedPostedBodies = [];
+  const upResMixed = await PBoxSync.upsertToSupabase([
+    {
+      docType: 'prec_lower',
+      court: '서울중앙지방법원',
+      caseNo: '2025가합90002',
+      decisionDate: '2025-07-01',
+      title: '혼합 구분자 계좌 이체 사건',
+      body: '피고는 ' + mixedAcctVariants.join(' / ') + ' 계좌 등으로 송금하였다.'
+    }
+  ], {
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'srv_secret'
+  }, async (url, init) => {
+    const m = (init && init.method) || 'GET';
+    if (m === 'GET') return { ok: true, status: 200, json: async () => [] };
+    if (m === 'POST') {
+      mixedPostedBodies.push(String(init.body || ''));
+      const arr = JSON.parse(init.body || '[]');
+      return { ok: true, status: 201, json: async () => arr.map((x) => ({ canonical_key: x.canonical_key })) };
+    }
+    return { ok: true, status: 200, json: async () => [] };
+  }, 'system_sync', {});
+  assert.equal(upResMixed.ok, true);
+  assert.equal(upResMixed.pushed, 1);
+  assert.equal(mixedPostedBodies.length, 1);
+  for (const mv of mixedAcctVariants) {
+    assert.ok(!mixedPostedBodies[0].includes(mv), '모의 upsertToSupabase POST 본문에 혼합 구분자 원문이 남지 않아야 합니다: ' + mv);
+  }
+  assert.ok(mixedPostedBodies[0].includes('***-***-******'), '혼합 구분자 계좌번호도 ***-***-****** 로 치환되어 POST되어야 합니다');
+  for (const safeLegalDate of [
+    '1. 2024. 12. 19. 선고 2024다247190 판결 (2024-01-01 ~ 2024-12-31)',
+    '2024. 10. 25. 2023두12345',
+    '2024-01-01 2024-12-31',
+    '2024-12-19 14:30:00'
+  ]) {
+    assert.equal(PBoxSync.hasResidualHardPii({ q: safeLegalDate }), false, '정상 판례 선고일·사건번호·시각 표기는 오탐하지 않아야 합니다: ' + safeLegalDate);
+    assert.equal(Engine.hasResidualHardPiiClient(safeLegalDate), false, '클라이언트도 정상 판례 선고일·사건번호·시각 표기는 오탐하지 않아야 합니다: ' + safeLegalDate);
+  }
+
+  const lowerSentUrls = [];
+  await PBoxSync.pullLowerCourtBundle({
+    lawOc: 'test_oc',
+    query: '원고 김철수 부당해고',
+    maxPages: 1,
+    fetchFn: async (url) => {
+      lowerSentUrls.push(decodeURIComponent(String(url)));
+      return { ok: true, status: 200, json: async () => ({ PrecSearch: { totalCnt: 0, prec: [] } }) };
+    }
+  });
+  assert.equal(lowerSentUrls.length, 1);
+  assert.ok(!lowerSentUrls[0].includes('김철수') && lowerSentUrls[0].includes('부당해고'), '하급심 수집 요청 URL에서도 당사자 실명이 마스킹되어야 합니다');
+
+  /* 다중 Cloud Functions 인스턴스 동시 요청 시 RTDB 원자 트랜잭션 중앙 쿨다운 검증 */
+  const sharedRtdbStore = new Map();
+  let txChain = Promise.resolve();
+  const ontWarnings = [];
+  const rawMockDb = {
+    ref(p) {
+      const cleanPath = String(p || '').replace(/^\/+|\/+$/g, '');
+      return {
+        transaction(updateFn) {
+          const next = txChain.then(() => {
+            const cur = sharedRtdbStore.has(cleanPath) ? JSON.parse(JSON.stringify(sharedRtdbStore.get(cleanPath))) : null;
+            const res = updateFn(cur);
+            if (res === undefined) return { committed: false, snapshot: { val: () => cur } };
+            const saved = JSON.parse(JSON.stringify(res));
+            sharedRtdbStore.set(cleanPath, saved);
+            return { committed: true, snapshot: { val: () => saved } };
+          });
+          txChain = next.catch(() => {});
+          return next;
+        }
+      };
+    }
+  };
+  const wrappedDb = OntologyServerWrite.wrapDatabase(rawMockDb, {
+    program: 'test-pbox-rate',
+    logger: (msg) => ontWarnings.push(msg)
+  });
+  const [inst1, inst2] = await Promise.all([
+    PBoxSync.claimActionCooldownShared({ db: wrappedDb, uid: 'staff-a', action: 'live_search', uidMinMs: 4000, globalMinMs: 1500, nowMs: 100000 }),
+    PBoxSync.claimActionCooldownShared({ db: wrappedDb, uid: 'staff-b', action: 'live_search', uidMinMs: 4000, globalMinMs: 1500, nowMs: 100200 })
+  ]);
+  assert.equal([inst1.ok, inst2.ok].filter(Boolean).length, 1, '서로 다른 인스턴스에서 전역 쿨다운 이내에 동시 도착한 요청은 정확히 1건만 허용되어야 합니다');
+  const sameUidTooFast = await PBoxSync.claimActionCooldownShared({ db: wrappedDb, uid: 'staff-a', action: 'live_search', uidMinMs: 4000, globalMinMs: 1500, nowMs: 102500 });
+  assert.equal(sameUidTooFast.ok, false, '전역 쿨다운이 지났더라도 동일 UID 연속 요청 쿨다운 이내이면 차단되어야 합니다');
+  const afterUidCool = await PBoxSync.claimActionCooldownShared({ db: wrappedDb, uid: 'staff-a', action: 'live_search', uidMinMs: 4000, globalMinMs: 1500, nowMs: 105000 });
+  assert.equal(afterUidCool.ok, true, '쿨다운 경과 후에는 정상 허용되어야 합니다');
+  assert.equal(ontWarnings.length, 0, '중앙 호출 제한 RTDB 저장 객체는 온톨로지 감시 경고를 유발하지 않아야 합니다');
+
+  const supaCalls = [];
+  const existingCk = PBoxSync.canonicalKeyOf({
+    docType: 'prec_sc',
+    court: '대법원',
+    caseNo: '2025다77889',
+    decisionDate: '2026-05-10',
+    title: '포괄임금 약정 무효 확인',
+    body: '기존 상세 본문'
+  }, 'system_sync');
+
+  const liveRes = await PBoxSync.liveSearchOfficialApis({
+    env: {
+      LAW_OC: 'env_only_oc',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'srv_secret'
+    },
+    dataGoKrKey: 'test_dgk_key',
+    query: '포괄임금',
+    maxPerTarget: 3,
+    fetchFn: async (url, init) => {
+      const u = String(url);
+      const method = (init && init.method) || 'GET';
+      if (u.includes('example.supabase.co')) {
+        supaCalls.push({ method, url: u });
+        if (method === 'GET' && u.includes('canonical_key=in.')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [{ canonical_key: existingCk, ingested_by: 'system_sync', deleted_at: null, body: '기존 상세 본문 길이 보존 확인용 텍스트입니다.' }]
+          };
+        }
+        if (method === 'POST') {
+          const parsed = JSON.parse((init && init.body) || '[]');
+          return {
+            ok: true,
+            status: 201,
+            json: async () => parsed.map((r) => ({ canonical_key: r.canonical_key }))
+          };
+        }
+        return { ok: true, status: 200, text: async () => '[]', json: async () => [] };
+      }
+      if (u.includes('apis.data.go.kr')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ response: { header: { resultCode: '00' }, body: { items: { item: [] } } } })
+        };
+      }
+      if (u.includes('lawSearch.do') && u.includes('org=400201')) {
+        assert.ok(u.includes('OC=env_only_oc'), 'env.LAW_OC 환경변수가 liveSearchOfficialApis에서도 그대로 인식되어야 합니다');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            PrecSearch: {
+              totalCnt: 1,
+              prec: [{
+                판례일련번호: '99001',
+                사건명: '포괄임금 약정 무효 확인',
+                사건번호: '2025다77889',
+                선고일자: '20260510',
+                법원명: '대법원'
+              }]
+            }
+          })
+        };
+      }
+      if (u.includes('lawService.do') && u.includes('ID=99001')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            PrecService: {
+              판시사항: '감시단속적 근로가 아닌 사무직 포괄임금 유효성',
+              판결요지: '원고:박하늘(' + synthRrn + ')에게 불리한 포괄임금 약정은 무효이다.',
+              참조조문: '근로기준법 제56조'
+            }
+          })
+        };
+      }
+      if (u.includes('lawSearch.do') && u.includes('target=nlrc')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            NlrcSearch: {
+              totalCnt: 1,
+              nlrc: [{
+                일련번호: '88002',
+                제목: '포괄임금 수당 미지급 구제신청',
+                사건번호: '중앙2026부해555',
+                의결일자: '20260601',
+                결정기관명: '중앙노동위원회'
+              }]
+            }
+          })
+        };
+      }
+      if (u.includes('lawService.do') && u.includes('ID=88002')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            NlrcService: {
+              결정요지: '연장근로시간 산정이 어렵지 않다면 포괄임금으로 가산수당 지급의무를 면할 수 없다.',
+              참조조문: '근로기준법 제56조'
+            }
+          })
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ Search: { totalCnt: 0 } }) };
+    }
+  });
+
+  assert.equal(liveRes.ok, true);
+  assert.ok(liveRes.dedupedCount >= 2, '대법원 판례와 중노위 재결례가 병렬로 실시간 수집되어야 합니다');
+  assert.ok(supaCalls.some((c) => c.method === 'POST'), '신규 수집 문서는 공유 Supabase DB에 system_sync로 자동 삽입되어야 합니다');
+  assert.ok(!supaCalls.some((c) => c.method === 'PATCH'), 'insertOnly 모드에서는 기존 공유 문서를 PATCH로 덮어쓰지 않아야 합니다');
+  assert.ok(liveRes.docs.every((d) => !(d.tags || []).includes('포괄임금')), '직원 검색어 자체는 공유 문서 태그에 남지 않아야 합니다');
+  assert.ok(!JSON.stringify(liveRes.docs).includes(synthRrn) && !JSON.stringify(liveRes.docs).includes('박하늘'), '실시간 수집된 판결 본문에서도 주민번호·당사자 실명이 자동 마스킹되어야 합니다');
+
+  /* 5) UI 화면(홈 기본 최근자료 · sites 뷰 · 스마트 조문 배너 · 실시간 수집 배너 · 외부 사이트 PII 차단) 통합 검증 */
+  const openedUrls = [];
+  const docListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    return {
+      id: id || '',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) delete elementsById[oldId];
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const idMatch = /\bid="([^"]+)"/i.exec(m[2] || '');
+          if (!idMatch) continue;
+          const child = makeEl(idMatch[1]);
+          const valMatch = /\bvalue="([^"]*)"/i.exec(m[2] || '');
+          if (valMatch) child.value = valMatch[1];
+          elementsById[idMatch[1]] = child;
+          this._ownedIds.add(idMatch[1]);
+        }
+      },
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      focus() {}
+    };
+  }
+  const rootContainer = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootContainer;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => elementsById[id] || (elementsById[id] = makeEl(id)),
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+  };
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    Blob: class {},
+    URL: { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        fetchedCount: liveRes.docs.length,
+        dedupedCount: liveRes.docs.length,
+        docs: liveRes.docs,
+        sourcesHit: liveRes.sourcesHit,
+        errors: []
+      })
+    }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1280,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    firebase: { auth: () => ({ currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }) },
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    open: (u) => { openedUrls.push(u); return { opener: null }; },
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('user-smart-11');
+  App.mount(rootContainer);
+  App.setAuthUser({ uid: 'user-smart-11', displayName: '권형하 대표', getIdToken: async () => 'mock-id-token' });
+  await new Promise((r) => setImmediate(r));
+
+  function dispatchClick(attrs, extraProps) {
+    const btn = Object.assign({
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    }, extraProps || {});
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 홈 화면 기본 최근 본 자료 ID가 모두 SEED_DOCS에 실재하고 undefined 문자열이 없는지 확인 */
+  App.switchView('home');
+  assert.ok(!elementsById.pboxMainArea.innerHTML.includes('undefined'), '홈 화면 렌더링에 undefined 텍스트가 없어야 합니다');
+  const homeDocIds = [...elementsById.pboxMainArea.innerHTML.matchAll(/data-act="open-doc"\s+data-id="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(homeDocIds.length >= 3, '홈 화면 기본 추천 최근자료가 표시되어야 합니다');
+  for (const hid of homeDocIds) {
+    assert.ok(Store.getDocById(hid), `홈 기본 추천 자료(${hid})가 실제 코퍼스에 존재해야 합니다`);
+  }
+
+  /* 판례 화면에서 '근기법 23' 검색 시 스마트 조문 바로가기 배너 표시 및 쟁점 칩 data-q 렌더링 확인 */
+  App.switchView('cases');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="pick-issue-chip" data-q="서면통지 해고 제27조"'), '원클릭 쟁점 칩의 data-q 검색어가 빈 문자열 없이 렌더링되어야 합니다');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('로앤비') && elementsById.pboxMainArea.innerHTML.includes('고용노동부'), '인라인 대형로펌·공공 DB 바로가기 버튼이 모두 표시되어야 합니다');
+  elementsById.pboxCaseSearchInput.value = '근기법 23';
+  dispatchClick({ 'data-act': 'run-case-filter' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pbox-smart-jump') && elementsById.pboxMainArea.innerHTML.includes('근로기준법 제23조'), '근기법 23 입력 시 스마트 법령·조문 바로가기 배너가 표시되어야 합니다');
+
+  /* 원클릭 쟁점 파인더 칩 클릭 시 즉시 관련 판례 검색 확인 */
+  dispatchClick({ 'data-act': 'pick-issue-chip', 'data-q': '포괄임금' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('2008다6052'), '원클릭 쟁점 칩 선택 시 해당 대법원 리딩판례가 즉시 조회되어야 합니다');
+
+  /* UI 실시간 수집 버튼(live-collect-cases) 클릭 시 총 수신 건수가 undefined 없이 표시되고 코퍼스에 적재되는지 확인 */
+  elementsById.pboxCaseSearchInput.value = '포괄임금';
+  dispatchClick({ 'data-act': 'live-collect-cases' });
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2025다77889'), '수집된 최신 판례가 통합검색 코퍼스에서 바로 조회되어야 합니다');
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('총 수신 2건') && !elementsById.pboxMainArea.innerHTML.includes('undefined'), '실시간 수집 완료 배너에 총 수신 건수가 정확히 표시되어야 합니다');
+
+  /* 전국 사이트 직접검색(sites 뷰) 렌더링 · 5단계 가이드 · 대형로펌 필수 배지 · 외부 사이트 PII 차단/마스킹 확인 */
+  App.switchView('sites');
+  const sitesHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(!sitesHtml.includes('undefined'), '전국 사이트 뷰 및 5단계 리서치 가이드에 undefined 텍스트가 없어야 합니다');
+  assert.ok(sitesHtml.includes('1단계') && sitesHtml.includes('온주(ONJU)') && sitesHtml.includes('★ 대형로펌 필수'), '대형로펌 5단계 리서치 가이드(layer/method)와 대형로펌 필수 배지가 정확히 렌더링되어야 합니다');
+
+  /* 주민번호·이메일 등 민감 개인정보가 포함된 검색어는 외부 사이트 열기를 차단해야 함 */
+  elementsById.pboxSiteSearchInput.value = '통상임금 ' + synthRrn;
+  dispatchClick({ 'data-act': 'open-ext-site', 'data-site-id': 'lbox', 'data-q-src': 'site' });
+  assert.equal(openedUrls.length, 0, '주민번호가 포함된 검색어는 제3자 외부 사이트 URL 전송이 차단되어야 합니다');
+
+  /* 당사자 실명('원고:김하늘')이 포함된 검색어는 Enter 키 및 외부 사이트 열기 모두에서 실명을 마스킹해야 함 */
+  elementsById.pboxSiteSearchInput.value = '원고:김하늘 통상임금';
+  (docListeners.keydown || []).forEach((fn) => fn({ key: 'Enter', target: elementsById.pboxSiteSearchInput, preventDefault: () => {} }));
+  assert.ok(!elementsById.pboxSiteSearchInput.value.includes('김하늘') && elementsById.pboxSiteSearchInput.value.includes('통상임금'), 'Enter 키 입력 시에도 당사자 실명이 즉시 마스킹되어야 합니다');
+  dispatchClick({ 'data-act': 'open-ext-site', 'data-site-id': 'lbox', 'data-q-src': 'site' });
+  assert.equal(openedUrls.length, 1);
+  assert.ok(openedUrls[0].startsWith('https://lbox.kr/') && openedUrls[0].includes(encodeURIComponent('통상임금')), '외부 사이트 직접 검색 열기 시 검색어가 인코딩된 HTTPS URL로 열려야 합니다');
+  assert.ok(!decodeURIComponent(openedUrls[0]).includes('김하늘'), '외부 사이트 검색어에서도 당사자 실명이 자동 마스킹되어야 합니다');
+
+  /* Store 경계 검증: 공백 1000개 + 이메일 검색어 입력 시 사전 slice 없이 즉시 거부되고 네트워크 요청이 발생하지 않아야 함 */
+  let storeBoundaryFetches = 0;
+  ctx.fetch = async () => {
+    storeBoundaryFetches++;
+    return { ok: true, status: 200, json: async () => ({ ok: true, docs: [] }) };
+  };
+  await assert.rejects(
+    () => Store.pullLowerCourtOfficial({
+      query: paddedEmailQuery,
+      auth: { currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /개인정보/
+  );
+  await assert.rejects(
+    () => Store.liveSearchAndCollect({
+      query: paddedEmailQuery,
+      auth: { currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /개인정보/
+  );
+  await assert.rejects(
+    () => Store.liveSearchAndCollect({
+      query: '통상임금 123-456 789012',
+      auth: { currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /개인정보/
+  );
+  await assert.rejects(
+    () => Store.pullLowerCourtOfficial({
+      query: '부당해고 123  456  789012',
+      auth: { currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /개인정보/
+  );
+  await assert.rejects(
+    () => Store.pullLowerCourtOfficial({
+      query: '가'.repeat(45),
+      auth: { currentUser: { uid: 'user-smart-11', getIdToken: async () => 'mock-id-token' } }
+    }),
+    /40자 이하/
+  );
+  assert.equal(storeBoundaryFetches, 0, 'Store 경계에서도 PII·길이초과 검색어는 fetch 호출 전에 즉시 차단되어야 합니다');
+
+  const openedBeforeMixed = openedUrls.length;
+  elementsById.pboxSiteSearchInput.value = '통상임금 123 - 456 - 789012';
+  dispatchClick({ 'data-act': 'open-ext-site', 'data-site-id': 'lbox', 'data-q-src': 'site' });
+  assert.equal(openedUrls.length, openedBeforeMixed, '혼합 구분자 계좌번호가 포함된 검색어는 외부 사이트 열기도 차단되어야 합니다');
+});

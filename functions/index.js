@@ -8253,6 +8253,45 @@ exports.pboxDailySync = functions
     return null;
   });
 
+const _pboxRateState = {
+  globalByAct: Object.create(null),
+  uidByAct: new Map()
+};
+
+async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs) {
+  const now = Date.now();
+  if (_pboxRateState.uidByAct.size > 500) {
+    for (const [k, ts] of _pboxRateState.uidByAct.entries()) {
+      if (now - ts > 300000) _pboxRateState.uidByAct.delete(k);
+    }
+  }
+  const gLast = _pboxRateState.globalByAct[action] || 0;
+  if (globalMinMs > 0 && now - gLast < globalMinMs) {
+    const waitSec = Math.max(1, Math.ceil((globalMinMs - (now - gLast)) / 1000));
+    return "공용 공공API 한도 보호를 위해 잠시 후(" + waitSec + "초 뒤) 다시 시도해 주세요.";
+  }
+  const uKey = String(uid || "") + ":" + action;
+  const uLast = _pboxRateState.uidByAct.get(uKey) || 0;
+  if (uidMinMs > 0 && now - uLast < uidMinMs) {
+    const waitSec2 = Math.max(1, Math.ceil((uidMinMs - (now - uLast)) / 1000));
+    return "연속 수집 요청 간격 제한입니다. " + waitSec2 + "초 후 다시 시도해 주세요.";
+  }
+  const shared = await PBoxSync.claimActionCooldownShared({
+    db: getDatabase(),
+    uid,
+    action,
+    uidMinMs,
+    globalMinMs,
+    nowMs: now
+  });
+  if (!shared || shared.ok !== true) {
+    return (shared && shared.error) || "수집 호출 제한 확인 중 잠시 후 다시 시도해 주세요.";
+  }
+  _pboxRateState.globalByAct[action] = now;
+  _pboxRateState.uidByAct.set(uKey, now);
+  return "";
+}
+
 exports.pboxApi = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 120, memory: "256MB" })
@@ -8261,63 +8300,20 @@ exports.pboxApi = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
     let me;
-    try { me = await requireStaff(req); }
+    try { me = await requireReader(req); }
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
     const PBoxSync = require("./pbox-sync");
     const body = (req.body && typeof req.body === "object") ? req.body : {};
-    const action = String(body.action || "sync");
     try {
-      if (action === "pull") {
-        const pulled = await PBoxSync.pullFromSupabaseServer(
-          process.env,
-          fetch,
-          body.limit,
-          body.sinceDeletedAt || "",
-          body.afterDeletedKey || ""
-        );
-        res.status(pulled.ok === false ? 502 : 200).json(pulled);
-        return;
-      }
-      if (action === "push") {
-        const docs = Array.isArray(body.docs) ? body.docs.slice(0, 50) : [];
-        const pushed = await PBoxSync.upsertToSupabase(docs, process.env, fetch, me.uid, {});
-        const status = pushed.ok === false ? (pushed.status || 403) : 200;
-        res.status(status).json(Object.assign({ ok: pushed.ok !== false }, pushed));
-        return;
-      }
-      if (action === "delete") {
-        const keys = Array.isArray(body.canonicalKeys) ? body.canonicalKeys.slice(0, 50) : [];
-        const del = await PBoxSync.deleteFromSupabaseServer(keys, process.env, fetch, me.uid);
-        const delStatus = del.ok === false ? (del.status || 502) : 200;
-        res.status(delStatus).json(Object.assign({ ok: del.ok !== false }, del));
-        return;
-      }
-      if (action === "pull_lower_court") {
-        const lowerOut = await PBoxSync.pullLowerCourtBundle({
-          env: process.env,
-          fetchFn: fetch,
-          lawOc: body.lawOc || "",
-          preset: body.preset || "all",
-          query: typeof body.query === "string" ? body.query.slice(0, 40) : "",
-          court: typeof body.court === "string" ? body.court.slice(0, 30) : "",
-          dateFrom: typeof body.dateFrom === "string" ? body.dateFrom.slice(0, 12) : "",
-          dateTo: typeof body.dateTo === "string" ? body.dateTo.slice(0, 12) : "",
-          maxQueries: 8,
-          maxPages: Math.min(Math.max(1, Number(body.maxPages) || 2), 4),
-          display: Math.min(Math.max(10, Number(body.display) || 25), 50),
-          detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 15)), 25),
-          includeComwel: body.includeComwel !== false
-        });
-        res.status((lowerOut.ok || lowerOut.partial) ? 200 : (lowerOut.status || 502)).json(lowerOut);
-        return;
-      }
-      const out = await PBoxSync.runSync({
+      const result = await PBoxSync.handleApiAction({
+        body,
+        uid: me.uid,
         env: process.env,
-        lawOc: body.lawOc || "",
-        sinceDate: body.sinceDate || "",
-        maxPages: body.maxPages
+        fetchFn: fetch,
+        enforceCooldown: (uid, action, uidMinMs, globalMinMs) =>
+          enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs)
       });
-      res.status(200).json(out);
+      res.status(result.status).json(result.payload);
     } catch (e) {
       res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 240) });
     }
