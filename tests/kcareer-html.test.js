@@ -2465,7 +2465,7 @@ test('★★ 체크를 누른 채 끌면 지나간 줄이 모두 같은 상태�
   assert.match(dg, /addEventListener\('mouseover'/, '끌면서 칠합니다');
   // ⚠ 누른 «그 자리에서» 끌기를 세운다 — 타이머로 미루면 누름·뗌이 더 빨리 끝날 때(터치 탭·자동 클릭) 끌기가 남는다
   //    (2026-11-15 — 자세히는 tests/kcareer-select-trash-hardening.test.js)
-  assert.match(dg, /_dragSel=\{sync:sync, on:c\.checked\}/, '⚠ 끌기를 세우고 «처음 누른 칸의 값»으로 칠합니다');
+  assert.match(dg, /_dragSel=\{sync:sync, on:!c\.checked/, '⚠ 끌기를 세우고 누른 칸이 «눌린 뒤» 갖게 될 값(!checked)으로 칠합니다 — 누르기 전 값이면 꺼진 칸에서 끌어도 안 켜집니다');
   assert.ok(!/setTimeout\(/.test(dg.replace(/\/\*[\s\S]*?\*\//g, '')), '⚠ 끌기를 타이머로 미루지 않는다');
   assert.match(dg, /document\.body\.style\.userSelect='none'/, '끌 때 글자가 잡히지 않게 합니다');
   assert.match(funcSource('careerDragSel'), /bindDragSel\(/,
