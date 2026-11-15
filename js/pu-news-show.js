@@ -29,7 +29,9 @@
   /* ⚠ 발송기(functions/mail-send.js IMG_HOST_OK)와 «같은 두 곳»이다.
        ★ 여기에 남의 도메인을 더하지 말 것 — 한 줄 더하는 순간 열람 추적이 뚫린다.
        tests/newsletter-show.test.js 가 두 목록이 같은지 견준다. */
+  /* 2026-11-15 ERP 주소 이사 — 새 ERP 출처도 «우리 집»(남의 도메인 아님). 옛 주소는 지난 회차 때문에 남긴다. */
   var 우리주소들 = ['https://nabaho.github.io/pureunall/',
+                   'https://erp.pureunlabor.co.kr/',
                    'https://asia-northeast3-pureun-erp.cloudfunctions.net/'];
 
   /* ⚠ 열두 장까지. 넘으면 «인사»가 아니라 «발표»가 된다 — 받는 분이 끝까지 안 본다. */

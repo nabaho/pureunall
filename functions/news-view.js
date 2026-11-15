@@ -95,9 +95,11 @@ function 쇼볼수있나(상태, 쇼) {
    ⚠ 담아 둔 쪽은 화면(pu-news-show.js)이 «우리 그림만» 골라 지었다. 그래도
      여기서 한 번 더 막는다: 누가 회차의 쇼 칸을 손으로 고쳐 남의 그림을 넣어도
      브라우저가 불러오지 않는다. 문이 둘이라야 한쪽이 뚫려도 안 샌다.
-   ⚠ 두 주소는 발송기(mail-send.js IMG_HOST_OK)와 «같다». 더하지 말 것. */
+   ⚠ 주소는 발송기(mail-send.js IMG_HOST_OK)와 «같다». 남의 도메인을 더하지 말 것.
+   ★ 2026-11-15 ERP 주소 이사 — 새 ERP 출처를 더했다(옛 출처 그림은 301 로 새 출처로 넘어가는데,
+     CSP 는 넘어간 «끝» 호스트도 검사하므로 이것이 없으면 지난 회차 쇼 그림이 깨진다). */
 const 쇼보안 = "default-src 'none'; "
-  + "img-src https://nabaho.github.io https://asia-northeast3-pureun-erp.cloudfunctions.net; "
+  + "img-src https://nabaho.github.io https://erp.pureunlabor.co.kr https://asia-northeast3-pureun-erp.cloudfunctions.net; "
   + "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
   + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 

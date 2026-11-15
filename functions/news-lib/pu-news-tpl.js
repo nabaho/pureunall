@@ -129,7 +129,9 @@
        tests/newsletter-letter.test.js 가 두 목록을 견준다.
      ⚠ 그림 주소는 «감싸지 않는다». newsClick 로 감싸면 그림이 안 나온다 —
        href() 와 갈라 둔 까닭이 이것이다. */
+  /* 2026-11-15 ERP 주소 이사 — 새 ERP 출처도 «우리 집». 옛 주소는 이미 나간 회차 때문에 남긴다. */
   var 그림집 = ['https://nabaho.github.io/pureunall/',
+                'https://erp.pureunlabor.co.kr/',
                 'https://asia-northeast3-pureun-erp.cloudfunctions.net/'];
   function img주소(s) {
     var u = String(s == null ? '' : s).trim();

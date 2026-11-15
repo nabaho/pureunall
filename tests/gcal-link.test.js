@@ -233,3 +233,94 @@ test('⑧ 배포 목록(index.js)에 다섯 함수가 다 있다', () => {
     assert.match(idx, new RegExp('exports\\.' + n + '\\s*=\\s*_gcalLink\\.' + n), n + ' 가 배포 목록에 없습니다');
   });
 });
+
+/* ══════ 2026-11-15 ERP 주소 이사 — 옛·새 두 출처 (카카오와 같은 짜임) ══════
+   돌아올 주소(pu-cal.html)는 «시작한 출처»의 것, code 교환은 인가 때와 «같은» 주소. */
+const G_NEW = 'https://erp.pureunlabor.co.kr';
+const G_OLD = 'https://nabaho.github.io';
+function callFrom(h, origin, { token, body, method = 'POST' } = {}) {
+  return new Promise((resolve) => {
+    const headers = {};
+    const req = { method, headers: Object.assign(origin ? { origin } : {}, { authorization: token ? 'Bearer ' + token : '' }), body: body || {}, query: {} };
+    const res = { _s: 200, set(k, v) { headers[k] = v; }, status(s) { this._s = s; return this; },
+      json(j) { resolve({ status: this._s, body: j, headers }); }, send() { resolve({ status: this._s, headers }); } };
+    h(req, res);
+  });
+}
+async function exchanged(run) {
+  const seen = []; const orig = global.fetch;
+  global.fetch = async (url, opts) => {
+    if (String(url).startsWith('https://oauth2.googleapis.com/token')) {
+      const b = new URLSearchParams(opts.body);
+      if (b.get('grant_type') === 'authorization_code') seen.push(b.get('redirect_uri'));
+    }
+    return orig(url, opts);
+  };
+  try { await run(); } finally { global.fetch = orig; }
+  return seen;
+}
+
+test('⑨ 새 출처에서 시작하면 새 출처 pu-cal.html 로 돌아오고, 교환도 같은 주소(교환이 옛 출처에서 와도)', async () => {
+  const G = fresh();
+  const a = await callFrom(G.gcalAuthUrl, G_NEW, { token: 'staff1' });
+  const u = new URL(a.body.url);
+  assert.equal(u.searchParams.get('redirect_uri'), G_NEW + '/pu-cal.html');
+  const seen = await exchanged(() => callFrom(G.gcalLink, G_OLD, { token: 'staff1', body: { code: 'cOK', state: u.searchParams.get('state') } }));
+  assert.deepEqual(seen, [G_NEW + '/pu-cal.html'], '★★ 교환 주소가 인가 때와 달라 구글이 redirect_uri_mismatch 로 거절한다');
+});
+
+test('⑨-2 옛 출처면 전과 같은 주소 · 이 배포 전 옛 꼴 state 도 옛 주소로', async () => {
+  const G = fresh();
+  const a = await callFrom(G.gcalAuthUrl, G_OLD, { token: 'staff1' });
+  const u = new URL(a.body.url);
+  assert.equal(u.searchParams.get('redirect_uri'), G_OLD + '/pureunall/pu-cal.html');
+  const seen = await exchanged(() => callFrom(G.gcalLink, G_NEW, { token: 'staff1', body: { code: 'cOK', state: u.searchParams.get('state') } }));
+  assert.deepEqual(seen, [G_OLD + '/pureunall/pu-cal.html']);
+  /* 옛 꼴 — 넷째 조각이 무작위 24자뿐 */
+  const T = G._test;
+  const payload = 'gl.' + Date.now() + '.' + T.uidTag('staff1') + '.' + crypto.randomBytes(18).toString('base64url');
+  const legacy = payload + '.' + crypto.createHmac('sha256', SECRET).update(payload).digest('base64url');
+  const G2 = fresh();
+  const seen2 = await exchanged(() => callFrom(G2.gcalLink, G_NEW, { token: 'staff1', body: { code: 'cOK', state: legacy } }));
+  assert.deepEqual(seen2, [G_OLD + '/pureunall/pu-cal.html'], '배포하는 순간 진행 중이던 구글 연결이 끊긴다');
+});
+
+test('⑨-3 출처 번호는 서명 안 — 바꿔 치면 받지 않는다 · 화면은 여전히 «gl.» 로 알아본다', async () => {
+  const G = fresh();
+  const a = await callFrom(G.gcalAuthUrl, G_NEW, { token: 'staff1' });
+  const st = new URL(a.body.url).searchParams.get('state');
+  assert.equal(st.indexOf('gl.'), 0, '화면(js/pu-gcal-auth.js)이 «gl.» 로 시작하는 것만 받는다');
+  const p = st.split('.');
+  assert.equal(p[3].slice(0, 2), 'o1');
+  p[3] = 'o0' + p[3].slice(2);
+  const r = await callFrom(G.gcalLink, G_NEW, { token: 'staff1', body: { code: 'cOK', state: p.join('.') } });
+  assert.equal(r.status, 400, '★★ 서명 밖에서 출처를 바꿔 치기 할 수 있다');
+});
+
+test('⑨-4 CORS — 두 출처는 그 값 그대로(Vary), 목록 밖은 안 연다', async () => {
+  const G = fresh();
+  for (const o of [G_OLD, G_NEW]) {
+    const r = await callFrom(G.gcalAuthUrl, o, { method: 'OPTIONS' });
+    assert.equal(r.headers['Access-Control-Allow-Origin'], o);
+    assert.equal(r.headers['Vary'], 'Origin');
+  }
+  for (const o of ['https://evil.example', 'http://erp.pureunlabor.co.kr', 'https://nabaho.github.io.evil.example']) {
+    const r = await callFrom(G.gcalAuthUrl, o, { method: 'OPTIONS' });
+    assert.equal(r.headers['Access-Control-Allow-Origin'], undefined, '★★ 남의 출처(' + o + ')에 문을 열었다');
+  }
+});
+
+test('⑨-5 서명 «다른 글자 같은 바이트»로 한 번 쓴 연결 요청표를 다시 쓰지 못한다 (2026-11-15 보안 검토 중간 1)', async () => {
+  const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const G = fresh();
+  const st = await stateFor(G, 'staff1');
+  const p = st.split('.');
+  const last = p[4].charAt(p[4].length - 1);
+  const 변형 = p.slice(0, 4).concat([p[4].slice(0, -1) + ABC.charAt(ABC.indexOf(last) ^ 1)]).join('.');
+  assert.notEqual(변형, st);
+  assert.deepEqual(Buffer.from(변형.split('.')[4], 'base64url'), Buffer.from(p[4], 'base64url'), '시험 밑감이 «같은 바이트»가 아니다');
+  const first = await call(G.gcalLink, { token: 'staff1', body: { code: 'cOK', state: st } });
+  assert.equal(first.body.ok, true);
+  const replay = await call(G.gcalLink, { token: 'staff1', body: { code: 'cOK', state: 변형 } });
+  assert.equal(replay.status, 400, '★★ 서명 글자만 비틀어 같은 연결 요청표를 한 번 더 썼다');
+});

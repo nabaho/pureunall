@@ -221,10 +221,15 @@ test('★ 회신이 «사람이 보는 곳»으로 온다', () => {
 });
 
 test('★ 발송 창구는 «우리 화면»에서만 연다', () => {
-  const m = /const MAIL_ORIGIN = "([^"]+)"/.exec(fns);
-  assert.ok(m, '★ 창구 설정을 못 찾았습니다');
-  assert.notEqual(m[1], '*',
-    '★★ 아무 데서나 부를 수 있습니다 — 주소만 알면 푸른노무법인 이름으로 메일이 나갑니다');
+  /* 2026-11-15 ERP 주소 이사 — 받아 주는 출처는 functions/erp-origins.js 한 자리(옛·새 ERP 주소)다.
+     창구(setCors)가 그 목록을 쓰는지, 그 목록이 남의 출처·와일드카드를 «실제로» 막는지 돌려서 본다. */
+  assert.match(fns, /function setCors\(req, res\) \{\s*ERP_ORIGINS_LIB\.allowOrigin\(req, res\);/,
+    '★ 창구 설정을 못 찾았습니다 — 발송 창구가 공용 출처 목록을 안 쓴다');
+  const O = require(path.join(__dirname, '..', 'functions', 'erp-origins.js'));
+  const 연다 = (origin) => { const h = {}; O.allowOrigin({ headers: { origin } }, { set: (k, v) => { h[k] = v; } }); return h['Access-Control-Allow-Origin']; };
+  ['*', 'https://evil.example', 'null', ''].forEach((o) => assert.equal(연다(o), undefined,
+    '★★ 아무 데서나 부를 수 있습니다(' + o + ') — 주소만 알면 푸른노무법인 이름으로 메일이 나갑니다'));
+  assert.ok(O.ERP_ORIGINS.indexOf('*') < 0, '★★ 출처 목록에 «*» 가 있다');
   /* 화면이 실제로 그 자리에서 돈다 — 어긋나면 발송이 «창구 막힘»으로 조용히 실패한다 */
   assert.match(erp, new RegExp('https://us-central1-pureun-erp\\.cloudfunctions\\.net/sendPayslip'),
     '★ 화면이 부르는 주소가 바뀌었습니다');
