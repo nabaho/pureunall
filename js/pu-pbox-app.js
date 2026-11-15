@@ -236,7 +236,8 @@
       prec_lower: '하급심판결',
       dec_nlrc: '위원회재결',
       interp_moel: '노동부해석',
-      interp_gov: '범부처해석',
+      interp_gov: '범부처·조례해석',
+      ordinance: '자치조례',
       internal_case: '수집판결문'
     };
     return map[dt] || '법률자료';
@@ -244,7 +245,7 @@
 
   function docTypeBadgeClass(dt) {
     if (dt === 'prec_sc') return 'pbox-badge-blue';
-    if (dt === 'prec_lower') return 'pbox-badge-green';
+    if (dt === 'prec_lower' || dt === 'ordinance') return 'pbox-badge-green';
     if (dt === 'dec_nlrc') return 'pbox-badge-amber';
     if (dt === 'interp_moel' || dt === 'interp_gov') return 'pbox-badge-gray';
     return 'pbox-badge-blue';
@@ -357,6 +358,7 @@
     var d = global.PuPBoxStore && global.PuPBoxStore.getDocById ? global.PuPBoxStore.getDocById(docId) : null;
     if (d) {
       if (d.docType === 'dec_nlrc') return '결정례';
+      if (d.docType === 'ordinance') return '조례·자치법규';
       if (d.docType === 'interp_moel' || d.docType === 'interp_gov') return '유권해석';
     }
     if (/재심판정|결정|처분\s*취소\s*청구/.test(String(r.title || '')) && !/판결/.test(String(r.title || ''))) {
@@ -1377,20 +1379,20 @@
     var sendDisabled = (state.aiBusy || state.reviewFileBusy) ? ' disabled aria-busy="true"' : '';
 
     var defaultRecentsHtml = [
-      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="prec-lower-seouladm-sanjae-lumbar">' +
-        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">서울행정법원 2019구단62415 판결 (추간판탈출증 산재)</span><span class="pbox-lbox-recent-kind">· 판례</span></div>' +
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="prec-lower-seouladm-2009gudan4596">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">서울행정법원 2011. 7. 8. 선고 2009구단4596 판결 (최초요양 일부불승인 취소)</span><span class="pbox-lbox-recent-kind">· 판례</span></div>' +
         '<span class="pbox-lbox-recent-age">오늘</span>' +
       '</div>',
       '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="prec-sc-2020da247190">' +
         '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결</span><span class="pbox-lbox-recent-kind">· 판례</span></div>' +
         '<span class="pbox-lbox-recent-age">오늘</span>' +
       '</div>',
-      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="dec-nlrc-probation-dismissal">' +
-        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">중앙노동위원회 수습근로자 본채용 거부 부당해고 구제 재심판정</span><span class="pbox-lbox-recent-kind">· 결정례</span></div>' +
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="interp-moleg-ordin-327105">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">법제처 18-0687 법령해석 (지자체 생활임금 조례 적용 범위)</span><span class="pbox-lbox-recent-kind">· 유권해석</span></div>' +
         '<span class="pbox-lbox-recent-age">어제</span>' +
       '</div>',
-      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="interp-moel-ordinary-wage-2025">' +
-        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">2024년 대법원 전원합의체 판결 반영 개정 통상임금 노사지도 지침</span><span class="pbox-lbox-recent-kind">· 유권해석</span></div>' +
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="ordin-seoul-living-wage">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">서울특별시 생활임금 조례 (서울특별시조례 제8993호)</span><span class="pbox-lbox-recent-kind">· 조례·자치법규</span></div>' +
         '<span class="pbox-lbox-recent-age">어제</span>' +
       '</div>',
       '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-law" data-dir="근로기준법" data-file="법률(법률).md">' +
@@ -2064,9 +2066,9 @@
       }).join(''),
       '    </div>',
       '    <div class="pbox-search-bar">',
-      '      <input type="search" id="pboxCaseSearchInput" class="pbox-input" aria-label="판례·재결·행정해석 검색" value="' + esc(state.caseQuery) + '" placeholder="사건·회시번호(2020다247190, 96다29892, 근기 68207-806), 약칭조문(근기법 23), 쟁점어(병가 주말 포함, 허리디스크 산재…)">',
+      '      <input type="search" id="pboxCaseSearchInput" class="pbox-input" aria-label="판례·재결·행정해석·조례 검색" value="' + esc(state.caseQuery) + '" placeholder="사건·회시·조례번호(2020다247190, 근기 68207-694, 법제처 18-0687, 서울특별시조례 제8993호), 약칭조문(근기법 23), 쟁점어(생활임금 조례, 허리디스크 산재…)">',
       '      <button type="button" class="pbox-btn-primary" data-act="run-case-filter">🔍 통합 검색</button>',
-      '      <button type="button" class="pbox-btn-live" data-act="live-collect-cases"' + liveBusyAttr + ' title="대법원·하급심·헌재·중노위·노동부·법제처·산재 공식 API에서 실시간으로 수집합니다 (의뢰인 실명·업체명 등 고유명사는 입력하지 마세요)">' + (state.liveCollectBusy ? '⏳ 전 기관 수집 중…' : '⚡ 전 기관 실시간 수집·검색') + '</button>',
+      '      <button type="button" class="pbox-btn-live" data-act="live-collect-cases"' + liveBusyAttr + ' title="국가법령정보센터 공식 원문(대법원·하급심·헌재·중노위·노동부·법제처 법령해석·자치법규 조례·조례 의견제시·행심위)을 OC 키 없이도 즉시 실시간 수집합니다 (의뢰인 실명·업체명 등 고유명사는 입력하지 마세요)">' + (state.liveCollectBusy ? '⏳ 전 기관 수집 중…' : '⚡ 전 기관 실시간 수집·검색') + '</button>',
       '      <button type="button" class="pbox-btn-sm" data-act="go-view" data-view="ingest">+ 파일·하급심 적재</button>',
       '    </div>',
       '    <div class="pbox-adv-row">',
@@ -2328,7 +2330,7 @@
       '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
       '    <div class="pbox-sec-hd"><span>🏛️ 지방법원 · 행정법원 · 고등법원 하급심 공식 API 자동 수집 (org=400202)</span></div>',
       '    <div class="pbox-info-note">',
-      '      법제처 공동활용 무료 <b>OC 아이디</b>(<code>open.law.go.kr</code> 가입 이메일 앞자리)를 연결하면 <b>지방법원·행정법원·고등법원 하급심 판례(<code>org=400202</code>, 본문 포함 검색)</b>와 <b>근로복지공단 산재 판례</b>를 즉시 당겨와 중복 제거 후 적재합니다.<br>',
+      '      <b>OC 아이디 미입력 상태에서도</b> 국가법령정보센터(<code>law.go.kr</code>) 공식 공개 원문에서 <b>지방법원·행정법원·고등법원 하급심 판례(<code>org=400202</code>)</b>를 즉시 당겨와 비식별·중복 제거 후 적재합니다 (법제처 무료 <b>OC 아이디</b> 등록 시 고속 DRF API 및 근로복지공단 산재 판례 병행 수집).<br>',
       '      수천 건 초기 대량 적재가 필요할 때는 터미널에서 <code class="pbox-inline-code">node scripts/backfill-pbox-lowercourt.js --oc=아이디</code> 를 실행해 생성된 JSON 파일을 아래 수집함에 끌어다 놓으세요.',
       '    </div>',
       '    <div class="pbox-matched-grid" style="margin-bottom:10px">',
@@ -2348,7 +2350,7 @@
                '</select></label>',
       '      <label class="pbox-field"><span class="pbox-label">지정 검색어 (선택 · 입력 시 해당 단어 집중 수집)</span>' +
                '<input type="text" id="pboxLowerQueryInput" class="pbox-input" value="' + esc(state.lowerCustomQuery) + '" placeholder="예: 추간판탈출증, 고라니, 포괄임금"></label>',
-      '      <label class="pbox-field"><span class="pbox-label">법제처 무료 OC 아이디 (서버 미설정 시 사용)</span>' +
+      '      <label class="pbox-field"><span class="pbox-label">법제처 무료 OC 아이디 (선택 · 미입력 시 공식 원문 직접 수집)</span>' +
                '<input type="text" id="pboxLowerLawOcInput" class="pbox-input" value="' + esc(cfg.lawOc || '') + '" placeholder="open.law.go.kr 신청 이메일 앞자리"></label>',
       '    </div>',
       '    <div class="pbox-btn-group">',
@@ -2634,6 +2636,10 @@
 
     if (state.readerKind === 'doc' && state.readerDoc) {
       var d = state.readerDoc;
+      var E = global.PuPBoxEngine;
+      var safeOfficialUrl = (E && typeof E.sanitizeOfficialLawUrlClient === 'function')
+        ? E.sanitizeOfficialLawUrlClient(d.officialUrl)
+        : '';
       rEl.innerHTML = [
         '<div class="pbox-reader-hd">',
         '  <div class="pbox-reader-titlewrap">',
@@ -2641,6 +2647,7 @@
         '    <strong class="pbox-reader-title">' + esc(d.title) + '</strong>',
         '  </div>',
         '  <div class="pbox-btn-group">',
+        (safeOfficialUrl ? '    <a class="pbox-btn-sm" href="' + esc(safeOfficialUrl) + '" target="_blank" rel="noopener noreferrer">🏛️ 법제처 공식원문 ↗</a>' : ''),
         '    <button type="button" class="pbox-btn-sm" data-act="attach-doc" data-id="' + esc(d.id) + '">@ AI 첨부</button>',
         '    <button type="button" class="pbox-btn-sm" data-act="copy-doc-body" data-id="' + esc(d.id) + '">📋 전문복사</button>',
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
@@ -2650,6 +2657,7 @@
         '  <div class="pbox-doc-meta-box">',
         '    <div><b>기관/법원:</b> ' + esc(d.court || d.agency) + '</div>',
         '    <div><b>출처 채널:</b> ' + esc((d.sources || []).join(' · ')) + '</div>',
+        (safeOfficialUrl ? '    <div><b>공식 검증 원문:</b> <a href="' + esc(safeOfficialUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(safeOfficialUrl) + ' ↗</a></div>' : ''),
         ((d.refLaws && d.refLaws.length) ? '<div><b>참조조문:</b> ' + d.refLaws.map(function (rl) {
           var m = /^([가-힣ㆍ\s]+?(?:법률|법))\s*(제\d+조(?:의\d+)?)?/.exec(rl);
           if (m) {
@@ -2762,7 +2770,7 @@
       '    사무실 공유 DB(Supabase Free Tier $0/월)는 보안을 위해 비로그인 익명 접근을 차단하고 <b>푸른 서버 인증 대리인(pboxApi)</b> 또는 <b>직원 인증 JWT</b>로만 읽기·쓰기를 허용합니다.',
       '  </div>',
       '  <div class="pbox-form-stack">',
-      '    <label class="pbox-field"><span class="pbox-label">법제처 국가법령정보 공동활용 OC 아이디 (선택 · 서버 자동수집 연동)</span><input type="text" id="pboxCfgLawOc" class="pbox-input" value="' + esc(cfg.lawOc) + '" placeholder="open.law.go.kr 신청 이메일 앞자리 ID"></label>',
+      '    <label class="pbox-field"><span class="pbox-label">법제처 국가법령정보 공동활용 OC 아이디 (선택 · 미입력 시에도 국가법령정보센터 공식 원문 직접 수집 즉시 작동)</span><input type="text" id="pboxCfgLawOc" class="pbox-input" value="' + esc(cfg.lawOc) + '" placeholder="open.law.go.kr 신청 이메일 앞자리 ID"></label>',
       '    <label class="pbox-field"><span class="pbox-label">Supabase HTTPS Project URL (선택 · 직접 조회 시)</span><input type="url" id="pboxCfgSupaUrl" class="pbox-input" value="' + esc(cfg.supabaseUrl) + '" placeholder="https://xxxxxxxxxxxx.supabase.co"></label>',
       '    <label class="pbox-field"><span class="pbox-label">Supabase 직원 인증 JWT (선택 · 현재 로그인 세션 메모리에만 보관되며 로그아웃 시 자동 파기)</span><input type="password" id="pboxCfgSupaKey" class="pbox-input" value="' + esc(cfg.supabaseStaffJwt) + '" placeholder="인증된 직원 세션 JWT (localStorage 영구 저장 안 함)"></label>',
       '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgAutoBoot" aria-label="앱을 열 때 법령 개정 및 수집 변경분 자동 점검"' + (cfg.autoSyncOnBoot ? ' checked' : '') + '> 앱을 열 때 법령 개정·수집 변경분 자동 점검</label>',
