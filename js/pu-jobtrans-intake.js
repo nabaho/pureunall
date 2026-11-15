@@ -66,10 +66,14 @@
   }
   function normCorpName(v) {
     return str(v).normalize('NFC')
+      .replace(/\(\s*구[\s.:：]+[^)]*\)/g, '')
       .replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|사단법인|\(재\)|재단법인|농업회사법인/g, '')
       .replace(/\s+/g, '')
       .replace(/[.,·・\-–—_'"()\[\]]/g, '')
       .toLowerCase();
+  }
+  function normCorpPhonetic(v) {
+    return normCorpName(v).replace(/렌/g, '랜').replace(/앤/g, '엔').replace(/씨/g, '시').replace(/쎄/g, '세');
   }
   function rowsOf(v) {
     var x = v && typeof v === 'object' && !Array.isArray(v) && v.v !== undefined ? v.v : v;
@@ -242,6 +246,7 @@
       companyId: coId,
       companyName: str(p.companyName),
       normName: normCorpName(p.companyName),
+      phoneticName: normCorpPhonetic(p.companyName),
       addrs: addrs,
       domains: domains,
       hasAddr: Object.keys(addrs).length > 0 || Object.keys(domains).length > 0
@@ -249,7 +254,21 @@
   }
 
   var POST_SIGNAL_RE = /중간보고\s*(?:피드백|검토|이후|수정의견|보완)|최종보고|결과보고|완료계|완료보고서|상생\s*협약|고용안정\s*협약|전환\s*배치안|신구\s*대조|장려금\s*신청|정책\s*매니저|만족도\s*조사/i;
-  var JOBTRANS_SIGNAL_RE = /산업\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|능률협회|kmac|충남경제진흥원|충경진|cepa|석탄화력|미래차|진단\s*컨설팅|전문\s*컨설팅|완료계|수행계획|중간보고|최종보고|결과보고|재무제표|취업규칙|인력현황|조직도|설문/i;
+  var EXPLICIT_JOBTRANS_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제\s*진흥원|충경진|cepa|석탄\s*화력|정의로운\s*전환|산일\s*충남|산일\s*능률/i;
+  var DOC_SIGNAL_RE = /재무제표|손익계산서|취업규칙|인력\s*현황|인력\s*명부|조직도|임금\s*대장|근로\s*계약|사업자\s*등록증|설문|인식\s*수준|완료계|수행\s*계획|중간\s*보고|최종\s*보고|결과\s*보고|상생\s*협약|고용안정\s*협약|전환\s*배치|직무\s*기술서|수행\s*일지/i;
+  var JOBTRANS_SIGNAL_RE = EXPLICIT_JOBTRANS_RE;
+  var NON_JOBTRANS_FOLDER_RE = /자문사|급여|사무대행|체불|체당금|산재|산안|공공기관|노무사회|근로복지기금|자율점검|이음센터|세금계산서|경조사|뉴스레터|개인메일|국민건강|기타광고|명함|소셜|쇼핑|이력서|청구서|일터\s*혁신|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|상공회의소|비지니스\s*지원단|비즈니스\s*지원단|출산\s*육아|휴지통|스팸|trash|spam|junk|draft/i;
+  var CUSTOM_CONSULTING_FOLDER_RE = /컨설팅|정부\s*사업|산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제|충경진|cepa|계약\s*서류/i;
+  var NON_JOBTRANS_MAIL_RE = /징계\s*(?:위원회|처분|검토|자문|양정)|해고\s*(?:검토|예고|통보|자문)|부당\s*해고|노동\s*위원회|임금\s*체불|체당금|산재\s*(?:신청|보상|승인)|실업\s*급여|육아\s*휴직\s*자문|자문\s*의견서|법률\s*자문|자문료\s*청구|급여\s*대장\s*송부|월분\s*급여|4대\s*보험\s*(?:고지|신고|상실|취득)|원천징수\s*이행|전자\s*세금\s*계산서|세금\s*계산서|청구서\s*발송|일터\s*혁신|기술\s*보호|현장\s*클리닉|비즈니스\s*지원단|비지니스\s*지원단|혁신\s*바우처|비정규직\s*고용|안전\s*보건\s*컨설팅|공공\s*기관\s*컨설팅|상공\s*회의소\s*컨설팅|근로자\s*이음/i;
+
+  function isJobtransMailFolder(folderObj, slug) {
+    var f = folderObj;
+    if (!f || typeof f !== 'object' || f.nomsg || BOX_KINDS.indexOf(f.kind) < 0) return false;
+    var label = str(f.name || f.title || f.path || '') + ' ' + str(slug);
+    if (NON_JOBTRANS_FOLDER_RE.test(label)) return false;
+    if (f.kind === 'custom' && !CUSTOM_CONSULTING_FOLDER_RE.test(label)) return false;
+    return true;
+  }
 
   function classifyDocKind(subject, attNames, bodyPreview) {
     var hay = (str(subject) + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : str(attNames)) + ' ' + str(bodyPreview)).toLowerCase();
@@ -287,10 +306,11 @@
     if (!folders || typeof folders !== 'object' || !msgs || typeof msgs !== 'object') return out;
     Object.keys(folders).forEach(function (slug) {
       var f = folders[slug];
-      if (!f || typeof f !== 'object' || f.nomsg || BOX_KINDS.indexOf(f.kind) < 0) return;
+      if (!isJobtransMailFolder(f, slug)) return;
       var box = msgs[slug];
       if (!box || (typeof box !== 'object' && !Array.isArray(box))) return;
       var isSent = f.kind === 'sent';
+      var isDedicatedFolder = f.kind === 'custom' && CUSTOM_CONSULTING_FOLDER_RE.test(str(f.name || f.title || '') + ' ' + str(slug));
       Object.keys(box).forEach(function (uid) {
         if (!/^[0-9]{1,12}$/.test(uid)) return;
         var r = box[uid];
@@ -303,6 +323,8 @@
           key: 'i:' + slug + ':' + uid,
           slug: slug,
           uid: String(uid),
+          folderKind: f.kind,
+          dedicatedConsultingFolder: isDedicatedFolder,
           dir: isSent ? 'out' : 'in',
           from: fromAddr,
           fromLabel: str(r.f) || fromAddr,
@@ -334,6 +356,11 @@
     var matched = [], nameCandidates = [], seenKeys = {};
     flat.forEach(function (m) {
       if (!m || seenKeys[m.key]) return;
+      var combined = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
+      var hasExplicitJt = EXPLICIT_JOBTRANS_RE.test(combined);
+      /* 타 컨설팅(일터혁신·기술보호 등)·일반자문(징계·해고·산재)·세금계산서는 '최종보고서' 등 공통 문서명이 붙어도 명시적 산업일자리 표지가 없으면 무조건 차단 */
+      if (NON_JOBTRANS_MAIL_RE.test(combined) && !hasExplicitJt) return;
+
       var peerAddrs = m.dir === 'out' ? m.to : [m.from];
       var addrHit = peerAddrs.some(function (em) {
         if (!em) return false;
@@ -346,26 +373,43 @@
       var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
       var linkedRec = existingByMailKey[m.key] || null;
       var checked = !!(linkedRec && linkedRec.checkedAt);
+      var hasDocSignal = hasExplicitJt || DOC_SIGNAL_RE.test(combined) || !!m.dedicatedConsultingFolder || !!linkedRec;
 
       if (addrHit) {
         seenKeys[m.key] = 1;
-        matched.push(Object.assign({}, m, {
-          matchKind: 'addr',
-          docKind: dk.code,
-          docKindName: dk.short,
-          track: dk.track,
-          phase: linkedRec && linkedRec.phase ? linkedRec.phase : phase,
-          intakeId: linkedRec ? linkedRec.id : '',
-          checked: checked,
-          analyzed: !!(linkedRec && linkedRec.analyzedAt)
-        }));
+        if (hasDocSignal) {
+          matched.push(Object.assign({}, m, {
+            matchKind: 'addr',
+            docKind: dk.code,
+            docKindName: dk.short,
+            track: dk.track,
+            phase: linkedRec && linkedRec.phase ? linkedRec.phase : phase,
+            intakeId: linkedRec ? linkedRec.id : '',
+            checked: checked,
+            analyzed: !!(linkedRec && linkedRec.analyzedAt)
+          }));
+        } else {
+          /* 발신 주소는 일치하나 컨설팅·기초자료 신호가 없는 일반 메일은 자동 확정하지 않고 수동 확인 후보로만 분리 */
+          nameCandidates.push(Object.assign({}, m, {
+            matchKind: 'addr_ambiguous',
+            docKind: dk.code,
+            docKindName: dk.short,
+            track: dk.track,
+            phase: phase,
+            intakeId: '',
+            checked: false,
+            analyzed: false
+          }));
+        }
         return;
       }
 
       if (prof.normName.length >= 2) {
-        var combined = m.subject + ' ' + m.attNames.join(' ');
         var normSubj = normCorpName(combined);
-        if (normSubj.indexOf(prof.normName) >= 0 && JOBTRANS_SIGNAL_RE.test(combined)) {
+        var phonSubj = normCorpPhonetic(combined);
+        var nameHit = normSubj.indexOf(prof.normName) >= 0
+          || (prof.phoneticName.length >= 2 && phonSubj.indexOf(prof.phoneticName) >= 0);
+        if (nameHit && hasExplicitJt) {
           seenKeys[m.key] = 1;
           nameCandidates.push(Object.assign({}, m, {
             matchKind: 'name_candidate',
@@ -395,6 +439,746 @@
       unseenPreCount: unseenPre,
       unseenPostCount: unseenPost,
       totalInCount: matched.filter(function (m) { return m.dir === 'in'; }).length
+    };
+  }
+
+  /* ══ 2-B. ERP·일정 산업일자리전환 후보 발견 & 로컬 컨설팅업체 폴더 선택 연결 엔진 ══ */
+  var JOBTRANS_BIZ_STRICT_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|산일\s*충남|산일\s*능률|석탄\s*화력|정의로운\s*전환/i;
+  var NON_JOBTRANS_BIZ_RE = /일터\s*혁신|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|안전\s*보건|공공\s*기관|상공\s*회의소|비즈니스\s*지원단|비지니스\s*지원단|근로자\s*이음/i;
+
+  var SHA256_K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+
+  function utf8BytesOf(input) {
+    var s = String(input == null ? '' : input);
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s);
+    var out = [];
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+      else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+        var c2 = s.charCodeAt(++i);
+        var u = 0x10000 + (((c & 0x3ff) << 10) | (c2 & 0x3ff));
+        out.push(0xf0 | (u >> 18), 0x80 | ((u >> 12) & 0x3f), 0x80 | ((u >> 6) & 0x3f), 0x80 | (u & 0x3f));
+      } else {
+        out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  function rotr32(x, n) { return (x >>> n) | (x << (32 - n)); }
+
+  function sha256Hex(input) {
+    var msg = utf8BytesOf(input);
+    var len = msg.length;
+    var padLen = (((len + 9 + 63) >> 6) << 6);
+    var buf = new Uint8Array(padLen);
+    buf.set(msg, 0);
+    buf[len] = 0x80;
+    var bitHi = Math.floor((len * 8) / 4294967296) >>> 0;
+    var bitLo = (len * 8) >>> 0;
+    buf[padLen - 8] = (bitHi >>> 24) & 0xff;
+    buf[padLen - 7] = (bitHi >>> 16) & 0xff;
+    buf[padLen - 6] = (bitHi >>> 8) & 0xff;
+    buf[padLen - 5] = bitHi & 0xff;
+    buf[padLen - 4] = (bitLo >>> 24) & 0xff;
+    buf[padLen - 3] = (bitLo >>> 16) & 0xff;
+    buf[padLen - 2] = (bitLo >>> 8) & 0xff;
+    buf[padLen - 1] = bitLo & 0xff;
+
+    var H0 = 0x6a09e667, H1 = 0xbb67ae85, H2 = 0x3c6ef372, H3 = 0xa54ff53a;
+    var H4 = 0x510e527f, H5 = 0x9b05688c, H6 = 0x1f83d9ab, H7 = 0x5be0cd19;
+    var W = new Int32Array(64);
+
+    for (var off = 0; off < padLen; off += 64) {
+      for (var i = 0; i < 16; i++) {
+        var j = off + (i << 2);
+        W[i] = (buf[j] << 24) | (buf[j + 1] << 16) | (buf[j + 2] << 8) | buf[j + 3];
+      }
+      for (var t = 16; t < 64; t++) {
+        var s0 = rotr32(W[t - 15], 7) ^ rotr32(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+        var s1 = rotr32(W[t - 2], 17) ^ rotr32(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+        W[t] = (W[t - 16] + s0 + W[t - 7] + s1) | 0;
+      }
+      var a = H0, b = H1, c = H2, d = H3, e = H4, f = H5, g = H6, h = H7;
+      for (var r = 0; r < 64; r++) {
+        var S1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
+        var ch = (e & f) ^ ((~e) & g);
+        var t1 = (h + S1 + ch + SHA256_K[r] + W[r]) | 0;
+        var S0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
+        var maj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = (S0 + maj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0;
+        d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H0 = (H0 + a) | 0; H1 = (H1 + b) | 0; H2 = (H2 + c) | 0; H3 = (H3 + d) | 0;
+      H4 = (H4 + e) | 0; H5 = (H5 + f) | 0; H6 = (H6 + g) | 0; H7 = (H7 + h) | 0;
+    }
+
+    return [H0, H1, H2, H3, H4, H5, H6, H7].map(function (v) {
+      return ('00000000' + (v >>> 0).toString(16)).slice(-8);
+    }).join('');
+  }
+
+  function safeIdPart(v) {
+    var raw = str(v);
+    if (!raw) return 'id';
+    if (!/[.#$\/\[\]\s]/.test(raw) && raw.length <= 120) return raw;
+    var cleaned = raw.replace(/[.#$\/\[\]\s]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    return (cleaned ? cleaned + '_' : 'id_') + sha256Hex(raw);
+  }
+
+  function firstEmailFrom(obj) {
+    if (!obj || typeof obj !== 'object') return '';
+    var addrs = Object.keys(collectAddrsFromObj(obj)).filter(function (e) { return !OWN_MAIL_RE.test(e); });
+    return addrs.length ? addrs[0] : '';
+  }
+
+  function formatBizNo(raw) {
+    var d = str(raw).replace(/\D/g, '');
+    if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5);
+    return str(raw);
+  }
+
+  function discoverJobtransCandidates(input) {
+    var opts = input && typeof input === 'object' ? input : {};
+    var coList = rowsOf(opts.companies);
+    var consList = rowsOf(opts.consultings);
+    var bizTypes = rowsOf(opts.bizTypes);
+    var scalCos = rowsOf(opts.scalCos);
+    var scalTypes = rowsOf(opts.scalTypes);
+    var scalScheds = rowsOf(opts.scalScheds);
+    var regProjs = rowsOf(opts.registeredProjects).filter(function (p) { return p && !p._deleted; });
+
+    var coById = {}, coByBiz = {};
+    coList.forEach(function (c) {
+      var cid = str(c.id);
+      if (cid) coById[cid] = c;
+      var bd = str(c.bizNo).replace(/\D/g, '');
+      if (bd.length === 10 && !coByBiz[bd]) coByBiz[bd] = c;
+    });
+
+    var bizTypeMap = {};
+    bizTypes.forEach(function (bt) {
+      var label = [str(bt.name || bt.title), str(bt.agency), str(bt.short)].filter(Boolean).join(' ');
+      if (bt.id) bizTypeMap[str(bt.id)] = label;
+      if (bt.code) bizTypeMap[str(bt.code)] = label;
+    });
+
+    var scalTypeMap = {};
+    scalTypes.forEach(function (t) {
+      if (t && t.id) scalTypeMap[str(t.id)] = str(t.name || t.title);
+    });
+
+    var scalByErpId = {}, scalByCoId = {}, scalByBiz = {};
+    scalCos.forEach(function (sc) {
+      if (!sc || sc.deleted || sc._deleted) return;
+      if (sc.erpId) scalByErpId[str(sc.erpId)] = sc;
+      var refCo = str(sc.erpCompanyId || sc.co_id);
+      if (refCo && !scalByCoId[refCo]) scalByCoId[refCo] = sc;
+      var sbd = str(sc.bizNo || (refCo && coById[refCo] && coById[refCo].bizNo)).replace(/\D/g, '');
+      if (sbd.length === 10 && !scalByBiz[sbd]) scalByBiz[sbd] = sc;
+    });
+
+    var regCoIds = {}, regBiz = {}, regConsIds = {}, regScalIds = {};
+    regProjs.forEach(function (p) {
+      if (p.companyId) regCoIds[str(p.companyId)] = 1;
+      var pbd = str(p.bizNo).replace(/\D/g, '');
+      if (pbd.length === 10) {
+        regBiz[pbd] = 1;
+        regCoIds['biz:' + pbd] = 1;
+      }
+      if (p.consultingId) regConsIds[str(p.consultingId)] = 1;
+      if (p.scalCoId) regScalIds[str(p.scalCoId)] = 1;
+    });
+
+    function pickJobtransScalType(sc) {
+      if (!sc) return '';
+      var tIds = [];
+      if (Array.isArray(sc.types)) tIds = tIds.concat(sc.types.map(str));
+      if (sc.typeId) tIds.push(str(sc.typeId));
+      for (var i = 0; i < tIds.length; i++) {
+        var tid = tIds[i];
+        var tName = scalTypeMap[tid] || '';
+        if (JOBTRANS_BIZ_STRICT_RE.test(tName) && !NON_JOBTRANS_BIZ_RE.test(tName)) return tid;
+      }
+      return '';
+    }
+
+    var out = [], seenCo = {}, seenScal = {}, seenBizYearAg = {};
+
+    consList.forEach(function (cs) {
+      if (!cs || cs._deleted || cs.deleted) return;
+      if (/취소|포기|무산|해지/.test(str(cs.status))) return;
+      var tKey = str(cs.typeCode || cs.bizTypeId);
+      var primaryLabel = [
+        str(cs.consultingType),
+        str(cs.bizName),
+        str(cs.typeName),
+        str(bizTypeMap[tKey] || ''),
+        str(cs.no)
+      ].filter(Boolean).join(' ');
+      var checkText = primaryLabel || str(cs.memo);
+      if (!JOBTRANS_BIZ_STRICT_RE.test(checkText)) return;
+      if (primaryLabel && !JOBTRANS_BIZ_STRICT_RE.test(primaryLabel) && NON_JOBTRANS_BIZ_RE.test(primaryLabel)) return;
+      if (cs.id && regConsIds[str(cs.id)]) return;
+
+      var coObj = (cs.company && typeof cs.company === 'object') ? cs.company : {};
+      var rawCoId = str(cs.companyId || coObj.id);
+      var initCoRec = rawCoId ? coById[rawCoId] : null;
+      var bizDigits = str(cs.bizNo || coObj.bizNo || (initCoRec && initCoRec.bizNo)).replace(/\D/g, '');
+      var linkedSc = (cs.id && scalByErpId[str(cs.id)])
+        || (rawCoId && scalByCoId[rawCoId])
+        || (bizDigits.length === 10 && scalByBiz[bizDigits])
+        || null;
+      if (!rawCoId && linkedSc) rawCoId = str(linkedSc.erpCompanyId || linkedSc.co_id);
+      if (bizDigits.length !== 10 && linkedSc) bizDigits = str(linkedSc.bizNo).replace(/\D/g, '');
+      var coRec = (rawCoId && coById[rawCoId]) || (bizDigits.length === 10 && coByBiz[bizDigits]) || null;
+      if (bizDigits.length !== 10 && coRec) bizDigits = str(coRec.bizNo).replace(/\D/g, '');
+      if (!linkedSc && coRec && scalByCoId[str(coRec.id)]) linkedSc = scalByCoId[str(coRec.id)];
+
+      var resolvedCoId = coRec ? str(coRec.id) : (rawCoId || (bizDigits.length === 10 ? ('biz:' + bizDigits) : ''));
+      if (!resolvedCoId) return;
+
+      var yearStr = String(cs.year || cs.startDate || cs.contractDate || '2026');
+      var yearMatch = /(202[4-9])/.exec(yearStr) || /(202[4-9])/.exec(str(cs.no));
+      var yr = yearMatch ? Number(yearMatch[1]) : 2026;
+      var inferred = Cat.inferAgencyAndTrack(checkText + ' ' + str((coRec && (coRec.addr || coRec.address)) || cs.addr || ''));
+      var coName = str((coRec && coRec.name) || cs.companyName || coObj.name || (linkedSc && linkedSc.name) || '사업장');
+      var bizYearAgKey = bizDigits.length === 10 ? (bizDigits + ':' + yr + ':' + inferred.agency) : '';
+
+      if (regCoIds[resolvedCoId] || (bizDigits.length === 10 && regBiz[bizDigits])) return;
+      if (linkedSc && linkedSc.id && regScalIds[str(linkedSc.id)]) return;
+      var dedupKey = resolvedCoId + ':' + yr + ':' + inferred.agency;
+      if (seenCo[dedupKey] || (bizYearAgKey && seenBizYearAg[bizYearAgKey])) return;
+      seenCo[dedupKey] = 1;
+      if (bizYearAgKey) seenBizYearAg[bizYearAgKey] = 1;
+      if (linkedSc && linkedSc.id) seenScal[str(linkedSc.id)] = 1;
+
+      var jtScalTid = pickJobtransScalType(linkedSc);
+      out.push({
+        candKey: 'erp_' + safeIdPart(cs.id || resolvedCoId),
+        source: '푸른이알피 계약확정',
+        bizLabel: str(cs.consultingType || cs.bizName || cs.typeName || bizTypeMap[tKey] || '산업·일자리전환'),
+        agency: inferred.agency,
+        track: inferred.track,
+        companyId: resolvedCoId,
+        companyName: coName,
+        bizNo: formatBizNo((coRec && coRec.bizNo) || cs.bizNo || (linkedSc && linkedSc.bizNo)),
+        industry: str((coRec && (coRec.bizType || coRec.bizCategory)) || cs.industry || ''),
+        contactEmail: firstEmailFrom(coRec) || firstEmailFrom(cs) || firstEmailFrom(linkedSc),
+        year: yr,
+        consultingId: str(cs.id || ''),
+        scalCoId: linkedSc ? str(linkedSc.id || '') : '',
+        scalTypeId: jtScalTid
+      });
+    });
+
+    scalCos.forEach(function (sc) {
+      if (!sc || !sc.id || sc.deleted || sc._deleted) return;
+      var scId = str(sc.id);
+      if (seenScal[scId] || regScalIds[scId]) return;
+
+      var jtTypeId = pickJobtransScalType(sc);
+      var explicitBizName = str(sc.bizName || '');
+      var hasExplicitNonJtType = (Array.isArray(sc.types) && sc.types.length > 0 && !jtTypeId)
+        || (sc.typeId && !jtTypeId && NON_JOBTRANS_BIZ_RE.test(scalTypeMap[str(sc.typeId)] || ''));
+      var hasJtSched = !hasExplicitNonJtType && scalScheds.some(function (s) {
+        if (!s || s._deleted || s.deleted) return false;
+        var sCo = str(s.coId || s.co_id);
+        var sTid = str(s.typeId || s.type);
+        return sCo === scId && JOBTRANS_BIZ_STRICT_RE.test(scalTypeMap[sTid] || '');
+      });
+      var labelText = (jtTypeId && scalTypeMap[jtTypeId]) || explicitBizName;
+      if (!jtTypeId && !JOBTRANS_BIZ_STRICT_RE.test(explicitBizName) && !hasJtSched) return;
+      if (NON_JOBTRANS_BIZ_RE.test(labelText) && !JOBTRANS_BIZ_STRICT_RE.test(labelText)) return;
+
+      var rawCoId = str(sc.erpCompanyId || sc.co_id);
+      var initScCo = rawCoId ? coById[rawCoId] : null;
+      var bizDigits = str(sc.bizNo || (initScCo && initScCo.bizNo)).replace(/\D/g, '');
+      var coRec = initScCo || (bizDigits.length === 10 && coByBiz[bizDigits]) || null;
+      if (bizDigits.length !== 10 && coRec) bizDigits = str(coRec.bizNo).replace(/\D/g, '');
+      var resolvedCoId = coRec ? str(coRec.id) : (rawCoId || (bizDigits.length === 10 ? ('biz:' + bizDigits) : ''));
+      if (!resolvedCoId) return;
+
+      var yrMatch = /(202[4-9])/.exec(String(sc.year || sc.createdAt || '2026'));
+      var yr = yrMatch ? Number(yrMatch[1]) : 2026;
+      var inferred = Cat.inferAgencyAndTrack(labelText + ' ' + str(sc.memo || (coRec && coRec.addr) || ''));
+      var coName = str((coRec && coRec.name) || sc.name || '사업장');
+      var bizYearAgKey = bizDigits.length === 10 ? (bizDigits + ':' + yr + ':' + inferred.agency) : '';
+      var dedupKey = resolvedCoId + ':' + yr + ':' + inferred.agency;
+
+      if (regCoIds[resolvedCoId] || (bizDigits.length === 10 && regBiz[bizDigits]) || seenCo[dedupKey] || (bizYearAgKey && seenBizYearAg[bizYearAgKey])) return;
+      seenCo[dedupKey] = 1;
+      if (bizYearAgKey) seenBizYearAg[bizYearAgKey] = 1;
+
+      out.push({
+        candKey: 'scal_' + safeIdPart(scId + '_' + resolvedCoId),
+        source: '정부사업일정',
+        bizLabel: labelText || '산업·일자리전환',
+        agency: inferred.agency,
+        track: inferred.track,
+        companyId: resolvedCoId,
+        companyName: coName,
+        bizNo: formatBizNo((coRec && coRec.bizNo) || sc.bizNo),
+        industry: str(coRec && (coRec.bizType || coRec.bizCategory)),
+        contactEmail: firstEmailFrom(coRec) || firstEmailFrom(sc),
+        year: yr,
+        consultingId: str(sc.erpId || ''),
+        scalCoId: scId,
+        scalTypeId: jtTypeId || str(sc.typeId || '')
+      });
+    });
+
+    return out;
+  }
+
+  /* ── 로컬 컨설팅업체 폴더 선택적 진입 · 필터 · 사업장 그룹화 엔진 ── */
+  var JOBTRANS_DIR_ALLOW_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신/i;
+  var JOBTRANS_DIR_PROBE_RE = /^컨설팅\s*업체$|^_?메일함[_\s]*양식$/i;
+  var NON_JOBTRANS_DIR_BLOCK_RE = /^(?:[012356789]\s*[.)\s]\s*)?(?:일터\s*혁신|공공\s*기관|상공\s*회의소|비지니스\s*지원단|비즈니스\s*지원단|기술\s*보호|근로자\s*이음|이음\s*센터|혁신\s*바우처|비정규직|안전\s*보건|현장\s*클리닉|자문\s*계약|급여|사무\s*대행)/i;
+  var JOBTRANS_SUBDIR_SKIP_RE = /^(?:\.git|node_modules|__MACOSX)$|비용\s*신청\s*서류|정산\s*필요\s*서류|^\d*\s*[._)]*\s*서약서$|컨설턴트\s*등록\s*관련/i;
+  var PERSONAL_SETTLEMENT_FILE_RE = /^(?:~\$|\._|desktop\.ini$|thumbs\.db$)|\.(?:tmp|bak|lnk)$|신분증|주민등록증|운전면허증|개인\s*통장|통장\s*사본|원천세\s*구분|윤리\s*경영\s*실천\s*서약|보안\s*서약서|^연락처\.xlsx$/i;
+  var SUPPORTED_JT_FILE_EXT_RE = /\.(?:xlsx|xls|csv|hwpx|hwp|docx|doc|pdf|pptx|ppt|txt|zip|jpg|jpeg|png|webp)$/i;
+
+  var CONTAINER_SEG_RE = /컨설팅\s*업체|_?메일함[_\s]*양식|구조\s*혁신\s*(?:지원\s*)?사업|구조\s*혁신\s*컨설팅|경제\s*진흥원\s*구조\s*혁신|산업\s*[·ㆍ.]?\s*일자리\s*(?:전환)?\s*(?:컨설팅|통합\s*정리)|정책\s*매니저.*(?:교육|매뉴얼|배포)|수행\s*사업장|진행\s*사업장|신청\s*사업장|수행\s*컨설팅|능률\s*협회|충남\s*경제\s*진흥원|^구조\s*혁신$/i;
+  var COMMON_GUIDE_SEG_RE = /^0+\s*[._)\-]|보고서\s*양식|표준\s*결과\s*보고서|간담회\s*자료|지원\s*센터\s*관련|지원금\s*안내|기초\s*자료\s*전달|구조\s*혁신\s*자료|교육\s*자료|공지|기타[_\s]*일반|공통\s*양식|총괄\s*정리|참고\s*서류|참고\s*자료|배포\s*자료|정부\s*지원\s*제도\s*안내|전문\s*분야\s*코드|양식\s*배부|서식/i;
+
+  function inspectConsultingSubdir(dirName, insideJobtransTree) {
+    var name = str(dirName).normalize('NFC');
+    if (!name || JOBTRANS_SUBDIR_SKIP_RE.test(name)) {
+      return { enter: false, nextInside: false };
+    }
+    if (NON_JOBTRANS_DIR_BLOCK_RE.test(name) && !JOBTRANS_DIR_ALLOW_RE.test(name)) {
+      return { enter: false, nextInside: false };
+    }
+    if (insideJobtransTree) {
+      return { enter: true, nextInside: true };
+    }
+    if (JOBTRANS_DIR_ALLOW_RE.test(name)) {
+      return { enter: true, nextInside: true };
+    }
+    if (JOBTRANS_DIR_PROBE_RE.test(name)) {
+      return { enter: true, nextInside: false };
+    }
+    return { enter: false, nextInside: false };
+  }
+
+  function splitRelPath(rawPath) {
+    return str(rawPath).normalize('NFC').replace(/\\/g, '/').split('/').map(str).filter(Boolean);
+  }
+
+  function filterJobtransFolderEntries(entries, rootDirName) {
+    var list = Array.isArray(entries) ? entries : [];
+    var rootName = str(rootDirName).normalize('NFC');
+    var startInside = rootName ? JOBTRANS_DIR_ALLOW_RE.test(rootName) : false;
+    var accepted = [];
+    var skippedNonJobtrans = 0;
+    var skippedPersonal = 0;
+
+    list.forEach(function (item) {
+      if (!item) return;
+      var rawRel = str(item.relPath || item.webkitRelativePath || item.path || item.name);
+      var segs = splitRelPath(rawRel);
+      if (!segs.length) return;
+      var fileName = segs[segs.length - 1];
+      var dirSegs = segs.slice(0, -1);
+
+      var inside = startInside;
+      var blockedDir = false;
+      var blockedPersonalDir = false;
+      for (var i = 0; i < dirSegs.length; i++) {
+        if (i === 0 && rootName && dirSegs[0] === rootName) {
+          if (JOBTRANS_DIR_ALLOW_RE.test(rootName)) inside = true;
+          continue;
+        }
+        if (JOBTRANS_SUBDIR_SKIP_RE.test(dirSegs[i])) {
+          blockedDir = true;
+          blockedPersonalDir = true;
+          break;
+        }
+        var step = inspectConsultingSubdir(dirSegs[i], inside);
+        if (!step.enter) {
+          blockedDir = true;
+          break;
+        }
+        inside = step.nextInside;
+      }
+
+      if (blockedPersonalDir) {
+        skippedPersonal++;
+        return;
+      }
+      if (blockedDir || !inside) {
+        skippedNonJobtrans++;
+        return;
+      }
+      if (!SUPPORTED_JT_FILE_EXT_RE.test(fileName)) return;
+      if (PERSONAL_SETTLEMENT_FILE_RE.test(fileName)) {
+        skippedPersonal++;
+        return;
+      }
+      if (NON_JOBTRANS_MAIL_RE.test(fileName) && !JOBTRANS_SIGNAL_RE.test(fileName)) {
+        skippedNonJobtrans++;
+        return;
+      }
+
+      accepted.push({
+        relPath: segs.join('/'),
+        fileName: fileName,
+        dirSegs: dirSegs,
+        size: Number(item.size || (item.file && item.file.size) || 0),
+        lastModified: Number(item.lastModified || (item.file && item.file.lastModified) || 0),
+        file: item.file || (typeof File !== 'undefined' && item instanceof File ? item : null),
+        handle: item.handle || null
+      });
+    });
+
+    return {
+      accepted: accepted,
+      skippedNonJobtrans: skippedNonJobtrans,
+      skippedPersonal: skippedPersonal
+    };
+  }
+
+  function isContainerDirSegment(seg) {
+    var s = str(seg).normalize('NFC');
+    if (!s) return true;
+    s = maskPiiStrict(s, []).text.split(GARIM).join('').trim();
+    if (!s) return true;
+    if (/^(?:202\d\s*년?|\d{6})$/.test(s)) return true;
+    if (/^[-_•]?\s*[가-힣]{2,4}\s*노무사$/.test(s)) return true;
+    if (/구조\s*혁신\s*\([가-힣]{2,4}\)/.test(s)) return true;
+    if (/^컨설팅\s*업체$|^_?메일함[_\s]*양식$/i.test(s)) return true;
+    if (/정책\s*매니저.*(?:교육|매뉴얼|배포)/i.test(s)) return true;
+    if (CONTAINER_SEG_RE.test(s) || JOBTRANS_DIR_ALLOW_RE.test(s)) {
+      var rest = s
+        .replace(/^\d{1,2}\s*[._)\-]\s*/, '')
+        .replace(/202\d\s*년?(?:\s*[-~_]\s*202\d\s*년?)?/g, '')
+        .replace(/산업\s*[·ㆍ.]?\s*일자리\s*(?:전환)?|일자리\s*전환|노동\s*전환|구조\s*혁신|지원\s*사업|사업|컨설팅|통합\s*정리|전체|수행\s*사업장|진행\s*사업장|신청\s*사업장|수행|진행|충남\s*경제\s*진흥원|경제\s*진흥원|충경진|충남|한국\s*능률\s*협회|능률\s*협회|kmac|cepa/gi, '')
+        .replace(/[\s_.\-()\[\]·ㆍ,]+/g, '');
+      return rest.length === 0;
+    }
+    return false;
+  }
+
+  function extractBizDigitsFromText(text) {
+    var s = str(text);
+    if (!s) return [];
+    var out = {};
+    var hyph = s.match(/(?<!\d)\d{3}-\d{2}-\d{5}(?!\d)/g) || [];
+    hyph.forEach(function (m) {
+      var d = m.replace(/\D/g, '');
+      if (d.length === 10) out[d] = 1;
+    });
+    var cont = s.match(/(?<!\d)[1-9]\d{2}(?:0[1-9]|[1-9]\d)\d{5}(?!\d)/g) || [];
+    cont.forEach(function (d) {
+      if (/^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[01]\d|2[0-3])$/.test(d)) return;
+      out[d] = 1;
+    });
+    return Object.keys(out);
+  }
+
+  function cleanWorkplaceSegmentName(seg) {
+    var s = str(seg).normalize('NFC')
+      .replace(/^\d{1,2}\s*[._)\-]\s*/, '')
+      .replace(/^202[4-9]\s*년?\s*[._\-]?\s*/, '')
+      .replace(/[\s_]*(?:\d{3}-\d{2}-\d{5}|(?!(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[01]\d|2[0-3]))[1-9]\d{2}(?:0[1-9]|[1-9]\d)\d{5})\s*$/, '')
+      .replace(/\s+(?:중간|최종|결과)?\s*보고서$/i, '')
+      .replace(/[\s_]*\((?:산업\s*[·ㆍ.]?\s*일자리(?:\s*전환)?(?:\s*컨설팅)?|일자리\s*전환(?:\s*컨설팅)?|노동\s*전환(?:\s*컨설팅)?|구조\s*혁신(?:\s*컨설팅)?|진단\s*컨설팅|전문\s*컨설팅)\)\s*$/i, '')
+      .replace(/_(?:진단\s*컨설팅|전문\s*컨설팅|산업\s*[·ㆍ.]?\s*일자리(?:\s*전환)?|일자리\s*전환|노동\s*전환|구조\s*혁신)(?:\s*컨설팅)?$/i, '');
+    s = maskPiiStrict(s, []).text.split(GARIM).join('')
+      .replace(/[\s_\-]{2,}/g, ' ')
+      .replace(/^[\s_\-,·]+|[\s_\-,·]+$/g, '')
+      .trim();
+    return s;
+  }
+
+  function baseWorkplacePhoneticKey(name) {
+    var stripped = cleanWorkplaceSegmentName(name)
+      .replace(/\((?:당진|태안|보령|서산|아산|천안|예산|홍성|공주|논산|본사|공장|사업소|석탄\s*화력|진단|전문|[가-힣]{2}\s*[,·]\s*[가-힣]{2})\)$/g, '')
+      .trim();
+    return normCorpPhonetic(stripped || name);
+  }
+
+  function deterministicFolderKey(year, agency, seed) {
+    var digest = sha256Hex(String(year) + '\0' + String(agency) + '\0' + String(seed));
+    return 'jtdir:' + year + '_' + agency + '_' + digest;
+  }
+
+  function boundaryFingerprint(boundaryPath) {
+    var raw = str(boundaryPath);
+    if (!raw) return '';
+    return 'bfp:' + sha256Hex('jobtrans-boundary-v1\0' + raw);
+  }
+
+  function groupJobtransFolderEntries(entries, options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    var rootNameNorm = str(opts.rootDirName || '').normalize('NFC');
+    var filtered = Array.isArray(entries) && entries.length && entries[0] && Array.isArray(entries[0].dirSegs)
+      ? { accepted: entries, skippedNonJobtrans: 0, skippedPersonal: 0 }
+      : filterJobtransFolderEntries(entries, rootNameNorm);
+
+    var coList = rowsOf(opts.companies);
+    var projs = rowsOf(opts.projects).filter(function (p) { return p && !p._deleted; });
+    var cands = Array.isArray(opts.discoverCandidates) ? opts.discoverCandidates : [];
+
+    var coByBiz = {}, coByPhon = {}, coPhonCount = {};
+    coList.forEach(function (c) {
+      if (!c || c._deleted || c.deleted) return;
+      var bd = str(c.bizNo).replace(/\D/g, '');
+      if (bd.length === 10 && !coByBiz[bd]) coByBiz[bd] = c;
+      var pk = normCorpPhonetic(c.name);
+      if (pk) {
+        coPhonCount[pk] = (coPhonCount[pk] || 0) + 1;
+        if (!coByPhon[pk] || (!coByPhon[pk].bizNo && c.bizNo)) coByPhon[pk] = c;
+      }
+    });
+
+    var rootStartsInside = rootNameNorm ? JOBTRANS_DIR_ALLOW_RE.test(rootNameNorm) : false;
+    var groupsByKey = {};
+    var formFiles = [];
+    var parsedItems = [];
+    var boundaryBizMap = {};
+
+    /* 1단계(Pass 1): 사업장 폴더 경계(boundaryId)별로 경로·하위파일 내 모든 10자리 사업자번호를 먼저 추출해
+     * 단일 번호 검증 폴더(:biz:)·번호 충돌 폴더(:conflict:)·무번호 폴더(:unnum:)를 명확히 가른다. */
+    filtered.accepted.forEach(function (entry) {
+      var yr = 2026;
+      var agency = 'kmac';
+      var track = 'kmac_std';
+      var explicitKmac = false;
+      var workplaceSeg = '';
+      var workplaceIdx = -1;
+      var isCommonForm = false;
+      var insideJobtrans = rootStartsInside;
+
+      for (var i = 0; i < entry.dirSegs.length; i++) {
+        var seg = entry.dirSegs[i];
+        if (!insideJobtrans) {
+          if (JOBTRANS_DIR_ALLOW_RE.test(seg)) {
+            insideJobtrans = true;
+          } else {
+            continue;
+          }
+        }
+
+        var ym = /(202[4-9])/.exec(seg);
+        if (ym) yr = Number(ym[1]);
+
+        if (/충남|경제\s*진흥원|충경진|cepa/i.test(seg)) {
+          agency = 'cepa';
+          track = /진단/.test(seg) ? 'cepa_diag' : (/자동차|미래차/.test(seg) ? 'cepa_auto' : 'cepa_coal');
+        } else if (/정책\s*매니저/.test(seg) && agency !== 'cepa') {
+          agency = 'kmac';
+          track = 'kmac_pm';
+          explicitKmac = true;
+        } else if (/능률\s*협회|kmac|구조\s*혁신\s*컨설팅/i.test(seg) && agency !== 'cepa') {
+          agency = 'kmac';
+          explicitKmac = true;
+        } else if (/구조\s*혁신/i.test(seg) && agency !== 'cepa') {
+          agency = 'kmac';
+        }
+
+        if (!workplaceSeg) {
+          if (isContainerDirSegment(seg)) continue;
+          if (COMMON_GUIDE_SEG_RE.test(seg)) {
+            isCommonForm = true;
+            break;
+          }
+          var cleaned = cleanWorkplaceSegmentName(seg);
+          if (cleaned && !/^\d+$/.test(cleaned)) {
+            workplaceSeg = cleaned;
+            workplaceIdx = i;
+            if (!explicitKmac && /\((?:당진|태안|보령|서산)[^)]*\)/.test(seg)) {
+              agency = 'cepa';
+              track = 'cepa_coal';
+            }
+            if (/석탄\s*화력/.test(seg) && agency === 'cepa') track = 'cepa_coal';
+            else if (/진단/.test(seg) && agency === 'cepa') track = 'cepa_diag';
+          }
+        }
+      }
+
+      if (!insideJobtrans) return;
+      if (isCommonForm || !workplaceSeg) {
+        formFiles.push(entry);
+        return;
+      }
+
+      var phonKey = baseWorkplacePhoneticKey(workplaceSeg);
+      if (!phonKey) {
+        formFiles.push(entry);
+        return;
+      }
+
+      var boundaryId = entry.dirSegs.slice(0, workplaceIdx + 1).join('/');
+      if (!boundaryBizMap[boundaryId]) boundaryBizMap[boundaryId] = {};
+      extractBizDigitsFromText(entry.relPath).forEach(function (digits) {
+        boundaryBizMap[boundaryId][digits] = 1;
+      });
+
+      parsedItems.push({
+        entry: entry,
+        yr: yr,
+        agency: agency,
+        track: track,
+        workplaceSeg: workplaceSeg,
+        phonKey: phonKey,
+        boundaryId: boundaryId
+      });
+    });
+
+    var unnumBoundarySeen = {};
+    var unnumPhonCount = {};
+    parsedItems.forEach(function (it) {
+      var bList = Object.keys(boundaryBizMap[it.boundaryId] || {});
+      if (bList.length === 0 && !unnumBoundarySeen[it.boundaryId]) {
+        unnumBoundarySeen[it.boundaryId] = 1;
+        var upk = it.yr + ':' + it.agency + ':' + it.phonKey;
+        unnumPhonCount[upk] = (unnumPhonCount[upk] || 0) + 1;
+      }
+    });
+
+    /* 2단계(Pass 2): 사업자번호가 확인된 경계만 사업자번호 기준(:biz:)으로 묶고,
+     * 번호 충돌 경계(:conflict:)와 무번호 경계(:unnum:)는 반드시 폴더 경계(boundaryId)별로 격리한다. */
+    parsedItems.forEach(function (it) {
+      var bizDigitsList = Object.keys(boundaryBizMap[it.boundaryId] || {});
+      var gKey = '';
+      var grpIdKey = '';
+      var verifiedBizFmt = '';
+      var isConflict = false;
+
+      if (bizDigitsList.length === 1) {
+        gKey = it.yr + ':' + it.agency + ':biz:' + bizDigitsList[0];
+        grpIdKey = 'fgrp_' + safeIdPart(it.yr + '_' + it.agency + '_biz_' + bizDigitsList[0]);
+        verifiedBizFmt = formatBizNo(bizDigitsList[0]);
+      } else if (bizDigitsList.length > 1) {
+        isConflict = true;
+        gKey = it.yr + ':' + it.agency + ':conflict:' + it.boundaryId;
+        grpIdKey = 'fgrp_' + safeIdPart(deterministicFolderKey(it.yr, it.agency, 'conflict:' + it.boundaryId));
+      } else {
+        gKey = it.yr + ':' + it.agency + ':unnum:' + it.boundaryId;
+        grpIdKey = 'fgrp_' + safeIdPart(deterministicFolderKey(it.yr, it.agency, 'unnum:' + it.boundaryId));
+      }
+
+      if (!groupsByKey[gKey]) {
+        groupsByKey[gKey] = {
+          groupKey: grpIdKey,
+          year: it.yr,
+          agency: it.agency,
+          track: it.track,
+          workplaceName: it.workplaceSeg,
+          phoneticKey: it.phonKey,
+          boundaryId: it.boundaryId,
+          files: [],
+          docKindCounts: {},
+          bizNoFound: verifiedBizFmt,
+          bizNoConflict: isConflict
+        };
+      } else {
+        if (!/\(주\)|㈜|주식회사/.test(groupsByKey[gKey].workplaceName) && /\(주\)|㈜|주식회사/.test(it.workplaceSeg)) {
+          groupsByKey[gKey].workplaceName = it.workplaceSeg;
+        }
+      }
+
+      var grp = groupsByKey[gKey];
+      var dk = classifyDocKind(it.entry.fileName, [it.entry.fileName], it.entry.dirSegs.join(' '));
+      var phase = POST_SIGNAL_RE.test(it.entry.relPath) ? 'post_mid' : (dk.defaultPhase || 'pre_mid');
+      grp.docKindCounts[dk.code] = (grp.docKindCounts[dk.code] || 0) + 1;
+      grp.files.push(Object.assign({}, it.entry, {
+        docKind: dk.code,
+        docKindName: dk.short,
+        phase: phase
+      }));
+    });
+
+    var groups = Object.keys(groupsByKey).map(function (gk) {
+      var g = groupsByKey[gk];
+      var folderBizDigits = (!g.bizNoConflict && g.bizNoFound) ? str(g.bizNoFound).replace(/\D/g, '') : '';
+
+      /* ★ 온톨로지 철칙: 자동 귀속(matchedProjectId / coByBiz)은 검증된 단일 10자리 사업자번호가 일치하고 연도·운영기관이 같을 때만 수행한다.
+       *   번호 충돌 경계는 격리 열쇠로 차단하고, 무번호 유사상호 항목은 suggested* 후보로만 분리하여 사용자 확인을 거친다. */
+      var verifiedProj = folderBizDigits.length === 10
+        ? (projs.find(function (p) {
+          return Number(p.year || 2026) === g.year
+            && (p.agency || 'kmac') === g.agency
+            && (str(p.bizNo).replace(/\D/g, '') === folderBizDigits || str(p.companyId) === ('biz:' + folderBizDigits));
+        }) || null)
+        : null;
+
+      var isUniqueUnnumPhon = (unnumPhonCount[g.year + ':' + g.agency + ':' + g.phoneticKey] || 0) === 1;
+      var matchingUnnumProjs = (!verifiedProj && !g.bizNoConflict && !folderBizDigits && isUniqueUnnumPhon)
+        ? projs.filter(function (p) {
+          return Number(p.year || 2026) === g.year
+            && (p.agency || 'kmac') === g.agency
+            && baseWorkplacePhoneticKey(p.companyName) === g.phoneticKey;
+        })
+        : [];
+      var suggestedProj = matchingUnnumProjs.length === 1 ? matchingUnnumProjs[0] : null;
+
+      var verifiedCand = (!verifiedProj && folderBizDigits.length === 10)
+        ? (cands.find(function (c) {
+          return Number(c.year || 2026) === g.year
+            && (c.agency || 'kmac') === g.agency
+            && (str(c.bizNo).replace(/\D/g, '') === folderBizDigits || str(c.companyId) === ('biz:' + folderBizDigits));
+        }) || null)
+        : null;
+
+      var verifiedCo = folderBizDigits.length === 10 ? (coByBiz[folderBizDigits] || null) : null;
+      var suggestedCo = (!verifiedCo && !g.bizNoConflict && !folderBizDigits && isUniqueUnnumPhon && coPhonCount[g.phoneticKey] === 1)
+        ? coByPhon[g.phoneticKey]
+        : null;
+
+      var isolatedFallbackKey = g.bizNoConflict
+        ? deterministicFolderKey(g.year, g.agency, 'conflict:' + g.boundaryId)
+        : deterministicFolderKey(g.year, g.agency, 'unnum:' + g.boundaryId);
+
+      var resolvedCompanyId = (verifiedProj && str(verifiedProj.companyId))
+        || (verifiedCand && str(verifiedCand.companyId))
+        || (verifiedCo && str(verifiedCo.id))
+        || (folderBizDigits.length === 10 ? ('biz:' + folderBizDigits) : isolatedFallbackKey);
+
+      return {
+        groupKey: g.groupKey,
+        boundaryHash: !folderBizDigits ? boundaryFingerprint(g.boundaryId) : '',
+        year: g.year,
+        agency: verifiedProj ? (verifiedProj.agency || g.agency) : g.agency,
+        track: verifiedProj ? (verifiedProj.track || g.track) : g.track,
+        companyId: resolvedCompanyId,
+        companyName: verifiedProj ? str(verifiedProj.companyName) : (verifiedCo ? str(verifiedCo.name) : g.workplaceName),
+        bizNo: formatBizNo((verifiedProj && verifiedProj.bizNo) || (verifiedCo && verifiedCo.bizNo) || g.bizNoFound),
+        bizNoConflict: !!g.bizNoConflict,
+        matchedProjectId: verifiedProj ? str(verifiedProj.id) : '',
+        suggestedProjectId: suggestedProj ? str(suggestedProj.id) : '',
+        suggestedCompanyId: suggestedCo ? str(suggestedCo.id) : '',
+        suggestedCompanyName: suggestedProj ? str(suggestedProj.companyName) : (suggestedCo ? str(suggestedCo.name) : ''),
+        scalCoId: (verifiedProj && verifiedProj.scalCoId) || (verifiedCand && verifiedCand.scalCoId) || '',
+        scalTypeId: (verifiedProj && verifiedProj.scalTypeId) || (verifiedCand && verifiedCand.scalTypeId) || '',
+        fileCount: g.files.length,
+        docKindCounts: g.docKindCounts,
+        files: g.files
+      };
+    }).sort(function (a, b) {
+      return (b.year - a.year) || a.agency.localeCompare(b.agency) || a.companyName.localeCompare(b.companyName, 'ko');
+    });
+
+    return {
+      groups: groups,
+      formFileCount: formFiles.length,
+      totalAcceptedFiles: filtered.accepted.length,
+      skippedNonJobtrans: filtered.skippedNonJobtrans,
+      skippedPersonal: filtered.skippedPersonal
     };
   }
 
@@ -1149,14 +1933,24 @@
   return {
     GARIM: GARIM,
     PUBLIC_DOMAINS: PUBLIC_DOMAINS,
+    sha256Hex: sha256Hex,
+    boundaryFingerprint: boundaryFingerprint,
+    normCorpName: normCorpName,
+    normCorpPhonetic: normCorpPhonetic,
     maskPiiStrict: maskPiiStrict,
     unmaskNames: unmaskNames,
     hasResidualPii: hasResidualPii,
+    isJobtransMailFolder: isJobtransMailFolder,
     buildCompanyMailProfile: buildCompanyMailProfile,
     classifyDocKind: classifyDocKind,
     resolvePhase: resolvePhase,
     flattenMailboxRows: flattenMailboxRows,
     scanProjectMails: scanProjectMails,
+    discoverJobtransCandidates: discoverJobtransCandidates,
+    inspectConsultingSubdir: inspectConsultingSubdir,
+    cleanWorkplaceSegmentName: cleanWorkplaceSegmentName,
+    filterJobtransFolderEntries: filterJobtransFolderEntries,
+    groupJobtransFolderEntries: groupJobtransFolderEntries,
     summarizeChecklistProgress: summarizeChecklistProgress,
     hasSensitiveTableHeaders: hasSensitiveTableHeaders,
     detectSheetDocKind: detectSheetDocKind,
