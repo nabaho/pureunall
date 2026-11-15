@@ -6945,7 +6945,7 @@ function _wsSend(k, id, secrets){
   PuWorkerSecret.write(fbDb, k, id, secrets).then(function(r){ if(!r.ok) _wsFail(r); });
 }
 // ── 사이트 아이디/비번 — 비번은 담당자·관리자 전용 칸(site_secret)으로 떼고 기본 숨김 (대표 요청 2026-11-15) ──
-//   공개 원장(data/*)에는 siteId 와 hasSitePw(비번 있음 표시)만 남기고, 실제 비번(sitePw)은
+//   공개 원장(data 아래)에는 siteId 와 hasSitePw(비번 있음 표시)만 남기고, 실제 비번(sitePw)은
 //   site_secret/{표}/{건 id}/sitePw 에 따로 둔다. 화면에서도 기본 숨김(•••••••• / password)이며
 //   담당자·관리자가 [보기]를 눌렀을 때만 읽거나 가림을 푼다. 설계: js/pu-site-secret.js
 function _siteSecOn(k){ return !!(window.PuSiteSecret && PuSiteSecret.isKind(k)); }
@@ -7098,7 +7098,7 @@ function SiteAccountCard(props){
                 loading ? '불러오는 중…' : (shown ? '숨기기' : '보기'))
             ]
       ),
-      err ? h('span', { style:{ color:'#b91c1c', fontWeight:600 } }, err) : null
+      err ? h('span', { style:{ color:'#dc2626', fontWeight:600 } }, err) : null
     )
   );
 }
