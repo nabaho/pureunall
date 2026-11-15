@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">푸른포털</string>
+    <string name="host_name" translatable="false">nabaho.github.io</string>
+    <string name="launch_url" translatable="false">https://nabaho.github.io/pureunall/enter.html</string>
+    <string name="provider_authority" translatable="false">kr.pureun.portal.fileprovider</string>
+    <string name="asset_statements" translatable="false">[{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://nabaho.github.io\"
+        }
+    }]</string>
+    <string name="offline_title">네트워크 연결이 필요합니다</string>
+    <string name="offline_message">푸른포털은 푸른노무법인 암호화 인증으로 동작합니다.\n와이파이(Wi-Fi) 또는 모바일 데이터를 켜 주시면 자동으로 포털 화면이 열립니다.</string>
+    <string name="offline_retry">다시 연결 시도</string>
+    <string name="offline_open_settings">네트워크 설정 열기</string>
+    <string name="offline_still_disconnected">아직 인터넷 연결이 확인되지 않습니다. 연결 상태를 확인한 뒤 다시 눌러 주세요.</string>
+</resources>
