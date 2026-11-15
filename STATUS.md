@@ -230,6 +230,12 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
+### 📰 뉴스레터 판례 — 법제처가 공개 열쇠(OC=test)를 거절, 함수 배포·수집 길 결정 대기 (2026-11-15 대표 「경고 확인하고 개선」)
+
+법제처 DRF 가 2026-10 중순부터 `OC=test` 를 거절 → 판례·행정해석 수집 0건, 편지 「전문 보기」 502. 코드는 고쳤다(공개 쪽 주소·거절을 탈로·점검 화면). `status/2026-11-15-news-watch-lawgo.md`
+- [ ] 함수 배포: newsFullPage · newsFull · newsletterWatchSunday · weeklyNewsletterPrepare · weeklyNewsletterSend · dailyDocsCollect · newsDocsPull · dailyRegionalNewsCollect
+- [ ] 판례를 다시 모을 길 결정 — ① 법제처 OPEN API 열쇠 신청 + 서버 IP 등록(클라우드 함수는 고정 IP 장치가 따로 필요) ② 열쇠 없이 열리는 국가법령정보센터 공개 쪽을 읽도록 모으개를 바꾸기. AI 교정의 법제처 조문 읽기도 같은 열쇠다
+
 ### 📲 푸른캘린더 «공유»로 캡처 받기 — 배포 뒤 폰에서 확인 대기 (2026-11-15 대표 「공유 버튼 만들기」)
 
 카톡·문자 캡처를 폰 «공유 → 푸른캘린더»로 보내면 새 일정 창에 올라오고, 「📷 공유받은 캡처 읽기」를 눌러야 AI 가 읽어 칸을 채운다(저장은 사람이). `status/2026-11-15-cal-share-image.md`

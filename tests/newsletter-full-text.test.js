@@ -54,9 +54,12 @@ test('★★ 주소는 «우리가» 짓는다 — 받은 글자를 주소에 �
   assert.match(받, /^https:\/\/www\.law\.go\.kr\//, '법제처 밖으로 나간다');
   assert.match(받, /target=prec/);
   assert.match(받, /type=XML/, '받아 읽을 것은 XML 이다');
-  assert.match(봄, /type=HTML/, '사람이 볼 것은 서식 있는 쪽이다');
+  /* ★ 사람이 볼 것은 국가법령정보센터 «공개 쪽» — 열쇠(OC) 없이 열린다 (2026-11-15).
+       DRF 서식 쪽(type=HTML·OC=test)은 법제처가 열쇠를 거절해 받는 분 눈에 «접속 실패» 쪽이 됐다. */
+  assert.match(봄, /^https:\/\/www\.law\.go\.kr\/LSW\/precInfoP\.do\?precSeq=622111$/, '사람이 볼 것은 판례 공개 쪽이다');
+  assert.ok(!/OC=/.test(봄), '★★ 사람이 볼 주소에 열쇠(OC)가 들어 있다 — 열쇠가 거절되면 받는 분이 실패 쪽을 본다');
   assert.match(NF.받을주소('expc', '7'), /target=expc/);
-  assert.match(NF.법제처주소('expc', '7'), /target=expc/);
+  assert.match(NF.법제처주소('expc', '7'), /\/LSW\/expcInfoP\.do\?expcSeq=7$/, '행정해석도 공개 쪽이다');
 });
 
 /* ══════ ② 받아 온 것을 «칸»으로 ══════ */

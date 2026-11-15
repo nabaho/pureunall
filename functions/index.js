@@ -2117,13 +2117,15 @@ exports.newsletterWatchSunday = functions
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
     const 회차 = await 감시용회차(db, 열쇠);
     const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
-    const [판례모음, 지난것, 노무사회메타] = await Promise.all([
+    /* ★ 판례탈 — 판례 모으개가 남긴 «못 모은 까닭»(2026-11-15). 「3주 넘게 새로 없음」에 까닭을 붙인다 */
+    const [판례모음, 지난것, 노무사회메타, 판례탈] = await Promise.all([
       db.ref("homepage/newsPrec/모음").once("value"),
       db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value"),
-      db.ref("ilabor/meta").once("value")]);
+      db.ref("ilabor/meta").once("value"),
+      db.ref("homepage/newsPrec/탈").once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
-      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
+      판례모음: 판례모음.val(), 판례탈: 판례탈.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
     /* ★ AI 교정 (2026-10-05) — 우리 말·한마디를 원문(판례 사건번호·선고일·판시사항, 법제처 조문)과 대조.
          AI 는 «확인할 것»만 올린다. 실패하면 그 줄만 빠지고 규칙 점검은 그대로 간다. */
     try {
@@ -4755,8 +4757,12 @@ exports.newsFullPage = functions
       const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
+        /* ★★ 못 받아 오면 «오류 쪽»이 아니라 국가법령정보센터 공개 쪽으로 곧장 보낸다 (2026-11-15).
+             법제처 DRF 가 OC=test 를 거절하면서 받는 분이 「전문 보기」를 누를 때마다 «받아 오지 못했습니다»
+             쪽을 먼저 보고, 그 아래 단추를 한 번 더 눌러야 했다(그 단추마저 예전에는 실패 쪽이었다).
+           ⚠ 공개 쪽은 우리 양식이 아니다 — 그래도 판례를 «바로» 보시는 편이 오류 쪽보다 낫다. 굳히지 않는다. */
         res.set("Cache-Control", "no-store");
-        res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
+        res.redirect(302, 법제처);
         return;
       }
       /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
@@ -4771,8 +4777,9 @@ exports.newsFullPage = functions
       res.status(200).send(NF.쪽(것, 법제처));
     } catch (e) {
       console.warn("newsFullPage", (e && e.message) || e);
+      /* 받다가 끊겨도 같다 — 공개 쪽으로 곧장(위 ★★ 참고) */
       res.set("Cache-Control", "no-store");
-      res.status(502).send(NF.오류쪽(NF.까닭말["못받음"], 법제처));
+      res.redirect(302, 법제처);
     }
   });
 
@@ -6023,13 +6030,26 @@ async function 자료거리모으기(몇개) {
      편지 짓는 층을 안 고쳐도 되고, 한 꼭지에 섞여 나란히 실린다. */
 const 해석찾을말 = ["근로기준법", "근로자퇴직급여", "산업안전보건법", "노동조합"];
 
+/* ★ 법제처 DRF 목록을 받는다 — «거절»(200 인데 「사용자 정보 검증에 실패」)이면 던진다 (2026-11-15).
+   ⚠⚠ 예전에는 거절 몸을 그대로 읽어 «0건»으로 넘어갔다. 탈(오류) 칸이 비어 있으니 감시꾼은
+     「판례가 3주 넘게 새로 안 들어왔습니다」만 알 뿐 까닭을 몰랐다(10월 9일부터 다섯 주).
+   ⚠ 낱말 «하나»가 거절되면 다른 낱말도 다 거절이다(같은 열쇠) — 모두 거절이면 모으기 전체를 탈로 남긴다. */
+const 법제처거절말 = "법제처 공동활용(DRF)이 열쇠 OC=test 를 거절했습니다 — 「사용자 정보 검증에 실패」. "
+  + "법제처 OPEN API 열쇠를 새로 받아 서버 주소를 등록해야 판례·행정해석을 다시 모읍니다";
+async function 법제처목록받기(주소) {
+  const 글 = await 쪽받기(주소);
+  if (판례부품.거절인가(글)) { const e = new Error(법제처거절말); e.거절 = true; throw e; }
+  return 글;
+}
+
 async function 해석거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(6, Number(몇개) || 2));
-  let 다 = [];
+  let 다 = [], 거절 = 0;
   for (const w of 해석찾을말) {
-    try { 다 = 다.concat(판례부품.해석목록읽기(await 쪽받기(판례부품.해석목록주소(w, 5)))); }
-    catch (e) { console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
+    try { 다 = 다.concat(판례부품.해석목록읽기(await 법제처목록받기(판례부품.해석목록주소(w, 5)))); }
+    catch (e) { if (e.거절) 거절++; console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
   }
+  if (거절 === 해석찾을말.length) throw new Error(법제처거절말);
   const out = [];
   for (const c of 판례부품.해석추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
@@ -6049,11 +6069,13 @@ async function 해석거리모으기(몇개, 모아둔것) {
 /* 법제처에서 노무 판례를 모은다 — 판시사항이 있는 것만 */
 async function 판례거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(8, Number(몇개) || 4));
-  let 다 = [];
+  let 다 = [], 거절 = 0;
   for (const w of 판례찾을말) {
-    try { 다 = 다.concat(판례부품.목록읽기(await 쪽받기(판례부품.목록주소(w, 5)))); }
-    catch (e) { console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
+    try { 다 = 다.concat(판례부품.목록읽기(await 법제처목록받기(판례부품.목록주소(w, 5)))); }
+    catch (e) { if (e.거절) 거절++; console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
   }
+  /* 모두 거절이면 «0건»이 아니라 «못 모았다» — 자료판례모아담기 가 탈로 남기고 감시꾼이 까닭을 보인다 */
+  if (거절 === 판례찾을말.length) throw new Error(법제처거절말);
   const out = [];
   for (const c of 판례부품.판례추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
