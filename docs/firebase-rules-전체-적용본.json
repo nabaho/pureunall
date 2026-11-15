@@ -1725,6 +1725,15 @@
       "$part": {
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)"
       },
+      "newsBrief": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
+      "newsDocs": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
+      "newsPrec": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
       "careerInbox": {
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
         "$sid": {

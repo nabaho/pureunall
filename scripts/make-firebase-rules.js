@@ -1232,6 +1232,14 @@ rules.pu_mailseen = {
        서버(관리자 SDK)는 규칙을 지나지 않아 영향이 없다. */
 const 통째지우기막음 = { '.write': ADMIN, $part: { '.write': `${LOGIN} && (newData.exists() || ${ADMIN})` } };
 rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
+/* ★ 자동 모으개 밑감은 «서버만» 쓴다 (2026-11-16, 뉴스레터 법제처 수정의 보안 검토 «낮음» 반영)
+     homepage/newsBrief·newsDocs·newsPrec 은 서버(관리자 SDK)가 날마다 모아 담는 자리다. 화면은 «읽기만» 한다
+     (pu-news.html 자동화 점검·뉴스레터 짓기 — 2026-11-16 저장소 전체에서 쓰는 곳이 없음을 확인).
+     그런데 위 $part 규칙으로 재직 직원도 쓸 수 있어, 「탈」 칸에 아무 글이나 적어 자동화 점검 경고에 띄울 수 있었다
+     (화면 출력은 모두 씻긴다 — 그래도 길을 닫는다).
+   → 이름 붙은 갈래로 두어 $part 를 안 타게 한다: 쓰기는 총괄관리자만 · 서버는 규칙을 안 지나 그대로 쓴다.
+     읽기는 그대로(LOGIN — 위 homepage '.read'). 보는 사람은 넓어지지 않고 쓰는 사람만 좁아진다. */
+['newsBrief', 'newsDocs', 'newsPrec'].forEach((k) => { rules.homepage[k] = { '.write': ADMIN }; });
 /* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
      직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
    ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.

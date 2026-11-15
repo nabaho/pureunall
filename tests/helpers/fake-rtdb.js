@@ -63,14 +63,17 @@ function 만들기(처음) {
         return { committed: true, snapshot: { val: () => 복사(읽기(자리)) } };
       },
       child: (k) => ref(자리 + '/' + k),
-      /* 뒤에서 n 개 — 진짜 DB 처럼 열쇠 순으로 */
-      orderByKey: () => ({ limitToLast: (n) => ({ once: async () => {
-        const v = 읽기(자리);
-        if (!v || typeof v !== 'object') return { val: () => null };
-        const o = {};
-        Object.keys(v).sort().slice(-n).forEach((k) => { o[k] = 복사(v[k]); });
-        return { val: () => (Object.keys(o).length ? o : null) };
-      } }) }),
+      /* 뒤에서 n 개 — 진짜 DB 처럼 열쇠 순으로. endAt(끝) 이 있으면 끝보다 큰 열쇠는 뺀다(2026-11-16 경고판 회차 읽기) */
+      orderByKey: () => {
+        const 질의 = (끝) => ({ limitToLast: (n) => ({ once: async () => {
+          const v = 읽기(자리);
+          if (!v || typeof v !== 'object') return { val: () => null };
+          const o = {};
+          Object.keys(v).filter((k) => 끝 == null || k <= 끝).sort().slice(-n).forEach((k) => { o[k] = 복사(v[k]); });
+          return { val: () => (Object.keys(o).length ? o : null) };
+        } }) });
+        return Object.assign(질의(null), { endAt: (e) => 질의(String(e)) });
+      },
       push: () => ({ key: 'k' + (++번호) })
     };
   }
