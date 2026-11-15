@@ -59,6 +59,7 @@ function geoip나라(ip) {
 }
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
+const MailReqScope = require("./mail-req-scope");   /* 경력관리 «요청 메일» 범위 분류(업무 vs 이력·회의·비용) — 애매한 건만 Jev 에게 */
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
@@ -3662,6 +3663,39 @@ exports.typeSafeEvaluate = functions
       res.status(result.ok ? 200 : result.status).json(result);
     } catch (e) {
       console.warn("Jev 판단 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
+
+/* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
+   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
+   본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
+   ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
+   ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
+exports.mailReqScope = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let who;
+    try { who = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    try {
+      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
+      res.status(out.status).json(out.body);
+    } catch (e) {
+      console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));
       res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
     }
   });
