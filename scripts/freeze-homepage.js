@@ -95,12 +95,23 @@ if (!LIVE && process.argv.indexOf('--preview') < 0) {
 }
 
 /* ── 내려받기 (한 번에 넷까지, 예의 있게) ── */
-function fetchBin(url) {
+/* ★ 넘김(3xx)도 «우리 출처 https» 안에서만 따라간다(2026-11-16 보안 재검증 중간) —
+     첫 주소만 검사하면 우리 서버가 302 로 남의 주소를 가리킬 때 그 응답이 우리 자산 자리에 담긴다.
+     넘김은 5번까지만(돌고 도는 넘김 방지). */
+function fetchBin(url, 남은넘김) {
+  if (남은넘김 == null) 남은넘김 = 5;
+  const 빈것 = { code: 0, buf: Buffer.alloc(0), type: '' };
   return new Promise(resolve => {
     const req = https.get(url, { timeout: 30000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return resolve(fetchBin(new URL(res.headers.location, url).href));
+        let 다음;
+        try { 다음 = new URL(res.headers.location, url); } catch (e) { return resolve(빈것); }
+        if (남은넘김 <= 0 || 다음.protocol !== 'https:' || 다음.origin !== new URL(ORIGIN).origin) {
+          console.warn('■ 넘김 건너뜀 — 우리 출처 밖: ' + 다음.href);
+          return resolve(빈것);
+        }
+        return resolve(fetchBin(다음.href, 남은넘김 - 1));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));

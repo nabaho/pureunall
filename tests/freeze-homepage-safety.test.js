@@ -32,6 +32,35 @@ test('★ 자산은 «출처가 정확히 같은» 것만 떠 온다 — 앞이 
     '★ 남의 주소를 우리 자산으로 떠 왔다: ' + JSON.stringify(받음));
 });
 
+test('★ 넘김(302)도 우리 출처 https 안에서만 따라간다 — 남의 주소 응답을 우리 자산으로 담지 않게', async () => {
+  /* 네트워크 없이 https.get 을 흉내 낸다: 주소별로 정해 둔 응답을 돌려주고, 부른 주소를 적는다 */
+  const 부른 = [];
+  const 응답표 = {
+    [ORIGIN + '/a.js']: { statusCode: 302, headers: { location: 'https://evil.example/payload.js' } },
+    [ORIGIN + '/b.js']: { statusCode: 302, headers: { location: '/files/b2.js' } },
+    [ORIGIN + '/files/b2.js']: { statusCode: 200, headers: { 'content-type': 'text/javascript' }, 몸: '우리것' },
+    [ORIGIN + '/c.js']: { statusCode: 302, headers: { location: 'http://' + new URL(ORIGIN).host + '/c2.js' } },
+  };
+  const 가짜https = { get(url, opts, cb) {
+    부른.push(url);
+    const r = 응답표[url] || { statusCode: 404, headers: {} };
+    const res = { statusCode: r.statusCode, headers: r.headers, resume() {},
+      on(ev, f) { if (ev === 'data' && r.몸) f(Buffer.from(r.몸)); if (ev === 'end') f(); return res; } };
+    setImmediate(() => cb(res));
+    return { on() { return this; }, destroy() {} };
+  } };
+  const fetchBin = new Function('https', 'ORIGIN', 'console', 'Buffer',
+    떠오기('fetchBin') + '\nreturn fetchBin;')(가짜https, ORIGIN, { warn() {} }, Buffer);
+  const 남 = await fetchBin(ORIGIN + '/a.js');
+  assert.equal(남.code, 0, '★ 남의 주소로 넘김을 따라가 그 응답을 받았다');
+  assert.ok(!부른.some(u => u.indexOf('evil.example') >= 0), '★ 남의 주소를 실제로 불렀다: ' + 부른.join(', '));
+  const 우리 = await fetchBin(ORIGIN + '/b.js');
+  assert.equal(우리.code, 200, '우리 출처 안의 넘김은 따라가야 한다');
+  assert.equal(우리.buf.toString(), '우리것');
+  const 평문 = await fetchBin(ORIGIN + '/c.js');
+  assert.equal(평문.code, 0, '★ https 가 아닌 주소로 넘김을 따라갔다');
+});
+
 test('★ 출력 폴더 밖으로는 안 쓴다 — 풀린 ../ 는 건너뛴다', () => {
   const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'freeze-safety-'));
   const 쓴곳 = [];
