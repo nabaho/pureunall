@@ -1,4 +1,4 @@
-상태: 코드 완료 · 합친 뒤 함수 배포·규칙 게시·첫 모으기 확인
+상태: 완료(코드·배포·규칙 게시·첫 모으기 확인)
 이어하기시도: 0
 작업폴더: C:\Users\user\Desktop\github\pureunall-wt-newslaw
 가지: fix/news-lawgo-public
@@ -43,7 +43,16 @@
 - 콘솔 대조(rules-deploy.js 보기): 새로 3(/homepage/newsBrief·newsDocs·newsPrec) · 바뀜 0 · 사라짐 0.
 - 자동 검토(ow review): 기능 검증 antigravity:gemini-4-argon-high «통과»(높음·중간·낮음 0) · 보안 codex «발견 없음».
 
-## 남은 일
-- 합친 뒤 함수 배포: dailyDocsCollect · newsDocsPull · newsletterSundayRefill(모으개) · newsFull · newsFullPage(전문 보기) ·
-  newsletterWatchSunday(AI 교정 조문·경고판) · 브리핑 법령을 쓰는 함수 · 경고판 갱신을 부르는 함수들. 규칙은 `node scripts/rules-deploy.js --deploy`.
-- 첫 아침 모으기 뒤 `homepage/newsPrec` 의 새것날·탈 확인.
+## 합친 뒤 한 것 (2026-11-16 01:10~01:20, PR #3112)
+- 「Firebase 배포」 실행 43733956060(rules=true + 함수 10개): 새 함수별 대조 «올라감 10 · 건너뜀 0 · 안 올라감 0».
+  gcloud 갱신 시각으로도 10개 확인(dailyNewsCollect·weeklyNewsBrief 는 기본 지역 us-central1).
+  올린 것: dailyDocsCollect · newsDocsPull · newsletterSundayRefill · newsFull · newsFullPage · newsletterWatchSunday ·
+  dailyNewsCollect · weeklyNewsBrief · newsletterWatchRetry · newsletterWatchDelivery.
+  안 올린 것: weeklyNewsletterSend(06시 발송 직전이라 — 바뀐 것은 경고판 회차 읽기 경계뿐) · newsletterBounceScan(같은 경계뿐). 다음 배포 때 함께 간다.
+- 규칙 게시: 새로 3(/homepage/newsBrief·newsDocs·newsPrec) · 바뀜 0 · 사라짐 0, «콘솔이 올린 것과 같음». 살아 있는 콘솔을 다시 읽어 적용본과 뜻이 같음 확인 →
+  새 기준 `docs/firebase-rules-콘솔원문-2026-11-16.json`, `tests/photos-staff-share.test.js` PENDING 비움.
+- 전문 보기 실서버: news.fairrunlabor.com/newsFullPage 판례·해석이 «푸른노무법인» 우리 양식으로 200(0.2~0.5초). 배포 직후 첫 한 번은
+  깨어나는 데 6초를 넘겨 설계대로 공개 쪽으로 302 했고, 그 뒤로는 계속 우리 양식.
+- 아침 모으기(dailyDocsCollect)를 01:16 에 한 번 당겨 돌림(「지금 가져오기」와 같은 일): homepage/newsPrec 모은수 6 · 쌓인수 27→33 ·
+  새것날 2026-10-09→2026-11-16 · 탈 없음. 새로 든 것 — 대법원 2026두30446 · 2021도11473 · 2023두53478 · 2024다206043,
+  법제처 26-0228 · 26-0284(모두 판시사항·공개 쪽 링크째). 오늘 06시 편지는 이미 확정본이라 그대로 — 금요일 준비부터 실린다.
