@@ -51,9 +51,9 @@
 <script src="js/pu-home-diff.js?v=10"></script>
 <script src="js/pu-home-fill.js?v=10"></script>
 <!-- 새 홈페이지를 «자료로» 그리는 부품. 명령줄(scripts/build-people.js)도 같은 것을 쓴다 -->
-<script src="js/pu-site-people.js?v=5"></script>
+<script src="js/pu-site-people.js?v=6"></script>
 <script src="js/pu-site-page.js?v=1"></script>
-<script src="js/pu-site-partner.js?v=3"></script>
+<script src="js/pu-site-partner.js?v=4"></script>
 <style>
 /* ★ 색값·간격은 승인된 목업(docs/mockups/homepage-manage-v4.html)에서 그대로 가져왔다.
    새로 만들지 말 것 — 목업이 배치·색·글귀의 기준이다. */
@@ -1049,7 +1049,12 @@ const PUBLISH_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/publishSi
      (jobsOf 머리말 — 이 화면에서 여섯 번 겪었다). 상자 안(상수 없음)에서는 옛 동작 그대로 돈다.
    ⚠ 서버도 같은 스위치를 따로 갖는다(functions/homepage-fetch.js OLD_SITE_CLOSED) — 옛 사이트로 «요청 자체»를
      안 보낸다(만료 도메인을 남이 다시 사면 관리자 계정이 그리로 갈 수 있어서). 되살린다면 «둘을 함께».
-   ⚠ 새 사이트에 아직 없는 길(남은 일): 얼굴 사진 바꾸기 · 글 번호 없는 새 노무사 넣기 · 계약 끝난 자문사 로고 저절로 숨기기. */
+   ★ (2026-11-16) 새 사이트에 이어 붙인 길:
+     ⑤ 얼굴 사진 — 편집칸에서 사진을 넣으면(새사진넣기) 「새 사이트에 올리기」(publishPeople)가 site/files/people/<열쇠>.jpg 로
+        먼저 올리고(photo.site 에 적음) 카드에 붙인다. 글 번호 있는 분도 우리 사진이 있으면 옛 사진 대신 그것을 쓴다.
+     ⑥ 글 번호 없는 새 노무사 — 새 사이트 사진 + 대표의 올리기 허락(publishOk)이 있으면 카드(data-srl = new-…)로 올라간다.
+     ⑦ 계약 끝난 자문사 로고 — 「새 사이트에 올리기」(publishPartner) 때 업체관리에서 거래 종료(closed)이고 로고와 이어진
+        (boardSrl) 회사의 로고를 저절로 숨긴다(PuSitePartner.계약끝난로고 — 회사 열쇠 companyId 로만 판정, 이름으로 맞추지 않음). */
 const OLD_SITE_OFF = true;
 
 /* 새 사이트 원본에서 쪽 하나를 읽는다 — 옛 readHomepage 와 «같은 약속»(못 읽으면 null, 「내용 없음」과 구분).
@@ -2164,13 +2169,21 @@ window.로고남기기 = 로고남기기; window.로고남기기풀기 = 로고�
 async function 홈로고목록() {
   App.siteLogoErr = '';
   try {
-    const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: 'partner' }) });
-    if (!res.ok) throw new Error('홈페이지 응답 ' + res.status);
-    const data = await res.json();
-    const list = PuHomeParse.parsePartners(data.html);
+    const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;
+    let 쪽;
+    if (접음) {
+      /* (2026-11-16) 접은 뒤에는 새 사이트 자문사 쪽을 읽는다 — 옛 readHomepage 는 410(접음)이다 */
+      쪽 = await 새사이트쪽읽기('partner');
+      if (쪽 == null) throw new Error('새 사이트 자문사 쪽을 읽지 못했습니다');
+    } else {
+      const token = await firebase.auth().currentUser.getIdToken();
+      const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: 'partner' }) });
+      if (!res.ok) throw new Error('홈페이지 응답 ' + res.status);
+      쪽 = (await res.json()).html;
+    }
+    const list = PuHomeParse.parsePartners(쪽);
     if (!list.length) throw new Error('로고를 하나도 못 찾았습니다 — 홈페이지 모양이 바뀐 것 같습니다');
     App.siteLogoList = list;
     return list;
@@ -2181,7 +2194,12 @@ async function 홈로고목록() {
 }
 function 로고그림주소(img) {
   const s = String(img || '');
-  return /^https?:\/\//.test(s) ? s : PuHomeExport.ORIGIN + (s.charAt(0) === '/' ? '' : '/') + s;
+  if (/^https?:\/\//.test(s)) return s;
+  /* (2026-11-16) 접은 뒤 로고 목록은 새 사이트 자문사 쪽에서 읽는다 — 그 쪽의 상대 주소(../files/…)는 새 사이트 /partner/ 를 바탕으로 푼다 */
+  if (typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true) {
+    try { return new URL(s, SITE_VIEW + '/partner/').href; } catch (e) { return ''; }
+  }
+  return PuHomeExport.ORIGIN + (s.charAt(0) === '/' ? '' : '/') + s;
 }
 /* 로고 하나에 이어진 업체 */
 function 로고의업체(srl) {
@@ -2409,11 +2427,14 @@ function 새로올리기칸Html(d) {
    ★ 이어 두지 않았으면 «자동으로 안 내려간다»고 있는 그대로 말한다. */
 function 로고연결칸Html(d) {
   const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
-  if (접음) return '';   // 옛 게시판 로고 글과 잇는 칸(계약 끝나면 옛 게시판 휴지통) — 접은 뒤에는 갈 곳이 없다
+  /* (2026-11-16) 접은 뒤에도 그린다 — 이은 로고(boardSrl)·남기기(keep)는 새 사이트의 «계약 끝난 로고 숨기기» 잣대다
+     (PuSitePartner.계약끝난로고). 옛 게시판 «내린 표시» 줄만 뺀다. */
   const mk = partnerMark(d.key) || {};
   const n = Number(mk.boardSrl) || 0;
   const 남김 = mk.keep && String(mk.keep.why || '').trim() ? mk.keep : null;
-  let h = '<div class="fld"><label>자동 연결 — 계약이 끝나면 다음 달 1일에 로고를 휴지통으로</label>';
+  let h = '<div class="fld"><label>' + (접음
+    ? '자동 연결 — 계약이 끝나면 새 사이트 로고에서 숨깁니다 («새 사이트에 올리기» · 매달 1일)'
+    : '자동 연결 — 계약이 끝나면 다음 달 1일에 로고를 휴지통으로') + '</label>';
   h += '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden">'
     + (n ? '<span>홈페이지 로고 글 <b>번호 ' + n + '</b>와 이어져 있습니다</span>'
            + '<button class="btn sm" onclick="로고잇기풀기(\'' + esc(d.key) + '\')">풀기</button>'
@@ -2426,7 +2447,7 @@ function 로고연결칸Html(d) {
             : '<span>계약이 끝나도 남기기</span>'
               + '<input id="keepWhy" placeholder="사유 (예: 실적으로 남김)" style="max-width:220px">'
               + '<button class="btn sm" onclick="로고남기기(\'' + esc(d.key) + '\', document.getElementById(\'keepWhy\').value)">남기기</button>')
-    + '</div>' + 내린표시줄Html('partner', d.key, mk) + '</div>';
+    + '</div>' + (접음 ? '' : 내린표시줄Html('partner', d.key, mk)) + '</div>';
   return h;
 }
 
@@ -4520,7 +4541,9 @@ function 새사진넣기(key, file) {
       if (!된것) { await say('사진을 읽지 못했습니다', esc(탈 || '')); resolve(false); return; }
       const 바이트 = Math.round(String(된것.바이트64 || '').length * 3 / 4);
       const 지금 = { at: todayString(), by: currentUserName() };
-      const 표시 = Object.assign({ bytes: 바이트, 크기말: 된것.크기말 || '' }, 지금);
+      /* ver — 사진을 바꿀 때마다 새 값. 새 사이트에 올린 사진(photo.site.ver)과 다르면 «다시 올릴 것»이다(2026-11-16).
+         ⚠ 이 자리에 새 표시를 통째로 쓰므로 지난 site 기록도 함께 사라진다 — 그래야 옛 사진이 새 사진인 척 안 남는다. */
+      const 표시 = Object.assign({ bytes: 바이트, 크기말: 된것.크기말 || '', type: 된것.종류 || 'image/jpeg', ver: String(Date.now()) }, 지금);
       try {
         await db.ref('homepage/memberPhotos/' + key).set(Object.assign({ b64: 된것.바이트64, type: 된것.종류 }, 지금));
         await db.ref('homepage/members/' + key + '/photo').set(표시);
@@ -4565,7 +4588,9 @@ async function 올리기허락(key) {
     await db.ref('homepage/members/' + key + '/publishOk').set(허락);
     (App.members[key] = App.members[key] || {}).publishOk = 허락;
     App.render();
-    toast('허락했습니다 — 다음 달 1일에 구성원 소개에 올라갑니다.');
+    toast((typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true)
+      ? '허락했습니다 — 「새 사이트에 올리기」를 누르면 구성원 소개에 올라갑니다.'
+      : '허락했습니다 — 다음 달 1일에 구성원 소개에 올라갑니다.');
     return true;
   } catch (e) {
     await say('저장하지 못했습니다', esc((e && e.code) || String(e)));
@@ -4591,12 +4616,22 @@ function 새노무사목록() {
   }).filter(Boolean);
 }
 
+/* 사진의 «판» — 바꿀 때마다 달라진다. ver 가 없던 옛 기록은 날짜·크기로 대신한다 */
+function 사진판(photo) {
+  const p = photo || {};
+  return String(p.ver || ((p.at || '') + ':' + (p.bytes || '')));
+}
+/* 이 사진이 이미 새 사이트에 올라가 있나 — photo.site 가 «지금 판»을 가리킬 때만 */
+function 사진새사이트에있나(photo) {
+  const p = photo || {};
+  return !!(p.site && typeof p.site === 'object' && p.site.path && String(p.site.ver || '') === 사진판(p));
+}
+
 /* 구성원 편집칸의 «새로 올리기» — 글 번호 없는 노무사에게만 */
 function 새노무사칸Html(d) {
   const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
-  /* 옛 구성원 게시판에 매달 저절로 올리던 칸 — 접은 뒤에는 갈 곳이 없다.
-     ⚠ 새 사이트에 «글 번호 없는 새 노무사»를 넣는 길은 아직 없다(남은 일 — 위 OLD_SITE_OFF). */
-  if (접음) return '';
+  /* 옛 구성원 게시판에 매달 저절로 올리던 칸 — 접은 뒤에는 «새 사이트» 칸으로 바뀐다(2026-11-16) */
+  if (접음) return 새사이트사진칸Html(d);
   if (!d || String(d.srl || '').trim() || d.mkind === 'staff') return '';
   const rec = (App.members || {})[d.key] || {};
   const 준비 = 새노무사준비(rec);
@@ -4615,6 +4650,41 @@ function 새노무사칸Html(d) {
     : '<span>' + (준비.낡은허락 ? '허락한 뒤 경력을 고쳤습니다 — 다시 허락해 주십시오' : '빠진 것: ' + esc(준비.빠진것.join(' · '))) + '</span>');
   return h + '</div>';
 }
+
+/* ══════ 새 사이트 — 얼굴 사진 · 글 번호 없는 새 노무사 (2026-11-16, 옛 홈페이지 접은 뒤) ══════
+   ★ 노무사(카드로 가는 분)면 글 번호가 있어도 «사진 바꾸기» 칸을 보인다 — 옛 「이 사진으로 바꾸기」(옛 관리자)를 대신한다.
+   ★ 글 번호 없는 분에게만 «올리기 허락» 줄을 더한다 — 사람 소개는 공개되는 글이라 대표가 허락한 것만 새로 올린다
+     (공용 부품 PuSitePeople.올릴사람 이 허락 없는 새 노무사를 «못 감»으로 거른다 — 서버 매달 재게시도 같은 부품).
+   ⚠ 사진은 여기서는 «담기»(homepage/memberPhotos)까지만 — 공개 저장소에 올리는 것은 「새 사이트에 올리기」를 누를 때다.
+     허락 전의 얼굴 사진이 공개 저장소에 먼저 올라가지 않게. */
+function 새사이트사진칸Html(d) {
+  if (!d || d.mkind === 'staff') return '';
+  const rec = (App.members || {})[d.key] || {};
+  if (PuSitePeople.직원인가(rec)) return '';
+  const 글있음 = !!String(d.srl || '').trim();
+  const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px">' + 안 + '</div>';
+  const 사진있음 = !!(rec.photo && Number(rec.photo.bytes) > 0);
+  let h = '<div class="fld"><label>새 사이트 — 얼굴 사진' + (글있음 ? '' : ' · 올리기 허락') + '</label>';
+  h += 줄('<b>얼굴 사진</b>'
+    + (사진있음
+      ? '<span>' + esc(rec.photo.크기말 || '있음') + ' · '
+        + (사진새사이트에있나(rec.photo) ? '새 사이트에 올라감' : '「새 사이트에 올리기」 때 함께 올라갑니다') + '</span>'
+      : '<span>' + (글있음 ? '지금 홈페이지 사진을 씁니다' : '없음') + '</span>')
+    + '<input type="file" accept="image/jpeg,image/png,image/webp" style="max-width:230px" title="얼굴 사진 고르기 — 긴 쪽 900px 로 줄여 담습니다" '
+    + 'onchange="새사진넣기(\'' + esc(d.key) + '\', this.files[0])">');
+  if (!글있음) {
+    const 준비 = 새노무사준비(rec);
+    h += 줄('<b>올리기 허락</b>' + (rec.publishOk
+        ? '<span>' + esc(rec.publishOk.at || '') + ' · ' + esc(기록자이름(rec.publishOk.by)) + '</span>'
+          + '<button class="btn sm" onclick="올리기허락풀기(\'' + esc(d.key) + '\')">풀기</button>'
+          + (준비.낡은허락 ? '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">경력이 바뀜 — 다시 허락</button>' : '')
+        : '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">새 사이트 올리기 허락</button>'));
+    h += 줄(준비.준비 ? '<b>「새 사이트에 올리기」를 누르면 구성원 소개에 올라갑니다</b>'
+      : '<span>' + (준비.낡은허락 ? '허락한 뒤 경력을 고쳤습니다 — 다시 허락해 주십시오' : '빠진 것: ' + esc(준비.빠진것.join(' · '))) + '</span>');
+  }
+  return h + '</div>';
+}
+window.새사이트사진칸Html = 새사이트사진칸Html;
 
 /* ══════ 퇴사자를 «한 번에» 내린다 (대표 지시 2026-09-13) ══════
    「퇴사자는 퇴사로 내리게 한 번에 하고 싶은데… 한 번에 수정할 수 있게 하고 싶다」
@@ -6865,16 +6935,15 @@ function jobsOf() {
          우리가 못 고치므로 «거기서 내리는 일»만 사람 손에 남는다 — 그 한 가지를 말한다. */
       /* ★ 2026-10-05 월간 자동 연결 — 이제 «이어 둔» 로고는 서버가 다음 달 1일에 내린다 */
       why: 접음
-        /* 접은 뒤에는 옛 게시판 로고를 서버가 내리던 길이 없다 — 새 사이트 자문사현황은 «로고 관리»에서 손본다.
-           ⚠ 계약 끝난 로고를 저절로 숨기는 길은 새 사이트에 아직 없다(남은 일). */
-        ? '우리 명단에서는 자동으로 뺐습니다. 홈페이지 자문사현황의 로고는 <b>저절로 내려가지 않습니다</b> — '
-          + '자문사 목록 머리의 «로고 관리»에서 빼고 올려 주십시오.'
+        /* (2026-11-16) 새 사이트 — 로고와 «이어 둔» 회사는 「새 사이트에 올리기」 때와 매달 1일에 저절로 숨긴다(PuSitePartner.계약끝난로고) */
+        ? '우리 명단에서는 자동으로 뺐습니다. 새 사이트의 로고는 <b>로고와 이어 둔 것만</b> '
+          + '「새 사이트에 올리기」 때와 매달 1일에 저절로 숨겨집니다 — 안 이은 것은 그 회사 편집칸의 «로고와 잇기»부터 해 주십시오.'
         : '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
           + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
   }
   /* ★ 3단계(2026-10-05) — 홈페이지에 아직 없는 노무사: 사진·올리기 허락을 넣어 달라고 알린다 */
-  /* 접은 뒤에는 옛 게시판에 매달 저절로 올리던 길이 없다 — 새 노무사(글 번호 없음)를 새 사이트에 넣는 길은 남은 일 */
-  const 새사람 = (!접음 && typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
+  /* (2026-11-16) 접은 뒤에도 센다 — 새 노무사(글 번호 없음)는 새 사이트 사진 + 올리기 허락이 있으면 「새 사이트에 올리기」로 간다 */
+  const 새사람 = (typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
   if (새사람.length) {
     add({ cls: 'info', t: '새 노무사 — 사진·올리기 허락을 넣어 주십시오', n: 새사람.length,
       who: esc(새사람.slice(0, 3).map(x => x.name + (x.낡은허락 ? '(다시 허락)' : '')).join(', ')
@@ -7563,6 +7632,17 @@ function base끼우기(html, b) {
     : t + html;
 }
 
+/* ★ 미리보기는 «스크립트 없이» 그린다 (2026-11-16 보안 검토 — 미리보기 iframe 에 sandbox 없음, 중간).
+   srcdoc 은 이 화면(이알피)과 «같은 출처»라, 쪽 안의 스크립트가 돌면 이알피 로그인 저장소를 만질 수 있다.
+   그래서 sandbox="allow-same-origin"(스크립트 막음 — 표시 붙이기 markPreview 는 바깥에서 DOM 만 만진다)으로 연다.
+   ⚠ 이 홈페이지 반죽은 카드(.animate-in)를 «스크립트가 켜 줄 때까지» 숨긴다 — 스크립트를 막으면 카드가 통째로 안 보인다.
+     그래서 미리보기 문서에만 «보이게» 꾸밈 한 줄을 덧붙인다. 올리는 HTML 에는 안 들어간다(여기서만 만든다). */
+const 미리보기꾸밈 = '<style id="pu-preview-static">.animate-in,.animate-out{visibility:visible!important;opacity:1!important}</style>';
+function 미리보기문서(html, b) {
+  const s = base끼우기(html, b);
+  return /<\/head>/i.test(s) ? s.replace(/<\/head>/i, 미리보기꾸밈 + '</head>') : 미리보기꾸밈 + s;
+}
+
 /* 지금 고르신 것의 «올릴 HTML». 못 만들면 왜인지 함께 돌려준다.
    ★ 아무것도 올리지 않는다 — 글자를 만들어 보기만 한다. */
 function 미리보기HTML() {
@@ -7636,7 +7716,8 @@ function prevHtml() {
      (HTML 글자를 건드리면 올릴 것과 달라진다). */
   const 표시 = JSON.stringify(r.바뀐줄 || []).replace(/"/g, '&quot;');
   h += '<iframe id="prevFrame" title="미리보기" data-marks="' + 표시 + '"'
-    + ' onload="markPreview(this)" srcdoc="' + esc(base끼우기(r.html, r.바탕)) + '"></iframe>';
+    + ' sandbox="allow-same-origin"'
+    + ' onload="markPreview(this)" srcdoc="' + esc(미리보기문서(r.html, r.바탕)) + '"></iframe>';
   h += '</div>';
   return h;
 }
@@ -7681,8 +7762,13 @@ function openPreviewWindow() {
   if (!r.html) { say('미리 볼 것이 없습니다', r.why || ''); return; }
   const w = window.open('', 'puPreview');
   if (!w) { say('새 창이 막혔습니다', '브라우저가 새 창을 막았습니다 — 주소창 오른쪽의 막음 표시를 풀어 주십시오.'); return; }
+  /* ★ 새 창도 «같은 출처»다 — 쪽을 그대로 쓰면 그 스크립트가 이알피 출처에서 돈다.
+       그래서 창에는 틀만 쓰고, 쪽은 스크립트 막은 iframe(srcdoc) 안에 그린다(위 미리보기문서와 같은 까닭). */
   w.document.open();
-  w.document.write(base끼우기(r.html, r.바탕));
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>미리보기</title>'
+    + '<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%;display:block}</style></head><body>'
+    + '<iframe title="미리보기" sandbox="allow-same-origin" srcdoc="' + esc(미리보기문서(r.html, r.바탕)) + '"></iframe>'
+    + '</body></html>');
   w.document.close();
   w.focus();
 }
@@ -7752,8 +7838,11 @@ function partnerEdit(d) {
       + ' — 홈페이지에는 <b>올림</b>으로 표시돼 있습니다.<br>'
       /* ★ 월간 자동 연결(2026-10-05) 뒤로는 «이어 둔» 로고가 다음 달 1일에 저절로 내려간다.
            안 이었거나 남기기로 둔 것은 그대로 — 사람에게 있는 그대로 말한다. */
+      /* ★ 옛 사이트를 접은 뒤(OLD_SITE_OFF)에는 휴지통이 아니라 «새 사이트 로고에서 숨김»이다(2026-11-16 검토 낮음) */
       + '<span class="sm">' + (Number(mk.boardSrl) > 0 && !(mk.keep && String(mk.keep.why || '').trim())
-          ? '로고와 이어져 있어 <b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 남기려면 아래 «남기기»를 쓰십시오.'
+          ? ((typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true)
+            ? '로고와 이어져 있어 <b>새 사이트 로고에서 저절로 숨깁니다</b>(«새 사이트에 올리기» · 매달 1일). 남기려면 아래 «남기기»를 쓰십시오.'
+            : '로고와 이어져 있어 <b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 남기려면 아래 «남기기»를 쓰십시오.')
           : '로고와 안 이었거나 «남기기»로 두어 자동으로는 안 내려갑니다.') + '</span></div>';
   }
   h += '</div><div class="esc">';
@@ -8309,10 +8398,22 @@ async function publishPeople() {
     const 퇴사로뺀 = Object.keys(App.members)
       .filter(k => !offSiteOf(App.members[k]) && !새홈페이지에갈사람(App.members[k]))
       .map(k => App.members[k].name || k);
-    const ours = Object.keys(App.members)
+    const ours0 = Object.keys(App.members)
       .filter(k => 새홈페이지에갈사람(App.members[k]))
       .map(k => Object.assign({}, App.members[k], { key: k }));
+    /* ★ 새 사이트에 아직 안 올라간 «우리 사진»(2026-11-16) — 올릴 자리를 미리 정해 카드에 끼워 보고,
+         «예»를 받은 뒤에 사진부터 올린다. 사진이 실패하면 쪽은 안 올린다(없는 그림을 가리키는 카드를 막는다). */
+    const 사진할일 = await 올릴사진준비(ours0);
+    const ours = ours0.map(m => 사진할일[m.key]
+      ? Object.assign({}, m, { photo: Object.assign({}, m.photo, { site: 사진할일[m.key].site }) }) : m);
     const 고른것 = PuSitePeople.올릴사람(지금쪽, ours);
+    /* 실제로 카드에 실리는 사람의 사진만 올린다 — 못 가는 사람(허락 없음 등)의 사진은 공개 저장소에 안 올린다 */
+    const 실릴열쇠 = {};
+    고른것.갈것.forEach(p => { 실릴열쇠[String(p.srl)] = 1; });
+    const 올릴사진 = Object.keys(사진할일).filter(k => {
+      const m = ours.filter(x => x.key === k)[0] || {};
+      return 실릴열쇠[String(m.srl || '').trim() || k];
+    });
     if (!고른것.갈것.length) {
       await say('올릴 사람이 없습니다',
         '홈페이지 글 번호와 사진이 맞는 사람이 하나도 없습니다.' +
@@ -8327,15 +8428,28 @@ async function publishPeople() {
       return;
     }
 
-    /* ★ 무엇이 올라가는지 «먼저 보여주고» 묻는다. 묻지 않고 올리면 되돌릴 틈이 없다 */
+    /* ★ 무엇이 올라가는지 «먼저 보여주고» 묻는다. 묻지 않고 올리면 되돌릴 틈이 없다
+       ⚠ askYes 는 본문을 HTML 로 넣는다 — 이름·까닭은 esc, 줄바꿈은 <br> (2026-11-16 검토: 목록이 한 줄로 뭉개지고 이름이 그대로 들어갔다).
+         직원바뀐것글 은 이미 esc 해서 돌려준다. */
     const ok = await askYes('홈페이지에 올릴까요?',
-      '구성원 ' + 고른것.갈것.length + '명으로 «구성원 소개» 쪽을 다시 만듭니다.\n' +
-      고른것.갈것.map(p => '· ' + p.이름 + (p.직책1 ? ' ' + p.직책1 : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
-      (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + x.이름 + ' — ' + x.why).join('\n') : '') +
-      (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + n).join('\n') : '') +
+      ('구성원 ' + 고른것.갈것.length + '명으로 «구성원 소개» 쪽을 다시 만듭니다.\n' +
+      고른것.갈것.map(p => '· ' + esc(p.이름) + (p.직책1 ? ' ' + esc(p.직책1) : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
+      (올릴사진.length ? '\n\n[새로 올리는 얼굴 사진] ' + 올릴사진.length + '장\n'
+        + 올릴사진.map(k => '· ' + esc((App.members[k] || {}).name || k)).join('\n') : '') +
+      (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + esc(x.이름) + ' — ' + esc(x.why)).join('\n') : '') +
+      (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + esc(n)).join('\n') : '') +
       직원바뀐것글(직원.전, 직원.후) +
-      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
+      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
+
+    /* 사진부터 — 한 장이라도 못 올리면 쪽은 올리지 않는다 */
+    for (const k of 올릴사진) {
+      const 일 = 사진할일[k];
+      await 그림올리기(일.site.path, 일.b64, '구성원 얼굴 사진');
+      const 기록 = Object.assign({ at: Date.now() }, 일.site);
+      await db.ref('homepage/members/' + k + '/photo/site').set(기록);
+      if (App.members[k] && App.members[k].photo) App.members[k].photo.site = 기록;
+    }
 
     const 답 = await 올리기('site/people/index.html', 새쪽,
       '구성원 ' + 고른것.갈것.length + '명');
@@ -8563,6 +8677,42 @@ async function 올리기(path, content, note) {
   return 답;
 }
 
+/* 그림 한 장을 저장소에 올린다 — 로고(site/files/logo/)와 얼굴 사진(site/files/people/)이 «같은 길»을 쓴다.
+   ★ 자리·크기·SVG 판단은 서버(publishSite)가 한다 — 여기서 느슨하게 해도 서버가 막는다. */
+async function 그림올리기(path, base64, note) {
+  const token = await firebase.auth().currentUser.getIdToken();
+  const up = await fetch(PUBLISH_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: path, content: base64, image: true, note: note || '' })
+  });
+  const 답 = await up.json().catch(() => ({}));
+  if (!up.ok) throw new Error(답.error || ('서버가 ' + up.status + ' 을 돌려줬습니다'));
+  return 답;
+}
+
+/* 새 사이트에 올릴 «우리 얼굴 사진» 고르기 (2026-11-16) — 읽기만 한다.
+   ★ 이미 올라간 판(photo.site.ver === 사진판)이면 건너뛴다 — 올리기 때마다 같은 사진을 다시 올리지 않게.
+   ★ 글 번호 없는 분은 «허락»이 있어야 실린다 — 허락이 없으면 사진을 읽지도 않는다(공개 저장소에 먼저 올라가지 않게).
+   돌려주는 것: { 열쇠: { b64, site: { path, v, ver } } } */
+async function 올릴사진준비(ours) {
+  const 일 = {};
+  for (const m of (ours || [])) {
+    const p = m && m.photo;
+    if (!p || !(Number(p.bytes) > 0) || 사진새사이트에있나(p)) continue;
+    if (PuSitePeople.직원인가(m)) continue;
+    if (!String(m.srl || '').trim() && !PuSitePeople.허락있나(m)) continue;
+    let 담긴것 = null;
+    try { 담긴것 = (await db.ref('homepage/memberPhotos/' + m.key).once('value')).val(); }
+    catch (e) { 담긴것 = null; }
+    const 종류 = (담긴것 && 담긴것.type) || p.type || 'image/jpeg';
+    const 자리 = PuSitePeople.사진자리(m.key, 종류);
+    if (!자리 || !담긴것 || !담긴것.b64) continue;
+    일[m.key] = { b64: String(담긴것.b64), site: { path: 자리, v: String(Date.now()), ver: 사진판(p) } };
+  }
+  return 일;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    로고 붙여넣기 (대표 요청 2026-09-02 「캡쳐 후 붙여넣기로 쉽게 해결하고 싶다」)
    ══════════════════════════════════════════════════════════════════════════
@@ -8716,15 +8866,7 @@ async function 로고담기(base64, 끝, 사연) {
   const 열쇠 = 로고열쇠();
   const 이름 = 열쇠 + '.' + 끝;
   const 자리 = 'site/files/logo/' + 이름;
-  const token = await firebase.auth().currentUser.getIdToken();
-  const up = await fetch(PUBLISH_URL, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: 자리, content: base64, image: true,
-                           note: '자문사 로고 ' + (사연 || '') })
-  });
-  const 답 = await up.json().catch(() => ({}));
-  if (!up.ok) throw new Error(답.error || ('서버가 ' + up.status + ' 을 돌려줬습니다'));
+  const 답 = await 그림올리기(자리, base64, '자문사 로고 ' + (사연 || ''));
   const 새것 = { srl: 열쇠, 그림: '../files/logo/' + 이름 };
   /* ★ 서버 목록에 «붙인다» — 다른 탭이 방금 담은 것이 있어도 함께 남는다.
        ⚠ 찬 자리(null)로 먼저 불려도 접지 않는다 — [새것] 을 내면 서버가 진짜 값으로 다시 부른다. */
@@ -8818,7 +8960,17 @@ async function publishPartner() {
     const res = await fetch(SITE_BASE + '/partner/index.html?t=' + Date.now());
     if (!res.ok) throw new Error('자문사 쪽을 읽지 못했습니다 (' + res.status + ')');
     const 지금쪽 = await res.text();
-    const 고른것 = PuSitePartner.올릴로고(지금쪽, App.partnerLogos);
+    /* ★ 계약 끝난 자문사 로고는 «저절로» 숨긴다 (2026-11-16 — 옛 홈페이지 자동 휴지통을 새 사이트로 옮김).
+         업체관리를 못 읽었으면(App.companiesErr) 판정하지 않는다 — 비어 보이는 목록으로 아무 로고나 숨기지 않게.
+         ⚠ 숨김 설정(homepage/partnerLogos)에는 «안 적는다» — 올릴 때마다 업체관리 상태로 다시 정한다.
+           (적어 두면 계약이 다시 이어진 회사의 로고가 숨김에 남아 영영 안 나온다.) */
+    const 끝난 = App.companiesErr ? { 숨길: {}, 목록: [], 겹침: [], 못읽음: true }
+      : PuSitePartner.계약끝난로고(App.partners, App.companies);
+    const 정한것 = Object.assign({}, App.partnerLogos,
+      { 숨김: Object.assign({}, (App.partnerLogos || {}).숨김 || {}, 끝난.숨길) });
+    const 고른것 = PuSitePartner.올릴로고(지금쪽, 정한것);
+    const 끝나숨김 = 고른것.숨긴것.filter(x => 끝난.숨길[String(x.srl)] && !(((App.partnerLogos || {}).숨김 || {})[x.srl]));
+    const 회사이름 = (id) => ((App.companies || []).filter(c => String(c.id) === String(id))[0] || {}).name || '(이름 없음)';
     const 새쪽 = PuSitePartner.쪽그리기(지금쪽, 고른것.갈것);
 
     /* ★ 메인에도 «같은 로고 띠»가 흐른다. 자문사 쪽만 고치고 메인을 그대로 두면
@@ -8841,11 +8993,17 @@ async function publishPartner() {
       await say('바뀐 것이 없습니다', '지금 올라가 있는 것과 같습니다 — 올리지 않았습니다.');
       return;
     }
+    /* ⚠ askYes 는 본문을 HTML 로 넣는다 — 회사 이름은 esc, 줄바꿈은 <br> */
     const ok = await askYes('홈페이지에 올릴까요?',
-      '자문사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
+      ('자문사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
       (고른것.숨긴것.length ? '\n숨기는 로고 ' + 고른것.숨긴것.length + '장' : '') +
+      (끝나숨김.length ? '\n\n[계약이 끝나 저절로 숨기는 로고] ' + 끝나숨김.length + '장\n'
+        + 끝나숨김.map(x => '· ' + esc(회사이름((끝난.목록.filter(y => y.srl === String(x.srl))[0] || {}).companyId))).join('\n')
+        + '\n(남겨야 하면 그 회사 편집칸의 「계약이 끝나도 남기기」에 사유를 적어 주십시오)' : '') +
+      (끝난.겹침.length ? '\n\n⚠ 로고 번호가 두 회사에 이어져 있어 숨기지 않은 곳 ' + 끝난.겹침.length + '곳 — 로고 잇기를 확인해 주십시오' : '') +
+      (끝난.못읽음 ? '\n\n⚠ 업체관리를 읽지 못해 계약 끝난 로고는 판정하지 않았습니다' : '') +
       (새메인 ? '\n메인 화면의 흐르는 로고 띠도 함께 바꿉니다.' : '') +
-      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
+      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
 
     let 올린쪽 = 0;

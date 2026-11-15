@@ -58,12 +58,26 @@
     }).filter(function (x) { return x.그림; });
   }
 
+  /* ★ 열쇠·그림 주소는 쪽 속성(그리고 이알피 화면의 onclick)에 그대로 들어간다 — 안전한 모양만 받는다(2026-11-16 검토).
+       그림은 따옴표·꺾쇠·빈칸·역빗금이 없고, 주소라면 http(s) 만. 열쇠는 영문·숫자·_- 만. */
+  var 로고열쇠꼴 = /^[A-Za-z0-9_-]{1,60}$/;
+  function 로고그림안전(g) {
+    var s = String(g == null ? '' : g);
+    if (!s || /["'<>`\\\s\u0000-\u001f]/.test(s) || /&#|&[a-z]+;/i.test(s)) return false;
+    var 머리 = /^([a-z][a-z0-9+.-]*):/i.exec(s);
+    return !머리 || /^https?$/i.test(머리[1]);
+  }
+
   function 칸그리기(본, 로고, 자리) {
     var h = 본;
+    if (!로고그림안전(로고 && 로고.그림)) throw new Error('로고 그림 주소 모양이 틀렸습니다');
     h = h.replace(/(<div class="bh bh_item item item)\d+/, '$1' + (자리 + 1));
     h = h.replace(/(<img[^>]+src=")[^"]*(")/, '$1' + 로고.그림 + '$2');
-    /* 로고를 누를 자리는 지금도 «주석»으로 막혀 있다 — 그 모양을 그대로 지킨다 */
-    h = h.replace(/data-srl="\d*"/g, 'data-srl="' + (로고.srl || '') + '"');
+    /* 로고를 누를 자리는 지금도 «주석»으로 막혀 있다 — 그 모양을 그대로 지킨다
+       ★ 본 칸이 새 로고(n…)여도 갈린다 — 숫자만 잡으면 첫 칸이 새 로고일 때 열쇠가 그대로 복사된다(2026-11-16 검토 낮음).
+       ★ 열쇠는 속성에 그대로 들어가므로 안전한 글자만 받는다. */
+    if (로고.srl && !로고열쇠꼴.test(String(로고.srl))) throw new Error('로고 열쇠 모양이 틀렸습니다');
+    h = h.replace(/data-srl="[A-Za-z0-9_-]*"/g, 'data-srl="' + (로고.srl || '') + '"');
     return h;
   }
 
@@ -102,8 +116,11 @@
        (올리고 나면 쪽에서 읽히므로 다음부터는 이 길로 안 온다.) */
     var 있는열쇠 = {};
     다.forEach(function (x) { 있는열쇠[x.srl] = 1; });
+    /* ★ 「추가」 목록은 로그인한 누구나 쓸 수 있는 자리다 — 우리가 지은 모양(n<시각>)이 아닌 열쇠·
+         안전하지 않은 그림 주소는 담지 않는다. 화면 단추(onclick)와 쪽 속성에 그대로 들어가기 때문이다. */
     ((정한것 && 정한것.추가) || []).forEach(function (x) {
       if (!x || !x.그림 || 있는열쇠[x.srl]) return;
+      if (!로고열쇠꼴.test(String(x.srl)) || !로고그림안전(x.그림)) return;
       다.push({ srl: String(x.srl), 그림: String(x.그림) });
       있는열쇠[x.srl] = 1;
     });
@@ -174,7 +191,43 @@
     return html;
   }
 
+  /* ── 계약 끝난 자문사 로고 (2026-11-16 — 옛 홈페이지 자동 «휴지통 내리기»를 새 사이트로 옮김) ──
+     옛 서버 자동(functions/homepage-auto.js 고르기 «자문사현황 로고 글 ↔ 업체»)과 «같은 잣대»:
+       업체관리에서 거래 종료(status === 'closed', 지운 업체 아님) · 로고와 이어 둠(boardSrl — 로고 칸의 data-srl) ·
+       「계약이 끝나도 남기기」(keep, 사유 있음) 아님.
+     ★ 회사 열쇠(companyId)로만 맞춘다 — 이름으로 짐작하지 않는다(온톨로지 규칙).
+     ★ 한 로고 번호를 두 회사가 가리키면 «숨기지 않는다» — 그 로고가 누구 것인지 모른다(옛 자동도 「글 번호가 겹침」으로 멈췄다).
+     ⚠ 아무것도 쓰지 않는다 — 회사 상태·로고 기록을 바꾸지 않고 «이번에 올릴 쪽에서 뺄 것»만 돌려준다
+       (종료·삭제·되돌림 불변 — 종결 건을 되살리거나 상태를 바꾸지 않는다). 업체를 못 읽었으면(목록 없음) 아무것도 안 숨긴다. */
+  function 계약끝난로고(partners, companies) {
+    var 숨길 = {}, 목록 = [], 겹침 = [];
+    var 회사 = {};
+    var 업체 = Array.isArray(companies) ? companies : (companies && typeof companies === 'object'
+      ? Object.keys(companies).map(function (k) { return companies[k]; }) : null);
+    if (!업체 || !업체.length) return { 숨길: 숨길, 목록: 목록, 겹침: 겹침, 못읽음: true };
+    업체.forEach(function (c) { if (c && c.id && !c._deleted) 회사[String(c.id)] = c; });
+    var 묶음 = (partners && typeof partners === 'object') ? partners : {};
+    var 번호셈 = {};
+    Object.keys(묶음).forEach(function (id) {
+      var n = Number((묶음[id] || {}).boardSrl);
+      if (Number.isInteger(n) && n > 0) 번호셈[n] = (번호셈[n] || 0) + 1;
+    });
+    Object.keys(묶음).forEach(function (id) {
+      var p = 묶음[id] || {};
+      var n = Number(p.boardSrl);
+      if (!(Number.isInteger(n) && n > 0)) return;
+      var c = 회사[String(id)];
+      if (!c || String(c.status || '') !== 'closed') return;
+      if (p.keep && typeof p.keep === 'object' && String(p.keep.why || '').trim()) return;
+      if (번호셈[n] > 1) { 겹침.push({ srl: String(n), companyId: String(id) }); return; }
+      숨길[String(n)] = true;
+      목록.push({ srl: String(n), companyId: String(id) });
+    });
+    return { 숨길: 숨길, 목록: 목록, 겹침: 겹침, 못읽음: false };
+  }
+
   global.PuSitePartner = {
+    계약끝난로고: 계약끝난로고,
     로고읽기: 로고읽기,
     쪽그리기: 쪽그리기,
     올릴로고: 올릴로고,

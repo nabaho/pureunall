@@ -65,6 +65,13 @@ module.exports = {
     { name: 'member', run: async (page) => {
         await page.evaluate(() => { const e = document.querySelector('.edit'); if (e) e.scrollIntoView(); });
       } },
+    /* 글 번호 없는 새 노무사 편집칸 — 새 사이트 «얼굴 사진 · 올리기 허락» 줄(2026-11-16) */
+    { name: 'member-new', run: async (page) => {
+        await page.evaluate(() => {
+          App.pick = 'm04'; if (typeof loadDraft === 'function') loadDraft(); App.render();
+          const e = document.querySelector('.edit'); if (e) e.scrollIntoView();
+        });
+      } },
     /* 편집칸 발(저장·고치기 줄)의 ⋯ — 위로 펴는 칸 */
     { name: 'member-more', run: async (page) => {
         await page.evaluate(() => { const d = document.querySelector('.eft details.more'); if (d) { d.open = true; d.scrollIntoView({ block: 'end' }); window.scrollBy(0, 120); } });
