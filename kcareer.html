@@ -853,6 +853,22 @@ html.dark #p1PickTbl .dt table{background:var(--card)}   /* 글자만 밝히면 
 html.dark #p1PickTbl .dt td{color:var(--text)}
 html.dark #p1PickTbl .dt thead th{background:#1e293b!important;color:var(--text)}
 html.dark #modalP1Pick .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
+/* 프로필 1장 화면(설정 칸) 어두운 테마 — 기본 단추는 흰 바탕에 밝은 글자(1.23:1), 노란 안내 상자·⚙ 칸은 밝은 바탕에 밝은 글자(1.19:1)였다
+   (고르기 창 밖의 원래 문제 — 대표 승인 2026-11-15). 켜진 단추는 인라인 배경(navy·teal)+흰 글자라 그대로 둔다.
+   ⚠ 이 화면 안만 — 다른 화면의 어두운 테마는 따로 본다(status/2026-11-15-kcareer-dark-a4-btn.md). */
+html.dark #page-profile1 .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
+html.dark #page-profile1 .btn:not(.primary):hover{background:#475569}
+html.dark #page-profile1 .p1-note{background:#854d0e!important;border-color:#d97706!important;color:#fffbeb}   /* 인라인 밝은 바탕·테두리를 이겨야 한다 · 색은 팔레트 안(amber) 에서 */
+html.dark #page-profile1 .p1-card{background:var(--soft)!important}   /* ⚙ 칸 — 인라인 밝은 바탕을 이겨야 한다 */
+/* ⚙·☑ 단추는 인라인 padding:1px 7px 라 높이가 20px 였다 — 누르는 칸 최소 24×24(WCAG 2.5.8) */
+#p1Side .btn.sm{min-height:24px;min-width:24px}
+/* 프로필 1장 쌓기 — 설정 칸(500px 고정)+그림 칸을 나란히 두면 사이드바(230px)가 보이는 폭에서 그림 칸이 193px(1024px 창)·69px(900px 창)로 눌린다.
+   _p1Scale 이 «칸 폭»이 아니라 «전체 폭»으로 그림 크기를 재서 그림이 칸 밖으로 나가 #main 이 가로로 밀렸다(실측 1024px: scrollW 983 > 779).
+   그림 칸이 ~370px 미만이 되는 ≤1200px 에서는 폰(≤520px)처럼 위아래로 쌓는다 — 폰 규칙은 그대로 두고 같은 두 줄을 더한 것이다. */
+@media (max-width:1200px){
+  .p1-wrap{grid-template-columns:minmax(0,1fr)!important}
+  #p1Side{position:static!important;max-height:none!important;overflow:visible!important}
+}
 #hcBody .dt thead th:last-child{width:auto;min-width:96px}   /* 공용 표는 맨 끝 칸(관리)을 200px 로 잡는다 — 여기 끝 칸은 짧은 «상태» 칩이라 좁게 */
 #cdBody tr.hc-canceled td:nth-child(n+3):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
 @media (max-width:760px){ .hc-btx{display:none} .hc-hint{display:none} }
@@ -7997,7 +8013,7 @@ function renderProfile1(){
     +'<button class="btn primary" type="button" onclick="p1Hwpx()">📄 한글(hwpx)로</button>'
     +'<button class="btn" type="button" onclick="p1Pdf()">🖨 PDF</button>'
     +'<button class="btn" type="button" onclick="p1Keep()">📁 서류 보관함에 담기</button></div>'
-    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px;font-size:12px">'
+    +'<div class="p1-note" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px;font-size:12px">'
     +(m.overflow?'⚠ 한 장을 조금 넘습니다 — 고른 것을 줄이거나 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다'+(m.filled?' — 남는 자리만큼 줄을 더 넣었습니다':''))+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
   /* ★ 종이는 «실제 A4 크기»(794×1123px, 여백 14mm)로 그리고 칸 너비에 맞춰 «줄여 보인다» —
        좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
@@ -8043,9 +8059,14 @@ function _p1Scale(){
     return;
   }
   paper.style.background='#fff'; paper.style.overflow='hidden'; a4.style.marginLeft='0';
-  var box=paper.parentNode, availW=(box&&box.clientWidth)||794;
+  var box=paper.parentNode;
+  /* ★ «그림 칸»의 폭을 잰다 — 설정 칸(500px)이 옆에 있으면 그림 칸은 전체(box)보다 훨씬 좁다.
+       전체 폭으로 재면 그림이 칸 밖으로 나가 #main 이 가로로 밀렸다(실측 1024px 창: 칸 193px 에 그림 433px, scrollW 983 > 779).
+       먼저 폭을 칸에 맞춰(100%) 놓고 잰다 — 아래에서 다시 정한다. 쌓인 폰·태블릿은 칸 = 전체 폭이라 그대로다. */
+  paper.style.width='100%'; paper.style.margin='0';
+  var availW=paper.offsetWidth||(box&&box.clientWidth)||794, fitW=Math.max(1, availW-2);   /* 종이는 안쪽 794×s + 테두리 2px — 칸에 «딱» 들어가려면 테두리를 뺀다 */
   var extra=0;
-  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; paper.style.margin='0'; }
+  if(_p1ZoomMode==='width'){ s=Math.min(1.4, fitW/794); paper.style.width='100%'; paper.style.margin='0'; }
   else if(_p1ZoomMode==='custom'){
     /* 직접 정한 크기 — 칸보다 크면 «옆으로 밀어» 본다(확대 상한 250%). 칸에 들어가면 가운데에 둔다 */
     s=Math.max(.4, Math.min(2.5, _p1Pct/100)); var fitsW=(794*s+2)<=availW;
@@ -8053,9 +8074,12 @@ function _p1Scale(){
     if(!fitsW){ paper.style.overflowX='auto'; extra=18; }
   }
   else{
-    var top=paper.getBoundingClientRect().top;
+    /* 태블릿에서 설정 칸 «아래»로 쌓이면 그림 자리(top)가 화면 밖 아래라, 높이를 그대로 재면 300px 한도(27%)로 쪼그라든다 —
+       그림 앞으로 스크롤해 오면 «한 화면»이 되게, 화면 맨 위에 있는 것으로 잰다. 폰(≤520px)은 예전 그대로 둔다. */
+    var 쌓임=false; try{ 쌓임=!!_p1Side&&window.innerWidth>520&&String(getComputedStyle(box).gridTemplateColumns||'').trim().split(/\s+/).length<2; }catch(e){}
+    var top=쌓임?8:paper.getBoundingClientRect().top;
     var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
-    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
+    s=Math.min(1, fitW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
   }
   a4.style.transform='scale('+s+')';
   paper.style.height=(Math.round(1123*s)+extra)+'px';
@@ -8113,7 +8137,7 @@ function p1Panel(k,o){
   var inp='width:100%;min-width:0;font-size:16px';
   /* «고른 것만 넣기»를 켠 칸은 건수를 안 본다(고른 줄이 전부 나온다) — 건수 상자는 막고 까닭을 적는다 */
   var 만=!!(o.only||{})[k]&&KcareerProfile1.PIN_KEYS.indexOf(k)>=0;
-  return '<div style="grid-column:1/-1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:0;background:#f8fafc;white-space:normal">'
+  return '<div class="p1-card" style="grid-column:1/-1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:0;background:#f8fafc;white-space:normal">'
     +'<div style="font-size:12px;color:var(--text-mute);margin-bottom:3px">몇 건 넣을까 <span style="color:var(--text-mute)">('+(만?'✅ 고른 것만 넣는 중 — 건수는 적용되지 않습니다':'정하면 한 장에 맞추려 줄이지 않습니다')+')</span></div>'
     +'<select class="tb-select" style="width:100%" data-k="'+k+'"'+(만?' disabled':'')+' aria-label="몇 건 넣을까" onchange="p1Lim(this.dataset.k,this.value)">'+opts+'</select>'
     +'<div style="font-size:12px;color:var(--text-mute);margin:6px 0 3px">제목 바꾸기</div>'
