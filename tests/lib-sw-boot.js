@@ -24,10 +24,11 @@ const R = path.join(__dirname, '..');
 function 일꾼켜기(파일, 주소) {
   const handlers = {};
   const 담긴것 = {};   // IndexedDB 이름 → 담긴 레코드들
+  const 자리 = {};     // IndexedDB 이름 → { 판, 함 } — 담을 때 연 판 번호와 함(store) 이름
   const 캐시 = {};     // 캐시 이름 → 넣은 열쇠들
   const ctx = { URL, Response, Promise, setTimeout, console: { warn() {}, log() {} } };
   ctx.indexedDB = {
-    open(이름) {
+    open(이름, 판) {
       const req = {};
       setTimeout(function () {
         req.result = {
@@ -37,10 +38,12 @@ function 일꾼켜기(파일, 주소) {
             const tx = {};
             setTimeout(function () { tx.oncomplete && tx.oncomplete(); }, 0);
             return Object.assign(tx, {
-              objectStore() {
+              objectStore(함) {
+                /* 이름만 맞고 판·함이 어긋나도 꺼내는 쪽은 빈 함을 연다 — 셋 다 적어 둔다 */
+                const 적기 = function () { 자리[이름] = { 판: 판, 함: 함 }; };
                 return {
-                  add(v) { (담긴것[이름] = 담긴것[이름] || []).push(v); },
-                  clear() { 담긴것[이름] = []; }
+                  add(v) { 적기(); (담긴것[이름] = 담긴것[이름] || []).push(v); },
+                  clear() { 적기(); 담긴것[이름] = []; }
                 };
               }
             });
@@ -81,7 +84,7 @@ function 일꾼켜기(파일, 주소) {
   };
   vm.createContext(ctx);
   싣기(path.basename(파일));
-  return { handlers, 담긴것, 캐시 };
+  return { handlers, 담긴것, 자리, 캐시 };
 }
 
 /* 가짜 공유 요청 — 안드로이드가 보내는 모양(multipart 의 파일 칸 하나) */

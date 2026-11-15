@@ -43,8 +43,13 @@ function 공유자리(manifest파일, 기준) {
   const st = mf(manifest파일).share_target;
   return { 주소: new URL(st.action, new URL(manifest파일, 기준)).href, 칸: st.params.files[0].name };
 }
-/* 사진첩 화면이 공유를 꺼내는 함의 이름 — 일꾼이 여기에 담아야 사진첩이 찾는다 */
+/* 사진첩 화면이 공유를 꺼내는 자리 — 일꾼이 «이름·함·판» 셋 다 같은 곳에 담아야 사진첩이 찾는다.
+   (이름만 맞고 판이나 함이 어긋나면 사진첩은 빈 함을 열고 「보낸 게 없다」고 한다) */
 const 사진첩함 = (사진첩.match(/const SHARE_IDB = '([^']+)'/) || [])[1];
+const 사진첩자리 = {
+  판: Number((사진첩.match(/indexedDB\.open\(SHARE_IDB,\s*(\d+)\)/) || [])[1]),
+  함: (사진첩.match(/SHARE_STORE = '([^']+)'/) || [])[1]
+};
 
 /* ══════ ① 같은 일꾼을 등록한다 ══════ */
 
@@ -73,6 +78,9 @@ for (const 기준 of [뿌리, 'http://localhost:8080/']) {
       '★ 받은 뒤 «같은 폴더의» 사진첩 화면으로 가야 합니다 — 사진첩이 꺼내 판독까지 잇습니다');
     const 담김 = w.담긴것[사진첩함] || [];
     assert.equal(담김.length, 2, '★ 사진첩 화면이 꺼내는 함(' + 사진첩함 + ')에 안 담겼습니다 — 사진첩이 「보낸 게 없다」고 합니다');
+    assert.ok(사진첩자리.판 >= 1 && 사진첩자리.함, 'pu-photos.html 에서 공유함의 판 번호·함 이름을 못 읽었습니다');
+    assert.deepEqual(w.자리[사진첩함], 사진첩자리,
+      '★ 이름은 같은데 판 번호·함 이름이 사진첩 화면과 다릅니다 — 사진첩이 빈 함을 엽니다');
     assert.equal(담김[0].name, '명함.jpg');
     assert.ok(담김[0].blob, '사진 알맹이를 그대로 담아야 합니다');
     assert.equal(담김[1].type, 'application/pdf', '스캔(PDF)도 받는다(manifest accept 와 같다)');

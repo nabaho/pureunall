@@ -35,9 +35,10 @@ const 통합일꾼 = new URL('pu-sw.js', 뿌리).href;
 
 /* ── 훑을 파일 ──
    ⚠ `git ls-files` 는 한글 이름을 따옴표로 감싸 내놓는다 — 끄고 읽는다(no-real-client-data 와 같은 까닭).
-   검사·남의 참고본·작업 사본(.claude/worktrees)은 화면이 아니므로 뺀다. */
+   검사·남의 참고본·작업 사본(.claude/worktrees)은 화면이 아니므로 뺀다.
+   ⚠ 아직 git add 안 한 새 화면도 본다(--others) — 내 컴퓨터에서 먼저 걸려야 한다. */
 function 훑을파일() {
-  return execSync('git -c core.quotepath=false ls-files', { cwd: R, encoding: 'utf8', maxBuffer: 1 << 28 })
+  return execSync('git -c core.quotepath=false ls-files --cached --others --exclude-standard', { cwd: R, encoding: 'utf8', maxBuffer: 1 << 28 })
     .split(/\r?\n/).filter(Boolean)
     .filter((f) => /\.(html|js|mjs)$/.test(f))
     .filter((f) => !/^(tests|node_modules|reference|\.claude)\//.test(f));
@@ -54,6 +55,14 @@ function 등록읽기(src, 파일) {
   const 읽은것 = [], 못읽음 = [];
   let m;
   부름.lastIndex = 0;
+  /* ⚠ 다른 이름으로 부른 등록(const sw = navigator.serviceWorker; sw.register(…) · navigator['serviceWorker'])은
+     위 꼴에 안 걸려 «조용히» 빠진다 — serviceWorker 가 든 파일의 .register( 수가 읽은 수보다 많으면 못 읽은 것으로 센다.
+     (2026-11-15 지금 그런 파일에는 일꾼 등록 말고 다른 .register( 가 없다. 생기면 아래 문구대로 이 검사를 넓힌다) */
+  if (/serviceWorker/.test(src)) {
+    const 모든부름 = (src.match(/\.register\s*\(/g) || []).length;
+    const 일꾼부름 = (src.match(부름) || []).length;
+    if (모든부름 > 일꾼부름) 못읽음.push(파일 + ' (serviceWorker 를 다른 이름으로 불러 등록한 듯한 .register( ' + (모든부름 - 일꾼부름) + '곳)');
+  }
   while ((m = 부름.exec(src))) {
     const 줄 = src.slice(0, m.index).split('\n').length;
     const k = 꼴.exec(src.slice(m.index));
@@ -145,6 +154,9 @@ test('② 이 검사의 «잣대»가 진짜로 잡는다 — 일부러 틀린 �
   assert.equal(어김("navigator.serviceWorker.register('a-sw.js')", 'sub/page.html'), 0, '하위 폴더 등록을 뿌리로 봅니다');
   assert.equal(못읽음('navigator.serviceWorker.register(swUrl)'), 1, '변수로 준 일꾼 주소를 «읽었다»고 넘어갑니다');
   assert.equal(못읽음("navigator.serviceWorker.register('x.js', { scope: NOPE })"), 1, '값을 모르는 scope 상수를 «읽었다»고 넘어갑니다');
+  assert.equal(못읽음("const sw = navigator.serviceWorker;\nsw.register('x-sw.js')"), 1, '다른 이름으로 부른 등록이 조용히 빠집니다');
+  assert.equal(못읽음("navigator['serviceWorker'].register('x-sw.js')"), 1, "navigator['serviceWorker'] 꼴의 등록이 조용히 빠집니다");
+  assert.equal(못읽음("navigator.serviceWorker.register('pu-sw.js')"), 0, '옳은 등록을 못 읽었다고 합니다');
 });
 
 /* ══════ ③ 공유 받는 앱마다, 그 주소를 맡는 일꾼이 실제로 받는다 ══════ */

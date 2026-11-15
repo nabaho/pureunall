@@ -14,5 +14,9 @@
         (pu-photos-sw.js 같은 옛 껍데기들이 실제로 갈라져 있다 — tests/photos-share-target 머리말).
    지우면 ①의 폰은 새 pu-erp.html(이제 pu-sw.js 를 등록한다)이나 다른 앱을 열 때까지
    옛 일꾼(이알피 공유만 받는다)으로 남는다. 다 갈아탄 것이 확실해지면 지워도 된다.
+   ⚠ 꼬리표(?from=erp-sw-20261115)는 «처음 갈아탈 때» 폰 캐시에 남은 옛 pu-sw.js(이알피 갈래가 없다)를
+     집지 않게 하려는 것이다 — 불러오는 파일은 브라우저 캐시(깃허브 약 10분)를 거친다. 처음 보는 주소라
+     반드시 새로 받는다. 나중에 pu-sw.js 를 고쳐도 이 꼬리표는 안 바꿔도 된다(브라우저가 불러온 파일도
+     일꾼 갱신 때 다시 견줘 본다 — 늦어도 캐시 시간만큼).
    지킴: tests/erp-share-target.test.js */
-importScripts('pu-sw.js');
+importScripts('pu-sw.js?from=erp-sw-20261115');
