@@ -1706,18 +1706,19 @@
     }
   }
   const _initSp = new URLSearchParams(location.search);
-  const _initFrom = _initSp.get('from') || '';
+  const fromParam = _initSp.get('from') || '';
+  const _initFrom = fromParam;
   const _initBid = _initSp.get('bid') || '';
   try {
     const raw = localStorage.getItem('pureun_hangul_bridge');
     if (raw) {
       localStorage.removeItem('pureun_hangul_bridge');
       /* 전용 조사 팝업(from=harass)은 opener postMessage + bid 검증 경로만 허용하고 공용 localStorage 잔류분은 무시 */
-      if (_initFrom !== 'harass') {
+      if (fromParam !== 'harass') {
         const p = JSON.parse(raw);
         if (p && String(p.bridgeId || '').indexOf('harass_') !== 0) {
-          const freshMs = _initFrom === 'jobtrans' ? 300000 : 60000;
-          if (_initFrom === 'fund' || Date.now() - (p.sentAt || 0) < freshMs) {
+          const freshMs = fromParam === 'jobtrans' ? 300000 : 60000;
+          if (fromParam === 'fund' || Date.now() - (p.sentAt || 0) < freshMs) {
             setTimeout(() => loadFromFundPayload(p), 60);
           }
         }
