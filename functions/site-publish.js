@@ -136,13 +136,23 @@ function 실행조각(html) {
   const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
   let m;
   const re1 = /<script\b[\s\S]*?<\/script\s*>/gi;
-  while ((m = re1.exec(s))) out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, ""));
-  const re2 = /\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
-  while ((m = re2.exec(s))) out.add("H:" + norm(m[0]));
-  /* 속성 이름은 가리지 않는다 — href·src 말고도 SVG <set to=…>·<animate values=…> 가 주소를 바꿀 수 있다. */
-  const 풀린 = 글자참조풀기(s).replace(/[\u0000-\u001f\u007f]/g, "");
-  const re3 = /[\w:-]+\s*=\s*["']?[\s ]*(?:javascript\s*:|vbscript\s*:|data:text\/html)/gi;
-  while ((m = re3.exec(풀린))) out.add("J:" + norm(m[0]));
+  let 닫힌수 = 0;
+  while ((m = re1.exec(s))) { 닫힌수++; out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, "")); }
+  /* 닫는 태그가 없는 <script> 도 브라우저는 문서 끝까지를 스크립트로 읽는다 — 수가 모자라면 그 자체를 조각으로 센다 */
+  const 연수 = (s.match(/<script\b/gi) || []).length;
+  if (연수 > 닫힌수) out.add("S:닫히지 않은 script " + (연수 - 닫힌수));
+  /* ★ 속성은 브라우저처럼 «날 글자»에서 가른다(따옴표 구조는 글자 참조로 바뀌지 않는다) — 그다음 값만 풀어 본다(2026-11-16 검토).
+       속성 이름 앞은 빈칸만이 아니다 — <svg/onload=…> 처럼 빗금·따옴표 뒤에도 온다. 이름은 가리지 않는다
+       (href·src 말고도 SVG <set to=…>·<animate values="a;javascript:…"> 가 주소를 바꾼다). 값 «어디든» 실행 주소가 있으면 센다.
+       열쇠는 «속성 통째(풀린 값)» — 있던 javascript:void(0) 옆에 다른 javascript: 를 새로 넣으면 새 조각으로 잡힌다. */
+  const re2 = /([^\s"'<>\/=`]+)\s*=\s*("[^"]*"|'[^']*'|[^\s"'<>`]+)/g;
+  while ((m = re2.exec(s))) {
+    const 이름 = m[1].toLowerCase();
+    const 날값 = m[2].replace(/^["']|["']$/g, "");
+    if (/^on[a-z]+$/.test(이름)) { out.add("H:" + norm(이름 + "=" + 날값)); continue; }
+    const 값 = 글자참조풀기(날값).replace(/[\u0000-\u001f\u007f]/g, "");
+    if (/(?:javascript|vbscript)\s*:|data:text\/html/i.test(값)) out.add("J:" + norm(이름 + "=" + 값));
+  }
   const re4 = /<(?:iframe|object|embed|base|frame|applet)\b[^>]*>|<meta\b[^>]*http-equiv[^>]*>/gi;
   while ((m = re4.exec(s))) out.add("T:" + norm(m[0]));
   return out;

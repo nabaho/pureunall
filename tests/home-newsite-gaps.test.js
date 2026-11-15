@@ -318,7 +318,12 @@ test('★★★ 실행 조각 검사는 글자 참조·탭으로 감춘 주소�
     '<a href="jav&Tab;ascript:alert(1)">누르기</a>',
     '<a href="java\tscript:alert(1)">누르기</a>',
     '<a href=" &#14;javascript:alert(1)">누르기</a>',
-    '<svg><a><set attributeName="href" to="javascript:alert(1)"/></a></svg>'
+    '<svg><a><set attributeName="href" to="javascript:alert(1)"/></a></svg>',
+    /* 재검증 2회째 — 빗금·따옴표 바로 뒤 이벤트 속성, 값 «가운데» 실행 주소, 닫히지 않은 스크립트 */
+    '<svg/onload=alert(1)>',
+    '<img src="x"onerror=alert(1)>',
+    '<svg><a><animate attributeName="href" values="https://example.org;javascript:alert(1)"/></a></svg>',
+    '<p>끝</p><script>alert(1)'
   ].forEach(나쁜 => {
     assert.ok(SP.새실행조각(있던, 있던 + 나쁜).length >= 1, '★★★ 감춘 실행 주소가 빠져나간다: ' + 나쁜);
   });
@@ -326,6 +331,14 @@ test('★★★ 실행 조각 검사는 글자 참조·탭으로 감춘 주소�
   assert.deepEqual(SP.새실행조각(있던, '<p>나</p><a href="javascript-guide.html">안내</a>'), []);
   const 감춘것 = '<p>가</p><a href="java&#x73;cript:x()">a</a>';
   assert.deepEqual(SP.새실행조각(감춘것, 감춘것.replace('가', '나')), [], '있던 조각을 그대로 두고 글만 고치면 통과');
+  /* 있던 javascript:void(0) 를 핑계로 «다른» 실행 주소를 새로 넣을 수 없다 */
+  const 옛반죽 = '<a href="javascript:void(0)">메뉴</a>';
+  assert.ok(SP.새실행조각(옛반죽, 옛반죽 + '<a href="javascript:alert(1)">b</a>').length >= 1,
+    '★★★ 있던 javascript: 와 «앞머리만 같으면» 새 실행 주소가 통과한다');
+  assert.deepEqual(SP.새실행조각(옛반죽, 옛반죽 + '<a href="javascript:void(0)">메뉴2</a>'), [], '있던 것과 똑같은 조각은 통과');
+  /* 있던 스크립트를 그대로 두고 글만 고치면 통과 (닫힌 스크립트 셈이 흔들리지 않는다) */
+  const 스크립트쪽 = '<p>가</p><script src="a.js"></script><script>b()</script>';
+  assert.deepEqual(SP.새실행조각(스크립트쪽, 스크립트쪽.replace('가', '나')), []);
 });
 
 test('★★★ 자문사 로고 — 「추가」 목록의 이상한 열쇠·그림은 담지 않고, 칸그리기는 그림 주소도 본다', () => {
