@@ -1880,3 +1880,200 @@ test('⑬ 현장 상담 실시간 음성녹취(Web Speech API) 좌·우 창 자�
   assert.equal(dbStore['harass_invest/cases'][importedId].erpDefer, false, '일괄 정리 실행 후 erpDefer 가 false 로 전환된다');
   assert.ok(dbStore['harass_invest/erp_sync'][importedId], '일괄 정리 실행 즉시 푸른이알피 채번·동기화 큐(erp_sync)에 등록된다');
 });
+
+test('⑭ 한국어 사업장·사건명 정밀 식별 — 영문 이메일·머리말 태그([FW]/[RE]/[대외비]) 배제, 명함함(pucards/idx)·형제메일·담당노무사 추론 및 배너 오탐 차단', async () => {
+  const vm = require('node:vm');
+
+  /* 1) [FW]/[RE]/[대외비]/[확인요망]/부서명('경영지원') 등 노이즈를 건너뛰고 실제 한국어 회사명 추출 */
+  assert.equal(
+    C.extractOrgName('RE: [대외비](주)가상점검솔루션_직장 내 괴롭힘 조사 의뢰의 건', [], ''),
+    '(주)가상점검솔루션',
+    '[대외비] 뒤에 이어지는 실제 한국어 법인명을 정확히 추출한다'
+  );
+  assert.equal(
+    C.extractOrgName('[FW] 직장 내 괴롭힘 개선지도 관련 문의', [], '홍점검/인사(경영지원)/푸른가상정밀'),
+    '푸른가상정밀',
+    '[FW]와 부서명(경영지원)을 건너뛰고 슬래시 소속의 한국어 회사명을 추출한다'
+  );
+  assert.equal(
+    C.extractOrgName('직장 내 괴롭힘 사실관계 조사 요청드립니다.', [], '총무담당', '안녕하세요, 가나점검대학교 총무팀 김점검입니다. 조사위원 위촉 문의드립니다.'),
+    '가나점검대학교',
+    '제목에 기관명이 없어도 본문 인사말에서 한국어 대학교·기관명을 추출한다'
+  );
+
+  /* 2) 공직자메일 하단 정책뉴스 배너 및 단독 영업비밀 비밀유지서약서 오탐 차단 */
+  const bannerNoiseMail = {
+    key: 'i:inbox:gov1', slug: 'inbox', uid: 'gov1', dir: 'in', date: '2026-04-01', ts: 100,
+    subject: 'RE: 가나돌봄 임금체불(접수번호: 9999) 진정인 근로자성 판단 자료',
+    attNames: [],
+    preview: '전체적으로 1부 제출해 주세요 공무원 ‘직장 내 괴롭힘’ 피해도 공무상 재해 인정',
+    attCount: 0,
+  };
+  assert.equal(C.inspectMailForHarass(bannerNoiseMail, true), null, '공직자통합메일 하단 정책뉴스 배너 때문에 일반 임금체불 메일이 괴롭힘 사건으로 오탐되지 않는다');
+
+  const pureNdaMail = {
+    key: 'i:inbox:nda1', slug: 'inbox', uid: 'nda1', dir: 'in', date: '2026-04-02', ts: 200,
+    subject: '기술보호컨설팅 퇴사자 경업금지 및 비밀유지서약서 검토 요청',
+    attNames: ['[서식]비밀유지서약서.hwp'],
+    preview: '영업비밀 보호 서식 검토 부탁드립니다.',
+    attCount: 1,
+  };
+  assert.equal(C.inspectMailForHarass(pureNdaMail, true), null, '괴롭힘·고충 맥락이 없는 단독 기술보호 비밀유지서약서 메일은 조사 사건으로 오탐되지 않는다');
+
+  const harassPledgeMail = {
+    key: 'i:inbox:hp1', slug: 'inbox', uid: 'hp1', dir: 'in', date: '2026-04-03', ts: 300,
+    subject: '직장 내 괴롭힘 조사 참여자 비밀유지서약서 제출',
+    attNames: ['비밀유지서약서.pdf'],
+    preview: '조사 면담 전 서약서 송부합니다.',
+    attCount: 1,
+  };
+  assert.equal(C.inspectMailForHarass(harassPledgeMail, true).docRole, 'pledge_protect', '실제 괴롭힘 조사 맥락의 비밀유지서약서 메일은 2단계 공문으로 정상 수집된다');
+
+  /* 3) 기업정보함(pucards/idx) + 형제 메일 + 담당 노무사(staffList) 추론으로 영문 없는 한국어 '<회사이름> <사건> 조사' 묶음 생성 */
+  const companies = [
+    { id: 'co-card-link', name: '(주)명함연결점검', bizNo: '123-81-77777', email: '' },
+  ];
+  const cardIdx = {
+    c1: { k: 'card', c: '(주)명함연결점검', bz: '123-81-77777', e: 'manager@cardlink-sample.example', n: '이담당' },
+    c2: { k: 'card', c: '다라점검복지재단', bz: '123-82-33333', e: 'welfare@darawf-sample.example', n: '박부장' },
+  };
+  const coDir = C.buildCompanyDirectory(companies, cardIdx);
+  const staffList = [
+    { sid: 'P-001', name: '김대표' },
+    { sid: 'P-005', name: '박조사' },
+  ];
+
+  const flatRows = C.flattenMailbox(
+    { inbox: { kind: 'inbox', name: '받은편지함' } },
+    {
+      inbox: {
+        'm_card1': {
+          u: 'm_card1',
+          s: 'RE: 사내 직장 내 괴롭힘 신고 건 외부조사 문의',
+          f: 'manager@cardlink-sample.example',
+          e: 'manager@cardlink-sample.example',
+          t: '370-6@daum.net',
+          d: Date.UTC(2026, 2, 10),
+          a: 0,
+          an: [],
+          p: '안녕하세요. 푸른노무법인 박조사 노무사님께 조사 일정 문의드립니다.',
+        },
+        'm_card2_a': {
+          u: 'm_card2_a',
+          s: '고충심의위원회 개최 및 직장 내 괴롭힘 조사 요청',
+          f: 'welfare@darawf-sample.example',
+          e: 'welfare@darawf-sample.example',
+          t: '370-6@daum.net',
+          d: Date.UTC(2025, 1, 10),
+          a: 0,
+          an: [],
+          p: '고충심의 관련 문의드립니다.',
+        },
+        'm_card2_b': {
+          u: 'm_card2_b',
+          s: '직장 내 괴롭힘 재진정 사건 조사 의뢰',
+          f: 'welfare@darawf-sample.example',
+          e: 'welfare@darawf-sample.example',
+          t: '370-6@daum.net',
+          d: Date.UTC(2026, 7, 15),
+          a: 0,
+          an: [],
+          p: '재진정 조사 의뢰 건입니다.',
+        },
+        'm_sib_general': {
+          u: 'm_sib_general',
+          s: '[바사점검전자(주)] 취업규칙 개정 검토 요청',
+          f: 'hr@basa-elec.example',
+          e: 'hr@basa-elec.example',
+          t: '370-6@daum.net',
+          d: Date.UTC(2024, 3, 1),
+          a: 0,
+          an: [],
+          p: '취업규칙 문의',
+        },
+        'm_sib_harass': {
+          u: 'm_sib_harass',
+          s: 'RE: 직장 내 성희롱 신고 건 인사위원회 징계심의 문의',
+          f: 'hr@basa-elec.example',
+          e: 'hr@basa-elec.example',
+          t: '370-6@daum.net',
+          d: Date.UTC(2024, 3, 12),
+          a: 0,
+          an: [],
+          p: '징계심의 관련 문의드립니다.',
+        },
+      },
+    }
+  );
+
+  const bundles = C.discoverUnregisteredBundles(flatRows, [], coDir, {}, { staffList });
+  assert.equal(bundles.length, 4, '명함 연결 1건 + 복지재단 연도별 2건 + 형제메일 전자회사 1건 총 4묶음이 발굴된다');
+  bundles.forEach((b) => {
+    assert.equal(/@/.test(b.companyName), false, '어떤 묶음의 사업장명에도 영문 이메일(@)이 노출되지 않는다: ' + b.companyName);
+    assert.equal(/@/.test(b.suggestedTitle), false, '어떤 묶음의 사건명에도 영문 이메일(@)이 노출되지 않는다: ' + b.suggestedTitle);
+    assert.equal(/^\[20\d{2}년/.test(b.suggestedTitle), false, '기계식 [2026년 #2] 대괄호 접두어를 쓰지 않는다: ' + b.suggestedTitle);
+    assert.ok(b.suggestedTitle.includes(b.companyName) && b.suggestedTitle.includes('조사'), '모든 사건명이 "<회사이름> <사건내용> 조사" 형식을 갖춘다: ' + b.suggestedTitle);
+  });
+
+  const cardLinkedBundle = bundles.find((b) => b.companyId === 'co-card-link');
+  assert.ok(cardLinkedBundle, '명함 사업자번호·상호를 통해 업체원장(co-card-link)까지 자동 연결된다');
+  assert.equal(cardLinkedBundle.companyName, '(주)명함연결점검');
+  assert.equal(cardLinkedBundle.managerMain, 'P-005', '메일 본문의 노무사 성명으로부터 담당 노무사 사번(P-005)이 자동 추론된다');
+
+  const sibBundle = bundles.find((b) => b.companyName === '바사점검전자(주)');
+  assert.ok(sibBundle, '조사 메일 자체에 회사명이 없어도 같은 담당자의 형제 메일에서 한국어 회사명을 찾아낸다');
+  assert.ok(sibBundle.suggestedTitle.includes('징계심의'), '메일 내용(징계심의)이 한국어 사건명에 반영된다');
+
+  /* 4) PuHarassView 화면 방어: 과거에 영문 이메일로 저장된 사건이 있어도 pucards/idx 를 통해 한국어 사업장·사건명으로 렌더링한다 */
+  const els = {};
+  const makeEl = (id) => ({
+    id, value: '', textContent: '', innerHTML: '', checked: false, disabled: false, style: { display: '' },
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+    addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], focus() {},
+  });
+  const getEl = (id) => (els[id] = els[id] || makeEl(id));
+  const mockDb = {
+    'uid_roles/uView': { sid: 'P001', name: '점검노무', status: 'active', isAdmin: true },
+    'data/user_dir': [{ sid: 'P001', name: '점검노무', status: 'active' }],
+    'pucards/idx': { cardA: { k: 'card', c: '아자점검대학교', e: 'admin@ajauniv-sample.example', n: '최총무' } },
+    'harass_invest/cases': {
+      'hc-legacy-eng': {
+        id: 'hc-legacy-eng',
+        companyName: 'admin@ajauniv-sample.example',
+        title: 'admin@ajauniv-sample.example 직장 내 괴롭힘 조사',
+        email: 'admin@ajauniv-sample.example',
+        category: 'harass',
+        managerMain: 'P001',
+        receiveDate: '2026-03-01',
+        erpDefer: true,
+        mailLinks: [],
+      },
+    },
+  };
+  function makeRef(p) {
+    return {
+      path: p, child(s) { return makeRef(p ? p + '/' + s : String(s)); }, on() {}, off() {},
+      once: () => Promise.resolve({ val: () => (mockDb[p] !== undefined ? mockDb[p] : null) }),
+    };
+  }
+  const ctx = vm.createContext({
+    console, setTimeout, clearTimeout, Promise, URLSearchParams,
+    PuHarassCore: C, PuGate: { show() {}, hide() {} },
+    PuOntologyWrite: { createGateway: () => ({ async save(r, fn) { const v = typeof fn === 'function' ? fn(null) : fn; return { committed: true, snapshot: { val: () => v } }; } }) },
+    location: { search: '', hash: '', pathname: '/pu-harass.html' }, history: { replaceState() {} },
+    document: { activeElement: null, contains: () => false, getElementById: (id) => getEl(id), querySelector: () => null, querySelectorAll: () => [], addEventListener() {} },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+  let authCb = null;
+  const curUser = { uid: 'uView', getIdToken: async () => 'tok' };
+  ctx.PuHarassView.boot({
+    auth: Object.assign(() => ({ currentUser: curUser, setPersistence() {}, onAuthStateChanged(fn) { authCb = fn; } }), { Auth: { Persistence: { LOCAL: 'local' } } }),
+    database: () => ({ ref: (p) => makeRef(p || '') }),
+  });
+  await authCb(curUser);
+  assert.ok(getEl('casesBox').innerHTML.includes('아자점검대학교'), '영문 이메일로 남아 있던 레거시 사건도 화면에서 명함함 한국어 기관명으로 표시된다');
+  assert.equal(getEl('casesBox').innerHTML.includes('admin@ajauniv-sample.example'), false, '사건 현황 표에 영문 이메일 주소가 사업장명으로 노출되지 않는다');
+  assert.equal(C.extractOrgName('[대건] 직장 내 괴롭힘 조사 요청', [], '', ''), '대건', '건으로 끝나는 2글자 상호 말머리도 잘리지 않고 보존된다');
+});
