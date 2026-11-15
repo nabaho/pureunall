@@ -579,8 +579,8 @@ async function runSync(deps, opts) {
               } catch (e) {
                 console.warn('mail-new-inquiry 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
-              /* ── 📥 일정 후보함 — 일정이 있어 보이는 새 메일에서 초안을 뽑아 후보로 쌓는다 (대표 지시 2026-10-24) ──
-                 ⚠ 기본 꺼짐(pucards/config/calInbox.on). 본문은 저장하지 않는다 — 까닭·규칙은 cal-inbox.js.
+              /* ── 📥 일정 자동 등록 + 후보함 — 일정이 있어 보이는 새 메일·첨부 공문에서 일정을 뽑아 달력·후보함에 반영 (대표 지시 2026-10-24 · 2026-11-15) ──
+                 ⚠ 기본 꺼짐(cal_inbox/cfg.on). 본문·첨부 원본은 저장하지 않는다 — 까닭·규칙은 cal-inbox.js.
                  ⚠ 실패해도 던지지 않는다 — 후보함이 죽어도 동기화는 계속된다. */
               if (!o.manualPull) {
                 try {
