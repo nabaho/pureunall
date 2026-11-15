@@ -573,7 +573,7 @@ async function deliverOnce(opts) {
   const 미리 = (사본규칙.mode === 'each' && 우체국.host === DAUM_HOST && typeof MA.prefetchSent === 'function'
                 && !(Number(v.bytes || 0) > MA.ARCHIVE_MAX_BYTES) && !미리접속막힘(Date.now())
                 && String(process.env.MAIL_ARCHIVE_OFF || '') !== '1')      /* 사본을 끄면 접속도 «아예» 안 만든다 */
-    ? MA.prefetchSent({ user: 접속아이디[0], loginIds: 접속아이디, pass: pass, openClient: opts.imapOpen })
+    ? MA.prefetchSent({ user: 접속아이디[0], loginIds: 접속아이디, pass: pass, openClient: opts.imapOpen, closeLimitMs: opts.prefetchCloseMs })
     : null;
   /* 미리 접속에서 로그인이 «거절됐다»는 것이 밝혀지면 — 배달이 어떻게 끝나든(성공이든 연결 끊김 같은 다른 실패든),
      늦게 밝혀지든 — 한동안 미리 접속을 쉰다. 한 곳에서 모두 잡는다(배달이 «인증 아닌 오류»로 실패해도 틀린 로그인이 쌓이지 않게). */
@@ -658,6 +658,7 @@ async function deliverOnce(opts) {
         user: usedId, loginIds: [usedId].concat(loginIds(from, envId).filter((id) => id !== usedId)), pass: pass,
         raws: raws, bytes: v.bytes,
         prefetch: 미리, openClient: opts.imapOpen,   /* 미리 붙어 둔 연결이 있으면 그것으로(없거나 못 쓰면 새로 붙는다) */
+        closeLimitMs: opts.prefetchCloseMs,          /* 닫는 시간 한도(시험용 — 안 주면 기본) */
       });
       if (!kept.ok) console.warn('archiveSent 못 남김:', kept.why, kept.box);
       else if (kept.dropped) console.warn('archiveSent 상한 초과 —', kept.dropped, '통은 사본 없음');

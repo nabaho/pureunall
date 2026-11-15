@@ -43,6 +43,11 @@ async function until(cond, label, ms) {
   throw new Error('기다리던 일이 안 일어났습니다: ' + label);
 }
 const settle = () => sleep(40);                 /* «더 일어날 일이 없다»를 보려고 타이머까지 흘려 보낸다 */
+/* «한도 안에 끝나야 한다» — 안 끝나면 검사가 끝없이 매달리지 않고 «실패»로 끝난다(망가뜨려 보기에서도 멈추지 않게) */
+function within(p, ms, label) {
+  let t; const lim = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('★ 한도(' + ms + 'ms) 안에 안 끝났습니다: ' + label)), ms); });
+  return Promise.race([p, lim]).finally(() => clearTimeout(t));
+}
 async function quiet(fn) {                      /* 경고 소음을 삼킨다 */
   const w = console.warn, l = console.log;
   console.warn = () => {}; console.log = () => {};
@@ -58,7 +63,7 @@ const BOXES = [{ path: '보낸메일함', name: '보낸메일함' }];
 /* 가짜 다음메일 IMAP — 일어난 일을 log 에 차례로 적는다 */
 function fakeImap(log, o) {
   const x = o || {};
-  const st = { opens: 0, openOpts: [], logouts: 0 };
+  const st = { opens: 0, openOpts: [], logouts: 0, closes: 0 };
   const client = {
     list: async () => {
       log.push('imap-list'); if (x.listGate) await x.listGate;
@@ -70,11 +75,13 @@ function fakeImap(log, o) {
       log.push('append-end'); return { uid: 1 };
     },
     /* 닫는 데 시간이 걸린다(logoutMs) — 기다리는지 안 기다리는지가 겉으로 갈린다. 끝나야 «닫혔다»고 센다. */
-    logout: async () => { if (x.logoutMs) await sleep(x.logoutMs); st.logouts++; log.push('imap-logout'); },
-    close: () => { log.push('imap-close'); },
+    /* logoutHang — 끝내 안 끝나는 닫기(서버가 응답을 안 준다). 강제로 끊는 close 가 불려야 «끊겼다». */
+    logout: async () => { if (x.logoutHang) await new Promise(() => {}); if (x.logoutMs) await sleep(x.logoutMs); st.logouts++; log.push('imap-logout'); },
+    close: () => { st.closes++; log.push('imap-close'); },
   };
   const open = async (opt) => {
     st.opens++; st.openOpts.push(opt); log.push('imap-open');
+    if (x.openMs) await sleep(x.openMs);                /* 접속에 시간이 걸린다 */
     if (x.openGate) await x.openGate;
     if (x.openThrows) throw new Error('접속 실패');
     /* 로그인이 거절되는 접속 — 처음 몇 번만(authFailTimes) 거절하고 그 뒤는 열어 준다. imapflow 는 authenticationFailed 를 단다. */
@@ -540,6 +547,57 @@ test('★★ 재검증 2회차 — 배달이 실패했을 때 목록 오류 처�
   const r = await run({ db: fakeDb(log), nodemailer: fakeSmtp(log, { fail: new Error('boom') }), imapOpen: im.open, prefetchReleaseMs: 10 });
   assert.equal(r.ok, false);
   assert.equal(im.st.logouts, 1, '★ 실패 응답이 나갔는데 연결은 아직 닫히는 중입니다 — 응답 뒤 함수가 멈추면 샙니다');
+});
+
+/* ── 재검증 3회차(2026-11-15) — 닫는 길이 «하나»여야 하고, 닫기에도 «시간 한도»가 있어야 한다 ── */
+test('★★ 재검증 3회차 — 배달이 실패한 «직후» 접속이 끝나 스스로 닫는 중이어도 release 는 그 닫기가 끝난 뒤에 돌아온다', async () => {
+  /* 접속은 1ms 만에 끝나지만 닫는 데 250ms — release 의 기다림(150ms)은 닫기 «도중»에 끝난다.
+     취소 표시를 보고 접속이 «스스로» 닫을 때 st.closing 을 거치지 않으면 release 가 «이미 비었다»며 먼저 돌아간다. */
+  const log = [], im = fakeImap(log, { openMs: 1, logoutMs: 250 });
+  const pre = MA.prefetchSent({ loginIds: ['a'], pass: 'pw', openClient: im.open });
+  await within(pre.release(150), 3000, 'release');
+  assert.equal(im.st.logouts, 1, '★ release 가 돌아왔는데 연결은 아직 닫히는 중입니다 — 응답 뒤 함수가 멈추면 샙니다');
+  await sleep(300);
+  assert.equal(im.st.logouts, 1, '★ 같은 연결을 두 번 닫았습니다');
+  assert.ok(!log.includes('imap-list'), '★ 쓸 일이 없어진 연결로 폴더 목록을 읽었습니다');
+  assert.equal(im.st.closes, 0, '★ 제때 정상으로 닫힌 연결을 또 «강제로» 끊었습니다 — 강제 끊기는 한도를 넘긴 때만이어야 합니다');
+});
+
+test('★★ 재검증 3회차 — 배달이 실패하고 접속이 «닫는 중»일 때 실패 응답은 연결이 닫힌 뒤에 나간다', async () => {
+  const log = [], im = fakeImap(log, { openMs: 30, logoutMs: 300 });
+  const r = await within(run({ db: fakeDb(log), nodemailer: fakeSmtp(log, { fail: new Error('boom') }), imapOpen: im.open, prefetchReleaseMs: 200 }), 4000, 'run');
+  assert.equal(r.ok, false);
+  assert.equal(im.st.logouts, 1, '★ 실패 응답이 나갔는데 연결은 아직 닫히는 중입니다');
+});
+
+test('★★ 재검증 3회차 — 닫기가 끝내 안 끝나는 서버여도 release 는 한도 안에 돌아오고 «강제로» 끊는다', async () => {
+  const log = [], im = fakeImap(log, { logoutHang: true });
+  const pre = MA.prefetchSent({ loginIds: ['a'], pass: 'pw', openClient: im.open, closeLimitMs: 30 });
+  await pre.done;
+  const t0 = Date.now();
+  await within(pre.release(10), 3000, 'release(닫기 멈춤)');
+  assert.ok(Date.now() - t0 < 1000, '★ 닫기가 멈춘 서버 때문에 release 가 한참 늦어졌습니다(한도 30ms 인데 기본 한도까지 기다렸다)');
+  assert.equal(im.st.closes, 1, '★ 안 닫히는 연결을 강제로 끊지 않았습니다 — 연결이 남습니다');
+});
+
+test('★★ 재검증 3회차 — 배달 실패 + 닫기 멈춤이어도 실패 응답은 한도 안에 나가고 연결은 끊겨 있다', async () => {
+  const log = [], im = fakeImap(log, { logoutHang: true });
+  const t0 = Date.now();
+  const r = await within(run({ db: fakeDb(log), nodemailer: fakeSmtp(log, { fail: new Error('boom') }), imapOpen: im.open,
+    prefetchReleaseMs: 10, prefetchCloseMs: 30 }), 4000, 'run(닫기 멈춤)');
+  assert.equal(r.ok, false);
+  assert.ok(Date.now() - t0 < 1000, '★ 닫기가 멈춘 서버 때문에 실패 응답이 한참 늦어졌습니다');
+  assert.equal(im.st.closes, 1, '★ 응답이 나갔는데 연결이 끊기지 않았습니다');
+});
+
+test('재검증 3회차 — 보내기가 성공하고 사본 올린 뒤 닫기가 멈춰도 응답은 한도 안에 나가고 연결은 끊긴다(사본은 올라갔다)', async () => {
+  const log = [], im = fakeImap(log, { logoutHang: true });
+  const t0 = Date.now();
+  const r = await within(run({ db: fakeDb(log), nodemailer: fakeSmtp(log), imapOpen: im.open, prefetchCloseMs: 30 }), 4000, 'run(올린 뒤 닫기 멈춤)');
+  assert.equal(r.ok, true);
+  assert.ok(log.includes('append-end'), '사본은 올라가야 합니다');
+  assert.ok(Date.now() - t0 < 1000, '★ 닫기가 멈춘 서버 때문에 보내기 응답이 한참 늦어졌습니다');
+  assert.equal(im.st.closes, 1, '★ 올린 뒤 안 닫히는 연결을 강제로 끊지 않았습니다');
 });
 
 test('★★ 재검증 — 배달이 «로그인 아닌 오류»(연결 끊김 등)로 실패해도 미리 접속의 로그인 거절을 기억한다', async () => {

@@ -113,12 +113,24 @@ async function openImap(opt) {
   throw last || new Error('접속할 아이디가 없습니다');
 }
 
-/* 연결을 «조용히» 닫는다 — 이미 끊겼으면 그대로 둔다 */
-async function closeQuiet(client) {
+/* 연결을 «조용히» 닫는다 — 이미 끊겼으면 그대로 둔다.
+   ⚠ 닫기를 «끝없이» 기다리지 않는다(2026-11-14 재검증 3회차: logout 이 안 끝나는 서버면 응답이 소켓 시간(20초)까지 늦어진다).
+     limitMs 안에 logout 이 안 끝나면 client.close() 로 «강제로» 끊고 돌아간다 — 연결은 그 순간 닫힌 것이다. */
+const CLOSE_LIMIT_MS = 1500;
+async function closeQuiet(client, limitMs) {
   if (!client) return;
-  try { await client.logout(); } catch (_) {
-    try { client.close(); } catch (__) { /* 이미 끊겼다 */ }
-  }
+  const limit = Number.isFinite(Number(limitMs)) ? Number(limitMs) : CLOSE_LIMIT_MS;
+  let timer = null;
+  const timedOut = new Promise((r) => { timer = setTimeout(() => r(true), limit); if (timer && timer.unref) timer.unref(); });
+  const closing = (async () => {
+    try { await client.logout(); } catch (_) {
+      try { client.close(); } catch (__) { /* 이미 끊겼다 */ }
+    }
+    return false;
+  })();
+  const late = await Promise.race([closing, timedOut]);
+  if (timer) clearTimeout(timer);
+  if (late) { try { client.close(); } catch (_) { /* 이미 끊겼다 */ } }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -154,7 +166,7 @@ function prefetchSent(opt) {
     const c = st.client;
     if (!c || st.used) { if (st.closing) await st.closing; return; }
     st.client = null;
-    st.closing = closeQuiet(c);
+    st.closing = closeQuiet(c, o.closeLimitMs);
     await st.closing;
   };
   const done = (async () => {
@@ -163,8 +175,10 @@ function prefetchSent(opt) {
       const ids = (Array.isArray(o.loginIds) && o.loginIds.length) ? [o.loginIds[0]] : [String(o.user || '')];
       st.failedId = ids[0];                                       /* 로그인이 거절되면 이 아이디는 다시 두드리지 않는다 */
       const client = await (o.openClient || openImap)(Object.assign({}, o, { loginIds: ids, user: ids[0] }));
-      if (st.abandoned) { await closeQuiet(client); st.why = '쓸 일이 없어져 닫았습니다'; return st; }   /* 배달이 실패한 사이 접속이 끝났다 */
       st.client = client;
+      /* 배달이 실패한 사이 접속이 끝났다 — «take» 로 닫는다(st.closing 을 거쳐야 release 의 마지막 take 가 이 닫기의 끝을 기다린다.
+         직접 closeQuiet 하면 release 가 «비었다»며 먼저 돌아가 연결이 닫히기 전에 실패 응답이 나간다 — 2026-11-14 재검증 3회차) */
+      if (st.abandoned) { await take(); st.why = '쓸 일이 없어져 닫았습니다'; return st; }
       st.box = pickSentBox(await client.list());
       if (!st.box) st.why = '보낸메일함을 찾지 못했습니다';
     } catch (e) {
@@ -243,12 +257,12 @@ async function archiveSent(o) {
     why = String((e && e.message) || e);
   } finally {
     /* 연결을 안 닫으면 함수가 안 끝나고 그동안 요금이 샌다 */
-    await closeQuiet(client);
+    await closeQuiet(client, opt.closeLimitMs);
   }
   return { ok: !!put && !why, put: put, dropped: dropped, box: box, why: why, viaPrefetch: viaPrefetch };
 }
 
 module.exports = {
-  archiveSent, prefetchSent, isAuthFailure, PREFETCH_RELEASE_WAIT_MS, buildRaw, pickSentBox, looksSent, boxName,
+  archiveSent, prefetchSent, isAuthFailure, PREFETCH_RELEASE_WAIT_MS, CLOSE_LIMIT_MS, buildRaw, pickSentBox, looksSent, boxName,
   ARCHIVE_MAX, ARCHIVE_MAX_BYTES, ARCHIVE_TIMEOUT_MS, IMAP_HOST,
 };
