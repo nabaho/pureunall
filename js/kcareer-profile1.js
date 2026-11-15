@@ -169,7 +169,9 @@
       /* 사람이 적은 차례 그대로 — 무엇을 앞세울지는 사람이 고른다 */
       role: (Array.isArray(opts.roles) ? opts.roles : String(opts.roles || '').split(/\r?\n/))
         .map(function (l) { return roleRow(l, 올해); }).filter(Boolean),
-      biz: bizRows(실적전부),
+      /* «고른 것만 넣기»(실적)를 켠 서류는 요약도 고른 실적만 센다 — 안 고른 건의 건수·일수가 종이에 새지 않고 위 표와 맞는다.
+         아니면(자동) 예전처럼 실적 전체(대표 지시 2026-11-15 「추천대로」) */
+      biz: bizRows(만('perf') ? 실적전부.filter(function (r) { return 꽂힘('perf', r); }) : 실적전부),
       pub: pubRows(opts.pubs)
     };
     /* ⚠ «연도별 실적 수» 줄은 없앴다(대표 2026-11-12) — 찍는 것은 고른 줄뿐이고, 몇 건 중 몇 건인지는 종이에 안 적는다 */

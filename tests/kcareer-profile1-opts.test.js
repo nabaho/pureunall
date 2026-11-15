@@ -54,6 +54,22 @@ test('사업별 수행 요약 — 기록에서 건수·일수(적힌 건만)를 
   assert.ok(!sec(P.build(s2, { use: 'general' }), 'biz'), '일반 용도는 사람이 켜야 한다');
   assert.ok(sec(P.build(s2, { use: 'bid' }), 'biz'), '입찰용은 저절로 켜진다');
 });
+test('사업별 수행 요약 — «고른 것만 넣기»(실적)를 켜면 고른 실적만 센다 · 자동·다른 칸 «고른 것만»은 전체 그대로 · 고른 게 없으면 칸이 빠진다', () => {
+  const 실적 = [
+    { id: 'a', type: '현장클리닉', days: 3, year: '2025' }, { id: 'b', type: '현장클리닉', days: 2, year: '2024' },
+    { id: 'c', type: '기술', days: 1, year: '2026' }, { id: 'd', type: '현장클리닉', year: '2023' }];
+  const s2 = Object.assign({}, src, { consult: 실적 });
+  const 전체 = sec(P.build(s2, { use: 'general', on: { biz: true } }), 'biz');
+  assert.deepEqual(전체.rows[0], ['3건', '현장클리닉', '일수 5일'], '자동은 예전처럼 실적 전체에서 센다');
+  const 고름 = sec(P.build(s2, { use: 'general', on: { biz: true }, pins: { perf: ['a', 'c'] }, only: { perf: true } }), 'biz');
+  assert.deepEqual(고름.rows, [['1건', '기술', '일수 1일'], ['1건', '현장클리닉', '일수 3일']], '고른 둘만 센다(안 고른 b·d의 건수·일수는 새지 않는다)');
+  const 고정만 = sec(P.build(s2, { use: 'general', on: { biz: true }, pins: { perf: ['a', 'c'] } }), 'biz');
+  assert.deepEqual(고정만.rows, 전체.rows, '«고른 것만»을 안 켜면 ⭐ 고정만으로는 요약이 바뀌지 않는다(자동 채움 방식)');
+  const 딴칸 = sec(P.build(s2, { use: 'general', on: { biz: true }, pins: { wic: ['x'] }, only: { wic: true } }), 'biz');
+  assert.deepEqual(딴칸.rows, 전체.rows, '위촉 «고른 것만»은 실적 요약을 건드리지 않는다');
+  const 없음 = P.build(s2, { use: 'general', on: { biz: true }, only: { perf: true } });
+  assert.ok(!sec(없음, 'biz'), '고른 실적이 하나도 없으면 요약 칸은 빠진다(지어내지 않는다)');
+});
 test('연구·저서·기고 — 한 줄에 하나, 앞의 4자리 연도는 연도 칸 · 빈 줄은 버린다 · 한 줄 소개는 머리에', () => {
   const m = P.build(src, { use: 'general', pubs: '2024 노동법 칼럼\n책 한 권\n\n', intro: '사람 중심' });
   assert.deepEqual(sec(m, 'pub').rows, [['2024', '노동법 칼럼'], ['', '책 한 권']]);
