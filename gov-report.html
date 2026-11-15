@@ -409,7 +409,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=99"></script>
+<script src="js/pu-ontology.js?v=100"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
      없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 알려진 .set 다섯뿐이다 —
@@ -418,7 +418,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
      (레코드 모양이 아니라 관문을 지난다 — 부분 update 도 관문이 막으므로 쓰지 않는다). -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=46"></script>
+<script src="js/pu-appbar.js?v=47"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -705,6 +705,7 @@ function grRenderDocs(){
     +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')
     +((t.auto||t.big)&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')
     +(t.plan.key==='workplace'?'<a class="act" href="ilteo.html" style="text-decoration:none">🏭 일터상생 자동화</a>':'')
+    +((t.plan.key==='industry'||t.plan.key==='industry-cn')?'<a class="act" href="jobtrans.html" style="text-decoration:none">⚡ 산업일자리 자동화</a>':'')
     +(closed?'':'<button type="button" class="act cm-b" data-cm="open">⋯ 사업 종결</button>')+'</div>';
   var body;
   if(!tid) body='<div class="empty">'+grEsc(D.UNLINKED)+' — 사업 잇기는 정부사업일정의 ERP 연결에서</div>';
@@ -1274,7 +1275,7 @@ function grOpenCell(coId,typeId,step,itemId){
   /* 장별 AI 초안 — 장 목록이 있는 대형 보고서 항목에만(chaps 가 비면 구역도 없다). 초안은 chap(화면 메모리)에만 산다 */
   var chaps=(it&&typeof PuGovReportChapters!=='undefined')?PuGovReportChapters.chaptersOf(it):[];
   GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,item:itemId||'',keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
-    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',cands:[],
+    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',planKey:plan.key||'',cands:[],
     rd:isRd,crit:isRd?String(plan.criteria||''):'',chaps:chaps,chap:chaps.length?{busy:false,msg:'',err:false,draft:{},warn:{},sent:''}:null};
   GR.avMsg=''; GR.avErr=false; if(GR.auto) GR.auto.av=false;
   grRenderCell();
@@ -1300,6 +1301,7 @@ function grRenderCell(){
     +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+(c.item?' · '+grEsc(item.name):'')+' — '+grEsc(c.coName)+'</b>'
     +(rec&&rec.by===PuGovReportAuto.AUTO_BY?' <span class="tag-ai" title="메일에서 자동으로 처리한 줄입니다">자동</span>':'')+'<span class="sp"></span>'
     +(c.crit==='workplace'?'<a class="act" href="ilteo.html#co='+encodeURIComponent(c.coId||'')+'" style="text-decoration:none">🏭 일터상생 자동화</a>':'')
+    +((c.planKey==='industry'||c.planKey==='industry-cn')?'<a class="act" href="jobtrans.html#co='+encodeURIComponent(c.coId||'')+'" style="text-decoration:none">⚡ 산업일자리 자동화</a>':'')
     +'<button type="button" data-close onclick="grCloseCell()">닫기</button></div>';
   if(c.keys.length>1) h+=field('서류','<select id="cwKey" onchange="grPickCell(this.value)">'+c.keys.map(function(k){ return opt(k.key,k.name,c.key); }).join('')+'</select>');
   else h+='<div class="toc-h">서류: '+grEsc(item.name)+'</div>';

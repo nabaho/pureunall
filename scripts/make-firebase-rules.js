@@ -2232,4 +2232,33 @@ rules.scal_ilteo = {
   $other: { '.validate': false }
 };
 
+/* ⚡ 산업·일자리전환 컨설팅 자동화 (jobtrans.html, 2026-11-15)
+   - 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 사업장 워크스페이스·비식별 분석 카드·중간/최종보고서·불변 스냅샷.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 중간보고·최종보고 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_jobtrans = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  final: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');
