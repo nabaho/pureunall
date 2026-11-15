@@ -255,23 +255,54 @@
     });
   }
 
-  /* ── 설정 읽기/쓰기 (인증 JWT는 영구 저장소 localStorage에 절대 쓰지 않고 현재 로그인 UID 메모리에만 귀속) ── */
+  /* 법제처 OC 아이디 클라이언트 정규화 (이메일 전체 입력 시 @ 앞자리만 추출하여 이메일 주소의 localStorage 저장 및 타 계정 노출 원천 차단) */
+  function sanitizeLawOcClient(rawOc) {
+    var s = String(rawOc || '').trim();
+    if (!s) return '';
+    var atIdx = s.indexOf('@');
+    if (atIdx > 0) s = s.slice(0, atIdx).trim();
+    if (!/^[A-Za-z0-9._-]{2,64}$/.test(s)) return '';
+    return s;
+  }
+
+  /* ── 설정 읽기/쓰기 (인증 JWT는 휘발성 메모리 전용 · lawOc는 이메일 도메인 제거 후 UID별로 격리 보관) ── */
   function getConfig() {
-    var cleanUid = sanitizeUid(mem.uid);
-    var sessionJwt = cleanUid ? String(sessionJwtByUid.get(cleanUid) || '') : '';
+    var cleanUid = sanitizeUid(mem.uid) || 'guest';
+    var sessionJwt = (cleanUid && cleanUid !== 'guest') ? String(sessionJwtByUid.get(cleanUid) || '') : '';
     try {
       var raw = localStorage.getItem(CFG_LS_KEY);
       var parsed = raw ? JSON.parse(raw) : {};
-      /* 과거 버전에 평문 저장된 토큰이 남아 있으면 즉시 걷어낸다 */
+      var dirty = false;
+      /* 과거 버전에 평문 저장된 토큰이나 계정 공용 이메일형 lawOc가 남아 있으면 즉시 정리 */
       if (parsed && (parsed.supabaseStaffJwt || parsed.supabaseAnonKey)) {
         delete parsed.supabaseStaffJwt;
         delete parsed.supabaseAnonKey;
+        dirty = true;
+      }
+      var byUid = (parsed && parsed.lawOcByUid && typeof parsed.lawOcByUid === 'object' && !Array.isArray(parsed.lawOcByUid))
+        ? parsed.lawOcByUid
+        : {};
+      if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'lawOc')) {
+        /* 소유 UID가 없는 구버전 공용 lawOc 는 타 계정으로 잘못 귀속되지 않도록 즉시 폐기 */
+        delete parsed.lawOc;
+        parsed.lawOcByUid = byUid;
+        dirty = true;
+      }
+      var rawUidOc = String(byUid[cleanUid] || '');
+      var cleanOc = sanitizeLawOcClient(rawUidOc);
+      if (rawUidOc !== cleanOc) {
+        if (cleanOc) byUid[cleanUid] = cleanOc;
+        else delete byUid[cleanUid];
+        parsed.lawOcByUid = byUid;
+        dirty = true;
+      }
+      if (dirty) {
         try { localStorage.setItem(CFG_LS_KEY, JSON.stringify(parsed)); } catch (e2) {}
       }
       return {
         supabaseUrl: String(parsed.supabaseUrl || '').trim().replace(/\/+$/, ''),
         supabaseStaffJwt: sessionJwt,
-        lawOc: String(parsed.lawOc || '').trim(),
+        lawOc: cleanOc,
         autoSyncOnBoot: parsed.autoSyncOnBoot !== false,
         preferOfflineAi: parsed.preferOfflineAi === true
       };
@@ -283,15 +314,33 @@
   function saveConfig(nextCfg) {
     var cur = getConfig();
     var incoming = stripUndefined(nextCfg || {});
-    var cleanUid = sanitizeUid(mem.uid);
+    var cleanUid = sanitizeUid(mem.uid) || 'guest';
     if (Object.prototype.hasOwnProperty.call(incoming, 'supabaseStaffJwt')) {
       var nextJwt = String(incoming.supabaseStaffJwt || '').trim();
-      if (cleanUid && nextJwt) sessionJwtByUid.set(cleanUid, nextJwt);
+      if (cleanUid && cleanUid !== 'guest' && nextJwt) sessionJwtByUid.set(cleanUid, nextJwt);
       else if (cleanUid) sessionJwtByUid.delete(cleanUid);
     }
+    var existingMap = {};
+    try {
+      var prevRaw = localStorage.getItem(CFG_LS_KEY);
+      var prevObj = prevRaw ? JSON.parse(prevRaw) : {};
+      if (prevObj && prevObj.lawOcByUid && typeof prevObj.lawOcByUid === 'object' && !Array.isArray(prevObj.lawOcByUid)) {
+        Object.keys(prevObj.lawOcByUid).forEach(function (k) {
+          var v = sanitizeLawOcClient(prevObj.lawOcByUid[k]);
+          if (v) existingMap[k] = v;
+        });
+      }
+    } catch (_) {}
+
+    if (incoming.lawOc !== undefined) {
+      var nextOc = sanitizeLawOcClient(incoming.lawOc);
+      if (nextOc) existingMap[cleanUid] = nextOc;
+      else delete existingMap[cleanUid];
+    }
+
     var persisted = {
       supabaseUrl: incoming.supabaseUrl !== undefined ? String(incoming.supabaseUrl || '').trim().replace(/\/+$/, '') : cur.supabaseUrl,
-      lawOc: incoming.lawOc !== undefined ? String(incoming.lawOc || '').trim() : cur.lawOc,
+      lawOcByUid: existingMap,
       autoSyncOnBoot: incoming.autoSyncOnBoot !== undefined ? (incoming.autoSyncOnBoot !== false) : cur.autoSyncOnBoot,
       preferOfflineAi: incoming.preferOfflineAi !== undefined ? (incoming.preferOfflineAi === true) : cur.preferOfflineAi
     };
@@ -1252,6 +1301,101 @@
     });
   }
 
+  /* ── 지방법원·행정법원·고등법원(하급심 org=400202) 및 산재 판례 공식 API 온디맨드 수집 ── */
+  function pullLowerCourtOfficial(opts) {
+    opts = opts || {};
+    var startGen = opts.expectedGen !== undefined ? opts.expectedGen : sessionGen;
+    var startUid = opts.expectedUid !== undefined ? opts.expectedUid : mem.uid;
+    if (startGen !== sessionGen || startUid !== mem.uid) {
+      return Promise.reject(makeStaleSessionError());
+    }
+
+    var auth = opts.auth;
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('공식 하급심 API 수집은 포털 직원 로그인 상태에서 실행할 수 있습니다. (비로그인 상태에서는 백필 JSON이나 판결문 PDF를 아래 수집함에 끌어다 놓으세요)'));
+    }
+
+    var cfg = getConfig();
+    var rawInputOc = opts.lawOc !== undefined ? String(opts.lawOc || '').trim() : '';
+    var lawOc = rawInputOc ? sanitizeLawOcClient(rawInputOc) : (cfg.lawOc || '');
+    if (rawInputOc && !lawOc) {
+      return Promise.reject(new Error('법제처 OC 아이디 형식이 올바르지 않습니다 (영문·숫자·점·하이픈·밑줄 2~64자 또는 신청 이메일).'));
+    }
+    if (lawOc && lawOc !== cfg.lawOc) {
+      saveConfig({ lawOc: lawOc });
+    }
+
+    return u.getIdToken().then(function (tok) {
+      if (startGen !== sessionGen || startUid !== mem.uid) {
+        throw makeStaleSessionError();
+      }
+      return fetch(PBOX_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          action: 'pull_lower_court',
+          lawOc: lawOc,
+          preset: String(opts.preset || 'all').slice(0, 32),
+          query: String(opts.query || '').trim().slice(0, 40),
+          court: String(opts.court || '').trim().slice(0, 30),
+          dateFrom: String(opts.dateFrom || '').trim().slice(0, 12),
+          dateTo: String(opts.dateTo || '').trim().slice(0, 12),
+          includeComwel: opts.includeComwel !== false
+        })
+      });
+    }).then(function (r) {
+      var jsonParseErr = false;
+      var parsePromise = (r && typeof r.json === 'function')
+        ? r.json().catch(function () { jsonParseErr = true; return null; })
+        : Promise.resolve(null);
+      return parsePromise.then(function (j) {
+        if (startGen !== sessionGen || startUid !== mem.uid) {
+          throw makeStaleSessionError();
+        }
+        var isPlainObj = !!(j && typeof j === 'object' && !Array.isArray(j));
+        var payload = isPlainObj ? j : {};
+        if (!r || jsonParseErr || !isPlainObj) {
+          throw new Error('하급심 공식 API 서버 응답(JSON) 형식이 올바르지 않습니다 (HTTP ' + ((r && r.status) || 0) + ')');
+        }
+        if (!r.ok || (payload.ok !== true && payload.partial !== true) || !Array.isArray(payload.docs)) {
+          throw new Error(payload.error || (Array.isArray(payload.errors) && payload.errors[0]) || ('하급심 공식 API 응답 오류 (HTTP ' + (r.status || 0) + ')'));
+        }
+        var rawDocs = payload.docs;
+        var validRows = rawDocs.filter(function (row) {
+          return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
+        });
+        var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
+        var added = 0;
+        var merged = 0;
+        if (mapped.length) {
+          var st = addDocuments(mapped, {
+            scope: 'public',
+            shareConfirmed: false,
+            expectedGen: startGen,
+            expectedUid: startUid
+          });
+          added = st.added;
+          merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
+        }
+        addAlert({
+          kind: 'sync',
+          title: '지방법원·행정법원 하급심 공식 수집 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: '법제처 하급심(org=400202) · 근로복지공단 산재 판례 ' + (payload.fetchedCount || mapped.length) + '건 대조 완료'
+        });
+        return {
+          ok: payload.ok !== false,
+          partial: !!payload.partial,
+          fetchedCount: payload.fetchedCount || mapped.length,
+          added: added,
+          merged: merged,
+          supabasePushed: payload.supabasePushed || 0,
+          errors: Array.isArray(payload.errors) ? payload.errors : []
+        };
+      });
+    });
+  }
+
   /* ── 최근 본 자료 · 프로젝트 · AI 작업이력 · 알림 관리 ── */
   function recordRecent(entry) {
     if (!entry || !entry.id) return;
@@ -1755,6 +1899,7 @@
     deleteDocuments: deleteDocuments,
     testSupabaseConnection: testSupabaseConnection,
     pullFromSupabase: pullFromSupabase,
+    pullLowerCourtOfficial: pullLowerCourtOfficial,
     pushDocsToSharedServer: pushDocsToSharedServer,
     deleteDocsFromSharedServer: deleteDocsFromSharedServer,
     recordRecent: recordRecent,

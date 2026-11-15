@@ -759,17 +759,19 @@
       return ta.text.trim();
     }).filter(Boolean);
 
-    var cleanRefLaws = (meta.refLaws || []).map(function (rl) {
+    var combinedRefLaws = [].concat(Array.isArray(opts.refLaws) ? opts.refLaws : [], meta.refLaws || []);
+    var cleanRefLaws = Array.from(new Set(combinedRefLaws.map(function (rl) {
       var ra = anonymizeLegalText(String(rl || ''), partyNames);
       mergeAnonCounts(anon, ra);
       return ra.text.trim();
-    }).filter(Boolean);
+    }).filter(Boolean)));
 
-    var cleanRefCases = (meta.refCases || []).map(function (rc) {
+    var combinedRefCases = [].concat(Array.isArray(opts.refCases) ? opts.refCases : [], meta.refCases || []);
+    var cleanRefCases = Array.from(new Set(combinedRefCases.map(function (rc) {
       var rca = anonymizeLegalText(String(rc || ''), partyNames);
       mergeAnonCounts(anon, rca);
       return rca.text.trim();
-    }).filter(Boolean);
+    }).filter(Boolean)));
 
     return {
       doc: {
@@ -804,6 +806,8 @@
       items = parsed;
     } else if (parsed && Array.isArray(parsed.documents)) {
       items = parsed.documents;
+    } else if (parsed && Array.isArray(parsed.docs)) {
+      items = parsed.docs;
     } else if (parsed && parsed.info && (parsed.dcss || parsed.assrs || parsed.close)) {
       items = [parsed];
     } else if (parsed && typeof parsed === 'object') {
@@ -857,9 +861,11 @@
         caseNo: it.caseNo || it.사건번호 || it.문서번호 || '',
         decisionDate: it.decisionDate || it.선고일자 || it.회시일자 || '',
         title: it.title || it.사건명 || it.안건명 || '',
-        docType: it.docType || '',
-        tags: it.tags || [],
-        sourceLabel: sourceLabel || '공공 JSON 데이터'
+        docType: it.docType || it.doc_type || '',
+        tags: Array.isArray(it.tags) ? it.tags : [],
+        refLaws: Array.isArray(it.refLaws || it.ref_laws) ? (it.refLaws || it.ref_laws) : [],
+        refCases: Array.isArray(it.refCases || it.ref_cases) ? (it.refCases || it.ref_cases) : [],
+        sourceLabel: (Array.isArray(it.sources) && it.sources[0]) || sourceLabel || '공공 JSON 데이터'
       });
       totalMasked += r2.anonymization.totalMasked;
       outDocs.push(r2.doc);

@@ -26,6 +26,30 @@ module.exports = {
           if (window.PuPBoxApp) window.PuPBoxApp.switchView('workflows');
         });
       }
+    },
+    {
+      name: 'ingest',
+      run: async (page) => {
+        await page.evaluate(() => {
+          if (window.PuPBoxApp) window.PuPBoxApp.switchView('ingest');
+        });
+      }
+    },
+    {
+      name: 'projects',
+      run: async (page) => {
+        await page.evaluate(() => {
+          if (window.PuPBoxStore && window.PuPBoxStore.saveProject && !window.PuPBoxStore.getProjects().length) {
+            window.PuPBoxStore.saveProject({
+              name: '부당해고구제재심판정취소및임금청구통합자문사건_' + '가'.repeat(180),
+              clientName: '주식회사푸른테스트사업장_' + 'A'.repeat(180),
+              docIds: ['prec-sc-2020da247190'],
+              lawKeys: ['근로기준법']
+            });
+          }
+          if (window.PuPBoxApp) window.PuPBoxApp.switchView('projects');
+        });
+      }
     }
   ]
 };

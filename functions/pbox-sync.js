@@ -96,6 +96,197 @@ function formatYmd(raw) {
   return "";
 }
 
+/* 법제처 Open API OC 아이디 정규화 (이메일 전체를 넣었을 경우 앞자리 추출 후 영숫자·점·하이픈·밑줄만 허용) */
+function sanitizeLawOc(rawOc) {
+  let s = String(rawOc || "").trim();
+  if (!s) return "";
+  const atIdx = s.indexOf("@");
+  if (atIdx > 0) s = s.slice(0, atIdx).trim();
+  if (!/^[A-Za-z0-9._-]{2,64}$/.test(s)) return "";
+  return s;
+}
+
+const LOWER_COURT_PRESETS = {
+  all: ["통상임금", "퇴직금", "부당해고", "산업재해", "요양불승인", "직장내괴롭힘", "근로자성", "취업규칙"],
+  dismissal: ["부당해고", "징계해고", "수습해고", "갱신기대권", "부당전보"],
+  wage: ["통상임금", "평균임금", "퇴직금", "포괄임금", "연장근로수당"],
+  sanjae: ["요양불승인", "업무상재해", "추간판탈출증", "뇌심혈관", "출퇴근재해", "유족급여"],
+  status: ["근로자성", "직장내괴롭힘", "기간제", "차별시정", "부당노동행위"],
+  backfill_full: [
+    "임금", "통상임금", "평균임금", "퇴직금", "포괄임금",
+    "해고", "부당해고", "징계해고", "갱신기대권", "근로자성",
+    "취업규칙", "산업재해", "요양불승인", "업무상재해", "추간판탈출증",
+    "뇌심혈관", "출퇴근재해", "유족급여", "직장내괴롭힘", "부당노동행위"
+  ]
+};
+
+const LOWER_COURT_ALLOWED_COURTS = new Set([
+  /* 고등법원 · 특허법원 (원외재판부 포함) */
+  "서울고등법원", "수원고등법원", "대전고등법원", "대구고등법원", "부산고등법원", "광주고등법원", "특허법원",
+  "서울고등법원 춘천재판부", "서울고등법원 인천재판부", "대전고등법원 청주재판부",
+  "부산고등법원 울산재판부", "부산고등법원 창원재판부", "광주고등법원 전주재판부", "광주고등법원 제주재판부",
+  /* 행정·회생·가정법원 */
+  "서울행정법원", "서울회생법원", "수원회생법원", "부산회생법원",
+  "서울가정법원", "인천가정법원", "수원가정법원", "대전가정법원", "대구가정법원", "부산가정법원", "울산가정법원", "광주가정법원",
+  /* 지방법원 본원 */
+  "서울중앙지방법원", "서울동부지방법원", "서울남부지방법원", "서울북부지방법원", "서울서부지방법원",
+  "의정부지방법원", "인천지방법원", "수원지방법원", "춘천지방법원",
+  "대전지방법원", "청주지방법원", "대구지방법원", "부산지방법원", "울산지방법원", "창원지방법원",
+  "광주지방법원", "전주지방법원", "제주지방법원",
+  /* 공식 지원 (단독명 및 소속 지방법원 병기형) */
+  "고양지원", "남양주지원", "부천지원", "성남지원", "여주지원", "평택지원", "안산지원", "안양지원",
+  "강릉지원", "원주지원", "속초지원", "영월지원",
+  "홍성지원", "공주지원", "논산지원", "서산지원", "천안지원",
+  "충주지원", "제천지원", "영동지원",
+  "서부지원", "안동지원", "경주지원", "포항지원", "김천지원", "상주지원", "의성지원", "영덕지원",
+  "동부지원", "마산지원", "진주지원", "통영지원", "밀양지원", "거창지원",
+  "목포지원", "장흥지원", "순천지원", "해남지원", "군산지원", "정읍지원", "남원지원",
+  "의정부지방법원 고양지원", "의정부지방법원 남양주지원", "인천지방법원 부천지원",
+  "수원지방법원 성남지원", "수원지방법원 여주지원", "수원지방법원 평택지원", "수원지방법원 안산지원", "수원지방법원 안양지원",
+  "춘천지방법원 강릉지원", "춘천지방법원 원주지원", "춘천지방법원 속초지원", "춘천지방법원 영월지원",
+  "대전지방법원 홍성지원", "대전지방법원 공주지원", "대전지방법원 논산지원", "대전지방법원 서산지원", "대전지방법원 천안지원",
+  "청주지방법원 충주지원", "청주지방법원 제천지원", "청주지방법원 영동지원",
+  "대구지방법원 서부지원", "대구지방법원 안동지원", "대구지방법원 경주지원", "대구지방법원 포항지원",
+  "대구지방법원 김천지원", "대구지방법원 상주지원", "대구지방법원 의성지원", "대구지방법원 영덕지원",
+  "부산지방법원 동부지원", "부산지방법원 서부지원",
+  "창원지방법원 마산지원", "창원지방법원 진주지원", "창원지방법원 통영지원", "창원지방법원 밀양지원", "창원지방법원 거창지원",
+  "광주지방법원 목포지원", "광주지방법원 장흥지원", "광주지방법원 순천지원", "광주지방법원 해남지원",
+  "전주지방법원 군산지원", "전주지방법원 정읍지원", "전주지방법원 남원지원"
+]);
+
+function validateCourtFilterStrict(rawCourt) {
+  const s = String(rawCourt || "").trim().replace(/\s+/g, " ");
+  if (!s || s === "all") return { ok: true, court: "" };
+  if (s === "대법원" || s === "헌법재판소") {
+    return { ok: false, court: "", error: "하급심 수집기에는 지방법원·행정법원·고등법원만 지정할 수 있습니다: " + s };
+  }
+  if (LOWER_COURT_ALLOWED_COURTS.has(s)) {
+    return { ok: true, court: s };
+  }
+  return { ok: false, court: "", error: "유효하지 않은 하급심 법원명입니다: " + s.slice(0, 30) };
+}
+
+function sanitizeCourtFilter(rawCourt) {
+  const v = validateCourtFilterStrict(rawCourt);
+  return v.ok ? v.court : "";
+}
+
+function validateCompactYmdStrict(rawDate, label) {
+  const raw = String(rawDate || "").trim();
+  if (!raw) return { ok: true, compact: "" };
+  if (!/^\d{4}(?:[-.]?\d{2}){2}$/.test(raw)) {
+    return { ok: false, compact: "", error: (label || "선고일") + " 형식이 올바르지 않습니다(YYYY-MM-DD): " + raw.slice(0, 20) };
+  }
+  const digits = raw.replace(/[^0-9]/g, "");
+  const y = Number(digits.slice(0, 4));
+  const m = Number(digits.slice(4, 6));
+  const d = Number(digits.slice(6, 8));
+  if (y < 1945 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) {
+    return { ok: false, compact: "", error: (label || "선고일") + " 범위가 올바르지 않습니다: " + raw.slice(0, 20) };
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    return { ok: false, compact: "", error: (label || "선고일") + "이 달력에 존재하지 않는 날짜입니다: " + raw.slice(0, 20) };
+  }
+  return { ok: true, compact: digits };
+}
+
+function sanitizeCompactYmd(rawDate) {
+  const v = validateCompactYmdStrict(rawDate, "선고일");
+  return v.ok ? v.compact : "";
+}
+
+const VALID_DRF_SEARCH_ROOTS = new Set(["PrecSearch", "Expc", "CgmExpc", "Nlrc", "Decc", "Detc", "LawSearch"]);
+const VALID_DRF_SERVICE_ROOTS = new Set(["PrecService", "ExpcService", "CgmExpcService", "NlrcService", "DeccService", "DetcService", "LawService"]);
+
+/* 법제처 DRF API가 HTTP 200으로 반환하는 인증실패·미승인·오류 JSON을 정상 빈 결과와 엄격히 분리 */
+function extractDrfRootOrThrow(j, expectedTarget) {
+  if (!j || typeof j !== "object" || Array.isArray(j)) {
+    throw new Error("Invalid JSON response");
+  }
+  const topKeys = Object.keys(j);
+  if (!topKeys.length) {
+    throw new Error("Empty JSON response");
+  }
+  if (j.error || j.Error || j.HTML || j.html) {
+    const errObj = j.error || j.Error || j.HTML || j.html;
+    const msg = typeof errObj === "string"
+      ? errObj
+      : String((errObj && (errObj.message || errObj.msg || errObj.result)) || "법제처 API 오류 응답");
+    throw new Error("DRF error: " + msg.slice(0, 120));
+  }
+  const rootKey = topKeys[0];
+  if (/^error$|^html$|^result$|^message$/i.test(rootKey)) {
+    throw new Error("DRF error(" + rootKey + "): " + String(JSON.stringify(j[rootKey] || "")).slice(0, 120));
+  }
+  const rootObj = j[rootKey];
+  if (!rootObj || typeof rootObj !== "object" || Array.isArray(rootObj)) {
+    throw new Error("Invalid DRF root payload: " + rootKey);
+  }
+  if (rootObj.error || rootObj.Error) {
+    const rErr = rootObj.error || rootObj.Error;
+    throw new Error("DRF root error: " + String((rErr && rErr.message) || rErr).slice(0, 120));
+  }
+  const resTxt = String(rootObj.result || rootObj.msg || rootObj.message || "");
+  if (resTxt && /실패|오류|일치하지|권한|미승인|등록되지|error|fail|denied|invalid/i.test(resTxt)) {
+    throw new Error("DRF rejected: " + resTxt.slice(0, 120));
+  }
+  if (
+    !VALID_DRF_SEARCH_ROOTS.has(rootKey) &&
+    !(expectedTarget && Object.prototype.hasOwnProperty.call(rootObj, expectedTarget)) &&
+    !Object.prototype.hasOwnProperty.call(rootObj, "totalCnt")
+  ) {
+    throw new Error("Unexpected DRF schema: " + rootKey);
+  }
+  return rootObj;
+}
+
+function splitRefTokens(rawStr) {
+  if (!rawStr) return [];
+  return String(rawStr)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .split(/[\n\/;]/)
+    .map((x) => x.replace(/^\s*\[\d+\]\s*/, "").trim())
+    .filter((x) => x.length >= 2 && x.length <= 160)
+    .slice(0, 25);
+}
+
+/* 하급심 전용 결과 필터 — 공단(COMWEL) 등 보조 채널 병합 시에도 대법원·타법원·기간외·검색어불일치 사건 유입 원천 차단 */
+function filterLowerCourtDocs(docs, filterOpts) {
+  const fo = filterOpts || {};
+  const targetCourtNorm = fo.court ? normalizeCourt(fo.court) : "";
+  const fromCompact = String(fo.dateFrom || "").replace(/[^0-9]/g, "");
+  const toCompact = String(fo.dateTo || "").replace(/[^0-9]/g, "");
+  const kwList = Array.isArray(fo.queries)
+    ? fo.queries.map((q) => String(q || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  return (docs || []).filter((d) => {
+    if (!d || typeof d !== "object") return false;
+    const cNorm = normalizeCourt(d.court || "");
+    if (d.docType === "prec_sc" || cNorm === "대법원" || cNorm === "헌법재판소") return false;
+    if (String(d.body || "").trim().length < 20) return false;
+    if (targetCourtNorm && cNorm !== targetCourtNorm) return false;
+    if (fromCompact || toCompact) {
+      const dc = String(d.decisionDate || "").replace(/[^0-9]/g, "");
+      if (dc.length !== 8) return false;
+      if (fromCompact && dc < fromCompact) return false;
+      if (toCompact && dc > toCompact) return false;
+    }
+    if (kwList.length) {
+      /* tags 필드에 붙은 검색어 라벨이 아니라 실제 제목·요지·본문·참조조문에 검색어가 포함되어 있는지 대조 */
+      const hay = [d.title, d.summary, d.body, Array.isArray(d.refLaws) ? d.refLaws.join(" ") : ""].join(" ").toLowerCase();
+      const hayNoSpace = hay.replace(/\s+/g, "");
+      const matched = kwList.some((kw) => {
+        const kwNoSpace = kw.replace(/\s+/g, "");
+        return hay.includes(kw) || (kwNoSpace && hayNoSpace.includes(kwNoSpace));
+      });
+      if (!matched) return false;
+    }
+    return true;
+  });
+}
+
 function isLikelyPersonName(cand) {
   const w = String(cand || "").trim();
   if (w.length < 2 || w.length > 4) return false;
@@ -255,20 +446,67 @@ async function checkLegalizeKrTree(fetchFn) {
   }
 }
 
-/* 법제처 DRF 단건 전문 상세 조회 (목록 API에 요약만 있을 때 본문 보강) */
-async function fetchLawGoKrDetail(oc, target, serialId, fetchFn) {
-  if (!serialId) return "";
+/* 법제처 DRF 단건 상세(lawService.do) 루트 검증 — HTTP 200 오류 JSON 차단 */
+function extractDrfServiceRootOrThrow(j) {
+  if (!j || typeof j !== "object" || Array.isArray(j)) {
+    throw new Error("Invalid detail JSON response");
+  }
+  const topKeys = Object.keys(j);
+  if (!topKeys.length) {
+    throw new Error("Empty detail JSON response");
+  }
+  if (j.error || j.Error || j.HTML || j.html) {
+    const errObj = j.error || j.Error || j.HTML || j.html;
+    const msg = typeof errObj === "string"
+      ? errObj
+      : String((errObj && (errObj.message || errObj.msg || errObj.result)) || "법제처 상세 API 오류");
+    throw new Error("DRF detail error: " + msg.slice(0, 120));
+  }
+  const rootKey = topKeys[0];
+  if (/^error$|^html$|^result$|^message$/i.test(rootKey)) {
+    throw new Error("DRF detail error(" + rootKey + ")");
+  }
+  const rootObj = j[rootKey];
+  if (!rootObj || typeof rootObj !== "object" || Array.isArray(rootObj)) {
+    throw new Error("Invalid DRF detail payload: " + rootKey);
+  }
+  if (rootObj.error || rootObj.Error) {
+    const rErr = rootObj.error || rootObj.Error;
+    throw new Error("DRF detail root error: " + String((rErr && rErr.message) || rErr).slice(0, 120));
+  }
+  const resTxt = String(rootObj.result || rootObj.msg || rootObj.message || "");
+  if (resTxt && /실패|오류|일치하지|권한|미승인|등록되지|error|fail|denied|invalid/i.test(resTxt)) {
+    throw new Error("DRF detail rejected: " + resTxt.slice(0, 120));
+  }
+  if (
+    !VALID_DRF_SERVICE_ROOTS.has(rootKey) &&
+    !rootObj.판결내용 && !rootObj.판결요지 && !rootObj.판시사항 &&
+    !rootObj.회답 && !rootObj.이유 && !rootObj.회시내용 &&
+    !rootObj.결정요지 && !rootObj.재결요지 && !rootObj.참조조문
+  ) {
+    throw new Error("Unexpected DRF detail schema: " + rootKey);
+  }
+  return rootObj;
+}
+
+/* 법제처 DRF 단건 전문 상세 조회 (본문 + 참조조문 + 참조판례 추출 · 오류 삼킴 방지) */
+async function fetchLawGoKrDetailRich(oc, target, serialId, fetchFn) {
+  const cleanOc = sanitizeLawOc(oc);
+  if (!cleanOc || !serialId) {
+    return { ok: false, error: "missing_oc_or_id", body: "", refLaws: [], refCases: [] };
+  }
   const url = LAW_DRF_SERVICE_HTTPS +
-    "?OC=" + encodeURIComponent(oc) +
+    "?OC=" + encodeURIComponent(cleanOc) +
     "&target=" + encodeURIComponent(target) +
     "&ID=" + encodeURIComponent(String(serialId)) +
     "&type=JSON";
   try {
-    const r = await safeHttpsFetch(fetchFn, url, { headers: { "User-Agent": UA } });
-    if (!r.ok) return "";
+    const r = await safeHttpsFetch(fetchFn || fetch, url, { headers: { "User-Agent": UA } });
+    if (!r.ok) {
+      return { ok: false, status: r.status, error: "HTTP " + r.status, body: "", refLaws: [], refCases: [] };
+    }
     const j = await r.json();
-    if (!j || typeof j !== "object") return "";
-    const root = j[Object.keys(j)[0]] || {};
+    const root = extractDrfServiceRootOrThrow(j);
     const parts = [
       root.판시사항,
       root.판결요지,
@@ -280,25 +518,36 @@ async function fetchLawGoKrDetail(oc, target, serialId, fetchFn) {
       root.결정요지,
       root.재결요지
     ].filter(Boolean);
-    return parts.join("\n\n").replace(/<br\s*\/?>/gi, "\n").trim();
-  } catch (_) {
-    return "";
+    const body = parts.join("\n\n").replace(/<br\s*\/?>/gi, "\n").trim();
+    const refLaws = splitRefTokens(root.참조조문 || root.관련법령 || "");
+    const refCases = splitRefTokens(root.참조판례 || "");
+    return { ok: true, body, refLaws, refCases };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e), body: "", refLaws: [], refCases: [] };
   }
 }
 
-/* 2) 국가법령정보 공동활용 오픈API(HTTPS) 페이지네이션·증분일자·상세전문 수집 */
+async function fetchLawGoKrDetail(oc, target, serialId, fetchFn) {
+  const rich = await fetchLawGoKrDetailRich(oc, target, serialId, fetchFn);
+  return rich.body;
+}
+
+/* 2) 국가법령정보 공동활용 오픈API(HTTPS) 페이지네이션·증분일자·상세전문 수집 (대법원 org=400201 + 하급심 org=400202 포함) */
 async function pullLawGoKrRecent(oc, fetchFn, opts) {
-  const cleanOc = String(oc || "").trim();
+  const cleanOc = sanitizeLawOc(oc);
   if (!cleanOc) return { docs: [], attempted: 0, succeeded: 0, errors: [] };
   const f = fetchFn || fetch;
   const o = opts || {};
   const maxPages = Math.max(1, Math.min(Number(o.maxPages) || 2, 10));
   const sinceDate = String(o.sinceDate || "").trim();
-  let detailBudget = Math.max(0, Number(o.detailLimit ?? 12));
+  let detailBudget = Number.isFinite(Number(o.detailLimit)) ? Math.max(0, Math.trunc(Number(o.detailLimit))) : 16;
 
   const targets = [
-    { target: "prec", query: "근로기준법", docType: "prec_sc", agency: "대법원·각급법원" },
-    { target: "prec", query: "산업재해", docType: "prec_lower", agency: "법원" },
+    { target: "prec", org: "400201", search: "1", query: "근로기준법", docType: "prec_sc", agency: "대법원" },
+    { target: "prec", org: "400202", search: "2", query: "부당해고", docType: "prec_lower", agency: "하급심법원" },
+    { target: "prec", org: "400202", search: "2", query: "통상임금", docType: "prec_lower", agency: "하급심법원" },
+    { target: "prec", org: "400202", search: "2", query: "산업재해", docType: "prec_lower", agency: "하급심법원" },
+    { target: "prec", org: "400202", search: "2", query: "직장내괴롭힘", docType: "prec_lower", agency: "하급심법원" },
     { target: "expc", query: "근로", docType: "interp_gov", agency: "법제처" },
     { target: "cgmExpc", query: "임금", docType: "interp_moel", agency: "고용노동부·중앙부처" },
     { target: "nlrc", query: "부당해고", docType: "dec_nlrc", agency: "중앙노동위원회" }
@@ -313,24 +562,23 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
     for (let page = 1; page <= maxPages; page++) {
       attempted++;
       try {
-        const url = LAW_DRF_SEARCH_HTTPS +
+        let url = LAW_DRF_SEARCH_HTTPS +
           "?OC=" + encodeURIComponent(cleanOc) +
           "&target=" + encodeURIComponent(t.target) +
           "&type=JSON&display=20&page=" + page +
           "&query=" + encodeURIComponent(t.query);
+        if (t.org) url += "&org=" + encodeURIComponent(t.org);
+        if (t.search) url += "&search=" + encodeURIComponent(t.search);
         const r = await safeHttpsFetch(f, url, { headers: { "User-Agent": UA } });
         if (!r.ok) {
           errors.push(t.target + "(p" + page + "): HTTP " + r.status);
           break;
         }
         const j = await r.json();
-        if (!j || typeof j !== "object") {
-          throw new Error("Invalid JSON response");
-        }
+        const rootObj = extractDrfRootOrThrow(j, t.target);
         succeeded++;
 
-        const rootObj = j[Object.keys(j)[0]] || {};
-        const list = rootObj[t.target] || [];
+        const list = rootObj[t.target] || rootObj.prec || [];
         const arr = Array.isArray(list) ? list : (list ? [list] : []);
         if (!arr.length) break;
 
@@ -345,14 +593,28 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
             continue;
           }
           const court = item.법원명 || item.해석기관명 || item.결정기관명 || t.agency;
-          let body = String(item.판결내용 || item.판결요지 || item.회시내용 || item.결정요지 || "").trim();
+          let body = String(
+            item.판결내용 || item.판결요지 || item.판시사항 ||
+            item.회시내용 || item.이유 || item.회답 ||
+            item.결정요지 || item.재결요지 || ""
+          ).trim();
+          let refLaws = splitRefTokens(item.참조조문 || item.관련법령 || "");
+          let refCases = splitRefTokens(item.참조판례 || "");
           const serialId = item.판례일련번호 || item.법령해석례일련번호 || item.문서일련번호 || item.일련번호 || "";
-          if (body.length < 80 && serialId && detailBudget > 0) {
+          const needsDetail = (!item.판결내용 || !refLaws.length || body.length < 160) && Boolean(serialId) && detailBudget > 0;
+          if (needsDetail) {
             detailBudget--;
-            const detailBody = await fetchLawGoKrDetail(cleanOc, t.target, serialId, f);
-            if (detailBody.length > body.length) body = detailBody;
+            const detailRich = await fetchLawGoKrDetailRich(cleanOc, t.target, serialId, f);
+            if (!detailRich.ok) {
+              errors.push(t.target + "(detail:" + serialId + "): " + (detailRich.error || "detail fetch failed"));
+            } else {
+              if (detailRich.body.length > body.length) body = detailRich.body;
+              if (detailRich.refLaws.length) refLaws = Array.from(new Set([].concat(refLaws, detailRich.refLaws))).slice(0, 30);
+              if (detailRich.refCases.length) refCases = Array.from(new Set([].concat(refCases, detailRich.refCases))).slice(0, 30);
+            }
           }
-          if (!body) body = String(title).trim();
+          /* 사건명(title)만 있고 실질 본문·요지가 전혀 없는 실패 항목을 정상 본문으로 위조하지 않음 */
+          if (!body) continue;
 
           const scrubbed = scrubDocumentObjectServer({
             docType: court === "대법원" ? "prec_sc" : t.docType,
@@ -361,10 +623,13 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
             caseNo,
             decisionDate: dateStr,
             title,
-            summary: String(item.판시사항 || item.판결요지 || item.질의요지 || title).slice(0, 400),
+            summary: String(item.판시사항 || item.판결요지 || item.질의요지 || body).slice(0, 400),
             body,
-            sources: ["국가법령정보 공동활용 API (" + t.target + ")"]
+            refLaws,
+            refCases,
+            sources: ["국가법령정보 공동활용 API (" + t.target + (t.org === "400202" ? " · 하급심" : "") + ")"]
           });
+          if (hasResidualHardPii(scrubbed)) continue;
           scrubbed.verified = scrubbed.body.length >= 20;
           scrubbed.canonicalKey = canonicalKeyOf(scrubbed, "system_sync");
           out.push(scrubbed);
@@ -377,6 +642,178 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
     }
   }
   return { docs: out, attempted, succeeded, errors };
+}
+
+/* 2-B) 지방법원·행정법원·고등법원(하급심 전용 org=400202) 핀포인트 및 대량 백필 수집기 */
+async function pullLawGoKrLowerCourt(oc, fetchFn, opts) {
+  const cleanOc = sanitizeLawOc(oc);
+  if (!cleanOc) return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, errors: [] };
+  const f = fetchFn || fetch;
+  const o = opts || {};
+
+  /* 직접 호출 시에도 무효 법원명·무효 달력 날짜·역전된 기간을 전체 조회로 넓히지 않고 즉시 거부 */
+  const courtCheck = validateCourtFilterStrict(o.court);
+  if (!courtCheck.ok) {
+    return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: "", invalidInput: true, errors: [courtCheck.error] };
+  }
+  const fromCheck = validateCompactYmdStrict(o.dateFrom || o.sinceDate || "", "선고 시작일");
+  if (!fromCheck.ok) {
+    return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: [fromCheck.error] };
+  }
+  const toCheck = validateCompactYmdStrict(o.dateTo || "", "선고 종료일");
+  if (!toCheck.ok) {
+    return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: [toCheck.error] };
+  }
+  if (fromCheck.compact && toCheck.compact && fromCheck.compact > toCheck.compact) {
+    const orderErr = "선고 시작일(" + fromCheck.compact + ")이 선고 종료일(" + toCheck.compact + ")보다 늦을 수 없습니다.";
+    return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: [orderErr] };
+  }
+
+  const presetKey = String(o.preset || "all").trim();
+  const basePreset = LOWER_COURT_PRESETS[presetKey] || LOWER_COURT_PRESETS.all;
+  let queries = [];
+  if (Array.isArray(o.queries) && o.queries.length) {
+    queries = o.queries.map((q) => String(q || "").trim().slice(0, 40)).filter(Boolean);
+  } else if (typeof o.query === "string" && o.query.trim()) {
+    queries = [o.query.trim().slice(0, 40)];
+  } else {
+    queries = basePreset.slice();
+  }
+  const maxQueries = Math.max(1, Math.min(Number(o.maxQueries) || 25, 30));
+  queries = Array.from(new Set(queries)).slice(0, maxQueries);
+
+  const courtFilter = courtCheck.court;
+  const fromCompact = fromCheck.compact;
+  const toCompact = toCheck.compact;
+  const prncYd = fromCompact
+    ? (fromCompact + "~" + (toCompact || "20991231"))
+    : (toCompact ? ("19500101~" + toCompact) : "");
+
+  const searchScope = String(o.searchScope || "2") === "1" ? "1" : "2";
+  const display = Math.max(1, Math.min(Number(o.display) || 30, 100));
+  const maxPages = Math.max(1, Math.min(Number(o.maxPages) || 2, 30));
+  const delayMs = Number.isFinite(Number(o.delayMs))
+    ? Math.max(0, Math.min(Math.trunc(Number(o.delayMs)), 2000))
+    : 0;
+  let detailBudget = Number.isFinite(Number(o.detailLimit))
+    ? Math.max(0, Math.trunc(Number(o.detailLimit)))
+    : 25;
+
+  const out = [];
+  const errors = [];
+  let attempted = 0;
+  let succeeded = 0;
+
+  for (let qi = 0; qi < queries.length; qi++) {
+    const q = queries[qi];
+    for (let page = 1; page <= maxPages; page++) {
+      if (delayMs > 0 && attempted > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      attempted++;
+      try {
+        let url = LAW_DRF_SEARCH_HTTPS +
+          "?OC=" + encodeURIComponent(cleanOc) +
+          "&target=prec&org=400202&type=JSON" +
+          "&search=" + searchScope +
+          "&display=" + display +
+          "&page=" + page +
+          "&query=" + encodeURIComponent(q);
+        if (courtFilter) url += "&curt=" + encodeURIComponent(courtFilter);
+        if (prncYd) url += "&prncYd=" + encodeURIComponent(prncYd);
+
+        const r = await safeHttpsFetch(f, url, { headers: { "User-Agent": UA } });
+        if (!r.ok) {
+          errors.push("lower_prec[" + q + ":p" + page + "]: HTTP " + r.status);
+          break;
+        }
+        const j = await r.json();
+        const rootObj = extractDrfRootOrThrow(j, "prec");
+        succeeded++;
+
+        const list = rootObj.prec || [];
+        const arr = Array.isArray(list) ? list : (list ? [list] : []);
+        if (!arr.length) break;
+
+        for (const item of arr) {
+          const title = item.사건명 || item.제목 || "";
+          const caseNo = item.사건번호 || item.문서번호 || "";
+          if (!title && !caseNo) continue;
+          const dateStr = formatYmd(item.선고일자 || "");
+          const court = String(item.법원명 || courtFilter || "지방법원").trim();
+          if (court === "대법원") continue; // org=400202 하급심 전용 수집 보장
+
+          let body = String(item.판결내용 || item.판결요지 || item.판시사항 || "").trim();
+          let refLaws = splitRefTokens(item.참조조문 || "");
+          let refCases = splitRefTokens(item.참조판례 || "");
+          const serialId = item.판례일련번호 || item.일련번호 || "";
+          const needsDetail = (!item.판결내용 || !refLaws.length || body.length < 200) && Boolean(serialId) && detailBudget > 0;
+          if (needsDetail) {
+            if (delayMs > 0) await new Promise((r2) => setTimeout(r2, Math.min(delayMs, 250)));
+            detailBudget--;
+            const detailRich = await fetchLawGoKrDetailRich(cleanOc, "prec", serialId, f);
+            if (!detailRich.ok) {
+              errors.push("lower_detail[" + serialId + "]: " + (detailRich.error || "detail fetch failed"));
+            } else {
+              if (detailRich.body.length > body.length) body = detailRich.body;
+              if (detailRich.refLaws.length) refLaws = Array.from(new Set([].concat(refLaws, detailRich.refLaws))).slice(0, 30);
+              if (detailRich.refCases.length) refCases = Array.from(new Set([].concat(refCases, detailRich.refCases))).slice(0, 30);
+            }
+          }
+          /* 사건명(title)을 본문(body)으로 대체해 verified:true 로 둔갑시키는 현상 원천 차단 */
+          if (body.length < 20) continue;
+
+          /* 요청한 검색어(q)가 실제 사건명·요지·본문·참조조문에 존재하는 항목만 수록 */
+          const qLow = String(q || "").trim().toLowerCase();
+          if (qLow) {
+            const rawHay = [title, item.판시사항, item.판결요지, body, refLaws.join(" ")].join(" ").toLowerCase();
+            const qNoSpace = qLow.replace(/\s+/g, "");
+            if (!rawHay.includes(qLow) && !(qNoSpace && rawHay.replace(/\s+/g, "").includes(qNoSpace))) {
+              continue;
+            }
+          }
+
+          const tags = Array.from(new Set(["하급심판례", court, q].filter(Boolean)));
+          const scrubbed = scrubDocumentObjectServer({
+            docType: "prec_lower",
+            court,
+            agency: court,
+            caseNo,
+            decisionDate: dateStr,
+            title: title || (court + " " + caseNo + " 판결"),
+            summary: String(item.판시사항 || item.판결요지 || body).slice(0, 400),
+            body,
+            tags,
+            refLaws,
+            refCases,
+            sources: ["국가법령정보 공동활용 하급심 API (org=400202)"]
+          });
+          if (hasResidualHardPii(scrubbed) || scrubbed.body.length < 20) continue;
+          scrubbed.verified = true;
+          scrubbed.canonicalKey = canonicalKeyOf(scrubbed, "system_sync");
+          out.push(scrubbed);
+        }
+
+        if (typeof o.onProgress === "function") {
+          o.onProgress({ query: q, page, fetchedSoFar: out.length, attempted, succeeded });
+        }
+        if (arr.length < display) break;
+      } catch (e) {
+        errors.push("lower_prec[" + q + ":p" + page + "]: " + String(e.message || e));
+        break;
+      }
+    }
+  }
+
+  return {
+    docs: deduplicateBatch(out, "system_sync"),
+    rawCount: out.length,
+    attempted,
+    succeeded,
+    queries,
+    courtFilter,
+    errors
+  };
 }
 
 /* 3) 공공데이터포털 근로복지공단 산재보험 판례 판결문 API (하급심 포함 · 다중 페이지 지원) */
@@ -402,8 +839,18 @@ async function pullComwelSanjaeCases(serviceKey, fetchFn, opts) {
         break;
       }
       const j = await r.json();
-      if (!j || typeof j !== "object") {
+      if (!j || typeof j !== "object" || Array.isArray(j)) {
         throw new Error("Invalid JSON response");
+      }
+      if (j.OpenAPI_ServiceResponse || j.error || j.Error) {
+        throw new Error("COMWEL API error response");
+      }
+      const hdr = j.response && j.response.header;
+      if (hdr && hdr.resultCode && !/^0+$/.test(String(hdr.resultCode))) {
+        throw new Error("COMWEL API error: " + String(hdr.resultMsg || hdr.resultCode).slice(0, 80));
+      }
+      if (!j.response || typeof j.response !== "object") {
+        throw new Error("Unexpected COMWEL JSON schema");
       }
       succeeded++;
 
@@ -414,7 +861,8 @@ async function pullComwelSanjaeCases(serviceKey, fetchFn, opts) {
         const court = String(it.courtNm || it.법원명 || "행정법원").trim();
         const caseNo = String(it.caseNo || it.사건번호 || "").trim();
         const title = String(it.caseNm || it.사건명 || (court + " " + caseNo + " 산재 판결")).trim();
-        const body = String(it.cn || it.판결내용 || it.sumry || title).trim();
+        const body = String(it.cn || it.판결내용 || it.sumry || it.판결요지 || "").trim();
+        if (!body) continue;
         const scrubbed = scrubDocumentObjectServer({
           docType: court === "대법원" ? "prec_sc" : "prec_lower",
           court,
@@ -422,10 +870,11 @@ async function pullComwelSanjaeCases(serviceKey, fetchFn, opts) {
           caseNo,
           decisionDate: formatYmd(it.judmnAdjuDe || it.선고일자 || ""),
           title,
-          summary: String(it.sumry || it.판결요지 || title).slice(0, 320),
+          summary: String(it.sumry || it.판결요지 || body).slice(0, 320),
           body,
           sources: ["근로복지공단 산재보험 판례 API"]
         });
+        if (hasResidualHardPii(scrubbed)) continue;
         scrubbed.verified = scrubbed.body.length >= 20;
         scrubbed.canonicalKey = canonicalKeyOf(scrubbed, "system_sync");
         out.push(scrubbed);
@@ -450,7 +899,19 @@ function deduplicateBatch(docs, ownerUid) {
     } else {
       const cur = map.get(ck);
       cur.sources = Array.from(new Set([].concat(cur.sources || [], d.sources || [])));
-      if (String(d.body || "").length > String(cur.body || "").length) cur.body = d.body;
+      if (String(d.body || "").length > String(cur.body || "").length) {
+        cur.body = d.body;
+        if (cur.body.length >= 20) cur.verified = true;
+      }
+      if (Array.isArray(d.refLaws) && d.refLaws.length) {
+        cur.refLaws = Array.from(new Set([].concat(cur.refLaws || [], d.refLaws))).slice(0, 30);
+      }
+      if (Array.isArray(d.refCases) && d.refCases.length) {
+        cur.refCases = Array.from(new Set([].concat(cur.refCases || [], d.refCases))).slice(0, 30);
+      }
+      if (Array.isArray(d.tags) && d.tags.length) {
+        cur.tags = Array.from(new Set([].concat(cur.tags || [], d.tags))).slice(0, 20);
+      }
     }
   }
   return Array.from(map.values());
@@ -1031,7 +1492,146 @@ async function runSync(opts) {
   };
 }
 
+async function pullLowerCourtBundle(opts) {
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const fetchFn = o.fetchFn || fetch;
+  const lawOc = sanitizeLawOc(o.lawOc || env.LAW_OC || "");
+  const dataKey = String(o.dataGoKrKey || env.DATA_GO_KR_KEY || "").trim();
+  const includeComwel = o.includeComwel !== false && !!dataKey;
+
+  if (!lawOc && !includeComwel) {
+    return {
+      ok: false,
+      status: 400,
+      error: "법제처 Open API OC 아이디(open.law.go.kr) 또는 근로복지공단 공공데이터 인증키가 필요합니다.",
+      fetchedCount: 0,
+      dedupedCount: 0,
+      supabasePushed: 0,
+      errors: ["missing_credentials"],
+      docs: []
+    };
+  }
+
+  /* 법원명·선고일자 범위 사전 검증 (유효하지 않은 필터는 전체 조회나 무효 날짜로 내보내지 않고 즉시 400 반환) */
+  const preCourt = validateCourtFilterStrict(o.court);
+  const preFrom = validateCompactYmdStrict(o.dateFrom, "선고 시작일");
+  const preTo = validateCompactYmdStrict(o.dateTo, "선고 종료일");
+  const rangeErr = !preCourt.ok
+    ? preCourt.error
+    : (!preFrom.ok ? preFrom.error : (!preTo.ok ? preTo.error : (
+        (preFrom.compact && preTo.compact && preFrom.compact > preTo.compact)
+          ? ("선고 시작일(" + preFrom.compact + ")이 선고 종료일(" + preTo.compact + ")보다 늦을 수 없습니다.")
+          : ""
+      )));
+  if (rangeErr) {
+    return {
+      ok: false,
+      partial: false,
+      status: 400,
+      error: rangeErr,
+      fetchedCount: 0,
+      dedupedCount: 0,
+      supabasePushed: 0,
+      errors: [rangeErr],
+      docs: []
+    };
+  }
+
+  const [lowerRes, comwelRes] = await Promise.all([
+    lawOc
+      ? pullLawGoKrLowerCourt(lawOc, fetchFn, {
+          preset: o.preset,
+          query: o.query,
+          queries: o.queries,
+          maxQueries: o.maxQueries || 8,
+          court: preCourt.court,
+          dateFrom: preFrom.compact,
+          dateTo: preTo.compact,
+          searchScope: o.searchScope,
+          display: o.display || 25,
+          maxPages: o.maxPages || 2,
+          detailLimit: Number.isFinite(Number(o.detailLimit)) ? Number(o.detailLimit) : 15,
+          delayMs: Number.isFinite(Number(o.delayMs)) ? Number(o.delayMs) : 0
+        })
+      : Promise.resolve({ docs: [], rawCount: 0, attempted: 0, succeeded: 0, errors: [] }),
+    includeComwel
+      ? pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: Math.min(Number(o.maxPages) || 2, 4) })
+      : Promise.resolve({ docs: [], attempted: 0, succeeded: 0, errors: [] })
+  ]);
+
+  const errors = [].concat(lowerRes.errors || [], comwelRes.errors || []);
+  const attempted = (lowerRes.attempted || 0) + (comwelRes.attempted || 0);
+  const succeeded = (lowerRes.succeeded || 0) + (comwelRes.succeeded || 0);
+
+  const explicitQueries = Array.isArray(o.queries) && o.queries.length
+    ? o.queries.map((q) => String(q || "").trim()).filter(Boolean)
+    : (typeof o.query === "string" && o.query.trim()
+        ? [o.query.trim()]
+        : ((o.preset && o.preset !== "all" && o.preset !== "sanjae" && o.preset !== "backfill_full" && LOWER_COURT_PRESETS[o.preset])
+            ? LOWER_COURT_PRESETS[o.preset]
+            : []));
+
+  const filteredLower = filterLowerCourtDocs(lowerRes.docs || [], {
+    court: preCourt.court,
+    dateFrom: preFrom.compact,
+    dateTo: preTo.compact,
+    queries: explicitQueries
+  });
+  const filteredComwel = filterLowerCourtDocs(comwelRes.docs || [], {
+    court: preCourt.court,
+    dateFrom: preFrom.compact,
+    dateTo: preTo.compact,
+    queries: explicitQueries
+  });
+  const deduped = deduplicateBatch([].concat(filteredLower, filteredComwel), "system_sync");
+
+  let supaRes = { ok: true, pushed: 0, skipped: true };
+  if (getSupabaseCreds(env) && deduped.length > 0 && o.skipSupabase !== true) {
+    supaRes = await upsertToSupabase(deduped, env, fetchFn, "system_sync").catch((e) => {
+      errors.push("supabase: " + String(e.message || e));
+      return { ok: false, pushed: 0 };
+    });
+    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:"))) {
+      errors.push("supabase: upsert failed (HTTP " + (supaRes.status || 500) + ")");
+    }
+  }
+
+  const upstreamOk = attempted > 0 && succeeded > 0;
+  const fullOk = upstreamOk && supaRes.ok !== false && errors.length === 0;
+  const partialOk = !fullOk && succeeded > 0;
+
+  return {
+    ok: fullOk,
+    partial: partialOk,
+    status: (fullOk || partialOk) ? 200 : 502,
+    error: (!fullOk && !partialOk) ? (errors[0] || "법제처 하급심 API 응답을 받지 못했습니다.") : undefined,
+    syncedAt: new Date().toISOString(),
+    fetchedCount: filteredLower.length + filteredComwel.length,
+    dedupedCount: deduped.length,
+    supabasePushed: supaRes.pushed || 0,
+    sourceStats: {
+      lowerAttempted: lowerRes.attempted || 0,
+      lowerSucceeded: lowerRes.succeeded || 0,
+      comwelAttempted: comwelRes.attempted || 0,
+      comwelSucceeded: comwelRes.succeeded || 0,
+      supabaseOk: supaRes.ok !== false
+    },
+    errors,
+    docs: deduped
+  };
+}
+
 module.exports = {
+  LOWER_COURT_PRESETS,
+  LOWER_COURT_ALLOWED_COURTS,
+  sanitizeLawOc,
+  validateCourtFilterStrict,
+  sanitizeCourtFilter,
+  validateCompactYmdStrict,
+  sanitizeCompactYmd,
+  extractDrfRootOrThrow,
+  filterLowerCourtDocs,
   normalizeCourt,
   normalizeCaseNo,
   deterministicDocHash16,
@@ -1042,8 +1642,11 @@ module.exports = {
   hasResidualHardPii,
   deduplicateBatch,
   checkLegalizeKrTree,
+  fetchLawGoKrDetailRich,
   pullLawGoKrRecent,
+  pullLawGoKrLowerCourt,
   pullComwelSanjaeCases,
+  pullLowerCourtBundle,
   upsertToSupabase,
   pullFromSupabaseServer,
   deleteFromSupabaseServer,

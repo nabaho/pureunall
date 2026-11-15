@@ -8238,6 +8238,25 @@ exports.pboxApi = functions
         res.status(delStatus).json(Object.assign({ ok: del.ok !== false }, del));
         return;
       }
+      if (action === "pull_lower_court") {
+        const lowerOut = await PBoxSync.pullLowerCourtBundle({
+          env: process.env,
+          fetchFn: fetch,
+          lawOc: body.lawOc || "",
+          preset: body.preset || "all",
+          query: typeof body.query === "string" ? body.query.slice(0, 40) : "",
+          court: typeof body.court === "string" ? body.court.slice(0, 30) : "",
+          dateFrom: typeof body.dateFrom === "string" ? body.dateFrom.slice(0, 12) : "",
+          dateTo: typeof body.dateTo === "string" ? body.dateTo.slice(0, 12) : "",
+          maxQueries: 8,
+          maxPages: Math.min(Math.max(1, Number(body.maxPages) || 2), 4),
+          display: Math.min(Math.max(10, Number(body.display) || 25), 50),
+          detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 15)), 25),
+          includeComwel: body.includeComwel !== false
+        });
+        res.status((lowerOut.ok || lowerOut.partial) ? 200 : (lowerOut.status || 502)).json(lowerOut);
+        return;
+      }
       const out = await PBoxSync.runSync({
         env: process.env,
         lawOc: body.lawOc || "",
