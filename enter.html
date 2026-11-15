@@ -3580,13 +3580,16 @@ body.portal-mode #moreFab{display:flex;}
     return ref;
   }
 
-  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일 표시·비활성·권한을 그대로 지킨다) ── */
+  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일·머리줄 단추 표시·비활성·권한을 그대로 지킨다) ── */
   window.portalLaunchApp = function(key, extraQuery){
     var app = null;
     for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === key){ app = APPS[i]; break; } }
     if(!app || app.off) return false;
     var tile = document.querySelector('#appRows .tile[data-key="' + key + '"]') || document.querySelector('.tile[data-key="' + key + '"]');
-    if(!tile || tile.style.display === 'none' || tile.getAttribute('aria-disabled') === 'true' || tile.getAttribute('href') === '#') return false;
+    var headEl = app.head ? document.getElementById('headApp_' + key) : null;
+    var canTile = !!(tile && tile.style.display !== 'none' && tile.getAttribute('aria-disabled') !== 'true' && tile.getAttribute('href') !== '#');
+    var canHead = !!(headEl && !headEl.hidden && headEl.style.display !== 'none' && headEl.getAttribute('aria-disabled') !== 'true');
+    if(!canTile && !canHead) return false;
     if(typeof app.act === 'function'){ app.act(); return true; }
     var v = Math.floor(Date.now() / 600000);
     var q = String(extraQuery || '').replace(/^[?&]+/, '');
@@ -3594,6 +3597,29 @@ body.portal-mode #moreFab{display:flex;}
     if(isMobile()) location.href = url;
     else openPortalApp(app, url);
     return true;
+  };
+
+  /* ── 길잡이 챗봇 자동 동기화용 포털 앱·영역 읽기 전용 목차 (새 앱이 APPS 에 추가되면 수동 수정 없이 자동 반영) ── */
+  window.portalAppCatalog = function(){
+    return {
+      rows: APP_ROWS.map(function(r){ return { id: r.id, label: r.label }; }),
+      apps: APPS.map(function(a){
+        var rawIcon = String(a.icon || '');
+        return {
+          key: a.key,
+          name: a.name || a.key,
+          desc: a.desc || '',
+          icon: (rawIcon && rawIcon.indexOf('<') < 0) ? rawIcon : '📅',
+          url: a.url || '',
+          row: appRowOf(a),
+          head: !!a.head,
+          soon: appIsSoon(a, false),
+          off: !!a.off,
+          adminOnly: !!a.adminOnly,
+          perm: a.perm || ''
+        };
+      })
+    };
   };
 
   // ── 하나은행·하나카드 입금 확인 알림 (총괄관리자 전용) ──
@@ -7784,7 +7810,7 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=9"></script>
-<script src="js/pu-chatbot.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=10"></script>
+<script src="js/pu-chatbot.js?v=6"></script>
 </body>
 </html>
