@@ -106,9 +106,11 @@ async function takeState(state, uid, secret) {
   const p = raw.split(".");
   if (p.length !== 5 || p[0] !== "gl" || !/^\d{13}$/.test(p[1]) || p[2] !== uidTag(uid) || !secret) return false;
   const payload = p.slice(0, 4).join(".");
-  const expected = crypto.createHmac("sha256", secret).update(payload).digest();
-  let got;
-  try { got = Buffer.from(p[4], "base64url"); } catch (_) { return false; }
+  /* ★ 서명은 «글자 그대로» 견준다 (2026-11-15 보안 검토 중간 1 — kakao.js 와 같다).
+     풀어 낸 바이트로 견주면 마지막 글자의 쓰지 않는 비트만 바꾼 «다른 글자»도 통과해,
+     원문 글자로 매기는 「한 번 씀」 기록을 비켜 같은 서명을 한 번 더 쓸 수 있었다. */
+  const expected = Buffer.from(crypto.createHmac("sha256", secret).update(payload).digest("base64url"));
+  const got = Buffer.from(String(p[4] || ""));
   if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
   const age = Date.now() - Number(p[1]);
   if (age < 0 || age > STATE_TTL_MS) return false;

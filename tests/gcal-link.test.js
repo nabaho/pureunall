@@ -309,3 +309,18 @@ test('⑨-4 CORS — 두 출처는 그 값 그대로(Vary), 목록 밖은 안 �
     assert.equal(r.headers['Access-Control-Allow-Origin'], undefined, '★★ 남의 출처(' + o + ')에 문을 열었다');
   }
 });
+
+test('⑨-5 서명 «다른 글자 같은 바이트»로 한 번 쓴 연결 요청표를 다시 쓰지 못한다 (2026-11-15 보안 검토 중간 1)', async () => {
+  const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const G = fresh();
+  const st = await stateFor(G, 'staff1');
+  const p = st.split('.');
+  const last = p[4].charAt(p[4].length - 1);
+  const 변형 = p.slice(0, 4).concat([p[4].slice(0, -1) + ABC.charAt(ABC.indexOf(last) ^ 1)]).join('.');
+  assert.notEqual(변형, st);
+  assert.deepEqual(Buffer.from(변형.split('.')[4], 'base64url'), Buffer.from(p[4], 'base64url'), '시험 밑감이 «같은 바이트»가 아니다');
+  const first = await call(G.gcalLink, { token: 'staff1', body: { code: 'cOK', state: st } });
+  assert.equal(first.body.ok, true);
+  const replay = await call(G.gcalLink, { token: 'staff1', body: { code: 'cOK', state: 변형 } });
+  assert.equal(replay.status, 400, '★★ 서명 글자만 비틀어 같은 연결 요청표를 한 번 더 썼다');
+});

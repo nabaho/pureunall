@@ -719,3 +719,24 @@ test('★★ 계정 «연결»도 — 새 출처에서 시작하면 교환이 �
   const seen = await exchangedRedirects(() => reqFrom(K.kakaoLink, { origin: NEW_ORIGIN, method: 'POST', token: 'staff1', body: { code: 'cA', state: a.body.state } }));
   assert.deepEqual(seen, [NEW_ORIGIN + '/enter.html'], '★★ 연결 교환 주소가 인가 때와 다르다 — 카카오가 거절해 연결이 막힌다');
 });
+
+/* 서명 마지막 글자의 «쓰지 않는 비트»만 바꾼 다른 글자 — 풀면 같은 바이트가 된다 */
+function 같은바이트다른글자(sig) {
+  const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const last = sig.charAt(sig.length - 1);
+  const other = ABC.charAt(ABC.indexOf(last) ^ 1);
+  return sig.slice(0, -1) + other;
+}
+
+test('★★ 서명 «다른 글자 같은 바이트»로 한 번 쓴 state 를 다시 쓰지 못한다 (2026-11-15 보안 검토 중간 1)', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { mode: 'login' } });
+  const parts = a.body.state.split('.');
+  const 변형 = parts.slice(0, 3).concat([같은바이트다른글자(parts[3])]).join('.');
+  assert.notEqual(변형, a.body.state);
+  assert.deepEqual(Buffer.from(변형.split('.')[3], 'base64url'), Buffer.from(parts[3], 'base64url'), '시험 밑감이 «같은 바이트»가 아니다');
+  const first = await reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: a.body.state } });
+  assert.equal(first.body.needLink, true, '처음 요청이 state 문턱을 못 넘었다');
+  const replay = await reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: 변형 } });
+  assert.match(String(replay.body.error), /이미 사용|만료/, '★★ 서명 글자만 비틀어 같은 state 를 한 번 더 썼다');
+});

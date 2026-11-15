@@ -147,9 +147,11 @@ async function takeState(state, mode, secret) {
   if (parts.length !== 4 || parts[0] !== mode || !/^\d{13}$/.test(parts[1])
       || !/^[A-Za-z0-9_-]{30,40}$/.test(parts[2]) || !/^[A-Za-z0-9_-]{40,50}$/.test(parts[3]) || !secret) return false;
   const payload = parts.slice(0, 3).join(".");
-  const expected = crypto.createHmac("sha256", secret).update(payload).digest();
-  let got;
-  try { got = Buffer.from(parts[3], "base64url"); } catch (_) { return false; }
+  /* ★ 서명은 «글자 그대로» 견준다 (2026-11-15 보안 검토 중간 1).
+     풀어 낸 바이트로 견주면 마지막 글자의 쓰지 않는 비트만 바꾼 «다른 글자»도 통과하는데,
+     「한 번 씀」 기록은 원문 글자로 매기므로 같은 서명을 한 번 더 쓸 수 있었다. 정규 인코딩 하나만 받는다. */
+  const expected = Buffer.from(crypto.createHmac("sha256", secret).update(payload).digest("base64url"));
+  const got = Buffer.from(String(parts[3]));
   if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
   const age = Date.now() - Number(parts[1]);
   if (age < 0 || age > STATE_TTL_MS) return false;
