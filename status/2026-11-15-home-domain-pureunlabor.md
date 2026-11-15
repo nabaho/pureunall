@@ -9,4 +9,4 @@
   - `REAL_ORIGIN`(검색 원본·sitemap) = 푸른노무법인.kr — 새 홈페이지는 아직 «미리보기»(robots 차단). 정식 공개(`--live`)는 대표 결정.
   - fairrunlabor.com — 메일(구글 워크스페이스)·뉴스레터·급여명세서 발신에 그대로 쓴다. MX·news 기록 손대지 않음.
 - 왜 옮겼나: fairrunlabor.com 은 DNS 가 스퀘어스페이스 자리표(「곧 출시 예정」)를 가리켜, 9-03 연결 뒤에도 새 홈페이지가 밖에서 안 보였다.
-- 남은 일: 가비아 DNS(A 넷 185.199.108~111.153 + www CNAME nabaho.github.io) → 인증서 → HTTPS 강제. pureunlabor.com → .co.kr 넘기기. 푸른노무법인.kr 11-27 만료(명의 woorimedia).
+- 남은 일: 가비아 DNS(A 넷 185.199.108~111.153 + www CNAME nabaho.github.io) → 인증서 → HTTPS 강제 → GitHub 계정 Pages «확인된 도메인» 등록(가로채기 방지). pureunlabor.com → .co.kr 넘기기. 옛 도메인(푸른노무법인.kr) 연장 여부는 대표에게 따로 알림(공개 저장소라 명의·만료일은 적지 않는다).
