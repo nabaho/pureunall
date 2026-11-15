@@ -1025,12 +1025,13 @@ const HOME_WRITE_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/homepa
 const SITE_BASE = 'https://raw.githubusercontent.com/nabaho/pureun-site/main';
 
 /* 사람이 «눌러 볼» 자리. 읽는 자리와 달리 도메인을 따라간다.
-   ★ 2026-09-03 대표 지시 「fairrunlabor.com 으로 도메인 연결해라」로 옮겼다.
-   ⚠ 이 주소는 «DNS 가 깃허브를 가리켜야» 열린다. 저장소 쪽(CNAME 파일·페이지 설정)은
-     붙여 두었고, 등록처(Squarespace) 화면에서 A 기록 넷을 바꾸면 열린다.
-     그 전까지는 이 링크가 옛 스퀘어스페이스 자리표로 간다 — 「올리기」는
+   ★ 2026-11-15 대표 지시 「홈페이지 도메인 주소 바꾸기 … 모두 실행해라」로
+     새로 산 pureunlabor.co.kr 로 옮겼다(scripts/freeze-homepage.js 의 SITE_DOMAIN 과 같이).
+     전에 붙였던 fairrunlabor.com 은 DNS 가 스퀘어스페이스 자리표를 가리켜 끝내 안 열렸다.
+   ⚠ 이 주소는 «DNS 가 깃허브를 가리켜야» 열린다(가비아 DNS 관리 — A 기록 넷 + www).
+     DNS·인증서가 서기 전에는 이 링크가 안 열릴 수 있다 — 「올리기」는
      그와 무관하게 돈다(읽는 자리가 저장소 원본이라서다. 위 SITE_BASE 참고). */
-const SITE_VIEW = 'https://fairrunlabor.com';
+const SITE_VIEW = 'https://pureunlabor.co.kr';
 const PUBLISH_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/publishSite';
 
 /* 관리하는 쪽.
