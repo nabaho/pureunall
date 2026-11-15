@@ -78,7 +78,8 @@ function keep(rec) {
       st.clear();
       st.add(rec);
       tx.oncomplete = function () { db.close(); res(true); };
-      tx.onerror = function () { db.close(); rej(tx.error); };
+      /* 용량이 모자라 저장이 «중단(abort)»돼도 끝을 알린다 — 안 그러면 공유 화면이 멈춘 채 남는다 */
+      tx.onerror = tx.onabort = function () { try { db.close(); } catch (_) {} rej(tx.error || new Error('공유함 저장 중단')); };
     });
   });
 }

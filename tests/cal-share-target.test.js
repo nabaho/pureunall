@@ -7,7 +7,8 @@
    ★ 이 검사가 지키는 것
      ① 매니페스트의 share_target 은 POST(사진 + 글) — 받을 주소는 앱 범위 안이고, 화면이 «좁은 scope» 로 등록한 일꾼이 받는다
        (scope 를 안 좁히면 /pureunall/ 을 차지하는 다른 앱의 일꾼이 밀어내 공유가 죽는다)
-     ② 공유된 글(title·text·url)이 «말로 채우기» 창에 채워져 열리고 곧바로 읽는다 — 저장은 안 한다(옛 GET 설치분)
+     ② 공유된 글(title·text·url)이 «말로 채우기» 창에 올라오고, 사람이 «읽어서 채우기»를 눌러야 읽는다 — 저장은 안 한다(옛 GET 설치분)
+     ★ 공유는 AI 를 «저절로» 부르지 않는다(2026-11-15 보안 검토) — 일꾼은 폰 공유와 남의 웹페이지가 몰래 보낸 전송을 못 가린다
      ③ 읽기 시작하면서 주소의 글·표를 지운다(새로고침이 같은 글을 또 AI 에 보내지 않게)
      ④ 공유와 상관없는 주소(출장 알림 등)는 건드리지 않는다
      ⑤ 공유 글 프롬프트는 «언제 받은 글인지 모른다»를 알리고 오늘 기준 계산을 check 로 남기게 한다 — 말 프롬프트는 그대로
@@ -79,7 +80,7 @@ test('① 기존 매니페스트 칸이 그대로다 — 이름·아이콘·시�
 function 일꾼켜기(옵션) {
   옵션 = 옵션 || {};
   const handlers = {};
-  const 함 = { 열린이름: [], 지움: 0, 담음: [], 순서: [] };
+  const 함 = { 열린이름: [], 지움: 0, 담음: [], 순서: [], 닫힘: 0 };
   const ctx = {
     URL, Response, Promise, String, Date, console: { warn() {} },
     caches: { open() { 함.캐시 = true; return Promise.resolve({ put() {} }); }, delete() { 함.캐시 = true; return Promise.resolve(true); } },
@@ -95,14 +96,15 @@ function 일꾼켜기(옵션) {
             transaction(store) {
               함.store = store;
               const tx = {};
-              setImmediate(() => tx.oncomplete && tx.oncomplete());
+              /* 중단: 용량 부족처럼 onerror 없이 onabort 만 오는 경우 */
+              setImmediate(() => { if (옵션.중단) { tx.onabort && tx.onabort(); } else if (tx.oncomplete) tx.oncomplete(); });
               tx.objectStore = () => ({
                 clear() { 함.지움++; 함.순서.push('clear'); 함.담음 = []; },
                 add(v) { 함.순서.push('add'); 함.담음.push(v); },
               });
               return tx;
             },
-            close() {},
+            close() { 함.닫힘++; },
           };
           req.onsuccess && req.onsuccess();
         });
@@ -178,6 +180,16 @@ test('⑦ 사진도 글도 없으면 담지 않고 ?share=none · 읽다 실패�
   const c = 일꾼켜기({ 열기실패: true });
   const 함실패 = await 보내기(c.handlers, 공유요청(받는주소, { files: [사진('a.jpg', 10, 'image/jpeg')] }));
   assert.strictEqual(함실패.headers.get('location'), 캘린더주소 + '?share=err');
+});
+
+test('⑦ 저장이 «중단(abort)»돼도(용량 부족) 멈추지 않고 ?share=err 로 돌려보낸다', async () => {
+  const w = 일꾼켜기({ 중단: true });
+  const 답 = await Promise.race([
+    보내기(w.handlers, 공유요청(받는주소, { files: [사진('a.jpg', 10, 'image/jpeg')] })),
+    new Promise((r) => setTimeout(() => r('멈춤'), 500)),
+  ]);
+  assert.notStrictEqual(답, '멈춤', '중단을 안 들으면 공유 화면이 멈춘 채 남는다');
+  assert.strictEqual(답.headers.get('location'), 캘린더주소 + '?share=err');
 });
 
 test('⑦ 공유 주소가 아닌 요청은 손대지 않고, 공유 주소를 그냥 열면(GET) 캘린더로 돌려보낸다 · 캐시는 안 쓴다', async () => {
@@ -282,27 +294,35 @@ function 상자(search, 옵션) {
     document: { getElementById: (id) => (id === 'capText' ? { value: b.S.cap ? b.S.cap.text : '' } : 요소[id] || null) },
     render() { 기록.render++; }, toast(t) { 기록.toast.push(t); }, confirm: () => false,
     openNew(ymd) { 기록.openNew.push(ymd); b.S.modal = { mode: 'new', kind: 'sch', date: ymd, endDate: '', title: '', note: '', timed: true, time: '10:00', endTime: '', place: '', contact: '' }; b.render(); },
-    closeModal() { 기록.닫기++; b.S.modal = null; },
+    closeModal() { 기록.닫기++; b.S.modal = null; b.S.cap = null; },
     캡처사진읽기(파일들) { 기록.사진읽기.push(파일들); },
     doSave() { 기록.doSave++; },
+    modalRead() {},
+    esc: (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';'),
   };
   if (옵션.함) b.indexedDB = 옵션.함.idb;
   vm.createContext(b);
   vm.runInContext('var 캡처듣기 = null;', b);
   vm.runInContext(줄('var 공유함 = '), b);
   ['function 캡처깔끔(){', 'function 캡처듣기끝(){', 'function 캡처정리(){', 'function 캡처묶음(manual){', 'function 캡처읽기(last, manual){',
-    'function 캡처결과(r){', 'function 캡처채우기(d){', 'function 캡처글읽기(){', 'function 공유글합치기(목록){', 'function 공유받기(){',
+    'function 캡처결과(r){', 'function 캡처채우기(d){', 'function 캡처글읽기(){', 'function 캡처누름(t){', 'function 캡처창Html(){',
+    'function 공유글합치기(목록){', 'function 공유받기(){', 'function 공유창열기(){', 'function 공유글올리기(글){', 'function 공유사진올리기(사진){',
     'function 공유함꺼내기(){', 'function 공유함받기(){'].forEach((h) => vm.runInContext(함수몸(h), b));
-  return { b, 기록, 실행: (코드) => vm.runInContext(코드, b) };
+  return { b, 기록, 실행: (코드) => vm.runInContext(코드, b), 누름: (뜻) => b.캡처누름({ getAttribute: (k) => (k === 'data-cap' ? 뜻 : null) }) };
 }
 
-test('② 공유된 글(옛 GET 설치분)이 새 일정 창 + «말로 채우기» 창에 채워져 열리고 곧바로 읽는다 — 저장은 안 한다', async () => {
+test('② 공유된 글(옛 GET 설치분)이 펼친 새 일정 창 + «말로 채우기» 칸에 올라오고, «읽어서 채우기»를 눌러야 읽는다 — 저장은 안 한다', async () => {
   const t = 상자('?text=' + encodeURIComponent('11/2 오후 3시 가나상사 방문 서산 임꺽정 010-0000-0000'));
   assert.strictEqual(t.실행('공유받기()'), true);
   assert.deepStrictEqual(t.기록.openNew, ['2026-10-31']);
+  assert.strictEqual(t.b.S.modal.full, true, '빠른 창(PC·태블릿)은 캡처 칸을 접어 숨긴다 — 펼친 창으로 열어야 보인다');
   assert.strictEqual(t.b.S.cap.mode, 'voice');
   assert.strictEqual(t.b.S.cap.src, 'share');
-  assert.strictEqual(t.b.S.cap.busy, true, '읽는 중이어야 한다');
+  assert.ok(t.b.S.cap.text.includes('가나상사 방문'), '받은 글이 칸에 올라와야 사람이 보고 고친다');
+  assert.ok(!t.b.S.cap.busy && t.b.S.cap.msg, '읽는 중이 아니라 «눌러 주세요» 안내가 떠야 한다');
+  await 기다림();
+  assert.strictEqual(t.기록.ai.length, 0, '★ 저절로 AI 를 부르면 남의 웹페이지가 우리 AI 한도를 쓰게 할 수 있다');
+  t.실행('캡처글읽기()');                 /* 사람이 «읽어서 채우기»를 누른다 */
   await 기다림();
   assert.strictEqual(t.기록.ai.length, 1);
   assert.ok(/공유한 글/.test(t.기록.ai[0].parts[0].text), '공유 글 프롬프트로 불러야 한다');
@@ -346,6 +366,8 @@ test('④ 공유와 상관없는 주소(출장 알림·빈 주소·공백뿐)는
 test('② 주소 지우기가 실패해도 계속한다 · 모듈이 없으면 AI 를 안 부르고 false', async () => {
   const a = 상자('?text=' + encodeURIComponent('11/2 3시 방문'), { 교체실패: true });
   assert.strictEqual(a.실행('공유받기()'), true);
+  assert.strictEqual(a.b.S.cap.text, '11/2 3시 방문');
+  a.실행('캡처글읽기()');
   await 기다림();
   assert.strictEqual(a.기록.ai.length, 1);
   const b = 상자('?text=' + encodeURIComponent('11/2 3시 방문'), { 모듈: null });
@@ -366,19 +388,40 @@ test('② 캡처묶음 은 공유 창일 때만 kind:"share" 를 싣는다', () 
 const 지금기록 = (덧) => Object.assign({ id: 1, at: Date.now(), title: '', text: '', url: '', files: [] }, 덧);
 const 사진알맹이 = (type) => ({ blob: { type: type || 'image/png', size: 1000 }, name: 'a.png', type: type || 'image/png' });
 
-test('⑧ ★ ?share=1 로 열리면 주소 표를 지우고, 공유함의 캡처를 «캡처로 채우기» 길로 읽는다 — 함은 꺼내면서 비운다', async () => {
+test('⑧ ★ ?share=1 로 열리면 주소 표를 지우고, 공유함의 캡처를 펼친 새 일정 창에 올려 둔다 — 함은 꺼내면서 비운다', async () => {
   const 함 = 가짜공유함([지금기록({ files: [사진알맹이(), 사진알맹이('image/jpeg')] })]);
   const t = 상자('?share=1', { 함 });
   t.실행('공유받기()');
   assert.strictEqual(t.기록.replace.length, 1, '?share=1 표를 지워야 새로고침이 또 꺼내지 않는다');
   await 기다림(8);
   assert.deepStrictEqual(t.기록.openNew, ['2026-10-31'], '새 일정 창을 열어야 칸을 채운다');
-  assert.strictEqual(t.기록.사진읽기.length, 1, '캡처 읽기 길로 넘겨야 한다');
-  assert.strictEqual(t.기록.사진읽기[0].length, 2);
-  assert.ok(t.기록.사진읽기[0].every((x) => /^image\//.test(x.type)), '알맹이(blob)를 넘겨야 줄이고 읽는다');
+  assert.strictEqual(t.b.S.modal.full, true, '펼친 창이어야 PC·태블릿에서도 캡처 칸이 보인다');
+  assert.strictEqual(t.b.S.cap.mode, 'photo');
+  assert.strictEqual(t.b.S.cap.shared.length, 2);
   assert.strictEqual(함.상태.비움, 1, '꺼낸 뒤 함을 비워야 사진이 폰에 남지 않는다');
   assert.strictEqual(함.상태.mode, 'readwrite');
+  assert.strictEqual(t.기록.사진읽기.length, 0, '★ 사람이 누르기 전에는 캡처를 AI 로 보내지 않는다');
+  assert.strictEqual(t.기록.ai.length, 0);
+  t.누름('shared');                       /* 사람이 «📷 공유받은 캡처 읽기»를 누른다 */
+  assert.strictEqual(t.기록.사진읽기.length, 1, '누르면 «캡처로 채우기»와 같은 길로 읽는다');
+  assert.strictEqual(t.기록.사진읽기[0].length, 2);
+  assert.ok(t.기록.사진읽기[0].every((x) => /^image\//.test(x.type)), '알맹이(blob)를 넘겨야 줄이고 읽는다');
   assert.strictEqual(t.기록.doSave, 0, '공유만으로 저장하면 안 된다');
+});
+
+test('⑧ 공유받은 캡처 칸에는 «공유받은 캡처 읽기» 단추와 몇 장인지가 보인다 — 평소 캡처 칸에는 그 단추가 없다', async () => {
+  const 함 = 가짜공유함([지금기록({ files: [사진알맹이(), 사진알맹이()] })]);
+  const t = 상자('?share=1', { 함 });
+  t.실행('공유받기()');
+  await 기다림(8);
+  const 칸 = t.실행('캡처창Html()');
+  assert.ok(/data-cap="shared"/.test(칸), '읽기 단추가 없다');
+  assert.ok(칸.includes('2장'), '몇 장을 받았는지 알려야 한다');
+  t.b.S.cap = { mode: 'photo', busy: false, drafts: null, msg: '' };
+  assert.ok(!/data-cap="shared"/.test(t.실행('캡처창Html()')), '공유가 아닐 때 단추가 보이면 안 된다');
+  t.b.S.cap = { mode: 'photo', busy: false, drafts: null, msg: '' };
+  t.누름('shared');
+  assert.strictEqual(t.기록.사진읽기.length, 0, '받은 캡처가 없으면 눌러도 아무 일도 없어야 한다');
 });
 
 test('⑧ 일꾼과 화면이 «같은 함»을 쓴다 — 이름·판이 어긋나면 화면이 빈 함을 연다', async () => {
@@ -393,12 +436,16 @@ test('⑧ 일꾼과 화면이 «같은 함»을 쓴다 — 이름·판이 어긋
   assert.strictEqual(함.상태.store, w.함.store, '공유함 칸(store) 이름이 다르다');
 });
 
-test('⑧ 글만 담겼으면 공유 글 길(말로 채우기 · kind share)로 읽는다', async () => {
+test('⑧ 글만 담겼으면 «말로 채우기» 칸에 올리고, 누르면 공유 글 길(kind share)로 읽는다', async () => {
   const 함 = 가짜공유함([지금기록({ title: '방문 안내', text: '11/2 오후 3시 가나상사 방문' })]);
   const t = 상자('?share=1', { 함 });
   t.실행('공유받기()');
   await 기다림(10);
   assert.strictEqual(t.기록.사진읽기.length, 0);
+  assert.strictEqual(t.b.S.cap.text, '방문 안내\n11/2 오후 3시 가나상사 방문');
+  assert.strictEqual(t.기록.ai.length, 0, '★ 누르기 전에는 AI 를 부르지 않는다');
+  t.누름('go');                            /* 사람이 «읽어서 채우기»를 누른다 */
+  await 기다림(4);
   assert.strictEqual(t.기록.ai.length, 1);
   assert.ok(/공유한 글/.test(t.기록.ai[0].parts[0].text) && t.기록.ai[0].parts[0].text.includes('가나상사 방문'));
   assert.strictEqual(t.b.S.modal.title, '1500 가나상사 방문');
@@ -423,11 +470,15 @@ test('⑧ 오래된 대기분(10분 넘음)·빈 함·사진 아닌 알맹이는
   assert.strictEqual(c.기록.사진읽기.length, 0, '사진이 아닌 것을 AI 로 보내면 안 된다');
 });
 
-test('⑧ ?share=none·err 는 알리고 주소 표를 지운다 · 공유함이 없는 기기(indexedDB 없음)는 조용히 넘어간다', async () => {
-  const a = 상자('?share=none');
+test('⑧ ?share=none·err 는 알리고 주소 표를 지운다 — 함에 남은 옛 것은 «읽지 않고» 비운다 · indexedDB 없는 기기는 조용히', async () => {
+  const 옛 = 가짜공유함([지금기록({ files: [사진알맹이()] })]);
+  const a = 상자('?share=none', { 함: 옛 });
   a.실행('공유받기()');
   assert.strictEqual(a.기록.toast.length, 1);
   assert.strictEqual(a.기록.replace.length, 1);
+  await 기다림(8);
+  assert.strictEqual(a.기록.openNew.length, 0, '«없다»고 한 직후 옛 캡처가 열리면 헷갈린다');
+  assert.strictEqual(옛.상태.비움, 1, '옛 것은 비워야 폰에 안 남는다');
   const b = 상자('?share=err');
   b.실행('공유받기()');
   assert.ok(/실패/.test(b.기록.toast[0]));
@@ -442,6 +493,17 @@ test('⑧ 다른 창이 열려 있으면 닫고 «새 일정 창»으로 — 있
   await 기다림(8);
   assert.strictEqual(t.기록.닫기, 1);
   assert.strictEqual(t.b.S.modal.mode, 'new');
+});
+
+test('⑧ 창을 닫으면(closeModal) 캡처·말 상태도 정리한다 — 뒤늦은 AI 답이 다음 새 창을 채우지 않게', () => {
+  const 몸 = 함수몸('function closeModal(){');
+  assert.ok(/캡처정리\(\)/.test(몸), 'closeModal 이 캡처정리를 안 부른다');
+  assert.ok(몸.indexOf('캡처정리()') < 몸.indexOf('render()'), '정리한 뒤에 다시 그려야 한다');
+});
+
+test('⑧ 폰 — 캡처 칸·확인 줄도 단추 줄처럼 왼쪽 들여쓰기가 없다', () => {
+  assert.ok(/body\.mob \.gform \.gcap\{[^}]*margin-left:0/.test(캘린더), '폰에서 캡처 칸이 56px 들여 써져 좁아진다');
+  assert.ok(/body\.mob \.gform \.gcapwarn\{[^}]*padding-left:0/.test(캘린더), '폰에서 확인 줄이 어긋난다');
 });
 
 /* ⑥ 부팅 */

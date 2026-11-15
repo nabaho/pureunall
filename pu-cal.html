@@ -628,6 +628,9 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   body.mob .gform .gtabs{margin-left:0;flex-wrap:wrap;gap:6px}
   body.mob .gform .gtabs button{height:36px;border-radius:18px;white-space:nowrap;padding:0 12px;font-size:13px}
   :root[data-theme="dark"] body.mob .gform .gtabs button.on{background:#3f4659;border-color:#3f4659;color:#ffffff}
+  /* 폰 — 캡처 칸·확인 줄도 단추 줄(.gtabs)처럼 왼쪽 들여쓰기(56px)를 없앤다. 안 그러면 폰 폭에서 칸이 56px 좁아지고 줄이 어긋난다 */
+  body.mob .gform .gcap{margin-left:0}
+  body.mob .gform .gcapwarn{padding-left:0}
   .gform .gsave{border:none;background:var(--gtoday);color:#ffffff;border-radius:20px;padding:0 24px;height:40px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
   :root[data-theme="dark"] .gform .gsave{color:#131314}
   .gform .gvis{font-weight:400}
@@ -4632,7 +4635,8 @@ function 긴날짜(ymd){
    ⚠ endAt 은 «밀리초»(Date.parse)다 — 처음에 «분»으로 셈해 상세 창에 「09:30 – 29854170000:00」이
      떴다(2026-09-27~10-04). 검사가 가짜 값(960분)을 써서 못 잡았다 — 검사도 실제 꼴로 바꿨다. */
 function 시분(ms){ return new Date(+ms + 9 * 3600000).toISOString().slice(11, 16); }
-function closeModal(){ S.modal = null; S.busy = false; render(); }
+/* 창을 닫으면 캡처·말 상태도 함께 정리한다(2026-11-15 검토) — 남겨 두면 뒤늦게 온 AI 답이 «다음에 연 새 창»을 채운다 */
+function closeModal(){ 캡처정리(); S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
 
 /* 구글 머티리얼 «선 아이콘» 길(path) — 24×24. 단색이라 글자색(currentColor)을 따른다 */
@@ -5487,7 +5491,9 @@ function 캡처창Html(){
         + (PuCalCapture.speechSupported() ? '<button class="glink" data-cap="mic">' + (c.listening ? '■ 멈춤' : '🎤 말하기') + '</button>' : '')
         + '<button class="glink" data-cap="go">읽어서 채우기</button><button class="glink" data-cap="close">닫기</button></div>';
     } else {
-      h += '<div class="gcapbtns"><button class="glink" data-cap="photo">📷 다른 사진 고르기</button><button class="glink" data-cap="close">닫기</button></div>';
+      h += '<div class="gcapbtns">'
+        + ((c.shared && c.shared.length) ? '<button class="glink" data-cap="shared">📷 공유받은 캡처 읽기</button>' : '')
+        + '<button class="glink" data-cap="photo">📷 다른 사진 고르기</button><button class="glink" data-cap="close">닫기</button></div>';
     }
     if(c.msg) h += '<div class="ghint">' + esc(c.msg) + '</div>';
     if(c.drafts) h += c.drafts.map(function(d, i){
@@ -5510,6 +5516,7 @@ function 캡처누름(t){
   else if(뜻 === "voice") 캡처말열기();
   else if(뜻 === "mic") 캡처마이크();
   else if(뜻 === "go") 캡처글읽기();
+  else if(뜻 === "shared"){ var 받은 = S.cap && S.cap.shared; if(받은 && 받은.length) 캡처사진읽기(받은); }   /* 📲 공유받은 캡처 — 사람이 눌러야 읽는다 */
   else if(뜻 === "pick"){ var d = S.cap && S.cap.drafts && S.cap.drafts[+t.getAttribute("data-ci")]; if(d) 캡처채우기(d); }
   else if(뜻 === "close"){ 캡처정리(); render(); }
 }
@@ -5635,8 +5642,11 @@ document.addEventListener("input", function(e){
    ★ 2026-10-31 글만(GET: 주소에 title·text·url) → 2026-11-15 캡처(사진)까지(POST).
      지금 pu-cal-manifest.json 의 share_target 은 POST 다 — 일꾼(pu-cal-share-sw.js)이 받아 IndexedDB(공유함)에
      잠깐 두고 이 화면을 ?share=1 로 연다. 옛 설정으로 깔린 폰은 아직 GET 으로 올 수 있어 주소 글도 그대로 받는다.
-   ★ 대표가 «직접 고른 것»이라 저절로 읽는다(한 번 덜 누른다). 저장은 그대로 사람이 «저장»을 눌러야 한다 — 칸만 채운다.
-     사진은 «📷 캡처로 채우기»와, 글은 «🎤 말로 채우기»(공유 글 프롬프트)와 같은 길로 읽는다.
+   ★★ 저절로 읽지 «않는다» — 받은 것을 새 일정 창(펼친 창)에 올려 두고, 사람이 «읽어서 채우기»·«📷 공유받은 캡처 읽기»를
+      한 번 눌러야 AI(구글 Gemini)로 보낸다 (2026-11-15 보안 검토). 까닭 — 일꾼은 «폰 공유»와 «남의 웹페이지가 몰래 보낸 전송»을
+      구별할 수 없다. 저절로 읽으면 아무 사이트나 우리 직원의 AI 한도를 쓰게 하고, 남의 사진을 바깥 AI 로 보내게 된다.
+      (10-31 판은 글을 저절로 읽었다 — 주소 글(GET)도 같은 까닭으로 함께 바꿨다.)
+     사진은 «📷 캡처로 채우기»와, 글은 «🎤 말로 채우기»(공유 글 프롬프트)와 같은 길로 읽는다. 저장은 그대로 사람이 «저장»을 눌러야 한다.
    ⚠ 읽기 시작하면서 주소의 글·표를 «지우고», 공유함은 꺼내면서 «비운다» — 새로고침이 같은 것을 또 AI 에 보내지 않게,
      사진이 폰에 남지 않게. 10분 넘은 대기분은 읽지 않고 버린다(엉뚱한 때 옛 캡처가 읽히지 않게).
    ⚠ 공유함은 ?share=1 이 없어도 본다 — 로그인 화면을 거치면 주소가 사라질 수 있어서다(10분 안이면 이어서 읽는다).
@@ -5651,16 +5661,34 @@ function 공유받기(){
   var 표 = q.get("share");
   var 글 = 공유글합치기([q.get("title"), q.get("text"), q.get("url")]);
   if(글 || 표 !== null){ try{ history.replaceState(null, "", location.pathname + location.hash); }catch(_){} }
-  if(표 === "none") toast("공유받은 사진·글이 없습니다 — 다시 공유해 주세요");
-  else if(표 === "err") toast("⚠ 공유받기에 실패했습니다 — 다시 공유해 주세요");
+  /* 없음·실패 — 알리고, 함에 남은 옛 것은 읽지 않고 비운다(«없다»고 한 직후 옛 캡처가 열리면 헷갈린다) */
+  if(표 === "none" || 표 === "err"){
+    toast(표 === "none" ? "공유받은 사진·글이 없습니다 — 다시 공유해 주세요" : "⚠ 공유받기에 실패했습니다 — 다시 공유해 주세요");
+    공유함꺼내기();
+    return false;
+  }
   if(!글){ 공유함받기(); return false; }
   if(typeof PuCalCapture === "undefined") return false;
-  글 = 글.slice(0, PuCalCapture.LIMIT.text);
-  openNew(todayYMD());
-  S.cap = { mode:"voice", src:"share", text:글, live:"", listening:false, busy:false, msg:"", drafts:null };
-  render();
-  캡처글읽기();
+  공유글올리기(글.slice(0, PuCalCapture.LIMIT.text));
   return true;
+}
+/* 받은 것을 «펼친» 새 일정 창에 올려 둔다 — 빠른 창(PC·태블릿)은 캡처 칸을 접어 두어 안 보인다. 읽지는 않는다. */
+function 공유창열기(){
+  if(S.modal) closeModal();          /* 다른 창이 열려 있으면 닫고 새 일정 창으로 — 있는 일정 창에 덮어쓰지 않는다 */
+  openNew(todayYMD());
+  if(S.modal) S.modal.full = true;
+}
+function 공유글올리기(글){
+  공유창열기();
+  S.cap = { mode:"voice", src:"share", text:글, live:"", listening:false, busy:false, drafts:null,
+    msg:"📲 공유받은 글입니다 — 확인하고 «읽어서 채우기»를 누르면 AI 가 일정을 읽습니다" };
+  render();
+}
+function 공유사진올리기(사진){
+  공유창열기();
+  S.cap = { mode:"photo", src:"share", shared:사진, busy:false, drafts:null,
+    msg:"📲 공유받은 캡처 " + 사진.length + "장 — «공유받은 캡처 읽기»를 누르면 AI 가 일정을 읽습니다" };
+  render();
 }
 /* 꺼낸 것을 읽는다 — 사진이 있으면 사진(캡처 길), 없으면 글(공유 글 길). 한 번에 하나만.
    ⚠ 함을 여는 일은 아래 «공유함» 구역(공유함꺼내기)이 한다 — 이 구역은 저장소를 직접 만지지 않는다. */
@@ -5672,14 +5700,7 @@ function 공유함받기(){
       .filter(function(b){ return b && /^image\//.test(String(b.type || "")); }).slice(0, PuCalCapture.LIMIT.images);
     var 글 = 공유글합치기([rec.title, rec.text, rec.url]).slice(0, PuCalCapture.LIMIT.text);
     if(!사진.length && !글) return false;
-    if(S.modal) closeModal();          /* 다른 창이 열려 있으면 닫고 새 일정 창으로 — 있는 일정 창에 덮어쓰지 않는다 */
-    openNew(todayYMD());
-    if(사진.length) 캡처사진읽기(사진);
-    else {
-      S.cap = { mode:"voice", src:"share", text:글, live:"", listening:false, busy:false, msg:"", drafts:null };
-      render();
-      캡처글읽기();
-    }
+    if(사진.length) 공유사진올리기(사진); else 공유글올리기(글);
     return true;
   })["catch"](function(){ return false; });
 }
