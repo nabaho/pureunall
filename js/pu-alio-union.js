@@ -2261,10 +2261,6 @@
     return res;
   }
 
-  function getInitialOrganFromUrl() {
-    return getInitialUrlParams().organ;
-  }
-
   function openOrganWindow(aid, forceSameWin) {
     var cleanAid = String(aid == null ? '' : aid).trim();
     if (!cleanAid) return null;
