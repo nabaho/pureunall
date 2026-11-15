@@ -5516,7 +5516,10 @@ function 캡처누름(t){
   else if(뜻 === "voice") 캡처말열기();
   else if(뜻 === "mic") 캡처마이크();
   else if(뜻 === "go") 캡처글읽기();
-  else if(뜻 === "shared"){ var 받은 = S.cap && S.cap.shared; if(받은 && 받은.length) 캡처사진읽기(받은); }   /* 📲 공유받은 캡처 — 사람이 눌러야 읽는다 */
+  else if(뜻 === "shared"){   /* 📲 공유받은 캡처 — 사람이 눌러야 읽는다. 읽다 실패해도 «다시 읽기» 단추가 남게 받은 캡처를 들고 간다 */
+    var 받은 = S.cap && S.cap.shared;
+    if(받은 && 받은.length){ 캡처사진읽기(받은); if(S.cap) S.cap.shared = 받은; }
+  }
   else if(뜻 === "pick"){ var d = S.cap && S.cap.drafts && S.cap.drafts[+t.getAttribute("data-ci")]; if(d) 캡처채우기(d); }
   else if(뜻 === "close"){ 캡처정리(); render(); }
 }

@@ -424,6 +424,17 @@ test('⑧ 공유받은 캡처 칸에는 «공유받은 캡처 읽기» 단추와
   assert.strictEqual(t.기록.사진읽기.length, 0, '받은 캡처가 없으면 눌러도 아무 일도 없어야 한다');
 });
 
+test('⑧ 공유받은 캡처를 읽다 실패해도 «공유받은 캡처 읽기» 단추가 남는다 — 다시 공유하지 않고 다시 누른다', async () => {
+  const 함 = 가짜공유함([지금기록({ files: [사진알맹이()] })]);
+  const t = 상자('?share=1', { 함 });
+  t.b.캡처사진읽기 = function () { t.b.S.cap = { mode: 'photo', busy: true, msg: '읽는 중', drafts: null }; };   /* 진짜처럼 S.cap 을 갈아 끼운다 */
+  t.실행('공유받기()');
+  await 기다림(8);
+  t.누름('shared');
+  t.실행('캡처결과({ ok:false, why:"연결이 끊겼습니다" })');
+  assert.ok(/data-cap="shared"/.test(t.실행('캡처창Html()')), '실패 뒤에 다시 읽을 단추가 없다');
+});
+
 test('⑧ 일꾼과 화면이 «같은 함»을 쓴다 — 이름·판이 어긋나면 화면이 빈 함을 연다', async () => {
   const w = 일꾼켜기();
   await 보내기(w.handlers, 공유요청(받는주소, { files: [사진('a.png', 10, 'image/png')] }));
