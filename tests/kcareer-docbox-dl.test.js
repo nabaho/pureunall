@@ -65,7 +65,7 @@ function 세상(o) {
     escapeHtml: (s) => String(s == null ? '' : s).replace(/</g, '&lt;'), _jsAttr: (s) => String(s),
     _cdSrc: () => 'made', hasOriginal: () => true, bindDragSel: () => {},
     kcAskDelete: (btn, opt, ok) => { ctx._물음 = opt; if (!o.noConfirm) ok(); },
-    kcTrashPut: (st, pg, r) => { 휴지통.push(r.id); return { tid: 'T' + 휴지통.length }; }, kcTrashDone: (e, m) => { 알림.push(m || '지움'); },
+    kcTrashPutMany: (st, pg, recs) => recs.map((r) => { 휴지통.push(r.id); return { tid: 'T' + 휴지통.length }; }), kcTrashDone: (e, m) => { 알림.push(m || '지움'); },
     /* 여러 건을 지우면 «되돌리기»가 지운 건 «전부»를 되살리는 함수를 받는다(2026-11-14 — 전에는 마지막 한 건의 번호만 쥐었다) */
     kcUndoBar: (m, t, f) => { ctx._되돌림 = { m, t, f }; }, kcTrashRestore: async () => {},
     kcTrashLabel: (r) => r.kind + ' ' + r.org, TRASH_DAYS: 30,
