@@ -25,6 +25,9 @@
        «자세히(모든 칸)»를 누르면 예전 전체 편집 화면.
      ★ 직접 등기·비용(2026-11-15 대표 「등기비용 등 필요 비용도 표시해달라 — 법무사 없이 직접하는 것이다」): 신청 방법 기본 «직접» —
        등기신청 위임장을 빼고 신청서를 제출용으로, ④ 단계에 직접 등기 순서와 💰 예상 비용(core costPlan — 2026-11-15 법령 확인 금액·근거).
+     ★ 오른쪽 보기 칸(2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」):
+       지난 기록 «👁 보기»는 목록 오른쪽 칸에 열린다(◀ 이전·다음 ▶ 으로 차례로 넘김 · 왼쪽 가장자리를 끌어 너비 조절).
+       탭을 옮겨도 칸은 남아 «등기 건 ② 서류»와 나란히 비교한다. 1080px 보다 좁으면 화면 전체를 덮는 창.
      ⚠ 법령 근거(2026-11-14 현행 원문 확인)·기한은 js/pu-deungi-core.js 머리글. 서식·기한·비용은 담당 법무사가 최종 확인한다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -78,7 +81,7 @@ main{padding:12px 16px 40px;max-width:1280px}
 .t .n{width:36px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 .t td.ti{max-width:280px;overflow:hidden;text-overflow:ellipsis}
 .t td.nw{max-width:340px;overflow:hidden;text-overflow:ellipsis}
-.t tr.cur td{background:var(--blue-bg)}
+.t tr.cur,.t tr.cur td{background:var(--blue-bg)}
 .t tr.click{cursor:pointer}
 .t input:not([type=checkbox]),.t select{width:100%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 12px}
@@ -160,6 +163,45 @@ main{padding:12px 16px 40px;max-width:1280px}
 .mbox>.mb{padding:12px 14px}
 .mbox>.mf{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #pv{min-height:200px}
+/* 오른쪽 보기 칸(2026-11-15) — 넓은 화면은 목록 오른쪽에 붙고 본문이 왼쪽으로 좁아진다 · 좁은 화면은 전체를 덮는다 */
+#side{display:none}
+#side.on{display:flex;flex-direction:column;position:fixed;z-index:15;top:var(--headH,92px);right:0;bottom:0;width:var(--sideW,46vw);background:var(--card);border-left:1px solid var(--line2);box-shadow:-4px 0 12px var(--line)}
+body.withSide main{margin-right:var(--sideW,46vw)}
+#side .sdh{display:flex;align-items:center;gap:6px;padding:8px 10px 6px 14px;flex-wrap:wrap}
+#side .sdh b{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+#side .sds{padding:0 14px 7px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--line)}
+#spv{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;background:var(--line)}
+#spv .pvi.pdf{height:100%}
+#spv iframe{display:block;width:100%;height:100%;border:0;background:var(--card)}
+#spv img{display:block;max-width:100%;margin:0 auto}
+#side .grip{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:1;border-radius:4px}
+#side .grip:hover{background:var(--blue-line)}
+#side .grip:focus-visible{background:var(--blue-line);outline:2px solid var(--blue);outline-offset:-1px}
+#spv:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+/* 칸을 열어 왼쪽 본문이 820px 보다 좁아지면(body.slim — sideFit 이 잰다) 폰처럼 표를 줄마다 카드로(외부 검토 2026-11-15: 종류 칸이 짓눌리고 보기 단추가 잘렸다) */
+body.slim .two{grid-template-columns:1fr}
+body.slim .t thead{display:none}
+body.slim .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+body.slim .t tbody td{border:none;padding:0;max-width:100%;white-space:normal}
+body.slim .t tbody td.c,body.slim .t tbody td.n{width:auto;flex:0 0 auto}
+body.slim .t tbody td.tk{cursor:pointer;padding:8px}
+body.slim .t tbody td.c{padding:8px}
+body.slim .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
+body.slim .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
+body.slim .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
+body.slim .t tbody td[data-l]::before{content:attr(data-l) ' ';color:var(--mute);font-size:12px}
+body.slim .t tbody td input:not([type=checkbox]),body.slim .t tbody td select{width:100%}
+body.slim .t tbody td.inp{flex:1 1 100%}
+body.slim .chg{margin:8px 6px}
+body.slim .tor input,body.slim .tor select{width:100%}
+body.slim .tiles{grid-template-columns:1fr 1fr}
+body.slim .wiz button{flex:1 1 calc(50% - 6px)}
+@media (max-width:1079px){
+  #side.on{top:0;left:0;width:auto;z-index:45;border-left:none;box-shadow:none}
+  body.withSide main{margin-right:0}
+  #side .grip{display:none}
+  #side .sdh b{flex-basis:100%}
+}
 .empty{padding:22px 12px;text-align:center;color:var(--mute)}
 .phone-only{display:none}
 @media (max-width:768px){
@@ -228,6 +270,7 @@ main{padding:12px 16px 40px;max-width:1280px}
     <div id="histBox"></div>
   </section>
 </main>
+<aside id="side" role="complementary" aria-label="원본 서류 보기"></aside>
 <div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="창"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
@@ -238,13 +281,13 @@ main{padding:12px 16px 40px;max-width:1280px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=98"></script>
+<script src="js/pu-ontology.js?v=99"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=45"></script>
+<script src="js/pu-appbar.js?v=46"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -252,7 +295,7 @@ main{padding:12px 16px 40px;max-width:1280px}
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
 <script src="js/pu-back.js?v=5"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ if(PuBack.closeTopVisible('#modal')) return true; if(window.SIDE && window.sideClose){ sideClose(); return true; } return false; }); }catch(e){}</script>
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -272,6 +315,8 @@ var RRN={};
 var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
 /* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 */
 var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
+/* 오른쪽 보기 칸 — 지금 보는 파일 {ev,fid} · 한글 바이트(너비가 바뀌면 다시 그림) · 닫으면 돌아갈 자리 · 다시 그리기 타이머 */
+var SIDE=null, PV_BYTES=null, SIDE_BACK=null, SIDE_T=null, SIDE_RW=0;
 var SAVE={ t:null, busy:false, dirty:false, err:'', at:0 };
 
 function $(id){ return document.getElementById(id); }
@@ -345,6 +390,7 @@ function draw(){
   if(TAB==='case'){ drawBaseWarn(); drawCaseList(); drawEditor(); }
   else if(TAB==='base') drawBase();
   else drawHist();
+  sideHead();
 }
 function drawBaseWarn(){
   var p=C.baseProblems(BASE);
@@ -909,21 +955,107 @@ function arcDownload(list){
       .then(function(){ if(g!==GEN){ ARC_DL=false; return; } setTimeout(next, 500); });
   })();
 }
-function arcRevoke(){ PV_SEQ++; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
+function arcRevoke(){ PV_SEQ++; PV_BYTES=null; clearTimeout(SIDE_T); SIDE_T=null; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
+/* ── 오른쪽 보기 칸(2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」) ──
+   넓은 화면: 목록 오른쪽에 붙는 칸(본문은 왼쪽으로 좁아진다) — 탭을 옮겨도 남아 «등기 건 ② 서류»와 나란히 본다.
+   좁은 화면(1080px 미만·폰): 화면 전체를 덮는 창(Tab 은 칸 안에서만 돈다). ◀ 이전·다음 ▶ 은 모든 묶음의 파일을 목록 차례대로.
+   ⚠ 여는 길은 그대로 puDocSecret(총괄관리자만) — 늦게 온 응답은 세대(GEN)·차례(PV_SEQ)·그릴 자리(box)로 버린다. */
+var SIDE_MIN=360, SIDE_KEEP=520;   /* 칸 최소 너비 · 왼쪽 본문에 남길 너비 */
+function sideOverlay(){ try{ return window.matchMedia('(max-width:1079px)').matches; }catch(e){ return false; } }
+function sideW(){ var w=Number(lsGet('sideW'))||Math.round(window.innerWidth*0.46); return Math.max(SIDE_MIN, Math.min(w, window.innerWidth-SIDE_KEEP)); }
+function arcFlat(){ var out=[]; arcRows().forEach(function(a){ C.arcFiles(a).forEach(function(x){ out.push({ ev:a.id, fid:x.fileId }); }); }); return out; }
+function sideIdx(fl){ if(!SIDE) return -1; for(var i=0;i<fl.length;i++) if(fl[i].ev===SIDE.ev && fl[i].fid===SIDE.fid) return i; return -1; }
+function sideFit(){
+  var root=document.documentElement, hd=$('head'), s=$('side'), w=sideW();
+  root.style.setProperty('--headH', (hd?Math.round(hd.getBoundingClientRect().height):0)+'px');
+  root.style.setProperty('--sideW', w+'px');
+  var ov=sideOverlay();
+  document.body.classList.toggle('slim', !!SIDE && !ov && document.documentElement.clientWidth-w < 820);
+  /* 덮는 모양일 때 가려진 머리·본문은 보조기술도 못 건드리게(보안 검토 2026-11-15) */
+  [hd, $('app')].forEach(function(e){ if(e) e.inert=!!(SIDE && ov); });
+  if(!s||!SIDE) return;
+  var gr=s.querySelector('[data-grip]');
+  s.setAttribute('role', ov?'dialog':'complementary'); if(ov) s.setAttribute('aria-modal','true'); else s.removeAttribute('aria-modal');
+  if(gr){ gr.setAttribute('aria-valuenow', String(w)); gr.setAttribute('aria-valuemax', String(Math.max(SIDE_MIN, window.innerWidth-SIDE_KEEP))); }
+}
+/* 머리줄 — 이름·자리(3 / 48)·이전/다음 가능 여부. 칸을 다시 만들지 않아 누른 단추에 초점이 남는다 */
+function sideHead(){
+  if(!SIDE||!$('sdName')) return;
+  var a=arcById(SIDE.ev), f=a&&a.files[SIDE.fid], fl=arcFlat(), i=sideIdx(fl), k=f&&C.ARC_KINDS.filter(function(o){ return o[0]===f.kind; })[0];
+  /* 보던 파일이 묶음에서 빠졌다(묶음에서 빼기·다른 창) — 남은 바이트·주소와 함께 칸을 닫는다(외부 검토 2026-11-15) */
+  if(!f || i<0){ sideClose(); toast('보던 파일이 묶음에서 빠져 보기 칸을 닫았습니다', 3500); return; }
+  $('sdName').textContent='👁 '+f.name; $('sdName').title=f.name; $('sdDl').setAttribute('aria-label', f.name+' 받기');
+  $('sdPos').textContent=(i>=0?(i+1):'—')+' / '+fl.length;
+  $('sdSub').textContent=[((a.at||'')+' '+(a.title||'')).trim(), k?k[1]:'', f.date||'', extOf(f.name)==='pdf'?'PDF 안을 누른 뒤에는 Esc 대신 ✕ 닫기':''].filter(Boolean).join(' · ');
+  var ae=document.activeElement, pv=$('sdPrev'), nx=$('sdNext');
+  pv.disabled=i<=0; nx.disabled=i<0||i>=fl.length-1;
+  if(ae && ae.disabled && (ae===pv||ae===nx)){ var o=ae===pv?nx:pv; (o.disabled?$('sdClose'):o).focus(); }
+}
+/* 지금 보는 줄을 목록에서 칠한다 */
+function sideMark(){
+  var on=null;
+  Array.prototype.forEach.call(document.querySelectorAll('#histBox [data-arc] tr[data-arcf]'), function(r){
+    var g=r.closest('[data-arc]'), yes=!!SIDE && r.dataset.arcf===SIDE.fid && !!g && g.dataset.arc===SIDE.ev;
+    r.classList.toggle('cur', yes); if(yes){ r.setAttribute('aria-current','true'); on=r; } else r.removeAttribute('aria-current');
+  });
+  return on;
+}
 function arcView(evId, fid){
   if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
   var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
-  openModal('<h3>👁 '+esc(f.name)+'<span class="sp"></span><button class="sm" data-act="arcDlOne" data-ev="'+esc(evId)+'" data-fid="'+esc(fid)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">불러오는 중…</div></div></div>');
-  var g=GEN, ext=extOf(f.name), seq=++PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && !!$('pv'); };
-  PuOfficeStore.secretBlob(fid).then(function(blob){
+  var s=$('side'), was=!!SIDE;
+  if(!was) SIDE_BACK=document.activeElement;
+  SIDE={ ev:evId, fid:fid };
+  if(!$('spv')) s.innerHTML='<div class="grip" data-grip role="separator" aria-orientation="vertical" aria-label="보기 칸 너비 — 끌거나 ←·→" aria-valuemin="'+SIDE_MIN+'" tabindex="0"></div>'+
+    '<div class="sdh"><b id="sdName"></b><span class="chip m" id="sdPos"></span><button class="sm" id="sdPrev" data-act="sideNav" data-d="-1">◀ 이전</button><button class="sm" id="sdNext" data-act="sideNav" data-d="1">다음 ▶</button><button class="sm" id="sdDl" data-act="sideDl">⬇ 받기</button><button class="sm" id="sdClose" data-act="sideClose" aria-label="보기 칸 닫기">✕ 닫기</button></div>'+
+    '<div class="sds" id="sdSub"></div><div id="spv" tabindex="0" aria-label="미리보기 — 화살표·PageDown 으로 넘겨 보기"></div>';
+  s.classList.add('on'); document.body.classList.add('withSide'); sideFit(); sideHead(); sideMark();
+  if(!SIDE || !$('spv')) return;   /* 머리줄이 칸을 닫았다(목록에 없는 파일) */
+  if(!was && sideOverlay()) setTimeout(function(){ var b=$('sdClose'); if(b) b.focus(); }, 0);
+  arcRevoke();
+  /* 파일마다 새 그릴 자리 — 앞 파일의 늦은 그림이 새 파일 위에 붙지 않게 */
+  $('spv').innerHTML='<div class="pvi"><div class="empty">불러오는 중…</div></div>'; $('spv').scrollTop=0;
+  var box=$('spv').firstChild, g=GEN, ext=extOf(f.name), seq=PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && box.isConnected; };
+  PuOfficeStore.secretBlob(f.fileId||fid).then(function(blob){
     if(!live()) return;
-    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; return PureunHwp.renderPreview($('pv'), new Uint8Array(b), f.name); });
-    if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; }
-    if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); $('pv').innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'" style="width:100%;height:75vh;border:0"></iframe>'; }
-    else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(blob); $('pv').innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'" style="max-width:100%">'; }
-    else $('pv').innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
-  }).catch(function(e){ if(!live()) return; $('pv').innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
+    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; PV_BYTES={ u8:new Uint8Array(b), name:f.name }; SIDE_RW=$('spv').clientWidth; return PureunHwp.renderPreview(box, PV_BYTES.u8, f.name); });
+    if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); box.className='pvi pdf'; box.innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'"></iframe>'; }
+    else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(new Blob([blob], { type:ext==='png'?'image/png':'image/jpeg' }));   /* 형식은 확장자로 고정 — 올린 사람이 정한 형식(text/html 등)을 믿지 않는다(보안 검토 2026-11-15) */ box.innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'">'; }
+    else box.innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
+  }).catch(function(e){ if(!live()) return; box.innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
 }
+function sideNav(d){
+  var fl=arcFlat(), i=sideIdx(fl), j=i+d; if(i<0||j<0||j>=fl.length) return;
+  arcView(fl[j].ev, fl[j].fid);
+  var r=sideMark(); if(r && r.offsetParent) r.scrollIntoView({ block:'nearest' });
+}
+function sideClose(){
+  /* 초점은 마지막에 본 파일 줄의 «보기» 단추로(목록을 다시 그렸으면 처음 누른 단추가 없다) */
+  var had=!!SIDE, row=sideMark(), rb=row&&row.offsetParent?row.querySelector('[data-act=arcView]'):null, back=rb||SIDE_BACK; arcRevoke(); SIDE=null; SIDE_BACK=null;
+  var s=$('side'); if(s){ s.classList.remove('on'); s.innerHTML=''; s.setAttribute('role','complementary'); s.removeAttribute('aria-modal'); }
+  document.body.classList.remove('withSide'); document.body.classList.remove('slim'); [$('head'), $('app')].forEach(function(e){ if(e) e.inert=false; }); sideMark();
+  if(had && back && back.isConnected && back.focus){ try{ back.focus(); }catch(e){} }
+}
+/* 한글 쪽은 칸 너비에 맞춰 그린다 — 너비가 바뀌면 잠시 뒤 같은 바이트로 다시 그린다(다시 받지 않는다) */
+function sideRedraw(){
+  clearTimeout(SIDE_T);
+  SIDE_T=setTimeout(function(){ SIDE_T=null; var b=PV_BYTES, spv=$('spv'); if(!SIDE||!b||!spv) return;
+    var w=spv.clientWidth; if(!w || Math.abs(w-SIDE_RW)<8) return;   /* 높이만 바뀐 것(폰 주소창)은 그대로 */
+    SIDE_RW=w; var at=spv.scrollTop/Math.max(1, spv.scrollHeight), seq=PV_SEQ;
+    spv.innerHTML='<div class="pvi"></div>'; var box=spv.firstChild;
+    PureunHwp.renderPreview(box, b.u8, b.name).then(function(){ if(seq===PV_SEQ && box.isConnected) spv.scrollTop=Math.round(at*spv.scrollHeight); }, function(){}); }, 250);
+}
+function sideSetW(w){ lsSet('sideW', String(Math.max(SIDE_MIN, Math.min(Math.round(w), window.innerWidth-SIDE_KEEP)))); sideFit(); sideRedraw(); }
+/* 칸 왼쪽 가장자리를 끌어 너비를 바꾼다 */
+document.addEventListener('pointerdown', function(ev){
+  var gr=ev.target && ev.target.closest && ev.target.closest('[data-grip]'); if(!gr || sideOverlay()) return;
+  ev.preventDefault(); try{ gr.setPointerCapture(ev.pointerId); }catch(e){}
+  var root=document.documentElement, last=sideW();
+  var mv=function(e){ last=Math.max(SIDE_MIN, Math.min(window.innerWidth-e.clientX, window.innerWidth-SIDE_KEEP)); root.style.setProperty('--sideW', last+'px'); };
+  var up=function(){ gr.removeEventListener('pointermove', mv); gr.removeEventListener('pointerup', up); gr.removeEventListener('pointercancel', up); sideSetW(last); };
+  gr.addEventListener('pointermove', mv); gr.addEventListener('pointerup', up); gr.addEventListener('pointercancel', up);
+});
+window.addEventListener('resize', function(){ if(SIDE){ sideFit(); sideRedraw(); } });
 /* 🔒 파일 받기 — 서버 함수 puDocSecret(총괄관리자만, 열람 기록을 남긴다). 문서관리(docs-esign)와 같은 길 */
 function fetchSecret(fileId){
   var u=firebase.auth().currentUser;
@@ -951,6 +1083,7 @@ function drawHist(){
   var hi=(BASE.history||[]).slice().reverse();
   h+='<div class="card"><h3>등기 현황 바뀐 기록 '+hi.length+'</h3>'+(hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>')+'</div>';
   $('histBox').innerHTML=drawArchive()+h;
+  sideMark(); sideHead();
 }
 
 /* ═══ 서류 ═══ */
@@ -999,7 +1132,7 @@ var MODAL_BACK=null;
 function openModal(html){ var m=$('modal'); MODAL_BACK=document.activeElement; m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex';
   var h=m.querySelector('h3'); m.setAttribute('aria-label', h?h.textContent.replace(/\s+/g,' ').trim().slice(0,40):'창');
   setTimeout(function(){ var f=m.querySelector('input,button:not([disabled])'); if(f) f.focus(); }, 0); }
-function closeModal(){ arcRevoke(); var m=$('modal'); m.style.display='none'; m.innerHTML=''; if(MODAL_BACK&&MODAL_BACK.focus){ try{ MODAL_BACK.focus(); }catch(e){} } MODAL_BACK=null; }
+function closeModal(){ var m=$('modal'); m.style.display='none'; m.innerHTML=''; if(MODAL_BACK&&MODAL_BACK.focus){ try{ MODAL_BACK.focus(); }catch(e){} } MODAL_BACK=null; }
 /* Esc 로 닫기 · Tab 은 창 안에서만 돈다 · 목록 줄은 Enter/Space 로 연다(키보드 — 기능 검증 2026-11-14) */
 document.addEventListener('keydown', function(ev){
   var m=$('modal');
@@ -1008,6 +1141,14 @@ document.addEventListener('keydown', function(ev){
     if(ev.key==='Tab'){ var fs=Array.prototype.filter.call(m.querySelectorAll('button,input,select,textarea,[tabindex]'), function(x){ return !x.disabled && x.offsetParent!==null; });
       if(fs.length){ var i=fs.indexOf(document.activeElement); if(ev.shiftKey && i<=0){ ev.preventDefault(); fs[fs.length-1].focus(); } else if(!ev.shiftKey && i===fs.length-1){ ev.preventDefault(); fs[0].focus(); } } }
     return;
+  }
+  var sd=$('side');
+  if(SIDE && sd){
+    var ov=sideOverlay();
+    if(ev.key==='Escape'){ ev.preventDefault(); sideClose(); return; }
+    if(ov && ev.key==='Tab'){ var sf=Array.prototype.filter.call(sd.querySelectorAll('button,[tabindex],iframe'), function(x){ return !x.disabled && x.offsetParent!==null; });
+      if(sf.length){ var si=sf.indexOf(document.activeElement); if(si<0 || (ev.shiftKey && si===0)){ ev.preventDefault(); sf[ev.shiftKey?sf.length-1:0].focus(); } else if(!ev.shiftKey && si===sf.length-1){ ev.preventDefault(); sf[0].focus(); } } return; }
+    if(ev.target && ev.target.hasAttribute && ev.target.hasAttribute('data-grip') && (ev.key==='ArrowLeft'||ev.key==='ArrowRight')){ ev.preventDefault(); sideSetW(sideW()+(ev.key==='ArrowLeft'?40:-40)); return; }
   }
   var tr=ev.target && ev.target.closest && ev.target.closest('tr[data-open]');
   if(tr && ev.target===tr && (ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); openCase(tr.dataset.open); }
@@ -1158,7 +1299,9 @@ document.addEventListener('click', function(ev){
     else if(act==='arcSave') arcSaveMeta(el.dataset.id||'');
     else if(act==='arcUp'){ var au=el.closest('[data-arc]'); if(au&&!ARC_BUSY){ ARC_EV=au.dataset.arc; $('arcFile').click(); } }
     else if(act==='arcView'||act==='arcDl'){ var av=el.closest('[data-arc]'), af=el.closest('[data-arcf]'); if(av&&af){ if(act==='arcView') arcView(av.dataset.arc, af.dataset.arcf); else arcDownload([{ ev:av.dataset.arc, fid:af.dataset.arcf }]); } }
-    else if(act==='arcDlOne') arcDownload([{ ev:el.dataset.ev, fid:el.dataset.fid }]);
+    else if(act==='sideNav') sideNav(Number(el.dataset.d)||0);
+    else if(act==='sideClose') sideClose();
+    else if(act==='sideDl'){ if(SIDE) arcDownload([{ ev:SIDE.ev, fid:SIDE.fid }]); }
     else if(act==='arcSelDl') arcDownload(arcSelected());
     else if(act==='arcSelOut') arcSelOut();
     else if(act==='arcSelClear'){ SEL.arc={}; drawHist(); }
@@ -1245,7 +1388,7 @@ document.addEventListener('change', onField);
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
 function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} }; DL_EACH=false; gate=null;
-  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; arcRevoke(); STEP=0; SHOWN=0; VIEW_GEN++; clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
+  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; sideClose(); STEP=0; SHOWN=0; VIEW_GEN++; clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }

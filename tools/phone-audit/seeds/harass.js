@@ -51,13 +51,14 @@ const harassCases = {
   'hc-2': {
     id: 'hc-2', entityType: 'Case', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 4, updatedAt: NOW - 7200e3, revision: 1,
+    erpCaseId: '', erpCaseNo: '', erpDefer: true,
     companyId: 'hco-2', companyName: '(주)다라점검바이오헬스케어시스템즈', bizNo: '123-81-20026',
     category: 'both', title: '연구소 직장 내 괴롭힘 및 성희롱 복합 조사 건',
     managerMain: 'P002', managerSubs: [],
-    receiveDate: '2026-11-01', dueDate: '2026-12-10', closeDate: '',
+    receiveDate: '2024-11-01', dueDate: '', closeDate: '',
     verdictSummary: '',
     steps: {
-      intake: { done: true, date: '2026-11-01', note: '착수 공문 접수' },
+      intake: { done: true, date: '2024-11-01', note: '과거 푸른메일 착수 공문 접수' },
     },
     mailLinks: [],
   },
@@ -78,7 +79,8 @@ const secrets = {
     ],
     conclusion: '쟁점 1은 근로기준법 제76조의2 요건을 모두 충족하여 직장 내 괴롭힘에 해당하며, 쟁점 2는 업무상 적정범위 내 인사조정으로 판단함.',
     recommendations: '피해근로자 희망 반영 부서 분리 유지 및 행위자 인사위원회 회부·재발방지 교육 권고.',
-    reportBody: '',
+    reportBody: '【 직장 내 괴롭힘 사안 외부전문가 조사결과보고서 】\n1. 사건 개요\n- 의뢰 사업장: (주)가나점검테크놀로지솔루션\n- 점검용 합성 본문 초안',
+    reportBodyAuto: true,
   },
 };
 
@@ -92,6 +94,11 @@ const mailboxMsgs = {
     '301': { u: 301, s: '[(주)마바점검엔지니어링] 직장 내 괴롭힘 외부조사 견적서 및 제안서 요청의 건', f: '법무팀', e: 'legal@maba-audit.example', t: 'p001@pureun.kr', d: NOW - 864e5 * 3, a: 1, an: ['조사제안요청서.pdf'] },
     '302': { u: 302, s: '[(주)마바점검엔지니어링] 직장 내 괴롭힘 조사 위임계약서 송부', f: '법무팀', e: 'legal@maba-audit.example', t: 'p001@pureun.kr', d: NOW - 864e5 * 2, a: 1, an: ['위임계약서_점검용.hwp'] },
   },
+};
+
+const mailboxOldMsgs = {
+  '9001': { u: '9001', s: '[(주)사아점검메디컬] 직장 내 성희롱 조사결과보고서 최종 송부의 건', f: '푸른점검', e: '370-6@daum.net', t: 'hr@saa-check.example', d: Date.UTC(2025, 4, 15, 2, 0, 0), a: 1, an: ['조사결과보고서_점검용.hwpx'], p: '최종 조사결과보고서를 송부드립니다.' },
+  '8001': { u: '8001', s: '[(주)자차점검정밀] 직장 내 괴롭힘 고충조사 위임계약 및 착수공문', f: '인사팀', e: 'people@jacha-check.example', t: '370-6@daum.net', d: Date.UTC(2024, 7, 20, 2, 0, 0), a: 2, an: ['위임계약서.pdf', '착수공문.hwp'], p: '고충조사 착수 서류 전달 건' },
 };
 
 module.exports = {
@@ -113,11 +120,13 @@ module.exports = {
     mailbox: {
       folders: mailboxFolders,
       msgs: mailboxMsgs,
+      old: { msgs: mailboxOldMsgs },
     },
   },
   views: [
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
+    { name: 'yearly', run: async (p) => { await p.click('#tabs button[data-tab="yearly"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
-    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('button[data-act="wsMode"][data-id="doc"]'); } },
+    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="report"]'); } },
   ],
 };

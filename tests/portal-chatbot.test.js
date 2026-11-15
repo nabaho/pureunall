@@ -65,8 +65,8 @@ test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결
 
   assert.deepEqual(Array.from(C.PORTAL_ROWS_GUIDE.map((r) => r.id)), ['client', 'store', 'sales', 'inside']);
   const totalRowApps = C.PORTAL_ROWS_GUIDE.reduce((sum, r) => sum + r.apps.length, 0);
-  /* 2026-11-14 푸른등기(내부관리) 더해 25개 */
-  assert.equal(totalRowApps, 25, '포털 4대 영역 25개 앱 전체가 수록되어야 합니다');
+  /* 2026-11-14 푸른등기(내부관리) 25개 · 2026-11-15 P박스(자료함) 더해 26개 */
+  assert.equal(totalRowApps, 26, '포털 4대 영역 26개 앱 전체가 수록되어야 합니다');
   for (const r of C.PORTAL_ROWS_GUIDE) {
     for (const ap of r.apps) {
       assert.ok(ap.key && ap.name && ap.when && ap.from && ap.to && ap.ask, ap.key + ' 입출력 설명이 모두 있어야 합니다');
@@ -785,5 +785,14 @@ test('푸른등기 질문은 푸른등기 길잡이로 — 내부관리 연결�
   assert.ok(inside.apps.indexOf('deungi') >= 0 && inside.tags.indexOf('푸른등기') >= 0 && /푸른등기/.test(inside.law));
   assert.match(kbSrc, /deungi: 'erp'/);
   assert.match(kbSrc, /deungi:푸른등기/);
+});
+test('P박스 질문은 P박스 길잡이로 — 자료함(store) 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'store').apps.find((a) => a.key === 'pbox').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-pbox-01');
+  assert.equal(PuChatbot.pick('P박스 사용법')[0].id, 'SYS-pbox-01');
+  const store = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-store');
+  assert.ok(store.apps.indexOf('pbox') >= 0 && store.tags.indexOf('P박스') >= 0 && /P박스/.test(store.law));
+  assert.match(kbSrc, /pbox: 'portal'/);
+  assert.match(kbSrc, /pbox:P박스/);
 });
 function C0(k) { return PuChatbot[k]; }

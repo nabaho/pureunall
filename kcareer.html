@@ -599,7 +599,7 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .g-title.top .gname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-title.top .gcnt{font-size:12px;color:#60a5fa;font-variant-numeric:tabular-nums}
 .g-title.top.gsel{background:#60a5fa;border-color:#60a5fa;color:#1e293b}
-.g-title.top.gsel .gcnt{color:#1e293b}
+.g-title.top.gsel .gcnt{color:#bfdbfe}   /* 고른 묶음의 바탕은 파란색(위 .gsel)이 아니라 어두운 그라데이션(.nav-group>.g-title 의 !important 가 이긴다)이라 남색 글자는 1.2:1 이었다 — tests/kcareer-dark-surfaces.test.js */
 .g-title.top:focus-visible{outline:2px solid #fff;outline-offset:2px}
 /* 하위 머리 — 어느 상위 «안»을 보고 있는지 적는다 */
 .nav-sec{font-size:10.5px;color:#60a5fa;letter-spacing:.1em;font-weight:700;margin:14px 14px 6px}
@@ -772,9 +772,9 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-banner a:focus-visible,.mr-pill:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .mr-banner a.mr-x{font-weight:400;opacity:.65;text-decoration:none}
 #nav .nav-item .ncnt.mr-alarm{color:#f87171;font-weight:800}
-.g-title.top.gsel .gcnt.mr-alarm{color:#1e293b}   /* 고른 단추는 파란 바탕 — 붉은 글자는 1:1 이라 안 보인다. «📬» 글자와 굵기로 알린다 */
+.g-title.top.gsel .gcnt.mr-alarm{color:#fecaca}   /* 고른 묶음도 바탕은 어두운 그라데이션이다(파란 바탕이 아님). «📬» 글자와 굵기로도 알린다 */
 #modalMr .mr-det-v input,#modalMr .mr-det-v .btn{margin:2px 4px 2px 0}   /* 좁은 폰에서 기한 칸이 줄바꿈돼도 위아래가 맞닿지 않게 */
-.g-title.top .gcnt.mr-alarm{color:#f87171;font-weight:800}   /* 어두운 옆줄 바탕 위 대비 5:1 — var(--red) 는 3:1 이라 모자란다. 골라 둔 칸(.gsel)은 기본 남색 그대로 */
+.g-title.top .gcnt.mr-alarm{color:#fecaca;font-weight:800}   /* 옆줄 바탕은 어두운 그라데이션(금빛 끝점 #373939) — #f87171 은 그 끝에서 4.2:1 이라 한 단계 밝은 붉은색(≥4.5:1). var(--red) 는 3:1 이라 모자란다 */
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
@@ -881,6 +881,36 @@ html.dark #page-profile1 .p1-card{background:var(--soft)!important}   /* ⚙ 칸
 #hcBody .dt thead th:last-child{width:auto;min-width:96px}   /* 공용 표는 맨 끝 칸(관리)을 200px 로 잡는다 — 여기 끝 칸은 짧은 «상태» 칩이라 좁게 */
 #cdBody tr.hc-canceled td:nth-child(n+3):not(:last-child){color:var(--text-mute)}   /* 취소된 줄은 «옅은 글자색»으로 — opacity 로 흐리면 명암비가 4.5:1 아래로 떨어진다. 종류 칸(빨간 «취소됨» 칩)과 관리 칸은 그대로 */
 @media (max-width:760px){ .hc-btx{display:none} .hc-hint{display:none} }
+/* 🧾 비용 서류 찾기 창(#modalFeeSweep) — 폰에서는 «이름표 + 값» 카드로(공용 폰 카드는 끝 칸을 관리 단추 열로 세운다 — 여기 끝 칸은 값이라 일반 칸처럼). 창 본문만 스크롤 */
+@media (max-width:520px){
+  #feeSwTbl td:last-child{grid-column:1 / 3;grid-row:auto;align-self:start;flex-direction:row;justify-content:flex-start;gap:8px;border-left:none!important;margin:0!important;padding:2px 0!important}
+  #feeSwTbl td:last-child::before{content:attr(data-label)}
+  #feeSwTbl td:last-child > span{display:inline!important;flex-direction:row;width:auto}
+  #feeSwTbl tr{grid-template-columns:66px minmax(0,1fr)}
+  #feeSwTbl td[colspan]::before{content:none}
+  #modalFeeSweep .modal{max-height:calc(100vh - 48px);display:flex;flex-direction:column}
+  #modalFeeSweep .modal-b{overflow:auto;min-height:0;flex:1 1 auto}
+  /* 아래 줄 — 요약 글이 38px 폭에 14줄로 쌓이고 단추 높이가 250px 로 늘던 것(검증 2026-11-15): 줄을 바꾸고, 요약은 한 줄 전체 폭으로 */
+  #modalFeeSweep .modal-foot{flex-wrap:wrap;align-items:center}
+  #modalFeeSweep #feeSwSum{flex:1 1 100%;margin-right:0!important}
+}
+/* 폰: 서류 보관함 줄(이력서·프로필·증명서·비용)이 한 줄 nowrap 이라 375px 에서 1,017px — 「↩ 원래 자리로」를 비롯한 단추가 화면 밖이었다(재검증 2회차 중간).
+   줄을 바꿔 두 줄 카드로: 위 ☐·번호·이름·종류·날짜, 아래 부제·단추. PC 는 그대로다. */
+@media (max-width:520px){
+  #page-docbox .ds-split{grid-template-columns:minmax(0,1fr)}   /* 격자 칸이 «줄이 가장 길 때의 폭»(501px)을 최소로 잡아 375px 화면을 넘던 것 — 칸이 줄어들 수 있게 */
+  #page-docbox .ds-list{min-width:0}
+  #page-docbox .card.ds-card[data-dsrow]{flex-wrap:wrap;row-gap:2px}
+  #page-docbox .ds-card[data-dsrow] .t{flex:1 1 0;min-width:40%}
+  #page-docbox .ds-card[data-dsrow] .s{flex:1 1 100%;order:5}
+  #page-docbox .ds-card[data-dsrow] .ds-kind{margin-left:0}
+  #page-docbox .ds-card[data-dsrow] .ds-ic{flex:1 1 100%;justify-content:flex-end;flex-wrap:wrap;order:9}
+}
+#modalFeeSweep .btn:disabled{opacity:.5;cursor:default}   /* 고른 것이 없으면 «옮기기»는 눌리는 것처럼 보이면 안 된다 */
+/* 어두운 테마 — 표 머리·본문·기본 단추가 밝은 바탕에 밝은 글자(1.18~1.23:1)가 되던 것(검증 2026-11-15). 프로필 고르기 창(#p1PickTbl)과 같은 한 벌 */
+html.dark #feeSwTbl table{background:var(--card)}
+html.dark #feeSwTbl tbody td{color:var(--text)}
+html.dark #feeSwTbl thead th{background:#1e293b!important;color:var(--text)!important}
+html.dark #modalFeeSweep .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
 #mrBody .btn:disabled{opacity:.5;cursor:default}
 #mrBody tr.mr-over td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 #mrBody tr.mr-soon td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
@@ -1586,6 +1616,59 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   .toolbar{padding:6px 7px!important}
   .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
 }
+/* ===== 어두운 테마 — 공용 표면 (대표 지시 2026-11-15 「경력관리 다른 화면의 어두운 테마도 고쳐 주세요」) =====
+   원칙: 어두운 판에서는 «바탕은 어둡게, 글자는 밝게»가 한 벌이어야 한다. 밝은 바탕을 하드코딩하고 글자색은 안 박거나 var(--text)(어두운 판에선 밝은색)로 두면
+   글자만 밝아져 1.2:1 이 된다(실측 28개 화면·창 39개에서 948건). 종이(흰 바탕+짙은 글자)는 일부러 흰색으로 두고 «안쪽 변수»를 밝은 판 값으로 되돌린다.
+   ⚠ 이 규칙들은 html.dark 안에만 — 밝은 판은 그대로다. 색은 팔레트 27색만(tests/color-palette-apps.test.js).
+   지킴: tests/kcareer-dark-surfaces.test.js · 기록: status/2026-11-15-kcareer-dark-surfaces.md */
+/* ① 브랜드 글자색 변수를 어두운 카드 위에서 읽히는 밝은 값으로(teal 2.05:1·red 2.96:1·amber 4.4:1·blue 2.9:1 였다). ⚠ --navy 는 안 바꾼다 — 흰 글자 단추의 «바탕»이 같은 값(540행 근처 선례) */
+html.dark{--teal:#4ade80;--red:#f87171;--amber:#fbbf24;--blue:#60a5fa;--green:#4ade80;--bzc-add:#166534;--bzc-del:#991b1b;--bzc-chg:#854d0e}
+/* ② «바탕»으로 쓰인 브랜드 색(흰 글자 단추·삭제 단추)은 흰 글자가 읽히는 원래 값으로 되박는다 — 변수가 밝아져서 */
+html.dark :is([style*="background:var(--teal)"],[style*="background: var(--teal)"],#sidePreviewHead .sp-type){background:#166534!important;border-color:#166534!important}
+html.dark :is([style*="background:var(--red)"],[style*="background: var(--red)"]){background:#dc2626!important;border-color:#dc2626!important}
+/* ③ 종이(문서 미리보기·서식 채우기·이력서 편집 용지) — 흰 바탕을 남기고 안쪽 변수를 밝은 판 값으로 되돌린다 */
+html.dark :is(.kf-paper,.kf-sheet,#kfSheetWrap,.cv-sheet,#rhwpEditor,#p1Paper){--bg:#f8fafc;--card:#fff;--ink:#1e293b;--border:#e2e8f0;--border-soft:#e2e8f0;--hover:#e2e8f0;--text:#1e293b;--text-sub:#475569;--text-mute:#475569;--soft:#f8fafc;--teal:#166534;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--green:#16a34a}   /* --text-mute 는 #64748b 가 아니라 #475569 — 회색 판(#e2e8f0) 위에서 3.86:1 이라 */
+html.dark :is(.kf-paper,.kf-sheet,#kfSheetWrap,#rhwpEditor){color:var(--text)}
+/* ④ 단추·표면 — 기본 단추는 흰 바탕+밝은 글자였고, 가로 줄(툴바)·표·빈 칸·칩·메뉴·미리보기 판은 흰 바탕을 하드코딩했다 */
+html.dark .btn:not(.primary){background:var(--soft);color:var(--text);border-color:#475569}
+html.dark .btn:not(.primary):hover{background:#475569}
+html.dark .toolbar,html.dark .dt .empty,html.dark .fee-chip,html.dark .puag-kind,html.dark .more-menu,html.dark .rc-fill,html.dark #sidePreview,html.dark #hoverPrev,html.dark .hj-c,html.dark .rh-pgrow button,html.dark .rh-slot.ok,html.dark .rh-slot.miss,html.dark .cv-pp-inner,html.dark .cp-chip,html.dark .rh-fitrow button,html.dark .dropzone{background:var(--card)}
+@media (min-width:521px){ html.dark .dt table{background:var(--card)} }   /* 폰에서는 줄마다 카드라 표 바깥 상자가 투명이다(폰 블록) — 그대로 둔다 */
+html.dark #sidePreviewFoot,html.dark .ocr-zone,html.dark .kc-dying,html.dark .dropzone.drag,html.dark .dup-badge-bar{background:var(--soft)!important}
+html.dark .ocr-zone.drag{background:#475569!important}
+html.dark #sidePreviewBody,html.dark .ds-pv-img,html.dark .kc-hwp-preview,html.dark #hwpViewBody,html.dark .cv-hwp-body{background:var(--soft)}   /* 종이(그림) 뒤 회색 판 — #kfSheetWrap 은 글자가 직접 놓이는 «종이 구역»이라 밝게 둔다(③) */
+html.dark #page-docbox .ds-card[data-dsrow].pick{background:#1e40af}
+html.dark #page-docbox .ds-card[data-dsrow]:hover{background:#475569}   /* 바탕 규칙이 id 를 달아 특이도가 높다 — 호버 때 밝아지는 것을 막는다 */
+html.dark .topbar{background:rgba(16,21,29,.92)!important}   /* 바탕 규칙이 !important 라 더 센 !important 로 */
+/* ⑤ 표 — 칸 글자색이 #1e293b 로 박혀 바탕(#1e293b)과 같았다(1.00:1). 머리줄·호버 줄은 바탕 규칙이 !important */
+html.dark .dt tbody td{color:var(--text)}
+html.dark .dt thead th{background:#1e293b!important;color:var(--text)!important}
+html.dark .dt tbody tr:hover,html.dark .dt tbody tr.row-warn{background:#475569!important}
+html.dark .id-chip{background:#475569;color:#e2e8f0;border-color:#64748b}
+html.dark input::placeholder,html.dark textarea::placeholder{color:#94a3b8;opacity:1}
+/* ⑥ 글자색만 문제인 것 — 어두운 카드 위 짙은 글자 / 밝은 칩 위 변수 글자 */
+html.dark :is(.fd-months,.rh-pgrow,.rh-fitrow) button{color:var(--text)}
+html.dark :is(.firm-note,.ds-same.same,.rh-chip-go,.rh-chip-drop,.at-warn){color:#fbbf24}
+html.dark .kf-hint{color:#94a3b8}
+html.dark :is(.kf-sheet,#kfSheetWrap,.kf-paper) .kf-hint{color:#475569}   /* 종이 구역 안은 밝은 바탕 */
+html.dark :is(#kcLock h2,.hy-tbl td.hy-y,.hy-tbl td.hy-sum,.tag.purple){color:var(--ink)}
+html.dark .kpi.kpi-btn .k-go{color:var(--text-sub)}
+html.dark .tag.red{color:#991b1b}
+html.dark :is(.fs-pill,.page-drop-overlay span){color:#166534}
+html.dark .cv-rowdel{color:#dc2626}
+html.dark .warn-banner{color:#991b1b}   /* #dc2626 on #FEF2F2 는 4.41:1 — 밝은 판에서도 모자랐던 값이라 한 단계 짙게 */
+html.dark .rh-warn,html.dark .ds-dupbar .m{color:#854d0e}
+/* ⑦ 화면에 «직접 박힌» 짙은 글자색 — 어두운 바탕 위에서는 밝은 계열로(540행 근처 navy 선례와 같다). 자기 바탕을 따로 박은 것·종이 안은 뺀다.
+   ⚠ style 속성이 JS(style.cssText)로 다시 쓰이면 «color: #x»(공백)·rgb() 꼴이 되므로 셋을 다 본다
+   ⚠ 밝은 바탕과 글자색을 함께 박은 «밝은 안내줄»(#fbNotice 등)은 그대로 두고, 그 안의 링크도 뺀다(마지막 :not) — 밝은 바탕 위에 밝은 글자가 되므로 */
+html.dark :is([style*="color:#854d0e" i],[style*="color: #854d0e" i],[style*="color:#d97706" i],[style*="color: #d97706" i],[style*="color: rgb(133, 77, 14)"],[style*="color: rgb(217, 119, 6)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#fbbf24!important}
+html.dark :is([style*="color:#166534" i],[style*="color: #166534" i],[style*="color:#16a34a" i],[style*="color: #16a34a" i],[style*="color: rgb(22, 101, 52)"],[style*="color: rgb(22, 163, 74)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#4ade80!important}
+html.dark :is([style*="color:#991b1b" i],[style*="color: #991b1b" i],[style*="color:#dc2626" i],[style*="color: #dc2626" i],[style*="color: rgb(153, 27, 27)"],[style*="color: rgb(220, 38, 38)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#f87171!important}
+html.dark :is([style*="color:#1e40af" i],[style*="color: #1e40af" i],[style*="color:#2563eb" i],[style*="color: #2563eb" i],[style*="color: rgb(30, 64, 175)"],[style*="color: rgb(37, 99, 235)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#60a5fa!important}
+html.dark :is([style*="color:#1e293b" i],[style*="color: #1e293b" i],[style*="color: rgb(30, 41, 59)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#e2e8f0!important}
+html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="color:#64748b" i],[style*="color: #64748b" i],[style*="color: rgb(71, 85, 105)"],[style*="color: rgb(100, 116, 139)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#94a3b8!important}
+/* ⑧ 화면에 «직접 박힌» 밝은 바탕(글자색 안 박은 것) → 어두운 바탕. 글자색을 같이 박은 밝은 칩·종이·프로필 1장 안내 상자는 뺀다 */
+html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -1597,7 +1680,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=98"></script>
+<script src="js/pu-ontology.js?v=99"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -1606,12 +1689,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/kcareer-scan.js?v=2"></script>
+<script src="js/kcareer-scan.js?v=3"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
-<script src="js/kcareer-kv.js?v=1"></script>
+<script src="js/kcareer-kv.js?v=2"></script>
 <script src="js/kcareer-profile1.js?v=16"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <!-- 🏢 푸른인사관리 증명서 당겨오기(재직·경력증명서 발급 이력 → 서류 보관함) 셈 — 2026-11-12 -->
@@ -1658,6 +1741,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hwpxpages.js?v=1"></script>
 <!-- 한글 문서에서 «글자»를 뽑아 판독으로 보낸다 — 한글 파일은 스캔이 아니다(kcareer-hwptext.js) -->
 <script src="js/kcareer-hwptext.js?v=1"></script>
+<!-- 🧾 이력서 보관함에 잘못 들어온 «비용 서류»를 알아보는 규칙 한 곳(2026-11-15) — 글을 밖으로 보내지 않는다 -->
+<script src="js/kcareer-feeroute.js?v=1"></script>
 <script src="js/kcareer-hwpkeys.js?v=3"></script>
 <script src="js/kcareer-overlay.js?v=3"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
@@ -1665,7 +1750,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=45"></script>
+  <script src="js/pu-appbar.js?v=46"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -2169,6 +2254,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <select class="tb-select" id="rsOrgFilter"><option value="">전체 기관</option></select>
           <div class="tb-spacer"></div>
           <span class="cnt" id="rsCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn fs-ui" type="button" onclick="feeSweepOpen()" title="이력서·프로필·경력증명서 보관함에 이미 담긴 서류 가운데 협회 지급확인서 같은 «비용 서류»를 찾아 비용관리로 옮깁니다 — 목록을 보고 고른 것만 옮기고, 글은 이 기기 안에서만 읽습니다">🧾 비용 서류 찾기</button>
           <button class="btn fs-ui" type="button" onclick="docImportResumeFolder()" title="서류 폴더 «5. 이력서 및 프로필»의 파일을 이력서·프로필 보관함에 한 번에 넣습니다 — 이름에 해가 있으면 그 해, 없으면 연도 모름">📚 5번 폴더 모두 넣기</button>
           <button class="btn fs-ui" type="button" onclick="pastCvOpen()" title="서류 폴더 «7. 컨설턴트,위원신청등»의 건 폴더 속 이력서·경력기술서·프로필을 찾아 그 건의 해로 넣습니다 — 같은 내용은 한 번만">📚 지난 제출 이력서 모으기</button>
           <button class="btn primary" id="rsAddExisting">+ 기존 이력서 추가</button>
@@ -3204,6 +3290,18 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-foot"><span id="p1PickSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" onclick="p1PickClose()">취소</button><button class="btn primary" onclick="p1PickSave()">저장</button></div>
   </div>
 </div>
+<!-- 🧾 비용 서류 찾기 (대표 지시 2026-11-15) — 이력서·프로필·증명서 보관함에 «이미» 담긴 서류 가운데 비용 서류로 보이는 것을 목록으로 보여 주고, 고른 것만 비용관리로 옮긴다.
+     판정: js/kcareer-feeroute.js · 그리는 곳: feeSweepOpen/feeSweepDraw/feeSweepGo. 글은 이 기기 안에서만 읽는다(밖으로 안 보냄). -->
+<div class="modal-ov" id="modalFeeSweep">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="feeSwTitle" style="width:900px;max-width:96vw">
+    <div class="modal-h" id="feeSwTitle" tabindex="-1">🧾 비용 서류 찾기</div>
+    <div class="modal-b">
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:8px;white-space:normal">이력서·프로필·경력증명서 보관함에 담긴 서류 가운데, <b>협회가 낸 지급확인서·상담비·강사비·영수증·참석확인서</b>로 보이는 것을 찾습니다. 고르기만으로는 아무것도 바뀌지 않고, 아래 단추를 눌러야 비용관리 › 저장 서류로 옮겨집니다(되돌리기 있음).</div>
+      <div id="feeSwBody"></div>
+    </div>
+    <div class="modal-foot"><span id="feeSwSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" type="button" onclick="feeSweepClose()">닫기</button><button class="btn primary" type="button" id="feeSwGo" onclick="feeSweepGo()" disabled>옮길 서류를 고르세요</button></div>
+  </div>
+</div>
 <!-- 📬 요청 메일 한 건 보기·고치기 (대표 지시 2026-11-09 「내용도 넣고 팝업창 보고 고치게」) — 메일 내용·알아본 까닭을 보고 종류·기한·메모를 고친다.
      그리는 곳: mrOpen · mrDetRender. 메일 내용은 열 때 «읽기만(peek)» 해서 이 창에만 보이고 저장하지 않는다 -->
 <div class="modal-ov" id="modalMr" role="dialog" aria-modal="true" aria-labelledby="mrDetTitle">
@@ -3998,9 +4096,13 @@ function set(key,arr){
   try{ if(typeof navCountsSoon==='function') navCountsSoon(); }catch(e){}
   /* 비용 «한눈에»를 보고 있으면 숫자 카드·정산도 다시 — 고치고 지워도 옛 숫자가 남았다(2026-10-07 검토) */
   try{ if((key==='meetfee'||key==='etcfee') && typeof feeDashSoon==='function') feeDashSoon(); }catch(e){}
+  /* ★ 이력서 보관함에 새 서류가 들어오면 «비용 서류인지» 한 번 본다 — 입구가 여럿이라 «여기 한 곳»에서 잡는다(2026-11-15).
+     프로필·증명서 보관함은 자동 대상이 아니다(경력 증빙에 강사료가 적혀 있어도 옮기지 않는다 — 훑기 단추로만) */
+  try{ if(key==='resume' && typeof feeRouteSoon==='function') feeRouteSoon(); }catch(e){}
   /* 제출서류↔사업관리 잇기 표(_caseMap)는 저장할 때 버린다 — 안 버리면 1.5초 동안 옛 짝을 보여 준다 */
   try{ if(typeof _caseMapMemo!=='undefined') delete _caseMapMemo[key]; }catch(e){}
-  try{ var _담김=LS.set(NS+key, JSON.stringify(arr)); if(typeof fbScheduleAuto==='function') fbScheduleAuto(key);
+  try{ set._lastOk=false; var _담김=LS.set(NS+key, JSON.stringify(arr)); set._lastOk=(_담김!==false);   /* 방금 쓴 것이 이 기기에 «담겼나» — 옮기는 길(feeMove)이 확인하고 원본을 뺀다. 반환값은 안 바꾼다(기존 호출자가 === false 를 본다) */
+    if(typeof fbScheduleAuto==='function') fbScheduleAuto(key);
     /* ⚠ 못 담았으면 «말한다» — 클라우드로는 보내되(위), 이 기기엔 없어 새로고침하면 사라질 수 있다 */
     if(_담김===false){ var _le=LS.lastErr||{}; if(_le.name==='QuotaExceededError'||/quota|storage/i.test(String(_le))){
       if(!set._fullAt || Date.now()-set._fullAt>60000){ set._fullAt=Date.now(); toast('⚠️ 저장공간 부족 — 이 기기에 담지 못했습니다(새로고침하면 사라질 수 있음) · 환경설정 › 저장공간 관리에서 파일 삭제 필요', 8000); }
@@ -4268,7 +4370,7 @@ async function kcFsBackupUp(quiet){
 /* 폴더에 없을 때 — 그 경로를 가진 기록의 클라우드 사본을 받아 온다. 없으면 null */
 async function _fsCloudFile(relPath){
   var 자리='';
-  KC_FS_STORES.some(function(st){ return (get(st)||[]).some(function(r){ if(r && r.relPath===relPath && r.fsCloud){ 자리=r.fsCloud; return true; } return false; }); });
+  KC_FS_STORES.some(function(st){ return (get(st)||[]).some(function(r){ if(r && r.relPath && KcareerScan.canonRelPath(r.relPath)===KcareerScan.canonRelPath(relPath) && r.fsCloud){ 자리=r.fsCloud; return true; } return false; }); });
   var s=kcFormStorage(); if(!자리 || !s) return null;
   try{ var url=await s.ref(자리).getDownloadURL(); var buf=await (await kcFetch(url)).arrayBuffer();
     var nm=String(relPath).split('/').pop(); return { name:nm, buf:buf }; }
@@ -4531,7 +4633,7 @@ async function fsSaveToFolder(fileRec, store, type, rec){
   var sub=fsFolderFor(store,type); if(!sub) return null;
   if(!await fsEnsureWrite(root)) return null;
   var dir;
-  try{ dir=await root.getDirectoryHandle(sub); }
+  try{ dir=await _fsDir(root, sub); }
   catch(e){ console.warn('폴더 없음: '+sub); return null; }   /* ⚠ 폴더를 새로 만들지 않는다 */
   /* 원본 파일 이름 대신 «기록에서 지은» 이름으로 저장한다 — 나중에 폴더에서 바로 알아본다 */
   var ext=(fileRec.ext || String(fileRec.name||'').split('.').pop() || '').toLowerCase();
@@ -4551,7 +4653,21 @@ async function fsSaveToFolder(fileRec, store, type, rec){
    ⚠ 무엇을 골라야 하는지는 고르기 전에 알린다 — «7. 컨설턴트,위원신청등» 이 들어 있는 윗폴더다. */
 /* need = 그 안에 있어야 할 하위 폴더 이름. 엉뚱한 폴더를 이어 두면 다음에 눌러도 또 막히므로 «다시 고르기»로 돌린다 */
 var _fsRepick=false;
-async function _fsHas(root, name){ try{ await root.getDirectoryHandle(name); return true; }catch(e){ return false; } }
+/* ★ 폴더를 «이름으로» 찾는 곳은 여기 한 곳이다 — 번호 접두어(«7. »)가 있는 이름과 없는 이름을 같은 폴더로 본다(대표 지시 2026-11-15).
+   이 PC 의 서류 폴더는 «컨설턴트,위원신청등»(번호 없음)이라 «7. 컨설턴트,위원신청등» 만 찾던 제출서류·새 지원 건 찾기가 「폴더가 없습니다」라고 했다.
+   ⚠ 먼저 «정확한 이름», 없을 때만 번호를 뗀 이름이다(7번 폴더는 반대로 번호 없는 이름으로 적힌 옛 기록도 번호 있는 이름으로 연다). 폴더를 새로 만들거나 이름을 바꾸지 않는다
+     (opt 로 create 를 준 곳만 만들되, 어느 쪽 이름도 없을 때만 «정확한 이름»으로 만든다).
+   ⚠ 범위: 7번만이 아니라 «번호 접두어가 붙은 모든 폴더 이름»(경로의 각 칸·1~6번 저장 폴더)에 같은 규칙이다 — 번호가 빠진 PC 에서 같은 폴더를 찾게 하려는 뜻이고,
+     정확한 이름이 있는 PC 는 그대로다. 이름이 같은 «다른» 폴더를 오인하지 않게 번호만 뗀 이름의 완전 일치만 본다.
+   ⚠ 기록에 적는 경로(relPath·caseDir)는 늘 «번호 있는 이름» 기준이다 — 파일을 열 때 여기서 실제 이름으로 바뀐다. */
+async function _fsDir(parent, name, opt){
+  var 후보=KcareerScan.dirNameChoices(name), last=null, 읽기=(opt && opt.create) ? Object.assign({}, opt, { create:false }) : opt;
+  /* ⚠ 먼저 «있는지»만 본다 — create 를 첫 후보에 그대로 주면 번호 없는 폴더가 이미 있어도 번호 있는 폴더를 새로 만들어 버린다(재검증 2026-11-15) */
+  for(var i=0;i<후보.length;i++){ try{ return await parent.getDirectoryHandle(후보[i], 읽기); }catch(e){ last=e; } }
+  if(opt && opt.create) return await parent.getDirectoryHandle(후보[0], opt);   /* 어느 쪽도 없을 때만 «정확한 이름»으로 만든다 */
+  throw last || new Error('폴더 없음: '+name);
+}
+async function _fsHas(root, name){ try{ await _fsDir(root, name); return true; }catch(e){ return false; } }
 async function fsRootOrConnect(need){
   var root=_fsRepick ? null : await fsRoot();
   if(root && need && !(await _fsHas(root, need))){
@@ -4598,10 +4714,19 @@ async function fsScanAll(onProgress){
   var root = await fsRoot();
   if(!root){ toast('먼저 ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return null; }
   var files = [], n = 0;
+  /* 서류 폴더 바로 아래에 «7. …»(번호 있음)이 «이미 있는지» — 둘 다 있으면 번호 없는 쪽은 «건너뛰고 알린다».
+     기록의 경로는 늘 «번호 있는 이름»이라(buildRecords 가 통일) 번호 없는 쪽 파일도 번호 있는 폴더 경로로 적혀, 열 때 _fsDir 가 번호 있는 쪽만 보고 못 연다(재검증 2026-11-15). */
+  var 번호있는7번 = false, 건너뛴폴더 = '';
+  try{ for await (var 맨위 of root.entries()){ if(맨위[1].kind === 'directory' && 맨위[0] === KcareerCases.CASE_ROOT) 번호있는7번 = true; } }catch(e){}
   async function walk(dir, prefix){
     for await (var ent of dir.entries()){
       var name = ent[0], h = ent[1];
-      if(h.kind === 'directory'){ await walk(h, prefix ? prefix + '/' + name : name); continue; }
+      if(h.kind === 'directory'){
+        /* 서류 폴더 바로 아래의 «번호 없는» 7번 폴더는 기록에 «번호 있는 이름»으로 적는다 — 건 등록(fsCaseFiles)과 같은 경로여야
+           두 PC 가 같은 기록을 쓰고, 이미 등록한 파일을 «새 파일»로 또 올리지 않는다(재검증 2026-11-15). 열 때는 _fsDir 가 실제 이름으로 바꾼다. */
+        if(!prefix && 번호있는7번 && name !== KcareerCases.CASE_ROOT && KcareerScan.isCaseRootName(name)){ 건너뛴폴더 = name; continue; }
+        var 칸이름 = (!prefix && KcareerScan.isCaseRootName(name)) ? KcareerCases.CASE_ROOT : name;
+        await walk(h, prefix ? prefix + '/' + name : 칸이름); continue; }
       try{
         var f = await h.getFile();     /* 메타데이터만 사용 — 내용은 읽지 않는다 */
         files.push({ name:name, relPath:(prefix ? prefix + '/' : '') + name,
@@ -4612,15 +4737,20 @@ async function fsScanAll(onProgress){
   }
   await walk(root, '');
   if(onProgress) onProgress(n);
+  if(건너뛴폴더) toast('「' + KcareerCases.CASE_ROOT + '」와 「' + 건너뛴폴더 + '」가 둘 다 있어 «번호 있는 폴더»만 읽었습니다. 두 폴더가 같은 것이면 하나로 합쳐 주세요.');
   return files;
 }
 
 /* 이미 등록된 파일 건너뛰기 — 경로+크기+수정일이 같으면 같은 파일로 본다 */
 function fsKnownKeys(){
   var map = {};
+  /* ⚠ 저장된 기록의 경로는 «적힌 그대로»와 «번호 있는 이름으로 통일한 것» 둘 다 키로 둔다 — 이 고침 전에 번호 없는 PC 에서 전체 스캔으로 저장한 기록(「컨설턴트,위원신청등/…」)이 있다.
+     새 스캔은 경로를 «7. 컨설턴트,위원신청등/…»으로 만들므로, 옛 기록을 통일해서도 견주지 않으면 이미 등록한 파일을 «새 파일»로 또 올린다(재검증 2026-11-15).
+     기록 자체는 고치지 않는다(견주는 키만 늘린다). */
+  function key(p, a, b){ return p + '|' + a + '|' + b; }
   function add(r){
-    if(r && r.src === 'fs' && r.relPath) map[r.relPath + '|' + r.fileSize + '|' + r.fileMtime] = true;
-    if(r && r.files) r.files.forEach(function(f){ map[f.relPath + '|' + f.size + '|' + f.mtime] = true; });
+    if(r && r.src === 'fs' && r.relPath){ map[key(r.relPath, r.fileSize, r.fileMtime)] = true; map[key(KcareerScan.canonRelPath(r.relPath), r.fileSize, r.fileMtime)] = true; }
+    if(r && r.files) r.files.forEach(function(f){ map[key(f.relPath, f.size, f.mtime)] = true; map[key(KcareerScan.canonRelPath(f.relPath), f.size, f.mtime)] = true; });
   }
   ['wiccok','cert','certdoc','submission'].forEach(function(k){ get(k).forEach(add); });
   return map;
@@ -4896,7 +5026,7 @@ async function _fsFileOf(relPath){
   var root = await fsRoot();
   if(!root) return null;
   var segs = String(relPath).split('/'), dir = root;
-  for(var i = 0; i < segs.length - 1; i++) dir = await dir.getDirectoryHandle(segs[i]);
+  for(var i = 0; i < segs.length - 1; i++) dir = await _fsDir(dir, segs[i]);
   return await (await dir.getFileHandle(segs[segs.length - 1])).getFile();
 }
 
@@ -5378,7 +5508,7 @@ async function _caseRootQuiet(){
 /* 7번 › 연도 › 건 폴더 이름만 — 파일은 읽지 않는다(가볍다) */
 async function fsCaseDirs(root){
   var out = [], top;
-  try{ top = await root.getDirectoryHandle(KcareerCases.CASE_ROOT); }catch(e){ return null; }   /* 폴더가 없다 */
+  try{ top = await _fsDir(root, KcareerCases.CASE_ROOT); }catch(e){ return null; }   /* 폴더가 없다 — «7. »이 있든 없든 */
   for await (var y of top.entries()){
     if(y[1].kind !== 'directory' || !KcareerCases.YEAR_DIR.test(y[0])) continue;
     for await (var c of y[1].entries()){
@@ -7191,6 +7321,256 @@ async function rhAutoSaveDomain(v){
   }catch(e){ console.warn('비용 서류 판정', e); }
   return v;
 }
+/* ═══ 🧾 비용 서류 자동 보내기 (대표 지시 2026-11-15 「회의 비용관리에 있어야 될 내용이 이력서 관리에 있다 — 잘못 입력되면 자동으로 비용관리로」) ═══
+   위 rhAutoSaveDomain 은 «올리기 화면»만 거쳤다. 「5번 폴더 모두 넣기」·「지난 제출 이력서 모으기」·직접 추가 같은 다른 입구로
+   들어온 협회 지급확인서는 판정 없이 이력서 보관함에 앉았다. → 입구가 아니라 «보관함에 쓰는 자리»(set)에서 한 번 더 본다.
+   ★ 판정은 js/kcareer-feeroute.js «한 곳»(협회 서류 + 돈 받은 확인 낱말, 이력서·프로필·증명서 이름이면 제외) — Jev(외부 AI)는 쓰지 않는다
+     (대표 결정 2026-11-15 「규칙으로 자동 분류」: 서류 글이 밖으로 나가지 않는다).
+   ★ 자동은 «이력서 보관함에 이번에 들어온 것»만(savedAt 이 이 화면을 연 순간 이후) — 예전에 담긴 수백 건을 몰래 열어 읽지 않는다.
+     프로필·증명서 보관함은 자동 대상이 아니다(경력 증빙에 강사료가 적혀 있어도 옮기지 않는다, 검증 2026-11-15).
+     예전 것은 「🧾 비용 서류 찾기」(feeSweepOpen) 를 대표가 눌러 목록을 보고 옮긴다.
+   ★ 글은 «이 기기에 있는 파일»만 읽는다(feeDocText → _feeLocalFile) — 창고(클라우드)에서 수백 건을 내려받아 폰 저장공간을 채우지 않는다. 없는 것은 «못 읽음»으로 센다.
+   ★ 옮기는 것은 «지우는 것이 아니다» — 같은 파일(genFileId)·같은 내용으로 새 보관함(feedoc)에 «새 번호(id)»로 «먼저» 쓰고 옛 보관함에서 뺀다.
+     · 새 번호인 까닭: 같은 번호로 두 통에 걸치면 다른 기기의 옛 보관함 사본과 합칠 때 양쪽에 다 남는다(검증 2026-11-15, KcareerNotices.mergeLs 로 재현).
+       옛 번호는 «지운 기록표(_tomb)»에 정상으로 적혀(_tombDiff) 다른 기기의 옛 사본도 사라진다.
+     · 새 자리에 «먼저» 쓰고, 그것이 이 기기에 «담겼는지» 확인한 뒤에만 옛 자리에서 뺀다(_feeSaved) — 못 담았는데 원본을 빼면 기록이 사라진다(검증 2026-11-15 높음).
+       담겼는지는 둘 다 본다: ① localStorage 쪽(set._lastOk) ② 기본 저장소(KV·IndexedDB)는 «쓰기를 받기만 하고 true»라서 flush 를 기다려 오류 횟수(KV.errors)가 늘지 않았는지.
+   ★ 되돌리기가 있다(feeUndo) — 되돌리면 원래 보관함에 «사람이 정함»(feeKeep)을 남겨 다시 안 옮긴다. 알림 막대는 8초뿐이라 비용 서류 줄에도 「↩ 원래 자리로」 단추가 있다(feeUndoOne).
+   ⚠ 사람이 보관함을 직접 고른 것(feeKeep)은 건드리지 않는다 — 사람이 정한 것이 이긴다. */
+var KC_FEE_SRC=['resume','profile','certdoc'];   /* 훑기(대표가 누를 때) 대상 */
+var KC_FEE_AUTO=['resume'];                      /* 자동 대상 — 이력서 보관함만 */
+var FEE_SRC_LABEL={ resume:'이력서', profile:'프로필', certdoc:'경력증명서' };
+/* ⚠ 이 화면을 연 «그 순간»부터다 — 여유를 두면(예전엔 60초 전) 직전 화면에서 담은 예전 서류가 허락 없이 열려 자동으로 옮겨진다(검증 2026-11-15) */
+var _feeBoot=Date.now(), _feeT=null, _feeBusy=false, _feeAgain=false, _feeDone={}, _feeSeq=0;
+/* 압축 파일(hwpx·docx)에서 읽을 글자·구역의 상한 — 작은 파일이 수 GB 로 풀리는 «압축 폭탄»에 탭이 죽지 않게(검증 2026-11-15) */
+var FEE_ZIP_MAX_CHARS=4*1024*1024, FEE_ZIP_MAX_ENTRIES=20;
+function feeRouteSoon(){
+  if(_feeT || typeof KcareerFeeRoute==='undefined') return;
+  _feeT=setTimeout(function(){ _feeT=null; feeRouteFresh().catch(function(e){ console.warn('비용 서류 자동 판정', e&&e.message); }); }, 2500);
+}
+function _feeFresh(r){
+  if(!r || !r.id || r.feeKeep || r.feeFrom || _feeDone[r.id]) return false;
+  var t=Date.parse(r.savedAt||''); return t>=_feeBoot;
+}
+/* 압축 파일 안의 글 한 칸을 «상한까지만» 푼다 — 넘으면 흐름을 멈춘다(JSZip internalStream). 헤더의 크기 표시는 거짓일 수 있어 «푼 만큼»을 센다 */
+function _feeEntryText(zf, cap){
+  return new Promise(function(res){
+    var out='', done=false, s=null;
+    function fin(){ if(done) return; done=true; res(out.length>cap?out.slice(0,cap):out); }
+    try{
+      s=zf.internalStream('string');
+      s.on('data', function(chunk){ if(done) return; out+=chunk; if(out.length>=cap){ try{ s.pause(); }catch(e){} fin(); } });
+      s.on('error', fin); s.on('end', fin);
+      s.resume();
+    }catch(e){ fin(); }
+  });
+}
+/* 이 기기(IndexedDB)에 있는 파일만 — 없으면 null. getFileAsync 는 없을 때 창고(클라우드)에서 내려받아 기기 저장소에 담는다 — 훑기에서 그러면 안 된다(검증 2026-11-15) */
+async function _feeLocalFile(id){
+  if(!id) return null;
+  try{
+    var 기억=getFile(id); if(기억 && 기억.base64) return 기억;
+    var db=await _openIDB();
+    return await new Promise(function(res){ var req=db.transaction('files','readonly').objectStore('files').get(id); req.onsuccess=function(){ res(req.result||null); }; req.onerror=function(){ res(null); }; });
+  }catch(e){ return null; }
+}
+/* 서류 «글자»를 이 기기 안에서 읽는다 — 밖으로 보내지 않는다. 못 읽으면 '' (스캔 PDF·그림·이 기기에 없는 파일·열리지 않는 hwp) */
+async function feeDocText(rec, opt){
+  var fid=rec && rec.genFileId; if(!fid) return '';
+  var race=function(p, ms){ return Promise.race([p, new Promise(function(res){ setTimeout(function(){ res(''); }, ms); })]); };
+  try{
+    var f=await _feeLocalFile(fid);
+    if(!f || !f.base64 || f.base64.length>28*1024*1024) return '';   /* 20MB 넘는 것은 열지 않는다 */
+    var ext=String(f.ext||String(f.name||rec.genName||'').split('.').pop()||'').toLowerCase();
+    /* ⚠ 확장자를 믿지 않는다 — 이름은 .hwp 인데 속은 압축(PK)인 파일은 한글 엔진 길(상한 없이 통째로 푼다)로 보내지 않고 상한 있는 길로 보낸다(검증 2026-11-15) */
+    var 압축=false; try{압축=(atob(f.base64.slice(0,8)).slice(0,2)==='PK');}catch(e){}
+    if(ext==='pdf' && !압축) return String(await race(_pkPdfText(new Uint8Array(b64ToAb(f.base64)), 3), 12000)||'');
+    if(압축 || ext==='hwpx' || ext==='docx'){
+      await _ensureJSZip();
+      var z=await JSZip.loadAsync(b64ToAb(f.base64)), 이름=Object.keys(z.files).filter(function(n){ return /^Contents\/section\d+\.xml$/i.test(n) || n==='word/document.xml'; }).slice(0, FEE_ZIP_MAX_ENTRIES), 글='';
+      for(var i=0;i<이름.length && 글.length<FEE_ZIP_MAX_CHARS;i++) 글+=' '+(await _feeEntryText(z.file(이름[i]), FEE_ZIP_MAX_CHARS-글.length)).replace(/<[^>]+>/g,' ');
+      return 글;
+    }
+    if(ext==='hwp'){
+      /* ⚠ .hwp 는 한글 엔진(7MB, 처음엔 인터넷에서 받는다)을 돌려야 읽힌다 — 엔진은 늘 새로 받아진다(재검증 2회차 2026-11-15).
+         그래서 «자동»(opt.noHwp)은 건너뛰고, 대표가 누른 훑기에서만 읽되 큰 파일은 열지 않는다(WASM 동기 호출이라 시간 제한으로 끊기지 않는다) */
+      if((opt && opt.noHwp) || f.base64.length>7*1024*1024) return '';
+      return String(await race(_hwpTextOf(new Uint8Array(b64ToAb(f.base64)), f.name||rec.genName), 15000)||'');
+    }
+  }catch(e){ console.warn('비용 서류 글 읽기', e&&e.message); }
+  return '';
+}
+function _feeJudgeRec(r, text){
+  return KcareerFeeRoute.judge({ name:r.genName||r.name, kind:r.kind, memo:r.memo, org:r.org, text:text, keep:r.feeKeep });
+}
+function _feeNewId(domain){ _feeSeq++; return domain+'_'+Date.now()+'_f'+_feeSeq; }
+/* 방금 쓴 것이 이 기기에 «담겼나» — localStorage 쪽은 set._lastOk, 기본 저장소(KV)는 flush 를 기다려 오류 횟수가 늘지 않았나 */
+async function _feeSaved(오류전){
+  if(set._lastOk===false) return false;
+  try{
+    if(typeof KV!=='undefined' && KV && typeof KV.flush==='function'){
+      await KV.flush();
+      if((KV.errors||0)>(오류전||0)) return false;
+    }
+  }catch(e){ return false; }
+  return true;
+}
+function _feeKvErrors(){ try{ return (typeof KV!=='undefined' && KV && KV.errors) || 0; }catch(e){ return 0; } }
+/* picks: [{id, kind}] — src 보관함에서 비용 서류(feedoc)로. 옮긴 기록(새 번호)을 돌려준다. 못 담으면 [] 이고 원본은 그대로다 */
+async function feeMove(src, picks){
+  var from=get(src)||[], 으뜸=kindsOf('feedoc'), now=new Date().toISOString(), by={}, moved=[], gone={};
+  var 전=get('feedoc')||[];
+  (picks||[]).forEach(function(p){ if(p && p.id!=null) by[String(p.id)]=p; });
+  from.forEach(function(r){ var p=r && by[String(r.id)]; if(!p) return;
+    gone[String(r.id)]=1;
+    /* 다른 탭·기기가 이미 같은 서류를 옮겼다(feeOrigId 가 같다) — 또 만들지 않고 이 자리에서만 뺀다(같은 서류가 두 줄이 되지 않게) */
+    if(전.some(function(x){ return x && x.feeOrigId!=null && String(x.feeOrigId)===String(r.id); })) return;
+    var k=(으뜸.indexOf(p.kind)>=0)?p.kind:(으뜸.indexOf('기타')>=0?'기타':으뜸[0]);
+    moved.push(Object.assign({}, r, { id:_feeNewId('feedoc'), kind:k, feeFrom:src, feeFromKind:r.kind||'', feeOrigId:String(r.id), feeAt:now })); });
+  if(!Object.keys(gone).length) return [];
+  if(moved.length){
+    /* ⚠ 새 자리에 «먼저», 그리고 «담겼는지» 확인한 뒤에만 옛 자리에서 뺀다 — 못 담았는데 빼면 기록이 사라진다 */
+    var 오류전=_feeKvErrors();
+    set('feedoc', moved.concat(전));
+    if(!(await _feeSaved(오류전))){
+      var 새번호={}; moved.forEach(function(r){ 새번호[String(r.id)]=1; });
+      set('feedoc', (get('feedoc')||[]).filter(function(r){ return !(r && 새번호[String(r.id)]); }));   /* 지금 목록에서 «이번에 넣은 것»만 뺀다 — 처음 읽은 사본으로 덮으면 그 사이 들어온 줄이 지워지고 지운 기록표까지 남는다(재검증 2회차) */
+      try{ toast('⚠️ 이 기기에 저장하지 못해 비용 서류로 옮기지 못했습니다 — 원래 보관함에 그대로 둡니다', 7000); }catch(e){}
+      return [];
+    }
+  }
+  set(src, (get(src)||[]).filter(function(r){ return !(r && gone[String(r.id)]); }));
+  _safe(function(){ renderDocStore('feedoc'); }); _safe(function(){ renderDocStore(src); });
+  return moved;
+}
+/* 되돌리기 — 원래 보관함에 «새 번호»로 «먼저» 쓰고(담겼는지 확인) 비용 서류에서 뺀다. feeKeep 을 남겨 다시 안 옮긴다 */
+async function feeUndo(ids){
+  var map={}; (ids||[]).forEach(function(i){ map[String(i)]=1; });
+  var cur=get('feedoc')||[], back=Object.create(null), 돌려=[];   /* 이름표 없는 통 — 동기화로 온 feeFrom 이 «__proto__» 여도 터지지 않게 */
+  cur.forEach(function(r){ if(!(r && map[String(r.id)] && r.feeFrom && KC_FEE_SRC.indexOf(r.feeFrom)>=0)) return;   /* 우리 보관함(이력서·프로필·증명서) 이름일 때만 — 엉뚱한 통에 쓰지 않는다 */
+    var rec=Object.assign({}, r, { id:_feeNewId(r.feeFrom), kind:r.feeFromKind||'', feeKeep:1 });
+    delete rec.feeFrom; delete rec.feeFromKind; delete rec.feeAt; delete rec.feeOrigId;
+    (back[r.feeFrom]=back[r.feeFrom]||[]).push(rec); 돌려.push(String(r.id)); });
+  if(!돌려.length) return 0;
+  var 쓴=[], 오류전=_feeKvErrors(), 실패=false, srcs=Object.keys(back);
+  for(var i=0;i<srcs.length && !실패;i++){
+    var src=srcs[i], 전=get(src)||[]; set(src, back[src].concat(전)); 쓴.push({ src:src, 전:전 });
+    if(!(await _feeSaved(오류전))) 실패=true;
+  }
+  if(실패){
+    쓴.forEach(function(w){ var 넣음={}; back[w.src].forEach(function(b){ 넣음[String(b.id)]=1; }); set(w.src, (get(w.src)||[]).filter(function(r){ return !(r && 넣음[String(r.id)]); })); });   /* 이번에 넣은 것만 뺀다(통째 사본으로 덮지 않는다) */
+    try{ toast('⚠️ 이 기기에 저장하지 못해 되돌리지 못했습니다 — 비용 서류에 그대로 둡니다', 7000); }catch(e){}
+    return 0;
+  }
+  set('feedoc', (get('feedoc')||[]).filter(function(r){ return !(r && 돌려.indexOf(String(r.id))>=0); }));
+  srcs.concat(['feedoc']).forEach(function(d){ _safe(function(){ renderDocStore(d); }); });
+  return 돌려.length;
+}
+/* 비용 서류 줄의 「↩ 원래 자리로」 — 알림 막대(8초)를 놓쳐도 되돌릴 길이 남는다 */
+async function feeUndoOne(id){
+  var n=await feeUndo([id]);
+  if(n) toast('↩ 원래 보관함으로 되돌렸습니다 — 다시 옮기지 않습니다');
+}
+function _feeMovedNote(moved){
+  var 이름=String((moved[0].genName||moved[0].name||'서류')).slice(0,30);
+  return '🧾 비용 서류로 보여 비용관리 › 저장 서류로 보냈습니다 — '+(moved.length>1?'«'+이름+'» 외 '+(moved.length-1)+'건':'«'+이름+'»');
+}
+async function feeRouteFresh(){
+  if(typeof KcareerFeeRoute==='undefined') return;
+  if(_feeBusy){ _feeAgain=true; return; }   /* 판정 도중 새 서류가 들어왔다 — 끝난 뒤 한 번 더 본다(「5번 폴더 모두 넣기」는 10건마다 나눠 담는다) */
+  _feeBusy=true;
+  try{
+    var 옮김=[];
+    for(var si=0; si<KC_FEE_AUTO.length; si++){
+      var src=KC_FEE_AUTO[si], 줄들=(get(src)||[]).filter(_feeFresh);
+      for(var i=0;i<줄들.length;i++){
+        var r=줄들[i]; _feeDone[r.id]=1;                            /* 한 번만 본다 — 같은 서류를 두 번 열지 않는다 */
+        var j=_feeJudgeRec(r, await feeDocText(r, { noHwp:true }));   /* 자동은 .hwp 를 열지 않는다 — 한글 엔진을 사람 몰래 받지 않게 */
+        if(j.fee) 옮김=옮김.concat(await feeMove(src, [{ id:r.id, kind:j.kind }]));
+      }
+    }
+    if(옮김.length){
+      var ids=옮김.map(function(r){ return r.id; });
+      kcUndoBar(_feeMovedNote(옮김)+' · 이력서에 두려면', null, function(){ feeUndo(ids).then(function(n){ if(n) toast('↩ '+n+'건을 원래 보관함으로 되돌렸습니다 — 다시 옮기지 않습니다'); }); });
+    }
+  } finally { _feeBusy=false; if(_feeAgain){ _feeAgain=false; feeRouteSoon(); } }
+}
+/* ── 예전에 담긴 서류 훑기 — 대표가 누를 때만, 목록을 보여 주고 «고른 것만» 옮긴다 ── */
+var _feeSw=null, _feeSwFrom=null;
+async function feeSweepOpen(){
+  if(typeof KcareerFeeRoute==='undefined'){ toast('비용 서류 규칙을 아직 못 불렀습니다 — 새로고침 후 다시 눌러 주세요'); return; }
+  var 대상=[]; KC_FEE_SRC.forEach(function(src){ (get(src)||[]).forEach(function(r){ if(r && r.id && !r.feeKeep && !r.feeFrom) 대상.push({ src:src, r:r }); }); });
+  if(!대상.length){ toast('훑을 서류가 없습니다'); return; }
+  if(_feeSw) _feeSw.stop=true;                                                /* 앞 훑기가 남아 있으면 멈춘다 */
+  var S=_feeSw={ rows:[], on:{}, total:대상.length, unread:0, stop:false, done:false };   /* ⚠ 이 훑기만의 상태 — 닫고 다시 열어도 옛 훑기가 새 목록에 섞이지 않게 아래는 늘 S 를 쓴다 */
+  _feeSwFrom=document.activeElement;
+  document.getElementById('modalFeeSweep').classList.add('open'); feeSweepDraw();
+  try{ var t0=document.getElementById('feeSwTitle'); if(t0) t0.focus(); }catch(e){}
+  if(document.addEventListener){ document.removeEventListener('keydown', feeSweepKey); document.addEventListener('keydown', feeSweepKey); }
+  for(var i=0;i<대상.length;i++){
+    if(S.stop || _feeSw!==S) return;
+    var x=대상[i], sumEl=document.getElementById('feeSwSum');
+    if(sumEl) sumEl.textContent='⏳ '+(i+1)+' / '+대상.length+' 읽는 중… (글은 이 기기 안에서만 읽습니다)';
+    var 글=await feeDocText(x.r);
+    if(S.stop || _feeSw!==S) return;                                          /* 닫았거나 다시 열었다 — 옛 결과를 새 창에 섞지 않는다 */
+    if(!글) S.unread++;
+    var j=_feeJudgeRec(x.r, 글);
+    if(j.fee){ S.rows.push({ src:x.src, id:x.r.id, name:x.r.genName||x.r.name||'', org:x.r.org||'', kind:j.kind, words:j.words.join('·') }); S.on[String(x.r.id)]=true; feeSweepDraw(true); }
+  }
+  if(_feeSw===S && !S.stop){ S.done=true; feeSweepDraw(); }
+}
+function feeSweepDraw(keepScan){
+  var S=_feeSw, box=document.getElementById('feeSwBody'); if(!S||!box) return;
+  /* 다시 그려도 초점을 잃지 않게 — 눌러 고른 칸 번호를 기억했다가 같은 칸에 돌려준다 */
+  var af=document.activeElement, fk=(af && af.getAttribute && box.contains && box.contains(af)) ? (af.id==='feeSwAll' ? '__all' : af.getAttribute('data-fid')) : null;
+  var n=S.rows.filter(function(r){ return S.on[String(r.id)]; }).length;
+  box.innerHTML='<div class="dt" id="feeSwTbl" style="max-height:56vh;overflow:auto"><table><thead><tr>'
+    +'<th class="rownum-h" style="width:62px"><label class="rn-chk"><input type="checkbox" id="feeSwAll" aria-label="보이는 줄 모두 고르기"'+(S.rows.length&&n===S.rows.length?' checked':'')+' onclick="feeSweepAll(this.checked)"><span>№</span></label></th>'
+    +'<th style="width:230px;white-space:nowrap">파일 이름</th><th style="width:104px;white-space:nowrap">지금 있는 곳</th><th style="width:170px;white-space:nowrap">기관</th><th style="width:130px;white-space:nowrap">보낼 종류</th><th style="white-space:nowrap">찾은 낱말</th></tr></thead><tbody>'
+    +S.rows.map(function(r,i){ return '<tr><td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" data-fid="'+escapeHtml(String(r.id))+'" aria-label="'+escapeHtml((r.name||'서류')+' 고르기')+'"'+(S.on[String(r.id)]?' checked':'')+' onclick="feeSweepToggle(\''+_jsAttr(String(r.id))+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
+        +'<td data-label="파일 이름" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.name)+'">'+escapeHtml(r.name||'(이름 없음)')+'</td>'
+        +'<td data-label="지금 있는 곳" style="white-space:nowrap">'+escapeHtml(FEE_SRC_LABEL[r.src]||r.src)+'</td>'
+        +'<td data-label="기관" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.org)+'">'+escapeHtml(r.org||'—')+'</td>'
+        +'<td data-label="보낼 종류" style="white-space:nowrap">'+escapeHtml(r.kind)+'</td>'
+        +'<td data-label="찾은 낱말" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.words)+'">'+escapeHtml(r.words)+'</td></tr>'; }).join('')
+    +(S.rows.length?'':'<tr><td colspan="6" style="color:var(--text-mute);padding:12px 6px">'+(S.done?'비용 서류로 보이는 서류가 없습니다':'찾는 중…')+'</td></tr>')
+    +'</tbody></table></div>';
+  if(fk){ var 칸=fk==='__all' ? document.getElementById('feeSwAll') : [].filter.call(box.querySelectorAll('input[data-fid]'), function(c){ return c.getAttribute('data-fid')===fk; })[0]; try{ if(칸) 칸.focus(); }catch(e){} }
+  var sum=document.getElementById('feeSwSum');
+  if(sum && (S.done||!keepScan)) sum.textContent=S.done
+    ? '훑은 서류 '+S.total+'건 · 비용 서류로 보이는 것 '+S.rows.length+'건 · 글을 못 읽은 것 '+S.unread+'건(스캔 PDF·그림·이 기기에 없는 파일 등) · 협회 서류만 옮깁니다 · '+n+'건 선택'
+    : '⏳ 읽는 중… · '+n+'건 선택';
+  var go=document.getElementById('feeSwGo'); if(go){ go.disabled=!n; go.textContent=n?('🧾 '+n+'건 비용관리로 옮기기'):'옮길 서류를 고르세요'; }
+}
+function feeSweepToggle(id,on){ if(!_feeSw) return; _feeSw.on[String(id)]=!!on; feeSweepDraw(!_feeSw.done); }
+function feeSweepAll(on){ if(!_feeSw) return; _feeSw.rows.forEach(function(r){ _feeSw.on[String(r.id)]=!!on; }); feeSweepDraw(!_feeSw.done); }
+/* 창 안에서만 Tab 이 돈다 — aria-modal 이라 뒤 화면으로 초점이 빠지면 안 된다(Esc 는 전역 처리기가 «닫기» 단추를 눌러 닫는다. hrCertKey 와 같은 방식) */
+function feeSweepKey(e){
+  var ov=document.getElementById('modalFeeSweep'); if(!ov || e.key!=='Tab' || !ov.classList.contains('open') || !ov.querySelectorAll) return;
+  var list=[].filter.call(ov.querySelectorAll('input,button,summary,[tabindex="0"]'), function(n){ return !n.disabled && n.offsetParent!==null; });
+  if(!list.length) return;
+  var first=list[0], last=list[list.length-1], cur=document.activeElement, inside=ov.contains?ov.contains(cur):true;
+  if(e.shiftKey && (cur===first || !inside || cur===document.getElementById('feeSwTitle'))){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (cur===last || !inside)){ e.preventDefault(); first.focus(); }
+}
+function feeSweepClose(){
+  if(_feeSw) _feeSw.stop=true;
+  var ov=document.getElementById('modalFeeSweep'); if(ov) ov.classList.remove('open');
+  if(document.removeEventListener) document.removeEventListener('keydown', feeSweepKey);
+  var back=_feeSwFrom; _feeSwFrom=null;
+  try{ if(back && back.focus && back.isConnected!==false) back.focus(); }catch(e){}
+}
+async function feeSweepGo(){
+  var S=_feeSw; if(!S) return; S.stop=true;
+  var go=document.getElementById('feeSwGo'); if(go) go.disabled=true;           /* 옮기는 동안 두 번 눌리지 않게 */
+  var by={}; S.rows.forEach(function(r){ if(S.on[String(r.id)]) (by[r.src]=by[r.src]||[]).push({ id:r.id, kind:r.kind }); });
+  var 옮김=[], 보관함=Object.keys(by);
+  for(var i=0;i<보관함.length;i++) 옮김=옮김.concat(await feeMove(보관함[i], by[보관함[i]]));
+  feeSweepClose();
+  if(!옮김.length){ toast('옮긴 서류가 없습니다'); return; }
+  var ids=옮김.map(function(r){ return r.id; });
+  kcUndoBar('🧾 '+옮김.length+'건을 비용관리 › 저장 서류로 옮겼습니다 · 잘못 옮겼으면', null, function(){ feeUndo(ids).then(function(n){ if(n) toast('↩ '+n+'건을 원래 보관함으로 되돌렸습니다 — 다시 옮기지 않습니다'); }); });
+}
 /* ⚠ renderRhDocList 를 되살리지 말 것 — 보관함을 그리는 코드는 renderDocStore «하나»다.
    전에는 같은 자료를 두 코드가 서로 다른 모양으로 그렸고, 저장해도 한쪽이 갱신되지 않아
    「저장했는데 보관함에 안 보인다」가 됐다. 화면을 합쳤으니 그릴 곳도 하나다. */
@@ -7809,6 +8189,7 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
   const genSt = await kcFormUpload(genFileId, genB64, (genName.split('.').pop()||'').toLowerCase());
   const origSt = origFileId ? await kcFormUpload(origFileId, origB64, (origName.split('.').pop()||'').toLowerCase()) : '';
   const arr=get(D.store); const entry={id,kind,year,org,memo,genFileId,genName,origFileId,origName,submits:[],savedAt:now};
+  if(_rhModeTouched && domain==='resume') entry.feeKeep=1;   /* 사람이 보관함을 «직접» 골랐다 — 비용 서류로 보여도 그 자리에 둔다(feeRouteFresh 가 건드리지 않는다) */
   if(genSt) entry.genStPath=genSt;
   if(origSt) entry.origStPath=origSt;
   (D.extra||[]).forEach(f=>{ const el=document.getElementById('rsx-'+f.key); entry[f.key]=el?el.value.trim():''; });
@@ -7843,7 +8224,7 @@ async function docImportResumeFolder(){
   var root=await fsRootOrConnect(fsFolderFor('resume'));
   if(!root) return;   /* 고르기를 취소했다 — 조용히 멈춘다 */
   var 폴더명=fsFolderFor('resume'), dir=null;
-  try{ dir=await root.getDirectoryHandle(폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
+  try{ dir=await _fsDir(root, 폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
   var 목록=[];
   for await (var ent of dir.entries()){
     if(ent[1].kind!=='file' || KcareerScan.isIgnoredFile(ent[0])) continue;
@@ -8015,7 +8396,7 @@ function renderProfile1(){
     +'<textarea class="tb-input" rows="3" style="width:100%;min-width:0;font-size:16px;resize:vertical" placeholder="2024 근로시간 제도 개편 칼럼 · ○○일보&#10;2023 공저 「일터혁신 실무」" onchange="p1Pubs(this.value)">'+escapeHtml(o.pubs||'')+'</textarea>'
     +'<div style="color:var(--text-mute);font-size:12px;margin-top:2px">앞에 4자리 연도를 적으면 연도 칸에 들어갑니다 · 위 「연구·저서·기고」 칸을 켜면 나옵니다</div>'
     +'<div style="font-weight:700;margin:12px 0 6px">용도</div>'
-    +'<select class="tb-select" style="width:100%" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
+    +'<select class="tb-select" style="width:100%" aria-label="용도" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
     +'<label style="'+row+';margin-top:8px"><input type="checkbox"'+(o.photo?' checked':'')+' onchange="p1Photo(this.checked)"> 증명사진 넣기 <span style="margin-left:auto;color:var(--text-mute);font-size:12px">미리보기·PDF</span></label>'
     +(o.photo&&!_p1PhotoUrl&&_p1PhotoWhy?'<div style="color:var(--red);font-size:12px;margin:-2px 0 4px;white-space:normal">⚠ '+escapeHtml(_p1PhotoWhy)+'</div>':'')
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'
@@ -8083,9 +8464,10 @@ function _p1Scale(){
     if(!fitsW){ paper.style.overflowX='auto'; extra=18; }
   }
   else{
-    /* 태블릿에서 설정 칸 «아래»로 쌓이면 그림 자리(top)가 화면 밖 아래라, 높이를 그대로 재면 300px 한도(27%)로 쪼그라든다 —
-       그림 앞으로 스크롤해 오면 «한 화면»이 되게, 화면 맨 위에 있는 것으로 잰다. 폰(≤520px)은 예전 그대로 둔다. */
-    var 쌓임=false; try{ 쌓임=!!_p1Side&&window.innerWidth>520&&String(getComputedStyle(box).gridTemplateColumns||'').trim().split(/\s+/).length<2; }catch(e){}
+    /* 설정 칸 «아래»로 쌓이면(폰·태블릿) 그림 자리(top)가 화면 밖 아래라, 높이를 그대로 재면 300px 한도(27%)로 쪼그라든다 —
+       폰에서 그림이 칸 폭의 절반도 안 되게 작게 나오던 까닭이다(2026-11-15 대표 «남은 것도 모두 고쳐라»).
+       그림 앞으로 스크롤해 오면 «한 화면»이 되게, 화면 맨 위에 있는 것으로 잰다 — 그러면 폭에 맞춰 칸을 채운다. */
+    var 쌓임=false; try{ 쌓임=!!_p1Side&&String(getComputedStyle(box).gridTemplateColumns||'').trim().split(/\s+/).length<2; }catch(e){}
     var top=쌓임?8:paper.getBoundingClientRect().top;
     var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
     s=Math.min(1, fitW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
@@ -8792,7 +9174,7 @@ async function cdScanNow(){
   if(!files) return;
   var db = get('certdoc');
   var known = {};
-  db.forEach(function(r){ if(r.relPath) known[r.relPath] = true; });
+  db.forEach(function(r){ if(r.relPath){ known[r.relPath] = true; known[KcareerScan.canonRelPath(r.relPath)] = true; } });   /* 번호 없는 이름으로 저장된 옛 기록도 같은 경로로 본다(재검증 2026-11-15) */
   var ext = [], own = [], attaches = [], seen = {};
   files.forEach(function(f){
     var c = KcareerScan.classify(f.name);
@@ -8901,7 +9283,7 @@ async function _cdFileBytes(r){
     var root = await fsRoot();
     if(!root){ toast('서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return null; }
     var segs = String(r.relPath).split('/'), dir = root;
-    for(var i = 0; i < segs.length - 1; i++) dir = await dir.getDirectoryHandle(segs[i]);
+    for(var i = 0; i < segs.length - 1; i++) dir = await _fsDir(dir, segs[i]);
     var fh = await dir.getFileHandle(segs[segs.length - 1]);
     var f = await fh.getFile();
     nm = segs[segs.length - 1];
@@ -9042,7 +9424,7 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
             ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
             : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄 보기</button><button class="btn sm ds-dl" onclick="docDl('${domain}','${r.id}','gen')" title="내 컴퓨터로 내려받습니다 — 브라우저의 다운로드 폴더(보통 내 PC › 다운로드)에 저장됩니다. 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇ 받기</button>`
               + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="받은 그대로의 빈 원본 양식을 내려받습니다(채운 서류가 아닙니다) — 다운로드 폴더에 저장됩니다">⬇ 원본</button>`:'')}
-          <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
+          ${r.feeFrom&&KC_FEE_SRC.indexOf(r.feeFrom)>=0?`<button class="btn sm" title="비용 서류로 보내진 서류입니다 — 눌러서 원래 보관함(${escapeHtml(FEE_SRC_LABEL[r.feeFrom]||r.feeFrom)})으로 되돌립니다. 되돌리면 다시 옮기지 않습니다" onclick="feeUndoOne('${_jsAttr(r.id)}')">↩ 원래 자리로</button>`:''}<button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
         </div>`+이전; }).join('');
   }).join('');
   const 겹침=dsDupSummary(rows, D);
@@ -10853,19 +11235,29 @@ var _dragSel=null;
    ⚠ 끝낼 때 글자 잡힘 막기(userSelect)도 함께 푼다 — 끌기만 지우고 이것만 남기면 화면 글자가 계속 안 잡힌다. */
 function _dragSelEnd(){
   if(!_dragSel) return;
-  var f=_dragSel.sync; _dragSel=null; document.body.style.userSelect='';
-  try{ f(); }catch(e){}
+  var d=_dragSel; _dragSel=null; document.body.style.userSelect='';
+  /* 다른 칸으로 넘어가 «시작 칸까지 칠한» 끌기면, 시작 칸으로 돌아와 뗄 때 이어지는 click 이 시작 칸을 도로 뒤집지 않게 한 번 삼킨다 */
+  if(d.moved) _dragSelSwallowClick();
+  try{ d.sync(); }catch(e){}
+}
+/* 뗀 직후 «한 번만» 오는 click 을 삼킨다. click 은 뗌과 같은 작업 안에서 바로 오므로 타이머(0)로 거두면 다음 클릭을 잡아먹지 않는다 */
+function _dragSelSwallowClick(){
+  var eat=function(e){ document.removeEventListener('click', eat, true); e.preventDefault(); e.stopPropagation(); };
+  document.addEventListener('click', eat, true);
+  setTimeout(function(){ document.removeEventListener('click', eat, true); }, 0);
 }
 function bindDragSel(box, sync){
   if(!box || box.dataset.dragBound) return;
   box.dataset.dragBound='1';
   box.addEventListener('mousedown', function(e){
+    if(e.button) return;   /* 오른쪽·가운데 단추는 끌어 고르기를 시작하지 않는다 */
     var c=e.target.closest('.row-chk'); if(!c) return;
     /* ★ 누른 «그 자리에서» 세운다 — 전에는 setTimeout(0) 으로 미뤘는데, 누름·뗌이 그보다 먼저 끝나면(터치 탭은 마우스 이벤트를
        한 작업 안에 잇달아 보내고, 자동 클릭도 3ms 만에 끝난다) 뗌이 «아직 없는 끌기»를 지우고 지나간 뒤에야 세워져,
        손을 안 댄 채 ☐ 위를 지나가기만 해도 켜지고 글자 잡힘 막기도 남았다(2026-11-15 재현).
-       이 시점의 checked 는 «누르기 전» 값이다(체크는 뗀 뒤 click 에서 바뀐다) — 사람 손 속도에서 미루던 때와 같은 값이다. */
-    _dragSel={sync:sync, on:c.checked};
+       ★ 칠하는 값은 누른 칸이 «눌린 뒤» 갖게 될 값(!c.checked)이다 — 체크는 뗀 뒤 click 에서 바뀌므로 지금 checked 는 «누르기 전» 값이다.
+       전에는 그 누르기 전 값으로 칠해, 꺼진 칸에서 끌기 시작하면 아무것도 안 켜지고 켜진 칸에서 시작해야 켜졌다(주석의 「켜며 끌면 켜고」와 반대 — 2026-11-15). */
+    _dragSel={sync:sync, on:!c.checked, start:c, moved:false};
     document.body.style.userSelect='none';
   });
   box.addEventListener('mouseover', function(e){
@@ -10873,7 +11265,13 @@ function bindDragSel(box, sync){
     /* 안전장치 — 누른 채가 아닌데 끌기가 남아 있으면(창 밖에서 뗐거나 뗌을 놓쳤을 때) 칠하지 않고 거기서 끝낸다 */
     if(!(e.buttons&1)){ _dragSelEnd(); return; }
     var c=e.target.closest('.row-chk'); if(!c) return;
-    if(c.checked!==_dragSel.on){ c.checked=_dragSel.on; try{ _dragSel.sync(); }catch(err){} }
+    var d=_dragSel;
+    if(c===d.start) return;   /* 시작 칸은 제자리에서 떼면 click 이 바꾸고, 다른 칸으로 넘어가면 아래에서 함께 칠한다 */
+    /* 다른 칸으로 «넘어가는 순간» 시작 칸도 칠한다 — 다른 칸에서 떼면 시작 칸에는 click 이 안 가서 그대로 두면 시작 칸만 빠진다 */
+    var 바뀜=false;
+    if(!d.moved){ d.moved=true; d.start.checked=d.on; 바뀜=true; }
+    if(c.checked!==d.on){ c.checked=d.on; 바뀜=true; }
+    if(바뀜){ try{ d.sync(); }catch(err){} }
   });
 }
 function careerDragSel(name){
@@ -16814,10 +17212,10 @@ function packOpen(){
   packDraw();
   document.getElementById('modalPack').classList.add('open');
 }
-async function _pkPdfText(bytes){
+async function _pkPdfText(bytes, maxPages){
   if(!(await _pdfLoadLib())) return '';
   var doc=await window._pdfjs.getDocument({isEvalSupported:false, data:bytes.slice()}).promise, out=[];
-  for(var i=1;i<=doc.numPages;i++){
+  for(var i=1;i<=(maxPages?Math.min(doc.numPages,maxPages):doc.numPages);i++){   /* maxPages: 앞쪽만 훑을 때(비용 서류 판정) */
     var tc=await (await doc.getPage(i)).getTextContent(), line='', lastY=null;
     tc.items.forEach(function(it){ var y=Math.round(it.transform[5]); if(lastY!==null && Math.abs(y-lastY)>3){ out.push(line); line=''; } line+=it.str; lastY=y; });
     out.push(line);
@@ -17230,7 +17628,7 @@ async function _pkRootForSave(){
   if(!hs.length){ toast('서류 폴더가 연결돼 있지 않아 zip 을 내려받습니다 — 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결'); return null; }
   for(var i=0;i<hs.length;i++){
     if(!await fsEnsureWrite(hs[i])) continue;
-    try{ return { root:hs[i], top:await hs[i].getDirectoryHandle(KcareerCases.CASE_ROOT) }; }catch(e){}
+    try{ return { root:hs[i], top:await _fsDir(hs[i], KcareerCases.CASE_ROOT) }; }catch(e){}
   }
   toast('연결한 폴더에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없거나 쓰기를 허락받지 못해 zip 을 내려받습니다', 6000);
   return null;

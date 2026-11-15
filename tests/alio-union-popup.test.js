@@ -297,6 +297,225 @@ test('⑤ 내장된 공공임단협 데이터(pu-alio-data.js)에 중앙공공�
   assert.ok(Array.isArray(dataMod.unions) && dataMod.unions.length >= 1900, '중앙+지방 노동조합 행이 1,900개 이상이어야 합니다');
   assert.ok(Array.isArray(dataMod.disclosures) && dataMod.disclosures.length >= 4000, '중앙+지방 공시·협약·규정 목록이 4,000건 이상이어야 합니다');
   assert.ok(Array.isArray(dataMod.metrics) && dataMod.metrics.length >= 900, '단체협약 13대 핵심 쟁점 지표가 900건 이상이어야 합니다');
-  assert.ok(Array.isArray(dataMod.articles) && dataMod.articles.length >= 900, '구조화 단협 조문 데이터가 900건 이상이어야 합니다');
-  assert.ok(dataMod.revisions && Object.keys(dataMod.revisions).length >= 300, '과거 임단협 vs 현행 임단협 비교(revisions) 대상 기관이 300곳 이상이어야 합니다');
+  assert.ok(Array.isArray(dataMod.articles) && dataMod.articles.length >= 1400, '구조화 단협 조문 데이터가 1,400건 이상이어야 합니다');
+  const localArts = dataMod.articles.filter((a) => String(a.apba_id || '').startsWith('L_'));
+  assert.ok(localArts.length >= 500, '지방공공기관·유관기관 단협 및 사규 조문이 500개 이상 수록되어야 합니다');
+  assert.ok(dataMod.revisions && Object.keys(dataMod.revisions).length >= 380, '과거 임단협 vs 현행 임단협 비교(revisions) 대상 기관이 380곳 이상이어야 합니다');
 });
+
+test('⑥ 지방공기업평가원(L_ERC) 및 행안부 산하 지방유관기관(KLID·KRILA·KILF·LOFA·POBA) 6곳이 모두 수록되고, openCleaneyeDirect로 클린아이(지방공기업·출자출연기관) POST 직결 및 평가원 원문 연결이 정확히 작동한다', () => {
+  const moisAids = ['L_ERC', 'L_KLID', 'L_KRILA', 'L_KILF', 'L_LOFA', 'L_POBA'];
+  for (const maid of moisAids) {
+    const inst = dataMod.institutions.find((i) => i && i.apba_id === maid);
+    assert.ok(inst, `${maid} 기관이 institutions에 수록되어야 합니다`);
+    const uList = dataMod.unions.filter((u) => u && u.apba_id === maid);
+    assert.ok(uList.length >= 1, `${maid} 노동조합 현황이 unions에 수록되어야 합니다`);
+    const dList = dataMod.disclosures.filter((d) => d && d.aid === maid);
+    assert.ok(dList.length >= 2, `${maid} 공시·협약·규정이 disclosures에 2건 이상 수록되어야 합니다`);
+    assert.ok(dataMod.revisions[maid] && dataMod.revisions[maid].length >= 1, `${maid} 과거↔현행 개정 비교(revisions)가 수록되어야 합니다`);
+    const aList = dataMod.articles.filter((a) => a && a.apba_id === maid);
+    assert.ok(aList.length >= 2, `${maid} 조문 데이터가 articles에 수록되어야 합니다`);
+  }
+
+  let submittedForms = [];
+  let openedUrls = [];
+  let shouldThrowOnSubmit = false;
+  const sandbox = {
+    window: {},
+    PU_ALIO_DATA: dataMod,
+    open: (url, target, specs) => {
+      openedUrls.push({ url, target, specs });
+      return { closed: false, opener: {} };
+    },
+    document: {
+      head: { appendChild: () => {} },
+      body: {
+        appendChild: () => {},
+        removeChild: () => {}
+      },
+      createElement: (tag) => {
+        const children = [];
+        const el = {
+          tagName: String(tag || '').toUpperCase(),
+          method: '',
+          action: '',
+          target: '',
+          style: {},
+          parentNode: null,
+          appendChild: (c) => { children.push(c); },
+          submit: () => {
+            if (shouldThrowOnSubmit) {
+              throw new Error('FORM_SUBMIT_BLOCKED');
+            }
+            submittedForms.push({
+              method: el.method,
+              action: el.action,
+              target: el.target,
+              inputs: Object.fromEntries(children.map((c) => [c.name, c.value]))
+            });
+          }
+        };
+        return el;
+      },
+      getElementById: () => null,
+      addEventListener: () => {}
+    },
+    URL
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+
+  // 1) 지방공기업(광주교통공사 L_2007100231 · 도시철도공사 006001) 클린아이 POST 직결 검증
+  const resEmp = sandbox.PuAlioUnion.openCleaneyeDirect('L_2007100231', 'union_info');
+  assert.equal(resEmp.mode, 'POST');
+  assert.equal(resEmp.url, 'https://www.cleaneye.go.kr/user/empWorkUnionInfo.do');
+  assert.equal(resEmp.fields.entId, '2007100231');
+  assert.equal(resEmp.fields.entKind, '006001');
+  assert.equal(resEmp.fields.itemId, 'workUnionInfo');
+  assert.equal(resEmp.fields.itemNo, '14_2');
+  assert.equal(submittedForms.length, 1);
+  assert.equal(submittedForms[0].action, 'https://www.cleaneye.go.kr/user/empWorkUnionInfo.do');
+  assert.equal(submittedForms[0].inputs.entId, '2007100231');
+
+  // 2) 지방출자·출연기관(L_B000013) 클린아이 POST 직결 검증 (내부규정·정관 rules 포함)
+  const resIpt = sandbox.PuAlioUnion.openCleaneyeDirect('L_B000013', 'union_info');
+  assert.equal(resIpt.mode, 'POST');
+  assert.equal(resIpt.url, 'https://www.cleaneye.go.kr/user/iptUnionCnvt.do');
+  assert.equal(resIpt.fields.entId, 'B000013');
+  assert.equal(resIpt.fields.itemId, 'iptUnionCnvt');
+  assert.equal(resIpt.fields.itemNo, '90_25');
+
+  const resIptRules = sandbox.PuAlioUnion.openCleaneyeDirect('L_B000013', 'rules');
+  assert.equal(resIptRules.mode, 'POST');
+  assert.equal(resIptRules.url, 'https://www.cleaneye.go.kr/user/iptSuOrdinance.do');
+  assert.equal(resIptRules.fields.itemNo, '90_40');
+
+  // 3) 지방공기업평가원(L_ERC), 한국지역정보개발원(L_KLID), 대한지방행정공제회(L_POBA) 세부 공시 URL 연결 검증
+  const resErc = sandbox.PuAlioUnion.openCleaneyeDirect('L_ERC', 'manual');
+  assert.equal(resErc.mode, 'URL');
+  assert.match(resErc.url, /erc\.re\.kr.*BBSMSTR_000000000571/);
+  const resKlid = sandbox.PuAlioUnion.openCleaneyeDirect('L_KLID', 'union_info');
+  assert.equal(resKlid.mode, 'URL');
+  assert.match(resKlid.url, /klid\.or\.kr.*workjoin_disc_s2/);
+  const resPobaLabor = sandbox.PuAlioUnion.openCleaneyeDirect('L_POBA', 'union_info');
+  assert.equal(resPobaLabor.mode, 'URL');
+  assert.match(resPobaLabor.url, /poba\.or\.kr\/mno\/mno01\/mno0102\/mno010201#tab1-9/);
+  const resPobaRules = sandbox.PuAlioUnion.openCleaneyeDirect('L_POBA', 'rules');
+  assert.equal(resPobaRules.mode, 'URL');
+  assert.match(resPobaRules.url, /poba\.or\.kr\/mno\/mno01\/mno0106\/mno010601/);
+
+  // 4) 잘못된 기관코드 또는 빈 값 전달 시 ERROR 반환 및 창 미오픈 검증, form.submit 예외 시 ERROR 반환 검증
+  const urlCountBeforeErr = openedUrls.length;
+  const formCountBeforeErr = submittedForms.length;
+  const resEmpty = sandbox.PuAlioUnion.openCleaneyeDirect('', 'union_info');
+  assert.equal(resEmpty.mode, 'ERROR');
+  const resInvalid = sandbox.PuAlioUnion.openCleaneyeDirect('UNKNOWN_INVALID_ID', 'union_info');
+  assert.equal(resInvalid.mode, 'ERROR');
+  assert.equal(openedUrls.length, urlCountBeforeErr);
+  assert.equal(submittedForms.length, formCountBeforeErr);
+
+  shouldThrowOnSubmit = true;
+  const resSubmitFail = sandbox.PuAlioUnion.openCleaneyeDirect('L_2007100231', 'union_info');
+  assert.equal(resSubmitFail.mode, 'ERROR');
+  assert.match(resSubmitFail.error, /FORM_SUBMIT_BLOCKED/);
+  shouldThrowOnSubmit = false;
+
+  // 5) L_ERC 타임라인에서 경영평가편람·인사조직지침이 RULE 분류로 정확히 매핑되는지 검증
+  const ercTl = sandbox.PuAlioUnion.buildOrganTimeline(dataMod, 'L_ERC');
+  const manualTl = ercTl.find((t) => t.id === 'ERC_DISC_MANUAL_2026');
+  const guideTl = ercTl.find((t) => t.id === 'ERC_DISC_GUIDELINE_2026');
+  assert.ok(manualTl && manualTl.catGroup === 'RULE', '경영평가편람이 RULE 분류로 매핑되어야 합니다');
+  assert.ok(guideTl && guideTl.catGroup === 'RULE', '인사조직지침이 RULE 분류로 매핑되어야 합니다');
+
+  // 6) safeHttpUrl 도메인 허용 검증 (erc.re.kr, klid.or.kr, krila.re.kr, kilf.re.kr, lofa.or.kr, poba.or.kr)
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.erc.re.kr/usr/com/prm/ContentView.do?cId=1'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.klid.or.kr/open/bbsDisc.do?PID=workjoin_disc_s2'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.krila.re.kr/disclosure/labor.php'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.kilf.re.kr/cmm/fms/FileDown.do?atchFileId=1'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.lofa.or.kr/subList/20000000223'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.poba.or.kr/mno/mno01/mno0102/mno010201#tab1-9'));
+});
+
+test('⑦ 기관 중심 마스터 인덱스(1기관=1통합뷰), 기관 내부 6대 핵심 영역 집계, 법정 타임오프 한도 계산 및 SVG 비교 그래프(레이더·산점도)가 정확히 동작한다', () => {
+  const sandbox = {
+    window: {},
+    PU_ALIO_DATA: dataMod,
+    document: { addEventListener: () => {}, getElementById: () => null, head: { appendChild: () => {} } },
+    URL
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+
+  // 1) 노조법 제24조 근로시간면제 법정 한도 계산 검증
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(0), 0);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(50), 2000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(150), 3000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(500), 6000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(3200), 14000);
+
+  // 2) 기관 중심 마스터 인덱스(buildOrganMasterIndex) 중복 없는 1기관=1레코드 통합 검증
+  const master = sandbox.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  assert.equal(master.records.length, dataMod.institutions.length, '전체 기관이 중복 없이 정확히 1기관=1통합레코드로 생성되어야 합니다');
+  const seenIds = new Set();
+  for (const r of master.records) {
+    assert.equal(seenIds.has(r.aid), false, `기관코드 ${r.aid}가 마스터 목록에 중복되면 안 됩니다`);
+    seenIds.add(r.aid);
+    assert.equal(r.radar.length, 6, `${r.aid}의 6축 프로파일 점수가 6개여야 합니다`);
+    assert.equal(Object.keys(r.issueScores).length, 13, `${r.aid}의 13대 핵심 쟁점 표준화 점수가 모두 산출되어야 합니다`);
+  }
+
+  // 복수노조 기관(예: 우체국물류지원단)이 여러 줄로 쪼개지지 않고 1개 기관 아래 복수 노조 배열로 묶였는지 검증
+  const multiOrgan = master.records.find((r) => r.name.includes('우체국물류지원단'));
+  assert.ok(multiOrgan, '우체국물류지원단이 마스터 인덱스에 존재해야 합니다');
+  assert.equal(multiOrgan.isMulti, true, '우체국물류지원단은 복수노조 기관으로 분류되어야 합니다');
+  assert.ok(multiOrgan.unions.length >= 4, '우체국물류지원단 산하 복수 단위노조들이 하나의 기관 레코드 안에 통합되어야 합니다');
+  assert.ok(multiOrgan.memberTotal >= 3000, '산하 복수노조 조합원 수가 기관 단위로 합산되어야 합니다');
+
+  // 지방공기업평가원(L_ERC) 및 강원랜드(C0005)의 내부 6대 핵심 영역 데이터 보유 검증
+  const c0005 = master.byId.C0005;
+  assert.ok(c0005 && c0005.hasUnion, 'C0005(강원랜드) 마스터 레코드가 존재해야 합니다');
+  assert.ok(c0005.domains.caDiscs.length >= 1, 'C0005 단체협약 영역 문서가 집계되어야 합니다');
+  assert.ok(c0005.domains.revisions.length >= 1, 'C0005 과거↔현행 개정 비교 데이터가 집계되어야 합니다');
+
+  const erc = master.byId.L_ERC;
+  assert.ok(erc && erc.hasUnion, 'L_ERC(지방공기업평가원) 마스터 레코드가 존재해야 합니다');
+  assert.ok(erc.domains.ruleDiscs.length >= 2, 'L_ERC 내부규정·경영평가편람 영역 문서가 집계되어야 합니다');
+
+  // 3) 업종별·전체 평균 벤치마크 및 순수 SVG 비교 차트 생성 검증
+  assert.ok(master.benchmarks && master.benchmarks.ALL && master.benchmarks.ALL.radar.length === 6);
+  const cmpSample = [c0005, multiOrgan, erc];
+  const radarHtml = sandbox.PuAlioUnion.renderRadarChartSvg(cmpSample, master.benchmarks.ALL);
+  assert.match(radarHtml, /<svg[^>]*aria-label="기관 6축 프로파일 레이더 비교 그래프"/);
+  assert.match(radarHtml, /강원랜드/);
+  assert.match(radarHtml, /지방공기업평가원/);
+
+  const scatterHtml = sandbox.PuAlioUnion.renderScatterTimeoffSvg(master.records.slice(0, 80), cmpSample);
+  assert.match(scatterHtml, /<svg[^>]*aria-label="조합원 규모 대비 타임오프 산점도 및 법정한도선"/);
+  assert.match(scatterHtml, /노조법 법정상한/);
+
+  // 4) 빈 배열(institutions: []) 데이터에서도 buildOrganMasterIndex가 예외 없이 동작하는지 검증
+  const emptyMaster = sandbox.PuAlioUnion.buildOrganMasterIndex({ institutions: [], unions: [], disclosures: [], metrics: [], articles: [], revisions: {} });
+  assert.equal(emptyMaster.records.length, 0);
+  assert.equal(emptyMaster.benchmarks.ALL.radar.length, 6);
+});
+
+test('⑧ 상단 헤더·탭 중복 제거(4개 핵심 탭 + 우측 API 유틸 탭), 탭 2 3×2 격자 및 서브탭 전환, 조문·원문 통합 토글(docMode), 입력창 플레이스홀더 간결화가 적용되어 있다', () => {
+  assert.match(uiSrc, /data-tab="unions"[^>]*>🏛️ 기관 목록<\/button>/);
+  assert.match(uiSrc, /data-tab="organ"[^>]*>🔎 기관 상세<\/button>/);
+  assert.match(uiSrc, /data-tab="matrix"[^>]*>📊 비교분석<\/button>/);
+  assert.match(uiSrc, /data-tab="articles"[^>]*>📚 조문·원문<\/button>/);
+  assert.match(uiSrc, /class="pau-tab util[^"]*"[^>]*data-tab="apihub"[^>]*>🔌 API<\/button>/);
+  assert.doesNotMatch(uiSrc, /data-tab="detail"/, '기존 5번 원문 탭은 4번 조문·원문 탭 내부 토글(docMode)로 통합되어야 합니다');
+
+  // 탭 2 5+1 고립 카드를 막기 위해 데스크톱 3열 고정 격자가 선언되어 있는지 검증
+  assert.match(uiSrc, /\.pau-dom-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(uiSrc, /\.pau-root input::placeholder\{font-size:13px/);
+  assert.doesNotMatch(uiSrc, /기관명·시도·부처 빠른 검색\.\.\./, '잘림을 유발하던 긴 검색창 플레이스홀더가 제거되어야 합니다');
+  assert.match(uiSrc, /data-doc-mode="ARTICLES"/);
+  assert.match(uiSrc, /data-doc-mode="DISC"/);
+  assert.match(uiSrc, /data-h-sub="HISTORY"/);
+  assert.match(uiSrc, /data-h-sub="PEERS"/);
+  assert.match(uiSrc, /data-h-sub="CHART"/);
+});
+
+
