@@ -1,4 +1,4 @@
-상태: 완료(코드) · 함수 배포 대기
+상태: 완료(코드·배포) · 수집 길 결정 대기
 이어하기시도: 0
 작업폴더: C:\Users\user\Desktop\github\pureunall-wt-newslaw
 가지: fix/news-watch-lawgo
@@ -29,6 +29,10 @@
   안 한 것 — watch 열쇠를 4개만 읽는 경계(서버와 같은 잣대, 지금 구조에선 문제없음) · homepage/newsPrec/탈 을 직원도 쓸 수 있는 규칙(출력은 모두 씻김, 규칙 좁히기는 따로).
 
 ## 남은 일
-- 함수 배포(대표 승인 필요): newsFullPage · newsFull(받는 분 「전문 보기」) · newsletterWatchSunday · weeklyNewsletterPrepare · weeklyNewsletterSend · dailyDocsCollect · newsDocsPull · dailyRegionalNewsCollect.
+- ~~함수 배포~~ → 끝남(2026-11-15 대표 「합쳐지면 배포」, 「Firebase 배포」 작업 2회):
+  newsFullPage · newsFull · newsView · newsletterWatchSunday · newsletterSundayRefill · weeklyNewsletterPrepare · dailyDocsCollect · newsDocsPull.
+  처음 목록의 weeklyNewsletterSend(바뀐 동작 없음 — 06시 발송 직전이라 뺌)·dailyRegionalNewsCollect(이번 변경을 안 씀)는 뺐고, newsView·newsletterSundayRefill 을 넣었다.
+  ⚠ 첫 실행이 weeklyNewsletterPrepare·newsletterSundayRefill 을 못 올리고도 «성공»으로 끝났다(gcloud 갱신 시각으로 발견) — 그 둘만 다시 돌려 올림.
+  확인: 내일 편지의 「전문 보기」 셋이 news.fairrunlabor.com → 302 → 국가법령정보센터 공개 쪽(200, 판례 본문)으로 열림.
 - 판례를 다시 모으려면 결정이 필요하다 — 법제처 OPEN API 열쇠를 새로 받아 서버 IP 를 등록(클라우드 함수는 나가는 IP 가 고정이 아니라 고정 IP 장치가 필요) 하거나, 열쇠 없이 열리는 국가법령정보센터 공개 쪽을 읽는 길로 바꾸기. STATUS.md 「2. 지금 손이 필요한 것」.
 - AI 교정이 쓰는 법제처 원문 조문 읽기(`functions/index.js` 같은 OC=test)도 같은 까닭으로 막혀 있다 — 위 결정에 함께 딸린다.

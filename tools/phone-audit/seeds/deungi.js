@@ -45,11 +45,15 @@ const ar1 = Object.assign(meta('ARtest2019a', 'DeungiArchive'), {
 });
 const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-12 정관변경(점검)', at: '2017-12-06', summary: '', files: {} });
 
+/* 앞 화면(자세히·지난 기록·덮는 칸)이 남긴 것을 치우고 «등기 건 탭 · 쉬운 진행»에서 시작 */
+const toEasy = async (p) => { await p.evaluate(() => window.sideClose && window.sideClose()); await p.click('#tabs button[data-tab=case]'); await p.waitForTimeout(300); const r = await p.$('#caseList tr[data-open]'); if (r && !(await p.$('#editor .card'))) { await r.click(); await p.waitForTimeout(600); } const e = await p.$('[data-act=mode][data-m=easy]'); if (e) { await e.click(); await p.waitForTimeout(500); } };
+
 module.exports = {
   data: { deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } } },
   localStorage: { pu_deungi_tab: 'case', pu_deungi_cur: c1.id },
   views: [
     { name: 'easy1', run: async (p) => { await p.click('#wizSteps [data-s="1"]'); } },
+    { name: 'easy2', run: async (p) => { await p.click('#wizSteps [data-s="2"]'); await p.waitForTimeout(1500); } },
     { name: 'easy3', run: async (p) => { await p.click('#wizSteps [data-s="3"]'); } },
     { name: 'easy4', run: async (p) => { await p.click('#wizSteps [data-s="4"]'); } },
     { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
@@ -57,5 +61,63 @@ module.exports = {
     { name: 'hist', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); } },
     /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
     { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } },
+    /* 새 서류 보기 칸 — ② 에서 저절로 열림 · 이전/다음 · 줄 누르기 · 새 서류↔지난 원본 · ①에서 고치면 다시 그림 · Esc 뒤엔 저절로 다시 열지 않음 · 건을 닫으면 칸도 닫힘.
+       어긋나면 throw → 결과 json 의 navErr 에 나온다 */
+    { name: 'docflow', wait: 800, run: async (p) => {
+      if (p.viewportSize().width < 1080) return;   /* 좁은 화면은 저절로 열리지 않는다 — docside 로 본다 */
+      await toEasy(p);
+      await p.evaluate(() => { const c = window.CASES[window.CUR]; if (c) { c.docsOff = {}; window.drawEasy(); } });   /* 앞의 «docs» 화면이 끈 서류를 다시 켠다 */
+      const w = (ms) => p.waitForTimeout(ms);
+      const must = (ok, why) => { if (!ok) throw new Error('docflow: ' + why); };
+      const snap = () => p.evaluate(() => ({ k: window.SIDE && window.SIDE.kind, key: window.SIDE && window.SIDE.key, pos: (document.getElementById('sdPos') || {}).textContent, cv: document.querySelectorAll('#spv canvas').length, cur: (document.querySelector('#editor tr.cur') || {}).dataset ? document.querySelector('#editor tr.cur').dataset.dockey : '', h: window.PV_BYTES ? window.PV_BYTES.u8.reduce((a, b) => (a * 31 + b) | 0, 0) : 0 }));
+      await p.click('#wizSteps [data-s="2"]'); await w(2500);
+      let s1 = await snap();
+      const at = (x) => Number(String(x.pos).split(' / ')[0]);   /* 앞 화면에서 보던 서류를 기억하므로 «몇 번째»는 정해져 있지 않다 */
+      must(s1.k === 'doc' && /^\d+ \/ \d+$/.test(s1.pos) && s1.cv > 0 && s1.cur === s1.key, '② 에서 서류가 저절로 열려야 함 ' + JSON.stringify(s1));
+      await p.click('#sdNext'); await w(1500);
+      let s2 = await snap();
+      must(s2.k === 'doc' && s2.key !== s1.key && at(s2) === at(s1) + 1 && s2.cur === s2.key && s2.cv > 0, '다음 ▶ ' + JSON.stringify(s2));
+      const k3 = await p.evaluate(() => document.querySelectorAll('#editor tr[data-dockey] button.lnk')[2].closest('tr').dataset.dockey);
+      await p.click('#editor tr[data-dockey]:nth-child(3) button.lnk'); await w(1500);
+      let s3 = await snap();
+      must(s3.key === k3 && s3.cur === k3 && /^3 \/ \d+$/.test(s3.pos), '줄 누르기 ' + JSON.stringify(s3));
+      await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); });
+      await p.click('#sdSrcArc'); await w(1200);
+      let s4 = await snap();
+      must(s4.k === 'arc' && /^\d \/ 4$/.test(s4.pos), '지난 원본으로 바꾸기 ' + JSON.stringify(s4));
+      await p.click('#sdSrcDoc'); await w(1800);
+      let s5 = await snap();
+      must(s5.k === 'doc' && s5.key === k3, '새 서류로 돌아오면 보던 서류 ' + JSON.stringify(s5));
+      /* 주민번호 뒷자리 — 넣으면 칸의 서류가 바뀌고, «모두 지우기» 뒤에는 옛 번호가 남지 않는다(보안 검토 2026-11-15) */
+      await p.evaluate(() => window.docView('roster', true)); await w(1800);
+      const r0 = await snap();
+      await p.click('#wizBody [data-act=rrn]'); await w(400);
+      await p.evaluate(() => { document.querySelectorAll('[data-rrn]').forEach((i) => { i.value = '1234567'; }); });
+      await p.click('[data-act=rrnOk]'); await w(1800);
+      const r1 = await snap();
+      must(r1.k === 'doc' && r1.key === 'roster' && r1.h !== r0.h, '주민번호를 넣으면 칸의 서류가 바뀌어야 함 ' + JSON.stringify({ r0, r1 }));
+      await p.click('#wizBody [data-act=rrn]'); await w(400);
+      await p.click('[data-act=rrnClear]'); await w(1800);
+      await p.click('#modal [data-act=closeModal]'); await w(500);
+      const r2 = await snap();
+      must(r2.h === r0.h, '모두 지우기 뒤에는 옛 번호가 칸에 남지 않아야 함 ' + JSON.stringify({ r0, r2 }));
+      await p.evaluate(() => window.docView('minutes', true)); await w(1800);
+      const before = await snap();
+      await p.click('#wizSteps [data-s="1"]'); await w(800);
+      await p.fill('#wizBody [data-k="meeting.place"]', '점검장소 바꿈'); await w(1800);
+      const after = await snap();
+      must(after.k === 'doc' && after.key === 'minutes' && after.h !== before.h && after.cv > 0, '① 에서 고치면 칸의 서류가 다시 그려져야 함 ' + JSON.stringify({ before, after }));
+      await p.click('#wizSteps [data-s="2"]'); await w(1500);
+      await p.keyboard.press('Escape'); await w(500);
+      must(await p.evaluate(() => !window.SIDE && !document.querySelector('#side.on')), 'Esc 로 닫혀야 함');
+      await p.click('#wizSteps [data-s="3"]'); await w(500); await p.click('#wizSteps [data-s="2"]'); await w(2000);
+      must(await p.evaluate(() => !window.SIDE), '사용자가 닫은 뒤에는 저절로 다시 열지 않아야 함');
+      await p.click('#editor tr[data-dockey] button.lnk'); await w(1500);
+      must(await p.evaluate(() => !!window.SIDE && window.SIDE.kind === 'doc'), '줄을 누르면 다시 열려야 함');
+      await p.click('[data-act=closeCase]'); await w(800);
+      must(await p.evaluate(() => !window.SIDE && !document.querySelector('#side.on')), '건을 닫으면 칸도 닫혀야 함');
+    } },
+    /* 새 서류 보기 칸(폰에서는 전체를 덮는 창) — 줄을 눌러 연다 */
+    { name: 'docside', wait: 2500, run: async (p) => { await toEasy(p); await p.click('#wizSteps [data-s="2"]'); await p.waitForTimeout(800); await p.click('#editor tr[data-dockey] button.lnk'); } },
   ],
 };
