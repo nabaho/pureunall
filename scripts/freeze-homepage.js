@@ -139,8 +139,12 @@ function 자산주소들(글, 기준) {
           || u.startsWith('tel:') || u.startsWith('javascript:')) return;
       let abs;
       try { abs = new URL(u, 기준).href; } catch (e) { return; }
-      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다 */
-      if (abs.indexOf(ORIGIN) !== 0 && abs.indexOf(ORIGIN_HANGUL) !== 0) return;
+      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다.
+         ★ 앞글자 비교가 아니라 «출처가 정확히 같은가»로 본다(2026-11-16 보안 검토 중간) —
+           `https://xn--…kr.evil.example/…` 처럼 앞이 같은 남의 주소가 끼어들지 못하게. */
+      let 출처 = '';
+      try { 출처 = new URL(abs).origin; } catch (e) { return; }
+      if (출처 !== new URL(ORIGIN).origin) return;
       if (/[?&]act=|[?&]mid=/.test(abs)) return;          // 쪽 주소는 자산이 아니다
       out.add(abs.split('#')[0]);
     });
@@ -160,10 +164,18 @@ function 자산경로(abs) {
   return p;
 }
 
+/* ★ 출력 폴더(OUT) 밖으로는 절대 안 쓴다(2026-11-16 보안 검토 중간) — 자산 주소를 풀면(%2e%2e%2f)
+     `../` 가 되어 저장소의 코드·설정을 덮을 수 있었다. 풀린 자리가 OUT 안이 아니면 건너뛴다. */
 function 담기(파일, buf) {
-  const 자리 = path.join(OUT, 파일);
+  const 자리 = path.resolve(OUT, 파일);
+  const 상대 = path.relative(OUT, 자리);
+  if (!상대 || 상대.split(path.sep)[0] === '..' || path.isAbsolute(상대)) {
+    console.warn('■ 건너뜀 — 출력 폴더 밖 자리: ' + 파일);
+    return false;
+  }
   fs.mkdirSync(path.dirname(자리), { recursive: true });
   fs.writeFileSync(자리, buf);
+  return true;
 }
 
 /* ── 쪽 글자 고치기 ── */
