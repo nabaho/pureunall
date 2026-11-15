@@ -499,3 +499,23 @@ test('⑦ 기관 중심 마스터 인덱스(1기관=1통합뷰), 기관 내부 6
   assert.equal(emptyMaster.benchmarks.ALL.radar.length, 6);
 });
 
+test('⑧ 상단 헤더·탭 중복 제거(4개 핵심 탭 + 우측 API 유틸 탭), 탭 2 3×2 격자 및 서브탭 전환, 조문·원문 통합 토글(docMode), 입력창 플레이스홀더 간결화가 적용되어 있다', () => {
+  assert.match(uiSrc, /data-tab="unions"[^>]*>🏛️ 기관 목록<\/button>/);
+  assert.match(uiSrc, /data-tab="organ"[^>]*>🔎 기관 상세<\/button>/);
+  assert.match(uiSrc, /data-tab="matrix"[^>]*>📊 비교분석<\/button>/);
+  assert.match(uiSrc, /data-tab="articles"[^>]*>📚 조문·원문<\/button>/);
+  assert.match(uiSrc, /class="pau-tab util[^"]*"[^>]*data-tab="apihub"[^>]*>🔌 API<\/button>/);
+  assert.doesNotMatch(uiSrc, /data-tab="detail"/, '기존 5번 원문 탭은 4번 조문·원문 탭 내부 토글(docMode)로 통합되어야 합니다');
+
+  // 탭 2 5+1 고립 카드를 막기 위해 데스크톱 3열 고정 격자가 선언되어 있는지 검증
+  assert.match(uiSrc, /\.pau-dom-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(uiSrc, /\.pau-root input::placeholder\{font-size:13px/);
+  assert.doesNotMatch(uiSrc, /기관명·시도·부처 빠른 검색\.\.\./, '잘림을 유발하던 긴 검색창 플레이스홀더가 제거되어야 합니다');
+  assert.match(uiSrc, /data-doc-mode="ARTICLES"/);
+  assert.match(uiSrc, /data-doc-mode="DISC"/);
+  assert.match(uiSrc, /data-h-sub="HISTORY"/);
+  assert.match(uiSrc, /data-h-sub="PEERS"/);
+  assert.match(uiSrc, /data-h-sub="CHART"/);
+});
+
+

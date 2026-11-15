@@ -156,7 +156,8 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function safeHttpUrl(rawUrl) {
@@ -1535,7 +1536,7 @@
   }
 
   // ── ⑤ 기관 내부 6대 핵심 영역 한눈에 보기 보드 렌더러 (인라인 펼침 & 탭 2 공용) ──
-  function renderOrganSixDomainsBoard(rec, isCompact, inCompareTray) {
+  function renderOrganSixDomainsBoard(rec, isCompact, inCompareTray, sectorBench) {
     var dom = rec.domains;
     var aid = rec.aid;
     var isLoc = rec.isLocal;
@@ -1543,7 +1544,6 @@
     var postAttrBase = (isLoc && !isMois) ? (' data-cleaneye-post="' + esc(aid) + '"') : '';
 
     var latestCa = dom.caDiscs[0] || null;
-    var latestWage = dom.wageDiscs[0] || null;
     var latestSep = dom.sepDiscs[0] || null;
     var latestRule = dom.ruleDiscs[0] || null;
     var latestRev = dom.revisions[0] || null;
@@ -1562,6 +1562,7 @@
     var ruleOpenUrl = safeHttpUrl(buildOrganUrl(rec.inst, latestRule && latestRule.dno, 'rules'));
     var unionOpenUrl = safeHttpUrl(buildOrganUrl(rec.inst, latestCa && latestCa.dno, 'union_info'));
     var welfareOpenUrl = safeHttpUrl(buildOrganUrl(rec.inst, '', 'welfare'));
+    var avgScoreTxt = sectorBench ? (' (업종평균 ' + sectorBench.totalScore + '점)') : '';
 
     return [
       '<div class="pau-dom-board">',
@@ -1571,13 +1572,22 @@
       '      <span class="pau-pill">' + esc(rec.sectorLabel) + '</span>',
       '      <b style="font-size:14px;">' + esc(rec.name) + '</b>',
       '      <span style="font-size:12px;color:var(--pau-muted);">(' + esc(rec.ministry + ' · ' + rec.inst_type) + ')</span>',
-      '      <span class="pau-pill ok">종합 프로파일 ' + rec.totalScore + '점</span>',
       '    </div>',
-      '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-      '      <button type="button" class="pau-act-btn' + (inCompareTray ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCompareTray ? '✓ 비교함에 담김' : '➕ 비교함에 담기') + '</button>',
-      (isCompact ? '      <button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔎 세부비교·연혁·그래프 전체보기</button>' : '      <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 유사기관과 그래프·표 직접비교</button>'),
-      '      <button type="button" class="pau-act-btn" data-jump-organ="' + esc(aid) + '">↗ 별개 독립 창 열기</button>',
-      '    </div>',
+      (isCompact ? [
+        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+        '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점</span>',
+        '      <button type="button" class="pau-act-btn' + (inCompareTray ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCompareTray ? '✓ 비교담김' : '+ 비교담기') + '</button>',
+        '      <button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔎 기관 상세</button>',
+        '      <button type="button" class="pau-act-btn" data-jump-organ="' + esc(aid) + '">↗ 독립 창</button>',
+        '    </div>'
+      ].join('') : [
+        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;">',
+        '      <span class="pau-pill">노조 ' + fmtNum(rec.unionCount) + '개 · 조합원 ' + fmtNum(rec.memberTotal) + '명</span>',
+        '      <span class="pau-pill fktu">조직률 ' + fmtPct(rec.orgRate) + '</span>',
+        '      <span class="pau-pill multi">타임오프 ' + fmtNum(rec.timeoffHours) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')</span>',
+        '      <span class="pau-pill ok">종합 ' + rec.totalScore + '점' + esc(avgScoreTxt) + '</span>',
+        '    </div>'
+      ].join('')),
       '  </div>',
 
       '  <div class="pau-dom-grid">',
@@ -1676,7 +1686,7 @@
         '      </div>'
       ].join('') : '<div class="pau-dom-empty">연도별 공시 문서(' + fmtNum(rec.discTotal) + '건)를 기반으로 과거 시점(A)과 현행 시점(B)의 체결 내역을 직접 대조할 수 있습니다.</div>'),
       '      <div class="pau-dom-foot">',
-      (isCompact ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔄 과거↔현행 조문대비표 열기</button>' : '<span style="font-size:11.5px;color:var(--pau-pri);font-weight:700;">⬇ 아래 섹션 ③에서 전체 신·구 조문 대비표 확인</span>'),
+      (isCompact ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(aid) + '">🔄 과거↔현행 조문대비표 열기</button>' : '<button type="button" class="pau-act-btn" data-h-sub="HISTORY" data-scroll-sub="1">🔄 하단 연혁·신구대비 보기</button>'),
       '      </div>',
       '    </div>',
       '  </div>',
@@ -1777,30 +1787,38 @@
       '.pau-lnk:hover,.pau-lnk:focus-visible{text-decoration:underline;outline:2px solid var(--pau-pri);outline-offset:1px;}',
       '.pau-sec-card{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;padding:10px 12px;margin-bottom:10px;}',
       '.pau-sec-tit{font-size:13.5px;font-weight:800;color:var(--pau-txt);margin:0 0 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}',
-      '.pau-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#ffffff;flex-wrap:wrap;flex-shrink:0;}',
-      '.pau-hdr-ico{font-size:20px;line-height:1;}',
-      '.pau-hdr-tit{font-size:15px;font-weight:800;letter-spacing:-.3px;margin-right:4px;word-break:keep-all;}',
-      '.pau-hdr-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
-      '.pau-badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);color:#f8fafc;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;}',
-      '.pau-badge.ok{background:rgba(22,163,74,.35);border-color:rgba(74,222,128,.55);color:#f0fdf4;}',
-      '.pau-hdr-r{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
-      '.pau-who-slot{display:inline-flex;align-items:center;background:#f8fafc;color:#0f172a;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #cbd5e1;min-height:26px;}',
+      '.pau-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#ffffff;flex-wrap:nowrap;flex-shrink:0;}',
+      '.pau-hdr-ico{font-size:18px;line-height:1;flex-shrink:0;}',
+      '.pau-hdr-tit{font-size:15px;font-weight:800;letter-spacing:-.3px;margin-right:2px;white-space:nowrap;flex-shrink:0;}',
+      '.pau-hdr-badges{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;}',
+      '.pau-badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);color:#f8fafc;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-badge.ok{background:rgba(22,163,74,.32);border-color:rgba(74,222,128,.5);color:#f0fdf4;}',
+      '.pau-hdr-r{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;}',
+      '.pau-who-slot{display:inline-flex;align-items:center;background:#f8fafc;color:#0f172a;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #cbd5e1;min-height:26px;white-space:nowrap;}',
       '.pau-who-slot:empty{display:none;}',
-      '.pau-btn{cursor:pointer;border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.14);color:#ffffff;padding:5px 10px;min-height:28px;border-radius:8px;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}',
+      '.pau-btn{cursor:pointer;border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.14);color:#ffffff;padding:4px 9px;min-height:28px;border-radius:7px;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}',
       '.pau-btn:hover,.pau-btn:focus-visible{background:rgba(255,255,255,.24);outline:2px solid #93c5fd;outline-offset:1px;}',
       '.pau-btn.pri{background:#2563eb;border-color:#60a5fa;color:#ffffff;}',
       '.pau-btn.pri:hover{background:#1d4ed8;}',
-      '.pau-tabs{display:flex;align-items:center;gap:4px;padding:6px 10px 0;background:var(--pau-card);border-bottom:1px solid var(--pau-bd-lt);flex-shrink:0;overflow-x:auto;}',
-      '.pau-tab{cursor:pointer;border:1px solid transparent;border-bottom:2px solid transparent;background:transparent;color:var(--pau-muted);padding:7px 11px;min-height:32px;font-size:12.5px;font-weight:700;border-radius:8px 8px 0 0;white-space:nowrap;}',
+      '.pau-tabs{display:flex;align-items:center;gap:4px;padding:4px 10px 0;background:var(--pau-card);border-bottom:1px solid var(--pau-bd-lt);flex-shrink:0;overflow-x:auto;}',
+      '.pau-tab{cursor:pointer;border:1px solid transparent;border-bottom:2px solid transparent;background:transparent;color:var(--pau-muted);padding:6px 12px;min-height:32px;font-size:13px;font-weight:700;border-radius:8px 8px 0 0;white-space:nowrap;}',
       '.pau-tab:hover,.pau-tab:focus-visible{color:var(--pau-txt);background:var(--pau-th);outline:2px solid #2563eb;outline-offset:-2px;}',
       '.pau-tab.on{color:var(--pau-pri);border-bottom-color:#2563eb;background:var(--pau-pri-bg);}',
-      '.pau-cmp-tray{display:none;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:#eff6ff;border-bottom:1px solid #93c5fd;flex-shrink:0;flex-wrap:wrap;}',
+      '.pau-tab.util{margin-left:auto;font-size:12px;}',
+      '.pau-cmp-tray{display:none;align-items:center;justify-content:space-between;gap:8px;padding:5px 12px;background:#eff6ff;border-bottom:1px solid #93c5fd;flex-shrink:0;flex-wrap:wrap;}',
       '.pau-cmp-tray.on{display:flex;}',
       '.pau-root[data-theme="dark"] .pau-cmp-tray,body.dark .pau-root .pau-cmp-tray{background:#172554;border-bottom-color:#3b82f6;}',
       '.pau-body{flex:1;min-height:0;overflow-y:auto;padding:8px 10px 18px;}',
-      '.pau-flt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;margin-bottom:8px;}',
-      '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root select,.pau-root input[type=search],.pau-root input[type=text],.pau-root input[type=password]{height:34px;min-height:34px;max-width:100%;border:1px solid var(--pau-bd);border-radius:7px;padding:0 8px;background:var(--pau-card);color:var(--pau-txt);font-size:16px;}',
-      '.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{min-width:160px;flex:1;max-width:300px;}',
+      '.pau-flt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:9px;margin-bottom:6px;}',
+      '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root select,.pau-root input[type=search],.pau-root input[type=text],.pau-root input[type=password]{height:33px;min-height:33px;max-width:100%;border:1px solid var(--pau-bd);border-radius:7px;padding:0 8px;background:var(--pau-card);color:var(--pau-txt);font-size:16px;}',
+      '.pau-root input::placeholder{font-size:13px;color:var(--pau-muted);}',
+      '.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password]{min-width:180px;flex:1;max-width:340px;}',
+      '.pau-subbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 6px;font-size:12px;color:var(--pau-sub);flex-wrap:wrap;}',
+      '.pau-seg{display:inline-flex;align-items:center;background:var(--pau-th);border:1px solid var(--pau-bd);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap;}',
+      '.pau-seg-btn{cursor:pointer;border:none;background:transparent;color:var(--pau-muted);padding:4px 10px;min-height:26px;border-radius:6px;font-size:12px;font-weight:700;white-space:nowrap;}',
+      '.pau-seg-btn:hover,.pau-seg-btn:focus-visible{color:var(--pau-txt);outline:2px solid #2563eb;outline-offset:-1px;}',
+      '.pau-seg-btn.on{background:#2563eb;color:#ffffff;}',
+      '.pau-seg-btn.on:hover,.pau-seg-btn.on:focus-visible{color:#ffffff;outline:2px solid #93c5fd;outline-offset:-1px;}',
       '.pau-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px;}',
       '.pau-kpis-6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:8px;}',
       '.pau-kpi{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;white-space:nowrap;overflow:hidden;}',
@@ -1809,7 +1827,7 @@
       '.pau-bulk{display:none;align-items:center;gap:8px;padding:6px 10px;background:var(--pau-pri-bg);border:1px solid #93c5fd;border-radius:8px;margin-bottom:8px;color:var(--pau-pri);font-size:12px;font-weight:600;flex-wrap:wrap;}',
       '.pau-bulk.on{display:flex;}',
       '.pau-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:6px;color:#78350f;font-size:12px;font-weight:600;flex-wrap:wrap;}',
-      '.pau-tbl-wrap{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;overflow:auto;max-height:calc(100vh - 260px);}',
+      '.pau-tbl-wrap{background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:10px;overflow:auto;max-height:calc(100vh - 185px);}',
       '.pau-tbl{width:100%;min-width:1160px;border-collapse:collapse;table-layout:fixed;}',
       '.pau-tbl th,.pau-tbl td{padding:6px 8px;border-bottom:1px solid var(--pau-bd-lt);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12.5px;}',
       '.pau-tbl th{position:sticky;top:0;z-index:2;background:var(--pau-th);color:var(--pau-sub);font-weight:700;font-size:12px;}',
@@ -1852,7 +1870,8 @@
       /* 기관 내부 6대 영역 보드 및 차트 스타일 */
       '.pau-dom-board{background:var(--pau-card);border:1px solid var(--pau-bd);border-radius:10px;padding:10px 12px;}',
       '.pau-dom-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--pau-bd-lt);}',
-      '.pau-dom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:8px;}',
+      '.pau-dom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}',
+      '@media (max-width:1100px){.pau-dom-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}',
       '.pau-dom-card{background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;}',
       '.pau-dom-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;font-weight:800;font-size:12.5px;color:var(--pau-txt);}',
       '.pau-dom-stat{font-size:12px;color:var(--pau-sub);line-height:1.45;}',
@@ -1881,7 +1900,7 @@
       '.pau-lgd-item{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}',
       '.pau-lgd-item > i{width:10px;height:10px;border-radius:3px;display:inline-block;}',
       '.pau-sec-bar-btn{cursor:pointer;border:none;background:transparent;padding:2px 4px;min-height:28px;border-radius:6px;display:flex;align-items:center;gap:6px;width:100%;text-align:left;color:var(--pau-txt);font-size:11.5px;white-space:nowrap;}',
-      '.pau-sec-bar-btn:hover{background:var(--pau-hov);}',
+      '.pau-sec-bar-btn:hover,.pau-sec-bar-btn:focus-visible{background:var(--pau-hov);outline:2px solid #2563eb;outline-offset:-1px;}',
       '.pau-sec-bar-nm{width:125px;overflow:hidden;text-overflow:ellipsis;font-weight:700;flex-shrink:0;}',
       '.pau-sec-bar-num{width:112px;text-align:right;font-variant-numeric:tabular-nums;color:var(--pau-muted);flex-shrink:0;}',
       '.pau-bars-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px;}',
@@ -1911,7 +1930,7 @@
       '  .pau-kpis,.pau-kpis-6{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-bottom:6px;}',
       '  .pau-kpi{padding:4px 8px;}',
       '  .pau-kpi b{font-size:13px;}',
-      '  .pau-issue-mini-grid{grid-template-columns:1fr;}',
+      '  .pau-dom-grid,.pau-issue-mini-grid{grid-template-columns:1fr;}',
       '  .pau-tbl-wrap{max-height:none;overflow-x:hidden;border:none;background:transparent;}',
       '  .pau-tbl{min-width:0!important;width:100%!important;display:block;}',
       '  .pau-tbl thead{display:none;}',
@@ -1959,10 +1978,18 @@
     document.head.appendChild(s);
   }
 
+  function safeCsvCell(val) {
+    var s = String(val == null ? '' : val);
+    if (/^[\s]*[=+\-@]/.test(s) && !/^[\s]*-\d+(\.\d+)?$/.test(s)) {
+      s = "'" + s;
+    }
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
   function downloadCsv(filename, headers, rows) {
-    var lines = [headers.map(function (h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(',')];
+    var lines = [headers.map(safeCsvCell).join(',')];
     rows.forEach(function (r) {
-      lines.push(r.map(function (c) { return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"'; }).join(','));
+      lines.push(r.map(safeCsvCell).join(','));
     });
     var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
@@ -2102,9 +2129,9 @@
     var organById = master.byId;
     var benchmarks = master.benchmarks;
 
-    var instMap = {};
+    var instMap = Object.create(null);
     safeInsts.forEach(function (i) { instMap[i.apba_id] = i; });
-    var unionsByAid = {};
+    var unionsByAid = Object.create(null);
     safeUnions.forEach(function (u) {
       if (!unionsByAid[u.apba_id]) unionsByAid[u.apba_id] = [];
       unionsByAid[u.apba_id].push(u);
@@ -2141,7 +2168,8 @@
       tab: (urlOrgan && instMap[urlOrgan]) ? 'organ' : 'unions',
       // 탭 1: 기관별 분류 · 내부영역 통합 (전 기관 노조·타임오프 현황 포함)
       uViewMode: 'ORGAN', // 'ORGAN' (1기관 1통합행 기본) | 'FLAT_UNION' (단위노조별 나열)
-      uShowMacroChart: true,
+      uShowMacroChart: false,
+      uShowMoreFilters: false,
       uScope: 'ALL',
       uSector: '',
       uType: '',
@@ -2152,7 +2180,6 @@
       uQuery: '',
       uPage: 0,
       uExpanded: {},
-      uChecked: {},
       // 비교 바구니 (최대 6개 기관)
       compareIds: [],
       cmpAddQuery: '',
@@ -2160,12 +2187,11 @@
       hScope: 'ALL',
       hSearch: '',
       hOrgan: defaultOrganAid,
+      hSubTab: 'HISTORY', // 'HISTORY' (연혁·신구대비) | 'PEERS' (유사기관 추천) | 'CHART' (업종 대비 진단 그래프)
       hCatFilter: '',
       hVerA: 1,
       hVerB: 0,
       hSimMode: 'ALL',
-      hCheckedTl: {},
-      hCheckedSim: {},
       // 탭 3: 그래프·히트맵 비교분석 스튜디오 & 13대 핵심 쟁점 기관간 비교·원문 대조
       mSubMode: 'STUDIO', // 'STUDIO' (다중기관 그래프·히트맵 비교) | 'ALL_LIST' (전 기관 단일쟁점 일람)
       mIssue: METRIC_DEFS[0].key,
@@ -2174,20 +2200,18 @@
       mConfed: '',
       mQuery: '',
       mChecked: {},
-      // 탭 4: 단체협약 조문 통합 검색
+      // 탭 4: 조문·원문 통합 (단체협약 조문 통합 검색 + 기관별 공시·별도합의·내부규정 원문)
+      docMode: 'ARTICLES', // 'ARTICLES' | 'DISC'
       aScope: 'ALL',
       aCat: 'ALL',
       aQuery: '',
-      aChecked: {},
-      // 탭 5: 기관별 공시·별도합의·내부규정 원문
       dScope: 'ALL',
       dOrganSearch: '',
       dOrgan: defaultOrganAid,
       dTax: 'ALL',
       dQuery: '',
       dPage: 0,
-      dChecked: {},
-      // 탭 6: 공공·법령 API 실시간 연동 센터
+      // 탭 5(유틸): 공공·법령 API 실시간 연동 센터
       apiLawKey: LAW_API_SOURCES[0].key,
       apiLawArt: '24',
       apiAlioSearch: '',
@@ -2209,27 +2233,24 @@
       '<div class="pau-root">',
       '  <div class="pau-hdr">',
       '    <span class="pau-hdr-ico" aria-hidden="true">🤝</span>',
-      '    <span class="pau-hdr-tit">공공임단협 — 기관별 임단협·노조·사규 통합분류 및 그래프 비교시스템</span>',
+      '    <span class="pau-hdr-tit">공공임단협</span>',
       '    <div class="pau-hdr-badges">',
-      '      <span class="pau-badge ok" data-pau-api-badge>🟢 중앙 ALIO + 지방 클린아이 + 법령 API 실시간 연동</span>',
-      '      <span class="pau-badge">기관 ' + fmtNum(totalInst) + '곳 (노조보유 ' + fmtNum(unionizedInstCount) + ' · 중앙 ' + fmtNum(centralInstCount) + ' · 지방 ' + fmtNum(localInstCount) + ')</span>',
-      '      <span class="pau-badge">공시·협약 ' + fmtNum(totalDisc) + '건 · 조문 ' + fmtNum(totalArt) + '개</span>',
+      '      <span class="pau-badge ok" data-pau-api-badge>중앙·지방 ' + fmtNum(totalInst) + '곳 · 실시간 법령연동</span>',
       '    </div>',
       '    <div class="pau-hdr-r">',
       '      <span id="who" class="pau-who-slot pau-hide-sm"></span>',
-      '      <button type="button" class="pau-btn pri" data-pau-csv aria-label="현재 화면 엑셀 CSV 받기">📥 CSV 받기</button>',
-      '      <a class="pau-btn pau-hide-sm" href="pu-alio-union.html" target="pureun-aliounion" rel="noopener">↗ 별개 창으로 열기</a>',
+      '      <button type="button" class="pau-btn pri" data-pau-csv aria-label="현재 화면 엑셀 CSV 받기">📥 CSV</button>',
+      (opts.isModal ? '      <a class="pau-btn pau-hide-sm" href="pu-alio-union.html" target="pureun-aliounion" rel="noopener">↗ 별개 창</a>' : ''),
       '      <a class="pau-btn" href="enter.html">🏠 포털 홈</a>',
       (opts.onClose ? '<button type="button" class="pau-btn" data-pau-close aria-label="닫기">✕ 닫기</button>' : ''),
       '    </div>',
       '  </div>',
-      '  <div class="pau-tabs" role="tablist" aria-label="공공임단협 기관중심 분석 탭">',
-      '    <button type="button" role="tab" id="pau-tab-unions" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'unions' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'unions' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'unions' ? ' on' : '') + '" data-tab="unions" title="전 기관 노조·타임오프 현황 및 기관별 6대 영역 통합 분류">🏛️ 1. 기관별 분류 · 6대영역 현황</button>',
-      '    <button type="button" role="tab" id="pau-tab-organ" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'organ' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'organ' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'organ' ? ' on' : '') + '" data-tab="organ" title="기관별 연혁·과거임단협·유사기관 비교 및 내부 6대 영역 한눈에 보기">🔎 2. 기관 내부 종합 · 세부비교</button>',
-      '    <button type="button" role="tab" id="pau-tab-matrix" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'matrix' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'matrix' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'matrix' ? ' on' : '') + '" data-tab="matrix" title="13대 핵심 쟁점 기관간 비교·원문 대조 및 그래프·히트맵 비교">📊 3. 그래프 · 히트맵 비교분석</button>',
-      '    <button type="button" role="tab" id="pau-tab-articles" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'articles' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'articles' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'articles' ? ' on' : '') + '" data-tab="articles">🔍 4. 단체협약 조문 통합 검색</button>',
-      '    <button type="button" role="tab" id="pau-tab-detail" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'detail' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'detail' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'detail' ? ' on' : '') + '" data-tab="detail">📂 5. 기관별 공시·별도합의·내부규정 원문</button>',
-      '    <button type="button" role="tab" id="pau-tab-apihub" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'apihub' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'apihub' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'apihub' ? ' on' : '') + '" data-tab="apihub">🔌 6. 공공·법령 API 실시간 연동 센터</button>',
+      '  <div class="pau-tabs" role="tablist" aria-label="공공임단협 분석 탭">',
+      '    <button type="button" role="tab" id="pau-tab-unions" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'unions' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'unions' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'unions' ? ' on' : '') + '" data-tab="unions" title="전 기관 노조·타임오프 현황 및 기관별 6대 영역 통합 분류">🏛️ 기관 목록</button>',
+      '    <button type="button" role="tab" id="pau-tab-organ" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'organ' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'organ' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'organ' ? ' on' : '') + '" data-tab="organ" title="기관별 연혁·과거임단협·유사기관 비교 및 내부 6대 영역 한눈에 보기">🔎 기관 상세</button>',
+      '    <button type="button" role="tab" id="pau-tab-matrix" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'matrix' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'matrix' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'matrix' ? ' on' : '') + '" data-tab="matrix" title="13대 핵심 쟁점 기관간 비교·원문 대조 및 그래프·히트맵 비교">📊 비교분석</button>',
+      '    <button type="button" role="tab" id="pau-tab-articles" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'articles' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'articles' ? 'true' : 'false') + '" class="pau-tab' + (state.tab === 'articles' ? ' on' : '') + '" data-tab="articles" title="단체협약 조문 통합 검색 및 기관별 공시·별도합의·내부규정 원문">📚 조문·원문</button>',
+      '    <button type="button" role="tab" id="pau-tab-apihub" aria-controls="pau-tabpanel" tabindex="' + (state.tab === 'apihub' ? '0' : '-1') + '" aria-selected="' + (state.tab === 'apihub' ? 'true' : 'false') + '" class="pau-tab util' + (state.tab === 'apihub' ? ' on' : '') + '" data-tab="apihub" title="공공·법령 API 실시간 연동 센터">🔌 API</button>',
       '  </div>',
       '  <div class="pau-cmp-tray" data-pau-cmp-tray></div>',
       '  <div class="pau-body" id="pau-tabpanel" role="tabpanel" aria-labelledby="pau-tab-' + state.tab + '" data-pau-body></div>',
@@ -2272,7 +2293,7 @@
 
     function renderCompareTray() {
       if (!cmpTrayEl) return;
-      if (!state.compareIds.length) {
+      if (!state.compareIds.length || state.tab === 'matrix') {
         if (cmpTrayEl.classList && cmpTrayEl.classList.toggle) cmpTrayEl.classList.toggle('on', false);
         cmpTrayEl.innerHTML = '';
         return;
@@ -2286,11 +2307,11 @@
           if (!r) return '';
           var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
           return '<button type="button" class="pau-act-btn" data-tray-rm="' + esc(cid) + '" aria-label="' + esc(r.name + ' 비교 제외') + '" style="border-color:' + pal.stroke + ';">' +
-            (idx === 0 ? '⭐기준: ' : '') + esc(r.name) + ' ✕</button>';
+            (idx === 0 ? '⭐ ' : '') + esc(r.name) + ' ✕</button>';
         }).join(''),
         '</div>',
         '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '  <button type="button" class="pau-act-btn pri" data-tray-go>📊 그래프·히트맵 비교분석 실행</button>',
+        '  <button type="button" class="pau-act-btn pri" data-tray-go>📊 비교분석 보기</button>',
         '  <button type="button" class="pau-act-btn" data-tray-clear>비우기</button>',
         '</div>'
       ].join('');
@@ -2318,7 +2339,7 @@
       }
     }
 
-    // 위임 클릭 핸들러 (클린아이 POST, 비교함 토글, 인라인 상세 전환, 별개 창 열기)
+    // 위임 클릭 핸들러 (클린아이 POST, 비교함 토글, 인라인 상세 전환, 서브탭 전환)
     if (bodyEl) {
       bodyEl.addEventListener('click', function (e) {
         if (!e.target || !e.target.closest) return;
@@ -2357,11 +2378,37 @@
           launchVisualComparisonWithPeers(visBtn.getAttribute('data-go-visual-cmp') || '');
           return;
         }
+
+        var hSubBtn = e.target.closest('[data-h-sub]');
+        if (hSubBtn) {
+          e.preventDefault();
+          var shouldScroll = hSubBtn.getAttribute('data-scroll-sub') === '1';
+          state.hSubTab = hSubBtn.getAttribute('data-h-sub') || 'HISTORY';
+          renderTabOrganHistory();
+          if (shouldScroll && bodyEl) {
+            var subCard = bodyEl.querySelector('#pauOrganSubCard');
+            if (subCard && subCard.scrollIntoView) subCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          return;
+        }
+
+        var docModeBtn = e.target.closest('[data-doc-mode]');
+        if (docModeBtn) {
+          e.preventDefault();
+          state.docMode = docModeBtn.getAttribute('data-doc-mode') || 'ARTICLES';
+          renderCurrentTab();
+          return;
+        }
       });
     }
 
     function switchTab(nextTab, focusTabBtn) {
-      state.tab = nextTab;
+      if (nextTab === 'detail') {
+        state.tab = 'articles';
+        state.docMode = 'DISC';
+      } else {
+        state.tab = nextTab;
+      }
       if (bodyEl) bodyEl.setAttribute('aria-labelledby', 'pau-tab-' + state.tab);
       Array.prototype.forEach.call(container.querySelectorAll('.pau-tab'), function (b) {
         var on = b.getAttribute('data-tab') === state.tab;
@@ -2370,6 +2417,7 @@
         b.setAttribute('tabindex', on ? '0' : '-1');
         if (on && focusTabBtn && typeof b.focus === 'function') b.focus();
       });
+      renderCompareTray();
       renderCurrentTab();
     }
 
@@ -2380,8 +2428,6 @@
       state.apiAlioAid = aid;
       state.hVerA = 1;
       state.hVerB = 0;
-      state.hCheckedTl = {};
-      state.hCheckedSim = {};
       if (shouldSwitchHere) {
         switchTab('organ');
       }
@@ -2393,19 +2439,19 @@
       state.apiDataKey = '';
       state.apiKeySource = reqUid ? '확인 중...' : '미설정 (로그인 후 자동연동)';
       if (!reqUid) {
-        if (apiBadgeEl) apiBadgeEl.textContent = '🟢 중앙 ALIO + 지방 클린아이 + 법령 API 실시간 연동';
+        if (apiBadgeEl) apiBadgeEl.textContent = '중앙·지방 ' + fmtNum(totalInst) + '곳 · 실시간 법령연동';
         if (state.tab === 'apihub') renderTabApiHub();
         return;
       }
       discoverPortalApiKeys(reqUid, function (res) {
         if (myGen !== authLookupGen || getActiveUid() !== reqUid || (res && res.stale)) return;
         state.apiDataKey = (res && res.dataKey) ? res.dataKey : '';
-        state.apiKeySource = (res && res.source) ? res.source : '미설정 (탭 6에서 등록 가능)';
+        state.apiKeySource = (res && res.source) ? res.source : '미설정 (API 탭에서 등록)';
         state.apiHolidays = (res && res.holidays) ? res.holidays : [];
         if (apiBadgeEl) {
           apiBadgeEl.textContent = state.apiDataKey
-            ? '🟢 중앙 ALIO + 지방 클린아이 + 법령 API (' + state.apiKeySource + ')'
-            : '🟢 중앙 ALIO + 지방 클린아이 + 법령 API 실시간 연동';
+            ? '중앙·지방 ' + fmtNum(totalInst) + '곳 · API 연동됨'
+            : '중앙·지방 ' + fmtNum(totalInst) + '곳 · 실시간 법령연동';
         }
         if (state.tab === 'apihub') renderTabApiHub();
       });
@@ -2536,14 +2582,7 @@
       var avgOrgRate = unionizedRows.length ? (Math.round((orgRateSum / unionizedRows.length) * 10) / 10) : 0;
       var avgTimeoff = timeoffCnt ? Math.round(timeoffSum / timeoffCnt) : 0;
 
-      var scopeChips = [
-        ['ALL', '전체 기관 (' + fmtNum(totalInst) + ')'],
-        ['CENTRAL', '🏛️ 중앙 ALIO (' + fmtNum(centralInstCount) + ')'],
-        ['LOCAL_ERC_MOIS', '🏛️ 평가원·행안부 유관 (6)'],
-        ['LOCAL_CORP', '🚇 지방공사·공단'],
-        ['LOCAL_AFFIL', '🏢 지방출자·출연'],
-        ['LOCAL_DIRECT', '💧 지방직영기업']
-      ];
+      var extraFilterCount = (state.uType ? 1 : 0) + (state.uConfed ? 1 : 0) + (state.uSort !== 'members_desc' ? 1 : 0) + (state.uViewMode === 'FLAT_UNION' ? 1 : 0);
 
       var pageSize = 250;
       var listSource = state.uViewMode === 'FLAT_UNION' ? filterFlatUnions() : organRows;
@@ -2554,79 +2593,82 @@
       var visibleRows = listSource.slice(startIdx, startIdx + pageSize);
 
       bodyEl.innerHTML = [
-        // 1) 권역 및 업종 빠른 분류 칩 바
-        '<div class="pau-chips" style="justify-content:space-between;">',
-        '  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
-        scopeChips.map(function (sc) {
-          return '<button type="button" class="pau-chip' + (state.uScope === sc[0] ? ' on' : '') + '" data-quick-scope="' + esc(sc[0]) + '">' + esc(sc[1]) + '</button>';
-        }).join(''),
-        '  </div>',
-        '  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
-        '    <button type="button" class="pau-act-btn' + (state.uShowMacroChart ? ' pri' : '') + '" data-toggle-macro>📊 분류 분포차트 ' + (state.uShowMacroChart ? '접기' : '열기') + '</button>',
-        '    <button type="button" class="pau-act-btn' + (state.uViewMode === 'ORGAN' ? ' pri' : '') + '" data-u-mode="ORGAN">🏢 기관별 통합분류 보기</button>',
-        '    <button type="button" class="pau-act-btn' + (state.uViewMode === 'FLAT_UNION' ? ' pri' : '') + '" data-u-mode="FLAT_UNION">👥 산하 단위노조 나열보기</button>',
-        '  </div>',
-        '</div>',
-
-        // 2) 세부 분류 필터 바
+        // 1) 1줄 통합 필터 바
         '<div class="pau-flt">',
+        '  <select data-f="uScope" aria-label="권역 구분 선택" title="중앙·지방 권역 구분">',
+        '    <option value="ALL"' + (state.uScope === 'ALL' ? ' selected' : '') + '>구분 전체 (' + fmtNum(totalInst) + '곳)</option>',
+        '    <option value="CENTRAL"' + (state.uScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO (' + fmtNum(centralInstCount) + '곳)</option>',
+        '    <option value="LOCAL_ERC_MOIS"' + (state.uScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관 (6곳)</option>',
+        '    <option value="LOCAL_CORP"' + (state.uScope === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·공단</option>',
+        '    <option value="LOCAL_AFFIL"' + (state.uScope === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연</option>',
+        '    <option value="LOCAL_DIRECT"' + (state.uScope === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
+        '    <option value="LOCAL_ALL"' + (state.uScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방 전체 (' + fmtNum(localInstCount) + '곳)</option>',
+        '  </select>',
         '  <select data-f="uSector" aria-label="10대 기능·업종 분류" title="업종군 분류">',
-        '    <option value="">10대 업종군 전체</option>',
+        '    <option value="">업종 전체</option>',
         SECTOR_RULES.concat([{ code: 'GENERAL', label: '일반공공서비스' }]).map(function (s) {
           return '<option value="' + esc(s.code) + '"' + (state.uSector === s.code ? ' selected' : '') + '>' + esc(s.label) + '</option>';
         }).join(''),
         '  </select>',
         '  <select data-f="uMinistry" aria-label="소관부처·시도 지자체 선택" title="소관부처·시도 지자체">',
-        '    <option value="">소관부처 · 17개 시/도 전체</option>',
+        '    <option value="">소관·시/도 전체</option>',
         allMinistries.map(function (m) { return '<option value="' + esc(m) + '"' + (state.uMinistry === m ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join(''),
         '  </select>',
-        '  <select data-f="uType" aria-label="기관유형 선택" title="기관유형">',
-        '    <option value="">기관유형 전체</option>',
-        allTypes.map(function (t) { return '<option value="' + esc(t) + '"' + (state.uType === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join(''),
-        '  </select>',
         '  <select data-f="uStruct" aria-label="노조 보유·형태 분류" title="노조 보유·형태">',
-        '    <option value=""' + (state.uStruct === '' ? ' selected' : '') + '>노조유무 전체 (노조보유 우선)</option>',
-        '    <option value="has_union"' + (state.uStruct === 'has_union' ? ' selected' : '') + '>노조 보유 기관만 (' + fmtNum(unionizedInstCount) + '곳)</option>',
-        '    <option value="multi"' + (state.uStruct === 'multi' ? ' selected' : '') + '>복수노조 기관만</option>',
-        '    <option value="single"' + (state.uStruct === 'single' ? ' selected' : '') + '>단일노조 기관만</option>',
-        '    <option value="no_union"' + (state.uStruct === 'no_union' ? ' selected' : '') + '>노조 미설립(사규·취업규칙) 기관</option>',
+        '    <option value=""' + (state.uStruct === '' ? ' selected' : '') + '>노조유무 전체</option>',
+        '    <option value="has_union"' + (state.uStruct === 'has_union' ? ' selected' : '') + '>노조 보유 (' + fmtNum(unionizedInstCount) + '곳)</option>',
+        '    <option value="multi"' + (state.uStruct === 'multi' ? ' selected' : '') + '>복수노조 기관</option>',
+        '    <option value="single"' + (state.uStruct === 'single' ? ' selected' : '') + '>단일노조 기관</option>',
+        '    <option value="no_union"' + (state.uStruct === 'no_union' ? ' selected' : '') + '>미설립·사규 운영</option>',
         '  </select>',
-        '  <select data-f="uConfed" aria-label="상급단체 선택" title="상급단체">',
-        '    <option value="">상급단체 전체</option>',
-        allConfeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.uConfed === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''),
-        '  </select>',
-        '  <select data-f="uSort" aria-label="기관 정렬 기준" title="정렬 기준">',
-        '    <option value="members_desc"' + (state.uSort === 'members_desc' ? ' selected' : '') + '>정렬: 조합원 규모순</option>',
-        '    <option value="timeoff_desc"' + (state.uSort === 'timeoff_desc' ? ' selected' : '') + '>정렬: 타임오프 시간순</option>',
-        '    <option value="orgrate_desc"' + (state.uSort === 'orgrate_desc' ? ' selected' : '') + '>정렬: 조직률(%) 높은순</option>',
-        '    <option value="score_desc"' + (state.uSort === 'score_desc' ? ' selected' : '') + '>정렬: 6대영역 종합점수순</option>',
-        '    <option value="disc_desc"' + (state.uSort === 'disc_desc' ? ' selected' : '') + '>정렬: 협약·공시 건수순</option>',
-        '    <option value="name_asc"' + (state.uSort === 'name_asc' ? ' selected' : '') + '>정렬: 기관명 가나다순</option>',
-        '  </select>',
-        '  <input type="search" data-f="uQuery" aria-label="기관명·노동조합명 검색" placeholder="기관명·노조명·부처·시도 검색..." value="' + esc(state.uQuery) + '">',
+        '  <input type="search" data-f="uQuery" aria-label="기관명·노동조합명 검색" placeholder="기관명·노조명·지역 검색" value="' + esc(state.uQuery) + '" style="min-width:170px;max-width:260px;">',
+        '  <div style="display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:wrap;">',
+        '    <button type="button" class="pau-act-btn' + ((state.uShowMoreFilters || extraFilterCount > 0) ? ' pri' : '') + '" data-toggle-more-flt>⚙️ 상세필터' + (extraFilterCount > 0 ? ' (' + extraFilterCount + ')' : '') + '</button>',
+        '    <button type="button" class="pau-act-btn' + (state.uShowMacroChart ? ' pri' : '') + '" data-toggle-macro>📊 분포차트</button>',
+        '  </div>',
         '</div>',
 
-        // 3) 핵심 정량 요약 KPI 바
-        '<div class="pau-kpis">',
-        '  <div class="pau-kpi"><span>분류 해당 기관</span><b>' + fmtNum(organRows.length) + '곳 (노조 ' + fmtNum(unionizedRows.length) + '곳)</b></div>',
-        '  <div class="pau-kpi"><span>산하 단위노조 · 조합원</span><b>' + fmtNum(totalUnionUnits) + '개 · ' + fmtNum(totalMembers) + '명</b></div>',
-        '  <div class="pau-kpi"><span>평균 노조 조직률</span><b>' + avgOrgRate + '%</b></div>',
-        '  <div class="pau-kpi"><span>기관 평균 타임오프</span><b>' + fmtNum(avgTimeoff) + '시간</b></div>',
-        '</div>',
-
-        // 4) 거시 분포 시각화 차트 스트립
-        (state.uShowMacroChart ? renderMacroDistributionStrip(organRows) : ''),
-
-        // 5) 페이저
-        (listSource.length > pageSize ? [
-          '<div class="pau-pager">',
-          '  <span>전체 <b>' + fmtNum(listSource.length) + '</b>곳 중 <b>' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '</b>번째 표시 (페이지 ' + (state.uPage + 1) + '/' + totalPages + ') · 행의 <b>[▼ 6대영역]</b>을 누르면 내부 영역이 한눈에 펼쳐지고, <b>[+ 비교]</b>로 그래프 비교를 실행할 수 있습니다</span>',
-          '  <div style="display:flex;gap:6px;">',
-          '    <button type="button" class="pau-act-btn" data-u-prev' + (state.uPage <= 0 ? ' disabled' : '') + '>◀ 이전 ' + pageSize + '곳</button>',
-          '    <button type="button" class="pau-act-btn" data-u-next' + (state.uPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ' + pageSize + '곳 ▶</button>',
+        // 2) 접이식 상세필터 바 (필요할 때만 펼침)
+        (state.uShowMoreFilters ? [
+          '<div class="pau-flt" style="background:var(--pau-th);">',
+          '  <select data-f="uType" aria-label="기관유형 선택" title="기관유형">',
+          '    <option value="">기관유형 전체</option>',
+          allTypes.map(function (t) { return '<option value="' + esc(t) + '"' + (state.uType === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join(''),
+          '  </select>',
+          '  <select data-f="uConfed" aria-label="상급단체 선택" title="상급단체">',
+          '    <option value="">상급단체 전체</option>',
+          allConfeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.uConfed === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''),
+          '  </select>',
+          '  <select data-f="uSort" aria-label="기관 정렬 기준" title="정렬 기준">',
+          '    <option value="members_desc"' + (state.uSort === 'members_desc' ? ' selected' : '') + '>정렬: 조합원 규모순</option>',
+          '    <option value="timeoff_desc"' + (state.uSort === 'timeoff_desc' ? ' selected' : '') + '>정렬: 타임오프 시간순</option>',
+          '    <option value="orgrate_desc"' + (state.uSort === 'orgrate_desc' ? ' selected' : '') + '>정렬: 조직률(%)순</option>',
+          '    <option value="score_desc"' + (state.uSort === 'score_desc' ? ' selected' : '') + '>정렬: 종합점수순</option>',
+          '    <option value="disc_desc"' + (state.uSort === 'disc_desc' ? ' selected' : '') + '>정렬: 공시건수순</option>',
+          '    <option value="name_asc"' + (state.uSort === 'name_asc' ? ' selected' : '') + '>정렬: 가나다순</option>',
+          '  </select>',
+          '  <div class="pau-seg" role="group" aria-label="목록 보기 방식">',
+          '    <button type="button" class="pau-seg-btn' + (state.uViewMode === 'ORGAN' ? ' on' : '') + '" data-u-mode="ORGAN">🏢 기관 통합</button>',
+          '    <button type="button" class="pau-seg-btn' + (state.uViewMode === 'FLAT_UNION' ? ' on' : '') + '" data-u-mode="FLAT_UNION">👥 단위노조 나열</button>',
           '  </div>',
+          '  <button type="button" class="pau-act-btn" data-u-reset style="margin-left:auto;">초기화</button>',
           '</div>'
         ].join('') : ''),
+
+        // 3) 접이식 거시 분포 차트 (버튼 클릭 시에만 펼침)
+        (state.uShowMacroChart ? renderMacroDistributionStrip(organRows) : ''),
+
+        // 4) 1줄 슬림 요약 + 인라인 페이저 바
+        '<div class="pau-subbar">',
+        '  <span>조회 <b>' + fmtNum(organRows.length) + '곳</b> (노조 <b>' + fmtNum(unionizedRows.length) + '곳</b> · 단위노조 <b>' + fmtNum(totalUnionUnits) + '개</b> · 조합원 <b>' + fmtNum(totalMembers) + '명</b> · 평균 조직률 <b>' + avgOrgRate + '%</b> · 타임오프 <b>' + fmtNum(avgTimeoff) + 'h</b>)</span>',
+        (listSource.length > pageSize ? [
+          '  <div style="display:flex;align-items:center;gap:6px;">',
+          '    <span>' + (state.uPage + 1) + ' / ' + totalPages + ' 페이지</span>',
+          '    <button type="button" class="pau-act-btn" data-u-prev' + (state.uPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
+          '    <button type="button" class="pau-act-btn" data-u-next' + (state.uPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>',
+          '  </div>'
+        ].join('') : ''),
+        '</div>',
 
         // 6) 기관 중심 통합 마스터 테이블 (기본) vs 단위노조 나열 테이블
         (state.uViewMode === 'ORGAN' ? [
@@ -2752,13 +2794,6 @@
 
       bindFilterInputs(renderTabUnions);
 
-      Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-quick-scope]'), function (b) {
-        b.addEventListener('click', function () {
-          state.uScope = b.getAttribute('data-quick-scope') || 'ALL';
-          state.uPage = 0;
-          renderTabUnions();
-        });
-      });
       Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-quick-sector]'), function (b) {
         b.addEventListener('click', function () {
           var sc = b.getAttribute('data-quick-sector') || '';
@@ -2767,6 +2802,29 @@
           renderTabUnions();
         });
       });
+      var moreFltBtn = bodyEl.querySelector('[data-toggle-more-flt]');
+      if (moreFltBtn) {
+        moreFltBtn.addEventListener('click', function () {
+          state.uShowMoreFilters = !state.uShowMoreFilters;
+          renderTabUnions();
+        });
+      }
+      var resetBtn = bodyEl.querySelector('[data-u-reset]');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+          state.uScope = 'ALL';
+          state.uSector = '';
+          state.uMinistry = '';
+          state.uType = '';
+          state.uStruct = '';
+          state.uConfed = '';
+          state.uSort = 'members_desc';
+          state.uViewMode = 'ORGAN';
+          state.uQuery = '';
+          state.uPage = 0;
+          renderTabUnions();
+        });
+      }
       var macroBtn = bodyEl.querySelector('[data-toggle-macro]');
       if (macroBtn) {
         macroBtn.addEventListener('click', function () {
@@ -2878,214 +2936,202 @@
       var inCmp = state.compareIds.indexOf(aid) >= 0;
 
       bodyEl.innerHTML = [
-        // 상단 기관 선택 및 직결 바
+        // 1) 1줄 기관 선택 · 액션 바
         '<div class="pau-flt">',
         '  <select data-f="hScope" aria-label="기관 검색 범위">',
-        '    <option value="ALL"' + (state.hScope === 'ALL' ? ' selected' : '') + '>전체 기관 (중앙+지방)</option>',
-        '    <option value="CENTRAL"' + (state.hScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙공공기관 (ALIO)</option>',
-        '    <option value="LOCAL_ALL"' + (state.hScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방공공기관·산하단체 전체 (1,338곳)</option>',
-        '    <option value="LOCAL_ERC_MOIS"' + (state.hScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 지방공기업평가원·행안부 유관 (6곳)</option>',
-        '    <option value="LOCAL_CORP"' + (state.hScope === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·지방공단</option>',
-        '    <option value="LOCAL_AFFIL"' + (state.hScope === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연기관</option>',
+        '    <option value="ALL"' + (state.hScope === 'ALL' ? ' selected' : '') + '>구분 전체 (중앙+지방)</option>',
+        '    <option value="CENTRAL"' + (state.hScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
+        '    <option value="LOCAL_ALL"' + (state.hScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방 전체 (1,338곳)</option>',
+        '    <option value="LOCAL_ERC_MOIS"' + (state.hScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관 (6곳)</option>',
+        '    <option value="LOCAL_CORP"' + (state.hScope === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·공단</option>',
+        '    <option value="LOCAL_AFFIL"' + (state.hScope === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연</option>',
         '  </select>',
-        '  <input type="search" data-f="hSearch" aria-label="분석할 기관명 검색" placeholder="기관명·시도·부처 빠른 검색..." value="' + esc(state.hSearch) + '" style="max-width:200px;">',
-        '  <select data-f="hOrgan" aria-label="분석 대상 기관 선택" style="min-width:250px;font-weight:700;">',
+        '  <input type="search" data-f="hSearch" aria-label="분석할 기관명 검색" placeholder="기관·지역 필터" value="' + esc(state.hSearch) + '" style="min-width:165px;max-width:220px;">',
+        '  <select data-f="hOrgan" aria-label="분석 대상 기관 선택" style="min-width:240px;font-weight:700;">',
         candidateOrgans.map(function (o) {
           var tag = isLocalOrgan(o) ? '(지방) ' : '(중앙) ';
           return '<option value="' + esc(o.apba_id) + '"' + (o.apba_id === aid ? ' selected' : '') + '>' + esc(tag + o.name + ' · ' + (o.ministry || o.inst_type || o.apba_id)) + '</option>';
         }).join(''),
         '  </select>',
-        '  <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 유사기관과 그래프·표 직접비교</button>',
-        '  <button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCmp ? '✓ 비교함에 담김' : '➕ 비교함 담기') + '</button>',
-        '  <button type="button" class="pau-act-btn" data-h-open-win="' + esc(aid) + '">↗ 별개 창으로 열기</button>',
+        '  <div style="display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap;">',
+        '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 유사기관 비교분석</button>',
+        '    <button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(aid) + '">' + (inCmp ? '✓ 비교담김' : '+ 비교담기') + '</button>',
+        '    <button type="button" class="pau-act-btn" data-h-open-win="' + esc(aid) + '">↗ 독립 창</button>',
+        '  </div>',
         '</div>',
 
-        // 6대 KPI 스코어카드
-        '<div class="pau-kpis-6">',
-        '  <div class="pau-kpi"><span>기관 · 업종</span><b title="' + esc(rec.name + ' · ' + rec.sectorLabel) + '">' + esc(rec.sectorLabel) + '</b></div>',
-        '  <div class="pau-kpi"><span>단위노조 · 조합원</span><b>' + fmtNum(rec.unionCount) + '개 · ' + fmtNum(rec.memberTotal) + '명</b></div>',
-        '  <div class="pau-kpi"><span>노조 조직률</span><b>' + fmtPct(rec.orgRate) + '</b></div>',
-        '  <div class="pau-kpi"><span>타임오프(법정한도비)</span><b>' + fmtNum(rec.timeoffHours) + 'h (' + fmtPct(rec.timeoffLimitPct) + ')</b></div>',
-        '  <div class="pau-kpi"><span>6대영역 종합점수</span><b>' + rec.totalScore + '점 (평균 ' + sectorBench.totalScore + ')</b></div>',
-        '  <div class="pau-kpi"><span>누적 공시 · 유사기관</span><b>' + fmtNum(timelineAll.length) + '건 · ' + fmtNum(similars.length) + '곳</b></div>',
+        // 2) 기관 내부 6대 핵심 영역 보드 (3×2 대칭 격자, 중복 KPI·버튼 제거)
+        '<div style="margin-bottom:8px;">',
+        renderOrganSixDomainsBoard(rec, false, inCmp, sectorBench),
         '</div>',
 
-        // 섹션 ①: 기관 내부 6대 핵심 영역 한눈에 보기 보드
-        '<div style="margin-bottom:10px;">',
-        renderOrganSixDomainsBoard(rec, false, inCmp),
-        '</div>',
-
-        // 섹션 ②: 기준 기관 시각 그래프 진단 (6축 레이더 + 업종 내 타임오프 산점도 + 정량 막대)
-        '<div class="pau-sec-card">',
+        // 3) 하단 세부 비교 단일 카드 (연혁·신구대비 | 유사기관 추천 | 업종 대비 그래프 전환)
+        '<div class="pau-sec-card" id="pauOrganSubCard">',
         '  <div class="pau-sec-tit">',
-        '    <span>📊 ② ' + esc(rec.name) + ' — 동종업종(' + esc(rec.sectorLabel) + ') 평균 및 최상위 유사기관 그래프 비교 진단</span>',
-        '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 탭 3 다중기관 상세 비교 스튜디오로 확장 ↗</button>',
-        '  </div>',
-        '  <div class="pau-vis-grid">',
-        '    <div class="pau-card">',
-        '      <div class="pau-card-hd"><span>🕸️ 6대 영역 프로파일 레이더 비교 (기준 vs 유사기관 vs 업종평균)</span></div>',
-        renderRadarChartSvg([rec].concat(topPeerRecs), sectorBench),
+        '    <div class="pau-seg" role="group" aria-label="기관 세부 분석 전환">',
+        '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'HISTORY' ? ' on' : '') + '" data-h-sub="HISTORY">🔄 연혁 · 과거↔현행 대비 (' + fmtNum(timelineAll.length) + '건)</button>',
+        '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'PEERS' ? ' on' : '') + '" data-h-sub="PEERS">🏛️ 유사기관 추천 (' + fmtNum(similars.length) + '곳)</button>',
+        '      <button type="button" class="pau-seg-btn' + (state.hSubTab === 'CHART' ? ' on' : '') + '" data-h-sub="CHART">📈 업종 대비 그래프 진단</button>',
         '    </div>',
-        '    <div class="pau-card">',
-        '      <div class="pau-card-hd"><span>🔵 동종업종(' + esc(rec.sectorLabel) + ') 조합원 규모 ↔ 타임오프 위치 진단</span></div>',
-        renderScatterTimeoffSvg(sectorPool, [rec].concat(topPeerRecs)),
-        '    </div>',
-        '  </div>',
-        renderGroupedKpiBarsHtml([rec].concat(topPeerRecs), sectorBench),
-        '</div>',
-
-        // 섹션 ③: 과거 임단협(A) ↔ 현행 임단협(B) 비교 및 신·구 조문 대비표 + 연혁 타임라인
-        '<div class="pau-sec-card">',
-        '  <div class="pau-sec-tit">',
-        '    <span>🔄 ③ ' + esc(inst.name) + ' — 연혁 타임라인 및 과거 임단협(A) ↔ 현행 임단협(B) 신·구 조문 비교</span>',
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <select data-f="hCatFilter" aria-label="연혁 구분 필터">',
-        '        <option value=""' + (!state.hCatFilter ? ' selected' : '') + '>연혁 구분 전체 (' + timelineAll.length + '건)</option>',
-        '        <option value="AGREEMENT"' + (state.hCatFilter === 'AGREEMENT' ? ' selected' : '') + '>단체협약·임금협약 체결</option>',
-        '        <option value="SEPARATE"' + (state.hCatFilter === 'SEPARATE' ? ' selected' : '') + '>별도합의·노사협의회</option>',
-        '        <option value="STATUS"' + (state.hCatFilter === 'STATUS' ? ' selected' : '') + '>노조설립·타임오프 현황</option>',
-        '        <option value="RULE"' + (state.hCatFilter === 'RULE' ? ' selected' : '') + '>취업규칙·내부규정·편람</option>',
-        '      </select>',
-        '      <label style="font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">과거(A):',
-        '        <select data-f="hVerA" aria-label="과거 임단협 시점 A 선택" style="max-width:210px;">',
-        agreementsForCompare.map(function (a, idx) {
-          return '<option value="' + idx + '"' + (idx === idxA ? ' selected' : '') + '>' + esc('(' + a.date + ') ' + a.title) + '</option>';
-        }).join(''),
-        '        </select>',
-        '      </label>',
-        '      <label style="font-size:12px;color:var(--pau-pri);font-weight:800;display:inline-flex;align-items:center;gap:4px;">↔ 현행(B):',
-        '        <select data-f="hVerB" aria-label="현행 임단협 시점 B 선택" style="max-width:210px;">',
-        agreementsForCompare.map(function (b, idx) {
-          return '<option value="' + idx + '"' + (idx === idxB ? ' selected' : '') + '>' + esc('(' + b.date + ') ' + b.title) + '</option>';
-        }).join(''),
-        '        </select>',
-        '      </label>',
-        '    </div>',
+        (state.hSubTab === 'HISTORY' ? [
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '      <select data-f="hCatFilter" aria-label="연혁 구분 필터">',
+          '        <option value=""' + (!state.hCatFilter ? ' selected' : '') + '>연혁 전체 (' + timelineAll.length + '건)</option>',
+          '        <option value="AGREEMENT"' + (state.hCatFilter === 'AGREEMENT' ? ' selected' : '') + '>단체협약·임금협약</option>',
+          '        <option value="SEPARATE"' + (state.hCatFilter === 'SEPARATE' ? ' selected' : '') + '>별도합의·노사협의</option>',
+          '        <option value="STATUS"' + (state.hCatFilter === 'STATUS' ? ' selected' : '') + '>노조·타임오프 현황</option>',
+          '        <option value="RULE"' + (state.hCatFilter === 'RULE' ? ' selected' : '') + '>취업규칙·내부규정</option>',
+          '      </select>',
+          '      <label style="font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">과거(A):',
+          '        <select data-f="hVerA" aria-label="과거 임단협 시점 A 선택" style="max-width:200px;">',
+          agreementsForCompare.map(function (a, idx) {
+            return '<option value="' + idx + '"' + (idx === idxA ? ' selected' : '') + '>' + esc('(' + a.date + ') ' + a.title) + '</option>';
+          }).join(''),
+          '        </select>',
+          '      </label>',
+          '      <label style="font-size:12px;color:var(--pau-pri);font-weight:800;display:inline-flex;align-items:center;gap:4px;">↔ 현행(B):',
+          '        <select data-f="hVerB" aria-label="현행 임단협 시점 B 선택" style="max-width:200px;">',
+          agreementsForCompare.map(function (b, idx) {
+            return '<option value="' + idx + '"' + (idx === idxB ? ' selected' : '') + '>' + esc('(' + b.date + ') ' + b.title) + '</option>';
+          }).join(''),
+          '        </select>',
+          '      </label>',
+          '    </div>'
+        ].join('') : (state.hSubTab === 'PEERS' ? [
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          '      <select data-f="hSimMode" aria-label="유사기관 추천 기준 선택">',
+          '        <option value="ALL"' + (state.hSimMode === 'ALL' ? ' selected' : '') + '>유사 기준: 종합 추천</option>',
+          '        <option value="SECTOR"' + (state.hSimMode === 'SECTOR' ? ' selected' : '') + '>동종 업종 (' + esc(rec.sectorLabel) + ')</option>',
+          '        <option value="MINISTRY"' + (state.hSimMode === 'MINISTRY' ? ' selected' : '') + '>동일 소관·지자체 (' + esc(inst.ministry || '') + ')</option>',
+          '        <option value="TYPE"' + (state.hSimMode === 'TYPE' ? ' selected' : '') + '>동일 기관유형 (' + esc(inst.inst_type || '') + ')</option>',
+          '      </select>',
+          '      <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 상위 유사기관 비교분석</button>',
+          '    </div>'
+        ].join('') : '    <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 비교분석 탭에서 다중기관 확장 ↗</button>')),
         '  </div>',
 
-        (verA && verB ? [
-          '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:10px;">',
+        (state.hSubTab === 'HISTORY' ? [
+          (verA && verB ? [
+            '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:10px;">',
+            '    <table class="pau-tbl">',
+            '      <thead>',
+            '        <tr>',
+            '          <th class="c-no">№</th>',
+            '          <th style="width:16%;">시점 비교 항목</th>',
+            '          <th style="width:42%;">⏪ 과거 임단협·공시 (시점 A: ' + esc(verA.date) + ')</th>',
+            '          <th style="width:42%;">⏩ 현행 임단협·공시 (시점 B: ' + esc(verB.date) + ')</th>',
+            '        </tr>',
+            '      </thead>',
+            '      <tbody>',
+            '        <tr><td class="c-no">1</td><td style="font-weight:700;">협약·공시 명칭</td><td title="' + esc(verA.title) + '">' + esc(verA.title) + '</td><td title="' + esc(verB.title) + '" style="font-weight:700;color:var(--pau-pri);">' + esc(verB.title) + '</td></tr>',
+            '        <tr><td class="c-no">2</td><td style="font-weight:700;">체결·공시 기준일</td><td>' + esc(verA.date + ' (' + verA.cname + ')') + '</td><td style="font-weight:700;">' + esc(verB.date + ' (' + verB.cname + ')') + '</td></tr>',
+            '        <tr><td class="c-no">3</td><td style="font-weight:700;">주요 체결·개정 요약</td><td title="' + esc(verA.summary) + '">' + esc(verA.summary || '—') + '</td><td title="' + esc(verB.summary) + '" style="font-weight:600;">' + esc(verB.summary || '—') + '</td></tr>',
+            '        <tr><td class="c-no">4</td><td style="font-weight:700;">핵심 조문 신·구 대비</td><td title="' + esc(matchedDiffPreviewA) + '">' + esc(matchedDiffPreviewA) + '</td><td title="' + esc(matchedDiffPreviewB) + '" style="font-weight:600;color:var(--pau-pri);">' + esc(matchedDiffPreviewB) + '</td></tr>',
+            '        <tr><td class="c-no">5</td><td style="font-weight:700;">원문 첨부 · 공시뷰어</td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
+              renderFilePills(verA.files, '과거A 원문') +
+              (safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verA)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
+              '</div></td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
+              renderFilePills(verB.files, '현행B 원문') +
+              (safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verB)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
+              (idxA === idxB && agreementsForCompare.length >= 2 ? ' <span class="pau-pill multi">동일 시점 문서 선택됨</span>' : '') +
+              '</div></td></tr>',
+            '      </tbody>',
+            '    </table>',
+            '  </div>'
+          ].join('') : ''),
+
+          (revList.length ? revList.map(function (rev, rIdx) {
+            var isSelectedMatch = isRevMatchVersion(rev, verA) || isRevMatchVersion(rev, verB);
+            return [
+              '  <div style="font-size:12.5px;font-weight:700;color:var(--pau-pri);margin:8px 0 4px;">📌 ' + (isSelectedMatch ? '⭐ 선택 시점 연동 ' : '') + '신·구 조문 대비표 #' + (rIdx + 1) + ' — ' + esc(rev.title) + ' (기준일: ' + esc(rev.date) + ' · 조문비교 ' + fmtNum(rev.diffs.length) + '건)</div>',
+              (rev.summaryLines.length ? '<div style="background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:8px;padding:7px 11px;margin-bottom:6px;font-size:12px;color:var(--pau-sub);line-height:1.5;"><b>주요 개정 요약:</b> ' + rev.summaryLines.slice(0, 6).map(function (s) { return esc(s); }).join(' · ') + '</div>' : ''),
+              (rev.diffs.length ? [
+                '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:8px;">',
+                '    <table class="pau-tbl">',
+                '      <thead><tr><th class="c-no">№</th><th style="width:18%;">개정 조문 · 항목</th><th style="width:35%;">⏪ 과거 임단협 (개정 전)</th><th style="width:35%;">⏩ 현행 임단협 (개정 후)</th><th style="width:12%;">비고</th></tr></thead>',
+                '      <tbody>',
+                rev.diffs.map(function (d, idx) {
+                  return '<tr><td class="c-no">' + (idx + 1) + '</td><td title="' + esc(d.art) + '" style="font-weight:700;">' + esc(d.art) + '</td><td title="' + esc(d.before) + '">' + esc(d.before) + '</td><td title="' + esc(d.after) + '" style="color:var(--pau-pri);font-weight:600;">' + esc(d.after) + '</td><td>' + esc(d.note) + '</td></tr>';
+                }).join(''),
+                '      </tbody>',
+                '    </table>',
+                '  </div>'
+              ].join('') : '')
+            ].join('');
+          }).join('') : ''),
+
+          '  <div style="font-size:12px;font-weight:700;margin:6px 0 4px;">📅 전체 연혁 타임라인 (' + fmtNum(timeline.length) + '건)</div>',
+          '  <div class="pau-tbl-wrap" style="max-height:260px;">',
           '    <table class="pau-tbl">',
-          '      <thead>',
-          '        <tr>',
-          '          <th class="c-no">№</th>',
-          '          <th style="width:16%;">시점 비교 항목</th>',
-          '          <th style="width:42%;">⏪ 과거 임단협·공시 (시점 A: ' + esc(verA.date) + ')</th>',
-          '          <th style="width:42%;">⏩ 현행 임단협·공시 (시점 B: ' + esc(verB.date) + ')</th>',
-          '        </tr>',
-          '      </thead>',
+          '      <thead><tr><th class="c-no">№</th><th style="width:12%;">연혁 일자</th><th style="width:13%;">영역 분류</th><th style="width:23%;">임단협·공시·규정 제목</th><th style="width:20%;">체결·개정 주요 요약</th><th style="width:14%;">시점 대조</th><th style="width:18%;">원문 · 첨부</th></tr></thead>',
           '      <tbody>',
-          '        <tr><td class="c-no">1</td><td style="font-weight:700;">협약·공시 명칭</td><td title="' + esc(verA.title) + '">' + esc(verA.title) + '</td><td title="' + esc(verB.title) + '" style="font-weight:700;color:var(--pau-pri);">' + esc(verB.title) + '</td></tr>',
-          '        <tr><td class="c-no">2</td><td style="font-weight:700;">체결·공시 기준일</td><td>' + esc(verA.date + ' (' + verA.cname + ')') + '</td><td style="font-weight:700;">' + esc(verB.date + ' (' + verB.cname + ')') + '</td></tr>',
-          '        <tr><td class="c-no">3</td><td style="font-weight:700;">주요 체결·개정 요약</td><td title="' + esc(verA.summary) + '">' + esc(verA.summary || '—') + '</td><td title="' + esc(verB.summary) + '" style="font-weight:600;">' + esc(verB.summary || '—') + '</td></tr>',
-          '        <tr><td class="c-no">4</td><td style="font-weight:700;">핵심 조문 신·구 대비</td><td title="' + esc(matchedDiffPreviewA) + '">' + esc(matchedDiffPreviewA) + '</td><td title="' + esc(matchedDiffPreviewB) + '" style="font-weight:600;color:var(--pau-pri);">' + esc(matchedDiffPreviewB) + '</td></tr>',
-          '        <tr><td class="c-no">5</td><td style="font-weight:700;">원문 첨부 · 공시뷰어</td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
-            renderFilePills(verA.files, '과거A 원문') +
-            (safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verA.dno, resolveTargetTypeFromDisc(verA)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verA)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
-            '</div></td><td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
-            renderFilePills(verB.files, '현행B 원문') +
-            (safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB))) ? '<a class="pau-pill ok" href="' + esc(safeHttpUrl(buildOrganUrl(inst, verB.dno, resolveTargetTypeFromDisc(verB)))) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(resolveTargetTypeFromDisc(verB)) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '—') +
-            (idxA === idxB && agreementsForCompare.length >= 2 ? ' <span class="pau-pill multi">동일 시점 문서 선택됨</span>' : '') +
-            '</div></td></tr>',
+          (timeline.length ? timeline.map(function (t, i) {
+            var cmpIdx = agreementsForCompare.findIndex(function (x) { return x.id === t.id; });
+            var isA = verA && verA.id === t.id;
+            var isB = verB && verB.id === t.id;
+            var tlTargetType = resolveTargetTypeFromDisc(t);
+            var safeView = safeHttpUrl(buildOrganUrl(inst, t.dno, tlTargetType));
+            var filePillsHtml = renderFilePills(t.files, '첨부원문');
+            return [
+              '<tr' + ((isA || isB) ? ' style="background:var(--pau-pri-bg);"' : '') + '>',
+              '  <td class="c-no">' + (i + 1) + '</td>',
+              '  <td style="font-weight:700;"><span class="pau-pill">' + esc(t.year) + '</span> ' + esc(t.date) + '</td>',
+              '  <td><span class="pau-pill ' + (t.catGroup === 'AGREEMENT' ? 'fktu' : (t.catGroup === 'SEPARATE' ? 'multi' : 'ok')) + '">' + esc(t.cname) + '</span></td>',
+              '  <td title="' + esc(t.title) + '" style="font-weight:700;">' + esc(t.title) + '</td>',
+              '  <td title="' + esc(t.summary) + '">' + esc(t.summary || '—') + '</td>',
+              '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">',
+              (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isA ? ' pri' : '') + '" data-set-vera="' + cmpIdx + '">과거A' + (isA ? '✓' : '') + '</button>' : ''),
+              (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isB ? ' pri' : '') + '" data-set-verb="' + cmpIdx + '">현행B' + (isB ? '✓' : '') + '</button>' : ''),
+              '  </div></td>',
+              '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + filePillsHtml + (safeView ? '<a class="pau-pill ok" href="' + esc(safeView) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(tlTargetType) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '') + (!filePillsHtml && !safeView ? '—' : '') + '</div></td>',
+              '</tr>'
+            ].join('');
+          }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--pau-muted);">해당 영역 분류의 연혁 문서가 없습니다.</td></tr>'),
           '      </tbody>',
           '    </table>',
           '  </div>'
-        ].join('') : ''),
-
-        (revList.length ? revList.map(function (rev, rIdx) {
-          var isSelectedMatch = isRevMatchVersion(rev, verA) || isRevMatchVersion(rev, verB);
-          return [
-            '  <div style="font-size:12.5px;font-weight:700;color:var(--pau-pri);margin:8px 0 4px;">📌 ' + (isSelectedMatch ? '⭐ 선택 시점 연동 ' : '') + '신·구 조문 대비표 #' + (rIdx + 1) + ' — ' + esc(rev.title) + ' (기준일: ' + esc(rev.date) + ' · 조문비교 ' + fmtNum(rev.diffs.length) + '건)</div>',
-            (rev.summaryLines.length ? '<div style="background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:8px;padding:7px 11px;margin-bottom:6px;font-size:12px;color:var(--pau-sub);line-height:1.5;"><b>주요 개정 요약:</b> ' + rev.summaryLines.slice(0, 6).map(function (s) { return esc(s); }).join(' · ') + '</div>' : ''),
-            (rev.diffs.length ? [
-              '  <div class="pau-tbl-wrap" style="max-height:240px;margin-bottom:8px;">',
-              '    <table class="pau-tbl">',
-              '      <thead><tr><th class="c-no">№</th><th style="width:18%;">개정 조문 · 항목</th><th style="width:35%;">⏪ 과거 임단협 (개정 전)</th><th style="width:35%;">⏩ 현행 임단협 (개정 후)</th><th style="width:12%;">비고</th></tr></thead>',
-              '      <tbody>',
-              rev.diffs.map(function (d, idx) {
-                return '<tr><td class="c-no">' + (idx + 1) + '</td><td title="' + esc(d.art) + '" style="font-weight:700;">' + esc(d.art) + '</td><td title="' + esc(d.before) + '">' + esc(d.before) + '</td><td title="' + esc(d.after) + '" style="color:var(--pau-pri);font-weight:600;">' + esc(d.after) + '</td><td>' + esc(d.note) + '</td></tr>';
-              }).join(''),
-              '      </tbody>',
-              '    </table>',
-              '  </div>'
-            ].join('') : '')
-          ].join('');
-        }).join('') : ''),
-
-        '  <div style="font-size:12px;font-weight:700;margin:6px 0 4px;">📅 전체 연혁 타임라인 (' + fmtNum(timeline.length) + '건)</div>',
-        '  <div class="pau-tbl-wrap" style="max-height:260px;">',
-        '    <table class="pau-tbl">',
-        '      <thead><tr><th class="c-no">№</th><th style="width:12%;">연혁 일자</th><th style="width:13%;">영역 분류</th><th style="width:23%;">임단협·공시·규정 제목</th><th style="width:20%;">체결·개정 주요 요약</th><th style="width:14%;">시점 대조</th><th style="width:18%;">원문 · 첨부</th></tr></thead>',
-        '      <tbody>',
-        (timeline.length ? timeline.map(function (t, i) {
-          var cmpIdx = agreementsForCompare.findIndex(function (x) { return x.id === t.id; });
-          var isA = verA && verA.id === t.id;
-          var isB = verB && verB.id === t.id;
-          var tlTargetType = resolveTargetTypeFromDisc(t);
-          var safeView = safeHttpUrl(buildOrganUrl(inst, t.dno, tlTargetType));
-          var filePillsHtml = renderFilePills(t.files, '첨부원문');
-          return [
-            '<tr' + ((isA || isB) ? ' style="background:var(--pau-pri-bg);"' : '') + '>',
-            '  <td class="c-no">' + (i + 1) + '</td>',
-            '  <td style="font-weight:700;"><span class="pau-pill">' + esc(t.year) + '</span> ' + esc(t.date) + '</td>',
-            '  <td><span class="pau-pill ' + (t.catGroup === 'AGREEMENT' ? 'fktu' : (t.catGroup === 'SEPARATE' ? 'multi' : 'ok')) + '">' + esc(t.cname) + '</span></td>',
-            '  <td title="' + esc(t.title) + '" style="font-weight:700;">' + esc(t.title) + '</td>',
-            '  <td title="' + esc(t.summary) + '">' + esc(t.summary || '—') + '</td>',
-            '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">',
-            (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isA ? ' pri' : '') + '" data-set-vera="' + cmpIdx + '">과거A' + (isA ? '✓' : '') + '</button>' : ''),
-            (cmpIdx >= 0 ? '<button type="button" class="pau-act-btn' + (isB ? ' pri' : '') + '" data-set-verb="' + cmpIdx + '">현행B' + (isB ? '✓' : '') + '</button>' : ''),
-            '  </div></td>',
-            '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + filePillsHtml + (safeView ? '<a class="pau-pill ok" href="' + esc(safeView) + '"' + ((isLoc && !isErcMoisOrgan(inst)) ? (' data-cleaneye-post="' + esc(aid) + '" data-cleaneye-type="' + esc(tlTargetType) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시원문</a>' : '') + (!filePillsHtml && !safeView ? '—' : '') + '</div></td>',
-            '</tr>'
-          ].join('');
-        }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--pau-muted);">해당 영역 분류의 연혁 문서가 없습니다.</td></tr>'),
-        '      </tbody>',
-        '    </table>',
-        '  </div>',
-        '</div>',
-
-        // 섹션 ④: 유사 공공기관·지방공공기관 자동 추천 & 비교함 연동
-        '<div class="pau-sec-card">',
-        '  <div class="pau-sec-tit">',
-        '    <span>🏛️ ④ ' + esc(inst.name) + ' — 유사 공공기관·지방공공기관 임단협 추천 목록 (' + fmtNum(similars.length) + '곳)</span>',
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <select data-f="hSimMode" aria-label="유사기관 추천 기준 선택">',
-        '        <option value="ALL"' + (state.hSimMode === 'ALL' ? ' selected' : '') + '>유사 기준: 종합 추천 (업종+부처/지자체+유형+규모)</option>',
-        '        <option value="SECTOR"' + (state.hSimMode === 'SECTOR' ? ' selected' : '') + '>동종 업종 기관만 (' + esc(rec.sectorLabel) + ')</option>',
-        '        <option value="MINISTRY"' + (state.hSimMode === 'MINISTRY' ? ' selected' : '') + '>동일 소관부처·시도 지자체 (' + esc(inst.ministry || '') + ')</option>',
-        '        <option value="TYPE"' + (state.hSimMode === 'TYPE' ? ' selected' : '') + '>동일·유사 기관유형 (' + esc(inst.inst_type || '') + ')</option>',
-        '      </select>',
-        '      <button type="button" class="pau-act-btn pri" data-go-visual-cmp="' + esc(aid) + '">📊 상위 유사기관들과 그래프·히트맵 비교</button>',
-        '    </div>',
-        '  </div>',
-        '  <div class="pau-tbl-wrap" style="max-height:280px;">',
-        '    <table class="pau-tbl">',
-        '      <thead><tr><th class="c-no">№</th><th style="width:19%;">기관명 · 소관 (클릭→별개 창)</th><th style="width:13%;">권역 · 유형</th><th style="width:15%;">대표노조 · 상급</th><th style="width:10%;">조합원 · 조직률</th><th style="width:9%;">타임오프</th><th style="width:18%;">유사 선정 사유 · 점수</th><th style="width:16%;">비교담기 · 상세</th></tr></thead>',
-        '      <tbody>',
-        (similars.length ? similars.map(function (sim, idx) {
-          var sRec = organById[sim.apba_id];
-          var sInCmp = state.compareIds.indexOf(sim.apba_id) >= 0;
-          var sRep = (sim.unions || [])[0] || {};
-          var simOrgFull = sim.name + (sim.ministry ? ' (' + sim.ministry + ')' : '');
-          return [
-            '<tr>',
-            '  <td class="c-no">' + (idx + 1) + '</td>',
-            '  <td title="' + esc(simOrgFull) + '"><a href="pu-alio-union.html?organ=' + encodeURIComponent(sim.apba_id) + '" data-jump-organ="' + esc(sim.apba_id) + '" style="color:var(--pau-pri);font-weight:700;text-decoration:none;">↗ ' + esc(simOrgFull) + '</a></td>',
-            '  <td><span class="pau-pill ' + (isLocalOrgan(sim.apba_id) ? 'loc' : '') + '">' + (isLocalOrgan(sim.apba_id) ? '지방' : '중앙') + '</span> ' + esc(sim.inst_type || '') + '</td>',
-            '  <td><span class="pau-pill ' + confedClass(sRep.confederation) + '">' + esc(sRep.confederation || '미가입') + '</span> ' + esc(sRep.union_name || '—') + '</td>',
-            '  <td class="c-num">' + fmtNum(sim.memberTotal) + '명' + (sRec ? (' (' + Math.round(sRec.orgRate) + '%)') : '') + '</td>',
-            '  <td class="c-num">' + (sim.timeoffHours ? fmtNum(sim.timeoffHours) + 'h' : '—') + '</td>',
-            '  <td><span class="pau-pill fktu">' + sim.score + '점</span> ' + esc((sim.reasons || []).join(' · ')) + '</td>',
-            '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
-              '<button type="button" class="pau-act-btn' + (sInCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(sim.apba_id) + '">' + (sInCmp ? '✓비교담김' : '+비교담기') + '</button>' +
-              '<button type="button" class="pau-act-btn" data-open-organ-here="' + esc(sim.apba_id) + '">🔎 열기</button>' +
-            '</div></td>',
-            '</tr>'
-          ].join('');
-        }).join('') : '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--pau-muted);">선택한 추천 기준에 해당하는 유사기관이 없습니다.</td></tr>'),
-        '      </tbody>',
-        '    </table>',
-        '  </div>',
+        ].join('') : (state.hSubTab === 'PEERS' ? [
+          '  <div class="pau-tbl-wrap" style="max-height:320px;">',
+          '    <table class="pau-tbl">',
+          '      <thead><tr><th class="c-no">№</th><th style="width:19%;">기관명 · 소관 (클릭→별개 창)</th><th style="width:13%;">권역 · 유형</th><th style="width:15%;">대표노조 · 상급</th><th style="width:10%;">조합원 · 조직률</th><th style="width:9%;">타임오프</th><th style="width:18%;">유사 선정 사유 · 점수</th><th style="width:16%;">비교담기 · 상세</th></tr></thead>',
+          '      <tbody>',
+          (similars.length ? similars.map(function (sim, idx) {
+            var sRec = organById[sim.apba_id];
+            var sInCmp = state.compareIds.indexOf(sim.apba_id) >= 0;
+            var sRep = (sim.unions || [])[0] || {};
+            var simOrgFull = sim.name + (sim.ministry ? ' (' + sim.ministry + ')' : '');
+            return [
+              '<tr>',
+              '  <td class="c-no">' + (idx + 1) + '</td>',
+              '  <td title="' + esc(simOrgFull) + '"><a href="pu-alio-union.html?organ=' + encodeURIComponent(sim.apba_id) + '" data-jump-organ="' + esc(sim.apba_id) + '" style="color:var(--pau-pri);font-weight:700;text-decoration:none;">↗ ' + esc(simOrgFull) + '</a></td>',
+              '  <td><span class="pau-pill ' + (isLocalOrgan(sim.apba_id) ? 'loc' : '') + '">' + (isLocalOrgan(sim.apba_id) ? '지방' : '중앙') + '</span> ' + esc(sim.inst_type || '') + '</td>',
+              '  <td><span class="pau-pill ' + confedClass(sRep.confederation) + '">' + esc(sRep.confederation || '미가입') + '</span> ' + esc(sRep.union_name || '—') + '</td>',
+              '  <td class="c-num">' + fmtNum(sim.memberTotal) + '명' + (sRec ? (' (' + Math.round(sRec.orgRate) + '%)') : '') + '</td>',
+              '  <td class="c-num">' + (sim.timeoffHours ? fmtNum(sim.timeoffHours) + 'h' : '—') + '</td>',
+              '  <td><span class="pau-pill fktu">' + sim.score + '점</span> ' + esc((sim.reasons || []).join(' · ')) + '</td>',
+              '  <td style="white-space:normal;"><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' +
+                '<button type="button" class="pau-act-btn' + (sInCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(sim.apba_id) + '">' + (sInCmp ? '✓비교담김' : '+비교담기') + '</button>' +
+                '<button type="button" class="pau-act-btn" data-open-organ-here="' + esc(sim.apba_id) + '">🔎 열기</button>' +
+              '</div></td>',
+              '</tr>'
+            ].join('');
+          }).join('') : '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--pau-muted);">선택한 추천 기준에 해당하는 유사기관이 없습니다.</td></tr>'),
+          '      </tbody>',
+          '    </table>',
+          '  </div>'
+        ].join('') : [
+          '  <div class="pau-vis-grid">',
+          '    <div class="pau-card">',
+          '      <div class="pau-card-hd"><span>🕸️ 6대 영역 프로파일 레이더 비교 (기준 vs 유사기관 vs 업종평균)</span></div>',
+          renderRadarChartSvg([rec].concat(topPeerRecs), sectorBench),
+          '    </div>',
+          '    <div class="pau-card">',
+          '      <div class="pau-card-hd"><span>🔵 동종업종(' + esc(rec.sectorLabel) + ') 조합원 규모 ↔ 타임오프 위치 진단</span></div>',
+          renderScatterTimeoffSvg(sectorPool, [rec].concat(topPeerRecs)),
+          '    </div>',
+          '  </div>',
+          renderGroupedKpiBarsHtml([rec].concat(topPeerRecs), sectorBench)
+        ].join(''))),
         '</div>'
       ].join('');
 
@@ -3164,23 +3210,21 @@
         var selectedRows = rows.filter(function (r) { return state.mChecked[r.apba_id]; });
 
         bodyEl.innerHTML = [
-          '<div class="pau-chips" style="justify-content:space-between;">',
-          '  <div style="display:flex;gap:5px;flex-wrap:wrap;">',
-          '    <button type="button" class="pau-act-btn" data-m-submode="STUDIO">📊 다중기관 그래프·히트맵 비교 스튜디오</button>',
-          '    <button type="button" class="pau-act-btn pri" data-m-submode="ALL_LIST">⚖️ 전 기관 단일쟁점 일람·원문검색</button>',
-          '  </div>',
-          '</div>',
-          '<div class="pau-chips">',
-          METRIC_DEFS.map(function (d) {
-            return '<button type="button" class="pau-chip' + (state.mIssue === d.key ? ' on' : '') + '" data-issue="' + esc(d.key) + '">' + esc(d.label) + '</button>';
-          }).join(''),
-          '</div>',
           '<div class="pau-flt">',
+          '  <div class="pau-seg" role="group" aria-label="비교분석 보기 전환">',
+          '    <button type="button" class="pau-seg-btn" data-m-submode="STUDIO">📊 다중기관 비교</button>',
+          '    <button type="button" class="pau-seg-btn on" data-m-submode="ALL_LIST">⚖️ 단일쟁점 목록</button>',
+          '  </div>',
+          '  <select data-f="mIssue" aria-label="13대 핵심 단협 쟁점 선택" style="font-weight:700;">',
+          METRIC_DEFS.map(function (d) {
+            return '<option value="' + esc(d.key) + '"' + (state.mIssue === d.key ? ' selected' : '') + '>쟁점: ' + esc(d.label) + '</option>';
+          }).join(''),
+          '  </select>',
           '  <select data-f="mScope" aria-label="중앙·지방 구분">',
-          '    <option value="ALL"' + (state.mScope === 'ALL' ? ' selected' : '') + '>전체 기관 (중앙+지방)</option>',
-          '    <option value="CENTRAL"' + (state.mScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙공공기관 (ALIO)</option>',
-          '    <option value="LOCAL_ALL"' + (state.mScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방공공기관·산하단체 전체</option>',
-          '    <option value="LOCAL_ERC_MOIS"' + (state.mScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 지방공기업평가원·행안부 유관</option>',
+          '    <option value="ALL"' + (state.mScope === 'ALL' ? ' selected' : '') + '>구분 전체 (중앙+지방)</option>',
+          '    <option value="CENTRAL"' + (state.mScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
+          '    <option value="LOCAL_ALL"' + (state.mScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방 전체</option>',
+          '    <option value="LOCAL_ERC_MOIS"' + (state.mScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관</option>',
           '  </select>',
           '  <select data-f="mType" aria-label="기관유형 선택">',
           '    <option value="">기관유형 전체</option>',
@@ -3190,15 +3234,15 @@
           '    <option value="">상급단체 전체</option>',
           allConfeds.map(function (c) { return '<option value="' + esc(c) + '"' + (state.mConfed === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''),
           '  </select>',
-          '  <input type="search" data-f="mQuery" aria-label="쟁점 조문 검색" placeholder="기관명·조문 내용·요약값 검색..." value="' + esc(state.mQuery) + '">',
+          '  <input type="search" data-f="mQuery" aria-label="쟁점 조문 검색" placeholder="기관명·조문 검색" value="' + esc(state.mQuery) + '" style="min-width:155px;max-width:220px;">',
           '  <span class="pau-flt-hint" style="font-size:12px;font-weight:700;">⚖️ ' + esc(def.lawTitle) + '</span>',
           '</div>',
           '<div class="pau-bulk' + (checkedAids.length ? ' on' : '') + '">',
           '  <span>☑️ 선택한 <b>' + fmtNum(checkedAids.length) + '곳</b> 하단 원문 대조 중</span>',
-          '  <button type="button" class="pau-act-btn pri" data-m-bulk-cmp>📊 선택 기관 그래프·히트맵 비교로 전환</button>',
+          '  <button type="button" class="pau-act-btn pri" data-m-bulk-cmp>📊 선택 기관 그래프·히트맵 비교</button>',
           '  <button type="button" class="pau-act-btn" data-m-bulk-clr>선택 해제</button>',
           '</div>',
-          '<div class="pau-tbl-wrap" style="max-height:340px;">',
+          '<div class="pau-tbl-wrap" style="max-height:360px;">',
           '  <table class="pau-tbl">',
           '    <thead><tr><th class="c-ck"><label class="pau-ck-lbl"><input type="checkbox" data-m-all aria-label="상위 6개 기관 전체 선택"' + (rows.length && rows.slice(0, 6).every(function (r) { return !!state.mChecked[r.apba_id]; }) ? ' checked' : '') + '></label></th><th class="c-no">№</th><th style="width:18%;">기관명 (클릭→별개 창)</th><th style="width:15%;">대표노조 · 상급</th><th style="width:11%;">조합원 · 타임오프</th><th style="width:18%;">단협 핵심 지표 요약</th><th style="width:23%;">조문 발췌</th><th style="width:12%;">비교담기</th></tr></thead>',
           '    <tbody>',
@@ -3220,7 +3264,7 @@
               '  <td class="c-num">' + esc(memFull) + '</td>',
               '  <td title="' + esc(r.metric_value || '') + '" style="font-weight:700;color:var(--pau-pri);">' + esc(r.metric_value || '—') + '</td>',
               '  <td title="' + esc(snip) + '">' + esc(snip || '—') + '</td>',
-              '  <td style="white-space:normal;"><button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(r.apba_id) + '">' + (inCmp ? '✓비교담김' : '+비교담기') + '</button></td>',
+              '  <td style="white-space:normal;"><button type="button" class="pau-act-btn' + (inCmp ? ' pri' : '') + '" data-toggle-cmp="' + esc(r.apba_id) + '">' + (inCmp ? '✓비교' : '+비교') + '</button></td>',
               '</tr>'
             ].join('');
           }).join('') : '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--pau-muted);">조건에 해당하는 쟁점 지표 데이터가 없습니다.</td></tr>'),
@@ -3233,12 +3277,6 @@
         Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-m-submode]'), function (b) {
           b.addEventListener('click', function () {
             state.mSubMode = b.getAttribute('data-m-submode') || 'STUDIO';
-            renderTabMatrix();
-          });
-        });
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-issue]'), function (b) {
-          b.addEventListener('click', function () {
-            state.mIssue = b.getAttribute('data-issue');
             renderTabMatrix();
           });
         });
@@ -3336,40 +3374,40 @@
       ];
 
       bodyEl.innerHTML = [
-        // 상단 모드 전환 및 비교 대상 기관 빌더
-        '<div class="pau-flt" style="justify-content:space-between;">',
-        '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '    <button type="button" class="pau-act-btn pri" data-m-submode="STUDIO">📊 다중기관 그래프·히트맵 비교 스튜디오</button>',
-        '    <button type="button" class="pau-act-btn" data-m-submode="ALL_LIST">⚖️ 전 기관 단일쟁점 일람·원문검색</button>',
-        '    <button type="button" class="pau-act-btn" data-preset-cmp="PEER">🔄 기준기관 유사그룹 자동채우기</button>',
-        '    <button type="button" class="pau-act-btn" data-preset-cmp="METRO">🚇 도시철도·교통공사 비교</button>',
-        '    <button type="button" class="pau-act-btn" data-preset-cmp="MOIS">🏛️ 행안부·평가원 유관기관 비교</button>',
-        '  </div>',
-        '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '    <input type="search" data-f="cmpAddQuery" aria-label="비교 추가할 기관 검색" placeholder="비교 추가할 기관 검색..." value="' + esc(state.cmpAddQuery) + '" style="max-width:170px;">',
-        '    <select data-cmp-add-sel aria-label="비교함에 추가할 기관 선택" style="max-width:230px;">',
-        '      <option value="">+ 비교할 기관 선택 추가 (최대 6곳)</option>',
+        // 상단 단일 통합 컨트롤 + 비교 대상 기관 배지 카드
+        '<div class="pau-sec-card" style="padding:8px 10px;">',
+        '  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">',
+        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+        '      <div class="pau-seg" role="group" aria-label="비교분석 보기 전환">',
+        '        <button type="button" class="pau-seg-btn on" data-m-submode="STUDIO">📊 다중기관 비교</button>',
+        '        <button type="button" class="pau-seg-btn" data-m-submode="ALL_LIST">⚖️ 단일쟁점 목록</button>',
+        '      </div>',
+        '      <button type="button" class="pau-act-btn" data-preset-cmp="PEER">🔄 유사그룹</button>',
+        '      <button type="button" class="pau-act-btn" data-preset-cmp="METRO">🚇 교통공사</button>',
+        '      <button type="button" class="pau-act-btn" data-preset-cmp="MOIS">🏛️ 행안부유관</button>',
+        '    </div>',
+        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+        '      <input type="search" data-f="cmpAddQuery" aria-label="비교 추가할 기관 검색" placeholder="추가 기관 필터" value="' + esc(state.cmpAddQuery) + '" style="min-width:140px;max-width:185px;">',
+        '      <select data-cmp-add-sel aria-label="비교함에 추가할 기관 선택" style="max-width:230px;">',
+        '        <option value="">+ 기관 추가 (최대 6곳)</option>',
         addCandidates.map(function (c) {
           return '<option value="' + esc(c.aid) + '">' + esc('(' + c.scopeLabel + ') ' + c.name + ' · ' + fmtNum(c.memberTotal) + '명') + '</option>';
         }).join(''),
-        '    </select>',
+        '      </select>',
+        '    </div>',
         '  </div>',
-        '</div>',
-
-        // 현재 비교 중인 기관 배지 스트립
-        '<div class="pau-sec-card" style="padding:8px 12px;">',
-        '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
+        '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px dashed var(--pau-bd);">',
         '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <b style="font-size:12.5px;">🎯 현재 직접 비교 대상 (' + cmpRecs.length + '개 기관 + 업종 평균선):</b>',
+        '      <b style="font-size:12px;">🎯 비교 대상 (' + cmpRecs.length + '곳 + 업종평균):</b>',
         cmpRecs.map(function (r, idx) {
           var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
-          return '<span style="display:inline-flex;align-items:center;gap:4px;">' +
+          return '<span style="display:inline-flex;align-items:center;gap:3px;">' +
             '<a class="pau-act-btn" href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="border:2px solid ' + pal.stroke + ';font-weight:800;text-decoration:none;">' +
-            (idx === 0 ? '⭐ 기준: ' : ('비교' + idx + ': ')) + esc(r.name) + '</a>' +
+            (idx === 0 ? '⭐ ' : ('비교' + idx + ': ')) + esc(r.name) + '</a>' +
             '<button type="button" class="pau-act-btn" data-cmp-rm-here="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 제외') + '" style="padding:4px 7px;">✕</button></span>';
         }).join(''),
         '    </div>',
-        '    <span style="font-size:11.5px;color:var(--pau-muted);">💡 아래 그래프·정량표·13대 쟁점 히트맵이 선택한 기관 기준으로 실시간 동기화됩니다</span>',
+        '    <span style="font-size:11.5px;color:var(--pau-muted);">그래프·정량표·13대 쟁점 히트맵 실시간 동기화</span>',
         '  </div>',
         '</div>',
 
@@ -3464,8 +3502,8 @@
               var diffBadge = '';
               if (cIdx > 0) {
                 if (sc.score >= baseSc.score + 8) diffBadge = ' <span style="font-weight:800;white-space:nowrap;">▲강화</span>';
-                else if (sc.score <= baseSc.score - 8) diffBadge = ' <span style="opacity:.85;white-space:nowrap;">▼완화</span>';
-                else diffBadge = ' <span style="opacity:.7;white-space:nowrap;">━유사</span>';
+                else if (sc.score <= baseSc.score - 8) diffBadge = ' <span style="font-weight:700;white-space:nowrap;">▼완화</span>';
+                else diffBadge = ' <span style="white-space:nowrap;">━유사</span>';
               }
               return '<td class="pau-hm-cell lv' + sc.level + '" title="' + esc(r.name + ' [' + sc.tag + ' · ' + sc.score + '점] ' + sc.val + (sc.snip ? ' — ' + sc.snip : '')) + '">' +
                 '<span class="pau-show-sm" style="font-weight:800;">' + esc(r.name) + ': </span><b style="white-space:nowrap;">[' + esc(sc.tag) + ']</b>' + diffBadge + ' ' + esc(sc.val) + '</td>';
@@ -3590,7 +3628,7 @@
       fetchLawLive(def.lawKey, function (err, law) {
         if (!lawBox) return;
         if (err || !law) {
-          lawBox.textContent = def.lawTitle + ' — 법령 원문 조회 대기 중 (탭 6에서 전체 조문 조회 가능)';
+          lawBox.textContent = def.lawTitle + ' — 법령 원문 조회 대기 중 (🔌 API 탭에서 전체 조문 조회 가능)';
           return;
         }
         var a = law.arts[def.lawArt];
@@ -3601,8 +3639,17 @@
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // 탭 4: 단체협약 조문 통합 검색
+    // 탭 4: 조문·원문 통합 (단체협약 조문 통합 검색 + 기관별 공시·별도합의·내부규정 원문)
     // ════════════════════════════════════════════════════════════════════════
+    function renderDocModeToggleHtml() {
+      return [
+        '<div class="pau-seg" role="group" aria-label="조문·원문 전환">',
+        '  <button type="button" class="pau-seg-btn' + (state.docMode !== 'DISC' ? ' on' : '') + '" data-doc-mode="ARTICLES">🔍 단협 조문 (' + fmtNum(totalArt) + ')</button>',
+        '  <button type="button" class="pau-seg-btn' + (state.docMode === 'DISC' ? ' on' : '') + '" data-doc-mode="DISC">📂 공시·사규 원문 (' + fmtNum(totalDisc) + ')</button>',
+        '</div>'
+      ].join('');
+    }
+
     function filterArticles() {
       var q = state.aQuery.trim().toLowerCase();
       return safeArticles.filter(function (a) {
@@ -3622,19 +3669,20 @@
 
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
+        '  ' + renderDocModeToggleHtml(),
         '  <select data-f="aScope" aria-label="기관 권역 선택">',
-        '    <option value="ALL"' + (state.aScope === 'ALL' ? ' selected' : '') + '>전체 기관 (중앙+지방)</option>',
-        '    <option value="CENTRAL"' + (state.aScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙공공기관 (ALIO)</option>',
-        '    <option value="LOCAL_ALL"' + (state.aScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방공공기관·산하단체 전체</option>',
-        '    <option value="LOCAL_ERC_MOIS"' + (state.aScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 지방공기업평가원·행안부 유관</option>',
+        '    <option value="ALL"' + (state.aScope === 'ALL' ? ' selected' : '') + '>구분 전체 (중앙+지방)</option>',
+        '    <option value="CENTRAL"' + (state.aScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
+        '    <option value="LOCAL_ALL"' + (state.aScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방 전체</option>',
+        '    <option value="LOCAL_ERC_MOIS"' + (state.aScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관</option>',
         '  </select>',
         '  <select data-f="aCat" aria-label="조문 분류 선택">',
         TAXONOMY_LIST.map(function (t) {
           return '<option value="' + esc(t[0]) + '"' + (state.aCat === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>';
         }).join(''),
         '  </select>',
-        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문 제목·본문 키워드 검색 (예: 타임오프, 징계위원회, 정년, 자동연장, 병가, 육아휴직)..." value="' + esc(state.aQuery) + '">',
-        '  <span style="font-size:12px;">조회 조문 <b>' + fmtNum(rows.length) + '</b>건</span>',
+        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문 검색 (예: 타임오프, 징계, 정년)" value="' + esc(state.aQuery) + '" style="min-width:220px;">',
+        '  <span style="font-size:12px;margin-left:auto;">조회 <b>' + fmtNum(rows.length) + '</b>건</span>',
         '</div>',
         '<div class="pau-tbl-wrap">',
         '  <table class="pau-tbl">',
@@ -3681,9 +3729,6 @@
       });
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // 탭 5: 기관별 공시·별도합의·내부규정 원문
-    // ════════════════════════════════════════════════════════════════════════
     function filterDisclosures() {
       var q = state.dQuery.trim().toLowerCase();
       return safeDiscs.filter(function (d) {
@@ -3723,13 +3768,14 @@
 
       bodyEl.innerHTML = [
         '<div class="pau-flt">',
+        '  ' + renderDocModeToggleHtml(),
         '  <select data-f="dScope" aria-label="중앙·지방 구분">',
-        '    <option value="ALL"' + (state.dScope === 'ALL' ? ' selected' : '') + '>전체 기관 (중앙+지방)</option>',
-        '    <option value="CENTRAL"' + (state.dScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙공공기관 (ALIO)</option>',
-        '    <option value="LOCAL_ALL"' + (state.dScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방공공기관·산하단체 전체</option>',
-        '    <option value="LOCAL_ERC_MOIS"' + (state.dScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 지방공기업평가원·행안부 유관 (6곳)</option>',
+        '    <option value="ALL"' + (state.dScope === 'ALL' ? ' selected' : '') + '>구분 전체 (중앙+지방)</option>',
+        '    <option value="CENTRAL"' + (state.dScope === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
+        '    <option value="LOCAL_ALL"' + (state.dScope === 'LOCAL_ALL' ? ' selected' : '') + '>🏙️ 지방 전체</option>',
+        '    <option value="LOCAL_ERC_MOIS"' + (state.dScope === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관</option>',
         '  </select>',
-        '  <input type="search" data-f="dOrganSearch" aria-label="공시 조회 기관명 필터" placeholder="기관명 빠른 필터..." value="' + esc(state.dOrganSearch) + '" style="max-width:170px;">',
+        '  <input type="search" data-f="dOrganSearch" aria-label="공시 조회 기관명 필터" placeholder="기관 필터" value="' + esc(state.dOrganSearch) + '" style="min-width:120px;max-width:165px;">',
         '  <select data-f="dOrgan" aria-label="공시 조회 기관 선택">',
         '    <option value="">전체 기관 (' + fmtNum(scopedOrgans.length) + '곳)</option>',
         scopedOrgans.map(function (i) {
@@ -3741,19 +3787,20 @@
           return '<option value="' + esc(t[0]) + '"' + (state.dTax === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>';
         }).join(''),
         '  </select>',
-        '  <input type="search" data-f="dQuery" aria-label="공시문서 검색" placeholder="공시문서명·첨부파일명 검색..." value="' + esc(state.dQuery) + '">',
-        (selectedInst ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(selectedInst.apba_id) + '">🔎 ' + esc(selectedInst.name) + ' 6대영역·비교</button>' : ''),
+        '  <input type="search" data-f="dQuery" aria-label="공시문서 검색" placeholder="문서·첨부파일명 검색" value="' + esc(state.dQuery) + '" style="min-width:175px;max-width:240px;">',
+        (selectedInst ? '<button type="button" class="pau-act-btn pri" data-open-organ-here="' + esc(selectedInst.apba_id) + '">🔎 ' + esc(selectedInst.name) + ' 상세</button>' : ''),
         (safeSelectedUnionUrl ? '<a class="pau-act-btn" href="' + esc(safeSelectedUnionUrl) + '"' + ((selectedInst && isLocalOrgan(selectedInst) && !isErcMoisOrgan(selectedInst)) ? (' data-cleaneye-post="' + esc(selectedInst.apba_id) + '" data-cleaneye-type="' + esc(state.dTax === '21110' ? 'rules' : (state.dTax === '63787' ? 'union_status' : (state.dTax === '21025' ? 'multi_union' : 'union_info'))) + '"') : '') + ' target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔗 공시 원문</a>' : ''),
         '</div>',
+        '<div class="pau-subbar">',
+        '  <span>조회 공시·사규 문서 <b>' + fmtNum(rows.length) + '</b>건' + (rows.length > pageSize ? ' (' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '번째 표시)' : '') + '</span>',
         (rows.length > pageSize ? [
-          '<div class="pau-pager">',
-          '  <span>전체 <b>' + fmtNum(rows.length) + '</b>건 중 <b>' + fmtNum(startIdx + 1) + '~' + fmtNum(startIdx + visibleRows.length) + '</b>번째 표시 (페이지 ' + (state.dPage + 1) + '/' + totalPages + ')</span>',
-          '  <div style="display:flex;gap:6px;">',
-          '    <button type="button" class="pau-act-btn" data-d-prev' + (state.dPage <= 0 ? ' disabled' : '') + '>◀ 이전 ' + pageSize + '건</button>',
-          '    <button type="button" class="pau-act-btn" data-d-next' + (state.dPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ' + pageSize + '건 ▶</button>',
-          '  </div>',
-          '</div>'
+          '  <div style="display:flex;align-items:center;gap:6px;">',
+          '    <span>' + (state.dPage + 1) + ' / ' + totalPages + ' 페이지</span>',
+          '    <button type="button" class="pau-act-btn" data-d-prev' + (state.dPage <= 0 ? ' disabled' : '') + '>◀ 이전</button>',
+          '    <button type="button" class="pau-act-btn" data-d-next' + (state.dPage + 1 >= totalPages ? ' disabled' : '') + '>다음 ▶</button>',
+          '  </div>'
         ].join('') : ''),
+        '</div>',
         '<div class="pau-tbl-wrap">',
         '  <table class="pau-tbl">',
         '    <thead><tr><th class="c-no">№</th><th style="width:17%;">기관명 (클릭→별개 창)</th><th style="width:14%;">공시항목 분류</th><th style="width:23%;">문서 제목 · 기준연혁일</th><th style="width:22%;">원문 첨부파일 · 공시뷰어 API</th><th style="width:24%;">본문 요약 · 추출 미리보기</th></tr></thead>',
@@ -3839,7 +3886,7 @@
           return '<option value="' + esc(l.key) + '"' + (state.apiLawKey === l.key ? ' selected' : '') + '>' + esc(l.name) + '</option>';
         }).join(''),
         '      </select>',
-        '      <input type="text" data-f="apiLawArt" aria-label="법령 조문번호 입력" placeholder="조문번호 (예: 24, 29의2, 50, 60)" value="' + esc(state.apiLawArt) + '" style="max-width:150px;">',
+        '      <input type="text" data-f="apiLawArt" aria-label="법령 조문번호 입력" placeholder="조문번호 (예: 24)" value="' + esc(state.apiLawArt) + '" style="min-width:145px;max-width:185px;">',
         '      <button type="button" class="pau-act-btn pri" data-api-law-run>법령 조문 조회</button>',
         '    </div>',
         '    <pre class="pau-card-pre" data-api-law-out style="max-height:260px;">조회 중...</pre>',
@@ -3847,7 +3894,7 @@
         '  <div class="pau-card">',
         '    <div class="pau-card-hd"><span>🏛️ 2. 중앙 ALIO + 지방 클린아이(Cleaneye) + 평가원 원문 직결 API</span><span class="pau-pill ok">실시간 연결됨</span></div>',
         '    <div class="pau-flt" style="margin:4px 0;">',
-        '      <input type="search" data-f="apiAlioSearch" aria-label="API 대상 기관명 검색" placeholder="기관명 빠른 검색..." value="' + esc(state.apiAlioSearch) + '" style="max-width:160px;">',
+        '      <input type="search" data-f="apiAlioSearch" aria-label="API 대상 기관명 검색" placeholder="기관 필터" value="' + esc(state.apiAlioSearch) + '" style="min-width:125px;max-width:175px;">',
         '      <select data-f="apiAlioAid" aria-label="API 대상 기관 선택">',
         apiOrgans.map(function (i) {
           return '<option value="' + esc(i.apba_id) + '"' + (state.apiAlioAid === i.apba_id ? ' selected' : '') + '>' + esc((isLocalOrgan(i) ? '(지방) ' : '(중앙) ') + i.name + ' (' + i.apba_id + ')') + '</option>';
@@ -3880,7 +3927,7 @@
         '  <div class="pau-card">',
         '    <div class="pau-card-hd"><span>🔑 3. 공공데이터포털 (data.go.kr) Open API 열쇠 & 공휴일 캐시 연동</span><span class="pau-pill ' + (state.apiDataKey ? 'ok' : 'multi') + '">' + esc(state.apiKeySource) + '</span></div>',
         '    <div class="pau-flt" style="margin:4px 0;">',
-        '      <input type="password" data-api-key-in aria-label="공공데이터포털 인증키 입력" placeholder="공공데이터포털 Decoding 인증키 입력..." value="' + esc(state.apiDataKey) + '" autocomplete="off">',
+        '      <input type="password" data-api-key-in aria-label="공공데이터포털 인증키 입력" placeholder="공공데이터포털 인증키 입력" value="' + esc(state.apiDataKey) + '" autocomplete="off" style="min-width:210px;">',
         '      <button type="button" class="pau-act-btn pri" data-api-key-save>인증키 저장·동기화</button>',
         '    </div>',
         '    <pre class="pau-card-pre" style="max-height:220px;">' + esc([
@@ -3978,7 +4025,7 @@
           if (key === 'uScope' || key === 'uSector' || key === 'uType' || key === 'uMinistry' || key === 'uConfed' || key === 'uStruct' || key === 'uSort' || key === 'uQuery') {
             state.uPage = 0;
           }
-          if (key === 'dScope' || key === 'dOrgan' || key === 'dTax' || key === 'dQuery') {
+          if (key === 'dScope' || key === 'dOrganSearch' || key === 'dOrgan' || key === 'dTax' || key === 'dQuery') {
             state.dPage = 0;
           }
           if (key === 'hOrgan') {
@@ -4064,7 +4111,7 @@
             return [def.label, r.apba_id, r.inst_name, r.inst_type, r.metric_value, r.evidence_article, r.snippet];
           })
         );
-      } else if (state.tab === 'articles') {
+      } else if (state.tab === 'articles' && state.docMode !== 'DISC') {
         var arts = filterArticles();
         downloadCsv(
           '공공임단협_단협조문검색.csv',
@@ -4089,8 +4136,10 @@
       if (state.tab === 'unions') renderTabUnions();
       else if (state.tab === 'organ') renderTabOrganHistory();
       else if (state.tab === 'matrix') renderTabMatrix();
-      else if (state.tab === 'articles') renderTabArticles();
-      else if (state.tab === 'detail') renderTabDetail();
+      else if (state.tab === 'articles') {
+        if (state.docMode === 'DISC') renderTabDetail();
+        else renderTabArticles();
+      } else if (state.tab === 'detail') renderTabDetail();
       else renderTabApiHub();
     }
 
