@@ -10,11 +10,15 @@
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script>
 /* 폰 「공유 → 푸른이알피」를 받는 일꾼 (대표 지시 2026-09-17).
-   ⚠ 이 일꾼은 아무것도 캐시하지 않는다 — 공유 POST 말고는 손도 안 댄다(pu-erp-sw.js 머리 참고).
+   ★ 통합 일꾼 pu-sw.js 하나를 다른 앱들과 «함께» 등록한다 (2026-11-15).
+     예전에는 이알피만 pu-erp-sw.js 를 같은 자리(/pureunall/)에 따로 등록해, 이알피를 연 뒤에는
+     기업정보함·사진첩 등의 공유가 죽고 다른 앱을 연 뒤에는 이알피 공유가 죽었다(pu-sw.js 머리말).
+     받은 사진은 pu-sw.js 의 takeErp 가 사진첩 받은 함에 넣고 사진첩 화면으로 넘긴다.
+   ⚠ 이 일꾼은 아무것도 캐시하지 않는다 — 공유 POST 말고는 손도 안 댄다.
    ⚠ https 에서만 된다. 깃허브 페이지는 https 다. */
 if('serviceWorker' in navigator && location.protocol === 'https:'){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('pu-erp-sw.js')['catch'](function(){});
+    navigator.serviceWorker.register('pu-sw.js')['catch'](function(){});
   });
 }
 </script>

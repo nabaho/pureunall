@@ -54,7 +54,7 @@ test('① 화면이 일꾼을 «좁은 scope» 로 등록하고, 받는 주소�
   assert.ok(등록, '★ pu-cal.html 이 scope 를 준 일꾼 등록을 하지 않는다 — POST 공유를 받을 길이 없다');
   assert.ok(일꾼글, '등록한 일꾼 파일이 없다(배포하면 404): ' + (등록 && 등록.파일));
   const scope = new URL(등록.scope, 앱주소).href;
-  assert.notStrictEqual(scope, 앱주소, '★ scope 를 앱 뿌리(/pureunall/)로 두면 pu-sw.js·pu-erp-sw.js 와 자리를 다퉈 밀려난다');
+  assert.notStrictEqual(scope, 앱주소, '★ scope 를 앱 뿌리(/pureunall/)로 두면 통합 일꾼 pu-sw.js 와 자리를 다퉈 밀려난다');
   assert.ok(받는주소.startsWith(scope), '받는 주소(' + 받는주소 + ')가 일꾼 scope(' + scope + ') 밖이다 — 일꾼이 못 받는다');
   assert.ok(받는주소.startsWith(new URL(매니페스트.scope, 앱주소).href), '앱 범위 밖이면 공유 대상으로 안 뜬다');
   assert.ok(new URL(등록.파일, 앱주소).href.startsWith(앱주소), '일꾼 파일이 scope 보다 깊은 곳에 있으면 등록이 거절된다');
