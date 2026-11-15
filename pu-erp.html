@@ -218,8 +218,10 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-adv-check.js?v=1"></script>
 <!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
+<!-- 사업장 포털(비즈니스지원단·현장클리닉 등) 비번 — 담당자·관리자만 + 보기 클릭 열람 (2026-11-15) -->
+<script src="js/pu-site-secret.js?v=1"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=100"></script>
+<script src="js/pu-ontology.js?v=101"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -5437,6 +5439,14 @@ function dbSet(k, v){
      되살리면 그 건의 담당자가 다시 본다. */
   if(typeof _wsOn === 'function' && _wsOn(k) && Array.isArray(v)) v = v.map(function(x){ return PuWorkerSecret.split(k, x).record; });
   if(k === 'trash_bin' && Array.isArray(v) && typeof _wsTrashStrip === 'function' && window.PuWorkerSecret) v = v.map(_wsTrashStrip);
+  if(typeof _siteSecOn === 'function' && _siteSecOn(k) && Array.isArray(v)){
+    v = v.map(function(x){
+      var sp = PuSiteSecret.split(k, x);
+      if(sp.any && sp.secret && x && x.id && typeof _siteSecSend === 'function') _siteSecSend(k, x.id, sp.secret);
+      return sp.record;
+    });
+  }
+  if(k === 'trash_bin' && Array.isArray(v) && typeof _siteSecTrashStrip === 'function' && window.PuSiteSecret) v = v.map(_siteSecTrashStrip);
   /* 일반 휴지통에 돈 기록이 섞이면 재무 전용 휴지통으로 옮긴다(재무 권한 기기만 — 아니면 그대로 둔다, 잃지 않게) */
   if(k === 'trash_bin' && Array.isArray(v) && typeof _trashFinSplit === 'function') v = _trashFinSplit(v);
   /* 직원 주민번호·계좌·예금주 — 명부 통째 저장에서도 뗀다(통째 저장은 대표가 «고친» 사람만 금고로 간다 — 값이 실린 줄만 있다) */
@@ -6934,6 +6944,219 @@ function _wsSend(k, id, secrets){
   if(!fbDb){ _wsFail({ error:'연결 없음' }); return; }
   PuWorkerSecret.write(fbDb, k, id, secrets).then(function(r){ if(!r.ok) _wsFail(r); });
 }
+// ── 사이트 아이디/비번 — 비번은 담당자·관리자 전용 칸(site_secret)으로 떼고 기본 숨김 (대표 요청 2026-11-15) ──
+//   공개 원장(data/*)에는 siteId 와 hasSitePw(비번 있음 표시)만 남기고, 실제 비번(sitePw)은
+//   site_secret/{표}/{건 id}/sitePw 에 따로 둔다. 화면에서도 기본 숨김(•••••••• / password)이며
+//   담당자·관리자가 [보기]를 눌렀을 때만 읽거나 가림을 푼다. 설계: js/pu-site-secret.js
+function _siteSecOn(k){ return !!(window.PuSiteSecret && PuSiteSecret.isKind(k)); }
+function _siteSecTrashStrip(t){
+  if(!t || !t.item || !_siteSecOn(t.storeKey)) return t;
+  var s = PuSiteSecret.split(t.storeKey, t.item);
+  return s.any ? Object.assign({}, t, { item: s.record }) : t;
+}
+var _siteSecToastAt = 0;
+function _siteSecFail(r){
+  console.warn('[사이트 비번] 저장 못함', r && (r.error || (r.denied ? 'denied' : '')));
+  if(Date.now() - _siteSecToastAt < 30000) return;
+  _siteSecToastAt = Date.now();
+  try { showToast(r && r.denied
+    ? '🔒 사이트 비번은 그 건의 담당자와 관리자만 저장할 수 있습니다 — 비번 칸은 저장되지 않았습니다'
+    : '⚠ 사이트 비번을 저장하지 못했습니다(연결 확인 후 다시 저장해 주세요)'); } catch(e){}
+}
+function _siteSecSend(k, id, secret){
+  if(!secret || !id) return;
+  if(!fbDb){ _siteSecFail({ error:'연결 없음' }); return; }
+  PuSiteSecret.write(fbDb, k, id, secret).then(function(r){ if(!r.ok) _siteSecFail(r); });
+}
+function erpSiteSecCarry(srcKind, srcId, dstKind, dstId){
+  if(!window.PuSiteSecret || !srcId || !dstId) return;
+  if(!fbDb){ _siteSecFail({ error:'연결 없음' }); return; }
+  PuSiteSecret.carry(fbDb, srcKind, srcId, dstKind, dstId).then(function(r){
+    if(r.ok) return;
+    if(r.denied){ try { showToast('🔒 사이트 비번은 옮기지 못했습니다 — 출발 건의 담당자나 관리자가 새 건에 다시 넣어야 합니다'); } catch(e){} }
+    else _siteSecFail(r);
+  });
+}
+function erpInferStoreKind(rec, explicitKind){
+  if(explicitKind && window.PuSiteSecret && PuSiteSecret.isKind(explicitKind)) return explicitKind;
+  if(!rec || typeof rec !== 'object') return '';
+  var id = String(rec.id || '');
+  if(rec.caseNo || id.indexOf('c-') === 0) return 'cases';
+  if(rec.contractNo || id.indexOf('ct-') === 0) return 'contracts';
+  if(id.indexOf('cs-') === 0 || id.indexOf('cons-') === 0) return 'consultings';
+  if(id.indexOf('fd-') === 0) return 'funds';
+  if(id.indexOf('op-') === 0) return 'other_projects';
+  if(rec.entityType === 'Organization' || id.indexOf('co-') === 0) return 'companies';
+  return '';
+}
+function erpSameCoForLink(a, b){
+  if(!a || !b) return false;
+  if(a.companyId && b.companyId && a.companyId === b.companyId) return true;
+  var ba = String(a.bizNo || '').replace(/\D/g, '').slice(0, 10);
+  var bb = String(b.bizNo || (b.company && b.company.bizNo) || '').replace(/\D/g, '').slice(0, 10);
+  if(ba.length === 10 && bb.length === 10) return ba === bb;
+  var norm = function(s){ return String(s || '').replace(/주식회사|\(주\)|㈜|\(유\)|유한회사|\s+/g, '').toLowerCase(); };
+  var na = norm(a.companyName || a.name);
+  var nb = norm(b.companyName || b.name || (b.company && b.company.name));
+  return !!(na && nb && (na === nb || (na.length >= 3 && nb.length >= 3 && (na.indexOf(nb) >= 0 || nb.indexOf(na) >= 0))));
+}
+function erpFindLinkedContract(rec, contracts){
+  var list = (contracts || []).filter(function(x){ return x && !x._deleted; });
+  if(!rec || !list.length) return null;
+  if(rec.sourceContractId){
+    var byId = list.find(function(x){ return x.id === rec.sourceContractId; });
+    if(byId) return byId;
+  }
+  var sNo = rec.sourceContractNo || rec.contractNo;
+  if(sNo){
+    var byNo = list.find(function(x){ return x.contractNo === sNo && erpSameCoForLink(rec, x); });
+    if(byNo) return byNo;
+  }
+  // 출처 계약 ID·번호가 없을 때는 동일 업체 후보가 정확히 1건으로 유일할 때만 연결(다중 계약 오연결 방지)
+  var cands = list.filter(function(x){ return (rec.companyId && x.companyId && x.companyId === rec.companyId) || (rec.bizNo && x.bizNo && x.bizNo === rec.bizNo); });
+  return cands.length === 1 ? cands[0] : null;
+}
+function _siteSecReadFirst(cands){
+  var list = (cands || []).filter(function(s){ return s && s.kind && s.id; });
+  if(!list.length || !window.PuSiteSecret || !fbDb) return Promise.resolve({ ok:false, error:'대상 없음' });
+  function step(idx, sawDenied){
+    if(idx >= list.length) return Promise.resolve(sawDenied ? { ok:false, denied:true } : { ok:false, error:'비번 없음' });
+    var cur = list[idx];
+    return PuSiteSecret.read(fbDb, cur.kind, cur.id).then(function(r){
+      if(r.ok && r.sitePw) return r;
+      if(r.ok && idx === list.length - 1) return r;
+      return step(idx + 1, sawDenied || !!r.denied);
+    });
+  }
+  return step(0, false);
+}
+// 상세 화면 공통 — 비번 기본 숨김(••••••••) · 담당자/관리자가 [보기]를 눌렀을 때만 열람
+function SiteAccountCard(props){
+  var rawSources = (props.sources || []).filter(function(s){ return s && s.rec && typeof s.rec === 'object'; });
+  var credSources = rawSources.filter(function(s){ return !!(s.rec.siteId || s.rec.hasSitePw || s.rec.sitePw); });
+  var primary = credSources[0] || null;
+  var primaryKey = primary && primary.rec ? String(primary.rec.id || '') : '';
+  var stShown = useState(false); var shown = stShown[0]; var setShown = stShown[1];
+  var stPw = useState(''); var pw = stPw[0]; var setPw = stPw[1];
+  var stLoad = useState(false); var loading = stLoad[0]; var setLoading = stLoad[1];
+  var stErr = useState(''); var err = stErr[0]; var setErr = stErr[1];
+  useEffect(function(){
+    setShown(false); setPw(''); setLoading(false); setErr('');
+  }, [primaryKey]);
+  if(!primary || !window.PuSiteSecret) return null;
+  var allRecs = rawSources.map(function(s){ return s.rec; });
+  if(!PuSiteSecret.canAccess(CURRENT_USER, allRecs[0], allRecs.slice(1))) return null;
+  var siteId = '';
+  for(var i=0; i<credSources.length; i++){
+    if(credSources[i].rec.siteId){ siteId = credSources[i].rec.siteId; break; }
+  }
+  var pwSources = credSources.filter(function(s){ return !!(s.rec.hasSitePw || s.rec.sitePw); });
+  // 현재 사용자가 직접 담당자인 원본을 먼저 읽도록 정렬
+  pwSources.sort(function(a, b){
+    var aa = PuSiteSecret.canAccess(CURRENT_USER, a.rec) ? 0 : 1;
+    var bb = PuSiteSecret.canAccess(CURRENT_USER, b.rec) ? 0 : 1;
+    return aa - bb;
+  });
+  var hasPw = pwSources.length > 0;
+  function togglePw(){
+    if(shown){
+      setShown(false); setPw('');
+      if(window.PuSiteSecret && PuSiteSecret.clearCache) PuSiteSecret.clearCache();
+      return;
+    }
+    for(var j=0; j<pwSources.length; j++){
+      if(pwSources[j].rec.sitePw){ setPw(String(pwSources[j].rec.sitePw)); setShown(true); return; }
+    }
+    setLoading(true); setErr('');
+    var cands = pwSources.map(function(s){ return { kind: erpInferStoreKind(s.rec, s.kind), id: s.rec.id }; });
+    _siteSecReadFirst(cands).then(function(r){
+      setLoading(false);
+      if(r.ok && r.sitePw){ setPw(r.sitePw); setShown(true); }
+      else if(r.ok){ setPw(''); setShown(true); }
+      else setErr(r.denied ? '🔒 담당자·관리자만 볼 수 있습니다' : '⚠ 비번을 불러오지 못했습니다');
+    });
+  }
+  var boxStyle = Object.assign({
+    background:'#fffbeb', border:'1px solid #fbbf24', borderRadius:'4px',
+    padding:'8px 12px', fontSize:'11.5px', color:'#854d0e', marginBottom:'6px'
+  }, props.style || {});
+  var btnStyle = {
+    marginLeft:'6px', padding:'2px 8px', fontSize:'11px', fontWeight:700,
+    border:'1px solid #d97706', borderRadius:'4px', background:'#fff', color:'#854d0e', cursor:'pointer'
+  };
+  return h('div', { style: boxStyle },
+    h('div', { style:{ fontWeight:700, marginBottom:'3px' } }, '🔐 사이트 아이디 / 비번 (담당자·관리자)'),
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'14px', flexWrap:'wrap' } },
+      h('span', null, '아이디: ', h('strong', { style:{ fontFamily:'monospace' } }, siteId || '-')),
+      h('span', { style:{ display:'inline-flex', alignItems:'center' } }, '비번: ',
+        !hasPw
+          ? h('strong', { style:{ marginLeft:'4px' } }, '-')
+          : [
+              h('strong', { key:'v', style:{ marginLeft:'4px', fontFamily:'monospace', letterSpacing: shown ? '0' : '1px' } },
+                shown ? (pw || '(비어 있음)') : '••••••••'),
+              h('button', { key:'b', type:'button', onClick:togglePw, disabled:loading, style:btnStyle },
+                loading ? '불러오는 중…' : (shown ? '숨기기' : '보기'))
+            ]
+      ),
+      err ? h('span', { style:{ color:'#b91c1c', fontWeight:600 } }, err) : null
+    )
+  );
+}
+// 수정 화면 공통 비번 입력칸 — 기본 가림(password / ••••••••) · [보기] 클릭 시에만 서버에서 읽어 평문 표시
+function SiteAccountPwBox(props){
+  var stShown = useState(false); var shown = stShown[0]; var setShown = stShown[1];
+  var stLoad = useState(false); var loading = stLoad[0]; var setLoading = stLoad[1];
+  var stFetched = useState(null); var loadedPw = stFetched[0]; var setLoadedPw = stFetched[1];
+  useEffect(function(){
+    setShown(false); setLoading(false); setLoadedPw(null);
+  }, [props.recId]);
+  var hasStored = !!props.hasSitePw;
+  var dirty = !!props.dirty;
+  var effVal = dirty ? (props.value || '') : (loadedPw !== null ? loadedPw : (props.value || ''));
+  var ph = (!dirty && !effVal && hasStored) ? '•••••••• (저장됨)' : (props.placeholder || '비번');
+  function toggleShow(){
+    if(shown){
+      setShown(false);
+      if(!dirty){
+        setLoadedPw(null);
+        if(window.PuSiteSecret && PuSiteSecret.clearCache) PuSiteSecret.clearCache(props.kind, props.recId);
+      }
+      return;
+    }
+    if(dirty || effVal || !hasStored || !props.recId){ setShown(true); return; }
+    setLoading(true);
+    var cands = [{ kind: props.kind, id: props.recId }].concat(props.fallbackSources || []);
+    _siteSecReadFirst(cands).then(function(r){
+      setLoading(false);
+      if(r.ok){ setLoadedPw(r.sitePw || ''); setShown(true); }
+      else {
+        try { showToast(r.denied ? '🔒 이 건의 담당자·관리자만 기존 비번을 볼 수 있습니다' : '⚠ 비번을 불러오지 못했습니다'); } catch(e){}
+      }
+    });
+  }
+  return h('div', { style: Object.assign({ display:'flex', gap:'4px', alignItems:'center', minWidth:0 }, props.wrapStyle || {}) },
+    h('input', Object.assign({
+      type: shown ? 'text' : 'password',
+      autoComplete: 'new-password',
+      maxLength: 120,
+      placeholder: ph,
+      title: props.title || '담당자·관리자 전용 (보기 클릭 시 표시)',
+      value: effVal,
+      onChange: function(e){ if(props.onChangePw) props.onChangePw(e.target.value); },
+      style: Object.assign({ flex:1, minWidth:0 }, props.inputStyle || {})
+    }, props.inputProps || {})),
+    h('button', {
+      type:'button', onClick:toggleShow, disabled:loading,
+      title: shown ? '비밀번호 숨기기' : '비밀번호 보기',
+      style: Object.assign({
+        flexShrink:0, padding:'5px 8px', fontSize:'11px', fontWeight:700,
+        border:'1px solid #cbd5e1', borderRadius:'4px',
+        background: shown ? '#fffbeb' : '#f8fafc',
+        color: shown ? '#854d0e' : '#475569', cursor:'pointer', whiteSpace:'nowrap'
+      }, props.btnStyle || {})
+    }, loading ? '…' : (shown ? '숨기기' : '보기'))
+  );
+}
 // ── 직원 주민번호·계좌·예금주 — 저장 «입구»에서 뗀다 (대표 승인 2026-11-01, 개인정보 2단계) ──────
 //   근로자명부는 재무 권한자가 통째로 읽는다. 그래서 이 셋은 명부에 안 싣고 staff_secret(대표만, 잠가서)으로 보낸다.
 //   입구 넷(dbSet·dbUpsert·dbPatch·dbUpsertMany)이 같은 도우미를 쓴다. 이 PC 사본(dbGet)에도 안 남는다.
@@ -6961,6 +7184,8 @@ function dbUpsert(k, item){
   /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로 보낸다(위 머리글) */
   var _wsSec = null;
   if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsS = PuWorkerSecret.split(k, item); if(_wsS.any){ item = _wsS.record; _wsSec = _wsS.secrets; } }
+  var _siteSec = null;
+  if(typeof _siteSecOn === 'function' && _siteSecOn(k)){ var _ssS = PuSiteSecret.split(k, item); if(_ssS.any){ item = _ssS.record; _siteSec = _ssS.secret; } }
   /* 직원 주민번호·계좌·예금주 — 명부에서 떼어 금고로(위 머리글) */
   if(typeof _ssOn === 'function' && _ssOn(k)){ var _ssU = PuStaffSecret.splitUser(item); if(_ssU.any){ item = _ssU.user; if(_ssU.secrets){ var _ssM = {}; _ssM[item.sid] = _ssU.secrets; _ssSend(_ssM); } } }
   // 지운 명단에 오른 업체는 되살리지 않는다 — 되돌리기는 명단에서 먼저 뺀 뒤 부른다(coMergeUndo)
@@ -6993,10 +7218,12 @@ function dbUpsert(k, item){
     // 바뀐 칸만 보낸다 — 남이 만진 다른 칸을 되돌리지 않게 (dbPatch 와 같은 규칙)
     _recServerWrite(k, _recFieldPaths(item, _prevRec));
     if(_wsSec) _wsSend(k, item.id, _wsSec);
+    if(_siteSec) _siteSecSend(k, item.id, _siteSec);
     return true;
   }
   var _upOk = dbSet(k, next); // 폴백: 전체 보호 경유 (동기화 전 보류 포함)
   if(_upOk && _wsSec) _wsSend(k, item.id, _wsSec);
+  if(_upOk && _siteSec) _siteSecSend(k, item.id, _siteSec);
   return _upOk;
 }
 // 1건의 특정 필드만 수정 (상태변경 등). 반환 true=저장됨, false=대상 없음/실패.
@@ -7005,6 +7232,8 @@ function dbPatch(k, id, fields){
   /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로(dbUpsert 위 머리글) */
   var _wsSec = null;
   if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsP = PuWorkerSecret.splitPatch(k, fields); if(_wsP.any){ fields = _wsP.fields; _wsSec = _wsP.secrets; } }
+  var _siteSecP = null;
+  if(typeof _siteSecOn === 'function' && _siteSecOn(k)){ var _ssP2 = PuSiteSecret.splitPatch(k, fields); if(_ssP2.any){ fields = _ssP2.fields; _siteSecP = _ssP2.secret; } }
   /* 직원 주민번호·계좌·예금주 — 명부에서 떼어 금고로(dbUpsert 위 머리글). 칸 하나만 고치는 길은 빈 값 = 지우기 */
   if(typeof _ssOn === 'function' && _ssOn(k)){ var _ssP = PuStaffSecret.splitPatch(fields); if(_ssP.any){ fields = _ssP.fields; if(_ssP.secrets){ var _ssPM = {}; _ssPM[id] = _ssP.secrets; _ssSend(_ssPM); } } }
   /* 지운 명단 업체의 칸만 고쳐 보내면 서버에 «껍데기» 업체가 되살아난다(칸 경로 쓰기는 없는 줄도 만든다) */
@@ -7058,10 +7287,12 @@ function dbPatch(k, id, fields){
     cp[id+'/id'] = id;
     _recServerWrite(k, cp);
     if(_wsSec) _wsSend(k, id, _wsSec);
+    if(_siteSecP) _siteSecSend(k, id, _siteSecP);
     return true;
   }
   var _ptOk = dbSet(k, next);
   if(_ptOk && _wsSec) _wsSend(k, id, _wsSec);
+  if(_ptOk && _siteSecP) _siteSecSend(k, id, _siteSecP);
   return _ptOk;
 }
 // 1건 삭제. 반환 true=처리됨.
@@ -7091,6 +7322,14 @@ function dbUpsertMany(k, items){
     items = items.map(function(it){
       var s = PuWorkerSecret.split(k, it);
       if(s.any && it && it.id) _wsAll.push([it.id, s.secrets]);
+      return s.record;
+    });
+  }
+  var _siteSecAll = [];
+  if(typeof _siteSecOn === 'function' && _siteSecOn(k)){
+    items = items.map(function(it){
+      var s = PuSiteSecret.split(k, it);
+      if(s.any && s.secret && it && it.id) _siteSecAll.push([it.id, s.secret]);
       return s.record;
     });
   }
@@ -7137,10 +7376,14 @@ function dbUpsertMany(k, items){
     var cp = {}; items.forEach(function(it){ cp[it.id] = it; });
     _recServerWrite(k, cp);
     _wsAll.forEach(function(p){ _wsSend(k, p[0], p[1]); });
+    _siteSecAll.forEach(function(p){ _siteSecSend(k, p[0], p[1]); });
     return true;
   }
   var _mnOk = dbSet(k, next);
-  if(_mnOk) _wsAll.forEach(function(p){ _wsSend(k, p[0], p[1]); });
+  if(_mnOk){
+    _wsAll.forEach(function(p){ _wsSend(k, p[0], p[1]); });
+    _siteSecAll.forEach(function(p){ _siteSecSend(k, p[0], p[1]); });
+  }
   return _mnOk;
 }
 // 여러 건 삭제 — 한 번의 요청에 건별 null
@@ -22133,7 +22376,8 @@ function ContractModal(props){
       try{
         var current = JSON.stringify(f);
         if(current === initialSnap) return;
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(Object.assign({}, f, { __savedAt: new Date().toISOString() })));
+        var draftSafe = (window.PuSiteSecret ? PuSiteSecret.split('contracts', f).record : f);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(Object.assign({}, draftSafe, { __savedAt: new Date().toISOString() })));
         setAutoSaveStatus(new Date());
       }catch(e){ window._erpErrLog && window._erpErrLog(e); }
     }, 1000);
@@ -24836,11 +25080,20 @@ function ContractModal(props){
       fldn6(
         h('input', { type:'text', value:f.payerName || '', onChange:setSimple('payerName'),
           placeholder:'입금자(예금주)', title:PAYER_PH }), 2),
-      // 사이트 아이디/비번 (관리자 전용) — 한 칸에 몰려 있던 둘을 갈랐다
-      CURRENT_USER && CURRENT_USER.isAdmin && fldn6(
-        h('input', { type:'text', placeholder:'🔐 포털 아이디', title:'관리자 전용', value:f.siteId||'', onChange:setSimple('siteId') })),
-      CURRENT_USER && CURRENT_USER.isAdmin && fldn6(
-        h('input', { type:'text', placeholder:'🔐 포털 비번', title:'관리자 전용', value:f.sitePw||'', onChange:setSimple('sitePw') })),
+      // 사이트 아이디/비번 (담당자·관리자) — 비번은 기본 숨김, [보기] 클릭 시 표시
+      (!props.cur || !f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f))) && fldn6(
+        h('input', { type:'text', placeholder:'🔐 사이트 아이디', title:'담당자·관리자 전용', value:f.siteId||'', onChange:setSimple('siteId') }), 2),
+      (!props.cur || !f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f))) && fldn6(
+        h(SiteAccountPwBox, {
+          kind: 'contracts',
+          recId: (props.cur && props.cur.id) ? f.id : '',
+          hasSitePw: !!(f.hasSitePw || f.sitePw),
+          value: f.sitePw || '',
+          dirty: !!f._sitePwDirty,
+          onChangePw: function(v){ setF(function(prev){ return Object.assign({}, prev, { sitePw:v, _sitePwDirty:true }); }); },
+          placeholder: '🔐 사이트 비번',
+          title: '담당자·관리자 전용 (보기 클릭 시 표시)'
+        }), 2),
       sec6('📝 비고'),
       fldn6(
         h('textarea', { value:f.note, onChange:setSimple('note'), placeholder:'특이사항' }), 6)
@@ -25742,6 +25995,8 @@ function transferContract(contract, opt){
         status: 'active',                                    // active | suboffice (사무대행) | closed
         sourceContractNo: contract.contractNo,
         sourceContractId: contract.id, sourceKind:'contract', sourceId:contract.id,
+        siteId: contract.siteId || '',
+        hasSitePw: !!(contract.hasSitePw || contract.sitePw),
         note: '계약(' + contract.contractNo + ')에서 이관',
         createdAt: (new Date()).toISOString()
       };
@@ -25818,6 +26073,9 @@ function transferContract(contract, opt){
            사람이 확인해야 할 것은 「새 업체가 생겼나」가 아니라 「이관이 반영됐나」다. */
         Object.assign(patch, arvStamp('계약', contract.contractNo));
         if(!dbUpsert('companies', Object.assign({}, exist, patch))) throw new Error('업체관리 저장 실패');
+        if((contract.hasSitePw || contract.sitePw) && !exist.hasSitePw && typeof erpSiteSecCarry === 'function'){
+          erpSiteSecCarry('contracts', contract.id, 'companies', exist.id);
+        }
         results.push({ type:'company', no:item.name + ' (기존 업체에 이음 — ' + kept + ')',
                        id:exist.id, linked:true });
         return;
@@ -25828,6 +26086,9 @@ function transferContract(contract, opt){
       item.xferUndo = { mode:'created', contractNo:contract.contractNo, contractId:contract.id,
         at:(new Date()).toISOString(), keys:[], before:{}, after:{}, noteBefore:'' };
       if(!dbUpsert('companies', item)) throw new Error('업체관리 저장 실패');
+      if((contract.hasSitePw || contract.sitePw) && typeof erpSiteSecCarry === 'function'){
+        erpSiteSecCarry('contracts', contract.id, 'companies', item.id);
+      }
       results.push({ type:'company', no:item.name, id:item.id });
       return;
     }
@@ -25904,6 +26165,8 @@ function transferContract(contract, opt){
         sourceContractNo: contract.contractNo,
         sourceContractId: contract.id, sourceKind:'contract', sourceId:contract.id,
         companyId: contract.companyId||'', companyLinkStatus:contract.companyLinkStatus,
+        siteId: contract.siteId || '',
+        hasSitePw: !!(contract.hasSitePw || contract.sitePw),
         note: '계약(' + contract.contractNo + ')에서 이관' + (contract.successFeeType === 'percent' ? ' / 성공보수 ' + (contract.successFee||0) + '%' : '')
       };
       if(contract.parentCaseId) newCase.parentCaseId = String(contract.parentCaseId);
@@ -25936,6 +26199,7 @@ function transferContract(contract, opt){
       Object.assign(newCase, arvStamp('계약', contract.contractNo));
       if(!dbUpsert('cases', newCase)) throw new Error('사건관리 저장 실패');
       if(typeof erpWsCarry === 'function') erpWsCarry('contracts', contract.id, 'cases', newCase.id);   /* 근로자 주민번호·계좌도 함께(2026-10-15) */
+      if((contract.hasSitePw || contract.sitePw) && typeof erpSiteSecCarry === 'function') erpSiteSecCarry('contracts', contract.id, 'cases', newCase.id);
       results.push({ type:'case', no:caseNo, id:newCase.id });
       return;
     }
@@ -26021,6 +26285,8 @@ function transferContract(contract, opt){
       personalDepositMode: contract.personalDepositMode || '', // 👤 «이 건만» 예외도 승계
       sourceContractNo: contract.contractNo,
       sourceContractId: contract.id, sourceKind:'contract', sourceId:contract.id,
+      siteId: contract.siteId || '',
+      hasSitePw: !!(contract.hasSitePw || contract.sitePw),
       note: '계약(' + contract.contractNo + ')에서 이관'
     };
     var allCtsForCarry2 = dbGet('contracts', []) || [];
@@ -26040,6 +26306,7 @@ function transferContract(contract, opt){
     // (제거) 컨설팅 이관 시 업체관리 자동 등록 — 컨설팅 사업장은 컨설팅관리에서만 관리
     if(!dbUpsert(storageMap[kindV], item2)) throw new Error(k.label + ' 저장 실패');
     if(typeof erpWsCarry === 'function') erpWsCarry('contracts', contract.id, storageMap[kindV], item2.id);   /* 근로자 주민번호·계좌도 함께(2026-10-15) */
+    if((contract.hasSitePw || contract.sitePw) && typeof erpSiteSecCarry === 'function') erpSiteSecCarry('contracts', contract.id, storageMap[kindV], item2.id);
     // 컨설팅은 계약일(startDate)순 자동 재정렬 (소급 입력 자연 정렬)
     if(kindV === 'consulting'){
       reorderConsultingNos();
@@ -26163,13 +26430,16 @@ async function returnToContract(storeKey, itemId){
        어디에도 자료가 없게 된다(undoCompanyTransfer 와 같은 차례). */
     if(plan.mode === 'restore'){
       var ctBack = Object.assign({}, plan.contract, { status:'signed', closedAt:null,
-        closedReason:null, transferredTo:null, updatedAt:Date.now() });
+        closedReason:null, transferredTo:null, updatedAt:Date.now(),
+        siteId: item.siteId || plan.contract.siteId || '',
+        hasSitePw: !!(item.hasSitePw || item.sitePw || plan.contract.hasSitePw || plan.contract.sitePw) });
       Object.assign(ctBack, arvStamp(storeLabel, itemNo));
       if(!dbUpsert('contracts', ctBack)){
         if(typeof showToast==='function') showToast('❌ 계약 되살리기 실패 — 아무것도 바꾸지 않았습니다');
         return;
       }
       if(typeof erpWsCarry === 'function') erpWsCarry(storeKey, itemId, 'contracts', ctBack.id);   /* 휴지통에 보내기 «전» — 그 사이 고친 주민번호·계좌를 계약으로 */
+      if((item.hasSitePw || item.sitePw) && typeof erpSiteSecCarry === 'function') erpSiteSecCarry(storeKey, itemId, 'contracts', ctBack.id);
       if(!ctReturnPark(storeKey, itemId, plan.contractNo)){
         dbUpsert('contracts', plan.contract);        // 되돌림: 계약을 원래대로
         if(typeof showToast==='function') showToast('❌ 복귀 실패 — 계약을 원래대로 두었습니다');
@@ -26215,6 +26485,8 @@ async function returnToContract(storeKey, itemId){
       personalDepositMode: item.personalDepositMode || '', // 👤 «이 건만» 예외도 승계 (역이관)
       successFee: item.successFee || item.balanceFee || 0,
       successFeeType: item.successFeeType || 'amount',
+      siteId: item.siteId || '',
+      hasSitePw: !!(item.hasSitePw || item.sitePw),
       status: 'signed',
       note: '[' + storeLabel + ']에서 계약관리로 복귀',
       createdAt: new Date().toISOString(),
@@ -26225,6 +26497,7 @@ async function returnToContract(storeKey, itemId){
 
     if(!dbUpsert('contracts', newContract)){ if(typeof showToast==='function') showToast('❌ 계약관리 생성 실패'); return; }
     if(typeof erpWsCarry === 'function') erpWsCarry(storeKey, itemId, 'contracts', newContract.id);   /* 휴지통에 보내기 «전» */
+    if((item.hasSitePw || item.sitePw) && typeof erpSiteSecCarry === 'function') erpSiteSecCarry(storeKey, itemId, 'contracts', newContract.id);
     if(!ctReturnPark(storeKey, itemId, newContract.contractNo)){
       // 롤백: 방금 생성한 계약 제거 (모듈 원본은 그대로 유지)
       dbRemove('contracts', newContract.id);
@@ -34396,7 +34669,21 @@ function CompanyEditModal(props){
                 )
               )
             )
-          )
+          ),
+          (!f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f, coCtHit ? [coCtHit] : []))) && sec4('🔐 사이트 아이디 / 비번', '담당자·관리자 전용 · 비번은 보기 클릭 시 표시'),
+          (!f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f, coCtHit ? [coCtHit] : []))) && fld4('사이트 아이디',
+            h('input', { type:'text', value:f.siteId || '', onChange:set('siteId'), placeholder:'예: 포털·비즈니스지원단 아이디' }), 2),
+          (!f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f, coCtHit ? [coCtHit] : []))) && fld4('사이트 비번',
+            h(SiteAccountPwBox, {
+              kind: 'companies',
+              recId: f.id || '',
+              hasSitePw: !!(f.hasSitePw || f.sitePw || (coCtHit && (coCtHit.hasSitePw || coCtHit.sitePw))),
+              value: f.sitePw || '',
+              dirty: !!f._sitePwDirty,
+              fallbackSources: coCtHit ? [{ kind:'contracts', id:coCtHit.id }] : [],
+              onChangePw: function(v){ setF(function(prev){ return Object.assign({}, prev, { sitePw:v, _sitePwDirty:true }); }); },
+              placeholder: '비번'
+            }), 2)
           )  // 계약정보 그리드 닫기
         ),  // 계약정보 상자 닫기
         // 담당자 정보
@@ -34913,7 +35200,13 @@ function CompanyDetailModal(props){
           row('CMS 자동이체', co.isCMS
             ? h('span', { style:{ background:'#bfdbfe', color:'#2563eb', fontWeight:700, padding:'2px 10px', borderRadius:'10px', fontSize:'11px' } }, '🏦 CMS 등록됨' + (co.taxInvoicePaymentDay ? ' · 매월 '+co.taxInvoicePaymentDay : ''))
             : h('span', { style:{ color:'#94a3b8', fontSize:'11px' } }, '미등록')),
-          row('출처 계약', co.sourceContractNo || '-')
+          row('출처 계약', co.sourceContractNo || '-'),
+          h(SiteAccountCard, {
+            style:{ marginTop:'8px', marginBottom:0 },
+            sources: [{ kind:'companies', rec:co }]
+              .concat(consultings.map(function(x){ return { kind:'consultings', rec:x }; }))
+              .concat(contracts.map(function(x){ return { kind:'contracts', rec:x }; }))
+          })
         ),
         // 담당자 정보
         h('div', { style:{ marginBottom:'14px' } },
@@ -37845,13 +38138,8 @@ function UnifiedDetailModal(props){
   var c = props.cur;
   var users = getActiveUsers();
   var _contracts = dbGet('contracts', []) || [];
-  // 원본 계약: sourceContractNo(이관 출처) 우선 → companyId/bizNo 보조
-  var _linkedContract = (c.sourceContractNo || c.contractNo)
-      ? _contracts.find(function(x){ return x.contractNo === (c.sourceContractNo || c.contractNo); })
-      : null;
-  if(!_linkedContract){
-    _linkedContract = _contracts.find(function(x){ return (c.companyId && x.companyId && x.companyId === c.companyId) || (c.bizNo && x.bizNo && x.bizNo === c.bizNo); }) || null;
-  }
+  // 원본 계약: sourceContractId → 같은 회사인 sourceContractNo → companyId/bizNo 순으로 탐색(재채번 번호 충돌 방지)
+  var _linkedContract = erpFindLinkedContract(c, _contracts);
   var _cpm = useState(null); var _contractPrint = _cpm[0]; var _setContractPrint = _cpm[1];
   function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : erpNoName(sid); }
 
@@ -38058,10 +38346,14 @@ function UnifiedDetailModal(props){
             );
           })
         ),
-        // 사이트 아이디/비번 (관리자만)
-        CURRENT_USER && CURRENT_USER.isAdmin && _linkedContract && (_linkedContract.siteId || _linkedContract.sitePw) && h('div', { style:{ background:'#fffbeb', border:'1px solid #fbbf24', borderRadius:'4px', padding:'8px 12px', fontSize:'11.5px', color:'#854d0e', marginBottom:'6px' } },
-          h('div', { style:{ fontWeight:700, marginBottom:'2px' } }, '🔐 사이트 아이디 / 비번 (관리자 전용)'),
-          h('div', null, '아이디: ', h('strong', null, _linkedContract.siteId || '-'), '　비번: ', h('strong', null, _linkedContract.sitePw || '-'))),
+        // 사이트 아이디/비번 (담당자·관리자, 비번 기본 숨김 · 보기 클릭 시 열람)
+        h(SiteAccountCard, {
+          sources: [
+            { kind: erpInferStoreKind(c, props.storageKey), rec: c },
+            { kind: 'contracts', rec: _linkedContract },
+            { kind: 'companies', rec: _ov && _ov.co }
+          ]
+        }),
         // 비고
         c.note && h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'8px 12px', fontSize:'11.5px', color:'#475569' } },
           h('div', { style:{ fontWeight:700, marginBottom:'2px' } }, '📝 비고'),
@@ -46882,6 +47174,7 @@ function BackupSection(){
     var writes = [];      // { lsKey, raw } — localStorage에 쓸 항목
     var fbUpdates = {};   // 'data/<key>' = { v, u } — Firebase 반영
     var wsRestore = [];   // [표, 건 id, {근로자:{칸:값}}] — 근로자 주민번호·계좌·예금주는 담당자 칸으로(2026-10-15)
+    var siteSecRestore = []; // [표, 건 id, {sitePw}] — 사이트 비번은 담당자·관리자 칸으로(2026-11-15)
     var summary = [];     // 미리보기용 "키: N건"
     var now = Date.now();
     Object.keys(d).forEach(function(kk){
@@ -46905,6 +47198,17 @@ function BackupSection(){
           valueObj = valueObj.map(function(x){
             var sp = PuWorkerSecret.split(logicalKey, x);
             if(sp.any && x && x.id && Object.keys(sp.secrets).length) wsRestore.push([logicalKey, x.id, sp.secrets]);
+            return sp.record;
+          });
+          raw = JSON.stringify(valueObj);
+        }
+      }
+      if(typeof _siteSecOn === 'function' && _siteSecOn(logicalKey)){
+        if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ } }
+        if(haveObj && Array.isArray(valueObj)){
+          valueObj = valueObj.map(function(x){
+            var sp = PuSiteSecret.split(logicalKey, x);
+            if(sp.any && sp.secret && x && x.id) siteSecRestore.push([logicalKey, x.id, sp.secret]);
             return sp.record;
           });
           raw = JSON.stringify(valueObj);
@@ -46982,6 +47286,11 @@ function BackupSection(){
         var wsRes = await Promise.all(wsRestore.map(function(t){ return PuWorkerSecret.write(fbDb, t[0], t[1], t[2]); }));
         var wsBad = wsRes.filter(function(r){ return !r.ok; }).length;
         if(wsBad) showToast('⚠ 근로자 주민번호·계좌 ' + wsBad + '건은 되돌리지 못했습니다(담당자 칸 권한) — 대표 계정으로 다시 복원해 주세요');
+      }
+      if(fbOk && fbDb && siteSecRestore.length && window.PuSiteSecret){
+        var ssRes = await Promise.all(siteSecRestore.map(function(t){ return PuSiteSecret.write(fbDb, t[0], t[1], t[2]); }));
+        var ssBad = ssRes.filter(function(r){ return !r.ok; }).length;
+        if(ssBad) showToast('⚠ 사이트 비번 ' + ssBad + '건은 되돌리지 못했습니다(담당자 칸 권한) — 관리자 계정으로 다시 복원해 주세요');
       }
       var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:0, fileName:(sourceLabel||'백업'), keyCount: Object.keys(fbUpdates).length || writes.length };
       saveHistory([rec].concat(history).slice(0,50));
@@ -74315,7 +74624,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
     // 수정 모달
 
     editModal && h(ProjectEditModal, {
-      cur: editModal, types: types, users: users, kindLabel: props.title, items: items,
+      cur: editModal, types: types, users: users, kindLabel: props.title, items: items, storageKey: props.storageKey,
       onSave: async function(form){
         /* 이 화면 하나가 컨설팅·기금·기타사업을 함께 쓴다 — 여기 한 번 붙이면 셋 다 덮인다.
            원본(editModal)을 넘겨 '그분이 고친 칸'을 정확히 알린다. */
@@ -74346,7 +74655,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
     }),
     // 상세 모달
     detailModal && h(ProjectDetailModal, {
-      cur: detailModal, typeName: typeName, userName: userName,
+      cur: detailModal, typeName: typeName, userName: userName, storageKey: props.storageKey,
       headerIcon: (props.title.match(/^[^\s]+/) || ['📁'])[0],
       onEdit: function(){ var t = detailModal; setDetailModal(null); setEditModal(Object.assign({}, t)); },
       onClose: function(){ setDetailModal(null); }
@@ -74552,8 +74861,14 @@ function ProjectEditModal(props){
         }, base);
       }
     }
-    var _ct2=(dbGet('contracts',[])||[]).find(function(x){ return (base.bizNo&&x.bizNo&&x.bizNo===base.bizNo)||(base.companyId&&x.companyId&&x.companyId===base.companyId); });
-    if(_ct2){ base=Object.assign({},base,{ siteId:base.siteId||_ct2.siteId||'', sitePw:base.sitePw||_ct2.sitePw||'' }); }
+    var _ctsAll = dbGet('contracts',[]) || [];
+    var _ct2 = erpFindLinkedContract(base, _ctsAll);
+    if(_ct2){
+      base = Object.assign({}, base, {
+        siteId: base.siteId || _ct2.siteId || '',
+        hasSitePw: !!(base.hasSitePw || base.sitePw || _ct2.hasSitePw || _ct2.sitePw)
+      });
+    }
     return base;
   })();
   var s = useState(Object.assign({ status:'progress' }, initData, {
@@ -74817,11 +75132,25 @@ function ProjectEditModal(props){
               h('option', { value:'pending' }, '대기'),
               h('option', { value:'progress' }, '진행중'),
               h('option', { value:'closed' }, '종료'))),
-          CURRENT_USER && CURRENT_USER.isAdmin && h('div', { className:'fld' },
-            h('label', null, '🔐 사이트 아이디 / 비번 (관리자 전용)'),
-            h('div', { style:{ display:'flex', gap:'8px' } },
-              h('input', { type:'text', placeholder:'아이디', value:f.siteId||'', onChange:set('siteId'), style:{ flex:1, border:'1px solid #e2e8f0', borderRadius:'4px', padding:'6px 8px', fontSize:'13px' } }),
-              h('input', { type:'text', placeholder:'비번', value:f.sitePw||'', onChange:set('sitePw'), style:{ flex:1, border:'1px solid #e2e8f0', borderRadius:'4px', padding:'6px 8px', fontSize:'13px' } })
+          (!f.id || (window.PuSiteSecret && PuSiteSecret.canAccess(CURRENT_USER, f))) && h('div', { className:'fld' },
+            h('label', null, '🔐 사이트 아이디 / 비번 (담당자·관리자)'),
+            h('div', { style:{ display:'flex', gap:'8px', alignItems:'center' } },
+              h('input', { type:'text', placeholder:'아이디', value:f.siteId||'', onChange:set('siteId'), style:{ flex:1, minWidth:0, border:'1px solid #e2e8f0', borderRadius:'4px', padding:'6px 8px', fontSize:'13px' } }),
+              h(SiteAccountPwBox, {
+                kind: erpInferStoreKind(f, props.storageKey),
+                recId: f.id || '',
+                hasSitePw: !!(f.hasSitePw || f.sitePw),
+                value: f.sitePw || '',
+                dirty: !!f._sitePwDirty,
+                fallbackSources: (function(){
+                  var ct = erpFindLinkedContract(f, dbGet('contracts', []) || []);
+                  return ct ? [{ kind:'contracts', id:ct.id }] : [];
+                })(),
+                onChangePw: function(v){ setF(function(prev){ return Object.assign({}, prev, { sitePw:v, _sitePwDirty:true }); }); },
+                placeholder: '비번',
+                wrapStyle: { flex:1.15, minWidth:0 },
+                inputStyle: { border:'1px solid #e2e8f0', borderRadius:'4px', padding:'6px 8px', fontSize:'13px' }
+              })
             )
           ),
         ),
@@ -74861,6 +75190,7 @@ function ProjectDetailModal(props){
   };
   return h(UnifiedDetailModal, {
     cur: f,
+    storageKey: props.storageKey,
     headerIcon: props.headerIcon || '📁',
     headerTitle: (f.no || '') + ' - ' + (f.companyName || ''),
     extraSections: [bizSection],
@@ -75830,7 +76160,16 @@ function ClosedManagement(){
               );
             })()
           ),
-          (function(){ var _ct=(dbGet('contracts',[])||[]).find(function(x){ return (detailModalCo.bizNo&&x.bizNo&&x.bizNo===detailModalCo.bizNo)||(detailModalCo.id&&x.companyId&&x.companyId===detailModalCo.id); }); return CURRENT_USER&&CURRENT_USER.isAdmin&&_ct&&(_ct.siteId||_ct.sitePw)&&h('div',{style:{marginTop:'10px',padding:'8px 12px',background:'#fffbeb',border:'1px solid #fbbf24',borderRadius:'5px',fontSize:'11.5px',color:'#854d0e'}},h('div',{style:{fontWeight:700,marginBottom:'4px'}},'🔐 사이트 아이디 / 비번 (관리자 전용)'),h('div',null,'아이디: ',h('strong',null,_ct.siteId||'-'),'　비번: ',h('strong',null,_ct.sitePw||'-'))); })(),
+          (function(){
+            var _ct = (dbGet('contracts',[])||[]).find(function(x){ return (detailModalCo.bizNo&&x.bizNo&&x.bizNo===detailModalCo.bizNo)||(detailModalCo.id&&x.companyId&&x.companyId===detailModalCo.id); });
+            var _cs = (dbGet('consultings',[])||[]).filter(function(x){ return x && ((detailModalCo.bizNo&&x.bizNo&&x.bizNo===detailModalCo.bizNo)||(detailModalCo.id&&x.companyId&&x.companyId===detailModalCo.id)); });
+            return h(SiteAccountCard, {
+              style:{ marginTop:'10px', marginBottom:0 },
+              sources: [{ kind:'companies', rec:detailModalCo }]
+                .concat(_cs.map(function(x){ return { kind:'consultings', rec:x }; }))
+                .concat(_ct ? [{ kind:'contracts', rec:_ct }] : [])
+            });
+          })(),
           detailModalCo.note && h('div', { style:{ marginTop:'10px', padding:'8px 12px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'5px', fontSize:'11.5px', color:'#854d0e' } },
             h('div', { style:{ fontWeight:700, marginBottom:'4px' } }, '📝 특이사항'),
             detailModalCo.note)

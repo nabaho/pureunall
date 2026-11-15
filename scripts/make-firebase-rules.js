@@ -1518,6 +1518,19 @@ rules.worker_secret = { $kind: { $rec: {
   }
 } } };
 
+/* ══ 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번 — 그 건의 담당자와 대표만 (2026-11-15) ══
+   화면 쪽: js/pu-site-secret.js
+   ★ data/consultings·contracts·companies 는 재직 직원 누구나 통째로 읽으므로
+     공개 덩어리에는 siteId 와 hasSitePw(표시)만 두고, 실제 비번(sitePw)은 여기 둔다.
+   ★ 권한 잣대는 worker_secret 과 같다(그 건의 주담당·부담당 앞 5명 또는 총괄관리자). */
+rules.site_secret = { $kind: { $rec: {
+  '.read': WS_OWNER,
+  '.write': WS_OWNER,
+  '.validate': "$kind.matches(/^(cases|contracts|consultings|funds|other_projects|companies)$/)",
+  sitePw: { '.validate': wsText(120) },
+  $other: { '.validate': false }
+} } };
+
 /* ══ 직원 주민번호·계좌·예금주 금고(staff_secret) — 대표 승인 2026-11-01 (개인정보 2단계) ══
    근로자명부(user_accounts)는 재무 권한자가 «한 덩어리»로 읽는다. 그 안의 칸 하나는 규칙이 못 막으므로
    주민번호·계좌·예금주를 이 금고로 떼어 «대표(isAdmin)만» 읽고 쓰게 한다. 위임관리인·재무 권한자는 못 본다.
