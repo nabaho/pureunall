@@ -12,7 +12,7 @@
 푸른노무법인의 **약 110개 외부 고객 사업장 급여·노동법 아웃소싱 자동화**. 자료(엑셀·PDF·사진)를 읽어 계산→검토(3색)→확정→명세서→파생신고까지. 담당자는 확인·확정만.
 
 ## 1. 아키텍처 (A안 — 통합시스템 통합)
-- 런처 `enter.html`(nabaho.github.io/pureunall) **급여관리 타일** → `payroll-os.html`(라이브).
+- 런처 `enter.html`(erp.pureunlabor.co.kr — 2026-11-15 이사, 옛 nabaho.github.io/pureunall 은 301) **급여관리 타일** → `payroll-os.html`(라이브).
 - **같은 Firebase `pureun-erp`** 공유 → pu-erp 직원이 **같은 이메일/비번 로그인(SSO)**·권한(`uid_roles`) 공유.
 - 데이터는 **`payroll_os` 노드만** 사용(pu-erp data 미접촉 — kcareer·ieum·fund_erp와 동일 앱별 칸 분리).
 - 계산 코어·기준값은 pu-erp에서 이식(공유), 데이터 분리.
@@ -125,7 +125,7 @@
 ```
 cd ~/Documents/pureunall
 git pull --rebase origin main          # ⚠️ 반드시 먼저 (원격에 여러 작업 올라옴)
-# payroll-os.html / enter.html 편집  → main = 라이브(push 시 nabaho.github.io 즉시 반영)
+# payroll-os.html / enter.html 편집  → main = 라이브(push 시 erp.pureunlabor.co.kr 즉시 반영)
 git add payroll-os.html && git commit -m "..."
 git rebase origin/main && git push origin <작업브랜치>:main   # main 은 pu-deploy 가 점유
 # 하네스/엔진/데이터생성도 이제 main 저장소에서 함께 커밋(워크트리 없어짐)

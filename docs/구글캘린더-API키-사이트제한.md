@@ -49,12 +49,13 @@ pu-erp.html:50844   AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo
 그러면 아래에 주소를 넣는 칸이 생긴다. **항목 추가**를 눌러 아래 둘을 넣는다:
 
 ```
+https://erp.pureunlabor.co.kr/*
 https://nabaho.github.io/*
 https://*.firebaseapp.com/*
 ```
 
-- 첫 줄이 실제 서비스 주소다(`https://nabaho.github.io/pureunall/…`).
-- 둘째 줄은 파이어베이스 쪽 주소로 들어오는 경우를 위한 예비다. 안 써도 그만이다.
+- 첫 줄이 실제 서비스 주소다(`https://erp.pureunlabor.co.kr/…` — 2026-11-15 이사). 둘째 줄(옛 주소)은 이사 뒤 약 3개월 남겼다가 뺀다.
+- 셋째 줄은 파이어베이스 쪽 주소로 들어오는 경우를 위한 예비다. 안 써도 그만이다.
 
 ### 4. 「API 제한사항」 — 캘린더만
 
@@ -70,7 +71,7 @@ https://*.firebaseapp.com/*
 ## 확인
 
 1. 5분쯤 기다린다.
-2. 폰이나 PC에서 <https://nabaho.github.io/pureunall/pu-erp.html> 를 열고 **달력 탭**에 들어간다.
+2. 폰이나 PC에서 <https://erp.pureunlabor.co.kr/pu-erp.html> 를 열고 **달력 탭**에 들어간다.
 3. 구글 캘린더 일정이 평소대로 보이면 끝이다.
 
 ### 안 보이면

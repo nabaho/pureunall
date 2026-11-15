@@ -15,10 +15,22 @@
      ④ 돌아올 주소(OAuth redirect_uri)는 «요청이 온 출처»의 것을 쓴다 — 옛 출처면
         /pureunall/ 아래, 새 출처면 뿌리 아래. 전환 날 함수를 다시 올리지 않아도 된다.
    옛 출처는 이미 나간 링크·설치된 옛 앱 때문에 이사 뒤에도 한동안(약 3개월) 남긴다
-   — 지우는 날은 docs/superpowers/plans/2026-11-15-ERP-주소-이사.md 5단계. */
+   — 지우는 날은 docs/superpowers/plans/2026-11-15-ERP-주소-이사.md 5단계.
+   ★ 전환: 2026-11-15 23:03 KST (Pages 도메인·인증서·HTTPS 강제). 옛 출처는 «2026-02-15 무렵까지»
+     남겨 두고, 그 뒤 이 목록에서 빼는 PR 을 따로 낸다(빼기 전 옛 출처 호출이 남았는지 로그로 본다).
+
+   ★ 사람에게 «내보내는» 링크(메일·문자·알림 본문)는 받아 주는 목록과 다르다 — 언제나 새 주소다.
+     ERP 화면으로 가는 링크는 ERP_LINK_BASE, 바깥 사람(뉴스레터 받는 분)에게 «홈»으로 보내는
+     링크는 PUBLIC_HOME(공개 홈페이지). 옛 주소로 내보내면 301 을 한 번 더 돌고, 옛 출처를
+     목록에서 뺀 뒤에는 그 링크가 남의 주소처럼 보이게 된다. (tests/erp-move-finish.test.js) */
 
 const ERP_OLD = "https://nabaho.github.io";
 const ERP_NEW = "https://erp.pureunlabor.co.kr";
+
+/* 사람에게 내보내는 ERP 링크의 뿌리 — 경로 앞머리(/pureunall) 없이 바로 화면 이름이 붙는다 */
+const ERP_LINK_BASE = ERP_NEW;
+/* 바깥 사람에게 보내는 «홈» — 공개 홈페이지(2026-11-15 정식 공개). ERP 로그인 문이 아니다. */
+const PUBLIC_HOME = "https://pureunlabor.co.kr/";
 
 /* 순서가 곧 번호다(OAuth state 에 «몇 번째 출처»로 싣는다) — 뒤에만 덧붙이고, 있는 것의 자리를 바꾸지 말 것. */
 const ERP_ORIGINS = Object.freeze([ERP_OLD, ERP_NEW]);
@@ -73,6 +85,6 @@ function baseFor(origin) {
 }
 
 module.exports = {
-  ERP_OLD, ERP_NEW, ERP_ORIGINS, ERP_BASES, LOCAL_RE,
+  ERP_OLD, ERP_NEW, ERP_ORIGINS, ERP_BASES, LOCAL_RE, ERP_LINK_BASE, PUBLIC_HOME,
   originOf, isErpOrigin, isAllowedOrigin, allowOrigin, originIndex, baseAt, baseFor,
 };
