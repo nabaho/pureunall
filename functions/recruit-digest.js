@@ -12,7 +12,8 @@
 
 const DEFAULT_TO = "370-6@hanmail.net";   // 뉴스레터 검토 메일과 같은 대표 주소(news-friday.js 검토받는곳)
 const LIMIT = 30;
-const PAGE_URL = "https://nabaho.github.io/pureunall/gov.html";
+/* 메일에 넣는 «정부사업 화면» 링크 — ERP 새 주소(2026-11-15 이사, functions/erp-origins.js) */
+const PAGE_URL = require("./erp-origins").ERP_LINK_BASE + "/gov.html";
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

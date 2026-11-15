@@ -35,14 +35,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- 포털 주소 App Links 자동 검증 (외부 임의 URI 직접 호출 차단) -->
+            <!-- 포털 주소 App Links 자동 검증 (외부 임의 URI 직접 호출 차단)
+                 2026-11-15 ERP 이사: 호스트 erp.pureunlabor.co.kr 은 ERP 전용 출처라 경로 앞머리(/pureunall) 없이 뿌리 전체 -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:host="@string/host_name"
-                    android:pathPrefix="/pureunall"
+                    android:pathPrefix="/"
                     android:scheme="https" />
             </intent-filter>
         </activity>

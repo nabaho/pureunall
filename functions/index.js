@@ -4532,8 +4532,11 @@ exports.newsClick = functions
     /* ⚠ 모르는 번호일 때 튕겨 보내는 자리다. 예전에는 «/pureunall/» 로 보냈는데
          그 자리에는 index 파일이 없어서 깃허브의 영어 404 가 떴다 —
          2026-09-05 에 대표께서 미리보기에서 링크를 눌러 실제로 그 화면을 보셨다.
-         받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보낸다. */
-    res.redirect(302, 갈곳 || "https://nabaho.github.io/pureunall/enter.html");
+         받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보냈었다.
+       ★ 2026-11-15 공개 홈페이지(pureunlabor.co.kr)가 열리고 ERP 가 erp.pureunlabor.co.kr 로
+         옮겨 갔다 — 누르는 분은 뉴스레터를 받은 «바깥 사람»이라 ERP 로그인 문이 아니라
+         공개 홈페이지(PUBLIC_HOME)로 보낸다(위 주석의 «우리 홈페이지로» 그대로). */
+    res.redirect(302, 갈곳 || ERP_ORIGINS_LIB.PUBLIC_HOME);
   });
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -193,7 +193,10 @@ test('Android TWA 프로젝트가 Google Play API 36·최소 권한·암호화 �
   assert.match(manifest, /android:allowBackup="false"/);
   assert.match(manifest, /PortalLauncherActivity/);
   assert.match(manifest, /WebViewFallbackActivity/);
-  assert.match(strings, /https:\/\/nabaho\.github\.io\/pureunall\/enter\.html/);
+  /* 앱이 여는 주소 = ERP 가 실제로 열리는 주소(2026-11-15 이사 — functions/erp-origins.js 한 자리) */
+  const ERP_LINK_BASE = require('../functions/erp-origins.js').ERP_LINK_BASE;
+  assert.ok(strings.indexOf('>' + ERP_LINK_BASE + '/enter.html<') >= 0,
+    '앱 시작 주소가 ERP 실제 주소(' + ERP_LINK_BASE + '/enter.html)가 아닙니다');
 
   // 네이티브 오프라인 방어 화면 및 내부 TWA 런처 비노출·URI 호스트 검증 확인
   assert.match(

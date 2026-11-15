@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">푸른포털</string>
-    <string name="host_name" translatable="false">nabaho.github.io</string>
-    <string name="launch_url" translatable="false">https://nabaho.github.io/pureunall/enter.html</string>
+    <string name="host_name" translatable="false">erp.pureunlabor.co.kr</string>
+    <string name="launch_url" translatable="false">https://erp.pureunlabor.co.kr/enter.html</string>
     <string name="provider_authority" translatable="false">kr.pureun.portal.fileprovider</string>
     <string name="asset_statements" translatable="false">[{
         \"relation\": [\"delegate_permission/common.handle_all_urls\"],
         \"target\": {
             \"namespace\": \"web\",
-            \"site\": \"https://nabaho.github.io\"
+            \"site\": \"https://erp.pureunlabor.co.kr\"
         }
     }]</string>
     <string name="offline_title">네트워크 연결이 필요합니다</string>

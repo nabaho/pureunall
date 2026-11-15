@@ -48,7 +48,7 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
    cat > cors.json <<'EOF'
    [
      {
-       "origin": ["https://nabaho.github.io", "http://localhost:8799", "http://127.0.0.1:8799"],
+       "origin": ["https://nabaho.github.io", "https://erp.pureunlabor.co.kr", "http://localhost:8799", "http://127.0.0.1:8799"],
        "method": ["GET", "HEAD"],
        "responseHeader": ["Content-Type", "Content-Length", "Content-Range", "Content-Disposition"],
        "maxAgeSeconds": 3600
@@ -61,6 +61,10 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 같은 내용이 이 폴더의 `storage-cors.json` 에도 있다 — **고칠 일이 생기면 그 파일을 고치고
 여기 붙여 둔 것도 함께 고친다**(둘이 어긋나면 어느 쪽이 맞는지 아무도 모른다).
+
+> 2026-11-15 ERP 이사(`erp.pureunlabor.co.kr`) — 실제 버킷 셋(`pureun-erp-photos`·`pureun-erp-hrphotos`·
+> `pureun-erp.firebasestorage.app`)에 새 출처를 **더해** 두었다(기존 값은 그대로, hrphotos 는 원래 GET·Content-Type 만).
+> 이 파일들은 그 실제 값과 맞춘 기록이다. 옛 출처(`nabaho.github.io`)는 이사 뒤 약 3개월 남긴다.
 
 ## 넣고 나면
 

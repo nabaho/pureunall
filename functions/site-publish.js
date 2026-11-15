@@ -106,7 +106,7 @@ async function 올리기(githubRequest, token, repo, path, content, message, bas
 }
 
 /* ── 실행되는 조각 (2026-11-15 보안) ───────────────────────────────────────────
-   홈페이지 쪽은 이알피와 «같은 주소»(nabaho.github.io/pureunall/site/…)에서도 열린다.
+   홈페이지 쪽은 이알피와 «같은 주소»(2026-11-15 이사 뒤 erp.pureunlabor.co.kr/site/… — 전에는 nabaho.github.io/pureunall/site/…)에서도 열린다.
    그래서 직원 계정 하나가 털려 <script> 를 심은 쪽을 올리면, 관리자가 그 링크를 여는 순간 이알피 로그인이 넘어간다.
    ★ 직원은 «글·그림·표»를 고칠 수 있다(대표 지시 2026-10-30 그대로). 다만 «실행되는 조각»을 새로 넣거나 바꾸는 것은 총괄관리자만.
    실행되는 조각 = <script>…</script> 덩어리 · on…= 속성 · javascript: 주소 · iframe/object/embed/base/meta-refresh 태그.

@@ -103,20 +103,39 @@ test('★ «진짜 편지»에는 base 를 넣지 않는다 — 메일 프로그
 
 /* ═══ ③ 모르는 번호로 튕길 때 404 가 아니다 ═══════════════════════════ */
 
+/* 튕겨 보내는 «기본 주소»를 실제 값으로 푼다.
+   2026-11-15 ERP 이사 뒤로는 글자 대신 functions/erp-origins.js 의 PUBLIC_HOME(공개 홈페이지)을 쓴다 —
+   뉴스레터를 누르는 분은 바깥 사람이라 ERP 로그인 문이 아니라 홈페이지로 보낸다. */
+function 기본주소() {
+  const m = /res\.redirect\(302,[^)]*\|\|\s*([^)]+)\)/.exec(서버);
+  if (!m) return null;
+  const 식 = m[1].trim();
+  const 글 = /^"([^"]+)"$/.exec(식);
+  if (글) return 글[1];
+  if (/^ERP_ORIGINS_LIB\.PUBLIC_HOME$/.test(식)) return require('../functions/erp-origins.js').PUBLIC_HOME;
+  return null;
+}
+
 test('★ 튕겨 보내는 자리에 «문이 있다» — 404 로 보내지 않는다', () => {
-  const m = /res\.redirect\(302,[^)]*\)/.exec(서버);
-  assert.ok(m, '★ 튕겨 보내는 자리를 못 찾았다');
-  const 줄 = m[0];
-  assert.ok(!/pureunall\/"\s*\)/.test(줄),
+  const 주소 = 기본주소();
+  assert.ok(주소, '★ 튕겨 보내는 자리(기본 주소)를 못 찾았다');
+  assert.ok(!/pureunall\/$/.test(주소),
     '★ index 파일이 없는 자리로 보낸다 — 깃허브의 영어 404 가 뜬다');
-  assert.ok(/\.html/.test(줄), '★ 실제 쪽으로 보내지 않는다');
+  /* 실제 쪽: 파일(…html) 이거나, index 가 있는 사이트 뿌리(…/) */
+  assert.ok(/\.html$/.test(주소) || /^https:\/\/[^/]+\/$/.test(주소), '★ 실제 쪽으로 보내지 않는다: ' + 주소);
 });
 
 test('★ 그 자리에 «정말로 파일이 있다» — 주소만 바꾸고 파일이 없으면 같은 일이다', () => {
-  const m = /res\.redirect\(302,[^)]*\|\|\s*"([^"]+)"/.exec(서버);
-  assert.ok(m, '★ 기본 주소를 못 찾았다');
-  const 파일 = String(m[1]).split('/').pop();
-  assert.ok(파일 && /\.html$/.test(파일), '★ 기본 주소가 파일이 아니다: ' + m[1]);
+  const 주소 = 기본주소();
+  assert.ok(주소, '★ 기본 주소를 못 찾았다');
+  if (/^https:\/\/[^/]+\/$/.test(주소)) {
+    /* 공개 홈페이지 뿌리 — 그 사본(site/)의 index.html 이 곧 그 자리다(nabaho/pureun-site 와 같은 내용) */
+    assert.ok(fs.existsSync(path.join(뿌리, 'site', 'index.html')),
+      '★ 공개 홈페이지 뿌리로 보내는데 그 첫 쪽(site/index.html)이 없다 — 또 404 다');
+    return;
+  }
+  const 파일 = String(주소).split('/').pop();
+  assert.ok(파일 && /\.html$/.test(파일), '★ 기본 주소가 파일이 아니다: ' + 주소);
   assert.ok(fs.existsSync(path.join(뿌리, 파일)),
     '★ 보내는 자리에 그 파일이 없다 — 또 404 다: ' + 파일);
 });

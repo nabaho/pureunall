@@ -33,7 +33,8 @@ const Show = require('./news-lib/pu-news-show.js');
 const 검토받는곳 = '370-6@hanmail.net';
 const 기본보내는주소 = '370-6@hanmail.net';
 const BULK_GAP_SEC = 15;                    /* 화면(pu-news.html)과 같은 값 */
-const 관리화면 = 'https://nabaho.github.io/pureunall/pu-news.html';
+/* 검토 메일에 넣는 «관리 화면» 링크 — ERP 새 주소(2026-11-15 이사, functions/erp-origins.js) */
+const 관리화면 = require('./erp-origins').ERP_LINK_BASE + '/pu-news.html';
 const 준비한이 = '금요일 자동 준비';
 /* 월요일 몇 시에 나가나 — 검토 메일이 말하는 시각. ⚠ functions/index.js 의
    weeklyNewsletterSend 예약(every monday HH:MM)과 «같아야» 한다.

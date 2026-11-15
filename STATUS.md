@@ -189,17 +189,18 @@ Pages 를 못 켠다. 세 갈래:
 `fund-erp/static/index.html` 등). 바꿀 때 한 번에 찾아 고치는 PR 하나면 된다.
 Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(안 하면 그 주소에서 로그인이 막힌다).
 
-도메인을 붙이는 일은 **비공개 여부와 무관하게 언제든** 할 수 있다 — 이미 쓰는
-`푸른노무법인.kr` 의 하위 주소(예: `erp.푸른노무법인.kr`)를 그대로 써도 된다
-(홈페이지 붙일 때와 같은 요령 — A 레코드 네 줄 + `www` CNAME. 단 그 도메인은
-2026-11-27 만료라 미리 살펴야 한다).
+**✅ 도메인은 붙였다(2026-11-15).** ERP 는 `https://erp.pureunlabor.co.kr`(가비아 `erp` CNAME →
+`nabaho.github.io`, Pages 사용자 도메인·HTTPS 강제), 공개 홈페이지는 `https://pureunlabor.co.kr`.
+옛 `nabaho.github.io/pureunall/…` 은 GitHub 이 301 로 새 주소에 넘긴다(뒤의 값 유지).
+⚠ 예전 안 «`erp.푸른노무법인.kr`»은 쓰지 말 것 — `푸른노무법인.kr` 은 연장하지 않아 2026-11-27 에 끝난다.
+이사 계획·진행: `docs/superpowers/plans/2026-11-15-ERP-주소-이사.md` · 기록 `status/2026-11-15-erp-move-finish.md`.
 
 ## 0. 한 줄
 
 푸른노무법인 사내 통합 포털. 정적 HTML + Firebase RTDB(서버 없음), GitHub Pages 배포.
 화면 13개가 한 저장소에 있고, 여러 방이 **동시에** 고친다.
 
-- 포털 입구: `enter.html` · 배포: https://nabaho.github.io/pureunall/
+- 포털 입구: `enter.html` · 배포: https://erp.pureunlabor.co.kr/ (2026-11-15 이사 — 옛 https://nabaho.github.io/pureunall/ 은 301 로 넘어간다)
 - 검사: `node --test tests/*.test.js` (2026-09-03 기준 약 **10,950건**)
 - **고장넣기(mutation)는 필수 절차다.** 검사가 정말 무는지 확인하지 않은 PR 은 반쪽이다.
 
@@ -1469,6 +1470,7 @@ Firebase 저장 방식 변경은 2초 우회 약속을 없애고 실제 완료�
    만들 때는 **누가 언제 켜는지**를 먼저 정하고, 얼마 뒤 실제로 켜졌는지 세어 볼 것.
    지운 자리와 되살리지 말아야 할 까닭: `tests/erp-closed-biz.test.js` 머리말.
 11. **localStorage 에 큰 것 두기.** nabaho.github.io 의 앱 «전부»가 한 주소 몫(크롬 약 5백만 자)을 함께 쓴다.
+   (2026-11-15 이사 뒤 ERP 는 `erp.pureunlabor.co.kr` 출처를 «혼자» 쓴다 — 한글편집기·홈페이지와 나눠 쓰던 몫은 풀렸지만, ERP 앱끼리는 여전히 한 몫이다. 아래 규칙은 그대로.)
    2026-10-07 한도까지 차서 경력관리가 목록을 못 적었다 — 범인은 이알피 계약서 양식 1.3MB·규정관리 작업본 1MB 같은 «남의 짐»이었다.
    수십 KB 를 넘는 것은 `js/pu-big-store.js`(IndexedDB, 옮길 때 읽기→쓰기→견주기→그때만 지우기)로.
    이알피 업무 표는 이제 «전부» 거기 있다 — 다른 앱이 빌려 읽을 때는 `PuBigStore.peek` 로(localStorage 로 읽으면 빈 것).
