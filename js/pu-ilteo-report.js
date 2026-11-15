@@ -142,7 +142,7 @@
     var defaultTopics = [
       '착수 오리엔테이션 · 일터혁신 디자인팀 위촉 및 과업 범위·추진일정 확정',
       '인사·복무규정 및 근태·임금 비식별 기초데이터 교차진단 리뷰',
-      '계층별(경영진·인사담당·근로자대표) 심층 인터뷰 및 전직원 EOS 설문 결과 점검',
+      '계층별(경영진·인사담당·근로자대표) 심층 인터뷰 및 전 근로자 EOS 설문 결과 점검',
       '중간보고회 개최 — 통합 현황진단 이슈 공유 및「' + firstTaskName + '」설계 방향 합의',
       '「' + firstTaskName + ' · ' + secondTaskName + '」세부 제도설계안 및 모의계산(시뮬레이션) 검토',
       '근로자 의견수렴·설명회 결과 반영, 취업규칙 신구대조표 확정 및 최종 결과보고회'
@@ -259,7 +259,7 @@
     var secOverview = [
       '1) 추진 배경 및 목적',
       '• ' + coName + '(' + industry + (workerCnt ? ', 상시근로자 ' + workerCnt + '명' : '') + ')는 급변하는 노동환경과 최신 노동관계법령 기조에 선제적으로 대응하고, 노사 상생 기반의 일터혁신 체계를 확립하기 위하여 노사발전재단 「2026년 일터혁신 상생컨설팅(' + lv.name + ')」을 추진함.',
-      '• 본 컨설팅은 객관적인 인사·노무 데이터(인력·근태·임금 비식별 통계), 취업규칙·근로계약 법정 점검, 계층별 인터뷰 및 전직원 조직진단(EOS) 결과를 교차 분석하여 '
+      '• 본 컨설팅은 객관적인 인사·노무 데이터(인력·근태·임금 비식별 통계), 취업규칙·근로계약 법정 점검, 계층별 인터뷰 및 전 근로자 조직진단(EOS) 결과를 교차 분석하여 '
         + tasks.map(function (t, i) { return '(' + (i + 1) + ') 「' + t.name + '」'; }).join(', ') + ' 과제의 실행 가능한 맞춤형 제도설계안을 도출하는 데 목적이 있음.',
       '',
       '2) 수행 체계 및 일터혁신 디자인팀 운영',
@@ -382,11 +382,14 @@
     } else {
       Cat.EOS_AREAS.forEach(function (a) {
         eosAreaBars.push({ label: a.name, score: round1(a.bench - 0.15), bench: a.bench, gap: -0.15, placeholder: true });
+        (a.items || []).forEach(function (it) {
+          eosItemBars.push({ area: a.name, label: it.name, score: round1(it.bench - 0.12), bench: it.bench, gap: -0.12, placeholder: true });
+        });
       });
     }
 
     var secEos = es ? [
-      '1) 전직원 조직진단(EOS) 응답 현황 및 종합 점수',
+      '1) 전 근로자 조직진단(EOS) 응답 현황 및 종합 점수',
       '• 노사발전재단 표준 EOS 설문 결과 종합 평균은 ' + es.totalAvg.toFixed(2) + '점(5점 만점)'
         + (es.respondentCount ? '이며, 총 ' + es.respondentCount + '명이 참여함' : '임')
         + (es.responseRatePct ? ' (응답률 ' + es.responseRatePct + '% — ' + lv.name + ' 기준 ' + es.requiredMinPct + '% ' + (es.rateMet ? '충족' : '추가 독려 필요') + ').' : '.'),
@@ -401,8 +404,8 @@
         return '• ' + (idx + 1) + '순위 — ' + w.name + ': ' + w.score.toFixed(2) + '점 (준거 대비 ' + (w.gap >= 0 ? '+' : '') + w.gap.toFixed(2) + '점)';
       }).join('\n')
     ].filter(Boolean).join('\n') : [
-      '1) 전직원 조직진단(EOS) 실시 기준 및 분석 대기',
-      '• ' + lv.name + ' 인정 기준에 따라 전직원 EOS 설문 응답률 ' + lv.eosMinPct + '% 이상 확보가 필수임.',
+      '1) 전 근로자 조직진단(EOS) 실시 기준 및 분석 대기',
+      '• ' + lv.name + ' 인정 기준에 따라 전 근로자 EOS 설문 응답률 ' + lv.eosMinPct + '% 이상 확보가 필수임.',
       '• EOS 설문 결과 엑셀 파일을 수신·첨부하면 5대 대영역·16개 세부영역 점수와 업종 준거집단 대비 격차 막대그래프가 자동으로 생성됩니다.'
     ].join('\n');
 
@@ -530,25 +533,72 @@
     var locks = Object.assign({}, (prevFinal && prevFinal.locks) || {});
     var prevSecs = (prevFinal && prevFinal.sections) || {};
 
-    var adoptedModel = diff.adoptedModel || tasks.map(function (t) { return t.name + ' 표준 설계모델'; }).join(' · ');
-    var wageAgree = diff.wageAgreement || '소정근로시간 단축·제도 개편에 따른 기존 임금 총액 100% 보전 및 통상임금 산입범위 적법화';
-    var effDate = diff.effectiveDate || ((num(p.year) || 2026) + '년 하반기(시범운영 후 본 시행)');
-    var targetScope = diff.targetScope || '전 부서 정규직 및 상시 근무 근로자(교대·특수직군 단계적 적용)';
-    var voteSummaryText = diff.votePct > 0
-      ? ('근로자 의견수렴·찬반투표 결과 찬성률 ' + diff.votePct + '%'
-          + (diff.voteTotal > 0 ? ' (대상 ' + diff.voteTotal + '명 중 ' + diff.voteYes + '명 찬성)' : '') + '로 과반수 동의 요건 충족')
-      : '디자인팀 협의 및 전 근로자 설명회 실시 후 근로자 과반수 의견수렴·동의 서명 절차 진행';
+    var diffOverrides = (p.diffOverrides && typeof p.diffOverrides === 'object') ? p.diffOverrides : {};
+    var adoptedModel = str(diffOverrides.df_model && diffOverrides.df_model.finalVal)
+      || diff.adoptedModel
+      || tasks.map(function (t) { return t.name + ' 표준 설계모델'; }).join(' · ');
+    var wageAgree = str(diffOverrides.df_wage && diffOverrides.df_wage.finalVal)
+      || diff.wageAgreement
+      || '소정근로시간 단축·제도 개편에 따른 기존 임금 총액 100% 보전 및 통상임금 산입범위 적법화';
+    var effDate = str(diffOverrides.df_date && diffOverrides.df_date.finalVal)
+      || diff.effectiveDate
+      || ((num(p.year) || 2026) + '년 하반기(시범운영 후 본 시행)');
+    var targetScope = str(diffOverrides.df_scope && diffOverrides.df_scope.finalVal)
+      || diff.targetScope
+      || '전 부서 정규직 및 상시 근무 근로자(교대·특수직군 단계적 적용)';
+    var voteSummaryText = str(diffOverrides.df_consent && diffOverrides.df_consent.finalVal)
+      || (diff.votePct > 0
+        ? ('근로자 의견수렴·찬반투표 결과 찬성률 ' + diff.votePct + '%'
+            + (diff.voteTotal > 0 ? ' (대상 ' + diff.voteTotal + '명 중 ' + diff.voteYes + '명 찬성)' : '') + '로 과반수 동의 요건 충족')
+        : '디자인팀 협의 및 전 근로자 설명회 실시 후 근로자 과반수 의견수렴·동의 서명 절차 진행');
 
-    /* 중간보고 대비 후속 메일 협의 변경점(Diff) 대조표 */
-    var diffSummaryRows = [
-      ['핵심 채택 모델', '복수 대안 비교 검토 (' + tasks.map(function (t) { return t.name; }).join(', ') + ')', adoptedModel, diff.adoptedModel ? '후속 메일 확정' : '표준안 적용'],
-      ['임금·수당 보전 원칙', '통상시급 변동폭 시뮬레이션 검토', wageAgree, diff.wageAgreement ? '후속 협의 반영' : '임금보전 기준'],
-      ['적용 대상 범위', '전 사 일괄 또는 부서별 단계 적용 검토', targetScope, diff.targetScope ? '후속 협의 반영' : '단계적 확대'],
-      ['시행 예정 시기', '컨설팅 종료 후 도입 시기 조율', effDate, diff.effectiveDate ? '시행일 확정' : '일정 수립'],
-      ['근로자 동의·의견수렴', '설명회 및 의견수렴 계획 수립', voteSummaryText, diff.votePct >= 50 ? '과반수 찬성 완료' : '절차 안내 완료']
+    /* 중간보고 대비 후속 메일 협의 변경점(Diff) 대조표 (수기 추가·편집·상태 체크 병합) */
+    var diffStatusMap = (p.diffStatusMap && typeof p.diffStatusMap === 'object') ? p.diffStatusMap : {};
+    var baseDiffItems = [
+      { id: 'df_model',   area: '핵심 채택 모델',      baseVal: '복수 대안 비교 검토 (' + tasks.map(function (t) { return t.name; }).join(', ') + ')', finalVal: adoptedModel, defaultStatus: (diff.adoptedModel || (diffOverrides.df_model && diffOverrides.df_model.finalVal)) ? '후속 메일 확정' : '표준안 적용' },
+      { id: 'df_wage',    area: '임금·수당 보전 원칙', baseVal: '통상시급 변동폭 시뮬레이션 검토', finalVal: wageAgree, defaultStatus: (diff.wageAgreement || (diffOverrides.df_wage && diffOverrides.df_wage.finalVal)) ? '후속 협의 반영' : '임금보전 기준' },
+      { id: 'df_scope',   area: '적용 대상 범위',      baseVal: '전 사 일괄 또는 부서별 단계 적용 검토', finalVal: targetScope, defaultStatus: (diff.targetScope || (diffOverrides.df_scope && diffOverrides.df_scope.finalVal)) ? '후속 협의 반영' : '단계적 확대' },
+      { id: 'df_date',    area: '시행 예정 시기',      baseVal: '컨설팅 종료 후 도입 시기 조율', finalVal: effDate, defaultStatus: (diff.effectiveDate || (diffOverrides.df_date && diffOverrides.df_date.finalVal)) ? '시행일 확정' : '일정 수립' },
+      { id: 'df_consent', area: '근로자 동의·의견수렴', baseVal: '설명회 및 의견수렴 계획 수립', finalVal: voteSummaryText, defaultStatus: diff.votePct >= 50 ? '과반수 찬성 완료' : '절차 안내 완료' }
     ];
     diff.requests.slice(0, 3).forEach(function (rq, idx) {
-      diffSummaryRows.push(['기업 보완요청 #' + (idx + 1), '중간보고 초안 기준', rq, '최종보고서 반영']);
+      baseDiffItems.push({
+        id: 'df_req_' + (idx + 1),
+        area: '기업 보완요청 #' + (idx + 1),
+        baseVal: '중간보고 초안 기준',
+        finalVal: rq,
+        defaultStatus: '최종보고서 반영'
+      });
+    });
+    var customDiffs = Array.isArray(p.customDiffRows)
+      ? p.customDiffRows.filter(function (r) { return r && !r._deleted && (str(r.area) || str(r.finalVal)); })
+      : [];
+    customDiffs.forEach(function (cr, idx) {
+      var cid = str(cr.id) || ('df_custom_' + (idx + 1));
+      baseDiffItems.push({
+        id: cid,
+        custom: true,
+        area: str(cr.area) || ('추가 협의 #' + (idx + 1)),
+        baseVal: str(cr.baseVal) || '중간보고 기준선',
+        finalVal: str(cr.finalVal),
+        defaultStatus: str(cr.status) || '수기 협의 확정'
+      });
+    });
+
+    var diffObjects = baseDiffItems.map(function (it) {
+      var ov = diffOverrides[it.id] || {};
+      var stLabel = str(diffStatusMap[it.id]) || str(ov.status) || it.defaultStatus;
+      return {
+        id: it.id,
+        custom: !!it.custom,
+        area: str(ov.area) || it.area,
+        baseVal: str(ov.baseVal) || it.baseVal,
+        finalVal: str(ov.finalVal) || it.finalVal,
+        status: stLabel
+      };
+    });
+    var diffSummaryRows = diffObjects.map(function (it) {
+      return [it.area, it.baseVal, it.finalVal, it.status];
     });
 
     /* ① 수행 개요·추진 경과 및 핵심 성과 요약 */
@@ -727,6 +777,7 @@
         effectiveDate: effDate,
         targetScope: targetScope,
         voteSummaryText: voteSummaryText,
+        diffObjects: diffObjects,
         diffSummaryRows: diffSummaryRows,
         taskDesignCards: taskDesignCards,
         simulationRows: simulationRows,
@@ -773,45 +824,94 @@
 
   function buildSinGuRows(tasks, adoptedModel, wageAgree, effDate) {
     var rows = [];
-    var hasWt = tasks.some(function (t) { return t.domain === 'worktime'; });
-    var hasWg = tasks.some(function (t) { return t.domain === 'wage'; });
-    var hasCu = tasks.some(function (t) { return t.domain === 'culture'; });
+    var domMap = {};
+    (tasks || []).forEach(function (t) { if (t && t.domain) domMap[t.domain] = 1; });
 
-    if (hasWt) {
+    if (domMap.worktime) {
       rows.push([
-        '제○조 (근로시간 및 근무체계)',
-        '1일 8시간, 1주 40시간을 기본 소정근로시간으로 한다.',
-        adoptedModel + ' 운영 기준 및 근로자대표 서면합의에 따른 유연근무·단축근무 조항을 신설한다.',
-        '근로시간 단축·유연근무 제도화'
+        '제18조 (소정근로시간 및 근무체계)',
+        '1일 8시간, 1주 40시간을 기본 소정근로시간으로 하며 시업 09:00, 종업 18:00로 한다.',
+        adoptedModel + ' 운영 기준 및 근로자대표 서면합의에 따른 단축·유연근무(시차·선택·탄력근무) 특례 조항을 신설한다.',
+        '근로기준법 제50조~제52조 (근로시간 단축·유연화)'
       ]);
       rows.push([
-        '제○조 (연장·휴일근로 사전승인)',
-        '업무상 필요한 경우 연장근로를 실시할 수 있다.',
-        '연장·야간·휴일근로는 사전 신청 및 부서장 승인을 득한 경우에 한하여 인정하며 전자기록으로 관리한다.',
-        '관행적 초과근로 방지'
+        '제21조 (연장·야간·휴일근로 사전승인)',
+        '업무상 필요한 경우 연장 및 휴일근로를 명할 수 있다.',
+        '연장·야간·휴일근로는 사전 신청 및 부서장 승인을 득한 경우에 한하여 인정하며 전자 출퇴근 기록으로 관리한다.',
+        '근로기준법 제53조 (관행적 장시간 근로 방지)'
       ]);
-    }
-    if (hasWg) {
       rows.push([
-        '제○조 (임금의 구성 및 계산방법)',
-        '기본급 및 제수당(포괄산정 수당 포함)으로 지급한다.',
-        wageAgree + ' 원칙에 따라 통상임금 산입항목과 실근로 가산수당 산출식을 명확히 구분 기재한다.',
-        '통상임금 적법화·임금명세 투명화'
+        '제26조 (연차유급휴가 사용 활성화)',
+        '근로기준법이 정하는 바에 따라 연차유급휴가를 부여한다.',
+        '반차(4시간)·반반차(2시간) 분할 사용 근거 및 분기별 계획연차·법정 사용촉진 절차를 명문화한다.',
+        '근로기준법 제60조·제61조 (실질 휴식권 보장)'
       ]);
     }
-    if (hasCu || !rows.length) {
+    if (domMap.wage) {
       rows.push([
-        '제○조 (일·가정양립 및 근로자 보호)',
-        '관련 법령이 정하는 바에 따른다.',
-        '육아기 근로시간 단축·가족돌봄휴가 최신 법정 기준 및 직장 내 괴롭힘 조사·비밀유지 절차를 구체화한다.',
-        '최신 개정 노동법 현행화'
+        '제32조 (임금의 구성항목 및 통상임금)',
+        '임금은 기본급 및 제수당(고정연장수당 등 포괄산정 수당 포함)으로 구성한다.',
+        wageAgree + ' 원칙에 따라 정기적·일률적 지급 수당의 통상임금 산입범위를 명시하고 실근로 가산수당 산출식을 구분한다.',
+        '대법원 통상임금 판례 및 근로기준법 제56조 준수'
+      ]);
+      rows.push([
+        '제35조 (임금명세서 교부)',
+        '매월 임금 지급 시 급여내역을 통지한다.',
+        '임금 구성항목별 금액, 연장·야간·휴일근로 시간수 및 계산방법, 공제내역을 기재한 임금명세서를 서면·전자로 교부한다.',
+        '근로기준법 제48조 제2항 (임금 산정 투명화)'
+      ]);
+    }
+    if (domMap.coop) {
+      rows.push([
+        '제54조 (노사협의회 및 고충처리)',
+        '노사 간 협의를 위하여 협의회를 둘 수 있다.',
+        '근로자참여법에 따른 분기별 정기 노사협의회 운영, 근로자위원 비밀투표 선출 및 고충처리위원(10일 내 통보) 절차를 명시한다.',
+        '근로자참여법 제4조·제12조·제26조 반영'
+      ]);
+    }
+    if (domMap.culture || !rows.length) {
+      rows.push([
+        '제42조 (모성보호 · 육아지원 및 일·가정양립)',
+        '육아휴직 등은 관계 법령이 정하는 바에 따른다.',
+        '육아휴직 기간 확대 요건, 육아기 근로시간 단축(만 12세 이하), 배우자 출산휴가 및 가족돌봄휴가·휴직 절차를 최신 개정법으로 현행화한다.',
+        '남녀고용평등법 최신 개정 조항 일괄 반영'
+      ]);
+      rows.push([
+        '제48조 (직장 내 괴롭힘·성희롱 예방 및 보호)',
+        '직장 내 괴롭힘 행위를 금지한다.',
+        '신고 접수 즉시 객관적 조사 실시, 피해근로자 근무장소 변경·유급휴가 보호조치 및 조사 참여자 비밀누설 금지 의무를 구체화한다.',
+        '근로기준법 제76조의2·제76조의3 준수'
+      ]);
+    }
+    if (domMap.job || domMap.eval || domMap.skill) {
+      rows.push([
+        '제14조 (직무분장 · 인사평가 및 교육훈련)',
+        '회사는 인사평가를 실시하여 인사에 반영할 수 있다.',
+        '직무기술서(JD) 기반 업무분장, 공정 평가기준 사전 공개·이의신청 절차 및 직무역량 교육훈련 시간의 근로시간 인정 기준을 신설한다.',
+        '직무·역량 중심 공정 인사관리 확립'
+      ]);
+    }
+    if (domMap.hire) {
+      rows.push([
+        '제7조 (공정채용 및 수습평가)',
+        '전형 절차에 따라 직원을 채용한다.',
+        '채용절차법 제4조의3에 따른 직무 무관 개인정보(출신지역·혼인·가족직업 등) 수집 금지 및 수습근로자 객관적 본채용 평가기준을 명시한다.',
+        '채용절차의 공정화에 관한 법률 준수'
+      ]);
+    }
+    if (domMap.senior) {
+      rows.push([
+        '제58조 (정년 및 고령자 계속고용제도)',
+        '근로자의 정년은 만 60세로 한다.',
+        '만 60세 정년 도래 근로자 중 희망자에 대한 재고용(촉탁 계속고용) 심사기준·계약기간 및 숙련기술 전수 수당 기준을 신설한다.',
+        '고령자고용법 제19조 및 계속고용장려금 요건 충족'
       ]);
     }
     rows.push([
-      '부칙 제1조 (시행일)',
+      '부칙 제1조 (시행일 및 경과조치)',
       '종전 규정에 따른다.',
-      '본 개정 규정은 ' + effDate + '부터 시행한다.',
-      '시행 시기 명문화'
+      '본 개정 취업규칙은 ' + effDate + '부터 시행하며, 법령 개정 사항은 해당 법령 시행일로부터 소급·우선 적용한다.',
+      '근로기준법 제94조 변경신고 및 시행일 확정'
     ]);
     return rows;
   }
@@ -870,20 +970,29 @@
       return Object.assign({}, r, { reportText: body });
     });
 
-    /* ③ 이행관리 등록 및 이행결과표 문안 */
+    /* ③ 이행관리 등록 및 이행결과표 문안 (사후 이행관리 체크리스트 연동) */
+    var fuChecks = (p.followupChecks && typeof p.followupChecks === 'object') ? p.followupChecks : {};
+    var fuItems = Array.isArray(Cat.FOLLOWUP_ITEMS) ? Cat.FOLLOWUP_ITEMS : [];
+    var fuDoneCnt = fuItems.filter(function (f) { return !!fuChecks[f.code]; }).length;
     var followUpText = [
       '【컨설팅 종료 후 이행관리 등록 · 이행결과표 입력 문안】',
       '■ 대상 기업: ' + coName + ' / 확정 모델: ' + fin.structured.adoptedModel,
       '■ 시행 예정일 및 적용 대상: ' + fin.structured.effectiveDate + ' / ' + fin.structured.targetScope,
+      '■ 3개월 사후 이행점검 진행 현황: 총 ' + fuItems.length + '개 항목 중 ' + fuDoneCnt + '개 완료',
       '',
       '1. 과제별 제도 도입 및 규정 정비 이행 현황',
       '• 근로자 의견수렴·동의: ' + fin.structured.voteSummaryText,
       '• 취업규칙·근로계약 정비: 신구대조표 확정 및 개정 규정 공지·신고 절차 이행',
       '',
-      '2. 3개월 사후 이행점검(2회) 주요 확인 내용',
-      fin.structured.monthPlanRows.map(function (m) {
-        return '• ' + m[0] + ': ' + m[1] + ' (' + m[2] + ')';
-      }).join('\n'),
+      '2. 3개월 사후 이행점검(2회) 세부 확인 결과',
+      (fuItems.length
+        ? fuItems.map(function (f, idx) {
+          var mark = fuChecks[f.code] ? '[이행완료 ✓]' : '[점검예정 □]';
+          return '• ' + (idx + 1) + '. ' + mark + ' [' + f.month + '] ' + f.title + ' (증빙: ' + f.proof + ')';
+        }).join('\n')
+        : fin.structured.monthPlanRows.map(function (m) {
+          return '• ' + m[0] + ': ' + m[1] + ' (' + m[2] + ')';
+        }).join('\n')),
       '',
       '3. 연계 정부지원사업 신청 및 후속 관리 권고',
       fin.structured.govAidRows.map(function (g) {

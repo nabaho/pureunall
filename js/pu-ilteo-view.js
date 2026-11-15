@@ -7,8 +7,9 @@
  *      일터혁신 참여 사업장 자동 발견 및 워크스페이스 등록
  *   3. 다음메일 거울(mailbox/folders·mailbox/msgs) 스캔 + Cloud Functions(readMailMessage/readMailAttachment peek:true)
  *      실시간 내용확인·첨부 파싱 + 로컬 드래그앤드롭 파일 이원화 비식별 분석(XLSX/CSV/HWPX/HWP/DOCX/PDF/TXT)
- *   4. 중간보고서 자동 정리 · 수기 고정(Lock) · 선택적 AI 윤문(환각 숫자 검증) · 기준선 스냅샷 확정 · PPTX 다운로드
- *   5. 중간보고 이후 후속 메일 체크 · 변경점(Diff) 대조 · 최종 결과보고서 자동 조립 · 플랫폼 문안 3종 복사 · PPTX 다운로드
+ *   4. 모든 표·체크리스트·회차·Diff·보고서 섹션·산출물·사후관리 목록 좌측 ☐ 고르기 칸 + 번호(1,2...) + 끌어고르기 + 일괄실행 지원
+ *   5. 중간보고서 자동 정리 · 회차 인정기준 관리 · 기준선 스냅샷 확정 · 후속 메일 Diff 대조 · 최종 결과보고서 자동 조립
+ *   6. 발표용 PPTX(미리보기 포함) · 취업규칙 DOCX · 근로계약/합의서 DOCX · 모의계산/이행점검 XLSX · 플랫폼 문안 · 통합 ZIP 생성 및 3개월 사후관리
  */
 (function (global) {
   'use strict';
@@ -17,6 +18,7 @@
   var Intake = function () { return global.PuIlteoIntake; };
   var Report = function () { return global.PuIlteoReport; };
   var Pptx = function () { return global.PuIlteoPptx; };
+  var Pack = function () { return global.PuIlteoPack; };
 
   var MAIL_FN_BASE = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
 
@@ -49,6 +51,7 @@
   var TAB = 'projects';
   var CUR_PID = '';
   var SEL = {};
+  var DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
   var UPLOAD_DOC_KIND = '';
   var POST_UPLOAD_DOC_KIND = '';
 
@@ -95,6 +98,10 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { el.classList.remove('on'); }, 3600);
   }
+  function askConfirm(msg) {
+    if (typeof global.confirm === 'function') return global.confirm(msg);
+    return true;
+  }
 
   function currentAuthUid() {
     try {
@@ -111,6 +118,7 @@
     TAB = 'projects';
     CUR_PID = '';
     SEL = {};
+    DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
     SCAN_CACHE = {};
     DISCOVER_LIST = [];
     D = {
@@ -212,6 +220,12 @@
     });
   }
 
+  function manualChecksOf(proj, phase) {
+    if (!proj || !proj.manualChecks || typeof proj.manualChecks !== 'object') return {};
+    var sub = proj.manualChecks[phase];
+    return (sub && typeof sub === 'object') ? sub : {};
+  }
+
   function rebuildScanAndDiscover() {
     SCAN_CACHE = {};
     var projs = activeProjects();
@@ -227,7 +241,6 @@
     if (!CUR_PID && projs.length) CUR_PID = projs[0].id;
     if (CUR_PID && !projectById(CUR_PID)) CUR_PID = projs[0] ? projs[0].id : '';
 
-    /* 정부사업일정 및 이알피에서 일터혁신(상생컨설팅) 참여기업 자동 발견 */
     var cands = [], seenCo = {};
     var ilteoRe = /일터\s*혁신|일터\s*상생|상생\s*컨설팅/;
     var typeMap = {};
@@ -269,7 +282,7 @@
       });
       if (!ilteoRe.test(tName) && !hasIlteoSched) return;
       var matchedErpCo = matchErpCompanyStrict(sc);
-      if (!matchedErpCo) return; // companyId 확정 매칭된 사업장만 원클릭 후보로 올림
+      if (!matchedErpCo) return;
       if (registeredCoIds[matchedErpCo.id] || seenCo[matchedErpCo.id]) return;
       seenCo[matchedErpCo.id] = 1;
       cands.push({
@@ -347,7 +360,7 @@
     }
   }
 
-  /* ══ 2. 공통 표 렌더러 (좌측 ☐ 체크박스 + № 번호 + 일괄 실행 바) ═══════ */
+  /* ══ 2. 공통 표 & 섹션 렌더러 (좌측 ☐ 체크박스 + № 번호 + 끌어고르기 + 일괄 실행 바) ═ */
   function renderTable(name, heads, rows, curId) {
     if (!rows.length) return '<div class="empty">표시할 내역이 없습니다.</div>';
     var allOn = rows.every(function (r) { return !!SEL[name + '|' + r.id]; });
@@ -375,13 +388,73 @@
     return html;
   }
 
+  function renderSectionList(listName, headLabel, sectionsMeta, secsObj, locksObj, modePrefix, badgeCls) {
+    var allOn = sectionsMeta.length > 0 && sectionsMeta.every(function (s) { return !!SEL[listName + '|' + s.key]; });
+    var cards = sectionsMeta.map(function (s, idx) {
+      var ckKey = listName + '|' + s.key;
+      var isSel = !!SEL[ckKey];
+      var locked = !!(locksObj && locksObj[s.key]);
+      var val = str(secsObj && secsObj[s.key]);
+      return '<div class="rpt-sec-card' + (isSel ? ' sel' : '') + '" data-sec-row="' + esc(s.key) + '">' +
+        '<div class="rpt-sec-hd">' +
+        '<input type="checkbox" data-ck="' + esc(ckKey) + '"' + (isSel ? ' checked' : '') + ' aria-label="' + (idx + 1) + '번 섹션 선택">' +
+        '<span class="sec-no">' + (idx + 1) + '</span>' +
+        '<span class="chip ' + esc(badgeCls) + '">' + esc(s.part) + '</span>' +
+        '<b>' + esc(s.title) + '</b>' +
+        '<span class="sp"></span>' +
+        '<label class="hint" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">' +
+        '<input type="checkbox" data-' + modePrefix + '-lock="' + esc(s.key) + '"' + (locked ? ' checked' : '') + '> 🔒 고정</label>' +
+        '<button class="sm" data-ai-polish="' + modePrefix + ':' + esc(s.key) + '" title="개인정보 2중 가림 후 문체만 다듬습니다">✨ AI 윤문</button>' +
+        '<button class="sm ok" data-save-' + modePrefix + '-sec="' + esc(s.key) + '">💾 저장</button>' +
+        '</div>' +
+        '<div class="rpt-sec-body">' +
+        '<textarea id="' + modePrefix + 'Sec_' + esc(s.key) + '" aria-label="' + esc(s.title) + '">' + esc(val) + '</textarea>' +
+        '</div></div>';
+    }).join('');
+
+    return '<div class="bulk" data-bulk="' + esc(listName) + '"></div>' +
+      '<div class="sec-list-hd">' +
+      '<input type="checkbox" data-all="' + esc(listName) + '"' + (allOn ? ' checked' : '') + ' aria-label="' + esc(headLabel) + ' 전체 선택">' +
+      '<span class="sec-no">번호</span>' +
+      '<span>' + esc(headLabel) + '</span>' +
+      '</div>' +
+      '<div class="rpt-sec-list" data-sec-name="' + esc(listName) + '">' + cards + '</div>';
+  }
+
+  function listCheckboxesInDom(name) {
+    if (typeof document === 'undefined') return [];
+    var sel = 'table.t[data-name="' + name + '"] input[data-ck], [data-sec-name="' + name + '"] input[data-ck]';
+    return Array.prototype.slice.call(document.querySelectorAll(sel));
+  }
+
+  function syncHeaderCheckbox(name) {
+    if (typeof document === 'undefined' || !name) return;
+    var hd = document.querySelector('input[data-all="' + name + '"]');
+    if (!hd) return;
+    var cbs = listCheckboxesInDom(name);
+    hd.checked = cbs.length > 0 && cbs.every(function (cb) { return cb.checked; });
+    cbs.forEach(function (cb) {
+      var card = cb.closest ? cb.closest('.rpt-sec-card') : null;
+      if (card) card.classList.toggle('sel', cb.checked);
+    });
+  }
+
   function pickedIds(name) {
     var prefix = name + '|';
     return Object.keys(SEL).filter(function (k) { return k.indexOf(prefix) === 0 && SEL[k]; }).map(function (k) { return k.slice(prefix.length); });
   }
   function clearSel(name) {
-    if (!name) { SEL = {}; return; }
+    if (!name) {
+      SEL = {};
+      if (typeof document !== 'undefined') {
+        document.querySelectorAll('input[data-ck], input[data-all]').forEach(function (cb) { cb.checked = false; });
+        document.querySelectorAll('.rpt-sec-card.sel').forEach(function (c) { c.classList.remove('sel'); });
+      }
+      return;
+    }
     pickedIds(name).forEach(function (id) { delete SEL[name + '|' + id]; });
+    listCheckboxesInDom(name).forEach(function (cb) { cb.checked = false; });
+    syncHeaderCheckbox(name);
   }
 
   function drawBulks() {
@@ -392,14 +465,39 @@
       if (!n) { el.innerHTML = ''; return; }
       var btns = '';
       if (nm === 'projects') {
-        btns = '<button class="sm danger" data-bulkact="projects:del">선택 사업장 숨김(삭제)</button>';
+        btns = '<button class="sm danger" data-bulkact="projects:del">선택 숨김(삭제)</button>';
       } else if (nm === 'discover') {
-        btns = '<button class="sm pri" data-bulkact="discover:activate">⚡ 선택 후보 일괄 워크스페이스 활성화</button>';
+        btns = '<button class="sm pri" data-bulkact="discover:activate">⚡ 선택 활성화</button>';
+      } else if (nm === 'preChk' || nm === 'postChk') {
+        btns = '<button class="sm ok" data-bulkact="' + nm + ':check">✓ 수령확인</button>' +
+          '<button class="sm" data-bulkact="' + nm + ':uncheck">확인 해제</button>' +
+          '<button class="sm warn-btn" data-bulkact="' + nm + ':reqmail">✉️ 요청문안</button>';
+      } else if (nm === 'candMails') {
+        btns = '<button class="sm pri" data-bulkact="candMails:analyze">🔍 내용확인·연결</button>';
       } else if (nm === 'preMails' || nm === 'postMails') {
-        btns = '<button class="sm pri" data-bulkact="' + nm + ':analyze">🔍 선택 메일 일괄 내용확인·자동분석</button>' +
-          '<button class="sm ok" data-bulkact="' + nm + ':check">✓ 선택 메일 확인완료 표시</button>';
+        btns = '<button class="sm pri" data-bulkact="' + nm + ':analyze">🔍 내용확인·분석</button>' +
+          '<button class="sm ok" data-bulkact="' + nm + ':check">✓ 확인표시</button>';
       } else if (nm === 'preCards' || nm === 'postCards') {
-        btns = '<button class="sm danger" data-bulkact="' + nm + ':del">선택 분석카드 삭제</button>';
+        btns = '<button class="sm danger" data-bulkact="' + nm + ':del">선택 카드 삭제</button>';
+      } else if (nm === 'rounds') {
+        btns = '<button class="sm ok" data-bulkact="rounds:proofOn">✓ 증빙완료</button>' +
+          '<button class="sm" data-bulkact="rounds:proofOff">증빙 해제</button>' +
+          '<button class="sm" data-bulkact="rounds:face">대면 전환</button>' +
+          '<button class="sm" data-bulkact="rounds:remote">비대면 전환</button>' +
+          '<button class="sm danger" data-bulkact="rounds:del">회차 삭제</button>';
+      } else if (nm === 'midSecs' || nm === 'finalSecs') {
+        btns = '<button class="sm ok" data-bulkact="' + nm + ':save">💾 선택 저장</button>' +
+          '<button class="sm pri" data-bulkact="' + nm + ':lock">🔒 수기 고정</button>' +
+          '<button class="sm" data-bulkact="' + nm + ':unlock">🔓 고정 해제</button>';
+      } else if (nm === 'diffRows') {
+        btns = '<button class="sm ok" data-bulkact="diffRows:confirm">✓ 합의 확정</button>' +
+          '<button class="sm warn-btn" data-bulkact="diffRows:hold">보류 표시</button>' +
+          '<button class="sm danger" data-bulkact="diffRows:del">수기행 삭제</button>';
+      } else if (nm === 'deliverables') {
+        btns = '<button class="sm pri" data-bulkact="deliverables:zip">📦 선택 산출물 ZIP</button>';
+      } else if (nm === 'followups') {
+        btns = '<button class="sm ok" data-bulkact="followups:done">✓ 이행완료</button>' +
+          '<button class="sm" data-bulkact="followups:todo">점검예정 복원</button>';
       }
       el.innerHTML = '<b>' + n + '건 선택됨</b>' + btns + '<button class="sm" data-bulkact="' + nm + ':clear">선택 해제</button>';
     });
@@ -513,15 +611,15 @@
     });
 
     var rows = filtered.map(function (p) {
-      var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0 };
-      var chkPre = Intake().summarizeChecklistProgress('pre_mid', p.selectedTasks, D.intake[p.id] || {}, sc.matched);
+      var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0, totalInCount: 0 };
+      var chkPre = Intake().summarizeChecklistProgress('pre_mid', p.selectedTasks, D.intake[p.id] || {}, sc.matched, manualChecksOf(p, 'pre_mid'));
       var lv = Cat().getLevel(p.level);
       var taskNames = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; }).join(' · ');
 
       var mailBadges = [];
       if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber">📩 기초 미확인 ' + sc.unseenPreCount + '</span>');
       if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green">📬 후속 미확인 ' + sc.unseenPostCount + '</span>');
-      if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + sc.totalInCount + '건 확인됨</span>');
+      if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + (sc.totalInCount || 0) + '건 확인됨</span>');
 
       return {
         id: p.id,
@@ -535,7 +633,7 @@
             k: 'act',
             html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초체크</button>' +
               '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간보고</button>' +
-              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 결과·PPT</button>'
+              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 결과·산출물</button>'
           }
         ]
       };
@@ -559,12 +657,19 @@
             { k: 'badge', html: '<span class="chip c-blue">' + esc(c.source) + '</span>' },
             { html: esc(c.bizNo || '-') },
             { html: esc(c.contactEmail || '이메일 미등록') },
-            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 워크스페이스 활성화</button>' }
+            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
           ]
         };
       });
       $('discoverBox').innerHTML = renderTable('discover', ['사업장명', '출처', '사업자번호', '등록 이메일', '활성화'], dRows, '');
     }
+  }
+
+  function statusBadgeForChecklist(it) {
+    if (it.status === 'analyzed') return '<span class="chip c-green">분석완료 ✓ (' + it.analyzedCount + ')</span>';
+    if (it.status === 'manual') return '<span class="chip c-green">수령체크 ✓</span>';
+    if (it.status === 'received') return '<span class="chip c-blue">메일수신 📩 (' + it.mailCount + ')</span>';
+    return '<span class="chip c-amber">' + (it.required ? '필수 미수신' : '선택 미수신') + '</span>';
   }
 
   /* ── 탭 2: ① 메일·기초자료 체크 및 비식별 분석 ── */
@@ -579,18 +684,45 @@
 
     var sc = SCAN_CACHE[proj.id] || { matched: [], nameCandidates: [], unseenPreCount: 0 };
     var preMails = sc.matched.filter(function (m) { return m.phase === 'pre_mid'; });
-    var chk = Intake().summarizeChecklistProgress('pre_mid', proj.selectedTasks, D.intake[proj.id] || {}, sc.matched);
+    var chk = Intake().summarizeChecklistProgress('pre_mid', proj.selectedTasks, D.intake[proj.id] || {}, sc.matched, manualChecksOf(proj, 'pre_mid'));
 
-    var chkHtml = chk.items.map(function (it) {
-      var stCls = it.status === 'analyzed' ? ' done' : (it.status === 'received' ? ' recv' : '');
-      var badge = it.status === 'analyzed'
-        ? '<span class="chip c-green">분석완료 ✓ (' + it.analyzedCount + ')</span>'
-        : (it.status === 'received' ? '<span class="chip c-blue">메일수신 📩 (' + it.mailCount + ')</span>' : '<span class="chip c-amber">' + (it.required ? '필수 미수신' : '선택') + '</span>');
-      return '<div class="chk-item' + stCls + '" title="' + esc(it.reason) + '">' +
-        '<b>' + esc(it.short) + ' ' + badge + '</b>' +
-        '<span>' + esc(it.reason) + '</span>' +
+    var chkRows = chk.items.map(function (it) {
+      var toggleLabel = it.manualChecked ? '확인 해제' : '✓ 수령체크';
+      var toggleCls = it.manualChecked ? 'sm' : 'sm ok';
+      return {
+        id: it.code,
+        cells: [
+          { cls: 'ti', title: it.name, html: esc(it.short) + (it.required ? ' <span class="chip c-blue">필수</span>' : ' <span class="chip">선택</span>') },
+          { k: 'badge', html: statusBadgeForChecklist(it) },
+          { cls: 'wide', title: it.reason, html: esc(it.reason) },
+          { k: 'act', html: '<button class="' + toggleCls + '" data-toggle-chk="' + esc(it.code) + '" data-phase="pre_mid">' + toggleLabel + '</button>' }
+        ]
+      };
+    });
+
+    var candCardHtml = '';
+    if (sc.nameCandidates && sc.nameCandidates.length) {
+      var candRows = sc.nameCandidates.map(function (cm) {
+        return {
+          id: cm.key,
+          cells: [
+            { cls: 'ti', title: cm.subject, html: esc(cm.subject || '(제목 없음)') },
+            { k: 'badge', html: '<span class="chip c-amber">상호 후보</span>' },
+            { html: esc(cm.fromLabel || cm.from || '-') },
+            { html: esc(cm.date || '-') },
+            { k: 'act', html: '<button class="sm pri" data-mail-inspect="' + esc(cm.key) + '" data-phase="pre_mid">🔍 확인·연결</button>' }
+          ]
+        };
+      });
+      candCardHtml = '<div class="card"><div class="sec">' +
+        '<span>🔎 상호 일치 미확정 메일 후보</span>' +
+        '<span class="chip c-amber">' + sc.nameCandidates.length + '건</span>' +
+        '<span class="sp"></span>' +
+        '<span class="hint">발신 주소 미등록 후보 — 확인 후 연결하세요</span>' +
+        '</div>' +
+        renderTable('candMails', ['후보 메일 제목', '구분', '발신처', '일자', '확인·귀속'], candRows, '') +
         '</div>';
-    }).join('');
+    }
 
     var mailRows = preMails.map(function (m) {
       var stChip = m.analyzed
@@ -612,14 +744,6 @@
         ]
       };
     });
-
-    var candNotice = '';
-    if (sc.nameCandidates && sc.nameCandidates.length) {
-      candNotice = '<div class="warn"><b>🔎 상호 일치 미확정 메일 후보 ' + sc.nameCandidates.length + '건</b> — 발신 주소가 거래처 정보에 아직 등록되지 않아 자동 귀속하지 않았습니다. 내용을 직접 확인한 뒤 맞으면 연결하세요.<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">' +
-        sc.nameCandidates.slice(0, 5).map(function (cm) {
-          return '<button class="sm" data-mail-inspect="' + esc(cm.key) + '" data-phase="pre_mid">📧 ' + esc((cm.date ? cm.date + ' ' : '') + cm.subject.slice(0, 32)) + '</button>';
-        }).join('') + '</div></div>';
-    }
 
     var preCards = Object.keys(D.intake[proj.id] || {}).map(function (k) { return D.intake[proj.id][k]; })
       .filter(function (c) { return c && !c._deleted && (c.phase || 'pre_mid') === 'pre_mid'; })
@@ -647,22 +771,22 @@
 
     box.innerHTML =
       projectHeaderBarHtml(proj) +
-      candNotice +
+      candCardHtml +
       '<div class="card">' +
       '<div class="sec">' +
       '<span>📋 착수 기초자료 필수 체크리스트</span>' +
       '<div class="prog-wrap"><div class="prog-fill" style="width:' + chk.pct + '%"></div></div>' +
       '<b>' + chk.pct + '% (' + chk.requiredDone + '/' + chk.requiredTotal + ')</b>' +
       '<span class="sp"></span>' +
-      '<button class="sm warn-btn" data-act="req-mail-pre">✉️ 미수신 기초자료 요청 문안</button>' +
-      '<button class="sm pri" data-goto-tab="mid">② 중간보고서 정리로 이동 →</button>' +
+      '<button class="sm warn-btn" data-act="req-mail-pre">✉️ 미수신 요청문안</button>' +
+      '<button class="sm pri" data-goto-tab="mid">② 중간보고 정리 →</button>' +
       '</div>' +
-      '<div class="chk-grid">' + chkHtml + '</div>' +
+      renderTable('preChk', ['필수·권장 서류', '수집 상태', '요구 사유 · 연동 기준', '수령 체크'], chkRows, '') +
       '</div>' +
 
       '<div class="card">' +
       '<div class="sec">' +
-      '<span>📩 공용 메일함(370-6@daum.net) 기초자료 자동 감지 내역</span>' +
+      '<span>📩 공용 메일함(370-6@daum.net) 기초자료 감지 내역</span>' +
       '<span class="chip c-amber">미확인 ' + sc.unseenPreCount + '건</span>' +
       '<span class="sp"></span>' +
       '<span class="hint">열람 시 peek 모드로 고객 메일의 읽음 상태를 변경하지 않습니다</span>' +
@@ -690,7 +814,7 @@
     wireDropZone('preDropZone', 'preFileInput', 'preUploadKind', 'pre_mid');
   }
 
-  /* ── 탭 3: ② 진단·중간보고서 자동화 ── */
+  /* ── 탭 3: ② 진단·중간보고서 자동화 + 회차 인정기준 관리 ── */
   function drawMidPane() {
     var box = $('midBox');
     if (!box) return;
@@ -700,12 +824,14 @@
       return;
     }
 
+    var schedRds = schedRoundsForProject(proj);
     var savedMid = D.mid[proj.id] || null;
-    var computedMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), savedMid);
+    var computedMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, savedMid);
     var secs = (savedMid && savedMid.sections) ? Object.assign({}, computedMid.sections, savedMid.sections) : computedMid.sections;
     var locks = (savedMid && savedMid.locks) || {};
     var iv = proj.interviews || {};
     var eosBars = (computedMid.structured && computedMid.structured.eosAreaBars) || [];
+    var rc = (computedMid.structured && computedMid.structured.roundCheck) || Report().normalizeRounds(proj, schedRds, {});
 
     var eosHtml = eosBars.map(function (b) {
       var pct = Math.max(4, Math.min(100, Math.round((Number(b.score || 0) / 5) * 100)));
@@ -719,35 +845,55 @@
         '</div>';
     }).join('');
 
-    var secCardsHtml = Cat().MID_SECTIONS.map(function (s) {
-      var locked = !!locks[s.key];
-      var val = str(secs[s.key]);
-      return '<div class="rpt-sec-card">' +
-        '<div class="rpt-sec-hd">' +
-        '<span class="chip c-blue">' + esc(s.part) + '</span>' +
-        '<b>' + esc(s.title) + '</b>' +
-        '<span class="sp"></span>' +
-        '<label class="hint" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">' +
-        '<input type="checkbox" data-mid-lock="' + esc(s.key) + '"' + (locked ? ' checked' : '') + '> 🔒 수기 고정</label>' +
-        '<button class="sm" data-ai-polish="mid:' + esc(s.key) + '" title="개인정보 2중 가림 후 문체만 다듬습니다">✨ AI 윤문</button>' +
-        '<button class="sm ok" data-save-mid-sec="' + esc(s.key) + '">💾 저장</button>' +
-        '</div>' +
-        '<div class="rpt-sec-body">' +
-        '<textarea id="midSec_' + esc(s.key) + '" aria-label="' + esc(s.title) + '">' + esc(val) + '</textarea>' +
-        '</div></div>';
-    }).join('');
+    var roundRows = rc.rounds.map(function (r) {
+      var modeChip = r.mode === 'remote'
+        ? '<span class="chip">비대면(화상)</span>'
+        : '<span class="chip c-blue">대면(현장)</span>';
+      var proofOk = r.hasPhoto && r.hasSign;
+      var proofChip = proofOk
+        ? '<span class="chip c-green">사진·서명 완료 ✓</span>'
+        : '<span class="chip c-amber">' + (!r.hasPhoto && !r.hasSign ? '사진·서명 대기' : (!r.hasPhoto ? '사진 대기' : '서명 대기')) + '</span>';
+      var ruleWarn = (r.mins < 120 || r.companyPeople < 3)
+        ? ' <span class="chip c-red">기준 미달⚠</span>'
+        : '';
+      return {
+        id: String(r.roundNo),
+        cells: [
+          { cls: 'ti', title: r.topic, html: r.roundNo + '회차 · ' + esc(r.topic) },
+          { k: 'badge', html: modeChip + ' ' + proofChip + ruleWarn },
+          { html: esc(r.date) + ' · ' + r.mins + '분 · 기업 ' + r.companyPeople + '명' },
+          {
+            k: 'act',
+            html: '<button class="sm" data-edit-round="' + r.roundNo + '">편집</button>' +
+              '<button class="sm ' + (proofOk ? '' : 'ok') + '" data-toggle-round-proof="' + r.roundNo + '">' + (proofOk ? '증빙해제' : '✓ 증빙완료') + '</button>'
+          }
+        ]
+      };
+    });
 
     box.innerHTML =
       projectHeaderBarHtml(proj) +
       (proj.midConfirmedAt
         ? '<div class="ok-banner">📌 <b>중간보고 기준선이 확정되었습니다</b> (' + esc(fmtDateTime(proj.midConfirmedAt)) + '). 이후 수신되는 메일은 자동으로 [③ 후속메일·결과보고] 단계로 분류됩니다.</div>'
-        : '<div class="note">수집된 기초자료 비식별 통계·규정 이슈·인터뷰 메모를 바탕으로 <b>사업장 중간보고서 7개 표준 섹션과 발표용 PPTX</b>를 자동 생성합니다.</div>') +
+        : '<div class="note">수집된 기초자료 비식별 통계·규정 이슈·인터뷰 메모·회차 기록을 바탕으로 <b>사업장 중간보고서 7개 표준 섹션과 발표용 PPTX</b>를 자동 생성합니다.</div>') +
+
+      '<div class="card">' +
+      '<div class="sec">' +
+      '<span>🗓️ 컨설팅 회차별 수행 · 재단 인정기준 점검</span>' +
+      '<span class="chip ' + (rc.faceMet ? 'c-green' : 'c-amber') + '">대면 ' + rc.facePct + '% (' + rc.faceCount + '/' + rc.totalCount + ')</span>' +
+      '<span class="chip ' + (rc.allTimeAndPeopleMet ? 'c-green' : 'c-amber') + '">' + (rc.allTimeAndPeopleMet ? '120분·3인+ 충족✓' : '시간·인원 점검⚠') + '</span>' +
+      '<span class="chip c-blue">증빙 ' + rc.proofReadyCount + '/' + rc.totalCount + '</span>' +
+      '<span class="sp"></span>' +
+      '<button class="sm pri" data-act="add-round">+ 회차 추가</button>' +
+      '</div>' +
+      renderTable('rounds', ['회차 · 핵심 수행주제', '방식 · 증빙 상태', '수행일 · 시간 · 참석', '관리'], roundRows, '') +
+      '</div>' +
 
       '<div class="card">' +
       '<div class="sec">' +
       '<span>🗣️ 계층별 심층 인터뷰 핵심 메모 (중간보고서 5절 & PPT 자동 반영)</span>' +
       '<span class="sp"></span>' +
-      '<button class="sm ok" data-act="save-interviews">💾 인터뷰 메모 저장</button>' +
+      '<button class="sm ok" data-act="save-interviews">💾 인터뷰 저장</button>' +
       '</div>' +
       '<div class="iv-grid">' +
       '<div class="iv-col"><label for="ivExec">경영진 (사용자 대표) 핵심 의견</label><textarea id="ivExec" rows="3" placeholder="예: 업무집중도 향상 전제로 격주 금요일 단축 긍정 검토, 통상임금 법적 리스크 정비 희망">' + esc(iv.exec || '') + '</textarea></div>' +
@@ -756,23 +902,24 @@
       '</div></div>' +
 
       '<div class="card">' +
-      '<div class="sec"><span>📊 전직원 조직진단(EOS) 5대 영역 점수 대 업종 준거집단 미리보기</span></div>' +
+      '<div class="sec"><span>📊 전 근로자 조직진단(EOS) 5대 영역 점수 대 업종 준거집단 미리보기</span></div>' +
       '<div class="eos-bars">' + eosHtml + '</div>' +
       '</div>' +
 
       '<div class="card">' +
       '<div class="bar">' +
-      '<button class="sm pri" data-act="regen-mid">⚡ 중간보고서 자동 정리</button>' +
-      '<button class="sm ok" data-act="dl-mid-pptx">📊 중간보고 PPTX 다운로드</button>' +
-      '<button class="sm warn-btn" data-act="open-platform-modal">📋 플랫폼 문안 복사</button>' +
+      '<button class="sm pri" data-act="regen-mid">⚡ 자동정리</button>' +
+      '<button class="sm" data-act="preview-mid-pptx">👁️ PPT 미리보기</button>' +
+      '<button class="sm ok" data-act="dl-mid-pptx">📊 중간 PPTX</button>' +
+      '<button class="sm warn-btn" data-act="open-platform-modal">📋 플랫폼 문안</button>' +
       '<span class="sp"></span>' +
-      '<button class="sm pri" data-act="confirm-mid-baseline" title="중간보고 기준선 확정 및 후속메일 감시 시작">📌 중간보고 기준선 확정</button>' +
+      '<button class="sm pri" data-act="confirm-mid-baseline" title="중간보고 기준선 확정 및 후속메일 감시 시작">📌 기준선 확정</button>' +
       '</div>' +
-      '<div class="rpt-sec-list">' + secCardsHtml + '</div>' +
+      renderSectionList('midSecs', '중간보고서 7개 표준 섹션 원고 (체크하여 일괄 저장·고정 가능)', Cat().MID_SECTIONS, secs, locks, 'mid', 'c-blue') +
       '</div>';
   }
 
-  /* ── 탭 4: ③ 후속 메일 확인 · 결과보고서 자동 조립 · PPTX ── */
+  /* ── 탭 4: ③ 후속 메일 확인 · 결과보고서 · 별첨 6종 패키지 · 3개월 사후관리 ── */
   function drawFinalPane() {
     var box = $('finalBox');
     if (!box) return;
@@ -782,26 +929,30 @@
       return;
     }
 
+    var schedRds = schedRoundsForProject(proj);
     var sc = SCAN_CACHE[proj.id] || { matched: [], unseenPostCount: 0 };
     var postMails = sc.matched.filter(function (m) { return m.phase === 'post_mid'; });
-    var chkPost = Intake().summarizeChecklistProgress('post_mid', proj.selectedTasks, D.intake[proj.id] || {}, sc.matched);
+    var chkPost = Intake().summarizeChecklistProgress('post_mid', proj.selectedTasks, D.intake[proj.id] || {}, sc.matched, manualChecksOf(proj, 'post_mid'));
     var savedMid = D.mid[proj.id] || null;
-    var computedMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), savedMid);
+    var computedMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, savedMid);
     var savedFinal = D.final[proj.id] || null;
-    var computedFinal = Report().buildFinalReport(proj, computedMid, D.intake[proj.id] || {}, schedRoundsForProject(proj), savedFinal);
+    var computedFinal = Report().buildFinalReport(proj, computedMid, D.intake[proj.id] || {}, schedRds, savedFinal);
     var secs = (savedFinal && savedFinal.sections) ? Object.assign({}, computedFinal.sections, savedFinal.sections) : computedFinal.sections;
     var locks = (savedFinal && savedFinal.locks) || {};
 
-    var chkHtml = chkPost.items.map(function (it) {
-      var stCls = it.status === 'analyzed' ? ' done' : (it.status === 'received' ? ' recv' : '');
-      var badge = it.status === 'analyzed'
-        ? '<span class="chip c-green">반영완료 ✓</span>'
-        : (it.status === 'received' ? '<span class="chip c-blue">메일수신 📩</span>' : '<span class="chip c-amber">수신대기</span>');
-      return '<div class="chk-item' + stCls + '">' +
-        '<b>' + esc(it.short) + ' ' + badge + '</b>' +
-        '<span>' + esc(it.reason) + '</span>' +
-        '</div>';
-    }).join('');
+    var chkPostRows = chkPost.items.map(function (it) {
+      var toggleLabel = it.manualChecked ? '확인 해제' : '✓ 수령체크';
+      var toggleCls = it.manualChecked ? 'sm' : 'sm ok';
+      return {
+        id: it.code,
+        cells: [
+          { cls: 'ti', title: it.name, html: esc(it.short) + (it.required ? ' <span class="chip c-green">필수</span>' : ' <span class="chip">선택</span>') },
+          { k: 'badge', html: statusBadgeForChecklist(it) },
+          { cls: 'wide', title: it.reason, html: esc(it.reason) },
+          { k: 'act', html: '<button class="' + toggleCls + '" data-toggle-chk="' + esc(it.code) + '" data-phase="post_mid">' + toggleLabel + '</button>' }
+        ]
+      };
+    });
 
     var postMailRows = postMails.map(function (m) {
       var stChip = m.analyzed
@@ -816,18 +967,28 @@
           { html: esc(m.dir === 'out' ? ('발신 → ' + m.toLabel) : m.fromLabel) },
           {
             k: 'act',
-            html: '<button class="sm pri" data-mail-inspect="' + esc(m.key) + '" data-phase="post_mid">🔍 내용확인·Diff추출</button>' +
+            html: '<button class="sm pri" data-mail-inspect="' + esc(m.key) + '" data-phase="post_mid">🔍 내용확인·Diff</button>' +
               (!m.checked ? '<button class="sm" data-mail-check="' + esc(m.key) + '" data-phase="post_mid">✓ 확인표시</button>' : '')
           }
         ]
       };
     });
 
-    var diffRows = (computedFinal.structured && computedFinal.structured.diffSummaryRows) || [];
-    var diffTableHtml = '<div class="scroll"><table class="t diff-t"><thead><tr><th>협의 영역</th><th>중간보고 기준선(초안)</th><th>후속 메일 협의 · 최종 확정안</th><th>상태</th></tr></thead><tbody>' +
-      diffRows.map(function (r) {
-        return '<tr><td class="ti">' + esc(r[0]) + '</td><td data-diff="base" title="' + esc(r[1]) + '">' + esc(r[1]) + '</td><td class="wide" data-diff="fin" title="' + esc(r[2]) + '"><b>' + esc(r[2]) + '</b></td><td data-diff="st"><span class="chip c-green">' + esc(r[3]) + '</span></td></tr>';
-      }).join('') + '</tbody></table></div>';
+    var diffObjs = (computedFinal.structured && computedFinal.structured.diffObjects) || [];
+    var diffTableRows = diffObjs.map(function (d) {
+      var isHold = /보류|협의중/.test(str(d.status));
+      var stChip = '<span class="chip ' + (isHold ? 'c-amber' : 'c-green') + '">' + esc(d.status) + '</span>';
+      return {
+        id: d.id,
+        cells: [
+          { cls: 'ti', title: d.area, html: esc(d.area) + (d.custom ? ' <span class="chip">수기</span>' : '') },
+          { k: 'badge', html: stChip },
+          { title: d.baseVal, html: esc(d.baseVal) },
+          { cls: 'wide', title: d.finalVal, html: '<b>' + esc(d.finalVal) + '</b>' },
+          { k: 'act', html: '<button class="sm" data-edit-diff="' + esc(d.id) + '">편집</button>' }
+        ]
+      };
+    });
 
     var postDkOptions = '<option value="">자동 분류 (피드백·투표·서명지·보완시뮬레이션)</option>' +
       Cat().DOC_KINDS.filter(function (d) { return d.defaultPhase === 'post_mid' || d.code === 'wage_ledger'; }).map(function (d) {
@@ -853,23 +1014,43 @@
       };
     });
 
-    var secCardsHtml = Cat().FINAL_SECTIONS.map(function (s) {
-      var locked = !!locks[s.key];
-      var val = str(secs[s.key]);
-      return '<div class="rpt-sec-card">' +
-        '<div class="rpt-sec-hd">' +
-        '<span class="chip c-green">' + esc(s.part) + '</span>' +
-        '<b>' + esc(s.title) + '</b>' +
-        '<span class="sp"></span>' +
-        '<label class="hint" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">' +
-        '<input type="checkbox" data-final-lock="' + esc(s.key) + '"' + (locked ? ' checked' : '') + '> 🔒 수기 고정</label>' +
-        '<button class="sm" data-ai-polish="final:' + esc(s.key) + '">✨ AI 윤문</button>' +
-        '<button class="sm ok" data-save-final-sec="' + esc(s.key) + '">💾 저장</button>' +
-        '</div>' +
-        '<div class="rpt-sec-body">' +
-        '<textarea id="finalSec_' + esc(s.key) + '" aria-label="' + esc(s.title) + '">' + esc(val) + '</textarea>' +
-        '</div></div>';
-    }).join('');
+    var safeCo = Pack() ? Pack().safeFilePart(proj.companyName) : safeKey(proj.companyName);
+    var deliverableSpecs = [
+      { id: 'mid_pptx', title: '01_' + safeCo + '_일터혁신_중간보고서.pptx', fmt: 'PPTX', desc: '7개 표준 섹션 + EOS 5대·16개 세부영역 격차 발표 슬라이드', actHtml: '<button class="sm" data-act="preview-mid-pptx">👁️ 미리보기</button><button class="sm ok" data-act="dl-mid-pptx">다운로드</button>' },
+      { id: 'final_pptx', title: '02_' + safeCo + '_일터혁신_최종결과보고서.pptx', fmt: 'PPTX', desc: '중간보고 기준선 Diff + 개선설계 + 모의계산 + 이행로드맵 발표 슬라이드', actHtml: '<button class="sm" data-act="preview-final-pptx">👁️ 미리보기</button><button class="sm ok" data-act="dl-final-pptx">다운로드</button>' },
+      { id: 'rules_docx', title: '03_' + safeCo + '_취업규칙개정안_신구대조표.docx', fmt: 'DOCX', desc: '선택 과제·합의사항 반영 조문별 현행/개정안 신구대조표 + 제94조 동의서', actHtml: '<button class="sm ok" data-act="dl-rules-docx">다운로드</button>' },
+      { id: 'contract_docx', title: '04_' + safeCo + '_표준근로계약서_서면합의동의서.docx', fmt: 'DOCX', desc: '확정 근무시간·임금항목 반영 표준 근로계약서 + 근로자대표 서면합의서', actHtml: '<button class="sm ok" data-act="dl-contract-docx">다운로드</button>' },
+      { id: 'sim_xlsx', title: '05_' + safeCo + '_통상시급모의계산_신구대조_이행점검표.xlsx', fmt: 'XLSX', desc: '회차점검·비식별 모의계산·EOS 16문항·후속 Diff·신구대조·3개월 사후점검 6개 시트', actHtml: '<button class="sm ok" data-act="dl-sim-xlsx">다운로드</button>' },
+      { id: 'platform_txt', title: '06_' + safeCo + '_노사발전재단_플랫폼입력문안_3종.txt', fmt: 'TXT', desc: '수행계획서 · 전 회차 수행보고서 · 종료 후 3개월 이행결과표 입력 문안', actHtml: '<button class="sm" data-act="open-platform-modal">👁️ 문안보기</button><button class="sm ok" data-act="dl-platform-txt">다운로드</button>' }
+    ];
+    var delivRows = deliverableSpecs.map(function (sp) {
+      return {
+        id: sp.id,
+        cells: [
+          { cls: 'ti', title: sp.title, html: esc(sp.title) },
+          { k: 'badge', html: '<span class="chip c-blue">' + esc(sp.fmt) + '</span>' },
+          { cls: 'wide', title: sp.desc, html: esc(sp.desc) },
+          { k: 'act', html: sp.actHtml }
+        ]
+      };
+    });
+
+    var fuMap = (proj.followupChecks && typeof proj.followupChecks === 'object') ? proj.followupChecks : {};
+    var fuList = Cat().FOLLOWUP_ITEMS || [];
+    var fuDoneCnt = fuList.filter(function (f) { return !!fuMap[f.code]; }).length;
+    var fuPct = fuList.length ? Math.round((fuDoneCnt / fuList.length) * 100) : 0;
+    var fuRows = fuList.map(function (f) {
+      var done = !!fuMap[f.code];
+      return {
+        id: f.code,
+        cells: [
+          { cls: 'ti', title: f.title, html: '[' + esc(f.month) + '] ' + esc(f.title) },
+          { k: 'badge', html: done ? '<span class="chip c-green">이행완료 ✓</span>' : '<span class="chip c-amber">점검예정</span>' },
+          { cls: 'wide', title: f.proof, html: '증빙: ' + esc(f.proof) },
+          { k: 'act', html: '<button class="sm ' + (done ? '' : 'ok') + '" data-toggle-followup="' + esc(f.code) + '">' + (done ? '예정으로' : '✓ 이행완료') + '</button>' }
+        ]
+      };
+    });
 
     box.innerHTML =
       projectHeaderBarHtml(proj) +
@@ -879,9 +1060,9 @@
       '<div class="prog-wrap"><div class="prog-fill" style="width:' + chkPost.pct + '%"></div></div>' +
       '<b>' + chkPost.pct + '% (' + chkPost.requiredDone + '/' + chkPost.requiredTotal + ')</b>' +
       '<span class="sp"></span>' +
-      '<button class="sm warn-btn" data-act="req-mail-post">✉️ 후속·보완자료 요청 문안</button>' +
+      '<button class="sm warn-btn" data-act="req-mail-post">✉️ 보완요청 문안</button>' +
       '</div>' +
-      '<div class="chk-grid">' + chkHtml + '</div>' +
+      renderTable('postChk', ['후속 필수·권장 서류', '수집 상태', '요구 사유 · 반영처', '수령 체크'], chkPostRows, '') +
       '</div>' +
 
       '<div class="card">' +
@@ -896,26 +1077,51 @@
       '</div>' +
       '<div class="drop-zone" id="postDropZone" tabindex="0" role="button" aria-label="후속자료 파일 선택 또는 끌어놓기">' +
       '<b>📂 중간보고 이후 받은 디자인팀 피드백·보완 시뮬레이션·찬반투표 집계표·서명지를 끌어다 놓으세요</b>' +
-      '<span>채택 모델 · 임금보전 합의 · 시행일 · 찬성률(%) · 수정요청사항을 자동 추출하여 최종 결과보고서에 반영합니다</span>' +
+      '<span>채택 모델 · 임금보전 합의 · 시행일 · 찬성률(%) · 수정요청사항을 자동 추출하여 최종 결과보고서 및 규정·계약서에 반영합니다</span>' +
       '<input type="file" id="postFileInput" multiple accept=".xlsx,.xls,.csv,.hwpx,.hwp,.docx,.pdf,.txt,.jpg,.jpeg,.png" style="display:none">' +
       '</div>' +
       (postCards.length ? renderTable('postCards', ['후속자료 제목', '분류', '추출된 합의·변경점 요약', '분석시각', '보기'], postCardRows, '') : '') +
       '</div>' +
 
       '<div class="card">' +
-      '<div class="sec"><span>🔄 중간보고 기준선 대비 후속 메일 합의·변경 내역 (Diff 자동 대조표)</span></div>' +
-      diffTableHtml +
+      '<div class="sec">' +
+      '<span>🔄 중간보고 기준선 대비 후속 합의·변경 내역 (Diff 대조표)</span>' +
+      '<span class="sp"></span>' +
+      '<button class="sm pri" data-act="add-diff">+ 합의사항 추가</button>' +
+      '</div>' +
+      renderTable('diffRows', ['협의 영역', '상태', '중간보고 기준선', '후속 협의 · 최종 확정안', '편집'], diffTableRows, '') +
+      '</div>' +
+
+      '<div class="card">' +
+      '<div class="sec">' +
+      '<span>📦 별첨 최종산출물 패키지 6종 (PPTX · 취업규칙 DOCX · 계약서 DOCX · 모의계산 XLSX · 플랫폼 문안)</span>' +
+      '<span class="sp"></span>' +
+      '<button class="sm pri" data-act="dl-full-zip">📦 6종 통합 ZIP</button>' +
+      '</div>' +
+      renderTable('deliverables', ['산출물 파일명', '형식', '수록 내용', '미리보기 · 다운로드'], delivRows, '') +
       '</div>' +
 
       '<div class="card">' +
       '<div class="bar">' +
-      '<button class="sm pri" data-act="regen-final" title="기준선 + 후속 메일 Diff → 최종 결과보고서 자동 조립">⚡ 최종 결과보고서 자동 조립</button>' +
-      '<button class="sm ok" data-act="dl-final-pptx">📊 결과보고 PPTX 다운로드</button>' +
-      '<button class="sm warn-btn" data-act="open-platform-modal">📋 플랫폼 문안 3종 복사</button>' +
+      '<button class="sm pri" data-act="regen-final" title="기준선 + 후속 메일 Diff → 최종 결과보고서 자동 조립">⚡ 결과보고 조립</button>' +
+      '<button class="sm" data-act="preview-final-pptx">👁️ PPT 미리보기</button>' +
+      '<button class="sm ok" data-act="dl-final-pptx">📊 결과 PPTX</button>' +
+      '<button class="sm warn-btn" data-act="open-platform-modal">📋 플랫폼 문안</button>' +
       '<span class="sp"></span>' +
-      '<button class="sm pri" data-act="confirm-final-snapshot">📌 최종보고 확정 스냅샷</button>' +
+      '<button class="sm pri" data-act="confirm-final-snapshot">📌 최종 확정</button>' +
       '</div>' +
-      '<div class="rpt-sec-list">' + secCardsHtml + '</div>' +
+      renderSectionList('finalSecs', '최종 결과보고서 7개 표준 섹션 원고 (체크하여 일괄 저장·고정 가능)', Cat().FINAL_SECTIONS, secs, locks, 'final', 'c-green') +
+      '</div>' +
+
+      '<div class="card">' +
+      '<div class="sec">' +
+      '<span>🛡️ 컨설팅 종료 후 3개월 사후 이행관리 · 증빙 점검표</span>' +
+      '<div class="prog-wrap"><div class="prog-fill" style="width:' + fuPct + '%"></div></div>' +
+      '<b>' + fuPct + '% (' + fuDoneCnt + '/' + fuList.length + ')</b>' +
+      '<span class="sp"></span>' +
+      '<button class="sm warn-btn" data-act="open-platform-modal">📋 이행결과표 문안</button>' +
+      '</div>' +
+      renderTable('followups', ['차수 · 사후 이행 점검 항목', '상태', '필수 구비 증빙', '체크'], fuRows, '') +
       '</div>';
 
     wireDropZone('postDropZone', 'postFileInput', 'postUploadKind', 'post_mid');
@@ -1019,7 +1225,6 @@
       throw new Error('파일명에 민감 고유식별정보 잔존 패턴이 감지되어 차단했습니다.');
     }
 
-    /* 사진 증빙(.jpg/.png/.webp) — 원본 미전송, 회차 사진 증빙 메타만 추출 */
     if (/\.(jpg|jpeg|png|webp)$/.test(lower)) {
       var diffMeta = Intake().extractPostMidDiff('타임스탬프 회의 사진 첨부 확인', safeFileName, [safeFileName]);
       return {
@@ -1036,7 +1241,6 @@
 
     var excelTextFallback = '';
     var resolvedNonQuantKind = explicitDk ? explicitDk.code : '';
-    /* 엑셀 / CSV — 시트 헤더로 정량 4종 및 민감 인사·급여 열 여부를 먼저 판별하며, 민감 열 시트는 절대 평문 발췌로 넘기지 않는다 */
     if (/\.(xlsx|xls|csv)$/.test(lower) && global.XLSX) {
       var wb = global.XLSX.read(bytes, { type: 'array' });
       var sheetMap = {};
@@ -1047,7 +1251,7 @@
       var isExplicitNonQuant = !!(explicitDk && explicitDk.track !== 'quant');
 
       if (isExplicitNonQuant && hasSensCols) {
-        throw new Error('성명·주민번호·임금 등 민감 인사·급여 열이 포함된 엑셀은 비정량 텍스트 서류로 업로드할 수 없습니다. 정량 서류 종류를 선택해 주세요.');
+        throw new Error('성명·주민번호·임금 등 민감 인사·임금 열이 포함된 엑셀은 비정량 텍스트 서류로 업로드할 수 없습니다. 정량 서류 종류를 선택해 주세요.');
       }
 
       if (!isExplicitNonQuant) {
@@ -1075,7 +1279,6 @@
         if (tabRes && tabRes.docKind) resolvedNonQuantKind = tabRes.docKind;
       }
 
-      /* 민감 인사·급여 열이 전혀 없는 순수 비정량 집계표(예: 찬반투표 집계표, 협의회 의견서 등)만 셀 텍스트로 추출 */
       excelTextFallback = Object.keys(sheetMap).map(function (sn) {
         var rows = (sheetMap[sn] || []).slice(0, 200).map(function (r) {
           return (Array.isArray(r) ? r : []).map(str).filter(Boolean).join(' ');
@@ -1084,7 +1287,6 @@
       }).join('\n');
     }
 
-    /* 한글(.hwp/.hwpx) · 워드(.docx) · PDF · TXT · 비정량 엑셀 본문 추출 후 2중 가림 분석 */
     var rawText = excelTextFallback || (await extractDocumentPlainText(fileName, bytes));
     if (!rawText.trim()) {
       rawText = '첨부파일명 확인: ' + safeFileName;
@@ -1133,7 +1335,8 @@
     }
     if (/\.pdf$/.test(lower) && global.pdfjsLib) {
       try {
-        var pdf = await global.pdfjsLib.getDocument({ data: bytes }).promise;
+        /* ★ CVE-2024-4367 방지: PDF 글꼴 렌더링 시 eval 실행 차단 필수 */
+        var pdf = await global.pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise;
         var pages = [];
         var lim = Math.min(pdf.numPages, 25);
         for (var p = 1; p <= lim; p++) {
@@ -1234,7 +1437,6 @@
         }
       }
     } catch (mailErr) {
-      /* 오프라인/시드 환경에서는 제목·첨부명 메타만으로 안전하게 폴백 분석 */
       bodyPlain = m.subject + '\n' + (m.attNames || []).join('\n');
     }
 
@@ -1288,7 +1490,6 @@
       analyzedAt: Date.now()
     };
 
-    /* 상호 후보였던 메일을 사람이 확인해 저장하면 해당 발신 이메일을 사업장 연락 이메일에 추가 */
     if (m.matchKind === 'name_candidate' && m.from && m.dir === 'in') {
       var nextEmails = Array.isArray(proj.contactEmails) ? proj.contactEmails.slice() : [];
       if (nextEmails.indexOf(m.from) < 0) {
@@ -1303,38 +1504,85 @@
     if (!silent && savedCard) openCardDetailModal(savedCard);
   }
 
-  async function markMailCheckedOnly(mailKey, phase) {
-    var proj = projectById(CUR_PID);
-    if (!proj) return;
+  function buildCheckedMailCardPayload(proj, mailKey, phase) {
     var m = findMailRowByKey(proj.id, mailKey);
-    if (!m) return;
+    if (!m) return null;
     var cardId = 'mail_' + safeKey(m.key);
     var prev = (D.intake[proj.id] && D.intake[proj.id][cardId]) || null;
     var safeSubjTitle = sanitizeMetaLabel(m.subject || m.docKindName, proj);
     var safeAttList = (m.attNames || []).map(function (n) { return sanitizeMetaLabel(n, proj); });
     if (Intake().hasResidualPii(safeSubjTitle) || safeAttList.some(Intake().hasResidualPii)) {
+      return null;
+    }
+    return {
+      prev: prev,
+      record: stripUndef(Object.assign({}, prev || {}, {
+        id: cardId,
+        projectId: proj.id,
+        entityType: 'Document',
+        companyId: str(proj.companyId),
+        companyName: str(proj.companyName),
+        mailKey: m.key,
+        source: 'mail',
+        title: safeSubjTitle,
+        subject: safeSubjTitle,
+        attNames: safeAttList,
+        phase: phase,
+        docKind: (prev && prev.docKind) || m.docKind,
+        track: (prev && prev.track) || m.track,
+        piiStripped: true,
+        summaryLines: (prev && prev.summaryLines) || ['수신 확인 완료 (' + (m.date || '') + ')'],
+        checkedAt: Date.now()
+      }))
+    };
+  }
+
+  async function markMailCheckedOnly(mailKey, phase) {
+    var proj = projectById(CUR_PID);
+    if (!proj) return;
+    var built = buildCheckedMailCardPayload(proj, mailKey, phase);
+    if (!built) {
       toast('⚠ 메일 제목·첨부명에 민감 식별정보 패턴이 남아 있어 저장을 차단했습니다.');
       return;
     }
-    await saveIntakeCard(proj, Object.assign({}, prev || {}, {
-      id: cardId,
-      mailKey: m.key,
-      source: 'mail',
-      title: safeSubjTitle,
-      subject: safeSubjTitle,
-      attNames: safeAttList,
-      phase: phase,
-      docKind: (prev && prev.docKind) || m.docKind,
-      track: (prev && prev.track) || m.track,
-      piiStripped: true,
-      summaryLines: (prev && prev.summaryLines) || ['수신 확인 완료 (' + (m.date || '') + ')'],
-      checkedAt: Date.now()
-    }));
+    await saveIntakeCard(proj, built.record);
     rebuildScanAndDiscover();
     draw();
   }
 
-  /* ══ 5. 온톨로지 강제 관문(gate) 저장 함수들 ════════════════════════════ */
+  /* ══ 5. 온톨로지 강제 관문(gate) 및 다건 원자적 저장 함수들 ══════════════ */
+  async function atomicMultiRecordUpdate(entries) {
+    if (!gate || !fbDb || !entries || !entries.length) return;
+    var rootRef = fbDb.ref();
+    if (rootRef && typeof rootRef.update === 'function' && global.PuOntologyWrite) {
+      var batch = {};
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var prepared = e.tombstone
+          ? global.PuOntologyWrite.tombstone(e.previous, { actor: ME.sid, entityType: e.entityType })
+          : gate.prepare(e.record, { previous: e.previous || null, entityType: e.entityType });
+        if (!prepared || !prepared.ok) {
+          throw new Error((prepared && prepared.issues && prepared.issues[0] && prepared.issues[0].message) || '온톨로지 검증 실패');
+        }
+        batch[e.path] = stripUndef(prepared.value);
+      }
+      await rootRef.update(batch);
+      return batch;
+    }
+    var fallbackOut = {};
+    for (var j = 0; j < entries.length; j++) {
+      var it = entries[j];
+      if (it.tombstone) {
+        var rmRes = await gate.remove(fbDb.ref(it.path), it.previous, { entityType: it.entityType });
+        fallbackOut[it.path] = rmRes && rmRes.snapshot ? rmRes.snapshot.val() : null;
+      } else {
+        var svRes = await gate.save(fbDb.ref(it.path), it.record, { entityType: it.entityType });
+        fallbackOut[it.path] = svRes && svRes.snapshot ? svRes.snapshot.val() : null;
+      }
+    }
+    return fallbackOut;
+  }
+
   async function saveProjectRecord(projInput) {
     if (!gate || !fbDb) throw new Error('저장 관문이 준비되지 않았습니다.');
     var id = str(projInput.id) || ('ilt_' + Date.now().toString(36));
@@ -1424,7 +1672,7 @@
     if (res && res.snapshot) D.snapshots[proj.id][sid] = res.snapshot.val();
   }
 
-  /* ══ 6. 모달 창 (사업장 등록 · 19개 과제 선택 · 카드 상세 · 플랫폼 문안 · AI 윤문) ═ */
+  /* ══ 6. 모달 창 (사업장 등록 · 과제 설정 · 회차 편집 · Diff 편집 · PPT 미리보기 · 플랫폼 문안 · AI 윤문) ═ */
   var LAST_MODAL_FOCUS = null;
   var LAST_MODAL_FOCUS_SEL = '';
 
@@ -1437,7 +1685,7 @@
   function buildFocusSelector(el) {
     if (!el || !el.tagName || el.tagName === 'BODY' || el.tagName === 'HTML') return '';
     if (el.id) return '#' + el.id;
-    var attrs = ['data-act', 'data-mail-inspect', 'data-view-card', 'data-ai-polish', 'data-proj-sel', 'data-tab'];
+    var attrs = ['data-act', 'data-mail-inspect', 'data-view-card', 'data-ai-polish', 'data-proj-sel', 'data-tab', 'data-edit-round', 'data-edit-diff'];
     for (var i = 0; i < attrs.length; i++) {
       var v = el.getAttribute && el.getAttribute(attrs[i]);
       if (v) return '[' + attrs[i] + '="' + v.replace(/"/g, '\\"') + '"]';
@@ -1559,6 +1807,7 @@
             closeModal(true);
             CUR_PID = created.id;
             TAB = 'intake';
+            clearSel();
             rebuildScanAndDiscover();
             draw();
             restoreModalFocus();
@@ -1574,12 +1823,14 @@
   function openTaskConfigModal(proj) {
     var picked = {};
     (proj.selectedTasks || []).forEach(function (c) { picked[c] = 1; });
+    var allTasksOn = Cat().TASKS.every(function (t) { return !!picked[t.code]; });
 
-    var taskHtml = Cat().TASKS.map(function (t) {
+    var taskHtml = Cat().TASKS.map(function (t, idx) {
       var dom = Cat().getDomain(t.domain) || { icon: '•', name: '' };
       var on = !!picked[t.code];
       return '<label class="task-opt' + (on ? ' on' : '') + '">' +
         '<input type="checkbox" name="cfgTask" value="' + esc(t.code) + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="task-no">' + (idx + 1) + '</span>' +
         '<div><b>' + esc(dom.icon + ' [' + dom.name + '] ' + t.name) + '</b><span>' + esc(t.summary) + '</span></div>' +
         '</label>';
     }).join('');
@@ -1594,16 +1845,35 @@
       '<input type="text" id="cfgIndustry" value="' + esc(proj.industry || '') + '" placeholder="업종">' +
       '<input type="number" id="cfgWorkers" value="' + esc(proj.workerCount || '') + '" placeholder="상시근로자수" style="max-width:130px"></div></div>' +
       '<div class="fr"><label for="cfgEmails">수신감지 이메일</label><div class="fv"><input type="text" id="cfgEmails" value="' + esc((proj.contactEmails || []).join(', ')) + '" placeholder="기업 담당자 이메일 (쉼표 구분)"></div></div>' +
-      '<div style="padding:8px 4px;font-weight:700">🎯 노사발전재단 공식 9대 분야 · 19개 개선과제 선택 (복수 선택)</div>' +
+      '<div class="task-pick-hd">' +
+      '<input type="checkbox" id="cfgTaskAll"' + (allTasksOn ? ' checked' : '') + ' aria-label="19개 개선과제 전체 선택">' +
+      '<span class="task-no" style="padding-top:0">번호</span>' +
+      '<span>🎯 노사발전재단 공식 9대 분야 · 19개 개선과제 선택 (복수 선택)</span>' +
+      '</div>' +
       '<div class="task-pick-grid">' + taskHtml + '</div>';
 
     openModal('🎯 ' + proj.companyName + ' — 개선과제 및 사업장 기준 설정', body,
-      '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="cfgSaveBtn">설정 저장 (체크리스트 즉시 갱신)</button>', 'wide');
+      '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="cfgSaveBtn">설정 저장</button>', 'wide');
 
+    var syncTaskAll = function () {
+      var cbs = Array.prototype.slice.call(document.querySelectorAll('#mbox input[name="cfgTask"]'));
+      if ($('cfgTaskAll')) $('cfgTaskAll').checked = cbs.length > 0 && cbs.every(function (x) { return x.checked; });
+    };
+    if ($('cfgTaskAll')) {
+      $('cfgTaskAll').onchange = function () {
+        var next = $('cfgTaskAll').checked;
+        document.querySelectorAll('#mbox input[name="cfgTask"]').forEach(function (cb) {
+          cb.checked = next;
+          var lbl = cb.closest('.task-opt');
+          if (lbl) lbl.classList.toggle('on', next);
+        });
+      };
+    }
     document.querySelectorAll('#mbox input[name="cfgTask"]').forEach(function (cb) {
       cb.onchange = function () {
         var lbl = cb.closest('.task-opt');
         if (lbl) lbl.classList.toggle('on', cb.checked);
+        syncTaskAll();
       };
     });
 
@@ -1637,6 +1907,201 @@
     }
   }
 
+  function currentNormalizedRounds(proj) {
+    var schedRds = schedRoundsForProject(proj);
+    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+    var rc = mid && mid.structured && mid.structured.roundCheck;
+    return rc ? rc.rounds.map(function (r) {
+      return {
+        roundNo: r.roundNo,
+        date: r.date === '일정 조율' ? '' : r.date,
+        mode: r.mode,
+        mins: r.mins,
+        companyPeople: r.companyPeople,
+        topic: r.topic,
+        hasPhoto: !!r.hasPhoto,
+        hasSign: !!r.hasSign
+      };
+    }) : [];
+  }
+
+  function openRoundEditModal(proj, roundNo) {
+    var rounds = currentNormalizedRounds(proj);
+    var existing = roundNo ? rounds.find(function (r) { return Number(r.roundNo) === Number(roundNo); }) : null;
+    var targetNo = existing ? existing.roundNo : (rounds.length + 1);
+    var initDate = existing ? existing.date : '';
+    var initMode = existing ? existing.mode : 'face';
+    var initMins = existing ? existing.mins : 120;
+    var initPeople = existing ? existing.companyPeople : Math.max(3, Number(proj.designTeamCount || 4));
+    var initTopic = existing ? existing.topic : '';
+    var initPhoto = existing ? existing.hasPhoto : false;
+    var initSign = existing ? existing.hasSign : false;
+
+    var body =
+      '<div class="note">노사발전재단 회차 인정 기준: 전체 회차 대비 <b>대면 70% 이상</b>, 회당 <b>120분 이상</b>, 기업 측 <b>3인 이상 참석</b>, 시작·종료 타임스탬프 사진 2장 및 참석자 전원 자필 서명지 구비 필수</div>' +
+      '<div class="fr"><label for="rdDate">수행 일자 / 방식</label><div class="fv">' +
+      '<input type="text" id="rdDate" value="' + esc(initDate) + '" placeholder="YYYY-MM-DD" style="max-width:160px">' +
+      '<select id="rdMode"><option value="face"' + (initMode === 'face' ? ' selected' : '') + '>대면(현장 회의)</option><option value="remote"' + (initMode === 'remote' ? ' selected' : '') + '>비대면(화상 회의)</option></select>' +
+      '</div></div>' +
+      '<div class="fr"><label for="rdMins">시간(분) / 기업참석</label><div class="fv">' +
+      '<input type="number" id="rdMins" value="' + esc(initMins) + '" min="30" max="480" style="max-width:130px"><span>분</span>' +
+      '<input type="number" id="rdPeople" value="' + esc(initPeople) + '" min="1" max="50" style="max-width:130px"><span>명 참석</span>' +
+      '</div></div>' +
+      '<div class="fr"><label for="rdTopic">핵심 수행 주제*</label><div class="fv"><input type="text" id="rdTopic" value="' + esc(initTopic) + '" placeholder="예: 주4.5일제 부서별 교대 편성안 및 통상시급 모의계산 검토"></div></div>' +
+      '<div class="fr"><label>필수 증빙 확인</label><div class="fv">' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="rdPhoto"' + (initPhoto ? ' checked' : '') + '> 시작·종료 타임스탬프 사진 2장</label>' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="rdSign"' + (initSign ? ' checked' : '') + '> 참석자 전원 자필 서명지</label>' +
+      '</div></div>';
+
+    openModal((existing ? '✏️ ' + targetNo + '회차 수행·증빙 편집' : '➕ 신규 컨설팅 회차 추가'), body,
+      '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="rdSaveBtn">회차 저장</button>', 'wide');
+
+    if ($('rdSaveBtn')) {
+      $('rdSaveBtn').onclick = function () {
+        return withBusy($('rdSaveBtn'), async function () {
+          var topic = sanitizeMetaLabel(str($('rdTopic').value), proj);
+          if (!topic) { toast('핵심 수행 주제를 입력해 주세요.'); return; }
+          if (Intake().hasResidualPii(topic)) { toast('수행 주제에 민감 식별정보 패턴이 포함되어 저장할 수 없습니다.'); return; }
+          var entry = {
+            roundNo: targetNo,
+            date: str($('rdDate').value),
+            mode: str($('rdMode').value) === 'remote' ? 'remote' : 'face',
+            mins: Math.max(30, Number($('rdMins').value) || 120),
+            companyPeople: Math.max(1, Number($('rdPeople').value) || 3),
+            topic: topic,
+            hasPhoto: !!($('rdPhoto') && $('rdPhoto').checked),
+            hasSign: !!($('rdSign') && $('rdSign').checked)
+          };
+          var nextRounds = rounds.slice();
+          var idx = nextRounds.findIndex(function (r) { return Number(r.roundNo) === Number(targetNo); });
+          if (idx >= 0) nextRounds[idx] = entry;
+          else nextRounds.push(entry);
+          nextRounds = nextRounds.map(function (r, i) { return Object.assign({}, r, { roundNo: i + 1 }); });
+
+          await saveProjectRecord(Object.assign({}, proj, { rounds: nextRounds }));
+          closeModal(true);
+          draw();
+          restoreModalFocus();
+          toast(targetNo + '회차 수행 내역이 반영되었습니다.');
+        });
+      };
+    }
+  }
+
+  function openDiffEditModal(proj, diffId) {
+    var schedRds = schedRoundsForProject(proj);
+    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+    var fin = Report().buildFinalReport(proj, mid, D.intake[proj.id] || {}, schedRds, D.final[proj.id] || null);
+    var diffObjs = (fin.structured && fin.structured.diffObjects) || [];
+    var existing = diffId ? diffObjs.find(function (d) { return d.id === diffId; }) : null;
+
+    var initArea = existing ? existing.area : '';
+    var initBase = existing ? existing.baseVal : '중간보고 초안 기준';
+    var initFinal = existing ? existing.finalVal : '';
+    var initSt = existing ? existing.status : '합의 확정 ✓';
+
+    var body =
+      '<div class="note">후속 협의 합의·변경 내역을 수정하면 최종 결과보고서, 발표용 PPTX, 취업규칙 신구대조표(.docx), 표준 근로계약서(.docx), 모의계산(.xlsx)에 즉시 연동됩니다.</div>' +
+      '<div class="fr"><label for="dfArea">협의 영역*</label><div class="fv"><input type="text" id="dfArea" value="' + esc(initArea) + '"' + (existing && !existing.custom ? ' readonly' : '') + ' placeholder="예: 생산본부 교대조 단축근무 특례"></div></div>' +
+      '<div class="fr"><label for="dfBase">중간보고 기준선</label><div class="fv"><input type="text" id="dfBase" value="' + esc(initBase) + '"></div></div>' +
+      '<div class="fr"><label for="dfFinal">최종 합의·확정안*</label><div class="fv"><textarea id="dfFinal" rows="3" placeholder="예: 격주 금요일 오후 4시간 단축근무 및 월 단위 사전 교대 편성 확정">' + esc(initFinal) + '</textarea></div></div>' +
+      '<div class="fr"><label for="dfStatus">합의 상태</label><div class="fv"><select id="dfStatus">' +
+      ['합의 확정 ✓', '후속 메일 확정', '과반수 찬성 완료', '추가 협의중', '검토 보류'].map(function (s) {
+        return '<option value="' + esc(s) + '"' + (initSt === s ? ' selected' : '') + '>' + esc(s) + '</option>';
+      }).join('') +
+      '</select></div></div>';
+
+    openModal((existing ? '✏️ 후속 협의 Diff 항목 편집' : '➕ 후속 협의 합의사항 추가'), body,
+      '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="dfSaveBtn">합의사항 저장</button>', 'wide');
+
+    if ($('dfSaveBtn')) {
+      $('dfSaveBtn').onclick = function () {
+        return withBusy($('dfSaveBtn'), async function () {
+          var area = sanitizeMetaLabel(str($('dfArea').value), proj);
+          var baseVal = sanitizeMetaLabel(str($('dfBase').value), proj);
+          var finalVal = sanitizeMetaLabel(str($('dfFinal').value), proj);
+          var status = str($('dfStatus').value) || '합의 확정 ✓';
+          if (!area || !finalVal) { toast('협의 영역과 최종 확정안을 입력해 주세요.'); return; }
+          if (Intake().hasResidualPii(area) || Intake().hasResidualPii(baseVal) || Intake().hasResidualPii(finalVal)) {
+            toast('민감 고유식별정보 패턴이 감지되어 저장할 수 없습니다.');
+            return;
+          }
+
+          var nextStatusMap = Object.assign({}, proj.diffStatusMap || {});
+          var nextOverrides = Object.assign({}, proj.diffOverrides || {});
+          var nextCustom = Array.isArray(proj.customDiffRows) ? proj.customDiffRows.slice() : [];
+
+          if (!existing) {
+            var newId = 'df_custom_' + Date.now().toString(36);
+            nextCustom.push({ id: newId, area: area, baseVal: baseVal, finalVal: finalVal, status: status });
+            nextStatusMap[newId] = status;
+          } else if (existing.custom) {
+            nextCustom = nextCustom.map(function (r) {
+              return r && r.id === existing.id ? Object.assign({}, r, { area: area, baseVal: baseVal, finalVal: finalVal, status: status }) : r;
+            });
+            nextStatusMap[existing.id] = status;
+          } else {
+            nextOverrides[existing.id] = { area: area, baseVal: baseVal, finalVal: finalVal, status: status };
+            nextStatusMap[existing.id] = status;
+          }
+
+          await saveProjectRecord(Object.assign({}, proj, {
+            diffStatusMap: nextStatusMap,
+            diffOverrides: nextOverrides,
+            customDiffRows: nextCustom
+          }));
+          closeModal(true);
+          draw();
+          restoreModalFocus();
+          toast('후속 협의 합의사항이 반영되었습니다.');
+        });
+      };
+    }
+  }
+
+  function openSlidePreviewModal(proj, mode) {
+    var schedRds = schedRoundsForProject(proj);
+    var domM = readCurrentMidSectionsFromDom(proj);
+    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+    mid.sections = Object.assign({}, mid.sections, domM.sections);
+
+    var slides = [];
+    var deckTitle = '';
+    if (mode === 'mid') {
+      slides = Pptx().buildMidSlideDeck(proj, mid);
+      deckTitle = '👁️ 중간보고서 발표용 PPT 슬라이드 미리보기 (총 ' + slides.length + '장)';
+    } else {
+      var domF = readCurrentFinalSectionsFromDom(proj);
+      var fin = Report().buildFinalReport(proj, mid, D.intake[proj.id] || {}, schedRds, D.final[proj.id] || null);
+      fin.sections = Object.assign({}, fin.sections, domF.sections);
+      slides = Pptx().buildFinalSlideDeck(proj, mid, fin);
+      deckTitle = '👁️ 최종 결과보고서 발표용 PPT 슬라이드 미리보기 (총 ' + slides.length + '장)';
+    }
+
+    var listHtml = '<div class="slide-pv-list">' + slides.map(function (s, idx) {
+      var lines = Array.isArray(s.previewLines) ? s.previewLines.slice(0, 6).join('\n') : '';
+      return '<div class="slide-pv-card">' +
+        '<div class="slide-pv-hd"><span class="chip c-blue">Slide ' + (idx + 1) + '</span>' +
+        (s.part ? '<span class="chip">' + esc(s.part) + '</span>' : '') +
+        '<span>' + esc(s.title || ('슬라이드 ' + (idx + 1))) + '</span></div>' +
+        '<div class="slide-pv-bd">' + esc(lines || '표지 · 목차 구성 슬라이드') + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+
+    var dlAct = mode === 'mid' ? 'dl-mid-pptx' : 'dl-final-pptx';
+    openModal(deckTitle, listHtml,
+      '<button class="sm" data-close-modal="1">닫기</button>' +
+      '<button class="sm ok" id="pvDlPptxBtn">📊 PPTX 파일 다운로드</button>', 'xwide');
+
+    if ($('pvDlPptxBtn')) {
+      $('pvDlPptxBtn').onclick = function () {
+        return withBusy($('pvDlPptxBtn'), function () {
+          return handleNamedAction(dlAct);
+        });
+      };
+    }
+  }
+
   function openCardDetailModal(card) {
     var dk = Cat().getDocKind(card.docKind) || { name: card.docKind };
     var lines = (card.summaryLines || []).map(function (l) { return '• ' + l; }).join('\n');
@@ -1651,19 +2116,25 @@
     openModal('🔍 분석 카드 상세 — ' + (card.title || dk.name), body, '<button class="sm pri" data-close-modal="1">확인</button>', 'wide');
   }
 
-  function openDocRequestMailModal(proj, phase) {
+  function openDocRequestMailModal(proj, phase, onlyCodes) {
     var sc = SCAN_CACHE[proj.id] || { matched: [] };
-    var chk = Intake().summarizeChecklistProgress(phase, proj.selectedTasks, D.intake[proj.id] || {}, sc.matched);
-    var mailDraft = Cat().buildDocRequestMailText(proj, chk.missingRequired, phase);
+    var chk = Intake().summarizeChecklistProgress(phase, proj.selectedTasks, D.intake[proj.id] || {}, sc.matched, manualChecksOf(proj, phase));
+    var targetDocs = chk.missingRequired;
+    if (Array.isArray(onlyCodes) && onlyCodes.length) {
+      var codeSet = {};
+      onlyCodes.forEach(function (c) { codeSet[c] = 1; });
+      targetDocs = chk.items.filter(function (it) { return !!codeSet[it.code]; });
+    }
+    var mailDraft = Cat().buildDocRequestMailText(proj, targetDocs, phase);
     var body =
       '<div class="note">⚠ 메일 자동 발송은 하지 않습니다. 아래 요청 문안을 복사하여 메일함 작성창에 붙여넣고 담당자가 직접 확인 후 발송하세요.</div>' +
       '<div class="fr"><label for="reqSubj">메일 제목</label><div class="fv"><input type="text" id="reqSubj" value="' + esc(mailDraft.subject) + '" readonly></div></div>' +
       '<textarea id="reqBody" aria-label="미수신 자료 요청 메일 본문" rows="13">' + esc(mailDraft.body) + '</textarea>';
     var foot =
       '<a class="act-link" href="pu-cards.html?view=mail" target="_blank" rel="noopener">✉️ 푸른 메일함 열기</a>' +
-      '<button class="sm pri" id="copyReqMailBtn">📋 제목+본문 클립보드 복사</button>' +
+      '<button class="sm pri" id="copyReqMailBtn">📋 제목+본문 복사</button>' +
       '<button class="sm" data-close-modal="1">닫기</button>';
-    openModal('✉️ 미수신 자료 요청 메일 문안', body, foot, 'wide');
+    openModal('✉️ 자료 요청 메일 문안', body, foot, 'wide');
     if ($('copyReqMailBtn')) {
       $('copyReqMailBtn').onclick = function () {
         copyTextToClipboard($('reqSubj').value + '\n\n' + $('reqBody').value);
@@ -1672,12 +2143,32 @@
     }
   }
 
+  function buildCombinedPlatformTextFile(proj, pt) {
+    return [
+      '══════════════════════════════════════════════════════════════════════',
+      '  ' + (proj.companyName || '참여기업') + ' — 노사발전재단 플랫폼 등록 입력 문안 3종 통합본',
+      '══════════════════════════════════════════════════════════════════════',
+      '',
+      pt.planText,
+      '',
+      '──────────────────────────────────────────────────────────────────────',
+      '【노사발전재단 회차별 수행보고서 입력 문안】',
+      '──────────────────────────────────────────────────────────────────────',
+      '',
+      pt.roundReports.map(function (r) { return r.reportText; }).join('\n\n'),
+      '',
+      '──────────────────────────────────────────────────────────────────────',
+      pt.followUpText
+    ].join('\n');
+  }
+
   function openPlatformTextsModal(proj) {
+    var schedRds = schedRoundsForProject(proj);
     var savedMid = D.mid[proj.id] || null;
-    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), savedMid);
+    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, savedMid);
     var savedFin = D.final[proj.id] || null;
-    var fin = Report().buildFinalReport(proj, mid, D.intake[proj.id] || {}, schedRoundsForProject(proj), savedFin);
-    var pt = Report().buildPlatformTexts(proj, mid, fin, D.intake[proj.id] || {}, schedRoundsForProject(proj));
+    var fin = Report().buildFinalReport(proj, mid, D.intake[proj.id] || {}, schedRds, savedFin);
+    var pt = Report().buildPlatformTexts(proj, mid, fin, D.intake[proj.id] || {}, schedRds);
     var rc = pt.roundCheck;
 
     var roundTextAll = pt.roundReports.map(function (r) { return r.reportText; }).join('\n\n────────────────────────────────────────\n\n');
@@ -1690,11 +2181,11 @@
     var body =
       roundStatusHtml +
       '<div style="display:flex;flex-direction:column;gap:12px">' +
-      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><b>① 수행계획서 플랫폼 입력 문안</b><span class="sp"></span><button class="sm pri" data-copy-target="pfPlanTxt">📋 수행계획서 복사</button></div>' +
+      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap"><b>① 수행계획서 플랫폼 입력 문안</b><span class="sp"></span><button class="sm pri" data-copy-target="pfPlanTxt">📋 수행계획서 복사</button></div>' +
       '<textarea id="pfPlanTxt" aria-label="수행계획서 플랫폼 입력 문안" rows="7">' + esc(pt.planText) + '</textarea></div>' +
-      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><b>② 회차별 수행보고서 입력 문안 (형식적 제목 자동 배제됨)</b><span class="sp"></span><button class="sm pri" data-copy-target="pfRoundTxt">📋 전 회차 수행보고 복사</button></div>' +
+      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap"><b>② 회차별 수행보고서 입력 문안 (형식적 제목 자동 배제됨)</b><span class="sp"></span><button class="sm pri" data-copy-target="pfRoundTxt">📋 수행보고 복사</button></div>' +
       '<textarea id="pfRoundTxt" aria-label="회차별 수행보고서 플랫폼 입력 문안" rows="8">' + esc(roundTextAll) + '</textarea></div>' +
-      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><b>③ 종료 후 3개월 이행관리 · 이행결과표 입력 문안</b><span class="sp"></span><button class="sm pri" data-copy-target="pfFollowTxt">📋 이행관리 문안 복사</button></div>' +
+      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap"><b>③ 종료 후 3개월 이행관리 · 이행결과표 입력 문안</b><span class="sp"></span><button class="sm pri" data-copy-target="pfFollowTxt">📋 이행관리 복사</button></div>' +
       '<textarea id="pfFollowTxt" aria-label="종료 후 3개월 이행관리 플랫폼 입력 문안" rows="6">' + esc(pt.followUpText) + '</textarea></div>' +
       '</div>';
 
@@ -1735,7 +2226,7 @@
         : '<div class="warn">⚠ 원본에 없던 숫자(' + esc(numCheck.hallucinatedNumbers.join(', ')) + ')가 감지되었습니다. 반드시 확인 후 반영하세요.</div>';
 
       openModal('✨ AI 윤문 결과 비교 확인', warnBanner + '<textarea id="aiPolishedTxt" aria-label="AI 윤문 결과 본문" rows="12">' + esc(unmasked) + '</textarea>',
-        '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="applyAiPolishBtn">본문에 반영 (수기 고정 자동 켬)</button>', 'wide');
+        '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="applyAiPolishBtn">본문에 반영 (고정 켬)</button>', 'wide');
 
       if ($('applyAiPolishBtn')) {
         $('applyAiPolishBtn').onclick = function () {
@@ -1757,7 +2248,61 @@
     }
   }
 
-  /* ══ 7. 이벤트 바인딩 및 부팅 ══════════════════════════════════════════ */
+  /* ══ 7. 산출물 생성 도우미 (현재 화면 수정분 즉시 반영) ══════════════════ */
+  function buildLiveReportsForExport(proj) {
+    var schedRds = schedRoundsForProject(proj);
+    var domM = readCurrentMidSectionsFromDom(proj);
+    var midSaved = Object.assign({}, D.mid[proj.id] || {}, { sections: domM.sections, locks: domM.locks });
+    var mid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, null);
+    mid.sections = Object.assign({}, mid.sections, domM.sections);
+    mid.locks = domM.locks;
+
+    var domF = readCurrentFinalSectionsFromDom(proj);
+    var finSaved = Object.assign({}, D.final[proj.id] || {}, { sections: domF.sections, locks: domF.locks });
+    var fin = Report().buildFinalReport(proj, mid, D.intake[proj.id] || {}, schedRds, null);
+    fin.sections = Object.assign({}, fin.sections, domF.sections);
+    fin.locks = domF.locks;
+
+    return { schedRds: schedRds, midSaved: midSaved, finSaved: finSaved, mid: mid, fin: fin };
+  }
+
+  async function downloadSelectedDeliverablesZip(proj, selectedIds) {
+    if (!Pack() || !global.JSZip) { toast('패키지 생성 엔진이 로드되지 않았습니다.'); return; }
+    var live = buildLiveReportsForExport(proj);
+    var safeCo = Pack().safeFilePart(proj.companyName);
+    var idSet = {};
+    selectedIds.forEach(function (id) { idSet[id] = 1; });
+
+    var zip = new global.JSZip();
+    if (idSet.mid_pptx) {
+      var b1 = await Pptx().generateMidPptxBytes(proj, live.mid);
+      zip.file('01_' + safeCo + '_일터혁신_중간보고서.pptx', b1);
+    }
+    if (idSet.final_pptx) {
+      var b2 = await Pptx().generateFinalPptxBytes(proj, live.mid, live.fin);
+      zip.file('02_' + safeCo + '_일터혁신_최종결과보고서.pptx', b2);
+    }
+    if (idSet.rules_docx) {
+      var b3 = await Pack().generateWorkRulesDocxBytes(proj, live.mid, live.fin);
+      zip.file('03_' + safeCo + '_취업규칙개정안_신구대조표.docx', b3);
+    }
+    if (idSet.contract_docx) {
+      var b4 = await Pack().generateLaborContractDocxBytes(proj, live.mid, live.fin);
+      zip.file('04_' + safeCo + '_표준근로계약서_서면합의동의서.docx', b4);
+    }
+    if (idSet.sim_xlsx) {
+      var b5 = Pack().generateSimulationXlsxBytes(proj, live.mid, live.fin, D.intake[proj.id] || {}, live.schedRds);
+      zip.file('05_' + safeCo + '_통상시급모의계산_신구대조_이행점검표.xlsx', b5);
+    }
+    if (idSet.platform_txt) {
+      var pt = Report().buildPlatformTexts(proj, live.mid, live.fin, D.intake[proj.id] || {}, live.schedRds);
+      zip.file('06_' + safeCo + '_노사발전재단_플랫폼입력문안_3종.txt', buildCombinedPlatformTextFile(proj, pt));
+    }
+    var zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+    Pack().downloadBytes(zipBytes, safeCo + '_일터혁신_선택산출물_' + selectedIds.length + '종.zip', 'application/zip');
+  }
+
+  /* ══ 8. 이벤트 바인딩 (끌어고르기 포함) 및 일괄 실행 ═════════════════════ */
   function readCurrentMidSectionsFromDom(proj) {
     var saved = D.mid[proj.id] || {};
     var secs = Object.assign({}, saved.sections || {});
@@ -1784,12 +2329,12 @@
     return { sections: secs, locks: locks };
   }
 
-  async function activateDiscoverCandidate(candKey) {
-    var c = DISCOVER_LIST.find(function (x) { return x.candKey === candKey; });
-    if (!c) return null;
+  function buildDiscoverProjectPayload(c) {
     var co = findCompanyById(c.companyId);
-    var created = await saveProjectRecord({
-      id: 'ilt_' + safeKey(c.companyId) + '_' + (c.year || 2026),
+    var id = 'ilt_' + safeKey(c.companyId) + '_' + (c.year || 2026);
+    return {
+      id: id,
+      entityType: 'Project',
       companyId: c.companyId,
       companyName: c.companyName,
       bizNo: c.bizNo,
@@ -1804,11 +2349,73 @@
       selectedTasks: ['wt_45day', 'wg_redesign'],
       consultantName: ME.name ? ME.name + ' 공인노무사' : '푸른노무법인 전담 노무사',
       designTeamCount: 4
+    };
+  }
+
+  async function activateDiscoverCandidate(candKey) {
+    var c = DISCOVER_LIST.find(function (x) { return x.candKey === candKey; });
+    if (!c) return null;
+    return saveProjectRecord(buildDiscoverProjectPayload(c));
+  }
+
+  function bindDragSel() {
+    document.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      var directCb = e.target.closest ? e.target.closest('input[data-ck]') : null;
+      var cellC = !directCb && e.target.closest ? e.target.closest('td.c') : null;
+      var cb = directCb || (cellC ? cellC.querySelector('input[data-ck]') : null);
+      if (!cb) return;
+      var ckKey = cb.getAttribute('data-ck') || '';
+      var listName = ckKey.split('|')[0];
+      if (!listName) return;
+
+      var targetVal = !cb.checked;
+      DRAG_SEL = { active: true, listName: listName, targetVal: targetVal, startKey: ckKey, moved: false };
+      if (cellC && !directCb) {
+        e.preventDefault();
+        cb.checked = targetVal;
+        SEL[ckKey] = targetVal;
+        syncHeaderCheckbox(listName);
+        drawBulks();
+      }
     });
-    return created;
+
+    document.addEventListener('mouseover', function (e) {
+      if (!DRAG_SEL.active || !DRAG_SEL.listName) return;
+      var rowEl = e.target.closest
+        ? (e.target.closest('tr[data-tname="' + DRAG_SEL.listName + '"]')
+          || e.target.closest('[data-sec-name="' + DRAG_SEL.listName + '"] .rpt-sec-card'))
+        : null;
+      if (!rowEl) return;
+      var cb = rowEl.querySelector('input[data-ck]');
+      if (!cb) return;
+      var ckKey = cb.getAttribute('data-ck');
+      if (ckKey === DRAG_SEL.startKey && !DRAG_SEL.moved) return;
+
+      if (!DRAG_SEL.moved) {
+        DRAG_SEL.moved = true;
+        var startCb = document.querySelector('input[data-ck="' + DRAG_SEL.startKey.replace(/"/g, '\\"') + '"]');
+        if (startCb) {
+          startCb.checked = DRAG_SEL.targetVal;
+          SEL[DRAG_SEL.startKey] = DRAG_SEL.targetVal;
+        }
+      }
+      if (cb.checked !== DRAG_SEL.targetVal) {
+        cb.checked = DRAG_SEL.targetVal;
+        SEL[ckKey] = DRAG_SEL.targetVal;
+        syncHeaderCheckbox(DRAG_SEL.listName);
+        drawBulks();
+      }
+    });
+
+    global.addEventListener('mouseup', function () {
+      DRAG_SEL.active = false;
+    });
   }
 
   function bindEvents() {
+    bindDragSel();
+
     if ($('tabs')) {
       $('tabs').addEventListener('click', function (e) {
         var btn = e.target.closest('button[data-tab]');
@@ -1854,7 +2461,10 @@
     ['projQ', 'projYear', 'projStage'].forEach(function (id) {
       var el = $(id);
       if (!el) return;
-      el.addEventListener(id === 'projQ' ? 'input' : 'change', function () { draw(); });
+      el.addEventListener(id === 'projQ' ? 'input' : 'change', function () {
+        clearSel('projects');
+        draw();
+      });
     });
 
     if ($('modal')) {
@@ -1873,16 +2483,21 @@
       var allCb = e.target.closest('input[data-all]');
       if (allCb) {
         var nm = allCb.getAttribute('data-all');
-        document.querySelectorAll('table.t[data-name="' + nm + '"] input[data-ck]').forEach(function (cb) {
+        /* 먼저 같은 목록의 이전 선택을 비우고 지금 보이는(걸러진) 항목만 토글 */
+        pickedIds(nm).forEach(function (id) { delete SEL[nm + '|' + id]; });
+        listCheckboxesInDom(nm).forEach(function (cb) {
           cb.checked = allCb.checked;
           SEL[cb.getAttribute('data-ck')] = allCb.checked;
         });
+        syncHeaderCheckbox(nm);
         drawBulks();
         return;
       }
       var rowCb = e.target.closest('input[data-ck]');
       if (rowCb) {
-        SEL[rowCb.getAttribute('data-ck')] = rowCb.checked;
+        var ck = rowCb.getAttribute('data-ck') || '';
+        SEL[ck] = rowCb.checked;
+        syncHeaderCheckbox(ck.split('|')[0]);
         drawBulks();
         return;
       }
@@ -1921,6 +2536,7 @@
       var gotoBtn = e.target.closest('[data-goto-tab]');
       if (gotoBtn) {
         TAB = gotoBtn.getAttribute('data-goto-tab');
+        clearSel();
         draw();
         return;
       }
@@ -1941,10 +2557,76 @@
           if (created) {
             CUR_PID = created.id;
             TAB = 'intake';
+            clearSel();
             rebuildScanAndDiscover();
             draw();
             toast(created.companyName + ' 워크스페이스 활성화 완료');
           }
+        });
+        return;
+      }
+
+      var toggleChkBtn = e.target.closest('[data-toggle-chk]');
+      if (toggleChkBtn && CUR_PID) {
+        await withBusy(toggleChkBtn, async function () {
+          var projC = projectById(CUR_PID);
+          if (!projC) return;
+          var dkCode = toggleChkBtn.getAttribute('data-toggle-chk');
+          var ph = toggleChkBtn.getAttribute('data-phase') || 'pre_mid';
+          var mc = Object.assign({}, projC.manualChecks || {});
+          var sub = Object.assign({}, mc[ph] || {});
+          sub[dkCode] = !sub[dkCode];
+          mc[ph] = sub;
+          await saveProjectRecord(Object.assign({}, projC, { manualChecks: mc }));
+          draw();
+          toast(sub[dkCode] ? '오프라인·직접 수령 확인 표시됨' : '수기 수령 확인 해제됨');
+        });
+        return;
+      }
+
+      var editRdBtn = e.target.closest('[data-edit-round]');
+      if (editRdBtn && CUR_PID) {
+        var projR = projectById(CUR_PID);
+        if (projR) openRoundEditModal(projR, Number(editRdBtn.getAttribute('data-edit-round')));
+        return;
+      }
+
+      var toggleRdProofBtn = e.target.closest('[data-toggle-round-proof]');
+      if (toggleRdProofBtn && CUR_PID) {
+        await withBusy(toggleRdProofBtn, async function () {
+          var projRP = projectById(CUR_PID);
+          if (!projRP) return;
+          var rno = Number(toggleRdProofBtn.getAttribute('data-toggle-round-proof'));
+          var rds = currentNormalizedRounds(projRP).map(function (r) {
+            if (Number(r.roundNo) !== rno) return r;
+            var nextOk = !(r.hasPhoto && r.hasSign);
+            return Object.assign({}, r, { hasPhoto: nextOk, hasSign: nextOk });
+          });
+          await saveProjectRecord(Object.assign({}, projRP, { rounds: rds }));
+          draw();
+          toast(rno + '회차 사진·서명지 증빙 상태가 변경되었습니다.');
+        });
+        return;
+      }
+
+      var editDfBtn = e.target.closest('[data-edit-diff]');
+      if (editDfBtn && CUR_PID) {
+        var projD = projectById(CUR_PID);
+        if (projD) openDiffEditModal(projD, editDfBtn.getAttribute('data-edit-diff'));
+        return;
+      }
+
+      var toggleFuBtn = e.target.closest('[data-toggle-followup]');
+      if (toggleFuBtn && CUR_PID) {
+        await withBusy(toggleFuBtn, async function () {
+          var projFu = projectById(CUR_PID);
+          if (!projFu) return;
+          var fuCode = toggleFuBtn.getAttribute('data-toggle-followup');
+          var nextFu = Object.assign({}, projFu.followupChecks || {});
+          nextFu[fuCode] = !nextFu[fuCode];
+          await saveProjectRecord(Object.assign({}, projFu, { followupChecks: nextFu }));
+          draw();
+          toast(nextFu[fuCode] ? '사후 이행완료로 체크되었습니다.' : '점검예정 상태로 변경되었습니다.');
         });
         return;
       }
@@ -2022,11 +2704,12 @@
         return;
       }
 
-      if (!e.target.closest('input,button,select,a,label')) {
+      if (!e.target.closest('input,button,select,a,label,textarea')) {
         var tr = e.target.closest('tr[data-row][data-tname="projects"]');
         if (tr) {
           CUR_PID = tr.getAttribute('data-row');
           TAB = 'intake';
+          clearSel();
           draw();
         }
       }
@@ -2039,31 +2722,97 @@
     if (op === 'clear') { clearSel(nm); drawBulks(); return; }
     var ids = pickedIds(nm);
     if (!ids.length) return;
+    var proj = projectById(CUR_PID);
 
     if (nm === 'discover' && op === 'activate') {
-      for (var i = 0; i < ids.length; i++) await activateDiscoverCandidate(ids[i]);
-      clearSel(nm);
-      rebuildScanAndDiscover();
-      draw();
-      toast(ids.length + '개 사업장 워크스페이스 활성화 완료');
-    } else if (nm === 'projects' && op === 'del') {
-      if (typeof global.confirm === 'function' && !global.confirm('선택한 사업장 ' + ids.length + '건을 목록에서 숨김(삭제) 처리하시겠습니까?')) return;
-      for (var p = 0; p < ids.length; p++) {
-        var rec = D.projects[ids[p]];
-        if (rec) {
-          await gate.remove(fbDb.ref('scal_ilteo/projects/' + rec.id), rec, { entityType: 'Project' });
-          D.projects[rec.id]._deleted = true;
-        }
+      if (!askConfirm('선택한 자동 발견 후보 ' + ids.length + '건을 일괄 워크스페이스 활성화하시겠습니까?')) return;
+      var actEntries = [];
+      ids.forEach(function (ck) {
+        var cand = DISCOVER_LIST.find(function (x) { return x.candKey === ck; });
+        if (!cand) return;
+        var rec = buildDiscoverProjectPayload(cand);
+        actEntries.push({
+          path: 'scal_ilteo/projects/' + rec.id,
+          previous: D.projects[rec.id] || null,
+          record: rec,
+          entityType: 'Project'
+        });
+      });
+      var savedAct = await atomicMultiRecordUpdate(actEntries);
+      if (savedAct) {
+        Object.keys(savedAct).forEach(function (pathKey) {
+          var val = savedAct[pathKey];
+          if (val && val.id) D.projects[val.id] = val;
+        });
       }
       clearSel(nm);
       rebuildScanAndDiscover();
       draw();
-      toast('선택 사업장을 목록에서 숨겼습니다(소프트 삭제).');
-    } else if ((nm === 'preMails' || nm === 'postMails') && (op === 'analyze' || op === 'check')) {
-      var ph = nm === 'postMails' ? 'post_mid' : 'pre_mid';
-      for (var m = 0; m < ids.length; m++) {
-        if (op === 'analyze') await inspectAndAnalyzeMail(ids[m], ph, true);
-        else await markMailCheckedOnly(ids[m], ph);
+      toast(actEntries.length + '개 사업장 워크스페이스 활성화 완료');
+    } else if (nm === 'projects' && op === 'del') {
+      if (typeof global.confirm === 'function' && !global.confirm('선택한 사업장 ' + ids.length + '건을 목록에서 숨김(소프트 삭제) 처리하시겠습니까?')) return;
+      var delProjEntries = [];
+      ids.forEach(function (pid) {
+        var rec = D.projects[pid];
+        if (rec) {
+          delProjEntries.push({
+            path: 'scal_ilteo/projects/' + rec.id,
+            previous: rec,
+            tombstone: true,
+            entityType: 'Project'
+          });
+        }
+      });
+      await atomicMultiRecordUpdate(delProjEntries);
+      ids.forEach(function (pid) { if (D.projects[pid]) D.projects[pid]._deleted = true; });
+      clearSel(nm);
+      rebuildScanAndDiscover();
+      draw();
+      toast('선택 사업장 ' + delProjEntries.length + '건을 목록에서 숨겼습니다(소프트 삭제).');
+    } else if ((nm === 'preChk' || nm === 'postChk') && proj) {
+      var phChk = nm === 'postChk' ? 'post_mid' : 'pre_mid';
+      if (op === 'reqmail') {
+        openDocRequestMailModal(proj, phChk, ids);
+        return;
+      }
+      var markVal = op === 'check';
+      if (!askConfirm('선택한 체크리스트 ' + ids.length + '건을 일괄 ' + (markVal ? '수령확인 완료' : '수령확인 해제') + ' 처리하시겠습니까?')) return;
+      var mcAll = Object.assign({}, proj.manualChecks || {});
+      var subChk = Object.assign({}, mcAll[phChk] || {});
+      ids.forEach(function (code) { subChk[code] = markVal; });
+      mcAll[phChk] = subChk;
+      await saveProjectRecord(Object.assign({}, proj, { manualChecks: mcAll }));
+      clearSel(nm);
+      draw();
+      toast(ids.length + '건 체크리스트 상태가 한 번에 저장되었습니다.');
+    } else if ((nm === 'preMails' || nm === 'postMails' || nm === 'candMails') && (op === 'analyze' || op === 'check') && proj) {
+      var phMail = nm === 'postMails' ? 'post_mid' : 'pre_mid';
+      if (!askConfirm('선택한 메일 ' + ids.length + '건을 일괄 ' + (op === 'analyze' ? '내용확인·분석' : '확인완료 표시') + ' 처리하시겠습니까?')) return;
+      if (op === 'check') {
+        var mailEntries = [];
+        ids.forEach(function (mk) {
+          var built = buildCheckedMailCardPayload(proj, mk, phMail);
+          if (built) {
+            mailEntries.push({
+              path: 'scal_ilteo/intake/' + proj.id + '/' + built.record.id,
+              previous: built.prev,
+              record: built.record,
+              entityType: 'Document'
+            });
+          }
+        });
+        var savedMails = await atomicMultiRecordUpdate(mailEntries);
+        if (!D.intake[proj.id]) D.intake[proj.id] = {};
+        if (savedMails) {
+          Object.keys(savedMails).forEach(function (pk) {
+            var v = savedMails[pk];
+            if (v && v.id) D.intake[proj.id][v.id] = v;
+          });
+        }
+      } else {
+        for (var m = 0; m < ids.length; m++) {
+          await inspectAndAnalyzeMail(ids[m], phMail, true);
+        }
       }
       clearSel(nm);
       rebuildScanAndDiscover();
@@ -2071,17 +2820,96 @@
       toast(ids.length + '건 메일 일괄 처리 완료');
     } else if ((nm === 'preCards' || nm === 'postCards') && op === 'del' && CUR_PID) {
       if (typeof global.confirm === 'function' && !global.confirm('선택한 분석카드 ' + ids.length + '건을 삭제하시겠습니까?')) return;
-      for (var c = 0; c < ids.length; c++) {
-        var prevC = D.intake[CUR_PID] && D.intake[CUR_PID][ids[c]];
+      var cardDelEntries = [];
+      ids.forEach(function (cid) {
+        var prevC = D.intake[CUR_PID] && D.intake[CUR_PID][cid];
         if (prevC) {
-          await gate.remove(fbDb.ref('scal_ilteo/intake/' + CUR_PID + '/' + prevC.id), prevC, { entityType: 'Document' });
-          D.intake[CUR_PID][prevC.id]._deleted = true;
+          cardDelEntries.push({
+            path: 'scal_ilteo/intake/' + CUR_PID + '/' + prevC.id,
+            previous: prevC,
+            tombstone: true,
+            entityType: 'Document'
+          });
         }
-      }
+      });
+      await atomicMultiRecordUpdate(cardDelEntries);
+      ids.forEach(function (cid) { if (D.intake[CUR_PID] && D.intake[CUR_PID][cid]) D.intake[CUR_PID][cid]._deleted = true; });
       clearSel(nm);
       rebuildScanAndDiscover();
       draw();
-      toast('선택 분석카드를 삭제했습니다.');
+      toast('선택 분석카드 ' + cardDelEntries.length + '건을 삭제했습니다.');
+    } else if (nm === 'rounds' && proj) {
+      if (!askConfirm('선택한 회차 ' + ids.length + '건에 일괄 작업을 적용하시겠습니까?')) return;
+      var selNoSet = {};
+      ids.forEach(function (id) { selNoSet[Number(id)] = 1; });
+      var curRds = currentNormalizedRounds(proj);
+      var nextRds = [];
+      if (op === 'del') {
+        nextRds = curRds.filter(function (r) { return !selNoSet[Number(r.roundNo)]; })
+          .map(function (r, idx) { return Object.assign({}, r, { roundNo: idx + 1 }); });
+      } else {
+        nextRds = curRds.map(function (r) {
+          if (!selNoSet[Number(r.roundNo)]) return r;
+          if (op === 'proofOn') return Object.assign({}, r, { hasPhoto: true, hasSign: true });
+          if (op === 'proofOff') return Object.assign({}, r, { hasPhoto: false, hasSign: false });
+          if (op === 'face') return Object.assign({}, r, { mode: 'face' });
+          if (op === 'remote') return Object.assign({}, r, { mode: 'remote' });
+          return r;
+        });
+      }
+      await saveProjectRecord(Object.assign({}, proj, { rounds: nextRds }));
+      clearSel(nm);
+      draw();
+      toast('선택 회차 ' + ids.length + '건 일괄 반영 완료');
+    } else if ((nm === 'midSecs' || nm === 'finalSecs') && proj) {
+      var isMid = nm === 'midSecs';
+      if (!askConfirm('선택한 보고서 섹션 ' + ids.length + '건을 일괄 ' + (op === 'save' ? '저장' : (op === 'lock' ? '수기 고정' : '고정 해제')) + '하시겠습니까?')) return;
+      var domState = isMid ? readCurrentMidSectionsFromDom(proj) : readCurrentFinalSectionsFromDom(proj);
+      var savedBase = (isMid ? D.mid[proj.id] : D.final[proj.id]) || {};
+      var nextSecs = Object.assign({}, savedBase.sections || {});
+      var nextLocks = Object.assign({}, domState.locks || {});
+      ids.forEach(function (secKey) {
+        nextSecs[secKey] = domState.sections[secKey];
+        if (op === 'lock') nextLocks[secKey] = true;
+        else if (op === 'unlock') nextLocks[secKey] = false;
+      });
+      if (isMid) await saveMidDoc(proj, nextSecs, nextLocks);
+      else await saveFinalDoc(proj, nextSecs, nextLocks);
+      clearSel(nm);
+      draw();
+      toast('선택 섹션 ' + ids.length + '건이 한 번에 저장되었습니다.');
+    } else if (nm === 'diffRows' && proj) {
+      if (!askConfirm('선택한 협의 Diff ' + ids.length + '건에 일괄 변경을 적용하시겠습니까?')) return;
+      var idSetDf = {};
+      ids.forEach(function (id) { idSetDf[id] = 1; });
+      var nextStMap = Object.assign({}, proj.diffStatusMap || {});
+      var nextCust = Array.isArray(proj.customDiffRows) ? proj.customDiffRows.slice() : [];
+      if (op === 'del') {
+        nextCust = nextCust.map(function (r) {
+          return (r && idSetDf[r.id]) ? Object.assign({}, r, { _deleted: true }) : r;
+        });
+      } else {
+        var label = op === 'confirm' ? '합의 확정 ✓' : '추가 협의중';
+        ids.forEach(function (id) { nextStMap[id] = label; });
+      }
+      await saveProjectRecord(Object.assign({}, proj, { diffStatusMap: nextStMap, customDiffRows: nextCust }));
+      clearSel(nm);
+      draw();
+      toast('선택 Diff 항목 ' + ids.length + '건이 반영되었습니다.');
+    } else if (nm === 'deliverables' && op === 'zip' && proj) {
+      await downloadSelectedDeliverablesZip(proj, ids);
+      clearSel(nm);
+      drawBulks();
+      toast('선택 산출물 ' + ids.length + '종 통합 ZIP 파일을 생성했습니다.');
+    } else if (nm === 'followups' && proj) {
+      var doneFlag = op === 'done';
+      if (!askConfirm('선택한 사후 이행점검 ' + ids.length + '건을 일괄 ' + (doneFlag ? '이행완료' : '점검예정') + ' 처리하시겠습니까?')) return;
+      var nextFuMap = Object.assign({}, proj.followupChecks || {});
+      ids.forEach(function (code) { nextFuMap[code] = doneFlag; });
+      await saveProjectRecord(Object.assign({}, proj, { followupChecks: nextFuMap }));
+      clearSel(nm);
+      draw();
+      toast('사후 이행관리 ' + ids.length + '건 상태가 한 번에 저장되었습니다.');
     }
   }
 
@@ -2095,12 +2923,24 @@
       openDocRequestMailModal(proj, 'pre_mid');
     } else if (act === 'req-mail-post') {
       openDocRequestMailModal(proj, 'post_mid');
+    } else if (act === 'add-round') {
+      openRoundEditModal(proj, null);
+    } else if (act === 'add-diff') {
+      openDiffEditModal(proj, null);
+    } else if (act === 'preview-mid-pptx') {
+      openSlidePreviewModal(proj, 'mid');
+    } else if (act === 'preview-final-pptx') {
+      openSlidePreviewModal(proj, 'final');
     } else if (act === 'save-interviews') {
       var iv = {
-        exec: str($('ivExec') && $('ivExec').value),
-        hr: str($('ivHr') && $('ivHr').value),
-        worker: str($('ivWorker') && $('ivWorker').value)
+        exec: sanitizeMetaLabel(str($('ivExec') && $('ivExec').value), proj),
+        hr: sanitizeMetaLabel(str($('ivHr') && $('ivHr').value), proj),
+        worker: sanitizeMetaLabel(str($('ivWorker') && $('ivWorker').value), proj)
       };
+      if (Intake().hasResidualPii(iv.exec) || Intake().hasResidualPii(iv.hr) || Intake().hasResidualPii(iv.worker)) {
+        toast('인터뷰 메모에 민감 고유식별정보 패턴이 감지되어 차단했습니다.');
+        return;
+      }
       await saveProjectRecord(Object.assign({}, proj, { interviews: iv }));
       toast('계층별 인터뷰 메모가 저장되었습니다.');
       draw();
@@ -2114,12 +2954,10 @@
       draw();
       toast('수집된 기초자료 기준으로 중간보고서가 자동 정리되었습니다(수기 고정 섹션 보존).');
     } else if (act === 'dl-mid-pptx') {
-      var domM = readCurrentMidSectionsFromDom(proj);
-      var midForPpt = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), null);
-      midForPpt.sections = Object.assign({}, midForPpt.sections, domM.sections);
-      var midBytes = await Pptx().generateMidPptxBytes(proj, midForPpt);
-      var safeCo = proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
-      Pptx().downloadPptxBytes(midBytes, safeCo + '_일터혁신_중간보고서.pptx');
+      var liveM = buildLiveReportsForExport(proj);
+      var midBytes = await Pptx().generateMidPptxBytes(proj, liveM.mid);
+      var safeCoM = Pack() ? Pack().safeFilePart(proj.companyName) : proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
+      Pptx().downloadPptxBytes(midBytes, safeCoM + '_일터혁신_중간보고서.pptx');
       toast('중간보고서 PPTX 파일을 생성했습니다.');
     } else if (act === 'confirm-mid-baseline') {
       var domM2 = readCurrentMidSectionsFromDom(proj);
@@ -2131,14 +2969,16 @@
       var snap = Report().buildMidSnapshot(proj, midObj, ME.sid, now);
       await saveImmutableSnapshot(proj, snap);
       await saveProjectRecord(Object.assign({}, proj, { midConfirmedAt: now, stage: 'design' }));
+      clearSel();
       rebuildScanAndDiscover();
       TAB = 'final';
       draw();
       toast('중간보고 기준선이 확정되었습니다. 이제 후속 메일 자동 감시 단계로 전환됩니다.');
     } else if (act === 'regen-final') {
       var curFin = readCurrentFinalSectionsFromDom(proj);
-      var baseMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), D.mid[proj.id] || null);
-      var builtF = Report().buildFinalReport(proj, baseMid, D.intake[proj.id] || {}, schedRoundsForProject(proj), {
+      var schedRdsF = schedRoundsForProject(proj);
+      var baseMid = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRdsF, D.mid[proj.id] || null);
+      var builtF = Report().buildFinalReport(proj, baseMid, D.intake[proj.id] || {}, schedRdsF, {
         sections: curFin.sections,
         locks: curFin.locks
       });
@@ -2146,14 +2986,41 @@
       draw();
       toast('중간보고 기준선과 후속 메일 Diff를 반영해 최종 결과보고서를 조립했습니다.');
     } else if (act === 'dl-final-pptx') {
-      var domF = readCurrentFinalSectionsFromDom(proj);
-      var baseM = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), D.mid[proj.id] || null);
-      var finForPpt = Report().buildFinalReport(proj, baseM, D.intake[proj.id] || {}, schedRoundsForProject(proj), null);
-      finForPpt.sections = Object.assign({}, finForPpt.sections, domF.sections);
-      var finBytes = await Pptx().generateFinalPptxBytes(proj, baseM, finForPpt);
-      var safeCo2 = proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
-      Pptx().downloadPptxBytes(finBytes, safeCo2 + '_일터혁신_최종결과보고서.pptx');
+      var liveF = buildLiveReportsForExport(proj);
+      var finBytes = await Pptx().generateFinalPptxBytes(proj, liveF.mid, liveF.fin);
+      var safeCoF = Pack() ? Pack().safeFilePart(proj.companyName) : proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
+      Pptx().downloadPptxBytes(finBytes, safeCoF + '_일터혁신_최종결과보고서.pptx');
       toast('최종 결과보고서 PPTX 파일을 생성했습니다.');
+    } else if (act === 'dl-rules-docx' && Pack()) {
+      var liveR = buildLiveReportsForExport(proj);
+      var rulesBytes = await Pack().generateWorkRulesDocxBytes(proj, liveR.mid, liveR.fin);
+      Pack().downloadBytes(rulesBytes, Pack().safeFilePart(proj.companyName) + '_취업규칙개정안_신구대조표.docx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      toast('취업규칙 개정안 및 신구대조표(.docx)를 생성했습니다.');
+    } else if (act === 'dl-contract-docx' && Pack()) {
+      var liveC = buildLiveReportsForExport(proj);
+      var contBytes = await Pack().generateLaborContractDocxBytes(proj, liveC.mid, liveC.fin);
+      Pack().downloadBytes(contBytes, Pack().safeFilePart(proj.companyName) + '_표준근로계약서_서면합의동의서.docx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      toast('표준 근로계약서 및 서면합의서(.docx)를 생성했습니다.');
+    } else if (act === 'dl-sim-xlsx' && Pack()) {
+      var liveX = buildLiveReportsForExport(proj);
+      var xlsxBytes = Pack().generateSimulationXlsxBytes(proj, liveX.mid, liveX.fin, D.intake[proj.id] || {}, liveX.schedRds);
+      Pack().downloadBytes(xlsxBytes, Pack().safeFilePart(proj.companyName) + '_통상시급모의계산_신구대조_이행점검표.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      toast('비식별 모의계산 및 사후 이행점검표(.xlsx, 6개 시트)를 생성했습니다.');
+    } else if (act === 'dl-platform-txt' && Pack()) {
+      var liveT = buildLiveReportsForExport(proj);
+      var ptTxt = Report().buildPlatformTexts(proj, liveT.mid, liveT.fin, D.intake[proj.id] || {}, liveT.schedRds);
+      var txtBytes = new TextEncoder().encode(buildCombinedPlatformTextFile(proj, ptTxt));
+      Pack().downloadBytes(txtBytes, Pack().safeFilePart(proj.companyName) + '_노사발전재단_플랫폼입력문안_3종.txt', 'text/plain;charset=utf-8');
+      toast('노사발전재단 플랫폼 입력문안 3종(.txt)을 생성했습니다.');
+    } else if (act === 'dl-full-zip' && Pack()) {
+      var liveZ = buildLiveReportsForExport(proj);
+      toast('최종산출물 6종 통합 ZIP 패키지 생성 중…');
+      var zipBytes = await Pack().generateFullPackageZipBytes(proj, D.intake[proj.id] || {}, liveZ.schedRds, liveZ.midSaved, liveZ.finSaved);
+      Pack().downloadBytes(zipBytes, Pack().safeFilePart(proj.companyName) + '_일터혁신_최종산출물_6종패키지.zip', 'application/zip');
+      toast('최종산출물 6종 통합 ZIP 패키지를 다운로드했습니다.');
     } else if (act === 'open-platform-modal') {
       openPlatformTextsModal(proj);
     } else if (act === 'confirm-final-snapshot') {

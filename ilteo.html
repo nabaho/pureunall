@@ -14,10 +14,12 @@
           직접 파일 첨부 창구로 사업장 기초자료를 체크·내용확인하고 이원화 비식별 분석한다.
        2. 인력·근태·임금·EOS 정량 엑셀은 브라우저 로컬 메모리에서만 비식별 통계로 집계하며,
           원본 성명·주민번호·임금대장은 외부 AI나 서버에 절대 전송·저장하지 않는다.
-       3. 수집된 진단 결과·인터뷰·일정을 통합하여 사업장 중간보고서(7개 섹션 + 발표용 .pptx)를 자동 정리하고,
-          확정 시 불변 기준선 스냅샷(midConfirmedAt)을 생성하여 후속 메일 감시 단계로 전환한다.
+       3. 수집된 진단 결과·인터뷰·회차 수행기록을 통합하여 사업장 중간보고서(7개 섹션 + 발표용 .pptx)를
+          자동 정리하고, 확정 시 불변 기준선 스냅샷(midConfirmedAt)을 생성하여 후속 메일 감시 단계로 전환한다.
        4. 중간보고 이후 수신된 피드백·협의회신·회차 사진/서명지·찬반투표 메일을 체크·분석(Diff)하여
-          최종 결과보고서(7개 섹션 + 발표용 .pptx)와 재단 플랫폼 입력 문안 3종을 자동 조립한다.
+          최종 결과보고서(.pptx), 별첨 규정·계약서(.docx), 모의계산·이행점검(.xlsx), 플랫폼 문안, 통합 .zip 및
+          종료 후 3개월 사후 이행관리까지 한 화면에서 완결한다.
+       5. 사람이 입력·정리하는 모든 표·체크리스트·회차·Diff·섹션·산출물 목록 맨 왼쪽에 ☐ 고르기 칸과 번호를 둔다.
      ★ 모든 쓰기는 PuOntologyWrite 강제 관문(enforce)만 거치며 물리 삭제 대신 _deleted 표식을 남긴다.
      ══════════════════════════════════════════════════════════════════════ -->
 <style>
@@ -139,8 +141,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .iv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px 12px}
 .iv-col{display:flex;flex-direction:column;gap:4px;min-width:0}
 .iv-col label{font-size:12px;font-weight:700;color:var(--ink2)}
+.sec-list-hd{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink2);flex-wrap:wrap}
+.sec-no{min-width:22px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums;font-weight:600;font-size:12.5px}
 .rpt-sec-list{display:flex;flex-direction:column;gap:10px;padding:10px 12px}
 .rpt-sec-card{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+.rpt-sec-card.sel{border-color:var(--blue)}
 .rpt-sec-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);flex-wrap:wrap}
 .rpt-sec-hd b{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rpt-sec-body{padding:10px 12px}
@@ -153,12 +158,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .eos-fill.low{background:var(--amber-m)}
 .eos-bench{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
 .eos-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.task-pick-hd{display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;flex-wrap:wrap}
 .task-pick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .task-opt{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer}
 .task-opt.on{border-color:var(--blue);background:var(--blue-bg)}
+.task-no{min-width:20px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums;font-weight:600;font-size:12px;padding-top:3px}
 .task-opt div{min-width:0;flex:1}
 .task-opt b{display:block;font-size:12.5px}
 .task-opt span{display:block;font-size:11.5px;color:var(--ink2);margin-top:2px}
+.slide-pv-list{display:flex;flex-direction:column;gap:8px}
+.slide-pv-card{border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden}
+.slide-pv-hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700;flex-wrap:wrap}
+.slide-pv-bd{padding:8px 12px;font-size:12.5px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
 .mail-body{max-height:48vh;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55}
 #lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
 #lock p{color:var(--mute);font-size:13px}
@@ -197,10 +208,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
   main{padding:8px 0 64px}
   .card{border-left:0;border-right:0;border-radius:0}
-  .ws-steps,.sec{background:transparent}
+  .ws-steps,.sec,.sec-list-hd{background:transparent}
   .rpt-sec-list{padding:0}
-  .rpt-sec-card{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent}
-  .rpt-sec-hd{background:transparent}
+  .rpt-sec-card,.slide-pv-card,.task-pick-hd{border-left:0;border-right:0;border-radius:0;background:transparent}
+  .rpt-sec-card{border-top:0}
+  .rpt-sec-hd,.slide-pv-hd{background:transparent}
   .drop-zone{border-left:0;border-right:0;border-radius:0;background:transparent;margin:6px 0}
   .note,.warn,.ok-banner{margin:0 10px 10px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
@@ -216,24 +228,16 @@ table.t tr.cur>td.n{color:var(--ink2)}
   table.t[data-name] thead th{display:none}
   table.t[data-name] thead th.c{display:block;width:40px;padding:6px 0;margin-left:4px}
   table.t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0;white-space:nowrap}
-  table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 74px;min-height:46px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 76px;min-height:46px;border-bottom:1px solid var(--line)}
   table.t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
   table.t[data-name] tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;order:6;color:var(--ink2);font-size:12.5px}
   table.t[data-name] tbody td:empty{display:none}
   table.t[data-name] tbody td.c{position:absolute;left:4px;top:8px;width:40px;text-align:center;order:0}
-  table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:24px;text-align:right;order:0}
+  table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:26px;text-align:right;order:0}
   table.t[data-name] tbody td.ti{order:1;flex:1 1 130px;min-width:130px;font-size:13.5px;font-weight:600;color:var(--ink)}
   table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
   table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
   table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
-  table.t.diff-t,table.t.diff-t tbody{display:block;width:100%}
-  table.t.diff-t thead{display:none}
-  table.t.diff-t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px;border-bottom:1px solid var(--line)}
-  table.t.diff-t tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--ink2)}
-  table.t.diff-t tbody td.ti{flex:1 1 140px;font-size:13.5px;color:var(--ink)}
-  table.t.diff-t tbody td[data-diff="st"]{order:2}
-  table.t.diff-t tbody td[data-diff="base"]{order:3;flex:0 0 100%}
-  table.t.diff-t tbody td[data-diff="fin"]{order:4;flex:0 0 100%;color:var(--ink)}
 }
 @media (max-width:520px){#who{display:none}}
 </style>
@@ -350,11 +354,12 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-ilteo-catalog.js?v=1"></script>
-<script src="js/pu-ilteo-intake.js?v=1"></script>
-<script src="js/pu-ilteo-report.js?v=1"></script>
-<script src="js/pu-ilteo-pptx.js?v=1"></script>
-<script src="js/pu-ilteo-view.js?v=1"></script>
+<script src="js/pu-ilteo-catalog.js?v=2"></script>
+<script src="js/pu-ilteo-intake.js?v=2"></script>
+<script src="js/pu-ilteo-report.js?v=2"></script>
+<script src="js/pu-ilteo-pptx.js?v=2"></script>
+<script src="js/pu-ilteo-pack.js?v=1"></script>
+<script src="js/pu-ilteo-view.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){
@@ -365,7 +370,8 @@ if(location.protocol==='file:'){
   document.getElementById('lockWhy').textContent='인터넷 연결이 필요합니다';
 } else {
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-  PuIlteoView.boot(firebase);
+  if(window.PuIlteoView) PuIlteoView.boot(firebase);
+  else if(window.PuGate) PuGate.show();
 }
 </script>
 </body>

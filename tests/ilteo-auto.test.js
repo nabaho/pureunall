@@ -9,10 +9,12 @@ const Cat = require('../js/pu-ilteo-catalog.js');
 const Intake = require('../js/pu-ilteo-intake.js');
 const Report = require('../js/pu-ilteo-report.js');
 const Pptx = require('../js/pu-ilteo-pptx.js');
+const Pack = require('../js/pu-ilteo-pack.js');
 const Ontology = require('../js/pu-ontology.js');
 const OntWrite = require('../js/pu-ontology-write.js');
 const DocReadServer = require('../functions/doc-read.js');
 const JSZip = require('../vendor/jszip.min.js');
+const XLSX = require('../vendor/xlsx.full.min.js');
 
 test('1. 카탈로그: 9대 분야 · 19개 공식 개선과제 · 12종 서류 · EOS 16개 문항 정합성', () => {
   assert.equal(Cat.DOMAINS.length, 9);
@@ -327,4 +329,96 @@ test('8. 비정량 엑셀(찬반투표 등) 분기 · 정량 4종 자동분류/�
   assert.ok(!dumped.includes(synTel), '연락처가 제목·첨부명 경로로 노출되면 안 된다');
   assert.ok(dumped.includes('(주)가나상생테크'), '기업 상호는 정상 표기되어야 한다');
   assert.equal(postRes.postDiff.votePct, 90);
+});
+
+test('9. 별첨 최종산출물 6종 패키지(DOCX 2종 · XLSX 6시트 · 통합 ZIP) 및 전 목록 ☐+번호·사후관리 검증', async () => {
+  /* ① 카탈로그 3개월 사후 이행관리 6대 표준 점검 항목 및 오프라인 수기 체크 연동 검증 */
+  assert.equal(Cat.FOLLOWUP_ITEMS.length, 6);
+  const manualChk = Intake.summarizeChecklistProgress(
+    'pre_mid',
+    ['wt_45day'],
+    {},
+    [],
+    { work_rules: true, labor_contract: true }
+  );
+  const rulesItem = manualChk.items.find(x => x.code === 'work_rules');
+  assert.equal(rulesItem.status, 'manual');
+  assert.equal(rulesItem.manualChecked, true);
+  assert.ok(manualChk.requiredDone >= 2);
+
+  /* ② 수기 Diff 편집(diffOverrides/customDiffRows) · 회차(rounds) · 사후점검(followupChecks) 반영 검증 */
+  const proj = {
+    id: 'ilt-pack-1',
+    companyId: 'co-pack-1',
+    companyName: '(주)가나상생패키지',
+    year: 2026,
+    level: 'deep',
+    industry: '정밀기계 제조업',
+    workerCount: 55,
+    selectedTasks: ['wt_45day', 'wg_redesign', 'sn_hr'],
+    diffOverrides: {
+      df_date: { finalVal: '2026년 12월 1일 전 부서 동시 시행' }
+    },
+    diffStatusMap: {
+      df_model: '합의 확정 ✓'
+    },
+    customDiffRows: [
+      { id: 'df_custom_shift', area: '교대조 운영 특례', baseVal: '초안 검토', finalVal: '월 단위 사전 편성 합의', status: '합의 확정 ✓' }
+    ],
+    followupChecks: {
+      fu_rules_report: true,
+      fu_time_log: true
+    }
+  };
+  const mid = Report.buildMidReport(proj, {}, [], null);
+  const fin = Report.buildFinalReport(proj, mid, {}, [], null);
+  assert.equal(fin.structured.effectiveDate, '2026년 12월 1일 전 부서 동시 시행');
+  assert.ok(fin.structured.diffObjects.some(d => d.id === 'df_custom_shift' && d.custom));
+  assert.ok(fin.structured.sinGuRows.some(r => r[0].includes('제58조')));
+
+  const pt = Report.buildPlatformTexts(proj, mid, fin, {}, []);
+  assert.match(pt.followUpText, /\[이행완료 ✓\].*개정 취업규칙/);
+  assert.match(pt.followUpText, /\[점검예정 □\]/);
+
+  /* ③ 별첨 Word(.docx) 2종, Excel(.xlsx) 6시트, 원클릭 통합 패키지(.zip) 무결성 검증 */
+  const rulesDocx = await Pack.generateWorkRulesDocxBytes(proj, mid, fin);
+  const rulesZip = await JSZip.loadAsync(rulesDocx);
+  const rulesXml = await rulesZip.file('word/document.xml').async('string');
+  assert.ok(rulesXml.includes('조문별 취업규칙 신·구 대조표'));
+  assert.ok(rulesXml.includes('2026년 12월 1일 전 부서 동시 시행'));
+  assert.ok(rulesXml.includes('제94조'));
+
+  const contDocx = await Pack.generateLaborContractDocxBytes(proj, mid, fin);
+  const contZip = await JSZip.loadAsync(contDocx);
+  const contXml = await contZip.file('word/document.xml').async('string');
+  assert.ok(contXml.includes('표준 근로계약서'));
+  assert.ok(contXml.includes('노사 서면합의서'));
+
+  const simXlsx = Pack.generateSimulationXlsxBytes(proj, mid, fin, {}, []);
+  const wb = XLSX.read(simXlsx, { type: 'array' });
+  assert.equal(wb.SheetNames.length, 6);
+  assert.ok(wb.SheetNames.includes('5_취업규칙_신구대조표'));
+  assert.ok(wb.SheetNames.includes('6_3개월_이행관리점검표'));
+
+  const fullZipBytes = await Pack.generateFullPackageZipBytes(proj, {}, [], null, null);
+  const fullZip = await JSZip.loadAsync(fullZipBytes);
+  const zipFiles = Object.keys(fullZip.files);
+  assert.equal(zipFiles.length, 6);
+  assert.ok(zipFiles.some(n => n.startsWith('01_') && n.endsWith('.pptx')));
+  assert.ok(zipFiles.some(n => n.startsWith('02_') && n.endsWith('.pptx')));
+  assert.ok(zipFiles.some(n => n.startsWith('03_') && n.endsWith('.docx')));
+  assert.ok(zipFiles.some(n => n.startsWith('04_') && n.endsWith('.docx')));
+  assert.ok(zipFiles.some(n => n.startsWith('05_') && n.endsWith('.xlsx')));
+  assert.ok(zipFiles.some(n => n.startsWith('06_') && n.endsWith('.txt')));
+
+  /* ④ 화면 전 목록 ☐ 고르기 칸 + 번호 · 끌어고르기 · CI 가드(PuGate / pdfjs no-eval) 검증 */
+  const html = fs.readFileSync(path.join(__dirname, '..', 'ilteo.html'), 'utf8');
+  const viewJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ilteo-view.js'), 'utf8');
+  assert.match(html, /pu-ilteo-pack\.js\?v=\d+/);
+  assert.match(html, /PuGate\.show\(/);
+  assert.match(viewJs, /isEvalSupported:\s*false/);
+  assert.match(viewJs, /function bindDragSel\(/);
+  for (const tbl of ['projects', 'discover', 'preChk', 'preMails', 'preCards', 'rounds', 'midSecs', 'postChk', 'postMails', 'diffRows', 'deliverables', 'finalSecs', 'followups']) {
+    assert.ok(viewJs.includes(`'${tbl}'`), `${tbl} 목록이 ☐+번호 선택 체계를 갖추어야 한다`);
+  }
 });

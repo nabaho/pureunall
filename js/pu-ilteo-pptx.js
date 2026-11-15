@@ -329,7 +329,7 @@
         var boxes = [
           ['Ⅰ. 프로젝트 개요', '1. 추진 배경·목적 및 일터혁신 디자인팀 편성\n2. 전체 추진일정 및 회차별 수행경과'],
           ['Ⅱ-1. 기업 일반현황', '3. 조직·인력 구성 및 최근 3개년 입·퇴사 추이 분석'],
-          ['Ⅱ-2. 주요 진단 이슈', '4. 근태·임금 비식별 데이터 및 규정 법정 점검\n5. 계층별 심층 인터뷰 및 전직원 EOS 설문 격차 분석'],
+          ['Ⅱ-2. 주요 진단 이슈', '4. 근태·임금 비식별 데이터 및 규정 법정 점검\n5. 계층별 심층 인터뷰 및 전 근로자 EOS 설문 격차 분석'],
           ['Ⅱ-3. 과제별 추진방향', '6. 선택 개선과제별 목표·설계방향 및 후속 협의 사항']
         ];
         return boxes.map(function (b, i) {
@@ -446,7 +446,7 @@
 
     /* 9. EOS 전직원 조직진단 막대 차트 */
     specs.push({
-      part: 'Ⅱ-2. 주요 진단 이슈', title: '6. 전직원 조직진단(EOS) 5대 영역 점수 및 준거집단 격차',
+      part: 'Ⅱ-2. 주요 진단 이슈', title: '6-1. 전 근로자 조직진단(EOS) 5대 영역 점수 및 준거집단 격차',
       body: function (nid) {
         var es = st.eosStats;
         var hdrTxt = es
@@ -463,6 +463,29 @@
         return shapes.concat(buildEosBarShapes(nid, st.eosAreaBars, 2.15));
       }
     });
+
+    /* 10. EOS 16개 세부영역 준거집단 격차 상세 대조표 */
+    var itemBars = Array.isArray(st.eosItemBars) ? st.eosItemBars : [];
+    if (itemBars.length) {
+      specs.push({
+        part: 'Ⅱ-2. 주요 진단 이슈', title: '6-2. 전 근로자 조직진단(EOS) 16개 세부영역 준거집단 격차 상세',
+        body: function (nid) {
+          function fmtItemRow(it, no) {
+            var g = Number(it.gap || 0);
+            return [String(no), it.label, Number(it.score || 0).toFixed(2), Number(it.bench || 0).toFixed(2), (g >= 0 ? '+' : '') + g.toFixed(2)];
+          }
+          var leftRows = itemBars.slice(0, 8).map(function (it, i) { return fmtItemRow(it, i + 1); });
+          var rightRows = itemBars.slice(8, 16).map(function (it, i) { return fmtItemRow(it, i + 9); });
+          var shapes = [
+            tableXml(nid(), 'EosItemLeft', 0.50, 1.12, 6.0, ['번호', '세부 진단 문항 (1~8)', '점수', '준거', '격차'], leftRows, [0.7, 3.0, 0.75, 0.75, 0.8], { bodyRowIn: 0.58, fontSize: 9.5, headFontSize: 10 })
+          ];
+          if (rightRows.length) {
+            shapes.push(tableXml(nid(), 'EosItemRight', 6.80, 1.12, 6.0, ['번호', '세부 진단 문항 (9~16)', '점수', '준거', '격차'], rightRows, [0.7, 3.0, 0.75, 0.75, 0.8], { bodyRowIn: 0.58, fontSize: 9.5, headFontSize: 10 }));
+          }
+          return shapes;
+        }
+      });
+    }
 
     /* 10..N. 개선과제별 추진 방향 카드 (과제당 1장) */
     taskCards.forEach(function (tc) {
@@ -532,8 +555,8 @@
 
     var nonCoverTotal = specs.length - 1;
     return specs.map(function (sp, idx) {
-      if (sp.kind === 'cover') return { title: sp.title, xml: sp.render() };
-      return { title: sp.title, xml: makeStandardSlide(sp.part, sp.title, idx, nonCoverTotal, sp.body) };
+      var xml = sp.kind === 'cover' ? sp.render() : makeStandardSlide(sp.part, sp.title, idx, nonCoverTotal, sp.body);
+      return { part: sp.part || 'COVER', title: sp.title, xml: xml, previewLines: extractSlidePreviewLines(xml) };
     });
   }
 
@@ -757,11 +780,44 @@
       }
     });
 
+    /* 부록: 최종 제출 산출물 패키지 총괄 목록 */
+    specs.push({
+      part: '부록 (APPENDIX)', title: '별첨 최종산출물 패키지 구성 및 사후관리 안내',
+      body: function (nid) {
+        return [
+          tableXml(nid(), 'PackTbl', 0.55, 1.18, 12.2,
+            ['번호', '제출 산출물 명칭', '파일 형식', '활용처 및 비고'],
+            [
+              ['01', coName + ' 일터혁신 상생컨설팅 중간보고서', '.pptx', '현황진단·인터뷰·EOS 16개 영역 기준선 보존본'],
+              ['02', coName + ' 일터혁신 상생컨설팅 최종 결과보고서', '.pptx', '후속 협의 Diff 반영 최종 발표·제출용 보고서'],
+              ['03', '개정 취업규칙(안) 및 조문별 신구대조표', '.docx', '근로기준법 제94조 변경신고 및 사내 게시용'],
+              ['04', '개정 표준 근로계약서 및 근로자대표 서면합의·동의서 양식', '.docx', '개별 근로계약 갱신 및 과반수 동의 편철용'],
+              ['05', '통상시급 모의계산 · EOS 진단 · 3개월 이행점검 통합문서', '.xlsx', '인사팀 실무 운영 및 사후 모니터링 관리대장'],
+              ['06', '노사발전재단 플랫폼 등록 문안 3종 (계획·회차·이행관리)', '.txt', '재단 시스템 수행보고 및 이행결과표 입력용']
+            ],
+            [0.9, 4.8, 1.4, 5.1], { bodyRowIn: 0.65, fontSize: 10.5 })
+        ];
+      }
+    });
+
     var nonCoverTotal = specs.length - 1;
     return specs.map(function (sp, idx) {
-      if (sp.kind === 'cover') return { title: sp.title, xml: sp.render() };
-      return { title: sp.title, xml: makeStandardSlide(sp.part, sp.title, idx, nonCoverTotal, sp.body) };
+      var xml = sp.kind === 'cover' ? sp.render() : makeStandardSlide(sp.part, sp.title, idx, nonCoverTotal, sp.body);
+      return { part: sp.part || 'COVER', title: sp.title, xml: xml, previewLines: extractSlidePreviewLines(xml) };
     });
+  }
+
+  function extractSlidePreviewLines(xml) {
+    var matches = String(xml || '').match(/<a:t>([\s\S]*?)<\/a:t>/g) || [];
+    var out = [];
+    matches.forEach(function (m) {
+      var t = m.replace(/<\/?a:t>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .trim();
+      if (!t || /^푸른노무법인 · 노사발전재단/.test(t) || /^\d+\s*\/\s*\d+$/.test(t)) return;
+      if (out.indexOf(t) < 0 && out.length < 14) out.push(t);
+    });
+    return out;
   }
 
   /* ══ 4. OOXML 패키지(.pptx ZIP) 조립기 ═════════════════════════════════ */

@@ -5,7 +5,7 @@
  *   1. 노사발전재단 2026년 일터혁신 상생컨설팅 9대 분야 · 19개 공식 개선과제 사전 정의
  *   2. 6단계 수행 생애주기 및 재단 필수 인정 기준(디자인팀·사전설문·회차수행·활동비) 상수 정의
  *   3. 수신·첨부 서류 12종 분류 체계 및 선택 과제별 착수 기초자료(pre_mid)·중간보고 이후 후속자료(post_mid) 체크리스트 도출
- *   4. 전직원 조직진단(EOS) 5대 대영역 · 16개 세부영역 표준 기준표 및 업종별 준거집단 평균치 제공
+ *   4. 전 근로자 조직진단(EOS) 5대 대영역 · 16개 세부영역 표준 기준표 및 업종별 준거집단 평균치 제공
  *   5. 중간보고서 · 최종보고서(결과보고) · 플랫폼 입력 문안 3종의 표준 목차 스키마 정의
  */
 (function (root, factory) {
@@ -40,7 +40,7 @@
   /* 6단계 표준 수행 생애주기 */
   var STAGES = [
     { code: 'kickoff',  order: 1, name: '착수·기초자료 수집',   short: '착수·기초수집', phase: 'pre_mid',  desc: '참여안내서·협약, 디자인팀 등록(4인+), 기초자료 메일 수신' },
-    { code: 'diag',     order: 2, name: '현황진단·설문·인터뷰', short: '현황진단',      phase: 'pre_mid',  desc: '규정·근태·임금 교차분석, 전직원 EOS 설문, 계층별 인터뷰' },
+    { code: 'diag',     order: 2, name: '현황진단·설문·인터뷰', short: '현황진단',      phase: 'pre_mid',  desc: '규정·근태·임금 교차분석, 전 근로자 EOS 설문, 계층별 인터뷰' },
     { code: 'mid_rpt',  order: 3, name: '중간보고·기준선 확정', short: '중간보고',      phase: 'pre_mid',  desc: '통합진단·이슈·추진방향 중간보고서(PPT) 발표 및 기준선 확정' },
     { code: 'design',   order: 4, name: '제도설계·후속메일 협의', short: '후속협의·설계', phase: 'post_mid', desc: '디자인팀 피드백 메일 반영, 임금·근로시간 시뮬레이션, 근로자 의견수렴·투표' },
     { code: 'final_rpt', order: 5, name: '최종 결과보고·제출',  short: '결과보고',      phase: 'post_mid', desc: '최종보고서(PPT)·신구대조표 완성, 플랫폼 수행보고·최종평가·활동비 정산' },
@@ -219,7 +219,7 @@
       keywords: ['노사협의회', '협의회규정', '정기회의', '근로자위원', '고충처리', '단체협약', '노사합의']
     },
     {
-      code: 'eos_survey', name: '전직원 조직진단(EOS) 설문 결과', short: 'EOS 설문결과',
+      code: 'eos_survey', name: '전 근로자 조직진단(EOS) 설문 결과', short: 'EOS 설문결과',
       defaultPhase: 'pre_mid', track: 'quant', govStepKey: '',
       keywords: ['설문', '조직진단', 'eos', '응답률', '인식조사', '만족도조사', '사전설문']
     },
@@ -297,7 +297,7 @@
     { key: 'company_stat',  part: 'Ⅱ-1. 기업 현황',     title: '3. 기업 일반현황 및 인력구조·3개년 입퇴사 분석' },
     { key: 'policy_issues', part: 'Ⅱ-2. 주요 이슈 도출', title: '4. 제도·규정 및 근태·임금 데이터 교차진단 이슈' },
     { key: 'interviews',    part: 'Ⅱ-2. 주요 이슈 도출', title: '5. 계층별(경영진·인사·근로자) 인터뷰 진단 결과' },
-    { key: 'eos_diag',      part: 'Ⅱ-2. 주요 이슈 도출', title: '6. 전직원 조직진단(EOS) 설문 분석 및 준거집단 격차' },
+    { key: 'eos_diag',      part: 'Ⅱ-2. 주요 이슈 도출', title: '6. 전 근로자 조직진단(EOS) 설문 분석 및 준거집단 격차' },
     { key: 'direction',     part: 'Ⅱ-3. 추진 방향',     title: '7. 선택 개선과제별 추진목표·설계방향 및 기대효과' }
   ];
 
@@ -310,6 +310,16 @@
     { key: 'consent_rule',  part: 'Ⅲ. 과제별 제도설계', title: '5. 근로자 의견수렴·찬반투표 결과 및 규정 신구대조 핵심' },
     { key: 'roadmap',       part: 'Ⅳ. 이행 로드맵',     title: '6. 단·중·장기 이행 로드맵 및 향후 3개월 실행계획' },
     { key: 'gov_support',   part: 'Ⅳ. 이행 로드맵',     title: '7. 연계 정부지원사업 검토 및 이행 리스크 관리방안' }
+  ];
+
+  /* 종료 후 3개월 사후 이행관리 6대 표준 점검 항목 (6단계 생애주기 완결용) */
+  var FOLLOWUP_ITEMS = [
+    { code: 'fu_rules_report',   month: 'M+1개월', title: '개정 취업규칙 근로자 과반수 동의서 편철 및 관할 노동관서 변경신고 접수', proof: '취업규칙 변경신고 접수증 · 동의명부' },
+    { code: 'fu_contract_sign',  month: 'M+1개월', title: '개정 표준 근로계약서 교부 및 근로자대표 서면합의서 체결 완료', proof: '개정 근로계약서 · 서면합의서 사본' },
+    { code: 'fu_visit_1',        month: 'M+1개월 (1차 점검)', title: '1차 사후 이행지원 점검 — 전자 출퇴근 기록 및 연장근로 사전승인제 가동 확인', proof: '1차 이행지원 자문일지 · 근태기록부' },
+    { code: 'fu_usage_check',    month: 'M+2개월', title: '부서별 단축근무·유연근무 실제 소진율 및 초과근로 편차 중간 모니터링', proof: '월별 근무시간·연차 점검표' },
+    { code: 'fu_visit_2',        month: 'M+3개월 (2차 점검)', title: '2차 사후 이행지원 점검 — 개정 임금명세서 산출식 교부 및 근로자 체감 만족도 확인', proof: '2차 이행지원 자문일지 · 임금명세 양식' },
+    { code: 'fu_platform_close', month: 'M+3개월 (종결)', title: '노사발전재단 플랫폼 이행관리(2회)·이행결과표 등록 및 연계 정부지원금 신청 안내', proof: '플랫폼 이행결과표 등록 완료 확인' }
   ];
 
   var taskByCode = {};
@@ -366,7 +376,7 @@
       guide_agree: { required: true, reason: '착수 2주 내 참여안내서 서명·협약 및 디자인팀(노사 4인+) 편성 확인' },
       org_roster:  { required: true, reason: '기업 현황 및 직군·직급·연령·3개년 입퇴사 인력구조 분석 필수' },
       work_rules:  { required: true, reason: '현행 취업규칙·제규정 적법성 및 제도 운영 실태 교차진단 필수' },
-      eos_survey:  { required: true, reason: '노사발전재단 전직원 조직진단(EOS) 응답률 충족 및 16개 영역 격차 분석' }
+      eos_survey:  { required: true, reason: '노사발전재단 전 근로자 조직진단(EOS) 응답률 충족 및 16개 영역 격차 분석' }
     };
     codes.forEach(function (c) {
       var t = getTask(c);
@@ -454,6 +464,7 @@
     EOS_AREAS: EOS_AREAS,
     MID_SECTIONS: MID_SECTIONS,
     FINAL_SECTIONS: FINAL_SECTIONS,
+    FOLLOWUP_ITEMS: FOLLOWUP_ITEMS,
     getTask: getTask,
     getDomain: getDomain,
     getDocKind: getDocKind,

@@ -361,8 +361,9 @@
     };
   }
 
-  function summarizeChecklistProgress(phase, selectedTasks, intakeMap, scannedMails) {
+  function summarizeChecklistProgress(phase, selectedTasks, intakeMap, scannedMails, manualChecks) {
     var list = Cat.checklistFor(phase, selectedTasks);
+    var manMap = (manualChecks && typeof manualChecks === 'object') ? manualChecks : {};
     var activeIntakes = Object.keys(intakeMap || {}).map(function (k) { return intakeMap[k]; })
       .filter(function (r) { return r && !r._deleted && (!r.phase || r.phase === phase); });
     var mailHits = (Array.isArray(scannedMails) ? scannedMails : []).filter(function (m) {
@@ -373,9 +374,14 @@
       var cards = activeIntakes.filter(function (r) { return r.docKind === item.docKind; });
       var mails = mailHits.filter(function (m) { return m.docKind === item.docKind; });
       var analyzedCount = cards.filter(function (r) { return !!r.analyzedAt; }).length;
-      var status = analyzedCount > 0 ? 'analyzed' : (cards.length > 0 || mails.length > 0 ? 'received' : 'missing');
+      var manualDone = !!manMap[item.docKind];
+      var status = analyzedCount > 0
+        ? 'analyzed'
+        : (manualDone ? 'manual' : (cards.length > 0 || mails.length > 0 ? 'received' : 'missing'));
       return Object.assign({}, item, {
+        code: item.docKind,
         status: status,
+        manualChecked: manualDone,
         cardCount: cards.length,
         mailCount: mails.length,
         analyzedCount: analyzedCount
@@ -506,7 +512,7 @@
       return {
         ok: false,
         nonQuant: false,
-        error: '민감 인사·급여 열이 포함되어 있으나 정량 서류 종류(인력·근태·임금·EOS) 필수 열 구성이 불완전합니다. 서류 종류와 열 머리글을 확인해 주세요.'
+        error: '민감 인사·임금 열이 포함되어 있으나 정량 서류 종류(인력·근태·임금·EOS) 필수 열 구성이 불완전합니다. 서류 종류와 열 머리글을 확인해 주세요.'
       };
     }
 
@@ -950,7 +956,7 @@
     var rateMet = responseRatePct > 0 ? responseRatePct >= levelInfo.eosMinPct : null;
 
     var summaryLines = [
-      '전직원 EOS 조직진단 종합 평균 ' + (totalAvg ? totalAvg.toFixed(2) + '점 / 5.00점' : '점수 확인 필요')
+      '전 근로자 EOS 조직진단 종합 평균 ' + (totalAvg ? totalAvg.toFixed(2) + '점 / 5.00점' : '점수 확인 필요')
         + (respondentCount ? ' · 응답 ' + respondentCount + '명' + (targetWorkers ? ' (응답률 ' + responseRatePct + '%, 기준 ' + levelInfo.eosMinPct + '% ' + (rateMet ? '충족 ✓' : '미달 ⚠') + ')' : '') : ''),
       weakest.length
         ? ('준거집단 대비 집중 개선 필요 항목: ' + weakest.map(function (w) {
