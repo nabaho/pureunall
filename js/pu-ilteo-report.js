@@ -169,6 +169,23 @@
     return Intake.unmaskNames(s, [{ as: '[해당 기업]', v: str(coName) }]);
   }
 
+  /* 한글 어절 중간 절단('정착되도록' → '정착되도')을 방지하는 공백 경계 절단 도우미 */
+  function safeSliceHead(txt, maxLen) {
+    var s = String(txt == null ? '' : txt);
+    if (s.length <= maxLen) return s;
+    var cut = s.slice(0, maxLen);
+    var wsIdx = cut.search(/\s+\S*$/);
+    return (wsIdx >= Math.floor(maxLen * 0.7) ? cut.slice(0, wsIdx) : cut).trim();
+  }
+
+  function safeSliceTail(txt, maxLen) {
+    var s = String(txt == null ? '' : txt);
+    if (s.length <= maxLen) return s;
+    var cut = s.slice(s.length - maxLen);
+    var wsMatch = /^\S*\s+/.exec(cut);
+    return (wsMatch && wsMatch[0].length <= Math.floor(maxLen * 0.3) ? cut.slice(wsMatch[0].length) : cut).trim();
+  }
+
   /* ══ 2. 회차 수행 내역 정규화 및 인정 기준 신호등 점검 ══════════════════ */
   function normalizeRounds(project, schedRounds, mergedDiff) {
     var list = Array.isArray(schedRounds) ? schedRounds.slice() : [];
@@ -309,14 +326,14 @@
       var hl = (md.summaryLines || []).map(function (l) { return '  · ' + restoreCorpPlaceholder(l, coName); }).join('\n');
       return '■ 수발신 중간보고 원문 [' + restoreCorpPlaceholder(md.title, coName) + ']\n'
         + (hl ? hl + '\n' : '')
-        + (body ? body.slice(0, 1800) : '');
+        + (body ? safeSliceHead(body, 1800) : '');
     }).filter(Boolean);
 
     var preDocSnippets = sum.preExcerpts.slice(0, 4).map(function (ex) {
       var dkObj = Cat.getDocKind(ex.docKind);
       var kLabel = dkObj ? dkObj.short : ex.docKind;
       return '• [' + kLabel + ' | ' + restoreCorpPlaceholder(ex.title, coName) + '] '
-        + restoreCorpPlaceholder(ex.excerpt, coName).replace(/\s+/g, ' ').slice(0, 380);
+        + safeSliceHead(restoreCorpPlaceholder(ex.excerpt, coName).replace(/\s+/g, ' '), 380);
     });
 
     /* ① 추진 배경·체계 */
@@ -674,13 +691,25 @@
       var hl = (fd.summaryLines || []).map(function (l) { return '  · ' + restoreCorpPlaceholder(l, coName); }).join('\n');
       return '■ 수발신 최종·결과보고서 원문 [' + restoreCorpPlaceholder(fd.title, coName) + ']\n'
         + (hl ? hl + '\n' : '')
-        + (body ? body.slice(0, 2200) : '');
+        + (body ? safeSliceHead(body, 2200) : '');
     }).filter(Boolean);
+    if (!finalOrigNotes.length && Array.isArray(sum.midReportDocs)) {
+      finalOrigNotes = sum.midReportDocs.filter(function (md) {
+        return md && /통합\s*진단|종합\s*보고|결과\s*보고/.test(str(md.title));
+      }).map(function (md) {
+        var body = restoreCorpPlaceholder(md.excerpt, coName);
+        var hl = (md.summaryLines || []).map(function (l) { return '  · ' + restoreCorpPlaceholder(l, coName); }).join('\n');
+        var tail = body ? safeSliceTail(body, 2200) : '';
+        return '■ 통합진단·종합보고서 원문 [' + restoreCorpPlaceholder(md.title, coName) + ']\n'
+          + (hl ? hl + '\n' : '')
+          + tail;
+      }).filter(Boolean);
+    }
     var postDocSnippets = sum.postExcerpts.slice(0, 4).map(function (ex) {
       var dkObj = Cat.getDocKind(ex.docKind);
       var kLabel = dkObj ? dkObj.short : ex.docKind;
       return '• [' + kLabel + ' | ' + restoreCorpPlaceholder(ex.title, coName) + '] '
-        + restoreCorpPlaceholder(ex.excerpt, coName).replace(/\s+/g, ' ').slice(0, 380);
+        + safeSliceHead(restoreCorpPlaceholder(ex.excerpt, coName).replace(/\s+/g, ' '), 380);
     });
 
     /* ① 수행 개요·추진 경과 및 핵심 성과 요약 */
@@ -694,7 +723,7 @@
       '• 임금·보상 연계 합의: ' + wageAgree,
       '• 적용 범위 및 시행 시기: ' + targetScope + ' / ' + effDate,
       '• 노사 수용성 확보: ' + voteSummaryText,
-      finalOrigNotes.length ? ('\n3) 기수행 최종·결과보고서 원문 핵심 요약\n' + finalOrigNotes[0].slice(0, 1200)) : ''
+      finalOrigNotes.length ? ('\n3) 기수행 최종·결과보고서 원문 핵심 요약\n' + safeSliceHead(finalOrigNotes[0], 1200)) : ''
     ].filter(Boolean).join('\n');
 
     /* ② 중간보고 진단 기준선 및 핵심 개선과제 연결 */
