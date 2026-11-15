@@ -40,6 +40,7 @@ const ar1 = Object.assign(meta('ARtest2019a', 'DeungiArchive'), {
     fake_file_id_0001: { fileId: 'fake_file_id_0001', name: '1. 노무법인 정관 변경인가 신청서(점검용 아주 긴 파일 이름 가나다라마바사아자차카타파하).hwp', kind: 'apply', date: '2019-07-17', note: '', masked: false, addedAt: T0 },
     fake_file_id_0002: { fileId: 'fake_file_id_0002', name: '4. 총사원 동의서_주민번호가림.hwp', kind: 'consent', date: '2019-07-30', note: '', masked: true, addedAt: T0 },
     fake_file_id_0003: { fileId: 'fake_file_id_0003', name: '정관변경인가증.pdf', kind: 'approval', date: '2019-07-31', note: '', masked: false, addedAt: T0 },
+    fake_file_id_0004: { fileId: 'fake_file_id_0004', name: '필요서류 안내(점검).png', kind: 'guide', date: '2019-07-10', note: '', masked: false, addedAt: T0 },
   },
 });
 const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-12 정관변경(점검)', at: '2017-12-06', summary: '', files: {} });
@@ -55,6 +56,6 @@ module.exports = {
     { name: 'base', run: async (p) => { await p.click('#tabs button[data-tab=base]'); } },
     { name: 'hist', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); } },
     /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
-    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); await p.evaluate(() => { PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf] [data-act=arcView]'); } },
+    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } },
   ],
 };

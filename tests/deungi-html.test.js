@@ -240,7 +240,15 @@ test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음
   assert.match(본문, /r\.classList\.toggle\('cur', yes\)/);
   /* 칸 받기·닫기·Esc */
   assert.match(본문, /act==='sideDl'\)\{ if\(SIDE\) arcDownload\(\[\{ ev:SIDE\.ev, fid:SIDE\.fid \}\]\); \}/);
-  assert.match(본문, /if\(ev\.key==='Escape' && \(ov \|\| sd\.contains\(document\.activeElement\)\)\)\{ ev\.preventDefault\(\); sideClose\(\); return; \}/);
+  assert.match(본문, /if\(SIDE && sd\)\{\n    var ov=sideOverlay\(\);\n    if\(ev\.key==='Escape'\)\{ ev\.preventDefault\(\); sideClose\(\); return; \}/);
+  /* 외부 검토 2026-11-15 — 좁아진 본문은 카드 표 · 덮는 모양은 뒤를 inert · 빠진 파일은 칸 닫기 · 너비가 바뀔 때만 새 자리에 다시 그림 · 뒤로가기 */
+  assert.match(html, /body\.slim \.t thead\{display:none\}/);
+  assert.match(본문, /document\.body\.classList\.toggle\('slim', !!SIDE && !ov && document\.documentElement\.clientWidth-w < 820\)/);
+  assert.match(본문, /if\(e\) e\.inert=!!\(SIDE && ov\)/);
+  assert.match(본문, /if\(!f \|\| i<0\)\{ sideClose\(\);/);
+  assert.match(본문, /\$\('histBox'\)\.innerHTML=drawArchive\(\)\+h;\n  sideMark\(\); sideHead\(\);/);
+  assert.match(본문, /if\(!w \|\| Math\.abs\(w-SIDE_RW\)<8\) return;/);
+  assert.match(html, /if\(window\.SIDE && window\.sideClose\)\{ sideClose\(\); return true; \}/);
   /* 덮는 창 닫기가 보기 칸 주소를 지우지 않는다 */
   assert.match(본문, /function closeModal\(\)\{ var m=\$\('modal'\);/);
   /* 너비는 이 브라우저에만(lsSet) — 끌기·←/→ */

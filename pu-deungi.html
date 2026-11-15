@@ -170,12 +170,32 @@ body.withSide main{margin-right:var(--sideW,46vw)}
 #side .sdh{display:flex;align-items:center;gap:6px;padding:8px 10px 6px 14px;flex-wrap:wrap}
 #side .sdh b{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
 #side .sds{padding:0 14px 7px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--line)}
-#spv{flex:1;min-height:0;overflow:auto;background:var(--line)}
+#spv{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;background:var(--line)}
 #spv .pvi.pdf{height:100%}
 #spv iframe{display:block;width:100%;height:100%;border:0;background:var(--card)}
 #spv img{display:block;max-width:100%;margin:0 auto}
 #side .grip{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:1;border-radius:4px}
-#side .grip:hover,#side .grip:focus{background:var(--blue-line);outline:none}
+#side .grip:hover{background:var(--blue-line)}
+#side .grip:focus-visible{background:var(--blue-line);outline:2px solid var(--blue);outline-offset:-1px}
+#spv:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+/* 칸을 열어 왼쪽 본문이 820px 보다 좁아지면(body.slim — sideFit 이 잰다) 폰처럼 표를 줄마다 카드로(외부 검토 2026-11-15: 종류 칸이 짓눌리고 보기 단추가 잘렸다) */
+body.slim .two{grid-template-columns:1fr}
+body.slim .t thead{display:none}
+body.slim .t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+body.slim .t tbody td{border:none;padding:0;max-width:100%;white-space:normal}
+body.slim .t tbody td.c,body.slim .t tbody td.n{width:auto;flex:0 0 auto}
+body.slim .t tbody td.tk{cursor:pointer;padding:8px}
+body.slim .t tbody td.c{padding:8px}
+body.slim .t tbody td.ti{flex:1 1 60%;font-weight:600;white-space:nowrap}
+body.slim .t tbody td.nw{flex:1 1 100%;white-space:nowrap}
+body.slim .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
+body.slim .t tbody td[data-l]::before{content:attr(data-l) ' ';color:var(--mute);font-size:12px}
+body.slim .t tbody td input:not([type=checkbox]),body.slim .t tbody td select{width:100%}
+body.slim .t tbody td.inp{flex:1 1 100%}
+body.slim .chg{margin:8px 6px}
+body.slim .tor input,body.slim .tor select{width:100%}
+body.slim .tiles{grid-template-columns:1fr 1fr}
+body.slim .wiz button{flex:1 1 calc(50% - 6px)}
 @media (max-width:1079px){
   #side.on{top:0;left:0;width:auto;z-index:45;border-left:none;box-shadow:none}
   body.withSide main{margin-right:0}
@@ -275,7 +295,7 @@ body.withSide main{margin-right:var(--sideW,46vw)}
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
 <script src="js/pu-back.js?v=5"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ if(PuBack.closeTopVisible('#modal')) return true; if(window.SIDE && window.sideClose){ sideClose(); return true; } return false; }); }catch(e){}</script>
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -296,7 +316,7 @@ var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
 /* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 */
 var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
 /* 오른쪽 보기 칸 — 지금 보는 파일 {ev,fid} · 한글 바이트(너비가 바뀌면 다시 그림) · 닫으면 돌아갈 자리 · 다시 그리기 타이머 */
-var SIDE=null, PV_BYTES=null, SIDE_BACK=null, SIDE_T=null;
+var SIDE=null, PV_BYTES=null, SIDE_BACK=null, SIDE_T=null, SIDE_RW=0;
 var SAVE={ t:null, busy:false, dirty:false, err:'', at:0 };
 
 function $(id){ return document.getElementById(id); }
@@ -949,8 +969,12 @@ function sideFit(){
   var root=document.documentElement, hd=$('head'), s=$('side'), w=sideW();
   root.style.setProperty('--headH', (hd?Math.round(hd.getBoundingClientRect().height):0)+'px');
   root.style.setProperty('--sideW', w+'px');
+  var ov=sideOverlay();
+  document.body.classList.toggle('slim', !!SIDE && !ov && document.documentElement.clientWidth-w < 820);
+  /* 덮는 모양일 때 가려진 머리·본문은 보조기술도 못 건드리게(보안 검토 2026-11-15) */
+  [hd, $('app')].forEach(function(e){ if(e) e.inert=!!(SIDE && ov); });
   if(!s||!SIDE) return;
-  var ov=sideOverlay(), gr=s.querySelector('[data-grip]');
+  var gr=s.querySelector('[data-grip]');
   s.setAttribute('role', ov?'dialog':'complementary'); if(ov) s.setAttribute('aria-modal','true'); else s.removeAttribute('aria-modal');
   if(gr){ gr.setAttribute('aria-valuenow', String(w)); gr.setAttribute('aria-valuemax', String(Math.max(SIDE_MIN, window.innerWidth-SIDE_KEEP))); }
 }
@@ -958,9 +982,11 @@ function sideFit(){
 function sideHead(){
   if(!SIDE||!$('sdName')) return;
   var a=arcById(SIDE.ev), f=a&&a.files[SIDE.fid], fl=arcFlat(), i=sideIdx(fl), k=f&&C.ARC_KINDS.filter(function(o){ return o[0]===f.kind; })[0];
-  $('sdName').textContent='👁 '+(f?f.name:'(묶음에서 빠진 파일)'); $('sdName').title=f?f.name:'';
+  /* 보던 파일이 묶음에서 빠졌다(묶음에서 빼기·다른 창) — 남은 바이트·주소와 함께 칸을 닫는다(외부 검토 2026-11-15) */
+  if(!f || i<0){ sideClose(); toast('보던 파일이 묶음에서 빠져 보기 칸을 닫았습니다', 3500); return; }
+  $('sdName').textContent='👁 '+f.name; $('sdName').title=f.name; $('sdDl').setAttribute('aria-label', f.name+' 받기');
   $('sdPos').textContent=(i>=0?(i+1):'—')+' / '+fl.length;
-  $('sdSub').textContent=a ? [((a.at||'')+' '+(a.title||'')).trim(), k?k[1]:'', f&&f.date?f.date:''].filter(Boolean).join(' · ') : '';
+  $('sdSub').textContent=[((a.at||'')+' '+(a.title||'')).trim(), k?k[1]:'', f.date||'', extOf(f.name)==='pdf'?'PDF 안을 누른 뒤에는 Esc 대신 ✕ 닫기':''].filter(Boolean).join(' · ');
   var ae=document.activeElement, pv=$('sdPrev'), nx=$('sdNext');
   pv.disabled=i<=0; nx.disabled=i<0||i>=fl.length-1;
   if(ae && ae.disabled && (ae===pv||ae===nx)){ var o=ae===pv?nx:pv; (o.disabled?$('sdClose'):o).focus(); }
@@ -981,8 +1007,8 @@ function arcView(evId, fid){
   if(!was) SIDE_BACK=document.activeElement;
   SIDE={ ev:evId, fid:fid };
   if(!$('spv')) s.innerHTML='<div class="grip" data-grip role="separator" aria-orientation="vertical" aria-label="보기 칸 너비 — 끌거나 ←·→" aria-valuemin="'+SIDE_MIN+'" tabindex="0"></div>'+
-    '<div class="sdh"><b id="sdName"></b><span class="chip m" id="sdPos"></span><button class="sm" id="sdPrev" data-act="sideNav" data-d="-1">◀ 이전</button><button class="sm" id="sdNext" data-act="sideNav" data-d="1">다음 ▶</button><button class="sm" data-act="sideDl">⬇ 받기</button><button class="sm" id="sdClose" data-act="sideClose" aria-label="보기 칸 닫기">✕ 닫기</button></div>'+
-    '<div class="sds" id="sdSub"></div><div id="spv"></div>';
+    '<div class="sdh"><b id="sdName"></b><span class="chip m" id="sdPos"></span><button class="sm" id="sdPrev" data-act="sideNav" data-d="-1">◀ 이전</button><button class="sm" id="sdNext" data-act="sideNav" data-d="1">다음 ▶</button><button class="sm" id="sdDl" data-act="sideDl">⬇ 받기</button><button class="sm" id="sdClose" data-act="sideClose" aria-label="보기 칸 닫기">✕ 닫기</button></div>'+
+    '<div class="sds" id="sdSub"></div><div id="spv" tabindex="0" aria-label="미리보기 — 화살표·PageDown 으로 넘겨 보기"></div>';
   s.classList.add('on'); document.body.classList.add('withSide'); sideFit(); sideHead(); sideMark();
   if(!was && sideOverlay()) setTimeout(function(){ var b=$('sdClose'); if(b) b.focus(); }, 0);
   arcRevoke();
@@ -991,7 +1017,7 @@ function arcView(evId, fid){
   var box=$('spv').firstChild, g=GEN, ext=extOf(f.name), seq=PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && box.isConnected; };
   PuOfficeStore.secretBlob(fid).then(function(blob){
     if(!live()) return;
-    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; PV_BYTES={ u8:new Uint8Array(b), name:f.name }; return PureunHwp.renderPreview(box, PV_BYTES.u8, f.name); });
+    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; PV_BYTES={ u8:new Uint8Array(b), name:f.name }; SIDE_RW=$('spv').clientWidth; return PureunHwp.renderPreview(box, PV_BYTES.u8, f.name); });
     if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); box.className='pvi pdf'; box.innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'"></iframe>'; }
     else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(blob); box.innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'">'; }
     else box.innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
@@ -1006,14 +1032,17 @@ function sideClose(){
   /* 초점은 마지막에 본 파일 줄의 «보기» 단추로(목록을 다시 그렸으면 처음 누른 단추가 없다) */
   var had=!!SIDE, row=sideMark(), rb=row&&row.offsetParent?row.querySelector('[data-act=arcView]'):null, back=rb||SIDE_BACK; arcRevoke(); SIDE=null; SIDE_BACK=null;
   var s=$('side'); if(s){ s.classList.remove('on'); s.innerHTML=''; s.setAttribute('role','complementary'); s.removeAttribute('aria-modal'); }
-  document.body.classList.remove('withSide'); sideMark();
+  document.body.classList.remove('withSide'); document.body.classList.remove('slim'); [$('head'), $('app')].forEach(function(e){ if(e) e.inert=false; }); sideMark();
   if(had && back && back.isConnected && back.focus){ try{ back.focus(); }catch(e){} }
 }
 /* 한글 쪽은 칸 너비에 맞춰 그린다 — 너비가 바뀌면 잠시 뒤 같은 바이트로 다시 그린다(다시 받지 않는다) */
 function sideRedraw(){
   clearTimeout(SIDE_T);
-  SIDE_T=setTimeout(function(){ SIDE_T=null; var b=PV_BYTES, box=$('spv')&&$('spv').firstChild; if(!SIDE||!b||!box) return;
-    PureunHwp.renderPreview(box, b.u8, b.name).catch(function(){}); }, 250);
+  SIDE_T=setTimeout(function(){ SIDE_T=null; var b=PV_BYTES, spv=$('spv'); if(!SIDE||!b||!spv) return;
+    var w=spv.clientWidth; if(!w || Math.abs(w-SIDE_RW)<8) return;   /* 높이만 바뀐 것(폰 주소창)은 그대로 */
+    SIDE_RW=w; var at=spv.scrollTop/Math.max(1, spv.scrollHeight), seq=PV_SEQ;
+    spv.innerHTML='<div class="pvi"></div>'; var box=spv.firstChild;
+    PureunHwp.renderPreview(box, b.u8, b.name).then(function(){ if(seq===PV_SEQ && box.isConnected) spv.scrollTop=Math.round(at*spv.scrollHeight); }, function(){}); }, 250);
 }
 function sideSetW(w){ lsSet('sideW', String(Math.max(SIDE_MIN, Math.min(Math.round(w), window.innerWidth-SIDE_KEEP)))); sideFit(); sideRedraw(); }
 /* 칸 왼쪽 가장자리를 끌어 너비를 바꾼다 */
@@ -1053,7 +1082,7 @@ function drawHist(){
   var hi=(BASE.history||[]).slice().reverse();
   h+='<div class="card"><h3>등기 현황 바뀐 기록 '+hi.length+'</h3>'+(hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>')+'</div>';
   $('histBox').innerHTML=drawArchive()+h;
-  sideMark();
+  sideMark(); sideHead();
 }
 
 /* ═══ 서류 ═══ */
@@ -1115,7 +1144,7 @@ document.addEventListener('keydown', function(ev){
   var sd=$('side');
   if(SIDE && sd){
     var ov=sideOverlay();
-    if(ev.key==='Escape' && (ov || sd.contains(document.activeElement))){ ev.preventDefault(); sideClose(); return; }
+    if(ev.key==='Escape'){ ev.preventDefault(); sideClose(); return; }
     if(ov && ev.key==='Tab'){ var sf=Array.prototype.filter.call(sd.querySelectorAll('button,[tabindex],iframe'), function(x){ return !x.disabled && x.offsetParent!==null; });
       if(sf.length){ var si=sf.indexOf(document.activeElement); if(si<0 || (ev.shiftKey && si===0)){ ev.preventDefault(); sf[ev.shiftKey?sf.length-1:0].focus(); } else if(!ev.shiftKey && si===sf.length-1){ ev.preventDefault(); sf[0].focus(); } } return; }
     if(ev.target && ev.target.hasAttribute && ev.target.hasAttribute('data-grip') && (ev.key==='ArrowLeft'||ev.key==='ArrowRight')){ ev.preventDefault(); sideSetW(sideW()+(ev.key==='ArrowLeft'?40:-40)); return; }
