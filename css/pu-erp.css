@@ -1893,3 +1893,6 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .stg-b,.stg-add{min-height:34px;padding:4px 12px}
   .stg-add{font-size:16px}
 }
+/* ↪ 후속 계약 후보(계획 5 · D) — 계약 창 «⚖ 심급·단계» 줄 아래. 후보는 연초록, 이미 만든 것은 파랑(확인함 모양) */
+.stg-it.stg-nx{border:1px solid #bbf7d0;background:#f0fdf4}
+.stg-it.stg-nx.stg-ck{border:1px solid #60a5fa;background:#eff6ff}

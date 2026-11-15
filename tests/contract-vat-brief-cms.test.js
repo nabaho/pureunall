@@ -75,6 +75,8 @@ function kboxCtx(kindV, extraF){
     clinicIsType(){ return false; },
     /* 📌 심급·단계 줄(계획 5)은 이 검사의 대상이 아니다 — 이름만 있으면 된다(실제 동작은 tests/erp-stage-marks.test.js) */
     erpStageBox(){ return null; },
+    /* ↪ 후속 계약 후보 줄(계획 5 · D)도 같다 — 이름만 있으면 된다(실제 동작은 tests/erp-stage-next.test.js) */
+    erpStageNextRow(){ return null; }, erpStageGoFollowup(){}, props:{}, dbGet(){ return []; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       return { tag, props: props || {}, kids };
