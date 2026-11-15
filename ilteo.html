@@ -41,6 +41,14 @@
     --pri-bg:#2563eb; --ok-bg:#166534;
   }
 }
+[data-theme="dark"]{
+  --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+  --blue:#60a5fa; --blue-d:#bfdbfe; --blue-bg:#1e293b; --blue-line:#2563eb;
+  --green:#4ade80; --green-m:#16a34a; --green-bg:#1e293b; --green-line:#16a34a;
+  --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+  --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+  --pri-bg:#2563eb; --ok-bg:#166534;
+}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
@@ -255,10 +263,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
   <div class="tabs" id="tabs" role="tablist" aria-label="일터상생혁신 단계 탭">
-    <button role="tab" aria-selected="true" tabindex="0" data-tab="projects" class="on">📂 사업장 · 메일 감지 <span class="chip c-blue" id="nProjects">0</span></button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="intake">① 메일·기초자료 체크 <span class="chip c-amber" id="nPreMail">0</span></button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="mid">② 진단·중간보고 자동화</button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="final">③ 후속메일·결과보고·PPT <span class="chip c-green" id="nPostMail">0</span></button>
+    <button id="tab-projects" role="tab" aria-selected="true" aria-controls="p-projects" tabindex="0" data-tab="projects" class="on">📂 사업장 · 메일 감지 <span class="chip c-blue" id="nProjects">0</span></button>
+    <button id="tab-intake" role="tab" aria-selected="false" aria-controls="p-intake" tabindex="-1" data-tab="intake">① 메일·기초자료 체크 <span class="chip c-amber" id="nPreMail">0</span></button>
+    <button id="tab-mid" role="tab" aria-selected="false" aria-controls="p-mid" tabindex="-1" data-tab="mid">② 진단·중간보고 자동화</button>
+    <button id="tab-final" role="tab" aria-selected="false" aria-controls="p-final" tabindex="-1" data-tab="final">③ 후속메일·결과보고·PPT <span class="chip c-green" id="nPostMail">0</span></button>
   </div>
 </div>
 
@@ -272,15 +280,24 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <div class="warn" id="loadNote" style="display:none"></div>
 
   <!-- 탭 1: 사업장 현황 · 메일 감지 -->
-  <section class="pane on" id="p-projects">
+  <section class="pane on" id="p-projects" role="tabpanel" aria-labelledby="tab-projects" tabindex="-1">
     <div class="kpis" id="kpiBox"></div>
     <div class="card">
       <div class="bar">
-        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·업종·선택과제·담당자 찾기" style="flex:1;min-width:160px;max-width:300px">
+        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·사업구분·업종·과제 찾기" style="flex:1;min-width:150px;max-width:280px">
+        <select id="projProg" aria-label="사업구분 필터">
+          <option value="">사업구분 전체</option>
+          <option value="ilteo">일터혁신 상생컨설팅</option>
+          <option value="other">타 컨설팅 이력</option>
+        </select>
         <select id="projYear" aria-label="연도 필터">
           <option value="">연도 전체</option>
           <option value="2026">2026년</option>
           <option value="2025">2025년</option>
+          <option value="2024">2024년</option>
+          <option value="2023">2023년</option>
+          <option value="2022">2022년</option>
+          <option value="2021">2021년</option>
         </select>
         <select id="projStage" aria-label="진행단계 필터">
           <option value="">진행단계 전체</option>
@@ -306,17 +323,17 @@ table.t tr.cur>td.n{color:var(--ink2)}
   </section>
 
   <!-- 탭 2: 메일 · 기초자료 체크 및 이원화 비식별 분석 -->
-  <section class="pane" id="p-intake">
+  <section class="pane" id="p-intake" role="tabpanel" aria-labelledby="tab-intake" tabindex="-1">
     <div id="intakeBox"></div>
   </section>
 
   <!-- 탭 3: 진단 · 중간보고서 자동 정리 및 PPTX -->
-  <section class="pane" id="p-mid">
+  <section class="pane" id="p-mid" role="tabpanel" aria-labelledby="tab-mid" tabindex="-1">
     <div id="midBox"></div>
   </section>
 
   <!-- 탭 4: 후속 메일 확인 · 결과보고서 자동 조립 · 플랫폼 문안 · PPTX -->
-  <section class="pane" id="p-final">
+  <section class="pane" id="p-final" role="tabpanel" aria-labelledby="tab-final" tabindex="-1">
     <div id="finalBox"></div>
   </section>
 </main>
@@ -354,12 +371,12 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-ilteo-catalog.js?v=2"></script>
-<script src="js/pu-ilteo-intake.js?v=2"></script>
-<script src="js/pu-ilteo-report.js?v=2"></script>
+<script src="js/pu-ilteo-catalog.js?v=7"></script>
+<script src="js/pu-ilteo-intake.js?v=18"></script>
+<script src="js/pu-ilteo-report.js?v=9"></script>
 <script src="js/pu-ilteo-pptx.js?v=2"></script>
 <script src="js/pu-ilteo-pack.js?v=1"></script>
-<script src="js/pu-ilteo-view.js?v=2"></script>
+<script src="js/pu-ilteo-view.js?v=10"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){
