@@ -13,8 +13,12 @@
   숨김 설정에는 적지 않는다(계약이 다시 이어지면 다시 나오게) · 업체를 못 읽으면 판정 안 함 · 한 번에 3장 넘으면 멈춤 · 회사·로고 기록은 안 바꿈.
 - **D. 미리보기 sandbox** — `prevFrame`·새 창 미리보기를 `sandbox="allow-same-origin"`(스크립트 막음)으로. 카드가 스크립트 없이 숨는 반죽이라
   미리보기 문서에만 «보이게» 꾸밈 한 줄(`미리보기문서`). 올리는 HTML 에는 안 들어간다.
-- 검사: `tests/home-newsite-gaps.test.js` 15건(함수를 떠서 돌림) + 규칙 바뀐 넷(home-live-preview·home-logo-no-clobber·home-old-site-off·site-people-in-sync).
+- 검사: `tests/home-newsite-gaps.test.js` 15건(검토 뒤 19건)(함수를 떠서 돌림) + 규칙 바뀐 넷(home-live-preview·home-logo-no-clobber·home-old-site-off·site-people-in-sync).
   고장넣기 12개 모두 잡힘 → 원복. 폰 점검(가짜 파이어베이스) 360px 옆넘침·짓눌림 0 — 새 보기 `member-new` 씨앗 추가.
+- ow review 1차(코더 claude · 검증 antigravity · 보안 codex) 지적 고침: ① [보안 높음] 글 번호를 거르지 않아 사진 있는 카드의 속성에
+  글자가 새어 들어갈 수 있었음 → 옛 글 번호는 숫자만(`올릴사람`), 카드·로고 그리기도 열쇠·사진 주소 모양을 다시 봄, 매달 로고 자동 올리기도
+  `새실행조각` 검사(`실행조각막기`)를 거침 ② [중간] 새 사이트 모드에서 로고 «자동 연결» 칸이 사라졌던 것 → 새 사이트용 칸으로 다시 보임
+  ③ [중간] 확인창 본문 이스케이프·줄바꿈 ④ [낮음] 로고 칸 열쇠가 숫자만 갈리던 것. 검사 4건 더해 19건 · 고장넣기 17개 모두 잡힘.
 - 남은 것: 「다시 확인」(PuHomeParse·PuHomeDiff)은 숫자 글 번호만 읽어 new-… 카드를 «새로 올릴 것»으로 계속 보일 수 있다 ·
   새 사이트 로고(n…)는 회사와 잇는 길이 없어 계약 종료 판정 대상이 아니다(옛 로고 boardSrl 만) · 구성원 카드의 «창»은 옛 서버 POST 로 여는 반죽이라
   정적 사이트에서 안 열릴 수 있다 [확인 필요 — 이번 범위 밖].

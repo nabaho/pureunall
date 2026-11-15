@@ -230,8 +230,8 @@ test('★★ 새 사이트 쪽 읽기 — 원본 자리·묵은 사본 피하기
 /* ══════ ③ 화면 — 옛 사이트에만 있던 칸은 숨긴다 ══════ */
 
 test('★★ 접으면 옛 사이트 전용 칸(사진 바꾸기·자동 연결 카드·새로 올리기·로고와 잇기)이 그려지지 않는다', () => {
-  /* (2026-11-16) 새노무사칸Html 은 접으면 «새 사이트» 칸으로 바뀐다 — 아래 검사가 따로 본다 */
-  const 칸들 = ['사진칸Html', '자동카드Html', '새로올리기칸Html', '로고연결칸Html'];
+  /* (2026-11-16) 새노무사칸Html·로고연결칸Html 은 접으면 «새 사이트» 칸으로 바뀐다 — 아래 검사가 따로 본다 */
+  const 칸들 = ['사진칸Html', '자동카드Html', '새로올리기칸Html'];
   칸들.forEach(이름 => {
     const ctx = { OLD_SITE_OFF: true, App: {} };
     vm.createContext(ctx);
@@ -261,6 +261,24 @@ test('★★ 접으면 새노무사칸은 «새 사이트» 칸이 된다 — �
   /* 직원은 카드가 아니다 — 칸 없음 */
   ctx.App.members.s = { name: '다', kind: 'staff' };
   assert.equal(ctx.새노무사칸Html({ key: 's', srl: '', mkind: 'staff' }), '', '★ 직원에게 얼굴 사진 칸을 그린다');
+});
+
+test('★★ 접으면 로고연결칸은 «새 사이트» 칸이 된다 — 로고 잇기·계약이 끝나도 남기기가 살아 있고, 옛 휴지통 말이 없다', () => {
+  /* 계약 끝난 로고 숨기기(PuSitePartner.계약끝난로고)의 잣대가 «이음(boardSrl)·남기기(keep)»다 — 칸이 없으면 사람이 그 둘을 못 정한다 */
+  const ctx = { OLD_SITE_OFF: true, App: {}, esc: (s) => String(s), 내린표시줄Html: () => '<i>내린표시</i>',
+                partnerMark: (id) => ({ c1: { boardSrl: 185 }, c2: { keep: { why: '실적' } } })[id] || null };
+  vm.createContext(ctx);
+  vm.runInContext(화면함수('로고연결칸Html'), ctx);
+  const 이음 = ctx.로고연결칸Html({ key: 'c1' }), 안이음 = ctx.로고연결칸Html({ key: 'c3' }), 남김 = ctx.로고연결칸Html({ key: 'c2' });
+  assert.match(안이음, /로고잇기창\(/, '★★ 접었는데 «로고와 잇기»가 없다 — 계약이 끝나도 숨길 로고를 못 정한다');
+  assert.match(안이음, /로고남기기\(/, '★★ 접었는데 «계약이 끝나도 남기기»가 없다 — 실적으로 남길 로고를 지킬 길이 없다');
+  assert.match(이음, /로고잇기풀기\(/, '★ 이은 로고를 풀 길이 없다');
+  assert.match(남김, /로고남기기풀기\(/, '★ 남기기를 풀 길이 없다');
+  [이음, 안이음, 남김].forEach(h => {
+    assert.match(h, /새 사이트/, '★★ 접었는데 칸 머리가 새 사이트를 말하지 않는다');
+    assert.doesNotMatch(h, /휴지통/, '★★ 접었는데 옛 게시판 «휴지통» 말을 한다');
+    assert.doesNotMatch(h, /내린표시/, '★ 접었는데 옛 게시판 «내린 표시» 줄을 그린다');
+  });
 });
 
 test('★ 접어도 「되살릴 길」은 남아 있다 — 칸 함수는 지우지 않고 스위치로만 숨긴다', () => {

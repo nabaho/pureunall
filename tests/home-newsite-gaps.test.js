@@ -258,3 +258,47 @@ test('★★ 미리보기문서 — 스크립트 없이도 카드가 보이게 �
   /* 올리는 쪽에는 안 들어간다 — publishPeople 이 미리보기문서를 부르지 않는다 */
   assert.doesNotMatch(stripJs(cutFn(HOME, 'async function publishPeople(')), /미리보기문서\(/, '★★★ 올리는 HTML 에 미리보기 꾸밈이 섞인다');
 });
+
+/* ══════ 보안 검토(2026-11-16 높음) — 자료의 글 번호·열쇠가 카드 속성을 깨지 못한다 ══════ */
+test('★★★ 따옴표·속성을 넣은 글 번호는 카드로 가지 않는다 — 우리 사진이 있어도', () => {
+  const 나쁜 = ['1" onclick="alert(1)', '190 x', '<b>', '../1', '1e5', '12345678901234'];
+  나쁜.forEach(srl => {
+    const r = P.올릴사람(사람쪽, [{ key: '190', srl: srl, name: '가', kind: 'labor', careers: ['x'],
+      photo: { bytes: 1, ver: '1', site: { path: 'site/files/people/190.jpg', v: '1', ver: '1' } } }]);
+    assert.equal(r.갈것.length, 0, '★★★ 모양이 틀린 글 번호가 카드로 간다: ' + srl);
+    assert.match(r.못갈것[0].why, /글 번호 모양/);
+  });
+});
+
+test('★★★ 카드그리기는 안전하지 않은 열쇠·사진 주소를 받지 않는다 (부품을 따로 불러도)', () => {
+  assert.throws(() => P.쪽그리기(사람쪽, [{ srl: '1" onclick="x', 이름: '가', 사진: '../a.jpg', 경력: [] }]), /열쇠/);
+  assert.throws(() => P.쪽그리기(사람쪽, [{ srl: '190', 이름: '가', 사진: '../a.jpg" onerror="x', 경력: [] }]), /사진/);
+  assert.throws(() => Pa.쪽그리기(자문사쪽, [{ srl: 'n1" x="', 그림: '../files/logo/n1.png' }]), /열쇠/);
+  /* 새 로고(n…)가 첫 칸이어도 다음 칸 열쇠가 갈린다 */
+  const 로고 = Pa.로고읽기(자문사쪽);
+  const 한번 = Pa.쪽그리기(자문사쪽, [{ srl: 'n17', 그림: '../files/logo/n17.png' }].concat(Array.from(로고)));
+  const 두번 = Pa.쪽그리기(한번, Pa.로고읽기(한번));
+  assert.deepEqual(Array.from(Pa.로고읽기(두번), x => x.srl), ['n17'].concat(Array.from(로고, x => x.srl)),
+    '★★ 첫 칸이 새 로고일 때 다른 칸 열쇠가 바뀐다');
+});
+
+test('★★ 확인창 본문 — 이름은 esc 하고 줄바꿈은 <br> 로 (askYes 는 HTML 로 넣는다)', () => {
+  ['async function publishPeople(', 'async function publishPartner('].forEach(fn => {
+    const s = stripJs(cutFn(HOME, fn));
+    const i = s.indexOf("askYes('홈페이지에 올릴까요?'");
+    assert.ok(i > 0, fn + ' 확인창을 못 찾았다');
+    const 몸 = s.slice(i, s.indexOf("'올리기')", i));
+    assert.match(몸, /\.replace\(\/\\n\/g, *'<br>'\)/, '★★ ' + fn + ' 확인창 줄바꿈이 한 줄로 뭉개진다');
+    assert.match(몸, /esc\(/, '★★ ' + fn + ' 확인창에 이름을 esc 없이 넣는다');
+  });
+  assert.doesNotMatch(stripJs(cutFn(HOME, 'async function publishPeople(')), /'· ' \+ p\.이름/, '★★ 구성원 이름을 esc 없이 넣는다');
+});
+
+test('★★★ 서버 매달 자동은 «실행되는 조각»이 새로 든 쪽을 올리지 않는다', () => {
+  const s = stripJs(fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8'));
+  const i = s.indexOf('async function 새사이트한번(');
+  const 몸 = s.slice(i, s.indexOf('\nexports.monthlyHomepageAuto', i));
+  assert.match(몸, /새실행조각\(/, '★★★ 자동 올리기에 실행 조각 검사가 없다');
+  const 막기 = (몸.match(/await 실행조각막기\(/g) || []).length;
+  assert.ok(막기 >= 2, '★★★ 구성원·로고 두 올리기 모두 검사해야 한다 (지금 ' + 막기 + '곳)');
+});

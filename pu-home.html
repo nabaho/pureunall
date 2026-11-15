@@ -2169,13 +2169,21 @@ window.로고남기기 = 로고남기기; window.로고남기기풀기 = 로고�
 async function 홈로고목록() {
   App.siteLogoErr = '';
   try {
-    const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: 'partner' }) });
-    if (!res.ok) throw new Error('홈페이지 응답 ' + res.status);
-    const data = await res.json();
-    const list = PuHomeParse.parsePartners(data.html);
+    const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;
+    let 쪽;
+    if (접음) {
+      /* (2026-11-16) 접은 뒤에는 새 사이트 자문사 쪽을 읽는다 — 옛 readHomepage 는 410(접음)이다 */
+      쪽 = await 새사이트쪽읽기('partner');
+      if (쪽 == null) throw new Error('새 사이트 자문사 쪽을 읽지 못했습니다');
+    } else {
+      const token = await firebase.auth().currentUser.getIdToken();
+      const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: 'partner' }) });
+      if (!res.ok) throw new Error('홈페이지 응답 ' + res.status);
+      쪽 = (await res.json()).html;
+    }
+    const list = PuHomeParse.parsePartners(쪽);
     if (!list.length) throw new Error('로고를 하나도 못 찾았습니다 — 홈페이지 모양이 바뀐 것 같습니다');
     App.siteLogoList = list;
     return list;
@@ -2186,7 +2194,12 @@ async function 홈로고목록() {
 }
 function 로고그림주소(img) {
   const s = String(img || '');
-  return /^https?:\/\//.test(s) ? s : PuHomeExport.ORIGIN + (s.charAt(0) === '/' ? '' : '/') + s;
+  if (/^https?:\/\//.test(s)) return s;
+  /* (2026-11-16) 접은 뒤 로고 목록은 새 사이트 자문사 쪽에서 읽는다 — 그 쪽의 상대 주소(../files/…)는 새 사이트 /partner/ 를 바탕으로 푼다 */
+  if (typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true) {
+    try { return new URL(s, SITE_VIEW + '/partner/').href; } catch (e) { return ''; }
+  }
+  return PuHomeExport.ORIGIN + (s.charAt(0) === '/' ? '' : '/') + s;
 }
 /* 로고 하나에 이어진 업체 */
 function 로고의업체(srl) {
@@ -2414,11 +2427,14 @@ function 새로올리기칸Html(d) {
    ★ 이어 두지 않았으면 «자동으로 안 내려간다»고 있는 그대로 말한다. */
 function 로고연결칸Html(d) {
   const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
-  if (접음) return '';   // 옛 게시판 로고 글과 잇는 칸(계약 끝나면 옛 게시판 휴지통) — 접은 뒤에는 갈 곳이 없다
+  /* (2026-11-16) 접은 뒤에도 그린다 — 이은 로고(boardSrl)·남기기(keep)는 새 사이트의 «계약 끝난 로고 숨기기» 잣대다
+     (PuSitePartner.계약끝난로고). 옛 게시판 «내린 표시» 줄만 뺀다. */
   const mk = partnerMark(d.key) || {};
   const n = Number(mk.boardSrl) || 0;
   const 남김 = mk.keep && String(mk.keep.why || '').trim() ? mk.keep : null;
-  let h = '<div class="fld"><label>자동 연결 — 계약이 끝나면 다음 달 1일에 로고를 휴지통으로</label>';
+  let h = '<div class="fld"><label>' + (접음
+    ? '자동 연결 — 계약이 끝나면 새 사이트 로고에서 숨깁니다 («새 사이트에 올리기» · 매달 1일)'
+    : '자동 연결 — 계약이 끝나면 다음 달 1일에 로고를 휴지통으로') + '</label>';
   h += '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden">'
     + (n ? '<span>홈페이지 로고 글 <b>번호 ' + n + '</b>와 이어져 있습니다</span>'
            + '<button class="btn sm" onclick="로고잇기풀기(\'' + esc(d.key) + '\')">풀기</button>'
@@ -2431,7 +2447,7 @@ function 로고연결칸Html(d) {
             : '<span>계약이 끝나도 남기기</span>'
               + '<input id="keepWhy" placeholder="사유 (예: 실적으로 남김)" style="max-width:220px">'
               + '<button class="btn sm" onclick="로고남기기(\'' + esc(d.key) + '\', document.getElementById(\'keepWhy\').value)">남기기</button>')
-    + '</div>' + 내린표시줄Html('partner', d.key, mk) + '</div>';
+    + '</div>' + (접음 ? '' : 내린표시줄Html('partner', d.key, mk)) + '</div>';
   return h;
 }
 
@@ -6919,16 +6935,15 @@ function jobsOf() {
          우리가 못 고치므로 «거기서 내리는 일»만 사람 손에 남는다 — 그 한 가지를 말한다. */
       /* ★ 2026-10-05 월간 자동 연결 — 이제 «이어 둔» 로고는 서버가 다음 달 1일에 내린다 */
       why: 접음
-        /* 접은 뒤에는 옛 게시판 로고를 서버가 내리던 길이 없다 — 새 사이트 자문사현황은 «로고 관리»에서 손본다.
-           ⚠ 계약 끝난 로고를 저절로 숨기는 길은 새 사이트에 아직 없다(남은 일). */
-        ? '우리 명단에서는 자동으로 뺐습니다. 홈페이지 자문사현황의 로고는 <b>저절로 내려가지 않습니다</b> — '
-          + '자문사 목록 머리의 «로고 관리»에서 빼고 올려 주십시오.'
+        /* (2026-11-16) 새 사이트 — 로고와 «이어 둔» 회사는 「새 사이트에 올리기」 때와 매달 1일에 저절로 숨긴다(PuSitePartner.계약끝난로고) */
+        ? '우리 명단에서는 자동으로 뺐습니다. 새 사이트의 로고는 <b>로고와 이어 둔 것만</b> '
+          + '「새 사이트에 올리기」 때와 매달 1일에 저절로 숨겨집니다 — 안 이은 것은 그 회사 편집칸의 «로고와 잇기»부터 해 주십시오.'
         : '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
           + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
   }
   /* ★ 3단계(2026-10-05) — 홈페이지에 아직 없는 노무사: 사진·올리기 허락을 넣어 달라고 알린다 */
-  /* 접은 뒤에는 옛 게시판에 매달 저절로 올리던 길이 없다 — 새 노무사(글 번호 없음)를 새 사이트에 넣는 길은 남은 일 */
-  const 새사람 = (!접음 && typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
+  /* (2026-11-16) 접은 뒤에도 센다 — 새 노무사(글 번호 없음)는 새 사이트 사진 + 올리기 허락이 있으면 「새 사이트에 올리기」로 간다 */
+  const 새사람 = (typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
   if (새사람.length) {
     add({ cls: 'info', t: '새 노무사 — 사진·올리기 허락을 넣어 주십시오', n: 새사람.length,
       who: esc(새사람.slice(0, 3).map(x => x.name + (x.낡은허락 ? '(다시 허락)' : '')).join(', ')
@@ -8410,16 +8425,18 @@ async function publishPeople() {
       return;
     }
 
-    /* ★ 무엇이 올라가는지 «먼저 보여주고» 묻는다. 묻지 않고 올리면 되돌릴 틈이 없다 */
+    /* ★ 무엇이 올라가는지 «먼저 보여주고» 묻는다. 묻지 않고 올리면 되돌릴 틈이 없다
+       ⚠ askYes 는 본문을 HTML 로 넣는다 — 이름·까닭은 esc, 줄바꿈은 <br> (2026-11-16 검토: 목록이 한 줄로 뭉개지고 이름이 그대로 들어갔다).
+         직원바뀐것글 은 이미 esc 해서 돌려준다. */
     const ok = await askYes('홈페이지에 올릴까요?',
-      '구성원 ' + 고른것.갈것.length + '명으로 «구성원 소개» 쪽을 다시 만듭니다.\n' +
-      고른것.갈것.map(p => '· ' + p.이름 + (p.직책1 ? ' ' + p.직책1 : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
+      ('구성원 ' + 고른것.갈것.length + '명으로 «구성원 소개» 쪽을 다시 만듭니다.\n' +
+      고른것.갈것.map(p => '· ' + esc(p.이름) + (p.직책1 ? ' ' + esc(p.직책1) : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
       (올릴사진.length ? '\n\n[새로 올리는 얼굴 사진] ' + 올릴사진.length + '장\n'
-        + 올릴사진.map(k => '· ' + ((App.members[k] || {}).name || k)).join('\n') : '') +
-      (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + x.이름 + ' — ' + x.why).join('\n') : '') +
-      (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + n).join('\n') : '') +
+        + 올릴사진.map(k => '· ' + esc((App.members[k] || {}).name || k)).join('\n') : '') +
+      (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + esc(x.이름) + ' — ' + esc(x.why)).join('\n') : '') +
+      (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + esc(n)).join('\n') : '') +
       직원바뀐것글(직원.전, 직원.후) +
-      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
+      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
 
     /* 사진부터 — 한 장이라도 못 올리면 쪽은 올리지 않는다 */
@@ -8973,16 +8990,17 @@ async function publishPartner() {
       await say('바뀐 것이 없습니다', '지금 올라가 있는 것과 같습니다 — 올리지 않았습니다.');
       return;
     }
+    /* ⚠ askYes 는 본문을 HTML 로 넣는다 — 회사 이름은 esc, 줄바꿈은 <br> */
     const ok = await askYes('홈페이지에 올릴까요?',
-      '자문사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
+      ('자문사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
       (고른것.숨긴것.length ? '\n숨기는 로고 ' + 고른것.숨긴것.length + '장' : '') +
       (끝나숨김.length ? '\n\n[계약이 끝나 저절로 숨기는 로고] ' + 끝나숨김.length + '장\n'
-        + 끝나숨김.map(x => '· ' + 회사이름((끝난.목록.filter(y => y.srl === String(x.srl))[0] || {}).companyId)).join('\n')
+        + 끝나숨김.map(x => '· ' + esc(회사이름((끝난.목록.filter(y => y.srl === String(x.srl))[0] || {}).companyId))).join('\n')
         + '\n(남겨야 하면 그 회사 편집칸의 「계약이 끝나도 남기기」에 사유를 적어 주십시오)' : '') +
       (끝난.겹침.length ? '\n\n⚠ 로고 번호가 두 회사에 이어져 있어 숨기지 않은 곳 ' + 끝난.겹침.length + '곳 — 로고 잇기를 확인해 주십시오' : '') +
       (끝난.못읽음 ? '\n\n⚠ 업체관리를 읽지 못해 계약 끝난 로고는 판정하지 않았습니다' : '') +
       (새메인 ? '\n메인 화면의 흐르는 로고 띠도 함께 바꿉니다.' : '') +
-      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
+      '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
 
     let 올린쪽 = 0;

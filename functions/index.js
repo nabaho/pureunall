@@ -5548,12 +5548,22 @@ async function 새사이트파일읽기(토큰, repo, path) {
 async function 새사이트한번(누가) {
   const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
   const db = getDatabase();
+  /* ★ 자동으로 올리는 쪽도 «실행되는 조각»을 새로 넣지 못한다 (2026-11-16 보안 검토 높음) —
+       publishSite 가 관리자 아닌 올리기에 하는 검사(새실행조각)를 그대로. 재직 직원이 고칠 수 있는 자료(homepage/members·partners)로
+       그려지는 쪽이라, 자료에 스크립트·속성이 섞여 들어오면 사람 손을 안 거치고 홈페이지에 실릴 수 있었다. */
+  const 실행조각막기 = async (자리, html) => {
+    let 있던 = "";
+    try { 있던 = await 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(자리)); } catch (e) { 있던 = ""; }
+    const 새것 = 새실행조각(있던, String(html));
+    if (새것.length) throw new Error("실행되는 조각이 새로 들어간 쪽이라 자동으로 올리지 않았습니다(" + 새것.length + "곳) — 「새 사이트에 올리기」로 확인해 주십시오");
+  };
   return HN.돌기({
     읽기: async (p) => (await db.ref(p).once("value")).val(),
     쓰기: (p, v) => db.ref(p).set(v),
     쪽읽기: () => 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(HN.사본자리)),
     /* 화면의 「새 사이트에 올리기」(publishSite)와 같은 차례 — 사람이 보는 쪽 먼저, 우리 사본은 실패해도 알리기만 */
     올리기: async (html, note) => {
+      await 실행조각막기(HN.사본자리, html);
       const 사연글 = 사연(누가, HN.사본자리, note);
       const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(HN.사본자리), html, 사연글);
       try { await 올리기(githubRequest, 토큰, REPO, HN.사본자리, html, 사연글); }
@@ -5568,6 +5578,7 @@ async function 새사이트한번(누가) {
     },
     파일올리기: async (자리, html, note) => {
       if ((자리 !== HN.자문사자리 && 자리 !== HN.메인자리) || !올릴자리인가(자리)) throw new Error("올릴 수 없는 자리: " + 자리);
+      await 실행조각막기(자리, html);
       const 사연글 = 사연(누가, 자리, note);
       const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(자리), html, 사연글);
       try { await 올리기(githubRequest, 토큰, REPO, 자리, html, 사연글); }
