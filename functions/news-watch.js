@@ -205,6 +205,26 @@ function 편지링크들(회차) {
   });
   return 줄;
 }
+/* 응답 몸의 «앞부분»만 글자로 — 한도를 넘으면 그 자리에서 끊는다. 읽개가 없으면(가짜 fetch 등) text() 를 자른다 */
+async function 앞부분읽기(r, 한도) {
+  const 끝 = Number(한도) || 65536;
+  if (r && r.body && typeof r.body.getReader === 'function') {
+    const 읽개 = r.body.getReader();
+    const 조각 = [];
+    let 받은 = 0;
+    try {
+      while (받은 < 끝) {
+        const { done, value } = await 읽개.read();
+        if (done) break;
+        조각.push(value);
+        받은 += value.length;
+      }
+    } finally { try { await 읽개.cancel(); } catch (_) { /* 이미 닫혔으면 그만 */ } }
+    return Buffer.concat(조각.map((x) => Buffer.from(x))).slice(0, 끝).toString('utf8');
+  }
+  if (r && typeof r.text === 'function') return String(await r.text()).slice(0, 끝);
+  return '';
+}
 async function 링크재기(링크들, fetchFn, 옵션) {
   const o = 옵션 || {};
   const 한도 = Number(o.한도) || 40, 기다림 = Number(o.기다림) || 8000, 동시 = Number(o.동시) || 6;
@@ -222,9 +242,11 @@ async function 링크재기(링크들, fetchFn, 옵션) {
       let 상태 = (s === 404 || s === 410) ? '깨짐' : (s >= 200 && s < 400) ? '됨' : '모름';
       /* ★★ 법제처는 «200 인데 실패 쪽»을 준다 — 「국가법령정보 공동활용 페이지 접속에 실패하였습니다」(2026-11-15 실측).
            코드만 보던 이 점검은 그 링크를 «모두 열림»이라 했다. 법제처 쪽만 몸을 읽어 그 말이 있으면 «깨짐».
-         ⚠ 다른 집은 여전히 몸을 안 읽는다(파일이 수백 MB 일 수 있다). */
-      if (상태 === '됨' && /^https?:\/\/(www\.)?law\.go\.kr\//i.test(l.주소) && r && typeof r.text === 'function') {
-        if (판례부품.거절인가(await r.text())) 상태 = '깨짐';
+         ⚠ 다른 집은 여전히 몸을 안 읽는다(파일이 수백 MB 일 수 있다).
+         ⚠ «마지막으로 닿은 곳»(넘겨받은 뒤 r.url)이 법제처일 때만, 앞 64KB 만 읽는다(보안 검토 2026-11-15). */
+      const 닿은곳 = String((r && r.url) || l.주소);
+      if (상태 === '됨' && /^https?:\/\/(www\.)?law\.go\.kr\//i.test(닿은곳) && r) {
+        if (판례부품.거절인가(await 앞부분읽기(r, 64 * 1024))) 상태 = '깨짐';
       } else {
         try { if (r && r.body && r.body.cancel) await r.body.cancel(); } catch (_) { /* 몸은 안 읽는다 */ }
       }

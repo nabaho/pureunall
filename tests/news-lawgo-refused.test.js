@@ -141,6 +141,61 @@ test('★★★ ③ 링크 점검 — 법제처 «200 인데 실패 쪽»은 깨
   assert.ok(!다른집몸, '★ 법제처가 아닌 곳의 몸까지 읽는다 — 파일이 수백 MB 일 수 있다');
 });
 
+test('★★ ③ 링크 점검 — 몸은 «마지막으로 닿은 곳»이 법제처일 때만, 앞부분만 읽는다(보안 검토)', async () => {
+  /* 법제처 주소로 시작했어도 다른 집으로 넘겨졌으면 몸을 안 읽는다 */
+  let 읽음 = false;
+  const 넘김 = await W.링크재기([{ 주소: 옛판 }], async () => ({ status: 200, url: 'https://other.test/x',
+    text: async () => { 읽음 = true; return ''; }, body: { cancel: async () => {} } }));
+  assert.strictEqual(넘김[0].상태, '됨');
+  assert.ok(!읽음, '★★ 넘겨진 다른 집의 몸까지 읽는다');
+  /* 아주 큰 몸이어도 한도까지만 읽고 끊는다 */
+  let 읽은조각 = 0, 끊음 = false;
+  const 큰몸 = { getReader: () => ({
+    read: async () => { 읽은조각++; return { done: false, value: new Uint8Array(16 * 1024) }; },
+    cancel: async () => { 끊음 = true; } }) };
+  const 큰 = await W.링크재기([{ 주소: NP.보는주소('1') }], async () => ({ status: 200, url: NP.보는주소('1'), body: 큰몸 }));
+  assert.strictEqual(큰[0].상태, '됨');
+  assert.ok(읽은조각 > 0 && 읽은조각 < 64, '★★ 몸을 끝없이 읽는다 — 한도에서 끊지 않는다(' + 읽은조각 + '조각)');
+  assert.ok(끊음, '★ 다 읽지 않은 몸을 닫지 않는다');
+});
+
+test('★★★ ③ 웹 전문 보기 — 못 펴면 «우리 전문 쪽»으로 물러선다(옛 DRF 주소로 보내지 않는다)', async () => {
+  const NV = require('../functions/news-view.js');
+  const vm = require('node:vm');
+  const 쪽 = NV.쪽('제목', '<p>편지</p>');
+  const m = /<script>([\s\S]*?)<\/script>/.exec(쪽);
+  assert.ok(m, '껍데기에 스크립트가 없다');
+  const 부른것 = [], 만든것 = [];
+  const 짐 = {
+    document: {
+      _클릭: null,
+      addEventListener(t, f, c) { if (t === 'click' && c === true) this._클릭 = f; },
+      createElement() { const e = { className: '', innerHTML: '', style: {}, appendChild() {} }; 만든것.push(e); return e; },
+      getElementById() { return null; }, querySelector() { return null; }, querySelectorAll() { return []; },
+      documentElement: { style: {} }
+    },
+    window: { addEventListener() {}, scrollY: 0, scrollTo() {} },
+    location: { hash: '', pathname: '/newsView', search: '' },
+    history: { replaceState() {} },
+    fetch(u) { 부른것.push(u); return Promise.resolve({ json: () => Promise.resolve({ ok: false, 말: '시험' }) }); }
+  };
+  짐.window.document = 짐.document;
+  vm.createContext(짐);
+  vm.runInContext(m[1], 짐);
+  /* 표(data-full) 없는 옛 회차 — 손잡이 주소가 새 꼴(공개 쪽)이어도 알아본다 */
+  const 손 = { attr_href: NP.보는주소('622955'), textContent: '전문 보기 ↗',
+    getAttribute(k) { return this['attr_' + k] == null ? null : this['attr_' + k]; },
+    closest() { return null; }, parentNode: { appendChild() {} } };
+  짐.document._클릭({ target: { closest: (s) => (s === 'a[href]' ? 손 : null) }, preventDefault() {}, stopPropagation() {} });
+  assert.strictEqual(부른것[0], '/newsFull?t=prec&id=622955', '★★ 공개 쪽 꼴 주소에서 판례를 못 읽는다');
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  const 칸 = 만든것.find((e) => /class="err"/.test(e.innerHTML));
+  assert.ok(칸, '못 받아 온 때의 칸이 없다');
+  assert.match(칸.innerHTML, /href="\/newsFullPage\?t=prec&amp;id=622955"/,
+    '★★★ 물러설 곳이 우리 전문 쪽이 아니다 — 옛 회차는 DRF(접속 실패) 주소로 간다');
+  assert.ok(칸.innerHTML.indexOf('OC=') < 0, '★★ 물러설 곳에 거절되는 열쇠가 남았다');
+});
+
 test('★★ ③ 편지 링크 점검은 받는 분이 «실제로 가는» 주소(공개 쪽)를 잰다', () => {
   const l = W.편지링크들({ 안: { case: [{ 제목: 'p', 링크: 옛판 }] } });
   assert.deepStrictEqual(l.map((x) => x.주소), [C.법제처사람주소(옛판)]);

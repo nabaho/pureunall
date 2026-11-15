@@ -23,6 +23,10 @@
 - `functions/news-watch.js` — 링크 점검이 받는 분이 실제로 가는 주소를 재고, law.go.kr 은 몸을 읽어 실패 쪽이면 «깨짐» · 판례 경고에 «까닭»을 붙이고, 3주 전이라도 못 모으면 알린다.
 - 검사: `tests/news-lawgo-refused.test.js`(9) 새로 · `newsletter-full-text`·`newsletter-dead-end` 의 «사람이 볼 주소 = DRF» 규칙을 «열쇠 없는 공개 쪽»으로 고침.
 - 화면 확인: 지어낸 자료(«현재» + 회차 기록)로 1366px·375px — «보내기 전 점검 ⚠ 확인 2건» 과 두 줄이 보이고 가로 넘침 없음.
+- 자동 검토(ow review): 기능 검증 antigravity:gemini-4-argon-high «통과», 보안 antigravity:claude-opus-5-5-high «높음·중간 없음».
+  낮음 넷 가운데 둘을 반영 — ① 웹 전문 보기(functions/news-view.js)가 못 펴면 옛 href(DRF) 대신 우리 newsFullPage 로 물러서고 공개 쪽 꼴도 알아봄
+  ② 링크 점검이 «넘겨받은 뒤 닿은 곳»이 법제처일 때만, 앞 64KB 만 읽음. 반영분은 검사로 확인(옛 코드로 되돌리면 둘 다 잡힘), 외부 재검토는 안 돌림.
+  안 한 것 — watch 열쇠를 4개만 읽는 경계(서버와 같은 잣대, 지금 구조에선 문제없음) · homepage/newsPrec/탈 을 직원도 쓸 수 있는 규칙(출력은 모두 씻김, 규칙 좁히기는 따로).
 
 ## 남은 일
 - 함수 배포(대표 승인 필요): newsFullPage · newsFull(받는 분 「전문 보기」) · newsletterWatchSunday · weeklyNewsletterPrepare · weeklyNewsletterSend · dailyDocsCollect · newsDocsPull · dailyRegionalNewsCollect.
