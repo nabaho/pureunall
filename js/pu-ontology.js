@@ -30,6 +30,8 @@
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
       DeungiBase:'노무법인 등기 현황', DeungiCase:'노무법인 변경등기 건', DeungiArchive:'노무법인 지난 등기 원본 서류 묶음',
+      /* 산재 묶음(2026-11-15) — 이알피 산재 사건 «한 건»의 청구 급여·서류 받음/제출·기한 날짜. 사건을 sourceKind 'case'·sourceId 로 가리킨다(js/pu-sanjae-kit.js) */
+      SanjaeKit:'산재 묶음(급여·서류·기한)',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -116,7 +118,7 @@
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
       primaryRoots:['data','improve_requests','ieum_public','worker_secret','staff_secret'],
       sharedRoots:['harass_invest'],
-      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
+      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document','SanjaeKit'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다(pu-erp.html PU_APPS 머리글).

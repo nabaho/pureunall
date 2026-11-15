@@ -82,7 +82,8 @@ const 사건 = [];
 for (let i = 0; i < 28; i++) {
   사건.push({
     id: 'cs-pa' + i, entityType: 'case', caseNo: `사건-2026-${String(200 + i)}`, companyName: 업체명(i + 3), bizNo: 사업자(i + 3),
-    managerMain: 담당(i + 1), managerSubs: i % 3 ? [담당(i + 3)] : [], typeCode: ['부당해고', '임금체불', '산재', '직장내괴롭힘'][i % 4],
+    /* 산재는 이알피의 실제 유형 코드(case-injury)로 — 그래야 산재 사건 전용 단추(⚖ 사례·🧰 산재 묶음)가 뜬다(2026-11-15) */
+    managerMain: 담당(i + 1), managerSubs: i % 3 ? [담당(i + 3)] : [], typeCode: ['부당해고', '임금체불', 'case-injury', '직장내괴롭힘'][i % 4],
     typeName: ['부당해고 구제신청', '임금체불 진정', '산업재해 보상 청구', '직장 내 괴롭힘 조사'][i % 4],
     status: ['progress', 'progress', 'pending', 'closed'][i % 4], jurisdiction: ['서울지방노동위원회', '중앙노동위원회', '근로복지공단 서울남부지사'][i % 3],
     receiveDate: 날(1 + (i % 9), 1 + (i % 27)), dueDate: 날(10, 18 + (i % 12)), retainerFee: [1100000, 2200000, 3300000][i % 3],
@@ -248,6 +249,18 @@ module.exports = {
     창('company-open', '(주)파하바이오헬스케어점검글로벌홀딩스제7공장'),
     메뉴('biz/case'),
     창('case-open', '사건-2026-208'),
+    /* 🧰 산재 묶음 (2026-11-15) — 산재 사건(사건-2026-202)을 열고 단추를 눌러 창을 띄운 뒤, 급여 하나를 골라 «저장됨»이 뜨는지 본다 */
+    { name: 'case-sanjae-kit', wait: 1500,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/case')); await page.waitForTimeout(2500);   /* --view 로 이것만 열어도 되게 */
+        await page.locator('main').getByText('사건-2026-202', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+        await page.getByText('🧰 서류·기한·계산 열기', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(500);
+        await page.locator('#puSjkBox .sjk-chip', { hasText: '휴업급여' }).click({ timeout: 3000 });
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    },
     메뉴('biz/consulting'),
     메뉴('biz/fund'),
     메뉴('biz/other'),

@@ -237,6 +237,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <script src="js/pu-sanjae-cases.js?v=2"></script>
+<script src="js/pu-sanjae-kit.js?v=1"></script>
 <script src="js/pu-harass-core.js?v=11"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
@@ -3091,6 +3092,8 @@ var FB_ALL_SYNC_KEYS = [
   'co_mgr_requests',
   /* 사건 «업무 메모» — 2026-10-05 까지 그 PC 의 localStorage 에만 있었다(CaseMemoPanel 머리글) */
   'case_memos',
+  /* 🧰 산재 묶음 (2026-11-15) — 산재 사건마다 한 줄: 고른 급여·서류 받음/제출·기한 날짜(js/pu-sanjae-kit.js) */
+  'case_sanjae',
   /* 💬 누구 입금인가요? (2026-10-24) — 재무가 묻고 직원이 답한다. 날짜·금액·보낸 사람 이름만 */
   'deposit_asks'
 ];
@@ -5408,7 +5411,7 @@ try { window.addEventListener('fb_initial_done', function(){ setTimeout(function
   try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
 }, 4000); }); } catch(e){}
 /* user_accounts — 2026-10-10 사번 열쇠 지도로(번호 = 사번, dbSet 이 붙인다) */
-var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos','deposit_asks'];
+var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos','case_sanjae','deposit_asks'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
      다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
@@ -37500,6 +37503,10 @@ function CaseDetailModal(props){
       erpIsInjuryCase(c, t) && window.PuSanjae ? ['산재 사례', h('button', { onClick:function(){ window.PuSanjae.open({ kind:'jil', q:window.PuSanjae.guessQuery(c),
           onAttach:function(txt){ erpCaseMemoAdd(c.id, '⚖ 참고 사례 — ' + txt); } }); },
         style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null,
+      /* 🧰 산재 묶음 — 급여·서류·기한·계산·유족·소식 (대표 「모든 단계 한번에 진행해라」 2026-11-15, js/pu-sanjae-kit.js) */
+      erpIsInjuryCase(c, t) && window.PuSanjaeKit ? ['산재 묶음', h('button', { onClick:function(){ erpSanjaeKitOpen(c); },
+        title:'청구 급여·챙길 서류·심사/재심사 기한·소멸시효·급여 어림·유족 순위',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '🧰 서류·기한·계산 열기')] : null,
       /* 🛡️ 괴롭힘·성희롱 조사 전용 연동 — 조사 사건일 때 조사실·보고서 바로가기 단추 노출 */
       (window.PuHarassCore && window.PuHarassCore.isErpInvestigateCase(c, caseTypes)) ? ['조사실·보고서', h('a', {
         href:'pu-harass.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
@@ -38107,6 +38114,43 @@ function erpCaseMemoAdd(caseId, text){
   if(!dbSet(CASE_MEMO_KEY, [row].concat(dbGet(CASE_MEMO_KEY, []) || []))){ showToast('❌ 메모 저장 실패'); return false; }
   try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: CASE_MEMO_KEY })); } catch(_){}
   return true;
+}
+/* 🧰 산재 묶음 (대표 「모든 단계 한번에 진행해라」 2026-11-15) — 산재 사건마다 «한 줄»(js/pu-sanjae-kit.js).
+   ■ 표 하나(case_sanjae)에 caseId 를 달아 dbSet 으로 저장한다 — 업무 메모(case_memos)와 같은 길(건별 저장 표 DIFF_KEYS).
+     ⚠ 사건마다 열쇠를 만들지 말 것(부팅 계획이 data 아래 이름을 «전부 표로» 받는다 — CASE_MEMO_KEY 머리글).
+   ■ 담는 것: 재해·질병 갈래, 고른 급여, 서류 받음/제출 날짜, 직접 넣은 서류 이름, 기한 계산용 날짜.
+     임금(계산 칸)·가족(유족 표)은 모듈이 저장하지 않는다 — 남길 것은 사람이 업무 메모로.
+   ■ 원본(사건)을 가리킬 때는 sourceKind 'case' · sourceId(사건 영구 id) — 온톨로지 SOURCE_KIND_STORE.
+   ■ 끝난 사건(erpIsTerminalRecord)은 모듈이 «보기만» 연다 — 여기서도 한 번 더 막는다. */
+var SANJAE_KIT_KEY = 'case_sanjae';
+function erpSanjaeKitGet(caseId){
+  var cid = String(caseId || ''); if(!cid) return null;
+  return (dbGet(SANJAE_KIT_KEY, []) || []).filter(function(r){ return r && r.caseId === cid && !r._deleted; })[0] || null;
+}
+function erpSanjaeKitPut(rec, caseRow){
+  if(!rec || !rec.caseId) return false;
+  if(caseRow && erpIsTerminalRecord(caseRow)){ showToast('끝난 사건은 보기만 할 수 있습니다'); return false; }
+  var cid = String(rec.caseId), now = (new Date()).toISOString();
+  var all = dbGet(SANJAE_KIT_KEY, []) || [];
+  var cur = all.filter(function(r){ return r && r.caseId === cid && !r._deleted; })[0] || null;
+  var row = Object.assign({}, cur || {}, rec, {
+    id: (cur && cur.id) || uid('sj'), entityType: 'SanjaeKit', schemaVersion: 1,
+    caseId: cid, sourceKind: 'case', sourceId: cid,
+    createdAt: (cur && cur.createdAt) || now, updatedAt: now,
+    updatedBy: (CURRENT_USER && CURRENT_USER.sid) || '', revision: ((cur && cur.revision) || 0) + 1 });
+  var next = cur ? all.map(function(r){ return r === cur ? row : r; }) : [row].concat(all);
+  if(!dbSet(SANJAE_KIT_KEY, next)){ showToast('❌ 산재 묶음 저장 실패'); return false; }
+  try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: SANJAE_KIT_KEY })); } catch(_){}
+  return true;
+}
+function erpSanjaeKitOpen(c){
+  if(!c || !c.id || !window.PuSanjaeKit) return;
+  var hol = []; try { hol = (erpHolidays() || []).map(function(x){ return x && x.date; }).filter(Boolean); } catch(_){}
+  window.PuSanjaeKit.open({ caseId: c.id, title: c.title || c.caseNo || '', readOnly: erpIsTerminalRecord(c), holidays: hol,
+    query: window.PuSanjae ? window.PuSanjae.guessQuery(c) : '',
+    load: function(){ return erpSanjaeKitGet(c.id); },
+    save: function(rec){ return erpSanjaeKitPut(rec, c); },
+    onMemo: function(txt){ return erpCaseMemoAdd(c.id, txt); } });
 }
 function CaseMemoPanel(props){
   var cid = String(props.caseId || '');
@@ -40814,11 +40858,11 @@ var BIZ_CASE_STAGE_SEED = [
     dueVerified:false, sortOrder:30 },
   { code:'wc-apply',     name:'요양신청', short:'요양', orgKind:'wc',
     forTypes:['case-injury'],
-    dueDays:90, dueFrom:'notice', dueNote:'결정 통보받은 날부터 90일 이내 심사청구',
+    dueDays:90, dueFrom:'notice', dueNote:'보험급여 결정이 있음을 안 날부터 90일 이내 심사청구 (산재보험법 제103조③) — 업무상질병판정위원회 심의를 거친 결정은 심사청구 없이 바로 재심사청구도 가능(제106조① 단서·③ 단서)',
     dueVerified:false, sortOrder:40 },
   { code:'wc-review',    name:'심사청구', short:'심사', orgKind:'wc',
     forTypes:['case-injury'],
-    dueDays:90, dueFrom:'notice', dueNote:'심사 결정 통보받은 날부터 90일 이내 재심사청구',
+    dueDays:90, dueFrom:'notice', dueNote:'심사 결정이 있음을 안 날부터 90일 이내 재심사청구 (산재보험법 제106조③)',
     dueVerified:false, sortOrder:50 },
   { code:'wc-rereview',  name:'재심사청구', short:'재심', orgKind:'wc',
     forTypes:['case-injury'],
@@ -40856,7 +40900,14 @@ function caseStageColor(orgKind){
    시드는 목록이 비었을 때만 쓰이므로, 고치기만 하면 이미 저장된 대표 화면엔 안 닿는다.
    ⚠ 빈 칸만 채운다 — 대표가 적은 설명은 덮지 않는다.
    ⚠ 한 번 채운 단계엔 seedNoteV 를 남긴다 — 대표가 일부러 비우면 다시 살아나지 않게. */
-var CASE_STAGE_SEED_NOTE_V = 1;
+/* 2판(2026-11-15) — 산재 두 단계 설명을 법 원문(«결정이 있음을 안 날», 제103조③·제106조③)으로 고쳤다.
+   ⚠ 옛 시드 글자 «그대로»인 것만 새 글로 바꾼다 — 대표가 고쳐 쓴 설명은 덮지 않는다.
+   ⚠ 1판에서 이미 채운 뒤 일부러 비운 칸은 2판에서도 다시 채우지 않는다. */
+var CASE_STAGE_SEED_NOTE_V = 2;
+var CASE_STAGE_OLD_SEED_NOTES = {
+  'wc-apply':  ['결정 통보받은 날부터 90일 이내 심사청구'],
+  'wc-review': ['심사 결정 통보받은 날부터 90일 이내 재심사청구']
+};
 function caseStageFillSeedNotes(arr){
   if(!Array.isArray(arr)) return arr;
   var changed = false;
@@ -40866,7 +40917,9 @@ function caseStageFillSeedNotes(arr){
     if(!s || !s.dueNote) return x;
     changed = true;
     var y = Object.assign({}, x, { seedNoteV: CASE_STAGE_SEED_NOTE_V });
-    if(!String(x.dueNote||'').trim()) y.dueNote = s.dueNote;
+    var cur = String(x.dueNote||'').trim();
+    if(!cur){ if(!(x.seedNoteV||0)) y.dueNote = s.dueNote; }
+    else if((CASE_STAGE_OLD_SEED_NOTES[x.code] || []).indexOf(cur) >= 0) y.dueNote = s.dueNote;
     return y;
   });
   if(changed) dbSet(BIZ_CASE_STAGE_KEY, out);
