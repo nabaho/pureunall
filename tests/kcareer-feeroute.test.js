@@ -124,7 +124,7 @@ function 판() {
   ctx.toast = (m) => ctx.알림들.push(m);
   ctx.kcUndoBar = (msg, tid, fn) => { ctx.막대 = { msg, fn }; }; ctx.KcareerFeeRoute = F;
   ctx.KV = { errors: 0, flush: async () => { if (ctx.KV실패) ctx.KV.errors++; } };   /* 기본 저장소(KV): 쓰기를 받기만 하고, 못 담았으면 flush 뒤에 errors 가 는다 */
-  Object.assign(ctx, { KC_FEE_SRC: ['resume', 'profile', 'certdoc'], KC_FEE_AUTO: ['resume'], FEE_SRC_LABEL: {}, _feeBoot: Date.now() - 60000, _feeT: null, _feeBusy: false, _feeDone: {}, _feeSeq: 0,
+  Object.assign(ctx, { KC_FEE_SRC: ['resume', 'profile', 'certdoc'], KC_FEE_AUTO: ['resume'], FEE_SRC_LABEL: {}, _feeBoot: Date.now() - 60000, _feeT: null, _feeBusy: false, _feeAgain: false, _feeDone: {}, _feeSeq: 0, 다시불림: 0, feeRouteSoon: () => { ctx.다시불림++; },
     읽은것: [], feeDocText: async (r) => { ctx.읽은것.push(r.id); return ctx.글[r.id] || ''; }, 글: {} });
   vm.createContext(ctx);
   vm.runInContext([떼기('function _feeFresh('), 떼기('function _feeJudgeRec('), 떼기('function _feeNewId('), 떼기('async function _feeSaved('), 떼기('function _feeKvErrors('), 떼기('async function feeMove('), 떼기('async function feeUndo('), 떼기('function _feeMovedNote('), 떼기('async function feeRouteFresh(')].join('\n'), ctx);
@@ -351,6 +351,65 @@ test('⑦ 훑기 창 — 아래 줄은 폰에서 줄을 바꾸고(요약 글이 
   assert.ok((머리.match(/white-space:nowrap/g) || []).length >= 5, '표 머리 칸은 한 줄(한 칸 한 줄 규칙)');
 });
 test('⑦ 비용 서류 줄에 「↩ 원래 자리로」 단추가 있다 — 알림 막대(8초)를 놓쳐도 되돌릴 길이 남는다', () => {
-  assert.match(SRC, /r\.feeFrom\?`<button class="btn sm"[^`]*onclick="feeUndoOne\('\$\{_jsAttr\(r\.id\)\}'\)">↩ 원래 자리로<\/button>`:''/);
+  assert.match(SRC, /r\.feeFrom&&KC_FEE_SRC\.indexOf\(r\.feeFrom\)>=0\?`<button class="btn sm"[^`]*onclick="feeUndoOne\('\$\{_jsAttr\(r\.id\)\}'\)">↩ 원래 자리로<\/button>`:''/, '우리 보관함 이름일 때만 단추를 보인다');
   const u = strip(떼기('async function feeUndoOne(')); assert.match(u, /feeUndo\(\[id\]\)/);
+});
+
+/* ───────── 재검증 2회차(2026-11-15) 지적 ───────── */
+test('⑤ 저장 실패로 되돌릴 때 «처음 읽은 사본»으로 덮지 않는다 — 그 사이 들어온 줄이 지워지지 않는다 (낮음 3)', async () => {
+  const { ctx, 저장 } = 판();
+  저장.resume = [{ id: 'resume_1', kind: '기타', org: '협회', savedAt: 지금() }]; 저장.feedoc = [{ id: 'feedoc_old', kind: '기타' }];
+  ctx.KV.flush = async () => { 저장.feedoc = 저장.feedoc.concat([{ id: 'feedoc_other_tab', kind: '기타' }]); ctx.KV.errors++; };   /* 쓰는 사이 다른 탭이 한 줄을 넣고, 이 쓰기는 실패한다 */
+  const 옮김 = await ctx.feeMove('resume', [{ id: 'resume_1', kind: '지급조서·영수증' }]);
+  assert.equal(옮김.length, 0);
+  assert.deepEqual(저장.feedoc.map((r) => r.id).sort(), ['feedoc_old', 'feedoc_other_tab'], '⚠ 다른 탭이 넣은 줄이 사라졌습니다');
+  assert.deepEqual(저장.resume.map((r) => r.id), ['resume_1']);
+});
+test('⑤ feeUndo 도 실패로 되돌릴 때 이번에 넣은 것만 뺀다', async () => {
+  const { ctx, 저장 } = 판();
+  저장.resume = [{ id: 'resume_1', kind: '기타', org: '협회', savedAt: 지금() }];
+  const 새 = await ctx.feeMove('resume', [{ id: 'resume_1', kind: '지급조서·영수증' }]);
+  ctx.KV.flush = async () => { 저장.resume = 저장.resume.concat([{ id: 'resume_other_tab', kind: '기타' }]); ctx.KV.errors++; };
+  assert.equal(await ctx.feeUndo([새[0].id]), 0);
+  assert.deepEqual(저장.resume.map((r) => r.id), ['resume_other_tab'], '⚠ 다른 탭이 넣은 줄이 사라졌거나 되돌린 줄이 남았습니다');
+  assert.deepEqual(저장.feedoc.map((r) => r.id), [새[0].id], '비용 서류 줄은 그대로');
+});
+test('⑤ feeUndo — 동기화로 온 feeFrom 이 우리 보관함(이력서·프로필·증명서) 이름이 아니면 건드리지 않는다 · «__proto__» 여도 터지지 않는다 (낮음 5)', async () => {
+  const { ctx, 저장, 쓴순서 } = 판();
+  저장.feedoc = [{ id: 'f1', kind: '기타', feeFrom: 'id_docs' }, { id: 'f2', kind: '기타', feeFrom: '__proto__' }, { id: 'f3', kind: '기타', feeFrom: 'meetfee' }];
+  assert.equal(await ctx.feeUndo(['f1', 'f2', 'f3']), 0); assert.equal(쓴순서.length, 0, '아무 통에도 쓰지 않았어야 합니다'); assert.equal(저장.feedoc.length, 3);
+  assert.ok(/back=Object\.create\(null\)/.test(strip(떼기('async function feeUndo('))), '이름표 없는 통');
+});
+test('자동 — 판정 도중 새 서류가 들어오면 끝난 뒤 한 번 더 본다(요청을 잊지 않는다) (낮음 4)', async () => {
+  const { ctx, 저장 } = 판();
+  저장.resume = [{ id: 'a', kind: '기타', org: '협회', genName: 'a', genFileId: 'fa', savedAt: 지금() }];
+  ctx.글 = { a: '지급확인서' };
+  const 첫째 = ctx.feeRouteFresh();                       /* 판정이 시작돼 «바쁜» 동안 */
+  await ctx.feeRouteFresh();                              /* 또 한 번 불린다 — 그냥 버려지면 안 된다 */
+  await 첫째;
+  assert.equal(ctx.다시불림, 1, '바쁠 때 들어온 요청을 끝난 뒤 다시 예약해야 합니다');
+  await ctx.feeRouteFresh(); assert.equal(ctx.다시불림, 1, '아무도 안 부르면 다시 예약하지 않는다');
+});
+test('⑦ .hwp — 자동 길은 열지 않고(한글 엔진 7MB 를 사람 몰래 받지 않는다), 훑기에서도 큰 파일은 안 연다 (낮음 2)', async () => {
+  let 엔진 = 0;
+  const 만들기 = (크기) => { const ctx = { Promise, Object, String, Array, Math, console, atob: (b) => Buffer.from(b, 'base64').toString('binary'), FEE_ZIP_MAX_CHARS: 1000, FEE_ZIP_MAX_ENTRIES: 20,
+    _feeLocalFile: async () => ({ base64: 'A'.repeat(크기), ext: 'hwp', name: 'x.hwp' }), b64ToAb: (b) => Buffer.from(b, 'base64'), _pkPdfText: async () => '', _ensureJSZip: async () => {}, JSZip: {},
+    _hwpTextOf: async () => { 엔진++; return '엔진 글'; } }; vm.createContext(ctx); vm.runInContext(떼기('function _feeEntryText(') + '\n' + 떼기('async function feeDocText('), ctx); return ctx; };
+  const 작은 = 만들기(1000);
+  await 작은.feeDocText({ genFileId: 'f', genName: 'x.hwp' }, { noHwp: true }); assert.equal(엔진, 0, '⚠ 자동 길이 한글 엔진을 불렀습니다');
+  assert.equal(await 작은.feeDocText({ genFileId: 'f', genName: 'x.hwp' }), '엔진 글'); assert.equal(엔진, 1, '훑기(사람이 누름)에서는 작은 .hwp 를 읽는다');
+  엔진 = 0; const 큰 = 만들기(8 * 1024 * 1024);
+  assert.equal(await 큰.feeDocText({ genFileId: 'f', genName: 'x.hwp' }), ''); assert.equal(엔진, 0, '큰 .hwp 는 열지 않는다');
+  assert.match(strip(떼기('async function feeRouteFresh(')), /noHwp:\s*true/, '자동 길은 noHwp');
+  assert.ok(!/이미 떠 있을 때만/.test(덩이), '⚠ 사실과 다른 주석(엔진은 늘 받아진다)이 남았습니다');
+});
+test('⑦ 폰 — 서류 보관함 줄은 줄을 바꿔 «단추까지 화면 안»에 둔다(PC 는 그대로) · 훑기 표의 «찾은 낱말»은 폭 상한 + 말줄임 + 전문 title', () => {
+  const 바탕 = strip(CSS);
+  const 폰 = [...바탕.matchAll(/@media\s*\(\s*max-width\s*:\s*520px\s*\)\s*\{([\s\S]*?)\n\}/g)].map((m) => m[1]).join('\n');
+  assert.match(폰, /#page-docbox \.card\.ds-card\[data-dsrow\]\{[^}]*flex-wrap:\s*wrap/); assert.match(폰, /\.ds-ic\{[^}]*flex:\s*1 1 100%/);
+  assert.match(폰, /#page-docbox \.ds-list\{[^}]*min-width:\s*0/, '⚠ 격자 칸이 줄어들 수 없으면 줄이 칸 밖(501px)으로 나가 단추가 화면 밖에 남습니다');
+  assert.match(폰, /#page-docbox \.ds-split\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(바탕, /#page-docbox \.card\.ds-card\[data-dsrow\]\{[^}]*flex-wrap:\s*nowrap/, 'PC 는 한 줄 그대로');
+  const 낱말 = strip(떼기('function feeSweepDraw(')).match(/data-label="찾은 낱말"[^>]*>/)[0];
+  assert.match(낱말, /max-width/); assert.match(낱말, /text-overflow:ellipsis/); assert.match(낱말, /title=/);
 });

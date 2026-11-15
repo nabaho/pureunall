@@ -894,6 +894,17 @@ html.dark #page-profile1 .p1-card{background:var(--soft)!important}   /* ⚙ 칸
   #modalFeeSweep .modal-foot{flex-wrap:wrap;align-items:center}
   #modalFeeSweep #feeSwSum{flex:1 1 100%;margin-right:0!important}
 }
+/* 폰: 서류 보관함 줄(이력서·프로필·증명서·비용)이 한 줄 nowrap 이라 375px 에서 1,017px — 「↩ 원래 자리로」를 비롯한 단추가 화면 밖이었다(재검증 2회차 중간).
+   줄을 바꿔 두 줄 카드로: 위 ☐·번호·이름·종류·날짜, 아래 부제·단추. PC 는 그대로다. */
+@media (max-width:520px){
+  #page-docbox .ds-split{grid-template-columns:minmax(0,1fr)}   /* 격자 칸이 «줄이 가장 길 때의 폭»(501px)을 최소로 잡아 375px 화면을 넘던 것 — 칸이 줄어들 수 있게 */
+  #page-docbox .ds-list{min-width:0}
+  #page-docbox .card.ds-card[data-dsrow]{flex-wrap:wrap;row-gap:2px}
+  #page-docbox .ds-card[data-dsrow] .t{flex:1 1 0;min-width:40%}
+  #page-docbox .ds-card[data-dsrow] .s{flex:1 1 100%;order:5}
+  #page-docbox .ds-card[data-dsrow] .ds-kind{margin-left:0}
+  #page-docbox .ds-card[data-dsrow] .ds-ic{flex:1 1 100%;justify-content:flex-end;flex-wrap:wrap;order:9}
+}
 #modalFeeSweep .btn:disabled{opacity:.5;cursor:default}   /* 고른 것이 없으면 «옮기기»는 눌리는 것처럼 보이면 안 된다 */
 /* 어두운 테마 — 표 머리·본문·기본 단추가 밝은 바탕에 밝은 글자(1.18~1.23:1)가 되던 것(검증 2026-11-15). 프로필 고르기 창(#p1PickTbl)과 같은 한 벌 */
 html.dark #feeSwTbl table{background:var(--card)}
@@ -7302,7 +7313,7 @@ var KC_FEE_SRC=['resume','profile','certdoc'];   /* 훑기(대표가 누를 때)
 var KC_FEE_AUTO=['resume'];                      /* 자동 대상 — 이력서 보관함만 */
 var FEE_SRC_LABEL={ resume:'이력서', profile:'프로필', certdoc:'경력증명서' };
 /* ⚠ 이 화면을 연 «그 순간»부터다 — 여유를 두면(예전엔 60초 전) 직전 화면에서 담은 예전 서류가 허락 없이 열려 자동으로 옮겨진다(검증 2026-11-15) */
-var _feeBoot=Date.now(), _feeT=null, _feeBusy=false, _feeDone={}, _feeSeq=0;
+var _feeBoot=Date.now(), _feeT=null, _feeBusy=false, _feeAgain=false, _feeDone={}, _feeSeq=0;
 /* 압축 파일(hwpx·docx)에서 읽을 글자·구역의 상한 — 작은 파일이 수 GB 로 풀리는 «압축 폭탄»에 탭이 죽지 않게(검증 2026-11-15) */
 var FEE_ZIP_MAX_CHARS=4*1024*1024, FEE_ZIP_MAX_ENTRIES=20;
 function feeRouteSoon(){
@@ -7336,7 +7347,7 @@ async function _feeLocalFile(id){
   }catch(e){ return null; }
 }
 /* 서류 «글자»를 이 기기 안에서 읽는다 — 밖으로 보내지 않는다. 못 읽으면 '' (스캔 PDF·그림·이 기기에 없는 파일·열리지 않는 hwp) */
-async function feeDocText(rec){
+async function feeDocText(rec, opt){
   var fid=rec && rec.genFileId; if(!fid) return '';
   var race=function(p, ms){ return Promise.race([p, new Promise(function(res){ setTimeout(function(){ res(''); }, ms); })]); };
   try{
@@ -7352,7 +7363,12 @@ async function feeDocText(rec){
       for(var i=0;i<이름.length && 글.length<FEE_ZIP_MAX_CHARS;i++) 글+=' '+(await _feeEntryText(z.file(이름[i]), FEE_ZIP_MAX_CHARS-글.length)).replace(/<[^>]+>/g,' ');
       return 글;
     }
-    if(ext==='hwp') return String(await race(_hwpTextOf(new Uint8Array(b64ToAb(f.base64)), f.name||rec.genName), 15000)||'');   /* 한글 엔진이 이미 떠 있을 때만 읽힌다(_hwpTextOf 안에서 확인) */
+    if(ext==='hwp'){
+      /* ⚠ .hwp 는 한글 엔진(7MB, 처음엔 인터넷에서 받는다)을 돌려야 읽힌다 — 엔진은 늘 새로 받아진다(재검증 2회차 2026-11-15).
+         그래서 «자동»(opt.noHwp)은 건너뛰고, 대표가 누른 훑기에서만 읽되 큰 파일은 열지 않는다(WASM 동기 호출이라 시간 제한으로 끊기지 않는다) */
+      if((opt && opt.noHwp) || f.base64.length>7*1024*1024) return '';
+      return String(await race(_hwpTextOf(new Uint8Array(b64ToAb(f.base64)), f.name||rec.genName), 15000)||'');
+    }
   }catch(e){ console.warn('비용 서류 글 읽기', e&&e.message); }
   return '';
 }
@@ -7389,7 +7405,8 @@ async function feeMove(src, picks){
     var 오류전=_feeKvErrors();
     set('feedoc', moved.concat(전));
     if(!(await _feeSaved(오류전))){
-      set('feedoc', 전);
+      var 새번호={}; moved.forEach(function(r){ 새번호[String(r.id)]=1; });
+      set('feedoc', (get('feedoc')||[]).filter(function(r){ return !(r && 새번호[String(r.id)]); }));   /* 지금 목록에서 «이번에 넣은 것»만 뺀다 — 처음 읽은 사본으로 덮으면 그 사이 들어온 줄이 지워지고 지운 기록표까지 남는다(재검증 2회차) */
       try{ toast('⚠️ 이 기기에 저장하지 못해 비용 서류로 옮기지 못했습니다 — 원래 보관함에 그대로 둡니다', 7000); }catch(e){}
       return [];
     }
@@ -7401,8 +7418,8 @@ async function feeMove(src, picks){
 /* 되돌리기 — 원래 보관함에 «새 번호»로 «먼저» 쓰고(담겼는지 확인) 비용 서류에서 뺀다. feeKeep 을 남겨 다시 안 옮긴다 */
 async function feeUndo(ids){
   var map={}; (ids||[]).forEach(function(i){ map[String(i)]=1; });
-  var cur=get('feedoc')||[], back={}, 돌려=[];
-  cur.forEach(function(r){ if(!(r && map[String(r.id)] && r.feeFrom)) return;
+  var cur=get('feedoc')||[], back=Object.create(null), 돌려=[];   /* 이름표 없는 통 — 동기화로 온 feeFrom 이 «__proto__» 여도 터지지 않게 */
+  cur.forEach(function(r){ if(!(r && map[String(r.id)] && r.feeFrom && KC_FEE_SRC.indexOf(r.feeFrom)>=0)) return;   /* 우리 보관함(이력서·프로필·증명서) 이름일 때만 — 엉뚱한 통에 쓰지 않는다 */
     var rec=Object.assign({}, r, { id:_feeNewId(r.feeFrom), kind:r.feeFromKind||'', feeKeep:1 });
     delete rec.feeFrom; delete rec.feeFromKind; delete rec.feeAt; delete rec.feeOrigId;
     (back[r.feeFrom]=back[r.feeFrom]||[]).push(rec); 돌려.push(String(r.id)); });
@@ -7413,7 +7430,7 @@ async function feeUndo(ids){
     if(!(await _feeSaved(오류전))) 실패=true;
   }
   if(실패){
-    쓴.forEach(function(w){ set(w.src, w.전); });
+    쓴.forEach(function(w){ var 넣음={}; back[w.src].forEach(function(b){ 넣음[String(b.id)]=1; }); set(w.src, (get(w.src)||[]).filter(function(r){ return !(r && 넣음[String(r.id)]); })); });   /* 이번에 넣은 것만 뺀다(통째 사본으로 덮지 않는다) */
     try{ toast('⚠️ 이 기기에 저장하지 못해 되돌리지 못했습니다 — 비용 서류에 그대로 둡니다', 7000); }catch(e){}
     return 0;
   }
@@ -7431,7 +7448,8 @@ function _feeMovedNote(moved){
   return '🧾 비용 서류로 보여 비용관리 › 저장 서류로 보냈습니다 — '+(moved.length>1?'«'+이름+'» 외 '+(moved.length-1)+'건':'«'+이름+'»');
 }
 async function feeRouteFresh(){
-  if(_feeBusy || typeof KcareerFeeRoute==='undefined') return;
+  if(typeof KcareerFeeRoute==='undefined') return;
+  if(_feeBusy){ _feeAgain=true; return; }   /* 판정 도중 새 서류가 들어왔다 — 끝난 뒤 한 번 더 본다(「5번 폴더 모두 넣기」는 10건마다 나눠 담는다) */
   _feeBusy=true;
   try{
     var 옮김=[];
@@ -7439,7 +7457,7 @@ async function feeRouteFresh(){
       var src=KC_FEE_AUTO[si], 줄들=(get(src)||[]).filter(_feeFresh);
       for(var i=0;i<줄들.length;i++){
         var r=줄들[i]; _feeDone[r.id]=1;                            /* 한 번만 본다 — 같은 서류를 두 번 열지 않는다 */
-        var j=_feeJudgeRec(r, await feeDocText(r));
+        var j=_feeJudgeRec(r, await feeDocText(r, { noHwp:true }));   /* 자동은 .hwp 를 열지 않는다 — 한글 엔진을 사람 몰래 받지 않게 */
         if(j.fee) 옮김=옮김.concat(await feeMove(src, [{ id:r.id, kind:j.kind }]));
       }
     }
@@ -7447,7 +7465,7 @@ async function feeRouteFresh(){
       var ids=옮김.map(function(r){ return r.id; });
       kcUndoBar(_feeMovedNote(옮김)+' · 이력서에 두려면', null, function(){ feeUndo(ids).then(function(n){ if(n) toast('↩ '+n+'건을 원래 보관함으로 되돌렸습니다 — 다시 옮기지 않습니다'); }); });
     }
-  } finally { _feeBusy=false; }
+  } finally { _feeBusy=false; if(_feeAgain){ _feeAgain=false; feeRouteSoon(); } }
 }
 /* ── 예전에 담긴 서류 훑기 — 대표가 누를 때만, 목록을 보여 주고 «고른 것만» 옮긴다 ── */
 var _feeSw=null, _feeSwFrom=null;
@@ -7486,7 +7504,7 @@ function feeSweepDraw(keepScan){
         +'<td data-label="지금 있는 곳" style="white-space:nowrap">'+escapeHtml(FEE_SRC_LABEL[r.src]||r.src)+'</td>'
         +'<td data-label="기관" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.org)+'">'+escapeHtml(r.org||'—')+'</td>'
         +'<td data-label="보낼 종류" style="white-space:nowrap">'+escapeHtml(r.kind)+'</td>'
-        +'<td data-label="찾은 낱말" style="white-space:nowrap">'+escapeHtml(r.words)+'</td></tr>'; }).join('')
+        +'<td data-label="찾은 낱말" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.words)+'">'+escapeHtml(r.words)+'</td></tr>'; }).join('')
     +(S.rows.length?'':'<tr><td colspan="6" style="color:var(--text-mute);padding:12px 6px">'+(S.done?'비용 서류로 보이는 서류가 없습니다':'찾는 중…')+'</td></tr>')
     +'</tbody></table></div>';
   if(fk){ var 칸=fk==='__all' ? document.getElementById('feeSwAll') : [].filter.call(box.querySelectorAll('input[data-fid]'), function(c){ return c.getAttribute('data-fid')===fk; })[0]; try{ if(칸) 칸.focus(); }catch(e){} }
@@ -9377,7 +9395,7 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
             ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
             : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄 보기</button><button class="btn sm ds-dl" onclick="docDl('${domain}','${r.id}','gen')" title="내 컴퓨터로 내려받습니다 — 브라우저의 다운로드 폴더(보통 내 PC › 다운로드)에 저장됩니다. 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇ 받기</button>`
               + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="받은 그대로의 빈 원본 양식을 내려받습니다(채운 서류가 아닙니다) — 다운로드 폴더에 저장됩니다">⬇ 원본</button>`:'')}
-          ${r.feeFrom?`<button class="btn sm" title="비용 서류로 보내진 서류입니다 — 눌러서 원래 보관함(${escapeHtml(FEE_SRC_LABEL[r.feeFrom]||r.feeFrom)})으로 되돌립니다. 되돌리면 다시 옮기지 않습니다" onclick="feeUndoOne('${_jsAttr(r.id)}')">↩ 원래 자리로</button>`:''}<button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
+          ${r.feeFrom&&KC_FEE_SRC.indexOf(r.feeFrom)>=0?`<button class="btn sm" title="비용 서류로 보내진 서류입니다 — 눌러서 원래 보관함(${escapeHtml(FEE_SRC_LABEL[r.feeFrom]||r.feeFrom)})으로 되돌립니다. 되돌리면 다시 옮기지 않습니다" onclick="feeUndoOne('${_jsAttr(r.id)}')">↩ 원래 자리로</button>`:''}<button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
         </div>`+이전; }).join('');
   }).join('');
   const 겹침=dsDupSummary(rows, D);
