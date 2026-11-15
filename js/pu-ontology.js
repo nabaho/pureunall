@@ -381,6 +381,16 @@
                       {path:'scal_ilteo/mid/{id}',entityType:'Document'},
                       {path:'scal_ilteo/final/{id}',entityType:'Document'},
                       {path:'scal_ilteo/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 산업일자리전환(jobtrans.html) — 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계 자동화(2026-11-15).
+       ★ 재무·인력·임금·설문 정량 엑셀 원본은 브라우저 로컬에서만 비식별 집계하고 DB·외부 AI 로 전송하지 않으며, 확정 스냅샷(snapshots)은 불변 보관한다. */
+    jobtrans:{ name:'산업일자리전환', file:'jobtrans.html', primaryRoots:['scal_jobtrans'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_jobtrans/projects/{id}',entityType:'Project'},
+                      {path:'scal_jobtrans/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/mid/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/final/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
       entityTypes:['Organization','Person','Project','Document','Task','Message'] }
   };
 
@@ -652,6 +662,9 @@
     /* 일터상생혁신 — 고객사 진단 요약·중간보고서·최종보고서 원고가 든 자리라 통합 진단에서 읽지 않고 앱 안에서만 본다. */
     ilteo_core:{program:'ilteo',strategy:'in_app',path:'scal_ilteo',parser:'coverage',
       gives:'일터상생혁신 사업장 워크스페이스·비식별 분석 카드·중간보고·최종보고 원고 (앱 안에서만 본다)'},
+    /* 산업일자리전환 — 능률협회·충남경제진흥원 사업장 비식별 요약 및 중간·최종보고서 원고가 든 자리라 앱 안에서만 본다. */
+    jobtrans_core:{program:'jobtrans',strategy:'in_app',path:'scal_jobtrans',parser:'coverage',
+      gives:'산업일자리전환 사업장 워크스페이스·비식별 분석 카드·기관별 중간·최종보고 원고 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
