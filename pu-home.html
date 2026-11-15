@@ -1034,6 +1034,38 @@ const SITE_BASE = 'https://raw.githubusercontent.com/nabaho/pureun-site/main';
 const SITE_VIEW = 'https://pureunlabor.co.kr';
 const PUBLISH_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/publishSite';
 
+/* ★★ 옛 홈페이지(라이믹스 · 푸른노무법인.kr)를 접었다 — 대표 결정 2026-11-15
+     「푸른노무법인.kr 더이상 연장 안한다」(2026-11-27 만료). 손님이 보는 홈페이지는 이제 새 사이트 하나다.
+   true 면:
+     ① «읽기»(다시 확인 · 쪽 읽어오기)는 옛 사이트(readHomepage) 대신 새 사이트 원본(SITE_BASE)에서 한다
+        — 2026-11-15 실제로 견줘 보니 구성원 7명·글 번호·경력 줄, 쪽 여덟의 글자·고칠 줄이 옛 사이트와 «같게» 읽혔다.
+     ② 「저장하고 반영」은 옛 관리자로 고치기(homepageWrite) 대신 새 사이트 구성원 쪽 올리기(publishPeople)로 잇는다.
+     ③ 옛 사이트에만 있던 단추(사진 바꾸기·내리기·칸 살펴보기·비상용 복사·관리자 화면·채우기 단추·로고와 잇기·
+        자동 연결 카드)는 «숨긴다» — 지우지 않는다. 눌러도 갈 곳이 없어 「안 되는 단추」만 남기 때문이다.
+     ④ «보기» 링크(사이트 열기·자문사 홈페이지 열기·이 쪽 열기)는 새 사이트 주소(SITE_VIEW),
+        좌우 두 칸·미리보기의 바탕은 우리 사본(사본바탕 — 이 화면과 같은 곳이라 CSS 가 text/css 로 온다).
+   ⚠ 함수 «안»에서는 이 상수를 맨이름으로 부르지 않는다 — `typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true`
+     로 읽어 `접음`에 담는다. 검사들이 함수를 떼어 «상자» 안에서 돌리는데, 상자에 이 상수가 없으면 통째로 죽는다
+     (jobsOf 머리말 — 이 화면에서 여섯 번 겪었다). 상자 안(상수 없음)에서는 옛 동작 그대로 돈다.
+   ⚠ 서버도 같은 스위치를 따로 갖는다(functions/homepage-fetch.js OLD_SITE_CLOSED) — 옛 사이트로 «요청 자체»를
+     안 보낸다(만료 도메인을 남이 다시 사면 관리자 계정이 그리로 갈 수 있어서). 되살린다면 «둘을 함께».
+   ⚠ 새 사이트에 아직 없는 길(남은 일): 얼굴 사진 바꾸기 · 글 번호 없는 새 노무사 넣기 · 계약 끝난 자문사 로고 저절로 숨기기. */
+const OLD_SITE_OFF = true;
+
+/* 새 사이트 원본에서 쪽 하나를 읽는다 — 옛 readHomepage 와 «같은 약속»(못 읽으면 null, 「내용 없음」과 구분).
+   mid 가 비면 첫 쪽(index.html). ?t= 는 GitHub 원본의 몇 분짜리 묵은 사본을 피하려고 붙인다(publishPeople 과 같은 길). */
+async function 새사이트쪽읽기(mid) {
+  try {
+    const 자리 = String(mid || '').replace(/^\/+|\/+$/g, '');
+    if (자리 && !/^[a-z0-9_]{1,30}$/.test(자리)) return null;   // 옛 서버 함수와 같은 이름 규칙 — 엉뚱한 자리를 읽지 않게
+    const res = await fetch(SITE_BASE + '/' + (자리 ? 자리 + '/' : '') + 'index.html?t=' + Date.now());
+    if (!res.ok) return null;
+    return await res.text();
+  } catch (e) {
+    return null;                                  // 그물이 끊긴 것도 «못 읽은 것»이다
+  }
+}
+
 /* 관리하는 쪽.
    ★ 2차 설계 §3 — «진짜»는 자료(homepage/config/pages/{mid} = { label, order })다.
      아래 두 목록은 ⑴ 자료가 비어 있을 때 쓰는 기본값이고 ⑵ 자료를 읽은 뒤의 «현재값»이다.
@@ -2340,6 +2372,8 @@ window.홈페이지에없음확인 = 홈페이지에없음확인;
 
 /* 자문사 편집칸의 «새로 올리기» — 아직 로고와 안 이은 회사에만 그린다. */
 function 새로올리기칸Html(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  if (접음) return '';   // 옛 자문사 게시판에 매달 저절로 올리던 칸 — 접은 뒤에는 갈 곳이 없다(위 OLD_SITE_OFF)
   const mk = partnerMark(d.key) || {};
   if (Number(mk.boardSrl) > 0) return '';
   const 동의 = mk.consent && String(mk.consent.date || '').trim() ? mk.consent : null;
@@ -2374,6 +2408,8 @@ function 새로올리기칸Html(d) {
 /* 자문사 편집칸의 «자동 연결» 줄 — 로고 잇기 · 계약이 끝나도 남기기.
    ★ 이어 두지 않았으면 «자동으로 안 내려간다»고 있는 그대로 말한다. */
 function 로고연결칸Html(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  if (접음) return '';   // 옛 게시판 로고 글과 잇는 칸(계약 끝나면 옛 게시판 휴지통) — 접은 뒤에는 갈 곳이 없다
   const mk = partnerMark(d.key) || {};
   const n = Number(mk.boardSrl) || 0;
   const 남김 = mk.keep && String(mk.keep.why || '').trim() ? mk.keep : null;
@@ -3514,9 +3550,15 @@ window.saveDraft = saveDraft;
      저장만 하고 그렇다고 말한다 — 묻는 창부터 띄우면 고장처럼 보인다.
    ⚠ «저장만» 하는 길은 ⋯ 안에 있다(saveDraft). 없애지 않는다. */
 async function 저장하고반영() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   const d = App.draft;
   if (!d) return;
   if (!await saveDraft(true)) return;
+  /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF) — 옛 관리자로 고치기(homepageWrite) 대신 홈페이지 «구성원 소개» 쪽을
+       우리 자료로 다시 만들어 올린다(publishPeople). 묻는 걸음은 그대로다: 무엇이 올라가는지 먼저 보여 주고
+       사람이 「올리기」를 눌러야 올라간다. 직원(글 번호 없음)도 이 쪽에 함께 실리므로 글 번호를 따지지 않는다 —
+       글 번호·사진이 없어 못 실리는 노무사는 그 창이 «못 올리는 사람»으로 까닭과 함께 알려 준다. */
+  if (접음) { await publishPeople(); return; }
   if (!String(d.srl || '').trim()) {
     toast('저장했습니다 — 글 번호가 없어 홈페이지에는 아직 안 올라갑니다.');
     return;
@@ -3830,6 +3872,7 @@ window.setLineFormat = setLineFormat;
    ★ 이 함수의 요점은 «읽기에 실패한 것을 「안 올라감」으로 몰지 않는 것»이다.
      실패를 안 올라감으로 몰면 사장님이 멀쩡한 쪽을 다시 붙여넣게 된다. */
 async function checkHomepage() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   if (App.checking) return;
   App.checking = true; App.checkMsg = ''; App.checkBad = false;
   App.render();
@@ -3837,8 +3880,10 @@ async function checkHomepage() {
        전에는 끝난 뒤(applyStatus)에 시각을 찍어, 읽는 동안 남이 찍은 딱지까지 「같음」으로 덮었다. */
   const 시작 = { at: Date.now(), 본것: 본딱지(App.check) };
   try {
-    const token = await firebase.auth().currentUser.getIdToken();
-    const ask = async (path) => {
+    /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF)에는 «손님이 보는» 새 사이트 원본을 읽는다 — 로그인 표도 필요 없다.
+         약속은 같다: 못 읽으면 null(「내용 없음」과 구분) — 아래 「못 읽은 쪽은 지난 결과 그대로」가 그대로 선다. */
+    const token = 접음 ? null : await firebase.auth().currentUser.getIdToken();
+    const ask = 접음 ? 새사이트쪽읽기 : async (path) => {
       try {
         const res = await fetch(READ_HOMEPAGE_URL, {
           method: 'POST',
@@ -4548,6 +4593,10 @@ function 새노무사목록() {
 
 /* 구성원 편집칸의 «새로 올리기» — 글 번호 없는 노무사에게만 */
 function 새노무사칸Html(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  /* 옛 구성원 게시판에 매달 저절로 올리던 칸 — 접은 뒤에는 갈 곳이 없다.
+     ⚠ 새 사이트에 «글 번호 없는 새 노무사»를 넣는 길은 아직 없다(남은 일 — 위 OLD_SITE_OFF). */
+  if (접음) return '';
   if (!d || String(d.srl || '').trim() || d.mkind === 'staff') return '';
   const rec = (App.members || {})[d.key] || {};
   const 준비 = 새노무사준비(rec);
@@ -4764,6 +4813,10 @@ const 사진긴쪽 = 900;
 const 사진품질 = 0.85;
 
 function 사진칸Html(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  /* 얼굴 사진 바꾸기는 옛 게시판의 «메인 이미지» 칸으로 보내는 길이었다 — 접은 뒤에는 갈 곳이 없다.
+     ⚠ 새 사이트는 지금 쪽의 사진을 «이어받기만» 한다. 새 사이트용 사진 올리기는 남은 일이다(위 OLD_SITE_OFF). */
+  if (접음) return '';
   if (!d || !d.srl) return '';
   const 고른것 = (App.사진 && App.사진.key === d.key) ? App.사진 : null;
   /* ★ 올린 뒤 «확인» (대표 지시 2026-09-14 「사진 올라가면 간단하게 사진 확인 가능하게」).
@@ -6216,6 +6269,10 @@ function 새사이트줄() {
 }
 /* 한 줄 = 말 · 숫자. 숫자가 없으면(0·빈 값) 그 줄을 안 그린다 — 빈 값은 자리만 차지한다. */
 function 자동카드Html() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  /* 「자동 연결」 카드 — 옛 게시판의 내리기·올리기·정찰. 접은 뒤에는 서버도 건너뛴다(홈자동한번 → 접음).
+     ⚠ 새 사이트 매달 재게시(퇴사자 빼기)는 이 카드와 따로 그대로 돈다. */
+  if (접음) return '';
   const r = 마지막자동();
   const 줄 = (t, v) => v ? '<div class="arow"><span>' + t + '</span><b>' + v + '</b></div>' : '';
   /* ★ 폰에서는 «한 줄»로 접는다 (대표 결정 2026-10-30 — 「폰화면도 더 간단히」, 목업 추천).
@@ -6291,6 +6348,9 @@ const 자동정찰간격 = 7 * 24 * 60 * 60 * 1000;
 /* 정찰 판 — 서버(functions/homepage-auto.js 정찰판)와 «같아야» 한다. 다르면 이레가 안 지났어도 다시 정찰한다. */
 const 자동정찰판 = 4;
 async function 자동정찰저절로() {
+  /* 옛 홈페이지를 접었으면(OLD_SITE_OFF) 화면을 열 때마다 옛 게시판을 정찰하러 서버를 부르지 않는다.
+     typeof 로 감싼다 — 이 함수를 떼어 돌리는 검사 상자에 그 상수가 없어도 죽지 않게. */
+  if (typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true) return false;
   if (!App.isStaff) return false;
   try {
     const s = await db.ref('homepage/auto/recon/at').once('value');
@@ -6452,6 +6512,7 @@ function railHtml() {
 }
 
 function appbarHtml() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   const at = App.check && App.check.at;
   /* ★★ 2026-10-24 대표 결정(목업 «추천» ①①①) — 「홈페이지」 낱말을 이 띠에서 걷는다.
        「홈페이지라는 단어가 너무 많아 혼란스럽다」. 맨 위 공용 띠(「푸 홈페이지」)가 이미
@@ -6490,7 +6551,8 @@ function appbarHtml() {
        거기 두면 자문사 화면 안(목록 머리)에도 같은 단추가 생겨 둘이 된다 —
        실제로 2026-09-06 에 「자문사 고르기」가 위아래 두 곳에 생겼다.
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
-    + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
+    /* 접은 뒤에는 손님이 보는 홈페이지가 새 사이트다 */
+    + '<a class="btn" style="text-decoration:none" href="' + esc(접음 ? SITE_VIEW : PuHomeExport.ORIGIN)
     + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">사이트 <span class="pc-only">열기 </span>↗</a>'
     /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).
        ⚠ 이 단추 하나가 «지금 홈페이지를 손 안 대고 고치는» 유일한 길인데, 넣는 자리가
@@ -6512,9 +6574,10 @@ function appbarHtml() {
     + '<option value="plain"' + (App.lineFormat === 'plain' ? ' selected' : '') + '>줄바꿈만 (기본)</option>'
     + '<option value="div"' + (App.lineFormat === 'div' ? ' selected' : '') + '>줄마다 감싸기</option>'
     + '</select></label>'
-    + '<button class="btn" onclick="openFillSetup()"'
+    /* 옛 관리자 화면용 즐겨찾기 단추 — 접은 뒤(OLD_SITE_OFF)에는 넣을 곳이 없어 숨긴다 */
+    + (접음 ? '' : '<button class="btn" onclick="openFillSetup()"'
     + ' title="지금 홈페이지를 관리자 화면에 안 들어가고 고치는 단추입니다 — 한 번만 넣으면 됩니다">'
-    + '⚙ 채우기 단추 넣기</button>'
+    + '⚙ 채우기 단추 넣기</button>')
     /* ★ 「바뀐 기록」 — 누가·언제·무엇을 전→후로 한 화면에서 본다 (2026-09-13 ㉮).
        ⚠ 머리띠에 둔다. 이것은 «화면 전체»에 대한 것이다 — 한 사람의 이력은
          그 사람 편집칸의 「되돌리기」가 이미 보여 준다. */
@@ -6526,8 +6589,9 @@ function appbarHtml() {
        ⚠ 없애지 않는다 — 구성원 갈래를 볼 때만 낸다(무엇이 올라가는지와 보는 화면이 맞게). */
     + (App.group === 'members'
         ? '<button class="btn" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
-          + ' title="여기 자료로 새 사이트의 «구성원 소개» 쪽을 다시 만들어 올립니다. 무엇이 올라가는지 먼저 보여드립니다.">'
-          + (App.publishing ? '올리는 중…' : '새 사이트에 올리기 (준비 중)') + '</button>'
+          + ' title="여기 자료로 홈페이지의 «구성원 소개» 쪽을 다시 만들어 올립니다. 무엇이 올라가는지 먼저 보여드립니다.">'
+          /* 접은 뒤에는 이 쪽이 «손님이 보는» 홈페이지다 — 「(준비 중)」을 뗀다 */
+          + (App.publishing ? '올리는 중…' : (접음 ? '구성원 쪽 다시 올리기' : '새 사이트에 올리기 (준비 중)')) + '</button>'
         : '')
     + '</div></details>'
     + '</div>';
@@ -6592,6 +6656,11 @@ function jobsOf() {
     const r = App.autoRuns[달][k];
     if (r && (!끝자동 || Number(r.at) > Number(끝자동.at))) 끝자동 = r;
   }));
+  /* ★ 옛 홈페이지를 접었나(OLD_SITE_OFF, 2026-11-15). typeof 로 감싼다 — 이 함수를 떼어 돌리는 검사 상자에
+       그 상수가 없어도 죽지 않게(아래 새거래처목록과 같은 까닭). 접었으면 옛 게시판 자동 연결의 할 일은 띄우지 않는다
+       — 서버도 이제 그 일을 건너뛰므로(홈자동한번 → 접음) 지난 기록의 「못 돌았다·못 내렸다」만 영영 남는다. */
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;
+  if (접음) 끝자동 = null;
   if (끝자동 && 끝자동.멈춤) {
     add({ cls: '', t: '자동 내리기를 멈췄습니다', n: (끝자동.후보 || []).length,
       who: esc(끝자동.멈춤),
@@ -6657,7 +6726,21 @@ function jobsOf() {
 
   /* ── 홈페이지에 남아 있는 것 ── */
   const toRemove = rowsWith(r => r.status === 'toRemove');
-  if (toRemove.length) {
+  if (toRemove.length && 접음) {
+    /* 접은 뒤: 손님이 보는 구성원 쪽은 우리 자료로 «다시 만들어» 올린다 — 다시 올리면 퇴사자는 저절로 빠진다
+       (publishPeople 이 퇴사·안 올림을 빼고 그린다). 옛 게시판 휴지통으로 옮기는 단추는 갈 곳이 없다. */
+    add({ cls: '', t: '퇴사한 노무사가 홈페이지에 남아 있습니다', n: toRemove.length,
+      who: someNames(toRemove),
+      go: '<button class="btn sm hot" onclick="publishPeople()"'
+          + ' title="우리 자료로 구성원 소개 쪽을 다시 만들어 올립니다 — 무엇이 올라가는지 먼저 보여 드립니다">'
+          + '구성원 쪽 다시 올리기</button>'
+          + '<button class="btn sm" onclick="App.filt(\'toRemove\',\'members\')">'
+          + '누구인지 보기</button>',
+      whyTitle: '다시 올리면 어떻게 되나',
+      why: '구성원 소개 쪽을 <b>우리 자료로 다시 만들어</b> 올립니다 — 퇴사한 분은 빠집니다. '
+         + '올리기 전에 누가 실리고 누가 빠지는지 먼저 보여 드립니다.<br>'
+         + '올린 뒤 1~2분 지나 <b>「다시 확인」</b>을 누르면 딱지가 바뀝니다.' });
+  } else if (toRemove.length) {
     add({ cls: '', t: '퇴사한 노무사가 홈페이지에 남아 있습니다', n: toRemove.length,
       who: someNames(toRemove),
       /* ★ 2026-09-13 — 한 사람씩 들어가 고치지 않는다 (대표 지시 「한 번에 수정할 수
@@ -6781,11 +6864,17 @@ function jobsOf() {
          전에는 «알리기만» 했다. 이제 우리 명단에서는 자동으로 빠지지만, 지금 홈페이지는
          우리가 못 고치므로 «거기서 내리는 일»만 사람 손에 남는다 — 그 한 가지를 말한다. */
       /* ★ 2026-10-05 월간 자동 연결 — 이제 «이어 둔» 로고는 서버가 다음 달 1일에 내린다 */
-      why: '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
-         + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
+      why: 접음
+        /* 접은 뒤에는 옛 게시판 로고를 서버가 내리던 길이 없다 — 새 사이트 자문사현황은 «로고 관리»에서 손본다.
+           ⚠ 계약 끝난 로고를 저절로 숨기는 길은 새 사이트에 아직 없다(남은 일). */
+        ? '우리 명단에서는 자동으로 뺐습니다. 홈페이지 자문사현황의 로고는 <b>저절로 내려가지 않습니다</b> — '
+          + '자문사 목록 머리의 «로고 관리»에서 빼고 올려 주십시오.'
+        : '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
+          + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
   }
   /* ★ 3단계(2026-10-05) — 홈페이지에 아직 없는 노무사: 사진·올리기 허락을 넣어 달라고 알린다 */
-  const 새사람 = (typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
+  /* 접은 뒤에는 옛 게시판에 매달 저절로 올리던 길이 없다 — 새 노무사(글 번호 없음)를 새 사이트에 넣는 길은 남은 일 */
+  const 새사람 = (!접음 && typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
   if (새사람.length) {
     add({ cls: 'info', t: '새 노무사 — 사진·올리기 허락을 넣어 주십시오', n: 새사람.length,
       who: esc(새사람.slice(0, 3).map(x => x.name + (x.낡은허락 ? '(다시 허락)' : '')).join(', ')
@@ -6797,7 +6886,8 @@ function jobsOf() {
   }
   /* ★ 2단계(2026-10-05) — 새 거래처: 로고·공개 동의를 넣어 달라고 알린다.
        ⚠ typeof 로 감싼다 — 이 함수를 떼어 돌리는 검사 상자에 새 부품이 없어도 죽지 않게. */
-  const 새거래처 = (typeof 새거래처목록 === 'function') ? 새거래처목록() : [];
+  /* 접은 뒤에는 옛 자문사 게시판에 매달 저절로 올리던 길·로고와 잇기가 갈 곳이 없다 — 그 할 일 셋을 띄우지 않는다 */
+  const 새거래처 = (!접음 && typeof 새거래처목록 === 'function') ? 새거래처목록() : [];
   const 넣을곳 = 새거래처.filter(x => !x.준비 && !x.올렸음);
   const 가는단추 = (목록) => 목록.slice(0, 3).map(x => '<button class="btn sm" onclick="App.jump(\'partner\',\''
     + esc(x.id) + '\')">' + esc(x.name) + '</button>').join('');
@@ -6821,7 +6911,7 @@ function jobsOf() {
   /* ★ 월간 자동 연결(2026-10-05) — 업체관리를 읽었는데 로고와 이은 업체가 «하나도» 없으면
        계약이 끝나도 아무것도 안 내려간다. 그 사실을 할 일로 알린다. */
   const 이은로고 = Object.keys(App.partners || {}).filter(id => Number((App.partners[id] || {}).boardSrl) > 0);
-  if ((App.companies || []).length && !App.companiesErr && !이은로고.length) {
+  if (!접음 && (App.companies || []).length && !App.companiesErr && !이은로고.length) {
     add({ cls: 'info', t: '자동 연결 — 자문사현황 로고를 업체와 아직 안 이었습니다',
       go: '<button class="btn sm" onclick="로고잇기창()">로고와 잇기</button>',
       why: '이어 둔 로고만 계약이 끝났을 때 <b>다음 달 1일에 저절로</b> 휴지통으로 내려갑니다. '
@@ -7288,6 +7378,7 @@ function listCountHtml() {
 }
 
 function listHtml() {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   let h = '<div class="list">';
   h += '<div class="lh"><span id="listCount">' + listCountHtml() + '</span>'
     + '<span style="flex:1"></span>'
@@ -7296,11 +7387,13 @@ function listHtml() {
          직원은 새 사이트에만 있어 이것이 «반영» 단추다. 사진은 직원에게 아직 없다(2단계). */
     + (App.group === 'members' && App.filter === 'staff'
         ? '<button class="btn sm pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '') + '>'
-          + (App.publishing ? '올리는 중…' : '새 사이트에 올리기') + '</button>'
+          + (App.publishing ? '올리는 중…' : (접음 ? '홈페이지에 올리기' : '새 사이트에 올리기')) + '</button>'
         : '')
     /* ★ 사진 여러 장 (대표 지시 2026-09-14 「여러 명도」) — 여러 사람 일이라
-         한 사람 편집칸이 아니라 «목록 머리»가 제자리다. */
-    + (App.group === 'members' && App.filter !== 'staff'
+         한 사람 편집칸이 아니라 «목록 머리»가 제자리다.
+       ⚠ 옛 게시판 «메인 이미지» 칸으로 보내는 길이라 접은 뒤(OLD_SITE_OFF)에는 숨긴다 — 눌러도 서버가 410 으로 돌려보낸다
+         (2026-11-15 검토 «중간»). 새 사이트용 사진 올리기는 남은 일. */
+    + (!접음 && App.group === 'members' && App.filter !== 'staff'
         ? '<button class="btn sm" onclick="사진여럿열기()"'
           + ' title="사진 여러 장을 한 번에 올립니다 — 파일 이름으로 주인을 찾아 드립니다">'
           + '📷 여러 장</button>'
@@ -7449,6 +7542,11 @@ function rowsHtml() {
    ★ 구성원 쪽은 새 홈페이지에서 온다(상대 주소를 쓴다) → 우리 사본을 바탕으로.
      사본은 이 화면과 같은 곳이라 도메인이 어떻게 되든 안 깨진다. */
 function 쪽바탕(mid) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
+  /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF)에는 쪽도 새 사이트에서 온다(상대 주소 «../files/…»를 쓴다) →
+       구성원 쪽과 같이 우리 사본을 바탕으로. 이 화면과 같은 곳이라 도메인·인증서와 무관하고,
+       CSS 를 text/css 로 준다(저장소 원본 raw 는 text/plain 으로 줘 꾸밈이 안 붙는다 — 2026-11-15 확인). */
+  if (접음) return 사본바탕(mid);
   try { return PuHomeExport.ORIGIN + '/' + mid; } catch (e) { return ''; }
 }
 function 사본바탕(mid) {
@@ -7700,7 +7798,9 @@ function partnerEdit(d) {
     + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">'
     + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
     + '<span style="flex:1"></span>'
-    + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
+    /* 접은 뒤에는 새 사이트의 자문사현황 — typeof 로 읽는다(상자 안에서도 안 죽게) */
+    + '<a class="btn" style="text-decoration:none" href="'
+    + esc((typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true) ? SITE_VIEW + '/partner/' : PuHomeExport.ORIGIN)
     + '" target="_blank" rel="noopener">홈페이지 열기</a>'
     + '<span class="sub">' + (mk.updatedAt ? '마지막 표시: ' + esc(stamp(mk.updatedAt)) : '표시 기록 없음')
     + '</span></div>';
@@ -7830,6 +7930,7 @@ function memberBandHtml(d, rec) {
 }
 
 function memberEdit(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   /* 직원은 이름·직급·차례만 고친다 — 글 번호·사진·경력은 노무사 카드의 것이다 (2026-11-01) */
   if (d.mkind === 'staff' && (App.members[d.key] || {}).kind === 'staff') return 직원편집(d);
   const rec = App.members[d.key] || {};
@@ -8043,17 +8144,22 @@ function memberEdit(d) {
        본길은 아래 띠의 「저장하고 반영」 하나다. 반영을 미루고 싶은 날을 위해 여기 둔다. */
   더보기.push('<button class="btn" onclick="saveDraft()"'
     + ' title="우리 자료에만 저장합니다 — 홈페이지는 바뀌지 않습니다">저장만 (홈페이지는 그대로)</button>');
-  더보기.push('<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
-    + ' title="즐겨찾기 「채우기」 단추에 넘길 쪽지를 복사합니다 — 반영이 막힐 때">'
-    + '비상용 복사 (반영이 막힐 때)</button>');
-  if (d.srl) {
+  /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF): 비상용 복사·관리자 화면·칸 살펴보기·내리기(휴지통)는
+       «옛 관리자 화면»으로 가는 길이라 숨긴다 — 눌러도 갈 곳이 없다. 새 사이트에서 빼는 길은 아래
+       「새 사이트에서 빼기」(offSiteSet)와 「저장하고 반영」이다. */
+  if (!접음) {
+    더보기.push('<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
+      + ' title="즐겨찾기 「채우기」 단추에 넘길 쪽지를 복사합니다 — 반영이 막힐 때">'
+      + '비상용 복사 (반영이 막힐 때)</button>');
+  }
+  if (d.srl && !접음) {
     더보기.push('<a class="btn" style="text-decoration:none" href="'
       + esc(PuHomeExport.editUrl('member', d.srl))
       + '" target="_blank" rel="noopener">관리자 화면에서 열기</a>');
   }
   더보기.push('<button class="btn" onclick="openHistory()">되돌리기</button>');
   /* 무엇이 «왜» 안 되는지 그 자리에서 보는 창. 값은 안 읽고 칸 이름만 본다. */
-  if (d.srl) {
+  if (d.srl && !접음) {
     더보기.push('<button class="btn" onclick="홈페이지칸살펴보기()"'
       + ' title="홈페이지 고치는 화면에 어떤 칸이 있는지 봅니다 — 값은 안 읽습니다">'
       + '칸 살펴보기</button>');
@@ -8062,12 +8168,12 @@ function memberEdit(d) {
        도메인을 안 붙인 사이트에 대한 스위치라 늘 자리를 차지할 까닭이 없다.
        ⚠ 지금 상태를 단추 글에 적는다 — 누르면 무엇이 되는지가 누르기 전에 읽혀야 한다. */
   더보기.push(d.offSite
-    ? '<button class="btn" onclick="offSiteSet(false)" title="지금은 새 사이트에서 빠져 있습니다">새 사이트에 다시 넣기</button>'
-    : '<button class="btn" onclick="offSiteSet(true)" title="새 사이트(준비 중) 구성원 쪽에서 뺍니다 — 우리 목록에는 남습니다">새 사이트에서 빼기</button>');
+    ? '<button class="btn" onclick="offSiteSet(false)" title="지금은 홈페이지에서 빠져 있습니다">' + (접음 ? '홈페이지에 다시 넣기' : '새 사이트에 다시 넣기') + '</button>'
+    : '<button class="btn" onclick="offSiteSet(true)" title="홈페이지 구성원 쪽에서 뺍니다 — 우리 목록에는 남습니다">' + (접음 ? '홈페이지에서 빼기' : '새 사이트에서 빼기') + '</button>');
   더보기.push(kept
     ? '<button class="btn keep" onclick="keepOnSiteClear()">퇴사 경고 되살리기</button>'
     : '<button class="btn keep" onclick="keepOnSiteAsk()">퇴사 경고 끄기 (사유 남김)</button>');
-  if (내릴것) {
+  if (내릴것 && !접음) {   // 옛 게시판 휴지통으로 옮기는 단추 — 접은 뒤에는 「홈페이지에서 빼기」가 그 일을 한다
     /* ★ 2026-09-13 — 누르면 «바로» 내린다. 전에는 다섯 걸음짜리 안내가 떴다.
          손으로 하는 길(copyPrivate)은 서버가 막혔을 때 그 자리에서 물어보고 연다. */
     더보기.push('<button class="btn rm" onclick="한사람내리기(\'' + esc(d.key) + '\')"'
@@ -8085,7 +8191,9 @@ function memberEdit(d) {
     + (clash.length
         ? '<button class="btn pri" onclick="saveDraft()" title="글 번호가 겹쳐 반영은 막아 두었습니다">저장</button>'
         : '<button class="btn pri" onclick="저장하고반영()"'
-          + ' title="저장한 뒤 홈페이지에서 무엇이 바뀌는지 먼저 보여 드리고, 「고치기」를 누르셔야 바뀝니다">'
+          + ' title="' + (접음
+              ? '저장한 뒤 홈페이지 «구성원 소개»에 무엇이 올라가는지 먼저 보여 드리고, 「올리기」를 누르셔야 바뀝니다'
+              : '저장한 뒤 홈페이지에서 무엇이 바뀌는지 먼저 보여 드리고, 「고치기」를 누르셔야 바뀝니다') + '">'
           + '저장하고 반영</button>')
     + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">' + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
     + '<details class="more"><summary class="btn">⋯</summary>'
@@ -8791,22 +8899,32 @@ function 쪽자동읽기() {
 }
 
 async function readOnePage(mid, 조용히) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   if (App.reading) return;
   App.reading = mid;
   App.render();
   let 잘못 = null;
   let 버린고침 = 0;
   try {
-    const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(READ_HOMEPAGE_URL, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: mid })
-    });
-    if (!res.ok) throw new Error('서버가 ' + res.status + ' 을 돌려줬습니다');
-    const data = await res.json();
-    if (typeof data.html !== 'string') throw new Error('내용이 비어 있습니다');
-    버린고침 = keepPageHtml(mid, data.html);
+    /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF)에는 새 사이트 원본에서 읽는다 — 「새 홈페이지에 올리기 (N줄)」이
+         고칠 줄(pageRuns)을 «손님이 보는 그 쪽»에서 얻어야 하기 때문이다. 옛 사이트에서 읽으면 11-27 뒤로
+         줄이 안 그려져 그 단추가 아예 안 나온다. */
+    if (접음) {
+      const html = await 새사이트쪽읽기(mid);
+      if (html === null) throw new Error('새 홈페이지에서 이 쪽을 읽지 못했습니다');
+      버린고침 = keepPageHtml(mid, html);
+    } else {
+      const token = await firebase.auth().currentUser.getIdToken();
+      const res = await fetch(READ_HOMEPAGE_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: mid })
+      });
+      if (!res.ok) throw new Error('서버가 ' + res.status + ' 을 돌려줬습니다');
+      const data = await res.json();
+      if (typeof data.html !== 'string') throw new Error('내용이 비어 있습니다');
+      버린고침 = keepPageHtml(mid, data.html);
+    }
   } catch (e) {
     console.warn('[쪽 읽기]', e);
     잘못 = (e && e.message) || String(e);
@@ -8906,9 +9024,11 @@ function pageFixList(mid) {
    ★ 길을 «진짜 주소»로 돌린다 — 안 돌리면 꾸밈도 사진도 하나도 안 붙어
      「민무늬 맨 글」이 된다(2026-09-03 목업에서 그렇게 나왔다). */
 function pageFrameDoc(mid) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   const 원본 = (App.pageHtml || {})[mid] || '';
   if (!원본) return '';
-  const 밑 = PuHomeExport.ORIGIN.replace(/\/+$/, '') + '/' + mid + '/';
+  /* 접은 뒤에는 원본(App.pageHtml)이 새 사이트 것이라 바탕도 우리 사본 — 위 쪽바탕() 과 같은 까닭 */
+  const 밑 = 접음 ? 사본바탕(mid) : PuHomeExport.ORIGIN.replace(/\/+$/, '') + '/' + mid + '/';
   const 머리 = (/<head[^>]*>([\s\S]*?)<\/head>/i.exec(원본) || [, ''])[1];
   const 꾸밈 = (머리.match(/<link[^>]+rel="stylesheet"[^>]*>|<style[^>]*>[\s\S]*?<\/style>/gi) || [])
     .join('\n');
@@ -8999,12 +9119,17 @@ function pageRunEdit(mid, key, text, val, i) {
   }
   /* ★ 다시 그리지 않는다 — 글을 치는 중에 다시 그리면 커서가 맨 앞으로 튄다.
      단추의 숫자만 손으로 갈아 끼운다. */
+  /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF)에는 그 단추가 «홈페이지에 올리기»다 — 옛 복사 문구로 덮지 않는다.
+       typeof 로 읽는다(이 함수를 떼어 돌리는 검사 상자에 상수가 없어도 죽지 않게). */
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;
   const b = document.getElementById('pfixBtn');
   if (b) {
     const n = pageFixList(mid).length;
-    b.disabled = !n;
-    b.textContent = n ? ('홈페이지에 채우기용 복사 (' + n + '줄)') : '고친 줄이 없습니다';
+    b.disabled = !n || (접음 && !!App.publishing);
+    b.textContent = n ? ((접음 ? '홈페이지에 올리기 (' : '홈페이지에 채우기용 복사 (') + n + '줄)') : '고친 줄이 없습니다';
   }
+  const r = 접음 ? document.getElementById('pfixReset') : null;
+  if (r) r.disabled = !pageFixList(mid).length;
 }
 window.pageRunEdit = pageRunEdit;
 
@@ -9052,6 +9177,7 @@ async function copyPageFix(mid) {
 window.copyPageFix = copyPageFix;
 
 function pageLinesHtml(mid) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   const lines = (App.pageLines || {})[mid];
   if (!Array.isArray(lines)) {
     /* 없는 줄을 빈 줄로 지어내 보여 드리지 않는다 — 대신 «읽어오는 단추»를 준다 */
@@ -9159,18 +9285,31 @@ function pageLinesHtml(mid) {
     + '</div>'
     + '</div></div>'
     + '<div class="pfixbar">'
-    + '<button class="btn pri sm" id="pfixBtn" onclick="copyPageFix(\'' + esc(mid) + '\')"'
-    + (고친수 ? '' : ' disabled') + '>'
-    + (고친수 ? '홈페이지에 채우기용 복사 (' + 고친수 + '줄)' : '고친 줄이 없습니다') + '</button>'
-    + (고친수 ? '<button class="btn sm" onclick="publishPage(\'' + esc(mid) + '\')"'
-               + (App.publishing ? ' disabled' : '')
-               + ' title="새 홈페이지(미리보기)에 고친 줄만 갈아 끼워 올립니다">'
-               + (App.publishing ? '올리는 중…' : '새 홈페이지에 올리기 (' + 고친수 + '줄)')
-               + '</button>' : '')
-    + (고친수 ? '<button class="btn sm" onclick="resetPageFix(\'' + esc(mid)
-               + '\')">고친 줄 되돌리기</button>' : '')
+    /* ★ 옛 홈페이지를 접은 뒤(OLD_SITE_OFF): 「채우기용 복사」(옛 관리자 화면에 붙여넣기)는 갈 곳이 없어 숨기고,
+         「홈페이지에 올리기」가 파란 단추가 된다 — 손님이 보는 홈페이지가 이제 새 사이트 하나다. */
+    /* ⚠ 접은 뒤의 두 단추는 «고친 줄이 0 이어도» 늘 그려 둔다(잠가서). 줄을 칠 때는 커서가 튀지 않게 다시 그리지
+         않고 pageRunEdit 가 #pfixBtn·#pfixReset 의 잠금·숫자만 갈아 끼우는데, 처음에 안 그려 두면 갈아 낄 단추가 없다
+         (2026-11-15 검토 «높음» — 줄을 고쳐도 올리기 단추가 안 나오고 눌러도 안 되는 옛 복사 문구가 떴다). */
+    + (접음
+        ? '<button class="btn pri sm" id="pfixBtn" onclick="publishPage(\'' + esc(mid) + '\')"'
+          + ((고친수 && !App.publishing) ? '' : ' disabled')
+          + ' title="홈페이지에 고친 줄만 갈아 끼워 올립니다">'
+          + (App.publishing ? '올리는 중…' : (고친수 ? '홈페이지에 올리기 (' + 고친수 + '줄)' : '고친 줄이 없습니다'))
+          + '</button>'
+          + '<button class="btn sm" id="pfixReset" onclick="resetPageFix(\'' + esc(mid) + '\')"'
+          + (고친수 ? '' : ' disabled') + '>고친 줄 되돌리기</button>'
+        : '<button class="btn pri sm" id="pfixBtn" onclick="copyPageFix(\'' + esc(mid) + '\')"'
+          + (고친수 ? '' : ' disabled') + '>'
+          + (고친수 ? '홈페이지에 채우기용 복사 (' + 고친수 + '줄)' : '고친 줄이 없습니다') + '</button>'
+          + (고친수 ? '<button class="btn sm" onclick="publishPage(\'' + esc(mid) + '\')"'
+                     + (App.publishing ? ' disabled' : '')
+                     + ' title="새 홈페이지(미리보기)에 고친 줄만 갈아 끼워 올립니다">'
+                     + (App.publishing ? '올리는 중…' : '새 홈페이지에 올리기 (' + 고친수 + '줄)')
+                     + '</button>' : '')
+          + (고친수 ? '<button class="btn sm" onclick="resetPageFix(\'' + esc(mid)
+                     + '\')">고친 줄 되돌리기</button>' : ''))
     + '<span class="tip" style="flex:1">고친 줄만 갈아 끼웁니다 — 지도·표·구획은 그대로입니다. '
-    + '저장은 홈페이지에서 사람이 누릅니다.</span></div>'
+    + (접음 ? '올리면 1~2분 뒤 홈페이지에 뜹니다.' : '저장은 홈페이지에서 사람이 누릅니다.') + '</span></div>'
     + '<div class="legend2"><span><b class="k-head">굵은 남색</b> 쪽 제목·소제목</span>'
     + '<span><b class="k-sec">주황 숫자</b> 구획(01·02)</span>'
     + '<span class="k-tel">회색 연락처</span>'
@@ -9214,8 +9353,10 @@ async function splitByLive() {
 window.splitByLive = splitByLive;
 
 function pageEdit(d) {
+  const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
   const rec = App.pages[d.key] || {};
-  const url = PuHomeExport.editUrl('page', d.key);
+  /* 「홈페이지에서 이 쪽 열기」 — 접은 뒤에는 옛 관리자 편집 화면 대신 손님이 보는 새 사이트의 그 쪽 */
+  const url = 접음 ? SITE_VIEW + '/' + d.key + '/' : PuHomeExport.editUrl('page', d.key);
   /* 쪽 갈래도 구성원과 «같은 틀»이다 — 머리 고정, 가운데만 구름, 발 고정.
      갈래를 옮겨도 단추가 같은 자리에 있어 틀이 안 흔들린다. */
   let h = '<div class="edit">';

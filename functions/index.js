@@ -34,7 +34,7 @@ const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
         올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
-const { homepageUrl } = require("./homepage-fetch");
+const { homepageUrl, OLD_SITE_CLOSED, OLD_SITE_CLOSED_MSG } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
 const PUSH = require("./push-admins");   /* 관리자 폰 알림 — 건의·메일 신규 문의가 함께 쓴다 */
@@ -4799,6 +4799,9 @@ exports.readHomepage = functions
       try { await STAFF_GATE.assertActive(decoded.uid); }
       catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
 
+      /* 옛 홈페이지를 접었다(2026-11-15) — 읽으러 나가지 않는다. 화면은 새 사이트 원본을 직접 읽는다. */
+      if (OLD_SITE_CLOSED) { res.status(410).json({ error: OLD_SITE_CLOSED_MSG, 접음: true }); return; }
+
       const url = homepageUrl((req.body && req.body.path) || "");
       if (!url) { res.status(400).json({ error: "읽을 수 없는 쪽입니다." }); return; }
 
@@ -4844,6 +4847,9 @@ function 홈쿠키그릇() {
 }
 
 async function 홈부르기(주소, 그릇, 더할것) {
+  /* ★★ 옛 홈페이지를 접었다(2026-11-15) — 옛 사이트로 가는 요청은 모두 이 문을 지난다. 여기서 «보내기 전에» 멈춘다.
+       만료 도메인을 남이 다시 등록하면 쿠키·관리자 계정이 그쪽으로 간다(functions/homepage-fetch.js OLD_SITE_CLOSED). */
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);
   const 옵 = Object.assign({
     redirect: "manual",
     headers: Object.assign({
@@ -4860,6 +4866,8 @@ async function 홈부르기(주소, 그릇, 더할것) {
 /* 관리자로 들어간다. 들어갔는지 «말»로 묻지 않는다 —
    고치는 화면이 오는지로 판단한다(막을까 가 본다). 그게 가장 정직하다. */
 async function 홈로그인(아이디, 암호, 그릇) {
+  /* 접은 옛 홈페이지에는 관리자로 들어가지 않는다 — 아이디·비밀번호를 «만지기 전»에 멈춘다(홈부르기와 겹쳐 둔다) */
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);
   const 걸음 = [];
   /* ① 로그인 칸을 «받아 온다». 손님이 게시판을 열면 403 과 함께 그 칸이 딸려 온다.
        ⚠ 403 은 실패가 아니다 — 여기서 멈추면 안 된다. */
@@ -4908,6 +4916,9 @@ exports.homepageWrite = functions
          잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
       try { await STAFF_GATE.assertActive(decoded.uid); }
       catch (e) { res.status(e.status || 403).json({ ok: false, error: String((e && e.message) || e) }); return; }
+
+      /* 옛 홈페이지를 접었다(2026-11-15) — 관리자 비밀값을 꺼내기 «전에» 돌려보낸다 */
+      if (OLD_SITE_CLOSED) { res.status(410).json({ ok: false, 접음: true, error: OLD_SITE_CLOSED_MSG }); return; }
 
       const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
       /* 보기 = 무엇이 바뀌는지만 · 쓰기 = 진짜로 보낸다 · 정찰 = 칸 «이름»만 본다
@@ -5218,6 +5229,7 @@ async function 홈자동게시판보기(그릇, 목록) {
    ⚠ 값은 한 글자도 안 남긴다(HW.정찰·HW.채운칸들 규칙). 읽기만 하고 아무것도 보내지 않는다.
    결과는 homepage/auto/recon 에 — 재직 직원이 읽는 자리다(2026-10-30 전엔 관리자만). */
 async function 홈자동정찰(그릇) {
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);   // 접은 옛 사이트는 정찰하지 않는다(2026-11-15)
   let 로고글번호 = 0;
   try {
     const p = await fetch(HW.ORIGIN + "/partner", { headers: { "User-Agent": HW.브라우저표시 } });
@@ -5418,6 +5430,13 @@ async function 홈자동올리기(그릇, 목록) {
 }
 
 async function 홈자동한번(방식, 받은지문, 누가) {
+  /* ★ 옛 홈페이지를 접었다(2026-11-15) — 옛 게시판의 내리기·올리기·정찰을 «통째로» 건너뛴다.
+       돌기(HA.돌기)도 안 부른다: 부르면 매달 「못 내림·못 올림」 할 일만 쌓인다(옛 게시판이 없으므로).
+       퇴사자 빼기는 새 사이트 쪽(새사이트한번 · 화면 「저장하고 반영」)이 명부로 따로 한다.
+       ⚠ config.off 를 켜지 않는 까닭: 그 스위치는 새 사이트 재게시까지 멈춘다. */
+  if (OLD_SITE_CLOSED) {
+    return { ok: true, 접음: true, 안내: OLD_SITE_CLOSED_MSG, 달: 서울달(Date.now()), 내림: [], 못내림: [] };
+  }
   const 아이디 = process.env.HOME_ADMIN_ID, 암호 = process.env.HOME_ADMIN_PW;
   let 그릇 = null;
   /* 들어가는 것은 «내릴 것이 있을 때만» — 할 일 없는 달에 관리자 로그인을 남기지 않는다 */
@@ -5531,7 +5550,8 @@ exports.monthlyHomepageAuto = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const r = await 홈자동한번("돌리기", "", "auto");
-    console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
+    if (r.접음) console.log("[홈페이지 자동] " + r.달 + " 옛 홈페이지 접음 — 옛 게시판 일은 건너뜀");
+    else console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
       + " · 못내림 " + (r.못내림 || []).length
       + (r.꺼짐 ? " · 꺼져 있음" : "") + (r.멈춤 ? " · 멈춤" : "") + (r.실패 ? " · 실패 " + r.실패 : ""));
     /* ★ 내리기를 «마친 뒤» 새 사이트를 만든다 — 방금 내린 사람(takenDown)이 새 사이트에서도 함께 빠진다.

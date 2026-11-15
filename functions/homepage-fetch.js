@@ -37,4 +37,16 @@ function homepageUrl(path) {
   return ORIGIN + "/" + key;
 }
 
-module.exports = { ORIGIN, ALLOWED, BLOCKED, NAME_RE, homepageUrl };
+/* ★★ 옛 홈페이지를 접었다 — 대표 결정 2026-11-15 「푸른노무법인.kr 더이상 연장 안한다」(2026-11-27 만료).
+   true 면 서버는 옛 사이트에 «아무 요청도» 보내지 않는다 — 읽기(readHomepage)·고치기(homepageWrite)·
+   자동 연결(homepageAuto·매달)의 관리자 로그인까지 전부(functions/index.js 의 홈부르기·홈로그인 맨 앞).
+   ⚠ 왜 «요청 자체»를 막나: 만료된 도메인을 남이 다시 등록하면, 우리 서버가 그쪽으로 관리자 아이디·비밀번호를
+     보내게 된다. 실패를 기다리지 않고 «보내기 전에» 멈춘다.
+   ⚠ 새 사이트(nabaho/pureun-site · pureunlabor.co.kr) 일은 이 스위치와 무관하다 — 매달 새 사이트 재게시는 그대로 돈다.
+     (homepage/auto/config.off 로 끄지 말 것 — 그 스위치는 새 사이트 재게시까지 함께 멈춘다.)
+   ⚠ 되살린다면 이 한 줄과 화면(pu-home.html 의 OLD_SITE_OFF)을 «함께» false 로. */
+const OLD_SITE_CLOSED = true;
+const OLD_SITE_CLOSED_MSG = "옛 홈페이지(푸른노무법인.kr)는 2026-11-27 로 접었습니다 — "
+  + "홈페이지(pureunlabor.co.kr)는 홈페이지 화면의 「저장하고 반영」으로 고칩니다.";
+
+module.exports = { ORIGIN, ALLOWED, BLOCKED, NAME_RE, homepageUrl, OLD_SITE_CLOSED, OLD_SITE_CLOSED_MSG };
