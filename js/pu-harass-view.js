@@ -59,6 +59,56 @@
   var LAST_FOCUS = null;
   var SESSION_EPOCH = 0;
   var MODAL_SEQ = 0;
+  var LIVE_REC = {
+    active: false,
+    recog: null,
+    mediaRec: null,
+    stream: null,
+    timer: null,
+    audioUrl: '',
+    blob: null,
+    onKeyDown: null
+  };
+
+  function stopActiveLiveCapture() {
+    LIVE_REC.active = false;
+    if (LIVE_REC.timer) {
+      clearInterval(LIVE_REC.timer);
+      LIVE_REC.timer = null;
+    }
+    if (LIVE_REC.onKeyDown && typeof document !== 'undefined' && document.removeEventListener) {
+      try { document.removeEventListener('keydown', LIVE_REC.onKeyDown); } catch (e) {}
+      LIVE_REC.onKeyDown = null;
+    }
+    if (LIVE_REC.recog) {
+      try {
+        LIVE_REC.recog.onresult = null;
+        LIVE_REC.recog.onerror = null;
+        LIVE_REC.recog.onend = null;
+        LIVE_REC.recog.stop();
+      } catch (e) {}
+      LIVE_REC.recog = null;
+    }
+    if (LIVE_REC.mediaRec) {
+      try {
+        if (LIVE_REC.mediaRec.state && LIVE_REC.mediaRec.state !== 'inactive') {
+          LIVE_REC.mediaRec.stop();
+        }
+      } catch (e) {}
+      LIVE_REC.mediaRec = null;
+    }
+    if (LIVE_REC.stream && typeof LIVE_REC.stream.getTracks === 'function') {
+      try {
+        LIVE_REC.stream.getTracks().forEach(function (tr) { try { tr.stop(); } catch (e) {} });
+      } catch (e) {}
+      LIVE_REC.stream = null;
+    }
+    if (LIVE_REC.audioUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      try { URL.revokeObjectURL(LIVE_REC.audioUrl); } catch (e) {}
+      LIVE_REC.audioUrl = '';
+    }
+    LIVE_REC.blob = null;
+  }
 
   function currentAuthUid() {
     try {
@@ -138,21 +188,30 @@
     var det = 'c-hi-' + C.safeKey(caseId);
     return String(ack.erpCaseId) === det ? det : '';
   }
+  function isCaseErpLinked(c) {
+    if (!c) return false;
+    var ack = D.erpAck[c.id];
+    var eid = C.str(c.erpCaseId) || (c.erpDefer ? '' : trustedAckErpId(c.id, ack));
+    return !!eid;
+  }
   function erpLinkChip(c) {
     var ack = D.erpAck[c.id];
     var sync = D.erpSync[c.id];
-    var eid = C.str(c.erpCaseId) || trustedAckErpId(c.id, ack);
+    var eid = C.str(c.erpCaseId) || (c.erpDefer ? '' : trustedAckErpId(c.id, ack));
     var no = C.str(c.erpCaseNo) || (eid && ack && ack.erpCaseId === eid ? C.str(ack.erpCaseNo) : '');
     if (eid && (!sync || (ack && ack.erpCaseId === eid && Number(ack.syncedRevision || 0) === Number(sync.revision || 0)))) {
       return '<span class="chip c-green" title="푸른이알피 사건 및 업무메모와 동기화됨">✓ ' + esc(no || '이알피 연결') + '</span>';
     }
-    if (sync) {
+    if (!eid && c.erpDefer) {
+      return '<span class="chip c-amber" title="과거·보류 자료로 현재 이알피 번호를 비워두었습니다. 추후 [🏢 이알피 공란 일괄정리]에서 한 번에 채번·연결할 수 있습니다">⏸ 번호 공란(추후정리)</span>';
+    }
+    if (sync && !sync._deleted) {
       return '<span class="chip c-amber" title="푸른이알피를 열면 즉시 반영됩니다">⏳ ' + esc(no || '이알피 반영 대기') + '</span>';
     }
     if (eid) {
       return '<span class="chip c-blue">🏢 ' + esc(no || '이알피 사건') + '</span>';
     }
-    return '<span class="chip">미연결</span>';
+    return '<span class="chip">번호 미부여</span>';
   }
 
   /* ═══ HTML 메일 안전 평문 추출기 (DOMParser 비활성 문서 — img onerror 등 XSS 원천 차단) ═══ */
@@ -250,6 +309,7 @@
     BUNDLES = [];
     YEARLY_DATA = null;
     MAIL_ROWS = [];
+    stopActiveLiveCapture();
     closeModal();
     ['kpiBox', 'casesBox', 'inboxBox', 'yrKpiBox', 'yearlyBox', 'caseYrBar', 'inboxYrBar', 'yrPillsBar', 'detailBox', 'reportBox', 'printArea'].forEach(function (id) {
       var el = $(id);
@@ -306,16 +366,19 @@
       var btns = '';
       if (nm === 'cases') {
         btns = '<button class="sm pri" data-bulkact="cases:sync">🔄 선택 사건 메일수집 + 이알피 동기화</button>' +
+          '<button class="sm warn-btn" data-bulkact="cases:erp_link">🏢 선택 사건 이알피 번호정리</button>' +
           '<button class="sm danger" data-bulkact="cases:del">선택 사건 삭제</button>';
       } else if (nm === 'bundles') {
-        btns = '<button class="sm pri" data-bulkact="bundles:reg">➕ 선택 후보 일괄 사건등록 + 이알피 반영</button>' +
+        btns = '<button class="sm pri" data-bulkact="bundles:reg_defer">📥 선택 후보 편입(이알피번호 공란)</button>' +
+          '<button class="sm ok" data-bulkact="bundles:reg">🚀 사건등록 + 이알피 즉시반영</button>' +
           '<button class="sm" data-bulkact="bundles:hide">🙈 목록에서 제외</button>';
       } else if (nm && nm.indexOf('yr_') === 0) {
         var yrPicks = pickedIds(nm);
         var yrBundleCnt = yrPicks.filter(function (x) { return x.indexOf('b:') === 0; }).length;
         var yrCaseCnt = yrPicks.filter(function (x) { return x.indexOf('c:') === 0; }).length;
         if (yrBundleCnt > 0) {
-          btns += '<button class="sm pri" data-bulkact="' + esc(nm) + ':reg">➕ 선택 미등록 묶음(' + yrBundleCnt + '건) 사건등록 + 이알피 반영</button> ' +
+          btns += '<button class="sm pri" data-bulkact="' + esc(nm) + ':reg_defer">📥 선택 묶음(' + yrBundleCnt + '건) 편입(번호공란)</button> ' +
+            '<button class="sm ok" data-bulkact="' + esc(nm) + ':reg">🚀 이알피 즉시반영</button> ' +
             '<button class="sm" data-bulkact="' + esc(nm) + ':hide">🙈 미등록 묶음 제외</button> ';
         }
         if (yrCaseCnt > 0) {
@@ -371,7 +434,7 @@
       if (!rec || typeof rec !== 'object' || rec._deleted) return;
       var copy = Object.assign({}, rec);
       var ack = D.erpAck[copy.id];
-      var safeAckEid = trustedAckErpId(copy.id, ack);
+      var safeAckEid = copy.erpDefer ? '' : trustedAckErpId(copy.id, ack);
       if (!copy.erpCaseId && safeAckEid) copy.erpCaseId = safeAckEid;
       if (!copy.erpCaseNo && copy.erpCaseId && ack && ack.erpCaseId === copy.erpCaseId && ack.erpCaseNo) copy.erpCaseNo = ack.erpCaseNo;
       if (copy.erpCaseId && erpMap[copy.erpCaseId]) {
@@ -541,7 +604,8 @@
       closeDate: C.str(rec.closeDate),
       verdictSummary: C.str(rec.verdictSummary),
       erpCaseId: eid,
-      erpCaseNo: C.str(rec.erpCaseNo),
+      erpCaseNo: eid ? C.str(rec.erpCaseNo) : '',
+      erpDefer: eid ? false : !!rec.erpDefer,
       steps: rec.steps || {},
       mailLinks: trimCaseMails(rec.mailLinks)
     };
@@ -559,6 +623,7 @@
     var m = mutation || null;
     if (!m) {
       var direct = Object.assign({}, prev || {}, seedClean);
+      direct.erpDefer = C.str(direct.erpCaseId) ? false : !!direct.erpDefer;
       if (!seedClean.erpCaseId) { delete direct.sourceKind; delete direct.sourceId; }
       return direct;
     }
@@ -572,6 +637,8 @@
     next.companyLinkStatus = C.str(next.companyId) ? 'linked' : 'pending';
     next.managerMain = C.str(next.managerMain);
     next.managerSubs = normalizeSubs(next.managerSubs, next.managerMain);
+    next.erpDefer = C.str(next.erpCaseId) ? false : !!next.erpDefer;
+    if (!C.str(next.erpCaseId)) next.erpCaseNo = '';
 
     var curLinks = Array.isArray(src.mailLinks) ? src.mailLinks.slice() : [];
     var deriveMails = false;
@@ -670,6 +737,15 @@
         if (sRes && sRes.snapshot && isSessionCurrent(reqEpoch, reqUid)) {
           D.erpSync[clean.id] = sRes.snapshot.val();
         }
+      } else if (savedVal.erpDefer && !C.str(savedVal.erpCaseId) && D.erpSync[clean.id] && !D.erpSync[clean.id]._deleted && gate && typeof gate.remove === 'function') {
+        try {
+          var staleSync = D.erpSync[clean.id];
+          await gate.remove(fbDb.ref('harass_invest').child('erp_sync').child(clean.id), staleSync, {
+            entityType: 'Task',
+            allowPendingCompany: computedAllowPending || !staleSync.companyId
+          });
+          if (isSessionCurrent(reqEpoch, reqUid)) delete D.erpSync[clean.id];
+        } catch (ignoreSyncRm) {}
       }
     }
     if (isSessionCurrent(reqEpoch, reqUid)) rebuildDerived();
@@ -692,16 +768,22 @@
         if (!C.canAccessSecret(latestCase, ME)) return null;
         var val = snap.val();
         delete D.secretDenied[cid];
-        D.secretCache[cid] = (val && !val._deleted) ? val : {
-          id: cid,
-          companyId: C.str(latestCase.companyId),
-          overview: '',
-          conclusion: '',
-          recommendations: '',
-          interviews: [],
-          issues: [],
-          reportBody: ''
-        };
+        if (val && !val._deleted) {
+          D.secretCache[cid] = val;
+        } else if (typeof C.synthesizeWorkspaceFromCase === 'function') {
+          D.secretCache[cid] = C.synthesizeWorkspaceFromCase(latestCase, { id: cid, companyId: C.str(latestCase.companyId) });
+        } else {
+          D.secretCache[cid] = {
+            id: cid,
+            companyId: C.str(latestCase.companyId),
+            overview: '',
+            conclusion: '',
+            recommendations: '',
+            interviews: [],
+            issues: [],
+            reportBody: ''
+          };
+        }
         return D.secretCache[cid];
       } catch (e) {
         if (isSessionCurrent(reqEpoch, reqUid)) {
@@ -761,17 +843,57 @@
         ? spec.issues
         : (Array.isArray(src.issues) ? src.issues : (fallback.issues || []));
       if (spec.upsertIssue) isss = upsertListById(isss, spec.upsertIssue);
+      if (Array.isArray(spec.upsertIssues)) {
+        spec.upsertIssues.forEach(function (ui) {
+          if (ui && ui.id) isss = upsertListById(isss, ui);
+        });
+      }
       if (spec.deleteIssueIds) isss = markDeletedByIds(isss, spec.deleteIssueIds);
+
+      var nextOverview = spec.overview !== undefined ? spec.overview : (src.overview !== undefined ? src.overview : fallback.overview);
+      var nextConclusion = spec.conclusion !== undefined ? spec.conclusion : (src.conclusion !== undefined ? src.conclusion : fallback.conclusion);
+      var nextRec = spec.recommendations !== undefined ? spec.recommendations : (src.recommendations !== undefined ? src.recommendations : fallback.recommendations);
+      var nextBody = spec.reportBody !== undefined ? spec.reportBody : (src.reportBody !== undefined ? src.reportBody : fallback.reportBody);
+      var nextBodyAuto = spec.reportBodyAuto !== undefined
+        ? !!spec.reportBodyAuto
+        : (spec.reportBody !== undefined ? false : (src.reportBodyAuto !== undefined ? !!src.reportBodyAuto : !!fallback.reportBodyAuto));
+
+      if (spec.synthesizeRightFromCase && typeof C.synthesizeWorkspaceFromCase === 'function') {
+        var synSeed = Object.assign({}, src, {
+          id: cid,
+          companyId: coId,
+          overview: nextOverview,
+          conclusion: nextConclusion,
+          recommendations: nextRec,
+          interviews: ivs,
+          issues: isss,
+          reportBody: nextBody,
+          reportBodyAuto: nextBodyAuto
+        });
+        var synRes = C.synthesizeWorkspaceFromCase(caseById(cid) || c, synSeed, {
+          extraCandidateIssues: spec.extraCandidateIssues || [],
+          refreshReportBody: spec.refreshReportBody !== false,
+          forceRefreshBody: !!spec.forceRefreshBody
+        });
+        ivs = synRes.interviews;
+        isss = synRes.issues;
+        nextOverview = synRes.overview;
+        nextConclusion = synRes.conclusion;
+        nextRec = synRes.recommendations;
+        nextBody = synRes.reportBody;
+        nextBodyAuto = !!synRes.reportBodyAuto;
+      }
 
       var base = Object.assign({}, src, stripUndef({
         id: cid,
         companyId: coId,
-        overview: C.maskRrnText(spec.overview !== undefined ? spec.overview : (src.overview !== undefined ? src.overview : fallback.overview)),
-        conclusion: C.maskRrnText(spec.conclusion !== undefined ? spec.conclusion : (src.conclusion !== undefined ? src.conclusion : fallback.conclusion)),
-        recommendations: C.maskRrnText(spec.recommendations !== undefined ? spec.recommendations : (src.recommendations !== undefined ? src.recommendations : fallback.recommendations)),
+        overview: C.maskRrnText(nextOverview),
+        conclusion: C.maskRrnText(nextConclusion),
+        recommendations: C.maskRrnText(nextRec),
         interviews: ivs,
         issues: isss,
-        reportBody: C.maskRrnText(spec.reportBody !== undefined ? spec.reportBody : (src.reportBody !== undefined ? src.reportBody : fallback.reportBody))
+        reportBody: C.maskRrnText(nextBody),
+        reportBodyAuto: nextBodyAuto
       }));
       if (erpId) {
         base.sourceKind = 'case';
@@ -786,7 +908,7 @@
     if (!isSessionCurrent(reqEpoch, reqUid)) return null;
     var saved = res && res.snapshot ? res.snapshot.val() : null;
     if (saved) D.secretCache[cid] = saved;
-    if (spec.overview !== undefined || spec.conclusion !== undefined || spec.recommendations !== undefined || spec.reportBody !== undefined) {
+    if (spec.overview !== undefined || spec.conclusion !== undefined || spec.recommendations !== undefined || spec.reportBody !== undefined || spec.synthesizeRightFromCase) {
       DIRTY_RPT = { _cid: cid };
     }
     return saved;
@@ -930,22 +1052,31 @@
   }
 
   function drawCasesPane() {
-    var openCnt = 0, closedCnt = 0, totalMails = 0;
+    var openCnt = 0, closedCnt = 0, totalMails = 0, linkedCnt = 0, unlinkedCnt = 0;
     MERGED_CASES.forEach(function (c) {
       if (c.progress.erpStatus === 'closed') closedCnt++; else openCnt++;
       totalMails += (c.mailLinks || []).length;
+      if (isCaseErpLinked(c)) linkedCnt++; else unlinkedCnt++;
     });
+    var fourthLabel = BUNDLES.length > 0 ? '이알피 공란 · 후보' : '이알피 연동 · 공란';
+    var fourthVal = BUNDLES.length > 0
+      ? ('공란 ' + unlinkedCnt + ' · 후보 ' + BUNDLES.length)
+      : ('연동 ' + linkedCnt + ' · 공란 ' + unlinkedCnt);
     $('kpiBox').innerHTML =
       '<div class="kpi k-blue"><span>전체 조사 사건</span><b>' + MERGED_CASES.length + '건</b></div>' +
       '<div class="kpi k-green"><span>진행·법리검토 중</span><b>' + openCnt + '건 (종결 ' + closedCnt + ')</b></div>' +
       '<div class="kpi"><span>사건별 수집 공문·메일</span><b>' + totalMails + '건</b></div>' +
-      '<div class="kpi k-amber"><span>미등록 메일 후보 묶음</span><b>' + BUNDLES.length + '묶음</b></div>';
+      '<div class="kpi k-amber" title="푸른이알피 연결 ' + linkedCnt + '건 · 이알피 번호 공란(추후정리) ' + unlinkedCnt + '건 · 미등록 메일묶음 ' + BUNDLES.length + '묶음"><span>' + fourthLabel + '</span><b>' + fourthVal + '</b></div>';
 
+    if ($('erpBatchBtn')) {
+      $('erpBatchBtn').textContent = '🏢 이알피 공란 정리' + (unlinkedCnt ? ' (' + unlinkedCnt + ')' : '');
+    }
     if ($('caseYrBar')) $('caseYrBar').innerHTML = renderYearPillsHtml('cases');
 
     var q = C.str($('caseQ') && $('caseQ').value).toLowerCase();
     var cat = C.str($('caseCat') && $('caseCat').value);
     var st = C.str($('caseSt') && $('caseSt').value);
+    var erpF = C.str($('caseErp') && $('caseErp').value);
     var mgr = C.str($('caseMgr') && $('caseMgr').value);
 
     var filtered = MERGED_CASES.filter(function (c) {
@@ -953,6 +1084,8 @@
       if (cat && c.category !== cat) return false;
       if (st === 'open' && c.progress.erpStatus === 'closed') return false;
       if (st === 'closed' && c.progress.erpStatus !== 'closed') return false;
+      if (erpF === 'linked' && !isCaseErpLinked(c)) return false;
+      if (erpF === 'deferred' && isCaseErpLinked(c)) return false;
       if (mgr && c.managerMain !== mgr && (c.managerSubs || []).indexOf(mgr) < 0) return false;
       if (q) {
         var hay = [c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
@@ -1022,7 +1155,8 @@
           { html: stepDots(b.steps) + esc(b.summary.doneCount + '/8단계 추정 (' + b.summary.currentStepShort + ')') },
           { html: esc((b.firstDate || '-') + ' ~ ' + (b.lastDate || '-')) },
           { k: 'act', html:
-            '<button class="sm pri" data-act="regBundle" data-id="' + esc(b.bundleKey) + '">➕ 사건 등록 + 이알피 반영</button> ' +
+            '<button class="sm pri" data-act="regBundleDefer" data-id="' + esc(b.bundleKey) + '" title="이알피 번호를 비워둔 채 사건 현황에 편입하고 좌·우 작업실을 자동 채웁니다">📥 편입(번호공란)</button> ' +
+            '<button class="sm" data-act="regBundle" data-id="' + esc(b.bundleKey) + '">➕ 상세등록</button> ' +
             '<button class="sm" data-act="previewBundle" data-id="' + esc(b.bundleKey) + '">👁 메일·첨부</button> ' +
             '<button class="sm" data-act="hideBundle" data-id="' + esc(b.bundleKey) + '">제외</button>'
           }
@@ -1135,7 +1269,8 @@
             { html: esc(period + mgrLbl) },
             { k: 'act', html:
               '<button class="sm" data-act="previewBundle" data-id="' + esc(b.bundleKey) + '">👁 메일·첨부(' + mc + ')</button> ' +
-              '<button class="sm pri" data-act="regBundle" data-id="' + esc(b.bundleKey) + '">➕ 사건 등록</button> ' +
+              '<button class="sm pri" data-act="regBundleDefer" data-id="' + esc(b.bundleKey) + '">📥 편입(번호공란)</button> ' +
+              '<button class="sm" data-act="regBundle" data-id="' + esc(b.bundleKey) + '">➕ 상세등록</button> ' +
               '<button class="sm" data-act="hideBundle" data-id="' + esc(b.bundleKey) + '">제외</button>'
             }
           ]
@@ -1269,26 +1404,28 @@
     var isSplit = TAB === 'report' && RPT_MODE === 'split';
     var isIv = TAB === 'report' && RPT_MODE === 'iv';
     var isDoc = TAB === 'report' && RPT_MODE === 'doc';
+    var canFill = canEditCase(c) && C.canAccessSecret(c, ME);
     return '<div class="ws-modes">' +
       '<span class="hint">작업 화면</span>' +
       '<button type="button" class="sm' + (isDetail ? ' on' : '') + '" data-act="wsMode" data-id="detail">📋 공문함 · 8단계(' + ((c.mailLinks || []).length) + ')</button>' +
       '<button type="button" class="sm' + (isSplit ? ' on' : '') + '" data-act="wsMode" data-id="split">⚡ 좌우 대조 통합작업실 (추천)</button>' +
       '<button type="button" class="sm' + (isIv ? ' on' : '') + '" data-act="wsMode" data-id="iv">🎙️ 면담·녹취·전자서명 집중</button>' +
       '<button type="button" class="sm' + (isDoc ? ' on' : '') + '" data-act="wsMode" data-id="doc">⚖️ 3요건·보고서(.hwpx) 집중</button>' +
+      (canFill ? '<span class="sp"></span><button type="button" class="sm ok" data-act="autoFillWs" data-id="' + esc(c.id) + '" title="수집 메일과 면담 진술을 기반으로 비어 있는 좌·우 창 항목 및 보고서 초안을 자동 채움·저장합니다">🪄 좌·우 창 자동채움</button>' : '') +
       '</div>';
   }
 
   function casePickerBar(c) {
     var opts = MERGED_CASES.map(function (x) {
-      var no = x.erpCaseNo ? '[' + x.erpCaseNo + '] ' : '';
+      var no = x.erpCaseNo ? '[' + x.erpCaseNo + '] ' : (x.erpDefer ? '[번호공란] ' : '');
       return '<option value="' + esc(x.id) + '"' + (x.id === c.id ? ' selected' : '') + '>' + esc(no + (x.companyName || '미입력') + ' — ' + (x.title || '조사')) + '</option>';
     }).join('');
+    var editable = canEditCase(c);
     var erpBtn = c.erpCaseId
       ? '<a class="chip c-green" href="pu-erp.html?open=case:' + encodeURIComponent(c.erpCaseId) + '#menu=biz/case" title="푸른이알피 사건 상세 창으로 바로 이동합니다">🏢 푸른이알피 사건 열기 (' + esc(c.erpCaseNo || '연결됨') + ') ›</a>'
-      : '';
-    var editable = canEditCase(c);
+      : (editable ? '<button type="button" class="sm warn-btn" data-act="openErpBatch" data-id="' + esc(c.id) + '" title="이 사건을 푸른이알피 기존 사건과 연결하거나 신규 번호를 부여합니다">🏢 이알피 번호 부여·연결</button>' : '');
     var actBtns = editable
-      ? ('<button class="sm" data-act="syncOne" data-id="' + esc(c.id) + '">🔄 메일 재수집 · 이알피 반영</button>' +
+      ? ('<button class="sm" data-act="syncOne" data-id="' + esc(c.id) + '">🔄 메일 재수집 · 동기화</button>' +
          '<button class="sm" data-act="editCase" data-id="' + esc(c.id) + '">✏️ 기본정보 수정</button>')
       : '<span class="chip" title="사건 수정·동기화는 배정된 주·부담당 노무사 및 대표만 수행할 수 있습니다">👁 열람 전용 (담당 노무사·대표 편집)</span>';
     return '<div class="bar">' +
@@ -1549,15 +1686,16 @@
       /* ── 왼쪽 단: 면담·녹취록 자동정리·전자서명 원스톱 패널 + 수집 공문 빠른 인용 ── */
       '<div class="ws-col-left">' +
       '<div class="card">' +
-      '<div class="sec">🎙️ 면담 · 녹취정리 · 전자서명 (' + interviews.length + '건) <span class="sp"></span>' +
+      '<div class="sec">🎙️ 면담 · 현장녹취 · 전자서명 (' + interviews.length + '건) <span class="sp"></span>' +
       '<button class="sm" data-act="harvestSigns" title="외부 서명자가 제출한 암호화 전자서명을 확인하여 비밀금고로 수거합니다">🔄 서명 수거' + (pendSigns ? ' (' + pendSigns + ')' : '') + '</button>' +
-      '<button class="sm pri" data-act="addIv">+ 면담·녹취 등록</button></div>' +
+      '<button class="sm ok" data-act="liveRecIv" title="현장 상담·면담 음성을 마이크로 실시간 문답 기록하고 좌·우 창 데이터를 자동 생성합니다">🎤 현장 실시간 녹취</button>' +
+      '<button class="sm pri" data-act="addIv">+ 면담 등록</button></div>' +
       '<div style="padding:10px 12px 2px">' +
       '<div class="drop-zone" id="quickIvDrop" data-act="quickUploadIv" role="button" tabindex="0">' +
-      '<b>📂 녹취록 · 진술서 파일 끌어놓기 또는 클릭 (.hwpx · .hwp · .docx · .txt · 텍스트PDF)</b>' +
-      '<span>브라우저 안에서 주민등록번호 가림 후 문답(Q&amp;A)·진술요지·3요건 쟁점 후보를 자동 정리하고 전자서명 및 한글(.hwpx) 진술확인서를 만듭니다</span>' +
+      '<b>📂 녹취록 · 진술서 · 현장녹음 끌어놓기 또는 클릭 (.hwpx · .hwp · .docx · .txt · 텍스트PDF · 녹음파일)</b>' +
+      '<span>현장 상담 실시간 음성녹취 또는 문서 업로드 시 주민등록번호 자동 가림 후 좌·우 창(문답·3요건·보고서 초안)을 자동 정리합니다</span>' +
       '</div>' +
-      '<input id="quickIvFile" type="file" accept=".hwpx,.hwp,.docx,.txt,.srt,.vtt,.md,.pdf" style="display:none">' +
+      '<input id="quickIvFile" type="file" accept=".hwpx,.hwp,.docx,.txt,.srt,.vtt,.md,.pdf,.mp3,.m4a,.wav,.webm,.ogg" style="display:none">' +
       '</div>' +
       '<div class="bulk" data-bulk="interviews"></div>' +
       ivCardsHtml +
@@ -1642,6 +1780,7 @@
   }
   function closeModal() {
     MODAL_SEQ++;
+    stopActiveLiveCapture();
     var m = $('modal');
     if (!m || m.style.display === 'none') return;
     m.style.display = 'none';
@@ -1706,6 +1845,26 @@
       ? '<span class="hint">담당자 변경은 주담당 노무사 또는 대표만 가능합니다</span>'
       : (!existing && !ME.isAdmin ? '<span class="hint">신규 등록 시 등록자 본인이 주·부담당에 포함되어야 합니다</span>' : '');
 
+    var usedErpIds = {};
+    MERGED_CASES.forEach(function (mc) {
+      if (mc && mc.id !== c.id && C.str(mc.erpCaseId)) usedErpIds[C.str(mc.erpCaseId)] = 1;
+    });
+    var erpInvestCases = D.erpCases.filter(function (ec) {
+      if (!ec || ec._deleted || !C.str(ec.id)) return false;
+      if (C.str(ec.id) === C.str(c.erpCaseId)) return true;
+      if (usedErpIds[C.str(ec.id)]) return false;
+      return C.isErpInvestigateCase(ec, D.caseTypes);
+    });
+    var initErpMode = C.str(c.erpCaseId)
+      ? 'link'
+      : (existing ? (c.erpDefer ? 'defer' : 'auto') : (b ? 'defer' : 'auto'));
+    var erpCaseOpts = '<option value="">-- 연결할 푸른이알피 사건 선택 --</option>' +
+      erpInvestCases.map(function (ec) {
+        var eid = C.str(ec.id);
+        var sel = eid === C.str(c.erpCaseId) ? ' selected' : '';
+        return '<option value="' + esc(eid) + '"' + sel + '>[' + esc(ec.caseNo || '번호미정') + '] ' + esc(ec.companyName || '') + ' — ' + esc(ec.title || ec.brief || '조사') + '</option>';
+      }).join('');
+
     openModal(
       '<div class="mhd" id="mhdTitle">' + (existing ? '✏️ 조사 사건 기본정보 수정' : '➕ 새 괴롭힘·성희롱 조사 사건 등록') + '<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
       '<div class="mbd">' +
@@ -1717,6 +1876,14 @@
       '<option value="sexual"' + (catVal === 'sexual' ? ' selected' : '') + '>직장 내 성희롱</option>' +
       '<option value="both"' + (catVal === 'both' ? ' selected' : '') + '>괴롭힘·성희롱 복합</option>' +
       '</select></div></div>' +
+      '<div class="fr"><label for="mErpMode">푸른이알피 번호</label><div class="fv">' +
+      '<select id="mErpMode">' +
+      '<option value="defer"' + (initErpMode === 'defer' ? ' selected' : '') + '>⏸ 이알피 번호 비워두고 등록 (추후 한 번에 일괄 정리)</option>' +
+      '<option value="auto"' + (initErpMode === 'auto' ? ' selected' : '') + '>🚀 푸른이알피 신규 사건번호 자동 채번·동기화</option>' +
+      '<option value="link"' + (initErpMode === 'link' ? ' selected' : '') + '>🔗 기존 푸른이알피 등록 사건과 직접 연결</option>' +
+      '</select>' +
+      '<select id="mErpPick" aria-label="연결할 푸른이알피 사건" style="' + (initErpMode === 'link' ? '' : 'display:none;') + 'min-width:220px">' + erpCaseOpts + '</select>' +
+      '</div></div>' +
       '<div class="fr"><label for="mEmail">담당자 이메일</label><div class="fv"><input id="mEmail" type="email" value="' + esc(c.email || (b && b.mails && b.mails[0] && b.mails[0].extAddrs && b.mails[0].extAddrs[0]) || '') + '" placeholder="공문 자동수집 기준 이메일 (여러 개는 쉼표 구분)"></div></div>' +
       '<div class="fr"><label for="mMgr">주담당 노무사</label><div class="fv"><select id="mMgr"' + disAttr + '>' + staffSelectOpts(mainMgr, '주담당 선택') + '</select>' + mgrHint + '</div></div>' +
       '<div class="fr"><label for="mSub1">부담당 노무사</label><div class="fv">' +
@@ -1728,8 +1895,14 @@
       '<label class="hint" for="mDue">보고기한</label><input id="mDue" type="date" value="' + esc(c.dueDate || '') + '">' +
       '<label class="hint" for="mClose">종결일</label><input id="mClose" type="date" value="' + esc(c.closeDate || '') + '"></div></div>' +
       '</div>' +
-      '<div class="mft"><button data-mclose="1">취소</button><button class="pri" id="mSaveCaseBtn">💾 저장 + 푸른이알피 자동동기화</button></div>'
+      '<div class="mft"><button data-mclose="1">취소</button><button class="pri" id="mSaveCaseBtn">💾 저장</button></div>'
     );
+
+    if ($('mErpMode') && $('mErpMode').addEventListener) {
+      $('mErpMode').addEventListener('change', function () {
+        if ($('mErpPick')) $('mErpPick').style.display = this.value === 'link' ? '' : 'none';
+      });
+    }
 
     function readModalFields() {
       var coId = C.str($('mCoId').value);
@@ -1743,6 +1916,18 @@
       if (!existing && !ME.isAdmin && pickedMain !== ME.sid && nextSubs.indexOf(ME.sid) < 0) {
         nextSubs = normalizeSubs([ME.sid].concat(nextSubs), pickedMain);
       }
+      var erpMode = $('mErpMode') ? C.str($('mErpMode').value) : initErpMode;
+      var nextErpId = '';
+      var nextErpNo = '';
+      var nextErpDefer = false;
+      if (erpMode === 'link') {
+        var pickedEid = $('mErpPick') ? C.str($('mErpPick').value) : C.str(c.erpCaseId);
+        var matchedEc = erpInvestCases.find(function (x) { return C.str(x.id) === pickedEid; });
+        nextErpId = pickedEid;
+        nextErpNo = matchedEc ? C.str(matchedEc.caseNo) : (pickedEid === C.str(c.erpCaseId) ? C.str(c.erpCaseNo) : '');
+      } else if (erpMode === 'defer') {
+        nextErpDefer = true;
+      }
       return {
         companyId: coId,
         companyName: coName,
@@ -1754,7 +1939,10 @@
         managerSubs: nextSubs,
         receiveDate: C.str($('mRecv').value),
         dueDate: C.str($('mDue').value),
-        closeDate: C.str($('mClose').value)
+        closeDate: C.str($('mClose').value),
+        erpCaseId: nextErpId,
+        erpCaseNo: nextErpNo,
+        erpDefer: nextErpDefer
       };
     }
 
@@ -1811,11 +1999,22 @@
           : null;
         var saved = await saveCaseAndSync(baseRec, false, mut, reqEpoch, reqUid);
         if (!saved || !isSessionCurrent(reqEpoch, reqUid)) return;
+        if (!existing && C.canAccessSecret(saved, ME) && typeof C.synthesizeWorkspaceFromCase === 'function') {
+          try {
+            await saveSecretRecord(id, {
+              synthesizeRightFromCase: true,
+              refreshReportBody: true
+            }, reqEpoch, reqUid);
+          } catch (ignoreSecInit) {}
+        }
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
         CUR_ID = id;
-        TAB = 'detail';
+        TAB = existing ? TAB : 'report';
         if (MODAL_SEQ === reqModalSeq) closeModal();
         draw();
-        toast('✅ 사건 저장 및 푸른이알피 동기화 요청 완료');
+        toast(saved.erpDefer && !saved.erpCaseId
+          ? '✅ 사건 등록 및 좌·우 보고서 창 자동채움 완료 (이알피 번호 공란 — 추후 일괄정리 가능)'
+          : '✅ 사건 저장 및 푸른이알피 동기화 요청 완료');
       } catch (e) {
         if (!isSessionCurrent(reqEpoch, reqUid)) return;
         if ($('mSaveCaseBtn')) $('mSaveCaseBtn').disabled = false;
@@ -1862,7 +2061,33 @@
     toast(fail ? ('동기화 ' + ok + '건 완료 · ' + fail + '건 실패' + tail) : ('✅ ' + ok + '개 사건 메일 자동수집 및 푸른이알피 진행과정 동기화 완료' + tail));
   }
 
-  async function registerBundleNow(bundle) {
+  async function autoFillCaseWorkspace(cid, opts) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid) || !cid) return null;
+    var c = caseById(cid);
+    if (!c || !C.canAccessSecret(c, ME) || typeof C.synthesizeWorkspaceFromCase !== 'function') return null;
+    var curSec = await ensureSecretLoaded(cid);
+    if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+    var o = opts || {};
+    var wantForceBody = !!o.forceRefreshBody && !DIRTY_RPT.reportBody;
+    if (wantForceBody && curSec && C.str(curSec.reportBody) && curSec.reportBodyAuto === false && typeof confirm === 'function') {
+      wantForceBody = confirm('수동으로 작성·저장된 조사결과보고서 본문이 있습니다.\n보고서 본문까지 새로 자동 조립할까요? ([취소]를 누르면 수동 작성 본문은 그대로 두고 빈 항목·3요건만 채웁니다)');
+    }
+    var patch = collectDirtyReportInputs({
+      synthesizeRightFromCase: true,
+      refreshReportBody: o.refreshReportBody !== false && !DIRTY_RPT.reportBody,
+      forceRefreshBody: wantForceBody
+    });
+    var saved = await saveSecretRecord(cid, patch, reqEpoch, reqUid);
+    if (!saved || !isSessionCurrent(reqEpoch, reqUid)) return null;
+    DIRTY_RPT = { _cid: cid };
+    return saved;
+  }
+
+  async function registerBundleNow(bundle, opts) {
+    var o = opts || {};
+    var deferErp = o.erpDefer !== undefined ? !!o.erpDefer : true;
     var id = 'hi_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     var firstAddr = (bundle.mails[0] && bundle.mails[0].extAddrs && bundle.mails[0].extAddrs[0]) || '';
     var mainSid = C.str(bundle.managerMain) || ME.sid;
@@ -1880,11 +2105,158 @@
       receiveDate: C.str(bundle.firstDate) || C.ymdOf(Date.now()),
       dueDate: '',
       closeDate: (bundle.steps && bundle.steps.report && bundle.steps.report.done) ? C.str(bundle.steps.report.date) : '',
+      erpCaseId: '',
+      erpCaseNo: '',
+      erpDefer: deferErp,
       mailLinks: bundle.mails.slice(),
       steps: bundle.steps
     };
-    await saveCaseAndSync(rec, false);
+    var saved = await saveCaseAndSync(rec, false);
+    if (saved && C.canAccessSecret(saved, ME) && typeof C.synthesizeWorkspaceFromCase === 'function') {
+      try {
+        await saveSecretRecord(id, {
+          synthesizeRightFromCase: true,
+          refreshReportBody: true
+        });
+      } catch (ignoreSec) {}
+    }
     return id;
+  }
+
+  async function importBundlesBatch(targetBundles, deferErp) {
+    var list = (Array.isArray(targetBundles) ? targetBundles : []).filter(Boolean);
+    if (!list.length) {
+      toast('편입할 미등록 메일 묶음이 없습니다.');
+      return 0;
+    }
+    var msg = deferErp
+      ? ('선택한 ' + list.length + '개 메일 묶음을 [⏸ 이알피 사건번호 공란(추후 일괄정리)] 상태로 조사 사건에 편입하고 좌·우 보고서 작업실을 모두 채워 넣을까요?')
+      : ('선택한 ' + list.length + '개 메일 묶음을 조사 사건으로 등록하고 지금 바로 푸른이알피 신규 사건번호를 채번·동기화할까요?');
+    if (typeof confirm === 'function' && !confirm(msg)) return 0;
+    var ok = 0;
+    for (var i = 0; i < list.length; i++) {
+      await registerBundleNow(list[i], { erpDefer: deferErp });
+      ok++;
+    }
+    return ok;
+  }
+
+  function openErpBatchLinkModal(focusCaseId) {
+    var unlinked = MERGED_CASES.filter(function (c) {
+      return c && !c._deleted && !isCaseErpLinked(c) && canEditCase(c);
+    });
+    if (!unlinked.length) {
+      toast('현재 이알피 번호가 비어 있는 담당 사건이 없습니다.');
+      return;
+    }
+    var usedErpIds = {};
+    MERGED_CASES.forEach(function (mc) {
+      if (mc && C.str(mc.erpCaseId)) usedErpIds[C.str(mc.erpCaseId)] = 1;
+    });
+    var erpInvestPool = D.erpCases.filter(function (ec) {
+      return ec && !ec._deleted && C.str(ec.id) && !usedErpIds[C.str(ec.id)] && C.isErpInvestigateCase(ec, D.caseTypes);
+    });
+    var prePicked = {};
+    pickedIds('cases').forEach(function (cid) { prePicked[cid] = 1; });
+    if (focusCaseId) prePicked[focusCaseId] = 1;
+    var hasSpecificPick = Object.keys(prePicked).length > 0;
+
+    var rowsHtml = unlinked.map(function (c, idx) {
+      var yr = C.caseYearOf(c);
+      var checked = (!hasSpecificPick || !!prePicked[c.id]) ? ' checked' : '';
+      var cCore = typeof C.coCoreNorm === 'function' ? C.coCoreNorm(c.companyName) : C.coNameNorm(c.companyName);
+      var sortedPool = erpInvestPool.slice().sort(function (a, b) {
+        var am = cCore && ((typeof C.coCoreNorm === 'function' ? C.coCoreNorm(a.companyName) : C.coNameNorm(a.companyName)) === cCore) ? 0 : 1;
+        var bm = cCore && ((typeof C.coCoreNorm === 'function' ? C.coCoreNorm(b.companyName) : C.coNameNorm(b.companyName)) === cCore) ? 0 : 1;
+        return am - bm;
+      });
+      var optHtml = '<option value="">🚀 신규 푸른이알피 사건번호 자동 채번</option>' +
+        sortedPool.map(function (ec) {
+          var ecCore = typeof C.coCoreNorm === 'function' ? C.coCoreNorm(ec.companyName) : C.coNameNorm(ec.companyName);
+          var tag = (cCore && ecCore === cCore) ? '★동일사업장 · ' : '';
+          return '<option value="' + esc(ec.id) + '">' + esc(tag + '[' + (ec.caseNo || '번호미정') + '] ' + (ec.companyName || '') + ' — ' + (ec.title || ec.brief || '조사')) + '</option>';
+        }).join('');
+      return '<div style="display:flex;gap:8px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);flex-wrap:wrap">' +
+        '<input type="checkbox" data-erpck="' + esc(c.id) + '"' + checked + ' aria-label="' + (idx + 1) + '번 사건 선택">' +
+        '<div style="flex:1;min-width:210px"><b>' + esc(yr) + '</b> · <b>' + esc(c.companyName || '(미입력)') + '</b> — ' + esc(c.title || '조사') +
+        '<div class="hint">수임일 ' + esc(c.receiveDate || '-') + ' · 수집공문 ' + ((c.mailLinks || []).length) + '건 · ' + esc(mgrText(c)) + '</div></div>' +
+        '<select data-erppick="' + esc(c.id) + '" aria-label="이알피 연결 방식 선택" style="min-width:240px;max-width:340px">' + optHtml + '</select>' +
+        '</div>';
+    }).join('');
+
+    openModal(
+      '<div class="mhd" id="mhdTitle">🏢 이알피 번호 공란 사건 일괄 정리·연동 (' + unlinked.length + '건)<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
+      '<div class="mbd">' +
+      '<div class="note" style="margin-bottom:8px">과거 푸른메일 발굴 자료 등 이알피 번호를 비워둔 사건들을 한 번에 정리합니다. 기존 이알피 사건이 있으면 오른쪽에서 선택해 연결하고, 없으면 <b>신규 자동 채번</b> 상태로 일괄 동기화할 수 있습니다.</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;padding:4px 6px 8px;border-bottom:1px solid var(--line2)">' +
+      '<label style="display:inline-flex;gap:6px;align-items:center;font-weight:600;cursor:pointer"><input type="checkbox" id="mErpBatchAll"' + (!hasSpecificPick ? ' checked' : '') + '> 전체 선택</label>' +
+      '<span class="sp"></span><span class="hint">이알피 화면을 열면 채번된 번호가 자동 회신(✓)됩니다</span>' +
+      '</div>' +
+      '<div id="mErpBatchList" style="max-height:52vh;overflow:auto">' + rowsHtml + '</div>' +
+      '</div>' +
+      '<div class="mft">' +
+      '<button type="button" data-mclose="1">나중에 정리(닫기)</button>' +
+      '<button type="button" class="pri" id="mErpBatchRunBtn">🚀 선택 사건 푸른이알피 일괄 채번·연결</button>' +
+      '</div>',
+      'wide'
+    );
+
+    if ($('mErpBatchAll') && $('mErpBatchAll').addEventListener) {
+      $('mErpBatchAll').addEventListener('change', function () {
+        var on = this.checked;
+        var box = $('mErpBatchList');
+        if (box && box.querySelectorAll) {
+          box.querySelectorAll('[data-erpck]').forEach(function (ck) { ck.checked = on; });
+        }
+      });
+    }
+
+    if ($('mErpBatchRunBtn') && $('mErpBatchRunBtn').addEventListener) {
+      $('mErpBatchRunBtn').addEventListener('click', async function () {
+        var reqEpoch = SESSION_EPOCH;
+        var reqUid = ME && ME.uid ? String(ME.uid) : '';
+        var reqModalSeq = MODAL_SEQ;
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        var box = $('mErpBatchList');
+        var pickedCids = [];
+        if (box && box.querySelectorAll) {
+          box.querySelectorAll('[data-erpck]').forEach(function (ck) {
+            if (ck.checked) pickedCids.push(ck.getAttribute('data-erpck'));
+          });
+        }
+        if (!pickedCids.length) { toast('연동할 사건을 하나 이상 선택하세요.'); return; }
+        if (typeof confirm === 'function' && !confirm('선택한 ' + pickedCids.length + '건의 사건을 푸른이알피와 일괄 연결·채번 요청할까요?')) return;
+
+        var runBtn = $('mErpBatchRunBtn');
+        try {
+          runBtn.disabled = true;
+          var linkedExist = 0, queuedNew = 0;
+          for (var i = 0; i < pickedCids.length; i++) {
+            var cid = pickedCids[i];
+            var cRec = caseById(cid);
+            if (!cRec || !canEditCase(cRec)) continue;
+            var selEl = box ? box.querySelector('[data-erppick="' + cid + '"]') : null;
+            var chosenErpId = selEl ? C.str(selEl.value) : '';
+            var matchedEc = chosenErpId ? erpInvestPool.find(function (x) { return C.str(x.id) === chosenErpId; }) : null;
+            var fieldsPatch = chosenErpId
+              ? { erpCaseId: chosenErpId, erpCaseNo: matchedEc ? C.str(matchedEc.caseNo) : '', erpDefer: false }
+              : { erpDefer: false };
+            var nextObj = Object.assign({}, cRec, fieldsPatch);
+            await saveCaseAndSync(nextObj, false, cRec._virtualFromErp ? null : { fields: fieldsPatch }, reqEpoch, reqUid);
+            if (chosenErpId) linkedExist++; else queuedNew++;
+          }
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
+          clearSel(['cases']);
+          if (MODAL_SEQ === reqModalSeq) closeModal();
+          draw();
+          toast('✅ 이알피 일괄 정리 완료 — 기존 연결 ' + linkedExist + '건 · 신규 채번요청 ' + queuedNew + '건');
+        } catch (err) {
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
+          if (runBtn) runBtn.disabled = false;
+          toast('일괄 연동 실패: ' + ((err && err.message) || err));
+        }
+      });
+    }
   }
 
   async function hideBundle(bundleKey) {
@@ -1950,7 +2322,7 @@
     openModal(
       '<div class="mhd" id="mhdTitle">📥 수집된 조사 메일 묶음 미리보기 — ' + esc(yrLbl + b.companyName) + '<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
       '<div class="mbd"><p class="hint">총 ' + b.mails.length + '통 · 자동 복원 단계: ' + b.summary.doneCount + '/8단계 (' + esc(b.summary.currentStepName) + ') · 각 메일의 [👁 본문·첨부]를 눌러 한글(.hwpx·.hwp)·PDF 원문을 바로 열람·내려받을 수 있습니다.</p><div id="mBundleMailList">' + listHtml + '</div></div>' +
-      '<div class="mft"><button data-mclose="1">닫기</button><button class="pri" id="mRegBundleEditBtn">검토 후 사건 등록 · 이알피 반영</button></div>',
+      '<div class="mft"><button data-mclose="1">닫기</button><button class="sm ok" id="mRegBundleDeferBtn">📥 즉시 편입 (이알피번호 공란·좌우자동채움)</button><button class="pri" id="mRegBundleEditBtn">➕ 상세 검토·이알피 설정 등록</button></div>',
       true
     );
     if ($('mBundleMailList') && $('mBundleMailList').querySelectorAll) {
@@ -1959,6 +2331,24 @@
           var mi = Number(this.getAttribute('data-bmail'));
           if (b.mails[mi]) openMailViewerModal(b.mails[mi], b);
         });
+      });
+    }
+    if ($('mRegBundleDeferBtn') && $('mRegBundleDeferBtn').addEventListener) {
+      $('mRegBundleDeferBtn').addEventListener('click', async function () {
+        var dBtn = $('mRegBundleDeferBtn');
+        try {
+          dBtn.disabled = true;
+          var newId = await registerBundleNow(b, { erpDefer: true });
+          closeModal();
+          CUR_ID = newId;
+          TAB = 'report';
+          RPT_MODE = 'split';
+          draw();
+          toast('✅ 과거 메일 묶음을 [이알피 번호 공란] 상태로 편입하고 좌·우 보고서 창을 모두 채웠습니다.');
+        } catch (err) {
+          dBtn.disabled = false;
+          toast('편입 실패: ' + ((err && err.message) || err));
+        }
       });
     }
     $('mRegBundleEditBtn').addEventListener('click', function () {
@@ -2465,6 +2855,13 @@
     var drop = $('quickIvDrop');
     var fileInp = $('quickIvFile');
     if (!drop || !drop.addEventListener) return;
+    drop.addEventListener('keydown', function (e) {
+      if (e && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        if (fileInp && typeof fileInp.click === 'function') fileInp.click();
+        else if (CUR_ID === cid) openInterviewModal(null);
+      }
+    });
     drop.addEventListener('dragover', function (e) {
       e.preventDefault();
       drop.classList.add('drag');
@@ -2668,18 +3065,31 @@
       sigInfoHtml +
 
       '<div class="studio-grid" style="margin-top:8px">' +
-      /* 왼쪽: 녹취록/파일 업로드 & 원문 */
+      /* 왼쪽: 현장 실시간 상담 녹취 + 녹취록/파일 업로드 & 원문 */
       '<div class="studio-pane">' +
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">' +
-      '<b>① 녹취록 · 진술서 파일/원문</b><span class="sp"></span>' +
-      '<button type="button" class="sm" id="ivPickFileBtn">📂 파일 불러오기 (.hwpx·.hwp·.docx·.txt·텍스트PDF)</button>' +
-      '<input id="ivFileInp" type="file" accept=".hwpx,.hwp,.docx,.txt,.srt,.vtt,.md,.pdf" style="display:none">' +
+      '<b>① 현장 상담 실시간 녹취 · 녹취록 파일/원문</b><span class="sp"></span>' +
+      '<button type="button" class="sm" id="ivPickFileBtn">📂 파일·음성 열기 (.hwpx·.hwp·.docx·.txt·PDF·음성)</button>' +
+      '<input id="ivFileInp" type="file" accept=".hwpx,.hwp,.docx,.txt,.srt,.vtt,.md,.pdf,.mp3,.m4a,.wav,.ogg,.webm" style="display:none">' +
+      '</div>' +
+      '<div class="live-rec-bar" id="ivLiveBar">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%">' +
+      '<span class="live-dot" aria-hidden="true"></span>' +
+      '<button type="button" class="sm pri" id="ivLiveStartBtn">🎤 현장 실시간 녹취 시작</button>' +
+      '<button type="button" class="spk-btn on" id="ivSpkQBtn" title="조사자 질문 발언으로 기록 (단축키 Alt+S)">문: 조사자</button>' +
+      '<button type="button" class="spk-btn" id="ivSpkABtn" title="진술인 답변 발언으로 기록 (단축키 Alt+S)">답: 진술인</button>' +
+      '<span id="ivLiveTimer" class="hint" style="font-variant-numeric:tabular-nums">00:00</span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" id="ivDlAudioBtn" style="display:none">💾 녹음본(.webm) 기기 보관</button>' +
+      '</div>' +
+      '<div id="ivLiveCap" class="live-cap">현장 상담·면담 시 마이크를 켜면 발언이 주민등록번호 자동 가림 상태로 실시간 기록되고 문답·3요건·보고서로 자동 정리됩니다 (원본 음성 외부 서버 미전송 · Alt+S 화자 전환).</div>' +
+      '<div id="ivLocalAudioBox" style="width:100%"></div>' +
       '</div>' +
       '<div class="drop-zone" id="ivDropZone" style="padding:8px;margin-bottom:7px">' +
-      '<span>여기에 <b>.hwpx · .hwp · .docx · .txt(.srt·.vtt) · 텍스트PDF</b> 녹취록·진술서를 끌어놓으세요 (브라우저 내 주민번호 가림 후 정리)</span>' +
+      '<span>여기에 <b>.hwpx · .hwp · .docx · .txt(.srt·.vtt) · 텍스트PDF</b> 녹취록 또는 <b>로컬 재생용 음성파일(.mp3·.m4a·.wav)</b>을 끌어놓으세요</span>' +
       '</div>' +
       '<label class="rpt-lbl" for="ivRaw">녹취록 · 서면진술 원문 (주민등록번호 자동 가림)</label>' +
-      '<textarea id="ivRaw" rows="11" placeholder="녹취록 텍스트를 붙여넣거나 위에서 한글(.hwpx/.hwp)·워드(.docx)·텍스트·음성 파일을 불러오세요.\n예:\n문: 회의 당시 어떤 발언이 있었나요?\n답: 팀장님이 전 직원이 보는 앞에서 서류를 던지며 폭언했습니다.">' + esc(initRaw) + '</textarea>' +
+      '<textarea id="ivRaw" rows="10" placeholder="현장 실시간 녹취를 시작하거나 녹취록 텍스트를 붙여넣으세요.\n예:\n문: 회의 당시 어떤 발언이 있었나요?\n답: 팀장님이 전 직원이 보는 앞에서 서류를 던지며 폭언했습니다.">' + esc(initRaw) + '</textarea>' +
       '<div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">' +
       '<button type="button" class="sm pri" id="ivAiOrgBtn">✨ AI 정밀 문답·쟁점 정리</button>' +
       '<button type="button" class="sm ok" id="ivRuleOrgBtn">⚡ 즉시 규칙 정리 (무료·오프라인)</button>' +
@@ -2702,7 +3112,7 @@
       '<textarea id="ivAmend" rows="2" placeholder="진술인이 열람 후 요청한 정정·보완 의견이 있으면 이곳에 기록·보존됩니다">' + esc(iv.amendNote || '') + '</textarea>' +
       '</div>' +
       '<div id="ivCandWrap" style="margin-top:8px;display:none">' +
-      '<span class="rpt-lbl">⚖️ 녹취에서 감지된 3요건 쟁점 후보 (클릭 시 쟁점 검토표에 바로 추가)</span>' +
+      '<span class="rpt-lbl">⚖️ 녹취에서 감지된 3요건 쟁점 후보 (저장 시 우측 쟁점 검토표·보고서에 자동 반영)</span>' +
       '<div id="ivCandBox" class="cand-list"></div>' +
       '</div>' +
       '</div>' +
@@ -2711,6 +3121,7 @@
       '</div>' +
       '<div class="mft">' +
       '<button type="button" class="sm" id="ivDlHwpxBtn">📄 진술확인서(.hwpx) 받기</button>' +
+      '<label style="display:inline-flex;gap:5px;align-items:center;font-size:12px;color:var(--ink2)"><input id="ivSyncRightPane" type="checkbox" checked> 우측 3요건·보고서 창까지 자동 채움</label>' +
       '<span class="sp"></span>' +
       '<button type="button" data-mclose="1">취소</button>' +
       '<button type="button" class="sm ok" id="ivSaveAndSignBtn">📲 저장 + 모바일 서명링크</button>' +
@@ -2719,6 +3130,225 @@
       '</div>',
       'xwide'
     );
+
+    var studioModalSeq = MODAL_SEQ;
+    var curSpeaker = 'Q';
+    var lastLoggedSpeaker = '';
+    var liveStartedAt = 0;
+
+    function fmtElapsed(sec) {
+      var s = Math.max(0, Math.floor(sec || 0));
+      var mm = String(Math.floor(s / 60)).padStart(2, '0');
+      var ss = String(s % 60).padStart(2, '0');
+      return mm + ':' + ss;
+    }
+
+    function setLiveSpeaker(spk) {
+      curSpeaker = spk === 'A' ? 'A' : 'Q';
+      if ($('ivSpkQBtn')) $('ivSpkQBtn').classList.toggle('on', curSpeaker === 'Q');
+      if ($('ivSpkABtn')) $('ivSpkABtn').classList.toggle('on', curSpeaker === 'A');
+    }
+
+    function appendLiveUtterance(rawPiece) {
+      var clean = scrubRrn(C.str(rawPiece));
+      if (!clean || !$('ivRaw')) return;
+      var curVal = scrubRrn(String($('ivRaw').value || ''));
+      var hasExplicitPrefix = /^(문\d*|답\d*|질문\d*|답변\d*|조사자|진술인|신고인|피신고인|참고인|Q\d*|A\d*)\s*[:：.)]\s*/i.test(clean);
+      var prefix = curSpeaker === 'A' ? '답: ' : '문: ';
+      if (hasExplicitPrefix) {
+        curVal = curVal ? (curVal.replace(/\s+$/, '') + '\n' + clean) : clean;
+        lastLoggedSpeaker = '';
+      } else if (!curVal) {
+        curVal = prefix + clean;
+        lastLoggedSpeaker = curSpeaker;
+      } else if (lastLoggedSpeaker === curSpeaker) {
+        curVal = curVal.replace(/[ \t]+$/, '') + ' ' + clean;
+      } else {
+        curVal = curVal.replace(/\s+$/, '') + '\n' + prefix + clean;
+        lastLoggedSpeaker = curSpeaker;
+      }
+      $('ivRaw').value = scrubRrn(curVal);
+      try { $('ivRaw').scrollTop = $('ivRaw').scrollHeight; } catch (e) {}
+    }
+
+    function mountLocalAudioPlayer(url, labelText) {
+      var box = $('ivLocalAudioBox');
+      if (!box || !url) return;
+      box.innerHTML = '<div style="margin-top:4px;font-size:11.5px;color:var(--mute)">🎧 로컬 음성 재생 (' + esc(labelText || '브라우저 내부 전용 · 외부 미전송') + ')</div>' +
+        '<audio controls preload="metadata" src="' + esc(url) + '" style="width:100%;height:32px;margin-top:3px"></audio>';
+    }
+
+    function pauseLiveCaptureInStudio(organizeNow) {
+      var wasActive = LIVE_REC.active;
+      LIVE_REC.active = false;
+      if (LIVE_REC.timer) {
+        clearInterval(LIVE_REC.timer);
+        LIVE_REC.timer = null;
+      }
+      if (LIVE_REC.onKeyDown && typeof document !== 'undefined' && document.removeEventListener) {
+        try { document.removeEventListener('keydown', LIVE_REC.onKeyDown); } catch (e) {}
+        LIVE_REC.onKeyDown = null;
+      }
+      if (LIVE_REC.recog) {
+        try {
+          LIVE_REC.recog.onresult = null;
+          LIVE_REC.recog.onerror = null;
+          LIVE_REC.recog.onend = null;
+          LIVE_REC.recog.stop();
+        } catch (e) {}
+        LIVE_REC.recog = null;
+      }
+      if (LIVE_REC.mediaRec) {
+        try {
+          if (LIVE_REC.mediaRec.state && LIVE_REC.mediaRec.state !== 'inactive') {
+            LIVE_REC.mediaRec.stop();
+          }
+        } catch (e) {}
+        LIVE_REC.mediaRec = null;
+      }
+      if (LIVE_REC.stream && typeof LIVE_REC.stream.getTracks === 'function') {
+        try {
+          LIVE_REC.stream.getTracks().forEach(function (tr) { try { tr.stop(); } catch (e) {} });
+        } catch (e) {}
+        LIVE_REC.stream = null;
+      }
+      if ($('ivLiveBar')) $('ivLiveBar').classList.remove('rec');
+      if ($('ivLiveStartBtn')) $('ivLiveStartBtn').textContent = '🎤 현장 실시간 녹취 이어하기';
+      if (wasActive && $('ivLiveCap')) {
+        $('ivLiveCap').textContent = '⏹ 실시간 녹취를 마쳤습니다. 발언 원문이 문답(Q&A)·요지·3요건 쟁점으로 정리되었습니다.';
+      }
+      if (organizeNow && $('ivRaw')) {
+        var rawTxt = scrubRrn(C.str($('ivRaw').value));
+        if (rawTxt) {
+          $('ivRaw').value = rawTxt;
+          var rVal = $('ivRole') ? C.str($('ivRole').value) : 'victim';
+          var parsedLive = C.parseTranscriptFallback(rawTxt, rVal);
+          applyOrganizedResult(parsedLive, '현장 상담 실시간 녹취 자동정리');
+        }
+      }
+    }
+
+    function startLiveCaptureInStudio() {
+      var SR = global.SpeechRecognition || global.webkitSpeechRecognition;
+      if (!SR) {
+        toast('현재 브라우저는 실시간 음성인식(Web Speech API)을 지원하지 않습니다. 크롬(Chrome) 또는 엣지(Edge)에서 실행하거나 녹취록 파일을 불러오세요.');
+        return;
+      }
+      stopActiveLiveCapture();
+      var recog;
+      try {
+        recog = new SR();
+      } catch (errSr) {
+        toast('실시간 음성인식을 시작하지 못했습니다: ' + ((errSr && errSr.message) || errSr));
+        return;
+      }
+      recog.lang = 'ko-KR';
+      recog.continuous = true;
+      recog.interimResults = true;
+      LIVE_REC.active = true;
+      LIVE_REC.recog = recog;
+      liveStartedAt = Date.now();
+      lastLoggedSpeaker = '';
+
+      if ($('ivLiveBar')) $('ivLiveBar').classList.add('rec');
+      if ($('ivLiveStartBtn')) $('ivLiveStartBtn').textContent = '⏹ 녹취 종료 · 문답 자동정리';
+      if ($('ivLiveTimer')) $('ivLiveTimer').textContent = '00:00';
+      if ($('ivLiveCap')) {
+        $('ivLiveCap').textContent = '🔴 현장 실시간 음성인식 중… 말씀하시면 [' + (curSpeaker === 'A' ? '답: 진술인' : '문: 조사자') + '] 화자로 주민등록번호 가림 후 기록됩니다.';
+      }
+
+      LIVE_REC.timer = setInterval(function () {
+        if (!LIVE_REC.active || MODAL_SEQ !== studioModalSeq) return;
+        if ($('ivLiveTimer')) $('ivLiveTimer').textContent = fmtElapsed((Date.now() - liveStartedAt) / 1000);
+      }, 1000);
+
+      LIVE_REC.onKeyDown = function (ev) {
+        if (!LIVE_REC.active || MODAL_SEQ !== studioModalSeq) return;
+        if (ev && ev.altKey && (ev.key === 's' || ev.key === 'S')) {
+          ev.preventDefault();
+          setLiveSpeaker(curSpeaker === 'Q' ? 'A' : 'Q');
+          toast(curSpeaker === 'A' ? '🗣️ 화자 전환 → [답: 진술인]' : '🗣️ 화자 전환 → [문: 조사자]');
+        }
+      };
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('keydown', LIVE_REC.onKeyDown);
+      }
+
+      /* 선택적 로컬 기기 녹음(.webm) 백업: 외부 서버에는 절대 업로드하지 않고 조사자 기기 다운로드·재생만 지원 */
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function' && typeof global.MediaRecorder === 'function') {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+          if (!LIVE_REC.active || MODAL_SEQ !== studioModalSeq) {
+            try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+            return;
+          }
+          LIVE_REC.stream = stream;
+          var chunks = [];
+          var mr = new global.MediaRecorder(stream);
+          LIVE_REC.mediaRec = mr;
+          mr.ondataavailable = function (ev) {
+            if (ev && ev.data && ev.data.size > 0) chunks.push(ev.data);
+          };
+          mr.onstop = function () {
+            if (!chunks.length || MODAL_SEQ !== studioModalSeq) return;
+            var blob = new Blob(chunks, { type: (mr && mr.mimeType) || 'audio/webm' });
+            LIVE_REC.blob = blob;
+            if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+              if (LIVE_REC.audioUrl && typeof URL.revokeObjectURL === 'function') {
+                try { URL.revokeObjectURL(LIVE_REC.audioUrl); } catch (e) {}
+              }
+              LIVE_REC.audioUrl = URL.createObjectURL(blob);
+              mountLocalAudioPlayer(LIVE_REC.audioUrl, '현장 녹음본 — 외부 전송 없음');
+            }
+            if ($('ivDlAudioBtn')) $('ivDlAudioBtn').style.display = '';
+          };
+          mr.start();
+        }).catch(function () {});
+      }
+
+      recog.onresult = function (ev) {
+        if (!LIVE_REC.active || MODAL_SEQ !== studioModalSeq || !ev || !ev.results) return;
+        var interim = '';
+        for (var ri = ev.resultIndex || 0; ri < ev.results.length; ri++) {
+          var res = ev.results[ri];
+          var piece = res && res[0] ? String(res[0].transcript || '') : '';
+          if (!piece) continue;
+          if (res.isFinal) {
+            appendLiveUtterance(piece);
+          } else {
+            interim += piece;
+          }
+        }
+        if ($('ivLiveCap')) {
+          var spkLbl = curSpeaker === 'A' ? '진술인 답' : '조사자 문';
+          if (C.str(interim)) {
+            $('ivLiveCap').textContent = '🎙️ 인식 중 (' + spkLbl + '): ' + scrubRrn(interim);
+          } else {
+            $('ivLiveCap').textContent = '✓ 실시간 기록 반영됨 (' + spkLbl + ' 대기 중 · 화자 전환: 버튼 또는 Alt+S)';
+          }
+        }
+      };
+
+      recog.onerror = function (ev) {
+        var code = ev && ev.error ? String(ev.error) : '';
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          pauseLiveCaptureInStudio(false);
+          toast('마이크 권한이 차단되어 있습니다. 브라우저 주소창에서 마이크 권한을 허용해 주세요.');
+        }
+      };
+
+      recog.onend = function () {
+        if (LIVE_REC.active && MODAL_SEQ === studioModalSeq && LIVE_REC.recog === recog) {
+          try { recog.start(); } catch (e) {}
+        }
+      };
+
+      try {
+        recog.start();
+      } catch (startErr) {
+        pauseLiveCaptureInStudio(false);
+        toast('음성인식 시작 오류: ' + ((startErr && startErr.message) || startErr));
+      }
+    }
 
     function collectQaFromDom() {
       var box = $('ivQaBox');
@@ -2844,9 +3474,16 @@
       var fname = String(file.name || '');
       var lower = fname.toLowerCase();
 
-      /* 원본 음성 파일은 주민등록번호 사전 가림 원칙상 외부 서버로 전송하지 않고 텍스트/문서 녹취록 사용을 안내 */
+      /* 원본 음성 파일은 주민등록번호 사전 가림 원칙상 외부 서버로 전송하지 않고 브라우저 내 로컬 재생기에만 연결 */
       if (/\.(mp3|m4a|wav|ogg|webm)$/i.test(lower)) {
-        toast('원본 녹음파일은 주민등록번호 사전 가림 원칙상 외부 서버로 전송하지 않습니다. 클로바노트·한글 등에서 변환한 한글(.hwpx·.hwp)·워드(.docx)·텍스트(.txt·.srt) 녹취록을 올려 주세요.');
+        if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+          if (LIVE_REC.audioUrl && typeof URL.revokeObjectURL === 'function') {
+            try { URL.revokeObjectURL(LIVE_REC.audioUrl); } catch (e) {}
+          }
+          LIVE_REC.audioUrl = URL.createObjectURL(file);
+          mountLocalAudioPlayer(LIVE_REC.audioUrl, fname + ' — 외부 서버 미전송');
+        }
+        toast('🎧 음성 파일을 로컬 재생기에 연결했습니다(외부 미전송). 재생하며 실시간 녹취·문답 입력을 하거나 변환된 .hwpx·.txt 녹취록을 불러오세요.');
         return;
       }
 
@@ -2873,6 +3510,29 @@
 
     renderQaRows();
     renderCandidates();
+
+    if ($('ivSpkQBtn') && $('ivSpkQBtn').addEventListener) {
+      $('ivSpkQBtn').addEventListener('click', function () { setLiveSpeaker('Q'); });
+    }
+    if ($('ivSpkABtn') && $('ivSpkABtn').addEventListener) {
+      $('ivSpkABtn').addEventListener('click', function () { setLiveSpeaker('A'); });
+    }
+    if ($('ivLiveStartBtn') && $('ivLiveStartBtn').addEventListener) {
+      $('ivLiveStartBtn').addEventListener('click', function () {
+        if (LIVE_REC.active) pauseLiveCaptureInStudio(true);
+        else startLiveCaptureInStudio();
+      });
+    }
+    if ($('ivDlAudioBtn') && $('ivDlAudioBtn').addEventListener) {
+      $('ivDlAudioBtn').addEventListener('click', function () {
+        if (!LIVE_REC.blob) { toast('아직 기기에 보관할 녹음본이 없습니다.'); return; }
+        var cRec = caseById(CUR_ID);
+        var aliasPart = $('ivAlias') ? C.str($('ivAlias').value) : '면담';
+        var aName = safeFilePart(cRec && cRec.companyName) + '_현장상담녹취_' + safeFilePart(aliasPart) + '_' + C.ymdOf(Date.now()) + '.webm';
+        downloadBytes(LIVE_REC.blob, aName, 'audio/webm');
+        toast('💾 현장 녹음본(.webm)을 기기에 안전하게 내려받았습니다 (외부 서버 미전송).');
+      });
+    }
 
     if ($('ivAddQaBtn') && $('ivAddQaBtn').addEventListener) {
       $('ivAddQaBtn').addEventListener('click', function () {
@@ -3010,18 +3670,47 @@
       var reqModalSeq = MODAL_SEQ;
       var reqCid = CUR_ID;
       if (!isSessionCurrent(reqEpoch, reqUid) || !reqCid) return;
+      if (LIVE_REC.active) {
+        pauseLiveCaptureInStudio(true);
+      }
       var item = buildDraftInterviewFromModal();
       if (!item) return;
+      if (C.str(item.rawTranscript) && (!item.qaList || !item.qaList.length) && !C.str(item.summary) && typeof C.parseTranscriptFallback === 'function') {
+        var autoFromRaw = C.parseTranscriptFallback(item.rawTranscript, item.role || 'victim');
+        if (Array.isArray(autoFromRaw.qaList) && autoFromRaw.qaList.length) item.qaList = autoFromRaw.qaList;
+        if (C.str(autoFromRaw.summary)) item.summary = autoFromRaw.summary;
+        if (Array.isArray(autoFromRaw.candidateIssues) && autoFromRaw.candidateIssues.length && !candIssues.length) {
+          candIssues = autoFromRaw.candidateIssues;
+        }
+      }
+      var syncRight = !($('ivSyncRightPane') && $('ivSyncRightPane').checked === false);
       var btn = $('ivSaveBtn');
       try {
         if (btn) btn.disabled = true;
         var sec = await ensureSecretLoaded(reqCid, reqEpoch, reqUid);
         if (!isSessionCurrent(reqEpoch, reqUid)) return;
         if (!sec) throw new Error('비밀유지 자료를 열지 못했습니다.');
-        var savedSec = await saveSecretRecord(reqCid, collectDirtyReportInputs({ upsertInterview: item }), reqEpoch, reqUid);
+        var secOp = syncRight
+          ? collectDirtyReportInputs({
+            upsertInterview: item,
+            synthesizeRightFromCase: true,
+            extraCandidateIssues: candIssues,
+            refreshReportBody: !DIRTY_RPT.reportBody
+          })
+          : collectDirtyReportInputs({ upsertInterview: item });
+        var savedSec = await saveSecretRecord(reqCid, secOp, reqEpoch, reqUid);
         if (!savedSec || !isSessionCurrent(reqEpoch, reqUid)) return;
         await syncIvAutoSteps(reqCid, item, reqEpoch, reqUid);
         if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        if (syncRight && Array.isArray(savedSec.issues) && savedSec.issues.some(function (x) { return x && !x._deleted; })) {
+          var cNow = caseById(reqCid);
+          if (cNow && (!cNow.steps || !cNow.steps.review || (!cNow.steps.review.done && !cNow.steps.review.manual))) {
+            var revAuto = { done: true, date: item.date || C.ymdOf(Date.now()), note: '상담·면담 진술 기반 3요건 검토표 자동 구성', srcMail: '', manual: false };
+            var ns2 = Object.assign({}, cNow.steps || {}, { review: revAuto });
+            await saveCaseAndSync(Object.assign({}, cNow, { steps: ns2 }), false, cNow._virtualFromErp ? null : { autoStepPatches: { review: revAuto } }, reqEpoch, reqUid);
+            if (!isSessionCurrent(reqEpoch, reqUid)) return;
+          }
+        }
         if (MODAL_SEQ === reqModalSeq) closeModal();
         draw();
         if (nextAction === 'mobileSign') {
@@ -3029,7 +3718,9 @@
         } else if (nextAction === 'onsiteSign') {
           openOnsiteSignModal(reqCid, item);
         } else {
-          toast('✅ 면담 진술·문답 저장 및 푸른이알피 진행단계 동기화 완료');
+          toast(syncRight
+            ? '✅ 상담·면담 녹취 진술 저장 및 좌·우 3요건·조사결과보고서 초안 자동 반영 완료'
+            : '✅ 면담 진술·문답 저장 및 푸른이알피 진행단계 동기화 완료');
         }
       } catch (err) {
         if (!isSessionCurrent(reqEpoch, reqUid)) return;
@@ -3050,6 +3741,8 @@
       handleStudioFile(opts.initialFile).catch(function (err) {
         toast('파일 불러오기 오류: ' + ((err && err.message) || err));
       });
+    } else if (opts.autoStartLive) {
+      startLiveCaptureInStudio();
     }
   }
 
@@ -3780,6 +4473,10 @@
     var ids = pickedIds(nm);
     if (!ids.length) return;
 
+    if (nm === 'cases' && act === 'erp_link') {
+      openErpBatchLinkModal('');
+      return;
+    }
     if (nm === 'cases' && act === 'sync') {
       clearSel(['cases']);
       await syncAllCases(ids);
@@ -3805,19 +4502,18 @@
       toast('삭제 처리되었습니다.');
       return;
     }
-    if (nm === 'bundles' && act === 'reg') {
+    if (nm === 'bundles' && (act === 'reg_defer' || act === 'reg')) {
       var regTargets = ids.map(function (bid) { return BUNDLES.find(function (x) { return x.bundleKey === bid; }); }).filter(Boolean);
       if (!regTargets.length) return;
-      if (!confirm('선택한 ' + regTargets.length + '개 메일 묶음을 조사 사건으로 등록하고 푸른이알피에 자동 반영할까요?')) return;
-      var ok = 0;
-      for (var bi = 0; bi < regTargets.length; bi++) {
-        await registerBundleNow(regTargets[bi]);
-        ok++;
-      }
+      var deferFlag = (act === 'reg_defer');
+      var ok = await importBundlesBatch(regTargets, deferFlag);
+      if (!ok) return;
       clearSel(['bundles']);
       TAB = 'cases';
       draw();
-      toast('✅ ' + ok + '개 조사 사건 등록 및 푸른이알피 반영 완료');
+      toast(deferFlag
+        ? ('✅ ' + ok + '개 메일 묶음을 [이알피 번호 공란(추후정리)] 상태로 편입하고 좌·우 작업실을 채웠습니다.')
+        : ('✅ ' + ok + '개 조사 사건 등록 및 푸른이알피 채번 동기화 완료'));
       return;
     }
     if (nm === 'bundles' && act === 'hide') {
@@ -3831,18 +4527,17 @@
     if (nm && nm.indexOf('yr_') === 0) {
       var bKeys = ids.filter(function (x) { return x.indexOf('b:') === 0; }).map(function (x) { return x.slice(2); });
       var cIds = ids.filter(function (x) { return x.indexOf('c:') === 0; }).map(function (x) { return x.slice(2); });
-      if (act === 'reg' && bKeys.length) {
+      if ((act === 'reg_defer' || act === 'reg') && bKeys.length) {
         var yrRegTargets = bKeys.map(function (bk) { return BUNDLES.find(function (x) { return x.bundleKey === bk; }); }).filter(Boolean);
         if (!yrRegTargets.length) return;
-        if (!confirm('선택한 ' + yrRegTargets.length + '개 메일 묶음을 조사 사건으로 등록하고 푸른이알피에 자동 반영할까요?')) return;
-        var regOk = 0;
-        for (var ybi = 0; ybi < yrRegTargets.length; ybi++) {
-          await registerBundleNow(yrRegTargets[ybi]);
-          regOk++;
-        }
+        var yrDefer = (act === 'reg_defer');
+        var regOk = await importBundlesBatch(yrRegTargets, yrDefer);
+        if (!regOk) return;
         clearSel([nm]);
         draw();
-        toast('✅ ' + regOk + '개 조사 사건 등록 및 푸른이알피 반영 완료');
+        toast(yrDefer
+          ? ('✅ ' + regOk + '개 메일 묶음을 [이알피 번호 공란(추후정리)] 상태로 편입했습니다.')
+          : ('✅ ' + regOk + '개 조사 사건 등록 및 푸른이알피 채번 동기화 완료'));
         return;
       }
       if (act === 'hide' && bKeys.length) {
@@ -3954,8 +4649,32 @@
     if ($('yrCsvBtn') && $('yrCsvBtn').addEventListener) {
       $('yrCsvBtn').addEventListener('click', exportYearlyCsv);
     }
+    if ($('erpBatchBtn') && $('erpBatchBtn').addEventListener) {
+      $('erpBatchBtn').addEventListener('click', function () { openErpBatchLinkModal(''); });
+    }
+    if ($('importAllDeferBtn') && $('importAllDeferBtn').addEventListener) {
+      $('importAllDeferBtn').addEventListener('click', async function () {
+        var btn = $('importAllDeferBtn');
+        try {
+          btn.disabled = true;
+          var targetList = YEAR_FILTER
+            ? BUNDLES.filter(function (b) { return C.bundleYearOf(b) === YEAR_FILTER; })
+            : BUNDLES.slice();
+          var cnt = await importBundlesBatch(targetList, true);
+          if (cnt > 0) {
+            TAB = 'cases';
+            draw();
+            toast('✅ 미등록 메일 묶음 ' + cnt + '건을 [이알피 번호 공란(추후정리)] 상태로 일괄 편입하고 좌·우 보고서 창을 모두 채웠습니다.');
+          }
+        } catch (err) {
+          toast('일괄 편입 실패: ' + ((err && err.message) || err));
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
     ['caseQ', 'inQ', 'yrQ'].forEach(function (id) { if ($(id)) $(id).addEventListener('input', draw); });
-    ['caseCat', 'caseSt', 'caseMgr', 'yrCat', 'yrKind'].forEach(function (id) { if ($(id)) $(id).addEventListener('change', draw); });
+    ['caseCat', 'caseSt', 'caseErp', 'caseMgr', 'yrCat', 'yrKind'].forEach(function (id) { if ($(id)) $(id).addEventListener('change', draw); });
 
     document.addEventListener('input', function (e) {
       var fld = e.target && e.target.getAttribute && e.target.getAttribute('data-rptfld');
@@ -4108,6 +4827,38 @@
             var b = BUNDLES.find(function (x) { return x.bundleKey === id; });
             if (b) openCaseModal(null, b);
           }
+          else if (act === 'regBundleDefer') {
+            var bd = BUNDLES.find(function (x) { return x.bundleKey === id; });
+            if (bd) {
+              actBtn.disabled = true;
+              try {
+                var newDeferId = await registerBundleNow(bd, { erpDefer: true });
+                CUR_ID = newDeferId;
+                TAB = 'report';
+                RPT_MODE = 'split';
+                clearSel();
+                draw();
+                toast('✅ [이알피 번호 공란] 상태로 사건을 편입하고 좌·우 보고서 창을 모두 채웠습니다.');
+              } finally {
+                actBtn.disabled = false;
+              }
+            }
+          }
+          else if (act === 'openErpBatch') {
+            openErpBatchLinkModal(id);
+          }
+          else if (act === 'autoFillWs') {
+            actBtn.disabled = true;
+            try {
+              var filled = await autoFillCaseWorkspace(id || CUR_ID, { refreshReportBody: true, forceRefreshBody: true });
+              if (filled) {
+                draw();
+                toast('🪄 수집 공문과 기존 진술을 바탕으로 좌·우 보고서 창(면담·3요건·초안)을 자동 구성했습니다.');
+              }
+            } finally {
+              actBtn.disabled = false;
+            }
+          }
           else if (act === 'previewBundle') {
             var bp = BUNDLES.find(function (x) { return x.bundleKey === id; });
             if (bp) previewBundleModal(bp);
@@ -4117,7 +4868,13 @@
             var cs = caseById(id);
             if (cs && canEditCase(cs)) {
               actBtn.disabled = true;
-              try { await syncCaseMails(cs); draw(); toast('✅ 메일 재수집 및 푸른이알피 동기화 완료'); }
+              try {
+                var syncedCase = await syncCaseMails(cs);
+                draw();
+                toast(syncedCase && syncedCase.erpDefer && !syncedCase.erpCaseId
+                  ? '✅ 메일 재수집 완료 (이알피 번호 공란 상태 유지)'
+                  : '✅ 메일 재수집 및 푸른이알피 동기화 완료');
+              }
               finally { actBtn.disabled = false; }
             }
           }
@@ -4168,6 +4925,7 @@
           else if (act === 'openMailFinder') openMailFinderModal();
           else if (act === 'addOfflineDoc') openOfflineDocModal();
           else if (act === 'addIv') openInterviewModal(null);
+          else if (act === 'liveRecIv') openInterviewModal(null, { autoStartLive: true });
           else if (act === 'quickUploadIv') {
             if ($('quickIvFile') && typeof $('quickIvFile').click === 'function') $('quickIvFile').click();
             else openInterviewModal(null);
