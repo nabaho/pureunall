@@ -148,7 +148,7 @@ test('칸 잡기가 안 되면(DB 오류) 부르지 않는다 — 셈이 안 되
   const r = await M.run(deps(db, ff), { items: ids(1) });
   assert.equal(r.status, 429); assert.equal(ff.calls.length, 0);
 });
-test('못 쓴 칸은 돌려준다 — 업체가 거절한 부름은 세지 않고, 일부만 성공하면 성공한 만큼만 센다', async () => {
+test('보낸 시도만 센다 — 업체가 열쇠를 거절해 글이 안 남은 부름은 돌려주고, 통신 오류로 끊긴 시도는 센다', async () => {
   const db = makeDb([rec(1, '서류 요청')]); const ff = fakeFetch(() => ({ choice: 'work' }), { status: 401 });
   const r = await M.run(deps(db, ff), { items: ids(1) });
   assert.equal(r.status, 502); assert.equal(r.body.ok, false); assert.equal(r.body.why, 'key');
@@ -158,7 +158,7 @@ test('못 쓴 칸은 돌려준다 — 업체가 거절한 부름은 세지 않�
   const db2 = makeDb([rec(1, 'a 서류'), rec(2, 'b 서류'), rec(3, 'c 서류')]);
   const r2 = await M.run(deps(db2, flaky), { items: ids(1, 2, 3) });
   assert.equal(r2.status, 200); assert.equal(Object.keys(r2.body.results).length, 1, '첫 건은 살린다'); assert.ok(r2.body.partial);
-  assert.equal(db2.읽기(M.tallyPath(YMD)), 1, '성공한 한 건만 센다(잡아 둔 세 칸 중 둘은 돌려줬다)');
+  assert.equal(db2.읽기(M.tallyPath(YMD)), 2, '성공 한 건 + 통신 오류로 끊긴 한 건 = 보낸 시도 둘을 센다(안 보낸 한 칸만 돌려줬다)');
 });
 
 /* ── ⑤ 마감 ── */
@@ -200,4 +200,54 @@ test('모듈이 읽는 칸은 s·an·st·scope·scopeBy·scopeAsked 뿐이고, �
   assert.equal(M.TALLY_ROOT, 'typesafe_tally_mailreq');
   ['typesafe_tally/', 'typesafe_tally_mail/'].forEach((p) => assert.ok(M.tallyPath(YMD).indexOf(p) !== 0, '다른 하루 문과 자리가 겹치지 않는다'));
   assert.match(M.itemPath(UID, 'INBOX-ab~1'), /^kcareer\/U1\/mailreq\/items\/INBOX-ab~1$/);
+});
+
+/* ── 검토 2회차 지적 (2026-11-15) — 재현 시험 ── */
+test('가리기 «전»에 자르지 않는다 — 경계에 걸린 이메일·업체 이름이 가림을 빠져나가지 않는다', () => {
+  const names = { staff: ['김가나'], companies: ['마바사식품'] };
+  const t1 = M.composeText(M.pickText({ s: '가'.repeat(130) + ' tester@example.org 문의' }), names);
+  assert.ok(!/tester|@exa|example/.test(t1), '이메일 조각이 안 남는다: ' + t1); assert.match(t1, /\[이메일\]/);
+  const t2 = M.composeText(M.pickText({ s: '가'.repeat(136) + ' 마바사식품 문의' }), names);
+  assert.ok(!/마바사/.test(t2), '업체 이름 조각이 안 남는다: ' + t2);
+  const t3 = M.composeText(M.pickText({ s: '자료', an: ['나'.repeat(55) + ' hong1234@example.org.hwp'] }), names);
+  assert.ok(!/hong|example/.test(t3), '첨부 이름 경계의 이메일도: ' + t3);
+  assert.ok(t1.length <= M.TEXT_MAX && t2.length <= M.TEXT_MAX, '길이 한도는 가린 «뒤»에 건다');
+});
+test('저장 단계가 «…» 로 잘라 둔 글은 끝의 한 마디를 버린다 — 잘린 이메일·이름 조각이 안 나간다', () => {
+  assert.equal(M.dropCutTail('가나다 tester@exa…'), '가나다');
+  assert.equal(M.dropCutTail('자료 요청 마바사식…'), '자료 요청');
+  assert.equal(M.dropCutTail('끝이 안 잘린 제목'), '끝이 안 잘린 제목');
+  assert.equal(M.dropCutTail('한마디만길게이어진제목…'), '', '한 덩어리뿐이면 통째로 버린다');
+  assert.equal(M.pickText({ s: '가나다 tester@exa…', an: ['양식 자료 ma…'] }).s, '가나다');
+  assert.deepEqual(M.pickText({ s: 'x', an: ['양식 자료 ma…'] }).an, ['양식 자료']);
+});
+test('보낸 뒤의 실패(통신 오류·시간 초과·업체 5xx)도 센다 — 반복 실패해도 한도가 줄어든다 · 열쇠 거절만 돌려준다', async () => {
+  assert.equal(M.counted({ ok: true }), true);
+  ['network', 'timeout', 'vendorDown', 'vendorQuota', 'server', 'unknown'].forEach((w) => assert.equal(M.counted({ ok: false, why: w }), true, w + ' 는 센다'));
+  ['key', 'route', 'shape'].forEach((w) => assert.equal(M.counted({ ok: false, why: w }), false, w + ' 는 글이 안 남아 돌려준다'));
+  const items = [rec(1, 'a 서류'), rec(2, 'b 서류'), rec(3, 'c 서류')];
+  const db = makeDb(items); let calls = 0;
+  const broken = async () => { calls++; throw new Error('통신 끊김'); };
+  for (let i = 0; i < 3; i++) await M.run(deps(db, broken), { items: ids(1) });          // 같은 건이 반복해서 나가는 경우
+  assert.equal(calls, 3); assert.equal(db.읽기(M.tallyPath(YMD)), 3, '실패한 시도 셋도 센다 — 안 세면 글이 계속 나가는데 한도가 안 준다');
+  const db2 = makeDb(items); const ff = fakeFetch(() => ({ choice: 'work' }), { status: 500 });
+  const r = await M.run(deps(db2, ff), { items: ids(1) });
+  assert.equal(r.status, 502); assert.equal(db2.읽기(M.tallyPath(YMD)), 1, '업체 5xx 는 센다');
+});
+test('응답 «본문»을 기다리는 동안에도 시간 한도가 걸린다 — 머리글만 오고 본문이 안 오면 끊고 실패로 센다', async () => {
+  const db = makeDb([rec(1, 'a 서류')]); let signal = null;
+  const slowBody = async (url, init) => { signal = init.signal; return { ok: true, status: 200, json: () => new Promise(() => {}) }; };   // 머리글은 오고 본문은 영영 안 온다
+  const t0 = Date.now();
+  const r = await M.run(deps(db, slowBody, { perCallMs: 40 }), { items: ids(1) });
+  assert.ok(Date.now() - t0 < 3000, '한도에서 끊었다(영영 기다리지 않는다)');
+  assert.equal(r.status, 504); assert.equal(r.body.why, 'timeout');
+  assert.ok(signal && signal.aborted, '요청도 끊었다(AbortController)');
+  assert.equal(db.읽기(M.tallyPath(YMD)), 1, '시간 초과도 보낸 시도라 센다');
+});
+test('전체 마감은 함수 «시작»부터 잰다 — 시작 뒤 DB 읽기·칸 잡기로 시간이 다 갔으면 한 건도 안 부르고 칸을 돌려준다', async () => {
+  const db = makeDb([rec(1, 'a 서류'), rec(2, 'b 서류')]); const ff = fakeFetch(() => ({ choice: 'work' }));
+  let n = 0; const now = () => (n++ === 0 ? 0 : M.TOTAL_MS);                      // 첫 부름(시작)은 0, 그다음은 마감 시각
+  const r = await M.run(deps(db, ff, { now }), { items: ids(1, 2) });
+  assert.equal(ff.calls.length, 0); assert.equal(r.status, 200); assert.equal(r.body.partial, 'deadline'); assert.deepEqual(r.body.results, {});
+  assert.ok(!db.읽기(M.tallyPath(YMD)), '안 보냈으니 잡은 칸을 모두 돌려줬다');
 });
