@@ -1054,6 +1054,8 @@
     }
     if (mode === 'draft') {
       ctxLines.push('출력 형식: 1. 사건 개요 및 핵심 쟁점, 2. 관련 법령 조문, 3. 대법원·하급심 판례 및 행정해석 법리, 4. 본 사안에의 포섭(논증), 5. 결론 및 실무 입증 체크리스트 순서로 서면 초안을 작성하십시오.');
+    } else if (mode === 'review') {
+      ctxLines.push('출력 형식(내용 검토 보고서): 1. 검토 요약 및 위험도 총평(고위험·주의·적법 구분), 2. 조항·쟁점별 법령·판례 위반 여부 정밀 검토(문제 문구 → 법적 리스크 및 근거 조문·판례 → 적법 수정 문안), 3. 관련 대법원·하급심 판례 및 행정해석 요지, 4. 실무 보완 체크리스트 순서로 명확히 작성하십시오.');
     } else {
       ctxLines.push('출력 형식: 1. 핵심 결론 요약, 2. 근거 법령, 3. 관련 판례·유권해석 요지, 4. 실무 유의사항 순서로 명확히 정리하십시오.');
     }
@@ -1077,10 +1079,171 @@
     return ctxLines.join('\n');
   }
 
+  /* 계약서·취업규칙·인사문서 조항별 강행규정 위반 및 법적 리스크 자동 진단기 (내용 검토 관리용) */
+  var CLAUSE_RISK_RULES = [
+    {
+      id: 'penalty_ban',
+      severity: 'high',
+      badge: '고위험 · 강행규정 위반',
+      title: '위약 예정 · 임금 일방 공제 위험',
+      pattern: /(?:위약금|손해배상액[을\s]*예정|퇴사\s*시[\s\S]{0,24}(?:반환|배상|공제)|급여에서\s*(?:차감|공제)|교육비[\s\S]{0,18}반환)/,
+      basis: '근로기준법 제20조(위약 예정의 금지) 및 근로기준법 제43조(임금 전액불 원칙)',
+      issue: '근로계약 불이행에 대한 위약금 또는 손해배상액을 예정하거나 근로자 동의·법령 근거 없이 임금에서 일방 공제하는 약정은 무효이며 형사처벌 대상이 될 수 있습니다.',
+      suggestion: '근로기준법 제20조 및 제43조에 위반되는 사전 위약금 약정 및 급여 일방 공제 문구는 삭제하고, 근로자의 고의·중과실로 실제 발생한 손해는 민사상 실손해 입증 절차를 따른다는 문구로 수정합니다.'
+    },
+    {
+      id: 'blanket_wage',
+      severity: 'high',
+      badge: '고위험 · 수당 분쟁',
+      title: '포괄임금 · 법정수당 청구권 사전 포기 위험',
+      pattern: /(?:포괄하여\s*지급|포괄임금|(?:연장|야간|휴일)[\s\S]{0,28}(?:포괄|포함)|추가\s*수당을\s*청구하지|일체의\s*수당[\s\S]{0,16}(?:포괄|포함))/,
+      basis: '근로기준법 제56조(연장·야간 및 휴일 근로) 및 근로기준법 제15조',
+      issue: '근로시간 산정이 어렵지 않은 직무에서 연장·야간·휴일근로수당을 포괄 산입하거나 추가 청구를 금지하면 근로자에게 불리한 부분(법정수당 미달분)은 무효가 됩니다.',
+      suggestion: '기본급과 고정 연장·야간·휴일근로 시간 수 및 각 수당 금액을 명확히 구분 기재하고, 약정 시간을 초과한 실근로 시 법정 가산수당을 별도 정산한다는 조항으로 수정합니다.'
+    },
+    {
+      id: 'ordinary_wage_cond',
+      severity: 'high',
+      badge: '고위험 · 2024 전합 변경',
+      title: '재직조건부 · 근무일수 조건 정기상여금 통상임금 리스크',
+      pattern: /(?:재직자에\s*한하|지급일\s*현재\s*재직|재직\s*중인\s*자|소정근로일수의\s*\d+%)/,
+      basis: '대법원 2020다247190 전원합의체 판결 · 근로기준법 제2조',
+      issue: '2024년 대법원 전원합의체 판례 변경으로 고정성 요건이 폐기되어, 소정근로 대가로 정기적·일률적으로 지급되는 상여금은 재직조건이나 기준일수 조건이 붙어 있어도 통상임금에 해당할 가능성이 높습니다.',
+      suggestion: '정기상여금이 통상임금에 산입될 경우의 연장·야간·휴일수당 및 연차수당 증액분을 재산정하고, 성과 연동형 인센티브와 소정근로 대가성 급여의 성격을 명확히 분리 설계합니다.'
+    },
+    {
+      id: 'disguised_freelancer',
+      severity: 'high',
+      badge: '고위험 · 근로자성 인정',
+      title: '용역·프리랜서 계약 내 지휘감독·전속성·퇴직금 배제 충돌',
+      pattern: /(?:용역계약|위탁계약|프리랜서)[\s\S]{0,400}(?:출퇴근|근무시간|근무장소|업무지시|겸업\s*금지|징계|결근|지각)|(?:출퇴근|근무시간|업무지시|징계)[\s\S]{0,400}(?:용역계약|위탁계약|프리랜서)|(?:출퇴근|근무시간|업무지시|결재|징계)[\s\S]{0,400}퇴직금[은을\s]*지급하지|퇴직금[은을\s]*지급하지[\s\S]{0,400}(?:출퇴근|근무시간|업무지시|결재|징계)/,
+      basis: '근로기준법 제2조 제1항 제1호 (대법원 2004다29736 근로자성 판단기준)',
+      issue: '계약 명칭이 용역·위탁이더라도 출퇴근 시간 지정, 근무장소 구속, 구체적 업무지시, 징계·겸업금지 조항이 존재하면 실질적 사용종속관계가 인정되어 퇴직금·주휴·연차수당 지급의무가 발생할 수 있습니다.',
+      suggestion: '독립 사업자 위탁 형태라면 출퇴근·근무장소 강제 및 징계·지시 조항을 제거해 업무 완수 결과물 중심으로 개편하거나, 지휘감독이 필수적이면 정규·기간제 근로계약으로 전환합니다.'
+    },
+    {
+      id: 'summary_dismissal',
+      severity: 'high',
+      badge: '고위험 · 부당해고',
+      title: '즉시해고 · 서면통지 및 해고예고 누락 위험',
+      pattern: /(?:즉시\s*해고|예고\s*없이\s*(?:해고|해지)|구두로?\s*(?:해고|통보)|임의로\s*(?:해고|계약[을\s]*해지))/,
+      basis: '근로기준법 제23조 · 근로기준법 제26조(해고의 예고) · 근로기준법 제27조(서면통지)',
+      issue: '정당한 이유 없는 임의 해지나 해고사유·시기의 서면통지 결여는 부당해고 무효 사유가 되며, 법정 예외 사유 없는 즉시해고는 30일분 이상의 해고예고수당 지급의무를 발생시킵니다.',
+      suggestion: '해고·계약해지 시 소명 기회 부여 등 인사위원회 절차와 해고사유·해고시기의 서면 통지 의무, 30일 전 예고(또는 예고수당 지급) 기준을 명시합니다.'
+    },
+    {
+      id: 'probation_wage_dismiss',
+      severity: 'warn',
+      badge: '주의 · 수습·최저임금',
+      title: '수습기간 급여 감액 한도 및 본채용 거절 요건 점검',
+      pattern: /(?:수습\s*기간|시용\s*기간)[\s\S]{0,120}(?:[5678]\d\s*%|임의\s*해지|조건\s*없이\s*해지|본채용을?\s*거부)/,
+      basis: '최저임금법 제5조 제2항 · 근로기준법 제23조',
+      issue: '1년 미만 기간제 근로자 또는 단순노무종사자에게는 수습 최저임금 감액(90%)을 적용할 수 없으며, 수습 중 본채용 거절 역시 객관적·합리적 평가 기준과 서면통지가 필요합니다.',
+      suggestion: '계약기간(1년 이상 여부)·직종(단순노무 해당 여부)을 확인해 최저임금 90% 이상을 보장하고, 객관적 수습평가표 및 서면 통지 절차를 명시합니다.'
+    },
+    {
+      id: 'annual_leave_waiver',
+      severity: 'warn',
+      badge: '주의 · 연차휴가',
+      title: '연차유급휴가 미사용수당 소멸 · 포괄산입 요건 점검',
+      pattern: /(?:연차수당[을\s]*지급하지|연차[\s\S]{0,18}자동\s*소멸|연차유급휴가[\s\S]{0,20}포기)/,
+      basis: '근로기준법 제60조 · 근로기준법 제61조(연차유급휴가의 사용 촉진)',
+      issue: '근로기준법 제61조가 정한 시기별 서면 촉진 절차를 적법하게 이행하지 않은 상태에서 연차미사용수당을 자동 소멸시키는 조항은 효력이 없습니다.',
+      suggestion: '근로기준법 제61조에 따른 1차(사용시기 지정 촉구)·2차(사용시기 지정 통보) 서면 촉진 절차를 모두 준수한 경우에 한하여 보상 의무가 면제됨을 명시합니다.'
+    },
+    {
+      id: 'work_rules_adverse',
+      severity: 'warn',
+      badge: '주의 · 취업규칙 변경',
+      title: '취업규칙·인사규정 일방적 불이익변경 절차 점검',
+      pattern: /(?:회사가\s*임의로\s*(?:변경|개정)|일방적으로\s*(?:변경|개정)|동의\s*없이\s*취업규칙)/,
+      basis: '근로기준법 제94조 제1항 단서 · 대법원 2018다200709 전원합의체 판결',
+      issue: '근로조건을 근로자에게 불리하게 변경하는 취업규칙 개정은 근로자 과반수(또는 과반수 노조)의 집단적 동의를 받지 않으면 원칙적으로 무효입니다.',
+      suggestion: '법령 개정 반영이나 유리한 변경은 의견청취로, 근로조건 불이익 변경 시에는 근로기준법 제94조 제1항 단서에 따른 과반수 집단적 동의 절차를 거친다는 문구로 수정합니다.'
+    }
+  ];
+
+  function analyzeDocumentClauses(rawText) {
+    var srcRaw = String(rawText || '').trim();
+    if (!srcRaw) {
+      return { findings: [], highCount: 0, warnCount: 0, clauseCount: 0 };
+    }
+    var partyNames = extractPartyNames(srcRaw, '');
+    var safeText = anonymizeLegalText(srcRaw, partyNames).text;
+
+    /* 조항(제N조) 단위 분할 시도 후, 조항 표기가 없으면 문단 단위 분할 */
+    var rawBlocks = safeText.split(/(?=(?:^|\n)\s*제\s*\d+\s*조)/g).map(function (b) { return b.trim(); }).filter(Boolean);
+    if (rawBlocks.length <= 1) {
+      rawBlocks = safeText.split(/\n{2,}/).map(function (b) { return b.trim(); }).filter(Boolean);
+    }
+
+    var findings = [];
+    var matchedRuleIds = new Set();
+
+    for (var bIdx = 0; bIdx < rawBlocks.length; bIdx++) {
+      var blk = rawBlocks[bIdx];
+      var clauseLabelMatch = /^(제\s*\d+\s*조(?:\s*\([^)]+\))?)/.exec(blk);
+      var clauseLabel = clauseLabelMatch ? clauseLabelMatch[1].replace(/\s+/g, ' ') : ('문단 ' + (bIdx + 1));
+      for (var rIdx = 0; rIdx < CLAUSE_RISK_RULES.length; rIdx++) {
+        var rule = CLAUSE_RISK_RULES[rIdx];
+        if (matchedRuleIds.has(rule.id)) continue;
+        if (rule.pattern.test(blk)) {
+          matchedRuleIds.add(rule.id);
+          findings.push({
+            id: rule.id,
+            ruleId: rule.id,
+            clauseLabel: clauseLabel,
+            severity: rule.severity,
+            badge: rule.badge,
+            title: rule.title,
+            excerpt: blk.length > 220 ? (blk.slice(0, 220) + '…') : blk,
+            basis: rule.basis,
+            issue: rule.issue,
+            suggestion: rule.suggestion
+          });
+        }
+      }
+    }
+
+    /* 문단 분할 경계를 넘어 전체 본문에서 탐지되는 복합 조항(예: 서두 용역계약 + 후반 출퇴근 조항) 추가 점검 */
+    for (var gIdx = 0; gIdx < CLAUSE_RISK_RULES.length; gIdx++) {
+      var gRule = CLAUSE_RISK_RULES[gIdx];
+      if (matchedRuleIds.has(gRule.id)) continue;
+      var gm = gRule.pattern.exec(safeText);
+      if (gm) {
+        matchedRuleIds.add(gRule.id);
+        var start = Math.max(0, gm.index - 20);
+        var snip = safeText.slice(start, Math.min(safeText.length, start + 200)).replace(/\s+/g, ' ');
+        findings.push({
+          id: gRule.id,
+          ruleId: gRule.id,
+          clauseLabel: '문서 종합',
+          severity: gRule.severity,
+          badge: gRule.badge,
+          title: gRule.title,
+          excerpt: snip + (safeText.length > start + 200 ? '…' : ''),
+          basis: gRule.basis,
+          issue: gRule.issue,
+          suggestion: gRule.suggestion
+        });
+      }
+    }
+
+    var highCount = findings.filter(function (f) { return f.severity === 'high'; }).length;
+    var warnCount = findings.filter(function (f) { return f.severity === 'warn'; }).length;
+    return {
+      findings: findings,
+      highCount: highCount,
+      warnCount: warnCount,
+      clauseCount: rawBlocks.length
+    };
+  }
+
   /* 무료 오프라인 추출형 법률 분석·서면 합성기 (AI API 키·한도 없이도 ₩0 즉시 작동) */
   function synthesizeOfflineAnswer(params) {
     params = params || {};
     var rawQuery = String(params.query || '').trim();
+    var mode = params.mode || 'auto';
     var query = anonymizeLegalText(rawQuery, extractPartyNames(rawQuery, '')).text;
     var workflow = params.workflow || null;
     var attached = Array.isArray(params.attached) ? params.attached : [];
@@ -1088,23 +1251,45 @@
     var arts = Array.isArray(params.retrievedArticles) ? params.retrievedArticles.slice(0, 5) : [];
     var fams = Array.isArray(params.retrievedLawFamilies) ? params.retrievedLawFamilies.slice(0, 4) : [];
 
+    var combinedReviewSource = [query].concat(attached.map(function (a) {
+      return String(a.body || a.plainText || a.summary || '');
+    })).join('\n\n');
+    var clauseDiag = mode === 'review' ? analyzeDocumentClauses(combinedReviewSource) : null;
+
     var lines = [];
-    var headTitle = workflow ? ('### 📋 ' + workflow.title) : '### ⚖️ P박스 법률·판례·유권해석 종합 검토';
+    var secNo = 1;
+    var headTitle = workflow
+      ? ('### 📋 ' + workflow.title)
+      : (mode === 'review' ? '### ✦ 문서 내용 검토 보고서 (법령·판례 대조)' : (mode === 'draft' ? '### ✎ 법률서면 · 의견서 초안' : '### ⚖️ P박스 법률·판례·유권해석 종합 검토'));
     lines.push(headTitle);
     lines.push('');
-    lines.push('#### 1. 질의 요지 및 검토 방향');
-    lines.push('- **검토 대상**: ' + (query.length > 180 ? query.slice(0, 180) + '…' : query));
+    lines.push('#### ' + (secNo++) + '. 검토 요약 및 핵심 진단');
+    lines.push('- **검토 요청**: ' + (query.length > 180 ? query.slice(0, 180) + '…' : query));
     if (attached.length) {
-      lines.push('- **@첨부 원문 반영**: ' + attached.map(function (x) { return '`' + (x.title || x.caseNo) + '`'; }).join(', '));
+      lines.push('- **검토 대상 자료**: ' + attached.map(function (x) { return '`' + (x.title || x.caseNo) + '`'; }).join(', '));
     }
-    if (docs.length) {
+    if (clauseDiag && clauseDiag.findings.length) {
+      lines.push('- **조항 리스크 진단**: 총 **' + clauseDiag.findings.length + '건** (고위험 **' + clauseDiag.highCount + '건** · 주의 **' + clauseDiag.warnCount + '건**) 탐지됨');
+    } else if (docs.length) {
       lines.push('- **핵심 판단 요약**: ' + docs[0].summary);
     } else {
       lines.push('- **핵심 판단 요약**: 관련 현행 법령 조문 및 유사 판례·행정해석의 요건사실 충족 여부를 단계별로 대조하여야 합니다.');
     }
 
+    if (clauseDiag && clauseDiag.findings.length) {
+      lines.push('');
+      lines.push('#### ' + (secNo++) + '. 조항·쟁점별 위험요소 및 수정 권고');
+      for (var cIdx = 0; cIdx < clauseDiag.findings.length; cIdx++) {
+        var cf = clauseDiag.findings[cIdx];
+        lines.push('- **[' + cf.badge + '] ' + cf.clauseLabel + ' — ' + cf.title + '**');
+        lines.push('  - **근거**: ' + cf.basis);
+        lines.push('  - **검토 의견**: ' + cf.issue);
+        lines.push('  - **수정 권고안**: ' + cf.suggestion);
+      }
+    }
+
     lines.push('');
-    lines.push('#### 2. 관련 법령 및 조문 근거');
+    lines.push('#### ' + (secNo++) + '. 관련 법령 및 조문 근거');
     if (arts.length) {
       for (var i = 0; i < arts.length; i++) {
         var ar = arts[i];
@@ -1124,7 +1309,7 @@
     }
 
     lines.push('');
-    lines.push('#### 3. 대법원·하급심 판례 및 행정해석·판정례 법리');
+    lines.push('#### ' + (secNo++) + '. 대법원·하급심 판례 및 행정해석·판정례 법리');
     if (docs.length) {
       for (var d = 0; d < docs.length; d++) {
         var dc = docs[d];
@@ -1137,7 +1322,7 @@
     }
 
     lines.push('');
-    lines.push('#### 4. 실무 포섭 및 입증 체크리스트');
+    lines.push('#### ' + (secNo++) + '. 실무 포섭 및 입증 체크리스트');
     lines.push('1. **처분·계약 문서 확인**: 근로계약서, 취업규칙·단체협약(시행일 기준 현행본), 임금명세서, 서면통지서 교부 여부 확인');
     lines.push('2. **사실관계 객관화**: 근무시간·업무강도·지휘감독 또는 업무상 부담 내역을 일자별·수치별로 특정');
     lines.push('3. **인용 원문 대조**: 아래 「기계적 인용 검증 결과」 배지를 눌러 판례·법령 원문 전체를 오른쪽 리더 창에서 직접 대조하십시오.');
@@ -1438,6 +1623,13 @@
     };
   }
 
+  function anonymizeText(rawText, fileName) {
+    var src = String(rawText || '');
+    var fn = String(fileName || '');
+    var names = extractPartyNames(src, fn);
+    return anonymizeLegalText(src, names);
+  }
+
   global.PuPBoxEngine = {
     todayKstYmd: todayKstYmd,
     parseYamlFrontmatter: parseYamlFrontmatter,
@@ -1452,11 +1644,13 @@
     deduplicateDocs: deduplicateDocs,
     extractPartyNames: extractPartyNames,
     anonymizeLegalText: anonymizeLegalText,
+    anonymizeText: anonymizeText,
     extractRulingMeta: extractRulingMeta,
     ingestRawDocument: ingestRawDocument,
     ingestJsonDataset: ingestJsonDataset,
     tokenizeQuery: tokenizeQuery,
     searchCorpus: searchCorpus,
+    analyzeDocumentClauses: analyzeDocumentClauses,
     buildRagPrompt: buildRagPrompt,
     synthesizeOfflineAnswer: synthesizeOfflineAnswer,
     extractLawCitationsFromText: extractLawCitationsFromText,

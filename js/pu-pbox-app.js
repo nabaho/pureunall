@@ -11,15 +11,20 @@
   var THEME_LS_KEY = 'pu_pbox_theme_v1';
 
   var state = {
-    view: 'home',            // home | alerts | laws | cases | ingest | workflows | projects
+    view: 'home',            // home | workspace | alerts | laws | cases | ingest | recents | workflows | projects | tasks
     authUser: null,
     userName: '노무사',
     theme: 'light',
+    sidebarCollapsed: false,
+    taskSecCollapsed: false,
+    hideHomeEmptyProjects: false,
+    workspaceTab: 'report',  // report | clauses | editor
     promptMode: 'auto',      // auto | search | draft | review
     attached: [],            // [{ id, kind, title, caseNo, lawDir, fileName, body }]
     activeThread: null,
     activeSearchRes: null,
     aiBusy: false,
+    reviewFileBusy: false,
     ingestBusy: false,
     lowerPullBusy: false,
     backupBusy: false,
@@ -42,6 +47,10 @@
     caseDocType: 'all',
     caseQuery: '',
     selectedDocIds: new Set(),
+
+    /* 최근 본 자료 · 작업 관리 선택 */
+    selectedRecentIds: new Set(),
+    selectedTaskIds: new Set(),
 
     /* 워크플로·프로젝트 */
     activeWorkflowId: 'wf_unfair_dismissal',
@@ -198,11 +207,80 @@
     });
   }
 
+  /* ── 엘박스형 표시 보조 함수 (이니셜 · 상대 일자 · 자료 구분 · 작업 배지) ── */
+  function avatarCharsOf(rawName) {
+    var s = String(rawName || '').replace(/공인노무사|노무사|\s+/g, '').trim();
+    if (!s) return '푸른';
+    if (s.length >= 3 && /^[가-힣]+$/.test(s)) return s.slice(-2);
+    return s.slice(0, 2);
+  }
+
+  function formatRelativeDay(ts) {
+    var num = Number(ts) || 0;
+    if (!num) return '오늘';
+    var kstOffset = 9 * 3600 * 1000;
+    var todayIdx = Math.floor((Date.now() + kstOffset) / 86400000);
+    var itemIdx = Math.floor((num + kstOffset) / 86400000);
+    var diff = Math.max(0, todayIdx - itemIdx);
+    if (diff === 0) return '오늘';
+    if (diff === 1) return '어제';
+    if (diff <= 30) return diff + '일 전';
+    var d = new Date(num + kstOffset);
+    return d.getUTCFullYear() + '. ' + (d.getUTCMonth() + 1) + '. ' + d.getUTCDate() + '.';
+  }
+
+  function recentKindLabel(r) {
+    if (!r) return '자료';
+    if (r.kind === 'law') return '법령';
+    var docId = String(r.id || '').replace(/^doc:/, '');
+    var d = global.PuPBoxStore && global.PuPBoxStore.getDocById ? global.PuPBoxStore.getDocById(docId) : null;
+    if (d) {
+      if (d.docType === 'dec_nlrc') return '결정례';
+      if (d.docType === 'interp_moel' || d.docType === 'interp_gov') return '유권해석';
+    }
+    if (/재심판정|결정|처분\s*취소\s*청구/.test(String(r.title || '')) && !/판결/.test(String(r.title || ''))) {
+      return '결정례';
+    }
+    return '판례';
+  }
+
+  function threadModeBadge(mode) {
+    if (mode === 'review') return { label: '✦ 내용 검토', cls: 'pbox-badge-blue' };
+    if (mode === 'draft') return { label: '✎ 문서 작성', cls: 'pbox-badge-green' };
+    if (mode === 'search') return { label: '🔍 통합 검색', cls: 'pbox-badge-gray' };
+    return { label: '⚖️ 법리 검토', cls: 'pbox-badge-amber' };
+  }
+
+  var SAMPLE_REVIEW_DOCS = {
+    freelancer: [
+      '업무위탁(프리랜서) 용역계약서',
+      '제1조 (목적) 갑은 을에게 인사노무 행정지원 및 상시 출퇴근 사무업무를 위탁한다.',
+      '제3조 (근무시간 및 지휘감독) 을은 매주 월~금 09:00부터 18:00까지 갑이 지정한 본사 좌석에 출근하여 갑의 팀장 결재와 업무지시에 따라 근무한다.',
+      '제5조 (보수 및 퇴직금 부존재) 갑은 매월 25일 고정 기본보수 3,000,000원을 지급하며, 4대보험 및 퇴직금·연차유급휴가는 일체 발생하지 아니한다.',
+      '제7조 (위약벌 및 손해배상 예정) 을이 계약기간 중 중도 퇴사할 경우 월 보수의 2배를 위약금으로 배상하며 갑은 미지급 보수에서 이를 우선 공제한다.',
+      '제9조 (즉시 해지) 을이 갑의 지시를 1회라도 불이행할 경우 최고 없이 즉시 본 계약을 해지한다.'
+    ].join('\n\n'),
+    blanket_wage: [
+      '연봉 및 포괄임금 근로계약서',
+      '제2조 (수습기간) 입사일로부터 3개월간 수습기간을 두며, 수습기간 중 급여는 최저임금의 80%를 지급하고 회사는 수습 중 언제든지 임의로 본채용을 거부할 수 있다.',
+      '제4조 (포괄임금 약정) 월 급여액에는 연장·야간·휴일근로수당 및 연차미사용수당 일체가 포괄되어 있으므로 실제 초과근로시간과 관계없이 별도의 가산수당을 청구하지 못한다.',
+      '제5조 (정기상여금) 분기별 정기상여금은 지급일 현재 재직 중인 자에 한하여 지급하며 통상임금 산정에서 제외한다.',
+      '제8조 (연차휴가 소멸) 당해 연도에 사용하지 못한 연차유급휴가는 별도 촉진 절차 없이도 자동 소멸된 것으로 본다.'
+    ].join('\n\n'),
+    work_rules: [
+      '취업규칙 개정안 (안)',
+      '제14조 (당연퇴직 및 징계해고) 무단결근 2일 이상 또는 업무성과 하위 평가 시 소명기회나 서면 통지 없이 즉시 징계해고한다.',
+      '제29조 (임금피크제 및 상여금 축소) 만 55세 도래 시부터 기본급을 매년 20%씩 감액하며, 본 취업규칙 불이익 변경은 부서장 회람으로 근로자 과반수 동의를 갈음한다.'
+    ].join('\n\n')
+  };
+
   /* ── 화면 이탈 시 체크박스 선택 집합 초기화 (고르기칸-번호 규칙 준수) ── */
   function clearViewSelections() {
     state.selectedLawDirs.clear();
     state.selectedDocIds.clear();
     state.selectedProjectIds.clear();
+    state.selectedRecentIds.clear();
+    state.selectedTaskIds.clear();
   }
 
   /* ── 뷰 전환 및 앱바 화면 기억 ── */
@@ -217,6 +295,7 @@
     closeMobileSidebar();
     renderMain();
     renderSidebarNavState();
+    renderSidebarRecents();
   }
 
   /* 모바일(<=768px) 닫힌 오프캔버스 사이드바를 키보드 Tab 순서 및 스크린리더 탐색 트리에서 완전 분리 */
@@ -276,7 +355,7 @@
     });
     state.activeThread.verification = vf;
     global.PuPBoxStore.saveThread(state.activeThread);
-    if (state.view === 'home') renderMain();
+    if (state.view === 'home' || state.view === 'workspace') renderMain();
   }
 
   function openLawInReader(dir, fileName, highlightArt) {
@@ -305,6 +384,7 @@
       });
       reverifyActiveThreadIfAny();
       renderReader();
+      if (state.view === 'home' || state.view === 'recents') renderMain();
       renderSidebarRecents();
       if (highlightArt) {
         setTimeout(function () {
@@ -333,6 +413,7 @@
       sub: [doc.court || doc.agency, doc.caseNo].filter(Boolean).join(' · ')
     });
     renderReader();
+    if (state.view === 'home' || state.view === 'recents') renderMain();
     renderSidebarRecents();
   }
 
@@ -354,7 +435,7 @@
     }
     state.attached.push(item);
     toast('AI 질의창에 @첨부되었습니다: ' + item.title);
-    if (state.view === 'home') renderMain();
+    if (state.view === 'home' || state.view === 'workspace') renderMain();
   }
 
   function attachLawByDir(dir, fileName) {
@@ -389,7 +470,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-   * 전체 골격 마운트
+   * 전체 골격 마운트 (엘박스형 사이드바 · 순백 워크스페이스 · 우측 원문리더)
    * ══════════════════════════════════════════════════════════════ */
   function mount(container) {
     rootEl = container;
@@ -400,7 +481,7 @@
     try {
       if (global.PuAppBar && global.PuAppBar.lastScreen) last = global.PuAppBar.lastScreen();
     } catch (e) {}
-    if (last && ['home', 'alerts', 'laws', 'cases', 'ingest', 'workflows', 'projects'].indexOf(last) >= 0) {
+    if (last && ['home', 'workspace', 'alerts', 'laws', 'cases', 'ingest', 'recents', 'workflows', 'projects', 'tasks'].indexOf(last) >= 0) {
       state.view = last;
     }
 
@@ -409,31 +490,48 @@
       '  <aside id="pboxSidePanel" class="pbox-sidebar" aria-label="P박스 메뉴">',
       '    <div class="pbox-brand-row">',
       '      <div class="pbox-brand-title" role="button" tabindex="0" data-act="go-view" data-view="home" aria-label="P박스 홈으로 이동">',
-      '        <span class="pbox-brand-logo" aria-hidden="true">📚</span>',
-      '        <div>',
-      '          <div class="pbox-brand-main">P박스 <span class="pbox-brand-subbadge">무료 통합판</span></div>',
-      '          <div class="pbox-brand-caption">국가 전 법령 · 판례 · 유권해석 · AI</div>',
-      '        </div>',
+      '        <span class="pbox-brand-mark" aria-hidden="true">P</span>',
+      '        <span class="pbox-brand-main">P박스 <span class="pbox-brand-subbadge">무료 통합</span></span>',
       '      </div>',
-      '      <button type="button" class="pbox-icon-btn pbox-mobile-only" data-act="close-mobile-nav" aria-label="메뉴 닫기">✕</button>',
+      '      <div class="pbox-btn-group">',
+      '        <button type="button" class="pbox-icon-btn pbox-pc-only" data-act="toggle-sidebar-collapse" title="사이드바 접기" aria-label="사이드바 접기">◧</button>',
+      '        <button type="button" class="pbox-icon-btn pbox-mobile-only" data-act="close-mobile-nav" aria-label="메뉴 닫기">✕</button>',
+      '      </div>',
       '    </div>',
       '    <div class="pbox-profile-card">',
-      '      <div id="who" class="pbox-who-slot"></div>',
-      '      <div id="pboxStorageBadge" class="pbox-tier-pill">₩0 무료 로컬·미러 활성</div>',
+      '      <div class="pbox-profile-top">',
+      '        <span id="pboxUserAvatar" class="pbox-user-avatar" aria-hidden="true">푸른</span>',
+      '        <div class="pbox-profile-meta">',
+      '          <div id="who" class="pbox-who-slot">푸른노무법인</div>',
+      '          <div id="pboxStorageBadge" class="pbox-plan-sub">스탠다드 · ₩0 무제한</div>',
+      '        </div>',
+      '        <span class="pbox-cert-pill">✓ 공인노무사</span>',
+      '      </div>',
       '    </div>',
       '    <nav id="pboxNavList" class="pbox-nav-list" aria-label="주요 기능 탐색">',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="home"><span aria-hidden="true">🏠</span><span>홈 · AI 법률비서</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="alerts"><span aria-hidden="true">🔔</span><span>개정·수집 알림</span><span id="pboxAlertCnt" class="pbox-nav-cnt">0</span></button>',
-      '      <div class="pbox-nav-sep">법령 · 판례 · 해석 데이터베이스</div>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="laws"><span aria-hidden="true">📖</span><span>국가법령 전수함</span><span id="pboxLawCnt" class="pbox-nav-cnt">5,773</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="cases"><span aria-hidden="true">⚖️</span><span>판례·심결·유권해석</span><span id="pboxCaseCnt" class="pbox-nav-cnt">0</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·판결 수집함</span></button>',
-      '      <div class="pbox-nav-sep">실무 서면 · 사건 폴더</div>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="workflows"><span aria-hidden="true">⚡</span><span>노무 AI 워크플로</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="projects"><span aria-hidden="true">📁</span><span>사건 프로젝트</span><span id="pboxProjCnt" class="pbox-nav-cnt">0</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="home"><span aria-hidden="true">🏠</span><span>홈</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="alerts"><span aria-hidden="true">🔔</span><span>알림</span><span id="pboxAlertCnt" class="pbox-nav-cnt alert">0</span></button>',
+      '      <div class="pbox-nav-divider" role="separator"></div>',
+      '      <div class="pbox-nav-sep">주석 · 법령 · 판례 DB</div>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="laws"><span aria-hidden="true">📖</span><span>주석·법령전수함</span><span id="pboxLawCnt" class="pbox-nav-cnt">5,773</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="cases"><span aria-hidden="true">⚖️</span><span>판례·결정·유권해석</span><span id="pboxCaseCnt" class="pbox-nav-cnt">0</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·판결 수집</span></button>',
+      '      <div class="pbox-nav-divider" role="separator"></div>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="recents"><span aria-hidden="true">🕘</span><span>최근 본 자료</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="workflows"><span aria-hidden="true">▷</span><span>워크플로</span></button>',
+      '      <div class="pbox-side-proj-row">',
+      '        <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="projects"><span aria-hidden="true">📁</span><span>프로젝트</span><span id="pboxProjCnt" class="pbox-nav-cnt">0</span></button>',
+      '        <button type="button" class="pbox-side-newproj-btn" data-act="create-project-prompt" aria-label="새 프로젝트 만들기">+ 새 프로젝트</button>',
+      '      </div>',
       '    </nav>',
       '    <div class="pbox-history-box">',
-      '      <div class="pbox-history-hd">최근 작업 · 검색</div>',
+      '      <div class="pbox-history-hd-row">',
+      '        <span class="pbox-history-hd"><span aria-hidden="true">✦</span> 작업</span>',
+      '        <div class="pbox-btn-group">',
+      '          <button type="button" class="pbox-link-btn" data-act="go-view" data-view="tasks">관리</button>',
+      '          <button type="button" id="pboxTaskSecToggle" class="pbox-icon-btn" data-act="toggle-task-sec" aria-label="작업 목록 접기 또는 펼치기">—</button>',
+      '        </div>',
+      '      </div>',
       '      <div id="pboxSideHistory" class="pbox-history-list"></div>',
       '    </div>',
       '    <div class="pbox-side-foot">',
@@ -451,7 +549,8 @@
       '    <header class="pbox-topbar">',
       '      <div class="pbox-topbar-left">',
       '        <button type="button" class="pbox-icon-btn pbox-mobile-only" data-act="open-mobile-nav" aria-label="메뉴 열기">☰</button>',
-      '        <span id="pboxTopTitle" class="pbox-top-title">홈 · AI 법률비서</span>',
+      '        <button type="button" id="pboxExpandSideBtn" class="pbox-icon-btn pbox-pc-only" data-act="toggle-sidebar-collapse" aria-label="사이드바 펼치기" style="display:none">◧</button>',
+      '        <span id="pboxTopTitle" class="pbox-top-title">ⓘ [안내] 새로워진 내용 검토 · 문서 작성 모드 — 전 법령 5,773편 · 판례 원문 대조 활성</span>',
       '      </div>',
       '      <div class="pbox-topbar-right">',
       '        <span id="pboxSyncStatus" class="pbox-sync-pill">국가법령 상시연결</span>',
@@ -496,16 +595,30 @@
 
   function renderSidebarNavState() {
     var titles = {
-      home: '홈 · AI 법률비서',
+      home: 'ⓘ [안내] 새로워진 내용 검토 · 문서 작성 모드 — 국가 전 법령 5,773편 · 판례 원문 대조 활성',
+      workspace: '✦ 내용 검토 · 문서 작성 워크스페이스 (우측 원문 대조)',
       alerts: '법령·판례 개정 및 자동수집 알림',
-      laws: '대한민국 국가법령 전수함 (법률·시행령·시행규칙)',
-      cases: '판례 · 위원회 재결례 · 부처 유권해석 통합검색',
-      ingest: '하급심(1·2심) · 재결서 비식별 수집 및 중복정리',
-      workflows: '공인노무사 전문 AI 서면 워크플로',
-      projects: '의뢰인 · 사건별 프로젝트 보관함'
+      laws: '주석 · 대한민국 국가법령 전수함 (법률·시행령·시행규칙)',
+      cases: '판례 · 위원회 결정례 · 부처 유권해석 통합검색',
+      ingest: '지방법원·행정법원 하급심 판례 및 결정서 비식별 수집함',
+      recents: '최근 본 법령 · 판례 · 결정례 · 유권해석 관리',
+      workflows: '공인노무사 워크플로 라이브러리',
+      projects: '의뢰인 · 사건별 프로젝트 보관함',
+      tasks: '✦ 작업 이력 및 내용 검토 문서 관리'
     };
     var topT = document.getElementById('pboxTopTitle');
     if (topT) topT.textContent = titles[state.view] || 'P박스';
+
+    var sb = document.getElementById('pboxSidePanel');
+    if (sb) {
+      if (state.sidebarCollapsed) sb.classList.add('collapsed');
+      else sb.classList.remove('collapsed');
+    }
+    var expBtn = document.getElementById('pboxExpandSideBtn');
+    if (expBtn) expBtn.style.display = state.sidebarCollapsed ? '' : 'none';
+
+    var avEl = document.getElementById('pboxUserAvatar');
+    if (avEl) avEl.textContent = avatarCharsOf(state.userName);
 
     var btns = document.querySelectorAll('#pboxNavList .pbox-nav-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -538,8 +651,8 @@
 
     if (elBadge) {
       elBadge.textContent = sum.supabaseConnected
-        ? ('공유 DB 연결됨 · 캐시법령 ' + sum.cachedLawsCount + '편')
-        : ('₩0 로컬·미러 활성 · 캐시법령 ' + sum.cachedLawsCount + '편');
+        ? ('공유플랜 · 보관법령 ' + sum.cachedLawsCount + '편')
+        : ('스탠다드 · ₩0 무제한');
     }
     if (elSync) {
       elSync.textContent = state.syncBusy
@@ -550,20 +663,28 @@
 
   function renderSidebarRecents() {
     var box = document.getElementById('pboxSideHistory');
+    var toggleBtn = document.getElementById('pboxTaskSecToggle');
+    if (toggleBtn) toggleBtn.textContent = state.taskSecCollapsed ? '＋' : '—';
     if (!box) return;
-    var threads = global.PuPBoxStore.getThreads().slice(0, 12);
-    if (!threads.length) {
-      box.innerHTML = '<div class="pbox-empty-mini">질문·서면 작업 내역이 여기에 쌓입니다.</div>';
+    if (state.taskSecCollapsed) {
+      box.innerHTML = '';
       return;
     }
+    var threads = global.PuPBoxStore.getThreads().slice(0, 16);
+    if (!threads.length) {
+      box.innerHTML = '<div class="pbox-empty-mini">내용 검토 · 문서 작성 · 검색 작업이 이곳에 기록됩니다.</div>';
+      return;
+    }
+    var curId = state.activeThread && state.view === 'workspace' ? state.activeThread.id : '';
     box.innerHTML = threads.map(function (th) {
-      return '<button type="button" class="pbox-hist-item" data-act="open-thread" data-id="' + esc(th.id) + '" title="' + esc(th.query) + '">' +
+      var isCur = curId && th.id === curId;
+      return '<button type="button" class="pbox-hist-item' + (isCur ? ' active' : '') + '" data-act="open-thread" data-id="' + esc(th.id) + '" title="' + esc(th.title || th.query) + '">' +
         esc(th.title || th.query) + '</button>';
     }).join('');
   }
 
   /* ══════════════════════════════════════════════════════════════
-   * 가운데 화면 렌더링 (7개 뷰)
+   * 가운데 화면 렌더링 (10개 뷰: 엘박스 홈 · 내용검토 워크스페이스 · 최근본자료 · 작업관리 포함)
    * ══════════════════════════════════════════════════════════════ */
   function renderMain() {
     var area = document.getElementById('pboxMainArea');
@@ -571,19 +692,21 @@
     renderSidebarCounts();
 
     if (state.view === 'home') area.innerHTML = buildHomeHtml();
+    else if (state.view === 'workspace') area.innerHTML = buildWorkspaceHtml();
     else if (state.view === 'alerts') area.innerHTML = buildAlertsHtml();
     else if (state.view === 'laws') area.innerHTML = buildLawsHtml();
     else if (state.view === 'cases') area.innerHTML = buildCasesHtml();
     else if (state.view === 'ingest') area.innerHTML = buildIngestHtml();
+    else if (state.view === 'recents') area.innerHTML = buildRecentsHtml();
     else if (state.view === 'workflows') area.innerHTML = buildWorkflowsHtml();
     else if (state.view === 'projects') area.innerHTML = buildProjectsHtml();
+    else if (state.view === 'tasks') area.innerHTML = buildTasksHtml();
   }
 
-  /* ── 1) 홈 · AI 법률비서 화면 (엘박스 스타일 + 인용 검증 + 최근 본 자료) ── */
+  /* ── 1) 홈 화면 (엘박스 동일 레이아웃: 중앙 인사말 · 라운드 컴포저 · 3종 시작 단추 · 최근 본 자료 · 최근 본 프로젝트) ── */
   function buildHomeHtml() {
-    var recents = global.PuPBoxStore.getRecents().slice(0, 6);
+    var recents = global.PuPBoxStore.getRecents().slice(0, 5);
     var projects = global.PuPBoxStore.getProjects().slice(0, 4);
-    var sum = global.PuPBoxStore.getStateSummary();
 
     var chipsHtml = state.attached.map(function (a, i) {
       return '<span class="pbox-att-chip">' +
@@ -594,129 +717,400 @@
 
     var modes = [
       { id: 'auto', label: '자동' },
-      { id: 'search', label: '법령·판례 검색' },
-      { id: 'draft', label: '서면 초안' },
-      { id: 'review', label: '쟁점 검토' }
+      { id: 'search', label: '🔍 검색' },
+      { id: 'review', label: '✦ 내용검토' },
+      { id: 'draft', label: '✎ 문서작성' }
     ];
 
-    var resultBlock = '';
-    if (state.aiBusy) {
-      resultBlock = '<div class="pbox-card pbox-ai-result" role="status" aria-live="polite"><div class="pbox-loading-line">⏳ 검증된 법령·판례·행정해석 원문을 대조하여 답변을 작성하고 있습니다…</div></div>';
-    } else if (state.activeThread) {
-      var th = state.activeThread;
-      var vf = th.verification || { items: [], verifiedCount: 0, unverifiedCount: 0 };
-      var vfBadges = (vf.items || []).filter(function (it) { return it && typeof it === 'object'; }).map(function (it) {
-        if (it.verified) {
-          var clickAttrs = it.kind === 'law'
-            ? ('data-act="open-law" data-dir="' + esc(it.lawDir) + '" data-file="' + esc(it.fileName || '') + '" data-art="' + esc(it.articleNo || '') + '"')
-            : (it.targetId ? ('data-act="open-doc" data-id="' + esc(it.targetId) + '"') : '');
-          return '<button type="button" class="pbox-cite-chip ok" ' + clickAttrs + ' title="' + esc(it.matchedTitle) + '">✓ 원문확인: ' + esc(it.raw) + '</button>';
-        }
-        if (it.status === 'unfetched_law' && it.lawDir) {
-          return '<button type="button" class="pbox-cite-chip unfetched" data-act="open-law" data-dir="' + esc(it.lawDir) + '" data-file="' + esc(it.fileName || '') + '" data-art="' + esc(it.articleNo || '') + '" title="' + esc(it.matchedTitle) + '">📖 클릭해 조문검증: ' + esc(it.raw) + '</button>';
-        }
-        return '<span class="pbox-cite-chip warn" title="' + esc(it.matchedTitle) + '">⚠ 원문미확인: ' + esc(it.raw) + '</span>';
-      }).join('');
+    var sendDisabled = (state.aiBusy || state.reviewFileBusy) ? ' disabled aria-busy="true"' : '';
 
-      resultBlock = [
-        '<div class="pbox-card pbox-ai-result">',
-        '  <div class="pbox-ai-result-hd">',
-        '    <div>',
-        '      <span class="pbox-badge-blue">' + esc(th.engineLabel) + '</span>',
-        '      <strong class="pbox-ai-qtitle">' + esc(th.title) + '</strong>',
-        '    </div>',
-        '    <div class="pbox-btn-group">',
-        '      <button type="button" class="pbox-btn-sm" data-act="copy-thread">📋 복사</button>',
-        '      <button type="button" class="pbox-btn-sm" data-act="export-thread-md">📝 MD 저장</button>',
-        '      <button type="button" class="pbox-btn-sm" data-act="export-thread-doc">📄 Word(.doc)</button>',
-        '      <button type="button" class="pbox-btn-sm" data-act="save-thread-proj">📁 프로젝트 담기</button>',
-        '    </div>',
+    var defaultRecentsHtml = [
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="prec-lower-seouladm-sanjae-lumbar">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">서울행정법원 2019구단62415 판결 (추간판탈출증 산재)</span><span class="pbox-lbox-recent-kind">· 판례</span></div>' +
+        '<span class="pbox-lbox-recent-age">오늘</span>' +
+      '</div>',
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="prec-sc-2020da247190">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결</span><span class="pbox-lbox-recent-kind">· 판례</span></div>' +
+        '<span class="pbox-lbox-recent-age">오늘</span>' +
+      '</div>',
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="dec-nlrc-probation-2024">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">중앙노동위원회 수습근로자 본채용 거부 부당해고 구제 재심판정</span><span class="pbox-lbox-recent-kind">· 결정례</span></div>' +
+        '<span class="pbox-lbox-recent-age">어제</span>' +
+      '</div>',
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-doc" data-id="interp-moel-2025-ordinary">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">고용노동부 임금근로시간과-2271 통상임금 판단 지침</span><span class="pbox-lbox-recent-kind">· 유권해석</span></div>' +
+        '<span class="pbox-lbox-recent-age">어제</span>' +
+      '</div>',
+      '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-law" data-dir="근로기준법" data-file="법률(법률).md">' +
+        '<div class="pbox-lbox-recent-left"><span class="pbox-lbox-recent-title">근로기준법 (현행 법률 전문)</span><span class="pbox-lbox-recent-kind">· 법령</span></div>' +
+        '<span class="pbox-lbox-recent-age">어제</span>' +
+      '</div>'
+    ].join('');
+
+    var recentLinesHtml = recents.length ? recents.map(function (r) {
+      var clickAttr = r.kind === 'law'
+        ? ('data-act="open-law" data-dir="' + esc(r.lawDir) + '" data-file="' + esc(r.fileName) + '"')
+        : ('data-act="open-doc" data-id="' + esc(String(r.id || '').replace(/^doc:/, '')) + '"');
+      return '<div class="pbox-lbox-recent-line" role="button" tabindex="0" ' + clickAttr + '>' +
+        '<div class="pbox-lbox-recent-left">' +
+          '<span class="pbox-lbox-recent-title">' + esc(r.title) + '</span>' +
+          '<span class="pbox-lbox-recent-kind">· ' + esc(recentKindLabel(r)) + '</span>' +
+        '</div>' +
+        '<span class="pbox-lbox-recent-age">' + esc(formatRelativeDay(r.viewedAt)) + '</span>' +
+      '</div>';
+    }).join('') : defaultRecentsHtml;
+
+    var projBodyHtml = '';
+    if (projects.length) {
+      projBodyHtml = '<div class="pbox-lbox-recent-list">' + projects.map(function (p) {
+        var totalItems = (p.docIds || []).length + (p.lawKeys || []).length + (p.drafts || []).length;
+        return '<div class="pbox-lbox-recent-line" role="button" tabindex="0" data-act="open-project" data-id="' + esc(p.id) + '">' +
+          '<div class="pbox-lbox-recent-left">' +
+            '<span class="pbox-lbox-recent-title">📁 ' + esc(p.name) + (p.clientName ? ' (' + esc(p.clientName) + ')' : '') + '</span>' +
+            '<span class="pbox-lbox-recent-kind">· 자료 ' + totalItems + '건</span>' +
+          '</div>' +
+          '<span class="pbox-lbox-recent-age">' + esc(formatRelativeDay(p.updatedAt)) + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
+    } else if (!state.hideHomeEmptyProjects) {
+      projBodyHtml = [
+        '<div class="pbox-lbox-empty-proj">',
+        '  <div aria-hidden="true" style="font-size:22px">📁</div>',
+        '  <div class="pbox-lbox-empty-msg">최근 본 프로젝트가 없습니다.</div>',
+        '  <div class="pbox-btn-group" style="justify-content:center">',
+        '    <button type="button" class="pbox-btn-sm" data-act="toggle-hide-home-proj">숨기기</button>',
+        '    <button type="button" class="pbox-btn-sm" data-act="go-view" data-view="projects">프로젝트로 이동</button>',
         '  </div>',
-        '  <div class="pbox-cite-bar">',
-        '    <span class="pbox-cite-summary">기계적 인용 검증: 원문확인 <b>' + vf.verifiedCount + '</b>건 · 미확인/미보유 <b>' + vf.unverifiedCount + '</b>건</span>',
-        '    <div class="pbox-cite-chips">' + (vfBadges || '<span class="pbox-muted">인용 배지를 누르면 오른쪽 창에 조문·판례 원문이 즉시 열립니다.</span>') + '</div>',
-        '  </div>',
-        '  <div class="pbox-md-body">' + formatSimpleMd(th.answer) + '</div>',
         '</div>'
       ].join('\n');
     }
 
-    var samplePrompts = [
-      '재직조건부 정기상여금의 통상임금 포함 여부(2024년 대법원 전합 기준)와 연장수당 산정 범위 검토해줘',
-      '허리디스크(추간판탈출증) 산재 최초요양 불승인 처분 취소 유사 판례와 입증 포인트 요약해줘',
-      '수습근로자 3개월 만료 시 카톡으로만 종료 통보한 경우 부당해고 구제신청 이유서 초안 작성해줘',
-      'DB형 퇴직연금 가입 근로자가 무주택 주택구입 사유로 중간정산 가능한지 유권해석 확인해줘'
-    ];
-
-    var sendDisabled = state.aiBusy ? ' disabled aria-busy="true"' : '';
-    var syncDisabled = state.syncBusy ? ' disabled aria-busy="true"' : '';
-
     return [
       '<div class="pbox-home-wrap">',
-      '  <div class="pbox-outage-banner">',
-      '    <span>🛡️ <b>국가법령 상시 보호 모드</b>: 법제처 국가법령정보센터 시스템 점검 시에도 P박스 전 법령 <b>' + sum.totalNationalLaws.toLocaleString() + '편</b>과 판례·행정해석 검색이 중단 없이 동작합니다.</span>',
-      '    <button type="button" class="pbox-link-btn" data-act="sync-core-pack"' + syncDisabled + '>핵심 노동법 20편 오프라인 보관 →</button>',
-      '  </div>',
       '  <h1 class="pbox-hero-greeting">' + esc(state.userName) + '님, 어떤 업무를 시작할까요?</h1>',
       '  <div class="pbox-composer-card">',
       (chipsHtml ? ('    <div class="pbox-att-row">' + chipsHtml + '</div>') : ''),
-      '    <textarea id="pboxPromptInput" class="pbox-composer-ta" rows="3" aria-label="법률 질문 및 사실관계 입력" placeholder="질문·사실관계·사건번호 입력 (@ 원문첨부 단추로 법령·판례를 직접 끼워 넣을 수 있습니다)"></textarea>',
+      '    <textarea id="pboxPromptInput" class="pbox-composer-ta" rows="3" aria-label="법률 질문 및 검토 내용 입력" placeholder="내용 입력 (@ 입력 시 자료 첨부)"></textarea>',
       '    <div class="pbox-composer-bar">',
       '      <div class="pbox-composer-left">',
-      '        <button type="button" class="pbox-icon-pill" data-act="open-attach-modal" title="법령·판례 @첨부">＋ @자료 첨부</button>',
-      '        <button type="button" class="pbox-icon-pill" data-act="trigger-quick-file" title="내 PC 판결문 PDF/TXT 열기">📎 판결문 열기</button>',
-      '        <input type="file" id="pboxQuickFileInput" accept=".pdf,.txt,.md,.json" style="display:none" aria-label="판결문 파일 선택">',
+      '        <button type="button" class="pbox-plus-btn" data-act="open-attach-modal" title="법령·판례·결정례 원문 첨부 (@)" aria-label="자료 첨부 (@)">＋</button>',
       '      </div>',
       '      <div class="pbox-composer-right">',
-      '        <div class="pbox-mode-seg" role="group" aria-label="질의 모드 선택">',
+      '        <div class="pbox-mode-seg" role="group" aria-label="작업 모드 선택">',
       modes.map(function (m) {
         var isAct = state.promptMode === m.id;
         return '<button type="button" class="pbox-mode-btn' + (isAct ? ' active' : '') + '" aria-pressed="' + (isAct ? 'true' : 'false') + '" data-act="set-mode" data-mode="' + m.id + '">' + esc(m.label) + '</button>';
       }).join(''),
       '        </div>',
-      '        <button type="button" id="pboxSendBtn" class="pbox-send-btn" data-act="submit-prompt"' + sendDisabled + ' title="질문·서면 생성 실행">' + (state.aiBusy ? '작성 중…' : '↑ 실행') + '</button>',
+      '        <button type="button" id="pboxSendBtn" class="pbox-send-btn" data-act="submit-prompt"' + sendDisabled + ' aria-label="질의 또는 내용 검토 실행" title="실행">' + (state.aiBusy ? '…' : '↑') + '</button>',
       '      </div>',
       '    </div>',
-      '    <div class="pbox-composer-foot">무료 무제한 작동 (푸른 AI 대리인 연결 시 심층 생성 · 오프라인/한도 시 ₩0 내장 원문합성 자동전환 · 모든 인용 기계 검증)</div>',
+      '  </div>',
+      '  <div class="pbox-composer-subbar">',
+      '    <span>ⓘ AI 내용 검토 · 조항별 위험진단 · 원문 인용검증을 무료 무제한 사용할 수 있습니다.</span>',
+      '    <button type="button" class="pbox-link-btn" data-act="open-pureun-roadmap">관리방식 · 사용 확인</button>',
       '  </div>',
       '  <div class="pbox-quick-actions">',
-      '    <button type="button" class="pbox-qa-pill" data-act="go-view" data-view="laws">📖 국가법령 5,773편 열람</button>',
-      '    <button type="button" class="pbox-qa-pill" data-act="go-view" data-view="cases">⚖️ 판례·행정해석 통합검색</button>',
-      '    <button type="button" class="pbox-qa-pill" data-act="go-view" data-view="workflows">⚡ 노무 서면 워크플로 (6종)</button>',
-      '    <button type="button" class="pbox-qa-pill" data-act="go-view" data-view="ingest">📥 하급심 판결문 수집·중복정리</button>',
+      '    <button type="button" class="pbox-qa-pill" data-act="start-new-doc"' + sendDisabled + '>📄 새 문서로 시작</button>',
+      '    <button type="button" class="pbox-qa-pill" data-act="open-review-file"' + sendDisabled + '>' + (state.reviewFileBusy ? '⏳ 문서 읽는 중…' : '📂 문서 열기') + '</button>',
+      '    <input type="file" id="pboxReviewFileInput" accept=".pdf,.txt,.md,.json" style="display:none" aria-label="내용 검토할 문서 파일 선택">',
+      '    <button type="button" class="pbox-qa-pill" data-act="go-view" data-view="workflows">🗂 워크플로 라이브러리</button>',
       '  </div>',
-      '  <div class="pbox-sample-row">',
-      samplePrompts.map(function (sp) {
-        return '<button type="button" class="pbox-sample-chip" data-act="use-sample" data-q="' + esc(sp) + '">💬 ' + esc(sp.slice(0, 38)) + '…</button>';
-      }).join(''),
+      '  <section class="pbox-lbox-sec" aria-label="최근 본 자료">',
+      '    <div class="pbox-lbox-sec-hd"><span>🕘 최근 본 자료</span><button type="button" class="pbox-link-btn" data-act="go-view" data-view="recents">전체보기</button></div>',
+      '    <div class="pbox-lbox-recent-list">' + recentLinesHtml + '</div>',
+      '  </section>',
+      '  <section class="pbox-lbox-sec" aria-label="최근 본 프로젝트">',
+      '    <div class="pbox-lbox-sec-hd"><span>📁 최근 본 프로젝트</span>' +
+        (state.hideHomeEmptyProjects && !projects.length
+          ? '<button type="button" class="pbox-link-btn" data-act="toggle-hide-home-proj">다시 표시</button>'
+          : '<button type="button" class="pbox-link-btn" data-act="go-view" data-view="projects">프로젝트 관리</button>') +
+      '    </div>',
+      projBodyHtml,
+      '  </section>',
+      '</div>'
+    ].join('\n');
+  }
+
+  /* ── 1-B) 엘박스형 내용 검토 · 문서 작성 통합 워크스페이스 (workspace 뷰) ── */
+  function buildWorkspaceHtml() {
+    if (state.aiBusy && !state.activeThread) {
+      return '<div class="pbox-ws-wrap"><div class="pbox-card" role="status" aria-live="polite"><div class="pbox-loading-line">⏳ 문서 조항 및 검증된 법령·판례·행정해석 원문을 대조하여 검토서를 작성하고 있습니다…</div></div></div>';
+    }
+    var th = state.activeThread;
+    if (!th) {
+      th = global.PuPBoxStore.saveThread({
+        title: '새 문서 · 내용 검토',
+        query: '',
+        answer: '',
+        mode: 'review',
+        sourceText: '',
+        workflowStyle: 'lbox'
+      });
+      state.activeThread = th;
+      state.workspaceTab = 'editor';
+    }
+
+    var modeInfo = threadModeBadge(th.mode);
+    var diag = global.PuPBoxEngine.analyzeDocumentClauses(th.sourceText || th.query || '');
+    var vf = th.verification || { items: [], verifiedCount: 0, unverifiedCount: 0 };
+    var vfBadges = (vf.items || []).filter(function (it) { return it && typeof it === 'object'; }).map(function (it) {
+      if (it.verified) {
+        var clickAttrs = it.kind === 'law'
+          ? ('data-act="open-law" data-dir="' + esc(it.lawDir) + '" data-file="' + esc(it.fileName || '') + '" data-art="' + esc(it.articleNo || '') + '"')
+          : (it.targetId ? ('data-act="open-doc" data-id="' + esc(it.targetId) + '"') : '');
+        return '<button type="button" class="pbox-cite-chip ok" ' + clickAttrs + ' title="' + esc(it.matchedTitle) + '">✓ 원문확인: ' + esc(it.raw) + '</button>';
+      }
+      if (it.status === 'unfetched_law' && it.lawDir) {
+        return '<button type="button" class="pbox-cite-chip unfetched" data-act="open-law" data-dir="' + esc(it.lawDir) + '" data-file="' + esc(it.fileName || '') + '" data-art="' + esc(it.articleNo || '') + '" title="' + esc(it.matchedTitle) + '">📖 클릭해 조문검증: ' + esc(it.raw) + '</button>';
+      }
+      return '<span class="pbox-cite-chip warn" title="' + esc(it.matchedTitle) + '">⚠ 원문미확인: ' + esc(it.raw) + '</span>';
+    }).join('');
+
+    var busyAttr = state.aiBusy ? ' disabled aria-busy="true"' : '';
+    var tabBodyHtml = '';
+
+    if (state.workspaceTab === 'clauses') {
+      tabBodyHtml = [
+        '<div class="pbox-sec-hd">',
+        '  <span>⚖️ 조항별 강행법규 위반 · 위험 진단 (고위험 <b>' + diag.highCount + '</b>건 · 주의 <b>' + diag.warnCount + '</b>건 / 분석 단위 ' + diag.clauseCount + '개)</span>',
+        '  <button type="button" class="pbox-btn-sm" data-act="set-ws-tab" data-tab="editor">✎ 원문 수정하러 가기</button>',
+        '</div>',
+        (diag.findings.length ? '<div class="pbox-clause-list">' + diag.findings.map(function (f, idx) {
+          var sevCls = f.severity === 'high' ? 'high' : 'warn';
+          var badgeCls = f.severity === 'high' ? 'pbox-badge-red' : 'pbox-badge-amber';
+          return '<div class="pbox-clause-card ' + sevCls + '">' +
+            '<div class="pbox-clause-top">' +
+              '<div><span class="' + badgeCls + '">' + esc(f.badge) + '</span> <strong>[' + esc(f.clauseLabel) + '] ' + esc(f.title) + '</strong></div>' +
+              '<span class="pbox-muted">' + esc(f.basis) + '</span>' +
+            '</div>' +
+            '<div class="pbox-clause-quote">원문 발췌: ' + esc(f.excerpt) + '</div>' +
+            '<div class="pbox-md-p"><strong>위험 요지:</strong> ' + esc(f.issue) + '</div>' +
+            '<div class="pbox-clause-suggest">' +
+              '<div><strong>권고 수정문안:</strong> ' + esc(f.suggestion) + '</div>' +
+              '<div style="margin-top:8px"><button type="button" class="pbox-btn-sm" data-act="apply-clause-fix" data-idx="' + idx + '">✎ 권고 수정문안을 문서 원문에 반영</button></div>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>' : [
+          '<div class="pbox-card pbox-empty-box">',
+          '  현재 입력된 문서에서 자동 탐지된 강행규정 위반 조항이 없거나 아직 검토할 계약서·취업규칙 본문이 입력되지 않았습니다.<br>',
+          '  <div class="pbox-btn-group" style="justify-content:center;margin-top:10px">',
+          '    <button type="button" class="pbox-btn-sm" data-act="load-ws-sample" data-sample="freelancer">용역(프리랜서) 계약서 샘플 불러오기</button>',
+          '    <button type="button" class="pbox-btn-sm" data-act="load-ws-sample" data-sample="blanket_wage">포괄임금 근로계약서 샘플 불러오기</button>',
+          '    <button type="button" class="pbox-btn-primary" data-act="set-ws-tab" data-tab="editor">✎ 원문 직접 입력</button>',
+          '  </div>',
+          '</div>'
+        ].join('\n'))
+      ].join('\n');
+    } else if (state.workspaceTab === 'editor') {
+      tabBodyHtml = [
+        '<div class="pbox-card pbox-flat-m">',
+        '  <div class="pbox-sec-hd">',
+        '    <span>✎ 검토 대상 계약서 · 취업규칙 · 서면 원문 편집' + (th.sourceFileName ? ' <span class="pbox-badge-gray">' + esc(th.sourceFileName) + '</span>' : '') + '</span>',
+        '    <div class="pbox-btn-group">',
+        '      <button type="button" class="pbox-btn-sm" data-act="load-ws-sample" data-sample="freelancer">샘플: 용역계약서</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="load-ws-sample" data-sample="blanket_wage">샘플: 포괄임금계약서</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="load-ws-sample" data-sample="work_rules">샘플: 취업규칙변경안</button>',
+        '    </div>',
+        '  </div>',
+        '  <textarea id="pboxWsSourceTa" class="pbox-textarea" rows="13" aria-label="검토 대상 문서 원문 입력" placeholder="검토할 근로계약서, 용역(프리랜서)계약서, 취업규칙, 징계·해고 통지서 또는 서면 초안 전문을 붙여넣으세요. (주민등록번호·실명·연락처·계좌번호는 저장 및 AI 검토 전 자동 비식별화됩니다)">' + esc(th.sourceText || '') + '</textarea>',
+        '  <div class="pbox-btn-group" style="margin-top:10px">',
+        '    <button type="button" class="pbox-btn-sm" data-act="save-ws-source">💾 본문 저장 · 위험진단 갱신</button>',
+        '    <button type="button" class="pbox-btn-primary" data-act="run-ws-quick-review" data-q="위 문서의 강행법규 위반 여부, 조항별 위험도, 관련 대법원·하급심 판례 및 적법 수정문안을 종합 검토해 주세요."' + busyAttr + '>✦ 이 문서 전체 내용 검토 실행</button>',
+        '  </div>',
+        '</div>'
+      ].join('\n');
+    } else {
+      tabBodyHtml = [
+        (state.aiBusy ? '<div class="pbox-info-note" role="status" aria-live="polite">⏳ 요청하신 내용 검토·수정 사항을 법령·판례 원문과 대조하여 반영하고 있습니다…</div>' : ''),
+        (th.answer ? [
+          '<div class="pbox-card pbox-flat-m">',
+          '  <div class="pbox-cite-bar">',
+          '    <span class="pbox-cite-summary">기계적 원문 인용 검증: 원문확인 <b>' + vf.verifiedCount + '</b>건 · 미확인/미보유 <b>' + vf.unverifiedCount + '</b>건 <span class="pbox-muted">(' + esc(th.engineLabel || 'P박스 검토 엔진') + ')</span></span>',
+          '    <div class="pbox-cite-chips">' + (vfBadges || '<span class="pbox-muted">인용 배지를 누르면 오른쪽 분할창에 해당 법령 조문·판례 전문이 즉시 열립니다.</span>') + '</div>',
+          '  </div>',
+          '  <div class="pbox-md-body">' + formatSimpleMd(th.answer) + '</div>',
+          '</div>'
+        ].join('\n') : [
+          '<div class="pbox-card pbox-empty-box">',
+          '  아직 생성된 검토 의견서·서면 초안이 없습니다. [검토 대상 원문 · 편집] 탭에 문서를 넣거나 아래 지시창으로 바로 시작하세요.<br>',
+          '  <div class="pbox-btn-group" style="justify-content:center;margin-top:10px">',
+          '    <button type="button" class="pbox-btn-sm" data-act="set-ws-tab" data-tab="editor">✎ 원문 입력 탭 열기</button>',
+          '    <button type="button" class="pbox-btn-primary" data-act="run-ws-quick-review" data-q="입력된 문서의 강행법규 위반 여부와 적법 수정문안을 검토해 주세요."' + busyAttr + '>✦ AI 내용 검토 실행</button>',
+          '  </div>',
+          '</div>'
+        ].join('\n')),
+        '<div class="pbox-btn-group" style="margin-top:12px">',
+        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="강행법규 위반 및 근로감독 지적 위험조항을 빠짐없이 다시 점검해 줘"' + busyAttr + '>⚖️ 강행규정·위험조항 점검</button>',
+        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="관련 대법원 전원합의체 및 행정·지방법원 하급심 유사 판례 법리를 보강해 줘"' + busyAttr + '>🏛️ 유사 판례·해석 보강</button>',
+        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="문제가 된 조항들을 적법한 표준 대체 조항 문안으로 다시 작성해 줘"' + busyAttr + '>✏️ 적법 수정조항 작성</button>',
+        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="의뢰인(사업주 또는 근로자)에게 바로 보낼 수 있도록 핵심 결론 중심으로 요약해 줘"' + busyAttr + '>📋 의뢰인 보고용 요약</button>',
+        '</div>',
+        '<div class="pbox-ws-follow-bar">',
+        '  <input type="text" id="pboxWsFollowInput" class="pbox-input" aria-label="후속 검토 지시 또는 서면 수정 요청" placeholder="이 작업에서 이어서 검토·보완할 지시를 입력하세요 (@ 입력 시 법령·판례 추가 첨부)">',
+        '  <button type="button" class="pbox-btn-primary" data-act="submit-ws-followup"' + busyAttr + '>↑ 후속 반영</button>',
+        '</div>'
+      ].join('\n');
+    }
+
+    return [
+      '<div class="pbox-ws-wrap">',
+      '  <div class="pbox-ws-head">',
+      '    <div class="pbox-ws-title-row">',
+      '      <button type="button" class="pbox-btn-sm" data-act="go-view" data-view="home">← 홈</button>',
+      '      <span class="' + modeInfo.cls + '">' + esc(modeInfo.label) + '</span>',
+      '      <input type="text" id="pboxWsTitleInput" class="pbox-ws-title-input" aria-label="작업 문서 제목" value="' + esc(th.title || '내용 검토 작업') + '">',
+      '      <button type="button" class="pbox-btn-sm" data-act="save-ws-meta">제목 저장</button>',
+      '    </div>',
+      '    <div class="pbox-btn-group">',
+      '      <button type="button" class="pbox-btn-sm" data-act="open-review-file"' + busyAttr + '>📂 문서 열기</button>',
+      '      <input type="file" id="pboxReviewFileInput" accept=".pdf,.txt,.md,.json" style="display:none" aria-label="내용 검토할 문서 파일 선택">',
+      '      <button type="button" class="pbox-btn-sm" data-act="copy-thread">📋 복사</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="export-thread-md">📝 MD 저장</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="export-thread-doc">📄 Word(.doc)</button>',
+      '      <button type="button" class="pbox-btn-primary" data-act="save-thread-proj">📁 프로젝트 담기</button>',
+      '    </div>',
       '  </div>',
-      resultBlock,
-      '  <div class="pbox-home-grid">',
-      '    <section class="pbox-card">',
-      '      <div class="pbox-sec-hd"><span>🕘 최근 본 법령·판례·해석</span><button type="button" class="pbox-link-btn" data-act="go-view" data-view="cases">전체 자료 보기</button></div>',
-      (recents.length ? recents.map(function (r) {
-        var clickAttr = r.kind === 'law'
+      '  <div class="pbox-pureun-bridge">',
+      '    <span>관리방식: <b>엘박스형 내용검토 · 작업관리</b> · 추후 <b>푸른노무법인 사건·자문 방식</b>(수임단계·임금/산재 계산기·노무사 결재라인) 자동 전환 호환</span>',
+      '    <button type="button" class="pbox-link-btn" data-act="open-pureun-roadmap">푸른 방식 로드맵 보기</button>',
+      '  </div>',
+      '  <div class="pbox-ws-tabs-bar">',
+      '    <div class="pbox-ws-tabs" role="tablist" aria-label="내용 검토 워크스페이스 탭">',
+      '      <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'report' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'report' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="report">✦ 검토 의견서 · 초안</button>',
+      '      <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'clauses' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'clauses' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="clauses">⚖️ 조항별 위험 진단 (' + diag.findings.length + ')</button>',
+      '      <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'editor' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'editor' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="editor">✎ 검토 대상 원문 · 편집</button>',
+      '    </div>',
+      '    <button type="button" class="pbox-btn-sm" data-act="open-attach-modal">@ 참고 법령·판례 첨부 (' + state.attached.length + '건)</button>',
+      '  </div>',
+      tabBodyHtml,
+      '</div>'
+    ].join('\n');
+  }
+
+  /* ── 1-C) 최근 본 자료 관리 화면 (recents 뷰 — 체크박스·번호 규격 표) ── */
+  function buildRecentsHtml() {
+    var recents = global.PuPBoxStore.getRecents();
+    var selCnt = state.selectedRecentIds.size;
+    var allSel = recents.length > 0 && recents.every(function (r) { return state.selectedRecentIds.has(r.id); });
+
+    return [
+      '<div class="pbox-page-wrap">',
+      (selCnt > 0 ? [
+        '  <div class="pbox-bulk-bar">',
+        '    <span>선택 <b>' + selCnt + '</b>건</span>',
+        '    <div class="pbox-btn-group">',
+        '      <button type="button" class="pbox-btn-sm" data-act="bulk-attach-recents">@ AI 검토에 첨부</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="bulk-proj-recents">📁 프로젝트에 담기</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="bulk-del-recents">🗑 열람 기록 삭제</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="clear-recent-sel">선택 해제</button>',
+        '    </div>',
+        '  </div>'
+      ].join('\n') : ''),
+      '  <div class="pbox-card pbox-list-card">',
+      '    <div class="pbox-sec-hd"><span>🕘 최근 본 자료 <b>' + recents.length + '</b>건</span><span class="pbox-muted">제목을 누르면 오른쪽 원문 리더가 열립니다</span></div>',
+      '    <div class="pbox-table-wrap">',
+      '      <table class="pbox-table" aria-label="최근 본 자료 목록">',
+      '        <thead><tr>',
+      '          <th class="col-chk"><input type="checkbox" data-act="toggle-all-recents" aria-label="최근 본 자료 전체 선택"' + (allSel ? ' checked' : '') + '></th>',
+      '          <th class="col-num">번호</th>',
+      '          <th style="width:96px">구분</th>',
+      '          <th>자료명</th>',
+      '          <th style="width:200px">기관 · 사건번호 · 시행정보</th>',
+      '          <th style="width:92px">열람시점</th>',
+      '          <th style="width:126px">동작</th>',
+      '        </tr></thead>',
+      '        <tbody>',
+      (recents.length ? recents.map(function (r, idx) {
+        var chk = state.selectedRecentIds.has(r.id) ? ' checked' : '';
+        var kLabel = recentKindLabel(r);
+        var openAttrs = r.kind === 'law'
           ? ('data-act="open-law" data-dir="' + esc(r.lawDir) + '" data-file="' + esc(r.fileName) + '"')
-          : ('data-act="open-doc" data-id="' + esc(r.id.replace(/^doc:/, '')) + '"');
-        return '<div class="pbox-recent-row" role="button" tabindex="0" ' + clickAttr + '>' +
-          '<div class="pbox-recent-main">' + esc(r.title) + '</div>' +
-          '<div class="pbox-recent-sub">' + esc(r.sub) + '</div>' +
-        '</div>';
-      }).join('') : [
-        '<div class="pbox-recent-row" role="button" tabindex="0" data-act="open-doc" data-id="prec-sc-2020da247190"><div class="pbox-recent-main">대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결</div><div class="pbox-recent-sub">통상임금 고정성 폐기 · 재직조건부 정기상여금</div></div>',
-        '<div class="pbox-recent-row" role="button" tabindex="0" data-act="open-law" data-dir="근로기준법" data-file="법률(법률).md"><div class="pbox-recent-main">근로기준법 (현행 법률 전문)</div><div class="pbox-recent-sub">고용노동부 · 조문 목차 및 시행일 확인</div></div>',
-        '<div class="pbox-recent-row" role="button" tabindex="0" data-act="open-doc" data-id="prec-lower-seouladm-sanjae-lumbar"><div class="pbox-recent-main">서울행정법원 2019구단62415 판결 (산재 하급심)</div><div class="pbox-recent-sub">추간판탈출증(허리디스크) 최초요양 불승인 취소 기준</div></div>'
-      ].join('')),
-      '    </section>',
-      '    <section class="pbox-card">',
-      '      <div class="pbox-sec-hd"><span>📁 사건 프로젝트</span><button type="button" class="pbox-link-btn" data-act="go-view" data-view="projects">프로젝트 관리</button></div>',
-      (projects.length ? projects.map(function (p) {
-        return '<div class="pbox-recent-row" role="button" tabindex="0" data-act="open-project" data-id="' + esc(p.id) + '">' +
-          '<div class="pbox-recent-main">📁 ' + esc(p.name) + (p.clientName ? ' (' + esc(p.clientName) + ')' : '') + '</div>' +
-          '<div class="pbox-recent-sub">판례·해석 ' + (p.docIds || []).length + '건 · 법령 ' + (p.lawKeys || []).length + '건 · 서면 ' + (p.drafts || []).length + '건</div>' +
-        '</div>';
-      }).join('') : '<div class="pbox-empty-box">등록된 사건 프로젝트가 없습니다.<br><button type="button" class="pbox-btn-primary" style="margin-top:8px" data-act="create-project-prompt">+ 새 프로젝트 만들기</button></div>'),
-      '    </section>',
+          : ('data-act="open-doc" data-id="' + esc(String(r.id || '').replace(/^doc:/, '')) + '"');
+        var attAttrs = r.kind === 'law'
+          ? ('data-act="attach-law" data-dir="' + esc(r.lawDir) + '" data-file="' + esc(r.fileName) + '"')
+          : ('data-act="attach-doc" data-id="' + esc(String(r.id || '').replace(/^doc:/, '')) + '"');
+        return '<tr>' +
+          '<td class="col-chk"><input type="checkbox" data-act="toggle-recent-chk" data-id="' + esc(r.id) + '" aria-label="' + esc(r.title) + ' 선택"' + chk + '></td>' +
+          '<td class="col-num">' + (idx + 1) + '</td>' +
+          '<td class="pbox-cell-hide-m"><span class="pbox-badge-gray">' + esc(kLabel) + '</span></td>' +
+          '<td class="pbox-row-click pbox-cell-main" role="button" tabindex="0" ' + openAttrs + ' title="' + esc(r.title) + '"><strong>' + esc(r.title) + '</strong></td>' +
+          '<td class="pbox-cell-meta" title="' + esc(r.sub || kLabel) + '">' + esc(r.sub || kLabel) + '</td>' +
+          '<td class="col-num pbox-cell-hide-m">' + esc(formatRelativeDay(r.viewedAt)) + '</td>' +
+          '<td class="pbox-cell-actions">' +
+            '<button type="button" class="pbox-mini-act" ' + openAttrs + '>원문</button> ' +
+            '<button type="button" class="pbox-mini-act" ' + attAttrs + '>@첨부</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') : '<tr class="pbox-empty-row"><td colspan="7" class="pbox-empty-cell">최근 열람한 법령·판례·결정례가 없습니다. 홈 또는 판례·법령 메뉴에서 원문을 열어 보세요.</td></tr>'),
+      '        </tbody>',
+      '      </table>',
+      '    </div>',
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  /* ── 1-D) 작업(내용검토·문서작성·검색) 통합 관리 화면 (tasks 뷰 — 체크박스·번호 규격 표) ── */
+  function buildTasksHtml() {
+    var threads = global.PuPBoxStore.getThreads();
+    var selCnt = state.selectedTaskIds.size;
+    var allSel = threads.length > 0 && threads.every(function (t) { return state.selectedTaskIds.has(t.id); });
+
+    return [
+      '<div class="pbox-page-wrap">',
+      '  <div class="pbox-sec-hd" style="margin-bottom:12px">',
+      '    <span>✦ 작업 이력 · 내용 검토 문서 관리 (' + threads.length + '건)</span>',
+      '    <div class="pbox-btn-group">',
+      '      <button type="button" class="pbox-btn-sm" data-act="open-review-file">📂 문서 열어 검토 시작</button>',
+      '      <input type="file" id="pboxReviewFileInput" accept=".pdf,.txt,.md,.json" style="display:none" aria-label="내용 검토할 문서 파일 선택">',
+      '      <button type="button" class="pbox-btn-primary" data-act="start-new-doc">📄 새 문서로 시작</button>',
+      '    </div>',
+      '  </div>',
+      (selCnt > 0 ? [
+        '  <div class="pbox-bulk-bar">',
+        '    <span>선택 <b>' + selCnt + '</b>개 작업</span>',
+        '    <div class="pbox-btn-group">',
+        '      <button type="button" class="pbox-btn-sm" data-act="bulk-proj-tasks">📁 프로젝트에 일괄 보관</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="bulk-del-tasks">🗑 선택 작업 삭제</button>',
+        '      <button type="button" class="pbox-btn-sm" data-act="clear-task-sel">선택 해제</button>',
+        '    </div>',
+        '  </div>'
+      ].join('\n') : ''),
+      '  <div class="pbox-card pbox-list-card">',
+      '    <div class="pbox-table-wrap">',
+      '      <table class="pbox-table" aria-label="작업 관리 목록">',
+      '        <thead><tr>',
+      '          <th class="col-chk"><input type="checkbox" data-act="toggle-all-tasks" aria-label="작업 전체 선택"' + (allSel ? ' checked' : '') + '></th>',
+      '          <th class="col-num">번호</th>',
+      '          <th style="width:104px">작업 유형</th>',
+      '          <th>작업 제목</th>',
+      '          <th style="width:170px">관리체계 · 인용검증</th>',
+      '          <th style="width:92px">최근 작업</th>',
+      '          <th style="width:124px">동작</th>',
+      '        </tr></thead>',
+      '        <tbody>',
+      (threads.length ? threads.map(function (th, idx) {
+        var chk = state.selectedTaskIds.has(th.id) ? ' checked' : '';
+        var mb = threadModeBadge(th.mode);
+        var vfCnt = (th.verification && th.verification.verifiedCount) || 0;
+        var metaTxt = (th.workflowStyle === 'pureun' ? '푸른방식' : '엘박스형') + (th.mode === 'search' ? ' · 검색기록' : (' · 인용확인 ' + vfCnt + '건'));
+        return '<tr>' +
+          '<td class="col-chk"><input type="checkbox" data-act="toggle-task-chk" data-id="' + esc(th.id) + '" aria-label="' + esc(th.title || th.query) + ' 선택"' + chk + '></td>' +
+          '<td class="col-num">' + (idx + 1) + '</td>' +
+          '<td class="pbox-cell-hide-m"><span class="' + mb.cls + '">' + esc(mb.label) + '</span></td>' +
+          '<td class="pbox-row-click pbox-cell-main" role="button" tabindex="0" data-act="open-thread" data-id="' + esc(th.id) + '" title="' + esc(th.title || th.query) + '"><strong>' + esc(th.title || th.query) + '</strong></td>' +
+          '<td class="pbox-cell-meta" title="' + esc(metaTxt) + '">' + esc(metaTxt) + '</td>' +
+          '<td class="col-num pbox-cell-hide-m">' + esc(formatRelativeDay(th.updatedAt || th.createdAt)) + '</td>' +
+          '<td class="pbox-cell-actions">' +
+            '<button type="button" class="pbox-mini-act" data-act="open-thread" data-id="' + esc(th.id) + '">열기</button> ' +
+            '<button type="button" class="pbox-mini-act" data-act="delete-single-task" data-id="' + esc(th.id) + '">삭제</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') : '<tr class="pbox-empty-row"><td colspan="7" class="pbox-empty-cell">저장된 내용 검토·문서 작성 작업이 없습니다. [새 문서로 시작] 또는 [문서 열기]로 시작해 보세요.</td></tr>'),
+      '        </tbody>',
+      '      </table>',
+      '    </div>',
       '  </div>',
       '</div>'
     ].join('\n');
@@ -1232,7 +1626,7 @@
       }).map(function (fn) {
         var fullFn = fn + '.md';
         var isCur = law.fileName === fullFn;
-        return '<button type="button" class="pbox-tab-pill' + (isCur ? ' active' : '') + '" data-act="open-law" data-dir="' + esc(law.dir) + '" data-file="' + esc(fullFn) + '">' + esc(fn === '법률(법률)' ? '법률(현행)' : fn) + '</button>';
+        return '<button type="button" role="tab" aria-selected="' + (isCur ? 'true' : 'false') + '" class="pbox-tab-pill' + (isCur ? ' active' : '') + '" data-act="open-law" data-dir="' + esc(law.dir) + '" data-file="' + esc(fullFn) + '">' + esc(fn === '법률(법률)' ? '법률(현행)' : fn) + '</button>';
       }).join('');
 
       rEl.innerHTML = [
@@ -1420,6 +1814,30 @@
     ].join('\n'));
   }
 
+  function showPureunRoadmapModal() {
+    openModalHtml([
+      '<div class="pbox-modal-hd"><strong id="pboxModalTitle">✦ 내용 검토 관리방식 및 푸른노무법인 전환 설계</strong><button type="button" class="pbox-icon-btn" data-act="close-modal" aria-label="창 닫기">✕</button></div>',
+      '<div class="pbox-modal-bd">',
+      '  <div class="pbox-info-note">',
+      '    <b>1단계 (현재 운영 중 — 엘박스형 내용검토 · 문서작성 · 작업관리)</b><br>',
+      '    • 홈 중앙 입력창(<code>자동</code> · <code>🔍 검색</code> · <code>✦ 내용검토</code> · <code>✎ 문서작성</code>) 및 <code>새 문서로 시작</code> · <code>문서 열기</code> 워크스페이스<br>',
+      '    • 근로계약서·용역계약서·취업규칙 8대 강행법규 위반 조항 자동 진단 및 우측 법령·판례 원문 실시간 분할 대조<br>',
+      '    • 좌측 <code>✦ 작업</code> 실시간 이력 보관 및 체크박스·번호 규격 일괄 관리',
+      '  </div>',
+      '  <div class="pbox-info-note">',
+      '    <b>2단계 (추후 확장 — 푸른노무법인 전용 업무방식 <code>workflowStyle: pureun</code>)</b><br>',
+      '    • 푸른포털 사건·자문사 수임코드 및 전담 공인노무사·담당자 배정 정보 자동 연동<br>',
+      '    • 임금·퇴직금·연차수당 계산기 및 산재 평균임금 산정 결과를 검토서·이유서 표에 직접 삽입<br>',
+      '    • [실무자 초안 → 공인노무사 법리 검수·결재 → 푸른노무법인 공식 의견서 양식 출력] 단계별 결재흐름 지원<br>',
+      '    • 현재 엘박스형으로 저장된 모든 작업·초안·프로젝트는 별도 마이그레이션 없이 그대로 승계됩니다.',
+      '  </div>',
+      '  <div class="pbox-modal-ft">',
+      '    <button type="button" class="pbox-btn-primary" data-act="close-modal">확인</button>',
+      '  </div>',
+      '</div>'
+    ].join('\n'));
+  }
+
   /* ══════════════════════════════════════════════════════════════
    * 이벤트 위임 처리기
    * ══════════════════════════════════════════════════════════════ */
@@ -1542,16 +1960,110 @@
     next(0);
   }
 
-  function runPromptSubmit(customQuery, workflowObj) {
-    if (state.aiBusy) return;
-    var ta = document.getElementById('pboxPromptInput');
-    var q = typeof customQuery === 'string' ? customQuery : (ta ? ta.value.trim() : '');
-    if (!q) {
-      toast('질문이나 검토할 사실관계를 입력해 주세요.', 'err');
+  function syncWorkspaceEditorDraftIfPresent() {
+    if (!state.activeThread) return;
+    var srcTa = document.getElementById('pboxWsSourceTa');
+    var titleIn = document.getElementById('pboxWsTitleInput');
+    var changed = false;
+    if (srcTa && typeof srcTa.value === 'string' && srcTa.value !== (state.activeThread.sourceText || '')) {
+      state.activeThread.sourceText = global.PuPBoxEngine.anonymizeText(srcTa.value).text;
+      changed = true;
+    }
+    if (titleIn && typeof titleIn.value === 'string' && titleIn.value.trim() && titleIn.value.trim() !== state.activeThread.title) {
+      state.activeThread.title = titleIn.value.trim();
+      changed = true;
+    }
+    if (changed) {
+      state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+      renderSidebarRecents();
+    }
+  }
+
+  function handleReviewFileOpen(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    if (state.reviewFileBusy || state.aiBusy) {
+      toast('이미 문서 처리 또는 검토 생성이 진행 중입니다.', 'err');
       return;
     }
+    var file = files[0];
+    var lower = String(file.name || '').toLowerCase();
+    if (!/\.(?:pdf|txt|md|json)$/i.test(lower)) {
+      toast('내용 검토는 PDF, TXT, MD, JSON 문서만 지원합니다. 한글(.hwp)·워드(.docx)는 PDF로 저장 후 열어 주세요.', 'err');
+      return;
+    }
+    if (typeof file.size === 'number' && file.size > 25 * 1024 * 1024) {
+      toast('25MB를 초과하는 대용량 파일은 열 수 없습니다. 필요한 계약·규정 부분만 분할해 열어 주세요.', 'err');
+      return;
+    }
+    var startGen = global.PuPBoxStore.getSessionGen();
+    var startUid = global.PuPBoxStore.getActiveUid();
 
-    if (state.promptMode === 'search' && !workflowObj) {
+    state.reviewFileBusy = true;
+    renderMain();
+
+    var pText = lower.endsWith('.pdf') ? extractPdfFileText(file) : file.text();
+    pText.then(function (rawTxt) {
+      if (!isSameSession(startGen, startUid)) return;
+      state.reviewFileBusy = false;
+      var trimmed = String(rawTxt || '').trim();
+      if (trimmed.length < 10) {
+        toast('문서 텍스트가 비어 있거나 너무 짧습니다. 스캔 이미지 PDF는 OCR 변환 후 열어 주세요.', 'err');
+        renderMain();
+        return;
+      }
+      var docPartyNames = global.PuPBoxEngine.extractPartyNames(trimmed, String(file.name || ''));
+      var cleanBody = global.PuPBoxEngine.anonymizeLegalText(trimmed, docPartyNames).text;
+      var cleanFn = global.PuPBoxEngine.anonymizeLegalText(String(file.name || '검토문서'), docPartyNames).text;
+      var baseTitle = cleanFn.replace(/\.[a-z0-9]+$/i, '').slice(0, 38) || '문서';
+      var reuseId = (state.view === 'workspace' && state.activeThread && state.activeThread.id) ? state.activeThread.id : '';
+
+      runPromptSubmit(
+        '열람한 문서(' + cleanFn + ')의 강행법규 위반 여부, 조항별 법적 위험도, 관련 대법원·하급심 판례 및 적법 수정문안을 종합 검토해 주세요.',
+        null,
+        {
+          inWorkspace: true,
+          threadId: reuseId,
+          mode: 'review',
+          sourceText: cleanBody,
+          sourceFileName: cleanFn,
+          customTitle: baseTitle + ' 내용 검토'
+        }
+      );
+    }).catch(function (err) {
+      if (!isSameSession(startGen, startUid)) return;
+      state.reviewFileBusy = false;
+      toast('문서를 열지 못했습니다: ' + ((err && err.message) || err), 'err');
+      renderMain();
+    });
+  }
+
+  function runPromptSubmit(customQuery, workflowObj, extraOpts) {
+    if (state.aiBusy) return;
+    var opts = extraOpts || {};
+    var ta = document.getElementById('pboxPromptInput');
+    var q = typeof customQuery === 'string' ? customQuery : (ta ? ta.value.trim() : '');
+    var srcTxt = typeof opts.sourceText === 'string'
+      ? opts.sourceText
+      : (opts.inWorkspace && state.activeThread ? (state.activeThread.sourceText || '') : '');
+    if (!q && !srcTxt) {
+      toast('검토할 내용이나 질문을 입력해 주세요.', 'err');
+      return;
+    }
+    if (!q && srcTxt) {
+      q = '입력된 문서의 강행법규 위반 여부와 적법 수정문안을 종합 검토해 주세요.';
+    }
+
+    var effMode = opts.mode || (workflowObj ? 'draft' : state.promptMode);
+    if (effMode === 'search' && !workflowObj && !opts.inWorkspace) {
+      global.PuPBoxStore.saveThread({
+        title: '"' + q.slice(0, 28) + '" 검색',
+        query: q,
+        answer: '',
+        mode: 'search',
+        engineLabel: '통합검색',
+        workflowStyle: 'lbox'
+      });
       state.caseQuery = q;
       switchView('cases');
       return;
@@ -1559,18 +2071,27 @@
 
     var submitGen = global.PuPBoxStore.getSessionGen ? global.PuPBoxStore.getSessionGen() : 0;
     state.aiBusy = true;
-    if (state.view !== 'home') {
+    state.workspaceTab = 'report';
+    if (!opts.inWorkspace) {
+      state.activeThread = null;
+    }
+    if (state.view !== 'workspace') {
       clearViewSelections();
-      state.view = 'home';
+      state.view = 'workspace';
       renderSidebarNavState();
     }
     renderMain();
 
     global.PuPBoxStore.askLegalAi({
       query: q,
-      mode: workflowObj ? 'draft' : state.promptMode,
+      mode: effMode,
       workflow: workflowObj || null,
       attached: state.attached,
+      sourceText: srcTxt,
+      sourceFileName: opts.sourceFileName || (opts.inWorkspace && state.activeThread ? state.activeThread.sourceFileName : ''),
+      customTitle: opts.customTitle || '',
+      threadId: opts.threadId || '',
+      workflowStyle: 'lbox',
       auth: getAuthObj(),
       manual: true
     }).then(function (res) {
@@ -1597,7 +2118,124 @@
     if (!act) return;
 
     if (act === 'go-view') {
+      if (state.view === 'workspace') syncWorkspaceEditorDraftIfPresent();
       switchView(btn.getAttribute('data-view') || 'home');
+    } else if (act === 'toggle-sidebar-collapse') {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+      renderSidebarNavState();
+    } else if (act === 'toggle-task-sec') {
+      state.taskSecCollapsed = !state.taskSecCollapsed;
+      renderSidebarRecents();
+    } else if (act === 'toggle-hide-home-proj') {
+      state.hideHomeEmptyProjects = !state.hideHomeEmptyProjects;
+      renderMain();
+    } else if (act === 'open-pureun-roadmap') {
+      showPureunRoadmapModal();
+    } else if (act === 'start-new-doc') {
+      var blankTh = global.PuPBoxStore.saveThread({
+        title: '새 문서 · 내용 검토',
+        query: '',
+        answer: '',
+        mode: 'review',
+        sourceText: '',
+        workflowStyle: 'lbox'
+      });
+      state.activeThread = blankTh;
+      state.workspaceTab = 'editor';
+      switchView('workspace');
+    } else if (act === 'open-review-file') {
+      var rf = document.getElementById('pboxReviewFileInput');
+      if (rf && (!ev || ev.target !== rf)) rf.click();
+    } else if (act === 'set-ws-tab') {
+      syncWorkspaceEditorDraftIfPresent();
+      state.workspaceTab = btn.getAttribute('data-tab') || 'report';
+      renderMain();
+    } else if (act === 'load-ws-sample') {
+      var sKey = btn.getAttribute('data-sample') || 'freelancer';
+      var sampleBody = SAMPLE_REVIEW_DOCS[sKey] || SAMPLE_REVIEW_DOCS.freelancer;
+      var sampleTitles = {
+        freelancer: '용역계약서 내용 검토',
+        blanket_wage: '포괄임금 근로계약서 내용 검토',
+        work_rules: '취업규칙 개정안 내용 검토'
+      };
+      if (!state.activeThread) {
+        state.activeThread = global.PuPBoxStore.saveThread({
+          title: sampleTitles[sKey] || '샘플 문서 내용 검토',
+          mode: 'review',
+          sourceText: sampleBody,
+          workflowStyle: 'lbox'
+        });
+      } else {
+        state.activeThread.sourceText = sampleBody;
+        if (!state.activeThread.title || state.activeThread.title === '새 문서 · 내용 검토') {
+          state.activeThread.title = sampleTitles[sKey] || '샘플 문서 내용 검토';
+        }
+        state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+      }
+      var sDiag = global.PuPBoxEngine.analyzeDocumentClauses(sampleBody);
+      toast('샘플 문서 적재 완료 · 위험조항 ' + sDiag.findings.length + '건이 감지되었습니다.');
+      renderAll();
+    } else if (act === 'save-ws-meta') {
+      if (!state.activeThread) return;
+      var tIn = document.getElementById('pboxWsTitleInput');
+      if (tIn && tIn.value.trim()) {
+        state.activeThread.title = tIn.value.trim();
+        state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+        renderSidebarRecents();
+        toast('작업 제목이 저장되었습니다.');
+      }
+    } else if (act === 'save-ws-source') {
+      if (!state.activeThread) return;
+      syncWorkspaceEditorDraftIfPresent();
+      var dRes = global.PuPBoxEngine.analyzeDocumentClauses(state.activeThread.sourceText || '');
+      state.workspaceTab = 'clauses';
+      toast('원문 비식별 저장 완료 · 조항별 위험진단 ' + dRes.findings.length + '건 갱신됨');
+      renderMain();
+    } else if (act === 'apply-clause-fix') {
+      if (!state.activeThread) return;
+      var fIdx = Number(btn.getAttribute('data-idx'));
+      var curDiag = global.PuPBoxEngine.analyzeDocumentClauses(state.activeThread.sourceText || state.activeThread.query || '');
+      var finding = curDiag.findings[fIdx];
+      if (finding) {
+        var baseTxt = state.activeThread.sourceText || state.activeThread.query || '';
+        state.activeThread.sourceText = (baseTxt ? (baseTxt + '\n\n') : '') +
+          '[' + finding.clauseLabel + ' 적법 수정안]\n' + finding.suggestion;
+        state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+        state.workspaceTab = 'editor';
+        toast(finding.clauseLabel + ' 권고 수정문안을 원문 편집창에 반영했습니다.');
+        renderMain();
+      }
+    } else if (act === 'run-ws-quick-review') {
+      syncWorkspaceEditorDraftIfPresent();
+      var quickQ = btn.getAttribute('data-q') || '입력된 문서의 강행법규 위반 여부와 적법 수정문안을 검토해 주세요.';
+      var curTh = state.activeThread;
+      var nonDefaultTitle = (curTh && curTh.title && curTh.title !== '새 문서 · 내용 검토' && curTh.title !== '새 문서 검토') ? curTh.title : '';
+      runPromptSubmit(quickQ, null, {
+        inWorkspace: true,
+        threadId: curTh ? curTh.id : '',
+        mode: (curTh && curTh.mode === 'draft') ? 'draft' : 'review',
+        sourceText: curTh ? (curTh.sourceText || '') : '',
+        sourceFileName: curTh ? (curTh.sourceFileName || '') : '',
+        customTitle: nonDefaultTitle
+      });
+    } else if (act === 'submit-ws-followup') {
+      syncWorkspaceEditorDraftIfPresent();
+      var fIn = document.getElementById('pboxWsFollowInput');
+      var fq = fIn ? fIn.value.trim() : '';
+      if (!fq) {
+        toast('추가 검토 지시나 수정 요청을 입력해 주세요.', 'err');
+        return;
+      }
+      var curTh2 = state.activeThread;
+      var nonDefaultTitle2 = (curTh2 && curTh2.title && curTh2.title !== '새 문서 · 내용 검토' && curTh2.title !== '새 문서 검토') ? curTh2.title : '';
+      runPromptSubmit(fq, null, {
+        inWorkspace: true,
+        threadId: curTh2 ? curTh2.id : '',
+        mode: (curTh2 && curTh2.mode) ? curTh2.mode : 'review',
+        sourceText: curTh2 ? (curTh2.sourceText || '') : '',
+        sourceFileName: curTh2 ? (curTh2.sourceFileName || '') : '',
+        customTitle: nonDefaultTitle2
+      });
     } else if (act === 'toggle-theme') {
       applyTheme(state.theme === 'dark' ? 'light' : 'dark');
       toast(state.theme === 'dark' ? '어두운 테마로 전환했습니다.' : '밝은 테마로 전환했습니다.');
@@ -1911,20 +2549,141 @@
       var thId = btn.getAttribute('data-id');
       var found = global.PuPBoxStore.getThreads().find(function (t) { return t.id === thId; });
       if (found) {
-        state.activeThread = found;
-        switchView('home');
+        if (found.mode === 'search') {
+          state.caseQuery = found.query || '';
+          switchView('cases');
+        } else {
+          state.activeThread = found;
+          state.workspaceTab = found.answer ? 'report' : 'editor';
+          switchView('workspace');
+        }
       }
+    } else if (act === 'toggle-recent-chk') {
+      var rid = btn.getAttribute('data-id');
+      if (btn.checked) state.selectedRecentIds.add(rid);
+      else state.selectedRecentIds.delete(rid);
+      renderMain();
+    } else if (act === 'toggle-all-recents') {
+      var allRecs = global.PuPBoxStore.getRecents();
+      if (btn.checked) allRecs.forEach(function (r) { state.selectedRecentIds.add(r.id); });
+      else state.selectedRecentIds.clear();
+      renderMain();
+    } else if (act === 'clear-recent-sel') {
+      state.selectedRecentIds.clear();
+      renderMain();
+    } else if (act === 'bulk-attach-recents') {
+      var recMap = global.PuPBoxStore.getRecents();
+      Array.from(state.selectedRecentIds).slice(0, 6).forEach(function (rid2) {
+        var rItem = recMap.find(function (x) { return x.id === rid2; });
+        if (!rItem) return;
+        if (rItem.kind === 'law') attachLawByDir(rItem.lawDir, rItem.fileName || '');
+        else {
+          var dcObj = global.PuPBoxStore.getDocById(String(rItem.id).replace(/^doc:/, ''));
+          if (dcObj) attachItem({ id: 'doc:' + dcObj.id, kind: 'doc', title: dcObj.title, caseNo: dcObj.caseNo, body: dcObj.body });
+        }
+      });
+    } else if (act === 'bulk-proj-recents') {
+      var recList = global.PuPBoxStore.getRecents();
+      var chosenRecs = Array.from(state.selectedRecentIds).map(function (rid3) {
+        return recList.find(function (x) { return x.id === rid3; });
+      }).filter(Boolean);
+      if (!chosenRecs.length) return;
+      ensureProjectThen(function (projId) {
+        var docIdsAdd = [];
+        var lawDirsAdd = [];
+        chosenRecs.forEach(function (rItem) {
+          if (rItem.kind === 'law' && rItem.lawDir) lawDirsAdd.push(rItem.lawDir);
+          else if (rItem.kind === 'doc') docIdsAdd.push(String(rItem.id).replace(/^doc:/, ''));
+        });
+        global.PuPBoxStore.addItemsToProject(projId, docIdsAdd, lawDirsAdd);
+        state.selectedRecentIds.clear();
+        toast('선택한 열람 자료를 프로젝트에 담았습니다.');
+        renderAll();
+      });
+    } else if (act === 'bulk-del-recents') {
+      var rIdsToDel = Array.from(state.selectedRecentIds);
+      if (!rIdsToDel.length) return;
+      if (typeof global.confirm === 'function' && !global.confirm('선택한 최근 본 자료 기록 ' + rIdsToDel.length + '건을 삭제하시겠습니까?')) {
+        return;
+      }
+      global.PuPBoxStore.deleteRecents(rIdsToDel);
+      state.selectedRecentIds.clear();
+      toast('열람 기록 ' + rIdsToDel.length + '건을 삭제했습니다.');
+      renderAll();
+    } else if (act === 'toggle-task-chk') {
+      var tid = btn.getAttribute('data-id');
+      if (btn.checked) state.selectedTaskIds.add(tid);
+      else state.selectedTaskIds.delete(tid);
+      renderMain();
+    } else if (act === 'toggle-all-tasks') {
+      var allThs = global.PuPBoxStore.getThreads();
+      if (btn.checked) allThs.forEach(function (t) { state.selectedTaskIds.add(t.id); });
+      else state.selectedTaskIds.clear();
+      renderMain();
+    } else if (act === 'clear-task-sel') {
+      state.selectedTaskIds.clear();
+      renderMain();
+    } else if (act === 'bulk-proj-tasks') {
+      var allThList = global.PuPBoxStore.getThreads();
+      var chosenTasks = Array.from(state.selectedTaskIds).map(function (tid2) {
+        return allThList.find(function (x) { return x.id === tid2; });
+      }).filter(function (x) { return x && (x.answer || x.sourceText); });
+      if (!chosenTasks.length) {
+        toast('프로젝트에 보관할 본문이 있는 작업을 선택해 주세요.', 'err');
+        return;
+      }
+      ensureProjectThen(function (projId) {
+        var prObj = global.PuPBoxStore.getProjects().find(function (x) { return x.id === projId; });
+        if (prObj) {
+          var newDrafts = chosenTasks.map(function (t) {
+            return { title: t.title || t.query, answer: t.answer || t.sourceText || '', savedAt: Date.now() };
+          });
+          prObj.drafts = newDrafts.concat(prObj.drafts || []);
+          global.PuPBoxStore.saveProject(prObj);
+          state.selectedTaskIds.clear();
+          toast('선택한 작업 ' + newDrafts.length + '건을 프로젝트에 보관했습니다.');
+          renderAll();
+        }
+      });
+    } else if (act === 'bulk-del-tasks') {
+      var tIdsToDel = Array.from(state.selectedTaskIds);
+      if (!tIdsToDel.length) return;
+      if (typeof global.confirm === 'function' && !global.confirm('선택한 작업 ' + tIdsToDel.length + '건을 삭제하시겠습니까?')) {
+        return;
+      }
+      global.PuPBoxStore.deleteThreads(tIdsToDel);
+      if (state.activeThread && state.selectedTaskIds.has(state.activeThread.id)) {
+        state.activeThread = null;
+      }
+      state.selectedTaskIds.clear();
+      toast('작업 ' + tIdsToDel.length + '건을 삭제했습니다.');
+      renderAll();
+    } else if (act === 'delete-single-task') {
+      var oneTid = btn.getAttribute('data-id');
+      if (!oneTid) return;
+      if (typeof global.confirm === 'function' && !global.confirm('이 작업 기록을 삭제하시겠습니까?')) {
+        return;
+      }
+      global.PuPBoxStore.deleteThreads([oneTid]);
+      state.selectedTaskIds.delete(oneTid);
+      if (state.activeThread && state.activeThread.id === oneTid) {
+        state.activeThread = null;
+      }
+      toast('작업을 삭제했습니다.');
+      renderAll();
     } else if (act === 'copy-thread') {
       if (state.activeThread && navigator.clipboard) {
-        navigator.clipboard.writeText(state.activeThread.answer).then(function () { toast('답변 전문이 클립보드에 복사되었습니다.'); });
+        var copyBody = state.activeThread.answer || state.activeThread.sourceText || '';
+        navigator.clipboard.writeText(copyBody).then(function () { toast('문서·의견서 전문이 클립보드에 복사되었습니다.'); });
       }
     } else if (act === 'export-thread-md') {
       if (state.activeThread) {
-        downloadBlob('pbox-opinion.md', state.activeThread.answer, 'text/markdown;charset=utf-8');
+        downloadBlob('pbox-opinion.md', state.activeThread.answer || state.activeThread.sourceText || '', 'text/markdown;charset=utf-8');
       }
     } else if (act === 'export-thread-doc') {
       if (state.activeThread) {
-        var wordHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(state.activeThread.title) + '</title></head><body style="font-family:Malgun Gothic,sans-serif;line-height:1.7">' + formatSimpleMd(state.activeThread.answer) + '</body></html>';
+        var docSrc = state.activeThread.answer || state.activeThread.sourceText || '';
+        var wordHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(state.activeThread.title) + '</title></head><body style="font-family:Malgun Gothic,sans-serif;line-height:1.7">' + formatSimpleMd(docSrc) + '</body></html>';
         downloadBlob('pbox-opinion.doc', wordHtml, 'application/msword;charset=utf-8');
       }
     } else if (act === 'save-thread-proj') {
@@ -1932,9 +2691,9 @@
       ensureProjectThen(function (projId) {
         var p = global.PuPBoxStore.getProjects().find(function (x) { return x.id === projId; });
         if (p) {
-          p.drafts = [{ title: state.activeThread.title, answer: state.activeThread.answer, savedAt: Date.now() }].concat(p.drafts || []);
+          p.drafts = [{ title: state.activeThread.title, answer: state.activeThread.answer || state.activeThread.sourceText || '', savedAt: Date.now() }].concat(p.drafts || []);
           global.PuPBoxStore.saveProject(p);
-          toast('프로젝트 폴더에 서면 초안을 보관했습니다.');
+          toast('프로젝트 폴더에 검토의견·초안을 보관했습니다.');
           renderSidebarCounts();
         }
       });
@@ -2127,6 +2886,22 @@
       if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && ev.target && ev.target.id === 'pboxPromptInput') {
         ev.preventDefault();
         runPromptSubmit();
+      } else if (ev.key === 'Enter' && ev.target && ev.target.id === 'pboxWsFollowInput') {
+        ev.preventDefault();
+        syncWorkspaceEditorDraftIfPresent();
+        var fqEnter = ev.target.value.trim();
+        if (fqEnter) {
+          var thEnter = state.activeThread;
+          var nonDefaultEnterTitle = (thEnter && thEnter.title && thEnter.title !== '새 문서 · 내용 검토' && thEnter.title !== '새 문서 검토') ? thEnter.title : '';
+          runPromptSubmit(fqEnter, null, {
+            inWorkspace: true,
+            threadId: thEnter ? thEnter.id : '',
+            mode: (thEnter && thEnter.mode) ? thEnter.mode : 'review',
+            sourceText: thEnter ? (thEnter.sourceText || '') : '',
+            sourceFileName: thEnter ? (thEnter.sourceFileName || '') : '',
+            customTitle: nonDefaultEnterTitle
+          });
+        }
       } else if (ev.key === 'Enter' && ev.target && ev.target.id === 'pboxLawSearchInput') {
         state.lawQuery = ev.target.value;
         state.lawPageLimit = 80;
@@ -2150,7 +2925,7 @@
         showAttachModal(val, true);
         var attIn = document.getElementById('pboxAttachFilterInput');
         if (attIn) { attIn.focus(); try { attIn.setSelectionRange(val.length, val.length); } catch (e) {} }
-      } else if (ev.target.id === 'pboxPromptInput') {
+      } else if (ev.target.id === 'pboxPromptInput' || ev.target.id === 'pboxWsFollowInput') {
         if (/@$/.test(ev.target.value)) {
           ev.target.value = ev.target.value.slice(0, -1);
           showAttachModal('', false);
@@ -2160,7 +2935,10 @@
 
     document.addEventListener('change', function (ev) {
       if (!ev.target) return;
-      if (ev.target.id === 'pboxQuickFileInput' || ev.target.id === 'pboxIngestFileInput') {
+      if (ev.target.id === 'pboxReviewFileInput') {
+        handleReviewFileOpen(ev.target.files);
+        ev.target.value = '';
+      } else if (ev.target.id === 'pboxQuickFileInput' || ev.target.id === 'pboxIngestFileInput') {
         handleIngestFiles(ev.target.files);
         ev.target.value = '';
       } else if (ev.target.id === 'pboxShareConfirmChk') {
@@ -2359,9 +3137,12 @@
 
   function resetSensitiveUiState() {
     state.aiBusy = false;
+    state.reviewFileBusy = false;
     state.ingestBusy = false;
     state.lowerPullBusy = false;
     state.backupBusy = false;
+    state.workspaceTab = 'report';
+    state.hideHomeEmptyProjects = false;
     state.activeThread = null;
     state.activeSearchRes = null;
     state.attached = [];
@@ -2378,6 +3159,8 @@
     state.selectedDocIds.clear();
     state.selectedLawDirs.clear();
     state.selectedProjectIds.clear();
+    state.selectedRecentIds.clear();
+    state.selectedTaskIds.clear();
   }
 
   function setAuthUser(u) {

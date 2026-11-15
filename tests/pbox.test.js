@@ -963,7 +963,7 @@ test('⑦ 포털 연결 · 연속 질의 스레드 ID 보존 · 사용자별 작
   };
   const uiLowerRes = await Store.pullLowerCourtOfficial({
     auth: { currentUser: { uid: 'user-c', getIdToken: async () => 'tok-c' } },
-    lawOc: 'pureun_staff@naver.com',
+    lawOc: 'pureun_staff@example.com',
     court: '수원지방법원',
     preset: 'wage'
   });
@@ -971,7 +971,7 @@ test('⑦ 포털 연결 · 연속 질의 스레드 ID 보존 · 사용자별 작
   assert.equal(uiLowerRes.added, 1);
   assert.ok(Store.getDocs().some((d) => d.caseNo === '2025가합55555'), '지방법원 수집 판례가 즉시 코퍼스에 반영되어야 합니다');
   assert.equal(Store.getConfig().lawOc, 'pureun_staff', '이메일 입력 시 @ 앞자리 ID만 정규화되어 보관되어야 합니다');
-  assert.ok(!JSON.stringify(lsMap).includes('@naver.com'), 'localStorage 에 이메일 원문이 저장되면 안 됩니다');
+  assert.ok(!JSON.stringify(lsMap).includes('@example.com'), 'localStorage 에 이메일 원문이 저장되면 안 됩니다');
 
   /* HTTP 200 응답의 JSON 파싱 실패 또는 빈 객체 응답을 성공(ok:true)으로 오판하지 않고 거부하는지 검증 */
   ctx.fetch = async () => ({
@@ -1002,7 +1002,7 @@ test('⑦ 포털 연결 · 연속 질의 스레드 ID 보존 · 사용자별 작
   /* 다른 계정(user-d)으로 전환 시 이전 계정의 lawOc 가 노출되지 않는지 및 구버전 비소유 lawOc 폐기 검증 */
   await Store.init('user-d');
   assert.equal(Store.getConfig().lawOc, '', '계정 전환 시 다른 계정의 OC 아이디가 노출되면 안 됩니다');
-  lsMap.pu_pbox_sync_cfg_v1 = JSON.stringify({ supabaseUrl: '', lawOc: 'legacy_owner@naver.com' });
+  lsMap.pu_pbox_sync_cfg_v1 = JSON.stringify({ supabaseUrl: '', lawOc: 'legacy_owner@example.com' });
   assert.equal(Store.getConfig().lawOc, '', '소유 UID가 없는 구버전 공용 lawOc 는 현재 사용자에게 귀속하지 않고 폐기해야 합니다');
   assert.ok(!lsMap.pu_pbox_sync_cfg_v1.includes('legacy_owner'), '폐기된 구버전 공용 lawOc 가 localStorage 에 남으면 안 됩니다');
 });
@@ -1015,7 +1015,7 @@ test('⑧ 지방법원·행정법원 하급심 전용 API(org=400202) 필터·�
   const PBoxSync = require(path.join(ROOT, 'functions', 'pbox-sync.js'));
   const Backfill = require(path.join(ROOT, 'scripts', 'backfill-pbox-lowercourt.js'));
 
-  assert.equal(PBoxSync.sanitizeLawOc('pureun_office@naver.com'), 'pureun_office', '이메일 전체 입력 시 앞자리 ID만 안전 추출해야 합니다');
+  assert.equal(PBoxSync.sanitizeLawOc('pureun_office@example.com'), 'pureun_office', '이메일 전체 입력 시 앞자리 ID만 안전 추출해야 합니다');
   assert.equal(PBoxSync.sanitizeLawOc('bad&org=400201'), '', '쿼리 주입 문자가 포함된 OC 값은 거부해야 합니다');
   assert.equal(PBoxSync.sanitizeCourtFilter('서울행정법원'), '서울행정법원');
   assert.equal(PBoxSync.sanitizeCourtFilter('https://evil.example'), '');
@@ -1379,6 +1379,15 @@ test('⑨ 화면 이탈 시 선택 집합 초기화 및 법령 전용 프로젝�
   const elementsById = {};
   const downloadedBlobs = [];
 
+  function unescapeMockHtml(s) {
+    return String(s || '')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+
   function makeEl(id) {
     return {
       id: id || '',
@@ -1387,13 +1396,33 @@ test('⑨ 화면 이탈 시 선택 집합 초기화 및 법령 전용 프로젝�
       checked: false,
       textContent: '',
       _html: '',
+      _ownedIds: new Set(),
       get innerHTML() { return this._html; },
       set innerHTML(v) {
+        for (const oldId of this._ownedIds) {
+          delete elementsById[oldId];
+        }
+        this._ownedIds.clear();
         this._html = String(v || '');
-        const idRe = /<([a-z0-9]+)\b[^>]*\bid="([^"]+)"[^>]*>/gi;
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
         let m;
-        while ((m = idRe.exec(this._html)) !== null) {
-          if (!elementsById[m[2]]) elementsById[m[2]] = makeEl(m[2]);
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const tag = m[1].toLowerCase();
+          const attrsStr = m[2] || '';
+          const idMatch = /\bid="([^"]+)"/i.exec(attrsStr);
+          if (!idMatch) continue;
+          const childId = idMatch[1];
+          const child = makeEl(childId);
+          const valMatch = /\bvalue="([^"]*)"/i.exec(attrsStr);
+          if (valMatch) child.value = unescapeMockHtml(valMatch[1]);
+          if (tag === 'textarea') {
+            const closeIdx = this._html.indexOf('</textarea>', tagRe.lastIndex);
+            if (closeIdx >= 0) {
+              child.value = unescapeMockHtml(this._html.slice(tagRe.lastIndex, closeIdx));
+            }
+          }
+          elementsById[childId] = child;
+          this._ownedIds.add(childId);
         }
       },
       classList: {
@@ -1588,4 +1617,260 @@ test('⑨ 화면 이탈 시 선택 집합 초기화 및 법령 전용 프로젝�
   const htmlCss = fs.readFileSync(path.join(ROOT, 'pu-pbox.html'), 'utf8');
   assert.match(htmlCss, /input::placeholder,textarea::placeholder\{color:#475569;opacity:1\}/, '밝은 테마 입력 placeholder 고대비(#475569)가 선언되어야 합니다');
   assert.match(htmlCss, /html\[data-theme="dark"\] input::placeholder,html\[data-theme="dark"\] textarea::placeholder\{color:#cbd5e1;opacity:1\}/, '어두운 테마 입력 placeholder 고대비(#cbd5e1, 9.08:1)가 선언되어야 합니다');
+});
+
+/* ══════════════════════════════════════════════════════════════
+ * 10. 엘박스형 내용 검토 · 문서 작성 · 작업/최근본자료 관리 및 추후 푸른 방식 확장성 검증
+ * ══════════════════════════════════════════════════════════════ */
+test('⑩ 엘박스형 조항별 위험진단(analyzeDocumentClauses) · 내용검토 워크스페이스 · 작업/최근본자료 관리 검증', async () => {
+  const synthRrn = '910203' + '-' + '1' + '234567';
+  const riskyContract = [
+    '제1조 (당사자) 원고:가나람(' + synthRrn + ')은 본사 지정 좌석에 상시 출퇴근하며 팀장 결재를 받는다.',
+    '제2조 (보수 및 퇴직금 부존재) 월 기본보수에 연장·야간근로수당 일체를 포괄하며 퇴직금은 지급하지 아니한다.',
+    '제3조 (정기상여금) 분기 상여금은 지급일 현재 재직자에 한하여 지급하고 통상임금에서 제외한다.',
+    '제4조 (위약금) 중도 퇴사 시 월 보수의 2배를 위약금으로 급여에서 공제한다.'
+  ].join('\n\n');
+
+  const diag = Engine.analyzeDocumentClauses(riskyContract);
+  assert.ok(diag.findings.length >= 4, '위약금·포괄임금·재직조건·위장프리랜서 위험조항이 모두 탐지되어야 합니다');
+  assert.ok(diag.highCount >= 2, '고위험 조항 건수가 집계되어야 합니다');
+  assert.ok(!JSON.stringify(diag).includes(synthRrn) && !JSON.stringify(diag).includes('가나람'), '조항 진단 발췌문에서도 주민번호·당사자 실명이 가려져야 합니다');
+  assert.ok(diag.findings.some((f) => f.ruleId === 'penalty_ban' && f.suggestion.includes('근로기준법 제20조')));
+  assert.ok(diag.findings.some((f) => f.ruleId === 'ordinary_wage_cond' && f.basis.includes('2020다247190')));
+
+  /* DOM/UI 통합 검증: 홈(엘박스 디자인) → 새 문서로 시작 → 샘플 적재 → 조항 수정 반영 → 다회차 내용 검토 → 작업/최근본자료 관리 */
+  const docListeners = {};
+  const winListeners = {};
+  const elementsById = {};
+
+  function unescapeMockHtml(s) {
+    return String(s || '')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+
+  function makeEl(id) {
+    return {
+      id: id || '',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) {
+          delete elementsById[oldId];
+        }
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const tag = m[1].toLowerCase();
+          const attrsStr = m[2] || '';
+          const idMatch = /\bid="([^"]+)"/i.exec(attrsStr);
+          if (!idMatch) continue;
+          const childId = idMatch[1];
+          const child = makeEl(childId);
+          const valMatch = /\bvalue="([^"]*)"/i.exec(attrsStr);
+          if (valMatch) child.value = unescapeMockHtml(valMatch[1]);
+          if (tag === 'textarea') {
+            const closeIdx = this._html.indexOf('</textarea>', tagRe.lastIndex);
+            if (closeIdx >= 0) {
+              child.value = unescapeMockHtml(this._html.slice(tagRe.lastIndex, closeIdx));
+            }
+          }
+          elementsById[childId] = child;
+          this._ownedIds.add(childId);
+        }
+      },
+      classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+      },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      appendChild() {},
+      removeChild() {},
+      click() {},
+      focus() {}
+    };
+  }
+
+  const rootContainer = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootContainer;
+
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => {
+      if (!elementsById[id]) elementsById[id] = makeEl(id);
+      return elementsById[id];
+    },
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => {
+      if (!docListeners[ev]) docListeners[ev] = [];
+      docListeners[ev].push(fn);
+    }
+  };
+
+  const ctx = {
+    setTimeout: (fn) => { void fn; return 1; },
+    clearTimeout: () => {},
+    Blob: class { constructor(p) { this.parts = p; } },
+    URL: { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({ ok: false, status: 503 }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1280,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    Blob: ctx.Blob,
+    URL: ctx.URL,
+    confirm: () => true,
+    addEventListener: (ev, fn) => {
+      if (!winListeners[ev]) winListeners[ev] = [];
+      winListeners[ev].push(fn);
+    }
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+
+  await Store.init('user-lbox-10');
+  App.mount(rootContainer);
+
+  function dispatchClick(attrs, extraProps) {
+    const btn = Object.assign({
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    }, extraProps || {});
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 1) 엘박스 스타일 홈 핵심 구성요소 확인 */
+  const homeHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(homeHtml.includes('내용 입력 (@ 입력 시 자료 첨부)'), '엘박스형 입력 placeholder가 표시되어야 합니다');
+  assert.ok(homeHtml.includes('새 문서로 시작') && homeHtml.includes('문서 열기') && homeHtml.includes('워크플로 라이브러리'), '3종 빠른 시작 알약 단추가 표시되어야 합니다');
+  assert.ok(homeHtml.includes('최근 본 프로젝트가 없습니다.'), '빈 프로젝트 안내 카드가 표시되어야 합니다');
+  dispatchClick({ 'data-act': 'toggle-hide-home-proj' });
+  assert.ok(!elementsById.pboxMainArea.innerHTML.includes('최근 본 프로젝트가 없습니다.'), '숨기기 클릭 시 빈 프로젝트 카드가 접혀야 합니다');
+
+  /* 2) 새 문서로 시작 → 용역계약서 샘플 적재 → 조항별 위험진단 탭 → 권고 수정문안 반영 → AI 내용 검토 실행 */
+  dispatchClick({ 'data-act': 'start-new-doc' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxWsSourceTa'), '새 문서로 시작 시 원문 편집 탭이 열려야 합니다');
+
+  dispatchClick({ 'data-act': 'load-ws-sample', 'data-sample': 'freelancer' });
+  dispatchClick({ 'data-act': 'set-ws-tab', 'data-tab': 'clauses' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('권고 수정문안'), '조항별 위험 진단 탭에 권고 수정문안 카드가 렌더링되어야 합니다');
+
+  dispatchClick({ 'data-act': 'apply-clause-fix', 'data-idx': '0' });
+  assert.ok(Store.getThreads()[0].sourceText.includes('적법 수정안]'), '권고 수정문안 반영 시 작업 원문(sourceText)에 추가되어야 합니다');
+  assert.equal(Store.getThreads()[0].workflowStyle, 'lbox', '기본 관리체계(workflowStyle: lbox)가 기록되어 추후 pureun 확장에 대비해야 합니다');
+
+  /* 동일 스레드에서 다회차 내용 검토 실행 시 history 누적 확인 */
+  const activeId = Store.getThreads()[0].id;
+  const revRes1 = await Store.askLegalAi({
+    threadId: activeId,
+    mode: 'review',
+    query: '강행규정 위반 검토',
+    sourceText: Store.getThreads()[0].sourceText,
+    forceOffline: true
+  });
+  assert.equal(revRes1.thread.id, activeId, '동일 작업 내에서 이어서 검토할 때 스레드 ID가 유지되어야 합니다');
+  assert.ok(revRes1.thread.answer.includes('문서 내용 검토 보고서'), '내용 검토 모드에서는 구조화된 문서 내용 검토 보고서가 생성되어야 합니다');
+
+  const revRes2 = await Store.askLegalAi({
+    threadId: activeId,
+    mode: 'review',
+    query: '적법 수정문안 보완',
+    sourceText: revRes1.thread.sourceText,
+    forceOffline: true
+  });
+  assert.equal(revRes2.thread.history.length, 2, '다회차 검토 이력(history)이 누적 보존되어야 합니다');
+
+  /* 3) 검색 모드 질의 시 사이드바 작업에 '"..." 검색' 기록 생성 및 재진입 검증 */
+  App.switchView('home');
+  dispatchClick({ 'data-act': 'set-mode', 'data-mode': 'search' });
+  elementsById.pboxPromptInput = makeEl('pboxPromptInput');
+  elementsById.pboxPromptInput.value = '2020다247190';
+  dispatchClick({ 'data-act': 'submit-prompt' });
+  const searchTask = Store.getThreads().find((t) => t.mode === 'search');
+  assert.ok(searchTask && searchTask.title.includes('"2020다247190" 검색'), '검색 모드 실행 시 엘박스처럼 검색 작업 이력이 기록되어야 합니다');
+
+  /* 4) 최근 본 자료(recents) 및 작업 관리(tasks) 선택 초기화 · 일괄 삭제 검증 */
+  Store.recordRecent({ id: 'doc:prec-sc-2020da247190', kind: 'doc', title: '대법원 전합 판결', sub: '2020다247190' });
+  App.switchView('recents');
+  dispatchClick({ 'data-act': 'toggle-recent-chk', 'data-id': 'doc:prec-sc-2020da247190' }, { checked: true });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pbox-bulk-bar'));
+  App.switchView('home');
+  App.switchView('recents');
+  assert.ok(!elementsById.pboxMainArea.innerHTML.includes('pbox-bulk-bar'), '최근 본 자료 화면 이탈 시 선택 집합이 초기화되어야 합니다');
+  dispatchClick({ 'data-act': 'toggle-recent-chk', 'data-id': 'doc:prec-sc-2020da247190' }, { checked: true });
+  dispatchClick({ 'data-act': 'bulk-del-recents' });
+  assert.equal(Store.getRecents().length, 0, '선택한 최근 본 자료 기록이 삭제되어야 합니다');
+
+  App.switchView('tasks');
+  dispatchClick({ 'data-act': 'toggle-task-chk', 'data-id': searchTask.id }, { checked: true });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pbox-bulk-bar'));
+  App.switchView('home');
+  App.switchView('tasks');
+  assert.ok(!elementsById.pboxMainArea.innerHTML.includes('pbox-bulk-bar'), '작업 관리 화면 이탈 시 선택 집합이 초기화되어야 합니다');
+  dispatchClick({ 'data-act': 'toggle-task-chk', 'data-id': searchTask.id }, { checked: true });
+  dispatchClick({ 'data-act': 'bulk-del-tasks' });
+  assert.ok(!Store.getThreads().some((t) => t.id === searchTask.id), '선택한 작업이 삭제되어야 합니다');
+
+  /* 5) 문서 열기(handleReviewFileOpen) 시 파일명·본문 당사자 실명·주민번호 자동 비식별화 및 미지원 확장자 차단 검증 */
+  App.switchView('home');
+  (docListeners.change || []).forEach((fn) => fn({
+    target: {
+      id: 'pboxReviewFileInput',
+      value: 'contract.hwp',
+      files: [{ name: '용역계약서.hwp', size: 1024, text: async () => '무시되어야 함' }]
+    }
+  }));
+  assert.ok(!Store.getThreads().some((t) => (t.sourceFileName || '').includes('.hwp')), '미지원 바이너리 확장자(.hwp)는 열리지 않아야 합니다');
+
+  (docListeners.change || []).forEach((fn) => fn({
+    target: {
+      id: 'pboxReviewFileInput',
+      value: 'contract.txt',
+      files: [{
+        name: '용역계약서_가나람.txt',
+        size: 512,
+        text: async () => '제1조 원고:가나람(' + synthRrn + ')은 매일 오전 9시 출퇴근하며 중도 퇴사 시 위약금을 급여에서 공제한다.'
+      }]
+    }
+  }));
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  const fileReviewThread = Store.getThreads()[0];
+  assert.ok(fileReviewThread && fileReviewThread.mode === 'review', '문서 열기 완료 후 내용검토 작업 스레드가 생성되어야 합니다');
+  assert.ok(!JSON.stringify(fileReviewThread).includes(synthRrn) && !JSON.stringify(fileReviewThread).includes('가나람'), '문서 열기 시 파일명·제목·본문·답변 어디에도 주민번호나 당사자 실명이 남지 않아야 합니다');
 });

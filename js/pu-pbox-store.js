@@ -1413,6 +1413,17 @@
     idbPut(getWorkspaceDb(), 'recents', item);
   }
 
+  function deleteRecents(ids) {
+    var delSet = new Set((Array.isArray(ids) ? ids : []).filter(Boolean).map(String));
+    if (!delSet.size) return 0;
+    var wsDb = getWorkspaceDb();
+    var before = mem.recents.length;
+    mem.recents = mem.recents.filter(function (r) { return !delSet.has(String(r.id)); });
+    delSet.forEach(function (rid) { idbDelete(wsDb, 'recents', rid); });
+    saveUidSnapshot();
+    return before - mem.recents.length;
+  }
+
   function saveProject(proj, opts) {
     var now = Date.now();
     var clean = stripUndefined(proj);
@@ -1485,7 +1496,9 @@
   function saveThread(thread) {
     var now = Date.now();
     var clean = stripUndefined(thread);
-    var vfRaw = clean.verification;
+    var existingIdx = clean.id ? mem.threads.findIndex(function (x) { return x.id === String(clean.id); }) : -1;
+    var prev = existingIdx >= 0 ? mem.threads[existingIdx] : null;
+    var vfRaw = clean.verification !== undefined ? clean.verification : (prev && prev.verification);
     var safeVf = { items: [], verifiedCount: 0, unverifiedCount: 0, allVerified: true };
     if (vfRaw && typeof vfRaw === 'object' && !Array.isArray(vfRaw) && Array.isArray(vfRaw.items)) {
       var cleanItems = vfRaw.items
@@ -1514,29 +1527,74 @@
     }
     var safeAttached = Array.isArray(clean.attachedTitles)
       ? clean.attachedTitles.filter(Boolean).map(String)
-      : [];
+      : (prev && Array.isArray(prev.attachedTitles) ? prev.attachedTitles.slice() : []);
     var safeRetrievedIds = Array.isArray(clean.retrievedDocIds)
       ? clean.retrievedDocIds.filter(Boolean).map(String)
+      : (prev && Array.isArray(prev.retrievedDocIds) ? prev.retrievedDocIds.slice() : []);
+    var rawHistory = Array.isArray(clean.history)
+      ? clean.history
+      : (prev && Array.isArray(prev.history) ? prev.history : []);
+    var E = global.PuPBoxEngine;
+    var fnHint = String(clean.sourceFileName !== undefined ? clean.sourceFileName : ((prev && prev.sourceFileName) || ''));
+    var rawSrcForNames = String(clean.sourceText !== undefined ? clean.sourceText : ((prev && prev.sourceText) || ''));
+    var rawTitleForNames = String(clean.title !== undefined ? clean.title : ((prev && prev.title) || ''));
+    var rawQueryForNames = String(clean.query !== undefined ? clean.query : ((prev && prev.query) || ''));
+    var threadPartyNames = (E && typeof E.extractPartyNames === 'function')
+      ? E.extractPartyNames(rawSrcForNames + '\n' + rawTitleForNames + '\n' + rawQueryForNames, fnHint)
       : [];
+    var scrubThreadField = function (val) {
+      var s = String(val || '');
+      if (!s) return '';
+      if (E && typeof E.anonymizeLegalText === 'function') {
+        s = E.anonymizeLegalText(s, threadPartyNames).text;
+      }
+      if (global.PuRrnScrub && typeof global.PuRrnScrub.scrub === 'function') {
+        s = global.PuRrnScrub.scrub(s);
+      }
+      return s;
+    };
+    var safeHistory = rawHistory
+      .filter(function (h) { return h && typeof h === 'object' && !Array.isArray(h); })
+      .slice(-20)
+      .map(function (h) {
+        return {
+          query: scrubThreadField(h.query || ''),
+          answer: scrubThreadField(h.answer || ''),
+          mode: String(h.mode || 'auto'),
+          engineLabel: String(h.engineLabel || ''),
+          at: Number(h.at) || now
+        };
+      });
+    var rawStyle = String(clean.workflowStyle || (prev && prev.workflowStyle) || 'lbox');
+    var safeStyle = (rawStyle === 'pureun' || rawStyle === 'lbox') ? rawStyle : 'lbox';
     var th = {
       id: String(clean.id || ('th-' + now + '-' + Math.random().toString(36).slice(2, 7))),
       ownerUid: mem.uid,
-      title: String(clean.title || '법률 리서치 작업'),
-      mode: String(clean.mode || 'auto'),
-      query: String(clean.query || ''),
-      answer: String(clean.answer || ''),
-      engineLabel: String(clean.engineLabel || 'P박스 하이브리드 엔진'),
+      title: scrubThreadField(rawTitleForNames || '법률 리서치 작업') || '법률 리서치 작업',
+      mode: String(clean.mode || (prev && prev.mode) || 'auto'),
+      query: scrubThreadField(rawQueryForNames),
+      answer: scrubThreadField(clean.answer !== undefined ? clean.answer : ((prev && prev.answer) || '')),
+      sourceText: scrubThreadField(rawSrcForNames),
+      sourceFileName: scrubThreadField(fnHint),
+      projectId: String(clean.projectId !== undefined ? clean.projectId : ((prev && prev.projectId) || '')),
+      workflowStyle: safeStyle,
+      engineLabel: String(clean.engineLabel || (prev && prev.engineLabel) || 'P박스 하이브리드 엔진'),
       verification: safeVf,
       attachedTitles: safeAttached,
       retrievedDocIds: safeRetrievedIds,
-      createdAt: Number(clean.createdAt) || now,
-      updatedAt: Number(clean.updatedAt) || now
+      history: safeHistory,
+      createdAt: Number(clean.createdAt) || (prev && Number(prev.createdAt)) || now,
+      updatedAt: Number(clean.updatedAt) || Math.max(now, prev ? ((Number(prev.updatedAt) || 0) + 1) : 0)
     };
 
     var wsDb = getWorkspaceDb();
     var idx = mem.threads.findIndex(function (x) { return x.id === th.id; });
-    if (idx >= 0) mem.threads[idx] = th;
-    else mem.threads.unshift(th);
+    if (idx >= 0) {
+      mem.threads.splice(idx, 1);
+      mem.threads.unshift(th);
+    } else {
+      mem.threads.unshift(th);
+    }
     if (mem.threads.length > 60) {
       var evictedThreads = mem.threads.slice(60);
       mem.threads = mem.threads.slice(0, 60);
@@ -1549,6 +1607,17 @@
       idbPut(wsDb, 'threads', th);
     }
     return th;
+  }
+
+  function deleteThreads(ids) {
+    var delSet = new Set((Array.isArray(ids) ? ids : []).filter(Boolean).map(String));
+    if (!delSet.size) return 0;
+    var wsDb = getWorkspaceDb();
+    var before = mem.threads.length;
+    mem.threads = mem.threads.filter(function (t) { return !delSet.has(String(t.id)); });
+    delSet.forEach(function (tid) { idbDelete(wsDb, 'threads', tid); });
+    saveUidSnapshot();
+    return before - mem.threads.length;
   }
 
   /* JSON 백업 일괄 복원 (스키마 검증 + 중복 ID 정리 + 문서·사건 프로젝트·AI 작업이력 최대 60건 영구 저장소 정합 복구) */
@@ -1689,14 +1758,16 @@
     var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
     var loadedLaws = Array.from(mem.laws.values());
     var rawQuery = String(params.query || '').trim();
+    var rawSourceText = String(params.sourceText || '').trim();
+    var rawSourceFileName = String(params.sourceFileName || '').trim();
     var rawAttached = Array.isArray(params.attached) ? params.attached.slice() : [];
     var wfObj = params.workflow || null;
 
-    /* 질문·사실관계·첨부·워크플로 전체에 대해 클라우드 전달 전 비식별화 관문 적용 */
-    var combinedInput = [rawQuery, wfObj ? (wfObj.title + ' ' + wfObj.desc) : '']
+    /* 질문·사실관계·열린 검토문서·첨부·워크플로 전체에 대해 클라우드 전달 전 비식별화 관문 적용 */
+    var combinedInput = [rawQuery, rawSourceText, wfObj ? (wfObj.title + ' ' + wfObj.desc) : '']
       .concat(rawAttached.map(function (a) { return (a.title || '') + '\n' + (a.body || a.plainText || a.summary || ''); }))
       .join('\n');
-    var promptPartyNames = E.extractPartyNames ? E.extractPartyNames(combinedInput, '') : [];
+    var promptPartyNames = E.extractPartyNames ? E.extractPartyNames(combinedInput, rawSourceFileName) : [];
     var scrubText = function (s) {
       var out = E.anonymizeLegalText(String(s || ''), promptPartyNames).text;
       if (global.PuRrnScrub && typeof global.PuRrnScrub.scrub === 'function') {
@@ -1706,6 +1777,8 @@
     };
 
     var query = scrubText(rawQuery);
+    var safeSourceText = rawSourceText ? scrubText(rawSourceText) : '';
+    var safeSourceFileName = rawSourceFileName ? scrubText(rawSourceFileName) : '';
     var attached = rawAttached.map(function (a) {
       return Object.assign({}, a, {
         title: scrubText(a.title || ''),
@@ -1715,8 +1788,18 @@
         summary: scrubText(a.summary || '')
       });
     });
+    if (safeSourceText && !attached.some(function (a) { return a.id === '__workspace_source__'; })) {
+      attached.unshift({
+        id: '__workspace_source__',
+        kind: 'doc',
+        title: safeSourceFileName || '검토 대상 문서 원문',
+        caseNo: '검토원문',
+        body: safeSourceText.slice(0, 5000)
+      });
+    }
 
-    var searchRes = E.searchCorpus(query, {
+    var searchSeed = safeSourceText ? (query + ' ' + safeSourceText.slice(0, 600)) : query;
+    var searchRes = E.searchCorpus(searchSeed, {
       docs: snapshotDocs,
       loadedLaws: loadedLaws,
       lawIndex: idxList,
@@ -1756,17 +1839,41 @@
           loadedLaws: Array.from(mem.laws.values()),
           lawIndex: idxList
         });
+        var existingTh = params.threadId
+          ? mem.threads.find(function (x) { return x.id === String(params.threadId); })
+          : null;
+        var prevHistory = (existingTh && Array.isArray(existingTh.history)) ? existingTh.history.slice() : [];
+        prevHistory.push({
+          query: query,
+          answer: safeAnswer,
+          mode: params.mode || 'auto',
+          engineLabel: engineLabel,
+          at: Date.now()
+        });
+        var autoDerivedSeed = safeSourceText
+          ? (safeSourceText.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean)[0] || query)
+          : query;
+        var computedTitle = params.customTitle
+          ? scrubText(params.customTitle)
+          : ((existingTh && existingTh.title && existingTh.title !== '새 문서 검토' && existingTh.title !== '새 문서 · 내용 검토')
+              ? existingTh.title
+              : ((wfObj ? '[' + scrubText(wfObj.badge) + '] ' : '') + autoDerivedSeed.slice(0, 38)));
         var threadPayload = {
           ownerUid: reqUid,
-          title: (wfObj ? '[' + scrubText(wfObj.badge) + '] ' : '') + query.slice(0, 38),
+          title: computedTitle,
           mode: params.mode || 'auto',
           query: query,
           answer: safeAnswer,
           engineLabel: engineLabel,
           verification: verification,
           attachedTitles: attached.map(function (a) { return a.title || a.caseNo; }),
-          retrievedDocIds: searchRes.docs.slice(0, 5).map(function (d) { return d.id; })
+          retrievedDocIds: searchRes.docs.slice(0, 5).map(function (d) { return d.id; }),
+          history: prevHistory
         };
+        if (safeSourceText) threadPayload.sourceText = safeSourceText;
+        if (safeSourceFileName) threadPayload.sourceFileName = safeSourceFileName;
+        if (params.projectId !== undefined) threadPayload.projectId = String(params.projectId || '');
+        if (params.workflowStyle) threadPayload.workflowStyle = String(params.workflowStyle);
         if (params.threadId) threadPayload.id = String(params.threadId);
         var saved = saveThread(threadPayload);
         return {
@@ -1780,6 +1887,7 @@
     if (!canUseCloudAi) {
       var offlineAns = E.synthesizeOfflineAnswer({
         query: query,
+        mode: params.mode || 'auto',
         workflow: wfObj,
         attached: attached,
         retrievedDocs: searchRes.docs,
@@ -1804,6 +1912,7 @@
       assertSameSession();
       var fallbackAns = E.synthesizeOfflineAnswer({
         query: query,
+        mode: params.mode || 'auto',
         workflow: wfObj,
         attached: attached,
         retrievedDocs: searchRes.docs,
@@ -1903,10 +2012,12 @@
     pushDocsToSharedServer: pushDocsToSharedServer,
     deleteDocsFromSharedServer: deleteDocsFromSharedServer,
     recordRecent: recordRecent,
+    deleteRecents: deleteRecents,
     saveProject: saveProject,
     deleteProject: deleteProject,
     addItemsToProject: addItemsToProject,
     saveThread: saveThread,
+    deleteThreads: deleteThreads,
     importBackupData: importBackupData,
     addAlert: addAlert,
     askLegalAi: askLegalAi,
