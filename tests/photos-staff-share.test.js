@@ -362,7 +362,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      (대표 「남은거 모두해라」 · 11-15 보안 검토 «낮음»). 새로 생김 3 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 읽기는 그대로(재직 직원),
      화면에서 그 자리에 쓰는 곳은 없다(서버만 쓴다). 에뮬레이터 짝 시험: 새 규칙 7/7, 옛 규칙에서는 직원 쓰기 셋이 통과(구멍 확인).
      게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 세 줄을 뺄 것. */
-  const PENDING = ['/homepage/newsBrief', '/homepage/newsDocs', '/homepage/newsPrec'];
+  /* ★ 2026-11-16 — 뉴스레터 모으개 밑감 게시 완료(GitHub 「Firebase 배포」 실행 43733956060 · rules-deploy.js --deploy):
+       새로 3 · 바뀜 0 · 사라짐 0 · 넓어짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
+       살아 있는 콘솔을 다시 읽어 적용본과 뜻이 같음을 확인 — 새 기준 docs/firebase-rules-콘솔원문-2026-11-16.json. 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
