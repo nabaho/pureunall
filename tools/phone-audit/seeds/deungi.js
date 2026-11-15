@@ -54,5 +54,7 @@ module.exports = {
     { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
     { name: 'base', run: async (p) => { await p.click('#tabs button[data-tab=base]'); } },
     { name: 'hist', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); } },
+    /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
+    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); await p.evaluate(() => { PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf] [data-act=arcView]'); } },
   ],
 };
