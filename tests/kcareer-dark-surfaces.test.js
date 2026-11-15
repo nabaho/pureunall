@@ -185,3 +185,68 @@ test('② 밝은 바탕을 하드코딩한 CSS 규칙은 «글자색을 박았�
   }
   assert.deepEqual(빠진, [], '밝은 바탕을 하드코딩했는데 어두운 판 짝이 없는 규칙이 있습니다 — html.dark 짝을 더하거나 «종이»라면 위 목록에 까닭과 함께 적으세요:\n' + 빠진.join('\n'));
 });
+
+/* ── 사이드바 «개수 칩» — 테마와 상관없이 사이드바는 늘 어둡다. 글자는 «실제 바탕»에서 읽혀야 한다 ──
+   고른 묶음(.gsel)은 파란 바탕으로 짜였지만 .nav-group>.g-title 의 !important 그라데이션이 늘 이겨, 남색 글자가 어두운 바탕 위에 앉아 1.2:1 이었다. */
+test('사이드바 개수 칩 글자는 «실제 바탕»(어두운 그라데이션의 두 끝)에서 4.5:1 이상이다 — 고른 묶음·안 고른 묶음·붉은 알림 모두', () => {
+  const css = strip(CSS);
+  const 사이드바 = P.norm((css.match(/--sidebar\s*:\s*(#[0-9a-fA-F]{3,6})/) || [])[1]);
+  assert.ok(사이드바, '--sidebar 를 못 찾았습니다');
+  const 겹치기 = (fg, a, bg) => { const h = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16)); const f = h(P.norm(fg)), b = h(bg); const c = f.map((v, i) => Math.round(v * a + b[i] * (1 - a))); return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''); };
+  /* 실제 바탕 — !important 그라데이션이 있으면 그 끝점들을 사이드바 위에 겹친 색, 없으면 고른 묶음의 파란 바탕 */
+  const 그라 = css.match(/\.nav-group>\.g-title\s*\{[^}]*background:\s*linear-gradient\(([^;]*?)\)\s*!important/);
+  let 바탕들;
+  if (그라) {
+    바탕들 = [...그라[1].matchAll(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/g)].map((m) => 겹치기('#' + [m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join(''), Number(m[4]), 사이드바));
+    assert.ok(바탕들.length >= 2, '그라데이션 끝점을 못 읽었습니다');
+  } else {
+    바탕들 = [P.norm((css.match(/\.g-title\.top\.gsel\s*\{[^}]*background:\s*(#[0-9a-fA-F]{3,6})/) || [])[1])];
+  }
+  const 못 = [];
+  for (const sel of ['.g-title.top.gsel .gcnt', '.g-title.top.gsel .gcnt.mr-alarm', '.g-title.top .gcnt', '.g-title.top .gcnt.mr-alarm']) {
+    const r = 규칙들(css).filter((x) => 분리(x.sel).includes(sel)).pop();
+    assert.ok(r, sel + ' 규칙이 없습니다');
+    const fg = 값(선언(r.body, 'color')); assert.ok(fg, sel + ' 글자색이 리터럴이 아닙니다');
+    for (const bg of 바탕들) { const c = 명암(fg, bg); if (c < 4.5) 못.push(sel + ' ' + fg + ' on ' + bg + ' = ' + c.toFixed(2)); }
+  }
+  assert.deepEqual(못, []);
+});
+
+/* ── 인라인으로 박힌 밝은 바탕 — 소스에 새로 생기면 어두운 규칙(⑧)이 덮어야 한다 ──
+   화면 시험은 «지금 그려지는 상태»만 본다. JS 가 새로 만드는 밝은 인라인 바탕은 이 정적 검사가 잡는다. */
+test('소스에 인라인으로 박힌 «밝은 바탕(글자색 안 박은 것)»은 전부 어두운 규칙(⑧)이 덮는다 — 새로 생기면 걸린다', () => {
+  const 바탕규칙 = 어두운규칙.find((r) => /\[style\*="background:#f8fafc" i\]/.test(r.sel));
+  assert.ok(바탕규칙, '인라인 밝은 바탕 뒤집기 규칙이 없습니다');
+  const 덮음 = new Set([...바탕규칙.sel.matchAll(/\[style\*="background: ?(#[0-9a-fA-F]{3,6})" i\]/g)].map((m) => P.norm(m[1])));
+  assert.ok(덮음.size >= 5, '덮는 색이 모자랍니다');
+  /* JS 가 style.cssText 로 쓰면 속성이 «rgb()» 꼴로 다시 쓰인다 — 덮는 색마다 rgb 짝도 있어야 한다 */
+  const rgb짝 = (h) => { const x = P.norm(h); const v = [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16)); return 'background: rgb(' + v.join(', ') + ')'; };
+  const 짝없음 = [...덮음].filter((h) => !바탕규칙.sel.includes(rgb짝(h)));
+  assert.deepEqual(짝없음, [], 'rgb() 꼴 짝이 없는 덮는 색: ' + 짝없음.join(' '));
+  /* 소스 — kcareer.html 의 <style> 밖(HTML·JS 문자열)과 js/kcareer-*.js */
+  const 파일들 = [['kcareer.html', SRC.slice(SRC.indexOf('</style>'))]];
+  const jsDir = path.join(__dirname, '..', 'js');
+  for (const f of fs.readdirSync(jsDir).filter((x) => /^kcareer-.*\.js$/.test(x))) 파일들.push(['js/' + f, fs.readFileSync(path.join(jsDir, f), 'utf8')]);
+  /* 종이·인쇄 창·그림 뒤판처럼 어두운 판에서도 일부러 밝은 것 — 까닭을 적는다 */
+  const 허용 = [
+    ['js/kcareer-profile1.js', '프로필 1장 종이(흰 종이·인쇄)'],
+    ['js/kcareer-svgtext.js', '그림(SVG) 글자 — 종이 안'],
+    ['th{background:#e2e8f0}', '인쇄 창(새 창)에 쓰는 문서 CSS — 화면이 아니다'],
+  ];
+  const 샘 = [];
+  for (const [이름, 본문] of 파일들) {
+    const re = /background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})\b/g; let m;
+    while ((m = re.exec(본문))) {
+      const hex = P.norm(m[1]); if (!밝은(hex)) continue;
+      let a = m.index, b = m.index + m[0].length;
+      while (a > 0 && !/["'`]/.test(본문[a - 1]) && 본문[a - 1] !== '\n') a--;
+      while (b < 본문.length && !/["'`]/.test(본문[b]) && 본문[b] !== '\n') b++;
+      const 조각 = 본문.slice(a, b);
+      if (/(?:^|[;\s])color\s*:/.test(조각)) continue;                       /* 글자색을 함께 박은 밝은 칩 */
+      if (덮음.has(hex)) continue;
+      if (허용.some(([k]) => 이름.includes(k) || 조각.includes(k))) continue;
+      샘.push(이름 + ' ' + m[1] + ' | ' + 조각.slice(0, 70).replace(/\s+/g, ' '));
+    }
+  }
+  assert.deepEqual(샘, [], '어두운 규칙(⑧)이 못 덮는 인라인 밝은 바탕이 있습니다 — 덮는 색 목록(⑧)에 더하거나(rgb() 짝도) 종이라면 허용 목록에 까닭과 함께 적으세요:\n' + 샘.join('\n'));
+});
