@@ -51,7 +51,7 @@
         }
         continue;
       }
-      if (mode === 'att' && curAtt && /^\s{2,}[가-힣A-Za-z]+:/.test(line)) {
+      if (mode === 'att' && curAtt && /^\s{2,}[가-힣A-Za-z0-9_]+:/.test(line)) {
         var idx = line.indexOf(':');
         var k = line.slice(0, idx).trim();
         var v = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, '');
@@ -1000,8 +1000,9 @@
 
     var caseNo = '';
     var caseMatch = /((?:19|20)\d{2}\s*[가-힣]{1,4}\s*\d{1,7})/.exec(head) ||
-                    /(\b9\d\s*[가-힣]{1,4}\s*\d{1,7})/.exec(head) ||
-                    /([가-힣]{2,12}과-\d{1,6})/.exec(head);
+                    /(?:^|[^\d])([789]\d\s*(?:다카|다|두|도|마|모|바|부|카|가합|가단|나|노|누|구합|구단|헌마|헌바)\s*\d{1,7})/.exec(head) ||
+                    /([가-힣]{2,12}과-\d{1,6})/.exec(head) ||
+                    /((?:근기|임금|노조|산재|산안|고평|고보|징수|재해보상|근로기준|노사관계|여성고용|근로감독|안전보건)\s*\d{3,6}-\d{1,6})/.exec(head);
     if (caseMatch) caseNo = caseMatch[1].replace(/\s+/g, '');
 
     var decisionDate = extractDateYmd(head);
@@ -1222,22 +1223,50 @@
    * 4. 하이브리드 법률 검색 · 오프라인 초안 합성 · 기계적 인용 검증기
    * ══════════════════════════════════════════════════════════════ */
   var SYNONYM_MAP = {
-    '허리디스크': ['추간판탈출증', '요추', '근골격계'],
-    '추간판탈출증': ['허리디스크', '요추'],
+    '허리디스크': ['추간판탈출증', '요추', '근골격계', '2010두17052', '2009두6919'],
+    '추간판탈출증': ['허리디스크', '요추', '2010두17052'],
     '목디스크': ['경추', '추간판탈출증'],
-    '난청': ['소음성난청', '85db', '장해급여'],
+    '난청': ['소음성난청', '85db', '장해급여', '2017두59949'],
+    '소음성난청': ['난청', '85db', '장해급여', '소멸시효', '2017두59949'],
+    '일부불승인': ['최초요양', '요양불승인', '2009두6919', '2009구단4596'],
+    '최초요양': ['요양급여', '일부불승인', '요양불승인', '2009두6919'],
+    '장해급여': ['치유', '증상고정', '장해등급', '6개월기준', '2004두14977'],
+    '증상고정': ['치유', '장해급여', '6개월기준', '2004두14977'],
     '학폭': ['괴롭힘'],
     '괴롭힘': ['직장내괴롭힘', '제76조의2', '제76조의3', '분리조치'],
     '고정성': ['통상임금', '2020다247190', '재직조건'],
     '상여금': ['통상임금', '정기상여금', '재직조건', '근무일수'],
-    'db형': ['확정급여형', '퇴직연금', '중도인출', '중간정산'],
-    'dc형': ['확정기여형', '퇴직연금', '중도인출'],
+    '성과급': ['경영평가성과급', '경영성과급', '평균임금', '2018다231536'],
+    '경영성과급': ['경영평가성과급', '성과급', '평균임금', '2018다231536'],
+    'db형': ['확정급여형', '퇴직연금', '중도인출', '중간정산', '분할약정'],
+    'dc형': ['확정기여형', '퇴직연금', '중도인출', '중간정산'],
+    '중간정산': ['퇴직금중간정산', '중도인출', '퇴직금분할약정', '계속근로기간', '퇴직연금복지과-4257'],
+    '재입사': ['계속근로기간', '계속근로단절', '공개채용', '퇴직금중간정산', '95다29932', '퇴직연금복지과-4257'],
+    '연차': ['연차유급휴가', '연차수당', '미사용수당', '연차사용촉진', '노무수령거부', '2019다279283', '임금근로시간과-2271'],
+    '연차사용촉진': ['연차유급휴가', '노무수령거부', '제61조', '2019다279283'],
+    '병가': ['약정병가', '유급병가', '무급병가', '임금근로시간과-2972', '근로개선정책과-3833'],
+    '주말': ['공휴일', '주휴일', '휴무일', '소정근로일'],
+    '휴일대체': ['주휴일대체', '대체휴일', '근기68207-806'],
     '수습': ['시용', '본채용거부', '부당해고'],
     '프리랜서': ['근로자성', '사용종속관계', '2004다29736'],
+    '용역계약서': ['위탁계약', '프리랜서', '근로자성', '사용종속관계', '2004다29736'],
     '하청': ['사내하도급', '불법파견', '근로자파견', '2010다106436'],
     '알바': ['단시간근로자', '기간제', '상시근로자수'],
     '5인미만': ['상시근로자수', '제11조', '시행령제7조의2'],
-    '과로사': ['뇌출혈', '뇌경색', '뇌심혈관', '상당인과관계', '고시'],
+    '상시근로자': ['상시근로자수', '5인미만', '하나의사업장', '제11조', '시행령제7조의2', '2023두57876'],
+    '쪼개기': ['하나의사업장', '법인분리', '상시근로자수', '2023두57876'],
+    '채용공고': ['채용공고제한', '남녀고용평등법', '고령자고용법', '채용절차법', '연령차별', '여성고용정책과-채용공고차별지침'],
+    '안전보건교육': ['산업안전보건교육', '산업안전교육', '사무직', '별표1', '현업업무', '산업안전보건법시행령-별표1해석'],
+    '산업안전보건교육': ['산업안전교육', '안전보건교육', '사무직', '별표1', '산업안전보건법시행령-별표1해석'],
+    '산업안전교육': ['산업안전보건교육', '안전보건교육', '사무직', '별표1', '산업안전보건법시행령-별표1해석'],
+    '사회복지법인': ['사회복지시설', '사회복지서비스업', '별표1', '산업안전보건법시행령-별표1해석'],
+    '회복지법인': ['사회복지법인', '사회복지시설', '별표1', '산업안전보건법시행령-별표1해석'],
+    '가입비': ['조합비', '체크오프', '노조탈퇴', '노사관계법제과-1745'],
+    '탈퇴': ['노조탈퇴', '도달주의', '체크오프', '가입비', '96다28899', '노사관계법제과-1745'],
+    '경업금지': ['경업금지약정', '전직금지', '영업비밀', '2009다82244'],
+    '위약금': ['위약예정', '교육비반환', '의무재직기간', '제20조', '2006다37274'],
+    '교육비': ['교육비반환', '위약예정', '의무재직기간', '96다29892', '2006다37274'],
+    '과로사': ['뇌출혈', '뇌경색', '뇌심혈관', '상당인과관계', '2020두39297'],
     '과로': ['뇌심혈관', '뇌출혈', '심근경색', '주52시간과로', '상당인과관계'],
     '중처법': ['중대재해처벌법', '안전보건확보의무', '경영책임자'],
     '저성과': ['저성과자', '통상해고', '인사평가', '2018두62492'],
@@ -1246,8 +1275,9 @@
     '전보': ['부당전보', '인사발령', '생활상불이익', '94다52928'],
     '출퇴근': ['출퇴근재해', '출퇴근산재', '통상적인경로', '일탈중단예외', '2014헌바254'],
     '출근길': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고'],
-    '퇴근길': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고'],
-    '교통사고': ['출퇴근재해', '출퇴근산재', '통상적인경로', '산재보험법'],
+    '퇴근길': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고', '2014헌바254'],
+    '고라니': ['출퇴근재해', '출퇴근산재', '통상적인경로', '교통사고', '야생동물'],
+    '교통사고': ['출퇴근재해', '출퇴근산재', '통상적인경로'],
     '어린이집': ['출퇴근재해', '일탈중단예외', '자녀등하원', '시행령제35조'],
     '카톡': ['서면통지', '카톡해고', '문자해고', '2015두41401'],
     '카카오톡': ['서면통지', '카톡해고', '문자해고', '2015두41401'],
@@ -1340,12 +1370,15 @@
     var abbrev = getAbbrevMap(customAbbrevMap);
     var idx = Array.isArray(lawIndex) ? lawIndex : [];
 
-    var m = /^([가-힣ㄱ-ㅎㆍ·\s]{2,28}?)(?:\s*(시행령|시행규칙))?(?:\s+(?:제\s*)?(\d{1,4}(?:\s*조)?(?:\s*의\s*\d{1,3})?)(?:\s*조)?)?$/.exec(q);
+    var m = /^([가-힣ㄱ-ㅎㆍ·\s]{2,28}?)(?:\s*(시행령|시행규칙))?(?:(?:\s+(?:제\s*)?(\d{1,4}(?:\s*조)?(?:\s*의\s*\d{1,3})?)(?:\s*조)?)|(?:\s*\[?\s*(별표|서식)\s*(\d{1,3})(?:\s*의\s*(\d{1,2}))?\s*\]?))?$/.exec(q);
     if (!m) return null;
 
     var rawName = String(m[1] || '').replace(/\s+/g, '');
     var subKind = String(m[2] || '').trim();
     var rawArt = String(m[3] || '').trim();
+    var annexKind = String(m[4] || '').trim();
+    var annexMain = String(m[5] || '').trim();
+    var annexSub = String(m[6] || '').trim();
 
     if (!subKind && /시행령$/.test(rawName)) {
       subKind = '시행령';
@@ -1356,7 +1389,9 @@
     }
 
     var canonicalDir = abbrev[rawName] || '';
-    var articleNo = normalizeArticleRef(rawArt);
+    var articleNo = annexKind
+      ? ('[' + annexKind + ' ' + parseInt(annexMain, 10) + (annexSub ? ('의' + parseInt(annexSub, 10)) : '') + ']')
+      : normalizeArticleRef(rawArt);
     var matchedFam = null;
 
     if (idx.length) {
@@ -1403,16 +1438,34 @@
     };
   }
 
+  var LEGACY_MOEL_DOC_SPACE_RE = /(^|[^가-힣A-Za-z0-9])(근기|임금|노조|산재|산안|고평|고보|근정|근지|노정|퇴직|징수|산보|재해보상|근로기준|노사관계|여성고용|근로감독|안전보건)\s+(\d{3,6}-\d{1,6})(?=$|[^0-9])/g;
+
+  function compactLegacyDocNos(str) {
+    return String(str || '').replace(LEGACY_MOEL_DOC_SPACE_RE, '$1$2$3');
+  }
+
+  function formatLawAttachmentLabel(att) {
+    if (!att || typeof att !== 'object') return '[별표]';
+    var kind = String(att['별표구분'] || '별표').trim();
+    var rawMain = String(att['별표번호'] || '').trim();
+    var rawSub = String(att['별표가지번호'] || '').trim();
+    var mainNo = /^\d+$/.test(rawMain) ? parseInt(rawMain, 10) : 0;
+    var subNo = /^\d+$/.test(rawSub) ? parseInt(rawSub, 10) : 0;
+    var numStr = mainNo > 0 ? String(mainNo) : rawMain;
+    if (subNo > 0) numStr += '의' + subNo;
+    return '[' + kind + (numStr ? (' ' + numStr) : '') + ']';
+  }
+
   /* 불리언 연산자(+필수, -제외, "정확구문") 및 법령 약칭 자동 확장 파서 */
   function parseSmartQueryOperators(rawQuery, customAbbrevMap) {
-    var src = String(rawQuery || '').trim();
+    var src = compactLegacyDocNos(String(rawQuery || '').trim());
     var phrases = [];
     var mustTokens = [];
     var excludeTokens = [];
     var abbrev = getAbbrevMap(customAbbrevMap);
 
     var rest = src.replace(/"([^"]{2,60})"|“([^”]{2,60})”/g, function (_, p1, p2) {
-      var ph = String(p1 || p2 || '').trim().toLowerCase();
+      var ph = compactLegacyDocNos(String(p1 || p2 || '').trim()).toLowerCase();
       if (ph) phrases.push(ph);
       return ' ';
     });
@@ -1444,6 +1497,8 @@
         expandedExtras.push('제' + tok);
       } else if (j > 0 && /^\d{1,4}(?:의\d{1,3})?$/.test(tok) && (abbrev[cleanParts[j - 1]] || /법$/.test(cleanParts[j - 1]))) {
         expandedExtras.push(normalizeArticleRef(tok));
+      } else if (/^별표\d{1,3}(?:의\d{1,2})?$/.test(tok)) {
+        expandedExtras.push(tok.replace(/^별표/, '별표 '));
       }
     }
 
@@ -1467,7 +1522,7 @@
     var splitWords = combined.split(/[\s,·/()[\]"'“”‘’?!+-]+/).filter(Boolean);
     for (var i = 0; i < splitWords.length; i++) {
       var w = splitWords[i].replace(/(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만)$/, '');
-      if (w.length >= 2 && rawList.indexOf(w) < 0) rawList.push(w);
+      if (w.length >= 2 && !LOW_INFO_QUERY_TOKENS.has(w.toLowerCase()) && rawList.indexOf(w) < 0) rawList.push(w);
     }
     return rawList.slice(0, 8);
   }
@@ -1482,9 +1537,42 @@
     return 6;
   }
 
+  /* 일반 서술·질문형 기능어(단독 매칭 시 무관 판례 노이즈 유발 방지용 0계층 토큰) */
+  var LOW_INFO_QUERY_TOKENS = new Set([
+    '판례', '사례', '유사', '참고', '요약', '검색', '확인', '검토', '검토해줘', '알려줘',
+    '여부', '기준', '규정', '포함', '적용', '인정', '판단', '가능', '가능성', '방법',
+    '신청', '청구', '사용', '지급', '처리', '산정', '계산', '제한', '의무', '요건',
+    '위반', '처분', '취소', '무효', '효력', '관련', '대한', '관한', '경우', '시점',
+    '기간', '절차', '이유', '내용', '문제', '질의', '회시', '해석', '유권해석', '행정해석',
+    '결정', '결정례', '재결', '판결', '법리', '법률', '조문', '사업장', '회사', '근로자', '직원',
+    '있나요', '되나요', '인가요', '중입니다', '인정되나요', '가능한가요'
+  ]);
+
+  /* 광역 법령·도메인 일반명(구체 쟁점어가 함께 있을 때는 보조 가중치로만 작동하는 1계층 토큰) */
+  var BROAD_DOMAIN_TOKENS = new Set([
+    '근로기준법', '근기법', '근기',
+    '산업재해보상보험법', '산재보험법', '산재법', '산재', '산업재해', '산재보상',
+    '산업안전보건법', '산안법',
+    '근로자퇴직급여보장법', '퇴직급여법', '근퇴법',
+    '남녀고용평등과일ㆍ가정양립지원에관한법률', '남녀고용평등법', '고평법', '남고법',
+    '노동조합및노동관계조정법', '노조법', '노동조합', '노조',
+    '고용보험법', '고보법', '최저임금법', '최임법',
+    '기간제및단시간근로자보호등에관한법률', '기간제법',
+    '파견근로자보호등에관한법률', '파견법',
+    '고용노동부고시', '시행령', '시행규칙'
+  ]);
+
+  function tokenSpecificityTier(tk) {
+    if (!tk) return 0;
+    if (LOW_INFO_QUERY_TOKENS.has(tk)) return 0;
+    if (BROAD_DOMAIN_TOKENS.has(tk)) return 1;
+    return 2;
+  }
+
   function tokenizeQuery(q) {
-    var raw = String(q || '').toLowerCase().trim();
+    var raw = compactLegacyDocNos(String(q || '')).toLowerCase().trim();
     if (!raw) return [];
+    raw = raw.replace(/별표\s*(\d{1,3}(?:의\d{1,2})?)/g, '별표$1');
     var abbrev = getAbbrevMap();
     var rawTokens = raw.split(/[\s,·/()[\]"'“”‘’?!]+/).filter(Boolean);
     var out = new Set();
@@ -1504,7 +1592,50 @@
     return Array.from(out);
   }
 
-  function scoreDocument(doc, tokens, rawQueryNorm) {
+  function buildTokenScoringMeta(tokens, docs) {
+    var tiers = [];
+    var weights = [];
+    var requiredMinTier = 0;
+    var nDocs = Math.max(Array.isArray(docs) ? docs.length : 0, 1);
+
+    var docHays = [];
+    if (Array.isArray(docs) && tokens.length) {
+      for (var dIdx = 0; dIdx < docs.length; dIdx++) {
+        var dc = docs[dIdx];
+        var hay = [
+          dc.caseNo || '', dc.title || '', dc.summary || '', dc.body || '',
+          (dc.tags || []).join(' '), (dc.refLaws || []).join(' '), (dc.refCases || []).join(' ')
+        ].join(' ').toLowerCase();
+        docHays.push({ hay: hay, noSpace: hay.replace(/\s+/g, '') });
+      }
+    }
+
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i];
+      var tkNoSpace = tk.replace(/\s+/g, '');
+      var tier = tokenSpecificityTier(tk);
+      if (tier > requiredMinTier) requiredMinTier = tier;
+
+      var df = 0;
+      for (var j = 0; j < docHays.length; j++) {
+        if (docHays[j].hay.indexOf(tk) >= 0 || (tkNoSpace.length >= 3 && docHays[j].noSpace.indexOf(tkNoSpace) >= 0)) {
+          df++;
+        }
+      }
+      var idf = 1 + Math.log((nDocs + 1) / (df + 1));
+      var w = tier === 0 ? 0.15 : (tier === 1 ? (0.45 * idf) : idf);
+      tiers.push(tier);
+      weights.push(w);
+    }
+
+    return {
+      tiers: tiers,
+      weights: weights,
+      requiredMinTier: requiredMinTier
+    };
+  }
+
+  function scoreDocument(doc, tokens, rawQueryNorm, tokenMeta, hasQuotedPhrase) {
     if (!tokens.length && !rawQueryNorm) return 1;
     var cno = String(doc.caseNo || '').toLowerCase().replace(/\s+/g, '');
     var title = String(doc.title || '').toLowerCase();
@@ -1515,20 +1646,41 @@
     var refsNoSpace = refs.replace(/\s+/g, '');
 
     var score = 0;
-    if (rawQueryNorm && cno && rawQueryNorm.indexOf(cno) >= 0) score += 120;
-    if (rawQueryNorm && title.replace(/\s+/g, '').indexOf(rawQueryNorm) >= 0) score += 60;
+    var directExactHit = Boolean(hasQuotedPhrase);
+    var maxMatchedTier = -1;
+
+    if (rawQueryNorm && cno && rawQueryNorm.indexOf(cno) >= 0) {
+      score += 150;
+      directExactHit = true;
+    }
+    if (rawQueryNorm && rawQueryNorm.length >= 2 && title.replace(/\s+/g, '').indexOf(rawQueryNorm) >= 0) {
+      score += 70;
+      directExactHit = true;
+    }
 
     for (var i = 0; i < tokens.length; i++) {
       var tk = tokens[i];
       var tkNoSpace = tk.replace(/\s+/g, '');
-      if (cno && cno.indexOf(tkNoSpace) >= 0) score += 80;
-      if (title.indexOf(tk) >= 0) score += 22;
-      if (tags.indexOf(tk) >= 0) score += 18;
-      if (refs.indexOf(tk) >= 0 || (tkNoSpace.length >= 3 && refsNoSpace.indexOf(tkNoSpace) >= 0)) score += 16;
-      if (summary.indexOf(tk) >= 0) score += 10;
-      if (body.indexOf(tk) >= 0) score += 5;
+      var baseHit = 0;
+      if (cno && tkNoSpace.length >= 3 && cno.indexOf(tkNoSpace) >= 0) baseHit += 85;
+      if (title.indexOf(tk) >= 0) baseHit += 24;
+      if (tags.indexOf(tk) >= 0) baseHit += 20;
+      if (refs.indexOf(tk) >= 0 || (tkNoSpace.length >= 3 && refsNoSpace.indexOf(tkNoSpace) >= 0)) baseHit += 16;
+      if (summary.indexOf(tk) >= 0) baseHit += 11;
+      if (body.indexOf(tk) >= 0) baseHit += 5;
+
+      if (baseHit > 0) {
+        var tier = tokenMeta ? tokenMeta.tiers[i] : tokenSpecificityTier(tk);
+        var w = tokenMeta ? tokenMeta.weights[i] : 1;
+        if (tier > maxMatchedTier) maxMatchedTier = tier;
+        score += baseHit * w;
+      }
     }
-    return score;
+
+    if (!directExactHit && tokenMeta && maxMatchedTier < tokenMeta.requiredMinTier) {
+      return 0;
+    }
+    return Math.round(score * 10) / 10;
   }
 
   function searchCorpus(query, opts) {
@@ -1538,7 +1690,7 @@
     var lawIndex = Array.isArray(opts.lawIndex) ? opts.lawIndex : [];
     var docTypeFilter = opts.docType || 'all';
     var limit = opts.limit || 50;
-    var subQueryStr = String(opts.subQuery || '').trim().toLowerCase();
+    var subQueryStr = compactLegacyDocNos(String(opts.subQuery || '').trim()).toLowerCase();
     var subTokens = subQueryStr ? subQueryStr.split(/\s+/).filter(Boolean) : [];
     var dateRange = String(opts.dateRange || 'all');
     var sortBy = String(opts.sortBy || 'relevance');
@@ -1555,6 +1707,7 @@
     var ops = parseSmartQueryOperators(qStr);
     var qNorm = ops.baseQuery.toLowerCase().replace(/\s+/g, '');
     var tokens = tokenizeQuery(ops.expandedQuery);
+    var tokenMeta = buildTokenScoringMeta(tokens, docs);
 
     var docHits = [];
     for (var i = 0; i < docs.length; i++) {
@@ -1604,7 +1757,7 @@
       /* 따옴표 구문("...") 필터 */
       var missingPhrase = false;
       for (var ph = 0; ph < ops.phrases.length; ph++) {
-        if (fullDocHay.indexOf(ops.phrases[ph]) < 0) {
+        if (fullDocHay.indexOf(ops.phrases[ph]) < 0 && fullDocNoSpace.indexOf(ops.phrases[ph].replace(/\s+/g, '')) < 0) {
           missingPhrase = true;
           break;
         }
@@ -1624,7 +1777,7 @@
       }
 
       var hasPositiveCriteria = Boolean(ops.baseQuery || ops.mustTokens.length || ops.phrases.length);
-      var sc = scoreDocument(d, tokens, qNorm);
+      var sc = scoreDocument(d, tokens, qNorm, tokenMeta, ops.phrases.length > 0);
       for (var ph2 = 0; ph2 < ops.phrases.length; ph2++) {
         sc += 40;
       }
@@ -1649,7 +1802,7 @@
       return String(b.item.decisionDate || '').localeCompare(String(a.item.decisionDate || ''));
     });
 
-    /* 적재된 법령 조문 검색 */
+    /* 적재된 법령 조문 및 [별표·서식] 첨부파일 검색 */
     var articleHits = [];
     if (qStr) {
       for (var l = 0; l < loadedLaws.length; l++) {
@@ -1661,11 +1814,21 @@
           var art = arts[a];
           var hay = (lawTitleLow + ' ' + art.no + ' ' + (art.heading || '') + ' ' + (art.text || '')).toLowerCase();
           var asc = 0;
-          if (qNorm && hay.replace(/\s+/g, '').indexOf(qNorm) >= 0) asc += 45;
-          for (var t = 0; t < tokens.length; t++) {
-            if (hay.indexOf(tokens[t]) >= 0) asc += (art.heading && art.heading.toLowerCase().indexOf(tokens[t]) >= 0) ? 16 : 7;
+          var artMaxTier = -1;
+          var artDirect = false;
+          if (qNorm && hay.replace(/\s+/g, '').indexOf(qNorm) >= 0) {
+            asc += 45;
+            artDirect = true;
           }
-          if (asc > 0) {
+          for (var t = 0; t < tokens.length; t++) {
+            if (hay.indexOf(tokens[t]) >= 0) {
+              var aTier = tokenMeta.tiers[t];
+              if (aTier > artMaxTier) artMaxTier = aTier;
+              var aWeight = aTier === 0 ? 0.2 : (aTier === 1 ? 0.5 : 1);
+              asc += ((art.heading && art.heading.toLowerCase().indexOf(tokens[t]) >= 0) ? 18 : 7) * aWeight;
+            }
+          }
+          if ((artDirect || artMaxTier >= tokenMeta.requiredMinTier) && asc > 0) {
             articleHits.push({
               lawDir: law.dir,
               lawTitle: law.title,
@@ -1674,7 +1837,51 @@
               articleNo: art.no,
               heading: art.heading,
               snippet: String(art.text || '').slice(0, 240),
-              score: asc
+              score: Math.round(asc * 10) / 10
+            });
+          }
+        }
+
+        /* 법령 내 [별표 · 서식] 메타 제목 검색 지원 (예: 산업안전보건법 시행령 [별표 1], 산재보험법 시행령 [별표 3]) */
+        var atts = Array.isArray(law.attachments) ? law.attachments : [];
+        for (var atIdx = 0; atIdx < atts.length; atIdx++) {
+          var att = atts[atIdx];
+          if (!att || typeof att !== 'object') continue;
+          var attLabel = formatLawAttachmentLabel(att);
+          var attCompact = attLabel.replace(/[\[\]\s]/g, '').toLowerCase();
+          var attTitle = String(att['제목'] || '').trim();
+          var attHay = (lawTitleLow + ' ' + attLabel + ' ' + attCompact + ' ' + attTitle).toLowerCase();
+          var attSc = 0;
+          var attMaxTier = -1;
+          var attDirect = false;
+          if (qNorm && attHay.replace(/\s+/g, '').indexOf(qNorm) >= 0) {
+            attSc += 55;
+            attDirect = true;
+          }
+          for (var tt = 0; tt < tokens.length; tt++) {
+            var qTok = tokens[tt];
+            if (attHay.indexOf(qTok) >= 0 || (qTok.length >= 3 && attHay.replace(/\s+/g, '').indexOf(qTok) >= 0)) {
+              var atTier = tokenMeta.tiers[tt];
+              if (atTier > attMaxTier) attMaxTier = atTier;
+              var atWeight = atTier === 0 ? 0.2 : (atTier === 1 ? 0.5 : 1.15);
+              attSc += ((attCompact === qTok || attTitle.toLowerCase().indexOf(qTok) >= 0) ? 22 : 9) * atWeight;
+            }
+          }
+          if ((attDirect || attMaxTier >= tokenMeta.requiredMinTier) && attSc > 0) {
+            var rawPdf = String(att['PDF링크'] || '').trim();
+            var rawFile = String(att['파일링크'] || '').trim();
+            articleHits.push({
+              lawDir: law.dir,
+              lawTitle: law.title,
+              fileName: law.fileName,
+              effectiveDate: law.effectiveDate,
+              articleNo: attLabel,
+              heading: attTitle,
+              snippet: attLabel + ' ' + attTitle,
+              isAttachment: true,
+              pdfUrl: /^https:\/\//i.test(rawPdf) ? rawPdf : '',
+              fileUrl: /^https:\/\//i.test(rawFile) ? rawFile : '',
+              score: Math.round(attSc * 10) / 10
             });
           }
         }
@@ -1682,7 +1889,7 @@
       articleHits.sort(function (a, b) { return b.score - a.score; });
     }
 
-    /* 5,773개 전 법령 제목 색인 매칭 (약칭·초성 검색 포함) */
+    /* 5,773개 전 법령 제목 색인 매칭 (약칭·초성 검색 포함 · 일반 기능어 단독 오탐 차단) */
     var lawTitleHits = [];
     var smartJump = (qStr && lawIndex.length) ? resolveSmartLawJump(qStr, lawIndex) : null;
     if (qStr && lawIndex.length) {
@@ -1692,18 +1899,30 @@
         var fHay = (fam.title + ' ' + fam.dir + ' ' + (fam.dept || '')).toLowerCase();
         var fNorm = fHay.replace(/\s+/g, '');
         var lsc = 0;
-        if (smartJump && smartJump.dir === fam.dir) lsc += 120;
+        var famMatchedNonTrivial = false;
+        if (smartJump && smartJump.dir === fam.dir) {
+          lsc += 120;
+          famMatchedNonTrivial = true;
+        }
         if (choQuery) {
           var famCho = extractChosung(fam.dir.replace(/[ㆍ·\s]/g, ''));
-          if (famCho === choQuery) lsc += 100;
-          else if (famCho.indexOf(choQuery) === 0) lsc += 70;
-          else if (famCho.indexOf(choQuery) >= 0) lsc += 40;
+          if (famCho === choQuery) { lsc += 100; famMatchedNonTrivial = true; }
+          else if (famCho.indexOf(choQuery) === 0) { lsc += 70; famMatchedNonTrivial = true; }
+          else if (famCho.indexOf(choQuery) >= 0) { lsc += 40; famMatchedNonTrivial = true; }
         }
-        if (qNorm && fNorm.indexOf(qNorm) >= 0) lsc += 50;
+        if (qNorm && qNorm.length >= 2 && fNorm.indexOf(qNorm) >= 0) {
+          lsc += 50;
+          famMatchedNonTrivial = true;
+        }
         for (var tkIdx = 0; tkIdx < tokens.length; tkIdx++) {
-          if (fHay.indexOf(tokens[tkIdx]) >= 0 || fNorm.indexOf(tokens[tkIdx]) >= 0) lsc += 20;
+          var lTier = tokenMeta.tiers[tkIdx];
+          if (lTier === 0 && tokenMeta.requiredMinTier > 0) continue;
+          if (fHay.indexOf(tokens[tkIdx]) >= 0 || fNorm.indexOf(tokens[tkIdx]) >= 0) {
+            lsc += (lTier === 2 ? 24 : 16);
+            famMatchedNonTrivial = true;
+          }
         }
-        if (lsc > 0) {
+        if (famMatchedNonTrivial && lsc > 0) {
           lawTitleHits.push({ family: fam, score: lsc + (fam.priority ? 10 : 0) });
         }
       }
@@ -1724,14 +1943,14 @@
   var FACT_ISSUE_RULES = [
     {
       id: 'commute_accident',
-      title: '출퇴근 재해 · 경로 일탈·중단 예외 인정 여부',
+      title: '출퇴근 재해 · 경로 일탈·중단 예외 및 야생동물·단독사고 인정 여부',
       canonicalQuery: '출퇴근재해 통상적인 경로 일탈 예외',
-      boostQuery: '출퇴근재해 출퇴근산재 통상적인경로 일탈중단예외 교통사고 산업재해보상보험법 산재보험법 제37조 시행령 제35조 2014헌바254',
-      pattern: /(?:출근|퇴근|출퇴근)[\s\S]{0,80}(?:사고|교통사고|추돌|접촉|넘어|낙상|골절|다쳤|부상|어린이집|유치원|등원|하원|병원|마트|산재)|(?:교통사고|어린이집|등원|하원)[\s\S]{0,80}(?:출근|퇴근|출퇴근|산재)/,
+      boostQuery: '출퇴근재해 출퇴근산재 통상적인경로 일탈중단예외 교통사고 산업재해보상보험법 산재보험법 제37조 시행령 제35조 2014헌바254 산재보상정책과-출퇴근재해지침',
+      pattern: /(?:출근|퇴근|출퇴근)[\s\S]{0,80}(?:사고|교통사고|고라니|야생동물|단독사고|추돌|접촉|넘어|낙상|골절|다쳤|부상|어린이집|유치원|등원|하원|병원|마트|산재)|(?:교통사고|고라니|야생동물|어린이집|등원|하원)[\s\S]{0,80}(?:출근|퇴근|출퇴근|산재)/,
       coreLaws: ['산업재해보상보험법 제37조 제1항 제3호', '산업재해보상보험법 시행령 제35조 제2항'],
-      conclusion: '통상적인 경로와 방법으로 출퇴근하던 중 발생한 사고는 사업주 지배관리 여부와 무관하게 업무상 재해(출퇴근재해)로 인정됩니다. 경로 일탈·중단이 있더라도 자녀 보육·교육기관 등하원, 일용품 구입, 진료 등 산재보험법 시행령 제35조 제2항의 일상생활 필요 행위 전후 이동 중 사고라면 예외적으로 산재 승인 대상입니다.',
+      conclusion: '통상적인 경로와 방법으로 출퇴근하던 중 발생한 사고(고라니·야생동물 회피 단독사고, 빗길·빙판길 전도 포함)는 사업주 지배관리 여부와 무관하게 업무상 재해(출퇴근재해)로 인정됩니다. 경로 일탈·중단이 있더라도 자녀 보육·교육기관 등하원, 일용품 구입, 진료 등 산재보험법 시행령 제35조 제2항의 일상생활 필요 행위 전후 이동 중 사고라면 예외적으로 산재 승인 대상입니다.',
       checklist: [
-        '자택~사업장 평소 이동 경로(내비게이션·블랙박스·교통카드 기록) 및 사고 시각·지점 특정',
+        '자택~사업장 평소 이동 경로(내비게이션·블랙박스·교통카드·보험사 출동 기록) 및 사고 시각·지점 특정',
         '경로 우회·중단이 있었다면 시행령 제35조 제2항 예외(어린이집 등하원·진료·생필품 구입 등) 증빙 확보',
         '음주·무면허·중앙선침범 등 중과실 범죄행위 해당 여부 배제 확인'
       ]
@@ -1782,10 +2001,10 @@
       id: 'worker_status_freelancer',
       title: '프리랜서·위탁계약자(3.3% 공제)의 근로기준법상 근로자성 및 퇴직금 검토',
       canonicalQuery: '프리랜서 근로자성 사용종속관계 퇴직금',
-      boostQuery: '프리랜서 근로자성 사용종속관계 위탁계약 사업소득세 퇴직금 2004다29736 근로기준법 제2조',
-      pattern: /(?:프리랜서|3\.3\s*%|사업소득|위탁계약|용역계약|근로자성|가짜\s*3\.3)[\s\S]{0,120}(?:출퇴근|지시|퇴직금|주휴|연차|4대보험|근무)|(?:퇴직금|주휴수당)[\s\S]{0,80}(?:프리랜서|3\.3\s*%|위탁|용역)/,
+      boostQuery: '프리랜서 근로자성 사용종속관계 위탁계약 용역계약 사업소득세 퇴직금 2004다29736 근로기준법 제2조',
+      pattern: /(?:프리랜서|3\.3\s*%|사업소득|위탁계약|용역계약|근로자성|가짜\s*3\.3)[\s\S]{0,120}(?:출퇴근|지시|퇴직금|주휴|연차|4대보험|근무|검토)?|(?:퇴직금|주휴수당)[\s\S]{0,80}(?:프리랜서|3\.3\s*%|위탁|용역)/,
       coreLaws: ['근로기준법 제2조 제1항 제1호', '근로자퇴직급여 보장법 제4조'],
-      conclusion: '계약 형식이 프리랜서·위탁계약이고 3.3% 사업소득세를 원천징수했더라도, 출퇴근 시간·근무장소 구속, 구체적 업무지시·결재, 비품 제공, 고정급 성격 보수 등 실질적 사용종속관계가 인정되면 근로기준법상 근로자로서 퇴직금·주휴·연차수당 청구권이 인정됩니다.',
+      conclusion: '계약 형식이 프리랜서·위탁·용역계약이고 3.3% 사업소득세를 원천징수했더라도, 출퇴근 시간·근무장소 구속, 구체적 업무지시·결재, 비품 제공, 고정급 성격 보수 등 실질적 사용종속관계가 인정되면 근로기준법상 근로자로서 퇴직금·주휴·연차수당 청구권이 인정됩니다.',
       checklist: [
         '메신저·이메일 업무지시 내역, 일일·주간 업무보고서, 근태 통제 증거 확보',
         '제3자 대체근무 가능 여부, 독자적 사업자 설비 보유 여부, 보수의 근로 자체 대가성 점검',
@@ -1793,17 +2012,157 @@
       ]
     },
     {
-      id: 'overwork_disease_sanjae',
-      title: '과로(뇌심혈관) · 근골격계(디스크) · 난청 · 직무스트레스 업무상 질병 산재 검토',
-      canonicalQuery: '업무상질병 과로 뇌심혈관 추간판탈출증',
-      boostQuery: '과로산재 뇌심혈관 뇌출혈 심근경색 추간판탈출증 소음성난청 우울증산재 상당인과관계 산업재해보상보험법 고용노동부고시 2020두39297 2015두8848 2017두59949',
-      pattern: /(?:뇌출혈|뇌경색|심근경색|뇌심혈관|과로|주\s*52시간|주\s*60시간|허리디스크|목디스크|추간판|근골격|난청|우울증|적응장애|극단적\s*선택|자살)[\s\S]{0,80}(?:산재|업무|근무|교대|야간|스트레스|불승인|요양)?/,
+      id: 'overwork_cerebro_sanjae',
+      title: '과로 · 뇌심혈관 질병(뇌출혈·뇌경색·심근경색) 업무상 재해 검토',
+      canonicalQuery: '과로 뇌심혈관 업무상질병 산재',
+      boostQuery: '과로산재 뇌심혈관 뇌출혈 뇌경색 심근경색 교대근무 주52시간 업무부담가중요인 산업재해보상보험법 제37조 고용노동부고시 2020두39297',
+      pattern: /(?:뇌출혈|뇌경색|심근경색|뇌심혈관|지주막하|심정지|과로사|(?:과로|주\s*52시간|주\s*60시간)[\s\S]{0,60}(?:산재|쓰러|사망|발병|질병|입원|요양))/,
       coreLaws: ['산업재해보상보험법 제37조 제1항 제2호', '산업재해보상보험법 시행령 제34조'],
-      conclusion: '뇌심혈관 질병은 발병 전 12주 평균 주 60시간(4주 64시간) 초과 시 업무관련성이 강하며, 주 52시간 초과 + 야간근무(30% 가산)·교대제·휴일부족·정신적 긴장 등 가중요인 결합 시 산재로 인정됩니다. 기저질환·퇴행성 소인이 있더라도 당해 근로자 기준으로 자연경과 이상 악화되었다면 상당인과관계가 인정됩니다.',
+      conclusion: '뇌심혈관 질병은 발병 전 12주 평균 주 60시간(4주 64시간) 초과 시 업무관련성이 강하며, 주 52시간 초과 + 야간근무(30% 가산)·교대제·휴일부족·정신적 긴장 등 가중요인 결합 시 산재로 인정됩니다. 고혈압 등 기저질환이 있더라도 당해 근로자 기준으로 자연경과 이상 악화되었다면 상당인과관계가 인정됩니다.',
       checklist: [
         '발병 전 24시간·1주·4주·12주 실업무시간 산정표 작성(22시~06시 야간근무 30% 가산 반영)',
-        '교대제·휴일부족·돌발업무·유해환경·중량물 반복취급 등 고용노동부 고시 업무부담 가중요인 특정',
+        '교대제·휴일부족·돌발업무·한랭노출 등 고용노동부 고시 업무부담 가중요인 특정',
         '의무기록지·건강검진 이력 및 직업환경의학과 업무관련성 소견 대조'
+      ]
+    },
+    {
+      id: 'musculoskeletal_sanjae',
+      title: '근골격계 질병(허리·목디스크·추간판탈출증) 산재 및 최초요양 일부불승인 취소 검토',
+      canonicalQuery: '허리디스크 추간판탈출증 근골격계 산재',
+      boostQuery: '허리디스크 목디스크 추간판탈출증 근골격계질병 신체부담업무 중량물 퇴행성 최초요양 일부불승인 처분취소 산업재해보상보험법 제37조 2009구단4596 2009두6919',
+      pattern: /(?:허리\s*디스크|목\s*디스크|추간판\s*탈출|추간판|요추|경추|회전근개|반월상|근골격계?|최초요양[\s\S]{0,30}(?:일부\s*)?불승인|일부\s*불승인[\s\S]{0,30}취소)/,
+      coreLaws: ['산업재해보상보험법 제37조 제1항 제2호', '산업재해보상보험법 시행령 제34조 별표 3'],
+      conclusion: '중량물 취급·부자연스러운 자세·반복동작 등 신체부담업무를 수행한 근로자에게 요추·경추 추간판탈출증이나 회전근개 파열이 발병·악화된 경우, MRI상 연령에 따른 퇴행성 변화가 동반되어 있더라도 업무가 자연경과 이상으로 악화시킨 원인이 되었다면 상당인과관계가 인정되며 최초요양 일부불승인 부분에 대해서도 독립하여 취소소송·심사청구가 가능합니다(2009두6919, 2009구단4596).',
+      checklist: [
+        '총 근무기간·일평균 중량물 무게(kg)·반복 인양 횟수·허리 굴곡/비틀림 작업 동영상·동료 진술서 확보',
+        'MRI 판독지상 돌출·파열 부위와 작업 부하 부위의 해부학적 일치성 및 타 병원 감정의 소견 대조',
+        '복수 상병 중 퇴행성을 이유로 일부 불승인된 상병의 독립 처분 취소 실익(향후 장해등급·요양기간) 검토'
+      ]
+    },
+    {
+      id: 'hearing_loss_sanjae',
+      title: '소음성 난청 산재 인정기준(85dB·3년·연령보정 배제) 및 장해급여 소멸시효 검토',
+      canonicalQuery: '소음성난청 산재 인정기준 장해급여',
+      boostQuery: '소음성난청 난청 감각신경성난청 85dB 연속음 소음노출 연령보정 장해급여 소멸시효 산업재해보상보험법 시행령 제34조 2017두59949',
+      pattern: /(?:소음성\s*난청|난청[\s\S]{0,40}(?:산재|소음|귀|청력|장해|판례|신청)|(?:청력\s*손실|이명)[\s\S]{0,40}(?:산재|소음))/,
+      coreLaws: ['산업재해보상보험법 시행령 제34조 제3항 별표 3', '산업재해보상보험법 제57조', '산업재해보상보험법 제112조'],
+      conclusion: '85dB 이상의 연속음에 3년 이상 노출되어 한 귀 청력손실이 40dB 이상인 감각신경성 난청은 업무상 질병으로 인정되며, 고령 퇴직자라도 일률적 연령보정 공제로 불승인할 수 없고 장해급여 소멸시효(5년)는 퇴직일이 아닌 소음성 난청 진단 확정일로부터 기산합니다(대법원 2017두59949).',
+      checklist: [
+        '고용보험 피보험자격 이력·국민연금 가입증명·작업환경측정결과표로 85dB 이상 소음공정 3년 이상 직력 입증',
+        '순음청력검사(PTA) 3회 이상(최소 48시간 간격) 및 뇌간유발반응검사(ABR) 결과지 확보',
+        '소음성 난청 진단 확정일 기준 5년 소멸시효 도과 여부 확인'
+      ]
+    },
+    {
+      id: 'mental_stress_sanjae',
+      title: '직무스트레스 · 정신질병(우울증·적응장애·자살) 업무상 재해 상당인과관계 검토',
+      canonicalQuery: '우울증 적응장애 직무스트레스 산재',
+      boostQuery: '우울증산재 적응장애 정신질병 자살 업무상스트레스 사회적평균인 상당인과관계 산업재해보상보험법 제37조 2015두8848',
+      pattern: /(?:우울증|적응장애|공황장애|외상후\s*스트레스|PTSD|극단적\s*선택|자살)[\s\S]{0,60}(?:산재|업무|직장|스트레스|괴롭힘|과로|사망|요양)/i,
+      coreLaws: ['산업재해보상보험법 제37조 제1항 제2호', '산업재해보상보험법 제37조 제2항'],
+      conclusion: '업무상 스트레스·직장 내 괴롭힘·과중한 책임 등으로 우울증·적응장애가 발병하거나 정상적 인식능력이 현저히 저하된 상태에서 자살에 이른 경우, 내성적 성격 등 개인적 취약성이 있더라도 업무와 질병·사망 사이의 상당인과관계가 인정됩니다(대법원 2015두8848).',
+      checklist: [
+        '발병 전 업무량 급증·부당 인사·고객 폭언·직장 내 괴롭힘 등 객관적 스트레스 사건 연표 정리',
+        '정신건강의학과 진료기록·심리검사지 및 가족·동료의 발병 전후 언행 변화 진술서 확보',
+        '사망 사건의 경우 유서·메신저 대화·통화내역 등 정상적 인식능력 저하 상태 입증자료 수집'
+      ]
+    },
+    {
+      id: 'sick_leave_holiday',
+      title: '약정 병가 규정 운영 시 주말(토·일)·공휴일 포함 여부 및 주휴수당 처리 검토',
+      canonicalQuery: '병가 규정 주말 포함 주휴수당',
+      boostQuery: '병가 병가규정 병가주말포함 약정병가 역일기준 소정근로일 주휴수당 무급병가 임금근로시간과-2972 근로개선정책과-3833 근로기준법 제55조',
+      pattern: /병가[\s\S]{0,40}(?:규정|주말|휴일|공휴일|토요일|일요일|포함|산정|주휴|유급|무급)|(?:주말|공휴일)[\s\S]{0,30}병가/,
+      coreLaws: ['근로기준법 제55조', '근로기준법 제93조'],
+      conclusion: '업무 외 질병 병가는 근로기준법상 법정휴가가 아닌 약정휴가이므로 주말·공휴일 산입 여부는 취업규칙·단체협약에 따릅니다(임금근로시간과-2972). 규정에 「연속 ○일·역일 기준」으로 정했다면 주말이 포함되고 「근로일 기준」이면 제외되며, 1주 전체를 병가로 쉰 주에 포함된 주휴일은 별도 유급 특약이 없는 한 무급 처리할 수 있습니다(근로개선정책과-3833).',
+      checklist: [
+        '취업규칙·인사규정상 병가 조항이 「기간(역일·연속일) 기준」인지 「소정근로일(근무일) 기준」인지 문언 확인',
+        '규정이 불명확한 경우 기존 분할 사용 시 주말 차감 관행 및 유·무급 지급 내역 확인',
+        '향후 분쟁 방지를 위해 취업규칙에 휴일 포함 여부 및 병가 기간 중 주휴수당 지급 기준 명문화'
+      ]
+    },
+    {
+      id: 'annual_leave_promo',
+      title: '연차유급휴가 발생·사용 기준(1년 미만 11일·80% 출근율) 및 연차사용촉진 적법성 검토',
+      canonicalQuery: '연차유급휴가 사용 기준 연차사용촉진',
+      boostQuery: '연차유급휴가 연차사용기준 연차사용촉진 노무수령거부 미사용수당 80퍼센트 출근율 근로기준법 제60조 제61조 2019다279283 2021다227100 임금근로시간과-2271',
+      pattern: /연차[\s\S]{0,36}(?:사용\s*기준|발생\s*기준|사용\s*촉진|미사용|노무\s*수령|소멸|정산|11일|15일|기준\s*확인)/,
+      coreLaws: ['근로기준법 제60조', '근로기준법 제61조'],
+      conclusion: '계속근로 1년 미만 기간에는 1개월 개근 시 1일(최대 11일), 1년간 80% 이상 출근 시 15일의 연차유급휴가가 발생하며 퇴직 등으로 근로관계가 종료되면 사용 가능 일수와 무관하게 전액 미사용수당을 정산해야 합니다(2021다227100, 임금근로시간과-2271). 또한 연차사용촉진(제61조) 후에도 지정 휴가일에 출근한 근로자의 노무를 묵인·수령했다면 수당 지급의무가 면제되지 않습니다(2019다279283).',
+      checklist: [
+        '입사일 기준 vs 회계연도 기준 연차 산정 방식 및 퇴사 시 입사일 기준 유불리 재정산 여부 확인',
+        '근로기준법 제61조에 따른 1차(사용시기 지정 촉구)·2차(시기 지정 통보) 기한별 개별 서면 통지 증빙 확인',
+        '지정 휴가일 출근 시 명확한 노무수령 거부 통지(반려·귀가 지시 기록) 이행 여부 점검'
+      ]
+    },
+    {
+      id: 'severance_interim_rehire',
+      title: '퇴직금 중간정산·DB형 중도인출 제한 및 퇴사 후 재입사 계속근로기간 통산 검토',
+      canonicalQuery: '퇴직금 중간정산 재입사 DB형 계속근로',
+      boostQuery: '퇴직금중간정산 DB형중간정산 확정급여형 DC형전환 재입사 계속근로기간 분할약정 근로자퇴직급여보장법 제8조 시행령 제3조 퇴직연금복지과-4257 95다29932 2010다47117',
+      pattern: /(?:db\s*형|확정급여형)[\s\S]{0,24}(?:중간\s*정산|중도\s*인출)|중간\s*정산[\s\S]{0,30}(?:재입사|db\s*형|가능|사유|무효)|퇴직금[\s\S]{0,30}(?:중간\s*정산|재입사|분할\s*약정)/i,
+      coreLaws: ['근로자퇴직급여 보장법 제8조 제2항', '근로자퇴직급여 보장법 시행령 제3조', '근로자퇴직급여 보장법 제22조'],
+      conclusion: '확정급여형(DB형) 퇴직연금은 제도상 중간정산(중도인출)이 불가하며(법정 사유 충족 시 적립금 담보대출 또는 규약 변경을 통한 DC형 전환 후 중도인출만 가능), 일반 퇴직금 역시 시행령 제3조의 법정 사유 없는 임의 중간정산·분할약정은 무효입니다(2010다47117). 또한 퇴직금 정산을 위해 형식적 사직·재입사 절차를 거친 경우 근로관계가 단절되지 않아 최초 입사일부터 계속근로기간을 통산합니다(95다29932, 퇴직연금복지과-4257).',
+      checklist: [
+        '사업장 퇴직급여 제도 유형(퇴직금 / DB형 / DC형) 및 시행령 제3조 법정 중간정산·중도인출 사유 증빙 확인',
+        '퇴사 후 재입사의 경우 사직의 진의성, 공백기간 유무, 신규 공개채용 전형 거침 여부, 업무 동일성 대조',
+        '무효인 중간정산·분할약정 기지급액의 부당이득 상계(퇴직금 채권 1/2 초과 부분에 한함) 범위 산정'
+      ]
+    },
+    {
+      id: 'osh_education_exemption',
+      title: '사회복지법인 · 사무직 사업장 산업안전보건교육 의무 면제(시행령 별표 1) 및 현업·특별교육 예외 검토',
+      canonicalQuery: '사회복지법인 사무직 산업안전보건교육 별표1',
+      boostQuery: '산업안전보건교육 산업안전교육 안전보건교육 사회복지법인 사회복지시설 사무직 별표1 현업업무종사자 특별안전보건교육 산업안전보건법 제29조 시행령 제2조 산업안전보건법시행령-별표1해석',
+      pattern: /(?:산업\s*안전\s*(?:보건\s*)?교육|안전\s*보건\s*교육)|(?:사회복지|사무직)[\s\S]{0,30}안전[\s\S]{0,16}교육/,
+      coreLaws: ['산업안전보건법 제29조', '산업안전보건법 시행령 제2조 제1항 별표 1'],
+      conclusion: '산업안전보건법 시행령 [별표 1]에 따라 「사회복지 서비스업」(제2호 자목) 및 「사무직에 종사하는 근로자만을 사용하는 사업장」(제5호)은 정기·채용 시 안전보건교육(법 제29조 제1항·제2항)이 원칙적으로 면제됩니다. 다만 ① 시설 내 조리·청소·시설관리·경비 등 현업업무 종사자가 있거나, ② 일반 업종에서 현장직과 사무직이 같은 사업장에 함께 근무하거나, ③ 유해·위험작업(법 제29조 제3항 특별교육) 수행 시에는 교육 의무가 부과됩니다.',
+      checklist: [
+        '사업자등록·산재보험 업종코드 기준 한국표준산업분류(사회복지 서비스업 등 별표 1 면제 업종) 일치 여부 확인',
+        '독립된 사무직 전용 사업장인지, 동일 장소·조직 내 조리·시설관리·청소·운전 등 현업근로자 혼재 여부 점검',
+        '유해·위험작업 투입 시 제29조 제3항 특별안전보건교육 실시 및 법정의무교육 오인 사설 영업 주의'
+      ]
+    },
+    {
+      id: 'disability_benefit_cure',
+      title: '산재 장해급여 신청 시점(치유·증상고정)과 요양 종료 시 「6개월 기준」 검토',
+      canonicalQuery: '장해급여 신청 시점 6개월 기준 증상고정',
+      boostQuery: '장해급여 장해급여신청시점 6개월기준 증상고정 치유 장해등급 소멸시효 산업재해보상보험법 제57조 시행규칙 제46조 산재보상정책과-장해급여판정지침 2004두14977',
+      pattern: /장해\s*급여[\s\S]{0,40}(?:시점|신청|6\s*개월|증상\s*고정|치유|판정|청구)|(?:증상\s*고정|6\s*개월\s*기준)[\s\S]{0,30}장해/,
+      coreLaws: ['산업재해보상보험법 제57조', '산업재해보상보험법 시행규칙 제46조 제10항', '산업재해보상보험법 제112조'],
+      conclusion: '장해급여는 상병이 치유(증상고정)된 날 이후 청구하며(대법원 2004두14977), 산재보험법 시행규칙 제46조 제10항에 따라 요양 종료 시 증상이 미고정인 경우 ① 6개월 이내 증상고정이 예상되면 고정된 때 판정하고 ② 6개월 이내 고정이 어려우면 요양 종료 시점에 장차 고정될 증상을 기준으로 판정합니다(관절·척추 수술 후 운동제한은 통상 수술 후 6개월 경과 시점 고정 상태 확인).',
+      checklist: [
+        '주치의 소견상 치료 종결 및 의학적 증상고정(치유) 도달 여부(추가 적극적 치료 시 재요양 대상 구분)',
+        '수술(관절경·유합술·내고정술) 후 6개월 경과 시점 AMA식 관절운동범위(ROM) 측정치 및 장해진단서 확보',
+        '치유일 다음 날부터 5년 장해급여 청구권 소멸시효(제112조) 기산점 점검'
+      ]
+    },
+    {
+      id: 'union_withdrawal_dues',
+      title: '노동조합 탈퇴 효력 발생 시점 · 체크오프 중지 및 가입비·조합비 환불 여부 검토',
+      canonicalQuery: '노동조합 탈퇴 가입비 환불 체크오프',
+      boostQuery: '노동조합탈퇴 노조탈퇴 가입비환불 조합비환불 체크오프 조합비공제중지 노동조합및노동관계조정법 제5조 노사관계법제과-1745 96다28899',
+      pattern: /(?:노조|노동조합)[\s\S]{0,40}(?:탈퇴|가입비|조합비|체크\s*오프|일괄\s*공제|환불|반환)|가입비[\s\S]{0,24}(?:환불|반환)/,
+      coreLaws: ['노동조합 및 노동관계조정법 제5조', '근로기준법 제43조'],
+      conclusion: '근로자는 자유롭게 노조를 탈퇴할 수 있어 탈퇴 의사표시가 노조에 도달하면 노조 승인 없이 즉시 탈퇴 효력이 발생하며(96다28899), 회사에 조합비 일괄공제 중지를 요청하면 사용자는 공제를 중단해야 합니다. 다만 탈퇴 전에 규약에 따라 적법하게 납부한 가입비·기납부 조합비는 규약에 별도 환급 조항이 없는 한 환불 청구할 수 없으나, 탈퇴 효력 발생 후 부당 공제된 조합비는 반환 청구할 수 있습니다(노사관계법제과-1745).',
+      checklist: [
+        '탈퇴서 제출·도달 일시 입증자료(내용증명·이메일·수신확인 캡처) 및 회사 인사팀 공제중지 요청서 발송 확인',
+        '노동조합 규약·회계규정상 탈퇴 시 가입비·회비 환급 특칙 존재 여부 확인',
+        '탈퇴 도달일 이후 급여에서 공제된 조합비 내역 유무(임금 전액불 위반 및 부당이득 반환 대상) 확인'
+      ]
+    },
+    {
+      id: 'under5_hiring_ad',
+      title: '상시 5인 미만 사업장 채용공고 제한 기준 (성별·용모·연령 차별 금지 전 사업장 적용)',
+      canonicalQuery: '5인미만 사업장 채용공고 제한 성차별 연령차별',
+      boostQuery: '5인미만 채용공고 채용공고제한 성차별 연령차별 용모단정 혼인조건 남녀고용평등법 제7조 고령자고용법 제4조의4 채용절차법 여성고용정책과-채용공고차별지침',
+      pattern: /(?:5인\s*미만|5명\s*미만|소규모\s*사업장)?[\s\S]{0,20}채용\s*공고[\s\S]{0,24}(?:제한|위반|금지|차별|과태료|벌금|성별|연령|나이)|(?:5인\s*미만|5명\s*미만)[\s\S]{0,24}(?:채용\s*공고|구인\s*공고|모집\s*공고)/,
+      coreLaws: ['남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제7조', '고용상 연령차별금지 및 고령자고용촉진에 관한 법률 제4조의4', '채용절차의 공정화에 관한 법률 제3조'],
+      conclusion: '상시 5인 미만 사업장은 채용절차법(상시 30인 이상 적용)상 출신지역·재산 등 기초심사자료 요구 과태료 대상에서는 제외되나, 남녀고용평등법 제7조(성별 제한·우대, 직무 무관 용모·키·미혼 조건 제시 금지)와 고령자고용법 제4조의4(합리적 이유 없는 연령 제한 금지)는 1인 이상 전 사업장(5인 미만 포함)에 적용되어 위반 시 500만 원 이하 벌금 대상입니다(여성고용정책과-채용공고차별지침).',
+      checklist: [
+        '채용공고문 내 「남/여 구분 모집·우대」, 「용모 단정·신장 조건」, 「미혼 우대」 문구 즉시 삭제(남녀고용평등법 제7조)',
+        '「20~30대 우대」, 「○○세 이하」 등 연령 제한 문구 삭제 및 직무수행 자격·역량 중심 기술(고령자고용법 제4조의4)',
+        '상시 30인 이상 성장 시 채용절차법(채용서류 반환·가족 학력/재산 요구 금지·거짓 채용광고 금지) 추가 준수'
       ]
     },
     {
@@ -1824,13 +2183,13 @@
       id: 'under5_workplace',
       title: '상시 5인 미만 사업장 산정 기준 및 적용·제외 법규 구분 검토',
       canonicalQuery: '상시 5인 미만 사업장 산정 해고예고 퇴직금',
-      boostQuery: '5인미만 상시근로자수 산정 해고예고수당 퇴직금 주휴수당 근로기준법 제11조 시행령 제7조의2 2022두58959',
-      pattern: /(?:5인\s*미만|5명\s*미만|4인\s*사업장|3인\s*사업장|상시\s*근로자\s*수|직원[이\s]*[1234]명)/,
+      boostQuery: '5인미만 상시근로자 상시근로자수 산정 해고예고수당 퇴직금 주휴수당 하나의사업장 근로기준법 제11조 시행령 제7조의2 2023두57876',
+      pattern: /(?:4인\s*사업장|3인\s*사업장|상시\s*근로자(?:\s*수|\s*판단)?|직원[이\s]*[1234]명|(?:5인\s*미만|5명\s*미만)(?![\s\S]{0,16}(?:채용\s*공고|구인\s*공고|모집\s*공고)(?![\s\S]{0,20}(?:해고|퇴직|수당|연차))))/,
       coreLaws: ['근로기준법 제11조', '근로기준법 시행령 제7조의2', '근로기준법 제26조'],
       conclusion: '상시 5인 미만 사업장은 부당해고 구제신청(제23조·제28조), 연장·야간·휴일 가산수당(제56조), 연차유급휴가(제60조)가 제외되지만, 30일 전 해고예고수당(제26조), 퇴직금, 주휴수당, 최저임금, 출산·육아휴직, 산재보험은 동일하게 적용됩니다. 알바·일용직을 포함한 사유발생 전 1개월 연인원÷가동일수로 5인 이상 여부를 먼저 재검산해야 합니다.',
       checklist: [
         '사유 발생 전 1개월간 단시간(알바)·일용직·외국인 포함 일별 출근 인원표로 상시 5인 이상 해당 여부 검증',
-        '실질적으로 하나의 사업장임에도 법인·사업자등록만 쪼갠(쪼개기 사업장) 경우 합산 판단(2022두58959)',
+        '실질적으로 인사·노무·재무가 통합된 하나의 사업장임에도 법인·사업자등록만 분리한 경우 합산 판단(2023두57876)',
         '5인 미만 확정 시에도 해고예고수당·퇴직금·주휴수당·최저임금 미지급분 청구 가능 여부 확인'
       ]
     },
@@ -1839,7 +2198,7 @@
       title: '육아휴직 복귀 후 불리한 처우 금지 · 전보 인사명령 정당성 검토',
       canonicalQuery: '육아휴직 불리한 처우 부당전보 복귀',
       boostQuery: '육아휴직 불리한처우 동등업무복귀 부당전보 생활상불이익 남녀고용평등 근로기준법 제19조 94다52928',
-      pattern: /(?:육아휴직|출산휴가|복직|전보|발령|인사명령|원거리\s*발령|보직\s*해임)/,
+      pattern: /(?:육아휴직|출산휴가|복직|(?:^|[^가-힣]|부당\s*|일방적?\s*)전보(?:명령|발령|처분|인사|조치|는|가|를|에|로|의|와|과|도|\s|$|[^가-힣])|(?:인사|전보|대기|원거리|지방|타부서)\s*발령|인사명령|보직\s*해임)/,
       coreLaws: ['남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제19조', '근로기준법 제23조'],
       conclusion: '육아휴직 종료 후에는 휴직 전과 같은 업무 또는 같은 수준의 임금을 지급하는 직무에 복귀시켜야 하며 실질적 한직 발령·임금 삭감은 위법합니다. 일반 전보명령 역시 업무상 필요성과 근로자의 생활상 불이익(통근·보육 등), 사전 성실 협의 여부를 비교·교량해 권리남용 여부를 판단합니다.',
       checklist: [
@@ -1890,7 +2249,11 @@
       '손해배상', '위약예정', '손해배상예정', '전차금', '강제근로', '경업금지', '전직금지', '영업비밀',
       '개인정보', '영상정보처리기기', '노사협의회', '채용절차',
       '실업급여', '구직급여', '고용유지지원금', '고용보험', '국민연금', '건강보험', '산재보험',
-      '소멸시효', '제척기간', '부당이득', '신의칙', '통상근로자', '감시단속적근로', '휴게시간', '유급휴일', '공휴일'
+      '소멸시효', '제척기간', '부당이득', '신의칙', '통상근로자', '감시단속적근로', '휴게시간', '유급휴일', '공휴일',
+      '병가', '약정병가', '휴일대체', '연차사용촉진', '노무수령거부', '재입사', '계속근로기간',
+      '산업안전보건교육', '산업안전교육', '안전보건교육', '사무직', '사회복지법인', '사회복지시설', '별표1',
+      '증상고정', '치유', '일부불승인', '추가상병', '채용공고', '연령차별', '성차별',
+      '가입비', '조합비', '체크오프', '환불', '의무재직기간', '교육비반환', '임금피크제'
     ]);
     Object.keys(SYNONYM_MAP).forEach(function (k) {
       var kk = String(k || '').trim();
@@ -1911,8 +2274,8 @@
     return set;
   })();
 
-  var OFFICIAL_CASE_TOKEN_RE = /^(?:(?:19|20)\d{2}|9\d)(?:다|두|도|누|구합|구단|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결|재심사)\d{1,8}$/;
-  var OFFICIAL_INTERP_TOKEN_RE = /^[가-힣]{2,14}(?:과|팀|부|실|위원회|고시|재심사)-\d{1,8}$/;
+  var OFFICIAL_CASE_TOKEN_RE = /^(?:(?:19|20)\d{2}|[789]\d)(?:다카|다|두|도|누|구합|구단|구|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결|재심사)\d{1,8}$/;
+  var OFFICIAL_INTERP_TOKEN_RE = /^(?:(?:임금근로시간|근로기준|근로기준정책|근로개선정책|노사관계법제|퇴직연금복지|고용지원실업급여|여성고용정책|고용차별개선|산재보상정책|산업안전보건|산업안전기준|산재예방정책|공무원노사관계|고용정책|노사협력정책|중대산업재해감독|직업건강정책|외국인력담당|법제처법령해석)[가-힣]{0,6}(?:과|팀|부|실|담당관)?-\d{1,8}|(?:고용노동부고시|산재재심사|중앙노동위원회|법제처)-\d{1,8}|(?:근기|임금|노조|산재|산안|고평|고보|근정|근지|노정|퇴직|징수|산보)\d{3,6}-\d{1,6})$/;
 
   /* 자동 외부 공공 API 조회용 화이트리스트 검색어 추출기:
    * - 역할어 없는 실명('김가람 해고')·법인/업체명('주식회사 가상기업 부당해고') 등 비법률 고유명사는 절대 외부 전송하지 않음
@@ -1922,10 +2285,12 @@
     if (!raw || hasResidualHardPiiClient(raw)) return '';
 
     var partyNames = extractPartyNames(raw, '');
-    var scrubbed = anonymizeLegalText(raw, partyNames).text;
+    var scrubbed = compactLegacyDocNos(anonymizeLegalText(raw, partyNames).text);
     var smartJump = resolveSmartLawJump(scrubbed, lawIndex || []);
     if (smartJump && smartJump.title) {
-      return (smartJump.title + (smartJump.articleNo ? (' ' + smartJump.articleNo) : '')).slice(0, 36).trim();
+      var jumpLaw = smartJump.displayLaw || smartJump.title;
+      var jumpArt = smartJump.articleNo ? (' ' + String(smartJump.articleNo).replace(/[\[\]]/g, '')) : '';
+      return (jumpLaw + jumpArt).slice(0, 36).trim();
     }
 
     var matchedIssues = detectFactIssues(scrubbed);
@@ -2328,6 +2693,26 @@
       basis: '근로기준법 제94조 제1항 단서 · 대법원 2018다200709 전원합의체 판결',
       issue: '근로조건을 근로자에게 불리하게 변경하는 취업규칙 개정은 근로자 과반수(또는 과반수 노조)의 집단적 동의를 받지 않으면 원칙적으로 무효입니다.',
       suggestion: '법령 개정 반영이나 유리한 변경은 의견청취로, 근로조건 불이익 변경 시에는 근로기준법 제94조 제1항 단서에 따른 과반수 집단적 동의 절차를 거친다는 문구로 수정합니다.'
+    },
+    {
+      id: 'non_compete_overbroad',
+      severity: 'warn',
+      badge: '주의 · 직업선택 자유',
+      title: '과도한 퇴직 후 경업금지·전직금지 기간 및 무대가 약정 리스크',
+      pattern: /(?:퇴직\s*후|퇴사\s*후)[\s\S]{0,60}(?:경쟁\s*업체|동종\s*업계|경업\s*금지|전직\s*금지|취업을?\s*금지)/,
+      basis: '헌법 제15조 · 민법 제103조 · 대법원 2009다82244 판결',
+      issue: '보호할 가치 있는 영업비밀이 특정되지 않거나 대가(보상금) 없이 장기간(예: 2년 이상) 동종업계 전직을 포괄 금지하는 약정은 민법 제103조 위반으로 무효가 될 가능성이 높습니다.',
+      suggestion: '핵심 기술·영업비밀 접근 직무에 한정하고, 금지 기간을 합리적 범위(통상 6개월~1년 이내)로 축소하며 별도의 경업금지 보상금 지급 기준을 명시합니다.'
+    },
+    {
+      id: 'hiring_ad_discrim',
+      severity: 'high',
+      badge: '고위험 · 채용차별 벌칙',
+      title: '모집·채용공고 내 성별·용모·혼인·연령 제한 문구 위반 위험',
+      pattern: /(?:남성\s*(?:사원|직원)\s*(?:모집|우대)|여(?:성\s*)?직원\s*(?:모집|우대)|용모\s*단정|미혼\s*(?:우대|한정)|(?:\d{2}\s*세\s*(?:이하|미만)|[23]0\s*대)\s*(?:모집|우대|지원\s*가능))/,
+      basis: '남녀고용평등법 제7조 · 고령자고용법 제4조의4 (1인 이상 전 사업장 적용 · 500만 원 이하 벌금)',
+      issue: '상시 5인 미만 사업장을 포함한 모든 사업장에서 합리적 이유 없이 성별·신체조건(용모·키)·미혼 조건이나 연령 제한을 모집·채용공고에 제시하면 형사처벌 대상이 됩니다.',
+      suggestion: '성별·연령·용모·혼인 관련 조건을 전량 삭제하고 수행할 직무 내용과 객관적 직무 역량·자격요건 중심으로 공고문을 수정합니다.'
     }
   ];
 
@@ -2698,8 +3083,8 @@
     var items = [];
     var seen = new Set();
 
-    /* ① 판례·재결 사건번호 검출 (단자리 일련번호 2025다1 포함 · 날짜/단위 숫자 오탐 제외) */
-    var caseRe = /(?:^|[^\d])((?:19|20)\d{2}\s*(?:다|두|도|누|구합|구단|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결)\s*\d{1,8}|(?:19|20)\d{2}[가-힣]{1,3}\d{2,8}|9\d[가-힣]{1,3}\d{1,8})(?![\d])/g;
+    /* ① 판례·재결 사건번호 검출 (단자리 일련번호 2025다1 · 70~90년대 96다29892 포함 · 날짜/단위 숫자 오탐 제외) */
+    var caseRe = /(?:^|[^\d])((?:19|20)\d{2}\s*(?:다카|다|두|도|누|구합|구단|구|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결)\s*\d{1,8}|(?:19|20)\d{2}[가-힣]{1,3}\d{2,8}|[789]\d\s*(?:다카|다|두|도|누|구합|구단|구|가합|가단|가소|나|마|즈기|카합|카단|헌마|헌바|헌가|헌나|헌라|행심|부해|부노|차별|산재|재결)\s*\d{1,8})(?![\d])/g;
     var cm;
     while ((cm = caseRe.exec(text))) {
       var rawCase = cm[1].replace(/\s+/g, '');
@@ -2723,14 +3108,23 @@
       });
     }
 
-    /* ② 행정해석·고시·재심사·판정기준 문서번호 검출 (예: 임금근로시간과-2271, 산재보상정책과-출퇴근재해지침, 중노위 판정기준-수습본채용거부) */
-    var interpRe = /([가-힣]{1,14}(?:\s*판정기준|과|팀|부|실|위원회|위|고시|재심사)-[0-9가-힣]{1,18})/g;
+    /* ② 행정해석·고시·재심사·판정기준·구 회시 문서번호 검출 (예: 임금근로시간과-2271, 근기 68207-806, 산업안전보건법시행령-별표1해석) */
+    var interpRe = /([가-힣]{1,18}(?:\s*판정기준|과|팀|부|실|위원회|위|고시|재심사|시행령|시행규칙)-[0-9가-힣]{1,18}|(?:근기|임금|노조|산재|산안|고평|고보|근정|근지|노정|퇴직|징수|산보)\s*\d{3,6}-\d{1,6})/g;
     var im;
     while ((im = interpRe.exec(text))) {
-      var rawDocNo = im[1];
-      if (seen.has('interp:' + rawDocNo)) continue;
-      seen.add('interp:' + rawDocNo);
-      var hitInterp = docMap.get(normalizeCaseNo(rawDocNo));
+      var rawDocNo = im[1].trim();
+      var dedupInterpKey = normalizeCaseNo(rawDocNo);
+      var hitInterp = docMap.get(dedupInterpKey);
+      if (!hitInterp && /[가-힣]$/.test(rawDocNo)) {
+        var strippedInterp = rawDocNo.replace(/(?:으로부터|로부터|에서는|에게는|으로서|으로써|에서|으로|로써|로서|부터|까지|이나|거나|은|는|이|가|을|를|의|도|만|와|과|로|에)$/, '');
+        if (strippedInterp && strippedInterp !== rawDocNo && strippedInterp.indexOf('-') > 0 && !/-$/.test(strippedInterp)) {
+          rawDocNo = strippedInterp;
+          dedupInterpKey = normalizeCaseNo(strippedInterp);
+          hitInterp = docMap.get(dedupInterpKey);
+        }
+      }
+      if (seen.has('interp:' + dedupInterpKey)) continue;
+      seen.add('interp:' + dedupInterpKey);
       items.push({
         raw: rawDocNo,
         kind: 'interp',
@@ -2865,6 +3259,7 @@
     extractChosung: extractChosung,
     isChosungOnly: isChosungOnly,
     resolveSmartLawJump: resolveSmartLawJump,
+    formatLawAttachmentLabel: formatLawAttachmentLabel,
     parseSmartQueryOperators: parseSmartQueryOperators,
     extractHighlightTerms: extractHighlightTerms,
     tokenizeQuery: tokenizeQuery,

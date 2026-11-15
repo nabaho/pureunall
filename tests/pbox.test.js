@@ -2922,3 +2922,227 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
   dispatchClick({ 'data-act': 'close-reader' });
   assert.equal(elementsById.pboxWsGrid.classList.contains('reader-open'), false, '원문 리더를 닫으면 워크스페이스 2단 분할 그리드가 복원되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ⑬ 엘박스·중앙경제(이레이버) 실무 검색 정밀도(IDF·앵커 게이트·구 회시번호·별표 검색) 및 보안 호스트 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('⑬ 엘박스·이레이버 실무 질의 정밀도 · 구 회시번호(근기 68207-806) · 시행령 별표 검색 · Supabase 호스트 화이트리스트 검증', async () => {
+  const lawIndex = loadLawIndex().list();
+  const docs = Corpus.SEED_DOCS;
+
+  /* 1) 코퍼스 무결성 및 미검증 번호 완전 배제 확인 */
+  assert.ok(docs.length >= 58, '검증된 실무 판례·행정해석·결정례 코퍼스가 58건 이상 수록되어야 합니다');
+  const idSet = new Set(docs.map((d) => d.id));
+  const caseNoSet = new Set(docs.map((d) => d.caseNo));
+  assert.equal(idSet.size, docs.length, '모든 SEED_DOCS id 가 유일해야 합니다');
+  assert.equal(caseNoSet.size, docs.length, '모든 SEED_DOCS 사건·회시번호가 유일해야 합니다');
+  const serializedCorpus = JSON.stringify(docs);
+  assert.ok(!serializedCorpus.includes('2022두58959'), '미검증 사건번호가 코퍼스에 남아 있으면 안 됩니다');
+
+  /* 2) 실무 벤치마크 질의 정밀도 & 오탐(False Positive) 차단 검증 */
+  const qDisk = Engine.searchUnifiedAllInOne('허리디스크 산재 유사 판례 사례', { docs, loadedLaws: [], lawIndex });
+  assert.deepEqual(qDisk.matchedIssues.map((m) => m.id), ['musculoskeletal_sanjae'], '허리디스크 산재 질의 시 근골격계 규칙만 단독 포섭되어야 합니다');
+  assert.ok(qDisk.docs.slice(0, 3).some((d) => d.caseNo === '2010두17052' || d.caseNo === '2009구단4596'), '허리디스크 산재 질의 시 추간판탈출증 핵심 판례가 최상위에 조회되어야 합니다');
+  assert.ok(!qDisk.docs.slice(0, 3).some((d) => d.caseNo === '2020두39297' || d.caseNo === '2015두8848'), '허리디스크 질의에 뇌출혈·자살 산재 판례가 잘못 부스팅되면 안 됩니다');
+
+  const qHearing = Engine.searchUnifiedAllInOne('난청 산재 신청 참고 판례 요약', { docs, loadedLaws: [], lawIndex });
+  assert.deepEqual(qHearing.matchedIssues.map((m) => m.id), ['hearing_loss_sanjae']);
+  assert.ok(qHearing.docs.slice(0, 3).some((d) => d.caseNo === '2017두59949'), '난청 산재 질의 시 대법원 2017두59949 판결이 최상위에 나와야 합니다');
+
+  const qUnion = Engine.searchUnifiedAllInOne('노조 탈퇴 시 가입비 환불 여부', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qUnion.docs.some((d) => d.caseNo === '노사관계법제과-1745') && qUnion.docs.some((d) => d.caseNo === '96다28899'), '노조 탈퇴·가입비 환불 질의 시 노사관계법제과-1745 및 96다28899가 조회되어야 합니다');
+
+  /* '안전보건교육' 내부 부분문자열 '전보'로 인해 육아휴직/부당전보 규칙이 오탐 발화하지 않는지 회귀 검증 */
+  const qOsh = Engine.searchUnifiedAllInOne('사회복지법인 사무직 산업안전보건교육 의무', { docs, loadedLaws: [], lawIndex });
+  assert.deepEqual(qOsh.matchedIssues.map((m) => m.id), ['osh_education_exemption'], '안전보건교육 안의 글자(전보) 때문에 부당전보 규칙이 오탐되면 안 됩니다');
+  assert.equal(qOsh.docs[0].caseNo, '산업안전보건법시행령-별표1해석', '사회복지법인 사무직 안전보건교육 질의 시 별표 1 유권해석이 1순위로 조회되어야 합니다');
+
+  /* 일반 전보 인사명령 문장은 정상적으로 부당전보 규칙이 포착되어야 함 */
+  const qTransfer = Engine.detectFactIssues('회사가 사전 협의도 없이 원거리 지방 공장으로 일방적 전보를 발령했습니다');
+  assert.ok(qTransfer.some((r) => r.id === 'parental_leave_transfer'), '실제 전보 발령 사실관계는 정상 포착되어야 합니다');
+
+  /* Tier-0 메타 단어('규정', '포함', '여부')만으로 무관한 판례(예: 임금피크제 96다29892)가 섞이지 않아야 함 */
+  const qSick = Engine.searchCorpus('병가 규정 주말 포함 여부', { docs, loadedLaws: [], lawIndex });
+  assert.equal(qSick.docs[0].caseNo, '임금근로시간과-2972', '병가 주말 포함 질의 시 임금근로시간과-2972 행정해석이 1순위로 조회되어야 합니다');
+  assert.ok(qSick.docs.some((d) => d.caseNo === '근로개선정책과-3833'), '병가 주휴수당 행정해석(근로개선정책과-3833)도 함께 조회되어야 합니다');
+  assert.ok(!qSick.docs.some((d) => d.caseNo === '96다29892'), '메타 단어(규정·여부) 일치를 이유로 무관한 취업규칙 판례(96다29892)가 섞이면 안 됩니다');
+
+  const qGorani = Engine.searchUnifiedAllInOne('퇴근길 고라니 사고 인정 여부', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qGorani.docs.slice(0, 3).some((d) => d.caseNo === '2014헌바254' || d.caseNo === '산재보상정책과-출퇴근재해지침'), '퇴근길 고라니 사고 질의 시 출퇴근재해 법리가 즉시 매칭되어야 합니다');
+
+  const qDisab = Engine.searchUnifiedAllInOne('장해급여 신청 시점과 6개월 기준', { docs, loadedLaws: [], lawIndex });
+  assert.equal(qDisab.docs[0].caseNo, '산재보상정책과-장해급여판정지침');
+  assert.ok(qDisab.docs.some((d) => d.caseNo === '2004두14977'));
+
+  const qAnnual = Engine.searchUnifiedAllInOne('연차 사용 기준 확인', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qAnnual.docs.slice(0, 3).some((d) => d.caseNo === '2019다279283') && qAnnual.docs.slice(0, 3).some((d) => d.caseNo === '임금근로시간과-2271'));
+
+  const qDb = Engine.searchUnifiedAllInOne('db형 중간정산', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qDb.docs.slice(0, 3).some((d) => d.caseNo === '퇴직연금정책과-중간정산해석'));
+
+  const qRehire = Engine.searchUnifiedAllInOne('퇴직금 중간정산 재입사 가능성', { docs, loadedLaws: [], lawIndex });
+  assert.equal(qRehire.docs[0].caseNo, '퇴직연금복지과-4257');
+  assert.ok(qRehire.docs.some((d) => d.caseNo === '95다29932'));
+
+  const qAd = Engine.searchUnifiedAllInOne('5인미만 사업장 채용공고 제한', { docs, loadedLaws: [], lawIndex });
+  assert.deepEqual(qAd.matchedIssues.map((m) => m.id), ['under5_hiring_ad']);
+  assert.equal(qAd.docs[0].caseNo, '여성고용정책과-채용공고차별지침');
+
+  const qUnder5 = Engine.searchUnifiedAllInOne('상시근로자 판단 판례 요약', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qUnder5.docs.slice(0, 3).some((d) => d.caseNo === '2023두57876'));
+
+  const qPartial = Engine.searchUnifiedAllInOne('최초요양 상병 일부 불승인 처분 취소 청구', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qPartial.docs.slice(0, 3).some((d) => d.caseNo === '2009두6919') && qPartial.docs.slice(0, 3).some((d) => d.caseNo === '2009구단4596'));
+
+  /* 3) 90년대 사건번호(96다29892) 및 띄어쓰기 구 회시번호('근기 68207-806') 정확 검색·인용검증·안전쿼리 추출 */
+  const q96 = Engine.searchCorpus('96다29892', { docs, loadedLaws: [], lawIndex });
+  assert.equal(q96.docs.length, 1);
+  assert.equal(q96.docs[0].caseNo, '96다29892');
+
+  const qLegacySpaced = Engine.searchCorpus('근기 68207-806', { docs, loadedLaws: [], lawIndex });
+  assert.equal(qLegacySpaced.docs.length, 1, '띄어쓰기된 근기 68207-806 검색 시 근기→근로기준법 약칭 오확장 없이 해당 회시 1건만 정확히 찾아야 합니다');
+  assert.equal(qLegacySpaced.docs[0].caseNo, '근기68207-806');
+
+  const vfLegacyAnd90s = Engine.verifyCitations(
+    '대법원 96다29892 판결 및 고용노동부 근기 68207-806 회시, 산업안전보건법시행령-별표1해석에 따릅니다.',
+    { docs, loadedLaws: [], lawIndex }
+  );
+  assert.equal(vfLegacyAnd90s.verifiedCount, 3, '90년대 대법원 사건번호·띄어쓴 구 회시번호·시행령 별표 해석번호가 모두 원문 검증되어야 합니다');
+  assert.equal(vfLegacyAnd90s.unverifiedCount, 0);
+
+  assert.equal(Engine.extractSafeLegalOfficialQuery('근기 68207-806', lawIndex), '근기68207-806');
+  const unsafeTeamCode = Engine.extractSafeLegalOfficialQuery('가상기업인사팀-101 징계', lawIndex);
+  assert.equal(unsafeTeamCode, '징계', '사기업 부서코드(가상기업인사팀-101)는 공식 회시번호로 오인되어 외부 전송되면 안 됩니다');
+
+  /* 4) 법령 시행령 [별표·서식] YAML 파싱 · 별표 조문 검색 · 스마트 별표 점프 · 원문 리더 렌더링 및 외부 링크 보안 검증 */
+  const sampleOshDecreeMd = [
+    '---',
+    '법령명: 산업안전보건법 시행령',
+    '시행일: 2026-01-01',
+    '공포번호: 35001',
+    '법종구분: 대통령령',
+    '첨부파일:',
+    '  - 별표번호: "0001"',
+    '    별표가지번호: "00"',
+    '    별표구분: 별표',
+    '    제목: 법의 일부를 적용하지 아니하는 사업 또는 사업장 및 적용 제외 법 규정(제2조제1항 관련)',
+    '    파일링크: https://www.law.go.kr/LSW/flDownload.do?flSeq=111',
+    '    PDF링크: javascript:alert(1)',
+    '---',
+    '제2조(적용범위) ① 법 제3조 단서에 따라 법의 일부를 적용하지 아니하는 사업 또는 사업장과 해당 사업 또는 사업장에 적용하지 아니하는 법 규정은 별표 1과 같다.'
+  ].join('\n');
+
+  const parsedDecree = Engine.parseLawMarkdown(sampleOshDecreeMd, {
+    dir: '산업안전보건법',
+    fileName: '시행령.md',
+    title: '산업안전보건법 시행령'
+  });
+  assert.equal(parsedDecree.attachments.length, 1, 'YAML 첨부파일(별표·서식) 메타데이터가 손실 없이 파싱되어야 합니다');
+  assert.equal(Engine.formatLawAttachmentLabel(parsedDecree.attachments[0]), '[별표 1]');
+
+  const annexSearch = Engine.searchCorpus('별표 1 적용 제외', {
+    docs: [],
+    loadedLaws: [parsedDecree],
+    lawIndex
+  });
+  assert.ok(annexSearch.articles.some((a) => a.articleNo === '[별표 1]'), '캐시된 시행령의 [별표 1] 제목도 조문·별표 검색 결과에 잡혀야 합니다');
+
+  const jumpAnnex = Engine.resolveSmartLawJump('산안법 시행령 별표1', lawIndex);
+  assert.ok(jumpAnnex && jumpAnnex.dir === '산업안전보건법' && jumpAnnex.fileName === '시행령.md' && jumpAnnex.articleNo === '[별표 1]', '산안법 시행령 별표1 입력 시 [별표 1]로 스마트 점프해야 합니다');
+
+  /* 5) Store Supabase 호스트 화이트리스트 및 리더 별표 비안전 링크 차단 검증 */
+  const elementsById = {};
+  const docListeners = {};
+  function makeSimpleEl(id) {
+    return {
+      id: id || '',
+      style: {},
+      value: '',
+      innerHTML: '',
+      textContent: '',
+      classList: { add() {}, remove() {}, contains() { return false; } },
+      setAttribute() {},
+      removeAttribute() {},
+      getAttribute() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      focus() {}
+    };
+  }
+  const rootEl = makeSimpleEl('pboxRoot');
+  elementsById.pboxRoot = rootEl;
+  elementsById.pboxReader = makeSimpleEl('pboxReader');
+  let fetchCount = 0;
+  const ctx = {
+    setTimeout: (fn) => { fn(); return 1; },
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    localStorage: {
+      _m: {},
+      getItem(k) { return Object.prototype.hasOwnProperty.call(this._m, k) ? this._m[k] : null; },
+      setItem(k, v) { this._m[k] = String(v); }
+    },
+    document: {
+      documentElement: makeSimpleEl('html'),
+      head: makeSimpleEl('head'),
+      body: makeSimpleEl('body'),
+      activeElement: null,
+      getElementById: (id) => elementsById[id] || (elementsById[id] = makeSimpleEl(id)),
+      createElement: (t) => makeSimpleEl(t),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+    },
+    fetch: async () => {
+      fetchCount++;
+      return { ok: true, status: 200, text: async () => sampleOshDecreeMd, json: async () => ({ ok: true, docs: [] }) };
+    },
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: ctx.document,
+    localStorage: ctx.localStorage,
+    open: () => ({ opener: null }),
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('user-sec-13');
+
+  /* 비공식 도메인으로 직원 JWT 가 유출되지 않도록 fetch 호출 전 차단 검증 */
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://attacker.example.com', supabaseStaffJwt: 'staff-jwt-token' }),
+    /공식 Supabase 호스트/
+  );
+  Store.saveConfig({ supabaseUrl: 'https://attacker.example.com', supabaseStaffJwt: 'staff-jwt-token' });
+  assert.equal(Store.getStateSummary().supabaseConnected, false, '비공식 도메인 URL은 Supabase 연결 상태로 인정되면 안 됩니다');
+  const skippedPull = await Store.pullFromSupabase();
+  assert.equal(skippedPull.skipped, true);
+  assert.equal(fetchCount, 0, '비공식 Supabase URL 설정 시 단 1건의 외부 fetch도 발생하면 안 됩니다');
+
+  /* 리더에서 시행령 [별표 1] 열람 시 별표 목록은 자동 펼침되고, javascript: 스킴 링크는 차단되며 https://www.law.go.kr 링크만 렌더링됨 */
+  App.mount(rootEl);
+  const openBtn = {
+    disabled: false,
+    getAttribute: (k) => ({ 'data-act': 'open-law', 'data-dir': '산업안전보건법', 'data-file': '시행령.md', 'data-art': '[별표 1]' }[k] || null),
+    closest: (sel) => (sel === '[data-act]' ? openBtn : null)
+  };
+  (docListeners.click || []).forEach((fn) => fn({ target: openBtn, stopPropagation: () => {}, preventDefault: () => {} }));
+  await new Promise((r) => setImmediate(r));
+
+  const readerHtml = elementsById.pboxReader.innerHTML;
+  assert.ok(readerHtml.includes('별표·서식 목록 (1건)') && readerHtml.includes('id="pboxArt_별표1"'), '원문 리더에 시행령 별표 목록과 [별표 1] 앵커가 렌더링되어야 합니다');
+  assert.ok(readerHtml.includes('https://www.law.go.kr/LSW/flDownload.do?flSeq=111'), '공식 law.go.kr 첨부 링크는 제공되어야 합니다');
+  assert.ok(!readerHtml.includes('javascript:alert'), '비허용 스킴이나 외부 도메인 링크는 원문 리더에 절대 렌더링되면 안 됩니다');
+});

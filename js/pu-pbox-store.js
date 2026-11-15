@@ -18,10 +18,11 @@
   var PBOX_API_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/pboxApi';
   var CFG_LS_KEY = 'pu_pbox_sync_cfg_v1';
 
-  /* 노무법인 실무 최우선 오프라인 보관 팩 (본법 + 주요 시행령) */
+  /* 노무법인 실무 최우선 오프라인 보관 팩 (본법 + 핵심 시행령·시행규칙·별표 25편) */
   var CORE_PACK_TARGETS = [
     { dir: '근로기준법', file: '법률(법률).md' },
     { dir: '근로기준법', file: '시행령.md' },
+    { dir: '근로기준법', file: '시행규칙.md' },
     { dir: '최저임금법', file: '법률.md' },
     { dir: '근로자퇴직급여보장법', file: '법률.md' },
     { dir: '근로자퇴직급여보장법', file: '시행령.md' },
@@ -29,18 +30,28 @@
     { dir: '기간제및단시간근로자보호등에관한법률', file: '법률.md' },
     { dir: '파견근로자보호등에관한법률', file: '법률.md' },
     { dir: '남녀고용평등과일ㆍ가정양립지원에관한법률', file: '법률.md' },
+    { dir: '남녀고용평등과일ㆍ가정양립지원에관한법률', file: '시행령.md' },
     { dir: '고용상연령차별금지및고령자고용촉진에관한법률', file: '법률.md' },
     { dir: '노동조합및노동관계조정법', file: '법률(법률).md' },
     { dir: '근로자참여및협력증진에관한법률', file: '법률(법률).md' },
     { dir: '노동위원회법', file: '법률(법률).md' },
     { dir: '산업재해보상보험법', file: '법률.md' },
     { dir: '산업재해보상보험법', file: '시행령.md' },
+    { dir: '산업재해보상보험법', file: '시행규칙.md' },
     { dir: '산업안전보건법', file: '법률.md' },
+    { dir: '산업안전보건법', file: '시행령.md' },
+    { dir: '산업안전보건법', file: '시행규칙.md' },
     { dir: '중대재해처벌등에관한법률', file: '법률.md' },
     { dir: '고용보험법', file: '법률.md' },
     { dir: '채용절차의공정화에관한법률', file: '법률.md' },
     { dir: '개인정보보호법', file: '법률.md' }
   ];
+
+  var SUPABASE_HOST_RE = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.(?:co|in)(?:\/|$)/i;
+
+  function isAllowedSupabaseUrl(rawUrl) {
+    return SUPABASE_HOST_RE.test(String(rawUrl || '').trim());
+  }
 
   var openHandles = new Map();
   var memByUid = new Map();       // IndexedDB 없는 환경에서도 UID별 개인 문서·작업공간 완전 격리 보장
@@ -350,7 +361,7 @@
 
   function hasSupabase() {
     var c = getConfig();
-    return !!(c.supabaseUrl && c.supabaseStaffJwt);
+    return !!(isAllowedSupabaseUrl(c.supabaseUrl) && c.supabaseStaffJwt);
   }
 
   function isDocTombstoned(doc) {
@@ -989,6 +1000,9 @@
     if (!/^https:\/\//i.test(cfg.supabaseUrl)) {
       return Promise.reject(new Error('보안을 위해 https:// 로 시작하는 Supabase URL만 허용됩니다.'));
     }
+    if (!isAllowedSupabaseUrl(cfg.supabaseUrl)) {
+      return Promise.reject(new Error('보안을 위해 공식 Supabase 호스트(*.supabase.co) URL만 허용됩니다.'));
+    }
     var url = cfg.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/pbox_documents?select=id&limit=1';
     return fetch(url, { headers: supaStaffHeaders(cfg) }).then(function (r) {
       if (!r.ok) throw new Error('수파베이스 인증·RLS 응답 오류 (HTTP ' + r.status + ')');
@@ -1055,7 +1069,7 @@
 
   function pullFromSupabase() {
     var cfg = getConfig();
-    if (!cfg.supabaseUrl || !cfg.supabaseStaffJwt || !/^https:\/\//i.test(cfg.supabaseUrl)) {
+    if (!cfg.supabaseUrl || !cfg.supabaseStaffJwt || !isAllowedSupabaseUrl(cfg.supabaseUrl)) {
       return Promise.resolve({ ok: true, added: 0, skipped: true });
     }
     var headers = supaStaffHeaders(cfg);
