@@ -79,6 +79,13 @@ const SITE_DOMAIN = 'pureunlabor.co.kr';
    ⚠ 2026-11-15 부터 홈페이지는 «운영 중»이다. 혹시 다시 굳힌다면 반드시 --live 를 붙일 것
      (안 붙이면 홈페이지가 검색에서 통째로 사라진다 — tests/homepage-static.test.js 가 잡는다). */
 const LIVE = process.argv.indexOf('--live') > 0;
+/* ★ 운영 중에는 미리보기로 굳히지 않는다(2026-11-15 보안 검토 낮음 2) — 실수로 돌려도
+   검색 차단이 되살아나거나 ERP 에서 올린 글이 덮이지 않게 «시작하기 전에» 멈춘다.
+   미리보기 사본이 정말 필요하면 --preview 를 붙이고 --out 으로 다른 폴더에 받을 것. */
+if (!LIVE && process.argv.indexOf('--preview') < 0) {
+  console.error('■ 멈춤: 홈페이지는 운영 중이다. --live 를 붙이거나(운영용), --preview --out <다른 폴더> 로 돌릴 것.');
+  process.exit(2);
+}
 
 /* ── 내려받기 (한 번에 넷까지, 예의 있게) ── */
 function fetchBin(url) {
