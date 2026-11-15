@@ -148,26 +148,27 @@ test('고르면 «N건 선택»과 줄 바탕이 나오고, 머리 ☐ 는 일�
 
 /* ── 일괄 삭제: 건수를 묻고 · 한 번에 저장 · 휴지통으로(되살릴 수 있게) ── */
 function trashWorld(picked, ask) {
-  const store = { certdoc: ROWS() }, sets = [], trash = [], asks = [], toasts = [], undo = [], restored = [], done = [];
+  const store = { certdoc: ROWS() }, sets = [], trash = [], puts = [], asks = [], toasts = [], undo = [], restored = [], done = [];
   const sel = selWorld(3);
   sel.boxes.forEach((b, i) => { b.checked = picked.includes(i); });
   const ctx = sel.ctx;
   Object.assign(ctx, {
     TRASH_DAYS: 30, escapeHtml: (s) => String(s), kcTrashLabel: (r) => r.kind + ' · ' + r.id,
     get: (k) => store[k].slice(), set: (k, v) => { sets.push(k); store[k] = v; },
-    kcTrashPut: (st, page, rec, what) => { trash.push({ st, rec }); return { tid: 'T' + trash.length }; }, kcTrashDone: (e, m) => { done.push(e && e.tid); toasts.push(m); },
+    kcTrashPutMany: (st, page, recs, what) => { puts.push(recs.length); return recs.map((rec) => { trash.push({ st, rec }); return { tid: 'T' + trash.length }; }); }, kcTrashDone: (e, m) => { done.push(e && e.tid); toasts.push(m); },
     kcUndoBar: (msg, tid, f) => undo.push({ msg, tid, fn: f }), kcTrashRestore: async (tid) => { restored.push(tid); },
     kcAskDelete: (btn, opt, onYes) => { asks.push(opt); if (ask) onYes(); }, renderDocStore: () => {}, toast: (m) => toasts.push(m),
   });
   ctx.DOMAINS.certdoc.store = 'certdoc'; ctx.DOMAINS.certdoc.label = '경력증명서';
   vm.runInContext(TRASH, ctx);
-  return { ctx, store, sets, trash, asks, toasts, undo, restored, done };
+  return { ctx, store, sets, trash, puts, asks, toasts, undo, restored, done };
 }
 test('선택 삭제 — 건수를 묻고(예 → 한 번에 저장), 지운 줄은 휴지통에 통째로 담긴다(되살릴 수 있다)', () => {
   const w = trashWorld([0, 2], true);
   w.ctx.docSelDel('certdoc', {});
   assert.equal(w.asks.length, 1); assert.match(w.asks[0].title, /2건/, '건수를 묻는다');
   assert.equal(w.sets.length, 1, '저장은 한 번');
+  assert.deepEqual(w.puts, [2], '휴지통에도 «한 번에» 담는다(건마다 담지 않는다)');
   assert.deepEqual(w.store.certdoc.map((r) => r.id), ['CD0002'], '고르지 않은 줄은 그대로');
   assert.deepEqual(w.trash.map((t) => t.rec.id).sort(), ['CD0001', 'CD0003'], '물리 삭제가 아니라 휴지통');
 });

@@ -120,7 +120,7 @@ test('⑦ 정리·골라 삭제는 «한 길»(_docTrashIds) — 한 번 묻고 
   assert.match(떼기('function docSelDel('), /_docTrashIds\(domain, ids/);
   const fn = 떼기('function _docTrashIds(');
   assert.match(fn, /kcAskDelete\(/, '묻지 않고 지우면 안 된다');
-  assert.match(fn, /kcTrashPut\(/, '휴지통을 거쳐야 되살릴 수 있다');
+  assert.match(fn, /kcTrashPutMany\(/, '휴지통을 거쳐야 되살릴 수 있다(여러 건을 한 번에 담는 길 — 건마다 N번 쓰지 않는다)');
   const 줄 = 떼기('function renderDocStore(');
   assert.match(줄, /dsDupSummary\(rows, D\)/);
   assert.match(줄, /판 \$\{판수\} \$\{펼침\?'▾':'▸'\}/);

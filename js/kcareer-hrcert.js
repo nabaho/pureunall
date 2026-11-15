@@ -51,7 +51,8 @@
   /* have = 서류 보관함(증명서) 기록들, gone = 휴지통에 든 기록들
      → { 발급번호: 기록 } · { 발급 이력 번호: 기록 } 두 색인 */
   function indexOf(list) {
-    var byNo = {}, byLog = {};
+    /* 열쇠가 «상속 속성 이름»(constructor·toString·__proto__)이어도 «이미 있다»로 읽히지 않게 프로토타입 없는 객체로 만든다(2026-11-15 검토) */
+    var byNo = Object.create(null), byLog = Object.create(null);
     (list || []).forEach(function (r) {
       if (!r || !isHrRecord(r)) return;
       var n = str(r.hrCertNo), l = str(r.hrCertLogId);
@@ -75,7 +76,7 @@
     stat.mine = mine.length;
     mine = mine.slice().sort(function (a, b) { return str(b.issuedAt).localeCompare(str(a.issuedAt)); });   /* 최근 발급이 위 */
 
-    var items = [], seenNo = {}, fixes = [], seenFix = {};
+    var items = [], seenNo = Object.create(null), fixes = [], seenFix = {};   /* 발급번호가 열쇠 — 상속 속성 이름이어도 «이미 봤다»로 읽지 않게 */
     mine.forEach(function (r) {
       var no = certNoOf(r), lid = logIdOf(r), label = kindLabel(str(r.kind));
       var rec = (no && have.byNo[no]) || (lid && have.byLog[lid]) || null;
@@ -144,7 +145,7 @@
 
   /* 넣기 직전의 마지막 거름 — 고른 줄 중 «지금 보관함에 이미 있는» 발급번호는 뺀다(두 번 눌렀거나 다른 탭에서 먼저 넣은 경우) */
   function freshOnly(items, have) {
-    var h = indexOf(have), seen = {};
+    var h = indexOf(have), seen = Object.create(null);
     return (items || []).filter(function (it) {
       if (!it || !it.certNo) return false;
       if (seen[it.certNo]) return false;
@@ -153,8 +154,19 @@
     });
   }
 
+  /* 휴지통에서 되살릴 줄(rec)과 «같은 발급분»이 지금 보관함(have)에 이미 있나 → 있으면 그 기록, 없으면 null.
+     freshOnly 와 같은 기준(indexOf: 발급번호·발급 이력 번호)이다 — «사람이 지운 적 있음 줄을 직접 골라 다시 넣은 뒤 옛 줄을 되살리는» 길이
+     freshOnly 를 지나지 않아 같은 발급번호가 두 줄이 되던 것을 되살리기 쪽에서 막는 데 쓴다.
+     ⚠ 인사관리 발급분(isHrRecord)이 아닌 줄은 항상 null — 종류·날짜·기관 이름이 비슷하다고 같은 줄로 «추정»하지 않는다(발급번호가 열쇠다).
+     ⚠ 찾기만 한다 — 합치거나 번호를 바꾸거나 지우지 않는다. 어떻게 할지는 부르는 쪽(알리고 건너뜀)과 사람이 정한다. */
+  function sameIssued(have, rec) {
+    if (!isHrRecord(rec)) return null;
+    var h = indexOf(have), n = str(rec.hrCertNo), l = str(rec.hrCertLogId);
+    return (n && h.byNo[n]) || (l && h.byLog[l]) || null;
+  }
+
   var api = { KINDS: KINDS, rowsOf: rowsOf, kstDate: kstDate, kindLabel: kindLabel, isHrRecord: isHrRecord,
-    plan: plan, toRecord: toRecord, usageOf: usageOf, applyFixes: applyFixes, freshOnly: freshOnly };
+    plan: plan, toRecord: toRecord, usageOf: usageOf, applyFixes: applyFixes, freshOnly: freshOnly, sameIssued: sameIssued };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerHrCert = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

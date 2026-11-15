@@ -191,6 +191,7 @@ function 세상(store) {
   vm.runInContext(cutFn(CODE, 'function kcTrashLabel('), ctx);
   vm.runInContext(cutFn(CODE, 'function kcTrashFileIds('), ctx);
   vm.runInContext(cutFn(CODE, 'function kcTrashList('), ctx);
+  vm.runInContext(cutFn(CODE, 'function _kcTrashEntry('), ctx);   /* 한 건·여러 건 담기가 함께 쓰는 «줄 짓기» */
   vm.runInContext(cutFn(CODE, 'function kcTrashPut('), ctx);
   ['function rhDraftAll(', 'function rhDraftPut(', 'function rhDraftFind(', 'function rhDraftNewId(',
    'function rhDraftCells(', 'function rhDraftDone(', 'function rhDraftTrash(', 'function _rhWhen(']

@@ -2463,9 +2463,10 @@ test('★★ 체크를 누른 채 끌면 지나간 줄이 모두 같은 상태�
   const dg = funcSource('bindDragSel');
   assert.match(dg, /addEventListener\('mousedown'/, '누를 때 시작합니다');
   assert.match(dg, /addEventListener\('mouseover'/, '끌면서 칠합니다');
-  // ⚠ 누른 «뒤»의 값으로 칠해야 켜며 끌면 켜지고 끄며 끌면 꺼진다
-  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{sync:sync, on:c\.checked\}/,
-    '⚠ 누르기 «전» 값으로 칠하면 반대로 동작합니다');
+  // ⚠ 누른 «그 자리에서» 끌기를 세운다 — 타이머로 미루면 누름·뗌이 더 빨리 끝날 때(터치 탭·자동 클릭) 끌기가 남는다
+  //    (2026-11-15 — 자세히는 tests/kcareer-select-trash-hardening.test.js)
+  assert.match(dg, /_dragSel=\{sync:sync, on:c\.checked\}/, '⚠ 끌기를 세우고 «처음 누른 칸의 값»으로 칠합니다');
+  assert.ok(!/setTimeout\(/.test(dg.replace(/\/\*[\s\S]*?\*\//g, '')), '⚠ 끌기를 타이머로 미루지 않는다');
   assert.match(dg, /document\.body\.style\.userSelect='none'/, '끌 때 글자가 잡히지 않게 합니다');
   assert.match(funcSource('careerDragSel'), /bindDragSel\(/,
     '★★ 목록 화면이 제 나름의 끌기를 쓰면 안 됩니다 — 얼개는 하나입니다');

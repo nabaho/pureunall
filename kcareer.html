@@ -830,6 +830,15 @@ body.kc-staff #hcOpenBtn{display:none!important}
 /* 증명서 보관함 표(#cdBody)의 첫 칸은 이제 ☐ + № 칸이다 — 직원 «보기 전용»에서는 다른 표처럼 감춘다(위 337~338줄). 종류·발급번호는 둘째 칸이라 남는다 */
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
+/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표 834~913px 대 상자 681px) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게(2026-11-15).
+   ⚠ 이 폭 띠에서만: 폰 카드(≤520px)는 줄을 카드로 접어 스크롤이 없고, 1280px 를 넘는 PC 는 그대로다(표가 상자 안에 들어와 스크롤이 없다 — 고정해도 안 보이는 «그대로»를 건드리지 않는다). 칸 바탕은 표 바탕과 같아(var(--card)) 스크롤이 없으면 보이는 모양은 같다 */
+@media (min-width:521px) and (max-width:1280px){
+  #cdBody .dt thead th:first-child,#cdBody .dt tbody td:first-child{position:sticky;left:0}
+  #cdBody .dt thead th:first-child{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
+  #cdBody .dt tbody td:first-child{z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
+  #cdBody .dt tbody tr:hover>td:first-child,#cdBody .dt tbody tr.sel-on>td:first-child{background:inherit}   /* 지나가는 줄·고른 줄의 바탕을 그대로 따른다 */
+  html.dark #cdBody .dt tbody tr.sel-on>td:first-child{box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
+}
 #hcBody tr.hc-gone td{opacity:.75}
 /* ☑ 고르기 창(#p1PickTbl)의 표는 «끝 칸이 관리 단추»가 아니다. 폰 카드(공용 .dt)가 끝 칸을 오른쪽 단추 열로 세우면 긴 기관명 줄에서 일자 칸이 0px 로 눌려 가려진다
    (자동 검증 2026-11-14, 375px · 자격·강의 고르기). 끝 칸도 다른 칸처럼 «이름표 + 값 한 줄»로 — 폰 폭에서만 */
@@ -1590,7 +1599,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-profile1.js?v=16"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <!-- 🏢 푸른인사관리 증명서 당겨오기(재직·경력증명서 발급 이력 → 서류 보관함) 셈 — 2026-11-12 -->
-<script src="js/kcareer-hrcert.js?v=1"></script>
+<script src="js/kcareer-hrcert.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=10"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
@@ -9337,17 +9346,21 @@ function _docTrashIds(domain, ids, btn, 제목, 덧말){
         +(줄들.length>4?'<br>… 외 '+(줄들.length-4)+'건':'')
         +'<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다</b>(환경설정 › 🗑 휴지통).' },
     function(){
-      var es=[];
-      줄들.forEach(function(r){ var e=kcTrashPut(D.store, '', r, D.label||'서류'); if(e) es.push(e); });
-      set(D.store, get(D.store).filter(function(x){ return ids.indexOf(x.id)<0; }));
+      /* ★ 휴지통에는 «한 번 읽고 한 번» 쓴다(kcTrashPutMany) — 건마다 쓰면 N번 저장하고 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-15).
+         원 자료에서 뺄 목록도 «쓰기 전에» 미리 계산해 둔다 — 두 번의 저장 사이에서 할 일을 줄인다 */
+      var 남길=get(D.store).filter(function(x){ return ids.indexOf(x.id)<0; });
+      var es=kcTrashPutMany(D.store, '', 줄들, D.label||'서류');
+      set(D.store, 남길);
       renderDocStore(domain);
       var 알림='🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다';
       if(es.length<=1){ kcTrashDone(es[0], 알림); return; }
       /* ★ 여러 건이면 «되돌리기»가 «전부» 되살린다 — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
          옛 순서로 놓이도록 거꾸로 되살린다(되살린 줄은 맨 앞에 놓인다) */
       kcUndoBar(알림+' · '+TRASH_DAYS+'일 보관', null, async function(){
-        for(var i=es.length-1;i>=0;i--) await kcTrashRestore(es[i].tid, true);
-        toast('↩ '+es.length+'건을 되살렸습니다');
+        var 됨=0, 건너뜀=0;
+        for(var i=es.length-1;i>=0;i--){ var r=await kcTrashRestore(es[i].tid, true); if(r && r.skipped) 건너뜀++; else if(r) 됨++; }
+        /* 같은 발급번호가 그새 보관함에 생긴 줄은 되살리지 않고 휴지통에 둔다 — 몇 건인지 밝힌다 */
+        toast('↩ '+됨+'건을 되살렸습니다'+(건너뜀?' — '+건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 휴지통에 그대로 두었습니다':''), 건너뜀?9000:undefined);
       });
     });
 }
@@ -10812,17 +10825,29 @@ var _dragSel=null;
    ⚠ 화면마다 따로 만들면 한쪽만 고쳐져 「여기선 끌리는데 저기선 안 끌린다」가 된다.
    ⚠ «한 번만» 묶는다(dragBound) — 다시 그릴 때마다 묶으면 지나간 줄이 여러 번 뒤집힌다.
      칸(.dt·#trashBody)은 안쪽만 갈릴 뿐 그대로 있으므로 한 번이면 된다. */
+/* ★ 끌기를 «끝낸다» — 손을 뗄 때(mouseup)와 «누른 채가 아닌데 끌기가 남아 있을 때»(아래 mouseover) 같은 한 곳.
+   ⚠ 끝낼 때 글자 잡힘 막기(userSelect)도 함께 푼다 — 끌기만 지우고 이것만 남기면 화면 글자가 계속 안 잡힌다. */
+function _dragSelEnd(){
+  if(!_dragSel) return;
+  var f=_dragSel.sync; _dragSel=null; document.body.style.userSelect='';
+  try{ f(); }catch(e){}
+}
 function bindDragSel(box, sync){
   if(!box || box.dataset.dragBound) return;
   box.dataset.dragBound='1';
   box.addEventListener('mousedown', function(e){
     var c=e.target.closest('.row-chk'); if(!c) return;
-    /* 이 시점의 checked 는 «누르기 전» 값 — 눌린 뒤 값으로 칠해야 한다 */
-    setTimeout(function(){ _dragSel={sync:sync, on:c.checked}; }, 0);
+    /* ★ 누른 «그 자리에서» 세운다 — 전에는 setTimeout(0) 으로 미뤘는데, 누름·뗌이 그보다 먼저 끝나면(터치 탭은 마우스 이벤트를
+       한 작업 안에 잇달아 보내고, 자동 클릭도 3ms 만에 끝난다) 뗌이 «아직 없는 끌기»를 지우고 지나간 뒤에야 세워져,
+       손을 안 댄 채 ☐ 위를 지나가기만 해도 켜지고 글자 잡힘 막기도 남았다(2026-11-15 재현).
+       이 시점의 checked 는 «누르기 전» 값이다(체크는 뗀 뒤 click 에서 바뀐다) — 사람 손 속도에서 미루던 때와 같은 값이다. */
+    _dragSel={sync:sync, on:c.checked};
     document.body.style.userSelect='none';
   });
   box.addEventListener('mouseover', function(e){
     if(!_dragSel) return;
+    /* 안전장치 — 누른 채가 아닌데 끌기가 남아 있으면(창 밖에서 뗐거나 뗌을 놓쳤을 때) 칠하지 않고 거기서 끝낸다 */
+    if(!(e.buttons&1)){ _dragSelEnd(); return; }
     var c=e.target.closest('.row-chk'); if(!c) return;
     if(c.checked!==_dragSel.on){ c.checked=_dragSel.on; try{ _dragSel.sync(); }catch(err){} }
   });
@@ -10830,10 +10855,7 @@ function bindDragSel(box, sync){
 function careerDragSel(name){
   bindDragSel(document.querySelector('#page-'+name+' .dt'), function(){ careerSelSync(name); });
 }
-document.addEventListener('mouseup', function(){
-  if(_dragSel){ var f=_dragSel.sync; _dragSel=null; document.body.style.userSelect='';
-    try{ f(); }catch(e){} }
-});
+document.addEventListener('mouseup', _dragSelEnd);
 function careerSelSync(name){
   var box=_selBox(name); if(!box) return;
   var ids=careerSelIds(name);
@@ -11820,14 +11842,30 @@ function kcTrashLeft(e){
   return Math.max(0, TRASH_DAYS-gone);
 }
 
+/* 휴지통 한 줄(e)을 «지어 낼 뿐» 저장하지 않는다 — 한 건(kcTrashPut)과 여러 건(kcTrashPutMany)이 같은 모양을 쓴다.
+   used: 이미 쓴 번호들({번호:1}) — 같은 순간에 여러 건을 지을 때 번호가 겹치지 않게 한다(겹치면 되살릴 때 두 줄이 한꺼번에 빠진다) */
+function _kcTrashEntry(store, page, rec, what, used){
+  if(!rec) return null;
+  var tid; do{ tid='T'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }while(used && used[tid]);
+  if(used) used[tid]=1;
+  return { tid:tid, store:store, page:page||'', what:what||'', rec:rec, delAt:Date.now(),
+    label:kcTrashLabel(rec), files:kcTrashFileIds(rec) };
+}
 /* 담는다. store 는 어느 보관함이었나, page 는 되살린 뒤 다시 그릴 화면. */
 function kcTrashPut(store, page, rec, what){
-  if(!rec) return null;
-  var e={ tid:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    store:store, page:page||'', what:what||'', rec:rec, delAt:Date.now(),
-    label:kcTrashLabel(rec), files:kcTrashFileIds(rec) };
+  var e=_kcTrashEntry(store, page, rec, what); if(!e) return null;
   var t=kcTrashList(); t.unshift(e); set(TRASH_STORE, t);
   return e;
+}
+/* ★ 여러 건을 «한 번 읽고 한 번 쓴다» (2026-11-15) — 건마다 휴지통 전체를 읽고 쓰면 N번 저장하고, 중간에 걸리면
+   «휴지통에는 있고 원 자료에도 남음»이 된다. 줄을 «전부 지어 낸 뒤에» 한 번만 쓰므로 짓다가 걸리면 아무것도 안 바뀐다.
+   ⚠ 순서는 한 건씩 담던 때와 같다 — 마지막 건이 맨 위(최근에 지운 것이 위). 담은 줄들(지운 순서)을 돌려준다. */
+function kcTrashPutMany(store, page, recs, what){
+  var es=[], used={};
+  (recs||[]).forEach(function(r){ var e=_kcTrashEntry(store, page, r, what, used); if(e) es.push(e); });
+  if(!es.length) return es;
+  set(TRASH_STORE, es.slice().reverse().concat(kcTrashList()));
+  return es;
 }
 /* 첨부 원본만 지울 때도 담는다 — 레코드는 그대로 두고 «파일 한 개»만.
    잘못 눌러도 되살릴 수 있게. 파일 본문은 그대로 있고 번호만 적어 둔다. */
@@ -11882,6 +11920,16 @@ async function kcTrashRestore(tid, quiet){
     return { fileOnly:e.fileOnly };
   }
   var rec=e.rec||{}, oldId=rec.id;
+  /* ★ 인사관리에서 당겨온 줄(hrCertNo)은 «같은 발급번호가 이미 보관함에 있으면» 되살리지 않는다 (2026-11-15).
+     «지운 적 있음» 줄을 사람이 직접 골라 다시 넣은 뒤 옛 줄을 되살리면 같은 증명서가 두 줄이 된다.
+     ⚠ 합치지도, 발급번호를 바꾸지도 않는다(자동 병합·번호 바꿈 금지 — 종료·삭제·되돌림 불변). 휴지통에 «그대로» 둔다 — 지워진 것도 아니고(30일 보관 그대로) 사람이 정한다. */
+  var 같은=(typeof KcareerHrCert!=='undefined' && typeof KcareerHrCert.sameIssued==='function' && e.store==='certdoc') ? KcareerHrCert.sameIssued(get(e.store), rec) : null;   /* 옛 캐시의 hrcert.js 에 sameIssued 가 없어도 되살리기가 멈추지 않게 */
+  if(같은){
+    var 번호=String(rec.hrCertNo||'');
+    /* 발급번호가 비고 «발급 이력 번호»로만 같을 때는 그 번호를 밝힌다 — 빈 칸이 «발급번호  는»으로 읽히지 않게 */
+    if(!quiet) toast('되살리지 않았습니다 — '+(번호?('발급번호 '+번호):('발급 이력 번호 '+String(rec.hrCertLogId||'')))+' 는 이미 보관함에 있습니다(번호 '+String(같은.id||'')+'). 같은 증명서가 두 줄이 되지 않게 휴지통에 그대로 두었습니다 — 보관함의 줄을 지우거나 이 줄을 완전삭제한 뒤 다시 하세요', 9000);
+    return { skipped:'sameIssued', store:e.store, oldId:oldId, hrCertNo:번호, existingId:String(같은.id||'') };
+  }
   var newId=kcFreeId(e.store, oldId);
   if(newId!==oldId){
     rec=Object.assign({}, rec, { id:newId, restoredFrom:oldId });
@@ -12111,17 +12159,19 @@ async function trashRestoreSel(btn){
   var ids=trashSelIds();
   if(!ids.length){ toast('고른 것이 없습니다'); return; }
   if(btn){ btn.disabled=true; btn.textContent='↩ 되살리는 중…'; }
-  var 됨=0, 이름바뀜=0;
+  var 됨=0, 이름바뀜=0, 건너뜀=0;
   for(var i=0;i<ids.length;i++){
     try{
       var r=await kcTrashRestore(ids[i], true);
-      if(r){ 됨++; if(r.renamed) 이름바뀜++; }
+      if(r && r.skipped) 건너뜀++;   /* 같은 발급번호가 이미 보관함에 있어 되살리지 않은 줄 — 휴지통에 그대로 있다 */
+      else if(r){ 됨++; if(r.renamed) 이름바뀜++; }
     }catch(e){ console.warn('휴지통 되살리기', ids[i], e); }
   }
   if(btn){ btn.disabled=false; btn.textContent='↩ 선택 되살리기'; }
   renderTrash();
   toast('↩ '+됨+'건을 되살렸습니다'
-    +(이름바뀜?' — 그중 '+이름바뀜+'건은 번호가 이미 쓰이고 있어 새 번호로 넣었습니다':''), 6000);
+    +(이름바뀜?' — 그중 '+이름바뀜+'건은 번호가 이미 쓰이고 있어 새 번호로 넣었습니다':'')
+    +(건너뜀?' — '+건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 되살리지 않고 휴지통에 그대로 두었습니다(보관함의 줄을 지우거나 이 줄을 완전삭제한 뒤 다시 하세요)':''), 건너뜀?9000:6000);
 }
 /* ⚠ 완전삭제는 되돌릴 수 없다 — 몇 건인지 세고 무엇이 가는지 보여 주고 묻는다 */
 function trashPurgeSel(btn){
