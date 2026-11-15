@@ -518,4 +518,63 @@ test('⑧ 상단 헤더·탭 중복 제거(4개 핵심 탭 + 우측 API 유틸 �
   assert.match(uiSrc, /data-h-sub="CHART"/);
 });
 
+test('⑨ 지자체 약칭·다중어 스마트 검색(충남→천안도시공사 등 105곳), 본청·시군구 소속 분류, 지역·지자체 산하기관 전수 비교(REGION 모드) 및 한글 IME 비파괴 부분 갱신이 동작한다', () => {
+  const sandbox = { URL, URLSearchParams };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+  const api = sandbox.PuAlioUnion;
+
+  const master = api.buildOrganMasterIndex(dataMod);
+  const localAffils = master.records.filter((r) => !!r.provinceKey);
+  assert.ok(localAffils.length >= 1300, '16개 시·도 지방산하기관이 provinceKey로 매핑되어야 합니다');
+
+  // 충청남도 산하기관 및 약칭("충남") 검색 검증
+  const chungnamAll = master.records.filter((r) => r.provinceKey === '충청남도');
+  assert.ok(chungnamAll.length >= 100, '충청남도 산하기관 100곳 이상이 빠짐없이 분류되어야 합니다');
+  const chungnamSearched = master.records.filter((r) => api.matchSmartQuery(r.searchHaystack, '충남'));
+  assert.ok(chungnamSearched.length >= chungnamAll.length, '약칭 "충남" 검색 시 천안도시공사 등 충청남도 산하기관 전체가 검색되어야 합니다');
+
+  const cheonanCorp = chungnamAll.find((r) => r.name.includes('천안도시공사'));
+  assert.ok(cheonanCorp, '천안도시공사가 충청남도 산하기관에 포함되어야 합니다');
+  assert.equal(cheonanCorp.muniName, '천안시', '천안도시공사의 기초지자체는 천안시로 분류되어야 합니다');
+  assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 공사'), true, '공백 다중 키워드("충남 공사") AND 검색이 일치해야 합니다');
+  assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 수원'), false, '불일치 키워드가 포함되면 제외되어야 합니다');
+
+  // 도립 의료원(천안의료원·공주의료원) 및 제주·전남광주 본청/자치구 산하 분류 정밀 검증
+  const cheonanMed = chungnamAll.find((r) => r.name === '천안의료원' || r.name.includes('천안의료원'));
+  if (cheonanMed) {
+    assert.equal(cheonanMed.muniName, '충남 본청', '도립 천안의료원은 충남 본청 산하로 분류되어야 합니다');
+  }
+  const jejuDev = master.records.find((r) => r.provinceKey === '제주특별자치도' && r.name.includes('제주특별자치도개발공사'));
+  assert.ok(jejuDev, '제주특별자치도개발공사가 존재해야 합니다');
+  assert.equal(jejuDev.muniName, '제주 본청', '제주특별자치도개발공사는 제주 본청으로 분류되어야 합니다');
+  const gwangjuTraffic = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('광주교통공사'));
+  assert.ok(gwangjuTraffic, '광주교통공사가 존재해야 합니다');
+  assert.equal(gwangjuTraffic.muniName, '전남·광주 본청', '광주교통공사는 전남·광주 본청으로 일원화 분류되어야 합니다');
+  const gwangjuDonggu = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('동구'));
+  if (gwangjuDonggu) {
+    assert.equal(gwangjuDonggu.muniName, '광주 동구', '광주광역시 동구 산하기관은 광주 동구로 분류되어야 합니다');
+  }
+
+  // 지역별 벤치마크, 보안 URL 제한(https 전용) 및 REGION 모드 UI 구성요소 존재 검증
+  assert.ok(master.benchmarks.LOCAL_ALL && master.benchmarks.LOCAL_ALL.totalOrgans >= 1300 && master.benchmarks.LOCAL_ALL.count > 300);
+  assert.ok(master.benchmarks.byProvince['충청남도'] && master.benchmarks.byProvince['충청남도'].totalOrgans >= 100 && master.benchmarks.byProvince['충청남도'].count >= 15);
+  assert.equal(api.inferProvinceFromQuery('충남 기관'), '충청남도');
+  assert.equal(api.safeHttpUrl('http://www.alio.go.kr/test'), '', '비암호화 http:// URL은 차단되어야 합니다');
+  assert.match(uiSrc, /data-m-submode="REGION"[^>]*>🗺️ 지역산하비교<\/button>/);
+  assert.match(uiSrc, /aria-pressed="/);
+  assert.match(uiSrc, /noopener noreferrer/);
+  assert.match(uiSrc, /data-m-reg-dyn/);
+  assert.match(uiSrc, /compositionend/, '한글 IME 자모 조합 보호를 위한 compositionend 처리가 포함되어야 합니다');
+
+  // 코드 내 issueScores.<key> 참조가 모두 실제 산출된 13대 지표 키와 일치하는지 정적·동적 교차 검증
+  const sampleScores = cheonanCorp.issueScores;
+  const referencedScoreKeys = [...uiSrc.matchAll(/\.issueScores\.([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
+  assert.ok(referencedScoreKeys.length > 0);
+  for (const k of referencedScoreKeys) {
+    assert.ok(sampleScores[k] && typeof sampleScores[k].tag === 'string', `issueScores.${k} 키가 실제 METRIC_DEFS 산출물에 존재해야 합니다`);
+  }
+});
+
+
 
