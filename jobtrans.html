@@ -252,6 +252,8 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <span id="who"></span>
     <span class="sp"></span>
     <a class="act-link wide-only" href="gov-report.html" title="컨설팅보고서 총괄 현황으로 이동">📑 보고서 총괄</a>
+    <button class="sm" id="linkFolderBtn" aria-label="컨설팅폴더 연결" title="컨설팅업체 폴더에서 산업·일자리전환 하위 폴더 자료만 선별해 연결합니다">📂<span class="wide-only"> 컨설팅폴더 연결</span></button>
+    <input type="file" id="folderFallbackInput" webkitdirectory multiple style="display:none">
     <button class="sm" id="scanAllBtn" aria-label="전체 메일 체크" title="등록된 모든 산업일자리전환 사업장의 푸른메일함 수신 자료를 다시 점검합니다">🔄<span class="wide-only"> 전체 메일 체크</span></button>
     <button class="sm wide-only" id="reloadBtn" title="새로고침">새로고침</button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
@@ -300,6 +302,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
         <button class="sm pri" id="newProjBtn">+ 사업장 등록</button>
       </div>
       <div id="projectsBox"></div>
+    </div>
+
+    <div class="card" id="folderSyncCard" style="display:none">
+      <div class="sec">
+        <span>📂 컨설팅업체 폴더 연결 (산업·일자리전환 전용 하위폴더만 선별)</span>
+        <span class="chip c-green" id="nFolderGroups">0</span>
+        <span class="sp"></span>
+        <span class="hint" id="folderSyncMeta">타 컨설팅·일반자문 폴더는 제외하고 산업일자리 사업장 자료만 가져옵니다</span>
+        <button class="sm" id="reconnectFolderBtn" style="display:none">🔓 폴더 권한 재연결</button>
+        <button class="sm" id="changeFolderBtn">📂 폴더 다시 선택</button>
+      </div>
+      <div id="folderSyncBox"></div>
     </div>
 
     <div class="card" id="discoverCard">
@@ -363,10 +377,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-jobtrans-catalog.js?v=1"></script>
-<script src="js/pu-jobtrans-intake.js?v=1"></script>
+<script src="js/pu-jobtrans-intake.js?v=2"></script>
 <script src="js/pu-jobtrans-report.js?v=1"></script>
 <script src="js/pu-jobtrans-hwpx.js?v=1"></script>
-<script src="js/pu-jobtrans-view.js?v=1"></script>
+<script src="js/pu-jobtrans-view.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){
