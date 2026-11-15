@@ -757,7 +757,7 @@
       : Promise.resolve();
 
     var pServer = opts.callServer
-      ? callServerSync(opts.auth)
+      ? callServerSync(opts.auth, { pullOnly: false })
           .then(function (r) {
             summary.serverPulled = (r && r.added) || 0;
             if (r && r.ok === false && Array.isArray(r.errors)) {
@@ -765,7 +765,11 @@
             }
           })
           .catch(function (e) { errors.push('server: ' + String((e && e.message) || e)); })
-      : Promise.resolve();
+      : (opts.pullSharedOnly
+          ? callServerSync(opts.auth, { pullOnly: true })
+              .then(function (r) { summary.serverPulled = (r && r.added) || 0; })
+              .catch(function () {})
+          : Promise.resolve());
 
     return Promise.all([pTree, pSupa, pServer]).then(function () {
       summary.ok = errors.length === 0 && summary.failedLaws === 0;
@@ -1229,7 +1233,8 @@
   }
 
   /* ── 서버 공공 API 동기화 대리인 호출 (`exports.pboxApi`) ── */
-  function callServerSync(auth) {
+  function callServerSync(auth, serverOpts) {
+    var sOpts = serverOpts || {};
     var cfg = getConfig();
     var u = auth && auth.currentUser;
     if (!u || !u.getIdToken) return Promise.resolve({ ok: true, added: 0, skipped: true });
@@ -1266,15 +1271,19 @@
         });
       }
 
+      var syncReq = sOpts.pullOnly === true
+        ? Promise.resolve({ ok: true, docs: [] })
+        : fetch(PBOX_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '' })
+          }).then(function (r) {
+            if (!r.ok) throw new Error('서버 자동수집 응답 오류 (HTTP ' + r.status + ')');
+            return r.json();
+          });
+
       return Promise.all([
-        fetch(PBOX_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-          body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '' })
-        }).then(function (r) {
-          if (!r.ok) throw new Error('서버 자동수집 응답 오류 (HTTP ' + r.status + ')');
-          return r.json();
-        }),
+        syncReq,
         pullTombstoneRounds(mem.syncMeta.lastTombstoneAt || '', mem.syncMeta.lastTombstoneKey || '', 0, [], [])
       ]);
     }).then(function (pair) {
@@ -1326,6 +1335,11 @@
       saveConfig({ lawOc: lawOc });
     }
 
+    var lowerQCheck = validateClientOfficialSearchQuery(opts.query, 40, true);
+    if (!lowerQCheck.ok) {
+      return Promise.reject(new Error(lowerQCheck.error));
+    }
+
     return u.getIdToken().then(function (tok) {
       if (startGen !== sessionGen || startUid !== mem.uid) {
         throw makeStaleSessionError();
@@ -1336,11 +1350,11 @@
         body: JSON.stringify({
           action: 'pull_lower_court',
           lawOc: lawOc,
-          preset: String(opts.preset || 'all').slice(0, 32),
-          query: String(opts.query || '').trim().slice(0, 40),
-          court: String(opts.court || '').trim().slice(0, 30),
-          dateFrom: String(opts.dateFrom || '').trim().slice(0, 12),
-          dateTo: String(opts.dateTo || '').trim().slice(0, 12),
+          preset: String(opts.preset || 'all'),
+          query: lowerQCheck.query,
+          court: opts.court == null ? '' : String(opts.court),
+          dateFrom: opts.dateFrom == null ? '' : String(opts.dateFrom),
+          dateTo: opts.dateTo == null ? '' : String(opts.dateTo),
           includeComwel: opts.includeComwel !== false
         })
       });
@@ -1390,6 +1404,160 @@
           added: added,
           merged: merged,
           supabasePushed: payload.supabasePushed || 0,
+          errors: Array.isArray(payload.errors) ? payload.errors : []
+        };
+      });
+    });
+  }
+
+  function validateClientOfficialSearchQuery(rawVal, maxLen, allowEmpty) {
+    if (rawVal != null && typeof rawVal !== 'string') {
+      return { ok: false, query: '', error: '검색어 형식이 올바르지 않습니다.' };
+    }
+    var rawStr = String(rawVal == null ? '' : rawVal);
+    if (rawStr === '') {
+      return allowEmpty
+        ? { ok: true, query: '' }
+        : { ok: false, query: '', error: '실시간 공공DB 수집 검색어는 2글자 이상 입력해 주세요.' };
+    }
+    if (rawStr.length > 100000) {
+      return { ok: false, query: '', error: '검색어는 ' + maxLen + '자 이하로 입력해 주세요.' };
+    }
+    var E = global.PuPBoxEngine;
+    var hasPii = (E && typeof E.hasResidualHardPiiClient === 'function')
+      ? E.hasResidualHardPiiClient(rawStr)
+      : (/(?:^|[^\d])\d{6}[-\s.]?[1-8]\d{6}(?:[^\d]|$)/.test(rawStr) || /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(rawStr) || /\b\d{10,19}\b/.test(rawStr));
+    if (!hasPii && global.PuRrnScrub && typeof global.PuRrnScrub.hasRrn === 'function' && global.PuRrnScrub.hasRrn(rawStr)) {
+      hasPii = true;
+    }
+    if (hasPii) {
+      return {
+        ok: false,
+        query: '',
+        error: '검색어에 주민등록번호·연락처·이메일·계좌번호 등 개인정보를 포함할 수 없습니다.'
+      };
+    }
+    if (rawStr.length > maxLen) {
+      return { ok: false, query: '', error: '검색어는 ' + maxLen + '자 이하로 입력해 주세요.' };
+    }
+    var full = rawStr.trim();
+    if (!full) {
+      return allowEmpty
+        ? { ok: true, query: '' }
+        : { ok: false, query: '', error: '실시간 공공DB 수집 검색어는 2글자 이상 입력해 주세요.' };
+    }
+    if (full.length < 2) {
+      return { ok: false, query: '', error: '검색어는 2글자 이상 입력해 주세요.' };
+    }
+    if (full.length > maxLen) {
+      return { ok: false, query: '', error: '검색어는 ' + maxLen + '자 이하로 입력해 주세요.' };
+    }
+    var qPartyNames = (E && typeof E.extractPartyNames === 'function') ? E.extractPartyNames(full, '') : [];
+    var safeQ = (E && typeof E.anonymizeLegalText === 'function')
+      ? E.anonymizeLegalText(full, qPartyNames).text
+      : full;
+    if (global.PuRrnScrub && typeof global.PuRrnScrub.scrub === 'function') {
+      safeQ = global.PuRrnScrub.scrub(safeQ);
+    }
+    safeQ = safeQ.trim();
+    if (safeQ.length < 2) {
+      return { ok: false, query: '', error: '유효한 법률 검색어를 입력해 주세요.' };
+    }
+    return { ok: true, query: safeQ };
+  }
+  function liveSearchAndCollect(opts) {
+    opts = opts || {};
+    var startGen = opts.expectedGen !== undefined ? Number(opts.expectedGen) : sessionGen;
+    var startUid = opts.expectedUid !== undefined ? String(opts.expectedUid || '') : mem.uid;
+    if (startGen !== sessionGen || startUid !== mem.uid) {
+      return Promise.reject(makeStaleSessionError());
+    }
+
+    var liveQCheck = validateClientOfficialSearchQuery(opts.query, 50, false);
+    if (!liveQCheck.ok) {
+      return Promise.reject(new Error(liveQCheck.error));
+    }
+
+    var auth = opts.auth;
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('실시간 전 기관 API 수집은 포털 직원 로그인 상태에서 실행할 수 있습니다.'));
+    }
+
+    var cfg = getConfig();
+    var rawInputOc = opts.lawOc !== undefined ? String(opts.lawOc || '').trim() : '';
+    var lawOc = rawInputOc ? sanitizeLawOcClient(rawInputOc) : (cfg.lawOc || '');
+    if (rawInputOc && !lawOc) {
+      return Promise.reject(new Error('법제처 OC 아이디 형식이 올바르지 않습니다.'));
+    }
+    if (lawOc && lawOc !== cfg.lawOc) {
+      saveConfig({ lawOc: lawOc });
+    }
+
+    var safeQuery = liveQCheck.query;
+    return u.getIdToken().then(function (tok) {
+      if (startGen !== sessionGen || startUid !== mem.uid) {
+        throw makeStaleSessionError();
+      }
+      return fetch(PBOX_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          action: 'live_search',
+          lawOc: lawOc,
+          query: safeQuery,
+          targets: Array.isArray(opts.targets) ? opts.targets.slice(0, 10) : [],
+          maxPerTarget: Math.min(Math.max(3, Number(opts.maxPerTarget) || 10), 20),
+          includeComwel: opts.includeComwel !== false
+        })
+      });
+    }).then(function (r) {
+      var jsonParseErr = false;
+      var parsePromise = (r && typeof r.json === 'function')
+        ? r.json().catch(function () { jsonParseErr = true; return null; })
+        : Promise.resolve(null);
+      return parsePromise.then(function (j) {
+        if (startGen !== sessionGen || startUid !== mem.uid) {
+          throw makeStaleSessionError();
+        }
+        var isPlainObj = !!(j && typeof j === 'object' && !Array.isArray(j));
+        var payload = isPlainObj ? j : {};
+        if (!r || jsonParseErr || !isPlainObj) {
+          throw new Error('실시간 공공API 서버 응답(JSON) 형식이 올바르지 않습니다 (HTTP ' + ((r && r.status) || 0) + ')');
+        }
+        if (!r.ok || (payload.ok !== true && payload.partial !== true) || !Array.isArray(payload.docs)) {
+          throw new Error(payload.error || (Array.isArray(payload.errors) && payload.errors[0]) || ('실시간 공공API 응답 오류 (HTTP ' + (r.status || 0) + ')'));
+        }
+        var validRows = payload.docs.filter(function (row) {
+          return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
+        });
+        var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
+        var added = 0;
+        var merged = 0;
+        if (mapped.length) {
+          var st = addDocuments(mapped, {
+            scope: 'public',
+            shareConfirmed: false,
+            expectedGen: startGen,
+            expectedUid: startUid
+          });
+          added = st.added;
+          merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
+        }
+        saveConfig({ lastSyncAt: new Date().toISOString() });
+        addAlert({
+          kind: 'sync',
+          title: '「' + safeQuery + '」 전 기관 실시간 수집 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : '수집 검색 완료')
+        });
+        return {
+          ok: payload.ok !== false,
+          partial: !!payload.partial,
+          query: safeQuery,
+          fetchedCount: payload.fetchedCount || mapped.length,
+          added: added,
+          merged: merged,
+          sourcesHit: Array.isArray(payload.sourcesHit) ? payload.sourcesHit : [],
           errors: Array.isArray(payload.errors) ? payload.errors : []
         };
       });
@@ -1818,6 +1986,7 @@
     var cfg = getConfig();
     var canUseCloudAi = !cfg.preferOfflineAi &&
       !params.forceOffline &&
+      !(E && typeof E.hasResidualHardPiiClient === 'function' && E.hasResidualHardPiiClient(prompt)) &&
       global.PuAiCall &&
       typeof global.PuAiCall.ask === 'function' &&
       params.auth &&
@@ -2009,6 +2178,7 @@
     testSupabaseConnection: testSupabaseConnection,
     pullFromSupabase: pullFromSupabase,
     pullLowerCourtOfficial: pullLowerCourtOfficial,
+    liveSearchAndCollect: liveSearchAndCollect,
     pushDocsToSharedServer: pushDocsToSharedServer,
     deleteDocsFromSharedServer: deleteDocsFromSharedServer,
     recordRecent: recordRecent,

@@ -196,8 +196,14 @@ function sanitizeCompactYmd(rawDate) {
   return v.ok ? v.compact : "";
 }
 
-const VALID_DRF_SEARCH_ROOTS = new Set(["PrecSearch", "Expc", "CgmExpc", "Nlrc", "Decc", "Detc", "LawSearch"]);
-const VALID_DRF_SERVICE_ROOTS = new Set(["PrecService", "ExpcService", "CgmExpcService", "NlrcService", "DeccService", "DetcService", "LawService"]);
+const VALID_DRF_SEARCH_ROOTS = new Set([
+  "PrecSearch", "Expc", "CgmExpc", "MoelCgmExpc", "Nlrc", "Decc", "Detc",
+  "LawSearch", "AdmrulSearch", "Ftc", "Ppc", "Nhrck", "TaxSearch"
+]);
+const VALID_DRF_SERVICE_ROOTS = new Set([
+  "PrecService", "ExpcService", "CgmExpcService", "MoelCgmExpcService", "NlrcService",
+  "DeccService", "DetcService", "LawService", "AdmrulService", "FtcService", "PpcService", "NhrckService"
+]);
 
 /* 법제처 DRF API가 HTTP 200으로 반환하는 인증실패·미승인·오류 JSON을 정상 빈 결과와 엄격히 분리 */
 function extractDrfRootOrThrow(j, expectedTarget) {
@@ -462,6 +468,226 @@ function findRrnSpansServer(raw) {
   return spans;
 }
 
+/* 계좌번호·가상이체번호·전화번호 공통 구간 탐지기 (서버)
+ * - 혼합 구분자(123-456 789012), 길이 무제한 연속 수평공백(123         456 789012), 공백 섞인 대시(123 - 456 - 789012),
+ *   날짜형 접두 혼합 숫자열(2024-01-01 234567, 2024 01 01 234567), 전각 숫자·비표시 제어문자·다중 그룹을 단일 규칙으로 탐지한다.
+ * - 단독 달력 날짜(YYYY-MM-DD / YYYY. M. D.), 사건번호(2024다247190), 시각(14:30)은 오탐 없이 보존한다. */
+function findNumericPiiSpansServer(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!s) return [];
+  const vis = [];
+  let idx = 0;
+  for (const ch of s) {
+    const start = idx;
+    idx += ch.length;
+    if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+    const d = ndToDigitServer(ch);
+    vis.push({
+      ch,
+      pos: start,
+      end: idx,
+      d,
+      isHws: ch === "\t" || ch === "\v" || ch === "\f" || /\p{Zs}/u.test(ch),
+      isDash: /^[-‐‑‒–—―﹣－]$/.test(ch),
+      isDot: /^[.．·]$/.test(ch),
+      isAsciiWord: /^[A-Za-z_]$/.test(ch),
+      isHangul: /^[가-힣]$/.test(ch)
+    });
+  }
+  const runs = [];
+  let vi = 0;
+  while (vi < vis.length) {
+    if (vis[vi].d < 0) { vi++; continue; }
+    const startVis = vi;
+    let digits = "";
+    while (vi < vis.length && vis[vi].d >= 0) {
+      digits += String(vis[vi].d);
+      vi++;
+    }
+    const endVis = vi - 1;
+    let isCaseYearPrefix = false;
+    if (/^(?:(?:19|20)\d{2}|9\d)$/.test(digits) && endVis + 2 < vis.length && vis[endVis + 1].isHangul) {
+      let hk = endVis + 1;
+      let hStr = "";
+      while (hk < vis.length && vis[hk].isHangul && hk - endVis <= 4) {
+        hStr += vis[hk].ch;
+        hk++;
+      }
+      if (hk > endVis + 1 && hk < vis.length && vis[hk].d >= 0 && /^(?:다|두|도|마|모|바|부|스|으|추|초|카|쿠|크|트|프|허|후|히|가합|가단|가소|나|노|누|구합|구단|고합|고단|고정|고약|즈단|즈기|카합|카단|카기|타채|하합|하단|회합|회단|간|재다|재두|재도|헌마|헌바|헌가|헌나|헌라|헌사|헌아|행심|부해|부노|차별)$/.test(hStr)) {
+        isCaseYearPrefix = true;
+      }
+    }
+    const isTimeAdj = (startVis > 0 && vis[startVis - 1].ch === ":" && startVis > 1 && vis[startVis - 2].d >= 0) ||
+      (endVis + 2 < vis.length && vis[endVis + 1].ch === ":" && vis[endVis + 2].d >= 0);
+    runs.push({
+      startVis,
+      endVis,
+      pos: vis[startVis].pos,
+      end: vis[endVis].end,
+      digits,
+      len: digits.length,
+      isTimeAdj,
+      isCaseYearPrefix,
+      leftBlocked: (startVis > 0 && vis[startVis - 1].isAsciiWord) || isTimeAdj,
+      rightBlocked: (endVis + 1 < vis.length && vis[endVis + 1].isAsciiWord) || isTimeAdj
+    });
+  }
+  if (!runs.length) return [];
+
+  /* 연속 수평공백 개수 제한 없이 소비하며 대시·마침표는 최대 1개까지 허용 */
+  function classifySep(rA, rB, allowAreaParen) {
+    const gapLen = rB.startVis - rA.endVis - 1;
+    if (gapLen < 1) return null;
+    let punctCount = 0;
+    let hasDash = false;
+    let hasDot = false;
+    let hasSpaceAfterPunct = false;
+    for (let k = rA.endVis + 1; k < rB.startVis; k++) {
+      const v = vis[k];
+      if (v.isDash) { punctCount++; hasDash = true; }
+      else if (v.isDot) { punctCount++; hasDot = true; }
+      else if (allowAreaParen && v.ch === ")") { punctCount++; }
+      else if (v.isHws) { if (punctCount > 0) hasSpaceAfterPunct = true; }
+      else return null;
+    }
+    if (punctCount > 1) return null;
+    return { hasPunct: punctCount === 1, hasDash, hasDot, hasSpaceAfterPunct };
+  }
+
+  function isFormattedDateTripleAt(idx) {
+    if (idx < 0 || idx + 2 >= runs.length) return false;
+    const yR = runs[idx], mR = runs[idx + 1], dR = runs[idx + 2];
+    if (yR.len !== 4 || !/^(?:19|20)\d{2}$/.test(yR.digits)) return false;
+    if (mR.len < 1 || mR.len > 2 || dR.len < 1 || dR.len > 2) return false;
+    const mm = Number(mR.digits), dd = Number(dR.digits);
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
+    const s1 = classifySep(yR, mR, false);
+    const s2 = classifySep(mR, dR, false);
+    if (!s1 || !s2 || !s1.hasPunct || !s2.hasPunct) return false;
+    return s1.hasDash === s2.hasDash && s1.hasDot === s2.hasDot;
+  }
+
+  const datePartRole = new Array(runs.length).fill(0);
+  for (let i = 0; i + 2 < runs.length; i++) {
+    if (datePartRole[i] !== 0) continue;
+    if (!isFormattedDateTripleAt(i)) continue;
+    const yR = runs[i], dR = runs[i + 2];
+
+    let leftSafe = true;
+    if (i > 0) {
+      const prevSep = classifySep(runs[i - 1], yR, false);
+      if (prevSep && !runs[i - 1].rightBlocked && !yR.leftBlocked) {
+        const prevIsDate = datePartRole[i - 1] === 3;
+        const prevIsListNum = runs[i - 1].len <= 2 && prevSep.hasDot && prevSep.hasSpaceAfterPunct;
+        if (!prevIsDate && !prevIsListNum) leftSafe = false;
+      }
+    }
+
+    let rightSafe = true;
+    if (i + 3 < runs.length) {
+      const nextR = runs[i + 3];
+      const nextSep = classifySep(dR, nextR, false);
+      if (nextSep && !dR.rightBlocked && !nextR.leftBlocked) {
+        const nextIsTimeOrCase = nextR.isTimeAdj || nextR.isCaseYearPrefix;
+        const nextIsStandaloneDate = isFormattedDateTripleAt(i + 3) &&
+          (i + 6 >= runs.length || classifySep(runs[i + 5], runs[i + 6], false) === null || runs[i + 6].isTimeAdj || runs[i + 6].isCaseYearPrefix);
+        if (!nextIsTimeOrCase && !nextIsStandaloneDate) rightSafe = false;
+      }
+    }
+
+    if (leftSafe && rightSafe) {
+      datePartRole[i] = 1;
+      datePartRole[i + 1] = 2;
+      datePartRole[i + 2] = 3;
+    }
+  }
+
+  const phonePrefixRe = /^0(?:1[016789]|2|[3-6][1-5]|70|80|50\d?)$/;
+  const phoneFullRe = /^(0(?:1[016789]|2|[3-6][1-5]|70|80|50\d?))(\d{7,8})$/;
+  const spans = [];
+  let ri = 0;
+  while (ri < runs.length) {
+    if (datePartRole[ri] !== 0) {
+      ri += (datePartRole[ri] === 1 ? 3 : 1);
+      continue;
+    }
+    if (runs[ri].leftBlocked) {
+      ri++;
+      continue;
+    }
+    let matched = null;
+    const maxK = Math.min(19, runs.length - ri);
+    for (let k = maxK; k >= 1; k--) {
+      const endIdx = ri + k - 1;
+      if (runs[endIdx].rightBlocked) continue;
+      if (k === 1) {
+        const r0 = runs[ri];
+        const pm0 = phoneFullRe.exec(r0.digits);
+        if (pm0) {
+          matched = { pos: r0.pos, end: r0.end, nextIdx: ri + 1, kind: "phone", prefix: pm0[1] };
+          break;
+        }
+        if (r0.len >= 10 && r0.len <= 19) {
+          matched = { pos: r0.pos, end: r0.end, nextIdx: ri + 1, kind: "account", prefix: "" };
+          break;
+        }
+        continue;
+      }
+      if (runs[ri].len > 18) continue;
+      const firstIsArea = phonePrefixRe.test(runs[ri].digits);
+      let chainOk = true;
+      let anyPunct = false;
+      let usedAreaParen = false;
+      let totalDigits = runs[ri].len;
+      let fullDigits = runs[ri].digits;
+      for (let m = ri; m < endIdx; m++) {
+        if (runs[m].rightBlocked || runs[m + 1].leftBlocked || datePartRole[m + 1] !== 0 || runs[m + 1].len > 18) {
+          chainOk = false;
+          break;
+        }
+        const sep = classifySep(runs[m], runs[m + 1], m === ri && firstIsArea);
+        if (!sep) {
+          chainOk = false;
+          break;
+        }
+        if (m === ri && firstIsArea) {
+          for (let pk = runs[m].endVis + 1; pk < runs[m + 1].startVis; pk++) {
+            if (vis[pk].ch === ")") usedAreaParen = true;
+          }
+        }
+        if (sep.hasPunct) anyPunct = true;
+        totalDigits += runs[m + 1].len;
+        fullDigits += runs[m + 1].digits;
+      }
+      if (!chainOk || totalDigits < 9 || totalDigits > 19) continue;
+
+      const pm = phoneFullRe.exec(fullDigits);
+      if (pm && firstIsArea) {
+        const openParenPos = (usedAreaParen && runs[ri].startVis > 0 && vis[runs[ri].startVis - 1].ch === "(")
+          ? vis[runs[ri].startVis - 1].pos
+          : runs[ri].pos;
+        matched = { pos: openParenPos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: "phone", prefix: runs[ri].digits };
+        break;
+      }
+      if (usedAreaParen) continue;
+      if (anyPunct) {
+        matched = { pos: runs[ri].pos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: "account", prefix: "" };
+        break;
+      } else if (totalDigits >= 10) {
+        matched = { pos: runs[ri].pos, end: runs[endIdx].end, nextIdx: endIdx + 1, kind: "account", prefix: "" };
+        break;
+      }
+    }
+    if (matched) {
+      spans.push(matched);
+      ri = matched.nextIdx;
+    } else {
+      ri++;
+    }
+  }
+  return spans;
+}
+
 function scrubServerPii(raw, knownNames) {
   let s = String(raw || "");
   const rrnSpans = findRrnSpansServer(s);
@@ -473,10 +699,18 @@ function scrubServerPii(raw, knownNames) {
     }
     s = out + s.slice(last);
   }
-  s = s.replace(/\b(01[016789])(?:[-\s.](\d{3,4})[-\s.](\d{4})|(\d{7,8}))\b/g, (_, p1) => p1 + "-****-****");
-  s = s.replace(/\b(0(?:2|[3-6][1-5]|70))[-\s.](\d{3,4})[-\s.](\d{4})\b/g, (_, p1) => p1 + "-****-****");
   s = s.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "***@***.***");
-  s = s.replace(/((?:은행|계좌|계좌번호|입금계좌|예금)\s*[:：]?\s*(?:[가-힣A-Za-z]{2,10}\s+)?)(\d{2,6}[-\s]\d{2,6}[-\s]\d{2,8}|\d{10,16})\b/g, (_, prefix) => prefix + "***-***-******");
+  s = s.replace(/((?:은행|계좌|계좌번호|입금계좌|예금)\s*[:：]?\s*(?:[가-힣A-Za-z]{2,10}\s+)?)(\d{1,6}(?:[^\S\r\n.．·-‐‑‒–—―﹣－]*[.．·-‐‑‒–—―﹣－\t\v\f \u00A0\u3000][^\S\r\n]*\d{1,8}){1,8}|\d{8,19})\b/g, (_, prefix) => prefix + "***-***-******");
+  for (let pass = 0; pass < 3; pass++) {
+    const numSpans = findNumericPiiSpansServer(s);
+    if (!numSpans.length) break;
+    let outNum = "", lastNum = 0;
+    for (const ns of numSpans) {
+      outNum += s.slice(lastNum, ns.pos) + (ns.kind === "phone" ? (ns.prefix + "-****-****") : "***-***-******");
+      lastNum = ns.end;
+    }
+    s = outNum + s.slice(lastNum);
+  }
   s = s.replace(/(\d{1,4})동\s*(\d{1,5})호/g, "***동 ***호");
 
   const nameList = Array.isArray(knownNames) && knownNames.length
@@ -525,29 +759,153 @@ function scrubDocumentObjectServer(d) {
   };
 }
 
-function collectStringsServer(val, out) {
-  if (typeof val === "string") { out.push(val); return; }
+function collectStringsServer(val, out, parentKey) {
+  if (typeof val === "string") {
+    if (parentKey === "ingested_by" || parentKey === "ownerUid") return;
+    if (parentKey === "id" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) return;
+    if ((parentKey === "canonical_key" || parentKey === "canonicalKey") && /^hash\|/.test(val)) {
+      const chunks = val.split("|");
+      if (chunks.length >= 3) {
+        out.push(chunks.slice(1, chunks.length - 1).filter((c) => !/^(?:kakao|google|naver|uid):/i.test(c)).join("|"));
+        return;
+      }
+    }
+    out.push(val);
+    return;
+  }
   if (!val || typeof val !== "object") return;
   if (Array.isArray(val)) {
-    for (const v of val) collectStringsServer(v, out);
+    for (const v of val) collectStringsServer(v, out, parentKey);
     return;
   }
   for (const k of Object.keys(val)) {
     out.push(k);
-    collectStringsServer(val[k], out);
+    collectStringsServer(val[k], out, k);
   }
+}
+
+function hasQueryBankOrPhoneDigits(raw) {
+  return findNumericPiiSpansServer(raw).length > 0;
 }
 
 function hasResidualHardPii(rowObj) {
   const parts = [];
-  collectStringsServer(rowObj, parts);
+  collectStringsServer(rowObj, parts, "");
   for (const str of parts) {
     if (findRrnSpansServer(str).length > 0) return true;
+    if (findNumericPiiSpansServer(str).length > 0) return true;
   }
   const dump = parts.join("\n\n");
   if (/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(dump)) return true;
-  if (/\b01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b/.test(dump)) return true;
+  if (/(?:은행|계좌|계좌번호|입금계좌|예금)\s*[:：]?\s*(?:[가-힣A-Za-z]{2,10}\s+)?(?:\d{1,6}(?:[^\S\r\n.．·-‐‑‒–—―﹣－]*[.．·-‐‑‒–—―﹣－\t\v\f \u00A0\u3000][^\S\r\n]*\d{1,8}){1,8}|\d{8,19})\b/.test(dump)) return true;
   return false;
+}
+
+/* 외부 공공 API(법제처·공단 등) 전송 검색어 공통 개인정보 검증 및 당사자 실명 마스킹
+   - 어떠한 사전 절단(slice)도 없이 입력 원문 전체에 대해 PII 검사와 원래 길이 검사를 먼저 수행한다.
+   - 공백 패딩을 포함한 원문 길이가 한도를 넘거나 PII가 감지되면 축약 전송 없이 즉시 거부(HTTP 400)한다. */
+function validateAndScrubOfficialQuery(rawQuery, opts) {
+  const o = opts || {};
+  const allowEmpty = o.allowEmpty === true;
+  const maxLen = Math.max(10, Math.min(Number(o.maxLen) || 50, 80));
+  if (rawQuery != null && typeof rawQuery !== "string") {
+    return { ok: false, query: "", error: "검색어 형식이 올바르지 않습니다." };
+  }
+  const rawStr = String(rawQuery == null ? "" : rawQuery);
+  if (rawStr === "") {
+    return allowEmpty
+      ? { ok: true, query: "" }
+      : { ok: false, query: "", error: "실시간·하급심 수집 검색어는 2글자 이상 입력해 주세요." };
+  }
+  if (rawStr.length > 100000) {
+    return { ok: false, query: "", error: "검색어는 " + maxLen + "자 이하로 입력해 주세요." };
+  }
+  if (hasResidualHardPii({ q: rawStr })) {
+    return {
+      ok: false,
+      query: "",
+      error: "검색어에 주민등록번호·연락처·이메일·계좌번호 등 개인정보를 포함할 수 없습니다."
+    };
+  }
+  if (rawStr.length > maxLen) {
+    return { ok: false, query: "", error: "검색어는 " + maxLen + "자 이하로 입력해 주세요." };
+  }
+  const full = rawStr.trim();
+  if (!full) {
+    return allowEmpty
+      ? { ok: true, query: "" }
+      : { ok: false, query: "", error: "실시간·하급심 수집 검색어는 2글자 이상 입력해 주세요." };
+  }
+  if (full.length < 2) {
+    return { ok: false, query: "", error: "검색어는 2글자 이상 입력해 주세요." };
+  }
+  if (full.length > maxLen) {
+    return { ok: false, query: "", error: "검색어는 " + maxLen + "자 이하로 입력해 주세요." };
+  }
+  const cleaned = scrubServerPii(full, []).replace(/[<>"'`;]/g, "").trim();
+  if (cleaned.length < 2) {
+    return { ok: false, query: "", error: "유효한 법률 검색어를 입력해 주세요." };
+  }
+  return { ok: true, query: cleaned };
+}
+
+/* 다중 Cloud Functions 인스턴스·콜드스타트 간 공유되는 원자적 호출 제한기(Firebase RTDB 트랜잭션) */
+async function claimActionCooldownShared(opts) {
+  const o = opts || {};
+  const action = String(o.action || "").replace(/[^a-z0-9_-]/gi, "");
+  const safeUid = String(o.uid || "anon").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) || "anon";
+  const uidMinMs = Math.max(0, Number(o.uidMinMs) || 0);
+  const globalMinMs = Math.max(0, Number(o.globalMinMs) || 0);
+  const now = Number.isFinite(Number(o.nowMs)) ? Number(o.nowMs) : Date.now();
+  const db = o.db || null;
+
+  if (!action || !db || typeof db.ref !== "function") {
+    return { ok: false, error: "중앙 호출 제한 저장소(RTDB)에 연결할 수 없습니다." };
+  }
+
+  let blockedMsg = "";
+  const ref = db.ref("pbox_server_rate/" + action);
+  const txRes = await ref.transaction((cur) => {
+    blockedMsg = "";
+    const state = (cur && typeof cur === "object" && !Array.isArray(cur)) ? cur : {};
+    const gLast = Number(state.globalAt) || 0;
+    if (globalMinMs > 0 && now - gLast < globalMinMs) {
+      const waitSec = Math.max(1, Math.ceil((globalMinMs - (now - gLast)) / 1000));
+      blockedMsg = "공용 공공API 한도 보호를 위해 잠시 후(" + waitSec + "초 뒤) 다시 시도해 주세요.";
+      return;
+    }
+    const prevUids = (state.byUid && typeof state.byUid === "object" && !Array.isArray(state.byUid))
+      ? state.byUid
+      : {};
+    const uLast = Number(prevUids[safeUid]) || 0;
+    if (uidMinMs > 0 && now - uLast < uidMinMs) {
+      const waitSec2 = Math.max(1, Math.ceil((uidMinMs - (now - uLast)) / 1000));
+      blockedMsg = "연속 수집 요청 간격 제한입니다. " + waitSec2 + "초 후 다시 시도해 주세요.";
+      return;
+    }
+    const nextUids = {};
+    const entries = Object.entries(prevUids);
+    for (let i = 0; i < entries.length; i++) {
+      const [k, ts] = entries[i];
+      const numTs = Number(ts) || 0;
+      if (numTs > 0 && now - numTs <= 600000 && k !== safeUid) {
+        nextUids[k] = numTs;
+      }
+    }
+    nextUids[safeUid] = now;
+    return {
+      globalAt: now,
+      byUid: nextUids
+    };
+  });
+
+  if (!txRes || txRes.committed !== true) {
+    return {
+      ok: false,
+      error: blockedMsg || "동시 수집 요청이 집중되어 잠시 후 다시 시도해 주세요."
+    };
+  }
+  return { ok: true, error: "" };
 }
 
 /* 1) legalize-kr 국가법령 Git 트리 SHA 증분 확인 (무료·무인증 HTTPS) */
@@ -602,7 +960,8 @@ function extractDrfServiceRootOrThrow(j) {
     !VALID_DRF_SERVICE_ROOTS.has(rootKey) &&
     !rootObj.판결내용 && !rootObj.판결요지 && !rootObj.판시사항 &&
     !rootObj.회답 && !rootObj.이유 && !rootObj.회시내용 &&
-    !rootObj.결정요지 && !rootObj.재결요지 && !rootObj.참조조문
+    !rootObj.결정요지 && !rootObj.재결요지 && !rootObj.주문 &&
+    !rootObj.조문내용 && !rootObj.참조조문
   ) {
     throw new Error("Unexpected DRF detail schema: " + rootKey);
   }
@@ -635,8 +994,10 @@ async function fetchLawGoKrDetailRich(oc, target, serialId, fetchFn) {
       root.회답,
       root.이유,
       root.회시내용,
+      root.주문,
       root.결정요지,
-      root.재결요지
+      root.재결요지,
+      Array.isArray(root.조문내용) ? root.조문내용.join("\n") : root.조문내용
     ].filter(Boolean);
     const body = parts.join("\n\n").replace(/<br\s*\/?>/gi, "\n").trim();
     const refLaws = splitRefTokens(root.참조조문 || root.관련법령 || "");
@@ -652,7 +1013,7 @@ async function fetchLawGoKrDetail(oc, target, serialId, fetchFn) {
   return rich.body;
 }
 
-/* 2) 국가법령정보 공동활용 오픈API(HTTPS) 페이지네이션·증분일자·상세전문 수집 (대법원 org=400201 + 하급심 org=400202 포함) */
+/* 2) 국가법령정보 공동활용 오픈API(HTTPS) 페이지네이션·증분일자·상세전문 수집 (대법원·하급심·헌재·노동위·행심·부처해석·행정규칙·위원회 전체) */
 async function pullLawGoKrRecent(oc, fetchFn, opts) {
   const cleanOc = sanitizeLawOc(oc);
   if (!cleanOc) return { docs: [], attempted: 0, succeeded: 0, errors: [] };
@@ -660,7 +1021,7 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
   const o = opts || {};
   const maxPages = Math.max(1, Math.min(Number(o.maxPages) || 2, 10));
   const sinceDate = String(o.sinceDate || "").trim();
-  let detailBudget = Number.isFinite(Number(o.detailLimit)) ? Math.max(0, Math.trunc(Number(o.detailLimit))) : 16;
+  let detailBudget = Number.isFinite(Number(o.detailLimit)) ? Math.max(0, Math.trunc(Number(o.detailLimit))) : 20;
 
   const targets = [
     { target: "prec", org: "400201", search: "1", query: "근로기준법", docType: "prec_sc", agency: "대법원" },
@@ -668,9 +1029,15 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
     { target: "prec", org: "400202", search: "2", query: "통상임금", docType: "prec_lower", agency: "하급심법원" },
     { target: "prec", org: "400202", search: "2", query: "산업재해", docType: "prec_lower", agency: "하급심법원" },
     { target: "prec", org: "400202", search: "2", query: "직장내괴롭힘", docType: "prec_lower", agency: "하급심법원" },
+    { target: "prec", org: "400202", search: "2", query: "중대재해", docType: "prec_lower", agency: "하급심법원" },
+    { target: "detc", query: "근로", docType: "dec_const", agency: "헌법재판소" },
+    { target: "nlrc", query: "부당해고", docType: "dec_nlrc", agency: "중앙노동위원회" },
+    { target: "decc", query: "근로", docType: "dec_admin", agency: "중앙행정심판위원회" },
     { target: "expc", query: "근로", docType: "interp_gov", agency: "법제처" },
     { target: "cgmExpc", query: "임금", docType: "interp_moel", agency: "고용노동부·중앙부처" },
-    { target: "nlrc", query: "부당해고", docType: "dec_nlrc", agency: "중앙노동위원회" }
+    { target: "admrul", query: "근로기준", docType: "interp_moel", agency: "고용노동부 훈령·예규" },
+    { target: "ppc", query: "근로자", docType: "interp_gov", agency: "개인정보보호위원회" },
+    { target: "nhrck", query: "고용", docType: "interp_gov", agency: "국가인권위원회" }
   ];
 
   const out = [];
@@ -698,29 +1065,29 @@ async function pullLawGoKrRecent(oc, fetchFn, opts) {
         const rootObj = extractDrfRootOrThrow(j, t.target);
         succeeded++;
 
-        const list = rootObj[t.target] || rootObj.prec || [];
+        const list = rootObj[t.target] || rootObj.admrul || rootObj.detc || rootObj.decc || rootObj.ppc || rootObj.nhrck || rootObj.prec || [];
         const arr = Array.isArray(list) ? list : (list ? [list] : []);
         if (!arr.length) break;
 
         let hitOldCursor = false;
         for (const item of arr) {
-          const title = item.사건명 || item.안건명 || item.제목 || "";
-          const caseNo = item.사건번호 || item.안건번호 || item.문서번호 || "";
+          const title = item.사건명 || item.안건명 || item.행정규칙명 || item.제목 || "";
+          const caseNo = item.사건번호 || item.안건번호 || item.문서번호 || item.발령번호 || "";
           if (!title && !caseNo) continue;
-          const dateStr = formatYmd(item.선고일자 || item.회시일자 || item.의결일자 || "");
+          const dateStr = formatYmd(item.선고일자 || item.종국일자 || item.회시일자 || item.의결일자 || item.발령일자 || item.시행일자 || "");
           if (sinceDate && dateStr && dateStr < sinceDate) {
             hitOldCursor = true;
             continue;
           }
-          const court = item.법원명 || item.해석기관명 || item.결정기관명 || t.agency;
+          const court = item.법원명 || item.해석기관명 || item.결정기관명 || item.재결청 || item.소관부처명 || t.agency;
           let body = String(
             item.판결내용 || item.판결요지 || item.판시사항 ||
             item.회시내용 || item.이유 || item.회답 ||
-            item.결정요지 || item.재결요지 || ""
+            item.결정요지 || item.재결요지 || item.주문 || ""
           ).trim();
           let refLaws = splitRefTokens(item.참조조문 || item.관련법령 || "");
           let refCases = splitRefTokens(item.참조판례 || "");
-          const serialId = item.판례일련번호 || item.법령해석례일련번호 || item.문서일련번호 || item.일련번호 || "";
+          const serialId = item.판례일련번호 || item.헌재결정례일련번호 || item.행정심판재결례일련번호 || item.법령해석례일련번호 || item.행정규칙일련번호 || item.문서일련번호 || item.일련번호 || "";
           const needsDetail = (!item.판결내용 || !refLaws.length || body.length < 160) && Boolean(serialId) && detailBudget > 0;
           if (needsDetail) {
             detailBudget--;
@@ -791,15 +1158,37 @@ async function pullLawGoKrLowerCourt(oc, fetchFn, opts) {
 
   const presetKey = String(o.preset || "all").trim();
   const basePreset = LOWER_COURT_PRESETS[presetKey] || LOWER_COURT_PRESETS.all;
+  const maxQueries = Math.max(1, Math.min(Number(o.maxQueries) || 25, 30));
   let queries = [];
-  if (Array.isArray(o.queries) && o.queries.length) {
-    queries = o.queries.map((q) => String(q || "").trim().slice(0, 40)).filter(Boolean);
-  } else if (typeof o.query === "string" && o.query.trim()) {
-    queries = [o.query.trim().slice(0, 40)];
+  if (o.queries !== undefined && o.queries !== null) {
+    if (!Array.isArray(o.queries)) {
+      return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: ["하급심 검색어 목록 형식이 올바르지 않습니다."] };
+    }
+    if (o.queries.length > 1000) {
+      return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: ["하급심 검색어는 한 번에 최대 " + maxQueries + "개까지 지정할 수 있습니다."] };
+    }
+    for (const rawQItem of o.queries) {
+      const qChk = validateAndScrubOfficialQuery(rawQItem, { allowEmpty: false, maxLen: 40 });
+      if (!qChk.ok) {
+        return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: [qChk.error] };
+      }
+      queries.push(qChk.query);
+    }
+    if (o.queries.length > maxQueries) {
+      return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: ["하급심 검색어는 한 번에 최대 " + maxQueries + "개까지 지정할 수 있습니다."] };
+    }
+    if (!queries.length) {
+      queries = basePreset.slice();
+    }
+  } else if (o.query !== undefined && o.query !== null && o.query !== "") {
+    const qChkSingle = validateAndScrubOfficialQuery(o.query, { allowEmpty: false, maxLen: 40 });
+    if (!qChkSingle.ok) {
+      return { docs: [], rawCount: 0, attempted: 0, succeeded: 0, queries: [], courtFilter: courtCheck.court, invalidInput: true, errors: [qChkSingle.error] };
+    }
+    queries = [qChkSingle.query];
   } else {
     queries = basePreset.slice();
   }
-  const maxQueries = Math.max(1, Math.min(Number(o.maxQueries) || 25, 30));
   queries = Array.from(new Set(queries)).slice(0, maxQueries);
 
   const courtFilter = courtCheck.court;
@@ -1097,9 +1486,9 @@ async function upsertToSupabase(docs, env, fetchFn, ingestedByUid, opts) {
     return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [] };
   }
 
-  /* 2) 기존 canonical_key 소유자 및 삭제 툼스톤 사전 조회 */
+  /* 2) 기존 canonical_key 소유자 및 삭제 툼스톤·기존 본문 길이 사전 조회 */
   const inFilter = "(" + rows.map((r) => '"' + r.canonical_key.replace(/"/g, "") + '"').join(",") + ")";
-  const checkUrl = creds.url + "/rest/v1/pbox_documents?select=canonical_key,ingested_by,deleted_at&canonical_key=in." + encodeURIComponent(inFilter);
+  const checkUrl = creds.url + "/rest/v1/pbox_documents?select=canonical_key,ingested_by,deleted_at,body,tags,ref_laws,ref_cases,sources&canonical_key=in." + encodeURIComponent(inFilter);
   const checkRes = await safeHttpsFetch(f, checkUrl, {
     method: "GET",
     headers: {
@@ -1136,6 +1525,21 @@ async function upsertToSupabase(docs, env, fetchFn, ingestedByUid, opts) {
     if (ex.deleted_at) {
       tombstoned.push(row.canonical_key);
       continue;
+    }
+    /* insertOnly 모드(직원 실시간 키워드 수집 등)에서는 기존 공유 문서를 절대 PATCH로 덮어쓰지 않음 */
+    if (o.insertOnly === true) {
+      canonicalKeys.push(row.canonical_key);
+      continue;
+    }
+    /* system_sync 갱신 시 상세 전문(긴 본문)이 목록 요약본으로 줄어들지 않도록 보호하고 메타 배열은 합집합 병합 */
+    if (owner === "system_sync") {
+      if (typeof ex.body === "string" && ex.body.length > String(row.body || "").length) {
+        row.body = ex.body;
+      }
+      if (Array.isArray(ex.tags)) row.tags = Array.from(new Set([].concat(ex.tags, row.tags || []))).slice(0, 20);
+      if (Array.isArray(ex.ref_laws)) row.ref_laws = Array.from(new Set([].concat(ex.ref_laws, row.ref_laws || []))).slice(0, 30);
+      if (Array.isArray(ex.ref_cases)) row.ref_cases = Array.from(new Set([].concat(ex.ref_cases, row.ref_cases || []))).slice(0, 30);
+      if (Array.isArray(ex.sources)) row.sources = Array.from(new Set([].concat(ex.sources, row.sources || []))).slice(0, 12);
     }
     toUpdateOwn.push(row);
   }
@@ -1556,13 +1960,18 @@ async function runSync(opts) {
   const o = opts || {};
   const env = o.env || process.env || {};
   const fetchFn = o.fetchFn || fetch;
-  const lawOc = o.lawOc || env.LAW_OC || "";
+  const lawOc = o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || "";
   const dataKey = o.dataGoKrKey || env.DATA_GO_KR_KEY || "";
+  const safeMaxPages = Math.max(1, Math.min(Number(o.maxPages) || 2, 5));
+  const rawSince = sanitizeCompactYmd(o.sinceDate || "");
+  const safeSinceDate = rawSince.length === 8
+    ? (rawSince.slice(0, 4) + "-" + rawSince.slice(4, 6) + "-" + rawSince.slice(6, 8))
+    : "";
 
   const [treeCheck, lawRes, comwelRes] = await Promise.all([
     checkLegalizeKrTree(fetchFn),
-    pullLawGoKrRecent(lawOc, fetchFn, { maxPages: o.maxPages, sinceDate: o.sinceDate, detailLimit: o.detailLimit }),
-    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: o.maxPages })
+    pullLawGoKrRecent(lawOc, fetchFn, { maxPages: safeMaxPages, sinceDate: safeSinceDate, detailLimit: o.detailLimit }),
+    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: safeMaxPages })
   ]);
 
   const errors = [];
@@ -1616,7 +2025,7 @@ async function pullLowerCourtBundle(opts) {
   const o = opts || {};
   const env = o.env || process.env || {};
   const fetchFn = o.fetchFn || fetch;
-  const lawOc = sanitizeLawOc(o.lawOc || env.LAW_OC || "");
+  const lawOc = sanitizeLawOc(o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || "");
   const dataKey = String(o.dataGoKrKey || env.DATA_GO_KR_KEY || "").trim();
   const includeComwel = o.includeComwel !== false && !!dataKey;
 
@@ -1633,17 +2042,43 @@ async function pullLowerCourtBundle(opts) {
     };
   }
 
-  /* 법원명·선고일자 범위 사전 검증 (유효하지 않은 필터는 전체 조회나 무효 날짜로 내보내지 않고 즉시 400 반환) */
+  /* 법원명·선고일자 범위·검색어 개인정보 사전 검증 (유효하지 않은 필터나 PII 검색어는 외부 요청 없이 즉시 400 반환) */
   const preCourt = validateCourtFilterStrict(o.court);
   const preFrom = validateCompactYmdStrict(o.dateFrom, "선고 시작일");
   const preTo = validateCompactYmdStrict(o.dateTo, "선고 종료일");
-  const rangeErr = !preCourt.ok
+  const bundleMaxQueries = Math.max(1, Math.min(Number(o.maxQueries) || 8, 30));
+  let sanitizedBundleQuery = "";
+  let sanitizedBundleQueries = undefined;
+  let queryValidationErr = "";
+  if (o.queries !== undefined && o.queries !== null) {
+    if (!Array.isArray(o.queries)) {
+      queryValidationErr = "하급심 검색어 목록 형식이 올바르지 않습니다.";
+    } else if (o.queries.length > 1000) {
+      queryValidationErr = "하급심 검색어는 한 번에 최대 " + bundleMaxQueries + "개까지 지정할 수 있습니다.";
+    } else if (o.queries.length > 0) {
+      sanitizedBundleQueries = [];
+      for (const rq of o.queries) {
+        const qc = validateAndScrubOfficialQuery(rq, { allowEmpty: false, maxLen: 40 });
+        if (!qc.ok) { queryValidationErr = qc.error; break; }
+        sanitizedBundleQueries.push(qc.query);
+      }
+      if (!queryValidationErr && o.queries.length > bundleMaxQueries) {
+        queryValidationErr = "하급심 검색어는 한 번에 최대 " + bundleMaxQueries + "개까지 지정할 수 있습니다.";
+      }
+    }
+  } else if (o.query !== undefined && o.query !== null && o.query !== "") {
+    const qcSingle = validateAndScrubOfficialQuery(o.query, { allowEmpty: false, maxLen: 40 });
+    if (!qcSingle.ok) queryValidationErr = qcSingle.error;
+    else sanitizedBundleQuery = qcSingle.query;
+  }
+
+  const rangeErr = queryValidationErr || (!preCourt.ok
     ? preCourt.error
     : (!preFrom.ok ? preFrom.error : (!preTo.ok ? preTo.error : (
         (preFrom.compact && preTo.compact && preFrom.compact > preTo.compact)
           ? ("선고 시작일(" + preFrom.compact + ")이 선고 종료일(" + preTo.compact + ")보다 늦을 수 없습니다.")
           : ""
-      )));
+      ))));
   if (rangeErr) {
     return {
       ok: false,
@@ -1662,8 +2097,8 @@ async function pullLowerCourtBundle(opts) {
     lawOc
       ? pullLawGoKrLowerCourt(lawOc, fetchFn, {
           preset: o.preset,
-          query: o.query,
-          queries: o.queries,
+          query: sanitizedBundleQuery,
+          queries: sanitizedBundleQueries,
           maxQueries: o.maxQueries || 8,
           court: preCourt.court,
           dateFrom: preFrom.compact,
@@ -1684,10 +2119,10 @@ async function pullLowerCourtBundle(opts) {
   const attempted = (lowerRes.attempted || 0) + (comwelRes.attempted || 0);
   const succeeded = (lowerRes.succeeded || 0) + (comwelRes.succeeded || 0);
 
-  const explicitQueries = Array.isArray(o.queries) && o.queries.length
-    ? o.queries.map((q) => String(q || "").trim()).filter(Boolean)
-    : (typeof o.query === "string" && o.query.trim()
-        ? [o.query.trim()]
+  const explicitQueries = Array.isArray(sanitizedBundleQueries) && sanitizedBundleQueries.length
+    ? sanitizedBundleQueries
+    : (sanitizedBundleQuery
+        ? [sanitizedBundleQuery]
         : ((o.preset && o.preset !== "all" && o.preset !== "sanjae" && o.preset !== "backfill_full" && LOWER_COURT_PRESETS[o.preset])
             ? LOWER_COURT_PRESETS[o.preset]
             : []));
@@ -1742,6 +2177,296 @@ async function pullLowerCourtBundle(opts) {
   };
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * 8. 대한민국 전 공공·사법·노동 기관 실시간 키워드 동시 수집(liveSearchOfficialApis)
+ * ══════════════════════════════════════════════════════════════ */
+async function liveSearchOfficialApis(opts) {
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const f = o.fetchFn || fetch;
+
+  const qCheck = validateAndScrubOfficialQuery(o.query, { allowEmpty: false, maxLen: 50 });
+  if (!qCheck.ok) {
+    return {
+      ok: false,
+      partial: false,
+      status: 400,
+      error: qCheck.error,
+      docs: [],
+      sourcesHit: [],
+      errors: [qCheck.error]
+    };
+  }
+  const cleanQuery = qCheck.query;
+
+  const lawOc = sanitizeLawOc(o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || "");
+  const dataKey = String(o.dataGoKrKey || env.DATA_GO_KR_KEY || "").trim();
+  if (!lawOc && !dataKey) {
+    return {
+      ok: false,
+      partial: false,
+      status: 400,
+      error: "법제처 공동활용 무료 OC 아이디(open.law.go.kr 이메일 앞자리)를 입력하거나 서버 환경변수(LAW_OC)를 설정해 주세요.",
+      docs: [],
+      sourcesHit: [],
+      errors: ["OC 미설정"]
+    };
+  }
+
+  const maxPerTarget = Math.max(3, Math.min(Number(o.maxPerTarget) || 12, 25));
+  let detailBudget = Number.isFinite(Number(o.detailLimit))
+    ? Math.max(0, Math.min(Math.trunc(Number(o.detailLimit)), 20))
+    : 10;
+
+  const ALL_LIVE_TARGETS = [
+    { id: "prec_sc", target: "prec", org: "400201", search: "2", docType: "prec_sc", label: "대법원 판례" },
+    { id: "prec_lower", target: "prec", org: "400202", search: "2", docType: "prec_lower", label: "지방법원·고등법원 하급심" },
+    { id: "detc", target: "detc", docType: "dec_const", label: "헌법재판소 결정례" },
+    { id: "nlrc", target: "nlrc", docType: "dec_nlrc", label: "중앙노동위원회 판정례" },
+    { id: "cgmExpc", target: "cgmExpc", docType: "interp_moel", label: "고용노동부·중앙부처 유권해석" },
+    { id: "expc", target: "expc", docType: "interp_gov", label: "법제처 법령해석례" },
+    { id: "decc", target: "decc", docType: "dec_admin", label: "중앙행정심판 재결례" },
+    { id: "admrul", target: "admrul", docType: "interp_moel", label: "행정규칙·훈령·예규·지침" }
+  ];
+
+  const reqTargets = Array.isArray(o.targets) && o.targets.length
+    ? ALL_LIVE_TARGETS.filter((t) => o.targets.includes(t.id) || o.targets.includes(t.target))
+    : ALL_LIVE_TARGETS;
+
+  const rawDocs = [];
+  const errors = [];
+  const sourcesHit = [];
+  let attempted = 0;
+  let succeeded = 0;
+
+  if (lawOc && reqTargets.length) {
+    const settled = await Promise.allSettled(reqTargets.map(async (t) => {
+      attempted++;
+      let url = LAW_DRF_SEARCH_HTTPS +
+        "?OC=" + encodeURIComponent(lawOc) +
+        "&target=" + encodeURIComponent(t.target) +
+        "&type=JSON&display=" + maxPerTarget +
+        "&page=1&query=" + encodeURIComponent(cleanQuery);
+      if (t.org) url += "&org=" + encodeURIComponent(t.org);
+      if (t.search) url += "&search=" + encodeURIComponent(t.search);
+
+      const r = await safeHttpsFetch(f, url, { headers: { "User-Agent": UA } });
+      if (!r.ok) throw new Error(t.label + ": HTTP " + r.status);
+      const j = await r.json();
+      const rootObj = extractDrfRootOrThrow(j, t.target);
+      const list = rootObj[t.target] || rootObj.admrul || rootObj.detc || rootObj.decc || rootObj.prec || [];
+      const arr = Array.isArray(list) ? list : (list ? [list] : []);
+      return { targetCfg: t, items: arr };
+    }));
+
+    for (const st of settled) {
+      if (st.status === "rejected") {
+        errors.push(String((st.reason && st.reason.message) || st.reason));
+        continue;
+      }
+      succeeded++;
+      const { targetCfg: t, items } = st.value;
+      let targetCount = 0;
+      for (const item of items) {
+        const title = item.사건명 || item.안건명 || item.행정규칙명 || item.제목 || "";
+        const caseNo = item.사건번호 || item.안건번호 || item.문서번호 || item.발령번호 || "";
+        if (!title && !caseNo) continue;
+        const dateStr = formatYmd(item.선고일자 || item.종국일자 || item.회시일자 || item.의결일자 || item.발령일자 || item.시행일자 || "");
+        const court = String(item.법원명 || item.해석기관명 || item.결정기관명 || item.재결청 || item.소관부처명 || t.label).trim();
+        if (t.org === "400202" && court === "대법원") continue;
+
+        let body = String(
+          item.판결내용 || item.판결요지 || item.판시사항 ||
+          item.회시내용 || item.이유 || item.회답 ||
+          item.결정요지 || item.재결요지 || item.주문 || ""
+        ).trim();
+        let refLaws = splitRefTokens(item.참조조문 || item.관련법령 || "");
+        let refCases = splitRefTokens(item.참조판례 || "");
+        const serialId = item.판례일련번호 || item.헌재결정례일련번호 || item.행정심판재결례일련번호 || item.법령해석례일련번호 || item.행정규칙일련번호 || item.문서일련번호 || item.일련번호 || "";
+        if ((!body || body.length < 160 || !refLaws.length) && serialId && detailBudget > 0) {
+          detailBudget--;
+          const det = await fetchLawGoKrDetailRich(lawOc, t.target, serialId, f);
+          if (det.ok) {
+            if (det.body.length > body.length) body = det.body;
+            if (det.refLaws.length) refLaws = Array.from(new Set([].concat(refLaws, det.refLaws))).slice(0, 30);
+            if (det.refCases.length) refCases = Array.from(new Set([].concat(refCases, det.refCases))).slice(0, 30);
+          } else {
+            errors.push(t.label + "(상세:" + serialId + "): " + (det.error || "detail failed"));
+          }
+        }
+        if (body.length < 20) continue;
+
+        const scrubbed = scrubDocumentObjectServer({
+          docType: court === "대법원" ? "prec_sc" : t.docType,
+          court,
+          agency: court,
+          caseNo,
+          decisionDate: dateStr,
+          title: title || (court + " " + caseNo),
+          summary: String(item.판시사항 || item.판결요지 || item.질의요지 || body).slice(0, 400),
+          body,
+          tags: [t.label],
+          refLaws,
+          refCases,
+          sources: ["실시간 공공API 수집 (" + t.label + ")"]
+        });
+        if (hasResidualHardPii(scrubbed) || scrubbed.body.length < 20) continue;
+        scrubbed.verified = true;
+        scrubbed.canonicalKey = canonicalKeyOf(scrubbed, "system_sync");
+        rawDocs.push(scrubbed);
+        targetCount++;
+      }
+      if (targetCount > 0) sourcesHit.push(t.label + " " + targetCount + "건");
+    }
+  }
+
+  if (dataKey && o.includeComwel !== false) {
+    const cw = await pullComwelSanjaeCases(dataKey, f);
+    attempted += cw.attempted || 0;
+    succeeded += cw.succeeded || 0;
+    if (cw.errors && cw.errors.length) errors.push(...cw.errors);
+    const qLow = cleanQuery.toLowerCase();
+    const matchedCw = (cw.docs || []).filter((d) => {
+      const hay = [d.title, d.summary, d.body, d.caseNo].join(" ").toLowerCase();
+      return hay.includes(qLow) || hay.replace(/\s+/g, "").includes(qLow.replace(/\s+/g, ""));
+    });
+    if (matchedCw.length) {
+      rawDocs.push(...matchedCw);
+      sourcesHit.push("근로복지공단 산재판례 " + matchedCw.length + "건");
+    }
+  }
+
+  const deduped = deduplicateBatch(rawDocs, "system_sync");
+  let supaRes = { ok: true, pushed: 0, skipped: true };
+  if (getSupabaseCreds(env) && deduped.length > 0 && o.skipSupabase !== true) {
+    supaRes = await upsertToSupabase(deduped, env, f, "system_sync", { insertOnly: true }).catch((e) => {
+      errors.push("supabase: " + String(e.message || e));
+      return { ok: false, pushed: 0 };
+    });
+    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:"))) {
+      errors.push("supabase: upsert failed (HTTP " + (supaRes.status || 500) + ")");
+    }
+  }
+
+  const upstreamOk = attempted > 0 && succeeded > 0;
+  const fullOk = upstreamOk && supaRes.ok !== false && errors.length === 0;
+  const partialOk = !fullOk && succeeded > 0;
+
+  return {
+    ok: fullOk,
+    partial: partialOk,
+    status: (fullOk || partialOk) ? 200 : 502,
+    error: (!fullOk && !partialOk) ? (errors[0] || "실시간 공공 API 응답을 받지 못했습니다.") : undefined,
+    query: cleanQuery,
+    syncedAt: new Date().toISOString(),
+    fetchedCount: rawDocs.length,
+    dedupedCount: deduped.length,
+    supabasePushed: supaRes.pushed || 0,
+    sourcesHit,
+    errors,
+    docs: deduped
+  };
+}
+
+/* HTTP pboxApi 액션 처리기 — 어떠한 사전 절단(slice)도 없이 원문 전체·전체 배열 검증을 먼저 수행 */
+async function handleApiAction(opts) {
+  const o = opts || {};
+  const body = (o.body && typeof o.body === "object" && !Array.isArray(o.body)) ? o.body : {};
+  const uid = String(o.uid || "").trim();
+  const env = o.env || process.env || {};
+  const f = o.fetchFn || fetch;
+  const checkCool = typeof o.enforceCooldown === "function" ? o.enforceCooldown : (async () => "");
+  const action = String(body.action || o.action || "sync");
+
+  if (action === "pull") {
+    const pulled = await pullFromSupabaseServer(
+      env,
+      f,
+      body.limit,
+      body.sinceDeletedAt || "",
+      body.afterDeletedKey || ""
+    );
+    return { status: pulled.ok === false ? 502 : 200, payload: pulled };
+  }
+  if (action === "push") {
+    if (body.docs !== undefined && (!Array.isArray(body.docs) || body.docs.length > 50)) {
+      return { status: 400, payload: { ok: false, error: "공유 문서 업로드는 한 번에 최대 50건까지 가능합니다." } };
+    }
+    const docs = Array.isArray(body.docs) ? body.docs : [];
+    const pushed = await upsertToSupabase(docs, env, f, uid, {});
+    const status = pushed.ok === false ? (pushed.status || 403) : 200;
+    return { status, payload: Object.assign({ ok: pushed.ok !== false }, pushed) };
+  }
+  if (action === "delete") {
+    if (body.canonicalKeys !== undefined && (!Array.isArray(body.canonicalKeys) || body.canonicalKeys.length > 50)) {
+      return { status: 400, payload: { ok: false, error: "공유 문서 삭제는 한 번에 최대 50건까지 가능합니다." } };
+    }
+    const keys = Array.isArray(body.canonicalKeys) ? body.canonicalKeys : [];
+    const del = await deleteFromSupabaseServer(keys, env, f, uid);
+    const delStatus = del.ok === false ? (del.status || 502) : 200;
+    return { status: delStatus, payload: Object.assign({ ok: del.ok !== false }, del) };
+  }
+  if (action === "pull_lower_court") {
+    const coolLower = await checkCool(uid, "pull_lower_court", 12000, 4000);
+    if (coolLower) return { status: 429, payload: { ok: false, error: coolLower, docs: [] } };
+    const lowerOut = await pullLowerCourtBundle({
+      env,
+      fetchFn: f,
+      lawOc: body.lawOc,
+      preset: body.preset || "all",
+      query: body.query,
+      queries: body.queries,
+      court: body.court,
+      dateFrom: body.dateFrom,
+      dateTo: body.dateTo,
+      maxQueries: 8,
+      maxPages: Math.min(Math.max(1, Number(body.maxPages) || 2), 4),
+      display: Math.min(Math.max(10, Number(body.display) || 25), 50),
+      detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 15)), 25),
+      includeComwel: body.includeComwel !== false
+    });
+    return {
+      status: (lowerOut.ok || lowerOut.partial) ? 200 : (lowerOut.status || 502),
+      payload: lowerOut
+    };
+  }
+  if (action === "live_search") {
+    const coolLive = await checkCool(uid, "live_search", 4000, 1500);
+    if (coolLive) return { status: 429, payload: { ok: false, error: coolLive, docs: [] } };
+    if (body.targets !== undefined && (!Array.isArray(body.targets) || body.targets.length > 10)) {
+      return { status: 400, payload: { ok: false, error: "실시간 수집 대상 기관은 최대 10개까지 지정할 수 있습니다.", docs: [] } };
+    }
+    const liveOut = await liveSearchOfficialApis({
+      env,
+      fetchFn: f,
+      lawOc: body.lawOc,
+      query: body.query,
+      targets: Array.isArray(body.targets) ? body.targets : [],
+      maxPerTarget: Math.min(Math.max(3, Number(body.maxPerTarget) || 10), 20),
+      detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 10)), 18),
+      includeComwel: body.includeComwel !== false
+    });
+    return {
+      status: (liveOut.ok || liveOut.partial) ? 200 : (liveOut.status || 502),
+      payload: liveOut
+    };
+  }
+  const coolSync = await checkCool(uid, "sync", 30000, 30000);
+  if (coolSync) return { status: 429, payload: { ok: false, error: coolSync, docs: [] } };
+  if (body.sinceDate !== undefined && body.sinceDate !== null && body.sinceDate !== "") {
+    const sdCheck = validateCompactYmdStrict(body.sinceDate, "증분 기준일");
+    if (!sdCheck.ok) return { status: 400, payload: { ok: false, error: sdCheck.error, docs: [] } };
+  }
+  const out = await runSync({
+    env,
+    fetchFn: f,
+    lawOc: body.lawOc,
+    sinceDate: body.sinceDate,
+    maxPages: Math.min(Math.max(1, Number(body.maxPages) || 2), 4)
+  });
+  return { status: 200, payload: out };
+}
+
 module.exports = {
   LOWER_COURT_PRESETS,
   LOWER_COURT_ALLOWED_COURTS,
@@ -1760,6 +2485,9 @@ module.exports = {
   scrubServerPii,
   scrubDocumentObjectServer,
   hasResidualHardPii,
+  hasQueryBankOrPhoneDigits,
+  validateAndScrubOfficialQuery,
+  claimActionCooldownShared,
   deduplicateBatch,
   checkLegalizeKrTree,
   fetchLawGoKrDetailRich,
@@ -1767,8 +2495,10 @@ module.exports = {
   pullLawGoKrLowerCourt,
   pullComwelSanjaeCases,
   pullLowerCourtBundle,
+  liveSearchOfficialApis,
   upsertToSupabase,
   pullFromSupabaseServer,
   deleteFromSupabaseServer,
-  runSync
+  runSync,
+  handleApiAction
 };

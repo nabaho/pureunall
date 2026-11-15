@@ -549,6 +549,201 @@
       ].join('\n'),
       sources: ['개인정보보호위원회 인사·노무 가이드라인', '국가인권위원회 결정례'],
       verified: true
+    },
+    {
+      id: 'prec-sc-2008da6052',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2008다6052',
+      decisionDate: '2010-05-13',
+      title: '근로시간 산정이 어렵지 않은 사무·일반직 근로자에 대한 포괄임금제 약정의 효력 부인 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['포괄임금제', '연장근로수당', '근로시간산정', '감시단속적근로', '차액청구'],
+      refLaws: ['근로기준법 제15조', '근로기준법 제56조', '근로기준법 제63조'],
+      refCases: [],
+      summary: '감시·단속적 근로 등과 같이 근로시간 산정이 어려운 경우가 아니라면 근로기준법상 근로시간에 따른 임금지급 원칙이 적용되어야 하므로, 포괄임금에 포함된 정액 수당이 근로기준법 기준에 미달하는 때에는 그 포괄임금 지급계약 부분은 무효이고 사용자는 미달 수당 차액을 지급해야 한다.',
+      body: [
+        '【판시사항】',
+        '근로시간의 산정이 어렵지 않은 경우에 체결된 포괄임금제 약정의 유효 요건 및 근로기준법 기준 미달 시 효력.',
+        '',
+        '【판결요지】',
+        '1. 사용자는 기본임금을 미리 산정하지 아니한 채 시간외근로 등에 대한 제 수당을 합한 금액을 월 급여액으로 정하거나 기본임금을 정하고 매월 실제 근로시간과 관계없이 일정액을 제 수당으로 지급하는 내용의 이른바 포괄임금제에 의한 임금지급계약을 체결하더라도, 근로시간의 산정이 어려운 경우가 아니라면 달리 근로기준법상의 근로시간에 관한 규정을 그대로 적용할 수 없다고 볼 만한 특별한 사정이 없는 한 근로기준법상의 근로시간에 따른 임금지급의 원칙이 적용되어야 한다.',
+        '2. 따라서 그러한 경우 포괄임금제 방식의 임금지급계약을 체결한 때에는 그것이 근로기준법이 정한 기준에 비추어 근로자에게 불이익이 없고 제반 사정에 비추어 정당하다고 인정될 때에 한하여 유효하고, 포괄임금에 포함된 정액의 법정수당이 근로기준법이 정한 기준에 따라 산정된 법정수당에 미달하는 때에는 그에 해당하는 포괄임금제에 의한 임금지급계약 부분은 근로자에게 불이익하여 무효라 할 것이며, 사용자는 근로기준법의 강행성과 보충성 원칙에 의해 근로자에게 그 미달되는 법정수당을 지급할 의무가 있다.'
+      ].join('\n'),
+      sources: ['대법원 판례공보', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2018du62492',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2018두62492',
+      decisionDate: '2021-02-25',
+      title: '근무성적·업무능력 불량(저성과자)을 이유로 한 통상해고의 정당성 판단기준 최초 설시 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['저성과자해고', '통상해고', '인사평가', '직무재배치', '개선기회부여'],
+      refLaws: ['근로기준법 제23조'],
+      refCases: [],
+      summary: '사용자가 근무성적이나 업무능력이 불량하여 직무를 수행할 수 없는 근로자를 통상해고하려면 ① 공정하고 객관적인 인사평가, ② 본래 업무를 수행할 수 없을 정도의 현저한 업무능력 결여, ③ 교육훈련·배치전환 등 실질적 업무능력 개선 기회 부여 요건을 모두 갖추어야 한다.',
+      body: [
+        '【판시사항】',
+        '근로자의 근무성적이나 업무능력이 불량하여 직무를 수행할 수 없다는 이유로 한 통상해고에 근로기준법 제23조 제1항의 정당한 이유가 인정되기 위한 요건.',
+        '',
+        '【판결요지】',
+        '1. 사용자가 인사규정 등에 근거하여 근무성적이나 업무능력이 불량하여 직무를 수행할 수 없는 경우에 해고할 수 있다고 정한 경우에도, 이는 사회통념상 고용관계를 계속할 수 없을 정도인 경우에 한하여 정당성이 인정된다.',
+        '2. 이때 사회통념상 고용관계를 계속할 수 없을 정도인지는 ① 사용자가 공정하고 객관적인 기준에 따라 평가하였는지, ② 근로자의 근무성적이나 업무능력이 다른 근로자에 비하여 상대적으로 낮은 정도를 넘어 상당한 기간 동안 일반적으로 기대되는 최소한의 수준에도 미치지 못하고 향후에도 개선될 가능성을 인정하기 어려운지, ③ 사용자가 교육훈련이나 직무재배치 등 업무능력 개선을 위한 실질적인 기회를 부여하였는지 등을 종합적으로 고려하여 엄격하게 판단하여야 한다.'
+      ].join('\n'),
+      sources: ['대법원 주요판결', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-94da52928',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '94다52928',
+      decisionDate: '1995-05-09',
+      title: '전보·전직 등 인사명령의 정당성 판단 3대 기준(업무상 필요성·생활상 불이익·신의칙상 협의) 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['부당전보', '인사발령', '전직명령', '업무상필요성', '생활상불이익'],
+      refLaws: ['근로기준법 제23조'],
+      refCases: [],
+      summary: '전보나 전직은 원칙적으로 인사권자인 사용자의 권한에 속하므로 상당한 재량이 인정되나, 업무상 필요성과 근로자가 입게 될 생활상의 불이익을 비교·교량하고 본인과의 성실한 협의 절차를 거쳤는지 여부를 종합해 권리남용 여부를 판단한다.',
+      body: [
+        '【판결요지】',
+        '1. 근로자에 대한 전보나 전직은 원칙적으로 인사권자인 사용자의 권한에 속하므로 업무상 필요한 범위 내에서는 사용자는 상당한 재량을 가지며 그것이 근로기준법에 위반되거나 권리남용에 해당되는 등의 특별한 사정이 없는 한 무효라고 할 수 없다.',
+        '2. 전보처분 등이 권리남용에 해당하는지 여부는 전보처분 등의 업무상의 필요성과 전보 등에 따른 근로자의 생활상의 불이익을 비교·교량하여 결정되어야 할 것이고, 업무상의 필요에 의한 전보 등에 따른 생활상의 불이익이 근로자가 통상 감수하여야 할 정도를 현저하게 벗어난 것이 아니라면 정당한 인사권의 범위 내에 속하며, 전보처분 등을 함에 있어서 근로자 본인과 성실한 협의절차를 거쳤는지 여부는 정당한 인사권의 행사인지 여부를 판단하는 하나의 요소라고 할 수 있다.'
+      ].join('\n'),
+      sources: ['대법원 판례공보', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2016du32992',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2016두32992',
+      decisionDate: '2017-02-03',
+      title: '복수노조 교섭창구단일화 절차에서 교섭대표노동조합과 사용자의 공정대표의무 위반(차별 합리적 이유) 판단 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['복수노조', '공정대표의무', '교섭창구단일화', '소수노조차별', '노동조합법'],
+      refLaws: ['노동조합 및 노동관계조정법 제29조의4', '노동조합 및 노동관계조정법 제29조의2'],
+      refCases: [],
+      summary: '교섭대표노동조합과 사용자는 교섭창구단일화 절차에 참여한 노동조합 또는 그 조합원 간에 합리적 이유 없이 차별을 하여서는 아니 되며, 단체협약 체결 결과뿐만 아니라 교섭 과정과 단체협약 이행 과정에서도 공정대표의무를 부담한다.',
+      body: [
+        '【판결요지】',
+        '1. 노동조합 및 노동관계조정법 제29조의4 제1항이 규정한 공정대표의무는 헌법이 보장하는 단체교섭권의 본질적 내용이 침해되지 않도록 하기 위한 것으로서, 교섭대표노동조합과 사용자는 교섭창구단일화 절차에 참여한 노동조합 또는 그 조합원 사이에 합리적 이유 없이 차별을 하여서는 아니 된다.',
+        '2. 공정대표의무는 단체협약의 내용뿐만 아니라 단체교섭의 과정이나 단체협약의 이행 과정에서도 준수되어야 하며, 소수 노동조합에게 노동조합 사무실이나 게시판 제공, 근로시간 면제 배분 등에 있어 현저한 불이익을 주면서 이를 정당화할 객관적·합리적 이유가 없다면 공정대표의무 위반에 해당한다.'
+      ].join('\n'),
+      sources: ['대법원 판례공보', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2017du59949',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2017두59949',
+      decisionDate: '2018-09-13',
+      title: '소음성 난청 장해급여 청구권의 소멸시효 기산점(소음작업장 이탈 시가 아닌 치유·진단 확정 시) 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['소음성난청', '장해급여', '소멸시효', '85dB', '산재보험법'],
+      refLaws: ['산업재해보상보험법 제37조', '산업재해보상보험법 제57조', '산업재해보상보험법 제112조'],
+      refCases: [],
+      summary: '소음성 난청에 관한 장해급여 청구권의 소멸시효는 소음작업장을 떠난 때부터 바로 진행하는 것이 아니라, 업무상 질병으로 진단이 확정되어 장해급여 지급사유가 발생한 날부터 진행하므로 퇴직 후 수년이 지난 뒤 진단받았더라도 소멸시효 완성을 이유로 부지급할 수 없다.',
+      body: [
+        '【판결요지】',
+        '1. 산업재해보상보험법상 장해급여는 근로자가 업무상의 사유로 부상을 당하거나 질병에 걸려 치유된 후 신체 등에 장해가 있는 경우에 지급하는 것으로서, 소음성 난청과 같은 만성 질환의 경우 소음 노출 작업장을 이탈하였다는 사정만으로 곧바로 치유되어 장해급여 청구권의 소멸시효가 진행한다고 단정할 수 없다.',
+        '2. 근로자가 소음성 난청 진단을 받아 비로소 업무상 질병의 증상이 고정되고 치료의 효과를 더 이상 기대할 수 없게 되었음을 객관적으로 알 수 있게 된 시점(진단 확정일)에 치유된 것으로 보아 그때부터 소멸시효가 기산된다고 해석함이 타당하다.'
+      ].join('\n'),
+      sources: ['대법원 주요판결', '근로복지공단 산재판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2015du8848',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2015두8848',
+      decisionDate: '2017-05-31',
+      title: '업무상 과로·직무스트레스로 인한 우울증 악화 및 극단적 선택(자살)의 업무상 재해 인정기준 완화 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['업무상자살', '우울증산재', '적응장애', '직무스트레스', '유족급여'],
+      refLaws: ['산업재해보상보험법 제37조 제1항', '산업재해보상보험법 제37조 제2항'],
+      refCases: [],
+      summary: '업무상 스트레스로 정신질병이 발병·악화되어 정상적인 인식능력이나 행위선택능력이 현저히 저하된 상태에서 자살에 이른 경우, 재해자의 성격 등 개인적 취약성이 일부 경합하였더라도 평균적인 근로자가 아닌 당해 근로자의 건강과 신체조건을 기준으로 상당인과관계를 인정해야 한다.',
+      body: [
+        '【판결요지】',
+        '1. 근로자가 업무상의 사유로 발생한 정신질환으로 치료를 받거나 증상이 발현되어 정상적인 인식능력이나 행위선택능력, 정신적 억제력이 현저히 저하되어 합리적인 판단을 기대할 수 없을 정도의 상황에서 자살에 이르게 된 것으로 추단할 수 있는 때에는 업무와 사망 사이에 상당인과관계가 인정된다.',
+        '2. 이때 업무와 재해 사이의 상당인과관계 유무는 보통 평균인이 아니라 당해 근로자의 건강과 신체조건을 기준으로 판단하여야 하므로, 내성적인 성격 등 개인적 소인이 일부 작용하였다는 사정만으로 쉽게 상당인과관계를 부정하여서는 아니 된다.'
+      ].join('\n'),
+      sources: ['대법원 주요판결', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2017du74702',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2017두74702',
+      decisionDate: '2018-04-12',
+      title: '직장 내 성희롱 사건 심리 시 성인지 감수성 원칙 및 피해자 진술 증명력 판단기준 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['직장내성희롱', '성인지감수성', '2차가해', '피해자진술신빙성', '남녀고용평등법'],
+      refLaws: ['남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제2조', '남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제14조'],
+      refCases: [],
+      summary: '법원이나 조사기관이 성희롱 관련 소송의 심리를 할 때에는 그 사건이 발생한 맥락에서 성차별 문제를 이해하고 양성평등을 실현할 수 있도록 성인지 감수성을 잃지 않아야 하며, 피해자가 처한 특별한 사정을 충분히 고려하지 않은 채 피해자 진술의 증명력을 가볍게 배척해서는 안 된다.',
+      body: [
+        '【판결요지】',
+        '1. 성희롱이 성립하기 위해서는 행위자에게 반드시 성적 동기나 의도가 있어야 하는 것은 아니지만, 당사자의 관계, 행위가 행해진 장소 및 상황, 행위에 대한 상대방의 명시적 또는 추정적인 반응의 내용, 행위의 내용 및 정도, 행위가 일회적 또는 단기간의 것인지 아니면 계속적인 것인지 등의 구체적 사정을 참작하여 볼 때 객관적으로 상대방과 같은 처지에 있는 일반적이고도 평균적인 사람으로 하여금 성적 굴욕감이나 혐오감을 느낄 수 있게 하는 행위가 있고, 그로 인하여 행위의 상대방이 성적 굴욕감이나 혐오감을 느꼈음이 인정되어야 한다.',
+        '2. 법원이 성희롱 관련 소송의 심리를 할 때에는 성인지 감수성을 견지하여야 하며, 2차 피해에 대한 불안감이나 조직 내 위계관계 등으로 인해 즉각적인 문제 제기를 하지 못하였다는 사정만으로 피해자 진술의 신빙성을 함부로 배척하여서는 아니 된다.'
+      ].join('\n'),
+      sources: ['대법원 주요판결', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-sc-2017da218642',
+      docType: 'prec_sc',
+      court: '대법원',
+      caseNo: '2017다218642',
+      decisionDate: '2018-08-30',
+      title: '복수노조 사업장에서 교섭대표노동조합과 사용자의 공정대표의무 위반 및 소수노조 차별 손해배상 판결',
+      subType: '판결',
+      agency: '대법원',
+      tags: ['공정대표의무', '복수노조', '교섭창구단일화', '노동조합사무실', '소수노조차별'],
+      refLaws: ['노동조합 및 노동관계조정법 제29조의4'],
+      refCases: [],
+      summary: '교섭대표노동조합과 사용자는 교섭창구 단일화 절차에 참여한 노동조합 또는 그 조합원 간에 합리적 이유 없이 차별을 하여서는 아니 되며, 노동조합 사무실 제공 등에서 합리적 이유 없이 소수 노동조합을 배제하는 것은 공정대표의무 위반으로서 불법행위에 해당한다.',
+      body: [
+        '【판결요지】',
+        '1. 노동조합 및 노동관계조정법 제29조의4 제1항이 규정하는 공정대표의무는 교섭창구 단일화 제도가 소수 노동조합의 단체교섭권을 제한하는 결과를 초래하는 것을 보완하기 위하여 교섭대표노동조합과 사용자 모두에게 부과된 법적 의무로서, 단체교섭의 과정이나 단체협약의 내용뿐만 아니라 단체협약의 이행 과정 전반에 걸쳐 준수되어야 한다.',
+        '2. 사용자가 교섭대표노동조합에게는 노동조합 사무실을 제공하면서 합리적 이유 없이 교섭창구 단일화 절차에 참여한 소수 노동조합에게는 사무실이나 최소한의 활동 공간을 전혀 제공하지 않는 것은 공정대표의무 위반에 해당한다.'
+      ].join('\n'),
+      sources: ['대법원 주요판결', '국가법령정보센터 판례'],
+      verified: true
+    },
+    {
+      id: 'prec-lower-2022godan3254',
+      docType: 'prec_lower',
+      court: '창원지방법원 마산지원',
+      caseNo: '2022고단3254',
+      decisionDate: '2023-04-26',
+      title: '창원지방법원 마산지원 2022고단3254 — 원청 대표이사의 중대재해처벌법 안전보건확보의무 위반 하급심 제1호 실형 판결',
+      subType: '하급심 형사판결',
+      agency: '창원지방법원 마산지원',
+      tags: ['중대재해처벌법', '안전보건확보의무', '경영책임자', '도급사업안전조치', '중량물낙하'],
+      refLaws: ['중대재해 처벌 등에 관한 법률 제4조', '중대재해 처벌 등에 관한 법률 제6조', '산업안전보건법 제63조'],
+      refCases: [],
+      summary: '원청 경영책임자(대표이사)가 유해·위험요인 확인·개선 업무절차 마련 및 안전보건관리책임자 평가기준 마련 등 중대재해처벌법 제4조의 안전보건확보의무를 이행하지 아니하여 하청 근로자가 중량물 방열판 낙하로 사망에 이른 사건에서 인과관계를 인정하고 실형을 선고한 하급심 판결.',
+      body: [
+        '【판결 요지 (하급심 중대재해처벌법 판례)】',
+        '1. 사안: 제강 사업장 내 협력업체 소속 근로자가 크레인으로 방열판을 인양하던 중 섬유벨트가 파단되면서 낙하한 방열판에 협착되어 사망함.',
+        '2. 법원의 판단: 경영책임자인 대표이사가 중대재해처벌법 시행 이후에도 사업장의 유해·위험요인을 확인·개선하는 실질적인 절차를 마련하지 아니하였고, 안전보건관리책임자 등이 업무를 충실히 수행하는지 평가하는 기준조차 마련하지 아니한 의무 불이행과 현장 안전조치 미비(중량물 취급 작업계획서 미작성 등) 및 사망 결과 사이에 상당인과관계가 인정된다.'
+      ].join('\n'),
+      sources: ['하급심 주요판결', '안전보건공단 중대재해 판례분석'],
+      verified: true
     }
   ];
 
@@ -637,12 +832,626 @@
     }
   ];
 
+  /* ── 실무 법령 약칭 사전 (예: '근기법 23' → '근로기준법 제23조' 즉시 점프 & 검색어 자동 확장) ── */
+  var LAW_ABBREV_MAP = {
+    '근기법': '근로기준법',
+    '근기': '근로기준법',
+    '산재법': '산업재해보상보험법',
+    '산재보험법': '산업재해보상보험법',
+    '산안법': '산업안전보건법',
+    '중처법': '중대재해처벌등에관한법률',
+    '중대재해처벌법': '중대재해처벌등에관한법률',
+    '중대재해법': '중대재해처벌등에관한법률',
+    '노조법': '노동조합및노동관계조정법',
+    '근참법': '근로자참여및협력증진에관한법률',
+    '퇴직급여법': '근로자퇴직급여보장법',
+    '근퇴법': '근로자퇴직급여보장법',
+    '기간제법': '기간제및단시간근로자보호등에관한법률',
+    '파견법': '파견근로자보호등에관한법률',
+    '남고법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '고평법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '남녀고용평등법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '최임법': '최저임금법',
+    '임채법': '임금채권보장법',
+    '고보법': '고용보험법',
+    '고령자법': '고용상연령차별금지및고령자고용촉진에관한법률',
+    '채용절차법': '채용절차의공정화에관한법률',
+    '외고법': '외국인근로자의고용등에관한법률',
+    '장고법': '장애인고용촉진및직업재활법',
+    '노무사법': '공인노무사법',
+    '개보법': '개인정보보호법',
+    '행소법': '행정소송법',
+    '행심법': '행정심판법',
+    '행절법': '행정절차법',
+    '민소법': '민사소송법',
+    '형소법': '형사소송법',
+    '채무자회생법': '채무자회생및파산에관한법률',
+    '공정거래법': '독점규제및공정거래에관한법률',
+    '하도급법': '하도급거래공정화에관한법률',
+    '국기법': '국세기본법',
+    '상증법': '상속세및증여세법'
+  };
+
+  /* ── 판례·해석례 원클릭 쟁점 파인더 (검색어를 몰라도 클릭 한 번으로 핵심 법리 탐색) ── */
+  var ISSUE_FINDER_TREE = [
+    {
+      id: 'dismissal',
+      label: '해고·징계·인사',
+      chips: [
+        { label: '해고 서면통지(제27조)', query: '서면통지 해고 제27조' },
+        { label: '수습·시용 본채용거부', query: '시용 본채용거부 합리적 이유' },
+        { label: '기간제 갱신기대권', query: '갱신기대권 기간제' },
+        { label: '저성과 통상해고', query: '저성과자 통상해고 인사평가' },
+        { label: '부당전보·인사발령', query: '부당전보 업무상 필요성 생활상 불이익' }
+      ]
+    },
+    {
+      id: 'wage',
+      label: '통상임금·포괄·퇴직금',
+      chips: [
+        { label: '통상임금(재직조건 폐기)', query: '통상임금 재직조건 2020다247190' },
+        { label: '포괄임금제 무효', query: '포괄임금제 근로시간 산정 연장근로수당' },
+        { label: '경영성과급 평균임금', query: '경영성과급 평균임금 퇴직금' },
+        { label: '연차미사용수당', query: '연차유급휴가 미사용수당' },
+        { label: '퇴직금 분할약정·DB형', query: '퇴직금 분할약정 부당이득 DB형' }
+      ]
+    },
+    {
+      id: 'status',
+      label: '근로자성·파견·5인미만',
+      chips: [
+        { label: '프리랜서 근로자성', query: '근로기준법상 근로자 사용종속관계' },
+        { label: '원·하청 불법파견', query: '근로자파견 직접고용의무' },
+        { label: '상시 5인 이상 산정', query: '상시근로자수 산정 제11조' },
+        { label: '위약예정·손해배상', query: '위약금 강제근로 제20조' }
+      ]
+    },
+    {
+      id: 'sanjae',
+      label: '산재·뇌심·난청·중처법',
+      chips: [
+        { label: '추간판탈출증(디스크)', query: '추간판탈출증 상당인과관계 요양불승인' },
+        { label: '소음성 난청(시효·85dB)', query: '소음성 난청 장해급여 소멸시효' },
+        { label: '출퇴근 재해', query: '출퇴근재해 통상적인 경로' },
+        { label: '우울증·업무상 자살', query: '우울증 자살 직무스트레스' },
+        { label: '중대재해처벌법', query: '중대재해처벌법 안전보건확보의무 경영책임자' }
+      ]
+    },
+    {
+      id: 'harass',
+      label: '괴롭힘·성희롱·개보법',
+      chips: [
+        { label: '직장 내 괴롭힘 3요건', query: '직장 내 괴롭힘 제76조의2 우위' },
+        { label: '객관적 조사·분리조치', query: '객관적 조사 비밀누설 제76조의3' },
+        { label: '성희롱·성인지감수성', query: '성희롱 성인지 감수성 성적 굴욕감' },
+        { label: 'CCTV 근태감시·개인정보', query: 'CCTV 근태감시 개인정보 노사협의회' }
+      ]
+    },
+    {
+      id: 'union',
+      label: '노조·단협·취업규칙',
+      chips: [
+        { label: '취업규칙 불이익변경', query: '취업규칙 불이익변경 과반수 동의' },
+        { label: '복수노조 공정대표의무', query: '공정대표의무 교섭창구단일화 차별' },
+        { label: '노조 탈퇴·가입비', query: '노동조합 탈퇴 가입비' }
+      ]
+    }
+  ];
+
+  /* ── 김앤장 · 대한민국 6대 대형로펌(광장·태평양·세종·율촌·화우) 법률리서치 & 법령추적 체계 총정리 ── */
+  var BIGLAW_RESEARCH_GUIDE = [
+    {
+      layer: '1단계 · 상용 리걸테크 & 온라인 주석서 교차검증',
+      tools: '로앤비 Pro + 온주(ONJU 온라인주석서) · 엘박스(LBox) · 빅케이스(BigCase) · 케이스노트 · 슈퍼로이어',
+      method: '김앤장·광장·태평양·세종·율촌·화우 등 대형로펌은 단일 사이트에 의존하지 않고, ① 로앤비·온주(ONJU)로 민법·근로기준법·행정소송법 조문별 집필진 주석과 학설을 먼저 잡은 뒤, ② 엘박스·빅케이스로 미간행 지방법원·행정법원·고등법원 하급심 판결문을 전수 교차 검색하여 재판부별 인용·기각 경향까지 대조합니다.'
+    },
+    {
+      layer: '2단계 · 사법부 원문 열람 & 미간행 하급심 확보',
+      tools: '대법원 종합법률정보 · 사법정보공개포털(판결서 인터넷열람) · 법원도서관(대법원판례해설) · 헌법재판소 결정례',
+      method: '공보 미게재 최신 하급심이나 심리불속행 원심 판결은 사법정보공개포털 판결서 인터넷열람으로 원문 PDF를 발급받아 법인 내부 KM(지식관리시스템)에 비식별 적재하고, 대법원 재판연구관이 집필한 법원도서관 「대법원판례해설」로 판결 이면의 법리를 확인합니다.'
+    },
+    {
+      layer: '3단계 · 법령 연혁 · 시행예정 · 국회 입법동향 선제 추적',
+      tools: '국가법령정보센터(3단비교·신구법비교) · 국회의안정보시스템(전문위원 검토보고서) · 국민참여입법센터 · 전자관보',
+      method: '현행 조문만 보지 않고 사건 당시의 구법 연혁과 시행예정 법령을 분리 대조하며, 조문 해석이 모호할 때는 국회의안정보시스템에서 입법 당시 국회 환경노동위원회·법사위 「전문위원 검토보고서」와 회의록을 찾아 입법취지를 논증 근거로 제시합니다.'
+    },
+    {
+      layer: '4단계 · 부처 유권해석 · 위원회 심결례 · 정보공개포털 원문',
+      tools: '고용노동부(질의회시·훈령·근로감독관 집무규정) · 중노위 · 산재재심사위 · 조세심판원 · 공정위 · 개보위 · 정보공개포털(open.go.kr)',
+      method: '기업 인사노무·중대재해·공정거래 자문에서는 법원 판결 이전에 감독기관의 집무규정·지침·질의회시가 실무 기준이 되므로 각 부처 DB와 대한민국 정보공개포털(open.go.kr)의 원문공개 공문을 함께 조회합니다.'
+    },
+    {
+      layer: '5단계 · 학술 판례평석 & 해외 비교법 DB (영미·일본·ILO)',
+      tools: 'KCI · RISS · DBpia · Westlaw / Lexis+ (무료 공개망: Google Scholar Case Law · CourtListener · ILO NORMLEX · 일본 e-Gov)',
+      method: '대법원 선례가 없는 신종 플랫폼 노동·AI 인사평가·글로벌 구조조정 쟁점은 국내 노동법 학회지 평석(KCI·RISS)과 미국(Westlaw·Lexis·CourtListener), 일본(e-Gov 노동계약법·판례), ILO 협약(NORMLEX) 비교법 자료로 논리를 보강합니다.'
+    }
+  ];
+
+  var SITE_CATEGORIES = [
+    { id: 'all', label: '전체 사이트' },
+    { id: 'biglaw_comm', label: '대형로펌·리걸테크·주석' },
+    { id: 'court_const', label: '대법원·판결열람·헌재' },
+    { id: 'law_assembly', label: '법제처·국회입법·관보' },
+    { id: 'labor_sanjae', label: '노동부·중노위·산재·행심' },
+    { id: 'tax_ftc_pipc', label: '국세·공정위·개보위·정보공개' },
+    { id: 'academic_global', label: '학술평석·해외비교법' }
+  ];
+
+  /* ── 대한민국 전 법률·판례·유권해석·입법·학술 사이트 직접 연결 디렉터리 (36개) ── */
+  var KOREA_LEGAL_SITES = [
+    /* 1. 대형로펌 상용 · AI 리걸테크 · 주석서 */
+    {
+      id: 'lbox',
+      cat: 'biglaw_comm',
+      bigLawPick: true,
+      name: '엘박스 (LBox)',
+      org: '엘박스',
+      tier: '6대로펌 필수',
+      domain: 'lbox.kr',
+      homeUrl: 'https://lbox.kr',
+      searchUrl: 'https://lbox.kr/v2/search/case?query={q}',
+      desc: '국내 최다 수준 지방법원·고등법원 하급심 판결문 검색 및 법률 AI 리서치 워크스페이스.'
+    },
+    {
+      id: 'lawnb',
+      cat: 'biglaw_comm',
+      bigLawPick: true,
+      name: '로앤비 (Lawnb · 온주 주석서)',
+      org: '톰슨로이터코리아',
+      tier: '김앤장·6대로펌 표준',
+      domain: 'lawnb.com',
+      homeUrl: 'https://www.lawnb.com',
+      searchUrl: 'https://www.google.com/search?q=site%3Alawnb.com+{q}',
+      desc: '대형로펌 표준 법률포털 및 대한민국 대표 온라인 주석서 「온주(ONJU)」·천자평석·법조인명록 수록.'
+    },
+    {
+      id: 'bigcase',
+      cat: 'biglaw_comm',
+      bigLawPick: true,
+      name: '빅케이스 (BigCase)',
+      org: '빅케이스',
+      tier: '하급심·쟁점 강점',
+      domain: 'bigcase.ai',
+      homeUrl: 'https://bigcase.ai',
+      searchUrl: 'https://bigcase.ai/search/case?q={q}',
+      desc: '대법원·하급심 판례 무료/구독 통합검색, 핵심 쟁점 그래프 및 유사판례 AI 탐색 지원.'
+    },
+    {
+      id: 'casenote',
+      cat: 'biglaw_comm',
+      name: '케이스노트 (CaseNote)',
+      org: '케이스노트',
+      tier: '무료 고속검색',
+      domain: 'casenote.kr',
+      homeUrl: 'https://casenote.kr',
+      searchUrl: 'https://casenote.kr/search/?q={q}',
+      desc: '깔끔한 판례·법령·결정례 원문 가독성과 사건번호·조문 즉시 연결을 제공하는 고속 판례검색 서비스.'
+    },
+    {
+      id: 'superlawyer',
+      cat: 'biglaw_comm',
+      name: '슈퍼로이어 (SuperLawyer)',
+      org: '로앤컴퍼니',
+      tier: '리걸AI 비서',
+      domain: 'superlawyer.kr',
+      homeUrl: 'https://superlawyer.kr',
+      searchUrl: 'https://superlawyer.kr',
+      desc: '빅케이스 판례·법령·주석 데이터와 연동된 법률가 전용 생성형 AI 서면·리서치 서비스.'
+    },
+    {
+      id: 'elabor',
+      cat: 'biglaw_comm',
+      name: '이레이버 (중앙경제 ELABOR)',
+      org: '중앙경제',
+      tier: '인사노무 전문',
+      domain: 'elabor.co.kr',
+      homeUrl: 'https://www.elabor.co.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aelabor.co.kr+{q}',
+      desc: '노동판례·고용노동부 행정해석·월간 노동법률 실무 칼럼 및 기업 HR 규정 자료 DB.'
+    },
+
+    /* 2. 사법부 · 판결서 인터넷열람 · 헌법재판소 */
+    {
+      id: 'scourt_glaw',
+      cat: 'court_const',
+      name: '대법원 종합법률정보',
+      org: '대한민국 대법원',
+      tier: '사법 공식원문',
+      domain: 'glaw.scourt.go.kr',
+      homeUrl: 'https://glaw.scourt.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Ascourt.go.kr+{q}',
+      desc: '대법원 판례공보·판례속보·전원합의체 판결·고등/지방법원 주요판결 및 대법원 규칙·예규 공식 DB.'
+    },
+    {
+      id: 'scourt_portal',
+      cat: 'court_const',
+      bigLawPick: true,
+      name: '사법정보공개포털 (판결서 인터넷열람)',
+      org: '대법원 법원행정처',
+      tier: '미간행 하급심 원문',
+      domain: 'portal.scourt.go.kr',
+      homeUrl: 'https://portal.scourt.go.kr/pgp/index.on?m=PGP1011M01&l=N&c=900',
+      searchUrl: 'https://portal.scourt.go.kr/pgp/index.on?m=PGP1011M01&l=N&c=900',
+      desc: '전국의 확정 민사·행정·형사 하급심 판결서 원문 PDF를 직접 검색·열람하여 P박스 수집함에 넣는 공식 창구.'
+    },
+    {
+      id: 'scourt_lib',
+      cat: 'court_const',
+      name: '법원도서관 (대법원판례해설·사법논집)',
+      org: '법원도서관',
+      tier: '재판연구관 해설',
+      domain: 'library.scourt.go.kr',
+      homeUrl: 'https://library.scourt.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Alibrary.scourt.go.kr+{q}',
+      desc: '대법원 재판연구관이 직접 집필한 「대법원판례해설」, 재판실무편람, 외국사법판례연구 원문 검색.'
+    },
+    {
+      id: 'ccourt',
+      cat: 'court_const',
+      name: '헌법재판소 결정례정보',
+      org: '헌법재판소',
+      tier: '위헌·헌법소원',
+      domain: 'search.ccourt.go.kr',
+      homeUrl: 'https://search.ccourt.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Accourt.go.kr+{q}',
+      desc: '위헌법률심판·헌법소원 결정문 전문, 심판사건 진행현황 및 헌법재판연구원 보고서 조회.'
+    },
+    {
+      id: 'ecfs',
+      cat: 'court_const',
+      name: '대한민국 전자소송',
+      org: '대한민국 법원',
+      tier: '송무·사건조회',
+      domain: 'ecfs.scourt.go.kr',
+      homeUrl: 'https://ecfs.scourt.go.kr',
+      searchUrl: 'https://ecfs.scourt.go.kr',
+      desc: '민사·행정·가사·회생파산 전자소송 서류 제출, 나의 사건검색 및 송달문서 확인.'
+    },
+
+    /* 3. 법제처 · 국회 입법추적 · 관보 · 자치법규 */
+    {
+      id: 'law_go_kr',
+      cat: 'law_assembly',
+      name: '국가법령정보센터 (통합·3단비교·연혁)',
+      org: '법제처',
+      tier: '국가 공식법령',
+      domain: 'law.go.kr',
+      homeUrl: 'https://www.law.go.kr',
+      searchUrl: 'https://www.law.go.kr/lsSc.do?menuId=1&subMenuId=15&tabMenuId=81&query={q}',
+      desc: '법률·시행령·시행규칙 3단비교, 신구법비교, 연혁법령, 시행예정법령, 행정규칙 및 조약 공식 통합검색.'
+    },
+    {
+      id: 'law_go_prec',
+      cat: 'law_assembly',
+      name: '국가법령정보센터 (판례·해석례·재결례)',
+      org: '법제처',
+      tier: '공공 판례·해석',
+      domain: 'law.go.kr',
+      homeUrl: 'https://www.law.go.kr/precSc.do?menuId=7&subMenuId=47&tabMenuId=213',
+      searchUrl: 'https://www.law.go.kr/precSc.do?menuId=7&subMenuId=47&tabMenuId=213&query={q}',
+      desc: '법제처 공동활용 DB에 수록된 대법원·하급심 판례, 법령해석례, 중앙부처 1차 유권해석 원문 직행 검색.'
+    },
+    {
+      id: 'assembly_bill',
+      cat: 'law_assembly',
+      bigLawPick: true,
+      name: '국회의안정보시스템 (계류법안·검토보고서)',
+      org: '대한민국 국회',
+      tier: '대형로펌 입법추적',
+      domain: 'likms.assembly.go.kr',
+      homeUrl: 'https://likms.assembly.go.kr/bill/main.do',
+      searchUrl: 'https://www.google.com/search?q=site%3Alikms.assembly.go.kr+{q}',
+      desc: '발의·계류 법률안 원문, 상임위 전문위원 검토보고서, 체계자구검토보고서 및 법안심사소위 회의록 확인.'
+    },
+    {
+      id: 'assembly_law',
+      cat: 'law_assembly',
+      name: '국회법률정보시스템',
+      org: '국회사무처',
+      tier: '입법연혁·비교',
+      domain: 'likms.assembly.go.kr',
+      homeUrl: 'https://likms.assembly.go.kr/law/',
+      searchUrl: 'https://www.google.com/search?q=site%3Alikms.assembly.go.kr%2Flaw+{q}',
+      desc: '제·개정 이유서, 국회 통과 법률 연혁 및 법제처 점검 시 대체 열람 공식 시스템.'
+    },
+    {
+      id: 'lawmaking',
+      cat: 'law_assembly',
+      name: '국민참여입법센터 (정부 입법예고)',
+      org: '법제처',
+      tier: '시행령 개정 선제파악',
+      domain: 'opinion.lawmaking.go.kr',
+      homeUrl: 'https://opinion.lawmaking.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aopinion.lawmaking.go.kr+{q}',
+      desc: '고용노동부 등 각 부처가 공포 전에 올리는 법률·시행령·시행규칙 입법예고안 및 조문별 제개정이유서.'
+    },
+    {
+      id: 'elis',
+      cat: 'law_assembly',
+      name: '자치법규정보시스템 (ELIS)',
+      org: '행정안전부',
+      tier: '지자체 조례·규칙',
+      domain: 'elis.go.kr',
+      homeUrl: 'https://www.elis.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aelis.go.kr+{q}',
+      desc: '전국 243개 지방자치단체 조례·규칙·생활임금 조례·지방출자출연기관 규정 통합검색.'
+    },
+    {
+      id: 'gwanbo',
+      cat: 'law_assembly',
+      name: '대한민국 전자관보',
+      org: '행정안전부',
+      tier: '당일 공포·고시',
+      domain: 'gwanbo.go.kr',
+      homeUrl: 'https://www.gwanbo.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Agwanbo.go.kr+{q}',
+      desc: '법령 공포, 최저임금 고시, 산재보험료율 고시 등 당일 발령된 정부 공식 관보 원문 확인.'
+    },
+
+    /* 4. 고용노동부 · 중앙노동위원회 · 산재 · 행정심판 · 인권위 */
+    {
+      id: 'moel',
+      cat: 'labor_sanjae',
+      name: '고용노동부 (질의회시·훈령·예규·지침)',
+      org: '고용노동부',
+      tier: '노무 필수 1순위',
+      domain: 'moel.go.kr',
+      homeUrl: 'https://www.moel.go.kr/info/lawinfo/instruction/list.do',
+      searchUrl: 'https://www.moel.go.kr/search/search.do?kwd={q}',
+      desc: '근로감독관 집무규정, 통상임금·포괄임금 지침, 근로기준정책과·임금근로시간과 최신 질의회시 원문.'
+    },
+    {
+      id: 'nlrc',
+      cat: 'labor_sanjae',
+      name: '중앙노동위원회 (판정사례·노동위 포털)',
+      org: '중앙노동위원회',
+      tier: '부당해고·부노 핵심',
+      domain: 'nlrc.go.kr',
+      homeUrl: 'https://www.nlrc.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Anlrc.go.kr+{q}',
+      desc: '부당해고·부당징계·부당노동행위·비정규직 차별시정·공정대표의무 주요 판정사례 및 심판업무 매뉴얼.'
+    },
+    {
+      id: 'comwel',
+      cat: 'labor_sanjae',
+      name: '근로복지공단 (산재·요양·업무상질병 지침)',
+      org: '근로복지공단',
+      tier: '산재 실무 기준',
+      domain: 'comwel.or.kr',
+      homeUrl: 'https://www.comwel.or.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Acomwel.or.kr+{q}',
+      desc: '뇌심혈관·근골격계·소음성난청·정신질병 업무상 질병 판정 지침, 산재 판례집 및 고용·산재 부과 기준.'
+    },
+    {
+      id: 'iacrc',
+      cat: 'labor_sanjae',
+      name: '산업재해보상보험재심사위원회',
+      org: '고용노동부 산재재심사위',
+      tier: '산재 재결례',
+      domain: 'iacrc.go.kr',
+      homeUrl: 'https://www.iacrc.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aiacrc.go.kr+{q}',
+      desc: '공단 심사결정에 불복한 요양·장해·유족급여 사건의 재심사 재결례 요지 및 취소 인정 사례.'
+    },
+    {
+      id: 'kosha',
+      cat: 'labor_sanjae',
+      name: '안전보건공단 (중대재해 사이렌·KOSHA Guide)',
+      org: '한국산업안전보건공단',
+      tier: '중처법·산안법',
+      domain: 'kosha.or.kr',
+      homeUrl: 'https://www.kosha.or.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Akosha.or.kr+{q}',
+      desc: '중대재해처벌법 판결·수사사례 분석, 업종별 안전작업 기술지침(KOSHA Guide) 및 위험성평가 매뉴얼.'
+    },
+    {
+      id: 'simpan',
+      cat: 'labor_sanjae',
+      name: '온라인행정심판 (중앙행정심판위원회)',
+      org: '국민권익위원회',
+      tier: '행정처분 취소재결',
+      domain: 'simpan.go.kr',
+      homeUrl: 'https://www.simpan.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Asimpan.go.kr+{q}',
+      desc: '고용지원금 환수·영업정지·과징금·임금채권보장 대지급금 처분 등 행정심판 재결례 통합검색.'
+    },
+    {
+      id: 'nhrc',
+      cat: 'labor_sanjae',
+      name: '국가인권위원회 (차별·괴롭힘 결정례)',
+      org: '국가인권위원회',
+      tier: '차별·인권 권고',
+      domain: 'humanrights.go.kr',
+      homeUrl: 'https://www.humanrights.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Ahumanrights.go.kr+{q}',
+      desc: '채용·성별·연령·장애·비정규직 고용차별 시정권고 및 직장 내 인권침해 결정례 원문.'
+    },
+
+    /* 5. 국세 · 조세심판 · 공정거래 · 개인정보 · 금융 · 정보공개 */
+    {
+      id: 'nts_law',
+      cat: 'tax_ftc_pipc',
+      name: '국세법령정보시스템 (예규·판례·심사)',
+      org: '국세청',
+      tier: '급여·퇴직소득 세무',
+      domain: 'txsi.hometax.go.kr',
+      homeUrl: 'https://txsi.hometax.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Ahometax.go.kr+{q}',
+      desc: '근로소득·퇴직소득·화해금/합의금 비과세 여부, 4대보험·원천징수 관련 국세청 서면질의·사전답변.'
+    },
+    {
+      id: 'tax_tribunal',
+      cat: 'tax_ftc_pipc',
+      name: '조세심판원 (조세심판결정례)',
+      org: '국무총리 조세심판원',
+      tier: '조세 심결 원문',
+      domain: 'tt.go.kr',
+      homeUrl: 'https://www.tt.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Att.go.kr+{q}',
+      desc: '임원 퇴직금 손금산입, 인건비 가공계상, 스톡옵션·성과급 과세 등 조세심판원 결정문 전문.'
+    },
+    {
+      id: 'ftc_case',
+      cat: 'tax_ftc_pipc',
+      name: '공정거래위원회 사건·심결정보',
+      org: '공정거래위원회',
+      tier: '하도급·위수탁',
+      domain: 'case.ftc.go.kr',
+      homeUrl: 'https://case.ftc.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aftc.go.kr+{q}',
+      desc: '원·하청 하도급법 위반, 기술유용, 대리점·가맹·특수형태근로 부당특약 심결서 및 의결서 원문.'
+    },
+    {
+      id: 'pipc',
+      cat: 'tax_ftc_pipc',
+      name: '개인정보보호위원회 (심결례·가이드라인)',
+      org: '개인정보보호위원회',
+      tier: '인사·CCTV·채용 개보법',
+      domain: 'pipc.go.kr',
+      homeUrl: 'https://www.pipc.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Apipc.go.kr+{q}',
+      desc: '인사노무 개인정보 보호 가이드라인, 작업장 CCTV·생체정보·이메일 감사 관련 과징금 심결례.'
+    },
+    {
+      id: 'fsc_better',
+      cat: 'tax_ftc_pipc',
+      name: '금융규제·법령해석포털',
+      org: '금융위원회·금융감독원',
+      tier: '금융권 인사·보수·제재',
+      domain: 'better.fsc.go.kr',
+      homeUrl: 'https://better.fsc.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Afsc.go.kr+{q}',
+      desc: '금융회사 지배구조법·책무구조도·임직원 제재 및 비조치의견서·금융법령 유권해석 조회.'
+    },
+    {
+      id: 'open_go_kr',
+      cat: 'tax_ftc_pipc',
+      bigLawPick: true,
+      name: '대한민국 정보공개포털 (원문정보 검색)',
+      org: '행정안전부',
+      tier: '대형로펌 고급리서치',
+      domain: 'open.go.kr',
+      homeUrl: 'https://www.open.go.kr',
+      searchUrl: 'https://www.google.com/search?q=site%3Aopen.go.kr+{q}',
+      desc: '중앙부처·공공기관 결재 원문 공개 문서 검색 및 미공개 지침·통계 정보공개청구 창구.'
+    },
+
+    /* 6. 학술 판례평석 & 해외 비교법 (김앤장·대형로펌 심층자문) */
+    {
+      id: 'kci',
+      cat: 'academic_global',
+      name: 'KCI 한국학술지인용색인 (노동법·민사법 평석)',
+      org: '한국연구재단',
+      tier: '등재학술지 원문',
+      domain: 'kci.go.kr',
+      homeUrl: 'https://www.kci.go.kr',
+      searchUrl: 'https://www.kci.go.kr/kciportal/po/search/poTotalSearList.kci?searchKeyword={q}',
+      desc: '노동법학·노동법포럼·민사판례연구 등 국내 등재 학술지의 최신 대법원 판례평석 무료 원문 검색.'
+    },
+    {
+      id: 'riss',
+      cat: 'academic_global',
+      name: 'RISS 학술연구정보서비스',
+      org: '한국교육학술정보원',
+      tier: '학위·학술논문 통합',
+      domain: 'riss.kr',
+      homeUrl: 'https://www.riss.kr',
+      searchUrl: 'https://www.riss.kr/search/Search.do?query={q}',
+      desc: '전국 대학 법학전문대학원(로스쿨) 석·박사 학위논문 및 국내외 법률 학술논문 통합검색.'
+    },
+    {
+      id: 'scholar',
+      cat: 'academic_global',
+      name: 'Google Scholar (학술논문 · 미국 연방/주 판례)',
+      org: 'Google',
+      tier: '무료 글로벌 판례·논문',
+      domain: 'scholar.google.co.kr',
+      homeUrl: 'https://scholar.google.co.kr',
+      searchUrl: 'https://scholar.google.co.kr/scholar?q={q}',
+      desc: '국내외 법학 논문 인용 추적 및 미국 연방대법원·항소법원 판례(Case Law) 무료 전문 검색.'
+    },
+    {
+      id: 'courtlistener',
+      cat: 'academic_global',
+      name: 'CourtListener (미국 판례 공개망 · Westlaw 무료대안)',
+      org: 'Free Law Project',
+      tier: '영미 비교법 원문',
+      domain: 'courtlistener.com',
+      homeUrl: 'https://www.courtlistener.com',
+      searchUrl: 'https://www.courtlistener.com/?q={q}',
+      desc: '대형로펌의 유료 Westlaw/Lexis+ 없이도 미국 연방·주 법원 판결문과 인용 관계를 무료로 검색하는 공개 아카이브.'
+    },
+    {
+      id: 'ilo_normlex',
+      cat: 'academic_global',
+      name: 'ILO NORMLEX & 일본 e-Gov 법령 (국제·비교노동법)',
+      org: '국제노동기구 · 일본 디지털청',
+      tier: '국제노동기준·일본법',
+      domain: 'normlex.ilo.org',
+      homeUrl: 'https://normlex.ilo.org',
+      searchUrl: 'https://www.google.com/search?q=(site%3Anormlex.ilo.org+OR+site%3Alaws.e-gov.go.jp)+{q}',
+      desc: '결사의 자유 등 ILO 핵심협약·결사의자유위원회 권고례 및 일본 노동기준법·노동계약법 비교 검색.'
+    }
+  ];
+
+  /* 원클릭 동시검색 묶음 (브라우저 팝업 차단 방지를 위해 4개 이하 정예 사이트 묶음으로 구성) */
+  var SITE_BUNDLE_PRESETS = [
+    {
+      id: 'bundle_biglaw_cases',
+      label: '⚡ 대형로펌 판례 4종 동시검색',
+      desc: '엘박스 · 빅케이스 · 케이스노트 · 국가법령 판례',
+      siteIds: ['lbox', 'bigcase', 'casenote', 'law_go_prec']
+    },
+    {
+      id: 'bundle_labor_gov',
+      label: '🏛️ 노동·산재 기관 4종 동시검색',
+      desc: '고용노동부 · 중앙노동위원회 · 근로복지공단 · 산재재심사위',
+      siteIds: ['moel', 'nlrc', 'comwel', 'iacrc']
+    },
+    {
+      id: 'bundle_court_law',
+      label: '⚖️ 사법·입법 원문 4종 동시검색',
+      desc: '대법원 · 헌법재판소 · 국가법령정보 · 국회의안정보',
+      siteIds: ['scourt_glaw', 'ccourt', 'law_go_kr', 'assembly_bill']
+    }
+  ];
+
+  function buildSiteSearchUrl(site, rawQuery) {
+    if (!site || typeof site !== 'object') return 'https://www.law.go.kr';
+    var home = String(site.homeUrl || 'https://www.law.go.kr');
+    if (!/^https:\/\//i.test(home)) home = 'https://www.law.go.kr';
+    var q = String(rawQuery || '').trim().slice(0, 120);
+    if (!q) return home;
+    var tpl = String(site.searchUrl || home);
+    if (!/^https:\/\//i.test(tpl)) return home;
+    if (tpl.indexOf('{q}') >= 0) {
+      return tpl.split('{q}').join(encodeURIComponent(q));
+    }
+    return home;
+  }
+
+  function buildSiteGoogleUrl(site, rawQuery) {
+    if (!site || typeof site !== 'object' || !site.domain) return 'https://www.google.com';
+    var dom = String(site.domain).replace(/[^a-zA-Z0-9.-]/g, '');
+    var q = String(rawQuery || '').trim().slice(0, 120);
+    var full = 'site:' + dom + (q ? (' ' + q) : '');
+    return 'https://www.google.com/search?q=' + encodeURIComponent(full);
+  }
+
   global.PuPBoxCorpus = {
     LAW_CATEGORIES: LAW_CATEGORIES,
     DOC_TYPES: DOC_TYPES,
     OFFICIAL_SOURCES: OFFICIAL_SOURCES,
     SEED_DOCS: SEED_DOCS,
-    WORKFLOWS: WORKFLOWS
+    WORKFLOWS: WORKFLOWS,
+    LAW_ABBREV_MAP: LAW_ABBREV_MAP,
+    ISSUE_FINDER_TREE: ISSUE_FINDER_TREE,
+    BIGLAW_RESEARCH_GUIDE: BIGLAW_RESEARCH_GUIDE,
+    SITE_CATEGORIES: SITE_CATEGORIES,
+    KOREA_LEGAL_SITES: KOREA_LEGAL_SITES,
+    SITE_BUNDLE_PRESETS: SITE_BUNDLE_PRESETS,
+    buildSiteSearchUrl: buildSiteSearchUrl,
+    buildSiteGoogleUrl: buildSiteGoogleUrl
   };
 
   if (typeof module !== 'undefined' && module.exports) {
