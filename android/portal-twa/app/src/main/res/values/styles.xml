@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PureunPortal" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/portal_primary_dark</item>
+        <item name="android:navigationBarColor">@color/portal_surface</item>
+        <item name="android:windowBackground">@color/portal_dark_bg</item>
+    </style>
+
+    <style name="Theme.PureunPortal.Launcher" parent="Theme.PureunPortal">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

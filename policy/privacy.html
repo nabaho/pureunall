@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>푸른포털 개인정보처리방침</title>
+<style>
+  :root{--ink:#1e293b;--sub:#475569;--mute:#64748b;--line:#e2e8f0;--bg:#f8fafc;--panel:#ffffff;--accent:#1e40af;--soft:#eff6ff;--soft-line:#bfdbfe}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR","Malgun Gothic",system-ui,-apple-system,sans-serif;
+    font-size:15px;line-height:1.75}
+  main{max-width:820px;margin:0 auto;padding:28px 16px 60px}
+  .doc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px 26px}
+  .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;font-size:13px}
+  .nav a{display:inline-block;padding:6px 4px;color:var(--accent);text-decoration:none;font-weight:600}
+  .nav a:hover{text-decoration:underline}
+  h1{font-size:22px;margin:0 0 6px}
+  .meta{color:var(--sub);font-size:13px;margin:0 0 20px}
+  .notice{background:var(--soft);border:1px solid var(--soft-line);color:var(--accent);border-radius:10px;padding:12px 14px;font-size:14px;margin:14px 0}
+  h2{font-size:16.5px;margin:26px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+  p,li{margin:6px 0}
+  ul{padding-left:20px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--bg);width:28%}
+  a{color:var(--accent)}
+  @media (max-width:640px){
+    main{padding:14px 10px 40px}
+    .doc{padding:18px 14px}
+    th,td{display:block;width:100%}
+    th{border-bottom:0}
+  }
+</style>
+</head>
+<body>
+<main><div class="doc">
+
+<nav class="nav" aria-label="정책 문서 이동">
+  <a href="../enter.html">← 푸른포털 돌아가기</a>
+  <span aria-hidden="true">·</span>
+  <a href="terms.html">서비스 이용약관</a>
+  <span aria-hidden="true">·</span>
+  <a href="account-deletion.html">계정 및 데이터 삭제 안내</a>
+  <span aria-hidden="true">·</span>
+  <a href="gcal-privacy.html">캘린더 연동 처리방침</a>
+</nav>
+
+<h1>푸른포털 개인정보처리방침</h1>
+<p class="meta">모바일 앱(Google Play) 및 통합 웹 포털 공통 · 시행일 2026년 11월 15일</p>
+
+<p>푸른노무법인(이하 «법인»)은 통합 인사노무 업무관리 시스템 「푸른포털」(모바일 애플리케이션 및 웹 서비스 포함, 이하 «서비스»)을 운영함에 있어 「개인정보 보호법」 제30조 및 Google Play 개발자 프로그램 정책을 준수하며, 이용자의 개인정보를 안전하게 보호하기 위하여 다음과 같이 개인정보처리방침을 수립·공개합니다.</p>
+
+<div class="notice">
+  본 서비스는 법인이 승인한 업무용 계정을 기반으로 운영되며, 광고 SDK를 포함하지 않고 단말기 광고 식별자(ADID)나 백그라운드 위치·연락처·문자메시지를 수집하지 않습니다.
+</div>
+
+<h2>1. 개인정보의 처리 목적</h2>
+<ul>
+  <li><b>본인 확인 및 인증 관리</b>: 승인된 업무 계정 로그인 확인, 세션 유지, 선택적 간편 로그인(카카오 계정 연결) 및 2단계 인증(TOTP) 제공</li>
+  <li><b>통합 인사노무 업무 수행</b>: 일정 관리, 전자문서 열람·편집, 공공기관 임금·단체협약 공개자료 분석, 업무용 문서·사진 등록 및 공유</li>
+  <li><b>서비스 보안 및 안정성 유지</b>: 비인가 접근 차단, 계정 도용 방지, 접속 오류 진단 및 버전 호환성 관리</li>
+</ul>
+
+<h2>2. 처리하는 개인정보의 항목 및 수집 방법</h2>
+<table>
+  <tr>
+    <th>구분</th>
+    <td><b>상세 항목 및 수집 시점</b></td>
+  </tr>
+  <tr>
+    <th>필수 계정·인증 정보</th>
+    <td>로그인 아이디(법인 업무용 이메일 또는 사번 기반 계정), 암호화된 인증 토큰(Firebase UID), 이름·직책·권한 구분(법인이 사전 등록한 명부 기준)</td>
+  </tr>
+  <tr>
+    <th>선택 연결 정보</th>
+    <td>이용자가 직접 연결을 선택한 경우에 한하여 카카오 계정 고유 식별자·연결 일시, 인증 앱 2단계 인증(MFA) 설정 여부, 업무 알림 수신용 웹 푸시 토큰, Google 캘린더 연동 토큰(<a href="gcal-privacy.html">캘린더 연동 처리방침</a> 별도 적용)</td>
+  </tr>
+  <tr>
+    <th>이용자 선택 미디어·문서</th>
+    <td>이용자가 직접 카메라 촬영 또는 파일 열기·공유하기를 실행한 사진·문서 파일. 한글 편집기 및 문서뷰어 기능은 선택한 문서를 기기 브라우저 내부에서만 처리하며 외부 서버로 전송하지 않습니다.</td>
+  </tr>
+  <tr>
+    <th>기기 권한 안내</th>
+    <td>서비스는 필수 기기 권한 없이 실행됩니다. 사진 촬영이나 파일 첨부 기능을 이용자가 직접 누를 때에만 운영체제 표준 파일 선택기·카메라 권한을 일시적으로 사용합니다.</td>
+  </tr>
+</table>
+
+<h2>3. 민감 식별정보 보호 원칙</h2>
+<ul>
+  <li>노무 업무 특성상 문서에 포함될 수 있는 주민등록번호 등 고유식별정보는 자동 판독 요청 전 기기·클라이언트 단계에서 비식별 가림 처리(마스킹)하는 것을 원칙으로 합니다.</li>
+  <li>본 서비스에 입력·저장된 어떠한 개인정보나 업무 문서도 맞춤형 광고, 제3자 데이터 판매, 외부 공개 인공지능 모델 학습 목적으로 사용하지 않습니다.</li>
+</ul>
+
+<h2>4. 개인정보의 보유 및 이용 기간</h2>
+<ul>
+  <li><b>계정 및 인증 정보</b>: 소속 구성원의 재직(또는 승인된 이용 기간) 중 보유하며, 퇴직·계정 해지 또는 <a href="account-deletion.html">계정 삭제 요청</a> 접수 시 지체 없이(최대 영업일 7일 이내) 파기합니다.</li>
+  <li><b>선택 연동 정보(카카오 연결·2단계 인증·캘린더 연결)</b>: 이용자가 서비스 내 「내 정보」에서 연결을 해제하는 즉시 파기합니다.</li>
+  <li><b>관계 법령에 따른 보존</b>: 공인노무사법, 근로기준법, 세법 등 관계 법령에 따라 법인이 보존 의무를 부담하는 수임·회계 기록은 해당 법정 보존 기간 동안 접근이 통제된 영역에 분리 보관 후 파기합니다.</li>
+</ul>
+
+<h2>5. 개인정보의 제3자 제공</h2>
+<p>법인은 이용자의 개인정보를 원칙적으로 외부에 제공하지 않습니다. 다만 법령에 특별한 규정이 있거나 정보주체의 별도 동의를 받은 경우에 한하여 관련 법령에 따라 적법하게 처리합니다.</p>
+
+<h2>6. 개인정보 처리위탁 및 국외 이전</h2>
+<table>
+  <tr><th>수탁자(이전받는 자)</th><td>Google LLC (Google Firebase Authentication · Realtime Database · Cloud Functions)</td></tr>
+  <tr><th>이전 국가 및 지역</th><td>대한민국(서버 함수 운영) · 싱가포르(데이터베이스 저장) · 미국(인증 인프라)</td></tr>
+  <tr><th>이전 항목 및 방법</th><td>위 2조의 계정·인증 정보 및 암호화된 업무 데이터 / 서비스 이용 시 TLS(HTTPS) 암호화 네트워크 전송</td></tr>
+  <tr><th>이용 목적 및 보유 기간</th><td>안전한 사용자 인증 및 클라우드 데이터베이스 운영 / 위 4조의 보유 기간과 동일</td></tr>
+</table>
+
+<h2>7. 개인정보의 파기 절차 및 방법</h2>
+<p>보유 기간이 경과하거나 처리 목적이 달성된 전자적 파일 형태의 개인정보는 복구 또는 재생되지 않도록 기술적 방법으로 영구 삭제하며, 외부 인증 연동 토큰은 삭제와 동시에 발급 기관에 철회를 요청합니다.</p>
+
+<h2>8. 정보주체의 권리·의무 및 계정 삭제 방법</h2>
+<ul>
+  <li>이용자는 언제든지 서비스 내 <b>내 메뉴(상단 이름 ▾) › 내 정보</b>에서 간편 로그인 연결 해제 및 보안 설정 변경을 직접 수행할 수 있습니다.</li>
+  <li>계정 영구 삭제 및 관련 개인정보 파기 신청은 앱을 삭제한 이후에도 <a href="account-deletion.html"><b>계정 및 데이터 삭제 안내 페이지</b></a>에 기재된 절차에 따라 요청할 수 있으며, 법인은 지체 없이 조치하고 결과를 안내합니다.</li>
+  <li>개인정보 열람·정정·삭제·처리정지 요구는 아래 개인정보 보호책임자에게 서면 또는 전자우편으로 요청할 수 있습니다.</li>
+</ul>
+
+<h2>9. 개인정보의 안전성 확보조치</h2>
+<ul>
+  <li><b>전송 및 저장 구간 보호</b>: 모든 네트워크 통신은 HTTPS(TLS) 암호화를 강제하며 평문 HTTP 통신을 차단합니다.</li>
+  <li><b>역할 기반 최소 권한 통제</b>: 승인된 재직 상태와 직무 권한이 확인된 계정에만 업무 데이터 접근을 허용하며, 심사·점검용 계정은 실제 의뢰인·구성원 데이터베이스로부터 완전히 격리합니다.</li>
+  <li><b>비밀번호 및 다중 인증 보호</b>: 비밀번호는 단방향 암호화되어 원본을 알 수 없으며, 비밀번호 변경·2단계 인증(TOTP)·자동 잠금 기능을 제공합니다.</li>
+</ul>
+
+<h2>10. 개인정보 보호책임자 및 고충처리 부서</h2>
+<table>
+  <tr><th>법인명</th><td>푸른노무법인</td></tr>
+  <tr><th>개인정보 보호책임자</th><td>권형하 · 대표노무사</td></tr>
+  <tr><th>문의 및 권리행사 접수처</th><td><a href="mailto:babylawyer11111@gmail.com">babylawyer11111@gmail.com</a></td></tr>
+</table>
+
+<h2>11. 권익침해 구제방법</h2>
+<ul>
+  <li>개인정보침해신고센터 (한국인터넷진흥원): 국번 없이 118 (<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer">privacy.kisa.or.kr</a>)</li>
+  <li>개인정보분쟁조정위원회: 1833-6972 (<a href="https://www.kopico.go.kr" target="_blank" rel="noopener noreferrer">www.kopico.go.kr</a>)</li>
+  <li>대검찰청 사이버수사과: 국번 없이 1301 · 경찰청 사이버수사국: 국번 없이 182</li>
+</ul>
+
+<h2>12. 개인정보처리방침의 변경</h2>
+<p>이 개인정보처리방침은 2026년 11월 15일부터 적용됩니다. 법령·정책 또는 서비스 기능 변경으로 내용이 수정될 경우 본 페이지를 통해 시행일과 개정 내용을 공지합니다.</p>
+
+</div></main>
+</body>
+</html>
