@@ -877,6 +877,137 @@ test('⑪ 기관 목록 상단 바 빠른 정렬(data-u-sort) 및 전 목록 표
   }
 });
 
+test('⑫ 기관 상세(탭 2) 통합 프로필 히어로·서브탭 분리·신구대비 병합 정제·동일분류 시점대조·조문 중복제거 검증', () => {
+  const vm = require('node:vm');
+  const dataMod = require(path.join(ROOT, 'js', 'pu-alio-data.js'));
+
+  function mountOrganView(initialSearch) {
+    const loc = { href: 'https://example.com/pureunall/pu-alio-union.html' + initialSearch, pathname: '/pureunall/pu-alio-union.html', search: initialSearch, protocol: 'https:' };
+    function makeNode(tag) {
+      const listeners = {};
+      const attrs = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    function clickSubTab(subKey, catAttr) {
+      const btn = {
+        getAttribute: (k) => {
+          if (k === 'data-h-sub') return subKey;
+          if (k === 'data-h-cat') return catAttr !== undefined ? catAttr : null;
+          return null;
+        },
+        focus: () => {}
+      };
+      bodyEl.trigger('click', {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        target: {
+          closest: (sel) => (sel === '[data-h-sub]' ? btn : null)
+        }
+      });
+    }
+
+    return { bodyEl, clickSubTab, sandbox };
+  }
+
+  // 1) (재)우체국금융개발원(C0352) 초기 상세 화면: 통합 히어로 + OVERVIEW(6대영역 요약)만 단일 노출되고 category_code 등 기계적 코드가 제거되어야 함
+  const c0352 = mountOrganView('?organ=C0352');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-org-hero"/, '상단 통합 프로필 히어로 카드가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-h-sub="OVERVIEW"/, '기본 서브탭은 OVERVIEW(6대영역 요약)여야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-dom-board plain"/, '히어로 아래에는 중복 헤더 없는 6대 영역 보드가 표시되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /class="pau-diff-list"/, 'OVERVIEW 기본 화면에서는 하단 신구대비표가 중복 적층되지 않아야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /category_code/i, '기계적 메타데이터(category_code)가 화면에 노출되지 않아야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /2026년 3분기 노사협의회 회의록/, '공시 일반명 대신 실제 첨부 문서명이 읽기 좋게 노출되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /풀2·파트4/, '히어로 KPI에 실제 타임오프 풀타임·파트타임 전임자 수(풀2·파트4)가 정확히 표시되어야 합니다');
+
+  // 2) 영역별 연혁 바로가기(data-h-cat="SEPARATE") 클릭 시 해당 구분 필터가 적용되고, 이후 일반 HISTORY 서브탭 클릭 시 전체 연혁으로 초기화되어야 함
+  c0352.clickSubTab('HISTORY', 'SEPARATE');
+  assert.match(c0352.bodyEl.innerHTML, /<option value="SEPARATE" selected>별도합의·노사협의<\/option>/, '영역별 연혁 바로가기 클릭 시 해당 구분 필터가 선택되어야 합니다');
+  c0352.clickSubTab('HISTORY');
+  assert.match(c0352.bodyEl.innerHTML, /<option value="" selected>연혁 전체/, '일반 HISTORY 서브탭 클릭 시 이전 구분 필터가 해제되고 연혁 전체가 표시되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="(true|false)" data-set-vera=/, '시점 지정 버튼(과거A/현행B)에 aria-pressed 접근성 상태가 부여되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-h-sub="HISTORY"/, 'HISTORY 서브탭이 활성화되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /class="pau-dom-board/, 'HISTORY 전환 시 6대영역 보드는 숨겨지고 연혁·신구대비 뷰만 집중 노출되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-bullet-box"/, '정제된 주요 개정 요약 불릿 박스가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-diff-list"/, '카드형 신·구 조문 대비표가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /9개 조항/, 'C0352의 분리된 개정요약+신구대비표 공시가 병합되어 실제 9개 조항 대비표가 노출되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /기존 협약 조항|\|\s*---\s*\|/, '플레이스홀더(기존 협약 조항)나 마크다운 파이프 표 원문이 노출되지 않아야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /category_code/i, 'HISTORY 시점 대조 및 연혁 표에서도 category_code가 없어야 합니다');
+
+  // 3) ISSUES 서브탭 클릭 시: 13대 핵심 근로조건 진단 카드 전체가 표시되어야 함
+  c0352.clickSubTab('ISSUES');
+  assert.match(c0352.bodyEl.innerHTML, /13대 핵심 근로조건 표준 진단/, 'ISSUES 서브탭에서 13대 핵심 근로조건 진단 카드가 표시되어야 합니다');
+  assert.equal([...c0352.bodyEl.innerHTML.matchAll(/class="pau-issue-card"/g)].length, 13, '13대 핵심 근로조건 카드 13개가 모두 렌더링되어야 합니다');
+
+  // 4) 다개년 공시 기관((주)강원랜드 C0005) HISTORY 진입 시 동일 분류(단체협약 ↔ 단체협약) 자동 매칭 검증
+  const c0005 = mountOrganView('?organ=C0005');
+  c0005.clickSubTab('HISTORY');
+  assert.match(c0005.bodyEl.innerHTML, /동일 분류\(단체협약 정보\) 시점 대조/, '단체협약과 임금협약이 섞여 있어도 기본 시점 대조(A↔B)는 동일 분류(단체협약↔단체협약)로 자동 짝지어져야 합니다');
+
+  // 5) 단협 조문 정규화(중복 신구대비 행 제거 및 제목/기호 정제) 검증
+  const master = c0352.sandbox.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  const c0006Arts = master.byId.C0006.domains.articles;
+  const c0006Keys = c0006Arts.map((a) => `${a.article_no}|${a.article_title}|${a.taxonomy_code}`);
+  assert.equal(new Set(c0006Keys).size, c0006Keys.length, '건강보험심사평가원(C0006)의 중복 신구대비 추출 조문이 중복 없이 정제되어야 합니다');
+  assert.ok(c0006Arts.every((a) => !/구분\s+현\s*행/.test(a.text)), '조문 본문에 신구대비표 머리글(구분 현행 개정안)이 남지 않아야 합니다');
+  const c0005Promo = master.byId.C0005.domains.articles.find((a) => a.article_no === '제16조');
+  assert.ok(c0005Promo && c0005Promo.article_title === '승진' && !/^[:：]/.test(c0005Promo.text), '강원랜드(C0005) 제16조의 【승진】 제목이 분리 추출되고 앞 콜론(:)이 제거되어야 합니다');
+  assert.ok(master.byId.C0005.domains.articles.every((a) => !/^[:：]/.test(a.text)), '강원랜드(C0005) 모든 조문 본문 앞의 불필요한 콜론(:)이 제거되어야 합니다');
+});
+
+
 
 
 
