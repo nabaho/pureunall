@@ -59,11 +59,11 @@ button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;fon
 button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
 button.warn-btn{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber);font-weight:600}
 button.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
-button.sm{padding:5px 10px;min-height:32px;font-size:12px}
+button.sm{padding:5px 10px;min-height:36px;font-size:12px}
 input,select,textarea{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
 textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55}
 a{color:var(--blue-d);text-decoration:none}
-a.act-link{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--blue-line);border-radius:7px;background:var(--blue-bg);color:var(--blue-d);font-size:12px;font-weight:600;white-space:nowrap}
+a.act-link{display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:5px 10px;border:1px solid var(--blue-line);border-radius:7px;background:var(--blue-bg);color:var(--blue-d);font-size:12px;font-weight:600;white-space:nowrap}
 #head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
 .top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
 .top h1{font-size:17px;margin:0}
@@ -284,12 +284,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <div class="kpis" id="kpiBox"></div>
     <div class="card">
       <div class="bar">
-        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·사업구분·업종·과제 찾기" style="flex:1;min-width:150px;max-width:280px">
-        <select id="projProg" aria-label="사업구분 필터">
-          <option value="">사업구분 전체</option>
-          <option value="ilteo">일터혁신 상생컨설팅</option>
-          <option value="other">타 컨설팅 이력</option>
-        </select>
+        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·업종·개선과제 찾기" style="flex:1;min-width:150px;max-width:280px">
         <select id="projYear" aria-label="연도 필터">
           <option value="">연도 전체</option>
           <option value="2026">2026년</option>
@@ -298,6 +293,12 @@ table.t tr.cur>td.n{color:var(--ink2)}
           <option value="2023">2023년</option>
           <option value="2022">2022년</option>
           <option value="2021">2021년</option>
+          <option value="2020">2020년</option>
+          <option value="2019">2019년</option>
+          <option value="2018">2018년</option>
+          <option value="2017">2017년</option>
+          <option value="2016">2016년</option>
+          <option value="2015">2015년</option>
         </select>
         <select id="projStage" aria-label="진행단계 필터">
           <option value="">진행단계 전체</option>
@@ -372,11 +373,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-ilteo-catalog.js?v=7"></script>
-<script src="js/pu-ilteo-intake.js?v=18"></script>
-<script src="js/pu-ilteo-report.js?v=9"></script>
+<script src="js/pu-ilteo-intake.js?v=23"></script>
+<script src="js/pu-ilteo-report.js?v=11"></script>
 <script src="js/pu-ilteo-pptx.js?v=2"></script>
 <script src="js/pu-ilteo-pack.js?v=1"></script>
-<script src="js/pu-ilteo-view.js?v=10"></script>
+<script src="js/pu-ilteo-view.js?v=12"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

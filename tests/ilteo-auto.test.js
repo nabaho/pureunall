@@ -974,3 +974,187 @@ test('12. 인명 끝글자(수·원·호) 가림 회귀 · ETag/If-Match 동시�
     assert.equal(await Backfill.sanitizeTitle(dn, { name: '(주)가나상생보안' }), dn);
   }
 });
+
+test('13. 노사발전재단 일터혁신 단독 필터 · 타 컨설팅 및 타 연도 배제 · .pptm/.ppsx/통합진단보고서 · 로컬경로 차단 검증', async () => {
+  const Backfill = require('../scripts/backfill-ilteo-history.js');
+
+  /* ① 타 컨설팅 프로그램(현장클리닉·산업일자리전환·기술보호·청년도약 등) 식별 및 일터혁신 우선 허용 검증 */
+  assert.equal(Intake.isNonIlteoText('2025년 현장클리닉 결과보고서'), true);
+  assert.equal(Intake.isNonIlteoText('산업일자리전환 컨설팅 수행계획서'), true);
+  assert.equal(Intake.isNonIlteoText('중소기업 기술보호 전문가 현장자문'), true);
+  assert.equal(Intake.isNonIlteoText('고용안정 선제대응 패키지 컨설팅'), true);
+  assert.equal(Intake.isNonIlteoText('노사발전재단 일터혁신 상생컨설팅 중간보고서'), false);
+  assert.equal(Intake.isNonIlteoText('2024년 일터혁신 통합진단보고서(기초컨설팅 연계)'), false);
+
+  /* ② scanProjectMails: 동일 거래처라도 타 컨설팅 메일 및 수행연도(±1년) 범위 밖 메일은 자동 배제 */
+  const proj2021 = {
+    id: 'ilt_co_yr_2021',
+    companyId: 'co_yr',
+    companyName: '(주)가나연도검증',
+    year: 2021,
+    isIlteo: true,
+    programName: '일터혁신 상생컨설팅',
+    contactEmails: ['hr@gana-year-test.co.kr']
+  };
+  const mailsMixed = [
+    {
+      key: 'imap:INBOX:1', src: 'imap', slug: 'INBOX', uid: '1', dir: 'in',
+      ts: Date.UTC(2021, 5, 10),
+      from: 'hr@gana-year-test.co.kr', to: ['370-6@daum.net'],
+      subject: '[가나연도검증] 2021년 일터혁신 중간보고서 검토의견',
+      attNames: ['통합진단보고서_초안.pptm'], attCount: 1, preview: '첨부 확인 바랍니다'
+    },
+    {
+      key: 'imap:INBOX:2', src: 'imap', slug: 'INBOX', uid: '2', dir: 'in',
+      ts: Date.UTC(2021, 7, 15),
+      from: 'hr@gana-year-test.co.kr', to: ['370-6@daum.net'],
+      subject: '[가나연도검증] 2021년 현장클리닉 지원사업 신청서',
+      attNames: ['현장클리닉_신청서.hwp'], attCount: 1, preview: '현장클리닉 서류 송부'
+    },
+    {
+      key: 'imap:INBOX:3', src: 'imap', slug: 'INBOX', uid: '3', dir: 'in',
+      ts: Date.UTC(2025, 4, 20),
+      from: 'hr@gana-year-test.co.kr', to: ['370-6@daum.net'],
+      subject: '[가나연도검증] 2025년 취업규칙 개정 문의',
+      attNames: ['취업규칙.docx'], attCount: 1, preview: '일반 자문 요청'
+    }
+  ];
+  const scanYr = Intake.scanProjectMails(proj2021, mailsMixed, null, [{ id: 'co_yr', name: '(주)가나연도검증', email: 'hr@gana-year-test.co.kr' }], [], {});
+  assert.equal(scanYr.matched.length, 1, '오직 2021년 순수 일터혁신 메일 1건만 매칭되어야 한다');
+  assert.equal(scanYr.matched[0].key, 'imap:INBOX:1');
+
+  /* ③ .pptm / .ppsx 및 통합진단보고서 분류 · 슬라이드 추출 · 파일명 인명 가림/독립 감사 · 최종보고 폴백 검증 */
+  assert.equal(Intake.classifyDocKind('2024_통합진단보고서_(주)가나상생.pptm', ['통합진단보고서.pptm'], '').code, 'mid_report_doc');
+  assert.equal(Intake.classifyDocKind('2024_일터혁신_최종본.ppsx', ['일터혁신_최종본.ppsx'], '').code, 'final_report_doc');
+  assert.equal(Intake.hasStandaloneNameInLabel('김민준_통합진단보고서.pptm'), true);
+  assert.equal(Intake.hasIndependentPersonAuditLeak('통합진단보고서_테스형A1.pptm'), true);
+  assert.equal(Backfill.passesIndependentAudit('통합진단보고서_테스형A1.pptm'), false);
+  assert.equal(Intake.hasResidualPii('단기근속 근로자 비중이 높은 사업장 인력분포 분석'), false, '직함 뒤 일반명사+조사(근로자 비중이)를 인명으로 오탐하지 않아야 한다');
+  assert.equal(Intake.hasIndependentPersonAuditLeak('단기근속 근로자 비중이 높은 사업장 인력분포 분석'), false);
+  assert.equal(Intake.hasResidualPii('직무성과주의 문화가 정착되도'), false, '피동 어간(정착되+도) 절단 형태를 서술형 인명으로 오탐하지 않아야 한다');
+
+  const zPptm = new JSZip();
+  zPptm.file('ppt/slides/slide1.xml', '<p:sld><a:t>2024년 일터혁신 통합진단보고서 핵심 장표</a:t></p:sld>');
+  zPptm.file('ppt/slides/slide2.xml', '<p:sld><a:t>최종 개편 모델: 직무성과급제 및 격주 금요일 단축 시행</a:t></p:sld>');
+  const pptmBuf = await zPptm.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  const parsedPptm = await Backfill.parseAttachmentBuffer(
+    '2024_통합진단보고서_(주)가나상생.pptm',
+    pptmBuf,
+    { name: '(주)가나상생', latestYear: 2024 },
+    'pre_mid',
+    0
+  );
+  assert.ok(parsedPptm && parsedPptm.docKind === 'mid_report_doc', '.pptm 통합진단보고서가 정상 추출·분류되어야 한다');
+
+  const p2024 = { id: 'ilt_gana_2024', companyId: 'gana', companyName: '(주)가나상생', year: 2024, isIlteo: true, programName: '일터혁신 상생컨설팅', selectedTasks: ['wt_45day', 'wg_redesign'] };
+  const intakeWithIntegrated = {
+    loc_1: Object.assign({ id: 'loc_1', title: '2024_통합진단보고서_(주)가나상생.pptm', phase: 'pre_mid' }, parsedPptm)
+  };
+  const mid2024 = Report.buildMidReport(p2024, intakeWithIntegrated, [], null);
+  const fin2024 = Report.buildFinalReport(p2024, mid2024, intakeWithIntegrated, [], null);
+  assert.ok(fin2024.sections.exec_summary.includes('통합진단·종합보고서 원문'), '별도 최종보고서 파일이 없어도 통합진단보고서 원문이 최종보고서에 폴백 반영되어야 한다');
+
+  /* ④ 로컬 경로 문자열 유출 원천 차단 및 CLI 인자 검증 */
+  const winSamplePath = ['C:', 'Users', 'sample', 'Desktop', '보고서.pptx'].join('\\');
+  const posixSamplePath = ['', 'Users', 'sample', 'Desktop', 'report.pptx'].join('/');
+  assert.equal(Backfill.passesIndependentAudit(winSamplePath), false, 'Windows 로컬 경로 포함 문자열은 독립 감사에서 차단되어야 한다');
+  assert.equal(Backfill.passesIndependentAudit(posixSamplePath), false, 'POSIX 홈 경로 포함 문자열도 독립 감사에서 차단되어야 한다');
+  assert.throws(() => Backfill.runFirebaseCli(['database:get', '/scal_types;whoami']), /INVALID_FIREBASE_CLI_ARGS/, '허용되지 않은 셸 메타문자가 포함된 CLI 인자는 즉시 거부되어야 한다');
+
+  /* ⑤ UI(ilteo.html · pu-ilteo-view.js): 타 컨설팅 이력 셀렉트 완전 제거 및 2015~2026 전 연도 지원 확인 */
+  const htmlTxt = fs.readFileSync(path.join(__dirname, '..', 'ilteo.html'), 'utf8');
+  const viewTxt = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ilteo-view.js'), 'utf8');
+  assert.ok(!htmlTxt.includes('projProg') && !htmlTxt.includes('타 컨설팅 이력'), 'ilteo.html 에 타 컨설팅 필터가 없어야 한다');
+  assert.ok(!viewTxt.includes('projProg') && !viewTxt.includes('타 컨설팅'), 'pu-ilteo-view.js 에 타 컨설팅 필터 로직이 없어야 한다');
+  assert.ok(htmlTxt.includes('value="2015"') && htmlTxt.includes('value="2026"'), '2015~2026년 연도 필터가 모두 제공되어야 한다');
+});
+
+test('14. 상호 정규화(normalizeCorpName) 노출 · CP949 ZIP 인메모리 색인/추출 · ZIP 압축폭탄 스트리밍 차단 검증', async () => {
+  const os = require('node:os');
+  const Backfill = require('../scripts/backfill-ilteo-history.js');
+
+  /* ① normalizeCorpName 노출 및 (합)/합자회사 포함 법인격 일관 정규화 */
+  assert.equal(typeof Intake.normalizeCorpName, 'function');
+  assert.equal(Intake.normalizeCorpName('(주) 가나 상생'), '가나상생');
+  assert.equal(Intake.normalizeCorpName('합자회사 다라산업'), '다라산업');
+  assert.equal(Intake.normalizeCorpName('(합)다라-산업'), '다라산업');
+
+  /* ② CP949(EUC-KR) 파일명 ZIP 아카이브 색인(indexLocalIlteoEntries) 및 스트리밍 해제(readLocalEntryBuffer) */
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ilteo-zip-test-'));
+  try {
+    const archiveSub = path.join(tmpRoot, '0. 일터혁신', '2024년_가나상생');
+    fs.mkdirSync(archiveSub, { recursive: true });
+
+    const zCp949 = new JSZip();
+    zCp949.file('최종보고서.txt', '2024년 일터혁신 상생컨설팅 최종 결과 요약 본문입니다.');
+    /* '최종보고서.txt' 의 CP949(EUC-KR) 바이트열 */
+    const cp949Bytes = Uint8Array.from([0xC3, 0xD6, 0xC1, 0xBE, 0xBA, 0xB8, 0xB0, 0xED, 0xBC, 0xAD, 0x2E, 0x74, 0x78, 0x74]);
+    const zipCp949Buf = await zCp949.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE',
+      encodeFileName: (name) => (name === '최종보고서.txt' ? cp949Bytes : Buffer.from(name, 'utf8'))
+    });
+    const zipDiskPath = path.join(archiveSub, '산출물묶음.zip');
+    fs.writeFileSync(zipDiskPath, zipCp949Buf);
+
+    const indexed = await Backfill.indexLocalIlteoEntries(tmpRoot, '');
+    assert.equal(indexed.length, 1, 'CP949 ZIP 내부 문서가 ReferenceError 없이 색인되어야 한다');
+    assert.equal(indexed[0].baseName, '최종보고서.txt');
+
+    const zCache = new Map();
+    const extracted = await Backfill.readLocalEntryBuffer(indexed[0], zCache);
+    assert.ok(Buffer.isBuffer(extracted) && extracted.toString('utf8').includes('최종 결과 요약'), 'CP949 ZIP 내부 본문이 정상 스트리밍 추출되어야 한다');
+
+    /* ③ 고압축 ZIP 폭탄(메타데이터 및 헤더 위변조 스트리밍 양방향) 차단 검증 */
+    const zBomb = new JSZip();
+    zBomb.file('과다압축보고서.txt', '0'.repeat(2 * 1024 * 1024));
+    const bombBuf = await zBomb.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    const bombPath = path.join(archiveSub, '폭탄검증.zip');
+    fs.writeFileSync(bombPath, bombBuf);
+
+    const bombIndexed = await Backfill.indexLocalIlteoEntries(tmpRoot, '');
+    assert.equal(bombIndexed.some(e => e.baseName === '과다압축보고서.txt'), false, '압축률 한도(120배) 초과 항목은 색인 단계에서부터 제외되어야 한다');
+
+    const bombCache = new Map();
+    const blockedMeta = await Backfill.readLocalEntryBuffer({ diskPath: bombPath, zipEntryName: '과다압축보고서.txt' }, bombCache);
+    assert.equal(blockedMeta, null, '고압축 ZIP 항목은 해제 전 메타 검사에서 null 반환으로 차단되어야 한다');
+
+    /* 헤더(_data)가 작게 위조된 경우에도 스트리밍 중 압축률 한도 도달 즉시 중단되어야 함 */
+    const cachedObj = bombCache.get(bombPath);
+    if (cachedObj && cachedObj.zip.files['과다압축보고서.txt'] && cachedObj.zip.files['과다압축보고서.txt']._data) {
+      cachedObj.zip.files['과다압축보고서.txt']._data.uncompressedSize = 1024;
+      cachedObj.zip.files['과다압축보고서.txt']._data.compressedSize = 512;
+    }
+    const blockedStream = await Backfill.readLocalEntryBuffer({ diskPath: bombPath, zipEntryName: '과다압축보고서.txt' }, bombCache);
+    assert.equal(blockedStream, null, '헤더 크기가 위조된 고압축 항목도 스트리밍 중 즉시 중단되어야 한다');
+
+    /* ④ PPTX 내부 슬라이드 XML 메타 위조 압축폭탄(8MB 페이로드) 스트리밍 조기 중단 회귀 검증 */
+    const zPptxBomb = new JSZip();
+    zPptxBomb.file('ppt/slides/slide1.xml', '<p:sld><a:t>' + 'A'.repeat(8 * 1024 * 1024) + '</a:t></p:sld>');
+    const pptxBombBytes = await zPptxBomb.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    let emittedPptxBytes = 0;
+    const MockZipSpoof = {
+      loadAsync: async (b) => {
+        const zLoaded = await JSZip.loadAsync(b);
+        const sEntry = zLoaded.files['ppt/slides/slide1.xml'];
+        if (sEntry && sEntry._data) {
+          /* 공격자가 ZIP 중앙디렉터리/로컬헤더의 크기를 정상 범위처럼 위조한 상황 시뮬레이션 */
+          sEntry._data.uncompressedSize = 128;
+          sEntry._data.compressedSize = 96;
+        }
+        const origInternalStream = sEntry.internalStream.bind(sEntry);
+        sEntry.internalStream = function (type) {
+          const h = origInternalStream(type);
+          h.on('data', (chunk) => { emittedPptxBytes += chunk.byteLength; });
+          return h;
+        };
+        return zLoaded;
+      }
+    };
+    const pptxBombText = await Intake.extractPptxText(pptxBombBytes, MockZipSpoof);
+    assert.equal(pptxBombText, '', '메타 크기가 위조된 고압축 PPTX도 빈 문자열로 차단되어야 한다');
+    assert.ok(emittedPptxBytes > 0 && emittedPptxBytes <= 2 * 1024 * 1024 + 32768, `8MB 전체 해제 전에 조기 중단되어야 한다 (실측 해제 바이트: ${emittedPptxBytes})`);
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});

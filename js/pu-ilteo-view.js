@@ -191,13 +191,13 @@
 
   function activeProjects() {
     return Object.keys(D.projects || {}).map(function (k) { return D.projects[k]; })
-      .filter(function (p) { return p && typeof p === 'object' && !p._deleted && p.id; })
+      .filter(function (p) { return p && typeof p === 'object' && !p._deleted && p.id && isIlteoProject(p); })
       .sort(function (a, b) { return (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)); });
   }
 
   function projectById(pid) {
     var p = D.projects && D.projects[pid];
-    return (p && !p._deleted) ? p : null;
+    return (p && !p._deleted && isIlteoProject(p)) ? p : null;
   }
 
   function schedRoundsForProject(proj) {
@@ -230,9 +230,11 @@
   }
 
   function isIlteoProject(proj) {
-    if (!proj) return true;
-    if (typeof proj.isIlteo === 'boolean') return proj.isIlteo;
+    if (!proj) return false;
+    if (proj.isIlteo === false) return false;
     var prog = str(proj.programName);
+    if (prog && Intake().isNonIlteoText && Intake().isNonIlteoText(prog)) return false;
+    if (typeof proj.isIlteo === 'boolean') return proj.isIlteo;
     if (!prog) return true;
     return /일터\s*혁신|일터\s*상생|상생\s*컨설팅/.test(prog);
   }
@@ -240,11 +242,14 @@
   function rebuildScanAndDiscover() {
     SCAN_CACHE = {};
     var projs = activeProjects();
-    var registeredCoIds = {};
+    var registeredKeys = {};
     projs.forEach(function (p) {
-      if (p.companyId) registeredCoIds[p.companyId] = p.id;
-      if (p.consultingId) registeredCoIds['cons:' + p.consultingId] = p.id;
-      if (p.scalCoId) registeredCoIds['scal:' + p.scalCoId] = p.id;
+      var yr = Number(p.year) || 2026;
+      if (p.companyId) registeredKeys['co:' + p.companyId + ':' + yr] = p.id;
+      if (p.consultingId) registeredKeys['cons:' + p.consultingId] = p.id;
+      if (p.scalCoId) registeredKeys['scal:' + p.scalCoId + ':' + yr] = p.id;
+      var pNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(p.companyName) : '';
+      if (pNorm) registeredKeys['norm:' + pNorm + ':' + yr] = p.id;
       SCAN_CACHE[p.id] = Intake().scanProjectMails(
         p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {}
       );
@@ -253,7 +258,7 @@
     if (!CUR_PID && projs.length) CUR_PID = projs[0].id;
     if (CUR_PID && !projectById(CUR_PID)) CUR_PID = projs[0] ? projs[0].id : '';
 
-    var cands = [], seenCo = {};
+    var cands = [], seenCoYear = {};
     var ilteoRe = /일터\s*혁신|일터\s*상생|상생\s*컨설팅/;
     var typeMap = {};
     Object.keys(D.scalTypes || {}).forEach(function (k) {
@@ -273,23 +278,36 @@
       if (!cs || cs._deleted) return;
       var bCode = str(cs.typeCode || cs.bizTypeId || cs.consultingTypeCode);
       var bName = str(cs.bizName || cs.typeName || cs.consultingType || bizTypeMap[bCode] || '');
-      if (!ilteoRe.test(bName)) return;
+      var csNo = str(cs.no);
+      var isPureIlteoCons = (
+        bCode === 'consulting-mozfisq7' ||
+        bCode === 'consulting-mp0wphau' ||
+        /^(?:일터상생|일터혁신|일터)-/.test(csNo) ||
+        (ilteoRe.test(bName) && !(Intake().isNonIlteoText && Intake().isNonIlteoText(bName)))
+      );
+      if (!isPureIlteoCons) return;
+      var yr = Number(String(cs.year || cs.contractDate || cs.startDate || '2026').slice(0, 4)) || 2026;
       var coObj = (cs.company && typeof cs.company === 'object') ? cs.company : {};
       var coId = str(cs.companyId || coObj.id) || (cs.id ? ('cons_' + safeKey(cs.id)) : '');
-      if (!coId || registeredCoIds[coId] || (cs.id && registeredCoIds['cons:' + cs.id]) || seenCo[coId]) return;
-      seenCo[coId] = 1;
       var coRec = findCompanyById(coId) || coObj;
+      var coNameStr = str(coRec.name || cs.companyName || cs.name || '사업장');
+      var cNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(coNameStr) : '';
+      var cyKey = coId + ':' + yr;
+      var normYrKey = cNorm ? ('norm:' + cNorm + ':' + yr) : '';
+      if (!coId || registeredKeys['co:' + cyKey] || (cs.id && registeredKeys['cons:' + cs.id]) || (normYrKey && registeredKeys[normYrKey]) || seenCoYear[cyKey] || (normYrKey && seenCoYear[normYrKey])) return;
+      seenCoYear[cyKey] = 1;
+      if (normYrKey) seenCoYear[normYrKey] = 1;
       cands.push({
-        candKey: 'erp_' + safeKey(coId),
+        candKey: 'erp_' + safeKey(coId) + '_' + yr,
         source: '이알피 컨설팅',
         companyId: coId,
         consultingId: str(cs.id),
-        companyName: str(coRec.name || cs.companyName || cs.name || '사업장'),
+        companyName: coNameStr,
         bizNo: str(coRec.bizNo || cs.bizNo),
         industry: str(coRec.bizType || coRec.bizCategory || cs.industry),
         contactEmail: firstEmailOf(coRec) || firstEmailOf(cs),
-        year: Number(String(cs.year || cs.contractDate || cs.startDate || '2026').slice(0, 4)) || 2026,
-        programName: bName || '일터혁신 상생컨설팅',
+        year: yr,
+        programName: '일터혁신 상생컨설팅',
         isIlteo: true,
         scalCoId: '',
         scalTypeId: ''
@@ -298,36 +316,43 @@
 
     Object.keys(D.scalCos || {}).forEach(function (sk) {
       var sc = D.scalCos[sk];
-      if (!sc || typeof sc !== 'object' || sc._deleted) return;
+      if (!sc || typeof sc !== 'object' || sc._deleted || sc.deleted || sc.mergedInto || sc.active === false) return;
       var scId = str(sc.id || sk);
       if (!scId) return;
       var rawTypes = Array.isArray(sc.types)
-        ? sc.types
-        : (sc.types && typeof sc.types === 'object' ? Object.keys(sc.types).map(function (tk) { return sc.types[tk]; }) : []);
-      if (sc.typeId) rawTypes.push(sc.typeId);
+        ? sc.types.map(str)
+        : (sc.types && typeof sc.types === 'object' ? Object.keys(sc.types).map(function (tk) { return str(sc.types[tk]); }) : []);
+      if (sc.typeId) rawTypes.push(str(sc.typeId));
+      var hasT1 = rawTypes.indexOf('t1') >= 0;
       var tNames = rawTypes.map(function (tid) { return typeMap[str(tid)] || ''; }).filter(Boolean);
       var joinedTypeNames = tNames.join(' ') + ' ' + str(sc.bizName || '');
       var hasIlteoSched = rowsOf(D.scalScheds).some(function (s) {
-        return s && s.coId === scId && ilteoRe.test(typeMap[s.typeId] || '');
+        return s && s.coId === scId && (s.typeId === 't1' || ilteoRe.test(typeMap[s.typeId] || ''));
       });
-      if (!ilteoRe.test(joinedTypeNames) && !hasIlteoSched) return;
+      if (!hasT1 && !ilteoRe.test(joinedTypeNames) && !hasIlteoSched) return;
+      var yr = Number(sc.year) || 2026;
       var matchedErpCo = matchErpCompanyStrict(sc);
       var targetCoId = matchedErpCo ? str(matchedErpCo.id) : ('scal_' + safeKey(scId));
-      if (registeredCoIds[targetCoId] || registeredCoIds['scal:' + scId] || seenCo[targetCoId]) return;
-      seenCo[targetCoId] = 1;
+      var scNameStr = str((matchedErpCo && matchedErpCo.name) || sc.name);
+      var sNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(scNameStr) : '';
+      var cyKey = targetCoId + ':' + yr;
+      var normYrKey = sNorm ? ('norm:' + sNorm + ':' + yr) : '';
+      if (registeredKeys['co:' + cyKey] || registeredKeys['scal:' + scId + ':' + yr] || (normYrKey && registeredKeys[normYrKey]) || seenCoYear[cyKey] || (normYrKey && seenCoYear[normYrKey])) return;
+      seenCoYear[cyKey] = 1;
+      if (normYrKey) seenCoYear[normYrKey] = 1;
       cands.push({
-        candKey: 'scal_' + safeKey(targetCoId),
+        candKey: 'scal_' + safeKey(targetCoId) + '_' + yr,
         source: '정부사업일정',
         companyId: targetCoId,
-        companyName: str((matchedErpCo && matchedErpCo.name) || sc.name),
+        companyName: scNameStr,
         bizNo: str((matchedErpCo && matchedErpCo.bizNo) || sc.bizNo),
         industry: str((matchedErpCo && (matchedErpCo.bizType || matchedErpCo.bizCategory)) || sc.industry),
         contactEmail: firstEmailOf(matchedErpCo) || firstEmailOf(sc),
-        year: Number(sc.year) || 2026,
+        year: yr,
         programName: '일터혁신 상생컨설팅',
         isIlteo: true,
         scalCoId: scId,
-        scalTypeId: str(rawTypes[0] || sc.typeId || 't1')
+        scalTypeId: hasT1 ? 't1' : str(rawTypes[0] || sc.typeId || 't1')
       });
     });
 
@@ -631,23 +656,33 @@
 
   /* ── 탭 1: 사업장 현황 · 메일 감지 ── */
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen) {
-    var ilteoOnlyCnt = projs.filter(isIlteoProject).length;
     if ($('kpiBox')) {
       $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>등록 컨설팅 사업장 (일터혁신 ' + ilteoOnlyCnt + ')</span><b>' + projs.length + '개사</b></div>' +
+        '<div class="kpi k-blue"><span>일터혁신 컨설팅 사업장</span><b>' + projs.length + '건</b></div>' +
         '<div class="kpi k-amber"><span>📩 기초자료 메일 미확인</span><b>' + totalPreUnseen + '건</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간·결과보고 수록 완료</span><b>' + midDoneCnt + '개사</b></div>' +
+        '<div class="kpi k-green"><span>📌 중간·결과보고 수록 완료</span><b>' + midDoneCnt + '건</b></div>' +
         '<div class="kpi k-blue"><span>📬 후속·결과 메일 미확인</span><b>' + totalPostUnseen + '건</b></div>';
     }
 
+    var yrSel = $('projYear');
+    if (yrSel) {
+      var curYrVal = str(yrSel.value);
+      var yrMap = {};
+      for (var y = 2026; y >= 2015; y--) yrMap[String(y)] = 1;
+      projs.forEach(function (p) { if (p.year) yrMap[String(p.year)] = 1; });
+      var sortedYrs = Object.keys(yrMap).sort(function (a, b) { return Number(b) - Number(a); });
+      if (yrSel.options.length !== sortedYrs.length + 1) {
+        yrSel.innerHTML = '<option value="">연도 전체</option>' + sortedYrs.map(function (yv) {
+          return '<option value="' + esc(yv) + '"' + (yv === curYrVal ? ' selected' : '') + '>' + esc(yv) + '년</option>';
+        }).join('');
+      }
+    }
+
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var progFilter = str($('projProg') && $('projProg').value);
     var yr = str($('projYear') && $('projYear').value);
     var stFilter = str($('projStage') && $('projStage').value);
 
     var filtered = projs.filter(function (p) {
-      if (progFilter === 'ilteo' && !isIlteoProject(p)) return false;
-      if (progFilter === 'other' && isIlteoProject(p)) return false;
       if (yr && String(p.year || '') !== yr) return false;
       var sc = SCAN_CACHE[p.id] || { unseenPreCount: 0, unseenPostCount: 0 };
       if (stFilter === 'pre_mid' && p.midConfirmedAt) return false;
@@ -655,7 +690,7 @@
       if (stFilter === 'unseen' && (sc.unseenPreCount + sc.unseenPostCount) === 0) return false;
       if (q) {
         var taskStr = resolveTaskNames(p.selectedTasks).join(' ');
-        var hay = (str(p.companyName) + ' ' + str(p.programName) + ' ' + str(p.industry) + ' ' + str(p.consultantName) + ' ' + taskStr).toLowerCase();
+        var hay = (str(p.companyName) + ' ' + str(p.industry) + ' ' + str(p.consultantName) + ' ' + taskStr).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -677,14 +712,12 @@
       if (hasMid || hasFin) mailBadges.push('<span class="chip c-green">' + (hasMid && hasFin ? '중간·최종✓' : (hasFin ? '최종✓' : '중간✓')) + '</span>');
       if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + (sc.totalInCount || 0) + '건</span>');
 
-      var progShort = isIlteoProject(p)
-        ? '<span class="chip c-blue">일터혁신</span>'
-        : '<span class="chip">' + esc(str(p.programName || '컨설팅').slice(0, 10)) + '</span>';
+      var progShort = '<span class="chip c-blue">일터혁신</span>';
 
       return {
         id: p.id,
         cells: [
-          { cls: 'ti', title: p.companyName + (p.programName ? ' (' + p.programName + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span> ' + progShort },
+          { cls: 'ti', title: p.companyName + ' (' + (p.year || 2026) + '년 일터혁신 상생컨설팅)', html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span> ' + progShort },
           { k: 'badge', html: '<span class="chip c-blue">' + esc(lv.short) + '</span> ' + stageDotsHtml(p) },
           { cls: 'wide', title: taskNames, html: esc(taskNames || '과제 선택 필요') },
           { html: '기초자료 <b>' + chkPre.pct + '%</b> (' + chkPre.requiredDone + '/' + chkPre.requiredTotal + ')' },
@@ -861,8 +894,8 @@
       '</div>' +
       '<div class="drop-zone" id="preDropZone" tabindex="0" role="button" aria-label="기초자료 파일 선택 또는 끌어놓기">' +
       '<b>📂 여기에 취업규칙·임금대장·근태기록·인력현황·EOS설문·중간보고서 파일을 끌어다 놓거나 클릭하세요</b>' +
-      '<span>지원 형식: .xlsx · .xls · .csv (브라우저 내 비식별 통계만 집계, 원본 성명·주민번호 폐기) / .pptx · .hwpx · .hwp · .docx · .pdf · .txt (2중 가림 분석)</span>' +
-      '<input type="file" id="preFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.hwpx,.hwp,.docx,.pdf,.txt" style="display:none">' +
+      '<span>지원 형식: .xlsx · .xls · .csv (브라우저 내 비식별 통계만 집계, 원본 성명·주민번호 폐기) / .pptx · .pptm · .ppsx · .hwpx · .hwp · .docx · .pdf · .txt (2중 가림 분석)</span>' +
+      '<input type="file" id="preFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.pptm,.ppsx,.hwpx,.hwp,.docx,.pdf,.txt" style="display:none">' +
       '</div>' +
       '</div>' +
 
@@ -1138,7 +1171,7 @@
       '<div class="drop-zone" id="postDropZone" tabindex="0" role="button" aria-label="후속자료 파일 선택 또는 끌어놓기">' +
       '<b>📂 중간보고 이후 받은 디자인팀 피드백·보완 시뮬레이션·찬반투표 집계표·서명지·최종보고서를 끌어다 놓으세요</b>' +
       '<span>채택 모델 · 임금보전 합의 · 시행일 · 찬성률(%) · 수정요청사항을 자동 추출하여 최종 결과보고서 및 규정·계약서에 반영합니다</span>' +
-      '<input type="file" id="postFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.hwpx,.hwp,.docx,.pdf,.txt,.jpg,.jpeg,.png" style="display:none">' +
+      '<input type="file" id="postFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.pptm,.ppsx,.hwpx,.hwp,.docx,.pdf,.txt,.jpg,.jpeg,.png" style="display:none">' +
       '</div>' +
       (postCards.length ? renderTable('postCards', ['후속자료 제목', '분류', '추출된 합의·변경점 요약', '분석시각', '보기'], postCardRows, '') : '') +
       '</div>' +
@@ -1293,8 +1326,10 @@
       var f = files[i];
       var errLabel = formatSafeErrorLabel(f.name, proj);
       try {
-        if (Number(f.size || 0) > 15 * 1024 * 1024) {
-          throw new Error('파일 크기가 15MB를 초과하여 브라우저 분석을 생략했습니다.');
+        var isSlideDeck = /\.(pptx|pptm|ppsx)$/i.test(str(f.name));
+        var maxBytes = isSlideDeck ? (40 * 1024 * 1024) : (15 * 1024 * 1024);
+        if (Number(f.size || 0) > maxBytes) {
+          throw new Error('파일 크기가 ' + (isSlideDeck ? '40MB' : '15MB') + '를 초과하여 브라우저 분석을 생략했습니다.');
         }
         var safeTitle = await sanitizeMetaLabelAsync(f.name, proj);
         var buf = await f.arrayBuffer();
@@ -1438,7 +1473,7 @@
     if (/\.(txt|md|log)$/.test(lower)) {
       return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
     }
-    if (/\.pptx$/.test(lower) && Intake().extractPptxText) {
+    if (/\.(pptx|pptm|ppsx)$/.test(lower) && Intake().extractPptxText) {
       try {
         var pptTxt = await Intake().extractPptxText(bytes, global.JSZip);
         if (pptTxt) return pptTxt;
@@ -1539,7 +1574,8 @@
       for (var i = 0; i < Math.min(atts.length, 6); i++) {
         var a = atts[i];
         var aName = str(a && a.name);
-        if (!aName || Number(a.size || 0) > 15 * 1024 * 1024) continue;
+        var maxAttBytes = /\.(pptx|pptm|ppsx)$/i.test(aName) ? (40 * 1024 * 1024) : (15 * 1024 * 1024);
+        if (!aName || Number(a.size || 0) > maxAttBytes) continue;
         try {
           var got = isPop3
             ? await callMailFn('readOldMail', { key: m.popKey, index: a.i == null ? i : a.i })
@@ -1966,9 +2002,14 @@
       return '<option value="' + esc(lv.code) + '"' + (lv.code === 'deep' ? ' selected' : '') + '>' + esc(lv.name + ' (최소 EOS ' + lv.eosMinPct + '%+)') + '</option>';
     }).join('');
 
+    var npYearOpts = [];
+    for (var ny = 2026; ny >= 2015; ny--) {
+      npYearOpts.push('<option value="' + ny + '"' + (ny === 2026 ? ' selected' : '') + '>' + ny + '년</option>');
+    }
+
     var body =
       '<div class="fr"><label for="npCo">대상 거래처*</label><div class="fv"><select id="npCo">' + coOpts + '</select></div></div>' +
-      '<div class="fr"><label for="npYear">사업 연도</label><div class="fv"><select id="npYear"><option value="2026" selected>2026년</option><option value="2025">2025년</option><option value="2024">2024년</option><option value="2023">2023년</option><option value="2022">2022년</option><option value="2021">2021년</option></select></div></div>' +
+      '<div class="fr"><label for="npYear">사업 연도</label><div class="fv"><select id="npYear">' + npYearOpts.join('') + '</select></div></div>' +
       '<div class="fr"><label for="npLevel">컨설팅 수준</label><div class="fv"><select id="npLevel">' + lvOpts + '</select></div></div>' +
       '<div class="fr"><label for="npIndustry">업종 / 근로자수</label><div class="fv"><input type="text" id="npIndustry" aria-label="업종" placeholder="예: 정밀기계 제조업"><input type="number" id="npWorkers" aria-label="상시근로자 수" placeholder="상시근로자 수" style="max-width:140px"></div></div>' +
       '<div class="fr"><label for="npEmail">담당자 이메일</label><div class="fv"><input type="email" id="npEmail" placeholder="수신 메일 자동 감지용 이메일 (여러 개는 쉼표 구분)"></div></div>' +
@@ -2001,6 +2042,8 @@
               ceoName: str(co.ceo || co.ceoName),
               contactName: contactNameOfCompany(co),
               year: Number($('npYear').value) || 2026,
+              programName: '일터혁신 상생컨설팅',
+              isIlteo: true,
               level: str($('npLevel').value) || 'deep',
               industry: str($('npIndustry').value) || str(co.bizType),
               workerCount: Number($('npWorkers').value) || 0,
@@ -2701,7 +2744,7 @@
       };
     }
     if ($('newProjBtn')) $('newProjBtn').onclick = openNewProjectModal;
-    ['projQ', 'projProg', 'projYear', 'projStage'].forEach(function (id) {
+    ['projQ', 'projYear', 'projStage'].forEach(function (id) {
       var el = $(id);
       if (!el) return;
       el.addEventListener(id === 'projQ' ? 'input' : 'change', function () {
