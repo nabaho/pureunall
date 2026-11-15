@@ -10906,19 +10906,29 @@ var _dragSel=null;
    ⚠ 끝낼 때 글자 잡힘 막기(userSelect)도 함께 푼다 — 끌기만 지우고 이것만 남기면 화면 글자가 계속 안 잡힌다. */
 function _dragSelEnd(){
   if(!_dragSel) return;
-  var f=_dragSel.sync; _dragSel=null; document.body.style.userSelect='';
-  try{ f(); }catch(e){}
+  var d=_dragSel; _dragSel=null; document.body.style.userSelect='';
+  /* 다른 칸으로 넘어가 «시작 칸까지 칠한» 끌기면, 시작 칸으로 돌아와 뗄 때 이어지는 click 이 시작 칸을 도로 뒤집지 않게 한 번 삼킨다 */
+  if(d.moved) _dragSelSwallowClick();
+  try{ d.sync(); }catch(e){}
+}
+/* 뗀 직후 «한 번만» 오는 click 을 삼킨다. click 은 뗌과 같은 작업 안에서 바로 오므로 타이머(0)로 거두면 다음 클릭을 잡아먹지 않는다 */
+function _dragSelSwallowClick(){
+  var eat=function(e){ document.removeEventListener('click', eat, true); e.preventDefault(); e.stopPropagation(); };
+  document.addEventListener('click', eat, true);
+  setTimeout(function(){ document.removeEventListener('click', eat, true); }, 0);
 }
 function bindDragSel(box, sync){
   if(!box || box.dataset.dragBound) return;
   box.dataset.dragBound='1';
   box.addEventListener('mousedown', function(e){
+    if(e.button) return;   /* 오른쪽·가운데 단추는 끌어 고르기를 시작하지 않는다 */
     var c=e.target.closest('.row-chk'); if(!c) return;
     /* ★ 누른 «그 자리에서» 세운다 — 전에는 setTimeout(0) 으로 미뤘는데, 누름·뗌이 그보다 먼저 끝나면(터치 탭은 마우스 이벤트를
        한 작업 안에 잇달아 보내고, 자동 클릭도 3ms 만에 끝난다) 뗌이 «아직 없는 끌기»를 지우고 지나간 뒤에야 세워져,
        손을 안 댄 채 ☐ 위를 지나가기만 해도 켜지고 글자 잡힘 막기도 남았다(2026-11-15 재현).
-       이 시점의 checked 는 «누르기 전» 값이다(체크는 뗀 뒤 click 에서 바뀐다) — 사람 손 속도에서 미루던 때와 같은 값이다. */
-    _dragSel={sync:sync, on:c.checked};
+       ★ 칠하는 값은 누른 칸이 «눌린 뒤» 갖게 될 값(!c.checked)이다 — 체크는 뗀 뒤 click 에서 바뀌므로 지금 checked 는 «누르기 전» 값이다.
+       전에는 그 누르기 전 값으로 칠해, 꺼진 칸에서 끌기 시작하면 아무것도 안 켜지고 켜진 칸에서 시작해야 켜졌다(주석의 「켜며 끌면 켜고」와 반대 — 2026-11-15). */
+    _dragSel={sync:sync, on:!c.checked, start:c, moved:false};
     document.body.style.userSelect='none';
   });
   box.addEventListener('mouseover', function(e){
@@ -10926,7 +10936,13 @@ function bindDragSel(box, sync){
     /* 안전장치 — 누른 채가 아닌데 끌기가 남아 있으면(창 밖에서 뗐거나 뗌을 놓쳤을 때) 칠하지 않고 거기서 끝낸다 */
     if(!(e.buttons&1)){ _dragSelEnd(); return; }
     var c=e.target.closest('.row-chk'); if(!c) return;
-    if(c.checked!==_dragSel.on){ c.checked=_dragSel.on; try{ _dragSel.sync(); }catch(err){} }
+    var d=_dragSel;
+    if(c===d.start) return;   /* 시작 칸은 제자리에서 떼면 click 이 바꾸고, 다른 칸으로 넘어가면 아래에서 함께 칠한다 */
+    /* 다른 칸으로 «넘어가는 순간» 시작 칸도 칠한다 — 다른 칸에서 떼면 시작 칸에는 click 이 안 가서 그대로 두면 시작 칸만 빠진다 */
+    var 바뀜=false;
+    if(!d.moved){ d.moved=true; d.start.checked=d.on; 바뀜=true; }
+    if(c.checked!==d.on){ c.checked=d.on; 바뀜=true; }
+    if(바뀜){ try{ d.sync(); }catch(err){} }
   });
 }
 function careerDragSel(name){
