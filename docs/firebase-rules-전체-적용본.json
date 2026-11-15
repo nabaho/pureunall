@@ -1369,6 +1369,30 @@
     },
     "cal_inbox": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "cfg": {
+        ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "on": {
+          ".validate": "newData.isBoolean()"
+        },
+        "autoAdd": {
+          ".validate": "newData.isBoolean()"
+        },
+        "perRunMax": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 30"
+        },
+        "dayLimit": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 300"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "by": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
       "cand": {
         ".indexOn": [
           "at"

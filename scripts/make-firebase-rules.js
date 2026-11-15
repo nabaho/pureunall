@@ -909,15 +909,25 @@ rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
 rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
-/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」) ═══════════════
+/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」 · 2026-11-15 자동등록·병합) ═══
    받은 메일에서 서버(AI)가 뽑은 «일정 초안». 메일에서 나온 이름·전화·이메일이 들어 있다.
    ⚠ 읽기는 «관리자(대표)만». 메일함은 직원이 함께 읽지만 후보함은 대표 몫이다 —
      위쪽 읽기가 막혀 있으니(위에서 허락해야 아래에서도 읽힌다) 직원은 못 읽는다.
-   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»만 바꾼다
-     (new → added | dismissed). 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
+   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»(cand/$id/status)과
+     자동등록 스위치·한도(cfg)만 바꾼다. 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
    ⚠ at 색인 — 30일 지난 후보를 서버가 정리할 때 쓴다. state 는 서버가 적는 «마지막 돈 기록»(한도 멈춤 표시 포함). */
 rules.cal_inbox = {
   '.read': `auth != null && ${ADMIN}`,
+  cfg: {
+    '.write': `auth != null && ${ADMIN}`,
+    on:        { '.validate': 'newData.isBoolean()' },
+    autoAdd:   { '.validate': 'newData.isBoolean()' },
+    perRunMax: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 30' },
+    dayLimit:  { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 300' },
+    at:        { '.validate': 'newData.isNumber()' },
+    by:        { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    $other:    { '.validate': false }
+  },
   cand: {
     '.indexOn': ['at'],
     $id: { status: {
