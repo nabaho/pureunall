@@ -146,7 +146,25 @@ for (let i = 0; i < 12; i++) 일정.push({ id: 'sc-pa' + i, sid: 'P001', date: �
 const 출석 = [];
 for (let i = 0; i < 26; i++) 출석.push({ id: 'at-pa' + i, sid: 사람[i % 10].sid, date: 날(10, 1 + (i % 17)), type: ['leave', 'trip', 'absent'][i % 3], memo: '점검근태' + i });
 
+/* ── 📄 기금 설립에서 온 계약 후보 5건 — 계약관리 위 «가져오기 띠» (2026-11-08) · 모두 지어낸 것 ──
+   ① 긴 이름 공동기금·계약확정 ② 사내기금·상담접수 ③ 같은 업체의 기금 계약이 이미 있는 후보(이어 붙이기 줄)
+   ④ 무시한 후보 ⑤ 이미 가져온 후보(기금관리는 계약확정인데 계약은 상담접수 → 🔔 반영 줄) */
+const 기금후보 = {
+  'fd-pa1': { fundName: '점검지역중소기업협의체공동근로복지기금1호', shortName: '점검공동1호', fundType: '공동', company: '점검지역중소기업협의체', manager: '점검노무',
+    brief: '점검공동1호 설립 인가 신청', stage: 'signed', by: '점검노무', createdAt: '2026-10-17', updatedAt: '2026-10-17' },
+  'fd-pa2': { fundName: '점검산업사내근로복지기금', shortName: '점검산업기금', fundType: '사내', company: '점검산업', manager: '점검사무장',
+    brief: '점검산업기금 설립 인가 신청', stage: 'consult', by: '점검사무장', createdAt: '2026-10-16', updatedAt: '2026-10-16' },
+  'fd-pa3': { fundName: '점검겹침사내근로복지기금', shortName: '점검겹침기금', fundType: '사내', company: 업체명(3), manager: '점검노무',
+    brief: '점검겹침기금 설립 인가 신청', stage: 'consult', by: '점검노무', createdAt: '2026-10-15', updatedAt: '2026-10-15' },
+  'fd-pa4': { fundName: '점검무시사내근로복지기금', shortName: '점검무시기금', fundType: '사내', company: '점검무시', manager: '점검노무',
+    brief: '점검무시기금 설립 인가 신청', stage: 'consult', by: '점검노무', createdAt: '2026-10-14', updatedAt: '2026-10-14', ignored: { at: '2026-10-15T01:00:00.000Z', bySid: 'P001' } },
+  'fd-pa5': { fundName: '점검가져옴사내근로복지기금', shortName: '점검가져옴기금', fundType: '사내', company: 업체명(0), manager: '점검노무',
+    brief: '점검가져옴기금 설립 인가 신청', stage: 'signed', by: '점검노무', createdAt: '2026-10-13', updatedAt: '2026-10-17',
+    erp: { contractId: 'ct-pa0', contractNo: '계약-2026-100', at: '2026-10-14T01:00:00.000Z', bySid: 'P001' } },
+};
+
 const data = {
+  fund_erp: { contract_inbox: 기금후보 },
   data: {
     user_accounts: { u: U, v: 사람 },
     user_dir: { u: U, v: 사람 },
@@ -184,6 +202,10 @@ module.exports = {
   data,
   views: [
     메뉴('biz/contract'),
+    /* 📄 기금 후보 띠 — ☐ 두 개를 눌러 «N건 선택» 줄이 뜨는지 본다(고르기만으로는 아무것도 안 바뀐다) */
+    { name: 'contract-fib-pick', wait: 1200,
+      run: async (page) => { await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500); await page.locator('.fib-row input[type=checkbox]').nth(1).click(); await page.locator('.fib-row input[type=checkbox]').nth(2).click(); },
+      back: async (page) => { await page.getByText('선택 풀기').click().catch(() => {}); } },
     창('contract-open', '파하바이오헬스케어점검글로벌홀딩스제7공장'),   // 계약 카드는 (주) 를 ㈜ 로 줄여 그린다
     /* 계약유형을 하나도 안 고른 계약 — CMS 줄이 «.fld» 칸 안으로 들어가 세로로 깨지던 자리
        (대표 갈무리 2026-10-22: 「CMS 자동이체」·「개인입금」 글자가 한 자씩 세로로 섰다) */

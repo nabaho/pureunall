@@ -366,3 +366,75 @@ test('한꺼번에(③ 머리 단추) — 확정할 수 있는 정산표만, 확
   assert.match(fn, /if\(!ME\.isAdmin\)\{ toast\(/, '대표가 아니면 확정만');
   assert.match(NOC, /if\(t\.closest\('#monthGo'\)\)\{ await confirmMonth\(\); return; \}/);
 });
+
+test('개인입금 사업 자동 연결 — 이알피의 개인입금 종류를 규칙 없는 «빈 칸»으로 올리되 서버에는 쓰지 않고, 안 건드린 칸은 저장에서 건너뛴다', () => {
+  const bw = fnBody('function buildWork(');
+  assert.match(bw, /C\.personalTypes\(ERP\.biz, ERP\.consultings/, '이알피 유형·컨설팅으로 고른다');
+  assert.match(bw, /if\(D\.rules\[p\.code\]\) return;/, '규칙이 있거나 지워진(_deleted) 사업은 다시 올리지 않는다');
+  assert.doesNotMatch(bw, /gate\.save|patchRecord|save\(|softDelete/, '칸을 올릴 때 서버에 쓴다');
+  assert.match(bw, /leadSid:''/, '주관을 미리 채우지 않는다 — 규칙이 생기면 재무관리 성과급이 막힌다');
+  assert.match(fnBody('async function loadErp('), /personal:!!b\.personalDeposit/, '유형 스위치를 읽는다');
+  /* 저장: 안 건드린 자동 칸은 건너뛰고, 건드렸으면 보통 칸처럼 주관 검사 */
+  const sv = fnBody('async function saveRules(');
+  assert.match(sv, /if\(w\.auto && autoUntouched\(w\)\) return;/);
+  assert.ok(sv.indexOf('autoUntouched(w)') < sv.indexOf('주관을 고르세요'), '건너뛰기가 주관 검사보다 먼저');
+  assert.doesNotMatch(sv, /auto\s*:/, '저장 레코드에 화면용 auto 표시를 싣지 않는다');
+  /* 안 건드린 판정을 돌려 본다 */
+  const ctx = { C: require('../js/pu-settle-core.js') };
+  vm.createContext(ctx);
+  vm.runInContext(fnBody('function autoUntouched(') + '; this.f = autoUntouched;', ctx);
+  const base = () => ({ leadSid: '', rates: {}, title: '', msgHead: '', msgFoot: '', siteRates: {}, tax: '3.3', active: true });
+  assert.equal(ctx.f(base()), true);
+  [{ leadSid: 'S1' }, { rates: { S1: '25' } }, { msgHead: '문구' }, { siteRates: { C1: { S1: '10' } } }, { tax: '8.8' }, { title: '이름' }]
+    .forEach((patch) => assert.equal(ctx.f(Object.assign(base(), patch)), false, JSON.stringify(patch)));
+  /* 켜짐만 끈 것은 «맡지 않겠다» — 이알피는 켜짐을 안 보고 규칙이 있으면 성과급을 막으므로 규칙을 만들지 않는다 */
+  assert.equal(ctx.f(Object.assign(base(), { active: false })), true, '켜짐만 끈 자동 칸');
+  assert.equal(ctx.f(Object.assign(base(), { rates: { S1: '  ' } })), true, '빈 칸에 공백만 있으면 안 건드린 것');
+  /* «빈 칸에 기존 % 넣기»·제안은 안 건드린 자동 칸을 채우지 않는다 — 채우면 «건드림»이 돼 다른 칸 저장까지 막힌다 */
+  const ctx2 = { C: require('../js/pu-settle-core.js'), WORK: null };
+  vm.createContext(ctx2);
+  vm.runInContext(fnBody('function autoUntouched(') + fnBody('function rateSuggest(') + '; this.f = rateSuggest;', ctx2);
+  const mk = (extra) => Object.assign({ leadSid: '', rates: {}, title: '', msgHead: '', msgFoot: '', siteRates: {}, tax: '3.3', active: true }, extra);
+  ctx2.WORK = { types: ['T-OLD', 'T-NEW', 'T-OLD2'], people: ['S1'], rules: {
+    'T-OLD': mk({ leadSid: 'L', rates: { S1: '25' } }), 'T-OLD2': mk({ leadSid: 'L' }), 'T-NEW': mk({ auto: { why: 'type' } }) } };
+  assert.deepEqual(Object.keys(ctx2.f()), ['T-OLD2|S1'], '보통 칸만 제안, 안 건드린 자동 칸(T-NEW)은 뺀다');
+  ctx2.WORK.rules['T-NEW'].leadSid = 'L';
+  assert.deepEqual(Object.keys(ctx2.f()).sort(), ['T-NEW|S1', 'T-OLD2|S1'], '주관을 고른(건드린) 자동 칸은 보통 칸처럼');
+});
+
+test('요율표 폭 — 사업 칸이 늘면 창 폭까지 자라고(잘리지 않는다), 자동 칸 설명 문구는 늘어놓지 않는다 (대표 2026-11-12)', () => {
+  /* 설정 칸 전체를 고정 폭으로 막지 않는다 — 막으면 개인입금 사업 칸이 늘 때 표가 잘려 옆으로 밀어야 한다 */
+  assert.doesNotMatch(NOC, /#sub-rules\s*\{[^}]*max-width:\s*\d+px/, '설정 칸 전체에 고정 폭 한도가 있다');
+  /* 요율표 상자는 «내용만큼 자라되 창 폭이 한도» — 칸이 적으면 예전 폭 */
+  const box = NOC.match(/#ruleBox\s*\{([^}]*)\}/);
+  assert.ok(box, '#ruleBox 규칙이 없다');
+  assert.match(box[1], /width:\s*max-content/);
+  assert.match(box[1], /max-width:\s*100%/, '창 폭이 한도');
+  /* 다른 카드는 읽기 좋은 폭에 둔다(대표 2026-10-31 「불필요하게 화면을 넓게」) */
+  assert.match(NOC, /#ruleDetBox,\s*#sub-rules>\.card\s*\{[^}]*max-width:\s*\d+px/);
+  /* 사업 이름은 자르지 않고 «두 줄»로 나눈다(1줄 이름 · 2줄 기관) — 칸 머리가 «…» 로 잘리지도, 한 줄로 길게 이어지지도 않는다 */
+  assert.match(NOC, /\.t\.mx th\.mxc \.mxn\s*\{[^}]*display:\s*block/);
+  assert.match(NOC, /\.t\.mx th\.mxc \.mxs\s*\{[^}]*display:\s*block/);
+  /* 자동 칸의 설명 한 줄은 없앴다 — 칸 머리 «설정 필요» 표시만 */
+  const view = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-settle-view.js'), 'utf8');
+  assert.doesNotMatch(view, /mx_autoNote/);
+  assert.match(view, /설정 필요/);
+});
+
+test('월별 한 화면 — 카톡 보내기는 사람 줄·카톡 방을 누를 때만 문구를 펼치고(하나만), 월 머리 줄은 정산표가 있으면 비운다 (대표 2026-11-12)', () => {
+  /* 누르면 그 줄만 펼치고 다시 누르면 접는다 — 펼친 줄은 다시 그릴 때도 이어진다(open) */
+  assert.match(NOC, /closest\('\[data-msg-open\]'\)[\s\S]{0,120}MSG_OPEN=\(MSG_OPEN===mo\)\?'':mo; drawSend\(/);
+  assert.match(fnBody('function drawSend('), /open:MSG_OPEN/);
+  /* 다른 달로 가면 접는다 */
+  assert.match(NOC, /closest\('\[data-month\]'\)\)\)\{[^}]*MSG_OPEN=''/);
+  /* 사람별 금액은 카톡 문구와 같은 사람·같은 순서일 때만 얹는다 */
+  const mi = fnBody('function monthItems(');
+  assert.match(mi, /C\.personTotals\(r, NAMES\)/);
+  assert.match(mi, /tots\[i\]\.sid===m\.sid/);
+  assert.doesNotMatch(mi, /gate\.save|patchRecord|save\(/, '화면 정리가 서버에 쓴다');
+  /* 정산표가 있으면 «2026년 10월 정산표 2개 · …» 머리 줄을 그리지 않는다 */
+  assert.match(fnBody('function drawMonth('), /\$\('monthHead'\)\.innerHTML=runs\.length \? ''/);
+  /* PC 카톡 연결은 한 줄짜리 딱지(긴 경고 줄은 설정 › 카톡 연결에서만) */
+  assert.match(fnBody('function drawSend('), /V\.agentPill\(/);
+  assert.match(fnBody('function drawRooms('), /V\.agentLine\(/);
+});

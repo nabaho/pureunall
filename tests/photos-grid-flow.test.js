@@ -23,6 +23,14 @@ const CSS = (RAW.match(/<style[^>]*>[\s\S]*?<\/style>/g) || []).join('\n').repla
 const DAY = 864e5;
 const NOON = new Date(2026, 10, 8, 12, 0, 0).getTime();
 
+/* vm 안의 «지금» — 진짜 오늘 날짜를 쓰지 않는다.
+   ⚠ dayLabel 은 new Date() 로 «오늘»을 가려 「(오늘)」을 붙인다. vm 안의 Date 는 «따로»라서 안 박으면 진짜 지금을 써,
+     시험을 만든 날(2026-11-08)이 지나자마자 날짜 줄 시험이 빨개졌다(2026-11-09). 사진 시각(NOON)과 같은 시계로 박아 둔다. */
+class FixedDate extends Date {
+  constructor(...a) { if (a.length) super(...a); else super(NOON); }
+  static now() { return NOON; }
+}
+
 /* 가짜 격자 — innerHTML 만 받는다 */
 function makeCtx(opts) {
   opts = opts || {};
@@ -35,6 +43,7 @@ function makeCtx(opts) {
     gridOwner: 'me', ALL_OWNERS: '__all__', NO_TITLE: '제목을 못 읽음', KIND_TABS: [{ key: 'all', label: '전체' }],
     GRAB_TAG: '', DRAG_TIP: '', selected: new Set(),
     fitCalls: 0,
+    Date: FixedDate,
     $: function (id) { return id === 'grid' ? grid : (id === 'empty' ? empty : null); },
     shownItems: function () { return opts.items || []; },
     resetGridRenderLimit: function () { ctx.gridRenderLimit = opts.limit || 9999; },
@@ -322,5 +331,15 @@ test('★★ 첫 날짜 줄의 위 여백 규칙은 «첫 묶음»으로 가린�
 test('★ 날짜 줄에는 전체 글자를 title 로 남긴다 — «…» 로 잘려도 읽을 수 있다', () => {
   const c = makeCtx({ items: [photo('a', 0)] });
   c.renderGrid();
-  assert.match(c.grid.innerHTML, /<b title="11월 8일 \(오늘\)">11월 8일 \(오늘\)<\/b>/);
+  const d = new Date(NOON);
+  const label = (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (오늘)';   // 시험 시계(NOON)의 «오늘» — 진짜 날짜가 아니다
+  assert.ok(c.grid.innerHTML.includes('<b title="' + label + '">' + label + '</b>'),
+    '날짜 줄 글자가 title 에도 그대로 남아야 합니다: ' + label);
+});
+
+test('★ 시험의 «지금»은 박혀 있다 — 진짜 오늘 날짜가 바뀌어도 「(오늘)」 줄이 흔들리지 않는다', () => {
+  const c = makeCtx({ items: [] });
+  assert.strictEqual(vm.runInContext('new Date().getTime()', c), NOON, 'new Date() 가 시험 시계여야 합니다');
+  assert.strictEqual(vm.runInContext('Date.now()', c), NOON, 'Date.now() 도 시험 시계여야 합니다');
+  assert.strictEqual(vm.runInContext('new Date(0).getTime()', c), 0, '값을 준 new Date(값) 은 그대로 받아야 합니다');
 });

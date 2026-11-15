@@ -39,13 +39,13 @@
 }catch(e){} })();
 </script>
 <script src="js/pu-sid-guard.js?v=1"></script>
-<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=90"></script>
+<script src="js/pu-ontology.js?v=97"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -84,10 +84,10 @@
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
-<script src="js/pu-doc-file.js?v=38"></script>
+<script src="js/pu-doc-file.js?v=41"></script>
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
-<script src="js/pu-office-store.js?v=10"></script>
-<script src="js/pu-co-roster.js?v=2"></script>
+<script src="js/pu-office-store.js?v=11"></script>
+<script src="js/pu-co-roster.js?v=4"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
@@ -134,9 +134,13 @@ input,select,textarea{font-family:inherit;font-size:14px}
   #modeBadge{font-size:0;padding:5px;margin-left:6px;flex:0 0 auto}
 }
 @media(max-width:400px){
-  #appbar{gap:2px;padding-left:10px;padding-right:10px}
-  #appbar .iconbtn{padding:7px 6px}
-  #pcWhoM{max-width:26vw}
+  #appbar{gap:1px;padding-left:6px;padding-right:6px}
+  #appbar .logo{font-size:15px}
+  #appbar .logoutTimer{display:none}
+  #appbar .iconbtn{padding:5px 3px;font-size:16px}
+  .actrow{gap:5px}
+  .actrow a{white-space:nowrap;padding-left:4px;padding-right:4px;font-size:12.5px}
+  #pcWhoM{max-width:24vw;min-width:0}
 }
 .iconbtn{font-size:19px;padding:7px 9px;border-radius:10px}
 .iconbtn:active{background:var(--bg2)}
@@ -176,6 +180,7 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 #mmBody{padding:10px 12px 90px}
 #mmBody *{max-width:100%}
 #mmBody table{width:100%;display:block;overflow-x:auto}
+@media(max-width:760px){#mmBody table th{white-space:nowrap}}
 #mmBody input,#mmBody textarea,#mmBody select{width:100%;min-width:0;box-sizing:border-box}
 #subbar{display:flex;align-items:center;gap:14px;padding:11px 16px;flex-shrink:0;
   background:var(--bg2);border-bottom:1px solid var(--line)}
@@ -1343,16 +1348,22 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .gn-m .l2 button{height:34px}
 /* ── 첨부 미리보기 창 (대표 승인 목업 2026-09-05) ──
    ⚠ 창을 크게 잡는다. 서식이 든 문서는 좁으면 줄이 접혀 무엇인지 더 알기 어렵다. */
-.mck.pvbox{width:min(1060px,100%);max-height:92vh}
+.mck.pvbox{width:min(1080px,100%);height:90vh;max-height:92vh}
+.mck.pvbox>header{flex:none}
 .mck.pvbox>header h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mck.pvbox .pvsz{flex:none;font-size:12px;color:#64748b}
-.pvstage{flex:1;overflow:auto;background:#f8fafc;display:flex;align-items:center;
-  justify-content:center;min-height:320px;padding:12px}
-.pvstage .pvpdf{max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.14)}
-.mck.pvbox>footer .pvpg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#64748b}
-.mck.pvbox>footer .pvpg button{height:26px;padding:0 9px}
+.mck.pvbox>header .x{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px}
+.mck.pvbox .pvsz{flex:none;font-size:12px;color:#475569}
+.mck.pvbox>footer{flex:none}
+.pvstage{flex:1 1 auto;min-height:0;overflow:auto;background:#e2e8f0;display:flex;align-items:flex-start;
+  justify-content:center;padding:14px 12px}
+.pvstage .pvpdf{margin:auto;max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.14)}
+.pvstage .pvhwp{align-self:stretch;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding:2px 0 10px}
+.pvstage .pvhwp .pvhwp-pg{background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.16);max-width:100%;overflow:hidden;flex:none}
+.pvstage .pvhwp canvas{display:block;margin:0;max-width:100%}
+.mck.pvbox>footer .pvpg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#475569}
+.mck.pvbox>footer .pvpg button{height:30px;padding:0 10px}
 .mck.pvbox>footer .pvpg b{color:#1e293b}
-.pvstage .pvimg{max-width:100%;max-height:70vh;background:#fff;
+.pvstage .pvimg{margin:auto;max-width:100%;max-height:70vh;background:#fff;
   box-shadow:0 2px 10px rgba(0,0,0,.14)}
 .pvstage .pvtext{margin:0;align-self:stretch;width:100%;background:#fff;padding:18px 22px;
   font:13px/1.9 "Malgun Gothic",monospace;color:#1e293b;white-space:pre-wrap;word-break:break-word;
@@ -1363,7 +1374,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .pvstage .pvsheet td,.pvstage .pvsheet th{border:1px solid #e2e8f0;padding:4px 8px;
   white-space:nowrap;text-align:left}
 .pvstage .pvsheet th{background:#f8fafc;color:#64748b;font-weight:600}
-.pvstage .pvnone{text-align:center;color:#64748b;font-size:13px;line-height:2}
+.pvstage .pvnone{margin:auto;text-align:center;color:#475569;font-size:13px;line-height:2}
 .pvstage .pvnone b{display:block;color:#1e293b;font-size:14px;margin-bottom:4px}
 /* ── 아래 단추 줄 — 단추 글자는 «한 줄» (대표 화면 2026-10-17) ──
    폰(355px)에서 네 단추가 한 줄에 끼어 들며 줄어들어 「→ 급 / 여데 / 이터」처럼 세 줄로
@@ -1858,7 +1869,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dmr .dm-read.moreon .rtop .lft .rbtn.pri{display:none}
 .dmr .dm-read .phbot{display:flex;gap:6px;order:99;position:sticky;bottom:0;z-index:7;margin:0 -12px;
   padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e2e8f0}
-.dmr .dm-read .phbot button{flex:1;height:38px;font:inherit;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b}
+.dmr .dm-read .phbot button{flex:1;height:38px;font:inherit;font-size:12px;padding:0 4px;white-space:nowrap;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b}
 /* 빠른 답장 시트 — body 에 붙인다(읽기 화면이 다시 그려져도 쓰던 글이 안 지워진다) */
 #mbQr{position:fixed;inset:0;z-index:55;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif}
 #mbQr .qd{position:absolute;inset:0;background:rgba(0,0,0,.35)}
@@ -2021,6 +2032,20 @@ table.sbox.tight td span.e{font-size:11px;line-height:1.3}
 table.sbox.tight td.w span{font-size:10.5px;line-height:1.3}
 table.sbox.tight td.a button{padding:3px 8px;font-size:11px}
 table.sbox.tight td.none{padding:26px 8px}
+/* 한 번에 보낸 것 «묶음 줄» — 낱줄과 한눈에 갈리게 옅은 파랑, 누르면 받은 곳이 안쪽 줄로 펼쳐진다 (sentFold) */
+table.sbox tr.sfold{cursor:pointer}
+table.sbox tr.sfold td{background:#eff6ff}
+table.sbox tr.sfold:hover td{background:#bfdbfe}
+table.sbox tr.sfold td.a button{border-color:#bfdbfe;color:#1e40af}
+/* 보내는 중 · 못 보낸 줄 — 보낸 창 맨 위 (sendPendHtml). 옅은 파랑 = 가는 중, 옅은 빨강 = 못 감 */
+table.sbox tr.sendpend.ing td{background:#eff6ff}
+table.sbox tr.sendpend.fail td{background:#fef2f2}
+table.sbox td .pst{color:#1e40af;font-size:11.5px;white-space:nowrap}
+table.sbox td .pst.bad{color:#991b1b;font-weight:700;margin-right:4px}
+table.sbox td.pe{color:#991b1b;font-size:11.5px;white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}
+table.sbox tr.sfsub td{background:#f8fafc}
+table.sbox tr.sfsub td:nth-child(4){padding-left:14px;white-space:nowrap}   /* 받는 곳 이름·주소는 한 줄 — 모자라는 자리는 제목 칸이 줄바꿈으로 내준다 */
+table.sbox td span.sn{display:inline-block;min-width:22px;color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums}
 /* 메일함 머리줄 — 제목·개수·찾기·단추를 한 줄에 (대표 지시 2026-08-15) */
 .mboxbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .mboxbar b{font-size:15px;color:#1e293b;white-space:nowrap}
@@ -3900,11 +3925,11 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=40"></script>
-  <script src="js/pu-handoff.js?v=1"></script>
-  <script src="js/pu-doc-pick.js?v=1"></script>
+  <script src="js/pu-appbar.js?v=44"></script>
+  <script src="js/pu-handoff.js?v=2"></script>
+  <script src="js/pu-doc-pick.js?v=2"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=5"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -4594,6 +4619,8 @@ const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', e
      ⚠ 판정은 mailFirstScreen() 한 자리다 — 여기 적어 넣으면 검사로 돌려 볼 수가 없다. */
   mailSent: mailFirstScreen(),
   sentBox:{}, schedBox:{}, sentQ:'', sentMine:false, sentCat:'', sentBy:'',
+  sentFlat:false, sentOpen:{},   /* 한 번에 보낸 것 «묶어 보기»(기본) ↔ 낱낱이 · 펼친 묶음 — sentFold */
+  sendPend:[],                   /* 보내는 중·못 보낸 메일 줄 — 보낸 창 맨 위(sendPendHtml) */
   showBcc:false, draftAt:'', matPick:'',
   edMode:'editor',   /* 2026-08-24: 가짜였던 bodyFont/Size/Bold/Italic 없앰 · 2026-08-30: 자료 서랍 값(drawerW·drawerQ·drawerOpen·mailDrawer) 없앰 */
   /* ★ 첫 화면 (대표 화면 2026-08-24 「3만 나오게 해달라」)
@@ -7385,6 +7412,18 @@ async function sendCompose(){
   }
   _sending = true;
   lockSendButtons(true);
+  /* ★ 메일함에서 «지금 보내기»는 쓰기 화면에 붙잡아 두지 않는다 (대표 지시 2026-11-09
+       「메일 보내면 보낸창으로 바로 넘어가고 기다리게」). 누르는 즉시 「보낸 메일」 창으로 가고,
+       그 맨 위 «보내는 중… N초» 줄로 기다린다. 서버는 4~6초 걸린다(2026-11-09 서버 로그: 6.1초·4.2초).
+     ⚠ 쓴 글(c)은 줄(pend.snap)이 들고 있다 — 실패하면 「다시 쓰기」로 그대로 되살린다.
+       임시저장은 «나간 뒤에만» 지운다(아래) — 중간에 창이 닫혀도 글이 남는다.
+     ⚠ 예약(sendAt)은 서버가 자리만 잡고 곧바로 답하므로 예전 그대로다. 메일함이 아닌 곳(자료함 보내기 창)도 예전 그대로. */
+  const wasMail = (state.view==='mail');
+  const direct = wasMail && !(Number(c.sendAt||0) > 0);
+  const pend = direct ? sendPendAdd(c) : null;
+  /* ⚠ 비우기 «전에» 지금 글을 임시저장한다 — 마지막 자동저장(30초) 뒤에 고친 글도 남아야, 보내는 중에
+       창이 닫히거나 새로고침돼도 «중간에 창이 닫혀도 글이 남는다»가 참이다. pid 로 «이 편지 것»임을 적어 둔다. */
+  if(direct){ saveDraft(true, pend.id); _compose = null; openSentBox(); }
   /* 첨부가 크면 오래 걸린다 — 몇 초째인지 보여 준다. 숫자가 움직이면 멈춘 게 아니라는 걸 안다. */
   const t0 = Date.now();
   const tick = setInterval(()=>{
@@ -7393,6 +7432,7 @@ async function sendCompose(){
       if(b.dataset.send!=='1') return;
       b.textContent = `보내는 중… ${s}초`;
     });
+    sendPendTick();
   }, 1000);
   try{
     const r = await postAutoMail({
@@ -7407,7 +7447,7 @@ async function sendCompose(){
            서버가 있는 쪽을 쓴다(위 addLocalFiles 머리글). 지우면 큰 첨부가 조용히 빠진다. */
       files: (c.files||[]).map(f=>({ name:f.name, dataUrl:f.dataUrl, path:f.path }))
     });
-    const cardId = c.cardId, wasMail = (state.view==='mail');
+    const cardId = c.cardId;
     const lost = (c.files||[]).length;
     /* ⚠ 답장이었으면 «원래 메일»에 답장 표를 켠다 (대표 지시 2026-09-03).
          다음메일은 우리가 SMTP 로 보낸 것을 「그 메일의 답장」인 줄 모르므로,
@@ -7416,8 +7456,11 @@ async function sendCompose(){
        ⚠ 예약이면 안 켠다 — 아직 안 나갔다. 그때 sendScheduledMail 이 보내고,
          다음 회차 동기화가 다음메일의 표를 그대로 가져온다. */
     const rep = (!r.scheduled && c.replyTo) ? c.replyTo : null;
-    _compose = null;
-    clearDraft();          /* 나갔으니 쓰다 만 글은 지운다 — 안 지우면 다음에 또 뜬다 */
+    if(!direct) _compose = null;   /* 바로 보낸 길은 이미 비웠다 — 그 사이 새로 쓰기 시작한 글을 건드리지 않는다 */
+    /* 나갔으니 쓰다 만 글은 지운다 — 안 지우면 다음에 또 뜬다.
+       ⚠ 바로 보낸 길은 «이 편지의 저장본»만 지운다(clearDraftIf) — 그 사이 새 메일을 열었어도(비어 있든 쓰고 있든)
+         나간 글의 저장본은 지워야 다음에 「이어서 쓸까요?」로 또 뜨지 않고, 새로 쓴 글의 저장본은 남는다. */
+    if(direct) clearDraftIf(pend.id); else clearDraft();
     if(r.scheduled){
       toast(`⏰ ${esc(fmtWhen(r.at))} 에 보내도록 맡겼습니다 — 창을 닫아도 나갑니다`
         + (lost?`\n⚠ 💻 내 PC 파일 ${lost}개는 예약에 담기지 않습니다 — 그때 직접 붙여 보내세요`:''),
@@ -7432,12 +7475,16 @@ async function sendCompose(){
        ⚠ 실패해도 «보내기는 성공»이다 — 표시 하나 때문에 보낸 것이 실패로 보이면 안 된다.
          다음 회차 동기화가 다음메일 쪽 표를 다시 읽어 오므로 스스로 맞춰지기도 한다. */
     if(rep && rep.slug && rep.uid) mbAnswered(rep.slug, rep.uid);
-    /* 보낸 뒤에는 보낸 메일함을 보여 준다 — 방금 것이 실제로 남았는지 그 자리에서 확인된다 */
-    if(wasMail) openSentBox(); else closeSendMat();
+    /* 보낸 뒤에는 보낸 메일함을 보여 준다 — 방금 것이 실제로 남았는지 그 자리에서 확인된다.
+       바로 보낸 길(direct)은 창이 이미 열려 있다 — 목록만 다시 읽어 «보내는 중» 줄을 실제 기록으로 바꾼다. */
+    if(direct) sentAfterSend(pend);
+    else if(wasMail) openSentBox(); else closeSendMat();
     /* 명함 없이 쓴 메일(cardId 없음)은 명함 기록이 없다 — 기록은 명함에 붙는다 */
     if(cardId) loadSendLog(cardId, ()=>{ const box=$('dSendLog'); if(box) box.innerHTML = sendLogHtml(cardId); });
   }catch(e){
-    /* ⚠ 화면을 닫지 않는다. 쓴 글이 그대로 남아 있어야 고쳐서 다시 보낼 수 있다. */
+    /* ⚠ 화면을 닫지 않는다. 쓴 글이 그대로 남아 있어야 고쳐서 다시 보낼 수 있다.
+       바로 보낸 길은 쓰기 화면을 이미 떠났다 — 보낸 창에 붉은 줄 + 「다시 쓰기」로 글을 되살린다(sendPendFail). */
+    if(pend) sendPendFail(pend, e);
     alert('보내지 못했습니다.\n\n' + ((e&&e.message)||'알 수 없는 오류'));
   }finally{
     clearInterval(tick);
@@ -8466,7 +8513,9 @@ function openMailPage(pre){
      ⚠ puAsk 는 confirm 과 달리 «JS를 안 멈춘다». 그래서 뒤에 오던 일을 통째로
        mailPageBuild 로 떼어 내고, 답을 받은 뒤에 부른다. 안 그러면 물어보는 동안
        화면이 먼저 그려져 «답하기 전에» 새 편지가 열린다. */
-  if(!_compose && !pre){
+  /* ⚠ 보내는 중(_sending)이면 임시저장은 «지금 나가는 그 글»이다 — 이어 쓰자고 묻지 않는다.
+       (보낸 창에서 기다리는 사이 「새 메일」을 눌러도 같은 글이 또 열려 두 번 나가는 길을 막는다. 실패하면 임시저장이 남아 있다.) */
+  if(!_compose && !pre && !_sending){
     const d = loadDraft();
     if(d && composeTouched(d)){
       const when = new Date(d.at).toTimeString().slice(0,5);
@@ -8479,6 +8528,8 @@ function openMailPage(pre){
       }).then(yes=>{
         if(yes){
           _compose = Object.assign({ picking:true }, d);
+          /* 못 보낸 줄에서 나온 저장본이면 그 붉은 줄을 거둔다 — 줄과 편집기가 같은 글을 두 벌로 들지 않게 */
+          if(d.pid) state.sendPend = (state.sendPend||[]).filter(x=>x.id!==d.pid);
           state.draftAt = when;
           if(d.lostFiles && d.lostFiles.length)
             setTimeout(()=>toast(`💻 내 PC 파일(${d.lostFiles.join(' · ')})은 다시 붙여 주세요 — 임시저장에는 담기지 않습니다`, 9000), 400);
@@ -8650,6 +8701,51 @@ function closeMailPage(){
   }
   state.view='list'; render();
 }
+/* ══════ 글자를 치는 중인 검색칸은 «그대로 둔 채» 나머지만 갈아 끼운다 ══════
+   (대표 지시 2026-11-14 「검색기능이 이상하다 제대로 작동 잘 안한다」)
+   ★ 까닭 — 검색칸에 한 글자 칠 때마다 메일 화면 «전체»를 다시 그렸다(el.innerHTML = …). 검색칸 자신도 새로
+     만들어져 커서가 풀렸다 — 「s」 한 글자만 들어가고 다음 글자는 어디에도 안 들어갔다
+     (2026-11-14 재현: 한 글자 친 뒤 활성 요소가 BODY). 한글은 더 나쁘다 — 글자를 «조합하는 중»에 칸이
+     바뀌면 입력기가 깨진다. 수신기록·사업장별·보낸 메일·폰 검색칸도 같은 모양이었다.
+   ★ 그래서 data-keep 표가 붙은 칸에 «지금 커서가 있으면» 그 칸과 그 조상 줄기는 그대로 두고, 줄기의
+     «옆 가지»(목록·단추·쪽수…)만 새 그림으로 갈아 끼운다. 칸이 그대로라 커서·글자 조합·되돌리기(Ctrl+Z)가 산다.
+   ⚠ 새 그림에서 같은 표의 칸을 못 찾거나 줄기 모양(깊이·꼬리표)이 다르면 «예전처럼 통째로» 그린다 —
+     안 맞는 줄기를 억지로 맞추지 않는다. 커서가 그 칸에 없을 때(다른 곳을 눌렀을 때)도 예전 그대로다.
+   ⚠ 칸의 글자(value)는 건드리지 않는다. 다만 코드가 값을 바꿨으면(칸에 든 글과 새 그림의 글이 다르면) 새 값을 따른다. */
+function mailPaintAttrs(o, n){
+  Array.from(o.attributes || []).forEach(a=>{ if(!n.hasAttribute(a.name)) o.removeAttribute(a.name); });
+  Array.from(n.attributes || []).forEach(a=>{ if(o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value); });
+}
+function mailPaint(el, html){
+  const ae = (typeof document !== 'undefined') ? document.activeElement : null;
+  const mark = (ae && ae.getAttribute && el.contains && el.contains(ae)) ? ae.getAttribute('data-keep') : '';
+  if(!mark){ el.innerHTML = html; return false; }
+  const tmp = document.createElement('div'); tmp.innerHTML = html;
+  const withMark = (root)=>Array.from(root.querySelectorAll('[data-keep]')).filter(x=>x.getAttribute('data-keep') === mark);
+  const news = withMark(tmp), olds = withMark(el);
+  /* ⚠ 같은 표의 칸이 한 화면에 «둘 이상»이면 어느 칸이 어느 칸인지 못 정한다(커서가 다른 칸 자리로 옮겨 간다) → 통째로 */
+  const nw = (news.length === 1 && olds.length === 1) ? news[0] : null;
+  const prevQ = ae.getAttribute('value') || '';      /* 직전에 그려 둔 검색어 — 줄기 속성을 맞추기 «전에» 읽는다 */
+  const chain = (n, top)=>{ const a = []; for(; n && n !== top; n = n.parentNode) a.push(n); return a; };
+  const oc = nw ? chain(ae, el) : [], nc = nw ? chain(nw, tmp) : [];
+  if(!nw || oc.length !== nc.length || oc.some((n,i)=>n.tagName !== nc[i].tagName)){ el.innerHTML = html; return false; }
+  for(let i = 0; i < oc.length; i++){
+    const o = oc[i], n = nc[i], parent = o.parentNode, nparent = n.parentNode;
+    while(parent.firstChild !== o) parent.removeChild(parent.firstChild);        /* 옛 앞 가지 */
+    while(o.nextSibling) parent.removeChild(o.nextSibling);                      /* 옛 뒤 가지 */
+    while(nparent.firstChild !== n) parent.insertBefore(nparent.firstChild, o);  /* 새 앞 가지 */
+    while(n.nextSibling) parent.appendChild(n.nextSibling);                      /* 새 뒤 가지 */
+    mailPaintAttrs(o, n);                                                        /* 줄기의 클래스·글귀도 새 것을 따른다 */
+  }
+  if(ae.value !== nw.value){                                                     /* 코드가 값을 바꾼 경우만 */
+    ae.value = nw.value;
+    try{ ae.setSelectionRange(ae.value.length, ae.value.length); }catch(_){}
+  }
+  /* 검색어가 «바뀌었으면» 결과는 맨 위부터 — 예전(통째로 다시 그림)과 같다. 줄기의 스크롤 칸(나눠 보기 목록)은
+     이제 지워지지 않아 내려 둔 자리가 남는다. 검색어가 같은 다시 그리기(새 메일 도착 등)는 스크롤을 건드리지 않는다. */
+  if(prevQ !== String(nw.value)) oc.forEach(o=>{ if(o.scrollTop) o.scrollTop = 0; });
+  return true;
+}
 function renderMailPage(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */
@@ -8672,7 +8768,7 @@ function renderMailPage(){
      갈래가 늘 때 **두 곳을 함께** 고쳐야 한다(폰은 renderMailMobile). */
   /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고쳐야 한다(폰은 renderMailMobile).
      'box' 는 다음메일함을 비추는 목록이다 — 2026-08-24 에 더했다. */
-  el.innerHTML = (state.mailSent==='box' ? mbBoxHtml()
+  const html = (state.mailSent==='box' ? mbBoxHtml()
                 : state.mailSent==='who' ? whoPageHtml()
                 /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
                 : state.mailSent==='mnew' ? cntHtml()
@@ -8686,6 +8782,8 @@ function renderMailPage(){
                 : state.mailSent ? sentBoxHtml() : mailWriteHtml())
                 /* 세무사무실 저장 창 — 열려 있을 때만 뒤에 붙는다 (2026-08-28) */
                 + taxSaveHtml();
+  /* 글자를 치는 중인 검색칸은 그대로 둔다(mailPaint). ⚠ 검사가 이 함수만 잘라 돌릴 때 mailPaint 가 없을 수 있다 */
+  if(typeof mailPaint === 'function') mailPaint(el, html); else el.innerHTML = html;
   if(!state.mailSent) wireMailWrite();
   mbPvAfter();     /* 첨부 미리보기의 PDF 는 화면이 그려진 «뒤»에 그린다 */
 }
@@ -8698,30 +8796,21 @@ function renderMailMobile(){
   if(state.view !== 'mail') return;   /* 명함 목록(#list)을 메일로 덮지 않는다 — renderMailPage 머리 참고 */
   const el=$('list'); if(!el) return;
   const tab=(fn,lb,on)=>`<button class="mmtab${on?' on':''}" onclick="${fn}">${lb}</button>`;
+  /* 글자를 치는 중인 검색칸은 그대로 둔 채 갈아 끼운다(mailPaint). ⚠ 검사가 이 함수만 잘라 돌릴 때 mailPaint 가 없을 수 있다 */
+  const paint = (html)=>{ if(typeof mailPaint === 'function') mailPaint(el, html); else el.innerHTML = html; };
   /* ★ 메일함은 폰에서 «앱과 같은 차림»으로 화면을 통째로 쓴다(대표 화면 2026-08-24).
      그래서 갈래줄을 안 그린다 — 그리면 앱에 없는 줄이 화면 뒤에 남는다.
      그 화면에서 다른 곳으로 가는 길은 왼쪽 서랍 맨 아래에 있다(mbDrawerHtml).
      ⚠ 나머지 화면(쓰기·보낸·예약·수신기록)은 예전 그대로 PC 것을 쓴다 — 두 벌로
        만들지 않는다는 약속은 그 화면들에 그대로 살아 있다. */
   if(state.mailSent==='box'){
-    el.innerHTML = `<div id="mmBody">${mbMobileHtml()}</div>`;
+    paint(`<div id="mmBody">${mbMobileHtml()}</div>`);
     mbPvAfter();   /* PC 와 «같이» 고친다 — 안 부르면 폰에서 PDF 가 빈 칸으로 남는다 */
     return;
   }
-  el.innerHTML = `<div class="mmbar">
-      <button class="mmback" onclick="mailBack()" title="${urlWantsMail()?'메일함으로':'명함 목록으로'}">‹ 목록</button>
-      ${tab("openMailBox(mbNow())",'📥 메일함', state.mailSent==='box')}
-      ${tab('openInbox()','🧾 수신기록', state.mailSent==='inbox')}
-      ${tab('openCoThread()','🏢 사업장별', state.mailSent==='co')}
-      ${tab('openMailPage()','✏️ 쓰기', !state.mailSent)}
-      ${tab('openSentBox()','📤 보낸', state.mailSent===true)}
-      ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
-      <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
-    </div><div id="mmBody"></div>`;
-  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
-  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
-  const body=$('mmBody'); if(!body) return;
-  body.innerHTML = (state.mailSent==='box' ? mbMobileHtml()
+  /* ⚠ 띠와 몸통을 «한 번에» 그린다(예전에는 띠를 먼저 그리고 몸통을 따로 채웠다) — 그래야 글자를 치는 중인
+       검색칸이 몸통 안에 있어도 그 칸을 그대로 둔 채 갈아 끼울 수 있다(mailPaint). */
+  const bodyHtml = (state.mailSent==='box' ? mbMobileHtml()
                  /* ⚠ 갈래가 늘 때 «두 곳을 함께» 고친다 — 한쪽만 고치면 폰에서만 안 열린다 */
                  : state.mailSent==='set' ? mailSetHtml()
                  : state.mailSent==='inbox' ? inboxBoxHtml()
@@ -8730,6 +8819,19 @@ function renderMailMobile(){
                  : state.mailSent ? sentBoxHtml() : mailWriteHtml())
                  /* 폰에서도 같은 저장 창을 쓴다 — 한쪽만 달면 기기에 따라 안 뜬다 */
                  + taxSaveHtml();
+  paint(`<div class="mmbar">
+      <button class="mmback" onclick="mailBack()" title="${urlWantsMail()?'메일함으로':'명함 목록으로'}">‹ 목록</button>
+      ${tab("openMailBox(mbNow())",'📥 메일함', state.mailSent==='box')}
+      ${tab('openInbox()','🧾 수신기록', state.mailSent==='inbox')}
+      ${tab('openCoThread()','🏢 사업장별', state.mailSent==='co')}
+      ${tab('openMailPage()','✏️ 쓰기', !state.mailSent)}
+      ${tab('openSentBox()','📤 보낸', state.mailSent===true)}
+      ${tab('openSchedBox()','⏰ 예약', state.mailSent==='sched')}
+      <button class="mmtab" onclick="openMatPage()" title="메일에 붙일 자료">📎 자료함</button>
+    </div><div id="mmBody">${bodyHtml}</div>`);
+  /* 붙은 «‹ 목록» 줄의 높이 — 쓰기 화면 보내기 줄이 그 밑에 붙는다(⑥ⓐ). 글자 크기에 따라 달라서 잰다 */
+  try{ const bar = el.querySelector('.mmbar'); if(bar) document.documentElement.style.setProperty('--mmbarH', bar.offsetHeight + 'px'); }catch(_){}
+  if(!$('mmBody')) return;
   if(!state.mailSent) wireMailWrite();
 }
 /* ── 쓰기 화면 ── */
@@ -9675,7 +9777,9 @@ function composeTouched(c){
   if(String(c.body||'')    !== String(base.body||''))    return true;
   return false;
 }
-function saveDraft(quiet){
+/* pid — 「지금 나가는 그 편지의 임시저장」 표(보내는 중 줄 번호). 있으면 저장본에 함께 적는다.
+   나간 뒤 «이 표가 붙은 저장본만» 지운다(clearDraftIf) — 그 사이 새로 쓴 글의 저장본은 건드리지 않는다. */
+function saveDraft(quiet, pid){
   grabCompose();
   if(!_compose) return;
   if(!composeTouched(_compose)){
@@ -9685,7 +9789,9 @@ function saveDraft(quiet){
     return;
   }
   try{
-    localStorage.setItem(DRAFT_LS, JSON.stringify(draftOf(_compose)));
+    const rec = draftOf(_compose);
+    if(pid) rec.pid = String(pid);
+    localStorage.setItem(DRAFT_LS, JSON.stringify(rec));
     state.draftAt = new Date().toTimeString().slice(0,5);
     if(!quiet) toast('임시저장했습니다 — 다음에 「메일 쓰기」로 오면 이어서 씁니다', 6000);
     else { const el=document.querySelector('.mauto'); if(el) el.textContent='자동저장 '+state.draftAt; }
@@ -9700,6 +9806,14 @@ function loadDraft(){
   }catch(_){ return null; }
 }
 function clearDraft(){ try{ localStorage.removeItem(DRAFT_LS); }catch(_){} state.draftAt=''; }
+/* 저장본이 «그 편지 것»일 때만 지운다 — 보내는 사이 새로 쓴 글이 자동저장으로 저장본을 덮었으면 그것은 남긴다. */
+function clearDraftIf(pid){
+  if(!pid) return;
+  try{
+    const v = JSON.parse(localStorage.getItem(DRAFT_LS)||'null');
+    if(v && String(v.pid||'') === String(pid)) clearDraft();
+  }catch(_){}
+}
 /* 30초마다 조용히 담아 둔다 — 자리를 비운 사이 창이 닫혀도 글이 남는다 */
 setInterval(()=>{ if(state.view==='mail' && !state.mailSent && _compose && composeTouched(_compose)) saveDraft(true); }, 30000);
 
@@ -9907,7 +10021,7 @@ function inboxBoxHtml(){
         : (state.inboxQ||(state.inboxFilter&&state.inboxFilter!=='all') ? '찾은 메일이 없습니다.' : '아직 서버가 본 메일이 없습니다.')}</td></tr>`;
   return `
     <div class="ibtools">
-      <input id="ibQ" placeholder="보낸이·제목으로 찾기" value="${esc(state.inboxQ||'')}"
+      <input id="ibQ" data-keep="ibQ" placeholder="보낸이·제목으로 찾기" value="${esc(state.inboxQ||'')}"
         oninput="state.inboxQ=this.value;if(!event.isComposing)renderMailPage()" oncompositionend="state.inboxQ=this.value;renderMailPage()">
       ${chip('all','전체',c.all)}${chip('took','자료 담김',c.took)}
       ${chip('none','안 담김',c.none)}${chip('lost','임자 못 찾음',c.lost)}
@@ -10063,7 +10177,7 @@ function coThreadHtml(){
   if(co) coMailWrite(co, rows);
 
   let h = '<div class="ibtools">'
-    + '<input id="ctQ" placeholder="사업장 이름으로 찾기" value="'+esc(state.coThreadQ||'')+'"'
+    + '<input id="ctQ" data-keep="ctQ" placeholder="사업장 이름으로 찾기" value="'+esc(state.coThreadQ||'')+'"'
     + ' oninput="state.coThreadQ=this.value;if(!event.isComposing)renderMailPage()"'
     + ' oncompositionend="state.coThreadQ=this.value;renderMailPage()">'
     + '<span class="ibnote" style="margin:0">오간 것이 있는 사업장 '+list.length+'곳</span>'
@@ -10191,8 +10305,9 @@ function loadSentBox(cb){
    그리는 곳과 「골라서 한 번에」가 **같은 목록**을 봐야 한다. 따로 세면 개수가 어긋난다. */
 function sentVisibleRows(){
   const q = String(state.sentQ||'').trim().toLowerCase().replace(/\s/g,'');
+  /* ⚠ 기록 열쇠(id)가 «이긴다» — 기록 안에 id 칸이 들어 있어도 열쇠를 못 덮는다(그 값이 단추에 실린다) */
   let rows = Object.entries(state.sentBox||{})
-    .map(([id,v])=>Object.assign({id}, v||{}))
+    .map(([id,v])=>Object.assign({}, v||{}, {id}))
     .filter(v=>v.at)
     .sort((a,b)=>(b.at||0)-(a.at||0));
   if(state.sentMine) rows = rows.filter(v=>String(v.by||'').toLowerCase()===String(myEmail||'').toLowerCase());
@@ -10207,45 +10322,195 @@ function sentVisibleRows(){
     .some(x=>String(x||'').toLowerCase().replace(/\s/g,'').includes(q)));
   return rows;
 }
+/* ══════ 한 번에 보낸 것은 «한 줄»로 묶는다 (대표 지시 2026-11-09 「대량으로 보낸메일 너무 많이 표시된다. 모든 사람 필요없다」) ══════
+   ★ 까닭 — 이 목록(pucards/sentBox)은 «받는 곳마다 한 줄»이다. 뉴스레터·안내문은 한 번에 수백 곳으로 나가
+     (예약 발송기가 15분마다 20통씩) 같은 제목 줄이 곳 수만큼 쌓이고, 불러온 최근 300줄이 거의 그것으로 찼다.
+     다음메일 보낸함은 10/12 에 «한 통»으로 고쳤지만(mail-one-copy.js) 이 목록은 따로라 그대로였다.
+   ★ 지우지 않고 «화면에서만» 묶는다 — 줄마다 기록은 「다시 쓰기」와 사업장 줄기(pu-co-thread)가 읽고,
+     누구에게 갔는지가 곧 증거다. 묶음 줄을 누르면 받은 곳이 그대로 펼쳐진다.
+   ★ 묶는 기준 — 같은 보낸이 + 같은 제목이 «발송기 한 바퀴보다 넉넉한 간격»으로 이어지고 줄 수가 여럿일 때.
+     ⚠ 두세 사람에게 따로 보낸 것은 묶지 않는다(한 줄씩이 맞다). 제목이 빈 것도 묶지 않는다(같은 편지인지 알 수 없다).
+   ⚠ 거르기·찾기를 «거친 뒤»에 묶는다 — 이름으로 찾으면 그 곳 줄만 남아 묶이지 않고 그대로 나온다.
+   ⚠ 서버(mail-bulk 의 묶음 번호)를 기다리지 않는다 — 옛 줄에는 번호가 없어 «제목·보낸이·간격»으로 본다. */
+const SENT_FOLD_GAP_MS = 40*60*1000;   /* 발송기가 15분마다 한 바퀴(mail-bulk DRAIN_EVERY_MIN) — 그 두 배 남짓이면 같은 발송이다 */
+const SENT_FOLD_MIN = 4;               /* 이 줄 수부터 묶는다 */
+function sentFold(rows){
+  const list = Array.isArray(rows) ? rows : [];
+  const runs = {}, of = [];
+  list.forEach((v,i)=>{
+    const subj = String((v&&v.subject)||'').replace(/\s+/g,' ').trim();
+    if(!subj){ of.push(null); return; }
+    const k = String(v.by||'').trim().toLowerCase()+'\u0001'+subj, at = Number(v.at||0);
+    let r = runs[k];
+    if(!r || Math.abs(r.last-at) > SENT_FOLD_GAP_MS) r = runs[k] = { idx:[], last:at };
+    r.idx.push(i); r.last = at; of.push(r);
+  });
+  const items = [];
+  list.forEach((v,i)=>{
+    const r = of[i];
+    if(r && r.idx.length >= SENT_FOLD_MIN){
+      if(r.idx[0] !== i) return;                       /* 묶음은 가장 위(최근) 줄 자리에 한 번만 */
+      const members = r.idx.map(j=>list[j]);
+      const to = {};
+      members.forEach(m=>String(m.to||'').split(',').forEach(a=>{ a = a.trim().toLowerCase(); if(a) to[a] = 1; }));
+      items.push({ fold:true, key:String(v.id||('i'+i)), rows:members, n:Object.keys(to).length || members.length });
+    } else items.push({ fold:false, row:v });
+  });
+  return items;
+}
+function sentFoldToggle(key){
+  const o = state.sentOpen || (state.sentOpen = {});
+  o[key] = !o[key];
+  renderMailPage();
+}
+function sentFlatToggle(){ state.sentFlat = !state.sentFlat; renderMailPage(); }
+/* ══════ 보내는 중 — 쓰기 화면이 아니라 «보낸 창»에서 기다린다 (대표 지시 2026-11-09) ══════
+   「메일 보내면 보낸창으로 바로 넘어가고 기다리게 했으면 좋겠다」
+   ★ 까닭 — 서버가 한 통 보내는 데 4~6초 걸린다(서버 로그 2026-11-09: 6.1초·4.2초). 그동안 쓰기 화면에
+     «보내는 중… N초» 단추만 남아 아무것도 못 했다. 이제 누르는 즉시 보낸 창으로 가고 맨 위 줄이 기다린다.
+   ★ 줄은 세 모양이다 — ⏳ 보내는 중(초가 올라감) → 나가면 실제 기록(sentBox)으로 바뀐다 / ❌ 못 보냄(까닭 + 「다시 쓰기」).
+   ⚠ 쓴 글은 줄이 들고 있다(snap) — 실패하면 「다시 쓰기」가 그대로 되살린다. 임시저장은 «나간 뒤에만» 지운다.
+   ⚠ 보내는 동안 다른 메일은 못 보낸다(_sending) — 같은 메일이 두 번 나가는 길을 막는다. */
+function sendPendAdd(c){
+  const it = (state.items||{})[c.cardId] || {};
+  const names = (c.ids||[]).map(id=>String((_matMeta[id]||{}).name||'')).concat((c.files||[]).map(f=>String((f&&f.name)||''))).filter(Boolean);
+  const p = { id:'sp'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), t0:Date.now(),
+              to:String(c.to||''), toName:String(it.name||it.company||''), subject:String(c.subject||''),
+              names:names, status:'sending', error:'', snap:c };
+  (state.sendPend || (state.sendPend = [])).unshift(p);
+  return p;
+}
+/* 초가 올라가게 — 줄을 다시 그리지 않고 숫자만 바꾼다(누르는 중인 단추가 안 흔들리게) */
+function sendPendTick(){
+  document.querySelectorAll('.sendpend .sec').forEach(el=>{
+    el.textContent = Math.max(0, Math.round((Date.now()-Number(el.dataset.t0||0))/1000));
+  });
+}
+function sendPendRedraw(){ if(state.view==='mail' && state.mailSent===true) renderMailPage(); }
+function sendPendFail(p, e){
+  p.status = 'failed';
+  p.error = String((e&&e.message)||'알 수 없는 오류');
+  sendPendRedraw();
+}
+/* 나갔다 — 목록을 다시 읽고, 읽은 뒤에 «보내는 중» 줄을 거둔다(그 사이 줄이 비어 보이지 않게) */
+function sentAfterSend(p){
+  loadSentBox(()=>{
+    state.sendPend = (state.sendPend||[]).filter(x=>!p || x.id!==p.id);
+    if(state.view==='mail' && state.mailSent===true){ renderPCSide(); renderMailPage(); }
+  });
+}
+function sendPendDrop(id){
+  state.sendPend = (state.sendPend||[]).filter(x=>x.id!==id);
+  clearDraftIf(id);   /* 못 보낸 글을 «버리겠다»는 뜻 — 그 저장본이 「이어서 쓸까요?」로 또 뜨지 않게 */
+  sendPendRedraw();
+}
+/* 못 보낸 글을 쓰기 화면에 그대로 되살린다 */
+function sendPendRetry(id){
+  const p = (state.sendPend||[]).find(x=>x.id===id);
+  if(!p || p.status!=='failed') return;
+  if(_compose && _compose!==p.snap && composeTouched(_compose)
+     && !confirm('지금 쓰고 있는 메일이 있습니다.\n못 보낸 메일로 바꿀까요? (쓰던 글은 사라집니다)')) return;
+  _compose = p.snap;
+  state.sendPend = state.sendPend.filter(x=>x.id!==id);
+  state.mailSent = false; render();
+}
+/* 값(id)은 data 속성에 «자료로만» 싣는다 — onclick 에 글자로 박지 않는다(묶음 줄과 같은 약속) */
+function sendPendHtml(){
+  return (state.sendPend||[]).map(p=>{
+    const ing = p.status==='sending';
+    const names = esc((p.names||[]).join(' · ')||'첨부 없음');
+    const sec = Math.max(0, Math.round((Date.now()-p.t0)/1000));
+    const row = `
+    <tr class="sendpend ${ing?'ing':'fail'}">
+      <td class="numonly">${ing?'⏳':'❌'}</td>
+      <td class="w">${fmtDate(p.t0)}<span>${sentHm(p.t0)}</span></td>
+      <td class="b">${esc(staffName(myEmail))}</td>
+      <td><b>${esc(p.toName||'')}</b><span class="e">${esc(p.to||'')}</span></td>
+      <td>${esc(p.subject||'')}<span class="e">${names}</span></td>
+      <td class="a">${ing
+        ? `<span class="pst">보내는 중… <b class="sec" data-t0="${p.t0}">${sec}</b>초</span>`
+        : `<span class="pst bad">보내지 못함</span>
+        <button type="button" data-pid="${esc(p.id)}" onclick="sendPendRetry(this.dataset.pid)">다시 쓰기</button>
+        <button type="button" data-pid="${esc(p.id)}" onclick="sendPendDrop(this.dataset.pid)">지우기</button>`}</td>
+    </tr>`;
+    return ing ? row : row + `
+    <tr class="sendpend fail"><td class="numonly"></td><td colspan="5" class="pe" role="alert">${esc(p.error||'')}</td></tr>`;
+  }).join('');
+}
+const sentHm = ts => new Date(ts||0).toTimeString().slice(0,5);
+/* 줄의 «번호 뒤» 다섯 칸 — 낱줄과 펼친 묶음 안쪽 줄이 한 벌을 쓴다(칸을 늘릴 때 한 곳만 고친다).
+   sub 는 묶음 안쪽 줄의 번호(1…) — 있으면 받는 곳 앞에 흐리게 붙인다. */
+function sentTdsHtml(v, sub){
+  return `
+      <td class="w">${fmtDate(v.at)}<span>${sentHm(v.at)}</span></td>
+      <td class="b">${esc(staffName(v.by))}</td>
+      <td>${sub?`<span class="sn">${sub}</span>`:''}<b>${esc(v.toName||'')}</b><span class="e">${esc(v.to||'')}</span></td>
+      <td>${esc(v.subject||'')}<span class="e">${v.set?'📦 '+esc(v.set)+' · ':''}${esc((v.names||[]).join(' · ')||'첨부 없음')}</span></td>
+      <td class="a">
+        <button data-id="${esc(v.id)}" onclick="event.stopPropagation();resendFrom(this.dataset.id)">다시 쓰기</button>
+        ${v.cardId?`<button data-cid="${esc(v.cardId)}" onclick="event.stopPropagation();openDetail(this.dataset.cid)">명함</button>`:''}
+      </td>`;
+}
+/* 묶음 줄 — 같은 칸 구성(번호·때·보낸 사람·받는 곳·제목·단추). 한 줄에 «몇 곳에 한 번에 보냈나»만 말한다. */
+function sentFoldHtml(g, i, isOpen){
+  const a = g.rows[0], z = g.rows[g.rows.length-1];      /* 가장 최근 · 가장 먼저 나간 줄 */
+  const head = `
+    <tr class="sfold ${isOpen?'on':''}" data-k="${esc(g.key)}" onclick="sentFoldToggle(this.dataset.k)" title="한 번에 보낸 ${g.n}곳 — 누르면 받은 곳을 ${isOpen?'접습니다':'펼칩니다'}">
+      <td class="numonly">${i+1}</td>
+      <td class="w">${fmtDate(a.at)}<span>${sentHm(z.at)}~${sentHm(a.at)}</span></td>
+      <td class="b">${esc(staffName(a.by))}</td>
+      <td><b>📨 ${g.n}곳</b><span class="e">한 번에 보냄</span></td>
+      <td>${esc(a.subject||'')}<span class="e">${a.set?'📦 '+esc(a.set)+' · ':''}${esc((a.names||[]).join(' · ')||'첨부 없음')}</span></td>
+      <td class="a"><button type="button" aria-expanded="${isOpen?'true':'false'}">${isOpen?'▾ 접기':'▸ 받은 곳 보기'}</button></td>
+    </tr>`;
+  if(!isOpen) return head;
+  /* 펼치면 나간 차례(오래된 것부터)로 — 발송기가 돈 순서가 그대로 보인다 */
+  return head + g.rows.slice().reverse().map((v,j)=>`
+    <tr class="sfsub"><td class="numonly"></td>${sentTdsHtml(v, j+1)}</tr>`).join('');
+}
 function sentBoxHtml(){
   const q = String(state.sentQ||'').trim().toLowerCase().replace(/\s/g,'');
   const mine = !!state.sentMine;
   const rows = sentVisibleRows();
+  const flat = !!state.sentFlat;
+  const items = flat ? rows.map(v=>({ fold:false, row:v })) : sentFold(rows);
+  const folds = items.filter(it=>it.fold).length;
+  const open = state.sentOpen || {};
   /* 2026-08-23 대표 지시: "모낸메일 은 체크표시 필요없고 번호만 있으면 된다"
      보낸 메일은 「이미 나간 기록」이라 골라서 지울 일이 없다. ☐ 를 거두고 번호만 둔다.
      예약 메일·자료함은 골라서 취소·이동·삭제를 하니 ☐ 를 그대로 둔다. */
-  const body = rows.length ? rows.map((v,i)=>`
+  const pendHtml = sendPendHtml();   /* 보내는 중·못 보낸 줄 — 거르기·찾기와 상관없이 맨 위 */
+  const body = items.length ? items.map((it,i)=>{
+    if(it.fold) return sentFoldHtml(it, i, !!open[it.key]);
+    const v = it.row;
+    return `
     <tr>
-      <td class="numonly">${i+1}</td>
-      <td class="w">${fmtDate(v.at)}<span>${new Date(v.at||0).toTimeString().slice(0,5)}</span></td>
-      <td class="b">${esc(staffName(v.by))}</td>
-      <td><b>${esc(v.toName||'')}</b><span class="e">${esc(v.to||'')}</span></td>
-      <td>${esc(v.subject||'')}<span class="e">${v.set?'📦 '+esc(v.set)+' · ':''}${esc((v.names||[]).join(' · ')||'첨부 없음')}</span></td>
-      <td class="a">
-        <button onclick="resendFrom('${v.id}')">다시 쓰기</button>
-        ${v.cardId?`<button onclick="openDetail('${v.cardId}')">명함</button>`:''}
-      </td>
-    </tr>`).join('')
-    : `<tr><td colspan="6" class="none">${q||mine?'찾은 메일이 없습니다.':'아직 보낸 메일이 없습니다.'}</td></tr>`;
+      <td class="numonly">${i+1}</td>${sentTdsHtml(v)}
+    </tr>`;
+  }).join('')
+    : (pendHtml ? '' : `<tr><td colspan="6" class="none">${q||mine?'찾은 메일이 없습니다.':'아직 보낸 메일이 없습니다.'}</td></tr>`);
   return `
     <div class="mboxbar">
       <button class="setback" onclick="mailBack()">← 목록으로</button>
       <b>📤 보낸 메일</b>
-      <span class="n">${rows.length}통${
+      <span class="n">${rows.length}통${folds?` · ${items.length}줄로 묶음`:''}${
         state.sentCat?` · ${esc(state.sentCat==='__none'?'자료 없이':state.sentCat)}`:''}${
         state.sentBy?` · ${esc(staffName(state.sentBy))}`:''}</span>
       ${(state.sentCat||state.sentBy)?`<button class="mattab" onclick="state.sentCat='';state.sentBy='';openSentBox()">전체 보기</button>`:''}
-      <div class="matsearch"><input value="${esc(state.sentQ||'')}"
+      <div class="matsearch"><input data-keep="sentQ" value="${esc(state.sentQ||'')}"
         placeholder="🔍 받는사람·제목·자료 이름으로 찾기"
         oninput="state.sentQ=this.value;if(!event.isComposing)renderMailPage()" oncompositionend="state.sentQ=this.value;renderMailPage()"></div>
       <button class="mattab ${mine?'on':''}" onclick="state.sentMine=!state.sentMine;renderMailPage()">내가 보낸 것</button>
+      ${(folds||flat)?`<button class="mattab ${flat?'on':''}" onclick="sentFlatToggle()"
+        title="${flat?'한 번에 보낸 것을 한 줄로 묶어 봅니다':'한 번에 보낸 것도 받는 곳마다 한 줄씩 봅니다'}">${flat?'묶어 보기':'낱낱이 보기'}</button>`:''}
       <button class="mattab" onclick="openMailPage()">✏️ 새 메일</button>
     </div>
     <table class="sbox tight"><thead><tr>
       <th class="numonly"></th><th>보낸 때</th><th>보낸 사람</th><th>받는 곳</th><th>제목 · 첨부</th><th></th>
-    </tr></thead><tbody>${body}</tbody></table>
+    </tr></thead><tbody>${pendHtml}${body}</tbody></table>
     <p style="font-size:11.5px;color:#94a3b8;line-height:1.7;margin-top:12px">
-      ※ 명함 없이 보낸 것도 남습니다. 명함 상세에는 그 사람 것만 추려 보입니다.</p>`;
+      ※ 명함 없이 보낸 것도 남습니다. 명함 상세에는 그 사람 것만 추려 보입니다.<br>
+      ※ 같은 제목을 여러 곳에 한 번에 보낸 것은 한 줄로 묶었습니다 — 줄을 누르면 받은 곳이 펼쳐집니다(기록은 지우지 않았습니다).</p>`;
 }
 /* 같은 내용으로 다시 쓰기 — 받는사람·제목·본문·자료를 그대로 옮겨 쓰기 화면을 연다.
    ⚠ 💻 내 PC 파일은 옮기지 못한다. 그 파일은 서버에 두지 않았다(이번 편지에만 붙는 파일). */
@@ -25803,7 +26068,7 @@ function mbMobileHtml(){
         <button class="dmm-ic ${state.mbFind?'on':''}" onclick="mbFindToggle()" title="찾기">🔍</button>`}
     </div>
     ${state.mbFind ? `<div class="dmm-find">
-      <input id="dmmQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
+      <input id="dmmQ" data-keep="dmmQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
         oninput="state.mbQ=this.value;if(!event.isComposing)renderMailPage()"
         oncompositionend="state.mbQ=this.value;renderMailPage()"></div>` : ''}
     <div class="dmm-list">${body}
@@ -26605,7 +26870,7 @@ function mbListHtml(){
         title="${mbCardOn() ? '줄에 마우스를 올리면 내용 카드가 뜹니다 — 읽음 표시는 안 됩니다. 누르면 끕니다' : '눌러서 올려보기를 켭니다'}">👁 올려보기</button>
       <span class="sp"></span>
       <span class="dm-search"><i>🔍</i>
-        <input id="mbQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
+        <input id="mbQ" data-keep="mbQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
           oninput="state.mbQ=this.value;if(!event.isComposing)renderMailPage()"
           oncompositionend="state.mbQ=this.value;renderMailPage()"></span>
       ${/* ── 본문까지 찾기 (대표 결정 2026-08-30) ──
@@ -27075,7 +27340,7 @@ function mbReadMarkBg(slug, uid){
 }
 function mbOpenMsg(slug, uid){
   mbCardHide();
-  state.mbInfoOn = false; mbPhMoreSet(false); mbQrClose();   /* 다른 통은 늘 접힌 채로 연다 */
+  state.mbInfoOn = false; mbPhMoreSet(false); mbQrClose(); mbPvReset();   /* 다른 통은 늘 접힌 채로 연다 */
   state.mailSent='box';
   /* 이 통이 «아직 안 읽음»이었나 — 미리 받은 본문으로 열면 서버에 따로 알려야 한다 */
   const row0 = (_mbMsgs[slug]||{})[String(uid)];
@@ -27147,7 +27412,7 @@ function mbSeenDone(slug, uid){
     ? '✅ 「내가 봤다」로 남겼습니다 — 함께 맡은 분에게 보입니다'
     : '✅ 「내가 봤다」로 남겼습니다 — 이 기록은 대표님만 보십니다', 7000);
 }
-function mbBack(){ mbPhMoreSet(false); mbQrClose(); state.mbOpen=null; renderMailPage(); }
+function mbBack(){ mbPhMoreSet(false); mbQrClose(); mbPvReset(); state.mbOpen=null; renderMailPage(); }
 /* 읽는 자리에서 누르는 전달·삭제 — 목록에서 고르지 않고 «지금 보는 이 통»에 한다.
    ⚠ 고른 것(pick)을 건드리지 않는다. 목록에서 딴 것을 골라 두었는데 여기서 누르면
      엉뚱한 메일이 지워진다. */
@@ -28686,7 +28951,7 @@ function mbAttsHtml(o){
       <span class="nm" onclick="mbAtt(${i})" title="${nm}">${nm}</span>
       ${a.size ? `<span class="z">${fmtMB(a.size)}</span>` : ''}
       ${can ? `<button class="peek" onclick="mbAttPeek(${i})" onmouseenter="mbAttPeekHover(${i})" onmouseleave="mbAttPeekHoverCancel()" ontouchstart="mbAttPeekHover(${i})"
-          title="내려받지 않고 «열지도 않고» 무엇인지만 봅니다 — 한글·워드는 글자만 뽑아 그립니다">미리보기</button>`
+          title="내려받지 않고 «열지도 않고» 화면에서 바로 봅니다 — 한글·PDF 는 쪽 모양 그대로 그립니다">미리보기</button>`
             : `<button class="peek off" disabled
           title="이 종류는 브라우저가 못 그립니다 — 내려받아 여시거나 「보내기」로 담으십시오">미리보기 없음</button>`}
       <span class="sp"></span>
@@ -29166,7 +29431,7 @@ function mbPvKind(name, mime){
   if(e === 'pdf' || m === 'application/pdf') return 'pdf';
   if(MB_PV_IMG[e] || m.indexOf('image/') === 0) return 'img';
   if(MB_PV_XLS[e]) return 'xls';
-  if(MB_PV_DOC[e]) return 'doc';
+  if(MB_PV_DOC[e] || (!e && /hwp/.test(m))) return 'doc';
   if(MB_PV_TXT[e] || m.indexOf('text/') === 0) return 'txt';
   return '';
 }
@@ -29200,16 +29465,22 @@ const MB_ATT_KEEP = 4;
 const MB_ATT_KEEP_MAX = 8 * 1024 * 1024;
 const MB_ATT_HOVER_MAX = 3 * 1024 * 1024;
 const MB_ATT_HOVER_MS = 150;
-let _mbAttBuf = {}, _mbAttOrder = [], _mbAttWait = {}, _mbAttHoverT = 0;
+/* 한글 엔진은 저장소 안 사본(vendor/rhwp-core)만 쓴다 — 메일 첨부를 볼 때 바깥 CDN 에 기대지 않게 */
+const MB_HWP_CORE_OPT = { cdnBase: '', coreUrl: 'vendor/rhwp-core/rhwp.js' };
+let _mbAttBuf = {}, _mbAttOrder = [], _mbAttWait = {}, _mbAttHoverT = 0, _mbPvSeq = 0;
 function mbAttKey(o, i){ return String(o.slug) + '|' + String(o.uid) + '|' + String(i); }
 function mbPvLibsFor(kind, name){
   if(kind === 'pdf') return mbPvLib('vendor/pdf.min.js?v=1', ()=>!!window.pdfjsLib);
   if(kind === 'xls') return mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX);
   if(kind === 'doc'){
+    const e = mbPvExt(name);
+    if((e === 'hwp' || e === 'hwpx') && window.PureunHwp && typeof window.PureunHwp.loadCore === 'function'){
+      return window.PureunHwp.loadCore({ cdnBase: '', coreUrl: 'vendor/rhwp-core/rhwp.js' }).catch(()=>{});
+    }
     const jobs = [ mbPvLib('vendor/pako.min.js?v=1', ()=>!!window.pako)
       .then(()=>mbPvLib('hwp_extract.js?v=5', ()=>typeof extractDocText === 'function')) ];
     /* 옛 한글(.hwp)은 CFB 라 xlsx 판독기가 있어야 한다 — 그 확장자일 때만 */
-    if(mbPvExt(name) === 'hwp') jobs.push(mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX));
+    if(e === 'hwp') jobs.push(mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX));
     return Promise.all(jobs);
   }
   return Promise.resolve();
@@ -29255,11 +29526,32 @@ function mbAttPeekHover(i){
   }, MB_ATT_HOVER_MS);
 }
 function mbAttPeekHoverCancel(){ clearTimeout(_mbAttHoverT); }
+/* 열린 문서(WASM 한글·PDF·관찰기) 뒷정리 — 안 놓아 주면 WASM 메모리가 쌓인다 */
+function mbPvRelease(p){
+  if(!p) return;
+  if(p._hwpCleanup){ try{ p._hwpCleanup(); }catch(_){} p._hwpCleanup = null; }
+  if(p._pdfCleanup){ try{ p._pdfCleanup(); }catch(_){} p._pdfCleanup = null; }
+  if(p.hwp && typeof p.hwp.free === 'function'){ try{ p.hwp.free(); }catch(_){} p.hwp = null; }
+  if(p.pdf && typeof p.pdf.destroy === 'function'){ try{ p.pdf.destroy(); }catch(_){} p.pdf = null; }
+}
+function mbPvReset(){
+  if(!state.mbPv) return;
+  if(state.mbPv.url){ try{ URL.revokeObjectURL(state.mbPv.url); }catch(_){} }
+  mbPvRelease(state.mbPv);
+  state.mbPv = null;
+}
 function mbPvClose(){
+  const idx = state.mbPv ? state.mbPv.i : null;
+  const prev = state.mbPv && state.mbPv._prevFocus;
   const u = state.mbPv && state.mbPv.url;
   if(u){ try{ URL.revokeObjectURL(u); }catch(_){ } }   /* 창을 닫으면 그 파일은 사라진다 */
+  mbPvRelease(state.mbPv);
   state.mbPv = null;
   renderMailPage();
+  let back = (typeof document !== 'undefined' && typeof document.querySelector === 'function' && idx != null)
+    ? document.querySelector('button[onclick="mbAttPeek(' + idx + ')"]') : null;
+  if(!back && prev && prev.isConnected !== false) back = prev;
+  if(back && typeof back.focus === 'function'){ try{ back.focus(); }catch(_){} }
 }
 /* 첨부 하나를 «열지 않고» 들여다본다 */
 function mbAttPeek(i){
@@ -29268,7 +29560,10 @@ function mbAttPeek(i){
   if(!kind) return toast('이 파일은 화면에서 못 엽니다 — 내려받아 여시거나 급여데이터함으로 담으십시오', 8000);
   const sz = Number(a.size||0);
   if(sz > MB_PV_MAX && !confirm(`${a.name} 은 ${fmtMB(sz)} 입니다.\n받는 데 오래 걸립니다. 그래도 보시겠습니까?`)) return;
-  state.mbPv = { i:i, name:String(a.name||'첨부'), size:sz, kind:kind, loading:true, err:'', url:'', text:'' };
+  const prevFocus = (state.mbPv && state.mbPv._prevFocus) || (typeof document !== 'undefined' && document.activeElement) || null;
+  mbPvReset();
+  const tok = ++_mbPvSeq;
+  state.mbPv = { i:i, tok:tok, name:String(a.name||'첨부'), size:sz, kind:kind, loading:true, err:'', url:'', text:'', _prevFocus:prevFocus };
   renderMailPage();
   const u = firebase.auth().currentUser;
   if(!u){ state.mbPv.loading=false; state.mbPv.err='로그인이 필요합니다'; return renderMailPage(); }
@@ -29276,12 +29571,16 @@ function mbAttPeek(i){
   Promise.all([ mbAttBytes(o, i, a), mbPvLibsFor(kind, a.name) ])
     .then(r=>mbPvDraw(kind, r[0], a))
     .then(got=>{
-      if(!state.mbPv || state.mbPv.i !== i) return;      /* 그새 닫았거나 딴 것을 열었다 */
+      if(!state.mbPv || state.mbPv.tok !== tok){      /* 그새 닫았거나 딴 것을 열었다 */
+        if(got && got.url){ try{ URL.revokeObjectURL(got.url); }catch(_){} }
+        mbPvRelease(got);
+        return;
+      }
       Object.assign(state.mbPv, { loading:false }, got);
       renderMailPage();
     })
     .catch(e=>{
-      if(!state.mbPv || state.mbPv.i !== i) return;
+      if(!state.mbPv || state.mbPv.tok !== tok) return;
       state.mbPv.loading = false;
       state.mbPv.err = (e&&e.message) || String(e);
       renderMailPage();
@@ -29297,7 +29596,23 @@ function mbPvDraw(kind, buf, a){
         try{ pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js?v=1'; }catch(_){ }
         return pdfjsLib.getDocument({ isEvalSupported: false, data: buf.slice() }).promise;   /* ⚠ 사본 — 받아 둔 바이트를 못 쓰게 되면 두 번째 미리보기가 빈다 */
       })
-      .then(doc=>({ pdf: doc, page: 1, pages: Number(doc.numPages || 1) }));
+      .then(doc=>{
+        const pages = Math.max(1, Number(doc.numPages || 1));
+        return Promise.resolve(doc && typeof doc.getPage === 'function' ? doc.getPage(1) : null)
+          .then(p1=>{
+            const v0 = p1 && typeof p1.getViewport === 'function' ? p1.getViewport({ scale: 1 }) : null;
+            const rw = v0 ? Number(v0.width) : 0, rh = v0 ? Number(v0.height) : 0;
+            return {
+              pdf: doc,
+              pdfBase: {
+                w: (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 595,
+                h: (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 842,
+              },
+              page: 1,
+              pages: pages,
+            };
+          }, ()=>({ pdf: doc, pdfBase: { w: 595, h: 842 }, page: 1, pages: pages }));
+      });
   }
   if(kind === 'img'){
     const e = mbPvExt(a.name);
@@ -29320,68 +29635,446 @@ function mbPvDraw(kind, buf, a){
         return { grid: grid.slice(0, 200), sheet: String(wb.SheetNames[0]||''), sheets: wb.SheetNames.length };
       });
   }
-  /* 한글·워드·ODT·RTF — 글자만 뽑는다. 그 안의 무엇도 돌지 않는다. */
-  return mbPvLib('vendor/pako.min.js?v=1', ()=>!!window.pako)
+  /* 워드·ODT·RTF 및 한글 폴백 — 글자만 뽑는다. 그 안의 무엇도 돌지 않는다. */
+  const readDocText = ()=>mbPvLib('vendor/pako.min.js?v=1', ()=>!!window.pako)
     .then(()=>mbPvLib('hwp_extract.js?v=5', ()=>typeof extractDocText === 'function'))
     .then(()=>{
-      /* 옛 한글(.hwp)은 CFB 라 XLSX.CFB 판독기가 있어야 한다 — 그때만 부른다(큰 파일이다) */
+      /* 옛 한글(.hwp)·옛 워드(.doc)는 CFB 라 XLSX.CFB 판독기가 있어야 한다 — 그때만 부른다(큰 파일이다) */
       const cfb = (buf[0] === 0xd0 && buf[1] === 0xcf);
       return cfb ? mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX) : null;
     })
     .then(()=>extractDocText(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
       window.XLSX, window.pako, window.pdfjsLib))
     .then(s=>({ text: String(s||'').slice(0, MB_PV_TEXT_MAX) }));
+  /* ★ 한글(.hwp·.hwpx)은 공용 한글 엔진(PureunHwp, WASM)으로 표·양식·체크박스까지 쪽 모양 그대로 캔버스에 그린다.
+     ⚠ 바이트 머릿글로 실제 형식(hwp/hwpx)을 다시 가른다 — 확장자가 바뀌어 온 한글도 열고, 가짜 파일은 거른다.
+     ⚠ 한글 3.0 이나 깨진 파일처럼 엔진이 못 여는 드문 경우에만 글자 뽑기(readDocText)로 물러난다. */
+  const ext = mbPvExt(a && a.name);
+  const hwpFmt = (window.PureunHwp && typeof window.PureunHwp.detectFormat === 'function')
+    ? window.PureunHwp.detectFormat(buf) : '';
+  if(hwpFmt && (ext === 'hwp' || ext === 'hwpx' || !ext) && window.PureunHwp && typeof window.PureunHwp.openDoc === 'function'){
+    return window.PureunHwp.openDoc(buf.slice(), 'document.' + hwpFmt, MB_HWP_CORE_OPT)
+      .then(doc=>{
+        try{
+          const n = Number(doc && doc.pageCount && doc.pageCount()) || 0;
+          if(!n) throw new Error('쪽이 없는 한글 문서입니다');
+          const sizes = [];
+          for(let k = 0; k < n; k++){
+            const raw = doc.getPageInfo ? doc.getPageInfo(k) : '{}';
+            const inf = JSON.parse(raw || '{}') || {};
+            const rw = Number(inf.width), rh = Number(inf.height);
+            sizes.push({
+              w: (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 794,
+              h: (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 1123,
+            });
+          }
+          return { hwp: doc, hwpSizes: sizes, page: 1, pages: n };
+        }catch(err){
+          try{ if(doc && typeof doc.free === 'function') doc.free(); }catch(_){}
+          throw err;
+        }
+      })
+      .catch(()=>readDocText());
+  }
+  return readDocText();
 }
-/* PDF 한 쪽을 캔버스에 그린다 — 화면이 그려진 «뒤»에 부른다(mbPvAfter) */
+/* PDF 전체 쪽을 세로 연속 스크롤로 캔버스에 그린다 — 화면이 그려진 «뒤»에 부른다(mbPvAfter) */
 function mbPvPdfDraw(){
   const p = state.mbPv;
   if(!p || p.kind !== 'pdf' || !p.pdf) return;
-  const cv = document.getElementById('mbPvCanvas');
-  if(!cv || cv.getAttribute('data-page') === String(p.page)) return;
-  cv.setAttribute('data-page', String(p.page));
-  p.pdf.getPage(p.page).then(pg=>{
-    const box = (cv.parentNode ? cv.parentNode.clientWidth : 900) - 28;
-    const v0 = pg.getViewport({ scale: 1 });
-    /* 너무 작게도 너무 크게도 그리지 않는다 — 작으면 글씨가 안 보이고, 크면 느리다 */
-    const sc = Math.min(2.2, Math.max(0.5, box / (v0.width || 600)));
-    const vp = pg.getViewport({ scale: sc });
-    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
-    return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-  }).catch(e=>console.warn('[첨부 미리보기]', (e&&e.message)||e));
+  const maxPx = 8 * 1024 * 1024;
+  const host = document.getElementById('mbPvPdf');
+  if(!host){
+    const cv = document.getElementById('mbPvCanvas');
+    const tag = String(p.tok || 0) + ':' + String(p.page);
+    if(!cv || cv.getAttribute('data-page') === tag) return;
+    cv.setAttribute('data-page', tag);
+    const drawSeq = (p._pdfSeq = (p._pdfSeq || 0) + 1);
+    p.pdf.getPage(p.page).then(pg=>{
+      if(state.mbPv !== p || p._pdfSeq !== drawSeq) return;
+      const box = Math.max(200, (cv.parentNode ? cv.parentNode.clientWidth : 900) - 28);
+      const v0 = pg.getViewport({ scale: 1 });
+      const w0 = (Number.isFinite(v0.width) && v0.width > 0) ? v0.width : 595;
+      const h0 = (Number.isFinite(v0.height) && v0.height > 0) ? v0.height : 842;
+      if(w0 > 200000 || h0 > 200000) throw new Error('문서 쪽 크기가 비정상적입니다');
+      let sc = Math.min(2.2, box / w0);
+      if(h0 * sc > 4096) sc = 4096 / h0;
+      const cssW = Math.max(1, Math.floor(w0 * sc)), cssH = Math.max(1, Math.floor(h0 * sc));
+      const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
+      const pxCapSc = Math.sqrt(maxPx / Math.max(1, w0 * h0)) * 0.99;
+      const renderSc = Math.min(sc * rawDpr, pxCapSc);
+      const vp = pg.getViewport({ scale: renderSc });
+      const pxW = Math.max(1, Math.floor(vp.width)), pxH = Math.max(1, Math.floor(vp.height));
+      if(!Number.isFinite(pxW) || !Number.isFinite(pxH) || pxW * pxH > maxPx) throw new Error('문서 쪽 해상도가 한도를 넘습니다');
+      cv.width = pxW; cv.height = pxH;
+      cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px';
+      return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    }).catch(e=>{
+      console.warn('[첨부 미리보기]', (e&&e.message)||e);
+      if(state.mbPv === p && p._pdfSeq === drawSeq){
+        mbPvRelease(p);
+        p.err = '화면에 그리지 못했습니다 (' + ((e && e.message) || 'PDF 렌더링 오류') + ')';
+        renderMailPage();
+      }
+    });
+    return;
+  }
+  const tag = String(p.tok || 0);
+  if(host.getAttribute('data-tok') === tag) return;
+  if(p._pdfCleanup){ try{ p._pdfCleanup(); }catch(_){} p._pdfCleanup = null; }
+  host.setAttribute('data-tok', tag);
+  const firstCv = document.getElementById('mbPvCanvas');
+  host.textContent = '';
+  const stage = host.parentNode;
+  const count = Math.max(1, Number(p.pages) || 1);
+  const base = p.pdfBase || { w: 595, h: 842 };
+  const pageSizes = [];
+  const pgs = [], drawn = [], tasks = [];
+  let alive = true;
+  const calcSize = (idx)=>{
+    const s = pageSizes[idx] || base;
+    const rw = Number(s.w), rh = Number(s.h);
+    const w0 = (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 595;
+    const h0 = (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 842;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 900;
+    const pad = stW < 520 ? 12 : 28;
+    const box = Math.max(200, stW - pad);
+    const maxW = w0 > h0 ? 980 : 880;
+    let cssSc = Math.min(2.2, Math.min(box, maxW) / w0);
+    if(h0 * cssSc > 4096) cssSc = 4096 / h0;
+    return {
+      w0:w0, h0:h0, cssSc:cssSc,
+      cssW:Math.max(1, Math.round(w0 * cssSc)),
+      cssH:Math.max(1, Math.round(h0 * cssSc)),
+    };
+  };
+  const drawOne = (idx)=>{
+    if(!alive || drawn[idx] || !p.pdf) return;
+    drawn[idx] = 1;
+    p.pdf.getPage(idx + 1).then(pg=>{
+      if(!alive || drawn[idx] !== 1 || state.mbPv !== p || !p.pdf) return;
+      const v0 = pg.getViewport({ scale: 1 });
+      const w0 = (Number.isFinite(v0.width) && v0.width > 0) ? v0.width : 595;
+      const h0 = (Number.isFinite(v0.height) && v0.height > 0) ? v0.height : 842;
+      if(w0 > 200000 || h0 > 200000) throw new Error('문서 쪽 크기가 비정상적입니다');
+      pageSizes[idx] = { w: w0, h: h0 };
+      const g = calcSize(idx);
+      const pgBox = pgs[idx]; if(!pgBox) return;
+      pgBox.style.width = g.cssW + 'px';
+      pgBox.style.height = g.cssH + 'px';
+      let cv = pgBox.querySelector('canvas');
+      if(!cv){
+        cv = document.createElement('canvas');
+        cv.className = 'pvpdf';
+        if(idx === 0 && cv.setAttribute) cv.setAttribute('id', 'mbPvCanvas');
+        pgBox.textContent = '';
+        pgBox.appendChild(cv);
+      }
+      if(cv.setAttribute){
+        cv.setAttribute('role', 'img');
+        cv.setAttribute('aria-label', String(p.name || 'PDF 문서') + ' ' + String(idx + 1) + '쪽');
+      }
+      const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
+      const pxCapSc = Math.sqrt(maxPx / Math.max(1, w0 * h0)) * 0.99;
+      const renderSc = Math.min(g.cssSc * rawDpr, pxCapSc);
+      const vp = pg.getViewport({ scale: renderSc });
+      const pxW = Math.max(1, Math.floor(vp.width)), pxH = Math.max(1, Math.floor(vp.height));
+      if(!Number.isFinite(pxW) || !Number.isFinite(pxH) || pxW * pxH > maxPx) throw new Error('문서 쪽 해상도가 한도를 넘습니다');
+      cv.width = pxW; cv.height = pxH;
+      cv.style.width = g.cssW + 'px'; cv.style.height = g.cssH + 'px';
+      const task = pg.render({ canvasContext: cv.getContext('2d'), viewport: vp });
+      tasks[idx] = task;
+      return (task && task.promise ? task.promise : Promise.resolve()).then(()=>{
+        tasks[idx] = null;
+        if(alive && drawn[idx] === 1) drawn[idx] = 2;
+      });
+    }).catch(e=>{
+      tasks[idx] = null;
+      if(!alive || state.mbPv !== p) return;
+      if(e && e.name === 'RenderingCancelledException'){ drawn[idx] = 0; return; }
+      drawn[idx] = 0;
+      console.warn('[첨부 미리보기]', (e&&e.message)||e);
+      mbPvRelease(p);
+      p.err = '화면에 그리지 못했습니다 (' + ((e && e.message) || 'PDF 렌더링 오류') + ')';
+      renderMailPage();
+    });
+  };
+  const releaseOne = (idx, force)=>{
+    if(!drawn[idx]) return;
+    if(!force){
+      const cur = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= 1) return;
+    }
+    drawn[idx] = 0;
+    if(tasks[idx] && typeof tasks[idx].cancel === 'function'){ try{ tasks[idx].cancel(); }catch(_){} }
+    tasks[idx] = null;
+    const pgBox = pgs[idx];
+    const cv = pgBox && pgBox.querySelector('canvas');
+    if(cv){ cv.width = 0; cv.height = 0; }
+  };
+  for(let k = 0; k < count; k++){
+    const d = document.createElement('div');
+    d.className = 'pvhwp-pg';
+    d.setAttribute('data-i', String(k));
+    const g = calcSize(k);
+    d.style.width = g.cssW + 'px';
+    d.style.height = g.cssH + 'px';
+    if(k === 0 && firstCv){
+      if(firstCv.setAttribute) firstCv.setAttribute('data-page', '');
+      d.appendChild(firstCv);
+    }
+    host.appendChild(d);
+    pgs.push(d);
+  }
+  const io = (typeof IntersectionObserver === 'function' && stage)
+    ? new IntersectionObserver((ents)=>{
+        ents.forEach((en)=>{
+          const idx = Number(en.target.getAttribute('data-i'));
+          if(en.isIntersecting) drawOne(idx); else releaseOne(idx, false);
+        });
+      }, { root: stage, rootMargin: '2400px 0px' })
+    : null;
+  const syncPagerDom = ()=>{
+    const bar = stage && stage.parentNode && stage.parentNode.querySelector('.pvpg');
+    if(!bar) return;
+    const b = bar.querySelector('b'); if(b) b.textContent = String(p.page);
+    const btns = bar.querySelectorAll('button');
+    if(btns[0]) btns[0].disabled = p.page <= 1;
+    if(btns[1]) btns[1].disabled = p.page >= count;
+  };
+  const onScroll = ()=>{
+    if(!alive || !stage) return;
+    p._scrollTop = stage.scrollTop;
+    const mid = stage.scrollTop + stage.clientHeight / 2;
+    let curIdx = 0;
+    for(let k = 0; k < pgs.length; k++){
+      if(pgs[k].offsetTop <= mid) curIdx = k; else break;
+    }
+    if(curIdx + 1 !== p.page){ p.page = curIdx + 1; syncPagerDom(); }
+  };
+  if(stage) stage.addEventListener('scroll', onScroll, { passive: true });
+  p._pdfGoto = (n)=>{
+    const idx = Math.max(0, Math.min(count - 1, (Number(n) || 1) - 1));
+    p.page = idx + 1;
+    drawOne(idx);
+    if(idx + 1 < count) drawOne(idx + 1);
+    if(stage && pgs[idx]) stage.scrollTop = Math.max(0, pgs[idx].offsetTop - 8);
+    syncPagerDom();
+  };
+  p._pdfCleanup = ()=>{
+    alive = false;
+    if(io) io.disconnect();
+    if(stage) stage.removeEventListener('scroll', onScroll);
+    p._pdfGoto = null;
+    for(let k = 0; k < count; k++) releaseOne(k, true);
+  };
+  if(io) pgs.forEach(d=>io.observe(d));
+  else for(let k = 0; k < count && alive; k++) drawOne(k);
+  const startIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+  if(alive) drawOne(startIdx);
+  if(alive && startIdx + 1 < count) drawOne(startIdx + 1);
+  if(alive && stage && p._scrollTop) stage.scrollTop = p._scrollTop;
+}
+/* 한글(.hwp·.hwpx) 쪽들을 종이 모양 그대로 캔버스에 그린다 — 전 쪽 세로 연속 스크롤 */
+function mbPvHwpDraw(){
+  const p = state.mbPv;
+  if(!p || !p.hwp) return;
+  const host = document.getElementById('mbPvHwp');
+  if(!host) return;
+  const tag = String(p.tok || 0);
+  if(host.getAttribute('data-tok') === tag) return;
+  if(p._hwpCleanup){ try{ p._hwpCleanup(); }catch(_){} p._hwpCleanup = null; }
+  host.setAttribute('data-tok', tag);
+  host.textContent = '';
+  const maxPx = 8 * 1024 * 1024;
+  const stage = host.parentNode;
+  const count = Number(p.pages) || 1;
+  const sizes = p.hwpSizes || [];
+  const pgs = [], drawn = [];
+  let alive = true;
+  const calcSize = (idx)=>{
+    const s = sizes[idx] || { w: 794, h: 1123 };
+    const rw = Number(s.w), rh = Number(s.h);
+    const w0 = (Number.isFinite(rw) && rw > 0) ? Math.min(rw, 200000) : 794;
+    const h0 = (Number.isFinite(rh) && rh > 0) ? Math.min(rh, 200000) : 1123;
+    const stW = (stage && stage.clientWidth) ? stage.clientWidth : 900;
+    const pad = stW < 520 ? 12 : 28;
+    const box = Math.max(200, stW - pad);
+    const maxW = w0 > h0 ? 980 : 880;
+    let cssSc = Math.min(1.15, Math.min(box, maxW) / w0);
+    if(h0 * cssSc > 4096) cssSc = 4096 / h0;
+    return {
+      w0:w0, h0:h0, cssSc:cssSc,
+      cssW:Math.max(1, Math.round(w0 * cssSc)),
+      cssH:Math.max(1, Math.round(h0 * cssSc)),
+    };
+  };
+  const drawOne = (idx)=>{
+    if(!alive || drawn[idx] || !p.hwp) return;
+    drawn[idx] = true;
+    try{
+      const g = calcSize(idx);
+      const pg = pgs[idx]; if(!pg) return;
+      pg.style.width = g.cssW + 'px';
+      pg.style.height = g.cssH + 'px';
+      let cv = pg.querySelector('canvas');
+      if(!cv){ cv = document.createElement('canvas'); pg.textContent = ''; pg.appendChild(cv); }
+      if(cv.setAttribute){
+        cv.setAttribute('role', 'img');
+        cv.setAttribute('aria-label', String(p.name || '한글 문서') + ' ' + String(idx + 1) + '쪽');
+      }
+      const rawDpr = Math.min(2, Math.max(1.5, Number(window.devicePixelRatio) || 1));
+      const pxCapSc = Math.sqrt(maxPx / Math.max(1, g.w0 * g.h0)) * 0.99;
+      const sc = Math.min(g.cssSc * rawDpr, pxCapSc);
+      const pxW = Math.max(1, Math.round(g.w0 * sc));
+      const pxH = Math.max(1, Math.round(g.h0 * sc));
+      if(!Number.isFinite(pxW) || !Number.isFinite(pxH) || pxW * pxH > maxPx) throw new Error('문서 쪽 해상도가 한도를 넘습니다');
+      cv.width = pxW;
+      cv.height = pxH;
+      p.hwp.renderPageToCanvas(idx, cv, sc);
+      cv.style.width = g.cssW + 'px';
+      cv.style.height = g.cssH + 'px';
+    }catch(e){
+      drawn[idx] = false;
+      console.warn('[한글 미리보기]', (e&&e.message)||e);
+      if(state.mbPv === p){
+        mbPvRelease(p);
+        p.err = '화면에 그리지 못했습니다 (' + ((e && e.message) || '렌더링 오류') + ')';
+        renderMailPage();
+      }
+    }
+  };
+  const releaseOne = (idx, force)=>{
+    if(!drawn[idx]) return;
+    if(!force){
+      const cur = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+      if(!stage || stage.clientHeight < 40 || Math.abs(idx - cur) <= 1) return;
+    }
+    drawn[idx] = false;
+    const pg = pgs[idx];
+    const cv = pg && pg.querySelector('canvas');
+    if(cv){ cv.width = 0; cv.height = 0; }
+  };
+  for(let k = 0; k < count; k++){
+    const d = document.createElement('div');
+    d.className = 'pvhwp-pg';
+    d.setAttribute('data-i', String(k));
+    const g = calcSize(k);
+    d.style.width = g.cssW + 'px';
+    d.style.height = g.cssH + 'px';
+    host.appendChild(d);
+    pgs.push(d);
+  }
+  const io = (typeof IntersectionObserver === 'function' && stage)
+    ? new IntersectionObserver((ents)=>{
+        ents.forEach((en)=>{
+          const idx = Number(en.target.getAttribute('data-i'));
+          if(en.isIntersecting) drawOne(idx); else releaseOne(idx, false);
+        });
+      }, { root: stage, rootMargin: '2400px 0px' })
+    : null;
+  const syncPagerDom = ()=>{
+    const bar = stage && stage.parentNode && stage.parentNode.querySelector('.pvpg');
+    if(!bar) return;
+    const b = bar.querySelector('b'); if(b) b.textContent = String(p.page);
+    const btns = bar.querySelectorAll('button');
+    if(btns[0]) btns[0].disabled = p.page <= 1;
+    if(btns[1]) btns[1].disabled = p.page >= count;
+  };
+  const onScroll = ()=>{
+    if(!alive || !stage) return;
+    p._scrollTop = stage.scrollTop;
+    const mid = stage.scrollTop + stage.clientHeight / 2;
+    let curIdx = 0;
+    for(let k = 0; k < pgs.length; k++){
+      if(pgs[k].offsetTop <= mid) curIdx = k; else break;
+    }
+    if(curIdx + 1 !== p.page){ p.page = curIdx + 1; syncPagerDom(); }
+  };
+  if(stage) stage.addEventListener('scroll', onScroll, { passive: true });
+  p._hwpGoto = (n)=>{
+    const idx = Math.max(0, Math.min(count - 1, (Number(n) || 1) - 1));
+    p.page = idx + 1;
+    drawOne(idx);
+    if(idx + 1 < count) drawOne(idx + 1);
+    if(stage && pgs[idx]) stage.scrollTop = Math.max(0, pgs[idx].offsetTop - 8);
+    syncPagerDom();
+  };
+  p._hwpCleanup = ()=>{
+    alive = false;
+    if(io) io.disconnect();
+    if(stage) stage.removeEventListener('scroll', onScroll);
+    p._hwpGoto = null;
+    for(let k = 0; k < count; k++) releaseOne(k, true);
+  };
+  if(io) pgs.forEach(d=>io.observe(d));
+  else for(let k = 0; k < count && alive; k++) drawOne(k);
+  const startIdx = Math.max(0, Math.min(count - 1, (Number(p.page) || 1) - 1));
+  if(alive) drawOne(startIdx);
+  if(alive && startIdx + 1 < count) drawOne(startIdx + 1);
+  if(alive && stage && p._scrollTop) stage.scrollTop = p._scrollTop;
 }
 function mbPvPage(step){
   const p = state.mbPv;
   if(!p || !p.pages) return;
   const n = Math.min(p.pages, Math.max(1, Number(p.page||1) + Number(step)));
   if(n === p.page) return;
+  if(p.hwp && typeof p._hwpGoto === 'function'){ p._hwpGoto(n); return; }
+  if(p.pdf && typeof p._pdfGoto === 'function'){ p._pdfGoto(n); return; }
   p.page = n;
   renderMailPage();
 }
 /* 화면을 그린 뒤에 해야 하는 일 — 캔버스는 «있어야» 그릴 수 있다 */
 function mbPvAfter(){
-  if(state.mbPv && state.mbPv.kind === 'pdf') setTimeout(mbPvPdfDraw, 0);
+  if(!state.mbPv) return;
+  if(typeof document !== 'undefined' && typeof document.querySelector === 'function'){
+    const dlg = document.querySelector('.mck.pvbox');
+    if(dlg){
+      if(!dlg._pvKeyBound){
+        dlg._pvKeyBound = true;
+        dlg.addEventListener('keydown', (ev)=>{
+          if(ev.key !== 'Tab') return;
+          const items = Array.from(dlg.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+          if(!items.length) return;
+          const first = items[0], last = items[items.length - 1];
+          if(ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus(); }
+          else if(!ev.shiftKey && document.activeElement === last){ ev.preventDefault(); first.focus(); }
+        });
+      }
+      if(!dlg.contains(document.activeElement)){
+        const closeBtn = dlg.querySelector('footer button:last-child') || dlg;
+        if(closeBtn && typeof closeBtn.focus === 'function'){ try{ closeBtn.focus(); }catch(_){} }
+      }
+    }
+  }
+  if(state.mbPv.kind === 'pdf' && state.mbPv.pdf) setTimeout(mbPvPdfDraw, 0);
+  else if(state.mbPv.hwp) setTimeout(mbPvHwpDraw, 0);
 }
 
 /* ══ 미리보기 창 ══ */
 function mbPvHtml(){
   const p = state.mbPv;
   if(!p) return '';
-  const pager = (p.kind === 'pdf' && p.pages > 1)
-    ? `<span class="pvpg"><button onclick="mbPvPage(-1)" ${p.page<=1?'disabled':''}>◀</button>
+  const paged = !!((p.kind === 'pdf' && p.pdf) || p.hwp);
+  const pager = (paged && p.pages > 1)
+    ? `<span class="pvpg"><button type="button" aria-label="이전 쪽" onclick="mbPvPage(-1)" ${p.page<=1?'disabled':''}>◀</button>
         <b>${p.page}</b> / ${p.pages}
-        <button onclick="mbPvPage(1)" ${p.page>=p.pages?'disabled':''}>▶</button></span>` : '';
+        <button type="button" aria-label="다음 쪽" onclick="mbPvPage(1)" ${p.page>=p.pages?'disabled':''}>▶</button></span>` : '';
   const foot = `<footer>${pager}<span class="sp"></span>
-    <button onclick="mbAttToPay(${p.i})">→ 급여데이터함</button>
-    <button onclick="mbAttToCo(${p.i})">→ 기업별 계약서</button>
-    <button class="pri" onclick="mbAtt(${p.i})">📥 내려받기</button>
-    <button onclick="mbPvClose()">닫기</button></footer>`;
+    <button type="button" onclick="mbAttToPay(${p.i})">→ 급여데이터함</button>
+    <button type="button" onclick="mbAttToCo(${p.i})">→ 기업별 계약서</button>
+    <button type="button" class="pri" onclick="mbAtt(${p.i})">📥 내려받기</button>
+    <button type="button" onclick="mbPvClose()">닫기</button></footer>`;
   let stage;
   if(p.loading) stage = '<div class="pvnone">가져오고 있습니다…</div>';
   else if(p.err) stage = '<div class="pvnone"><b>못 열었습니다</b>' + esc(p.err)
     + '<br>내려받아 여시거나 급여데이터함으로 담으십시오.</div>';
   else if(p.kind === 'pdf' && p.pdf)
-    /* ⚠ 캔버스에 «그림으로» 그린다 — PDF 안의 무엇도 돌지 않는다(mbPvPdfDraw) */
-    stage = `<canvas id="mbPvCanvas" class="pvpdf"></canvas>`;
+    /* ⚠ 모든 쪽을 세로로 이어 캔버스에 «그림으로» 그린다 — PDF 안의 무엇도 돌지 않는다(mbPvPdfDraw) */
+    stage = `<div id="mbPvPdf" class="pvhwp" role="region" aria-label="${esc(p.name)} PDF 미리보기"><div class="pvhwp-pg" data-i="0"><canvas id="mbPvCanvas" class="pvpdf" role="img" aria-label="${esc(p.name)} 1쪽"></canvas></div></div>`;
+  else if(p.hwp)
+    /* ⚠ 한글도 WASM 엔진으로 캔버스에 «종이 모양 그대로» 그린다 — 문서 안의 무엇도 돌지 않는다(mbPvHwpDraw) */
+    stage = `<div id="mbPvHwp" class="pvhwp" role="region" aria-label="${esc(p.name)} 한글 양식 미리보기"></div>`;
   else if(p.kind === 'img')
     stage = `<img class="pvimg" src="${esc(p.url)}" alt="${esc(p.name)}">`;
   else if(p.grid)
@@ -29392,14 +30085,17 @@ function mbPvHtml(){
   else stage = `<div class="pvnone"><b>글자를 못 찾았습니다</b>
     그림으로만 된 문서이거나, 암호가 걸려 있을 수 있습니다.<br>
     내려받아 여시거나 급여데이터함으로 담으십시오.</div>`;
-  const sub = p.kind === 'doc' ? ' · 글자만 뽑아 보여 드립니다(모양은 다릅니다)'
+  const sub = p.loading ? ''
+            : p.hwp ? (p.pages ? ` · 한글 양식 ${p.pages}쪽` : ' · 한글 양식')
+            : (p.kind === 'pdf' && p.pdf && p.pages) ? ` · PDF ${p.pages}쪽`
+            : p.kind === 'doc' ? ' · 글자만 뽑아 보여 드립니다(모양은 다릅니다)'
             : p.kind === 'xls' ? (p.sheets > 1 ? ` · 「${esc(p.sheet)}」 등 ${p.sheets}장 중 첫 장` : '')
             : '';
   return `<div class="mck-dim pvdim" onclick="if(event.target===this)mbPvClose()">
-    <div class="mck pvbox">
-      <header><span>👁</span><h2>${esc(p.name)}</h2>
+    <div class="mck pvbox" role="dialog" aria-modal="true" aria-labelledby="mbPvTitle" tabindex="-1">
+      <header><span aria-hidden="true">👁</span><h2 id="mbPvTitle">${esc(p.name)}</h2>
         <span class="pvsz">${p.size?esc(fmtMB(p.size)):''}${sub}</span>
-        <span class="x" onclick="mbPvClose()" title="닫기">✕</span></header>
+        <span class="x" role="button" tabindex="0" aria-label="닫기" title="닫기" onclick="mbPvClose()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();mbPvClose()}">✕</span></header>
       <div class="pvstage">${stage}</div>
       ${foot}
     </div></div>`;
@@ -29623,7 +30319,8 @@ async function mbDocsToPhotos(){
       if(at < 0){ 못한것.push(String(v.s||'').slice(0,20) + ' (서류 첨부를 못 찾음)'); continue; }
       const f = await mbAttFetch(o, at, atts[at]);
       const k = await PuHandoff.put({ name:f.name, type:f.mime, bytes:f.bytes,
-        from:'메일 · ' + String(v.f || v.e || '').slice(0,40) });
+        from:'메일 · ' + String(v.f || v.e || '').slice(0,40),
+        mailMeta: { dir: ((state.mbFolders && state.mbFolders[v._slug] && state.mbFolders[v._slug].kind === 'sent') || /^sent$|^보낸/i.test(String(v._slug || ''))) ? 'sent' : 'recv', slug: String(v._slug || ''), uid: String(v.u || ''), srcKey: 'mail_' + String(v._slug || '') + '_' + String(v.u || ''), subject: String(v.s || ''), from: String(v.f || v.e || ''), to: String(v.to || ''), date: String(v.d || '') } });
       열쇠들.push(k);
     } catch(e){
       못한것.push(String(v.s||'').slice(0,20) + ' (' + ((e&&e.message)||e) + ')');
@@ -29653,7 +30350,8 @@ function mbAttToPhoto(i){
   mbAttFetch(o, i, a)
     .then(f => PuHandoff.put({ name: f.name, type: f.mime, bytes: f.bytes,
       /* 어디서 온 것인지 — 사진첩이 「메일에서 온 서류」라고 알려 줄 수 있게 */
-      from: '메일 · ' + String(v.f || v.e || '').slice(0, 40) }))
+      from: '메일 · ' + String(v.f || v.e || '').slice(0, 40),
+      mailMeta: { dir: ((state.mbFolders && state.mbFolders[o.slug] && state.mbFolders[o.slug].kind === 'sent') || /^sent$|^보낸/i.test(String(o.slug || ''))) ? 'sent' : 'recv', slug: String(o.slug || ''), uid: String(o.uid || ''), srcKey: 'mail_' + String(o.slug || '') + '_' + String(o.uid || ''), subject: String(v.s || o.subject || ''), from: String(v.f || v.e || ''), to: String(v.to || ''), date: String(v.d || '') } }))
     .then(k => { goPhotos('take=' + encodeURIComponent(k)); })
     .catch(e => toast('사진첩으로 담지 못했습니다 — ' + ((e&&e.message)||e), 9000));
 }
@@ -41883,6 +42581,7 @@ document.addEventListener('keydown', e=>{
        걸 닫는다"는 토글로 오인해 아무 반응이 없었다. closePcDetail() 로 coPick 도
        함께 비운다(다른 상세 패널을 닫을 땐 coPick 이 이미 비어 있어 해가 없다). */
   if(e.key==='Escape'){
+    if(state.mbPv){ e.preventDefault(); mbPvClose(); return; }
     /* ⚙️ 환경설정에서 Esc = 한 단계 뒤로 (대표 지시 2026-09-30 「환경설정에서 esc 누르면 뒤로가기」)
        하위 화면 → 환경설정 목록 → 원래 목록. ⚠ 열린 창·패널이 있으면 그것부터 닫는다(아래 그대로).
        ⚠ 입력칸에 글자를 쓰는 중이면 안 간다 — 붙여 넣던 명단이 날아간다. */
@@ -42627,7 +43326,7 @@ function delMailBlock(email){
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){
   /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
      ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */

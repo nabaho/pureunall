@@ -33,7 +33,7 @@ const {
 const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-        올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
+        올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
@@ -78,6 +78,8 @@ function getDatabase() {
 /* 「재직 직원인가」 공용 문 — requireStaff·requireReader 가 함께 쓴다 (2026-10-14).
    가입이 열려 있어 «비밀번호로 들어왔다»만으로는 우리 직원이 아니다. 자세한 까닭은 staff-gate.js 머리말. */
 const STAFF_GATE = require("./staff-gate").makeStaffGate({ getDatabase });
+/* 🔒 서명본·견적서를 누가 열 수 있나 (puDocSecret) — 총괄관리자 + 견적 길 파일의 재무·확정 담당자 */
+const SECRET_ACCESS = require("./doc-secret-access");
 
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
@@ -4610,6 +4612,7 @@ exports.newsView = functions
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
       /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
       res.set("Cache-Control", "public, max-age=300");
+      res.set("Content-Security-Policy", NV.전문보안);   // 2026-11-15 보안 — 전문 칸에 심은 스크립트·양식이 돌지 않게
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
@@ -6316,7 +6319,9 @@ exports.weeklyNewsBrief = functions
        못 읽거나 /notice 줄이 없으면 sitemap 은 건드리지 않고 글만 올린다. */
     const 올릴것 = [["site/notice/" + 새번호 + "/index.html", 글쪽]];
     try {
-      const 새사이트맵 = NoticeLib.사이트맵더하기(await 새홈페이지쪽("sitemap.xml"), 새번호, 오늘);
+      /* ⚠ 사이트맵채우기 — 홈페이지 저장소 sitemap 에 빠진 공지(2026-11-08: 140)까지 함께 채운다. 까닭은 notice-lib.js */
+      const 새사이트맵 = NoticeLib.사이트맵채우기(await 새홈페이지쪽("sitemap.xml"), 새번호,
+        있던글.map((g) => g.번호), 오늘);
       if (새사이트맵) 올릴것.push(["site/sitemap.xml", 새사이트맵]);
       else console.warn("[브리핑] sitemap 에서 /notice 줄을 못 찾아 sitemap 은 건너뜁니다");
     } catch (e) { console.warn("[브리핑] sitemap 을 못 읽어 건너뜁니다", e.message); }
@@ -6733,6 +6738,25 @@ exports.publishSite = functions
         return;
       }
 
+      /* ★ 2026-11-15 보안 — «실행되는 조각»을 새로 넣는 올리기와 SVG 그림은 총괄관리자만(까닭은 site-publish.js 실행조각 머리).
+         글·표·그림(png·jpg·webp) 고치기는 지금처럼 재직 직원 누구나. 있던 쪽을 못 읽으면(새 쪽 포함) 빈 쪽과 견준다 — 막는 쪽으로 기운다. */
+      const 관리자인가 = ((await getDatabase().ref("uid_roles/" + decoded.uid + "/isAdmin").once("value")).val() === true);
+      if (!관리자인가) {
+        if (그림인가 && /\.svg$/i.test(String(path))) {
+          res.status(403).json({ error: "SVG 그림은 총괄관리자만 올릴 수 있습니다 — png·jpg·webp 로 올려 주세요." });
+          return;
+        }
+        if (!그림인가) {
+          let 있던쪽 = "";
+          try { 있던쪽 = await 새홈페이지쪽(홈페이지자리(path)); } catch (e) { 있던쪽 = ""; }
+          const 새것 = 새실행조각(있던쪽, String(content));
+          if (새것.length) {
+            res.status(403).json({ error: "스크립트·실행 코드가 새로 들어간 쪽은 총괄관리자만 올릴 수 있습니다(" + 새것.length + "곳). 글만 고쳐 다시 올려 주세요." });
+            return;
+          }
+        }
+      }
+
       const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
       const 사연글 = 사연(누가, path, (req.body && req.body.note) || "");
       const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
@@ -6840,6 +6864,18 @@ async function hanaNoteSkip(linked, reason) {
   } catch (err) { /* 기록에 실패해도 문자 처리를 막지 않는다 */ }
 }
 
+/* ★ 연결된 휴대폰 주인(uid)이 «지금도 재직 중인 관리자·재무 담당자»인지 확인한다 (2026-11-11 폰 보안 점검).
+   연결 당시 권한이 있었더라도 퇴사·권한 회수 뒤에 기기 열쇠만으로 입금 내역 올리기·카톡 업무방 목록 받기·
+   방문 안내 문자(고객 번호) 가져가기가 계속 도는 것을 막는다. 403 을 돌려주면 폰 앱도 스스로 연결을 지운다. */
+async function hanaStaffRoleOk(db, uid) {
+  if (!uid) return false;
+  const role = (await db.ref(`uid_roles/${uid}`).once("value")).val() || {};
+  return role.status === "active" && (role.isAdmin === true || role.fin === true);
+}
+
+const HANA_PAIR_WINDOW_MS = 10 * 60 * 1000;
+const HANA_PAIR_MAX_FAILS = 5;
+
 async function requireHanaDevice(req, body) {
   const match = /^Device\s+(.+)$/i.exec(String(req.headers.authorization || ""));
   const uid = String(body.uid || "").trim();
@@ -6849,7 +6885,8 @@ async function requireHanaDevice(req, body) {
     error.status = 401;
     throw error;
   }
-  const ref = getDatabase().ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
+  const db = getDatabase();
+  const ref = db.ref(`hanaSmsBridge/devices/${uid}/${hanaDeviceKey(deviceId)}`);
   const snap = await ref.once("value");
   const device = snap.val() || {};
   if (device.disabled === true || !device.tokenHash || !hanaSafeEqual(device.tokenHash, hanaHash(match[1]))) {
@@ -6858,7 +6895,7 @@ async function requireHanaDevice(req, body) {
        그래서 화면은 「연결 뒤 문자 0건」이라고만 했고, 대표는
        「앱이 지워졌나 · 알림이 꺼졌나 · 절전인가」를 셋 다 헤매야 했다.
        실은 «앱은 멀쩡히 살아 말을 걸고 있는데 연결만 끊긴» 것일 수 있다.
-     ⚠ «그 폰이 실제로 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
+     ⚠ «그 폰이 등록되어 있을 때»만 적는다(tokenHash 가 있을 때).
        아무 uid 나 적게 하면 모르는 사람이 남의 칸에 글을 쓸 수 있다. */
     if (device.tokenHash) {
       ref.child("lastReject").set({ at: Date.now(), reason: device.disabled === true ? "disabled" : "bad_token" })
@@ -6866,6 +6903,12 @@ async function requireHanaDevice(req, body) {
     }
     const error = new Error("휴대폰 연결이 만료되었거나 해제되었습니다.");
     error.status = 401;
+    throw error;
+  }
+  if (!(await hanaStaffRoleOk(db, uid))) {
+    ref.update({ disabled: true, lastReject: { at: Date.now(), reason: "role_revoked" } }).catch(() => {});
+    const error = new Error("재무·관리자 권한이 없거나 재직 중인 계정이 아닙니다.");
+    error.status = 403;
     throw error;
   }
   /* 잘 들어왔으면 「끊김」 자국을 지운다 — 지난 자국이 남아 계속 붉으면 못 믿는 표가 된다. */
@@ -6893,26 +6936,50 @@ exports.hanaMessageBridge = functions
         if (!/^\d{8}$/.test(code) || !deviceId || deviceId.length > 200) {
           hanaJson(res, 400, { ok: false, error: "8자리 연결번호와 휴대폰 정보가 필요합니다." }); return;
         }
+        /* 8자리 연결번호 무차별 대입 차단 — 기기·접속지별 실패 횟수를 세어 한도를 넘기면 잠근다 */
+        const callerIp = String((req.headers["x-forwarded-for"] || req.ip || "")).split(",")[0].trim();
+        const guardKey = hanaHash("pair:" + (callerIp || deviceId));
+        const guardRef = db.ref(`hanaSmsBridge/pairAttempts/${guardKey}`);
+        const guardVal = (await guardRef.once("value")).val() || {};
+        const nowAt = Date.now();
+        const recentFails = (nowAt - Number(guardVal.windowAt || 0) < HANA_PAIR_WINDOW_MS) ? Number(guardVal.count || 0) : 0;
+        if (recentFails >= HANA_PAIR_MAX_FAILS) {
+          hanaJson(res, 429, { ok: false, error: "연결 시도가 너무 많습니다. 10분 뒤 다시 시도해 주세요." }); return;
+        }
+        const notePairFail = () => guardRef.set({
+          count: recentFails + 1,
+          windowAt: recentFails > 0 ? Number(guardVal.windowAt || nowAt) : nowAt,
+          lastAt: nowAt,
+        }).catch(() => {});
+
         const pairRef = db.ref(`hanaSmsBridge/pairs/${hanaHash(code)}`);
         const pairSnap = await pairRef.once("value");
         const pair = pairSnap.val() || {};
-        if (!pair.uid || Number(pair.expiresAt || 0) < Date.now()) {
+        if (!pair.uid || Number(pair.expiresAt || 0) < nowAt) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "연결번호가 만료되었습니다. ERP에서 다시 발급해 주세요." }); return;
         }
         const currentPair = await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).once("value");
         if (String(currentPair.val() || "") !== hanaHash(code)) {
+          await notePairFail();
           await pairRef.remove().catch(() => {});
           hanaJson(res, 410, { ok: false, error: "새 연결번호가 발급되었습니다. 가장 최근 번호를 입력해 주세요." }); return;
         }
+        if (!(await hanaStaffRoleOk(db, pair.uid))) {
+          await pairRef.remove().catch(() => {});
+          await db.ref(`hanaSmsBridge/pairByUid/${pair.uid}`).remove().catch(() => {});
+          hanaJson(res, 403, { ok: false, error: "재무·관리자 권한이 있는 재직 계정만 휴대폰을 연결할 수 있습니다." }); return;
+        }
+        await guardRef.remove().catch(() => {});
         const token = crypto.randomBytes(32).toString("base64url");
         const deviceKey = hanaDeviceKey(deviceId);
         await db.ref(`hanaSmsBridge/devices/${pair.uid}`).set({
           [deviceKey]: {
             tokenHash: hanaHash(token),
             deviceName,
-            pairedAt: Date.now(),
-            lastSeenAt: Date.now(),
+            pairedAt: nowAt,
+            lastSeenAt: nowAt,
             disabled: false,
           },
         });
@@ -7931,6 +7998,8 @@ exports.logLoginAttempt = functions
 
 /* ══ 문서관리 🔒 서명본 열기 — puDocSecret (설계 2026-10-03-계약서류-표준-기록 §3.1, 대표 「추천대로」) ══
    서명본·EDI 위임장에는 대표자 주민번호(일부)·계좌가 들어 있다 — 대표·관리자만 연다.
+   ★ 단 하나의 예외(2026-11-08, 견적·계약 자동화 계획 1): 견적 길로 올린 🔒 원본(from.kind 'quote')은 재무와 그 건의 «확정» 담당자도
+     연다 — 요청에 견적 번호(qid)를 함께 보내야 하고, 규칙은 functions/doc-secret-access.js 한 곳에 있다(서명본 같은 다른 🔒 파일은 그대로 총괄관리자만).
    창고 규칙은 «관리자인가»를 못 본다. 그래서 창고 pu_docs/secret/… 는 읽기 false 이고,
    이 함수가 uid_roles 로 총괄관리자인지 본 뒤 «파일 바이트»를 직접 내준다.
    ⚠ 토큰 주소·서명 주소를 만들지 않는다 — 주소가 한 번 새면 누구나 연다(사진첩 서류와 같은 원칙).
@@ -7948,11 +8017,17 @@ exports.puDocSecret = functions
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
     const fileId = String((req.body && req.body.fileId) || "");
     if (!/^[-_A-Za-z0-9]{10,40}$/.test(fileId)) { res.status(400).json({ ok: false, error: "파일 번호가 올바르지 않습니다." }); return; }
+    /* 견적 번호(선택) — 견적 길로 올린 🔒 원본을 재무·확정 담당자가 열 때만 쓴다(doc-secret-access.js) */
+    const rawQid = req.body && req.body.qid;
+    const qid = (rawQid === undefined || rawQid === null || rawQid === "") ? "" : String(rawQid);
+    if (qid && !SECRET_ACCESS.isQid(qid)) { res.status(400).json({ ok: false, error: "견적 번호가 올바르지 않습니다." }); return; }
     const db = getDatabase();
     try {
       const roleSnap = await db.ref("uid_roles/" + me.uid).once("value");
-      if (((roleSnap && roleSnap.val()) || {}).isAdmin !== true) {
-        res.status(403).json({ ok: false, error: "🔒 서명본은 대표·관리자만 열 수 있습니다." });
+      const role = (roleSnap && roleSnap.val()) || {};
+      /* 총괄관리자가 아니면 견적 번호가 있어야 한다 — 없으면 읽을 것도 없이 거절 */
+      if (role.isAdmin !== true && !qid) {
+        res.status(403).json({ ok: false, error: SECRET_ACCESS.DENY_MESSAGE });
         return;
       }
       const rec = (await db.ref("pu_docs/originals/" + fileId).once("value")).val();
@@ -7960,8 +8035,21 @@ exports.puDocSecret = functions
         res.status(404).json({ ok: false, error: "서명본 보관함에 없는 파일입니다." });
         return;
       }
+      if (role.isAdmin !== true) {
+        const [quoteSnap, amtSnap] = await Promise.all([
+          db.ref("pu_quotes/" + qid).once("value"),
+          db.ref("pu_quote_amt/" + qid).once("value"),
+        ]);
+        const ok = SECRET_ACCESS.canOpenSecret({
+          role: role, uid: me.uid, fileId: fileId, file: rec,
+          quote: (quoteSnap && quoteSnap.val()) || null, amt: (amtSnap && amtSnap.val()) || null,
+        });
+        if (!ok) { res.status(403).json({ ok: false, error: SECRET_ACCESS.DENY_MESSAGE }); return; }
+      }
       const [buf] = await getStorage().bucket(PHOTO_BUCKET).file(rec.path).download();
-      await db.ref("pu_docs/secret_log").push({ fileId: fileId, by: me.uid, at: Date.now() });
+      const logRow = { fileId: fileId, by: me.uid, at: Date.now() };
+      if (qid) logRow.qid = qid;
+      await db.ref("pu_docs/secret_log").push(logRow);
       res.set("Cache-Control", "no-store");
       res.set("Content-Type", String(rec.type || "application/octet-stream"));
       res.set("X-File-Name", encodeURIComponent(String(rec.name || "file")));

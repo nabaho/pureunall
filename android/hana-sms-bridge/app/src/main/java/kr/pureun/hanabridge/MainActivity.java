@@ -96,9 +96,17 @@ public final class MainActivity extends Activity {
             ping.put("canSendSms", VisitSmsSender.canSend(this));
             /* 답에 카톡 업무방 목록이 실려 온다(2026-10-09) — 앱을 열면 곧바로 새 목록을 받는다. */
             KakaoRooms.absorb(this, HanaUploadWorker.post(ping, SecureStore.token(this)));
+        } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+            onUnauthorized();
         } catch (Exception ignored) {
             /* 인사 한 번 못 했다고 앱이 멈추지는 않는다 */
         }
+    }
+
+    private void onUnauthorized() {
+        SecureStore.clearAll(this);
+        SecureStore.setLastStatus(this, "연결이 해제되었습니다. ERP에서 다시 연결해 주세요.");
+        runOnUiThread(this::refresh);
     }
 
     @Override
@@ -145,6 +153,7 @@ public final class MainActivity extends Activity {
         code = new EditText(this);
         code.setHint("8자리 숫자 — 붙여넣기도 됩니다");
         code.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        code.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO);
         /* ★★ 붙여넣은 글에서 «숫자만» 남긴다 (대표 지시 2026-08-31: 「계속 헤깔린다」).
              ⚠ 예전에는 여덟 «글자»에서 잘랐다. 화면에 「1234 5678」로 띄어 적혀 있어
                그대로 복사해 붙이면 아홉 글자다 — 앞 여덟 자만 남아 「1234 567」이
@@ -239,7 +248,7 @@ public final class MainActivity extends Activity {
 
         Button clear = button("연결 지우기", Color.rgb(100, 116, 139));
         clear.setOnClickListener(v -> {
-            SecureStore.clearConnection(this);
+            SecureStore.clearAll(this);
             /* ⚠ 훑기도 함께 멈춘다 — 안 멈추면 연결을 지운 폰이 15분마다 서버를 두드린다. */
             HanaSweepWorker.cancel(this);
             SecureStore.setLastStatus(this, "연결을 지웠습니다.");
@@ -387,6 +396,8 @@ public final class MainActivity extends Activity {
             ping.put("readOk", readOk);
             ping.put("capped", capped);
             HanaUploadWorker.post(ping, SecureStore.token(this));
+        } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+            onUnauthorized();
         } catch (Exception ignored) {
             /* 알리기 하나 실패했다고 가져오기를 막지 않는다 */
         }
@@ -439,6 +450,7 @@ public final class MainActivity extends Activity {
             String uid = SecureStore.uid(this);
             String token = SecureStore.token(this);
             int sent = 0, already = 0, skipped = 0, failed = 0;
+            boolean unauthorizedStop = false;
             for (int i = 0; i < found.size(); i++) {
                 SmsHistoryReader.Item item = found.get(i);
                 final int done = i + 1;
@@ -459,12 +471,18 @@ public final class MainActivity extends Activity {
                     if (response.optBoolean("saved")) sent++;
                     else if (response.optBoolean("duplicate")) already++;
                     else skipped++;
+                } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+                    onUnauthorized();
+                    unauthorizedStop = true;
+                    break;
                 } catch (Exception error) {
                     failed++;
                 }
             }
 
-            final String report = "지난 문자 " + found.size() + "통을 살펴봤습니다.\n" +
+            final String report = unauthorizedStop
+                    ? "연결이 해제되었습니다. ERP에서 다시 연결해 주세요."
+                    : "지난 문자 " + found.size() + "통을 살펴봤습니다.\n" +
                     "• 새로 보낸 것 " + sent + "건\n" +
                     "• 이미 있던 것 " + already + "건" +
                     (skipped > 0 ? "\n• 거래로 안 읽힌 것 " + skipped + "건" : "") +

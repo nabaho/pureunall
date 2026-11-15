@@ -159,6 +159,7 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=12"></script>
+<script src="js/kcareer-mailreq.js?v=2"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -238,11 +239,38 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm{margin-right:auto;}
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
+.pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
 /* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
    예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
    여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
 .pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
+/* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
+   챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
+   ⚠ 폰·태블릿(≤900px)은 그림만 남긴다(글자는 title·aria-label 로) — 머리줄이 한 줄을 넘지 않게. */
+.pbar .hd-app{order:4;display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;border-radius:14px;background:#fff;
+  border:2px solid var(--accent);box-shadow:0 2px 10px rgba(30,64,175,.2);color:var(--ink);text-decoration:none;white-space:nowrap;cursor:pointer;}
+.pbar .hd-app[hidden]{display:none;}
+.pbar .hd-app:hover{box-shadow:0 3px 12px rgba(30,64,175,.3);}
+.pbar .hd-app:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.pbar .hd-ico{width:30px;height:32px;border-radius:7px;background:#fff;border:1px solid #cbd5e1;overflow:hidden;display:flex;flex-direction:column;flex:none;}
+.pbar .hd-ico i{font-style:normal;display:block;height:11px;line-height:11px;background:#dc2626;color:#fff;font-size:9px;font-weight:800;text-align:center;}
+.pbar .hd-ico em{font-style:normal;flex:1;display:grid;place-items:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
+.pbar .hd-app{position:relative;}
+.pbar .hd-tx{display:flex;flex-direction:column;line-height:1.2;}
+.pbar .hd-tx b{font-size:.84rem;font-weight:800;}
+/* 「오늘 N건」(구글 공용 달력 오늘 일정, 대표 지시 2026-11-15) — PC 는 이름 아래 한 줄, 폰·태블릿은 그림 모서리의 빨간 숫자 딱지.
+   ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있다. 못 받았을 때·폰에서 0건은 «안 보인다»(못 받음을 0으로 쓰지 않는다). */
+.pbar .hd-n{font-size:.7rem;font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums;}
+.pbar .hd-n[hidden]{display:none;}
+.pbar .hd-n.is-zero{color:#64748b;font-weight:600;}
+@media(max-width:900px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:contents;} .pbar .hd-tx b{display:none;}
+  .pbar .hd-n{position:absolute;top:-9px;right:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff;}
+  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;} }
+/* 태블릿(521~900px)은 머리줄이 한 줄(nowrap)이라 단추 글자까지 두면 오른쪽(로그아웃)이 화면 밖으로 밀렸다(768px 에서 102px — 2026-11-15 검증 작업자 지적·직접 쟀다).
+   그림만 남기고(위 ≤900px 규칙) 줄 사이 틈도 줄여 768·744px(아이패드 세로)에서 한 줄에 들어오게 한다. 폰(≤520px)은 줄이 접히므로 틈은 그대로. */
+@media(min-width:521px) and (max-width:900px){ .pbar{gap:6px;} }
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
@@ -346,17 +374,84 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .cfg-tool[hidden]{display:none;}
 .sec{font-size:.82rem;font-weight:700;color:var(--sub);margin:24px 4px 12px;display:flex;align-items:center;gap:10px;}
 .sec h2{font:inherit;color:inherit;}
-/* 타일 순서 고정 토글 */
-#tileLockBtn{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(10,20,60,.14);background:rgba(255,255,255,.6);
+/* ✏️ 앱 배치 편집 — 관리자만 보이는 단추 (대표 지시 2026-11-08). 직원 화면에는 아예 안 그린다([hidden]) */
+#layoutEditBtn{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(10,20,60,.14);background:rgba(255,255,255,.6);
   color:var(--sub);border-radius:99px;padding:4px 12px;font-size:.68rem;font-weight:700;font-family:inherit;cursor:pointer;transition:.12s;}
-#tileLockBtn:hover{border-color:var(--accent);color:var(--accent);}
-#tileLockBtn.locked{background:#1e40af;border-color:#1e40af;color:#fff;}
+#layoutEditBtn:hover{border-color:var(--accent);color:var(--accent);}
+#layoutEditBtn.editing{background:#1e40af;border-color:#1e40af;color:#fff;}
+#layoutEditBtn[hidden],#layoutBar[hidden],#layoutPanel[hidden],#lpSelBar[hidden]{display:none;}
 #tileHint{font-size:.66rem;color:var(--mute);font-weight:500;}
+/* 편집 중 알림 줄 · 편집 중에는 영역마다 점선 — 어디에 놓을 수 있는지 보이게(빈 영역도 한 칸 높이는 둔다) */
+#layoutBar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 4px 10px;padding:8px 12px;border-radius:12px;
+  background:rgba(239,246,255,.85);border:1px solid rgba(30,64,175,.25);font-size:.74rem;color:#1e40af;}
+#layoutBar .lb-hint{flex:1 1 240px;min-width:0;color:#475569;font-weight:500;}
+#layoutBar button{border:1px solid rgba(30,64,175,.35);background:#fff;color:#1e40af;border-radius:99px;padding:4px 12px;
+  font-size:.7rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+#layoutBar button:hover{background:#eff6ff;}
+.lay-say{font-size:.72rem;font-weight:700;color:#166534;}
+.lay-say.bad{color:#991b1b;}
+.lay-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9980;max-width:min(92vw,560px);padding:9px 16px;border-radius:99px;
+  background:#1e293b;color:#fff;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.3);text-align:center;}
+.lay-toast.bad{background:#991b1b;}
+.lay-toast[hidden]{display:none;}
+body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
+/* ⚠ 앱마다 붙이던 📌(틀 고정 표시·단추)는 걷었다 — 대표 지시 2026-11-08 「각 앱에 고정표시는 없애고 오른쪽 끝에만 고정표시 있으면 된다」.
+   고정 표시는 줄 머리 오른쪽 끝의 단추 하나뿐이다. 앱 하나만 고정하는 길은 «목록 창»(앱마다 📌)에만 남겨 두었다. */
+/* 줄 머리 오른쪽 «📌 이 줄 고정» — 그 줄 앱을 한 번에 틀 고정(관리자 PC 만). 줄 머리(접기 단추)와 «형제»로 둔다 — 단추 안에 단추를 넣지 않는다 */
+.row-freeze{position:absolute;right:6px;top:0;display:inline-flex;align-items:center;gap:4px;border:1px solid #bfdbfe;background:rgba(255,255,255,.85);color:#1e40af;
+  border-radius:99px;padding:2px 10px;font-size:.66rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.row-freeze:hover{background:#eff6ff;}
+.row-freeze.on{background:#1e40af;border-color:#1e40af;color:#fff;}
+.row-freeze[hidden]{display:none;}
+.row-freeze:focus-visible{outline:2px solid #1e40af;outline-offset:1px;}
+/* 📋 배치 편집 창 — 영역별 목록(☐ 고르기 + 번호 + ▲▼ + 영역 + 📌). 폰에서는 줄마다 두 줄 카드 */
+.lp-overlay{position:fixed;inset:0;z-index:9990;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:14px;}
+.lp-overlay[hidden]{display:none;}
+.lp-box{background:#fff;border-radius:16px;width:min(760px,100%);max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);
+  display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;color:#1e293b;}
+.lp-hd{display:flex;align-items:center;gap:8px 10px;padding:12px 14px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}
+.lp-hd b{font-size:.95rem;}
+.lp-sub{font-size:.7rem;color:#64748b;flex:1 1 220px;min-width:0;}
+.lp-x{border:0;background:#e2e8f0;border-radius:99px;width:34px;height:34px;cursor:pointer;font-size:.9rem;flex:none;margin-left:auto;}
+.lp-selbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:.76rem;}
+.lp-selbar b{color:#1e40af;}
+.lp-selbar button,.lp-ft button{border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:6px 12px;min-height:34px;
+  font-size:.74rem;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.lp-selbar select{height:34px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;font-family:inherit;max-width:100%;}
+.lp-body{overflow:auto;padding:4px 12px 10px;flex:1 1 auto;min-height:120px;}
+.lp-area{margin:8px 0 4px;}
+.lp-ah{display:flex;align-items:center;padding:4px 0;font-size:.8rem;font-weight:800;color:#1e293b;border-bottom:1px solid #cbd5e1;}
+.lp-an{white-space:nowrap;}
+.lp-ac{margin-left:8px;font-size:.7rem;font-weight:600;color:#64748b;}
+.lp-row{display:flex;align-items:center;gap:6px;min-height:44px;border-bottom:1px solid #e2e8f0;}
+.lp-ckc{flex:0 0 28px;width:28px;min-height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.lp-ckc input{width:18px;height:18px;margin:0;cursor:pointer;}
+.lp-no{flex:0 0 36px;width:36px;text-align:right;padding-right:6px;font-variant-numeric:tabular-nums;color:#64748b;font-size:.76rem;}
+.lp-ic{flex:0 0 24px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;}
+.lp-ic svg{width:100%;height:100%;}
+.lp-nm{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.84rem;font-weight:600;}
+.lp-soon{flex:none;font-size:.6rem;font-weight:700;color:#854d0e;background:#fffbeb;border-radius:99px;padding:2px 6px;white-space:nowrap;}
+.lp-ctl{display:flex;align-items:center;gap:4px;flex:none;}
+.lp-b{width:34px;height:34px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;font-size:.8rem;line-height:1;padding:0;font-family:inherit;color:#475569;}
+.lp-b[disabled]{opacity:.35;cursor:not-allowed;}
+.lp-b.on{background:#1e40af;border-color:#1e40af;color:#fff;}
+.lp-sel{height:34px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;font-family:inherit;width:118px;max-width:100%;}
+.lp-sel[disabled]{opacity:.5;cursor:not-allowed;}
+.lp-ft{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #e2e8f0;flex-wrap:wrap;}
+.lp-ft #lpSay{flex:1 1 200px;min-width:0;}
+.lp-b:focus-visible,.lp-sel:focus-visible,.lp-selbar button:focus-visible,.lp-ft button:focus-visible,.lp-x:focus-visible{outline:2px solid #1e40af;outline-offset:1px;}
+@media (max-width:520px){
+  .lp-overlay{padding:8px;}
+  .lp-body{padding:2px 8px 8px;}
+  .lp-row{flex-wrap:wrap;row-gap:0;}
+  .lp-ctl{flex:1 0 100%;padding:0 0 6px 70px;}
+  .lp-sel{flex:1 1 0;width:auto;min-width:0;}
+}
 .tile.dragging{opacity:.35;}
 .tile:not(.lock)[draggable="true"]{cursor:grab;}
 .tile:not(.lock)[draggable="true"]:active{cursor:grabbing;}
 .tiles{display:flex;flex-wrap:wrap;gap:8px 4px;justify-content:flex-start;}
-.tilerow{margin-bottom:6px;}
+.tilerow{margin-bottom:6px;position:relative;}
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
 /* ══ 접었다 펴는 줄 · 자주 쓰는 앱 (대표 2026-10-24 시안 2 「추천대로」) ══
@@ -431,7 +526,19 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
        차라리 자주 쓰는 앱은 꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것 같다」 → 「맨 위 줄 없애기」) ──
      앱을 «꾹 누르면» 그 자리 칩에 ★·노란 테두리가 붙고, 다시 꾹 누르면 빠진다(initFold 의 꾹 누르기).
      ⚠ 같은 별표 목록(tilePrefs.pins)을 쓴다 — 폰에서 붙인 ★ 는 PC 의 자주 쓰는 앱 줄에 그대로 올라간다. */
-  #pinRow{display:none;}
+  #pinRow{background:rgba(255,251,235,.92);border:1.5px solid #fde68a;border-radius:14px;padding:6px 8px 8px;margin-bottom:8px;box-shadow:0 2px 8px rgba(217,119,6,.10);}
+  #pinRow.empty{display:none;}
+  #pinTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;padding:4px 2px 2px;}
+  #pinRow .tile{flex-direction:row;width:auto;min-width:0;max-width:100%;gap:5px;padding:4px 9px 4px 5px;border-radius:99px;transition:none;background:#fff;border:1px solid #fde68a;box-shadow:0 1px 3px rgba(20,30,80,.07);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+  #pinRow .tile .ic{width:20px;height:20px;font-size:.85rem;margin:0;border:0;background:none;backdrop-filter:none;flex:none;transition:none;}
+  #pinRow .tile .ic svg{width:100%;height:100%;}
+  #pinRow .tile .tx{min-width:0;overflow:hidden;}
+  #pinRow .tile b{font-size:.76rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #pinRow .tile .tx span,#pinRow .tile .newtab,#pinRow .tile .pin-star{display:none;}
+  #pinRow .tile::after{content:'★';margin-left:auto;padding-left:4px;color:#d97706;font-size:.82rem;line-height:1;flex:none;}
+  #pinRow .tile-alert{position:absolute;left:auto;right:-4px;top:-8px;writing-mode:horizontal-tb;padding:2px 6px;letter-spacing:0;font-size:10px;border-width:2px;box-shadow:0 2px 6px rgba(185,28,28,.35);z-index:2;}
+  #pinRow .tile .nl-warn{position:absolute;right:-4px;top:-8px;transform:none;min-width:18px;height:18px;line-height:18px;padding:0 5px;z-index:2;}
+  #pinRow .tile .tile-soon-pill{position:absolute;left:auto;right:6px;top:-7px;transform:none;font-size:9px;padding:2px 5px;line-height:1;white-space:nowrap;z-index:2;}
   .tilerow.fold .tile.is-pin{background:#fffbeb;border-color:#fde68a;}
   .tilerow.fold .tile.is-pin::after{content:'★';margin-left:auto;padding-left:4px;color:#d97706;font-size:.82rem;line-height:1;flex:none;}
   .pin-star:not(.on){display:none;}   /* 펼친 줄(동그란 타일)에서도 빈 ☆ 단추는 안 보인다 — 넣기는 꾹 누르기로 */
@@ -498,6 +605,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   writing-mode:vertical-rl;cursor:pointer;
   box-shadow:0 3px 9px rgba(185,28,28,.42);}
 .tile-alert:hover{background:#991b1b;}
+.tile-alert:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px #1e40af;}   /* 키보드로 닿았을 때 */
 .tile.lock{opacity:.5;cursor:default;}
 .tile.lock:hover{background:none;}
 .tile.lock:hover .ic{transform:none;box-shadow:none;border-color:var(--card-border);}
@@ -597,6 +705,8 @@ body.portal-mode #camFab{display:flex;}
    한 줄을 지키려면 여기서 한 치수 더 줄여야 한다. 줄이 늘어나는 것보다 낫다. */
 @media (max-width:380px){
   .pbar{gap:4px 6px;padding:2px 2px 8px;}
+  .pbar #chatFab{padding:5px 8px;}
+  .pbar #chatFab .chat-lb{display:none;}
   .pbar .nm small{display:none;}
   .pbar .pmeta{font-size:.68rem;gap:5px;}
   .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
@@ -633,6 +743,16 @@ body.portal-mode #camFab{display:flex;}
 .connection-status[data-state="offline"]{color:#991b1b;}
 .statusbadge .clock{color:var(--mute);border-left:1px solid rgba(10,20,60,.14);padding-left:9px;}
 @media(max-width:520px){ .topfix{display:none;} }
+/* ── 푸른 통합 AI 챗봇 — 머리줄 건의하기 왼쪽 동그란 파란 단추 ── */
+#chatFab{position:relative;display:none;align-items:center;gap:5px;white-space:nowrap;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;border:none;padding:8px 15px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;font-family:inherit;cursor:pointer;box-shadow:0 5px 14px -3px rgba(37,99,235,.45),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
+#chatFab:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(37,99,235,.52);}
+#chatFab:active{transform:translateY(0) scale(.97);}
+#chatFab[aria-expanded="true"]{outline:2px solid #bfdbfe;outline-offset:1px;}
+#chatFab:focus-visible{outline:2px solid #bfdbfe;outline-offset:2px;}
+@media(max-width:520px){
+  #chatFab{min-height:30px;padding:5px 10px;font-size:.72rem;border-radius:999px;flex:0 0 auto;}
+  .pbar #chatFab{order:4;}
+}
 /* ── 프로그램 건의함 — 헤더 바(캡쳐2) 안 왼쪽, 브랜드 옆 동그란 눈에 띄는 버튼 ── */
 #sgFab{position:relative;display:none;align-items:center;gap:6px;white-space:nowrap;background:linear-gradient(135deg,#d97706,#dc2626);color:#fff;border:none;padding:8px 16px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;cursor:pointer;box-shadow:0 5px 14px -3px rgba(239,68,68,.5),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
 #sgFab:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(239,68,68,.55);}
@@ -751,6 +871,7 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ order 로 «늘» 끝에 둔다 — 백업·복구는 로그인 뒤 늦게 생겨 막대 맨 뒤에 붙는다. 차례에 기대면
        건의하기 «오른쪽»에 붙어 가운데 📷 와 겹쳤다(2026-10-24 대표 폰 캡처). */
   #fabBar > #sgFab{position:relative!important;margin-left:auto!important;order:9;}
+  #fabBar > #pu-health-admin-badge,#fabBar > #pu-resilience-badge{position:absolute!important;left:12px!important;bottom:calc(100% + 6px)!important;box-shadow:0 4px 12px rgba(185,28,28,.28)!important;}
   body.portal-mode #camFab{left:50%;right:auto;margin-left:-27px;width:54px;height:54px;z-index:62;
     bottom:calc(16px + env(safe-area-inset-bottom));}
   #moreDock{bottom:calc(68px + env(safe-area-inset-bottom));}
@@ -1306,6 +1427,13 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
+      <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
+      <!-- 📅 머리줄 앱 단추 — APPS 의 head:true 앱(지금은 푸른 캘린더)이 줄 타일 대신 여기 선다 (대표 지시 2026-11-14, 목업 A안).
+           처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
+      <a id="headApp_cal" class="hd-app" data-head-app="1" data-name="푸른 캘린더" href="pu-cal.html?sso=1" hidden>
+        <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
+        <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
+      </a>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
@@ -1331,6 +1459,8 @@ body.portal-mode #moreFab{display:flex;}
           <span class="of" id="aiOf"></span>
         </button>
       </div>
+      <!-- ✏️ 앱 배치 편집 — 관리자에게만(JS 가 켠다). 폰은 끌 수 없어 이 길로 «목록 창»을 열어 단추로 옮긴다(대표 지시 2026-11-08). -->
+      <button type="button" class="me-item" id="meLayout" hidden>✏️ 앱 배치 편집<span class="me-go" aria-hidden="true">관리자 · 열기 ›</span></button>
       <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
       <button type="button" class="logout me-logout" id="meLogout">로그아웃</button>
       </div>
@@ -1363,9 +1493,21 @@ body.portal-mode #moreFab{display:flex;}
     </div>
 
     <div class="sec"><h2 id="portalHeading">업무 시스템</h2>
-      <button id="tileLockBtn" type="button" aria-describedby="tileHint"></button>
-      <!-- 긴 안내는 «이동 가능» 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
-      <span id="tileHint" hidden>마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서)</span>
+      <!-- ✏️ 배치 편집 — 관리자(권형하)만, PC 에서만 보인다(대표 지시 2026-11-08 「이 부분은 관리자인 권형하만 가능하게」).
+           예전 「🔓 이동 가능」은 사람마다 «자기 화면만» 바꾸는 단추였다 — 이제 배치는 한 벌이라 관리자만 바꾼다.
+           ⚠ 기본은 감춘 채(hidden)다 — JS 가 관리자로 확인한 뒤에만 켠다. 직원 화면에는 단추도 끌기도 없다.
+           긴 안내는 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
+      <button id="layoutEditBtn" type="button" aria-describedby="tileHint" hidden></button>
+      <span id="tileHint" hidden>관리자는 앱을 마우스로 바로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 줄 오른쪽 끝의 «📌 이 줄 고정»을 누르면 그 줄 앱이 줄 밖으로 못 나갑니다. 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
+    </div>
+    <!-- 편집 중 안내 줄(관리자·PC) — 목록으로 편집(폰과 같은 창) · 처음 자리로 · 끝내기 -->
+    <div id="layoutBar" role="group" aria-label="앱 배치 편집" hidden>
+      <b>✏️ 배치 편집 중</b>
+      <span class="lb-hint">앱을 끌어 놓으세요 — 다른 영역에도 놓을 수 있습니다. 줄 오른쪽 끝의 «📌 이 줄 고정»을 누르면 그 줄 앱은 줄 밖으로 못 나갑니다(다시 누르면 풀림). 모든 직원 화면에 같이 반영됩니다.</span>
+      <span id="layoutSay" class="lay-say" role="status" aria-live="polite"></span>
+      <button id="layoutListBtn" type="button" title="목록에서 ▲▼·영역·📌 를 단추로 바꾸고, 여러 개를 한꺼번에 옮깁니다">📋 목록으로 편집</button>
+      <button id="layoutResetBtn" type="button" title="모든 앱을 처음 자리로 되돌리고 틀 고정을 모두 풉니다">↩ 처음 자리로</button>
+      <button id="layoutDoneBtn" type="button">끝내기</button>
     </div>
     <!-- 줄은 APP_ROWS 에서 «만들어» 넣는다 (대표 결정 2026-08-29, 안 ㉮).
          여태는 여기에 손으로 두 줄을 적어 두어, 줄을 늘리려면 화면·자바스크립트
@@ -1577,13 +1719,12 @@ body.portal-mode #moreFab{display:flex;}
         규정관리 · 정부사업일정에 함께 적용됩니다. <b>비워두면 60분</b>이고,
         안전을 위해 10분~480분(8시간) 범위만 적용됩니다.</p>
 
-      <label for="cfgTileCross">업무 시스템 — 줄 사이 이동</label>
-      <select id="cfgTileCross" style="width:200px">
-        <option value="">막음 (기본)</option>
-        <option value="1">허용</option>
-      </select>
-      <p class="cfg-help">포털 타일을 <b>업무지원 ↔ 직접업무</b> 줄 사이로 옮길 수 있게 할지 정합니다.
-        막아 두면 각자 자기 줄 안에서만 순서를 바꿉니다. <b>전 직원에게 함께 적용</b>됩니다.</p>
+      <!-- 「줄 사이 이동」 허용·막음 칸(cfgTileCross)은 걷었다 — 2026-11-08 앱 배치는 «관리자만 한 벌로» 바꾸고
+           영역 이동은 앱마다 📌 틀 고정으로 가른다. 이 칸이 남아 있으면 눌러도 아무 일이 없는 «죽은 스위치»가 된다. -->
+      <label>업무 시스템 — 앱 배치</label>
+      <p class="cfg-help">앱을 위아래·다른 영역으로 옮기고 <b>📌 틀 고정</b>하는 일은 포털 첫 화면의
+        <b>✏️ 배치 편집</b>(폰은 내 메뉴 › 앱 배치 편집)에서 합니다. 관리자만 바꿀 수 있고
+        <b>바꾼 배치는 전 직원 화면에 같이 반영</b>됩니다. 이 창에서 저장해도 배치는 지워지지 않습니다.</p>
 
       <div class="cfg-extra">
         <div class="cfg-extra-hd">
@@ -1603,6 +1744,35 @@ body.portal-mode #moreFab{display:flex;}
       <span style="flex:1"></span>
       <button class="sg-btn ghost" id="cfgCancel" type="button" style="margin-top:0;width:auto;padding:9px 16px">닫기</button>
       <button class="sg-btn" id="cfgSave" type="button" style="margin-top:0;width:auto;padding:9px 20px">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 편집 줄·목록 창이 안 보일 때 배치를 바꿨다/못 바꿨다를 알리는 떠 있는 알림(관리자 화면에서만 켜진다) -->
+<div id="layoutToast" class="lay-toast" role="status" aria-live="polite" hidden></div>
+
+<!-- ── 📋 앱 배치 편집 창 (관리자만 · 폰은 내 메뉴에서, PC 는 편집 줄의 «목록으로 편집») ──
+     ⚠ body 바로 아래에 둔다 — overflow·backdrop-filter 가 있는 조상 안의 fixed 창은 폰에서 통째로 잘린다(STATUS 「열려 있는데 안 보인다」).
+     목록 안 줄은 JS(lpRender)가 영역별로 그린다 — ☐ 고르기 · № · 이름 · 📌 · ▲▼ · 영역. 기본은 감춘 채(hidden). -->
+<div id="layoutPanel" class="lp-overlay" role="dialog" aria-modal="true" aria-labelledby="lpTitle" hidden>
+  <div class="lp-box">
+    <div class="lp-hd">
+      <b id="lpTitle">✏️ 앱 배치 편집</b>
+      <span class="lp-sub">관리자만 바꿀 수 있습니다 · 바꾸면 모든 직원 화면에 같이 반영됩니다(직원은 새로고침하면 보입니다)</span>
+      <button type="button" id="lpClose" class="lp-x" aria-label="닫기" title="닫기">✕</button>
+    </div>
+    <div id="lpSelBar" class="lp-selbar" hidden>
+      <b id="lpSelN"></b>
+      <select id="lpBulkRow" aria-label="보낼 영역"></select>
+      <button type="button" id="lpBulkMove">영역으로 보내기</button>
+      <button type="button" id="lpBulkFreeze">📌 틀 고정</button>
+      <button type="button" id="lpBulkUnfreeze">📌 풀기</button>
+      <button type="button" id="lpBulkClear">선택 해제</button>
+    </div>
+    <div id="lpBody" class="lp-body"></div>
+    <div class="lp-ft">
+      <span id="lpSay" class="lay-say" role="status" aria-live="polite"></span>
+      <button type="button" id="lpReset" title="모든 앱을 처음 자리로 되돌리고 틀 고정을 모두 풉니다">↩ 처음 자리로</button>
     </div>
   </div>
 </div>
@@ -1891,7 +2061,7 @@ body.portal-mode #moreFab{display:flex;}
        그림글자에 달력은 📅 📆 🗓️ 셋뿐이고 작아지면 서로 같아 보였다.
        ⚠ icon 값이 이제 «HTML 문자열»이다(innerHTML 로 꽂는다). enter.html 이 그렇게 쓴다.
        ⚠ 탭 그림글자·바탕화면 아이콘도 같은 그림이다 — tests/app-icons.test.js 가 견준다. */
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client' },
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client', head:true, count:'gcalToday' },   /* head — 타일 대신 «머리줄 큰 단추»(#headApp_cal)로 선다 (대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 한 번에 클릭」 → A안). count — 단추에 「오늘 N건」(구글 공용 달력 오늘 일정, 2026-11-15) */
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱을 만들어 진행」).
        ⚠ 이 앱은 «보고 건너가는 곳»이다 — 초안·AI·HWPX·확정은 정부사업일정의 보고서 창이 한다(#rpt= 로 건너감).
@@ -1900,6 +2070,7 @@ body.portal-mode #moreFab{display:flex;}
     /* 정부지원금 — 지원사업 사전 + 기존·예비 고객사 후보 + 노무사 검토(대표 지시 2026-10-11). 재직 직원 전원(규칙 govaid).
        2026-10-12 「의뢰인 업무로 넣어달라」 — 영업관리에서 옮김(옛 줄은 ROW_MOVED_FROM 이 없던 일로 친다). */
     { key:'govaid',  name:'기업정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'client' },
+    { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -1911,6 +2082,9 @@ body.portal-mode #moreFab{display:flex;}
     { key:'fin',     name:'재무관리',      desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inside' },
     /* 컨설팅정산(2026-10-31 대표 지시) — 개인입금 사업 정산. 재무관리와 같은 사람만(perm 'fin' — 새 권한 깃발을 만들지 않는다) */
     { key:'settle',  name:'컨설팅정산',    desc:'개인입금 사업 정산', icon:'🧾', url:'pu-settle.html',      roles:null, perm:'fin', row:'inside' },
+    /* 푸른등기(2026-11-14 대표 지시 「내부관리에 프로그램을 넣어라」) — 노무법인 변경등기 서류·필요서류. 사원 주소·생년월일이 든 자리라
+       대표·위임관리인만 — perm 'deungi' 는 아무에게도 주지 않은 깃발이라 관리자·위임관리인에게만 보인다(규칙 deungi 와 같은 사람). */
+    { key:'deungi',  name:'푸른등기',     desc:'변경등기 서류·체크', icon:'🖋', url:'pu-deungi.html',      roles:null, perm:'deungi', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
@@ -1951,7 +2125,7 @@ body.portal-mode #moreFab{display:flex;}
        2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
-,
+    { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
@@ -2330,22 +2504,24 @@ body.portal-mode #moreFab{display:flex;}
       if(user && user.email){
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
         if(_handled && _portalUid && user.uid !== _portalUid){
-          // 다른 사람이 들어온 경우 이전 사람의 타일을 다시 드러내지 않는다.
+          // 다른 사람이 들어온 경우 이전 사람의 타일·빠른 복원 캐시를 지우고 다시 그리지 않는다.
+          try { sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_fc0){}
           _loginGuard.cover();
-          location.replace(location.pathname + '?v=' + Date.now());
-          return;
+          location.replace(location.pathname + '?v=' + Date.now()); return;
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
         }
         try { _loginGuard.userSeen(); } catch(_g){}
-        window._puAuthAt = Date.now();
+        window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
-        else if(_handled && _portalReady && _portalUid === user.uid) _rmBootSplash();
+        else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); if(window._fastRestored){ window._fastRestored = false; enterPortal(user); } }
       } else if(_handled){
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
         // 실제 로그아웃 신호가 있으면 기다리지 않는다.
+        try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
         _loginGuard.cover();
         if(_authRecheckTimer) clearTimeout(_authRecheckTimer);
         var logoutAt = 0;
@@ -2356,13 +2532,13 @@ body.portal-mode #moreFab{display:flex;}
           _handled = false;
           _portalUid = '';
           _portalReady = false;
-          try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
+          try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
           try { location.replace(location.pathname + '?v=' + Date.now()); }
           catch(_) { location.reload(); }
         }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : AUTH_RECOVERY_MS);
       } else {
-        // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
-        try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
+        // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시 (빠른 복원 캐시도 비움)
+        try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
         // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다.
         // ⚠ 여기서 카카오 로그아웃으로 «보내지 않는다» (대표 2026-09-29 「로그인 눌렀는데 로그아웃 화면이 나온다」).
         //   카카오 로그아웃은 조용히 끝나지 않고 «로그아웃하시겠습니까?» 를 묻는 화면이다 — 로그인하러 온
@@ -2383,6 +2559,31 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 서버 함수(functions/passkey.js)·규칙의 passkey 칸은 그대로 남아 있다(지금 아무도 부르지 않는다).
        되살릴 때는 git 이력(이 커밋의 앞)에서 화면을 가져온다. */
   try { localStorage.removeItem('pu_passkey_sid'); localStorage.removeItem('pu_passkey_later'); } catch(e){}
+  /* ★ 앱에서 뒤로가기·홈으로 돌아왔을 때 「로그인 상태 확인 중…」 대기 없이 즉시 포털 타일을 표시한다 (2026-11-10):
+     같은 탭(sessionStorage)에 방금 확인된 인증 힌트와 직원 프로필 사본이 있고 로그아웃 신호가 없으면
+     IndexedDB 복원을 기다리지 않고 즉시 포털 화면을 연다. 뒤이어 onAuthStateChanged 가 도착하면 이어받는다. */
+  (function _instantReturnFromApp(){
+    try {
+      if(_handled || window.__kkReturning || _kkLoginStarting) return;
+      if(sessionStorage.getItem('pu_auth_hint') !== '1') return;
+      var raw = sessionStorage.getItem('pu_portal_fast_acct');
+      if(!raw) return;
+      var cached = JSON.parse(raw);
+      if(!cached || !cached.uid || !cached.acct) return;
+      if(cached.acct.status && cached.acct.status !== 'active'){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      /* 옆 탭에서 다른 사람으로 바뀐 경우(pu_auth_uid 불일치) 또는 12시간 지난 사본은 즉시 폐기 */
+      var activeUid = String(localStorage.getItem('pu_auth_uid') || '');
+      if(activeUid && activeUid !== cached.uid){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      if(!cached.at || Date.now() - Number(cached.at) > 12 * 3600 * 1000){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      var logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0);
+      if(logoutAt && logoutAt >= cached.at){ sessionStorage.removeItem('pu_portal_fast_acct'); return; }
+      window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
+      window._fastRestored = true;
+      _handled = true;
+      renderPortal(cached.acct, { email: cached.email || '', all: cached.all || [], via: 'auto' });
+      $('portalView').style.display = 'block'; _portalReady = true; _portalUid = cached.uid; _rmBootSplash();
+    } catch(_ir){}
+  })();
 
   /* ══ 카카오로 로그인 (2026-09-27, 대표 「추천대로」) ══════════════════════════
      ★ 지문과 달리 «이 기기에 등록했나» 가 아니라 «내 카카오 계정을 이 직원 계정에
@@ -3121,11 +3322,28 @@ body.portal-mode #moreFab{display:flex;}
     var _via = _freshLogin ? 'login' : 'auto';
     _freshLogin = false;
     // 직원명부에서 이 사용자(이메일 매칭) 찾아 이름·역할 확정 → 그 후에 한 번에 표시
-    function _show(m){
+    function _show(m, fromCache){
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
       _portalReady = true;
       armKakaoPortalHistory();
+      try {
+        if(m && m.acct && !fromCache){
+          /* 빠른 복원 사본은 현재 탭(sessionStorage)에만 두고 영구 localStorage 에는 남기지 않는다(사번 이메일·프로필 잔류 차단) */
+          var _fastAcct = JSON.stringify({ uid:user.uid||'', acct:m.acct, all:m.all||[], at:Date.now() });
+          sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
+          localStorage.removeItem('pu_portal_fast_acct');
+        }
+      } catch(_fc){}
+      try {
+        if(!auth.currentUser && auth.onAuthStateChanged){
+          var _unFast = auth.onAuthStateChanged(function(u){
+            if(!u || u.uid !== _portalUid) return;
+            try { if(typeof _unFast === 'function') _unFast(); } catch(_){}
+            try { renderPortal(m.acct, { email:(u.email||''), all:m.all, via:_via }); } catch(_){}
+          });
+        }
+      } catch(_fa){}
       try {
         var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
         if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
@@ -3158,6 +3376,20 @@ body.portal-mode #moreFab{display:flex;}
       _show(verifiedProfile);
       return;
     }
+    /* 같은 계정의 최근 확인된 명부 사본이 현재 탭(sessionStorage)에 있으면 3.5초 서버 명부 조회를 기다리지 않고 즉시 타일을 먼저 그린다 */
+    try {
+      var _fastRaw = sessionStorage.getItem('pu_portal_fast_acct');
+      if(_fastRaw){
+        var _fp = JSON.parse(_fastRaw);
+        if(_fp && _fp.acct && _fp.acct.status === 'active'
+           && _fp.uid === (user.uid || '')
+           && sidToEmail(_fp.acct.sid) === String(user.email || '').toLowerCase()
+           && (Date.now() - Number(_fp.at || 0) < 12 * 3600 * 1000)){
+          _show({ acct: _fp.acct, all: _fp.all || [_fp.acct] }, true);
+          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
+        }
+      }
+    } catch(_fe){}
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){
       var read = null;
@@ -3287,6 +3519,22 @@ body.portal-mode #moreFab{display:flex;}
     try { ref.focus(); } catch(e){}
     return ref;
   }
+
+  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일 표시·비활성·권한을 그대로 지킨다) ── */
+  window.portalLaunchApp = function(key, extraQuery){
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === key){ app = APPS[i]; break; } }
+    if(!app || app.off) return false;
+    var tile = document.querySelector('#appRows .tile[data-key="' + key + '"]') || document.querySelector('.tile[data-key="' + key + '"]');
+    if(!tile || tile.style.display === 'none' || tile.getAttribute('aria-disabled') === 'true' || tile.getAttribute('href') === '#') return false;
+    if(typeof app.act === 'function'){ app.act(); return true; }
+    var v = Math.floor(Date.now() / 600000);
+    var q = String(extraQuery || '').replace(/^[?&]+/, '');
+    var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + v + (q ? '&' + q : '');
+    if(isMobile()) location.href = url;
+    else openPortalApp(app, url);
+    return true;
+  };
 
   // ── 하나은행·하나카드 입금 확인 알림 (총괄관리자 전용) ──
   // 큰 거래표를 감시하지 않고 작은 서버 요약만 로그인 때 1회, 이후 3분마다 확인한다.
@@ -3431,6 +3679,109 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('visibilitychange',portalHanaVisibilityHandler);
   }
 
+  // ── 📬 경력관리 «요청 메일» 딱지 (대표 본인 전용 · 대표 지시 2026-11-09) ──
+  // 법인 메일함에 «경력 요청·동의서·서류 제출 요청»이 오면 경력관리 타일에 「요청 N」 딱지만 붙인다.
+  // ★ 창을 띄우지 않는다 — 하던 일을 가로막는 창은 일을 끊는다(입금 딱지와 같은 약속). 볼지 말지는 사람이 정한다.
+  // 알아보는 일·저장 자리는 경력관리와 «같은 모듈·같은 자리»(js/kcareer-mailreq.js · kcareer/{uid}/mailreq) —
+  // 어느 쪽에서 «확인함·완료»를 눌러도 딱지가 같이 바뀐다. 문서: docs/kcareer-요청메일.md
+  // ⚠ 대표 본인(경력관리의 OWNER_SID·OWNER_NAME 과 같은 기준)일 때만 훑는다 — 다른 관리자 칸에 메일 제목이 쌓이면 안 된다.
+  // ⚠ 폰 푸시는 건드리지 않는다(받은 메일 폰 알림은 2026-10-20 대표 지시로 «전체 꺼짐»).
+  var MR_FN_BASE = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
+  var portalMrTimer = 0;
+  var portalMrVis = null;
+  var portalMrRef = null;
+  var portalMrUid = '';
+  var portalMrFn = null;
+  var portalMrItems = {};
+  var portalMrBusy = false;
+  function portalMrOwner(acct){ return !!acct && (String(acct.sid || '') === 'P-001' || acct.name === '권형하'); }
+  function portalMrCall(fn, body){
+    var u = auth.currentUser;
+    if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
+    return u.getIdToken().then(function(token){
+      return fetch(MR_FN_BASE + fn, { method:'POST', headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+    }).then(function(resp){
+      return resp.json().catch(function(){ return {}; }).then(function(j){
+        if(!j.ok) throw new Error(j.error || '메일을 열지 못했습니다');
+        return j;
+      });
+    });
+  }
+  var portalMrPinKey = '';
+  /* 「자주 쓰는 앱」 줄은 타일의 «복제본»이라 딱지가 나중에 붙으면 복제본에는 없다 — 딱지가 «바뀐 때만» 복제본을 다시 만든다 */
+  function portalMrSyncPins(key){
+    if(key === portalMrPinKey) return;
+    portalMrPinKey = key;
+    try{ if(typeof paintPins === 'function') paintPins(); }catch(e){}
+  }
+  function portalMrRemoveBadge(silent){ var b = $('portalMrBadge'); if(b) b.remove(); if(!silent) portalMrSyncPins(''); }
+  /* 딱지 — 알릴 것이 «있을 때만» 만든다(늘 켜진 등은 아무것도 알려 주지 못한다). 타일이 다시 그려지면 다시 붙인다 */
+  function portalMrPaint(){
+    portalMrRemoveBadge(true);
+    if(!portalMrRef || typeof KcareerMailReq === 'undefined'){ portalMrSyncPins(''); return; }
+    var now = Date.now(), Q = KcareerMailReq, sm = Q.summary(portalMrItems, now);
+    if(!sm.alarm){ portalMrSyncPins(''); return; }
+    var tile = document.querySelector('.tile[data-key="career"]');
+    if(!tile) return;                       // 타일이 아직 안 그려졌으면 다음 조회 때
+    var b = document.createElement('span');
+    b.id = 'portalMrBadge';
+    b.className = 'tile-alert';
+    b.textContent = '요청 ' + sm.alarm;
+    var lines = Q.sortItems(Q.alarmItems(portalMrItems, now), now).slice(0, 5).map(function(x){
+      var d = Q.ddayOf(x.deadline, now).label;
+      return '· ' + Q.kindsLabel(x.kinds) + ' — ' + x.s + (d ? ' (' + d + ')' : '');
+    });
+    b.title = '📬 확인할 요청 메일 ' + sm.alarm + '건\n' + lines.join('\n') + '\n\n눌러서 경력관리 「요청 메일」에서 봅니다';
+    /* 표시를 누른 것은 «타일을 누른 것이 아니므로» 끊어 준다 — 안 끊으면 경력관리가 두 번 열린다 */
+    b.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); portalMrOpen(); };
+    b.setAttribute('role', 'button'); b.tabIndex = 0;              // 키보드로도 — Enter·Space
+    b.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); ev.stopPropagation(); portalMrOpen(); } });
+    tile.appendChild(b);
+    portalMrSyncPins(sm.alarm + '|' + b.title);
+  }
+  function portalMrOpen(){
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === 'career'){ app = APPS[i]; break; } }
+    if(!app) return;
+    var v = Math.floor(Date.now() / 600000);
+    var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&go=mailreq&v=' + v;
+    if(isMobile()) location.href = url;
+    else openPortalApp(app, url);
+  }
+  function portalMrScan(){
+    if(!portalMrRef || portalMrBusy || document.hidden) return;
+    var u = auth.currentUser;
+    if(!u) return;
+    portalMrBusy = true;
+    KcareerMailReq.scan({ db: db, uid: u.uid, readBody: KcareerMailReq.makeReadBody(portalMrCall) })
+      .catch(function(e){ console.warn('[요청 메일] 훑기', e); })     // 다음 조회에서 조용히 재시도
+      .then(function(){ portalMrBusy = false; });
+  }
+  function stopPortalMrAlerts(){
+    try{ if(portalMrRef && portalMrFn) portalMrRef.off('value', portalMrFn); }catch(e){}
+    if(portalMrTimer){ clearInterval(portalMrTimer); portalMrTimer = 0; }
+    if(portalMrVis){ document.removeEventListener('visibilitychange', portalMrVis); portalMrVis = null; }
+    portalMrRef = null; portalMrUid = ''; portalMrFn = null; portalMrItems = {}; portalMrBusy = false;
+    portalMrRemoveBadge();
+  }
+  function initPortalMrAlerts(role, acct){
+    var u = auth.currentUser;
+    if(portalMrRef && u && portalMrUid === u.uid && role === 'admin' && portalMrOwner(acct)){ portalMrPaint(); return; }   // 타일만 다시 그려졌다 — 껐다 켜면 딱지가 깜박인다
+    stopPortalMrAlerts();
+    if(role !== 'admin' || !portalMrOwner(acct) || typeof KcareerMailReq === 'undefined') return;
+    if(!u) return;
+    try{
+      portalMrUid = u.uid;
+      portalMrRef = db.ref('kcareer/' + u.uid + '/mailreq/items');
+      portalMrFn = function(s){ portalMrItems = s.val() || {}; portalMrPaint(); };
+      portalMrRef.on('value', portalMrFn, function(e){ console.warn('[요청 메일] 읽지 못했습니다', e); });
+    }catch(e){ portalMrRef = null; return; }
+    portalMrScan();
+    portalMrTimer = setInterval(portalMrScan, KcareerMailReq.POLL_MS);       // 메일함 거울이 3분마다 갱신된다
+    portalMrVis = function(){ if(!document.hidden) portalMrScan(); };
+    document.addEventListener('visibilitychange', portalMrVis);
+  }
+
   // 로그인 직후 바로 찍기 — 오른쪽 아래 동그란 단추(#camFab, 정적 마크업).
   // 타일 줄과 달리 다시 그릴 필요가 없어 배선은 한 번만 한다.
   function wireCamFab(){
@@ -3544,7 +3895,14 @@ body.portal-mode #moreFab{display:flex;}
       puIdentityBand('');
     }
 
+    /* 앱 배치를 바꿀 수 있는 사람 — 규칙(app_config 쓰기 = uid_roles.isAdmin)과 «같은 사람»인 관리자(권형하)뿐이다.
+       ⚠ 위임관리인(admin-delegate)은 안 된다 — 서버가 쓰기를 막는다. 화면은 1차 방어, 진짜 잠금은 규칙이다.
+       다시 그릴 때마다 편집 중이던 것은 꺼 둔다(다른 계정으로 바뀌었을 수 있다). */
+    _layoutAdmin = (role === 'admin') || (typeof sgIsAdmin === 'function' && sgIsAdmin());
+    _layoutEdit = false;
+    layoutPanelClose();
     tileConts().forEach(function(c){ c.innerHTML = ''; });
+    portalHeadAppsHide();     // 머리줄 단추는 먼저 감춘다 — 아래 반복에서 «볼 수 있는 사람»에게만 다시 켠다
     wireCamFab();
     APPS.forEach(function(app){
       // 역할 제한이 있으면 확인
@@ -3563,6 +3921,9 @@ body.portal-mode #moreFab{display:flex;}
          준비중 타일로 돌아온다. 앱 막대(js/pu-appbar.js)의 off 와 짝이다. */
       if(app.off) return;
       if(app.adminOnly && !_isAdm) return;
+      /* 머리줄 단추 앱(head) — 줄 타일을 «만들지 않는다». 저장된 공용 배치(app_config)에 자료함 따위로 적혀 있어도
+         타일 자체가 없으니 그 자리에 안 남는다(대표 지시 2026-11-14). 단추 쪽은 portalHeadAppPaint 가 그린다. */
+      if(app.head){ portalHeadAppPaint(app); return; }
       /* 직원 인사·재무 — 관리자이거나 그 권한이 있을 때만(APPS 의 perm 머리글).
          권한표(uid_roles)는 뒤에서 읽는다 — 그래서 타일은 만들어 두고 «감춰» 둔다(포털을 통째로 다시 그리지 않게).
          읽고 나면 portalApplyAppPerm 이 보이거나 감춘다. */
@@ -3666,7 +4027,7 @@ body.portal-mode #moreFab{display:flex;}
     hideEmptyRows();
     뉴스레터경고달기();
 
-    // 타일 드래그 재배치 + 순서 고정 (사용자별 저장)
+    // 앱 배치 — 관리자가 저장한 공용 배치를 따르고(관리자만 편집·📌 틀 고정), 즐겨찾기·접힘은 사람별 저장
     initTileOrder();
     // 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
     initFold();
@@ -3680,11 +4041,148 @@ body.portal-mode #moreFab{display:flex;}
     /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
        다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
     portalHanaPaintBadge();
+    initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
   }
 
-  // ══════════ 타일 순서: 드래그 이동 + 고정 (사용자별, 기기 간 동기화) ══════════
-  // 타일은 두 줄(업무지원 / 직접업무)로 나뉜 각각의 상자에 담긴다.
-  // 상자가 따로라 줄 사이 이동이 저절로 막힌다 — 관리자가 설정에서 허용하면 그때만 넘나든다.
+  /* ── 머리줄 단추 앱 (APPS 의 head:true) — 타일 대신 머리줄(.pbar)에 큰 단추로 선다 ──
+     대표 지시 2026-11-14 「캘린더를 자료함으로 안 넣고 별도로 관리해서 한 번에 클릭」 → 목업 A안.
+     ★ 눌렀을 때는 «타일과 같은 길»이다 — PC 는 openPortalApp(창 이름·재사용·10분 캐시 버킷), 폰은 그냥 링크(sso=1).
+     ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
+     ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
+  function portalHeadAppsHide(){
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++) els[i].hidden = true;
+  }
+  function portalHeadAppDate(el){
+    var d = new Date(), mo = (d.getMonth() + 1) + '월', da = String(d.getDate());
+    var m = el.querySelector('.hd-m'), n = el.querySelector('.hd-d');
+    if(m) m.textContent = mo;
+    if(n) n.textContent = da;
+    el.setAttribute('data-today', mo + ' ' + da + '일');
+    portalHeadAppLabel(el);
+  }
+  /* 접근성 이름·말풍선 — 날짜는 항상, 「오늘 N건」은 «받았을 때만». 숫자가 무슨 뜻인지(구글 공용 달력만)도 말풍선에 밝힌다. */
+  function portalHeadAppLabel(el){
+    var name = el.getAttribute('data-name') || '', day = el.getAttribute('data-today') || '';
+    var n = el.getAttribute('data-n');
+    var cnt = (n !== null && n !== '') ? ' · 오늘 구글 공용 달력 일정 ' + n + '건' : '';
+    el.setAttribute('aria-label', name + ' — 오늘 ' + day + cnt);
+    el.title = (el.getAttribute('data-title') || name) + (cnt ? cnt + ' (연차·출장·나만 보기 일정은 달력에서)' : '');
+  }
+  function portalHeadAppPaint(app){
+    var el = document.getElementById('headApp_' + app.key);
+    if(!el) return;
+    var join = app.url.indexOf('?') >= 0 ? '&' : '?';
+    el.hidden = false;
+    el.href = app.url + join + 'sso=1';
+    el.setAttribute('data-title', app.name + (app.desc ? ' — ' + app.desc : ''));
+    el.setAttribute('data-count', app.count || '');
+    if(!isMobile()) el.target = portalAppWindowName(app.key); else el.removeAttribute('target');
+    portalHeadAppDate(el);       // 말풍선·접근성 이름도 여기서 맞춘다(portalHeadAppLabel)
+    portalHeadAppCount(el);      // 「오늘 N건」 — 받는 동안은 숫자 없이 선다
+    if(el.getAttribute('data-wired') === '1') return;
+    el.setAttribute('data-wired', '1');
+    el.addEventListener('click', function(ev){
+      if(isMobile()) return;                      // 폰은 링크가 그대로 연다(타일과 같다)
+      ev.preventDefault();
+      var v = Math.floor(Date.now() / 600000);    // 10분 버킷 캐시 우회 — 타일과 같다
+      openPortalApp(app, app.url + join + 'sso=1&v=' + v);
+    });
+  }
+  /* ── 오늘 N건 (머리줄 단추) ── 대표 지시 2026-11-15 「네, 이어서」 (목업 A안의 「오늘 N건」)
+     ★ 무엇을 세나: 구글 «공용 달력»의 오늘 일정 건수다. 푸른 캘린더 화면이 «구글» 일정을 받는 것과 같은 달력·같은 열쇠
+       (pu-cal.html 의 GCAL_CAL_ID·GCAL_API_KEY — tests/portal-cal-head-button.test.js 가 맞대 본다)로 «하루치»만 받는다.
+       걸친 날 계산도 달력과 같다(종일 일정의 끝날은 하루 당김 · 자정에 끝나면 그날은 안 든다 · 여러 날 일정은 걸친 날마다 든다).
+       달력의 «오늘 칸»은 줄이 더 많을 수 있다(연차·출장·이음 근무 근태, 사건 마감, 나만 보기) — 그것은 세지 않는다.
+       그래서 말풍선이 「구글 공용 달력 일정 N건」이라고 «정확히» 말한다(portalHeadAppLabel).
+     ★ 못 받았으면 숫자를 «안 보인다» — 0건으로 쳐서 「오늘 0건」이라 하면 거짓말이다(못 받음 ≠ 0). 하루에 250건 넘게 와서 쪽이 나뉘어도 같다(모르는 것을 모른다고 한다).
+     ★ 하루치 한 번 — 5분 안에는 다시 안 받고(캐시), 실패하면 1분은 쉰다. 두 번 그려도 한 번만 받는다. 날이 바뀌면 어제 숫자는 지운다.
+     ⚠ 서버 표(my_schedules 등)는 읽지 않는다 — 달력 내용 대부분이 구글 쪽이고 서버 표에는 옛 기록 25건뿐이다(pu-cal.html «구글 캘린더» 머리말).
+     ⚠ 포털이 구글 달력 열쇠를 «또» 갖는다 — 열쇠는 사이트 제한(docs/구글캘린더-API키-사이트제한.md)이 지킨다. 같은 사이트(nabaho.github.io)에서 부르므로 제한에 걸리지 않는다. */
+  var PORTAL_GCAL = { key: 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo', cal: 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com' };
+  var PORTAL_CAL_FRESH_MS = 5 * 60 * 1000, PORTAL_CAL_RETRY_MS = 60 * 1000;
+  var portalCalCount = { ymd: '', at: 0, n: null, failAt: 0, pending: null, pendingYmd: '' };
+  function portalYmdOf(d){
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function portalShiftYmd(ymd, days){
+    var p = String(ymd).split('-'), t = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + days));
+    return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + t.getUTCDate()).slice(-2);
+  }
+  /* 그 날(ymd)에 걸친 구글 일정 건수 — pu-cal.html 의 gcalToEvent(date·끝)·eventsOn(걸침 판단)과 «같은 규칙» */
+  function portalCountGcalOn(items, ymd){
+    var n = 0;
+    (items || []).forEach(function(ev){
+      if(!ev || !ev.start || !(ev.start.date || ev.start.dateTime)) return;
+      var date = String(ev.start.date || ev.start.dateTime).slice(0, 10), end = date;
+      if(ev.end && ev.end.date) end = portalShiftYmd(String(ev.end.date).slice(0, 10), -1);       // 종일 일정의 end.date 는 «다음 날»
+      else if(ev.end && ev.end.dateTime){
+        end = String(ev.end.dateTime).slice(0, 10);
+        if(String(ev.end.dateTime).slice(11, 16) === '00:00' && end > date) end = portalShiftYmd(end, -1);   // 자정에 끝나면 그날은 안 든다
+      }
+      if(!end || end < date) end = date;
+      if(date === ymd || (date < ymd && ymd <= end)) n++;
+    });
+    return n;
+  }
+  /* 오늘 구글 공용 달력 일정 건수 → Promise<숫자 | null(못 받음)> */
+  function portalCalTodayCount(){
+    var c = portalCalCount, ymd = portalYmdOf(new Date()), now = Date.now();
+    if(c.ymd === ymd && c.n !== null && now - c.at < PORTAL_CAL_FRESH_MS) return Promise.resolve(c.n);
+    if(c.ymd === ymd && c.n === null && c.failAt && now - c.failAt < PORTAL_CAL_RETRY_MS) return Promise.resolve(null);
+    if(c.pending && c.pendingYmd === ymd) return c.pending;
+    var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(PORTAL_GCAL.cal) + '/events?key=' + PORTAL_GCAL.key
+      + '&timeMin=' + encodeURIComponent(ymd + 'T00:00:00+09:00') + '&timeMax=' + encodeURIComponent(portalShiftYmd(ymd, 1) + 'T00:00:00+09:00')
+      + '&singleEvents=true&orderBy=startTime&maxResults=250&fields=' + encodeURIComponent('nextPageToken,items(start,end)');
+    c.pendingYmd = ymd;
+    var p = Promise.resolve().then(function(){ return fetch(url); })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || d.error || !Array.isArray(d.items) || d.nextPageToken) throw new Error('오늘 일정을 셀 수 없습니다');
+        return portalCountGcalOn(d.items, ymd);
+      })
+      .then(function(n){ c.ymd = ymd; c.at = Date.now(); c.n = n; c.failAt = 0; return n; },
+            function(){ c.ymd = ymd; c.at = 0; c.n = null; c.failAt = Date.now(); return null; })
+      .then(function(n){ if(c.pending === p) c.pending = null; return n; });
+    c.pending = p;
+    return p;
+  }
+  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount };
+  function portalHeadAppCountApply(el, n, ymd){
+    var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv');
+    if(n === null || n === undefined){
+      el.removeAttribute('data-n'); el.removeAttribute('data-n-ymd');
+      if(box) box.hidden = true;
+    } else {
+      el.setAttribute('data-n', String(n)); el.setAttribute('data-n-ymd', ymd || '');
+      if(v) v.textContent = String(n);
+      if(box){ box.hidden = false; box.classList.toggle('is-zero', n === 0); }
+    }
+    portalHeadAppLabel(el);
+  }
+  function portalHeadAppCount(el){
+    var fn = PORTAL_HEAD_COUNTERS[el.getAttribute('data-count') || ''];
+    if(!fn) return;
+    var ymd = portalYmdOf(new Date());
+    if(el.getAttribute('data-n-ymd') !== ymd) portalHeadAppCountApply(el, null);    // 어제 숫자를 오늘 것처럼 두지 않는다
+    var p; try{ p = fn(); }catch(_e){ return; }
+    if(!p || typeof p.then !== 'function') return;
+    p.then(function(n){
+      if(el.hidden) return;                              // 그 사이 감춰졌다(다른 사람으로 바뀜)
+      if(portalYmdOf(new Date()) !== ymd) return;        // 받는 사이 자정을 넘겼다 — 다음에 다시 센다
+      portalHeadAppCountApply(el, n, ymd);
+    }, function(){});
+  }
+  /* ── 오늘 N건 끝 ── */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    var els = document.querySelectorAll('[data-head-app]');
+    for(var i = 0; i < els.length; i++){ if(!els[i].hidden){ portalHeadAppDate(els[i]); portalHeadAppCount(els[i]); } }
+  });
+
+  // ══════════ 앱 배치: 관리자만 끌어 옮김 + 📌 틀 고정 (공용 한 벌 · 즐겨찾기·접힘은 사람별) ══════════
+  // 타일은 영역(APP_ROWS)마다 각각의 상자에 담긴다. 영역 사이 이동은 관리자가 «배치 편집» 중에만 하고,
+  // 📌 틀 고정한 앱은 자기 영역 밖으로 못 나간다(2026-11-08 — 자세히 「🧩 앱 배치」 머리글).
   /* 줄 뼈대를 APP_ROWS 대로 만든다 — 한 번만. */
   function buildAppRows(){
     var host = $('appRows'); if(!host || host.dataset.built) return;
@@ -3695,6 +4193,8 @@ body.portal-mode #moreFab{display:flex;}
         + '<div class="tilerow-h" role="button" tabindex="0" aria-expanded="true" data-fold-row="' + r.id + '">'
         + '<span class="fold-chev" aria-hidden="true">▾</span>'
         + '<span class="tilerow-t">' + r.label + '</span><span class="tilerow-n"></span></div>'
+        /* 📌 이 줄 고정 — 관리자 PC 에서만 JS 가 켠다(기본은 감춤). 줄 머리와 형제다(머리는 접기 단추라 그 안에 단추를 못 넣는다) */
+        + '<button type="button" class="row-freeze" data-row-freeze="' + r.id + '" hidden></button>'
         + '<div class="tiles" id="appTiles_' + r.id + '" data-row="' + r.id + '"'
         + ' aria-label="' + r.label + ' 목록"></div></div>';
     }).join('');
@@ -3713,7 +4213,8 @@ body.portal-mode #moreFab{display:flex;}
       var box = c.closest ? c.closest('.tilerow') : c.parentNode;
       /* 감춰 둔 타일(권한 기다리는 직원 인사·재무)은 «없는 것»으로 센다 */
       var shown = Array.prototype.some.call(c.children, function(t){ return !t.style || t.style.display !== 'none'; });
-      if(box) box.style.display = shown ? '' : 'none';
+      /* 끌어 옮길 수 있는 관리자 화면에는 빈 영역도 보인다 — 비었다고 감추면 그 영역으로 앱을 옮길 수 없다 */
+      if(box) box.style.display = (shown || layoutCanDrag() || layoutEditing()) ? '' : 'none';
     });
   }
 
@@ -3755,10 +4256,8 @@ body.portal-mode #moreFab{display:flex;}
     tileConts().forEach(function(c){ Array.prototype.forEach.call(c.children, function(t){ out.push(t); }); });
     return out;
   }
-  // 줄 사이 이동 허용 — 관리자가 ⚙ 시스템 설정에서 켠다(전 직원 공통)
-  function tileCrossOk(){
-    try { return !!(window.PU_CFG && String(window.PU_CFG.tileCrossRow) === '1'); } catch(e){ return false; }
-  }
+  /* (2026-11-08) 예전 「줄 사이 이동 허용」(tileCrossOk · PU_CFG.tileCrossRow)은 걷었다 —
+     이제 영역 이동은 관리자만 하고, 못 가게 막을 앱은 앱마다 📌 틀 고정으로 가른다. 저장돼 있던 옛 값은 읽지 않는다. */
   var tilePrefs = { order: null, locked: false, homeApp: null };
   var _curRole = 'member';   // 현재 로그인 사용자 역할 (바로가기 권한 판정용)
   var _curName = '';         // 현재 로그인 사용자 이름 — 인증 앱에 뜨는 계정 이름(이메일·사번 대신)
@@ -4268,6 +4767,510 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('mouseup', up);
     document.addEventListener('touchend', up);
   })();
+  /* ══════ 🧩 앱 배치 — 관리자만 옮기고, 모든 직원이 같은 배치를 본다 (대표 지시 2026-11-08) ══════
+     「화면에서 프로그램을 위아래로 이동가능하게 해라. 서로 다른 영역을 정리할 수 있게 하고 틀 고정하게 하면
+       각 영역에서만 움직이게 해라. 만약 의뢰인 업무를 내부관리로 보내고 틀고정으로 하면 내부관리에서만 움직이게
+       하는 것이다. 이 부분은 관리자인 권형하만 가능하게 해라.」
+
+     ★ 저장 자리: data/app_config/portalLayout — 이미 «읽기 직원 · 쓰기 관리자만(uid_roles.isAdmin)» 인 자리(규칙 app_config)다.
+       그래서 보안규칙은 새로 만들지도 넓히지도 않았다. 직원 화면에서 감추는 것은 1차 방어이고, 진짜 잠금은 서버 규칙이다.
+     ★ 모양: { v:1, order:[앱 key …], rows:{ 앱 key: 영역 id }, frozen:{ 앱 key:true }, updatedAt }
+       frozen(📌 틀 고정) 인 앱은 «지금 있는 영역 안에서만» 움직인다 — 끌기·▲▼ 단추·영역 고르기·일괄 옮기기 모두.
+     ⚠ 설정 창(cfgSave)은 data/app_config 를 «통째로 바꾼다»(set). 저장 때 portalLayout 을 다시 얹지 않으면 배치가 지워진다 — cfgSave 가 얹는다.
+     ⚠ 공용 배치가 «아직 없을 때»는 예전처럼 각자 옛 저장값(tilePrefs.order·rows)을 따른다. 관리자가 처음 옮기는 순간부터 모두 같은 배치다.
+       「처음 자리로」는 저장값을 지우는 것이 아니라 «기본 배치를 새로 저장»한다 — 그래야 직원의 옛 개인 저장값이 되살아나지 않는다.
+     ⚠ 즐겨찾기 ★(자주 쓰는 앱)·줄 접기는 «개인 설정»이라 그대로 각자 것이다 — 배치와 별개. 직원도 앱을 끌어 ★ 줄에 넣을 수는 있다(배치는 안 바뀐다).
+     ⚠ 계산(lay…)은 화면을 안 만지는 순수 함수다 — tests/portal-layout-admin.test.js 가 떠서 «돌려» 본다. 이름을 lay 로 시작하게 둔 것도 그래서다. */
+  var LAYOUT_PATH = 'data/app_config/portalLayout';
+  var LAYOUT_CACHE = 'pu_portal_layout_v1';
+  var _layout = null;          // 서버에 있는 «공용 배치»(정리한 것) — null 이면 아직 정한 적 없음
+  var _layoutAdmin = false;    // 이 사람이 배치를 바꿀 수 있는가(render 가 채운다)
+  var _layoutEdit = false;     // 지금 «배치 편집» 중인가 — 저장하지 않는다(화면을 열 때마다 꺼진 채 시작)
+  var _layoutWriting = 0;      // 쓰는 중인 저장 수 — 쓰는 도중 서버 읽기가 덮어쓰지 않게
+  var _layoutSayT = 0, _dragBefore = null, _dragWarned = false;
+  var _lpSel = {}, _lpLast = null, _lpBulkRow = '', _layoutWired = false;
+
+  /* 서버·기기에서 읽은 값을 한 모양으로 정리한다 — 틀린 것은 버린다. 순서가 비면 «배치 없음»(null). */
+  function layClean(raw){
+    if(!raw || typeof raw !== 'object') return null;
+    var seen = {}, order = [];
+    (Array.isArray(raw.order) ? raw.order : []).forEach(function(k){
+      if(typeof k === 'string' && k && !seen[k]){ seen[k] = 1; order.push(k); }
+    });
+    if(!order.length) return null;
+    var rows = {}, frozen = {};
+    if(raw.rows && typeof raw.rows === 'object') Object.keys(raw.rows).forEach(function(k){
+      if(typeof raw.rows[k] === 'string' && raw.rows[k]) rows[k] = raw.rows[k];
+    });
+    if(raw.frozen && typeof raw.frozen === 'object') Object.keys(raw.frozen).forEach(function(k){
+      if(raw.frozen[k] === true) frozen[k] = true;
+    });
+    return { order: order, rows: rows, frozen: frozen };
+  }
+  /* 두 배치가 «같은가» 보는 지문 — 같으면 다시 쓰지 않는다. */
+  function laySig(L){
+    if(!L) return 'null';
+    var rk = Object.keys(L.rows || {}).sort().map(function(k){ return k + '=' + L.rows[k]; });
+    var fk = Object.keys(L.frozen || {}).filter(function(k){ return L.frozen[k]; }).sort();
+    return JSON.stringify([L.order || [], rk, fk]);
+  }
+  function layIsFrozen(L, key){
+    return !!(L && L.frozen && Object.prototype.hasOwnProperty.call(L.frozen, key) && L.frozen[key] === true);
+  }
+  /* 저장된 영역 — 지금 없는 영역 이름이면 앱의 제자리(dflt)로 보낸다(타일이 사라지면 안 된다). */
+  function layRowOf(L, key, dflt){
+    var r = (L && L.rows && Object.prototype.hasOwnProperty.call(L.rows, key)) ? L.rows[key] : '';
+    return (r && rowExists(r)) ? r : dflt;
+  }
+  /* 앱 처음 자리 — 영역은 앱이 정한 제자리, 순서는 APPS 순서, 틀 고정 없음 */
+  function layoutDefault(){
+    var order = [], rows = {};
+    APPS.forEach(function(a){ order.push(a.key); rows[a.key] = appRowOf(a); });
+    return { order: order, rows: rows, frozen: {} };
+  }
+
+  /* ── 순수 계산: 모델 = { rowIds:[영역 id…], rows:{영역 id:[앱 key…]}, frozen:{key:true}, tail:{key:true(준비중 — 늘 영역 맨 끝)} } ──
+     모델을 «복사해서» 고친다(원본은 그대로) — 일괄 작업은 미리 돌려 보고 건수를 물은 뒤에 적용한다. */
+  function layCopy(m){
+    var rows = {}, fz = {};
+    (m.rowIds || []).forEach(function(id){ rows[id] = ((m.rows || {})[id] || []).slice(); });
+    Object.keys(m.frozen || {}).forEach(function(k){ if(m.frozen[k]) fz[k] = true; });
+    return { rowIds: (m.rowIds || []).slice(), rows: rows, frozen: fz, tail: m.tail || {} };
+  }
+  function layFind(m, key){
+    for(var i = 0; i < m.rowIds.length; i++){
+      var at = m.rows[m.rowIds[i]].indexOf(key);
+      if(at > -1) return { row: m.rowIds[i], at: at };
+    }
+    return null;
+  }
+  /* how: 'up'·'down'(같은 영역 안 순서) · 'row'(arg=영역 id, 다른 영역으로) · 'freeze'·'unfreeze'(📌)
+     ⚠ 틀 고정한 앱은 'row' 가 «안 된다» — 영역을 못 벗어난다. 순서 바꾸기는 된다.
+     ⚠ 준비중 앱은 늘 줄 맨 끝이다(대표 2026-10-09) — 그 앞뒤를 건너뛰는 순서 바꾸기는 안 된다. */
+  function layMove(model, key, how, arg){
+    var m = layCopy(model), at = layFind(m, key), soon = m.tail || {};
+    if(!at) return { ok:false, why:'이 앱은 지금 화면에 없습니다' };
+    var list = m.rows[at.row];
+    if(how === 'freeze'){
+      if(m.frozen[key]) return { ok:false, why:'이미 틀 고정입니다' };
+      m.frozen[key] = true; return { ok:true, model:m };
+    }
+    if(how === 'unfreeze'){
+      if(!m.frozen[key]) return { ok:false, why:'틀 고정이 아닙니다' };
+      delete m.frozen[key]; return { ok:true, model:m };
+    }
+    if(how === 'up' || how === 'down'){
+      var to = at.at + (how === 'up' ? -1 : 1);
+      if(to < 0) return { ok:false, why:'이미 이 영역의 맨 위입니다' };
+      if(to >= list.length) return { ok:false, why:'이미 이 영역의 맨 아래입니다' };
+      if(!!soon[key] !== !!soon[list[to]]) return { ok:false, why:'준비중 앱은 늘 영역 맨 끝에 있습니다' };
+      var t = list[to]; list[to] = list[at.at]; list[at.at] = t;
+      return { ok:true, model:m };
+    }
+    if(how === 'row'){
+      if(!Object.prototype.hasOwnProperty.call(m.rows, arg)) return { ok:false, why:'없는 영역입니다' };
+      if(arg === at.row) return { ok:false, why:'이미 그 영역에 있습니다' };
+      if(m.frozen[key]) return { ok:false, why:'📌 틀 고정한 앱은 다른 영역으로 못 갑니다 — 먼저 틀 고정을 풀어 주세요' };
+      list.splice(at.at, 1);
+      var dest = m.rows[arg], pos = dest.length;
+      if(!soon[key]){ while(pos > 0 && soon[dest[pos - 1]]) pos--; }   // 준비중 앞에 끼운다
+      dest.splice(pos, 0, key);
+      return { ok:true, model:m };
+    }
+    return { ok:false, why:'알 수 없는 동작입니다' };
+  }
+  /* 여럿을 한꺼번에 — 틀 고정은 건너뛰고 건수를 센다. moved 가 0 이면 ok:false. */
+  function layBulk(model, keys, how, arg){
+    var cur = model, moved = 0, frozenSkip = 0, noop = 0;
+    keys.forEach(function(k){
+      var at = layFind(cur, k);
+      if(how === 'row' && at && cur.frozen[k] && at.row !== arg){ frozenSkip++; return; }
+      var r = layMove(cur, k, how, arg);
+      if(r.ok){ cur = r.model; moved++; } else noop++;
+    });
+    return { ok: moved > 0, model: cur, moved: moved, frozenSkip: frozenSkip, noop: noop,
+      why: moved ? '' : (frozenSkip ? '고른 앱이 모두 틀 고정이라 옮기지 못했습니다' : '바뀐 것이 없습니다') };
+  }
+  /* 모델 → 저장할 배치. 화면에 안 그린 앱(지금 안 씀·권한 밖)의 자리는 «버리지 않고» 뒤에 이어 붙인다. */
+  function layBuild(model, old){
+    var order = [], rows = {}, seen = {};
+    model.rowIds.forEach(function(id){
+      (model.rows[id] || []).forEach(function(k){ order.push(k); rows[k] = id; seen[k] = 1; });
+    });
+    var o = old || { order: [], rows: {} };
+    (o.order || []).forEach(function(k){
+      if(seen[k]) return;
+      seen[k] = 1; order.push(k);
+      if(o.rows && Object.prototype.hasOwnProperty.call(o.rows, k)) rows[k] = o.rows[k];
+    });
+    var frozen = {};
+    Object.keys(model.frozen || {}).forEach(function(k){ if(model.frozen[k]) frozen[k] = true; });
+    return { order: order, rows: rows, frozen: frozen };
+  }
+
+  function layoutAdminOk(){ return _layoutAdmin === true; }
+  function layoutEditing(){ return _layoutAdmin === true && _layoutEdit === true; }
+  /* 이 사람이 PC 에서 앱을 «끌어 옮길 수 있는가» — 관리자(권형하)는 편집 단추를 안 눌러도 «바로» 끌린다.
+     (대표 보고 2026-11-08 「마우스로 이동이 안된다」: 처음엔 «배치 편집»을 먼저 켜야 끌리게 했는데, 그걸 모르고 끌면
+      아무 일도 없었다. 예전 「이동 가능」 칩은 바로 끌렸다.) 편집을 켜면 📌 틀 고정·점선 영역·편집 줄이 «더» 보일 뿐이다.
+     ⚠ 폰은 끌기가 없다(목록 창). 관리자가 아니면 언제나 아니오 — 서버 규칙이 한 번 더 막는다. */
+  function layoutCanDrag(){ return _layoutAdmin === true && !isMobile(); }
+
+  /* 화면(DOM) ⇄ 모델 */
+  function layModelFromDom(){
+    var m = { rowIds: [], rows: {}, frozen: {}, tail: {} };
+    tileConts().forEach(function(c){
+      var id = c.dataset.row; if(!id) return;
+      m.rowIds.push(id); m.rows[id] = [];
+      Array.prototype.forEach.call(c.children, function(t){
+        var k = t.dataset && t.dataset.key; if(!k) return;
+        m.rows[id].push(k);
+        if(t.dataset.soonApp === '1') m.tail[k] = true;
+      });
+    });
+    var fz = (_layout && _layout.frozen) || {};
+    Object.keys(fz).forEach(function(k){ if(fz[k]) m.frozen[k] = true; });
+    return m;
+  }
+  function layModelToDom(m){
+    m.rowIds.forEach(function(id){
+      (m.rows[id] || []).forEach(function(k){ var t = origTile(k); if(t) tileCont(id).appendChild(t); });
+    });
+    soonToEnd();
+    hideEmptyRows();
+  }
+
+  function layoutSay(msg, bad){
+    ['layoutSay', 'lpSay'].forEach(function(id){
+      var el = $(id); if(!el) return;
+      el.textContent = msg || '';
+      el.classList.toggle('bad', !!bad);
+    });
+    /* 편집 줄·목록 창이 «안 보일 때»(편집을 안 켠 채 끌었을 때)는 떠 있는 알림으로 알린다 — 조용히 저장되면 모두의 배치가 바뀐 줄 모른다 */
+    var tt = $('layoutToast');
+    if(tt){
+      var pn = $('layoutPanel'), br = $('layoutBar');
+      tt.textContent = msg || '';
+      tt.hidden = !msg || !!(pn && !pn.hidden) || !!(br && !br.hidden);
+      tt.classList.toggle('bad', !!bad);
+    }
+    clearTimeout(_layoutSayT);
+    if(msg) _layoutSayT = setTimeout(function(){ layoutSay(''); }, 6000);
+  }
+  function layoutCacheRead(){
+    try { return layClean(JSON.parse(localStorage.getItem(LAYOUT_CACHE) || 'null')); } catch(e){ return null; }
+  }
+  function layoutCacheSave(L){
+    try { if(L) localStorage.setItem(LAYOUT_CACHE, JSON.stringify(L)); else localStorage.removeItem(LAYOUT_CACHE); } catch(e){}
+  }
+
+  /* 공용 배치를 «서버에 쓴다» — 관리자만. 화면·기기 저장은 먼저(곧바로 보이게), 서버가 거절하면 되돌린다.
+     ⚠ 관리자가 아니면 서버를 «부르지도 않는다» — 직원 화면에서 어떻게든 불려도 쓰기는 안 나간다(규칙이 한 번 더 막는다). */
+  function layoutPublish(next){
+    if(!layoutAdminOk() || !db) return Promise.resolve(false);
+    var rec = { v: 1, order: next.order.slice(), rows: {}, updatedAt: new Date().toISOString() };
+    Object.keys(next.rows).forEach(function(k){ rec.rows[k] = next.rows[k]; });
+    var fk = Object.keys(next.frozen || {}).filter(function(k){ return next.frozen[k]; });
+    if(fk.length){ rec.frozen = {}; fk.forEach(function(k){ rec.frozen[k] = true; }); }
+    var prev = _layout;
+    _layout = layClean(rec);
+    layoutCacheSave(_layout);
+    layoutRowBtnPaint();
+    _layoutWriting++;
+    return db.ref(LAYOUT_PATH).set(rec).then(function(){
+      layoutSay('✔ 저장했습니다 — 모든 직원 화면에 같이 반영됩니다');
+      return true;
+    }).catch(function(e){
+      _layout = prev; layoutCacheSave(prev);
+      layoutRepaint();
+      var denied = !!(e && (e.code === 'PERMISSION_DENIED' || /permission/i.test(String(e.message || ''))));
+      layoutSay('⚠ 저장하지 못했습니다 — ' + (denied ? '관리자(권형하) 계정으로 로그인했는지 확인해 주세요' : '인터넷 연결을 확인하고 다시 해 주세요'), true);
+      return false;
+    }).then(function(ok){ _layoutWriting--; return ok; });
+  }
+  /* 화면을 모델로 보고 «바뀐 것이 있을 때만» 쓴다 */
+  function layoutCommit(model){
+    var next = layBuild(model, _layout);
+    if(_layout && laySig(next) === laySig(_layout)) return Promise.resolve(false);
+    return layoutPublish(next);
+  }
+  /* 모델 바꾸기 결과(layMove·layBulk)를 화면에 반영하고 저장한다 */
+  function layoutApply(r){
+    layModelToDom(r.model);
+    var p = layoutCommit(r.model);
+    layoutRowBtnPaint();
+    var panel = $('layoutPanel'); if(panel && !panel.hidden) lpRender();
+    return p;
+  }
+  function tilesToDefault(){
+    /* ⚠ 타일을 그리는 대목과 «같은 글자»로 시작하지 않게 매개변수 이름을 달리했다 —
+       검사(tests/portal-soon-locked.test.js)가 그 글자로 대목을 찾아 뜬다(STATUS 「이름이 남의 검사 잣대에 걸린다」). */
+    APPS.forEach(function(ap){
+      var t = origTile(ap.key); if(!t) return;
+      tileCont(t.dataset.row || appRowOf(ap)).appendChild(t);
+    });
+  }
+  /* 배치가 바뀐 뒤 다시 맞춘다 — 기본 자리로 한 번 놓고 지금 배치를 얹는다(배치가 «없어진» 경우도 되돌아가게) */
+  function layoutRepaint(){
+    tilesToDefault();
+    applyTileOrder();
+    updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
+    var panel = $('layoutPanel'); if(panel && !panel.hidden) lpRender();
+  }
+  function layoutLoad(){
+    if(!auth.currentUser) return;
+    db.ref(LAYOUT_PATH).once('value').then(function(s){
+      if(_layoutWriting) return;
+      var L = layClean(s.val());
+      if(laySig(L) === laySig(_layout)) return;
+      _layout = L; layoutCacheSave(L); layoutRepaint();
+    }).catch(function(){ /* 못 읽으면 이 기기가 마지막으로 받아 둔 배치 그대로 */ });
+  }
+
+  /* 줄 머리 오른쪽 끝의 «📌 이 줄 고정» — 누르면 그 줄에 지금 있는 앱을 한꺼번에 틀 고정, 전부 고정이면 한꺼번에 풂.
+     ★ 묻지 않는다 — 그냥 한 번 누르면 켜지고, 다시 누르면 풀린다(대표 지시 2026-11-08 「줄고정 관련 팝업 필요없다 그냥클릭으로 푸는거다」).
+       결과는 화면 아래 알림(layoutSay)으로만 알린다. 안 그려진 앱(권한 밖·지금 안 씀)은 건드리지 않는다. */
+  function layoutRowFreezeToggle(rowId){
+    if(!layoutAdminOk()) return;
+    var m = layModelFromDom(), keys = (m.rows && m.rows[rowId]) || [];
+    if(!keys.length){ layoutSay('· 이 줄에는 앱이 없습니다', true); return; }
+    var all = keys.every(function(k){ return m.frozen[k]; });
+    var r = layBulk(m, keys, all ? 'unfreeze' : 'freeze');
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    var label = lpRowLabel(rowId);
+    layoutApply(r);
+    layoutSay(all ? ('✔ 「' + label + '」 줄의 틀 고정을 풀었습니다') : ('✔ 「' + label + '」 줄 ' + r.moved + '개를 틀 고정했습니다 — 줄 밖으로 못 나갑니다 (모든 직원 화면에 반영)'));
+  }
+  /* 줄 머리 단추를 지금 형편에 맞춘다 — 끌 수 있는 관리자 화면에서, 앱이 있는 줄에만 보인다 */
+  function layoutRowBtnPaint(){
+    var host = $('appRows'); if(!host || !host.querySelectorAll) return;
+    var show = layoutCanDrag(), m = show ? layModelFromDom() : null;
+    Array.prototype.forEach.call(host.querySelectorAll('[data-row-freeze]'), function(b){
+      var keys = (m && m.rows && m.rows[b.dataset.rowFreeze]) || [];
+      var all = keys.length > 0 && keys.every(function(k){ return m.frozen[k]; });
+      var some = keys.some(function(k){ return m.frozen[k]; });
+      var vis = show && keys.length > 0;
+      if(b.hidden === vis) b.hidden = !vis;
+      var txt = all ? '📌 줄 고정 중 · 풀기' : (some ? '📌 이 줄 모두 고정' : '📌 이 줄 고정');
+      if(b.textContent !== txt) b.textContent = txt;
+      b.classList.toggle('on', all);
+      var say = all ? '이 줄의 앱이 모두 틀 고정입니다 — 눌러서 모두 풀기' : '눌러서 이 줄의 앱을 모두 틀 고정 — 줄 밖으로 못 나가고 줄 안 순서만 바꿀 수 있습니다';
+      if(b.title !== say){ b.title = say; b.setAttribute('aria-label', say); }
+      var pr = all ? 'true' : 'false';
+      if(b.getAttribute('aria-pressed') !== pr) b.setAttribute('aria-pressed', pr);
+    });
+  }
+  function layoutResetDefault(){
+    if(!layoutAdminOk()) return;
+    if(!confirm('모든 앱을 처음 자리(기본 배치)로 되돌립니다.\n📌 틀 고정도 모두 풀립니다.\n모든 직원 화면에 같이 반영됩니다. 계속할까요?')) return;
+    layoutPublish(layoutDefault());
+    layoutRepaint();
+  }
+  /* 편집 줄·단추를 지금 형편에 맞춘다 — 직원 화면은 «전부 감춘 채» 둔다 */
+  function layoutUiPaint(){
+    var admin = layoutAdminOk(), edit = layoutEditing(), pc = !isMobile();
+    var b = $('layoutEditBtn');
+    if(b){
+      b.hidden = !(admin && pc);
+      b.textContent = edit ? '✅ 편집 끝내기' : '✏️ 배치 편집';
+      b.classList.toggle('editing', edit);
+      b.setAttribute('aria-pressed', edit ? 'true' : 'false');
+      b.setAttribute('aria-label', edit ? '앱 배치 편집 끝내기' : '앱 배치 편집 시작');
+      b.title = edit ? '눌러서 편집 도구(점선·편집 줄)를 끕니다'
+        : '앱은 마우스로 «바로» 끌어 옮길 수 있습니다 (관리자만 · 바꾸면 모든 직원 화면에 같이 반영). 줄 오른쪽 끝의 «📌 이 줄 고정»을 누르면 그 줄 앱이 줄 밖으로 못 나갑니다(다시 누르면 풀림). 눌러서 점선 영역·목록 편집을 켭니다';
+    }
+    var bar = $('layoutBar'); if(bar) bar.hidden = !(admin && pc && edit);
+    var me = $('meLayout'); if(me) me.hidden = !admin;
+    if(document.body) document.body.classList.toggle('lay-editing', edit);
+  }
+  /* 칩(PC)을 누르면 편집을 켜고 끈다. 폰은 끌 수 없어 «목록 창»을 바로 연다. */
+  function layoutEditToggle(){
+    if(!layoutAdminOk()) return;
+    if(isMobile()){ layoutPanelOpen(); return; }
+    _layoutEdit = !_layoutEdit;
+    layoutSay('');
+    updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
+  }
+
+  /* ── 📋 목록 창 — 영역별 목록. ☐ 고르기 · № · 이름 · 📌 · ▲▼ · 영역 (모든 줄이 «같은 길»(layMove)로 바뀐다) ── */
+  function lpEsc(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function lpApp(key){
+    /* ⚠ APPS 는 중간에 «쉼표만 있는 자리»가 하나 있어 빈 칸(undefined)이 낀다 — forEach 는 건너뛰지만 for 는 걸린다 */
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i] && APPS[i].key === key) return APPS[i]; }
+    return null;
+  }
+  function lpRowLabel(id){
+    for(var i = 0; i < APP_ROWS.length; i++){ if(APP_ROWS[i].id === id) return APP_ROWS[i].label; }
+    return id;
+  }
+  function lpPicked(m){      // 지금 목록 순서대로 고른 앱
+    var out = [];
+    m.rowIds.forEach(function(id){ m.rows[id].forEach(function(k){ if(_lpSel[k]) out.push(k); }); });
+    return out;
+  }
+  function lpRender(){
+    var body = $('lpBody'); if(!body) return;
+    var m = layModelFromDom(), html = [], keep = null, ae = document.activeElement;
+    if(ae && ae.dataset && ae.dataset.act && body.contains(ae)) keep = '[data-act="' + ae.dataset.act + '"][data-key="' + ae.dataset.key + '"]';
+    var scroll = body.scrollTop;
+    var opts = m.rowIds.map(function(rid){ return { id: rid, label: lpRowLabel(rid) }; });
+    m.rowIds.forEach(function(id){
+      var label = lpRowLabel(id), list = m.rows[id];
+      var allOn = list.length > 0 && list.every(function(k){ return _lpSel[k]; });
+      html.push('<section class="lp-area" aria-label="' + lpEsc(label) + '">'
+        + '<div class="lp-ah"><label class="lp-ckc"><input type="checkbox" data-area="' + id + '"' + (allOn ? ' checked' : '')
+        + ' aria-label="' + lpEsc(label) + ' 전체 고르기"></label>'
+        + '<span class="lp-an">' + lpEsc(label) + '</span><span class="lp-ac">' + list.length + '개</span></div>');
+      list.forEach(function(k, i){
+        var a = lpApp(k) || { name: k, icon: '' }, frz = !!m.frozen[k], soon = !!m.tail[k];
+        var canUp = layMove(m, k, 'up').ok, canDn = layMove(m, k, 'down').ok;
+        var nm = lpEsc(a.name);
+        html.push('<div class="lp-row" data-key="' + lpEsc(k) + '">'
+          + '<label class="lp-ckc"><input type="checkbox" class="lp-ck" data-key="' + lpEsc(k) + '"' + (_lpSel[k] ? ' checked' : '') + ' aria-label="' + nm + ' 고르기"></label>'
+          + '<span class="lp-no">' + (i + 1) + '</span>'
+          + '<span class="lp-ic" aria-hidden="true">' + (a.icon || '') + '</span>'
+          + '<span class="lp-nm" title="' + nm + (a.desc ? ' — ' + lpEsc(a.desc) : '') + '">' + nm + '</span>'
+          + (soon ? '<span class="lp-soon">준비중</span>' : '')
+          + '<span class="lp-ctl">'
+          + '<button type="button" class="lp-b' + (frz ? ' on' : '') + '" data-act="frz" data-key="' + lpEsc(k) + '" aria-pressed="' + (frz ? 'true' : 'false') + '"'
+          + ' title="' + (frz ? '틀 고정 중 — 이 영역 안에서만 움직입니다 (누르면 풀기)' : '틀 고정 — 누르면 이 영역 안에서만 움직입니다') + '"'
+          + ' aria-label="' + nm + (frz ? ' 틀 고정 풀기' : ' 틀 고정') + '">📌</button>'
+          + '<button type="button" class="lp-b" data-act="up" data-key="' + lpEsc(k) + '" title="위로" aria-label="' + nm + ' 위로"' + (canUp ? '' : ' disabled') + '>▲</button>'
+          + '<button type="button" class="lp-b" data-act="down" data-key="' + lpEsc(k) + '" title="아래로" aria-label="' + nm + ' 아래로"' + (canDn ? '' : ' disabled') + '>▼</button>'
+          + '<select class="lp-sel" data-act="row" data-key="' + lpEsc(k) + '" aria-label="' + nm + ' 영역 옮기기"'
+          + (frz ? ' disabled title="틀 고정한 앱은 다른 영역으로 못 갑니다 — 📌 를 눌러 풀어 주세요"' : ' title="다른 영역으로 옮기기"') + '>'
+          + opts.map(function(o){ return '<option value="' + o.id + '"' + (o.id === id ? ' selected' : '') + '>' + lpEsc(o.label) + '</option>'; }).join('')
+          + '</select></span></div>');
+      });
+      html.push('</section>');
+    });
+    body.innerHTML = html.join('');
+    body.scrollTop = scroll;
+    if(keep){ var again = body.querySelector(keep); if(again && !again.disabled) try { again.focus(); } catch(e){} }
+    /* 고른 건수 띠 — 고르기만으로는 아무것도 안 바뀐다. 「N건 선택」과 할 일을 띄운다. */
+    var picked = lpPicked(m), bar = $('lpSelBar');
+    if(bar){
+      bar.hidden = picked.length === 0;
+      var n = $('lpSelN'); if(n) n.textContent = picked.length + '건 선택';
+      var sel = $('lpBulkRow');
+      if(sel){
+        sel.innerHTML = '<option value="">보낼 영역 고르기…</option>'
+          + opts.map(function(o){ return '<option value="' + o.id + '">' + lpEsc(o.label) + '</option>'; }).join('');
+        sel.value = _lpBulkRow; if(sel.value !== _lpBulkRow) sel.value = '';
+      }
+    }
+  }
+  function lpBodyClick(e){
+    var b = e.target.closest && e.target.closest('button[data-act]');
+    if(!b || b.disabled || !layoutAdminOk()) return;
+    var key = b.dataset.key, act = b.dataset.act, m = layModelFromDom();
+    var r = layMove(m, key, act === 'frz' ? (m.frozen[key] ? 'unfreeze' : 'freeze') : act);
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    layoutApply(r);
+  }
+  function lpBodyChange(e){
+    var t = e.target; if(!t || !layoutAdminOk()) return;
+    if(t.matches && t.matches('select[data-act="row"]')){
+      var r = layMove(layModelFromDom(), t.dataset.key, 'row', t.value);
+      if(!r.ok){ layoutSay('· ' + r.why, true); lpRender(); return; }   // 안 되면 고르개를 제자리로
+      layoutApply(r);
+      layoutSay('✔ ' + (lpApp(t.dataset.key) || { name: t.dataset.key }).name + ' → ' + lpRowLabel(t.value) + ' (모든 직원 화면에 반영)');
+      return;
+    }
+    if(t.classList && t.classList.contains('lp-ck')){
+      if(t.checked) _lpSel[t.dataset.key] = true; else delete _lpSel[t.dataset.key];
+      lpRender(); return;
+    }
+    if(t.dataset && t.dataset.area){
+      var m = layModelFromDom();
+      (m.rows[t.dataset.area] || []).forEach(function(k){ if(t.checked) _lpSel[k] = true; else delete _lpSel[k]; });
+      lpRender();
+    }
+  }
+  /* 여럿 한꺼번에 — 먼저 «미리 돌려» 건수를 묻고, 확인하면 한 번에 저장한다(반쯤 하다 멈추지 않게) */
+  function lpBulk(how){
+    if(!layoutAdminOk()) return;
+    var m = layModelFromDom(), keys = lpPicked(m);
+    if(!keys.length) return;
+    var arg = '';
+    if(how === 'row'){
+      arg = ($('lpBulkRow') || {}).value || '';
+      if(!arg){ layoutSay('· 보낼 영역을 먼저 골라 주세요', true); return; }
+    }
+    var r = layBulk(m, keys, how, arg);
+    if(!r.ok){ layoutSay('· ' + r.why, true); return; }
+    var what = how === 'row' ? ('「' + lpRowLabel(arg) + '」로 보냅니다') : (how === 'freeze' ? '📌 틀 고정합니다' : '📌 틀 고정을 풉니다');
+    var msg = '고른 ' + keys.length + '개 중 ' + r.moved + '개를 ' + what + '.'
+      + (r.frozenSkip ? '\n(📌 틀 고정한 ' + r.frozenSkip + '개는 옮기지 않습니다)' : '')
+      + (r.noop ? '\n(이미 그 상태인 ' + r.noop + '개는 그대로 둡니다)' : '')
+      + '\n모든 직원 화면에 같이 반영됩니다. 계속할까요?';
+    if(!confirm(msg)) return;
+    _lpSel = {};
+    layoutApply(r);
+    layoutSay('✔ ' + r.moved + '개를 바꿨습니다 (모든 직원 화면에 반영)');
+  }
+  function layoutPanelOpen(){
+    if(!layoutAdminOk()) return;
+    var p = $('layoutPanel'); if(!p) return;
+    _lpSel = {}; _lpBulkRow = '';
+    _lpLast = document.activeElement;
+    layoutSay('');
+    p.hidden = false;
+    lpRender();
+    var x = $('lpClose'); if(x) x.focus();
+  }
+  function layoutPanelClose(){
+    var p = $('layoutPanel'); if(!p || p.hidden) return;
+    p.hidden = true;
+    _lpSel = {};         // 고른 것은 화면을 떠나면 비운다
+    if(_lpLast && _lpLast.focus){ try { _lpLast.focus(); } catch(e){} }
+    _lpLast = null;
+  }
+  /* 단추·창 연결 — 한 번만. 고정된 마크업(id)에만 붙인다. */
+  function layoutWire(){
+    if(_layoutWired) return;
+    _layoutWired = true;
+    var on = function(id, ev, fn){ var el = $(id); if(el) el.addEventListener(ev, fn); };
+    on('layoutEditBtn', 'click', layoutEditToggle);
+    on('layoutDoneBtn', 'click', layoutEditToggle);
+    on('layoutListBtn', 'click', layoutPanelOpen);
+    on('layoutResetBtn', 'click', layoutResetDefault);
+    on('lpReset', 'click', layoutResetDefault);
+    on('meLayout', 'click', layoutPanelOpen);
+    on('lpClose', 'click', layoutPanelClose);
+    on('lpBody', 'click', lpBodyClick);
+    on('lpBody', 'change', lpBodyChange);
+    on('lpBulkRow', 'change', function(){ _lpBulkRow = this.value; });
+    on('lpBulkMove', 'click', function(){ lpBulk('row'); });
+    on('lpBulkFreeze', 'click', function(){ lpBulk('freeze'); });
+    on('lpBulkUnfreeze', 'click', function(){ lpBulk('unfreeze'); });
+    on('lpBulkClear', 'click', function(){ _lpSel = {}; lpRender(); });
+    on('appRows', 'click', function(e){
+      var b = e.target.closest && e.target.closest('[data-row-freeze]'); if(!b) return;
+      e.preventDefault(); e.stopPropagation();
+      layoutRowFreezeToggle(b.dataset.rowFreeze);
+    });
+    var ov = $('layoutPanel');
+    if(ov){
+      ov.addEventListener('mousedown', function(e){ if(e.target === ov) layoutPanelClose(); });
+      /* Tab 이 창 밖으로 새지 않게 — 창 안에서만 돈다 */
+      ov.addEventListener('keydown', function(e){
+        if(e.key !== 'Tab') return;
+        var f = Array.prototype.filter.call(ov.querySelectorAll('button, select, input'), function(x){ return !x.disabled && x.offsetParent !== null; });
+        if(!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    document.addEventListener('keydown', function(e){
+      var p = $('layoutPanel');
+      if(e.key === 'Escape' && p && !p.hidden){ e.preventDefault(); layoutPanelClose(); }
+    });
+  }
+
   function tilePrefLocalKey(){ return 'pu_portal_tiles_uid_' + ((auth.currentUser && auth.currentUser.uid) || '_'); }
   function tilePrefLegacyLocalKey(){ return 'pu_portal_tiles_' + sgEmailKey((auth.currentUser && auth.currentUser.email) || ''); }
   function tilePrefPath(){ return 'data/portal_prefs_uid/' + ((auth.currentUser && auth.currentUser.uid) || '_'); }
@@ -4295,53 +5298,54 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
   function applyTileOrder(){
-    if(!tilePrefs.order || !tilePrefs.order.length){ soonToEnd(); return; }
+    /* ★ 관리자가 저장한 «공용 배치»(_layout)가 있으면 모두 그것을 따른다(2026-11-08). 없을 때만 옛 개인 저장값. */
+    var L = _layout;
+    var order = L ? L.order : tilePrefs.order;
+    if(!order || !order.length){ soonToEnd(); return; }
     var all = allTiles();
     var byKey = {};
     all.forEach(function(t){ byKey[t.dataset.key] = t; });
     var seq = [];
-    tilePrefs.order.forEach(function(k){ if(byKey[k]){ seq.push(byKey[k]); delete byKey[k]; } });
+    order.forEach(function(k){ if(byKey[k]){ seq.push(byKey[k]); delete byKey[k]; } });
     all.forEach(function(t){ if(byKey[t.dataset.key] === t) seq.push(t); });  // 저장에 없던 새 타일
     // 저장된 순서대로 다시 담되, 각 타일은 자기 줄 상자로 보낸다.
-    // (관리자가 줄 사이 이동을 허용해 옮겨 둔 것은 저장된 줄을 따른다)
     seq.forEach(function(t){
       /* 사람이 옮겨 둔 자리를 쓰되, 지금 없는 줄 이름이면 앱의 제자리로 보낸다.
-         (옛 「support/direct」 가 저장돼 있는 사람이 있다 — 2026-08-29 에 줄이 바뀌었다) */
-      var row = savedRowOf(t.dataset.key, t.dataset.row);
+         (옛 「support/direct」 가 저장돼 있는 사람이 있다 — 2026-08-29 에 줄이 바뀌었다)
+         공용 배치의 줄은 관리자가 «일부러 둔 자리»라 옛 줄 되돌림(ROW_MOVED_FROM)을 타지 않는다. */
+      var row = L ? layRowOf(L, t.dataset.key, t.dataset.row) : savedRowOf(t.dataset.key, t.dataset.row);
       tileCont(row).appendChild(t);
     });
     soonToEnd();
   }
   function persistOrderFromDom(){
     soonToEnd();   /* 끌어 옮긴 뒤에도 준비중은 오른쪽 끝 — 그 자리를 저장한다 */
-    var order = [], rows = {};
-    tileConts().forEach(function(c){
-      /* 옛 기본값 support 는 이제 없는 줄이다 — 첫 줄로 되돌린다. */
-      var row = c.dataset.row || (APP_ROWS[0] ? APP_ROWS[0].id : '');
-      Array.prototype.forEach.call(c.children, function(t){
-        var k = t.dataset.key || ''; if(!k) return;
-        order.push(k); rows[k] = row;
-      });
-    });
-    tilePrefs.order = order;
-    tilePrefs.rows = rows;      // 어느 줄에 뒀는지도 함께 기억
-    saveTilePrefs();
+    /* ★ 공용 배치는 «끌 수 있는 관리자»만 쓴다(2026-11-08). 직원의 끌기는 ★ 줄에 넣는 일뿐이라 배치는 안 바뀐다.
+       예전에는 여기서 사람마다 자기 순서(tilePrefs.order·rows)를 저장했다 — 그 저장은 걷었다. */
+    if(!layoutCanDrag()){ _dragBefore = null; return; }
+    var m = layModelFromDom();
+    /* 끌었는데 «제자리에 놓았다»면 쓰지 않는다 — 아직 공용 배치가 없을 때 아무것도 안 옮겼는데 내 화면 순서가 모두에게 퍼지면 안 된다 */
+    if(_dragBefore !== null){
+      var same = laySig(layBuild(m, _layout)) === _dragBefore;
+      _dragBefore = null;
+      if(same) return;
+    }
+    layoutCommit(m);
   }
   function updateLockUi(){
-    var b = $('tileLockBtn');
-    b.textContent = tilePrefs.locked ? '🔒 고정됨' : '🔓 이동 가능';
-    b.classList.toggle('locked', tilePrefs.locked);
-    b.setAttribute('aria-pressed', tilePrefs.locked ? 'true' : 'false');
-    b.setAttribute('aria-label', tilePrefs.locked ? '타일 순서 고정 해제' : '타일 순서 고정');
-    b.title = tilePrefs.locked ? '눌러서 순서 고정 풀기'
-      : '마우스로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다 (같은 줄 안에서) — 눌러서 고정';
-    allTiles().forEach(function(t){ t.draggable = !tilePrefs.locked; });
+    layoutUiPaint();       // 편집 단추·줄·내 메뉴 항목 — 직원은 전부 감춘 채
+    layoutRowBtnPaint();   // 줄 머리 오른쪽 끝의 «📌 이 줄 고정» — 관리자 PC 에만, 고정 상태를 칠한다
+    /* 앱은 PC 에서 «누구나» 끌 수 있다 — 직원은 ★ 줄에 넣으려고(배치는 안 바뀐다), 관리자는 배치 편집 중에 옮기려고 */
+    allTiles().forEach(function(t){ t.draggable = !isMobile(); });
+    hideEmptyRows();
   }
 
   var _dragEl = null, _tileDragWired = false;
   function onTileDragStart(e){
-    if(tilePrefs.locked){ e.preventDefault(); return; }
     _dragEl = this;
+    _dragWarned = false;
+    /* 끌기 시작할 때의 배치 지문 — 끝났을 때 달라졌는지 본다(persistOrderFromDom) */
+    _dragBefore = layoutCanDrag() ? laySig(layBuild(layModelFromDom(), _layout)) : null;
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', this.dataset.key || ''); } catch(_){}
@@ -4351,18 +5355,32 @@ body.portal-mode #moreFab{display:flex;}
     if(_dragEl){ _dragEl = null; persistOrderFromDom(); }
   }
   function onTileDragOver(e){
-    if(!_dragEl) return;
+    /* 끌 수 있는 관리자만 앱 사이로 옮긴다. 직원의 끌기는 여기서 «아무것도 안 한다»(★ 줄 쪽이 따로 받는다) */
+    if(!_dragEl || !layoutCanDrag()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    // 옮길 수 있는 범위: 기본은 자기 줄 안에서만. 관리자가 허용하면 두 줄 모두.
+    // 옮길 수 있는 범위: 📌 틀 고정한 앱은 «자기 영역 안에서만», 아니면 모든 영역.
     var own = _dragEl.parentNode;
-    if(!tileCrossOk() && own){
-      // 커서가 자기 줄 밖이면 아무것도 하지 않는다.
-      // (이 가드가 없으면 아래 줄로 끌 때 제 줄 맨 끝으로 튀어 엉뚱하게 순서가 바뀐다)
+    var frozen = layIsFrozen(_layout, _dragEl.dataset.key);
+    if(frozen && own){
+      // 커서가 자기 영역 밖이면 아무것도 하지 않는다 — 틀 고정은 영역을 못 벗어난다.
+      // (이 가드가 없으면 다른 영역으로 끌 때 제 영역 맨 끝으로 튀어 엉뚱하게 순서가 바뀐다)
       var orr = own.getBoundingClientRect(), pad = 12;
-      if(e.clientY < orr.top - pad || e.clientY > orr.bottom + pad) return;
+      if(e.clientY < orr.top - pad || e.clientY > orr.bottom + pad){
+        if(!_dragWarned){ _dragWarned = true; layoutSay('📌 틀 고정한 앱은 이 영역 밖으로 옮길 수 없습니다 — 📌 를 눌러 풀면 됩니다', true); }
+        return;
+      }
     }
-    var conts = tileCrossOk() ? tileConts() : [own].filter(Boolean);
+    var conts = frozen ? [own].filter(Boolean) : tileConts();
+    // 빈 영역으로 끌어올 때: 커서가 그 상자 안이면 그냥 담는다(다른 앱이 하나도 없는 영역)
+    var emptyHit = null;
+    conts.forEach(function(cont){
+      var others = Array.prototype.filter.call(cont.children, function(c){ return c !== _dragEl; });
+      if(others.length || emptyHit) return;
+      var r = cont.getBoundingClientRect();
+      if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) emptyHit = cont;
+    });
+    if(emptyHit){ if(_dragEl.parentNode !== emptyHit) emptyHit.appendChild(_dragEl); return; }
     var target = null, before = true, dist = Infinity, hitCont = null;
     conts.forEach(function(cont){
       Array.prototype.forEach.call(cont.children, function(c){
@@ -4373,24 +5391,13 @@ body.portal-mode #moreFab{display:flex;}
         if(d < dist){ dist = d; target = c; hitCont = cont; before = (Math.abs(dy) > r.height/2) ? (dy < 0) : (dx < 0); }
       });
     });
-    // 빈 줄로 끌어올 때: 커서가 그 상자 안이면 그냥 담는다
-    if(tileCrossOk() && !target){
-      conts.forEach(function(cont){
-        if(cont.children.length) return;
-        var r = cont.getBoundingClientRect();
-        if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
-          cont.appendChild(_dragEl);
-        }
-      });
-      return;
-    }
     if(target && target !== _dragEl && hitCont){
       hitCont.insertBefore(_dragEl, before ? target : target.nextSibling);
     }
   }
 
   function onTileKeyDown(e){
-    if(tilePrefs.locked || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if(!layoutCanDrag() || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
     // 키보드 이동은 자기 줄 안에서만 (끝에 닿으면 더 안 간다)
     var cont = this.parentNode;
     var target = e.key === 'ArrowLeft' ? this.previousElementSibling : this.nextElementSibling;
@@ -4403,9 +5410,8 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   function initTileOrder(){
-    var btn = $('tileLockBtn');
-    // 모바일: HTML5 드래그 미지원 → 버튼·힌트 숨김, 저장된 순서만 적용
-    if(isMobile()){ btn.style.display = 'none'; $('tileHint').style.display = 'none'; }
+    layoutWire();   // 배치 편집 단추·목록 창 연결(한 번만) — 관리자가 아니면 단추가 안 켜진다
+    // 모바일: HTML5 드래그 미지원 → 끌기 배선은 건너뛰고(편집은 내 메뉴 › 목록 창), 저장된 배치만 적용
     // 1) 로컬 캐시로 즉시 적용 (깜빡임 없이) — 캐시 없으면 기본값으로 리셋(이전 사용자 설정 잔존 방지)
     try {
       var rawPref = localStorage.getItem(tilePrefLocalKey());
@@ -4415,10 +5421,13 @@ body.portal-mode #moreFab{display:flex;}
       }
       tilePrefs = tilePrefsFrom(JSON.parse(rawPref || 'null'));
     } catch(e){}
+    _layout = layoutCacheRead();   // 관리자가 저장한 공용 배치(이 기기에 마지막으로 받아 둔 것) — 곧바로 그린다
     applyTileOrder();
+    updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
     if(!isMobile()){
-      updateLockUi();
-      // 2) 드래그 배선 (컨테이너 이벤트는 1회만) — 두 줄 상자 모두
+      // 2) 드래그 배선 (컨테이너 이벤트는 1회만) — 영역 상자 모두
+      //    ⚠ 직원 화면에도 배선한다 — 앱을 끌어 ★ 자주 쓰는 앱 줄에 넣는 길이 이것을 쓴다. 배치는 onTileDragOver 가 관리자 편집 중에만 바꾼다.
       allTiles().forEach(function(t){
         t.addEventListener('dragstart', onTileDragStart);
         t.addEventListener('dragend', onTileDragEnd);
@@ -4430,14 +5439,10 @@ body.portal-mode #moreFab{display:flex;}
           c.addEventListener('dragover', onTileDragOver);
           c.addEventListener('drop', function(e){ e.preventDefault(); });
         });
-        btn.addEventListener('click', function(){
-          tilePrefs.locked = !tilePrefs.locked;
-          saveTilePrefs();
-          updateLockUi();
-        });
       }
     }
-    // 3) 서버 저장분과 동기화 (다른 기기에서 바꾼 순서 반영)
+    layoutLoad();   // 서버의 공용 배치와 맞춘다(다른 기기·다른 사람이 바꾼 것)
+    // 3) 서버 저장분과 동기화 (다른 기기에서 바꾼 개인 설정 — 별표·접힘)
     if(auth.currentUser){
       db.ref(tilePrefPath()).once('value').then(function(s){
         var p = s.val();
@@ -4454,7 +5459,8 @@ body.portal-mode #moreFab{display:flex;}
           tilePrefs = tilePrefsFrom(p);
           try { localStorage.setItem(tilePrefLocalKey(), JSON.stringify(tilePrefs)); } catch(e){}
           applyTileOrder();
-          if(!isMobile()) updateLockUi();
+          updateLockUi();
+    if(typeof refreshFoldUi === 'function') refreshFoldUi();
           refreshFoldUi();   // 다른 기기에서 고른 별표·접힘도 곧바로
         }
       }).catch(function(){});
@@ -4575,7 +5581,7 @@ body.portal-mode #moreFab{display:flex;}
       c.removeAttribute('data-key');
       c.removeAttribute('id');
       c.removeAttribute('target');
-      c.draggable = !tilePrefs.locked && !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기
+      c.draggable = !isMobile();   // 자주 쓰는 앱 줄 «안에서» 순서 바꾸기 (예전 「고정됨」 잠금은 걷었다 — 개인 ★ 순서는 늘 바꿀 수 있다)
       c.classList.remove('dragging', 'tile-soon-first');
       Array.prototype.forEach.call(c.querySelectorAll('[id]'), function(n){ n.removeAttribute('id'); });
       c.dataset.pinOf = orig.dataset.key;
@@ -4702,7 +5708,7 @@ body.portal-mode #moreFab{display:flex;}
       var pt = $('pinTiles');
       pt.addEventListener('click', onPinCloneClick);
       pt.addEventListener('keydown', function(e){
-        if((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pin-star')) onPinCloneClick(e);
+        if((e.key === 'Enter' || e.key === ' ') && e.target.classList && (e.target.classList.contains('pin-star') || e.target.classList.contains('tile-alert'))) onPinCloneClick(e);   // 딱지(요청 N)도 — 복제본 딱지는 리스너가 없다
       });
       $('foldAllBtn').addEventListener('click', foldAllToggle);
       /* 폰: 앱을 «꾹 누르면» 자주 쓰는 앱 넣기·빼기 (대표 2026-10-24 「꾹 눌렀을 때 그냥 별표가 되는 게 더 눈에 잘 띌 것」).
@@ -4711,7 +5717,7 @@ body.portal-mode #moreFab{display:flex;}
            — PC 오른쪽 단추 메뉴는 그대로 둔다. 밀어 내리는 중(10px 넘게 움직임)이면 꾹 누르기가 아니다. */
       var lpTile = function(e){
         var t = e.target && e.target.closest ? e.target.closest('.tile') : null;
-        return (t && host.contains(t) && t.dataset.key && t.getAttribute('aria-disabled') !== 'true') ? t : null;
+        return (t && (host.contains(t) || pt.contains(t)) && (t.dataset.key || t.dataset.pinOf) && t.getAttribute('aria-disabled') !== 'true') ? t : null;
       };
       var lpStop = function(){ if(_lp){ clearTimeout(_lp.timer); _lp = null; } };
       host.addEventListener('touchstart', function(e){
@@ -4720,7 +5726,7 @@ body.portal-mode #moreFab{display:flex;}
         me.timer = setTimeout(function(){
           if(_lp !== me) return;
           me.fired = true; _lpAt = Date.now();
-          togglePin(t.dataset.key);
+          togglePin(t.dataset.key || t.dataset.pinOf);
           try { if(navigator.vibrate) navigator.vibrate(25); } catch(_v){}
         }, LONG_MS);
         _lp = me;
@@ -4736,6 +5742,30 @@ body.portal-mode #moreFab{display:flex;}
         if(Date.now() - _lpAt < 800 && lpTile(e)){ e.preventDefault(); e.stopPropagation(); }
       }, true);
       host.addEventListener('contextmenu', function(e){
+        if(lpTile(e) && (_lp || Date.now() - _lpAt < 800)) e.preventDefault();
+      });
+      pt.addEventListener('touchstart', function(e){
+        var t = lpTile(e); if(!t || e.touches.length !== 1) return;
+        var p = e.touches[0], me = { x: p.clientX, y: p.clientY, fired: false };
+        me.timer = setTimeout(function(){
+          if(_lp !== me) return;
+          me.fired = true; _lpAt = Date.now();
+          togglePin(t.dataset.key || t.dataset.pinOf);
+          try { if(navigator.vibrate) navigator.vibrate(25); } catch(_v){}
+        }, LONG_MS);
+        _lp = me;
+      }, { passive: true });
+      pt.addEventListener('touchmove', function(e){
+        if(!_lp || _lp.fired) return;
+        var p = e.touches[0];
+        if(Math.abs(p.clientX - _lp.x) > 10 || Math.abs(p.clientY - _lp.y) > 10) lpStop();
+      }, { passive: true });
+      pt.addEventListener('touchend', function(e){ if(_lp && _lp.fired) e.preventDefault(); lpStop(); });
+      pt.addEventListener('touchcancel', lpStop);
+      pt.addEventListener('click', function(e){
+        if(Date.now() - _lpAt < 800 && lpTile(e)){ e.preventDefault(); e.stopPropagation(); }
+      }, true);
+      pt.addEventListener('contextmenu', function(e){
         if(lpTile(e) && (_lp || Date.now() - _lpAt < 800)) e.preventDefault();
       });
       /* 끌어 올리기 — 줄 안의 진짜 타일(접힌 칩도 같은 타일)을 끌어 «자주 쓰는 앱» 줄에 놓으면 그 자리에 들어간다.
@@ -4771,7 +5801,7 @@ body.portal-mode #moreFab{display:flex;}
       });
       pt.addEventListener('dragstart', function(e){
         var c = e.target.closest && e.target.closest('[data-pin-of]');
-        if(!c || tilePrefs.locked){ e.preventDefault(); return; }
+        if(!c){ e.preventDefault(); return; }
         _pinDrag = c;
         c.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
@@ -4824,17 +5854,30 @@ body.portal-mode #moreFab{display:flex;}
      그 시각을 보고 스스로 끊는다(js/pu-authsync.js). 포털은 authsync 를 안 싣으므로 같은 열쇠를 직접 적는다.
      ⚠ 열쇠 이름은 pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다 — tests/authsync-global-logout.test.js 가 견준다. */
   function broadcastLogout(){
+    try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
     try {
       localStorage.setItem('pu_auth_logout_at', String(Date.now()));
       localStorage.removeItem('pu_auth_uid');
       localStorage.removeItem('pureun_v6_autologin_sid');
       sessionStorage.removeItem('pureun_v6_session_sid');
+      localStorage.removeItem('pu_portal_fast_acct');
+      sessionStorage.removeItem('pu_portal_fast_acct');
+      localStorage.removeItem('pu_sid_guard_known');
+      sessionStorage.removeItem('pu_open_camera');
+      sessionStorage.removeItem('pu_return_app');
     } catch(e){}
+    try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
+    try {
+      if(window.indexedDB && indexedDB.deleteDatabase){
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+      }
+    } catch(_idb){}
   }
   $('logoutBtn').addEventListener('click', function(){
     try { window.PuLogoutWhy && PuLogoutWhy.why('로그아웃 단추 누름'); } catch(_w){}
     /* 같은 탭에서 다시 로그인하면 반드시 포털 선택 화면에 머문다. */
     stopPortalHanaAlerts();
+    stopPortalMrAlerts();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
     broadcastLogout();
     kkLogoutFlow();
@@ -4951,6 +5994,8 @@ body.portal-mode #moreFab{display:flex;}
     SG.email = (auth.currentUser && auth.currentUser.email) || '';
     SG.role = acct ? acct.role : 'member';
     $('sgFab').style.display = 'inline-flex';
+    if($('chatFab')) $('chatFab').style.display = 'inline-flex';
+    chatImpStartWatch();  // 길잡이 채팅방 내 개선요청 실시간 상태·결과 답변·승인 동기화
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
     sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
@@ -4985,7 +6030,7 @@ body.portal-mode #moreFab{display:flex;}
   var CFG_PATH = 'data/app_config';
   /* ⚠ Gemini 키 칸은 뺐다(2026-11-05 「유료 API 통제」) — 판독이 유료 등급이고 이 자리는 직원 모두가 읽는다.
      열쇠는 서버 금고(GEMINI_KEY)에만 둔다. 저장은 set(통째로 바꾸기)이라, 다음에 저장하면 옛 값도 함께 지워진다. */
-  var CFG_FIELDS = [['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes'], ['cfgTileCross','tileCrossRow']];
+  var CFG_FIELDS = [['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes']];
 
   function cfgShowFab(){
     var b = $('cfgFab'), admin = sgIsAdmin();
@@ -5074,7 +6119,14 @@ body.portal-mode #moreFab{display:flex;}
     }
     rec.extra = ex.obj;
     $('cfgSave').disabled = true; $('cfgStat').textContent = '저장 중…';
-    db.ref(CFG_PATH).set(rec).then(function(){
+    /* ⚠★ 이 자리(data/app_config)는 «통째로» 바꾼다(set). 포털 앱 배치(portalLayout, 2026-11-08)도 같은 자리에 있어
+       저장 때 다시 얹지 않으면 이 창에서 키 하나만 고쳐도 모든 직원의 배치가 지워진다.
+       배치를 못 읽으면 «저장하지 않는다» — 모르는 채로 덮어쓰면 지워지기 때문이다. */
+    db.ref(LAYOUT_PATH).once('value').then(function(snap){
+      var keep = snap.val();
+      if(keep) rec.portalLayout = keep;
+      return db.ref(CFG_PATH).set(rec);
+    }).then(function(){
       $('cfgStat').textContent = '저장됐습니다 — 각 프로그램에서 새로고침하면 반영됩니다';
       setTimeout(cfgClose, 1200);
     }).catch(function(e){
@@ -5898,6 +6950,119 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ══ 💬 길잡이 채팅방 ↔ 건의·개선요청 폐루프 연동 다리 (portalChatImprove) ══
+     채팅 중 코딩·문제해결이 필요할 때 건의함(suggestions_private · suggestions_meta_private ·
+     suggestions_resolved_private/{uid})과 동일한 통로로 접수하고, 개선 결과 답변이 오면
+     채팅방 안에서 실시간으로 받아 채팅자가 「확인·승인(완성)」 또는 「보완 재요청」까지 마친다. */
+  var _chatImpWatchRef = null;
+  var _chatImpWatchFn = null;
+  var _chatImpMap = {};
+  var _chatImpSubs = [];
+  function _chatImpValidId(id){ return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id); }
+  function _chatImpEmit(){
+    var uid = SG.uid || '';
+    _chatImpSubs.slice().forEach(function(fn){ try { fn(_chatImpMap, uid); } catch(_){} });
+  }
+  function chatImpStopWatch(){
+    if(_chatImpWatchRef && _chatImpWatchFn){
+      try { _chatImpWatchRef.off('value', _chatImpWatchFn); } catch(_){}
+    }
+    _chatImpWatchRef = null;
+    _chatImpWatchFn = null;
+    _chatImpMap = {};
+    _chatImpEmit();
+  }
+  function chatImpStartWatch(){
+    chatImpStopWatch();
+    if(!SG.uid) return;
+    var ref = db.ref(sgResolvedUidPath(SG.uid));
+    var fn = function(snap){
+      _chatImpMap = (snap && snap.val()) || {};
+      _chatImpEmit();
+    };
+    _chatImpWatchRef = ref;
+    _chatImpWatchFn = fn;
+    ref.on('value', fn, function(){});
+  }
+  window.portalChatImprove = {
+    submit: function(opts){
+      if(!auth.currentUser || !SG.uid) return Promise.reject(new Error('로그인 후 이용할 수 있습니다.'));
+      var o = opts || {};
+      var cat = sgCatClass(o.cat || 'portal');
+      var title = String(o.title || '').trim().slice(0, 200) || '[챗봇] 시스템 개선 요청';
+      var content = String(o.content || '').trim().slice(0, 9500) || title;
+      var now = Date.now();
+      var rec = {
+        cat: cat, title: title, content: content,
+        images: [],
+        author: SG.name || '사용자', authorEmail: SG.email || '', authorUid: SG.uid,
+        status: 'new', reply: '', source: 'chatbot', createdAt: now
+      };
+      if(o.relatedId && _chatImpValidId(o.relatedId)) rec.relatedId = o.relatedId;
+      var ref = db.ref(SG_PRIVATE_PATH).push();
+      return ref.set(rec).then(function(){
+        var ownRec = { title: rec.title, cat: rec.cat, status: 'new', at: rec.createdAt, seen: true, source: 'chatbot' };
+        if(rec.relatedId) ownRec.relatedId = rec.relatedId;
+        return Promise.all([
+          db.ref(SG_META_PRIVATE_PATH+'/'+ref.key).set({
+            author: rec.author, authorEmail: rec.authorEmail, authorUid: rec.authorUid,
+            status: 'new', cat: rec.cat, title: rec.title, createdAt: rec.createdAt
+          }).catch(function(){}),
+          db.ref(sgResolvedUidPath(SG.uid)+'/'+ref.key).set(ownRec).catch(function(){})
+        ]).then(function(){
+          if(sgIsAdmin()) sgUpdateBadge();
+          return { id: ref.key, cat: cat, catName: sgCatName(cat), title: title, status: 'new', at: now };
+        });
+      });
+    },
+    approve: function(id){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var now = Date.now();
+      return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+        seen: true, resolvedOk: true, resolvedAt: now
+      }).then(function(){
+        sgUpdateBadge();
+        return { ok: true, id: id, resolvedAt: now };
+      });
+    },
+    reopen: function(id, feedbackText){
+      if(!auth.currentUser || !SG.uid || !_chatImpValidId(id)) return Promise.reject(new Error('잘못된 요청입니다.'));
+      var txt = String(feedbackText || '').trim();
+      if(!txt) return Promise.reject(new Error('보완이 필요한 내용을 적어주세요.'));
+      var orig = (_chatImpMap && _chatImpMap[id]) || {};
+      var cat = sgCatClass(orig.cat || 'portal');
+      var reTitle = ('↩ 재요청: ' + (orig.title || '개선 요청')).slice(0, 200);
+      return window.portalChatImprove.submit({
+        cat: cat, title: reTitle, content: txt, relatedId: id
+      }).then(function(res){
+        return db.ref(sgResolvedUidPath(SG.uid)+'/'+id).update({
+          seen: true, resolvedOk: false, feedback: txt.slice(0, 2000), feedbackAt: Date.now()
+        }).catch(function(){}).then(function(){
+          sgUpdateBadge();
+          return { ok: true, id: res.id, relatedId: id, title: reTitle, cat: cat };
+        });
+      });
+    },
+    subscribe: function(fn){
+      if(typeof fn !== 'function') return function(){};
+      if(_chatImpSubs.indexOf(fn) < 0) _chatImpSubs.push(fn);
+      if(SG.uid) { try { fn(_chatImpMap, SG.uid); } catch(_){} }
+      return function(){
+        var idx = _chatImpSubs.indexOf(fn);
+        if(idx >= 0) _chatImpSubs.splice(idx, 1);
+      };
+    },
+    stop: chatImpStopWatch,
+    isAdmin: sgIsAdmin,
+    catName: sgCatName,
+    openAdminDetail: function(id){
+      if(!sgIsAdmin() || !_chatImpValidId(id)) return false;
+      sgOpen();
+      sgViewDetail(id);
+      return true;
+    }
+  };
+
   /* ══ 🤖 AI 답변 도움 (대표 지시 2026-09-11) ══════════════════════════════
      건의가 올라오면 서버(suggestionAssist)가 요약·종류·짐작·답변 초안을 지어
      suggestions_private/{id}/assist 에 적어 둔다.
@@ -6526,5 +7691,8 @@ window.PU_TYPESAFE_MOUNT = function(){
 };
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=8"></script>
+<script src="js/pu-chatbot.js?v=5"></script>
 </body>
 </html>

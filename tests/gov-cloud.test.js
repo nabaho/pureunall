@@ -28,7 +28,9 @@ test('★★ gov/{uid} 는 «본인만» 읽고 쓴다 — 인증키가 들어 �
   assert.match(r['.write'], /auth\.uid === \$uid/);
   // 관리자·직원에게 넓히면 인증키가 남에게 보인다
   assert.doesNotMatch(r['.read'], /isAdmin|\|\|/, '읽기를 넓히면 인증키가 남에게 보입니다');
-  assert.doesNotMatch(r['.write'], /isAdmin|\|\|/);
+  /* 쓰기는 «재직 직원(LOGIN) + 본인»(2026-11-15). LOGIN 안의 로그인 방식 || 는 넓힘이 아니다 — 관리자·남에게 여는 것만 막는다 */
+  assert.doesNotMatch(r['.write'], /isAdmin|\$uid\s*\|\||\|\|\s*auth\.uid/);
+  assert.match(r['.write'], /uid_roles/, '익명 토큰으로도 쓰게 됩니다');
 });
 
 test('★ 최상위 gov 에는 읽기·쓰기를 열지 않는다', () => {

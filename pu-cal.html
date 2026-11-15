@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=90"></script>
+<script src="js/pu-ontology.js?v=97"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -25,7 +25,7 @@
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
-<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-back.js?v=5"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-gcal-auth.js?v=14"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
@@ -547,7 +547,8 @@
   :root[data-theme="dark"] body.mob .gform .gsave{background:#377aff;color:#ffffff;height:45px;padding:0 28px;font-size:15px}
   body.mob .gform .gtitle{font-size:28px;border-bottom-color:transparent}
   body.mob .gform .gtitle::placeholder{color:var(--gtext)}
-  body.mob .gform .gtabs button{height:36px;border-radius:18px}
+  body.mob .gform .gtabs{margin-left:0;flex-wrap:wrap;gap:6px}
+  body.mob .gform .gtabs button{height:36px;border-radius:18px;white-space:nowrap;padding:0 12px;font-size:13px}
   :root[data-theme="dark"] body.mob .gform .gtabs button.on{background:#3f4659;border-color:#3f4659;color:#ffffff}
   .gform .gsave{border:none;background:var(--gtoday);color:#ffffff;border-radius:20px;padding:0 24px;height:40px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
   :root[data-theme="dark"] .gform .gsave{color:#131314}
@@ -6528,7 +6529,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=40"></script>
+<script src="js/pu-appbar.js?v=44"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{

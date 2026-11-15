@@ -32,7 +32,9 @@ const require = createRequire(import.meta.url);
 async function loadPlaywright() {
   try { return await import('playwright'); } catch (e) {}
   const g = execSync('npm root -g').toString().trim();
-  return require(path.join(g, 'playwright'));
+  try { return require(path.join(g, 'playwright')); } catch (e) {}
+  try { return await import('playwright-core'); } catch (e) {}
+  return require(path.join(g, 'playwright-core'));
 }
 
 /* 포털 앱 목록은 enter.html 의 APPS 에서 읽는다 — 새 앱이 생기면 저절로 점검에 든다 */
@@ -73,18 +75,42 @@ function deepMerge(a, b) {
 /* 저장소를 그대로 내어 주는 작은 서버 */
 function serve() {
   const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript', '.css': 'text/css',
-    '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json' };
+    '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.webmanifest': 'application/manifest+json' };
+  const realRoot = fs.realpathSync(root);
   const srv = http.createServer((req, res) => {
-    const u = decodeURIComponent(req.url.split('?')[0]);
-    let f = path.join(root, u === '/' ? 'enter.html' : u);
-    if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' });
-    fs.createReadStream(f).pipe(res);
+    try {
+      if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
+      const port = srv.address()?.port;
+      const host = String(req.headers.host || '').toLowerCase();
+      if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
+      const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+      if (sfs && sfs !== 'same-origin' && sfs !== 'none') { res.writeHead(403); return res.end(); }
+      const origin = req.headers.origin;
+      if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) { res.writeHead(403); return res.end(); }
+      let u;
+      try { u = decodeURIComponent(String(req.url || '/').split('?')[0]); } catch (e) { res.writeHead(400); return res.end(); }
+      if (u.split('/').some(seg => seg.startsWith('.') && seg !== '.')) { res.writeHead(403); return res.end(); }
+      const cand = path.resolve(realRoot, '.' + (u === '/' ? '/enter.html' : (u.startsWith('/') ? u : '/' + u)));
+      const rel = path.relative(realRoot, cand);
+      if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(cand)) { res.writeHead(404); return res.end(); }
+      const f = fs.realpathSync(cand);
+      const realRel = path.relative(realRoot, f);
+      if (!realRel || realRel.startsWith('..') || path.isAbsolute(realRel) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+      if (!types[path.extname(f).toLowerCase()]) { res.writeHead(403); return res.end(); }
+      res.writeHead(200, { 'content-type': types[path.extname(f).toLowerCase()] });
+      if (req.method === 'HEAD') return res.end();
+      const st = fs.createReadStream(f);
+      st.on('error', () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+      st.pipe(res);
+    } catch (e) {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    }
   });
   return new Promise(r => srv.listen(0, '127.0.0.1', () => r(srv)));
 }
 
-const ALLOW = /^(https:\/\/(unpkg\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.tailwindcss\.com|code\.jquery\.com|t1\.kakaocdn\.net|developers\.kakao\.com))/;
+const ALLOW_HOSTS = new Set(['unpkg.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.tailwindcss.com', 'code.jquery.com', 't1.kakaocdn.net', 'developers.kakao.com']);
 
 /* 한 화면을 재고 갈무리한다 */
 async function snapOne(page, key, view, width) {
@@ -139,11 +165,17 @@ async function auditOne(browser, base, app, width) {
   }, { data, uid: seed.UID, sid: seed.SID, email: seed.EMAIL, ls: extra.localStorage || {} });
   await ctx.route('**/*', (route) => {
     const u = route.request().url();
-    if (u.startsWith(base)) return route.continue();
-    if (/gstatic\.com\/firebasejs\//.test(u)) return route.fulfill({ status: 200, contentType: 'text/javascript', body: fakeSrc });
-    if (/(firebaseio\.com|firebasedatabase\.app)\/.*\.json/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
-    if (ALLOW.test(u)) return route.continue();
     if (u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
+    let parsed = null;
+    try { parsed = new URL(u); } catch (e) { return route.abort(); }
+    if (parsed.origin === base) return route.continue();
+    if (parsed.protocol === 'https:' && (parsed.hostname === 'www.gstatic.com' || parsed.hostname === 'gstatic.com') && parsed.pathname.startsWith('/firebasejs/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: fakeSrc });
+    }
+    if (parsed.protocol === 'https:' && (parsed.hostname.endsWith('.firebaseio.com') || parsed.hostname.endsWith('.firebasedatabase.app')) && parsed.pathname.endsWith('.json')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+    }
+    if (parsed.protocol === 'https:' && ALLOW_HOSTS.has(parsed.hostname)) return route.continue();
     return route.abort();
   });
   const page = await ctx.newPage();
@@ -183,7 +215,18 @@ async function main() {
   const { chromium } = await loadPlaywright();
   const srv = await serve();
   const base = `http://127.0.0.1:${srv.address().port}`;
-  const browser = await chromium.launch({ args: ['--no-sandbox'] });
+  const localBins = ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'];
+  let browser;
+  try { browser = await chromium.launch(); }
+  catch (e) {
+    const exe = localBins.find(p => fs.existsSync(p));
+    if (exe) {
+      try { browser = await chromium.launch({ executablePath: exe }); }
+      catch (e2) { browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] }); }
+    } else {
+      browser = await chromium.launch({ args: ['--no-sandbox'] });
+    }
+  }
   let apps = portalApps();
   if (only.length) apps = apps.filter(a => only.includes(a.key));
   const results = [];

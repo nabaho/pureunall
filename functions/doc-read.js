@@ -35,6 +35,17 @@ function isTransient(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
 }
 
+const HARASS_RRN_TIGHT_RE = /(^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))(?:\s*[-~–—]\s*)?([1-8])\d{6}(?!\d)/g;
+const HARASS_RRN_SPACED_RE = /(^|[^\d])((?:\d\s*){2}(?:0\s*[1-9]|1\s*[0-2])(?:0\s*[1-9]|[12]\s*\d|3\s*[01]))\s*[-~–—]\s*([1-8])(?:\s*\d){6}(?!\s*\d)/g;
+
+function maskHarassRrn(text) {
+  return String(text == null ? "" : text)
+    .replace(HARASS_RRN_TIGHT_RE, "$1$2-$3******")
+    .replace(HARASS_RRN_SPACED_RE, function (_, pre, front, gender) {
+      return pre + String(front).replace(/\s+/g, "") + "-" + gender + "******";
+    });
+}
+
 /* 요청이 말이 되는지 본다. 못 알아보면 **부르기 전에** 돌려보낸다 —
    구글을 부르고 나서 실패하면 그만큼이 그대로 요금이다. */
 function validate(body) {
@@ -42,9 +53,26 @@ function validate(body) {
   const parts = body.parts;
   if (!Array.isArray(parts) || !parts.length) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const resolvedApp = appOf(body.app);
   let imgs = 0, chars = 0;
+  const cleanHarassParts = [];
+
   for (const p of parts) {
-    if (!p || typeof p !== "object") return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    if (!p || typeof p !== "object" || Array.isArray(p)) {
+      return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    }
+    if (resolvedApp === "harass") {
+      /* 괴롭힘 조사 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+         오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
+      const keys = Object.keys(p);
+      if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: "괴롭힘 조사 앱은 주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
+      }
+      const masked = maskHarassRrn(p.text);
+      chars += masked.trim().length;
+      cleanHarassParts.push({ text: masked });
+      continue;
+    }
     if (p.inline_data) {
       const d = p.inline_data.data;
       if (typeof d !== "string" || !d) return { ok: false, error: "사진을 읽을 수 없습니다" };
@@ -66,13 +94,14 @@ function validate(body) {
      ⚠ 그림도 글자도 없으면 그대로 돌려보낸다 — 부르는 만큼이 요금이다. */
   if (!imgs && !chars) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const outParts = resolvedApp === "harass" ? cleanHarassParts : parts;
   const size = Buffer.byteLength(JSON.stringify(body), "utf8");
   if (size > MAX_BODY_BYTES) {
     return { ok: false, error: imgs
       ? "사진이 너무 큽니다 — 장수를 나눠 판독해 주세요"
       : "글자가 너무 많습니다 — 나눠서 판독해 주세요" };
   }
-  return { ok: true, parts: parts, cfg: body.generationConfig, app: appOf(body.app) };
+  return { ok: true, parts: outParts, cfg: body.generationConfig, app: resolvedApp };
 }
 
 /* ══ ⑤ 어느 앱이 몫을 썼나 (대표 물음 2026-09-08 「판독 한도 어떻게 해결할까」) ══
@@ -85,7 +114,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";

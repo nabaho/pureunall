@@ -218,7 +218,9 @@ function 글짓기(뉴스, 법령, 옷) {
     /* ★ 제목과 링크만 싣는다 — 기사 본문은 남의 글이다 */
     줄.push('<ul>');
     뉴스목록.forEach(function (x) {
-      줄.push('<li><a href="' + 감싸기(x.링크) + '" target="_blank" rel="noopener">'
+      /* 2026-11-15 보안 — 링크는 http(s) 만. 모음 칸은 직원도 쓸 수 있어 javascript: 가 들어오면 공지에 그대로 실린다 */
+      const 링크 = /^https?:\/\//i.test(String(x.링크 || '').trim()) ? String(x.링크).trim() : '#';
+      줄.push('<li><a href="' + 감싸기(링크) + '" target="_blank" rel="noopener">'
         + 감싸기(x.제목) + '</a>'
         + (x.언론사 ? ' <span>· ' + 감싸기(x.언론사) + '</span>' : '') + '</li>');
     });

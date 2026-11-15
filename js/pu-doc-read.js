@@ -237,7 +237,7 @@
        사업체도 읽어야 추후 계약관리에 연동할 수 있다."
        ⚠ 실제 오독: 서명란의 **우리 쪽(을)** 을 상대로 담았다 — 푸른노무법인/권형하가
          상호·대표자 칸에 들어왔다. 상대는 언제나 갑(맡긴 쪽)이다. */
-    '\nkind=contract 이면 키: company(상대 업체 상호), ceo(상대 업체 대표자), address(상대 업체 주소), companyTel(상대 업체 연락처), bizno(상대 사업자등록번호 — 적혀 있으면), docName(계약서 이름 그대로 — 예 자문계약서·위임계약서), scope(위임사무·업무 범위 — 제1조 등에 적힌 맡은 일을 그대로, 예 인사노무진단(RBA 점검)), signDate(계약 체결일 — 2026-08-10 형식), startDate(계약 시작일), endDate(계약 종료일 — 없으면 빈 문자열), term(계약 기간을 적은 그대로 — 예 1년, 자동연장), fee(보수·자문료·용역비 — 적힌 그대로), vat(부가세 — 별도/포함 중 적힌 그대로, 표기가 없으면 빈 문자열), retainer(착수금), success(성공보수 — 예 승소시 청구액의 10%), deposit(계약금), memo(위에 안 담긴 특약이나 눈여겨볼 조건 한 줄), pairs(계약서의 모든 조항·칸 — 아래 규칙). **없는 항목은 빈 문자열로 두고 지어내지 마세요.**' +
+    '\nkind=contract 이면 키: company(상대 업체 상호), ceo(상대 업체 대표자), address(상대 업체 주소), companyTel(상대 업체 연락처), bizno(상대 사업자등록번호 — 적혀 있으면), corpno(상대 법인등록번호 — 적혀 있으면), docName(계약서 이름 그대로 — 예 자문계약서·위임계약서·위임약정서), scope(위임사무·업무 범위 — 제1조나 위임내용 칸에 적힌 맡은 일을 그대로, 예 인사노무진단(RBA 점검)·충남2026부해1332 부당해고 등 구제신청 사건 처리에 관한 일체의 사항), signDate(계약 체결일 — 2026-08-10 형식), startDate(계약 시작일), endDate(계약 종료일 — 없으면 빈 문자열), term(계약 기간을 적은 그대로 — 예 1년, 자동연장), fee(보수·자문료·용역비 — 적힌 그대로), vat(부가세 — 별도/포함 중 적힌 그대로, 표기가 없으면 빈 문자열), retainer(착수금), success(성공보수 — 예 승소시 청구액의 10% 또는 금 3,300,000원), deposit(계약금), memo(위에 안 담긴 특약이나 눈여겨볼 조건 한 줄), pairs(계약서의 모든 조항·칸 — 아래 규칙). **없는 항목은 빈 문자열로 두고 지어내지 마세요.**' +
     /* ── CMS 자동이체 신청서 (대표 지시 2026-08-28) ──
        이 값들이 기업정보함의 «은행·자동이체» 칸으로 가고, 그 업체 계약의 자동이체를 켠다.
        ⚠⚠ **예금주 주민번호는 읽지 않는다.** 신청서에 적혀 있지만 자동이체를 아는 데
@@ -1164,6 +1164,23 @@
     });
   }
 
+  /* 글자 + 부르는 쪽의 판독 사전 → { ok:true, data } 또는 { ok:false, why } — readWithPrompt 의 «글자판»
+     (견적·계약 가져오기: 한글·PDF 에서 뽑은 글자를 AI 에 맡긴다).
+     ⚠ 마지막 문지기 — 주민번호를 «여기서» 한 번 더 지운다. 부르는 쪽이 지우는 것을 잊어도 AI 로는 안 나간다.
+        지우개(js/pu-rrn-mask.js)가 화면에 없으면 멈춘다(NO_SCRUB). 글자는 사진과 달리 자리를 틀릴 일이 없다.
+     ⚠ afterRead 를 안 탄다 · 저장하지 않는다 — 이 층의 원칙 그대로다. */
+  function readTextWithPrompt(prompt, text, opts) {
+    if (!deps.fetch) return Promise.resolve({ ok: false, why: '판독 준비가 되지 않았습니다' });
+    var p = String(prompt == null ? '' : prompt).trim();
+    if (!p) return Promise.resolve({ ok: false, why: '판독 사전이 없습니다' });
+    var body = String(text == null ? '' : text).trim();
+    /* 빈 글자로 AI 를 부르면 헛돈이고 답도 쓸 수 없다 */
+    if (!body) return Promise.resolve({ ok: false, why: '읽을 글자가 없습니다' });
+    body = rrnScrub(body);
+    if (body === null) return Promise.resolve({ ok: false, why: NO_SCRUB });
+    return runRawParts([{ text: p }, { text: body }], opts || {});
+  }
+
   /* 답을 «그대로» 돌려주는 길 — runDocParts 와 달리 afterRead 를 안 탄다 */
   function runRawParts(parts, opts) {
     var 마무리 = function (j) {
@@ -1312,7 +1329,9 @@
     담당자휴대전화: 'mobile', 담당자휴대폰: 'mobile',
     담당자유선: 'tel', 담당자전화: 'tel', 담당자전화번호: 'tel', 담당자연락처: 'tel',
     직위: 'title', 직책: 'title',
-    휴대폰: 'mobile', 휴대전화: 'mobile', 휴대폰번호: 'mobile'
+    휴대폰: 'mobile', 휴대전화: 'mobile', 휴대폰번호: 'mobile',
+    위임내용: 'scope', 위임사무: 'scope', 업무내용: 'scope', 업무범위: 'scope',
+    착수금: 'retainer', 성공보수: 'success', 계약금: 'deposit', 자문료: 'fee', 보수: 'fee'
   };
   /* 되메우기를 하는 갈래 — 위 칸 이름들을 실제로 갖고 있는 것만.
      명함(card)은 칸 이름이 달라 섞으면 엉뚱한 자리에 들어간다. */
@@ -1357,6 +1376,10 @@
     if (!read || read.error || !read.fields) return [];
     var had = String(read.fields.bizno || '').trim();
     var filled = fillFromPairs(read.kind, read.fields);
+    if (read.kind === 'contract' && read.fields.bizno && read.bizNoOk == null) {
+      read.fields.bizno = fmtBizNo(read.fields.bizno);
+      read.bizNoOk = bizNoValid(read.fields.bizno);
+    }
     if (!filled.length) return filled;
     /* 사업자번호가 «새로» 생겼으면 검산해서 자동 입력 규칙에 태운다.
        원래 있던 번호의 판정은 건드리지 않는다 — 국세청 조회까지 거친 값일 수 있다. */
@@ -1443,7 +1466,7 @@
     /* 서식은 사업자번호가 **있을 때만** 검산한다 — 번호 없는 서식이 더 많아서
        무조건 검사하면 멀쩡한 서식이 죄다 「검증 실패」로 보인다. 국세청 조회는
        안 한다(서식의 번호는 참고용이지 등록용이 아니다). */
-    if (kind === 'form') {
+    if (kind === 'form' || kind === 'contract') {
       if (fields.bizno) {
         out.bizNoOk = bizNoValid(fields.bizno);
         out.fields.bizno = fmtBizNo(fields.bizno);
@@ -2238,6 +2261,8 @@
     read: read,
     /* 서류 종류마다 사전이 다른 앱을 위한 입구(경력관리) — 위 설명 참고 */
     readWithPrompt: readWithPrompt,
+    /* 글자판 — 한글·PDF 에서 뽑은 글자 + 부르는 쪽의 사전(견적·계약 가져오기). 주민번호는 여기서 한 번 더 지운다 */
+    readTextWithPrompt: readTextWithPrompt,
     readDocText: readDocText,
     appName: appName, APP_KO: APP_KO,   /* ⑤ 앱별 판독 셈 — 검사가 이것을 겨눈다 */
     visionText: visionText,    /* 글자만 뽑기 — 몫이 Gemini 와 따로다 (2026-09-08) */

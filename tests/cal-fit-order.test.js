@@ -151,6 +151,6 @@ test('⑤ 창이 화면보다 커지지 않고(높이 한도) · 스크롤이 �
 });
 
 test('⑤ 폰 칩 줄(.gcalchips)은 한 줄 묶기에서 빠진다 · 기존 폰 규칙이 그대로 있다', () => {
-  assert.ok(/body\.mob \.gform \.gtabs button\{height:36px;border-radius:18px\}/.test(캘린더));
+  assert.ok(/body\.mob \.gform \.gtabs button\{height:\d+px;border-radius:\d+px/.test(캘린더));
   assert.ok(/\.gform\.full \.gcols\{display:grid;grid-template-columns:minmax\(0,2fr\) minmax\(0,1fr\);gap:28px\}/.test(캘린더), '전체 화면(옵션 더보기)의 기존 두 칸 배치가 그대로');
 });

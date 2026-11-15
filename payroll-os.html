@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=90"></script>
+<script src="js/pu-ontology.js?v=97"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -28,7 +28,7 @@
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
-<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="xlsx_gen.js?v=15"></script>
@@ -232,7 +232,12 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
   nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
   nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px}
   #colist{width:100%;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
-  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis{grid-template-columns:1fr}
+  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis,.sev-3col{grid-template-columns:minmax(0,1fr)!important}
+  .sev-card{min-width:0;max-width:100%}
+  .sev-card .badge{white-space:nowrap;flex:0 0 auto}
+  .sev-card>div:first-child{gap:6px}
+  .sev-card>div:first-child>b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sev-card>div:first-child>span{white-space:nowrap;flex:0 0 auto}
 }
 /* ══════ 머리줄 회사 칸 (2026-10-05) — 회사 이름·담당·지표를 맨 위 파란 줄에 ══════ */
 /* ⚠ 넘치면 잘라 버리지 않고 둘째 줄로 내린다 — 맨 끝의 「확정」 단추가 잘려 안 보이면 안 된다 */
@@ -336,13 +341,13 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=40"></script>
+<script src="js/pu-appbar.js?v=44"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-authsync.js?v=5"></script>
+<script src="js/pu-authsync.js?v=6"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -2643,8 +2648,8 @@ function kakaoOcrPanelHtml(site, month){
     preview='<div style="margin-top:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#f8fafc">' +
       '<tr style="background:#eff6ff"><th style="padding:5px 8px;text-align:left">성명</th><th style="padding:5px 8px;text-align:left">날짜</th><th style="padding:5px 8px;text-align:left">유형</th><th style="padding:5px 8px;text-align:left">출퇴근·휴게</th><th style="padding:5px 8px;text-align:left">원문 증빙</th></tr>' +
       kakaoOcrDraft.map(function(r){
-        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name||'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
-          '<td style="padding:5px 8px">'+r.date+'</td><td style="padding:5px 8px">'+r.type+'</td>' +
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name?esc(r.name):'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
+          '<td style="padding:5px 8px">'+esc(r.date)+'</td><td style="padding:5px 8px">'+esc(r.type)+'</td>' +
           '<td style="padding:5px 8px">'+(r.type==='work'||r.type==='holiday'?(r.in+'~'+r.out+' (휴게 '+r.breakMin+'분)'):'-')+'</td>' +
           '<td style="padding:5px 8px;color:var(--sub)">'+esc(r.raw)+'</td></tr>';
       }).join('') + '</table>' +
@@ -2709,7 +2714,11 @@ function attendOf(site, month, name) { return lmap('attend')[site + '|' + month 
 function leaveOf(site, year, name) { return lmap('leave')[site + '|' + year + '|' + name] || {}; }
 function severOf(site, name) { return lmap('sever')[site + '|' + name] || {}; }
 
-function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, ''); }
+/* ★ 2026-11-15 보안 — 따옴표만 지우던 것을 «& < > 도 바꾼다».
+   바깥에서 온 글(받은 메일 제목·첨부 이름·카톡 판독 이름)이 화면에 그대로 그려졌다.
+   ⚠ 따옴표 «지우기»는 그대로 둔다 — 이 함수가 onclick="f('…')" 안의 JS 글자에도 쓰인다(&#39; 로 바꾸면 속성을 풀 때 ' 로 되살아나 빠져나간다).
+   & < > 는 속성을 풀 때 원래 글자로 돌아오므로 onclick 안의 값·열쇠는 바뀌지 않는다. */
+function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmtComma(val) {
   if (val == null || val === '') return '';
   var n = Number(String(val).replace(/,/g, ''));
@@ -3412,7 +3421,7 @@ function shellMainHtml(m){
   }
   var mode = App.uiMode || 'focus';
   var chips=x.sites.length>1?('<span class="chips">자료 묶음 '+x.sites.map(function(s){
-      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+s+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
+      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+esc(s)+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
   var modeBar = '<div class="uimode-bar noprint">' +
     '<div class="uimode-btns">' +
       '<button type="button" class="uimode-btn" onclick="toggleSidebarFold()" title="왼쪽 담당자·사업장 목록을 접어 화면을 넓게 씁니다">' + (App.foldSide ? '▶ 좌측목록 펼치기' : '◀ 좌측목록 접기(넓게보기)') + '</button>' +
@@ -3481,7 +3490,7 @@ function coBarHtml(m){
     }
   }
   var RM=lmap('row_marks')||{}, ckKey=co?('co:'+co.id):('site:'+App.loose), ckEsc=co?('co:'+esc(co.id)):('site:'+esc(App.loose)), cmk=RM[ckKey]||{};
-  var h='<span class="cn" title="'+esc(name)+'">'+name+'</span>'
+  var h='<span class="cn" title="'+esc(name)+'">'+esc(name)+'</span>'
     +'<button type="button" class="rmk'+(cmk.chk?' on':'')+'" style="color:#fff" onclick="toggleRowMark(\''+ckEsc+'\',\'chk\',event)" title="사업장 체크 저장">'+(cmk.chk?'☑':'☐')+'</button>'
     +'<button type="button" class="rst'+(cmk.star?' on':'')+'" onclick="toggleRowMark(\''+ckEsc+'\',\'star\',event)" title="사업장 별표 저장">'+(cmk.star?'★':'☆')+'</button>'
     +'<span class="cm">'+[who, card?('급여일 '+(card.급여일||'미지정')):'', '기준 '+ymText(m.ym)].filter(Boolean).join(' · ')+'</span>'
@@ -5536,7 +5545,7 @@ window.importCards=importCards;window.doLogin=doLogin;window.doLogout=doLogout;w
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=3"></script>
+<script src="js/pu-back.js?v=5"></script>
 <!-- 파일 끌어다 놓기(2026-10-10) — JSON 을 받는 네 곳. 모두 서버를 덮어쓰는 일이라 exact: 단추 «위»에서만 받는다(화면 아무 데나 놓아 덮어쓰지 않게) -->
 <script>try{ PuDnd.init({ rules:{ importPayroll:{ext:['json'],argc:0,exact:true}, importCards:{ext:['json'],argc:0,exact:true}, importTaxTable:{ext:['json'],argc:0,exact:true}, uploadRrn:{ext:['json'],argc:0,exact:true} } }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
