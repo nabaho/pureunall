@@ -62,19 +62,26 @@
     'kakao.com': 1, 'nate.com': 1, 'yahoo.com': 1, 'hotmail.com': 1,
     'outlook.com': 1, 'icloud.com': 1, 'korea.com': 1, 'paran.com': 1
   };
-  var OWN_RE = /@pureun\.kr$/i;
+  var OWN_RE = /(?:^370-6@(?:daum\.net|hanmail\.net)$|@pureun\.kr$)/i;
   var NOREPLY_RE = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|postmaster|mailer-daemon|newsletter|marketing|ad|webmaster)@/i;
-  var BOX_KINDS = ['inbox', 'sent', 'archive', 'custom'];
+  var BOX_KINDS = ['inbox', 'sent', 'archive', 'custom', 'tome', 'sched'];
 
-  /* 홍보·뉴스레터·일반 의무교육 안내 메일은 조사 사건 자동발굴에서 제외 */
-  var NOISE_RE = /뉴스레터|수신\s*거부|광고\)|법정의무교육\s*안내|교육기관\s*지정|무료\s*특강|세미나\s*안내|홍보물|카드\s*명세서|세금계산서\s*발행\s*안내/i;
+  /* 홍보·뉴스레터·일반 의무교육 안내·단순 4대보험 신고 메일은 조사 사건 자동발굴에서 제외 */
+  var NOISE_RE = /뉴스레터|수신\s*거부|광고\)|법정의무교육\s*안내|교육기관\s*지정|무료\s*특강|세미나\s*안내|홍보물|카드\s*명세서|세금계산서\s*발행\s*안내|사대보험\s*상실신고서|4대보험\s*상실신고서|입퇴사자\s*요청\s*서식/i;
+  /* 단순 법정의무 예방교육·강의안·근로조건 자율점검 증빙은 실제 조사·분쟁 신호가 없으면 제외 */
+  var EDU_ONLY_RE = /예방\s*교육\s*(자료|일지|서명|안내|보고서|실습생|일정|게시|이수|확인서|사진)|성폭력\s*예방\s*교육|법정의무\s*교육|강의\s*(자료|안)|교육\s*지정\s*기관|자율\s*(개선|점검)\s*(지원\s*사업|사업|내역|신청)/i;
+  var CASE_OVERRIDE_RE = /조사\s*(결과|보고|위원|위임|착수|계획|용역|의뢰|진행)|문답서|진술서|소명서|신고서|징계|인사위원회|고충\s*(심의|처리\s*조사|신청)|개선\s*지도|재진정|실태\s*조사/;
   /* 개인 민감 서류(급여·주민번호·계좌) — 목록에는 표시하되 자동 열람 경고 */
   var PRIV_RE = /급여\s*대장|임금\s*대장|원천\s*징수|주민등록|신분증|통장\s*사본|연말\s*정산|4대\s*보험\s*명부/;
 
   /* 괴롭힘·성희롱 조사 직접 신호 */
-  var HARASS_SIGNAL_RE = /직장\s*내\s*괴롭힘|직장내괴롭힘|직괴|직장\s*내\s*성희롱|직장내성희롱|괴롭힘\s*조사|성희롱\s*조사|고충\s*조사|고충\s*심의|고충\s*처리|피해\s*근로자\s*보호|피신고인|신고인\s*면담|행위자\s*면담|비밀\s*유지\s*서약|조사\s*결과\s*보고서|외부\s*전문가\s*조사/;
+  var HARASS_SIGNAL_RE = /직장\s*내\s*괴롭힘|직장내괴롭힘|직괴|직장\s*내\s*성희롱|직장내성희롱|직장\s*괴롭힘|괴롭힘\s*조사|성희롱\s*조사|괴롭힘\s*신고|성희롱\s*신고|성희롱\s*사건|성희롱\s*발언|성희롱\s*징계|고충\s*조사|고충\s*심의|고충\s*처리|피해\s*근로자\s*보호|피신고인|신고인\s*면담|행위자\s*면담|비밀\s*유지\s*서약|조사\s*결과\s*보고서|외부\s*전문가\s*조사|조사\s*위원\s*위촉|진상\s*조사\s*보고|성폭력\s*상담|(?:소장|고충|사내|신고)\s*(?:관련\s*)?["'「]?조사\s*보고서/;
   /* 기등록 조사 사건의 업체와 주고받은 보조 진행 서류 신호 */
   var CASE_DOC_SIGNAL_RE = /공문|조사|면담|출석|진술|문답|소명|경위서|서약서|동의서|녹취|증거|호증|설문|실태|보고서|의견서|인사위원회|징계|보호\s*조치|위임|계약서|견적서/;
+  /* 추정 외부 이메일(2차 확장)에서 허용할 조사 핵심 진행 서류 신호 */
+  var INFERRED_STEP_RE = /위임\s*계약|위임\s*약정|서면\s*진술|문답서|소명서|의견서|결과\s*보고|기한\s*연장|징계|고충\s*처리|심의\s*위원회|감사실|실태\s*조사|추가\s*자료\s*제출|녹취/;
+  /* 공공기관 감독관·위원회·협업 노무법인 메일은 의뢰인 고유 이메일 자동확장 대상에서 제외 */
+  var NON_CLIENT_ADDR_RE = /(?:@(?:korea\.kr|korea\.co\.kr|mail\.go\.kr|hrdkorea\.or\.kr|kcplaa\.or\.kr)$|^(?:labor1002|ourlabor|thlabor)@)/i;
 
   var NOTE_START = '── [괴롭힘·성희롱 조사 자동연동] ──';
   var NOTE_END   = '── [/괴롭힘·성희롱 조사 자동연동] ──';
@@ -98,8 +105,9 @@
     var s = str(msOrStr);
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
     var n = Number(msOrStr);
-    if (!isFinite(n) || n <= 0) return '';
-    return new Date(n + 9 * 3600000).toISOString().slice(0, 10);
+    if (!isFinite(n) || n <= 0 || n > 8640000000000000 - 9 * 3600000) return '';
+    var d = new Date(n + 9 * 3600000);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
   }
 
   function parseYmdMs(ymd) {
@@ -141,6 +149,17 @@
     s = s.replace(/\((주|유|합|사|재|학|의)\)|주식회사|유한회사|사단법인|재단법인|학교법인|의료법인|사회복지법인/g, ' ');
     s = s.replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g, '').toLowerCase();
     return s;
+  }
+
+  /* 사업장 약칭·핵심명 정규화 (예: '(주)가나점검장항공장' -> '가나점검', '국공립푸른어린이집' -> '푸른어린이집') */
+  function coCoreNorm(name) {
+    var c = coNameNorm(name);
+    if (!c) return '';
+    var s = c.replace(/^(?:국공립|공립|시립|구립|도립|군립|민간|가정|부설)/, '');
+    var s2 = s.replace(/(?:[가-힣]{1,2}(?:공장|지점|지사|사업소|물류센터|사업장)|본사|공장|지점|지사)$/, '');
+    if (s2.length >= 2) return s2;
+    if (s.length >= 2) return s;
+    return c;
   }
 
   /* 주민등록번호 패턴 가림 — 하이픈·물결표 유무 및 PDF 스팬 분절 공백('900101- 123 4567' 등)까지 모두 가린다 */
@@ -280,36 +299,91 @@
     return '';
   }
 
-  /* 메일함 폴더 + 메시지 맵 → 평탄화된 메일 행 배열 */
-  function flattenMailbox(folders, msgsBySlug) {
+  function mailFp(fromAddr, toAddrs, ts, subject, attNames) {
+    var sNorm = str(subject).replace(/\s+/g, ' ').toLowerCase().slice(0, 120);
+    var tNorm = Array.isArray(toAddrs)
+      ? toAddrs.map(function (a) { return str(a).toLowerCase(); }).sort().join(',')
+      : str(toAddrs).toLowerCase();
+    var aNorm = Array.isArray(attNames)
+      ? attNames.map(function (a) { return str(a).toLowerCase(); }).sort().join('|')
+      : '';
+    var secSlot = ts > 0 ? String(Math.round(ts / 2000)) : '0';
+    return str(fromAddr).toLowerCase() + '|' + tNorm + '|' + secSlot + '|' + sNorm + '|' + aNorm;
+  }
+
+  /* 메일함 폴더(IMAP) + 지난메일(POP3 mailbox/old/msgs) → 중복 제거·평탄화된 메일 행 배열 */
+  function flattenMailbox(folders, msgsBySlug, oldMsgsMap) {
     var out = [];
-    if (!obj(folders) || !obj(msgsBySlug)) return out;
-    Object.keys(folders).forEach(function (slug) {
-      var f = folders[slug];
-      if (!okId(slug) || !obj(f) || f.nomsg) return;
-      var kind = str(f.kind || 'custom');
-      if (BOX_KINDS.indexOf(kind) < 0) return;
-      var box = msgsBySlug[slug];
-      if (!obj(box) && !Array.isArray(box)) return;
-      var isSent = (kind === 'sent');
-      Object.keys(box).forEach(function (uidKey) {
-        var m = box[uidKey];
-        if (!obj(m)) return;
+    var imapFpSet = {};
+    if (obj(folders) && obj(msgsBySlug)) {
+      Object.keys(folders).forEach(function (slug) {
+        var f = folders[slug];
+        if (!okId(slug) || !obj(f) || f.nomsg) return;
+        var kind = str(f.kind || 'custom');
+        if (BOX_KINDS.indexOf(kind) < 0) return;
+        var box = msgsBySlug[slug];
+        if (!obj(box) && !Array.isArray(box)) return;
+        var isSent = (kind === 'sent' || kind === 'tome' || kind === 'sched');
+        Object.keys(box).forEach(function (uidKey) {
+          var m = box[uidKey];
+          if (!obj(m)) return;
+          var uid = str(m.u || uidKey);
+          if (!uid) return;
+          var fromAddrs = parseAddrs(m.e || m.f);
+          var toAddrs = parseAddrs(m.t);
+          var fromAddr = fromAddrs[0] || '';
+          if (!isSent && NOREPLY_RE.test(fromAddr)) return;
+          /* 내부 직원끼리 주고받은 순수 내부 메일은 제외하되 고객 주소가 함께 있으면 포함 */
+          var extAddrs = (isSent ? toAddrs : fromAddrs.concat(toAddrs)).filter(function (a) { return !OWN_RE.test(a); });
+          var an = Array.isArray(m.an) ? m.an.map(str).filter(Boolean) : [];
+          var ts = Number(m.d) || 0;
+          if (ts > 0 || str(m.s)) imapFpSet[mailFp(fromAddr, toAddrs, ts, m.s, an)] = 1;
+          out.push({
+            key: 'i:' + slug + ':' + uid,
+            slug: slug,
+            uid: uid,
+            old: false,
+            folderKind: kind,
+            dir: isSent ? 'out' : 'in',
+            ts: ts,
+            date: ymdOf(ts),
+            fromName: str(m.f),
+            fromAddr: fromAddr,
+            toAddr: toAddrs.join(', '),
+            toName: str(m.tn),
+            extAddrs: extAddrs,
+            subject: str(m.s),
+            preview: str(m.p),
+            attCount: Number(m.a) || an.length,
+            attNames: an
+          });
+        });
+      });
+    }
+
+    var oldBox = obj(oldMsgsMap) && oldMsgsMap.v !== undefined ? oldMsgsMap.v : oldMsgsMap;
+    if (obj(oldBox) || Array.isArray(oldBox)) {
+      Object.keys(oldBox).forEach(function (uidKey) {
+        var m = oldBox[uidKey];
+        if (!obj(m) || m._deleted) return;
         var uid = str(m.u || uidKey);
         if (!uid) return;
         var fromAddrs = parseAddrs(m.e || m.f);
         var toAddrs = parseAddrs(m.t);
         var fromAddr = fromAddrs[0] || '';
+        var isSent = OWN_RE.test(fromAddr);
         if (!isSent && NOREPLY_RE.test(fromAddr)) return;
-        /* 내부 직원끼리 주고받은 순수 내부 메일은 제외하되 고객 주소가 함께 있으면 포함 */
-        var extAddrs = (isSent ? toAddrs : fromAddrs.concat(toAddrs)).filter(function (a) { return !OWN_RE.test(a); });
         var an = Array.isArray(m.an) ? m.an.map(str).filter(Boolean) : [];
         var ts = Number(m.d) || 0;
+        var fp = mailFp(fromAddr, toAddrs, ts, m.s, an);
+        if ((ts > 0 || str(m.s)) && imapFpSet[fp]) return;
+        var extAddrs = (isSent ? toAddrs : fromAddrs.concat(toAddrs)).filter(function (a) { return !OWN_RE.test(a); });
         out.push({
-          key: 'i:' + slug + ':' + uid,
-          slug: slug,
+          key: 'p:' + uid,
+          slug: '*old',
           uid: uid,
-          folderKind: kind,
+          old: true,
+          folderKind: 'old',
           dir: isSent ? 'out' : 'in',
           ts: ts,
           date: ymdOf(ts),
@@ -324,7 +398,8 @@
           attNames: an
         });
       });
-    });
+    }
+
     out.sort(function (a, b) { return (b.ts - a.ts) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); });
     return out;
   }
@@ -386,18 +461,21 @@
     var attArr = Array.isArray(mailRow.attNames)
       ? mailRow.attNames.map(str).filter(Boolean)
       : (str(mailRow.attNames) ? [str(mailRow.attNames)] : []);
-    var text = str(mailRow.subject) + ' ' + attArr.join(' ') + ' ' + str(mailRow.preview);
+    var headText = str(mailRow.subject) + ' ' + attArr.join(' ');
+    var text = headText + ' ' + str(mailRow.preview);
     if (NOISE_RE.test(text)) return null;
+    if (EDU_ONLY_RE.test(headText) && !CASE_OVERRIDE_RE.test(headText)) return null;
     var hasDirect = HARASS_SIGNAL_RE.test(text) || !!mailRow.imapHit;
     var hasDocSig = CASE_DOC_SIGNAL_RE.test(text) || mailRow.attCount > 0;
     if (strictSignal ? !hasDirect : (!hasDirect && !hasDocSig)) return null;
 
     var role = classifyDocRole(mailRow.subject, attArr, mailRow.preview, mailRow.dir === 'out');
-    var priv = PRIV_RE.test(str(mailRow.subject) + ' ' + attArr.join(' '));
+    var priv = PRIV_RE.test(headText);
     return {
       key: mailRow.key,
       slug: mailRow.slug,
       uid: mailRow.uid,
+      old: !!mailRow.old,
       dir: mailRow.dir,
       date: mailRow.date,
       ts: mailRow.ts,
@@ -425,6 +503,15 @@
     '사건': 1, '사안': 1, '외부': 1, '전문가': 1, '외부전문가': 1,
     '의뢰': 1, '신고': 1, '접수': 1, '건': 1, '관련': 1, '대응': 1
   };
+
+  function hasNameToken(rawText, normToken) {
+    if (!normToken || normToken.length < 2) return false;
+    if (normToken.length >= 3) return coNameNorm(rawText).indexOf(normToken) >= 0;
+    if (GENERIC_TITLE_WORDS[normToken]) return false;
+    var esc = normToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var re = new RegExp('(?:^|[^가-힣a-z0-9])' + esc + '(?:$|[^가-힣a-z0-9]|공장|지점|지사|본사|사건|조사)', 'i');
+    return re.test(str(rawText));
+  }
 
   function extractCaseTokens(c) {
     if (!obj(c)) return [];
@@ -505,6 +592,7 @@
       addAddrList(coDir.byId[str(caseRec.companyId)].addrs);
     }
     var cNorm = coNameNorm(caseRec.companyName);
+    var cCore = coCoreNorm(caseRec.companyName);
     var startMs = parseYmdMs(caseRec.receiveDate);
     var endMs = parseYmdMs(caseRec.closeDate);
     var fromBound = startMs > 0 ? (startMs - 60 * DAY_MS) : 0;
@@ -538,9 +626,11 @@
       var addrHit = (row.extAddrs || []).some(function (a) { return !!addrs[a]; });
       var domHit = !addrHit && (row.extAddrs || []).some(function (a) { var d = domainOf(a); return d && !!doms[d]; });
       var nameHit = false;
-      if (!addrHit && !domHit && cNorm.length >= 3) {
-        var combinedNorm = coNameNorm(row.subject + ' ' + (row.attNames || []).join(' ') + ' ' + (row.dir === 'out' ? row.toName : row.fromName));
-        if (combinedNorm.indexOf(cNorm) >= 0) nameHit = true;
+      if (!addrHit && !domHit) {
+        var hayRaw = str(row.subject) + ' ' + (row.attNames || []).join(' ') + ' ' + (row.dir === 'out' ? str(row.toName) : str(row.fromName)) + ' ' + str(row.preview);
+        if (hasNameToken(hayRaw, cNorm) || (cCore && cCore !== cNorm && hasNameToken(hayRaw, cCore))) {
+          nameHit = true;
+        }
       }
       if (!addrHit && !domHit && !nameHit) return;
 
@@ -562,6 +652,50 @@
       seen[row.key] = 1;
       autoItems.push(info);
     });
+
+    /* 2차 확장: 업체 이메일이 마스터에 없더라도 1차 직접 매칭된 의뢰인 주소와의 동일 사건기간 후속 서류(문답서·소명서·보고서 등)를 자동 연결 */
+    if (siblings.length === 0 && autoItems.length > 0) {
+      var inferredAddrs = {};
+      var inferredDoms = {};
+      var minAutoTs = 0;
+      var maxAutoTs = 0;
+      autoItems.forEach(function (it) {
+        var t = Number(it.ts) || 0;
+        if (t > 0) {
+          if (!minAutoTs || t < minAutoTs) minAutoTs = t;
+          if (!maxAutoTs || t > maxAutoTs) maxAutoTs = t;
+        }
+        (it.extAddrs || []).forEach(function (a) {
+          var cleanA = str(a).toLowerCase();
+          if (!cleanA || OWN_RE.test(cleanA) || NOREPLY_RE.test(cleanA) || NON_CLIENT_ADDR_RE.test(cleanA) || addrs[cleanA]) return;
+          if (coDir && coDir.byAddr[cleanA] && str(caseRec.companyId) && coDir.byAddr[cleanA].id !== str(caseRec.companyId)) return;
+          inferredAddrs[cleanA] = 1;
+          var dm = domainOf(cleanA);
+          if (isPrivateDomain(dm) && (!coDir || !coDir.byDomain[dm] || coDir.byDomain[dm].length <= 1)) {
+            inferredDoms[dm] = 1;
+          }
+        });
+      });
+
+      if (Object.keys(inferredAddrs).length > 0) {
+        var p2From = fromBound > 0 ? fromBound : (minAutoTs > 0 ? minAutoTs - 45 * DAY_MS : 0);
+        var p2To = toBound > 0 ? toBound : (maxAutoTs > 0 ? maxAutoTs + 120 * DAY_MS : 0);
+        mailRows.forEach(function (row) {
+          if (!obj(row) || seen[row.key] || siblingManualKeys[row.key]) return;
+          if (p2From > 0 && row.ts > 0 && row.ts < p2From) return;
+          if (p2To > 0 && row.ts > 0 && row.ts > p2To) return;
+          var infAddr = (row.extAddrs || []).some(function (a) { return !!inferredAddrs[a]; });
+          var infDom = !infAddr && (row.extAddrs || []).some(function (a) { var d = domainOf(a); return d && !!inferredDoms[d]; });
+          if (!infAddr && !infDom) return;
+          var p2Text = str(row.subject) + ' ' + (row.attNames || []).join(' ') + ' ' + str(row.preview);
+          if (!HARASS_SIGNAL_RE.test(p2Text) && !(infAddr && INFERRED_STEP_RE.test(p2Text))) return;
+          var info2 = inspectMailForHarass(row, false);
+          if (!info2) return;
+          seen[row.key] = 1;
+          autoItems.push(info2);
+        });
+      }
+    }
 
     autoItems.sort(function (a, b) { return ((Number(b.ts) || 0) - (Number(a.ts) || 0)); });
     var allowAuto = Math.max(0, MAX_CASE_MAILS - manualItems.length);
@@ -654,19 +788,45 @@
     };
   }
 
-  /* 미등록 조사 메일 자동 발굴 → 사건별 후보 묶음(Bundle) 생성 */
+  function earliestMailTs(links) {
+    var minTs = 0;
+    (Array.isArray(links) ? links : []).forEach(function (m) {
+      if (!obj(m)) return;
+      var t = Number(m.ts) || parseYmdMs(m.date);
+      if (t > 0 && (!minTs || t < minTs)) minTs = t;
+    });
+    return minTs;
+  }
+
+  function latestMailTs(links) {
+    var maxTs = 0;
+    (Array.isArray(links) ? links : []).forEach(function (m) {
+      if (!obj(m)) return;
+      var t = Number(m.ts) || parseYmdMs(m.date);
+      if (t > 0 && t > maxTs) maxTs = t;
+    });
+    return maxTs;
+  }
+
+  /* 미등록 조사 메일 자동 발굴 → 사건별·연도별 후보 묶음(Bundle) 생성 */
   function discoverUnregisteredBundles(mailRows, existingCases, coDir, dismissedMap) {
     var linkedMailKeys = {};
-    var existingOrgNorms = {};
+    var existingByCoId = {};
     (Array.isArray(existingCases) ? existingCases : []).forEach(function (c) {
       if (!obj(c) || c._deleted) return;
       (Array.isArray(c.mailLinks) ? c.mailLinks : []).forEach(function (m) {
         if (obj(m) && m.key) linkedMailKeys[m.key] = 1;
       });
-      if (c.companyId) existingOrgNorms['id:' + c.companyId] = c;
+      var cid = str(c.companyId);
+      if (cid) {
+        var ecStart = parseYmdMs(c.receiveDate) || earliestMailTs(c.mailLinks);
+        var ecEnd = parseYmdMs(c.closeDate) || (ecStart > 0 ? Math.max(ecStart + 180 * DAY_MS, latestMailTs(c.mailLinks)) : 0);
+        if (!existingByCoId[cid]) existingByCoId[cid] = [];
+        existingByCoId[cid].push({ start: ecStart, end: ecEnd });
+      }
     });
     var dis = obj(dismissedMap) ? dismissedMap : {};
-    var groups = {};
+    var rawGroups = {};
 
     (Array.isArray(mailRows) ? mailRows : []).forEach(function (row) {
       if (!obj(row) || linkedMailKeys[row.key]) return;
@@ -696,62 +856,241 @@
       var companyName = matchedCo ? matchedCo.name : extractedName;
       var companyLinkStatus = companyId ? 'linked' : 'pending';
 
-      /* 이미 같은 companyId 로 활성 조사 사건이 등록돼 있고 기간이 겹치면 새 묶음 대신 기존 사건 수집 대상이므로 제외 */
-      if (companyId && existingOrgNorms['id:' + companyId]) return;
-
-      var groupKey = '';
-      if (companyId) groupKey = 'co_' + safeKey(companyId);
-      else if (companyName && coNameNorm(companyName).length >= 2) groupKey = 'nm_' + safeKey(coNameNorm(companyName));
-      else if (row.extAddrs && row.extAddrs[0]) {
-        var d0 = domainOf(row.extAddrs[0]);
-        groupKey = isPrivateDomain(d0) ? ('dom_' + safeKey(d0)) : ('addr_' + safeKey(row.extAddrs[0]));
-      } else {
-        groupKey = 'msg_' + safeKey(row.slug + '_' + row.uid);
+      /* 이미 같은 companyId 로 활성 조사 사건이 등록돼 있고 사건 기간이 겹치면 새 묶음 대신 기존 사건 수집 대상이므로 제외 (과거 다른 연도 사건은 유지) */
+      if (companyId && existingByCoId[companyId]) {
+        var overlapsExisting = existingByCoId[companyId].some(function (b) {
+          if (!b.start || !row.ts) return true;
+          return rangesOverlap(row.ts, row.ts, b.start, b.end);
+        });
+        if (overlapsExisting) return;
       }
 
-      if (dis[groupKey] && !dis[groupKey]._deleted) return;
+      var baseKey = '';
+      if (companyId) baseKey = 'co_' + safeKey(companyId);
+      else if (companyName && coNameNorm(companyName).length >= 2) baseKey = 'nm_' + safeKey(coNameNorm(companyName));
+      else if (row.extAddrs && row.extAddrs[0]) {
+        var d0 = domainOf(row.extAddrs[0]);
+        baseKey = isPrivateDomain(d0) ? ('dom_' + safeKey(d0)) : ('addr_' + safeKey(row.extAddrs[0]));
+      } else {
+        baseKey = 'msg_' + safeKey(row.slug + '_' + row.uid);
+      }
 
-      if (!groups[groupKey]) {
-        groups[groupKey] = {
-          bundleKey: groupKey,
+      if (!rawGroups[baseKey]) {
+        rawGroups[baseKey] = {
+          baseKey: baseKey,
           companyId: companyId,
           companyLinkStatus: companyLinkStatus,
           companyName: companyName || (row.extAddrs && row.extAddrs[0]) || '미확인 의뢰처',
           bizNo: (matchedCo && matchedCo.rec && str(matchedCo.rec.bizNo)) || '',
           managerMain: (matchedCo && matchedCo.rec && str(matchedCo.rec.managerMain)) || '',
-          category: info.category,
-          firstDate: info.date,
-          lastDate: info.date,
-          lastTs: info.ts || 0,
-          mails: []
+          entries: []
         };
       }
-      var g = groups[groupKey];
-      g.mails.push(info);
-      if (info.category === 'both' || (g.category !== info.category && g.category !== 'both')) {
-        if ((g.category === 'harass' && info.category === 'sexual') || (g.category === 'sexual' && info.category === 'harass') || info.category === 'both') {
-          g.category = 'both';
-        }
-      }
-      if (info.date && (!g.firstDate || info.date < g.firstDate)) g.firstDate = info.date;
-      if ((info.ts || 0) >= g.lastTs) {
-        g.lastTs = info.ts || 0;
-        if (info.date) g.lastDate = info.date;
-      }
+      rawGroups[baseKey].entries.push(info);
     });
 
-    var list = Object.keys(groups).map(function (k) {
-      var g = groups[k];
-      g.mails.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
-      g.steps = deriveStepsFromMails({}, g.mails, g.firstDate, '');
-      g.summary = summarizeProgress(g.steps, '');
-      var catLabel = (CATEGORIES[g.category] || CATEGORIES.harass).label;
-      g.suggestedTitle = g.companyName + ' ' + catLabel + ' 조사';
-      return g;
+    var list = [];
+    var usedBundleKeys = {};
+    Object.keys(rawGroups).forEach(function (bk) {
+      var rg = rawGroups[bk];
+      var asc = rg.entries.slice().sort(function (a, b) {
+        return ((Number(a.ts) || 0) - (Number(b.ts) || 0)) || (str(a.key) < str(b.key) ? -1 : 1);
+      });
+      if (!asc.length) return;
+
+      /* 동일 의뢰처가 여러 해에 걸쳐 별개 조사 사건을 의뢰한 경우 사건 단위로 분리 (120일 초과 공백 또는 해가 바뀌며 45일 초과 공백) */
+      var episodes = [[asc[0]]];
+      for (var i = 1; i < asc.length; i++) {
+        var prev = asc[i - 1];
+        var cur = asc[i];
+        var prevTs = Number(prev.ts) || 0;
+        var curTs = Number(cur.ts) || 0;
+        var prevYr = str(prev.date).slice(0, 4);
+        var curYr = str(cur.date).slice(0, 4);
+        var gap = (prevTs > 0 && curTs > 0) ? (curTs - prevTs) : 0;
+        if (gap > 120 * DAY_MS || (prevYr && curYr && prevYr !== curYr && gap > 45 * DAY_MS)) {
+          episodes.push([cur]);
+        } else {
+          episodes[episodes.length - 1].push(cur);
+        }
+      }
+
+      var yrSeq = {};
+      episodes.forEach(function (epMails) {
+        var cat = epMails[0].category || 'harass';
+        var firstDate = '';
+        var lastDate = '';
+        var lastTs = 0;
+        epMails.forEach(function (info) {
+          if (info.category === 'both' || (cat !== info.category && cat !== 'both')) {
+            if ((cat === 'harass' && info.category === 'sexual') || (cat === 'sexual' && info.category === 'harass') || info.category === 'both') {
+              cat = 'both';
+            }
+          }
+          if (info.date && (!firstDate || info.date < firstDate)) firstDate = info.date;
+          if ((info.ts || 0) >= lastTs) {
+            lastTs = info.ts || 0;
+            if (info.date) lastDate = info.date;
+          }
+        });
+        var epYear = str(firstDate || lastDate).slice(0, 4) || '미상';
+        yrSeq[epYear] = (yrSeq[epYear] || 0) + 1;
+        /* 앞선 에피소드가 사건 등록되더라도 뒤 에피소드의 열쇠가 흔들리지 않도록 에피소드 고유 시작일(또는 첫 메일 키)을 열쇠에 고정 */
+        var epAnchor = digits(firstDate || lastDate) || safeKey(epYear + '_' + str(epMails[0] && epMails[0].key));
+        var bKey = bk + '_' + epAnchor;
+        if (usedBundleKeys[bKey]) {
+          var dupIdx = 2;
+          while (usedBundleKeys[bKey + '_' + dupIdx]) dupIdx++;
+          bKey = bKey + '_' + dupIdx;
+        }
+        usedBundleKeys[bKey] = 1;
+        if (dis[bKey] && !dis[bKey]._deleted) return;
+        if (dis[bk] && !dis[bk]._deleted) {
+          var disTs = Number(dis[bk].updatedAt || dis[bk].createdAt || 0);
+          if ((disTs > 0 && lastTs > 0 && lastTs <= disTs + 7 * DAY_MS) || (!disTs && episodes.length === 1)) return;
+        }
+
+        var descMails = epMails.slice().sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+        var steps = deriveStepsFromMails({}, descMails, firstDate, '');
+        var summary = summarizeProgress(steps, '');
+        var catLabel = (CATEGORIES[cat] || CATEGORIES.harass).label;
+        var titlePrefix = episodes.length > 1
+          ? ('[' + epYear + '년' + (yrSeq[epYear] > 1 ? ' #' + yrSeq[epYear] : '') + '] ')
+          : '';
+        list.push({
+          bundleKey: bKey,
+          year: epYear,
+          companyId: rg.companyId,
+          companyLinkStatus: rg.companyLinkStatus,
+          companyName: rg.companyName,
+          bizNo: rg.bizNo,
+          managerMain: rg.managerMain,
+          category: cat,
+          firstDate: firstDate,
+          lastDate: lastDate,
+          lastTs: lastTs,
+          mails: descMails,
+          steps: steps,
+          summary: summary,
+          suggestedTitle: titlePrefix + rg.companyName + ' ' + catLabel + ' 조사'
+        });
+      });
     });
 
     list.sort(function (a, b) { return (b.lastTs - a.lastTs) || (b.mails.length - a.mails.length); });
     return list;
+  }
+
+  /* 사건 기준 연도 산출: 수임일 → 가장 이른 수집메일 일자 → 사건번호 연도 → 종결일 → 생성시각 */
+  function caseYearOf(caseRec) {
+    if (!obj(caseRec)) return '미상';
+    var m1 = /^(20\d{2})/.exec(str(caseRec.receiveDate));
+    if (m1) return m1[1];
+    var minTs = earliestMailTs(caseRec.mailLinks);
+    if (minTs > 0) {
+      var ym = ymdOf(minTs).slice(0, 4);
+      if (/^20\d{2}$/.test(ym)) return ym;
+    }
+    var mNo = /(20\d{2})/.exec(str(caseRec.erpCaseNo));
+    if (mNo) return mNo[1];
+    var mClose = /^(20\d{2})/.exec(str(caseRec.closeDate));
+    if (mClose) return mClose[1];
+    var cr = ymdOf(caseRec.createdAt).slice(0, 4);
+    if (/^20\d{2}$/.test(cr)) return cr;
+    return '미상';
+  }
+
+  function bundleYearOf(bundle) {
+    if (!obj(bundle)) return '미상';
+    if (/^20\d{2}$/.test(str(bundle.year))) return str(bundle.year);
+    var m = /^(20\d{2})/.exec(str(bundle.firstDate || bundle.lastDate));
+    return m ? m[1] : '미상';
+  }
+
+  /* 등록 사건 + 미등록 메일 묶음을 연도별(최신순)로 통합 집계 */
+  function buildYearlyArchive(cases, bundles) {
+    var byYear = {};
+    var totalCases = 0;
+    var totalBundles = 0;
+    var totalMails = 0;
+
+    function ensureYr(yr) {
+      var y = str(yr) || '미상';
+      if (!byYear[y]) {
+        byYear[y] = {
+          year: y,
+          cases: [],
+          bundles: [],
+          caseCount: 0,
+          bundleCount: 0,
+          totalCount: 0,
+          mailCount: 0,
+          catCounts: { harass: 0, sexual: 0, both: 0 }
+        };
+      }
+      return byYear[y];
+    }
+
+    (Array.isArray(cases) ? cases : []).forEach(function (c) {
+      if (!obj(c) || c._deleted) return;
+      var yr = caseYearOf(c);
+      var bucket = ensureYr(yr);
+      var mc = Array.isArray(c.mailLinks) ? c.mailLinks.length : 0;
+      var cat = CATEGORIES[c.category] ? c.category : 'harass';
+      bucket.cases.push(c);
+      bucket.caseCount++;
+      bucket.totalCount++;
+      bucket.mailCount += mc;
+      bucket.catCounts[cat] = (bucket.catCounts[cat] || 0) + 1;
+      totalCases++;
+      totalMails += mc;
+    });
+
+    (Array.isArray(bundles) ? bundles : []).forEach(function (b) {
+      if (!obj(b)) return;
+      var yr = bundleYearOf(b);
+      var bucket = ensureYr(yr);
+      var mc = Array.isArray(b.mails) ? b.mails.length : 0;
+      var cat = CATEGORIES[b.category] ? b.category : 'harass';
+      bucket.bundles.push(b);
+      bucket.bundleCount++;
+      bucket.totalCount++;
+      bucket.mailCount += mc;
+      bucket.catCounts[cat] = (bucket.catCounts[cat] || 0) + 1;
+      totalBundles++;
+      totalMails += mc;
+    });
+
+    var years = Object.keys(byYear).sort(function (a, b) {
+      var na = /^20\d{2}$/.test(a) ? Number(a) : -1;
+      var nb = /^20\d{2}$/.test(b) ? Number(b) : -1;
+      if (na !== nb) return nb - na;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+
+    var groups = years.map(function (yr) {
+      var g = byYear[yr];
+      g.cases.sort(function (a, b) {
+        var da = str(a.receiveDate);
+        var db = str(b.receiveDate);
+        if (da !== db) return db.localeCompare(da);
+        return ((Array.isArray(b.mailLinks) ? b.mailLinks.length : 0) - (Array.isArray(a.mailLinks) ? a.mailLinks.length : 0));
+      });
+      g.bundles.sort(function (a, b) {
+        return ((Number(b.lastTs) || 0) - (Number(a.lastTs) || 0)) || ((b.mails || []).length - (a.mails || []).length);
+      });
+      return g;
+    });
+
+    return {
+      years: years,
+      byYear: byYear,
+      groups: groups,
+      totalCases: totalCases,
+      totalBundles: totalBundles,
+      totalItems: totalCases + totalBundles,
+      totalMails: totalMails
+    };
   }
 
   /* 이알피 비고(note)에 조사 자동연동 블록을 안전하게 병합 (사람이 직접 적은 위·아래 글은 그대로 보존) */
@@ -1311,6 +1650,7 @@
     ymdOf: ymdOf,
     parseAddrs: parseAddrs,
     coNameNorm: coNameNorm,
+    coCoreNorm: coCoreNorm,
     maskRrnText: maskRrnText,
     hasUnmaskedRrn: hasUnmaskedRrn,
     canAccessSecret: canAccessSecret,
@@ -1328,6 +1668,9 @@
     deriveStepsFromMails: deriveStepsFromMails,
     summarizeProgress: summarizeProgress,
     discoverUnregisteredBundles: discoverUnregisteredBundles,
+    caseYearOf: caseYearOf,
+    bundleYearOf: bundleYearOf,
+    buildYearlyArchive: buildYearlyArchive,
     mergeErpNote: mergeErpNote,
     buildErpSyncPayload: buildErpSyncPayload,
     judgeIssue: judgeIssue,

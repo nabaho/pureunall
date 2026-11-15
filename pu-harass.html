@@ -145,6 +145,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .ws-step.cur span{color:var(--blue-d)}
 .ws-modes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);background:var(--card)}
 .ws-modes button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.yr-pills{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+.yr-pills:empty{display:none}
+.yr-pills button{font-size:12px;padding:4px 10px;border-radius:16px;min-height:30px;background:var(--card);border:1px solid var(--line2);color:var(--ink2)}
+.yr-pills button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
 .ws-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
 .ws-split.focus-iv{grid-template-columns:1fr}
 .ws-split.focus-iv .ws-col-right{display:none}
@@ -200,6 +204,9 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
+  .yr-pills{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:7px 10px}
+  .yr-pills::-webkit-scrollbar{display:none}
+  .yr-pills button{flex:0 0 auto;min-height:36px;padding:6px 11px}
   main{padding:8px 0 64px}
   .card{border-left:0;border-right:0;border-radius:0}
   .note,.warn,.secret-lock{margin:0 10px 10px}
@@ -249,6 +256,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <div class="tabs" id="tabs">
     <button data-tab="cases" class="on">📂 조사 사건 현황 <span class="chip c-blue" id="nCases">0</span></button>
     <button data-tab="inbox">📥 메일 자동수집 · 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
+    <button data-tab="yearly">📅 연도별 전체 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
     <button data-tab="detail">📋 공문함 · 8단계 관리</button>
     <button data-tab="report">🔒 녹취·전자서명 · 3요건·보고서(.hwpx)</button>
   </div>
@@ -267,6 +275,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <section class="pane on" id="p-cases">
     <div class="kpis" id="kpiBox"></div>
     <div class="card">
+      <div class="yr-pills" id="caseYrBar"></div>
       <div class="bar">
         <input id="caseQ" type="search" aria-label="사건 검색" placeholder="사업장·사건명·사건번호 찾기" style="flex:1;min-width:160px;max-width:300px">
         <select id="caseCat" aria-label="조사 구분 필터">
@@ -292,10 +301,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <!-- 탭 2: 메일 자동수집 · 미등록 후보 -->
   <section class="pane" id="p-inbox">
     <div class="note">
-      푸른 메일함에서 <b>직장 내 괴롭힘·성희롱 조사 관련 견적·계약·공문·진술서·보고서</b>를 자동 감지해 의뢰처별로 묶었습니다.
+      푸른 메일함(최근 메일 + 2021년~현재 지난메일 전체)에서 <b>직장 내 괴롭힘·성희롱 조사 관련 견적·계약·공문·진술서·보고서</b>를 자동 감지해 의뢰처·연도별로 묶었습니다.
       맞는 묶음을 골라 <b>➕ 사건 등록 + 이알피 반영</b>을 누르면 조사 사건 생성과 함께 푸른이알피에 진행 과정 전체가 자동 등록됩니다.
     </div>
     <div class="card">
+      <div class="yr-pills" id="inboxYrBar"></div>
       <div class="bar">
         <input id="inQ" type="search" aria-label="미등록 후보 검색" placeholder="의뢰처·메일 제목·첨부파일 찾기" style="flex:1;min-width:160px;max-width:320px">
         <button class="sm" id="imapInboxBtn">🔍 키워드 지정 메일함 심층검색</button>
@@ -304,6 +314,31 @@ table.t tr.cur>td.n{color:var(--ink2)}
       </div>
       <div id="inboxBox"></div>
     </div>
+  </section>
+
+  <!-- 탭 3: 연도별 전체 자료함 -->
+  <section class="pane" id="p-yearly">
+    <div class="kpis" id="yrKpiBox"></div>
+    <div class="card">
+      <div class="yr-pills" id="yrPillsBar"></div>
+      <div class="bar">
+        <input id="yrQ" type="search" aria-label="연도별 자료 검색" placeholder="연도·의뢰처·사건명·메일 제목·첨부파일 찾기" style="flex:1;min-width:160px;max-width:320px">
+        <select id="yrCat" aria-label="연도별 조사 구분 필터">
+          <option value="">조사 구분 전체</option>
+          <option value="harass">직장 내 괴롭힘</option>
+          <option value="sexual">직장 내 성희롱</option>
+          <option value="both">괴롭힘·성희롱 복합</option>
+        </select>
+        <select id="yrKind" aria-label="등록 상태 필터">
+          <option value="">등록사건 + 미등록 묶음 전체</option>
+          <option value="case">등록된 조사 사건만</option>
+          <option value="bundle">미등록 메일 묶음만</option>
+        </select>
+        <span class="sp"></span>
+        <button class="sm" id="yrCsvBtn" title="연도별 전체 괴롭힘·성희롱 사건 및 메일 묶음 목록을 CSV(엑셀) 파일로 내려받습니다">📥 연도별 목록 CSV 받기</button>
+      </div>
+    </div>
+    <div id="yearlyBox"></div>
   </section>
 
   <!-- 탭 3: 사건 상세 · 8단계 진행 & 공문함 -->
@@ -347,10 +382,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-harass-core.js?v=6"></script>
+<script src="js/pu-harass-core.js?v=7"></script>
 <script src="js/pu-harass-sign.js?v=3"></script>
 <script src="js/pu-harass-hwpx.js?v=5"></script>
-<script src="js/pu-harass-view.js?v=9"></script>
+<script src="js/pu-harass-view.js?v=10"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
