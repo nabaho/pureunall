@@ -599,7 +599,7 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .g-title.top .gname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-title.top .gcnt{font-size:12px;color:#60a5fa;font-variant-numeric:tabular-nums}
 .g-title.top.gsel{background:#60a5fa;border-color:#60a5fa;color:#1e293b}
-.g-title.top.gsel .gcnt{color:#1e293b}
+.g-title.top.gsel .gcnt{color:#bfdbfe}   /* 고른 묶음의 바탕은 파란색(위 .gsel)이 아니라 어두운 그라데이션(.nav-group>.g-title 의 !important 가 이긴다)이라 남색 글자는 1.2:1 이었다 — tests/kcareer-dark-surfaces.test.js */
 .g-title.top:focus-visible{outline:2px solid #fff;outline-offset:2px}
 /* 하위 머리 — 어느 상위 «안»을 보고 있는지 적는다 */
 .nav-sec{font-size:10.5px;color:#60a5fa;letter-spacing:.1em;font-weight:700;margin:14px 14px 6px}
@@ -772,9 +772,9 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-banner a:focus-visible,.mr-pill:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .mr-banner a.mr-x{font-weight:400;opacity:.65;text-decoration:none}
 #nav .nav-item .ncnt.mr-alarm{color:#f87171;font-weight:800}
-.g-title.top.gsel .gcnt.mr-alarm{color:#1e293b}   /* 고른 단추는 파란 바탕 — 붉은 글자는 1:1 이라 안 보인다. «📬» 글자와 굵기로 알린다 */
+.g-title.top.gsel .gcnt.mr-alarm{color:#fecaca}   /* 고른 묶음도 바탕은 어두운 그라데이션이다(파란 바탕이 아님). «📬» 글자와 굵기로도 알린다 */
 #modalMr .mr-det-v input,#modalMr .mr-det-v .btn{margin:2px 4px 2px 0}   /* 좁은 폰에서 기한 칸이 줄바꿈돼도 위아래가 맞닿지 않게 */
-.g-title.top .gcnt.mr-alarm{color:#f87171;font-weight:800}   /* 어두운 옆줄 바탕 위 대비 5:1 — var(--red) 는 3:1 이라 모자란다. 골라 둔 칸(.gsel)은 기본 남색 그대로 */
+.g-title.top .gcnt.mr-alarm{color:#fecaca;font-weight:800}   /* 옆줄 바탕은 어두운 그라데이션(금빛 끝점 #373939) — #f87171 은 그 끝에서 4.2:1 이라 한 단계 밝은 붉은색(≥4.5:1). var(--red) 는 3:1 이라 모자란다 */
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
@@ -1668,7 +1668,7 @@ html.dark :is([style*="color:#1e40af" i],[style*="color: #1e40af" i],[style*="co
 html.dark :is([style*="color:#1e293b" i],[style*="color: #1e293b" i],[style*="color: rgb(30, 41, 59)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#e2e8f0!important}
 html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="color:#64748b" i],[style*="color: #64748b" i],[style*="color: rgb(71, 85, 105)"],[style*="color: rgb(100, 116, 139)"]):not([style*="background:#"]):not([style*="background: #"]):not([style*="background: rgb"]):not([style*="background-color"]):not(:is(.cv-sheet,.kf-paper,.kf-sheet,#p1Paper,#rhwpEditor) *):not(:is([style*="background:#"],[style*="background: #"],[style*="background: rgb"]):is([style^="color:"],[style*=";color:"],[style*=" color:"]) *){color:#94a3b8!important}
 /* ⑧ 화면에 «직접 박힌» 밝은 바탕(글자색 안 박은 것) → 어두운 바탕. 글자색을 같이 박은 밝은 칩·종이·프로필 1장 안내 상자는 뺀다 */
-html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
+html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -8436,9 +8436,10 @@ function _p1Scale(){
     if(!fitsW){ paper.style.overflowX='auto'; extra=18; }
   }
   else{
-    /* 태블릿에서 설정 칸 «아래»로 쌓이면 그림 자리(top)가 화면 밖 아래라, 높이를 그대로 재면 300px 한도(27%)로 쪼그라든다 —
-       그림 앞으로 스크롤해 오면 «한 화면»이 되게, 화면 맨 위에 있는 것으로 잰다. 폰(≤520px)은 예전 그대로 둔다. */
-    var 쌓임=false; try{ 쌓임=!!_p1Side&&window.innerWidth>520&&String(getComputedStyle(box).gridTemplateColumns||'').trim().split(/\s+/).length<2; }catch(e){}
+    /* 설정 칸 «아래»로 쌓이면(폰·태블릿) 그림 자리(top)가 화면 밖 아래라, 높이를 그대로 재면 300px 한도(27%)로 쪼그라든다 —
+       폰에서 그림이 칸 폭의 절반도 안 되게 작게 나오던 까닭이다(2026-11-15 대표 «남은 것도 모두 고쳐라»).
+       그림 앞으로 스크롤해 오면 «한 화면»이 되게, 화면 맨 위에 있는 것으로 잰다 — 그러면 폭에 맞춰 칸을 채운다. */
+    var 쌓임=false; try{ 쌓임=!!_p1Side&&String(getComputedStyle(box).gridTemplateColumns||'').trim().split(/\s+/).length<2; }catch(e){}
     var top=쌓임?8:paper.getBoundingClientRect().top;
     var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
     s=Math.min(1, fitW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
