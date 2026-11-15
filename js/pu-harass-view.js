@@ -26,6 +26,7 @@
     erpAck: {},
     dismissed: {},
     companies: [],
+    cardIdx: {},
     erpCases: [],
     caseTypes: [],
     mailFolders: {},
@@ -295,6 +296,7 @@
     D.erpAck = {};
     D.dismissed = {};
     D.companies = [];
+    D.cardIdx = {};
     D.erpCases = [];
     D.caseTypes = [];
     D.mailFolders = {};
@@ -410,8 +412,51 @@
     return [];
   }
 
+  function resolveDisplayCompanyAndTitle(c) {
+    var co = C.str(c && c.companyName);
+    var ti = C.str(c && c.title);
+    var hasEmailCo = !co || /@/.test(co) || co === '미확인 의뢰처';
+    if (hasEmailCo && c) {
+      var exts = [];
+      C.parseAddrs(c.email).concat(C.parseAddrs(co)).forEach(function (ea) {
+        if (ea && exts.indexOf(ea) < 0) exts.push(ea);
+      });
+      (Array.isArray(c.mailLinks) ? c.mailLinks : []).forEach(function (m) {
+        (m && Array.isArray(m.extAddrs) ? m.extAddrs : []).forEach(function (ea) {
+          if (ea && exts.indexOf(ea) < 0) exts.push(ea);
+        });
+      });
+      if (CO_DIR) {
+        for (var i = 0; i < exts.length; i++) {
+          var ea = exts[i];
+          if (CO_DIR.byAddr && CO_DIR.byAddr[ea]) { co = CO_DIR.byAddr[ea].name; break; }
+          if (CO_DIR.cardByAddr && CO_DIR.cardByAddr[ea] && CO_DIR.cardByAddr[ea].name) { co = CO_DIR.cardByAddr[ea].name; break; }
+          var dom = C.domainOf(ea);
+          if (C.isPrivateDomain(dom)) {
+            if (CO_DIR.byDomain && CO_DIR.byDomain[dom] && CO_DIR.byDomain[dom].length === 1) { co = CO_DIR.byDomain[dom][0].name; break; }
+            if (CO_DIR.cardByDomain && CO_DIR.cardByDomain[dom] && CO_DIR.cardByDomain[dom].name) { co = CO_DIR.cardByDomain[dom].name; break; }
+          }
+        }
+      }
+      if (!co || /@/.test(co) || co === '미확인 의뢰처') {
+        var mails = Array.isArray(c.mailLinks) ? c.mailLinks : [];
+        for (var mi = 0; mi < mails.length; mi++) {
+          var cand = C.extractOrgName(mails[mi].subject, mails[mi].attNames, mails[mi].from || mails[mi].to, '');
+          if (cand) { co = cand; break; }
+        }
+      }
+      if (!co || /@/.test(co) || co === '미확인 의뢰처') co = '기타 조사 의뢰 사업장';
+    }
+    if (!ti || /@/.test(ti) || /^미확인 의뢰처/.test(ti)) {
+      ti = typeof C.buildKoreanCaseTitle === 'function'
+        ? C.buildKoreanCaseTitle(co, c && c.category, c && c.mailLinks, '')
+        : (co + ' 조사 사건');
+    }
+    return { companyName: co, title: ti };
+  }
+
   function rebuildDerived() {
-    CO_DIR = C.buildCompanyDirectory(D.companies);
+    CO_DIR = C.buildCompanyDirectory(D.companies, D.cardIdx);
     var baseRows = C.flattenMailbox(D.mailFolders, D.mailMsgs, D.oldMailMsgs);
     var seenKeys = {};
     MAIL_ROWS = [];
@@ -510,7 +555,7 @@
     if (CUR_ID && !byId[CUR_ID]) CUR_ID = '';
     if (!CUR_ID && MERGED_CASES.length) CUR_ID = MERGED_CASES[0].id;
 
-    BUNDLES = C.discoverUnregisteredBundles(MAIL_ROWS, MERGED_CASES, CO_DIR, D.dismissed);
+    BUNDLES = C.discoverUnregisteredBundles(MAIL_ROWS, MERGED_CASES, CO_DIR, D.dismissed, { staffList: STAFF });
     YEARLY_DATA = C.buildYearlyArchive(MERGED_CASES, BUNDLES);
     if (YEAR_FILTER && (!YEARLY_DATA.byYear || !YEARLY_DATA.byYear[YEAR_FILTER])) {
       YEAR_FILTER = '';
@@ -929,9 +974,10 @@
       fbDb.ref('data/biz_case_types/v').once('value'),
       fbDb.ref('mailbox/folders').once('value'),
       fbDb.ref('mailbox/msgs').once('value'),
-      fbDb.ref('mailbox/old/msgs').once('value')
+      fbDb.ref('mailbox/old/msgs').once('value'),
+      fbDb.ref('pucards/idx').once('value')
     ];
-    var labels = ['조사사건', '동기화큐', '동기화응답', '제외목록', '업체원장', '이알피사건', '사건유형', '메일폴더', '메일목록', '지난메일'];
+    var labels = ['조사사건', '동기화큐', '동기화응답', '제외목록', '업체원장', '이알피사건', '사건유형', '메일폴더', '메일목록', '지난메일', '명함색인'];
     var res = await Promise.allSettled(tasks);
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var fails = [];
@@ -950,6 +996,19 @@
     D.mailFolders = valAt(7, {});
     D.mailMsgs = valAt(8, {});
     D.oldMailMsgs = valAt(9, {});
+    var rawCardIdx = valAt(10, {});
+    var slimCardIdx = {};
+    if (rawCardIdx && typeof rawCardIdx === 'object') {
+      Object.keys(rawCardIdx).forEach(function (ck) {
+        var it = rawCardIdx[ck];
+        if (!it || typeof it !== 'object') return;
+        var co = C.str(it.c || it.company || it.co);
+        var em = C.str(it.e || it.email);
+        if (!co || !em) return;
+        slimCardIdx[ck] = { c: co, bz: C.str(it.bz || it.bizNo || it.bizno), e: em };
+      });
+    }
+    D.cardIdx = slimCardIdx;
 
     var noteEl = $('loadNote');
     if (noteEl) {
@@ -1088,7 +1147,8 @@
       if (erpF === 'deferred' && isCaseErpLinked(c)) return false;
       if (mgr && c.managerMain !== mgr && (c.managerSubs || []).indexOf(mgr) < 0) return false;
       if (q) {
-        var hay = [c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
+        var dispQ = resolveDisplayCompanyAndTitle(c);
+        var hay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -1108,11 +1168,12 @@
       var vLbl = c.verdictSummary && C.VERDICTS[c.verdictSummary] ? ' · ' + C.VERDICTS[c.verdictSummary].label : '';
       var yr = C.caseYearOf(c);
       var yrBadge = /^20\d{2}$/.test(yr) ? ('<span class="chip">' + esc(yr) + '</span> ') : '';
-      var fullLabel = (c.companyName || '(사업장 미입력)') + ' — ' + (c.title || '조사 사건');
+      var disp = resolveDisplayCompanyAndTitle(c);
+      var fullLabel = disp.companyName + ' — ' + disp.title;
       return {
         id: c.id,
         cells: [
-          { cls: 'ti', title: fullLabel, html: yrBadge + esc(c.companyName || '(사업장 미입력)') + ' — ' + esc(c.title || '조사 사건') },
+          { cls: 'ti', title: fullLabel, html: yrBadge + esc(disp.companyName) + ' — ' + esc(disp.title) },
           { k: 'badge', html: catChip(c.category) },
           { html: esc(mgrText(c)) },
           { html: stepDots(c.steps) + '<b>' + p.doneCount + '/' + p.totalCount + '</b> ' + esc(p.currentStepShort + vLbl) },
@@ -1178,8 +1239,9 @@
       var fCases = kind === 'bundle' ? [] : g.cases.filter(function (c) {
         if (cat && c.category !== cat) return false;
         if (q) {
+          var dispY = resolveDisplayCompanyAndTitle(c);
           var mTxt = (c.mailLinks || []).map(function (m) { return m.subject + ' ' + (m.attNames || []).join(' '); }).join(' ');
-          var hay = [g.year, c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), mTxt].join(' ').toLowerCase();
+          var hay = [g.year, dispY.companyName, dispY.title, c.companyName, c.title, c.erpCaseNo, nameOf(c.managerMain), mTxt].join(' ').toLowerCase();
           if (hay.indexOf(q) < 0) return false;
         }
         return true;
@@ -1232,11 +1294,12 @@
         secMailSum += mc;
         var attSum = (c.mailLinks || []).reduce(function (s, m) { return s + (Number(m.attCount) || (m.attNames || []).length || 0); }, 0);
         var period = (c.receiveDate || '-') + (c.closeDate ? (' ~ ' + c.closeDate) : ' ~ 진행중');
-        var fullCaseTi = (c.companyName || '(미입력)') + ' — ' + (c.title || '조사 사건');
+        var disp = resolveDisplayCompanyAndTitle(c);
+        var fullCaseTi = disp.companyName + ' — ' + disp.title;
         rows.push({
           id: 'c:' + c.id,
           cells: [
-            { cls: 'ti', title: fullCaseTi, html: '<span class="chip c-green">✓ 등록사건</span> ' + esc(c.companyName || '(미입력)') + ' — ' + esc(c.title || '조사 사건') },
+            { cls: 'ti', title: fullCaseTi, html: '<span class="chip c-green">✓ 등록사건</span> ' + esc(disp.companyName) + ' — ' + esc(disp.title) },
             { k: 'badge', html: catChip(c.category) },
             { html: stepDots(c.steps) + '<b>' + p.doneCount + '/8</b> · 메일 <b>' + mc + '</b>통' + (attSum ? (' (첨부 ' + attSum + ')') : '') },
             { html: esc(period + ' · ' + mgrText(c)) },
@@ -1324,6 +1387,7 @@
       var g = entry.group;
       entry.cases.forEach(function (c) {
         var p = c.progress || C.summarizeProgress(c.steps, c.closeDate);
+        var dispC = resolveDisplayCompanyAndTitle(c);
         var mails = c.mailLinks || [];
         var attSum = mails.reduce(function (s, m) { return s + (Number(m.attCount) || (m.attNames || []).length || 0); }, 0);
         var sample = mails.slice(0, 3).map(function (m) {
@@ -1331,7 +1395,7 @@
           return (m.date || '') + ' ' + (m.subject || '') + an;
         }).join(' / ');
         lines.push([
-          g.year, '등록사건', c.companyName || '', c.title || '',
+          g.year, '등록사건', dispC.companyName || '', dispC.title || '',
           (C.CATEGORIES[c.category] || C.CATEGORIES.harass).label,
           p.doneCount + '/8 (' + p.currentStepShort + ')',
           String(mails.length), String(attSum),
@@ -1418,7 +1482,8 @@
   function casePickerBar(c) {
     var opts = MERGED_CASES.map(function (x) {
       var no = x.erpCaseNo ? '[' + x.erpCaseNo + '] ' : (x.erpDefer ? '[번호공란] ' : '');
-      return '<option value="' + esc(x.id) + '"' + (x.id === c.id ? ' selected' : '') + '>' + esc(no + (x.companyName || '미입력') + ' — ' + (x.title || '조사')) + '</option>';
+      var dispX = resolveDisplayCompanyAndTitle(x);
+      return '<option value="' + esc(x.id) + '"' + (x.id === c.id ? ' selected' : '') + '>' + esc(no + (dispX.companyName || '미입력') + ' — ' + (dispX.title || '조사')) + '</option>';
     }).join('');
     var editable = canEditCase(c);
     var erpBtn = c.erpCaseId
@@ -1517,11 +1582,12 @@
          '<button class="sm" data-act="addOfflineDoc">✍️ 오프라인 서류 기록</button>')
       : '';
 
+    var dispCur = resolveDisplayCompanyAndTitle(c);
     box.innerHTML =
       '<div class="card">' +
       casePickerBar(c) +
       '<div class="prof">' +
-      '<span><b>의뢰 사업장</b>' + esc(c.companyName || '-') + (c.bizNo ? ' (' + esc(c.bizNo) + ')' : '') + '</span>' +
+      '<span><b>의뢰 사업장</b>' + esc(dispCur.companyName || '-') + (c.bizNo ? ' (' + esc(c.bizNo) + ')' : '') + '</span>' +
       '<span><b>담당 노무사</b>' + esc(mgrText(c)) + '</span>' +
       '<span><b>수임·착수일</b>' + esc(c.receiveDate || '-') + '</span>' +
       '<span><b>보고 기한</b>' + esc(c.dueDate || '-') + '</span>' +
@@ -2176,9 +2242,10 @@
           var tag = (cCore && ecCore === cCore) ? '★동일사업장 · ' : '';
           return '<option value="' + esc(ec.id) + '">' + esc(tag + '[' + (ec.caseNo || '번호미정') + '] ' + (ec.companyName || '') + ' — ' + (ec.title || ec.brief || '조사')) + '</option>';
         }).join('');
+      var dispE = resolveDisplayCompanyAndTitle(c);
       return '<div style="display:flex;gap:8px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);flex-wrap:wrap">' +
         '<input type="checkbox" data-erpck="' + esc(c.id) + '"' + checked + ' aria-label="' + (idx + 1) + '번 사건 선택">' +
-        '<div style="flex:1;min-width:210px"><b>' + esc(yr) + '</b> · <b>' + esc(c.companyName || '(미입력)') + '</b> — ' + esc(c.title || '조사') +
+        '<div style="flex:1;min-width:210px"><b>' + esc(yr) + '</b> · <b>' + esc(dispE.companyName || '(미입력)') + '</b> — ' + esc(dispE.title || '조사') +
         '<div class="hint">수임일 ' + esc(c.receiveDate || '-') + ' · 수집공문 ' + ((c.mailLinks || []).length) + '건 · ' + esc(mgrText(c)) + '</div></div>' +
         '<select data-erppick="' + esc(c.id) + '" aria-label="이알피 연결 방식 선택" style="min-width:240px;max-width:340px">' + optHtml + '</select>' +
         '</div>';
@@ -2766,10 +2833,12 @@
   function openMailFinderModal() {
     var c = caseById(CUR_ID);
     if (!c || !canEditCase(c)) return;
+    var dispM = resolveDisplayCompanyAndTitle(c);
+    var initQ = dispM.companyName === '기타 조사 의뢰 사업장' ? '' : (dispM.companyName || '');
     openModal(
-      '<div class="mhd" id="mhdTitle">🔍 푸른 메일함에서 서류 찾아 연결 — ' + esc(c.companyName) + '<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
+      '<div class="mhd" id="mhdTitle">🔍 푸른 메일함에서 서류 찾아 연결 — ' + esc(dispM.companyName) + '<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
       '<div class="mbd">' +
-      '<div class="bar" style="padding:0 0 8px"><input id="mfQ" type="search" aria-label="메일 검색어" placeholder="회사명·제목·이메일·첨부파일명 입력" value="' + esc(c.companyName || '') + '" style="flex:1"><button class="sm pri" id="mfBtn">찾기</button></div>' +
+      '<div class="bar" style="padding:0 0 8px"><input id="mfQ" type="search" aria-label="메일 검색어" placeholder="회사명·제목·이메일·첨부파일명 입력" value="' + esc(initQ) + '" style="flex:1"><button class="sm pri" id="mfBtn">찾기</button></div>' +
       '<div id="mfRes"></div></div>' +
       '<div class="mft"><button data-mclose="1">닫기</button></div>',
       true

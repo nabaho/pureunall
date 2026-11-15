@@ -68,14 +68,16 @@
 
   /* 홍보·뉴스레터·일반 의무교육 안내·단순 4대보험 신고 메일은 조사 사건 자동발굴에서 제외 */
   var NOISE_RE = /뉴스레터|수신\s*거부|광고\)|법정의무교육\s*안내|교육기관\s*지정|무료\s*특강|세미나\s*안내|홍보물|카드\s*명세서|세금계산서\s*발행\s*안내|사대보험\s*상실신고서|4대보험\s*상실신고서|입퇴사자\s*요청\s*서식/i;
-  /* 단순 법정의무 예방교육·강의안·근로조건 자율점검 증빙은 실제 조사·분쟁 신호가 없으면 제외 */
-  var EDU_ONLY_RE = /예방\s*교육\s*(자료|일지|서명|안내|보고서|실습생|일정|게시|이수|확인서|사진)|성폭력\s*예방\s*교육|법정의무\s*교육|강의\s*(자료|안)|교육\s*지정\s*기관|자율\s*(개선|점검)\s*(지원\s*사업|사업|내역|신청)/i;
+  /* 단순 법정의무 예방교육·강의안·근로조건 자율점검·기술보호 일반서식·임금체불 확인서는 실제 조사·분쟁 신호가 없으면 제외 */
+  var EDU_ONLY_RE = /예방\s*교육\s*(자료|일지|서명|안내|보고서|실습생|일정|게시|이수|확인서|사진)|성폭력\s*예방\s*교육|법정의무\s*교육|강의\s*(자료|안|주제)|교육\s*주제\s*알려|교육\s*지정\s*기관|자율\s*(개선|점검)\s*(지원\s*사업|사업|내역|신청)|기술\s*보호\s*(컨설팅|지원반|서식)|사업주\s*체불\s*확인서|임금\s*체불.*근로자성/i;
   var CASE_OVERRIDE_RE = /조사\s*(결과|보고|위원|위임|착수|계획|용역|의뢰|진행)|문답서|진술서|소명서|신고서|징계|인사위원회|고충\s*(심의|처리\s*조사|신청)|개선\s*지도|재진정|실태\s*조사/;
+  /* 공직자통합메일(korea.kr) 등 메일 하단에 자동 삽입되는 정책뉴스 배너 문구 제거 */
+  var GOV_BANNER_STRIP_RE = /공무원\s*[‘'""「]?\s*직장\s*내\s*괴롭힘\s*[’'""」]?\s*피해도[\s\S]*$/i;
   /* 개인 민감 서류(급여·주민번호·계좌) — 목록에는 표시하되 자동 열람 경고 */
   var PRIV_RE = /급여\s*대장|임금\s*대장|원천\s*징수|주민등록|신분증|통장\s*사본|연말\s*정산|4대\s*보험\s*명부/;
 
-  /* 괴롭힘·성희롱 조사 직접 신호 */
-  var HARASS_SIGNAL_RE = /직장\s*내\s*괴롭힘|직장내괴롭힘|직괴|직장\s*내\s*성희롱|직장내성희롱|직장\s*괴롭힘|괴롭힘\s*조사|성희롱\s*조사|괴롭힘\s*신고|성희롱\s*신고|성희롱\s*사건|성희롱\s*발언|성희롱\s*징계|고충\s*조사|고충\s*심의|고충\s*처리|피해\s*근로자\s*보호|피신고인|신고인\s*면담|행위자\s*면담|비밀\s*유지\s*서약|조사\s*결과\s*보고서|외부\s*전문가\s*조사|조사\s*위원\s*위촉|진상\s*조사\s*보고|성폭력\s*상담|(?:소장|고충|사내|신고)\s*(?:관련\s*)?["'「]?조사\s*보고서/;
+  /* 괴롭힘·성희롱 조사 직접 신호 (단독 영업비밀·입사 비밀유지서약서는 제외하고 조사·고충 맥락이 있는 신호만 채택) */
+  var HARASS_SIGNAL_RE = /직장\s*내\s*괴롭힘|직장내괴롭힘|직괴|직장\s*내\s*성희롱|직장내성희롱|직장\s*괴롭힘|괴롭힘\s*조사|성희롱\s*조사|괴롭힘\s*신고|성희롱\s*신고|성희롱\s*사건|성희롱\s*발언|성희롱\s*징계|고충\s*조사|고충\s*심의|고충\s*처리|피해\s*근로자\s*보호|피신고인|신고인\s*면담|행위자\s*면담|(?:조사|면담|고충|괴롭힘|성희롱)[^\n]{0,24}비밀\s*유지\s*서약|비밀\s*유지\s*서약[^\n]{0,24}(?:조사|면담|고충|괴롭힘|성희롱)|조사\s*결과\s*보고서|외부\s*전문가\s*조사|조사\s*위원\s*위촉|진상\s*조사\s*보고|성폭력\s*상담|(?:소장|고충|사내|신고)\s*(?:관련\s*)?["'「]?조사\s*보고서/;
   /* 기등록 조사 사건의 업체와 주고받은 보조 진행 서류 신호 */
   var CASE_DOC_SIGNAL_RE = /공문|조사|면담|출석|진술|문답|소명|경위서|서약서|동의서|녹취|증거|호증|설문|실태|보고서|의견서|인사위원회|징계|보호\s*조치|위임|계약서|견적서/;
   /* 추정 외부 이메일(2차 확장)에서 허용할 조사 핵심 진행 서류 신호 */
@@ -241,59 +243,129 @@
     return DOC_ROLES.general;
   }
 
-  /* 제목·첨부·발신자명에서 기관/회사 이름 추출 */
-  function extractOrgName(subject, attNames, peerName) {
-    var an = Array.isArray(attNames) ? attNames : [];
+  function stripMailBannerNoise(text) {
+    return str(text).replace(GOV_BANNER_STRIP_RE, ' ');
+  }
+
+  function cleanMailDisplayName(raw) {
+    var s = str(raw);
+    if (!s) return '';
+    /* "홍길동" <a@b.com> 형태에서 꺾쇠 주소 제거 */
+    s = s.replace(/<[^>]*>/g, ' ').replace(/^["'‘’“”\s]+|["'‘’“”\s]+$/g, '').replace(/\s+/g, ' ').trim();
+    if (!s || /@/.test(s)) return '';
+    return s;
+  }
+
+  /* 제목·첨부·상대방 표시이름·본문 미리보기에서 한국어 기관/회사 이름 추출 */
+  var ORG_NOISE_EXACT_RE = /^(?:fw|fwd|re|sv|회신|답장|전달|재송부|재발송|재전송|대외비|극비|기밀|비밀|긴급|필독|중요|공지|공문|안내|알림|참고|참고용|확인|확인요망|검토|검토요망|자문|자문요청|문의|업무협조|협조요청|서식|양식|초안|수정|수정본|최종|최종본|최종보고|별첨|붙임|첨부|개정|신규|감사메일|자동회신|부재중|결혼|부음|전자세금계산서|세금계산서|푸른노무법인|푸른노무|공인노무사|노무법인|직장내괴롭힘|직장내성희롱|괴롭힘조사|성희롱조사|조사결과보고서|조사보고서|진상조사보고서|비밀유지서약서|위임계약서|위임약정서|견적서|문답서|진술서|소명서|경위서|의견서|내용증명|신고인|피신고인|피해자|피해근로자|행위자|가해자|참고인|진정인|피진정인|신청인|피신청인|근로자|사용자|사업주|경영지원|경영지원팀|경영지원실|경영지원부|경영지원본부|경영관리|경영관리팀|인사|인사팀|인사부|인사총무팀|총무|총무팀|관리|관리팀|법무|법무팀|재무|재무팀|회계|회계팀|기획|기획팀|감사|감사팀|감사실|윤리경영실|운영지원팀|근로개선지도팀|현장클리닉|기술보호|기술보호서식|강의자료|교육자료)$/i;
+  var ORG_CASE_NO_NOISE_RE = /^(?:[가-힣]{0,4}\d{0,4}(?:부해|부노|차별|단협)\d+|접수번호\d*|iso\d+|esg경영|aeo|hr|ir|pr|qa|qc|tf|tft)$/i;
+  var KOREAN_INST_RE = /((?:주식회사|유한회사|합자회사|재단법인|사단법인|사회복지법인|학교법인|의료법인)\s*[가-힣0-9]{2,18}|(?:\(주\)|㈜|\(유\)|\(재\)|\(사\))\s*[가-힣A-Za-z0-9]{2,18}|[가-힣A-Za-z0-9]{2,18}\s*(?:주식회사|\(주\)|㈜|\(유\))|(?:국공립|공립|시립|구립|도립)?\s*[가-힣]{2,16}(?:대학교\s*산학협력단|대학교\s*인권센터|교육대학교|대학교|대학|지방고용노동청\s*[가-힣]{2,6}지청|지방고용노동청|고용노동청|지방중소벤처기업청|시설관리공단|산업인력공단|국제협력단|과학기술연구회|연구회|여성정책개발원|연구원|개발원|개발공사|전력공사\s*[가-힣]{2,6}본부|전력공사|철도공사|청화공사|경제진흥원|정보문화산업진흥원|진흥원|어린이인성학습원|인성학습원|사회서비스원|복지재단|문화복지센터|노인종합복지관|종합복지관|복지관|성폭력상담소|상담소|새마을금고|중앙신협|신협|산림조합|어린이집|유치원|산부인과의원|산부인과|정형외과의원|병원|의원|쉼터|요양원|호텔관리단|노사민정협의회|노동권익센터))/;
+
+  function extractOrgName(subject, attNames, peerName, previewText) {
+    var an = Array.isArray(attNames) ? attNames : (str(attNames) ? [str(attNames)] : []);
     var sources = [str(subject)].concat(an.map(str));
-    var badWords = /^(푸른노무법인|공인노무사|직장내괴롭힘|직장내성희롱|괴롭힘조사|성희롱조사|조사결과보고서|비밀유지서약서|위임계약서|견적서|회신|답장|전달|긴급|공문|붙임|별첨|첨부)$/;
 
     function cleanCand(raw) {
       var c = str(raw)
-        .replace(/^(RE|FW|FWD)\s*:\s*/gi, '')
-        .replace(/\b20\d{2}[._-]?\d{0,2}[._-]?\d{0,2}\b/g, '')
-        .replace(/\b\d{6}\b/g, '')
-        .replace(/\.(hwp|hwpx|pdf|docx?|xlsx?|zip|jpg|png)$/i, '')
-        .replace(/견적서|위임계약서|위임약정서|조사결과보고서|조사보고서|착수공문|비밀유지서약서|직장\s*내\s*괴롭힘|직장\s*내\s*성희롱|및|조사|관련|송부|제출|요청|건$/g, ' ')
-        .replace(/[_\-·]+/g, ' ')
+        .replace(/^(?:RE|FW|FWD|SV|회신|전달)\s*[:：]\s*/gi, '')
+        .replace(/@[a-z0-9.-]+\.[a-z]{2,}/gi, ' ')
+        .replace(/\b20\d{2}[._-]?\d{0,2}[._-]?\d{0,2}\b/g, ' ')
+        .replace(/\b\d{6,8}\b/g, ' ')
+        .replace(/\.(hwp|hwpx|pdf|docx?|xlsx?|pptx?|pptm|zip|jpg|jpeg|png)$/i, '')
+        .replace(/(?:견적서|위임계약서|위임약정서|용역계약서|조사결과보고서|조사보고서|진상조사보고서|완료보고서|착수공문|비밀유지서약서|비밀유지서약|정보보호서약서|윤리경영서약서|청렴의무준수서약서|문답서|진술서|소명서|의견서|직장\s*내\s*괴롭힘|직장내괴롭힘|직장\s*내\s*성희롱|직장내성희롱|성희롱|괴롭힘|자문의뢰|자문요청|조사위원|위촉|외부전문가|인사노무|컨설팅|초안|최종본|최종|수정본|수정|검토|회신|송부의\s*건|제출의\s*건|요청의\s*건|송부|제출|요청|관련|\s+및|\s+건)$/g, ' ')
+        .replace(/[_\-·•]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+      c = c.replace(/\s+(?:직장|괴롭힘|성희롱|고충|조사|자문|관련|건|송부|제출|요청).*$/, '').trim();
       if (c.length < 2 || c.length > 28) return '';
-      if (/푸른노무/.test(c) || badWords.test(c.replace(/\s+/g, ''))) return '';
-      if (/^\d+$/.test(c)) return '';
+      if (/푸른노무|370-6/.test(c)) return '';
+      var compact = c.replace(/\s+/g, '');
+      if (ORG_NOISE_EXACT_RE.test(compact) || ORG_CASE_NO_NOISE_RE.test(compact)) return '';
+      if (/^\d+$/.test(compact)) return '';
+      /* 한글이 전혀 없는 짧은 영문 머리말(FW, RE, BNK, HR 등)은 회사명으로 채택하지 않음 */
+      if (!/[가-힣]/.test(c) && c.length <= 6) return '';
+      if (/@|https?:\/\//i.test(c)) return '';
       return c;
     }
 
     for (var i = 0; i < sources.length; i++) {
       var src = sources[i];
-      /* 1) 대괄호 [기관명] */
-      var mBr = /\[([^\]]{2,28})\]/.exec(src);
-      if (mBr) {
+      if (!src) continue;
+      /* 1) 대괄호 [기관명] — 앞머리에 [RE]·[FW]·[대외비]가 있어도 뒤의 실제 [기관명]까지 모두 확인 */
+      var brRe = /\[([^\[\]]{2,30})\]/g;
+      var mBr;
+      while ((mBr = brRe.exec(src))) {
         var cb = cleanCand(mBr[1]);
-        if (cb) return cb;
+        if (cb && /[가-힣]/.test(cb)) return cb;
       }
-      /* 2) 파일명 패턴: 견적서(직장내괴롭힘)_기관명_250423 또는 조사보고서(기관명) */
-      var mUnder = /(?:견적서|계약서|약정서|보고서|공문|조사)[^_]*_([가-힣A-Za-z0-9()㈜\s]{2,25}?)(?:_\d{4,8}|\.[a-z0-9]{2,4}|$)/i.exec(src);
+      /* 2) [대외비](주)가나테크_... 처럼 대괄호 바로 뒤에 붙은 법인·기관명 */
+      var afterBr = src.replace(/^(?:\s*(?:RE|FW|FWD)\s*[:：]\s*|\s*\[[^\[\]]{1,16}\]\s*)+/i, '');
+      var mLeadCorp = /^((?:\(주\)|㈜|\(유\)|\(재\)|\(사\)|주식회사|유한회사|재단법인|사단법인|합자회사)\s*[가-힣A-Za-z0-9]{2,18}|[가-힣A-Za-z0-9]{2,18}(?:\(주\)|㈜|\(유\)))/.exec(afterBr);
+      if (mLeadCorp) {
+        var clc = cleanCand(mLeadCorp[1]);
+        if (clc) return clc;
+      }
+      /* 3) 파일명·제목 밑줄 패턴: 견적서(직장내괴롭힘)_기관명_250423 또는 완료보고서_기관명 */
+      var mUnder = /(?:견적서|계약서|약정서|보고서|공문|조사|서약서)[^_]*_([가-힣A-Za-z0-9()㈜\s]{2,25}?)(?:_\d{2,8}|_v\d+|\.[a-z0-9]{2,4}|$)/i.exec(src);
       if (mUnder) {
         var cu = cleanCand(mUnder[1]);
-        if (cu) return cu;
+        if (cu && /[가-힣]/.test(cu)) return cu;
       }
-      var mParen = /(?:견적서|계약서|보고서|조사)\s*[（(]([가-힣A-Za-z0-9㈜\s]{2,25})[)）]/.exec(src);
-      if (mParen) {
+      /* 4) 괄호 패턴: 조사보고서(기관명) — 단 (신고인)·(피신고인)·(초안)은 cleanCand 에서 자동 제외 */
+      var parenRe = /(?:견적서|계약서|보고서|조사|자문\s*요청)\s*[（(]([^()（）]{2,25})[)）]/g;
+      var mParen;
+      while ((mParen = parenRe.exec(src))) {
         var cp = cleanCand(mParen[1]);
-        if (cp) return cp;
+        if (cp && /[가-힣]/.test(cp)) return cp;
+      }
+      /* 5) 제목·첨부 안의 명확한 한국어 법인·공공기관·학교·어린이집·조합 명칭 */
+      var mInst = KOREAN_INST_RE.exec(afterBr);
+      if (mInst) {
+        var ci = cleanCand(mInst[1]);
+        if (ci) return ci;
       }
     }
-    /* 3) 상대방 표시 이름 안의 소속: 홍길동(한국상하수도협회) 또는 기관명 자체 */
-    var pn = str(peerName);
+
+    /* 6) 상대방 표시 이름 안의 소속: '홍길동/인사(경영지원)/한국상하수도협회' 또는 '홍길동(한국상하수도협회)' */
+    var pn = cleanMailDisplayName(peerName);
     if (pn && !/푸른노무/.test(pn)) {
-      var mp2 = /[（(]([^)）]{2,25})[)）]/.exec(pn);
-      if (mp2) {
-        var cp2 = cleanCand(mp2[1]);
-        if (cp2) return cp2;
+      if (pn.indexOf('/') >= 0) {
+        var slashParts = pn.split('/').map(str).filter(Boolean);
+        for (var sp = slashParts.length - 1; sp >= 0; sp--) {
+          var spPart = slashParts[sp].replace(/[（(][^()（）]*[)）]/g, ' ').trim();
+          var csp = cleanCand(spPart);
+          if (csp && /[가-힣]/.test(csp) && sp > 0) return csp;
+        }
       }
-      if (/협회|병원|센터|공단|공사|재단|대학교|산학협력단|금고|시청|군청|구청|주식회사|\(주\)|㈜|위원회|연구원|복지관/.test(pn)) {
+      var pRe = /[（(]([^)）]{2,25})[)）]/g;
+      var mp2;
+      while ((mp2 = pRe.exec(pn))) {
+        var cp2 = cleanCand(mp2[1]);
+        if (cp2 && /[가-힣]/.test(cp2)) return cp2;
+      }
+      if (/협회|병원|의원|센터|공단|공사|재단|대학교|대학|산학협력단|금고|신협|조합|시청|군청|구청|노동청|지청|기업청|주식회사|합자회사|\(주\)|㈜|\(유\)|\(재\)|위원회|연구회|연구원|개발원|진흥원|학습원|복지관|어린이집|유치원|상담소|쉼터|요양원|관리단|노무법인|컨설팅/.test(pn)) {
         var cp3 = cleanCand(pn);
         if (cp3) return cp3;
+      }
+    }
+
+    /* 7) 본문 미리보기(preview) 자기소개·수신처 표기에서 한국어 기관명 추출 */
+    var pv = stripMailBannerNoise(previewText);
+    if (pv) {
+      var mLabel = /(?:회사명|사업장명|기관명|업체명|소속)\s*[:：]\s*([가-힣0-9()㈜\s]{2,24})/.exec(pv);
+      if (mLabel) {
+        var clb = cleanCand(mLabel[1]);
+        if (clb) return clb;
+      }
+      var mIntroInst = KOREAN_INST_RE.exec(pv.slice(0, 220));
+      if (mIntroInst) {
+        var cii = cleanCand(mIntroInst[1]);
+        if (cii) return cii;
+      }
+      var mHello = /(?:안녕하세요|안녕하십니까)[,.!\s]*(?:노무사님[,.!\s]*)?([가-힣0-9()㈜]{2,18})\s+(?:[가-힣]{2,10}(?:팀|부|실|과|처|국|센터|본부)\s+)?[가-힣]{2,4}\s*(?:입니다|드림|올림|배상|과장|차장|부장|팀장|대리|주임|사원|실장|본부장|센터장|원장|소장|국장|처장|이사|상무|전무|대표|위원|연구원|계장|주무관|감독관|프로|매니저|책임|선임)/.exec(pv);
+      if (mHello) {
+        var ch = cleanCand(mHello[1]);
+        if (ch) return ch;
       }
     }
     return '';
@@ -338,6 +410,8 @@
           var an = Array.isArray(m.an) ? m.an.map(str).filter(Boolean) : [];
           var ts = Number(m.d) || 0;
           if (ts > 0 || str(m.s)) imapFpSet[mailFp(fromAddr, toAddrs, ts, m.s, an)] = 1;
+          var fDisp = cleanMailDisplayName(m.f);
+          var tDisp = cleanMailDisplayName(m.tn) || cleanMailDisplayName(m.t);
           out.push({
             key: 'i:' + slug + ':' + uid,
             slug: slug,
@@ -347,10 +421,10 @@
             dir: isSent ? 'out' : 'in',
             ts: ts,
             date: ymdOf(ts),
-            fromName: str(m.f),
+            fromName: fDisp,
             fromAddr: fromAddr,
             toAddr: toAddrs.join(', '),
-            toName: str(m.tn),
+            toName: tDisp,
             extAddrs: extAddrs,
             subject: str(m.s),
             preview: str(m.p),
@@ -378,6 +452,8 @@
         var fp = mailFp(fromAddr, toAddrs, ts, m.s, an);
         if ((ts > 0 || str(m.s)) && imapFpSet[fp]) return;
         var extAddrs = (isSent ? toAddrs : fromAddrs.concat(toAddrs)).filter(function (a) { return !OWN_RE.test(a); });
+        var fDispOld = cleanMailDisplayName(m.f);
+        var tDispOld = cleanMailDisplayName(m.tn) || cleanMailDisplayName(m.t);
         out.push({
           key: 'p:' + uid,
           slug: '*old',
@@ -387,10 +463,10 @@
           dir: isSent ? 'out' : 'in',
           ts: ts,
           date: ymdOf(ts),
-          fromName: str(m.f),
+          fromName: fDispOld,
           fromAddr: fromAddr,
           toAddr: toAddrs.join(', '),
-          toName: str(m.tn),
+          toName: tDispOld,
           extAddrs: extAddrs,
           subject: str(m.s),
           preview: str(m.p),
@@ -404,10 +480,11 @@
     return out;
   }
 
-  /* 업체 마스터 목록에서 이메일·도메인·사업자번호·정규화이름 색인 구축 */
-  function buildCompanyDirectory(companiesRaw) {
+  /* 업체 마스터 목록 + 선택적 기업정보함 명함 색인(pucards/idx 또는 items)에서 이메일·도메인·사업자번호·정규화이름 색인 구축 */
+  function buildCompanyDirectory(companiesRaw, cardsRaw) {
     var list = rowsOf(companiesRaw);
-    var byId = {}, byAddr = {}, byDomain = {}, byBiz = {}, byName = {};
+    var byId = {}, byAddr = {}, byDomain = {}, byBiz = {}, byName = {}, byCore = {};
+    var cardByAddr = {}, cardByDomain = {};
     list.forEach(function (co) {
       var id = str(co.id);
       if (!id) return;
@@ -420,12 +497,17 @@
           if (obj(ct)) parseAddrs(ct.email).forEach(function (a) { if (addrs.indexOf(a) < 0) addrs.push(a); });
         });
       }
-      var entry = { id: id, rec: co, name: str(co.name), nameNorm: coNameNorm(co.name), bizNo: digits(co.bizNo), addrs: addrs };
+      var core = coCoreNorm(co.name);
+      var entry = { id: id, rec: co, name: str(co.name), nameNorm: coNameNorm(co.name), coreNorm: core, bizNo: digits(co.bizNo), addrs: addrs };
       byId[id] = entry;
       if (entry.bizNo.length === 10 && !byBiz[entry.bizNo]) byBiz[entry.bizNo] = entry;
       if (entry.nameNorm) {
         if (!byName[entry.nameNorm]) byName[entry.nameNorm] = [];
         byName[entry.nameNorm].push(entry);
+      }
+      if (core && core.length >= 2) {
+        if (!byCore[core]) byCore[core] = [];
+        if (byCore[core].indexOf(entry) < 0) byCore[core].push(entry);
       }
       addrs.forEach(function (a) {
         if (!OWN_RE.test(a) && !byAddr[a]) byAddr[a] = entry;
@@ -436,7 +518,136 @@
         }
       });
     });
-    return { list: list, byId: byId, byAddr: byAddr, byDomain: byDomain, byBiz: byBiz, byName: byName };
+
+    /* 기업정보함(명함·사업자등록증) 경량 색인(pucards/idx): 등록 업체 연결 및 미등록 외부기관 한국어 상호 파악 */
+    var cardSrc = obj(cardsRaw) && obj(cardsRaw.idx) ? cardsRaw.idx : (obj(cardsRaw) && !Array.isArray(cardsRaw) && cardsRaw.items !== undefined ? {} : cardsRaw);
+    var cardRows = rowsOf(cardSrc);
+    var domCandNames = {};
+    cardRows.forEach(function (card) {
+      if (!obj(card)) return;
+      var cName = str(card.company || card.c || card.co || '');
+      if (!cName || /푸른노무/.test(cName) || /@/.test(cName)) return;
+      var bz = digits(card.bizNo || card.bizno || card.bz || '').slice(0, 10);
+      var cAddrs = parseAddrs(card.email || card.e || '');
+      if (!cAddrs.length) return;
+
+      var linkedEntry = null;
+      if (bz.length === 10 && byBiz[bz]) {
+        linkedEntry = byBiz[bz];
+      } else {
+        var cn = coNameNorm(cName);
+        var cc = coCoreNorm(cName);
+        if (cn && byName[cn] && byName[cn].length === 1) linkedEntry = byName[cn][0];
+        else if (cc && cc.length >= 3 && byCore[cc] && byCore[cc].length === 1) linkedEntry = byCore[cc][0];
+      }
+
+      var cardInfo = { name: cName, bizNo: bz.length === 10 ? bz : '', companyEntry: linkedEntry };
+      cAddrs.forEach(function (a) {
+        if (OWN_RE.test(a)) return;
+        if (linkedEntry && !byAddr[a]) byAddr[a] = linkedEntry;
+        if (!cardByAddr[a]) cardByAddr[a] = cardInfo;
+        var dom = domainOf(a);
+        if (isPrivateDomain(dom)) {
+          if (linkedEntry) {
+            if (!byDomain[dom]) byDomain[dom] = [];
+            if (byDomain[dom].indexOf(linkedEntry) < 0) byDomain[dom].push(linkedEntry);
+          }
+          if (!domCandNames[dom]) domCandNames[dom] = [];
+          var normKey = coCoreNorm(cName) || coNameNorm(cName);
+          if (normKey && !domCandNames[dom].some(function (x) { return (coCoreNorm(x.name) || coNameNorm(x.name)) === normKey; })) {
+            domCandNames[dom].push(cardInfo);
+          }
+        }
+      });
+    });
+    Object.keys(domCandNames).forEach(function (dom) {
+      if (domCandNames[dom].length === 1) cardByDomain[dom] = domCandNames[dom][0];
+    });
+
+    return {
+      list: list,
+      byId: byId,
+      byAddr: byAddr,
+      byDomain: byDomain,
+      byBiz: byBiz,
+      byName: byName,
+      byCore: byCore,
+      cardByAddr: cardByAddr,
+      cardByDomain: cardByDomain
+    };
+  }
+
+  /* 한국어 기관명으로 업체 원장 단일 엔트리 역추적 */
+  function resolveCompanyByOrgName(coDir, orgName) {
+    if (!obj(coDir) || !str(orgName)) return null;
+    var nm = coNameNorm(orgName);
+    if (nm && coDir.byName && coDir.byName[nm] && coDir.byName[nm].length === 1) return coDir.byName[nm][0];
+    var cr = coCoreNorm(orgName);
+    if (cr && cr.length >= 3 && coDir.byCore && coDir.byCore[cr] && coDir.byCore[cr].length === 1) return coDir.byCore[cr][0];
+    return null;
+  }
+
+  /* 메일 제목·본문·발신표시에서 담당 노무사 사번(sid) 자동 추론 */
+  function inferManagerSidFromText(text, staffList) {
+    var t = str(text);
+    var staff = Array.isArray(staffList) ? staffList : [];
+    if (!t || !staff.length) return '';
+    var bestSid = '';
+    var bestPos = Infinity;
+    staff.forEach(function (st) {
+      if (!obj(st) || !str(st.sid) || !str(st.name)) return;
+      var nm = str(st.name).replace(/\s+/g, '');
+      if (nm.length < 2) return;
+      var escNm = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var reAtty = new RegExp(escNm + '\\s*(?:대표\\s*)?노무사');
+      var m = reAtty.exec(t);
+      if (m && m.index < bestPos) {
+        bestPos = m.index;
+        bestSid = str(st.sid);
+      }
+    });
+    if (bestSid) return bestSid;
+    staff.forEach(function (st) {
+      if (!obj(st) || !str(st.sid) || !str(st.name)) return;
+      var nm = str(st.name).replace(/\s+/g, '');
+      if (nm.length < 2) return;
+      var idx = t.indexOf(nm);
+      if (idx >= 0 && idx < bestPos) {
+        bestPos = idx;
+        bestSid = str(st.sid);
+      }
+    });
+    return bestSid;
+  }
+
+  /* 사업장명과 수집 메일 내용으로부터 깔끔한 한국어 조사 사건명('<회사이름> <사건내용> 조사') 생성 */
+  function buildKoreanCaseTitle(companyName, catCode, mails, periodSuffix) {
+    var co = str(companyName) || '의뢰 사업장';
+    var cat = CATEGORIES[catCode] || CATEGORIES.harass;
+    var joined = (Array.isArray(mails) ? mails : []).map(function (m) {
+      if (!obj(m)) return '';
+      var an = Array.isArray(m.attNames) ? m.attNames.join(' ') : str(m.attNames);
+      return str(m.subject) + ' ' + an;
+    }).join(' ');
+
+    var topic = '';
+    if (/재심의/.test(joined)) topic = cat.label + ' 재심의 사건 조사';
+    else if (/재진정/.test(joined)) topic = cat.label + ' 재진정 사건 조사';
+    else if (/전문위원|판단\s*전문/.test(joined)) topic = cat.label + ' 판단 전문위원회 사건 조사';
+    else if (/고충\s*심의|고충\s*처리/.test(joined)) {
+      topic = catCode === 'sexual' ? '성희롱·성폭력 고충심의 사건 조사' : '고충처리 및 ' + cat.label + ' 사건 조사';
+    } else if (/징계\s*심의|인사위원회|징계\s*양형|징계\s*적정/.test(joined)) {
+      topic = cat.label + ' 및 징계심의 사건 조사';
+    } else if (/개선\s*지도|시정\s*지도/.test(joined)) {
+      topic = cat.label + ' 개선지도 사건 조사';
+    } else if (/부당\s*해고|부당\s*전보|부당\s*전직|구제\s*신청/.test(joined)) {
+      topic = cat.label + ' 및 부당인사 사건 조사';
+    } else if (/실태\s*조사/.test(joined)) {
+      topic = cat.label + ' 실태조사 사건';
+    } else {
+      topic = cat.label + ' 사건 조사';
+    }
+    return co + ' ' + topic + (str(periodSuffix) ? (' (' + str(periodSuffix) + ')') : '');
   }
 
   /* 이알피 사건이 괴롭힘·성희롱·조사 사건인지 판별 */
@@ -462,14 +673,15 @@
       ? mailRow.attNames.map(str).filter(Boolean)
       : (str(mailRow.attNames) ? [str(mailRow.attNames)] : []);
     var headText = str(mailRow.subject) + ' ' + attArr.join(' ');
-    var text = headText + ' ' + str(mailRow.preview);
+    var cleanPreview = stripMailBannerNoise(mailRow.preview);
+    var text = headText + ' ' + cleanPreview;
     if (NOISE_RE.test(text)) return null;
     if (EDU_ONLY_RE.test(headText) && !CASE_OVERRIDE_RE.test(headText)) return null;
     var hasDirect = HARASS_SIGNAL_RE.test(text) || !!mailRow.imapHit;
     var hasDocSig = CASE_DOC_SIGNAL_RE.test(text) || mailRow.attCount > 0;
     if (strictSignal ? !hasDirect : (!hasDirect && !hasDocSig)) return null;
 
-    var role = classifyDocRole(mailRow.subject, attArr, mailRow.preview, mailRow.dir === 'out');
+    var role = classifyDocRole(mailRow.subject, attArr, cleanPreview, mailRow.dir === 'out');
     var priv = PRIV_RE.test(headText);
     return {
       key: mailRow.key,
@@ -809,54 +1021,128 @@
   }
 
   /* 미등록 조사 메일 자동 발굴 → 사건별·연도별 후보 묶음(Bundle) 생성 */
-  function discoverUnregisteredBundles(mailRows, existingCases, coDir, dismissedMap) {
+  function discoverUnregisteredBundles(mailRows, existingCases, coDir, dismissedMap, opts) {
+    var o = obj(opts) ? opts : {};
+    var staffList = Array.isArray(o.staffList) ? o.staffList : [];
     var linkedMailKeys = {};
     var existingByCoId = {};
+    var existingByCore = {};
     (Array.isArray(existingCases) ? existingCases : []).forEach(function (c) {
       if (!obj(c) || c._deleted) return;
       (Array.isArray(c.mailLinks) ? c.mailLinks : []).forEach(function (m) {
         if (obj(m) && m.key) linkedMailKeys[m.key] = 1;
       });
+      var ecStart = parseYmdMs(c.receiveDate) || earliestMailTs(c.mailLinks);
+      var ecEnd = parseYmdMs(c.closeDate) || (ecStart > 0 ? Math.max(ecStart + 180 * DAY_MS, latestMailTs(c.mailLinks)) : 0);
       var cid = str(c.companyId);
       if (cid) {
-        var ecStart = parseYmdMs(c.receiveDate) || earliestMailTs(c.mailLinks);
-        var ecEnd = parseYmdMs(c.closeDate) || (ecStart > 0 ? Math.max(ecStart + 180 * DAY_MS, latestMailTs(c.mailLinks)) : 0);
         if (!existingByCoId[cid]) existingByCoId[cid] = [];
         existingByCoId[cid].push({ start: ecStart, end: ecEnd });
       }
+      var cCore = coCoreNorm(c.companyName);
+      if (cCore && cCore.length >= 3) {
+        if (!existingByCore[cCore]) existingByCore[cCore] = [];
+        existingByCore[cCore].push({ start: ecStart, end: ecEnd });
+      }
     });
+
+    /* 같은 외부 이메일·비공개 도메인의 형제 메일에서 한국어 사업장명 단서 사전 수집 */
+    var rowsArr = Array.isArray(mailRows) ? mailRows : [];
+    var rowByKey = {};
+    var siblingOrgByAddr = {};
+    var siblingDomCands = {};
+    rowsArr.forEach(function (r) {
+      if (!obj(r)) return;
+      if (r.key) rowByKey[r.key] = r;
+      var exts = Array.isArray(r.extAddrs) ? r.extAddrs : [];
+      if (!exts.length) return;
+      var candOrg = extractOrgName(r.subject, r.attNames, r.dir === 'out' ? r.toName : r.fromName, r.preview);
+      if (!candOrg || !/[가-힣]/.test(candOrg)) return;
+      exts.forEach(function (ea) {
+        if (!ea || NON_CLIENT_ADDR_RE.test(ea)) return;
+        if (!siblingOrgByAddr[ea]) siblingOrgByAddr[ea] = candOrg;
+        var dom = domainOf(ea);
+        if (isPrivateDomain(dom)) {
+          if (!siblingDomCands[dom]) siblingDomCands[dom] = [];
+          var nk = coCoreNorm(candOrg) || coNameNorm(candOrg);
+          if (nk && !siblingDomCands[dom].some(function (x) { return (coCoreNorm(x) || coNameNorm(x)) === nk; })) {
+            siblingDomCands[dom].push(candOrg);
+          }
+        }
+      });
+    });
+    var siblingOrgByDom = {};
+    Object.keys(siblingDomCands).forEach(function (dom) {
+      if (siblingDomCands[dom].length === 1) siblingOrgByDom[dom] = siblingDomCands[dom][0];
+    });
+
     var dis = obj(dismissedMap) ? dismissedMap : {};
     var rawGroups = {};
 
-    (Array.isArray(mailRows) ? mailRows : []).forEach(function (row) {
+    rowsArr.forEach(function (row) {
       if (!obj(row) || linkedMailKeys[row.key]) return;
       var info = inspectMailForHarass(row, true);
       if (!info) return;
 
-      /* 업체 식별: 1) 등록 이메일 정확 일치 → 2) 비공개 도메인 유일 일치 → 3) 제목·첨부 추출 기관명 → 4) 외부 이메일 */
+      var exts = row.extAddrs || [];
+      /* 업체 식별: 1) 업체원장 이메일/도메인 → 2) 메일 본문·제목 한국어 기관명 → 3) 기업정보함(명함) → 4) 형제 메일 한국어 기관명 */
       var matchedCo = null;
+      var cardMatch = null;
       if (coDir) {
-        for (var i = 0; i < (row.extAddrs || []).length; i++) {
-          var ea = row.extAddrs[i];
-          if (coDir.byAddr[ea]) { matchedCo = coDir.byAddr[ea]; break; }
+        for (var i = 0; i < exts.length; i++) {
+          var ea = exts[i];
+          if (coDir.byAddr && coDir.byAddr[ea]) { matchedCo = coDir.byAddr[ea]; break; }
         }
         if (!matchedCo) {
-          for (var j = 0; j < (row.extAddrs || []).length; j++) {
-            var dom = domainOf(row.extAddrs[j]);
-            if (dom && coDir.byDomain[dom] && coDir.byDomain[dom].length === 1) {
+          for (var j = 0; j < exts.length; j++) {
+            var dom = domainOf(exts[j]);
+            if (dom && coDir.byDomain && coDir.byDomain[dom] && coDir.byDomain[dom].length === 1) {
               matchedCo = coDir.byDomain[dom][0];
               break;
             }
           }
         }
+        for (var ci = 0; ci < exts.length; ci++) {
+          if (coDir.cardByAddr && coDir.cardByAddr[exts[ci]]) { cardMatch = coDir.cardByAddr[exts[ci]]; break; }
+        }
+        if (!cardMatch) {
+          for (var cj = 0; cj < exts.length; cj++) {
+            var cDom = domainOf(exts[cj]);
+            if (cDom && coDir.cardByDomain && coDir.cardByDomain[cDom]) { cardMatch = coDir.cardByDomain[cDom]; break; }
+          }
+        }
       }
 
-      var extractedName = extractOrgName(row.subject, row.attNames, row.dir === 'out' ? row.toName : row.fromName);
+      var peerDisp = row.dir === 'out' ? row.toName : row.fromName;
+      var extractedName = extractOrgName(row.subject, row.attNames, peerDisp, row.preview);
+      if (!extractedName && cardMatch && str(cardMatch.name)) {
+        extractedName = str(cardMatch.name);
+      }
+      if (!extractedName) {
+        for (var si = 0; si < exts.length; si++) {
+          if (siblingOrgByAddr[exts[si]]) { extractedName = siblingOrgByAddr[exts[si]]; break; }
+        }
+      }
+      if (!extractedName) {
+        for (var sj = 0; sj < exts.length; sj++) {
+          var sDom = domainOf(exts[sj]);
+          if (sDom && siblingOrgByDom[sDom]) { extractedName = siblingOrgByDom[sDom]; break; }
+        }
+      }
+
+      if (!matchedCo && extractedName && coDir) {
+        matchedCo = resolveCompanyByOrgName(coDir, extractedName);
+      }
+      if (!matchedCo && cardMatch && cardMatch.companyEntry) {
+        matchedCo = cardMatch.companyEntry;
+      }
+
+      /* 법인·기관명이 확인되지 않은 경우 당사자·개인의 성명을 사업장명으로 노출하지 않고 공란 처리(묶음 표기는 '기타 조사 의뢰 사업장') */
       var companyId = matchedCo ? matchedCo.id : '';
       var companyName = matchedCo ? matchedCo.name : extractedName;
       var companyLinkStatus = companyId ? 'linked' : 'pending';
 
-      /* 이미 같은 companyId 로 활성 조사 사건이 등록돼 있고 사건 기간이 겹치면 새 묶음 대신 기존 사건 수집 대상이므로 제외 (과거 다른 연도 사건은 유지) */
+      /* 이미 같은 companyId 또는 같은 한국어 핵심 상호로 활성 조사 사건이 등록돼 있고 사건 기간이 겹치면 기존 사건 수집 대상이므로 제외 */
       if (companyId && existingByCoId[companyId]) {
         var overlapsExisting = existingByCoId[companyId].some(function (b) {
           if (!b.start || !row.ts) return true;
@@ -864,13 +1150,21 @@
         });
         if (overlapsExisting) return;
       }
+      var candCore = coCoreNorm(companyName);
+      if (!companyId && candCore && candCore.length >= 3 && existingByCore[candCore]) {
+        var overlapsByName = existingByCore[candCore].some(function (b) {
+          if (!b.start || !row.ts) return false;
+          return rangesOverlap(row.ts, row.ts, b.start, b.end);
+        });
+        if (overlapsByName) return;
+      }
 
       var baseKey = '';
       if (companyId) baseKey = 'co_' + safeKey(companyId);
       else if (companyName && coNameNorm(companyName).length >= 2) baseKey = 'nm_' + safeKey(coNameNorm(companyName));
-      else if (row.extAddrs && row.extAddrs[0]) {
-        var d0 = domainOf(row.extAddrs[0]);
-        baseKey = isPrivateDomain(d0) ? ('dom_' + safeKey(d0)) : ('addr_' + safeKey(row.extAddrs[0]));
+      else if (exts && exts[0]) {
+        var d0 = domainOf(exts[0]);
+        baseKey = isPrivateDomain(d0) ? ('dom_' + safeKey(d0)) : ('addr_' + safeKey(exts[0]));
       } else {
         baseKey = 'msg_' + safeKey(row.slug + '_' + row.uid);
       }
@@ -880,11 +1174,13 @@
           baseKey: baseKey,
           companyId: companyId,
           companyLinkStatus: companyLinkStatus,
-          companyName: companyName || (row.extAddrs && row.extAddrs[0]) || '미확인 의뢰처',
-          bizNo: (matchedCo && matchedCo.rec && str(matchedCo.rec.bizNo)) || '',
+          companyName: companyName || '기타 조사 의뢰 사업장',
+          bizNo: (matchedCo && matchedCo.rec && str(matchedCo.rec.bizNo)) || (cardMatch && str(cardMatch.bizNo)) || '',
           managerMain: (matchedCo && matchedCo.rec && str(matchedCo.rec.managerMain)) || '',
           entries: []
         };
+      } else if (companyName && (rawGroups[baseKey].companyName === '기타 조사 의뢰 사업장' || / 의뢰 사업장$/.test(rawGroups[baseKey].companyName)) && !/ 의뢰 사업장$/.test(companyName)) {
+        rawGroups[baseKey].companyName = companyName;
       }
       rawGroups[baseKey].entries.push(info);
     });
@@ -914,6 +1210,18 @@
           episodes[episodes.length - 1].push(cur);
         }
       }
+
+      var yrCounts = {};
+      episodes.forEach(function (epMails) {
+        var fDt = '';
+        var lDt = '';
+        epMails.forEach(function (m) {
+          if (m.date && (!fDt || m.date < fDt)) fDt = m.date;
+          if (m.date && (!lDt || m.date > lDt)) lDt = m.date;
+        });
+        var y = str(fDt || lDt).slice(0, 4) || '미상';
+        yrCounts[y] = (yrCounts[y] || 0) + 1;
+      });
 
       var yrSeq = {};
       episodes.forEach(function (epMails) {
@@ -953,10 +1261,27 @@
         var descMails = epMails.slice().sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
         var steps = deriveStepsFromMails({}, descMails, firstDate, '');
         var summary = summarizeProgress(steps, '');
-        var catLabel = (CATEGORIES[cat] || CATEGORIES.harass).label;
-        var titlePrefix = episodes.length > 1
-          ? ('[' + epYear + '년' + (yrSeq[epYear] > 1 ? ' #' + yrSeq[epYear] : '') + '] ')
-          : '';
+
+        var mgrSid = rg.managerMain;
+        if (!mgrSid && staffList.length) {
+          var clueTxt = descMails.map(function (m) {
+            var rawRow = rowByKey[m.key];
+            return [m.subject, m.from, m.to, rawRow ? rawRow.preview : ''].join(' ');
+          }).join('\n');
+          mgrSid = inferManagerSidFromText(clueTxt, staffList);
+        }
+
+        var periodSuffix = '';
+        if (episodes.length > 1 && /^20\d{2}$/.test(epYear)) {
+          if (yrCounts[epYear] > 1) {
+            var mm = Number(str(firstDate || lastDate).slice(5, 7)) || 0;
+            var halfLbl = mm >= 7 ? '하반기' : mm >= 1 ? '상반기' : (yrSeq[epYear] + '차');
+            periodSuffix = epYear + '년 ' + halfLbl + (yrCounts[epYear] > 2 ? ' ' + yrSeq[epYear] + '차' : '');
+          } else {
+            periodSuffix = epYear + '년';
+          }
+        }
+
         list.push({
           bundleKey: bKey,
           year: epYear,
@@ -964,7 +1289,7 @@
           companyLinkStatus: rg.companyLinkStatus,
           companyName: rg.companyName,
           bizNo: rg.bizNo,
-          managerMain: rg.managerMain,
+          managerMain: mgrSid,
           category: cat,
           firstDate: firstDate,
           lastDate: lastDate,
@@ -972,7 +1297,7 @@
           mails: descMails,
           steps: steps,
           summary: summary,
-          suggestedTitle: titlePrefix + rg.companyName + ' ' + catLabel + ' 조사'
+          suggestedTitle: buildKoreanCaseTitle(rg.companyName, cat, descMails, periodSuffix)
         });
       });
     });
@@ -1912,6 +2237,9 @@
     extractOrgName: extractOrgName,
     flattenMailbox: flattenMailbox,
     buildCompanyDirectory: buildCompanyDirectory,
+    resolveCompanyByOrgName: resolveCompanyByOrgName,
+    inferManagerSidFromText: inferManagerSidFromText,
+    buildKoreanCaseTitle: buildKoreanCaseTitle,
     isErpInvestigateCase: isErpInvestigateCase,
     MAX_CASE_MAILS: MAX_CASE_MAILS,
     inspectMailForHarass: inspectMailForHarass,
