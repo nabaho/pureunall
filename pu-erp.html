@@ -9186,13 +9186,18 @@ function erpPayerRelationAdd(co, entry){
   if(!erpPayerRelationKnown(rel)) return { ok:false, why:'관계를 골라야 합니다' };
   var reason = String(entry.reason || '').trim();
   if(rel === 'other' && !reason) return { ok:false, why:'「기타」는 사유를 적어야 등록할 수 있습니다' };
-  var cur = ((co && co.payerRelations) || []).filter(function(r){ return r && !r._deleted && r.key !== keys[0]; });
+  /* 같은 이름의 «살아 있는» 등록은 갈아 끼운다. 지운 줄(_deleted)은 이력으로 남긴다 */
+  var cur = ((co && co.payerRelations) || []).filter(function(r){ return r && !(r.key === keys[0] && !r._deleted); });
   cur.push({ key:keys[0], keys:keys, name:erpMemoPayerName(raw), relation:rel, reason:reason,
     at:entry.at || new Date().toISOString(), by:entry.by || '', byName:entry.byName || '' });
   return { ok:true, list:cur };
 }
-function erpPayerRelationDel(co, key){
-  return ((co && co.payerRelations) || []).filter(function(r){ return r && r.key !== key; });
+/* 지운다 — 줄을 «없애지 않고» _deleted 표시만 한다(누가 언제 등록했고 왜 지웠는지 남는다. 읽는 곳은 모두 _deleted 를 건너뛴다) */
+function erpPayerRelationDel(co, key, by){
+  return ((co && co.payerRelations) || []).map(function(r){
+    if(!r || r.key !== key || r._deleted) return r;
+    return Object.assign({}, r, { _deleted:true, deletedAt:new Date().toISOString(), deletedBy:by || '' });
+  });
 }
 /* 입금자 종류를 가른다.
    memo = 통장 적요 · pItem = 이 돈을 붙이려는 후보(업체 이름·항목) ·
@@ -9580,6 +9585,9 @@ function erpAdvisoryDues(co, incomes, opts){
     var got = 0;
     erpAdvisoryPaidFor(co, ym, idx).forEach(function(i){ got += parseInt(i.amount, 10) || 0; });
     if(got >= fee) continue;                       // 그 달은 다 받았다
+    /* 허용치(±1,100원) 안으로 모자란 달은 «완납»으로 본다 — 거래내역이 그 금액을 확정 가능으로 받아 들였으므로,
+       다음 일괄 입금이 그 1,000원 남짓을 «가장 오래된 밀린 달»로 먼저 채우면 안 된다(2026-11-16 자동 검토). */
+    if(got > 0 && fee - got <= ERP_ARREARS_TOL) continue;
     out.push({ ym:ym, fee:fee, got:got, remain:fee - got });
   }
   return out;
@@ -9594,6 +9602,7 @@ function erpArrearsAllocate(amount, dues, opts){
   opts = opts || {};
   var tol = (opts.tol === undefined) ? ERP_ARREARS_TOL : (parseInt(opts.tol, 10) || 0);
   var total = parseInt(amount, 10) || 0;
+  if(total <= 0) return { parts:[], rest:0, exact:false, total:total };     // 들어온 돈이 없거나 음수면 나눌 것이 없다
   var left = total, parts = [];
   (dues || []).forEach(function(d){
     if(left <= 0 || !d) return;
@@ -9610,7 +9619,8 @@ function erpArrearsAllocate(amount, dues, opts){
       left = 0;
     }
   });
-  var rest = left > tol ? left : 0;
+  /* 채운 돈 + 남은 돈 = 입금액이 «항상» 맞게 — 밀린 달이 하나도 없으면 입금액 전부가 남은 돈이다(허용치 안이라도 버리지 않는다) */
+  var rest = (!parts.length || left > tol) ? left : 0;
   var exact = parts.length > 0 && rest === 0 && parts.every(function(p){ return p.full; });
   return { parts:parts, rest:rest, exact:exact, total:total };
 }
@@ -27311,7 +27321,7 @@ function ConsultCardModal(props){
             onInput:function(e){ set({ approvalNo:e.target.value }); } })),
         h('div', null, h('div', { style:lbl }, '카드 끝 4자리(선택)'),
           h('input', { style:Object.assign({}, inp, { width:'110px', fontFamily:'ui-monospace,monospace' }), value:f.cardTail,
-            onInput:function(e){ set({ cardTail:e.target.value }); } }))),
+            'aria-label':'카드 끝 4자리', maxLength:19, onInput:function(e){ set({ cardTail:String(e.target.value).replace(/\D/g, '').slice(-4) }); } }))),
       h('label', { style:{ display:'flex', alignItems:'center', gap:'5px', fontSize:'12.5px', color:'#475569', cursor:'pointer', marginBottom:'4px' } },
         h('input', { type:'checkbox', checked:!!f.approvalMissing, onChange:function(){ set({ approvalMissing:!f.approvalMissing, approvalNo:'' }); } }),
         '승인번호 없음(전표를 못 찾음 등) — 증빙 점검에 걸립니다'),
@@ -49227,7 +49237,7 @@ function PayerAliasModal(props){
   });
   async function delRel(x){
     if(!(await popConfirm('⚠️ "' + (x.r.name || x.r.key) + ' → ' + x.co.name + '" 관계 입금자 등록을 지우시겠습니까?\n\n→ 다음부터 이 이름은 이름 근거가 되지 않습니다\n→ 이미 확정된 입금은 그대로 남습니다'))) return;
-    dbPatch('companies', x.co.id, { payerRelations:erpPayerRelationDel(x.co, x.r.key) });
+    dbPatch('companies', x.co.id, { payerRelations:erpPayerRelationDel(x.co, x.r.key, (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.sid : '') });
     showToast('관계 입금자 등록을 지웠습니다');
     setRefresh(refresh+1);
   }
@@ -54422,9 +54432,27 @@ function erpConsultPaymentsAfter(list, pay, linkId){
     if(!p || p.id !== linkId || p.status !== 'approved') return p;
     done = true;
     return Object.assign({}, p, { status:'received', incomeId:pay.incomeId || '', settleDate:String(pay.date || '').slice(0, 10),
-      fee:parseInt(pay.fee, 10) || 0, netAmount:parseInt(pay.netAmount, 10) || 0 });
+      fee:parseInt(pay.fee, 10) || 0, netAmount:parseInt(pay.netAmount, 10) || 0, fromApproved:true });
   });
   return done ? cur : null;
+}
+/* 입금을 무를 때 결제 한 줄을 «돌려놓은» 새 목록 — 순수 함수. 못 찾거나 그 입금이 아니면 null.
+   입금 전 승인을 잇었던 줄(fromApproved)은 입금 전(approved)으로, 직접 적은 줄은 취소(cancelled)로.
+   ★ 기록은 지우지 않는다 — 취소 표시만. */
+function erpConsultPaymentsOnUndo(list, payId, incomeId){
+  if(!payId || !incomeId) return null;       // 번호가 비면 «입금과 이어지지 않은 줄(incomeId 없음)»과 같아 보여 엉뚱한 줄을 취소한다
+  var hit = false;
+  var out = (list || []).map(function(p){
+    if(!p || p.id !== payId || p.incomeId !== incomeId) return p;      // 그 입금이 «실제로 이 줄을 입금 확인으로 만든» 때만 — 아니면 건드리지 않는다
+    hit = true;
+    if(p.fromApproved){
+      var q = Object.assign({}, p, { status:'approved' });
+      delete q.incomeId; delete q.settleDate; delete q.netAmount; delete q.fee; delete q.fromApproved;
+      return q;
+    }
+    return Object.assign({}, p, { status:'cancelled', cancelledAt:new Date().toISOString() });
+  });
+  return hit ? out : null;
 }
 
 /* ── 상담료 후보 (상담접수와 이름 대조) ──
@@ -54587,15 +54615,24 @@ function erpUndoIncome(fi, _noCascade){
      ⚠ 함수를 «하나»로 둔다 — 마감월·기타사업 롤백 검사들이 이 함수 하나만 떠서 돌린다.
        lumpId 가 없는 옛 입금은 이 갈래를 아예 타지 않는다(그 검사들의 판 안에 erpLumpSiblings 가 없어도 된다). */
   if(fi.lumpId && !_noCascade){
-    var _sibs = erpLumpSiblings(fi, (typeof dbGet === 'function' ? dbGet('finance_income', []) : []) || []).filter(erpIncomeLive);
+    var _all = (typeof dbGet === 'function' ? dbGet('finance_income', []) : []) || [];
+    /* 이미 물러진 줄이면 다시 무르지 않는다 — 형제와 함께 물러진 줄을 또 무르면 단일 줄 무르기가 되풀이되어
+       마감월이면 마이너스 성과 조정이 겹쳐 생긴다(2026-11-16 자동 검토: 일괄 확정 실패 복구가 줄마다 부른다) */
+    for(var _ai = 0; _ai < _all.length; _ai++){
+      if(_all[_ai] && _all[_ai].id === fi.id){ if(!erpIncomeLive(_all[_ai])) return true; break; }
+    }
+    var _sibs = erpLumpSiblings(fi, _all).filter(erpIncomeLive);
     if(_sibs.length > 1){
       for(var _si = 0; _si < _sibs.length; _si++){
         var _sl = erpIncomeLockYm(_sibs[_si]);
         if(_sl){ try{ showToast('🔒 ' + _sl + ' 입금 마감 — 되돌릴 수 없습니다'); }catch(_t){} return false; }
       }
-      var _allOk = true;
-      _sibs.forEach(function(s){ if(!erpUndoIncome(s, true)) _allOk = false; });
-      return _allOk;
+      var _fail = 0;
+      _sibs.forEach(function(s){ if(!erpUndoIncome(s, true)) _fail++; });
+      if(_fail > 0 && _fail < _sibs.length){      // 일부만 되돌려졌다 — 말없이 true/false 로 뭉개지 않는다
+        try{ showToast('⚠ 한 통장 줄에서 나뉜 ' + _sibs.length + '건 중 ' + _fail + '건을 되돌리지 못했습니다 — 확정 이력에서 나머지를 확인하세요'); }catch(_t2){}
+      }
+      return _fail === 0;
     }
   }
   /* 입금 마감된 달은 무르지 않는다 — 마감한 달 입금 합계가 뒤에서 바뀐다(fin.md 6).
@@ -54618,7 +54655,18 @@ function erpUndoIncome(fi, _noCascade){
       _patch.perfSettled = true;               // 그 달 몫은 그대로 둔다
       if(_r.count) _patch.perfRoutedTo = _r.to;
     }
-    dbPatch('finance_income', fi.id, _patch);
+    if(dbPatch('finance_income', fi.id, _patch) === false) return false;   // 저장이 안 됐으면 «되돌렸다»고 하지 않는다
+    /* 📇 상담료 — 입금을 무르면 상담접수 카드의 결제 한 줄도 «같이» 돌려놓는다(2026-11-16 자동 검토).
+       입금 전 승인을 잇었던 줄은 입금 전(approved)으로, 직접 적은 줄은 취소로. 안 그러면 취소된 입금이 «받은 돈»에 계속 센다. */
+    if(fi.consultId && fi.consultPayId && typeof erpConsultPaymentsOnUndo === 'function'){
+      try{
+        var _cts = (typeof dbGet === 'function' ? (dbGet('contracts', []) || []) : []);
+        var _ct = null;
+        for(var _ci = 0; _ci < _cts.length; _ci++){ if(_cts[_ci] && _cts[_ci].id === fi.consultId){ _ct = _cts[_ci]; break; } }
+        var _nl = _ct ? erpConsultPaymentsOnUndo(_ct.consultPayments || [], fi.consultPayId, fi.id) : null;
+        if(_nl) dbPatch('contracts', fi.consultId, { consultPayments:_nl });
+      }catch(_ce){ if(window._erpErrLog) window._erpErrLog(_ce); }
+    }
     if(fi.sourceId && fi.sourceKind){
       var store = (typeof erpIncomeSourceStore === 'function')
         ? erpIncomeSourceStore(fi.sourceKind)
@@ -55073,6 +55121,17 @@ function FinanceLedger(props){
   var candKS=useState({});       var candK=candKS[0];     var setCandK=candKS[1];     // 후보 종류 필터 {_k:'cases'|''}
   var dirPopS=useState(null);    var dirPop=dirPopS[0];   var setDirPop=dirPopS[1];   // ➕ 직접 등록 팝업 (상담료·현금영수증 등)
   var payerAskS=useState(null);  var payerAsk=payerAskS[0]; var setPayerAsk=payerAskS[1];   // 👤 입금자 이름이 다를 때 «왜?» 를 묻는 창 {row,pItem,a,res,relation,reason,register}
+  /* Esc 는 «취소 — 확정하지 않음» 이다. 창이 떠 있는 동안만 건다(표의 자판이 새어 들어가지 않게 잡는 단계에서 막는다) */
+  useEffect(function(){
+    if(!payerAsk) return;
+    function onEsc(e){
+      if(e.key !== 'Escape') return;
+      e.preventDefault(); e.stopPropagation();
+      var r = payerAsk.res; setPayerAsk(null); r(null);
+    }
+    window.addEventListener('keydown', onEsc, true);
+    return function(){ window.removeEventListener('keydown', onEsc, true); };
+  }, [payerAsk]);
   var ldInfoS=useState(false);   var ldInfoOpen=ldInfoS[0]; var setLdInfoOpen=ldInfoS[1]; // 파일 정보 접기/펼치기
   var draftTimer=useRef(null);   // 초안 저장 디바운스
   var draftReady=useRef(false);  // 복원 완료 전에는 저장하지 않음
@@ -55993,20 +56052,23 @@ function FinanceLedger(props){
      ★ 이름이 사업장과 다른 돈(다른 사업장 이름·모르는 이름)은 «사유를 고른 뒤에만» 확정한다.
      ★ 그런 돈은 입금자 별칭으로 «배우지 않는다» — 한 번 확정했다고 계속 그렇게 되면 안 된다.
        계속 대신 내는 사람은 사람이 «관계 입금자»로 등록한다(지울 수 있다). */
+  var _payerCoCache = { arr:null, idx:null };     // 업체 색인 — 같은 목록이면 다시 만들지 않는다(줄마다 판정하므로)
   function _payerAssess(row, pItem){
     var memo = row.memo || row.note || '';
     var sc = null;
     try{ sc = erpMatchScore({ date:row.date, amount:row.amount, memo:memo }, pItem); }catch(_e){ sc = null; }
-    var coIdx = erpCoIndexByName(dbGet('companies', []) || []);
+    var _carr = dbGet('companies', []) || [];
+    if(_payerCoCache.arr !== _carr) _payerCoCache = { arr:_carr, idx:erpCoIndexByName(_carr) };
+    var coIdx = _payerCoCache.idx;
     return erpPayerAssess(memo, pItem, { co:erpPayerCoOf(pItem, coIdx), coIdx:coIdx,
       nameOk:!!(sc && (sc.nameScore || 0) >= 60 && !sc.aliasWeak) });
   }
   function _payerAssessSafe(row, pItem){
     try{ return _payerAssess(row, pItem); }catch(e){ if(window._erpErrLog) window._erpErrLog(e); return null; }
   }
-  function askPayer(row, pItem, a){
+  function askPayer(row, pItem, a, noRegister){
     return new Promise(function(res){
-      setPayerAsk({ row:row, pItem:pItem, a:a, res:res, relation:'', reason:'', register:false });
+      setPayerAsk({ row:row, pItem:pItem, a:a, res:res, relation:'', reason:'', register:false, noRegister:!!noRegister });
     });
   }
   /* 확정 전에 입금자를 가리고 필요하면 사유를 묻는다. 돌려주는 것: { payer } | {}(판정 못 함) | null(취소) */
@@ -56032,7 +56094,11 @@ function FinanceLedger(props){
   }
   /* 이 입금자 이름을 별칭으로 «배워도» 되나 — 이름이 다른 돈(다른 사업장·모르는 이름)은 배우지 않는다.
      별칭 학습(erpLearnPayerAlias)은 부르는 자리에 그대로 두고, 여기서는 «배울지만» 가른다. */
-  function payerLearns(pay){ return !erpPayerNeedsReason(pay); }
+  function payerLearns(pay){
+    /* 관계 입금자(related)도 배우지 않는다 — 그 등록 자체가 규칙이다. 별칭으로도 굳으면 등록을 지워도 자동 매칭이 남고,
+       한 입금자가 여러 사업장 몫을 낼 때 «마지막 사업장»으로 덮어써진다(2026-11-16 자동 검토). */
+    return !erpPayerNeedsReason(pay) && !(pay && pay.kind === 'related');
+  }
   /* 확정이 «저장된 뒤»의 후속 — 사람이 등록을 켰을 때만 관계 입금자로 남긴다 */
   function _payerAfter(row, pItem, pay){
     var reg = false;
@@ -56119,6 +56185,12 @@ function FinanceLedger(props){
   }
   /* 합계 후보 — 한 입금이 여러 건의 합계일 때 (밀린 자문료 몇 달치 등) */
   async function confirmCombo(row, cb){
+    /* 입금자 이름이 사업장과 다른 업체가 끼어 있으면 합계 후보로는 확정하지 않는다 — 여러 업체 몫을 한꺼번에 적는 길이라
+       사유를 업체마다 물을 수 없다(2026-11-16 자동 검토). 업체를 골라 하나씩 확정하면 사유 창이 뜬다. */
+    if(cb.cands.some(function(c){ return erpPayerNeedsReason(_payerAssessSafe(row, c)); })){
+      showToast('입금자 이름이 사업장과 달라 합계 후보로는 확정할 수 없습니다 — 업체를 골라 사유를 정한 뒤 하나씩 확정하세요');
+      return;
+    }
     var lines = cb.cands.map(function(c){
       return '· ' + c.companyName + ' ' + c.label + ' ' + c.amount.toLocaleString() + '원';
     }).join('\n');
@@ -56129,7 +56201,7 @@ function FinanceLedger(props){
     cb.cands.forEach(function(c){
       try {
         saveIncome(Object.assign({}, row, {amount:c.amount}), c, { withPerf:true });
-        erpLearnPayerAlias(row.memo || row.note || '', c);
+        if(payerLearns(_payerAssessSafe(row, c))) erpLearnPayerAlias(row.memo || row.note || '', c);
         ok++;
       } catch(e){ ng++; if(window._erpErrLog) window._erpErrLog(e); }
     });
@@ -56167,12 +56239,14 @@ function FinanceLedger(props){
       });
     }catch(e){
       if(window._erpErrLog) window._erpErrLog(e);
+      /* 만든 줄은 같은 lumpId 라 «한 번만» 부르면 함께 물러진다(erpUndoIncome 이 형제를 무른다).
+         줄마다 부르면 이미 물러진 줄을 또 무르게 된다 — 결과도 확인해 «되돌렸다» 고 거짓말하지 않는다. */
       var back = dbGet('finance_income', []) || [];
-      made.forEach(function(id){
-        var fi = back.find(function(x){ return x && x.id === id; });
-        if(fi) erpUndoIncome(fi);
-      });
-      showToast('❌ 일괄 확정 실패 — 만든 ' + made.length + '건은 되돌렸습니다: ' + (e && e.message));
+      var firstFi = made.length ? back.find(function(x){ return x && x.id === made[0]; }) : null;
+      var undone = !firstFi || erpUndoIncome(firstFi);
+      showToast(undone
+        ? ('❌ 일괄 확정 실패 — 만든 ' + made.length + '건은 되돌렸습니다: ' + (e && e.message))
+        : ('❌ 일괄 확정 실패, 만든 ' + made.length + '건을 되돌리지도 못했습니다 — 확정 이력에서 직접 되돌려 주세요: ' + (e && e.message)));
       return;
     }
     erpLearnPayerAlias(row.memo || row.note || '', erpAdvisoryCand(co, parts[0]));
@@ -56231,7 +56305,9 @@ function FinanceLedger(props){
     try{
       var _c = pendById[pid];
       var _m = row.memo || row.note || '';
-      if(_c && _m && erpLearnPayerAlias(_m, _c))
+      /* ★ 이름이 다른 입금자(다른 사업장·모르는 이름·관계 입금자)는 «고르는 순간»에도 배우지 않는다 (2026-11-16 자동 검토).
+           고르기만 해도 별칭이 쌓여 두 번째에는 «본인»으로 바뀌고, 그러면 사유 창 없이 확정되어 버린다. */
+      if(_c && _m && payerLearns(_payerAssessSafe(row, _c)) && erpLearnPayerAlias(_m, _c))
         showToast('🔖 기억함 — 다음부터 「' + _m + '」 은 ' + _c.companyName + ' 로 찾아옵니다');
     }catch(_le){ if(window._erpErrLog) window._erpErrLog(_le); }
   }
@@ -56288,7 +56364,7 @@ function FinanceLedger(props){
       try{ shares = calcPerfShares(perfBase, d.mainSid, [], 'other', 100, {paidDate:paidDate}) || []; }
       catch(_pe){ if(window._erpErrLog) window._erpErrLog(_pe); }
     }
-    var DOC = {tax:'세금계산서', cash:'현금영수증', none:'증빙없음'};
+    var DOC = {tax:'세금계산서', cash:'현금영수증', card:'카드전표', none:'증빙없음'};
     /* ── 자문료로 등록할 때 (대표 결정 2026-08-22, 김보람 건의 3번) ──
        ★ 자문료는 «다른 항목» 이다. 기타(inc-other)로 적으면 자문료 매출에서 빠지고,
          업체관리의 「미입금 대기」도 안 지워져 같은 달 자문료가 두 번 보인다.
@@ -56312,6 +56388,19 @@ function FinanceLedger(props){
         cardLast4:d.cardTail, approvalDate:d.approvalDate || paidDate, fee:cardFee, by:_me.sid || '', byName:_me.name || '' });
       if(!_cb.ok){ showToast('❌ ' + _cb.why); return false; }
       _cpay = _cb.pay;
+    }
+    /* 상담접수·잇기 대상을 저장 «전에» 확인한다 — 없는 상담접수·이미 입금 확인된 승인 줄이면 입금 줄에 번호만 남고 상담접수와 어긋난다 */
+    var _ctPre = null;
+    if(_isConsult && d.consultId && _cpay){
+      _ctPre = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === d.consultId && !x._deleted; }) || null;
+      if(!_ctPre){ showToast('❌ 고른 상담접수를 찾지 못했습니다 — 상담접수를 다시 고르세요'); return false; }
+      if(_linkId){
+        var _lp = (_ctPre.consultPayments || []).find(function(p){ return p && p.id === _linkId; });
+        if(!_lp || _lp.status !== 'approved'){
+          showToast('❌ 잇기로 한 카드 승인 줄이 없거나 이미 입금 확인되었습니다 — 「잇기 풀기」 후 다시 등록하세요');
+          return false;
+        }
+      }
     }
     var _fiId2 = 'fi-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var _ok = erpUpsertIncome({
@@ -56345,6 +56434,25 @@ function FinanceLedger(props){
       confirmedAt:new Date().toISOString(), confirmedBy:CURRENT_USER?CURRENT_USER.sid:''
     });
     if(_ok === false){ showToast('❌ 저장 실패 — 행을 그대로 둡니다'); return false; }
+    /* 상담접수 카드에 «같은 결제 한 줄»을 적는다 — 입금을 저장한 «뒤에», 수수료 지출·처리됨 표시보다 «앞에».
+       ★ 저장이 안 되면(false·예외) 방금 만든 입금도 무르고 멈춘다 — 입금만 남고 상담접수에는 안 적히는 반쪽 상태를 만들지 않는다
+         (2026-11-16 자동 검토). 잇기 대상은 저장 «전에» 확인했으므로 여기서 못 찾는 것은 그사이 바뀐 경우뿐이다. */
+    if(_isConsult && d.consultId && _cpay){
+      var _patched = false;
+      try{
+        var _entry = Object.assign({}, _cpay, { incomeId:_fiId2, status:'received', settleDate:paidDate, netAmount:row.amount });
+        var _next = _linkId
+          ? erpConsultPaymentsAfter(_ctPre.consultPayments || [], { incomeId:_fiId2, date:paidDate, netAmount:row.amount, fee:cardFee }, _linkId)
+          : erpConsultPaymentsAfter(_ctPre.consultPayments || [], _entry, '');
+        if(_next) _patched = (dbPatch('contracts', d.consultId, { consultPayments:_next }) !== false);
+      }catch(_ce){ if(window._erpErrLog) window._erpErrLog(_ce); _patched = false; }
+      if(!_patched){
+        var _made = (dbGet('finance_income', []) || []).find(function(x){ return x && x.id === _fiId2; }) || { id:_fiId2, date:paidDate, kind:'상담료' };
+        erpUndoIncome(_made);
+        showToast('❌ 상담접수에 결제를 적지 못해 입금도 취소했습니다 — 행을 그대로 둡니다');
+        return false;
+      }
+    }
     // 카드 수수료는 지출로 남긴다 (매출 원금과 실입금의 차액)
     if(cardFee > 0){
       dbUpsert('finance_expense', {
@@ -56353,25 +56461,6 @@ function FinanceLedger(props){
         payee:(d.name||'').trim()||'카드사',
         note:'카드 수수료 — 매출 '+gross.toLocaleString()+'원 중 '+row.amount.toLocaleString()+'원 입금',
         paid:true, paidDate:paidDate, branch:'cheonan'});
-    }
-    /* 상담접수 카드에 «같은 결제 한 줄»을 적는다 — 입금을 저장한 «뒤에». 입금 전 승인 줄을 잇는 경우는 새 줄을 더하지 않는다. */
-    if(_isConsult && d.consultId && _cpay){
-      try{
-        var _ct = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === d.consultId; });
-        if(_ct){
-          var _entry = Object.assign({}, _cpay, { incomeId:_fiId2, status:'received', settleDate:paidDate, netAmount:row.amount });
-          var _next = _linkId
-            ? erpConsultPaymentsAfter(_ct.consultPayments || [], { incomeId:_fiId2, date:paidDate, netAmount:row.amount, fee:cardFee }, _linkId)
-            : erpConsultPaymentsAfter(_ct.consultPayments || [], _entry, '');
-          if(_next === null){        // 이을 승인 줄이 없다 — 입금은 이미 저장됐으니 새 줄로 적고 알린다
-            showToast('⚠ 잇기로 한 카드 승인 줄을 상담접수에서 찾지 못해 새 줄로 적었습니다');
-            _next = erpConsultPaymentsAfter(_ct.consultPayments || [], _entry, '');
-          }
-          dbPatch('contracts', d.consultId, { consultPayments:_next });
-        } else {
-          showToast('⚠ 상담접수를 찾지 못해 입금에만 적었습니다');
-        }
-      }catch(_ce){ if(window._erpErrLog) window._erpErrLog(_ce); }
     }
     erpMarkBankRowProcessed(row,'income','➕ '+((d.name||'').trim()||'직접 등록')+' '+(d.kind||'상담료'));
     removeRow(row._k,'inc');
@@ -56680,6 +56769,10 @@ function FinanceLedger(props){
   /* 상담접수 카드 — 사무관리에도 계산서에도 없는 입금(상담료)의 유일한 이름 근거다.
      렌더당 한 번만 만든다 (행마다 dbGet 하면 82행에 82번 읽는다) */
   var _intakes = (dbGet('contracts', []) || []).filter(function(c){ return c && c.status === 'consult'; });
+  /* 상담료 연결·정산 입금 후보용 — 지운 건은 뺀다. 계약협의·확정으로 넘어갔어도 «입금 전 카드 승인»이 남아 있으면 포함한다 */
+  var _consultPool = (dbGet('contracts', []) || []).filter(function(c){
+    return c && !c._deleted && (c.status === 'consult' || erpConsultPaymentsOf(c).some(function(p){ return p.status === 'approved'; }));
+  });
   /* ── 지난번처럼 나눠담기 ──
      적요를 열쇠로 한 번만 묶어 둔다. 줄마다 목록 전체를 훑으면 505줄 × 200기억이 매 렌더 돈다. */
   var _recByKey = {};
@@ -56914,6 +57007,14 @@ function FinanceLedger(props){
   if(rows && ldTabEff === 'inc') incList.forEach(function(row){
     var grp = rowGroups(row);
     var st = stateOf(row, grp);
+    /* 👤 입금자 이름이 사업장과 다르면 «모두확정·자동확정»에 넣지 않는다 (2026-11-16 자동 검토).
+       그 길들은 사유를 물을 수 없다 — 세금계산서 일치·손으로 고른 짝으로 초록이 된 줄이 사유 없이 확정되던 구멍.
+       노랑으로 남겨 사람이 열어 «사유를 고르고» 확정하게 한다. */
+    if(st.state === 'ready' && grp.length === 1){
+      var _pp = pendById[grp[0].head.cand.id] || grp[0].head.cand;
+      if(erpPayerNeedsReason(_payerAssessSafe(row, _pp)))
+        st = Object.assign({}, st, { state:'check', label:'입금자 이름이 사업장과 다릅니다 — 사유를 골라 확정', payerAsk:true });
+    }
     rowInfo[row._k] = { grp:grp, st:st };
     stCnt[st.state] = (stCnt[st.state] || 0) + 1;
     if(st.state === 'ready' && grp.length === 1){
@@ -59854,6 +59955,21 @@ function FinanceLedger(props){
                   : ('입금 '+amountIn.toLocaleString()+'원을 '+selIds.length+'건에 나눠 반영합니다.'))+'\n\n'+lines;
                 if(diff>1100 && spGm==='fee') msg+='\n\n수수료 '+absDiff.toLocaleString()+'원 지출 기록';
                 if(!(await popConfirm(msg))) return;
+                /* 👤 입금자 이름이 사업장과 다른 건이 끼어 있으면 사유를 «한 번» 묻는다(2026-11-16 자동 검토).
+                   사유는 그런 건들에 함께 적힌다. 여러 사업장 몫이라 관계 입금자 등록은 여기서 하지 않는다(사업장마다 하나씩). */
+                var _needP=null, _needA=null;
+                selIds.forEach(function(id){
+                  if(_needP) return;
+                  var _pp=pending.find(function(x){return x.id===id;});
+                  if(!_pp) return;
+                  var _aa=_payerAssessSafe(rowsIn[0],_pp);
+                  if(erpPayerNeedsReason(_aa)){ _needP=_pp; _needA=_aa; }
+                });
+                var _splitPick=null;
+                if(_needP){
+                  _splitPick=await askPayer(rowsIn[0],_needP,_needA,true);
+                  if(!_splitPick) return;
+                }
                 var ok=0,ng=0;
                 /* 통장 행을 앞에서부터 헐어 미입금 건을 채운다.
                    한 건이 두 행에 걸치면 기록도 둘로 나뉜다 — 실제로 두 번 들어온 돈이니 그게 맞다.
@@ -59872,9 +59988,12 @@ function FinanceLedger(props){
                     var take=Math.min(slot.left,need);
                     try{
                       // 이 조각만으로 다 채우지 못하면 일부입금으로 남긴다
+                      var _sa=_payerAssessSafe(slot.row,p);
+                      var _sy=(_splitPick && erpPayerNeedsReason(_sa))
+                        ? { kind:_sa.kind, name:_sa.name, owner:_sa.owner, relation:_splitPick.relation, reason:_splitPick.reason } : undefined;
                       saveIncome(Object.assign({},slot.row,{amount:take}),p,
-                        (got+take)<ea?{partial:true}:{});
-                      erpLearnPayerAlias(slot.row.memo||slot.row.note||'',p);
+                        Object.assign({}, (got+take)<ea?{partial:true}:{}, { payer:_sy }));
+                      if(payerLearns(_sy || _sa)) erpLearnPayerAlias(slot.row.memo||slot.row.note||'',p);
                     }catch(_e){bad=true;}
                     slot.left-=take; need-=take; got+=take;
                   }
@@ -59970,7 +60089,7 @@ function FinanceLedger(props){
       var _isAdv = (dirPop.kind === '자문료');
       /* 📇 상담료 — 상담접수와 잇고, 카드면 승인 정보를 적고, 입금 전 카드 승인 중 같은 건이 있으면 잇는다 (대표 2026-11-16) */
       var _isConsultK = (dirPop.kind === '상담료');
-      var _cands = (_isConsultK && dirPop.cardMode && !dirPop.payLinkId) ? erpConsultSettleCands(_r, _intakes) : [];
+      var _cands = (_isConsultK && dirPop.cardMode && !dirPop.payLinkId) ? erpConsultSettleCands(_r, _consultPool) : [];
       var _cardBuild = (_isConsultK && dirPop.cardMode)
         ? erpConsultPayBuild({ amount:_gross, method:'card', date:_r.date, cardCompany:dirPop.cardCompany, approvalNo:dirPop.approvalNo,
             approvalMissing:!!dirPop.approvalMissing, cardLast4:dirPop.cardTail, approvalDate:dirPop.approvalDate || _r.date })
@@ -60042,7 +60161,7 @@ function FinanceLedger(props){
             h('div',{style:_fldS},
               h('div',{style:_lblS},'결제수단'),
               h('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
-                seg(dirPop.cardMode?'card':'account','account','계좌',function(){upd({cardMode:false});}),
+                seg(dirPop.cardMode?'card':'account','account','계좌',function(){upd({cardMode:false, payLinkId:''});}),
                 seg(dirPop.cardMode?'card':'account','card','카드',function(){upd({cardMode:true, grossAmt:dirPop.grossAmt||_r.amount});})),
               dirPop.cardMode && h('div',{style:{marginTop:'5px'}},
                 h('div',{style:_lblS},'매출액 (수수료 빼기 전)'),
@@ -60056,9 +60175,9 @@ function FinanceLedger(props){
             /* ── 📇 상담료 결제 기록 — 어느 상담의 상담료인지, 카드면 승인 정보까지 «업무 기록»으로 남긴다 (대표 2026-11-16) ── */
             _isConsultK && h('div',{style:{marginBottom:'9px',padding:'8px 10px',borderRadius:'6px',background:'#eff6ff',border:'1px solid #bfdbfe'}},
               h('div',{style:_lblS},'상담접수 연결'),
-              h('select',{style:_inpS,value:dirPop.consultId||'',onChange:function(e){ upd({consultId:e.target.value}); }},
+              h('select',{style:_inpS,value:dirPop.consultId||'','aria-label':'상담접수 연결',onChange:function(e){ upd({consultId:e.target.value, payLinkId:''}); }},
                 h('option',{value:''},'(연결 안 함 — 증빙 점검에 걸립니다)'),
-                _intakes.map(function(c){
+                _consultPool.map(function(c){
                   return h('option',{key:c.id,value:c.id},(c.clientName||c.companyName||'-')+' · '
                     +String(c.consultDate||c.createdAt||'').slice(0,10)+(c.contractNo?(' · '+c.contractNo):''));
                 })),
@@ -60094,7 +60213,7 @@ function FinanceLedger(props){
                   h('input',{type:'date',style:Object.assign({},_inpS,{width:'auto'}),title:'승인일',
                     value:dirPop.approvalDate||String(_r.date||'').slice(0,10),onInput:function(e){ upd({approvalDate:e.target.value}); }}),
                   h('input',{style:Object.assign({},_inpS,{width:'92px',fontFamily:'ui-monospace,monospace'}),placeholder:'카드 끝 4자리',
-                    value:dirPop.cardTail||'',onInput:function(e){ upd({cardTail:e.target.value}); }})),
+                    value:dirPop.cardTail||'','aria-label':'카드 끝 4자리',maxLength:19,onInput:function(e){ upd({cardTail:String(e.target.value).replace(/\D/g,'').slice(-4)}); }})),
                 h('label',{style:{display:'flex',alignItems:'center',gap:'5px',marginTop:'4px',fontSize:'12.5px',color:'#475569',cursor:'pointer'}},
                   h('input',{type:'checkbox',checked:!!dirPop.approvalMissing,onChange:function(){ upd({approvalMissing:!dirPop.approvalMissing, approvalNo:''}); }}),
                   '승인번호 없음(전표를 못 찾음 등) — 증빙 점검에 걸립니다'),
@@ -60107,6 +60226,7 @@ function FinanceLedger(props){
               h('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
                 seg(dirPop.doc,'tax','🧾 세금계산서',function(v){upd({doc:v});}),
                 seg(dirPop.doc,'cash','🧾 현금영수증',function(v){upd({doc:v});}),
+                dirPop.cardMode && seg(dirPop.doc,'card','💳 카드전표',function(v){upd({doc:v});}),
                 seg(dirPop.doc,'none','증빙 없음',function(v){upd({doc:v});})),
               h('div',{style:{fontSize:'12px',color:'#94a3b8',marginTop:'3px'}},
                 '현금영수증도 매출이므로 예상부가세에 함께 잡힙니다')),
@@ -60142,8 +60262,8 @@ function FinanceLedger(props){
             h('div',{style:{flex:1}}),
             h('button',{className:'btn-secondary',onClick:function(){setDirPop(null);}},'취소'),
             h('button',{className:'btn-primary',
-              disabled:!(dirPop.name||'').trim() || (!_isAdv && dirPop.perfOn && !dirPop.mainSid),
-              style:(!(dirPop.name||'').trim() || (!_isAdv && dirPop.perfOn && !dirPop.mainSid)) ? {opacity:0.5,cursor:'not-allowed'} : {},
+              disabled:!(dirPop.name||'').trim() || (!_isAdv && dirPop.perfOn && !dirPop.mainSid) || (_isConsultK && dirPop.cardMode && !_cardBuild.ok),
+              style:(!(dirPop.name||'').trim() || (!_isAdv && dirPop.perfOn && !dirPop.mainSid) || (_isConsultK && dirPop.cardMode && !_cardBuild.ok)) ? {opacity:0.5,cursor:'not-allowed'} : {},
               onClick:async function(){
                 if(!(dirPop.name||'').trim()){ showToast('업체·의뢰인을 입력하세요'); return; }
                 if(!_isAdv && dirPop.perfOn && !dirPop.mainSid){ showToast('담당자를 고르세요 (성과급을 끄면 없어도 됩니다)'); return; }
@@ -60194,7 +60314,8 @@ function FinanceLedger(props){
       return h('div',{style:{position:'fixed',inset:0,background:'rgba(15,23,42,.45)',zIndex:9100,
           display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'},
         onClick:function(e){ if(e.target===e.currentTarget) done(null); }},
-        h('div',{style:{background:'#fff',borderRadius:'10px',width:'min(520px,96vw)',maxHeight:'88vh',overflow:'auto',padding:'14px 16px'}},
+        h('div',{role:'dialog','aria-modal':'true','aria-label':'입금자 이름이 사업장과 다른 이유 고르기',
+          style:{background:'#fff',borderRadius:'10px',width:'min(520px,96vw)',maxHeight:'88vh',overflow:'auto',padding:'14px 16px'}},
           h('div',{style:{fontSize:'14px',fontWeight:800,color:'#854d0e',marginBottom:'6px'}},'👤 입금자 이름이 사업장과 다릅니다'),
           h('div',{style:_ps},
             '입금 ',h('b',null,(pa.row.amount||0).toLocaleString()+'원'),' · ',String(pa.row.date||''),h('br'),
@@ -60215,11 +60336,13 @@ function FinanceLedger(props){
           h('textarea',{value:pa.reason||'',rows:2,placeholder:'예) 대표님 개인 카드로 이체, 세무사무소가 모아서 입금',
             onInput:function(e){ upd({ reason:e.target.value }); },
             style:{width:'100%',padding:'6px 8px',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'13.5px',resize:'vertical'}}),
-          h('label',{style:{display:'flex',alignItems:'center',gap:'6px',margin:'8px 0 4px',fontSize:'13px',color:'#166534',fontWeight:700,cursor:'pointer'}},
+          !pa.noRegister && h('label',{style:{display:'flex',alignItems:'center',gap:'6px',margin:'8px 0 4px',fontSize:'13px',color:'#166534',fontWeight:700,cursor:'pointer'}},
             h('input',{type:'checkbox',checked:!!pa.register,onChange:function(){ upd({ register:!pa.register }); }}),
             '다음부터 「'+a.name+'」 을(를) 이 사업장의 관계 입금자로 등록'),
-          h('div',{style:{fontSize:'12px',color:'#64748b',marginBottom:'10px',lineHeight:1.6}},
-            '등록하면 다음부터 이 이름이 이름 근거가 됩니다(환경설정 › 입금자 별칭에서 지울 수 있음). 등록하지 않으면 이번 한 건만 기록하고 별칭으로 배우지도 않습니다.'),
+          h('div',{style:{fontSize:'12px',color:'#64748b',margin:pa.noRegister?'8px 0 10px':'0 0 10px',lineHeight:1.6}},
+            pa.noRegister
+              ? '여러 사업장 몫을 나누는 중이라 관계 입금자 등록은 여기서 하지 않습니다(사업장마다 한 건씩 확정하며 등록하세요). 이 사유는 이름이 다른 건들에 함께 적힙니다.'
+              : '등록하면 다음부터 이 이름이 이름 근거가 됩니다(환경설정 › 입금자 별칭에서 지울 수 있음). 등록하지 않으면 이번 한 건만 기록하고 별칭으로 배우지도 않습니다.'),
           h('div',{style:{display:'flex',gap:'6px',justifyContent:'flex-end'}},
             h('button',{onClick:function(){ done(null); },
               style:{padding:'6px 14px',background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'13px',cursor:'pointer'}},'취소 — 확정하지 않음'),
@@ -60268,7 +60391,8 @@ function FinanceLedger(props){
           savePick(sugPopK, pid);
           try{
             var _c=pendById[pid];
-            var _learned = !!(_c && _memo && erpLearnPayerAlias(_memo, _c));
+            /* 이름이 다른 입금자는 고르기만 해서는 배우지 않는다(pickFor 와 같은 원칙 — 2026-11-16) */
+            var _learned = !!(_c && _memo && payerLearns(_payerAssessSafe(_row, _c)) && erpLearnPayerAlias(_memo, _c));
             if(_c){
               /* 틀린 것을 고친 것인지, 처음 고른 것인지를 갈라 말한다.
                  고친 경우 «전에 배운 것도 함께 지워진다» 는 것을 알려야 한다 —
@@ -60905,11 +61029,14 @@ function FinanceLedger(props){
       if(autoOnly) allInc = allInc.filter(function(fi){ return fi && fi.autoConfirmed; });
       /* 👤 입금자 이름이 사업장과 달랐던 건만 모아 본다 — 창을 못 거친 자동·묶음 확정은 «확인 필요» 표시가 달려 있다 */
       var payerOnlyS=useState(false); var payerOnly=payerOnlyS[0]; var setPayerOnly=payerOnlyS[1];
-      var _payerDiffN = allInc.filter(function(fi){ return fi && (fi.payerKind === 'other_company' || fi.payerKind === 'third' || fi.payerKind === 'related'); }).length;
-      if(payerOnly) allInc = allInc.filter(function(fi){ return fi && (fi.payerKind === 'other_company' || fi.payerKind === 'third' || fi.payerKind === 'related'); });
-      /* 🧾 상담료 증빙 점검 — 증빙·카드 승인번호·상담접수 연결이 빈 상담료를 모아 본다(지우지 않고 무엇이 비었는지 말한다) */
       var gapOnlyS=useState(false); var gapOnly=gapOnlyS[0]; var setGapOnly=gapOnlyS[1];
+      function _isPayerDiff(fi){ return !!fi && (fi.payerKind === 'other_company' || fi.payerKind === 'third' || fi.payerKind === 'related'); }
+      /* 🧾 상담료 증빙 점검 — 증빙·카드 승인번호·상담접수 연결이 빈 상담료를 모아 본다(지우지 않고 무엇이 비었는지 말한다) */
+      /* 두 모아 보기의 개수는 «걸러 내기 전» 목록으로 센다 — 한쪽을 켜면 다른 쪽 개수가 0 이 되어 단추가 사라지고,
+         켜 둔 채 풀 길이 없어진다(2026-11-16 자동 검토). 켜 둔 단추는 개수가 0 이어도 남긴다. */
+      var _payerDiffN = allInc.filter(_isPayerDiff).length;
       var _gapN = allInc.filter(function(fi){ return !!erpConsultEvidenceGap(fi); }).length;
+      if(payerOnly) allInc = allInc.filter(_isPayerDiff);
       if(gapOnly) allInc = allInc.filter(function(fi){ return !!erpConsultEvidenceGap(fi); });
       var ql=q.toLowerCase().trim();
       var filtered = ql ? allInc.filter(function(fi){
@@ -60940,10 +61067,10 @@ function FinanceLedger(props){
               _undoneSum>0?' · 되돌린 '+allInc.filter(function(f){return f.undoneDate;}).length+'건':''),
             h('button',{onClick:function(){setConfHistOpen(false);},style:{background:'none',border:'none',color:'#fff',fontSize:'18px',
               cursor:'pointer',padding:'0 4px',lineHeight:1}},'×')),
-          h('div',{style:{padding:'8px 14px',borderBottom:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'8px'}},
+          h('div',{style:{padding:'8px 14px',borderBottom:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},
             h('input',{type:'search',value:q,placeholder:'업체명·담당자·금액 검색',
               onInput:function(e){setQ(e.target.value);_setPg(0);},
-              style:{flex:1,padding:'5px 10px',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px'}}),
+              style:{flex:1,minWidth:'140px',padding:'5px 10px',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px'}}),
             h('button',{onClick:function(){ setAutoOnly(!autoOnly); _setPg(0); },
               title:'사람이 고르지 않고 자동으로 붙은 건만 봅니다 — 잘못 붙었을 여지가 여기 있습니다',
               style:{padding:'5px 11px',borderRadius:'5px',fontSize:'13px',fontWeight:700,cursor:'pointer',
@@ -60951,14 +61078,14 @@ function FinanceLedger(props){
                 border:'1px solid '+(autoOnly?'#d97706':'#fde68a'),
                 background:autoOnly?'#d97706':'#fffbeb', color:autoOnly?'#fff':'#854d0e'}},
               autoOnly?'↩ 전체 보기':'⚡ 자동 확정만 보기'),
-            _payerDiffN>0 && h('button',{onClick:function(){ setPayerOnly(!payerOnly); _setPg(0); },
+            (_payerDiffN>0 || payerOnly) && h('button',{onClick:function(){ setPayerOnly(!payerOnly); _setPg(0); },
               title:'입금자 이름이 사업장과 달랐던 건(다른 사업장 이름·모르는 이름·관계 입금자)만 봅니다',
               style:{padding:'5px 11px',borderRadius:'5px',fontSize:'13px',fontWeight:700,cursor:'pointer',
                 whiteSpace:'nowrap',
                 border:'1px solid '+(payerOnly?'#475569':'#e2e8f0'),
                 background:payerOnly?'#475569':'#f8fafc', color:payerOnly?'#fff':'#475569'}},
               payerOnly?'↩ 전체 보기':('👤 입금자 다른 건 '+_payerDiffN)),
-            _gapN>0 && h('button',{onClick:function(){ setGapOnly(!gapOnly); _setPg(0); },
+            (_gapN>0 || gapOnly) && h('button',{onClick:function(){ setGapOnly(!gapOnly); _setPg(0); },
               title:'상담료 가운데 증빙·카드 승인번호·상담접수 연결이 비어 있는 건만 봅니다',
               style:{padding:'5px 11px',borderRadius:'5px',fontSize:'13px',fontWeight:700,cursor:'pointer',
                 whiteSpace:'nowrap',
@@ -61316,14 +61443,21 @@ function FinanceLedger(props){
                  + '앞 업체의 입금표시·성과급은 되돌리고, 새 업체 담당자로 성과급을 다시 나눕니다.\n'
                  + '금액 ' + _amt.toLocaleString() + '원 · 날짜 ' + (fi.date||'-') + ' 는 그대로입니다.'
                  + erpLockNoticeFor(fi);
-        if(!(await popConfirm(_msg))) return;
-        if(!erpUndoIncome(fi)){ if(!erpIncomeLockYm(fi)) showToast('❌ 앞 확정을 되돌리지 못했습니다'); return; }
         /* 통장 줄 꼴로 되돌려 saveIncome 에 넘긴다.
            적요의 「[하나은행] 」 머리말은 떼어 낸다 — 안 떼면 옮길 때마다 겹쳐 붙는다. */
         var _memo2 = String(fi.memo || '').replace(/^\[하나(은행|카드)\]\s*/, '');
+        var _mrow = { date:fi.date, amount:_amt, memo:_memo2, _k:'' };
+        /* 입금자 이름이 새 업체와 다르면 사유부터 — 옮겨도 «사유 없이는 확정하지 않는다»(2026-11-16) */
+        var _mpo = await payerOptsFor(_mrow, p);
+        if(_mpo === null) return;
+        if(!(await popConfirm(_msg))) return;
+        /* ★ 한 줄만 무른다(_noCascade) — 한 통장 줄에서 나뉜 일괄입금 줄을 옮길 때 형제 줄까지 무르면
+             옮겨 만드는 것은 이 한 줄뿐이라 나머지 금액이 장부에서 사라진다(2026-11-16 자동 검토). */
+        if(!erpUndoIncome(fi, true)){ if(!erpIncomeLockYm(fi)) showToast('❌ 앞 확정을 되돌리지 못했습니다'); return; }
         var _fid2 = '';
         try {
-          _fid2 = saveIncome({ date:fi.date, amount:_amt, memo:_memo2, _k:'' }, p, { withPerf:true });
+          _fid2 = saveIncome(_mrow, p, { withPerf:true, payer:_mpo.payer });
+          _payerAfter(_mrow, p, _mpo.payer);
         } catch(e){
           if(window._erpErrLog) window._erpErrLog(e);
           showToast('❌ 옮기지 못했습니다: ' + (e && e.message));

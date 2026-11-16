@@ -331,21 +331,53 @@ test('④ 입금 전 승인 줄을 잇으면 새 줄을 더하지 않고 그 줄
   assert.equal(s.incomes[0].consultPayId, 'cp-77');
 });
 
-test('④ 잇기로 한 승인 줄이 없어졌으면 알리고 새 줄로 적는다(입금은 이미 저장됐다)', () => {
+test('④ 잇기로 한 승인 줄이 없으면 «저장 전에» 막는다 — 입금 줄에 번호만 남고 상담접수와 어긋나지 않게', () => {
   const s = saveCtx(CTS([]));
-  assert.equal(s.c.saveDirectIncome(DBASE({ payLinkId: 'cp-없음' })), true);
-  assert.ok(s.toasts.some((t) => /찾지 못/.test(t)));
-  const p = s.patches.find((x) => x.store === 'contracts');
-  assert.equal(p.p.consultPayments.length, 1);
-  assert.equal(p.p.consultPayments[0].status, 'received');
+  assert.equal(s.c.saveDirectIncome(DBASE({ payLinkId: 'cp-없음' })), false);
+  assert.equal(s.incomes.length, 0, '입금을 만들지 않았다');
+  assert.equal(s.patches.length, 0);
+  assert.equal(s.expenses.length, 0);
+  assert.equal(s.marked.length, 0, '통장 줄을 처리됨으로 찍지도 않는다');
+  assert.ok(s.toasts.some((t) => /잇기/.test(t)));
 });
 
-test('① 상담접수를 못 찾으면 입금에만 적고 알린다', () => {
+test('④ 이미 입금 확인된 승인 줄을 또 잇지 못한다', () => {
+  const done = { id: 'cp-5', method: 'card', status: 'received', amount: 220000, incomeId: 'fi-전', cardCompany: '신한', approvalNo: '12345678' };
+  const s = saveCtx(CTS([done]));
+  assert.equal(s.c.saveDirectIncome(DBASE({ payLinkId: 'cp-5' })), false);
+  assert.equal(s.incomes.length, 0);
+});
+
+test('① 고른 상담접수가 없으면(지워졌거나 못 찾으면) 입금도 만들지 않는다 — 번호만 남은 입금 줄을 만들지 않는다', () => {
   const s = saveCtx([]);
-  assert.equal(s.c.saveDirectIncome(DBASE({ consultId: 'ct-없음' })), true);
-  assert.equal(s.incomes.length, 1);
-  assert.equal(s.patches.filter((x) => x.store === 'contracts').length, 0);
+  assert.equal(s.c.saveDirectIncome(DBASE({ consultId: 'ct-없음' })), false);
+  assert.equal(s.incomes.length, 0);
   assert.ok(s.toasts.some((t) => /상담접수를 찾지 못/.test(t)));
+  const gone = saveCtx([{ id: 'ct-1', clientName: '지워짐', status: 'consult', _deleted: true, consultPayments: [] }]);
+  assert.equal(gone.c.saveDirectIncome(DBASE()), false, '지운 상담접수에도 적지 않는다');
+});
+
+test('① 상담접수에 적지 못하면(저장 실패) 방금 만든 입금도 무르고 멈춘다 — 수수료 지출·처리됨 표시도 남기지 않는다', () => {
+  const s = saveCtx(CTS());
+  const undone = [];
+  s.c.erpUndoIncome = (fi) => { undone.push(fi.id); return true; };
+  s.c.dbPatch = (store) => (store === 'contracts' ? false : true);
+  assert.equal(s.c.saveDirectIncome(DBASE()), false);
+  assert.equal(undone.length, 1, '입금을 물렀다');
+  assert.equal(undone[0], s.incomes[0].id);
+  assert.equal(s.expenses.length, 0, '수수료 지출을 안 만들었다');
+  assert.equal(s.marked.length, 0, '통장 줄을 처리됨으로 안 찍었다');
+  assert.ok(s.toasts.some((t) => /입금도 취소/.test(t)));
+});
+
+test('① 상담접수 저장이 예외를 던져도 같다', () => {
+  const s = saveCtx(CTS());
+  const undone = [];
+  s.c.erpUndoIncome = (fi) => { undone.push(fi.id); return true; };
+  s.c.dbPatch = (store) => { if (store === 'contracts') throw new Error('끊김'); return true; };
+  assert.equal(s.c.saveDirectIncome(DBASE()), false);
+  assert.equal(undone.length, 1);
+  assert.equal(s.expenses.length, 0);
 });
 
 test('① 상담접수를 안 골랐으면 계좌 입금은 상담접수에 손대지 않고, 증빙 점검에 걸린다', () => {
@@ -372,4 +404,104 @@ test('① 계좌로 낸 상담료도 상담접수를 고르면 결제 한 줄이
   assert.equal(e.method, 'account');
   assert.equal(e.incomeId, s.incomes[0].id);
   assert.equal(e.cardCompany, undefined);
+});
+
+/* ───────── ⑧ 입금을 무르면 상담접수 결제 한 줄도 «돌려놓는다» (2026-11-16 자동 검토) ───────── */
+test('⑧ 입금 전 승인을 잇었던 줄은 입금을 무르면 «입금 전»으로 돌아간다(승인 정보는 그대로, 입금 칸은 지운다)', () => {
+  const c = makeCtx();
+  const list = [{ id: 'cp-1', method: 'card', status: 'received', amount: 220000, approvalNo: '12345678', cardCompany: '신한',
+    incomeId: 'fi-9', settleDate: '2026-11-17', netAmount: 213000, fee: 7000, fromApproved: true }];
+  const out = c.erpConsultPaymentsOnUndo(list, 'cp-1', 'fi-9');
+  assert.equal(out[0].status, 'approved');
+  assert.equal(out[0].approvalNo, '12345678');
+  ['incomeId', 'settleDate', 'netAmount', 'fee', 'fromApproved'].forEach((k) => assert.ok(!(k in out[0]), k + ' 를 지운다'));
+  assert.equal(list[0].status, 'received', '원본은 건드리지 않는다');
+  assert.equal(c.erpConsultPaidSum({ consultPayments: out }), 0, '무른 입금은 «받은 돈»에 안 센다');
+});
+
+test('⑧ 직접 적었던 줄은 입금을 무르면 취소로 표시된다(기록은 지우지 않는다)', () => {
+  const c = makeCtx();
+  const out = c.erpConsultPaymentsOnUndo([{ id: 'cp-2', status: 'received', incomeId: 'fi-1', amount: 110000 }], 'cp-2', 'fi-1');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].status, 'cancelled');
+  assert.ok(out[0].cancelledAt);
+});
+
+test('⑧ 그 입금이 만든 줄이 아니면 건드리지 않는다 — 다른 입금·못 찾음은 null', () => {
+  const c = makeCtx();
+  const list = [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', fromApproved: true }, { id: 'cp-0', status: 'approved' }];
+  assert.equal(c.erpConsultPaymentsOnUndo(list, 'cp-1', 'fi-다른'), null, '다른 입금이 무르는 것은 이 줄과 무관');
+  assert.equal(c.erpConsultPaymentsOnUndo(list, 'cp-없음', 'fi-9'), null);
+  assert.equal(c.erpConsultPaymentsOnUndo(list, 'cp-0', undefined), null, '입금이 잇지 않은 입금 전 승인 줄을 «취소»로 바꾸지 않는다');
+});
+
+function undoCtx(contracts, incomes) {
+  const c = makeCtx();
+  const patches = [], toasts = [];
+  c.dbGet = (k, d) => (k === 'contracts' ? contracts : k === 'finance_income' ? incomes : d);
+  c.dbPatch = (store, id, p) => { patches.push({ store, id, p }); return c._patchResult === undefined ? true : c._patchResult; };
+  c.showToast = (m) => toasts.push(m);
+  c.erpPerfLockInfo = () => ({ locked: false });
+  c.erpIncomeLockYm = () => '';
+  c.erpIncomeLive = (fi) => !!fi && !fi._deleted && !fi.undoneDate;
+  c.erpLumpSiblings = () => [];
+  c.erpIncomeSourceStore = () => 'companies';
+  c.CURRENT_USER = { sid: 'P-9' };
+  vm.runInContext(cut('function erpUndoIncome(', '/* 안내 글 — 되돌리기 확인창에'), c);
+  return { c, patches, toasts };
+}
+test('⑧ 상담료 입금을 무르는 «문 하나»(erpUndoIncome)가 상담접수 결제 한 줄도 함께 돌려놓는다', () => {
+  const fi = { id: 'fi-9', kind: '상담료', date: '2026-11-17', consultId: 'ct-1', consultPayId: 'cp-1' };
+  const ct = [{ id: 'ct-1', consultPayments: [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', fromApproved: true, amount: 220000 }] }];
+  const u = undoCtx(ct, [fi]);
+  assert.equal(u.c.erpUndoIncome(fi), true);
+  const cp = u.patches.find((p) => p.store === 'contracts');
+  assert.ok(cp, '상담접수 카드도 고친다');
+  assert.equal(cp.p.consultPayments[0].status, 'approved');
+  assert.ok(u.patches.some((p) => p.store === 'finance_income' && p.p.undoneDate));
+});
+
+test('⑧ 입금 저장이 안 되면(dbPatch false) «되돌렸다»고 하지 않고 상담접수도 건드리지 않는다', () => {
+  const fi = { id: 'fi-9', kind: '상담료', date: '2026-11-17', consultId: 'ct-1', consultPayId: 'cp-1' };
+  const ct = [{ id: 'ct-1', consultPayments: [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', amount: 1 }] }];
+  const u = undoCtx(ct, [fi]);
+  u.c._patchResult = false;
+  assert.equal(u.c.erpUndoIncome(fi), false);
+  assert.equal(u.patches.filter((p) => p.store === 'contracts').length, 0);
+});
+
+test('⑧ 상담 칸이 없는 옛 입금은 상담접수를 찾지도 않는다(기존 되돌리기 그대로)', () => {
+  const fi = { id: 'fi-1', kind: '자문료', date: '2026-11-17' };
+  const u = undoCtx([], [fi]);
+  assert.equal(u.c.erpUndoIncome(fi), true);
+  assert.equal(u.patches.filter((p) => p.store === 'contracts').length, 0);
+});
+
+/* ───────── ⑩ 화면 연결 (자동 검토 반영) ───────── */
+test('⑩ 직접 등록 창 — 상담접수·결제수단을 바꾸면 «잇기»를 풀고, 카드전표 증빙이 있고, 카드 정보가 모자라면 등록이 안 눌린다', () => {
+  assert.match(FL, /onChange:function\(e\)\{ upd\(\{consultId:e\.target\.value, payLinkId:''\}\); \}/, '상담접수를 바꾸면 잇기 풀림');
+  assert.match(FL, /upd\(\{cardMode:false, payLinkId:''\}\)/, '계좌로 바꾸면 잇기 풀림');
+  assert.ok(FL.indexOf("seg(dirPop.doc,'card','💳 카드전표'") >= 0, '카드로 받았으면 카드전표를 증빙으로 고를 수 있다');
+  assert.match(FL, /\|\| \(_isConsultK && dirPop\.cardMode && !_cardBuild\.ok\),/, '카드 정보가 모자라면 등록 단추가 안 눌린다');
+});
+
+test('⑩ 승인 후 계약협의로 넘어간 상담접수도 정산 입금 후보·선택지에 남고, 지운 것은 뺀다', () => {
+  const at = FL.indexOf('var _consultPool = ');
+  const pool = FL.slice(at, at + 400);
+  assert.ok(/!c\._deleted/.test(pool), '지운 상담접수를 뺀다');
+  assert.ok(/status === 'approved'/.test(pool), '입금 전 카드 승인이 남은 건은 상태가 바뀌어도 포함한다');
+  assert.ok(FL.indexOf('erpConsultSettleCands(_r, _consultPool)') >= 0);
+});
+
+test('⑩ 카드 끝 4자리 칸은 전체 번호를 붙여 넣어도 «입력창 상태에도» 끝 네 자리만 둔다(두 입력창 모두)', () => {
+  const needle = 'String(e.target.value).replace(/' + String.fromCharCode(92) + "D/g";
+  const hits = SRC.split(needle).length - 1;
+  assert.ok(hits >= 2, '직접 등록 창과 카드 승인 기록 창 둘 다 (' + hits + ')');
+  assert.ok(SRC.indexOf("'aria-label':'카드 끝 4자리'") >= 0);
+});
+
+test('⑩ 확정 이력 — 두 모아 보기는 걸러 내기 전 목록으로 세고, 켜 둔 단추는 0건이어도 남는다', () => {
+  assert.match(FL, /var _payerDiffN = allInc\.filter\(_isPayerDiff\)\.length;\s*\n\s*var _gapN = allInc\.filter\(/, '둘 다 걸러 내기 전에 센다');
+  assert.ok(FL.indexOf('(_payerDiffN>0 || payerOnly) && h(') >= 0 && FL.indexOf('(_gapN>0 || gapOnly) && h(') >= 0, '켜 둔 단추는 사라지지 않는다');
+  assert.ok(FL.indexOf("flexWrap:'wrap'}},\n            h('input',{type:'search'") >= 0, '검색 줄이 좁은 화면에서 접힌다');
 });

@@ -110,11 +110,16 @@ test('④ CMS 통로·합계 후보 적요·사업장 이름 자신·두 글자 
 });
 
 /* ───────── ⑦ 지우기 ───────── */
-test('⑦ 관계 입금자는 지울 수 있다 — 지우면 더 이상 맞지 않는다', () => {
+test('⑦ 관계 입금자는 지울 수 있다 — 지우면 더 이상 맞지 않고, 줄은 «지움 표시»로 이력이 남는다', () => {
   const c = makeCtx();
   const co = CO({ payerRelations: [R('김대표개인', 'ceo'), R('박직원', 'staff')] });
-  const left = c.erpPayerRelationDel(co, '김대표개인');
-  assert.equal(left.length, 1);
+  const left = c.erpPayerRelationDel(co, '김대표개인', 'P-9');
+  assert.equal(left.length, 2, '줄을 없애지 않는다(누가 언제 등록·삭제했는지 남는다)');
+  const gone = left.find((x) => x.key === '김대표개인');
+  assert.equal(gone._deleted, true);
+  assert.equal(gone.deletedBy, 'P-9');
+  assert.ok(gone.deletedAt);
+  assert.ok(!left.find((x) => x.key === '박직원')._deleted, '다른 등록은 그대로');
   assert.equal(c.erpPayerRelationHit(Object.assign({}, co, { payerRelations: left }), '김대표개인'), null);
   assert.equal(co.payerRelations.length, 2, '원본은 그대로');
 });
@@ -208,7 +213,7 @@ function flowCtx(opts) {
   c.CURRENT_USER = { sid: 'P-9', name: '검사' };
   c.confirmRow = (row, pItem, o) => { confirmed.push({ row, pItem, o }); return true; };
   c.erpMatchScore = () => ({ nameScore: opts.nameScore === undefined ? 0 : opts.nameScore, aliasWeak: !!opts.aliasWeak });
-  const src = cut('  function _payerAssess(row, pItem){', '  /* ── 확정 한 번 = 연쇄 처리 ──');
+  const src = cut('  var _payerCoCache = { arr:null, idx:null };', '  /* ── 확정 한 번 = 연쇄 처리 ──');
   vm.runInContext(src, c);
   return { c, co, other, asked, learned, patched, confirmed, toasts };
 }
@@ -282,9 +287,10 @@ test('③ 이름이 다른 돈은 별칭으로 «배우지 않고», 등록을 �
   assert.equal(f.patched.length, 0, '등록하지 않았다');
 });
 
-test('③ 이름이 같은 돈(본인·관계·통로·적요 없음)과 사유 없는 옛 길은 지금처럼 별칭을 배운다(회귀 방지)', () => {
+test('③ 이름이 같은 돈(본인·통로·적요 없음)과 사유 없는 옛 길은 지금처럼 별칭을 배운다(회귀 방지) — 관계 입금자는 등록 자체가 규칙이라 배우지 않는다', () => {
   const f = flowCtx();
-  ['self', 'related', 'channel', 'unknown'].forEach((k) => assert.equal(f.c.payerLearns({ kind: k, name: 'x' }), true, k));
+  ['self', 'channel', 'unknown'].forEach((k) => assert.equal(f.c.payerLearns({ kind: k, name: 'x' }), true, k));
+  assert.equal(f.c.payerLearns({ kind: 'related', name: 'x' }), false, '별칭으로도 굳으면 등록을 지워도 자동 매칭이 남고 여러 사업장 몫이 덮어써진다');
   assert.equal(f.c.payerLearns(undefined), true, '판정을 못 한 길은 예전 그대로');
   assert.equal(f.c.payerLearns(null), true);
 });
@@ -365,9 +371,99 @@ test('⑥ 사유 창 — 취소·바깥 누르기는 확정하지 않고, 관계
 
 test('⑦ 환경설정에서 관계 입금자를 보고 지울 수 있다 · 확정 이력에서 입금자 다른 건을 모아 본다', () => {
   const PA = cut('function PayerAliasModal(props){', 'function ', 1) ;
-  assert.ok(SRC.indexOf('erpPayerRelationDel(x.co, x.r.key)') >= 0, '지우는 길이 있다');
+  assert.ok(SRC.indexOf('erpPayerRelationDel(x.co, x.r.key,') >= 0, '지우는 길이 있다');
   assert.ok(SRC.indexOf("'👤 관계 입금자 · 대납 ('") >= 0);
   assert.ok(FL.indexOf('setPayerOnly(!payerOnly)') >= 0, '입금자 다른 건만 보기');
   assert.ok(FL.indexOf("fi.payerKind === 'other_company'") >= 0 && FL.indexOf('fi.payerReview') >= 0, '딱지·확인 필요 표시');
   assert.ok(PA.length > 0);
+});
+
+/* ───────── ⑧ 자동 검토(2026-11-16) 반영 — 사유 없이 확정되는 우회로를 막는다 ───────── */
+test('⑧ 지운 관계 입금자 줄은 목록에서 빠지고, 같은 이름을 다시 등록해도 지운 줄은 이력으로 남는다', () => {
+  const c = makeCtx();
+  const co = CO({ payerRelations: [R('김대표개인', 'ceo', { _deleted: true, deletedBy: 'P-1' })] });
+  assert.equal(c.erpPayerRelationHit(co, '김대표개인'), null);
+  const r = c.erpPayerRelationAdd(co, { name: '김대표개인', relation: 'staff' });
+  assert.equal(r.ok, true);
+  assert.equal(r.list.length, 2, '지운 줄은 이력으로, 새 줄이 살아 있는 등록');
+  assert.equal(r.list.filter((x) => !x._deleted).length, 1);
+});
+
+test('⑧ 후보를 «고르는 순간»(pickFor·후보 창)에도 이름이 다른 입금자는 별칭으로 배우지 않는다 — 고르기만 해서 두 번째에 «본인»이 되는 구멍', () => {
+  const PICKFOR = cut('  function pickFor(row, pid){', '  /* ── 업체별 「몇 월분」 기준 저장 ──');
+  assert.match(PICKFOR, /payerLearns\(_payerAssessSafe\(row, _c\)\) && erpLearnPayerAlias\(_m, _c\)/);
+  assert.match(FL, /payerLearns\(_payerAssessSafe\(_row, _c\)\) && erpLearnPayerAlias\(_memo, _c\)/, '후보 크게 보기 창의 고르기도 같은 원칙');
+});
+
+test('⑧ 이름이 다른 입금자가 «초록(모두확정·자동확정)»이 되는 길을 막는다 — 노랑으로 남겨 사람이 사유를 고르고 확정하게', () => {
+  const at = FL.indexOf('var st = stateOf(row, grp);');
+  const blk = FL.slice(at, at + 900);
+  assert.match(blk, /if\(st\.state === 'ready' && grp\.length === 1\)\{/);
+  assert.match(blk, /erpPayerNeedsReason\(_payerAssessSafe\(row, _pp\)\)/);
+  assert.match(blk, /state:'check'/, '노랑으로');
+  // 모두확정·자동확정 후보(readyRows)는 이 다음에 만들어진다 — 위 강등이 먼저여야 한다
+  assert.ok(FL.indexOf("if(st.state === 'ready' && grp.length === 1){\n      var p = pendById") > at, '강등 뒤에 readyRows 를 만든다');
+});
+
+test('⑧ 합계 후보 확정은 이름이 다른 업체가 끼어 있으면 하지 않고, 별칭 학습도 이름이 같은 업체만', async () => {
+  const f = flowCtx();
+  const calls = [], learned = [];
+  f.c.popConfirm = async () => true;
+  f.c.saveIncome = (r, c) => { calls.push(c.companyName); };
+  f.c.erpLearnPayerAlias = (m, c) => { learned.push(c.companyName); return true; };
+  f.c.erpMarkBankRowProcessed = () => {};
+  f.c.removeRow = () => {};
+  f.c.setOpenRow = () => {};
+  vm.runInContext(cut('  async function confirmCombo(row, cb){', '  /* 📚 밀린 자문료 일괄 입금 확정'), f.c);
+  const row = ROW('아무개');
+  const same = { companyName: '가상산업', amount: 100000, label: '자문료', item: f.co, kind: 'advisory' };
+  const diff = { companyName: '다른산업', amount: 120000, label: '자문료', item: f.other, kind: 'advisory' };
+  // _payerAssessSafe 는 후보 이름으로 가른다 — 가상산업은 본인(이름 근거 있음), 다른산업은 모르는 이름
+  f.c._payerAssessSafe = (r, c) => (c.companyName === '가상산업' ? { kind: 'self', name: 'x' } : { kind: 'third', name: '아무개' });
+  await f.c.confirmCombo(row, { cands: [same, diff], total: 220000, diff: 0 });
+  assert.equal(calls.length, 0, '이름이 다른 업체가 끼면 하나도 확정하지 않는다');
+  assert.ok(f.toasts.some((t) => /합계 후보로는 확정할 수 없/.test(t)));
+  await f.c.confirmCombo(row, { cands: [same], total: 100000, diff: 0 });
+  assert.equal(calls.length, 1, '모두 본인이면 확정');
+  assert.equal(learned.length, 1, '본인은 지금처럼 배운다');
+});
+
+test('⑧ 나눠담기 창은 이름이 다른 건이 끼면 사유를 «한 번» 묻고, 관계 등록은 하지 않는다', () => {
+  const SPLIT = cut('                if(!(await popConfirm(msg))) return;\n                /* 👤 입금자 이름이 사업장과 다른 건이 끼어 있으면', '                var ok=0,ng=0;');
+  assert.match(SPLIT, /if\(_needP\)\{\s*\n\s*_splitPick=await askPayer\(rowsIn\[0\],_needP,_needA,true\);/, '이름이 다른 건이 있을 때(_needP) 한 번 묻는다 — noRegister=true: 여러 사업장 몫이라 등록은 사업장마다 하나씩');
+  assert.match(SPLIT, /if\(erpPayerNeedsReason\(_aa\)\)\{ _needP=_pp; _needA=_aa; \}/, '이름이 다른 건을 가려낸다');
+  assert.match(SPLIT, /if\(!_splitPick\) return;/, '취소하면 확정하지 않는다');
+  const SAVE_AT = FL.indexOf('var _sa=_payerAssessSafe(slot.row,p);');
+  const SAVE = FL.slice(SAVE_AT, SAVE_AT + 700);
+  assert.match(SAVE, /Object\.assign\(\{\}, \(got\+take\)<ea\?\{partial:true\}:\{\}, \{ payer:_sy \}\)/, '사유를 저장 길에 싣는다');
+  assert.match(SAVE, /if\(payerLearns\(_sy \|\| _sa\)\) erpLearnPayerAlias/, '이름이 다른 건은 배우지 않는다');
+  assert.ok(FL.indexOf('askPayer(row, pItem, a, noRegister)') >= 0 && FL.indexOf('!pa.noRegister && h(') >= 0, '창이 등록 칸을 숨긴다');
+});
+
+test('⑧ 업체 바꾸기도 입금자 사유를 묻고(취소하면 아무것도 안 바꾼다), 한 줄만 무른다', () => {
+  const at = FL.indexOf('async function doMove(p){');
+  const MOVE = FL.slice(at, at + 2600);
+  assert.match(MOVE, /var _mpo = await payerOptsFor\(_mrow, p\);\s*\n\s*if\(_mpo === null\) return;/);
+  assert.ok(MOVE.indexOf('payerOptsFor(_mrow, p)') < MOVE.indexOf('erpUndoIncome(fi, true)'), '사유를 먼저 묻고 나서 무른다(취소하면 아무것도 안 바뀐다)');
+  assert.match(MOVE, /saveIncome\(_mrow, p, \{ withPerf:true, payer:_mpo\.payer \}\)/);
+});
+
+test('⑧ 사유 창 — Esc 는 «취소(확정하지 않음)», 대화상자로 알린다', () => {
+  assert.match(FL, /if\(!payerAsk\) return;\s*\n\s*function onEsc\(e\)\{\s*\n\s*if\(e\.key !== 'Escape'\) return;\s*\n\s*e\.preventDefault\(\); e\.stopPropagation\(\);\s*\n\s*var r = payerAsk\.res; setPayerAsk\(null\); r\(null\);\s*\n\s*\}/, 'Esc 는 창을 닫고 «취소(null)»로 답한다');
+  assert.match(FL, /window\.addEventListener\('keydown', onEsc, true\);/);
+  assert.match(FL, /role:'dialog','aria-modal':'true'/);
+});
+
+test('⑧ 업체 색인은 같은 목록이면 다시 만들지 않는다(줄마다 판정하므로) — 목록이 바뀌면 새로 만든다', () => {
+  const f = flowCtx();
+  let builds = 0;
+  const real = f.c.erpCoIndexByName;
+  f.c.erpCoIndexByName = (arr) => { builds++; return real(arr); };
+  f.c._payerAssess(ROW('아무개'), PIT('가상산업', f.co));
+  f.c._payerAssess(ROW('아무개'), PIT('가상산업', f.co));
+  f.c._payerAssess(ROW('다른산업'), PIT('가상산업', f.co));
+  assert.equal(builds, 1, '세 번 판정해도 색인은 한 번');
+  f.c._companies = f.c._companies.slice();               // 목록이 새로 들어오면
+  f.c._payerAssess(ROW('아무개'), PIT('가상산업', f.co));
+  assert.equal(builds, 2);
 });
