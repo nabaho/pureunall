@@ -1,23 +1,15 @@
-/* ⚠ 더 이상 등록하지 않는다 — pu-sw.js 로 합쳐졌다.
-   앱마다 워커를 따로 등록하면 같은 scope에서 서로 밀어내 공유 받기가 죽는다.
-   이 파일은 예전에 등록해 둔 브라우저가 조용히 갈아타도록 남겨 둔 것이다. */
-/* 푸른기업정보함 서비스워커 — 카톡·갤러리 [공유→푸른기업정보함] 수신 처리 */
-self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('activate', e => self.clients.claim());
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (e.request.method === 'POST' && url.pathname.endsWith('/pu-cards-share')) {
-    e.respondWith((async () => {
-      try {
-        const form = await e.request.formData();
-        const files = form.getAll('images').filter(f => f && f.size);
-        await caches.delete('pucards-share');
-        const cache = await caches.open('pucards-share');
-        await cache.put('shared-files', new Response(JSON.stringify({ n: files.length })));
-        for (let i = 0; i < files.length; i++)
-          await cache.put('shared-' + i, new Response(files[i], { headers: { 'Content-Type': files[i].type || 'image/jpeg' } }));
-      } catch (err) {}
-      return Response.redirect('./pu-cards.html?shared=1', 303);
-    })());
-  }
-});
+/* ⚠ 더 이상 등록하지 않는다 — pu-sw.js 로 합쳐졌다(기업정보함 몫은 pu-sw.js 의 takeCards).
+   ═══════════════════════════════════════════════════════════════════
+   앱마다 워커를 따로 등록하면 같은 scope 에서 서로 밀어내 공유 받기가 죽는다(pu-sw.js 머리말).
+   이 파일은 예전에 등록해 둔 브라우저가 조용히 갈아타도록 남겨 둔 것이다.
+
+   ★ 2026-11-16 옛 기업정보함 갈래를 들고 있던 것을 «통합 일꾼을 그대로 부르는 껍데기»로 바꿨다
+     (pu-erp-sw.js 와 같은 방법). 까닭 —
+     ① 이 일꾼이 남은 폰도 통합 일꾼과 같은 지킴(다른 웹사이트가 보낸 공유는 담지 않는다)을 받게 한다.
+        옛 갈래를 따로 들고 있으면 언젠가 통합 일꾼과 갈라진다.
+     ② 브라우저는 깔린 일꾼의 파일을 때때로 다시 받아 바뀌었는지 본다 — 바뀌어 있으면 아래 한 줄로
+        갈아 끼우고, 그때부터 통합 일꾼과 «똑같이» 모든 앱의 공유를 받는다(아무 화면도 안 열어도).
+   ⚠ 꼬리표(?from=…)는 «처음 갈아탈 때» 폰 캐시에 남은 옛 pu-sw.js 를 집지 않게 하려는 것이다
+     (불러오는 파일은 브라우저 캐시 — 깃허브 약 10분 — 를 거친다).
+   지킴: tests/share-target-other-site.test.js(공유를 받는 모든 일꾼을 돌려 본다) */
+importScripts('pu-sw.js?from=cards-sw-20261116');

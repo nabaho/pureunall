@@ -87,10 +87,16 @@ function 일꾼켜기(파일, 주소) {
   return { handlers, 담긴것, 자리, 캐시 };
 }
 
-/* 가짜 공유 요청 — 안드로이드가 보내는 모양(multipart 의 파일 칸 하나) */
-function 공유요청(주소, 칸, 파일들) {
+/* 가짜 공유 요청 — 안드로이드가 보내는 모양(multipart 의 파일 칸 하나)
+   덧(고를 것): { 보낸곳: request.referrer 값, origin: Origin 머리 값 } — 없으면 폰 공유처럼 비어 있다 */
+function 공유요청(주소, 칸, 파일들, 덧) {
+  덧 = 덧 || {};
+  const 머리 = {};
+  if (덧.origin !== undefined) 머리.origin = 덧.origin;
   return {
     method: 'POST', url: 주소, mode: 'navigate',
+    referrer: 덧.보낸곳 === undefined ? '' : 덧.보낸곳,
+    headers: { get: function (k) { k = String(k).toLowerCase(); return k in 머리 ? 머리[k] : null; } },
     formData: async function () {
       return {
         getAll: function (k) { return k === 칸 ? 파일들.slice() : []; },
