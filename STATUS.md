@@ -251,7 +251,7 @@ PR #3114 · `status/2026-11-16-home-newsite-gaps.md`. 가짜 파이어베이스�
 - [ ] **카페24(옛 사이트 호스팅·메일 `mw-002.cafe24.com`) 계약 확인** — 도메인과 따로 돈이 나갈 수 있다. 옛 사이트 자료 백업 뒤 해지 여부 결정. 그 도메인 메일 주소를 쓰는 사람이 있으면 먼저 옮긴다.
 
 **로그인만 해 주면 AI 가 이어서**
-- [ ] **가비아 로그인** → AI 가: `pureunlabor.com` → `pureunlabor.co.kr` 넘김(TXT `_github-pages-challenge-nabaho` → GitHub Verify → A 4줄·`www` CNAME → `nabaho/pureunlabor-com` cname → HTTPS 강제) · 두 새 도메인에 메일 사칭 막기(SPF `v=spf1 -all`, DMARC `p=reject`) · 도메인 잠금 확인
+- [x] **가비아 로그인 뒤 AI 가 끝냄(2026-11-16 20:3x)**: `pureunlabor.com` DNS 8줄(A 4·`www` CNAME·GitHub 확인 TXT·SPF·DMARC) → GitHub «Verified» → `nabaho/pureunlabor-com` cname·인증서 approved·HTTPS 강제(실측: https 200, www·http → https://pureunlabor.com 301, 그 쪽이 pureunlabor.co.kr 로 넘김). `pureunlabor.co.kr` 에 SPF `v=spf1 -all`·DMARC `p=reject` 2줄 추가(기존 7줄 그대로, 홈페이지·ERP 200 확인). 이전 잠금: .com `clientTransferProhibited`, .co.kr «기관이전 잠금 On»(«안전 잠금»·«등록 정보 숨김»은 Off 그대로). 옛 도메인 푸른노무법인.kr 은 이 가비아 계정 목록에 없음(다른 계정 등록 — 자동 연장 걱정 없음).
 - [ ] **새 주소 ERP 로그인**(https://erp.pureunlabor.co.kr) → 「홈페이지」 → 「새 사이트에 올리기」 — 담아 둔 얼굴 사진 7장(위 🏠 절). 대표 본인 기기도 «로그인 유지»·앱 다시 설치·폰 알림 다시 켜기
 - [ ] **네이버 로그인** → 서치어드바이저 사이트 등록(`https://pureunlabor.co.kr`, HTML 파일 확인 → pureun-site 뿌리) · 사이트맵 제출. 크롬 확장·내장 브라우저 모두 네이버를 막아 AI 는 못 연다
 
