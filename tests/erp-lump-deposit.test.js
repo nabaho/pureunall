@@ -377,7 +377,9 @@ const CONFIRM = cut('  async function confirmLump(row, lz, choice){', '  /* 보�
 test('⑨ 일괄 확정은 «전부 되거나 하나도 안 된다» — 중간에 막히면 만든 것을 무른다', () => {
   assert.match(CONFIRM, /var lumpId = 'lp-'/);
   assert.match(CONFIRM, /saveIncome\(Object\.assign\(\{\}, row, \{ amount:p\.amount \}\), pit,\s*\{ withPerf:true, prepay:!!p\.prepay, lump:\{ id:lumpId/);
-  assert.match(CONFIRM, /catch\(e\)\{[\s\S]*made\.forEach\(function\(id\)\{[\s\S]*erpUndoIncome\(fi\)/, '실패하면 방금 만든 줄을 모두 무른다');
+  assert.match(CONFIRM, /catch\(e\)\{[\s\S]*var undone = !firstFi \|\| erpUndoIncome\(firstFi\);/, '실패하면 «한 번만» 불러 만든 줄을 모두 무르고 결과를 확인한다');
+  assert.ok(CONFIRM.indexOf('made.forEach') < 0, '줄마다 부르지 않는다 — 이미 물러진 줄을 또 무르게 된다');
+  assert.match(CONFIRM, /되돌리지도 못했습니다/, '못 물렀으면 «되돌렸다»고 하지 않는다');
   assert.ok(CONFIRM.indexOf('return;', CONFIRM.indexOf('catch(e)')) > 0, '실패하면 통장 줄을 «처리됨»으로 찍지 않고 멈춘다');
   assert.ok(CONFIRM.indexOf('erpMarkBankRowProcessed') > CONFIRM.indexOf('catch(e)'), '처리됨 표시는 «다 만든 뒤»에만');
   assert.match(CONFIRM, /if\(!parts\)\{ showToast/, '남는 돈을 안 골랐으면 확정하지 않는다');
@@ -391,7 +393,7 @@ test('⑨ 확정 전에 사람에게 무엇이 어떻게 나뉘는지 보여 주
 const FL = cut('function FinanceLedger(', 'function FinanceIncome');
 test('⑩ 줄 상태가 stateOf 를 거치고, 모두확정(readyRows)은 일괄을 모른다', () => {
   assert.ok(FL.indexOf('var st = stateOf(row, grp);') >= 0, '줄 상태 계산이 일괄 표시를 거친다');
-  assert.ok(FL.indexOf('var _st  = stateOf(row, _grp);') >= 0, '펼침 창도 같은 판단');
+  assert.ok(FL.indexOf('var _st  = (rowInfo[row._k] && rowInfo[row._k].st) || stateOf(row, _grp);') >= 0, '펼침 창도 «줄과 같은 판정»(이름 다른 줄은 노랑으로 강등된 것)을 쓴다');
   const ready = FL.slice(FL.indexOf('var readyRows = []'), FL.indexOf('var autoRows = [];'));
   assert.ok(ready.indexOf('lumpOf') < 0 && ready.indexOf('confirmLump') < 0, '모두확정 길에 일괄이 끼어들지 않는다');
 });
@@ -403,4 +405,82 @@ test('⑩ 펼침 창에 일괄 제안이 있고, 일괄일 때는 과입금 질�
 test('⑩ 확정 이력에 일괄·분할 딱지가 있다', () => {
   assert.ok(FL.indexOf('fi.lumpId && h(') >= 0);
   assert.ok(FL.indexOf('fi.isSplit && h(') >= 0);
+});
+
+/* ───────── ⑪ 자동 검토(2026-11-16) 반영 ───────── */
+test('⑪ 채운 돈 + 남은 돈 = 입금액은 «밀린 달이 하나도 없을 때»도 지킨다(허용치 이하의 작은 돈도 버리지 않는다)', () => {
+  const c = makeCtx();
+  const p = c.erpArrearsAllocate(500, []);
+  assert.equal(p.parts.length, 0);
+  assert.equal(p.rest, 500, '밀린 달이 없으면 입금액 전부가 남은 돈이다');
+  assert.equal(c.erpArrearsAllocate(0, DUES(2, 220000)).rest, 0);
+  assert.equal(c.erpArrearsAllocate(-100, DUES(2, 220000)).parts.length, 0);
+  assert.equal(c.erpArrearsAllocate(-100, DUES(2, 220000)).rest, 0, '음수는 나눌 것이 없다');
+});
+
+test('⑪ 허용치 안으로 모자란 달은 «완납»으로 본다 — 다음 일괄 입금이 그 1,000원 남짓을 가장 오래된 달로 먼저 채우지 않는다', () => {
+  const c = makeCtx();
+  const tol = c.ERP_ARREARS_TOL;
+  const near = [INC('2026-09', 220000 - tol, { id: 'near' })];                  // 9월은 허용치만큼 모자라게 받았다
+  const dues = c.erpAdvisoryDues(CO(), near, { upToYm: '2026-11', maxMonths: 3 });
+  assert.equal(YMS(dues), '2026-10,2026-11', '9월은 완납으로 보고 빼고 10·11월만 밀린 달');
+  const over = [INC('2026-09', 220000 - tol - 1, { id: 'over' })];             // 허용치를 넘게 모자라면 밀린 달
+  assert.equal(YMS(c.erpAdvisoryDues(CO(), over, { upToYm: '2026-11', maxMonths: 3 })), '2026-09,2026-10,2026-11');
+  const none = c.erpAdvisoryDues(CO(), [], { upToYm: '2026-11', maxMonths: 3 });
+  assert.equal(none.length, 3, '아무것도 안 받은 달은 허용치와 상관없이 밀린 달');
+});
+
+/* 되돌리기 «문 하나» — 이미 물러진 줄을 또 무르지 않는다 / 일부 실패를 뭉개지 않는다 */
+function undo2Ctx(incomes, opts) {
+  opts = opts || {};
+  const c = makeCtx();
+  const patched = [], toasts = [];
+  c.dbGet = (k, d) => (k === 'finance_income' ? incomes : d);
+  c.dbPatch = (store, id, p) => { patched.push({ store, id, p }); return opts.failId && id === opts.failId ? false : true; };
+  c.showToast = (m) => toasts.push(m);
+  c.isIncomeLocked = () => false;
+  c.erpPerfLockInfo = () => ({ locked: false });
+  c.erpIncomeSourceStore = () => 'companies';
+  c.erpIncomeLockYm = () => '';
+  c.CURRENT_USER = { sid: 'P-1' };
+  vm.runInContext(cut('function erpLumpSiblings(', '/* 입금 마감된 달이면 그 달'), c);
+  vm.runInContext(cut('function erpUndoIncome(', '/* 안내 글 — 되돌리기 확인창에'), c);
+  return { c, patched, toasts };
+}
+const LP = (id, seq, over) => Object.assign({ id, kind: '자문료', date: '2026-11-16', lumpId: 'lp-1', lumpSeq: seq, lumpN: 3, companyName: '가상산업' }, over || {});
+
+test('⑪ 이미 물러진 줄을 또 무르면 아무것도 하지 않는다 — 일괄 확정 실패 복구가 줄마다 불러도 단일 무르기가 되풀이되지 않는다', () => {
+  const list = [LP('f1', 1), LP('f2', 2), LP('f3', 3)];
+  const u = undo2Ctx(list);
+  const stale = list.map((x) => Object.assign({}, x));            // 화면이 쥔 «옛 사본» — 아직 undoneDate 가 없다
+  assert.equal(u.c.erpUndoIncome(stale[0]), true);                // 형제까지 함께 물러진다
+  const first = u.patched.filter((p) => p.store === 'finance_income').length;
+  assert.equal(first, 3);
+  list.forEach((x, i) => { x.undoneDate = '2026-11-17'; });        // 저장소에는 이제 모두 물러져 있다
+  assert.equal(u.c.erpUndoIncome(stale[1]), true, '두 번째 호출은 «이미 됨»');
+  assert.equal(u.c.erpUndoIncome(stale[2]), true);
+  assert.equal(u.patched.filter((p) => p.store === 'finance_income').length, first, '다시 저장하지 않았다');
+});
+
+test('⑪ 일부만 되돌려지면 말없이 true/false 로 뭉개지 않고 알린다', () => {
+  const list = [LP('f1', 1), LP('f2', 2), LP('f3', 3)];
+  const u = undo2Ctx(list, { failId: 'f2' });
+  assert.equal(u.c.erpUndoIncome(list[0]), false, '하나라도 못 물렀으면 성공이 아니다');
+  assert.ok(u.toasts.some((t) => /3건 중 1건/.test(t)), '몇 건 중 몇 건인지 알린다');
+});
+
+test('⑪ 저장이 안 되면(dbPatch false) 되돌렸다고 하지 않는다(일괄이 아닌 줄도)', () => {
+  const list = [{ id: 'x1', kind: '자문료', date: '2026-11-16' }];
+  const u = undo2Ctx(list, { failId: 'x1' });
+  assert.equal(u.c.erpUndoIncome(list[0]), false);
+});
+
+test('⑪ 한 줄만 무르는 길(_noCascade)이 있고, 업체 바꾸기(doMove)는 그 길을 쓴다 — 일괄 줄 하나를 옮길 때 형제 금액이 사라지지 않는다', () => {
+  const list = [LP('f1', 1), LP('f2', 2), LP('f3', 3)];
+  const u = undo2Ctx(list);
+  assert.equal(u.c.erpUndoIncome(list[1], true), true);
+  assert.equal(u.patched.filter((p) => p.store === 'finance_income').map((p) => p.id).join(','), 'f2', '그 한 줄만');
+  const MOVE = FL.slice(FL.indexOf('async function doMove(p){'), FL.indexOf('async function doMove(p){') + 2600);
+  assert.ok(MOVE.indexOf('erpUndoIncome(fi, true)') >= 0, '업체 바꾸기는 한 줄만 무른다');
+  assert.ok(MOVE.indexOf('erpUndoIncome(fi)') < 0, '형제까지 무르는 호출이 남아 있지 않다');
 });

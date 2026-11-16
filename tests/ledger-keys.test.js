@@ -143,7 +143,7 @@ console.log('\n[⑪ 되돌리기는 한 곳에서만 — 두 길이 다른 일�
    「되돌리는 길이 여럿이어도 실제 일은 한 함수가 한다」이다 —
    그래야 되돌린 뒤의 장부가 하나다. 그것을 직접 센다. */
 t('되돌리는 길이 여럿이어도 실제 일은 erpUndoIncome 한 곳이 한다',
-  (src.match(/erpUndoIncome\(fi\)/g) || []).length >= 3, true);
+  (src.match(/erpUndoIncome\(fi(?:, true)?\)/g) || []).length >= 3, true);   // 업체 바꾸기는 «한 줄만»(_noCascade) 무른다 — 같은 문, 다른 인자(2026-11-16)
 t('되돌리기 본체는 하나뿐이다',
   (src.match(/rollback\.retainerPaid=false/g) || []).length, 1);
 t('무른 표시를 남긴다 (지우지 않는다)', /undoneDate:new Date\(\)\.toISOString\(\)/.test(src), true);
