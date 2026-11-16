@@ -451,7 +451,7 @@ test('8. 화면·포털·총괄·푸른한글·보안규칙 통합 연결 및 �
   assert.match(viewJs, /function bindDragSel\(/);
   assert.match(viewJs, /ArrowRight/);
 
-  for (const tbl of ['projects', 'folderSync', 'discover', 'preChk', 'preMails', 'preCards', 'rounds', 'midSecs', 'postChk', 'postMails', 'diffRows', 'deliverables', 'finalSecs', 'followups']) {
+  for (const tbl of ['projectsKmac', 'projectsCepa', 'folderSync', 'discover', 'preChk', 'preMails', 'preCards', 'rounds', 'midSecs', 'midReview', 'postChk', 'postMails', 'diffRows', 'deliverables', 'finalSecs', 'finalReview', 'followups', 'formReviewKmac', 'formReviewCepa']) {
     assert.ok(viewJs.includes(`'${tbl}'`), `${tbl} 목록이 ☐+번호 선택 체계를 갖추어야 한다`);
   }
 
@@ -850,7 +850,7 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
       querySelectorAll() { return []; }
     };
   }
-  ['app', 'lock', 'lockWhy', 'outBtn', 'toast', 'folderFallbackInput', 'folderSyncCard', 'folderSyncMeta', 'nFolderGroups', 'reconnectFolderBtn', 'folderSyncBox', 'projectsBox'].forEach(id => {
+  ['app', 'lock', 'lockWhy', 'outBtn', 'toast', 'agencyScopeBar', 'folderFallbackInput', 'folderSyncCard', 'folderSyncMeta', 'nFolderGroups', 'reconnectFolderBtn', 'folderSyncBox', 'projectsBox', 'formsBox'].forEach(id => {
     elMap[id] = makeEl(id);
   });
 
@@ -1183,4 +1183,113 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
   for (const pw of projWrites) {
     assert.match(pw.payload.folderBoundaryHash, /^bfp:[0-9a-f]{64}$/, '프로젝트에는 도메인 구분 SHA-256 지문(folderBoundaryHash)만 저장되어야 한다');
   }
+});
+
+/* ══ 12. 소속기관(KMAC vs CEPA) 완전 분리 · 일터상생컨설팅/석유화학노동전환 중복 원천 배제 · 분리 양식 검수 · 와이드 레이아웃 검증 ══ */
+test('12. 소속기관(KMAC vs CEPA) 분리 · 일터상생/석유화학노동전환 배제 · 기관별 양식 검수기 검증', () => {
+  /* ① ERP 계약 발견 시 산일능률(KMAC)과 산일충남(CEPA)만 정확히 분리하고, 일터상생 및 석유화학 노동전환지원센터는 원천 배제한다 */
+  const cands = Intake.discoverJobtransCandidates({
+    companies: [
+      { id: 'co-syn-kmac', name: '(주)가상능률제조', bizNo: '101-81-00011', addr: '충청남도 천안시', email: 'kmac@syn1.example' },
+      { id: 'co-syn-cepa', name: '(주)가상충남설비', bizNo: '102-81-00022', addr: '충청남도 당진시', email: 'cepa@syn2.example' },
+      { id: 'co-syn-ilteo', name: '(주)가상상생기업', bizNo: '103-81-00033', email: 'ilteo@syn3.example' },
+      { id: 'co-syn-petro', name: '(주)가상석유화학', bizNo: '104-81-00044', email: 'petro@syn4.example' }
+    ],
+    bizTypes: [
+      { code: 'bt-kmac', name: '산업일자리전환컨설팅능률', agency: '한국능률협회', short: '산일능률' },
+      { code: 'bt-cepa', name: '산업일자리전환컨설팅충남', agency: '충남경제진흥원', short: '산일충남' },
+      { code: 'bt-ilteo', name: '일터혁신상생컨설팅', agency: '에프엠어소시에이션', short: '일터상생' },
+      { code: 'bt-petro', name: '노동전환컨설팅', agency: '충남노동전환지원센터', short: '노동전환' }
+    ],
+    consultings: [
+      { id: 'cs-1', no: '산일능률-2026-001', typeCode: 'bt-kmac', companyId: 'co-syn-kmac', status: 'pending' },
+      { id: 'cs-2', no: '산일충남-2026-001', typeCode: 'bt-cepa', companyId: 'co-syn-cepa', status: 'pending' },
+      { id: 'cs-3', no: '일터상생-2026-001', typeCode: 'bt-ilteo', consultingType: '일터상생혁신컨설팅', companyId: 'co-syn-ilteo', status: 'progress' },
+      { id: 'cs-4', no: '일터상생-2026-002', typeCode: 'bt-ilteo', consultingType: '일터혁신상생컨설팅', companyId: 'co-syn-cepa', status: 'progress' },
+      { id: 'cs-5', no: '노동전환-2026-001', typeCode: 'bt-petro', consultingType: '노동전환컨설팅', companyId: 'co-syn-petro', status: 'pending' }
+    ],
+    scalCos: {},
+    scalTypes: {},
+    scalScheds: [],
+    registeredProjects: []
+  });
+
+  const candByCo = Object.fromEntries(cands.map(c => [c.companyId, c]));
+  assert.ok(candByCo['co-syn-kmac'], '산일능률 사업장이 발견되어야 한다');
+  assert.equal(candByCo['co-syn-kmac'].agency, 'kmac', '충남 소재 기업이라도 산일능률 계약이면 KMAC으로 판정되어야 한다');
+  assert.equal(candByCo['co-syn-kmac'].contractNo, '산일능률-2026-001');
+  assert.ok(candByCo['co-syn-cepa'], '산일충남 사업장이 발견되어야 한다');
+  assert.equal(candByCo['co-syn-cepa'].agency, 'cepa', '산일충남 계약은 CEPA로 판정되어야 한다');
+  assert.equal(candByCo['co-syn-ilteo'], undefined, '일터상생컨설팅 사업장은 산업일자리전환 후보에 섞이면 안 된다');
+  assert.equal(candByCo['co-syn-petro'], undefined, '충남노동전환지원센터(석유화학 노동전환) 사업장은 CEPA에 섞이면 안 된다');
+
+  /* 동일 사업장의 병행 일터상생 계약 감지 검증 */
+  const parallel = Intake.detectParallelConsultings(
+    { companyId: 'co-syn-cepa', agency: 'cepa', year: 2026, consultingId: 'cs-2' },
+    [
+      { id: 'cs-2', no: '산일충남-2026-001', companyId: 'co-syn-cepa', status: 'pending' },
+      { id: 'cs-4', no: '일터상생-2026-002', consultingType: '일터혁신상생컨설팅', companyId: 'co-syn-cepa', status: 'progress' }
+    ],
+    []
+  );
+  assert.equal(parallel.hasIlteoSangsaeng, true);
+  assert.equal(parallel.contractNo, '산일충남-2026-001');
+
+  /* ② 공용 정부사업 메일함(3.컨설팅(정부사업)) 내 일터상생 메일 및 타 소속기관 메일 교차 혼입 차단 */
+  const mailScan = Intake.scanProjectMails(
+    { id: 'p-cepa-1', companyId: 'co-syn-cepa', companyName: '(주)가상충남설비', agency: 'cepa', year: 2026, contactEmails: ['cepa@syn2.example'] },
+    { govbox: { kind: 'custom', name: '3.컨설팅(정부사업)' } },
+    {
+      govbox: {
+        '701': { u: 701, s: '[(주)가상충남설비] 2026년 일터상생컨설팅 디자인팀 회의록 및 통합진단보고서양식_일반형', e: 'cepa@syn2.example', t: 'p001@pureun.kr', d: Date.UTC(2026, 8, 10), a: 1, an: ['통합진단보고서양식_일반형_v5.pptx'] },
+        '702': { u: 702, s: '[(주)가상충남설비] 한국능률협회컨설팅 정책매니저 보고서 제출', e: 'cepa@syn2.example', t: 'p001@pureun.kr', d: Date.UTC(2026, 8, 11), a: 1, an: ['정책매니저보고서.hwpx'] },
+        '703': { u: 703, s: '[(주)가상충남설비] 2026년 충남경제진흥원 산업일자리전환 재무제표·조직도 송부', e: 'cepa@syn2.example', t: 'p001@pureun.kr', d: Date.UTC(2026, 8, 12), a: 2, an: ['재무제표.xlsx', '조직도.pdf'] }
+      }
+    },
+    [],
+    [],
+    {}
+  );
+  assert.ok(mailScan.matched.some(m => m.uid === '703'), '해당 소속기관(CEPA) 기초자료 메일은 정상 감지되어야 한다');
+  assert.ok(!mailScan.matched.some(m => m.uid === '701'), '공용 컨설팅 폴더 안의 일터상생 메일은 절대 매칭되면 안 된다');
+  assert.ok(!mailScan.matched.some(m => m.uid === '702'), '반대편 소속기관(KMAC 정책매니저) 메일은 CEPA 프로젝트에 섞이면 안 된다');
+
+  /* ③ 로컬 폴더 스캔 시 파일 증거로 KMAC vs CEPA 교정 및 일터상생 서식 차단 */
+  const folderGrouped = Intake.groupJobtransFolderEntries([
+    { webkitRelativePath: '4. 산업일자리전환컨설팅/2025 구조혁신 지원사업/가상발전기업/25년 산업일자리 전환 전문컨설팅_가상발전기업(당진)_중간보고서.hwp', size: 120 },
+    { webkitRelativePath: '4. 산업일자리전환컨설팅/2025 전체 산업일자리전환 컨설팅/가상부품기업/정책매니저 보고서_가상부품기업.hwp', size: 120 },
+    { webkitRelativePath: '4. 산업일자리전환컨설팅/2025 구조혁신 지원사업/가상상생혼입/통합진단보고서양식_일반형_가상상생혼입_v5.pptx', size: 120 }
+  ], { rootDirName: '4. 산업일자리전환컨설팅' });
+  const grpByCo = Object.fromEntries(folderGrouped.groups.map(g => [g.companyName, g]));
+  assert.equal(grpByCo['가상발전기업'].agency, 'cepa', '당진·전문컨설팅 증거가 있는 사업장은 상위 폴더명과 무관하게 CEPA로 분류되어야 한다');
+  assert.equal(grpByCo['가상부품기업'].agency, 'kmac', '정책매니저 증거만 있는 사업장은 KMAC으로 분류되어야 한다');
+  assert.equal(grpByCo['가상상생혼입'], undefined, '일터상생 통합진단보고서양식_일반형 파일은 폴더 스캔에서 차단되어야 한다');
+
+  /* ④ 기관별 분리 보고서 양식 검수기(evaluateReportFormReview) 및 타 양식 혼입 탐지 검증 */
+  const kmacProj = { id: 'p-kmac', companyName: '(주)가상능률', agency: 'kmac', track: 'kmac_std', selectedTasks: ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_gov_match'] };
+  const cepaProj = { id: 'p-cepa', companyName: '(주)가상충남', agency: 'cepa', track: 'cepa_coal', selectedTasks: ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_gov_match'] };
+  const kmacMid = Report.buildMidReport(kmacProj, {}, [], null);
+  const kmacFin = Report.buildFinalReport(kmacProj, kmacMid, {}, [], null);
+  const cepaMid = Report.buildMidReport(cepaProj, {}, [], null);
+  const cepaFin = Report.buildFinalReport(cepaProj, cepaMid, {}, [], null);
+
+  const kmacRev = Report.evaluateReportFormReview(kmacProj, 'final', kmacFin, { c1: { id: 'c1', docKind: 'biz_fin' } }, []);
+  const cepaRev = Report.evaluateReportFormReview(cepaProj, 'final', cepaFin, { c1: { id: 'c1', docKind: 'biz_fin' } }, []);
+  assert.equal(kmacRev.agencyCode, 'kmac');
+  assert.equal(cepaRev.agencyCode, 'cepa');
+  assert.notEqual(kmacRev.formTitle, cepaRev.formTitle, 'KMAC과 CEPA의 검토 양식명이 명확히 구분되어야 한다');
+  assert.equal(kmacRev.hasCrossContamination, false);
+  assert.equal(cepaRev.hasCrossContamination, false);
+
+  const pollutedFin = Object.assign({}, cepaFin, {
+    sections: Object.assign({}, cepaFin.sections, { exec_summary: cepaFin.sections.exec_summary + ' 디자인팀 회의 및 통합진단보고서양식_일반형' })
+  });
+  const pollutedRev = Report.evaluateReportFormReview(cepaProj, 'final', pollutedFin, {}, []);
+  assert.equal(pollutedRev.hasCrossContamination, true, '일터상생 문구가 섞이면 타 양식 혼입 경고가 켜져야 한다');
+
+  /* ⑤ 와이드 전체폭(max-width:none) 및 기관별 분리 UI 구조 검증 */
+  const html = fs.readFileSync(path.join(__dirname, '..', 'jobtrans.html'), 'utf8');
+  assert.match(html, /main\{[^}]*max-width:none/, 'PC 화면에서 좌우 전체 폭을 사용해야 한다');
+  assert.match(html, /id="agencyScopeBar"/, '소속기관 구분 스코프 바가 존재해야 한다');
+  assert.match(html, /id="p-forms"/, '기관별 양식 분리검토 전용 패널이 존재해야 한다');
 });

@@ -70,7 +70,7 @@ a.act-link{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border
 .c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
 .c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
 .c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
-main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
+main{padding:12px 20px 56px;width:100%;max-width:none;margin:0}
 .pane{display:none}
 .pane.on{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
@@ -80,7 +80,29 @@ main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
 .note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px}
 .warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
 .ok-banner{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.agency-scope-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;margin-bottom:12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.agency-scope-lbl{font-weight:700;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.agency-scope-btn{padding:6px 12px;min-height:34px;border-radius:8px;font-weight:600;font-size:12.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.agency-scope-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.agency-scope-btn.cepa.on{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff}
+.agency-split-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+@media (min-width:1440px){.agency-split-grid.dual{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.agency-col-card{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;margin-bottom:12px}
+.agency-col-card.kmac{border-top:3px solid var(--pri-bg)}
+.agency-col-card.cepa{border-top:3px solid var(--ok-bg)}
+.agency-col-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--blue-bg);color:var(--blue-d);font-weight:700;font-size:13.5px}
+.agency-col-card.cepa .agency-col-hd{background:var(--green-bg);color:var(--green)}
+.agency-col-sub{padding:8px 14px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--line);background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.report-workbench{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+@media (min-width:1260px){
+  .report-workbench{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr)}
+  .report-side-sticky{position:sticky;top:96px;max-height:calc(100vh - 112px);overflow:auto}
+}
+.form-compare-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-bottom:12px}
+@media (min-width:1180px){.form-compare-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.form-step-list{margin:0;padding:10px 14px 10px 28px;font-size:12.5px;line-height:1.65;color:var(--ink)}
+.form-step-list li{margin-bottom:3px}
 .kpi{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;flex-direction:column;gap:3px;min-width:0}
 .kpi span{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi b{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -108,9 +130,9 @@ main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
 table.t{width:100%;border-collapse:collapse}
 table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
-table.t td{overflow:hidden;text-overflow:ellipsis;max-width:340px}
-table.t td.ti{font-weight:600;max-width:300px}
-table.t td.wide{max-width:420px}
+table.t td{overflow:hidden;text-overflow:ellipsis;max-width:480px}
+table.t td.ti{font-weight:600;max-width:360px}
+table.t td.wide{max-width:680px}
 table.t th.c,table.t td.c{width:40px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
@@ -161,7 +183,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 .task-opt span{display:block;font-size:11.5px;color:var(--ink2);margin-top:2px}
 .mail-body{max-height:48vh;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55}
 /* ── 웹 A4 미리보기 (27색 팔레트 변수만 사용) ── */
-.pv-doc{max-width:860px;margin:0 auto;padding:22px 24px;border:1px solid var(--line2);border-radius:10px;background:var(--card);color:var(--ink)}
+.pv-doc{max-width:none;width:100%;margin:0;padding:18px 20px;border:1px solid var(--line2);border-radius:10px;background:var(--card);color:var(--ink)}
 .pv-banner{border:2px solid var(--pri-bg);border-radius:8px;overflow:hidden;margin-bottom:16px;text-align:center}
 .pv-cepa .pv-banner{border-color:var(--ok-bg)}
 .pv-top{background:var(--pri-bg);color:#ffffff;padding:7px 12px;font-weight:700;font-size:12px}
@@ -179,20 +201,21 @@ table.t tr.cur>td.n{color:var(--ink2)}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70;max-width:90vw}
 #toast.on{opacity:1}
 .modal{position:fixed;inset:0;background:rgba(30,41,59,.42);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px;overflow:auto}
-.mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;width:100%;max-width:680px;overflow:hidden}
-.mbox.wide{max-width:900px}
-.mbox.xwide{max-width:1080px}
+.mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;width:100%;max-width:740px;overflow:hidden}
+.mbox.wide{max-width:1160px}
+.mbox.xwide{max-width:1460px}
 .mhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-weight:700}
 .mbd{padding:12px 14px;max-height:76vh;overflow:auto}
 .mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
 .phone-only{display:none}
-@media (max-width:1024px){
+@media (max-width:1100px){
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ws-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
   .iv-grid{grid-template-columns:1fr}
 }
 /* ── 폰 화면: 가로 밀기 없이 2줄 카드 · 입력칸 자동확대 방지(16px) · 상자 1겹 ── */
 @media (max-width:768px){
-  button.sm{min-height:36px;padding:6px 9px}
+  button.sm,.agency-scope-btn{min-height:36px;padding:6px 9px}
   input,select,textarea,.rpt-sec-body textarea{font-size:16px}
   input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
   .modal{padding:0}
@@ -209,8 +232,9 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
   main{padding:8px 0 64px}
-  .card{border-left:0;border-right:0;border-radius:0}
-  .ws-steps,.sec,.sec-list-hd{background:transparent}
+  .card,.agency-scope-bar,.agency-col-card{border-left:0;border-right:0;border-radius:0}
+  .agency-scope-bar{padding:8px 10px;gap:6px}
+  .ws-steps,.sec,.sec-list-hd,.agency-col-sub{background:transparent}
   .rpt-sec-list{padding:0}
   .rpt-sec-card,.task-pick-hd,.pv-doc{border-left:0;border-right:0;border-radius:0;background:transparent}
   .pv-doc{padding:8px}
@@ -259,10 +283,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
   <div class="tabs" id="tabs" role="tablist" aria-label="산업일자리전환 단계 탭">
-    <button role="tab" aria-selected="true" tabindex="0" data-tab="projects" class="on">📂 사업장 · 메일 감지 <span class="chip c-blue" id="nProjects">0</span></button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="intake">① 메일·기초자료 체크 <span class="chip c-amber" id="nPreMail">0</span></button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="mid">② 기관맞춤 중간보고</button>
-    <button role="tab" aria-selected="false" tabindex="-1" data-tab="final">③ 최종보고·완료계·HWPX <span class="chip c-green" id="nPostMail">0</span></button>
+    <button role="tab" aria-selected="true" tabindex="0" data-tab="projects" class="on">📂 사업장<span class="wide-only"> · 메일 감지</span> <span class="chip c-blue" id="nProjects">0</span></button>
+    <button role="tab" aria-selected="false" tabindex="-1" data-tab="intake">① <span class="wide-only">메일·</span>기초자료 <span class="chip c-amber" id="nPreMail">0</span></button>
+    <button role="tab" aria-selected="false" tabindex="-1" data-tab="mid">② <span class="wide-only">기관맞춤 </span>중간보고</button>
+    <button role="tab" aria-selected="false" tabindex="-1" data-tab="final">③ 최종<span class="wide-only">보고·완료계</span>·HWPX <span class="chip c-green" id="nPostMail">0</span></button>
+    <button role="tab" aria-selected="false" tabindex="-1" data-tab="forms">⚖️ <span class="wide-only">기관별 </span>양식검토</button>
   </div>
 </div>
 
@@ -274,17 +299,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
 
 <main id="app" style="display:none">
   <div class="warn" id="loadNote" style="display:none"></div>
+  <div class="agency-scope-bar" id="agencyScopeBar" role="region" aria-label="소속기관별 구분 보기"></div>
 
   <!-- 탭 1: 사업장 현황 · 푸른이알피 계약 감지 · 푸른메일함 감지 -->
   <section class="pane on" id="p-projects">
     <div class="kpis" id="kpiBox"></div>
     <div class="card">
       <div class="bar">
-        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·전환목표·업종·담당자 찾기" style="flex:1;min-width:160px;max-width:280px">
+        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·계약번호·전환목표·업종 찾기" style="flex:1;min-width:180px;max-width:360px">
         <select id="projAgency" aria-label="운영기관 필터">
-          <option value="">운영기관 전체</option>
-          <option value="kmac">한국능률협회컨설팅 (KMAC)</option>
-          <option value="cepa">충남경제진흥원 (CEPA)</option>
+          <option value="">운영기관 좌우 분리 (전체)</option>
+          <option value="kmac">🔵 한국능률협회컨설팅 (KMAC) 전용</option>
+          <option value="cepa">🟢 충남경제진흥원 (CEPA) 전용</option>
         </select>
         <select id="projYear" aria-label="연도 필터">
           <option value="">연도 전체</option>
@@ -301,8 +327,8 @@ table.t tr.cur>td.n{color:var(--ink2)}
         <span class="sp"></span>
         <button class="sm pri" id="newProjBtn">+ 사업장 등록</button>
       </div>
-      <div id="projectsBox"></div>
     </div>
+    <div id="projectsBox"></div>
 
     <div class="card" id="folderSyncCard" style="display:none">
       <div class="sec">
@@ -341,6 +367,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
   <section class="pane" id="p-final">
     <div id="finalBox"></div>
   </section>
+
+  <!-- 탭 5: 소속기관별(KMAC vs CEPA) 보고서 양식 분리 검토 · 타 컨설팅(일터상생) 구분 대조 -->
+  <section class="pane" id="p-forms">
+    <div id="formsBox"></div>
+  </section>
 </main>
 
 <div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox" role="dialog" aria-modal="true" aria-labelledby="mhdTitle" tabindex="-1"></div></div>
@@ -376,11 +407,11 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-jobtrans-catalog.js?v=1"></script>
-<script src="js/pu-jobtrans-intake.js?v=2"></script>
-<script src="js/pu-jobtrans-report.js?v=1"></script>
+<script src="js/pu-jobtrans-catalog.js?v=2"></script>
+<script src="js/pu-jobtrans-intake.js?v=3"></script>
+<script src="js/pu-jobtrans-report.js?v=2"></script>
 <script src="js/pu-jobtrans-hwpx.js?v=1"></script>
-<script src="js/pu-jobtrans-view.js?v=2"></script>
+<script src="js/pu-jobtrans-view.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

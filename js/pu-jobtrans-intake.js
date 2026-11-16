@@ -230,9 +230,19 @@
     });
 
     consList.forEach(function (cs) {
+      if (!cs || cs._deleted || cs.deleted) return;
+      var csId = str(cs.id);
+      var pConsId = str(p.consultingId);
+      var csLabel = [str(cs.consultingType), str(cs.bizName), str(cs.typeName), str(cs.no)].filter(Boolean).join(' ');
+      /* 타 컨설팅(일터상생·기술보호·현장클리닉·인사서산·석유화학노동전환 등) 계약 레코드의 이메일은 산업일자리 프로필에 합치지 않는다 */
+      if (pConsId && csId && csId !== pConsId) return;
+      if (!pConsId && csLabel) {
+        if (ILTEO_AND_OTHER_STRICT_RE.test(csLabel) || NON_JOBTRANS_BIZ_RE.test(csLabel)) return;
+        if (!JOBTRANS_BIZ_STRICT_RE.test(csLabel)) return;
+      }
       var csCoId = str(cs.companyId || (cs.company && cs.company.id));
       var csBiz = str(cs.bizNo || (cs.company && cs.company.bizNo)).replace(/\D/g, '');
-      var match = (coId && csCoId === coId) || (bizDigits.length === 10 && csBiz === bizDigits);
+      var match = (pConsId && csId === pConsId) || (coId && csCoId === coId) || (bizDigits.length === 10 && csBiz === bizDigits);
       if (!match) return;
       Object.keys(collectAddrsFromObj(cs)).forEach(addAllowed);
       if (cs.company) Object.keys(collectAddrsFromObj(cs.company)).forEach(addAllowed);
@@ -245,6 +255,8 @@
     return {
       companyId: coId,
       companyName: str(p.companyName),
+      agency: str(p.agency).toLowerCase() === 'cepa' ? 'cepa' : (str(p.agency).toLowerCase() === 'kmac' ? 'kmac' : ''),
+      year: Number(p.year) || 0,
       normName: normCorpName(p.companyName),
       phoneticName: normCorpPhonetic(p.companyName),
       addrs: addrs,
@@ -253,13 +265,19 @@
     };
   }
 
+  /* 일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환지원센터 등 비대상 컨설팅 엄격 배제 정규식 */
+  var ILTEO_AND_OTHER_STRICT_RE = /일터\s*상생|상생\s*컨설팅|상생\s*혁신|일터\s*혁신|노사\s*발전(?:\s*재단)?|에프엠\s*어소시에이션|호인사|디자인\s*팀\s*회의|이행\s*(?:결과표|실적\s*확인서)|통합\s*진단\s*보고서(?:\s*양식)?[_\s]*일반형|노동\s*전환\s*지원\s*센터|충남\s*노동\s*전환\s*지원\s*센터|석유\s*화학\s*(?:산업\s*)?(?:협력\s*업체\s*)?(?:노동\s*전환|컨설팅)|^노동전환-\d{4}|인터뷰\s*수당\s*확인서/i;
   var POST_SIGNAL_RE = /중간보고\s*(?:피드백|검토|이후|수정의견|보완)|최종보고|결과보고|완료계|완료보고서|상생\s*협약|고용안정\s*협약|전환\s*배치안|신구\s*대조|장려금\s*신청|정책\s*매니저|만족도\s*조사/i;
-  var EXPLICIT_JOBTRANS_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제\s*진흥원|충경진|cepa|석탄\s*화력|정의로운\s*전환|산일\s*충남|산일\s*능률/i;
+  var EXPLICIT_JOBTRANS_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제\s*진흥원|충경진|cepa|석탄\s*화력|정의로운\s*전환|산일\s*충남|산일\s*능률|정책\s*매니저/i;
+  var KMAC_ONLY_MAIL_RE = /한국\s*능률\s*협회|능률\s*협회|kmac|중진공|중소벤처기업진흥공단|산일\s*능률|정책\s*매니저\s*보고서|구조\s*혁신\s*진단/i;
+  var CEPA_ONLY_MAIL_RE = /충남\s*경제\s*진흥원|충경진|cepa|산일\s*충남|산업\s*[·ㆍ.]?\s*일자리\s*전환\s*완료계|석탄\s*화력\s*발전/i;
   var DOC_SIGNAL_RE = /재무제표|손익계산서|취업규칙|인력\s*현황|인력\s*명부|조직도|임금\s*대장|근로\s*계약|사업자\s*등록증|설문|인식\s*수준|완료계|수행\s*계획|중간\s*보고|최종\s*보고|결과\s*보고|상생\s*협약|고용안정\s*협약|전환\s*배치|직무\s*기술서|수행\s*일지/i;
   var JOBTRANS_SIGNAL_RE = EXPLICIT_JOBTRANS_RE;
-  var NON_JOBTRANS_FOLDER_RE = /자문사|급여|사무대행|체불|체당금|산재|산안|공공기관|노무사회|근로복지기금|자율점검|이음센터|세금계산서|경조사|뉴스레터|개인메일|국민건강|기타광고|명함|소셜|쇼핑|이력서|청구서|일터\s*혁신|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|상공회의소|비지니스\s*지원단|비즈니스\s*지원단|출산\s*육아|휴지통|스팸|trash|spam|junk|draft/i;
-  var CUSTOM_CONSULTING_FOLDER_RE = /컨설팅|정부\s*사업|산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제|충경진|cepa|계약\s*서류/i;
-  var NON_JOBTRANS_MAIL_RE = /징계\s*(?:위원회|처분|검토|자문|양정)|해고\s*(?:검토|예고|통보|자문)|부당\s*해고|노동\s*위원회|임금\s*체불|체당금|산재\s*(?:신청|보상|승인)|실업\s*급여|육아\s*휴직\s*자문|자문\s*의견서|법률\s*자문|자문료\s*청구|급여\s*대장\s*송부|월분\s*급여|4대\s*보험\s*(?:고지|신고|상실|취득)|원천징수\s*이행|전자\s*세금\s*계산서|세금\s*계산서|청구서\s*발송|일터\s*혁신|기술\s*보호|현장\s*클리닉|비즈니스\s*지원단|비지니스\s*지원단|혁신\s*바우처|비정규직\s*고용|안전\s*보건\s*컨설팅|공공\s*기관\s*컨설팅|상공\s*회의소\s*컨설팅|근로자\s*이음/i;
+  var NON_JOBTRANS_FOLDER_RE = /자문사|급여|사무대행|체불|체당금|산재|산안|공공기관|노무사회|근로복지기금|자율점검|이음센터|세금계산서|경조사|뉴스레터|개인메일|국민건강|기타광고|명함|소셜|쇼핑|이력서|청구서|일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|노사\s*발전|에프엠|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|상공회의소|비지니스\s*지원단|비즈니스\s*지원단|출산\s*육아|통상\s*경영|농촌\s*융복합|삼성\s*협력|노동\s*전환\s*지원\s*센터|휴지통|스팸|trash|spam|junk|draft/i;
+  var CUSTOM_CONSULTING_FOLDER_RE = /컨설팅|정부\s*사업|산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제|충경진|cepa|계약\s*서류/i;
+  /* 3.컨설팅(정부사업)처럼 일터상생·현장클리닉·기술보호가 함께 들어 있는 공용 정부사업 폴더는 산업일자리 전용 폴더로 간주하지 않는다 */
+  var DEDICATED_JOBTRANS_MAIL_FOLDER_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|산일\s*충남|산일\s*능률/i;
+  var NON_JOBTRANS_MAIL_RE = /징계\s*(?:위원회|처분|검토|자문|양정)|해고\s*(?:검토|예고|통보|자문)|부당\s*해고|노동\s*위원회|임금\s*체불|체당금|산재\s*(?:신청|보상|승인)|실업\s*급여|육아\s*휴직\s*자문|자문\s*의견서|법률\s*자문|자문료\s*청구|급여\s*대장\s*송부|월분\s*급여|4대\s*보험\s*(?:고지|신고|상실|취득)|원천징수\s*이행|전자\s*세금\s*계산서|세금\s*계산서|청구서\s*발송|일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|노사\s*발전(?:\s*재단)?|에프엠\s*어소시에이션|호인사|디자인\s*팀|이행\s*결과표|통합\s*진단\s*보고서(?:\s*양식)?|기술\s*보호|울타리|현장\s*클리닉|현장\s*지도\s*결과서|비즈니스\s*지원단|비지니스\s*지원단|혁신\s*바우처|비정규직\s*고용|안전\s*보건\s*컨설팅|공공\s*기관\s*컨설팅|상공\s*회의소|인사\s*서산|인사\s*충남|출산\s*육아|통상\s*경영|농촌\s*융복합|근로자\s*이음|석유\s*화학\s*(?:산업\s*)?(?:협력\s*업체\s*)?(?:노동\s*전환|컨설팅)|노동\s*전환\s*지원\s*센터|인터뷰\s*수당\s*확인서/i;
 
   function isJobtransMailFolder(folderObj, slug) {
     var f = folderObj;
@@ -310,7 +328,8 @@
       var box = msgs[slug];
       if (!box || (typeof box !== 'object' && !Array.isArray(box))) return;
       var isSent = f.kind === 'sent';
-      var isDedicatedFolder = f.kind === 'custom' && CUSTOM_CONSULTING_FOLDER_RE.test(str(f.name || f.title || '') + ' ' + str(slug));
+      var folderLabel = str(f.name || f.title || '') + ' ' + str(slug);
+      var isDedicatedFolder = f.kind === 'custom' && DEDICATED_JOBTRANS_MAIL_FOLDER_RE.test(folderLabel);
       Object.keys(box).forEach(function (uid) {
         if (!/^[0-9]{1,12}$/.test(uid)) return;
         var r = box[uid];
@@ -358,8 +377,19 @@
       if (!m || seenKeys[m.key]) return;
       var combined = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
       var hasExplicitJt = EXPLICIT_JOBTRANS_RE.test(combined);
-      /* 타 컨설팅(일터혁신·기술보호 등)·일반자문(징계·해고·산재)·세금계산서는 '최종보고서' 등 공통 문서명이 붙어도 명시적 산업일자리 표지가 없으면 무조건 차단 */
+      /* 일터혁신 상생컨설팅(일터상생)·석유화학 노동전환지원센터 서식은 어떤 경우에도 산업일자리전환 메일로 섞이지 않도록 무조건 차단 */
+      if (ILTEO_AND_OTHER_STRICT_RE.test(combined) && !hasExplicitJt) return;
+      if (/일터\s*상생|상생\s*컨설팅|상생\s*혁신|통합\s*진단\s*보고서\s*양식[_\s]*일반형|디자인\s*팀\s*회의|이행\s*결과표|석유\s*화학.*노동\s*전환|노동\s*전환\s*지원\s*센터/i.test(combined)) return;
+      /* 타 컨설팅(기술보호·현장클리닉 등)·일반자문(징계·해고·산재)·세금계산서는 명시적 산업일자리 표지가 없으면 차단 */
       if (NON_JOBTRANS_MAIL_RE.test(combined) && !hasExplicitJt) return;
+      /* 소속기관(KMAC vs CEPA) 교차 혼입 방지: 상대편 기관 전용 표식만 있는 메일은 자동 귀속에서 제외 */
+      if (prof.agency === 'kmac' && CEPA_ONLY_MAIL_RE.test(combined) && !KMAC_ONLY_MAIL_RE.test(combined)) return;
+      if (prof.agency === 'cepa' && KMAC_ONLY_MAIL_RE.test(combined) && !CEPA_ONLY_MAIL_RE.test(combined)) return;
+      /* 사업 연도와 2년 이상 동떨어진 과거 연도 메일은 명시적 해당 연도 표기가 없는 한 타 사업 이력으로 보아 제외 */
+      if (prof.year >= 2024 && m.ts > 0) {
+        var mailYr = new Date(m.ts).getUTCFullYear();
+        if (isFinite(mailYr) && mailYr < prof.year - 1 && combined.indexOf(String(prof.year)) < 0) return;
+      }
 
       var peerAddrs = m.dir === 'out' ? m.to : [m.from];
       var addrHit = peerAddrs.some(function (em) {
@@ -443,8 +473,8 @@
   }
 
   /* ══ 2-B. ERP·일정 산업일자리전환 후보 발견 & 로컬 컨설팅업체 폴더 선택 연결 엔진 ══ */
-  var JOBTRANS_BIZ_STRICT_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신|산일\s*충남|산일\s*능률|석탄\s*화력|정의로운\s*전환/i;
-  var NON_JOBTRANS_BIZ_RE = /일터\s*혁신|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|안전\s*보건|공공\s*기관|상공\s*회의소|비즈니스\s*지원단|비지니스\s*지원단|근로자\s*이음/i;
+  var JOBTRANS_BIZ_STRICT_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|산일\s*충남|산일\s*능률/i;
+  var NON_JOBTRANS_BIZ_RE = /일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|노사\s*발전|에프엠\s*어소시에이션|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|안전\s*보건|공공\s*기관|상공\s*회의소|인사\s*충남|인사\s*서산|출산\s*육아|통상\s*경영|농촌\s*융복합|삼성\s*컨설|삼성\s*협력|비즈니스\s*지원단|비지니스\s*지원단|근로자\s*이음|노동\s*전환\s*지원\s*센터|충남\s*노동\s*전환|석유\s*화학|^노동전환-/i;
 
   var SHA256_K = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -629,6 +659,8 @@
         str(cs.no)
       ].filter(Boolean).join(' ');
       var checkText = primaryLabel || str(cs.memo);
+      /* 일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환지원센터(노동전환-)는 어떤 경우에도 산업일자리전환 후보에 넣지 않는다 */
+      if (ILTEO_AND_OTHER_STRICT_RE.test(checkText)) return;
       if (!JOBTRANS_BIZ_STRICT_RE.test(checkText)) return;
       if (primaryLabel && !JOBTRANS_BIZ_STRICT_RE.test(primaryLabel) && NON_JOBTRANS_BIZ_RE.test(primaryLabel)) return;
       if (cs.id && regConsIds[str(cs.id)]) return;
@@ -653,7 +685,8 @@
       var yearStr = String(cs.year || cs.startDate || cs.contractDate || '2026');
       var yearMatch = /(202[4-9])/.exec(yearStr) || /(202[4-9])/.exec(str(cs.no));
       var yr = yearMatch ? Number(yearMatch[1]) : 2026;
-      var inferred = Cat.inferAgencyAndTrack(checkText + ' ' + str((coRec && (coRec.addr || coRec.address)) || cs.addr || ''));
+      /* 기관 추론은 사업명·계약코드(산일능률 vs 산일충남)만 기준으로 하고, 기업 주소(예: 충남 소재 KMAC 참여기업)로 기관이 뒤바뀌지 않게 한다 */
+      var inferred = Cat.inferAgencyAndTrack(checkText);
       var coName = str((coRec && coRec.name) || cs.companyName || coObj.name || (linkedSc && linkedSc.name) || '사업장');
       var bizYearAgKey = bizDigits.length === 10 ? (bizDigits + ':' + yr + ':' + inferred.agency) : '';
 
@@ -669,6 +702,7 @@
       out.push({
         candKey: 'erp_' + safeIdPart(cs.id || resolvedCoId),
         source: '푸른이알피 계약확정',
+        contractNo: str(cs.no || ''),
         bizLabel: str(cs.consultingType || cs.bizName || cs.typeName || bizTypeMap[tKey] || '산업·일자리전환'),
         agency: inferred.agency,
         track: inferred.track,
@@ -700,6 +734,7 @@
         return sCo === scId && JOBTRANS_BIZ_STRICT_RE.test(scalTypeMap[sTid] || '');
       });
       var labelText = (jtTypeId && scalTypeMap[jtTypeId]) || explicitBizName;
+      if (ILTEO_AND_OTHER_STRICT_RE.test(labelText)) return;
       if (!jtTypeId && !JOBTRANS_BIZ_STRICT_RE.test(explicitBizName) && !hasJtSched) return;
       if (NON_JOBTRANS_BIZ_RE.test(labelText) && !JOBTRANS_BIZ_STRICT_RE.test(labelText)) return;
 
@@ -713,7 +748,7 @@
 
       var yrMatch = /(202[4-9])/.exec(String(sc.year || sc.createdAt || '2026'));
       var yr = yrMatch ? Number(yrMatch[1]) : 2026;
-      var inferred = Cat.inferAgencyAndTrack(labelText + ' ' + str(sc.memo || (coRec && coRec.addr) || ''));
+      var inferred = Cat.inferAgencyAndTrack(labelText + ' ' + str(sc.memo || ''));
       var coName = str((coRec && coRec.name) || sc.name || '사업장');
       var bizYearAgKey = bizDigits.length === 10 ? (bizDigits + ':' + yr + ':' + inferred.agency) : '';
       var dedupKey = resolvedCoId + ':' + yr + ':' + inferred.agency;
@@ -725,6 +760,7 @@
       out.push({
         candKey: 'scal_' + safeIdPart(scId + '_' + resolvedCoId),
         source: '정부사업일정',
+        contractNo: '',
         bizLabel: labelText || '산업·일자리전환',
         agency: inferred.agency,
         track: inferred.track,
@@ -743,10 +779,70 @@
     return out;
   }
 
+  /* 동일 사업장이 ERP에 일터상생컨설팅 등 타 컨설팅 계약을 병행 보유 중인지 판별 (자동분리 안내 배지용) */
+  function detectParallelConsultings(project, consultings, bizTypes) {
+    var p = project || {};
+    var consList = rowsOf(consultings);
+    var btList = rowsOf(bizTypes);
+    var btMap = {};
+    btList.forEach(function (bt) {
+      var lbl = [str(bt.short), str(bt.name || bt.title)].filter(Boolean).join(' ');
+      if (bt.id) btMap[str(bt.id)] = lbl;
+      if (bt.code) btMap[str(bt.code)] = lbl;
+    });
+    var coId = str(p.companyId);
+    var bizDigits = str(p.bizNo).replace(/\D/g, '');
+    var pConsId = str(p.consultingId);
+    var ilteoItems = [], otherItems = [], seen = {};
+    var matchedContractNo = str(p.contractNo || '');
+
+    consList.forEach(function (cs) {
+      if (!cs || cs._deleted || cs.deleted) return;
+      if (/취소|포기|무산|해지/.test(str(cs.status))) return;
+      var csId = str(cs.id);
+      if (pConsId && csId === pConsId) {
+        if (!matchedContractNo && cs.no) matchedContractNo = str(cs.no);
+        return;
+      }
+      var csCoId = str(cs.companyId || (cs.company && cs.company.id));
+      var csBiz = str(cs.bizNo || (cs.company && cs.company.bizNo)).replace(/\D/g, '');
+      var sameCo = (coId && csCoId && csCoId === coId)
+        || (bizDigits.length === 10 && csBiz === bizDigits)
+        || (coId.indexOf('biz:') === 0 && csBiz === coId.slice(4));
+      if (!sameCo) return;
+      var tKey = str(cs.typeCode || cs.bizTypeId);
+      var lbl = str(cs.no) || str(cs.consultingType || cs.bizName || btMap[tKey] || '');
+      var full = [str(cs.no), str(cs.consultingType), str(cs.bizName), str(btMap[tKey] || '')].filter(Boolean).join(' ');
+      if (!lbl || seen[lbl]) return;
+      if (JOBTRANS_BIZ_STRICT_RE.test(full) && !ILTEO_AND_OTHER_STRICT_RE.test(full)) {
+        if (!matchedContractNo && cs.no) {
+          var csInf = Cat.inferAgencyAndTrack(full);
+          if (csInf.agency === (p.agency === 'cepa' ? 'cepa' : 'kmac') && String(cs.no).indexOf(String(p.year || '')) >= 0) {
+            matchedContractNo = str(cs.no);
+          }
+        }
+        return;
+      }
+      seen[lbl] = 1;
+      if (/일터\s*상생|상생\s*컨설팅|상생\s*혁신|일터\s*혁신/i.test(full)) {
+        ilteoItems.push(lbl);
+      } else {
+        otherItems.push(lbl);
+      }
+    });
+
+    return {
+      contractNo: matchedContractNo,
+      hasIlteoSangsaeng: ilteoItems.length > 0,
+      ilteoLabels: ilteoItems,
+      otherLabels: otherItems
+    };
+  }
+
   /* ── 로컬 컨설팅업체 폴더 선택적 진입 · 필터 · 사업장 그룹화 엔진 ── */
-  var JOBTRANS_DIR_ALLOW_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|노동\s*전환|구조\s*혁신/i;
+  var JOBTRANS_DIR_ALLOW_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신/i;
   var JOBTRANS_DIR_PROBE_RE = /^컨설팅\s*업체$|^_?메일함[_\s]*양식$/i;
-  var NON_JOBTRANS_DIR_BLOCK_RE = /^(?:[012356789]\s*[.)\s]\s*)?(?:일터\s*혁신|공공\s*기관|상공\s*회의소|비지니스\s*지원단|비즈니스\s*지원단|기술\s*보호|근로자\s*이음|이음\s*센터|혁신\s*바우처|비정규직|안전\s*보건|현장\s*클리닉|자문\s*계약|급여|사무\s*대행)/i;
+  var NON_JOBTRANS_DIR_BLOCK_RE = /^(?:[012356789]\s*[.)\s]\s*)?(?:일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|공공\s*기관|상공\s*회의소|비지니스\s*지원단|비즈니스\s*지원단|기술\s*보호|근로자\s*이음|이음\s*센터|혁신\s*바우처|비정규직|안전\s*보건|현장\s*클리닉|자문\s*계약|급여|사무\s*대행|석유\s*화학\s*노동\s*전환|노동\s*전환\s*지원\s*센터)/i;
   var JOBTRANS_SUBDIR_SKIP_RE = /^(?:\.git|node_modules|__MACOSX)$|비용\s*신청\s*서류|정산\s*필요\s*서류|^\d*\s*[._)]*\s*서약서$|컨설턴트\s*등록\s*관련/i;
   var PERSONAL_SETTLEMENT_FILE_RE = /^(?:~\$|\._|desktop\.ini$|thumbs\.db$)|\.(?:tmp|bak|lnk)$|신분증|주민등록증|운전면허증|개인\s*통장|통장\s*사본|원천세\s*구분|윤리\s*경영\s*실천\s*서약|보안\s*서약서|^연락처\.xlsx$/i;
   var SUPPORTED_JT_FILE_EXT_RE = /\.(?:xlsx|xls|csv|hwpx|hwp|docx|doc|pdf|pptx|ppt|txt|zip|jpg|jpeg|png|webp)$/i;
@@ -826,6 +922,10 @@
       if (!SUPPORTED_JT_FILE_EXT_RE.test(fileName)) return;
       if (PERSONAL_SETTLEMENT_FILE_RE.test(fileName)) {
         skippedPersonal++;
+        return;
+      }
+      if (ILTEO_AND_OTHER_STRICT_RE.test(fileName)) {
+        skippedNonJobtrans++;
         return;
       }
       if (NON_JOBTRANS_MAIL_RE.test(fileName) && !JOBTRANS_SIGNAL_RE.test(fileName)) {
@@ -1033,10 +1133,41 @@
         yr: yr,
         agency: agency,
         track: track,
+        explicitKmac: explicitKmac,
         workplaceSeg: workplaceSeg,
         phonKey: phonKey,
         boundaryId: boundaryId
       });
+    });
+
+    /* 경계 폴더 내 실제 파일명 증거로 KMAC vs CEPA 오분류를 교정한다
+     * (예: 상위 폴더가 '구조혁신 지원사업'이어도 완료계·당진/태안 전문컨설팅 파일이면 cepa,
+     *      상위 폴더가 '전체 산업일자리전환'이어도 정책매니저·구조혁신진단 파일만 있으면 kmac) */
+    var boundaryEv = {};
+    parsedItems.forEach(function (it) {
+      var ev = boundaryEv[it.boundaryId] || (boundaryEv[it.boundaryId] = { kmac: 0, cepa: 0, pm: 0, diag: 0, pro: 0 });
+      var fn = str(it.entry.fileName) + ' ' + str(it.entry.relPath);
+      if (/정책\s*매니저|구조\s*혁신\s*진단|산업[·ㆍ.]?\s*일자리\s*전환_2_결과|신규\s*양식_|능률\s*구조\s*혁신|산업\s*일자리\s*능률|\[kmac\]|한국\s*능률\s*협회/i.test(fn)) ev.kmac++;
+      if (/정책\s*매니저/.test(fn)) ev.pm++;
+      if (/완료계|충남\s*경제\s*진흥원|석탄\s*화력|산업\s*일자리\s*전환\s*전문\s*컨설팅|진단\s*컨설팅\s*수행\s*계획서\s*및\s*결과\s*보고서|\((?:당진|태안|보령)(?:\s*사업소)?\)/i.test(fn)) ev.cepa++;
+      if (/진단\s*컨설팅\s*(?:수행\s*계획서\s*및\s*)?결과\s*보고서/i.test(fn)) ev.diag++;
+      if (/전문\s*컨설팅.*(?:중간|결과|최종)\s*보고서/i.test(fn)) ev.pro++;
+    });
+    parsedItems.forEach(function (it) {
+      var ev = boundaryEv[it.boundaryId];
+      if (!ev) return;
+      if (ev.cepa > 0 && ev.kmac === 0) {
+        it.agency = 'cepa';
+        it.track = (ev.diag > 0 && ev.pro === 0) ? 'cepa_diag' : (it.track.indexOf('cepa_') === 0 ? it.track : 'cepa_coal');
+      } else if (ev.kmac > 0 && ev.cepa === 0) {
+        it.agency = 'kmac';
+        it.track = (ev.pm > 0 && ev.kmac === ev.pm) ? 'kmac_pm' : 'kmac_std';
+      } else if (it.agency === 'cepa' && ev.cepa === 0 && !it.explicitKmac && /[가-힣]+_[가-힣]{2,4}_산업[·ㆍ.]?일자리전환_최종결과보고서/.test(it.entry.fileName)) {
+        it.agency = 'kmac';
+        it.track = 'kmac_std';
+      } else if (it.agency === 'cepa' && ev.diag > 0 && ev.pro === 0) {
+        it.track = 'cepa_diag';
+      }
     });
 
     var unnumBoundarySeen = {};
@@ -1947,6 +2078,7 @@
     flattenMailboxRows: flattenMailboxRows,
     scanProjectMails: scanProjectMails,
     discoverJobtransCandidates: discoverJobtransCandidates,
+    detectParallelConsultings: detectParallelConsultings,
     inspectConsultingSubdir: inspectConsultingSubdir,
     cleanWorkplaceSegmentName: cleanWorkplaceSegmentName,
     filterJobtransFolderEntries: filterJobtransFolderEntries,
