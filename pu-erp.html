@@ -55688,7 +55688,11 @@ function FinanceLedger(props){
     /* ── 입금자 명의 (대표 2026-11-16) — 누가 낸 돈인지를 줄에 적는다.
        창을 거친 확정은 사유까지(opts.payer). 창을 못 거치는 길(⚡자동·묶음·합계·일괄)은 여기서 판정만 하고,
        입금자가 다르면 «확인 필요»(payerReview) 표시를 단다 — 확정 이력에서 모아 볼 수 있다. */
-    var _pay = opts.payer || _payerAssessSafe(row, pItem);
+    var _pay = opts.payer || null, _payReview;
+    try{
+      if(!_pay) _pay = _payerAssessSafe(row, pItem);
+      _payReview = (!opts.payer && erpPayerNeedsReason(_pay)) ? true : undefined;
+    }catch(_pe){ _pay = opts.payer || null; _payReview = undefined; }   // 판정이 안 되면 입금자 칸만 비운다 — 확정은 막지 않는다
     /* 저장이 막히면(입금 마감·저장 실패) 여기서 멈춘다 — 그대로 가면 원본에 «받음»만 찍히고 입금은 없다.
        부르는 쪽은 모두 try/catch 로 받아 그 통장 줄을 «처리됨» 으로 찍지 않는다. */
     var _saved = erpUpsertIncome({id:_fiId,
@@ -55717,7 +55721,7 @@ function FinanceLedger(props){
       prepaid:opts.prepay ? true : undefined,
       payerName:(_pay && _pay.name) || undefined, payerKind:(_pay && _pay.kind) || undefined,
       payerRelation:(_pay && _pay.relation) || undefined, payerReason:(_pay && _pay.reason) || undefined,
-      payerReview:(!opts.payer && erpPayerNeedsReason(_pay)) ? true : undefined,
+      payerReview:_payReview,
       perfShares:_perfShares, confirmedAt:new Date().toISOString(), confirmedBy:CURRENT_USER?CURRENT_USER.sid:''});
     if(_saved === false) throw new Error('입금을 저장하지 못했습니다 (입금 마감된 달이거나 저장 실패)');
     if(isAdv) return _fiId;
@@ -55807,13 +55811,14 @@ function FinanceLedger(props){
       return dbPatch('companies', co.id, { payerRelations:r.list }) !== false;
     }catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
   }
-  /* 학습·등록 «저장 뒤 후속» — 이름이 다른 돈은 별칭으로 배우지 않고, 등록을 골랐을 때만 관계로 남긴다 */
+  /* 이 입금자 이름을 별칭으로 «배워도» 되나 — 이름이 다른 돈(다른 사업장·모르는 이름)은 배우지 않는다.
+     별칭 학습(erpLearnPayerAlias)은 부르는 자리에 그대로 두고, 여기서는 «배울지만» 가른다. */
+  function payerLearns(pay){ return !erpPayerNeedsReason(pay); }
+  /* 확정이 «저장된 뒤»의 후속 — 사람이 등록을 켰을 때만 관계 입금자로 남긴다 */
   function _payerAfter(row, pItem, pay){
-    var diff = !!pay && erpPayerNeedsReason(pay);
-    var learned = diff ? false : erpLearnPayerAlias(row.memo || row.note || '', pItem);
     var reg = false;
-    if(diff && pay.register) reg = _registerPayerRelation(pItem, pay);
-    return { learned:learned, registered:reg };
+    if(pay && erpPayerNeedsReason(pay) && pay.register) reg = _registerPayerRelation(pItem, pay);
+    return { registered:reg };
   }
   async function confirmRowAsk(row, pItem, opts){
     opts = opts || {};
@@ -55835,7 +55840,7 @@ function FinanceLedger(props){
         feeCat:(row.src === 'card' || row.src === 'nicebill') ? 'exp-cardfee' : 'exp-bankfee',
         vatIncluded:opts.vatIncluded, payer:opts.payer });
       var _after = _payerAfter(row, pItem, opts.payer);
-      var _learned = _after.learned;
+      var _learned = payerLearns(opts.payer) ? erpLearnPayerAlias(row.memo || row.note || '', pItem) : false;
       erpMarkBankRowProcessed(row, 'income', pItem.companyName + ' ' + (pItem.label || '')
         + (opts.partial ? ' (일부)' : '') + (opts.feeAmount ? ' (수수료차감)' : ''));
       /* 방금 한 일을 하나만 적어 둔다 — 되돌리기 띠와 Ctrl+Z 가 이것만 본다.
@@ -55886,6 +55891,7 @@ function FinanceLedger(props){
     });
     if(ok){
       _payerAfter(row, pItem, _po.payer);
+      if(payerLearns(_po.payer)) erpLearnPayerAlias(row.memo || row.note || '', pItem);
       erpMarkBankRowProcessed(row, 'income', pItem.companyName + ' 과입금 ' + ok + '건');
       removeRow(row._k, 'inc');
       setOpenRow('');
@@ -60269,6 +60275,7 @@ function FinanceLedger(props){
                   // 막히면(입금 마감 등) 통장 줄을 처리됨으로 찍지 않는다
                   try{ saveIncome(_row,_pi,{ payer:_dpo.payer }); }catch(_se){ showToast('❌ 확정 실패: ' + (_se && _se.message)); return; }
                   _payerAfter(_row,_pi,_dpo.payer);
+                  if(payerLearns(_dpo.payer)) erpLearnPayerAlias(_row.memo||_row.note||'',_pi);
                   erpMarkBankRowProcessed(_row,'income',_pi.companyName+' '+_pi.label);
                   removeRow(_row._k,'inc');
                   setDetPop(null);

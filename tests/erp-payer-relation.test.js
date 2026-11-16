@@ -272,21 +272,21 @@ test('② 이미 사유를 들고 오면 다시 묻지 않는다', { timeout: 50
   assert.equal(f.confirmed.length, 1);
 });
 
-test('③ 이름이 다른 돈은 별칭으로 배우지 않고, 등록을 안 켰으면 등록하지도 않는다', () => {
+test('③ 이름이 다른 돈은 별칭으로 «배우지 않고», 등록을 안 켰으면 등록하지도 않는다', () => {
   const f = flowCtx();
-  const r = f.c._payerAfter(ROW('아무개'), PIT('가상산업', f.co), { kind: 'third', name: '아무개', relation: 'ceo', reason: 'x', register: false });
-  assert.equal(r.learned, false);
+  const pay = { kind: 'third', name: '아무개', relation: 'ceo', reason: 'x', register: false };
+  assert.equal(f.c.payerLearns(pay), false, '이름이 다른 돈은 학습 대상이 아니다');
+  assert.equal(f.c.payerLearns({ kind: 'other_company', name: '다른산업' }), false);
+  const r = f.c._payerAfter(ROW('아무개'), PIT('가상산업', f.co), pay);
   assert.equal(r.registered, false);
-  assert.equal(f.learned.length, 0, '별칭 학습을 부르지 않았다');
   assert.equal(f.patched.length, 0, '등록하지 않았다');
 });
 
-test('③ 이름이 같은 돈(본인·관계·통로)은 지금처럼 별칭을 배운다(회귀 방지)', () => {
+test('③ 이름이 같은 돈(본인·관계·통로·적요 없음)과 사유 없는 옛 길은 지금처럼 별칭을 배운다(회귀 방지)', () => {
   const f = flowCtx();
-  f.c._payerAfter(ROW('가상산업'), PIT('가상산업', f.co), { kind: 'self', name: '가상산업' });
-  assert.equal(f.learned.length, 1);
-  f.c._payerAfter(ROW('더빌이체3572'), PIT('가상산업', f.co), { kind: 'channel', name: '더빌이체3572' });
-  assert.equal(f.learned.length, 2, '통로도 그대로(내부에서 CMS 는 배우지 않고 지운다)');
+  ['self', 'related', 'channel', 'unknown'].forEach((k) => assert.equal(f.c.payerLearns({ kind: k, name: 'x' }), true, k));
+  assert.equal(f.c.payerLearns(undefined), true, '판정을 못 한 길은 예전 그대로');
+  assert.equal(f.c.payerLearns(null), true);
 });
 
 test('③ 사람이 등록을 켜면 사업장 기록에 관계 입금자가 적힌다(누가·언제·사유)', () => {
@@ -302,7 +302,7 @@ test('③ 사람이 등록을 켜면 사업장 기록에 관계 입금자가 적
   assert.equal(saved[0].relation, 'agent');
   assert.equal(saved[0].reason, '세무사무소');
   assert.equal(saved[0].by, 'P-9');
-  assert.equal(f.learned.length, 0, '등록해도 별칭으로는 배우지 않는다');
+  assert.equal(f.c.payerLearns({ kind: 'third', register: true }), false, '등록해도 별칭으로는 배우지 않는다');
 });
 
 test('④ 등록이 거절되는 이름이면 사업장 기록을 바꾸지 않고 이유를 알린다', () => {
@@ -326,8 +326,10 @@ const SAVE = cut('  function saveIncome(row, pItem, opts){', '  /* ── 👤 �
 const UPSERT = SAVE.slice(SAVE.indexOf('erpUpsertIncome({id:_fiId,'), SAVE.indexOf('if(_saved === false)'));
 test('⑥ saveIncome 이 입금자·종류·관계·사유를 줄에 적고, 창을 못 거친 길은 «확인 필요»를 단다', () => {
   ['payerName', 'payerKind', 'payerRelation', 'payerReason', 'payerReview'].forEach((k) => assert.ok(UPSERT.indexOf(k + ':') >= 0, k + ' 를 적지 않는다'));
-  assert.match(SAVE, /var _pay = opts\.payer \|\| _payerAssessSafe\(row, pItem\);/, '사유를 들고 오지 않은 길도 판정은 한다');
-  assert.match(UPSERT, /payerReview:\(!opts\.payer && erpPayerNeedsReason\(_pay\)\) \? true : undefined/, '사유를 물은 길에는 «확인 필요»가 없다');
+  assert.match(SAVE, /if\(!_pay\) _pay = _payerAssessSafe\(row, pItem\);/, '사유를 들고 오지 않은 길도 판정은 한다');
+  assert.match(SAVE, /_payReview = \(!opts\.payer && erpPayerNeedsReason\(_pay\)\) \? true : undefined;/, '사유를 물은 길에는 «확인 필요»가 없다');
+  assert.match(UPSERT, /payerReview:_payReview/);
+  assert.match(SAVE, /catch\(_pe\)\{ _pay = opts\.payer \|\| null; _payReview = undefined; \}/, '판정이 안 돼도 확정은 막지 않는다');
 });
 
 const FL = cut('function FinanceLedger(', 'function FinanceIncome');
@@ -347,7 +349,7 @@ test('⑥ confirmRow 는 사유를 saveIncome 에 넘기고, 학습·등록은 �
   assert.match(CR, /vatIncluded:opts\.vatIncluded, payer:opts\.payer \}\);/);
   assert.match(CR, /var _after = _payerAfter\(row, pItem, opts\.payer\);/);
   assert.ok(CR.indexOf('_payerAfter(') > CR.indexOf('saveIncome('), '저장이 막히면 등록도 남지 않는다');
-  assert.ok(CR.indexOf('erpLearnPayerAlias(') < 0, 'confirmRow 가 별칭을 곧장 배우지 않는다 — _payerAfter 가 가른다');
+  assert.match(CR, /payerLearns\(opts\.payer\) \? erpLearnPayerAlias\(/, '별칭 학습은 «이름이 같은 돈»일 때만(payerLearns)');
 });
 
 test('⑥ 사유 창 — 취소·바깥 누르기는 확정하지 않고, 관계를 안 고르면(기타는 사유까지) 확정 단추가 막힌다', () => {

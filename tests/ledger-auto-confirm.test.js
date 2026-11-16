@@ -111,7 +111,8 @@ ok('확정 실패를 조용히 삼키지 않는다', /확정 실패/.test(CONFIR
 ok('부분입금은 완납 표시를 안 찍는다 (남은 금액이 미수로 남는다)',
    /var partial = opts\.partial && !opts\.feeAmount/.test(src)
    && /if\(!partial\)\{ _sp\.paid=true/.test(src));
-ok('부분입금을 화면에서 고를 수 있다', /confirmRow\(row,pItem,\{partial:true\}\)/.test(src));
+/* 확정 단추는 입금자 사유 묻기(confirmRowAsk)를 «거쳐» confirmRow 로 간다 (2026-11-16) — 지키려는 것은 «화면에서 고를 수 있다» */
+ok('부분입금을 화면에서 고를 수 있다', /confirmRow(?:Ask)?\(row,pItem,\{partial:true\}\)/.test(src));
 
 console.log('\n[입금관리 — 스스로 여는 입금확정 창은 그대로 있다]');
 // 거래내역에서 넘겨 주던 통로(sendToConfirm)는 없앴지만, 입금관리 자체의 확정 창은 남아 있어야 한다

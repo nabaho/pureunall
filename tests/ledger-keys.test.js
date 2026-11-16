@@ -119,7 +119,7 @@ t('CMS 줄은 CMS 창으로 (업체 후보로 확정하면 남의 돈이 된다)
   /isCmsMemo\[row\._k\][\s\S]{0,40}?setCmsRow\(row\)/.test(ACT), true);
 t('후보가 없으면 찾기 창', /openFindRow\(row\)/.test(ACT), true);
 t('줄이 빠졌는지를 돌려준다 (커서를 어디로 옮길지가 여기 달렸다)',
-  /confirmRow\(row, p, \{ feeAmount:_s\.fee \|\| 0 \}\);\s*\n\s*return true;/.test(ACT), true);
+  /confirmRow(?:Ask)?\(row, p, \{ feeAmount:_s\.fee \|\| 0 \}\);\s*\n\s*return (?:true|!erpPayerNeedsReason\(_pa\));/.test(ACT), true);   // 사유를 묻는 줄은 아직 목록에 남는다(2026-11-16)
 
 console.log('\n[⑩ 되돌리기]');
 const UNDO = grab('function undoLast(){', '/* ══════ Enter 한 번이 하는 일 ══════');
