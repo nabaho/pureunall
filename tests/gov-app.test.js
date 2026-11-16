@@ -651,7 +651,11 @@ const PLANS = () => [
 ];
 const planRowsOf = (h) => (h.match(/class="row-chk"/g) || []).length;
 test('★★ 「📅 발주 예정」 탭이 있고 고르면 그 화면만 보인다', () => {
-  assert.match(src, /<button class="tb" id="tbPlan" onclick="setTab\('plan'\)">📅 발주 예정<\/button>/);
+  /* 폰에서는 「 예정」이 숨는다(.mx — 2026-11-16 탭이 넷이 되어 한 줄에 들어오게). 보이는 글을 이어 붙여 본다 */
+  const tbPlan = (src.match(/<button class="tb" id="tbPlan" onclick="setTab\('plan'\)">([\s\S]*?)<\/button>/) || [])[1];
+  assert.ok(tbPlan, '발주 예정 탭 단추가 없다');
+  assert.equal(tbPlan.replace(/<[^>]+>/g, ''), '📅 발주 예정', 'PC 에서 읽히는 탭 이름');
+  assert.match(tbPlan, /<span class="mx"> 예정<\/span>/, '폰에서 줄이는 부분');
   assert.match(src, /<script src="js\/gov-plan\.js\?v=\d+"><\/script>/);
   const r = runApp({ plan: PLANS() });
   r.api.setTab('plan');
@@ -673,7 +677,7 @@ test('★★★ 공고 전(기본) — 임박·이번 달·예정월 지남·몇
   assert.match(h, /⏳ 이번 달 발주 예정/); assert.match(h, /⚠ 예정월 지남 · 아직 공고 없음/); assert.match(h, /3개월 뒤 발주 예정/);
   assert.match(h, /경영지원팀<div>02-000-0000<\/div>/, '담당 부서·전화');
   assert.match(h, /href="https:\/\/www\.g2b\.go\.kr:8082\/ep\/co\/fileDownload\.do\?fileTask=PS&amp;fileSeq=9::1"/, '사전규격서 링크');
-  assert.match(r.el('tbPlan').innerHTML, /📅 발주 예정 <span class="tag red"[^>]*>2<\/span>/, '임박 1 + 이번 달 1');
+  assert.match(r.el('tbPlan').innerHTML.replace(/<span class="mx">([^<]*)<\/span>/g, '$1'), /📅 발주 예정 <span class="tag red"[^>]*>2<\/span>/, '임박 1 + 이번 달 1');
   assert.match(r.el('pCnt').innerHTML, /전체 5건 · 지금 4건 · 숨김 1건/);
 });
 test('★★★ 「공고 나옴」 보기 — 공고 모아보기에 그 공고가 있으면 「공고 보기」로 바로 연다', () => {
@@ -726,7 +730,9 @@ test('★★★ 새로 받기 — 발주계획(올해 1월부터 31일씩)·사�
   assert.match(pu[0], new RegExp('inqryBgnDt=' + y + '01010000'));
   assert.match(pu[0], new RegExp('orderBgnYm=' + y + '01&orderEndYm=' + (y + 1) + '12'));
   assert.match(r.store.gov3_plan_since, /^\d{4}-\d{2}-\d{2}$/);
-  assert.match(r.el('note').innerHTML, /📅 발주 예정 <b>2건<\/b> 새로 걸림/);
+  /* 2026-11-16 캡쳐2 정리(대표 「불필요한 부분이다 빼달라」) — 받은 결과는 목록 위 줄이 아니라 알림으로 한 번 말한다 */
+  assert.match(r.el('toast').textContent, /📅 발주 예정 2건/);
+  assert.doesNotMatch(r.el('note').innerHTML, /새로 걸/, '받은 결과 줄을 목록 위에 남기지 않는다');
   urls.length = 0; await r.api.fetchAll();
   assert.equal(urls.filter((u) => /OrderPlanSttusService/.test(u)).length, 1, '두 번째부터는 지난 며칠치 한 묶음');
   assert.equal(JSON.parse(r.store.gov3_plan).length, 2, '같은 줄이 또 들어왔다');
@@ -764,7 +770,8 @@ test('★★★ 인증키가 있고 한 번도 안 받았으면 탭을 여는 �
   for (let i = 0; i < 100 && !r.store.gov3_plan_at; i++) await tickP(5);
   assert.match(r.store.gov3_plan_at || '', /^\d{4}-/, '받은 때를 남긴다');
   assert.match(r.el('planNote').innerHTML, /마지막으로 받은 때/);
-  assert.match(r.el('note').innerHTML, /📅 발주 예정 <b>0건<\/b> 새로 걸림/);
+  assert.match(r.el('toast').textContent, /발주 예정 0건이 새로 걸렸습니다/, '받은 셈은 알림으로(2026-11-16 캡쳐2 정리)');
+  assert.doesNotMatch(r.el('note').innerHTML, /받는 중/, '다 받았으면 진행 글을 지운다');
 });
 test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하루 한 번 자동에 맡긴다) · 열쇠가 없으면 안 받는다', async () => {
   let n = 0;
@@ -1140,20 +1147,23 @@ test('★★ 받다 실패하면 «못 받음»으로 남는다 — 이전 성�
   const h = r.el('period').innerHTML;
   assert.match(h, /class="hc bad"[^>]*><b>✖ 나라장터<\/b> 못 받음 — SERVICE_ACCESS_DENIED_ERROR/);
 });
-test('★★ 수집 상태 줄 — 기록·키가 없으면 안 그리고, 있으면 출처마다 점·글 + 「날짜별 기록」 · 팝업은 하루 한 줄 표', () => {
+/* 2026-11-16 대표 「(캡쳐2) 불필요한 부분이다 빼달라」 — 목록 위 수집 상태 줄은 «문제일 때만»(위 검사: ✖ 못 받음),
+   평소 상태(● 받음)·날짜별 기록은 📡 단추가 여는 팝업으로 옮겼다. */
+test('★★ 수집 상태 — 잘 받으면 목록 위에는 안 그리고, 📡 팝업에 출처마다 점·글 + 하루 한 줄 표', () => {
+  assert.match(src, /<button class="btn" onclick="healthPop\(\)" title="[^"]+">📡<\/button>/, '목록 위 줄을 걷었으니 📡 단추가 팝업으로 가는 길이다');
   const none = runApp({ feed: [] }); none.api.draw();
-  assert.doesNotMatch(none.el('period').innerHTML, /수집 상태/, '키도 기록도 없는데 줄을 그린다');
+  assert.doesNotMatch(none.el('period').innerHTML, /수집/, '키도 기록도 없는데 줄을 그린다');
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const at = new Date().toISOString();
   const stat = { cur: { g2b: { at, n: 3077, newest: today, err: '', okAt: at }, alio: { at, n: 525, newest: '', err: '', okAt: at } },
     hist: [{ d: today, g2b: { n: 3077, newest: today, e: 0 }, alio: { n: 525, newest: '', e: 0 } }] };
   const r = runApp({ feed: [], key_data: 'K', src_stat: stat }); r.api.draw();
-  const h = r.el('period').innerHTML;
-  assert.match(h, /📡 <b>수집 상태<\/b>/); assert.match(h, /class="hc ok"[^>]*><b>● 나라장터<\/b>/); assert.match(h, /class="hc ok"[^>]*><b>● 알리오<\/b>/);
-  assert.match(h, /class="hc none"[^>]*><b>○ 기업마당<\/b> 아직 받은 기록이 없습니다/);
-  assert.match(h, /onclick="healthPop\(\);return false">📊 날짜별 기록/);
+  assert.doesNotMatch(r.el('period').innerHTML, /수집 상태|나라장터/, '모두 잘 받았으면 목록 위에는 아무것도 그리지 않는다');
   r.api.healthPop();
   const p = r.el('popBody').innerHTML;
+  assert.match(p, /📡 <b>수집 상태<\/b>/); assert.match(p, /class="hc ok"[^>]*><b>● 나라장터<\/b>/); assert.match(p, /class="hc ok"[^>]*><b>● 알리오<\/b>/);
+  assert.match(p, /class="hc none"[^>]*><b>○ 기업마당<\/b> 아직 받은 기록이 없습니다/);
+  assert.doesNotMatch(p, /onclick="healthPop\(\)/, '팝업 안에 자기를 다시 여는 링크를 달지 않는다');
   assert.match(p, /<th>날짜<\/th><th>나라장터<\/th><th>알리오<\/th><th>기업마당<\/th>/); assert.match(p, /3,077건/); assert.match(p, /525건/);
   assert.match(p, /걸러내기 «전»/);
   const empty = runApp({ feed: [], key_data: 'K' }); empty.api.healthPop();
