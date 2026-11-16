@@ -251,7 +251,11 @@ test('칩 크기 — 구글 앱 실측(글자 12px · 굵기 400 · 줄 20px · 
   assert.strictEqual(칩[1], '1px 8px', '좌우 여백이 구글 앱(8px)과 다릅니다: ' + 칩[1]);
   assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
   /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
-  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
+  /* 2026-11-15 대표 「둥글게 부드럽게」로 폰 칩을 키웠다 — 값이 아니라 «폰 칩 규칙이 따로 있고, 둥글다»를 본다 */
+  const 폰칩 = 캘린더.match(/body\.mob \.ev\{font-size:([\d.]+)px;line-height:(\d+)px;height:(\d+)px;padding:[^;]+;border-radius:(\d+)px/);
+  assert.ok(폰칩, '폰 칩 규칙이 없습니다');
+  assert.ok(Number(폰칩[4]) >= 6, '폰 칩 모서리가 다시 각졌습니다: ' + 폰칩[4] + 'px');
+  assert.strictEqual(폰칩[2], 폰칩[3], '줄 높이와 칩 높이가 어긋나면 글자가 잘립니다');
 });
 
 /* ── 상세 팝업·시각 일정 글자는 구글 공식 화면 실측 (2026-10-11) ── */
