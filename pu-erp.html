@@ -27235,6 +27235,97 @@ function ErpFundInboxStrip(props){
         }))));
 }
 
+/* ── 💳 카드로 낸 상담료 — 승인 기록 창 (대표 2026-11-16 「신용카드로 상담료 계산한 부분은 정확하게 업무 기록이 남지 않는다」) ──
+   상담이 끝나 카드를 긁은 «그때» 상담접수 카드에 승인을 먼저 적는다(상태 approved — 아직 입금 전이라 «받은 돈»이 아니다).
+   며칠 뒤 정산 입금이 통장에 들어오면 거래내역의 「상담료」(직접 등록)에서 이 승인과 «같은 줄»로 잇는다 — 두 번 적지 않는다.
+   ★ 카드번호 전체·유효기간·CVC 는 받지 않는다 — 승인번호와 끝 네 자리까지만.
+   처리 기준 docs/규칙/카드-상담료-기록.md */
+function ConsultCardModal(props){
+  useEscClose(props.onClose);
+  var c = props.contract || {};
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER : {};
+  var fS = useState({ amount:'', cardCompany:'', approvalNo:'', approvalMissing:false, cardTail:'', approvalDate:todayYMD() });
+  var f = fS[0], setF = fS[1];
+  var tS = useState(0); var tick = tS[0], setTick = tS[1];
+  var fresh = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === c.id; }) || c;
+  var list = erpConsultPaymentsOf(fresh);
+  function set(p){ setF(Object.assign({}, f, p)); }
+  var built = erpConsultPayBuild({ amount:String(f.amount || '').replace(/[^0-9]/g, ''), method:'card', status:'approved', date:f.approvalDate,
+    cardCompany:f.cardCompany, approvalNo:f.approvalNo, approvalMissing:!!f.approvalMissing, cardLast4:f.cardTail,
+    approvalDate:f.approvalDate, by:me.sid || '', byName:me.name || '' });
+  function save(){
+    if(!built.ok){ showToast('❌ ' + built.why); return; }
+    var next = erpConsultPaymentsAfter(fresh.consultPayments || [], built.pay, '');
+    if(dbPatch('contracts', c.id, { consultPayments:next }) === false){ showToast('❌ 저장하지 못했습니다'); return; }
+    showToast('✅ 카드 승인을 기록했습니다 — 정산 입금이 들어오면 거래내역의 «상담료»에서 잇습니다');
+    setF({ amount:'', cardCompany:f.cardCompany, approvalNo:'', approvalMissing:false, cardTail:'', approvalDate:todayYMD() });
+    setTick(tick + 1);
+    if(props.onSaved) props.onSaved();
+  }
+  async function cancelPay(p){
+    if(!(await popConfirm('이 카드 승인(' + erpConsultPayLabel(p) + ')을 «취소»로 표시합니다.\n\n→ 입금 전 목록에서 빠집니다\n→ 기록은 지우지 않습니다'))) return;
+    var next = (fresh.consultPayments || []).map(function(x){
+      return (x && x.id === p.id) ? Object.assign({}, x, { status:'cancelled', cancelledAt:new Date().toISOString(), cancelledBy:me.sid || '' }) : x;
+    });
+    if(dbPatch('contracts', c.id, { consultPayments:next }) === false){ showToast('❌ 저장하지 못했습니다'); return; }
+    showToast('승인을 취소로 표시했습니다');
+    setTick(tick + 1);
+    if(props.onSaved) props.onSaved();
+  }
+  var lbl = { fontSize:'12px', fontWeight:800, color:'#475569', marginBottom:'3px' };
+  var inp = { padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'13.5px' };
+  return h('div', { onClick:props.onClose,
+    style:{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15,23,42,.45)', zIndex:9300,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' } },
+    h('div', { onClick:function(e){ e.stopPropagation(); },
+      style:{ background:'#fff', borderRadius:'10px', width:'min(520px,96vw)', maxHeight:'88vh', overflow:'auto', padding:'14px 16px' } },
+      h('div', { style:{ fontSize:'14px', fontWeight:800, color:'#1e40af', marginBottom:'4px' } },
+        '💳 카드 승인 기록 — ' + (c.clientName || c.companyName || '-')),
+      h('div', { style:{ fontSize:'12.5px', color:'#64748b', lineHeight:1.6, marginBottom:'10px' } },
+        '카드로 낸 상담료의 승인을 먼저 적어 둡니다. 아직 입금 전이라 «받은 돈»에는 세지 않고, 정산 입금이 통장에 들어오면 거래내역의 「상담료」에서 이 승인과 잇습니다.'),
+      list.length > 0 && h('div', { style:{ marginBottom:'10px' } },
+        h('div', { style:lbl }, '이미 적힌 결제'),
+        list.map(function(p){
+          return h('div', { key:p.id, style:{ display:'flex', alignItems:'center', gap:'6px', padding:'4px 8px', background:'#f8fafc',
+              border:'1px solid #e2e8f0', borderRadius:'5px', marginBottom:'3px', fontSize:'12.5px' } },
+            h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }, title:erpConsultPayLabel(p) },
+              erpConsultPayLabel(p)),
+            h('span', { style:{ color:p.status === 'received' ? '#166534' : '#854d0e', fontWeight:700, whiteSpace:'nowrap' } },
+              p.status === 'received' ? '입금 확인' : '입금 전'),
+            p.status === 'approved' && h('button', { onClick:function(){ cancelPay(p); },
+              style:{ padding:'1px 7px', background:'#fff', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', fontSize:'12px', cursor:'pointer' } }, '승인 취소'));
+        })),
+      h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'8px' } },
+        h('div', null, h('div', { style:lbl }, '금액(원)'),
+          h('input', { style:Object.assign({}, inp, { width:'110px', fontFamily:'ui-monospace,monospace' }), value:f.amount,
+            onInput:function(e){ set({ amount:e.target.value.replace(/[^0-9]/g, '') }); } })),
+        h('div', null, h('div', { style:lbl }, '카드사'),
+          h('select', { style:Object.assign({}, inp, { minWidth:'92px' }), value:f.cardCompany, onChange:function(e){ set({ cardCompany:e.target.value }); } },
+            h('option', { value:'' }, '선택'),
+            ERP_CARD_COMPANIES.map(function(n){ return h('option', { key:n, value:n }, n); }))),
+        h('div', null, h('div', { style:lbl }, '승인일'),
+          h('input', { type:'date', style:inp, value:f.approvalDate, onInput:function(e){ set({ approvalDate:e.target.value }); } }))),
+      h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'6px' } },
+        h('div', null, h('div', { style:lbl }, '승인번호(6~12자리)'),
+          h('input', { style:Object.assign({}, inp, { width:'150px', fontFamily:'ui-monospace,monospace' }), value:f.approvalNo, disabled:!!f.approvalMissing,
+            onInput:function(e){ set({ approvalNo:e.target.value }); } })),
+        h('div', null, h('div', { style:lbl }, '카드 끝 4자리(선택)'),
+          h('input', { style:Object.assign({}, inp, { width:'110px', fontFamily:'ui-monospace,monospace' }), value:f.cardTail,
+            onInput:function(e){ set({ cardTail:e.target.value }); } }))),
+      h('label', { style:{ display:'flex', alignItems:'center', gap:'5px', fontSize:'12.5px', color:'#475569', cursor:'pointer', marginBottom:'4px' } },
+        h('input', { type:'checkbox', checked:!!f.approvalMissing, onChange:function(){ set({ approvalMissing:!f.approvalMissing, approvalNo:'' }); } }),
+        '승인번호 없음(전표를 못 찾음 등) — 증빙 점검에 걸립니다'),
+      h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'8px' } }, '카드번호 전체·유효기간·CVC 는 받지 않습니다 — 끝 네 자리만 남깁니다.'),
+      (String(f.amount || '').length > 0 || f.cardCompany || f.approvalNo) && !built.ok &&
+        h('div', { style:{ fontSize:'12.5px', color:'#991b1b', fontWeight:700, marginBottom:'6px' } }, '⚠ ' + built.why),
+      h('div', { style:{ display:'flex', gap:'6px', justifyContent:'flex-end' } },
+        h('button', { onClick:props.onClose,
+          style:{ padding:'6px 14px', background:'#fff', color:'#64748b', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'13px', cursor:'pointer' } }, '닫기'),
+        h('button', { disabled:!built.ok, onClick:save,
+          style:{ padding:'6px 16px', background:built.ok ? '#2563eb' : '#cbd5e1', color:'#fff', border:'none', borderRadius:'5px',
+            fontSize:'13px', fontWeight:700, cursor:built.ok ? 'pointer' : 'not-allowed' } }, '승인 기록'))));
+}
+
 function ContractManagement(props){
   props = props || {};
   var existing = dbGet('contracts', null);
@@ -27389,6 +27480,7 @@ function ContractManagement(props){
   var m = useState(null); var modal = m[0]; var setModal = m[1];
   var pm = useState(null); var printModal = pm[0]; var setPrintModal = pm[1];
   var dm = useState(null); var docModal = dm[0]; var setDocModal = dm[1];   // 계약서 보관함(NAS 링크)
+  var cpS = useState(null); var cardPay = cpS[0]; var setCardPay = cpS[1];   // 💳 카드로 낸 상담료 — 승인 기록 창 (대표 2026-11-16)
   var sa = useState(null); var sendAsk = sa[0]; var setSendAsk = sa[1];    // ✅ 확정 → 서류 보내기 (2026-10-09)
   // 통합 검색 포커스
   var initFocus = useGlobalSearchFocus();
@@ -28943,6 +29035,19 @@ function ContractManagement(props){
           '🆕 오늘 ' + regTimeText(c)) : null,
         h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0, whiteSpace:'nowrap' } }, c.contractNo),
         erpStageChip(c),
+        /* 💳 상담료 결제 기록 — 얼마를 어떻게 받았나(카드 승인·입금 전 포함)를 카드 한 줄에서 본다 (대표 2026-11-16) */
+        (function(){
+          var ps = erpConsultPaymentsOf(c);
+          if(!ps.length) return null;
+          var got = erpConsultPaidSum(c), pend = ps.filter(function(p){ return p.status === 'approved'; }).length;
+          return h('span', { title:ps.map(erpConsultPayLabel).join('\n'),
+            style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'10px', padding:'1px 7px',
+              fontSize:'10px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
+            '💳 ' + (got > 0 ? got.toLocaleString() + '원' : '') + (pend ? ((got > 0 ? ' · ' : '') + '입금 전 ' + pend) : ''));
+        })(),
+        c.status === 'consult' && h('button', { onClick:function(e){ e.stopPropagation(); setCardPay(c); },
+          title:'카드로 낸 상담료 — 승인을 먼저 기록합니다(정산 입금이 들어오면 거래내역 «상담료»에서 잇습니다)',
+          style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '💳'),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
@@ -29270,6 +29375,7 @@ function ContractManagement(props){
     sendAsk && h(ErpConfirmSendAsk, { contract:sendAsk, onClose:function(){ setSendAsk(null); } }),
     printModal && h(ContractFormPrintModal, { contract:printModal, onClose:closePrintModal }),
     docModal && h(ContractDocVault, { contract:docModal, onClose:function(){ setDocModal(null); } }),
+    cardPay && h(ConsultCardModal, { contract:cardPay, onClose:function(){ setCardPay(null); }, onSaved:function(){ refreshContracts(); } }),
     dupSweep && h(DupSweepModal, { result:dupSweep, filter:dupFilter, onFilter:setDupFilter,
       onClose:function(){ setDupSweep(null); },
       onRescan:function(){ setDupSweep(dupSweepScan()); },
@@ -54209,6 +54315,118 @@ function erpHeldSummary(list){
   });
   return { n:n, sum:sum, oldest:oldest };
 }
+/* ══ 카드로 낸 상담료 — 업무 기록 (대표 2026-11-16 「신용카드로 상담료 계산한 부분은 정확하게 업무 기록이 남지 않는다」) ══
+   예전에는 상담접수 번호(consultId)를 직접 등록 창에 «넘기기만» 하고 저장하지 않았다.
+   그래서 상담접수 카드에는 «얼마를 어떻게 받았나»가 안 남고, 입금에는 «어느 상담인가»가 안 남았다.
+   이제 한 건의 상담료 결제를 두 곳에 «같은 번호»로 적는다:
+     · 입금 줄(finance_income): consultId · consultPayId · payMethod · cardCompany · approvalNo · cardLast4 · approvalDate
+     · 상담접수 카드(contracts[].consultPayments[]): 같은 결제 한 줄 (status: approved 입금 전 · received 입금 확인)
+   ★ 카드번호 전체·유효기간·CVC 는 «저장하지 않는다». 끝 네 자리와 승인번호까지만.
+   ★ 카드 승인만 먼저 적어 두고(approved), 며칠 뒤 정산 입금이 들어오면 «같은 줄»을 입금 확인(received)으로 잇는다 — 두 번 적지 않는다.
+   ★ 증빙이 비면(카드인데 승인번호 없음·증빙 없음·상담접수와 안 이어짐) 지우지 않고 «증빙 점검»에 모아 보인다.
+   처리 기준: docs/규칙/카드-상담료-기록.md · 지킴: tests/erp-consult-card.test.js */
+var ERP_CARD_COMPANIES = ['신한','삼성','KB국민','현대','롯데','하나','우리','BC','NH농협','기타'];
+var ERP_CARD_SETTLE_DAYS = 14;      // 승인일이 정산 입금일보다 이만큼 이내로 앞서야 «그 승인의 정산»으로 본다
+function erpCardNoNorm(s){ return String(s === null || s === undefined ? '' : s).replace(/[\s-]/g, ''); }
+function erpApprovalNoOk(s){ return /^\d{6,12}$/.test(erpCardNoNorm(s)); }
+/* 긴 카드번호를 붙여 넣어도 «끝 네 자리»만 남긴다 */
+function erpCardLast4(s){
+  var d = String(s === null || s === undefined ? '' : s).replace(/\D/g, '');
+  return d.length >= 4 ? d.slice(-4) : '';
+}
+/* 상담료 결제 한 줄을 만든다 — 순수 함수. 거절하면 { ok:false, why } */
+function erpConsultPayBuild(o){
+  o = o || {};
+  var amount = parseInt(o.amount, 10) || 0;
+  if(amount <= 0) return { ok:false, why:'금액이 없습니다' };
+  var method = (o.method === 'card' || o.method === 'cash' || o.method === 'account') ? o.method : '';
+  if(!method) return { ok:false, why:'결제수단을 골라야 합니다' };
+  var e = { id:o.id || ('cp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)),
+    date:String(o.date || '').slice(0, 10), amount:amount, method:method,
+    status:(o.status === 'approved' ? 'approved' : 'received'),
+    incomeId:o.incomeId || '', at:o.at || new Date().toISOString(), by:o.by || '', byName:o.byName || '' };
+  if(method === 'card'){
+    if(ERP_CARD_COMPANIES.indexOf(o.cardCompany) < 0) return { ok:false, why:'카드사를 골라야 합니다' };
+    var okNo = erpApprovalNoOk(o.approvalNo);
+    if(!okNo && !o.approvalMissing) return { ok:false, why:'승인번호(6~12자리 숫자)를 적거나 «승인번호 없음»을 골라야 합니다' };
+    e.cardCompany = o.cardCompany;
+    e.approvalNo = okNo ? erpCardNoNorm(o.approvalNo) : '';
+    if(!okNo) e.approvalMissing = true;
+    e.cardLast4 = erpCardLast4(o.cardNo || o.cardLast4);
+    e.approvalDate = String(o.approvalDate || o.date || '').slice(0, 10);
+    e.fee = parseInt(o.fee, 10) || 0;
+  }
+  return { ok:true, pay:e };
+}
+function erpConsultPaymentsOf(c){
+  return ((c && c.consultPayments) || []).filter(function(p){ return p && !p._deleted && p.status !== 'cancelled'; });
+}
+/* 그 상담접수가 받은 상담료 합계(입금 확인된 것만) — 입금 전 승인(approved)은 «아직 받은 돈»이 아니다 */
+function erpConsultPaidSum(c){
+  var s = 0;
+  erpConsultPaymentsOf(c).forEach(function(p){ if(p.status === 'received') s += parseInt(p.amount, 10) || 0; });
+  return s;
+}
+/* 한 줄 설명 — 카드·상담 화면에서 «얼마를 어떻게 받았나» */
+function erpConsultPayLabel(p){
+  if(!p) return '';
+  var m = { card:'카드', cash:'현금', account:'계좌' }[p.method] || '';
+  var s = m + ' ' + (parseInt(p.amount, 10) || 0).toLocaleString() + '원';
+  if(p.method === 'card') s += ' · ' + (p.cardCompany || '') + (p.approvalNo ? (' 승인 ' + p.approvalNo) : ' 승인번호 없음');
+  if(p.status === 'approved') s += ' · 입금 전';
+  return s;
+}
+/* 입금 전 카드 승인 중에서, 이 통장 줄(정산 입금)과 «같은 건»일 수 있는 것.
+   정산 입금은 수수료를 뺀 금액이다 — 승인 금액 이하이고 수수료율 한도(ERP_FEE_MAX_RATE) 안이어야 하며,
+   승인일이 입금일보다 앞서되 ERP_CARD_SETTLE_DAYS 안이어야 한다. 가까운 금액부터 돌려준다.
+   ★ 고르는 것은 사람이다 — 여기는 후보만 낸다. */
+function erpConsultSettleCands(row, intakes){
+  var amt = parseInt(row && row.amount, 10) || 0;
+  var d = String((row && row.date) || '').slice(0, 10);
+  var out = [];
+  if(amt <= 0) return out;
+  (intakes || []).forEach(function(c){
+    erpConsultPaymentsOf(c).forEach(function(p){
+      if(p.method !== 'card' || p.status !== 'approved') return;
+      var gross = parseInt(p.amount, 10) || 0;
+      if(gross <= 0 || amt > gross) return;
+      if((gross - amt) / gross > ERP_FEE_MAX_RATE) return;
+      var ad = String(p.approvalDate || p.date || '').slice(0, 10);
+      if(d && ad){
+        var gap = (new Date(d + 'T00:00:00Z') - new Date(ad + 'T00:00:00Z')) / 86400000;
+        if(!(gap >= 0 && gap <= ERP_CARD_SETTLE_DAYS)) return;
+      }
+      out.push({ contract:c, pay:p, fee:gross - amt, gross:gross });
+    });
+  });
+  out.sort(function(a, b){ return a.fee - b.fee; });
+  return out;
+}
+/* 증빙 점검 — 상담료 입금 줄 가운데 «기록이 비어 있는 것». 빈 칸을 지어내지 않고 무엇이 비었는지만 말한다 */
+function erpConsultEvidenceGap(fi){
+  if(!fi || fi._deleted || fi.undoneDate || fi.kind !== '상담료') return '';
+  if(fi.docType === 'none') return '증빙 없음(세금계산서·현금영수증·카드전표)';
+  if(fi.payMethod === 'card' && !fi.approvalNo) return '카드 승인번호 없음';
+  if(!fi.consultId) return '상담접수와 이어지지 않음';
+  return '';
+}
+/* 결제 한 줄을 목록에 «반영»한 새 목록 — 순수 함수.
+   linkId 가 있으면 «입금 전 승인» 그 줄을 입금 확인(received)으로 바꾼다 — 새 줄을 더하지 않는다(두 번 적지 않는다).
+   이을 줄이 없거나 이미 입금 확인된 줄이면 null — 말없이 새 줄을 더하면 같은 돈이 두 번 적힌다.
+   linkId 가 없으면 끝에 더한다. pay: { incomeId, date(입금일), amount, netAmount(들어온 돈), fee } 또는 새 줄 전체 */
+function erpConsultPaymentsAfter(list, pay, linkId){
+  var cur = (list || []).slice();
+  if(!linkId){ cur.push(pay); return cur; }
+  var done = false;
+  cur = cur.map(function(p){
+    if(!p || p.id !== linkId || p.status !== 'approved') return p;
+    done = true;
+    return Object.assign({}, p, { status:'received', incomeId:pay.incomeId || '', settleDate:String(pay.date || '').slice(0, 10),
+      fee:parseInt(pay.fee, 10) || 0, netAmount:parseInt(pay.netAmount, 10) || 0 });
+  });
+  return done ? cur : null;
+}
+
 /* ── 상담료 후보 (상담접수와 이름 대조) ──
    상담만 하고 현금·카드로 받으면 사무관리에도 계산서에도 기록이 없다. 그런데 상담접수
    카드에는 이름이 있다 — 그것을 근거로 쓴다. 접수보다 «나중» 에 들어온 것만 본다. */
@@ -56081,8 +56299,28 @@ function FinanceLedger(props){
          (창에서도 자문료를 고르면 성과급 칸이 사라진다 — 화면과 결과가 어긋나지 않게) */
     var _isAdv = (d.kind === '자문료');
     if(_isAdv){ shares = []; }
+    /* ── 📇 상담료 결제 기록 (대표 2026-11-16 「신용카드로 상담료 계산한 부분은 정확하게 업무 기록이 남지 않는다」) ──
+       예전에는 상담접수 번호(consultId)를 창에 «넘기기만» 하고 저장하지 않았다.
+       이제 결제 한 줄을 입금 줄과 상담접수 카드 «두 곳에 같은 번호로» 적는다.
+       ★ 검증이 «먼저» — 카드는 카드사·승인번호가 없으면 입금도 만들지 않는다(반만 남지 않게). 카드번호는 끝 네 자리만. */
+    var _isConsult = (d.kind === '상담료');
+    var _cpay = null, _linkId = d.payLinkId || '';
+    if(_isConsult && (d.cardMode || d.consultId)){
+      var _me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER : {};
+      var _cb = erpConsultPayBuild({ amount:gross, method:(d.cardMode ? 'card' : 'account'), date:paidDate,
+        cardCompany:d.cardCompany, approvalNo:d.approvalNo, approvalMissing:!!d.approvalMissing,
+        cardLast4:d.cardTail, approvalDate:d.approvalDate || paidDate, fee:cardFee, by:_me.sid || '', byName:_me.name || '' });
+      if(!_cb.ok){ showToast('❌ ' + _cb.why); return false; }
+      _cpay = _cb.pay;
+    }
+    var _fiId2 = 'fi-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var _ok = erpUpsertIncome({
-      id:'fi-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      id:_fiId2,
+      consultId:(_isConsult && d.consultId) ? d.consultId : undefined,
+      consultPayId:_cpay ? (_linkId || _cpay.id) : undefined,
+      cardCompany:(_cpay && _cpay.cardCompany) || undefined, approvalNo:(_cpay && _cpay.approvalNo) || undefined,
+      approvalMissing:(_cpay && _cpay.approvalMissing) || undefined, cardLast4:(_cpay && _cpay.cardLast4) || undefined,
+      approvalDate:(_cpay && _cpay.approvalDate) || undefined,
       companyName:(d.name||'').trim() || (row.memo||'-'),
       amount:gross, date:paidDate,
       kind:d.kind||'상담료', category:_isAdv ? 'inc-advisory' : 'inc-other',
@@ -56115,6 +56353,25 @@ function FinanceLedger(props){
         payee:(d.name||'').trim()||'카드사',
         note:'카드 수수료 — 매출 '+gross.toLocaleString()+'원 중 '+row.amount.toLocaleString()+'원 입금',
         paid:true, paidDate:paidDate, branch:'cheonan'});
+    }
+    /* 상담접수 카드에 «같은 결제 한 줄»을 적는다 — 입금을 저장한 «뒤에». 입금 전 승인 줄을 잇는 경우는 새 줄을 더하지 않는다. */
+    if(_isConsult && d.consultId && _cpay){
+      try{
+        var _ct = (dbGet('contracts', []) || []).find(function(x){ return x && x.id === d.consultId; });
+        if(_ct){
+          var _entry = Object.assign({}, _cpay, { incomeId:_fiId2, status:'received', settleDate:paidDate, netAmount:row.amount });
+          var _next = _linkId
+            ? erpConsultPaymentsAfter(_ct.consultPayments || [], { incomeId:_fiId2, date:paidDate, netAmount:row.amount, fee:cardFee }, _linkId)
+            : erpConsultPaymentsAfter(_ct.consultPayments || [], _entry, '');
+          if(_next === null){        // 이을 승인 줄이 없다 — 입금은 이미 저장됐으니 새 줄로 적고 알린다
+            showToast('⚠ 잇기로 한 카드 승인 줄을 상담접수에서 찾지 못해 새 줄로 적었습니다');
+            _next = erpConsultPaymentsAfter(_ct.consultPayments || [], _entry, '');
+          }
+          dbPatch('contracts', d.consultId, { consultPayments:_next });
+        } else {
+          showToast('⚠ 상담접수를 찾지 못해 입금에만 적었습니다');
+        }
+      }catch(_ce){ if(window._erpErrLog) window._erpErrLog(_ce); }
     }
     erpMarkBankRowProcessed(row,'income','➕ '+((d.name||'').trim()||'직접 등록')+' '+(d.kind||'상담료'));
     removeRow(row._k,'inc');
@@ -59711,6 +59968,13 @@ function FinanceLedger(props){
       /* 자문료는 다른 항목이고 성과급도 안 붙는다 — 이 한 값이 창 전체를 가른다
          (대표 결정 2026-08-22, 김보람 건의 3번) */
       var _isAdv = (dirPop.kind === '자문료');
+      /* 📇 상담료 — 상담접수와 잇고, 카드면 승인 정보를 적고, 입금 전 카드 승인 중 같은 건이 있으면 잇는다 (대표 2026-11-16) */
+      var _isConsultK = (dirPop.kind === '상담료');
+      var _cands = (_isConsultK && dirPop.cardMode && !dirPop.payLinkId) ? erpConsultSettleCands(_r, _intakes) : [];
+      var _cardBuild = (_isConsultK && dirPop.cardMode)
+        ? erpConsultPayBuild({ amount:_gross, method:'card', date:_r.date, cardCompany:dirPop.cardCompany, approvalNo:dirPop.approvalNo,
+            approvalMissing:!!dirPop.approvalMissing, cardLast4:dirPop.cardTail, approvalDate:dirPop.approvalDate || _r.date })
+        : { ok:true };
       /* 업체관리에 같은 이름이 있나 — 미입금 대기가 «회사명|받을 달» 로 맞춰지므로
          이름이 다르면 등록해도 그 달 미입금이 안 지워진다. 미리 알려 주려고 찾아 둔다. */
       var _advCo = null;
@@ -59789,6 +60053,55 @@ function FinanceLedger(props){
                   _fee>0 ? '카드 수수료 '+_fee.toLocaleString()+'원을 지출로 함께 기록합니다'
                          : '매출액이 입금액보다 크면 차액을 수수료로 기록합니다'))),
 
+            /* ── 📇 상담료 결제 기록 — 어느 상담의 상담료인지, 카드면 승인 정보까지 «업무 기록»으로 남긴다 (대표 2026-11-16) ── */
+            _isConsultK && h('div',{style:{marginBottom:'9px',padding:'8px 10px',borderRadius:'6px',background:'#eff6ff',border:'1px solid #bfdbfe'}},
+              h('div',{style:_lblS},'상담접수 연결'),
+              h('select',{style:_inpS,value:dirPop.consultId||'',onChange:function(e){ upd({consultId:e.target.value}); }},
+                h('option',{value:''},'(연결 안 함 — 증빙 점검에 걸립니다)'),
+                _intakes.map(function(c){
+                  return h('option',{key:c.id,value:c.id},(c.clientName||c.companyName||'-')+' · '
+                    +String(c.consultDate||c.createdAt||'').slice(0,10)+(c.contractNo?(' · '+c.contractNo):''));
+                })),
+              _cands.length>0 && h('div',{style:{marginTop:'7px'}},
+                h('div',{style:{fontSize:'12px',fontWeight:800,color:'#1e40af',marginBottom:'3px'}},'💳 입금 전 카드 승인 중 같은 건일 수 있는 것 — 맞는 것을 골라 잇습니다'),
+                _cands.slice(0,5).map(function(k){
+                  return h('div',{key:k.pay.id,style:{display:'flex',alignItems:'center',gap:'6px',padding:'3px 6px',background:'#fff',
+                      border:'1px solid #e2e8f0',borderRadius:'5px',marginBottom:'3px',fontSize:'12.5px'}},
+                    h('span',{style:{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'},
+                        title:(k.contract.clientName||k.contract.companyName||'')+' · '+erpConsultPayLabel(k.pay)},
+                      (k.contract.clientName||k.contract.companyName||'-')+' · '+erpConsultPayLabel(k.pay)),
+                    h('span',{style:{color:'#475569',whiteSpace:'nowrap'}},'수수료 '+k.fee.toLocaleString()),
+                    h('button',{type:'button',onClick:function(){
+                        upd({ consultId:k.contract.id, payLinkId:k.pay.id, cardCompany:k.pay.cardCompany||'', approvalNo:k.pay.approvalNo||'',
+                          cardTail:k.pay.cardLast4||'', approvalDate:k.pay.approvalDate||'', approvalMissing:!!k.pay.approvalMissing,
+                          grossAmt:String(k.gross), name:(k.contract.clientName||k.contract.companyName||dirPop.name||'') });
+                      },style:{padding:'2px 8px',background:'#2563eb',color:'#fff',border:'none',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer'}},'이 승인과 잇기'));
+                })),
+              dirPop.payLinkId && h('div',{style:{marginTop:'6px',fontSize:'12.5px',color:'#166534',fontWeight:700}},
+                '✓ 입금 전 카드 승인과 잇습니다 — 새 줄을 더하지 않고 그 줄이 «입금 확인»으로 바뀝니다',
+                h('button',{type:'button',onClick:function(){ upd({ payLinkId:'' }); },
+                  style:{marginLeft:'8px',padding:'1px 7px',background:'#fff',color:'#475569',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'12px',cursor:'pointer'}},'잇기 풀기')),
+              dirPop.cardMode && h('div',{style:{marginTop:'8px'}},
+                h('div',{style:_lblS},'카드 승인 정보 ',h('span',{style:{color:'#dc2626'}},'*')),
+                h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},
+                  h('select',{style:Object.assign({},_inpS,{width:'auto',minWidth:'92px'}),value:dirPop.cardCompany||'',
+                    onChange:function(e){ upd({cardCompany:e.target.value}); }},
+                    h('option',{value:''},'카드사'),
+                    ERP_CARD_COMPANIES.map(function(n){ return h('option',{key:n,value:n},n); })),
+                  h('input',{style:Object.assign({},_inpS,{width:'150px',fontFamily:'ui-monospace,monospace'}),placeholder:'승인번호(6~12자리)',
+                    value:dirPop.approvalNo||'',disabled:!!dirPop.approvalMissing,
+                    onInput:function(e){ upd({approvalNo:e.target.value}); }}),
+                  h('input',{type:'date',style:Object.assign({},_inpS,{width:'auto'}),title:'승인일',
+                    value:dirPop.approvalDate||String(_r.date||'').slice(0,10),onInput:function(e){ upd({approvalDate:e.target.value}); }}),
+                  h('input',{style:Object.assign({},_inpS,{width:'92px',fontFamily:'ui-monospace,monospace'}),placeholder:'카드 끝 4자리',
+                    value:dirPop.cardTail||'',onInput:function(e){ upd({cardTail:e.target.value}); }})),
+                h('label',{style:{display:'flex',alignItems:'center',gap:'5px',marginTop:'4px',fontSize:'12.5px',color:'#475569',cursor:'pointer'}},
+                  h('input',{type:'checkbox',checked:!!dirPop.approvalMissing,onChange:function(){ upd({approvalMissing:!dirPop.approvalMissing, approvalNo:''}); }}),
+                  '승인번호 없음(전표를 못 찾음 등) — 증빙 점검에 걸립니다'),
+                h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},
+                  '카드번호 전체·유효기간·CVC 는 저장하지 않습니다 — 끝 네 자리만 남깁니다.'),
+                !_cardBuild.ok && h('div',{style:{fontSize:'12.5px',color:'#991b1b',fontWeight:700,marginTop:'3px'}},'⚠ '+_cardBuild.why))),
+
             h('div',{style:_fldS},
               h('div',{style:_lblS},'증빙'),
               h('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
@@ -59834,6 +60147,7 @@ function FinanceLedger(props){
               onClick:async function(){
                 if(!(dirPop.name||'').trim()){ showToast('업체·의뢰인을 입력하세요'); return; }
                 if(!_isAdv && dirPop.perfOn && !dirPop.mainSid){ showToast('담당자를 고르세요 (성과급을 끄면 없어도 됩니다)'); return; }
+                if(_isConsultK && dirPop.cardMode && !_cardBuild.ok){ showToast('카드 승인 정보를 확인하세요 — ' + _cardBuild.why); return; }
                 var _ym = String(_r.date||'').slice(0,7);
                 if(_ym && isIncomeLocked(_ym)){ showToast('🔒 '+_ym+' 입금 마감 — 등록할 수 없습니다'); return; }
                 var _advYm = dirPop.advYm || String(_r.date||'').slice(0,7);
@@ -59846,6 +60160,11 @@ function FinanceLedger(props){
                                    : '\n· ⚠ 업체관리에 없는 이름입니다 — 미입금은 그대로 남습니다')):'')
                       +'\n\n· 증빙: '+({tax:'세금계산서',cash:'현금영수증',none:'증빙없음'}[dirPop.doc]||'증빙없음')
                       +(_fee>0?'\n· 카드 수수료 '+_fee.toLocaleString()+'원을 지출로 기록':'')
+                      +((_isConsultK && dirPop.cardMode)
+                          ? ('\n· 카드 '+(dirPop.cardCompany||'')+' 승인 '+(dirPop.approvalMissing?'번호 없음':String(dirPop.approvalNo||'').replace(/[\s-]/g,''))
+                             +(dirPop.payLinkId?' — 입금 전 승인 줄과 잇습니다':''))
+                          : '')
+                      +((_isConsultK && dirPop.consultId) ? '\n· 상담접수에 이 결제가 함께 기록됩니다' : (_isConsultK ? '\n· ⚠ 상담접수와 연결하지 않았습니다 — 증빙 점검에 걸립니다' : ''))
                       +(_isAdv?'\n· 성과급 없음 (자문료는 대상이 아닙니다)'
                              :(_shares.length?'\n· 성과급 '+_sidName(dirPop.mainSid)+' '+_perfSum.toLocaleString()+'원':'\n· 성과급 없음'))
                       +'\n\n→ 잘못되면 「확정 이력」에서 되돌릴 수 있습니다'))) return;
@@ -60588,6 +60907,10 @@ function FinanceLedger(props){
       var payerOnlyS=useState(false); var payerOnly=payerOnlyS[0]; var setPayerOnly=payerOnlyS[1];
       var _payerDiffN = allInc.filter(function(fi){ return fi && (fi.payerKind === 'other_company' || fi.payerKind === 'third' || fi.payerKind === 'related'); }).length;
       if(payerOnly) allInc = allInc.filter(function(fi){ return fi && (fi.payerKind === 'other_company' || fi.payerKind === 'third' || fi.payerKind === 'related'); });
+      /* 🧾 상담료 증빙 점검 — 증빙·카드 승인번호·상담접수 연결이 빈 상담료를 모아 본다(지우지 않고 무엇이 비었는지 말한다) */
+      var gapOnlyS=useState(false); var gapOnly=gapOnlyS[0]; var setGapOnly=gapOnlyS[1];
+      var _gapN = allInc.filter(function(fi){ return !!erpConsultEvidenceGap(fi); }).length;
+      if(gapOnly) allInc = allInc.filter(function(fi){ return !!erpConsultEvidenceGap(fi); });
       var ql=q.toLowerCase().trim();
       var filtered = ql ? allInc.filter(function(fi){
         return (fi.companyName||'').toLowerCase().indexOf(ql)>=0
@@ -60635,6 +60958,13 @@ function FinanceLedger(props){
                 border:'1px solid '+(payerOnly?'#475569':'#e2e8f0'),
                 background:payerOnly?'#475569':'#f8fafc', color:payerOnly?'#fff':'#475569'}},
               payerOnly?'↩ 전체 보기':('👤 입금자 다른 건 '+_payerDiffN)),
+            _gapN>0 && h('button',{onClick:function(){ setGapOnly(!gapOnly); _setPg(0); },
+              title:'상담료 가운데 증빙·카드 승인번호·상담접수 연결이 비어 있는 건만 봅니다',
+              style:{padding:'5px 11px',borderRadius:'5px',fontSize:'13px',fontWeight:700,cursor:'pointer',
+                whiteSpace:'nowrap',
+                border:'1px solid '+(gapOnly?'#d97706':'#fde68a'),
+                background:gapOnly?'#d97706':'#fffbeb', color:gapOnly?'#fff':'#854d0e'}},
+              gapOnly?'↩ 전체 보기':('🧾 증빙 점검 '+_gapN)),
             h('span',{style:{fontSize:'13px',color:'#64748b',whiteSpace:'nowrap'}},'유효 ',_activeSum.toLocaleString(),'원')
           ),
           h('div',{style:{flex:1,overflowY:'auto',padding:0}},
@@ -60679,6 +61009,10 @@ function FinanceLedger(props){
                         style:{marginLeft:'4px',background:fi.payerReview?'#fef2f2':'#f8fafc',color:fi.payerReview?'#991b1b':'#475569',
                           border:'1px solid '+(fi.payerReview?'#fecaca':'#e2e8f0'),borderRadius:'8px',padding:'0 5px',fontSize:'12px',fontWeight:700}},
                         '👤'+(fi.payerReview?'확인':'대납')),
+                      /* 🧾 상담료 증빙이 빈 건 — 무엇이 비었는지 말한다 */
+                      erpConsultEvidenceGap(fi) && h('span',{title:'증빙 점검: '+erpConsultEvidenceGap(fi),
+                        style:{marginLeft:'4px',background:'#fffbeb',color:'#854d0e',border:'1px solid #fde68a',
+                          borderRadius:'8px',padding:'0 5px',fontSize:'12px',fontWeight:700}},'🧾점검'),
                       /* 📚 한 통장 줄에서 나뉘어 들어온 돈 — 같은 번호(lumpId)의 줄이 한꺼번에 되돌려진다 */
                       fi.lumpId && h('span',{title:'한 번에 들어온 '+(parseInt(fi.lumpTotal,10)||0).toLocaleString()
                           +'원을 '+(fi.lumpN||'')+'건으로 나눠 적은 줄입니다 — 되돌리면 함께 되돌려집니다',
