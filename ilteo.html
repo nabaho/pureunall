@@ -79,11 +79,26 @@ a.act-link{display:inline-flex;align-items:center;gap:4px;min-height:36px;paddin
 .c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
 .c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
 .c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
-main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
+main{width:100%;max-width:none;margin:0;padding:12px 18px 48px}
 .pane{display:none}
 .pane.on{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
 .bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 12px}
+.yr-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.yr-lbl{font-size:12px;font-weight:700;color:var(--ink2);margin-right:2px;white-space:nowrap}
+button.yr-pill{min-height:36px;padding:5px 11px;border-radius:18px;font-size:12px;font-weight:600;background:var(--card);color:var(--ink2);border:1px solid var(--line2);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+button.yr-pill:hover{border-color:var(--blue)}
+button.yr-pill.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:700}
+.yr-sum{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--blue-bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink)}
+.yr-sum b{color:var(--blue-d)}
+.proj-split{display:block}
+.rv-subtabs{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+button.rv-tab{min-height:36px;padding:5px 11px;font-size:12px;font-weight:600}
+button.rv-tab.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.rv-body{padding:10px 12px;max-height:74vh;overflow:auto}
+.rv-sec{border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:9px 11px;margin-bottom:8px}
+.rv-sec-hd{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rv-sec-txt{font-size:12.5px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;word-break:keep-all;overflow-wrap:break-word}
 .sec{padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .card>.sec:first-child{border-top:0;border-radius:10px 10px 0 0}
 .note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px}
@@ -117,9 +132,11 @@ main{padding:12px 16px 48px;max-width:1360px;margin:0 auto}
 table.t{width:100%;border-collapse:collapse}
 table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
-table.t td{overflow:hidden;text-overflow:ellipsis;max-width:340px}
-table.t td.ti{font-weight:600;max-width:300px}
-table.t td.wide{max-width:420px}
+table.t td{overflow:hidden;text-overflow:ellipsis;max-width:480px}
+table.t td.ti{font-weight:600;max-width:420px}
+table.t td.wide{max-width:620px}
+table.t td.yr-col{width:76px;max-width:96px}
+table.t td[data-k="act"]{overflow:visible;max-width:none}
 table.t th.c,table.t td.c{width:40px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
@@ -185,12 +202,21 @@ table.t tr.cur>td.n{color:var(--ink2)}
 #toast.on{opacity:1}
 .modal{position:fixed;inset:0;background:rgba(30,41,59,.42);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px;overflow:auto}
 .mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;width:100%;max-width:680px;overflow:hidden}
-.mbox.wide{max-width:900px}
-.mbox.xwide{max-width:1080px}
+.mbox.wide{max-width:980px}
+.mbox.xwide{max-width:1360px}
 .mhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-weight:700}
 .mbd{padding:12px 14px;max-height:76vh;overflow:auto}
 .mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
 .phone-only{display:none}
+@media (min-width:1440px){
+  .proj-split.split-on{display:grid;grid-template-columns:minmax(0,2.05fr) minmax(380px,0.95fr);gap:12px;align-items:start}
+  .proj-split.split-on .rv-sticky{position:sticky;top:92px}
+  .proj-split.split-on table.t td.ti{max-width:230px}
+  .proj-split.split-on table.t td.wide{max-width:250px}
+}
+@media (min-width:1360px){
+  .rpt-sec-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+}
 @media (max-width:1024px){
   .ws-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
   .chk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -216,7 +242,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
   main{padding:8px 0 64px}
   .card{border-left:0;border-right:0;border-radius:0}
-  .ws-steps,.sec,.sec-list-hd{background:transparent}
+  .ws-steps,.sec,.sec-list-hd,.yr-bar,.yr-sum,.rv-subtabs{background:transparent}
+  .yr-bar,.yr-sum,.rv-subtabs{padding:8px 10px;border-radius:0}
+  .rv-body{max-height:none;padding:8px 10px}
+  .rv-sec{border-left:0;border-right:0;border-radius:0;background:transparent}
   .rpt-sec-list{padding:0}
   .rpt-sec-card,.slide-pv-card,.task-pick-hd{border-left:0;border-right:0;border-radius:0;background:transparent}
   .rpt-sec-card{border-top:0}
@@ -242,10 +271,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
   table.t[data-name] tbody td:empty{display:none}
   table.t[data-name] tbody td.c{position:absolute;left:4px;top:8px;width:40px;text-align:center;order:0}
   table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:26px;text-align:right;order:0}
-  table.t[data-name] tbody td.ti{order:1;flex:1 1 130px;min-width:130px;font-size:13.5px;font-weight:600;color:var(--ink)}
-  table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="yr"]{order:1;flex:0 0 auto;color:var(--ink)}
+  table.t[data-name] tbody td.ti{order:2;flex:1 1 130px;min-width:130px;font-size:13.5px;font-weight:600;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="badge"]{order:3;color:var(--ink)}
   table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
   table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
+  table.t.resp-plain,table.t.resp-plain thead,table.t.resp-plain tbody{display:block;width:100%}
+  table.t.resp-plain thead{display:none}
+  table.t.resp-plain tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  table.t.resp-plain tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2);font-size:12.5px}
+  table.t.resp-plain tbody td.n{display:none}
+  table.t.resp-plain tbody td.wide{flex:1 1 100%}
+  table.t.resp-plain tbody td[data-k="act"]{flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
 }
 @media (max-width:520px){#who{display:none}}
 </style>
@@ -279,47 +316,65 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <main id="app" style="display:none">
   <div class="warn" id="loadNote" style="display:none"></div>
 
-  <!-- 탭 1: 사업장 현황 · 메일 감지 -->
+  <!-- 탭 1: 사업장 현황 · 메일 감지 · 연도별 검토 -->
   <section class="pane on" id="p-projects" role="tabpanel" aria-labelledby="tab-projects" tabindex="-1">
     <div class="kpis" id="kpiBox"></div>
-    <div class="card">
-      <div class="bar">
-        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·업종·개선과제 찾기" style="flex:1;min-width:150px;max-width:280px">
-        <select id="projYear" aria-label="연도 필터">
-          <option value="">연도 전체</option>
-          <option value="2026">2026년</option>
-          <option value="2025">2025년</option>
-          <option value="2024">2024년</option>
-          <option value="2023">2023년</option>
-          <option value="2022">2022년</option>
-          <option value="2021">2021년</option>
-          <option value="2020">2020년</option>
-          <option value="2019">2019년</option>
-          <option value="2018">2018년</option>
-          <option value="2017">2017년</option>
-          <option value="2016">2016년</option>
-          <option value="2015">2015년</option>
-        </select>
-        <select id="projStage" aria-label="진행단계 필터">
-          <option value="">진행단계 전체</option>
-          <option value="pre_mid">착수~중간보고 전</option>
-          <option value="post_mid">중간보고 완료 (후속·결과보고)</option>
-          <option value="unseen">미확인 메일 있음</option>
-        </select>
-        <span class="sp"></span>
-        <button class="sm pri" id="newProjBtn">+ 사업장 등록</button>
-      </div>
-      <div id="projectsBox"></div>
-    </div>
+    <div class="proj-split split-on" id="projSplitWrap">
+      <div class="proj-left">
+        <div class="card">
+          <div class="yr-bar" id="yearQuickBar" role="group" aria-label="연도별 빠른 필터"></div>
+          <div class="bar">
+            <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·업종·개선과제 찾기" style="flex:1;min-width:180px;max-width:300px">
+            <select id="projYear" aria-label="연도 필터">
+              <option value="">연도 전체</option>
+              <option value="2026">2026년</option>
+              <option value="2025">2025년</option>
+              <option value="2024">2024년</option>
+              <option value="2023">2023년</option>
+              <option value="2022">2022년</option>
+              <option value="2021">2021년</option>
+              <option value="2020">2020년</option>
+              <option value="2019">2019년</option>
+              <option value="2018">2018년</option>
+              <option value="2017">2017년</option>
+              <option value="2016">2016년</option>
+              <option value="2015">2015년</option>
+            </select>
+            <select id="projStage" aria-label="진행단계 필터">
+              <option value="">단계 전체</option>
+              <option value="pre_mid">착수·기초진단</option>
+              <option value="post_mid">중간보고 완료</option>
+              <option value="unseen">미확인 메일</option>
+            </select>
+            <select id="projSort" aria-label="정렬 기준">
+              <option value="year_desc">최신 연도순</option>
+              <option value="year_asc">과거 연도순</option>
+              <option value="name_asc">사업장명순</option>
+              <option value="updated_desc">최근 작업순</option>
+            </select>
+            <span class="sp"></span>
+            <button class="sm" data-act="open-year-review" title="2026~2015년 연도별 수행·보고서 현황을 한눈에 검토합니다">📑 연도별 검토표</button>
+            <button class="sm wide-only" id="toggleSplitBtn" data-act="toggle-split-review" aria-expanded="true" aria-controls="projReviewWrap" title="좌우 분할 즉시검토 패널을 접거나 폅니다">📐 검토창 접기</button>
+            <button class="sm pri" id="newProjBtn">+ 사업장 등록</button>
+          </div>
+          <div id="yearSummaryBar"></div>
+          <div id="projectsBox"></div>
+        </div>
 
-    <div class="card" id="discoverCard">
-      <div class="sec">
-        <span>🔎 정부사업일정 · 이알피 자동 발견 후보 (일터혁신 참여기업)</span>
-        <span class="chip c-blue" id="nDiscover">0</span>
-        <span class="sp"></span>
-        <span class="hint">원클릭으로 자동화 워크스페이스를 개설합니다</span>
+        <div class="card" id="discoverCard">
+          <div class="sec">
+            <span>🔎 정부사업일정 · 이알피 자동 발견 후보 (일터혁신 참여기업)</span>
+            <span class="chip c-blue" id="nDiscover">0</span>
+            <span class="sp"></span>
+            <span class="hint">원클릭으로 자동화 워크스페이스를 개설합니다</span>
+          </div>
+          <div id="discoverBox"></div>
+        </div>
       </div>
-      <div id="discoverBox"></div>
+
+      <div class="rv-sticky" id="projReviewWrap">
+        <div class="card" id="projReviewBox"></div>
+      </div>
     </div>
   </section>
 
@@ -377,7 +432,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-ilteo-report.js?v=11"></script>
 <script src="js/pu-ilteo-pptx.js?v=2"></script>
 <script src="js/pu-ilteo-pack.js?v=1"></script>
-<script src="js/pu-ilteo-view.js?v=12"></script>
+<script src="js/pu-ilteo-view.js?v=17"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){
