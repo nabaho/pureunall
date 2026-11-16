@@ -7,6 +7,13 @@
     if (ev.source !== window || ev.origin !== location.origin) return;
     var m = ev.data;
     if (!m || m.__from !== PAGE || m.__to !== EXT) return;
+    if (m.cmd === 'run-now') {
+      chrome.runtime.sendMessage({ cmd: 'run-now' }, function (r) {
+        void chrome.runtime.lastError;
+        window.postMessage({ __from: EXT, __to: PAGE, cmd: 'run-now-ack', ok: !!(r && r.ok), why: (r && r.why) || '' }, location.origin);
+      });
+      return;
+    }
     if (wait && wait.cmd === m.cmd) { var cb = wait.cb; wait = null; cb(m); }
   });
   chrome.runtime.onMessage.addListener(function (msg, sender, send) {

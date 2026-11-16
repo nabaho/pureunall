@@ -62,9 +62,17 @@ chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'guard') { guard
    판 번호로 답해야 kick.js 가 «다시 시작»을 안 한다. ⚠ 확장 «자기 화면»이 보낸 것만 받는다 —
    리멤버·푸른 탭의 다리(content script)가 보낸 말로는 돌지 않는다. */
 chrome.runtime.onMessage.addListener(function (m, s, send) {
-  if (!m || m.cmd !== 'kick' || !s || String(s.url || '').indexOf(chrome.runtime.getURL('')) !== 0) return false;
-  send({ ver: DISK_VER });
-  armIfNone(); run();
+  if (!m) return false;
+  if (m.cmd === 'kick' && s && String(s.url || '').indexOf(chrome.runtime.getURL('')) === 0) {
+    send({ ver: DISK_VER });
+    armIfNone(); run();
+    return false;
+  }
+  if (m.cmd === 'run-now' && s && s.tab && INTAKE_ANY.some(function (p) { return String(s.url || '').indexOf(p) === 0; })) {
+    send({ ok: true, running: running });
+    armIfNone(); run();
+    return false;
+  }
   return false;
 });
 /* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다
@@ -84,6 +92,18 @@ async function findOrOpen(prefix, url) {
   var hit = all.find(function (t) { return t.url && prefixes.some(function (p) { return t.url.indexOf(p) === 0; }); });
   if (hit) return hit;
   return chrome.tabs.create({ url: url, pinned: true, active: false });
+}
+/* 받는 화면 탭이 여러 개 열려 있을 때(예: 로그인 전 탭 + 로그인된 탭) 로그인된 탭을 우선 고른다 */
+async function findIntake() {
+  var all = await chrome.tabs.query({});
+  var hits = all.filter(function (t) { return t.url && INTAKE_ANY.some(function (p) { return t.url.indexOf(p) === 0; }); });
+  if (!hits.length) return chrome.tabs.create({ url: INTAKE, pinned: true, active: false });
+  if (hits.length === 1) return hits[0];
+  for (var i = 0; i < hits.length; i++) {
+    var r = await ask(hits[i].id, { cmd: 'hello' }, 1);
+    if (r && r.ready) return hits[i];
+  }
+  return hits[0];
 }
 async function waitLoaded(id, ms) {
   var t0 = Date.now();
@@ -154,7 +174,7 @@ async function run() {
   var itId = 0;
   try {
     /* ① 받는 화면 */
-    var it = await findOrOpen(INTAKE_ANY, INTAKE);
+    var it = await findIntake();
     itId = it.id;
     await waitLoaded(it.id, 60000);
     var hello = await askReady(it.id);
