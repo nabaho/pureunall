@@ -328,6 +328,8 @@
     var idx = safe.indexOf(marker);
     if (idx >= 0) {
       var bodyPart = safe.slice(idx + marker.length).trim();
+      var tailIdx = bodyPart.indexOf('5. 고충심의위원회 심의위원 확인 서명란');
+      if (tailIdx > 0) bodyPart = bodyPart.slice(0, tailIdx).trim();
       if (bodyPart) return bodyPart;
     }
     return safe;
@@ -406,21 +408,62 @@
     return root.PureunHwpx;
   }
 
-  /* ① 면담 진술확인서 (겸 비밀유지서약서) 정식 .hwpx 생성 */
-  function buildInterviewHwpx(caseRec, interviewRec) {
+  /* 세련된 상단 문서분류·표제 배너 표 (27색 팔레트 엄수) */
+  function docTopBannerTable(classBadge, mainTitle, subInfo, docNoText) {
+    return {
+      type: 'table',
+      widthRatio: 1,
+      colWidths: [72, 28],
+      rows: [
+        [
+          tCell([
+            pBlock(classBadge || '대외비 · 외부전문가 독립조사 문서', { size: 8.8, bold: true, color: '#991B1B', after: 2 }),
+            pBlock(mainTitle, { size: 15, bold: true, color: '#0F172A', after: 2 }),
+            pBlock(subInfo || '조사·자문기관: 푸른노무법인', { size: 9.2, color: '#475569', after: 0 })
+          ], { bg: '#F8FAFC', valign: 'middle' }),
+          tCell([
+            pBlock('문서관리 · 보안등급', { align: 'center', size: 8.5, bold: true, color: '#1E40AF', after: 2 }),
+            pBlock(docNoText || '인사기밀 (열람제한)', { align: 'center', size: 9.2, bold: true, color: '#1E293B', after: 1 }),
+            pBlock('무단 복제·유출 엄금', { align: 'center', size: 8.2, color: '#64748B', after: 0 })
+          ], { bg: '#EFF6FF', valign: 'middle', align: 'center' })
+        ]
+      ]
+    };
+  }
+
+  /* ① 면담 진술확인서 / 법무 문답조서 / 노동부 면담기록지 정식 .hwpx 생성 (3종 서식 지원 · 왕복 무손실 보존) */
+  function buildInterviewHwpx(caseRec, interviewRec, opts) {
     var Hx = ensureHwpxBuilder();
     var c = caseRec || {};
     var iv = interviewRec || {};
+    var o = opts || {};
+    var styleId = str(o.stmtStyle || iv.stmtStyle) || 'confirm_std';
     var cat = (C && C.CATEGORIES && C.CATEGORIES[c.category]) || { label: '직장 내 괴롭힘' };
     var roleKr = iv.role === 'accused' ? '피신고인(행위자)' : iv.role === 'witness' ? '참고인' : '신고인(피해근로자)';
     var qaList = Array.isArray(iv.qaList) ? iv.qaList.filter(function (q) { return q && (str(q.q) || str(q.a)); }) : [];
 
+    var titleByStyle = styleId === 'legal_record'
+      ? (roleKr + ' 면담 문답조서 (비밀유지서약 겸용)')
+      : styleId === 'moel_sheet'
+        ? (cat.label + ' 고충사건 면담기록지 (매뉴얼 표준)')
+        : '비밀유지서약 및 면담 진술확인서';
+    var badgeByStyle = styleId === 'legal_record'
+      ? '대외비 · 법무·외부조사단 표준 문답조서'
+      : styleId === 'moel_sheet'
+        ? '대외비 · 고용노동부 매뉴얼 별지 표준양식'
+        : '대외비 · 노무법인 표준 진술확인·서약서';
+
     var blocks = [];
-    blocks.push(pBlock('비밀유지서약 및 면담 진술확인서', { align: 'center', size: 16, bold: true, after: 8 }));
-    blocks.push(pBlock('조사 수행 기관: 푸른노무법인 · 근로기준법 제76조의3 제7항 직무상 비밀엄수 문서', { align: 'center', size: 9.5, color: '#475569', after: 10 }));
+    blocks.push(docTopBannerTable(
+      badgeByStyle,
+      titleByStyle,
+      '수행기관: 푸른노무법인 · 근로기준법 제76조의3 제7항 및 남녀고용평등법 제14조 비밀엄수 문서',
+      str(c.erpCaseNo || c.caseNo) || (str(iv.date) || '대외비 진술기록')
+    ));
+    blocks.push(pBlock('', { size: 4, after: 4 }));
 
     /* 1. 사건 및 면담 개요 표 */
-    blocks.push(pBlock('1. 사건 및 면담 개요', { size: 11.5, bold: true, before: 4, after: 4 }));
+    blocks.push(pBlock('1. 사건 및 면담 개요', { size: 11.5, bold: true, color: '#0F172A', before: 4, after: 4 }));
     blocks.push({
       type: 'table',
       widthRatio: 1,
@@ -438,54 +481,69 @@
         ],
         [
           tCell('대상자 구분', { bg: '#F1F5F9', bold: true, align: 'center' }),
-          tCell(roleKr),
+          tCell(roleKr, { bold: true }),
           tCell('성명·호칭 / 소속', { bg: '#F1F5F9', bold: true, align: 'center' }),
           tCell((str(iv.alias) || '익명') + (str(iv.dept) ? ' (' + str(iv.dept) + ')' : ''))
         ],
         [
           tCell('면담 일자', { bg: '#F1F5F9', bold: true, align: 'center' }),
           tCell(str(iv.date) || '-'),
-          tCell('면담 방식', { bg: '#F1F5F9', bold: true, align: 'center' }),
-          tCell(str(iv.method) || '대면면담')
+          tCell('면담 방식 · 양식', { bg: '#F1F5F9', bold: true, align: 'center' }),
+          tCell((str(iv.method) || '대면면담') + ' · ' + (styleId === 'legal_record' ? '문답조서형' : styleId === 'moel_sheet' ? '면담기록지형' : '진술확인서형'))
         ]
       ]
     });
 
-    /* 2. 비밀유지서약 확인 */
-    blocks.push(pBlock('2. 조사 참여자 비밀유지 서약 (근로기준법 제76조의3 제7항)', { size: 11.5, bold: true, before: 10, after: 4 }));
+    /* 2. 비밀유지서약 및 사전 고지 확인 */
+    blocks.push(pBlock('2. 조사 참여자 비밀유지 서약 및 절차 고지 확인 (근로기준법 제76조의3 제7항)', { size: 11.5, bold: true, color: '#0F172A', before: 10, after: 4 }));
     blocks.push({
       type: 'table',
       widthRatio: 1,
       colWidths: [100],
       rows: [[
         tCell([
-          pBlock('• 본인은 직장 내 괴롭힘·성희롱 사안 조사 참여자로서 조사 과정에서 알게 된 사건 내용·질문·타인의 진술·개인정보 등 일체의 비밀을 정당한 이유 없이 누설하지 않을 것을 서약합니다.', { size: 9.5, after: 2 }),
+          pBlock('• 본인은 직장 내 괴롭힘·성희롱 사안 조사 참여자로서 조사 과정에서 알게 된 사건 내용·질문·타인의 진술·개인정보 등 일체의 비밀을 정당한 이유 없이 누설하지 않을 것을 서약하며, 신고인·참고인에 대한 일체의 불이익 처우 및 2차 가해가 법령상 엄격히 금지됨을 안내받았습니다.', { size: 9.5, after: 2 }),
           pBlock('• 서약 확인 상태: ' + (iv.pledgeSigned ? '☑ 비밀유지서약 동의 및 징구 완료' : '☐ 서약 확인 대기'), { size: 9.8, bold: true, color: iv.pledgeSigned ? '#166534' : '#475569' })
         ], { bg: '#F8FAFC' })
       ]]
     });
 
-    /* 3. 녹취·면담 문답(Q&A) 조서 */
-    blocks.push(pBlock('3. 면담 문답(Q&A) 정리 내역', { size: 11.5, bold: true, before: 10, after: 4 }));
+    /* 3. 녹취·면담 문답(Q&A) 조서 (서식 스타일별 렌더링 · 왕복 파서 호환 유지) */
+    blocks.push(pBlock('3. 면담 문답(Q&A) 정리 내역', { size: 11.5, bold: true, color: '#0F172A', before: 10, after: 4 }));
     if (qaList.length) {
-      var qaRows = [[
-        tCell('순번', { bg: '#EFF6FF', bold: true, align: 'center' }),
-        tCell('질문 요지 (조사역)', { bg: '#EFF6FF', bold: true, align: 'center' }),
-        tCell('진술 답변 (진술인)', { bg: '#EFF6FF', bold: true, align: 'center' })
-      ]];
-      qaList.forEach(function (qa, idx) {
-        qaRows.push([
-          tCell(String(idx + 1), { align: 'center', valign: 'top' }),
-          tCell(str(qa.q) || '-', { valign: 'top' }),
-          tCell(str(qa.a) || '-', { valign: 'top' })
-        ]);
-      });
-      blocks.push({
-        type: 'table',
-        widthRatio: 1,
-        colWidths: [10, 34, 56],
-        rows: qaRows
-      });
+      if (styleId === 'legal_record') {
+        /* 법무·조서형 연속 문답 블록 (【문1】 / 【답1】 — tryParseStructuredInterviewText 완벽 왕복 호환) */
+        var recordBlocks = [];
+        qaList.forEach(function (qa, idx) {
+          recordBlocks.push(pBlock('【문' + (idx + 1) + '】 ' + (str(qa.q) || '진술 사항 확인'), { size: 10, bold: true, color: '#1E293B', before: idx === 0 ? 0 : 6, after: 2 }));
+          recordBlocks.push(pBlock('【답' + (idx + 1) + '】 ' + (str(qa.a) || '-'), { size: 10, color: '#0F172A', after: 3 }));
+        });
+        blocks.push({
+          type: 'table',
+          widthRatio: 1,
+          colWidths: [100],
+          rows: [[tCell(recordBlocks, { valign: 'top' })]]
+        });
+      } else {
+        var qaRows = [[
+          tCell('순번', { bg: '#EFF6FF', bold: true, align: 'center' }),
+          tCell(styleId === 'moel_sheet' ? '확인 항목 · 질문 (육하원칙)' : '질문 요지 (조사역)', { bg: '#EFF6FF', bold: true, align: 'center' }),
+          tCell(styleId === 'moel_sheet' ? '면담 진술 기록' : '진술 답변 (진술인)', { bg: '#EFF6FF', bold: true, align: 'center' })
+        ]];
+        qaList.forEach(function (qa, idx) {
+          qaRows.push([
+            tCell(String(idx + 1), { align: 'center', valign: 'top', bold: true }),
+            tCell(str(qa.q) || '-', { valign: 'top' }),
+            tCell(str(qa.a) || '-', { valign: 'top' })
+          ]);
+        });
+        blocks.push({
+          type: 'table',
+          widthRatio: 1,
+          colWidths: [10, 34, 56],
+          rows: qaRows
+        });
+      }
     } else {
       blocks.push(pBlock('(개별 문답 항목 없이 아래 진술 핵심 요지로 갈음함)', { size: 9.5, color: '#64748B' }));
     }
@@ -545,7 +603,7 @@
     return Hx.buildHwpx({ page: Hx.defaultPage(), pageNum: { pos: 'BOTTOM_CENTER', dash: true }, blocks: blocks });
   }
 
-  /* ② 최종 직장 내 괴롭힘·성희롱 조사결과보고서 정식 .hwpx 생성 (실명 원본 · 비식별 익명본 겸용, 성희롱·복합·제3자 요건 자동 분기) */
+  /* ② 최종 직장 내 괴롭힘·성희롱 조사결과보고서·법률의견서 정식 .hwpx 생성 (6대 마스터 양식 · 실명 원본 · 비식별 익명본 겸용) */
   function buildReportHwpx(caseRec, secRec, opts) {
     var Hx = ensureHwpxBuilder();
     var o = opts || {};
@@ -554,6 +612,18 @@
       : { caseRec: caseRec || {}, secretRec: secRec || {} };
     var c = pkg.caseRec || {};
     var sec = pkg.secretRec || {};
+    var tplId = (C && typeof C.normalizeTemplateId === 'function')
+      ? C.normalizeTemplateId(o.reportTemplate || c.reportTemplate || sec.reportTemplate)
+      : 'laborfirm_deep';
+    var tpl = (C && C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tplId]) || {
+      id: 'laborfirm_deep',
+      name: '전문 노무법인 심층 사실조사 표준형',
+      docClassBadge: '대외비 · 외부독립조사 보고서',
+      docTitleSuffix: '사안 외부전문가 조사결과보고서'
+    };
+    var tm = (sec.templateMeta && typeof sec.templateMeta === 'object' && sec.templateMeta[tplId] && typeof sec.templateMeta[tplId] === 'object')
+      ? sec.templateMeta[tplId]
+      : ((sec.templateMeta && typeof sec.templateMeta === 'object') ? sec.templateMeta : {});
     var cat = (C && C.CATEGORIES && C.CATEGORIES[c.category]) || { label: '직장 내 괴롭힘' };
     var subMeta = (C && C.CASE_SUBTYPES && C.CASE_SUBTYPES[str(c.caseSubType)]) || { label: '' };
     var caseSchema = (C && typeof C.getLegalSchema === 'function') ? C.getLegalSchema(c) : {
@@ -572,15 +642,67 @@
       : null;
 
     var blocks = [];
-    var mainTitle = cat.label + ' 사안 외부전문가 조사결과보고서' + (o.anonymized ? ' (비식별 익명본)' : '');
-    blocks.push(pBlock(mainTitle, { align: 'center', size: 16.5, bold: true, after: 6 }));
-    blocks.push(pBlock(
-      '작성기관: 푸른노무법인 · ' + (o.anonymized ? '열람·심의용 개인정보 비식별 처리본 · ' : '') + '대외비(' + caseSchema.lawBasis + ' 비밀엄수)',
-      { align: 'center', size: 9.5, color: '#991B1B', bold: true, after: 10 }
+    var mainTitle = cat.label + ' ' + tpl.docTitleSuffix + (o.anonymized ? ' (비식별 익명본)' : '');
+    var docRefTxt = o.anonymized
+      ? '비식별 심의·열람본'
+      : (mask(str(tm.docRefNo || tm.agendaNo || c.erpCaseNo || c.caseNo)) || '인사기밀 · 외부조사');
+    blocks.push(docTopBannerTable(
+      tpl.docClassBadge + (o.anonymized ? ' · 개인정보 비식별 처리본' : ''),
+      mainTitle,
+      '적용 양식: ' + tpl.name + ' · 수행기관: 푸른노무법인 · 근거법령: ' + caseSchema.lawBasis,
+      docRefTxt
     ));
+    blocks.push(pBlock('', { size: 4, after: 4 }));
+
+    /* 양식별 상단 Executive / 심의주문 / 경영진 요약 특화 표 */
+    if (tplId === 'lawfirm_opinion') {
+      var riskLbl = str(tm.litigationRisk) === 'high' ? '주의 (분쟁·부당징계 리스크 높음)' : str(tm.litigationRisk) === 'mid' ? '보통 (절차·양정 비례성 유의)' : '안정 (객관 물증·절차 확보)';
+      blocks.push(pBlock('▣ 법률검토 Executive Summary (결론 선제시)', { size: 11.5, bold: true, color: '#1E40AF', before: 2, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [22, 78],
+        rows: [
+          [tCell('검토 질의 요지', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(mask(str(tm.querySummary)) || (cat.label + ' 성립 여부 및 인사조치 적정성에 관한 법률 검토'))],
+          [tCell('핵심 법률의견', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(mask(str(tm.execSummary || sec.conclusion)) || verdict.label, { bold: true, color: '#0F172A' })],
+          [tCell('소송·분쟁 리스크', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(riskLbl)]
+        ]
+      });
+    } else if (tplId === 'corp_executive') {
+      var sevTxt = str(tm.severityGrade) === 'S' ? 'S등급 (Critical — 중대 비위)' : str(tm.severityGrade) === 'B' ? 'B등급 (Medium — 주의·경고)' : str(tm.severityGrade) === 'C' ? 'C등급 (Low — 불인정·종결)' : 'A등급 (High — 법 위반 인정)';
+      var lRisk = str(tm.riskLegal) === 'red' ? '고위험(적색)' : str(tm.riskLegal) === 'amber' ? '주의(황색)' : '안정(녹색)';
+      var rRisk = str(tm.riskRep) === 'red' ? '고위험(적색)' : str(tm.riskRep) === 'green' ? '안정(녹색)' : '주의(황색)';
+      blocks.push(pBlock('▣ Executive Brief — 경영진 의사결정 대시보드', { size: 11.5, bold: true, color: '#1E40AF', before: 2, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('사안 심각도 등급', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(sevTxt, { bold: true, color: '#991B1B' }), tCell('최종 판정 결론', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(verdict.label, { bold: true, color: '#1E40AF' })],
+          [tCell('법규·노동청 리스크', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(lRisk), tCell('평판·조직 리스크', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(rRisk)],
+          [tCell('경영진 3줄 핵심요약', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mask(str(tm.execKeyPoints || sec.conclusion || sec.overview)) || verdict.label, { colSpan: 3 })]
+        ]
+      });
+    } else if (tplId === 'public_committee') {
+      var ordMap = { uphold: '인용 (괴롭힘·성희롱 해당 — 가결)', partial: '일부 인용 (일부 쟁점 해당)', dismiss: '기각 (해당 없음)', reject: '각하 (심의요건 불비·취하)' };
+      blocks.push(pBlock('▣ 고충심의위원회 부의안건 및 의결 주문 표지', { size: 11.5, bold: true, color: '#1E40AF', before: 2, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [22, 28, 22, 28],
+        rows: [
+          [tCell('부의 안건번호', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(mask(str(tm.agendaNo)) || '-'), tCell('외부위원·제척 확인', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(mask(str(tm.committeeQuorum)) || (c.fairnessChecked ? '제척사유 없음 확인필' : '외부위원 참여'))],
+          [tCell('의결 주문(안)', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(ordMap[str(tm.resolutionOrder)] || verdict.label, { colSpan: 3, bold: true, color: '#1E40AF' })]
+        ]
+      });
+    } else if (tplId === 'nlrb_defense') {
+      blocks.push(pBlock('▣ 노동위원회·소송 방어용 징계정당성 3단 입증 요약', { size: 11.5, bold: true, color: '#1E40AF', before: 2, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [24, 76],
+        rows: [
+          [tCell('① 징계사유 (사실인정)', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(verdict.label + ' (전체 쟁점 ' + issues.length + '건 · 객관 호증 ' + evidences.length + '건 매핑)')],
+          [tCell('② 징계절차 (방어권 보장)', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(mask(str(tm.dueProcessNote)) || '외부전문가 공정조사 · 피신고인 소명기회 부여 및 진술서명 확인')],
+          [tCell('③ 징계양정 (비례·형평성)', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(mask(str(tm.equityNote || sec.recommendations)) || '비위 정도·반복성·2차가해 유무 및 동종 사례 형평성 종합 참작')]
+        ]
+      });
+    }
 
     /* 1. 사건 개요 표 */
-    blocks.push(pBlock('1. 사건 개요', { size: 12, bold: true, before: 4, after: 4 }));
+    blocks.push(pBlock('1. 사건 개요', { size: 12, bold: true, color: '#0F172A', before: 8, after: 4 }));
     var effDue = (C && typeof C.effectiveDueDateOf === 'function') ? C.effectiveDueDateOf(c) : str(c.dueDate);
     var catCellTxt = cat.label + (str(c.caseSubType) && subMeta.label ? ' (' + subMeta.label + ')' : '');
     var metaRows = [
@@ -601,6 +723,12 @@
         tCell(str(c.closeDate) || effDue || '진행 중')
       ]
     ];
+    if (str(tm.investTeam) || str(tm.intakeRoute)) {
+      metaRows.push([
+        tCell(tplId === 'moel_standard' ? '인지·접수 경로' : '조사단 · 조사방식', { bg: '#F1F5F9', bold: true, align: 'center' }),
+        tCell(mask(str(tm.intakeRoute || tm.investTeam)), { colSpan: 3 })
+      ]);
+    }
     if (str(c.laborOffice) || str(c.govCaseNo)) {
       metaRows.push([
         tCell('관할 노동관서', { bg: '#F1F5F9', bold: true, align: 'center' }),
@@ -715,12 +843,71 @@
       blocks.push(pBlock('등록된 개별 쟁점 행위가 없습니다.', { size: 9.8, color: '#64748B' }));
     }
 
+    /* 3-2. 진술 신빙성 5대 지표 평가표 (법무법인형·소송방어형 또는 신빙성 평가 데이터가 있을 때 수록) */
+    var hasAnyCred = issues.some(function (iss) {
+      return C && typeof C.evaluateIssueCredibility === 'function' && (C.evaluateIssueCredibility(iss).hasExplicit || str(iss.credibilityNote));
+    });
+    if (issues.length && (tplId === 'lawfirm_opinion' || tplId === 'nlrb_defense' || hasAnyCred) && C && typeof C.evaluateIssueCredibility === 'function') {
+      blocks.push(pBlock('3-2. 대법원 판례 기준 진술 신빙성(Credibility) 5대 지표 평가표', { size: 11.5, bold: true, color: '#0F172A', before: 10, after: 4 }));
+      var credRows = [[
+        tCell('쟁점 행위', { bg: '#EFF6FF', bold: true, align: 'center' }),
+        tCell('신빙성 종합', { bg: '#EFF6FF', bold: true, align: 'center' }),
+        tCell('충족 지표 (일관·구체·합리·무고부재·물증부합)', { bg: '#EFF6FF', bold: true, align: 'center' }),
+        tCell('신빙성 판단 근거', { bg: '#EFF6FF', bold: true, align: 'center' })
+      ]];
+      issues.forEach(function (iss, idx) {
+        var cr = C.evaluateIssueCredibility(iss);
+        credRows.push([
+          tCell('[' + (idx + 1) + '] ' + (mask(str(iss.title)) || '쟁점'), { valign: 'top' }),
+          tCell(cr.level, { align: 'center', bold: true, color: cr.count >= 4 ? '#166534' : cr.count >= 2 ? '#1E40AF' : '#475569' }),
+          tCell(cr.checkedLabels.length ? cr.checkedLabels.join(' · ') : '(개별 체크 전)', { align: 'center' }),
+          tCell(mask(cr.note || str(iss.evidenceNote)) || '-', { valign: 'top' })
+        ]);
+      });
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [28, 18, 26, 28], rows: credRows });
+    }
+
+    /* 3-3. 고용노동부 매뉴얼 법정의무 6대 점검표 (moel_standard 양식 선택 시 수록) */
+    if (tplId === 'moel_standard' && C && Array.isArray(C.MOEL_OBLIGATION_CHECKS)) {
+      blocks.push(pBlock('3-3. 근로기준법 제76조의3 · 남녀고용평등법 제14조 법정의무 이행 점검표', { size: 11.5, bold: true, color: '#0F172A', before: 10, after: 4 }));
+      var mcObj = (tm.moelChecks && typeof tm.moelChecks === 'object') ? tm.moelChecks : {};
+      var stepsObj = (c.steps && typeof c.steps === 'object') ? c.steps : {};
+      var moelRows = [[
+        tCell('법정의무 점검 항목', { bg: '#EFF6FF', bold: true, align: 'center' }),
+        tCell('이행 확인', { bg: '#EFF6FF', bold: true, align: 'center' })
+      ]];
+      C.MOEL_OBLIGATION_CHECKS.forEach(function (chk) {
+        var isOk = (typeof C.isMoelObligationMet === 'function')
+          ? C.isMoelObligationMet(chk.key, c, sec, tm)
+          : (mcObj[chk.key] !== undefined ? !!mcObj[chk.key] : false);
+        moelRows.push([
+          tCell(chk.label, { valign: 'top' }),
+          tCell(isOk ? '☑ 이행 완료' : '☐ 점검·이행 예정', { align: 'center', bold: isOk, color: isOk ? '#166534' : '#92400E' })
+        ]);
+      });
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [76, 24], rows: moelRows });
+    }
+
     /* 4. 조사결과보고서 상세 본문 (주의: '4. 상세 사실인정 및 종합 판단 본문' 표지는 왕복 추출기 기준점임) */
-    blocks.push(pBlock('4. 상세 사실인정 및 종합 판단 본문', { size: 12, bold: true, before: 10, after: 4 }));
-    var bodyText = mask(str(sec.reportBody)) || (C && C.assembleReportDraft ? C.assembleReportDraft(c, sec) : '');
+    blocks.push(pBlock('4. 상세 사실인정 및 종합 판단 본문', { size: 12, bold: true, color: '#0F172A', before: 10, after: 4 }));
+    var bodyText = mask(str(sec.reportBody)) || (C && C.assembleReportDraft ? C.assembleReportDraft(c, sec, tplId) : '');
     multiLineBlocks(bodyText, { size: 10.2, lineSpacing: 165, after: 3 }).forEach(function (b) {
       blocks.push(b);
     });
+
+    /* 공공기관 고충심의위 양식 선택 시 말미 심의위원 서명 확인 표 자동 첨부 */
+    if (tplId === 'public_committee' && !o.anonymized) {
+      blocks.push(pBlock('5. 고충심의위원회 심의위원 확인 서명란', { size: 11.5, bold: true, color: '#0F172A', before: 12, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 25, 25],
+        rows: [
+          [tCell('구분', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('소속 · 직위', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('성명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('서명 / 날인', { bg: '#F1F5F9', bold: true, align: 'center' })],
+          [tCell('위원장', { align: 'center', bold: true }), tCell(''), tCell(''), tCell('(서명)', { align: 'right', color: '#64748B' })],
+          [tCell('외부위원', { align: 'center' }), tCell('푸른노무법인'), tCell(''), tCell('(서명)', { align: 'right', color: '#64748B' })],
+          [tCell('내부위원', { align: 'center' }), tCell(''), tCell(''), tCell('(서명)', { align: 'right', color: '#64748B' })]
+        ]
+      });
+    }
 
     return Hx.buildHwpx({ page: Hx.defaultPage(), pageNum: { pos: 'BOTTOM_CENTER', dash: true }, blocks: blocks });
   }
@@ -884,6 +1071,48 @@
       code: 'disciplinary_pack',
       label: '인사(징계)위원회 출석통지서 · 의결서 · 징계처분통지서',
       short: '인사위 출석·의결·처분통지서',
+      stepCode: 'report',
+      docRole: 'final_report'
+    },
+    counsel_log: {
+      code: 'counsel_log',
+      label: '초기 고충 상담일지 및 잠정 보호·분리 검토서 (노동부 매뉴얼 별지)',
+      short: '초기고충 상담일지',
+      stepCode: 'intake',
+      docRole: 'intake'
+    },
+    investigator_oath: {
+      code: 'investigator_oath',
+      label: '조사위원(내·외부 공동조사단) 비밀엄수 및 공정조사 서약서',
+      short: '조사위원 비밀·공정서약서',
+      stepCode: 'plan',
+      docRole: 'pledge_protect'
+    },
+    separation_order: {
+      code: 'separation_order',
+      label: '조사기간 중 잠정 분리·보호조치(공간분리·유급휴가·재택) 인사명령서',
+      short: '잠정 분리·보호조치 명령서',
+      stepCode: 'pledge',
+      docRole: 'pledge_protect'
+    },
+    evidence_receipt: {
+      code: 'evidence_receipt',
+      label: '증거자료(녹음·메신저·물증) 제출 목록 및 원본대조 확인서',
+      short: '증거제출·원본대조 확인서',
+      stepCode: 'witness',
+      docRole: 'witness_evid'
+    },
+    legal_opinion_short: {
+      code: 'legal_opinion_short',
+      label: '단독 법률검토의견서 (징계양정 적정성 · 법적 리스크 자문서)',
+      short: '단독 법률검토의견서',
+      stepCode: 'review',
+      docRole: 'final_report'
+    },
+    committee_minutes: {
+      code: 'committee_minutes',
+      label: '고충심의위원회(인사위원회) 심의 회의록 및 의결서 표준양식',
+      short: '고충심의위 회의록·의결서',
       stepCode: 'report',
       docRole: 'final_report'
     }
@@ -1320,6 +1549,163 @@
         ]
       });
 
+    } else if (kind === 'counsel_log') {
+      /* 초기 고충 상담일지 및 잠정 보호·분리 검토서 (고용노동부 매뉴얼 별지 제1호 스타일) */
+      blocks.push(docTopBannerTable('대외비 · 고용노동부 매뉴얼 별지 표준양식', cat.label + ' 초기 고충 상담일지 및 처리방안 검토서', '접수·상담기관: ' + coName + ' / 푸른노무법인 (' + mgrLabel + ')', issueDate));
+      blocks.push(pBlock('1. 상담 접수 및 내담자 인적사항', { size: 11.5, bold: true, before: 8, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('상담 일시', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mask(str(o.meetWhen)) || issueDate), tCell('상담 방식', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mask(str(o.meetWhere)) || '대면 / 유선 / 온라인')],
+          [tCell('내담자 성명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetName || '(익명 상담 가능)'), tCell('소속 / 직위', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetDept || '-')],
+          [tCell('피신고 지목인', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('(성명·직위·업무상 관계 기재)', { colSpan: 3 })]
+        ]
+      });
+      blocks.push(pBlock('2. 고충 호소 요지 및 희망 처리 절차 확인', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [24, 76],
+        rows: [
+          [tCell('고충 상담 요지\n(육하원칙)', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(customNote || '• 발생 일시·장소:\n• 구체적 언행 내용:\n• 현재 고충 및 피해 상태:\n• 보유 증거(녹음·메신저·목격자 등):')],
+          [tCell('내담자 희망 절차', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('☐ 정식 사실조사 착수 요청     ☐ 당사자 분리·약식 조정 희망     ☐ 상담 기록만 유지(보류)')],
+          [tCell('즉시 잠정 보호조치\n검토 (제76조의3 제3항)', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell('☐ 근무장소 임시 분리   ☐ 유급휴가·재택근무 부여   ☐ 업무보고선 임시 변경   ☐ 해당 없음')]
+        ]
+      });
+      blocks.push(pBlock('3. 상담원(조사역) 안내 및 확인 서명', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [25, 75],
+        rows: [
+          [tCell('법정 고지 확인', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('☑ 비밀유지 의무(제76조의3 제7항) 및 신고·상담에 따른 불리한 처우 금지(제6항) 안내 완료')],
+          [tCell('상담자 확인', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mgrLabel + '   (서명 또는 인)', { align: 'right' })]
+        ]
+      });
+
+    } else if (kind === 'investigator_oath') {
+      /* 조사위원(내·외부 공동조사단) 비밀엄수 및 공정조사 서약서 */
+      blocks.push(docTopBannerTable('대외비 · 조사단 공정성·기밀성 담보 문서', '내·외부 조사위원 비밀엄수 및 공정조사 서약서', '대상 사건: ' + coName + ' — ' + caseTitle, issueDate));
+      blocks.push(pBlock('1. 서약 조항 (' + lawBasis + ')', { size: 11.5, bold: true, before: 8, after: 4 }));
+      var oathTxt = customNote || [
+        '1. [독립·공정 조사] 본인은 어느 일방 당사자에게도 치우침 없이 객관적 증거와 법리에 입각하여 중립적·공정하게 사실조사를 수행하겠습니다.',
+        '2. [제척·회피 확인] 본인은 신고인 또는 피신고인과 친족, 직속 이해관계 등 조사의 공정성을 해할 우려가 있는 사유가 없음을 확인하며, 사유 발생 시 즉시 회피하겠습니다.',
+        '3. [직무상 비밀엄수] 조사 과정에서 지득한 당사자 인적사항, 진술 내용, 녹취록, 호증 등 일체의 기밀을 조사 목적 외에 사용하거나 제3자에게 누설하지 않겠습니다(위반 시 과태료 및 민·형사 책임 감수).',
+        '4. [2차 피해 방지] 면담 진행 시 피해자 비난·합의 강요·예단 발언 등 2차 피해를 유발할 수 있는 언동을 엄격히 금하겠습니다.'
+      ].join('\n\n');
+      blocks.push({ type: 'table', widthRatio: 1, colWidths: [100], rows: [[tCell(oathTxt, { bg: '#F8FAFC', valign: 'top' })]] });
+      blocks.push(pBlock('서약 일자:  ' + issueDate, { align: 'center', size: 11, bold: true, before: 12, after: 6 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 25, 25],
+        rows: [
+          [tCell('구분', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('소속 · 직위', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('성명', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('자필 서명', { bg: '#EFF6FF', bold: true, align: 'center' })],
+          [tCell('책임 조사위원', { align: 'center', bold: true }), tCell('푸른노무법인'), tCell(mgrLabel), tCell('(서명)', { align: 'right', color: '#64748B' })],
+          [tCell('공동 조사위원', { align: 'center' }), tCell(targetDept || '푸른노무법인 / 사내 간사'), tCell(targetName || ''), tCell('(서명)', { align: 'right', color: '#64748B' })]
+        ]
+      });
+
+    } else if (kind === 'separation_order') {
+      /* 조사기간 중 잠정 분리·보호조치 인사명령 통지서 (근기법 제76조의3 제3항) */
+      blocks.push(docTopBannerTable('인사대외비 · 조사기간 중 잠정조치 명령', '조사기간 중 당사자 잠정 분리·보호조치 통지서', '발신: ' + coName + ' 인사권자 · 자문: 푸른노무법인', issueDate));
+      blocks.push(pBlock('1. 통지 대상 및 조치 내역', { size: 11.5, bold: true, before: 8, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [22, 28, 22, 28],
+        rows: [
+          [tCell('대상자 성명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetName || '(성명 기재)'), tCell('소속 / 직위', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetDept || '-')],
+          [tCell('조치 적용 기간', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(issueDate + ' ~ 조사 종결 및 후속조치 확정 시까지', { colSpan: 3 })],
+          [tCell('잠정 조치 내용', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(customNote || '• 근무장소 임시 분리 배치 / 재택근무 전환 / 유급휴가(대기) 부여\n• 업무 지시·보고 라인 임시 조정 (직접 대면·유선·메신저 접촉 일체 금지)', { colSpan: 3 })]
+        ]
+      });
+      blocks.push(pBlock('2. 법적 성격 및 준수 유의사항', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [100],
+        rows: [[tCell('• 본 조치는 ' + lawBasis + '에 의거하여 객관적인 사실조사 및 당사자 보호·2차 피해 방지를 위해 시행하는 잠정적 보호·예방 조치이며, 징계처분이 아닙니다.\n• 조사 종결 전까지 상대방 당사자 및 참고인에 대한 사적 연락, 사건 언급, 소문 유포, 합의 종용 행위를 엄격히 금합니다.', { bg: '#F8FAFC' })]]
+      });
+
+    } else if (kind === 'evidence_receipt') {
+      /* 증거자료 제출 목록 및 원본대조 확인서 */
+      blocks.push(docTopBannerTable('대외비 · 조사 증거물 무결성 확인서', '증거자료(호증) 제출 목록 및 원본대조 확인서', '사건명: ' + caseTitle + ' · 수행기관: 푸른노무법인', issueDate));
+      blocks.push(pBlock('1. 제출인 정보', { size: 11.5, bold: true, before: 8, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('제출인 성명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetName || '-'), tCell('당사자 구분', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(o.targetRole === 'accused' ? '피신고인 측(을호증)' : o.targetRole === 'witness' ? '참고인(참고자료)' : '신고인 측(갑호증)')],
+          [tCell('제출 일자', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(issueDate), tCell('소속 / 직위', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(targetDept || '-')]
+        ]
+      });
+      blocks.push(pBlock('2. 제출 증거 목록 및 원본 대조', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [16, 22, 38, 24],
+        rows: [
+          [tCell('호증 번호', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('자료 형태·생성일', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('자료 명칭 및 입증 취지', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('원본대조 확인', { bg: '#EFF6FF', bold: true, align: 'center' })],
+          [tCell('제1호증', { align: 'center', bold: true }), tCell('녹음 / 캡처 / 문서'), tCell(customNote || '(제출 자료 명칭 및 입증하고자 하는 사실 요지 기재)'), tCell('☐ 원본대조필', { align: 'center' })],
+          [tCell('제2호증', { align: 'center', bold: true }), tCell(''), tCell(''), tCell('☐ 원본대조필', { align: 'center' })],
+          [tCell('제3호증', { align: 'center', bold: true }), tCell(''), tCell(''), tCell('☐ 원본대조필', { align: 'center' })]
+        ]
+      });
+      blocks.push(pBlock('3. 진정성립(무편집·무위조) 서약 및 확인 서명', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [100],
+        rows: [[tCell('본인이 제출한 위 증거자료는 인위적인 편집·짜깁기·위변조가 없는 원본(또는 원본과 상위 없는 사본)임을 확인합니다.\n\n제출인:  ' + (targetName || '                ') + '  (서명)      /      원본대조 확인 조사역:  ' + mgrLabel + '  (서명)', { bg: '#F8FAFC' })]]
+      });
+
+    } else if (kind === 'legal_opinion_short') {
+      /* 단독 법률검토의견서 (징계양정 적정성 · 법적 리스크 자문서 — 법무·노무법인 자문 양식) */
+      blocks.push(docTopBannerTable('극비(Confidential) · 인사노무 법률검토의견서', cat.label + ' 관련 인사조치 및 법적 리스크 검토의견서', '수신: ' + coName + ' 대표이사 · 발신: 푸른노무법인 (' + mgrLabel + ')', issueDate));
+      blocks.push(pBlock('Ⅰ. 질의 요지 및 핵심 검토 결론 (Executive Summary)', { size: 11.5, bold: true, color: '#1E40AF', before: 8, after: 4 }));
+      var issList = Array.isArray(o.issues) ? o.issues : [];
+      var recIssCnt = issList.filter(function (x) { return x && (x.verdict === 'yes' || (C && C.judgeIssue && C.judgeIssue(x) === 'yes')); }).length;
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [22, 78],
+        rows: [
+          [tCell('검토 사안', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(caseTitle + ' (' + lawBasis + ')')],
+          [tCell('사실조사 요약', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell(vObj.label + ' (검토 쟁점 총 ' + issList.length + '건 중 성립 인정 ' + recIssCnt + '건)', { bold: true, color: '#0F172A' })],
+          [tCell('자문 결론 요지', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(customNote || mask(str(o.recommendations)) || '인정된 비위 행위의 정도·반복성·2차 가해 유무를 종합할 때 사규상 징계사유가 성립하며, 피해근로자 사전 의견청취 절차를 거쳐 비례원칙에 부합하는 인사조치를 시행함이 타당합니다.')]
+        ]
+      });
+      blocks.push(pBlock('Ⅱ. 부당징계·재진정 예방을 위한 4대 적법절차 체크포인트', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [26, 74],
+        rows: [
+          [tCell('① 피해자 사전 의견청취', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('징계·배치전환 등 행위자 조치 전 반드시 피해근로자의 의견을 서면·전자서명으로 청취하여 보존할 것 (근기법 제76조의3 제5항)')],
+          [tCell('② 인사위원회 소명 보장', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('취업규칙상 출석통지 기한(통상 3~7일 전) 준수 및 혐의사실을 구체적으로 특정하여 방어권을 보장할 것')],
+          [tCell('③ 징계양정 형평성 확보', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('사내 양정기준표 및 과거 동종 사례와 현저한 불균형이 없도록 가중·감경 사유를 의결서에 명시할 것')],
+          [tCell('④ 불이익처우·비밀 관리', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('처분 통지 시 서면 사유 명시 및 종결 후 신고인·참고인에 대한 보복성 인사조치 여부 모니터링 실시')]
+        ]
+      });
+
+    } else if (kind === 'committee_minutes') {
+      /* 고충심의위원회(인사위원회) 심의 회의록 및 의결서 표준양식 */
+      blocks.push(docTopBannerTable('대외비 · 고충심의위원회 공식 심의기록', cat.label + ' 고충심의위원회 심의 회의록 및 의결서', '기관·사업장명: ' + coName + ' · 자문: 푸른노무법인', issueDate));
+      blocks.push(pBlock('1. 회의 소집 및 성원 확인', { size: 11.5, bold: true, before: 8, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 20, 30],
+        rows: [
+          [tCell('개최 일시', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mask(str(o.meetWhen)) || issueDate), tCell('개최 장소', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(mask(str(o.meetWhere)) || '대회의실 (비공개)')],
+          [tCell('심의 안건명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell(caseTitle + ' 심의·의결의 건', { colSpan: 3 })],
+          [tCell('외부위원·정족수', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('재적위원 ___인 중 출석 ___인 (외부전문가 ' + mgrLabel + ' 포함 · 제척사유 없음 확인)', { colSpan: 3 })]
+        ]
+      });
+      blocks.push(pBlock('2. 조사결과 보고 청취 및 주요 심의 요지', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [100],
+        rows: [[tCell(customNote || '• 외부전문가 조사결과보고서 핵심 요지 보고 청취\n• 쟁점별 사실인정 및 법정 요건(' + lawBasis + ') 충족 여부 질의·토론\n• 피해근로자 보호조치 의견 및 행위자 조치 수위 심의', { valign: 'top' })]]
+      });
+      blocks.push(pBlock('3. 의결 주문 및 참석 위원 서명', { size: 11.5, bold: true, before: 10, after: 4 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [22, 78],
+        rows: [
+          [tCell('심의 의결 주문', { bg: '#EFF6FF', bold: true, align: 'center' }), tCell('☐ 직장 내 괴롭힘·성희롱 해당(인용)    ☐ 일부 해당(일부인용)    ☐ 비해당(기각)', { bold: true })],
+          [tCell('후속조치 건의', { bg: '#F8FAFC', bold: true, align: 'center' }), tCell(mask(str(o.recommendations)) || '피해근로자 분리·보호조치 유지 및 인사위원회 회부·재발방지 교육 권고')]
+        ]
+      });
+      blocks.push(pBlock('', { size: 4, after: 2 }));
+      blocks.push({
+        type: 'table', widthRatio: 1, colWidths: [20, 30, 25, 25],
+        rows: [
+          [tCell('직책', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('소속', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('성명', { bg: '#F1F5F9', bold: true, align: 'center' }), tCell('서명 / 날인', { bg: '#F1F5F9', bold: true, align: 'center' })],
+          [tCell('위원장', { align: 'center', bold: true }), tCell(coName), tCell(''), tCell('(서명)', { align: 'right', color: '#64748B' })],
+          [tCell('외부위원', { align: 'center' }), tCell('푸른노무법인'), tCell(mgrLabel), tCell('(서명)', { align: 'right', color: '#64748B' })],
+          [tCell('위원 / 간사', { align: 'center' }), tCell(coName), tCell(''), tCell('(서명)', { align: 'right', color: '#64748B' })]
+        ]
+      });
+
     } else {
       /* measure_rec: 피해근로자 보호조치 및 사후 조치 권고 공문 */
       blocks.push(pBlock(cat.label + ' 사안 사업주 법정의무 및 후속조치 권고 공문', { align: 'center', size: 16, bold: true, after: 6 }));
@@ -1359,6 +1745,63 @@
     return Hx.buildHwpx({ page: Hx.defaultPage(), pageNum: { pos: 'BOTTOM_CENTER', dash: true }, blocks: blocks });
   }
 
+  /* ④ 마스터 보고서 양식 6종 견본(빈 표준양식) .hwpx 즉시 생성 */
+  function buildTemplateSampleHwpx(templateId, optCategory) {
+    var tplKey = (C && typeof C.normalizeTemplateId === 'function') ? C.normalizeTemplateId(templateId) : 'laborfirm_deep';
+    var catKey = (optCategory === 'sexual' || optCategory === 'both') ? optCategory : 'harass';
+    var sampleCase = {
+      id: 'sample_' + tplKey,
+      companyName: '(의뢰 사업장명 기재)',
+      title: '직장 내 괴롭힘·성희롱 사안 외부전문가 조사 (표준 양식 견본)',
+      category: catKey,
+      caseSubType: 'internal',
+      reportTemplate: tplKey,
+      receiveDate: '2026-00-00',
+      dueDate: '2026-00-00',
+      fairnessChecked: true,
+      verdictSummary: 'hold'
+    };
+    var sampleSec = {
+      reportTemplate: tplKey,
+      overview: '(신고 접수 일자, 접수 경로, 당사자 직급·업무 관계 및 조사 착수 범위를 기재합니다)',
+      companyRuleQuote: '(의뢰 사업장 취업규칙·인사규정·인권경영지침 중 괴롭힘·성희롱 금지 및 징계 조항을 인용합니다)',
+      conclusion: '(쟁점별 사실인정 및 법리 포섭 결과를 종합한 최종 판단 의견을 기재합니다)',
+      recommendations: '(피해근로자 사전 의견청취 후 분리·보호조치, 행위자 인사조치, 재발방지 교육 계획을 기재합니다)',
+      interviews: [
+        { id: 's_iv1', role: 'victim', alias: '신고인 (성명·직위)', dept: '소속부서', date: '2026-00-00', method: '대면면담', pledgeSigned: true, stmtSigned: true, summary: '(신고인의 주요 피해 주장 일시·장소·내용·요구사항 요지)' },
+        { id: 's_iv2', role: 'accused', alias: '피신고인 (성명·직위)', dept: '소속부서', date: '2026-00-00', method: '대면면담', pledgeSigned: true, stmtSigned: true, summary: '(피신고인의 업무상 필요성 해명 및 반박 소명 요지)' },
+        { id: 's_iv3', role: 'witness', alias: '참고인 (성명·직위)', dept: '소속부서', date: '2026-00-00', method: '대면면담', pledgeSigned: true, stmtSigned: false, summary: '(목격 정황 및 평소 조직 분위기에 관한 제3자 객관 진술 요지)' }
+      ],
+      evidences: [
+        { id: 's_ev1', side: 'gap', exhibitNo: '갑 제1호증', date: '2026-00-00', submitter: '신고인 측', title: '고충 신고서 및 메신저·녹취 자료', summary: '당시 발언 정황 입증' },
+        { id: 's_ev2', side: 'eul', exhibitNo: '을 제1호증', date: '2026-00-00', submitter: '피신고인 측', title: '업무 지시 이메일 및 소명서', summary: '업무상 경위 소명' }
+      ],
+      issues: [
+        {
+          id: 's_is1',
+          lawType: catKey === 'sexual' ? 'sexual' : 'harass',
+          title: '제1쟁점 행위명 (발생 일시 · 장소 기재)',
+          whenWhere: '2026-00-00 회의실',
+          claimVictim: '(신고인 주장 요지)',
+          claimAccused: '(피신고인 소명 요지)',
+          evidenceNote: '(갑/을 호증 및 참고인 진술 대조 결과)',
+          credibility: { consistency: true, specificity: true, rationality: true, noMotive: true, corroboration: true },
+          credibilityNote: '(일관성·구체성·물증 부합 여부 검토 의견)',
+          factStatus: 'hold',
+          elemSuperiority: 'hold',
+          elemBeyondScope: 'hold',
+          elemHarm: 'hold',
+          verdict: 'hold'
+        }
+      ],
+      templateMeta: {}
+    };
+    sampleSec.reportBody = (C && typeof C.assembleReportDraft === 'function')
+      ? C.assembleReportDraft(sampleCase, sampleSec, tplKey)
+      : '';
+    return buildReportHwpx(sampleCase, sampleSec, { reportTemplate: tplKey });
+  }
+
   return {
     OFFICIAL_DOC_TYPES: OFFICIAL_DOC_TYPES,
     extractDocumentText: extractDocumentText,
@@ -1366,6 +1809,7 @@
     buildInterviewHwpx: buildInterviewHwpx,
     buildReportHwpx: buildReportHwpx,
     buildEvidenceTimelineHwpx: buildEvidenceTimelineHwpx,
-    buildOfficialDocHwpx: buildOfficialDocHwpx
+    buildOfficialDocHwpx: buildOfficialDocHwpx,
+    buildTemplateSampleHwpx: buildTemplateSampleHwpx
   };
 });
