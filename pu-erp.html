@@ -21316,6 +21316,13 @@ function erpStagePartsFromQuote(req){
   var r = req || {};
   return [{ where:'subject', text:r.subject }, { where:'atts', text:(Array.isArray(r.atts) ? r.atts : []).join(' ') }];
 }
+/* E — 이미 있는 계약 «다시 읽기»: 계약에 «이미 적혀 있는» 글만(원본 서류 이름 · 업무 요약 · 메모).
+   ⚠ 서류 파일(한글·PDF)을 새로 열어 읽지 않는다 — 그건 AI·OCR 이 필요해 따로다. 일지·금액·근로자·업체 칸도 안 본다. */
+function erpStagePartsFromSaved(f, cur){
+  var x = f || {}, c = cur || {};
+  return [{ where:'docName', text:(x.srcPhoto && x.srcPhoto.name) || (c.srcPhoto && c.srcPhoto.name) },
+    { where:'scope', text:x.briefs && x.briefs.case }, { where:'memo', text:x.note }];
+}
 /* 카드·표에 그릴 칩 글 — 다시 안 띄우기로 한 단계는 뺀다. 없으면 null */
 function erpStageChipInfo(c){
   var S = window.PuCaseStage;
@@ -21334,11 +21341,12 @@ function erpStageChip(c){
 }
 /* 계약 창 «⚖ 심급·단계» 줄 — 읽은 것이 있을 때만 그린다(평소 계약 창은 그대로).
    opts: 이 사건 유형에서 고를 수 있는 단계 목록(caseStageOpts) — «현재 단계로»·«단계 추가»는 이 안에서만 */
-function erpStageBox(f, setF, opts){
+function erpStageBox(f, setF, opts, cur){
   var S = window.PuCaseStage;
   if(!S || !f) return null;
   var marks = S.clean(f.stageMarks);
-  if(!marks.length) return null;
+  var canRead = !!(cur && cur.id);   // E — 저장된 계약만 «다시 읽기». 새 계약·읽은 것도 없고 저장도 안 됐으면 줄이 없다
+  if(!marks.length && !canRead) return null;
   var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
   var allowed = (opts || []).map(function(st){ return st && st.code; });
   function put(code, state){
@@ -21347,11 +21355,24 @@ function erpStageBox(f, setF, opts){
   function btn(label, title, on, kind){
     return h('button', { type:'button', className:'stg-b' + (kind ? ' ' + kind : ''), title:title, onClick:on }, label);
   }
+  /* 눌렀을 때만 — 읽어서 «새 단계만» 확인 필요(auto)로 더한다. 사람이 정한 상태·stageCode·상태·금액은 안 건드린다.
+     저장은 계약 창의 «저장»으로(여느 고침과 같다) */
+  function readNow(){
+    var found = S.detect(erpStagePartsFromSaved(f, cur), { kinds:f.kinds });
+    var r = S.merge(f.stageMarks, found, { now:Date.now(), srcDoc:'계약 글 다시 읽기' });
+    if(!r.added.length){
+      showToast(found.length ? '새로 읽은 단계가 없습니다 — 이미 표에 있습니다' : '계약에 적힌 글(서류 이름·업무 요약·메모)에서 심급·단계 낱말을 찾지 못했습니다');
+      return;
+    }
+    setF(function(prev){ return Object.assign({}, prev, { stageMarks:r.marks }); });
+    showToast('⚖ ' + r.added.length + '개 단계를 읽었습니다 — «확인 필요»입니다. ☑ 로 확인해 주세요(저장하면 남습니다)');
+  }
   var have = {};
   marks.forEach(function(m){ have[m.code] = 1; });
   var addable = (opts || []).filter(function(st){ return st && !have[st.code]; });
   return h('div', { className:'pu-krow pu-stgrow' },
     h('span', { className:'stg-lbl', title:'계약서·메일에서 읽은 심급·단계입니다. 기계가 읽은 것은 «확인 필요» — ☑ 해야 확인한 단계가 됩니다.' }, '⚖ 심급·단계'),
+    !marks.length && h('span', { className:'stg-st' }, '읽은 단계 없음'),
     marks.map(function(m){
       var inf = S.info(m.code) || { short:m.code, name:m.code };
       var ck = m.state === 'checked', no = m.state === 'dismissed';
@@ -21366,6 +21387,8 @@ function erpStageBox(f, setF, opts){
         ck && f.stageCode === m.code && h('span', { className:'stg-cur', title:'현재 단계로 지정됨' }, '현재'),
         !no && m.evidence && h('span', { className:'stg-ev', title:'읽은 글: ' + m.evidence + (m.srcDoc ? '\n(' + m.srcDoc + ')' : '') }, '「' + m.evidence + '」'));
     }),
+    canRead && btn(marks.length ? '다시 읽기' : '계약 글에서 읽어 보기', '이 계약에 이미 적힌 글(서류 이름·업무 요약·메모)에서 심급·단계를 읽어 «확인 필요»로 더합니다. 서류 파일은 열지 않습니다',
+      readNow),
     addable.length > 0 && h('select', { className:'stg-add', value:'', 'aria-label':'심급·단계 직접 추가', title:'계약서에서 못 읽은 단계를 직접 더합니다(확인함으로 들어갑니다)',
       onChange:function(e){ var c = e.target.value; if(c) put(c, 'checked'); } },
       h('option', { value:'' }, '＋ 단계 추가'),
@@ -24954,7 +24977,7 @@ function ContractModal(props){
                   vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '성공보수'))
               ),
               /* 📌 읽은 심급·단계가 있을 때만 — 평소 계약 창은 그대로(erpStageBox) */
-              isCase && erpStageBox(f, setF, caseStageOpts),
+              isCase && erpStageBox(f, setF, caseStageOpts, props.cur),
               /* ↪ ☑ 한 단계의 다음 단계를 «후속 계약 후보»로 — 저장된 계약(props.cur)에서만, 누르면 후속 계약 창이 열린다(erpStageNextRow) */
               isCase && erpStageNextRow(props.cur, dbGet('contracts', []) || [], caseStageOpts, function(nx){ erpStageGoFollowup(props.cur, nx, props.onClose); }),
               /* ─── 줄 2 (컨설팅만): 일수 계산 + 잔금 — «다른 이야기」라 한 줄로 안 합친다.
