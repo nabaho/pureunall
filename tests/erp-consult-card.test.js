@@ -541,3 +541,51 @@ test('⑩ 확정 이력 — 두 모아 보기는 걸러 내기 전 목록으로 
   assert.ok(FL.indexOf('(_payerDiffN>0 || payerOnly) && h(') >= 0 && FL.indexOf('(_gapN>0 || gapOnly) && h(') >= 0, '켜 둔 단추는 사라지지 않는다');
   assert.ok(FL.indexOf("flexWrap:'wrap'}},\n            h('input',{type:'search'") >= 0, '검색 줄이 좁은 화면에서 접힌다');
 });
+
+/* ───────── ⑪ 3차 검토 반영 — 입금이 물러지기 «전에» 어디서 실패해도 상담접수를 원래대로 ───────── */
+function undoFailCtx(over) {
+  const orig = [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', amount: 1, fromApproved: true }];
+  const fi = { id: 'fi-9', kind: '상담료', date: '2026-11-17', consultId: 'ct-1', consultPayId: 'cp-1', perfShares: [{ sid: 'P-1', amount: 100 }] };
+  const u = undoCtx([{ id: 'ct-1', consultPayments: orig }], [fi]);
+  Object.assign(u.c, over || {});
+  return { u, fi, orig };
+}
+test('⑪ 입금 저장이 «예외»를 던져도 상담접수를 원래대로 돌려놓는다 — 입금은 살아 있는데 결제만 입금 전으로 남지 않게', () => {
+  const { u, fi, orig } = undoFailCtx();
+  u.c.dbPatch = (store, id, p) => { u.patches.push({ store, id, p }); if (store === 'finance_income') throw new Error('끊김'); return true; };
+  assert.equal(u.c.erpUndoIncome(fi), false);
+  const cps = u.patches.filter((p) => p.store === 'contracts');
+  assert.equal(cps.length, 2, '고쳤다가 되돌려 놓았다');
+  assert.equal(cps[1].p.consultPayments, orig);
+});
+
+test('⑪ 마감월 성과 조정(erpRoutePerfDelta)이 예외를 던지거나 실패해도 같다', () => {
+  for (const kind of ['throw', 'failed']) {
+    const { u, fi, orig } = undoFailCtx();
+    u.c.erpPerfLockInfo = () => ({ locked: true, ym: '2026-10' });
+    u.c.erpRoutePerfDelta = () => { if (kind === 'throw') throw new Error('끊김'); return { failed: true }; };
+    assert.equal(u.c.erpUndoIncome(fi), false, kind);
+    assert.equal(u.patches.filter((p) => p.store === 'finance_income').length, 0, '입금은 안 건드렸다 ' + kind);
+    const cps = u.patches.filter((p) => p.store === 'contracts');
+    assert.equal(cps.length, 2, kind);
+    assert.equal(cps[1].p.consultPayments, orig, kind);
+  }
+});
+
+test('⑪ 상담접수를 «원래대로 돌려놓기»도 실패하면 조용히 두지 않고 알린다', () => {
+  const { u, fi } = undoFailCtx();
+  let n = 0;
+  u.c.dbPatch = (store, id, p) => { u.patches.push({ store, id, p }); if (store === 'contracts') { n++; return n === 1; } return false; };   // 상담접수 1번째 성공 → 입금 실패 → 돌려놓기 실패
+  assert.equal(u.c.erpUndoIncome(fi), false);
+  assert.ok(u.toasts.some((t) => /돌려놓지 못했습니다/.test(t) && /직접 확인/.test(t)), '실패를 사용자에게 드러낸다');
+});
+
+test('⑪ 입금이 이미 물러진 «뒤»의 예외로는 상담접수를 되돌려 놓지 않는다(되돌린 입금과 결제가 어긋나면 안 된다)', () => {
+  const { u, fi } = undoFailCtx();
+  u.c.erpIncomeSourceStore = () => { throw new Error('원본 저장소 이름을 못 구함'); };
+  const fi2 = Object.assign({}, fi, { sourceId: 'co-1', sourceKind: 'company', perfShares: [] });
+  u.c.erpUndoIncome(fi2);
+  const cps = u.patches.filter((p) => p.store === 'contracts');
+  assert.equal(cps.length, 1, '입금이 물러진 뒤에는 상담접수를 그대로 둔다(고친 채로)');
+  assert.equal(cps[0].p.consultPayments[0].status, 'approved');
+});
