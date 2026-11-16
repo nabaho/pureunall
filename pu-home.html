@@ -2534,14 +2534,49 @@ function refuseIfPageConfigUnread() {
   return true;
 }
 
+/* 홈페이지 «머리 메뉴»에는 있는데 관리 목록에는 없는 주요업무 쪽 — 「＋ 쪽 추가」가 미리 채울 후보.
+   (2026-11-16 대표 「니가직접 모두해라」 — 새 쪽 work6 「AI 인사노무 시스템」을 손으로 치지 않게)
+   ★ 후보를 «내놓기만» 한다. 저장은 사람이 「추가」를 눌러야 한다 — 일부러 분리해 둔 쪽을 저절로 되살리지 않게.
+   ★ PC 머리 메뉴의 칸(uphover:bh_bg_color_main)만 본다. 인사말·구성원·자문사·오시는길·공지·개인정보처리방침은
+     주요업무가 아니라 뺀다. 같은 쪽이 두 번 나오면(사내 공동근로복지기금 → 사내근로복지기금) 뒤의 작은 이름을 쓴다. */
+function 메뉴새쪽(html, cfg) {
+  const 있음 = cfg || {};
+  const 뺄것 = { inquiry: 1, greeting: 1, people: 1, partner: 1, notice: 1, privacy: 1 };
+  const re = /<a class="uphover:bh_bg_color_main" href="(?:\.\.\/)*([a-z0-9_]{1,30})\/">([^<]{1,40})<\/a>/g;
+  const 차례 = [], 이름 = {};
+  let m;
+  while ((m = re.exec(String(html || '')))) {
+    const mid = m[1], label = m[2].trim();
+    if (뺄것[mid] || 있음[mid] || !label) continue;
+    if (!(mid in 이름)) 차례.push(mid);
+    이름[mid] = label;
+  }
+  return 차례.map(mid => ({ mid: mid, label: 이름[mid] }));
+}
+
 /* 「＋ 쪽 추가」 — 홈페이지에 «먼저» 쪽이 있어야 한다. 없는 이름을 넣으면 대조에서
-   「홈페이지를 읽지 못함」으로 뜰 뿐, 자료가 망가지지는 않는다. */
+   「홈페이지를 읽지 못함」으로 뜰 뿐, 자료가 망가지지는 않는다.
+   ★ (2026-11-16) 새 사이트 메뉴에서 찾은 후보(메뉴새쪽)를 두 칸에 미리 채운다 — 못 읽으면 예전처럼 빈 칸.
+     함수 안에서는 상수·새 함수를 typeof 로 읽는다(검사 상자에 없어도 죽지 않게 — OLD_SITE_OFF 머리말). */
 async function addPage() {
   if (refuseIfPageConfigUnread()) return;
+  let 후보 = [];
+  try {
+    if (typeof 메뉴새쪽 === 'function' && typeof 새사이트쪽읽기 === 'function'
+        && typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true) {
+      후보 = 메뉴새쪽(await 새사이트쪽읽기(''), App.pageConfig);
+    }
+  } catch (e) {
+    후보 = [];                                    // 못 읽은 것은 «후보 없음» — 손으로 적으면 된다
+  }
   const asked = await askText('＋ 쪽 추가 — 홈페이지 쪽 이름',
-    '주소 전체가 아니라 «쪽 이름»만 적습니다 — 예: <b>work6</b><br>'
+    (후보.length
+      ? '홈페이지 메뉴에는 있는데 목록에 없는 쪽: '
+        + 후보.map(x => '<b>' + esc(x.mid) + '</b>(' + esc(x.label) + ')').join(', ') + '<br>'
+      : '')
+    + '주소 전체가 아니라 «쪽 이름»만 적습니다 — 예: <b>work6</b><br>'
     + '영문 소문자·숫자·밑줄만, 30자까지입니다.',
-    { rows: 1, hint: 'work6', ok: '다음' });
+    { rows: 1, hint: 'work6', ok: '다음', value: 후보.length ? 후보[0].mid : '' });
   if (asked === null) return;                 // 스스로 그만두었다 — 조용히 닫는다
   const raw = String(asked).trim();
   if (!raw) { await say('쪽을 추가하지 않았습니다', '쪽 이름을 적지 않으셨습니다.'); return; }
@@ -2557,9 +2592,10 @@ async function addPage() {
     await say('이미 관리 목록에 있습니다', '「' + esc(mid) + '」 은(는) 이미 목록에 들어 있습니다.');
     return;
   }
+  const 메뉴이름 = (후보.filter(x => x.mid === mid)[0] || {}).label || '';
   const askedLabel = await askText('화면에 보일 이름',
     '목록에서 알아볼 이름을 적습니다 — 예: <b>중대재해 대응</b>',
-    { rows: 1, hint: '중대재해 대응', ok: '추가' });
+    { rows: 1, hint: '중대재해 대응', ok: '추가', value: 메뉴이름 });
   if (askedLabel === null) return;
   const label = String(askedLabel).trim();
   if (!label) {

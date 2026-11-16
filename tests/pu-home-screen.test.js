@@ -1420,6 +1420,71 @@ test('★ 이미 있는 쪽 이름은 두 번 넣지 않는다', async () => {
   assert.ok(ctx.said.some(m => /이미/.test(m)), '이미 있다고 말해 주지 않았습니다');
 });
 
+/* ══════ ③-더함: 홈페이지 메뉴에서 찾은 새 쪽을 「＋ 쪽 추가」에 미리 채운다 (2026-11-16) ══════
+   지어낸 메뉴 조각으로 본다 — 진짜 사이트를 읽지 않는다. */
+const 메뉴조각 = [
+  '<a class="uphover:bh_bg_color_main" href="../greeting/">인사말</a>',
+  '<a class="uphover:bh_bg_color_main" href="../work1/">자문서비스</a>',
+  '<a class="uphover:bh_bg_color_main" href="../work5a/">사내 공동근로복지기금</a>',
+  '<li><a class="uphover:bh_bg_color_main" href="../work5a/">사내근로복지기금</a></li>',
+  '<a class="uphover:bh_bg_color_main" href="../work9/">새 업무 쪽</a>',
+  '<a class="uphover:bh_bg_color_main" href="../inquiry/">오시는길</a>',
+  '<a class="uphover:bh_bg_color_main" href="../notice/">공지사항</a>',
+  '<a class="uphover:bh_bg_color_main" href="../privacy/">개인정보처리방침</a>'
+].join('\n');
+
+function 메뉴상자(cfg, 읽은것) {
+  const ctx = cfgBox(cfg);
+  run(ctx, fnSource('메뉴새쪽'));
+  ctx.OLD_SITE_OFF = true;
+  ctx.새사이트쪽읽기 = () => Promise.resolve(읽은것);
+  ctx.물음 = [];
+  return ctx;
+}
+
+test('★ 메뉴에는 있고 목록에 없는 «주요업무» 쪽만 후보로 낸다', () => {
+  const ctx = 메뉴상자({ work1: { label: '자문서비스', order: 1 } }, 메뉴조각);
+  const 후보 = plain(ctx.메뉴새쪽(메뉴조각, { work1: {} }));
+  const 이름들 = 후보.map(x => x.mid);
+  assert.ok(이름들.indexOf('work9') >= 0, '메뉴에만 있는 새 쪽을 못 찾았습니다');
+  assert.ok(이름들.indexOf('work1') < 0, '이미 목록에 있는 쪽을 후보로 냈습니다');
+  ['greeting', 'inquiry', 'notice', 'privacy'].forEach(m =>
+    assert.ok(이름들.indexOf(m) < 0, m + ' 은(는) 주요업무가 아닌데 후보로 냈습니다'));
+  assert.equal(new Set(이름들).size, 이름들.length, '같은 쪽을 두 번 냈습니다');
+  const 기금 = 후보.filter(x => x.mid === 'work5a')[0];
+  assert.ok(기금 && 기금.label === '사내근로복지기금', '두 번 나온 쪽은 뒤의 작은 이름을 써야 합니다');
+  assert.deepEqual(plain(ctx.메뉴새쪽(null, {})), [], '못 읽은 쪽에서 후보를 지어냈습니다');
+});
+
+test('★ 「＋ 쪽 추가」는 후보를 두 칸에 미리 채우고, 저장은 사람이 눌러야 한다', async () => {
+  const ctx = 메뉴상자(null, 메뉴조각);
+  /* 미리 채운 값을 «그대로» 받아들이는 사람 */
+  ctx.askText = (t, b, o) => { ctx.물음.push({ t, b, o }); return Promise.resolve(o && o.value); };
+  const 전 = [...ctx.PAGE_IDS];
+  await ctx.addPage();
+  assert.ok(ctx.물음.length >= 2, '두 번 물어야 합니다(쪽 이름 · 보일 이름)');
+  assert.ok(/work9/.test(ctx.물음[0].b), '찾은 후보를 안내하지 않았습니다');
+  assert.ok(ctx.물음[0].o.value, '쪽 이름 칸을 미리 채우지 않았습니다');
+  assert.equal(ctx.saved.length, 1, '받아들였는데 자료에 안 적혔습니다');
+  const cfg = plain(ctx.saved[0].value);
+  const 새것 = Object.keys(cfg).filter(k => 전.indexOf(k) < 0);
+  assert.ok(새것.length >= 1, '새 쪽이 자료에 없습니다');
+  새것.forEach(k => assert.equal(cfg[k].label, plain(ctx.메뉴새쪽(메뉴조각, {})).filter(x => x.mid === k)[0].label,
+    '보일 이름 칸에 메뉴 이름을 채우지 않았습니다'));
+
+  /* 그만두면 아무것도 안 적는다 — 후보가 있어도 저절로 넣지 않는다 */
+  const 그만 = 메뉴상자(null, 메뉴조각);
+  그만.askText = () => Promise.resolve(null);
+  await 그만.addPage();
+  assert.equal(그만.saved.length, 0, '사람이 그만뒀는데 후보를 저절로 넣었습니다');
+
+  /* 홈페이지를 못 읽어도 예전처럼 빈 칸으로 묻는다 */
+  const 못읽음 = 메뉴상자(null, null);
+  못읽음.askText = (t, b, o) => { 못읽음.물음.push({ t, b, o }); return Promise.resolve(null); };
+  await 못읽음.addPage();
+  assert.ok(못읽음.물음.length === 1 && !못읽음.물음[0].o.value, '못 읽었는데 칸을 채웠습니다');
+});
+
 test('★ 보일 이름을 안 적으면 추가하지 않는다', async () => {
   const ctx = cfgBox(null);
   dlgStubs(ctx, ['work6', '   ']);
