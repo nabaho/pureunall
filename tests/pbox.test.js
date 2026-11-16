@@ -943,7 +943,7 @@ test('⑦ 포털 연결 · 연속 질의 스레드 ID 보존 · 사용자별 작
   assert.equal(cleanedTh.verification.items.length, 1, 'verification.items 내부의 null 원소는 제거되어야 합니다');
 
   /* Supabase 삭제 툼스톤 RPC가 503 실패하거나 활성 행 스키마가 손상된 경우 침묵하지 않고 동기화 오류로 보고하는지 검증 */
-  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-c' });
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-c', supabasePublicKey: 'sb_publishable_testKey0001' });
   ctx.fetch = async (url) => {
     if (String(url).includes('api.github.com')) {
       return { ok: true, status: 200, json: async () => ({ tree: [{ path: 'kr', sha: 'sha-1' }] }) };
@@ -3098,6 +3098,7 @@ test('⑬ 엘박스·이레이버 실무 질의 정밀도 · 구 회시번호(�
       fetchCount++;
       return { ok: true, status: 200, text: async () => sampleOshDecreeMd, json: async () => ({ ok: true, docs: [] }) };
     },
+    atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
     window: null
   };
   ctx.window = {
@@ -3129,6 +3130,163 @@ test('⑬ 엘박스·이레이버 실무 질의 정밀도 · 구 회시번호(�
   const skippedPull = await Store.pullFromSupabase();
   assert.equal(skippedPull.skipped, true);
   assert.equal(fetchCount, 0, '비공식 Supabase URL 설정 시 단 1건의 외부 fetch도 발생하면 안 됩니다');
+
+  /* 수파베이스 직접 연결: 프로젝트 «공개 키»는 apikey, 직원 증표는 Authorization(공식 API 키 문서) — 비밀 키는 브라우저에 받지 않는다 */
+  const supaPubKey = 'sb_publishable_testKey0001';
+  const prevFetchForHeaders = ctx.fetch;
+  const seenSupaHeaders = [];
+  ctx.fetch = async (url, init) => {
+    seenSupaHeaders.push(Object.assign({ url: String(url) }, (init && init.headers) || {}));
+    return { ok: true, status: 200, json: async () => [] };
+  };
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: '' }),
+    /공개 키/
+  );
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: 'sb_secret_abcdefghijklmnop' }),
+    /비밀 키/
+  );
+  assert.equal(seenSupaHeaders.length, 0, '공개 키가 없거나 비밀 키면 fetch 전에 막혀야 합니다');
+  await Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: supaPubKey });
+  assert.equal(seenSupaHeaders.length, 1);
+  assert.equal(seenSupaHeaders[0].apikey, supaPubKey, 'apikey 에는 프로젝트 공개 키가 들어가야 합니다');
+  assert.equal(seenSupaHeaders[0].Authorization, 'Bearer staff-jwt-token', '직원 증표는 Authorization 에만 들어가야 합니다');
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: 'sb_secret_abcdefghijklmnop' });
+  assert.equal(Store.getConfig().supabasePublicKey, '', '비밀 키는 설정에 저장되면 안 됩니다');
+  assert.equal(Store.getStateSummary().supabaseConnected, false, '공개 키가 없으면 수파베이스 연결로 표시하면 안 됩니다');
+  /* 옛 방식(JWT) 키: anon 은 공개 키로 받고 service_role 은 어느 칸에서도 받지 않는다 */
+  const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const legacyAnon = 'eyJhbGciOiJIUzI1NiJ9.' + b64u({ role: 'anon' }) + '.sig';
+  const legacyService = 'eyJhbGciOiJIUzI1NiJ9.' + b64u({ role: 'service_role' }) + '.sig';
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: legacyService }),
+    /비밀 키/
+  );
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: legacyService, supabasePublicKey: supaPubKey }),
+    /직원 인증 JWT 칸/
+  );
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'sb_secret_abcdefghijklmnop', supabasePublicKey: supaPubKey }),
+    /직원 인증 JWT 칸/
+  );
+  assert.equal(seenSupaHeaders.length, 1, '비밀 키가 들어간 시험은 fetch 전에 막혀야 합니다');
+  /* 길게 늘여 비밀 키 검사를 피해 가는 길도 막는다(600자 넘는 sb_secret_ · 여분 항목으로 길어진 service_role JWT) */
+  const longSecret = 'sb_secret_' + 'a'.repeat(700);
+  const longServiceJwt = 'eyJhbGciOiJIUzI1NiJ9.' + b64u({ role: 'service_role', pad: 'x'.repeat(700) }) + '.sig';
+  assert.ok(longServiceJwt.length > 600 && longSecret.length > 600);
+  for (const longKey of [longSecret, longServiceJwt]) {
+    await assert.rejects(
+      () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: longKey, supabasePublicKey: supaPubKey }),
+      /직원 인증 JWT 칸/
+    );
+    await assert.rejects(
+      () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: longKey }),
+      /비밀 키/
+    );
+    Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: longKey, supabasePublicKey: supaPubKey });
+    assert.equal(Store.getConfig().supabaseStaffJwt, '', '길이를 늘린 비밀 키도 직원 증표 칸 메모리에 저장되면 안 됩니다');
+  }
+  assert.equal(seenSupaHeaders.length, 1, '길이를 늘린 비밀 키 시험도 fetch 전에 막혀야 합니다');
+  /* 아주 긴 값(상한 초과)은 어느 칸에서도 받지 않는다 — 상한 경계(8192자)는 받고 8193자부터 거절 */
+  const hugeServiceJwt = 'eyJhbGciOiJIUzI1NiJ9.' + b64u({ role: 'service_role', pad: 'x'.repeat(120000) }) + '.sig';
+  await assert.rejects(
+    () => Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: hugeServiceJwt, supabasePublicKey: supaPubKey }),
+    /직원 인증 JWT 칸/
+  );
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: hugeServiceJwt, supabasePublicKey: supaPubKey });
+  assert.equal(Store.getConfig().supabaseStaffJwt, '', '상한을 넘는 값은 직원 증표 칸 메모리에 저장되면 안 됩니다');
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'j'.repeat(8192), supabasePublicKey: supaPubKey });
+  assert.equal(Store.getConfig().supabaseStaffJwt.length, 8192, '상한 경계(8192자)의 일반 값은 받아야 합니다');
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'j'.repeat(8193), supabasePublicKey: supaPubKey });
+  assert.equal(Store.getConfig().supabaseStaffJwt, '', '상한(8192자)을 1자라도 넘으면 받으면 안 됩니다');
+  assert.equal(seenSupaHeaders.length, 1, '상한 초과 시험도 fetch 전에 막혀야 합니다');
+  await Store.testSupabaseConnection({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: legacyAnon });
+  assert.equal(seenSupaHeaders.length, 2, '옛 anon 키는 공개 키로 받아야 합니다');
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: legacyService, supabasePublicKey: supaPubKey });
+  assert.equal(Store.getConfig().supabaseStaffJwt, '', '직원 증표 칸의 비밀 키는 메모리에도 저장되면 안 됩니다');
+  Store.saveConfig({ supabaseUrl: 'https://example.supabase.co', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: supaPubKey });
+  assert.equal(Store.getStateSummary().supabaseConnected, true);
+
+  /* 서버에 연결 값이 없을 때 «성공»으로만 답하면 공유됐다고 오해한다 — configured:false 로 «연결 안 됨»을 알리고 화면은 «이 기기에만 저장»으로 안내 */
+  const failIfCalled = async () => { throw new Error('연결 값이 없으면 수파베이스를 부르면 안 됩니다'); };
+  const noCredPush = await PBoxSync.upsertToSupabase([{ title: 't', body: 'b' }], {}, failIfCalled, 'u-nocred', {});
+  assert.equal(noCredPush.skipped, true);
+  assert.equal(noCredPush.configured, false);
+  const noCredDel = await PBoxSync.deleteFromSupabaseServer(['case|x|1'], {}, failIfCalled, 'u-nocred');
+  assert.equal(noCredDel.skipped, true);
+  assert.equal(noCredDel.configured, false);
+  const connectedEnv = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'srv-key' };
+  const emptyPush = await PBoxSync.upsertToSupabase([], connectedEnv, failIfCalled, 'u-nocred', {});
+  assert.equal(emptyPush.skipped, true);
+  assert.notEqual(emptyPush.configured, false, '연결돼 있는데 보낼 문서가 없는 경우는 «연결 안 됨»이 아닙니다');
+
+  ctx.fetch = async (url) => {
+    if (String(url).includes('pboxApi')) {
+      return { ok: true, status: 200, json: async () => ({ ok: true, pushed: 0, skipped: true, configured: false, conflicts: [], tombstoned: [] }) };
+    }
+    return { ok: false, status: 503 };
+  };
+  const unconnectedErrs = [];
+  const unconnectedSt = Store.addDocuments([{
+    id: 'no-shared-db-1',
+    docType: 'internal_case',
+    court: '중앙노동위원회',
+    caseNo: '',
+    decisionDate: '2026-03-02',
+    title: '공유 DB 미연결 확인용 요약',
+    body: '공유 DB 가 연결되지 않은 상태에서 공유를 요청한 경우를 확인하기 위한 합의 사건 본문 요약입니다.'
+  }], {
+    shareConfirmed: true,
+    auth: { currentUser: { uid: 'user-sec-13', getIdToken: async () => 'tok-sec13' } },
+    onSyncError: (err) => unconnectedErrs.push(String((err && err.message) || err))
+  });
+  const unconnectedRes = await unconnectedSt.syncPromise;
+  assert.equal(unconnectedRes.ok, false, '서버에 공유 DB 연결이 없으면 공유 성공(ok:true)으로 처리하면 안 됩니다');
+  assert.equal(unconnectedErrs.length, 1, '공유 DB 미연결은 사용자에게 한 번 알려야 합니다');
+  assert.ok(/연결되어 있지 않/.test(unconnectedErrs[0]), '«이 기기에만 저장» 안내여야 합니다');
+
+  /* 삭제: 공유했던 문서인데 서버에 공유 DB 연결이 없으면 «공유 서버 삭제 못 함»으로 알리고, 공유한 적 없는 문서는 조용히 넘어간다 */
+  const sec13Auth = { currentUser: { uid: 'user-sec-13', getIdToken: async () => 'tok-sec13' } };
+  ctx.fetch = async (url, init) => {
+    if (String(url).includes('pboxApi')) {
+      const parsedBody = JSON.parse(init.body);
+      if (parsedBody.action === 'push') {
+        const ck = PBoxSync.canonicalKeyOf(parsedBody.docs[0], 'user-sec-13');
+        return { ok: true, status: 200, json: async () => ({ ok: true, pushed: 1, canonicalKeys: [ck] }) };
+      }
+      if (parsedBody.action === 'delete') {
+        return { ok: true, status: 200, json: async () => ({ ok: true, deleted: 0, unmatched: [], skipped: true, configured: false }) };
+      }
+    }
+    return { ok: false, status: 503 };
+  };
+  const sharedDocForDelete = {
+    id: 'shared-then-unconfigured-1',
+    docType: 'internal_case',
+    court: '중앙노동위원회',
+    caseNo: '',
+    decisionDate: '2026-03-03',
+    title: '공유 뒤 연결이 끊긴 삭제 확인용 요약',
+    body: '공유한 뒤 서버의 공유 DB 연결이 사라진 상태에서 삭제를 요청한 경우를 확인하기 위한 합의 사건 본문 요약입니다.'
+  };
+  await Store.addDocuments([sharedDocForDelete], { shareConfirmed: true, auth: sec13Auth }).syncPromise;
+  const delErrs = [];
+  Store.deleteDocuments(['shared-then-unconfigured-1'], { auth: sec13Auth, onSyncError: (err) => delErrs.push(String((err && err.message) || err)) });
+  const sharedDelRes = await Store.getLastDeleteSyncResult();
+  assert.equal(sharedDelRes.ok, false, '공유했던 문서의 삭제를 서버가 연결 없이 받았으면 성공(ok:true)으로 처리하면 안 됩니다');
+  assert.equal(delErrs.length, 1);
+  assert.ok(/연결되어 있지 않/.test(delErrs[0]));
+  const neverSharedDelErrs = [];
+  Store.deleteDocuments(['no-shared-db-1'], { auth: sec13Auth, onSyncError: (err) => neverSharedDelErrs.push(String((err && err.message) || err)) });
+  const neverSharedDelRes = await Store.getLastDeleteSyncResult();
+  assert.equal(neverSharedDelRes.ok, true, '공유한 적 없는 문서의 삭제는 공유 DB 연결이 없어도 정상이다');
+  assert.equal(neverSharedDelErrs.length, 0, '공유한 적 없는 문서를 지울 때마다 오류를 띄우면 안 됩니다');
+
+  /* 뒤 검사가 앞 상태에 기대므로 원래대로 되돌린다 */
+  ctx.fetch = prevFetchForHeaders;
+  Store.saveConfig({ supabaseUrl: 'https://attacker.example.com', supabaseStaffJwt: 'staff-jwt-token', supabasePublicKey: '' });
 
   /* 리더에서 시행령 [별표 1] 열람 시 별표 목록은 자동 펼침되고, javascript: 스킴 링크는 차단되며 https://www.law.go.kr 링크만 렌더링됨 */
   App.mount(rootEl);

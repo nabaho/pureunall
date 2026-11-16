@@ -1521,7 +1521,12 @@ function getSupabaseCreds(env) {
  */
 async function upsertToSupabase(docs, env, fetchFn, ingestedByUid, opts) {
   const creds = getSupabaseCreds(env);
-  if (!creds || !Array.isArray(docs) || !docs.length) {
+  if (!creds) {
+    /* 연결 값(SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY)이 없으면 «보낼 문서가 없음»이 아니라 «연결 안 됨»이다.
+     * 호출한 쪽이 공유됐다고 오해하지 않게 configured:false 를 싣는다(pull 응답과 같은 표시). */
+    return { ok: true, pushed: 0, skipped: true, configured: false, conflicts: [], tombstoned: [] };
+  }
+  if (!Array.isArray(docs) || !docs.length) {
     return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [] };
   }
   const f = fetchFn || fetch;
@@ -1962,7 +1967,10 @@ async function pullFromSupabaseServer(env, fetchFn, limit, sinceDeletedAt, after
 /* 본인 등록 공유 문서 소프트 삭제 — return=representation으로 실제 갱신된 행 수만 집계하고 1건이라도 미삭제(타인 소유/미존재)가 있으면 부분 실패(ok:false, 409/403)로 투명 보고 */
 async function deleteFromSupabaseServer(canonicalKeys, env, fetchFn, staffUid) {
   const creds = getSupabaseCreds(env);
-  if (!creds || !Array.isArray(canonicalKeys) || !canonicalKeys.length || !staffUid) {
+  if (!creds) {
+    return { ok: true, deleted: 0, unmatched: [], skipped: true, configured: false };
+  }
+  if (!Array.isArray(canonicalKeys) || !canonicalKeys.length || !staffUid) {
     return { ok: true, deleted: 0, unmatched: [], skipped: true };
   }
   const f = fetchFn || fetch;

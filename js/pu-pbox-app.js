@@ -2772,6 +2772,7 @@
       '  <div class="pbox-form-stack">',
       '    <label class="pbox-field"><span class="pbox-label">법제처 국가법령정보 공동활용 OC 아이디 (선택 · 미입력 시에도 국가법령정보센터 공식 원문 직접 수집 즉시 작동)</span><input type="text" id="pboxCfgLawOc" class="pbox-input" value="' + esc(cfg.lawOc) + '" placeholder="open.law.go.kr 신청 이메일 앞자리 ID"></label>',
       '    <label class="pbox-field"><span class="pbox-label">Supabase HTTPS Project URL (선택 · 직접 조회 시)</span><input type="url" id="pboxCfgSupaUrl" class="pbox-input" value="' + esc(cfg.supabaseUrl) + '" placeholder="https://xxxxxxxxxxxx.supabase.co"></label>',
+      '    <label class="pbox-field"><span class="pbox-label">Supabase 공개 키 (선택 · 직접 조회 시 · publishable 또는 anon 키만 · 비밀 키(secret·service_role)는 절대 입력 금지)</span><input type="text" id="pboxCfgSupaPub" class="pbox-input" value="' + esc(cfg.supabasePublicKey) + '" placeholder="sb_publishable_…" autocomplete="off" spellcheck="false"></label>',
       '    <label class="pbox-field"><span class="pbox-label">Supabase 직원 인증 JWT (선택 · 현재 로그인 세션 메모리에만 보관되며 로그아웃 시 자동 파기)</span><input type="password" id="pboxCfgSupaKey" class="pbox-input" value="' + esc(cfg.supabaseStaffJwt) + '" placeholder="인증된 직원 세션 JWT (localStorage 영구 저장 안 함)"></label>',
       '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgAutoBoot" aria-label="앱을 열 때 법령 개정 및 수집 변경분 자동 점검"' + (cfg.autoSyncOnBoot ? ' checked' : '') + '> 앱을 열 때 법령 개정·수집 변경분 자동 점검</label>',
       '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgOfflineAi" aria-label="클라우드 AI 호출 없이 내장 무료 합성 모드만 사용"' + (cfg.preferOfflineAi ? ' checked' : '') + '> 클라우드 AI 호출 없이 100% 내장 무료 합성 모드만 사용</label>',
@@ -3958,13 +3959,18 @@
     } else if (act === 'test-supa-cfg') {
       var uVal = (document.getElementById('pboxCfgSupaUrl') || {}).value || '';
       var kVal = (document.getElementById('pboxCfgSupaKey') || {}).value || '';
-      global.PuPBoxStore.testSupabaseConnection({ supabaseUrl: uVal.trim(), supabaseStaffJwt: kVal.trim() })
+      var pVal = (document.getElementById('pboxCfgSupaPub') || {}).value || '';
+      if (btn.disabled) return;
+      btn.disabled = true;
+      global.PuPBoxStore.testSupabaseConnection({ supabaseUrl: uVal.trim(), supabaseStaffJwt: kVal.trim(), supabasePublicKey: pVal.trim() })
         .then(function () { toast('✓ Supabase 직원 인증 연결 성공!'); })
-        .catch(function (e) { toast(e.message, 'err'); });
+        .catch(function (e) { toast(e.message, 'err'); })
+        .then(function () { btn.disabled = false; });
     } else if (act === 'save-cfg') {
       global.PuPBoxStore.saveConfig({
         supabaseUrl: (document.getElementById('pboxCfgSupaUrl') || {}).value || '',
         supabaseStaffJwt: (document.getElementById('pboxCfgSupaKey') || {}).value || '',
+        supabasePublicKey: (document.getElementById('pboxCfgSupaPub') || {}).value || '',
         lawOc: (document.getElementById('pboxCfgLawOc') || {}).value || '',
         autoSyncOnBoot: !!(document.getElementById('pboxCfgAutoBoot') || {}).checked,
         preferOfflineAi: !!(document.getElementById('pboxCfgOfflineAi') || {}).checked

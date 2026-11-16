@@ -53,6 +53,39 @@
     return SUPABASE_HOST_RE.test(String(rawUrl || '').trim());
   }
 
+  /* 브라우저에 둬도 되는 «공개 키»만 받는다 — 서버용 비밀 키(sb_secret_… · service_role)는 절대 받지 않는다.
+   * 수파베이스 공식 규칙: 요청의 apikey 칸에는 프로젝트 공개 키(sb_publishable_… 또는 옛 anon), 직원 증표는 Authorization 칸. */
+  /* 수파베이스 열쇠·증표는 길어야 수 KB 다 — 이보다 긴 값은 어느 칸에서도 받지 않는다(길이로 검사를 피해 가는 길 차단) */
+  var MAX_SUPABASE_KEY_CHARS = 8192;
+
+  function classifySupabaseKey(raw) {
+    var k = String(raw || '').trim();
+    if (!k) return 'empty';
+    /* 비밀 키 판별을 길이 제한보다 먼저 한다 — 길게 늘여 비밀 키 검사를 피해 가지 못하게 */
+    if (/^sb_secret_/i.test(k)) return 'secret';
+    if (k.length > MAX_SUPABASE_KEY_CHARS) return 'invalid';
+    if (/^sb_publishable_[A-Za-z0-9_-]{8,}$/.test(k)) return k.length <= 600 ? 'public' : 'invalid';
+    var m = /^eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+$/.exec(k);
+    if (m) {
+      var role = '';
+      try {
+        var dec = (typeof global.atob === 'function') ? global.atob : (typeof atob === 'function' ? atob : null);
+        if (dec) {
+          var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4) b64 += '=';
+          role = String(JSON.parse(dec(b64)).role || '');
+        }
+      } catch (e) { role = ''; }
+      if (role === 'service_role') return 'secret';
+      if (role === 'anon') return k.length <= 600 ? 'public' : 'invalid';
+    }
+    return 'invalid';
+  }
+
+  function sanitizeSupabasePublicKey(raw) {
+    return classifySupabaseKey(raw) === 'public' ? String(raw).trim() : '';
+  }
+
   var openHandles = new Map();
   var memByUid = new Map();       // IndexedDB 없는 환경에서도 UID별 개인 문서·작업공간 완전 격리 보장
   var sessionJwtByUid = new Map();// 직원 선택적 JWT는 localStorage에 절대 영구 저장하지 않고 현재 UID 세션 메모리에만 보관
@@ -313,12 +346,13 @@
       return {
         supabaseUrl: String(parsed.supabaseUrl || '').trim().replace(/\/+$/, ''),
         supabaseStaffJwt: sessionJwt,
+        supabasePublicKey: sanitizeSupabasePublicKey(parsed.supabasePublicKey),
         lawOc: cleanOc,
         autoSyncOnBoot: parsed.autoSyncOnBoot !== false,
         preferOfflineAi: parsed.preferOfflineAi === true
       };
     } catch (e) {
-      return { supabaseUrl: '', supabaseStaffJwt: sessionJwt, lawOc: '', autoSyncOnBoot: true, preferOfflineAi: false };
+      return { supabaseUrl: '', supabaseStaffJwt: sessionJwt, supabasePublicKey: '', lawOc: '', autoSyncOnBoot: true, preferOfflineAi: false };
     }
   }
 
@@ -328,6 +362,8 @@
     var cleanUid = sanitizeUid(mem.uid) || 'guest';
     if (Object.prototype.hasOwnProperty.call(incoming, 'supabaseStaffJwt')) {
       var nextJwt = String(incoming.supabaseStaffJwt || '').trim();
+      /* 직원 증표 칸에 서버용 비밀 키(sb_secret_… · service_role)가 들어오면 메모리에도 두지 않는다 */
+      if (classifySupabaseKey(nextJwt) === 'secret' || nextJwt.length > MAX_SUPABASE_KEY_CHARS) nextJwt = '';
       if (cleanUid && cleanUid !== 'guest' && nextJwt) sessionJwtByUid.set(cleanUid, nextJwt);
       else if (cleanUid) sessionJwtByUid.delete(cleanUid);
     }
@@ -351,6 +387,7 @@
 
     var persisted = {
       supabaseUrl: incoming.supabaseUrl !== undefined ? String(incoming.supabaseUrl || '').trim().replace(/\/+$/, '') : cur.supabaseUrl,
+      supabasePublicKey: incoming.supabasePublicKey !== undefined ? sanitizeSupabasePublicKey(incoming.supabasePublicKey) : cur.supabasePublicKey,
       lawOcByUid: existingMap,
       autoSyncOnBoot: incoming.autoSyncOnBoot !== undefined ? (incoming.autoSyncOnBoot !== false) : cur.autoSyncOnBoot,
       preferOfflineAi: incoming.preferOfflineAi !== undefined ? (incoming.preferOfflineAi === true) : cur.preferOfflineAi
@@ -361,7 +398,7 @@
 
   function hasSupabase() {
     var c = getConfig();
-    return !!(isAllowedSupabaseUrl(c.supabaseUrl) && c.supabaseStaffJwt);
+    return !!(isAllowedSupabaseUrl(c.supabaseUrl) && c.supabaseStaffJwt && c.supabasePublicKey);
   }
 
   function isDocTombstoned(doc) {
@@ -905,6 +942,10 @@
       });
       res.stats.syncPromise = pushDocsToSharedServer(cleanIncoming, opts.auth, {})
         .then(function (srvRes) {
+          /* 서버에 수파베이스 연결 값이 없으면 공유된 것이 아니다 — 아래 catch 에서 «이 기기에만 저장»으로 되돌리고 알린다 */
+          if (srvRes && srvRes.configured === false) {
+            throw new Error('사무실 공유 DB가 아직 연결되어 있지 않아 이 기기에만 저장되었습니다.');
+          }
           if (pushGen === sessionGen && pushUid === mem.uid) {
             var wsDb2 = getWorkspaceDb();
             var acceptedSet = new Set(Array.isArray(srvRes && srvRes.canonicalKeys) ? srvRes.canonicalKeys : []);
@@ -956,6 +997,7 @@
     var set = new Set(ids || []);
     var seedIds = new Set(((global.PuPBoxCorpus && global.PuPBoxCorpus.SEED_DOCS) || []).map(function (d) { return d.id; }));
     var removed = 0;
+    var sharedTouched = false;
     var deletedCkSet = new Set();
     var wsDb = getWorkspaceDb();
     var activeOwner = (opts.auth && opts.auth.currentUser && opts.auth.currentUser.uid)
@@ -964,6 +1006,8 @@
 
     function recordDelete(d) {
       removed++;
+      /* serverCanonicalKey 는 공유 전에도 미리 계산돼 있어 «공유됐다»의 증거가 아니다 — 실제로 공유 처리된 표시(sharedToOffice)만 본다 */
+      if (d.sharedToOffice === true) sharedTouched = true;
       mem.deletedDocKeys.add(String(d.id));
       var ck = d.canonicalKey || (E ? E.canonicalKeyOf(d) : '');
       if (ck) {
@@ -1000,6 +1044,10 @@
       if (deletedCks.length && opts.auth && opts.auth.currentUser) {
         lastDeleteSyncPromise = deleteDocsFromSharedServer(deletedCks, opts.auth)
           .then(function (srvDel) {
+            /* 공유했던 문서인데 서버에 공유 DB 연결이 없으면 공유 서버의 문서는 그대로 남는다 — 성공으로 넘기지 않는다 */
+            if (srvDel && srvDel.configured === false && sharedTouched) {
+              throw new Error('사무실 공유 DB가 연결되어 있지 않아 공유 서버의 문서는 삭제되지 않았습니다.');
+            }
             if (typeof opts.onSyncSuccess === 'function') opts.onSyncSuccess(srvDel);
             return Object.assign({ ok: true }, srvDel);
           })
@@ -1018,7 +1066,7 @@
   function supaStaffHeaders(cfg) {
     return {
       'Content-Type': 'application/json',
-      'apikey': cfg.supabaseStaffJwt,
+      'apikey': cfg.supabasePublicKey,
       'Authorization': 'Bearer ' + cfg.supabaseStaffJwt
     };
   }
@@ -1028,14 +1076,25 @@
     if (!cfg.supabaseUrl || !cfg.supabaseStaffJwt) {
       return Promise.reject(new Error('Supabase HTTPS URL과 직원 인증 JWT(또는 서버 대리인 연동)를 입력해 주세요.'));
     }
+    if (classifySupabaseKey(cfg.supabaseStaffJwt) === 'secret' || String(cfg.supabaseStaffJwt).length > MAX_SUPABASE_KEY_CHARS) {
+      return Promise.reject(new Error('직원 인증 JWT 칸에 비밀 키(secret·service_role)를 넣었거나 값이 너무 깁니다. 수파베이스 직원 계정의 로그인 증표(JWT)만 넣어 주세요.'));
+    }
     if (!/^https:\/\//i.test(cfg.supabaseUrl)) {
       return Promise.reject(new Error('보안을 위해 https:// 로 시작하는 Supabase URL만 허용됩니다.'));
     }
     if (!isAllowedSupabaseUrl(cfg.supabaseUrl)) {
       return Promise.reject(new Error('보안을 위해 공식 Supabase 호스트(*.supabase.co) URL만 허용됩니다.'));
     }
+    var keyKind = classifySupabaseKey(cfg.supabasePublicKey);
+    if (keyKind === 'secret') {
+      return Promise.reject(new Error('비밀 키(secret·service_role)는 브라우저에 입력하면 안 됩니다. 프로젝트 공개 키(publishable 또는 anon)만 넣어 주세요.'));
+    }
+    if (keyKind !== 'public') {
+      return Promise.reject(new Error('Supabase 프로젝트 공개 키(sb_publishable_… 또는 anon)를 입력해 주세요.'));
+    }
     var url = cfg.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/pbox_documents?select=id&limit=1';
-    return fetch(url, { headers: supaStaffHeaders(cfg) }).then(function (r) {
+    var testHeaders = supaStaffHeaders({ supabasePublicKey: String(cfg.supabasePublicKey).trim(), supabaseStaffJwt: cfg.supabaseStaffJwt });
+    return fetch(url, { headers: testHeaders }).then(function (r) {
       if (!r.ok) throw new Error('수파베이스 인증·RLS 응답 오류 (HTTP ' + r.status + ')');
       return { ok: true };
     });
@@ -1105,7 +1164,7 @@
 
   function pullFromSupabase() {
     var cfg = getConfig();
-    if (!cfg.supabaseUrl || !cfg.supabaseStaffJwt || !isAllowedSupabaseUrl(cfg.supabaseUrl)) {
+    if (!cfg.supabaseUrl || !cfg.supabaseStaffJwt || !cfg.supabasePublicKey || !isAllowedSupabaseUrl(cfg.supabaseUrl)) {
       return Promise.resolve({ ok: true, added: 0, skipped: true });
     }
     var headers = supaStaffHeaders(cfg);
