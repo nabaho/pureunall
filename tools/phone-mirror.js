@@ -26,7 +26,7 @@
  * ■ 지키는 것 — CLAUDE.md 「화면 같이 보기」·「에고라이트」 절과 같다. 폰 크롬은 «진짜 로그인»이다.
  *   · 이 도구는 폰을 «누르지도 치지도» 않는다 — adb input·CDP Input.* 를 쓰지 않는다(tests/phone-mirror.test.js 가 막는다).
  *     미러 창에서 누르는 것은 사람이다. 저장·삭제·보내기는 사람이 직접 한다.
- *   · 재기는 푸른 화면(nabaho.github.io/pureunall · 내 PC 의 localhost)에서만 — 은행·메일 등 다른 탭은 열어 보지도 않는다.
+ *   · 재기는 푸른 화면(nabaho.github.io/pureunall · 새 주소 erp.pureunlabor.co.kr · 내 PC 의 localhost)에서만 — 은행·메일 등 다른 탭은 열어 보지도 않는다.
  *     재는 스크립트는 measure.js 하나뿐이다(값만 돌려주고 화면은 안 건드린다). 그 밖의 코드를 폰 탭에서 돌리지 않는다.
  *   · 갈무리는 tools/phone-mirror/out/ 에만 남긴다 — .gitignore 에 있어 저장소에 안 올라간다.
  *     폰 화면에는 고객 이름·금액이 그대로 보인다. 그림을 채팅·PR·이슈에 붙이지 말 것(필요하면 가린 뒤).
@@ -53,6 +53,8 @@ function 허용주소(u) {
   let x;
   try { x = new URL(String(u || '')); } catch (e) { return false; }
   if (x.protocol === 'https:' && x.hostname === 'nabaho.github.io' && /^\/pureunall(\/|$)/.test(x.pathname)) return true;
+  /* 새 주소 — ERP 혼자 쓰는 집이라 경로를 가리지 않는다 (2026-11-15 ERP 주소 이사 준비) */
+  if (x.protocol === 'https:' && x.hostname === 'erp.pureunlabor.co.kr') return true;
   if (x.protocol === 'http:' && (x.hostname === 'localhost' || x.hostname === '127.0.0.1')) return true;   // 내 PC 에서 띄운 판
   return false;
 }
@@ -204,7 +206,13 @@ async function 재기(dry) {
   const 기 = 준비(); if (!기) return;
   const f = 돌려(기.adb, ['-s', 기.serial, 'forward', 'tcp:' + PORT, 'localabstract:chrome_devtools_remote']);
   if (f.status !== 0) { console.log('✗ 폰 크롬에 길을 못 냈습니다 — 폰에서 «크롬»을 열어 두십시오'); return; }
-  return 탭재기(PORT);
+  /* ★ 재기가 끝나면(성공하든 실패하든) 열린 디버그 통로(tcp:9222)를 곧바로 닫는다 —
+     열어 둔 채로 끝내면 PC의 다른 프로세스가 폰 크롬 세션에 붙을 수 있다 (2026-11-11). */
+  try {
+    return await 탭재기(PORT);
+  } finally {
+    try { 돌려(기.adb, ['-s', 기.serial, 'forward', '--remove', 'tcp:' + PORT]); } catch (e) {}
+  }
 }
 
 /* 길(adb forward)이 난 뒤 — 푸른 탭 하나를 잰다. 길만 다르면 PC 크롬에도 그대로 쓴다(검사·시험용) */
@@ -213,8 +221,12 @@ async function 탭재기(port) {
   try { 탭들 = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json(); }
   catch (e) { console.log('✗ 폰 크롬 탭을 못 읽었습니다 — 폰에서 크롬을 앞에 띄워 두십시오'); return; }
   const 고름 = 탭고르기(탭들);
-  if (!고름.tab) { console.log('✗ 폰 크롬에 푸른 화면이 없습니다 — nabaho.github.io/pureunall 을 열어 두십시오 (다른 탭 ' + 고름.다른탭수 + '개는 안 봤습니다)'); return; }
-  const ws = 고름.tab.webSocketDebuggerUrl;
+  if (!고름.tab) { console.log('✗ 폰 크롬에 푸른 화면이 없습니다 — 푸른포털(erp.pureunlabor.co.kr 또는 nabaho.github.io/pureunall)을 열어 두십시오 (다른 탭 ' + 고름.다른탭수 + '개는 안 봤습니다)'); return; }
+  const ws = String(고름.tab.webSocketDebuggerUrl || '');
+  if (!/^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(ws)) {
+    console.log('✗ 폰 크롬 디버그 주소가 로컬이 아닙니다 — 중단합니다');
+    return;
+  }
   console.log('잴 화면: ' + 고름.tab.title + '  (' + 고름.tab.url + ')');
   const 자 = fs.readFileSync(MEASURE, 'utf8');
   const 식 = '(function(){' + 자 + '\n;return JSON.stringify(__paMeasure({ width: Math.min(screen.width, document.documentElement.clientWidth) }));})()';

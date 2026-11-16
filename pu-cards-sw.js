@@ -11,6 +11,7 @@ self.addEventListener('fetch', e => {
       try {
         const form = await e.request.formData();
         const files = form.getAll('images').filter(f => f && f.size);
+        await caches.delete('pucards-share');
         const cache = await caches.open('pucards-share');
         await cache.put('shared-files', new Response(JSON.stringify({ n: files.length })));
         for (let i = 0; i < files.length; i++)

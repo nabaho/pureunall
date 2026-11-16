@@ -131,6 +131,9 @@ test('★★★ 서식을 못 읽는 프로그램에서도 법제처 대문 주�
   assert.ok(짓기('https://www.law.go.kr/').indexOf('https://www.law.go.kr/') < 0,
     '★★★ 평문에 법제처 대문 주소가 그대로 적힌다');
   const 한건 = 'https://www.law.go.kr/DRF/lawService.do?OC=test&target=prec&type=HTML&ID=622111';
-  assert.ok(짓기(한건).indexOf(한건) >= 0,
+  /* ★ 옛 꼴(DRF·OC=test)은 «공개 쪽» 같은 한 건으로 바꿔 적는다 (2026-11-15 — 법제처가 OC=test 를 거절) */
+  assert.ok(짓기(한건).indexOf(C.법제처사람주소(한건)) >= 0,
     '(재기 값) 멀쩡한 판례 주소까지 평문에서 사라졌다');
+  assert.ok(짓기(한건).indexOf('OC=test') < 0,
+    '★★ 평문에 거절되는 옛 법제처 주소가 그대로 적힌다 — 받는 분이 «접속 실패» 쪽을 본다');
 });

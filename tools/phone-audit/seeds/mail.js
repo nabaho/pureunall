@@ -29,6 +29,24 @@ for (let i = 0; i < 26; i++) {
     desc: i % 4 === 0 ? '자문 계약 전에 보내는 기본 제안서 — 회사 규모에 맞춰 금액을 고쳐서 보냄' : '' };
 }
 
+/* 📤 앱이 보낸 기록(pucards/sentBox) — 받는 곳마다 한 줄. 한 번에 보낸 대량 발송(같은 제목·15분 간격 20통씩) 36곳 +
+   따로 보낸 메일 몇 통. 「한 번에 보낸 것은 한 줄로 묶는다」(sentFold)가 폰·PC 에서 어떻게 보이는지 재려고 넣었다.
+   ⚠ 이름·주소는 모두 지어낸 것이다(example.invalid). 실제 받는 곳·제목 없음. */
+data.pucards.sentBox = {};
+for (let i = 0; i < 36; i++) {
+  data.pucards.sentBox['pa-sent-bulk-' + String(i).padStart(3, '0')] = {
+    at: NOW - 3 * 3600e3 + Math.floor(i / 20) * 15 * 60e3 + (i % 20) * 1000, by: 'weeklyNewsletterSend',
+    to: 'pa-bulk-' + i + '@example.invalid', toName: '점검수신자' + (i + 1), cc: '', subject: '점검노무법인 주간 소식지입니다',
+    body: '지어낸 본문', html: '', ids: [], names: [], localNames: [], set: '', cardId: '', from: 'pa-office@example.invalid', scheduled: true,
+  };
+}
+[['pa-sent-one-1', '점검가 대표', 'pa-one-1@example.invalid', '근로계약서 보내드립니다', 40], ['pa-sent-one-2', '점검나다', 'pa-one-2@example.invalid', '4대보험 취득 신고 안내', 90],
+ ['pa-sent-one-3', '점검라', 'pa-one-3@example.invalid', '지난주 상담 내용 정리본(긴 제목 — 폰에서 한 줄로 잘리는지 보려고 길게 적어 둔 지어낸 제목)', 200]]
+  .forEach(([id, nm, to, sub, min]) => {
+    data.pucards.sentBox[id] = { at: NOW - min * 60e3, by: 'p001@pureun.kr', to, toName: nm, cc: '', subject: sub,
+      body: '지어낸 본문', html: '', ids: [], names: ['pa-sample.pdf'], localNames: [], set: '', cardId: '', from: 'pa-office@example.invalid', scheduled: false };
+  });
+
 const clickFirst = (sel) => async (page) => { await page.locator(sel).first().click({ timeout: 4000 }); };
 
 module.exports = {

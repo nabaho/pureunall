@@ -30,6 +30,17 @@ test('GEMINI.md 도 AGENTS.md 와 규칙 파일을 가리킨다', () => {
   assert.match(g, /\.agents\/rules\//);
 });
 
+test('★ Gemini·Antigravity 도 ERP 새 주소를 안다 — 옛 주소를 새 코드에 박지 않게 (2026-11-15 이사)', () => {
+  /* 이 둘은 CLAUDE.md 를 안 읽는다. 여기서 빠지면 Antigravity 가 옛 코드를 흉내 내 옛 주소를 또 박는다. */
+  for (const f of ['GEMINI.md', path.join('.agents', 'rules', 'pureun-rules.md')]) {
+    const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    assert.match(t, /erp\.pureunlabor\.co\.kr/, f + ' 에 ERP 새 주소가 없다');
+    assert.match(t, /erp-origins\.js/, f + ' 에 서버 주소 한 자리(functions/erp-origins.js) 안내가 없다');
+    assert.match(t, /ERP-주소\.md/, f + ' 가 자세한 문서(docs/규칙/ERP-주소.md)를 안 가리킨다');
+  }
+  assert.ok(fs.existsSync(path.join(ROOT, 'docs', '규칙', 'ERP-주소.md')), '가리키는 문서가 실제로 있어야 한다');
+});
+
 test('규칙 폴더는 배포본에서 지워진다 — 개발용이다', () => {
   const wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'deploy-pages.yml'), 'utf8');
   assert.match(wf, /\s\.agents\s/, '배포에서 .agents 를 지우지 않으면 규칙 파일이 인터넷에 열립니다');

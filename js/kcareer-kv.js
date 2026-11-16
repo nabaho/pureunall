@@ -27,7 +27,7 @@
     function has(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
     function persist(k, v) {
       q = q.then(function () { return v === null ? idb.del(k) : idb.put(k, v); })
-           .catch(function (e) { onErr(e, k); });
+           .catch(function (e) { api.errors = (api.errors || 0) + 1; onErr(e, k); });   /* errors: 쓰기가 «못 담긴» 횟수 — flush() 뒤에 늘었으면 방금 쓴 것이 이 기기에 안 담겼다(옮기는 길이 원본을 지키는 데 쓴다) */
       return q;
     }
     function post(k, v) { try { if (bc) bc.postMessage({ k: k, v: v }); } catch (e) {} }
@@ -35,6 +35,7 @@
       if (mirror[k]) { try { if (v === null) ls.removeItem(k); else ls.setItem(k, v); } catch (e) {} }
     }
     var api = {
+      errors: 0,
       get state() { return state; },
       mine: mine,
       /* 켜졌으면 저장소 것, 아니면 열리기 전 모은 것 → localStorage */

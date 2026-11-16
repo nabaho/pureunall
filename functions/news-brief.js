@@ -142,7 +142,37 @@ function 뉴스읽기(xml, 언론사) {
 }
 
 /* ── ② 법령 (법제처 공동활용) ── */
+/* ★ 법령 목록 — 국가법령정보센터 «공개 쪽» 법령 검색, 공포일자 내림차순(selSort=20desc) (2026-11-16).
+     예전 법제처 DRF(lawSearch target=law, OC=test)가 열쇠를 거절해 옮겼다 — 거절 몸이 «0건»으로 읽혀
+     법령 소식이 조용히 비어 있었다. 공개 쪽 한 줄(2026-11-16 실측):
+       <tr><td>번호</td><td class="tit"><a onclick="lawInfoPop('285279','20260407','21436', '20261008', …)">근로기준법</a></td>
+           <td>2026. 4. 7.</td><td><p>법률</p></td><td><p>제21436호</p></td><td> 2026. 10. 8. </td><td>일부개정</td><td><p>고용노동부</p></td></tr>
+   ⚠ 링크는 우리가 짓는다 — 번호(lsiSeq)만 숫자로 받아 /LSW/lsInfoP.do?lsiSeq= 로(열쇠 없이 열린다). */
+function 공개법령목록주소(낱말, 몇개) {
+  const 몇 = Math.max(1, Math.min(50, Math.floor(Number(몇개) || 5)));
+  return "https://www.law.go.kr/LSW/lsSc.do?menuId=1&subMenuId=15&tabMenuId=81&selSort=20desc"
+    + "&outmax=" + 몇 + "&query=" + encodeURIComponent(String(낱말 == null ? "" : 낱말));
+}
+function 공개법령목록읽기(html) {
+  const 칸글 = (s) => 풀기(String(s == null ? "" : s).replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  const out = [];
+  String(html == null ? "" : html).split(/<tr\b/i).forEach(function (줄) {
+    const 열 = /lawInfoPop\(\s*'(\d{1,12})'\s*,\s*'(\d{8})'\s*,\s*'\d*'\s*,\s*'(\d{8})'/.exec(줄);
+    if (!열) return;
+    const 칸 = [];
+    const re = /<td\b[^>]*>([\s\S]*?)<\/td>/gi;
+    let m;
+    while ((m = re.exec(줄))) 칸.push(칸글(m[1]));
+    /* 칸: 0 번호 · 1 이름 · 2 공포일 · 3 구분 · 4 공포번호 · 5 시행일 · 6 제개정 · 7 소관부처 */
+    if (칸.length < 8 || !칸[1]) return;
+    out.push({ 이름: 칸[1], 구분: 칸[3], 고친결: 칸[6], 공포일: 열[2], 시행일: 열[3], 부처: 칸[7],
+      링크: "/LSW/lsInfoP.do?lsiSeq=" + 열[1] });
+  });
+  return out;
+}
+
 function 법령읽기(xml) {
+  if (!/<law[\s>]/.test(String(xml == null ? "" : xml))) return 공개법령목록읽기(xml);
   const 덩이 = String(xml == null ? "" : xml).split(/<law[^>]*>/).slice(1);
   return 덩이.map(function (b) {
     return {
@@ -218,7 +248,9 @@ function 글짓기(뉴스, 법령, 옷) {
     /* ★ 제목과 링크만 싣는다 — 기사 본문은 남의 글이다 */
     줄.push('<ul>');
     뉴스목록.forEach(function (x) {
-      줄.push('<li><a href="' + 감싸기(x.링크) + '" target="_blank" rel="noopener">'
+      /* 2026-11-15 보안 — 링크는 http(s) 만. 모음 칸은 직원도 쓸 수 있어 javascript: 가 들어오면 공지에 그대로 실린다 */
+      const 링크 = /^https?:\/\//i.test(String(x.링크 || '').trim()) ? String(x.링크).trim() : '#';
+      줄.push('<li><a href="' + 감싸기(링크) + '" target="_blank" rel="noopener">'
         + 감싸기(x.제목) + '</a>'
         + (x.언론사 ? ' <span>· ' + 감싸기(x.언론사) + '</span>' : '') + '</li>');
     });
@@ -374,7 +406,7 @@ function 주간브리핑(뉴스, 법령, 오늘, 며칠) {
 
 module.exports = {
   뉴스샘들, 골고루,
-  뽑기, 풀기, 감싸기, 노동글인가, 뉴스읽기, 법령읽기, 날짜꼴, 법령추리기, 브리핑,
+  뽑기, 풀기, 감싸기, 노동글인가, 뉴스읽기, 법령읽기, 공개법령목록주소, 공개법령목록읽기, 날짜꼴, 법령추리기, 브리핑,
   링크열쇠, 며칠전, 모으기, 오래된것털기, 주간뉴스고르기, 주간브리핑,
   뺄말뉴스, 뺄말법령, 뺄글인가, 쓸모있는법령인가
 };

@@ -35,6 +35,171 @@ function isTransient(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
 }
 
+function ndToDigit(ch) {
+  if (!/\p{Nd}/u.test(ch)) return -1;
+  const cp = ch.codePointAt(0);
+  let base = cp;
+  while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+  return (cp - base) % 10;
+}
+
+function findRrnSpans(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!s) return [];
+  const vis = [];
+  let idx = 0;
+  for (const ch of s) {
+    const start = idx;
+    idx += ch.length;
+    if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+    const d = ndToDigit(ch);
+    vis.push({
+      ch,
+      pos: start,
+      end: idx,
+      d,
+      isHws: ch === "\t" || ch === "\v" || ch === "\f" || /\p{Zs}/u.test(ch),
+      isLb: ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029",
+      isWord: d >= 0 || /\p{L}/u.test(ch),
+    });
+  }
+  const maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const spans = [];
+  let i = 0;
+  while (i < vis.length) {
+    if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+    let cur = i;
+    const digits = [vis[cur].d];
+    let usedInnerSpace = false;
+    let usedDateDot = false;
+    let ok = true;
+    for (let k = 1; k < 6; k++) {
+      let sp = 0;
+      if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === "." || vis[cur + 1].ch === "．")) {
+        sp = 1;
+        usedDateDot = true;
+      }
+      let hws = 0;
+      while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+      if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+      if (hws > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp + hws;
+      digits.push(vis[cur].d);
+    }
+    if (!ok) { i++; continue; }
+    const mm = digits[2] * 10 + digits[3];
+    const dd = digits[4] * 10 + digits[5];
+    if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+
+    let sepEnd = cur + 1;
+    let sepSteps = 0;
+    let lbCount = 0;
+    let hasExplicitSep = false;
+    while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+      if (vis[sepEnd].isLb) {
+        if (!(vis[sepEnd].ch === "\n" && sepEnd > cur + 1 && vis[sepEnd - 1].ch === "\r")) {
+          lbCount++;
+        }
+        if (lbCount > 2) break;
+      } else if (!vis[sepEnd].isHws) {
+        hasExplicitSep = true;
+      }
+      sepEnd++;
+      sepSteps++;
+    }
+    if (usedDateDot && !hasExplicitSep) { i++; continue; }
+    if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+
+    cur = sepEnd;
+    digits.push(vis[cur].d);
+    for (let k = 1; k < 7; k++) {
+      let sp = 0;
+      while (cur + 1 + sp < vis.length && vis[cur + 1 + sp].isHws && sp < 2) sp++;
+      if (cur + 1 + sp >= vis.length || vis[cur + 1 + sp].d < 0) { ok = false; break; }
+      if (sp > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp;
+      digits.push(vis[cur].d);
+    }
+    if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+    if (usedInnerSpace) {
+      let lp = i - 1;
+      while (lp >= 0 && vis[lp].isHws) lp--;
+      if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+      let rp = cur + 1;
+      while (rp < vis.length && vis[rp].isHws) rp++;
+      if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+    }
+    spans.push({ start: vis[i].pos, end: vis[cur].end, front: digits.slice(0, 6).join(""), gender: String(digits[6]) });
+    i = cur + 1;
+  }
+  return spans;
+}
+
+/* 괴롭힘 조사 앱(pu-harass-core.js · tests/harass-invest.test.js)은 당사자 동명이인 구별용으로
+   생년월일+성별 첫 자리(YYMMDD-G******) 가림 규약을 사용하므로 동일 형식을 유지한다(P박스는 13자리 전량 차단·전량 마스킹). */
+function maskHarassRrn(text) {
+  const s = String(text == null ? "" : text);
+  const spans = findRrnSpans(s);
+  if (!spans.length) return s;
+  let out = "", last = 0;
+  for (const sp of spans) {
+    out += s.slice(last, sp.start) + sp.front + "-" + sp.gender + "******";
+    last = sp.end;
+  }
+  return out + s.slice(last);
+}
+
+/* 산업일자리전환(jobtrans) AI 윤문 요청은 주민등록번호뿐 아니라 공백 포함 이메일·9~11자리 국내 전화·계좌번호도 서버에서 재가림한다. */
+const JT_EMAIL_RE = /[A-Za-z0-9._%+-]+(?:\s*@\s*)[A-Za-z0-9-]+(?:\s*\.\s*[A-Za-z0-9-]+)*\s*\.\s*[A-Za-z]{2,}/g;
+const JT_BIZ_RE = /(?<!\d)\d{3}-\d{2}-\d{5}(?!\d)/g;
+const JT_TEL_SEP_RE = /(?<!\d)(?:\+82[-.\s]?)?\(?0(?:1[016789]|2|[3-6][1-5]|70)\)?(?:[-.\s]\d{3,4}[-.\s]\d{4}|[-.\s]\d{7,8})(?!\d)/g;
+const JT_TEL_TIGHT_RE = /(?<!\d)0(?:1[016789][1-9]\d{6,7}|2[1-9]\d{6,7}|(?:[3-6][1-5]|70)[1-9]\d{6,7})(?!\d)/g;
+const JT_ACCT_CTX_RE = /((?:계좌(?:\s*번호)?|입금(?:\s*계좌)?|통장(?:\s*번호)?|예금|(?:신한|국민|우리|하나|기업|농협|수협|부산|대구|경남|광주|전북|제주|씨티|SC제일|산업)\s*은행|우체국|새마을금고|신협|카카오\s*뱅크|토스\s*뱅크|케이\s*뱅크)(?:\s+[가-힣A-Za-z]{2,10})?\s*[:：]?\s*)(\d[\d\s.\-]{8,22}\d)(?!\d)/g;
+const JT_ACCT_SEP_RE = /(?<!\d)\d{2,6}(?:[-.]\d{2,8}){1,3}(?!\d)/g;
+const JT_ACCT_SPACED_RE = /(?<!\d)(?!19\d{2}\s|20\d{2}\s)\d{2,6}\s+\d{2,6}\s+\d{4,8}(?:\s+\d{1,6})?(?!\d)/g;
+const JT_ACCT_LONG_RE = /\b\d[\d-]{9,18}\d\b/g;
+
+function isJtAccountDigits(raw) {
+  const d = String(raw || "").replace(/\D/g, "");
+  if (/^(19|20)\d{6}$/.test(d)) return false;
+  return d.length >= 10 && d.length <= 16;
+}
+
+function maskJobtransServerPii(text) {
+  return String(text == null ? "" : text)
+    .replace(JT_EMAIL_RE, "[가림]")
+    .replace(JT_BIZ_RE, "[가림]")
+    .replace(JT_TEL_SEP_RE, "[가림]")
+    .replace(JT_TEL_TIGHT_RE, "[가림]")
+    .replace(JT_ACCT_CTX_RE, (m, prefix, acc) => {
+      const d = String(acc || "").replace(/\D/g, "");
+      return d.length >= 9 && d.length <= 16 ? prefix + "[가림]" : m;
+    })
+    .replace(JT_ACCT_SEP_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m))
+    .replace(JT_ACCT_SPACED_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m))
+    .replace(JT_ACCT_LONG_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m));
+}
+
+function hasJobtransResidualPii(text) {
+  const s = String(text == null ? "" : text);
+  JT_EMAIL_RE.lastIndex = 0;
+  if (JT_EMAIL_RE.test(s)) return true;
+  JT_TEL_TIGHT_RE.lastIndex = 0;
+  if (JT_TEL_TIGHT_RE.test(s)) return true;
+  const sepPhones = s.match(JT_TEL_SEP_RE) || [];
+  for (const ph of sepPhones) {
+    const tail = ph.replace(/^(?:\+82[-.\s]?)?\(?0(?:1[016789]|2|[3-6][1-5]|70)\)?[-.\s]?/, "").replace(/\D/g, "");
+    if (tail && !/^0+$/.test(tail)) return true;
+  }
+  const accts = (s.match(JT_ACCT_SEP_RE) || [])
+    .concat(s.match(JT_ACCT_SPACED_RE) || [])
+    .concat(s.match(JT_ACCT_LONG_RE) || []);
+  for (const ac of accts) {
+    if (isJtAccountDigits(ac)) return true;
+  }
+  return false;
+}
+
 /* 요청이 말이 되는지 본다. 못 알아보면 **부르기 전에** 돌려보낸다 —
    구글을 부르고 나서 실패하면 그만큼이 그대로 요금이다. */
 function validate(body) {
@@ -42,9 +207,36 @@ function validate(body) {
   const parts = body.parts;
   if (!Array.isArray(parts) || !parts.length) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const resolvedApp = appOf(body.app);
   let imgs = 0, chars = 0;
+  const cleanHarassParts = [];
+
   for (const p of parts) {
-    if (!p || typeof p !== "object") return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    if (!p || typeof p !== "object" || Array.isArray(p)) {
+      return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    }
+    if (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") {
+      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+         오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
+      const keys = Object.keys(p);
+      if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
+        const appName = resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : "괴롭힘 조사 앱은 ");
+        return { ok: false, error: appName + "주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
+      }
+      let masked = maskHarassRrn(p.text);
+      if (findRrnSpans(masked).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      if (resolvedApp === "jobtrans") {
+        masked = maskJobtransServerPii(masked);
+        if (hasJobtransResidualPii(masked)) {
+          return { ok: false, error: "비식별화되지 않은 연락처·이메일 등 개인정보가 포함되어 AI 전송을 차단했습니다." };
+        }
+      }
+      chars += masked.trim().length;
+      cleanHarassParts.push({ text: masked });
+      continue;
+    }
     if (p.inline_data) {
       const d = p.inline_data.data;
       if (typeof d !== "string" || !d) return { ok: false, error: "사진을 읽을 수 없습니다" };
@@ -66,13 +258,28 @@ function validate(body) {
      ⚠ 그림도 글자도 없으면 그대로 돌려보낸다 — 부르는 만큼이 요금이다. */
   if (!imgs && !chars) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const outParts = (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") ? cleanHarassParts : parts;
   const size = Buffer.byteLength(JSON.stringify(body), "utf8");
   if (size > MAX_BODY_BYTES) {
     return { ok: false, error: imgs
       ? "사진이 너무 큽니다 — 장수를 나눠 판독해 주세요"
       : "글자가 너무 많습니다 — 나눠서 판독해 주세요" };
   }
-  return { ok: true, parts: parts, cfg: body.generationConfig, app: appOf(body.app) };
+  if (resolvedApp === "pbox") {
+    const cleanPboxParts = [];
+    for (const p of parts) {
+      const pKeys = Object.keys(p);
+      if (pKeys.length !== 1 || pKeys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: "P박스 AI 질의는 비식별 텍스트(text 단일 속성)만 허용되며 이미지·첨부 데이터 전송은 차단됩니다." };
+      }
+      if (findRrnSpans(p.text).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      cleanPboxParts.push({ text: p.text });
+    }
+    return { ok: true, parts: cleanPboxParts, cfg: body.generationConfig, app: resolvedApp };
+  }
+  return { ok: true, parts: outParts, cfg: body.generationConfig, app: resolvedApp };
 }
 
 /* ══ ⑤ 어느 앱이 몫을 썼나 (대표 물음 2026-09-08 「판독 한도 어떻게 해결할까」) ══
@@ -85,7 +292,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";

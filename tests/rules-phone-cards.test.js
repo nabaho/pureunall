@@ -98,7 +98,10 @@ test('★② CSS 가 기대는 칸 차례가 실제 그림과 맞다 — 맨 앞
     Number(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + name + '\\)$')).match(/order\s*:\s*(\d+)/)[1]), '☐ 가 이름보다 앞에 서야 한다');
   assert.match(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + name + '\\)$')), /flex\s*:\s*1/,
     '이름 칸(' + name + '째)이 남는 자리를 안 가져간다 — 칸이 늘었으면 폰 CSS 의 nth-child 를 함께 고친다');
-  assert.match(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + docs + '\\)$')), /flex\s*:\s*none/,
+  /* «안 줄어든다» 가 규칙이다 — 글자(flex:none)든, 자기 줄 하나를 통째로 받는 것(flex:0 0 <폭>)이든 flex-shrink 가 0 이면 된다.
+     자료 칸이 이웃 칸과 한 줄을 나눠 쓰면 이웃이 2px 로 짓눌린다(411px 실측 2026-11-15) — 그래서 자기 줄을 받는다 */
+  const 자료규칙 = decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + docs + '\\)$'));
+  assert.match(자료규칙, /flex\s*:\s*(none|0\s+0\s+\S)/,
     '자료 딱지 칸(' + docs + '째)이 줄어 잘린다 — 칸이 늘었으면 폰 CSS 의 nth-child 를 함께 고친다');
 });
 

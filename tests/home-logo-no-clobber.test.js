@@ -41,8 +41,9 @@ function 상자(서버) {
     }; } }
   };
   vm.createContext(ctx);
+  /* 그림올리기 — 로고·얼굴 사진이 함께 쓰는 올리기 길(2026-11-16). 로고담기가 이것을 부른다 */
   vm.runInContext(['function 로고칸(', 'function 로고목록(', 'function 로고열쇠(',
-    'async function 로고담기(', 'async function hidePartnerLogo('].map(s => cutFn(HOME, s)).join('\n'), ctx);
+    'async function 그림올리기(', 'async function 로고담기(', 'async function hidePartnerLogo('].map(s => cutFn(HOME, s)).join('\n'), ctx);
   return { ctx, 쓴것 };
 }
 

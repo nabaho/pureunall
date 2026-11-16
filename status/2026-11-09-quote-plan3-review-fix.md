@@ -49,3 +49,13 @@ Antigravity(기능 검증)·Codex(보안 검토) 2차 결과에서 높음 4건·
 ## 최종 재검증 반영 (2026-11-09, 같은 PR)
 
 Antigravity·Codex 마지막 1회 재검증에서 높음 3건이 나와 고쳤다(표는 계획 문서 끝 「최종 재검증 결과 반영」): **정규식 ReDoS**(겹치는 반복 제거 + 1000자 상한) · **낱말 끝 한글 숫자 오인**(고객사만·이천 등) · **서버 거절 뒤 같은 화면 다시 시도가 요청을 지우는 문제**(못 닿은 요청 표시). 이번 마지막 수정은 단위 시험으로만 확인했고 AI 재검증은 하지 않았다(재검증 한도 소진).
+
+## main 합침 (2026-11-16, 같은 PR)
+
+PR 이 main 과 충돌 상태(약 400 커밋 뒤처짐)여서 main 을 합쳤다. 충돌 8개 파일을 «둘 다 살리는» 쪽으로 풀었다 — 다른 방이 main 에 넣은 것(메일 생애주기 종합 분석·계약서 «심급·단계» 표시·보낸 견적서 전수 수집)과 이 PR 의 검토 수정이 같은 함수(`erpQuoteLanePlan`·`processQuoteLaneRequest`·`isOurQuote`)를 함께 고쳤다.
+- **감지(`js/pu-quote-detect.js`)**: main 이 넓힌 낱말(제안서·수임료 안내·계약서 종류 확대·`isSignedContract`)을 바탕으로 두고, 이 PR 의 «견적서 요청 메일에 견적서를 붙여 답한 경우는 우리 견적» 규칙(`EXCL_STRONG`/`EXCL_ASK`/`ASK_IN_NAME`)과 금액 가리기(`scrubMoney`)를 얹었다. 서버 사본은 `scripts/sync-quote-detect-core.js` 로 다시 만들었다.
+- **계획 함수**: main 의 `reqSrcMails`(여러 메일)·종료 사업장/중복 noop·`allowCreateReview`(계약서 신호면 계약협의 카드를 새로 만듦)·`synthesizedNote`·`stageMarks` 를 그대로 두고, 이 PR 의 업체 id 로만 잇기·`loose`(업체 미연결 카드는 사람이 정함)·비교견적 기다림·저장이 서버에 닿았는지 확인(`settle`)을 함께 지난다.
+- **판단 하나**: «옮길 카드가 없고 종료·취소 카드만 있는 사업장»은 main 의 불변 검사(`tests/anti-resurrection-guards.test.js`)가 noop 을 못 박아 그쪽을 따랐다. 계약확정·이관 카드만 있을 때는 이 PR 대로 blocked(재계약일 수 있어 사람이 본다).
+- 걸린 요청 듣기: main 의 «기다리는 요청이 새로 오면 바로 처리»와 이 PR 의 1분 시계를 둘 다 둔다(시계는 멈춘 흔적 보강). 토스트 셈은 noop 을 «한 일»로 세지 않는 이 PR 쪽.
+- 규칙 시험 `PENDING`(`/pu_docs/config`)은 main 의 새 콘솔 기준 파일 위에 그대로 얹었다(게시 전).
+- 눈에 띈 것(이 PR 밖): main 의 `js/pu-doc-file.js` 가 화면에서 `contract_requests` 의 `mq-…` 요청을 만들면서 `companyId` 를 `matchCoFromMail` 이 고른 업체에서 채운다(맞추는 방식은 읽어 확인하지 못했다) — 이름·메일로 맞춘 것이라면 이 PR 의 «요청이 가리키는 companyId 만 믿는다» 와 결이 다르다. 따로 확인이 필요하다.

@@ -95,7 +95,7 @@ test('아는 구멍이 메워지면 목록에서 빼라고 알린다', () => {
 /* 사진을 안 보내는 것들 — 이 이름만 울타리 밖에서 불러도 된다.
    ⚠ 이름을 **늘어놓고 막지 않는다.** 여기 없는 것은 전부 새는 길로 본다 —
      판독 함수를 새로 만들면 이 검사가 먼저 깨진다. 그것이 의도다. */
-const SAFE = ['init', 'bizNoDigits', 'bizNoValid', 'fmtBizNo', 'mapTo', 'keysFrom',
+const SAFE = ['init', 'bizNoDigits', 'bizNoValid', 'bizNoOk', 'fmtBizNo', 'mapTo', 'keysFrom',
   'MODELS', 'PROMPTS', 'READ_VERSION', 'PROMPT_VERSION', 'autoOk',
   /* healRead 는 밖으로 안 보낸다 — 이미 읽어 온 답을 손보는 계산뿐이다 */
   'healRead',

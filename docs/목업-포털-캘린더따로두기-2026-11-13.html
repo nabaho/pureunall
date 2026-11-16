@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른포털 캘린더 따로 두기 목업</title>
+<style>
+:root{
+  --page:#eef1f6; --card:#ffffff; --ink:#1e293b; --sub:#475569; --mute:#64748b;
+  --line:#dbe2ec; --accent:#1e40af; --accent-soft:rgba(30,64,175,.08);
+  --portal-bg:linear-gradient(135deg,#dbe6f8 0%,#e8e4f6 45%,#d8ecee 100%);
+  --tile:#f8fafc; --red:#c0392b; --pin:#1e40af; --warn:#d97706;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:'Pretendard','Malgun Gothic','맑은 고딕',system-ui,sans-serif;font-size:14px;line-height:1.5}
+.page{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 14px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.tab{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;color:var(--sub)}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.note{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:0 0 16px}
+.note b{color:var(--accent)}
+.note ul{margin:6px 0 0;padding-left:18px;color:var(--sub)}
+.stage{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.pc{flex:1 1 760px;min-width:0}
+.ph{flex:0 0 auto}
+.cap{font-size:12px;font-weight:700;color:var(--mute);margin:0 0 6px}
+.frame{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,23,42,.08)}
+.bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#f1f5f9;border-bottom:1px solid var(--line)}
+.dot{width:10px;height:10px;border-radius:50%;background:#cbd5e1}
+.url{margin-left:10px;font-size:12px;color:var(--mute);background:#fff;border:1px solid var(--line);border-radius:99px;padding:2px 12px}
+.portal{background:var(--portal-bg);padding:26px 22px 30px;min-height:560px}
+.inner{max-width:920px;margin:0 auto}
+/* 머리 */
+.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center}
+.brand b{display:block;font-size:15px;line-height:1.1}
+.brand small{font-size:10px;letter-spacing:1.5px;color:var(--mute)}
+.hb{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;font-weight:700;font-size:12.5px;white-space:nowrap}
+.hb.dark{background:#1e40af;color:#fff;border-color:#1e40af}
+.hb.org{background:#ea580c;color:#fff;border-color:#ea580c}
+.user{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 14px 4px 6px;font-size:12.5px}
+.av{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center;font-size:12px}
+.logout{font-size:12.5px;font-weight:700;color:var(--accent)}
+/* 달력 아이콘(날짜가 보이는 작은 달력) */
+.cico{width:34px;height:36px;border-radius:7px;background:#fff;border:1px solid #cbd5e1;overflow:hidden;display:flex;flex-direction:column;flex:none;box-shadow:0 1px 2px rgba(15,23,42,.12)}
+.cico i{display:block;font-style:normal;background:var(--red);color:#fff;font-size:8.5px;font-weight:800;text-align:center;line-height:11px;height:11px}
+.cico em{font-style:normal;flex:1;display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cico.big{width:54px;height:58px;border-radius:10px}
+.cico.big i{font-size:11px;line-height:16px;height:16px}
+.cico.big em{font-size:24px}
+/* 안 A — 머리 단추 */
+.calbtn{display:flex;align-items:center;gap:9px;background:#fff;border:2px solid var(--accent);border-radius:14px;padding:5px 14px 5px 7px;box-shadow:0 2px 10px rgba(30,64,175,.2);cursor:pointer}
+.calbtn b{display:block;font-size:13.5px;line-height:1.15}
+.calbtn small{display:block;font-size:11px;color:var(--red);font-weight:700}
+/* 안 B — 오늘 띠 */
+.strip{display:flex;align-items:center;gap:16px;background:#fff;border:1.5px solid #c7d2e8;border-radius:16px;padding:12px 16px;margin-bottom:16px;box-shadow:0 2px 12px rgba(30,64,175,.1);cursor:pointer}
+.strip .mid{flex:1;min-width:0}
+.strip h3{margin:0 0 5px;font-size:14px}
+.strip h3 span{color:var(--red)}
+.evs{display:flex;gap:8px;flex-wrap:wrap}
+.ev{display:inline-flex;gap:6px;align-items:center;background:var(--tile);border:1px solid var(--line);border-radius:99px;padding:3px 11px;font-size:12px;max-width:100%}
+.ev time{font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+.ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.open{flex:none;background:var(--accent);color:#fff;border-radius:99px;padding:9px 18px;font-weight:700;font-size:13px}
+/* 안 C — 자주 쓰는 앱 맨 앞 고정 */
+.fixedcal{display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px 20px 2px 4px;margin-right:6px;border-right:1px dashed #b6c2d8;cursor:pointer}
+.fixedcal{text-align:center}
+.phone .fixedcal{text-align:left}
+.fixedcal b{font-size:12px}
+.fixedcal small{font-size:10px;color:var(--red);font-weight:700}
+/* 앱 판 */
+.sec{margin:0 0 14px}
+.sectitle{font-weight:800;font-size:13px;margin:0 0 6px;display:flex;gap:8px;align-items:center}
+.sectitle small{color:var(--mute);font-weight:600;font-size:11px}
+.sectitle .pinb{margin-left:auto;background:var(--pin);color:#fff;border-radius:99px;font-size:10.5px;padding:2px 10px}
+.fav{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.9);border-radius:16px;padding:12px 14px}
+.favrow{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.favit{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;font-weight:700;width:76px;text-align:center}
+.favit .ic{width:54px;height:54px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:24px;border:1px solid var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px 6px}
+.tile{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:6px 12px 6px 8px;font-size:12.5px;font-weight:700;position:relative;min-width:0}
+.tile .ic{font-size:15px;flex:none}
+.tile .tag{position:absolute;top:-6px;right:8px;background:var(--warn);color:#fff;font-size:9px;border-radius:99px;padding:0 6px}
+.gone{outline:2px dashed #ef4444;outline-offset:2px;background:#fef2f2;color:#991b1b}
+/* 폰 */
+.phone{width:360px;border:10px solid #1f2937;border-radius:34px;background:var(--portal-bg);overflow:hidden;height:660px;position:relative}
+.phone .pin{padding:14px 12px 16px}
+.phone .head{gap:8px;margin-bottom:12px}
+.phone .brand b{font-size:14px}
+.phone .tiles{grid-template-columns:repeat(2,1fr)}
+.phone .favrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 4px}
+.phone .favit{width:auto;font-size:10.5px;letter-spacing:-.3px}
+.phone .favit .ic{width:44px;height:44px;font-size:20px}
+.phone .strip{padding:10px 12px;gap:10px}
+.strip h3 .pre{color:inherit}
+.phone .strip{flex-wrap:wrap}
+.phone .strip .pre{display:none}
+.phone .evs{flex-direction:column;gap:4px}
+.phone .ev{width:100%}
+.phone .ev:nth-child(n+3){display:none}
+.phone .strip .open{width:100%;text-align:center}
+.phone .open{padding:7px 12px;font-size:12px}
+.phone .calbtn{padding:4px 10px 4px 5px}
+.phone .calbtn small{display:none}
+.phone .fixedcal{grid-column:1/-1;flex-direction:row;justify-content:flex-start;gap:10px;margin:0;padding:0 0 8px;border-right:0;border-bottom:1px dashed #b6c2d8}
+.phone .fixedcal .cico.big{width:44px;height:48px}
+.phone .fixedcal .cico.big em{font-size:20px}
+.phone .hb.hide-p{display:none}
+.phone .head.tight{flex-wrap:nowrap;gap:6px}
+.phone .head.tight .brand div{display:none}
+.phone .head.tight .brand{margin-right:auto}
+.phone .head.tight .hb.org{padding:6px 10px;font-size:11.5px}
+.legend{margin-top:10px;font-size:12px;color:var(--mute)}
+.legend b{color:#991b1b}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--page:#0f172a;--card:#1e293b;--ink:#e2e8f0;--sub:#b6c2d4;--mute:#94a3b8;--line:#334155}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>푸른포털 — 「푸른 캘린더」 따로 두기 목업 <small style="font-weight:500;color:var(--mute)">(예시 화면 · 글은 지어낸 것)</small></h1>
+  <p class="lead">지금은 «자료함» 줄 안에 섞여 있는 캘린더를, 자료함에서 빼서 <b>한 번에 누르는 자리</b>로 옮기는 세 가지 안입니다. 아래 단추로 안을 바꿔 보세요. 왼쪽은 PC, 오른쪽은 폰입니다.</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="note" id="note"></div>
+  <div class="stage">
+    <div class="pc">
+      <p class="cap">💻 PC 화면</p>
+      <div class="frame">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">nabaho.github.io/pureunall/enter.html</span></div>
+        <div class="portal" id="pcPortal"></div>
+      </div>
+      <p class="legend"><b>빨간 점선</b> = 지금 자료함에 있다가 «빠지는» 자리(자료함은 7개 → 6개).</p>
+    </div>
+    <div class="ph">
+      <p class="cap">📱 폰 화면</p>
+      <div class="phone"><div class="pin" id="phPortal"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var d = new Date();
+  var M = d.getMonth() + 1, D = d.getDate(), W = '일월화수목금토'.charAt(d.getDay());
+  var EV = [['10:00','방문 상담 (가나상사)'],['14:00','이음센터 근무'],['16:30','보고서 마감 확인']];
+
+  var ROWS = [
+    ['의뢰인 업무', [['🏢','푸른이알피'],['🪙','기금관리'],['📑','컨설팅보고서'],['📅','정부사업일정'],['📝','한글 편집기'],['🎯','기업정부지원금'],['📜','기업규정집','준비중'],['💰','급여아웃소싱','준비중']]],
+    ['자료함', [['📧','푸른 메일'],['🖼️','사진첩'],['📇','기업정보함'],['📤','계약서등관리'],['📋','업무관리'],['🤝','공공임단협']], true],
+    ['영업관리', [['📰','뉴스레터'],['🌐','홈페이지'],['⚖️','회생광고'],['📺','전광판'],['🏛','정부사업신청']]],
+    ['내부관리', [['👤','경력관리'],['📒','재무관리'],['👥','인사관리'],['🧾','컨설팅정산']]]
+  ];
+  var FAV = [['👤','경력관리'],['🖼️','사진첩'],['📅','정부사업일정'],['🏢','푸른이알피']];
+
+  var VARS = {
+    A: { name: '안 A · 머리 단추',
+      html: '<b>위쪽 단추 줄에 «푸른 캘린더» 큰 단추</b>를 둡니다(건의하기 옆). 단추 안에 오늘 날짜와 «오늘 N건»이 보입니다.',
+      ul: ['장점 — 자료함을 접어 두거나 어느 줄에 있든 <b>늘 보이고 한 번에 누름</b>. 가장 가볍게 만들 수 있음.',
+           '단점 — 오늘 일정의 «내용»은 안 보임(건수만). 폰에서는 단추 글자를 줄여 아이콘 위주로.',
+           '고칠 곳 — enter.html 머리 단추 줄에 단추 하나 추가, 캘린더 앱의 줄(row) 소속을 «없음»으로.'] },
+    B: { name: '안 B · 오늘 일정 띠',
+      html: '<b>업무 시스템 위에 넓은 «오늘 일정 띠»</b>를 둡니다. 띠 어디를 눌러도 캘린더가 열리고, 열기 전에 오늘 일정 두세 건이 먼저 보입니다.',
+      ul: ['장점 — <b>한 번에 누르면서 오늘 할 일도 바로 보임</b>. 가장 눈에 띔.',
+           '단점 — 화면 위쪽을 한 줄(약 80px) 차지. 오늘 일정을 포털이 읽어 와야 해서 구글 연결·권한을 따져 봐야 함(날짜만 보이는 «가벼운 판»도 가능).',
+           '고칠 곳 — enter.html 에 띠 영역 추가 + 일정 읽기, 캘린더 앱의 줄 소속을 «없음»으로.'] },
+    C: { name: '안 C · 자주 쓰는 앱 맨 앞 고정',
+      html: '<b>«자주 쓰는 앱» 상자 맨 앞에 캘린더를 고정</b>합니다. 즐겨찾기 칸 수(4/7)와 따로 세고, 별표를 풀 수 없습니다.',
+      ul: ['장점 — 새 영역 없이 지금 구조 안에서 해결. 폰에서도 맨 앞이라 바로 눌림.',
+           '단점 — 눈에 띄는 정도가 가장 약함. «자주 쓰는 앱» 상자를 접으면 같이 접힐 수 있어 접힘 규칙을 정해야 함.',
+           '고칠 곳 — enter.html 자주 쓰는 앱 상자에 고정칸 추가, 캘린더 앱의 줄 소속을 «없음»으로.'] }
+  };
+
+  function cico(big){ return '<span class="cico'+(big?' big':'')+'"><i>'+M+'월</i><em>'+D+'</em></span>'; }
+  function head(v, phone){
+    var h = '<div class="head'+(phone && v === 'A' ? ' tight' : '')+'"><div class="brand"><span class="logo">푸</span><div><b>푸른노무법인</b>'+(phone?'':'<small>PUREUN · LLF</small>')+'</div></div>';
+    h += '<span class="hb hide-p">✨ TypeSafe 검토</span>';
+    h += '<span class="hb dark hide-p">🚍 길잡이 챗봇</span>';
+    if(v === 'A') h += '<span class="calbtn">'+cico(false)+'<span><b>푸른 캘린더</b><small>오늘 '+EV.length+'건</small></span></span>';
+    h += '<span class="hb org">💬 건의하기</span>';
+    h += phone ? '<span class="av">홍</span>' : '<span class="user"><span class="av">홍</span>홍길동</span><span class="logout">로그아웃</span>';
+    return h + '</div>';
+  }
+  function strip(){
+    var evs = EV.map(function(e){ return '<span class="ev"><time>'+e[0]+'</time><span>'+e[1]+'</span></span>'; }).join('');
+    return '<div class="strip">'+cico(true)+'<div class="mid"><h3><span class="pre">푸른 캘린더 · </span>오늘 '+M+'월 '+D+'일 ('+W+') <span>일정 '+EV.length+'건</span></h3><div class="evs">'+evs+'</div></div><span class="open">캘린더 열기 ›</span></div>';
+  }
+  function fav(v){
+    var items = FAV.map(function(f){ return '<div class="favit"><span class="ic">'+f[0]+'</span>'+f[1]+'</div>'; }).join('');
+    var fixed = v === 'C' ? '<div class="fixedcal">'+cico(true)+'<span><b>푸른 캘린더</b><br><small>오늘 '+EV.length+'건 · 고정</small></span></div>' : '';
+    return '<div class="sec"><div class="sectitle">★ 자주 쓰는 앱 <small>4/7</small></div><div class="fav"><div class="favrow">'+fixed+items+'</div></div></div>';
+  }
+  function rows(showGone){
+    return ROWS.map(function(r){
+      var t = r[1].map(function(x){ return '<span class="tile"><span class="ic">'+x[0]+'</span>'+x[1]+(x[2]?'<span class="tag">'+x[2]+'</span>':'')+'</span>'; }).join('');
+      if(r[2] && showGone) t += '<span class="tile gone"><span class="ic">📅</span>캘린더 (빠짐)</span>';
+      return '<div class="sec"><div class="sectitle">'+r[0]+' <small>'+r[1].length+'개</small><span class="pinb">📌 줄 고정 중 · 풀기</span></div><div class="tiles">'+t+'</div></div>';
+    }).join('');
+  }
+  function render(v, phone, showGone){
+    var body = head(v, phone);
+    if(v === 'B') body = body + strip();
+    body += '<div class="sectitle" style="margin:0 0 8px;font-size:13px">업무 시스템 <span class="hb" style="padding:3px 10px;font-size:11px">✏️ 배치 편집</span></div>';
+    body += fav(v) + rows(showGone);
+    return '<div class="inner">'+body+'</div>';
+  }
+  function show(v){
+    var t = document.querySelectorAll('.tab');
+    for(var i=0;i<t.length;i++) t[i].setAttribute('aria-selected', t[i].getAttribute('data-v') === v ? 'true' : 'false');
+    document.getElementById('note').innerHTML = '<b>'+VARS[v].name+'</b> — '+VARS[v].html+'<ul>'+VARS[v].ul.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';
+    document.getElementById('pcPortal').innerHTML = render(v, false, true);
+    document.getElementById('phPortal').innerHTML = render(v, true, false);
+  }
+  var tabs = document.getElementById('tabs');
+  Object.keys(VARS).forEach(function(k){
+    var b = document.createElement('button');
+    b.className = 'tab'; b.type = 'button'; b.setAttribute('role','tab'); b.setAttribute('data-v', k); b.textContent = VARS[k].name;
+    b.onclick = function(){ show(k); };
+    tabs.appendChild(b);
+  });
+  show('A');
+})();
+</script>
+</body>
+</html>

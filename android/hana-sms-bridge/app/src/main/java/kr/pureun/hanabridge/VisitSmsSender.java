@@ -147,6 +147,8 @@ final class VisitSmsSender {
             body.put("results", results);
             HanaUploadWorker.post(body, token);
             prefs.edit().remove(PENDING).apply();        // 알렸다 — 이제 비운다
+        } catch (HanaUploadWorker.UnauthorizedException unauthorized) {
+            SecureStore.clearAll(context);
         } catch (Exception offline) {
             /* 못 알렸다 — 담아 둔 채 다음 안부 때 다시 알린다(그 사이 같은 문자를 또 보내지는 않는다) */
         }
@@ -177,5 +179,10 @@ final class VisitSmsSender {
         String m = e.getMessage();
         if (m == null || m.isEmpty()) m = e.getClass().getSimpleName();
         return m.length() > 80 ? m.substring(0, 80) : m;
+    }
+
+    static void clear(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().remove(SENT).remove(PENDING).apply();
     }
 }

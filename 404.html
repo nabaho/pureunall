@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>찾는 화면이 없습니다 · 푸른포털</title>
+<!-- ERP 의 «없는 주소» 쪽 (2026-11-15 ERP 주소 이사 준비).
+     ★ 새 주소(erp.pureunlabor.co.kr)에서 옛 꼴 /pureunall/… 로 들어오면 그 앞머리를 떼고 넘긴다.
+       옛 즐겨찾기·이미 보낸 알림 링크·손으로 옮겨 적은 주소가 여기로 온다. 쿼리·해시는 그대로.
+     ⚠ 옛 주소(nabaho.github.io)에서는 아무것도 넘기지 않는다 — 안내만 한다.
+     ⚠ 앞머리를 뗀 뒤 «//» 로 시작하면(예: /pureunall//evil.com) 다른 집으로 가는 주소가 되므로 뿌리로 보낸다. -->
+<script>
+(function () {
+  var NEW_HOST = 'erp.pureunlabor.co.kr';
+  var OLD = '/pureunall';
+  var p = location.pathname;
+  if (location.hostname === NEW_HOST && (p === OLD || p.indexOf(OLD + '/') === 0)) {
+    var rest = p.slice(OLD.length) || '/';
+    if (rest.charAt(0) !== '/' || rest.charAt(1) === '/') rest = '/';
+    location.replace(rest + location.search + location.hash);
+  }
+})();
+</script>
+<style>
+body{font-family:'Apple SD Gothic Neo','맑은 고딕',sans-serif;background:#f8fafc;color:#1e293b;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 14px;box-sizing:border-box}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px 20px;max-width:380px;width:100%;text-align:center}
+h1{font-size:18px;margin:0 0 8px}
+p{font-size:14px;color:#475569;line-height:1.6;margin:0 0 18px}
+a.go{display:inline-block;padding:12px 20px;background:#1e40af;color:#fff;border-radius:10px;font-weight:700;text-decoration:none;font-size:15px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>찾는 화면이 없습니다</h1>
+  <p>주소가 바뀌었거나 없어진 화면입니다.<br>포털 입구에서 다시 찾아 주십시오.</p>
+  <a class="go" id="go" href="enter.html">푸른포털 입구로</a>
+</div>
+<script>
+/* 없는 주소는 어느 깊이에서든 이 쪽이 뜬다 — 상대주소 enter.html 은 깊은 곳에서 엇나가므로 앱 뿌리로 맞춘다 */
+(function () {
+  var a = document.getElementById('go');
+  if (!a) return;
+  a.href = (location.hostname === 'nabaho.github.io' ? '/pureunall/' : '/') + 'enter.html';
+})();
+</script>
+</body>
+</html>

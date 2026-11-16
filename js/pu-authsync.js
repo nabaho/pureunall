@@ -46,10 +46,11 @@
   /* 부팅 직후 「없음」을 기다려 보는 시간. 검사에서는 짧게 바꿔 쓴다. */
   var GRACE_MS = (typeof global.PU_AUTHSYNC_GRACE_MS === 'number') ? global.PU_AUTHSYNC_GRACE_MS : 2500;
 
-  /* 푸른이알피가 파이어베이스와 «따로» 들고 있는 열쇠들.
-     여기서 함께 지운다 — 앱이 등록을 잊어도 남의 세션이 살아남지 않게. */
-  var SESSION_KEYS = ['pureun_v6_session_sid'];
-  var LOCAL_KEYS   = ['pureun_v6_autologin_sid'];
+  /* 푸른이알피·포털·카메라가 파이어베이스와 «따로» 들고 있는 열쇠들과 공유 임시함.
+     여기서 함께 지운다 — 앱이 등록을 잊거나 계정이 바뀌어도 앞사람 흔적·공유 파일이 남지 않게. */
+  var SESSION_KEYS = ['pureun_v6_session_sid', 'pu_portal_fast_acct', 'pu_auth_hint', 'pu_open_camera'];
+  var LOCAL_KEYS   = ['pureun_v6_autologin_sid', 'pu_portal_fast_acct', 'pu_auth_hint', 'pu_sid_guard_known'];
+  var SHARE_IDBS   = ['pu-photos-share', 'pu-paydata-share', 'pu-viewer-share', 'pu-handoff'];
 
   var kicked = false;
   var handlers = [];
@@ -84,9 +85,16 @@
     } catch (e) { return ''; }
   }
 
+  function wipeSharedInboxes() {
+    try { if (global.caches && global.caches.delete) global.caches.delete('pucards-share'); } catch (e) { }
+    SHARE_IDBS.forEach(function (dbName) {
+      try { if (global.indexedDB && global.indexedDB.deleteDatabase) global.indexedDB.deleteDatabase(dbName); } catch (e) { }
+    });
+  }
   function wipeLocalSession() {
     SESSION_KEYS.forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) { } });
     LOCAL_KEYS.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) { } });
+    wipeSharedInboxes();
   }
   /* 「지금 나갔다」를 모든 탭에 알린다 — 로그아웃하는 쪽(이알피 등)이 부른다. 포털은 같은 열쇠를 직접 적는다. */
   function broadcastLogout() {

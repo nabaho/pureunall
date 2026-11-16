@@ -76,6 +76,9 @@ module.exports = {
     },
   },
   views: [
+    /* 어두운판 월 보기 — 「구글과 같은 색·둥글게·부드럽게」(2026-11-15)를 눈으로 재는 자리 */
+    { name: 'month-dark', run: go(`S.themeMode='dark';themeResolve();document.documentElement.setAttribute('data-theme',S.theme)`),
+      back: go(`S.themeMode='light';themeResolve();document.documentElement.setAttribute('data-theme',S.theme)`) },
     { name: 'sheet', run: go(`S.pick='${고른날}';S.sheet=true`) },
     { name: 'detail', run: async (page) => {
         await page.evaluate(reset + `S.pick='${고른날}';S.sheet=true;render();`);

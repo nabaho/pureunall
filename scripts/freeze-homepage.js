@@ -22,6 +22,11 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+/* 굳힐 «원본» = 옛 홈페이지(외부 업체가 짓고 관리하던 XE 사이트).
+   ⚠ 2026-11-15 대표 결정 「푸른노무법인.kr 더이상 연장 안한다」 — 그 도메인은 2026-11-27 에 끝난다.
+     그 뒤로 이 굳히개는 «내려받을 곳이 없어» 못 돈다. 지금 사본이 마지막 굳힘이다.
+     홈페이지를 고치는 길은 ERP 「홈페이지」 화면의 「저장하고 반영」(publishSite) 한 길이다.
+   ⚠ 그 전이라도 다시 굳히지 말 것 — ERP 에서 올린 글(구성원·공지)이 옛 사이트 내용으로 덮인다. */
 const ORIGIN = 'https://xn--o80bs5mdnbm0bf80anms.kr';
 /* 사람이 읽는 도메인도 본문에 그대로 박혀 있다(한글 도메인) — 둘 다 갈아 끼운다 */
 const ORIGIN_HANGUL = 'https://푸른노무법인.kr';
@@ -48,29 +53,65 @@ const OUT = (() => {
 
 /* ★ 사람에게 보이는 «진짜 주소». 검색엔진에게 「원본은 여기」라고 말하는 데 쓴다.
    대표 지시 2026-08-31: 「홈페이지가 외부로 나갈 경우 원래 있던 도메인으로 나가야 한다.
-   나바호 깃허브로 나가면 안 된다」 */
-const REAL_ORIGIN = 'https://푸른노무법인.kr';
+   나바호 깃허브로 나가면 안 된다」
+   2026-11-15 옛 도메인(푸른노무법인.kr)을 연장하지 않기로 해 «원본»이 새 홈페이지로 넘어왔다.
+   이 값이 굳힌 사본의 canonical·og:url·sitemap·robots 의 주소 머리다.
+   (그날 사본은 내려받기 없이 머리만 바꿔 «운영용»으로 돌렸다 — status/2026-11-15-home-go-live.md) */
+const REAL_ORIGIN = 'https://pureunlabor.co.kr';
 
-/* ★ 굳힌 쪽이 «실제로 얹히는» 주소 (대표 지시 2026-09-03 「fairrunlabor.com 으로
-   도메인 연결해라」). 깃허브 페이지가 CNAME 파일로 이 주소를 받는다.
-   ⚠ REAL_ORIGIN 과 다른 것이다:
-     REAL_ORIGIN — 검색엔진에게 「원본은 여기」라고 말하는 주소(옛 홈페이지).
+/* 쪽 하나의 «최종» 주소 — 하위 쪽은 폴더(index.html)라 끝 빗금까지 붙여야 301 없이 바로 열린다.
+   빗금 없이 적으면(…/greeting) 깃허브가 …/greeting/ 로 넘기므로, 검색엔진에 «넘어가는 주소»를
+   원본이라 알리는 셈이 된다(2026-11-16 서치콘솔 제출 때 실측). 뿌리는 `${REAL_ORIGIN}/` 그대로. */
+function 쪽주소(mid) {
+  return REAL_ORIGIN + '/' + (mid ? String(mid).replace(/\/+$/, '') + '/' : '');
+}
+
+/* ★ 굳힌 쪽이 «실제로 얹히는» 주소. 깃허브 페이지가 CNAME 파일로 이 주소를 받는다.
+   2026-09-03 대표 지시로 fairrunlabor.com 에 붙였으나 그 DNS 가 끝내 스퀘어스페이스
+   자리표(「곧 출시 예정」)를 가리켜 홈페이지가 밖에서 안 보였다.
+   2026-11-15 대표 지시 「홈페이지 도메인 주소 바꾸기 … 모두 실행해라」로 새로 산
+   pureunlabor.co.kr(가비아, 3년 등록)로 옮겼다.
+   ⚠ fairrunlabor.com 은 메일(구글 워크스페이스)·뉴스레터·급여명세서 발신에 그대로 쓴다
+     — 홈페이지만 옮긴 것이다. 그 도메인의 MX·news 기록은 건드리지 않는다.
+   ★ REAL_ORIGIN 과의 관계:
+     REAL_ORIGIN — 검색엔진에게 「원본은 여기」라고 말하는 주소.
      SITE_DOMAIN — 이 굳힌 사본이 «얹히는» 주소.
-     둘을 하나로 합치지 말 것. 합치면, 아직 옛 홈페이지가 진짜인 동안에도
-     검색엔진이 이 사본을 원본으로 삼는다. */
-const SITE_DOMAIN = 'fairrunlabor.com';
+     옛 홈페이지가 진짜이던 동안(~2026-11-15)에는 둘이 달라야 했다(사본이 원본 행세를 하면
+     진짜 홈페이지의 검색 노출을 갉아먹으므로). 옛 도메인을 접은 지금은 «같아야» 한다 —
+     다르면 검색엔진이 곧 사라질 주소를 원본으로 삼는다. (tests/home-domain-cname.test.js) */
+const SITE_DOMAIN = 'pureunlabor.co.kr';
 
 /* --live : 도메인을 옮긴 «실제 운영»용으로 굳힌다(검색 차단을 빼고).
-   붙이지 않으면 미리보기용 — 검색에 잡히지 않게 막는다. */
+   붙이지 않으면 미리보기용 — 검색에 잡히지 않게 막는다.
+   ⚠ 2026-11-15 부터 홈페이지는 «운영 중»이다. 혹시 다시 굳힌다면 반드시 --live 를 붙일 것
+     (안 붙이면 홈페이지가 검색에서 통째로 사라진다 — tests/homepage-static.test.js 가 잡는다). */
 const LIVE = process.argv.indexOf('--live') > 0;
+/* ★ 운영 중에는 미리보기로 굳히지 않는다(2026-11-15 보안 검토 낮음 2) — 실수로 돌려도
+   검색 차단이 되살아나거나 ERP 에서 올린 글이 덮이지 않게 «시작하기 전에» 멈춘다.
+   미리보기 사본이 정말 필요하면 --preview 를 붙이고 --out 으로 다른 폴더에 받을 것. */
+if (!LIVE && process.argv.indexOf('--preview') < 0) {
+  console.error('■ 멈춤: 홈페이지는 운영 중이다. --live 를 붙이거나(운영용), --preview --out <다른 폴더> 로 돌릴 것.');
+  process.exit(2);
+}
 
 /* ── 내려받기 (한 번에 넷까지, 예의 있게) ── */
-function fetchBin(url) {
+/* ★ 넘김(3xx)도 «우리 출처 https» 안에서만 따라간다(2026-11-16 보안 재검증 중간) —
+     첫 주소만 검사하면 우리 서버가 302 로 남의 주소를 가리킬 때 그 응답이 우리 자산 자리에 담긴다.
+     넘김은 5번까지만(돌고 도는 넘김 방지). */
+function fetchBin(url, 남은넘김) {
+  if (남은넘김 == null) 남은넘김 = 5;
+  const 빈것 = { code: 0, buf: Buffer.alloc(0), type: '' };
   return new Promise(resolve => {
     const req = https.get(url, { timeout: 30000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return resolve(fetchBin(new URL(res.headers.location, url).href));
+        let 다음;
+        try { 다음 = new URL(res.headers.location, url); } catch (e) { return resolve(빈것); }
+        if (남은넘김 <= 0 || 다음.protocol !== 'https:' || 다음.origin !== new URL(ORIGIN).origin) {
+          console.warn('■ 넘김 건너뜀 — 우리 출처 밖: ' + 다음.href);
+          return resolve(빈것);
+        }
+        return resolve(fetchBin(다음.href, 남은넘김 - 1));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));
@@ -109,8 +150,12 @@ function 자산주소들(글, 기준) {
           || u.startsWith('tel:') || u.startsWith('javascript:')) return;
       let abs;
       try { abs = new URL(u, 기준).href; } catch (e) { return; }
-      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다 */
-      if (abs.indexOf(ORIGIN) !== 0 && abs.indexOf(ORIGIN_HANGUL) !== 0) return;
+      /* 우리 도메인 것만 떠 온다 — 남의 서버(카카오 지도 등)는 그대로 부른다.
+         ★ 앞글자 비교가 아니라 «출처가 정확히 같은가»로 본다(2026-11-16 보안 검토 중간) —
+           `https://xn--…kr.evil.example/…` 처럼 앞이 같은 남의 주소가 끼어들지 못하게. */
+      let 출처 = '';
+      try { 출처 = new URL(abs).origin; } catch (e) { return; }
+      if (출처 !== new URL(ORIGIN).origin) return;
       if (/[?&]act=|[?&]mid=/.test(abs)) return;          // 쪽 주소는 자산이 아니다
       out.add(abs.split('#')[0]);
     });
@@ -130,10 +175,18 @@ function 자산경로(abs) {
   return p;
 }
 
+/* ★ 출력 폴더(OUT) 밖으로는 절대 안 쓴다(2026-11-16 보안 검토 중간) — 자산 주소를 풀면(%2e%2e%2f)
+     `../` 가 되어 저장소의 코드·설정을 덮을 수 있었다. 풀린 자리가 OUT 안이 아니면 건너뛴다. */
 function 담기(파일, buf) {
-  const 자리 = path.join(OUT, 파일);
+  const 자리 = path.resolve(OUT, 파일);
+  const 상대 = path.relative(OUT, 자리);
+  if (!상대 || 상대.split(path.sep)[0] === '..' || path.isAbsolute(상대)) {
+    console.warn('■ 건너뜀 — 출력 폴더 밖 자리: ' + 파일);
+    return false;
+  }
   fs.mkdirSync(path.dirname(자리), { recursive: true });
   fs.writeFileSync(자리, buf);
+  return true;
 }
 
 /* ── 쪽 글자 고치기 ── */
@@ -181,7 +234,7 @@ function 쪽고치기(html, mid) {
         그러면 임시 주소가 «자기가 원본»이라고 검색엔진에 말하게 된다 —
         진짜 홈페이지와 검색에서 서로 잡아먹고, 검색 결과에 깃허브 주소가 뜬다.
         도메인을 옮긴 뒤에는 이 주소가 곧 제 주소라 그대로 맞다. */
-  const 진짜주소 = REAL_ORIGIN + '/' + mid;
+  const 진짜주소 = 쪽주소(mid);
   s = s.replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi,
     '<link rel="canonical" href="' + 진짜주소 + '" />');
   s = s.replace(/(<meta[^>]+property=["']og:url["'][^>]*content=")[^"]*(")/gi,
@@ -295,11 +348,12 @@ function 게시글주소들(html, mid) {
      그날 홈페이지가 조용히 반쪽이 된다. */
   담기('.nojekyll', Buffer.from('', 'utf8'));
 
-  /* ①-2 CNAME — «우리 도메인»을 적어 둔다 (대표 지시 2026-09-03 「fairrunlabor.com 으로
-     도메인 연결해라」). 깃허브 페이지는 이 파일 하나로 어느 주소를 받을지 정한다.
+  /* ①-2 CNAME — «우리 도메인»(SITE_DOMAIN)을 적어 둔다.
+     깃허브 페이지는 이 파일 하나로 어느 주소를 받을지 정한다.
      ⚠ 이 파일이 없으면 «도메인이 조용히 끊긴다» — 홈페이지가 통째로 404 가 되는데
        오류도 안 나고 저장소는 멀쩡해 보인다. 실제로 굳히개가 이 파일을 몰랐다.
-     ⚠ DNS 는 여기서 못 고친다 — 등록처(Squarespace) 화면에서 사람이 고친다.
+     ⚠ DNS 는 여기서 못 고친다 — 등록처(가비아) DNS 관리 화면에서 고친다
+       (A 기록 넷 185.199.108~111.153 + www CNAME nabaho.github.io).
        이 파일은 «깃허브 쪽 절반»이다. 둘이 다 맞아야 열린다. */
   담기('CNAME', Buffer.from(SITE_DOMAIN + '\n', 'utf8'));
 
@@ -346,7 +400,7 @@ function 게시글주소들(html, mid) {
      주소를 그대로 지켰으므로 옮긴 뒤 색인이 빨리 따라온다. */
   const 오늘 = new Date().toISOString().slice(0, 10);
   const 목록 = Object.keys(쪽글).map(mid =>
-    '  <url><loc>' + REAL_ORIGIN + '/' + mid + '</loc>'
+    '  <url><loc>' + 쪽주소(mid) + '</loc>'
     + '<lastmod>' + 오늘 + '</lastmod></url>').join('\n');
   담기('sitemap.xml', Buffer.from(
     '<?xml version="1.0" encoding="UTF-8"?>\n'

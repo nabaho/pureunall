@@ -37,9 +37,15 @@ const verifyAuthenticationResponse = (o) => swa().verifyAuthenticationResponse(o
 /* 로그인은 기다림이 바로 느껴지는 자리라 가까운 곳(서울)에 둔다.
    ⚠ 리전을 바꾸면 주소가 바뀐다 — js/pu-passkey.js 의 BASE 도 함께 고쳐야 한다. */
 const REGION = "asia-northeast3";
+/* ⚠ RP_ID·ORIGIN(검증 기준)은 «옛 출처 그대로» 둔다 (2026-11-15 ERP 주소 이사).
+   패스키 화면은 2026-10-09 에 걷혀(enter.html) 지금 부르는 곳이 없는 «휴면» 기능이다.
+   WebAuthn 규칙상 RP_ID 를 erp.pureunlabor.co.kr 로 바꾸면 이미 등록한 패스키가 전부 무효가
+   되므로, 되살리는 날 «전원 재등록 + passkeys/creds 정리»와 함께 바꾼다.
+   CORS 만은 공용 출처 목록(./erp-origins)을 따른다 — 함수 7곳이 한 잣대를 쓰게. */
 const RP_ID = "nabaho.github.io";
 const RP_NAME = "푸른통합시스템";
 const ORIGIN = "https://nabaho.github.io";
+const ERP_ORIGINS_LIB = require("./erp-origins");
 
 const CHALLENGE_TTL_MS = 3 * 60 * 1000;   // 3분 — 넉넉하되 오래 굴러다니지 않게
 const MAX_DEVICES = 5;                    // 한 사람이 등록할 수 있는 기기 수
@@ -53,18 +59,33 @@ function db() { return OntologyServerWrite.wrapDatabase(getRawDatabase(), { prog
    예전에는 어떤 증표든(익명까지) 받고, 본문에 적힌 «아무 사번»에나 기기를 붙였다 —
    남의 사번마다 기기 한도를 채워 등록을 막을 수 있었다. 잣대는 functions/staff-gate.js 와 같다. */
 const STAFF_GATE = require("./staff-gate").makeStaffGate({ getDatabase: db });
+const LOGIN_SEC = require("./login-security");
 async function ownSidOk(user, sid) {
   if (!user || user.firebase && user.firebase.sign_in_provider === "anonymous") return false;
   try { const role = await STAFF_GATE.assertActive(user.uid); return normSid(role.sid) === sid; }
   catch (e) { return false; }
 }
+/* ★ 로그인·기기 관리에서도 «지금 재직 중인 그 사번» 인지 다시 확인한다 (2026-11-11 폰 보안 점검).
+   등록 뒤 퇴사·중지된 직원이 옛 폰 패스키로 커스텀 토큰(passkey:true)을 새로 받아 들어오는 길을 막고,
+   폰 분실·퇴사 시 관리자(isAdmin·isSubAdmin)가 등록 기기를 조회·회수할 수 있게 한다. */
+async function activeSidOk(uid, sid, gate) {
+  const g = gate || STAFF_GATE;
+  if (!uid || !sid) return false;
+  try { const role = await g.assertActive(uid); return normSid(role.sid) === normSid(sid); }
+  catch (e) { return false; }
+}
+async function canManageDevices(user, sid, have, gate) {
+  const g = gate || STAFF_GATE;
+  if (!user || (user.firebase && user.firebase.sign_in_provider === "anonymous")) return false;
+  let role;
+  try { role = await g.assertActive(user.uid); } catch (e) { return false; }
+  if (role.isAdmin === true || role.isSubAdmin === true) return true;
+  if (normSid(role.sid) !== normSid(sid)) return false;
+  return !have.length || have.every((c) => c.uid === user.uid);
+}
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
 }
@@ -204,7 +225,9 @@ exports.passkeyLoginStart = functions.region(REGION).https.onRequest(async (req,
   const have = await listCreds(sid);
   /* ⚠ 「등록된 기기가 없다」와 「그런 사번이 없다」를 구분해 말하지 않는다 —
      구분해 주면 남의 사번이 있는지 없는지를 알아내는 데 쓰인다. */
-  if (!have.length) return bad(res, 400, "이 사번으로 등록된 기기가 없습니다");
+  if (!have.length || !(await activeSidOk(have[0].uid, sid))) {
+    return bad(res, 400, "이 사번으로 등록된 기기가 없습니다");
+  }
 
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
@@ -257,6 +280,20 @@ exports.passkeyLoginFinish = functions.region(REGION).https.onRequest(async (req
   if (next > 0 && next <= (hit.counter || 0)) {
     return bad(res, 401, "기기 확인 값이 이상합니다. 관리자에게 알려 주세요");
   }
+
+  /* ★ 기기 서명이 맞아도 «지금 재직 중인 그 사번 계정» 이어야만 토큰을 내준다 (2026-11-11).
+     퇴사·중지된 계정이면 로그인 기록과 관리자 경보를 남기고 즉시 거절한다. */
+  if (!(await activeSidOk(hit.uid, sid))) {
+    try {
+      const ev = LOGIN_SEC.buildServerLoginEvent({
+        uid: hit.uid, sid, via: "passkey", kind: "fail", reason: "inactive_account", req,
+      });
+      await db().ref("login_events").push(ev);
+      await db().ref("systemAlerts").push(LOGIN_SEC.buildInactiveAlert({ uid: hit.uid, sid, via: "passkey", at: ev.at }));
+    } catch (e) { /* 경보 실패가 거절 자체를 막지 않게 */ }
+    return bad(res, 403, "재직 중인 계정이 아닙니다. 관리자에게 문의해 주세요");
+  }
+
   await db().ref(DB_CRED + "/" + pathSafe(sid) + "/" + hit._key + "/counter").set(next);
   await db().ref(DB_CRED + "/" + pathSafe(sid) + "/" + hit._key + "/lastAt").set(Date.now());
 
@@ -267,7 +304,7 @@ exports.passkeyLoginFinish = functions.region(REGION).https.onRequest(async (req
   res.json({ ok: true, token });
 });
 
-/* ── ⑤ 등록한 기기 목록·삭제 (잃어버렸을 때) ──────────────────────────────── */
+/* ── ⑤ 등록한 기기 목록·삭제 (잃어버렸을 때·퇴사 회수) ────────────────────── */
 exports.passkeyDevices = functions.region(REGION).https.onRequest(async (req, res) => {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).send("");
@@ -278,9 +315,8 @@ exports.passkeyDevices = functions.region(REGION).https.onRequest(async (req, re
   const sid = normSid((req.body && req.body.sid) || "");
   if (!sid) return bad(res, 400, "사번이 없습니다");
   const have = await listCreds(sid);
-  /* ★ 남의 기기 목록을 보거나 지우지 못하게 — 이 사번의 기기가 «내 계정» 것인지 본다.
-     (등록된 기기가 아직 없으면 볼 것도 없으므로 빈 목록을 돌려준다) */
-  if (have.length && !have.every((c) => c.uid === user.uid)) return bad(res, 403, "다른 사람의 기기입니다");
+  /* ★ 재직 중인 본인 또는 관리자(isAdmin·isSubAdmin)만 기기 목록을 보거나 지울 수 있다. */
+  if (!(await canManageDevices(user, sid, have))) return bad(res, 403, "본인 또는 관리자만 기기를 관리할 수 있습니다");
 
   const del = String((req.body && req.body.remove) || "");
   if (del) {
@@ -295,5 +331,5 @@ exports.passkeyDevices = functions.region(REGION).https.onRequest(async (req, re
   });
 });
 
-// 검사에서 쓰기 위해 내놓는다 (순수 함수만)
-exports._internal = { pathSafe, normSid, RP_ID, ORIGIN, MAX_DEVICES, CHALLENGE_TTL_MS };
+// 검사에서 쓰기 위해 내놓는다
+exports._internal = { pathSafe, normSid, RP_ID, ORIGIN, MAX_DEVICES, CHALLENGE_TTL_MS, activeSidOk, canManageDevices };

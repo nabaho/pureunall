@@ -175,7 +175,7 @@ function 삭제무대(창고) {
     toast: function (m) { 알림.push(m); },
     isAwardType: function (t) { return /표창|포상|감사|공로|상장/.test(String(t || '')); },
     TRASH_DAYS: 30,
-    kcTrashPut: function (store, page, r) { 휴지통.push({ store: store, page: page, id: r.id }); },
+    kcTrashPutMany: function (store, page, rs) { rs.forEach(function (r) { 휴지통.push({ store: store, page: page, id: r.id }); }); return []; },
     kcUndoBar: function () {},
     renderCareer: function () {},
     kcAskDelete: function (btn, o, go) { 물음 = o; ctx._진행 = go; },

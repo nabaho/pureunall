@@ -9,10 +9,11 @@
        갈색 상자 안에 판시 요지 한 덩이, 그 아래 「* 사건 / * 원고 / * 피고 /
        * 원심판결 / * 판결선고」가 줄줄이. 링크 한 줄이 아니었다.
 
-   ★ 어디서 오는가 — 법제처 «국가법령정보 공동활용»(DRF) 판례 API.
-     news-brief 가 법령을 읽는 그 문이다(OC=test).
-       목록: /DRF/lawSearch.do?target=prec
-       한 건: /DRF/lawService.do?target=prec&ID=…
+   ★ 어디서 오는가 — 국가법령정보센터 «공개 쪽»(열쇠 없이 열리는 사람용 쪽, 2026-11-16 부터).
+       목록: /LSW/precSc.do?…&query=      (선고일 내림차순)
+       한 건: /LSW/precInfoP.do?precSeq=…  (받는 분이 누르는 바로 그 쪽)
+     ⚠ 예전에는 법제처 공동활용 문(DRF·OC=test)이었다 — 법제처가 그 열쇠를 거절해(2026-10-09 무렵부터)
+       다섯 주 동안 한 건도 못 모았다. 아래 「⑥ 공개 쪽」 머리글 참고.
 
    ★ 이 파일은 «글자를 다루는 일»만 한다 — 바깥을 두드리는 것은 index.js.
 
@@ -21,19 +22,35 @@
 
 var 밑 = "https://www.law.go.kr";
 
+/* 목록 — 공개 판례 검색, 선고일 내림차순(selSort1=2 선고일자 · selSort2=DESC). 예전 DRF(sort=ddes)와 같은 차례다.
+   ⚠ 몇개는 1~50 — 사람용 쪽이라 크게 부르지 않는다(낱말 하나에 다섯이면 넉넉하다, 예전 display=5 와 같다). */
+function 몇개꼴(n, 기본) {
+  var k = Math.floor(Number(n) || 기본);
+  return Math.max(1, Math.min(50, k));
+}
 function 목록주소(낱말, 몇개) {
-  return 밑 + "/DRF/lawSearch.do?OC=test&target=prec&type=XML&sort=ddes&search=2"
-    + "&display=" + (Number(몇개) || 5)
+  return 밑 + "/LSW/precSc.do?menuId=7&subMenuId=47&tabMenuId=213&selSort1=2&selSort2=DESC"
+    + "&outmax=" + 몇개꼴(몇개, 5)
     + "&query=" + encodeURIComponent(String(낱말 || ""));
 }
+/* 한 건 — 받는 분이 누르는 공개 쪽 그대로 읽는다(보는주소). 번호는 숫자만 넣는다. */
 function 한건주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=prec&type=XML&ID="
+  return 보는주소(String(일련번호 == null ? "" : 일련번호).replace(/\D/g, ""));
+}
+/* 사람이 눌러 볼 자리 — 국가법령정보센터의 «공개 쪽»(열쇠 없이 열린다).
+   ⚠⚠ 예전에는 DRF 의 서식 쪽(type=HTML·OC=test)이었다. 법제처가 OC=test 를 거절하면서 그 쪽은
+     받는 분 눈에 「국가법령정보 공동활용 페이지 접속에 실패하였습니다」가 됐다(2026-11-15 실측).
+     같은 번호(일련번호 = precSeq)로 공개 쪽이 그 판례를 그대로 연다. 옛 꼴은 Core.법제처사람주소 가 바꾼다. */
+function 보는주소(일련번호) {
+  return 밑 + "/LSW/precInfoP.do?precSeq="
     + encodeURIComponent(String(일련번호 || ""));
 }
-/* 사람이 눌러 볼 자리 — 서식 있는 쪽 */
-function 보는주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=prec&type=HTML&ID="
-    + encodeURIComponent(String(일련번호 || ""));
+
+/* 법제처 DRF 가 우리를 «거절»했나 — 응답은 200 인데 몸이 「사용자 정보 검증에 실패」다(2026-11-15 실측).
+   ⚠⚠ 200 이라 오류로 안 잡히고 «0건»으로 조용히 넘어갔다 — 그래서 10월 9일 뒤로 판례가 한 건도
+     안 들어왔는데 탈(오류) 칸은 늘 비어 있었다. 이 말이 보이면 «못 읽었다»로 친다. */
+function 거절인가(글) {
+  return /사용자 정보 검증에 실패|공동활용 페이지 접속에 실패/.test(String(글 == null ? "" : 글));
 }
 
 /* ── 글자 다듬기 ────────────────────────────────────────────────────── */
@@ -73,8 +90,10 @@ function 선고꼴(s) {
   return p[0] + ". " + Number(p[1]) + ". " + Number(p[2]) + ".";
 }
 
-/* ── ① 목록 읽기 ───────────────────────────────────────────────────── */
+/* ── ① 목록 읽기 ─────────────────────────────────────────────────────
+   ★ 공개 쪽(HTML)이 오면 공개판례목록읽기 로, 예전 DRF XML 이 오면 아래 그대로 읽는다. */
 function 목록읽기(xml) {
+  if (!/<prec[\s>]/.test(String(xml == null ? "" : xml))) return 공개판례목록읽기(xml);
   var 덩이 = String(xml == null ? "" : xml).split(/<prec[\s>]/).slice(1);
   return 덩이.map(function (b) {
     return {
@@ -90,9 +109,12 @@ function 목록읽기(xml) {
   }).filter(function (x) { return x.일련번호 && x.사건번호; });
 }
 
-/* ── ② 한 건 읽기 — 판시사항·판결요지까지 ───────────────────────────── */
-function 한건읽기(xml) {
+/* ── ② 한 건 읽기 — 판시사항·판결요지까지 ─────────────────────────────
+   ★ 공개 쪽(HTML)이면 먼저 «예전 XML 칸 모양»으로 바꾼다(공개쪽XML) — 읽는 잣대는 하나로 둔다.
+     번호는 공개 쪽에 숨은 칸(fPrecSeq)으로도 오지만, 부른 쪽이 아는 번호를 먼저 쓴다. */
+function 한건읽기(xml, 번호) {
   var s = String(xml == null ? "" : xml);
+  if (s.indexOf("<판례정보일련번호>") < 0) s = 공개쪽XML("prec", s, 번호);
   var 일련 = 뽑기(s, "판례정보일련번호");
   if (!일련) return null;
   return {
@@ -264,21 +286,23 @@ function 오래된것털기(모아둔것, 오늘, 며칠) {
 
    ⚠ 회답이 없으면 «싣지 않는다». 물음만 있고 답이 없는 칸은 아무 쓸모가 없다. */
 
+/* 목록 — 공개 법령해석례 검색. 기본 차례가 회신일 내림차순(selSort=30desc)이라 그대로 둔다. */
 function 해석목록주소(낱말, 몇개) {
-  return 밑 + "/DRF/lawSearch.do?OC=test&target=expc&type=XML&search=2"
-    + "&display=" + (Number(몇개) || 5)
+  return 밑 + "/LSW/expcSc.do?menuId=7&subMenuId=51&tabMenuId=237"
+    + "&outmax=" + 몇개꼴(몇개, 5)
     + "&query=" + encodeURIComponent(String(낱말 || ""));
 }
 function 해석한건주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=expc&type=XML&ID="
-    + encodeURIComponent(String(일련번호 || ""));
+  return 해석보는주소(String(일련번호 == null ? "" : 일련번호).replace(/\D/g, ""));
 }
+/* 사람이 눌러 볼 자리 — 판례(보는주소)와 같은 까닭으로 공개 쪽이다(2026-11-15) */
 function 해석보는주소(일련번호) {
-  return 밑 + "/DRF/lawService.do?OC=test&target=expc&type=HTML&ID="
+  return 밑 + "/LSW/expcInfoP.do?expcSeq="
     + encodeURIComponent(String(일련번호 || ""));
 }
 
 function 해석목록읽기(xml) {
+  if (!/<expc[\s>]/.test(String(xml == null ? "" : xml))) return 공개해석목록읽기(xml);
   var 덩이 = String(xml == null ? "" : xml).split(/<expc[\s>]/).slice(1);
   return 덩이.map(function (b) {
     return {
@@ -292,8 +316,9 @@ function 해석목록읽기(xml) {
   }).filter(function (x) { return x.일련번호 && x.안건명; });
 }
 
-function 해석한건읽기(xml) {
+function 해석한건읽기(xml, 번호) {
   var s = String(xml == null ? "" : xml);
+  if (s.indexOf("<법령해석례일련번호>") < 0) s = 공개쪽XML("expc", s, 번호);
   var 일련 = 뽑기(s, "법령해석례일련번호");
   if (!일련) return null;
   return {
@@ -418,9 +443,154 @@ function 안모은것만(후보들, 모아둔것) {
   });
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ⑥ 국가법령정보센터 «공개 쪽» 읽기 (2026-11-16 대표 「남은거 모두해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ■ 왜 — 법제처 공동활용 문(DRF)이 공개 열쇠 OC=test 를 거절한다(2026-11-15 실측: 200 + 「사용자 정보 검증에
+     실패 … 서버장비의 IP주소 및 도메인주소를 등록해 주세요」). 새 열쇠를 받아도 서버 IP 를 등록해야 하는데
+     클라우드 함수는 나가는 IP 가 고정이 아니다. 그래서 열쇠 없이 열리는 «사람용 쪽»을 읽는다.
+     robots.txt 는 «모두 허용»이다(2026-11-16 확인). 날마다 목록 열 번 · 한 건 열두 번쯤이다.
+   ■ 무엇을 — 2026-11-16 실측한 모양
+     판례 목록 한 줄: onclick="precView('625415','Y')" … 퇴직금등 <span> [대법원 2026. 9. 3. 선고 2024다206043 판결]</span>
+                      (같은 번호의 둘째 줄은 판시 미리보기 <p class="tx"> — 건너뛴다)
+     판례 한 건    : <h2>사건명</h2> · <div class="ct_sub"><span>[법원 날짜 선고 번호 판결]</span>
+                      · <h4>【판시사항】</h4><p>…</p> · 【판결요지】 · 【참조조문】 · 【참조판례】 · 【전문】(<h5>【주 문】</h5> …)
+     해석 목록 한 줄: onclick="expcView('343479','Y')" 안건명</a></td><td> 법제처 26-0228 </td><td> 2026. 07. 15 </td><td> 민원인 </td>
+     해석 한 건    : <h2>안건명</h2> · <span> [법제처 26-0209, 2026. 5. 26., 민원인] </span> · 【질의요지】 · 【회답】 · 【이유】
+   ★ 한 건은 «예전 XML 칸 모양»으로 바꿔 넘긴다(공개쪽XML) — 한건읽기·해석한건읽기·전문 보기(news-full.js)가
+     그 모양을 그대로 읽는다. 읽는 층을 두 벌로 두면 한쪽만 낡는다.
+   ⚠ 남의 집 화면이라 모양이 언젠가 바뀐다 — 모양을 못 알아보면 «빈손»을 돌려준다(지어내지 않는다).
+     목록이 모든 낱말에서 빈손이면 모으개(index.js)가 «못 읽었다»로 탈을 남긴다. */
+
+/* 태그를 걷은 한 줄 글자 — 목록 칸·머리줄용 */
+function 한줄글(s) {
+  return 풀기(String(s == null ? "" : s).replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+}
+
+/* 「2026. 07. 15」 · 「2026. 5. 26.」 → 2026-07-15 (자릿수가 들쭉날쭉해도) */
+function 점날짜(s) {
+  var m = /(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/.exec(String(s == null ? "" : s));
+  return m ? m[1] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[3]).slice(-2) : "";
+}
+
+/* 「[대법원 2026. 5. 21. 선고 2018다296229 전원합의체 판결]」 · 「[수원고등법원 2025. 12. 17. 선고 2025나11545 판결 : 확정]」
+   · 「[대법원 2025. 3. 4.자 2024마1234 결정]」 → { 법원, 선고일, 사건번호, 판결유형 }. 못 알아보면 null. */
+function 판례꼬리풀기(글) {
+  var t = 한줄글(글).replace(/^\[\s*/, "").replace(/\s*\]$/, "");
+  var m = /^(.+?)\s+(\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2})\s*\.?\s*(?:자\s*)?(?:선고\s+)?(.+?)(?:\s*:\s*[^:]*)?$/.exec(t);
+  if (!m) return null;
+  var 뒤 = m[3].trim();
+  var 유형 = (/((?:전원합의체\s*)?(?:판결|결정|명령))$/.exec(뒤) || [, ""])[1];
+  var 번호 = (유형 ? 뒤.slice(0, 뒤.length - 유형.length) : 뒤).trim();
+  if (!번호 || !/\d/.test(번호)) return null;
+  return { 법원: m[1].trim(), 선고일: 점날짜(m[2]), 사건번호: 번호, 판결유형: 유형.replace(/\s+/g, " ") };
+}
+
+function 공개판례목록읽기(html) {
+  var s = String(html == null ? "" : html);
+  var re = /precView\('(\d{1,12})'[^)]*\)\s*;?\s*return false;?"\s*>([\s\S]*?)<\/a>/g;
+  var 본것 = {}, out = [], m;
+  while ((m = re.exec(s))) {
+    var 번호 = m[1], 안 = m[2];
+    if (본것[번호] || /class="tx"/.test(안)) continue;
+    var k = /<span[^>]*>\s*(\[[\s\S]*?\])\s*<\/span>/.exec(안);
+    if (!k) continue;
+    var 꼬리 = 판례꼬리풀기(k[1]);
+    if (!꼬리) continue;
+    본것[번호] = 1;
+    out.push({
+      일련번호: 번호, 사건명: 한줄글(안.slice(0, k.index)),
+      사건번호: 꼬리.사건번호, 선고일: 꼬리.선고일, 법원: 꼬리.법원,
+      사건종류: "", 판결유형: 꼬리.판결유형, 출처: "국가법령정보센터"
+    });
+  }
+  return out;
+}
+
+function 공개해석목록읽기(html) {
+  var s = String(html == null ? "" : html);
+  var re = /expcView\('(\d{1,12})'[^)]*\)\s*;?\s*return false;?"\s*>([\s\S]*?)<\/a>\s*<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/g;
+  var 본것 = {}, out = [], m;
+  while ((m = re.exec(s))) {
+    if (본것[m[1]]) continue;
+    var 기관번호 = 한줄글(m[3]);                  /* 「법제처 26-0228」 */
+    var b = /^(\S+)\s+(.+)$/.exec(기관번호) || [null, "", 기관번호];
+    var 안건명 = 한줄글(m[2]);
+    if (!안건명) continue;
+    본것[m[1]] = 1;
+    out.push({ 일련번호: m[1], 안건명: 안건명, 안건번호: b[2].trim(), 회신일: 점날짜(m[4]),
+      회신기관: b[1] || "법제처", 질의기관: 한줄글(m[5]) });
+  }
+  return out;
+}
+
+/* 본문 한 칸을 «줄을 살린 글»로 — 글 속 꾸밈 태그(a·strong·span…)는 글자만 남기고, 덩이 태그(p·h5·div)는 줄을 바꾼다.
+   ⚠ 꾸밈 태그를 빈칸으로 바꾸면 「여부 (원칙적 적극)」처럼 괄호 앞에 빈칸이 생긴다 — 없앤다. */
+function 공개글(s) {
+  return 글다듬기(String(s == null ? "" : s)
+    .replace(/<\/?(?:a|strong|b|em|i|u|span|font|sup|sub|label|img|input)\b[^>]*>/gi, "")
+    .replace(/<\/?(?:p|div|h[1-6]|li|tr|table|tbody|ul|ol)\b[^>]*>/gi, "\n"));
+}
+
+/* 【이름】 머리표(<h4>) 아래 덩이 — 다음 <h4> 나 본문 끝까지. 없으면 빈 글자. */
+function 공개칸(html, 이름) {
+  var 표 = String(이름).split("").join("\\s*");
+  var re = new RegExp("【\\s*" + 표 + "\\s*】\\s*</h4>([\\s\\S]*?)(?=<h4\\b|id=\"fPrecSeq\"|<!--\\s*/\\s*contentBody|$)");
+  var m = re.exec(String(html == null ? "" : html));
+  return m ? m[1] : "";
+}
+
+/* 줄을 살린 글 → XML 한 칸. 뽑기·글다듬기 가 정확히 되돌린다(<br/> = 줄, &lt; 따위는 풀린다). */
+function XML칸(태그, 글) {
+  var t = String(글 == null ? "" : 글)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
+  return "<" + 태그 + ">" + t + "</" + 태그 + ">";
+}
+
+/* 공개 쪽 한 건 → 예전 DRF XML 칸 모양. 모양을 못 알아보면 "" (지어내지 않는다).
+   번호는 숫자만 — 모르면 공개 쪽 숨은 칸에서 찾는다. */
+function 공개쪽XML(갈래, html, 번호) {
+  var s = String(html == null ? "" : html);
+  var 제목 = 한줄글((/<h2\b[^>]*>([\s\S]*?)<\/h2>/.exec(s) || [, ""])[1]);
+  var 꼬리글 = 한줄글((/class="ct_sub"[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/.exec(s) || [, ""])[1]);
+  var 번 = String(번호 == null ? "" : 번호).replace(/\D/g, "");
+  if (갈래 === "expc") {
+    if (!번) 번 = (/id="(?:fExpcSeq|expcSeq)"[^>]*value="(\d{1,12})"/.exec(s) || [, ""])[1];
+    var e = /^\[?\s*(\S+)\s+([^,\]]+?)\s*,\s*(\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2}\.?)\s*,?\s*([^\]]*?)\s*\]?$/.exec(꼬리글);
+    var 질의 = 공개글(공개칸(s, "질의요지")), 회답 = 공개글(공개칸(s, "회답"));
+    if (!제목 || (!질의 && !회답)) return "";
+    return "<ExpcService>"
+      + (번 ? XML칸("법령해석례일련번호", 번) : "")
+      + XML칸("안건명", 제목)
+      + XML칸("안건번호", e ? e[2] : "")
+      + XML칸("해석일자", e ? 점날짜(e[3]).replace(/-/g, "") : "")
+      + XML칸("해석기관명", e ? e[1] : "")
+      + XML칸("질의기관명", e ? e[4] : "")
+      + XML칸("질의요지", 질의) + XML칸("회답", 회답)
+      + XML칸("이유", 공개글(공개칸(s, "이유")))
+      + "</ExpcService>";
+  }
+  if (!번) 번 = (/id="fPrecSeq"[^>]*value="(\d{1,12})"/.exec(s) || [, ""])[1];
+  var 꼬리 = 판례꼬리풀기(꼬리글);
+  if (!제목 || !꼬리) return "";
+  return "<PrecService>"
+    + (번 ? XML칸("판례정보일련번호", 번) : "")
+    + XML칸("사건명", 제목) + XML칸("사건번호", 꼬리.사건번호)
+    + XML칸("선고일자", 꼬리.선고일.replace(/-/g, "")) + XML칸("선고", "선고")
+    + XML칸("법원명", 꼬리.법원) + XML칸("사건종류명", "") + XML칸("판결유형", 꼬리.판결유형)
+    + XML칸("판시사항", 공개글(공개칸(s, "판시사항")))
+    + XML칸("판결요지", 공개글(공개칸(s, "판결요지")))
+    + XML칸("참조조문", 공개글(공개칸(s, "참조조문")))
+    + XML칸("참조판례", 공개글(공개칸(s, "참조판례")))
+    + XML칸("판례내용", 공개글(공개칸(s, "전문")))
+    + "</PrecService>";
+}
+
 module.exports = {
+  공개판례목록읽기: 공개판례목록읽기, 공개해석목록읽기: 공개해석목록읽기, 판례꼬리풀기: 판례꼬리풀기,
+  공개쪽XML: 공개쪽XML, 공개글: 공개글, 공개칸: 공개칸, 점날짜: 점날짜,
   안모은것만: 안모은것만,
-  밑: 밑, 목록주소: 목록주소, 한건주소: 한건주소, 보는주소: 보는주소,
+  밑: 밑, 목록주소: 목록주소, 한건주소: 한건주소, 보는주소: 보는주소, 거절인가: 거절인가,
   해석목록주소: 해석목록주소, 해석한건주소: 해석한건주소, 해석보는주소: 해석보는주소,
   해석목록읽기: 해석목록읽기, 해석한건읽기: 해석한건읽기, 노무해석인가: 노무해석인가,
   안건다듬기: 안건다듬기, 회답고르기: 회답고르기,
