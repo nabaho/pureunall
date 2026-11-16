@@ -69,8 +69,14 @@ function 담긴수(w) {
     Object.values(w.캐시).reduce((n, a) => n + a.length, 0);
 }
 
-async function 보내보기(파일, 뿌리, 앱, 덧) {
-  const w = 켜기(파일, 뿌리);
+/* 켠 일꾼을 다시 쓸 때 담긴 것을 비운다(일꾼은 같은 그릇을 붙들고 있으니 그릇 안만 비운다) */
+function 비우기(w) {
+  for (const 그릇 of [w.담긴것, w.캐시, w.자리]) for (const k of Object.keys(그릇)) delete 그릇[k];
+}
+
+/* w — 미리 켠 일꾼(같은 짝·같은 뿌리로 여러 번 보낼 때 다시 켜지 않는다). 없으면 새로 켠다 */
+async function 보내보기(파일, 뿌리, 앱, 덧, w) {
+  if (w) 비우기(w); else w = 켜기(파일, 뿌리);
   const 곳 = 받는곳(앱, 뿌리);
   const res = await 보내기(w.handlers, 공유요청(곳.주소, 곳.칸, [사진('명함.jpg')], 덧));
   return { res, n: 담긴수(w) };
@@ -128,8 +134,9 @@ test('★ ③ 폰의 공유·우리 앱 화면에서 온 것은 그대로 담는
   assert.ok(짝들.length, '받는 짝이 없습니다(② 먼저)');
   for (const { f, 앱 } of 짝들) {
     for (const 뿌리 of 뿌리들) {
+      const w = 켜기(f, 뿌리);
       for (const [이름, 덧] of 경우들(뿌리).받음) {
-        const { res, n } = await 보내보기(f, 뿌리, 앱, 덧);
+        const { res, n } = await 보내보기(f, 뿌리, 앱, 덧, w);
         assert.ok(res && res.status === 303 && n > 0,
           '★ ' + f + ' 이 ' + 앱.f + ' 공유를 «' + 이름 + '»에서 받았는데 안 담았습니다(' + (res && res.status) + ') — 폰의 공유가 막힙니다');
       }
@@ -141,8 +148,9 @@ test('★ ③ 다른 웹사이트가 보낸 것은 어느 일꾼도 담지 않�
   assert.ok(짝들.length, '받는 짝이 없습니다(② 먼저)');
   for (const { f, 앱 } of 짝들) {
     for (const 뿌리 of 뿌리들) {
+      const w = 켜기(f, 뿌리);
       for (const [이름, 덧] of 경우들(뿌리).거절) {
-        const { res, n } = await 보내보기(f, 뿌리, 앱, 덧);
+        const { res, n } = await 보내보기(f, 뿌리, 앱, 덧, w);
         const 어디 = f + ' · ' + 앱.f + ' · «' + 이름 + '» · ' + 뿌리;
         assert.equal(n, 0, '★ 다른 사이트가 보낸 것을 담았습니다: ' + 어디);
         assert.ok(res, '응답이 없으면 전송이 서버(깃허브)로 가 오류 화면이 뜹니다: ' + 어디);
@@ -153,6 +161,26 @@ test('★ ③ 다른 웹사이트가 보낸 것은 어느 일꾼도 담지 않�
         const 고리 = [...본문.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
         assert.ok(고리.length >= 1, '거절 화면에 앱으로 돌아갈 고리가 없습니다: ' + 어디);
         for (const h of 고리) assert.ok(h.startsWith(뿌리), '거절 화면의 고리가 앱 밖을 가리킵니다(' + h + '): ' + 어디);
+      }
+    }
+  }
+});
+
+test('★ ③ 받은 주소를 꼬아 보내도 거절 화면의 «앱으로 가기»는 앱 폴더 안을 가리킨다', async () => {
+  /* 주소 앞에 빗금 둘(//남의주소/…)을 붙이면, 받은 주소에서 고리를 만들 때 남의 사이트 주소로 풀린다 */
+  assert.ok(짝들.length, '받는 짝이 없습니다(② 먼저)');
+  for (const { f, 앱 } of 짝들) {
+    for (const 뿌리 of 뿌리들) {
+      const w = 켜기(f, 뿌리);
+      const 곳 = 받는곳(앱, 뿌리);
+      const 꼰주소 = new URL(뿌리).origin + '//evil.example' + new URL(곳.주소).pathname;
+      const res = await 보내기(w.handlers, 공유요청(꼰주소, 곳.칸, [사진('명함.jpg')], { 보낸곳: 'https://evil.example/' }));
+      const 어디 = f + ' · ' + 앱.f + ' · ' + 꼰주소;
+      if (!res) continue;   // 꼰 주소를 아예 안 받는 일꾼은 브라우저가 평소대로 처리한다 — 고리를 만들 일이 없다
+      assert.equal(담긴수(w), 0, '꼰 주소로 온 남의 전송을 담았습니다: ' + 어디);
+      const 고리 = [...(await res.text()).matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+      for (const h of 고리) {
+        assert.ok(h.startsWith(뿌리) && !h.includes('evil.example'), '거절 화면의 고리가 앱 밖을 가리킵니다(' + h + '): ' + 어디);
       }
     }
   }

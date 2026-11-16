@@ -30,13 +30,14 @@ function 일꾼켜기(파일, 주소) {
   ctx.indexedDB = {
     open(이름, 판) {
       const req = {};
-      setTimeout(function () {
+      /* setImmediate — 윈도우에서 setTimeout(0) 은 한 번에 약 15ms 를 기다려 공유를 수백 번 보내는 검사가 느려진다 */
+      setImmediate(function () {
         req.result = {
           objectStoreNames: { contains() { return true; } },
           createObjectStore() {},
           transaction() {
             const tx = {};
-            setTimeout(function () { tx.oncomplete && tx.oncomplete(); }, 0);
+            setImmediate(function () { tx.oncomplete && tx.oncomplete(); });
             return Object.assign(tx, {
               objectStore(함) {
                 /* 이름만 맞고 판·함이 어긋나도 꺼내는 쪽은 빈 함을 연다 — 셋 다 적어 둔다 */
@@ -51,7 +52,7 @@ function 일꾼켜기(파일, 주소) {
           close() {}
         };
         req.onsuccess && req.onsuccess();
-      }, 0);
+      });
       return req;
     }
   };

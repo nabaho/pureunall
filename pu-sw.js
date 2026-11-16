@@ -85,9 +85,14 @@ function fromOtherSite(req) {
   return false;
 }
 
-/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다) */
+/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다)
+   home 은 받은 주소가 아니라 «이 일꾼 폴더 기준의 정해 둔 화면»으로 준다. 그래도 풀린 주소가
+   이 폴더 밖이면 폴더 첫 화면으로 — «앱으로 가기»가 앱 밖을 가리키면 안 된다. */
 function refuseOtherSite(home) {
-  var to = String(new URL(home, self.location).href).replace(/[&<>"']/g, function (c) {
+  var base = new URL('./', self.location);
+  var dest = new URL(home, base);
+  if (dest.origin !== base.origin || dest.pathname.indexOf(base.pathname) !== 0) dest = base;
+  var to = String(dest.href).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
   var html = '<!doctype html><html lang="ko"><head><meta charset="utf-8">' +
@@ -169,7 +174,7 @@ function keepPhotos(files) {
 }
 
 function takePhotos(req, url) {
-  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite(url.pathname));
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + PHOTOS_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     /* manifest 의 params.files[0].name 과 같은 이름이어야 한다 */
@@ -197,7 +202,7 @@ function takePhotos(req, url) {
    따로 들면 언젠가 어긋나 사진첩이 빈 함을 열고 「보낸 게 없다」고 한다).
    ⚠ 파일 칸 이름은 pu-erp-manifest.json 의 params.files[0].name 과 짝이다. */
 function takeErp(req, url) {
-  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite(url.pathname));
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + ERP_SHARE));
   /* 넘길 곳은 «이 앱과 같은 폴더»의 사진첩이다 — 주소를 손으로 붙이지 않고 받은 주소에서 만든다 */
   var photos = url.origin + url.pathname.slice(0, url.pathname.length - ERP_SHARE.length) + PHOTOS_SHARE;
   return req.formData().then(function (fd) {
@@ -251,7 +256,7 @@ function keepPaydata(files) {
 }
 
 function takePaydata(req, url) {
-  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite(url.pathname));
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + PAYDATA_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     var files = fd.getAll('photos').filter(function (f) {
@@ -303,7 +308,7 @@ function keepViewer(files) {
 }
 
 function takeViewer(req, url) {
-  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite(url.pathname));
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + VIEWER_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     var files = fd.getAll('docs').filter(function (f) {

@@ -69,9 +69,14 @@ function fromOtherSite(req) {
   return false;
 }
 
-/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다) */
+/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다)
+   home 은 받은 주소가 아니라 «이 일꾼 폴더 기준의 정해 둔 화면»으로 준다. 그래도 풀린 주소가
+   이 폴더 밖이면 폴더 첫 화면으로 — «앱으로 가기»가 앱 밖을 가리키면 안 된다. */
 function refuseOtherSite(home) {
-  var to = String(new URL(home, self.location).href).replace(/[&<>"']/g, function (c) {
+  var base = new URL('./', self.location);
+  var dest = new URL(home, base);
+  if (dest.origin !== base.origin || dest.pathname.indexOf(base.pathname) !== 0) dest = base;
+  var to = String(dest.href).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
   var html = '<!doctype html><html lang="ko"><head><meta charset="utf-8">' +
