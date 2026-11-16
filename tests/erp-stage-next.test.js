@@ -197,7 +197,7 @@ test('줄 — 후보가 없으면 줄이 없고, 후보에는 «후속 계약 �
 /* ── 짜임새: 계약 창에는 «저장된 계약»만 · 단계 상자 바로 아래 · 닫기 길은 계약 창의 onClose ── */
 test('계약 창에 한 번, 사건 상자 안에서만 걸리고 저장된 계약(props.cur)을 넘긴다 · 계약관리는 닫힐 때 씨앗을 받는다', () => {
   assert.equal((SRC.match(/isCase && erpStageNextRow\(props\.cur, /g) || []).length, 1);
-  const box = SRC.indexOf('isCase && erpStageBox(f, setF, caseStageOpts)');
+  const box = SRC.indexOf('isCase && erpStageBox(f, setF, caseStageOpts, props.cur)');   // E — 4번째 인자는 저장된 계약(다시 읽기)
   const next = SRC.indexOf('isCase && erpStageNextRow(props.cur, ');
   assert.ok(box > 0 && next > box && next - box < 900, '단계 상자 바로 아래');
   assert.match(SRC.slice(next, next + 300), /erpStageGoFollowup\(props\.cur, nx, props\.onClose\)/, '눌렀을 때 계약 창을 닫는다');

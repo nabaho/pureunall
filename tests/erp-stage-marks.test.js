@@ -336,7 +336,7 @@ test('칩·상자는 세 카드 모양과 계약 창에 한 번씩 걸려 있고
   assert.ok(!/erpStageChip\(c\)/.test(l1), '첫 줄(회사명 줄)에는 안 둔다 — 회사명이 줄을 차지하면 칩이 찌그러진다');
   assert.equal((SRC.match(/var stgL = erpStageChipInfo\(c\)/g) || []).length, 1, '목록 카드');
   assert.equal((SRC.match(/var stgP = erpStageChipInfo\(c\)/g) || []).length, 1, '폰 카드');
-  assert.equal((SRC.match(/isCase && erpStageBox\(f, setF, caseStageOpts\)/g) || []).length, 1, '계약 창 — 사건 종류 상자 안에서만');
+  assert.equal((SRC.match(/isCase && erpStageBox\(f, setF, caseStageOpts(?:, props\.cur)?\)/g) || []).length, 1, '계약 창 — 사건 종류 상자 안에서만(4번째 인자 props.cur 는 단계 E)');
   assert.match(SRC, /<script src="js\/pu-case-stage\.js\?v=\d+"><\/script>/, '모듈 적재');
 });
 

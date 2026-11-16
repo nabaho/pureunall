@@ -94,6 +94,10 @@ for (let i = 0; i < 30; i++) {
     { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '지방노동위원회 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
     { code: 'lrc-central', state: 'checked', strength: 'strong', evidence: '중앙노동위원회 재심 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
   { id: 'ct-pa-stg5', no: 94, st: 'consult', i: 27, marks: [], extra: { parentContractId: 'ct-pa-stg4', stageCode: 'court-admin' } },
+  /* ⑥ 확정 · 단계 마크 없음 · 메모에 지노위·중노위 낱말이 있다 → 계약 창 «계약 글에서 읽어 보기»를 누르면 두 단계를 읽는다(2026-11-16, 계획 5 · E)
+     ⑦ 확정 · 단계 마크 없음 · 낱말 없음 → 눌러도 «찾지 못했습니다» */
+  { id: 'ct-pa-stg6', no: 95, st: 'signed', i: 26, marks: [], extra: { note: '수임계약서 — 부당해고 구제신청(지방노동위원회) 및 중앙노동위원회 재심 대리' } },
+  { id: 'ct-pa-stg7', no: 96, st: 'signed', i: 25, marks: [], extra: { note: '임금체불 진정 대리 — 노동청 진정만' } },
 ].forEach((x) => {
   계약.push(Object.assign({
     id: x.id, entityType: 'contract', contractNo: `계약-2026-${String(100 + x.no)}`,
