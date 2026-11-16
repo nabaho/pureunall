@@ -10,7 +10,7 @@
     if (m.cmd === 'run-now') {
       chrome.runtime.sendMessage({ cmd: 'run-now' }, function (r) {
         void chrome.runtime.lastError;
-        window.postMessage({ __from: EXT, __to: PAGE, cmd: 'run-now-ack', ok: !!(r && r.ok), why: (r && r.why) || '' }, location.origin);
+        window.postMessage({ __from: EXT, __to: PAGE, cmd: 'run-now-ack', ok: !!(r && r.ok), running: !!(r && r.running), why: (r && r.why) || '' }, location.origin);
       });
       return;
     }
