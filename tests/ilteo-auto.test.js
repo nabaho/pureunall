@@ -1158,3 +1158,73 @@ test('14. 상호 정규화(normalizeCorpName) 노출 · CP949 ZIP 인메모리 �
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 });
+
+test('15. 화면 좌우 전체폭 레이아웃 · 최신 연도순(2026→2015) 기본 정렬 · 연도별 필터/검토 패널 검증', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'ilteo.html'), 'utf8');
+  const viewJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ilteo-view.js'), 'utf8');
+
+  /* ① 좌우 전체폭 사용: main 에 max-width:1360px 제한이 없어야 하고 width:100%;max-width:none 및 좌우 분할(.proj-split)이 적용되어야 함 */
+  assert.doesNotMatch(html, /main\{[^}]*max-width:1360px/, 'main 본문이 1360px 가운데 상자에 갇히지 않고 좌우 전체 폭을 써야 한다');
+  assert.match(html, /main\{width:100%;max-width:none;/, 'main 이 좌우 100% 전체폭을 사용해야 한다');
+  assert.match(html, /id="yearQuickBar"/, '원클릭 연도별 빠른 필터 바가 존재해야 한다');
+  assert.match(html, /id="yearSummaryBar"/, '연도별 검토 요약 바가 존재해야 한다');
+  assert.match(html, /id="projSort"/, '정렬 기준 선택기가 존재해야 한다');
+  assert.match(html, /id="projReviewBox"/, '우측 즉시 검토 패널이 존재해야 한다');
+  assert.match(viewJs, /openYearReviewModal/, '연도별 종합검토 모달 함수가 구현되어야 한다');
+
+  /* ② PuIlteoView.sortProjects: 백필 updatedAt 이 역순이어도 기본(year_desc) 정렬 시 최신 연도순(2026→2015)으로 정렬되어야 함 */
+  const sandbox = {};
+  const vm = require('node:vm');
+  vm.createContext(sandbox);
+  vm.runInContext(viewJs, sandbox);
+  assert.ok(sandbox.PuIlteoView && typeof sandbox.PuIlteoView.sortProjects === 'function');
+
+  const jumbled = [
+    { id: 'ilt_a_2015', year: 2015, companyName: '(주)가나시스템', updatedAt: 9000 },
+    { id: 'ilt_b_2018', year: 2018, companyName: '(주)다라유한', updatedAt: 8000 },
+    { id: 'ilt_c_2026', year: 2026, companyName: '(주)하하테크', updatedAt: 1000 },
+    { id: 'ilt_d_2016', year: 2016, companyName: '(주)마바공단', updatedAt: 7000 },
+    { id: 'ilt_e_2024', year: 2024, companyName: '(주)사아산업', updatedAt: 2000 },
+    { id: 'ilt_f_2026', year: 2026, companyName: '(주)가나모빌리티', updatedAt: 1000 }
+  ];
+  const sortedDesc = sandbox.PuIlteoView.sortProjects(jumbled, 'year_desc', {});
+  assert.deepEqual(
+    sortedDesc.map(p => p.year),
+    [2026, 2026, 2024, 2018, 2016, 2015],
+    '기본 정렬은 updatedAt 과 무관하게 최신 연도순(2026→2015)이어야 한다'
+  );
+  assert.equal(sortedDesc[0].companyName, '(주)가나모빌리티', '동일 연도 내에서는 가나다순으로 깔끔히 정렬되어야 한다');
+
+  const sortedAsc = sandbox.PuIlteoView.sortProjects(jumbled, 'year_asc', {});
+  assert.deepEqual(sortedAsc.map(p => p.year), [2015, 2016, 2018, 2024, 2026, 2026]);
+
+  /* ③ 우측 검토 패널 XSS 방어(workerCount 악성 문자열 무효화), 빈 필터 상태 처리, ARIA 상태 확인 */
+  assert.match(html, /id="toggleSplitBtn"[^>]*aria-expanded="true"/, '검토창 접기 단추에 aria-expanded 상태가 있어야 한다');
+  sandbox.PuIlteoCatalog = Cat;
+  sandbox.PuIlteoIntake = Intake;
+  sandbox.PuIlteoReport = Report;
+  const emptyRvHtml = sandbox.PuIlteoView.buildReviewPanelHtml(null, []);
+  assert.ok(emptyRvHtml.includes('조건에 맞는 일터혁신 사업장이 없습니다'), '필터 결과 0건 시 빈 안내문을 반환해야 한다');
+
+  const xssProj = {
+    id: 'ilt_xss_2026',
+    year: '2026"><img src=x onerror=alert(1)>',
+    companyName: '<script>alert(1)</script>(주)가나',
+    industry: '제조업<svg onload=alert(1)>',
+    workerCount: '<img src=x onerror=alert(1)>',
+    level: 'deep',
+    selectedTasks: ['wt_45day']
+  };
+  const safeRvHtml = sandbox.PuIlteoView.buildReviewPanelHtml(xssProj, [xssProj]);
+  assert.ok(!safeRvHtml.includes('<img') && !safeRvHtml.includes('<script>') && !safeRvHtml.includes('<svg'), '악성 DB 필드값이 HTML 태그로 삽입되지 않아야 한다');
+  assert.match(safeRvHtml, /class="rv-tab on"[^>]*aria-pressed="true"/, '검토 서브탭에 aria-pressed 상태가 표시되어야 한다');
+
+  /* ④ summarizeByYear 프로토타입 키(__proto__ / constructor) 오염 및 비정상 연도 방어 검증 */
+  const protoGroups = sandbox.PuIlteoView.summarizeByYear([
+    { id: 'ilt_p1', year: '__proto__', companyName: '(주)가나', selectedTasks: ['wt_45day'] },
+    { id: 'ilt_p2', year: 'constructor', companyName: '(주)다라', selectedTasks: ['wg_redesign'] },
+    { id: 'ilt_p3', year: 2024, companyName: '(주)마바', selectedTasks: ['wt_45day'] }
+  ]);
+  assert.deepEqual(Array.from(protoGroups, g => g.year), ['2026', '2024'], '__proto__/constructor 연도 입력도 TypeError 없이 안전 정수로 정규화되어야 한다');
+  assert.equal(protoGroups[0].count, 2);
+});
