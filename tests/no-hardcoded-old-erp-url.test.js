@@ -20,9 +20,13 @@ const ROOT = path.join(__dirname, '..');
 const 옛주소 = 'nabaho.github.io/pureunall';
 
 /* 지금 남은 자리 — 상한과 까닭. 새 줄을 더하려면 까닭을 적고, 그 전에 상대경로·erp-origins.js 로 될지 먼저 본다. */
+/* (2026-11-16 전수 점검) pu-cal·pu-erp 의 OAuth 대체값·이음 보기 뿌리·apk 주소·안내 글, 앱 설명 파일 두 개,
+   기금 앱 포털 링크, 리멤버 받기 도구를 새 주소로 바꿨다 — 그 자리들은 이제 0 이라 목록에서 뺐다.
+   검사 범위도 넓혔다: 뿌리 *.json(앱 설명 파일)·fund-erp/static·tools 를 전에는 안 봐서 옛 주소가 남아 있었다. */
 const 허용 = {
-  'pu-cal.html': [2, 'OAuth 돌아올 주소의 «https 아닐 때» 대체값 · 이음 보기 링크 뿌리(301 로 동작 — 바꿀 때 받는 쪽 확인)'],
-  'pu-erp.html': [4, 'Gmail OAuth «https 아닐 때» 대체값·리디렉션 안내 글 · 하나 문자 다리 apk 내려받기 · 이음 보기 링크 뿌리(301 로 동작)'],
+  'tools/remember-ext/bg.js': [1, '이미 옛 주소로 열어 둔 받는 화면 탭도 찾는 목록(INTAKE_ANY) — 2027-02-15 무렵 옛 출처와 함께 뺀다'],
+  'tools/remember-ext/manifest.json': [2, '옛 주소로 열린 받는 화면 탭에도 붙는 권한·내용 스크립트 — 2027-02-15 무렵 뺀다'],
+  'tools/phone-mirror.js': [1, '폰 크롬에서 푸른 탭을 못 찾을 때의 안내 글 — 두 주소 모두 받는다고 알려 준다'],
   'pu-news.html': [3, '소식지 그림 주소 안내·예시 — 옛 주소 그림도 지난 회차 때문에 계속 받는다'],
   'js/pu-news-show.js': [1, '소식지 웹보기 그림 허용 목록 — 지난 회차 옛 주소 그림'],
   'js/pu-news-tpl.js': [1, '소식지 틀 그림 허용 목록 — 지난 회차 옛 주소 그림'],
@@ -52,6 +56,18 @@ function 대상들() {
       else if (e.name.endsWith('.js') && !e.name.endsWith('.test.js')) out.push(p);
     }
   })('functions');
+  /* (2026-11-16) 앱 설명 파일(*.json)·기금 앱 화면·도구 — 여기 남은 옛 주소는 검사가 못 봐서 이사 뒤에도 남았다 */
+  for (const f of fs.readdirSync(ROOT)) if (f.endsWith('.json') && !/^package(-lock)?\.json$/.test(f)) out.push(f);
+  const 기금 = path.join(ROOT, 'fund-erp', 'static');
+  if (fs.existsSync(기금)) for (const f of fs.readdirSync(기금)) if (/\.(html|js)$/.test(f)) out.push('fund-erp/static/' + f);
+  (function 훑기(d) {
+    for (const e of fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const p = d + '/' + e.name;
+      if (e.isDirectory()) 훑기(p);
+      else if ((e.name.endsWith('.js') && !e.name.endsWith('.test.js')) || e.name === 'manifest.json') out.push(p);
+    }
+  })('tools');
   return out;
 }
 
@@ -78,6 +94,10 @@ test('훑는 범위가 비어 있지 않다(없으면 아래 검사가 아무것
   assert.ok(t.filter((f) => f.endsWith('.html')).length >= 10, '뿌리 html 을 못 찾았다');
   assert.ok(t.some((f) => f.startsWith('functions/')), 'functions 를 못 훑었다');
   assert.ok(t.includes('functions/erp-origins.js'), '★ 주소 한 자리(erp-origins.js)가 없다');
+  /* (2026-11-16) 이사 뒤 옛 주소가 남아 있던 곳 — 다시 범위에서 빠지면 또 못 본다 */
+  assert.ok(t.includes('pu-erp-manifest.json') && t.includes('pu-photos-manifest.json'), '앱 설명 파일(*.json)을 못 훑었다');
+  assert.ok(t.some((f) => f.startsWith('fund-erp/static/')), '기금 앱 화면(fund-erp/static)을 못 훑었다');
+  assert.ok(t.includes('tools/remember-ext/manifest.json') && t.includes('tools/remember-pull/run.js'), '도구(tools)를 못 훑었다');
 });
 
 test('★★ 옛 ERP 주소를 실행 코드에 새로 박지 않는다 — 허용 목록 밖에 생기거나 상한을 넘으면 실패', () => {

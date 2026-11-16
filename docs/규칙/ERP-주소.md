@@ -24,9 +24,9 @@
    - 주소 글자(`https://…`)를 함수 파일에 새로 박지 않는다.
 3. **옛 주소는 «동작은 하지만» 새 코드·문서·안내 글에 쓰지 않는다.** 301 을 한 번 더 돌고, 2027-02 이후 옛 출처 허용을 빼면 서버 호출이 막힌다.
 4. **브라우저 저장소는 출처별이다.** 옛 주소의 localStorage·IndexedDB·로그인·알림 권한·설치 앱은 새 주소에서 안 보인다. 자료를 옮기는 코드를 짜지 말고, 필요하면 구출 쪽으로 꺼내 사람이 넘긴다.
-5. **바깥 콘솔에 주소를 등록하는 곳**(새 기능이 OAuth·CORS 를 쓰면 같이 넣는다): Firebase Auth 승인 도메인, 구글 OAuth 클라이언트(프로젝트 tactile-timer-447610-p5)의 JS 원본·리디렉션, 카카오 앱 1589519 리다이렉트 URI, Storage 버킷 3개 CORS(`docs/storage-cors.json`).
+5. **바깥 콘솔에 주소를 등록하는 곳**(새 기능이 OAuth·CORS 를 쓰면 같이 넣는다): Firebase Auth 승인 도메인, 구글 OAuth 클라이언트(프로젝트 tactile-timer-447610-p5)의 JS 원본·리디렉션, 카카오 앱 1589519 리다이렉트 URI, Storage 버킷 3개 CORS(`docs/storage-cors.json`), App Check reCAPTCHA v3 키 `pu-erp`(같은 tactile-timer 프로젝트 — 2026-11-16 새 주소 추가, 강제는 꺼짐). 구글 OAuth 동의 화면의 홈페이지·개인정보처리방침·약관 링크는 2026-11-16 `erp.pureunlabor.co.kr`(`/policy/privacy.html`·`/policy/terms.html`)로 바꿨다(전에는 없어진 netlify 주소였다).
 
 ## 지키는 검사
 
-- `tests/no-hardcoded-old-erp-url.test.js` — 화면·서버 실행 코드(뿌리 `*.html`·`js/*.js`·`functions/**/*.js`, 주석 제외)에 `nabaho.github.io/pureunall` 이 «새로 생기거나 늘면» 실패. 지금 남은 자리는 파일별 상한과 까닭을 적은 허용 목록으로 묶었다(줄이는 것은 언제나 좋다 — 줄였으면 상한도 내린다).
+- `tests/no-hardcoded-old-erp-url.test.js` — 화면·서버 실행 코드(뿌리 `*.html`·`*.json`(앱 설명 파일)·`js/*.js`·`functions/**/*.js`·`fund-erp/static`·`tools/**`, 주석 제외 — 2026-11-16 json·기금·도구를 더함)에 `nabaho.github.io/pureunall` 이 «새로 생기거나 늘면» 실패. 지금 남은 자리는 파일별 상한과 까닭을 적은 허용 목록으로 묶었다(줄이는 것은 언제나 좋다 — 줄였으면 상한도 내린다).
 - `tests/erp-origins-dual.test.js`·`tests/erp-dual-origin.test.js`·`tests/erp-move-finish.test.js` — 두 출처 허용·화면 두 주소 동작·내보내는 링크가 새 주소.

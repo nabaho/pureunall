@@ -20,7 +20,7 @@ const PROFILE = path.join(process.env.LOCALAPPDATA || '.', 'pu-remember-chrome')
 const LOG = path.join(PROFILE, 'run.log');
 const LOCK = path.join(PROFILE, 'run.lock');
 const REM_HOME = 'https://card.rememberapp.co.kr/book/groups';
-const INTAKE = 'https://nabaho.github.io/pureunall/remember-intake.html';
+const INTAKE = 'https://erp.pureunlabor.co.kr/remember-intake.html';
 const LIST = 'https://api.rememberapp.co.kr/v2/stacks/list.json';
 const IMG_OK = /^https:\/\/remember-cdn\.rememberapp\.co\.kr\/[^\s"'<>]+$/;
 const IMG_MAX = 4 * 1024 * 1024;
@@ -63,7 +63,7 @@ async function image(url) {
 async function login() {
   const { spawn } = require('child_process');
   fs.mkdirSync(PROFILE, { recursive: true });
-  spawn(CHROME, ['--user-data-dir=' + PROFILE, '--no-first-run', REM_HOME, 'https://nabaho.github.io/pureunall/enter.html', INTAKE], { detached: true, stdio: 'ignore' }).unref();
+  spawn(CHROME, ['--user-data-dir=' + PROFILE, '--no-first-run', REM_HOME, 'https://erp.pureunlabor.co.kr/enter.html', INTAKE], { detached: true, stdio: 'ignore' }).unref();
   log('login: 전용 크롬을 띄웠습니다 — 리멤버·푸른 포털에 로그인한 뒤 창을 닫아 주세요');
 }
 

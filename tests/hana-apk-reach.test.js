@@ -87,8 +87,10 @@ test('★★ 주소는 «폰 주소창에 칠 수 있는» 온전한 주소다',
 
 test('★ file:// 로 열어 봤을 때는 «올려 둔 곳»을 가리킨다', () => {
   const { url } = render({ protocol: 'file:', origin: 'null', pathname: '/C:/x/pu-erp.html' });
-  assert.match(url, /^https:\/\/nabaho\.github\.io\//,
-    '★ 내 PC 안의 주소를 알려 주면 폰에서 안 열린다');
+  /* «올려 둔 곳» = 서버가 밖으로 내보내는 ERP 주소 한 자리(2026-11-15 이사 — 옛 nabaho.github.io 를 박아 두었다가 2026-11-16 바꿈) */
+  const { ERP_LINK_BASE } = require('../functions/erp-origins.js');
+  assert.ok(url.startsWith(ERP_LINK_BASE + '/'),
+    '★ 내 PC 안의 주소를 알려 주면 폰에서 안 열린다 — 배포 주소(' + ERP_LINK_BASE + ')를 가리켜야 한다: ' + url);
 });
 
 test('★★ 두 창이 «같은 덩이»를 쓴다 (한쪽만 낡으면 안 된다)', () => {
