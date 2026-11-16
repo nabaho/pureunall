@@ -36871,6 +36871,7 @@ function CaseManagement(props){
     // 통일 헤더: 월 네비 + KPI 4개
     h(MonthKpiHeader, {
       selYM: selYM,
+      phoneKpiInline: true,   /* 폰: 요약 한 줄을 월 줄 안에 (2026-11-15) */
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
       kpis: [
         { label:'📁 전체 사건', value:totalCount+'건', bg:'#eff6ff', fg:'#1e40af', color:'#1e40af', border:'#bfdbfe' },
@@ -36911,7 +36912,7 @@ function CaseManagement(props){
               setStatusFilter(e.target.value);
             },
             style:{ padding:'5px 8px', border:'1px solid '+(statusFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: statusFilter!=='all'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='all'?'#1e40af':'#64748b', fontWeight: statusFilter!=='all'?700:400, cursor:'pointer' } },
             /* ⚠ 기본값 'open'(종결 제외)의 자리가 없어 폰에서 이 칸이 «빈칸»으로 보였다 (2026-10-23) */
@@ -36920,38 +36921,45 @@ function CaseManagement(props){
             h('option', { value:'closed' }, '📦 종결 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: typeFilter!=='all'?'#eff6ff':'#f8fafc',
               color: typeFilter!=='all'?'#2563eb':'#64748b', fontWeight: typeFilter!=='all'?700:400, cursor:'pointer' } },
-            h('option', { value:'all' }, '전체 유형'),
+            h('option', { value:'all' }, '유형 전체'),
             types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); })),
           h('select', { value:stageFilter, onChange:function(e){ setStageFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(stageFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: stageFilter!=='all'?'#eff6ff':'#f8fafc',
               color: stageFilter!=='all'?'#1e40af':'#64748b', fontWeight: stageFilter!=='all'?700:400, cursor:'pointer' } },
-            h('option', { value:'all' }, '⚖ 전체 심급'),
+            h('option', { value:'all' }, '심급 전체'),
             stageDefs.map(function(sd){ return h('option', { key:sd.code, value:sd.code }, sd.name); })),
           h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: mgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400, cursor:'pointer' } },
-            h('option', { value:'all' }, '👤 담당자'),
+            h('option', { value:'all' }, '담당 전체'),
             users.filter(function(u){return isAdminByUser(u) || isLawyerByUser(u);}).map(function(u){
               return h('option', { key:u.sid, value:u.sid }, u.name); })),
           h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: subMgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: subMgrFilter!=='all'?'#2563eb':'#64748b', fontWeight: subMgrFilter!=='all'?700:400, cursor:'pointer' } },
-            h('option', { value:'all' }, '👥 부담당'),
+            h('option', { value:'all' }, '부담당'),
             users.filter(function(u){return isAdminByUser(u) || isLawyerByUser(u);}).map(function(u){
               return h('option', { key:u.sid, value:u.sid }, u.name); })),
-          h(MineFirstChip, { on:mineFirst, onToggle:function(){ setMineFirst(!mineFirst); } }),
-          h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan({ kinds:['case'] })); },
-            title:'사건 목록에서 같은 의뢰인·같은 사건유형 중복을 훑습니다 (읽기만 함)',
-            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'20px', fontSize:'11px', flexShrink:0, background:'#fff', color:'#475569', fontWeight:600, cursor:'pointer' } }, '🔎 중복 훑기')
+          /* ⋯ — 「내 담당 먼저」·「중복 훑기」를 고르기 하나로 (대표 지시 2026-11-15 「같은 방식」). 거르개 다섯 + 이것 = 세 칸씩 두 줄 */
+          h('select', { value:'', 'aria-label':'사건관리 더보기', title:'내 담당 먼저 · 중복 훑기',
+              onChange:function(e){ var v = e.target.value; e.target.value = '';
+                if(v === 'mine') setMineFirst(!mineFirst);
+                else if(v === 'dup') setDupSweep(dupSweepScan({ kinds:['case'] })); },
+              style:{ padding:'5px 8px', border:'1px solid '+(mineFirst?'#16a34a':'#cbd5e1'), borderRadius:'20px', fontSize:'11px',
+                fontFamily:'inherit', flex:'1 1 30%', minWidth:0, background: mineFirst?'#f0fdf4':'#fff',
+                color: mineFirst?'#166534':'#475569', fontWeight:700, cursor:'pointer' } },
+            h('option', { value:'' }, mineFirst ? '✓ 내 것 먼저' : '⋯ 더보기'),
+            h('option', { value:'mine' }, mineFirst ? '내 담당 먼저 끄기' : '👤 내 담당 먼저'),
+            h('option', { value:'dup' }, '🔎 중복 훑기'))
         )
       )
     /* ★ 한 줄 (대표 지시 2026-10-05 「관리 대시보드는 항상 1줄로」) — 공용 툴바와 같은 규칙. flexWrap 으로 되돌리지 말 것. */
@@ -74209,6 +74217,7 @@ function ProjectManagementShared(props){
     h(MonthKpiHeader, {
       selYM: selYM,
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
+      phoneKpiInline: true,   /* 폰: 요약 한 줄을 월 줄 안에 (2026-11-15) */
       kpis: [
         { label:'📁 전체', value:totalCount+'건', bg:'#f8fafc', fg:'#475569', color:'#1e293b', border:'#cbd5e1' },
         { label:'⏳ 대기', value:pendingCount+'건', bg:'#fffbeb', fg:'#854d0e', color:'#854d0e', border:'#fde68a' },
@@ -74249,38 +74258,44 @@ function ProjectManagementShared(props){
               setStatusFilter(e.target.value);
             },
             style:{ padding:'5px 8px', border:'1px solid '+(statusFilter!=='open'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: statusFilter!=='open'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='open'?'#1e40af':'#64748b', fontWeight: statusFilter!=='open'?700:400 } },
             h('option',{value:'open'},'종료 제외'), h('option',{value:'pending'},'대기'), h('option',{value:'progress'},'진행중'), h('option',{value:'closed'},'📦 종료 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: typeFilter!=='all'?'#eff6ff':'#f8fafc',
               color: typeFilter!=='all'?'#2563eb':'#64748b', fontWeight: typeFilter!=='all'?700:400 } },
-            h('option',{value:'all'},'전체 유형'),
+            h('option',{value:'all'},'유형 전체'),
             types.map(function(t){ return h('option',{key:t.code,value:t.code},t.name); })),
           h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: mgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400 } },
-            h('option',{value:'all'},'👤 담당자'),
+            h('option',{value:'all'},'담당 전체'),
             users.map(function(u){ return h('option',{key:u.sid,value:u.sid},u.name); })),
           h('select', { value:subMgrFilter, onChange:function(e){ setSubMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(subMgrFilter!=='all'?'#2563eb':'#cbd5e1'),
-              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 84px', minWidth:0,
+              borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flex:'1 1 30%', minWidth:0,
               background: subMgrFilter!=='all'?'#eff6ff':'#f8fafc',
               color: subMgrFilter!=='all'?'#2563eb':'#64748b', fontWeight: subMgrFilter!=='all'?700:400 } },
-            h('option',{value:'all'},'👥 부담당'),
+            h('option',{value:'all'},'부담당'),
             users.map(function(u){ return h('option',{key:u.sid,value:u.sid},u.name); })),
-          h(MineFirstChip, { on:mineFirst, onToggle:function(){ setMineFirst(!mineFirst); } }),
-          props.sourceKind === 'consulting' && h('button', { onClick:resetProjView,
-            title:RESET_VIEW_TIP,
-            style:{ padding:'5px 10px', border:'1px solid #bfdbfe', borderRadius:'20px', fontSize:'11px', flexShrink:0, background:'#eff6ff', color:'#2563eb', fontWeight:700, cursor:'pointer' } }, '↺ 기본값'),
-          h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan({ kinds:[props.sourceKind] })); },
-            title:'이 목록에서 같은 사업장·같은 유형 중복을 훑습니다 (읽기만 함)',
-            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'20px', fontSize:'11px', flexShrink:0, background:'#fff', color:'#475569', fontWeight:600, cursor:'pointer' } }, '🔎 중복 훑기')
+          /* ⋯ — 「내 담당 먼저」·「기본값」·「중복 훑기」를 고르기 하나로 (대표 지시 2026-11-15 「같은 방식」). 거르개 넷 + 이것 = 세 칸·두 칸 두 줄 */
+          h('select', { value:'', 'aria-label':'목록 더보기', title:'내 담당 먼저 · 기본값 · 중복 훑기',
+              onChange:function(e){ var v = e.target.value; e.target.value = '';
+                if(v === 'mine') setMineFirst(!mineFirst);
+                else if(v === 'reset') resetProjView();
+                else if(v === 'dup') setDupSweep(dupSweepScan({ kinds:[props.sourceKind] })); },
+              style:{ padding:'5px 8px', border:'1px solid '+(mineFirst?'#16a34a':'#cbd5e1'), borderRadius:'20px', fontSize:'11px',
+                fontFamily:'inherit', flex:'1 1 30%', minWidth:0, background: mineFirst?'#f0fdf4':'#fff',
+                color: mineFirst?'#166534':'#475569', fontWeight:700, cursor:'pointer' } },
+            h('option', { value:'' }, mineFirst ? '✓ 내 것 먼저' : '⋯ 더보기'),
+            h('option', { value:'mine' }, mineFirst ? '내 담당 먼저 끄기' : '👤 내 담당 먼저'),
+            props.sourceKind === 'consulting' && h('option', { value:'reset', title:RESET_VIEW_TIP }, '↺ 기본값'),
+            h('option', { value:'dup' }, '🔎 중복 훑기'))
         )
       )
     /* ★ 한 줄 (대표 지시 2026-10-05 「관리 대시보드는 항상 1줄로」) — 넘치면 줄을 바꾸지 않고 검색칸·유형칸이 줄어든다.
