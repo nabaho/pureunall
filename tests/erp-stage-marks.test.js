@@ -158,7 +158,7 @@ test('④ «＋ 단계 추가» — 이 유형에서 고를 수 있고 아직 �
 });
 
 /* ── 자동 길 두 곳을 진짜 소스째 돌려 본다 ── */
-const PLAN = ['function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
+const PLAN = ['function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(', 'function erpQuoteReqSrcKeys(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
 /* 견적 길은 «요청이 가리키는 업체(companyId)»로만 카드를 고른다(이름 모양으로 잇지 않는다 — 계획 3 검토) → 이 시험의 요청·카드도 업체를 «이은» 모양이다.
    금액 가리기 한 벌(PuQuoteDetect)은 pu-erp.html 이 먼저 싣는다 */
 const PuQuoteDetect = require('../js/pu-quote-detect.js');
@@ -291,6 +291,8 @@ function quoteLaneRun(req, cts) {
     erpQuoteLanePlan: vm.runInContext('(function(){' + HELPERS + '\n' + PLAN + '\nreturn erpQuoteLanePlan;})()',
       vm.createContext({ window: { PuCaseStage, PuQuoteDetect }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' })),
     erpStageMarksMerge: H.erpStageMarksMerge, erpStagePartsFromQuote: H.erpStagePartsFromQuote,
+    erpQuoteReqSrcKeys: vm.runInContext('(' + cutFn(SRC, 'function erpQuoteReqSrcKeys(') + ')', vm.createContext({})),
+    erpQuoteScrub: vm.runInContext('(' + cutFn(SRC, 'function erpQuoteScrub(') + ')', vm.createContext({ window: { PuQuoteDetect } })),
     persistOne: (c) => { saved.push(c); return true; },
     patchOne: (id, patch) => { patched.push({ id, patch }); return true; },
     erpDeferCoLinkIfNew: () => null, isContractLocked: () => false, genContractNo: () => '계약-2026-901',

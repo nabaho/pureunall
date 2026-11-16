@@ -21531,11 +21531,23 @@ function erpQuoteNote(req){
   if(atts.length) lines.push('첨부: ' + atts.join(' · '));
   if(r.compare === 'bundle') lines.push('비교견적서가 함께 나갔음 — 사람이 «선정»할 건(자동으로 계약협의로 옮기지 않음).');
   if(r.synthesizedNote){
-    var sn = String(r.synthesizedNote).replace(/\d{1,3}(?:,\d{3})+|\d{3,}/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    var sn = erpQuoteScrub(String(r.synthesizedNote).replace(/\d{1,3}(?:,\d{3})+|\d{3,}/g, '').replace(/\s+/g, ' ').trim()).slice(0, 80);
     if(sn) lines.push(sn);
   }
   lines.push('금액은 이 칸에 적지 않았음(계약서등관리 「지난 견적·계약」).');
   return lines.join('\n');
+}
+/* 요청이 «이 메일들을 반영한다»고 말하는 본 메일 열쇠 — srcMails 와 srcKey 의 합집합(중복·빈 값 없이).
+   계획(이미 반영했나)과 저장(카드에 적을 것)이 «같은 목록»을 써야 srcKey 만 다른 요청이 다시 돌 때 같은 메일이 두 번 붙지 않는다. */
+function erpQuoteReqSrcKeys(r){
+  var out = [];
+  var q = r || {};
+  if(Array.isArray(q.srcMails)){
+    q.srcMails.forEach(function(k){ var s = String(k || '').trim(); if(s && out.indexOf(s) < 0) out.push(s); });
+  }
+  var one = String(q.srcKey || '').trim();
+  if(one && out.indexOf(one) < 0) out.push(one);
+  return out;
 }
 /* 카드가 가리키는 업체 id — 검사 길(erpValidateContractCompany)이 두 군데에 적는다 */
 function erpCardCoId(c){ return String((c && (c.companyId || (c.company && c.company.companyId))) || ''); }
@@ -21545,11 +21557,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
   if(kind !== 'quote' && kind !== 'advance') return { action:'blocked', why:'알 수 없는 요청 종류입니다' };
   var all = (cts || []).filter(function(c){ return c && !c._deleted; });
   var srcKey = String(r.srcKey || '');
-  var reqSrcMails = [];
-  if(Array.isArray(r.srcMails)){
-    r.srcMails.forEach(function(k){ var s = String(k || '').trim(); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
-  }
-  if(srcKey && reqSrcMails.indexOf(srcKey) < 0) reqSrcMails.push(srcKey);
+  var reqSrcMails = erpQuoteReqSrcKeys(r);
   if(srcKey && all.some(function(c){ return (c.srcMails || []).indexOf(srcKey) >= 0; }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
   if(reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return (c.srcMails || []).indexOf(sk) >= 0; }); }))
@@ -21582,6 +21590,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
   if(r.companyClosed || isCoClosed(co)) return { action:'noop', why:'종료된 사업장입니다' };
   if(r.isDuplicateInErp) return { action:'noop', why:'이미 등록·이관된 중복 건입니다' };
   if(kind === 'advance'){
+    if(r.compare === 'bundle') return { action:'blocked', why:WAIT_WHY };   // 비교견적서가 함께 나간 신호 — 카드에 표시가 달리기 전이라도 자동으로 옮기거나 만들지 않는다
     if(r.contractId){
       var t = all.find(function(c){ return c.id === r.contractId; });
       if(!t) return { action:'blocked', why:'요청이 가리키는 계약이 없습니다' };
@@ -21607,7 +21616,7 @@ function erpQuoteLanePlan(req, cos, cts, users){
     if(lc.length) return { action:'blocked', why:'이름·주소가 같은 상담접수 카드가 ' + lc.length + '건 있는데 업체가 이어져 있지 않습니다 — 그 카드에 업체를 이은 뒤 다시 시도하거나 직접 옮겨 주세요(이름 모양으로 자동으로 옮기지 않습니다)' };
     /* 이미 «계약협의»로 옮겨진 카드가 있으면 할 일이 없다(조용히 끝). 계약확정 카드만 있는 사업장은 «재계약일 수 있다» — 조용히 지우지 않고 사람이 본다 */
     if(same0.some(function(c){ return c.status === 'review'; })) return { action:'noop', why:'이미 계약협의로 진행된 사업장입니다' };
-    if(same0.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; })) return { action:'blocked', why:'옮길 상담접수 카드가 없고 계약확정 카드만 있습니다 — 재계약이면 상담접수 카드를 먼저 만들어 주세요' };
+    if(same0.some(function(c){ return c.status === 'signed' || c.status === 'transferred'; }) || loose(['signed', 'transferred']).length) return { action:'blocked', why:'옮길 상담접수 카드가 없고 계약확정 카드만 있습니다 — 재계약이면 상담접수 카드를 먼저 만들어 주세요' };
     /* 종료·취소된 카드만 있으면 «조용히 끝낸다» — 끝난 건은 되살리거나 같은 사업장에 빈 카드를 다시 만들지 않는다(종료·삭제·되돌림 불변, tests/anti-resurrection-guards).
        업체가 안 이어진 옛 카드(이름·주소만 같음)도 같다. 새 계약이면 계약관리에서 직접 만든다 */
     if(same0.some(function(c){ return c.status === 'closed' || c.status === 'cancelled'; }) || loose(['closed', 'cancelled']).length)
@@ -27509,13 +27518,14 @@ function ContractManagement(props){
     if(plan.action === 'blocked') return await stop(plan.why);
     if(plan.action === 'advance'){
       var advPatch = { status:'review', orderTs:Date.now() };
-      if(req && Array.isArray(req.srcMails) && req.srcMails.length){
+      var advKeys = erpQuoteReqSrcKeys(req);
+      if(advKeys.length){
         var mergedSrc = (plan.target.srcMails || []).slice();
-        req.srcMails.forEach(function(sk){ var s = String(sk || '').trim(); if(s && mergedSrc.indexOf(s) < 0) mergedSrc.push(s); });
+        advKeys.forEach(function(s){ if(mergedSrc.indexOf(s) < 0) mergedSrc.push(s); });
         advPatch.srcMails = mergedSrc;
       }
       if(req && req.synthesizedNote){
-        var sn = String(req.synthesizedNote).replace(/\d{1,3}(?:,\d{3})+|\d{3,}/g, '').trim();
+        var sn = erpQuoteScrub(String(req.synthesizedNote).replace(/\d{1,3}(?:,\d{3})+|\d{3,}/g, '').trim()).slice(0, 80);
         if(sn && String(plan.target.note || '').indexOf(sn) < 0){
           advPatch.note = (plan.target.note ? plan.target.note + '\n\n' : '') + sn;
         }
@@ -27531,8 +27541,7 @@ function ContractManagement(props){
     if(plan.action === 'attach'){
       var t = plan.target;
       var attSrc = (t.srcMails || []).slice();
-      var addList = (req && Array.isArray(req.srcMails) && req.srcMails.length) ? req.srcMails : (req && req.srcKey ? [String(req.srcKey)] : []);
-      addList.forEach(function(sk){ var s = String(sk || '').trim(); if(s && attSrc.indexOf(s) < 0) attSrc.push(s); });
+      erpQuoteReqSrcKeys(req).forEach(function(s){ if(attSrc.indexOf(s) < 0) attSrc.push(s); });
       var upd = Object.assign({}, t, {
         note: (t.note ? t.note + '\n\n' : '') + plan.note,
         srcMails: attSrc

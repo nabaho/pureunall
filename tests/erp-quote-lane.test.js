@@ -31,13 +31,13 @@ const STAGE_FNS = ['function erpStageMarksMerge(', 'function erpStagePartsFromCo
 const STAGE_SRC = STAGE_FNS.map((d) => cutFn(SRC, d)).join('\n');
 const PuCaseStage = require('../js/pu-case-stage.js');
 
-const PURE = ['function erpQuoteLaneReq(', 'function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(',
+const PURE = ['function erpQuoteLaneReq(', 'function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(', 'function erpQuoteReqSrcKeys(',
   'function erpQuoteLanePlan(', 'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey('].map((d) => cutFn(SRC, d)).join('\n') + '\n' + STAGE_SRC;
 
 function pure(withDetect) {
   const ctx = { console, Date, Object, Array, String, Number, JSON, Math, todayYMD: () => '2026-11-08', window: withDetect === false ? { PuCaseStage } : { PuQuoteDetect: DETECT, PuCaseStage } };
   vm.createContext(ctx);
-  vm.runInContext(PURE + '\nthis.api={erpQuoteLaneReq,erpQuoteDay,erpQuoteNote,erpQuoteScrub,erpQuoteLanePlan,erpStageMarksMerge,erpStagePartsFromQuote,erpStagePartsFromContract};', ctx);
+  vm.runInContext(PURE + '\nthis.api={erpQuoteLaneReq,erpQuoteDay,erpQuoteNote,erpQuoteScrub,erpQuoteReqSrcKeys,erpQuoteLanePlan,erpStageMarksMerge,erpStagePartsFromQuote,erpStagePartsFromContract};', ctx);
   return ctx.api;
 }
 const P = pure();
@@ -225,7 +225,7 @@ function wrap(env) {
     dbGet: (k, d) => (env.data && env.data[k]) || d,
     getActiveUsers: () => USERS,
     erpQuoteLanePlan: (r, c, t, u) => P.erpQuoteLanePlan(r, c, t, u),
-    erpStageMarksMerge: P.erpStageMarksMerge, erpStagePartsFromQuote: P.erpStagePartsFromQuote,
+    erpStageMarksMerge: P.erpStageMarksMerge, erpStagePartsFromQuote: P.erpStagePartsFromQuote, erpQuoteReqSrcKeys: P.erpQuoteReqSrcKeys, erpQuoteScrub: P.erpQuoteScrub,
     erpDeferCoLinkIfNew: (f) => Object.assign({}, f, { companyLinkStatus: 'pending', companyId: '' }),
     isContractLocked: (ym) => ym === (env.lockedYm || ''),
     genContractNo: () => '계약-2026-196',
@@ -1213,4 +1213,64 @@ test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내�
   assert.equal(rPromote.made.bizNo, '123-82-15423', '체결 계약서의 검증된 사업자번호 반영');
   assert.deepEqual(out(rPromote.made.srcMails), ['Sent|101', 'Sent|102', 'INBOX|201']);
   assert.match(rPromote.made.note, /①보낸견적서 → ②보낸계약서양식 → ③체결계약서회신/);
+});
+
+/* ── 2026-11-16 main 합침 뒤 자동 검토(기능 검증·보안) 중간 4건 ── */
+test('㉖ ★ 메일 종합 메모(synthesizedNote)도 금액 글자를 가린다 — 카드 비고는 직원 모두가 읽는다', async () => {
+  const note = P.erpQuoteNote(req({ synthesizedNote: '[메일종합] 총액 사백만원 · 월 50만원 · 2억원 ①보낸견적서' }));
+  assert.ok(!/사백만|50만|2억/.test(note), '금액 글자가 비고에 남았다: ' + note);
+  assert.match(note, /메일종합/, '금액이 아닌 글자는 그대로 둔다');
+  /* 가리는 한 벌(PuQuoteDetect)이 안 실려 있으면 «글자를 아예 안 옮긴다» — 새는 쪽이 아니라 막는 쪽 */
+  const bare = pure(false).erpQuoteNote(req({ synthesizedNote: '[메일종합] 총액 사백만원' }));
+  assert.ok(!/메일종합|사백만/.test(bare), '가리는 한 벌이 없으면 옮기지 않는다');
+  /* 계약협의로 옮길 때 카드 비고에 덧붙는 글도 같다 */
+  const rq = req({ kind: 'advance', docKind: 'contract', synthesizedNote: '[메일종합] 계약금 삼백만원' });
+  const w = wrap({ data: { companies: [CO], contracts: [card({ id: 'ct-S', status: 'consult' })] }, reqNode: rq });
+  const r = await w.run('k1', rq);
+  assert.ok(r.advanced);
+  const patch = w.calls.patch[0].f;
+  assert.ok(!/삼백만/.test(String(patch.note || '')), '옮길 때 덧붙은 비고에 금액이 남았다: ' + patch.note);
+});
+
+test('㉗ ★ srcKey 가 srcMails 에 없는 요청도 «본 메일»이 카드에 모두 적힌다 — 같은 요청이 다시 돌아도 같은 메일이 두 번 붙지 않는다', async () => {
+  const r0 = req({ srcKey: 'Sent|1002', srcMails: ['Sent|1001'] });
+  assert.deepEqual(out(P.erpQuoteReqSrcKeys(r0)), ['Sent|1001', 'Sent|1002']);
+  assert.deepEqual(out(P.erpQuoteReqSrcKeys({ srcKey: ' ', srcMails: ['a', 'a', ''] })), ['a'], '중복·빈 값은 뺀다');
+  const open = card({ id: 'ct-A', status: 'consult' });
+  const w = wrap({ data: { companies: [CO], contracts: [open] }, reqNode: r0 });
+  const r = await w.run('k1', r0);
+  assert.ok(r.attached);
+  assert.deepEqual(out(w.calls.persist[0].srcMails).sort(), ['Sent|1001', 'Sent|1002']);
+  /* 그 카드가 서버에 있는 채 같은 요청이 다시 오면 «이미 반영» — 또 붙지 않는다 */
+  const again = P.erpQuoteLanePlan(r0, [CO], [w.calls.persist[0]], USERS);
+  assert.equal(again.action, 'noop');
+  /* 계약협의로 옮길 때도 srcKey 가 카드에 적힌다 */
+  const rq2 = req({ kind: 'advance', docKind: 'contract', srcKey: 'Sent|2002', srcMails: ['Sent|2001'] });
+  const w2 = wrap({ data: { companies: [CO], contracts: [card({ id: 'ct-B', status: 'consult' })] }, reqNode: rq2 });
+  const r2 = await w2.run('k1', rq2);
+  assert.ok(r2.advanced);
+  assert.deepEqual(out(w2.calls.patch[0].f.srcMails).sort(), ['Sent|2001', 'Sent|2002']);
+});
+
+test('㉘ ★ 비교견적서가 함께 나간 신호(compare:bundle)는 계약협의로 옮기지도, 계약협의 카드를 새로 만들지도 않는다 — 사람이 «선정»', () => {
+  const openConsult = card({ id: 'ct-C', status: 'consult' });
+  const p1 = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', compare: 'bundle' }), [CO], [openConsult], USERS);
+  assert.equal(p1.action, 'blocked'); assert.match(p1.why, /비교견적/);
+  const p2 = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', compare: 'bundle', allowCreateReview: true }), [CO], [], USERS);
+  assert.equal(p2.action, 'blocked', '카드가 없어도 비교견적 신호로 계약협의 카드를 만들지 않는다');
+  const p3 = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', contractId: 'ct-C', compare: 'bundle' }), [CO], [openConsult], USERS);
+  assert.equal(p3.action, 'blocked', '계약 id 로 가리켜도 같다');
+  /* 표시 없는 평범한 신호는 그대로 옮긴다 */
+  assert.equal(P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract' }), [CO], [openConsult], USERS).action, 'advance');
+});
+
+test('㉙ ★ 업체가 안 이어진 계약확정·이관 카드만 있어도 «계약협의 카드 새로 만들기»(allowCreateReview)로 내려가지 않는다 — 재계약일 수 있어 사람이 본다', () => {
+  for (const st of ['signed', 'transferred']) {
+    const loose = card({ id: 'ct-L', status: st, companyId: '', company: { name: '가나기관', bizNo: '1234567890' } });
+    const p = P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', allowCreateReview: true }), [CO], [loose], USERS);
+    assert.equal(p.action, 'blocked', st + ' 미연결 카드만 있는데 새 카드를 만들었다');
+    assert.match(p.why, /계약확정 카드만 있습니다/);
+  }
+  /* 카드가 «하나도» 없을 때만 새로 만든다 */
+  assert.equal(P.erpQuoteLanePlan(req({ kind: 'advance', docKind: 'contract', allowCreateReview: true }), [CO], [], USERS).action, 'create');
 });
