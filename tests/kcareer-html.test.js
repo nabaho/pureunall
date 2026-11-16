@@ -1070,7 +1070,7 @@ test('넘버 옆 □ 로 여러 건을 골라 한 번에 지운다', () => {
   assert.ok(!/confirm\(/.test(del),
     '확인은 «단추 옆 쪽지»로 한다 — confirm 은 화면 맨 위에 뜬다');
   assert.match(del, /kcAskDelete\(/, '지우기 전에 물어봐야 합니다');
-  assert.match(del, /kcTrashPut\(/, '휴지통에 담아야 되살릴 수 있습니다');
+  assert.match(del, /kcTrashPut(Many)?\(/, '휴지통에 담아야 되살릴 수 있습니다(여러 건은 한 번에 담는 kcTrashPutMany)');
   assert.ok(!/deleteFile\(/.test(del),
     '첨부 원본은 휴지통이 들고 있다 — 여기서 지우면 되살려도 원본이 없습니다');
   assert.match(del, /set\(cfg\.store, get\(cfg\.store\)\.filter/);
