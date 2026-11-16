@@ -262,6 +262,11 @@ public final class MainActivity extends Activity {
         sendSms.setOnClickListener(v -> askSendSms());
         moreBox.addView(sendSms, withTop(matchWrap(), 8));
 
+        /* 통화 후 명함 문자 (2026-11-16) — 설정 화면은 따로 연다. 권한은 거기서 스위치를 켤 때 묻는다. */
+        Button cardSms = button("통화 후 명함 문자", Color.rgb(124, 58, 237));
+        cardSms.setOnClickListener(v -> startActivity(new Intent(this, CardSmsActivity.class)));
+        moreBox.addView(cardSms, withTop(matchWrap(), 8));
+
         /* ⚠ 예전에는 「문자 읽기 권한은 사용하지 않습니다」라고 적혀 있었다.
              지난 문자 가져오기를 넣으면서 그 말이 «거짓»이 되었다 —
              화면의 약속과 앱이 하는 일이 어긋나면 그 안내는 안 하느니만 못하다.
