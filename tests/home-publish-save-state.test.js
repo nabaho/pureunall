@@ -78,14 +78,67 @@ test('오래 걸리면 다시 알리고(saved→saving), 끝나면 시계를 멈
   assert.ok(r.시계들[0].멈춤, '끝났는데 시계가 계속 돈다');
 });
 
-test('응답이 영영 안 오면 한도 뒤에는 다시 알리기를 멈춘다(탭을 붙잡지 않게)', () => {
+test('응답이 영영 안 오면 한도 뒤에는 다시 알리기를 멈추고 «saved» 로 놓아 준다', () => {
   const r = 돌리기();
   r.켜기();
-  const 앞 = r.받은.length;
   r.시간(r.상태.다시알림한도ms + 1);
   r.시계들[0].fn();
-  assert.equal(r.받은.length, 앞, '한도가 지났는데 또 «saving» 을 보냈다');
-  assert.ok(r.시계들[0].멈춤);
+  assert.ok(r.시계들[0].멈춤, '한도가 지났는데 시계가 계속 돈다');
+  assert.equal(r.받은[r.받은.length - 1], 'saved',
+    '알리기만 멈추면 마지막 «saving» 이 남아 pu-version 이 영영 붙잡힌다(2026-11-16 검토)');
+});
+
+/* ★ 실제 pu-version.js 의 받는 쪽과 맞물려 돌린다 — 부품만 보면 «놓아 주는가»를 못 본다(2026-11-16 검토가 짚음).
+   받는 쪽 덩이: «var BLOCK_MAX_MS» 부터 pu:save-state 듣기의 끝까지. */
+function 맞물려돌리기() {
+  const a = VER.indexOf('var BLOCK_MAX_MS');
+  const b = VER.indexOf("window.addEventListener('pu:save-state'", a);
+  const 끝 = VER.indexOf('\n  });', b);
+  assert.ok(a >= 0 && b > a && 끝 > b, 'pu-version.js 의 저장 상태 듣기를 못 찾았습니다');
+  const 받는쪽 = VER.slice(a, 끝 + '\n  });'.length);
+  const 듣는이 = {};
+  const 시계들 = [];
+  let 지금 = 1000;
+  const ctx = {
+    Date: { now: () => 지금 }, Math,
+    setInterval: (fn, ms) => { const t = { fn, ms, 멈춤: false }; 시계들.push(t); return t; },
+    clearInterval: (t) => { if (t) t.멈춤 = true; },
+    CustomEvent: function (name, init) { this.type = name; this.detail = init && init.detail; },
+    window: {
+      addEventListener: (n, f) => { (듣는이[n] = 듣는이[n] || []).push(f); },
+      dispatchEvent: (e) => { (듣는이[e.type] || []).forEach(f => f(e)); },
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext('var saveBlocked = false; var pendingVersion = null; function scheduleApply() {}\n'
+    + 받는쪽 + '\n' + 부품() + '\nthis.__켜기 = 올리는중켜기; this.__상태 = 올리는중;'
+    + '\nthis.__막힘 = function () { return saveBlocked; };', ctx);
+  return { 켜기: ctx.__켜기, 상태: ctx.__상태, 막힘: ctx.__막힘, 시계들, 시간: (ms) => { 지금 += ms; } };
+}
+
+test('맞물림 — 올리는 동안은 한도 안에서 계속 막고, 끝나면 푼다', () => {
+  const r = 맞물려돌리기();
+  const 끄기 = r.켜기();
+  assert.equal(r.막힘(), true, '켰는데 pu-version 이 안 막는다');
+  for (let i = 0; i < 4; i++) {           // 다시 알림 몇 번 — 한도 안
+    r.시간(r.상태.다시알림ms);
+    if (!r.시계들[0].멈춤) r.시계들[0].fn();
+  }
+  assert.equal(r.막힘(), true, '한도 안인데 pu-version 이 놓아 버렸다 — 올리는 도중 새로고침된다');
+  끄기();
+  assert.equal(r.막힘(), false, '끝났는데 pu-version 이 계속 붙잡혀 있다');
+});
+
+test('맞물림 — 응답이 영영 안 와도 한도가 지나면 pu-version 이 풀린다(교착 없음)', () => {
+  const r = 맞물려돌리기();
+  r.켜기();                                // 끄기를 끝내 안 부른다(응답이 안 오는 올리기)
+  const 번 = Math.ceil(r.상태.다시알림한도ms / r.상태.다시알림ms) + 2;
+  for (let i = 0; i < 번; i++) {
+    r.시간(r.상태.다시알림ms);
+    if (!r.시계들[0].멈춤) r.시계들[0].fn();
+  }
+  assert.ok(r.시계들[0].멈춤, '한도가 지났는데 다시 알리기가 계속된다');
+  assert.equal(r.막힘(), false, '★ 한도가 지났는데 pu-version 이 계속 붙잡혀 있다 — 탭이 영영 새 판으로 못 간다');
 });
 
 test('다시 알림 간격이 pu-version 이 저절로 놓는 시간보다 짧다', () => {
