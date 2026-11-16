@@ -11308,7 +11308,8 @@ function careerDelAll(name, btn){
       +(남을것.length?'<br><span style="color:var(--teal)">같은 통을 쓰는 «다른 화면»의 '
         +남을것.length+'건은 그대로 둡니다.</span>':'') },
     function(){
-      갈것.forEach(function(r){ kcTrashPut(cfg.store, name, r, '전체 삭제'); });
+      /* ★ 휴지통에는 «한 번 읽고 한 번» 쓴다(kcTrashPutMany) — 수백 건을 건마다 쓰면 N번 저장하고, 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16) */
+      kcTrashPutMany(cfg.store, name, 갈것, '전체 삭제');
       set(cfg.store, 남을것); renderCareer(name);
       kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
     });
@@ -11328,7 +11329,7 @@ function careerDelSelected(name, btn){
     function(){
       /* ⚠ 첨부 원본을 여기서 지우지 않는다 — 전에는 지웠고, 확인창에 스스로
          「되돌릴 수 없습니다」라고 적어 두었다. 이제 휴지통이 들고 있는다. */
-      갈것.forEach(function(r){ kcTrashPut(cfg.store, name, r, '경력·실적'); });
+      kcTrashPutMany(cfg.store, name, 갈것, '경력·실적');   /* 한 번에 담는다 — 건마다 쓰지 않는다(2026-11-16) */
       set(cfg.store, get(cfg.store).filter(function(r){ return !keep[r.id]; }));
       renderCareer(name);
       kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
@@ -18210,8 +18211,11 @@ function bizSelAll(on){ document.querySelectorAll('#bizBody .row-chk').forEach(f
 function bizSelDel(btn){
   var ids=_bizChecked(); if(!ids.length) return;
   kcAskDelete(btn, { detail:'고른 사업 <b>'+ids.length+'건</b>과 그 서류를 휴지통으로 보냅니다.<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다.</b>' }, function(){
-    var arr=get(BIZ_STORE)||[], last=null;
-    arr.forEach(function(r){ if(r && ids.indexOf(r.id)>=0) last=kcTrashPut(BIZ_STORE,'page-bizlist',r,'사업'); });
+    var arr=get(BIZ_STORE)||[];
+    /* ★ 한 번에 담는다(kcTrashPutMany) — 건마다 쓰면 N번 저장하고 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16).
+       «되살리기» 손잡이는 예전과 같이 마지막으로 담은 줄이다 */
+    var es=kcTrashPutMany(BIZ_STORE,'page-bizlist',arr.filter(function(r){ return r && ids.indexOf(r.id)>=0; }),'사업');
+    var last=es.length?es[es.length-1]:null;
     set(BIZ_STORE, arr.filter(function(r){ return !(r && ids.indexOf(r.id)>=0); }));
     renderBizList(); kcTrashDone(last, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
   });
@@ -21549,13 +21553,13 @@ function rhDraftTrashSel(btn){
     +이름.slice(0,4).join('\n')+(이름.length>4?'\n… 그 밖 '+(이름.length-4)+'건':'')
     +'\n\n환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다.')) return;
   var 갈것={}; ids.forEach(function(id){ 갈것[id]=1; });
-  var 됨=0;
-  ids.forEach(function(id){
-    var d=rhDraftFind(id); if(!d) return;
-    /* ⚠ 파일은 여기서 지우지 않는다 — 휴지통이 들고 있다가 30일 뒤에 지운다(줄마다 버리기와 같다) */
-    if(kcTrashPut(RH_DRAFTS, 'page-resume-hub', d, '작성 중 서류')) 됨++;
-    if(_rhDraftId===id) _rhDraftId=null;
-  });
+  var 담을것=[];
+  ids.forEach(function(id){ var d=rhDraftFind(id); if(d) 담을것.push(d); });
+  /* ⚠ 파일은 여기서 지우지 않는다 — 휴지통이 들고 있다가 30일 뒤에 지운다(줄마다 버리기와 같다)
+     ★ 한 번에 담는다(kcTrashPutMany) — 건마다 쓰면 N번 저장하고 중간에 걸리면 «휴지통에도 있고 목록에도 남는» 반쪽이 된다(2026-11-16).
+     지금 열어 둔 자리 표시(_rhDraftId)는 «담은 뒤에» 지운다 — 담다가 걸리면 열어 둔 자리가 그대로여야 한다 */
+  var 됨=kcTrashPutMany(RH_DRAFTS, 'page-resume-hub', 담을것, '작성 중 서류').length;
+  담을것.forEach(function(d){ if(_rhDraftId===d.id) _rhDraftId=null; });
   rhDraftPut(rhDraftAll().filter(function(x){ return !갈것[x.id]; }));
   rhDraftDraw(); rhDraftCheck();
   toast('🗑 '+됨+'건을 휴지통으로 보냈습니다 — 환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다', 6000);
