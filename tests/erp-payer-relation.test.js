@@ -430,8 +430,9 @@ test('⑧ 합계 후보 확정은 이름이 다른 업체가 끼어 있으면 �
 
 test('⑧ 나눠담기 창은 이름이 다른 건이 끼면 사유를 «한 번» 묻고, 관계 등록은 하지 않는다', () => {
   const SPLIT = cut('                if(!(await popConfirm(msg))) return;\n                /* 👤 입금자 이름이 사업장과 다른 건이 끼어 있으면', '                var ok=0,ng=0;');
-  assert.match(SPLIT, /if\(_needP\)\{\s*\n\s*_splitPick=await askPayer\(rowsIn\[0\],_needP,_needA,true\);/, '이름이 다른 건이 있을 때(_needP) 한 번 묻는다 — noRegister=true: 여러 사업장 몫이라 등록은 사업장마다 하나씩');
-  assert.match(SPLIT, /if\(erpPayerNeedsReason\(_aa\)\)\{ _needP=_pp; _needA=_aa; \}/, '이름이 다른 건을 가려낸다');
+  assert.match(SPLIT, /if\(_needP\)\{\s*\n\s*_splitPick=await askPayer\(_needR,_needP,_needA,true\);/, '이름이 다른 건이 있을 때(_needP) 한 번 묻는다 — noRegister=true: 여러 사업장 몫이라 등록은 사업장마다 하나씩');
+  assert.match(SPLIT, /rowsIn\.forEach\(function\(_rr\)\{\s*\n\s*if\(_needP\) return;\s*\n\s*var _aa=_payerAssessSafe\(_rr,_pp\);/, '«모든 통장 줄 × 고른 건»을 본다 — 첫 줄만 보면 뒤 줄의 제3자가 사유 없이 저장된다');
+  assert.ok(SPLIT.indexOf('_payerAssessSafe(rowsIn[0]') < 0, '첫 줄만 보는 판정이 남아 있지 않다');
   assert.match(SPLIT, /if\(!_splitPick\) return;/, '취소하면 확정하지 않는다');
   const SAVE_AT = FL.indexOf('var _sa=_payerAssessSafe(slot.row,p);');
   const SAVE = FL.slice(SAVE_AT, SAVE_AT + 700);
@@ -466,4 +467,16 @@ test('⑧ 업체 색인은 같은 목록이면 다시 만들지 않는다(줄마
   f.c._companies = f.c._companies.slice();               // 목록이 새로 들어오면
   f.c._payerAssess(ROW('아무개'), PIT('가상산업', f.co));
   assert.equal(builds, 2);
+});
+
+/* ───────── ⑨ 2차 검토 반영 — 일괄·모두확정도 «배울지»를 가른다 ───────── */
+test('⑨ 일괄 확정(confirmLump)·모두 확정(confirmReadyList)도 관계 입금자를 별칭으로 굳히지 않는다', () => {
+  const LUMP = cut('  async function confirmLump(row, lz, choice){', '  /* 보류함 — 누가 왜 보낸 돈인지 모를 때.');
+  assert.match(LUMP, /if\(payerLearns\(_payerAssessSafe\(row, _lc0\)\)\) erpLearnPayerAlias\(row\.memo \|\| row\.note \|\| '', _lc0\);/);
+  assert.ok(LUMP.indexOf("erpLearnPayerAlias(row.memo || row.note || '', erpAdvisoryCand(co, parts[0]))") < 0, '가드 없는 학습이 남아 있지 않다');
+  assert.match(FL, /if\(payerLearns\(_payerAssessSafe\(r\.row, r\.pItem\)\)\) erpLearnPayerAlias\(r\.row\.memo\|\|r\.row\.note\|\|'', r\.pItem\);/);
+  // 별칭 학습을 부르는 «모든» 자리가 배울지를 가른 뒤에 부른다 (CMS 줄 연결·등록 창의 직접 학습 같은 사업장 이름 자체 학습은 예외)
+  const calls = FL.split('\n').filter((l) => /erpLearnPayerAlias\(/.test(l) && !/^\s*\/\*|^\s*\/\//.test(l));
+  const unguarded = calls.filter((l) => !/payerLearns\(/.test(l));
+  assert.deepEqual(unguarded.map((l) => l.trim().slice(0, 90)), [], '가드 없이 학습을 부르는 자리가 없다');
 });

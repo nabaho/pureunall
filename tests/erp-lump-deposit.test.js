@@ -393,7 +393,7 @@ test('⑨ 확정 전에 사람에게 무엇이 어떻게 나뉘는지 보여 주
 const FL = cut('function FinanceLedger(', 'function FinanceIncome');
 test('⑩ 줄 상태가 stateOf 를 거치고, 모두확정(readyRows)은 일괄을 모른다', () => {
   assert.ok(FL.indexOf('var st = stateOf(row, grp);') >= 0, '줄 상태 계산이 일괄 표시를 거친다');
-  assert.ok(FL.indexOf('var _st  = stateOf(row, _grp);') >= 0, '펼침 창도 같은 판단');
+  assert.ok(FL.indexOf('var _st  = (rowInfo[row._k] && rowInfo[row._k].st) || stateOf(row, _grp);') >= 0, '펼침 창도 «줄과 같은 판정»(이름 다른 줄은 노랑으로 강등된 것)을 쓴다');
   const ready = FL.slice(FL.indexOf('var readyRows = []'), FL.indexOf('var autoRows = [];'));
   assert.ok(ready.indexOf('lumpOf') < 0 && ready.indexOf('confirmLump') < 0, '모두확정 길에 일괄이 끼어들지 않는다');
 });

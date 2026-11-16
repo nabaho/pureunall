@@ -461,13 +461,48 @@ test('⑧ 상담료 입금을 무르는 «문 하나»(erpUndoIncome)가 상담�
   assert.ok(u.patches.some((p) => p.store === 'finance_income' && p.p.undoneDate));
 });
 
-test('⑧ 입금 저장이 안 되면(dbPatch false) «되돌렸다»고 하지 않고 상담접수도 건드리지 않는다', () => {
+test('⑧ 입금 저장이 안 되면(dbPatch false) «되돌렸다»고 하지 않고, 먼저 고친 상담접수를 원래대로 돌려놓는다', () => {
+  const orig = [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', amount: 1, fromApproved: true }];
   const fi = { id: 'fi-9', kind: '상담료', date: '2026-11-17', consultId: 'ct-1', consultPayId: 'cp-1' };
-  const ct = [{ id: 'ct-1', consultPayments: [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', amount: 1 }] }];
+  const ct = [{ id: 'ct-1', consultPayments: orig }];
   const u = undoCtx(ct, [fi]);
-  u.c._patchResult = false;
+  u.c.dbPatch = (store, id, p) => { u.patches.push({ store, id, p }); return store === 'finance_income' ? false : true; };
   assert.equal(u.c.erpUndoIncome(fi), false);
-  assert.equal(u.patches.filter((p) => p.store === 'contracts').length, 0);
+  const cps = u.patches.filter((p) => p.store === 'contracts');
+  assert.equal(cps.length, 2, '상담접수를 고쳤다가(입금 전) 원래대로 되돌렸다');
+  assert.equal(cps[0].p.consultPayments[0].status, 'approved');
+  assert.equal(cps[1].p.consultPayments, orig, '마지막 상태는 원래 목록');
+});
+
+test('⑧ 상담접수 저장이 실패하면(false·예외) 입금은 아직 건드리지 않고 멈춘다 — 입금만 물러지고 결제는 received 로 남는 어긋남이 없다', () => {
+  const mk = () => ({ fi: { id: 'fi-9', kind: '상담료', date: '2026-11-17', consultId: 'ct-1', consultPayId: 'cp-1' },
+    ct: [{ id: 'ct-1', consultPayments: [{ id: 'cp-1', status: 'received', incomeId: 'fi-9', amount: 1 }] }] });
+  const a = mk(); const ua = undoCtx(a.ct, [a.fi]);
+  ua.c.dbPatch = (store, id, p) => { ua.patches.push({ store, id, p }); return store === 'contracts' ? false : true; };
+  assert.equal(ua.c.erpUndoIncome(a.fi), false);
+  assert.equal(ua.patches.filter((p) => p.store === 'finance_income').length, 0, '입금은 그대로');
+  assert.ok(ua.toasts.some((t) => /상담접수/.test(t)));
+  const b = mk(); const ub = undoCtx(b.ct, [b.fi]);
+  ub.c.dbPatch = (store, id, p) => { ub.patches.push({ store, id, p }); if (store === 'contracts') throw new Error('끊김'); return true; };
+  assert.equal(ub.c.erpUndoIncome(b.fi), false);
+  assert.equal(ub.patches.filter((p) => p.store === 'finance_income').length, 0);
+});
+
+test('⑧ 일반 입금(일괄이 아닌 줄)도 이미 물러졌으면 두 번 무르지 않는다 — 마감월 성과 조정이 겹치지 않게', () => {
+  const stale = { id: 'fi-1', kind: '자문료', date: '2026-11-17' };
+  const stored = { id: 'fi-1', kind: '자문료', date: '2026-11-17', undoneDate: '2026-11-18' };
+  const u = undoCtx([], [stored]);
+  assert.equal(u.c.erpUndoIncome(stale), true);
+  assert.equal(u.patches.length, 0, '아무것도 저장하지 않았다');
+});
+
+test('⑨ 상담접수 저장 실패 복구가 입금 취소까지 실패하면 «취소했다»고 하지 않고 직접 되돌리라고 알린다', () => {
+  const s = saveCtx(CTS());
+  s.c.erpUndoIncome = () => false;
+  s.c.dbPatch = (store) => (store === 'contracts' ? false : true);
+  assert.equal(s.c.saveDirectIncome(DBASE()), false);
+  assert.ok(s.toasts.some((t) => /입금 취소도 실패/.test(t) && /직접 되돌린 뒤/.test(t)), '실패를 분명히 알린다');
+  assert.ok(!s.toasts.some((t) => /입금도 취소했습니다/.test(t)), '취소했다고 거짓말하지 않는다');
 });
 
 test('⑧ 상담 칸이 없는 옛 입금은 상담접수를 찾지도 않는다(기존 되돌리기 그대로)', () => {
@@ -480,7 +515,8 @@ test('⑧ 상담 칸이 없는 옛 입금은 상담접수를 찾지도 않는다
 /* ───────── ⑩ 화면 연결 (자동 검토 반영) ───────── */
 test('⑩ 직접 등록 창 — 상담접수·결제수단을 바꾸면 «잇기»를 풀고, 카드전표 증빙이 있고, 카드 정보가 모자라면 등록이 안 눌린다', () => {
   assert.match(FL, /onChange:function\(e\)\{ upd\(\{consultId:e\.target\.value, payLinkId:''\}\); \}/, '상담접수를 바꾸면 잇기 풀림');
-  assert.match(FL, /upd\(\{cardMode:false, payLinkId:''\}\)/, '계좌로 바꾸면 잇기 풀림');
+  assert.match(FL, /upd\(\{cardMode:false, payLinkId:'', doc:\(dirPop\.doc==='card'\?'cash':dirPop\.doc\)\}\)/, '계좌로 바꾸면 잇기와 카드전표 선택이 풀린다');
+  assert.ok(FL.indexOf("card:'카드전표',none:'증빙없음'}[dirPop.doc]") >= 0, '등록 확인창도 카드전표를 그대로 보여 준다');
   assert.ok(FL.indexOf("seg(dirPop.doc,'card','💳 카드전표'") >= 0, '카드로 받았으면 카드전표를 증빙으로 고를 수 있다');
   assert.match(FL, /\|\| \(_isConsultK && dirPop\.cardMode && !_cardBuild\.ok\),/, '카드 정보가 모자라면 등록 단추가 안 눌린다');
 });
