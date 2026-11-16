@@ -2205,6 +2205,13 @@
     o = o || {};
     var f = o.fields || {};
     var mm = o.mailMeta || {};
+    /* 종료·해지 «통보»(메일 제목·서류 이름)는 새 계약이 아니다.
+       메일 가져오기 길(pullMailContracts)은 이미 거르는데 사진첩 길에는 같은 거르개가 없어,
+       «자문계약 종료 의 건» 메일의 날인본이 계약협의 카드가 됐다(2026-11-16 점검).
+       제목·서류 이름만 본다 — 본문은 이 길에 없다. 걸러도 아무것도 지우지 않고 요청만 안 만든다. */
+    if (isTerminatedMailText(mm.subject, '') || isTerminatedMailText(f.docName, '')) {
+      return Promise.resolve({ ok: false, reason: 'terminated_notice' });
+    }
     var compName = String(f.company || '').trim();
     if (!compName || /푸른노무법인/.test(compName)) {
       compName = String(mm.companyName || '').trim() || extractCoFromSubj(mm.subject) || extractCoFromSubj(f.docName);
