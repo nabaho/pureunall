@@ -15,6 +15,7 @@
      cal-share/ 아래로 오는 요청만 보고, 그 밖의 주소는 애초에 이 일꾼에게 오지 않는다.
    ⚠ 사진만 받는다(image/*). 한 번에 3장까지(화면 캡처 읽기 한도와 같다) · 한 장 15MB 넘는 것은 버린다.
    ⚠ 새 공유가 오면 앞의 대기분을 «먼저 비운다» — 옛 캡처가 새 공유에 섞이지 않게.
+   ⚠ 다른 웹사이트가 보낸 전송은 담지 않는다(아래 fromOtherSite, 2026-11-16 — pu-sw.js 와 같은 잣대).
    ⚠ 이름(IDB_NAME·IDB_STORE·IDB_VER·파일 칸 'images')은 pu-cal.html 공유함 · pu-cal-manifest.json 과 짝이다.
      tests/cal-share-target.test.js 가 셋을 맞대 본다.
    ⚠ 애플(아이폰)은 웹앱을 공유 목록에 올리는 것을 막아 두었다. 안드로이드 전용이다. */
@@ -38,10 +39,59 @@ self.addEventListener('fetch', function (e) {
   var url;
   try { url = new URL(e.request.url); } catch (_) { return; }
   if (url.pathname.slice(-SHARE_DIR.length) !== SHARE_DIR) return;   // 공유 주소가 아니면 손대지 않는다
-  if (e.request.method === 'POST') { e.respondWith(take(e.request)); return; }
+  if (e.request.method === 'POST') {
+    e.respondWith(fromOtherSite(e.request) ? refuseOtherSite(BACK) : take(e.request));
+    return;
+  }
   /* 공유 주소를 그냥 열면(GET) 깃허브가 404 를 낸다 — 캘린더로 돌려보낸다 */
   if (e.request.mode === 'navigate') e.respondWith(redirect(BACK));
 });
+
+/* ══════ 다른 웹사이트가 보낸 «공유»는 담지 않는다 (대표 지시 2026-11-16) ══════
+   pu-sw.js 의 같은 이름 두 함수와 «똑같다» — 이 일꾼은 scope 를 좁혀 따로 살아서 불러 쓰지 않고 옮겨 두었다.
+   고치면 함께 고친다 — tests/share-target-other-site.test.js 가 공유를 받는 모든 일꾼을 같은 잣대로 돌려 본다.
+   폰의 공유는 «보낸 곳»이 비어서 오거나 android-app:// 로 온다. 웹페이지가 보낸 전송에는 그 페이지 주소가
+   붙는다 — 그것이 이 일꾼과 같은 폴더(우리 앱) 밖이면 담지 않는다.
+   ⚠ 보낸 곳이 비었거나 http(s) 주소가 아니면 받는다 — 폰의 공유가 그렇게 온다(막으면 공유가 죽는다). */
+function fromOtherSite(req) {
+  var home = new URL('./', self.location);          // 이 일꾼 파일이 사는 폴더(깃허브 /pureunall/)
+  var from = '';
+  try { from = String(req.referrer || ''); } catch (_) { from = ''; }
+  if (/^https?:/i.test(from)) {
+    var u;
+    try { u = new URL(from); } catch (_) { return true; }
+    /* 같은 깃허브 주소라도 폴더가 다르면 다른 저장소의 페이지다 */
+    if (u.origin !== home.origin || u.pathname.indexOf(home.pathname) !== 0) return true;
+  }
+  var origin = '';
+  try { origin = String((req.headers && req.headers.get && req.headers.get('origin')) || ''); } catch (_) { origin = ''; }
+  if (/^https?:/i.test(origin) && origin !== home.origin) return true;
+  return false;
+}
+
+/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다)
+   home 은 받은 주소가 아니라 «이 일꾼 폴더 기준의 정해 둔 화면»으로 준다. 그래도 풀린 주소가
+   이 폴더 밖이면 폴더 첫 화면으로 — «앱으로 가기»가 앱 밖을 가리키면 안 된다. */
+function refuseOtherSite(home) {
+  var base = new URL('./', self.location);
+  var dest = new URL(home, base);
+  if (dest.origin !== base.origin || dest.pathname.indexOf(base.pathname) !== 0) dest = base;
+  var to = String(dest.href).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+  var html = '<!doctype html><html lang="ko"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>공유를 받지 않았습니다</title></head>' +
+    '<body style="margin:0;padding:24px 16px;font-family:system-ui,sans-serif;line-height:1.7;color:#1f2937;background:#fff">' +
+    '<h1 style="font-size:20px;margin:0 0 12px">공유를 받지 않았습니다</h1>' +
+    '<p style="font-size:16px;margin:0 0 16px">다른 웹사이트에서 보낸 것이라 담지 않았습니다.<br>' +
+    '사진·문서는 폰의 갤러리·카톡 등에서 «공유»로 보내 주세요.</p>' +
+    '<p style="font-size:16px;margin:0"><a href="' + to + '">앱으로 가기</a></p></body></html>';
+  return new Response(html, {
+    status: 403,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
 
 /* 303 — 받은 POST 를 GET 으로 바꿔 돌려보낸다(새로고침해도 다시 안 보낸다) */
 function redirect(to) {

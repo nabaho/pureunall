@@ -287,7 +287,12 @@ test('★★ PuAuthSync·공유 워커 — 로그아웃 시 공유 캐시·Index
   });
 
   assert.match(stripJs(read('pu-sw.js')), /await caches\.delete\('pucards-share'\);\s*var cache = await caches\.open\('pucards-share'\)/);
-  assert.match(stripJs(read('pu-cards-sw.js')), /await caches\.delete\('pucards-share'\);\s*const cache = await caches\.open\('pucards-share'\)/);
+  /* 옛 껍데기 pu-cards-sw.js 는 2026-11-16 부터 통합 일꾼을 불러 쓴다 — 그러면 비우기도 바로 위 pu-sw.js 몫이다.
+     자기 갈래를 다시 들게 되면 그 갈래도 먼저 비워야 한다. */
+  const cardsSw = stripJs(read('pu-cards-sw.js'));
+  if (!/importScripts\(\s*['"]pu-sw\.js(\?[^'"]*)?['"]\s*\)/.test(cardsSw)) {
+    assert.match(cardsSw, /await caches\.delete\('pucards-share'\);\s*(?:var|let|const) cache = await caches\.open\('pucards-share'\)/);
+  }
 });
 
 test('★★ 포털 빠른 복원(_instantReturnFromApp) — 영구 localStorage 저장을 금하고 계정 불일치·퇴사·만료를 차단한다', () => {
