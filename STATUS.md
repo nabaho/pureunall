@@ -242,13 +242,31 @@ PR #3114 · `status/2026-11-16-home-newsite-gaps.md`. 가짜 파이어베이스�
 - [x] 합친 뒤 함수 3개 배포 — 실행 43736600904 성공(2026-11-16). ⚠ bash 에서는 한글 작업 이름이 안 넘어가니 `gh workflow run firebase-deploy.yml --ref main -f functions=…` 로 부른다
 - [ ] 다음 달 1일 자동(`homepage/auto/newsite`·`newsiteLogos`) 기록에서 숨긴 로고·멈춤 사유 확인
 
-### 🌐 도메인 이사 뒤 남은 것 — 사람이 로그인만 해 주면 AI 가 이어서 끝낸다 (2026-11-16 확인)
+### 🙋 도메인 이사 뒤 «대표가 직접» 할 일 — 로그인·결정만 해 주면 나머지는 AI 가 끝낸다 (2026-11-16 전수 점검)
 
-인수인계: `docs/superpowers/plans/2026-11-15-ERP-주소-이사-진행상황.md`(PR #3096). 크롬·에고라이트 둘 다 아래 두 곳이 로그인 화면이다 — 비밀번호는 AI 가 넣지 않는다.
-- [ ] 가비아 로그인 → `pureunlabor.com` 을 `pureunlabor.co.kr` 로 넘김(TXT `_github-pages-challenge-nabaho` → GitHub Verify → A 4줄·`www` CNAME → `nabaho/pureunlabor-com` cname → HTTPS 강제)
-- [ ] 네이버 로그인 → 서치어드바이저 사이트 등록(`https://pureunlabor.co.kr`, HTML 파일 확인 → pureun-site 뿌리) · 사이트맵 제출. 크롬 확장은 이 사이트를 막아 둠
-- [x] 구글 서치콘솔 sitemap.xml — «성공 · 발견한 페이지 17»(2026-11-16)
-- [ ] 2027-02-15 무렵 `functions/erp-origins.js` 의 옛 출처 빼기
+인수인계: `docs/superpowers/plans/2026-11-15-ERP-주소-이사-진행상황.md`(PR #3096). 비밀번호·인증번호는 AI 가 넣지 않는다 — 아래 «로그인»은 사람이 한다.
+
+**급함 — 11월 27일 전에**
+- [ ] **옛 홈페이지 도메인 `푸른노무법인.kr` 결정**(등록처 가비아, 사용 종료일 2026-11-27). 연장 안 하면 남이 등록해 옛 명함·검색 결과·옛 메일 속 링크가 그쪽으로 갈 수 있다. ① 도메인만 연장해 새 홈페이지로 넘기기 ② 그대로 끝내기 — 대표가 고른다(①이면 가비아 로그인 뒤 AI 가 넘김 설정).
+- [ ] **카페24(옛 사이트 호스팅·메일 `mw-002.cafe24.com`) 계약 확인** — 도메인과 따로 돈이 나갈 수 있다. 옛 사이트 자료 백업 뒤 해지 여부 결정. 그 도메인 메일 주소를 쓰는 사람이 있으면 먼저 옮긴다.
+
+**로그인만 해 주면 AI 가 이어서**
+- [ ] **가비아 로그인** → AI 가: `pureunlabor.com` → `pureunlabor.co.kr` 넘김(TXT `_github-pages-challenge-nabaho` → GitHub Verify → A 4줄·`www` CNAME → `nabaho/pureunlabor-com` cname → HTTPS 강제) · 두 새 도메인에 메일 사칭 막기(SPF `v=spf1 -all`, DMARC `p=reject`) · 도메인 잠금 확인
+- [ ] **새 주소 ERP 로그인**(https://erp.pureunlabor.co.kr) → 「홈페이지」 → 「새 사이트에 올리기」 — 담아 둔 얼굴 사진 7장(위 🏠 절). 대표 본인 기기도 «로그인 유지»·앱 다시 설치·폰 알림 다시 켜기
+- [ ] **네이버 로그인** → 서치어드바이저 사이트 등록(`https://pureunlabor.co.kr`, HTML 파일 확인 → pureun-site 뿌리) · 사이트맵 제출. 크롬 확장·내장 브라우저 모두 네이버를 막아 AI 는 못 연다
+
+**대표가 눈으로 확인**
+- [ ] 네이버 스마트플레이스·구글 비즈니스 프로필의 «홈페이지» 칸 — 옛 주소면 `https://pureunlabor.co.kr` 로(카카오맵 4곳은 홈페이지 칸 없음 — 확인함)
+- [ ] 명함·홍보물·블로그 소개 등 인쇄·게시물에 옛 홈페이지 주소가 있으면 새로 찍을 때 바꾸기(메일 서명엔 없음 — 확인함)
+- [ ] PR #3096(이사 계획·진행 기록 문서만) 합칠지 — 자동 권한 확인이 AI 의 보류 해제를 막아 대표가 합친다
+
+**나중 결정(급하지 않음)**
+- [ ] App Check 켤지 — reCAPTCHA 키에 새 주소는 넣어 둠(2026-11-16). 켜려면 ① 화면 `FB_APPCHECK_ON=true` ② 며칠 «확인된 요청» 100% 근처 확인 ③ 콘솔 «적용». 지금 «적용»만 누르면 전부 막힌다
+- [ ] 업체 홈페이지 찾기(`findCompanyWebsite`)를 쓰려면 네이버 검색 API 열쇠 발급 — 처음부터 없던 기능이라 안 써도 된다
+
+**끝난 것(2026-11-16)**
+- [x] 구글 서치콘솔 sitemap.xml «성공 · 17쪽» · 구글 OAuth 동의 화면 링크 3개(없어진 netlify → 새 주소) · reCAPTCHA 키 새 주소 · 나스 역방향 프록시 «푸른이알피» 머리글 새 주소(작업 스케줄러 3개엔 옛 주소 없음) · 코드 옛 주소 6곳(PR #3120 합침·배포 `ff1c0f7a` 확인)
+- [ ] (AI) 2027-02-15 무렵 `functions/erp-origins.js`·리멤버 확장·reCAPTCHA 키·OAuth 클라이언트에서 옛 주소 빼기
 
 ### 📰 뉴스레터 판례 — ✅ 끝남(2026-11-16): 국가법령정보센터 공개 쪽 읽기로 되살림 · 배포·규칙 게시·첫 모으기 확인
 
