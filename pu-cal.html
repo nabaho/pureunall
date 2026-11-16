@@ -1883,7 +1883,7 @@ var GCAL_SCOPE    = "https://www.googleapis.com/auth/calendar.events";
 function 옛구글로그인(){
   location.href = PuGcalAuth.signInUrl({
     clientId: GCAL_OAUTH_ID, scope: GCAL_SCOPE,
-    fallbackRedirect: "https://nabaho.github.io/pureunall/pu-cal.html"
+    fallbackRedirect: "https://erp.pureunlabor.co.kr/pu-cal.html"
   });
 }
 /* ★ 구글 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다 그래야 혼란이 없다」)
@@ -3743,7 +3743,7 @@ function lockNote(){
 var IEUM_START_YEAR = 2024;
 /* 이알피의 같은 이름과 «같은 값»이어야 한다 — 다르면 밖으로 나간 링크가 갈린다.
    tests/cal-ieum-view.test.js 가 두 값을 맞대 본다. */
-var IEUM_VIEW_BASE = 'https://nabaho.github.io/pureunall/ieum-view.html';
+var IEUM_VIEW_BASE = 'https://erp.pureunlabor.co.kr/ieum-view.html';
 
 /* 사람 목록 — 내부 노무사 → 외부 노무사 → 변호사 → 그만둔 사람(기록이 있는 경우만).
    ⚠ 그만둔 사람을 지우지 않는다 — 지나간 근무 기록이 사라지면 셈이 틀어진다. */

@@ -31626,7 +31626,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   function gmailSignIn(){
     var redirect = (window.location.protocol === 'https:')
       ? (window.location.origin + window.location.pathname).replace(/\/+$/, '')
-      : 'https://nabaho.github.io/pureunall/pu-erp.html';
+      : 'https://erp.pureunlabor.co.kr/pu-erp.html';
     var url = 'https://accounts.google.com/o/oauth2/v2/auth?'
       +'client_id='+encodeURIComponent(GMAIL_OAUTH_ID)
       +'&redirect_uri='+encodeURIComponent(redirect)
@@ -44824,7 +44824,7 @@ function hanaApkUrl(){
     if(location.protocol==='https:')
       return location.origin + location.pathname.replace(/[^/]*$/, '') + 'hana-bridge.apk';
   }catch(_e){}
-  return 'https://nabaho.github.io/pureunall/hana-bridge.apk';
+  return 'https://erp.pureunlabor.co.kr/hana-bridge.apk';
 }
 // ============ rhwp (HWP/HWPX 정밀 텍스트 + 원본 SVG 미리보기) ============
 // 판 고르기·하루 한 번 자동 갱신만 여기 남는다. 「최신확인」 단추는 문서관리 › 계약서 양식에 있다.
@@ -72067,7 +72067,7 @@ var EXPENSE_CAT_QUICK = [
   { code:'exp-other',    name:'기타' },
 ];
 
-var IEUM_VIEW_BASE = 'https://nabaho.github.io/pureunall/ieum-view.html';
+var IEUM_VIEW_BASE = 'https://erp.pureunlabor.co.kr/ieum-view.html';
 function ieumViewUrl(key){
   var base = (window.location.protocol === 'https:')
     ? window.location.origin + window.location.pathname.replace(/[^\/]*$/, 'ieum-view.html')
@@ -95933,7 +95933,7 @@ function App(){
   return h('div', null,
     isFileProtocol && h('div', { style:{ position:'fixed', top:0, left:0, right:0, zIndex:99999, background:'#dc2626', color:'#fff', padding:'10px 16px', fontSize:'13px', fontWeight:600, textAlign:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.2)' } },
       '⚠️ 로컬 파일(file://)로 열려 있어 기기 간 데이터 동기화가 작동하지 않습니다. 반드시 ',
-      h('span', { style:{ textDecoration:'underline' } }, 'https://nabaho.github.io/pureunall/pu-erp.html'),
+      h('span', { style:{ textDecoration:'underline' } }, 'https://erp.pureunlabor.co.kr/pu-erp.html'),
       ' 주소로 접속하세요. (현재 데이터는 이 PC에만 저장됩니다)'
     ),
     /* 📄 회사 한 장 — 어느 화면에서 열든 여기 하나에 뜬다(온톨로지 2걸음, 2026-09-18).
