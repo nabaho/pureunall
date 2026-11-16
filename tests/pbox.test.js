@@ -3616,3 +3616,244 @@ test('⑭ 판례·행정해석·조례·조례유권해석·결정례 100% 법�
   assert.equal(slowSsr.docs.length, 0);
   assert.ok(slowSsr.errors.some((e) => e.includes('제한시간')), '지연되는 SSR 요청은 시간 제한 내에 중단되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ⑮ 노동 연결법률 · 공무원·군인·교원 특수직역 전수 확장 · 통상임금관련 오탐 제로 · 차분한 홈 자동완성 UX 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('⑮ 공무원·군인·교원·선원 및 민사·상사·집행·회생 연결법률 · 통상임금관련 오탐 차단 · 홈 스마트 자동완성 UX 검증', async () => {
+  const lawIdxMod = loadLawIndex();
+  const lawIndex = lawIdxMod.list();
+  const docs = Corpus.SEED_DOCS;
+  const PBoxSync = require(path.join(ROOT, 'functions', 'pbox-sync.js'));
+
+  /* 1) 135건 실존 원문 코퍼스 무결성 및 FACT_ISSUE_RULES 교차 인용 전수 점검 */
+  assert.ok(docs.length >= 135, `실존 공식 문서 코퍼스가 135건 이상이어야 합니다 (현재 ${docs.length}건)`);
+  for (const d of docs) {
+    assert.equal(d.verified, true, `${d.id} 문서가 공식 검증 상태여야 합니다`);
+    assert.match(String(d.officialUrl || ''), /^https:\/\/www\.law\.go\.kr\/LSW\//, `${d.id} 공식 원문 URL이 유효해야 합니다`);
+    for (const rl of (d.refLaws || [])) {
+      assert.ok(!String(rl).includes('\n'), `${d.id} 참조조문에 개행문자가 남으면 안 됩니다: ${rl}`);
+    }
+  }
+
+  /* 2) 사용자 캡처 실측 버그('통상임금관련') 오탐 완전 차단 검증 */
+  const qOrdRel = Engine.searchUnifiedAllInOne('통상임금관련', { docs, loadedLaws: [], lawIndex });
+  const ordLawDirs = qOrdRel.lawFamilies.map((f) => f.dir);
+  assert.ok(ordLawDirs.includes('근로기준법'), '통상임금관련 검색 시 근로기준법이 매칭되어야 합니다');
+  assert.ok(!ordLawDirs.some((nm) => nm.includes('이자제한법')), '단독 조문번호(제2조) 일치를 이유로 이자제한법 규정이 오탐되면 안 됩니다');
+  assert.ok(qOrdRel.unified.precedents.some((d) => d.caseNo === '2020다247190') && qOrdRel.unified.precedents.some((d) => d.caseNo === '2023다302838'), '통상임금 전원합의체 판결이 최상위에 조회되어야 합니다');
+  assert.ok(!qOrdRel.unified.precedents.some((d) => d.caseNo === '2018다200709'), '취업규칙 불이익변경 판결(2018다200709)이 통상임금에 잘못 섞이면 안 됩니다');
+  assert.ok(!qOrdRel.unified.decisions.some((d) => String(d.caseNo).includes('23진정') || String(d.caseNo).includes('개인정보위')), '제2조 일치를 이유로 인권위·개인정보위 무관 결정례가 오탐되면 안 됩니다');
+  assert.ok(qOrdRel.unified.interpretations.some((d) => d.caseNo === '근로기준정책과-218'), '통상임금 고용노동부 행정해석(근로기준정책과-218)이 조회되어야 합니다');
+  assert.ok(!qOrdRel.unified.interpretations.some((d) => d.caseNo === '법제처 19-0248'), '제56조 일치를 이유로 산재 시행령 해석(법제처 19-0248)이 오탐되면 안 됩니다');
+
+  /* 3) 공무원·군인·군무원·교원·경찰·소방·선원 및 민사·상사·집행·회생·영업비밀·세법 확장 검증 */
+  const prioLaws = lawIndex.filter((f) => f.priority > 0);
+  assert.ok(prioLaws.length >= 150, `핵심 우선 법령군이 150개 이상이어야 합니다 (현재 ${prioLaws.length}개)`);
+  const byDir = new Map(lawIndex.map((f) => [f.dir, f]));
+  for (const mustPublicMil of ['국가공무원법', '지방공무원법', '공무원재해보상법', '공무원연금법', '군인사법', '군인의지위및복무에관한기본법', '군인보수법', '군인재해보상법', '군인연금법', '군무원인사법', '국가유공자등예우및지원에관한법률', '사립학교법', '경찰공무원법', '소방공무원법', '청원경찰법']) {
+    const fam = byDir.get(mustPublicMil);
+    assert.ok(fam && fam.cat === 'public_mil', `${mustPublicMil} 법령이 public_mil 분야로 분류되어야 합니다`);
+  }
+  for (const mustConn of ['선원법', '건설근로자의고용개선등에관한법률', '민사집행법', '채무자회생및파산에관한법률', '부정경쟁방지및영업비밀보호에관한법률', '발명진흥법', '통신비밀보호법', '소득세법']) {
+    const fam = byDir.get(mustConn);
+    assert.ok(fam && fam.priority > 0, `${mustConn} 연결법률이 핵심 법령군에 포함되어야 합니다`);
+  }
+
+  /* 양방향 연결법령 탐색(근로기준법 ↔ 군인사법, 산재보험법 ↔ 군인재해보상법, 퇴직급여법 ↔ 민사집행법) 및 primaryFile 매핑 검증 */
+  const connObjsFromLsa = Engine.getConnectedLawsFor('근로기준법', lawIndex, 20);
+  const connFromLsa = connObjsFromLsa.map((c) => c.dir);
+  assert.ok(connFromLsa.includes('국가공무원법') && connFromLsa.includes('군인사법') && connFromLsa.includes('사립학교법'), '근로기준법에서 공무원·군인·사립학교 징계/보수 특별법이 연결되어야 합니다');
+  for (const cObj of connObjsFromLsa) {
+    const refFam = byDir.get(cObj.dir);
+    assert.equal(cObj.fileName, refFam.primaryFile, `${cObj.dir} 연결법령의 fileName은 실제 primaryFile(${refFam.primaryFile})이어야 하며 ${cObj.dir}.md가 되면 안 됩니다`);
+  }
+  const connFromMil = Engine.getConnectedLawsFor('군인사법', lawIndex, 15).map((c) => c.dir);
+  assert.ok(connFromMil.includes('근로기준법') && connFromMil.includes('군무원인사법') && connFromMil.includes('국가공무원법'), '군인사법 열람 시 일반 근로기준법 및 군무원·국가공무원법이 역방향 연결되어야 합니다');
+  const connFromGarnish = Engine.getConnectedLawsFor('급여압류', lawIndex, 15).map((c) => c.dir);
+  assert.ok(connFromGarnish.includes('민사집행법') && connFromGarnish.includes('채무자회생및파산에관한법률'), '급여압류 검색 시 민사집행법·채무자회생법이 연결되어야 합니다');
+
+  /* 특수직역 · 연결법률 실존 판례·해석 검색 정밀도 검증 */
+  const qCiv = Engine.searchUnifiedAllInOne('국가공무원 징계 소청', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qCiv.docs.slice(0, 5).some((d) => d.caseNo === '2020누67287' || d.caseNo === '법제처 26-0056'));
+  const qMil = Engine.searchUnifiedAllInOne('군인 인사소청 공상군경', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qMil.docs.slice(0, 5).some((d) => d.caseNo === '2021누2439' || d.caseNo === '2024두45511' || d.caseNo === '2020구합104810'));
+  const qTch = Engine.searchUnifiedAllInOne('사립학교 교원 징계 교원소청', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qTch.docs.slice(0, 5).some((d) => d.caseNo === '2023두47411'));
+  const qSeafarer = Engine.searchUnifiedAllInOne('선원법 재해보상', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qSeafarer.docs.slice(0, 5).some((d) => d.caseNo === '2009가합22910'));
+  const qInv = Engine.searchUnifiedAllInOne('직무발명 보상금', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qInv.docs.slice(0, 3).some((d) => d.caseNo === '2025다219742'));
+  const qRec = Engine.searchUnifiedAllInOne('직장 대화 녹음 통신비밀보호법', { docs, loadedLaws: [], lawIndex });
+  assert.ok(qRec.docs.slice(0, 3).some((d) => d.caseNo === '2025노907'));
+
+  /* SSR 파서 지원(공백 포함 법원명) 및 제소연도 이전 처분일자 오추출 방지 검증 */
+  const parsedBranch = PBoxSync.parseLawGoKrSsrDetailHtml(
+    'prec',
+    '<div>손해배상(기)<br>[대구지방법원 경주지원 2022. 11. 15. 선고 2021나12345 판결]<br>【주문】항소를 기각한다. ' + '가'.repeat(120) + '</div>',
+    { seq: '12345', docType: 'prec_lower' }
+  );
+  assert.ok(parsedBranch && parsedBranch.court === '대구지방법원 경주지원' && parsedBranch.decisionDate === '2022-11-15', '지원(공백 포함 법원명)과 선고일자가 정확히 파싱되어야 합니다');
+
+  const parsedNoHeaderDate = PBoxSync.parseLawGoKrSsrDetailHtml(
+    'prec',
+    '<div>요양불승인처분취소<br>[서울행정법원 2009구단4596]<br>피고는 2008. 3. 28. 이 사건 처분을 하였다. ' + '나'.repeat(120) + '</div>',
+    { seq: '367820', docType: 'prec_lower', listDate: '2011.07.08' }
+  );
+  assert.equal(parsedNoHeaderDate.decisionDate, '2011-07-08', '사건연도(2009)보다 앞선 본문 내 처분일(2008-03-28)을 선고일로 오인하지 않고 목록 선고일(2011-07-08)을 사용해야 합니다');
+
+  /* 4) 홈 스마트 자동완성 UX: 4열 카드벽·우측리더 간섭 제거 · IME 조합 보호 · Esc/숨김 토글 · 자동 모드 라우팅 */
+  const elementsById = {};
+  const docListeners = {};
+  function makeUxEl(id) {
+    const cls = new Set();
+    return {
+      id: id || '',
+      tagName: id === 'pboxPromptInput' ? 'TEXTAREA' : 'DIV',
+      style: {},
+      value: '',
+      innerHTML: '',
+      textContent: '',
+      focused: false,
+      classList: {
+        add: (c) => cls.add(c),
+        remove: (c) => cls.delete(c),
+        contains: (c) => cls.has(c)
+      },
+      setAttribute() {},
+      removeAttribute() {},
+      getAttribute() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false },
+      closest() { return null; },
+      focus() { this.focused = true; }
+    };
+  }
+  elementsById.pboxRoot = makeUxEl('pboxRoot');
+  elementsById.pboxReader = makeUxEl('pboxReader');
+  elementsById.pboxPromptInput = makeUxEl('pboxPromptInput');
+  elementsById.pboxLiveFactReview = makeUxEl('pboxLiveFactReview');
+
+  const lsMap = {};
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    localStorage: {
+      getItem: (k) => (Object.prototype.hasOwnProperty.call(lsMap, k) ? lsMap[k] : null),
+      setItem: (k, v) => { lsMap[k] = String(v); }
+    },
+    document: {
+      documentElement: makeUxEl('html'),
+      head: makeUxEl('head'),
+      body: makeUxEl('body'),
+      activeElement: null,
+      getElementById: (id) => elementsById[id] || (elementsById[id] = makeUxEl(id)),
+      createElement: (t) => makeUxEl(t),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+    },
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '---\n법령명: 군인사법\n시행일: 2026-01-01\n공포번호: 20001\n---\n제56조(징계사유) 군인이 직무상 의무를 위반하면 징계한다.',
+      json: async () => ({ ok: true, docs: [] })
+    }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: ctx.document,
+    localStorage: ctx.localStorage,
+    open: () => ({ opener: null }),
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('user-ux-15');
+  App.mount(elementsById.pboxRoot);
+  App.switchView('home');
+
+  function clickAct(attrs) {
+    const btn = {
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    };
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* A) 한글 조합 중(isComposing: true)에는 자동완성 DOM을 흔들지 않고 compositionend 시점에 깔끔하게 1회 반영 */
+  elementsById.pboxLiveFactReview.innerHTML = '';
+  elementsById.pboxPromptInput.value = '통상임';
+  (docListeners.input || []).forEach((fn) => fn({ target: elementsById.pboxPromptInput, isComposing: true }));
+  assert.equal(elementsById.pboxLiveFactReview.innerHTML, '', '한글 자모 조합 중(isComposing)에는 미리보기 DOM이 요동치면 안 됩니다');
+
+  elementsById.pboxPromptInput.value = '통상임금관련';
+  (docListeners.compositionend || []).forEach((fn) => fn({ target: elementsById.pboxPromptInput }));
+  const assistHtml = elementsById.pboxLiveFactReview.innerHTML;
+  assert.ok(assistHtml.includes('pbox-calm-assist') && assistHtml.includes('pbox-ac-list'), '조합 완료 시 간결한 단문 실행 선택 상자가 표시되어야 합니다');
+  assert.ok(!assistHtml.includes('pbox-unified-board'), '홈 입력 중에는 화면을 가리는 4열 12카드 보드가 렌더링되면 안 됩니다');
+  assert.ok(!assistHtml.includes('data-act="open-doc"') && !assistHtml.includes('data-act="open-law"'), '홈 자동제안 항목이 우측 원문 리더 창(#pboxReader)을 강제로 띄우면 안 됩니다');
+  assert.equal(elementsById.pboxReader.style.display, 'none', '홈 타이핑으로 우측 리더가 열리면 안 됩니다');
+
+  /* B) Escape 입력 시 입력창 텍스트는 보존하면서 자동제안 상자만 즉시 닫힘 */
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Escape',
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => {}
+  }));
+  assert.equal(elementsById.pboxLiveFactReview.innerHTML, '', 'Esc 키로 어지러운 제안 상자를 즉시 닫을 수 있어야 합니다');
+  assert.equal(elementsById.pboxPromptInput.value, '통상임금관련', 'Esc로 제안 상자를 닫아도 입력한 검색어는 그대로 유지되어야 합니다');
+
+  /* C) [자동제안 숨김] 토글 영구 저장 및 재활성화 검증 */
+  elementsById.pboxPromptInput.value = '공무원징계';
+  (docListeners.input || []).forEach((fn) => fn({ target: elementsById.pboxPromptInput, isComposing: false }));
+  assert.ok(elementsById.pboxLiveFactReview.innerHTML.includes('연결·유사직역 법령 비교'));
+  clickAct({ 'data-act': 'toggle-home-assist' });
+  assert.equal(lsMap.pu_pbox_hide_assist_v1, '1', '자동제안 숨김 설정이 localStorage에 저장되어야 합니다');
+  assert.equal(elementsById.pboxLiveFactReview.innerHTML, '', '자동제안 숨김 상태에서는 일반 타이핑 시 제안 상자가 뜨지 않아야 합니다');
+  clickAct({ 'data-act': 'toggle-home-assist' });
+  assert.equal(lsMap.pu_pbox_hide_assist_v1, '0');
+
+  /* D) 자동(auto) 모드 Enter 라우팅: 짧은 검색어('통상임금관련') → 통합검색(cases), 사실관계 문장 → 내용검토(workspace) */
+  App.switchView('home');
+  elementsById.pboxPromptInput.value = '통상임금관련';
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    shiftKey: false,
+    isComposing: false,
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => {}
+  }));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxCaseSearchInput'), '자동 모드에서 키워드 입력 후 Enter 시 즉시 통합검색(cases) 화면으로 연결되어야 합니다');
+
+  App.switchView('home');
+  elementsById.pboxPromptInput.value = '출근길 어린이집에 아이를 등원시키고 회사로 가던 중 교통사고가 났는데 산재가 되나요?';
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    shiftKey: false,
+    isComposing: false,
+    target: elementsById.pboxPromptInput,
+    preventDefault: () => {}
+  }));
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('id="pboxWsGrid"'), '자동 모드에서 사실관계 서술 후 Enter 시 내용검토 워크스페이스(workspace)로 연결되어야 합니다');
+
+  /* E) 우측 리더에서 군인사법 열람 시 연결·유사직역 비교 법령 바(근로기준법·국가공무원법·군무원인사법) 표시 확인 */
+  clickAct({ 'data-act': 'open-law', 'data-dir': '군인사법', 'data-file': '법률.md' });
+  await new Promise((r) => setImmediate(r));
+  assert.ok(elementsById.pboxReader.innerHTML.includes('pbox-conn-law-bar') && elementsById.pboxReader.innerHTML.includes('근로기준법'), '군인사법 원문 리더 상단에 연결·유사직역 비교 법령 막대가 표시되어야 합니다');
+});

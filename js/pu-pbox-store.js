@@ -18,7 +18,7 @@
   var PBOX_API_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/pboxApi';
   var CFG_LS_KEY = 'pu_pbox_sync_cfg_v1';
 
-  /* 노무법인 실무 최우선 오프라인 보관 팩 (본법 + 핵심 시행령·시행규칙·별표 25편) */
+  /* 노무법인 실무 최우선 오프라인 보관 팩 (노동 본법·시행령·별표 + 공무원·군인·교원·선원·연결법 40편) */
   var CORE_PACK_TARGETS = [
     { dir: '근로기준법', file: '법률(법률).md' },
     { dir: '근로기준법', file: '시행령.md' },
@@ -44,7 +44,22 @@
     { dir: '중대재해처벌등에관한법률', file: '법률.md' },
     { dir: '고용보험법', file: '법률.md' },
     { dir: '채용절차의공정화에관한법률', file: '법률.md' },
-    { dir: '개인정보보호법', file: '법률.md' }
+    { dir: '개인정보보호법', file: '법률.md' },
+    { dir: '국가공무원법', file: '법률.md' },
+    { dir: '지방공무원법', file: '법률.md' },
+    { dir: '공무원재해보상법', file: '법률.md' },
+    { dir: '군인사법', file: '법률.md' },
+    { dir: '군인재해보상법', file: '법률.md' },
+    { dir: '군무원인사법', file: '법률.md' },
+    { dir: '사립학교법', file: '법률.md' },
+    { dir: '선원법', file: '법률.md' },
+    { dir: '민법', file: '법률.md' },
+    { dir: '상법', file: '법률.md' },
+    { dir: '민사집행법', file: '법률.md' },
+    { dir: '채무자회생및파산에관한법률', file: '법률.md' },
+    { dir: '부정경쟁방지및영업비밀보호에관한법률', file: '법률.md' },
+    { dir: '발명진흥법', file: '법률.md' },
+    { dir: '통신비밀보호법', file: '법률.md' }
   ];
 
   var SUPABASE_HOST_RE = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.(?:co|in)(?:\/|$)/i;
@@ -525,12 +540,13 @@
         mem.recents = [];
       }
 
+      var seedTotalCnt = ((global.PuPBoxCorpus && Array.isArray(global.PuPBoxCorpus.SEED_DOCS)) ? global.PuPBoxCorpus.SEED_DOCS.length : 135);
       var freshAlert2 = {
         id: 'init-alert-2',
         date: E.todayKstYmd(),
         kind: 'prec',
-        title: '법제처(law.go.kr) 실존 판례·행정해석·자치법규 조례·조례 유권해석 108선 원문 검증 수록 및 무인증 실시간 수집 연동',
-        detail: '대법원·헌재·하급심 판례, 고용노동부 질의회시·고시·예규, 법제처 법령해석·자치법규 의견제시, 전국 지자체 조례, 중앙노동위·산재재심사위·행심위·개보위·인권위 결정례가 100% 법제처 공식 원문 그대로 수록·연동되었습니다.'
+        title: '법제처(law.go.kr) 실존 판례·행정해석·자치법규 조례·조례 유권해석 ' + seedTotalCnt + '선 원문 검증 수록 및 무인증 실시간 수집 연동',
+        detail: '노동법뿐 아니라 공무원·군인·교원·선원 특수직역 및 민사·상사·집행·회생·영업비밀·세법 연결 판례·유권해석까지 100% 법제처 공식 원문 그대로 수록·연동되었습니다.'
       };
       if (!mem.alerts.length) {
         mem.alerts = [
@@ -622,7 +638,7 @@
     });
   }
 
-  /* 노무 핵심 20편 일괄 오프라인 적재 (네트워크 실패 시 거짓 lastSyncAt 갱신 금지) */
+  /* 노동·공무원·군인·교원·선원·연결 핵심 40편 일괄 오프라인 적재 (네트워크 실패 시 거짓 lastSyncAt 갱신 금지) */
   function syncCoreLaborLaws(onProgress) {
     var total = CORE_PACK_TARGETS.length;
     var done = 0;

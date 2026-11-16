@@ -4,6 +4,19 @@ module.exports = {
   data: {},
   views: [
     {
+      name: 'home_keyword_assist',
+      run: async (page) => {
+        await page.evaluate(() => {
+          if (window.PuPBoxApp) window.PuPBoxApp.switchView('home');
+          var ta = document.getElementById('pboxPromptInput');
+          if (ta) {
+            ta.value = '통상임금관련';
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+      }
+    },
+    {
       name: 'home_live_review',
       run: async (page) => {
         await page.evaluate(() => {
