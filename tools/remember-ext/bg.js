@@ -11,10 +11,17 @@ var REM_HOME = 'https://card.rememberapp.co.kr/book/groups';
    이미 열린 탭은 두 주소 어느 쪽이든 찾는다 — 옛 주소로 열어 둔 탭이 남아 있을 수 있어서(2027-02-15 무렵 옛 주소를 뺀다). */
 var INTAKE = 'https://erp.pureunlabor.co.kr/remember-intake.html';
 var INTAKE_ANY = [INTAKE, 'https://nabaho.github.io/pureunall/remember-intake.html'];
+function isIntakeUrl(u) {
+  try {
+    var p = new URL(String(u || ''));
+    return INTAKE_ANY.some(function (a) { var q = new URL(a); return p.origin === q.origin && p.pathname === q.pathname; });
+  } catch (e) { return false; }
+}
 var EVERY_MIN = 30;
 var IMG_OK = /^https:\/\/remember-cdn\.rememberapp\.co\.kr\/[^\s"'<>]+$/;
 var IMG_MAX = 4 * 1024 * 1024;
 var running = false;
+var preferIntakeId = 0;
 
 /* 도는 때 (대표 지시 2026-10-31): 낮 09:00~18:00 은 EVERY_MIN 분마다, 그 밖에는 00:00 · 06:00 에 한 번씩.
    알람은 «다음 때» 하나만 맞추고, 울릴 때마다 다시 맞춘다(PC 시계 기준). */
@@ -62,9 +69,18 @@ chrome.alarms.onAlarm.addListener(function (a) { if (a.name === 'guard') { guard
    판 번호로 답해야 kick.js 가 «다시 시작»을 안 한다. ⚠ 확장 «자기 화면»이 보낸 것만 받는다 —
    리멤버·푸른 탭의 다리(content script)가 보낸 말로는 돌지 않는다. */
 chrome.runtime.onMessage.addListener(function (m, s, send) {
-  if (!m || m.cmd !== 'kick' || !s || String(s.url || '').indexOf(chrome.runtime.getURL('')) !== 0) return false;
-  send({ ver: DISK_VER });
-  armIfNone(); run();
+  if (!m) return false;
+  if (m.cmd === 'kick' && s && String(s.url || '').indexOf(chrome.runtime.getURL('')) === 0) {
+    send({ ver: DISK_VER });
+    armIfNone(); run();
+    return false;
+  }
+  if (m.cmd === 'run-now' && s && s.tab && isIntakeUrl(s.url)) {
+    send({ ok: true, running: running });
+    preferIntakeId = s.tab.id;
+    armIfNone(); run();
+    return false;
+  }
   return false;
 });
 /* 툴바 아이콘을 누르면 지금 바로 한 번 돈다 · 글자 띠(뱃지)로 «어디까지 갔는지» 보인다
@@ -84,6 +100,24 @@ async function findOrOpen(prefix, url) {
   var hit = all.find(function (t) { return t.url && prefixes.some(function (p) { return t.url.indexOf(p) === 0; }); });
   if (hit) return hit;
   return chrome.tabs.create({ url: url, pinned: true, active: false });
+}
+/* 받는 화면 탭이 여러 개 열려 있을 때(예: 로그인 전 탭 + 로그인된 탭) 요청한 탭 또는 로그인된 탭을 우선 고른다 */
+async function findIntake(preferId) {
+  var all = await chrome.tabs.query({});
+  var hits = all.filter(function (t) { return t.url && isIntakeUrl(t.url); });
+  if (!hits.length) return chrome.tabs.create({ url: INTAKE, pinned: true, active: false });
+  if (preferId) {
+    var pref = hits.find(function (t) { return t.id === preferId; });
+    if (pref) return pref;
+  }
+  if (hits.length === 1) return hits[0];
+  for (var i = 0; i < hits.length; i++) {
+    var r = await ask(hits[i].id, { cmd: 'hello' }, 1);
+    if (r && r.ready) return hits[i];
+  }
+  /* 확장 재시작 직후엔 모든 탭의 다리가 끊겨 있을 수 있으므로 최근 활성 탭을 우선한다 */
+  hits.sort(function (a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0) || (b.lastAccessed || 0) - (a.lastAccessed || 0); });
+  return hits[0];
 }
 async function waitLoaded(id, ms) {
   var t0 = Date.now();
@@ -147,14 +181,16 @@ async function selfUpdate() {
 }
 
 async function run() {
-  if (running) return;
+  if (running) { preferIntakeId = 0; return; }
   running = true;
+  var preferId = preferIntakeId;
+  preferIntakeId = 0;
   if (await selfUpdate()) { running = false; return; }
   note('..', '도는 중');
   var itId = 0;
   try {
     /* ① 받는 화면 */
-    var it = await findOrOpen(INTAKE_ANY, INTAKE);
+    var it = await findIntake(preferId);
     itId = it.id;
     await waitLoaded(it.id, 60000);
     var hello = await askReady(it.id);

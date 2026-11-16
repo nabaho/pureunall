@@ -52,7 +52,14 @@ body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"
 .wait{background:var(--bluebg);color:var(--blue);border:1px solid #bfdbfe;}
 .bad{background:var(--redbg);color:var(--red);border:1px solid #fecaca;}
 .warn{background:var(--amberbg);color:var(--amber);border:1px solid #fde68a;}
-.muted{color:var(--sub);font-size:12px;line-height:1.7;}
+.muted{color:var(--sub);font-size:12px;line-height:1.7;word-break:keep-all;}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.btn{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;line-height:1.2;}
+.btn:hover{background:var(--bg);}
+.btn.pri{background:var(--blue2);border-color:var(--blue2);color:#fff;}
+.btn.pri:hover{background:var(--blue);}
+.btn:disabled{opacity:.6;cursor:default;}
+.act-msg{font-size:12px;color:var(--sub);margin-top:6px;word-break:keep-all;}
 table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;table-layout:fixed;}
 td,th{padding:6px 8px;border-bottom:1px solid var(--bg);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 th{background:var(--bg);color:var(--sub);font-size:11.5px;}
@@ -61,11 +68,13 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
 <body>
 <div class="hd"><div class="org">푸른노무법인 · 기업정보함</div><h1>📇 리멤버 받기</h1></div>
 <div class="wrap">
-  <div class="card"><div id="state" class="band wait">준비 중…</div>
+  <div class="card"><div id="state" class="band wait" aria-live="polite">준비 중…</div>
+    <div id="actions" class="actions"></div>
+    <div id="actMsg" class="act-msg" aria-live="polite" style="display:none"></div>
     <p class="muted" style="margin-top:8px">이 탭은 «푸른 리멤버 연결» 확장이 쓰는 받는 창입니다 — 닫지 말고 고정해 두세요.
       리멤버에서 새로 받거나 고친 명함이 낮(09~18시)에는 30분마다, 밤에는 00시·06시에 사진첩과 기업정보함에 저절로 들어옵니다.
       푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.</p></div>
-  <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:110px"><col style="width:90px"><col><col style="width:150px"></colgroup>
+  <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:22%"><col style="width:18%"><col style="width:30%"><col style="width:30%"></colgroup>
     <tr><th>받은 때</th><th>이름</th><th>회사</th><th>결과</th></tr></table></div>
 </div>
 <script>
@@ -116,9 +125,55 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
   /* «예정된 때를 지났는데(15분 여유) 그 때 이후 확인이 없다» = 멈춘 것 — 초록 「연결됨」으로 두면 몇 시간이고 모른다 */
   function lateBy(st, nowMs) { var p = prevSlot(nowMs - 15 * 60000); return !!(st.at && p && Number(st.at) < p); }
 
+  function showActMsg(txt, bad) {
+    var m = $('actMsg');
+    if (!m) return;
+    if (!txt) { m.style.display = 'none'; m.textContent = ''; return; }
+    m.style.display = 'block';
+    m.style.color = bad ? 'var(--red)' : 'var(--blue)';
+    m.textContent = txt;
+  }
+  var runTimer = 0;
+  function setRunBtn(busy, text) {
+    S.runBusy = !!busy;
+    var b = $('btnRunNow');
+    if (!b) return;
+    b.disabled = S.runBusy;
+    b.textContent = text || (S.runBusy ? '⏳ 리멤버 가져오는 중…' : '📇 지금 바로 리멤버 받기');
+  }
+  function triggerRunNow() {
+    setRunBtn(true, '⏳ 연결 요청 중…');
+    showActMsg('확장에 지금 바로 받기를 요청했습니다…', false);
+    clearTimeout(runTimer);
+    runTimer = setTimeout(function () {
+      setRunBtn(false);
+      showActMsg('이 브라우저에 «푸른 리멤버 연결» 확장이 설치되어 있지 않거나 꺼져 있습니다 (크롬/에고라이트 확장 확인).', true);
+    }, 2500);
+    reply({ cmd: 'run-now' });
+  }
+  function drawActions() {
+    var box = $('actions');
+    if (!box) return;
+    if (!S.user) {
+      S.runBusy = false; clearTimeout(runTimer); showActMsg('', false);
+      box.innerHTML = '<a class="btn pri" href="enter.html" target="_blank" rel="noopener">🔑 푸른 포털 로그인하러 가기</a>' +
+        '<button type="button" class="btn" id="btnReload">🔄 로그인 확인(새로고침)</button>';
+      var r = $('btnReload');
+      if (r) r.onclick = function () { location.reload(); };
+      return;
+    }
+    box.innerHTML = '<button type="button" class="btn pri" id="btnRunNow">' + (S.runBusy ? '⏳ 리멤버 가져오는 중…' : '📇 지금 바로 리멤버 받기') + '</button>' +
+      '<a class="btn" href="https://card.rememberapp.co.kr/book/groups" target="_blank" rel="noopener">🔗 리멤버 로그인 열기</a>' +
+      '<a class="btn" href="pu-photos.html" target="_blank" rel="noopener">🖼 사진첩 보기</a>' +
+      '<a class="btn" href="pu-cards.html" target="_blank" rel="noopener">🏢 기업정보함 보기</a>';
+    var b = $('btnRunNow');
+    if (b) { b.disabled = !!S.runBusy; b.onclick = triggerRunNow; }
+  }
+
   function draw() {
     var st = S.status || {}, el = $('state');
-    if (!S.user) { el.className = 'band bad'; el.textContent = '✕ 푸른 포털에 로그인되어 있지 않습니다 — 이 탭에서 로그인해 주세요'; return; }
+    drawActions();
+    if (!S.user) { el.className = 'band bad'; el.textContent = '✕ 푸른 포털에 로그인되어 있지 않습니다 — 아래 버튼으로 로그인한 뒤 새로고침해 주세요'; return; }
     if (st.err === 'login') { el.className = 'band bad'; el.textContent = '✕ 리멤버 로그인이 풀렸습니다 — 크롬에서 리멤버(card.rememberapp.co.kr)에 다시 로그인해 주세요 · ' + day(st.errAt); }
     else if (lateBy(st, Date.now())) { el.className = 'band warn'; el.textContent = '⚠ 확인이 늦습니다 — 마지막 확인 ' + day(st.at) + ' (예정 ' + hhmm(prevSlot(Date.now() - 15 * 60000)) + ') · 크롬과 PC·확장이 켜져 있는지 봐 주세요'; }
     else if (st.at) { el.className = 'band ok'; el.textContent = '● 연결됨 — 마지막 확인 ' + day(st.at) + ' · 다음 ' + hhmm(nextSlot(Date.now())) + ' · 지난번 새로 ' + (st.newN || 0) + '장 · 고침 ' + (st.updN || 0) + '장' + (st.total ? ' · 리멤버 전체 ' + Number(st.total).toLocaleString() + '장' : ''); }
@@ -208,8 +263,8 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
       var st = { cp: nextCp, at: now, total: Number(m.total) || 0, newN: res.filter(function (r) { return r.isNew && !r.err; }).length,
         updN: res.filter(function (r) { return !r.isNew && !r.err; }).length, errN: res.filter(function (r) { return r.err; }).length,
         first: p.first || null, err: null, errAt: null, recent: recent, by: S.user.uid };
-      return db.ref(ROOT + '/status').set(st).then(function () { S.status = st; draw(); reply({ cmd: 'done', cp: nextCp, n: res.length }); });
-    }).catch(function (e) { reply({ cmd: 'done', err: String((e && e.message) || e).slice(0, 80) }); })
+      return db.ref(ROOT + '/status').set(st).then(function () { S.status = st; S.runBusy = false; showActMsg('', false); draw(); reply({ cmd: 'done', cp: nextCp, n: res.length }); });
+    }).catch(function (e) { S.runBusy = false; draw(); reply({ cmd: 'done', err: String((e && e.message) || e).slice(0, 80) }); })
       .then(function () { S.busy = false; });
   }
 
@@ -374,6 +429,18 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
     if (ev.source !== window || ev.origin !== location.origin) return;
     var m = ev.data;
     if (!m || m.__from !== EXT || m.__to !== PAGE) return;
+    if (m.cmd === 'run-now-ack') {
+      clearTimeout(runTimer);
+      if (!m.ok) {
+        setRunBtn(false);
+        showActMsg('연결하지 못했습니다: ' + (m.why || '확장 응답 없음'), true);
+      } else {
+        setRunBtn(true, '⏳ 리멤버 가져오는 중…');
+        showActMsg(m.running ? '이미 리멤버를 가져오는 중입니다. 잠시만 기다려 주세요.' : '확장이 지금 바로 받기를 시작했습니다. 완료되면 위 상태가 바뀝니다.', false);
+        setTimeout(function () { if (S.runBusy) { setRunBtn(false); } }, 15000);
+      }
+      return;
+    }
     if (m.cmd === 'hello') {
       /* 확장이 «찾아왔다»는 흔적 — 회차가 어디까지 가는지 밖에서 볼 수 있게(개수·시각만) */
       if (S.user && S.ready) db.ref(ROOT + '/ping').set({ at: Date.now(), by: S.user.uid }).catch(function () {});
