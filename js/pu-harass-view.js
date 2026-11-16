@@ -546,7 +546,7 @@
 
   function hasDirtyReportInputs() {
     if (!CUR_ID || DIRTY_RPT._cid !== CUR_ID) return false;
-    return !!(DIRTY_RPT.overview || DIRTY_RPT.conclusion || DIRTY_RPT.recommendations || DIRTY_RPT.companyRuleQuote || DIRTY_RPT.reportBody || DIRTY_RPT.verdict);
+    return !!(DIRTY_RPT.overview || DIRTY_RPT.conclusion || DIRTY_RPT.recommendations || DIRTY_RPT.companyRuleQuote || DIRTY_RPT.reportBody || DIRTY_RPT.verdict || DIRTY_RPT.templateMeta || DIRTY_RPT.reportTemplate);
   }
 
   function updateDirtySaveButtons() {
@@ -1351,6 +1351,24 @@
       var nextConclusion = spec.conclusion !== undefined ? spec.conclusion : (src.conclusion !== undefined ? src.conclusion : fallback.conclusion);
       var nextRec = spec.recommendations !== undefined ? spec.recommendations : (src.recommendations !== undefined ? src.recommendations : fallback.recommendations);
       var nextRuleQuote = spec.companyRuleQuote !== undefined ? spec.companyRuleQuote : (src.companyRuleQuote !== undefined ? src.companyRuleQuote : fallback.companyRuleQuote);
+      var nextReportTpl = C.normalizeTemplateId
+        ? C.normalizeTemplateId(spec.reportTemplate || src.reportTemplate || fallback.reportTemplate || (c && c.reportTemplate))
+        : (spec.reportTemplate || src.reportTemplate || 'laborfirm_deep');
+      var baseTm = (src.templateMeta && typeof src.templateMeta === 'object') ? Object.assign({}, src.templateMeta) : {};
+      if (spec.templateMetaPatch && typeof spec.templateMetaPatch === 'object') {
+        Object.keys(spec.templateMetaPatch).forEach(function (tk) {
+          var subPrev = (baseTm[tk] && typeof baseTm[tk] === 'object') ? baseTm[tk] : {};
+          var subNext = spec.templateMetaPatch[tk];
+          if (subNext && typeof subNext === 'object') {
+            var mergedSub = Object.assign({}, subPrev);
+            Object.keys(subNext).forEach(function (fk) {
+              var fv = subNext[fk];
+              mergedSub[fk] = typeof fv === 'string' ? scrubRrn(fv) : fv;
+            });
+            baseTm[tk] = mergedSub;
+          }
+        });
+      }
       var nextBody = spec.reportBody !== undefined ? spec.reportBody : (src.reportBody !== undefined ? src.reportBody : fallback.reportBody);
       var nextBodyAuto = spec.reportBodyAuto !== undefined
         ? !!spec.reportBodyAuto
@@ -1360,6 +1378,8 @@
         var synSeed = Object.assign({}, src, {
           id: cid,
           companyId: coId,
+          reportTemplate: nextReportTpl,
+          templateMeta: baseTm,
           overview: nextOverview,
           conclusion: nextConclusion,
           recommendations: nextRec,
@@ -1391,6 +1411,8 @@
       var base = Object.assign({}, src, stripUndef({
         id: cid,
         companyId: coId,
+        reportTemplate: nextReportTpl,
+        templateMeta: baseTm,
         overview: scrubRrn(nextOverview),
         conclusion: scrubRrn(nextConclusion),
         recommendations: scrubRrn(nextRec),
@@ -2222,10 +2244,11 @@
       : '';
 
     var docBtns = editable
-      ? ('<button class="sm pri" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 14종 공문·서식(.hwpx)</button>' +
+      ? ('<button class="sm pri" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 20종 공문·서식(.hwpx)</button>' +
+         '<button class="sm" data-act="openTemplateGallery" data-id="' + esc(c.id) + '">🏛️ 마스터 양식관리</button>' +
          '<button class="sm" data-act="openMailFinder">+ 메일함에서 찾아 연결</button>' +
          '<button class="sm" data-act="addOfflineDoc">✍️ 오프라인 서류 기록</button>')
-      : '<button class="sm" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 14종 공문·서식(.hwpx)</button>';
+      : '<button class="sm" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 20종 공문·서식(.hwpx)</button>';
 
     var dispCur = resolveDisplayCompanyAndTitle(c);
     var curPm = casePerformMode(c);
@@ -2237,11 +2260,13 @@
       ? (C.str(c.laborOffice) + (c.inspectorName ? ' · ' + C.str(c.inspectorName) + ' 감독관' : '') + (c.govCaseNo ? ' (' + C.str(c.govCaseNo) + ')' : ''))
       : '해당 없음(자체·외부위탁 조사)';
     var monList = Array.isArray(c.monitoringLogs) ? c.monitoringLogs : [];
+    var curTplObj = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[C.normalizeTemplateId ? C.normalizeTemplateId(c.reportTemplate) : 'laborfirm_deep']) || { short: '노무법인 심층조사형' };
     var procCardHtml = '<div class="card">' +
-      '<div class="sec">🏛️ 법정 절차 점검 · 관할 노동청 대응 · 사후 모니터링 · 통합시스템 연동 <span class="sp"></span>' +
-      '<button class="sm pri" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 14종 공문·서식(.hwpx)</button>' +
+      '<div class="sec">🏛️ 법정 절차 점검 · 마스터 양식 체계 · 노동청 대응 · 사후 모니터링 <span class="sp"></span>' +
+      '<button class="sm ok" data-act="openTemplateGallery" data-id="' + esc(c.id) + '">🏛️ 양식선택 (' + esc(curTplObj.short) + ')</button>' +
+      '<button class="sm pri" data-act="openOfficialDoc" data-id="' + esc(c.id) + '">📄 20종 공문·서식(.hwpx)</button>' +
       '<button class="sm" data-act="openLaborDoc" data-id="' + esc(c.id) + '">🏛️ 노동청 연장·결과공문</button>' +
-      '<button class="sm ok" data-act="openMonitoring" data-id="' + esc(c.id) + '">🩺 사후 모니터링(' + monList.length + ')</button>' +
+      '<button class="sm" data-act="openMonitoring" data-id="' + esc(c.id) + '">🩺 사후 모니터링(' + monList.length + ')</button>' +
       '<button class="sm" data-act="openScheduleHelper" data-id="' + esc(c.id) + '">📅 일정(.ics)·캘린더</button>' +
       '</div>' +
       '<div style="padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px">' +
@@ -2453,13 +2478,17 @@
       var lawBadge = c.category === 'both'
         ? ('<span class="chip ' + (issLaw === 'sexual' ? 'c-red' : 'c-blue') + '">' + (issLaw === 'sexual' ? '성희롱' : '괴롭힘') + '</span> ')
         : '';
+      var credInfo = typeof C.evaluateIssueCredibility === 'function' ? C.evaluateIssueCredibility(iss) : null;
+      var credBadge = (credInfo && credInfo.hasExplicit)
+        ? (' <span class="chip c-blue" title="대법원 판례 기준 진술 신빙성 5대 지표">' + esc(credInfo.level) + '</span>')
+        : '';
       var issFullTitle = (iss.title || '쟁점 행위') + (iss.whenWhere ? ' (' + iss.whenWhere + ')' : '');
       return {
         id: iss.id,
         cells: [
           { cls: 'ti', title: issFullTitle, html: lawBadge + esc(issFullTitle) },
           { html: esc(factLbl[iss.factStatus] || '검토중') },
-          { html: elemChip('①', iss.elemSuperiority, issSchema.e1.label) + ' ' + elemChip('②', iss.elemBeyondScope, issSchema.e2.label) + ' ' + elemChip('③', iss.elemHarm, issSchema.e3.label) },
+          { html: elemChip('①', iss.elemSuperiority, issSchema.e1.label) + ' ' + elemChip('②', iss.elemBeyondScope, issSchema.e2.label) + ' ' + elemChip('③', iss.elemHarm, issSchema.e3.label) + credBadge },
           { k: 'badge', html: resBadge },
           { k: 'act', html: '<button class="sm" data-act="editIssue" data-id="' + esc(iss.id) + '">수정</button>' }
         ]
@@ -2497,6 +2526,91 @@
     var valRuleQuote = (sameDirty && DIRTY_RPT.companyRuleQuote && $('rCompanyRule')) ? $('rCompanyRule').value : (sec.companyRuleQuote || '');
     var valConclusion = (sameDirty && DIRTY_RPT.conclusion && $('rConclusion')) ? $('rConclusion').value : (sec.conclusion || '');
     var valBody = (sameDirty && DIRTY_RPT.reportBody && $('rBody')) ? $('rBody').value : (sec.reportBody || '');
+    var activeTplId = C.normalizeTemplateId
+      ? C.normalizeTemplateId((sameDirty && DIRTY_RPT._tplVal) || c.reportTemplate || sec.reportTemplate)
+      : 'laborfirm_deep';
+    var activeTpl = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[activeTplId]) || {
+      id: 'laborfirm_deep',
+      name: '전문 노무법인 심층 사실조사 표준형',
+      short: '노무법인 심층조사형',
+      orgType: '전문 노무법인 마스터 표준',
+      badge: '사실조사·매트릭스·로드맵',
+      sections: [],
+      fields: []
+    };
+    var tplSelectOpts = Object.keys(C.REPORT_TEMPLATES || {}).map(function (tk) {
+      var tp = C.REPORT_TEMPLATES[tk];
+      return '<option value="' + esc(tk) + '"' + (tk === activeTplId ? ' selected' : '') + '>[' + esc(tp.orgType) + '] ' + esc(tp.name) + '</option>';
+    }).join('');
+    var curTmObj = (sec.templateMeta && typeof sec.templateMeta === 'object' && sec.templateMeta[activeTplId] && typeof sec.templateMeta[activeTplId] === 'object')
+      ? sec.templateMeta[activeTplId]
+      : {};
+    var comp = typeof C.evaluateTemplateCompleteness === 'function'
+      ? C.evaluateTemplateCompleteness(c, sec, activeTplId)
+      : { done: 0, total: 0, pct: 100, items: [] };
+    var compPillsHtml = (comp.items || []).map(function (it) {
+      var icon = it.ok ? '✓ ' : '○ ';
+      var actAttr = it.act
+        ? ('data-act="tplJump" data-id="' + esc(it.act) + '"')
+        : ('data-act="tplJump" data-id="focus:' + esc(it.focusId || '') + '"');
+      return '<button type="button" class="tpl-pill' + (it.ok ? ' done' : '') + '" ' + actAttr + ' title="누르면 해당 양식 입력 항목으로 바로 이동합니다">' + icon + esc(it.label) + '</button>';
+    }).join('');
+    var tplBarHtml =
+      '<div class="tpl-bar">' +
+      '<div class="tpl-bar-hd">' +
+      '<label for="rTplSelect" style="font-weight:700;font-size:12.5px">🏛️ 관리·보고 양식:</label>' +
+      '<select id="rTplSelect" data-tplsel="1" aria-label="관리 및 보고서 마스터 양식 선택">' + tplSelectOpts + '</select>' +
+      '<span class="chip c-blue">' + esc(activeTpl.badge || '') + '</span>' +
+      '<span class="chip ' + (comp.done === comp.total ? 'c-green' : 'c-amber') + '">필수항목 ' + comp.done + '/' + comp.total + ' (' + comp.pct + '%)</span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" data-act="openTemplateGallery">🏛️ 6대 양식 갤러리·견본(.hwpx)</button>' +
+      '<button type="button" class="sm ok" data-act="assembleRpt">✨ 선택 양식으로 본문 조립</button>' +
+      '</div>' +
+      '<div class="tpl-pills" role="group" aria-label="선택 양식 항목별 작성 현황">' + compPillsHtml + '</div>' +
+      '</div>';
+
+    var tplMetaFieldsHtml = (activeTpl.fields || []).map(function (fd) {
+      var fid = 'tm_' + fd.key;
+      var curVal = (sameDirty && DIRTY_RPT.templateMeta && $(fid)) ? $(fid).value : C.str(curTmObj[fd.key]);
+      if (fd.type === 'select') {
+        var fOpts = (fd.options || []).map(function (op) {
+          return '<option value="' + esc(op.value) + '"' + (curVal === op.value ? ' selected' : '') + '>' + esc(op.label) + '</option>';
+        }).join('');
+        return '<div><label class="rpt-lbl" for="' + esc(fid) + '">' + esc(fd.label) + '</label>' +
+          '<select id="' + esc(fid) + '" data-tmkey="' + esc(fd.key) + '" data-rptfld="templateMeta" style="width:100%">' + fOpts + '</select></div>';
+      }
+      if (fd.type === 'textarea') {
+        return '<div class="full"><label class="rpt-lbl" for="' + esc(fid) + '">' + esc(fd.label) + '</label>' +
+          '<textarea id="' + esc(fid) + '" data-tmkey="' + esc(fd.key) + '" data-rptfld="templateMeta" rows="2" placeholder="' + esc(fd.placeholder || '') + '">' + esc(curVal) + '</textarea></div>';
+      }
+      return '<div><label class="rpt-lbl" for="' + esc(fid) + '">' + esc(fd.label) + '</label>' +
+        '<input id="' + esc(fid) + '" data-tmkey="' + esc(fd.key) + '" data-rptfld="templateMeta" type="text" style="width:100%" value="' + esc(curVal) + '" placeholder="' + esc(fd.placeholder || '') + '"></div>';
+    }).join('');
+
+    var moelChecklistHtml = '';
+    if (activeTpl.hasMoelChecklist && Array.isArray(C.MOEL_OBLIGATION_CHECKS)) {
+      moelChecklistHtml = '<div id="tmMoelBox" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2)">' +
+        '<div class="rpt-lbl">✅ 근로기준법 제76조의3 · 남녀고용평등법 제14조 법정의무 6대 이행 점검 (보고서 표 자동 반영)</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:5px">' +
+        C.MOEL_OBLIGATION_CHECKS.map(function (chk) {
+          var ckId = 'moelck_' + chk.key;
+          var domCk = (sameDirty && DIRTY_RPT.templateMeta) ? $(ckId) : null;
+          var isOn = domCk
+            ? !!domCk.checked
+            : (typeof C.isMoelObligationMet === 'function' ? C.isMoelObligationMet(chk.key, c, sec, curTmObj) : false);
+          return '<label class="cred-item" style="background:var(--card);cursor:pointer"><input id="' + esc(ckId) + '" type="checkbox" data-moelck="' + esc(chk.key) + '" data-rptfld="templateMeta"' + (isOn ? ' checked' : '') + '> <span>' + esc(chk.label) + '</span></label>';
+        }).join('') +
+        '</div></div>';
+    }
+
+    var tplMetaPanelHtml =
+      '<div class="tpl-meta-panel" id="tplMetaPanel" data-rendered-tpl="' + esc(activeTplId) + '">' +
+      '<div class="tpl-meta-hd"><b>📋 [' + esc(activeTpl.short || activeTpl.name) + '] 양식 맞춤 핵심 관리 항목</b>' +
+      '<span class="hint">선택한 노무법인·법무법인·기관 양식의 필수 기재란과 목차 구조에 맞춰 사건 내용을 체계적으로 관리합니다</span></div>' +
+      '<div class="rpt-grid" style="padding:2px 0 0">' + tplMetaFieldsHtml + '</div>' +
+      moelChecklistHtml +
+      '</div>';
+
     if (!sameDirty) DIRTY_RPT = { _cid: c.id };
 
     var splitCls = 'ws-split' + (RPT_MODE === 'iv' ? ' focus-iv' : RPT_MODE === 'doc' ? ' focus-doc' : '');
@@ -2506,7 +2620,7 @@
       : '';
 
     box.innerHTML =
-      '<div class="card">' + casePickerBar(c) + '</div>' +
+      '<div class="card">' + casePickerBar(c) + tplBarHtml + '</div>' +
       '<div class="' + splitCls + '" id="wsSplitBox">' +
 
       /* ── 왼쪽 단: 면담·녹취록 자동정리·전자서명 + 법정 의사확인/실태조사 + 호증 편철·타임라인 + 수집 공문 ── */
@@ -2559,6 +2673,7 @@
       '<button class="sm" data-act="openRecomplaintDiff" title="동일 사업장 선행 사건과 쟁점·판단 결과를 비교합니다">🔄 재진정·지노위 비교</button>' +
       '<button class="sm pri" data-act="saveReportAll">💾 진술·검토·보고서 전체 저장</button></div>' +
       subcastNote +
+      tplMetaPanelHtml +
       '<div class="rpt-grid">' +
       '<div class="full"><label class="rpt-lbl" for="rOverview">신고 및 조사 착수 요지</label><textarea id="rOverview" data-rptfld="overview" rows="2" placeholder="신고 접수 경위, 당사자 관계, 핵심 조사 범위를 요약하세요">' + esc(valOverview) + '</textarea></div>' +
       '<div><label class="rpt-lbl" for="rVerdict">종합 판단 결과 (이알피 요약 동기화)</label><select id="rVerdict" data-rptfld="verdict" style="width:100%">' + verdictOpts + '</select></div>' +
@@ -2747,6 +2862,13 @@
       '<option value="advisory_rep"' + (initPerfMode === 'advisory_rep' ? ' selected' : '') + '>⚖️ 당사자 대리 · 법률자문 · 보고서검토</option>' +
       '<option value="committee_collab"' + (initPerfMode === 'committee_collab' ? ' selected' : '') + '>🏛️ 외부위원 위촉 · 타법인 협업</option>' +
       '</select></div></div>' +
+      '<div class="fr"><label for="mRptTpl">기본 관리·보고 양식</label><div class="fv"><select id="mRptTpl">' +
+      Object.keys(C.REPORT_TEMPLATES || {}).map(function (tk) {
+        var tp = C.REPORT_TEMPLATES[tk];
+        var curT = C.normalizeTemplateId ? C.normalizeTemplateId(c.reportTemplate) : 'laborfirm_deep';
+        return '<option value="' + esc(tk) + '"' + (tk === curT ? ' selected' : '') + '>[' + esc(tp.orgType) + '] ' + esc(tp.name) + '</option>';
+      }).join('') +
+      '</select></div></div>' +
       '<div class="fr"><label for="mErpMode">푸른이알피 번호</label><div class="fv">' +
       '<select id="mErpMode">' +
       '<option value="defer"' + (initErpMode === 'defer' ? ' selected' : '') + '>⏸ 이알피 번호 비워두고 등록 (추후 한 번에 일괄 정리)</option>' +
@@ -2834,7 +2956,8 @@
         erpCaseId: nextErpId,
         erpCaseNo: nextErpNo,
         erpDefer: nextErpDefer,
-        performMode: $('mPerfMode') ? C.str($('mPerfMode').value) : initPerfMode
+        performMode: $('mPerfMode') ? C.str($('mPerfMode').value) : initPerfMode,
+        reportTemplate: $('mRptTpl') ? (C.normalizeTemplateId ? C.normalizeTemplateId($('mRptTpl').value) : C.str($('mRptTpl').value)) : (C.str(c.reportTemplate) || 'laborfirm_deep')
       };
     }
 
@@ -3957,6 +4080,13 @@
       '<option value="화상·유선"' + (iv.method === '화상·유선' ? ' selected' : '') + '>화상·유선</option>' +
       '<option value="서면진술"' + (iv.method === '서면진술' ? ' selected' : '') + '>서면진술</option>' +
       '</select>' +
+      '<select id="ivStmtStyle" aria-label="진술조서 한글(.hwpx) 서식" style="max-width:210px">' +
+      Object.keys(C.STATEMENT_STYLES || { confirm_std: { short: '표준 진술확인서형' } }).map(function (sk) {
+        var stObj = C.STATEMENT_STYLES[sk];
+        var curSt = C.str(iv.stmtStyle) || 'confirm_std';
+        return '<option value="' + esc(sk) + '"' + (sk === curSt ? ' selected' : '') + '>📄 ' + esc(stObj.short || stObj.label) + '</option>';
+      }).join('') +
+      '</select>' +
       '<label style="display:inline-flex;gap:4px;align-items:center;font-size:12.5px"><input id="ivPledge" type="checkbox"' + (iv.pledgeSigned !== false ? ' checked' : '') + '> 비밀유지서약 징구</label>' +
       '</div></div>' +
       sigInfoHtml +
@@ -4006,6 +4136,17 @@
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">' +
       '<b>② 정리된 문답(Q&amp;A) · 진술확인서 본문</b><span class="sp"></span>' +
       '<button type="button" class="sm" id="ivAddQaBtn">+ 문답 행 추가</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:7px;padding:6px 8px;border:1px solid var(--blue-line);border-radius:8px;background:var(--card)">' +
+      '<span class="hint" style="font-weight:700;color:var(--blue-d)">📋 표준 질문지 양식:</span>' +
+      '<select id="ivPresetTplSel" aria-label="역할·사건별 표준 질문지 양식 선택" style="flex:1;min-width:160px">' +
+      Object.keys(C.INTERVIEW_TEMPLATES || {}).map(function (ik) {
+        var itObj = C.INTERVIEW_TEMPLATES[ik];
+        var defKey = C.pickDefaultInterviewTemplate ? C.pickDefaultInterviewTemplate(caseById(CUR_ID), iv.role || 'victim') : 'victim_harass';
+        return '<option value="' + esc(ik) + '"' + (ik === defKey ? ' selected' : '') + '>' + esc(itObj.label) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<button type="button" class="sm pri" id="ivLoadPresetBtn">+ 질문지 불러오기</button>' +
       '</div>' +
       '<div id="ivQaBox" class="qa-list"></div>' +
       '<div style="margin-top:8px">' +
@@ -4596,6 +4737,7 @@
         dept: deptVal,
         date: dateVal,
         method: methodVal,
+        stmtStyle: $('ivStmtStyle') ? C.str($('ivStmtStyle').value) : (C.str(iv.stmtStyle) || 'confirm_std'),
         pledgeSigned: !!($('ivPledge') && $('ivPledge').checked) || keepSigned,
         summary: sumVal,
         qaList: curQa,
@@ -4608,6 +4750,34 @@
         signedAtText: keepSigned ? C.str(iv.signedAtText) : '',
         signMode: keepSigned ? C.str(iv.signMode) : ''
       };
+    }
+
+    if ($('ivRole') && $('ivRole').addEventListener) {
+      $('ivRole').addEventListener('change', function () {
+        if ($('ivPresetTplSel') && C.pickDefaultInterviewTemplate) {
+          $('ivPresetTplSel').value = C.pickDefaultInterviewTemplate(caseById(CUR_ID), C.str($('ivRole').value));
+        }
+      });
+    }
+    if ($('ivLoadPresetBtn') && $('ivLoadPresetBtn').addEventListener) {
+      $('ivLoadPresetBtn').addEventListener('click', function () {
+        var pk = C.str($('ivPresetTplSel') && $('ivPresetTplSel').value);
+        var pObj = C.INTERVIEW_TEMPLATES && C.INTERVIEW_TEMPLATES[pk];
+        if (!pObj || !Array.isArray(pObj.questions)) return;
+        var cur = collectQaFromDom().filter(function (x) { return C.str(x.q) || C.str(x.a); });
+        var existingQs = {};
+        cur.forEach(function (x) { existingQs[C.str(x.q)] = 1; });
+        var added = 0;
+        pObj.questions.forEach(function (qTxt) {
+          if (!existingQs[C.str(qTxt)]) {
+            cur.push({ q: qTxt, a: '' });
+            added++;
+          }
+        });
+        qaRows = cur;
+        renderQaRows();
+        toast('📋 «' + pObj.label + '»에서 문답 질문 ' + added + '항을 불러왔습니다.');
+      });
     }
 
     if ($('ivDlHwpxBtn') && $('ivDlHwpxBtn').addEventListener) {
@@ -4733,15 +4903,20 @@
     if (!c) return null;
     var disp = resolveDisplayCompanyAndTitle(c);
     var vSel = $('rVerdict') ? C.str($('rVerdict').value) : C.str(c.verdictSummary);
+    var tplSel = $('rTplSelect')
+      ? (C.normalizeTemplateId ? C.normalizeTemplateId($('rTplSelect').value) : C.str($('rTplSelect').value))
+      : (C.normalizeTemplateId ? C.normalizeTemplateId(c.reportTemplate || (D.secretCache[CUR_ID] && D.secretCache[CUR_ID].reportTemplate)) : 'laborfirm_deep');
     var tempCase = Object.assign({}, c, {
       companyName: disp.companyName || c.companyName || '',
       title: disp.title || c.title || '',
-      verdictSummary: vSel
+      verdictSummary: vSel,
+      reportTemplate: tplSel
     });
     var maskedBody = getMaskedReportBodyForExport();
-    var tempSec = Object.assign({}, D.secretCache[CUR_ID] || {}, mergeCurrentReportInputs({}));
-    if (!C.str(maskedBody)) {
-      maskedBody = C.assembleReportDraft(tempCase, tempSec);
+    var tempSec = mergeLiveSecretForPreview(CUR_ID, tplSel);
+    var isAnon = !!anonymized;
+    if (!C.str(maskedBody) && !isAnon) {
+      maskedBody = C.assembleReportDraft(tempCase, tempSec, tplSel);
       if ($('rBody')) {
         $('rBody').value = maskedBody;
         DIRTY_RPT._cid = CUR_ID;
@@ -4749,12 +4924,13 @@
         updateDirtySaveButtons();
       }
     }
-    tempSec.reportBody = maskedBody;
-    var isAnon = !!anonymized;
-    var bytes = H.buildReportHwpx(tempCase, tempSec, { anonymized: isAnon });
+    tempSec.reportBody = isAnon && !C.str(maskedBody) ? '' : maskedBody;
+    var extraStaffNames = STAFF.map(function (s) { return s && s.name; }).filter(Boolean);
+    var tplObj = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tplSel]) || { short: '조사결과보고서' };
+    var bytes = H.buildReportHwpx(tempCase, tempSec, { anonymized: isAnon, reportTemplate: tplSel, extraMaskNames: extraStaffNames });
     var fname = isAnon
-      ? ('비식별익명본_조사결과보고서_' + C.ymdOf(Date.now()) + '.hwpx')
-      : (safeFilePart(tempCase.companyName || '사건') + '_조사결과보고서_' + C.ymdOf(Date.now()) + '.hwpx');
+      ? ('비식별익명본_' + safeFilePart(tplObj.short || '조사결과보고서') + '_' + C.ymdOf(Date.now()) + '.hwpx')
+      : (safeFilePart(tempCase.companyName || '사건') + '_' + safeFilePart(tplObj.short || '조사결과보고서') + '_' + C.ymdOf(Date.now()) + '.hwpx');
     return {
       bytes: bytes,
       fname: fname,
@@ -4812,31 +4988,37 @@
     }
 
     openModal(
-      '<div class="mhd" id="mhdTitle">📄 조사 단계별 실무 공문 · 법정 서식 14종(.hwpx) 즉시 발급<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
+      '<div class="mhd" id="mhdTitle">📄 조사 단계별 실무 공문 · 법정 서식 20종(.hwpx) 즉시 발급<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
       '<div class="mbd">' +
       '<div class="note">선택한 서식에 <b>' + esc(disp.companyName || '의뢰 사업장') + '</b> 사건 개요·적용 법령·담당 노무사·등록 쟁점이 자동 기입된 한컴오피스 및 푸른 한글편집기 호환 <b>.hwpx</b> 문서를 생성합니다.</div>' +
-      '<div class="fr"><label for="odType">발급 서식 (14종)</label><div class="fv"><select id="odType">' +
-      '<optgroup label="1~3단계: 접수 · 공정성 확인 · 개인정보 · 착수계획 · 비밀서약">' +
-      odOpt('intake_form', '① [1단계] 고충 신고서 및 기초 사실확인 설문지 (.hwpx)') +
-      odOpt('committee_fairness', '② [2단계] 외부 조사위원 위촉장 및 공정조사(제척·기피·회피) 확인서 (.hwpx)') +
-      odOpt('privacy_consent', '③ [3단계] 개인정보·민감정보 수집·이용 및 제3자 제공 동의서 (.hwpx)') +
-      odOpt('plan_req', '④ [2단계] 조사계획서 및 기초자료 제출·협조 요청 공문 (.hwpx)') +
-      odOpt('pledge_form', '⑤ [3단계] 조사 참여자 비밀유지서약서 — 현장 자필서명용 (.hwpx)') +
+      '<div class="fr"><label for="odType">발급 서식 (20종)</label><div class="fv"><select id="odType">' +
+      '<optgroup label="1~3단계: 초기상담 · 접수 · 조사단 공정성 · 개인정보 · 잠정분리 · 비밀서약">' +
+      odOpt('counsel_log', '① [초기상담] 고충 상담일지 및 잠정 보호·분리 검토서 — 매뉴얼 별지 (.hwpx)') +
+      odOpt('intake_form', '② [1단계] 고충 신고서 및 기초 사실확인 설문지 (.hwpx)') +
+      odOpt('committee_fairness', '③ [2단계] 외부 조사위원 위촉장 및 공정조사(제척·기피·회피) 확인서 (.hwpx)') +
+      odOpt('investigator_oath', '④ [2단계] 내·외부 조사위원 비밀엄수 및 공정조사 서약서 (.hwpx)') +
+      odOpt('plan_req', '⑤ [2단계] 조사계획서 및 기초자료 제출·협조 요청 공문 (.hwpx)') +
+      odOpt('privacy_consent', '⑥ [3단계] 개인정보·민감정보 수집·이용 및 제3자 제공 동의서 (.hwpx)') +
+      odOpt('pledge_form', '⑦ [3단계] 조사 참여자 비밀유지서약서 — 현장 자필서명용 (.hwpx)') +
+      odOpt('separation_order', '⑧ [3단계] 조사기간 중 잠정 분리·보호조치(공간분리·유급휴가·재택) 통지서 (.hwpx)') +
       '</optgroup>' +
-      '<optgroup label="4~6단계: 출석통지 · 사전 서면질문지 · 노동청 기한연장">' +
-      odOpt('attend_notice', '⑥ [4~6단계] 당사자·참고인 조사 출석 및 면담 안내문 (.hwpx)') +
-      odOpt('written_inquiry', '⑦ [5단계] 피신고인 소명 안내 및 쟁점별 사전 서면질문지 (.hwpx)') +
-      odOpt('labor_ext_req', '⑧ [행정대응] 관할 고용노동지청 조사결과 보고기한 연장 신청 공문 (.hwpx)') +
+      '<optgroup label="4~6단계: 출석통지 · 사전 서면질문지 · 증거 원본대조 · 노동청 기한연장">' +
+      odOpt('attend_notice', '⑨ [4~6단계] 당사자·참고인 조사 출석 및 면담 안내문 (.hwpx)') +
+      odOpt('written_inquiry', '⑩ [5단계] 피신고인 소명 안내 및 쟁점별 사전 서면질문지 (.hwpx)') +
+      odOpt('evidence_receipt', '⑪ [4~6단계] 증거자료(호증) 제출 목록 및 원본대조 확인서 (.hwpx)') +
+      odOpt('labor_ext_req', '⑫ [행정대응] 관할 고용노동지청 조사결과 보고기한 연장 신청 공문 (.hwpx)') +
       '</optgroup>' +
-      '<optgroup label="7~8단계: 피해자 사전의견청취 · 취하/합의 · 당사자 비공개 통지">' +
-      odOpt('victim_opinion_form', '⑨ [8단계 필수] 피해근로자 보호 및 행위자 조치 사전 의견청취서 (.hwpx)') +
-      odOpt('withdrawal_settle', '⑩ [종결] 신고 취하 · 정식조사 종료 동의 · 당사자 합의 확인서 (.hwpx)') +
-      odOpt('party_result_notice', '⑪ [8단계] 당사자 교부용 조사결과 통지문 — 비공개 요약본 (.hwpx)') +
+      '<optgroup label="7~8단계: 단독 법률검토의견서 · 피해자 사전의견청취 · 취하합의 · 결과통지">' +
+      odOpt('legal_opinion_short', '⑬ [7단계] 단독 법률검토의견서 — 징계양정 적정성·법적 리스크 자문서 (.hwpx)') +
+      odOpt('victim_opinion_form', '⑭ [8단계 필수] 피해근로자 보호 및 행위자 조치 사전 의견청취서 (.hwpx)') +
+      odOpt('withdrawal_settle', '⑮ [종결] 신고 취하 · 정식조사 종료 동의 · 당사자 합의 확인서 (.hwpx)') +
+      odOpt('party_result_notice', '⑯ [8단계] 당사자 교부용 조사결과 통지문 — 비공개 요약본 (.hwpx)') +
       '</optgroup>' +
-      '<optgroup label="사후 이행: 보호·후속조치 권고 · 노동청 결과보고 · 인사/징계위원회">' +
-      odOpt('measure_rec', '⑫ [3·8단계] 피해근로자 보호조치 및 사후 조치 권고 공문 (.hwpx)') +
-      odOpt('labor_result_rpt', '⑬ [행정종결] 고용노동부 개선지도 자체(외부)조사 및 조치결과 보고서 (.hwpx)') +
-      odOpt('disciplinary_pack', '⑭ [사후징계] 인사(징계)위원회 출석통지·징계의결서·징계처분통지서 세트 (.hwpx)') +
+      '<optgroup label="사후 이행: 고충심의위 회의록 · 보호조치 권고 · 노동청 결과보고 · 인사위원회">' +
+      odOpt('committee_minutes', '⑰ [심의위] 고충심의위원회(인사위원회) 심의 회의록 및 의결서 (.hwpx)') +
+      odOpt('measure_rec', '⑱ [3·8단계] 피해근로자 보호조치 및 사후 조치 권고 공문 (.hwpx)') +
+      odOpt('labor_result_rpt', '⑲ [행정종결] 고용노동부 개선지도 자체(외부)조사 및 조치결과 보고서 (.hwpx)') +
+      odOpt('disciplinary_pack', '⑳ [사후징계] 인사(징계)위원회 출석통지·징계의결서·징계처분통지서 세트 (.hwpx)') +
       '</optgroup>' +
       '</select></div></div>' +
       '<div class="fr"><label for="odDate">문서 발신·작성일</label><div class="fv">' +
@@ -4882,13 +5064,14 @@
     );
 
     var targetTypes = {
-      intake_form: 1, privacy_consent: 1, pledge_form: 1, attend_notice: 1,
-      written_inquiry: 1, victim_opinion_form: 1, withdrawal_settle: 1, party_result_notice: 1, disciplinary_pack: 1
+      counsel_log: 1, intake_form: 1, investigator_oath: 1, privacy_consent: 1, pledge_form: 1, separation_order: 1,
+      attend_notice: 1, written_inquiry: 1, evidence_receipt: 1, victim_opinion_form: 1, withdrawal_settle: 1,
+      party_result_notice: 1, committee_minutes: 1, disciplinary_pack: 1
     };
     function syncOdTypeUi() {
       var tp = C.str($('odType') && $('odType').value) || 'plan_req';
       if ($('odTargetRows')) $('odTargetRows').style.display = targetTypes[tp] ? '' : 'none';
-      if ($('odMeetRow')) $('odMeetRow').style.display = (tp === 'attend_notice' || tp === 'disciplinary_pack') ? '' : 'none';
+      if ($('odMeetRow')) $('odMeetRow').style.display = (tp === 'attend_notice' || tp === 'disciplinary_pack' || tp === 'counsel_log' || tp === 'committee_minutes') ? '' : 'none';
       if ($('odLaborRows')) $('odLaborRows').style.display = (tp === 'labor_ext_req' || tp === 'labor_result_rpt') ? '' : 'none';
       if ($('odExtRow')) $('odExtRow').style.display = tp === 'labor_ext_req' ? '' : 'none';
       if ((tp === 'written_inquiry' || tp === 'disciplinary_pack') && $('odRole')) $('odRole').value = 'accused';
@@ -5682,6 +5865,15 @@
       '<span class="hint" id="isE2Lbl" title="' + esc(initSchema.e2.label) + '">②' + esc(initSchema.e2.short) + '</span>' + ynSel('isE2', iss.elemBeyondScope, initSchema.e2.label) +
       '<span class="hint" id="isE3Lbl" title="' + esc(initSchema.e3.label) + '">③' + esc(initSchema.e3.short) + '</span>' + ynSel('isE3', iss.elemHarm, initSchema.e3.label) +
       '</div></div>' +
+      '<div style="padding:6px 14px 2px"><span class="rpt-lbl">🔍 대법원 판례 기준 진술 신빙성(Credibility) 5대 판단 지표 (법무법인·소송방어 양식 자동 반영)</span></div>' +
+      '<div class="cred-grid">' +
+      (C.CREDIBILITY_FACTORS || []).map(function (cf) {
+        var cMap = (iss.credibility && typeof iss.credibility === 'object') ? iss.credibility : {};
+        var isOn = cMap[cf.key] === true || cMap[cf.key] === 'yes' || cMap[cf.key] === 1;
+        return '<label class="cred-item" style="cursor:pointer"><input type="checkbox" data-credck="' + esc(cf.key) + '"' + (isOn ? ' checked' : '') + '> <span>' + esc(cf.label) + '</span></label>';
+      }).join('') +
+      '</div>' +
+      '<div style="padding:4px 14px"><label class="rpt-lbl" for="isCredNote">신빙성 종합 평가 메모 (선택)</label><input id="isCredNote" type="text" style="width:100%" value="' + esc(iss.credibilityNote || '') + '" placeholder="예: 최초 신고서·면담진술·동료 목격담 및 메신저 타임스탬프가 일관되게 부합함"></div>' +
       '</div>' +
       '<div class="mft"><button data-mclose="1">취소</button><button class="pri" id="isSaveBtn">저장</button></div>',
       true
@@ -5708,6 +5900,13 @@
         var sec = await ensureSecretLoaded(reqCid, reqEpoch, reqUid);
         if (!isSessionCurrent(reqEpoch, reqUid)) return;
         if (!sec) throw new Error('비밀유지 자료를 열지 못했습니다.');
+        var credObj = {};
+        if ($('mbox') && $('mbox').querySelectorAll) {
+          $('mbox').querySelectorAll('input[data-credck]').forEach(function (ck) {
+            var ckKey = C.str(ck.getAttribute('data-credck'));
+            if (ckKey && ck.checked) credObj[ckKey] = true;
+          });
+        }
         var item = {
           id: iss.id || ('iss_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 5)),
           lawType: $('isLawType') ? C.str($('isLawType').value) : initLaw,
@@ -5716,6 +5915,8 @@
           claimVictim: scrubRrn(C.str($('isVic').value)),
           claimAccused: scrubRrn(C.str($('isAcc').value)),
           evidenceNote: scrubRrn(C.str($('isEvid').value)),
+          credibility: credObj,
+          credibilityNote: $('isCredNote') ? scrubRrn(C.str($('isCredNote').value)) : scrubRrn(C.str(iss.credibilityNote)),
           factStatus: C.str($('isFact').value),
           elemSuperiority: C.str($('isE1').value),
           elemBeyondScope: C.str($('isE2').value),
@@ -6558,6 +6759,186 @@
     });
   }
 
+  /* 현재 화면 DOM(data-rendered-tpl 기준)에 실제로 그려진 마스터 양식의 전용 입력칸·체크리스트 값을 읽어 패치 생성 */
+  function getRenderedTemplateId(fallbackTplId) {
+    var panel = $('tplMetaPanel');
+    var domTpl = panel && panel.getAttribute ? C.str(panel.getAttribute('data-rendered-tpl')) : '';
+    var raw = domTpl || C.str(fallbackTplId) || 'laborfirm_deep';
+    return C.normalizeTemplateId ? C.normalizeTemplateId(raw) : raw;
+  }
+
+  function readActiveTemplateMetaSub(tplId) {
+    var tk = getRenderedTemplateId(tplId);
+    var tpl = C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tk];
+    if (!tpl) return null;
+    var sub = {};
+    var touched = false;
+    (tpl.fields || []).forEach(function (fd) {
+      var el = $('tm_' + fd.key);
+      if (el) {
+        sub[fd.key] = scrubRrn(C.str(el.value));
+        touched = true;
+      }
+    });
+    if (tpl.hasMoelChecklist && typeof document !== 'undefined' && document.querySelectorAll) {
+      var cks = document.querySelectorAll('input[data-moelck]');
+      if (cks && cks.length) {
+        var mc = {};
+        cks.forEach(function (ck) {
+          var k = C.str(ck.getAttribute('data-moelck'));
+          if (k) mc[k] = !!ck.checked;
+        });
+        sub.moelChecks = mc;
+        touched = true;
+      }
+    }
+    return touched ? sub : null;
+  }
+
+  function mergeLiveSecretForPreview(cid, optTplId) {
+    var prevSec = (cid && D.secretCache[cid]) ? D.secretCache[cid] : {};
+    var curInputs = mergeCurrentReportInputs({});
+    var tk = C.normalizeTemplateId
+      ? C.normalizeTemplateId(optTplId || curInputs.reportTemplate || prevSec.reportTemplate || (caseById(cid) && caseById(cid).reportTemplate))
+      : 'laborfirm_deep';
+    var mergedTm = Object.assign({}, (prevSec.templateMeta && typeof prevSec.templateMeta === 'object') ? prevSec.templateMeta : {});
+    if (curInputs.templateMetaPatch && typeof curInputs.templateMetaPatch === 'object') {
+      Object.keys(curInputs.templateMetaPatch).forEach(function (pk) {
+        mergedTm[pk] = Object.assign({}, mergedTm[pk] || {}, curInputs.templateMetaPatch[pk]);
+      });
+    }
+    return Object.assign({}, prevSec, curInputs, { reportTemplate: tk, templateMeta: mergedTm });
+  }
+
+  async function applyCaseTemplateSelection(cid, rawTplId, reassembleNow) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    var c = caseById(cid || CUR_ID);
+    if (!c) return;
+    var nextTpl = C.normalizeTemplateId ? C.normalizeTemplateId(rawTplId) : (C.str(rawTplId) || 'laborfirm_deep');
+    var tplMeta = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[nextTpl]) || { name: nextTpl, short: nextTpl };
+
+    if (canEditCase(c)) {
+      await saveCaseAndSync(Object.assign({}, c, { reportTemplate: nextTpl }), false, isVirtualCase(c) ? null : { fields: { reportTemplate: nextTpl } }, reqEpoch, reqUid);
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    }
+    if (C.canAccessSecret(c, ME)) {
+      await ensureSecretLoaded(c.id, reqEpoch, reqUid);
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      var secPatch = collectDirtyReportInputs({ reportTemplate: nextTpl });
+      var curSec = D.secretCache[c.id] || {};
+      var shouldReassemble = !!reassembleNow || !C.str(curSec.reportBody) || curSec.reportBodyAuto === true;
+      if (shouldReassemble) {
+        var liveSec = mergeLiveSecretForPreview(c.id, nextTpl);
+        secPatch.reportBody = C.assembleReportDraft(Object.assign({}, caseById(c.id) || c, { reportTemplate: nextTpl }), liveSec, nextTpl);
+        secPatch.reportBodyAuto = true;
+        delete DIRTY_RPT.reportBody;
+      }
+      await saveSecretRecord(c.id, secPatch, reqEpoch, reqUid);
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    }
+    DIRTY_RPT._tplVal = nextTpl;
+    delete DIRTY_RPT.reportTemplate;
+    draw();
+    toast('🏛️ «' + tplMeta.name + '» 양식 체계로 전환되었습니다.');
+  }
+
+  function openTemplateGalleryModal(cid) {
+    var c = caseById(cid || CUR_ID);
+    var curSec = (c && D.secretCache[c.id]) ? D.secretCache[c.id] : {};
+    var curTplId = C.normalizeTemplateId
+      ? C.normalizeTemplateId(($('rTplSelect') && $('rTplSelect').value) || (c && c.reportTemplate) || curSec.reportTemplate)
+      : 'laborfirm_deep';
+    var catCode = (c && c.category) || 'harass';
+
+    var cardsHtml = Object.keys(C.REPORT_TEMPLATES || {}).map(function (tk) {
+      var tp = C.REPORT_TEMPLATES[tk];
+      var isCur = tk === curTplId;
+      var tocHtml = (tp.sections || []).map(function (s) { return '<div>' + esc(s) + '</div>'; }).join('');
+      var fldNames = (tp.fields || []).map(function (f) { return f.label; }).join(' · ');
+      return '<div class="tpl-gal-card' + (isCur ? ' cur' : '') + '">' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<span class="chip ' + (isCur ? 'c-direct' : 'c-blue') + '">' + esc(tp.orgType) + '</span>' +
+        '<span class="chip">' + esc(tp.badge) + '</span>' +
+        (isCur ? '<span class="chip c-green">현재 적용 중</span>' : '') +
+        '</div>' +
+        '<div style="font-weight:700;font-size:14px">' + esc(tp.name) + '</div>' +
+        '<div class="hint" style="line-height:1.45">' + esc(tp.desc) + '</div>' +
+        '<div class="tpl-gal-toc"><b>[표준 목차 구성]</b>' + tocHtml +
+        (fldNames ? '<div style="margin-top:4px;color:var(--blue-d)"><b>· 전용 관리항목:</b> ' + esc(fldNames) + '</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:auto;padding-top:4px">' +
+        (c ? '<button type="button" class="sm ' + (isCur ? 'ok' : 'pri') + '" data-tplapply="' + esc(tk) + '">' + (isCur ? '✨ 이 양식으로 본문 재조립' : '✓ 이 양식으로 사건 관리') + '</button>' : '') +
+        '<button type="button" class="sm" data-tplsample="' + esc(tk) + '">📄 빈 견본(.hwpx)</button>' +
+        '<button type="button" class="sm" data-tplhangul="' + esc(tk) + '">🖋️ 편집기 열기</button>' +
+        '</div></div>';
+    }).join('');
+
+    openModal(
+      '<div class="mhd" id="mhdTitle">🏛️ 대한민국 노무법인 · 법무법인 · 노동부 · 공공기관 · 대기업 마스터 양식 센터<span class="sp"></span><button class="sm" data-mclose="1">닫기</button></div>' +
+      '<div class="mbd">' +
+      '<div class="note">사건 성격과 제출처(인사권자 · 이사회 · 대형 로펌 법률자문 · 고용노동부 감독관 · 공공기관 고충심의위 · 지방노동위원회 소송방어)에 맞는 <b>마스터 양식 체계</b>를 선택하면, <b>전용 입력 항목 · 체크리스트 · 목차 완성도 · 한글(.hwpx) 보고서 조판</b>이 해당 양식에 맞춰 일원화 관리됩니다.</div>' +
+      '<div class="tpl-gal-grid">' + cardsHtml + '</div>' +
+      '<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<span style="font-size:12.5px;font-weight:700">📂 단계별 부속 서식 · 면담 문답 양식:</span>' +
+      '<span class="hint">진술조서 3종(확인서·문답조서·면담기록지) · 심층 질문지 6종 · 단계별 법정 공문 20종 완비</span>' +
+      '<span class="sp"></span>' +
+      (c ? '<button type="button" class="sm pri" id="tgOpen20DocsBtn">📄 단계별 20종 공문·서식 발급기 열기</button>' : '') +
+      '</div>' +
+      '</div>' +
+      '<div class="mft"><button type="button" data-mclose="1">닫기</button></div>',
+      'xwide'
+    );
+
+    if ($('mbox') && $('mbox').querySelectorAll) {
+      $('mbox').querySelectorAll('[data-tplapply]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var tk = C.str(this.getAttribute('data-tplapply'));
+          if (!c || !tk) return;
+          try {
+            this.disabled = true;
+            closeModal();
+            if (TAB !== 'report' && C.canAccessSecret(c, ME)) {
+              TAB = 'report';
+            }
+            await applyCaseTemplateSelection(c.id, tk, true);
+          } catch (err) {
+            toast('양식 전환 실패: ' + ((err && err.message) || err));
+          }
+        });
+      });
+      $('mbox').querySelectorAll('[data-tplsample]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var H = hwpxMod();
+          var tk = C.str(this.getAttribute('data-tplsample'));
+          var tp = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tk]) || { short: '표준양식' };
+          if (!H || typeof H.buildTemplateSampleHwpx !== 'function') return;
+          var bytes = H.buildTemplateSampleHwpx(tk, catCode);
+          var fn = '표준견본_' + safeFilePart(tp.short || tk) + '.hwpx';
+          downloadBytes(bytes, fn, 'application/hwp+zip');
+          toast('📄 «' + tp.name + '» 표준 견본(.hwpx)을 내려받았습니다.');
+        });
+      });
+      $('mbox').querySelectorAll('[data-tplhangul]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var H = hwpxMod();
+          var tk = C.str(this.getAttribute('data-tplhangul'));
+          var tp = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tk]) || { short: '표준양식', name: '표준양식' };
+          if (!H || typeof H.buildTemplateSampleHwpx !== 'function') return;
+          var bytes = H.buildTemplateSampleHwpx(tk, catCode);
+          var fn = '표준견본_' + safeFilePart(tp.short || tk) + '.hwpx';
+          openBytesInHangulEditor(bytes, fn, tp.name);
+        });
+      });
+    }
+    if ($('tgOpen20DocsBtn')) {
+      $('tgOpen20DocsBtn').addEventListener('click', function () {
+        closeModal();
+        if (c) openOfficialDocModal(c.id);
+      });
+    }
+  }
+
   /* 모달에서 항목만 저장할 때는 실제로 사용자가 고친 텍스트 칸만 반영하여 동시 작업 덮어쓰기를 막음 */
   function collectDirtyReportInputs(extra) {
     var base = {};
@@ -6566,6 +6947,18 @@
     if (DIRTY_RPT.recommendations && $('rRec')) base.recommendations = $('rRec').value;
     if (DIRTY_RPT.companyRuleQuote && $('rCompanyRule')) base.companyRuleQuote = $('rCompanyRule').value;
     if (DIRTY_RPT.reportBody && $('rBody')) base.reportBody = $('rBody').value;
+    if (DIRTY_RPT.reportTemplate && $('rTplSelect')) {
+      base.reportTemplate = C.normalizeTemplateId ? C.normalizeTemplateId($('rTplSelect').value) : C.str($('rTplSelect').value);
+    }
+    if (DIRTY_RPT.templateMeta) {
+      var curTpl = $('rTplSelect') ? C.str($('rTplSelect').value) : ((caseById(CUR_ID) && caseById(CUR_ID).reportTemplate) || 'laborfirm_deep');
+      var renderedTk = getRenderedTemplateId(curTpl);
+      var sub = readActiveTemplateMetaSub(renderedTk);
+      if (sub) {
+        base.templateMetaPatch = {};
+        base.templateMetaPatch[renderedTk] = sub;
+      }
+    }
     return Object.assign(base, extra || {});
   }
 
@@ -6589,6 +6982,16 @@
     if ($('rRec')) base.recommendations = $('rRec').value;
     if ($('rCompanyRule')) base.companyRuleQuote = $('rCompanyRule').value;
     if ($('rBody')) base.reportBody = $('rBody').value;
+    if ($('rTplSelect')) {
+      base.reportTemplate = C.normalizeTemplateId ? C.normalizeTemplateId($('rTplSelect').value) : C.str($('rTplSelect').value);
+    }
+    var activeTk = base.reportTemplate || ((caseById(CUR_ID) && caseById(CUR_ID).reportTemplate) || 'laborfirm_deep');
+    var renderedTk2 = getRenderedTemplateId(activeTk);
+    var subTm = readActiveTemplateMetaSub(renderedTk2);
+    if (subTm) {
+      base.templateMetaPatch = {};
+      base.templateMetaPatch[renderedTk2] = subTm;
+    }
     return Object.assign(base, extra || {});
   }
 
@@ -6601,15 +7004,20 @@
     /* interviews / issues 는 넘기지 않아 서버 최신 배열을 그대로 유지 */
     var patch = mergeCurrentReportInputs({});
     var vVal = $('rVerdict') ? C.str($('rVerdict').value) : C.str(c.verdictSummary);
+    var tVal = patch.reportTemplate || C.str(c.reportTemplate) || 'laborfirm_deep';
     var savedSec = await saveSecretRecord(c.id, patch, reqEpoch, reqUid);
     if (!savedSec || !isSessionCurrent(reqEpoch, reqUid)) return;
-    if (vVal !== C.str(c.verdictSummary)) {
-      await saveCaseAndSync(Object.assign({}, c, { verdictSummary: vVal }), false, isVirtualCase(c) ? null : { fields: { verdictSummary: vVal } }, reqEpoch, reqUid);
+    var caseFieldsPatch = {};
+    var needCaseSync = false;
+    if (vVal !== C.str(c.verdictSummary)) { caseFieldsPatch.verdictSummary = vVal; needCaseSync = true; }
+    if (tVal !== C.str(c.reportTemplate) && canEditCase(c)) { caseFieldsPatch.reportTemplate = tVal; needCaseSync = true; }
+    if (needCaseSync) {
+      await saveCaseAndSync(Object.assign({}, c, caseFieldsPatch), false, isVirtualCase(c) ? null : { fields: caseFieldsPatch }, reqEpoch, reqUid);
       if (!isSessionCurrent(reqEpoch, reqUid)) return;
     }
     DIRTY_RPT = { _cid: c.id };
     draw();
-    toast('💾 진술 · 3요건 검토 · 조사결과보고서가 안전하게 저장되었습니다.');
+    toast('💾 선택 양식 항목 · 진술 · 법정요건 · 조사결과보고서가 안전하게 저장되었습니다.');
   }
 
   function formatExtLogQuoteLine(lg) {
@@ -6997,6 +7405,10 @@
           drawBulks();
           return;
         }
+        if (t.matches('[data-tplsel]')) {
+          await applyCaseTemplateSelection(CUR_ID, t.value, false);
+          return;
+        }
         if (t.matches('[data-casesel]')) {
           if (!confirmLeaveDirtyCase(t.value)) {
             t.value = CUR_ID;
@@ -7053,6 +7465,31 @@
           else if (act === 'resetCaseFilter') { resetCaseFilters(); }
           else if (act === 'resetInboxFilter') { resetInboxFilters(); }
           else if (act === 'openOfficialDoc') { openOfficialDocModal(id || CUR_ID); }
+          else if (act === 'openTemplateGallery') { openTemplateGalleryModal(id || CUR_ID); }
+          else if (act === 'tplJump') {
+            if (id === 'addInterview') openInterviewModal(null);
+            else if (id === 'addIssue') openIssueModal(null);
+            else if (id === 'addEvidence') openEvidenceModal(null);
+            else if (id === 'editIssueFirst') {
+              var secJ = D.secretCache[CUR_ID];
+              var firstIss = secJ && (secJ.issues || []).find(function (x) { return x && !x._deleted; });
+              if (firstIss) openIssueModal(firstIss); else openIssueModal(null);
+            } else if (id.indexOf('focus:') === 0) {
+              var fid = id.slice(6);
+              if (RPT_MODE === 'iv' && $('wsSplitBox')) {
+                RPT_MODE = 'split';
+                $('wsSplitBox').className = 'ws-split';
+                syncWsModeButtons();
+              }
+              var fEl = fid ? $(fid) : null;
+              if (fEl) {
+                try {
+                  if (typeof fEl.scrollIntoView === 'function') fEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  if (typeof fEl.focus === 'function') fEl.focus();
+                } catch (ignoreF) {}
+              }
+            }
+          }
           else if (act === 'openLaborDoc') { openOfficialDocModal(id || CUR_ID, 'labor_ext_req'); }
           else if (act === 'openMonitoring') { openMonitoringModal(id || CUR_ID); }
           else if (act === 'openScheduleHelper') { openScheduleHelperModal(id || CUR_ID); }
@@ -7359,16 +7796,20 @@
             var ca = caseById(CUR_ID);
             if (!ca) return;
             var vSel = $('rVerdict') ? C.str($('rVerdict').value) : C.str(ca.verdictSummary);
-            var tempCase = Object.assign({}, ca, { verdictSummary: vSel });
-            var tempSec = Object.assign({}, D.secretCache[CUR_ID] || {}, mergeCurrentReportInputs({}));
-            var draft = C.assembleReportDraft(tempCase, tempSec);
+            var tplPick = $('rTplSelect')
+              ? (C.normalizeTemplateId ? C.normalizeTemplateId($('rTplSelect').value) : C.str($('rTplSelect').value))
+              : (C.normalizeTemplateId ? C.normalizeTemplateId(ca.reportTemplate) : 'laborfirm_deep');
+            var tempCase = Object.assign({}, ca, { verdictSummary: vSel, reportTemplate: tplPick });
+            var tempSec = mergeLiveSecretForPreview(CUR_ID, tplPick);
+            var draft = C.assembleReportDraft(tempCase, tempSec, tplPick);
             if ($('rBody')) {
               $('rBody').value = draft;
               DIRTY_RPT._cid = CUR_ID;
               DIRTY_RPT.reportBody = 1;
               updateDirtySaveButtons();
             }
-            toast('✨ 표준 조사결과보고서 초안이 조립되었습니다. 검토 후 [💾 보고서 저장] 또는 [📄 실명원본(.hwpx)]을 누르세요.');
+            var tplInfo = (C.REPORT_TEMPLATES && C.REPORT_TEMPLATES[tplPick]) || { name: '표준 양식' };
+            toast('✨ «' + tplInfo.name + '» 목차·항목에 맞춰 본문이 조립되었습니다.');
           }
           else if (act === 'saveReportAll') {
             actBtn.disabled = true;
