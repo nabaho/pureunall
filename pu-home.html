@@ -8383,10 +8383,48 @@ function 직원바뀐것글(전, 후) {
     + (빠짐.length > 3 ? '\n⚠ 직원이 한 번에 ' + 빠짐.length + '명 빠집니다 — 맞는지 확인해 주십시오.' : '');
 }
 
+/* ★ 서버에 «실제로 쓰는» 동안만 「저장 중」이라고 알린다 (2026-11-16 — 대표 「고쳐라」).
+   그날 얼굴 사진 7장을 올리는 30초 사이에 다른 배포가 들어와, js/pu-version.js 가 «손을 30초 놓은 탭»으로
+   보고 새 판으로 갈아탔다 — 6장째에서 끊겨 사진 기록 1장과 구성원 쪽 갱신이 빠졌다(다시 눌러 마무리).
+   사진 한 장마다 우리 저장소 사본 커밋 → 배포가 생기므로 사진이 많을수록 잘 걸린다.
+   ★ pu-version 은 pu:save-state «saving» 이면 갈아타기를 미루고, 3분이 넘으면 스스로 놓는다(교착 없음).
+     그래서 2분마다 다시 알린다(경력관리 kcBusy 와 같은 길). 10분이 넘으면 다시 알리기를 멈춘다 —
+     응답이 영영 안 오는 올리기가 탭을 붙잡지 않게.
+   ⚠ «고치는 중»(초안)에는 쓰지 않는다 — 위 «이어쓰기» 머리글대로 초안은 끊겨도 이어지게 했다.
+     확인 창에서 「올리기」를 누른 뒤부터 끝날 때까지만 켠다.
+   여럿이 겹쳐도 되게 센다 — 마지막 하나가 끝나야 «saved». 돌려받은 끄기는 두 번 불러도 한 번만 센다. */
+const 올리는중 = { 수: 0, 시계: null, 시작: 0, 다시알림ms: 120000, 다시알림한도ms: 600000 };
+function 저장상태알림(상태) {
+  try { window.dispatchEvent(new CustomEvent('pu:save-state', { detail: { state: 상태, by: 'pu-home' } })); } catch (e) {}
+}
+function 올리는중켜기() {
+  if (!올리는중.수) 올리는중.시작 = Date.now();
+  올리는중.수++;
+  저장상태알림('saving');
+  if (!올리는중.시계) {
+    올리는중.시계 = setInterval(() => {
+      if (Date.now() - 올리는중.시작 > 올리는중.다시알림한도ms) { clearInterval(올리는중.시계); 올리는중.시계 = null; return; }
+      저장상태알림('saved'); 저장상태알림('saving');
+    }, 올리는중.다시알림ms);
+  }
+  let 껐나 = false;
+  return function 올리는중끄기() {
+    if (껐나) return;
+    껐나 = true;
+    올리는중.수 = Math.max(0, 올리는중.수 - 1);
+    if (올리는중.수 === 0) {
+      if (올리는중.시계) { clearInterval(올리는중.시계); 올리는중.시계 = null; }
+      저장상태알림('saved');
+    }
+  };
+}
+window.올리는중켜기 = 올리는중켜기;
+
 async function publishPeople() {
   if (App.publishing) return;
   if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   App.publishing = true; App.render();
+  let 올림끄기 = null;
   try {
     /* 지금 올라가 있는 쪽을 먼저 읽는다 — 사진과 «틀»을 그대로 이어받기 위해서다 */
     const res = await fetch(SITE_BASE + '/people/index.html?t=' + Date.now());
@@ -8441,6 +8479,7 @@ async function publishPeople() {
       직원바뀐것글(직원.전, 직원.후) +
       '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
+    올림끄기 = 올리는중켜기();   // 여기서부터 끝날 때까지 새 판 갈아타기를 미룬다(위 머리글)
 
     /* 사진부터 — 한 장이라도 못 올리면 쪽은 올리지 않는다 */
     for (const k of 올릴사진) {
@@ -8457,8 +8496,10 @@ async function publishPeople() {
     toast('올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다' + (답.commit ? ' (' + 답.commit + ')' : ''));
   } catch (e) {
     console.warn('[홈페이지 올리기]', e);
+    if (올림끄기) { 올림끄기(); 올림끄기 = null; }   // 실패 알림 창을 띄우기 «전에» 놓는다 — 창이 떠 있는 동안 붙잡지 않게
     await say('올리지 못했습니다', (e && e.message) || String(e));
   } finally {
+    if (올림끄기) 올림끄기();
     App.publishing = false; App.render();
   }
 }
@@ -8483,6 +8524,7 @@ async function publishPage(mid) {
     return;
   }
   App.publishing = true; App.render();
+  let 올림끄기 = null;
   try {
     /* raw 는 «파일»만 읽는다 — 폴더 주소(/work1/)로는 못 읽는다 */
     const res = await fetch(SITE_BASE + '/' + mid + '/index.html?t=' + Date.now());
@@ -8503,6 +8545,7 @@ async function publishPage(mid) {
         out.skipped.map(x => '· ' + x.before + ' — ' + x.why).join('\n') : '') +
       '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
     if (!ok) return;
+    올림끄기 = 올리는중켜기();   // 끝날 때까지 새 판 갈아타기를 미룬다(publishPeople 위 머리글)
 
     const 답 = await 올리기('site/' + mid + '/index.html', out.html,
       (PAGE_LABEL[mid] || mid) + ' ' + out.done.length + '줄');
@@ -8521,8 +8564,10 @@ async function publishPage(mid) {
     toast('올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다' + (답.commit ? ' (' + 답.commit + ')' : ''));
   } catch (e) {
     console.warn('[쪽 올리기]', e);
+    if (올림끄기) { 올림끄기(); 올림끄기 = null; }
     await say('올리지 못했습니다', (e && e.message) || String(e));
   } finally {
+    if (올림끄기) 올림끄기();
     App.publishing = false; App.render();
   }
 }
@@ -8956,6 +9001,7 @@ async function publishPartner() {
   if (App.publishing) return;
   if (!App.isStaff) { await say('재직 직원만 올릴 수 있습니다', ''); return; }
   App.publishing = true;
+  let 올림끄기 = null;
   try {
     const res = await fetch(SITE_BASE + '/partner/index.html?t=' + Date.now());
     if (!res.ok) throw new Error('자문사 쪽을 읽지 못했습니다 (' + res.status + ')');
@@ -9005,6 +9051,7 @@ async function publishPartner() {
       (새메인 ? '\n메인 화면의 흐르는 로고 띠도 함께 바꿉니다.' : '') +
       '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.').replace(/\n/g, '<br>'), '올리기');
     if (!ok) return;
+    올림끄기 = 올리는중켜기();   // 끝날 때까지 새 판 갈아타기를 미룬다(publishPeople 위 머리글)
 
     let 올린쪽 = 0;
     if (새쪽 !== 지금쪽) {
@@ -9028,8 +9075,10 @@ async function publishPartner() {
     toast(올린쪽 + '쪽을 올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다');
   } catch (e) {
     console.warn('[자문사 올리기]', e);
+    if (올림끄기) { 올림끄기(); 올림끄기 = null; }
     await say('올리지 못했습니다', (e && e.message) || String(e));
   } finally {
+    if (올림끄기) 올림끄기();
     App.publishing = false;
   }
 }
