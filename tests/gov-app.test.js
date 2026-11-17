@@ -177,6 +177,28 @@ test('★ 마감일을 모르면 «-» 로 둔다 — D-0 으로 속이지 않�
   assert.ok(r.api.dchip({ closeDt: '' }).indexOf('D-') < 0);
 });
 
+/* 2026-11-16 대표 갈무리 — 마감 10.21 「지나감」 줄의 「남음」 칸이 「D-14」였다. 받은 날 적어 둔 dday 를 그대로 써서다.
+   규칙: 남은 날은 «마감일 − 오늘(한국 날짜)»로 볼 때마다 다시 센다. 적어 둔 dday 는 마감일을 못 읽을 때만. */
+test('★★★ 남은 날은 마감일로 «오늘» 다시 센다 — 받은 날 적어 둔 dday(낡은 값)를 믿지 않는다', () => {
+  /* «오늘»은 화면과 같은 잣대(이 기기 날짜 — recYmd(recToday())). CI 는 UTC 라 한국 날짜로 세면 하루 어긋난다 */
+  const p2 = (n) => String(n).padStart(2, '0');
+  const ymd = (n) => { const d = new Date(Date.now() + n * 864e5); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  const r = runApp({ feed: [] });
+  assert.match(r.api.dchip({ closeDt: ymd(-26) + ' 18:00', dday: 14 }), />지남</, '마감이 지났으면 적어 둔 D-14 가 아니라 「지남」');
+  assert.match(r.api.dchip({ closeDt: ymd(3) + ' 18:00', dday: 30 }), />D-3</);
+  assert.match(r.api.dchip({ closeDt: ymd(0) + ' 18:00', dday: 5 }), />D-0</, '오늘 마감은 D-0');
+  assert.match(r.api.dchip({ closeDt: ymd(5).replace(/-/g, '') + '1800', dday: 99 }), />D-5</, 'YYYYMMDDHHmm 꼴도 마감일로 센다');
+  assert.match(r.api.dchip({ closeDt: '', dday: 4 }), />D-4</, '마감일을 못 읽을 때만 적어 둔 값');
+  assert.match(r.api.dchip({ closeDt: '2026-02-30 18:00', dday: 4 }), />D-4</, '없는 날(2월 30일)은 «못 읽음» — Date 가 3월 2일로 바꿔 세면 안 된다');
+  assert.doesNotMatch(r.api.dchip({ closeDt: '', dday: NaN }), /D-/, '적어 둔 값이 숫자가 아니면 D-NaN 이 아니라 «-»');
+  assert.doesNotMatch(r.api.dchip({ closeDt: '', dday: Infinity }), /D-/);
+  /* 목록에서도 — 「지나감」 줄에 D-몇이 안 붙는다 */
+  const l = runApp({ feed: [{ id: 'G0001', src: '나라장터', type: '지나감', no: 'X1', nm: '한국문화 미술관장 공개모집', org: '가', closeDt: ymd(-26) + ' 18:00', dday: 14, kw: '노무' }] });
+  l.el('fSt').value = '__all'; l.api.draw();
+  const tr = l.el('tb').innerHTML;
+  assert.match(tr, /<span class="tag">지남<\/span>/); assert.doesNotMatch(tr, /D-14/);
+});
+
 test('★ 찾는 말 칩이 그려지고 「교육」은 없다', () => {
   const r = runApp({ feed: [] });
   r.api.drawKw();

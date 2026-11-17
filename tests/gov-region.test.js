@@ -31,14 +31,28 @@ test('★★ 지역 낱말 — 도·광역시·시군 이름은 잡고, 낱말�
   assert.deepEqual(R.regionsIn('예산군 노동권익센터'), ['충남'], '«군»이 붙으면 예산군');
   assert.deepEqual(R.regionsIn('음성 인식 시스템 구축'), []);
   assert.deepEqual(R.regionsIn('서울아산병원 인사제도'), [], '아산은 «아산시»만');
-  assert.deepEqual(R.regionsIn('충청권 공공기관 위원 모집'), [R.WIDE], '도가 안 적힌 «충청»은 충청권으로 따로');
-  assert.deepEqual(R.regionsIn('대전충청지방노무사회 위원 추천'), ['대전'], '도가 적히면 충청권은 안 붙인다');
-  assert.equal(R.label(R.WIDE), '충청권');
+  assert.deepEqual(R.regionsIn('충청권 공공기관 위원 모집'), [R.WIDE], '도가 안 적힌 «충청»은 따로(충청 공통)');
+  assert.deepEqual(R.regionsIn('대전충청지방노무사회 위원 추천'), ['대전'], '도가 적히면 충청 공통은 안 붙인다');
+  assert.equal(R.label(R.WIDE), '충청 공통', '탭의 폰 이름 「충청권」과 헷갈리지 않게');
+});
+
+/* 2026-11-17 대표 「세종도 넣어달라」 — 「세종」은 다른 곳 이름에 흔해서 «세종시·특별자치시»·뒤에 한글이 안 붙는 「세종」·알려진 세종 기관만 */
+test('★★ 세종 — 세종시·세종특별자치시·[세종]·대전·세종은 잡고, 세종문화회관·세종대학교·세종대왕·세종로는 안 잡는다', () => {
+  assert.ok(R.REGIONS.includes('세종'));
+  assert.deepEqual(R.regionsIn('세종특별자치시 일자리센터'), ['세종']);
+  assert.deepEqual(R.regionsIn('세종시설관리공단 인사제도 개선'), ['세종']);
+  assert.deepEqual(R.regionsIn('[세종] 소상공인 노무 지원'), ['세종']);
+  assert.deepEqual(R.regionsIn('대전·세종 지역 컨설턴트 모집'), ['대전', '세종']);
+  assert.deepEqual(R.regionsIn('대전세종연구원 위원 위촉'), ['대전', '세종']);
+  assert.deepEqual(R.regionsIn('정부세종청사 관리본부'), ['세종']);
+  assert.deepEqual(R.regionsIn('세종테크노파크 전문가 풀'), ['세종']);
+  ['세종문화회관 조직진단 용역', '세종대학교 인사제도', '세종대왕기념사업회', '서울 세종로 청사', '세종연구소 연구용역', '세종병원 노무 자문', '세종시대 문화유산 연구 용역']
+    .forEach((t) => assert.deepEqual(R.regionsIn(t), [], t + ' — 세종시가 아니다'));
 });
 
 test('★★ 공고 줄 — 참가 가능 지역 → 기관 → 공고 기관 → 공고명 차례로 보고 «까닭»을 단다', () => {
   const a = R.ofFeed({ src: '나라장터', rgn: '충청남도 · 세종특별자치시', org: '서울특별시 가나구청', nm: '노무 용역' });
-  assert.deepEqual(a.regions, ['충남']); assert.match(a.why[0], /^참가 가능 지역 — 충남$/);
+  assert.deepEqual(a.regions, ['세종', '충남']); assert.match(a.why[0], /^참가 가능 지역 — 세종·충남$/);
   const b = R.ofFeed({ src: '기업마당', rgn: '충북', org: '중소벤처기업부', nm: '[충북] 컨설팅 지원' });
   assert.deepEqual(b.regions, ['충북']); assert.match(b.why[0], /^지역 표시/, '기업마당 rgn 은 해시태그·제목에서 읽은 것');
   const c = R.ofFeed({ src: '나라장터', org: '대전광역시 서구', nm: '조직진단 용역' });
@@ -64,7 +78,7 @@ test('★★★ 게시판 번호표는 서버와 맞물린다 — 번호가 서�
     assert.ok(R.regionsIn(b.name).includes(R.BOARD_REGION[id]), id + ' 게시판(' + b.name + ')의 이름에 ' + R.BOARD_REGION[id] + ' 이(가) 없다');
   });
 });
-test('★★★ 이름에 대전·충남·충북이 적힌 서버 게시판은 빠짐없이 번호표에 있다 — 새 지역 게시판을 더하고 잊으면 이 탭에 안 뜬다', () => {
+test('★★★ 이름에 대전·세종·충남·충북이 적힌 서버 게시판은 빠짐없이 번호표에 있다 — 새 지역 게시판을 더하고 잊으면 이 탭에 안 뜬다', () => {
   BOARDS.forEach((b) => {
     const rg = R.regionsIn(b.name).filter((k) => k !== R.WIDE);
     if (rg.length) assert.ok(R.BOARD_REGION[b.id], b.id + '(' + b.name + ') 가 js/gov-region.js BOARD_REGION 에 없다');
@@ -154,7 +168,10 @@ const rowsOf = (h) => (h.match(/<tr class="rr/g) || []).length;
 const rowFor = (h, sel) => h.split('</tr>').find((t) => t.includes('data-sel="' + sel + '" onclick="rgnRowClick')) || '';
 
 test('★★★ 탭이 있고, 열면 이 화면만 보인다 · 다른 탭으로 가면 숨는다', () => {
-  assert.match(src, /<button class="tb" id="tbRgn" onclick="setTab\('rgn'\)"[^>]*>📍 대전·충남·충북<\/button>/);
+  const tb = (src.match(/<button class="tb" id="tbRgn" onclick="setTab\('rgn'\)"[^>]*>([\s\S]*?)<\/button>/) || [])[1];
+  assert.ok(tb, '📍 탭 단추가 없다');
+  assert.match(tb, /<span class="mx">대전·세종·충남·충북<\/span>/, 'PC 이름 — 세종 포함(2026-11-17)');
+  assert.match(tb, /<span class="m-only">충청권<\/span>/, '폰 이름(탭 넷이 360px 한 줄에 들어가게)');
   assert.match(src, /<script src="js\/gov-region\.js\?v=\d+"><\/script>/, '화면이 모듈을 싣는다');
   const r = runApp({ feed: FEED });
   r.api.setTab('rgn');
@@ -188,7 +205,7 @@ test('★★ 보기를 넓히면 마감 지난 것이 돌아오고, 지역 칩�
   r.api.setWatch(WATCH); r.api.setTab('rgn');
   r.el('rView').value = 'all'; r.api.rgnDraw();
   assert.match(r.el('rgnTb').innerHTML, /경영평가위원 위촉/);
-  assert.match(r.el('rgnChips').innerHTML, /📍 충북 <span class="n">2<\/span>/);
+  assert.match(r.el('rgnChips').innerHTML.replace(/<span class="mx">([^<]*)<\/span>/g, '$1'), /📍 충북 <span class="n">2<\/span>/);
   r.api.rgnReg('충북');
   const h = r.el('rgnTb').innerHTML;
   assert.equal(rowsOf(h), 2); assert.match(h, /경영평가위원 위촉/); assert.match(h, /2027 충북/);
@@ -252,7 +269,7 @@ test('★★ 화면을 떠나면 고른 것을 비운다 · 탭을 안 보고 �
   r.api.setTab('feed');
   assert.equal(Object.keys(r.api.getSel()).length, 0);
   r.api.draw();
-  assert.match(r.el('tbRgn').innerHTML, /📍 대전·충남·충북 <span class="tag red"[^>]*>3<\/span>/, '새 공고 1(G0001) + 안 본 모집 글 2(h1·h3) — 관심(G0005)은 새 것이 아니다');
+  assert.match(r.el('tbRgn').innerHTML, /📍 <span class="mx">대전·세종·충남·충북<\/span><span class="m-only">충청권<\/span> <span class="tag red"[^>]*>3<\/span>/, '새 공고 1(G0001) + 안 본 모집 글 2(h1·h3) — 관심(G0005)은 새 것이 아니다');
 });
 
 test('★★★ 모집 글 팝업은 열자마자 opener 를 끊는다 — 바깥 누리집이 ERP 창을 다른 주소로 못 바꾼다(2026-11-16 보안 검토)', () => {
@@ -285,6 +302,7 @@ test('★ 키보드로도 — 공고 제목은 상세를 여는 링크(role=butt
   assert.match(row, /<a class="tlink" href="#" role="button" data-sel="f:G0001" onclick="rgnPop\(this\.dataset\.sel\);return false">천안시 노무관리/);
   assert.match(row, /<input type="checkbox" class="row-chk" aria-label="\d+번 고르기"/);
   assert.match(src, /<input id="rq"[^>]*aria-label="[^"]+"/);
+  assert.match(src, /<select id="rKind"[^>]*aria-label="[^"]+"/); assert.match(src, /<select id="rView"[^>]*aria-label="[^"]+"/);
 });
 
 /* ───────── 캡쳐2 정리 (같은 날 대표 「불필요한 부분이다 빼달라」) ───────── */
