@@ -35,10 +35,36 @@
     reopenOpenId: '',
     reopenDrafts: {},
     impBusyIds: {},
-    impUnsub: null
+    impUnsub: null,
+    ontologyLoaded: false,
+    ontologyLoading: null,
+    inspectedApps: {},
+    appUrls: {},
+    voiceOn: false,
+    voiceInterim: '',
+    voiceHint: '',
+    voiceRec: null,
+    voiceSeq: 0,
+    voiceDirtyInp: false,
+    ttsMode: 'voice',   // 'voice' (음성질문 시 자동읽기) | 'all' (항상 읽기) | 'off' (자동읽기 끄기)
+    speakingTurnIdx: -1
   };
 
   function $(id) { return d.getElementById(id); }
+
+  function currentAuthUid() {
+    try {
+      var auth = (w.firebase && typeof w.firebase.auth === 'function') ? w.firebase.auth() : null;
+      var u = auth && auth.currentUser;
+      if (u && u.uid) return String(u.uid);
+    } catch (_) {}
+    return String(STATE.uid || '');
+  }
+
+  function isChatWinOpen() {
+    var win = $('puChatWin');
+    return !!(win && win.classList && win.classList.contains('on'));
+  }
 
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
@@ -75,7 +101,7 @@
       '.puc-hcnt{background:#dc2626;color:#ffffff;border-radius:999px;padding:0 5px;font-size:10px;font-weight:800;line-height:15px;}',
       '.puc-xbtn{border:none;background:transparent;color:#475569;font-size:14px;font-weight:800;min-width:26px;min-height:26px;padding:3px 6px;cursor:pointer;line-height:1;border-radius:6px;flex-shrink:0;}',
       '.puc-xbtn:hover{background:#bfdbfe;color:#1e293b;}',
-      '.puc-hbtn:focus-visible,.puc-xbtn:focus-visible,.puc-cat:focus-visible,.puc-chip:focus-visible,.puc-wchip:focus-visible,.puc-appbtn:focus-visible,.puc-impbtn:focus-visible,.puc-fstep:focus-visible,.puc-fup:focus-visible,.puc-dict-item:focus-visible,.puc-okbtn:focus-visible,.puc-rebtn:focus-visible,.puc-reopen-send:focus-visible,#puChatSend:focus-visible{outline:2px solid #2563eb;outline-offset:1px;}',
+      '.puc-hbtn:focus-visible,.puc-xbtn:focus-visible,.puc-cat:focus-visible,.puc-chip:focus-visible,.puc-wchip:focus-visible,.puc-appbtn:focus-visible,.puc-impbtn:focus-visible,.puc-spkbtn:focus-visible,.puc-vbtn:focus-visible,.puc-fstep:focus-visible,.puc-fup:focus-visible,.puc-dict-item:focus-visible,.puc-okbtn:focus-visible,.puc-rebtn:focus-visible,.puc-reopen-send:focus-visible,#puChatSend:focus-visible{outline:2px solid #2563eb;outline-offset:1px;}',
       '#puChatCats{display:none;align-items:center;gap:5px;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;overflow-x:auto;flex-shrink:0;}',
       '.puc-cat{border:1px solid #cbd5e1;background:#ffffff;color:#475569;border-radius:999px;padding:3px 9px;min-height:26px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none;}',
       '.puc-cat.on{background:#2563eb;border-color:#2563eb;color:#ffffff;}',
@@ -120,6 +146,8 @@
       '.puc-appbtn:hover{border-color:#16a34a;}',
       '.puc-impbtn{border:1px solid #fde68a;background:#fffbeb;color:#854d0e;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;}',
       '.puc-impbtn:hover{border-color:#d97706;}',
+      '.puc-spkbtn{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;border-radius:999px;padding:3px 9px;min-height:24px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;}',
+      '.puc-spkbtn:hover,.puc-spkbtn.on{border-color:#2563eb;background:#eff6ff;color:#1e40af;}',
       /* 🛠 개선요청 접수 · 결과 답변 · 채팅자 승인 완성 카드 */
       '.puc-imp-card{margin-top:8px;padding:9px 10px;border-radius:10px;border:1px solid #bfdbfe;background:#f8fafc;font-size:11.5px;line-height:1.5;color:#1e293b;}',
       '.puc-imp-card.wait-approve{border-color:#fbbf24;background:#fffbeb;}',
@@ -152,8 +180,18 @@
       '.puc-app-io-hd{display:flex;align-items:center;justify-content:space-between;gap:5px;flex-wrap:wrap;margin-bottom:3px;}',
       '.puc-io-line{font-size:10.5px;color:#475569;margin-top:2px;}',
       '.puc-io-line b{color:#1e293b;}',
-      '#puChatFoot{display:flex;align-items:center;gap:6px;padding:8px 9px;background:#ffffff;border-top:1px solid #e2e8f0;flex-shrink:0;}',
-      '#puChatInp,#puChatDictInp{flex:1;height:36px;padding:0 10px;border:1px solid #cbd5e1;border-radius:9px;background:#ffffff;color:#1e293b;font-size:13px;font-family:inherit;outline:none;}',
+      '#puChatVoiceBar{display:none;align-items:center;gap:6px;padding:6px 10px;background:#eff6ff;border-top:1px solid #bfdbfe;color:#1e293b;font-size:11.5px;line-height:1.35;flex-shrink:0;}',
+      '#puChatVoiceBar.on{display:flex;}',
+      '#puChatVoiceBar.rec{background:#fef2f2;border-top-color:#fecaca;color:#991b1b;}',
+      '.puc-vdot{width:8px;height:8px;border-radius:999px;background:#dc2626;flex-shrink:0;}',
+      '.puc-vtxt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}',
+      '#puChatFoot{display:flex;align-items:center;gap:5px;padding:8px 9px;background:#ffffff;border-top:1px solid #e2e8f0;flex-shrink:0;}',
+      '.puc-vbtn{width:34px;height:36px;padding:0;border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;color:#1e293b;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}',
+      '.puc-vbtn:hover{border-color:#2563eb;background:#eff6ff;color:#1e40af;}',
+      '.puc-vbtn.rec{border-color:#dc2626;background:#fef2f2;color:#991b1b;}',
+      '.puc-vbtn.on{border-color:#2563eb;background:#eff6ff;color:#1e40af;}',
+      '.puc-vbtn.muted{color:#64748b;background:#f8fafc;}',
+      '#puChatInp,#puChatDictInp{flex:1;min-width:0;height:36px;padding:0 10px;border:1px solid #cbd5e1;border-radius:9px;background:#ffffff;color:#1e293b;font-size:13px;font-family:inherit;outline:none;}',
       '#puChatInp:focus,#puChatDictInp:focus,.puc-reopen-inp:focus{border-color:#1e40af;}',
       '#puChatSend{height:36px;padding:0 13px;border:none;border-radius:9px;background:#1e40af;color:#ffffff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}',
       '#puChatSend:disabled{opacity:.55;cursor:not-allowed;}',
@@ -209,6 +247,141 @@
     return STATE.fundKbLoading;
   }
 
+  /* ── pu-ontology.js 지연 로드 및 실시간 앱 카탈로그·화면 HTML 자동 수집 ── */
+  function ensureOntology() {
+    if (w.PuOntology && w.PuOntology.PROGRAMS) {
+      STATE.ontologyLoaded = true;
+      return Promise.resolve(w.PuOntology.PROGRAMS);
+    }
+    if (!w.location) return Promise.resolve(null);
+    if (STATE.ontologyLoading) return STATE.ontologyLoading;
+    STATE.ontologyLoading = new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (!settled) {
+          settled = true;
+          STATE.ontologyLoading = null;
+          resolve((w.PuOntology && w.PuOntology.PROGRAMS) || null);
+        }
+      }, 800);
+      function done(val) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(val);
+      }
+      try {
+        var s = d.createElement('script');
+        s.src = 'js/pu-ontology.js?t=' + Math.floor(Date.now() / 600000);
+        s.async = true;
+        s.onload = function () {
+          STATE.ontologyLoaded = true;
+          done((w.PuOntology && w.PuOntology.PROGRAMS) || null);
+        };
+        s.onerror = function () { STATE.ontologyLoading = null; done(null); };
+        (d.head || d.body || d.documentElement).appendChild(s);
+      } catch (_) {
+        STATE.ontologyLoading = null;
+        done(null);
+      }
+    });
+    return STATE.ontologyLoading;
+  }
+
+  function cleanHtmlRelFile(rawUrl) {
+    var base = String(rawUrl || '').split('#')[0].split('?')[0].trim();
+    return /^[A-Za-z0-9._-]+\.html$/.test(base) ? base : '';
+  }
+
+  function syncLiveCatalog() {
+    if (!w.PuChatbot || typeof w.PuChatbot.syncCatalog !== 'function') return;
+    var catObj = (typeof w.portalAppCatalog === 'function') ? w.portalAppCatalog() : null;
+    var liveApps = [];
+    var seen = {};
+    if (catObj && Array.isArray(catObj.apps)) {
+      catObj.apps.forEach(function (ap) {
+        if (!ap || !ap.key) return;
+        seen[ap.key] = true;
+        if (ap.url) STATE.appUrls[ap.key] = ap.url;
+        liveApps.push(ap);
+      });
+    }
+    /* portalAppCatalog 외부에서 동적으로 꽂힌 DOM 타일(.tile[data-key])도 함께 수집 */
+    var root = d.getElementById('appRows');
+    var tiles = root ? root.querySelectorAll('.tile[data-key]') : (d.querySelectorAll ? d.querySelectorAll('.tile[data-key]') : []);
+    for (var i = 0; i < tiles.length; i++) {
+      var t = tiles[i];
+      var key = t.dataset && t.dataset.key;
+      if (!key || seen[key]) continue;
+      seen[key] = true;
+      var b = t.querySelector && t.querySelector('.tx b');
+      var nm = b ? b.textContent.trim() : key;
+      var ttl = t.getAttribute ? (t.getAttribute('title') || '') : '';
+      var dsc = ttl.indexOf('—') >= 0 ? ttl.split('—').slice(1).join('—').trim() : '';
+      var href = t.getAttribute ? (t.getAttribute('href') || '') : '';
+      if (href && href !== '#') STATE.appUrls[key] = href;
+      var rowEl = t.closest ? t.closest('[data-row-id]') : null;
+      var rowId = (t.dataset && t.dataset.row) || (rowEl && rowEl.getAttribute && rowEl.getAttribute('data-row-id')) || 'client';
+      liveApps.push({ key: key, name: nm, desc: dsc, url: href, row: rowId, off: false });
+    }
+    var ontProgs = (w.PuOntology && w.PuOntology.PROGRAMS) || null;
+    if (ontProgs) {
+      Object.keys(ontProgs).forEach(function (k) {
+        if (!STATE.appUrls[k] && ontProgs[k] && ontProgs[k].file) {
+          STATE.appUrls[k] = ontProgs[k].file;
+        }
+      });
+    }
+    w.PuChatbot.syncCatalog({
+      rows: catObj && catObj.rows,
+      apps: liveApps,
+      ontologyPrograms: ontProgs,
+      appDetails: STATE.inspectedApps
+    });
+  }
+
+  function ensureAppHtmlInspected(questionOrKey) {
+    syncLiveCatalog();
+    if (!w.PuChatbot || typeof w.PuChatbot.detectMentionedApps !== 'function' || typeof w.PuChatbot.extractHtmlAppDetail !== 'function') {
+      return Promise.resolve();
+    }
+    if (typeof w.fetch !== 'function') return Promise.resolve();
+    var targets = w.PuChatbot.detectMentionedApps(questionOrKey).slice(0, 2);
+    var jobs = targets.map(function (key) {
+      if (STATE.inspectedApps[key]) return Promise.resolve();
+      var relFile = cleanHtmlRelFile(STATE.appUrls[key] || '');
+      if (!relFile) return Promise.resolve();
+      return new Promise(function (resolve) {
+        var settled = false;
+        var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = setTimeout(function () {
+          if (!settled) { settled = true; if (ac) { try { ac.abort(); } catch (_) {} } resolve(); }
+        }, 1400);
+        w.fetch(relFile, { method: 'GET', credentials: 'same-origin', signal: ac ? ac.signal : undefined })
+          .then(function (r) { return (r && r.ok) ? r.text() : ''; })
+          .then(function (html) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (html) {
+              var det = w.PuChatbot.extractHtmlAppDetail(html, { key: key });
+              if (det) {
+                STATE.inspectedApps[key] = det;
+                var patch = {};
+                patch[key] = det;
+                w.PuChatbot.syncCatalog({ appDetails: patch });
+              }
+            }
+            resolve();
+          })
+          .catch(function () {
+            if (!settled) { settled = true; clearTimeout(timer); resolve(); }
+          });
+      });
+    });
+    return Promise.all(jobs);
+  }
+
   function accessibleApps() {
     var root = d.getElementById('appRows');
     var tiles = root ? root.querySelectorAll('.tile[data-key]') : d.querySelectorAll('.tile[data-key]');
@@ -227,6 +400,11 @@
       var desc = title.indexOf('—') >= 0 ? title.split('—').slice(1).join('—').trim() : '';
       map[key] = { key: key, name: name, desc: desc };
       list.push(map[key]);
+    }
+    var headCal = $('headApp_cal');
+    if (headCal && !map.cal && !headCal.hidden && (!headCal.style || headCal.style.display !== 'none')) {
+      map.cal = { key: 'cal', name: '푸른 캘린더', desc: '일정·근태' };
+      list.push(map.cal);
     }
     return { map: map, list: list };
   }
@@ -572,7 +750,7 @@
     return '<div class="' + cardCls + '" data-imp-card="' + esc(id || '') + '">'
       + '<div class="puc-imp-top">' + stBadge
       + '<div style="display:flex;align-items:center;gap:4px">'
-      + (v.at ? '<span style="font-size:10px;color:#64748b">' + esc(fmtShortTime(v.at)) + '</span>' : '')
+      + (v.at ? '<span style="font-size:10px;color:#475569">' + esc(fmtShortTime(v.at)) + '</span>' : '')
       + adminBtn
       + '</div></div>'
       + '<div class="puc-imp-tt">' + esc(v.title || '시스템 개선 요청') + '</div>'
@@ -738,8 +916,22 @@
 
   function openDocDetail(id) {
     if (!w.PuChatbot) return;
+    syncLiveCatalog();
     var it = w.PuChatbot.findById(id);
     if (!it) return;
+    if (it._autoKey && !STATE.inspectedApps[it._autoKey]) {
+      ensureAppHtmlInspected(it._autoKey).then(function () {
+        var refreshed = w.PuChatbot.findById(id);
+        var dm = $('puChatDocModal');
+        if (refreshed && dm && dm.classList.contains('on') && STATE.inspectedApps[it._autoKey]) {
+          renderDocModalContent(refreshed);
+        }
+      });
+    }
+    renderDocModalContent(it);
+  }
+
+  function renderDocModalContent(it) {
     var m = ensureDocModal();
     var acc = accessibleApps();
     var pts = (it.points || []).map(function (p) { return '<li style="margin:4px 0">' + esc(p) + '</li>'; }).join('');
@@ -862,6 +1054,12 @@
       return '<button type="button" class="puc-appbtn" data-chat-app="' + esc(k) + '"' + (extra ? ' data-chat-extra="' + esc(extra) + '"' : '') + '>↗ ' + esc(acc.map[k].name) + '</button>';
     }).join(' ');
 
+    var isSpkOn = STATE.speakingTurnIdx === idx;
+    var speakBtn = (!turn.aiLoading && ans)
+      ? ('<button type="button" class="puc-spkbtn' + (isSpkOn ? ' on' : '') + '" aria-pressed="' + (isSpkOn ? 'true' : 'false') + '" data-chat-speak="' + idx + '" title="' + (isSpkOn ? '음성 답변 멈추기' : '이 답변을 음성으로 듣기') + '">'
+          + (isSpkOn ? '⏹ 멈춤' : '🔊 듣기') + '</button>')
+      : '';
+
     var manualImpBtn = (!turn.improveTicket && !turn.improveSubmitting && !turn.aiLoading)
       ? '<button type="button" class="puc-impbtn" data-chat-imp-idx="' + idx + '" title="이 대화 내용으로 코딩·기능 개선을 요청합니다">🛠 개선요청</button>'
       : '';
@@ -874,9 +1072,9 @@
       ? '<div class="puc-warn-note">' + esc(turn.errNote) + '</div>'
       : '';
 
-    var links = [citeChips, appChips, manualImpBtn].filter(Boolean).join(' ');
+    var links = [speakBtn, citeChips, appChips, manualImpBtn].filter(Boolean).join(' ');
     return '<div>'
-      + '<div class="puc-msg-q"><div class="puc-bub-q">' + esc(turn.q) + '</div></div>'
+      + '<div class="puc-msg-q"><div class="puc-bub-q">' + (turn.viaVoice ? '🎤 ' : '') + esc(turn.q) + '</div></div>'
       + '<div class="puc-msg-a"><div class="puc-bub-a">'
       + '<div style="white-space:pre-line">' + esc(ans) + '</div>'
       + flowCardHtml
@@ -918,17 +1116,26 @@
   function renderMapBody() {
     var C = w.PuChatbot;
     if (!C) return '';
+    syncLiveCatalog();
     var acc = accessibleApps();
     var flows = C.PORTAL_FLOWS || [];
     var rows = C.PORTAL_ROWS_GUIDE || [];
 
+    var rowCounts = { client: 0, store: 0, sales: 0, inside: 0 };
+    var totalAppsCnt = 0;
+    rows.forEach(function (r) {
+      var n = (r.apps || []).length;
+      rowCounts[r.id] = n;
+      totalAppsCnt += n;
+    });
+
     var subTabs = [
-      ['flows',   '➔ 흐름도 6선'],
-      ['allrows', '전체 24개 앱'],
-      ['client',  '의뢰인(8)'],
-      ['store',   '자료함(7)'],
-      ['sales',   '영업(5)'],
-      ['inside',  '내부(4)']
+      ['flows',   '➔ 흐름도 ' + flows.length + '선'],
+      ['allrows', '전체 ' + totalAppsCnt + '개 앱'],
+      ['client',  '의뢰인(' + rowCounts.client + ')'],
+      ['store',   '자료함(' + rowCounts.store + ')'],
+      ['sales',   '영업(' + rowCounts.sales + ')'],
+      ['inside',  '내부(' + rowCounts.inside + ')']
     ];
     var subBar = '<div class="puc-map-subbar" role="tablist" aria-label="연결도 보기 구분">' + subTabs.map(function (t) {
       var on = STATE.mapTab === t[0];
@@ -1055,9 +1262,11 @@
     syncBadges();
 
     var foot = $('puChatFoot');
-    if (foot) foot.style.display = (STATE.mode === 'dict' || STATE.mode === 'req') ? 'none' : 'flex';
+    var showFoot = !(STATE.mode === 'dict' || STATE.mode === 'req');
+    if (foot) foot.style.display = showFoot ? 'flex' : 'none';
     var sendBtn = $('puChatSend');
     if (sendBtn) sendBtn.disabled = !!STATE.busy;
+    syncVoiceUi(showFoot);
 
     var body = $('puChatBody');
     if (!body) return;
@@ -1162,23 +1371,318 @@
     return hasLocalAnswer ? '' : ('AI 연결이 원활하지 않습니다 (' + (msg || '응답 지연') + ')');
   }
 
-  /* ── 질문 전송 (6턴 연속 대화 맥락 + 코딩·문제해결 필요 시 자동 개선요청 접수) ── */
-  function ask(rawQ) {
+  /* ── 🎤 음성 질문(STT) 및 🔊 음성 답변(TTS) 지원 ── */
+  function syncVoiceUi(showFoot) {
+    var micBtn = $('puChatMic');
+    if (micBtn) {
+      micBtn.classList.toggle('rec', !!STATE.voiceOn);
+      micBtn.setAttribute('aria-pressed', STATE.voiceOn ? 'true' : 'false');
+      micBtn.textContent = STATE.voiceOn ? '⏹' : '🎤';
+      micBtn.title = STATE.voiceOn
+        ? '음성 듣기 완료·전송 (누르면 지금 말씀하신 내용으로 질문합니다)'
+        : '음성으로 질문하기 (한국어로 말씀하시면 자동으로 질문하고 음성으로 답변합니다)';
+    }
+    var ttsBtn = $('puChatTtsBtn');
+    if (ttsBtn) {
+      ttsBtn.classList.toggle('on', STATE.ttsMode === 'all');
+      ttsBtn.classList.toggle('muted', STATE.ttsMode === 'off');
+      ttsBtn.setAttribute('aria-pressed', STATE.ttsMode !== 'off' ? 'true' : 'false');
+      ttsBtn.textContent = STATE.ttsMode === 'off' ? '🔇' : '🔊';
+      ttsBtn.title = STATE.ttsMode === 'all'
+        ? '모든 질문 음성 답변 켜짐 (누르면 자동 읽기 끄기로 전환)'
+        : (STATE.ttsMode === 'off'
+            ? '자동 음성 답변 꺼짐 (누르면 음성 질문 시 자동 읽기로 전환)'
+            : '음성 질문 시 자동 음성 답변 켜짐 (누르면 모든 질문 자동 읽기로 전환)');
+    }
+    var vbar = $('puChatVoiceBar');
+    if (!vbar) return;
+    if (showFoot === false || (!STATE.voiceOn && !STATE.voiceHint)) {
+      vbar.classList.remove('on', 'rec');
+      vbar.innerHTML = '';
+      return;
+    }
+    vbar.classList.add('on');
+    vbar.classList.toggle('rec', !!STATE.voiceOn);
+    if (STATE.voiceOn) {
+      var liveTxt = STATE.voiceInterim
+        ? ('“' + STATE.voiceInterim + '”')
+        : '듣고 있습니다… 편하게 질문해 주세요';
+      vbar.innerHTML = '<span class="puc-vdot" aria-hidden="true"></span>'
+        + '<span class="puc-vtxt">' + esc(liveTxt) + '</span>'
+        + '<button type="button" class="puc-chip" data-chat-act="mic-send">전송</button>'
+        + '<button type="button" class="puc-chip" data-chat-act="mic-cancel">취소</button>';
+    } else {
+      vbar.innerHTML = '<span class="puc-vtxt">' + esc(STATE.voiceHint) + '</span>'
+        + '<button type="button" class="puc-chip" data-chat-act="voice-hide">닫기</button>';
+    }
+  }
+
+  function stopSpeaking() {
+    var prevIdx = STATE.speakingTurnIdx;
+    STATE.speakingTurnIdx = -1;
+    if (w.speechSynthesis && typeof w.speechSynthesis.cancel === 'function') {
+      try { w.speechSynthesis.cancel(); } catch (_) {}
+    }
+    if (prevIdx >= 0 && STATE.mode === 'chat') refreshView(false);
+  }
+
+  function speakText(rawText, turnIdx) {
+    if (!w.speechSynthesis || typeof w.SpeechSynthesisUtterance !== 'function') {
+      STATE.voiceHint = '이 브라우저에서는 음성 읽기(TTS)가 지원되지 않습니다.';
+      syncVoiceUi(true);
+      return false;
+    }
+    var clean = (w.PuChatbot && typeof w.PuChatbot.cleanTextForSpeech === 'function')
+      ? w.PuChatbot.cleanTextForSpeech(rawText)
+      : String(rawText || '').trim();
+    if (!clean) return false;
+    try { w.speechSynthesis.cancel(); } catch (_) {}
+    var utter = new w.SpeechSynthesisUtterance(clean);
+    utter.lang = 'ko-KR';
+    utter.rate = 1.03;
+    try {
+      var voices = (typeof w.speechSynthesis.getVoices === 'function') ? w.speechSynthesis.getVoices() : [];
+      for (var i = 0; i < voices.length; i++) {
+        if (voices[i] && /^ko/i.test(String(voices[i].lang || ''))) {
+          utter.voice = voices[i];
+          break;
+        }
+      }
+    } catch (_) {}
+    STATE.speakingTurnIdx = typeof turnIdx === 'number' ? turnIdx : -1;
+    utter.onend = function () {
+      if (STATE.speakingTurnIdx === turnIdx) {
+        STATE.speakingTurnIdx = -1;
+        if (STATE.mode === 'chat') refreshView(false);
+      }
+    };
+    utter.onerror = function () {
+      if (STATE.speakingTurnIdx === turnIdx) {
+        STATE.speakingTurnIdx = -1;
+        if (STATE.mode === 'chat') refreshView(false);
+      }
+    };
+    if (STATE.mode === 'chat') refreshView(false);
+    try {
+      w.speechSynthesis.speak(utter);
+      return true;
+    } catch (_) {
+      STATE.speakingTurnIdx = -1;
+      return false;
+    }
+  }
+
+  function speakTurn(idx) {
+    var n = Number(idx);
+    if (isNaN(n) || !STATE.logs[n]) return false;
+    if (STATE.speakingTurnIdx === n) {
+      stopSpeaking();
+      return false;
+    }
+    var t = STATE.logs[n];
+    var txt = t.aiText || t.answer || '';
+    return speakText(txt, n);
+  }
+
+  function toggleVoiceReply() {
+    var next = STATE.ttsMode === 'voice' ? 'all' : (STATE.ttsMode === 'all' ? 'off' : 'voice');
+    STATE.ttsMode = next;
+    if (next === 'off') stopSpeaking();
+    STATE.voiceHint = next === 'all'
+      ? '🔊 모든 질문의 답변을 음성으로 읽어 드립니다.'
+      : (next === 'off' ? '🔇 자동 음성 답변을 껐습니다 (말풍선 [🔊 듣기]는 언제든 사용 가능).' : '🎤 음성으로 질문하시면 답변도 음성으로 읽어 드립니다.');
+    syncVoiceUi(STATE.mode !== 'dict' && STATE.mode !== 'req');
+    return next;
+  }
+
+  function stopVoice(cancelOnly) {
+    var wasOn = STATE.voiceOn;
+    var activeRec = STATE.voiceRec;
+    STATE.voiceOn = false;
+    if (cancelOnly) {
+      STATE.voiceSeq++;
+      STATE.voiceInterim = '';
+      if (wasOn || activeRec || STATE.voiceDirtyInp) {
+        var inp = $('puChatInp');
+        if (inp) inp.value = '';
+        STATE.voiceDirtyInp = false;
+      }
+    }
+    if (activeRec) {
+      if (cancelOnly) {
+        activeRec._puCancelled = true;
+        STATE.voiceRec = null;
+        try {
+          if (typeof activeRec.abort === 'function') activeRec.abort();
+          else if (typeof activeRec.stop === 'function') activeRec.stop();
+        } catch (_) {}
+      } else if (!activeRec._puStopping) {
+        activeRec._puStopping = true;
+        try {
+          if (typeof activeRec.stop === 'function') activeRec.stop();
+        } catch (_) {}
+      }
+    }
+    if (wasOn) syncVoiceUi(STATE.mode !== 'dict' && STATE.mode !== 'req');
+  }
+
+  /* ⚠ 개인정보 보호 원칙: 원본 녹음 오디오(inlineData)는 외부 AI 서버로 절대 직접 전송하지 않는다.
+   * 브라우저 내장 SpeechRecognition(ko-KR)으로 기기에서 텍스트 변환한 뒤 반드시 maskPersonal()을 거쳐 전송한다. */
+  function startVoice() {
+    if (STATE.busy || !isChatWinOpen()) return false;
+    if (STATE.voiceOn) {
+      stopVoice(false);
+      return false;
+    }
+    if (STATE.voiceRec) stopVoice(true);
+    STATE.mode = 'chat';
+    STATE.voiceHint = '';
+    var SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (typeof SR !== 'function') {
+      STATE.voiceHint = '이 브라우저에서는 음성 인식이 지원되지 않습니다. 크롬·엣지·사파리에서 🎤 음성 질문을 쓰실 수 있습니다.';
+      syncVoiceUi(true);
+      return false;
+    }
+    stopSpeaking();
+    var rec;
+    try {
+      rec = new SR();
+    } catch (_) {
+      STATE.voiceHint = '음성 인식을 시작할 수 없습니다.';
+      syncVoiceUi(true);
+      return false;
+    }
+    rec.lang = 'ko-KR';
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+
+    var myVoiceSeq = ++STATE.voiceSeq;
+    var myEpoch = STATE.epoch;
+    var myUid = currentAuthUid();
+    var finalBuf = '';
+    var latestInterim = '';
+    STATE.voiceRec = rec;
+    STATE.voiceOn = true;
+    STATE.voiceInterim = '';
+    STATE.voiceDirtyInp = false;
+    refreshView(false);
+
+    function isStaleSession() {
+      return !!(
+        rec._puCancelled ||
+        myVoiceSeq !== STATE.voiceSeq ||
+        myEpoch !== STATE.epoch ||
+        myUid !== currentAuthUid() ||
+        !isChatWinOpen()
+      );
+    }
+
+    rec.onresult = function (ev) {
+      if (isStaleSession()) return;
+      var fin = '';
+      var inter = '';
+      var resList = (ev && ev.results) || [];
+      for (var i = 0; i < resList.length; i++) {
+        var r = resList[i];
+        var seg = (r && r[0] && r[0].transcript) ? String(r[0].transcript) : '';
+        if (r && r.isFinal) fin += seg + ' ';
+        else inter += seg;
+      }
+      if (fin.trim()) finalBuf = fin.trim();
+      latestInterim = inter.trim();
+      var combined = (finalBuf + (latestInterim ? (' ' + latestInterim) : '')).trim();
+      STATE.voiceInterim = combined;
+      var inp = $('puChatInp');
+      if (inp && combined) {
+        inp.value = combined;
+        STATE.voiceDirtyInp = true;
+      }
+      syncVoiceUi(true);
+    };
+
+    rec.onerror = function (ev) {
+      if (isStaleSession()) return;
+      var code = (ev && ev.error) || '';
+      if (code === 'aborted' && rec._puCancelled) return;
+      STATE.voiceOn = false;
+      if (STATE.voiceRec === rec) STATE.voiceRec = null;
+      STATE.voiceInterim = '';
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        STATE.voiceHint = '마이크 권한이 꺼져 있습니다. 주소창 왼쪽 자물쇠에서 마이크를 허용해 주세요.';
+      } else if (code === 'no-speech') {
+        STATE.voiceHint = '음성이 감지되지 않았습니다. 🎤 단추를 누르고 다시 말씀해 주세요.';
+      } else if (code === 'audio-capture') {
+        STATE.voiceHint = '연결된 마이크를 찾을 수 없습니다.';
+      } else {
+        STATE.voiceHint = '음성 인식 중 문제가 생겼습니다. 다시 눌러 말씀해 주세요.';
+      }
+      syncVoiceUi(true);
+    };
+
+    rec.onend = function () {
+      var stale = isStaleSession();
+      var textToAsk = (finalBuf || latestInterim || STATE.voiceInterim || '').trim();
+      if (STATE.voiceRec === rec) STATE.voiceRec = null;
+      if (myVoiceSeq === STATE.voiceSeq) {
+        STATE.voiceOn = false;
+        STATE.voiceInterim = '';
+        if (isChatWinOpen()) syncVoiceUi(true);
+      }
+      if (!stale && textToAsk) {
+        var inp = $('puChatInp');
+        if (inp) inp.value = '';
+        STATE.voiceDirtyInp = false;
+        ask(textToAsk, { viaVoice: true });
+      }
+    };
+
+    try {
+      rec.start();
+      return true;
+    } catch (_) {
+      STATE.voiceOn = false;
+      STATE.voiceRec = null;
+      STATE.voiceHint = '음성 인식을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+      syncVoiceUi(true);
+      return false;
+    }
+  }
+
+  function toggleVoice() {
+    if (STATE.voiceOn) {
+      stopVoice(false);
+      return false;
+    }
+    return startVoice();
+  }
+
+  /* ── 질문 전송 (실시간 앱·온톨로지·HTML 동기화 + 6턴 맥락 + 자동 개선요청 + 음성 답변) ── */
+  function ask(rawQ, askOpts) {
     if (!w.PuChatbot || STATE.busy) return Promise.resolve();
-    bindImproveBridge();
+    askOpts = askOpts || {};
     var inp = $('puChatInp');
     var q = String(rawQ != null ? rawQ : (inp ? inp.value : '')).trim();
+    if (STATE.voiceOn || STATE.voiceRec) stopVoice(true);
+    STATE.voiceDirtyInp = false;
+    stopSpeaking();
+    STATE.voiceHint = '';
+    bindImproveBridge();
     if (!q) {
       if (inp) inp.focus();
       return Promise.resolve();
     }
-    if (inp && rawQ == null) inp.value = '';
+    if (inp && (rawQ == null || askOpts.viaVoice)) inp.value = '';
     STATE.mode = 'chat';
     STATE.busy = true;
     var myEpoch = STATE.epoch;
 
-    return ensureFundKb().then(function () {
+    return Promise.all([ensureFundKb(), ensureOntology()]).then(function () {
       if (myEpoch !== STATE.epoch) { STATE.busy = false; return; }
+      return ensureAppHtmlInspected(q);
+    }).then(function () {
+      if (myEpoch !== STATE.epoch) { STATE.busy = false; return; }
+      syncLiveCatalog();
       var acc = accessibleApps();
       var historySnapshot = STATE.logs.filter(function (x) { return x && x.q; }).slice(-6);
       var picked = w.PuChatbot.pick(q, { cat: STATE.cat, max: 3, history: historySnapshot });
@@ -1188,6 +1692,7 @@
 
       var turn = {
         q: q,
+        viaVoice: !!askOpts.viaVoice,
         picked: picked,
         _histBefore: historySnapshot,
         answer: localImp.needed
@@ -1229,6 +1734,11 @@
         if (myEpoch !== STATE.epoch) return;
         STATE.busy = false;
         refreshView(true);
+        var shouldAutoSpeak = ((turn.viaVoice && STATE.ttsMode !== 'off') || STATE.ttsMode === 'all') && isChatWinOpen();
+        if (shouldAutoSpeak) {
+          var turnIdx = STATE.logs.indexOf(turn);
+          speakText(turn.aiText || turn.answer || '', turnIdx);
+        }
         if ((aiImprove && aiImprove.needed) || localImp.needed) {
           return triggerImproveForTurn(turn, aiImprove, false);
         }
@@ -1238,9 +1748,13 @@
 
   function setMode(nextMode) {
     if (nextMode !== 'chat' && nextMode !== 'map' && nextMode !== 'dict' && nextMode !== 'req') return;
+    if ((nextMode === 'dict' || nextMode === 'req') && STATE.voiceOn) stopVoice(true);
     STATE.mode = nextMode;
-    if (nextMode === 'dict') {
-      ensureFundKb().then(function () { refreshView(false); });
+    if (nextMode === 'dict' || nextMode === 'map') {
+      Promise.all([ensureFundKb(), ensureOntology()]).then(function () {
+        syncLiveCatalog();
+        refreshView(false);
+      });
     }
     refreshView(nextMode === 'map' || nextMode === 'req');
   }
@@ -1267,8 +1781,11 @@
       + '</div>'
       + '<div id="puChatCats" role="tablist" aria-label="사전 분야 선택"></div>'
       + '<div id="puChatBody" aria-live="polite"></div>'
+      + '<div id="puChatVoiceBar" aria-live="polite"></div>'
       + '<div id="puChatFoot">'
-      + '<input id="puChatInp" type="text" aria-label="푸른 시스템 길잡이 질문 입력" placeholder="이어서 질문하거나 고칠 점·오류를 편하게 적어주세요…" autocomplete="off">'
+      + '<button type="button" id="puChatMic" class="puc-vbtn" data-chat-act="mic" aria-label="음성으로 질문하기" aria-pressed="false" title="음성으로 질문하기">🎤</button>'
+      + '<input id="puChatInp" type="text" aria-label="푸른 시스템 길잡이 질문 입력" placeholder="질문·개선요청 입력 또는 🎤 말로 질문…" autocomplete="off">'
+      + '<button type="button" id="puChatTtsBtn" class="puc-vbtn" data-chat-act="tts-mode" aria-label="음성 답변 읽기 설정" aria-pressed="true" title="음성 질문 시 자동 음성 답변 켜짐">🔊</button>'
       + '<button type="button" id="puChatSend">전송</button>'
       + '</div>';
 
@@ -1291,6 +1808,9 @@
     });
 
     win.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'puChatInp') {
+        STATE.voiceDirtyInp = false;
+      }
       if (e.target && e.target.getAttribute) {
         var rid = e.target.getAttribute('data-reopen-inp');
         if (rid) STATE.reopenDrafts[rid] = e.target.value || '';
@@ -1303,6 +1823,15 @@
         var act = actBtn.getAttribute('data-chat-act');
         if (act === 'close') close();
         else if (act === 'clear') clearChat();
+        else if (act === 'mic' || act === 'mic-send') toggleVoice();
+        else if (act === 'mic-cancel') stopVoice(true);
+        else if (act === 'tts-mode') toggleVoiceReply();
+        else if (act === 'voice-hide') { STATE.voiceHint = ''; syncVoiceUi(true); }
+        return;
+      }
+      var spkBtn = e.target.closest && e.target.closest('[data-chat-speak]');
+      if (spkBtn) {
+        speakTurn(spkBtn.getAttribute('data-chat-speak'));
         return;
       }
       var modeBtn = e.target.closest && e.target.closest('[data-chat-mode]');
@@ -1413,8 +1942,10 @@
     clampWinPos(win);
     var fab = $('chatFab');
     if (fab) fab.setAttribute('aria-expanded', 'true');
-    ensureFundKb().then(function () {
-      if (STATE.mode === 'dict') refreshView(false);
+    syncLiveCatalog();
+    Promise.all([ensureFundKb(), ensureOntology()]).then(function () {
+      syncLiveCatalog();
+      if (STATE.mode === 'dict' || STATE.mode === 'map') refreshView(false);
     });
     refreshView(true);
     if (initQuestion) {
@@ -1426,6 +1957,9 @@
   }
 
   function close() {
+    stopVoice(true);
+    stopSpeaking();
+    STATE.voiceHint = '';
     var win = $('puChatWin');
     if (win) win.classList.remove('on');
     var dm = $('puChatDocModal');
@@ -1441,6 +1975,9 @@
   }
 
   function clearChat() {
+    stopVoice(true);
+    stopSpeaking();
+    STATE.voiceHint = '';
     STATE.epoch++;
     STATE.busy = false;
     STATE.logs = [];
@@ -1448,8 +1985,12 @@
     refreshView(false);
   }
 
-  /* 로그아웃 시 대화 기록·개선 구독·열린 창 즉시 정리 (공용 PC 개인정보 잔류 방지) */
+  /* 로그아웃 시 대화 기록·음성·입력란·개선 구독·열린 창 즉시 정리 (공용 PC 개인정보 잔류 방지) */
   function resetOnLogout() {
+    stopVoice(true);
+    stopSpeaking();
+    STATE.voiceHint = '';
+    STATE.dictQ = '';
     STATE.epoch++;
     STATE.busy = false;
     STATE.logs = [];
@@ -1461,6 +2002,10 @@
     STATE.reopenOpenId = '';
     STATE.reopenDrafts = {};
     STATE.impBusyIds = {};
+    var inp = $('puChatInp');
+    if (inp) inp.value = '';
+    var dinp = $('puChatDictInp');
+    if (dinp) dinp.value = '';
     if (typeof STATE.impUnsub === 'function') {
       try { STATE.impUnsub(); } catch (_) {}
       STATE.impUnsub = null;
@@ -1491,6 +2036,13 @@
     toggle: toggle,
     setMode: setMode,
     ask: ask,
+    startVoice: startVoice,
+    stopVoice: stopVoice,
+    toggleVoice: toggleVoice,
+    speakTurn: speakTurn,
+    stopSpeaking: stopSpeaking,
+    toggleVoiceReply: toggleVoiceReply,
+    syncLiveCatalog: syncLiveCatalog,
     approveTicket: approveTicket,
     reopenTicket: reopenTicket,
     clear: clearChat,

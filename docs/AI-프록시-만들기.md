@@ -46,7 +46,8 @@ Claude 를 쓰려면 **유료 키**가 있어야 합니다. 그런데 이 키를
 
 // 이 주소에서 오는 요청만 받는다. 우리 앱 주소를 적는다.
 const ALLOW = [
-  'https://nabaho.github.io',
+  'https://erp.pureunlabor.co.kr',   // ERP 새 주소(2026-11-15 이사)
+  'https://nabaho.github.io',        // 옛 주소 — 이사 뒤 약 3개월 남긴다
   // 'http://localhost:8080',   // 내 컴퓨터에서 시험할 때만 잠깐 열기
 ];
 

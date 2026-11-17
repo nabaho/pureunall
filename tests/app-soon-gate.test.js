@@ -27,15 +27,13 @@ const { stripJs } = require('./strip-comments');
 const R = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 const GATE = R('js/pu-gate.js');
 const 잠글앱 = {
-  /* 취업규칙은 «한 앱 두 파일»(두 앱 합치기 2026-10-04) — 타일은 하나라도 문은 두 파일에 다 단다.
-     한 파일만 달면 그 파일 주소를 직접 친 사람에게 열린다. */
-  'rules.html': '취업규칙',
+  /* 기업규정집(옛 취업규칙)은 2026-11-15 대표 「기업규정집 준비중 열어라」로 열었다 — ⑩ 이 지킨다.
+     «한 앱 두 파일»(rules.html · rules-v2.html)이라 문도 두 파일에서 «함께» 뺐다. */
   /* 급여관리는 2026-10-09 「준비중 풀기」로 열었다가 2026-10-20 「급여관리도 준비중으로」 다시 닫았다 — ⑨ */
   'payroll-os.html': '급여아웃소싱',
   /* 문서관리는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — ⑦ 이 지킨다 */
-  'pu-paydata.html': '급여데이터함',
+  'pu-paydata.html': '급여데이터함'
   /* 푸른 메일(pu-cards.html)은 2026-10-09 대표 「준비중 풀어도 된다」로 열었다 — ⑧ 이 지킨다 */
-  'rules-v2.html': '취업규칙'
 };
 
 test('①★★ 잠근 앱은 모두 문을 단다 — 하나라도 빠지면 그 앱은 주소로 열린다', () => {
@@ -148,6 +146,21 @@ test('⑧★★ 푸른 메일은 직원에게 열려 있다 — 대표 「준비
   const s = stripJs(R('pu-cards.html'));
   assert.doesNotMatch(s, /PuGate\.soonUnlessAdmin\(/,
     '★★ 메일함 안쪽에 준비중 문이 다시 생겼다 — 포털에서는 열리는데 들어가면 막힌다');
+});
+
+test('⑩★★ 기업규정집은 직원에게 열려 있다 — 대표 「기업규정집 준비중 열어라」(2026-11-15)', () => {
+  /* ★ 문은 «세 곳»이 짝이다 — 포털 딱지 · rules-v2.html 안쪽 · rules.html 안쪽. 하나만 되살아나도 반쪽이 된다:
+       딱지만 남으면 주소를 직접 친 사람에게 열리고, 안쪽만 남으면 포털에서는 멀쩡한데 눌러서 들어가면 막힌다.
+       (rules.html 은 ✏️ 검토·개정 — 머리줄 단추로 오가므로 한 파일만 막혀도 앱 안에서 길이 끊긴다) */
+  const portal = R('enter.html');
+  const 줄 = portal.split('\n').find(l => l.indexOf("key:'rules'") >= 0);
+  assert.ok(줄, '★ 포털에 기업규정집 타일이 없다');
+  assert.doesNotMatch(줄, /soon:\s*true/, '★★ 포털 기업규정집 타일이 다시 준비중이다 — 직원이 못 누른다');
+  assert.doesNotMatch(줄, /off:\s*true/, '★★ 포털 기업규정집 타일이 다시 감춰졌다');
+  ['rules-v2.html', 'rules.html'].forEach(f => {
+    assert.doesNotMatch(stripJs(R(f)), /PuGate\.soonUnlessAdmin\(/,
+      '★★ ' + f + ' 안쪽에 준비중 문이 다시 생겼다 — 포털에서는 열리는데 들어가면 막힌다');
+  });
 });
 
 test('⑨★★ 급여관리는 다시 준비중이다 — 대표 「급여관리도 준비중으로」(2026-10-20)', () => {

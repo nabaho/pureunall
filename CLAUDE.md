@@ -56,6 +56,18 @@
 - 새 함수·화면·검사·스크립트 전에 같은 일을 하는 것이 있는지 찾는다(`rg`, `STATUS.md` 「되풀이된 실수」, `status/`). 있으면 그 길을 탄다.
 - 못 찾은 곳은 «못 찾았다»고 밝힌다 — 안 본 것과 없는 것은 다르다.
 
+## 입금자 이름이 사업장과 다르면 «사유 없이는 확정하지 않는다» — 모든 입금 확정 (대표 지시 2026-11-16)
+
+- 다른 사업장 이름·모르는 이름으로 온 돈은 «왜 다른지» 사유를 고른 뒤에만 확정한다. 앱이 스스로 그 사업장에 붙이지 않는다. 화면의 확정 길은 `confirmRowAsk` 하나 — `confirmRow` 를 곧장 부르지 않는다.
+- 그런 돈은 입금자 별칭으로 «배우지» 않는다. 계속 대신 내는 사람은 사람이 «관계 입금자»로 등록한다(사업장 기록 `payerRelations`, 지울 수 있다). CMS 통로·합계 후보 적요는 등록 못 한다.
+- 지킴: `tests/erp-payer-relation.test.js` · 자세히: `docs/규칙/입금-명의-처리.md`
+
+## 카드로 낸 상담료는 «같은 번호로 두 곳에» 적는다 — 입금 줄 · 상담접수 카드 (대표 지시 2026-11-16)
+
+- 상담료 결제 한 줄을 입금 줄(`consultId`·`consultPayId`·`approvalNo`…)과 상담접수 카드(`consultPayments[]`)에 함께 적는다. 카드는 카드사 + 승인번호가 있어야 등록되고, 카드번호는 «끝 네 자리»만 — 전체 번호·유효기간·CVC 는 저장하지 않는다.
+- 카드 승인만 먼저 적으면 `approved`(입금 전 — 받은 돈이 아니다). 정산 입금은 «같은 줄»을 `received` 로 잇는다(두 번 적지 않는다). 후보는 낼 뿐 고르는 것은 사람이다.
+- 지킴: `tests/erp-consult-card.test.js` · 자세히: `docs/규칙/카드-상담료-기록.md`
+
 ## 파이어베이스 보안규칙 — 묻지 않고 내가 콘솔까지 올린다 (대표 지시 2026-09-03)
 
 - 실시간DB: `scripts/make-firebase-rules.js` 만 고치고 `node scripts/rules-deploy.js --deploy` 로 올린 뒤 무엇이 바뀌었는지 보고한다. 더 많은 사람이 보게 되는 변경이면 «어느 칸이 누구에게 보이게 됐는지»를 반드시 적는다.
@@ -69,6 +81,12 @@
 
 - 그것들은 CLAUDE.md 를 안 읽고 AGENTS.md 를 읽는다. 규칙을 고치면 두 파일을 «함께» 고친다. 어긋나면 CLAUDE.md 가 이긴다.
 - 지킴: `tests/agents-md.test.js`(특히 「배포에서 지우는 목록」). Codex 저장소 스킬 자리 `.agents/skills/` 는 배포 게이트에 미리 넣어 두었다.
+
+## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
+
+- 배포 주소는 erp.pureunlabor.co.kr, 홈페이지는 pureunlabor.co.kr. 옛 `nabaho.github.io/pureunall/` 은 301 이라 «동작은 하지만» 새 코드·안내에 쓰지 않는다.
+- 화면은 상대경로만(절대 `/pureunall/` 금지), 서버는 `functions/erp-origins.js` 의 `ERP_ORIGINS`·`ERP_LINK_BASE`·`PUBLIC_HOME` 만 쓴다 — 주소 글자를 새로 박지 않는다.
+- 지킴: `tests/no-hardcoded-old-erp-url.test.js` · 자세히: `docs/규칙/ERP-주소.md`
 
 ## 보안 점검 결과는 공개 저장소에 적지 않는다 (대표 지시 2026-11-15)
 

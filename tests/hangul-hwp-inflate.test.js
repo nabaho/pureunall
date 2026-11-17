@@ -252,7 +252,7 @@ test('★★ 대조: 옛 읽기는 같은 파일에서 문단 일부만 읽는�
   assert.ok(blocks < 3000, '옛 읽기가 전부 읽었다면 이 검사는 고장을 못 잡습니다(' + blocks + ')');
 });
 
-/* ---- 압축 폭탄 막기 (2026-11-09 자동 검토 «중간»: 해제 크기 상한이 없었다) ---- */
+/* ---- 압축 폭탄 방어 (2026-11-09) ---- */
 test('★★★ 압축 폭탄: 상한을 넘으면 «바로» 던진다 — 자체 해제기로 다시 시도하지 않는다', async () => {
   const bomb = zlib.deflateRawSync(Buffer.alloc(40 * 1024 * 1024)); // 40MB 가 수십 KB 로
   assert.ok(bomb.length < 100_000, '시험 자료가 폭탄처럼 압축되지 않았습니다: ' + bomb.length);
@@ -294,7 +294,7 @@ test('★★ 문서 전체 상한: 줄기를 여럿으로 쪼개도 합쳐서 �
   assert.strictEqual(ok.blocks.length, 3000);
 });
 
-/* ---- 재검증 «중간»: 자체 해제기가 «출력 길이»만 막고 버퍼를 상한 밖으로 잡던 것 (2026-11-09) ---- */
+/* ---- 자체 해제기의 버퍼 할당도 상한 안에서 (2026-11-09) ---- */
 function loadSpy(log) {
   const Spy = class extends Uint8Array { constructor(a, b, c) { super(a, b, c); if (typeof a === 'number') log.push(a); } };
   const code = [oneLine(/const MAX_INFLATE_STREAM = [^\n]*/), oneLine(/const tooBig = [^\n]*/), cutFn(CODE, 'function inflateRawJs(')].join('\n');
@@ -302,12 +302,12 @@ function loadSpy(log) {
 }
 const biggest = log => log.reduce((a, b) => Math.max(a, b), 0);
 
-test('★★★ 자체 해제기는 첫 버퍼를 상한 안에서만 잡는다 — 빈 압축 뒤에 큰 자투리를 붙여도 입력 길이의 4배를 잡지 않는다', () => {
+test('★★★ 자체 해제기는 첫 버퍼를 상한 안에서만 잡는다 — 입력이 커도 상한 밖으로 잡지 않는다', () => {
   const log = [];
   const inflateRawJs = loadSpy(log);
   const LIMIT = 5000;
   const empty = zlib.deflateRawSync(Buffer.alloc(0));
-  const src = new Uint8Array(Buffer.concat([empty, Buffer.alloc(1024 * 1024, 9)])); // 입력 1MB → 옛 코드는 4MB 를 한꺼번에 잡았다
+  const src = new Uint8Array(Buffer.concat([empty, Buffer.alloc(1024 * 1024, 9)])); // 입력 1MB
   const out = inflateRawJs(src, LIMIT);
   assert.strictEqual(out.length, 0, '빈 압축은 빈 결과');
   assert.ok(biggest(log) <= LIMIT, '버퍼를 ' + biggest(log) + ' 바이트 잡았습니다(상한 ' + LIMIT + ')');

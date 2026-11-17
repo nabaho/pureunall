@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Android 13+ 테마 아이콘(단색) 대응 -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M39,36 L69,36 A1.5,1.5 0 0 1 70.5,37.5 L70.5,38 A1.5,1.5 0 0 1 69,39.5 L39,39.5 A1.5,1.5 0 0 1 37.5,38 L37.5,37.5 A1.5,1.5 0 0 1 39,36 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M39,50 L69,50 A1.5,1.5 0 0 1 70.5,51.5 L70.5,52 A1.5,1.5 0 0 1 69,53.5 L39,53.5 A1.5,1.5 0 0 1 37.5,52 L37.5,51.5 A1.5,1.5 0 0 1 39,50 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M43.5,38 L47,38 L47,51.5 L43.5,51.5 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M61,38 L64.5,38 L64.5,51.5 L61,51.5 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M39,61 L69,61 A1.5,1.5 0 0 1 70.5,62.5 L70.5,63 A1.5,1.5 0 0 1 69,64.5 L39,64.5 A1.5,1.5 0 0 1 37.5,63 L37.5,62.5 A1.5,1.5 0 0 1 39,61 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M52,63 L56,63 L56,71.5 A1.5,1.5 0 0 1 54.5,73 L53.5,73 A1.5,1.5 0 0 1 52,71.5 Z" />
+</vector>

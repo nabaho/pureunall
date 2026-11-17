@@ -133,8 +133,10 @@ test('★★ base 를 끼운다 — 안 끼우면 그림·스타일이 통째로
   assert.match(b, /<base href=/, '★ base 를 안 만든다');
   assert.match(b, /<head/, '★ 머리에 안 끼운다 — 몸통에 넣으면 늦다');
 
+  /* (2026-11-16) 미리보기는 sandbox 로 스크립트를 막은 «미리보기문서»로 그린다 — 그 문서가 base 를 끼운다 */
   const p = 함수('prevHtml');
-  assert.match(p, /base끼우기\(/, '★★ 미리보기가 base 없이 그린다 — 그림이 다 깨진다');
+  assert.match(p, /미리보기문서\(/, '★★ 미리보기가 base 없이 그린다 — 그림이 다 깨진다');
+  assert.match(함수('미리보기문서'), /base끼우기\(html, *b\)/, '★★ 미리보기문서가 base 를 안 끼운다');
 });
 
 test('★★ 바탕(base)은 «그 HTML 이 온 곳»을 가리킨다', () => {
@@ -176,7 +178,7 @@ test('★★ 바탕(base)은 «그 HTML 이 온 곳»을 가리킨다', () => {
     '★★ 쪽 바탕을 우리 사본으로 잡았다 — 뿌리부터 쓰는 주소가 다 404 가 되어 민무늬가 된다');
   assert.match(m, /사본바탕\('people'\)/, '★ 구성원 바탕이 우리 사본이 아니다');
 
-  assert.match(함수('prevHtml'), /base끼우기\(r\.html, *r\.바탕\)/,
+  assert.match(함수('prevHtml'), /미리보기문서\(r\.html, *r\.바탕\)/,
     '★★ 틀에 바탕을 안 넘긴다 — 넘기지 않으면 민무늬로 나온다');
 });
 

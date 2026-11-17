@@ -297,6 +297,953 @@ test('⑤ 내장된 공공임단협 데이터(pu-alio-data.js)에 중앙공공�
   assert.ok(Array.isArray(dataMod.unions) && dataMod.unions.length >= 1900, '중앙+지방 노동조합 행이 1,900개 이상이어야 합니다');
   assert.ok(Array.isArray(dataMod.disclosures) && dataMod.disclosures.length >= 4000, '중앙+지방 공시·협약·규정 목록이 4,000건 이상이어야 합니다');
   assert.ok(Array.isArray(dataMod.metrics) && dataMod.metrics.length >= 900, '단체협약 13대 핵심 쟁점 지표가 900건 이상이어야 합니다');
-  assert.ok(Array.isArray(dataMod.articles) && dataMod.articles.length >= 900, '구조화 단협 조문 데이터가 900건 이상이어야 합니다');
-  assert.ok(dataMod.revisions && Object.keys(dataMod.revisions).length >= 300, '과거 임단협 vs 현행 임단협 비교(revisions) 대상 기관이 300곳 이상이어야 합니다');
+  assert.ok(Array.isArray(dataMod.articles) && dataMod.articles.length >= 1400, '구조화 단협 조문 데이터가 1,400건 이상이어야 합니다');
+  const localArts = dataMod.articles.filter((a) => String(a.apba_id || '').startsWith('L_'));
+  assert.ok(localArts.length >= 500, '지방공공기관·유관기관 단협 및 사규 조문이 500개 이상 수록되어야 합니다');
+  assert.ok(dataMod.revisions && Object.keys(dataMod.revisions).length >= 380, '과거 임단협 vs 현행 임단협 비교(revisions) 대상 기관이 380곳 이상이어야 합니다');
 });
+
+test('⑥ 지방공기업평가원(L_ERC) 및 행안부 산하 지방유관기관(KLID·KRILA·KILF·LOFA·POBA) 6곳이 모두 수록되고, openCleaneyeDirect로 클린아이(지방공기업·출자출연기관) POST 직결 및 평가원 원문 연결이 정확히 작동한다', () => {
+  const moisAids = ['L_ERC', 'L_KLID', 'L_KRILA', 'L_KILF', 'L_LOFA', 'L_POBA'];
+  for (const maid of moisAids) {
+    const inst = dataMod.institutions.find((i) => i && i.apba_id === maid);
+    assert.ok(inst, `${maid} 기관이 institutions에 수록되어야 합니다`);
+    const uList = dataMod.unions.filter((u) => u && u.apba_id === maid);
+    assert.ok(uList.length >= 1, `${maid} 노동조합 현황이 unions에 수록되어야 합니다`);
+    const dList = dataMod.disclosures.filter((d) => d && d.aid === maid);
+    assert.ok(dList.length >= 2, `${maid} 공시·협약·규정이 disclosures에 2건 이상 수록되어야 합니다`);
+    assert.ok(dataMod.revisions[maid] && dataMod.revisions[maid].length >= 1, `${maid} 과거↔현행 개정 비교(revisions)가 수록되어야 합니다`);
+    const aList = dataMod.articles.filter((a) => a && a.apba_id === maid);
+    assert.ok(aList.length >= 2, `${maid} 조문 데이터가 articles에 수록되어야 합니다`);
+  }
+
+  let submittedForms = [];
+  let openedUrls = [];
+  let shouldThrowOnSubmit = false;
+  const sandbox = {
+    window: {},
+    PU_ALIO_DATA: dataMod,
+    open: (url, target, specs) => {
+      openedUrls.push({ url, target, specs });
+      return { closed: false, opener: {} };
+    },
+    document: {
+      head: { appendChild: () => {} },
+      body: {
+        appendChild: () => {},
+        removeChild: () => {}
+      },
+      createElement: (tag) => {
+        const children = [];
+        const el = {
+          tagName: String(tag || '').toUpperCase(),
+          method: '',
+          action: '',
+          target: '',
+          style: {},
+          parentNode: null,
+          appendChild: (c) => { children.push(c); },
+          submit: () => {
+            if (shouldThrowOnSubmit) {
+              throw new Error('FORM_SUBMIT_BLOCKED');
+            }
+            submittedForms.push({
+              method: el.method,
+              action: el.action,
+              target: el.target,
+              inputs: Object.fromEntries(children.map((c) => [c.name, c.value]))
+            });
+          }
+        };
+        return el;
+      },
+      getElementById: () => null,
+      addEventListener: () => {}
+    },
+    URL
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+
+  // 1) 지방공기업(광주교통공사 L_2007100231 · 도시철도공사 006001) 클린아이 POST 직결 검증
+  const resEmp = sandbox.PuAlioUnion.openCleaneyeDirect('L_2007100231', 'union_info');
+  assert.equal(resEmp.mode, 'POST');
+  assert.equal(resEmp.url, 'https://www.cleaneye.go.kr/user/empWorkUnionInfo.do');
+  assert.equal(resEmp.fields.entId, '2007100231');
+  assert.equal(resEmp.fields.entKind, '006001');
+  assert.equal(resEmp.fields.itemId, 'workUnionInfo');
+  assert.equal(resEmp.fields.itemNo, '14_2');
+  assert.equal(submittedForms.length, 1);
+  assert.equal(submittedForms[0].action, 'https://www.cleaneye.go.kr/user/empWorkUnionInfo.do');
+  assert.equal(submittedForms[0].inputs.entId, '2007100231');
+
+  // 2) 지방출자·출연기관(L_B000013) 클린아이 POST 직결 검증 (내부규정·정관 rules 포함)
+  const resIpt = sandbox.PuAlioUnion.openCleaneyeDirect('L_B000013', 'union_info');
+  assert.equal(resIpt.mode, 'POST');
+  assert.equal(resIpt.url, 'https://www.cleaneye.go.kr/user/iptUnionCnvt.do');
+  assert.equal(resIpt.fields.entId, 'B000013');
+  assert.equal(resIpt.fields.itemId, 'iptUnionCnvt');
+  assert.equal(resIpt.fields.itemNo, '90_25');
+
+  const resIptRules = sandbox.PuAlioUnion.openCleaneyeDirect('L_B000013', 'rules');
+  assert.equal(resIptRules.mode, 'POST');
+  assert.equal(resIptRules.url, 'https://www.cleaneye.go.kr/user/iptSuOrdinance.do');
+  assert.equal(resIptRules.fields.itemNo, '90_40');
+
+  // 3) 지방공기업평가원(L_ERC), 한국지역정보개발원(L_KLID), 대한지방행정공제회(L_POBA) 세부 공시 URL 연결 검증
+  const resErc = sandbox.PuAlioUnion.openCleaneyeDirect('L_ERC', 'manual');
+  assert.equal(resErc.mode, 'URL');
+  assert.match(resErc.url, /erc\.re\.kr.*BBSMSTR_000000000571/);
+  const resKlid = sandbox.PuAlioUnion.openCleaneyeDirect('L_KLID', 'union_info');
+  assert.equal(resKlid.mode, 'URL');
+  assert.match(resKlid.url, /klid\.or\.kr.*workjoin_disc_s2/);
+  const resPobaLabor = sandbox.PuAlioUnion.openCleaneyeDirect('L_POBA', 'union_info');
+  assert.equal(resPobaLabor.mode, 'URL');
+  assert.match(resPobaLabor.url, /poba\.or\.kr\/mno\/mno01\/mno0102\/mno010201#tab1-9/);
+  const resPobaRules = sandbox.PuAlioUnion.openCleaneyeDirect('L_POBA', 'rules');
+  assert.equal(resPobaRules.mode, 'URL');
+  assert.match(resPobaRules.url, /poba\.or\.kr\/mno\/mno01\/mno0106\/mno010601/);
+
+  // 4) 잘못된 기관코드 또는 빈 값 전달 시 ERROR 반환 및 창 미오픈 검증, form.submit 예외 시 ERROR 반환 검증
+  const urlCountBeforeErr = openedUrls.length;
+  const formCountBeforeErr = submittedForms.length;
+  const resEmpty = sandbox.PuAlioUnion.openCleaneyeDirect('', 'union_info');
+  assert.equal(resEmpty.mode, 'ERROR');
+  const resInvalid = sandbox.PuAlioUnion.openCleaneyeDirect('UNKNOWN_INVALID_ID', 'union_info');
+  assert.equal(resInvalid.mode, 'ERROR');
+  assert.equal(openedUrls.length, urlCountBeforeErr);
+  assert.equal(submittedForms.length, formCountBeforeErr);
+
+  shouldThrowOnSubmit = true;
+  const resSubmitFail = sandbox.PuAlioUnion.openCleaneyeDirect('L_2007100231', 'union_info');
+  assert.equal(resSubmitFail.mode, 'ERROR');
+  assert.match(resSubmitFail.error, /FORM_SUBMIT_BLOCKED/);
+  shouldThrowOnSubmit = false;
+
+  // 5) L_ERC 타임라인에서 경영평가편람·인사조직지침이 RULE 분류로 정확히 매핑되는지 검증
+  const ercTl = sandbox.PuAlioUnion.buildOrganTimeline(dataMod, 'L_ERC');
+  const manualTl = ercTl.find((t) => t.id === 'ERC_DISC_MANUAL_2026');
+  const guideTl = ercTl.find((t) => t.id === 'ERC_DISC_GUIDELINE_2026');
+  assert.ok(manualTl && manualTl.catGroup === 'RULE', '경영평가편람이 RULE 분류로 매핑되어야 합니다');
+  assert.ok(guideTl && guideTl.catGroup === 'RULE', '인사조직지침이 RULE 분류로 매핑되어야 합니다');
+
+  // 6) safeHttpUrl 도메인 허용 검증 (erc.re.kr, klid.or.kr, krila.re.kr, kilf.re.kr, lofa.or.kr, poba.or.kr)
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.erc.re.kr/usr/com/prm/ContentView.do?cId=1'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.klid.or.kr/open/bbsDisc.do?PID=workjoin_disc_s2'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.krila.re.kr/disclosure/labor.php'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.kilf.re.kr/cmm/fms/FileDown.do?atchFileId=1'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.lofa.or.kr/subList/20000000223'));
+  assert.ok(sandbox.PuAlioUnion.safeHttpUrl('https://www.poba.or.kr/mno/mno01/mno0102/mno010201#tab1-9'));
+});
+
+test('⑦ 기관 중심 마스터 인덱스(1기관=1통합뷰), 기관 내부 6대 핵심 영역 집계, 법정 타임오프 한도 계산 및 SVG 비교 그래프(레이더·산점도)가 정확히 동작한다', () => {
+  const sandbox = {
+    window: {},
+    PU_ALIO_DATA: dataMod,
+    document: { addEventListener: () => {}, getElementById: () => null, head: { appendChild: () => {} } },
+    URL
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+
+  // 1) 노조법 제24조 근로시간면제 법정 한도 계산 검증
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(0), 0);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(50), 2000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(150), 3000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(500), 6000);
+  assert.equal(sandbox.PuAlioUnion.calcLegalTimeoffLimit(3200), 14000);
+
+  // 2) 기관 중심 마스터 인덱스(buildOrganMasterIndex) 중복 없는 1기관=1레코드 통합 검증
+  const master = sandbox.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  assert.equal(master.records.length, dataMod.institutions.length, '전체 기관이 중복 없이 정확히 1기관=1통합레코드로 생성되어야 합니다');
+  const seenIds = new Set();
+  for (const r of master.records) {
+    assert.equal(seenIds.has(r.aid), false, `기관코드 ${r.aid}가 마스터 목록에 중복되면 안 됩니다`);
+    seenIds.add(r.aid);
+    assert.equal(r.radar.length, 6, `${r.aid}의 6축 프로파일 점수가 6개여야 합니다`);
+    assert.equal(Object.keys(r.issueScores).length, 13, `${r.aid}의 13대 핵심 쟁점 표준화 점수가 모두 산출되어야 합니다`);
+  }
+
+  // 복수노조 기관(예: 우체국물류지원단)이 여러 줄로 쪼개지지 않고 1개 기관 아래 복수 노조 배열로 묶였는지 검증
+  const multiOrgan = master.records.find((r) => r.name.includes('우체국물류지원단'));
+  assert.ok(multiOrgan, '우체국물류지원단이 마스터 인덱스에 존재해야 합니다');
+  assert.equal(multiOrgan.isMulti, true, '우체국물류지원단은 복수노조 기관으로 분류되어야 합니다');
+  assert.ok(multiOrgan.unions.length >= 4, '우체국물류지원단 산하 복수 단위노조들이 하나의 기관 레코드 안에 통합되어야 합니다');
+  assert.ok(multiOrgan.memberTotal >= 3000, '산하 복수노조 조합원 수가 기관 단위로 합산되어야 합니다');
+
+  // 지방공기업평가원(L_ERC) 및 강원랜드(C0005)의 내부 6대 핵심 영역 데이터 보유 검증
+  const c0005 = master.byId.C0005;
+  assert.ok(c0005 && c0005.hasUnion, 'C0005(강원랜드) 마스터 레코드가 존재해야 합니다');
+  assert.ok(c0005.domains.caDiscs.length >= 1, 'C0005 단체협약 영역 문서가 집계되어야 합니다');
+  assert.ok(c0005.domains.revisions.length >= 1, 'C0005 과거↔현행 개정 비교 데이터가 집계되어야 합니다');
+
+  const erc = master.byId.L_ERC;
+  assert.ok(erc && erc.hasUnion, 'L_ERC(지방공기업평가원) 마스터 레코드가 존재해야 합니다');
+  assert.ok(erc.domains.ruleDiscs.length >= 2, 'L_ERC 내부규정·경영평가편람 영역 문서가 집계되어야 합니다');
+
+  // 3) 업종별·전체 평균 벤치마크 및 순수 SVG 비교 차트 생성 검증
+  assert.ok(master.benchmarks && master.benchmarks.ALL && master.benchmarks.ALL.radar.length === 6);
+  const cmpSample = [c0005, multiOrgan, erc];
+  const radarHtml = sandbox.PuAlioUnion.renderRadarChartSvg(cmpSample, master.benchmarks.ALL);
+  assert.match(radarHtml, /<svg[^>]*aria-label="기관 6축 프로파일 레이더 비교 그래프"/);
+  assert.match(radarHtml, /강원랜드/);
+  assert.match(radarHtml, /지방공기업평가원/);
+
+  const scatterHtml = sandbox.PuAlioUnion.renderScatterTimeoffSvg(master.records.slice(0, 80), cmpSample);
+  assert.match(scatterHtml, /<svg[^>]*aria-label="조합원 규모 대비 타임오프 산점도 및 법정한도선"/);
+  assert.match(scatterHtml, /노조법 법정상한/);
+
+  // 4) 빈 배열(institutions: []) 데이터에서도 buildOrganMasterIndex가 예외 없이 동작하는지 검증
+  const emptyMaster = sandbox.PuAlioUnion.buildOrganMasterIndex({ institutions: [], unions: [], disclosures: [], metrics: [], articles: [], revisions: {} });
+  assert.equal(emptyMaster.records.length, 0);
+  assert.equal(emptyMaster.benchmarks.ALL.radar.length, 6);
+});
+
+test('⑧ 상단 헤더·탭 중복 제거(4개 핵심 탭 + 우측 API 유틸 탭), 탭 2 3×2 격자 및 서브탭 전환, 조문·원문 통합 토글(docMode), 입력창 플레이스홀더 간결화가 적용되어 있다', () => {
+  assert.match(uiSrc, /data-tab="unions"[^>]*>🏛️ 기관 목록<\/button>/);
+  assert.match(uiSrc, /data-tab="organ"[^>]*>🔎 기관 상세<\/button>/);
+  assert.match(uiSrc, /data-tab="matrix"[^>]*>📊 비교분석<\/button>/);
+  assert.match(uiSrc, /data-tab="articles"[^>]*>📚 조문·원문<\/button>/);
+  assert.match(uiSrc, /class="pau-tab util[^"]*"[^>]*data-tab="apihub"[^>]*>🔌 API<\/button>/);
+  assert.doesNotMatch(uiSrc, /data-tab="detail"/, '기존 5번 원문 탭은 4번 조문·원문 탭 내부 토글(docMode)로 통합되어야 합니다');
+
+  // 탭 2 5+1 고립 카드를 막기 위해 데스크톱 3열 고정 격자가 선언되어 있는지 검증
+  assert.match(uiSrc, /\.pau-dom-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(uiSrc, /\.pau-root input::placeholder\{font-size:13px/);
+  assert.doesNotMatch(uiSrc, /기관명·시도·부처 빠른 검색\.\.\./, '잘림을 유발하던 긴 검색창 플레이스홀더가 제거되어야 합니다');
+  assert.match(uiSrc, /data-doc-mode="ARTICLES"/);
+  assert.match(uiSrc, /data-doc-mode="DISC"/);
+  assert.match(uiSrc, /data-h-sub="HISTORY"/);
+  assert.match(uiSrc, /data-h-sub="PEERS"/);
+  assert.match(uiSrc, /data-h-sub="CHART"/);
+});
+
+test('⑨ 지자체 약칭·다중어 스마트 검색(충남→천안도시공사 등 105곳), 본청·시군구 소속 분류, 지역·지자체 산하기관 전수 비교(REGION 모드) 및 한글 IME 비파괴 부분 갱신이 동작한다', () => {
+  const sandbox = { URL, URLSearchParams };
+  sandbox.window = sandbox;
+  vm.runInNewContext(uiSrc, sandbox);
+  const api = sandbox.PuAlioUnion;
+
+  const master = api.buildOrganMasterIndex(dataMod);
+  const localAffils = master.records.filter((r) => !!r.provinceKey);
+  assert.ok(localAffils.length >= 1300, '16개 시·도 지방산하기관이 provinceKey로 매핑되어야 합니다');
+
+  // 충청남도 산하기관 및 약칭("충남") 검색 검증
+  const chungnamAll = master.records.filter((r) => r.provinceKey === '충청남도');
+  assert.ok(chungnamAll.length >= 100, '충청남도 산하기관 100곳 이상이 빠짐없이 분류되어야 합니다');
+  const chungnamSearched = master.records.filter((r) => api.matchSmartQuery(r.searchHaystack, '충남'));
+  assert.ok(chungnamSearched.length >= chungnamAll.length, '약칭 "충남" 검색 시 천안도시공사 등 충청남도 산하기관 전체가 검색되어야 합니다');
+
+  const cheonanCorp = chungnamAll.find((r) => r.name.includes('천안도시공사'));
+  assert.ok(cheonanCorp, '천안도시공사가 충청남도 산하기관에 포함되어야 합니다');
+  assert.equal(cheonanCorp.muniName, '천안시', '천안도시공사의 기초지자체는 천안시로 분류되어야 합니다');
+  assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 공사'), true, '공백 다중 키워드("충남 공사") AND 검색이 일치해야 합니다');
+  assert.equal(api.matchSmartQuery(cheonanCorp.searchHaystack, '충남 수원'), false, '불일치 키워드가 포함되면 제외되어야 합니다');
+
+  // 도립 의료원(천안의료원·전라남도순천의료원) 및 경기·제주·전남·광주 본청/자치구 산하 분류 정밀 검증
+  const cheonanMed = chungnamAll.find((r) => r.name.includes('천안의료원'));
+  assert.ok(cheonanMed, '천안의료원이 존재해야 합니다');
+  assert.equal(cheonanMed.muniName, '충남 본청', '도립 천안의료원은 충남 본청 산하로 분류되어야 합니다');
+
+  const suncheonMed = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전라남도순천의료원'));
+  assert.ok(suncheonMed, '전라남도순천의료원이 존재해야 합니다');
+  assert.equal(suncheonMed.muniName, '전남 본청', '도립 전라남도순천의료원은 전남 본청 산하로 분류되어야 합니다');
+
+  const gangjinMed = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전라남도강진의료원'));
+  assert.ok(gangjinMed, '전라남도강진의료원이 존재해야 합니다');
+  assert.equal(gangjinMed.muniName, '전남 본청', '도립 전라남도강진의료원은 전남 본청 산하로 분류되어야 합니다');
+
+  const jejuDev = master.records.find((r) => r.provinceKey === '제주특별자치도' && r.name.includes('제주특별자치도개발공사'));
+  assert.ok(jejuDev, '제주특별자치도개발공사가 존재해야 합니다');
+  assert.equal(jejuDev.muniName, '제주 본청', '제주특별자치도개발공사는 제주 본청으로 분류되어야 합니다');
+
+  const gwangjuTraffic = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('광주교통공사'));
+  assert.ok(gwangjuTraffic, '광주교통공사가 존재해야 합니다');
+  assert.equal(gwangjuTraffic.muniName, '광주 본청', '광주교통공사는 광주 본청으로 분류되어야 합니다');
+
+  const jeonnamDev = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('전남개발공사'));
+  assert.ok(jeonnamDev, '전남개발공사가 존재해야 합니다');
+  assert.equal(jeonnamDev.muniName, '전남 본청', '전남개발공사는 전남 본청으로 분류되어야 합니다');
+
+  const gyeonggiPort = master.records.find((r) => r.provinceKey === '경기도' && r.name.includes('경기평택항만공사'));
+  assert.ok(gyeonggiPort, '경기평택항만공사가 존재해야 합니다');
+  assert.equal(gyeonggiPort.muniName, '경기 본청', '도립 경기평택항만공사는 경기 본청으로 분류되어야 합니다');
+
+  const suwonWorldcup = master.records.find((r) => r.provinceKey === '경기도' && r.name.includes('경기도수원월드컵경기장'));
+  assert.ok(suwonWorldcup, '경기도수원월드컵경기장관리재단이 존재해야 합니다');
+  assert.equal(suwonWorldcup.muniName, '경기 본청', '도립 경기도수원월드컵경기장관리재단은 경기 본청으로 분류되어야 합니다');
+
+  const gwangjuDonggu = master.records.find((r) => r.provinceKey === '전남광주통합특별시' && r.name.includes('동구'));
+  assert.ok(gwangjuDonggu, '광주 동구 산하기관이 존재해야 합니다');
+  assert.equal(gwangjuDonggu.muniName, '광주 동구', '광주광역시 동구 산하기관은 광주 동구로 분류되어야 합니다');
+
+  // 지역별 벤치마크, 보안 URL 제한(https 전용) 및 REGION 모드 UI 구성요소 존재 검증
+  assert.ok(master.benchmarks.LOCAL_ALL && master.benchmarks.LOCAL_ALL.totalOrgans >= 1300 && master.benchmarks.LOCAL_ALL.count > 300);
+  assert.ok(master.benchmarks.byProvince['충청남도'] && master.benchmarks.byProvince['충청남도'].totalOrgans >= 100 && master.benchmarks.byProvince['충청남도'].count >= 15);
+  assert.equal(api.inferProvinceFromQuery('충남 기관'), '충청남도');
+  assert.equal(api.safeHttpUrl('http://www.alio.go.kr/test'), '', '비암호화 http:// URL은 차단되어야 합니다');
+  assert.match(uiSrc, /data-m-submode="REGION"[^>]*>🗺️ 지역산하비교<\/button>/);
+  assert.match(uiSrc, /aria-pressed="/);
+  assert.match(uiSrc, /noopener noreferrer/);
+  assert.match(uiSrc, /data-m-reg-dyn/);
+  assert.match(uiSrc, /compositionend/, '한글 IME 자모 조합 보호를 위한 compositionend 처리가 포함되어야 합니다');
+
+  // 코드 내 issueScores.<key> 참조가 모두 실제 산출된 13대 지표 키와 일치하는지 정적·동적 교차 검증
+  const sampleScores = cheonanCorp.issueScores;
+  const referencedScoreKeys = [...uiSrc.matchAll(/\.issueScores\.([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
+  assert.ok(referencedScoreKeys.length > 0);
+  for (const k of referencedScoreKeys) {
+    assert.ok(sampleScores[k] && typeof sampleScores[k].tag === 'string', `issueScores.${k} 키가 실제 METRIC_DEFS 산출물에 존재해야 합니다`);
+  }
+});
+
+test('⑩ URL 딥링크(?region=충남&muni=천안시, ?compare=중복제거, ?tab=articles&doc=DISC) 및 서브모드 전환 시 history.replaceState 상태 동기화가 정확히 동작한다', () => {
+  function runWithUrl(initialSearch) {
+    const replacedUrls = [];
+    const loc = {
+      protocol: 'https:',
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch,
+      hash: ''
+    };
+
+    function makeNode(tag) {
+      const attrs = {};
+      const listeners = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const cmpTrayEl = makeNode('DIV');
+    const subModeAllListBtn = makeNode('BUTTON');
+    subModeAllListBtn.setAttribute('data-m-submode', 'ALL_LIST');
+    bodyEl.querySelectorAll = (sel) => {
+      if (sel === '[data-m-submode]') return [subModeAllListBtn];
+      return [];
+    };
+
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          replacedUrls.push(url);
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+    return { root, bodyEl, subModeAllListBtn, loc, replacedUrls };
+  }
+
+  // 1) ?sso=1&region=충남&muni=천안시 진입 시 REGION 모드(충청남도·천안시)로 열리고, ALL_LIST로 전환하면 region/muni가 정리되며 sso=1은 보존됨
+  const r1 = runWithUrl('?sso=1&region=%EC%B6%A9%EB%82%A8&muni=%EC%B2%9C%EC%95%88%EC%8B%9C');
+  assert.match(r1.bodyEl.innerHTML, /천안도시공사/, '천안시 산하기관이 초기 렌더링되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /sso=1/, '포털 기존 쿼리(sso=1)는 유지되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /region=충청남도/, '약칭 충남이 정규 광역키 충청남도로 URL 동기화되어야 합니다');
+  assert.match(decodeURIComponent(r1.loc.search), /muni=천안시/, '유효 기초지자체 천안시가 URL에 유지되어야 합니다');
+
+  r1.subModeAllListBtn.trigger('click');
+  const afterAllList = decodeURIComponent(r1.loc.search);
+  assert.doesNotMatch(afterAllList, /region=/, 'ALL_LIST 전환 후 이전 region 파라미터가 남아있으면 안 됩니다');
+  assert.doesNotMatch(afterAllList, /muni=/, 'ALL_LIST 전환 후 이전 muni 파라미터가 남아있으면 안 됩니다');
+  assert.match(afterAllList, /sso=1/, 'ALL_LIST 전환 후에도 sso=1은 보존되어야 합니다');
+  assert.match(afterAllList, /mode=ALL_LIST/, 'ALL_LIST 상태가 URL에 기록되어야 합니다');
+
+  // 2) ?compare=C0005,C0005,L_ERC 진입 시 중복 기관코드(C0005)가 자동 제거되어 고유 2개만 반영됨
+  const r2 = runWithUrl('?compare=C0005,C0005,L_ERC');
+  assert.equal(decodeURIComponent(r2.loc.search), '?compare=C0005,L_ERC', '중복 compare 기관코드가 제거되어야 합니다');
+
+  // 3) ?tab=articles&doc=DISC 진입 시 공시·사규 원문 모드로 직결되고 새로고침 URL도 유지됨
+  const r3 = runWithUrl('?tab=articles&doc=DISC');
+  assert.match(r3.bodyEl.innerHTML, /공시항목 분류/, 'doc=DISC 진입 시 공시·사규 원문 화면이 렌더링되어야 합니다');
+  assert.equal(decodeURIComponent(r3.loc.search), '?tab=articles&doc=DISC');
+});
+
+test('⑪ 기관 목록 상단 바 빠른 정렬(data-u-sort) 및 전 목록 표 머리글(data-th-sort) 클릭 오름차순·내림차순(▲/▼) 정렬이 정확히 동작한다', () => {
+  function mountTestable(initialSearch) {
+    const loc = {
+      protocol: 'https:',
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch || '',
+      hash: ''
+    };
+    const sortSelectNode = {
+      tagName: 'SELECT',
+      value: 'members_desc',
+      listeners: {},
+      addEventListener(ev, fn) { this.listeners[ev] = fn; },
+      focus() {}
+    };
+    function makeNode(tag) {
+      const attrs = {};
+      const listeners = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const uDynNode = makeNode('DIV');
+    const moreFltBtn = makeNode('BUTTON');
+    bodyEl.querySelector = (sel) => {
+      if (sel === '[data-u-sort]') return sortSelectNode;
+      if (sel === '[data-u-dyn]') return uDynNode;
+      if (sel === '[data-toggle-more-flt]') return moreFltBtn;
+      return null;
+    };
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    function clickHeaderSort(colId) {
+      const thBtn = {
+        getAttribute: (k) => (k === 'data-th-sort' ? colId : ''),
+        focus: () => {}
+      };
+      bodyEl.trigger('click', {
+        preventDefault: () => {},
+        target: {
+          closest: (sel) => (sel === '[data-th-sort]' ? thBtn : null)
+        }
+      });
+    }
+
+    function extractRowOrganIds(html) {
+      const tbodyMatch = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+      if (!tbodyMatch) return [];
+      return [...tbodyMatch[1].matchAll(/data-jump-organ="([^"]+)"/g)].map((m) => m[1].trim());
+    }
+
+    return { bodyEl, uDynNode, moreFltBtn, sortSelectNode, clickHeaderSort, extractRowOrganIds };
+  }
+
+  const master = (() => {
+    const sb = { URL, URLSearchParams };
+    sb.window = sb;
+    vm.runInNewContext(uiSrc, sb);
+    return sb.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  })();
+
+  // 1) 탭 1 기관 목록 초기 렌더링 시 상단 바 빠른 정렬(data-u-sort)과 클릭형 열 머리글(data-th-sort) 및 aria-sort="descending" 확인
+  const t1 = mountTestable('');
+  assert.match(t1.bodyEl.innerHTML, /data-u-sort/, '페이지네이션 상단 바에 빠른 정렬 드롭다운(data-u-sort)이 즉시 노출되어야 합니다');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_members"/, '초기 조합원 열 머리글이 내림차순(descending) 활성 상태여야 합니다');
+  const descIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(descIds.length >= 10);
+  assert.ok(master.byId[descIds[0]].memberTotal >= master.byId[descIds[1]].memberTotal, '초기 조합원 내림차순이 적용되어야 합니다');
+
+  // 2) 조합원 열 머리글(u_members) 클릭 시 오름차순(members_asc) 전환 — 미설립(—) 기관이 아니라 최소 규모 노조보유 기관이 먼저 나와야 함
+  t1.clickHeaderSort('u_members');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="u_members"/, 'u_members 클릭 후 오름차순(ascending)으로 전환되어야 합니다');
+  const ascIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.notEqual(ascIds[0], descIds[0], '오름차순 전환 시 첫 번째 행 기관이 바뀌어야 합니다');
+  const firstAscRec = master.byId[ascIds[0]];
+  assert.ok(firstAscRec && firstAscRec.hasUnion && firstAscRec.memberTotal >= 1, '조합원 적은순(▲) 정렬 시 미설립(—)이나 0명 노조가 아닌 실제 1명 이상 노조보유 기관이 상위에 표시되어야 합니다');
+  assert.ok(firstAscRec.memberTotal <= master.byId[ascIds[1]].memberTotal, '조합원 오름차순이 정확히 적용되어야 합니다');
+
+  // 3) 기관명 열 머리글(u_name) 클릭 시 가나다 오름차순(▲) → 재클릭 시 역순 내림차순(▼) 전환 검증
+  t1.clickHeaderSort('u_name');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="u_name"/);
+  const nameAscIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(master.byId[nameAscIds[0]].name.localeCompare(master.byId[nameAscIds[1]].name, 'ko') <= 0, '기관명 가나다 오름차순이 적용되어야 합니다');
+
+  t1.clickHeaderSort('u_name');
+  assert.match(t1.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_name"/);
+  const nameDescIds = t1.extractRowOrganIds(t1.bodyEl.innerHTML);
+  assert.ok(master.byId[nameDescIds[0]].name.localeCompare(master.byId[nameDescIds[1]].name, 'ko') >= 0, '기관명 재클릭 시 가나다 역순(내림차순)이 적용되어야 합니다');
+
+  // 4) 상단 바 빠른 정렬 드롭다운(data-u-sort) 변경 시 즉시 반영 및 상세필터 배지 동기화 검증
+  t1.sortSelectNode.value = 'score_desc';
+  t1.sortSelectNode.listeners.change();
+  assert.match(t1.uDynNode.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="u_domains"/, '종합점수 높은순 선택 시 6대영역 열 머리글이 내림차순 표시로 동기화되어야 합니다');
+  assert.match(t1.moreFltBtn.textContent, /\(1\)/, '상단 빠른 정렬 변경 시 상세필터 활성 개수 배지도 즉시 갱신되어야 합니다');
+  const scoreDescIds = t1.extractRowOrganIds(t1.uDynNode.innerHTML);
+  assert.ok(master.byId[scoreDescIds[0]].totalScore >= master.byId[scoreDescIds[1]].totalScore, '종합점수 내림차순 정렬이 정확히 적용되어야 합니다');
+
+  // 5) 지역산하비교(REGION), 13대쟁점목록(ALL_LIST), 단협조문(ARTICLES), 공시원문(DISC) 열 머리글 정렬 동작 검증
+  const tReg = mountTestable('?region=%EC%B6%A9%EB%82%A8');
+  assert.match(tReg.bodyEl.innerHTML, /data-r-sort/);
+  tReg.clickHeaderSort('r_score');
+  assert.match(tReg.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="r_score"/);
+
+  const tAllList = mountTestable('?tab=matrix&mode=ALL_LIST');
+  tAllList.clickHeaderSort('m_name');
+  assert.match(tAllList.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="m_name"/);
+
+  const tArt = mountTestable('?tab=articles');
+  tArt.clickHeaderSort('a_no');
+  assert.match(tArt.bodyEl.innerHTML, /aria-sort="ascending"[^>]*><button[^>]*data-th-sort="a_no"/);
+  const artNos = [...tArt.bodyEl.innerHTML.matchAll(/<td style="font-weight:700;">제?(\d+)조?/g)].map((m) => Number(m[1]));
+  assert.ok(artNos.length >= 2 && artNos[0] <= artNos[1], '조문번호 오름차순 정렬 시 숫자 기준(제1조, 제2조...)으로 정렬되어야 합니다');
+
+  const tDisc = mountTestable('?tab=articles&doc=DISC');
+  assert.match(tDisc.bodyEl.innerHTML, /data-d-sort/);
+  tDisc.clickHeaderSort('d_date');
+  assert.match(tDisc.bodyEl.innerHTML, /aria-sort="descending"[^>]*><button[^>]*data-th-sort="d_date"/);
+  const discDatesDesc = [...tDisc.bodyEl.innerHTML.matchAll(/\((20\d{2}[^()]{3,18})\)<\/td>/g)]
+    .map((m) => {
+      const n = m[1].trim().match(/^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+      return n ? `${n[1]}-${n[2].padStart(2, '0')}-${n[3].padStart(2, '0')}` : '';
+    })
+    .filter(Boolean);
+  assert.ok(discDatesDesc.length >= 5);
+  for (let i = 1; i < discDatesDesc.length; i++) {
+    assert.ok(discDatesDesc[i - 1] >= discDatesDesc[i], `공시 기준연혁일 내림차순이 혼재 날짜 형식에서도 시간순이어야 합니다: ${discDatesDesc[i - 1]} vs ${discDatesDesc[i]}`);
+  }
+});
+
+test('⑫ 기관 상세(탭 2) 통합 프로필 히어로·서브탭 분리·신구대비 병합 정제·동일분류 시점대조·조문 중복제거 검증', () => {
+  const vm = require('node:vm');
+  const dataMod = require(path.join(ROOT, 'js', 'pu-alio-data.js'));
+
+  function mountOrganView(initialSearch) {
+    const loc = { href: 'https://example.com/pureunall/pu-alio-union.html' + initialSearch, pathname: '/pureunall/pu-alio-union.html', search: initialSearch, protocol: 'https:' };
+    function makeNode(tag) {
+      const listeners = {};
+      const attrs = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => attrs[k] || '',
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    const bodyEl = makeNode('DIV');
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    function clickSubTab(subKey, catAttr) {
+      const btn = {
+        getAttribute: (k) => {
+          if (k === 'data-h-sub') return subKey;
+          if (k === 'data-h-cat') return catAttr !== undefined ? catAttr : null;
+          return null;
+        },
+        focus: () => {}
+      };
+      bodyEl.trigger('click', {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        target: {
+          closest: (sel) => (sel === '[data-h-sub]' ? btn : null)
+        }
+      });
+    }
+
+    return { bodyEl, clickSubTab, sandbox };
+  }
+
+  // 1) (재)우체국금융개발원(C0352) 초기 상세 화면: 통합 히어로 + OVERVIEW(6대영역 요약)만 단일 노출되고 category_code 등 기계적 코드가 제거되어야 함
+  const c0352 = mountOrganView('?organ=C0352');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-org-hero"/, '상단 통합 프로필 히어로 카드가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-h-sub="OVERVIEW"/, '기본 서브탭은 OVERVIEW(6대영역 요약)여야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-dom-board plain"/, '히어로 아래에는 중복 헤더 없는 6대 영역 보드가 표시되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /class="pau-diff-list"/, 'OVERVIEW 기본 화면에서는 하단 신구대비표가 중복 적층되지 않아야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /category_code/i, '기계적 메타데이터(category_code)가 화면에 노출되지 않아야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /2026년 3분기 노사협의회 회의록/, '공시 일반명 대신 실제 첨부 문서명이 읽기 좋게 노출되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /풀2·파트4/, '히어로 KPI에 실제 타임오프 풀타임·파트타임 전임자 수(풀2·파트4)가 정확히 표시되어야 합니다');
+
+  // 2) 영역별 연혁 바로가기(data-h-cat="SEPARATE") 클릭 시 해당 구분 필터가 적용되고, 이후 일반 HISTORY 서브탭 클릭 시 전체 연혁으로 초기화되어야 함
+  c0352.clickSubTab('HISTORY', 'SEPARATE');
+  assert.match(c0352.bodyEl.innerHTML, /<option value="SEPARATE" selected>별도합의·노사협의<\/option>/, '영역별 연혁 바로가기 클릭 시 해당 구분 필터가 선택되어야 합니다');
+  c0352.clickSubTab('HISTORY');
+  assert.match(c0352.bodyEl.innerHTML, /<option value="" selected>연혁 전체/, '일반 HISTORY 서브탭 클릭 시 이전 구분 필터가 해제되고 연혁 전체가 표시되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="(true|false)" data-set-vera=/, '시점 지정 버튼(과거A/현행B)에 aria-pressed 접근성 상태가 부여되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-h-sub="HISTORY"/, 'HISTORY 서브탭이 활성화되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /class="pau-dom-board/, 'HISTORY 전환 시 6대영역 보드는 숨겨지고 연혁·신구대비 뷰만 집중 노출되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-bullet-box"/, '정제된 주요 개정 요약 불릿 박스가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /class="pau-diff-list"/, '카드형 신·구 조문 대비표가 렌더링되어야 합니다');
+  assert.match(c0352.bodyEl.innerHTML, /9개 조항/, 'C0352의 분리된 개정요약+신구대비표 공시가 병합되어 실제 9개 조항 대비표가 노출되어야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /기존 협약 조항|\|\s*---\s*\|/, '플레이스홀더(기존 협약 조항)나 마크다운 파이프 표 원문이 노출되지 않아야 합니다');
+  assert.doesNotMatch(c0352.bodyEl.innerHTML, /category_code/i, 'HISTORY 시점 대조 및 연혁 표에서도 category_code가 없어야 합니다');
+
+  // 3) ISSUES 서브탭 클릭 시: 13대 핵심 근로조건 진단 카드 전체가 표시되어야 함
+  c0352.clickSubTab('ISSUES');
+  assert.match(c0352.bodyEl.innerHTML, /13대 핵심 근로조건 표준 진단/, 'ISSUES 서브탭에서 13대 핵심 근로조건 진단 카드가 표시되어야 합니다');
+  assert.equal([...c0352.bodyEl.innerHTML.matchAll(/class="pau-issue-card"/g)].length, 13, '13대 핵심 근로조건 카드 13개가 모두 렌더링되어야 합니다');
+
+  // 4) 다개년 공시 기관((주)강원랜드 C0005) HISTORY 진입 시 동일 분류(단체협약 ↔ 단체협약) 자동 매칭 검증
+  const c0005 = mountOrganView('?organ=C0005');
+  c0005.clickSubTab('HISTORY');
+  assert.match(c0005.bodyEl.innerHTML, /동일 분류\(단체협약 정보\) 시점 대조/, '단체협약과 임금협약이 섞여 있어도 기본 시점 대조(A↔B)는 동일 분류(단체협약↔단체협약)로 자동 짝지어져야 합니다');
+
+  // 5) 단협 조문 정규화(중복 신구대비 행 제거 및 제목/기호 정제) 검증
+  const master = c0352.sandbox.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  const c0006Arts = master.byId.C0006.domains.articles;
+  const c0006Keys = c0006Arts.map((a) => `${a.article_no}|${a.article_title}|${a.taxonomy_code}`);
+  assert.equal(new Set(c0006Keys).size, c0006Keys.length, '건강보험심사평가원(C0006)의 중복 신구대비 추출 조문이 중복 없이 정제되어야 합니다');
+  assert.ok(c0006Arts.every((a) => !/구분\s+현\s*행/.test(a.text)), '조문 본문에 신구대비표 머리글(구분 현행 개정안)이 남지 않아야 합니다');
+  const c0005Promo = master.byId.C0005.domains.articles.find((a) => a.article_no === '제16조');
+  assert.ok(c0005Promo && c0005Promo.article_title === '승진' && !/^[:：]/.test(c0005Promo.text), '강원랜드(C0005) 제16조의 【승진】 제목이 분리 추출되고 앞 콜론(:)이 제거되어야 합니다');
+  assert.ok(master.byId.C0005.domains.articles.every((a) => !/^[:：]/.test(a.text)), '강원랜드(C0005) 모든 조문 본문 앞의 불필요한 콜론(:)이 제거되어야 합니다');
+});
+
+test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기관 즉석 매트릭스·비교함) 및 조문·원문 3모드(쟁점별 병렬비교·기관별 묶음·문서 묶음) 검증', () => {
+  const vm = require('node:vm');
+  const dataMod = require(path.join(ROOT, 'js', 'pu-alio-data.js'));
+
+  function mountInteractive(initialSearch) {
+    const loc = {
+      href: 'https://example.com/pureunall/pu-alio-union.html' + initialSearch,
+      pathname: '/pureunall/pu-alio-union.html',
+      search: initialSearch,
+      protocol: 'https:'
+    };
+
+    function makeNode(tag) {
+      const listeners = {};
+      const attrs = {};
+      return {
+        tagName: String(tag || 'DIV').toUpperCase(),
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        checked: false,
+        style: {},
+        dataset: {},
+        classList: { toggle: () => {} },
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        getAttribute: (k) => (k in attrs ? attrs[k] : ''),
+        appendChild: () => {},
+        removeChild: () => {},
+        addEventListener: (ev, fn) => { listeners[ev] = fn; },
+        trigger: (ev, arg) => { if (listeners[ev]) listeners[ev](arg || {}); },
+        focus: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    }
+
+    let dynNodes = {};
+    let parsedMap = {};
+
+    const bodyEl = makeNode('DIV');
+    let rawBodyHtml = '';
+
+    function rebuildParsed() {
+      parsedMap = {};
+      const allHtml = getCombinedHtml();
+      const tagRe = /<(button|tr|select|input|div|span)\b([^>]*)>/gi;
+      let m;
+      while ((m = tagRe.exec(allHtml)) !== null) {
+        const tag = m[1].toUpperCase();
+        const attrStr = m[2];
+        const node = makeNode(tag);
+        const attrRe = /([a-zA-Z0-9_-]+)(?:="([^"]*)")?/g;
+        let am;
+        while ((am = attrRe.exec(attrStr)) !== null) {
+          node.setAttribute(am[1], am[2] !== undefined ? am[2] : '');
+        }
+        const keys = Object.keys(parsedMap);
+        void keys;
+        const dataAttrs = [...attrStr.matchAll(/\b(data-[a-z0-9-]+)(?:="([^"]*)")?/g)];
+        for (const da of dataAttrs) {
+          const k = da[1];
+          const v = da[2];
+          const selBare = `[${k}]`;
+          if (!parsedMap[selBare]) parsedMap[selBare] = [];
+          parsedMap[selBare].push(node);
+          if (k === 'data-f' && v !== 'aCmpAddQ') {
+            const notSel = '[data-f]:not([data-f="aCmpAddQ"])';
+            if (!parsedMap[notSel]) parsedMap[notSel] = [];
+            parsedMap[notSel].push(node);
+          }
+          if (v !== undefined) {
+            const selVal = `[${k}="${v}"]`;
+            if (!parsedMap[selVal]) parsedMap[selVal] = [];
+            parsedMap[selVal].push(node);
+            if (attrStr.includes('pau-topic-chip')) {
+              const chipSel = `.pau-topic-chip[${k}="${v}"]`;
+              if (!parsedMap[chipSel]) parsedMap[chipSel] = [];
+              parsedMap[chipSel].push(node);
+            }
+          }
+        }
+      }
+    }
+
+    function getCombinedHtml() {
+      let out = rawBodyHtml;
+      for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+        if (dynNodes[k]) {
+          out = out.replace(new RegExp(`<div ${k}>[\\s\\S]*$`), `<div ${k}>${dynNodes[k].innerHTML}</div>`);
+        }
+      }
+      return out;
+    }
+
+    Object.defineProperty(bodyEl, 'innerHTML', {
+      get: () => getCombinedHtml(),
+      set: (v) => {
+        rawBodyHtml = String(v || '');
+        dynNodes = {};
+        for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+          const dm = rawBodyHtml.match(new RegExp(`<div ${k}>([\\s\\S]*)<\\/div>$`));
+          if (dm) {
+            const dn = makeNode('DIV');
+            let dHtml = dm[1];
+            Object.defineProperty(dn, 'innerHTML', {
+              get: () => dHtml,
+              set: (nv) => {
+                dHtml = String(nv || '');
+                rebuildParsed();
+              }
+            });
+            dn.querySelector = (sel) => (parsedMap[sel] && parsedMap[sel][0]) || null;
+            dn.querySelectorAll = (sel) => parsedMap[sel] || [];
+            dynNodes[k] = dn;
+          }
+        }
+        rebuildParsed();
+      }
+    });
+
+    bodyEl.querySelector = (sel) => {
+      if (sel === '[data-m-reg-dyn]' && dynNodes['data-m-reg-dyn']) return dynNodes['data-m-reg-dyn'];
+      if (sel === '[data-a-dyn]' && dynNodes['data-a-dyn']) return dynNodes['data-a-dyn'];
+      if (sel === '[data-d-dyn]' && dynNodes['data-d-dyn']) return dynNodes['data-d-dyn'];
+      return (parsedMap[sel] && parsedMap[sel][0]) || null;
+    };
+    bodyEl.querySelectorAll = (sel) => parsedMap[sel] || [];
+
+    const cmpTrayEl = makeNode('DIV');
+    const root = makeNode('DIV');
+    root.querySelector = (sel) => {
+      if (sel === '[data-pau-body]') return bodyEl;
+      if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      return makeNode('DIV');
+    };
+
+    const sandbox = {
+      window: {},
+      PU_ALIO_DATA: dataMod,
+      location: loc,
+      history: {
+        replaceState: (_st, _tit, url) => {
+          const qIdx = url.indexOf('?');
+          loc.search = qIdx >= 0 ? url.slice(qIdx) : '';
+        }
+      },
+      document: {
+        head: makeNode('HEAD'),
+        body: makeNode('BODY'),
+        createElement: (t) => makeNode(t),
+        getElementById: () => null,
+        querySelector: () => null,
+        addEventListener: () => {}
+      },
+      fetch: () => Promise.resolve({ ok: false }),
+      URL,
+      URLSearchParams
+    };
+    sandbox.window = sandbox;
+    vm.runInNewContext(uiSrc, sandbox);
+    sandbox.PuAlioUnion.mount(root, { isModal: false });
+
+    return { bodyEl, cmpTrayEl, loc };
+  }
+
+  // 0) 정의되지 않은 CSS 변수(--pau-text, --pau-surface-alt, --pau-border) 미사용 및 .pau-hm-tag 스타일 정의 검증
+  assert.doesNotMatch(uiSrc, /var\(--pau-(?:text|surface-alt|border)\)/, '정의되지 않은 CSS 변수가 남아 있으면 안 됩니다');
+  assert.match(uiSrc, /\.pau-hm-tag\{/, '.pau-hm-tag 배지 스타일이 명시적으로 정의되어야 합니다');
+
+  // 1) 지역산하비교 다중 시·도 URL(?region=충남,대전) 및 다중 시·군·구 URL(?region=충남&muni=천안시,아산시) 진입 검증
+  const regMulti = mountInteractive('?region=%EC%B6%A9%EB%82%A8,%EB%8C%80%EC%A0%84');
+  assert.match(decodeURIComponent(regMulti.loc.search), /region=충청남도,대전광역시/, '복수 지역 약칭(충남,대전)이 정규 시·도 목록으로 URL 동기화되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /data-r-multigov-card/, '선택 광역 시·도 산하기관 총괄 다중비교 카드가 렌더링되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /충청남도/, '총괄 다중비교 표에 충청남도가 포함되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /대전광역시/, '총괄 다중비교 표에 대전광역시가 포함되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /data-toggle-cmp="/, '지역산하비교 각 행에도 비교함 담기(+비교) 버튼이 제공되어야 합니다');
+
+  const quickTop4Btn = regMulti.bodyEl.querySelector('[data-r-quick-top4]');
+  assert.ok(quickTop4Btn, '상위 4곳 즉석 다중비교 버튼이 노출되어야 합니다');
+  quickTop4Btn.trigger('click');
+  assert.match(regMulti.bodyEl.innerHTML, /data-r-inline-cmp/, '상위 4곳 즉석 다중비교 클릭 시 화면 내 산하기관 병렬 비교 매트릭스가 즉시 표시되어야 합니다');
+  assert.match(regMulti.bodyEl.innerHTML, /선택 산하기관\(4곳\) 즉석 다중비교 매트릭스/, '선택 산하기관 4곳 비교 매트릭스 제목이 정확히 표시되어야 합니다');
+
+  const regMuniMulti = mountInteractive('?region=%EC%B6%A9%EB%82%A8&muni=%EC%B2%9C%EC%95%88%EC%8B%9C,%EC%95%84%EC%82%B0%EC%8B%9C');
+  assert.match(decodeURIComponent(regMuniMulti.loc.search), /region=충청남도/, '복수 기초지자체 진입 시 광역 시·도가 유지되어야 합니다');
+  assert.match(decodeURIComponent(regMuniMulti.loc.search), /muni=천안시,아산시/, '복수 기초지자체 URL 파라미터(muni=천안시,아산시)가 보존·동기화되어야 합니다');
+  assert.match(regMuniMulti.bodyEl.innerHTML, /기초지자체\(2곳\) 산하기관 총괄 다중비교/, '선택 기초지자체 2곳 총괄 다중비교 카드가 즉시 활성화되어야 합니다');
+
+  // 2) 단협 조문(?tab=articles&compare=C0006) 진입 시: 평면 나열 대신 쟁점별 다중비교(COMPARE) 기본 진입 + 동종 업종(보건·의료) 유사기관 자동 매칭 + 프리셋 + 쟁점 칩 전환 검증
+  const artCmp = mountInteractive('?tab=articles&compare=C0006');
+  assert.match(artCmp.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-a-view="COMPARE"/, '단협 조문 기본 보기 모드는 쟁점별 다중비교(COMPARE)여야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /건강보험심사평가원/, '비교함에 담긴 기준기관(건강보험심사평가원)이 조문 비교 대상에 즉시 반영되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /국민건강보험공단|한국보훈복지의료공단/, '기준기관 1곳 진입 시 동종 업종 유사기관이 자동 매칭되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /13대 핵심 단협 쟁점 한눈 비교표/, '전체 쟁점 상태에서는 13대 핵심 쟁점 한눈 비교표가 먼저 제시되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /class="pau-clause-cmp-grid"/, '비교 기관별 주요 수록 조문 카드 대조 그리드가 렌더링되어야 합니다');
+
+  const persChip = artCmp.bodyEl.querySelector('.pau-topic-chip[data-a-topic="PERSONNEL"]');
+  assert.ok(persChip, '인사·승진·전보 쟁점 빠른 선택 칩이 존재해야 합니다');
+  persChip.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /data-a-law-out/, '특정 쟁점 선택 시 대한민국 현행 노동관계법령 기준 스트립이 표시되어야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /기관별 조문 전문 병렬 대조/, '특정 쟁점 선택 시 기관별 조문 전문 병렬 대조 그리드로 전환되어야 합니다');
+
+  const medPresetBtn = artCmp.bodyEl.querySelector('[data-a-preset="LOCAL_MEDICAL"]');
+  assert.ok(medPresetBtn, '지방의료원 빠른 비교 프리셋 버튼이 존재해야 합니다');
+  medPresetBtn.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /의료원/, '지방의료원 프리셋 클릭 시 실제 지방의료원 기관들이 비교 대상에 채워져야 합니다');
+
+  // 2-1) 추출 조문이 없고 신·구대비표(diffs)가 있는 기관(C0352 우체국금융개발원) 진입 시 신·구대비 미리보기 정상 표시 + 악성 검색어(XSS) 이스케이프 검증
+  const artRev = mountInteractive('?tab=articles&compare=C0352');
+  assert.match(artRev.bodyEl.innerHTML, /\[신·구대비\]\s*제30조/, '추출 조문이 없는 기관 카드에는 신·구대비표 조항(diffs.art) 미리보기가 표시되어야 합니다');
+  const aQueryIn = artRev.bodyEl.querySelector('[data-f="aQuery"]');
+  assert.ok(aQueryIn, '조문 검색 입력창이 존재해야 합니다');
+  aQueryIn.value = '<img src=x onerror=alert(1)>';
+  aQueryIn.trigger('input');
+  assert.doesNotMatch(artRev.bodyEl.innerHTML, /<img\b/i, '조문 검색어에 HTML 태그 입력 시 원시 태그가 삽입(DOM XSS)되면 안 됩니다');
+  assert.match(artRev.bodyEl.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/, '조문 검색어가 안전하게 HTML 이스케이프 처리되어야 합니다');
+
+  // 3) 기관별 묶음(BY_ORGAN) 전환 시: 동일 기관 조문이 수십 행으로 쪼개지지 않고 1기관=1카드로 통합되어 +비교담기 버튼 중복이 없어야 함
+  const byOrgBtn = artCmp.bodyEl.querySelector('[data-a-view="BY_ORGAN"]');
+  assert.ok(byOrgBtn, '기관별 묶음 보기 전환 버튼이 존재해야 합니다');
+  byOrgBtn.trigger('click');
+  assert.match(artCmp.bodyEl.innerHTML, /class="pau-org-art-list"/, '기관별 묶음 전환 시 기관별 조문 카드 리스트가 렌더링되어야 합니다');
+  const toggleIdsInByOrgan = [...artCmp.bodyEl.innerHTML.matchAll(/data-toggle-cmp="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(toggleIdsInByOrgan.length >= 10, '기관별 묶음 카드마다 비교담기 버튼이 제공되어야 합니다');
+  assert.equal(new Set(toggleIdsInByOrgan).size, toggleIdsInByOrgan.length, '기관별 묶음 화면에서는 한 기관당 +비교담기 버튼이 중복 없이 단 1개만 노출되어야 합니다');
+
+  // 4) 공시·사규 원문(?tab=articles&doc=DISC) 기본 진입 시: 기관별 원문 묶음(BY_ORGAN)으로 중복 기관 나열 없이 정리되고 펼침 동작 검증
+  const discGrp = mountInteractive('?tab=articles&doc=DISC');
+  assert.match(discGrp.bodyEl.innerHTML, /aria-pressed="true"[^>]*data-d-view="BY_ORGAN"/, '공시·사규 원문 기본 보기 모드는 기관별 원문 묶음(BY_ORGAN)이어야 합니다');
+  const discOrgExpBtns = discGrp.bodyEl.querySelectorAll('[data-d-org-exp]');
+  assert.ok(discOrgExpBtns.length >= 20, '기관별 원문 묶음 행마다 문서 펼침 버튼이 렌더링되어야 합니다');
+  discOrgExpBtns[0].trigger('click');
+  assert.match(discGrp.bodyEl.innerHTML, /class="pau-exp-row"/, '문서 펼침 클릭 시 해당 기관의 공시 문서 목록이 인라인으로 펼쳐져야 합니다');
+});
+
+
+
+
+
+

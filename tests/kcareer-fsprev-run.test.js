@@ -51,6 +51,7 @@ function 무대(opts) {
   const pdf호출 = [];
   const ctx = {
     console: { warn: function () {}, log: function () {} },
+    KcareerScan: require('../js/kcareer-scan.js'),   /* _fsDir 가 번호 있는·없는 폴더 이름을 같이 본다(2026-11-15) */
     document: { getElementById: function (id) { return id === 'fsPrevBox' ? box : null; } },
     URL: { createObjectURL: function () { return 'blob:fake'; }, revokeObjectURL: function () {} },
     fsRoot: async function () { return opts.root === null ? null : 폴더(opts.files || {}); },
@@ -66,6 +67,7 @@ function 무대(opts) {
   vm.createContext(ctx);
   const 코드 = [
     떼기('function _isHwpName(n){'),
+    떼기('async function _fsDir('),
     떼기('async function _fsFileOf(relPath){'),
     떼기('async function recFileAsync(rec, id){'),
     떼기('async function _renderFsFormPreview(rec){'),

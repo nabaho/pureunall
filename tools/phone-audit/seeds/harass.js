@@ -30,7 +30,11 @@ const harassCases = {
     companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '123-81-20012',
     category: 'harass', title: '생산품질본부 직장 내 괴롭힘 신고 외부전문가 조사 건',
     managerMain: 'P001', managerSubs: ['P002'],
-    receiveDate: '2026-10-05', dueDate: '2026-11-20', closeDate: '',
+    receiveDate: '2026-10-05', dueDate: '2026-11-20', extDue1: '2026-11-30', closeDate: '',
+    laborOffice: '대전지방고용노동청 천안지청', inspectorName: '점검감독관', govCaseNo: '진정 제2026-00101호',
+    fairnessChecked: true,
+    reportTemplate: 'lawfirm_opinion',
+    monitoringLogs: [{ id: 'mn-1', round: '중간점검', date: '2026-10-25', status: '양호(재발·불이익 없음)', note: '임시 부서 분리 유지 확인' }],
     verdictSummary: 'partial',
     steps: {
       intake: { done: true, date: '2026-10-05', note: '조사 위임계약서 및 착수공문 접수 완료' },
@@ -51,15 +55,20 @@ const harassCases = {
   'hc-2': {
     id: 'hc-2', entityType: 'Case', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 4, updatedAt: NOW - 7200e3, revision: 1,
+    erpCaseId: '', erpCaseNo: '', erpDefer: true,
     companyId: 'hco-2', companyName: '(주)다라점검바이오헬스케어시스템즈', bizNo: '123-81-20026',
     category: 'both', title: '연구소 직장 내 괴롭힘 및 성희롱 복합 조사 건',
     managerMain: 'P002', managerSubs: [],
-    receiveDate: '2026-11-01', dueDate: '2026-12-10', closeDate: '',
+    receiveDate: '2024-11-01', dueDate: '', closeDate: '',
     verdictSummary: '',
     steps: {
-      intake: { done: true, date: '2026-11-01', note: '착수 공문 접수' },
+      intake: { done: true, date: '2024-11-01', note: '과거 푸른메일 착수 공문 접수' },
+      report: { done: true, date: '2024-12-05', note: '최종 조사결과보고서 송부 완료' },
     },
-    mailLinks: [],
+    closeDate: '2024-12-05',
+    mailLinks: [
+      { key: 'i:sent:905', slug: 'sent', uid: '905', dir: 'out', date: '2024-12-05', ts: Date.UTC(2024, 11, 5, 2, 0, 0), from: '점검대표 <370-6@daum.net>', to: 'audit@dara-check.example', subject: '[푸른노무법인] (주)다라점검바이오 직장 내 괴롭힘 조사보고서 송부의 건', docRole: 'final_report', stepCode: 'report', attCount: 1, attNames: ['조사결과보고서_점검용.hwpx'] },
+    ],
   },
 };
 
@@ -67,18 +76,32 @@ const secrets = {
   'hc-1': {
     id: 'hc-1', entityType: 'Document', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 5, updatedAt: NOW - 3600e3, revision: 2,
+    reportTemplate: 'lawfirm_opinion',
+    templateMeta: {
+      lawfirm_opinion: {
+        docRefNo: '법률자문 제2026-HR-001호 · 인사기밀',
+        querySummary: '생산품질본부 내 폭언·업무조정의 근로기준법 제76조의2 해당 여부 및 인사조치 적정성 검토',
+        litigationRisk: 'low',
+        execSummary: '제1쟁점은 참고인 진술 및 녹취로 신빙성이 확보되어 괴롭힘 성립 인정, 제2쟁점은 정당한 순환배치로 불인정함.',
+      },
+    },
     overview: '생산품질본부 내 업무 배제 및 반복적 폭언 관련 외부전문가 조사 의뢰 건(점검용 합성 데이터).',
     interviews: [
-      { id: 'iv-1', role: 'victim', alias: '신고인 가', dept: '품질관리파트', date: '2026-10-14', method: '대면면담', pledgeSigned: true, summary: '회의석상에서 반복적인 모욕성 발언과 메신저 방 배제가 있었다고 진술함.' },
-      { id: 'iv-2', role: 'accused', alias: '피신고인 나', dept: '품질관리파트', date: '2026-10-21', method: '대면면담', pledgeSigned: true, summary: '납기 지연에 따른 업무 질책이었으나 표현이 과했음을 일부 인정함.' },
+      { id: 'iv-1', role: 'victim', alias: '신고인 가', dept: '품질관리파트', date: '2026-10-14', method: '대면면담', stmtStyle: 'legal_record', pledgeSigned: true, summary: '회의석상에서 반복적인 모욕성 발언과 메신저 방 배제가 있었다고 진술함.' },
+      { id: 'iv-2', role: 'accused', alias: '피신고인 나', dept: '품질관리파트', date: '2026-10-21', method: '대면면담', stmtStyle: 'confirm_std', pledgeSigned: true, summary: '납기 지연에 따른 업무 질책이었으나 표현이 과했음을 일부 인정함.' },
     ],
     issues: [
-      { id: 'iss-1', title: '회의석상 폭언 및 모욕적 언동', whenWhere: '2026-09-12 본사 회의실', claimVictim: '다수 팀원 앞에서 인격 모독 발언 반복', claimAccused: '업무상 실수 지적 과정이었음', evidenceNote: '참고인 2명 진술 일치 및 회의록 확인', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' },
+      { id: 'iss-1', title: '회의석상 폭언 및 모욕적 언동', whenWhere: '2026-09-12 본사 회의실', claimVictim: '다수 팀원 앞에서 인격 모독 발언 반복', claimAccused: '업무상 실수 지적 과정이었음', evidenceNote: '참고인 2명 진술 일치 및 회의록 확인', credibility: { consistency: true, specificity: true, rationality: true, noMotive: true, corroboration: true }, credibilityNote: '최초 신고·면담·참고인 목격담 모두 일치', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' },
       { id: 'iss-2', title: '정기 프로젝트 배정 조정 건', whenWhere: '2026-09-20 사내 메신저', claimVictim: '의도적 업무 배제 주장', claimAccused: '전사 분기 순환배치 기준에 따른 조정', evidenceNote: '인사팀 순환배치 공문 확인', factStatus: 'partial', elemSuperiority: 'yes', elemBeyondScope: 'no', elemHarm: 'no', verdict: 'no' },
+    ],
+    evidences: [
+      { id: 'ev-1', side: 'gap', no: 1, exhibitNo: '갑 제1호증', date: '2026-09-12', title: '주간회의 음성녹취 발췌록', submitter: '신고인 가', summary: '회의석상 모욕적 발언 정황 확인' },
+      { id: 'ev-2', side: 'eul', no: 1, exhibitNo: '을 제1호증', date: '2026-09-20', title: '분기 업무분장 순환배치 공문', submitter: '피신고인 나', summary: '전사 기준에 따른 업무 조정 확인' },
     ],
     conclusion: '쟁점 1은 근로기준법 제76조의2 요건을 모두 충족하여 직장 내 괴롭힘에 해당하며, 쟁점 2는 업무상 적정범위 내 인사조정으로 판단함.',
     recommendations: '피해근로자 희망 반영 부서 분리 유지 및 행위자 인사위원회 회부·재발방지 교육 권고.',
-    reportBody: '',
+    reportBody: '【 직장 내 괴롭힘 사안 외부전문가 조사결과보고서 】\n1. 사건 개요\n- 의뢰 사업장: (주)가나점검테크놀로지솔루션\n- 점검용 합성 본문 초안',
+    reportBodyAuto: true,
   },
 };
 
@@ -113,7 +136,27 @@ module.exports = {
     data: {
       companies: { v: companies },
       cases: { v: erpCases },
+      contracts: {
+        v: [
+          { id: 'ct-hi-1', contractNo: '계약-2026-001', arrivedCaseId: 'ec-hi-1', companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', contractDate: '2026-10-05', title: '직장 내 괴롭힘 조사 대행 위임계약', scope: '직장 내 괴롭힘 외부전문가 조사 및 조사보고서 작성', managerMain: 'P001' },
+        ],
+      },
+      other_projects: {
+        v: [
+          { id: 'op-hi-1', no: '문서작성-2026-001', sourceContractId: 'ct-hi-1', companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', startDate: '2026-10-06', title: '생산품질본부 괴롭힘 조사 지원', managerMain: 'P001' },
+        ],
+      },
       biz_case_types: { v: [{ code: 'case-investigate', short: '조사', name: '조사', sortOrder: 100 }] },
+    },
+    work_erp: {
+      items: {
+        'wk-hi-1': { id: 'wk-hi-1', no: '2026-조사-001', cat: '조사', co: '(주)가나점검테크놀로지솔루션', companyId: 'hco-1', title: '생산품질본부 괴롭힘 조사', mgr: 'P001', startDate: '2026-10-05' },
+      },
+      itemlogs: {
+        'wk-hi-1': {
+          l1: { date: '2026-10-14', txt: '신고인 및 참고인 대면 면담 진행 완료' },
+        },
+      },
     },
     mailbox: {
       folders: mailboxFolders,
@@ -125,6 +168,6 @@ module.exports = {
     { name: 'inbox', run: async (p) => { await p.click('#tabs button[data-tab="inbox"]'); } },
     { name: 'yearly', run: async (p) => { await p.click('#tabs button[data-tab="yearly"]'); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); } },
-    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="detail"]'); await p.click('button[data-act="wsMode"][data-id="doc"]'); } },
+    { name: 'report', run: async (p) => { await p.click('#tabs button[data-tab="report"]'); } },
   ],
 };

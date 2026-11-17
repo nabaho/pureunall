@@ -20,9 +20,11 @@ function load() {
 /* 마지막 그물 — 주민·외국인번호 꼴(앞 6자리-뒤 7자리, 뒤 첫 자리 1~8). 가린 것(●)은 안 걸린다 */
 /* \b 를 쓰지 않는다 — 앞뒤가 글자(A900101-1234567)에 붙어 있으면 \b 는 못 잡는다. 숫자만 아니면 걸리게 한다 */
 const RAW_RE = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/;
+const RAW_RE_G = /(?<!\d)(\d{6})\s*-\s*[1-8]\d{6}(?!\d)/g;
 /* PDF 전용 두 번째 그물 — 글자 사이가 벌어진 PDF(자간·글자마다 위치)는 pdf.js 가 「9 0 0 1 0 1 - 1 2 3 4 5 6 7」 로 뽑아
    번호 규칙·RAW_RE 가 못 잡는다(최종 검토 실측). 숫자 사이 공백을 허락하고 «가린 글»에서 한 번 더 본다. */
 const SPACED_RRN_RE = /(?<!\d)\d(?:[ \t]*\d){5}[ \t]*-[ \t]*[1-8](?:[ \t]*\d){6}(?!\d)/;   // 한 줄 안에서만 — \s 는 줄바꿈을 넘어 숫자 표를 잘못 잡는다
+const SPACED_RRN_G = new RegExp(SPACED_RRN_RE.source, 'g');
 /* pdf.js 가 «문서 자체가 나쁨»으로 던지는 이름 — 이것만 「열지 못함」으로 닫는다. 그 밖(싣기·메모리·환경)은 문서 탓이 아니므로 다시 본다 */
 const PDF_DOC_ERRORS = ['InvalidPDFException', 'PasswordException', 'FormatError', 'MissingPDFException', 'UnexpectedResponseException'];
 
@@ -81,4 +83,28 @@ async function recheck(text) {
   const t = T.tally(p.hits);
   return { leak: t.total, count: t.count, text: t.total ? p.text : String(text || '') };
 }
-module.exports = { redactOne, recheck, RAW_RE, load };
+/* 일정 추출(cal-inbox)용 — 파일 바이트는 내보내지 않고 «주민번호·계좌·신분증 번호만 가린 글»만 돌려준다 (2026-11-15).
+   공문 담당자의 전화번호·메일은 일정 안내 칸(contact)에 들어가야 하므로 phone·email 은 남긴다. */
+async function readScheduleText(buf, ext) {
+  const bytes = new Uint8Array(buf);
+  let text = '';
+  if (ext === 'pdf') {
+    let got;
+    try { got = await PDF.pdfText(buf); }
+    catch (_) { return { ok: false, scanned: false, chars: 0 }; }
+    if (!got || !(Number(got.chars) >= PDF.SCAN_MIN)) return { ok: false, scanned: true, chars: Number(got && got.chars) || 0 };
+    text = got.text;
+  } else {
+    try { await load(); const r = await T.read(bytes); text = (r && r.text) || ''; }
+    catch (_) { return { ok: false, scanned: false, chars: 0 }; }
+  }
+  if (!text.trim()) return { ok: false, scanned: false, chars: 0 };
+  const K = await load();
+  const p = K.redactText(text, { rules: T.rulesOf(['rrn', 'money', 'id']) });
+  const safe = String((p && p.text) || text)
+    .replace(RAW_RE_G, '$1-*******')
+    .replace(SPACED_RRN_G, '******-*******');
+  if (RAW_RE.test(safe) || SPACED_RRN_RE.test(safe)) return { ok: false, scanned: false, chars: 0 };
+  return { ok: true, text: safe };
+}
+module.exports = { redactOne, recheck, readScheduleText, RAW_RE, SPACED_RRN_RE, load };

@@ -95,9 +95,11 @@ function 쇼볼수있나(상태, 쇼) {
    ⚠ 담아 둔 쪽은 화면(pu-news-show.js)이 «우리 그림만» 골라 지었다. 그래도
      여기서 한 번 더 막는다: 누가 회차의 쇼 칸을 손으로 고쳐 남의 그림을 넣어도
      브라우저가 불러오지 않는다. 문이 둘이라야 한쪽이 뚫려도 안 샌다.
-   ⚠ 두 주소는 발송기(mail-send.js IMG_HOST_OK)와 «같다». 더하지 말 것. */
+   ⚠ 주소는 발송기(mail-send.js IMG_HOST_OK)와 «같다». 남의 도메인을 더하지 말 것.
+   ★ 2026-11-15 ERP 주소 이사 — 새 ERP 출처를 더했다(옛 출처 그림은 301 로 새 출처로 넘어가는데,
+     CSP 는 넘어간 «끝» 호스트도 검사하므로 이것이 없으면 지난 회차 쇼 그림이 깨진다). */
 const 쇼보안 = "default-src 'none'; "
-  + "img-src https://nabaho.github.io https://asia-northeast3-pureun-erp.cloudfunctions.net; "
+  + "img-src https://nabaho.github.io https://erp.pureunlabor.co.kr https://asia-northeast3-pureun-erp.cloudfunctions.net; "
   + "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
   + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
@@ -302,6 +304,9 @@ var 전문펴기스크립트 =
   'if(d){var p=d.split(":");' +
   'if(p.length===2&&/^(prec|expc)$/.test(p[0])&&/^\\d{1,12}$/.test(p[1]))return p;}' +
   'var h=a.getAttribute("href")||"";if(h.indexOf("law.go.kr")<0)return null;' +
+  /* 공개 쪽 꼴(precInfoP.do?precSeq= · expcInfoP.do?expcSeq=)도 같은 한 건이다 (2026-11-15) */
+  'var q=/\\/(prec|expc)InfoP\\.do\\?(?:[^#]*&)?(?:precSeq|expcSeq)=(\\d{1,12})\\b/i.exec(h);' +
+  'if(q)return [q[1].toLowerCase(),q[2]];' +
   'var g=/[?&]target=(prec|expc)\\b/.exec(h),n=/[?&]ID=(\\d{1,12})\\b/i.exec(h);' +
   'return (g&&n)?[g[1],n[1]]:null;}' +
   /* 어디에 펴나 — 창 안이면 창 바닥, 쪽이면 그 건의 «표 바로 다음».
@@ -342,9 +347,14 @@ var 전문펴기스크립트 =
   '+몸+"</details>"):("<h4>"+씻(k.이름)+"</h4>"+몸);});' +
   'h+=\'<div class="src"><a href="\'+씻(d.법제처||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
   '칸.innerHTML=h;' +
+  /* ⚠⚠ 못 받아 오면 «우리 전문 쪽»(newsFullPage)으로 보낸다 (2026-11-15).
+       예전에는 그 링크의 href 를 그대로 걸었다 — 옛 회차 전문에는 DRF 주소(OC=test)가 박혀 있어
+       법제처가 그 열쇠를 거절한 뒤로 «접속 실패» 쪽으로 갔다. newsFullPage 는 받으면 우리 양식,
+       못 받으면 공개 쪽으로 넘겨 준다(functions/index.js) — 주소 짓는 잣대를 여기 따로 두지 않는다.
+     ⚠ t·id 는 어느것() 이 갈래 둘·숫자만 걸러 낸 값이다. */
   '}).catch(function(err){' +
   '칸.innerHTML=\'<div class="err">\'+씻((err&&err.message)||"못 받아 왔습니다")' +
-  '+\' <a href="\'+씻(a.getAttribute("href")||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
+  '+\' <a href="\'+씻("/newsFullPage?t="+t+"&id="+id)+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
   '});}' +
   'document.addEventListener("click",function(e){' +
   'var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;' +

@@ -48,7 +48,7 @@ function runApp(seed, opt) {
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
-    + 'pickOpen,pickBody,pickOff,pickReset,pickStar,pickAuto,pickRank,pickBadge,inboxPull,feedSrvHtml,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
+    + 'pickOpen,pickBody,pickOff,pickReset,pickStar,pickAuto,pickRank,pickBadge,inboxPull,feedSrvHtml,healthPop,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
     + 'recStarTog,recStarOnlyTog,recStarMap,recStarOn,appHist,appTag,appOpen,appSetSt,starAllItems,starAllOpen,appOrgOf,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -1578,12 +1578,16 @@ test('★ 읽을 권한이 없으면(직원) 조용히 넘어간다 — 오류�
   await r.api.inboxPull();
   assert.equal(r.api.get('feed').length, 1); assert.equal(r.api.feedSrvHtml(), ''); assert.deepEqual(r.toasts, []);
 });
-test('★ 서버 상태 줄 — 공고 목록 위 「📅 … 마지막으로 받은 때」 밑에 «마지막 시각·출처별 건수»가 보인다', async () => {
+/* 2026-11-16 대표 「(캡쳐2) 불필요한 부분이다 빼달라」 — 서버 안내(🛰)는 잘 돌 때는 목록 위에서 걷고 📡 수집 기록 팝업으로 옮겼다.
+   ⚠ 멈췄을 때(빨강)만은 목록 위에 남긴다 — 아래 검사. */
+test('★ 서버 상태 줄 — 잘 돌면 목록 위에는 안 그리고, 📡 팝업에 «마지막 시각·출처별 건수»가 보인다', async () => {
   const r = runApp({ feed: [{ id: 'G0001', no: 'K', nm: '노무 용역', openDt: '2026-10-01', savedAt: '2026-10-01T00:00:00Z' }] }, { Date: FixedDate('2026-10-12T09:00:00') });
   r.api.draw();
   assert.doesNotMatch(r.el('period').innerHTML, /서버가 매일 아침/, '아직 안 읽었으면 말하지 않는다');
   r.api.setFb(fbInbox(INBOX).db, 'U1'); await r.api.inboxPull(); r.api.draw();
-  const h = r.el('period').innerHTML;
+  assert.doesNotMatch(r.el('period').innerHTML, /서버가 매일 아침/, '잘 돌면 목록 위에 그리지 않는다');
+  r.api.healthPop();
+  const h = r.el('popBody').innerHTML;
   assert.match(h, /🛰 서버가 매일 아침 공고를 모읍니다/); assert.match(h, /나라장터 40 · 알리오 6 · 기업마당 9/); assert.match(h, /이번에 목록에 합친 것 2건/);
 });
 test('★ 서버가 아직 한 번도 안 돌았으면 그렇게 말한다 · 멈춘 지 이틀이면 빨갛게', async () => {
@@ -1593,6 +1597,8 @@ test('★ 서버가 아직 한 번도 안 돌았으면 그렇게 말한다 · �
   const r2 = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
   r2.api.setFb(fbInbox({ last: { at: '2026-10-09T22:40:00.000Z', today: '2026-10-10', counts: {}, added: 0 } }).db, 'U1'); await r2.api.inboxPull();
   assert.match(r2.api.feedSrvHtml(), /color:var\(--red\)[^>]*>🛰[\s\S]*2일째 새로 안 돌았습니다/);
+  r2.api.draw();
+  assert.match(r2.el('period').innerHTML, /2일째 새로 안 돌았습니다/, '멈춘 것은 목록 위에 남긴다 — 조용히 덮으면 «새 공고가 없다»로 읽힌다');
 });
 test('★ 불러오기는 로그인 뒤 cloudPull «다음», 규칙(rejudge) «앞»이다 — 순서가 바뀌면 합친 줄이 걸러지지 않는다', () => {
   assert.match(src, /await cloudPull\(\); await inboxPull\(\); srcBackfill\(\); rejudge\(\);/);

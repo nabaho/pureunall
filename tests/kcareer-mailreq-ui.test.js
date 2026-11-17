@@ -344,11 +344,13 @@ test('날짜 칸에 없는 날짜·덜 친 날짜를 넣으면 «기한 없음»
   assert.equal(w.db.writes(), before, '저장하지 않았다'); assert.ok(w.items()[ID].deadline, '있던 기한이 지워지지 않았다'); assert.ok(w.toasts.some((m) => /끝까지/.test(m)));
   assert.ok(w.els.modalMr.classList.contains('open'), '팝업은 열려 있어 고칠 수 있다');
 });
-test('옆줄 숫자 — 줄 숫자(.ncnt)를 다 만든 «뒤에» 붉은 표시를 칠한다 · 고른 단추(.gsel) 위에서는 남색 그대로 · 좁은 폰에서 기한 칸 간격', () => {
+test('옆줄 숫자 — 줄 숫자(.ncnt)를 다 만든 «뒤에» 붉은 표시를 칠한다 · 고른 단추(.gsel) 위 표시색이 따로 있다 · 좁은 폰에서 기한 칸 간격', () => {
   const f = html.slice(html.indexOf('function navPaintCounts(){'), html.indexOf('var _navCntT=null;'));
   assert.ok(f.indexOf('mrPaintNav()') > f.indexOf("s.className='ncnt'"), 'mrPaintNav 는 .ncnt 를 만든 뒤에 불러야 막 만든 줄에도 붉은 표시가 붙는다');
   assert.equal((f.match(/mrPaintNav\(\)/g) || []).length, 1, '한 번만');
-  assert.match(html, /\.g-title\.top\.gsel \.gcnt\.mr-alarm\{color:#1e293b\}/, '파란 바탕 위 붉은 글자(1:1)는 안 보인다');
+  /* 색 «값»은 박지 않는다 — 고른 단추의 «실제 바탕»에서 읽히는지는 tests/kcareer-dark-surfaces.test.js 가 재 본다
+     (예전엔 «파란 바탕 위 붉은 글자는 1:1» 이라며 남색을 박았지만, 실제 바탕은 어두운 그라데이션이라 남색이 1.2:1 이었다) */
+  assert.match(html, /\.g-title\.top\.gsel \.gcnt\.mr-alarm\{color:#[0-9a-fA-F]{6}\}/, '고른 단추 위 붉은 표시는 따로 색을 정한다');
   assert.match(html, /#modalMr \.mr-det-v input,#modalMr \.mr-det-v \.btn\{margin:2px 4px 2px 0\}/);
 });
 test('목록의 제목은 «누르는 단추»다(키보드로도) · 팝업 입력칸은 폰에서 확대되지 않게 16px', async () => {

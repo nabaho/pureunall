@@ -2513,11 +2513,32 @@
     cur.dirty = false; renderTabs();
     toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
   }
+  const _seenBridgeIds = new Set();
   async function loadFromFundPayload(p) {
     if (!p || typeof p !== 'object') return;
-    fundCtx = { fundId: p.fundId || '', fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' };
+    if (p.bridgeId) {
+      if (_seenBridgeIds.has(p.bridgeId)) return;
+      _seenBridgeIds.add(p.bridgeId);
+      const isHarassBridge = String(p.bridgeId).indexOf('harass_') === 0;
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'pureun_hangul_ack', bridgeId: p.bridgeId }, location.origin);
+        }
+      } catch (e) {}
+      if (!isHarassBridge) {
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            const ackBc = new BroadcastChannel('pureun_hangul_channel');
+            ackBc.postMessage({ type: 'pureun_hangul_ack', bridgeId: p.bridgeId });
+            ackBc.close();
+          }
+        } catch (e) {}
+      }
+    }
+    fundCtx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
     _renderFundBridgeBar();
-    const docName = (p.name || p.label || '기금서식').replace(/\.(hwpx|hwp|hwt)$/i, '');
+    const srcLabel = p.sourceLabel || '기금관리';
+    const docName = (p.name || p.label || '서식문서').replace(/\.(hwpx|hwp|hwt)$/i, '');
     if (p.b64) {
       try {
         const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
@@ -2533,31 +2554,58 @@
       const pg = Hx.defaultPage();
       if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
       addDoc({ name: docName, html: p.html, page: pg, pristine: false });
-      toast(`기금관리에서 '${docName}' 서식을 불러왔습니다.`);
+      toast(`${srcLabel}에서 '${docName}' 서식을 불러왔습니다.`);
     }
   }
+  const _initSp = new URLSearchParams(location.search);
+  const fromParam = _initSp.get('from') || '';
+  const _initFrom = fromParam;
+  const _initBid = _initSp.get('bid') || '';
   try {
     const raw = localStorage.getItem('pureun_hangul_bridge');
     if (raw) {
       localStorage.removeItem('pureun_hangul_bridge');
-      const p = JSON.parse(raw);
-      if (p && (new URLSearchParams(location.search).get('from') === 'fund' || Date.now() - (p.sentAt || 0) < 60000)) {
-        setTimeout(() => loadFromFundPayload(p), 60);
+      /* 전용 조사 팝업(from=harass)은 opener postMessage + bid 검증 경로만 허용하고 공용 localStorage 잔류분은 무시 */
+      if (fromParam !== 'harass') {
+        const p = JSON.parse(raw);
+        if (p && String(p.bridgeId || '').indexOf('harass_') !== 0) {
+          const freshMs = fromParam === 'jobtrans' ? 300000 : 60000;
+          if (fromParam === 'fund' || Date.now() - (p.sentAt || 0) < freshMs) {
+            setTimeout(() => loadFromFundPayload(p), 60);
+          }
+        }
       }
     }
   } catch (e) {}
   window.addEventListener('message', e => {
-    if (!e || e.origin !== location.origin) return; // 다른 사이트가 보낸 «열기» 는 듣지 않는다(서식 HTML 이 편집기 안으로 들어오므로)
-    const d = e.data;
-    if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+    if (!e || e.origin !== location.origin) return;   // 2026-11-15 보안 — 다른 사이트가 보낸 «열기» 쪽지는 무시
+    const d = e && e.data;
+    if (!d || d.type !== 'pureun_hangul_open' || !d.payload) return;
+    const pBid = String(d.payload.bridgeId || '');
+    if (pBid.indexOf('harass_') === 0 || _initFrom === 'harass') {
+      /* 기밀 조사문서는 반드시 해당 bid로 열린 전용 팝업만 opener로부터 수신(다른 탭 유출 원천 차단) */
+      if (_initFrom !== 'harass' || !_initBid || pBid !== _initBid) return;
+      if (!window.opener || e.source !== window.opener) return;
+    }
+    loadFromFundPayload(d.payload);
   });
   try {
-    if (typeof BroadcastChannel !== 'undefined') {
+    if (typeof BroadcastChannel !== 'undefined' && _initFrom !== 'harass') {
       const bc = new BroadcastChannel('pureun_hangul_channel');
       bc.onmessage = e => {
         const d = e && e.data;
-        if (d && d.type === 'pureun_hangul_open' && d.payload) loadFromFundPayload(d.payload);
+        if (!d || d.type !== 'pureun_hangul_open' || !d.payload) return;
+        if (String(d.payload.bridgeId || '').indexOf('harass_') === 0) return;
+        loadFromFundPayload(d.payload);
       };
+      if (_initFrom === 'jobtrans' || _initFrom === 'fund') {
+        try { bc.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  try {
+    if ((_initFrom === 'jobtrans' || _initFrom === 'fund' || _initFrom === 'harass') && window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }, location.origin);
     }
   } catch (e) {}
   window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund };

@@ -30,6 +30,8 @@
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
       DeungiBase:'노무법인 등기 현황', DeungiCase:'노무법인 변경등기 건', DeungiArchive:'노무법인 지난 등기 원본 서류 묶음',
+      /* 산재 묶음(2026-11-15) — 이알피 산재 사건 «한 건»의 청구 급여·서류 받음/제출·기한 날짜. 사건을 sourceKind 'case'·sourceId 로 가리킨다(js/pu-sanjae-kit.js) */
+      SanjaeKit:'산재 묶음(급여·서류·기한)',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -113,10 +115,11 @@
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
       /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
+      /* site_secret — 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번. 그 건의 담당자와 대표만(2026-11-15) */
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
-      primaryRoots:['data','improve_requests','ieum_public','worker_secret','staff_secret'],
+      primaryRoots:['data','improve_requests','ieum_public','worker_secret','site_secret','staff_secret'],
       sharedRoots:['harass_invest'],
-      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
+      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document','SanjaeKit'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다(pu-erp.html PU_APPS 머리글).
@@ -209,6 +212,8 @@
       note:'한글 문서를 이 PC 안에서 열고 고치는 도구 — 파이어베이스에 쓰지 않는다' },
     aliounion:{ name:'공공임단협', file:'pu-alio-union.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
       note:'알리오 공공기관 노동조합·단체협약 비교분석 도구 — 파이어베이스에 쓰지 않는다' },
+    pbox:{ name:'P박스', file:'pu-pbox.html', primaryRoots:[], entityTypes:['Document','Project'], localOnly:true,
+      note:'대한민국 전 법령·판례·유권해석·AI 서면 도구 — 브라우저 로컬 및 무료 외부 색인 기반으로 파이어베이스에 쓰지 않는다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],
@@ -367,7 +372,27 @@
                       {path:'harass_secret/{id}',entityType:'Document'},
                       {path:'harass_sign/req/{cid}/{id}',entityType:'Submission'},
                       {path:'harass_sign/open/{id}',entityType:'Submission'}],
-      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] }
+      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] },
+    /* 일터상생혁신(ilteo.html) — 노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 비식별 진단 요약, 중간보고서·최종결과보고서·PPTX 자동화(2026-11-15).
+       ★ 임금대장·근태·명부 원본은 브라우저 로컬 비식별 통계만 산출하고 DB·외부 AI 로 전송하지 않는다. 확정 스냅샷(snapshots)은 불변으로 보관한다. */
+    ilteo:{ name:'일터상생혁신', file:'ilteo.html', primaryRoots:['scal_ilteo'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_ilteo/projects/{id}',entityType:'Project'},
+                      {path:'scal_ilteo/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/mid/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/final/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 산업일자리전환(jobtrans.html) — 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계 자동화(2026-11-15).
+       ★ 재무·인력·임금·설문 정량 엑셀 원본은 브라우저 로컬에서만 비식별 집계하고 DB·외부 AI 로 전송하지 않으며, 확정 스냅샷(snapshots)은 불변 보관한다. */
+    jobtrans:{ name:'산업일자리전환', file:'jobtrans.html', primaryRoots:['scal_jobtrans'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_jobtrans/projects/{id}',entityType:'Project'},
+                      {path:'scal_jobtrans/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/mid/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/final/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -489,6 +514,9 @@
   };
   var EXCLUDED_SCREENS = {
     'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다',
+    /* ERP 주소 이사 준비 (2026-11-15) — 뿌리 주소·없는 주소를 포털 입구로 잇는 «길잡이»뿐. 자료·Firebase 없음 */
+    'index.html':'뿌리 주소 → 포털 입구(enter.html)로 넘기기만 — 자료·저장 자리 없음',
+    '404.html':'없는 주소 안내 · 새 주소에서 옛 꼴(/pureunall/…) 넘기기만 — 자료·저장 자리 없음',
     /* 푸른 문서뷰어 (2026-10-25) — 이 기기의 파일을 «보기만» 한다. 서버·Firebase 를 쓰지 않고 저장하는 자리가 없다
        (최근 목록은 이 브라우저 localStorage 의 이름·크기·형식·때뿐, 파일 내용은 안 담는다). 그래서 PROGRAMS(저장 자리)도
        SATELLITES(주인 프로그램)도 아니다. 포털 타일은 «저장 자리 없는 프로그램»을 등록부가 어떻게 받을지 정한 뒤에 단다. 설계 docs/폰-문서뷰어-설계.md */
@@ -635,6 +663,12 @@
     /* 푸른등기 — 사원 주소·생년월일이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     deungi_core:{program:'deungi',strategy:'in_app',path:'deungi',parser:'coverage',
       gives:'등기 현황·변경등기 건·지난 등기 원본 서류 묶음 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 일터상생혁신 — 고객사 진단 요약·중간보고서·최종보고서 원고가 든 자리라 통합 진단에서 읽지 않고 앱 안에서만 본다. */
+    ilteo_core:{program:'ilteo',strategy:'in_app',path:'scal_ilteo',parser:'coverage',
+      gives:'일터상생혁신 사업장 워크스페이스·비식별 분석 카드·중간보고·최종보고 원고 (앱 안에서만 본다)'},
+    /* 산업일자리전환 — 능률협회·충남경제진흥원 사업장 비식별 요약 및 중간·최종보고서 원고가 든 자리라 앱 안에서만 본다. */
+    jobtrans_core:{program:'jobtrans',strategy:'in_app',path:'scal_jobtrans',parser:'coverage',
+      gives:'산업일자리전환 사업장 워크스페이스·비식별 분석 카드·기관별 중간·최종보고 원고 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

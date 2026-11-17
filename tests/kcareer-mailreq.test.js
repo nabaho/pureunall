@@ -201,9 +201,11 @@ test('탭 — 진행 중은 새 요청+확인함, 끝난 것은 따로', () => {
   assert.deepEqual(Q.filterItems(items, 'ignored').map((x) => x.id), ['d~4']);
   assert.equal(Q.filterItems(items, 'all').length, 4);
 });
-test('상태 바꾸기 — 한 번에 쓰는 update 모양 · st 와 시각만 · 이상한 id 는 버린다', () => {
+test('상태 바꾸기 — 한 번에 쓰는 update 모양 · 상태에 딸린 칸(st·시각·자동 제외 표시)만 · 이상한 id 는 버린다', () => {
   const u = Q.stateUpdate([IN + '~1', 'bad id', 'a/b~2', IN + '~3'], 'done', NOW);
-  assert.deepEqual(Object.keys(u).sort(), [IN + '~1/doneAt', IN + '~1/st', IN + '~1/updatedAt', IN + '~3/doneAt', IN + '~3/st', IN + '~3/updatedAt']);
+  assert.deepEqual(Object.keys(u).sort(), [IN + '~1/autoIgnored', IN + '~1/doneAt', IN + '~1/st', IN + '~1/updatedAt', IN + '~3/autoIgnored', IN + '~3/doneAt', IN + '~3/st', IN + '~3/updatedAt']);
+  assert.equal(u[IN + '~1/autoIgnored'], null, '사람이 상태를 바꾸면 «기계가 치웠다» 표시를 지운다');
+  assert.ok(!Object.keys(u).some((k) => /\/(kinds|deadline|memo|fixed|s|f|e|an)$/.test(k)), '기한·종류·메모·제목·보낸이는 건드리지 않는다');
   assert.equal(u[IN + '~1/st'], 'done'); assert.equal(u[IN + '~1/doneAt'], NOW);
   assert.equal(Q.stateUpdate([IN + '~1'], 'doing', NOW)[IN + '~1/doneAt'], null, '되돌리면 처리 시각을 지운다');
   assert.deepEqual(Q.stateUpdate([IN + '~1'], 'nope', NOW), {}, '모르는 상태는 쓰지 않는다');

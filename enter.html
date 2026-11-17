@@ -118,7 +118,7 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#1e40af">
-<link rel="manifest" href="/pureunall/manifest.json">
+<link rel="manifest" href="manifest.json"><!-- 상대주소 — 옛 주소(/pureunall/)·새 주소(erp.pureunlabor.co.kr/) 양쪽에서 열린다 (2026-11-15 주소 이사 준비) -->
 <title>푸른포털</title>
 <!-- 창 아이콘 — 홈 화면 아이콘과 같은 「푸」 마크 (대표 지시 2026-08-24 「너무 촌스럽다」).
      ⚠ 이모지를 글자로 박아 두면 기기·브라우저마다 다른 그림이 나온다. 획으로 그린다.
@@ -159,7 +159,7 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=2"></script>
+<script src="js/kcareer-mailreq.js?v=3"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -227,6 +227,10 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   padding:4px 14px;cursor:pointer;transition:.15s;}
 .pill.on{border-color:var(--accent);color:var(--accent);font-weight:700;background:#fff;}
 .foot{margin-top:26px;font-size:.68rem;color:var(--mute);text-align:center;}
+.foot-links{margin-top:8px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;font-size:.74rem;color:#64748b;}
+.foot-links a{display:inline-block;padding:6px 4px;color:#475569;text-decoration:none;font-weight:600;}
+.foot-links a:hover{color:#1e40af;text-decoration:underline;}
+#camFab[hidden],#sgFab[hidden],#chatFab[hidden],#fabBar[hidden],#moreDock[hidden]{display:none!important;}
 
 /* ---------- 포털 홈 ---------- */
 .portal{display:none;width:100%;max-width:920px;}
@@ -1420,6 +1424,13 @@ body.portal-mode #moreFab{display:flex;}
     <!-- 지난번에 왜 풀렸나 — 다시 생기면 이 줄을 찍어 보내 주시면 원인을 바로 짚는다 -->
     <div id="logoutWhy" style="display:none;margin:10px auto 0;max-width:420px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center"></div>
     <div class="foot">© 2026 푸른노무법인 · 통합 포털 · 안전한 인증 연결</div>
+    <nav class="foot-links" aria-label="약관 및 정책 안내">
+      <a href="policy/privacy.html">개인정보처리방침</a>
+      <span aria-hidden="true">·</span>
+      <a href="policy/terms.html">이용약관</a>
+      <span aria-hidden="true">·</span>
+      <a href="policy/account-deletion.html">계정·데이터 삭제 안내</a>
+    </nav>
   </div>
 
   <!-- 포털 홈 -->
@@ -1619,8 +1630,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>538번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
+        — 하루 <b>539번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -2071,6 +2082,8 @@ body.portal-mode #moreFab{display:flex;}
        2026-10-12 「의뢰인 업무로 넣어달라」 — 영업관리에서 옮김(옛 줄은 ROW_MOVED_FROM 이 없던 일로 친다). */
     { key:'govaid',  name:'기업정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'client' },
     { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
+    { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
+    { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -2121,14 +2134,17 @@ body.portal-mode #moreFab{display:flex;}
        앱 머리줄의 세 갈래 단추(✏️ 검토·개정 · 📚 조별 문안 · 📥 모은 자료)로 들어간다.
        ⚠ 타일을 다시 둘로 나누지 말 것 — 같은 앱의 문이 둘이면 사람이 어느 쪽인지 헷갈린다.
        첫 화면은 🏢 사업장(2026-10-04 대표 「추천」) — 타일은 rules-v2.html 로 열고, ✏️ 검토·개정은 머리줄 단추로 간다.
-       준비중 딱지 — 두 화면 안쪽의 PuGate.soonUnlessAdmin 과 «짝»이다(이름도 같게).
-       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸다. */
-    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, soon:true, row:'client' },
+       2026-10-24 「지금 안 씀」(off)으로 감췄다가 2026-10-30 대표 「다시 살려」로 off 만 걷어 준비중 타일로 되돌렸고,
+       2026-11-15 대표 「기업규정집 준비중 열어라」로 준비중 딱지(soon)와 두 화면 안쪽 문(rules-v2.html·rules.html 의
+       PuGate.soonUnlessAdmin)을 «짝으로 함께» 걷었다 — 직원도 연다(푸른 메일·문서관리와 같다. tests/app-soon-gate.test.js ⑩). */
+    { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
+    /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
+    { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
     { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, soon:true, row:'client' },  /* 2026-10-20 대표 「급여관리도 준비중으로」 · 2026-10-24 off 로 감췄다가 2026-11-02 대표 「여기에 급여아웃소싱(준비중) 앱만들어 달라」로 off 걷고 이름 변경 — 안쪽 문과 짝 */
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
@@ -2212,7 +2228,7 @@ body.portal-mode #moreFab{display:flex;}
      옮기기 전에 한 번이라도 끌었던 사람은 옛 줄이 남아, 앱의 row 를 바꿔도 화면이 그대로였다
      (대표 보고 2026-10-10 「계약서등관리 자료함으로 옮겨줘」 — 10-05 에 row 를 바꿨는데 의뢰인 업무 줄에 남음).
      ⚠ 줄 사이 옮기기는 원래 막혀 있어(관리자가 풀어야 한다) 옛 줄 값은 «일부러 둔 자리»가 아니다. */
-  var ROW_MOVED_FROM = { docs:'client', govaid:'sales' };
+  var ROW_MOVED_FROM = { docs:'client', govaid:'sales', pbox:'client' };
   function savedRowOf(key, dflt){
     var r = tilePrefs && tilePrefs.rows && tilePrefs.rows[key];
     if(ROW_MOVED_FROM[key] && r === ROW_MOVED_FROM[key]) return dflt;
@@ -2823,12 +2839,34 @@ body.portal-mode #moreFab{display:flex;}
     if($('kkModal').style.display === 'flex') kkOpenProfile();
   }
 
+  /* ── 약관·개인정보처리방침·계정 삭제 안내 카드 (내 정보 창 공용) ── */
+  function puPolicyLinksHtml(){
+    return '<div class="cfg-tool" style="margin:10px 0 0;display:block">'
+      + '<div><b>📄 약관 · 개인정보 · 계정 삭제 안내</b>'
+      + '<span>개인정보 처리 기준과 계정·데이터 삭제 절차를 확인할 수 있습니다</span></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:.78rem;">'
+      + '<a href="policy/privacy.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#1e40af;font-weight:700;text-decoration:none;">개인정보처리방침 ↗</a>'
+      + '<span aria-hidden="true" style="color:#cbd5e1">·</span>'
+      + '<a href="policy/terms.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#1e40af;font-weight:700;text-decoration:none;">이용약관 ↗</a>'
+      + '<span aria-hidden="true" style="color:#cbd5e1">·</span>'
+      + '<a href="policy/account-deletion.html" target="_blank" rel="noopener" style="display:inline-block;padding:4px 2px;color:#dc2626;font-weight:700;text-decoration:none;">계정·데이터 삭제 요청 ↗</a>'
+      + '</div></div>';
+  }
+
   /* ── 내 정보 — 이름·아바타를 눌러 연다(직원 누구나) ── */
   function kkOpenProfile(){
     var uid = auth.currentUser && auth.currentUser.uid;
     var body = $('kkBody');
     if(!uid || !body) return;
     $('kkModal').style.display = 'flex';
+    if(_curRole === 'reviewer'){
+      body.innerHTML =
+        '<div class="cfg-tool" style="margin-bottom:0">'
+        + '<div><b>🔒 스토어 심사 전용 계정</b><span>의뢰인·구성원 실데이터 접근이 분리된 심사 환경입니다</span></div>'
+        + '</div>'
+        + puPolicyLinksHtml();
+      return;
+    }
     body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">불러오는 중…</p>';
     db.ref('uid_kakao/' + uid).once('value').then(function(snap){
       var v = snap.val();
@@ -2842,14 +2880,15 @@ body.portal-mode #moreFab{display:flex;}
         + '</div>'
         + '<div class="cfg-tool" style="margin:10px 0 0"><div><b>🔐 인증 앱 2단계 인증</b>'
         + '<span id="mfaProfileState">등록 여부를 확인하는 중…</span></div>'
-        + '<button type="button" id="mfaEnrollBtn" disabled>확인 중</button></div>';
+        + '<button type="button" id="mfaEnrollBtn" disabled>확인 중</button></div>'
+        + puPolicyLinksHtml();
       $('kkLinkBtn').addEventListener('click', function(){
         if(linked) kkUnlinkSelf(); else kkStartLink();
       });
       mfaRefreshProfile();
       homeCareerOpen(body);
     }).catch(function(){
-      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>';
+      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>' + puPolicyLinksHtml();
     });
   }
   /* ── 홈페이지 경력 (대표 지시 2026-11-01 「최근것 10개 이하로 넣고 필요시 개인이 추가할 수 있게」) ──
@@ -2953,7 +2992,7 @@ body.portal-mode #moreFab{display:flex;}
       .finally(function(){ if(btn) btn.disabled=false; });
   }
   function mfaOfferAfterLogin(role, via){
-    if(via !== 'login' || role === 'admin' || !auth.currentUser) return;
+    if(via !== 'login' || role === 'admin' || role === 'reviewer' || !auth.currentUser) return;
     var u=auth.currentUser, key='pu_mfa_offer:'+u.uid;
     try { if(sessionStorage.getItem(key)==='1') return; sessionStorage.setItem(key,'1'); } catch(_e){}
     puLoadMFA().then(function(mfa){ return Promise.all([mfa.status(), u.getIdTokenResult()]); }).then(function(all){
@@ -3305,6 +3344,22 @@ body.portal-mode #moreFab{display:flex;}
     return true;
   }
 
+  /* ── 스토어 심사 전용 격리 계정 판별 ──
+     Google Play 앱 심사관 전용 계정(playreviewer@pureun.kr)은 uid_roles 에 등록하지 않아
+     서버 보안 규칙이 모든 의뢰인·인사 실데이터 읽기를 원천 차단한다.
+     포털에서는 명부 미등록 경고를 띄우지 않고, 로컬·공공데이터 프로그램만 노출한다. */
+  function puPlayReviewerAcct(email){
+    var em = String(email || '').trim().toLowerCase();
+    if(em !== 'playreviewer@pureun.kr') return null;
+    return {
+      sid: 'PLAYREVIEWER',
+      name: '심사 점검 계정',
+      role: 'reviewer',
+      status: 'reviewer',
+      title: '앱 심사 전용'
+    };
+  }
+
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
   function enterPortal(user, verifiedProfile){
     if(_returnToApp(user)) return;     // 로그아웃으로 밀려났던 앱 탭 — 하던 앱으로 돌아간다
@@ -3368,6 +3423,11 @@ body.portal-mode #moreFab{display:flex;}
       }
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
       window.__puPortalEntering = false;
+    }
+    var _revAcct = puPlayReviewerAcct(user && user.email);
+    if(_revAcct){
+      _show({ acct: _revAcct, all: [_revAcct] }, true);
+      return;
     }
     /* 이 정보는 카카오 인가코드·재직 확인을 마친 서버가 같은 응답으로 보낸 것만 쓴다.
        Firebase가 실제로 연 계정 이메일과 사번이 다르면 기존 명부 조회로 돌아간다. */
@@ -3520,13 +3580,16 @@ body.portal-mode #moreFab{display:flex;}
     return ref;
   }
 
-  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일 표시·비활성·권한을 그대로 지킨다) ── */
+  /* ── 통합 AI 챗봇에서 관련 앱 바로 열기 (현재 사용자의 타일·머리줄 단추 표시·비활성·권한을 그대로 지킨다) ── */
   window.portalLaunchApp = function(key, extraQuery){
     var app = null;
     for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === key){ app = APPS[i]; break; } }
     if(!app || app.off) return false;
     var tile = document.querySelector('#appRows .tile[data-key="' + key + '"]') || document.querySelector('.tile[data-key="' + key + '"]');
-    if(!tile || tile.style.display === 'none' || tile.getAttribute('aria-disabled') === 'true' || tile.getAttribute('href') === '#') return false;
+    var headEl = app.head ? document.getElementById('headApp_' + key) : null;
+    var canTile = !!(tile && tile.style.display !== 'none' && tile.getAttribute('aria-disabled') !== 'true' && tile.getAttribute('href') !== '#');
+    var canHead = !!(headEl && !headEl.hidden && headEl.style.display !== 'none' && headEl.getAttribute('aria-disabled') !== 'true');
+    if(!canTile && !canHead) return false;
     if(typeof app.act === 'function'){ app.act(); return true; }
     var v = Math.floor(Date.now() / 600000);
     var q = String(extraQuery || '').replace(/^[?&]+/, '');
@@ -3534,6 +3597,29 @@ body.portal-mode #moreFab{display:flex;}
     if(isMobile()) location.href = url;
     else openPortalApp(app, url);
     return true;
+  };
+
+  /* ── 길잡이 챗봇 자동 동기화용 포털 앱·영역 읽기 전용 목차 (새 앱이 APPS 에 추가되면 수동 수정 없이 자동 반영) ── */
+  window.portalAppCatalog = function(){
+    return {
+      rows: APP_ROWS.map(function(r){ return { id: r.id, label: r.label }; }),
+      apps: APPS.map(function(a){
+        var rawIcon = String(a.icon || '');
+        return {
+          key: a.key,
+          name: a.name || a.key,
+          desc: a.desc || '',
+          icon: (rawIcon && rawIcon.indexOf('<') < 0) ? rawIcon : '📅',
+          url: a.url || '',
+          row: appRowOf(a),
+          head: !!a.head,
+          soon: appIsSoon(a, false),
+          off: !!a.off,
+          adminOnly: !!a.adminOnly,
+          perm: a.perm || ''
+        };
+      })
+    };
   };
 
   // ── 하나은행·하나카드 입금 확인 알림 (총괄관리자 전용) ──
@@ -3840,8 +3926,13 @@ body.portal-mode #moreFab{display:flex;}
     var role = acct ? acct.role : 'member';
     _curRole = role;   // 바로가기(홈 앱) 권한 판정용
     _curName = name || '';
-    try { kkAfterLogin(); } catch(e){}
-    try { kkSetupRegRow(mySid); } catch(e){}
+    if(role === 'reviewer'){
+      var _kr = $('kkRegRow');
+      if(_kr) _kr.style.display = 'none';
+    } else {
+      try { kkAfterLogin(); } catch(e){}
+      try { kkSetupRegRow(mySid); } catch(e){}
+    }
     try { billStart(role); } catch(e){}   // 💳 사용액 — 관리자일 때만 안이 돈다
     var title = acct ? (acct.title || '') : '';
     /* ★ 화면에는 «이름»만 쓴다 — 사번도, 로그인 이메일도 안 쓴다 (대표 결정 2026-10-25 「이름만 있어야한다」).
@@ -3883,6 +3974,8 @@ body.portal-mode #moreFab{display:flex;}
       // ⚠ 이메일(= 로그인 아이디)은 글자로 안 적는다(대표 결정 2026-10-25) — 「이 계정」이라고만 한다
       puIdentityBand('⚠️ 로그인은 되었지만 직원명부에서 <b>이 계정</b>을 찾지 못했습니다.<br>'
         + '이름·권한이 제대로 나오지 않습니다 — 관리자에게 알려주세요.', 'warn');
+    } else if(role === 'reviewer'){
+      puIdentityBand('🔒 의뢰인 개인정보 보호를 위해 실제 수임·인사 데이터가 분리된 <b>스토어 심사 전용 화면</b>입니다.');
     } else {
       /* 여느 때는 띠를 안 그린다.
          ★ 「자동 로그인되었습니다 — 본인이 아니면 로그아웃」 안내는 걷어냈다(2026-08-10 대표 지시).
@@ -3907,6 +4000,11 @@ body.portal-mode #moreFab{display:flex;}
     APPS.forEach(function(app){
       // 역할 제한이 있으면 확인
       if(app.roles && app.roles.indexOf(role) < 0) return;
+      /* 스토어 심사 전용 계정(reviewer)은 준비중·PC 전용·사내 실데이터 화면을 노출하지 않고,
+         로컬·공공데이터 프로그램(한글 편집기·공공임단협)만 그대로 연다.
+         ⚠ tests/portal-cal-head-button.test.js 가 'APPS.forEach...// 역할 제한이 있으면 확인' 첫머리를 보고,
+           tests/portal-soon-locked.test.js 가 APPS.forEach 블록을 vm 에서 돌리므로 이 자리에서 role 로 거른다. */
+      if(role === 'reviewer' && app.key !== 'hangul' && app.key !== 'aliounion') return;
       /* 관리자 전용 타일(경력관리·홈페이지 관리·⚙설정·백업) —
          ★ 이 자리에서는 sgIsAdmin() 을 쓰지 않는다. 그것은 건의함이 뜰 때 채워지므로
            타일을 그리는 지금은 아직 비어 있어, 대표님에게까지 타일이 사라졌다
@@ -4032,16 +4130,27 @@ body.portal-mode #moreFab{display:flex;}
     // 자주 쓰는 앱 · 줄 접기 (대표 2026-10-24 시안 2) — 저장된 순서를 적용한 «뒤»에
     initFold();
 
-    // 건의함: 현재 사용자 정보 전달 + 플로팅 버튼 표시
-    if(window.sgSetUser) window.sgSetUser(acct);
-    initPortalHanaAlerts(role);
-    initPortalExpAlerts();
-    portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
+    // 건의함: 현재 사용자 정보 전달 + 플로팅 버튼 표시 (심사 전용 계정은 사내 건의·설정·촬영·알림을 감춘다)
+    if(role === 'reviewer'){
+      SG.role = 'reviewer';
+      try { cfgShowFab(); } catch(e){}
+    } else {
+      if(window.sgSetUser) window.sgSetUser(acct);
+      initPortalHanaAlerts(role);
+      initPortalExpAlerts();
+      portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
+    }
     mfaOfferAfterLogin(role, info.via);
-    /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
-       다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
-    portalHanaPaintBadge();
-    initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+    if(role !== 'reviewer'){
+      /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
+         다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
+      portalHanaPaintBadge();
+      initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+    }
+    ['camFab', 'sgFab', 'chatFab', 'fabBar', 'moreDock'].forEach(function(id){
+      var el = $(id);
+      if(el) el.hidden = (role === 'reviewer');
+    });
   }
 
   /* ── 머리줄 단추 앱 (APPS 의 head:true) — 타일 대신 머리줄(.pbar)에 큰 단추로 선다 ──
@@ -5869,7 +5978,16 @@ body.portal-mode #moreFab{display:flex;}
     try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
     try {
       if(window.indexedDB && indexedDB.deleteDatabase){
-        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        if(typeof indexedDB.databases === 'function'){
+          indexedDB.databases().then(function(ls){
+            (ls || []).forEach(function(it){
+              if(it && it.name && it.name.indexOf('pu_pbox_workspace_v1') === 0){
+                try { indexedDB.deleteDatabase(it.name); } catch(_){}
+              }
+            });
+          }).catch(function(){});
+        }
       }
     } catch(_idb){}
   }
@@ -7692,7 +7810,7 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=8"></script>
-<script src="js/pu-chatbot.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=10"></script>
+<script src="js/pu-chatbot.js?v=6"></script>
 </body>
 </html>

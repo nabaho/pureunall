@@ -50,6 +50,8 @@
     { key: 'govreport', row: 'client', name: '컨설팅보고서', icon: '📑', url: 'gov-report.html',     desc: '보고서 현황·작성' },
     { key: 'govaid',  row: 'client', name: '기업정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
+    { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
+    { key: 'jobtrans', row: 'client', name: '산업일자리전환',  icon: '⚡', url: 'jobtrans.html',       desc: '능률협회·충경진 메일·보고서·HWPX' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
     /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
@@ -72,6 +74,7 @@
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
     { key: 'aliounion', row: 'store', name: '공공임단협', icon: '🤝', url: 'pu-alio-union.html', desc: '알리오 노조·임금·단체협약 API 통합비교' },
     { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
+    { key: 'pbox',    row: 'store',  name: 'P박스',        icon: '📚', url: 'pu-pbox.html',  desc: '전 법령·판례·행정해석·AI 서면' },
     { key: 'payroll', row: 'client', name: '급여아웃소싱', icon: '💰', url: 'payroll-os.html',     desc: '급여·근태·명세서·연차' },
     /* 홈페이지·뉴스레터 — 예전엔 총괄관리자 전용이었다가 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원 모두.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */

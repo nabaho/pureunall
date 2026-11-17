@@ -71,8 +71,8 @@
      큰 문서는 본문 글이 약 5%(편람: 문단 1,974개 중 411개)만 읽히고, DocInfo(글자·문단 모양)와 큰 그림도 잘렸다.
      그래서 ① 통째로 풀어 보고 ② 오류면 꼬리 8바이트를 떼고(풀린 크기가 꼬리에 적힌 크기와 «같을 때만» 받는다)
      ③ 그래도 안 되면 자체 해제기(inflateRawJs — 압축 끝에서 멈추고 뒤의 자투리는 보지 않는다)로 푼다. */
-  /* ⚠ 압축 폭탄 막기(2026-11-09 자동 검토 «중간»): 해제 결과에 상한이 없어 16KB 가 16MB(1,029배)로 불어나는 파일을 열면 탭이 멎을 수 있었다.
-     한 줄기(스트림)는 128MB, 문서 전체는 256MB 까지만 푼다(실제 문서: 바탕화면 .hwp 18,287개 중 가장 큰 한 줄기 37MB, 문서 합 38MB). 넘으면 «다시 시도하지 않고» 바로 던진다. */
+  /* 압축 폭탄 방어(2026-11-09): 한 줄기(스트림)는 128MB, 문서 전체는 256MB 까지만 푼다(실제 문서: 바탕화면 .hwp 18,287개 중 가장 큰 한 줄기 37MB, 문서 합 38MB).
+     넘으면 «다시 시도하지 않고» 바로 던진다. 자체 해제기도 버퍼를 이 상한 안에서만 잡는다. */
   const MAX_INFLATE_STREAM = 128 * 1024 * 1024, MAX_INFLATE_DOC = 256 * 1024 * 1024;
   const tooBig = () => Object.assign(new Error('압축을 푼 크기가 너무 큽니다. (손상됐거나 악의적으로 만든 파일일 수 있어 열지 않습니다)'), { tooBig: true });
   async function nativeInflate(data, limit) {
@@ -95,7 +95,7 @@
   }
   // RFC 1951 inflate — 압축 끝(마지막 블록)에서 멈춘다. 느리지만(한 비트씩) 브라우저 해제기가 거절하는 자투리 있는 자료의 마지막 보루.
   function inflateRawJs(src, limit = MAX_INFLATE_STREAM) {
-    // ⚠ 첫 버퍼도 늘릴 때도 상한(limit)을 넘지 않는다 — 압축 입력이 크면 4배(수백 MB)를 한꺼번에 잡던 것을 막음(2026-11-09 재검증 «중간»)
+    // 첫 버퍼도 늘릴 때도 상한(limit)을 넘지 않는다
     let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.min(limit, Math.max(4096, src.length * 4))), op = 0;
     const bits = n => {
       while (bitCnt < n) { if (pos >= src.length) throw new Error('압축 자료가 중간에 끝났습니다.'); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }

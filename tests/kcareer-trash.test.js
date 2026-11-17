@@ -54,7 +54,7 @@ test('보관 기간이 30일이다', () => {
   test('「' + 이름 + '」 삭제는 휴지통에 담는다', () => {
     const fn = cutFn(bare, decl);
     assert.ok(fn, decl + ' 를 찾지 못했다');
-    assert.ok(/kcTrashPut\s*\(/.test(fn),
+    assert.ok(/kcTrashPut(Many)?\s*\(/.test(fn),   /* 여러 건을 지우는 자리는 한 번에 담는 kcTrashPutMany(2026-11-16) */
       이름 + ' 이 휴지통에 담지 않는다 — 지우면 되살릴 곳이 없다');
   });
   test('「' + 이름 + '」 삭제는 첨부 원본을 그 자리에서 지우지 않는다', () => {

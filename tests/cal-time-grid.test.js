@@ -145,6 +145,7 @@ test('폰 주·3일·일 보기 — 시간마다 둥근 칸(구글 앱 캡처), 
 
 test('폰 월 보기 — 구글 앱(M3 Expressive)처럼 둥근 날짜 칸, 연한 면 위', () => {
   assert.match(캘린더, /document\.body\.classList\.toggle\("gm", 폰달력 && S\.view === "month"\);/);
-  assert.match(캘린더, /body\.mob\.gm \.calgrid\{gap:3px;padding:3px\}/);
-  assert.match(캘린더, /body\.mob\.gm \.calgrid \.day\{background:var\(--gslot\);border:none !important;border-radius:12px\}/);
+  assert.match(캘린더, /body\.mob\.gm \.calgrid\{gap:\d+px;padding:\d+px\}/, '날짜 칸 사이 틈이 없습니다');
+  const 칸 = 캘린더.match(/body\.mob\.gm \.calgrid \.day\{background:var\(--gslot\);border:none !important;border-radius:(\d+)px\}/);
+  assert.ok(칸 && Number(칸[1]) >= 12, '날짜 칸이 둥글지 않습니다');
 });

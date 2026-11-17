@@ -17,6 +17,19 @@ const hit = (key, title, extra) => Object.assign({ key, title, org: 'erc', board
 const row = (no, nm, extra) => Object.assign({ id: 'G' + no, no, nm, org: '어느 기관', src: '나라장터', type: '새 공고', closeDt: '2026-11-20 10:00:00', dday: 27, url: 'https://g2b.example/' + no }, extra || {});
 const rank = (o) => P.rank(Object.assign({ today: TODAY, hits: [], feed: [], orgs: [], deps: deps() }, o));
 
+/* 2026-11-17 — 받은 날 적어 둔 dday 는 낡는다(갈무리: 「지나감」인데 D-14). «곧 마감» 순서도 마감일로 오늘 다시 센다 */
+test('★★ 남은 날은 마감일로 다시 센다 — 낡은 dday 로 «곧 마감»을 놓치거나 지난 공고를 올리지 않는다', () => {
+  const soon = rank({ feed: [row('1', '실제로는 곧 마감', { dday: 30, closeDt: '2026-10-26 10:00:00' })] }).items[0];
+  assert.equal(soon.due.k, 'soon'); assert.equal(soon.due.days, 2);
+  assert.equal(rank({ feed: [row('2', '이미 지난 공고', { dday: 14, closeDt: '2026-10-20 10:00:00' })] }).items.length, 0, '마감 지난 공고는 빼야 한다');
+  assert.equal(rank({ feed: [row('3', '마감일 없음', { dday: 3, closeDt: '' })] }).items[0].due.days, 3, '마감일을 못 읽을 때만 적어 둔 값');
+  const glued = rank({ feed: [row('4', '붙여 쓴 날짜', { dday: 30, closeDt: '202610271000' })] }).items[0];
+  assert.equal(glued.due.days, 3, 'YYYYMMDDHHmm 꼴도');
+  assert.equal(glued.due.text, '~10.27 · D-3', '보이는 글에도 날짜가 있어야 한다(「~ · D-3」 아님)');
+  assert.equal(rank({ feed: [row('5', '없는 날', { dday: 4, closeDt: '2026-02-30 10:00:00' })] }).items[0].due.days, 4, '2월 30일은 못 읽음 → 적어 둔 값');
+  assert.equal(rank({ feed: [row('6', '숫자 아님', { dday: NaN, closeDt: '' })] }).items[0].due.k, 'unknown', 'D-NaN 이 아니라 «마감 모름»');
+});
+
 test('★ 지역 제한 판정 — 우리 지역 포함(in) / 없음(out) / 정보 없음(none, «없다»고 하지 않는다)', () => {
   assert.equal(P.regionFit('충청남도 · 세종특별자치시 · 서울특별시').k, 'in');
   assert.deepEqual(P.regionFit('충청남도 · 서울특별시').hit, ['충남']);

@@ -222,7 +222,8 @@ test('★ 새 공지를 올리면 sitemap 에도 «한 줄» 더해진다 — �
   const 센 = (x) => (x.match(/<loc>/g) || []).length;
   const 새 = N.사이트맵더하기(xml, '9999', '2026-12-01');
   assert.equal(센(새), 센(xml) + 1, '★ sitemap 에 새 공지가 안 더해졌다');
-  assert.match(새, /\/notice\/9999<\/loc><lastmod>2026-12-01</, '★ 주소·날짜가 틀렸다');
+  assert.match(새, /\/notice\/9999\/<\/loc><lastmod>2026-12-01</,
+    '★ 주소·날짜가 틀렸다 — 쪽은 폴더라 끝 빗금까지 적어야 301 없이 열린다(2026-11-16)');
   assert.equal(N.사이트맵더하기(새, '9999', '2026-12-01'), 새, '★ 두 번 불렀더니 두 줄이 됐다');
   assert.equal(N.사이트맵더하기('<urlset></urlset>', '9999', '2026-12-01'), null, '★ /notice 줄이 없는데 억지로 넣었다');
 });
@@ -235,9 +236,28 @@ test('★ 홈페이지 저장소 sitemap 에 빠진 공지도 «함께» 채운�
     '  <url><loc>https://x.kr/notice/138</loc><lastmod>2026-08-31</lastmod></url>',
     '</urlset>', ''].join('\n');
   const 새 = N.사이트맵채우기(xml, '141', ['140', '139', '138', '12'], '2026-11-09');
-  const 번호 = [...새.matchAll(/\/notice\/(\d+)<\/loc>/g)].map(m => m[1]);
+  const 번호 = [...새.matchAll(/\/notice\/(\d+)\/?<\/loc>/g)].map(m => m[1]);
   assert.deepEqual(번호, ['141', '140', '139', '138'],
     '★ 빠진 140 을 안 채웠거나, 새 글이 맨 위가 아니거나, 원래 안 싣던 옛 공지(12)까지 넣었다');
   assert.equal(N.사이트맵채우기(새, '141', ['140'], '2026-11-09'), 새, '★ 두 번 불렀더니 줄이 늘었다');
   assert.equal(N.사이트맵채우기('<urlset></urlset>', '141', [], '2026-11-09'), null);
+});
+
+test('★ sitemap 공지 주소는 «끝 빗금» — 옛 꼴(빗금 없음)이 섞여 있어도 같은 번호를 두 번 싣지 않는다 (2026-11-16)', () => {
+  /* 쪽은 폴더(notice/141/index.html)라 빗금 없는 주소는 깃허브가 301 로 넘긴다.
+     sitemap 에 «넘어가는 주소»를 적으면 검색엔진이 원본을 헷갈린다. */
+  const 새꼴 = [
+    '<urlset>',
+    '  <url><loc>https://x.kr/notice/</loc><lastmod>2026-08-31</lastmod></url>',
+    '  <url><loc>https://x.kr/notice/139/</loc><lastmod>2026-08-31</lastmod></url>',
+    '</urlset>', ''].join('\n');
+  const 더한 = N.사이트맵더하기(새꼴, '140', '2026-11-16');
+  assert.ok(더한, '★ 끝 빗금 꼴 /notice/ 줄을 못 찾아 아무것도 안 했다');
+  assert.ok(더한.indexOf('<loc>https://x.kr/notice/140/</loc>') > 0, '★ 새 공지 주소에 끝 빗금이 없다');
+  /* 옛 꼴로 이미 실린 번호는 다시 안 넣는다 */
+  const 옛꼴 = 새꼴.replace('<loc>https://x.kr/notice/139/</loc>', '<loc>https://x.kr/notice/139</loc>');
+  assert.equal(N.사이트맵더하기(옛꼴, '139', '2026-11-16'), 옛꼴, '★ 옛 꼴로 실린 139 를 끝 빗금 꼴로 또 넣었다');
+  const 채운 = N.사이트맵채우기(옛꼴, '141', ['140', '139'], '2026-11-16');
+  const 번호 = [...채운.matchAll(/\/notice\/(\d+)\/?<\/loc>/g)].map(m => m[1]);
+  assert.deepEqual(번호, ['141', '140', '139'], '★ 같은 번호가 두 번 실렸거나 순서가 틀렸다');
 });

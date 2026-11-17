@@ -35,9 +35,12 @@ function stripScript() {
 }
 
 /* 앱이 실제로 부르는 것 / 개발용인 것 */
+/* index.html·404.html·.well-known/assetlinks.json 은 2026-11-15 ERP 주소 이사 준비로 더했다 —
+   뿌리 주소·옛 꼴 주소를 포털로 잇고, 플레이스토어 앱이 주소를 확인하는 파일이다. */
 const 살아야 = ['js', 'css', 'vendor', 'enter.html', 'fund.html', 'work.html', 'pu-erp.html',
   'manifest.json', 'hwpx_gen.js', 'pu-sw.js', 'hana-bridge.apk',
-  'install.html', 'icon-portal-192.png', 'icon-portal-512.png'];
+  'install.html', 'icon-portal-192.png', 'icon-portal-512.png',
+  'index.html', '404.html', '.well-known/assetlinks.json'];
 /* ⚠ .agents 는 Codex 가 저장소 스킬을 찾는 자리다($REPO_ROOT/.agents/skills).
      아직 비어 있어도 «지우는 목록에 미리» 있어야 한다 — 나중에 스킬을 넣는 사람이
      배포 게이트까지 같이 고칠 것이라고 기대하면 안 된다. 안 지우면 인터넷에 공개된다. */
@@ -50,7 +53,7 @@ const 폴더 = new Set(['js', 'css', 'vendor', '.claude', '.agents', 'tests', 'd
 function 만들기(dir, name) {
   const p = path.join(dir, name);
   if (폴더.has(name)) { fs.mkdirSync(p, { recursive: true }); fs.writeFileSync(path.join(p, 'a.txt'), 'x'); }
-  else fs.writeFileSync(p, 'x');
+  else { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, 'x'); }
 }
 
 /* ⚠ 여기서부터는 지우는 대목을 bash 로 «실제로» 돌린다. 그런데 이 저장소를 만지는

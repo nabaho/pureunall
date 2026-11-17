@@ -251,9 +251,15 @@ rules.data = {
      (2026-09-06 메일 수집기가 이 자리의 업체 담당자 주소를 읽게 되면서 드러났다) */
   cases:          { '.read': LOGIN, '.write': LOGIN,     /* 사건 기록 */
                     v: { $id: { workers: { $i: 근로자칸막기 } } } },
+  other_projects: { '.read': LOGIN, '.write': LOGIN,     /* 기타사업 기록(이알피·업무관리·괴롭힘조사 연동) */
+                    v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 «업무 메모» (2026-10-05) — 여태 그 PC 의 localStorage 에만 있어 다른 PC 에서 안 보였다
      (pu-erp.html CaseMemoPanel). 권한은 사건 기록과 «같게» — 사건을 보는 사람이 그 메모도 본다. */
   case_memos:     { '.read': LOGIN, '.write': LOGIN },
+  /* 🧰 산재 묶음 (2026-11-15, js/pu-sanjae-kit.js) — 산재 사건마다 한 줄: 고른 급여·서류 받음/제출·기한 날짜·질병 «갈래».
+     권한은 사건 기록·업무 메모와 «같게»(재직 직원) — 여태 이름이 없으면 떨어지던 $other 와도 같다. 이름만 붙인다.
+     ⚠ 임금·가족 정보는 이 칸에 안 담는다(모듈이 저장하지 않는다). */
+  case_sanjae:    { '.read': LOGIN, '.write': LOGIN },
 
   /* 근태·일정 — 여태 이름이 없어 $other 로 떨어져 있었다.
      ★ 권한은 «지금 그대로»다(재직 직원 전원 읽기·쓰기). 이름만 적는다 — 동작은 한 톨도 안 바뀐다.
@@ -903,15 +909,25 @@ rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
 rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
-/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」) ═══════════════
+/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」 · 2026-11-15 자동등록·병합) ═══
    받은 메일에서 서버(AI)가 뽑은 «일정 초안». 메일에서 나온 이름·전화·이메일이 들어 있다.
    ⚠ 읽기는 «관리자(대표)만». 메일함은 직원이 함께 읽지만 후보함은 대표 몫이다 —
      위쪽 읽기가 막혀 있으니(위에서 허락해야 아래에서도 읽힌다) 직원은 못 읽는다.
-   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»만 바꾼다
-     (new → added | dismissed). 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
+   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»(cand/$id/status)과
+     자동등록 스위치·한도(cfg)만 바꾼다. 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
    ⚠ at 색인 — 30일 지난 후보를 서버가 정리할 때 쓴다. state 는 서버가 적는 «마지막 돈 기록»(한도 멈춤 표시 포함). */
 rules.cal_inbox = {
   '.read': `auth != null && ${ADMIN}`,
+  cfg: {
+    '.write': `auth != null && ${ADMIN}`,
+    on:        { '.validate': 'newData.isBoolean()' },
+    autoAdd:   { '.validate': 'newData.isBoolean()' },
+    perRunMax: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 30' },
+    dayLimit:  { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 300' },
+    at:        { '.validate': 'newData.isNumber()' },
+    by:        { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    $other:    { '.validate': false }
+  },
   cand: {
     '.indexOn': ['at'],
     $id: { status: {
@@ -1216,6 +1232,14 @@ rules.pu_mailseen = {
        서버(관리자 SDK)는 규칙을 지나지 않아 영향이 없다. */
 const 통째지우기막음 = { '.write': ADMIN, $part: { '.write': `${LOGIN} && (newData.exists() || ${ADMIN})` } };
 rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
+/* ★ 자동 모으개 밑감은 «서버만» 쓴다 (2026-11-16, 뉴스레터 법제처 수정의 보안 검토 «낮음» 반영)
+     homepage/newsBrief·newsDocs·newsPrec 은 서버(관리자 SDK)가 날마다 모아 담는 자리다. 화면은 «읽기만» 한다
+     (pu-news.html 자동화 점검·뉴스레터 짓기 — 2026-11-16 저장소 전체에서 쓰는 곳이 없음을 확인).
+     그런데 위 $part 규칙으로 재직 직원도 쓸 수 있어, 「탈」 칸에 아무 글이나 적어 자동화 점검 경고에 띄울 수 있었다
+     (화면 출력은 모두 씻긴다 — 그래도 길을 닫는다).
+   → 이름 붙은 갈래로 두어 $part 를 안 타게 한다: 쓰기는 총괄관리자만 · 서버는 규칙을 안 지나 그대로 쓴다.
+     읽기는 그대로(LOGIN — 위 homepage '.read'). 보는 사람은 넓어지지 않고 쓰는 사람만 좁아진다. */
+['newsBrief', 'newsDocs', 'newsPrec'].forEach((k) => { rules.homepage[k] = { '.write': ADMIN }; });
 /* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
      직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
    ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.
@@ -1500,6 +1524,19 @@ rules.worker_secret = { $kind: { $rec: {
     holder:  { '.validate': wsText(40) },
     $other:  { '.validate': false }
   }
+} } };
+
+/* ══ 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번 — 그 건의 담당자와 대표만 (2026-11-15) ══
+   화면 쪽: js/pu-site-secret.js
+   ★ data/consultings·contracts·companies 는 재직 직원 누구나 통째로 읽으므로
+     공개 덩어리에는 siteId 와 hasSitePw(표시)만 두고, 실제 비번(sitePw)은 여기 둔다.
+   ★ 권한 잣대는 worker_secret 과 같다(그 건의 주담당·부담당 앞 5명 또는 총괄관리자). */
+rules.site_secret = { $kind: { $rec: {
+  '.read': WS_OWNER,
+  '.write': WS_OWNER,
+  '.validate': "$kind.matches(/^(cases|contracts|consultings|funds|other_projects|companies)$/)",
+  sitePw: { '.validate': wsText(120) },
+  $other: { '.validate': false }
 } } };
 
 /* ══ 직원 주민번호·계좌·예금주 금고(staff_secret) — 대표 승인 2026-11-01 (개인정보 2단계) ══
@@ -2185,6 +2222,63 @@ rules.harass_sign = {
       }
     }
   },
+  $other: { '.validate': false }
+};
+
+/* 🏭 일터상생혁신 자동화 (ilteo.html, 2026-11-15)
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 중간보고·최종보고 확정 기준선 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_ilteo = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  final: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
+/* ⚡ 산업·일자리전환 컨설팅 자동화 (jobtrans.html, 2026-11-15)
+   - 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 사업장 워크스페이스·비식별 분석 카드·중간/최종보고서·불변 스냅샷.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 중간보고·최종보고 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_jobtrans = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  final: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
   $other: { '.validate': false }
 };
 

@@ -32,15 +32,18 @@ function dragWorld() {
   const box = { dataset: {}, addEventListener: (t, f) => { handlers[t] = f; } };
   const mk = (checked) => { const c = { checked, closest: (s) => (s === '.row-chk' ? c : null) }; return c; };
   const body = { style: { userSelect: '' } };
-  const synced = [];
-  const ctx = vm.createContext({ document: { body }, setTimeout: (f) => { timers.push(f); return timers.length; }, console });
-  vm.runInContext('var _dragSel=null;\n' + fns('_dragSelEnd', 'bindDragSel'), ctx);
+  const synced = [], docL = [];                                            /* docL: document 에 걸린 click 듣는이(캡처 여부 포함) */
+  const document = { body, addEventListener: (t, f, cap) => docL.push({ t, f, cap }), removeEventListener: (t, f) => { const i = docL.findIndex((l) => l.t === t && l.f === f); if (i >= 0) docL.splice(i, 1); } };
+  const ctx = vm.createContext({ document, setTimeout: (f) => { timers.push(f); return timers.length; }, console });
+  vm.runInContext('var _dragSel=null;\n' + fns('_dragSelEnd', '_dragSelSwallowClick', 'bindDragSel'), ctx);
   ctx.bindDragSel(box, () => synced.push(1));
-  const down = (c) => handlers.mousedown({ target: c, buttons: 1 });
+  const down = (c, button) => handlers.mousedown({ target: c, buttons: 1, button: button || 0 });
   const over = (c, buttons) => handlers.mouseover({ target: c, buttons });
   const up = () => vm.runInContext('_dragSelEnd()', ctx);                 /* document 의 mouseup 이 부르는 것 */
   const state = () => vm.runInContext('_dragSel', ctx);
-  return { ctx, box, body, mk, down, over, up, state, timers, synced, handlers };
+  const flush = () => { while (timers.length) timers.shift()(); };         /* 타이머(0)를 돌린다 */
+  const clicks = () => docL.filter((l) => l.t === 'click');
+  return { ctx, box, body, mk, down, over, up, state, timers, synced, handlers, flush, clicks };
 }
 test('① 터치 탭·자동 클릭처럼 «누름→뗌»이 한 작업 안에 끝나도 끌기가 남지 않는다 — 타이머에 기대지 않고 누른 자리에서 세운다', () => {
   const w = dragWorld(), a = w.mk(false), b = w.mk(false);
@@ -63,15 +66,49 @@ test('① 안전장치 — 누른 채가 아닌데 끌기가 남아 있으면(�
   assert.equal(w.body.style.userSelect, '');
   assert.ok(w.synced.length >= 1, '끝내면서 고른 상태를 한 번 맞춘다');
 });
-test('① 끌어 고르기는 그대로 — 이미 켜진 칸에서 누른 채 지나가면 지나간 칸이 켜지고, 뗄 때 고른 상태를 맞춘다', () => {
-  const w = dragWorld(), a = w.mk(true), b = w.mk(false), c = w.mk(false), d = w.mk(true);
+test('① 꺼진 칸에서 누른 채 끌면 «켜며 끌면 켠다» — 지나간 칸과 시작 칸이 모두 켜진다(전에는 아무것도 안 켜졌다)', () => {
+  const w = dragWorld(), a = w.mk(false), b = w.mk(false), c = w.mk(true), d = w.mk(false);
   w.down(a);
   w.over(b, 1); w.over(c, 1); w.over(d, 1);
+  assert.equal(a.checked, true, '시작 칸도 켜진다 — 다른 칸에서 떼면 시작 칸에는 click 이 안 간다');
   assert.equal(b.checked, true); assert.equal(c.checked, true); assert.equal(d.checked, true);
   const before = w.synced.length;
   w.up();
-  assert.equal(w.synced.length, before + 1, '뗄 때 한 번 맞춘다');
+  assert.equal(w.synced.length, before + 1, '뗄 때 한 번 더 고른 상태를 맞춘다');
   assert.equal(w.state(), null);
+});
+test('① 켜진 칸에서 누른 채 끌면 «끄며 끌면 끈다» — 지나간 칸과 시작 칸이 모두 꺼진다', () => {
+  const w = dragWorld(), a = w.mk(true), b = w.mk(true), c = w.mk(false), d = w.mk(true);
+  w.down(a);
+  w.over(b, 1); w.over(c, 1); w.over(d, 1);
+  assert.equal(a.checked, false); assert.equal(b.checked, false); assert.equal(c.checked, false); assert.equal(d.checked, false);
+});
+test('① 끌지 않고 제자리에서 누르면 끌기 쪽은 시작 칸을 건드리지 않는다(바꾸는 것은 뒤따르는 click) · 다른 단추로는 시작하지 않는다', () => {
+  const w = dragWorld(), a = w.mk(false);
+  w.down(a); w.up();
+  assert.equal(a.checked, false, '제자리 누름은 click 이 바꾼다 — 끌기 쪽이 먼저 바꾸면 click 이 도로 뒤집는다');
+  assert.equal(w.clicks().length, 0, '끌지 않았으면 click 을 삼키지 않는다');
+  const r = dragWorld(), b = r.mk(false), c = r.mk(false);
+  r.down(b, 2);                                   /* 오른쪽 단추 */
+  assert.equal(r.state(), null, '오른쪽·가운데 단추는 끌어 고르기를 시작하지 않는다');
+  r.over(c, 1); assert.equal(c.checked, false);
+});
+test('① 시작 칸으로 돌아와 떼도 시작 칸이 도로 뒤집히지 않는다 — 칠한 끌기 뒤 이어지는 click 은 «한 번만» 삼키고 곧 거둔다', () => {
+  const w = dragWorld(), a = w.mk(false), b = w.mk(false);
+  w.down(a); w.over(b, 1); w.over(a, 1);          /* 시작 칸을 다시 지나가도 시작 칸은 그대로(이미 칠함) */
+  assert.equal(a.checked, true);
+  w.up();
+  const l = w.clicks();
+  assert.equal(l.length, 1, 'click 을 삼킬 듣는이가 하나 걸린다'); assert.equal(l[0].cap, true, '캡처 단계 — 체크칸이 받기 전에 막는다');
+  let prevented = 0, stopped = 0;
+  l[0].f({ preventDefault: () => prevented++, stopPropagation: () => stopped++ });
+  assert.equal(prevented, 1); assert.equal(stopped, 1);
+  assert.equal(w.clicks().length, 0, '삼킨 뒤 스스로 거둔다 — 다음 클릭을 잡아먹지 않는다');
+  /* click 이 안 왔어도(다른 곳에서 뗌) 타이머가 거둔다 */
+  const x = dragWorld(), p = x.mk(false), q = x.mk(false);
+  x.down(p); x.over(q, 1); x.up();
+  assert.equal(x.clicks().length, 1); x.flush();
+  assert.equal(x.clicks().length, 0, 'click 이 안 와도 곧 거둔다');
 });
 test('① 끌기 끝내기는 한 곳 — 뗌(mouseup)이 같은 함수를 부르고, 칸마다 따로 묶지 않는다', () => {
   assert.match(html, /document\.addEventListener\('mouseup', _dragSelEnd\);/, '뗌은 _dragSelEnd 하나가 맡는다');

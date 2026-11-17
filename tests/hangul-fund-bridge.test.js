@@ -73,10 +73,11 @@ test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는
   const block = CODE.slice(at, CODE.indexOf('\n  });', at) + '\n  });'.length);
   let handler = null;
   const calls = [];
-  new Function('window', 'location', 'loadFromFundPayload', block)(
+  // main 의 조사 문서 전용 팝업 확인(_initFrom·_initBid)이 같은 블록 안에서 쓰이므로 «일반 기금 창» 값으로 넣는다
+  new Function('window', 'location', 'loadFromFundPayload', '_initFrom', '_initBid', block)(
     { addEventListener: (t, f) => { if (t === 'message') handler = f; } },
     { origin: 'https://nabaho.github.io' },
-    p => calls.push(p));
+    p => calls.push(p), '', '');
   assert.strictEqual(typeof handler, 'function');
   const open = origin => handler({ origin, data: { type: 'pureun_hangul_open', payload: { html: '<p>x</p>' } } });
   open('https://evil.example');
